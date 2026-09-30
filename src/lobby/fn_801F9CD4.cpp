@@ -403,7 +403,7 @@ void fn_801FBAE4(void)
  * has finished. */
 s32 fn_801FB524(LbChgSeqWork* self)
 {
-    u16 status = Psw[0].pressed_0x2C4;
+    u16 status = Psw[0].button_0x2C0.pressed_0x04;
     s32 done = 0;
     Q_ResultWork* q;
     s32 v;

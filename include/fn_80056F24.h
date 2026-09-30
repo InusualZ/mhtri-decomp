@@ -28,6 +28,9 @@ void system_copy_filter_clear(void);
 /* 0x80058044 - starts fade `slot` toward table entry `table_index`; the map's `fade_set__Fll`.  Added with
  * `quest/arenatask.cpp` (rule 2: this range owns the address). */
 void fade_set(s32 slot, s32 table_index);
+/* 0x800584B0 - resets the screen copy filter (`filter_reset__Fv`; the owner defines it at C++ scope,
+ * src/fn_80056F24.cpp:436).  Added with `quest/arenatask.cpp`. */
+void filter_reset(void);
 #endif
 
 #endif /* MHTRI_FN_80056F24_H */

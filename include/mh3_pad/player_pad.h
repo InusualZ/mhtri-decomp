@@ -16,6 +16,22 @@
 extern "C" {
 #endif
 
+/* The button-state block at +0x2C0 of a pad record (the per-frame words the menus and the arena task read
+ * through a pointer to it).  Only the named offsets are read by matched code; the block runs up to the next
+ * named PlayerPad field, so its size is an approximation. size: 0x74 (approximate) */
+typedef struct PadButtons {
+    /* +0x00 */ u16 hold_0x00;       /* the raw hold word (0x80 = the start-style confirm bit the arena tests) */
+    /* +0x02 */ u8 pad_0x02[0x2];
+    /* +0x04 */ u16 pressed_0x04;    /* buttons that went down this frame */
+    /* +0x06 */ u8 pad_0x06[0x2];
+    /* +0x08 */ u16 press_0x08;      /* GUESS name: the third button word after `pressed_0x04` (read by `lobby/fn_801E0ADC.cpp`'s own view as `press_0x2C8`) */
+    /* +0x0A */ u8 pad_0x0A[0x2];
+    /* +0x0C */ u16 trigger_0x0C;    /* GUESS name: the shoulder-trigger word `menu_cursor_step_fixed_tail` pages with */
+    /* +0x0E */ u8 pad_0x0E[0x6];
+    /* +0x14 */ u16 held_0x14;       /* the auto-repeat word, ORed with `pressed_0x04` for cursor steps */
+    /* +0x16 */ u8 pad_0x16[0x5E];
+} PadButtons; /* size: 0x74 (approximate: even, so the struct's 2-byte alignment leaves PlayerPad's +0x335 in place) */
+
 typedef struct PlayerPad {
     /* +0x000 */ u8 pad_0x000[0x30];
     /* +0x030 */ u32 field_0x30;
@@ -40,13 +56,9 @@ typedef struct PlayerPad {
     /* +0x104 */ u16 control_0x104;  /* the pressed-button word */
     /* +0x106 */ u8 pad_0x106[0x18];
     /* +0x11E */ u16 field_0x11e;
-    /* +0x120 */ u8 pad_0x120[0x1A4];
-    /* +0x2C4 */ u16 pressed_0x2C4;
-    /* +0x2C6 */ u8 pad_0x2c6[0x2];
-    /* +0x2C8 */ u16 press_0x2C8;
-    /* +0x2CA */ u8 pad_0x2ca[0xA];
-    /* +0x2D4 */ u16 held_0x2D4;
-    /* +0x2D6 */ u8 pad_0x2d6[0x5F];
+    /* +0x120 */ u8 pad_0x120[0x1A0];
+    /* +0x2C0 */ PadButtons button_0x2C0;
+    /* +0x334 */ u8 pad_0x334[0x1];
     /* +0x335 */ u8 field_0x335;
     /* +0x336 */ u8 pad_0x336[0x1A];
 } PlayerPad; /* size: 0x350 */

@@ -40,6 +40,11 @@ struct LightWork* fn_802BECD0(void);
  * that unit's body pass (rule 2: this range owns both addresses). */
 void set_amblight(u8 id, _GXColor color);
 void make_dir_light2(s32 index, nw4r::math::VEC3* vec, _GXColor color, s32 flag);
+
+/* 0x802BF284 / 0x802C1D30 - the scene light setup and its per-frame update (`light_init__Fv`,
+ * `light_move__Fv`).  Added with `quest/arenatask.cpp` (rule 2: this range owns both addresses). */
+void light_init(void);
+void light_move(void);
 #endif
 
 #endif /* MHTRI_LIGHT_LIGHT_H */

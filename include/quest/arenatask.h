@@ -12,10 +12,9 @@
  * own `.bss 0x806E3E10..0x806E40C0`, `.sbss 0x80794D3C..0x80794D50`, `.sdata 0x80793B28..0x80793B88`,
  * `.sdata2 0x8079C960..0x8079C998` and `.data 0x80604D30..0x806073F0` runs in
  * `config/RMHE08/splits.txt` (rule 12: the unit that uses the bytes claims and matches them; rule 2:
- * the declaration lives with the owner, and this is the owner's header).  `splits.txt` claims the `.bss` run,
- * but the object emits none of it: `arena_user_data_buf`, `arena_work` and `arena_draw_func` stay declared here
- * (see the header of `src/quest/arenatask.cpp`).  The band's record types stay in the band header, which
- * this header includes.
+ * the declaration lives with the owner, and this is the owner's header).  The unit defines the `.bss` run
+ * and two `.sbss` pointers at the foot of `src/quest/arenatask.cpp`, after every body (see its header).  The
+ * band's record types stay in the band header, which this header includes.
  *
  * C++-only: the two vector arrays are `nw4r::math::VEC3` (the band's TUs are C++).
  */
@@ -81,7 +80,7 @@ extern ArenaResourceInfo arena_resource_info;
 extern const char* arena_texture_names[32];
 
 /* The 0x200-byte arena user-data record buffer the two `arena_eqdata_from_*` fillers build their
- * record in and `arena_userdata_apply` consumes (`.bss` 0x806E3E10, claimed in `splits.txt`, not emitted).  Its two
+ * record in and `arena_userdata_apply` consumes (`.bss` 0x806E3E10, defined at the foot of `arenatask.cpp`).  Its two
  * 0x100-byte records are selected by the player work's own `chunk_ofs << 8`; the GUESS in the name is
  * that stride, which is what `arena_eqdata_from_vsuser` and `Pl/fn_80288CEC.cpp`'s `fn_8028F1E8`
  * both index it with.  `Pl/fn_80288CEC.cpp` is the one foreign reader (rule 2: it includes this

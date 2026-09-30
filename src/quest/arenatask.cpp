@@ -3,8 +3,8 @@
  * acdata -> `_arena_eq_data` conversion, the task `ArenaSelExec` (0x80041A34) installs, and the
  * per-player arena setup the task drives.
  *
- * `.text` 0x804459E4..0x80448404 (19 functions, 10784 B; the object emits 7032 B, `arena_game_task` is
- * unwritten), extab 0x8001DE9C..0x8001DF24, extabindex 0x8003EB20..0x8003EBEC.  Definitions follow `.text`
+ * `.text` 0x804459E4..0x80448404 (19 functions, 10784 B; the object emits 11024 B, `arena_task` being 244 B
+ * over), extab 0x8001DE9C..0x8001DF24, extabindex 0x8003EB20..0x8003EBEC.  Definitions follow `.text`
  * address order (the object is a permutation of the target once the unit flips).  Module `quest` and file
  * name `arenatask.cpp` are class-1 evidence: `.data` 0x80607390 is the bare `__FILE__` string
  * "arenatask.cpp", and its only referrer is `arena_resource_load` (0x804459E4).
@@ -23,21 +23,32 @@
  *     emission order is load-bearing: stage config, then the table, then the functions' literals, then
  *     the two small runs at the end of the file.
  *   - `.sdata` 95 of 96 B (the target keeps one pad byte after `icon01` that MWCC does not emit).
- *   - `.bss` 0x806E3E10..0x806E40C0: claimed, the object emits none.  `arena_user_data_buf`, `arena_work`
- *     and `arena_draw_func` stay declared in `include/quest/arenatask.h`: defining them made MWCC address
- *     the three through one `...bss.0` base (`arena_task` 83.50 -> 80.73 %), which the target does not do.
- *   - not emitted either: `.sbss` (20 B claimed, 8 B would be defined: `que_info` and the 4-byte
- *     `arena_lsp_data_adrs`; the other 12 bytes have no reference in the DOL), `.sdata2` (naming the 56-byte
- *     pool needs float literals, which makes the 100 % camera/vec functions' relocations anonymous) and
- *     `.ctors` (`arena_camera_light_vec_init` is a static initialiser; the flip needs its file-scope object).
- *   `flipcheck.py` answers NOT READY: `.text` 7032 of 10784 B.
+ *   - `.bss` 0x806E3E10..0x806E40C0 (688 B): emitted as five sized definitions at the foot of the file
+ *     (`arena_user_data_buf`, `arena_work`, `arena_draw_func`, `arena_camera_vec`, `arena_light_vec`).  The
+ *     definitions must follow every body: above them MWCC addresses the objects through one `...bss.0` base
+ *     (`arena_task` 83.50 -> 80.73 %), which the target does not do.
+ *   - `.sbss` 8 of 20 B (`que_info` and `arena_lsp_data_adrs`, defined at the foot; the other 12 claimed bytes
+ *     have no reference in the DOL), `.sdata2` 0 of 56 B (naming the pool needs float literals, which makes
+ *     the 100 % camera/vec functions' relocations anonymous) and `.ctors` 0 of 4 B (`arena_camera_light_vec_init`
+ *     is a static initialiser; the flip needs its file-scope object) are not emitted.
+ *   - the orphan census lists `stage_w` (0x806B87C0, shared by four units, so not claimable here) and
+ *     `multi_arena_clr_time` (shared with `menu/arena_result`); `dataclaim.py --fixpoint` has nothing to claim.
+ *   `flipcheck.py` answers NOT READY: `.text` 11024 of 10784 B, `.sbss`, `.sdata` (one pad byte), `.sdata2`,
+ *     `.ctors`, one extab byte and three extabindex bytes (`arena_result_next` saves r24-r31, retail r23-r31).
  *
  * NAMES: real names from the map/dump where they exist; the rest are GUESSES from the bodies -
  *   `arena_camera_vec`, `arena_light_vec`, `arena_user_data_buf` (0x100-byte records selected by
  *   `chunk_ofs << 8`), `arena_player_offset_table`, `arena_stage_config`, `arena_texture_names`,
  *   `arena_resource_info`, `_PLW`'s `user_profile_*`, `ArenaEqSlot::stage_col_0x04`/`stage_row_0x05`, and
- *   the `SystemWork`/`ArenaWork`/`ArenaEqSlot` fields marked GUESS at their declarations.  The 37 callee
- *   names this pass gave the map are listed in `.pi/notes/arenatask-69c4.md`.
+ *   the `SystemWork`/`ArenaWork`/`ArenaEqSlot` fields marked GUESS at their declarations (the state/phase/step
+ *   bytes, the cursor/limit pairs, the ready and grid flags, the blink and sync counters).  The 37 callee names
+ *   an earlier pass gave the map are listed in `.pi/notes/arenatask-69c4.md`; this pass named the four
+ *   `arena_game_task` callees that were left: `snd_bank_layout` (0x800EF7D8, lays the six sound bank tables
+ *   out) and `scene_se_bank_load` (0x800EF9C0, loads a scene's SE bank) from `sound/fn_800EF7D8.cpp`'s bodies,
+ *   `isSessionStartDone` (0x804344A0, tests `net_ctrl_wk` +0xC153, which the start request's completion
+ *   callback sets) and `net_session_abort_start` (0x80434800, clears +0x98 and raises pending action 8) from
+ *   their callers, all four GUESSES.  `PadButtons` (the 0x74-byte button block at `PlayerPad` +0x2C0) is new.
+ *   `lb_sub1d_send`'s flag is declared `u8` in `lobby/lb_sub0a_send.h` (the owner's `s8` adds an `extsb`).
  *
  * LOAD-BEARING SOURCE SHAPES (measured; do not re-derive):
  *   - `arena_eqdata_apply`: `switch (slot->kind_0x08)`, not `switch (kind)` (99.48 -> 100 %).
@@ -51,6 +62,15 @@
  *     for `&arena_work`; both packed words are byte-wise on the `vsuser` side.
  *   - `arena_result_next`: `slots` assigned inside the local-mode branch and `slot++` in the loop.
  *   - `arena_task`: `task->wait_0x0C--` (not `wait - 1`), `(other == 0) & 0xFF` for the second slot index.
+ *   - `arena_resource_load`: `#pragma pool_data off` around it (retail materialises each data address with its
+ *     own `lis`/`addi`; pooled, MWCC shares one `...data.0` base, 91.30 -> 96.31 %), `name` declared first and
+ *     `for (i = 0, name = ...)` (99.37 -> 100 %).
+ *   - `arena_game_task`: the player count is an `s32` narrowed by `(s16)` at each use (retail keeps the raw
+ *     value in a register and re-extends it per loop; an `s16` local scores 95.50 -> 96.90 % lower), the
+ *     early exits are `break` (a `return 0` adds a branch), `buttons` is a `u32` (a `u16` narrows on the
+ *     assignment), the stage index is computed in two statements (`row * cols`, then `+= col`), the copy
+ *     loop indexes `work->slot_0x14[i]` (a slot pointer is folded into the `slot` variable, 96.49 %), and
+ *     `lb_sub1d_send` takes a `u8` flag.
  *   - the stage table is indexed through `((const ArenaStageRecord*)arena_stage_config)[stage]` at the
  *     point of use; hoisting it to a local of `arena_vs_mode_enter` moves `arena_task` to 79.89 %.
  *
@@ -59,23 +79,33 @@
  * an extab record (all but the two leaf setters); C++ because `dl_acdata_to_ar_eqdata` is a mangled name.
  *
  * RESIDUALS:
- *   - `arena_game_task` (4000 B): not written (a separate claim); its callee set still lacks names for a few
- *     sound, network-state and unsplit callees, and its `m2c` output is unrolled 8x loops with shared tails.
+ *   - `arena_game_task` 98.24 % (3996 of 4000 B): every row that differs is a register number.  Retail keeps
+ *     `work` in r31 and the player count / ready count in r23 / r18 below the hoisted loop constants; ours
+ *     gives the count and the ready count r31 / r30 and `work` r29, so the whole function shifts.  Declaration
+ *     order, `register`, pointer-walking and `work->slot_0x14[i]` spellings of the loops, and a `const` count
+ *     all score the same or lower.  The other differing rows are the copy loop at the start of state 0's
+ *     phase 0 (retail forms `work + 0x14` as a pointer, ours folds the offset into the displacements; two
+ *     rows) and the compiler's debugger crashing on this file (`mwcc_debugger.py` dies on the first dump
+ *     with a gdb memory error), so the allocator's order could not be read.
  *   - `arena_task` 83.50 %: the Vs start (`arena_vs_mode_enter`) is one shared block in retail that steps 0
  *     and 1 both jump into.  Two goto-free shapes are measured: inlined twice (committed, 83.50 %, 1728 B
  *     against the target's 1484 B) and a `vs_enter` flag shape (65.33 %, 1516 B).  A `goto` into the else branch scores
  *     99.70 % and rule 8 forbids landing it.  Also `NetCtrlWk::getSelectedServer()`'s `extsb` lands in r0 here
  *     (in place in r3 in retail).
- *   - `arena_resource_load` 91.30 % (+4 B): retail materialises the resource record's address twice
- *     (`li r30`/`li r31, sda21`) and the texture-name table address only at the loop; ours keeps one
- *     pointer and hoists the table address to the top.  Two-pointer and `arena_texture_names[i]` variants
- *     scored lower.  `Panic`'s line is the literal 260 (no `__LINE__`).
  *   - `arena_result_next` 96.32 %: register allocation only - retail keeps the constants 1 and 2 in
- *     r23/r25 across the item-mask loops.
+ *     r23/r25 across the item-mask loops (ours hoists only the 1, and `li r0, 2` stays at the `mtctr`), so it
+ *     saves r23-r31 where ours saves r24-r31.  `pool_data off` does not change it.
  *   - `arena_light_init` 99.88 %: the first colour load is `lwz r0, 0(r30)` in retail and
- *     `lwz r0, arena_light_colors@l(r3)` here (one instruction).
+ *     `lwz r0, arena_light_colors@l(r3)` here (one instruction); `*colors`, a walking pointer and
+ *     `pool_data off` leave it unchanged.
  *   - `get_move_work_max` is declared locally (rule 2 debt): ten headers view the pair with different types
- *     and adding it to `ef/fn_800CDB2C.h` broke nine units (`illegal overloading`).
+ *     and adding it to `ef/fn_800CDB2C.h` broke nine units (`illegal overloading`).  The owner's leaf header
+ *     `ef/get_move_work_adrs.h` compiles here, but its `u32` return drops `arena_player_init` 100 -> 98.78 % (98.14 %
+ *     without the `(u16)` cast), so the local `u16` view stays.
+ *   - `lb_sub1d_send`: `lobby/lb_sub0a_send.h` declares `u8 flag` (no `extsb`), the owner defines `s8 flag`; making the
+ *     owner `u8` drops it 100 -> 95.4 %, so the rule 2 split stays.
+ *   - `StageMapView` (`unsplit/stage.h`) duplicates `StageRuntime`'s +0xBC5/+0xBC6 bytes: `stage/fn_802B2AA0.h`
+ *     cannot be included beside `pl.h` (both redefine `_GXChannelID` and `MHchar`, verified by compiling both).
  */
 
 #include "types.h"
@@ -115,6 +145,13 @@
 #include "ai/fn_802D44F4.h"     /* `ai_npc_reaction_forward` (the owner's header, rule 2) */
 #include "unsplit/Network.h"    /* the session close entry points (unowned: band header) */
 #include "unsplit/unknown.h"   /* `system_w` (unowned: band header) */
+#include "menu/menu_message.h"  /* the `menu_cursor_step*` family (the owner's header, rule 2) */
+#include "sound/fn_800E46E8.h"  /* `PlayStream` (the owner's header, rule 2) */
+#include "lobby/lb_sub0a_send.h" /* the lobby link senders and entry checks (the owner's leaf header, rule 2) */
+#include "Pl/pl_yure.h"         /* `yure_move` (the owner's header, rule 2) */
+#include "Pl/fn_80288CEC.h"     /* `pl_motion_set` (the owner's header, rule 2) */
+#include "unsplit/stage.h"      /* `stage_w` (unowned: band header) */
+#include "mh3_pad/Psw.h"        /* `Psw` (the owner's header, rule 2) */
 
 
 
@@ -444,7 +481,10 @@ const char* arena_texture_names[32] = {
 
 /* Loads the arena's `.brres` texture pack into a resource-memory slot and binds its textures (with their
  * palettes) to draw-shape texture slots; on failure it raises the assert and clears slots 7..12. */
+#pragma pool_data off
 extern "C" void arena_resource_load(void) {
+    const char** name;
+    ArenaResourceInfo* info = &arena_resource_info;
     char path[128];
     nw4r::g3d::ResFile file;
     u32 tex;
@@ -456,8 +496,6 @@ extern "C" void arena_resource_load(void) {
     void* mem;
     ResEntry* entry;
     u16 i;
-    const char** name;
-    ArenaResourceInfo* info = &arena_resource_info;
 
     cnvt_eur_fname(path, (char*)info->name_0x04);
     handle = pull_res_mem((char*)info->name_0x04, info->size_0x00, 1);
@@ -473,8 +511,7 @@ extern "C" void arena_resource_load(void) {
                 entry = ckResourceName((char*)info->name_0x04);
                 if (entry != NULL) {
                     res_file_assign((u32*)&file, res_file_ctor(&file_tmp, (u32)entry->data));
-                    name = arena_texture_names;
-                    for (i = 0; i < 31; i++) {
+                    for (i = 0, name = arena_texture_names; i < 31; i++) {
                         tex_word = file.GetResTex(*name);
                         res_tex_assign(&tex, &tex_word);
                         if (res_tex_has_pltt(&tex)) {
@@ -493,6 +530,7 @@ extern "C" void arena_resource_load(void) {
     nw4r::db::Panic("arenatask.cpp", 260, "NW4R:Failed assertion 0");
     draw_shape_tex_slots_clear(7, 12);
 }
+#pragma pool_data reset
 
 /* Fills the arena quest-info rows (one per arena quest id 0x2328 + i) from the quest records the game
  * loaded, and picks each row's clear-time limit from the column the Vs mode selects. */
@@ -542,7 +580,7 @@ extern "C" void arena_eqdata_head_set(ArenaEqDataHead* dst, const u16* src) {
 extern "C" void arena_other_player_eq_set(u8 player, u8 equip) {
     ArenaWork* work = &arena_work;
     if (player != (s8)my_player_no()) {
-        work->slot_0x14[1].flag_0x0B = 1;
+        work->slot_0x14[1].ready_0x0B = 1;
         work->slot_0x14[1].player_0x00 = equip;
     }
 }
@@ -840,7 +878,7 @@ extern "C" void arena_task(TaskSlot* task) {
                 task->wait_0x0C--;
                 return;
             }
-            if ((Psw[0].pressed_0x2C4 & 0x10) != 0) {
+            if ((Psw[0].button_0x2C0.pressed_0x04 & 0x10) != 0) {
                 sysSE_req(0);
                 task->wait_0x0C = 20;
                 task->step_0x08++;
@@ -928,7 +966,7 @@ extern "C" void arena_player_init(ArenaWork* params) {
 
 /* Points the scene's first camera at the arena: position from `arena_camera_vec[0]`, target from
  * `[1]`, a perspective of the arena's own fov and clip range. */
-extern "C" void arena_camera_init(void) {
+extern "C" void arena_camera_init(ArenaWork* work) {
     nw4r::g3d::Camera::PostureInfo posture;
     nw4r::g3d::Camera camera;
     s32 handle;
@@ -967,17 +1005,17 @@ extern "C" void arena_light_init(void) {
  * equip page count, kind 2 looks at the id of the acdata record the slot's player owns. */
 extern "C" void arena_eqdata_apply(ArenaWork* params, ArenaEqSlot* slot, u8 kind, u8 index) {
     slot->kind_0x08 = kind;
-    slot->clear_0x02 = 0;
+    slot->page_0x02 = 0;
     switch (slot->kind_0x08) {
     case 1: {
         _PLW* base;
 
-        slot->state_0x03 = 5;
+        slot->page_limit_0x03 = 5;
         base = (_PLW*)get_move_work_adrs(2);
         if (base != NULL) {
             u8 player = slot->player_0x00;
 
-            slot->state_0x03 += equip_list_page_count((EquipListWork*)&base[player + index * 4]);
+            slot->page_limit_0x03 += equip_list_page_count((EquipListWork*)&base[player + index * 4]);
         }
         break;
     }
@@ -992,17 +1030,17 @@ extern "C" void arena_eqdata_apply(ArenaWork* params, ArenaEqSlot* slot, u8 kind
             record = &params->eq_data_0x10->eq_0x000[slot->player_0x00];
         }
         if (record->head_0x00[0].id_0x00 == 0xB) {
-            slot->state_0x03 = 4;
+            slot->page_limit_0x03 = 4;
         } else {
-            slot->state_0x03 = 3;
+            slot->page_limit_0x03 = 3;
         }
         break;
     }
     case 3:
-        slot->state_0x03 = 4;
+        slot->page_limit_0x03 = 4;
         break;
     default:
-        slot->state_0x03 = 0;
+        slot->page_limit_0x03 = 0;
         break;
     }
 }
@@ -1010,58 +1048,58 @@ extern "C" void arena_eqdata_apply(ArenaWork* params, ArenaEqSlot* slot, u8 kind
 /* Clears one equip slot and refills its kind and state from the work block's mode. */
 extern "C" void arena_eqdata_reset(ArenaWork* params, ArenaEqSlot* slot, u8 index) {
     slot->player_0x00 = 0;
-    slot->mode_0x01 = 0;
-    slot->clear_0x02 = 0;
-    slot->state_0x03 = 0;
+    slot->player_limit_0x01 = 0;
+    slot->page_0x02 = 0;
+    slot->page_limit_0x03 = 0;
     slot->stage_col_0x04 = 0;
     slot->stage_row_0x05 = 0;
-    slot->pair_a_0x06 = 0;
-    slot->pair_b_0x07 = 0;
-    slot->value_0x12 = 0;
-    slot->flag_0x0B = 0;
+    slot->stage_cols_0x06 = 0;
+    slot->stage_rows_0x07 = 0;
+    slot->moved_0x12 = 0;
+    slot->ready_0x0B = 0;
     if (params->mode_0x04 == 2) {
-        slot->state_0x09 = 3;
+        slot->kind_limit_0x09 = 3;
     } else {
-        slot->state_0x09 = 4;
+        slot->kind_limit_0x09 = 4;
     }
     arena_eqdata_apply(params, slot, 0, index);
-    slot->cleared_0x0A = 0;
-    slot->value_0x0E = 0;
-    slot->value_0x10 = 0;
-    slot->pair_0x0C = 0;
+    slot->kind_open_0x0A = 0;
+    slot->arrow_l_timer_0x0E = 0;
+    slot->arrow_r_timer_0x10 = 0;
+    slot->grid_mode_0x0C = 0;
 }
 
 /* Loads one of the arena's three parameter presets: the mode selects how many equip slots exist and
  * which of the two Vs configurations each of them takes. */
 extern "C" void arena_eqdata_setup(ArenaWork* params, u8 mode) {
-    params->mode_0x00 = mode;
-    params->timer_0x01 = 0;
-    params->unused_0x02 = 0;
+    params->state_0x00 = mode;
+    params->phase_0x01 = 0;
+    params->step_0x02 = 0;
     params->round_0x03 = 0;
     switch (mode) {
     case 0:
         arena_eqdata_reset(params, &params->slot_0x14[0], 0);
-        params->slot_0x14[0].mode_0x01 = 3;
+        params->slot_0x14[0].player_limit_0x01 = 3;
         params->slot_0x14[0].mirror_0x0D = get_arena_cfg(0, 7);
         params->slot_0x14[1].mirror_0x0D = get_arena_cfg(1, 7);
-        params->value_0x44 = 0;
-        params->value_0x46 = 0;
+        params->blink_0x44 = 0;
+        params->blink_0x46 = 0;
         break;
     case 1:
         arena_eqdata_reset(params, &params->slot_0x14[0], 0);
-        params->slot_0x14[0].pair_a_0x06 = 5;
-        params->slot_0x14[0].pair_b_0x07 = 2;
-        params->value_0x44 = 0;
-        params->value_0x46 = 0;
+        params->slot_0x14[0].stage_cols_0x06 = 5;
+        params->slot_0x14[0].stage_rows_0x07 = 2;
+        params->blink_0x44 = 0;
+        params->blink_0x46 = 0;
         break;
     case 2:
         arena_eqdata_reset(params, &params->slot_0x14[0], 0);
-        params->slot_0x14[0].mode_0x01 = 4;
+        params->slot_0x14[0].player_limit_0x01 = 4;
         arena_eqdata_reset(params, &params->slot_0x14[1], 1);
-        params->slot_0x14[1].mode_0x01 = 4;
-        params->value_0x44 = 0;
-        params->value_0x46 = 0;
-        params->value_0x48 = 0x1518;
+        params->slot_0x14[1].player_limit_0x01 = 4;
+        params->blink_0x44 = 0;
+        params->blink_0x46 = 0;
+        params->select_countdown_0x48 = 0x1518;
         break;
     default:
         break;
@@ -1076,9 +1114,9 @@ extern "C" void arena_result_next(ArenaWork* work) {
     s32 i;
     s32 count;
 
-    work->mode_0x00 = 0;
-    work->timer_0x01 = 0;
-    work->unused_0x02 = 0;
+    work->state_0x00 = 0;
+    work->phase_0x01 = 0;
+    work->step_0x02 = 0;
     work->round_0x03 = 0;
     lb_param_w.flag_0x0C[0] = 0;
     lb_param_w.value_0x10[0] = 0;
@@ -1138,13 +1176,13 @@ extern "C" void arena_result_next(ArenaWork* work) {
         switch (work->sub_mode_0x4E) {
         case 1:
             arena_eqdata_setup(work, 1);
-            work->slot_0x14[0].stage_col_0x04 = work->stage_0x0C % work->slot_0x14[0].pair_a_0x06;
-            work->slot_0x14[0].stage_row_0x05 = work->stage_0x0C / work->slot_0x14[0].pair_a_0x06;
+            work->slot_0x14[0].stage_col_0x04 = work->stage_0x0C % work->slot_0x14[0].stage_cols_0x06;
+            work->slot_0x14[0].stage_row_0x05 = work->stage_0x0C / work->slot_0x14[0].stage_cols_0x06;
             break;
         case 2:
             arena_eqdata_setup(work, 1);
             work->eq_data_0x10 = (const ArenaStageRecord*)arena_stage_config + work->stage_0x0C;
-            work->timer_0x01 = 0xC8;
+            work->phase_0x01 = 0xC8;
             break;
         default:
             arena_eqdata_setup(work, 0);
@@ -1159,13 +1197,442 @@ extern "C" void arena_result_next(ArenaWork* work) {
             arena_eqdata_reset(work, &work->slot_0x14[i], i);
         }
         arena_eqdata_setup(work, 1);
-        work->timer_0x01 = 0xC8;
+        work->phase_0x01 = 0xC8;
     }
     if (work->sub_mode_0x4E != 2) {
         work->stage_0x0C = -1;
     }
     memset(arena_user_data_buf, 0, 0x100);
     memset(arena_user_data_buf + 0x100, 0, 0x100);
+}
+
+/* Steps the arena's state machine one frame (equip picker, stage picker and start-up, network picker and
+ * match); returns 1 when the round ends, 2 to leave and -1 after a network drop. */
+extern "C" s32 arena_game_task(ArenaWork* work) {
+    const PadButtons* pads[2];
+    u16 moved_row;
+    u16 moved_col;
+    _arena_eq_data eq;
+    s32 n;
+    s32 ready;
+    s32 i;
+    ArenaEqSlot* slot;
+
+    if (isServerSelectState() == 1) {
+        NetCtrlWk::flushSession();
+    }
+    n = (work->mode_0x04 == 1) + 1;
+    for (i = 0; i < (s16)n; i++) {
+        pads[i] = &Psw[i].button_0x2C0;
+    }
+    ready = 0;
+    switch (work->state_0x00) {
+    case 0:
+        if (work->solo_0x50 == 0) {
+            if ((u32)srt_ready_ck(1) != 1) {
+                break;
+            }
+            PlayStream(1, 58);
+            work->solo_0x50 = 1;
+        }
+        slot = work->slot_0x14;
+        switch (work->phase_0x01) {
+        case 0:
+            switch (work->step_0x02) {
+            case 0:
+                if ((pads[0]->pressed_0x04 & 0x10) != 0) {
+                    switch (slot->player_0x00) {
+                    case 0:
+                        arena_eqdata_setup(work, 1);
+                        titleSE_req(9);
+                        break;
+                    case 1:
+                        work->phase_0x01 = 2;
+                        for (i = 0; i < (s16)n; i++) {
+                            work->slot_0x14[i].page_0x02 = work->slot_0x14[i].mirror_0x0D;
+                            work->slot_0x14[i].page_limit_0x03 = 3;
+                            work->slot_0x14[i].ready_0x0B = 0;
+                        }
+                        sysSE_req(5);
+                        break;
+                    case 2:
+                        sysSE_req(0);
+                        work->step_0x02++;
+                        work->wait_0x06 = 0;
+                        PlayStream(1, 1);
+                        break;
+                    }
+                } else {
+                    slot->player_0x00 = menu_cursor_step(slot->player_0x00, slot->player_limit_0x01,
+                                                         pads[0]->pressed_0x04 | pads[0]->held_0x14, 1, 2);
+                }
+                break;
+            case 1:
+                if ((u32)file_loading_ck(NULL, NULL) != 1) {
+                    if (++work->wait_0x06 > 16) {
+                        return 2;
+                    }
+                }
+                break;
+            }
+            break;
+        case 1:
+            if ((pads[0]->pressed_0x04 & 0x10) == 0) {
+                if ((pads[0]->pressed_0x04 & 0x20) != 0) {
+                    work->phase_0x01 = 0;
+                } else {
+                    slot->page_0x02 = menu_cursor_step(slot->page_0x02, slot->page_limit_0x03,
+                                                       pads[0]->pressed_0x04 | pads[0]->held_0x14, 1, 2);
+                }
+            }
+            break;
+        case 2:
+            for (i = 0, slot = work->slot_0x14; i < (s16)n; i++) {
+                ArenaEqSlot* slot_i = &work->slot_0x14[i];
+                const PadButtons* pad;
+
+                slot_i->moved_0x12 = 0;
+                pad = pads[i];
+                if (slot_i->ready_0x0B == 0) {
+                    u16 buttons = pad->pressed_0x04;
+
+                    if ((buttons & 0x10) != 0) {
+                        slot_i->ready_0x0B = 1;
+                        slot_i->mirror_0x0D = slot_i->page_0x02;
+                        sysSE_req(0);
+                        arena_cfg_set(i, 7, slot_i->mirror_0x0D);
+                    } else if ((buttons & 0x20) != 0) {
+                        slot_i->ready_0x0B = 1;
+                        sysSE_req(1);
+                    } else {
+                        slot_i->page_0x02 = menu_cursor_step_forward(slot_i->page_0x02, slot_i->page_limit_0x03,
+                                                                      buttons | pad->held_0x14, 4, 8, 6,
+                                                                      &slot_i->moved_0x12);
+                    }
+                }
+            }
+            for (i = 0; i < (s16)n; i++, slot++) {
+                if (slot->ready_0x0B != 0) {
+                    ready++;
+                }
+            }
+            if (ready >= (s16)n) {
+                work->phase_0x01 = 0;
+            }
+            break;
+        }
+        break;
+    case 1:
+        if (++work->blink_0x44 > 20) {
+            work->blink_0x44 = 0;
+        }
+        switch (work->phase_0x01) {
+        case 0:
+            if (work->solo_0x50 == 0) {
+                if ((u32)srt_ready_ck(1) != 1) {
+                    break;
+                }
+                PlayStream(1, 58);
+                work->solo_0x50 = 1;
+            }
+            switch (work->step_0x02) {
+            case 0:
+                if ((pads[0]->pressed_0x04 & 0x10) != 0) {
+                    s32 stage = work->slot_0x14[0].stage_row_0x05 * work->slot_0x14[0].stage_cols_0x06;
+
+                    stage += work->slot_0x14[0].stage_col_0x04;
+
+                    if ((work->ready_mask_0x08 & (1 << stage)) != 0) {
+                        work->step_0x02++;
+                        work->stage_0x0C = stage;
+                        work->eq_data_0x10 = (const ArenaStageRecord*)arena_stage_config + stage;
+                        work->wait_0x06 = 0;
+                        titleSE_req(11);
+                        PlayStream(1, 1);
+                    } else {
+                        sysSE_req(2);
+                    }
+                } else if ((pads[0]->pressed_0x04 & 0x20) != 0) {
+                    arena_eqdata_setup(work, 0);
+                    sysSE_req(1);
+                } else {
+                    work->slot_0x14[0].stage_col_0x04 = menu_cursor_step_fixed_tail(
+                        work->slot_0x14[0].stage_col_0x04, work->slot_0x14[0].stage_cols_0x06,
+                        pads[0]->pressed_0x04 | pads[0]->held_0x14, 4, 8, &moved_col);
+                    work->slot_0x14[0].stage_row_0x05 = menu_cursor_step_fixed_tail(
+                        work->slot_0x14[0].stage_row_0x05, work->slot_0x14[0].stage_rows_0x07,
+                        pads[0]->pressed_0x04 | pads[0]->held_0x14, 1, 2, &moved_row);
+                    if (moved_col != 0 || moved_row != 0) {
+                        titleSE_req(10);
+                    }
+                }
+                break;
+            case 1:
+                if (++work->wait_0x06 > 16) {
+                    work->step_0x02++;
+                    if (system_w.field_0x8af == 0) {
+                        loading_disp_set(1, 0);
+                    } else {
+                        loading_disp_set(1, 5);
+                    }
+                    snd_bank_layout(0);
+                    scene_se_bank_load(0, 0);
+                    title_bgm_load();
+                }
+                break;
+            case 2:
+                if (srt_ready_ck(1) != 0) {
+                    work->phase_0x01++;
+                    init_player_work();
+                    player_init_data_load();
+                    player_control_move();
+                }
+                break;
+            }
+            break;
+        case 1:
+            if ((u32)file_loading_ck(NULL, NULL) != 1) {
+                work->phase_0x01++;
+                arena_camera_init(work);
+                pl_motion_set();
+                ((StageMapView*)stage_w)->mapno = 0xFF;
+                ((StageMapView*)stage_w)->areano = 0;
+                filter_reset();
+                light_init();
+                arena_light_init();
+                player_control_move();
+            }
+            break;
+        case 2:
+            if (player_move_start_ck() == 1) {
+                title_se_load();
+                player_move_start(-1);
+                if (work->mode_0x04 == 2) {
+                    work->phase_0x01++;
+                    work->sync_sent_0x4A = 0;
+                    work->sync_tick_0x4C = 0;
+                } else {
+                    loading_disp_set(0, 0);
+                    PlayStream(1, 55);
+                    arena_eqdata_setup(work, 2);
+                }
+            }
+            player_control_move();
+            break;
+        case 3:
+            if (getLinkStatus() == 1 || system_w.net_result_wait_0x8c1 == 1) {
+                net_session_abort_start();
+                return -1;
+            }
+            if (isSessionStartDone() != 0) {
+                if (isReadyCountOne() == 1 && work->sync_sent_0x4A == 0 && (u32)lb_seen_pad_ck(4) == 1) {
+                    work->sync_sent_0x4A = 1;
+                    lb_sub0b_send(NetCtrlWk::getSelectedServer(), 4);
+                }
+                if ((++work->sync_tick_0x4C & 0x1F) == 0) {
+                    lb_sub0a_send(NetCtrlWk::getSelectedServer(), 4);
+                }
+                if (lb_handled_ck(4) != 0) {
+                    loading_disp_set(0, 0);
+                    PlayStream(1, 55);
+                    arena_eqdata_setup(work, 2);
+                }
+            }
+            break;
+        case 200:
+            work->phase_0x01++;
+            if (work->mode_0x04 == 2 || system_w.field_0x8af == 0) {
+                loading_disp_set(1, 0);
+            } else {
+                loading_disp_set(1, 5);
+            }
+            snd_bank_layout(0);
+            scene_se_bank_load(0, 0);
+            title_bgm_load();
+            break;
+        case 201:
+            if (srt_ready_ck(1) != 0) {
+                work->phase_0x01 = 1;
+                init_player_work();
+                player_init_data_load();
+                player_control_move();
+            }
+            break;
+        }
+        break;
+    case 2:
+        if (work->mode_0x04 == 2 && getLinkStatus() == 1) {
+            net_session_abort_start();
+            return -1;
+        }
+        if (++work->blink_0x44 > 35) {
+            work->blink_0x44 = 0;
+        }
+        if (++work->blink_0x46 > 40) {
+            work->blink_0x46 = 0;
+        }
+        if (work->select_countdown_0x48 > 0) {
+            work->select_countdown_0x48--;
+        }
+        switch (work->phase_0x01) {
+        case 0:
+            for (i = 0; i < (s16)n; i++) {
+                ArenaEqSlot* slot_i = &work->slot_0x14[i];
+                const PadButtons* pad;
+
+                slot_i->moved_0x12 = 0;
+                pad = pads[i];
+                if (slot_i->arrow_l_timer_0x0E != 0) {
+                    if (++slot_i->arrow_l_timer_0x0E > 10) {
+                        slot_i->arrow_l_timer_0x0E = 0;
+                    }
+                }
+                if (slot_i->arrow_r_timer_0x10 != 0) {
+                    if (++slot_i->arrow_r_timer_0x10 > 10) {
+                        slot_i->arrow_r_timer_0x10 = 0;
+                    }
+                }
+                if (slot_i->ready_0x0B == 0) {
+                    if (slot_i->kind_open_0x0A == 0) {
+                        if ((pad->hold_0x00 & 0x80) != 0 && slot_i->grid_mode_0x0C == 0 &&
+                            (work->mode_0x04 != 2 || work->select_countdown_0x48 != 0)) {
+                            slot_i->kind_open_0x0A = 1;
+                            sysSE_req(5);
+                        } else {
+                            u32 buttons = pad->pressed_0x04;
+
+                            if ((buttons & 0x10) != 0 || (work->mode_0x04 == 2 && work->select_countdown_0x48 == 0)) {
+                                if (slot_i->grid_mode_0x0C == 0) {
+                                    slot_i->ready_0x0B = 1;
+                                    sysSE_req(0);
+                                    if (work->mode_0x04 == 2) {
+                                        work->phase_0x01 = 100;
+                                        lb_sub1d_send(my_player_no(), slot_i->player_0x00);
+                                    }
+                                }
+                            } else if (work->mode_0x04 != 2 && (buttons & 0x2000) != 0) {
+                                slot_i->grid_mode_0x0C ^= 1;
+                                slot_i->stage_col_0x04 = 0;
+                                slot_i->stage_row_0x05 = 0;
+                                slot_i->stage_cols_0x06 = 4;
+                                slot_i->stage_rows_0x07 = 4;
+                                sysSE_req(5);
+                            } else if (slot_i->grid_mode_0x0C == 0) {
+                                if ((u32)(slot_i->kind_0x08 - 1) > 2) {
+                                    if (slot_i->kind_0x08 == 0) {
+                                        slot_i->player_0x00 = menu_cursor_step_forward(
+                                            slot_i->player_0x00, slot_i->player_limit_0x01, buttons | pad->held_0x14,
+                                            4, 8, 6, &slot_i->moved_0x12);
+                                        if ((slot_i->moved_0x12 & 4) != 0) {
+                                            slot_i->arrow_l_timer_0x0E = 1;
+                                        } else if ((slot_i->moved_0x12 & 8) != 0) {
+                                            slot_i->arrow_r_timer_0x10 = 1;
+                                        }
+                                    }
+                                } else {
+                                    buttons |= pad->held_0x14;
+                                    if ((buttons & 0xC) != 0) {
+                                        slot_i->player_0x00 = menu_cursor_step(
+                                            slot_i->player_0x00, slot_i->player_limit_0x01, buttons, 4, 8);
+                                        switch (slot_i->kind_0x08) {
+                                        case 2: {
+                                            const _arena_eq_data* record;
+
+                                            if (work->mode_0x04 == 2) {
+                                                dl_acdata_to_ar_eqdata(&eq, slot_i->player_0x00);
+                                                record = &eq;
+                                            } else {
+                                                record = &work->eq_data_0x10->eq_0x000[slot_i->player_0x00];
+                                            }
+                                            if (record->head_0x00[0].id_0x00 == 0xB) {
+                                                slot_i->page_limit_0x03 = 4;
+                                            } else {
+                                                slot_i->page_limit_0x03 = 3;
+                                            }
+                                            break;
+                                        }
+                                        case 1: {
+                                            _PLW* base;
+
+                                            slot_i->page_limit_0x03 = 5;
+                                            base = (_PLW*)get_move_work_adrs(2);
+                                            if (base != NULL) {
+                                                slot_i->page_limit_0x03 += equip_list_page_count(
+                                                    (EquipListWork*)&base[slot_i->player_0x00 + i * 4]);
+                                            }
+                                            break;
+                                        }
+                                        }
+                                        if (slot_i->page_0x02 >= slot_i->page_limit_0x03) {
+                                            slot_i->page_0x02 = 0;
+                                        }
+                                    } else {
+                                        slot_i->page_0x02 = menu_cursor_step_fixed_tail(
+                                            slot_i->page_0x02, slot_i->page_limit_0x03, pad->trigger_0x0C, 0x800,
+                                            0x400, &slot_i->moved_0x12);
+                                    }
+                                }
+                            } else {
+                                slot_i->stage_col_0x04 = menu_cursor_step(
+                                    slot_i->stage_col_0x04, slot_i->stage_cols_0x06, buttons | pad->held_0x14, 4, 8);
+                                slot_i->stage_row_0x05 = menu_cursor_step(
+                                    slot_i->stage_row_0x05, slot_i->stage_rows_0x07,
+                                    pad->pressed_0x04 | pad->held_0x14, 1, 2);
+                            }
+                        }
+                    } else if ((pad->hold_0x00 & 0x80) != 0 &&
+                               (work->mode_0x04 != 2 || work->select_countdown_0x48 != 0)) {
+                        slot_i->kind_open_0x0A = 1;
+                        slot_i->kind_0x08 = menu_cursor_step_fixed_tail(
+                            slot_i->kind_0x08, slot_i->kind_limit_0x09, pad->pressed_0x04 | pad->held_0x14, 1, 2,
+                            &slot_i->moved_0x12);
+                        if ((slot_i->moved_0x12 & 3) != 0) {
+                            arena_eqdata_apply(work, slot_i, slot_i->kind_0x08, i);
+                        }
+                    } else {
+                        slot_i->kind_open_0x0A = 0;
+                    }
+                } else if (slot_i->ready_0x0B == 1) {
+                    ready++;
+                    if (system_w.field_0x8af == 0) {
+                        work->phase_0x01++;
+                        work->wait_0x06 = 0;
+                        sysSE_stop(31);
+                        PlayStream(1, 1);
+                    } else if (ready == 2) {
+                        work->phase_0x01++;
+                        work->wait_0x06 = 0;
+                        sysSE_stop(31);
+                        PlayStream(1, 1);
+                    } else if ((pad->pressed_0x04 & 0x20) != 0) {
+                        slot_i->ready_0x0B = 0;
+                        ready--;
+                    }
+                }
+            }
+            break;
+        case 1:
+            if (++work->wait_0x06 > 16) {
+                return 1;
+            }
+            break;
+        case 100:
+            if (countOccupiedServerSlots() <= 1 || work->slot_0x14[1].ready_0x0B == 1) {
+                work->phase_0x01 = 1;
+                work->wait_0x06 = 0;
+                sysSE_stop(31);
+                PlayStream(1, 1);
+            }
+            break;
+        }
+        arena_player_init(work);
+        player_control_move();
+        yure_move();
+        light_move();
+        ((nw4r::g3d::ScnRoot*)pRoot)->SetCurrentCamera(0);
+        break;
+    }
+    return 0;
 }
 
 /* Writes the six default vectors the arena camera and the four arena lights start from. */
@@ -1184,3 +1651,13 @@ f32 arena_player_offset_table[10] = {0.0f, 0.0f, 0.0f, -140.0f, -40.0f, 0.0f, 14
 
 /* The four direct-light colours `arena_light_init` installs (RGBA words). */
 u32 arena_light_colors[4] = {0x5A5A5AFF, 0xFFFFFFFF, 0x405050FF, 0x808080FF};
+
+/* The band's `.bss` (0x806E3E10..0x806E40C0, 0x2B0 B).  The definitions follow every body: defined above them,
+ * MWCC addresses the three objects through one `...bss.0` base, which the target does not do. */
+u8 arena_user_data_buf[0x200];
+ArenaWork arena_work;
+u32 arena_draw_func[4];
+nw4r::math::VEC3 arena_camera_vec[2];
+nw4r::math::VEC3 arena_light_vec[4];
+ArenaQuestInfoList* que_info;
+u8* arena_lsp_data_adrs;

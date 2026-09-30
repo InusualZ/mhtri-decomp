@@ -234,7 +234,7 @@ typedef struct StageBlendRec {
  * the block symbols (.bss: no registered unit owns them, so the declarations live here)
  * ------------------------------------------------------------------------------------------------ */
 
-extern "C" u8 stage_w[];
+#include "unsplit/stage.h" /* `stage_w` (moved to the band header so a `pl.h` consumer can name it) */
 extern "C" u8 lbl_806BB7B8[];
 extern "C" u8 lbl_806BB7C4[];
 extern "C" u8 lbl_806BB7D0[];

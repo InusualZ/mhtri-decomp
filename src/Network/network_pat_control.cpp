@@ -163,8 +163,8 @@ void updateNetworkPatControl(void)
     NetCtrlWk* work = net_ctrl_wk;
     NetListMenu* menu = work->list_0xBF34;
     NetDialog* dialog = work->dialog_0xBF30;
-    u16 pressed = Psw[0].pressed_0x2C4;
-    u16 held = Psw[0].held_0x2D4 | pressed;
+    u16 pressed = Psw[0].button_0x2C0.pressed_0x04;
+    u16 held = Psw[0].button_0x2C0.held_0x14 | pressed;
 
     if (work->sub_state_0x017 != 0x21 && work->flag_0xC1BF != 1 && work->flag_0xC1BE != 1 &&
         work->sub_state_0x017 < 0x32 &&
