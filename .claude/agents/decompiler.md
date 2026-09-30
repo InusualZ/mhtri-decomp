@@ -225,6 +225,8 @@ is not measured), so measure it yourself before you report.
     python tools/units/flipcheck.py <unit>       # a unit at ~100 %: names the section that would break a flip
                                                  # (extab, a data claim, an undefined reference); READY is
                                                  # necessary, not sufficient - the DOL hash is the proof
+    python tools/objdiff/relocdiff.py <unit> --by-owner   # relocations vs the target's, by symbol NAME: a bl to
+                                                 # the wrong callee scores 100 % in objdiff; exit 1 on a difference
 
 The data row is not optional and not a later lane's work. `ours-extra` means your source emits a section the
 original TU did not own - drop the definition, or restructure the source (playbook 29/58). `target-extra` on a

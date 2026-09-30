@@ -170,10 +170,41 @@ def test_gate() -> None:
     check("an error is not identical", rd.unit_identical({"error": "boom", "sections": []}), False)
 
 
+def test_by_owner() -> None:
+    """`compare_by_owner`: identical, wrong callee name, wrong addend, shifted function, slid instruction."""
+    import undefrefs_selftest as us
+    func = (1 << 4) | 2
+
+    def obj(pad=0, callee="callee_a", addend=0, r1=4, r2=24):
+        syms = [("f", 16, ".text", func, pad), ("g", 16, ".text", func, pad + 16),
+                (callee, 0, None, 0x10, 0), ("callee_b", 0, None, 0x10, 0)]
+        return us.build_obj([(".text", b"\0" * (pad + 32))], syms,
+                            [(".text", pad + r1, callee, R_REL24, addend),
+                             (".text", pad + r2, "callee_b", R_REL24, 0)])
+
+    base = obj()
+    check("by-owner: identical", rd.compare_by_owner(obj(), base), (2, 2, []))
+    m, _t, lines = rd.compare_by_owner(obj(callee="callee_x"), base)
+    check("by-owner: wrong callee is one line naming both",
+          (m, len(lines), "callee_x vs callee_a" in lines[0], "f+0x4" in lines[0]), (1, 1, True, True))
+    m, _t, lines = rd.compare_by_owner(obj(addend=8), base)
+    check("by-owner: wrong addend", (m, len(lines), "addend +8 vs +0" in lines[0]), (1, 1, True))
+    check("by-owner: a shifted function still pairs", rd.compare_by_owner(obj(pad=16), base), (2, 2, []))
+    m, _t, lines = rd.compare_by_owner(obj(r1=8), base)
+    check("by-owner: a slid instruction is a non-failing note",
+          (m, len(lines), lines[0].startswith("note")), (2, 1, True))
+    one = us.build_obj([(".text", b"\0" * 32)], [("f", 16, ".text", func, 0), ("callee_a", 0, None, 0x10, 0)],
+                       [(".text", 4, "callee_a", R_REL24, 0)])
+    _m, _t, lines = rd.compare_by_owner(one, base)
+    check("by-owner: a symbol absent from ours is one line",
+          (len(lines), "only in target" in lines[0]), (1, True))
+
+
 def selftest() -> int:
     test_pure()
     test_reader()
     test_gate()
+    test_by_owner()
     for failure in FAILURES:
         print("FAIL " + failure)
     print("ok - %d checks" % CHECKS)

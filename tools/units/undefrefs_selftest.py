@@ -50,7 +50,8 @@ def build_obj(sections, symbols, relocs=()) -> bytes:
     """
     syms = [(None, 0, None, 0, 0)] + [(s[0], s[1], s[2], s[3], s[4] if len(s) > 4 else 0) for s in symbols]
     rela_targets = []
-    for target, _off, _name in relocs:
+    for rel in relocs:
+        target = rel[0]
         if target not in rela_targets:
             rela_targets.append(target)
     sec_names = ([""] + [n for n, _ in sections] + [".rela" + t for t in rela_targets]
@@ -71,8 +72,10 @@ def build_obj(sections, symbols, relocs=()) -> bytes:
                               index.get(section, 0) if section else 0)
 
     rela_data = {t: bytearray() for t in rela_targets}
-    for target, offset, name in relocs:
-        rela_data[target] += struct.pack(">IIi", offset, (sym_index[name] << 8) | 0, 0)
+    for rel in relocs:
+        target, offset, name = rel[:3]
+        rtype, addend = (rel[3], rel[4]) if len(rel) > 3 else (0, 0)
+        rela_data[target] += struct.pack(">IIi", offset, (sym_index[name] << 8) | rtype, addend)
 
     data = {n: d for n, d in sections}
     for t in rela_targets:
