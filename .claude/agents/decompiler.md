@@ -222,6 +222,9 @@ is not measured), so measure it yourself before you report.
     python tools/units/stylelint.py --diff main  # must add no new section 6.5 violation
     python tools/units/datagap.py --unit <stem>  # data: no `ours-extra` row, and no `target-extra` row for a
                                                  # section your splits block claims (see *Data*)
+    python tools/units/flipcheck.py <unit>       # a unit at ~100 %: names the section that would break a flip
+                                                 # (extab, a data claim, an undefined reference); READY is
+                                                 # necessary, not sufficient - the DOL hash is the proof
 
 The data row is not optional and not a later lane's work. `ours-extra` means your source emits a section the
 original TU did not own - drop the definition, or restructure the source (playbook 29/58). `target-extra` on a

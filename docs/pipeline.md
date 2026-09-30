@@ -556,6 +556,13 @@ it is verified, not asserted.
 
 * **`flipcheck.py` READY is necessary, not sufficient.** READY is the *entry* condition: it says the unit is a
   candidate. It does not say the unit is correct, and it must not be quoted as if it did.
+* **Where `flipcheck` runs (2026-09-29).** Three places, cheapest first: the **lane** runs it on any unit that
+  reaches ~100 % (the `decompiler` profile's verification list) so a section defect is found while the source is
+  still open; the **reviewer** runs it per unit (dimension 1); and the **landing gate** runs it as a refusing row
+  for every unit the batch turns `Matching` (`land.flipped_units` reads the `configure.py` diff), after the
+  compile gate and before the slow link - so a broken flip is refused with the section named instead of a moved DOL
+  hash. A `NonMatching` batch is not gated on it (most units are legitimately not ready). The DOL-hash row stays
+  the proof.
 * **A flip is bytes *and* relocations.** Verify the relocation **offsets inside `extab`**, not its size: a
   record can have the **right size with its relocations at the wrong offsets** — `NetworkWiiMediator`'s `extab`
   is the correct `0x1a8` with three `dl` relocations at `+0x2c`/`+0x34`/`+0x54` instead of
