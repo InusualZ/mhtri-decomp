@@ -84,6 +84,47 @@ def selftest() -> int:
                        failures)
         failures = _ok("... and the objdiff unit name", u.name, "main/demo/unit", failures)
 
+        # top-level units: `src/<file>.cpp`, spelled like a nested unit without the directory
+        os.makedirs(os.path.join(fx, "src", "other"))
+        open(os.path.join(fx, "src", "main.cpp"), "w", encoding="utf-8").write("int g(void);\n")
+        open(os.path.join(fx, "src", "mh3_pad.cpp"), "w", encoding="utf-8").write("int h(void);\n")
+        bs = os.path.join(fx, "build", "RMHE08")
+        for spec in ("main", "main/main", "main.cpp", "src/main.cpp", "src/main", "build/RMHE08/src/main.o",
+                     "build/RMHE08/obj/main.o", "main\\main"):
+            t = uu.resolve_unit(spec, root=fx)
+            failures = _ok("top-level %r -> main/main" % spec, (t.name, t.lib, t.file), ("main/main", "", "main"),
+                           failures)
+        t = uu.resolve_unit("mh3_pad", root=fx)
+        failures = _ok("top-level name", t.name, "main/mh3_pad", failures)
+        failures = _ok("... its source", os.path.normcase(t.src),
+                       os.path.normcase(os.path.join(fx, "src", "mh3_pad.cpp")), failures)
+        failures = _ok("... its object", os.path.normcase(t.obj),
+                       os.path.normcase(os.path.join(bs, "src", "mh3_pad.o")), failures)
+        failures = _ok("... its split target", os.path.normcase(t.target),
+                       os.path.normcase(os.path.join(bs, "obj", "mh3_pad.o")), failures)
+        failures = _ok("... its object dir", os.path.normcase(t.obj_dir),
+                       os.path.normcase(os.path.join(bs, "src")), failures)
+        failures = _ok("a top-level unit is listed", "main/main" in [u.name for u in uu.list_units(fx)], True,
+                       failures)
+        failures = _ok("nested with extension", uu.resolve_unit("demo/unit.cpp", root=fx).name, "main/demo/unit",
+                       failures)
+        failures = _ok("nested bare stem", uu.resolve_unit("unit", root=fx).name, "main/demo/unit", failures)
+
+        # a stem shared by two units is refused, listing both - never guessed
+        open(os.path.join(fx, "src", "other", "unit.cpp"), "w", encoding="utf-8").write("int k(void);\n")
+        open(os.path.join(fx, "src", "unit.cpp"), "w", encoding="utf-8").write("int m(void);\n")
+        try:
+            uu.resolve_unit("unit", root=fx)
+            msg = ""
+        except SystemExit as e:
+            msg = str(e)
+        failures = _ok("ambiguous stem refused, all candidates listed",
+                       all(n in msg for n in ("main/demo/unit", "main/other/unit", "main/unit")), True, failures)
+        failures = _ok("... a qualified spec still resolves", uu.resolve_unit("other/unit", root=fx).name,
+                       "main/other/unit", failures)
+        failures = _ok("... and the top-level one by src path", uu.resolve_unit("src/unit.cpp", root=fx).name,
+                       "main/unit", failures)
+
         # without `root=` the same spec resolves the REAL tree, which has no demo/unit: the fixture's own
         # unit must not be reachable by accident (the pre-fix silent wrong-tree read)
         failures = _ok("the real tree has no demo/unit (a fixture cannot leak into it)",

@@ -214,6 +214,12 @@ lines with a stray `L`. Use the helper instead:
 `--edit` works at byte level and **refuses, writing nothing, when the match count is not the N you asserted** - that
 is the difference between a rewrite and a corruption. Assert the count every time.
 
+**Line endings.** A slot's working copy mixes CRLF and LF files while the index is LF, so a scripted `str.replace`
+with `\n` silently matches nothing on a CRLF file, and a careless write puts CRLF into an LF file. Edit through
+`python tools/agents/edit.py replace FILE --old-file A --new-file B [--count N]` (texts from files, the file's own
+endings kept, 0 or more than N matches refused with their line numbers, a diff printed); `edit.py normalise FILE...`
+rewrites to LF and `edit.py check [--fix]` lists the tracked files whose endings differ from the index.
+
 ## Commit messages
 
 Follow the convention in CLAUDE.md ("Commit messages follow one convention"): `<category>: <message>`, then an

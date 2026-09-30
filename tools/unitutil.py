@@ -9,6 +9,8 @@ A *unit spec* is any of these spellings:
     <Lib>/<file>                             project-relative, without extension
     main/<Lib>/<file>                        objdiff unit name
     src/<Lib>/<file>.c                       source path
+    <file> | main/<file> | src/<file>.cpp    a top-level unit (`main`, `mh3_pad`, ...); a bare stem shared
+                                             by two units is refused, listing the candidates
     build/<version>/src/<Lib>/<file>.o       a built object (the target object works too)
 
     (in this repo today that is `Camellia/camellia`, the only unit with source)
@@ -207,28 +209,35 @@ def _find_src(lib, file, root=None):
 
 
 def _make(lib, file, version, root=None):
+    """A `Unit`; `lib` is "" for a top-level unit (`src/<file>.cpp`, objdiff name `main/<file>`)."""
     root = root or ROOT
     src = _find_src(lib, file, root)
     if src is None:
-        raise SystemExit("no source for unit %s/%s under src/" % (lib, file))
-    return Unit(name="main/%s/%s" % (lib, file), lib=lib, file=file, version=version, src=src,
-                obj_dir=os.path.join(root, "build", version, "src", lib),
-                obj=os.path.join(root, "build", version, "src", lib, file + ".o"),
-                target=os.path.join(root, "build", version, "obj", lib, file + ".o"))
+        raise SystemExit("no source for unit %s under src/" % ("%s/%s" % (lib, file) if lib else file))
+    sub = [lib] if lib else []
+    return Unit(name="/".join(["main"] + sub + [file]), lib=lib, file=file, version=version, src=src,
+                obj_dir=os.path.join(root, "build", version, "src", *sub),
+                obj=os.path.join(root, "build", version, "src", *sub, file + ".o"),
+                target=os.path.join(root, "build", version, "obj", *sub, file + ".o"))
 
 
 def list_units(root=None):
-    """Every configured unit that has source in `root`'s `src/` (`root` defaults to `ROOT`)."""
+    """Every configured unit that has source in `root`'s `src/` (`root` defaults to `ROOT`).
+
+    A unit is `src/<lib>/<file>.<ext>` or a top-level `src/<file>.<ext>` (`lib` is "" - `main`,
+    `mh3_pad`, `fn_80047398`, ...); the objdiff name is `main/<lib>/<file>` / `main/<file>`.
+    """
     root = root or ROOT
     out = []
     for version in _versions(root):
-        for lib in sorted(os.listdir(os.path.join(root, "src"))):
-            d = os.path.join(root, "src", lib)
-            if not os.path.isdir(d):
-                continue
-            for entry in sorted(os.listdir(d)):
-                if entry.endswith(SOURCE_EXT):
-                    out.append(_make(lib, os.path.splitext(entry)[0], version, root))
+        for entry in sorted(os.listdir(os.path.join(root, "src"))):
+            d = os.path.join(root, "src", entry)
+            if os.path.isdir(d):
+                for sub in sorted(os.listdir(d)):
+                    if sub.endswith(SOURCE_EXT):
+                        out.append(_make(entry, os.path.splitext(sub)[0], version, root))
+            elif entry.endswith(SOURCE_EXT):
+                out.append(_make("", os.path.splitext(entry)[0], version, root))
     return out
 
 
@@ -240,6 +249,10 @@ def resolve_unit(spec=None, root=None):
     only way to resolve a unit in a tree that is **not a git worktree**, i.e. a fixture: without it the
     fixture silently reads this module's own `ROOT` and refuses (or, worse, resolves the real unit).  The
     returned `Unit`'s `src`/`obj`/`target` are therefore absolute paths *under that root*.
+
+    A bare file name (`camellia`, `main`, `main.cpp`) names a unit by its stem; when two units share the
+    stem the spec is refused with the candidates, never guessed. A top-level unit is spelled exactly like
+    a nested one without the directory (`main`, `main/main`, `src/main.cpp`, `build/RMHE08/src/main.o`).
     """
     units = list_units(root)
     if spec is None:
@@ -248,27 +261,38 @@ def resolve_unit(spec=None, root=None):
         raise SystemExit("--unit is required; candidates:\n  " +
                          "\n  ".join(u.name for u in units))
     s = spec.replace("\\", "/").strip()
+    qualified = False          # a `src/`, `main/` or `build/...` prefix says "this is a path, not a bare stem"
     for pre in ("build/", "src/"):
         if s.startswith(pre):
             s = s[len(pre):]
+            qualified = True
     parts = [p for p in s.split("/") if p not in ("", ".")]
-    if parts and parts[0] == "main":
+    if len(parts) > 1 and parts[0] == "main":          # the objdiff prefix; a lone `main` is the unit
         parts = parts[1:]
-    if len(parts) >= 3 and parts[0] in _versions(root):      # build/<ver>/{src,obj}/<lib>/<file>.o
+        qualified = True
+    if len(parts) >= 3 and parts[0] in _versions(root):      # build/<ver>/{src,obj}/[<lib>/]<file>.o
         parts = parts[2:]
+        qualified = True
     if not parts:
         raise SystemExit("cannot parse unit spec %r" % spec)
     file = os.path.splitext(parts[-1])[0]
     if len(parts) == 1:
-        for u in units:
-            if u.file == file:
-                return u
+        # a qualified single part is a top-level unit; a bare stem may be a nested unit's file name
+        hits = [u for u in units if u.file == file and (u.lib == "" or not qualified)]
+        if len(hits) == 1:
+            return hits[0]
+        if hits:
+            raise SystemExit("unit spec %r is ambiguous; name the directory:\n  %s"
+                             % (spec, "\n  ".join(u.name for u in hits)))
         raise SystemExit("no unit with file name %r" % file)
     lib = parts[-2]
     for u in units:
         if u.lib == lib and u.file == file:
             return u
-    return _make(lib, file, units[0].version if units else _versions(root)[0], root)
+    versions = _versions(root)
+    if not versions:
+        raise SystemExit("no build/<version>/obj tree under %s - build first" % (root or ROOT))
+    return _make(lib, file, units[0].version if units else versions[0], root)
 
 
 def compile_command(unit):

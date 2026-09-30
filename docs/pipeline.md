@@ -1019,6 +1019,14 @@ Grouped by cause; each cost a lane ~30 min the first time.
 * **Line endings.** Files are LF in the repo and working tree (`* text=auto eol=lf`; a clone must not set
   `core.autocrlf=true`, which overrides `eol=lf`). Older notes said `include/**`/`configure.py` are CRLF - if a
   scripted anchor with `\n` fails to match, `assert` the match count and read/write with `newline=""`.
+  Slot working copies still mix CRLF and LF files (measured 2026-09-30) while the index is LF: a `str.replace` with
+  `\n` silently matches nothing on a CRLF file, and one lane wrote CRLF into four files. Edit with
+  `python tools/agents/edit.py replace FILE --old-file A --new-file B [--count N]` (the file's own endings kept,
+  0 or more than N matches refused with line numbers, a diff printed); `edit.py normalise FILE...` rewrites to LF and
+  `edit.py check [--fix]` lists tracked files whose on-disk endings differ from the index.
+* **Unit specs.** `unitutil.resolve_unit` (`symdiff.py -u`, `mt.py diff -u`, `unitscore.py`, `relocdiff.py`) takes a
+  top-level unit exactly like a nested one (`main`, `main/mh3_pad`, `src/fn_80047398.cpp`; objdiff name
+  `main/<file>`); a bare stem shared by two units is refused with the candidates - name the directory.
 * **Encoding.** Source stays UTF-8 with no BOM (`sjiswrap`); MWCC on this host turns a literal `\n` into CRLF
   (playbook 45); a Windows `PermissionError [WinError 5]` at **process launch** is transient
   (measured 2026-09-30, see "Selftest flakes").
