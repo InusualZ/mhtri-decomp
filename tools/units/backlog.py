@@ -28,7 +28,7 @@ file no longer carries that rule's findings (re-linted, not remembered), `stale`
 fires for its unit (re-run over the unit's object, not remembered); with no compiled object to judge it
 stays `open` rather than guess.
 
-Four sources, one register:
+Five sources, one register:
 
 * **`config_requests`** in `.pi/outbox/*.json`. A `range` (a seam re-draw, or a data run to claim) is open
   until a proposal pass re-draws it; a `shared-file` (a defect in a header a worker may not touch) is open
@@ -64,6 +64,12 @@ Four sources, one register:
   open item, so the credit ratio rations new claims against it exactly as against the rest, with no
   special-casing; its key is the unit, and it is carried forward from the published register so `triage`
   can re-run the one rule (`undefrefs.unresolved_names`) and close it once no undefined reference remains.
+
+* **`tools/units/datagap.py`**'s strict data-claim rule (`strict_report`): one `data-claim` item per unit that
+  still has refusable sole-owned orphan data (data only that unit's object references, claimable on its own).
+  The pair count is the item's rank weight; the item is an ordinary open item the credit ratio rations against,
+  keyed by the unit, carried forward from the published register, and `triage` re-runs the one rule and closes
+  it once the unit has none left - the same lifecycle as an `undefrefs` item.
 
 This is also the owner's "do not revoke committed progress - put the mounted naming debt in a backlog and
 work on it slowly" half: the stylelint items are ordinary open items, so the credit ratio rations new
@@ -132,7 +138,7 @@ from units import handoff as handoff_mod  # noqa: E402 (the outbox schema: FREE_
 
 STATUSES = ("open", "done", "parked")
 NEW_KINDS = ("shared-file", "range", "seam", "flag", "tooling", "naming", "band-header", "untyped",
-            "method", "undefrefs")
+            "method", "undefrefs", "data-claim")
 # default open; a `rename` is never carried
 # The lint-derived kinds: `naming` is one item per file carrying rule-7 findings, `band-header` one per file
 # carrying rule-2 findings, `untyped` one per file carrying rule-11 findings and `method` one per file carrying
@@ -156,6 +162,13 @@ DEBT_KINDS = ("naming", "band-header")
 # never re-implements it, and - like every other kind - it is an ordinary open item the ratio rations
 # against with no special-casing.
 UNDEFREF_KIND = "undefrefs"
+# The data-claim source (owner, 2026-09-29: "no data should be left behind", strict): one item per unit that still
+# has refusable sole-owned orphan data - data only that unit's target object references, which no `splits.txt`
+# claim covers and which is claimable on its own. `datagap.py` owns the one rule (`strict_report`); this source
+# reads it, never re-implements it. The item's weight is the pair count; `triage` re-runs the rule and closes the
+# item once the unit has none left. The unit's pairs a deferred class keeps out (`datagap.STRICT_CLASSES`) are
+# not backlog: they are reported by the row, never owed.
+DATACLAIM_KIND = "data-claim"
 
 # -----------------------------------------------------------------------------------------------------------
 # Text helpers
@@ -393,14 +406,17 @@ def build_items(outbox_dir: str, notes_dir: str, tooling_register: str = "",
                 statuses: dict[str, str] | None = None,
                 tooling_statuses: dict[str, str] | None = None,
                 lint_items: list[Item] | None = None,
-                undefref_items: list[Item] | None = None) -> list[Item]:
-    """Aggregate all four sources into one de-duplicated register, then apply persisted statuses.
+                undefref_items: list[Item] | None = None,
+                dataclaim_items: list[Item] | None = None) -> list[Item]:
+    """Aggregate all five sources into one de-duplicated register, then apply persisted statuses.
 
     `tooling_register` is the tracked `docs/tooling-requests.md`; its statuses are read from it when
     `tooling_statuses` is not supplied. `lint_items` is the stylelint source (one item per file with
     rule-7/rule-2 findings), built by `collect_lint_items`; it is `None` when a caller has no tree to lint.
     `undefref_items` is the undefined-reference source (one item per unit with pre-existing unresolved
     references), built by `collect_undefref_items`; it is `None` when a caller has no compiled tree.
+    `dataclaim_items` is the strict data-claim source (one item per unit with refusable sole-owned orphan
+    data), built by `collect_dataclaim_items`; `None` when a caller has no split tree.
     """
     statuses = statuses or {}
     if tooling_statuses is None:
@@ -443,6 +459,10 @@ def build_items(outbox_dir: str, notes_dir: str, tooling_register: str = "",
 
     # The undefined-reference source: an already-built item per unit, open until the rule stops firing.
     for it in (undefref_items or []):
+        _merge(grouped, (it.kind, it.target, it.defect), it)
+
+    # The data-claim source: an already-built item per unit, open until the unit's own data is claimed.
+    for it in (dataclaim_items or []):
         _merge(grouped, (it.kind, it.target, it.defect), it)
 
     items = list(grouped.values())
@@ -714,6 +734,75 @@ def collect_undefref_items(main: str, register: str | None = None) -> list[Item]
     return items
 
 
+_DATACLAIM_CACHE: dict = {}
+
+
+def dataclaim_counts(main: str) -> dict | None:
+    """`{unit: refusable pair count}` from `datagap.strict_report` - the one rule, never a second.
+
+    `None` when the rule cannot run here (no split objects, or a read failure): the source then contributes
+    nothing and `triage` leaves the items `open (no check)`, rather than reading an empty tree as "all claimed".
+    Cached per process on the map/splits mtimes, because `build` runs several times per command.
+    """
+    base = os.path.join(main, "config", "RMHE08")
+    if not (os.path.isdir(os.path.join(main, "build", "RMHE08", "obj"))
+            and os.path.exists(os.path.join(base, "splits.txt")) and os.path.exists(os.path.join(base, "symbols.txt"))):
+        return None
+    stamp = tuple(os.path.getmtime(os.path.join(base, f)) for f in ("splits.txt", "symbols.txt"))
+    hit = _DATACLAIM_CACHE.get(main)
+    if hit and hit[0] == stamp:
+        return hit[1]
+    try:
+        from units import datagap as dg
+        ranges = dg.load_claims(main)
+        (records, _stats), _n, have = dg.census(main, None, ranges=ranges)
+        if not have:
+            return None
+        report = dg.strict_report(main, records, ranges)
+    except Exception:                              # additive source: never take the register down
+        return None
+    counts: dict = {}
+    for block in report["blocks"]:
+        if block["verdict"] == "refuse":
+            counts[block["unit"]] = counts.get(block["unit"], 0) + len(block["pairs"])
+    _DATACLAIM_CACHE[main] = (stamp, counts)
+    return counts
+
+
+def _prior_dataclaim_items(register: dict) -> dict:
+    """The `unit` data-claim items the published register already carries, keyed for carry-forward (see
+    `_prior_undefref_items`: the item must survive the regeneration that follows its fix, so `triage` can close it)."""
+    out: dict = {}
+    for it in (register or {}).get("items", []):
+        if isinstance(it, dict) and it.get("kind") == DATACLAIM_KIND:
+            out[it.get("target", "")] = it
+    return out
+
+
+def collect_dataclaim_items(main: str, register: str | None = None) -> list[Item]:
+    """The fifth source: `datagap.py`'s strict data-claim rule, one item per unit with refusable pairs.
+
+    The pair count is the item's `weight`, so the unit with the most unclaimed data of its own leads. A unit
+    whose debt is gone is carried forward from the published register (weight 0) so `triage` can re-run the
+    rule and earn the credit. A tree the rule cannot run on contributes nothing new but still carries the
+    published items forward.
+    """
+    counts = dataclaim_counts(main)
+    prior = _prior_dataclaim_items(load_register(main, register))
+    items: list[Item] = []
+    for unit in sorted(set(counts or {}) | set(prior)):
+        live = (counts or {}).get(unit, 0)
+        last = int((prior.get(unit) or {}).get("weight") or 0)
+        ask = ("`%s` still has %d data pair(s) only its own object references and no `splits.txt` claim covers - "
+               "claim them (`python tools/units/dataclaim.py --unit %s` prints the exact lines) and reconstruct "
+               "the bytes, until the strict data-claim rule stops refusing the unit"
+               % (unit, live or last, unit))
+        items.append(Item(kind=DATACLAIM_KIND, target=unit, defect="sole-owned", status="open",
+                          default_status="open", ask=ask, weight=live,
+                          filings=[Filing(source="datagap", lane="datagap", when="", detail=ask)]))
+    return items
+
+
 def rank(items: list[Item]) -> list[Item]:
     """Filers first (the priority signal), then the item's weight, then recency; open before closed.
 
@@ -927,7 +1016,8 @@ def build(main: str, outbox: str | None = None, notes: str | None = None,
     ledger = load_ledger(main, register)
     items = build_items(outbox, notes, tooling_register, statuses,
                         lint_items=collect_lint_items(main, register),
-                        undefref_items=collect_undefref_items(main, register))
+                        undefref_items=collect_undefref_items(main, register),
+                        dataclaim_items=collect_dataclaim_items(main, register))
     as_of = _as_of(items)
     counts = {"open": sum(1 for i in items if i.status == "open"),
               "done": sum(1 for i in items if i.status == "done"),
@@ -1073,7 +1163,7 @@ def lane_task(main: str, item: Item, cwd: str | None = None, brief: str | None =
         return debt_task(main, item, cwd=cwd, brief=brief)
     profile = {"shared-file": "fixer", "range": "decompiler", "flag": "fixer",
                "naming": "fixer", "band-header": "fixer", "untyped": "fixer", "method": "fixer",
-               "undefrefs": "fixer",
+               "undefrefs": "fixer", "data-claim": "decompiler",
                "tooling": "worker"}.get(item.kind, "worker")
     task = ("Work the campaign backlog item `%s` (%s %s): %s. "
             "This is on the backlog, so `queue.py next` spends a credit on a new proposal claim until it is "
@@ -1565,6 +1655,35 @@ def _check_undefrefs(main: str, item: Item, ctx: dict):
             % (item.target, len(hits), ", ".join(hits[:3]) + (" ..." if len(hits) > 3 else "")))
 
 
+def _dataclaim_census(main: str, ctx: dict):
+    """The one rule, re-run once per triage: `dataclaim_counts` (which is `datagap.strict_report` over the tree).
+
+    Cached in `ctx` so many `data-claim` items pay for the census once. `None` when the rule cannot run at all,
+    which is `no check`, never a guess.
+    """
+    if "dataclaim_counts" not in ctx:
+        ctx["dataclaim_counts"] = dataclaim_counts(main)
+    return ctx["dataclaim_counts"]
+
+
+def _check_dataclaim(main: str, item: Item, ctx: dict):
+    """Whether a unit still has refusable sole-owned data - the ONE rule re-run now, never remembered.
+
+    `resolved` only when the rule ran, the unit still has a built target object to judge and the rule refuses
+    none of its data; `open` otherwise, naming the live pair count. No object, no evidence, so it stays open.
+    """
+    counts = _dataclaim_census(main, ctx)
+    if counts is None:
+        return ("open", "no check: the strict data-claim rule is not runnable here (no split objects)")
+    if not os.path.exists(os.path.join(main, "build", "RMHE08", "obj", item.target + ".o")):
+        return ("open", "no check: no target object for %s to re-run the rule" % item.target)
+    live = counts.get(item.target, 0)
+    if live:
+        return ("open", "%s still has %d refusable sole-owned data pair(s)" % (item.target, live))
+    return ("resolved", "the strict data-claim rule no longer refuses %s (re-ran datagap.strict_report over "
+                        "the tree; no refusable sole-owned pair remains)" % item.target)
+
+
 def triage_item(main: str, item: Item, ctx: dict):
     if item.kind == "range":
         return _span_decision(ctx["splits"], item.target)
@@ -1578,6 +1697,8 @@ def triage_item(main: str, item: Item, ctx: dict):
         return _check_lint(main, item, ctx)
     if item.kind == UNDEFREF_KIND:
         return _check_undefrefs(main, item, ctx)
+    if item.kind == DATACLAIM_KIND:
+        return _check_dataclaim(main, item, ctx)
     return _check_tooling(main, item, ctx)
 
 
@@ -1623,7 +1744,8 @@ def apply_triage(main: str, decisions: list, register: str | None = None, **kw) 
     tooling_register = kw.get("tooling_register") or tooling_register_path(main)
     items = build_items(outbox, notes, tooling_register, statuses,
                         lint_items=collect_lint_items(main, register),
-                        undefref_items=collect_undefref_items(main, register))
+                        undefref_items=collect_undefref_items(main, register),
+                        dataclaim_items=collect_dataclaim_items(main, register))
     counts = {"open": sum(1 for i in items if i.status == "open"),
               "done": sum(1 for i in items if i.status == "done"),
               "parked": sum(1 for i in items if i.status == "parked"),
@@ -1738,6 +1860,7 @@ def main() -> int:
     ledger = load_ledger(main_wt, register)
     lint = collect_lint_items(main_wt, register)   # the third source: one item per (file, rule)
     undefref = collect_undefref_items(main_wt, register)  # the fourth source: one item per debt-carrying unit
+    dataclaim = collect_dataclaim_items(main_wt, register)  # the fifth source: one item per unit with unclaimed data
     if args.set_status:
         key, status = args.set_status
         status = status.lower()
@@ -1745,7 +1868,7 @@ def main() -> int:
             print("status must be one of: %s" % ", ".join(STATUSES), file=sys.stderr)
             return 2
         known = {it.key for it in build_items(outbox, notes, tooling_register, statuses, lint_items=lint,
-                                              undefref_items=undefref)}
+                                              undefref_items=undefref, dataclaim_items=dataclaim)}
         if key not in known:
             print("unknown backlog key %r - see `python tools/units/backlog.py --print`" % key, file=sys.stderr)
             return 2
@@ -1756,7 +1879,7 @@ def main() -> int:
                               tooling_register=tooling_register, register=register)
         rep = triage_report(decisions)
         all_items = build_items(outbox, notes, tooling_register, statuses, lint_items=lint,
-                                undefref_items=undefref)
+                                undefref_items=undefref, dataclaim_items=dataclaim)
         balance = ledger_summary(all_items, ledger["claims"], args.ratio)
         if args.json:
             print(json.dumps({"triage": rep, "credits": balance,
@@ -1780,7 +1903,7 @@ def main() -> int:
         return 0
 
     items = build_items(outbox, notes, tooling_register, statuses, lint_items=lint,
-                        undefref_items=undefref)
+                        undefref_items=undefref, dataclaim_items=dataclaim)
     as_of = _as_of(items)
     counts = {"open": sum(1 for i in items if i.status == "open"),
               "done": sum(1 for i in items if i.status == "done"),

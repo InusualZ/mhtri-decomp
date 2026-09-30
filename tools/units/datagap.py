@@ -367,6 +367,462 @@ def orphan_verdict(base_keys, after: dict, shrinks, allowed=()) -> dict:
     return {"added": added, "pre_existing": pre, "accepted": accepted}
 
 
+# -- the strict half: sole-owned orphans of a TOUCHED unit (owner, 2026-09-29: "Yes, refuse (strict)") ----------
+#
+# The add-only row above lets a pre-existing orphan through, reported. The owner's ruling: a batch that touches a
+# unit must claim that unit's own data ("no data should be left behind"). "Own" is computed, never a file key:
+# exactly ONE registered unit's target object references the address and `callers.py` finds no unsplit reader
+# (`sole_owned_pairs`). Every such pair of a batch unit is refused, pre-existing or new, unless it can be shown
+# the pair is not claimable on its own. Each deferred pair names its class and its reason in the row's output:
+#
+#   pool-synth       .sdata/.sdata2 and our object emits more of that section than the unit's claims carry: a
+#                    claim is partial against a section the compiler still fills (playbook 23/29/58: the link dies
+#                    or the flip fails). Needs our object, so a unit with no built object is never deferred here.
+#   ambiguous-owner  the claim would sit beside a claim whose unit's `.text` order does not bracket this unit's
+#                    (text-window order): the address is read by a unit that cannot be its TU, or dtk would order
+#                    the units in a cycle.
+#   span-blocked     the unit already claims that section and the gap between its claim and the run holds another
+#                    unit's claim or data another registered unit references: one spanning claim is impossible and
+#                    a second separate range is the playbook 53 cycle.
+#   isolated-run     .sdata/.sdata2 only: the unit has no claim there and both neighbours of the run are other
+#                    owners' data or unowned (auto) - a merged cross-TU literal pool the object cannot reproduce.
+#
+# Everything else is `refuse`. A run is the maximal stretch of adjacent map rows that are all the unit's own
+# sole-owned orphans; runs merge into one block (one `splits.txt` range) while the gap between them holds no
+# other owner's data, and one verdict covers the block.
+
+POOL_SECTIONS = (".sdata", ".sdata2")
+STRICT_CLASSES = ("pool-synth", "ambiguous-owner", "span-blocked", "isolated-run")
+SECTION_ORDER = (".init", "extab", "extabindex", ".text", ".ctors", ".dtors", ".rodata", ".data", ".bss",
+                 ".sdata", ".sbss", ".sdata2", ".sbss2")
+
+
+def section_rows(symbols: dict) -> dict[str, list[tuple[int, str, int]]]:
+    """`{section: [(address, name, size)]}` sorted, one row per address (an alias at the same address is dropped)."""
+    out: dict[str, dict[int, tuple]] = {}
+    for name, e in symbols.items():
+        if e.get("section") in CENSUS_SECTIONS and e.get("type") != "function":
+            out.setdefault(e["section"], {}).setdefault(e["address"], (e["address"], name, int(e.get("size") or 0)))
+    return {sec: [rows[a] for a in sorted(rows)] for sec, rows in out.items()}
+
+
+def row_extent(rows: list, index: int) -> int:
+    """Byte extent of `rows[index]`: its `size:`, else the distance to the next row, else one word."""
+    address, _name, size = rows[index]
+    if size > 0:
+        return size
+    if index + 1 < len(rows) and rows[index + 1][0] > address:
+        return rows[index + 1][0] - address
+    return 4
+
+
+def text_starts(ranges: dict) -> dict[str, int]:
+    """`{unit: first .text address}` from the claims (a data-only unit has none)."""
+    out: dict[str, int] = {}
+    for start, _end, unit in ranges.get(".text", []):
+        out[unit] = min(start, out.get(unit, start))
+    return out
+
+
+def unit_claims(ranges: dict, unit: str, section: str) -> list[tuple[int, int]]:
+    return [(s, e) for s, e, u in ranges.get(section, []) if u == unit]
+
+
+def sole_owned_pairs(records: list[dict], query=None, units=None) -> tuple[list[dict], dict]:
+    """`(pairs, stats)`: the orphan pairs exactly one registered unit's object references and nothing else reads.
+
+    `query(address) -> ({unit: sites}, unsplit_sites)` is `readers_index`'s; with None the callers check is
+    skipped (`stats["readers_checked"]` says so). `units` restricts which units are asked (the query is the
+    expensive part). Pure given `query`.
+    """
+    want = set(units) if units is not None else None
+    pairs, stats = [], {"readers_checked": query is not None, "shared": 0, "unsplit_reader": 0}
+    for g in orphan_groups(records).values():
+        if len(g["units"]) != 1:
+            stats["shared"] += 1
+            continue
+        unit = next(iter(g["units"]))
+        if want is not None and unit not in want:
+            continue
+        if query is not None:
+            readers, unsplit = query(g["address"])
+            if unsplit or not set(readers) <= {unit}:
+                stats["unsplit_reader" if unsplit else "shared"] += 1
+                continue
+        pairs.append({"unit": unit, "name": g["name"], "section": g["section"], "address": g["address"],
+                      "size": g["size"], "sites": g["units"][unit]})
+    return pairs, stats
+
+
+def _runs(pairs: list[dict], rows_by_section: dict) -> list[dict]:
+    """Group one unit's sole-owned pairs into runs of adjacent map rows: `{unit, section, start, end, pairs}`."""
+    import bisect
+
+    out: list[dict] = []
+    by_key: dict[tuple, list[dict]] = {}
+    for p in pairs:
+        by_key.setdefault((p["unit"], p["section"]), []).append(p)
+    for (unit, section), plist in sorted(by_key.items()):
+        rows = rows_by_section.get(section, [])
+        addrs = [r[0] for r in rows]
+        plist.sort(key=lambda p: p["address"])
+        cur = None
+        for p in plist:
+            i = bisect.bisect_left(addrs, p["address"])
+            known = i < len(rows) and rows[i][0] == p["address"]
+            extent = row_extent(rows, i) if known else max(int(p["size"]) or 4, 4)
+            end = p["address"] + extent
+            if cur is not None and known and cur["last_index"] is not None and i == cur["last_index"] + 1:
+                cur["pairs"].append(p)
+                cur["end"] = end
+                cur["last_index"] = i
+            else:
+                cur = {"unit": unit, "section": section, "start": p["address"], "end": end, "pairs": [p],
+                       "last_index": i if known else None}
+                out.append(cur)
+    for run in out:
+        run.pop("last_index", None)
+        run["end"] = (run["end"] + 3) // 4 * 4
+    return out
+
+
+def _foreign_neighbour(rows: list, index: int, unit: str, section: str, ranges: dict, group_units: dict) -> bool:
+    """Whether the map row at `index` (or the section's edge) is another owner's data or unowned."""
+    if index < 0 or index >= len(rows):
+        return True
+    verdict = classify_address(section, rows[index][0], ranges, unit)
+    if verdict["status"] == "own":
+        return False
+    if verdict["status"] == "other":
+        return True
+    return group_units.get((section, rows[index][0])) != {unit}
+
+
+def _gap_blocker(lo: int, hi: int, unit: str, section: str, ctx: dict) -> str | None:
+    """Why the bytes `[lo, hi)` cannot be claimed into `unit`'s one spanning range, or None.
+
+    A blocker is another unit's claim in the gap, or a map row in it that another registered unit references or
+    `callers.py` shows an unsplit reader for (data of some other TU: a second range would put it between two
+    ranges of this unit - the playbook 53 link-order cycle). An unreferenced row is padding and does not block.
+    """
+    import bisect
+
+    for s, e, u in ctx["ranges"].get(section, []):
+        if u != unit and s < hi and lo < e:
+            return "%s's claim 0x%08X-0x%08X" % (u, s, e)
+    rows = ctx["rows"].get(section, [])
+    query = ctx.get("query")
+    for address, name, _size in rows[bisect.bisect_left(rows, (lo,)):]:
+        if address >= hi:
+            break
+        units = ctx["group_units"].get((section, address))
+        if units:
+            if units != {unit}:
+                return "%s (0x%08X), referenced by %s" % (name, address, ",".join(sorted(units)[:3]))
+            continue
+        if query is not None:
+            readers, unsplit = query(address)
+            if unsplit or not set(readers) <= {unit}:
+                return "%s (0x%08X), read by %s" % (name, address,
+                                                    ",".join(sorted(readers)[:3]) if readers else "unsplit code")
+    return None
+
+
+def judge_blocks(unit: str, section: str, runs: list[dict], ctx: dict) -> list[dict]:
+    """The blocks one unit's runs in one section merge into, each with its verdict. Pure given `ctx`.
+
+    Runs (and the unit's existing claims, as anchors) merge into one block while the gap between them holds no
+    `_gap_blocker`. The block holding an existing claim - or, with none, the block with the most pairs - is the
+    **main** one: its verdict is `refuse` unless a class below defers it. Every other block is `span-blocked`:
+    claiming it is a second range of the section separated by another owner's data. Per block, in order:
+    `pool-synth`, `ambiguous-owner`, then for the main block `isolated-run`. `ctx` carries `ranges`, `rows`,
+    `group_units`, `text_start`, `our_sizes` and `query` (see `strict_report`).
+    """
+    import bisect
+
+    ranges, rows = ctx["ranges"], ctx["rows"].get(section, [])
+    mine = unit_claims(ranges, unit, section)
+    claimed = sum(e - s for s, e in mine)
+    items = ([{"start": s, "end": e, "pairs": [], "anchor": True} for s, e in mine]
+             + [dict(r, anchor=False) for r in runs])
+    items.sort(key=lambda r: r["start"])
+    blocks: list[dict] = []
+    for item in items:
+        if blocks:
+            gap = _gap_blocker(blocks[-1]["end"], item["start"], unit, section, ctx) \
+                if item["start"] > blocks[-1]["end"] else None
+            if gap is None:
+                blocks[-1]["end"] = max(blocks[-1]["end"], item["end"])
+                blocks[-1]["pairs"] += item["pairs"]
+                blocks[-1]["anchor"] = blocks[-1]["anchor"] or item["anchor"]
+                continue
+            item["gap_before"] = gap
+        blocks.append({"unit": unit, "section": section, "start": item["start"], "end": item["end"],
+                       "pairs": list(item["pairs"]), "anchor": item["anchor"], "gap_before": item.get("gap_before")})
+    blocks = [b for b in blocks if b["pairs"]]
+    anchored = [b for b in blocks if b["anchor"]]
+    main = anchored[0] if anchored else (max(blocks, key=lambda b: (len(b["pairs"]), -b["start"])) if blocks else None)
+    our = ctx.get("our_sizes", {}).get(unit)
+    tstart = ctx["text_start"]
+    mine_t = tstart.get(unit)
+    for b in blocks:
+        start, end = b["start"], b["end"]
+        b["verdict"], b["cls"], b["reason"] = "refuse", None, ""
+        if section in POOL_SECTIONS and our is not None and our.get(section, 0) > claimed:
+            b["verdict"], b["cls"] = "deferred", "pool-synth"
+            b["reason"] = ("our object emits %d B of its own %s and the unit claims %d B: a claim of this run "
+                           "is a partial pool (playbook 23/29/58)" % (our.get(section, 0), section, claimed))
+            continue
+        below = [(s, e, u) for s, e, u in ranges.get(section, []) if e <= start and u != unit]
+        above = [(s, e, u) for s, e, u in ranges.get(section, []) if s >= end and u != unit]
+        prev = max(below, key=lambda r: r[1]) if below else None
+        nxt = min(above, key=lambda r: r[0]) if above else None
+        if mine_t is not None:
+            for other, bad in ((prev, lambda t: t > mine_t), (nxt, lambda t: t < mine_t)):
+                if other and other[2] in tstart and bad(tstart[other[2]]):
+                    b["verdict"], b["cls"] = "deferred", "ambiguous-owner"
+                    b["reason"] = ("0x%08X-0x%08X sits beside %s's claim (.text 0x%08X) but this unit's .text is "
+                                   "0x%08X: the text-window order does not bracket it"
+                                   % (start, end, other[2], tstart[other[2]], mine_t))
+                    break
+            if b["verdict"] == "deferred":
+                continue
+        if b is not main:
+            b["verdict"], b["cls"] = "deferred", "span-blocked"
+            b["reason"] = ("a second %s range for the unit: %s separates it from the unit's main range (one "
+                           "spanning claim is impossible, two is the playbook 53 cycle)"
+                           % (section, b.get("gap_before") or "other data"))
+            continue
+        if b["anchor"]:
+            b["reason"] = ("extends the unit's own %s claim (span claim, unreferenced padding included)" % section)
+            continue
+        if section in POOL_SECTIONS and rows:
+            addrs = [r[0] for r in rows]
+            i = bisect.bisect_left(addrs, start)
+            j = bisect.bisect_left(addrs, end)
+            if (_foreign_neighbour(rows, i - 1, unit, section, ranges, ctx["group_units"])
+                    and _foreign_neighbour(rows, j, unit, section, ranges, ctx["group_units"])):
+                b["verdict"], b["cls"] = "deferred", "isolated-run"
+                b["reason"] = ("no claim of the unit in %s and both neighbours of 0x%08X-0x%08X are other owners' "
+                               "or unowned data (a merged cross-TU pool)" % (section, start, end))
+                continue
+        b["reason"] = "a new %s range for the unit" % section
+    return blocks
+
+
+def strict_report(root: str, records: list[dict], ranges: dict, units: list[str] | None = None,
+                  query="lazy", symbols: dict | None = None) -> dict:
+    """The strict row's whole evidence for `units` (all registered units when None): blocks with their verdicts.
+
+    Returns `{blocks, stats, ctx}`; each block is `{unit, section, start, end, pairs, verdict, cls, reason}`.
+    """
+    symbols = symbols if symbols is not None else load_data_symbols(root)
+    if query == "lazy":
+        try:
+            query = readers_index(root)
+        except Exception:                                                    # noqa: BLE001 - no index: reloc-only
+            query = None
+    pairs, stats = sole_owned_pairs(records, query, units)
+    ctx = {"ranges": ranges, "rows": section_rows(symbols), "query": query,
+           "group_units": {k: set(g["units"]) for k, g in orphan_groups(records).items()},
+           "text_start": text_starts(ranges), "our_sizes": {}}
+    for unit in sorted({p["unit"] for p in pairs}):
+        path = os.path.join(root, "build", GAME_DIR, "src", unit + ".o")
+        try:
+            ctx["our_sizes"][unit] = section_sizes(path) if os.path.exists(path) else None
+        except Exception:                                                    # noqa: BLE001
+            ctx["our_sizes"][unit] = None
+    blocks: list[dict] = []
+    grouped: dict[tuple, list[dict]] = {}
+    for run in _runs(pairs, ctx["rows"]):
+        grouped.setdefault((run["unit"], run["section"]), []).append(run)
+    for (unit, section), runs in sorted(grouped.items()):
+        blocks += judge_blocks(unit, section, runs, ctx)
+    stats["pairs"] = len(pairs)
+    return {"blocks": blocks, "stats": stats, "ctx": ctx}
+
+
+def strict_counts(report: dict) -> dict:
+    """`{cls-or-refuse: pairs}` over a strict report's runs (a run counts its pair count)."""
+    out: dict[str, int] = {}
+    for run in report["blocks"]:
+        key = run["cls"] if run["verdict"] == "deferred" else "refuse"
+        out[key] = out.get(key, 0) + len(run["pairs"])
+    return out
+
+
+def render_strict(report: dict, names_shown: int = 4) -> str:
+    """One screen: the counts, then every block with its verdict, pair count, reason and first names."""
+    counts = strict_counts(report)
+    stats = report["stats"]
+    lines = ["strict data claim: %d sole-owned pair(s) in %d block(s) - refusable %d, %s%s"
+             % (stats.get("pairs", 0), len(report["blocks"]), counts.get("refuse", 0),
+                ", ".join("%s %d" % (c, counts.get(c, 0)) for c in STRICT_CLASSES),
+                "" if stats.get("readers_checked") else "  (callers index unavailable: references only)")]
+    for block in sorted(report["blocks"], key=lambda b: (b["unit"], SECTION_ORDER.index(b["section"])
+                                                         if b["section"] in SECTION_ORDER else 99, b["start"])):
+        tag = "REFUSE  " if block["verdict"] == "refuse" else "deferred %s" % block["cls"]
+        names = ", ".join(p["name"] for p in block["pairs"][:names_shown])
+        lines.append("  %-22s %-28s %-8s 0x%08X-0x%08X  %3d pair(s): %s%s"
+                     % (tag, block["unit"], block["section"], block["start"], block["end"], len(block["pairs"]),
+                        names, " ..." if len(block["pairs"]) > names_shown else ""))
+        lines.append("      " + block["reason"])
+    return "\n".join(lines)
+
+
+def strict_verdict(report: dict, skip_keys=(), allowed=()) -> dict:
+    """The strict row's decision. Pure.
+
+    `refused` is one line per refusable pair not already in `skip_keys` (the add-only row refuses those itself)
+    and not excused by `allowed` (hex addresses; an address inside the pair's object excuses it); `accepted` is
+    what an allowance excused; `deferred` is `{cls: [line]}`, reported and never refused.
+    """
+    sanction = set()
+    for token in allowed:
+        try:
+            sanction.add(int(str(token).strip(), 16))
+        except ValueError:
+            continue
+    refused, accepted, deferred, used = [], [], {}, set()
+    for run in report["blocks"]:
+        for p in run["pairs"]:
+            line = ("%s %s 0x%08X (%s, %d site(s)): %s" % (p["unit"], p["name"], p["address"], p["section"],
+                                                           p["sites"], run["reason"]))
+            if run["verdict"] == "deferred":
+                deferred.setdefault(run["cls"], []).append(line)
+                continue
+            if orphan_key(p["unit"], p["section"], p["address"]) in skip_keys:
+                continue
+            hit = [a for a in sanction if p["address"] <= a < p["address"] + max(int(p["size"]), 1)]
+            if hit:
+                used.update(hit)
+                accepted.append(line)
+            else:
+                refused.append(line)
+    return {"refused": refused, "accepted": accepted, "deferred": deferred, "used": sorted(used),
+            "unmatched_allowances": sorted("0x%08X" % a for a in sanction - used)}
+
+
+def splits_plan(text: str, unit: str, blocks: list[dict], our_sizes: dict | None = None) -> dict:
+    """The exact `splits.txt` edit that claims `unit`'s refusable blocks, in link-order position. Pure.
+
+    The unit's block in `text` is already where the link order wants it (units are listed in address order), so
+    the edit is inside it: each refusable block becomes one line in the section order of the file's `Sections:`
+    table, or - when the unit already claims that section - the REPLACEMENT of its line(s) by one spanning
+    range (two ranges with a gap between them is the playbook 53 cycle). Returns `{header, edits, result,
+    deferred, found}`: `edits` are `{action, section, old, new, start, end, note}`, `result` is the unit's block
+    as it would read, `deferred` the blocks the row would not refuse, with their class. Never applied.
+    """
+    import re
+
+    lines = text.splitlines()
+    head = None
+    for i, line in enumerate(lines):
+        m = re.match(r"^([^\s:][^:]*):\s*$", line)
+        if m and os.path.splitext(m.group(1))[0] == unit:
+            head = i
+            break
+    if head is None:
+        return {"found": False, "header": None, "edits": [], "result": [], "deferred": []}
+    j = head + 1
+    body = []
+    while j < len(lines) and lines[j].strip():
+        body.append(lines[j])
+        j += 1
+    parsed = []
+    for line in body:
+        m = re.match(r"^\s+(\S+)\s+start:(0x[0-9A-Fa-f]+)\s+end:(0x[0-9A-Fa-f]+)(.*)$", line)
+        parsed.append({"section": m.group(1), "start": int(m.group(2), 16), "end": int(m.group(3), 16),
+                       "tail": m.group(4), "line": line, "new": False} if m else
+                      {"section": None, "line": line, "new": False})
+    edits, deferred = [], []
+    for block in sorted(blocks, key=lambda b: (SECTION_ORDER.index(b["section"]) if b["section"] in SECTION_ORDER
+                                               else 99, b["start"])):
+        if block["verdict"] != "refuse":
+            deferred.append(block)
+            continue
+        section = block["section"]
+        same = [r for r in parsed if r["section"] == section]
+        start, end = block["start"], block["end"]
+        for r in same:
+            start, end = min(start, r["start"]), max(end, r["end"])
+        new_line = splits_line(section, start, end)
+        ours = None if our_sizes is None else our_sizes.get(section, 0)
+        total = end - start
+        note = ("our object emits %d B of %s and the claim totals %d B" % (ours, section, total)
+                if ours is not None else "no built object for the unit: the claim is unmeasured")
+        if ours is not None and ours != total:
+            if section in POOL_SECTIONS:
+                note += ("; PARTIAL RUN: the section pairs %d B of ours against %d B of the target - a claim the "
+                         "source does not define or declare in full lowers the score and can fail the link "
+                         "(playbook 23/29/58)" % (ours, total))
+            else:
+                note += ("; partial until the source defines the %d B the claim adds (rule 12: claim it, then "
+                         "reconstruct it to byte-match)" % (total - ours))
+        if same:
+            edits.append({"action": "replace", "section": section, "old": [r["line"] for r in same],
+                          "new": new_line, "start": start, "end": end, "note": note,
+                          "pairs": len(block["pairs"])})
+            first = parsed.index(same[0])
+            parsed[first] = {"section": section, "start": start, "end": end, "tail": same[0]["tail"],
+                             "line": new_line, "new": True}
+            for r in same[1:]:
+                parsed.remove(r)
+        else:
+            edits.append({"action": "add", "section": section, "old": [], "new": new_line, "start": start,
+                          "end": end, "note": note, "pairs": len(block["pairs"])})
+            at = len(parsed)
+            for k, r in enumerate(parsed):
+                if r["section"] in SECTION_ORDER and SECTION_ORDER.index(r["section"]) > SECTION_ORDER.index(section):
+                    at = k
+                    break
+            parsed.insert(at, {"section": section, "start": start, "end": end, "tail": "", "line": new_line,
+                               "new": True})
+    return {"found": True, "header": lines[head], "edits": edits, "deferred": deferred,
+            "result": [("+ " if r["new"] else "  ") + r["line"] for r in parsed]}
+
+
+def splits_line(section: str, start: int, end: int) -> str:
+    return "\t%-11s start:0x%08X end:0x%08X" % (section, start, end)
+
+
+def render_plan(plan: dict, unit: str) -> str:
+    """The plan as text a lane can paste: per-edit action lines, then the unit's resulting block."""
+    if not plan["found"]:
+        return "no `%s` block in splits.txt: register the unit first" % unit
+    lines = ["splits.txt edit for `%s` (NOT applied; force a re-split after it - `rm build/RMHE08/config.json` - and "
+             "measure the unit before and after, playbook 23):" % unit]
+    if not plan["edits"]:
+        lines.append("  nothing to add: no refusable sole-owned data block")
+    for e in plan["edits"]:
+        if e["action"] == "replace":
+            lines.append("  REPLACE %s" % " + ".join(x.strip() for x in e["old"]))
+            lines.append("     WITH %s   (%d pair(s))" % (e["new"].strip(), e["pairs"]))
+        else:
+            lines.append("  ADD     %s   (%d pair(s), in section order inside the unit's block)"
+                         % (e["new"].strip(), e["pairs"]))
+        lines.append("          %s" % e["note"])
+    for b in plan["deferred"]:
+        lines.append("  deferred %s %s 0x%08X-0x%08X (%d pair(s)): %s"
+                     % (b["cls"], b["section"], b["start"], b["end"], len(b["pairs"]), b["reason"]))
+    lines.append("resulting block (+ = new):")
+    lines.append("  " + plan["header"])
+    lines += ["  " + r for r in plan["result"]]
+    return "\n".join(lines)
+
+
+def unit_plan(root: str, unit: str) -> dict:
+    """`{plan, report}` for one unit as it stands in `root` (census over every registered object)."""
+    unit = os.path.splitext(unit.replace("\\", "/"))[0]
+    ranges = load_claims(root)
+    (records, _stats), _n, _have = census(root, None, ranges=ranges)
+    report = strict_report(root, records, ranges, [unit])
+    with open(os.path.join(root, "config", GAME_DIR, "splits.txt"), encoding="utf-8", errors="replace") as fh:
+        text = fh.read()
+    blocks = [b for b in report["blocks"] if b["unit"] == unit]
+    return {"plan": splits_plan(text, unit, blocks, report["ctx"]["our_sizes"].get(unit)), "report": report}
+
+
 def load_claims(root: str) -> dict:
     path = os.path.join(root, "config", GAME_DIR, "splits.txt")
     with open(path, encoding="utf-8", errors="replace") as fh:
@@ -421,7 +877,8 @@ def snapshot_orphans(root: str) -> dict:
             "claims": {sec: [list(r) for r in rows] for sec, rows in claimed_bytes(ranges).items()}}
 
 
-def batch_orphans(root: str, units: list[str], base_snapshot: dict | None, allowed=()) -> dict:
+def batch_orphans(root: str, units: list[str], base_snapshot: dict | None, allowed=(), strict=True,
+                  query="lazy") -> dict:
     """The gate row's whole decision for the batch units against the recorded base (see `orphan_verdict`)."""
     ranges = load_claims(root)
     names = [os.path.splitext(u)[0] for u in units]
@@ -432,13 +889,31 @@ def batch_orphans(root: str, units: list[str], base_snapshot: dict | None, allow
     shrinks = shrunk_claims(base_claims, claimed_bytes(ranges)) if base_claims else []
     verdict = orphan_verdict(snap.get("keys") or [], after, shrinks, allowed)
     verdict["have_base"] = "keys" in snap and "claims" in snap
-    # Reported, never refused: a pre-existing orphan no OTHER registered unit's object references is data this
-    # unit alone needs - the batch that works on the unit is the natural place to close it.
-    referencing = {(g["section"], g["address"]): len(g["units"]) for g in orphan_groups(records).values()}
+    # STRICT (owner, 2026-09-29): a unit the batch touches must claim the data only it references - the
+    # pre-existing pairs too. `strict_report` decides per block (refuse, or deferred with a named class); a pair
+    # the add-only half already refused or allowed is not refused twice.
     base_keys = set(snap.get("keys") or [])
-    verdict["sole_owned_debt"] = ["%s %s 0x%08X (%s)" % (r["unit"], r["name"], r["address"], r["section"])
-                                  for k, r in sorted(after.items())
-                                  if k in base_keys and referencing[(r["section"], r["address"])] == 1]
+    strict = strict_report(root, records, ranges, names, query=query) if strict else None
+    if strict is not None:
+        sv = strict_verdict(strict, skip_keys=set(after) - base_keys, allowed=allowed)
+        verdict["strict"] = sv
+        verdict["strict_counts"] = strict_counts(strict)
+        verdict["strict_blocks"] = strict["blocks"]
+        verdict["strict_stats"] = strict["stats"]
+        verdict["sole_owned"] = sv["refused"]
+        sanction = set()
+        for token in allowed:
+            try:
+                sanction.add(int(str(token).strip(), 16))
+            except ValueError:
+                continue
+        used = set(sv["used"]) | {r["address"] for k, r in after.items()
+                                   if k not in base_keys and r["address"] in sanction}
+        used |= {a for a in sanction for _s, lo, hi in shrinks if lo <= a < hi}
+        verdict["unmatched_allowances"] = sorted("0x%08X" % a for a in sanction - used)
+        verdict["sole_owned_debt"] = sv["refused"] + sv["accepted"] + [ln for v in sv["deferred"].values() for ln in v]
+    else:
+        verdict["sole_owned"], verdict["sole_owned_debt"] = [], []
     return verdict
 
 
@@ -660,6 +1135,137 @@ def selftest_census(eq) -> None:
         eq(batch_orphans(tmp, ["B/b"], {})["have_base"], False, "a base with no snapshot is flagged")
 
 
+def selftest_strict(eq) -> None:
+    """The strict half: classification classes, the row's verdict, allowance plumbing, the `splits.txt` plan."""
+    import tempfile
+
+    splits = ("Sections:\n\t.text type:code align:32\n\n"
+              "A/a.cpp:\n\t.text start:0x80010000 end:0x80010100\n\t.data start:0x805E0000 end:0x805E0010\n\n"
+              "B/b.cpp:\n\t.text start:0x80010100 end:0x80010200\n\t.data start:0x805E0100 end:0x805E0110\n\n"
+              "C/c.cpp:\n\t.text start:0x80010200 end:0x80010300\n\t.rodata start:0x80500000 end:0x80500010\n")
+    ranges = parse_splits_text(splits)
+
+    def sym(section, address, size=4):
+        return {"section": section, "address": address, "size": size, "type": "object"}
+
+    symbols = {"a1": sym(".data", 0x805E0000), "p1": sym(".data", 0x805E0010), "q": sym(".data", 0x805E0020),
+               "x": sym(".data", 0x805E0040), "y": sym(".data", 0x805E0060),
+               "ro": sym(".rodata", 0x80500010),
+               "f0": sym(".sdata2", 0x8078FFFC), "s1": sym(".sdata2", 0x80790000), "f1": sym(".sdata2", 0x80790004)}
+    refs = {"A/a": {"p1": 1, "q": 2, "y": 1, "s1": 3, "ro": 1}, "B/b": {"f0": 1, "f1": 1}, "C/c": {"x": 1}}
+    records, _stats = census_records(refs, symbols, ranges)
+    with tempfile.TemporaryDirectory() as tmp:
+        rep = strict_report(tmp, records, ranges, ["A/a"], query=None, symbols=symbols)
+        by = {(b["section"], b["start"]): b for b in rep["blocks"]}
+        data_main = by[(".data", 0x805E0000)]
+        eq((data_main["verdict"], data_main["cls"], [p["name"] for p in data_main["pairs"]]),
+           ("refuse", None, ["p1", "q"]), "a run beside the unit's own claim merges into it and is refused")
+        eq((data_main["start"], data_main["end"]), (0x805E0000, 0x805E0024), "the block is the span claim")
+        far = by[(".data", 0x805E0060)]
+        eq((far["verdict"], far["cls"]), ("deferred", "span-blocked"),
+           "a second range separated by another unit's data is span-blocked")
+        eq("x (0x805E0040)" in far["reason"], True, "... and the reason names the blocker")
+        eq(by[(".sdata2", 0x80790000)]["cls"], "isolated-run",
+           "a literal with both neighbours other owners' and no claim is an isolated run")
+        eq(by[(".rodata", 0x80500010)]["cls"], "ambiguous-owner",
+           "data beside a claim whose unit's .text is later is ambiguous by text-window order")
+        eq(strict_counts(rep), {"refuse": 2, "span-blocked": 1, "isolated-run": 1, "ambiguous-owner": 1},
+           "counts are per pair and per class")
+
+        # (b) our object emits its own pool: pool-synth wins over the neighbour test
+        ctx = dict(rep["ctx"], our_sizes={"A/a": {".sdata2": 8}})
+        run = {"unit": "A/a", "section": ".sdata2", "start": 0x80790000, "end": 0x80790004,
+               "pairs": [{"unit": "A/a", "name": "s1", "section": ".sdata2", "address": 0x80790000, "size": 4,
+                          "sites": 3}]}
+        got = judge_blocks("A/a", ".sdata2", [run], ctx)
+        eq((got[0]["verdict"], got[0]["cls"]), ("deferred", "pool-synth"),
+           "a pool section our object fills beyond the claim is deferred as pool-synth")
+        ctx0 = dict(rep["ctx"], our_sizes={"A/a": {".sdata2": 0}})
+        eq(judge_blocks("A/a", ".sdata2", [run], ctx0)[0]["cls"], "isolated-run", "no own pool: the next test decides")
+        eq(judge_blocks("A/a", ".sdata2", [run], dict(ctx0, our_sizes={"A/a": None}))[0]["cls"], "isolated-run",
+           "a unit with no built object is never deferred as pool-synth")
+        # a non-pool section never defers on our object's emission
+        drun = dict(run, section=".data", start=0x805E0010, end=0x805E0014,
+                    pairs=[dict(run["pairs"][0], section=".data", address=0x805E0010)])
+        eq(judge_blocks("A/a", ".data", [drun], ctx)[0]["verdict"], "refuse", ".data is never pool-synth")
+
+        # the row's decision: pre-existing pairs are refused, an allowance excuses one, deferred pairs are reported
+        ver = strict_verdict(rep)
+        eq((len(ver["refused"]), sorted(ver["deferred"])), (2, ["ambiguous-owner", "isolated-run", "span-blocked"]),
+           "refusable pairs are refused; each deferred class is reported with its pairs")
+        eq(all("adjacent" in ln or "span claim" in ln for ln in ver["refused"]), True, "every refusal carries its reason")
+        eq(len(strict_verdict(rep, allowed=["0x805E0010"])["refused"]), 1, "an allowance on the pair's address excuses it")
+        eq(len(strict_verdict(rep, allowed=["0x805E0012"])["refused"]), 1,
+           "... so does an address inside the pair's object")
+        eq(strict_verdict(rep, allowed=["0x805E0FFF"])["unmatched_allowances"], ["0x805E0FFF"],
+           "an allowance that matches nothing is reported and excuses nothing")
+        eq(len(strict_verdict(rep, allowed=["0x805E0FFF"])["refused"]), 2, "... the refusals stand")
+        eq(len(strict_verdict(rep, skip_keys={orphan_key("A/a", ".data", 0x805E0010)})["refused"]), 1,
+           "a pair the add-only half already refused is not refused twice")
+
+        # sharing: a second registered reader, or an unsplit reader, makes it not sole-owned
+        shared_refs = dict(refs, **{"B/b": {"p1": 1}})
+        shared_records, _s = census_records(shared_refs, symbols, ranges)
+        pairs, stats = sole_owned_pairs(shared_records, None, ["A/a"])
+        eq("p1" in [p["name"] for p in pairs], False, "a word a second unit's object references is shared, not refused")
+        pairs, stats = sole_owned_pairs(records, lambda a: ({"A/a": 1}, 1 if a == 0x805E0010 else 0), ["A/a"])
+        eq("p1" in [p["name"] for p in pairs], False, "an unsplit reader keeps the word out of the strict set")
+        eq(stats["unsplit_reader"], 1, "... and is counted")
+        pairs, _s = sole_owned_pairs(records, lambda a: ({"A/a": 1, "D/d": 1} if a == 0x805E0020 else {}, 0), ["A/a"])
+        eq("q" in [p["name"] for p in pairs], False, "another registered reader found by callers keeps it out too")
+        pairs, _s = sole_owned_pairs(records, None, ["C/c"])
+        eq([p["name"] for p in pairs], ["x"], "units restricts whose pairs are judged")
+
+        # the end-to-end row: a touched unit is refused for its PRE-EXISTING sole-owned orphan, an untouched one is not
+        import json as _json
+        os.makedirs(os.path.join(tmp, "config", "RMHE08"), exist_ok=True)
+        os.makedirs(os.path.join(tmp, "build", "RMHE08", "obj", "A"), exist_ok=True)
+        os.makedirs(os.path.join(tmp, "build", "RMHE08", "obj", "B"), exist_ok=True)
+        with open(os.path.join(tmp, "config", "RMHE08", "splits.txt"), "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(splits)
+        with open(os.path.join(tmp, "config", "RMHE08", "symbols.txt"), "w", encoding="utf-8", newline="\n") as fh:
+            fh.write("a1 = .data:0x805E0000; // type:object size:0x4\np1 = .data:0x805E0010; // type:object size:0x4\n")
+        build_fixture_object(os.path.join(tmp, "build", "RMHE08", "obj", "A", "a.o"), ["p1"])
+        build_fixture_object(os.path.join(tmp, "build", "RMHE08", "obj", "B", "b.o"), ["a1"])
+        snap = snapshot_orphans(tmp)
+        eq(snap["keys"], [orphan_key("A/a", ".data", 0x805E0010)], "the fixture's one pre-existing orphan is in the base")
+        touched = batch_orphans(tmp, ["A/a"], snap, query=None)
+        eq((touched["added"], len(touched["sole_owned"])), ([], 1),
+           "a TOUCHED unit with a pre-existing sole-owned orphan is refused (not merely reported)")
+        eq(touched["strict_counts"], {"refuse": 1}, "... with the counts alongside")
+        untouched = batch_orphans(tmp, ["B/b"], snap, query=None)
+        eq((untouched["added"], untouched["sole_owned"]), ([], []),
+           "the same orphan with its unit UNTOUCHED is not refused")
+        allowed = batch_orphans(tmp, ["A/a"], snap, ["0x805E0010"], query=None)
+        eq((allowed["sole_owned"], len(allowed["strict"]["accepted"]), allowed["unmatched_allowances"]), ([], 1, []),
+           "--allow-orphan <addr> excuses it, recorded as accepted")
+        wrong = batch_orphans(tmp, ["A/a"], snap, ["0x805E0044"], query=None)
+        eq((len(wrong["sole_owned"]), wrong["unmatched_allowances"]), (1, ["0x805E0044"]),
+           "an allowance that matches nothing keeps the refusal and is listed as unmatched")
+        off = batch_orphans(tmp, ["A/a"], snap, query=None, strict=False)
+        eq(off["sole_owned"], [], "strict=False is the old add-only row")
+        _ = _json
+
+        # the migration aid: the exact edit, in section order, replacing the unit's own line when it has one
+        plan = splits_plan(splits, "A/a", [data_main, far])
+        eq([(e["action"], e["section"], e["new"].strip()) for e in plan["edits"]],
+           [("replace", ".data", ".data       start:0x805E0000 end:0x805E0024")],
+           "the plan replaces the unit's .data line with the spanning range")
+        eq([b["cls"] for b in plan["deferred"]], ["span-blocked"], "... and lists the deferred block with its class")
+        eq(plan["result"][-1].strip().startswith("+ .data") or plan["result"][-1].startswith("+ "), True,
+           "the resulting block marks the new line")
+        ro = {"unit": "C/c", "section": ".sdata", "start": 0x80793000, "end": 0x80793008, "verdict": "refuse",
+              "cls": None, "pairs": [1, 2], "reason": "x"}
+        plan2 = splits_plan(splits, "C/c", [ro], {".sdata": 0})
+        eq(plan2["edits"][0]["action"], "add", "a section the unit does not claim is an ADD")
+        eq([r.split()[-3] if r.startswith("+") else "" for r in plan2["result"]].count(".sdata"), 1,
+           "... placed in the result")
+        eq("partial until the source defines" in plan2["edits"][0]["note"] or "PARTIAL RUN" in plan2["edits"][0]["note"],
+           True, "... with a partial-run note when our object emits less than the claim")
+        eq(splits_plan(splits, "Z/z", [])["found"], False, "an unregistered unit has no block")
+        eq("NOT applied" in render_plan(plan, "A/a"), True, "the rendering says it does not apply the edit")
+
+
 def selftest() -> int:
     checks = 0
 
@@ -734,6 +1340,7 @@ def selftest() -> int:
         dataseams.seam_note = real
 
     selftest_census(eq)
+    selftest_strict(eq)
 
     print(f"datagap selftest: {checks} checks OK")
     return 0
@@ -788,16 +1395,31 @@ def main(argv=None) -> int:
         verdict = batch_orphans(args.root, units, snap, args.allow_orphan)
         for line in verdict["added"]:
             print("REFUSED  " + line)
-        for line in verdict["accepted"]:
+        for line in verdict["sole_owned"]:
+            print("REFUSED  sole-owned: " + line)
+        for line in verdict["accepted"] + verdict["strict"]["accepted"]:
             print("ALLOWED  " + line)
-        print("pre-existing (reported, not refused): %d, of which %d referenced by no other registered unit"
-              % (len(verdict["pre_existing"]), len(verdict["sole_owned_debt"])))
-        for line in verdict["pre_existing"][:10]:
-            print("  " + line)
-        print("row: %s" % ("FAIL, %d added" % len(verdict["added"]) if verdict["added"] else "PASS"))
-        return 1 if verdict["added"] else 0
+        if verdict["unmatched_allowances"]:
+            print("UNMATCHED allowance(s) excuse nothing: " + ", ".join(verdict["unmatched_allowances"]))
+        for cls, lines in sorted(verdict["strict"]["deferred"].items()):
+            print("deferred %-15s %4d pair(s)" % (cls, len(lines)))
+            for line in lines[:3]:
+                print("    " + line)
+        per_unit: dict = {}
+        for block in verdict["strict_blocks"]:
+            row = per_unit.setdefault(block["unit"], {"refuse": 0, "deferred": 0})
+            row["refuse" if block["verdict"] == "refuse" else "deferred"] += len(block["pairs"])
+        for unit, row in sorted(per_unit.items()):
+            print("  %-34s refusable pairs %3d, deferred pairs %3d" % (unit, row["refuse"], row["deferred"]))
+        print("pre-existing (reported, not refused): %d" % len(verdict["pre_existing"]))
+        failed = bool(verdict["added"] or verdict["sole_owned"])
+        print("row: %s" % ("FAIL, %d added + %d sole-owned pair(s) unclaimed" % (len(verdict["added"]),
+                                                                                  len(verdict["sole_owned"]))
+                           if failed else "PASS"))
+        return 1 if failed else 0
     if args.census:
-        (records, stats), registered, read = census(args.root, args.unit or None)
+        ranges = load_claims(args.root)
+        (records, stats), registered, read = census(args.root, args.unit or None, ranges=ranges)
         query = None if args.no_readers else readers_index(args.root)
         rep = census_report(records, stats, query)
         if args.json:
@@ -805,6 +1427,14 @@ def main(argv=None) -> int:
                 json.dump({"registered": registered, "read": read, **rep}, fh, indent=1)
             print(f"wrote {args.json}")
         print(render_census(rep, args.top, (registered, read)))
+        if args.unit:
+            # the units' own sole-owned data, judged as the strict row judges it (the census above reads only
+            # the requested units' objects, so the other units' references are not seen here: for the pair's
+            # sharing the row re-reads every registered object)
+            (all_records, _s), _n, _h = census(args.root, None, ranges=ranges)
+            names = [os.path.splitext(u)[0] for u in args.unit]
+            print("")
+            print(render_strict(strict_report(args.root, all_records, ranges, names, query=None if args.no_readers else (query or "lazy"))))
         return 0
     if not os.path.exists(args.report):
         print(f"no report at {args.report} - run `ninja build/RMHE08/report.json` first", file=sys.stderr)

@@ -43,6 +43,10 @@ registered source, or the queue's own `never`/`owner-held`/`not claimed` refusal
         address's owner and the declaration's home can disagree), and the exact `splits.txt`
         claim (or named data-only unit) to fix it.
         Read-only - it never writes `splits.txt`; `--dry-run` just says so explicitly.
+        It ends with the land gate's STRICT data-claim view of that unit (`datagap.strict_report`: the
+        data only that unit references, refusable or deferred with its class) and the exact `splits.txt`
+        edit that claims the refusable blocks (lines to ADD in section order inside the unit's block, or the
+        spanning range that REPLACES its existing line, with a partial-run note) - a touched unit must claim it.
 
 Read-only by design: no `ninja`, no compile, no link, no write to `splits.txt`. `land.py` owns the batch
 that acts on these verdicts.
@@ -1061,10 +1065,28 @@ def reference_cli(unit: str, as_json: bool = False, dry_run: bool = False) -> in
         print("dataclaim: no built object for `%s` (build/RMHE08/obj/<unit>.o or src/<unit>.o)"
               % unit, file=sys.stderr)
         return 2
+    plan_info = None
+    try:
+        from units import datagap as datagap_mod  # noqa: PLC0415 - the strict row's own reading
+        plan_info = datagap_mod.unit_plan(ROOT, unit)
+    except Exception as exc:                        # noqa: BLE001 - the plan is additive; the references stand alone
+        print("dataclaim: strict claim plan unavailable (%s)" % exc, file=sys.stderr)
     if as_json:
+        if plan_info is not None:
+            plan = plan_info["plan"]
+            payload = dict(payload, strict_plan={
+                "found": plan["found"], "header": plan["header"], "result": plan["result"],
+                "edits": plan["edits"],
+                "deferred": [{k: v for k, v in b.items() if k != "pairs"} | {"pairs": len(b["pairs"])}
+                             for b in plan["deferred"]]})
         sys.stdout.write(json.dumps(payload, indent=1, sort_keys=True) + "\n")
     else:
         sys.stdout.write(render_references(payload) + "\n")
+        if plan_info is not None:
+            sys.stdout.write("\n" + datagap_mod.render_strict(
+                {"blocks": [b for b in plan_info["report"]["blocks"] if b["unit"] == unit],
+                 "stats": plan_info["report"]["stats"]}) + "\n\n")
+            sys.stdout.write(datagap_mod.render_plan(plan_info["plan"], unit) + "\n")
     return 0
 
 
