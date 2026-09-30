@@ -160,7 +160,7 @@ void eft_spawn_pos_in_area(void* pos, u8 a, u8 b, s32 c, f32 d);
 /* the runtime helpers the range reaches. */
 f32 fn_80050EF4(const void* a, const void* b);
 void addVec3(void* out, const void* a, const void* b);
-void fn_80051490(void* dst, s32 src);
+void assignVec3(void* dst, s32 src);
 void fn_800516F0(void* out);
 void draw_shape_arm(struct _ENEMY_WORK* self, s32 a, s32 b);
 void mhchar_mat_tev_set(void* self, s32 a, s32 b, u8 c, s32 d, s32 e, u8 f, f32 g);
@@ -1091,12 +1091,12 @@ void fn_80154D44(void) {
     nw4r::math::VEC3 e;
     nw4r::math::VEC3 f;
 
-    fn_80051490(vec_pair_801502C8_0, (s32)setVec3(&a, lbl_80796E1C, lbl_80796F84, lbl_80796E1C));
-    fn_80051490(&vec_pair_801502C8_0[1], (s32)setVec3(&b, lbl_80796E1C, lbl_807970B4, lbl_80796E1C));
-    fn_80051490(vec_pair_801502C8_1, (s32)setVec3(&c, lbl_80796E1C, lbl_80796F84, lbl_80796E1C));
-    fn_80051490(&vec_pair_801502C8_1[1], (s32)setVec3(&d, lbl_80796E1C, lbl_807970B4, lbl_80796E1C));
-    fn_80051490(vec_pair_801502C8_2, (s32)setVec3(&e, lbl_80796E1C, lbl_80796E58, lbl_80796E1C));
-    fn_80051490(&vec_pair_801502C8_2[1], (s32)setVec3(&f, lbl_80796E1C, lbl_807970B8, lbl_80796E1C));
+    assignVec3(vec_pair_801502C8_0, (s32)setVec3(&a, lbl_80796E1C, lbl_80796F84, lbl_80796E1C));
+    assignVec3(&vec_pair_801502C8_0[1], (s32)setVec3(&b, lbl_80796E1C, lbl_807970B4, lbl_80796E1C));
+    assignVec3(vec_pair_801502C8_1, (s32)setVec3(&c, lbl_80796E1C, lbl_80796F84, lbl_80796E1C));
+    assignVec3(&vec_pair_801502C8_1[1], (s32)setVec3(&d, lbl_80796E1C, lbl_807970B4, lbl_80796E1C));
+    assignVec3(vec_pair_801502C8_2, (s32)setVec3(&e, lbl_80796E1C, lbl_80796E58, lbl_80796E1C));
+    assignVec3(&vec_pair_801502C8_2[1], (s32)setVec3(&f, lbl_80796E1C, lbl_807970B8, lbl_80796E1C));
 }
 
 /* 0x80154E40 (0x50) - reset the effect slot set. */

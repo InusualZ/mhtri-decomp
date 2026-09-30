@@ -69,7 +69,7 @@ struct _ENEMY_WORK {
     /* +0x01A */ union {
         u8 pad_0x1A[0x6];
         struct {
-            /* +0x01A */ u16 field_0x01A;   /* passed to `fn_80141B88` (`enemy/fn_8035E034.cpp`) */
+            /* +0x01A */ u16 field_0x01A;   /* passed to `em_spawn_request` (`enemy/fn_8035E034.cpp`) */
             /* +0x01C */ u8 unused_0x1C[0x4];
         };
     };

@@ -261,7 +261,6 @@ typedef struct QuestListItem {
     /* +0x02E */ u8 unused_0x02E[0x002];
 } QuestListItem; /* size: 0x30 (lower bound) */
 extern QuestListItem** quest_list_items;   /* .sbss 0x80794C3C */
-extern u16* quest_list_values;             /* .sbss 0x80794C24 */
 extern s32 quest_list_count;               /* .sbss 0x80794C44 */
 #include "mh3_pad/Screen_w.h" /* `ScreenWork`/`Screen_w`, owned by src/mh3_pad.cpp (rule 1/2) */
 /* The band's own data tables. */

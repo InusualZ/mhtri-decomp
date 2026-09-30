@@ -74,6 +74,8 @@
 #include "types.h"
 #include "nw4r/math.h"                /* nw4r::math::VEC3 / MTX34 + the free-function declarations (rule 9) */
 #include "Runtime.PPCEABI.H/memset.h" /* owned by Runtime.PPCEABI.H/memset.c (rule 2) */
+#include "fn_8004CAD8/get_qResult_work.h" /* get_qResult_work (its own leaf header) */
+#include "quest/quest_result_work.h"        /* Q_ResultWork, the record the accessor hands out */
 
 /* --- the unit's own work blocks (declared, never defined - the split object defines them) ---------- */
 
@@ -91,7 +93,6 @@ extern "C" void* fn_8004D134(void);
 extern "C" void fn_8004D1A4(void);
 /* These four carry a C++ mangling in the map (`__Fv`/`__Fl`), so they are real C++ functions: the
  * compiler produces the map name from the plain spelling (rule 9 - the mangled form is never written). */
-void* get_qResult_work(void);
 void* get_vsUser_work(s32 index);
 void clear_FqResult_work(void);
 void clear_qResult_work(void);
@@ -116,9 +117,9 @@ extern "C" void* fn_8004D134(void)
 }
 
 /* The 0x438 B qResult buffer. */
-void* get_qResult_work(void)
+Q_ResultWork* get_qResult_work(void)
 {
-    return lbl_8066A1E8;
+    return (Q_ResultWork*)lbl_8066A1E8;
 }
 
 /* One of the two 0x100 B VS user slots, or null when the index is out of range. */

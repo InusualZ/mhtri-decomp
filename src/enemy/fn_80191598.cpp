@@ -93,7 +93,7 @@
  *   * the plain prototypes at the top of this file (`em_move_mode_set`, `fn_80126324`, `fn_80129xxx`,
  *     `fn_8013918C`, `joint_mtx_store`, `joint_mtx_load`, `fn_8013A654`, `fn_8008E8D0`, `fn_8008EE68`,
  *     `fn_800FBB90`, `fn_800FC0D4`, `fn_805012E8`, `mtx34_trans_add`, `mtx34_trans_get`, `MTX34_ctor`,
- *     `fn_800516F0`, `setVec3`, `copyVec3`, `VEC3_ctor`, `fn_80051490`, `stage_map_kind_get`,
+ *     `fn_800516F0`, `setVec3`, `copyVec3`, `VEC3_ctor`, `assignVec3`, `stage_map_kind_get`,
  *     `fn_80182D5C`) belong in their owners' headers / `include/unsplit/enemy.h`; `setVec3`'s
  *     `void` return in `include/mh3_pad.h` is wrong for this range's call sites, which read its r3.
  *   * the unit registers a `.ctors` word (0x8056F33C..0x8056F340, added by the split itself): the
@@ -334,7 +334,7 @@ void fn_805012E8(EmMtx33* dst, const MTX34* src);
 void mtx34_trans_add(MTX34* mtx, VEC3* vec);
 void mtx34_trans_get(MTX34* mtx, VEC3* out);
 void fn_800516F0(void* mtx);
-void fn_80051490(void* dst, const void* src);
+void assignVec3(void* dst, const void* src);
 
 /* This range's own entry points (rule 2: declared where they are defined, i.e. here). */
 void fn_80191598(EmActWork* self, u8* out_class, u8* out_state);
@@ -828,21 +828,21 @@ void fn_80192204(void) {
     VEC3 v7;
     VEC3 v8;
 
-    fn_80051490(&vec_pair_80191598_0.vec_0x00,
+    assignVec3(&vec_pair_80191598_0.vec_0x00,
                 setVec3(&v1, lbl_80797E88, lbl_807981C0, lbl_80797E88));
-    fn_80051490(&vec_pair_80191598_0.vec_0x0C,
+    assignVec3(&vec_pair_80191598_0.vec_0x0C,
                 setVec3(&v2, lbl_80797E88, lbl_80797E88, lbl_80797E88));
-    fn_80051490(&vec_pair_80191598_1.vec_0x00,
+    assignVec3(&vec_pair_80191598_1.vec_0x00,
                 setVec3(&v3, lbl_80797E88, lbl_80798230, lbl_80797E88));
-    fn_80051490(&vec_pair_80191598_1.vec_0x0C,
+    assignVec3(&vec_pair_80191598_1.vec_0x0C,
                 setVec3(&v4, lbl_80797E88, lbl_80797E88, lbl_80797E88));
-    fn_80051490(&vec_pair_80191598_2.vec_0x00,
+    assignVec3(&vec_pair_80191598_2.vec_0x00,
                 setVec3(&v5, lbl_80797E88, lbl_80797F80, lbl_80797E88));
-    fn_80051490(&vec_pair_80191598_2.vec_0x0C,
+    assignVec3(&vec_pair_80191598_2.vec_0x0C,
                 setVec3(&v6, lbl_80797E88, lbl_80798234, lbl_80797E88));
-    fn_80051490(&vec_pair_80191598_3.vec_0x00,
+    assignVec3(&vec_pair_80191598_3.vec_0x00,
                 setVec3(&v7, lbl_80797E88, lbl_80797E88, lbl_80797EB4));
-    fn_80051490(&vec_pair_80191598_3.vec_0x0C,
+    assignVec3(&vec_pair_80191598_3.vec_0x0C,
                 setVec3(&v8, lbl_80797E88, lbl_80797F24, lbl_80797E88));
 }
 

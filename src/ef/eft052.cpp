@@ -440,11 +440,11 @@ extern "C" void eft052_hold_entry_copy(CockpitHoldEntry* dst, CockpitHoldEntry* 
 extern "C" u32 eft052_page_counts_get(u16 id, u32* out1, u32* out2, u32* out3)
 {
     u32 a = fn_8004AF20(lobby_world_block);
-    u32 b = item_count_find(id, fn_8004AF78(lobby_world_block), a);
+    u32 b = item_count_find(id, userdata_equip_item_slots_get(lobby_world_block), a);
     u32 c = fn_8004B70C(id, &lobby_world_block->field_0x0180, fn_8004AE70(lobby_world_block));
     u32 d;
 
-    if (fn_8004AEC0(lobby_world_block) == 1)
+    if (userdata_gunner_ck(lobby_world_block) == 1)
         d = item_count_find(id, fn_8004AF60(lobby_world_block, 0), fn_8004AF0C(0));
     else
         d = item_count_find(id, fn_8004AF60(lobby_world_block, 1), fn_8004AF0C(1));

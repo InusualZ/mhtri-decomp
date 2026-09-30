@@ -100,7 +100,7 @@ void fn_800CC5B0(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
         v88.x = scale_a * (v64.x * scale);
         v88.y = 0.0f;
         v88.z = scale_b * (v64.z * scale);
-        fn_80051490((Vec*)&v52, (Vec*)&v64);
+        assignVec3((Vec*)&v52, (Vec*)&v64);
         VEC3_ctor(&v40);
         if (0.0f == em->spread) {
             v40.x = 0.0f;

@@ -72,6 +72,7 @@
 #include "mh3_pad/lb_param_w.h" /* `lb_param_w`, owned by mh3_pad.cpp (rule 2) */
 #include "unsplit/ai.h"
 #include "ai/fn_802D44F4.h"    /* the owner's own header (rule 2) */
+#include "quest/quest_item_slot.h" /* quest_move_state_valid_ck (rule 2: its owner) */
 
 /* Retail keeps the unfused `clrlwi`+`slwi` / `clrlwi`+`cmpwi` forms (the peephole pass fuses them
  * into `clrlslwi` and a masked compare), so the unit is compiled with the pass off (playbook 39). */
@@ -111,7 +112,6 @@ extern u16 lbl_805D43A0[0x7C];
 /* The matching 0x805D44EC table: 21 records of two u16 (size 0x54). */
 extern u16 lbl_805D44EC[0x2A];
 
-s32 quest_move_state_valid_ck(void);
 f32 fn_80050EAC(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 f32 fn_80050EF4(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 void fn_800DCCF8(void* state, nw4r::math::VEC3* pos, s32 enable);
@@ -802,7 +802,7 @@ u32 ai_skill_ck(struct _AINPC_W* self, u8 skill)
     return 0;
 }
 
-/* One 0x20-byte entry of `ainpc_entry_tbl`: `fn_802DA1B0` clears the sixteen of them with `fn_802DA200`. */
+/* One 0x20-byte entry of `ainpc_entry_tbl`: `ai_slots_clear` clears the sixteen of them with `fn_802DA200`. */
 struct AinpcEntry {
     /* +0x00 */ u8 pad_0x00[0x20];
 }; /* size: 0x20 */

@@ -13,7 +13,7 @@
  *     through `em_action_finish`.
  *   * `fn_80170600` clears the two `field_0x328`/`field_0x32A` timers; `fn_80170610` is the slot-2 setup
  *     (reads the action byte pair through `fn_80176090`, then seats the position through `setVector3`);
- *     `fn_801706B8` arms a status effect through `fn_80141B88`; `fn_80170758` reacts to an event byte;
+ *     `fn_801706B8` arms a status effect through `em_spawn_request`; `fn_80170758` reacts to an event byte;
  *     `fn_80170804` runs the slot-0 idle tick.
  *
  * Language.  C++: `nw4r::math::setVector3` is declared for C++ only (`nw4r/math.h`), and the calls the
@@ -34,6 +34,7 @@
 #include "enemy/fn_80138074.h"
 #include "enemy/fn_80171194.h"
 #include "unsplit/enemy.h"
+#include "enemy/enemy_control.h" /* em_spawn_request (the owner's header, rule 2) */
 #include "unsplit/ef.h"
 #include "ef/fn_80105314.h"
 #include "ef/eft_slot.h"     /* enemy_data_find / enemy_data_grp (their owner's header) */
@@ -85,10 +86,10 @@ void fn_801706B8(_ENEMY_WORK *self);
 
 void fn_801706B8(_ENEMY_WORK *self) {
     if (self->team == 0xC) {
-        fn_80141B88(self->field_0x01A, 0xA, 0, self->area_no, self->field_0x46C, 1, 2, 8,
+        em_spawn_request(self->field_0x01A, 0xA, 0, self->area_no, self->field_0x46C, 1, 2, 8,
                     0xFF, 0, 0);
     } else {
-        fn_80141B88(self->field_0x01A, 0xD, 0, self->area_no, self->field_0x46C, 1, 2, 8,
+        em_spawn_request(self->field_0x01A, 0xD, 0, self->area_no, self->field_0x46C, 1, 2, 8,
                     0xFF, 0, 0);
     }
 }

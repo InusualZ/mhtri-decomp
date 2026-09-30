@@ -258,8 +258,8 @@ EfVec3x2* fn_800C1B7C(EfVec3x2* self) {
 
 /* Builds a two-vector record from two source vectors and a scalar, and returns it. */
 EfVec3x2* fn_800C26A4(EfVec3x2* self, Vec* a, Vec* b, f32 w) {
-    fn_80051490(&self->a, a);
-    fn_80051490(&self->b, b);
+    assignVec3(&self->a, a);
+    assignVec3(&self->b, b);
     self->w = w;
     return self;
 }
@@ -310,9 +310,9 @@ EfAheadContext* fn_800C9434(EfAheadContext* self) {
 
 /* Builds a three-vector record from three source vectors and a scalar, and returns it. */
 EfVec3x3* fn_800C3834(EfVec3x3* self, Vec* a, Vec* b, Vec* c, f32 w) {
-    fn_80051490(&self->a, a);
-    fn_80051490(&self->b, b);
-    fn_80051490(&self->c, c);
+    assignVec3(&self->a, a);
+    assignVec3(&self->b, b);
+    assignVec3(&self->c, c);
     self->w = w;
     return self;
 }

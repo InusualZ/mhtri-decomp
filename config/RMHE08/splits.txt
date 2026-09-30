@@ -1276,7 +1276,9 @@ lobby/lb_companion_ui.cpp:
 	extab       start:0x80016994 end:0x80016CA4
 	extabindex  start:0x80035CC4 end:0x8003615C
 	.text       start:0x80338808 end:0x8033F270
-	.data       start:0x805E27D4 end:0x805E27F8
+	.data       start:0x805E27D4 end:0x805E2870
+	.bss        start:0x806BEF20 end:0x806BF0A0
+	.sbss       start:0x80794B90 end:0x80794BE0
 
 hud/cockpit_icon_data.cpp:
 	.data       start:0x805E6A58 end:0x805E70F8
@@ -1416,7 +1418,8 @@ menu/menu_result.cpp:
 	extab       start:0x8001843C end:0x8001863C
 	extabindex  start:0x800384C0 end:0x800387C0
 	.text       start:0x803967F0 end:0x8039D278
-	.data       start:0x805F1698 end:0x805F16BC
+	.data       start:0x805F1500 end:0x805F1704
+	.bss        start:0x806C5528 end:0x806C5558
 
 menu/multi_result.cpp:
 	extab       start:0x8001863C end:0x8001882C
@@ -1429,14 +1432,23 @@ lobby/lb_quest_screen.cpp:
 	.text       start:0x803A3A50 end:0x803AA4A4
 	.data       start:0x805F2038 end:0x805F2090
 
-quest/quest_entry.cpp:
-	extab       start:0x80018A6C end:0x80018C54
-	extabindex  start:0x80038E08 end:0x800390E4
-	.text       start:0x803AA4A4 end:0x803B0F98
+quest/quest_item_slot.cpp:
+	extab       start:0x80018A6C end:0x80018B0C
+	extabindex  start:0x80038E08 end:0x80038EF8
+	.text       start:0x803AA4A4 end:0x803AB3BC
 	.ctors      start:0x8056F3B0 end:0x8056F3B4
+	.data       start:0x805F2940 end:0x805F2A38
+	.sdata      start:0x807935D0 end:0x807935D8
+	.sdata2     start:0x8079C4C0 end:0x8079C50C
+
+quest/quest_entry.cpp:
+	extab       start:0x80018B0C end:0x80018C54
+	extabindex  start:0x80038EF8 end:0x800390E4
+	.text       start:0x803AB3BC end:0x803B0F98
 	.data       start:0x805F7AB0 end:0x805F7AF8
 	.bss        start:0x806C5558 end:0x806C5858
-	.sdata      start:0x80793600 end:0x80793604
+	.sdata      start:0x807935D8 end:0x8079367C
+	.sbss       start:0x80794C1C end:0x80794C3C
 
 menu/arena_result.cpp:
 	extab       start:0x80018C54 end:0x80018DC4

@@ -256,6 +256,7 @@
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "Pl/bss_pool.h" /* the owner of the `.bss` move-work table `pl_move_work` (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "quest/quest_item_slot.h" /* quest_item_work_notify (rule 2: its owner) */
 
 /* The actor the whole Pl_* family takes as its first argument. Only the offsets this unit touches are named;
  * everything in between is padding. */
@@ -536,7 +537,7 @@ extern "C" u32 isServerSelectState(s32);
 extern "C" {
 void lb_entry_handover_send(s32, u8, u8);
 }
-extern "C" void fn_80272E30(_PLW*, u16, s16);
+extern "C" void pl_item_add(_PLW*, u16, s16);
 extern "C" void fn_802E5D68(u16);
 
 extern "C" s32 pl_part_flag_ck(_PLW*, s32);
@@ -1901,7 +1902,7 @@ extern "C" void fn_8027AF88(_PLW* self)
     }
     *(s16*)((u8*)self + 1626) = 0;
     *((u8*)self + 1625) = 0;
-    fn_80272E30(self, *(u16*)(q + 1506 + *(s8*)(q + 1505) * 4),
+    pl_item_add(self, *(u16*)(q + 1506 + *(s8*)(q + 1505) * 4),
                 *(s16*)(q + 1508 + *(s8*)(q + 1505) * 4));
     *(u32*)(q + 1668 + (*(s8*)(q + 1505) >> 5) * 4) |= 1 << (*(s8*)(q + 1505) & 31);
     fn_802E5D68(*(u16*)(q + 1506 + *(s8*)(q + 1505) * 4));
@@ -2010,7 +2011,6 @@ extern "C" void fn_80278D1C(_PLW* self)
 extern "C" s32 fn_8026A6F4(_PLW*, s32);
 void sysSE_req(s32);
 extern "C" u32 fn_803B521C(s32);
-extern "C" u32 quest_item_work_notify(s32);
 
 /* 0x8027B918: steps the actor's clutch state machine from the pad edge events the move work reports. */
 extern "C" void fn_8027B918(_PLW* self)
@@ -3254,7 +3254,7 @@ extern "C" u16 fn_803BA9B0(u8, u8, u8*, s16*, void*, void*, void*);
 extern "C" void hit_flag_set__FP6_HIT_WUl(void*, u32);
 extern "C" void hit_data_apply(void*, void*);
 extern "C" void hit_flags_clear(void*);
-extern "C" void fn_8035B700(s32, s32, s32);
+extern "C" void hud_item_msg_push(s32, s32, s32);
 extern "C" void fn_8033A920(s32);
 extern "C" u16 ran_suu__Fl(s32);
 extern "C" void item_pair_copy(void*, void*);
@@ -3550,15 +3550,15 @@ extern "C" void fn_80278674(_PLW* self, s16 arg1, u8 arg2)
         u8 old = *(u8*)((u8*)self + 0x56B);
         if ((u8)m != old) {
             if (old > (u8)m) {
-                fn_8035B700(1, 4, 0);
+                hud_item_msg_push(1, 4, 0);
                 fn_8033A920(0x15);
             } else {
-                fn_8035B700(1, 5, 0);
+                hud_item_msg_push(1, 5, 0);
             }
             *(u8*)((u8*)self + 0x56B) = m;
         }
         if (changed != 0) {
-            fn_8035B700(1, 6, 0);
+            hud_item_msg_push(1, 6, 0);
         }
     }
 }

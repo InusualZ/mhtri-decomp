@@ -149,7 +149,7 @@ extern "C" void fn_802B2278(u8 a, u8 b);
 extern "C" void* fn_802B1558(void* work, long which);
 extern "C" void* fn_802B057C(void* base, s32 off);
 extern "C" void* fn_802B0540(void* self);
-/* fn_80051490 comes from include/fn_8004CAD8.h and fn_800700C0 from include/g3d/g3d_calcview.h
+/* assignVec3 comes from include/fn_8004CAD8.h and fn_800700C0 from include/g3d/g3d_calcview.h
  * (rule 2: the owner's header). */
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -401,7 +401,7 @@ extern "C" u32 fn_802B0290(u8 i, u8 j, u8 area)
 /* Copies the current area's row [i] 12-byte element [k] into `out`. */
 extern "C" void fn_802B02C4(void* out, u8 i, u8 k)
 {
-    fn_80051490((Vec*)out, (Vec*)&SW->areas[SW->areano].rows[(u8)i].v.vecs[(u8)k]);
+    assignVec3((Vec*)out, (Vec*)&SW->areas[SW->areano].rows[(u8)i].v.vecs[(u8)k]);
 }
 
 /* Classifies the current map number into a load category. */

@@ -36,7 +36,7 @@
  *     `addi r,r,-3; cmplwi r,1`.
  *   - `fn_800D87B8` (89.6 %): retail reaches the stop body by a direct jump from case 4; the `goto`-free
  *     shape (a `stop` flag with the body written twice) costs 15 instructions.
- *   - The int->float magic in `fn_800DABF0`/`fn_800DACA8`/`fn_800DB044` is the compiler's own `.sdata2`
+ *   - The int->float magic in `fn_800DABF0`/`snd_item_fail_play`/`fn_800DB044` is the compiler's own `.sdata2`
  *     pool entry: the target names it `lbl_80796400`, ours emits an anonymous `@NN` (playbook 29).
  *
  * Data runs in this range are recorded in `splits.txt` as comments and not claimed (playbook 23,
@@ -3149,7 +3149,7 @@ extern "C" void fn_800DABF0(void) {
 }
 
 /* The same, but the voice is opened with the alternate argument. */
-extern "C" void fn_800DACA8(void) {
+extern "C" void snd_item_fail_play(void) {
     SeWork* work = get_move_work_adrs__FUc(0);
     if (work == NULL) {
         return;

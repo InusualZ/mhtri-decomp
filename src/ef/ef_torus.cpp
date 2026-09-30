@@ -141,7 +141,7 @@ void fn_800C9540(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
         v_pt.y = scale_b * c2;
         v_pt.z = scale_c * (s1 * (-ratio * s2) - s1) / (1.0f + ratio);
 
-        fn_80051490((Vec*)&v_norm, (Vec*)&v_pt);
+        assignVec3((Vec*)&v_norm, (Vec*)&v_pt);
         fn_8009C484(&v_norm, &v_norm);
         setVec3(&v_flat, v_pt.x, 0.0f, v_pt.z);
         fn_8009C484(&v_flat, &v_flat);

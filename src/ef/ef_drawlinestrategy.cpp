@@ -246,7 +246,7 @@ void fn_800BEF98(DrawLineStrategy* self, DrawLineEmitter* em, DrawLineParticleMa
         if (g < fn_800B5A48()) {
             continue;
         }
-        fn_80051490((Vec*)&pos, (Vec*)&particle->position);
+        assignVec3((Vec*)&pos, (Vec*)&particle->position);
         VEC3_ctor(&dir);
         fn_800A7F00(particle, &dir);
         if (fn_800B59E4(&dir) == 0) {

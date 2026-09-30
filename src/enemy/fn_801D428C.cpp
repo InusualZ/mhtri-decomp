@@ -340,7 +340,7 @@ void eft_spawn_type11(struct _ENEMY_WORK* self, void* pos, u8 a, f32 b);
 void eft_spawn_pos_in_area(void* pos, u8 a, u8 b, s32 c, f32 d);
 void fn_800FA378(void* out);
 void fn_800FA3B8(void* out);
-void fn_80051490(void* out, const void* in);
+void assignVec3(void* out, const void* in);
 void addVec3(void* out, const void* in, const void* v);
 void fn_8004FFC8(void* a, void* b, void* c, f32 d);
 void draw_shape_arm(struct _ENEMY_WORK* self, u32 a, u32 b);
@@ -1481,20 +1481,20 @@ void fn_801D6FB8(void) {
     nw4r::math::VEC3 v12;
     nw4r::math::VEC3 v13;
 
-    fn_80051490(vec_pair_801D428C_0, setVec3(&v0, lbl_80799220, lbl_807992B0, lbl_80799220));
-    fn_80051490(&vec_pair_801D428C_0[1], setVec3(&v1, lbl_80799220, lbl_807994B8, lbl_80799220));
-    fn_80051490(vec_pair_801D428C_1, setVec3(&v2, lbl_80799220, lbl_807992B0, lbl_80799220));
-    fn_80051490(&vec_pair_801D428C_1[1], setVec3(&v3, lbl_80799220, lbl_807994B8, lbl_80799220));
-    fn_80051490(vec_pair_801D428C_2, setVec3(&v4, lbl_80799220, lbl_807992F4, lbl_80799220));
-    fn_80051490(&vec_pair_801D428C_2[1], setVec3(&v5, lbl_80799220, lbl_807994BC, lbl_80799220));
-    fn_80051490(vec_pair_801D428C_3, setVec3(&v6, lbl_80799220, lbl_807992B0, lbl_80799220));
-    fn_80051490(&vec_pair_801D428C_3[1], setVec3(&v7, lbl_80799220, lbl_807994B8, lbl_80799220));
-    fn_80051490(lbl_805B6950, setVec3(&v8, lbl_807994C0, lbl_80799220, lbl_807994C4));
-    fn_80051490(lbl_805B6950 + 0xC, setVec3(&v9, lbl_807994C8, lbl_807994CC, lbl_807994D0));
-    fn_80051490(lbl_805B6950 + 0x1C, setVec3(&v10, lbl_807994D4, lbl_80799220, lbl_807994D8));
-    fn_80051490(lbl_805B6950 + 0x28, setVec3(&v11, lbl_807994DC, lbl_80799220, lbl_807994E0));
-    fn_80051490(lbl_805B6950 + 0x38, setVec3(&v12, lbl_807994E4, lbl_80799220, lbl_807994E8));
-    fn_80051490(lbl_805B6950 + 0x44, setVec3(&v13, lbl_807994EC, lbl_80799220, lbl_807994F0));
+    assignVec3(vec_pair_801D428C_0, setVec3(&v0, lbl_80799220, lbl_807992B0, lbl_80799220));
+    assignVec3(&vec_pair_801D428C_0[1], setVec3(&v1, lbl_80799220, lbl_807994B8, lbl_80799220));
+    assignVec3(vec_pair_801D428C_1, setVec3(&v2, lbl_80799220, lbl_807992B0, lbl_80799220));
+    assignVec3(&vec_pair_801D428C_1[1], setVec3(&v3, lbl_80799220, lbl_807994B8, lbl_80799220));
+    assignVec3(vec_pair_801D428C_2, setVec3(&v4, lbl_80799220, lbl_807992F4, lbl_80799220));
+    assignVec3(&vec_pair_801D428C_2[1], setVec3(&v5, lbl_80799220, lbl_807994BC, lbl_80799220));
+    assignVec3(vec_pair_801D428C_3, setVec3(&v6, lbl_80799220, lbl_807992B0, lbl_80799220));
+    assignVec3(&vec_pair_801D428C_3[1], setVec3(&v7, lbl_80799220, lbl_807994B8, lbl_80799220));
+    assignVec3(lbl_805B6950, setVec3(&v8, lbl_807994C0, lbl_80799220, lbl_807994C4));
+    assignVec3(lbl_805B6950 + 0xC, setVec3(&v9, lbl_807994C8, lbl_807994CC, lbl_807994D0));
+    assignVec3(lbl_805B6950 + 0x1C, setVec3(&v10, lbl_807994D4, lbl_80799220, lbl_807994D8));
+    assignVec3(lbl_805B6950 + 0x28, setVec3(&v11, lbl_807994DC, lbl_80799220, lbl_807994E0));
+    assignVec3(lbl_805B6950 + 0x38, setVec3(&v12, lbl_807994E4, lbl_80799220, lbl_807994E8));
+    assignVec3(lbl_805B6950 + 0x44, setVec3(&v13, lbl_807994EC, lbl_80799220, lbl_807994F0));
 }
 
 void fn_801D71C4(struct _ENEMY_WORK* self, u8 arg1) {

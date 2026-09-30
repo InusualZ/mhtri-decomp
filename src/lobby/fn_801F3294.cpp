@@ -368,7 +368,7 @@ s16 fn_801F5534(LbPage* self)
         s16 extra = self->field_0x008 + 1;
 
         value += extra;
-        if ((u16)self->count_0x006 <= 1 && self->field_0x008 == 1 && fn_8004AEC0(lobby_world_block) == 0) {
+        if ((u16)self->count_0x006 <= 1 && self->field_0x008 == 1 && userdata_gunner_ck(lobby_world_block) == 0) {
             value = (s16)(value + 1);
         }
     }

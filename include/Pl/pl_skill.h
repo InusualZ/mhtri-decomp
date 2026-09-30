@@ -10,6 +10,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "Pl/pl_item_add.h"   /* pl_item_add (leaf header) */
 
 struct _PLW;
 
@@ -34,10 +35,8 @@ u32 Pl_cat_skill_ck__FP4_PLWUs(struct _PLW* work, u16 skill);
 extern "C" {
 #endif
 void fn_8027350C(struct _PLW* self, s32 part);
-/* 0x80272E30 - the item/skill value setter `Pl/fn_802489D4.cpp` calls and the item/motion lookup
- * `Pl/pl_act.cpp` and `Pl/pl_act_step.cpp` call; the owner defines it `extern "C" s16`
- * (`Pl/pl_skill.cpp:1233`), so the declaration keeps that return. */
-s16 fn_80272E30(struct _PLW* plw, u16 item, s16 value);
+/* 0x80272E30 - `pl_item_add`, the item/skill value setter `Pl/fn_802489D4.cpp` calls; declared in the leaf
+ * header `Pl/pl_item_add.h`, included below. */
 /* 0x802739F0 - the equipment-slot record resolver `Pl/fn_80273B14.cpp`'s act-kind switch calls;
  * the owner defines it `extern "C" s32` at `Pl/pl_skill.cpp:1682`. */
 s32 fn_802739F0(struct _PLW* plw, s16 value, s32 mode, s8* out);

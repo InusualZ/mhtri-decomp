@@ -37,6 +37,7 @@
 #include "menu/fn_8031EA8C.h"
 #include "unsplit/lobby.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "ai/fn_802D44F4.h" /* ai_slots_clear (rule 2: its owner) */
 
 /* The band's unowned callees (no registered unit owns these addresses). */
 extern "C" {
@@ -54,7 +55,6 @@ s32   fn_80217934(void);
 void  fn_803B4C64(void);
 void  fn_802E0468(u8 index, s32 value);
 void  fn_802DFCD4(void);
-void  fn_802DA1B0(void);
 void* memset(void* dst, int value, u32 size);
 s32   fn_802087D4(void);
 void  sysSE_stop(s32 value);
@@ -334,7 +334,7 @@ extern "C" void fn_8032422C(void) {
         fn_802E0468((u8)i, 0);
     }
     fn_802DFCD4();
-    fn_802DA1B0();
+    ai_slots_clear();
 }
 
 /* 0x80324224 - the screen's stored word at +0x348. */

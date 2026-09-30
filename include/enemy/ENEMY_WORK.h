@@ -117,7 +117,7 @@ struct EmFileRow {
     /* +0x48 */ u32 unused_0x48;
 };
 
-/* One 0x08-byte `{key, name}` entry of the two file tables `fn_80141050` walks (`lbl_80581E20`'s
+/* One 0x08-byte `{key, name}` entry of the two file tables `em_kind_release` walks (`lbl_80581E20`'s
  * entries are loaded through `fn_80140E48`, `lbl_80582348`'s through `fn_80140FB0`).
  * size: 0x08 */
 struct EmFileEntry {
@@ -218,7 +218,7 @@ struct _ENEMY_WORK {
     /* +0x016 */ u8 field_0x016;        /* the first counter `fn_8013791C`'s states run */
     /* +0x017 */ u8 state_0x017;        /* the state `fn_8013791C`'s second switch dispatches on */
     /* +0x018 */ s16 field_0x018;       /* `fn_80126844`'s joint/motion index */
-    /* +0x01A */ u16 field_0x01A;       /* passed to `fn_80141B88` */
+    /* +0x01A */ u16 field_0x01A;       /* passed to `em_spawn_request` */
     /* +0x01C */ u8 unused_0x01C[0x020 - 0x01C];
     /* +0x020 */ s32 timer_0x020;       /* fn_8017799C runs this down */
     /* +0x024 */ u8 char_0x024[0x34];   /* the embedded `MHchar` base `fn_800E0914` takes (0x40 bytes

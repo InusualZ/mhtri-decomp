@@ -448,8 +448,8 @@ extern "C" void fn_800584E8(void* dst) {
     copyVec2(dst, lbl_8066ACF8.vec_0x120);
 }
 
-/* `fn_80058BB0`/`system_copy_filter_arm`/`system_copy_filter_clear`: the copy-filter handshake with the system block. */
-extern "C" void fn_80058BB0(void) {
+/* `system_copy_filter_request`/`system_copy_filter_arm`/`system_copy_filter_clear`: the copy-filter handshake with the system block. */
+extern "C" void system_copy_filter_request(void) {
     if (system_w.field_0x868 != 1) {
         system_w.field_0x868 = 1;
     }

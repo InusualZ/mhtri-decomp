@@ -217,7 +217,7 @@ void fn_802E4AD4(void) {
     idx = (s8)my_player_no();
     fn_802E4978(&cockpit_work[0], &move[idx]);
     fn_802DFCD4();
-    fn_802DA1B0(NULL);
+    ai_slots_clear();
 }
 
 void fn_802E4B8C(void) {
@@ -232,7 +232,7 @@ void fn_802E4B8C(void) {
     cockpit_state.field_0x078 = 0;
     cockpit_state.field_0x002 = 100;
     cockpit_state.field_0x004 = 0;
-    fn_802DA1B0(NULL);
+    ai_slots_clear();
 }
 
 void fn_802E4C24(void) {
@@ -266,7 +266,7 @@ void fn_802E53C4(void) {
 
 void fn_802E5400(void) {
     cockpit_work[0].field_0x0CF = 1;
-    fn_802DA1B0(&cockpit_work[0]);
+    ai_slots_clear();
 }
 
 void fn_802E5414(u8 arg0) {
@@ -668,7 +668,7 @@ void fn_802E71C4(void) {
     } else {
         f32 f;
         limit = (s32)(lbl_8079A91C * Screen_w.frame_scale);
-        if (fn_803AA41C(1, lbl_8079A91C) == 0) {
+        if (quest_sub_state_end_ck(1) == 0) {
             total = quest_time_elapsed_get();
         } else {
             total = fn_803A881C();

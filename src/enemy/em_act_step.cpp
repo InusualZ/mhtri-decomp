@@ -238,7 +238,7 @@ f32 calcVecDistXZ(const void* a, const void* b);
 void fn_8012E694(struct _ENEMY_WORK* self);
 void fn_80136DF4(struct _ENEMY_WORK* self);
 void fn_800FC0D4(_CP_VECTOR* dst, const _CP_VECTOR* src);
-u32 fn_803AA41C(u32 a);
+u32 quest_sub_state_end_ck(u32 a);
 u32 fn_803B88A8(void);
 void fn_80130350(struct _ENEMY_WORK* self, void* vec);
 void fn_8027D3F0(struct _PLW* self, u8 a);
@@ -388,7 +388,7 @@ extern "C" u32 em_act_face_away(_EM_CHARA_WORK* self, _PLW* pl)
     if (Pl_master_ck(pl) != 1) {
         return 0;
     }
-    if (fn_803AA41C(1) != 0) {
+    if (quest_sub_state_end_ck(1) != 0) {
         return 0;
     }
     if (fn_803B88A8() != 0) {

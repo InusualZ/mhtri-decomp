@@ -51,6 +51,15 @@ s32 eft052_part_level_even_ck(struct _ENEMY_WORK* self, u32 part);
  * the block from it. */
 void eft052_hold_entry_set(void* entry, u8 flag);
 
+/* 0x8035B5FC - pushes the text `text` on channel `ch` onto the HUD message list and returns the new
+ * entry's id (-1 when the list is missing or full).  GUESS name; `lobby/lb_companion_ui.h` still carries
+ * its own two-argument view. */
+s32 hud_msg_push(u32 ch, const char* text);
+/* 0x8035B700 - pushes one item message (`kind` the channel, `id` the message, `arg` the item id it names) onto
+ * the HUD log: builds the line from the string table and the item name and hands it on.  Renamed from
+ * `hud_item_msg_push` (GUESS name from those two uses); moved here from `unsplit/unknown.h`. */
+s32 hud_item_msg_push(s32 kind, s32 id, u16 arg);
+
 #ifdef __cplusplus
 }
 #endif

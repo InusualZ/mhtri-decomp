@@ -40,6 +40,7 @@
 #include "Pl/fn_802693C4.h"
 #include "unsplit/Pl.h"
 #include "unsplit/unknown.h"
+#include "ef/eft052.h" /* hud_item_msg_push (the owner's header, rule 2) */
 #include "lobby/fn_8021E1EC.h"
 #include "ef/fn_800CDB2C.h"
 #include "sound/fn_800D7F54.h"
@@ -479,13 +480,13 @@ void pl_model_state_set(_PLW* self, u32 action, s32 a, u16 b) {
     if (Pl_master_ck(self) != 0 || action == 3) {
         switch (action) {
         case 2:
-            fn_8035B700(2, a, b);
+            hud_item_msg_push(2, a, b);
             return;
         case 1:
-            fn_8035B700(1, a, b);
+            hud_item_msg_push(1, a, b);
             return;
         case 3:
-            fn_8035B700(3, a, self->chunk_ofs);
+            hud_item_msg_push(3, a, self->chunk_ofs);
             break;
         }
     }

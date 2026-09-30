@@ -11,6 +11,7 @@
 
 #include "types.h"
 #include "unsplit/menu.h"
+#include "menu/quest_str_tbl_35_get.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -22,6 +23,10 @@ QuestRecord* quest_record_get(void);
 /* The result record of quest `quest_id` from the loaded quest list (or the network control's slots), or
  * NULL when none carries that id. */
 QuestRecord* quest_record_find(u16 quest_id);
+
+/* 0x803B33B0 / 0x803B33E8 - the quest message string tables 35 and 4: the string at `index`
+ * (`quest_str_tbl_35_get` is declared in the leaf header below). */
+char* quest_str_tbl_4_get(u32 index);
 
 #ifdef __cplusplus
 }

@@ -265,7 +265,7 @@ extern void Panic__Q24nw4r2dbFPCciPCce(const char* file, int line, const char* f
  * `fn_800CC5B0` by 0.006). */
 extern void VEC3_ctor(VEC3* out);                                   /* 0x80043EA8 - owner mh3_pad.cpp */
 extern VEC3* setVec3(VEC3* out, f32 x, f32 y, f32 z);               /* 0x80041E8C - owner mh3_pad.cpp */
-extern void fn_80051490(Vec* out, Vec* in);                         /* out = in */
+extern void assignVec3(Vec* out, Vec* in);                         /* out = in */
 extern void fn_8009C6F0(Vec* out, f32 angle);                       /* sin/cos of angle */
 extern void fn_8009C760(f32* out_a, f32* out_b, f32 angle);         /* sin/cos of angle */
 extern void fn_800A99B4(s32 ctx, Vec* out, EfWork* em, Vec* pos, Vec* a, Vec* b, Vec* c);

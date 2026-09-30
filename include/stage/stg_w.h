@@ -47,6 +47,16 @@ u32 fn_802B0688(void* self);
  * the signature is the callee's own body - `clrlwi r3,24` for the index, a `stb` for the value). */
 void fn_802B0A98(u8 idx, u8 value);
 
+#ifdef __cplusplus
+namespace nw4r { namespace math { struct VEC3; } }
+/* 0x802B07B4 - the start position and facing of the stage's area `area` (`quest/quest_entry.cpp`'s warp
+ * writes them into the player).  GUESS name from that use. */
+void stage_area_start_get(u8 area, nw4r::math::VEC3* pos, s32* angle);
+/* 0x802AFD50 - the start position and facing of the stage the quest phase `phase` names.  GUESS name from
+ * that use. */
+void stage_start_get(u8 phase, nw4r::math::VEC3* pos, s32* angle);
+#endif
+
 /* 0x802AEC00 - the stage pack reset `light/light.cpp`'s `fn_802C2314` calls; added with that
  * registration (rule 2: this range owns the address).  The owner's body does not exist yet, so the
  * signature is the call site's view: no arguments, no result. */

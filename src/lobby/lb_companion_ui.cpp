@@ -116,6 +116,12 @@
 
 #include "types.h"
 #include "lobby/lb_companion_ui.h"
+#include "quest/quest_result_enter.h"  /* quest_reward_faint_penalty, quest_result_enter, quest_start_enter (rule 2) */
+#include "quest/quest_item_slot.h"     /* quest_item_pair_copy_row (rule 2) */
+#include "menu/quest_str_tbl_35_get.h"  /* quest_str_tbl_35_get (rule 2) */
+#include "ef/eft052.h"               /* hud_msg_push (rule 2) */
+#include "Pl/pl_item_add.h"          /* pl_item_add (rule 2) */
+#include "lobby/lb_quest_screen.h"   /* quest_time_limit_set (rule 2) */
 #include "Network/network_pat_control.h" /* the owner's header (rule 2) */
 
 #pragma peephole off
@@ -201,7 +207,7 @@ void lb_entry_notify_send(s32 index, u8 entry) {
 /* Acts 6 and 7: 6 announces the companion work's entry when its step byte is not 4, 7 hands the
  * index to the entry handler.
  * Name: act 6 announces the companion entry when its step byte is not 4, act 7 forwards the index to
- *   `fn_803AF98C` */
+ *   `quest_reward_faint_penalty` */
 void lb_act_announce(u8 unused, LbActReq* req) {
     LbMoveWork* work;
     LbCompanionWork* companion;
@@ -220,7 +226,7 @@ void lb_act_announce(u8 unused, LbActReq* req) {
         }
         return;
     case 7:
-        fn_803AF98C(req->index_0x01);
+        quest_reward_faint_penalty(req->index_0x01);
         break;
     }
 }
@@ -333,7 +339,7 @@ s32 lb_handled_ck(u8 index) {
 }
 
 /* Act 8: hands the award screen over to act 5's or act 3's entry state.
- * Name: act 8: sel 5/3 set `work->state_0xFA` and start the `fn_803A9130` delay scaled by `Screen_w` */
+ * Name: act 8: sel 5/3 set `work->state_0xFA` and start the `quest_time_limit_set` delay scaled by `Screen_w` */
 void lb_act_award_handover(u8 unused, LbActReq* req) {
     LbMoveWork* work;
     LbCompanionWork* companion;
@@ -347,15 +353,15 @@ void lb_act_award_handover(u8 unused, LbActReq* req) {
                     work->state_0xFA = 5;
                     companion->value_0x20 = companion->value_0x24;
                     companion->step_0x2C = companion->step_0x2C + 1;
-                    fn_803A9130((s32)(lbl_8079B2B8 * Screen_w.scale_0x14), lbl_8079B2B8);
+                    quest_time_limit_set((s32)(lbl_8079B2B8 * Screen_w.scale_0x14));
                 }
                 if (req->sel_0x04.word_0x00 == 3) {
                     fn_802A0188();
                     work->state_0xFA = 3;
                     companion->value_0x20 = companion->value_0x24;
                     companion->step_0x2C = companion->step_0x2C + 1;
-                    fn_803A9130((s32)(lbl_8079B2BC * Screen_w.scale_0x14), lbl_8079B2BC);
-                    fn_800F4538();
+                    quest_time_limit_set((s32)(lbl_8079B2BC * Screen_w.scale_0x14));
+                    snd_quest_start_bgm_set();
                 }
             }
         }
@@ -430,7 +436,7 @@ void lb_act_handover(u8 unused, LbActReq* req) {
                     moves[index].flag_0x659 = 0;
                     if (req->sel_0x04.bytes_0x00.d_0x03 != 0xFF) {
                         pair = &companion->pairs_0x5E2[req->sel_0x04.bytes_0x00.d_0x03];
-                        fn_80272E30(pair->id_0x00, pair->value_0x02);
+                        pl_item_add((_PLW*)&moves[index], pair->id_0x00, pair->value_0x02);
                         fn_802E5D68(pair->id_0x00, (s8)req->sel_0x04.bytes_0x00.d_0x03);
                     }
                 }
@@ -734,7 +740,7 @@ void lb_act_slot_write(u8 unused, LbActReq* req) {
         companion = work->companion_0xDC;
         if (companion != NULL) {
             if (req->sel_0x04.bytes_0x00.d_0x03 == 0) {
-                if (isReadyCountOne() != 0 && fn_803AA41C(1) == 0 &&
+                if (isReadyCountOne() != 0 && quest_sub_state_end_ck(1) == 0 &&
                     quest_element_pick_ck((QuestWork*)companion, req->mask_0x08.byte_0x00, 1) != 1 &&
                     (s8)companion->step_0x2C != 4) {
                     fn_80334A34(&cmd, fn_800CF384(), 0xD, 0x16);
@@ -743,7 +749,7 @@ void lb_act_slot_write(u8 unused, LbActReq* req) {
                     cmd.value_0x09 = 1;
                     broadcastSessionCommand(&cmd, 0xC);
                 }
-            } else if (work->state_0xFA <= 2 && fn_803AA41C(1) == 0 &&
+            } else if (work->state_0xFA <= 2 && quest_sub_state_end_ck(1) == 0 &&
                        quest_element_pick_ck((QuestWork*)companion, req->mask_0x08.byte_0x00, 1) != 1) {
                 index = req->mask_0x08.byte_0x00;
                 fn_803A9F28(companion, &companion->slots_0x94[index], (u16)index, 0);
@@ -767,7 +773,7 @@ void lb_sub17_send(s16 value, s8 first, s8 second, s8 third) {
 
 /* Act 22: keeps the companion work's high score and hands the row on.
  * Name: act 22: keeps `companion->best_0x8F` and hands the row on (`quest_item_pair_copy_row`,
- * `fn_8035B5FC`) */
+ * `hud_msg_push`) */
 void lb_act_best_keep(u8 unused, LbActReq* req) {
     LbMoveWork* work;
     LbCompanionWork* companion;
@@ -785,7 +791,7 @@ void lb_act_best_keep(u8 unused, LbActReq* req) {
             quest_item_pair_copy_row((Q_ItemPair*)companion->pairs_0x5E2,
                                      req->sel_0x04.half_0x00,
                                      (s8)companion->best_0x8F, req->mask_0x08.byte_0x00);
-            fn_8035B5FC(1, fn_803B33B0(0x14));
+            hud_msg_push(1, quest_str_tbl_35_get(0x14));
         }
     }
 }
@@ -902,10 +908,10 @@ void lb_act_entry_start(u8 unused, LbCmdSub19* req) {
                 companion->param_0x6A3E = work->value_0xFC;
                 companion->param_0x6A3F = work->value_0xFB;
                 if (work->state_0xFA == 5) {
-                    fn_803AFE4C(companion, companion->index_0x6A68);
+                    quest_result_enter((Q_ItemWork*)companion, (Q_MoveWork*)work, companion->index_0x6A68);
                     return;
                 }
-                fn_803AFF34(companion);
+                quest_start_enter((Q_ItemWork*)companion, (Q_MoveWork*)work);
             }
         }
     }

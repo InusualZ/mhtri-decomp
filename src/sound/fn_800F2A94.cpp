@@ -41,8 +41,8 @@
  * because MAIN has neither a target object nor a ninja rule for this range):
  *   * 22 of the 45 symbols are reconstructed and at or above the 80 % bar; 18 of them are byte-identical.
  *     Matched bytes across the unit: 1983 / 14988 (13.23 %).
- *   * `#pragma peephole off` is load-bearing and is this file's first line: `fn_800F46D8` 86.82 -> 100 and
- *     `fn_800F4704` 87.92 -> 100 are byte-identical only with it, and it is the shared finding of both
+ *   * `#pragma peephole off` is load-bearing and is this file's first line: `snd_player_mask_set` 86.82 -> 100 and
+ *     `snd_player_mask_clear` 87.92 -> 100 are byte-identical only with it, and it is the shared finding of both
  *     neighbouring `sound` units.  It costs `fn_800F51B8` (100 -> 90, still above the bar) and
  *     `fn_800F5A54` (100 -> 96); the scoped-pragma alternative is an outbox `flag` request.
  *   * Below 100 % but above the bar: `fn_800F2E38` 97.47, `fn_800F3218` 96.79, `fn_800F4644` 95.54,
@@ -50,7 +50,7 @@
  *     register colouring only.
  *   * 23 symbols are unwritten (0 %).  Biggest first: `fn_800F4A90` (0x728), `fn_800F5290` (0x67C),
  *     `fn_800F3F98` (0x3B8), `fn_800F3C58` (0x340), `fn_800F3604` (0x320), `fn_800F3054` (0x1C4),
- *     `fn_800F2A94` (0x244), `fn_800F2CD8` (0x160), `fn_800F34EC`+`fn_800F3554` (0x118), `fn_800F4734`
+ *     `fn_800F2A94` (0x244), `fn_800F2CD8` (0x160), `fn_800F34EC`+`fn_800F3554` (0x118), `snd_quest_scene_set`
  *     (0x138), `fn_800F48F4` (0x174).  The complete per-symbol table is the outbox's `symbols`.
  *   * `fn_800F2A94` (the 0x244-byte block initialiser) is *not* written: its store order interleaves
  *     three parallel 3-entry runs and no source shape tried so far reproduces the sequence.  It is the
@@ -358,7 +358,7 @@ extern "C" void fn_800F6514() {
 }
 
 /* 0x800F4538 - 0x28: drop the two pending flags and raise 0x44/0x4C. */
-extern "C" void fn_800F4538() {
+extern "C" void snd_quest_start_bgm_set() {
     BgmCtrl* work = lbl_80791690;
     if (work == NULL) {
         return;
@@ -379,7 +379,7 @@ extern "C" int fn_800F4A68() {
 }
 
 /* 0x800F46D8 - 0x2C: set bit `id` of the pending word. */
-extern "C" void fn_800F46D8(u8 id) {
+extern "C" void snd_player_mask_set(u8 id) {
     BgmCtrl* work = lbl_80791690;
     if (work == NULL) {
         return;
@@ -388,7 +388,7 @@ extern "C" void fn_800F46D8(u8 id) {
 }
 
 /* 0x800F4704 - 0x30: clear bit `id` of the pending word. */
-extern "C" void fn_800F4704(u8 id) {
+extern "C" void snd_player_mask_clear(u8 id) {
     BgmCtrl* work = lbl_80791690;
     if (work == NULL) {
         return;
@@ -397,7 +397,7 @@ extern "C" void fn_800F4704(u8 id) {
 }
 
 /* 0x800F486C - 0x50: restart the active request. */
-extern "C" void fn_800F486C() {
+extern "C" void snd_quest_result_bgm_set() {
     BgmCtrl* work = lbl_80791690;
     if (work == NULL) {
         return;

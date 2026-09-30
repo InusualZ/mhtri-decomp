@@ -101,4 +101,13 @@ u8 Pl_area_flag_get(u8 index);
  * had not declared it yet). */
 void fn_8028F558(void* a, void* b);
 
+/* 0x8028D0EC - starts a player warp to `pos` facing `angle`: stores the destination in the move work,
+ * arms the transfer mode and the fade; `mode` 0xFF warps the current player only.  C linkage (the map
+ * row is a plain name).  GUESS name from those effects; declared for `quest/quest_entry.cpp`. */
+#ifdef __cplusplus
+extern "C" {
+void pl_warp_start(u8 mode, nw4r::math::VEC3* pos, u16 angle);
+}
+#endif
+
 #endif /* MHTRI_PL_FN_80288CEC_H */

@@ -664,9 +664,9 @@ s32 fn_80262688(_PLW* self) {
                     fn_80335CE8(self, 7, (u16)work->chunk_ofs);
                 }
             } else {
-                fn_80272E30(work, work->field_0x650, (s16)(-work->field_0x652));
+                pl_item_add(work, work->field_0x650, (s16)(-work->field_0x652));
                 work->field_0x656 = 0xFF;
-                fn_80272E30(self, self->field_0x650, self->field_0x652);
+                pl_item_add(self, self->field_0x650, self->field_0x652);
                 self->field_0x656 = 1;
                 pl_model_state_set(self, 2, 29, self->field_0x650);
                 if ((u16)fn_8004EB18(self->field_0x650) == 1) {

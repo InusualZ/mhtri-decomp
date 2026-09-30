@@ -260,11 +260,7 @@ void fn_80132264(struct _ENEMY_WORK* self);
  * unit.  `enemy/fn_801502C8.cpp` owns 0x801502C8-0x801545B8 now, so `include/enemy/fn_801502C8.h`
  * (included above) declares both: `fn_80154CA4` takes the record and `fn_801545B8` the 0x18-byte
  * spawn record; the spellings here were the call sites' `void*`/`u32` view (rule 2). */
-/* The tenth argument is a POINTER, settled from the callee's own body (`auto_fn_80141B88_text.s`):
- * it loads the outgoing stack word into r21 and hands it to `copyVec3` as the second argument
- * when it is non-null, and the two callers pass a `VEC3*` (`enemy/fn_8015D860.cpp`'s `fn_8015DB68`)
- * or null (`enemy/fn_80170600.cpp`'s `fn_801706B8`). */
-void fn_80141B88(u16 a, s32 b, s32 c, u8 d, u8 e, s32 f, s32 g, s32 h, s32 i, void* j, s32 k);
+/* `em_spawn_request` (0x80141B88) moved to its owner's header, `include/enemy/enemy_control.h`. */
 /* The unclaimed `.text` run 0x801926EC..0x801993E0 (a proposal of its own, registered by nobody
  * yet): its per-action entry points are what the dispatchers in `enemy/fn_801993E0.cpp` switch
  * over.  Added with that unit's registration (docs/plan.md 6.5 rule 2): the address band brackets as

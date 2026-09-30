@@ -96,7 +96,8 @@ typedef struct SystemWork {
     /* +0x7CC */ u8 field_0x7cc;
     /* +0x7CD */ u8 field_0x7cd;
     /* +0x7CE */ u8 field_0x7ce;
-    /* +0x7CF */ u8 pad_0x7cf[0x2];
+    /* +0x7CF */ u8 field_0x7cf;    /* 0x15 selects the second string of each quest entry message pair */
+    /* +0x7D0 */ u8 pad_0x7d0[0x1];
     /* +0x7D1 */ u8 field_0x7d1;    /* set to 1 with +0x7D2 by the lobby pre-quest flow */
     /* +0x7D2 */ u8 field_0x7d2;    /* == 1 is the quest-work busy gate (`quest_work_busy_ck`) */
     /* +0x7D3 */ u8 field_0x7d3;    /* game_ready_ck: == 1 */

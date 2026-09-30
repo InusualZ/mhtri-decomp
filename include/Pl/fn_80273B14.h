@@ -7,6 +7,7 @@
 #define MHTRI_PL_FN_80273B14_H
 
 #include "types.h"
+#include "Pl/pl_act_stage_latch_set.h" /* pl_act_stage_latch_set, my_player_work_get (leaf header) */
 
 struct _PLW;
 struct _EQUIP;
@@ -114,7 +115,6 @@ s32 fn_80273ED8(struct _PLW* plw, s32 kind, s32 flag);
 /* 0x802740F4 / 0x802744A0 / 0x80274748 / 0x80274794 - the armed-value and follow-up stage helpers. */
 void fn_802740F4(struct _PLW* plw, struct _EQUIP* equip);
 void fn_802744A0(struct _PLW* plw);
-void fn_80274748(struct _PLW* plw, s8 stage);
 s32 fn_80274794(struct _PLW* plw);
 
 /* 0x80274808 / 0x80275AFC - the follow-up stage byte and the act kind byte. */
@@ -125,7 +125,6 @@ void fn_80275AFC(struct _PLW* plw, s8 value);
 void fn_802761DC(struct _PLW* self, u32 a, u32 b, u32 c);
 
 /* 0x80274810 / 0x80274850 - the player's own move work record and its sibling scan. */
-void* fn_80274810(void);
 void* fn_80274850(struct _PLW* plw);
 
 /* 0x80274918 - the act-name table row picker. */

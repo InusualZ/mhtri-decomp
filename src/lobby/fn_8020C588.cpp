@@ -44,7 +44,7 @@
  *    definition lives in `src/mh3_pad.cpp` (rule 1: a shared type in one header), so naming them here
  *    would copy it.  Config_request: move `PlayerPad` into `include/mh3_pad.h`.
  *  - `fn_80211E68` (504 B, 0x80211E68) is the range's other jump-table switch and needs no `_PLW`
- *    field, only `Pl_act_ck(_PLW*, u8, u16)` + `fn_80274810()` passed straight through.  Its arms are
+ *    field, only `Pl_act_ck(_PLW*, u8, u16)` + `my_player_work_get()` passed straight through.  Its arms are
  *    in the DOL's table order `0, 28|33|37, 27, 7, 17, 23, 24, 2, 21, 22, 3, 15, 4, 11, 5, 6, 8, 12,
  *    29, 13, 14, 16, 18, 19, 10, 20, 26, 30, 31, 32, 34, 25, 35` (read out of `jumptable_805B96D8`),
  *    and cases 1, 9 and 36 fall straight through to the end.  Left for the next session rather than

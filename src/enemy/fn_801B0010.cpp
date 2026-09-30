@@ -48,7 +48,7 @@
  * and the bodies came across as a delta; the header set was reconciled with the units that landed
  * while the branch waited, and the two functions whose rows moved moved UP (`fn_801B0230` 95.09 ->
  * 95.64 and `fn_801B03E8` 91.35 -> 93.65: the branch had declared `Pl/pl_skill.h`'s `Pl_item_timer_get`/
- * `fn_80272E30` at C++ scope, while their owner defines them `extern "C"`, so their call sites were
+ * `pl_item_add` at C++ scope, while their owner defines them `extern "C"`, so their call sites were
  * emitting a mangled reloc the target does not have).  Everything else that changed here:
  *   * `pl_model_state_set` moved from `include/unsplit/Pl.h` (a fallback band, and a `rule 2` finding once
  *     its owner existed) to the owner's header `include/Pl/fn_80262940.h`; `fn_801E01BC` likewise to
@@ -125,6 +125,7 @@
 #include "Pl/fn_80262940.h" /* pl_model_state_set (rule 2: its owner's header) */
 
 #include "mh3_pad.h"
+#include "quest/quest_item_slot.h" /* quest_item_work_merge (rule 2: its owner) */
 
 /* ------------------------------------------------------------------------------------------------ */
 /* declarations this unit needs whose owner's header does not carry them yet                          */
@@ -143,9 +144,6 @@ struct EmItemRow {
     /* +0x02 */ u8 unused_0x02[2];
 };
 EmItemRow* GetItemData(u16 id);
-/* 0x803AAB80 - the not-yet-registered band between `hud/fn_80324F7C.c` and
- * `Network/NetworkWiiMediator.c` (named gap).  r3 the player work, r4 the id, r5 the value. */
-extern "C" void quest_item_work_merge(_PLW* plw, u16 id, s32 value);
 /* 0x802D8414 - `ai_torch_ck(_AINPC_W*)`; the owner band sits between `ai/fn_802D0DCC.c` and
  * `ef/fn_803066F0.c` (named gap).  Declared at C++ scope with its real signature (rule 9). */
 struct _AINPC_W;
@@ -362,7 +360,7 @@ extern "C" u32 fn_801B0230(_ENEMY_WORK* work, _PLW* plw) {
         work->field_0x328 = plw->slot_id[usable[ran_suu(0) % count]].item_id;
     }
     work->plw_0x32C = plw;
-    fn_80272E30(plw, work->field_0x328, -1);
+    pl_item_add(plw, work->field_0x328, -1);
     pl_model_state_set(plw, 2, 0x1B, work->field_0x328);
     return 1;
 }
@@ -376,7 +374,7 @@ extern "C" void fn_801B03E8(_ENEMY_WORK* work) {
     if (work->plw_0x32C == NULL) {
         return;
     }
-    fn_80272E30(work->plw_0x32C, work->field_0x328, 1);
+    pl_item_add(work->plw_0x32C, work->field_0x328, 1);
     pl_model_state_set(work->plw_0x32C, 2, 0x1C, work->field_0x328);
     work->field_0x328 = 0;
     work->plw_0x32C = NULL;
@@ -1621,9 +1619,9 @@ extern "C" void fn_801B42DC(void) {
     VEC3 rec;
 
     setVec3(&rec, lbl_80798B48, lbl_80798B94, lbl_80798C58);
-    fn_80051490((Vec*)vec_pair_801B0010_0, (Vec*)&rec);
+    assignVec3((Vec*)vec_pair_801B0010_0, (Vec*)&rec);
     setVec3(&rec, lbl_80798B48, lbl_80798C5C, lbl_80798C60);
-    fn_80051490((Vec*)&vec_pair_801B0010_0[1], (Vec*)&rec);
+    assignVec3((Vec*)&vec_pair_801B0010_0[1], (Vec*)&rec);
 }
 
 /* 0x801B4348 (0x50).  The em030 ground-position hook: the ground record `fn_80125F54` builds for the
