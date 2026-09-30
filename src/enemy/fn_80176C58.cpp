@@ -13,7 +13,7 @@
  * The rest is the enemy's damage/death bookkeeping:
  *   - `fn_80176C58(self, arg)` is the per-tick entry: it attaches a 12-byte helper (the vtable object
  *     `lbl_805AA900`, constructed by `fn_80176E50`) when `fn_801391E8` says the enemy has none, then
- *     resets `field_0x1E4`, picks a motion set from `fn_802B0668(self->field_0x1E0)`, and - when the
+ *     resets `field_0x1E4`, picks a motion set from `stage_map_kind_get(self->field_0x1E0)`, and - when the
  *     enemy's `state_0x009` is clear - spawns the effect (`setVector3` + `fn_801057A4` + `fn_8010A7D4`).
  *   - `fn_80176E8C` / `fn_8017708C` are the two state transition tables, keyed on the current
  *     `(state, sub-state)` pair read out of two `u8` records the caller passes in.
@@ -91,7 +91,7 @@ extern "C" u8 lbl_805AA900[];
 /* Declared in a shared header: `VEC3_ctor`, `setVector3` (`nw4r/math.h`); `fn_8012ECF0`,
  * `em_mot_end_ck`, `em_move_mode_set` (`unsplit/enemy.h`).  The C++ free functions are declared by their
  * real signatures so the front-end mangles them to the map spellings. */
-extern "C" u8 fn_802B0668(u8 id);
+extern "C" u8 stage_map_kind_get(u8 id);
 extern "C" void fn_80182978(_ENEMY_WORK* self);
 extern "C" void fn_80128A8C(_ENEMY_WORK* self, u32 a, u32 b);
 extern "C" u32 quest_id_get(void);
@@ -137,7 +137,7 @@ extern "C" void fn_80176C58(_ENEMY_WORK* self, u32 arg) {
     if ((u32)(mode - 1) <= 1 || mode == 4) {
         /* these modes do not run the motion hand-off */
     } else {
-        kind = fn_802B0668(self->field_0x1E0);
+        kind = stage_map_kind_get(self->field_0x1E0);
         switch (kind) {
           case 1:
             if (self->act_id == 5) {

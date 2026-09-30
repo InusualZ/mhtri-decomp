@@ -622,7 +622,7 @@ void fn_801E843C(LbMenuWork* self)
         idp += 2;
     }
     if ((s32)shown == 0) {
-        fn_801E6850((s16*)&pos, (void*)get_lsp_data(0x1D7DU, NULL));
+        spr_data_copy((s16*)&pos, (void*)get_lsp_data(0x1D7DU, NULL));
         pos.y += 0x32;
         draw_font((const _SPR_DATA_&)pos, (s8*)LbStr(0, 0x13CU), 0, &anchor);
     }
@@ -689,12 +689,12 @@ void fn_801E89B4(LbMenuWork* self)
     get_lsp_data(0x1E16U, &pos);
     draw_sprite_ary((const u16*)lbl_805BAA20, &pos);
     found = 0;
-    fn_801E6850((s16*)&p0, (s16*)get_lsp_data(0x1307U, NULL));
+    spr_data_copy((s16*)&p0, (s16*)get_lsp_data(0x1307U, NULL));
     uv_pair_copy(&a, &p0);
     off = 0;
     for (i = 0; i < 0x1E; i++) {
         fn_80222848(i, (s16*)&m);
-        fn_801E6850((s16*)&p2, (s16*)get_lsp_data(0x12F9U, NULL));
+        spr_data_copy((s16*)&p2, (s16*)get_lsp_data(0x12F9U, NULL));
         uv_pair_copy(&p2, &m);
         p0.x = m.x + a.x;
         p0.y = m.y + a.y;
@@ -704,7 +704,7 @@ void fn_801E89B4(LbMenuWork* self)
             uv_pair_copy(&p1, &m);
         }
         if ((u8)(self->state_0x00 + 0xFF) <= 1U && chk_pointer() == 0 && self->count_0x10 == i) {
-            fn_801E6850((s16*)&p2, (s16*)get_lsp_data(0x1304U, NULL));
+            spr_data_copy((s16*)&p2, (s16*)get_lsp_data(0x1304U, NULL));
             p2.x += m.x;
             p2.y += m.y;
             set_blendmode(4, 1, 1);
@@ -718,12 +718,12 @@ void fn_801E89B4(LbMenuWork* self)
     }
     if (self->list_mode_0x0C != 0 && found != 0) {
         set_blendmode(4, 1, 1);
-        fn_801E6850((s16*)&p2, (s16*)get_lsp_data(0x1305U, NULL));
+        spr_data_copy((s16*)&p2, (s16*)get_lsp_data(0x1305U, NULL));
         p2.x += p1.x;
         p2.y += p1.y;
         fn_802E0DA8((s16*)&p2, (u16)self->stage_0x0E, (s16*)&pos);
         set_blendmode(4, 5, 1);
-        fn_801E6850((s16*)&p2, (s16*)get_lsp_data(0x1306U, NULL));
+        spr_data_copy((s16*)&p2, (s16*)get_lsp_data(0x1306U, NULL));
         p2.x += p1.x;
         p2.y += p1.y;
         fn_802E0DA8((s16*)&p2, (u16)self->stage_0x0E, (s16*)&pos);
@@ -820,7 +820,7 @@ void fn_801E8D5C(LbMenuWork* self)
             str_tbl_33_get(entry->kind_0x00);
             fn_80215C98(selected, (s16*)&pos, color, 0xC);
             sprintf((char*)buf, (char*)lbl_80791BC0, entry->id_0x02, LbStr(1, 0x2CU));
-            fn_801E6850((s16*)&data, (s16*)get_lsp_data(0x1E62U, NULL));
+            spr_data_copy((s16*)&data, (s16*)get_lsp_data(0x1E62U, NULL));
             draw_font((const _SPR_DATA_&)data, (s8*)buf, 2, &pos);
         }
         entry++;

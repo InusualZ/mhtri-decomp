@@ -18,10 +18,31 @@
 extern "C" {
 #endif
 
-void fn_802DA1A8(void* work);            /* 0x802DA1A8 */
+/* One 0x20-byte slot of the HUD notice pool at 0x806BD808 (16 slots; `hud_notice_spawn` returns the
+ * free slot it filled, or 0 when the pool is full).  Only the watched-flag pointer the cockpit
+ * sets is written by the consumers.  size: 0x20 */
+typedef struct HudNotice {
+    /* +0x00 */ u8 unused_0x00[0x08 - 0x00];
+    /* +0x08 */ u8* flag_ptr;   /* the byte the notice reads its live state from */
+    /* +0x0C */ u8 unused_0x0C[0x20 - 0x0C];
+} HudNotice;
+
+/* 0x802DA1A8 - stores the watched flag pointer into the slot `hud_notice_spawn` returned. */
+void hud_notice_set_flag_ptr(HudNotice* notice, u8* flag);
 void fn_802DA1B0(void* work);            /* 0x802DA1B0 */
 void fn_802DA344(void);                  /* 0x802DA344 */
-s32 fn_802DA454(s32, s32, s16, s16, s32, s32, s32); /* 0x802DA454 */
+/* 0x802DA454 - claims a free slot of the notice pool and fills it from the arguments (kind, id, the
+ * position and three mode bytes); returns the slot. */
+HudNotice* hud_notice_spawn(s32 kind, s32 id, s16 x, s16 y, s32 a, s32 b, s32 c);
+
+struct _AINPC_W;
+/* 0x802D7DB4 - whether the AI NPC's +0x420 == 5 state has its +0x422 timer running (0 for an empty record). */
+s32 ai_npc_hold_ck(struct _AINPC_W* self);
+/* 0x802D7E20 - whether the AI NPC has arrived (its step counter is at 1; 0 for an empty record). */
+s32 ai_npc_arrived_ck(struct _AINPC_W* self);
+
+/* 0x802D9F58 - the HUD colour word of player `player`. */
+u32 player_color_get(u8 player);
 void ai_npc_hold_item_arm(void);                  /* 0x802D6534, called by hud/cockpit_quest.cpp's
                                           * `quest_slot_arm_a` (its body is written in this unit) */
 

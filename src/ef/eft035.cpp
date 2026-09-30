@@ -21,7 +21,7 @@
  *
  * Seam (unproven).  This is one maximal unclaimed run, registered whole.  Two clusters share it and
  * there is no call edge between them: 0x802F140C..0x802F2238 (11 functions) drives the cockpit HUD
- * records (`lbl_806BDCC8`/`lbl_806BDFF0`, the `draw_sprite`/`drawshape` helpers) and carries the
+ * records (`cockpit_work`/`cockpit_state`, the `draw_sprite`/`drawshape` helpers) and carries the
  * file-scope static initialiser `fn_802F20D8`, while 0x802F2238..0x802F5138 (28 functions) is the
  * `eft035` family proper.  A *second* effect family (tag 34; `fn_802F39DC` seeds `field_0x03 = 34`
  * where `eft035_set` seeds 35) sits in the same half, so the range may hold more than one original
@@ -84,7 +84,7 @@
  * fn_802F2988 (0x2F0), fn_802F2CB0 (0x540), fn_802F31F0 (0x168), fn_802F3358 (0x5E8),
  * fn_802F3B48 (0x24C), fn_802F3D94 (0xC34), fn_802F49DC (0x17C), fn_802F4B58 (0x2F0),
  * fn_802F4E48 (0x270), fn_802F50B8 (0x44), fn_802F50FC (0x3C).  What they need beyond this pass: the
- * 11 HUD functions drive `lbl_806BDCC8`/`lbl_806BDFF0` (their types live in `hud/cockpit_quest.h` and
+ * 11 HUD functions drive `cockpit_work`/`cockpit_state` (their types live in `hud/cockpit_quest.h` and
  * `hud/fn_802EBED8.h`) plus the `draw_sprite`/`drawshape` helpers, and `fn_802F20D8` needs the
  * `__construct_array` runtime helper (whose only declaration today sits in `sound/sound_work.h`);
  * the two tag-34 bodies (`fn_802F3B48`, `fn_802F3D94`) read the `_ENEMY_WORK` motion/sound block and

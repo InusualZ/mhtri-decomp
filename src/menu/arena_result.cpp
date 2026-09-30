@@ -83,16 +83,16 @@
  *
  * The 13 functions still unwritten are blocked by *naming*, not by evidence: every one of them but
  * `quest_arena_summary_step` calls another band's starter name (`fn_80272E30`,
- * `fn_8027BC48`, `countOccupiedServerSlots`/`isServerSelectState`/`isReadyCountOne`,
+ * `Pl_motion_input_ck`, `countOccupiedServerSlots`/`isServerSelectState`/`isReadyCountOne`,
  * `fn_802D8ABC`..`fn_802D8EA8`, `fn_8035B5FC`, `fn_8033A920`, `fn_802AFC94`/`AFE08`, ..., and the
  * `fn_800CF280` this list used to carry is the already-named `move_work_state_ck`), and a call to
  * one in this new file is a rule-7 finding; `quest_arena_summary_step` (344 B) is blocked
  * by *ownership* instead - its only foreign callee `quest_element_build` (0x803AD008) is already
  * named, but it is `quest/quest_entry.cpp`'s row, so its declaration belongs in that owner's
  * header.  Naming them means sweeping every reference site in the units that own them
- * (`fn_802B0668` alone is cited from 30 files of `enemy`, `Pl`, `sound` and `stage`), so the sweep
+ * (`stage_map_kind_get` alone is cited from 30 files of `enemy`, `Pl`, `sound` and `stage`), so the sweep
  * belongs to the campaign's naming wall - registered in `.pi/notes/naming-backlog.md` (`| 14 | 30 |
- * fn_802B0668 |`) and carried in this batch's outbox `blockers` (never in `config_requests`, which
+ * stage_map_kind_get |`) and carried in this batch's outbox `blockers` (never in `config_requests`, which
  * is all `tools/units/backlog.py` reads) - and not to this lane's diff.  The blocked rows are
  * listed with their sizes in the outbox; the two biggest are `fn_803B0F98` (2020 B) and
  * `fn_803B177C` (1596 B).

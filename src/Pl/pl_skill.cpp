@@ -264,7 +264,7 @@ u8 fn_800CF208(void);
 u32 fn_80363A2C(void);
 int fn_80274AB8(int);
 u32 fn_8027E29C(u8);
-int fn_802731B4(_PLW*, u16);
+int Pl_item_timer_get(_PLW*, u16);
 u32 fn_8029F6B4(u16);
 u32 fn_8027E290(u8);
 void fn_8027E98C(u8*);
@@ -360,11 +360,11 @@ extern "C" u16 fn_80270018(_PLW* plw, u32 param, u8* out) {
 
     *out = 0;
     if (Pl_master_ck(plw) == 1) {
-        if (fn_802731B4(plw, 596) > 0) {
+        if (Pl_item_timer_get(plw, 596) > 0) {
             value += 6;
             *out = 1;
         }
-        if (fn_802731B4(plw, 597) > 0) {
+        if (Pl_item_timer_get(plw, 597) > 0) {
             value += 9;
             *out = 1;
         }
@@ -443,11 +443,11 @@ extern "C" u16 fn_802703F4(_PLW* plw, u32 param, u8* out) {
 
     *out = 0;
     if (Pl_master_ck(plw) == 1) {
-        if (fn_802731B4(plw, 598) > 0) {
+        if (Pl_item_timer_get(plw, 598) > 0) {
             value += 8;
             *out = 1;
         }
-        if (fn_802731B4(plw, 599) > 0) {
+        if (Pl_item_timer_get(plw, 599) > 0) {
             value += 12;
             *out = 1;
         }
@@ -1653,7 +1653,7 @@ extern "C" void fn_8027243C(_PLW* plw, u8 skill) {
 }
 
 /* The signed skill value of the equipment slot `slot`, or 0 for the empty slot. */
-extern "C" int fn_802731B4(_PLW* plw, u16 slot) {
+extern "C" int Pl_item_timer_get(_PLW* plw, u16 slot) {
     u16 id = fn_80273044(plw, slot);
 
     if (id != 0xFFFF) {

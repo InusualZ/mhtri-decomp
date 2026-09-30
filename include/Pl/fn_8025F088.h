@@ -69,7 +69,7 @@ u32 fn_8029EFDC(void* p);
 u32 fn_8012A624(void* out);
 u32 fn_80131934(u8 index);
 u32 fn_80224AC4(void* physics);
-/* `fn_802731B4` and `fn_80273044` are declared by their owner, `include/Pl/pl_skill.h` (`extern "C"
+/* `Pl_item_timer_get` and `fn_80273044` are declared by their owner, `include/Pl/pl_skill.h` (`extern "C"
  * int`/`u16`, `struct _PLW*`, `u16`), which this unit includes - the `s32`/`u32` copies that stood here
  * clashed with it ((10197) illegal function overloading) once MAIN's landing registered the owner's
  * declarations (rule 2). */

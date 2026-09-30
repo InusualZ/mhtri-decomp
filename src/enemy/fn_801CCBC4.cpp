@@ -377,7 +377,7 @@ void fn_80136D14(struct _ENEMY_WORK* self);
 
 /* enemy/fn_8013ACC4.cpp (0x8013ACC4..0x8013BE60) */
 void fn_8013AAC4(struct _ENEMY_WORK* self);
-u32 fn_802B0668(u8 kind);
+u32 stage_map_kind_get(u8 kind);
 
 /* enemy/enemy_control.cpp (0x801411B8..0x80147CE0) */
 void fn_80149788(struct _ENEMY_WORK* self, u32 a);
@@ -710,7 +710,7 @@ void fn_801CD2EC(struct _ENEMY_WORK* self) {
 void fn_801CD400(struct _ENEMY_WORK* self, u8 mode) {
     em_busy_set(self);
     fn_80131D9C(self);
-    if ((u8)fn_802B0668(self->field_0x1E0) == 4) {
+    if ((u8)stage_map_kind_get(self->field_0x1E0) == 4) {
         if ((u32)(self->area_no - 4) <= 2) {
             fn_80136D14(self);
         }
@@ -2010,7 +2010,7 @@ void fn_801D2ED0(struct _ENEMY_WORK* self) {
     VEC3_ctor(&spot);
     switch (self->state) {
     case 0:
-        if ((u8)fn_802B0668(self->field_0x1E0) == 4) {
+        if ((u8)stage_map_kind_get(self->field_0x1E0) == 4) {
             switch (self->area_no) {
             case 1:
                 setVector3(&spot, lbl_807993B0, lbl_807993B4, lbl_807993B8);

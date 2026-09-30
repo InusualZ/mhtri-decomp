@@ -62,6 +62,7 @@
 #include "stage/fn_802B2AA0.h"
 #include "fn_80423E74.h"
 #include "sys_mem.h"
+#include "stage/stg_w.h"
 
 /* `stage/fn_802B2AA0.h` used to open a file-wide `#pragma peephole off` that this unit picked up by
  * including it.  Measured: with the leak gone this unit drops (unit fuzzy 5.168 -> 4.893;
@@ -166,7 +167,7 @@ u32 em020_hp_ratio_ck(struct _ENEMY_WORK* self)
  * 0x80375494 */
 void em020_map_area_action_set(struct _ENEMY_WORK* self)
 {
-    if (fn_802B0668(self->field_0x1E0) == 7 && self->area_no == 3) {
+    if (stage_map_kind_get(self->field_0x1E0) == 7 && self->area_no == 3) {
         fn_80128AEC(self, 13, 3);
     }
 }

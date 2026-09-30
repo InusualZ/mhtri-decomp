@@ -111,7 +111,7 @@ typedef struct LbPageOwner {
 } LbPageOwner; /* size: 0x3B8+ (approximate) */
 
 /* The sprite-data record the `draw_*` family takes by reference.  Only +0x1C - the colour word
- * `fn_801F60D4` overwrites - is named; `fn_802E0AD4` initialises the rest of the block.
+ * `fn_801F60D4` overwrites - is named; `sprite_frame_apply` initialises the rest of the block.
  * size: 0x20 (approximate: the frame `fn_801F60D4` reserves for it) */
 typedef struct _SPR_DATA_ {
     /* +0x00 */ u8 unused_0x00[0x1C];
@@ -168,7 +168,7 @@ void fn_80223258(LbPage* page, u8 value);
 u32 fn_8004D70C(s32 id);
 s32 fn_8004AEC0(LbWorldBlock* world);
 void fn_802DB140(u16* rows, s16 a, s16 b, u16 c, const _mh_ivec2_* pos);
-void fn_802E0AD4(_SPR_DATA_* spr, u32 id, u8 flag, s32 arg);
+void sprite_frame_apply(_SPR_DATA_* spr, u32 id, u8 flag, s32 arg);
 void fn_8004A20C(LbIconRec* dst, const LbIconRec* src);
 void fn_801F8318(LbPage* self, s16 x, s16 y);
 void fn_801F6DBC(void* dst, s16 x, s16 y, u8* ptr);

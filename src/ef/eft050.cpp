@@ -92,6 +92,7 @@
 #include "ef/effect.h"
 #include "pl.h"
 #include "hud/cockpit_quest.h" /* hud/layout.h + pl.h: the 2D element library and its records */
+#include "stage/stg_w.h"     /* get_now_areano (the owner header, rule 2) */
 #include "ef/fn_800CDB2C.h" /* push_g3d_wk */
 #include "Runtime.PPCEABI.H/memset.h" /* memset - owner Runtime.PPCEABI.H/memset.c */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
@@ -344,7 +345,7 @@ extern "C" void fn_8033F270(CockpitPanel* self, const _mh_ivec2_* pos)
     _mh_ivec2_ anchor = *pos;
     draw_sprite_ary(lbl_805E7410, pos);
     _SPR_DATA_ frame;
-    fn_801E6850(&frame, get_lsp_data(0x2019, 0));
+    spr_data_copy(&frame, get_lsp_data(0x2019, 0));
     frame.pos.x += 6;
     draw_sprite(frame, pos);
     if (self->icon_0x0A != 0) {
@@ -435,7 +436,7 @@ extern "C" void fn_8033F788(CockpitItemBlock* self)
     draw_sprite_anim_ary(lbl_805E7514, 0, &anchor);
     s32 found = 0;
     _SPR_DATA_ frame;
-    fn_801E6850(&frame, get_lsp_data(0x1307, 0));
+    spr_data_copy(&frame, get_lsp_data(0x1307, 0));
     _mh_ivec2_ frame_pos;
     uv_pair_copy(&frame_pos, &frame);
     _mh_ivec2_ cursor = { 0, 0 };
@@ -444,7 +445,7 @@ extern "C" void fn_8033F788(CockpitItemBlock* self)
         fn_8033F6C4(i, &digit);
         u16 id = (i < 0x14) ? 0x2092 : 0x209B;
         _SPR_DATA_ rec;
-        fn_801E6850(&rec, get_lsp_data(id, 0));
+        spr_data_copy(&rec, get_lsp_data(id, 0));
         uv_pair_copy(&rec, &digit);
         frame.pos.x = (s16)(digit.x + frame_pos.x);
         frame.pos.y = (s16)(digit.y + frame_pos.y);
@@ -457,7 +458,7 @@ extern "C" void fn_8033F788(CockpitItemBlock* self)
             if (chk_pointer() == 0) {
                 if (self->cursor2_0x10 == i) {
                     _SPR_DATA_ sel;
-                    fn_801E6850(&sel, get_lsp_data(0x1304, 0));
+                    spr_data_copy(&sel, get_lsp_data(0x1304, 0));
                     sel.pos.x = (s16)(sel.pos.x + digit.x);
                     sel.pos.y = (s16)(sel.pos.y + digit.y);
                     set_blendmode(4, 1, 1);
@@ -474,12 +475,12 @@ extern "C" void fn_8033F788(CockpitItemBlock* self)
     if (self->sel_flag_0x0C != 0 && found != 0) {
         set_blendmode(4, 1, 1);
         _SPR_DATA_ sel;
-        fn_801E6850(&sel, get_lsp_data(0x1305, 0));
+        spr_data_copy(&sel, get_lsp_data(0x1305, 0));
         sel.pos.x = (s16)(sel.pos.x + cursor.x);
         sel.pos.y = (s16)(sel.pos.y + cursor.y);
         fn_802E0DA8(&sel, self->sel_id_0x0A, &anchor);
         set_blendmode(4, 5, 1);
-        fn_801E6850(&sel, get_lsp_data(0x1306, 0));
+        spr_data_copy(&sel, get_lsp_data(0x1306, 0));
         sel.pos.x = (s16)(sel.pos.x + cursor.x);
         sel.pos.y = (s16)(sel.pos.y + cursor.y);
         fn_802E0DA8(&sel, self->sel_id_0x0A, &anchor);

@@ -82,7 +82,7 @@ struct _ENEMY_WORK {
     /* +0x194 */ u8 unused_0x194[0x1C8 - 0x194];
     /* +0x1C8 */ u32 field_0x1C8;    /* bit 0x80 suppresses `fn_8012C6F4` */
     /* +0x1CC */ u8 unused_0x1CC[0x1E0 - 0x1CC];
-    /* +0x1E0 */ u8 field_0x1E0;     /* passed to `fn_802B0668` (map lookup) */
+    /* +0x1E0 */ u8 field_0x1E0;     /* passed to `stage_map_kind_get` (map lookup) */
     /* +0x1E1 */ u8 area_no;         /* the area the enemy belongs to; `em_area_ck` compares it */
     /* +0x1E2 */ u8 field_0x1E2;
     /* +0x1E3 */ u8 field_0x1E3;
@@ -237,8 +237,8 @@ extern "C" void* fn_8028EF7C(u16 id);
 extern "C" u32 fn_8012B5C4(_ENEMY_WORK* enemy, u32 a, u32 b, u8 slot);
 extern "C" f32 fn_80050EF4(void* ref, nw4r::math::VEC3* pos);
 extern "C" f32 fn_80050F80(void* ref, nw4r::math::VEC3* pos);
-extern "C" s32 fn_803A8858(void);
-extern "C" s32 fn_803A87E0(void);
+extern "C" s32 quest_time_limit_get(void);
+extern "C" s32 quest_time_elapsed_get(void);
 extern "C" u8 fn_8012B86C(_ENEMY_WORK* enemy);
 extern "C" s32 fn_8012D3E0(_ENEMY_WORK* enemy, u32 kind);
 extern "C" u32 fn_8012D23C(_ENEMY_WORK* enemy, u32 kind, u32 slot);
@@ -276,9 +276,9 @@ extern "C" s32 fn_8012E8C0(_ENEMY_WORK* enemy);
 extern "C" void fn_8012E8DC(_ENEMY_WORK* record);
 extern "C" s32 fn_8012E8F4(f32 seconds);
 extern "C" void fn_8012B8F8(_ENEMY_WORK* enemy);
-extern "C" u8 fn_802B0668(u32 map_no);
+extern "C" u8 stage_map_kind_get(u32 map_no);
 extern "C" u32 fn_802B0688(void* pos);
-extern "C" u8 fn_8028EF30(u32 value);
+extern "C" u8 Pl_area_flag_get(u32 value);
 extern "C" s32 fn_8012B944(_ENEMY_WORK* enemy, u8 index, s32 value);
 extern "C" void fn_8012B988(_ENEMY_WORK* enemy, s32 value);
 extern "C" void fn_8012B9BC(_ENEMY_WORK* enemy, u8 index, s32 value);
@@ -846,8 +846,8 @@ extern "C" s32 fn_8012D0B4(_ENEMY_WORK* enemy, _PLW* work)
         return 0;
     }
     if (enemy->area_no == work->field_0x016) {
-        if (fn_802B0668(enemy->field_0x1E0) == 9) {
-            if (fn_8028EF30(work->field_0x008) == 0) {
+        if (stage_map_kind_get(enemy->field_0x1E0) == 9) {
+            if (Pl_area_flag_get(work->field_0x008) == 0) {
                 if (fn_802B0688(&enemy->pos) == 1) {
                     return 1;
                 }
@@ -1341,7 +1341,7 @@ extern "C" s32 fn_8012E6A0(u32 kind, u16 id)
 {
     u8* entry;
 
-    if (fn_8027BC48(0) == 1) {
+    if (Pl_motion_input_ck(0) == 1) {
         return 0;
     }
     entry = (u8*)fn_8028EF7C(id);
@@ -1378,7 +1378,7 @@ extern "C" void fn_8012E8DC(_ENEMY_WORK* record)
 /* Whether more than `seconds` have passed since the last frame stamp. */
 extern "C" s32 fn_8012E8F4(f32 seconds)
 {
-    s32 now = fn_803A8858();
+    s32 now = quest_time_limit_get();
 
-    return (f32)(now - fn_803A87E0()) > seconds;
+    return (f32)(now - quest_time_elapsed_get()) > seconds;
 }

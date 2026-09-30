@@ -49,6 +49,7 @@
 #include "fn_8004CAD8.h"
 #include "mh3_pad.h"
 #include "enemy/fn_801993E0.h" /* fn_8019E960/fn_8019E9AC/fn_8019EA04/fn_8019EC38 */
+#include "stage/stg_w.h"
 
 /* The pooled `.sdata2` floats this range reads (each is a bare marker symbol in the map; the values
  * drive the comparisons/floats below).  Declared, never defined here: the pool belongs to the data
@@ -1421,7 +1422,7 @@ void fn_801A9210(_ENEMY_WORK* self) {
     _GXColor color;
 
     MTX34_ctor(&mtx);
-    if (fn_802B0668(self->field_0x1E0) == 6 && self->area_no == 1) {
+    if (stage_map_kind_get(self->field_0x1E0) == 6 && self->area_no == 1) {
         nw4r::g3d::ScnMdl::CopiedMatAccess access((nw4r::g3d::ScnMdl*) self->field_0x13C, 6);
         if (fn_800E2994(&access) != 0) {
             nw4r::g3d::ResTexSrt srt;

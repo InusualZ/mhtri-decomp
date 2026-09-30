@@ -72,6 +72,7 @@
 #include "unsplit/enemy.h"
 #include "unsplit/unknown.h"
 #include "lobby/fn_802FA9A0.h"
+#include "stage/stg_w.h"
 
 /* The band's pooled `.sdata2` constants (declared, never defined: the pool belongs to the data pass,
  * playbook 29). */
@@ -544,7 +545,7 @@ extern "C" s32 fn_802F9740(_ENEMY_WORK* work) {
 #pragma peephole off
 /* Reports whether the record's area lookup and attack timer allow the action. */
 extern "C" s32 fn_802F9774(_ENEMY_WORK* work) {
-    switch (fn_802B0668(work->field_0x1E0)) {
+    switch (stage_map_kind_get(work->field_0x1E0)) {
     case 1:
     case 3:
     case 11:

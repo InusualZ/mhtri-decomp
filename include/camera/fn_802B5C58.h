@@ -16,6 +16,9 @@ extern "C" {
 /* 0x802BE1DC - moves `camera` to `pos` when `pos` is non-NULL (a tail call into `Camera::SetPosition`). */
 void camera_position_set(nw4r::g3d::Camera* camera, const nw4r::math::VEC3* pos);
 
+/* 0x802BDF5C - the camera's yaw (the angle of its view direction), as the 16-bit-wrapped word the HUD rotates by. */
+s32 camera_angle_y_get(void);
+
 #ifdef __cplusplus
 }
 #endif

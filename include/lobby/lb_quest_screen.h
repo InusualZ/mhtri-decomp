@@ -32,9 +32,9 @@ void note_pane_get_motion(struct NoteWork* self);
  * they keep the map's stems; renaming them is the batch that writes them (rule 7's unblock is the
  * name, and nine consumer sites across `enemy/fn_8012BDF4.cpp`, `enemy/fn_80176C58.cpp`,
  * `lobby/lb_companion_ui.cpp` and the two `menu` units have to be swept with it). */
-s32 fn_803A87E0(void);
+s32 quest_time_elapsed_get(void);
 s32 fn_803A881C(void);
-s32 fn_803A8858(void);
+s32 quest_time_limit_get(void);
 s32 fn_803A9690(void);
 s32 fn_803AA41C(s32, f32);
 

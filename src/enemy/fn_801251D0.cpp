@@ -65,7 +65,7 @@ extern "C" void fn_80124C5C(u32 a, u32 b, u8 c);
 
 /* The unit's own next symbols, defined in this TU. */
 extern "C" void fn_8012933C(struct _ENEMY_WORK* self, u8 a, u32 b, u32 c);
-extern "C" u32 fn_802B0668(u32 kind);
+extern "C" u32 stage_map_kind_get(u32 kind);
 
 /* `fn_8033737C` (0x8033737C) sits in the unclaimed run 0x803250B0..0x8033737C+: its bracketing
  * *registered* units are `hud/fn_80324F7C.c` and `Network/NetworkWiiMediator.c`, different modules,
@@ -116,7 +116,7 @@ extern "C" u32 enemy_kind_same_ck(u32 a, u32 b)
 
 extern "C" u32 fn_80125FF0(u32 a, u32 b)
 {
-    return (u8)fn_802B0668((u8)a) == (u8)b;
+    return (u8)stage_map_kind_get((u8)a) == (u8)b;
 }
 
 extern "C" u8* fn_80126044(struct _ENEMY_WORK* self)

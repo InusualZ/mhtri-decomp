@@ -173,7 +173,7 @@ void fn_8026099C(_PLW* self) {
 s16 fn_80260A18(_PLW* self) {
     s16 active = 0;
 
-    if (fn_802731B4(self, 382) > 0) {
+    if (Pl_item_timer_get(self, 382) > 0) {
         active = 1;
     }
     return active;

@@ -148,7 +148,7 @@ extern "C" void fn_8027D76C(_PLW* self) {
     if (Pl_master_ck(self) != 0 && (self->field_0x655 & 0x80) != 0) {
         self->act_end_request = 1;
         s16 timer = self->field_0x652;
-        if (fn_802731B4(self, self->field_0x650) >= timer) {
+        if (Pl_item_timer_get(self, self->field_0x650) >= timer) {
             fn_80272E30(self, self->field_0x650, -timer);
         }
     }
@@ -178,7 +178,7 @@ extern "C" s32 fn_8027DC90(void) {
 }
 
 /* The +0x460 timer, as a boolean. */
-extern "C" s32 fn_8027DFD0(_PLW* self) {
+extern "C" s32 Pl_timer_0x460_ck(_PLW* self) {
     return self->field_0x460 > 0;
 }
 

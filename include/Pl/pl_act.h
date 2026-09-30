@@ -19,7 +19,7 @@ extern "C" {
 #endif
 
 s32 fn_8027AC18(void* arg);
-u32 fn_8027BC48(s32 arg);
+u32 Pl_motion_input_ck(s32 arg);
 
 /* Declarations added with `Pl/fn_80262940.cpp` (the player main/control cluster 0x80262940-0x802693C4),
  * which calls them; all four are in this unit's `.text` range (0x80276B58-0x8027D684). */

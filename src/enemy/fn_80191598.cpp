@@ -93,7 +93,7 @@
  *   * the plain prototypes at the top of this file (`em_move_mode_set`, `fn_80126324`, `fn_80129xxx`,
  *     `fn_8013918C`, `fn_80139A64`, `fn_80139A7C`, `fn_8013A654`, `fn_8008E8D0`, `fn_8008EE68`,
  *     `fn_800FBB90`, `fn_800FC0D4`, `fn_805012E8`, `fn_80101428`, `fn_8010140C`, `MTX34_ctor`,
- *     `fn_800516F0`, `setVec3`, `copyVec3`, `VEC3_ctor`, `fn_80051490`, `fn_802B0668`,
+ *     `fn_800516F0`, `setVec3`, `copyVec3`, `VEC3_ctor`, `fn_80051490`, `stage_map_kind_get`,
  *     `fn_80182D5C`) belong in their owners' headers / `include/unsplit/enemy.h`; `setVec3`'s
  *     `void` return in `include/mh3_pad.h` is wrong for this range's call sites, which read its r3.
  *   * the unit registers a `.ctors` word (0x8056F33C..0x8056F340, added by the split itself): the
@@ -188,7 +188,7 @@ struct EmActWork {
     /* +0x00B */ u8 unused_0x00B[0x188 - 0x00B];
     /* +0x188 */ VEC3 pos_0x188;
     /* +0x194 */ u8 unused_0x194[0x1E0 - 0x194];
-    /* +0x1E0 */ u8 field_0x1E0;  /* the key `fn_802B0668` (map lookup) is called with */
+    /* +0x1E0 */ u8 field_0x1E0;  /* the key `stage_map_kind_get` (map lookup) is called with */
     /* +0x1E1 */ u8 act_id;       /* the action id every dispatch in this range switches on */
     /* +0x1E2 */ u8 state_0x1E2;
     /* +0x1E3 */ u8 unused_0x1E3[0x328 - 0x1E3];
@@ -310,7 +310,7 @@ extern "C" {
 void em_move_mode_set(EmActWork* self, u32 mode);
 void fn_80126324(EmActWork* self, u8 a, u8 b, f32 value);
 void fn_80182D5C(void);
-u8 fn_802B0668(u8 key);
+u8 stage_map_kind_get(u8 key);
 u32 fn_8012EC60(EmActWork* self);
 u32 fn_8012EC3C(EmActWork* self);
 u32 fn_801321DC(EmActWork* self);
@@ -375,7 +375,7 @@ void fn_80191598(EmActWork* self, u8* out_class, u8* out_state) {
         em_move_mode_set(self, 0);
         *out_class = 12;
         *out_state = 2;
-        switch (fn_802B0668(self->field_0x1E0)) {
+        switch (stage_map_kind_get(self->field_0x1E0)) {
         case 1:
             switch (self->act_id) {
             case 6:
@@ -421,7 +421,7 @@ void fn_80191598(EmActWork* self, u8* out_class, u8* out_state) {
         break;
     case 17:
         fn_80182D5C();
-        switch (fn_802B0668(self->field_0x1E0)) {
+        switch (stage_map_kind_get(self->field_0x1E0)) {
         case 1:
             switch (self->act_id) {
             case 5:
@@ -512,7 +512,7 @@ void fn_80191598(EmActWork* self, u8* out_class, u8* out_state) {
 void fn_80191990(EmActWork* self) {
     u32 state = 0;
 
-    switch (fn_802B0668(self->field_0x1E0)) {
+    switch (stage_map_kind_get(self->field_0x1E0)) {
     case 3:
         switch (self->act_id) {
         case 1:
@@ -571,7 +571,7 @@ void fn_80191AE8(EmActWork* self, u32 kind) {
 /* Reports whether the work may run its current action: the team/state gate, the entry probe and the
  * two restart checks. */
 s32 fn_80191B4C(EmActWork* self, u32 arg) {
-    u8 kind = fn_802B0668(self->field_0x1E0);
+    u8 kind = stage_map_kind_get(self->field_0x1E0);
     s32 hit;
     u32 probe;
 

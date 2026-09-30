@@ -170,7 +170,7 @@ void fn_802B2318(u8 mode);
 void fn_802B56E0(void);
 void fn_802BB0EC(void);
 void fn_802BECB8(char* buf, u8 index);
-void fn_802E0AD4(void* dst, u16 id, u8 flag, const _mh_ivec2_* src);
+void sprite_frame_apply(void* dst, u16 id, u8 flag, const _mh_ivec2_* src);
 void fn_8032422C(void);
 void fn_8035A9E4(void);
 void fn_803A75D8(void);

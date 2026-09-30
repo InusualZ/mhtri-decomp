@@ -4,8 +4,8 @@
  * Naming note: the symbol map had only fn_XXXXXXXX for most of this range; this run named every row it
  * wrote and the rows they call inside the unit (see "Renames" below).  The rows still carrying a
  * `fn_` stem are the ones with no body yet, plus the pre-existing debt (`fn_802E1978`,
- * `fn_802E198C`, `fn_802E0A24`, `fn_802E0B54`, `fn_802E0C80`, `fn_802E0CE4`, `fn_802E0DA8`,
- * `fn_802E08E8`, `fn_802E099C`, `fn_802E0AD4`, `fn_802E0F78`, `fn_802E1AEC`, `fn_802E1C74`,
+ * `fn_802E198C`, `fn_802E0A24`, `fn_802E0B54`, `sprite_ary_last_frame`, `fn_802E0CE4`, `fn_802E0DA8`,
+ * `fn_802E08E8`, `fn_802E099C`, `sprite_frame_apply`, `fn_802E0F78`, `fn_802E1AEC`, `fn_802E1C74`,
  * `fn_802E1D30`, `fn_802E0714`) - filed as a naming sweep, not fixed here because each needs its
  * own evidence and the two that are called from outside this unit are cross-unit sweeps.
  *
@@ -110,7 +110,7 @@
  * entries call `menu_text_center_x`/`menu_text_center_x_by_gaps`/`menu_text_block_center_x`
  * (`menu/menu_message.cpp`, already renamed there; 11 call sites) and
  * `fn_802E21C0` also `fn_8005C8F0` (`g3d/g3d_anmchr.cpp`, 4 call sites); `fn_802E23D0` calls
- * `fn_802E0AD4` (this unit's own row, but 44 referrer lines across 8 files).  `fn_802E2440`,
+ * `sprite_frame_apply` (this unit's own row, but 44 referrer lines across 8 files).  `fn_802E2440`,
  * `fn_802E2524`, `fn_802E4798`/`fn_802E4828`, the four 0x802E33B4-family layout entries and
  * `fn_802E4850` are blocked on **data** (the `lbl_805D58xx`/`lbl_805D5Axx` tables and the `__FILE__`
  * and panic strings), i.e. on the `.data`/`.sdata` claim below.
@@ -121,7 +121,7 @@
  * (`cur`/`prev` land in the opposite register pair), `anim_step_uv` 98.91 %, `anim_step_color`
  * 98.96 %, plus the pre-existing `fn_802E1978` 79.0 %, `fn_802E198C` 89.98 %, `fn_802E0F78` 91.05 %,
  * `fn_802E0A24` 93.86 %, `fn_802E1D30` 97.39 %, `put_button_icon_tex` 97.9 %,
- * `fn_802E099C` 99.88 % (the switch's arm order), `fn_802E0C80` 99.4 % and `draw_sprite` 99.96 %
+ * `fn_802E099C` 99.88 % (the switch's arm order), `sprite_ary_last_frame` 99.4 % and `draw_sprite` 99.96 %
  * (retail materialises the 0x4330 conversion high word twice; MWCC CSEs ours, 4 bytes short).
  *
  * Data: `datagap.py --unit hud/layout` reports `ours-extra .sdata2 20B` - the compiler's own pool
@@ -221,7 +221,7 @@ void fn_802E08E8(u16 id, u32 color, const _mh_ivec2_* pos)
 {
     _SPR_DATA_ rec;
 
-    fn_801E6850(&rec, get_lsp_data(id, 0));
+    spr_data_copy(&rec, get_lsp_data(id, 0));
     rec.color = color;
     draw_sprite(rec, pos);
 }
@@ -283,9 +283,9 @@ u32 fn_802E0A24(_SPR_DATA_* rec, const _SPR_ANIM_* anim, u16 frame, _mh_ivec2_* 
 
 /* 0x802E0AD4 (0x80) - copy the id's record into the caller's block, then run the id's animation
  * table against it with `part` as the frame. */
-u32 fn_802E0AD4(_SPR_DATA_* rec, u16 id, u16 part, _mh_ivec2_* out)
+u32 sprite_frame_apply(_SPR_DATA_* rec, u16 id, u16 part, _mh_ivec2_* out)
 {
-    fn_801E6850(rec, get_lsp_data(id, 0));
+    spr_data_copy(rec, get_lsp_data(id, 0));
     return fn_802E0A24(rec, fn_802E0714(id), part, out);
 }
 
@@ -332,7 +332,7 @@ u16 fn_802E0B54(u16 id)
 }
 
 /* 0x802E0C80 (0x64) - the highest frame value over the 0xFFFF-terminated id run. */
-u16 fn_802E0C80(const u16* ids)
+u16 sprite_ary_last_frame(const u16* ids)
 {
     u16 highest = 1;
 
@@ -486,11 +486,11 @@ void fn_802E1288(s16 x, s16 y, s16 size, u32 color, u8 tex_idx)
 }
 
 /* 0x802E12A0 (0x80) - the animation-step blit with a texture override: the record is built by
- * `fn_802E0AD4`, then handed to the copy-and-recolour helper. */
+ * `sprite_frame_apply`, then handed to the copy-and-recolour helper. */
 u32 fn_802E12A0(u16 id, u16 part, u8 tex_idx, u32 color, const _mh_ivec2_* pos)
 {
     _SPR_DATA_ work;
-    u32 drawn = fn_802E0AD4(&work, id, part, 0);
+    u32 drawn = sprite_frame_apply(&work, id, part, 0);
 
     fn_802E1024(&work, tex_idx, color, pos);
     return drawn;
@@ -637,7 +637,7 @@ void draw_monstericon_idx(u16 id, u8 tex_idx, const _mh_ivec2_* pos)
 u32 fn_802E1A7C(u16 id, u16 part, u8 tex_idx, const _mh_ivec2_* pos)
 {
     _SPR_DATA_ work;
-    u32 drawn = fn_802E0AD4(&work, id, part, 0);
+    u32 drawn = sprite_frame_apply(&work, id, part, 0);
 
     fn_802E198C(&work, tex_idx, pos);
     return drawn;
@@ -668,7 +668,7 @@ void draw_number_idx(u16 id, u8 frame, u32 color, const _mh_ivec2_* pos)
 u32 draw_number_anim(u16 id, u16 part, u8 frame, u32 color, const _mh_ivec2_* pos)
 {
     _SPR_DATA_ work;
-    u32 drawn = fn_802E0AD4(&work, id, part, 0);
+    u32 drawn = sprite_frame_apply(&work, id, part, 0);
 
     fn_802E1AEC(&work, frame, color, pos);
     return drawn;

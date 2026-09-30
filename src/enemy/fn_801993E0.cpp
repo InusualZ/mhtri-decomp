@@ -49,12 +49,12 @@
  * `fn_8019E604` (108 B) and `fn_8019EC38` (156 B).
  *
  * Residuals, by measurement (all the near-misses are codegen shapes, not comprehension):
- *   * `fn_802B0668` RETURN TRUNCATION - `fn_8019D8B8` 90.52, `fn_8019D9BC` 82.62, `fn_8019DAC0`
+ *   * `stage_map_kind_get` RETURN TRUNCATION - `fn_8019D8B8` 90.52, `fn_8019D9BC` 82.62, `fn_8019DAC0`
  *     96.00, `fn_8019E70C` 84.05.  The target keeps `clrlwi r0,r3,24` after every call to the
  *     map-id lookup (it is a byte table) and compares the byte; MWCC folds the truncation away
  *     when the compared value is a small constant.  Written with the `(u8)` cast at the call
  *     (`fn_8019E70C`) and without, and the instruction is dropped both ways: the owner's
- *     declaration is `u32 fn_802B0668(u32)` (this unit's own, since no registered unit owns
+ *     declaration is `u32 stage_map_kind_get(u32)` (this unit's own, since no registered unit owns
  *     0x802B0668 and `stylelint`'s rule-2 band answers `None` for it), so the truncation has to
  *     come from a `u8`-returning view of the callee, which would re-measure every landed
  *     consumer (`enemy/fn_80182D5C.cpp` declares the same `u32` form).
@@ -139,11 +139,11 @@ extern f32 lbl_8079852C;
 /* ------------------------------------------------------------------------------------------------
  * Symbols with no registered owner whose address band names no module (the lint's counted
  * "address band interleaves modules" gap): the RSO-side helpers this band calls.  Declared here for
- * the same reason `enemy/fn_80182D5C.cpp` declares `fn_802B0668`.
+ * the same reason `enemy/fn_80182D5C.cpp` declares `stage_map_kind_get`.
  * ------------------------------------------------------------------------------------------------ */
 
 /* 0x802B0668 - the map-id lookup: a byte table, `0xFF` meaning "no entry" (the argument comes back). */
-u32 fn_802B0668(u32 kind);
+u32 stage_map_kind_get(u32 kind);
 /* 0x803B50A8 - r3 (a selector, 0 at every call site here) and no other argument; returns a status
  * compared against 1. */
 u32 em_work_state_bit21_ck(u32 a);
@@ -456,7 +456,7 @@ u32 fn_8019D8B8(struct _ENEMY_WORK* self, u8 mode) {
  * group, this area decides whether the state is armed. */
 void fn_8019DAC0(struct _ENEMY_WORK* self) {
     u32 state = 0;
-    if (fn_802B0668(self->field_0x1E0) == 3) {
+    if (stage_map_kind_get(self->field_0x1E0) == 3) {
         switch (self->area_no) {
         case 1:
             state = 1;
@@ -486,7 +486,7 @@ void fn_8019D9BC(struct _ENEMY_WORK* self, u8* out_a, u8* out_b) {
     em_move_mode_set(self, 4);
     *out_a = 12;
     *out_b = 0;
-    switch (fn_802B0668(self->field_0x1E0)) {
+    switch (stage_map_kind_get(self->field_0x1E0)) {
     case 3:
         switch (self->area_no) {
         case 3:
@@ -535,7 +535,7 @@ u32 fn_8019E70C(struct _ENEMY_WORK* self) {
     if (self->team != 25) {
         return 255;
     }
-    if (fn_802B0668(self->field_0x1E0) != 6) {
+    if (stage_map_kind_get(self->field_0x1E0) != 6) {
         return 255;
     }
     if (self->area_no != 1) {
@@ -566,7 +566,7 @@ u32 fn_8019E70C(struct _ENEMY_WORK* self) {
 u32 fn_8019E840(struct _ENEMY_WORK* self) {
     if (self != 0) {
         if (self->team == 25) {
-            if (fn_802B0668(self->field_0x1E0) == 6) {
+            if (stage_map_kind_get(self->field_0x1E0) == 6) {
                 if (self->area_no == 1) {
                     if (em_work_state_bit21_ck(0) != 1) {
                         if (fn_8019E670(self, 3, 30, 59) == 1) {

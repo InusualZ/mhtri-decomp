@@ -12,8 +12,8 @@
  * `draw_sprite`/`draw_font`/`drawshape_*` family - and the registered sibling `menu/menu_message.cpp`
  * owns `GetMenuFontColor`, so the module is `menu`.  The file keeps the map's stem (brief section 2,
  * class 4: nothing in the object names the original source file).  Its own data is the two
- * 0x194-byte per-player cockpit work records at `lbl_806BDCC8` (2 entries) and the sub-screen state
- * at `lbl_806BDFF0`.
+ * 0x194-byte per-player cockpit work records at `cockpit_work` (2 entries) and the sub-screen state
+ * at `cockpit_state`.
  *
  * Sections: .text 0x802E4978..0x802E7408, extab 0x80014FFC..0x800150C4 and extabindex
  * 0x80033660..0x8003378C (dtk derived both from the range's own prologues).  The range's `.data`
@@ -68,11 +68,12 @@
 #include "Pl/pl_act.h"
 #include "Pl/pl_master.h"
 #include "fn_80047398.h"
+#include "hud/cockpit_icon_data.h"
 
 /* The two player records and the sub-screen state the band drives.  The map spells them `lbl_*`;
  * this file defines them (they are this band's own .bss, 0x806BDCC8-0x806BE078). */
-CockpitWork lbl_806BDCC8[2];
-CockpitState lbl_806BDFF0;
+CockpitWork cockpit_work[2];
+CockpitState cockpit_state;
 
 extern "C" {
 
@@ -98,10 +99,6 @@ extern u32 lbl_805CDE78[];
 extern u16 lbl_805D5B98[];
 extern u8 lbl_805D5BD8[];
 extern u8 lbl_805D5C68[];
-extern u16 lbl_805E707C[];
-extern u16 lbl_805E70C8[];
-extern u16 lbl_805E70D4[];
-extern u16 lbl_805E70E8[];
 extern u32* jumptable_805D5B48[];
 extern char lbl_807927C0[];
 extern char lbl_807927C4[];
@@ -118,7 +115,7 @@ void fn_802E53C4(void);
 void fn_802E5400(void);
 void fn_802E5414(u8);
 u32 fn_802E54A8(CockpitMove*);
-u32 fn_802E54F8(CockpitMove*, u8);
+u32 cockpit_hud_hidden_ck(CockpitMove*, u8);
 void fn_802E555C(void);
 void fn_802E56B4(void);
 void fn_802E5764(void*, u8);
@@ -202,7 +199,7 @@ void fn_802E4AD4(void) {
     CockpitState* st;
     s8 idx;
 
-    st = &lbl_806BDFF0;
+    st = &cockpit_state;
     move = (CockpitMove*)get_move_work_adrs(2);
     st->field_0x000 = 1;
     st->field_0x059 = 0;
@@ -218,7 +215,7 @@ void fn_802E4AD4(void) {
     }
     st->field_0x074 = 0;
     idx = (s8)my_player_no();
-    fn_802E4978(&lbl_806BDCC8[0], &move[idx]);
+    fn_802E4978(&cockpit_work[0], &move[idx]);
     fn_802DFCD4();
     fn_802DA1B0(NULL);
 }
@@ -227,21 +224,21 @@ void fn_802E4B8C(void) {
     CockpitMove* move;
 
     move = (CockpitMove*)get_move_work_adrs(2);
-    lbl_806BDFF0.field_0x000 = 2;
-    lbl_806BDFF0.field_0x059 = 0;
-    lbl_806BDFF0.field_0x058 = 0;
-    fn_802E4978(&lbl_806BDCC8[0], &move[0]);
-    fn_802E4978(&lbl_806BDCC8[1], &move[1]);
-    lbl_806BDFF0.field_0x078 = 0;
-    lbl_806BDFF0.field_0x002 = 100;
-    lbl_806BDFF0.field_0x004 = 0;
+    cockpit_state.field_0x000 = 2;
+    cockpit_state.field_0x059 = 0;
+    cockpit_state.field_0x058 = 0;
+    fn_802E4978(&cockpit_work[0], &move[0]);
+    fn_802E4978(&cockpit_work[1], &move[1]);
+    cockpit_state.field_0x078 = 0;
+    cockpit_state.field_0x002 = 100;
+    cockpit_state.field_0x004 = 0;
     fn_802DA1B0(NULL);
 }
 
 void fn_802E4C24(void) {
-    lbl_806BDFF0.field_0x078++;
-    lbl_806BDCC8[0].field_0x190++;
-    lbl_806BDCC8[1].field_0x190++;
+    cockpit_state.field_0x078++;
+    cockpit_work[0].field_0x190++;
+    cockpit_work[1].field_0x190++;
 }
 
 void fn_802E5220(CockpitWork* self) {
@@ -262,14 +259,14 @@ void fn_802E5220(CockpitWork* self) {
 }
 
 void fn_802E53C4(void) {
-    fn_80047058();
+    screen_split_mode_ck();
     fn_802DA344();
     subTransSetPrio(6, (u32)&fn_802DA3CC, 0, NULL);
 }
 
 void fn_802E5400(void) {
-    lbl_806BDCC8[0].field_0x0CF = 1;
-    fn_802DA1B0(&lbl_806BDCC8[0]);
+    cockpit_work[0].field_0x0CF = 1;
+    fn_802DA1B0(&cockpit_work[0]);
 }
 
 void fn_802E5414(u8 arg0) {
@@ -294,7 +291,7 @@ void fn_802E5414(u8 arg0) {
         return;
     }
     get_lsp_data(lsp, &pos);
-    fn_802DA454(2, idx, pos.x, pos.y, 1, 1, 0);
+    hud_notice_spawn(2, idx, pos.x, pos.y, 1, 1, 0);
 }
 
 u32 fn_802E54A8(CockpitMove* move) {
@@ -307,7 +304,7 @@ u32 fn_802E54A8(CockpitMove* move) {
     return r;
 }
 
-u32 fn_802E54F8(CockpitMove* move, u8 id) {
+u32 cockpit_hud_hidden_ck(CockpitMove* move, u8 id) {
     u32 r;
 
     if (id == 0xFF) {
@@ -340,7 +337,7 @@ void fn_802E5BB4(void) {
     CockpitWork* self;
     CockpitMove* move;
 
-    self = &lbl_806BDCC8[0];
+    self = &cockpit_work[0];
     move = self->move;
     if (self->field_0x17E == 1) {
         fn_8027B918((struct _PLW*)move);
@@ -360,10 +357,10 @@ void fn_802E5C3C(_mh_ivec2_* pos, s8 idx) {
     _mh_ivec2_* src;
 
     get_lsp_data(0xE15, pos);
-    src = (_mh_ivec2_*)get_lsp_data(lbl_805E70C8[idx >> 3], NULL);
+    src = (_mh_ivec2_*)get_lsp_data(cockpit_slot_row_sprite_ids[idx >> 3], NULL);
     pos->x += src->x;
     pos->y = (s16)(pos->y + src->y);
-    src = (_mh_ivec2_*)get_lsp_data(lbl_805E70D4[idx & 7], NULL);
+    src = (_mh_ivec2_*)get_lsp_data(cockpit_slot_column_sprite_ids[idx & 7], NULL);
     pos->x += src->x;
     pos->y = (s16)(pos->y + src->y);
 }
@@ -372,10 +369,11 @@ void fn_802E5CFC(s8 idx) {
     _mh_ivec2_ pos;
     CockpitWork* self;
 
-    self = &lbl_806BDCC8[0];
+    self = &cockpit_work[0];
     fn_802E5C3C(&pos, idx);
-    if (fn_802DA454(0, 6, pos.x, pos.y, 1, 1, 0) != 0) {
-        fn_802DA1A8(&self->field_0x17A);
+    HudNotice* notice = hud_notice_spawn(0, 6, pos.x, pos.y, 1, 1, 0);
+    if (notice != 0) {
+        hud_notice_set_flag_ptr(notice, &self->field_0x17A);
     }
 }
 
@@ -386,21 +384,21 @@ void fn_802E555C(void) {
     CockpitMove* move;
 
     m0 = (CockpitMove0*)get_move_work_adrs(0);
-    move = lbl_806BDCC8[0].move;
+    move = cockpit_work[0].move;
     if (get_now_areano() != 0xFF) {
         set_zmode(0, 0, 0);
-        lbl_806BDCC8[0].field_0x0CD = 0;
+        cockpit_work[0].field_0x0CD = 0;
         fn_802E56B4();
         draw_lsp_parts();
         fn_802EC700();
         if (fn_802E54A8(move) == 1) {
             fn_802E71C4();
-            fn_802E7FA0();
+            quest_gauge_draw();
             fn_802ED480();
         }
-        fn_802EE82C(&lbl_806BDCC8[0]);
+        fn_802EE82C(&cockpit_work[0]);
         if (m0->field_0x0EF != 0) {
-            fn_802EF0FC(&lbl_806BDCC8[0]);
+            fn_802EF0FC(&cockpit_work[0]);
         }
         if (menu_item_frame_update((MenuFrameWork*)move) == 0) {
             if (move->field_0x5BC != 0) {
@@ -408,12 +406,12 @@ void fn_802E555C(void) {
             } else if (move->field_0x5BD != 0) {
                 quest_marker_arm();
                 if (fn_802E54A8(move) == 1) {
-                    fn_802EE65C(move, &lbl_806BDCC8[0].field_0x16F);
-                    fn_802EDCE4(move, &lbl_806BDCC8[0].field_0x16B);
+                    fn_802EE65C(move, &cockpit_work[0].field_0x16F);
+                    fn_802EDCE4(move, &cockpit_work[0].field_0x16B);
                 }
             }
         }
-        fn_802EA33C(&lbl_806BDCC8[0]);
+        quest_marks_flush(&cockpit_work[0]);
         fn_802E6EB4();
         note_box_draw();
         if (move_work_state_ck() != 0) {
@@ -428,7 +426,7 @@ void fn_802E5A14(void) {
     CockpitMove* move;
     u8 v;
 
-    self = &lbl_806BDCC8[0];
+    self = &cockpit_work[0];
     move = self->move;
     if (self->field_0x176 != 0) {
         fn_8027B0BC((struct _PLW*)move);
@@ -502,20 +500,20 @@ void fn_802E5284(void) {
     CockpitMove* move;
 
     m0 = (CockpitMove0*)get_move_work_adrs(0);
-    move = lbl_806BDCC8[0].move;
-    if (fn_80046F0C(&lbl_806BDCC8[0]) != 1) {
-        lbl_806BDCC8[0].field_0x0D1 = 0;
+    move = cockpit_work[0].move;
+    if (fn_80046F0C(&cockpit_work[0]) != 1) {
+        cockpit_work[0].field_0x0D1 = 0;
         fn_802E4C24();
         fn_803839EC();
         fn_802DFD38();
-        fn_802E796C(&lbl_806BDCC8[0], 0xFF);
-        fn_802E4C5C(move, &lbl_806BDCC8[0].text);
+        quest_gauge_update(&cockpit_work[0], 0xFF);
+        fn_802E4C5C(move, &cockpit_work[0].text);
         if (m0->field_0x0EF != 0) {
-            fn_802E5220(&lbl_806BDCC8[0]);
+            fn_802E5220(&cockpit_work[0]);
         }
-        fn_802EDB0C(move, &lbl_806BDCC8[0].field_0x16B, &lbl_806BDCC8[0].field_0x16F);
-        quest_targets_update_b(&lbl_806BDCC8[0]);
-        fn_802EC4F0(&lbl_806BDCC8[0]);
+        fn_802EDB0C(move, &cockpit_work[0].field_0x16B, &cockpit_work[0].field_0x16F);
+        quest_targets_update_b(&cockpit_work[0]);
+        fn_802EC4F0(&cockpit_work[0]);
         fn_802E5A14();
         fn_802E5BB4();
         fn_802ED88C();
@@ -545,7 +543,7 @@ void fn_802E704C(u16 arg0, s32 arg1, _mh_ivec2_* pos) {
     SprView spr;
     f32 f;
 
-    fn_801E6850((s16*)&spr, get_lsp_data(arg0, NULL));
+    spr_data_copy((s16*)&spr, get_lsp_data(arg0, NULL));
     f = (f32)(arg1 / 5);
     spr.field_0x010 = (s16)(lbl_8079A918 * f);
     draw_sprite(*(_SPR_DATA_*)&spr, (_mh_ivec2_*)pos);
@@ -567,7 +565,7 @@ void fn_802E70F0(s32 arg0, _mh_ivec2_* pos) {
     drawshape_set_vertex_array((_mh_ivec2_*)lbl_805D5B98);
     drawshape_set_flat_color(0xFFFFFFFF);
     drawshape_set_texture_array(0xD, (_mh_tex_uv_*)(lbl_805D5BD8 + tex * 4), 0);
-    fn_80054178((s16*)pos);
+    drawshape_set_offset_ivec2((s16*)pos);
     drawshape_exec();
 }
 
@@ -576,11 +574,11 @@ void fn_802E6EB4(void) {
     _mh_ivec2_ pos;
     _mh_ivec2_* p;
 
-    move = lbl_806BDCC8[0].move;
+    move = cockpit_work[0].move;
     if (move->field_0x00A == 7 && move->field_0x3A4 != 0) {
         set_blendmode(4, 5, 1);
         get_lsp_data(0xBCE, &pos);
-        draw_sprite_anim_ary(lbl_805E70E8, lbl_806BDCC8[0].half_0x180, &pos);
+        draw_sprite_anim_ary(cockpit_flash_anim_ids, cockpit_work[0].half_0x180, &pos);
         p = (_mh_ivec2_*)get_lsp_data(0xBD2, NULL);
         {
             u8 lo = move->field_0x3A5;
@@ -612,7 +610,7 @@ void fn_802E5D68(s16 arg0, u8 arg1) {
     s32 sq;
     s8 v;
 
-    self = &lbl_806BDCC8[0];
+    self = &cockpit_work[0];
     self->field_0x174 = arg0;
     self->field_0x177 = arg1;
     fn_802E5C3C(&pos, (s8)arg1);
@@ -671,24 +669,24 @@ void fn_802E71C4(void) {
         f32 f;
         limit = (s32)(lbl_8079A91C * Screen_w.field_0x14);
         if (fn_803AA41C(1, lbl_8079A91C) == 0) {
-            total = fn_803A87E0();
+            total = quest_time_elapsed_get();
         } else {
             total = fn_803A881C();
         }
         if (total <= limit * 5) {
             if (total > limit) {
-                f = (f32)((lbl_806BDCC8[0].field_0x190 & 0x1F) << 0xB);
+                f = (f32)((cockpit_work[0].field_0x190 & 0x1F) << 0xB);
             } else {
-                f = (f32)((lbl_806BDCC8[0].field_0x190 & 0xF) << 0xC);
+                f = (f32)((cockpit_work[0].field_0x190 & 0xF) << 0xC);
             }
             colour = color_lerp(0xF50C23FF, 0xFF8C9BFF, (u8)fn_800AB658(0, lbl_8079A920 * f),
                                  lbl_8079A8FC + 0.0f, 0.0f);
         }
-        value = fn_803A8858();
+        value = quest_time_limit_get();
         frame = (value - total) / limit;
         bars = value / limit;
     }
-    fn_801E6850((s16*)&spr, get_lsp_data(0xB91, NULL));
+    spr_data_copy((s16*)&spr, get_lsp_data(0xB91, NULL));
     spr.colour_0x01C = colour;
     draw_sprite(*(_SPR_DATA_*)&spr, &pos);
     draw_sprite_idx(0xB92, &pos);

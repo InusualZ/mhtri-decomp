@@ -189,7 +189,40 @@ void fn_800513F0(VEC3* v, f32 scale);
  * consumer's call sites, neither body being written yet).  0x80053960 sets a four-word colour run on
  * the draw-shape state, 0x80054178 takes the 2D vertex pair it rewrites. */
 void fn_80053960(u32, s32, s32, u32);
-void fn_80054178(s16* pos);
+void drawshape_set_offset_ivec2(s16* pos);
+/* 0x800501B4 / 0x800501E4 - the animation clock's cosine and its angle: `t` is a tick count (16-bit wrapped). */
+f32 anim_tick_cos(u16 t);
+f32 anim_tick_angle(u16 t);
+
+/* One 2D textured rectangle for `draw_rect_2d_tex_by_id` (the map's `_DRAW_RECT_2D_TEX`): the corner, the
+ * opposite corner, the colour word and the two texture coordinate pairs.  size: 0x14 */
+typedef struct _DRAW_RECT_2D_TEX {
+    /* +0x00 */ s16 x;       /* the top-left corner */
+    /* +0x02 */ s16 y;
+    /* +0x04 */ s16 end_x;   /* the opposite corner (corner + size) */
+    /* +0x06 */ s16 end_y;
+    /* +0x08 */ u32 color;
+    /* +0x0C */ s16 u0;      /* the first texture coordinate pair */
+    /* +0x0E */ s16 v0;
+    /* +0x10 */ s16 u1;      /* the second pair */
+    /* +0x12 */ s16 v1;
+} _DRAW_RECT_2D_TEX;
+
+/* The draw-shape band's setters the cockpit quest HUD drives (0x80053xxx-0x80054xxx); names are guesses from
+ * the callers (the owner's bodies are not written yet).  The vec2 arguments are two-float pairs. */
+void draw_rect_2d_tex_init(_DRAW_RECT_2D_TEX* rect, const s16* pos, u16 width, u16 height, u32 color, const s16* uv0,
+                           const s16* uv1); /* 0x8005265C */
+void draw_rect_2d_tex_by_id(const _DRAW_RECT_2D_TEX* rect, u16 tex_no); /* 0x80053770 */
+void drawshape_set_vertex_array_f32(const f32* verts);                     /* 0x800538CC */
+void drawshape_set_color_array(const u32* colors);                         /* 0x80053994 */
+void drawshape_copy_vec2(f32* dst, const f32* src);                        /* 0x80053CF8 */
+void drawshape_set_texture_array_f32(u16 tex_no, const f32* uvs);          /* 0x80053D0C */
+void drawshape_set_tex_scale_uniform(const f32* offset, u16 tex_no, f32 scale); /* 0x80053FC0 */
+void drawshape_set_scale_ivec2(const s16* offset, const f32* scale);       /* 0x80053FF4 */
+void drawshape_set_offset_uniform(const f32* offset, f32 scale);           /* 0x800541DC */
+void drawshape_set_offset_f32(const f32* scale, const f32* offset);        /* 0x8005420C */
+void drawshape_set_tex_offset_uniform(const f32* offset, f32 scale);       /* 0x8005442C */
+void drawshape_set_tex_offset_f32(const f32* scale, u16 tex_no, const f32* offset); /* 0x8005445C */
 /* Added by `enemy/em_action.cpp` (rule 2: the declaration belongs with the owner TU, which
  * had not declared it yet). */
 s32 fn_80050C40(void* a, void* b);

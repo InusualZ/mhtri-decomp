@@ -422,7 +422,7 @@ void Put_equip_dtl_basis_sword_colorX(_PLW* plw, _EQUIP_INDEX* idx, u16 a, u16 b
         }
     }
     while (*tbl != 0xFFFF) {
-        fn_801E6850(&spr, get_lsp_data(*tbl, NULL));
+        spr_data_copy(&spr, get_lsp_data(*tbl, NULL));
         spr.color = color;
         draw_sprite(spr, &vec);
         tbl++;

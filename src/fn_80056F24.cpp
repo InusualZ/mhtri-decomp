@@ -204,7 +204,7 @@ namespace nw4r { namespace math { f32 SinFIdx(f32); } }
 extern "C" {
 void GXSetTexCoordGen2(u32 a, u32 b, u32 c, u32 d, u32 e, u32 f);
 
-void fn_800403AC(void* dst, const void* src);
+void copyVec2(void* dst, const void* src);
 void fn_8004030C(struct _MH_VEC2* v);
 void fn_800569CC(void);
 void fn_80056F04(void);
@@ -441,11 +441,11 @@ void filter_reset(void) {
 
 /* The two `Screen_w` vector copies into the state block. */
 extern "C" void fn_800584D8(void* dst) {
-    fn_800403AC(dst, lbl_8066ACF8.vec_0x128);
+    copyVec2(dst, lbl_8066ACF8.vec_0x128);
 }
 
 extern "C" void fn_800584E8(void* dst) {
-    fn_800403AC(dst, lbl_8066ACF8.vec_0x120);
+    copyVec2(dst, lbl_8066ACF8.vec_0x120);
 }
 
 /* `fn_80058BB0`/`system_copy_filter_arm`/`system_copy_filter_clear`: the copy-filter handshake with the system block. */

@@ -92,7 +92,7 @@ u32 item_page_option_available(s8 index);                                       
 extern "C" {
 #endif
 
-void fn_802E0AD4(_SPR_DATA_* rec, u16 id, u16 part, _mh_ivec2_* out); /* 0x802E0AD4, hud/layout.cpp */
+void sprite_frame_apply(_SPR_DATA_* rec, u16 id, u16 part, _mh_ivec2_* out); /* 0x802E0AD4, hud/layout.cpp */
 void fn_802E1A7C(u16 id, u16 part, u16 arg2, const _mh_ivec2_* pos);
 void fn_802E23D0(u32 id, u32 part, s8* text, u8 flag, const _mh_ivec2_* pos);
 u32 color_lerp(u32 value, u32 mask);
@@ -109,11 +109,11 @@ MenuRowData* fn_8004EA24(void);
 char* flfntStrChr(char* text, s32 c);   /* owner: `g3d/g3d_anmchr.cpp` */
 void fn_800CEE74(u8 a, u16 b, f32* out);
 u32 fn_8026FE44(s32 worker);
-s32 fn_802731B4(s32 worker, u16 id);
+s32 Pl_item_timer_get(s32 worker, u16 id);
 void fn_802D9EA8(void);
 u32 fn_802DA20C(s32 a, u8 b);
 void fn_802DA2D4(s32 flag);
-s32 fn_802DA454(s32 a, u8 b, s16 c, s16 d, s32 e, s32 f, s32 g);
+s32 hud_notice_spawn(s32 a, u8 b, s16 c, s16 d, s32 e, s32 f, s32 g);
 s8* fn_802DFB18(u8 idx);
 u16* fn_8033ADD0(u16 a, u16* b, u16* c, u16 d);
 s8 fn_8033AED0(void* a, u16 b);
@@ -159,7 +159,7 @@ void draw_sprite_anim_ary(const u16* ids, u16 anim, const _mh_ivec2_* pos);
 void draw_itemicon_item_id(const _SPR_DATA_& spr, u16 id, const _mh_ivec2_* pos);
 void font_set_size(s16 w, s16 h);
 s32 chk_pointer(void);
-s32 fn_801E6850(s16* dst, void* src);
+s32 spr_data_copy(s16* dst, void* src);
 u8 get_option_cfg(u8 index);
 
 /* `lobby/fn_801F3294.cpp`'s page arrow and the menu band's own text helpers. */

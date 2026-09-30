@@ -26,6 +26,12 @@ void fn_8012FE3C(struct _ENEMY_WORK* self, f32 a);
 /* r3 (`self`); returns a word compared against 1 (`cmplwi`) - the teardown step of
  * `enemy/fn_80182D5C.cpp` runs `fn_8012E664` only when it answers 1. */
 u32 fn_801337FC(struct _ENEMY_WORK* self);
+/* 0x80133638 - nonzero while the +0x810 mark timer runs (> 0); the cockpit's quest marker asks it. */
+u32 em_mark_timer_ck(struct _ENEMY_WORK* self);
+/* 0x8013364C - 0 for the team-0x28 record and for a kind-4 record that is not grounded; else 1. */
+u32 em_markable_ck(struct _ENEMY_WORK* self);
+/* 0x8012F1D8 - the motion-timer window test of the skill-0xBE blink. */
+u32 em_motion_window_ck(struct _ENEMY_WORK* self);
 /* r3 (`self`) and r4/r5; the arming helper the action band's functions call. */
 void fn_80136B50(struct _ENEMY_WORK* self, u32 a, u32 b);
 /* r3 (`self`) and f1, the fade duration it stores and passes on.  `enemy/fn_8014A1BC.c` calls

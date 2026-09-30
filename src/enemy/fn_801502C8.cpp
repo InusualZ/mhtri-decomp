@@ -128,7 +128,7 @@ u32 fn_80129A70(struct _ENEMY_WORK* self, u16 a);u32 fn_80129D3C(struct _ENEMY_W
 u8 fn_80129DB8(struct _ENEMY_WORK* self);
 u8 fn_80129E48(struct _ENEMY_WORK* self);
 s32 fn_8012A204(struct _ENEMY_WORK* self);
-u8 fn_802B0668(u8 a);
+u8 stage_map_kind_get(u8 a);
 void fn_80127FE4(struct _ENEMY_WORK* self);
 
 /* enemy/fn_80147CE0.cpp (0x80147CE0..0x80149D6C) - the band below. */
@@ -766,7 +766,7 @@ s32 fn_801542D0(struct _ENEMY_WORK* self, u16 arg1) {
     s32 armed;
     s32 arg3;
 
-    kind = fn_802B0668(self->field_0x1E0);
+    kind = stage_map_kind_get(self->field_0x1E0);
     if ((u32)(kind - 1) > 2U && kind != 5) {
         return 0;
     }
@@ -900,7 +900,7 @@ u8 fn_801547AC(struct _ENEMY_WORK* self, u8 arg1) {
     case 1:
         return self->field_0x356 != 0;
     case 2:
-        kind = fn_802B0668(self->field_0x1E0);
+        kind = stage_map_kind_get(self->field_0x1E0);
         switch (kind) {
         case 0:
             return 1;

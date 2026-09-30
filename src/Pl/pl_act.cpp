@@ -73,7 +73,7 @@
  *   * 7885C: `(s16)fn_802753E4(...)` - retail's `mr r0,r3; mr r3,self; extsh r4,r0` says the shared helper
  *     returns `s16`, but changing that declaration would disturb 789EC/78D1C, so the cast stays and each of
  *     the five call sites costs one row.
- *   * B358/C89C-family: `quest_element_remaining_get`/`fn_802731B4`/`fn_803B31E0` take/return `s32` (not `s16`/`s8`) - the
+ *   * B358/C89C-family: `quest_element_remaining_get`/`Pl_item_timer_get`/`fn_803B31E0` take/return `s32` (not `s16`/`s8`) - the
  *     missing `extsb` at the call site is the tell; and an `s8` field assigned from an `s32` local needs the
  *     field typed `s8` so `stb` keeps retail's `extsb`.
  *   * `int -> s16`/`s8` store conversion (A044, CA48, 76CE8, 76E08): retail stores the *raw* int sum
@@ -517,7 +517,7 @@ void rotVecXYZ(nw4r::math::VEC3*, _CP_VECTOR*);
 extern "C" void fn_800FC0D4(_CP_VECTOR*, void*);
 extern "C" f32 fn_80050EF4(void*, void*);
 extern "C" u32 ef_inst_spawn(_PLW*, s32);
-extern "C" u32 fn_802B0668(u8);
+extern "C" u32 stage_map_kind_get(u8);
 extern "C" u32 fn_802753E4(_PLW*, s32);
 extern "C" void fn_80278D1C(_PLW*);
 u8 get_now_mapno(void);
@@ -1419,7 +1419,7 @@ extern "C" s32 fn_8027A2A0(_PLW* self, s32 arg1)
 }
 
 /* 0x8027BC48: whether the current motion still takes directional input. */
-extern "C" s32 fn_8027BC48(s32 arg1)
+extern "C" s32 Pl_motion_input_ck(s32 arg1)
 {
     u8* p = get_move_work_adrs(0);
     if (p == 0) {
@@ -1716,7 +1716,7 @@ u32 Pl_bari_ck(_PLW* self, s32 arg1)
 /* 0x802784B8 */
 extern "C" s32 fn_802784B8(_PLW* self)
 {
-    s32 m = (u8)fn_802B0668((u8)get_now_mapno());
+    s32 m = (u8)stage_map_kind_get((u8)get_now_mapno());
     switch (m) {
     case 6:
     case 17:
@@ -2056,7 +2056,7 @@ extern "C" void fn_8027B918(_PLW* self)
                 *(u8*)((u8*)self + 0x5BD) = 1;
                 return;
             case 1:
-                if ((u32)fn_8027BC48(0) != 1) {
+                if ((u32)Pl_motion_input_ck(0) != 1) {
                     if ((u32)fn_803B521C(0) == 1) {
                         if (quest_item_work_notify(1) == 1 || quest_item_work_notify(2) == 1) {
                             (*(u8*)((u8*)self + 0x5C0))++;
@@ -2102,7 +2102,7 @@ extern "C" void fn_8027B918(_PLW* self)
                 return;
             }
             if ((u32)fn_8026A6F4(self, 0x16) == 1) {
-                if ((s32)*(u8*)((u8*)self + 0x5BF) == 1 && (u32)fn_8027BC48(0) != 1) {
+                if ((s32)*(u8*)((u8*)self + 0x5BF) == 1 && (u32)Pl_motion_input_ck(0) != 1) {
                     sysSE_req(0);
                     *(u8*)((u8*)self + 0x5BD) = 1;
                     return;
@@ -2127,7 +2127,7 @@ extern "C" void fn_8027B918(_PLW* self)
     }
 }
 
-extern "C" s32 fn_802731B4(_PLW*, u16);
+extern "C" s32 Pl_item_timer_get(_PLW*, u16);
 extern "C" s32 fn_803B31E0(s8);
 extern "C" void fn_803B6078(u16, u16*);
 extern "C" s32 quest_element_remaining_get(u16);
@@ -2152,7 +2152,7 @@ extern "C" void fn_8027B358(_PLW* self)
     if (q == 0) {
         return;
     }
-    if ((u32)fn_8027BC48(0) == 1) {
+    if ((u32)Pl_motion_input_ck(0) == 1) {
         sysSE_req(1);
         *(u8*)((u8*)self + 0x5BE) = 0;
         return;
@@ -2193,7 +2193,7 @@ extern "C" void fn_8027B358(_PLW* self)
                 sysSE_req(2);
                 return;
             case 2:
-                if (fn_802731B4(self, sp8) < 1) {
+                if (Pl_item_timer_get(self, sp8) < 1) {
                     sysSE_req(2);
                     return;
                 }
@@ -2232,7 +2232,7 @@ extern "C" void fn_8027B358(_PLW* self)
         }
         if ((u32)fn_8026A6F4(self, 0x12) == 1) {
             u8 t31 = *(u8*)(q + 0x68E);
-            if ((s8)t31 < fn_802731B4(self, sp8)) {
+            if ((s8)t31 < Pl_item_timer_get(self, sp8)) {
                 if ((s8)t31 < r28) {
                     sysSE_req(6);
                     *(u16*)(q + 0x696) |= 1;
@@ -2244,10 +2244,10 @@ extern "C" void fn_8027B358(_PLW* self)
             }
         } else if ((u32)fn_8026A6F4(self, 0x15) == 1) {
             u8 t31b = *(u8*)(q + 0x68E);
-            if (r28 < fn_802731B4(self, sp8)) {
+            if (r28 < Pl_item_timer_get(self, sp8)) {
                 *(s8*)(q + 0x68E) = r28;
             } else {
-                *(s8*)(q + 0x68E) = fn_802731B4(self, sp8);
+                *(s8*)(q + 0x68E) = Pl_item_timer_get(self, sp8);
             }
             if ((s8)t31b != *(s8*)(q + 0x68E)) {
                 sysSE_req(6);
@@ -3369,7 +3369,7 @@ extern "C" s32 fn_80277FF8(u8 arg0, u8 arg1, s32 arg2)
 /* 0x80278144: whether the given action may start in the player's current map/move-work state. */
 extern "C" u32 fn_80278144(u8 arg0, u8* arg1, u8 arg2)
 {
-    u32 m = fn_802B0668(get_now_mapno());
+    u32 m = stage_map_kind_get(get_now_mapno());
     if (fn_80277FF8((u8)m, arg0, arg2) == 0) {
         return 0;
     }
@@ -3422,7 +3422,7 @@ extern "C" u32 fn_80278144(u8 arg0, u8* arg1, u8 arg2)
 /* 0x80278310: the same map/move-work gate as 80278144, for the smaller action set. */
 extern "C" u32 fn_80278310(u8 arg0, u8* arg1, u8 arg2)
 {
-    u32 m = fn_802B0668(get_now_mapno());
+    u32 m = stage_map_kind_get(get_now_mapno());
     if (fn_80277FF8((u8)m, arg0, arg2) == 0) {
         return 0;
     }
@@ -3630,7 +3630,7 @@ extern "C" void fn_80279C20(_PLW* self)
     if (fn_8026FE44(self) == 0) {
         return;
     }
-    if (fn_8027BC48(1) == 1U) {
+    if (Pl_motion_input_ck(1) == 1U) {
         return;
     }
     if (Pl_bari_ck(self, 1) == 1U) {
@@ -4037,7 +4037,7 @@ extern "C" s32 fn_8027C208(_PLW* self, u16 arg1)
         if (fn_8027CC2C(self) == 1U) {
             return 0;
         }
-        if (fn_802731B4(self, 0x1D) > 0 && self->unk009 != 3) {
+        if (Pl_item_timer_get(self, 0x1D) > 0 && self->unk009 != 3) {
             return 1;
         }
         break;
@@ -4048,7 +4048,7 @@ extern "C" s32 fn_8027C208(_PLW* self, u16 arg1)
         if (fn_8027CC2C(self) == 1U) {
             return 0;
         }
-        if (fn_802731B4(self, 0x1D) > 0 && fn_802D7804(4, lbl_8079A0F8) == 1U) {
+        if (Pl_item_timer_get(self, 0x1D) > 0 && fn_802D7804(4, lbl_8079A0F8) == 1U) {
             return 1;
         }
         break;

@@ -931,7 +931,7 @@ struct _PLW {
         /* +0x45E */ u8 pad_0x45E[0x466 - 0x45E];
         struct {
             /* +0x45E */ u8 pad_0x45E_start[0x460 - 0x45E];
-            /* +0x460 */ s16 field_0x460;  /* > 0 is the whole of `fn_8027DFD0` */
+            /* +0x460 */ s16 field_0x460;  /* > 0 is the whole of `Pl_timer_0x460_ck` */
             /* +0x462 */ u8 pad_0x462[0x464 - 0x462];
             /* +0x464 */ s16 field_0x464;  /* the cockpit-quest bar's recompute gate:
                                             * `quest_bar_a_next_id` (`hud/cockpit_quest.cpp`) reads it
@@ -1212,7 +1212,7 @@ struct _PLW {
             };
         };
     };
-    /* +0x650 */ u16 field_0x650;   /* the id `fn_802731B4`/`fn_80272E30` are handed */
+    /* +0x650 */ u16 field_0x650;   /* the id `Pl_item_timer_get`/`fn_80272E30` are handed */
     /* +0x652 */ s16 field_0x652;   /* the amount `fn_8027D76C` compares against and negates */
     /* +0x654 */ union { /* MAIN's arm first; the second arm is this branch's view of
                           * the same 16 bytes, so `Pl/fn_8025F088.cpp` keeps the names

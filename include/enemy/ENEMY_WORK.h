@@ -191,7 +191,7 @@ struct EmActionBlock {
 /* size: 0xB18 */
 struct _ENEMY_WORK {
     /* +0x000 */ u8 active;             /* nonzero while the record is in use */
-    /* +0x001 */ u8 unused_0x001;
+    /* +0x001 */ u8 visible_0x001;          /* the quest marker shows the record only while this is set (`quest_target_color`) */
     /* +0x002 */ u8 group;              /* the enemy group/entry index */
     /* +0x003 */ u8 team;
     /* +0x004 */ u8 field_0x004;        /* `em_work_die_ck` treats values below 2 as still alive */
@@ -254,7 +254,7 @@ struct _ENEMY_WORK {
     /* +0x1D8 */ u8 unused_0x1D8[0x1DE - 0x1D8];
     /* +0x1DE */ u8 field_0x1DE;        /* `fn_8013791C`'s request-to-redraw byte */
     /* +0x1DF */ u8 unused_0x1DF[1];
-    /* +0x1E0 */ u8 field_0x1E0;        /* passed to `fn_802B0668` (map lookup) */
+    /* +0x1E0 */ u8 field_0x1E0;        /* passed to `stage_map_kind_get` (map lookup) */
     /* +0x1E1 */ u8 area_no;
     /* +0x1E2 */ u8 field_0x1E2;
     /* +0x1E3 */ u8 field_0x1E3;
@@ -715,7 +715,7 @@ struct _ENEMY_WORK {
     /* +0x8D4 */ u8 unused_0x8D4[0x916 - 0x8D4];
     /* +0x916 */ s16 field_0x916;
     /* +0x918 */ u8 unused_0x918[0x938 - 0x918];
-    /* +0x938 */ s16 field_0x938;       /* the motion timer `fn_8012F1D8` gates its window test on */
+    /* +0x938 */ s16 field_0x938;       /* the motion timer `em_motion_window_ck` gates its window test on */
     /* +0x93A */ u8 unused_0x93A[0x94A - 0x93A];
     /* +0x94A */ u16 field_0x94A;       /* the action-end block clears it */
     /* +0x94C */ u16 field_0x94C;       /* the action-end block clears it */

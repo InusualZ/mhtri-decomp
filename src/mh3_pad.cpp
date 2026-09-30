@@ -776,7 +776,7 @@ extern "C" s32 fn_80046F0C(void)
     return system_w.field_0x30 != 0;
 }
 
-extern "C" s32 fn_80047058(void)
+extern "C" s32 screen_split_mode_ck(void)
 {
     return Screen_w[0x1A] != 0;
 }

@@ -72,6 +72,7 @@
 #include "sound/mhchar.h"
 #include "unsplit/unknown.h" /* SystemWork / system_w */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "stage/stg_w.h"
 
 /* ----------------------------------------------------------------------------------------------------
  * the pool the range reads (owned elsewhere; declared, never defined - playbook 29)
@@ -817,7 +818,7 @@ void fn_801D4F78(struct _ENEMY_WORK* self) {
         break;
     }
     area_flag = 0;
-    if ((u8)fn_802B0668(self->field_0x1E0) == 4 && (self->area_no == 4 || self->area_no == 6)) {
+    if ((u8)stage_map_kind_get(self->field_0x1E0) == 4 && (self->area_no == 4 || self->area_no == 6)) {
         area_flag = 1;
     }
     if (fn_8012EC60(self) == 1 || area_flag == 1) {
@@ -1288,7 +1289,7 @@ u32 fn_801D68A8(struct _ENEMY_WORK* self, u32 arg1) {
     sel = (u8)arg1;
     switch (sel) {
     case 0:
-        if ((u8)fn_802B0668(self->field_0x1E0) == 4) {
+        if ((u8)stage_map_kind_get(self->field_0x1E0) == 4) {
             switch (self->area_no) {
             case 2:
                 setVector3(&pos, lbl_80799490, lbl_8079930C, lbl_80799494);
@@ -1394,7 +1395,7 @@ s32 fn_801D6CCC(struct _ENEMY_WORK* self, u8 arg1) {
 
 void fn_801D6D24(struct _ENEMY_WORK* self) {
     if (self->action_0x328.armed_0x328.field_0x330 == 0xFF) {
-        if ((u8)fn_802B0668(self->field_0x1E0) == 4) {
+        if ((u8)stage_map_kind_get(self->field_0x1E0) == 4) {
             if (self->area_no == 5 && self->field_0x9F6 == 7) {
                 self->action_0x328.armed_0x328.field_0x330 = 1;
             } else {
@@ -1407,7 +1408,7 @@ void fn_801D6D24(struct _ENEMY_WORK* self) {
 }
 
 s32 fn_801D6DA4(struct _ENEMY_WORK* self, u16 arg1) {
-    u8 kind = (u8)fn_802B0668(self->field_0x1E0);
+    u8 kind = (u8)stage_map_kind_get(self->field_0x1E0);
     s32 found;
     u8 sel;
     u8 sub;
@@ -1518,7 +1519,7 @@ void fn_801D71C4(struct _ENEMY_WORK* self, u8 arg1) {
         fn_801057FC(self, 0x14, 0x18, &pos, lbl_807994F8, 0);
     }
     if (arg1 == 2) {
-        switch ((u8)fn_802B0668(self->field_0x1E0)) {
+        switch ((u8)stage_map_kind_get(self->field_0x1E0)) {
         case 1:
             switch (self->area_no) {
             case 4:

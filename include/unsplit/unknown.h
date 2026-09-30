@@ -217,7 +217,6 @@ extern SystemWork system_w;
  * name different modules (0x802B/0x803), so no `<module>.h` is sound - the rule 2 named gap.  The
  * signatures are the call sites' (r3 the work record; `fn_80304510`'s fifth argument is the s32
  * `0`/0xF4A0/0xB61 the target materialises; `fn_803B50A8` returns the r3 word compared against 1). */
-u8 fn_802B0668(u8 kind);
 /* `fn_802BE638` (0x802BE638) is in `camera/fn_802B5C58.cpp`'s range 0x802B5C58-0x802BEAAC, so the
  * owner's header declares it and this one includes it (rule 2). */
 void fn_80304510(struct _ENEMY_WORK* self, u32 a, u32 b, void* v, s32 d, f32 s);

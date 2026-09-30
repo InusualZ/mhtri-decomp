@@ -640,7 +640,20 @@ config.libs = [
             # (0x802E0740..0x802E4978) are both registered in this lib, and this range drives the
             # same two `lbl_806BDCC8` work records and calls the same `hud` 2D element library.
             # Same `cflags_main` as `hud/layout.cpp`.
-            Object(NonMatching, "hud/cockpit_quest.cpp"),
+            # `-pool off` evidence (playbook 43; compiled with and without the flag, scored against the target):
+            # each row below reads 3+ `.data` tables of one section that this unit defines, and without the flag MWCC
+            # shares one base register across them where retail loads each with its own `lis`/`addi`.
+            #   quest_bar_a_next_id       93.188 -> 100.000
+            #   quest_bar_b_next_id       83.841 ->  99.207
+            #   quest_gauge_blend_update  82.810 -> 100.000
+            #   quest_gauge_draw          93.728 ->  96.270
+            # weighted code 16553.20 B -> 16765.04 B matched, no row lower with the flag.
+            Object(NonMatching, "hud/cockpit_quest.cpp", cflags=[*cflags_hud, "-pool off"]),
+            # A **data-only** unit (precedent `Network/network_shared_data.cpp`): the `.data` run 0x805E6A58..0x805E70F8,
+            # the map icon id lists and per-map pointer tables `hud/cockpit_quest.cpp` reads plus the data of
+            # `hud/fn_802EBED8.cpp`, `ef/eft035.cpp` and `menu/fn_802E4978.cpp` that sits inside it (GUESS: one
+            # owner for the interleaved run; see the unit header).
+            Object(NonMatching, "hud/cockpit_icon_data.cpp", cflags=[*cflags_hud]),
             # Registered once, at its final home (docs/plan.md 12).  The continuation of the cockpit
             # HUD band above `hud/cockpit_quest.cpp`: `.text` 0x802EBED8..0x802F140C (54 functions,
             # 21812 B), extab 0x8001529C..0x80015424 and extabindex 0x80033A50..0x80033C9C (49

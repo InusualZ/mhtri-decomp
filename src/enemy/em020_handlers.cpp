@@ -63,7 +63,7 @@
  *     target's caller compares it unsigned (`cmplwi r3,0x1`), which is what mode 2 needs.
  *
  * Naming note: references only to other units' unrenamed `fn_XXXXXXXX` symbols (`MTX34_ctor`,
- * `fn_8005024C`, `fn_800E2994`, `fn_8006F304`, `fn_8013A9F4`, `fn_802B0668`, `fn_802B0A98`,
+ * `fn_8005024C`, `fn_800E2994`, `fn_8006F304`, `fn_8013A9F4`, `stage_map_kind_get`, `fn_802B0A98`,
  * `fn_802D94C4`, `fn_8027DC64`), each declared by its
  * owner's header below; checked with `grep -n "fn_" include/fn_8004CAD8.h include/unsplit/{g3d,sound,unknown}.h
  * include/enemy/fn_80138074.h include/stage/stg_w.h include/ai/fn_802D44F4.h include/Pl/fn_8027D684.h`.
@@ -81,7 +81,7 @@
 #include "fn_8004CAD8.h"         /* MTX34_ctor, fn_8005024C (their owner's header) */
 #include "unsplit/g3d.h"         /* fn_8006F304 */
 #include "unsplit/sound.h"       /* fn_800E2994 */
-#include "unsplit/unknown.h"     /* SystemWork / system_w, fn_802B0668 */
+#include "unsplit/unknown.h"     /* SystemWork / system_w, stage_map_kind_get */
 #include "enemy/em020_ai.h"      /* em020_aim_target_ck (its owner is enemy/em020_ai.cpp) */
 #include "stage/stg_w.h"         /* fn_802B0A98 (the owner is stage/stg_w.cpp) */
 #include "ai/fn_802D44F4.h"      /* fn_802D94C4 (the owner is ai/fn_802D44F4.cpp) */
@@ -197,7 +197,7 @@ extern "C" u8 em020_condition_ck(_ENEMY_WORK* self, u32 mode) {
 extern "C" void em020_area_model_set(_ENEMY_WORK* self) {
     fn_8013A9F4(self);
 
-    if (fn_802B0668(self->field_0x1E0) == 7) {
+    if (stage_map_kind_get(self->field_0x1E0) == 7) {
         switch (self->area_no) {
         case 2:
             fn_802B0A98(9, 1);

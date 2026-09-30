@@ -992,17 +992,17 @@ extern "C" void fn_8004030C(_MH_VEC2* v)
 
 extern "C" void* fn_804C2200(void* heap, u32 size, u32 align);
 extern "C" void MEMFreeToExpHeap(void* heap, void* block);
-extern "C" void fn_800403AC(_MH_VEC2* dst, const _MH_VEC2* src);
+extern "C" void copyVec2(_MH_VEC2* dst, const _MH_VEC2* src);
 
 /* Copies the two screen-size rectangles out of the calibration block. */
 extern "C" void fn_80040360(_MH_VEC2* dst)
 {
-    fn_800403AC(&dst[0], (const _MH_VEC2*)&Screen_w.f44);
-    fn_800403AC(&dst[1], (const _MH_VEC2*)&Screen_w.f52);
+    copyVec2(&dst[0], (const _MH_VEC2*)&Screen_w.f44);
+    copyVec2(&dst[1], (const _MH_VEC2*)&Screen_w.f52);
 }
 
 /* Copies one screen-size rectangle. */
-extern "C" void fn_800403AC(_MH_VEC2* dst, const _MH_VEC2* src)
+extern "C" void copyVec2(_MH_VEC2* dst, const _MH_VEC2* src)
 {
     dst->x = src->x;
     dst->y = src->y;

@@ -105,6 +105,7 @@
 #include "fn_8004CAD8.h"       /* fn_8005024C/fn_80051378/rotVecY/calcDistanceSqXZ */
 #include "mh3_pad.h"           /* VEC3_ctor/copyVec3/setVec3 */
 #include "sys_mem.h"           /* operator delete (the `__dl__FPv` global deleter) */
+#include "stage/stg_w.h"
 
 /* One 0x16-byte action record `fn_80182AB8` builds (the +0x00 type word, a VEC3 and three scalars).
  * size: 0x16 */
@@ -118,7 +119,7 @@ struct EmWorkItem {
 
 extern "C" {
 
-/* `fn_802B0668` (the byte-table map lookup) comes from `include/unsplit/unknown.h`, which already
+/* `stage_map_kind_get` (the byte-table map lookup) comes from `include/unsplit/unknown.h`, which already
  * carries the band-interleaves-modules declaration. */
 
 /* ------------------------------------------------------------------------------------------------
@@ -308,7 +309,7 @@ void fn_80182080(_ENEMY_WORK* self, u32 part) {
  * next action, either by setting the 0x1FC/0x1FE/0x1FF request or by running the 0x8012A014 test.
  * ------------------------------------------------------------------------------------------------ */
 u32 fn_801820DC(_ENEMY_WORK* self, u32 arg) {
-    u8 mode = (u8)fn_802B0668(self->field_0x1E0);
+    u8 mode = (u8)stage_map_kind_get(self->field_0x1E0);
     if (mode != 1 && mode != 3) {
         return 0;
     }
@@ -525,7 +526,7 @@ u32 fn_801825A4(_ENEMY_WORK* self, u32 kind) {
  * map/area state names.
  * ------------------------------------------------------------------------------------------------ */
 void fn_80182768(_ENEMY_WORK* self, u8* out_a, u8* out_b) {
-    switch ((u8)fn_802B0668(self->field_0x1E0)) {
+    switch ((u8)stage_map_kind_get(self->field_0x1E0)) {
     case 1:
         if (self->area_no == 7) {
             em_move_mode_set(self, 2);
@@ -598,7 +599,7 @@ void fn_80182978(_ENEMY_WORK* self) {
     self->aim.x = zero;
     self->aim.y = zero;
     self->aim.z = zero;
-    switch ((u8)fn_802B0668(self->field_0x1E0)) {
+    switch ((u8)stage_map_kind_get(self->field_0x1E0)) {
     case 1:
         if ((s32)self->area_no == 7 || (s32)self->area_no == 12) {
             fn_80126278(self, (u16)((self->area_no & 0xF) * 256), &self->aim);
