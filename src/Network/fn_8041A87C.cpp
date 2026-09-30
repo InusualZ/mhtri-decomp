@@ -1,118 +1,57 @@
 /*
  * fn_8041A87C.cpp - the GameSpy interface / peer band, `.text` 0x8041A87C..0x8041DF10.
  *
- * SHAPE.  The band's four object types - `NetworkGameSpyInterface`, the worker thread
- * `GameSpyInterfaceThread`, `NetworkPeerGameSpy` and `NetworkTimedHandler` - own their bodies as
- * member functions, and every call the target takes through an object's vtable goes through a
- * declared `virtual` on the *foreign* class being dispatched (`NetworkLogger`, `GameSpyReceiver`,
- * `NetworkPeerCallback`): only a real virtual emits retail's `lwz r12, 0x0(r3)` / `lwz r12, <slot>(r12)`
- * shape, while a struct of function pointers loads through a scratch register.  The unit's *own*
- * vtables stay referenced (`lbl_806036A0`, `lbl_80603740`), never declared: their entries are all
- * defined here, so a `virtual` spelling makes MWCC emit a second copy of the table in `.data`
- * (measured: a class whose virtuals are all defined in its TU gains a 20-byte `.data` vtable).
+ * WHAT IT IS.  Four object types share the range: five `NetworkReflectService` methods (connect/search
+ * sub-machines, the DWC event applier), the GT2 socket callbacks and the worker thread
+ * `GameSpyInterfaceThread`, `NetworkPeerGameSpy` and `NetworkTimedHandler`.  Each owns its bodies as members;
+ * every call through a foreign object's vtable goes through a declared `virtual` on that class (the only
+ * shape MWCC emits as `lwz r12, 0x0(r3)` / `lwz r12, <slot>(r12)`).
  *
- * Naming note: `dumpmap.py lookup` answers only `zz_XXXXXXXX_` for this range's code, so the
- * `fn_` stems of the unsplit callees this file still calls stay (they are the map's placeholders).
- * The band's own names come from the code and the pool: the map carries each member's mangled
- * spelling, and the seven the pool spells out are `NetworkGameSpyInterface::startMatch`,
- * `::ConnectToAnybody`, `::executeError`, `::sendUnreliable`, `::tGameSpyInterface`,
- * `::GameSpyInterfaceThreadInit` and `NetworkPeerGameSpy::put`.  No `unkNN` identifier survives.
+ * SEAMS (the registration was unproven; now evidenced, a recut is filed in the outbox).  Three or four TUs:
+ * (1) `updateCallbackStep`..`applyEvent` (0x8041A87C..0x8041B194) are `NetworkReflectService` members: its ctor
+ * is `__ct__21NetworkReflectService` (0x8041A1C4), the thunk at 0x8041A194 tail-calls `applyEvent`, the one at
+ * 0x8041A5A8 is its `notify`, and `updateCallbackStep` logs the string at 0x80603154 that precedes that class's
+ * vtable 0x80603190.  (2) The thread's vtable 0x806036A0 is followed by the peer's strings 0x806036B0: a
+ * vtable-to-string seam at 0x8041D750 (`NetworkPeerGameSpy`, vtable 0x80603714).  (3) The timed handler's vtable
+ * 0x80603740 rises above the peer's: a third TU at 0x8041DE20.
  *
- * WHAT IT IS.  The Wii network layer's GameSpy half: the `NetworkGameSpyInterface` connect and NAT
- * sub-machines (the DWC callback codes 0x8000..0x8082, the 0x6001..0x6005 work records), the
- * interface's worker thread `GameSpyInterfaceThread` (init/open/step request bytes, a three-slot
- * socket table at 0x806D3650, the NAT-negotiation sub-machine and its error record), and
- * `NetworkPeerGameSpy`'s 0x600-byte send / 0x6000-byte receive buffers.
+ * FLAGS.  Per object in `configure.py`: `-O3` + `-inline noauto`, the lib's `-Cpp_exceptions on`, and `-pool off`
+ * (playbook 43; measured there).  The file is `#pragma peephole off` throughout: retail keeps the unfused
+ * `clrlwi`/`extsb` + `cmpwi` forms, so narrow stores are compound assignments and shift-and-mask bytes are
+ * `(v >> 16) & 0xFF` (playbook 95).
  *
- * MODULE AND NAME (brief section 2, evidence order).  1. No `__FILE__` string covers the range: the
- * `.data` pool it loads (0x80603000..0x806036xx) is class format strings ("connectAttemptCallback is
- * called.", "NetworkGameSpyInterface::startMatch ...", "NetworkPeerGameSpy::put: buf_recv_peer over
- * ..."), never a source-file name.  2. `dumpmap.py lookup` answers only `zz_XXXXXXXX_` for the code.
- *  3. The classes plus the registered neighbour `Network/NetworkWiiMediator.c` place the band in
- * `Network`, and the `.data` vtables it stores (`lbl_806036A0`, `lbl_80603740`) name no source file,
- * so the file keeps the map's stem (brief option 4).  The seam is unproven (discovery cap at
- * Camellia's start).  Open naming question: the *thread* class's own log strings read
- * `NetworkGameSpyInterface::<method>`, and the header gives that name to the connect sub-machine's
- * object instead - recorded here rather than renamed, since the sub-machine's real name is unproven.
+ * LOAD-BEARING SHAPES.  The vtable pointer sits where the first virtual is declared, so `~GameSpyInterfaceThread`
+ * comes first in the class (playbook 98); being the key function it makes this unit emit `__vt__` and `__dt__`.
+ * The error record is passed by value through `NetworkInstanceDispatch`'s inline overload (playbook 97).
+ * `unregisterReceiver` keeps an element pointer across its call (playbook 96); `executeError` copies the two
+ * values it logs so the switch re-reads the stack; `isQueued` is the plain three-way return.  `profile_4485` is
+ * five `u32` at the odd offset 0x4485 (the class's `#pragma pack(1)`); the connect call's out parameter is one
+ * `GT2Connection`.  A `switch` whose cases all leave 0 is `break` + one trailing `return 0;` (playbook 34).
  *
- * LANGUAGE AND SECTIONS.  C++ (mangled `__dl__FPv` delete, vtables).  `-Cpp_exceptions on` now comes
- * from `cflags_network` (flags-audit 2026-09-28) while retail's object carries `extab` 380 B and
- * `extabindex` 540 B (playbook 30's pragma pair).  Nothing in the range's `.data` is claimed: the
- * 0x80603xxx string pool is shared with the NetworkWiiMediator band above it (that band loads the
- * same literals), so per playbook 58 it can be neither claimed nor named here.  Our object keeps the
- * empty `ours-extra` set: the view classes are never constructed, so no vtable is emitted.
+ * DATA (INTERIM).  Claimed and emitted: `.data` 0x806031A0..0x80603714 (the callback set first, then the log
+ * strings as literals in retail's order, then the thread vtable), `.bss` 0x806D3650..0x806D3670 and `.sbss`
+ * 0x80794CE0..0x80794CE8.  The `.data` claim is interim and both edges are suspect: the left edge holds only if
+ * the Reflect TU takes 0x80603154..0x806031A0, and the right edge 0x80603714 is probably false - the thread TU
+ * should end at 0x806036B0 (peer strings and vtable belong to the peer TU).  Deferred by the data tools:
+ * `lbl_80603154` and `lbl_80603740` (span-blocked, they belong to the Reflect and timed-handler TUs) and the
+ * `.sdata` entries `sRejectMessageNG`, `sEmptyString`, `sPortFormat` (isolated run).  The two `lbl_` names stay:
+ * renaming an extern of unclaimed data adds a rule-12 finding.  The callback set is defined ahead of the first
+ * literal because MWCC emits `.data` in definition order.
  *
- * DATA CLAIMED (2026-09-28).  `.sbss` 0x80794CE0..0x80794CE8 - the pair the worker thread owns:
- * 0x80794CE0 (stored four times here, read ten) and 0x80794CE4 `sGameSpyInterfaceThread`, the
- * singleton this unit publishes at `.text`+0x1E14 and its destructor zeroes at +0x1EE0 (both
- * `stw rX, 0(0)` + `R_PPC_EMB_SDA21`).  The band header `include/unsplit/Network.h` declared both,
- * which is rule 12.  The *other* unit that names the singleton, `Network/NetworkSessionManager.cpp`, only
- * loads it (`GameSpyInterfaceThread_getInstance`), so the definer is this unit and the claim is
- * here.  One contiguous run, symbol- and 8-byte-aligned, so the split needs no interior auto band.
+ * NAMES.  The six `gt2*Callback` bodies and `DWC_GetLastErrorEx` come from the pool strings; every other name
+ * for an unsplit callee (the `gt2*` API, `DWC_*`, `DWCi_natProbe*`, `sendReq*`, `hasMultipleRefs60d4`,
+ * `errorRecordCode613c`, `getErrorInfo654c`, `getGameInfo2d1c`) and `natNegProgressCallback`,
+ * `natNegCompletedCallback`, `copyGameSpyAddress`, `NetworkReflectService::notify` and the peer's
+ * `armDrop`/`init` (the base's +0x20/+0x24 slots) is a GUESS from call shape or opcode.
  *
- * FLAGS.  The object deviates from the lib on three points, all in `configure.py` or in this file
- * with the evidence: `-O3` + `-inline noauto` in place of `-O4,p` + `-inline auto` (retail calls the
- * file-static helpers - the peer's `isQueued` is 72 B against our 64 B when the inliner folds them
- * in), the lib's `-Cpp_exceptions on`, and a file-wide `#pragma peephole off` (retail keeps the
- * *unfused* folds across the band - `clrlwi`+`slwi` in place of `clrlslwi`, `extsh`+`cmpwi` in place
- * of a folded compare, `extsb`+`cmpwi` in place of `extsb.`), with the five functions whose retail
- * bodies DO carry the folded forms bracketed back on.
- *
- * SHAPES THAT MATTER (measured, easy to undo by accident).  The runtime entry points the band needs
- * are the owners' headers (`Runtime.PPCEABI.H/memcpy.h`, `memset.h`, `unsplit/Runtime.PPCEABI.H.h`),
- * never local declarations (rule 2; the swap is score-neutral, but playbook 60 says measure it).
- * `registerReceiver` returns `s32`, not the u8 the call sites cast - retail's early returns are
- * `li r3, -1` / `-2` and the tail masks the slot it returns (`bind` then stores with a plain `stw`).
- * `sessionOpen_4484` is `s8` (retail `lbz`+`extsb` at every test), `bufferSize_4482` is read unsigned
- * (`(u16)` at its one use), and `profile_4485` is five `u32` at the *odd* offset 0x4485, which needs
- * the class's `#pragma pack(1)` (retail stores them `stw r0, 0x4485(r31)`, `0x4489`, ...).
- * `NetworkLogger::flag_48` returns `u16` (`include/unsplit/Network.h`): retail stores the result with
- * a raw `sth` and masks it only where it is widened.  An extern whose size is unknown is addressed
- * absolutely - `lbl_80793990[3]`/`lbl_80793998[4]` give retail's `li r5, sym@sda21` where `char[]`
- * gave `lis`/`addi`; `natNegMessageMagic` - the shared NATNEG signature, declared in the unit that
- * owns the bytes (`include/DWCi/DWCi_NatNeg.h`) - stays unsized because the target relocates it
- * ADDR16_HA/LO.  The
- * error record a caller builds is three constants stored twice (retail's five 12-byte frame objects
- * at 0x08..0x43): the by-value dispatch is emulated with a per-site `u32 info[6]` whose `[3],[4],[5]`
- * half is written first (`fn_8041B720` 74.25 -> 99.89, `fn_8041B538` 93.77 -> 99.92, `applyEvent`'s
- * two sites).  A `switch` whose cases all leave 0 is written `break` + one trailing `return 0;`, and
- * `default: break;` (playbook 34): `runSearch`/`runConnect`/`runNasLogin` only match that way.  The
- * clamp in `runSearch` is the ternary `size = size >= 0x2000 ? 0x2000 : size;` (retail plants the
- * constant first and copies in the other arm).  `ConnectToAnybody(s32 arg)` takes the thread argument
- * even though its body ignores it - retail's caller sets r4 - so the map row is `...Fl`.
- *
- * RESIDUALS.  Unit 98.48 % fuzzy, 53/71 functions byte-identical, `.text` 13968 B against 13972 B,
- * mean 99.09 %, every function >= 80 %.  isQueued 83.89: retail keeps the *unfused* `extsb`+`cmpwi`
- * and branches to the clamp; with the peephole on ours fuses to `extsb.` and inverts, with it off it
- * is unfused but still inverts and puts the slot in r4 - both measure below the fused shape, so it
- * stays (the shapesearch candidate that scores higher negates the guard: a different shape that
- * measures 84.44).  unregisterReceiver 91.375 keeps its `count` local cached in r30 across the
- * `replyRequest` call; reading `receiverCount_28` at the loop - retail's `lbz r4, 0x28(r28)` *after*
- * the call - has the right instruction stream but rotates every callee-saved register (90.93), and
- * assigning the local after the call measures 85.93.  startMatch 93.63, send 95.68, receive 94.99,
- * publishRequest 96.83, executeError 97.88, updateCallbackStep 96.22 (five `clrlwi.`/`rlwinm.` pairs
- * retail keeps unfused; a scoped peephole pragma pair inside the function does nothing and switching
- * the function to `peephole off` measures 95.68), startNegotiation 98.23 (the third guard's branch
- * polarity - retail `bne return`, ours `beq body` + `b return`), tGameSpyInterface 98.48,
- * checkPeerProfile 98.38, fn_8041B334 98.52, applyEvent 94.42 (the record pairs land as two 24-byte
- * arrays where retail packs five 12-byte objects, and the `ticks * 17` 64-bit multiply materialises
- * a fresh `li r0, 0x0` where retail reuses its zero) and the two `fn_8041B5xx` callbacks are
- * register colourings of statements that measure byte-identical on their own.
- *
- * POSTERROR.  The four `postError` sites dispatch through `NetworkInstanceDispatch`
- * (`include/unsplit/Network.h`), the singleton read as the polymorphic class it is: declaring its
- * 161 slots makes the call retail's `lwz r12, 0x0(r3)` / `lwz r12, 0x288(r12)`, where the data-slot
- * view this file used to carry loaded the table into a scratch register (`lwz r5, 0x0(r3)`).  With
- * it `fn_8041B538` and `fn_8041B720` are 100 % (was 99.92/99.89) and `applyEvent` gains 0.1; the
- * sibling `Network/network_state.cpp` keeps its own view because its record is passed **by value**
- * there, which is a different call shape (measured: the pointer form costs that row 2.4 points).
- *
- * `runThread` and the thread body it calls are emitted in the reverse of the target's
- * address order (the map has `runThread` at 0x8041D31C and the body at 0x8041D344): a source-order
- * defect that costs no row.  Data: `extabindex` 540/540 exact, `.rela.text` 5616/5616, `extab` 360
- * against 380 and `.relaextab` 12 B short - the target's last extab entry is the 20-byte cleanup
- * record whose reloc points at `dtor_803CA338`, a local object with a destructor the range's own code
- * does not show.
+ * RESIDUALS.  `send`/`receive`: retail materialises the error-source constant as a relocation
+ * (`@eti_80030018+9/+10`), ours is the immediate; `receive` also keeps a `clrlwi` ours drops.
+ * `tGameSpyInterface`: the hoisted high word of `ticks * 17` is a fresh `li r0, 0` where retail reuses r24.
+ * `NetworkTimedHandler::create`: retail leaves the `lis` half of the vtable address in r4 as `init`'s unused
+ * first argument.  `init`, `publishRequest`: register colouring.  Sections: `.data` 1392 of 1396 B until the
+ * cut, `extab` 360 of 380 B (a 20-byte cleanup record against `dtor_803CA338`, the peer's member-mutex
+ * destructor, which the hand-modelled `NetworkPeerGameSpy::destroy` does not produce; retry a real
+ * `NetworkPeerBase` derivation with a member mutex in the peer TU after the cut).
  */
 
 #include "types.h"
@@ -121,14 +60,9 @@
 #include "Runtime.PPCEABI.H/memset.h"    /* memset  - owner Runtime.PPCEABI.H/memset.c */
 #include "unsplit/Runtime.PPCEABI.H.h"   /* memmove / memcmp / snprintf - no registered owner */
 
-/* retail keeps the *unfused* peephole forms across this band: `clrlwi`+`slwi` in place of
- * `clrlslwi`, `extsh`+`cmpwi` in place of a folded compare, `extsb`+`cmpwi` in place of
- * `extsb.`.  The five functions below re-enable the pass - their retail bodies DO carry the
- * folded forms - and each is bracketed rather than left open (playbook 32). */
+/* retail keeps the unfused peephole forms across the whole band (see the header): `clrlwi`/`extsb` + `cmpwi`
+ * in place of the recording forms, `clrlwi`+`slwi` in place of `clrlslwi`. */
 #pragma peephole off
-
-/* The target object carries `extab`/`extabindex` (380/540 B) while the `Network` lib is built with
- * exceptions off, so the front-end is told per file (the pragma pair of playbook 30). */
 
 /* The debug manager's virtual slots: the target re-runs `bl getNetworkLogger` at *every* logging site
  * (never once per function), so each site expands to its own block that fetches the singleton and
@@ -144,28 +78,32 @@ extern "C" {
  * Every other body in the range is a member of one of the four classes, so those are declared in
  * include/Network/fn_8041A87C.h and not here.  The DWC callbacks are installed through
  * `(NetworkCallback)`, so they keep the C spelling and the flat parameter lists retail shows. */
-void fn_8041B194(void);
-void fn_8041B26C(void);
-s32 fn_8041B270(NetworkInstance* self, u32 peer, u16 value, const void* data, u32 size);
-void fn_8041B334(s32 result, s32 unused, const GameSpyAddress* src, GameSpyResultInfo* info);
-void fn_8041B514(GameSpyAddress* out, const GameSpyAddress* in);
-void fn_8041B538(s32 unused0, s32 socket, s32 unused1, s32 unused2, s32 unused3, const void* profile,
+void gt2SocketErrorCallback(void);
+void natNegProgressCallback(void);
+/* untyped: byte range - the received datagram */
+s32 gt2UnrecognizedMessageCallback(NetworkInstance* self, u32 peer, u16 value, const void* data, u32 size);
+void natNegCompletedCallback(s32 result, s32 unused, const GameSpyAddress* src, GameSpyResultInfo* info);
+void copyGameSpyAddress(GameSpyAddress* out, const GameSpyAddress* in);
+/* untyped: byte range - the peer profile */
+void gt2ConnectAttemptCallback(s32 unused0, s32 socket, s32 unused1, s32 unused2, s32 unused3, const void* profile,
                  u32 size);
-void fn_8041B720(s32 socket, s32 result, s32 unused, s32 timeout);
-void fn_8041B894(u32 socket, s32 address, s32 size);
-void fn_8041B984(u32 socket, s32 result);
-void fn_8041BAB4(void);
-s32 runThread(void* self);
-void fn_8041DD24(void);
-s32 fn_8041DD28(NetworkPeerCallback* self);
+void gt2ConnectedCallback(s32 socket, s32 result, s32 unused, s32 timeout);
+void gt2ReceivedCallback(u32 socket, s32 address, s32 size);
+void gt2ClosedCallback(u32 socket, s32 result);
+void gt2PingCallback(void);
+s32 runThread(GameSpyInterfaceThread* self);
 
 }
+
+/* The callbacks every GT2 connection this unit accepts or opens gets. */
+GT2ConnectionCallbacks sGameSpyConnectionCallbacks = {
+    gt2ConnectedCallback, gt2ReceivedCallback, gt2ClosedCallback, gt2PingCallback
+};
 
 /* ------------------------------------------------------------------------------------------------ */
 
 /* Runs the connect-attempt callback sub-machine, one step per frame. */
-#pragma peephole on
-void NetworkGameSpyInterface::updateCallbackStep()
+void NetworkReflectService::updateCallbackStep()
 {
     u8 step;
 
@@ -184,7 +122,7 @@ void NetworkGameSpyInterface::updateCallbackStep()
             callbackStep_17 = 5;
             break;
         }
-        if (fn_803FD658(getInstance_()) != 0) {
+        if (hasMultipleRefs60d4(getInstance_()) != 0) {
             callbackStep_17 = 4;
             break;
         }
@@ -194,48 +132,47 @@ void NetworkGameSpyInterface::updateCallbackStep()
         }
         flags_0C = 0;
         sendReqShut(getInstance_(), 1);
-        callbackStep_17 = (u8)(callbackStep_17 + 1);
+        callbackStep_17 += 1;
         break;
     case 2:
         if ((flags_0C & 1) != 0 || (flags_0C & 2) != 0 || (flags_0C & 0x10) != 0) {
             flags_0C = 0;
             resetNetworkState3(getInstance_());
-            callbackStep_17 = (u8)(callbackStep_17 + 1);
+            callbackStep_17 += 1;
         }
         break;
     case 3:
         if ((flags_0C & 8) != 0) {
-            callbackStep_17 = (u8)(step + 1);
+            callbackStep_17 += 1;
         }
         break;
     case 4:
         resetCallback(getInstance_(), 7);
-        callbackStep_17 = (u8)(callbackStep_17 + 1);
+        callbackStep_17 += 1;
         break;
     case 5:
         decrement60d4(getInstance_());
-        callbackStep_17 = (u8)(callbackStep_17 + 1);
+        callbackStep_17 += 1;
         break;
     case 6: {
         NetworkLogger* lm = getNetworkLogger();
         if (lm->isVerbose_3C() > 0) {
-            callbackStep_17 = (u8)(callbackStep_17 + 1);
+            callbackStep_17 += 1;
         }
         break;
     }
     case 7:
         callbackStep_17 = 0;
         connectStep_15 = 0;
-        fn_8041A5A8(this, 0x6003, 0, 0, 0, NULL);
+        notify(0x6003, 0, 0, 0, NULL);
         break;
     default:
         break;
     }
 }
-#pragma peephole off
 
 /* Dispatches to the search sub-machine (task 1) or the connect sub-machine (task 2). */
-s32 NetworkGameSpyInterface::dispatchTask()
+s32 NetworkReflectService::dispatchTask()
 {
     switch (task_10) {
     case 1:
@@ -248,7 +185,7 @@ s32 NetworkGameSpyInterface::dispatchTask()
 }
 
 /* Runs the GameSpy connect sub-machine, one step per frame. */
-s32 NetworkGameSpyInterface::runSearch()
+s32 NetworkReflectService::runSearch()
 {
     u32 pending;
     u32 offset;
@@ -258,7 +195,7 @@ s32 NetworkGameSpyInterface::runSearch()
     switch (searchStep_14) {
     case 0:
         flags_0C = 0;
-        fn_80403F60(getInstance_(), channel_18);
+        sendReqChannelInfo(getInstance_(), channel_18);
         searchStep_14 = 5;
         break;
     case 5:
@@ -277,7 +214,7 @@ s32 NetworkGameSpyInterface::runSearch()
         offset = writePos_8168;
         size = limit_8164 - offset;
         size = size >= 0x2000 ? 0x2000 : size;
-        fn_80403FE4(getInstance_(), channel_18, offset, size);
+        sendReqChannelData(getInstance_(), channel_18, offset, size);
         searchStep_14 = 0x0F;
         break;
     case 0x0F:
@@ -295,18 +232,18 @@ s32 NetworkGameSpyInterface::runSearch()
         }
         break;
     case 0x14:
-        fn_8041A5A8(this, 0x6004, 0, 0, 1, &channel_18);
+        notify(0x6004, 0, 0, 1, &channel_18);
         return 1;
     case 0x64:
         info[0] = 0x80000007;
         info[1] = 0;
-        info[2] = (u32)fn_803FD694(getInstance_(), 0);
-        fn_8041A5A8(this, 0x6004, 0, (s32)info[0], 1, info);
+        info[2] = (u32)errorRecordCode613c(getInstance_(), 0);
+        notify(0x6004, 0, (s32)info[0], 1, info);
         return 1;
     case 0x6E:
-        fn_803FD794(getInstance_(), info);
-        fn_8041A5A8(this, 0x6004, 0, (s32)info[0], 1, info);
-        fn_8041A5A8(this, 0x6001, 0, (s32)info[0], 1, info);
+        getErrorInfo654c(getInstance_(), info);
+        notify(0x6004, 0, (s32)info[0], 1, info);
+        notify(0x6001, 0, (s32)info[0], 1, info);
         return 1;
     default:
         break;
@@ -315,7 +252,7 @@ s32 NetworkGameSpyInterface::runSearch()
 }
 
 /* Runs the GameSpy NAT/connect sub-machine, one step per frame. */
-s32 NetworkGameSpyInterface::runConnect()
+s32 NetworkReflectService::runConnect()
 {
     u32 pending;
     u32 info[3];
@@ -323,7 +260,7 @@ s32 NetworkGameSpyInterface::runConnect()
     switch (searchStep_14) {
     case 0:
         flags_0C = 0;
-        fn_80404070(getInstance_());
+        sendReqConnect(getInstance_());
         searchStep_14 = 5;
         break;
     case 5:
@@ -337,18 +274,18 @@ s32 NetworkGameSpyInterface::runConnect()
         }
         break;
     case 0x0A:
-        fn_8041A5A8(this, 0x6005, 0, 0, 0, NULL);
+        notify(0x6005, 0, 0, 0, NULL);
         return 1;
     case 0x64:
         info[0] = 0x80000007;
         info[1] = 0;
-        info[2] = (u32)fn_803FD694(getInstance_(), 0);
-        fn_8041A5A8(this, 0x6005, 0, (s32)info[0], 1, info);
+        info[2] = (u32)errorRecordCode613c(getInstance_(), 0);
+        notify(0x6005, 0, (s32)info[0], 1, info);
         return 1;
     case 0x6E:
-        fn_803FD794(getInstance_(), info);
-        fn_8041A5A8(this, 0x6005, 0, (s32)info[0], 1, info);
-        fn_8041A5A8(this, 0x6001, 0, (s32)info[0], 1, info);
+        getErrorInfo654c(getInstance_(), info);
+        notify(0x6005, 0, (s32)info[0], 1, info);
+        notify(0x6001, 0, (s32)info[0], 1, info);
         return 1;
     default:
         break;
@@ -357,8 +294,7 @@ s32 NetworkGameSpyInterface::runConnect()
 }
 
 /* Applies a DWC event to the interface, then folds the event bits into the state machine's flags. */
-#pragma peephole on
-void NetworkGameSpyInterface::applyEvent(u32 code, s32 a, void* b, const GameSpyEventMsg* msg)
+void NetworkReflectService::applyEvent(u32 code, s32 a, s32 b, s32 c, const GameSpyEventMsg* msg)
 {
     u32 limit;
     GameSpyChannel* dst;
@@ -372,8 +308,8 @@ void NetworkGameSpyInterface::applyEvent(u32 code, s32 a, void* b, const GameSpy
         u32 info[3];
 
         if (task_10 <= 0) {
-            fn_803FD794(getInstance_(), info);
-            fn_8041A5A8(this, 0x6001, 0, (s32)info[0], 1, info);
+            getErrorInfo654c(getInstance_(), info);
+            notify(0x6001, 0, (s32)info[0], 1, info);
         }
         flags_0C |= 1;
         break;
@@ -382,7 +318,7 @@ void NetworkGameSpyInterface::applyEvent(u32 code, s32 a, void* b, const GameSpy
         flags_0C |= 2;
         break;
     case 0x8004:
-        if (a != 0) {
+        if (b != 0) {
             flags_0C |= 1;
         }
         break;
@@ -393,21 +329,14 @@ void NetworkGameSpyInterface::applyEvent(u32 code, s32 a, void* b, const GameSpy
         flags_0C |= 1;
         break;
     case 0x8080:
-        if (msg == NULL) {
-            break;
-        }
+        src = msg->channelView.channels_10;
         if (msg->channelView.channel_00 != channel_18) {
-            u32 info[6];
-            NetworkInstance* inst;
+            NetworkPostedError error;
 
-            info[3] = 0x80000000;
-            info[4] = 0;
-            info[5] = 0;
-            info[0] = 0x80000000;
-            info[1] = 0;
-            info[2] = 0;
-            inst = getInstance_();
-            ((NetworkInstanceDispatch*)inst)->postError((NetworkErrorInfo*)info);
+            error.code_00 = 0x80000000;
+            error.param1_04 = 0;
+            error.param2_08 = 0;
+            ((NetworkInstanceDispatch*)getInstance_())->postError(error);
             break;
         }
         peerId_1C = msg->channelView.peerId_04;
@@ -420,9 +349,7 @@ void NetworkGameSpyInterface::applyEvent(u32 code, s32 a, void* b, const GameSpy
         if (limit_8164 > 0x8000) {
             limit_8164 = 0x7FFF;
         }
-        src = msg->channelView.channels_10;
-        dst = channels_8024;
-        for (i = 0; i < channelCount_8020; i++) {
+        for (i = 0, dst = channels_8024; i < channelCount_8020; i++) {
             dst->ownerId_00 = src->ownerId_00;
             dst->peerId_04 = src->peerId_04;
             memcpy(dst->address_08, src->address_08, 0x1F);
@@ -433,27 +360,19 @@ void NetworkGameSpyInterface::applyEvent(u32 code, s32 a, void* b, const GameSpy
         flags_0C |= 0x80;
         break;
     case 0x8081:
-        if (msg == NULL) {
-            break;
-        }
         if (msg->dataView.channel_00 != channel_18 ||
             msg->dataView.writePos_04 != writePos_8168) {
-            u32 info[6];
-            NetworkInstance* inst;
+            NetworkPostedError error;
 
-            info[3] = 0x80000000;
-            info[4] = 0;
-            info[5] = 0;
-            info[0] = 0x80000000;
-            info[1] = 0;
-            info[2] = 0;
-            inst = getInstance_();
-            ((NetworkInstanceDispatch*)inst)->postError((NetworkErrorInfo*)info);
+            error.code_00 = 0x80000000;
+            error.param1_04 = 0;
+            error.param2_08 = 0;
+            ((NetworkInstanceDispatch*)getInstance_())->postError(error);
             break;
         }
-        size = msg->dataView.size_08;
         limit = limit_8164 - writePos_8168;
-        if (size > limit) {
+        size = msg->dataView.size_08;
+        if (limit < size) {
             size = limit;
         }
         memcpy(recvArea_20 + writePos_8168, msg->dataView.data_0C, size);
@@ -467,33 +386,33 @@ void NetworkGameSpyInterface::applyEvent(u32 code, s32 a, void* b, const GameSpy
         break;
     }
 }
-#pragma peephole off
 
 /* Drops every socket of the three-slot table, one request record at a time. */
-extern "C" void fn_8041B194(void)
+extern "C" void gt2SocketErrorCallback(void)
 {
     s32 i;
 
-    SIGNAL_LOG(3, lbl_806031B0);
-    if (GameSpyInterfaceThread_getInstance() == NULL) {
-        SIGNAL_LOG(3, lbl_806031D0);
+    SIGNAL_LOG(3, "SocketErrorCallback is called\n");
+    if (GameSpyInterfaceThread::getInstance() == NULL) {
+        SIGNAL_LOG(3, "IGSInterface is NULL\n");
         return;
     }
     for (i = 0; i < 3; i++) {
-        if (lbl_806D3650[i] != 0) {
-            ((GameSpyInterfaceThread*)GameSpyInterfaceThread_getInstance())->failRequest(-0x2DB0, 1, 0, (u8)i, -1);
-            lbl_806D3650[i] = 0;
+        if (sGameSpyConnections[i] != 0) {
+            GameSpyInterfaceThread::getInstance()->failRequest(-0x2DB0, 1, 0, (u8)i, -1);
+            sGameSpyConnections[i] = 0;
         }
     }
 }
 
 /* Empty body: the socket table's accept callback placeholder, installed but never used. */
-extern "C" void fn_8041B26C(void)
+extern "C" void natNegProgressCallback(void)
 {
 }
 
 /* Sends a framed GameSpy header through the DWC socket layer. */
-extern "C" s32 fn_8041B270(NetworkInstance* self, u32 peer, u16 value, const void* data, u32 size)
+/* untyped: byte range - the received datagram */
+extern "C" s32 gt2UnrecognizedMessageCallback(NetworkInstance* self, u32 peer, u16 value, const void* data, u32 size)
 {
     GameSpyHeader header;
 
@@ -512,52 +431,51 @@ extern "C" s32 fn_8041B270(NetworkInstance* self, u32 peer, u16 value, const voi
 }
 
 /* Maps a GameSpy connect result onto the interface's request state and error record. */
-#pragma peephole on
-extern "C" void fn_8041B334(s32 result, s32 unused, const GameSpyAddress* src, GameSpyResultInfo* info)
+extern "C" void natNegCompletedCallback(s32 result, s32 unused, const GameSpyAddress* src, GameSpyResultInfo* info)
 {
-    s32 error = 0;
+    s32 error;
 
     info->result_04 = 1;
     info->connected_00 = 0;
+    error = 0;
     switch (result) {
     case 0:
-        fn_8041B514(&info->address_08, src);
+        copyGameSpyAddress(&info->address_08, src);
         info->connected_00 = 1;
-        SIGNAL_LOG(3, lbl_806031E8);
+        SIGNAL_LOG(3, "NAT negotiation succeeded.\n");
         break;
     case 1:
-        SIGNAL_LOG(3, lbl_80603204);
+        SIGNAL_LOG(3, "dearbeatpartner\n");
         error = -0x2DA6;
         break;
     case 2:
-        SIGNAL_LOG(3, lbl_80603218);
+        SIGNAL_LOG(3, "inittimeout\n");
         error = -0x2DA7;
         break;
     case 3:
-        SIGNAL_LOG(3, lbl_80603228);
+        SIGNAL_LOG(3, "pingtimeout\n");
         error = -0x2DA8;
         break;
     case 4:
-        SIGNAL_LOG(3, lbl_80603238);
+        SIGNAL_LOG(3, "unknownerror\n");
         error = -0x2DA9;
         break;
     default:
-        SIGNAL_LOG(3, lbl_80603248);
+        SIGNAL_LOG(3, "unknown\n");
         error = -0x2DA9;
         break;
     }
-    if (GameSpyInterfaceThread_getInstance() == NULL) {
-        SIGNAL_LOG(3, lbl_806031D0);
+    if (GameSpyInterfaceThread::getInstance() == NULL) {
+        SIGNAL_LOG(3, "IGSInterface is NULL\n");
         return;
     }
     if (info->connected_00 == 0) {
-        ((GameSpyInterfaceThread*)GameSpyInterfaceThread_getInstance())->setError(0x80000007, 0x5F, -error);
+        GameSpyInterfaceThread::getInstance()->setError(0x80000007, 0x5F, -error);
     }
 }
-#pragma peephole off
 
 /* Copies the 8-byte GameSpy header out of a received frame. */
-extern "C" void fn_8041B514(GameSpyAddress* out, const GameSpyAddress* in)
+extern "C" void copyGameSpyAddress(GameSpyAddress* out, const GameSpyAddress* in)
 {
     out->first_00 = in->first_00;
     out->second_01 = in->second_01;
@@ -566,124 +484,109 @@ extern "C" void fn_8041B514(GameSpyAddress* out, const GameSpyAddress* in)
 }
 
 /* Handles a connect-attempt callback: validates the reply and publishes the socket. */
-extern "C" void fn_8041B538(s32 unused0, s32 socket, s32 unused1, s32 unused2, s32 unused3,
+/* untyped: byte range - the peer profile */
+extern "C" void gt2ConnectAttemptCallback(s32 unused0, s32 socket, s32 unused1, s32 unused2, s32 unused3,
                             const void* profile, u32 size)
 {
     u32 peerId;
     s32 i;
-    u32 info[6];
 
-    SIGNAL_LOG(3, lbl_80603254);
-    if (GameSpyInterfaceThread_getInstance() == NULL) {
-        SIGNAL_LOG(3, lbl_806031D0);
+    SIGNAL_LOG(3, "connectAttemptCallback is called.\n");
+    if (GameSpyInterfaceThread::getInstance() == NULL) {
+        SIGNAL_LOG(3, "IGSInterface is NULL\n");
         return;
     }
-    peerId = ((GameSpyInterfaceThread*)GameSpyInterfaceThread_getInstance())->getPeerId();
-    if (((GameSpyInterfaceThread*)GameSpyInterfaceThread_getInstance())->checkPeerProfile(profile, size) == 0) {
-        fn_8050DF90(socket, lbl_80793990, 2);
-        ((GameSpyInterfaceThread*)GameSpyInterfaceThread_getInstance())->publishRequest(-0x2DA0, 0xFF, peerId);
+    peerId = GameSpyInterfaceThread::getInstance()->getPeerId();
+    if (GameSpyInterfaceThread::getInstance()->checkPeerProfile(profile, size) == 0) {
+        gt2Reject(socket, sRejectMessageNG, 2);
+        GameSpyInterfaceThread::getInstance()->publishRequest(-0x2DA0, 0xFF, peerId);
         return;
     }
-    if (fn_8050DF80(socket, lbl_806031A0) != 0) {
-        SIGNAL_LOG(3, lbl_80603278);
+    if (gt2Accept(socket, &sGameSpyConnectionCallbacks) != 0) {
+        SIGNAL_LOG(3, "gt2Accept is succeeded.\n");
         for (i = 0; i < 3; i++) {
-            if (lbl_806D3650[i] == 0) {
-                lbl_806D3650[i] = socket;
-                ((GameSpyInterfaceThread*)GameSpyInterfaceThread_getInstance())->publishRequest(0, (u8)i, peerId);
+            if (sGameSpyConnections[i] == 0) {
+                sGameSpyConnections[i] = socket;
+                GameSpyInterfaceThread::getInstance()->publishRequest(0, (u8)i, peerId);
                 break;
             }
         }
         if (i >= 3 && getInstance_() != NULL) {
-            u32 code = 0x80000007;
-            u32 type = 0x5F;
-            u32 detail = 0x2D6A;
-            NetworkInstance* inst;
+            NetworkPostedError error;
 
-            info[3] = code;
-            info[4] = type;
-            info[5] = detail;
-            info[0] = code;
-            info[1] = type;
-            info[2] = detail;
-            inst = getInstance_();
-            ((NetworkInstanceDispatch*)inst)->postError((NetworkErrorInfo*)info);
+            error.code_00 = 0x80000007;
+            error.param1_04 = 0x5F;
+            error.param2_08 = 0x2D6A;
+            ((NetworkInstanceDispatch*)getInstance_())->postError(error);
         }
     } else {
-        ((GameSpyInterfaceThread*)GameSpyInterfaceThread_getInstance())->publishRequest(-0x2DAE, 0xFF, peerId);
+        GameSpyInterfaceThread::getInstance()->publishRequest(-0x2DAE, 0xFF, peerId);
     }
 }
 
 /* Handles a socket accept callback: registers the socket or fails the request. */
-extern "C" void fn_8041B720(s32 socket, s32 result, s32 unused, s32 timeout)
+extern "C" void gt2ConnectedCallback(s32 socket, s32 result, s32 unused, s32 timeout)
 {
     s32 i;
-    u32 info[6];
     s32 error;
 
-    SIGNAL_LOG(3, lbl_80603298, result);
-    if (GameSpyInterfaceThread_getInstance() == NULL) {
-        SIGNAL_LOG(3, lbl_806031D0);
+    SIGNAL_LOG(3, "connectedCallback is called. result:%d\n", result);
+    if (GameSpyInterfaceThread::getInstance() == NULL) {
+        SIGNAL_LOG(3, "IGSInterface is NULL\n");
         return;
     }
     if (result == 0) {
         for (i = 0; i < 3; i++) {
-            if (lbl_806D3650[i] == 0) {
-                lbl_806D3650[i] = socket;
-                ((GameSpyInterfaceThread*)GameSpyInterfaceThread_getInstance())->publishRequest(0, (u8)i, 0);
+            if (sGameSpyConnections[i] == 0) {
+                sGameSpyConnections[i] = socket;
+                GameSpyInterfaceThread::getInstance()->publishRequest(0, (u8)i, 0);
                 break;
             }
         }
         if (i >= 3 && getInstance_() != NULL) {
-            u32 code = 0x80000007;
-            u32 type = 0x5F;
-            u32 detail = 0x2D6A;
+            NetworkPostedError error;
 
-            info[3] = code;
-            info[4] = type;
-            info[5] = detail;
-            info[0] = code;
-            info[1] = type;
-            info[2] = detail;
-            NetworkInstance* inst = getInstance_();
-
-            ((NetworkInstanceDispatch*)inst)->postError((NetworkErrorInfo*)info);
+            error.code_00 = 0x80000007;
+            error.param1_04 = 0x5F;
+            error.param2_08 = 0x2D6A;
+            ((NetworkInstanceDispatch*)getInstance_())->postError(error);
         }
     } else {
         error = timeout > 0 ? -0x2DA0 : -0x2DAD;
-        ((GameSpyInterfaceThread*)GameSpyInterfaceThread_getInstance())->publishRequest(error, 0xFF, 0);
+        GameSpyInterfaceThread::getInstance()->publishRequest(error, 0xFF, 0);
     }
 }
 
 /* Forwards receive data to the socket's receiver slot. */
-extern "C" void fn_8041B894(u32 socket, s32 address, s32 size)
+extern "C" void gt2ReceivedCallback(u32 socket, s32 address, s32 size)
 {
     s32 i;
 
     if (size <= 0) {
-        SIGNAL_LOG(3, lbl_806032C0);
+        SIGNAL_LOG(3, "receivedCallback len is zero\n");
         return;
     }
-    if (GameSpyInterfaceThread_getInstance() == NULL) {
-        SIGNAL_LOG(3, lbl_806031D0);
+    if (GameSpyInterfaceThread::getInstance() == NULL) {
+        SIGNAL_LOG(3, "IGSInterface is NULL\n");
         return;
     }
     for (i = 0; i < 3; i++) {
-        if (socket == lbl_806D3650[i]) {
-            ((GameSpyInterfaceThread*)GameSpyInterfaceThread_getInstance())->dispatchReceiver((u8)i, address, size);
+        if (socket == sGameSpyConnections[i]) {
+            GameSpyInterfaceThread::getInstance()->dispatchReceiver((u8)i, address, size);
             return;
         }
     }
 }
 
 /* Handles a socket close callback: unregisters the socket and fails its record. */
-extern "C" void fn_8041B984(u32 socket, s32 result)
+extern "C" void gt2ClosedCallback(u32 socket, s32 result)
 {
     s32 error;
     s32 i;
 
-    SIGNAL_LOG(3, lbl_806032E0, result);
-    if (GameSpyInterfaceThread_getInstance() == NULL) {
-        SIGNAL_LOG(3, lbl_806031D0);
+    SIGNAL_LOG(3, "closedCallback is called. reason:%d\n", result);
+    if (GameSpyInterfaceThread::getInstance() == NULL) {
+        SIGNAL_LOG(3, "IGSInterface is NULL\n");
         return;
     }
     switch (result) {
@@ -701,18 +604,18 @@ extern "C" void fn_8041B984(u32 socket, s32 result)
         break;
     }
     for (i = 0; i < 3; i++) {
-        if (socket == lbl_806D3650[i]) {
-            ((GameSpyInterfaceThread*)GameSpyInterfaceThread_getInstance())->failRequest(error, 0, 0, (u8)i, -1);
-            lbl_806D3650[i] = 0;
+        if (socket == sGameSpyConnections[i]) {
+            GameSpyInterfaceThread::getInstance()->failRequest(error, 0, 0, (u8)i, -1);
+            sGameSpyConnections[i] = 0;
             return;
         }
     }
 }
 
 /* Logs a ping callback. */
-extern "C" void fn_8041BAB4(void)
+extern "C" void gt2PingCallback(void)
 {
-    SIGNAL_LOG(3, lbl_80603308);
+    SIGNAL_LOG(3, "pingCallback is called\n");
 }
 
 /* Stores the id the timed handler waits for. */
@@ -730,25 +633,25 @@ s32 GameSpyInterfaceThread::runNasLogin()
 
     switch (stage_98) {
     case 0:
-        if (fn_8050A8A0() == 0) {
+        if (DWC_NASLoginAsync() == 0) {
             stage_98 = 4;
             break;
         }
         stage_98 = stage_98 + 1;
         break;
     case 1:
-        result = fn_8050A8D0();
+        result = DWC_NASLoginProcess();
         switch (result) {
         case 3:
-            SIGNAL_LOG(3, lbl_80603320);
+            SIGNAL_LOG(3, "NASLogin succeeded\n");
             stage_98 = stage_98 + 1;
             break;
         case 4:
-            SIGNAL_LOG(3, lbl_80603334);
+            SIGNAL_LOG(3, "NASLogin failed\n");
             stage_98 = 4;
             break;
         case 5:
-            SIGNAL_LOG(3, lbl_80603348);
+            SIGNAL_LOG(3, "NASLogin canceled\n");
             setError(0x80000000, 0, 0);
             stage_98 = 4;
             break;
@@ -757,31 +660,31 @@ s32 GameSpyInterfaceThread::runNasLogin()
         }
         break;
     case 2:
-        if (fn_8050A990() == 0) {
-            fn_8050A9A0();
+        if (DWC_SVLBegin() == 0) {
+            DWC_SVLEnd();
             stage_98 = 4;
-        } else if (fn_8050A9B0(&lbl_80793994, handle_94) == 0) {
-            fn_8050A9A0();
+        } else if (DWC_SVLGetTokenAsync(sEmptyString, handle_94) == 0) {
+            DWC_SVLEnd();
             stage_98 = 4;
         } else {
             stage_98 = stage_98 + 1;
         }
         break;
     case 3:
-        result = fn_8050A9D0();
+        result = DWC_SVLProcess();
         switch (result) {
         case 3:
-            SIGNAL_LOG(3, lbl_8060335C);
-            fn_8050A9A0();
+            SIGNAL_LOG(3, "SVL succeeded\n");
+            DWC_SVLEnd();
             return 1;
         case 4:
-            SIGNAL_LOG(3, lbl_8060336C);
-            fn_8050A9A0();
+            SIGNAL_LOG(3, "SVL error\n");
+            DWC_SVLEnd();
             stage_98 = 4;
             break;
         case 5:
-            SIGNAL_LOG(3, lbl_80603378);
-            fn_8050A9A0();
+            SIGNAL_LOG(3, "SVL canceled\n");
+            DWC_SVLEnd();
             stage_98 = 4;
             break;
         default:
@@ -815,7 +718,7 @@ void GameSpyInterfaceThread::failRequest(s32 error, s32 a, s32 b, u8 index, s32 
     if (error != 0) {
         setError(0x80000007, 0x5F, -error);
     }
-    slotState_54[index] = 0xFF;
+    slotState_54[index] = -1;
 }
 
 /* Records the outcome of the DWC request the interface is waiting on. */
@@ -840,27 +743,25 @@ void GameSpyInterfaceThread::setRequestResult(s32 error, s32 value)
 void GameSpyInterfaceThread::publishRequest(s32 error, u8 index, u32 value)
 {
     u8 i;
-    u32 peer;
 
     if (error == 0) {
-        receiverIds_34[receiverCount_28 - 1] = value_30;
+        slotIds_44[receiverCount_28 - 1] = value_30;
         slotState_54[receiverCount_28 - 1] = 1;
-        peer = value;
-        if (peer == 0) {
-            peer = peerId_4470;
+        if (value == 0) {
+            value = peerId_4470;
         }
         for (i = 0; i < receiverCount_28; i++) {
-            if (slotIds_44[i] == peer) {
+            if (slotIds_44[i] == value) {
                 if (i != index) {
                     slotIds_44[i] = 0;
-                    if (lbl_806D3650[i] != 0) {
-                        fn_8050E250(lbl_806D3650[i]);
+                    if (sGameSpyConnections[i] != 0) {
+                        gt2CloseConnection(sGameSpyConnections[i]);
                     }
                 }
                 break;
             }
         }
-        slotIds_44[index] = peer;
+        slotIds_44[index] = value;
         slotState_54[index] = 1;
         receiverState_24[index] = 3;
         for (i = 0; i < receiverCount_28; i++) {
@@ -888,15 +789,15 @@ void GameSpyInterfaceThread::ConnectToAnybody(s32 arg)
     state = 1;
     phase = state_2C;
     if (phase <= 0) {
-        INFO_LOG(lbl_80603388, phase);
+        INFO_LOG("NetworkGameSpyInterface::ConnectToAnybody not login GameSpy:%d\n", phase);
         phase_74 = -1;
         return;
     }
-    snprintf(address, 7, lbl_80793998, (u16)bufferSize_4482);
+    snprintf(address, 7, sPortFormat, (u16)bufferSize_4482);
     address[6] = 0;
-    if (fn_8050DEC0(&lbl_80794CE0, address, 0x2000, 0x2000, (NetworkCallback)fn_8041B194) == 0) {
-        fn_8050E2A0(lbl_80794CE0, (NetworkCallback)fn_8041B270);
-        fn_8050DF70(lbl_80794CE0, (NetworkCallback)fn_8041B538);
+    if (gt2CreateSocket(&sGameSpySocket, address, 0x2000, 0x2000, (NetworkCallback)gt2SocketErrorCallback) == 0) {
+        gt2SetUnrecognizedMessageCallback(sGameSpySocket, (NetworkCallback)gt2UnrecognizedMessageCallback);
+        gt2Listen(sGameSpySocket, (NetworkCallback)gt2ConnectAttemptCallback);
     } else {
         setError(0x80000007, 0x5F, 0x2DA2);
         state = 0;
@@ -926,7 +827,7 @@ s32 GameSpyInterfaceThread::startMatch(s32 count, u32 value, s32 a, u16 b,
 
     phase = phase_74;
     if (phase > 0) {
-        INFO_LOG(lbl_806033C8, phase);
+        INFO_LOG("NetworkGameSpyInterface::startMatch already call startMatch:%d\n", phase);
         return -1;
     }
     if (count <= 1) {
@@ -940,18 +841,18 @@ s32 GameSpyInterfaceThread::startMatch(s32 count, u32 value, s32 a, u16 b,
     paramC_84 = c;
     paramD_88 = d;
     paramE_8C = e;
-    snprintf(name_9C, 0x80, lbl_80603408, b);
+    snprintf(name_9C, 0x80, "ik1='%d' and ik2='%d' and ik3='%d' and ik4='%d' and ik5='%d'", a, b, c, d, e);
     if (count > 4) {
-        WARN_LOG(lbl_80603448, count, 4);
+        WARN_LOG("NetworkGameSpyInterface::startMatch match_num(%d) is greater than MAX_NUM_MATCH(%d)\n", count, 4);
         receiverCount_28 = 4;
     } else {
         receiverCount_28 = (u8)count;
     }
     value_30 = value;
-    idByte_11C = (s8)(value >> 24);
-    idByte_11D = (u8)(value >> 16);
-    idByte_11E = (u8)(value >> 8);
-    idByte_11F = (u8)value;
+    idByte_11C = value >> 24;
+    idByte_11D = (value >> 16) & 0xFF;
+    idByte_11E = (value >> 8) & 0xFF;
+    idByte_11F = value & 0xFF;
     phase_74 = 2;
     openRequested_125 = 1;
     return 1;
@@ -960,11 +861,10 @@ s32 GameSpyInterfaceThread::startMatch(s32 count, u32 value, s32 a, u16 b,
 /* Ticks the GameSpy clock and counts one more frame. */
 s32 GameSpyInterfaceThread::updateClock()
 {
-    s32 time[8];
+    u32 time[9];
 
-    getInstance();
-    fn_804167B4(time);
-    fn_8050C5F0((const void*)time[3]);
+    getGameInfo2d1c(::getInstance(), time);
+    DWCi_natProbeStart((const char*)time[3]);
     frame_70 = frame_70 + 1;
     return 1;
 }
@@ -1050,10 +950,10 @@ s32 GameSpyInterfaceThread::closeSession()
         DWCi_NatNegCleanup();
         sessionOpen_4484 = 0;
     }
-    if (lbl_80794CE0 != 0) {
-        fn_8050DED0(lbl_80794CE0);
-        memset(lbl_806D3650, 0, 0x10);
-        lbl_80794CE0 = 0;
+    if (sGameSpySocket != 0) {
+        gt2CloseSocket(sGameSpySocket);
+        memset(sGameSpyConnections, 0, 0x10);
+        sGameSpySocket = 0;
     }
     OSUnlockMutex(mutex_4450);
     phase_74 = 0;
@@ -1129,7 +1029,6 @@ void GameSpyInterfaceThread::resetSlots()
  * `new GameSpyInterfaceThread()`. */
 GameSpyInterfaceThread::GameSpyInterfaceThread()
 {
-    vtable_00 = lbl_806036A0;
     sGameSpyInterfaceThread = this;
     field_68 = 0;
     running_6C = 0;
@@ -1147,23 +1046,16 @@ GameSpyInterfaceThread::GameSpyInterfaceThread()
     mutexReady_444C = 0;
     memset(mutex_4450, 0, 0x18);
     GameSpyInterfaceThreadInit();
-    memset(lbl_806D3650, 0, 0x10);
-    lbl_80794CE0 = 0;
+    memset(sGameSpyConnections, 0, 0x10);
+    sGameSpySocket = 0;
     sessionOpen_4484 = 0;
 }
 
 /* Deleting destructor: restores the base vtable, empties the singleton and frees on request. */
-void* GameSpyInterfaceThread::destroy(s16 flags)
+GameSpyInterfaceThread::~GameSpyInterfaceThread()
 {
-    if (this != NULL) {
-        vtable_00 = lbl_806036A0;
-        onDestroy();
-        sGameSpyInterfaceThread = NULL;
-        if (flags > 0) {
-            operator delete(this);
-        }
-    }
-    return this;
+    onDestroy();
+    sGameSpyInterfaceThread = NULL;
 }
 
 /* Resets the per-request tables and the pending-request flags. */
@@ -1192,7 +1084,7 @@ void GameSpyInterfaceThread::onDestroy()
 }
 
 /* Registers a receiver for `id` in the first free slot. */
-s32 GameSpyInterfaceThread::registerReceiver(void* receiver, u32 id)
+s32 GameSpyInterfaceThread::registerReceiver(NetworkPeerGameSpy* receiver, u32 id)
 {
     u8 slot;
     u8 i;
@@ -1229,19 +1121,18 @@ s32 GameSpyInterfaceThread::registerReceiver(void* receiver, u32 id)
 /* Releases the receiver slot at `index` and clears its id. */
 void GameSpyInterfaceThread::unregisterReceiver(s32 index)
 {
-    u8 count;
     u8 i;
 
-    count = receiverCount_28;
-    replyRequest((s32)receiverIds_34[index]);
-    for (i = 0; i < count; i++) {
+    u32* slot = &receiverIds_34[index];
+    replyRequest((s32)*slot);
+    for (i = 0; i < receiverCount_28; i++) {
         if (index == receiverState_24[i]) {
             receiverState_24[i] = 3;
             break;
         }
     }
     receivers_14[index] = 0;
-    receiverIds_34[index] = 0;
+    *slot = 0;
 }
 
 /* Returns the state of the slot `id` maps to, or the pending negotiation result. */
@@ -1278,7 +1169,7 @@ s8 GameSpyInterfaceThread::findSlot(u32 id)
    close/cancel bookkeeping. */
 void GameSpyInterfaceThread::step()
 {
-    u32 info[3];
+    u32 connection;
     s32 r;
     s32 error;
     s32 i;
@@ -1287,7 +1178,7 @@ void GameSpyInterfaceThread::step()
     if (running_6C != 0 && state_2C >= 0) {
         OSLockMutex(mutex_4450);
         if (frame_70 == 1 && state_2C == 0) {
-            r = fn_8050C770();
+            r = DWCi_natProbePoll();
             if (r != 0) {
                 if (r == 1) {
                     setRequestResult(0, 0);
@@ -1296,16 +1187,16 @@ void GameSpyInterfaceThread::step()
                 }
             }
         }
-        if (field_68 == 0 && state_2C == 1 && phase_74 == 1 && lbl_80794CE0 != 0) {
+        if (field_68 == 0 && state_2C == 1 && phase_74 == 1 && sGameSpySocket != 0) {
             if (negotiation_446C != 0) {
                 switch (negotiationStep_4480) {
                 case 0:
                     peerMatch_4478 = (value_30 != peerId_4470);
-                    if (lbl_806D3660.result_04 == 0) {
+                    if (sNatNegState.result_04 == 0) {
                         session_447C = peerId_4470 ^ selfPeerId_4474;
-                        r = DWCi_NatNegStartSession(fn_8050E290(lbl_80794CE0), session_447C, peerMatch_4478,
-                                        (NetworkCallback)fn_8041B26C, (NetworkCallback)fn_8041B334,
-                                        &lbl_806D3660);
+                        r = DWCi_NatNegStartSession(gt2GetSocketSOCKET(sGameSpySocket), session_447C, peerMatch_4478,
+                                        (NetworkCallback)natNegProgressCallback, (NetworkCallback)natNegCompletedCallback,
+                                        &sNatNegState);
                         if (r != 0) {
                             error = 0;
                             switch (r) {
@@ -1321,8 +1212,8 @@ void GameSpyInterfaceThread::step()
                             default:
                                 break;
                             }
-                            lbl_806D3660.result_04 = 1;
-                            lbl_806D3660.active_00 = 0;
+                            sNatNegState.result_04 = 1;
+                            sNatNegState.active_00 = 0;
                             setError(0x80000007, 0x5F, -error);
                         }
                         sessionOpen_4484 = 1;
@@ -1332,19 +1223,19 @@ void GameSpyInterfaceThread::step()
                     }
                     break;
                 case 1:
-                    if (lbl_806D3660.result_04 != 0) {
+                    if (sNatNegState.result_04 != 0) {
                         DWCi_NatNegCleanup();
                         sessionOpen_4484 = 0;
                         negotiationStep_4480 = 2;
                     }
                     break;
                 case 2:
-                    if (lbl_806D3660.active_00 != 0) {
+                    if (sNatNegState.active_00 != 0) {
                         if (peerMatch_4478 == 1) {
-                            if (fn_8050DFA0(lbl_80794CE0, info,
-                                            DWCi_formatAddress(lbl_806D3660.session_0C,
-                                                        DWCi_htons(lbl_806D3660.encoded_0A), NULL),
-                                            profile_4485, 0x14, 0x2710, lbl_806031A0, 0) == 0) {
+                            if (gt2Connect(sGameSpySocket, &connection,
+                                            DWCi_formatAddress(sNatNegState.session_0C,
+                                                        DWCi_htons(sNatNegState.encoded_0A), NULL),
+                                            profile_4485, 0x14, 0x2710, &sGameSpyConnectionCallbacks, 0) == 0) {
                                 negotiationStep_4480 = 3;
                                 break;
                             }
@@ -1368,7 +1259,7 @@ void GameSpyInterfaceThread::step()
                 }
             }
             DWCi_NatNegProcess();
-            fn_8050DF20(lbl_80794CE0);
+            gt2Think(sGameSpySocket);
         }
         OSUnlockMutex(mutex_4450);
     }
@@ -1384,8 +1275,8 @@ void GameSpyInterfaceThread::step()
             if (slot < 0) {
                 slotHandles_58[i] = 0;
             } else {
-                if (lbl_806D3650[slot] != 0) {
-                    fn_8050E250(lbl_806D3650[slot]);
+                if (sGameSpyConnections[slot] != 0) {
+                    gt2CloseConnection(sGameSpyConnections[slot]);
                 }
                 slotIds_44[slot] = 0;
                 slotState_54[slot] = 0;
@@ -1425,16 +1316,22 @@ s32 GameSpyInterfaceThread::executeError()
     s32 code;
     s32 type;
 
-    if (fn_805073C0(&code, &type) != 0 && code < 0 && type != 0) {
-        INFO_LOG(lbl_806034A0, code, type);
+    if (DWC_GetLastErrorEx(&code, &type) != 0 && code < 0 && type != 0) {
+        {
+            s32 loggedCode = code;
+            s32 loggedType = type;
+
+            INFO_LOG("NetworkGameSpyInterface::executeError DWC_GetLastErrorEx ErrorCode:%d ErrorType:%d\n",
+                     loggedCode, loggedType);
+        }
         switch (type) {
         case 1:
             setError(0x80000007, 0x4A, -code);
-            fn_80507470();
+            DWC_ClearError();
             break;
         case 2:
             setError(0x80000007, 0x49, -code);
-            fn_80507470();
+            DWC_ClearError();
             break;
         case 3:
             setError(0x80000007, 0x49, -code);
@@ -1446,15 +1343,15 @@ s32 GameSpyInterfaceThread::executeError()
                     DWCi_NatNegCleanup();
                     sessionOpen_4484 = 0;
                 }
-                if (lbl_80794CE0 != 0) {
-                    fn_8050DED0(lbl_80794CE0);
-                    memset(lbl_806D3650, 0, 0x10);
-                    lbl_80794CE0 = 0;
+                if (sGameSpySocket != 0) {
+                    gt2CloseSocket(sGameSpySocket);
+                    memset(sGameSpyConnections, 0, 0x10);
+                    sGameSpySocket = 0;
                 }
                 running_6C = 0;
             }
             phase_74 = 0;
-            fn_80507470();
+            DWC_ClearError();
             break;
         case 6:
             setError(0x80000007, 0x49, -code);
@@ -1467,15 +1364,15 @@ s32 GameSpyInterfaceThread::executeError()
                     DWCi_NatNegCleanup();
                     sessionOpen_4484 = 0;
                 }
-                if (lbl_80794CE0 != 0) {
-                    fn_8050DED0(lbl_80794CE0);
-                    memset(lbl_806D3650, 0, 0x10);
-                    lbl_80794CE0 = 0;
+                if (sGameSpySocket != 0) {
+                    gt2CloseSocket(sGameSpySocket);
+                    memset(sGameSpyConnections, 0, 0x10);
+                    sGameSpySocket = 0;
                 }
                 running_6C = 0;
             }
             phase_74 = 0;
-            fn_80507470();
+            DWC_ClearError();
             break;
         case 7:
             errorReported_10 = 1;
@@ -1520,29 +1417,37 @@ void GameSpyInterfaceThread::setError(s32 code, s32 a, s32 b)
 }
 
 /* Sends a buffer out over the socket the index maps to. */
+/* untyped: byte range - the datagram */
 s32 GameSpyInterfaceThread::sendUnreliable(u8 index, const void* data, s32 size)
 {
     s32 sent;
 
     sent = 0;
     if (field_68 < 0 || state_2C != 1 || phase_74 <= 0) {
-        INFO_LOG(lbl_806034F4, size);
+        INFO_LOG("NetworkGameSpyInterface::sendUnreliable DWC_SendUnreliable Error over time size %d\n", size);
     } else {
         if (mutexReady_444C != 0) {
             OSLockMutex(mutex_4450);
-            if (lbl_806D3650[index] != 0) {
+            if (sGameSpyConnections[index] != 0) {
                 sent = size;
-                fn_8050E150(lbl_806D3650[index], data, size, 0);
+                gt2Send(sGameSpyConnections[index], data, size, 0);
             }
             OSUnlockMutex(mutex_4450);
         } else {
-            if (lbl_806D3650[index] != 0) {
+            if (sGameSpyConnections[index] != 0) {
                 sent = size;
-                fn_8050E150(lbl_806D3650[index], data, size, 0);
+                gt2Send(sGameSpyConnections[index], data, size, 0);
             }
         }
     }
     return sent;
+}
+
+/* The worker thread's entry point. */
+extern "C" s32 runThread(GameSpyInterfaceThread* self)
+{
+    self->tGameSpyInterface((s32)self);
+    return 0;
 }
 
 /* The worker thread's body: drains the request flags until the stop flag is set. */
@@ -1573,14 +1478,7 @@ void GameSpyInterfaceThread::tGameSpyInterface(s32 arg)
         OSSleepTicks(ticks * 17);
     }
     mutexReady_444C = 0;
-    INFO_LOG(lbl_80603548);
-}
-
-/* The worker thread's entry point. */
-extern "C" s32 runThread(void* self)
-{
-    ((GameSpyInterfaceThread*)self)->tGameSpyInterface((s32)self);
-    return 0;
+    INFO_LOG("NetworkGameSpyInterface::tGameSpyInterface GameSpyInterfaceThread End\n");
 }
 
 /* Spawns the interface's worker thread. */
@@ -1593,9 +1491,9 @@ s32 GameSpyInterfaceThread::GameSpyInterfaceThreadInit()
         started_120 = 1;
         threadParam_4448 = 0;
         OSResumeThread(thread_130);
-        INFO_LOG(lbl_80603590);
+        INFO_LOG("NetworkGameSpyInterface::GameSpyInterfaceThreadInit GameSpyInterfaceThread Start\n");
     } else {
-        INFO_LOG(lbl_806035E4);
+        INFO_LOG("NetworkGameSpyInterface::GameSpyInterfaceThreadInit GameSpyInterfaceThread Fail\n");
     }
     return thread;
 }
@@ -1607,37 +1505,32 @@ void GameSpyInterfaceThread::setBufferSize(s16 size)
 }
 
 /* Starts a NAT negotiation between the two peer ids. */
-#pragma peephole on
 void GameSpyInterfaceThread::startNegotiation(const GameSpyPeerId* a, const GameSpyPeerId* b)
 {
-    s32 i;
-
-    if (a == NULL || b == NULL || negotiation_446C != 0) {
-        return;
-    }
-    negotiationResult_446D = 0;
-    negotiationDone_446E = 0;
-    peerId_4470 = a->peerId_00;
-    selfPeerId_4474 = b->peerId_00;
-    lbl_806D3660.result_04 = 0;
-    if (a->mode_04 == b->mode_04) {
-        lbl_806D3660.result_04 = 1;
-        lbl_806D3660.active_00 = 1;
-        lbl_806D3660.session_0C = a->session_08;
-        {
-            NetworkLogger* lm = getNetworkLogger();
-            lbl_806D3660.encoded_0A = lm->encode_4C(a->port_0C);
+    if (a != NULL && b != NULL && negotiation_446C == 0) {
+        negotiationResult_446D = 0;
+        negotiationDone_446E = 0;
+        peerId_4470 = a->peerId_00;
+        selfPeerId_4474 = b->peerId_00;
+        sNatNegState.result_04 = 0;
+        if (a->mode_04 == b->mode_04) {
+            sNatNegState.result_04 = 1;
+            sNatNegState.active_00 = 1;
+            sNatNegState.session_0C = a->session_08;
+            {
+                NetworkLogger* lm = getNetworkLogger();
+                sNatNegState.encoded_0A = lm->encode_4C(a->port_0C);
+            }
         }
+        profile_4485[0] = selfPeerId_4474;
+        profile_4485[1] = paramA_7C;
+        profile_4485[2] = paramB_80;
+        profile_4485[3] = paramC_84;
+        profile_4485[4] = paramD_88;
+        negotiationStep_4480 = 0;
+        negotiation_446C = 1;
     }
-    profile_4485[0] = selfPeerId_4474;
-    profile_4485[1] = paramA_7C;
-    profile_4485[2] = paramB_80;
-    profile_4485[3] = paramC_84;
-    profile_4485[4] = paramD_88;
-    negotiationStep_4480 = 0;
-    negotiation_446C = 1;
 }
-#pragma peephole off
 
 /* Reports whether a negotiation is running. */
 u8 GameSpyInterfaceThread::isNegotiating()
@@ -1652,6 +1545,7 @@ u8 GameSpyInterfaceThread::getNegotiationResult()
 }
 
 /* Compares a received peer profile against the one this interface published. */
+/* untyped: byte range - the received peer profile */
 s32 GameSpyInterfaceThread::checkPeerProfile(const void* profile, u32 size)
 {
     if (size == 0x14) {
@@ -1659,14 +1553,14 @@ s32 GameSpyInterfaceThread::checkPeerProfile(const void* profile, u32 size)
             return 1;
         }
         if (memcmp(profile, profile_4485, 4) != 0) {
-            SIGNAL_LOG(3, lbl_80603638);
+            SIGNAL_LOG(3, "message does not fit profile_id.\n");
         }
         if (memcmp((const u8*)profile + 4, (const u8*)profile_4485 + 4, 0x10) != 0) {
-            SIGNAL_LOG(3, lbl_80603660);
+            SIGNAL_LOG(3, "message does not fit position.\n");
         }
-        return 0;
+    } else {
+        SIGNAL_LOG(3, "message does not fit len[%d].\n", size);
     }
-    SIGNAL_LOG(3, lbl_80603680, size);
     return 0;
 }
 
@@ -1694,7 +1588,6 @@ s32 NetworkPeerGameSpy::send(const u16* a, s32 aLen, const u16* b, s32 bLen,
     s8 flagByte;
     u16 aLen16;
     u16 bLen16;
-    u8* record;
     u8* cursor;
     s32 total;
     s8 slot;
@@ -1702,23 +1595,24 @@ s32 NetworkPeerGameSpy::send(const u16* a, s32 aLen, const u16* b, s32 bLen,
     flagByte = flag;
     slot = interface_6634->getSlotState(peer_6638);
     if (slot < 0) {
-        networkPeerError_set(this, lbl_806036A0, 0, -1);
+        networkPeerError_set(this, (const void*)NETWORK_ERROR_PEER_SEND, 0, -1);
         return -1;
     }
-    record = sendBuffer_14;
+    cursor = sendBuffer_14;
     if (a == NULL || aLen <= 0) {
         aLen16 = 0;
-        memcpy(record, &aLen16, 2);
-        cursor = record + 2;
+        memcpy(cursor, &aLen16, 2);
+        cursor += 2;
         total = 2;
     } else {
         {
             NetworkLogger* lm = getNetworkLogger();
             aLen16 = lm->encode_4C((u16)aLen);
         }
-        memcpy(record, &aLen16, 2);
-        memcpy(record + 2, a, (u32)(u16)aLen);
-        cursor = record + 2 + aLen;
+        memcpy(cursor, &aLen16, 2);
+        cursor += 2;
+        memcpy(cursor, a, (u32)(u16)aLen);
+        cursor += aLen;
         total = aLen + 2;
     }
     if (b == NULL || bLen <= 0) {
@@ -1732,8 +1626,9 @@ s32 NetworkPeerGameSpy::send(const u16* a, s32 aLen, const u16* b, s32 bLen,
         }
         memcpy(cursor, &bLen16, 2);
         memcpy(cursor + 2, &flagByte, 1);
+        total = total + 3;
         memcpy(cursor + 3, b, (u32)(u16)bLen);
-        total = total + 3 + bLen;
+        total = total + bLen;
     }
     {
         NetworkLogger* lm = getNetworkLogger();
@@ -1746,17 +1641,18 @@ s32 NetworkPeerGameSpy::send(const u16* a, s32 aLen, const u16* b, s32 bLen,
     }
     slot = interface_6634->findSlot(peer_6638);
     if (slot < 0) {
-        networkPeerError_set(this, lbl_806036A0, 0, -2);
+        networkPeerError_set(this, (const void*)NETWORK_ERROR_PEER_SEND, 0, -2);
         return -1;
     }
     if (interface_6634->sendUnreliable((u8)slot, sendBuffer_14, total) == 0) {
-        networkPeerError_set(this, lbl_806036A0, 0, -3);
+        networkPeerError_set(this, (const void*)NETWORK_ERROR_PEER_SEND, 0, -3);
         return -1;
     }
     return total;
 }
 
 /* Pulls one framed message out of the peer's receive buffer. */
+/* untyped: byte range - the two caller buffers the framed payloads are copied into */
 s32 NetworkPeerGameSpy::receive(void* a, s32* aLen, void* b, s32* bLen,
                            u8* flag)
 {
@@ -1771,13 +1667,12 @@ s32 NetworkPeerGameSpy::receive(void* a, s32* aLen, void* b, s32* bLen,
 
     aMax = *aLen;
     bMax = *bLen;
-    payload = 0;
     *aLen = 0;
     *bLen = 0;
     *flag = 0;
     slot = interface_6634->getSlotState(peer_6638);
     if (slot < 0) {
-        networkPeerError_set(this, lbl_806036A0, 0, 0);
+        networkPeerError_set(this, (const void*)NETWORK_ERROR_PEER_RECEIVE, 0, 0);
         return -1;
     }
     if (received_10 < 4) {
@@ -1790,9 +1685,11 @@ s32 NetworkPeerGameSpy::receive(void* a, s32* aLen, void* b, s32* bLen,
         NetworkLogger* lm = getNetworkLogger();
         aLen16 = lm->flag_48(aLen16);
     }
+    payload = 0;
     bLen16 = 0;
     if (received_10 >= (u32)aLen16 + 4) {
-        memcpy(&bLen16, cursor + aLen16 + 2, 2);
+        cursor += aLen16 + 2;
+        memcpy(&bLen16, cursor, 2);
         {
             NetworkLogger* lm = getNetworkLogger();
             payload = lm->flag_48(bLen16);
@@ -1831,11 +1728,12 @@ s32 NetworkPeerGameSpy::receive(void* a, s32* aLen, void* b, s32* bLen,
 }
 
 /* Appends a buffer to the peer's receive queue. */
+/* untyped: byte range - the datagram appended to the receive queue */
 s32 NetworkPeerGameSpy::put(const void* data, u32 size)
 {
     LockMutex(mutex_6614);
     if (received_10 + size > 0x6000) {
-        INFO_LOG(lbl_806036B0);
+        INFO_LOG("NetworkPeerGameSpy::put: buf_recv_peer over. please check NetworkPeerGameSpy::MAX_SIZE_BUF_PEER\n");
         UnlockMutex(mutex_6614);
         return -1;
     }
@@ -1846,7 +1744,6 @@ s32 NetworkPeerGameSpy::put(const void* data, u32 size)
 }
 
 /* Reports whether the peer has a message queued. */
-#pragma peephole on
 s32 NetworkPeerGameSpy::isQueued()
 {
     s8 state;
@@ -1855,19 +1752,21 @@ s32 NetworkPeerGameSpy::isQueued()
     if (state > 0) {
         return 1;
     }
-    return state & (state >> 31);
+    if (state < 0) {
+        return state;
+    }
+    return 0;
 }
-#pragma peephole off
 
-/* Empty body: the peer's vtable placeholder. */
-extern "C" void fn_8041DD24(void)
+/* Empty body: the peer's vtable slot +0x20, which only the Mcs peer implements. */
+void NetworkPeerGameSpy::armDrop()
 {
 }
 
-/* Ticks the callback object's virtual slot. */
-extern "C" s32 fn_8041DD28(NetworkPeerCallback* self)
+/* Clears the peer through its own virtual slot +0x28 and reports it usable. */
+s32 NetworkPeerGameSpy::init()
 {
-    self->tick_28();
+    ((NetworkPeerCallback*)this)->tick_28();
     return 1;
 }
 
@@ -1882,7 +1781,7 @@ void NetworkPeerGameSpy::release()
 }
 
 /* Deleting destructor: destroys the queue mutex and the base, then frees on request. */
-void* NetworkPeerGameSpy::destroy(s16 flags)
+NetworkPeerGameSpy* NetworkPeerGameSpy::destroy(s16 flags)
 {
     if (this != NULL) {
         dtor_803CA338(mutex_6614, -1);
@@ -1896,7 +1795,7 @@ void* NetworkPeerGameSpy::destroy(s16 flags)
 }
 
 /* Constructs the timed handler. */
-void* NetworkTimedHandler::create()
+NetworkTimedHandler* NetworkTimedHandler::create()
 {
     vtable_00 = lbl_80603740;
     init((s32)lbl_80603740, 0, 0);
@@ -1904,7 +1803,7 @@ void* NetworkTimedHandler::create()
 }
 
 /* Deleting destructor for the timed handler. */
-void* NetworkTimedHandler::destroy(s16 flags)
+NetworkTimedHandler* NetworkTimedHandler::destroy(s16 flags)
 {
     if (this != NULL && flags > 0) {
         operator delete(this);
@@ -1917,8 +1816,8 @@ void NetworkTimedHandler::init(s32 a, s32 b, s32 c)
 {
     clear();
     timeout_14 = 1000;
-    limit_0C = c;
     interval_08 = b;
+    limit_0C = c;
 }
 
 /* Clears the timed handler's state, ready flag and expiry flag. */
@@ -1927,4 +1826,17 @@ void NetworkTimedHandler::clear()
     state_04 = 0;
     ready_10 = 0;
     expired_18 = 0;
+}
+
+/* ---- the zero-initialised data this unit owns (declared in include/Network/fn_8041A87C.h; the
+ * callback set is defined above, ahead of the first log string, because MWCC emits `.data` in
+ * definition order and retail's set precedes the whole string run) ------------------------------- */
+
+extern "C" {
+
+u32 sGameSpyConnections[4];
+GameSpyNegotiation sNatNegState;
+u32 sGameSpySocket;
+GameSpyInterfaceThread* sGameSpyInterfaceThread;
+
 }

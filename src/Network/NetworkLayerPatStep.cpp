@@ -102,9 +102,9 @@ bool NetworkLayerPat::stepRequest(NetworkRequest* request)
         if (getNetworkSessionManagerPat(getPatsObject(), 0) != NULL) {
             closeNetworkSessionManagerPat(getNetworkSessionManagerPat(getPatsObject(), 0));
         }
-        if (GameSpyInterfaceThread_getInstance() != NULL) {
-            GameSpyInterfaceThread_getInstance()->canClose();
-            GameSpyInterfaceThread_getInstance()->initialize();
+        if (GameSpyInterfaceThread::getInstance() != NULL) {
+            GameSpyInterfaceThread::getInstance()->canClose();
+            GameSpyInterfaceThread::getInstance()->initialize();
         }
         requestFlags_324 = 0;
         requestResult_37C = sendReqLayerChildInfo(getInstance_(), -1, 0);

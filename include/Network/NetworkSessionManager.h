@@ -19,6 +19,7 @@
 #include "Network/network_transport.h"
 #include "Network/network_shared_data.h"
 #include "Network/network_writer_types.h"
+#include "Network/sGameSpyInterfaceThread.h"   /* sGameSpyInterfaceThread - owner Network/fn_8041A87C.cpp */
 #include "Runtime.PPCEABI.H/ptmf.h"
 
 /* The 0x60-byte record block `NetworkRequest_copyRecord` moves.  Only its size (24 words) is
@@ -455,6 +456,8 @@ class GameSpyInterfaceThread {
 public:
     virtual void destroy(u32 flags);   /* +0x08 - the key function, defined in the Pat band */
     GameSpyInterfaceThread();
+    /* the live worker thread (`.sbss` 0x80794CE4); defined in `Network/NetworkSessionManager.cpp` */
+    static GameSpyInterfaceThread* getInstance();
     void canClose();
     s32 initialize();
     void armCancel();
@@ -475,7 +478,6 @@ public:
    which the consumer includes (`enemy/em020_ai.h`, `Runtime.PPCEABI.H/memset.h`). */
 extern "C" void PatInterface_clear(void);
 extern "C" int PatInterface_isReady(void);
-extern "C" GameSpyInterfaceThread* GameSpyInterfaceThread_getInstance(void);
 /* untyped: opaque handle passed through - the context's layout belongs to the Pat band */
 extern "C" void networkLog_destroyContext(NetworkSessionManagerLogger* log, void* context);
 extern "C" void networkPatResetCircleInfo(NetworkSessionManagerPat* self, s32 index);
@@ -544,7 +546,6 @@ u32 networkStreamWriter_size(const void* sub);
 /* the band's float constants and singleton slots live in the shared pool owned by the data-only unit
    `Network/network_shared_data.cpp`; its header (included at the top of this file) declares them, so
    they are not re-declared here (rule 2). */
-extern void* sGameSpyInterfaceThread;      /* 0x80794CE4 (.sbss) */
 
 /* 0x80794CA0 (.sbss) - the request-id source: `requestId_70 = counter; counter = requestId_70 + 1`. */
 extern u32 NetworkRequest_idCounter;

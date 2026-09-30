@@ -84,17 +84,17 @@ void NetworkSessionManagerPat::move()
     if (this->udp_65C != NULL) {
         this->udp_65C->move();
     }
-    if (GameSpyInterfaceThread_getInstance() != NULL) {
+    if (GameSpyInterfaceThread::getInstance() != NULL) {
         if (this->field_6E75 != 0) {
-            if (GameSpyInterfaceThread_getInstance()->getResult() < 0) {
-                GameSpyInterfaceThread_getInstance()->getErrorStruct(&info);
+            if (GameSpyInterfaceThread::getInstance()->getResult() < 0) {
+                GameSpyInterfaceThread::getInstance()->getErrorStruct(&info);
                 if (info.code_04 == 0x4B) {
                     ((PatErrorCallback)this->unused_04)(3, 0, info.value_00, 1, &info, this->unused_08);
                     forwarded.value_00 = info.value_00;
                     forwarded.code_04 = info.code_04;
                     forwarded.extra_08 = info.extra_08;
                     ((NetworkInstanceDispatch*)getInstance_())->postError(&forwarded);
-                    GameSpyInterfaceThread_getInstance()->clearError();
+                    GameSpyInterfaceThread::getInstance()->clearError();
                 }
             }
         }

@@ -94,6 +94,7 @@
 
 #include "types.h"
 #include "DWCi/DWCi_NatNeg.h"            /* DWCi_GetStringLength: the owner's header (rule 2) */
+#include "DWCi/fn_805113B0.h"            /* this unit's own exported entry points */
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
 #include "unsplit/DWCi.h"                /* the band's unowned data and helpers (rule 2) */

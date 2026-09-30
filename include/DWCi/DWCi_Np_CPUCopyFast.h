@@ -65,7 +65,7 @@ extern char DWCi_npEmptyFriendCode[4];
  * (`fn_80507050` +0xE0, `fn_80507780` +0x90) with the result unused, so it is declared
  * memcpy-shaped with a `void` result - the real return type is not recoverable from the image; and
  * `DWCi_authDataTask` is called with no argument set up at all from the middle band's step
- * functions `fn_8050A8D0`/`fn_8050A9D0` (+0x3C / +0x100), so it takes none. */
+ * functions `DWC_NASLoginProcess`/`DWC_SVLProcess` (+0x3C / +0x100), so it takes none. */
 void DWCi_Np_CPUCopyFast(u8* dst, const u8* src, u32 len);
 void DWCi_authDataTask(void);
 

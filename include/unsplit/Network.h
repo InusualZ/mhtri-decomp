@@ -77,8 +77,16 @@ typedef struct NetworkInstance {
     /* +0x00 */ NetworkInstanceVtable* vtable;
 } NetworkInstance;   /* size: 0x04 */
 
-/* The same object dispatched as a real virtual: the four `postError` sites of
- * `fn_8041A87C.cpp` pass a **pointer**, and that is retail's `lwz r12, 0x0(r3)` /
+/* The DWC error record `postError` takes **by value** (a by-value parameter makes MWCC build the argument copy
+ * and re-materialise the constants, which is retail's shape at every caller). */
+typedef struct NetworkPostedError {
+    /* +0x00 */ s32 code_00;
+    /* +0x04 */ s32 param1_04;
+    /* +0x08 */ s32 param2_08;
+} NetworkPostedError;   /* size: 0x0C */
+
+/* The same object dispatched as a real virtual: the `postError` sites of
+ * `fn_8041A87C.cpp` pass the record by value, and that is retail's `lwz r12, 0x0(r3)` /
  * `lwz r12, 0x288(r12)` shape - the struct view above stages the table through a scratch register
  * instead.  The slot is 161 declared virtuals in, so the unnamed ones consume the table; none is
  * defined and MWCC emits no table of its own (rule 10). */
@@ -245,6 +253,9 @@ public:
     /* +0x280 */ virtual void pad_280();
     /* +0x284 */ virtual void pad_284();
     /* +0x288 */ virtual void postError(NetworkErrorInfo* info);
+
+    /* the by-value spelling: the caller's argument copy is what the virtual slot is handed */
+    inline void postError(NetworkPostedError info) { postError((NetworkErrorInfo*)&info); }
 };   /* size: 0x04 (the object's leading vtable word) */
 
 extern "C" {
@@ -270,37 +281,53 @@ void resetCallback(NetworkInstance* self, s32 index);
 /* DWC/GameSpy session layer */
 void constructNetworkLibrary(void);   /* 0x804189C8, the sNetworkLibrary constructor body the opener calls */
 void decrement60d4(NetworkInstance* self);
-s32 fn_803FD658(NetworkInstance* self);
-s32 fn_803FD694(NetworkInstance* self, s32 index);
-void fn_803FD794(NetworkInstance* self, void* info);
+s32 hasMultipleRefs60d4(NetworkInstance* self);
+/* untyped: caller-owned payload - the 0x208-byte error record copied in when non-null */
+s32 errorRecordCode613c(NetworkInstance* self, const void* record);
+void getErrorInfo654c(NetworkInstance* self, u32* info);
 
-/* the work-record emitter the previous band owns */
-void fn_8041A5A8(void* self, u32 code, s32 a, s32 b, s32 c, void* data);
+/* GameSpy GT2 transport (the SDK's `gt2*` API): a socket and a connection are opaque handles, and
+ * `gt2Accept` / `gt2Connect` take the four-callback set `GameSpyInterfaceThread` installs on a
+ * connection.  The callbacks keep the flat parameter lists the retail bodies read (GUESS on every
+ * parameter name: the GT2 header spells `connection, result, message, size`). */
+typedef u32 GT2Socket;
+typedef u32 GT2Connection;
+typedef struct GT2ConnectionCallbacks {
+    /* +0x00 */ void (*connected_00)(s32 connection, s32 result, s32 message, s32 timeout);
+    /* +0x04 */ void (*received_04)(u32 connection, s32 message, s32 size);
+    /* +0x08 */ void (*closed_08)(u32 connection, s32 reason);
+    /* +0x0C */ void (*ping_0C)(void);
+} GT2ConnectionCallbacks;   /* size: 0x10 */
 
 /* GameSpy socket layer (DWC / GameSpyInterface) */
-s32 fn_8050A8A0(void);
-s32 fn_8050A8D0(void);
-s32 fn_8050A990(void);
-void fn_8050A9A0(void);
-s32 fn_8050A9B0(const void* key, s32 value);
-s32 fn_8050A9D0(void);
-void fn_8050C5F0(const void* self);
-s32 fn_8050C770(void);
-s32 fn_8050DEC0(void* socket, const void* address, u32 a, u32 b, NetworkCallback callback);
-void fn_8050DED0(u32 socket);
-void fn_8050DF20(u32 socket);
-void fn_8050DF70(u32 socket, NetworkCallback callback);
-s32 fn_8050DF80(u32 socket, const char* string);
-void fn_8050DF90(u32 socket, const void* data, s32 len);
-s32 fn_8050DFA0(u32 socket, void* out, void* address, void* buffer, u32 size, u32 timeout, const char* fmt, s32 flags);
-s32 fn_8050E150(u32 socket, const void* data, u32 size, s32 flags);
-void fn_8050E250(u32 socket);
-s32 fn_8050E290(u32 socket);
-void fn_8050E2A0(u32 data, NetworkCallback callback);
+s32 DWC_NASLoginAsync(void);
+s32 DWC_NASLoginProcess(void);
+s32 DWC_SVLBegin(void);
+void DWC_SVLEnd(void);
+s32 DWC_SVLGetTokenAsync(const char* svl, s32 handle);
+s32 DWC_SVLProcess(void);
+void DWCi_natProbeStart(const char* gameName);
+s32 DWCi_natProbePoll(void);
+s32 gt2CreateSocket(GT2Socket* socket, const char* localAddress, u32 outgoingBufferSize, u32 incomingBufferSize,
+                    NetworkCallback socketErrorCallback);
+void gt2CloseSocket(GT2Socket socket);
+void gt2Think(GT2Socket socket);
+void gt2Listen(GT2Socket socket, NetworkCallback connectAttemptCallback);
+s32 gt2Accept(GT2Connection connection, const GT2ConnectionCallbacks* callbacks);
+/* untyped: byte range - the reject message */
+void gt2Reject(GT2Connection connection, const char* message, s32 length);
+/* untyped: byte range - the connect message */
+s32 gt2Connect(GT2Socket socket, u32* connection, const char* remoteAddress, const void* message, u32 length,
+               u32 timeout, const GT2ConnectionCallbacks* callbacks, s32 blocking);
+/* untyped: byte range - the datagram */
+s32 gt2Send(GT2Connection connection, const void* message, u32 length, s32 reliable);
+void gt2CloseConnection(GT2Connection connection);
+s32 gt2GetSocketSOCKET(GT2Socket socket);
+void gt2SetUnrecognizedMessageCallback(GT2Socket socket, NetworkCallback callback);
 
 /* NHTTP / network utility layer */
-s32 fn_805073C0(s32* code, s32* type);
-void fn_80507470(void);
+s32 DWC_GetLastErrorEx(s32* code, s32* type);
+void DWC_ClearError(void);
 
 /* The DWCi NATNEG / transport-tail unit (`.text` 0x80512490..0x805145B8) is registered as
  * `src/DWCi/DWCi_NatNeg.c`, so its five entry points now live in its owner header; including
@@ -310,10 +337,10 @@ void fn_80507470(void);
 /* OS / runtime helpers.  `SOHtoNs` is an SO-library symbol whose one home is the SO band header,
  * which is C-linkage-safe and so reachable from the DWCi `.c` units as well. */
 #include "unsplit/SO.h"
-void fn_804167B4(void* out);
-void fn_80403F60(NetworkInstance* self, u32 handle);
-void fn_80403FE4(NetworkInstance* self, u32 handle, u32 offset, u32 size);
-void fn_80404070(NetworkInstance* self);
+void getGameInfo2d1c(class NetworkWiiMediator* self, u32* out);
+void sendReqChannelInfo(NetworkInstance* self, u32 handle);
+void sendReqChannelData(NetworkInstance* self, u32 handle, u32 offset, u32 size);
+void sendReqConnect(NetworkInstance* self);
 void dtor_803CA338(void* self, s32 flags);
 void OSLockMutex(void* mutex);
 void OSUnlockMutex(void* mutex);
@@ -325,14 +352,13 @@ s32 OSIsThreadTerminated(void* thread);
 void OSSleepTicks(u64 ticks);
 
 /* another TU's vtables (rule 10: reference, never rebuild) */
-extern u32 lbl_806036A0[];
 extern u32 lbl_80603740[];
 
-/* the three-slot socket table and the peer thread's reply marker, lookup key and address format */
-extern u32 lbl_806D3650[3];
-extern const char lbl_80793990[3];
-extern u32 lbl_80793994;
-extern const char lbl_80793998[4];
+/* the GT2 reject message, the empty service-locator string and the listen-address format (shared
+   `.sdata` pool entries no registered unit claims) */
+extern const char sRejectMessageNG[3];
+extern const char sEmptyString[4];
+extern const char sPortFormat[4];
 /* 0x80794380 `natNegMessageMagic` - the NATNEG message signature this unit compares the head of a
  * received datagram against - is deliberately *not* declared here: the bytes belong to the NATNEG
  * unit, so rule 2 puts the declaration in `include/DWCi/DWCi_NatNeg.h` (included above), and that
@@ -341,7 +367,7 @@ extern const char lbl_80793998[4];
  * for the SDA21 form its ten sites use (playbook row 12 - the reloc kind is a codegen input). */
 
 /* Three declarations that used to stand here are owned now, so each lives in its OWNER's header and is
- * reached through this band by including it (section 6.5 rule 2, 2026-09-28): `lbl_80794CE0` and
+ * reached through this band by including it (section 6.5 rule 2, 2026-09-28): `sGameSpySocket` and
  * `sGameSpyInterfaceThread` by `Network/fn_8041A87C.cpp`, whose `splits.txt` claims
  * `.sbss:0x80794CE0..0x80794CE8` - they are declared in `include/Network/fn_8041A87C.h`, the header of
  * the unit that defines them - and `natNegMessageMagic` by `DWCi/DWCi_NatNeg.c`, whose `.sdata` run
@@ -349,42 +375,9 @@ extern const char lbl_80793998[4];
  * this band).  A band header that still declared them would collide with the owners' definitions.
  */
 
-/* the range's own string pool */
+/* the warning `updateCallbackStep` logs: a string of the neighbouring NetworkReflectService TU (its run ends at
+   that class's vtable 0x80603190, which unsplit code reads), so no claim of this band's unit can cover it */
 extern const char lbl_80603154[];
-extern const char lbl_806031A0[];
-extern const char lbl_806031B0[];
-extern const char lbl_806031D0[];
-extern const char lbl_806031E8[];
-extern const char lbl_80603204[];
-extern const char lbl_80603218[];
-extern const char lbl_80603228[];
-extern const char lbl_80603238[];
-extern const char lbl_80603248[];
-extern const char lbl_80603254[];
-extern const char lbl_80603278[];
-extern const char lbl_80603298[];
-extern const char lbl_806032C0[];
-extern const char lbl_806032E0[];
-extern const char lbl_80603308[];
-extern const char lbl_80603320[];
-extern const char lbl_80603334[];
-extern const char lbl_80603348[];
-extern const char lbl_8060335C[];
-extern const char lbl_8060336C[];
-extern const char lbl_80603378[];
-extern const char lbl_80603388[];
-extern const char lbl_806033C8[];
-extern const char lbl_80603408[];
-extern const char lbl_80603448[];
-extern const char lbl_806034A0[];
-extern const char lbl_806034F4[];
-extern const char lbl_80603548[];
-extern const char lbl_80603590[];
-extern const char lbl_806035E4[];
-extern const char lbl_80603638[];
-extern const char lbl_80603660[];
-extern const char lbl_80603680[];
-extern const char lbl_806036B0[];
 
 /* The Network band's constants live in the data-only sibling header (see its comment for why a
  * unit that also includes `Network/NetworkSessionManager.h` cannot take them from here). */
