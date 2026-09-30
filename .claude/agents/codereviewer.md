@@ -89,12 +89,22 @@ them before you form an opinion, and cite the rule number rather than your taste
     * **sections against the claim**: the `extab`/`extabindex`/`.ctors`/`.dtors`/`.data` ranges in
       `splits.txt` versus what the object actually emits (`tools/elf/elfsect.py`, or objdiff's section
       rows);
+    * **`python tools/objdiff/relocdiff.py <unit> --by-owner`** - our relocations against the target's, aligned
+      per owning symbol: type, symbol **name**, addend, only the differences plus `N/N relocations match`, exit
+      1 on a difference (without `--by-owner` it prints both sides' tables paired by offset, which a moved
+      function floods). objdiff scores a `bl` to the wrong symbol as equal to the right one, so a 100 % row can hide a
+      wrong callee, vtable slot or pool entry; this is the check that sees it. A `note` line (same names, moved
+      offsets) is an instruction-placement residual, not a name error;
     * **relocations, not just bytes**: a flip is bytes **and** relocs, and the two can disagree. That same
       finding measured three spellings byte-identical in `.text`, `extab` and `extabindex` - the decision
       came from the call site's **relocation** (the real callee against a synthesized `__ct__…`);
     * **the source smells**: a hand-written `operator new` + null check where a `new` expression belongs
       (playbook 62), a hand-rolled allocation/destruction sequence, a `(void *)` cast at an allocation, or a
       constructor called explicitly where the class has a real one.
+    **On a `NonMatching` unit** `flipcheck.py` will print NOT READY, and that alone is not a finding: the unit is
+    `NonMatching` on purpose. Compare each NOT READY reason with the reasons the unit's header records as its
+    residual, and report **only a reason the header does not record** (an unrecorded blocker is the defect; a
+    recorded one is the landed win the header describes).
     This is always `defect`, never `taste`: the unit is `NonMatching` for a reason, and this is usually it.
     The mistake has a second telling - when the manual form *does* change `.text`, it is playbook 62's
     original evidence, a register and a frame size off from the very top of the function.
@@ -141,7 +151,9 @@ them before you form an opinion, and cite the rule number rather than your taste
     names as a refusal; the manual probe it replaced is what found `Network/NetworkWiiMediator`'s four
     undefined constructors - a flip would have answered `undefined: '__ct__12PatInterfaceFv'`. Also diff the
     relocation **names** our object emits against `symbols.txt`: a source calling a name no map row carries is
-    a flip blocker no per-symbol score shows.
+    a flip blocker no per-symbol score shows. `python tools/objdiff/relocdiff.py <unit> --by-owner` is the same idea against
+    the **target's** names rather than the map's - run both, they catch different things (an undefined name
+    versus a defined-but-wrong one).
   * **a permutation - the section is the right size, every symbol is at 100 %, and the bytes are in the wrong
     place.** `Network/NetworkPat` measured 99.83 % with twelve symbols at 100 %, `extab`/`extabindex`
     byte-identical and equal section sizes - and **577 of 720 `.text` bytes mislaid**, because the object's
@@ -175,7 +187,14 @@ them before you form an opinion, and cite the rule number rather than your taste
 
 ## How to gather evidence (never an impression)
 
-Run the project's own tools and cite their output rather than re-deriving a judgement by eye:
+Run the project's own tools and cite their output rather than re-deriving a judgement by eye.
+
+**Your shell rejects compound commands** when you run in a worktree-isolated tree: a `for` loop, process
+substitution (`<(...)`), `&&`/`;` chains and `git -C <other tree>` are refused as "too complex to verify that
+it stays inside the worktree". Every probe here is one plain command; to look at another tree, pass its path
+to the tool (`--report <path>`, `--main <path>`) or read the file with your file tools, and run the command once
+per unit instead of looping. A one-off Python probe goes in as a single `python <file under .pi/tmp/>`, never a
+shell loop.
 
 * `python tools/units/stylelint.py --budget` (the backlog per unit) or `--diff <ref>` (only what a change
   added; it selects the merge base itself);
@@ -183,6 +202,13 @@ Run the project's own tools and cite their output rather than re-deriving a judg
   rename would have to sweep - never open or print `symbols.txt` (rule 7 of the non-negotiables: it is 4.5 MB);
 * `python tools/objdiff/unitscore.py <unit>` for the unit's rows in one call (`--threshold` to filter), and the `objdiff-verify`
   skill for what "matches" really requires;
+* **a per-symbol before/after against `main`**: main's own `report.json` is the "before", and `unitscore.py` reads
+  any report, so it is two single commands: `python tools/objdiff/unitscore.py <unit> --report <MAIN>/build/RMHE08/report.json --force-stale`
+  (main's rows; `--force-stale` because the freshness guard compares main's report to *this* tree's object,
+  which is expected to differ) and `python tools/objdiff/unitscore.py <unit> --measure` (the branch's rows, one
+  objdiff call, no report needed). Add `--threshold 100` to list only open rows and compare the two by symbol.
+  `<MAIN>` is the primary checkout (the slot's sibling directory `mhtri-dtk`); the "before" is only as current
+  as main's last `ninja build/RMHE08/report.json`, so state its mtime when you cite it;
 * `python tools/objdiff/pairgap.py` for the size-gap class, and the corrected reading of the metric it exists
   for: **objdiff does not decline a pair on size**, a row with no `fuzzy_match_percent` key is 0 %, and the
   value is *matched / target instructions* - so a "0 %" row with a big size gap can be **one** matched
