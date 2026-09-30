@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (79)
+## Ideas that work (80)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -88,6 +88,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 78 | [A data claim must cover the run the unit actually TOUCHES, not the extent the symbol happens to name](078-data-claim-full-run.md) | works | data, sections | A `.sbss` claim covered 4 B (the list head) while the unit's own rows relocate words of a 16-byte run that the target holds as one object - so rows the unit owns stayed blocked and the blocked total was mis-recorded. |
 | 79 | [A reconstruction is not deferred for a low match score](079-no-deferral-for-low-score.md) | works | process | A data run and a compiler-emitted vtable were both left out of a unit because their bytes would score badly (a table about 5 % right) - and both deferrals were wrong, because the score is not the arbiter of what gets... |
 | 80 | [A TU's `.data` is globals, strings, vtables in reverse, then inline-function strings - two vtable groups with strings between them are two TUs](080-data-order-vtables-strings.md) | works | data, vtable, sections | A unit whose classes all emitted vtables of the right size still scored 10.4 % on `.data`, because the retail run interleaves vtables with strings - an order no single TU produces - so it reads as a claim or class-model... |
+| 94 | [One literal pool per TU: a pool literal two units read means the units are one original TU](094-pool-per-tu.md) | works | data, sections, measurement | A unit's literal pool is a partial pool - two neighbouring units' `.sdata2` interleave or share entries, the first `.data` object is 4 B late, or a claim "cannot be reproduced" - because the original was ONE TU cut into... |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 

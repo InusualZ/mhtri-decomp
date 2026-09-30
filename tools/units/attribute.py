@@ -128,6 +128,7 @@ import tudiscover as td  # noqa: E402  (path set above)
 import dataorder as do  # noqa: E402  (the `.data` emission-order seams; docs/data-order-seams.md)
 import sharedfiles as sf  # noqa: E402
 import langcheck as lc  # noqa: E402
+import poolseams as ps  # noqa: E402  (literal pools as TU evidence; docs/pool-seams.md)
 
 SPLITS = ROOT / "config" / "RMHE08" / "splits.txt"
 CONFIGURE = ROOT / "configure.py"
@@ -663,8 +664,22 @@ def tu_probe(an, lo_i: int, hi_i: int, note: str | None = None) -> dict:
             "verdict": verdict}
 
 
+def pool_seams_of(names, graph, labels, pool_touch) -> dict | None:
+    """The registered units that already touch a pooled literal the functions `names` read, or None.
+
+    MWCC emits one literal pool per TU, so a literal a registered unit reads or claims puts this range in the same
+    original TU as that unit (`poolseams.pool_seams_for`); `pool_touch` is `poolseams.literal_units`' shape
+    (None/empty = no evidence, nothing is attached).
+    """
+    if not pool_touch:
+        return None
+    lits = [labels[r]["addr"] for n in names for r in graph["funcs"].get(n, {}).get("refs", ())
+            if r in labels and td.is_pool_literal(labels[r])]
+    return ps.pool_seams_for(lits, pool_touch)
+
+
 def propose(an, fns, labels, graph, start: int, end: int, min_bytes: int = MIN_BYTES_DEFAULT,
-            max_bytes: int = MAX_BYTES_DEFAULT, claimed=None, seam_records=None) -> list[dict]:
+            max_bytes: int = MAX_BYTES_DEFAULT, claimed=None, seam_records=None, pool_touch=None) -> list[dict]:
     """One proposal per unit the region's evidence supports, in address order.
 
     The walk is over maximal *unclaimed* runs of functions inside `[start, end)`, not over seeds: a run
@@ -724,6 +739,9 @@ def propose(an, fns, labels, graph, start: int, end: int, min_bytes: int = MIN_B
             ds = data_seams_for(entry["text"], data, seam_records)
             if ds:
                 entry["data_seams"] = ds
+            pool = pool_seams_of(names, graph, labels, pool_touch)
+            if pool:
+                entry["pool_seams"] = pool
             out.append(entry)
     kept, dropped = drop_overlaps(out, claimed)
     for why in dropped:
@@ -1099,6 +1117,7 @@ def queue_doc(proposals: list[dict], cap: int, fingerprints: dict | None = None)
             "functions": p["functions"],
             "runs": p["runs"],
             **({"data_seams": p["data_seams"]} if p.get("data_seams") else {}),
+            **({"pool_seams": p["pool_seams"]} if p.get("pool_seams") else {}),
         } for p in proposals],
     }
 
@@ -1309,7 +1328,7 @@ def main() -> int:
               "      `end` on a function edge to include them"
               % (len(straddling), end, straddling[0][1], straddling[0][0]), file=sys.stderr)
     props = propose(an, fns, labels, graph, start, end, args.min_bytes, args.max_bytes,
-                    seam_records=load_data_seam_records())
+                    seam_records=load_data_seam_records(), pool_touch=ps.literal_units(str(ROOT)))
     if args.limit:
         props = props[:args.limit]
     kept, refused, detail = cap_batch(props, args.max_total_bytes)

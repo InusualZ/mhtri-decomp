@@ -863,6 +863,26 @@ def selftest() -> int:
     check("seams: a seam exactly at the run's start is not interior",
           at.data_seams_for([0x5000, 0x6000], {".data": {"start": 0x140, "end": 0x141, "density": 1.0}}, recs), None)
     check("seams: no records is no evidence", at.data_seams_for([0x1000, 0x2000], dense, None), None)
+
+    # pool seams (docs/pool-seams.md): a pooled literal a registered unit already touches puts the range in that TU
+    plabels = {"f_a": {"section": ".sdata2", "addr": 0x8000, "size": 4, "kind": "float", "local": False},
+               "f_b": {"section": ".sdata2", "addr": 0x8004, "size": 4, "kind": "float", "local": False},
+               "tbl": {"section": ".sdata2", "addr": 0x8010, "size": 0x20, "kind": "", "local": False}}
+    pgraph = {"funcs": {"fn1": {"refs": ["f_a", "tbl"]}, "fn2": {"refs": ["f_b"]}, "fn3": {"refs": []}}}
+    touch = {0x8000: ["menu/fn_802E4978", "hud/cockpit_quest"], 0x8004: ["menu/fn_802E4978"], 0x8010: ["x/y"]}
+    got = at.pool_seams_of(["fn1", "fn2", "fn3"], pgraph, plabels, touch)
+    check("pool: the registered units touching the range's pooled literals, most-shared first",
+          ([(r["unit"], r["count"]) for r in got["units"]], got["shared"]),
+          ([("menu/fn_802E4978", 2), ("hud/cockpit_quest", 1)], 2))
+    check("pool: a table is not a pooled literal, so its owner is not named",
+          "x/y" in [r["unit"] for r in got["units"]], False)
+    check("pool: no touch index, or no shared literal, is no evidence",
+          (at.pool_seams_of(["fn1"], pgraph, plabels, None), at.pool_seams_of(["fn3"], pgraph, plabels, touch),
+           at.pool_seams_of(["fn1"], pgraph, plabels, {0x9999: ["a/b"]})), (None, None, None))
+    check("pool: propose() attaches pool_seams only when a registered unit touches a literal",
+          ["pool_seams" in p for p in at.propose(fake_an(FUNCS), {}, {}, {}, 0x1000, whole_end, min_bytes=0,
+                                                 max_bytes=0x4000, claimed=[], seam_records=[], pool_touch={})],
+          [False])
     check("seams: propose() attaches data_seams only when a seam bears on the proposal",
           ["data_seams" in p for p in at.propose(fake_an(FUNCS), {}, {}, {}, 0x1000, whole_end, min_bytes=0,
                                                  max_bytes=0x4000, claimed=[], seam_records=[])], [False])

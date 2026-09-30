@@ -365,6 +365,21 @@ def selftest() -> int:
                fc.data_seam_problems("U/u", ".data", seam_ours, seam_tgt, seams, (0x2000, 0x2100)), [])
         expect("another section adds no line",
                fc.data_seam_problems("U/u", ".text", seam_ours, seam_tgt, seams, (0x1000, 0x1200)), [])
+        # 17c. pool sharing: a differing `.sdata2` of a unit in a pool-sharing group is a partial pool of one TU
+        pool_ours = write(tmp, "pool_ours.o", build_obj(
+            [(".sdata2", b"\0" * 8)], [("@1", 4, ".sdata2", 0x01, 0), ("@2", 4, ".sdata2", 0x01, 4)]))
+        pool_tgt = write(tmp, "pool_tgt.o", build_obj(
+            [(".sdata2", b"\0" * 16)], [("lbl_a", 4, ".sdata2", 0x01, 0), ("lbl_b", 4, ".sdata2", 0x01, 4),
+                                        ("lbl_c", 4, ".sdata2", 0x01, 8), ("lbl_d", 4, ".sdata2", 0x01, 12)]))
+        fold = "candidate fold: U/u with V/v (3 shared pool literal(s), text adjacent, confidence high)"
+        got = fc.pool_group_problems("U/u", {".sdata2": (16, 4)}, {".sdata2": (8, 4)}, pool_ours, pool_tgt, fold)
+        expect("a short .sdata2 of a unit in a pool group is named a partial pool, with the fold",
+               (len(got), "partial pool of a TU that spans several registered units" in got[0], fold in got[0]),
+               (1, True, True))
+        expect("a matching pool adds no line",
+               fc.pool_group_problems("U/u", {".sdata2": (16, 4)}, {".sdata2": (16, 4)}, pool_tgt, pool_tgt, fold), [])
+        expect("a section the unit does not claim adds no line",
+               fc.pool_group_problems("U/u", {".data": (16, 4)}, {".sdata2": (8, 4)}, pool_ours, pool_tgt, fold), [])
         seam_other = write(tmp, "seam_other.o", build_obj(
             [(".data", st)], [("lbl_str", 8, ".data", 0x11, 0)]))
         got = fc.data_seam_problems("U/u", ".data", seam_other, seam_tgt, seams, (0x1000, 0x1200))

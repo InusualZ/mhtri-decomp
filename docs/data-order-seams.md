@@ -192,3 +192,11 @@ yet; the 0x805F94E0 seam family of `network_transport` and the g3d gaps are the 
   slot is not its TU (a derived class starts with a base function), so the vtable owner is not used as ground truth.
 * `fragments()` now cuts a `V->S` gap of at most `dataseams.NARROW` symbols after its tail and leaves a wider gap
   uncut (it only had a cut at the first string before); it has no consumer outside `dataorder`'s own selftest.
+
+## Literal pools are the same kind of evidence (2026-09-30)
+
+The `.sdata2`/`.sdata` literal pool is a per-TU section too: one pool per TU, one entry per value, pools never merged by
+the linker. A pooled literal two registered units read is a **fold** (one TU cut into pieces), one value at two pool
+addresses is a **cut**. Premise, measurement, exceptions and census: `docs/pool-seams.md` (playbook idea 94). It agrees
+with the `.data` model in 19 of 20 groups; the one disagreement (`Network/network_*` group: a foreign `.data` range
+inside the group's `.data` span) is the place to look for a wrong claim in either model.

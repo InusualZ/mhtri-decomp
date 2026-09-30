@@ -33,6 +33,14 @@ Observations, in decreasing authority:
   order is unmeasured): `--data-order weak` adds it as a weak vote, `--data-order off` disables the whole kind.
   Why soft: the `bench` tier 4 and `dataorder` subcommand measure it against `splits.txt` and the `__FILE__`
   anchors (docs/data-order-seams.md section 6).
+* **pool model** (`--pool-model on`, default; docs/pool-seams.md) - MWCC emits ONE literal pool per TU, one entry per
+  distinct value, and `mwld` does not merge pools.  So an `.sdata2` float/double (or `.sdata` string) read by several
+  functions is one TU's pool entry - a must-link even when its value is unique (the `--span-max` guard still keeps a
+  far-apart reader pair out) - and **one `.sdata2` value at two pool addresses is two TUs**: the boundary lies between
+  the last referrer of one copy and the first of the next (`pooldup`, soft; `--pool-model strong` makes it a strong
+  pin).  Independent check against the 95 `__FILE__`-anchored TUs: no `pooldup` interval and no shared literal spans
+  two anchored files.  `at` also names the registered units the range overlaps and their pool-sharing group
+  (`tools/units/poolseams.py`): a fold candidate, not a tool limit.
 * **codegen fingerprint** (soft) - a `_savegpr_*`/`stmw` change or a record-form presence change
   between two neighbouring functions is a per-TU flag change (playbook idea 21).
 * **alignment gap** (soft) - a >4 byte gap; weak in this binary, where `.text` is one run with gaps
@@ -48,8 +56,9 @@ reference, so a table with several relocated functions cannot merge them.
 
 What is deliberately *not* used: dtk's `auto_*` units (they are per-function build scaffolding, not
 TU evidence), naive `lbl_` sharing (`.sbss` 69.8 % and `.bss` 60 % of labels are shared by several
-functions and are ordinary cross-TU globals), and constant values (a repeated float is not a
-boundary marker - dtk labels every pool word).
+functions and are ordinary cross-TU globals), and a repeated `.sdata`/`.data` *string* (an initialised `char[]`
+is a distinct object, never pooled).  A repeated `.sdata2` float is used only through the pool model above:
+the repeat itself is the boundary evidence, not a mere coincidence of values.
 
 Usage (addresses in hex, or a symbol name):
 
@@ -122,9 +131,21 @@ DATA_ORDER_MODES = ("off", "on", "strong", "weak")
 DATA_ORDER_DEFAULT = "on"
 
 
-def strong_kinds(mode):
-    """The observation kinds that may move a boundary on their own, for a `--data-order` mode."""
-    return STRONG + (("dataorder",) if mode == "strong" else ())
+def strong_kinds(mode, pool_model=None):
+    """The observation kinds that may move a boundary on their own, for a `--data-order` / `--pool-model` mode."""
+    pool_model = POOL_MODEL if pool_model is None else pool_model
+    return STRONG + (("dataorder",) if mode == "strong" else ()) + (("pooldup",) if pool_model == "strong" else ())
+
+
+#: `--pool-model` (docs/pool-seams.md): MWCC emits one literal pool per TU, one entry per value, so
+#: `on` - a pooled literal (an `.sdata2` float/double, an `.sdata` string) read by several functions is one TU
+#: (must-link) even when its value is unique, and one value at two pool addresses is a boundary (`pooldup`, soft);
+#: `strong` - `pooldup` joins the strong kinds; `off` - only the older rule (a value copied elsewhere + span).
+POOL_MODELS = ("off", "on", "strong")
+#: a `pooldup` interval wider than this many functions names no boundary worth printing (it still votes in `score_cuts`)
+POOL_DEDUPE_NARROW = 64
+POOL_MODEL_DEFAULT = "on"
+POOL_MODEL = POOL_MODEL_DEFAULT
 
 # Tier 1: how many functions inside one claimed `.text` range may seed their own closure, and how
 # many of the resulting distinct intervals the report lists (the rest are counted).
@@ -685,7 +706,14 @@ def duplicate_values(labels, dol):
     return {name for names in seen.values() if len(names) > 1 for name in names}
 
 
-def classify(labels, refs_of, ordered, addr, size, span_max, dup):
+def is_pool_literal(lab):
+    """An object MWCC pools per TU: an `.sdata2` 4/8-byte scalar or an `.sdata` string literal."""
+    if lab["section"] == ".sdata2":
+        return lab["size"] in (4, 8)
+    return lab["section"] == ".sdata" and lab["kind"] == "string"
+
+
+def classify(labels, refs_of, ordered, addr, size, span_max, dup, pool=False):
     """private / ambiguous per label, with the reason kept for the report.
 
     `span_max` is in *bytes* of .text: every referrer of a private pooled constant is inside the one
@@ -704,10 +732,47 @@ def classify(labels, refs_of, ordered, addr, size, span_max, dup):
             out[name] = ("private", "scope:local")
         elif lab["section"] in (".sdata2", ".sdata") and name in dup and span <= span_max:
             out[name] = ("private", "%s pool, value copied elsewhere, span %d B" % (lab["section"], span))
+        elif pool and is_pool_literal(lab) and len(users) > 1 and span <= span_max:
+            # one pool per TU: a literal several functions read lives in one TU's pool whatever its value
+            out[name] = ("private", "%s pool literal read by %d functions, span %d B"
+                         % (lab["section"], len(users), span))
         elif len(users) > 1:
             out[name] = ("ambiguous", "%s, span %d B, no scope%s"
                          % (lab["section"], span, "" if name in dup else ", unique value"))
     return out
+
+
+def pool_dedupe_cuts(labels, refs_of, dol):
+    """`(observations, records)` for one `.sdata2` value held at two pool addresses (the compiler would reuse the first).
+
+    Copies of a value (same section, same bytes) sorted by address belong to different TUs, in text order, so the
+    boundary lies between the last referrer of one copy and the first of the next: cut indices
+    `(last+1 .. first)`.  Referrers that interleave contradict the rule (the copies are cross-TU globals or the
+    referrer graph is wrong): recorded as `overlap`, no observation.  Needs the DOL (`dol` None -> nothing).
+    """
+    if dol is None:
+        return [], []
+    seen = collections.defaultdict(list)
+    for name, lab in labels.items():
+        if name not in refs_of or lab["section"] != ".sdata2" or lab["kind"] not in ("float", "double"):
+            continue          # `.sdata` strings can be initialised arrays (never pooled); an untyped/`4byte` word can be
+                              # half of an 8-byte object the map cut in two (two 0xFFFFFFFF words read by one `lfd`)
+        raw = dol.read(lab["addr"], lab["size"])
+        if raw:
+            seen[(lab["section"], bytes(raw))].append((lab["addr"], name))
+    soft, records = [], []
+    for (section, raw), copies in sorted(seen.items(), key=lambda kv: min(a for a, _n in kv[1])):
+        copies.sort()
+        for (_a1, n1), (_a2, n2) in zip(copies, copies[1:]):
+            r1, r2 = refs_of[n1], refs_of[n2]
+            rec = {"section": section, "first": n1, "second": n2, "value": raw.hex()}
+            if r1[-1] >= r2[0]:
+                records.append({**rec, "status": "overlap"})
+                continue
+            records.append({**rec, "status": "pinned", "lo": r1[-1] + 1, "hi": r2[0]})
+            soft.append((r1[-1] + 1, r2[0], 1.0, "pooldup",
+                         "%s value copy %s -> %s" % (section, n1, n2)))
+    return soft, records
 
 
 def source_file_label(dol, labels, name):
@@ -822,7 +887,8 @@ def data_order_records(addr, size, refs_of, dol, mode, syms=None):
     return soft, records
 
 
-def analyse(fns, labels, graph, dol, span_max, source_span_max=0x8000, data_order="off", do_syms=None):
+def analyse(fns, labels, graph, dol, span_max, source_span_max=0x8000, data_order="off", do_syms=None,
+            pool_model=None):
     """Ordered function list + every observation, in index space (cut i = boundary before f[i])."""
     ordered = sorted(fns, key=lambda n: fns[n]["addr"])
     idx = {n: i for i, n in enumerate(ordered)}
@@ -850,7 +916,9 @@ def analyse(fns, labels, graph, dol, span_max, source_span_max=0x8000, data_orde
         if got:
             owners_of[name] = got
 
-    cls = classify(labels, refs_of, ordered, addr, size, span_max, duplicate_values(labels, dol))
+    pool_model = POOL_MODEL if pool_model is None else pool_model
+    cls = classify(labels, refs_of, ordered, addr, size, span_max, duplicate_values(labels, dol),
+                   pool=pool_model != "off")
     must_link, soft = [], []
 
     def link(lo, hi, why):
@@ -946,6 +1014,12 @@ def analyse(fns, labels, graph, dol, span_max, source_span_max=0x8000, data_orde
                 soft.append((u[-1], v[0], 1.0, "pool",
                              "%s run jump %s -> %s" % (section, n1, n2)))
 
+    # Pool dedupe: one value at two pool addresses is two TUs (MWCC keeps one entry per value per TU).
+    pool_records = []
+    if pool_model != "off":
+        more, pool_records = pool_dedupe_cuts(labels, refs_of, dol)
+        soft.extend(more)
+
     # Data emission order: a vtable followed by a string (or two ascending vtables) is a TU seam.
     order_records = []
     if data_order != "off":
@@ -968,8 +1042,8 @@ def analyse(fns, labels, graph, dol, span_max, source_span_max=0x8000, data_orde
 
     return {"ordered": ordered, "idx": idx, "addr": addr, "size": size, "refs_of": refs_of,
             "cls": cls, "must_link": must_link, "soft": soft, "owners_of": owners_of,
-            "source_names": source_names, "order_records": order_records,
-            "strong_kinds": strong_kinds(data_order)}
+            "source_names": source_names, "order_records": order_records, "pool_records": pool_records,
+            "pool_model": pool_model, "strong_kinds": strong_kinds(data_order, pool_model)}
 
 
 def expand(an, seed, max_funcs):
@@ -1175,6 +1249,16 @@ def report(args):
                        for r in an["order_records"]
                        if r["status"] == "pinned" and r["hi"] >= sug_lo - args.window
                        and r["lo"] <= sug_hi + args.window],
+        "pool_dedupe": sorted(
+            ({"first": r["first"], "second": r["second"], "value": r["value"],
+              "text": [an["addr"][r["lo"]], an["addr"][r["hi"]]], "functions": r["hi"] - r["lo"] + 1}
+             for r in an["pool_records"]
+             if r["status"] == "pinned" and r["hi"] >= sug_lo - args.window and r["lo"] <= sug_hi + args.window
+             and r["hi"] - r["lo"] + 1 <= POOL_DEDUPE_NARROW),
+            key=lambda r: (r["functions"], r["text"][0]))[:12],
+        "pool_model": an["pool_model"],
+        "pool_units": pool_fold_info(an["addr"][lo], an["addr"][hi - 1] + an["size"][hi - 1],
+                                     an["addr"][sug_lo], an["addr"][sug_hi - 1] + an["size"][sug_hi - 1]),
     }
     if args.json:
         print(json.dumps(result, indent=2))
@@ -1206,6 +1290,36 @@ def _clean(cand):
     return {"cut": cand["cut"], "support": cand["support"], "share": cand["share"],
             "strong": [{"kind": k, "why": w} for k, w in cand["strong"]],
             "pins": [{"kind": k, "why": w} for k, w in cand["pins"][:6]], "veto": cand["veto"]}
+
+
+def pool_fold_info(match_lo, match_hi, ext_lo, ext_hi):
+    """The registered units a proposed range overlaps, and the pool-sharing groups they belong to.
+
+    `scope` is `match` when the MATCH SET itself spans several registered units, `extended` when only the
+    extended range does.  `{}` whenever the registry, the objects or the census are unreadable (never raises).
+    """
+    try:
+        claims = claimed_units()
+        hit = lambda lo, hi: sorted((c[".text"][0], u) for u, c in claims.items()  # noqa: E731
+                                     if c[".text"][0] < hi and c[".text"][1] > lo)
+        units, scope = [u for _a, u in hit(match_lo, match_hi)], "match"
+        if len(units) < 2:
+            units, scope = [u for _a, u in hit(ext_lo, ext_hi)], "extended"
+        units = [os.path.splitext(u)[0] for u in units]
+        out = {"units": units, "scope": scope, "groups": []}
+        if units:
+            sys.path.insert(0, os.path.join(ROOT, "tools", "units"))
+            import poolseams
+            census = poolseams.load_census(ROOT)
+            seen = set()
+            for u in units:
+                g = poolseams.group_of(census, u)
+                if g and id(g) not in seen:
+                    seen.add(id(g))
+                    out["groups"].append(poolseams.fold_line(g))
+        return out
+    except Exception:  # noqa: BLE001 - evidence, not a dependency
+        return {}
 
 
 def print_human(res, ordered, fns, sug_lo, sug_hi):
@@ -1252,6 +1366,23 @@ def print_human(res, ordered, fns, sug_lo, sug_hi):
         for r in res["data_order"][:6]:
             print("  0x%08X %-6s .text 0x%08X..0x%08X (%d fn)  %s -> %s"
                   % (r["addr"], r["seam"], r["text"][0], r["text"][1], r["functions"], r["before"], r["after"]))
+        print()
+    pu = res.get("pool_units") or {}
+    if pu.get("groups") or len(pu.get("units") or ()) > 1:
+        print("pool model    the %s overlaps %d registered unit(s): %s" % (
+            "MATCH SET" if pu["scope"] == "match" else "extended range", len(pu["units"]), ", ".join(pu["units"][:6])
+            + (" ..." if len(pu["units"]) > 6 else "")))
+        for line in pu.get("groups", [])[:3]:
+            print("              %s" % line)
+        if pu.get("groups"):
+            print("              a pooled literal read by two registered units is one TU's pool entry (MWCC: one pool per TU,\n"
+                  "              `mwld` does not merge pools): the claim is blocked by a seam, not by the tool - fold them.")
+        print()
+    if res.get("pool_dedupe"):
+        print("pool dedupe   one value held at two pool addresses is two TUs (the compiler reuses a pooled value inside one TU):")
+        for r in res["pool_dedupe"][:6]:
+            print("  value %-16s %-14s -> %-14s new TU's first code in .text 0x%08X..0x%08X (%d fn)"
+                  % (r["value"], r["first"], r["second"], r["text"][0], r["text"][1], r["functions"]))
         print()
     print("data the range would own (contiguous run per section; `dens` = share of labels inside the"
           " run that the range actually references, `leak` = also referenced from outside, `own` ="
@@ -1812,6 +1943,56 @@ def selftest():
           [r["addr"] for r in st["at_unit_start"]], [0x130])
     check("... status counts", dict(st["by_status"]), {"pinned": 2, "overlap": 1})
 
+    # pool model (docs/pool-seams.md): a shared pooled literal is one TU even with a unique value, and one value at
+    # two pool addresses is a boundary between the referrers of the two copies
+    class FakeDol:
+        def __init__(self, words):
+            self.words = words
+
+        def read(self, a, n):
+            return self.words.get(a)
+
+        def cstr(self, a, limit=256):
+            return b""
+
+    def lab(section, a, size, kind="float"):
+        return {"section": section, "addr": a, "size": size, "kind": kind, "local": False}
+
+    plabels = {"u1": lab(".sdata2", 0x8000, 4), "u2": lab(".sdata2", 0x8004, 4), "c1": lab(".sdata2", 0x8008, 4),
+               "c2": lab(".sdata2", 0x800C, 4), "tbl": lab(".sdata2", 0x8010, 0x20, ""),
+               "str": lab(".sdata", 0x9000, 3, "string"), "var": lab(".sdata", 0x9008, 4, "4byte")}
+    prefs = {"u1": [0, 1], "u2": [2], "c1": [0, 1], "c2": [3, 4], "tbl": [0, 5], "str": [0, 1], "var": [0, 1]}
+    porder = ["f%d" % i for i in range(6)]
+    paddr = [0x1000 + 0x100 * i for i in range(6)]
+    psize = [0x100] * 6
+    check("is_pool_literal: sdata2 4/8 bytes and sdata strings only",
+          [n for n, l in plabels.items() if is_pool_literal(l)], ["u1", "u2", "c1", "c2", "str"])
+    off = classify(plabels, prefs, porder, paddr, psize, 0x4000, set(), pool=False)
+    on = classify(plabels, prefs, porder, paddr, psize, 0x4000, set(), pool=True)
+    check("old rule: a unique-valued shared literal is only ambiguous", off["u1"][0], "ambiguous")
+    check("pool model: a shared pooled literal is private even with a unique value",
+          sorted(n for n, (k, _w) in on.items() if k == "private"), ["c1", "c2", "str", "u1"])
+    check("... a table and a non-string sdata object stay ambiguous", (on["tbl"][0], on["var"][0]),
+          ("ambiguous", "ambiguous"))
+    check("... one reader is no link", "u2" in on, False)
+    wide = classify(plabels, prefs, porder, paddr, psize, 0x100, set(), pool=True)
+    check("... the span guard still keeps a far-apart reader pair out", wide["c2"][0], "ambiguous")
+    one = bytes.fromhex("3f800000")
+    dol = FakeDol({0x8000: one, 0x8004: bytes.fromhex("40000000"), 0x8008: bytes.fromhex("40000000"),
+                   0x800C: bytes.fromhex("40000000")})
+    obs, rec = pool_dedupe_cuts(plabels, prefs, dol)
+    check("dedupe: copies of 2.0f at 0x8004/0x8008/0x800C chain pairwise; u2/c1 referrers interleave -> overlap, "
+          "c1/c2 do not -> a boundary",
+          ([(o[0], o[1], o[3]) for o in obs], [r["status"] for r in rec]), ([(2, 3, "pooldup")], ["overlap", "pinned"]))
+    obs2, rec2 = pool_dedupe_cuts(plabels, {"u2": [0], "c1": [1], "c2": [3], "u1": [2]}, dol)
+    check("dedupe: disjoint ordered referrers pin the cut between them (last+1 .. first)",
+          [(o[0], o[1], o[3]) for o in obs2], [(1, 1, "pooldup"), (2, 3, "pooldup")])
+    check("dedupe: no DOL, no observation", pool_dedupe_cuts(plabels, prefs, None), ([], []))
+    check("pooldup is strong only with --pool-model strong",
+          ["pooldup" in strong_kinds("on", m) for m in POOL_MODELS], [False, False, True])
+    fold = pool_fold_info(0, 1, 0, 1)
+    check("pool_fold_info never raises on an unreadable registry", isinstance(fold, dict), True)
+
     if fails:
         print("FAIL (%d)" % len(fails))
         for f in fails:
@@ -1877,6 +2058,12 @@ def main():
                         help="`.data` emission-order seams (V->S = a boundary in a gap, zigzag; soft): off / on (default) / "
                              "weak (adds V->D as a weak vote)")
 
+    def pool_model_arg(sp):
+        sp.add_argument("--pool-model", choices=POOL_MODELS, default=POOL_MODEL_DEFAULT,
+                        help="literal pools as TU evidence (docs/pool-seams.md): on (default) = a shared pooled literal "
+                             "is one TU + a value held at two pool addresses is a soft boundary; strong = that boundary "
+                             "may move a cut; off = the older rule")
+
     a = sub.add_parser("at", help="propose the TU boundary around an address or symbol")
     a.add_argument("at")
     a.add_argument("--window", type=int, default=40, help="candidate cuts to search each side")
@@ -1892,6 +2079,7 @@ def main():
     a.add_argument("--allow-stale", action="store_true",
                    help="print the splits block even when stale split-tree files remain (read-only)")
     data_order_arg(a)
+    pool_model_arg(a)
     a.set_defaults(func=report)
 
     b = sub.add_parser("stats", help="cache, coverage and observation counts")
@@ -1899,6 +2087,7 @@ def main():
     b.add_argument("--source-span-max", type=int, default=0x8000)
     b.add_argument("--force", action="store_true", help="rebuild the graph cache")
     data_order_arg(b)
+    pool_model_arg(b)
     b.set_defaults(func=cmd_stats)
 
     c = sub.add_parser("cache", help="(re)build the graph cache only")
@@ -1906,6 +2095,7 @@ def main():
     c.add_argument("--span-max", type=int, default=0x4000)
     c.add_argument("--source-span-max", type=int, default=0x8000)
     data_order_arg(c)
+    pool_model_arg(c)
     c.set_defaults(func=lambda a: cmd_stats(a) or 0)
 
     d = sub.add_parser("bench", help="scorecard used to iterate on this tool")
@@ -1921,6 +2111,7 @@ def main():
     d.add_argument("--save", default=None, help="write the scorecard here (e.g. build/tmp/tudiscover/baseline.json)")
     d.add_argument("--compare", default=None, help="diff the sweep against a saved scorecard")
     data_order_arg(d)
+    pool_model_arg(d)
     d.set_defaults(func=cmd_bench)
 
     g = sub.add_parser("dataorder", help="the `.data` emission-order seams as `.text` intervals")
@@ -1942,6 +2133,8 @@ def main():
     e.set_defaults(func=cmd_prune)
 
     args = ap.parse_args()
+    global POOL_MODEL
+    POOL_MODEL = getattr(args, "pool_model", POOL_MODEL_DEFAULT)
     sys.exit(args.func(args) or 0)
 
 
