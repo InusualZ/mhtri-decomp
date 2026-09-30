@@ -80,6 +80,8 @@ never through a per-file escape hatch. **Rules 1-6, 8, 9, 10 and 11 apply as bef
 **A move is credited, a copy is not.** A token new to one file is credited when another file of the same batch
 stopped carrying the same (rule, token, detail): one credit per removal, reported as `moved rule R <token>: <old> ->
 <new>` (and the `--json` `moved` key). A copy, a removal of another rule, or net growth still refuses.
+A file the batch **deletes** counts as a source: its base findings are read from the base blob (`deleted_src_files`,
+`findings_of_deleted`) and every identity it carried is a removal; a git-detected rename keeps its identities.
 
 **`--diff` says how many; `--list-added` says which.** A `+N rule R <file>` row names no occurrence, so a
 lane that reads `+76 rule 7` cannot tell which of its renames are load-bearing: one dropped three whole
@@ -2553,6 +2555,40 @@ def findings_at_ref(root: str, ref: str, pairs: list[tuple[str | None, str]],
     return findings
 
 
+def deleted_src_files(root: str, base: str, ref: "str | None" = None) -> list[str]:
+    """Base paths of the `src/`/`include/` files the batch **deletes** (a rename is not one: `-M` pairs it).
+
+    `changed_src_files*` exclude deletions because a deleted file has no after side, but its base findings
+    are exactly what a fold gives up: a unit whose bodies moved into a neighbour leaves every identity it
+    carried behind, and `apply_move_credits` can only credit a removal it can see.  `ref` None compares the
+    working tree with `base` (`--diff`); a ref compares two git trees (`--ref`).
+    """
+    args = ["diff", "--name-status", "-M", "--diff-filter=D", base] + ([ref] if ref else []) + ["--", SRC, HEADERS]
+    out = []
+    for line in git(root, *args).splitlines():
+        parts = line.split("\t")
+        if len(parts) >= 2 and parts[-1].endswith(SUFFIXES):
+            out.append(parts[-1])
+    return out
+
+
+def findings_of_deleted(root: str, base: str, paths: list[str],
+                        ownership: "Ownership | None" = None) -> list[dict]:
+    """The base copies of the deleted files, linted: every identity they carried is a removal (`before` only).
+
+    Read from the base side, keyed by the path they had - a deleted file has no other key.  Appended to the
+    `before` findings only, so it can earn a move credit but can never itself be an addition.
+    """
+    findings = []
+    for path in paths:
+        try:
+            text = git_bytes(root, "show", "%s:%s" % (base, path)).decode("utf-8", "replace")
+        except RuntimeError:
+            continue
+        findings.extend(lint_source(Source(path, path, text), ownership))
+    return findings
+
+
 def changed_src_files_between(root: str, base: str, ref: str) -> list[tuple[str | None, str]]:
     """`(path_at_base, path_at_ref)` for every `src/`/`include/` file `ref` changed against `base`.
 
@@ -4360,6 +4396,44 @@ def selftest() -> int:
             rc, out = mrun()
             check("(move 5) a name that grew across the batch still refuses (one credit per removal)",
                   (rc, len(moved_lines(out))), (1, 1))
+
+            # (6) a DELETED file's identities are removals: a fold that deletes pl_act.cpp and absorbs its
+            # bodies into pl_new.cpp is a move, though the deleted file no longer exists after the batch
+            for extra_file in ("src/Pl/pl_new.cpp", "src/Pl/pl_new2.cpp"):
+                if os.path.exists(os.path.join(tmp, extra_file)):
+                    os.remove(os.path.join(tmp, extra_file))
+            mput("src/Pl/pl_act.cpp", old_body + "extern u8 unowned_data[];\n")
+            os.remove(os.path.join(tmp, "src/Pl/pl_act.cpp"))
+            mput("src/Pl/pl_new.cpp", old_body)
+            rc, out = mrun()
+            check("(delete 1) delete-and-absorb is credited and the verdict is clean", rc, 0)
+            check("... reported as moved from the deleted file",
+                  moved_lines(out),
+                  ["moved rule 7 fn_80040598: src/Pl/pl_act.cpp -> src/Pl/pl_new.cpp",
+                   "moved rule 7 fn_80275B04: src/Pl/pl_act.cpp -> src/Pl/pl_new.cpp"])
+
+            # (7) delete + one genuinely new finding: only the new one refuses
+            mput("src/Pl/pl_new.cpp", old_body + "void extra(void) { fn_80ABCDEF(); }\n")
+            rc, out = mrun("--list-added")
+            check("(delete 2) delete-and-absorb plus a new finding refuses only the new one",
+                  (rc, [ln.strip() for ln in out.splitlines() if ln.strip().startswith("rule 7 src/")]),
+                  (1, ["rule 7 src/Pl/pl_new.cpp:3 fn_80ABCDEF"]))
+
+            # (8) a deleted file whose content is NOT absorbed anywhere earns nothing for an unrelated add
+            mput("src/Pl/pl_new.cpp", "void fn_80ABCDEF(void) {}\n")
+            rc, out = mrun()
+            check("(delete 3) a new token is not credited by an unrelated deleted file", (rc, moved_lines(out)),
+                  (1, []))
+
+            # (9) a pure rename (git pairs it, -M) is no finding at all
+            os.remove(os.path.join(tmp, "src/Pl/pl_new.cpp"))
+            mput("src/Pl/pl_act.cpp", old_body + "extern u8 unowned_data[];\n")
+            mgit("add", "-A")
+            mgit("mv", "src/Pl/pl_act.cpp", "src/Pl/pl_ren.cpp")
+            rc, out = mrun()
+            check("(delete 4) a rename carries its identities: clean, nothing credited", (rc, moved_lines(out)),
+                  (0, []))
+            mgit("mv", "src/Pl/pl_ren.cpp", "src/Pl/pl_act.cpp")
         finally:
             os.chdir(old_cwd)
 
@@ -4486,7 +4560,8 @@ def ref_comparison(root: str, branch: str, ownership: "Ownership | None", as_jso
         + header_pragma_findings_at_ref(root, base, rename)
         + header_rule11_findings_at_ref(root, base, rename)
         + header_rule13_findings_at_ref(root, base, rename)
-        + header_rule12_findings_at_ref(root, base, base_ownership, rename))
+        + header_rule12_findings_at_ref(root, base, base_ownership, rename)
+        + findings_of_deleted(root, base, deleted_src_files(root, base, branch), base_ownership))
     before = rule_counts(before_findings)
     touched = findings_of_ref(root, branch, pairs, after_ownership)
     after_sources = sources_of_ref(root, branch, pairs)
@@ -4603,7 +4678,8 @@ def main(argv: list[str] | None = None) -> int:
                 + header_pragma_findings_at_ref(root, args.diff, rename)
                 + header_rule11_findings_at_ref(root, args.diff, rename)
                 + header_rule13_findings_at_ref(root, args.diff, rename)
-                + header_rule12_findings_at_ref(root, args.diff, base_ownership, rename))
+                + header_rule12_findings_at_ref(root, args.diff, base_ownership, rename)
+                + findings_of_deleted(root, args.diff, deleted_src_files(root, args.diff), base_ownership))
             before = rule_counts(before_findings)
             # the base copy's rule-2 symbols, so a credit can only ever touch a name that is *new* to the
             # file: one it already declared is part of `before`, never one of the batch's additions
