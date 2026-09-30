@@ -1,16 +1,16 @@
 /*
  * menu/menu_message.cpp - the menu band's list/cursor layer and its message helpers.
  *
- * `.text` 0x802A6624-0x802AA764 (71 functions, 16704 B), extab 0x800137D4-0x8001398C and extabindex
- * 0x8003123C-0x800314D0 (55 records each, one per framed function), `.data` 0x805CE00C-0x805CE040.
- * 48 of 71 rows written, 42 byte-identical, 23 unwritten; objdiff unit metric 44.78 %; still `NonMatching`.
+ * `.text` 0x802A6624-0x802AA6A8 (70 functions, 16516 B), extab 0x800137D4-0x80013984 and extabindex
+ * 0x8003123C-0x800314C4 (54 records each, one per framed function), `.data` 0x805CE00C-0x805CE198 (396 B).
+ * 48 of 70 rows written, 42 byte-identical, 22 unwritten; objdiff unit metric 44.78 %; still `NonMatching`.
  * The object emits no `.sdata`: the target's `.sdata` reads (`"%d"` 0x807922A0, `"%s"` 0x807922A4/0x807922A8)
  * belong to bodies that are not written yet.
  *
  * Provenance: registered from `proposal/802A6624_fn_802A6624.cpp` and re-homed here on 2026-09-29; the name is
  * a GUESS from what the range does (the selection list and its cursor, the message/frame dialog) - no
- * `__FILE__` string covers it.  The right edge was cut at 0x802AA764 (the tail is the gunner-shell layer, see
- * `.pi/notes/menu-message-4d56.md` for the cut, the unwind-run partition and the tail's recipe).
+ * `__FILE__` string covers it.  The right edge was cut at 0x802AA764 and then again at 0x802AA6A8: the tail is
+ * the gunner-shell pool (`stage/shell.cpp`), whose first function `shell_work_init` (0x802AA6A8) clears the shell pool's `.bss` and calls its table initialisers.
  *
  * Seams, both open: the left edge is the proposal's own (`lbl_806BE340` is also read from the range before it,
  * and the first block is `menu_item.h`'s `MenuSlot`); the two `"%s"` copies (0x807922A4 read from 0x802A78F4 and
@@ -41,9 +41,14 @@
  *     folds the same source into a conditional return, one instruction shorter (four shapes measured, all fold).
  *   * `item_pairs_shell_sort` 98.06 and `menu_frame_page_draw` 98.75: allocation-only (the latter keeps two
  *     locals in the highest callee-saved registers where the target keeps parameters).
- *   * Unwritten bodies are blocked by (a) `.data` reads no claim covers yet (`dialog_piece_uv_tbl` 0x805CE0A0,
- *     `lbl_805CE160`/`lbl_805CE180`/`lbl_805CE18C`, `lbl_805CE090`, the 0x805CE040..0x805CE07C blobs - second half,
- *     unproven), (b) `.sdata2` 120.0f at 0x8079A3F8 (sole referrer `fn_802AA4F4`), (c) callees no header declares
+ *   * `.data` is emitted in full (the sprite-id run, four value runs with their pointer table, the dialog piece rectangles and three
+ *     sprite-id runs) but is 400 B against the target's 396: the compiler 8-aligns every object whose size is a multiple of 8, and the
+ *     target has three (the pointer table at +0x84, the rectangles at +0x94, the frame sprite ids at +0x154) on 4-mod-8 offsets, so
+ *     everything from the pointer table on sits 4 B late (the first 0x84 B are byte-equal).  Every size-multiple-of-8 object of the
+ *     target is 8-aligned in absolute addresses (0x805CE090/A0/160/180) although the claim starts at 0x805CE00C; the section start
+ *     is the suspect (an unseen 4-byte object ahead of it), not the tables.  Same result for `#pragma pack/align`, `aligned(4)`, a
+ *     struct wrapper and Wii 1.0-1.7.
+ *   * Unwritten bodies are blocked by (a) `.sdata2` 120.0f at 0x8079A3F8 (sole referrer `fn_802AA4F4`), (b) callees no header declares
  *     with a usable signature (`fn_802E3D18`, `fn_802D9EA8`, `fn_802E1320`, `get_rare_color`, `draw_number_idx`,
  *     `fn_8027993C`/`fn_80279B84`, the font cluster: `font_print` is `char*` in `unsplit/menu.h` where the map's
  *     variadic `font_print__FPSce` has `crclr`).
@@ -109,6 +114,36 @@ u16 menu_item_row_sprite_ids[26] = {
     0x00B5, 0x00B6, 0x00B7, 0x00B8, 0x00B9, 0x009D, 0x00AD, 0x00AE,
     0xFFFF, 0x0000
 };
+
+/* Four per-slot value runs (17 values of 1..3; the compiler pads each to 0x14) and the pointer table over them, which the
+ * tail helper at 0x802AA68C (index by the second argument) hands to the pad layer's setter (`.data` 0x805CE040-0x805CE0A0).  GUESS: names, from the reader. */
+u8 menu_pad_slot_map_0[17] = {1, 1, 1, 1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
+u8 menu_pad_slot_map_1[17] = {1, 1, 1, 1, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
+u8 menu_pad_slot_map_2[17] = {1, 1, 1, 1, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
+u8 menu_pad_slot_map_3[17] = {1, 1, 1, 1, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
+u8* menu_pad_slot_map_tbl[4] = {menu_pad_slot_map_0, menu_pad_slot_map_1, menu_pad_slot_map_2, menu_pad_slot_map_3};
+
+/* The dialog frame's piece rectangles, read by `draw_dialog_piece` and the frame builder (`.data` 0x805CE0A0).  GUESS: each row's
+ * four halfwords are a texture rectangle (left/top/right/bottom). */
+u16 dialog_piece_uv_tbl[24][4] = {
+    {0x0067, 0x0083, 0x0069, 0x0085}, {0x0060, 0x0060, 0x0080, 0x0061}, {0x0080, 0x0060, 0x00A0, 0x0061},
+    {0x0080, 0x0060, 0x0081, 0x0080}, {0x0060, 0x0040, 0x0080, 0x0060}, {0x0080, 0x0040, 0x00A0, 0x0060},
+    {0x0060, 0x0060, 0x0080, 0x0080}, {0x0080, 0x0060, 0x00A0, 0x0080}, {0x00A2, 0x004C, 0x00B2, 0x006C},
+    {0x00B2, 0x004C, 0x00BA, 0x006C}, {0x0095, 0x006E, 0x00A9, 0x007E}, {0x00A9, 0x006E, 0x00B1, 0x007E},
+    {0x01C5, 0x005F, 0x01FB, 0x008B}, {0x01FA, 0x005F, 0x01FB, 0x008B}, {0x01B9, 0x00D7, 0x01C2, 0x00EB},
+    {0x01BF, 0x00D7, 0x01C2, 0x00EB}, {0x00B7, 0x0000, 0x00C5, 0x0017}, {0x00B7, 0x0000, 0x00BE, 0x0017},
+    {0x00B7, 0x0000, 0x00B8, 0x0017}, {0x00A4, 0x0000, 0x00AB, 0x001B}, {0x00AB, 0x0000, 0x00AD, 0x001B},
+    {0x00A5, 0x000B, 0x00A6, 0x0011}, {0x0093, 0x002C, 0x00A3, 0x003E}, {0x00A3, 0x002C, 0x0093, 0x003E},
+};
+
+/* Three sprite-id runs (terminated by 0xFFFF, the last word padding) the dialog's sprite draw passes to `draw_sprite_ary`
+ * (`.data` 0x805CE160-0x805CE198).  GUESS: names, from the reader's order. */
+u16 dialog_sprite_ids_frame[16] = {
+    0x01C9, 0x01C1, 0x01C2, 0x01C3, 0x01C4, 0x01C5, 0x01C6, 0x01C7,
+    0x01C8, 0x01AF, 0x01B0, 0x01B1, 0x01B7, 0x01B8, 0x01B9, 0xFFFF
+};
+u16 dialog_sprite_ids_a[6] = {0x01B5, 0x01B2, 0x01B3, 0x01B4, 0xFFFF, 0x0000};
+u16 dialog_sprite_ids_b[6] = {0x01BD, 0x01BA, 0x01BB, 0x01BC, 0xFFFF, 0x0000};
 
 /* This unit's own bodies, in address order. */
 extern "C" void menu_frame_row_draw(s32 select, u32* dst, void* entry, s32 flags, struct _mh_ivec2_* pos);

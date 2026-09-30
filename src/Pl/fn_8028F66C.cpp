@@ -139,7 +139,7 @@ s32 fn_8028F66C(HitSphere* a, HitSphere* b, VEC3* out) {
     if (dist <= reach * reach) {
         if (dist > 0.001f) {
             PSVECSubtract(&sep.x, &a->pos.x, &b->pos.x);
-            fn_80051424(&sep.x, &sep.x, b->radius / fn_80050BC0(dist));
+            fn_80051424(&sep.x, &sep.x, b->radius / sqrt_f32(dist));
             fn_800513CC(out, &sep, &b->pos);
         } else {
             fn_80050028(out, &b->pos);
@@ -165,7 +165,7 @@ s32 fn_8028F758(HitSphere* a, HitSphere* b, VEC3* out) {
             f32 ratio;
 
             PSVECSubtract(&sep.x, &a->pos.x, &b->pos.x);
-            mag = fn_80050BC0(dist);
+            mag = sqrt_f32(dist);
             ratio = (reach - mag) / mag;
             fn_80051424(&out->x, &sep.x, ratio);
         } else {

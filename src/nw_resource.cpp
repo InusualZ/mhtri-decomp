@@ -5,7 +5,8 @@
  * The game's resource / "work" manager: the refcounted resource-memory cache (`RESmemAlloc`,
  * `RESmemFree`, `pull_res_mem`, `push_res_mem`, `getResMemAdrs`), the name table (`ckResourceName`,
  * `nwAddResource`, `nwDelResource`) and the loader-work entry points (`nwWorkInitialize`, `nwMoveStart`,
- * `nwMoveEnd`).  `.text` 0x800D45AC-0x800D77B0, 111 functions, 12804 B.
+ * `nwMoveEnd`).  `.text` 0x800D2FEC-0x800D6C00 (recut 2026-09-30: it absorbs the memory-manager/g3d-work group 0x800D2FEC..0x800D45AC
+ * from `ef/fn_800CDB2C.cpp`, none of whose bodies were written, and hands 0x800D6C00..0x800D77B0 to `g3d/g3d_xsi.cpp`).
  *
  * Naming (brief section 2, class 3 - what the code does plus the siblings' scheme): the range carries no
  * `__FILE__` string of its own.  The only file strings it references are the header `memorymanagertmp.h`
@@ -14,10 +15,10 @@
  * a separate original TU whose seam is not pinned.  The file name is therefore descriptive, at the root
  * beside `sys_mem.cpp`/`main.cpp`, and the remaining `fn_XXXXXXXX` names are the map's.
  *
- * Seam: unproven (brief section 1).  The left edge 0x800D45AC is the start of `fn_800D45AC` in the map
- * and of a function in the target object; the preceding run 0x800CDB2C-0x800D45AC (proposal
- * `800CDB2C`) is plainly the same subsystem (`work_mem_alloc`, `load_file_req`, `get_move_work_adrs`)
- * and belongs in this same module.
+ * Seams (evidence: `.pi/notes/ef-nwres-seam.md`).  Left edge 0x800D2FEC: the previous function is this TU's neighbour's
+ * `__sinit` element constructor (`.ctors` 0x8056F2EC).  Right edge 0x800D6C00: `g3d/g3d_xsi.cpp` starts there (the `g3d_xsi.cpp`
+ * file string `.data` 0x80595790, one `.sdata2` pool 0x807963C8).  The vtable group `.data` 0x80595378..0x80595428 is one TU's
+ * and its readers straddle the former 0x800D45AC edge, which is therefore not a seam.
  *
  * Result (measured against the target object with `recompile.py --measure`, official report metric):
  * 35 of 111 symbols at >= 80 %, 18 of them byte-identical (100.00).  The two tables (`resMem` at
@@ -46,6 +47,14 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "nw_resource.h" /* `ResEntry` and the C++ entry points (this unit owns them) */
+#include "ef/nw_res_manager.h"
+#include "ef/pRoot.h"
+
+/* The two `.sbss` words this unit defines (0x80794970-0x80794978): the resource manager every function below walks, and the
+ * g3d model root (stored once, by `fn_800D32CC`; read by `nwWorkInitialize`/`nwMoveStart`/`nwMoveEnd`).  Definer of both:
+ * `.sbss` follows text order and the unit's first word is 0x80794970 (seam evidence in the header). */
+ResManager* nw_res_manager;
+s32 pRoot;
 
 /* The whole range is peephole-clean in retail: no record-form instruction (`add.`, `and.`, `extsb.`, ...)
  * occurs anywhere in the target object, and `fn_800D476C` encodes `~(align-1) & end` as `not`+`and`
@@ -111,7 +120,6 @@ struct ResManager {
     /* +0x29084 */ void* ptr_0x29084;
 }; /* size: 0x29088 */
 
-extern ResManager* lbl_80794970;
 extern u8 lbl_80595428[];
 
 /* The C-linkage helpers: their map names are plain `fn_XXXXXXXX`, so an `extern "C"` declaration keeps
@@ -168,7 +176,6 @@ void nwMoveEnd(void);
 MTX34 get_current_view_mtx(void);
 void load_file_req(char* path, u32 a, s32 b, u32 c, s32 d, u32* e);
 
-extern void* pRoot;
 
 /* 0x800D476C - round `size` up to an `align` boundary. */
 u32 fn_800D476C(u32 size, s32 align) {
@@ -199,7 +206,7 @@ void* fn_800D4A74(void* startAddress, u32 size) {
 
 /* 0x800D4BC4 - allocate from the resource-memory allocator and cache the free total. */
 void* RESmemAlloc(u32 size) {
-    ResManager* m = lbl_80794970;
+    ResManager* m = nw_res_manager;
     void* p = MEMAllocFromAllocator(&m->alloc1, size);
     m->heap1_free = fn_800D312C(m->heap1);
     return p;
@@ -207,7 +214,7 @@ void* RESmemAlloc(u32 size) {
 
 /* 0x800D4C14 - allocate from the second resource allocator and cache the free total. */
 void* fn_800D4C14(u32 size) {
-    ResManager* m = lbl_80794970;
+    ResManager* m = nw_res_manager;
     void* p = MEMAllocFromAllocator(&m->alloc0, size);
     m->heap0_free = fn_800D312C(m->heap0);
     return p;
@@ -215,21 +222,21 @@ void* fn_800D4C14(u32 size) {
 
 /* 0x800D4C64 - free into the resource-memory allocator and cache the free total. */
 void RESmemFree(void* p) {
-    ResManager* m = lbl_80794970;
+    ResManager* m = nw_res_manager;
     MEMFreeToAllocator(&m->alloc1, p);
     m->heap1_free = fn_800D312C(m->heap1);
 }
 
 /* 0x800D4CA4 - free into the second resource allocator and cache the free total. */
 void fn_800D4CA4(void* p) {
-    ResManager* m = lbl_80794970;
+    ResManager* m = nw_res_manager;
     MEMFreeToAllocator(&m->alloc0, p);
     m->heap0_free = fn_800D312C(m->heap0);
 }
 
 /* 0x800D4D9C - the name of a live resource-memory slot, or NULL. */
 char* fn_800D4D9C(s32 index) {
-    ResManager* m = lbl_80794970;
+    ResManager* m = nw_res_manager;
     if (m->resMem[index].data == 0) {
         return 0;
     }
@@ -247,7 +254,7 @@ void* getResMemAdrs(s32 index) {
     if (index >= 1024) {
         return 0;
     }
-    return lbl_80794970->resMem[index].data;
+    return nw_res_manager->resMem[index].data;
 }
 
 /* 0x800D5138 - the size of a resource-memory slot, or 0. */
@@ -258,12 +265,12 @@ u32 fn_800D5138(s32 index) {
     if (index >= 1024) {
         return 0;
     }
-    return lbl_80794970->resMem[index].size;
+    return nw_res_manager->resMem[index].size;
 }
 
 /* 0x800D516C - the first resource-memory slot holding `data`, or -1. */
 s32 fn_800D516C(void* data) {
-    ResManager* m = lbl_80794970;
+    ResManager* m = nw_res_manager;
     s32 i;
     for (i = 0; i < 1024; i++) {
         if (m->resMem[i].data == data) {
@@ -275,7 +282,7 @@ s32 fn_800D516C(void* data) {
 
 /* 0x800D5250 - release every live resource-memory slot. */
 void fn_800D5250(void) {
-    ResManager* m = lbl_80794970;
+    ResManager* m = nw_res_manager;
     s32 i;
     for (i = 0; i < 1024; i++) {
         if (m->resMem[i].data != 0) {
@@ -286,7 +293,7 @@ void fn_800D5250(void) {
 
 /* 0x800D4CE4 - find a resource-memory slot by basename and take a reference. */
 s32 fn_800D4CE4(const char* path) {
-    ResManager* m = lbl_80794970;
+    ResManager* m = nw_res_manager;
     s32 i;
     char* p = fn_80041404(path, 47);
     if (p != 0) {
@@ -303,7 +310,7 @@ s32 fn_800D4CE4(const char* path) {
 
 /* 0x800D4DD8 - find a resource-memory slot by basename, without taking a reference. */
 s32 fn_800D4DD8(const char* path) {
-    ResManager* m = lbl_80794970;
+    ResManager* m = nw_res_manager;
     s32 i;
     char* p = fn_80041404(path, 47);
     if (p != 0) {
@@ -319,7 +326,7 @@ s32 fn_800D4DD8(const char* path) {
 
 /* 0x800D52A8 - find a resource-table entry by basename; NULL when absent. */
 ResEntry* ckResourceName(char* path) {
-    ResManager* m = lbl_80794970;
+    ResManager* m = nw_res_manager;
     ResEntry* e = m->resTable;
     s32 i;
     char* p = fn_80041404(path, 47);
@@ -336,7 +343,7 @@ ResEntry* ckResourceName(char* path) {
 
 /* 0x800D5360 - the table index of a resource-table entry by basename, or -1. */
 s32 fn_800D5360(char* path) {
-    ResManager* m = lbl_80794970;
+    ResManager* m = nw_res_manager;
     ResEntry* e = m->resTable;
     s32 i;
     char* p = fn_80041404(path, 47);
@@ -353,7 +360,7 @@ s32 fn_800D5360(char* path) {
 
 /* 0x800D5418 - the resource-table entry whose index equals `index`, or NULL. */
 ResEntry* fn_800D5418(s32 index) {
-    ResManager* m = lbl_80794970;
+    ResManager* m = nw_res_manager;
     ResEntry* e = m->resTable;
     s32 i;
     if (index < 0) {
@@ -372,7 +379,7 @@ ResEntry* fn_800D5418(s32 index) {
 
 /* 0x800D506C - drop one reference on a resource-memory slot; free it at zero. */
 s32 push_res_mem(s32 index) {
-    ResManager* m = lbl_80794970;
+    ResManager* m = nw_res_manager;
     if (m->resMem[index].data == 0) {
         return -1;
     }
@@ -390,7 +397,7 @@ s32 push_res_mem(s32 index) {
 
 /* 0x800D4848 - walk the auxiliary table the work system publishes. */
 void fn_800D4848(void) {
-    ResManager* m = lbl_80794970;
+    ResManager* m = nw_res_manager;
     u32 i;
     if (m->ptr_0x29074 != 0) {
         for (i = 0; i < m->count_0x29080; i++) {
@@ -401,7 +408,7 @@ void fn_800D4848(void) {
 
 /* 0x800D48AC - hand the current view matrix to the work system. */
 void fn_800D48AC(void) {
-    ResManager* m = lbl_80794970;
+    ResManager* m = nw_res_manager;
     if (m->ptr_0x29074 != 0 && m->ptr_0x29084 != 0) {
         fn_800D4908(m->ptr_0x29084, &get_current_view_mtx());
     }
@@ -409,7 +416,7 @@ void fn_800D48AC(void) {
 
 /* 0x800D490C - size the four resource heaps and reset the two tables. */
 void fn_800D490C(void) {
-    ResManager* m = lbl_80794970;
+    ResManager* m = nw_res_manager;
     u32 i;
     m->heap0_start = 0x81276600;
     m->heap0_size = 0x00280000;
@@ -444,7 +451,7 @@ void fn_800D490C(void) {
 
 /* 0x800D4A7C - rebuild the resource heaps and reset the two tables. */
 void fn_800D4A7C(void) {
-    ResManager* m = lbl_80794970;
+    ResManager* m = nw_res_manager;
     u32 i;
     if (m->heap0 != 0) {
         MEMDestroyExpHeap(m->heap0);
@@ -480,7 +487,7 @@ void fn_800D4A7C(void) {
 
 /* 0x800D5864 - drop a resource-table entry's registration. */
 s32 nwDelResource(s32 index) {
-    ResManager* m = lbl_80794970;
+    ResManager* m = nw_res_manager;
     if (m->resTable[index].flag > 1) {
         m->resTable[index].flag--;
         return -1;
@@ -494,7 +501,7 @@ s32 nwDelResource(s32 index) {
 
 /* 0x800D58B0 - clear one resource-table entry outright. */
 void fn_800D58B0(s32 index) {
-    ResEntry* e = &lbl_80794970->resTable[index];
+    ResEntry* e = &nw_res_manager->resTable[index];
     e->name[0] = 0;
     e->index = -1;
     e->data = 0;
@@ -503,7 +510,7 @@ void fn_800D58B0(s32 index) {
 
 /* 0x800D58DC - clear every resource-table entry. */
 void fn_800D58DC(void) {
-    ResManager* m = lbl_80794970;
+    ResManager* m = nw_res_manager;
     u32 i;
     for (i = 0; i < 1024; i++) {
         m->resTable[i].name[0] = 0;
@@ -551,7 +558,7 @@ s32 fn_800D5CAC(void* table) {
 /* 0x800D5C74 - bring up the work system. */
 void nwWorkInitialize(void) {
     if (pRoot == 0) {
-        fn_80082668(pRoot);
+        fn_80082668((void*)pRoot);
     }
     fn_800D58DC();
     fn_800D31B0();
@@ -561,21 +568,21 @@ void nwWorkInitialize(void) {
 /* 0x800D5D18 - start the move phase. */
 void nwMoveStart(void) {
     if (pRoot != 0) {
-        fn_80082668(pRoot);
+        fn_80082668((void*)pRoot);
     }
 }
 
 /* 0x800D5D2C - end the move phase. */
 void nwMoveEnd(void) {
     if (pRoot != 0) {
-        fn_80083290(pRoot);
-        fn_800832DC(pRoot);
+        fn_80083290((void*)pRoot);
+        fn_800832DC((void*)pRoot);
     }
 }
 
 /* 0x800D4E88 - the refcounted resource-memory pull: reuse a live slot, else allocate one. */
 s32 pull_res_mem(char* path, u32 size, s32 mode) {
-    ResManager* m = lbl_80794970;
+    ResManager* m = nw_res_manager;
     char* name;
     s32 i;
     if (size == 0) {
@@ -620,7 +627,7 @@ s32 pull_res_mem(char* path, u32 size, s32 mode) {
 
 /* 0x800D5550 - register a resource-table entry (or bump an existing one's reference). */
 s32 nwAddResource(char* name, void* data) {
-    ResEntry* table = lbl_80794970->resTable;
+    ResEntry* table = nw_res_manager->resTable;
     ResEntry* e;
     s32 i;
     if (name == 0) {

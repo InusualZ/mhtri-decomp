@@ -63,7 +63,7 @@ u32 fn_802872E4(struct _PLW* self);
 s32 fn_802919FC(struct _PLW* self, void* a, void* b, f32* out, s32 slot);
 u32 fn_802950D8(struct _PLW* self, u8 mode, u16 flags);
 u32 fn_8027DCA8(struct _PLW* self);
-u32 fn_8029EFDC(void* p);
+u32 hit_attack_list_push(void* p);
 
 /* ---- callees another registered unit owns whose header does not declare them ---- */
 u32 fn_8012A624(void* out);

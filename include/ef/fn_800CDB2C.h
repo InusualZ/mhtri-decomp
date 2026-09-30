@@ -34,8 +34,6 @@ u32 move_work_state_ck(void);
 void ef_move_state_dispatch(u8 mode);
 
 s32 fn_800CED10(char* path, u32 dma, u32 size);
-/* Builds the nw4r::ef::EffectSystem the effect manager keeps at `eft_control` +0x04. */
-s32 fn_800D3C0C(void);
 s32 fn_800CEE2C(const char* path, void* info);
 /* The task-table entry `ef/fn_80059550.cpp` reads (its own return view is `_GXTexObj*`). */
 u8* fn_800D0568(s32 index);
@@ -51,8 +49,7 @@ u32 game_ready_ck(void);
 
 /* 0x800CF3C4 - the owner's own narrowed read, called by `menu/menu_message.cpp`'s
  * `menu_list_mode_get`/`menu_list_fill` as a signed byte (the caller keeps an `extsb` on the widened
- * form and compares it with a signed `cmpwi`+`ble`).  Added with `menu/menu_message.cpp`
- * (rule 2: this range owns the address). */
+ * form and compares it with a signed `cmpwi`+`ble`). */
 s8 player_count_get(void);
 
 /* 0x800CF3D4 - stores the session's player count (`system_w`'s +0x28, which `player_count_get` reads back);

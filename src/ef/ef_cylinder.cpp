@@ -45,7 +45,7 @@
 #include "types.h"
 #include "nw4r/math.h" /* nw4r::math::VEC3 - the vector record these bodies work on (rule 11) */
 #include "unsplit/ef.h"
-#include "fn_8004CAD8.h"       /* fn_80050BC0 - that unit owns the address and publishes it (rule 2) */
+#include "fn_8004CAD8.h"       /* sqrt_f32 - that unit owns the address and publishes it (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* The 3-float vector `include/nw4r/math.h` owns, spelled `VEC3` here: this unit's whole vector
@@ -160,7 +160,7 @@ void fn_800CB948(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
         if (flags & 0x01000000) {
             /* One argument, not two: the callee (0x80050BC0) reads only f1.  Retail's f2 at
              * 0x800CBD20 is the hoisted `1.0f - t` the else branch reuses (0x800CBD3C). */
-            factor = fn_80050BC0(t + (1.0f - t) * (rate * rate));
+            factor = sqrt_f32(t + (1.0f - t) * (rate * rate));
         } else {
             factor = t + rate * (1.0f - t);
         }

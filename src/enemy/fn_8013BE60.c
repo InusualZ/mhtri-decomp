@@ -497,8 +497,8 @@ extern f32 lbl_80796DA4; /* 0.5f */
 extern f32 lbl_80796DA8; /* 65536.0f */
 extern f32 lbl_80796DAC; /* 6.2831855f */
 extern f32 calcVecDistXZ(Vec3 *a, Vec3 *b);
-extern f32 fn_80050BC0(f32 x);
-extern f32 fn_80463E08(f32 y, f32 x);
+extern f32 sqrt_f32(f32 x);
+extern f32 atan2f(f32 y, f32 x);
 extern u32 fn_80125FF0(u8 a, u8 b);
 extern void fn_801285C0(_ENEMY_WORK *self, u32 a, u32 b, u32 c);
 extern void fn_80126278(_ENEMY_WORK *self, u16 a, Vec3 *out);
@@ -1267,8 +1267,8 @@ void fn_8013E2B0(_ENEMY_WORK *self, u8 *in) {
     if (in[0] == 0) {
         f32 dx = self->target.x - self->pos.x;
         f32 dz = self->target.z - self->pos.z;
-        f32 dist = fn_80050BC0(dx * dx + dz * dz);
-        f32 angle = fn_80463E08(-(self->target.y - self->pos.y), dist);
+        f32 dist = sqrt_f32(dx * dx + dz * dz);
+        f32 angle = atan2f(-(self->target.y - self->pos.y), dist);
         u16 raw = (u16)(s32)(lbl_80796DA8 * angle / lbl_80796DAC + lbl_80796DA4);
 
         fn_8013BE60(self, in, 51, 8, (s16)(u8)(((s32)raw >> 8) + 64));

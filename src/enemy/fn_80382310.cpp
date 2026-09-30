@@ -77,6 +77,7 @@
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "enemy/note_work.h" /* NoteWork and the pane/slot/layout types (rule 1) */
 #include "lobby/lb_quest_screen.h" /* note_pane_get_motion (rule 2: the owner's header) */
+#include "ef/pRoot.h"
 
 /* --- the declarations this band's bodies need (the owners are not registered yet; the address of
  * each sits inside 0x80380000.., the band this unit opens) ------------------------------- */
@@ -157,8 +158,8 @@ void fn_803C7EAC(void);
 void fn_803C7F88(void);
 void fn_800D58B0(s32 handle);
 s32 fn_800D9804(u32 a, void* b, void* c);
-void fn_800E0560(MHchar* self);
-void fn_801FF984(void* self);
+void mhchar_reset(MHchar* self);
+void mhchar_construct(void* self);
 void fn_802DFC6C(void);
 s32 fn_80383F0C(_ENEMY_WORK* self, s16 a);
 void __construct_array(void* array, void* ctor, u32 a, u32 size, u32 count);
@@ -186,7 +187,7 @@ void fn_800E0BE8(void* chr, s32 a);
 void fn_800E2228(void* chr, void* src, u32 a, u32 b);
 void fn_800E26C4(void* chr);
 void fn_800FC0D4(void* dst, void* src);
-void fn_8007F0CC(s32 root, u32 id);
+void g3d_root_model_bind(s32 root, u32 id);
 void fn_801280F4(_ENEMY_WORK* self);
 void fn_8013032C(_ENEMY_WORK* self);
 void fn_801303EC(_ENEMY_WORK* self);
@@ -205,7 +206,6 @@ extern f32 lbl_8079BF94;
 extern f32 lbl_8079BF90;
 extern f32 lbl_8079BF88;
 extern f32 lbl_8079BF78;
-extern s32 pRoot;
 }
 
 /* ---------- the band's bodies, in address order ---------- */
@@ -355,7 +355,7 @@ extern "C" void fn_80385068(void) {
 
 /* 0x8038526C */
 extern "C" void fn_8038526C(NoteWork* self) {
-    fn_800E0560(&self->model);
+    mhchar_reset(&self->model);
     self->field_0x000 = 0;
     self->field_0x001 = 0;
     self->field_0x168 = 0;
@@ -535,7 +535,7 @@ extern "C" void fn_80385E7C(void) {
 
 /* 0x80385E9C */
 extern "C" NoteWork* fn_80385E9C(NoteWork* self) {
-    fn_801FF984(&self->model);
+    mhchar_construct(&self->model);
     VEC3_ctor(&self->vec_0x170);
     VEC3_ctor(&self->vec_0x17C);
     return self;
@@ -757,7 +757,7 @@ extern "C" void fn_803857BC(NoteWork* self) {
             fn_803858F8(self);
         }
     }
-    fn_8007F0CC(pRoot, self->model.field_0x118);
+    g3d_root_model_bind(pRoot, self->model.field_0x118);
 }
 
 /* 0x80385B5C */

@@ -1,5 +1,8 @@
 /*
- * ef/fn_800CDB2C.cpp - the `.text` 0x800CDB2C..0x800D45AC run, 165 functions / 0x6A80 bytes.
+ * ef/fn_800CDB2C.cpp - the game-system core TU: `.text` 0x800CE5A8..0x800D2FEC (the `system_w` interface, the file loader, the
+ * work heap, the texture/hbm block), extab 0x8000A5E4..0x8000A77C, extabindex 0x80023C7C..0x80023EE0, `.ctors` 0x8056F2EC.
+ * The file keeps the stem of the proposal it was registered from (`800CDB2C`, a --max-bytes cut); the range was recut on
+ * 2026-09-30 - see "Seams" below.
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every
  * `fn_` name this file uses is a bare `.text` entry in config/RMHE08/symbols.txt; only the 24 named
  * symbols - file_loading_ck, load_file_req, load_file, ran_suu, system_w_clr, all_reset, PlayMode_ck,
@@ -18,6 +21,16 @@
  *     names of the loading/UI tail (TPLtexLoad et al.), which is not ef code.
  *   - `memorymanagertmp.h` (0x80595520/0x80595584) and `g3d_anmobj.h` (0x8059577C, beside
  *     `g3d_xsi.cpp`) name the TUs that end the range.
+ * Seams (recut 2026-09-30; the proposal range 0x800CDB2C..0x800D45AC held four original TUs):
+ *   - 0x800CDB2C..0x800CE5A8 is `ef/ef_sphere.cpp` (one function; its strings `.data` 0x80595058 name `ef_sphere.cpp`).  The
+ *     tail thunk `fn_800CE5A4` is its own call target; `fn_800CE5A8` returns the `system_w` side-table size 0x84D0 and is
+ *     called only from this unit's `fn_800CF3E4`, so it opens this TU.
+ *   - 0x800D2FEC is the right edge: `fn_800D2F88` is the TU's `__sinit` (the `.ctors` word 0x8056F2EC) and `fn_800D2F94` its
+ *     element constructor; every function from `fn_800D2FEC` reads `.sbss` 0x80794970 (the resource manager), and the `.sbss`
+ *     words 0x80794958..0x80794970 are read only below it.
+ *   - 0x800D2FEC..0x800D6C00 is `nw_resource.cpp` (one vtable group 0x80595378..0x80595428 whose readers straddle the old
+ *     0x800D45AC edge, plus the inline-assert tail 0x80595490..0x80595790), 0x800D6C00..0x800D77B0 is `g3d/g3d_xsi.cpp`.
+ *     Evidence for each cut: `.pi/notes/ef-nwres-seam.md`.
  * More than one original file is evidenced, so no single name names the unit: the registration uses
  * the map's `fn_` stem (evidence class 4), exactly as `ef/fn_800AEE48.cpp` did for the same
  * capped-seam situation.  The module is `ef` (the `__FILE__` string and the band below are ef) and
@@ -71,6 +84,12 @@
 #include "Runtime.PPCEABI.H/memset.h" /* memset is owned by Runtime.PPCEABI.H/memset.c (rule 2) */
 #include "unsplit/unknown.h" /* SystemWork / system_w (undecided module, rule 2's unsplit gap) */
 #include "ai/ainpc_w.h" /* `ainpc_w`, owned by ai/fn_802D44F4.cpp (rule 2): fn_800CEF60 clears it */
+
+/* Claimed data (splits.txt): `.data` 0x80595118-0x80595378, `.bss` 0x80694C68-0x80695610 (five objects, each still
+ * `extern`-declared below) and `.sbss` 0x80794958-0x80794970 (the words at 0x80794958/0x80794960/com_data_func).  None of it is
+ * emitted yet: the `.data` run holds the jump table of the unwritten `fn_800D21CC` (0x80595318, a rule-10 run `vtableaudit`
+ * counts until the function is written) and strings/tables of unwritten bodies, and the `.bss`/`.sbss` words need their 8-byte
+ * rows reproduced. */
 
 /* --------------------------------------------------------------------------------------------- */
 /* Data owned by no registered unit (its range sits outside every splits.txt block); declared,

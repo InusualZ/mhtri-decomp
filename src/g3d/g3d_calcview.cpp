@@ -59,7 +59,7 @@ extern u32 lbl_807911B0;
 extern "C" {
 
 /* -------- the helpers this unit calls (still unsplit `fn_XXXXXXXX`, C linkage) -------- */
-f32 fn_80050BC0(f32 value);                      /* reciprocal-square-root / length helper */
+f32 sqrt_f32(f32 value);                      /* reciprocal-square-root / length helper */
 u32* fn_8005D1AC(void* pDst, u32 value);         /* checked pointer wrapper */
 u32 fn_8005AAEC(void* self);
 u32* fn_8005D0C4(void* self);
@@ -141,7 +141,7 @@ f32 fn_8006F908(const f32* pMtx, u32 idx) {
     f32 a = p[8] * p[8];
     f32 b = p[0] * p[0];
     f32 c = p[4] * p[4];
-    return fn_80050BC0(a + (b + c));
+    return sqrt_f32(a + (b + c));
 }
 
 /* 0x8006FFB4 - dereference the handle. */

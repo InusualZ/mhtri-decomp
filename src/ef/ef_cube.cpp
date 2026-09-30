@@ -14,7 +14,7 @@
  *     works on one *pair* of it, in descending order: (152,164), (128,140), (104,116), (80,92).
  *   * six near-identical blocks, each: `VEC3_ctor(&pair[0])`, `VEC3_ctor(&pair[1])`, fill both,
  *     scale one component by `fn_800A8A08(&em->field_0xEC)`, take `fn_80463F04` (fabsf) of a component
- *     and compare it against `lbl_80796268`, then `fn_80463F98` + `fn_800610AC` + `fn_80050BC0`
+ *     and compare it against `lbl_80796268`, then `fn_80463F98` + `fn_800610AC` + `sqrt_f32`
  *     (nw4r::math::FrSqrt) and finish with `fn_800C9DD0(a, &pair[1], &pair[0], em, pm, d, f, e)`.
  *   * `fn_800C9DCC` is a 4-byte `b fn_80463F04` thunk and `fn_80463F04` is `fabsf`; the body calls it
  *     69 times, so the source's absolute-value calls are what the 69 `bl`s are.

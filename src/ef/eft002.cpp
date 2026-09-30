@@ -235,9 +235,9 @@ struct _EFT_MODEL {
  * externs
  * ------------------------------------------------------------------------------------------------- */
 
-extern "C" void fn_800504D4(void* mtx);
+extern "C" void mtx34_identity(void* mtx);
 extern "C" void fn_800532DC(void* dst, const nw4r::math::MTX34& src);
-extern "C" void fn_80051574(void* dst, void* src);
+extern "C" void mtx34_concat_assign(void* dst, void* src);
 extern "C" void fn_800FBB90(void* mtx, nw4r::math::VEC3* pos);
 extern "C" void fn_800F93D8(void* self, void* list, u32 mode, s32 count, u32 arg);
 extern "C" _EFT* fn_800F8788(u32 pool_id);
@@ -431,10 +431,10 @@ extern "C" void fn_800FCED4(_EFT_MODEL* self)
     }
 
     fn_800532DC(&mtx_a, get_current_view_mtx());
-    fn_800883C4(&mtx_a, &mtx_a);
-    fn_800504D4(&mtx_b);
+    mtx34_inverse(&mtx_a, &mtx_a);
+    mtx34_identity(&mtx_b);
     fn_800FBB90(&mtx_b, &self->pos_0x18);
-    fn_80051574(&mtx_b, &mtx_a);
+    mtx34_concat_assign(&mtx_b, &mtx_a);
     work->model->move2(&mtx_b, 0);
     fn_800F93D8(self, &work->model, 2, 1, 0);
 }

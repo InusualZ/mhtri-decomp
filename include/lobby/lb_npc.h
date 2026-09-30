@@ -223,7 +223,7 @@ extern "C" {
 /* 0x801FF984 - the block constructor this range's `fn_802C2698` hands a record's +0x08 to.  Added
  * with the `light/light.cpp` registration (rule 2: this range owns the address); the owner's own body
  * does not exist yet, so the declaration is that call site's view. */
-void fn_801FF984(void* block);
+void mhchar_construct(void* block);
 
 #ifdef __cplusplus
 }

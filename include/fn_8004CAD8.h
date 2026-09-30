@@ -97,7 +97,7 @@ f32 fn_80052214(const f32* a, const f32* b);
  * hoisted common subexpression `1.0f - t` that its `else` branch reuses (ef_disc 0x800CCA7C/0x800CCA98,
  * ef_cylinder 0x800CBD20/0x800CBD3C).  The `(f32, f32)` spelling this symbol used to carry in
  * `include/ef.h` was the wrong view and made every TU including both headers fail to compile. */
-f32 fn_80050BC0(f32 x);
+f32 sqrt_f32(f32 x);
 /* 0x8005024C - the `SinFIdx` wrapper `enemy/fn_80181E24.cpp`'s alpha computation calls: it narrows
  * its argument to u16 (`clrlwi r3,r3,16`), scales the `anim_tick_angle` result and returns
  * `nw4r::math::SinFIdx`, so the signature is `(u16) -> f32` (settled from the callee's own body,
@@ -107,7 +107,11 @@ f32 fn_8005024C(u16 idx);
 void PSVECSubtract(f32* dst, const f32* a, const f32* b);
 /* 0x800504D4/0x8005050C - the two GX pipe-setup helpers `g3d/g3d_state.cpp` calls (rule 2, moved
  * out of that unit's local extern block on landing, 2026-09-25). */
-void fn_800504D4(void* pOut);
+void mtx34_identity(void* pOut);
+/* 0x80051574 - `dst = dst * src` (the 3x4 matrix product) and 0x80050AF4 - the packed angle word of a
+ * direction vector. */
+void mtx34_concat_assign(MTX34* dst, const MTX34* src);
+s32 vec3_angle_xy(const f32* v);
 /* `MTX34_ctor` (0x8005050C) and `set_slot_none` (0x8004CAD8) live in `fn_8004CAD8/mtx.h`, included
  * below - this header's other declarations still disagree with several consumers, so a band that
  * only needs those two takes the light one. */
@@ -143,6 +147,8 @@ f32 fn_80050EF4(void* a, void* b);
  * then the length helper `fn_80050F24(&local)`, i.e. `|a - b|`.  Ten consumer files used to declare these
  * locally (four spellings, one of them a `MTX34*` misnomer); they now include this header, so the home is
  * here.  All parameters are pointers - a declaration cannot change a call site's codegen. */
+void subVec3(void* out, const void* a, const void* b);
+f32 calcVecDistXZ(const void* a, const void* b);
 void subVec3(void* out, const void* a, const void* b);
 f32 calcVecDistXZ(const void* a, const void* b);
 /* 0x80050EAC - the SQUARED distance between two positions (the callers compare it against a squared
@@ -245,6 +251,11 @@ void fn_8004EA58(const void* entry);
  * `mulVecMatAddTrans__FPQ34nw4r4math4VEC3PQ34nw4r4math5MTX34`, so C++ linkage at global scope).
  * Added with `enemy/fn_801A4504.cpp`, its consumer (rule 2/9). */
 void mulVecMatAddTrans(VEC3* v, MTX34* m);
+
+/* 0x800500CC / 0x80050364 - build the rotation about X / Z by the angle word `angle` into `m` (map
+ * manglings `rotMatrixX__FUlPQ34nw4r4math5MTX34` / `rotMatrixZ__...`). */
+void rotMatrixX(u32 angle, MTX34* m);
+void rotMatrixZ(u32 angle, MTX34* m);
 
 /* 0x80050990 - build an MTX34 from the Z-X-Y Euler triple `_CP_VECTOR`.  The address sits between the
  * registered `fn_8004C9A0.cpp` and `draw_shape.cpp` units, so no unit owns it yet; the callers are

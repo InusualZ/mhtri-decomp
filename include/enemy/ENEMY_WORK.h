@@ -225,7 +225,7 @@ struct _ENEMY_WORK {
                                         * in this band's view; its +0x34 byte is named below) */
     /* +0x058 */ u8 model_flag_0x058;   /* set, the tail of `fn_8013791C` refreshes the scene model */
     /* +0x059 */ u8 unused_0x059[0x13C - 0x059];
-    /* +0x13C */ u32 field_0x13C;       /* the scene-model id `fn_8007F0CC` is handed */
+    /* +0x13C */ u32 field_0x13C;       /* the scene-model id `g3d_root_model_bind` is handed */
     /* +0x140 */ u8 unused_0x140[0x188 - 0x140];
     /* +0x188 */ nw4r::math::VEC3 pos;
     /* +0x194..0x1AC is one 0x18-byte run; the two views are a union so the run keeps its size
@@ -682,7 +682,8 @@ struct _ENEMY_WORK {
     /* +0x7A8 */ u8 unused_0x7A8[0x7AC - 0x7A8];
     /* +0x7AC */ u32 field_0x7AC;       /* the second frame counter `fn_8012EE80` measures against `field_0x7A0` */
     /* +0x7B0 */ f32 field_0x7B0;       /* the `team == 0xf` threshold `fn_8012EFDC` tests against 0.0 */
-    /* +0x7B4 */ u8 unused_0x7B4[0x7BC - 0x7B4];
+    /* +0x7B4 */ f32 shell_rate_0x7B4;  /* the factor `shell_attack_set` scales a shell's hit life by */
+    /* +0x7B8 */ u8 unused_0x7B8[0x7BC - 0x7B8];
     /* +0x7BC */ f32 field_0x7BC;       /* the effect radius `fn_8012F474` scales */
     /* +0x7C0 */ f32 field_0x7C0;       /* its second factor */
     /* +0x7C4 */ f32 field_0x7C4;       /* the value `em_mot_set_blend` clears to 1.0f */

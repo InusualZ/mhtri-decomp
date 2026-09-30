@@ -374,7 +374,7 @@ u32 fn_800A4AF8(void* effect);
 const char* fn_800A485C(void* p);
 void* fn_800A4864(void* p);
 u16 fn_8009B374(void* list, void** buf, u16 size);
-void* fn_800504D4(void* mtx);
+void* mtx34_identity(void* mtx);
 void* fn_80050508(void* mtx);
 void* fn_80051570(const void* src);
 void fn_800A559C(EfSys* self); /* the system's constructor lives in ef/ef_effect.cpp */
@@ -650,8 +650,8 @@ extern "C" void* fn_800A6134(EfSysDefaultRecord* self) {
     MTX34_ctor(&self->mtx_0x00);
     MTX34_ctor(&self->mtx_0x30);
     VEC3_ctor(&self->vec_0x8C);
-    fn_800504D4(&self->mtx_0x00);
-    fn_800504D4(&self->mtx_0x30);
+    mtx34_identity(&self->mtx_0x00);
+    mtx34_identity(&self->mtx_0x30);
     self->field_0x60 = 0;
     self->field_0x64 = 0;
     self->field_0x68 = 0;

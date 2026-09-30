@@ -216,7 +216,7 @@ extern "C" void fn_802B2E2C(void)
         fn_802AE1DC(&rec);
         return;
     }
-    if (fn_802AFF38() == 0) {
+    if (stage_water_enabled_ck() == 0) {
         return;
     }
     if (fn_802BE088() == 1U) {
@@ -1551,7 +1551,7 @@ extern "C" u32 fn_802B55E8(u32 block)
 
     p = block + 4;
     do {
-        fn_801FF984((void*)p);
+        mhchar_construct((void*)p);
         p += 0x164;
     } while (p < block + 0x594);
     return block;

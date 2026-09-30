@@ -39,7 +39,7 @@
 #include "g3d/fn_80075DCC.h"               /* fn_800768DC, owner g3d/fn_80075DCC.cpp (rule 2) */
 #include "g3d/fn_800680CC.h"               /* fn_8006E2AC, owner g3d/fn_800680CC.cpp (rule 2) */
 #include "g3d/g3d_state.h"                 /* fn_80087870, owner g3d/g3d_state.cpp (rule 2) */
-#include "fn_8004CAD8.h"                   /* fn_800504D4, owner fn_8004CAD8.cpp (rule 2) */
+#include "fn_8004CAD8.h"                   /* mtx34_identity, owner fn_8004CAD8.cpp (rule 2) */
 #include "unsplit/g3d.h"                   /* fn_8007100C, no registered owner (rule 2) */
 
 /* nw4r::db::Panic - the assert failure handler (variadic).  Called through its namespace
@@ -107,7 +107,7 @@ bool nw4r::g3d::ResTexSrt::SetEffectMtx(u32 id, const nw4r::math::MTX34* pMtx)
             fn_8007100C(pEffect->mtx, pMtx);
             pEffect->flag &= ~1;
         } else {
-            fn_800504D4(pEffect->mtx);
+            mtx34_identity(pEffect->mtx);
             pEffect->flag |= 1;
         }
         return true;

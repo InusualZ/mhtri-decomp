@@ -206,14 +206,14 @@ extern "C" void fn_80224AC4(PlSeRig* rig)
             PlSeModel* m = &rig->models_0x004[i];
 
             if (m->model.field_0x118 != 0 && m->model.field_0x34 != 0) {
-                fn_8007F0CC(pRoot, m->model.field_0x118);
+                g3d_root_model_bind(pRoot, m->model.field_0x118);
             }
         }
         for (i = 0; i < 3; i++) {
             PlSeModel* m = &rig->sub_0x0A14[i];
 
             if (m->model.field_0x118 != 0 && m->model.field_0x34 != 0) {
-                fn_8007F0CC(pRoot, m->model.field_0x118);
+                g3d_root_model_bind(pRoot, m->model.field_0x118);
             }
         }
     }

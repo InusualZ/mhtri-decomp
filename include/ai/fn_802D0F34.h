@@ -18,6 +18,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "ef/pRoot.h"
 #include "pl.h"
 #include "ai/ai_npc.h"
 
@@ -58,9 +59,9 @@ s32 fn_80291B08(struct _AINPC_W* self, nw4r::math::VEC3* pos, void* angle, f32* 
                s32 mode);
 s32 fn_8029208C(nw4r::math::VEC3* probe, nw4r::math::VEC3* current, nw4r::math::VEC3* pos,
                u16 mask, u16 flags, s32 a, u8 area, f32 offset);
-void fn_8029EFDC(struct _HIT_W* hit);
-void fn_8029F204(struct _HIT_W* hit, void* owner, f32 value);
-void fn_8029F538(struct _HIT_W* hit);
+void hit_attack_list_push(struct _HIT_W* hit);
+void hit_data_apply(struct _HIT_W* hit, void* owner, f32 value);
+void hit_flags_clear(struct _HIT_W* hit);
 void fn_800FC0D4(struct _CP_VECTOR* dst, struct _CP_VECTOR* src);
 void fn_801006A0(u8 id, nw4r::math::VEC3* pos, s32 a, u8 area, s32 b, f32 scale);
 void fn_801075AC(struct _AINPC_W* self, nw4r::math::VEC3* pos, s32 a, s32 b, f32 c);
@@ -68,7 +69,9 @@ void fn_8012A624(nw4r::math::VEC3* out);
 void fn_800524C0(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b,
                   nw4r::math::VEC3* c, f32 d);
 void addVec3To(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
-void fn_8007F0CC(s32 a, u32 b);
+void g3d_root_model_bind(s32 a, u32 b);
+void addVec3To(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
+void g3d_root_model_bind(s32 a, u32 b);
 void fn_80051EE0(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 scale);
 f32 fn_80050EF4(void* a, void* b);
 f32 calcVecDistXZ(const void* a, const void* b);
@@ -126,7 +129,6 @@ extern void* lbl_805D3FB8[8];              /* the two-level motion table `fn_802
 extern u8 lbl_805D3AD8[];                  /* the motion-entry records `fn_802D2F7C` walks (stride 0x1A) */
 extern u32 lbl_80792508[];                 /* the motion ids the entries' +0x0F byte indexes */
 extern void* lbl_805D4150[16];             /* the dispatcher table `ai/fn_802D0DCC.c` also uses */
-extern s32 pRoot;                          /* g3d's root scene node (`.sbss` 0x80794974) */
 
 /* ---- C++-linkage callees (their map names are manglings; rule 9) ---- */
 u16 ran_suu(s32 index);

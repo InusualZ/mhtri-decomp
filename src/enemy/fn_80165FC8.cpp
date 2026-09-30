@@ -131,10 +131,10 @@ void fn_801661FC(ResUserDataAc* self, MTX34* mtx, void* cursor, s32 arg3) {
     {
         _ENEMY_WORK* work = self->work;
         fn_800532DC(&local, &mtx[fn_8006FDCC(head)]);
-        fn_800504D4(&out);
+        mtx34_identity(&out);
         rotMatrixX(work->field_0x608, &out);
         rotMatrixZ(work->field_0x610, &out);
-        fn_80051574(&local, &out);
+        mtx34_concat_assign(&local, &out);
         copyMat33(&mtx[fn_8006FDCC(head)], &local);
     }
 }

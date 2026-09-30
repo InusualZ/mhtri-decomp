@@ -112,6 +112,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "enemy/ENEMY_WORK.h"
+#include "ef/nw_res_manager.h"
 
 #pragma peephole off
 
@@ -134,7 +135,6 @@ extern f32 lbl_80796DBC;
 extern f32 lbl_80796DC0;
 extern f32 lbl_80796DC4;
 /* the row base `fn_80140CA0` indexes with `fn_800D4DD8`'s answer */
-extern u8* lbl_80794970;
 /* the enemy file/sound-proc work blob (`fn_80140B20` clears its second array) */
 extern u8 emc_work[];
 extern u32 em_snd_proc_tbl[];
@@ -1049,7 +1049,7 @@ void fn_80140CA0(char* name, u32 data, u32 a, u32 b, u32 c, u32* ctx) {
         return;
     }
     rec = (u8*)fn_800D5418(work->handle_0x08);
-    fn_80140DAC(&row, (EmFileRow*)(lbl_80794970 + fn_800D4DD8(name) * 0x4C + 0x3070));
+    fn_80140DAC(&row, (EmFileRow*)((u8*)nw_res_manager + fn_800D4DD8(name) * 0x4C + 0x3070));
     if (rec == NULL) {
         return;
     }

@@ -8,7 +8,7 @@
 
 #include "types.h"
 
-/* The 0x20-byte task slot table at `lbl_80659150` (`Tsk_Change`/`fn_800417F0`/`fn_8004192C` index it by
+/* The 0x20-byte task slot table at `task_slot_table` (`Tsk_Change`/`fn_800417F0`/`fn_8004192C` index it by
  * `slot << 5`, `fn_80041694` walks all 16).  `func` is the task body, called with its own slot; the
  * bytes after it are the body's private state (`quest/arenatask.cpp`'s `arena_task` keeps its step,
  * countdown and a flag there).  size: 0x20 */

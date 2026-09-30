@@ -155,7 +155,7 @@ void fn_800BDB60(EfDrawStrategyObj* self, void* em, EfDrawArgs* args);
 u32 fn_800BC41C(void* unused, EfParticleFlags* self);
 
 /* SDK GX state setters and the mtx helpers (unsplit / SDK: rule 2's named gap). */
-extern void fn_800504D4(Mtx34* mtx);
+extern void mtx34_identity(Mtx34* mtx);
 extern void fn_80050508(Mtx34* mtx);
 void fn_800C6064(void* self, EfDrawArgs* args, EfEmitterShape* shape, void* em);
 extern void GXEnableTexOffsets(u32 coord, u32 line_enable, u32 point_enable);
@@ -499,7 +499,7 @@ void fn_800BB748(EfDrawStrategyObj* self, void* em, EfDrawArgs* args) {
     GXSetVtxAttrFmt(0, 9, 1, 4, 0);
     GXSetVtxAttrFmt(0, 0xD, 1, 0, 0);
     MTX34_ctor(&mtx);
-    fn_800504D4(&mtx);
+    mtx34_identity(&mtx);
     fn_80050508(&mtx);
     GXLoadPosMtxImm(&mtx, 0);
     GXSetCurrentMtx(0);

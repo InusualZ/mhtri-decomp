@@ -58,6 +58,7 @@
 #include "unsplit/unknown.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "ef/pRoot.h"
 
 /* The engine's own 3-float vector.  It is NOT `nw4r::math::VEC3`: `vec_to_mh_vec3` exists to convert
  * between the two (`nw4r::math::VEC3* dst, Vec* src`), so they are distinct types that happen to share
@@ -197,7 +198,7 @@ extern "C" void fn_800FA3E8(EmEffectSegment* seg); /* seg = ((0,0,0), (0,0,0)) *
 extern "C" void fn_800FA420(nw4r::math::VEC3* out); /* out = (0, 0, 0) */
 extern "C" u8 fn_8028F4B4(const EmEffectSegment* seg, const EmEffectQuad* quad);
 extern "C" u8 fn_80290598(const EmEffectQuad* quad, const nw4r::math::VEC3* pos, s32 a, s32 b);
-extern "C" s32 fn_802AFF38(void);
+extern "C" s32 stage_water_enabled_ck(void);
 extern "C" u32 fn_802B45D4(void);
 extern "C" u32 fn_802BE39C(void);
 extern "C" u8 get_option_21(void);
@@ -215,7 +216,6 @@ extern "C" void move__6MHcharFUs(_EmHandle* self, u32 motion);
 extern "C" void setTevKColor__6MHcharFUl14_GXTevKColorIDP8_GXColor(_EmHandle* self, u32 index, u32 id,
                                                                   _GXColor* color);
 
-extern s32 pRoot;
 
 /* --- pooled constants (declared, never defined: the pool belongs to the data pass) --------------- */
 
@@ -308,7 +308,7 @@ extern "C" void fn_80101FA4(EmEffectWork* work) {
     if (fn_802B45D4() == 1) {
         return;
     }
-    if (fn_802AFF38() != 0) {
+    if (stage_water_enabled_ck() != 0) {
         get_camera_pos__Fv(&cam);
         copyVec3(&vD0, &cam);
         if (vD0.y < lbl_807966F4) {

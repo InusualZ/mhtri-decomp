@@ -17,6 +17,9 @@ struct _ENEMY_WORK;
 extern "C" {
 #endif
 
+struct _HIT_W;
+/* 0x80129674 - registers the hit record `hit` (a shell's embedded record) with the enemy `self`. */
+void em_hit_buff_apply(struct _ENEMY_WORK* self, struct _HIT_W* hit);
 void fn_801252DC(struct _ENEMY_WORK* work);
 s32 fn_80126098(struct _ENEMY_WORK* work);
 s32 fn_801260BC(struct _ENEMY_WORK* work);

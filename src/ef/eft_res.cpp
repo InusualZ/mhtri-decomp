@@ -82,6 +82,8 @@
 #include "ef/fn_800CDB2C.h"
 #include "nw_resource.h"
 #include "sound/fn_800DD1F0.h"
+#include "ef/pRoot.h"
+#include "ef/fn_800D3C0C.h"
 
 /* ---------------------------------------------------------------------------------------------------
  * the control block, the slot table and the model records
@@ -268,8 +270,8 @@ u32 fn_800F97F0(u16, void*, void*);
 void fn_800FA450(void*);
 void fn_800FA5D4(_EFT*);
 void fn_800FD864(void);
-void fn_800E3B8C(s32, u8, s32, s32, s32, void*, s32);
-void fn_800E0560(void*);
+void sound_job_request(s32, u8, s32, s32, s32, void*, s32);
+void mhchar_reset(void*);
 void fn_800E0BE8(void*, s32);
 void fn_800E2228(void*, void*, void*, s32);
 void res_file_ctor(void*, s32);
@@ -300,7 +302,6 @@ void load_file_req(char*, u32, s32, u32, s32, u32*);
 void push_g3d_wk(struct _g3d_work* work);
 
 /* g3d's root node (the map spells it `pRoot`; ef/eft007.cpp declares the same) */
-extern s32 pRoot;
 
 void* res_eft_model_create_light(MHchar* model, u16 id, u32 arg, long light);
 
@@ -655,7 +656,7 @@ extern "C" u8* fn_800F8914(void) {
         if (slot->used_0x00 == 0) {
             slot->used_0x00 = 1;
             ctrl->model_used_0x20++;
-            fn_800E0560(&slot->model_0x04);
+            mhchar_reset(&slot->model_0x04);
             return (u8*)&slot->model_0x04;
         }
         slot++;
@@ -670,7 +671,7 @@ extern "C" void fn_800F89A4(void* self_) {
 
     if (self->field_0x10C != NULL) {
         push_g3d_wk((struct _g3d_work*)self->field_0x10C);
-        fn_800E0560(self);
+        mhchar_reset(self);
         self->field_0x10C = NULL;
     }
     EftResModelSlot* slot = (EftResModelSlot*)ctrl->models_0x1C;
@@ -904,7 +905,7 @@ extern "C" void fn_800F93D8(_EFT* self, void** models, s32 mode, s32 count, void
             EftModel* model = (EftModel*)models[i];
             if (model != NULL
                 && model->field_0x118 == ((EftResModelLink*)model->field_0x10C)->field_0x04) {
-                fn_8007F0CC(pRoot, model->field_0x118);
+                g3d_root_model_bind(pRoot, model->field_0x118);
             }
         }
         return;    }
@@ -922,7 +923,7 @@ extern "C" void fn_800F93D8(_EFT* self, void** models, s32 mode, s32 count, void
             EftModel* model = (EftModel*)models[i];
             if (model != NULL) {
                 fn_800FA450(model);
-                fn_800E3B8C(1, 1, (s32)model, 2, flags, arg, 0);
+                sound_job_request(1, 1, (s32)model, 2, flags, arg, 0);
             }
         }
     }
@@ -932,8 +933,8 @@ extern "C" void fn_800F93D8(_EFT* self, void** models, s32 mode, s32 count, void
             if (model != NULL
                 && model->field_0x118 == ((EftResModelLink*)model->field_0x10C)->field_0x04) {
                 fn_800FA5D4(self);
-                fn_800E3B8C(1, model->field_0x35, (s32)model->field_0x118, 0, flags, arg, 0);
-                fn_8007F0CC(pRoot, model->field_0x118);
+                sound_job_request(1, model->field_0x35, (s32)model->field_0x118, 0, flags, arg, 0);
+                g3d_root_model_bind(pRoot, model->field_0x118);
             }
         }
     }

@@ -3252,8 +3252,8 @@ extern "C" void fn_8027A57C(_PLW* self, u16 arg1, u8 arg2)
  * New callees these bodies reference, under the map's spellings. */
 extern "C" u16 fn_803BA9B0(u8, u8, u8*, s16*, void*, void*, void*);
 extern "C" void hit_flag_set__FP6_HIT_WUl(void*, u32);
-extern "C" void fn_8029F204(void*, void*);
-extern "C" void fn_8029F538(void*);
+extern "C" void hit_data_apply(void*, void*);
+extern "C" void hit_flags_clear(void*);
 extern "C" void fn_8035B700(s32, s32, s32);
 extern "C" void fn_8033A920(s32);
 extern "C" u16 ran_suu__Fl(s32);
@@ -3262,9 +3262,9 @@ extern "C" u32 fn_80274DCC(_PLW*, u8);
 extern "C" s32 fn_8027D968(_PLW*, void*, void*, void*);
 extern "C" s32 fn_8027DC90(void);
 extern "C" u32 fn_802D7804(s32, f32);
-extern "C" void fn_800504D4(void*);
+extern "C" void mtx34_identity(void*);
 extern "C" void fn_8008C484(void*, f32, f32, f32);
-extern "C" void fn_80051574(void*, void*);
+extern "C" void mtx34_concat_assign(void*, void*);
 extern "C" u8 fn_80224E28(_PLW*, u8);
 extern "C" void fn_8026A394(_PLW*, s32, void*);
 extern "C" void fn_8026A230(_PLW*, s32, u16, s32, s32);
@@ -3473,7 +3473,7 @@ extern "C" void fn_80277974(_PLW* self, _HIT_W* hit, u8* base, u16 idx, s32* ids
     u8* p = (u8*)self->unk13C;
     u8* d = base + idx * 0x1A;
     *(s32*)((u8*)hit + 0x08) = ids[*(u8*)(d + 0xF)];
-    fn_8029F538(hit);
+    hit_flags_clear(hit);
     if ((flags & 1) != 0) {
         hit_flag_set__FP6_HIT_WUl(hit, 0x728);
     } else {
@@ -3514,7 +3514,7 @@ extern "C" void fn_80277974(_PLW* self, _HIT_W* hit, u8* base, u16 idx, s32* ids
             }
         }
     }
-    fn_8029F204(hit, d);
+    hit_data_apply(hit, d);
     Pl_attack_set_sub(self, (_HIT_DATA*)d, hit, flags);
 }
 
@@ -3894,9 +3894,9 @@ extern "C" void fn_8027C064(_PLW* self, nw4r::math::VEC3* out)
         break;
     }
     fn_8026A394(self, part, &m);
-    fn_800504D4(&m2);
+    mtx34_identity(&m2);
     fn_8008C484(&m2, v.x, v.y, v.z);
-    fn_80051574(&m, &m2);
+    mtx34_concat_assign(&m, &m2);
     mulVecMat(out, &m);
     out->x = out->x + m.m[0][3];
     out->y = out->y + m.m[1][3];

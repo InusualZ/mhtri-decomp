@@ -213,21 +213,9 @@ struct _EFT {
     /* +0x045 */ u8 pad_0x45[0x3];
 };
 
-/* The shell actor the player effect and the shell family read: `_PLW::equip_0x2C` points at one, and
- * `ef/eft002.cpp` / `ef/fn_800FD718.c` each carried a copy.  Union of both. size: 0x10C */
-typedef struct _SHELL_W {
-    /* +0x000 */ u8 field_0x00;
-    /* +0x001 */ u8 pad_0x1[0x2];
-    /* +0x003 */ u8 type_0x03;
-    /* +0x004 */ u8 pad_0x4[0x4];
-    /* +0x008 */ u8 area_0x08;
-    /* +0x009 */ u8 pad_0x9[0xF];
-    /* +0x018 */ VEC3 pos_0x18;
-    /* +0x024 */ u32 rot_x_0x24;
-    /* +0x028 */ u8 pad_0x28[0x4];
-    /* +0x02C */ u32 rot_z_0x2C;
-    /* +0x030 */ u8 pad_0x30[0xDC];
-} _SHELL_W;
+/* The shell actor the player effect and the shell family read: `_PLW::equip_0x2C` points at one.  The
+ * full record (size 0x10C) is owned by the shell pool unit; its definition is `stage/shell.h`'s. */
+typedef struct _SHELL_W _SHELL_W;
 
 /* The effect-model entry the ef units carry (`ef/fn_8010D1A8.c` and `ef/fn_803066F0.c`).  The two
  * views are compatible: `model`/`created` sit inside the first view's +0x00..0x35 block, the +0x35

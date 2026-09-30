@@ -52,6 +52,9 @@ void fn_80136D4C();
 /* `UpdateValue` is this unit's own definition (0x8012FDA0) and its map name is unmangled, so it is
  * declared at C linkage.  Added by `enemy/fn_801B0010.cpp` (rule 2); the answer is in r3. */
 u32 UpdateValue(struct _ENEMY_WORK* self);
+/* 0x80135AC4 - the enemy's rank byte (a weak enemy answers 0 or 1); `stage/shell.cpp`'s
+ * `shell_attack_set` drops an attack bit for a weak master. */
+u8 em_get_rank(struct _ENEMY_WORK* self);
 /* 0x80132154 - this unit's own definition, added by `enemy/fn_801B0010.cpp` (rule 2): r3 the work
  * record and nothing else. */
 void fn_80132154(struct _ENEMY_WORK* self);

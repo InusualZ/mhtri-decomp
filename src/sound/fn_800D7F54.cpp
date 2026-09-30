@@ -563,7 +563,7 @@ struct _UserData {
 };
 
 extern "C" void* memset(void* dst, s32 c, u32 n);
-extern "C" u32 fn_802AFFF4(void);
+extern "C" u32 stage_water_area_ck(void);
 extern "C" u32 fn_800D843C(void);
 extern "C" void fn_800D8EA8(_se_w* work, SeSlot* slot);
 extern "C" u32 Get_motion_no__FP4_PLW(_PLW* plw);
@@ -586,7 +586,7 @@ extern u8 lbl_805979EC[];
  * the position sits below the world's audible band.
  */
 extern "C" u32 fn_800D8D8C(nw4r::math::VEC3* pos) {
-    if (fn_802AFFF4() == 1 && pos->y < lbl_807963E0) {
+    if (stage_water_area_ck() == 1 && pos->y < lbl_807963E0) {
         return 1;
     }
     return 0;
@@ -2587,7 +2587,7 @@ void get_joint_wpos_em(_ENEMY_WORK* enemy, u32 joint, nw4r::math::VEC3* pos);
 void get_joint_wpos_ai(_AINPC_W* npc, u32 joint, nw4r::math::VEC3* pos);
 u32 em_area_ck(_ENEMY_WORK* enemy);
 
-extern "C" u32 fn_802AFFF4(void);
+extern "C" u32 stage_water_area_ck(void);
 extern "C" u8 fn_800CF208(void);
 extern "C" u32 fn_800F26B8(s32 handle, u32 id, s32 which);
 extern "C" u32 fn_802BE088(void);
@@ -2845,7 +2845,7 @@ extern "C" void fn_800D92E4(_se_w* work, SeSlot* slot) {
         u32 b = fn_800F26B8(s->owner, ids[i], 1);
 
         scale = lbl_807963D8;
-        if (fn_802AFFF4() == 1) {
+        if (stage_water_area_ck() == 1) {
             if (fn_802BE088() == 1) {
                 a = 0;
                 if (s->pos.y >= lbl_807963E0) {
@@ -2933,7 +2933,7 @@ extern "C" void fn_800D92E4(_se_w* work, SeSlot* slot) {
     }
 
     if (s->field_0x24 != 0) {
-        if (fn_802AFFF4() == 0) {
+        if (stage_water_area_ck() == 0) {
             s->field_0x20 = lbl_807963E0;
         } else if (s->pos.y >= lbl_807963E0) {
             s->field_0x20 = lbl_807963E0;
