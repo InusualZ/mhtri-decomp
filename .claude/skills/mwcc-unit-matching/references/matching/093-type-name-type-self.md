@@ -31,6 +31,14 @@ and its callers: the declaration set is a codegen input (row 60). A function tha
 evidenced by an unmangled name in the shared dump or a caller's relocation, or a plain C struct from an SDK API - is
 marked `/* free: <reason> */` on its declaration instead.
 
+**The static form.** The same name with no `Type* self` (`GameSpyInterfaceThread_getInstance(void)`,
+`PatInterface_isReady(void)`, `NetworkSessionStable_setNotifyValue(u32)`) is a **static member** (owner ruling
+2026-09-29): declare `static R name(args);` in the class, define `R Type::name(args)`, call `Type::name(...)`. The
+mangling is the plain member one over the full parameter list, with no `this` and no `C`
+(`getInstance__22GameSpyInterfaceThreadFv`), so the map row is renamed the same way and `methodize.py` plans it
+(`kind: static`). A `<Type>_ctor`/`_dtor`/`_construct`/`_destruct` whose first parameter points at another type
+(`VEC3_ctor(MHTRI_PAD_VEC3*)`) is a C-style helper for that type, not a static member.
+
 **Result.** Not yet measured on a unit: the demo below is the compiler-level claim (same body, the member emits a
 mangled name and the free form the plain one), written without a compiler in reach - run
 `python tools/agents/ideas.py demo-check 93` before promoting this to `works`.

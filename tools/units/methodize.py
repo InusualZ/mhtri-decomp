@@ -2,7 +2,11 @@
 """Plan the migration of `Type_name(Type* self, ...)` free functions to `Type::name` members (rule 13).
 
 docs/plan.md section 6.5 rule 13: a free function named `<Type>_<name>` whose first parameter is the type's own
-`self` is a member function spelled the C way. This tool is the read-only planner for fixing one: it lists, per
+`self` is a member function spelled the C way; the **static form** (owner ruling 2026-09-29) is the same name with
+no `Type* self` (`GameSpyInterfaceThread_getInstance(void)`), a **static member**: the plan then reads
+`static R name(args);` in the class, `R Type::name(args)` for the definition, callers `Type::name(...)`, and the
+compiler's mangling is the plain member one with no `this` and no `C` (`getInstance__22GameSpyInterfaceThreadFv`).
+Each plan entry says `kind: member` or `kind: static`. This tool is the read-only planner for fixing one: it lists, per
 function, where it is declared and defined, every reference in `src/` and `include/` (comment-aware), the
 member signature to write, the mangled name the compiler will then emit, and the map row it must rename.
 
@@ -68,9 +72,9 @@ def collect(root: str) -> tuple[list[dict], list[sl.Source]]:
 
 
 def member_signature(f: dict) -> str:
-    """`ret Type::name(params) [const]` - the member to declare in the class and define."""
-    return "%s %s::%s(%s)%s" % (f["ret"] or "void", f["owner"], f["method"], ", ".join(f["params"]),
-                                " const" if f["const_self"] else "")
+    """`[static] ret Type::name(params) [const]` - the member to declare in the class and define."""
+    return "%s%s %s::%s(%s)%s" % ("static " if f.get("static") else "", f["ret"] or "void", f["owner"],
+                                  f["method"], ", ".join(f["params"]), " const" if f["const_self"] else "")
 
 
 def references(sources: list[sl.Source], name: str, skip: set) -> list[dict]:
@@ -112,8 +116,9 @@ def exact_mangling(f: dict) -> str | None:
     known = set(mg._PRIMITIVE_CODES) | mg._QUALIFIERS | {"unsigned", "signed", "long", "short", "int", "char", "void"}
     fwd = "".join("struct %s;\n" % i for i in sorted(idents - known - {f["owner"]}) if i[:1].isupper())
     params = ", ".join(f["params"])
-    snippet = ("%sstruct %s;\n%sstruct %s { %s %s(%s)%s; };\n%s %s::%s(%s)%s"
-               % (fwd, f["owner"], "", f["owner"], f["ret"] or "void", f["method"], params,
+    snippet = ("%sstruct %s;\n%sstruct %s { %s%s %s(%s)%s; };\n%s %s::%s(%s)%s"
+               % (fwd, f["owner"], "", f["owner"], "static " if f.get("static") else "", f["ret"] or "void",
+                  f["method"], params,
                   " const" if f["const_self"] else "", f["ret"] or "void", f["owner"], f["method"], params,
                   " const" if f["const_self"] else ""))
     try:
@@ -152,7 +157,11 @@ def plan(root: str, type_name: str | None, exact: bool = False) -> list[dict]:
                 how = "estimated (the exact compile failed)" if mangled else "none"
         if mangled is None and note is None:
             note = "no mangling estimate (a shape the estimator will not guess) - rerun with --exact"
+        is_static = bool(first.get("static"))
         out.append({"name": name, "type": first["owner"], "method": first["method"],
+                    "kind": "static" if is_static else "member",
+                    "call_form": ("%s::%s(...)" % (first["owner"], first["method"])) if is_static
+                    else "obj->%s(...)" % first["method"],
                     "signature": member_signature(first), "declarations": decls, "definitions": defs,
                     "references": references(sources, name, skip), "mangled": mangled, "mangled_how": how,
                     "map_row": rows.get(name), "note": note})
@@ -163,7 +172,7 @@ def render(entries: list[dict]) -> str:
     lines: list[str] = []
     for e in entries:
         lines.append("%s -> %s::%s" % (e["name"], e["type"], e["method"]))
-        lines.append("  member:      %s" % e["signature"])
+        lines.append("  member:      %s  [kind: %s; call as %s]" % (e["signature"], e["kind"], e["call_form"]))
         for kind, key in (("declared", "declarations"), ("defined", "definitions")):
             for d in e[key]:
                 lines.append("  %-12s %s:%d" % (kind + ":", d["file"], d["line"]))
@@ -225,7 +234,7 @@ def selftest() -> int:
         put("include/mod/tcp.h",
             'struct Tcp {\n    int a;\n};\ns32 Tcp_send(Tcp* self, const u8* data, s32 size);\n'
             "void Tcp_construct(Tcp* self);\n/* free: retail C linkage, the dump names it unmangled */\n"
-            "int Tcp_raw(Tcp* self);\nTcp* Tcp_getInstance(void);\n")
+            "int Tcp_raw(Tcp* self);\nTcp* Tcp_getInstance(void);\nvoid Tcp_ctor(Other* out);\n")
         put("src/mod/tcp.cpp",
             '#include "mod/tcp.h"\ns32 Tcp_send(Tcp* self, const u8* data, s32 size) {\n    return size;\n}\n'
             "void Tcp_construct(Tcp* self) {\n}\n"
@@ -237,8 +246,8 @@ def selftest() -> int:
             "Tcp_sender = .text:0x803CE600; // type:function size:0x10\n")
         e = plan(tmp, "Tcp")
         check("the functions of the type, alphabetically, exempt one excluded",
-              [x["name"] for x in e], ["Tcp_construct", "Tcp_send"])
-        send = e[1]
+              [x["name"] for x in e], ["Tcp_construct", "Tcp_getInstance", "Tcp_send"])
+        send = e[2]
         check("the member signature", send["signature"], "s32 Tcp::send(const u8* data, s32 size)")
         check("the declaration and the definition are told apart",
               ([d["file"] for d in send["declarations"]], [d["file"] for d in send["definitions"]]),
@@ -253,9 +262,16 @@ def selftest() -> int:
         check("a constructor-shaped name proposes no rename and says why",
               (e[0]["mangled"], "constructor" in (e[0]["note"] or "")), (None, True))
         check("a name absent from the map has no map row", e[0]["map_row"], None)
+        gi = e[1]
+        check("a static-form finding is planned as a static member",
+              (gi["kind"], gi["signature"], gi["call_form"], gi["mangled"]),
+              ("static", "static Tcp* Tcp::getInstance()", "Tcp::getInstance(...)", "getInstance__3TcpFv"))
+        check("a member-form finding says how it is called", (send["kind"], send["call_form"]),
+              ("member", "obj->send(...)"))
+        check("`Type_ctor(Other*)` is a C-style helper, not planned", "Tcp_ctor" in [x["name"] for x in e], False)
         check("the plan for another type is empty", plan(tmp, "Nope"), [])
         check("--all covers every type with a finding", [x["name"] for x in plan(tmp, None)],
-              ["Tcp_construct", "Tcp_send"])
+              ["Tcp_construct", "Tcp_getInstance", "Tcp_send"])
         text = render(e)
         check("the human plan names the member, the sites and the map row",
               all(s in text for s in ("Tcp::send", "include/mod/tcp.h:4", "src/mod/other.cpp:3",
@@ -266,7 +282,7 @@ def selftest() -> int:
         check("an estimate is a commented row, never an active rename",
               [l for l in b.splitlines() if l and not l.startswith("#")], [])
         check("... and carries the `#~ old new` form", "#~ Tcp_send send__3TcpFPCUcl" in b, True)
-        e[1]["mangled_how"] = "exact"
+        e[2]["mangled_how"] = "exact"
         b2 = batch_text(e)
         check("a compiler-confirmed name is an active `old new` row",
               [l for l in b2.splitlines() if l and not l.startswith("#")], ["Tcp_send send__3TcpFPCUcl"])
