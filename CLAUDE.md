@@ -361,7 +361,11 @@ This repository was converted from the pi agent harness to Claude Code on 2026-0
   and is removed the ordinary way. A slot needs a **current** build tree (the hook never re-seeds; it fails and
   returns the token). For a claimed unit, `worktreehook.py arm --slot N` binds the token to the slot
   `queue.py next` / `claims.py claim` already took, so the subagent works in the claim's own slot and branch
-  (no adoption step). Claude Code did not call the remove hook after a clean subagent, so the
+  (no adoption step). **Slot-bound launches are sequential: arm ONE slot, launch that one lane, arm the next.**
+  The hook payload (`name` = harness-made `agent-<id>`, `prompt_id` shared by every Agent call of one message,
+  no description/prompt) carries nothing the launcher controls, so a token cannot be matched to its lane and
+  parallel launches got slots in token-claim order (a slot-4 brief got slot 3); `arm` now refuses several
+  bound tokens, and any mix of bound and unbound ones. Claude Code did not call the remove hook after a clean subagent, so the
   orchestrator runs **`python tools/units/slots.py collect --path <the result's worktreePath> --release`** when a
   lane's result arrives: it copies the slot's `.pi/outbox/*.json` and `.pi/notes/*.md` into MAIN, reports the
   commits main lacks, and releases the slot only when nothing is unlanded.

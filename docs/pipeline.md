@@ -252,6 +252,14 @@ skill: run `python tools/agents/sync_profiles.py --check` and never hand-edit be
 * **Check the brief slug against the worktree slug** when pasting several `queue.py next` launches: one was
   launched with the `80394038` task in the `803967f0` tree. `briefs/<slug>.md` in the task must equal the cwd's
   slug.
+* **Launching in-session lanes into claimed slots is sequential.** `worktreehook.py arm --slot N`, launch that
+  one Agent (`isolation: "worktree"`), confirm its `pwd` is slot N, then arm the next. Measured 2026-09-29:
+  three lanes launched in one message after `arm --slot 2 --slot 3 --slot 4` received slots in token-claim
+  order, so the slot-4 brief got slot 3. The create-hook payload has only `name` (`agent-<agentId>`, generated
+  by the harness, unknown at arm time), `prompt_id` (identical across the calls of one message), `session_id`,
+  `cwd`, `transcript_path`, `scratchpad_dir` - nothing to key a token on. `arm` refuses more than one
+  slot-bound token and any bound/unbound mix; unbound tokens (`arm N`, any free current slot) may still be
+  armed in a batch. A lane's first check stays `git rev-parse --show-toplevel` against its brief.
 * **Rescue and resolve refs are a safety net.** `claims.release` parks `refs/rescue/<slug>` first; the audit
   runs at teardown (`rescue.py audit`: `redundant` is pruned, `landed-with-drift` is reported and never
   pruned, `unlanded`/`unknown` are named and kept; fail-open). A re-claim of a unit overwrites its slug's ref.
