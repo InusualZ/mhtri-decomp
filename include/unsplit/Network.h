@@ -13,8 +13,8 @@
 
 #include "types.h"
 
-/* The band got its first *claimed* range (0x803CCDF8..0x803D3CE8, `Network/network_transport.cpp`),
-   so the declarations that range now owns moved into that unit's own header and are reached
+/* The band got its first *claimed* range (0x803CCDF8..0x803D3CE8, the Network transport units),
+   so the declarations that range now owns moved into those units' own headers and are reached
    through this include - a band header that still declared them would collide with the owner's
    definitions (docs/plan.md 6.5 rule 2). */
 #include "Network/network_transport.h"

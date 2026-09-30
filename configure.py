@@ -2387,37 +2387,44 @@ config.libs = [
             # the sibling `NetworkWiiMediator.cpp` is byte-identical at `-O4,p`.
             Object(NonMatching, "Network/fn_803D3CE8.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `803CCDF8_dtor_803CCDF8.cpp` (`.text` 0x803CCDF8..0x803D3CE8, 118 auto units / 28400 B).
-            # The transport half of the same band: the peer payload buffers and their error records,
-            # the socket peers' clear/set/send family and the NetworkSessionStable session state
-            # machine.  Module `Network` from the class names and the registered neighbours
-            # (`Network/fn_803D3CE8.cpp` abuts it exactly in extab/extabindex); no `__FILE__` string
-            # and only `zz_` dump names cover the code, and the tile spans more than one original TU,
-            # so the name is derived from the range's subject and is a GUESS (brief section 2,
-            # class 3 module + class 4 name).  C++ (`__dl__FPv`, virtual dispatch), the lib's
-            # `-Cpp_exceptions on` supplies the target's extab/extabindex.  The seam is unproven
-            # (discovery byte cap) and the unit header records it.
-            # Per-unit flag deviation (brief section 8.2), instruction-level evidence: `-O3` like
-            # the two sibling session units.  Measured on this source: the lib's `-O4,p` puts 14 rows
-            # at 100 % (unit score 4.05), `-O3` puts 37 of 38 there (unit score 7.37).  The unit's own
-            # lever is the file-scope `#pragma peephole off` in the source (playbook 39), with the
-            # measured before/after in the unit header.
-            # `-pool off` (playbook 43): the target materialises each log string with its own
-            # `lis`/`addi` pair (NetworkMultipleUdp_receive: `lis r4,lbl_805F988C@ha` /
-            # `addi r4,r4,lbl_805F988C@l`, then `lis r4,lbl_805F98C4@ha` for the next string), where the
-            # default pooling addresses every string of a function through one `@stringBase0` register
-            # (`lis r5,...@ha` once, then `addi r4,r25,0x2ec`).  Measured at unit level on the current
-            # source (2026-09-29, same tree, only this flag toggled): with pooling the unit scores 38.71 %
-            # and 81 of 145 rows are at 100 %; with `-pool off` 38.80 % and 81 rows - the flag moves one
-            # row, `NetworkMultipleUdp_receive` 89.53 % -> 94.06 %, and lowers none.
-            Object(NonMatching, "Network/network_transport.cpp",
+            # The Network transport band, `.text` 0x803CCDF8..0x803D3CE8, registered as eight units -
+            # one per translation unit (docs/network-transport-split.md holds the evidence and the
+            # confidence of each cut: the retail `.data` interleaves each class's vtable with its own
+            # strings, which one TU cannot emit, and the `extabindex` entries tile in the same order).
+            # Module `Network` from the class names and the registered neighbours
+            # (`Network/fn_803D3CE8.cpp` abuts the last one exactly in extab/extabindex); no `__FILE__`
+            # string names any of them, so every file name is derived from the classes it holds and is a
+            # GUESS (recorded in each unit's header).  C++ (`__dl__FPv`, virtual dispatch); the lib's
+            # `-Cpp_exceptions on` supplies the target's extab/extabindex.
+            # Per-unit flag deviation (brief section 8.2), instruction-level evidence, unchanged by the
+            # split: `-O3` like the two sibling session units - measured on the combined unit, the lib's
+            # `-O4,p` put 14 rows at 100 % (unit score 4.05), `-O3` put 37 of 38 there (unit score 7.37);
+            # and `-pool off` (playbook 43) - the target materialises each log string with its own
+            # `lis`/`addi` pair (`NetworkMultipleUdp_receive`: `lis r4,lbl_805F988C@ha` / `addi
+            # r4,r4,lbl_805F988C@l`, then `lis r4,lbl_805F98C4@ha`), where the default pooling addresses
+            # every string of a function through one `@stringBase0` register; toggling it moved one row
+            # (`NetworkMultipleUdp_receive` 89.53 % -> 94.06 %) and lowered none.
+            Object(NonMatching, "Network/NetworkPeerBase.cpp",
+                   cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
+            Object(NonMatching, "Network/NetworkPeerBuffer.cpp",
+                   cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
+            Object(NonMatching, "Network/NetworkPeerUdp.cpp",
+                   cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
+            Object(NonMatching, "Network/NetworkPeerMcs.cpp",
+                   cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
+            Object(NonMatching, "Network/network_socket_streams.cpp",
+                   cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
+            Object(NonMatching, "Network/NetworkResolverWii.cpp",
+                   cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
+            Object(NonMatching, "Network/NetworkSessionBase.cpp",
+                   cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
+            Object(NonMatching, "Network/NetworkSessionStable.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
             # A **data-only** unit: the Network band's shared small-data pool, `.sdata2`
             # 0x8079C690-0x8079C758 (200 B) and `.sdata` 0x80793900-0x80793930 (48 B), whose source
             # defines nothing (playbook 23/53 route 2, playbook 54; the model is
             # `Pl/pl_frame_data.cpp`).  Both runs are read by more than one party -
-            # `Network/network_transport.cpp` and `Network/fn_803D3CE8.cpp` share
+            # the Network transport units and `Network/fn_803D3CE8.cpp` share
             # 0x8079C6EC..0x8079C754, and unsplit (Network) code reads 0x8079C690 and 0x8079C750 -
             # so no consumer may claim them without taking rows only the other consumer reads.
             # One owner is what lets every consumer include `Network/network_shared_data.h`

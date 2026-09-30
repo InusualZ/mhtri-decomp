@@ -5,7 +5,7 @@
  * The two runs this header's words live in -
  *   `.sdata2` 0x8079C690-0x8079C758 and `.sdata` 0x80793900-0x80793930 -
  * are the MWLD merge of several Network objects' own pools: one address is read by more than one TU
- * (`callers.py 0x8079C6EC` answers `Network/network_transport.cpp` and `Network/fn_803D3CE8.cpp`;
+ * (`callers.py 0x8079C6EC` answers the Network transport units (`Network/NetworkPeerMcs.cpp` ...) and `Network/fn_803D3CE8.cpp`;
  * `0x8079C750` answers an unsplit (Network) object as well), so no single consumer can emit the run
  * and no consumer may claim it without taking rows another registered unit reads.  Giving the run one
  * owner is what lets every consumer *include this header* instead of declaring the words into its own
