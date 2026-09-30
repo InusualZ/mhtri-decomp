@@ -79,7 +79,7 @@ public:
     void setMatColor(u32 idx, _GXChannelID channel, _GXColor color, bool keep);
     /* Returns the material-found status in r3 (the owner's body sets 0 on the no-resource and
      * no-material paths and the inner reader's value otherwise), so the return is `u32`, not `void`:
-     * `enemy/fn_801A4504.cpp`'s `fn_801A9210` compares it against 1 with `cmplwi` (settled from the
+     * `enemy/fn_8019ED34.cpp`'s `fn_801A9210` compares it against 1 with `cmplwi` (settled from the
      * callee's body, docs/plan.md 6.5). */
     u32 getMatColor(u32 idx, _GXChannelID channel, _GXColor* out);
     void setAmbColor(u32 idx, _GXChannelID channel, _GXColor color, bool keep);
@@ -89,7 +89,7 @@ public:
      * the colour in a local and pass its address (`addi r6,r1,8`), and the map name is the pointer
      * mangling `setTevKColor__6MHcharFUl14_GXTevKColorIDP8_GXColor` (settled from the call sites and
      * the disassembly, docs/plan.md 6.5 rule 6).  Added with proposal/80181C88; the by-value spelling
-     * above keeps the `enemy/fn_801D428C.cpp`/`enemy/fn_801DB8E0.cpp` call sites unchanged. */
+     * above keeps the `enemy/fn_801CCBC4.cpp`/`enemy/fn_801D80EC.cpp` call sites unchanged. */
     void setTevKColor(u32 idx, _GXTevKColorID id, _GXColor* color);
     void setMatAlphaBlendMode(u32 idx, _GXBlendMode mode, _GXBlendFactor src, _GXBlendFactor dst,
                               _GXLogicOp op);

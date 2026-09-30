@@ -1,5 +1,5 @@
 /* The declarations `enemy/fn_80191598.cpp` owns (docs/plan.md 6.5 rule 2: an extern lives with the TU
- * that defines the symbol).  Created when `enemy/fn_801993E0.cpp` registered as a consumer: its
+ * that defines the symbol).  Created when `enemy/fn_801926EC.cpp` registered as a consumer: its
  * `fn_8019D8B8` and `fn_8019D9BC` call into the aim/action group this unit holds, and no header for
  * the owner existed yet (the rule-2 backlog's "owners needing a header" shape).
  */

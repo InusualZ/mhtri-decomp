@@ -1,5 +1,6 @@
 /* enemy/fn_80382310.cpp - the enemy `em009`/`em019` program band's shared support block, `.text`
- * 0x80382310..0x80387844 (118 functions / 0x5534 bytes, one maximal unclaimed run, docs/plan.md 12).
+ * 0x80382310..0x803868DC (the tail 0x803868DC..0x80387844 moved to `enemy/fn_80387844.cpp` in the
+ * 2026-09-30 recut; the range still holds more than one TU, see SEAM).
  *
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup 0x80382310` -> `zz_0382310_`; the map's own rows for the
@@ -25,16 +26,19 @@
  * `qn_get_motion_no__FP7_QNPC_W`, and reaches genuinely mangled callees - `MHchar::getTevKColor`/
  * `setTevKColor`, `setVector3__FPQ34nw4r4math4VEC3fff`, `get_joint_wpos_em__FP11_ENEMY_WORK...` -
  * through their real signatures, rule 9).  Every plain `fn_` definition is `extern "C"` so it keeps
- * the map's name (playbook 42).  Sections claimed: `.text` 0x80382310..0x80387844, extab
- * 0x80017E2C..0x80018094 (77 records x 8 B) and extabindex 0x80037BA8..0x80037F44 (77 x 12 B) - the
- * 77 framed functions of the band.  Both runs are contiguous with the following unit's
- * (`enemy/fn_80387844.cpp` claims extab 0x80018094.. and extabindex 0x80037F44..), which is what fixes
- * the extent.  The band's `.data`/`.sdata2` tables live in other splits and are referenced here as the
- * map's `lbl_`/`jumptable_` symbols, never re-emitted (rule 10 / rule 2).
+ * the map's name (playbook 42).  Sections claimed: `.text` 0x80382310..0x803868DC, extab
+ * 0x80017E2C..0x8001803C, extabindex 0x80037BA8..0x80037EC0, `.ctors` 0x8056F3A8..0x8056F3B0, `.data`
+ * 0x805EF8C0..0x805EF990, `.bss` 0x806C23E8..0x806C5488 and `.sbss` 0x80794C00..0x80794C08.  The band's
+ * `.sdata2` tables live in other splits and are referenced here as the map's `lbl_`/`jumptable_`
+ * symbols, never re-emitted (rule 10 / rule 2).
  *
- * SEAM.  Unproven (the brief says so): the left edge 0x80382310 is discovery's cap, not a proven TU
- * boundary - `tudiscover.py at 0x80382310` extends the range left to 0x8037F940 on its strong cuts.
- * The right edge 0x80387844 is the registered neighbour and is real.
+ * SEAM.  The right edge 0x803868DC starts the `em009` TU (`enemy/fn_80387844.cpp`).  The range is still
+ * more than one TU, not split yet: the two `.ctors` words (`fn_8038309C`, `fn_80385E7C`) are two TUs'
+ * static initializers (the first TU ends at 0x80383148; `fn_80385E7C` constructs the `lbl_806C4A88`
+ * array with `fn_80385E9C`, emitted after it), and the pool repeats 41c00000 at `lbl_8079BFAC` (first
+ * read by `fn_803865B4`), so a third TU starts in 0x80385E7C..0x80386028 (taken as
+ * 0x80385EE0..0x803868DC: GUESS).  The left edge 0x80382310 is discovery's cap, not a proven boundary -
+ * `tudiscover.py at 0x80382310` extends the range left to 0x8037F940 on its strong cuts.
  *
  * RECONSTRUCTION STATUS (measured with `tools/units/recompile.py enemy/fn_80382310 --measure <sym>`,
  * the official report metric, against MAIN's retired split objects `auto_fn_*_text.o`).  72 of the
@@ -117,8 +121,6 @@ extern NoteScreenScale Screen_w; /* .bss  0x8065903C - the screen frame scale */
 extern void* q_npc_snd_func;     /* .sbss 0x80794C00 - the NPC sound callback pointer */
 extern u32* lbl_805EF940[3];     /* .data 0x805EF940 - the per-kind model-table run `fn_80385B28` indexes */
 extern f32 lbl_8079BF60;         /* .sdata2 - the note pen's width factor */
-extern u8 lbl_805F0C88[];        /* .data 0x805F0C88 - the record table `fn_803869C8` installs */
-extern u8 lbl_807933C8[];        /* .sdata 0x807933C8 - the note's format string */
 }
 
 /* `qn_get_motion_no__FP7_QNPC_W` is a C++ free function (the map name carries the mangling), so its
@@ -138,10 +140,6 @@ void fn_803863C8(NoteWork* self);
 void fn_80386484(NoteWork* self);
 void fn_803864C0(NoteWork* self);
 void fn_803865B4(NoteWork* self);
-void fn_803872C8(_ENEMY_WORK* self);
-void fn_80387344(_ENEMY_WORK* self);
-void fn_803873C0(_ENEMY_WORK* self);
-void fn_8038743C(_ENEMY_WORK* self);
 void fn_80384FF8(u8 idx);
 NoteWork* fn_803851D4(void);
 NoteWork* fn_803853C8(u8 idx);
@@ -172,7 +170,6 @@ extern "C" NoteWork* fn_80385E9C(NoteWork* self);
  * mangled spelling). */
 struct _PLW;
 struct _g3d_work;
-u32 event_demo_ck(void);
 void* get_move_work_adrs(u8 kind);
 s32 Pl_act_ck(_PLW* plw, u8 a, u16 b);
 void push_g3d_wk(_g3d_work* wk);
@@ -180,20 +177,10 @@ void push_g3d_wk(_g3d_work* wk);
 /* The band's plain-name callees. */
 extern "C" {
 void res_file_ctor(void* obj, s32 flag);
-void res_file_assign(void* dst, void* src);
-void* fn_800D5418(s32 handle);
 void fn_800D8E44(s32 handle);
-void fn_800E0BE8(void* chr, s32 a);
-void fn_800E2228(void* chr, void* src, u32 a, u32 b);
 void fn_800E26C4(void* chr);
 void fn_800FC0D4(void* dst, void* src);
 void g3d_root_model_bind(s32 root, u32 id);
-void fn_801280F4(_ENEMY_WORK* self);
-void fn_8013032C(_ENEMY_WORK* self);
-void fn_801303EC(_ENEMY_WORK* self);
-void em_action_finish(_ENEMY_WORK* self);
-u32 em_mot_end_ck(_ENEMY_WORK* self);
-void em_mot_set_ck(_ENEMY_WORK* self, u32 a, u32 b, u32 c);
 void em_move_mode_set(_ENEMY_WORK* self, u32 a);
 void fn_80385828(NoteWork* self);
 void fn_803858F8(NoteWork* self);
@@ -201,11 +188,8 @@ void fn_8029208C(nw4r::math::VEC3* a, nw4r::math::VEC3* b, f32 c, nw4r::math::VE
                  u32 f, u32 g, u8 h);
 void fn_800E1280(MHchar* self, u32 a, u16 b, u32 c, u32 d, u32 e, f32 f, f32 g);
 extern f32 lbl_8079BF6C;
-extern f32 lbl_8079BF8C;
 extern f32 lbl_8079BF94;
 extern f32 lbl_8079BF90;
-extern f32 lbl_8079BF88;
-extern f32 lbl_8079BF78;
 }
 
 /* ---------- the band's bodies, in address order ---------- */
@@ -594,63 +578,6 @@ extern "C" void fn_803864C0(NoteWork* self) {
     }
 }
 
-/* 0x803868DC */
-extern "C" void fn_803868DC(_ENEMY_WORK* self) {
-    self->handles_0x328[0] = 0;
-    self->init_0x328.field_0x338 = 0;
-    self->init_0x328.field_0x33A = 0;
-}
-
-/* 0x803869C8 */
-extern "C" void* fn_803869C8(void* self) {
-    em_res_user_data_ctor(self);
-    *(void**)self = (void*)lbl_805F0C88;
-    return self;
-}
-
-/* 0x8038729C */
-extern "C" void fn_8038729C(_ENEMY_WORK* self) {
-    if (self->init_0x328.field_0x338 < 1800) {
-        self->init_0x328.field_0x338++;
-    }
-    if (self->init_0x328.field_0x33A > 0) {
-        self->init_0x328.field_0x33A--;
-    }
-}
-
-/* 0x803874C8 */
-extern "C" void fn_803874C8(_ENEMY_WORK* self) {
-    u8 v = self->state_sub;
-    if (v == 0) {
-        fn_803872C8(self);
-        return;
-    }
-    if (v == 1) {
-        fn_80387344(self);
-        return;
-    }
-    if (v == 2) {
-        fn_803873C0(self);
-        return;
-    }
-    if (v == 3) {
-        fn_803872C8(self);
-        return;
-    }
-    if (v == 4) {
-        fn_803872C8(self);
-        return;
-    }
-    if (v == 6) {
-        fn_803872C8(self);
-        return;
-    }
-    if (v == 7) {
-        fn_8038743C(self);
-        return;
-    }
-}
-
 /* ---------- batch 2: the state machines, the slot set and the pane steps ---------- */
 
 /* 0x80384B34 - the seat record lookup (the 100-byte-stride table at `self + 12`). */
@@ -877,64 +804,6 @@ extern "C" void fn_803863C8(NoteWork* self) {
         }
         if (self->field_0x16C < 5) {
             self->field_0x1B0 = (f32)self->field_0x16C / lbl_8079BF94;
-        }
-    }
-}
-
-/* 0x803872C8 - the motion state machine, set A. */
-extern "C" void fn_803872C8(_ENEMY_WORK* self) {
-    u8 v = self->state;
-    if (v == 0) {
-        self->state = v + 1;
-        em_move_mode_set(self, 0);
-        em_mot_set_ck(self, 1, 6, 0);
-    } else if (v == 1) {
-        if (em_mot_end_ck(self) == 1) {
-            em_action_finish(self);
-        }
-    }
-}
-
-/* 0x80387344 - the motion state machine, set B. */
-extern "C" void fn_80387344(_ENEMY_WORK* self) {
-    u8 v = self->state;
-    if (v == 0) {
-        self->state = v + 1;
-        em_move_mode_set(self, 0);
-        em_mot_set_ck(self, 2, 6, 0);
-    } else if (v == 1) {
-        if (em_mot_end_ck(self) == 1) {
-            em_action_finish(self);
-        }
-    }
-}
-
-/* 0x803873C0 - the motion state machine, set C. */
-extern "C" void fn_803873C0(_ENEMY_WORK* self) {
-    u8 v = self->state;
-    if (v == 0) {
-        self->state = v + 1;
-        em_move_mode_set(self, 0);
-        em_mot_set_ck(self, 14, 6, 0);
-    } else if (v == 1) {
-        if (em_mot_end_ck(self) == 1) {
-            em_action_finish(self);
-        }
-    }
-}
-
-/* 0x8038743C - the motion state machine, set D. */
-extern "C" void fn_8038743C(_ENEMY_WORK* self) {
-    u8 v = self->state;
-    if (v == 0) {
-        self->state = v + 1;
-        em_move_mode_set(self, 4);
-        em_mot_set_ck(self, 1, 0, 0);
-        fn_8013032C(self);
-        fn_801303EC(self);
-    } else if (v == 1) {
-        if (em_mot_end_ck(self) == 1) {
-            fn_801280F4(self);
         }
     }
 }

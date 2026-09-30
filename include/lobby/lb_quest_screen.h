@@ -47,7 +47,7 @@ void quest_rand_seed_set(void);
 /* 0x803A8EE4 - the quest random source: the next value of the item work's 0x5A halfword, a multiplicative
  * step (x176 mod 65363, `mulli 176` then `lis 1; subi 0xAD`; state 0 is taken as 1) kept in the
  * halfword; 0 when the item work is missing.  The value is 16 bits wide;
- * `enemy/fn_801993E0.cpp` masks it, so the return stays `u32` as that caller reads it. */
+ * `enemy/fn_801926EC.cpp` masks it, so the return stays `u32` as that caller reads it. */
 u32 quest_rand_next(void);
 
 /* 0x803A7E68 - sets the lobby area up from `count` area entry handles (the quest work's +0x69A8 list), spawning

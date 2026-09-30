@@ -43,7 +43,7 @@ s32 fn_8035B700(s32 a, s32 b, u16 c); /* 0x8035B700 - bracket: hud below, Networ
 
 #include "mh3_pad/system_w.h" /* `SystemWork`/`system_w`, owned by src/mh3_pad.cpp (rule 1/2) */
 
-/* The unowned C helpers `enemy/fn_801A4504.cpp` calls: addresses whose bracketing registered units
+/* The unowned C helpers `enemy/fn_8019ED34.cpp` calls: addresses whose bracketing registered units
  * name different modules (0x802B/0x803), so no `<module>.h` is sound - the rule 2 named gap.  The
  * signatures are the call sites' (r3 the work record; `eft_em_spawn_param`'s fifth argument is the s32
  * `0`/0xF4A0/0xB61 the target materialises; `fn_803B50A8` returns the r3 word compared against 1). */

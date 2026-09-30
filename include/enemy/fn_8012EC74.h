@@ -19,6 +19,8 @@ struct _ENEMY_WORK;
 extern "C" {
 #endif
 
+/* 0x80133BB4 - r3 the work record; the hit-part refresh the action band calls. */
+void fn_80133BB4(struct _ENEMY_WORK* enemy);
 /* r3 (`self`) and f1; its callers `fadds` the return into a value they build. */
 f32 fn_8013026C(struct _ENEMY_WORK* self);
 /* r3 (`self`), f1; no return (`enemy/fn_80182D5C.cpp`'s `fn_801850F8` passes the sum it just built). */
@@ -121,7 +123,7 @@ void fn_80136DF4(struct _ENEMY_WORK* self);
 #ifdef __cplusplus
 /* The C++ spellings of this unit's mangled callees, so a call site never spells the mangling
  * (docs/plan.md 6.5 rule 9); each mangles back to its map name.  Added with the registration of
- * `enemy/fn_801993E0.cpp`, which calls all three. */
+ * `enemy/fn_801926EC.cpp`, which calls all three. */
 f32 em_water_check(struct _ENEMY_WORK* self);
 f32 get_em_chg_scale(struct _ENEMY_WORK* self);
 /* `fn_80131034` is deliberately NOT declared here: its map name is the plain `fn_80131034`, so its
@@ -134,7 +136,7 @@ f32 get_em_scale(struct _ENEMY_WORK* self);
 /* This unit owns three C++-mangled callees the enemy action units reach: the map names
  * `em_get_mot_no__FP11_ENEMY_WORK`, `em_after_frame_check__FP11_ENEMY_WORKUsff` and
  * `get_joint_wmat_em__FP11_ENEMY_WORKUlPQ34nw4r4math5MTX34`.  Declared at C++ scope so a caller
- * never spells the mangling (docs/plan.md 6.5 rule 9), added with `enemy/fn_801A4504.cpp` (its first
+ * never spells the mangling (docs/plan.md 6.5 rule 9), added with `enemy/fn_8019ED34.cpp` (its first
  * consumer to need all three). */
 u16 em_get_mot_no(struct _ENEMY_WORK* self);
 u32 em_after_frame_check(struct _ENEMY_WORK* self, u16 a, f32 b, f32 c);

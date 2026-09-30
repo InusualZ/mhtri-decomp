@@ -1,115 +1,53 @@
-/* enemy/fn_801CCBC4.cpp - the enemy action/step band `.text` 0x801CCBC4..0x801D428C (58 functions /
- * 0x76C8 bytes), plus the extab run 0x8000FF4C..0x800100D4 and the extabindex run
- * 0x8002BDDC..0x8002C028 its 49 framed functions carry.
+/* enemy/fn_801CCBC4.cpp - the em005 enemy's action band, `.text` 0x801CA8DC..0x801D71C4.
  *
- * Registration (proposal/801CCBC4_fn_801CCBC4.cpp).  The range is registered once, here, at its final
- * home.  Which class decided the name and the module:
- *   * class 1 (a `__FILE__` string) fails.  The range's only data references are the `.sdata2` float
- *     pool (0x80799220..0x807993E4), the `.data` jump tables/dispatch tables (0x805B5000..0x805B61E8)
- *     and `.rodata` numeric tables (0x80570450..0x80570500) - no source-file-name literal is loaded
- *     anywhere in the range.  The one `enemy` source name in the image (`enemy_control.cpp`, at
- *     lbl_805A1BB8) is referenced only by the registered `enemy/enemy_control.cpp`, 0x8F000 below.
- *   * class 2 fails too: `python tools/symbols/dumpmap.py lookup` answers a `zz_XXXXXXX_` placeholder
- *     for every address of the range, and the brief states a `zz_` name is not evidence.
- *   * class 3 decides the module: `enemy`.  Both bracketing registered units are `enemy`
- *     (below `enemy/fn_801B7020.cpp` ends at 0x801BD6C0; above `enemy/fn_801D428C.cpp` starts at
- *     0x801D428C), every callee out of the range is an enemy-band function (`_ENEMY_WORK`-based
- *     `fn_8012xxxx`/`fn_8013xxxx` bodies, `em_frame_check`, `em_parts_damage_level_get`,
- *     `get_em_scale`), every function switches on `_ENEMY_WORK::state` (+0x05) or
- *     `_ENEMY_WORK::state_sub` (+0x1E6), and the range's own jump tables (`jumptable_805B5414`,
- *     `_805B546C`, `_805B54F4`, `_805B551C`, `_805B553C`, `_805B5D90`) sit in the enemy `.data` run.
- *   * class 4 keeps the name: nothing supports a file name, so the map's own `fn_801CCBC4` stem is the
- *     file name (the sibling units use the same scheme).  No name was invented.
+ * Recut 2026-09-30.  The 0x801B7020..0x801E0ADC band was registered as seven ranges that cut through its
+ * translation units.  The real TUs (each one's `.data` chunk opens with its `emNNN_prog_tbl`, each ends with its
+ * static initializer - the `.ctors` words 0x8056F34C/350/354/358 - and the `.sdata2` pool repeats a value at each
+ * change): em036 0x801B7020..0x801B98C8 (`fn_801B7020.cpp`), em040 0x801B98C8..0x801BB758 (`em040_ai.cpp`), em006
+ * 0x801BB758..0x801C29F8 (`fn_801BD6C0.cpp`), em004 0x801C29F8..0x801CA8DC (`fn_801CA004.cpp`), em005 0x801CA8DC..
+ * 0x801D71C4 (`fn_801CCBC4.cpp`), em007 0x801D71C4..0x801E0ADC (`fn_801D80EC.cpp`).  The files keep their old stems;
+ * the `emNNN` names are GUESSes from the prog table that opens each TU's data.
  *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/dumpmap.py lookup 0x801CCBC4` - every address answers the runtime dump's
- * `zz_XXXXXXXX_` placeholder and a bare `fn_XXXXXXXX = .text:0x...` map entry, and no `__FILE__`
- * string is reachable from the range).
+ * This unit's sections: extab 0x8000FE4C..0x80010164, extabindex 0x8002BC5C..0x8002C100, `.ctors`
+ * 0x8056F358..0x8056F35C (`fn_801D6FB8`, the four-record `__sinit`), `.rodata` 0x80570410..0x80570500, `.data`
+ * 0x805B5000..0x805B69D8 (after `em005_prog_tbl`, 0x805B4F90, up to `em007_prog_tbl`) and `.bss`
+ * 0x806A7B30..0x806A7B90.  The exact right edge 0x801D71C4: `fn_801D6FB8` ends there and the 0.0 entry repeats at
+ * `lbl_807994FC` from `fn_801D71C4` (a one-function window).  The left edge starts at `fn_801CA8DC` (the
+ * function after em004's `__sinit`, see `enemy/fn_801CA004.cpp`).
  *
- * Seam.  `tudiscover at 0x801CCBC4` reports NO strong boundary at the left edge - every candidate
- * around it is `weak share 0.000`, and the range owns no labelled data at all, so the tool's own
- * answer is "the boundary is unconstrained".  The left edge is the `--max-bytes` cut the brief warns
- * about, and the range below (proposal/801CA004, 0x801CA004..0x801CCBC4) is the same subsystem: this
- * range's dispatchers tail-call into it (`fn_801CBA4C`, `fn_801CBB0C`, `fn_801CBBD8`, `fn_801CBC64`,
- * `fn_801CBD30`, `fn_801CB308`, `fn_801CB9DC`) and its jump tables are contiguous with this range's in
- * the same `.data` run (`jumptable_805B53E4` -> `jumptable_805B5414` -> `jumptable_805B546C`).  The
- * two very probably belong to one TU; the range is worked as one unit and the extent settles as its
- * functions match (invariant 8.3).  The right edge 0x801D428C IS evidence: it is the start of the
- * registered `enemy/fn_801D428C.cpp`, whose extab run begins exactly where this range's ends
- * (0x800100D4) and whose `fn_801D4C3C` dispatch table tail-calls this range's functions.
- * Registration uses the pinned pool range (brief section 2) - extending it left is the orchestrator's
- * re-split decision, recorded as a note in this worker's outbox.
- *
- * Sections claimed: `.text` 0x801CCBC4..0x801D428C, extab 0x8000FF4C..0x800100D4, extabindex
- * 0x8002BDDC..0x8002C028.  No `.ctors`/.dtors word belongs to the range (the `.ctors` words at
- * 0x8056F34C/0x8056F354/0x8056F358 point at `fn_801B985C`, `fn_801CA870` and `fn_801D6FB8`, none of
- * them in this range).
- *
- * Language.  C++: the range reaches mangled callees (`em_frame_check__FP11_ENEMY_WORKUsff`,
- * `setVector3__FPQ34nw4r4math4VEC3fff`, `calcVecAng2__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3`,
- * `get_em_scale__FP11_ENEMY_WORK`), so C++ is settled by class 1 of the language probe.  Rule 9: each
- * is declared at C++ scope with the signature its mangling encodes and called through it; every plain
- * `fn_XXXXXXXX` definition stays `extern "C"` so the map name is emitted.
- *
- * STATUS (measured in this worktree with `python tools/units/recompile.py
- * enemy/fn_801CCBC4.cpp --measure <symbol>`; the worktree also passes a full `ninja
- * build/RMHE08/ok` -> `build/RMHE08/main.dol: OK`).  This is a PARTIAL landing: 45 of the range's 58
- * functions are reconstructed and EVERY one of them is at or above the 80 % bar; 27 of them are
- * byte-identical (100.00 %).  The report's own unit-level number for the whole range is
- * `fuzzy_match_percent` 46.47 (6364 of 30408 bytes matched, 28 of 58 functions) - it is byte-weighted,
- * and the 13 unwritten rows are 16044 of the range's 30408 bytes, which is what holds it down; the
- * mean over the 45 written rows is 98.10.  The 13 unwritten ones are the residual this worker hands on (address,
- * size in bytes): `fn_801CF0C0` (1416), `fn_801CF840` (948), `fn_801CFE04` (2408), `fn_801D0B94`
- * (1100), `fn_801D1110` (1152), `fn_801D1590` (844), `fn_801D18DC` (1316), `fn_801D1E00` (836),
- * `fn_801D2144` (1992), `fn_801D320C` (856), `fn_801D3564` (828), `fn_801D38A0` (920),
- * `fn_801D3CF8` (1428) - they are the range's remaining state machines and the two biggest
- * parameter-table bodies, so they are incremental work, not a blocked seam.
- *
- * Residuals of the 45 written functions (all are codegen shapes, not comprehension):
- *   * ONE INSTRUCTION / REGISTER CHOICE - `fn_801CFBF4` 97.40, `fn_801CE4A0` 96.88,
- *     `fn_801CEE74` 96.15, `fn_801CEF44` 95.79, `fn_801D0FE0` 94.74: the control flow and every call
- *     match; a single register or the compare's operand order differs (e.g. `cmplw a,b` for the
- *     target's `cmplw b,a`).  Nothing to change without moving a landed owner's header.
- *   * `fn_801CD71C` 84.43 (388 B vs our 392 B) - the target reuses `r3` for the (short-lived) area
- *     target pointer that `fn_80131034` returns, so it needs no third callee-saved register; every
- *     spelling tried (a named local, a ternary, an early `break`) allocates one, costing the extra
- *     `stw`/`lwz` pair.  Recorded rather than restructured.
- *   * `fn_801CD400` 93.55, `fn_801CD944` 99.13, `fn_801CEC44` 99.81, `fn_801CD068` 99.81,
- *     `fn_801CDCDC` 98.70, `fn_801CE2B0` 97.35, `fn_801D08A8` 99.95, `fn_801D2B10` 99.83,
- *     `fn_801D2ED0` 97.78, `fn_801CDF10` 96.92 - one hoisted `li`/`mr`, one argument's materialisation
- *     order (the int before the pool float, or the reverse) or one commutative `fmuls` operand order.
- *
- * Pragma.  The whole unit is compiled with `#pragma peephole off` AND `#pragma fp_contract off`.
- * `peephole off` is load-bearing: retail keeps the unfused `clrlwi`/`rlwinm` + `cmpwi` pairs `-O3`
- * folds into their record forms (measured on `fn_801CCBC4`'s mode test, `fn_801CD2EC` and the whole
- * band - the same finding `enemy/fn_801D428C.cpp` recorded).  `fp_contract off` is measured too: with
- * the lib's `-fp_contract on` the three sites that multiply an effect scale and then add it
- * (`fn_801CD068` case 2/3, `fn_801CD944` state 2, `fn_801CEC44` state 2) fuse into `fmadds` where
- * retail keeps `fmuls` + `fadds`; turning it off moved exactly those three up (97.81 -> 99.81,
- * 98.41 -> 99.13, 98.29 -> 99.81) and left the other 42 scores unchanged.  Both are per-unit
- * `#pragma`s, the scoped deviation invariant 8.2 allows, not a lib flag.
+ * The file is three former sections in this order: the former `enemy/fn_801CCBC4.cpp` (0x801CCBC4..0x801D428C),
+ * then the former `enemy/fn_801CA004.cpp` from 0x801CA8DC, then the former `enemy/fn_801D428C.cpp` up to 0x801D71C4;
+ * each keeps its own declarations and its `#pragma` state (the em005 bodies are measured with the peephole off
+ * and `fp_contract` off, the others per their own header).  Where the old sections declared one symbol two
+ * ways the first declaration is kept and the other deleted (`stage_map_kind_get` is the owner's `u8` form in
+ * `stage/stg_w.h`); the call sites were re-measured, none is lower.  Function order is the sections', not
+ * address order: sort before this unit flips to Matching.
  */
 
 #include "types.h"
 #include "nw4r/math.h"
-
-/* The whole band is compiled with the peephole optimizer OFF: retail keeps the unfused
- * `clrlwi`/`rlwinm` + `cmpwi` pairs that `-O3` fuses into their record forms (`clrlwi.`),
- * measured on this range's own functions - the same finding `enemy/fn_801D428C.cpp` and
- * `enemy/fn_80147CE0.cpp` recorded.  A per-unit `#pragma` is the scoped deviation invariant 8.2
- * allows for one unit. */
-#pragma peephole off
-#pragma fp_contract off
-
 #include "enemy/ENEMY_WORK.h"
+#include "enemy/fn_801CCBC4.h"
+#include "enemy/fn_801251D0.h" /* fn_80128AAC, em_target_pos_set, em_hit_window_set (rule 2: the owner's header) */
+#include "enemy/fn_8012EC74.h" /* fn_80133BB4 (rule 2: the owner's header) */
+#include "ef/eft009.h"       /* eft009_set_pos (rule 2: the owner's header) */
 #include "fn_8004CAD8.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "sound/mhchar.h"
+#include "unsplit/unknown.h" /* SystemWork / system_w */
+#include "stage/stg_w.h"
+
+/* ===================================================================================================
+ * former fn_801CCBC4.cpp
+ * =================================================================================================== */
+#pragma peephole off
+#pragma fp_contract off
 
 /* The band's owner headers are NOT included: several of them publish spellings that do not match the
  * callees' own bodies (`em_alt_mode_ck(void)` where the body reads +0x8AA, `fn_80126278(u16,VEC3*)`
  * where the body takes `self` in r3), and MWCC rejects two C-linkage declarations of the same name in
  * one TU (`10197 illegal function overloading`).  This unit therefore declares its foreign callees
- * itself - the same shape the neighbouring `enemy/fn_801D428C.cpp` uses - and the owner-header
+ * itself - the same shape the em007 unit `enemy/fn_801D80EC.cpp` uses - and the owner-header
  * corrections are recorded as a `shared-file` request in this worker's outbox. */
 
 /* ----------------------------------------------------------------------------------------------------
@@ -118,31 +56,13 @@
  * addresses the pool.  This is the counted rule-2 "address band interleaves modules" gap.
  * -------------------------------------------------------------------------------------------------- */
 
-extern f32 lbl_80799220;
-extern f32 lbl_80799240;
-extern f32 lbl_8079924C;
-extern f32 lbl_80799250;
-extern f32 lbl_80799258;
-extern f32 lbl_8079925C;
-extern f32 lbl_80799264;
 extern f32 lbl_80799268;
 extern f32 lbl_8079926C;
-extern f32 lbl_80799270;
-extern f32 lbl_80799274;
 extern f32 lbl_80799278;
 extern f32 lbl_8079927C;
-extern f32 lbl_80799280;
 extern f32 lbl_80799284;
-extern f32 lbl_80799288;
-extern f32 lbl_8079928C;
-extern f32 lbl_80799294;
 extern f32 lbl_80799298;
-extern f32 lbl_807992A0;
-extern f32 lbl_807992A8;
-extern f32 lbl_807992B0;
 extern f32 lbl_807992B8;
-extern f32 lbl_807992BC;
-extern f32 lbl_807992C0;
 extern f32 lbl_807992C4;
 extern f32 lbl_807992C8;
 extern f32 lbl_807992CC;
@@ -152,22 +72,14 @@ extern f32 lbl_807992D8;
 extern f32 lbl_807992DC;
 extern f32 lbl_807992E0;
 extern f32 lbl_807992E4;
-extern f32 lbl_807992E8;
 extern f32 lbl_807992EC;
 extern f32 lbl_807992F0;
-extern f32 lbl_807992F4;
 extern f32 lbl_807992F8;
 extern f32 lbl_807992FC;
 extern f32 lbl_80799300;
 extern f32 lbl_80799304;
-extern f32 lbl_80799308;
-extern f32 lbl_8079930C;
-extern f32 lbl_80799310;
 extern f32 lbl_80799314;
-extern f32 lbl_80799318;
-extern f32 lbl_8079931C;
 extern f32 lbl_80799320;
-extern f32 lbl_80799324;
 extern f32 lbl_80799328;
 extern f32 lbl_8079932C;
 extern f32 lbl_80799330;
@@ -176,32 +88,18 @@ extern f32 lbl_80799338;
 extern f32 lbl_8079933C;
 extern f32 lbl_80799340;
 extern f32 lbl_80799344;
-extern f32 lbl_80799348;
-extern f32 lbl_8079934C;
 extern f32 lbl_80799350;
-extern f32 lbl_80799354;
 extern f32 lbl_80799358;
-extern f32 lbl_8079935C;
 extern f32 lbl_80799360;
 extern f32 lbl_80799364;
-extern f32 lbl_80799368;
-extern f32 lbl_8079936C;
 extern f32 lbl_80799370;
 extern f32 lbl_80799374;
-extern f32 lbl_80799378;
 extern f32 lbl_8079937C;
-extern f32 lbl_80799380;
 extern f32 lbl_80799384;
-extern f32 lbl_80799388;
 extern f32 lbl_8079938C;
-extern f32 lbl_80799390;
 extern f32 lbl_80799394;
 extern f32 lbl_80799398;
-extern f32 lbl_8079939C;
-extern f32 lbl_807993A0;
-extern f32 lbl_807993A4;
 extern f32 lbl_807993A8;
-extern f32 lbl_807993AC;
 extern f32 lbl_807993B0;
 extern f32 lbl_807993B4;
 extern f32 lbl_807993B8;
@@ -305,11 +203,8 @@ void em_action_finish_fall(struct _ENEMY_WORK* self);
 void em_action_finish_walk(struct _ENEMY_WORK* self);
 void em_state_set(struct _ENEMY_WORK* self, u32 a, u32 b);
 void fn_80128A70(struct _ENEMY_WORK* self, u32 a, u32 b);
-void em_target_pos_set(struct _ENEMY_WORK* self, u32 a);
-void em_hit_window_set(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 void em_hit_window_set_default(struct _ENEMY_WORK* self, u32 a, u32 b);
 void em_hit_window_clear(struct _ENEMY_WORK* self, u32 a);
-void fn_80129744(struct _ENEMY_WORK* self, u32 a);
 
 /* enemy/fn_8012BDF4.cpp (0x8012BDF4..0x8012E968) */
 void fn_8012B380(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
@@ -352,11 +247,9 @@ f32 fn_802B0430(u8 area);
     * shape here is the owner body's (`mr r3,r31` -> returns `dst`) */
 u32 em_turn_to_target(struct _ENEMY_WORK* self, u32 a);
 void fn_80133CC8(struct _ENEMY_WORK* self, u32 a, u32 b);
-void fn_80133DB0(struct _ENEMY_WORK* self, u32 a);
 void em_turn_in_window(struct _ENEMY_WORK* self, f32 lo, f32 hi, s32 angle);
 void em_approach_start(struct _ENEMY_WORK* self, f32 speed, u32 flags);
 u32 em_approach_step(struct _ENEMY_WORK* self, s32 a, s32 b);
-void em_turn_seq_start(struct _ENEMY_WORK* self, void* tbl, u32 a, u32 b, u32 c);
 u32 em_turn_seq_step(struct _ENEMY_WORK* self, void* tbl);
 void em_lift_start(struct _ENEMY_WORK* self);
 void em_lift_step(struct _ENEMY_WORK* self);
@@ -377,7 +270,6 @@ void fn_80136D14(struct _ENEMY_WORK* self);
 
 /* enemy/fn_8013ACC4.cpp (0x8013ACC4..0x8013BE60) */
 void fn_8013AAC4(struct _ENEMY_WORK* self);
-u32 stage_map_kind_get(u8 kind);
 
 /* enemy/enemy_control.cpp (0x801411B8..0x80147CE0) */
 void em_spawn_rec_init(struct _ENEMY_WORK* self, u32 a);
@@ -389,18 +281,17 @@ void fn_801CAF70(struct _ENEMY_WORK* self);
 void fn_801CAFBC(struct _ENEMY_WORK* self);
 void fn_801CB008(struct _ENEMY_WORK* self);
 void fn_801CB050(struct _ENEMY_WORK* self);
-void fn_801CBA4C(struct _ENEMY_WORK* self, u32 a);
-void fn_801CBB0C(struct _ENEMY_WORK* self, u32 a);
+void fn_801CBA4C(struct _ENEMY_WORK* self, u8 a);
+void fn_801CBB0C(struct _ENEMY_WORK* self, u8 a);
 void fn_801CBBD8(struct _ENEMY_WORK* self);
-void fn_801CBC64(struct _ENEMY_WORK* self, u32 a);
+void fn_801CBC64(struct _ENEMY_WORK* self, u8 a);
 void fn_801CBD30(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
-void fn_801CC5DC(struct _ENEMY_WORK* self, u32 a);
+void fn_801CC5DC(struct _ENEMY_WORK* self, u8 a);
 void fn_801CCB6C(struct _ENEMY_WORK* self, u32 a, u32 b);
 
-/* enemy/fn_801D428C.cpp (0x801D428C..0x801D80EC) - the unit above; it declares this range's
- * dispatchers, so the two units agree on their signatures. */
-void fn_801D6548(struct _ENEMY_WORK* self, u8 a);
-void fn_801D6EDC(void* rec, u8 a, u16 b, u16 c);
+/* this range's dispatchers (the em007 unit `enemy/fn_801D80EC.cpp` calls them, so the two agree on their
+ * signatures). */
+s32 fn_801D6548(struct _ENEMY_WORK* self, u8 a);
 s32 fn_801D80EC();
 
 
@@ -2089,3 +1980,1765 @@ void fn_801D2ED0(struct _ENEMY_WORK* self) {
 }
 
 } /* extern "C" */
+
+/* ===================================================================================================
+ * former fn_801CA004.cpp, from 0x801CA8DC
+ * =================================================================================================== */
+#pragma fp_contract on
+extern "C" {
+void fn_8013221C(struct _ENEMY_WORK* self, f32 a, u32 b, u32 c);
+void fn_80132224(struct _ENEMY_WORK* self);
+void fn_80132264(struct _ENEMY_WORK* self);
+}
+
+/* retail keeps the unfused clrlwi/rlwinm + cmpwi pairs this band's -O3 peephole folds, so the whole
+ * unit is built with the peephole off (the same finding as `enemy/fn_801B7020.cpp`,
+ * `enemy/fn_80147CE0.cpp` and `enemy/fn_801D80EC.cpp`). */
+#pragma peephole off
+
+/* the `.rodata`/`.data` tables this range references (shared pools, not this unit's data). */
+extern u8 lbl_80570410[];
+extern u8 lbl_80570450[];
+
+extern "C" {
+
+/* ----------------------------------------------------------------------------------------------- *
+ * the action band's step functions
+ * ----------------------------------------------------------------------------------------------- */
+
+/* 0x801CAF6C - a 4-byte `blr`. */
+void fn_801CAF6C(_ENEMY_WORK* self) {}
+
+/* 0x801CAA8C - clear the action block: the float, the word and the armed byte. */
+void fn_801CAA8C(_ENEMY_WORK* self) {
+    self->timer_0x328.field_0x328 = lbl_80799220;
+    self->timer_0x328.field_0x32C = 0;
+    self->action_0x328.armed_0x328.field_0x330 = 0xFF;
+}
+
+/* 0x801CA8DC - average the motion slots' aim angles (the wrap-aware mean `fn_801CAA20` steps the
+ * rotation by); 0xFFFF means none. */
+u16 fn_801CA8DC(_ENEMY_WORK* self, u8 a) {
+    if (self->field_0x218 == 0)
+        return 0xFFFF;
+    u32 angles[10];
+    u8 count = 0;
+    u8 i = 0;
+    EmMotionSlot* slot = self->slots_0x244;
+    VEC3* vec = &self->slots_0x244[0].vec;
+    u32* p = angles;
+    for (; i < 10; i++, slot++, vec++) {
+        if (slot->flags == 0)
+            break;
+        if (a == 1 && (u32)(slot->value - 0x6000) > 0x4000)
+            continue;
+        if ((slot->flags & 0x800) == 0)
+            continue;
+        u32 x;
+        u32 y;
+        calcVecAngXY(vec, &x, &y);
+        *p++ = y;
+        count++;
+    }
+    if (count == 0)
+        return 0xFFFF;
+    if (count == 1)
+        return (u16)angles[0];
+    s32 avg = angles[0];
+    u32* q = &angles[1];
+    for (s8 i = 1; (u8)i < count; i++, q++) {
+        s32 delta = (s32)*q - avg;
+        if (delta > 0x8000)
+            delta -= 0x10000;
+        else if (delta < -0x8000)
+            delta += 0x10000;
+        avg += delta / (i + 1);
+    }
+    return (u16)avg;
+}
+
+/* 0x801CAF70 - enter the 0x0B motion. */
+void fn_801CAF70(_ENEMY_WORK* self) {
+    em_fall_height_get(self);
+    em_fall_start(self);
+    fn_80128AAC(self, 3, 0x0B);
+    fn_80133BB4(self);
+}
+
+/* 0x801CAFBC - enter the 0x14 motion. */
+void fn_801CAFBC(_ENEMY_WORK* self) {
+    em_fall_height_get(self);
+    em_fall_start(self);
+    fn_80128AAC(self, 3, 0x14);
+    fn_80133BB4(self);
+}
+
+/* 0x801CB008 - arm motion 7/5. */
+void fn_801CB008(_ENEMY_WORK* self) {
+    em_move_mode_set(self, 0);
+    fn_80128AAC(self, 7, 5);
+    fn_80133BB4(self);
+}
+
+/* 0x801CB050 - arm motion 7/6. */
+void fn_801CB050(_ENEMY_WORK* self) {
+    em_move_mode_set(self, 0);
+    fn_80128AAC(self, 7, 6);
+    fn_80133BB4(self);
+}
+
+/* 0x801CB098 - state 0 arms motion 1/0x0A, state 1 closes on the motion end. */
+void fn_801CB098(_ENEMY_WORK* self) {
+    switch (self->state) {
+    case 0:
+        self->state++;
+        em_move_mode_set(self, 0);
+        em_mot_set_ck(self, 1, 10, 0);
+        break;
+    case 1:
+        if (em_mot_end_ck(self) == 1)
+            em_action_finish(self);
+        break;
+    }
+}
+
+/* 0x801CB114 - state 0 arms motion 2/4, state 1 closes on the motion end. */
+void fn_801CB114(_ENEMY_WORK* self) {
+    switch (self->state) {
+    case 0:
+        self->state++;
+        em_move_mode_set(self, 0);
+        em_mot_set_ck(self, 2, 4, 0);
+        break;
+    case 1:
+        if (em_mot_end_ck(self) == 1)
+            em_action_finish(self);
+        break;
+    }
+}
+
+/* 0x801CB190 - the same body as 0x801CB114 (the band's second 2/4 step). */
+void fn_801CB190(_ENEMY_WORK* self) {
+    switch (self->state) {
+    case 0:
+        self->state++;
+        em_move_mode_set(self, 0);
+        em_mot_set_ck(self, 2, 4, 0);
+        break;
+    case 1:
+        if (em_mot_end_ck(self) == 1)
+            em_action_finish(self);
+        break;
+    }
+}
+
+/* 0x801CB20C - state 0 re-seats the motion and arms 0x1A/6, state 1 runs it out. */
+void fn_801CB20C(_ENEMY_WORK* self) {
+    switch (self->state) {
+    case 0:
+        self->state++;
+        em_fall_height_get(self);
+        em_fall_start(self);
+        em_mot_set_ck(self, 0x1A, 6, 0);
+        break;
+    case 1:
+        if (em_mot_end_ck(self) == 1)
+            em_action_finish_fall(self);
+        break;
+    }
+}
+
+/* 0x801CB28C - state 0 arms motion 0x1B/6, state 1 runs it out. */
+void fn_801CB28C(_ENEMY_WORK* self) {
+    switch (self->state) {
+    case 0:
+        self->state++;
+        em_move_mode_set(self, 3);
+        em_mot_set_ck(self, 0x1B, 6, 0);
+        break;
+    case 1:
+        if (em_mot_end_ck(self) == 1)
+            em_action_finish_walk(self);
+        break;
+    }
+}
+
+/* 0x801CB308 - the sub-state dispatcher over the six step functions above. */
+void fn_801CB308(_ENEMY_WORK* self) {
+    switch (self->state_sub) {
+    case 0:
+        fn_801CB098(self);
+        break;
+    case 1:
+        fn_801CB114(self);
+        break;
+    case 2:
+        fn_801CB190(self);
+        break;
+    case 3:
+        fn_801CB20C(self);
+        break;
+    case 6:
+        fn_801CB28C(self);
+        break;
+    }
+}
+
+/* 0x801CB500 - state 0 arms motion 0x12/0x0A, state 1 runs it out. */
+void fn_801CB500(_ENEMY_WORK* self) {
+    switch (self->state) {
+    case 0:
+        self->state++;
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 0x12, 0x0A, 0);
+        break;
+    case 1:
+        if (em_mot_end_ck(self) == 1)
+            em_action_finish(self);
+        break;
+    }
+}
+
+/* 0x801CB57C - state 0 arms 0x13/6 and the 0x12C-frame timer, state 1 counts it down. */
+void fn_801CB57C(_ENEMY_WORK* self) {
+    em_busy_set(self);
+    switch (self->state) {
+    case 0:
+        self->state++;
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 0x13, 6, 0);
+        self->timer_0x020 = 0x12C;
+        break;
+    case 1:
+        if (--self->timer_0x020 <= 0)
+            em_state_set(self, 1, 3);
+        break;
+    }
+}
+
+/* 0x801CB618 - state 0 arms 0x14/8, state 1 runs it out. */
+void fn_801CB618(_ENEMY_WORK* self) {
+    switch (self->state) {
+    case 0:
+        self->state++;
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 0x14, 8, 0);
+        break;
+    case 1:
+        if (em_mot_end_ck(self) == 1)
+            em_action_finish(self);
+        break;
+    }
+}
+
+/* 0x801CB694 - the four-step 0x17/0x18/0x19 action. */
+void fn_801CB694(_ENEMY_WORK* self) {
+    switch (self->state) {
+    case 0:
+        self->state++;
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 0x17, 6, 0);
+        break;
+    case 1:
+        if (em_mot_end_ck(self) == 1) {
+            self->state++;
+            em_mot_set(self, 0x18, 0, 0);
+            self->timer_0x020 = 0x708;
+            fn_80132224(self);
+        }
+        break;
+    case 2:
+        fn_8013221C(self, lbl_8079924C, 1, 0x14);
+        if (--self->timer_0x020 <= 0) {
+            self->state++;
+            em_mot_set(self, 0x19, 4, 0);
+            fn_80132264(self);
+        }
+        break;
+    case 3:
+        if (em_mot_end_ck(self) == 1)
+            em_action_finish(self);
+        break;
+    }
+}
+
+/* 0x801CB7B0 - state 0 arms 0x7C/2, state 1 runs it out. */
+void fn_801CB7B0(_ENEMY_WORK* self) {
+    switch (self->state) {
+    case 0:
+        self->state++;
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 0x7C, 2, 0);
+        break;
+    case 1:
+        if (em_mot_end_ck(self) == 1)
+            em_action_finish(self);
+        break;
+    }
+}
+
+/* 0x801CB82C - state 0 arms 4/4; a nonzero `a` first re-seats the motion. */
+void fn_801CB82C(_ENEMY_WORK* self, u8 a) {
+    if (a == 1)
+        em_busy_set(self);
+    switch (self->state) {
+    case 0:
+        self->state++;
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 4, 4, 0);
+        break;
+    case 1:
+        if (em_mot_end_ck(self) == 1)
+            em_action_finish(self);
+        break;
+    }
+}
+
+/* 0x801CB8C0 - state 0 arms 3/4, state 1 runs it out. */
+void fn_801CB8C0(_ENEMY_WORK* self) {
+    switch (self->state) {
+    case 0:
+        self->state++;
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 3, 4, 0);
+        break;
+    case 1:
+        if (em_mot_end_ck(self) == 1)
+            em_action_finish(self);
+        break;
+    }
+}
+
+/* 0x801CB93C - state 0 arms 2/4, state 1 waits the `a`-selected frame window. */
+void fn_801CB93C(_ENEMY_WORK* self, u8 a) {
+    switch (self->state) {
+    case 0:
+        self->state++;
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 2, 4, 0);
+        break;
+    case 1:
+        if (em_frame_check(self, 1, ((s32)(u8)a == 1) ? lbl_80799250 : lbl_80799254, lbl_80799220) == 1)
+            em_action_finish(self);
+        break;
+    }
+}
+
+/* 0x801CBA4C - state 0 arms 6/4 and starts the `a`-selected fade, state 1 waits it out. */
+void fn_801CBA4C(_ENEMY_WORK* self, u8 a) {
+    switch (self->state) {
+    case 0:
+        self->state++;
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 6, 4, 0);
+        if ((s32)(u8)a != 1)
+            em_approach_start(self, lbl_80799258, 0);
+        else
+            em_approach_start(self, lbl_80799220, 0);
+        break;
+    case 1:
+        if (em_approach_step(self, 0, 0x40) == 1)
+            em_action_finish(self);
+        break;
+    }
+}
+
+/* 0x801CBB0C - state 0 arms 7/6, sets the motion rate and starts the `a`-selected fade. */
+void fn_801CBB0C(_ENEMY_WORK* self, u8 a) {
+    switch (self->state) {
+    case 0:
+        self->state++;
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 7, 6, 0);
+        em_mot_speed_set(self, lbl_8079925C);
+        if ((s32)(u8)a != 1)
+            em_approach_start(self, lbl_80799258, 0);
+        else
+            em_approach_start(self, lbl_80799220, 0);
+        break;
+    case 1:
+        if (em_approach_step(self, 0, 0x40) == 1)
+            em_action_finish(self);
+        break;
+    }
+}
+
+/* 0x801CBBD8 - state 0 starts the `lbl_80570410` table effect, state 1 waits it out. */
+void fn_801CBBD8(_ENEMY_WORK* self) {
+    switch (self->state) {
+    case 0:
+        self->state++;
+        em_move_mode_set(self, 0);
+        em_turn_seq_start(self, lbl_80570410, 0, 0, 0);
+        break;
+    case 1:
+        if (em_turn_seq_step(self, lbl_80570410) == 1)
+            em_action_finish(self);
+        break;
+    }
+}
+
+/* 0x801CBC64 - state 0 starts the `lbl_80570450` table effect (and the 0x482 fade), state 1 waits. */
+void fn_801CBC64(_ENEMY_WORK* self, u8 a) {
+    switch (self->state) {
+    case 0:
+        self->state++;
+        em_move_mode_set(self, 0);
+        em_turn_seq_start(self, lbl_80570450, 0, 1, 0);
+        if (self->field_0x482 == 1)
+            em_mot_speed_set(self, lbl_80799260);
+        break;
+    case 1:
+        if (a == 1 && em_mot_end_ck(self) == 1) {
+            em_action_finish(self);
+        } else if (em_turn_seq_step(self, lbl_80570450) == 1) {
+            em_action_finish(self);
+        }
+        break;
+    }
+}
+
+/* 0x801CC5DC - the strafe/approach action: state 0 seats the offset vector, state 1 steers it. */
+void fn_801CC5DC(_ENEMY_WORK* self, u8 a) {
+    switch (self->state) {
+    case 0:
+        self->state++;
+        em_move_mode_set(self, 0);
+        em_move_vec2_clr(self);
+        switch (a) {
+        case 0: {
+            em_mot_set(self, 0xD2, 4, 0);
+            em_mot_speed_set(self, lbl_8079925C);
+            f32 scale = get_em_chg_scale(self);
+            f32 rate = get_em_base_scale(self);
+            self->offset_0x30C.vec_0x310.x = lbl_807992A0 * rate * scale;
+            break;
+        }
+        case 1: {
+            em_mot_set(self, 0xD3, 4, 0);
+            em_mot_speed_set(self, lbl_8079925C);
+            f32 scale = get_em_chg_scale(self);
+            f32 rate = get_em_base_scale(self);
+            self->offset_0x30C.vec_0x310.x = lbl_807992A4 * rate * scale;
+            break;
+        }
+        }
+        rotVecY(&self->offset_0x30C.vec_0x310, self->field_0x1C0);
+        em_hit_window_set_default(self, 0, 0x18);
+        break;
+    case 1:
+        switch (a) {
+        case 0:
+            em_turn_in_window(self, lbl_80799220, lbl_807992A8, 0x4000);
+            break;
+        case 1:
+            em_turn_in_window(self, lbl_80799220, lbl_807992A8, -0x4000);
+            break;
+        }
+        if (em_frame_check(self, 3, lbl_80799220, lbl_807992A8) == 1)
+            CancelFade(self);
+        if (em_mot_end_ck(self) == 1)
+            em_action_finish(self);
+        break;
+    }
+}
+
+} /* extern "C" */
+
+/* This unit's own `.bss` (`splits.txt` `.bss 0x806A7B18..0x806A7B30`), in address order: the 1 two-vector record(s)
+ * its static constructor `fn_801CA870` builds (`.data` tables point at them).  Names are GUESSes: each record is a
+ * pair of model-space points. */
+
+/* ===================================================================================================
+ * former fn_801D428C.cpp, up to 0x801D71C4
+ * =================================================================================================== */
+#pragma peephole on
+
+/* ----------------------------------------------------------------------------------------------------
+ * the pool the range reads (owned elsewhere; declared, never defined - playbook 29)
+ * -------------------------------------------------------------------------------------------------- */
+
+
+/* the range's own `.data` tables (no `.data` range is registered for this unit yet, so they stay the
+ * shared pool's bytes; only the ones the code loads explicitly are declared). */
+extern u8 lbl_805B61F8[];
+extern u8 lbl_805B63A8[];
+extern u8 lbl_805B63E8[];
+extern u8 lbl_805B6950[];
+extern VEC3 vec_pair_801CCBC4_0[2];
+extern VEC3 vec_pair_801CCBC4_1[2];
+extern VEC3 vec_pair_801CCBC4_2[2];
+extern VEC3 vec_pair_801CCBC4_3[2];
+
+/* ----------------------------------------------------------------------------------------------------
+ * the C++-mangled callees (rule 9: declared with the signature the mangling encodes, called through it)
+ * -------------------------------------------------------------------------------------------------- */
+
+u16 calcVecAngX(nw4r::math::VEC3* v);                       /* calcVecAngX__FPQ34nw4r4math4VEC3 */
+f32 calcDistanceSqXZ(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
+                                                            /* calcDistanceSqXZ__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3 */
+void setVector3(nw4r::math::VEC3* v, f32 x, f32 y, f32 z);  /* setVector3__FPQ34nw4r4math4VEC3fff */
+void rotVecY(nw4r::math::VEC3* v, u32 angle);               /* rotVecY__FPQ34nw4r4math4VEC3Ul */
+u32 em_frame_check(struct _ENEMY_WORK* self, u16 a, f32 b, f32 c);
+u32 em_after_frame_check(struct _ENEMY_WORK* self, u16 a, f32 b, f32 c);
+                                                            /* em_frame_check__FP11_ENEMY_WORKUsff */
+s32 em_die_ck(struct _ENEMY_WORK* self);                    /* em_die_ck__FP11_ENEMY_WORK */
+u16 em_get_mot_no(struct _ENEMY_WORK* self);                /* em_get_mot_no__FP11_ENEMY_WORK */
+u8 em_parts_damage_level_get(struct _ENEMY_WORK* self, u8 part);
+                                                            /* em_parts_damage_level_get__FP11_ENEMY_WORKUc */
+f32 get_em_chg_scale(struct _ENEMY_WORK* self);             /* get_em_chg_scale__FP11_ENEMY_WORK */
+void get_joint_wpos_em(struct _ENEMY_WORK* self, u32 joint, nw4r::math::VEC3* out);
+                                                            /* get_joint_wpos_em__FP11_ENEMY_WORKUlPQ34nw4r4math4VEC3 */
+void* get_move_work_adrs(u8 index);                         /* get_move_work_adrs__FUc */
+u16 get_move_work_max(u8 index);                            /* get_move_work_max__FUc */
+
+/* the runtime's allocator pair; spelling the manglings `__nw__FUl`/`__dl__FPv` as identifiers would be
+ * rule 9's violation, so the C++ definitions the compiler mangles to them are declared and called. */
+void* operator new(unsigned long size);
+void operator delete(void* ptr) throw();
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* ----------------------------------------------------------------------------------------------------
+ * the enemy-band callees
+ *
+ * The signatures are the call sites' (the argument counts are the ones the callers set in r4..r6 and
+ * f1..f3); where a callee's body disagrees with its owner header, the body won and the correction is
+ * recorded in the outbox.
+ * -------------------------------------------------------------------------------------------------- */
+
+/* enemy/enemy_control.cpp (0x801411B8..0x80147CE0) */
+s16 em_demo_frame_get();
+u32 em_demo_time_ck(u32 id);
+void em_demo_pos_set(struct _ENEMY_WORK* self, f32 a, f32 b, f32 c);
+void em_demo_rot_set(struct _ENEMY_WORK* self, f32 a, f32 b, f32 c);
+void em_demo_reset(struct _ENEMY_WORK* self, u32 a);
+void em_demo_key3_apply(struct _ENEMY_WORK* self, s16 a, void* b, u32 c);
+void em_demo_key_apply(struct _ENEMY_WORK* self, s16 a, void* b, void* c, u32 d, u32 e);
+void em_demo_enable(struct _ENEMY_WORK* self);
+
+/* enemy/fn_801251D0.cpp (0x801251D0..0x8012BA00).  `fn_80126278` takes the work record in r3 (the
+ * callee's body does `mr r30,r4` / `mr r31,r5` before `fn_801261D8`), which the owner header
+ * (`void fn_80126278(u16 id, VEC3* out)`) does not carry - corrected here. */
+void fn_80126278(struct _ENEMY_WORK* self, u16 id, nw4r::math::VEC3* out);
+void em_action_finish(struct _ENEMY_WORK* self);
+void fn_801280F4(struct _ENEMY_WORK* self);
+void em_state_set(struct _ENEMY_WORK* self, u32 a, u32 b);
+void em_hit_window_set_default(struct _ENEMY_WORK* self, u32 a, u32 b);
+u32 fn_80129A70(struct _ENEMY_WORK* self, u16 a);
+u8 fn_80129DB8(struct _ENEMY_WORK* self);
+u32 fn_8012A014(struct _ENEMY_WORK* self, u32 a, u32 b, u16 c, void* d, void* e);
+
+/* enemy/fn_8012BDF4.cpp (0x8012BDF4..0x8012E968) */
+void em_busy_set(struct _ENEMY_WORK* self);
+u32 fn_8012E5A8(struct _ENEMY_WORK* self);
+
+/* enemy/fn_8012E968.cpp (0x8012E968..0x8012EC74) - both bodies read the work record (settled from the
+ * callees: `fn_8012EC3C` loads +0x89F, `em_alt_mode_ck` loads +0x8AA). */
+u32 fn_8012EC3C(struct _ENEMY_WORK* self);
+u32 em_alt_mode_ck(struct _ENEMY_WORK* self);
+
+/* enemy/fn_8012EC74.cpp (0x8012EC74..0x80137604) */
+void em_mot_set_blend(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d);
+void em_mot_set(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
+void em_mot_set_ck(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
+u32 em_mot_end_ck(struct _ENEMY_WORK* self);
+s32 fn_8012F948(struct _ENEMY_WORK* self);
+void em_hit_window_clear(struct _ENEMY_WORK* self, u32 a);
+void em_mot_speed_set(struct _ENEMY_WORK* self, f32 a);
+u32 fn_8013023C(struct _ENEMY_WORK* self);
+f32 fn_8013032C(struct _ENEMY_WORK* self);
+void fn_801303EC(struct _ENEMY_WORK* self, f32 a);
+void em_move_mode_set(struct _ENEMY_WORK* self, u32 a);
+void em_fall_start(struct _ENEMY_WORK* self);
+void fn_80133C3C(struct _ENEMY_WORK* self);
+void em_move_offset_rot_apply(struct _ENEMY_WORK* self, void* p);
+f32 em_key_curve_eval(struct _ENEMY_WORK* self, void* tbl);
+void fn_801369A0(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c);
+void fn_80130CDC(struct _ENEMY_WORK* self, u32 a);
+void fn_80130F74(struct _ENEMY_WORK* self);
+struct _ENEMY_WORK* fn_80131034(struct _ENEMY_WORK* self, u8 kind, u8 distance_check);
+void fn_8013221C(struct _ENEMY_WORK* self, f32 a, u32 b, u32 c);
+void fn_80132224(struct _ENEMY_WORK* self);
+void fn_80132264(struct _ENEMY_WORK* self);
+u8* fn_801377D0(u8 index);
+void em_part_hit_set(struct _ENEMY_WORK* self, u32 a, u32 b);
+void em_camera_req(struct _ENEMY_WORK* self, u32 a, u32 b);
+void fn_801376B4(struct _ENEMY_WORK* self);
+
+/* enemy/fn_80138074.c (0x80138074..0x8013ACC4) */
+void em_res_user_data_set(struct _ENEMY_WORK* self, void* helper);
+void fn_8013918C(void* helper, s16 flag);
+s32 em_res_user_data_ck(struct _ENEMY_WORK* self);
+
+/* enemy/fn_80147CE0.cpp (0x80147CE0..0x80149D6C) */
+void* em_res_user_data_ctor(void* self);
+
+/* this range's own not-yet-written bodies (`fn_801D4C3C` dispatches into `fn_801D428C`);
+ * declared so the dispatchers compile, written in the next pass (see the residual note above). */
+
+void fn_801049D0(struct _ENEMY_WORK* self, u32 id, u32 type, s32 joint, nw4r::math::VEC3* pos,
+                 f32 scale);
+void eft_spawn_type10(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c);
+void fn_801057FC(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c, s32 d);
+void eft_spawn_type11(struct _ENEMY_WORK* self, void* pos, u8 a, f32 b);
+void eft_spawn_pos_in_area(void* pos, u8 a, u8 b, s32 c, f32 d);
+void fn_800FA378(void* out);
+void fn_800FA3B8(void* out);
+void assignVec3(void* out, const void* in);
+void fn_8004FFC8(void* a, void* b, void* c, f32 d);
+void draw_shape_arm(struct _ENEMY_WORK* self, u32 a, u32 b);
+
+/* the unclaimed enemy action band below this range (0x801CB308..0x801D3CF8) - the dispatchers'
+ * tail-call targets.  Their band header is `include/unsplit/enemy.h` and the move is recorded as a
+ * `shared-file` request in the outbox; until it lands this file carries its own copy. */
+void fn_801CCCE8(struct _ENEMY_WORK* self);
+void fn_801CE898(struct _ENEMY_WORK* self);
+void fn_801CF648(struct _ENEMY_WORK* self);
+void fn_801D290C(struct _ENEMY_WORK* self);
+void fn_801D2B10(struct _ENEMY_WORK* self);
+void fn_801D2E0C(struct _ENEMY_WORK* self);
+void fn_801D2EBC(struct _ENEMY_WORK* self);
+void fn_801D2ED0(struct _ENEMY_WORK* self);
+void fn_801D320C(struct _ENEMY_WORK* self);
+void fn_801D3564(struct _ENEMY_WORK* self);
+void fn_801D38A0(struct _ENEMY_WORK* self);
+void fn_801D3C38(struct _ENEMY_WORK* self);
+void fn_801D3CF8(struct _ENEMY_WORK* self, u32 a);
+
+/* the unclaimed band above this range (0x801D80EC..0x801EC9E0), bracketed by `enemy` below and
+ * `lobby` above - rule 2's documented gap, so the declaration stays here. */
+void eft_em_spawn_joint(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c, u32 d);
+
+/* the same gap in the other modules: 0x802Bxxxx sits between `Pl/pl_act.cpp` and
+ * `stage/fn_802B2978.c`, 0x8030xxxx between `ai/fn_802D0DCC.c` and `ef/fn_803066F0.c`. */
+s32 fn_8028F558(void* a, void* b);
+s32 fn_802907BC(s32 a, void* b);
+void fn_802B43A8(void* pos, u8 a, u16 b);
+void eft_em_spawn(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c);
+
+/* ----------------------------------------------------------------------------------------------------
+ * the records this unit needs locally
+ * -------------------------------------------------------------------------------------------------- */
+
+/* The two stack scratch records `fn_801D66BC` builds: `fn_800FA3B8`/`fn_800FA378` fill them,
+ * `fn_8004FFC8` reads the first and `fn_8028F558` compares them.  No function reads their contents, so
+ * only their sizes (the target's own frame layout) are stated.
+ * size: 0x20 */
+struct EmScratchA {
+    /* +0x00 */ u8 unused_0x00[0x20];
+};
+
+/* size: 0x40 */
+struct EmScratchB {
+    /* +0x00 */ u8 unused_0x00[0x40];
+};
+
+/* The record `fn_801377D0` hands back for an area entry, as `fn_801D6758` reads it (the `_ENEMY_WORK`
+ * shape at +0x00/+0x16/+0x5A6).
+ * size: 0x5A8 (only the three bytes the caller reads are named) */
+struct EmAreaEntry801CCBC4 {
+    /* +0x000 */ u8 active;
+    /* +0x001 */ u8 unused_0x001[0x016 - 0x001];
+    /* +0x016 */ u8 area_no;
+    /* +0x017 */ u8 unused_0x017[0x5A6 - 0x017];
+    /* +0x5A6 */ u8 flags_0x5A6;
+    /* +0x5A7 */ u8 unused_0x5A7[0x5A8 - 0x5A7];
+};
+
+/* One 0x1C-byte entry of the `lbl_805B6950` table `fn_801D66BC` indexes (`arg0 * 0x1C`): the two
+ * 0xC-byte records `fn_8004FFC8` interpolates between, and the scale it takes at +0x18.
+ * size: 0x1C */
+struct EmGrowTable801CCBC4 {
+    /* +0x00 */ u8 rec_a[0xC];
+    /* +0x0C */ u8 rec_b[0xC];
+    /* +0x18 */ f32 scale;
+};
+
+/* The 0x18-byte spawn record `fn_801D6EDC` fills (`id` word, a vector, then the three scalars).
+ * size: 0x18 */
+struct EmSpawnRec801CCBC4 {
+    /* +0x00 */ u32 id;
+    /* +0x04 */ nw4r::math::VEC3 pos;
+    /* +0x10 */ u8 field_0x10;
+    /* +0x12 */ u16 field_0x12;
+    /* +0x14 */ u16 field_0x14;
+};
+
+/* ====================================================================================================
+ * bodies
+ * ================================================================================================== */
+
+/* this range's own functions that a later body calls before its definition */
+void fn_801D4CE0(struct _ENEMY_WORK* self);
+void fn_801D4DD8(struct _ENEMY_WORK* self, u8 arg1, u8 arg2, u32 arg3, s32 arg4, f32 arg5);
+
+void fn_801D4F78(struct _ENEMY_WORK* self) {
+    nw4r::math::VEC3 spot;
+    u32 area_flag;
+    u8 area;
+    u8 flags;
+
+    VEC3_ctor(&spot);
+    fn_801D4CE0(self);
+    switch (em_get_mot_no(self)) {
+    case 0x8:
+        if ((em_after_frame_check(self, 0, lbl_807993A4, lbl_80799220) == 1) || (em_after_frame_check(self, 0, lbl_80799444, lbl_80799220) == 1)) {
+            fn_801D4DD8(self, 0, 0, 0x25, 0, lbl_8079925C);
+            fn_801D4DD8(self, 0, 0, 0x2D, 0, lbl_8079925C);
+        }
+        if ((em_after_frame_check(self, 0, lbl_807992F4, lbl_80799220) == 1) || (em_after_frame_check(self, 0, lbl_8079934C, lbl_80799220) == 1)) {
+            fn_801D4DD8(self, 0, 2, 8, 0, lbl_80799448);
+            em_camera_req(self, -1, 0);
+        }
+        if ((em_after_frame_check(self, 0, lbl_8079944C, lbl_80799220) == 1) || (em_after_frame_check(self, 0, lbl_80799450, lbl_80799220) == 1)) {
+            fn_801D4DD8(self, 0, 2, 0x11, 0, lbl_80799448);
+        }
+        break;
+    case 0x9:
+        if (em_after_frame_check(self, 0, lbl_80799390, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 0, 2, 8, 0, lbl_80799454);
+            em_camera_req(self, 8, 7);
+        }
+        if (em_after_frame_check(self, 0, lbl_80799274, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 0, 2, 0x11, 0, lbl_80799458);
+            em_camera_req(self, 0x11, 7);
+        }
+        break;
+    case 0xC:
+        if (em_after_frame_check(self, 0, lbl_80799348, lbl_80799220) == 1) {
+            em_hit_window_set(self, 0, 0x14, 8);
+            em_hit_window_set(self, 1, 0x15, 0x10);
+        }
+        if (em_after_frame_check(self, 0, lbl_8079930C, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 0, 0, 0x11, 0, lbl_8079925C);
+        }
+        break;
+    case 0xD:
+        if (em_after_frame_check(self, 0, lbl_80799348, lbl_80799220) == 1) {
+            em_hit_window_set(self, 0, 0x16, 8);
+            em_hit_window_set(self, 1, 0x17, 0x10);
+        }
+        if (em_after_frame_check(self, 0, lbl_8079930C, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 0, 0, 8, 0, lbl_8079925C);
+        }
+        break;
+    case 0x1B:
+        if (em_after_frame_check(self, 0, lbl_807992C0, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 2, 0, 3, 0, lbl_80799230);
+        }
+        break;
+    case 0x1E:
+        if (em_after_frame_check(self, 0, lbl_8079945C, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 2, 0, 3, 0, lbl_80799230);
+        }
+        break;
+    case 0x25:
+    case 0x26:
+        if (em_after_frame_check(self, 0, lbl_807992B0, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 2, 0, 3, 0, lbl_80799230);
+        }
+        break;
+    case 0x29:
+        if (em_after_frame_check(self, 0, lbl_807992F4, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 0, 5, 3, 0, lbl_80799460);
+            setVector3(&spot, lbl_80799220, lbl_80799220, lbl_8079928C);
+            fn_801369A0(self, 1, 0, &spot, lbl_80799460);
+        }
+        break;
+    case 0x2A:
+        if (em_after_frame_check(self, 0, lbl_80799378, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 0, 5, 3, 0, lbl_80799460);
+        }
+        break;
+    case 0x41:
+        if (em_after_frame_check(self, 0, lbl_80799318, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 1, 4, 3, 0, lbl_80799288);
+            setVector3(&spot, lbl_80799220, lbl_80799220, lbl_8079928C);
+            fn_801369A0(self, 2, 0, &spot, lbl_80799368);
+            em_camera_req(self, -1, 7);
+        }
+        break;
+    case 0x44:
+        if (em_after_frame_check(self, 0, lbl_807992C0, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 2, 0, 3, 0, lbl_80799230);
+        }
+        break;
+    case 0x64:
+        if (em_after_frame_check(self, 0, lbl_807993AC, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 0, 2, 8, 0, lbl_80799448);
+        }
+        if (em_after_frame_check(self, 0, lbl_80799310, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 0, 2, 0x11, 0, lbl_80799448);
+        }
+        break;
+    case 0x65:
+        if (em_after_frame_check(self, 0, lbl_80799464, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 0, 2, 8, 0, lbl_80799448);
+        }
+        if (em_after_frame_check(self, 0, lbl_80799308, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 0, 2, 0x11, 0, lbl_80799448);
+        }
+        break;
+    case 0x66:
+        if (em_after_frame_check(self, 0, lbl_80799404, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 1, 0, 4, 0x2AAB, lbl_80799260);
+            em_camera_req(self, -1, 7);
+        }
+        break;
+    case 0x67:
+        if (em_after_frame_check(self, 0, lbl_80799404, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 1, 0, 4, 0xD556, lbl_80799260);
+            em_camera_req(self, -1, 7);
+        }
+        break;
+    case 0x71:
+        if (em_after_frame_check(self, 0, lbl_80799348, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 1, 5, 4, 0, lbl_80799240);
+            em_camera_req(self, -1, 1);
+        }
+        break;
+    case 0x72:
+        if (em_after_frame_check(self, 0, lbl_80799468, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 1, 1, 0x19, 0, lbl_8079924C);
+        }
+        break;
+    case 0x74:
+        if (em_after_frame_check(self, 0, lbl_8079946C, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 1, 1, 0x19, 0, lbl_8079924C);
+        }
+        break;
+    case 0x78:
+        if (em_after_frame_check(self, 0, lbl_80799274, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 0, 0, 0x25, 0, lbl_8079925C);
+        }
+        if (em_after_frame_check(self, 0, lbl_80799468, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 0, 0, 0x2D, 0, lbl_8079925C);
+        }
+        if (em_after_frame_check(self, 0, lbl_80799308, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 1, 4, 0x18, 0, lbl_80799288);
+            em_camera_req(self, -1, 7);
+        }
+        break;
+    case 0x7D:
+        if (em_after_frame_check(self, 0, lbl_80799310, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 1, 4, 4, 0, lbl_80799288);
+        }
+        if (em_after_frame_check(self, 0, lbl_80799470, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 1, 1, 4, 0, lbl_80799240);
+        }
+        break;
+    case 0x7F:
+        if (em_after_frame_check(self, 0, lbl_80799388, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 1, 2, 4, 0, lbl_8079925C);
+            em_camera_req(self, -1, 7);
+        }
+        break;
+    case 0x80:
+        if (em_after_frame_check(self, 0, lbl_80799474, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 0, 2, 0x1C, 0, lbl_80799454);
+        }
+        break;
+    case 0x82:
+        if (em_after_frame_check(self, 0, lbl_80799478, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 1, 1, 0x1A, 0, lbl_807993A0);
+            em_camera_req(self, -1, 7);
+        }
+        break;
+    case 0x83:
+        if (em_after_frame_check(self, 0, lbl_80799468, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 0, 2, 0x11, 0, lbl_80799448);
+            em_camera_req(self, -1, 7);
+        }
+        if ((em_after_frame_check(self, 0, lbl_80799354, lbl_80799220) == 1) || (em_after_frame_check(self, 0, lbl_8079944C, lbl_80799220) == 1) || (em_after_frame_check(self, 0, lbl_8079939C, lbl_80799220) == 1) || (em_after_frame_check(self, 0, lbl_80799308, lbl_80799220) == 1)) {
+            fn_801D4DD8(self, 0, 2, 8, 0, lbl_80799448);
+        }
+        break;
+    case 0x84:
+        if (em_after_frame_check(self, 0, lbl_8079947C, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 0, 2, 0x11, 0, lbl_80799448);
+            em_camera_req(self, -1, 7);
+        }
+        if (em_after_frame_check(self, 0, lbl_80799468, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 0, 2, 8, 0, lbl_80799448);
+        }
+        break;
+    case 0xC9:
+    case 0xCA:
+        if (em_after_frame_check(self, 0, lbl_807993AC, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 1, 6, 4, 0, lbl_80799348);
+        }
+        break;
+    case 0xCB:
+    case 0xCC:
+        if ((em_after_frame_check(self, 0, lbl_807992B0, lbl_80799220) == 1) || (em_after_frame_check(self, 0, lbl_80799308, lbl_80799220) == 1)) {
+            fn_801D4DD8(self, 2, 0, 4, 0, lbl_80799230);
+        }
+        break;
+    case 0xCD:
+    case 0xCF:
+        if (em_after_frame_check(self, 0, lbl_80799294, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 0, 5, 4, 0, lbl_80799460);
+        }
+        break;
+    case 0xCE:
+    case 0xD0:
+        if (em_after_frame_check(self, 0, lbl_807993A4, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 2, 0, 4, 0, lbl_80799230);
+        }
+        break;
+    case 0xD1:
+        if (em_after_frame_check(self, 0, lbl_80799378, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 1, 4, 4, 0, lbl_807993A0);
+            em_camera_req(self, -1, 7);
+        }
+        break;
+    case 0xD2:
+        if (em_after_frame_check(self, 0, lbl_8079936C, lbl_80799220) == 1) {
+            setVector3(&spot, lbl_80799220, lbl_80799220, lbl_8079923C);
+            fn_801049D0(self, 8, 2, 0, &spot, lbl_80799448);
+        }
+        if (em_after_frame_check(self, 0, lbl_80799380, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 0, 2, 0x11, 0, lbl_80799448);
+        }
+        break;
+    case 0xD3:
+        if (em_after_frame_check(self, 0, lbl_8079936C, lbl_80799220) == 1) {
+            setVector3(&spot, lbl_80799220, lbl_80799220, lbl_8079923C);
+            fn_801049D0(self, 0x11, 2, 0, &spot, lbl_80799448);
+        }
+        if (em_after_frame_check(self, 0, lbl_80799380, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 0, 2, 8, 0, lbl_80799448);
+        }
+        break;
+    case 0xD4:
+        if ((u8) self->action == 0xA) {
+            if (em_after_frame_check(self, 0, lbl_80799318, lbl_80799220) == 1) {
+                em_hit_window_set(self, 0, 3, 8);
+                em_hit_window_set(self, 1, 4, 0x18);
+            }
+            if (em_frame_check(self, 0, lbl_8079935C, lbl_80799220) == 1) {
+                em_hit_window_clear(self, 1);
+                em_hit_window_set(self, 1, 0x10, 0x10);
+            }
+        }
+        if (em_after_frame_check(self, 0, lbl_80799270, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 0, 2, 8, 0, lbl_80799448);
+            em_camera_req(self, 8, 7);
+        }
+        if (em_after_frame_check(self, 0, lbl_80799378, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 0, 2, 0x11, 0, lbl_80799448);
+            em_camera_req(self, 0x11, 7);
+        }
+        break;
+    case 0xD5:
+        if (em_after_frame_check(self, 0, lbl_80799380, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 0, 2, 0x2D, 0, lbl_80799348);
+        }
+        if (em_after_frame_check(self, 0, lbl_80799324, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 0, 2, 0x11, 0, lbl_80799348);
+        }
+        if (em_after_frame_check(self, 0, lbl_80799468, lbl_80799220) == 1) {
+            em_camera_req(self, -1, 7);
+        }
+        break;
+    case 0xD7:
+        if (em_after_frame_check(self, 0, lbl_80799318, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 1, 4, 4, 0, lbl_80799460);
+            em_camera_req(self, -1, 1);
+        }
+        break;
+    case 0xD9:
+        if (em_after_frame_check(self, 0, lbl_80799380, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 0, 2, 0x25, 0, lbl_80799348);
+        }
+        if (em_after_frame_check(self, 0, lbl_80799324, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 0, 2, 8, 0, lbl_80799348);
+        }
+        if (em_after_frame_check(self, 0, lbl_80799468, lbl_80799220) == 1) {
+            em_camera_req(self, -1, 7);
+        }
+        break;
+    case 0xDB:
+        if (em_after_frame_check(self, 0, lbl_80799318, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 1, 4, 4, 0, lbl_80799460);
+            em_camera_req(self, -1, 1);
+        }
+        break;
+    case 0xDC:
+        if (((s32) (self->flags_0x836 & 1) == 0) && (em_after_frame_check(self, 0, lbl_80799480, lbl_80799220) == 1)) {
+            setVector3(&spot, lbl_80799220, lbl_80799220, lbl_80799220);
+            eft_em_spawn_joint(self, 1, 0x1A, &spot, 0xC, lbl_80799240);
+            eft_em_spawn_joint(self, 1, 0x1C, &spot, 0xC, lbl_80799240);
+        }
+        break;
+    case 0xDD:
+        if (((s32) (self->flags_0x836 & 1) == 0) && (em_after_frame_check(self, 0, lbl_80799480, lbl_80799220) == 1)) {
+            setVector3(&spot, lbl_80799220, lbl_80799220, lbl_80799220);
+            eft_em_spawn_joint(self, 1, 0x19, &spot, 0xC, lbl_80799240);
+            eft_em_spawn_joint(self, 1, 0x1B, &spot, 0xC, lbl_80799240);
+        }
+        break;
+    case 0xDE:
+    case 0xE1:
+        if (em_after_frame_check(self, 0, lbl_80799484, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 1, 4, 4, 0, lbl_80799460);
+        }
+        break;
+    case 0xDF:
+        if (em_after_frame_check(self, 0, lbl_80799488, lbl_80799220) == 1) {
+            setVector3(&spot, lbl_80799220, lbl_80799220, lbl_80799220);
+            eft_em_spawn(self, 0x7C, 0x14, &spot, lbl_80799240);
+            em_camera_req(self, -1, 7);
+        }
+        break;
+    case 0xE2:
+        if (em_after_frame_check(self, 0, lbl_80799488, lbl_80799220) == 1) {
+            setVector3(&spot, lbl_80799220, lbl_80799220, lbl_80799220);
+            eft_em_spawn(self, 0x7D, 0xB, &spot, lbl_80799240);
+            em_camera_req(self, -1, 7);
+        }
+        break;
+    case 0xE4:
+        if (em_after_frame_check(self, 0, lbl_80799388, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 0, 2, 0x11, 0, lbl_80799448);
+        }
+        if (em_after_frame_check(self, 0, lbl_807993AC, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 0, 2, 8, 0, lbl_80799448);
+        }
+        break;
+    case 0xE9:
+        if (em_after_frame_check(self, 0, lbl_80799388, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 2, 0, 3, 0, lbl_80799230);
+        }
+        break;
+    case 0xEC:
+        if (em_after_frame_check(self, 0, lbl_80799274, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 0, 5, 3, 0, lbl_80799460);
+        }
+        break;
+    case 0xED:
+        if (em_after_frame_check(self, 0, lbl_80799348, lbl_80799220) == 1) {
+            fn_801369A0(self, 1, 0, NULL, lbl_80799240);
+        }
+        break;
+    case 0xEF:
+        if (em_after_frame_check(self, 0, lbl_80799274, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 1, 4, 4, 0, lbl_807993A0);
+            em_camera_req(self, -1, 1);
+        }
+        break;
+    case 0xF0:
+    case 0xF1:
+        if (em_after_frame_check(self, 0, lbl_80799388, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 1, 4, 4, 0, lbl_807993A0);
+            em_camera_req(self, -1, 7);
+        }
+        break;
+    case 0xF2:
+    case 0xF3:
+        if (em_after_frame_check(self, 0, lbl_80799388, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 1, 4, 4, 0, lbl_807993A0);
+            em_camera_req(self, -1, 7);
+        }
+        break;
+    case 0xF6:
+        if (em_after_frame_check(self, 0, lbl_80799348, lbl_80799220) == 1) {
+            fn_801D4DD8(self, 1, 4, 4, 0, lbl_807993A0);
+            em_camera_req(self, -1, 1);
+        }
+        break;
+    }
+    area_flag = 0;
+    if ((u8)stage_map_kind_get(self->field_0x1E0) == 4 && (self->area_no == 4 || self->area_no == 6)) {
+        area_flag = 1;
+    }
+    if (em_alt_mode_ck(self) == 1 || area_flag == 1) {
+        self->field_0x761 = (u8)(self->field_0x761 | 1);
+    } else {
+        flags = self->field_0x761;
+        if ((flags & 1) != 0) {
+            self->field_0x761 = (u8)(flags & 0xFE);
+        }
+    }
+    if (area_flag == 1 && self->field_0x762 == 0) {
+        self->field_0x761 = (u8)(self->field_0x761 | 2);
+        return;
+    }
+    flags = self->field_0x761;
+    if ((flags & 2) != 0) {
+        self->field_0x761 = (u8)(flags & 0xFD);
+    }
+}
+
+void fn_801D428C(struct _ENEMY_WORK* self) {
+    nw4r::math::VEC3 spot;
+
+    VEC3_ctor(&spot);
+    switch (self->state) {
+    case 0:
+        self->state++;
+        self->timer_0x020 = 0;
+        em_fall_height_get(self);
+        em_fall_start(self);
+        em_mot_set(self, 1, 0, 0);
+        em_demo_reset(self, 0);
+        break;
+    case 1:
+        if (em_demo_time_ck(0x10E) == 1) {
+            self->state++;
+            em_demo_enable(self);
+            em_mot_set(self, 1, 0, 0);
+            em_demo_rot_set(self, lbl_807993E8, lbl_807993EC, lbl_807993F0);
+            em_demo_pos_set(self, lbl_807993F4, lbl_807993F8, lbl_807993FC);
+        }
+        break;
+    case 2:
+        em_demo_rot_set(self, lbl_807993E8, lbl_807993EC, lbl_807993F0);
+        fn_80133C3C(self);
+        if (em_demo_time_ck(0x1B4) == 1) {
+            self->state++;
+            em_mot_set(self, 2, 0xA, 0);
+        }
+        break;
+    case 3:
+        em_demo_rot_set(self, lbl_807993E8, lbl_807993EC, lbl_807993F0);
+        fn_80133C3C(self);
+        if (em_frame_check(self, 1, lbl_80799254, lbl_80799220) == 1) {
+            self->state++;
+            em_mot_set(self, 8, 8, 0);
+            em_mot_speed_set(self, lbl_80799368);
+        }
+        break;
+    case 4:
+        em_demo_rot_set(self, lbl_807993E8, lbl_807993EC, lbl_807993F0);
+        fn_80133C3C(self);
+        if (em_frame_check(self, 0, lbl_80799274, lbl_80799220) == 1) {
+            setVector3(&spot, lbl_80799220, lbl_80799220, lbl_8079923C);
+            fn_801049D0(self, 1, 5, 0, &spot, lbl_807993A0);
+        }
+        if (em_demo_time_ck(0x294) == 1) {
+            self->state++;
+            em_move_mode_set(self, 0);
+            em_mot_set(self, 0xDA, 0, 0x56);
+            em_mot_speed_set(self, lbl_80799280);
+            em_demo_rot_set(self, lbl_80799220, lbl_80799400, lbl_80799220);
+            em_demo_key_apply(self, em_demo_frame_get(), lbl_805B61F8, lbl_805B63A8, 7, 2);
+            fn_801303EC(self, self->pos.y - self->field_0x20C);
+        }
+        break;
+    case 5:
+        em_demo_key_apply(self, em_demo_frame_get(), lbl_805B61F8, lbl_805B63A8, 7, 2);
+        fn_801303EC(self, self->pos.y - self->field_0x20C);
+        if (em_demo_time_ck(0x2AE) == 1) {
+            self->state++;
+            em_mot_set(self, 0xDB, 0, 0);
+        }
+        break;
+    case 6:
+        em_demo_key_apply(self, em_demo_frame_get(), lbl_805B61F8, lbl_805B63A8, 7, 2);
+        fn_801303EC(self, self->pos.y - self->field_0x20C);
+        if (em_frame_check(self, 0, lbl_80799404, lbl_80799220) == 1) {
+            get_joint_wpos_em(self, 3, &spot);
+            spot.y = lbl_807992E8 + self->pos.y;
+            eft_spawn_pos_in_area(&spot, self->area_no, 5, 0, lbl_80799408);
+        }
+        if (em_mot_end_ck(self) == 1) {
+            self->state++;
+            em_mot_set(self, 2, 4, 0);
+            em_mot_speed_set(self, lbl_80799288);
+        }
+        break;
+    case 7:
+        em_demo_key_apply(self, em_demo_frame_get(), lbl_805B61F8, lbl_805B63A8, 7, 2);
+        fn_801303EC(self, self->pos.y - self->field_0x20C);
+        if (em_frame_check(self, 1, lbl_80799354, lbl_80799220) == 1) {
+            self->state++;
+            em_mot_speed_set(self, lbl_80799240);
+        }
+        break;
+    case 8:
+        em_demo_key_apply(self, em_demo_frame_get(), lbl_805B61F8, lbl_805B63A8, 7, 2);
+        fn_801303EC(self, self->pos.y - self->field_0x20C);
+        if (em_demo_time_ck(0x3FC) == 1) {
+            self->state++;
+            em_mot_set(self, 2, 0, 0x110);
+            em_demo_rot_set(self, lbl_80799220, lbl_8079940C, lbl_80799220);
+            em_demo_pos_set(self, lbl_80799410, lbl_80799220, lbl_80799414);
+            fn_801303EC(self, lbl_80799220);
+        }
+        break;
+    case 9:
+        if (em_frame_check(self, 1, lbl_80799418, lbl_80799220) == 1) {
+            self->state++;
+            em_mot_set(self, 0xDF, 0xA, 0);
+        }
+        break;
+    case 10:
+        if (em_demo_time_ck(0x42A) == 1) {
+            em_demo_rot_set(self, lbl_80799220, lbl_8079941C, lbl_80799220);
+            em_demo_key3_apply(self, em_demo_frame_get(), lbl_805B63E8, 0);
+            fn_801303EC(self, self->pos.y - self->field_0x20C);
+        } else if (fn_8012F948(self) == 0) {
+            self->field_0x318 = em_key_curve_eval(self, lbl_805B52D8);
+            em_move_offset_rot_apply(self, &self->field_0x1BC);
+        }
+        if (em_demo_time_ck(0x454) == 1) {
+            self->state++;
+            em_mot_set(self, 0xDF, 0, 0);
+            em_mot_speed_set(self, lbl_80799420);
+        }
+        break;
+    case 11:
+        em_demo_rot_set(self, lbl_80799220, lbl_8079941C, lbl_80799220);
+        em_demo_key3_apply(self, em_demo_frame_get(), lbl_805B63E8, 0);
+        fn_801303EC(self, self->pos.y - self->field_0x20C);
+        if (em_frame_check(self, 1, lbl_80799424, lbl_80799220) == 1) {
+            self->state++;
+            em_mot_speed_set(self, lbl_80799240);
+        }
+        break;
+    case 12:
+        em_demo_rot_set(self, lbl_80799220, lbl_8079941C, lbl_80799220);
+        em_demo_key3_apply(self, em_demo_frame_get(), lbl_805B63E8, 0);
+        fn_801303EC(self, self->pos.y - self->field_0x20C);
+        if (em_demo_time_ck(0x49C) == 1) {
+            self->state++;
+            em_demo_rot_set(self, lbl_80799220, lbl_80799428, lbl_80799220);
+            em_demo_pos_set(self, lbl_8079942C, lbl_80799220, lbl_80799430);
+        }
+        break;
+    case 13:
+        if (em_demo_time_ck(0x5AA) == 1) {
+            self->state++;
+            em_mot_set(self, 0x12, 0, 0);
+            em_mot_speed_set(self, lbl_80799434);
+        }
+        break;
+    case 14:
+        if (em_demo_time_ck(0x6E4) == 1) {
+            self->state++;
+            em_mot_set(self, 5, 0, 0);
+            em_demo_rot_set(self, lbl_80799220, lbl_80799428, lbl_80799220);
+            em_demo_pos_set(self, lbl_80799438, lbl_80799220, lbl_8079943C);
+            self->timer_0x020 = 0;
+        }
+        break;
+    case 15:
+        if (em_frame_check(self, 0, lbl_80799238, lbl_80799220) == 1) {
+            draw_shape_arm(self, 0x1D, 0xA);
+        }
+        if (em_frame_check(self, 0, lbl_80799238, lbl_80799220) == 1) {
+            setVector3(&spot, lbl_80799220, lbl_80799220, lbl_8079923C);
+            eft_em_spawn(self, 0, 0x1B, &spot, lbl_80799240);
+        }
+        if (em_frame_check(self, 3, lbl_80799244, lbl_80799248) == 1) {
+            if ((self->timer_0x020 & 7) == 0) {
+                setVector3(&spot, lbl_80799220, lbl_80799220, lbl_8079923C);
+                eft_em_spawn(self, 1, 0x1B, &spot, lbl_80799240);
+            }
+            self->timer_0x020++;
+        }
+        if (em_mot_end_ck(self) == 1) {
+            self->state++;
+            em_mot_set(self, 2, 4, 0);
+            em_mot_speed_set(self, lbl_80799440);
+        }
+        break;
+    }
+}
+
+void fn_801D4B84(struct _ENEMY_WORK* self) {
+    switch (self->state) {
+    case 0:
+        self->state++;
+        em_move_mode_set(self, 0);
+        em_mot_set(self, 2, 0, 0);
+        em_demo_rot_set(self, lbl_80799220, lbl_80799428, lbl_80799220);
+        em_demo_pos_set(self, lbl_80799438, lbl_80799220, lbl_8079943C);
+        fn_801303EC(self, lbl_80799220);
+        em_demo_enable(self);
+        break;
+    case 1:
+        if (em_mot_end_ck(self) == 1) {
+            em_action_finish(self);
+        }
+        break;
+    }
+}
+
+void fn_801D4C3C(struct _ENEMY_WORK* self) {
+    switch (self->state_sub) {
+    case 0:
+        fn_801D2ED0(self);
+        break;
+    case 1:
+        fn_801D320C(self);
+        break;
+    case 2:
+        fn_801D3564(self);
+        break;
+    case 3:
+        fn_801D38A0(self);
+        break;
+    case 4:
+        fn_801D3C38(self);
+        break;
+    case 5:
+        fn_801D3CF8(self, 0);
+        break;
+    case 6:
+        fn_801D3CF8(self, 1);
+        break;
+    case 7:
+        fn_801D428C(self);
+        break;
+    case 8:
+        fn_801D4B84(self);
+        break;
+    }
+}
+
+void fn_801D4C90(struct _ENEMY_WORK* self) {
+    switch (self->action) {
+    case 0:
+        fn_801CB308(self);
+        break;
+    case 1:
+        fn_801CB9DC(self);
+        break;
+    case 2:
+        fn_801CCCE8(self);
+        break;
+    case 3:
+        fn_801CE898(self);
+        break;
+    case 4:
+        fn_801CF648(self);
+        break;
+    case 5:
+        fn_801D290C(self);
+        break;
+    case 6:
+        fn_801D2B10(self);
+        break;
+    case 7:
+        fn_801D2E0C(self);
+        break;
+    case 8:
+        fn_801D2EBC(self);
+        break;
+    case 9:
+        fn_801D4C3C(self);
+        break;
+    }
+}
+
+void fn_801D4CE0(struct _ENEMY_WORK* self) {
+    nw4r::math::VEC3 pos;
+    u16 ang;
+
+    VEC3_ctor(&pos);
+    if (em_alt_mode_ck(self) != 0) {
+        ang = calcVecAngX(&self->vec_0x76C);
+        if ((u16)(ang + 0x8000) > 0x671B) {
+            u16 mot = em_get_mot_no(self);
+            if (mot != 0xD8 && mot != 0xE4) {
+                setVector3(&pos, lbl_80799220, lbl_807992BC, lbl_80799380);
+                if ((system_w.field_0x0c & 0x1F) == 0) {
+                    if ((u16)(ang + 0x8000) > 0x6E38) {
+                        eft_spawn_type10(self, 0x16, 0x1C, &pos, lbl_80799240);
+                    } else {
+                        eft_spawn_type10(self, 0x15, 0x1C, &pos, lbl_80799240);
+                    }
+                }
+            }
+        }
+    }
+}
+
+void fn_801D4DD8(struct _ENEMY_WORK* self, u8 arg1, u8 arg2, u32 arg3, s32 arg4, f32 arg5) {
+    nw4r::math::VEC3 pos;
+
+    VEC3_ctor(&pos);
+    switch (arg1) {
+    case 0:
+        if ((u32)(arg2 - 0xC) > 0xD) {
+            if (arg2 != 0x26) {
+                if (arg3 == 0xFF) {
+                    pos.x = self->pos.x;
+                    pos.y = lbl_807992E8 + self->field_0x20C;
+                    pos.z = self->pos.z;
+                    eft009_set_pos(arg2, &pos, (_CP_VECTOR*)&self->field_0x1BC, arg5, self->area_no);
+                } else {
+                    eft009_spawn_at_joint(self, arg3, arg2, arg4, arg5);
+                }
+            }
+        }
+        break;
+    case 1:
+        if (arg3 == 0xFF) {
+            copyVec3(&pos, &self->pos);
+        } else {
+            get_joint_wpos_em(self, arg3, &pos);
+        }
+        pos.y = self->field_0x20C;
+        eft_spawn_pos_in_area(&pos, self->area_no, arg2, self->field_0x1C0,
+                    arg5 * get_em_chg_scale(self));
+        break;
+    case 2:
+        if (arg3 == 0xFF) {
+            copyVec3(&pos, &self->pos);
+        } else {
+            get_joint_wpos_em(self, arg3, &pos);
+        }
+        pos.y = self->field_0x20C;
+        eft_spawn_type11(self, &pos, arg2, arg5 * get_em_chg_scale(self));
+        break;
+    }
+}
+
+void fn_801D64A4(struct _ENEMY_WORK* self) {
+    _GXColor color;
+
+    ((MHchar*)self->char_0x024)->getTevKColor(5, GX_KCOLOR3, &color);
+    if (em_alt_mode_ck(self) == 1) {
+        if (color.a < 251) {
+            color.a = color.a + 4;
+        } else {
+            color.a = 255;
+        }
+    } else {
+        if (color.a > 4) {
+            color.a = color.a - 4;
+        } else {
+            color.a = 0;
+        }
+    }
+    ((MHchar*)self->char_0x024)->setTevKColor(5, GX_KCOLOR3, &color);
+}
+
+s32 fn_801D6548(struct _ENEMY_WORK* self, u8 arg1) {
+    nw4r::math::VEC3 a;
+    nw4r::math::VEC3 b;
+    nw4r::math::VEC3 c;
+    nw4r::math::VEC3 d;
+    struct _ENEMY_WORK* other;
+    f32 dist;
+    f32 scale;
+
+    VEC3_ctor(&a);
+    VEC3_ctor(&b);
+    other = fn_80131034(self, 0x1C, 0);
+    if (other != NULL && fn_8012E5A8(other) == 1) {
+        if (arg1 == 0) {
+            return 1;
+        }
+        copyVec3(&b, setVec3(&d, lbl_80799220, lbl_80799220,
+                                    lbl_80799264 * get_em_chg_scale(self)));
+        rotVecY(&b, self->field_0x1C0);
+        addVec3(&c, &self->pos, &b);
+        copyVec3(&a, &c);
+        dist = calcDistanceSqXZ(&a, &other->pos);
+        scale = lbl_8079948C * get_em_chg_scale(self);
+        if (dist < lbl_8079948C * get_em_chg_scale(self) * scale) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+u32 fn_801D6694(struct _ENEMY_WORK* self) {
+    if (self->action == 13 && self->state_sub <= 4) {
+        return 1;
+    }
+    return 0;
+}
+
+s32 fn_801D66BC(u8 arg0, void* target) {
+    EmScratchA scratchA;
+    EmScratchB scratchB;
+    EmGrowTable801CCBC4* entry;
+
+    fn_800FA3B8(&scratchA);
+    fn_800FA378(&scratchB);
+    if (arg0 >= 3) {
+        return 0;
+    }
+    entry = (EmGrowTable801CCBC4*)lbl_805B6950 + arg0;
+    fn_8004FFC8(entry->rec_a, entry->rec_b, &scratchA, entry->scale);
+    fn_8028F558(&scratchA, &scratchB);
+    return fn_802907BC((s32)target, &scratchB) - 1 == 0;
+}
+
+s32 fn_801D6758(struct _ENEMY_WORK* self) {
+    EmAreaEntry801CCBC4* entry;
+
+    if (self->field_0x382 != 0xFF && self->field_0x380 == 1) {
+        entry = (EmAreaEntry801CCBC4*)fn_801377D0(self->state_0x381);
+        if (entry->active != 0 && entry->area_no == self->area_no &&
+            (entry->flags_0x5A6 & 0x7F) == 1) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+u8 fn_801D67D8(struct _ENEMY_WORK* self, u8 arg1, u8 arg2, nw4r::math::VEC3* target) {
+    nw4r::math::VEC3 pos;
+    f32 dist;
+    u8 best;
+    u8 id;
+    s32 i;
+
+    VEC3_ctor(&pos);
+    i = 0;
+    id = arg1;
+    best = arg2;
+    for (i = 0; i < (s32)arg2; i++) {
+        fn_80126278(self, (u16)((self->area_no & 0xF) << 8 | id), &pos);
+        if (i == 0) {
+            dist = calcDistanceSqXZ(target, &pos);
+            best = (u8)i;
+        } else {
+            f32 d = calcDistanceSqXZ(target, &pos);
+            if (dist > d) {
+                dist = d;
+                best = (u8)i;
+            }
+        }
+        id++;
+    }
+    return best;
+}
+
+u32 fn_801D68A8(struct _ENEMY_WORK* self, u32 arg1) {
+    nw4r::math::VEC3 pos;
+    u32 t;
+    u8 sel;
+
+    VEC3_ctor(&pos);
+    sel = (u8)arg1;
+    switch (sel) {
+    case 0:
+        if ((u8)stage_map_kind_get(self->field_0x1E0) == 4) {
+            switch (self->area_no) {
+            case 2:
+                setVector3(&pos, lbl_80799490, lbl_8079930C, lbl_80799494);
+                if (calcDistanceSqXZ(&self->pos, &pos) <= lbl_80799498) {
+                    return 0;
+                }
+                break;
+            case 3:
+                setVector3(&pos, lbl_8079949C, lbl_8079931C, lbl_807994A0);
+                if (calcDistanceSqXZ(&self->pos, &pos) <= lbl_80799498) {
+                    return 0;
+                }
+                break;
+            case 7:
+                setVector3(&pos, lbl_807994A4, lbl_80799220, lbl_807994A8);
+                if (calcDistanceSqXZ(&self->pos, &pos) <= lbl_80799498) {
+                    return 0;
+                }
+                setVector3(&pos, lbl_807994AC, lbl_807994B0, lbl_807994B4);
+                if (calcDistanceSqXZ(&self->pos, &pos) <= lbl_80799498) {
+                    return 1;
+                }
+                break;
+            }
+        }
+        return 0xFF;
+    case 1:
+        return fn_80131034(self, 0x1C, 1) != NULL;
+    case 2:
+        return self->action_0x328.armed_0x328.field_0x330;
+    case 3:
+        if (em_parts_damage_level_get(self, 2) >= 1) {
+            return 1;
+        }
+        break;
+    case 4:
+        if (em_parts_damage_level_get(self, 3) >= 1) {
+            return 1;
+        }
+        break;
+    case 5:
+        if (self->field_0x010 == 2) {
+            sel = fn_801D67D8(self, 0x11, 3, &self->pos);
+        } else {
+            sel = fn_801D67D8(self, 0xC, 3, &self->pos);
+        }
+        switch (sel) {
+        case 0:
+            if (fn_801D66BC(0, &self->vec_0x36C) == 1 ||
+                fn_801D66BC(1, &self->vec_0x36C) == 1 ||
+                fn_801D66BC(2, &self->vec_0x36C) == 1) {
+                return 0;
+            }
+            break;
+        case 1:
+            if (fn_801D66BC(0, &self->vec_0x36C) == 1 ||
+                fn_801D66BC(1, &self->vec_0x36C) == 1 ||
+                fn_801D66BC(2, &self->vec_0x36C) == 1) {
+                return 0;
+            }
+            break;
+        case 2:
+            if (fn_801D66BC(0, &self->vec_0x36C) == 1 ||
+                fn_801D66BC(1, &self->vec_0x36C) == 1 ||
+                fn_801D66BC(2, &self->vec_0x36C) == 1) {
+                return 0;
+            }
+            break;
+        }
+        if (fn_801D6758(self) == 1) {
+            return 0;
+        }
+        if (self->field_0x010 == 2) {
+            return (u8)(fn_801D67D8(self, 9, 3, &self->vec_0x36C) + 1);
+        }
+        return (u8)(fn_801D67D8(self, 6, 3, &self->vec_0x36C) + 1);
+    case 6:
+        t = fn_801D6758(self);
+        return (u32)((1 - t) | (t - 1)) >> 31;
+    }
+    return 0;
+}
+
+void fn_801D6C50(struct _ENEMY_WORK* self, u8* out1, u8* out2) {
+    *out1 = 12;
+    *out2 = 0;
+    self->pos.y = self->pos.y + lbl_80799224;
+}
+
+s32 fn_801D6C74(struct _ENEMY_WORK* self, u8 arg1) {
+    if (arg1 == 0 && em_alt_mode_ck(self) == 1 && self->field_0x1E2 == 0) {
+        return 1;
+    }
+    return 0;
+}
+
+s32 fn_801D6CCC(struct _ENEMY_WORK* self, u8 arg1) {
+    if (arg1 == 0 && fn_8012EC3C(self) == 1 && self->field_0x1E2 == 0) {
+        return 1;
+    }
+    return 0;
+}
+
+void fn_801D6D24(struct _ENEMY_WORK* self) {
+    if (self->action_0x328.armed_0x328.field_0x330 == 0xFF) {
+        if ((u8)stage_map_kind_get(self->field_0x1E0) == 4) {
+            if (self->area_no == 5 && self->field_0x9F6 == 7) {
+                self->action_0x328.armed_0x328.field_0x330 = 1;
+            } else {
+                self->action_0x328.armed_0x328.field_0x330 = 0;
+            }
+        } else {
+            self->action_0x328.armed_0x328.field_0x330 = 0xFF;
+        }
+    }
+}
+
+s32 fn_801D6DA4(struct _ENEMY_WORK* self, u16 arg1) {
+    u8 kind = (u8)stage_map_kind_get(self->field_0x1E0);
+    s32 found;
+    u8 sel;
+    u8 sub;
+
+    if (kind != 4) {
+        return 0;
+    }
+    found = 0;
+    sel = 0xFF;
+    if (kind == 4) {
+        sel = 7;
+    }
+    if (sel != 0xFF) {
+        sub = fn_80129DB8(self);
+        if (sub == 1) {
+            found = 1;
+        } else if (sub == 2) {
+            return 1;
+        }
+    }
+    if (found == 0 && self->value_0x452 >= 0x384) {
+        u8 arg = 0xFF;
+        if (kind == 4) {
+            arg = 5;
+        }
+        if (fn_8012A014(self, 0x1C, arg, arg1, lbl_805B5310, lbl_805B531C) == 1) {
+            return 1;
+        }
+    }
+    if (fn_80129A70(self, arg1) == 1) {
+        return 1;
+    }
+    return fn_8012A204(self) - 1 == 0;
+}
+
+void fn_801D6EDC(EmSpawnRec801CCBC4* rec, u8 a1, u16 a2, u16 a3) {
+    nw4r::math::VEC3 pos;
+
+    setVec3(&pos, lbl_80799220, lbl_807992BC, lbl_80799380);
+    rec->id = 29;
+    copyVec3(&rec->pos, &pos);
+    rec->field_0x10 = a1;
+    rec->field_0x12 = a2;
+    rec->field_0x14 = a3;
+}
+
+void* fn_801D6F5C(void* self, s16 arg1) {
+    if (self != NULL) {
+        fn_8013918C(self, 0);
+        if (arg1 > 0) {
+            operator delete(self);
+        }
+    }
+    return self;
+}
+
+void fn_801D6FB8(void) {
+    nw4r::math::VEC3 v0;
+    nw4r::math::VEC3 v1;
+    nw4r::math::VEC3 v2;
+    nw4r::math::VEC3 v3;
+    nw4r::math::VEC3 v4;
+    nw4r::math::VEC3 v5;
+    nw4r::math::VEC3 v6;
+    nw4r::math::VEC3 v7;
+    nw4r::math::VEC3 v8;
+    nw4r::math::VEC3 v9;
+    nw4r::math::VEC3 v10;
+    nw4r::math::VEC3 v11;
+    nw4r::math::VEC3 v12;
+    nw4r::math::VEC3 v13;
+
+    assignVec3(vec_pair_801CCBC4_0, setVec3(&v0, lbl_80799220, lbl_807992B0, lbl_80799220));
+    assignVec3(&vec_pair_801CCBC4_0[1], setVec3(&v1, lbl_80799220, lbl_807994B8, lbl_80799220));
+    assignVec3(vec_pair_801CCBC4_1, setVec3(&v2, lbl_80799220, lbl_807992B0, lbl_80799220));
+    assignVec3(&vec_pair_801CCBC4_1[1], setVec3(&v3, lbl_80799220, lbl_807994B8, lbl_80799220));
+    assignVec3(vec_pair_801CCBC4_2, setVec3(&v4, lbl_80799220, lbl_807992F4, lbl_80799220));
+    assignVec3(&vec_pair_801CCBC4_2[1], setVec3(&v5, lbl_80799220, lbl_807994BC, lbl_80799220));
+    assignVec3(vec_pair_801CCBC4_3, setVec3(&v6, lbl_80799220, lbl_807992B0, lbl_80799220));
+    assignVec3(&vec_pair_801CCBC4_3[1], setVec3(&v7, lbl_80799220, lbl_807994B8, lbl_80799220));
+    assignVec3(lbl_805B6950, setVec3(&v8, lbl_807994C0, lbl_80799220, lbl_807994C4));
+    assignVec3(lbl_805B6950 + 0xC, setVec3(&v9, lbl_807994C8, lbl_807994CC, lbl_807994D0));
+    assignVec3(lbl_805B6950 + 0x1C, setVec3(&v10, lbl_807994D4, lbl_80799220, lbl_807994D8));
+    assignVec3(lbl_805B6950 + 0x28, setVec3(&v11, lbl_807994DC, lbl_80799220, lbl_807994E0));
+    assignVec3(lbl_805B6950 + 0x38, setVec3(&v12, lbl_807994E4, lbl_80799220, lbl_807994E8));
+    assignVec3(lbl_805B6950 + 0x44, setVec3(&v13, lbl_807994EC, lbl_80799220, lbl_807994F0));
+}
+
+#ifdef __cplusplus
+}
+#endif
+
+/* This unit's own `.bss` (`splits.txt` `.bss 0x806A7B30..0x806A7B90`), in address order: the 4 two-vector record(s)
+ * its static constructor `fn_801D6FB8` builds (`.data` tables point at them).  Names are GUESSes: each record is a
+ * pair of model-space points. */
+VEC3 vec_pair_801CCBC4_0[2];  /* +0x806A7B30 */
+VEC3 vec_pair_801CCBC4_1[2];  /* +0x806A7B48 */
+VEC3 vec_pair_801CCBC4_2[2];  /* +0x806A7B60 */
+VEC3 vec_pair_801CCBC4_3[2];  /* +0x806A7B78 */

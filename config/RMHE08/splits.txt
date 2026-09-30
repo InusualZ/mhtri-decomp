@@ -652,20 +652,20 @@ enemy/fn_8014A1BC.c:
 	.data       start:0x805A217C end:0x805A2BD8
 
 enemy/fn_801502C8.cpp:
-	extab       start:0x8000DC54 end:0x8000DD14
-	extabindex  start:0x80028968 end:0x80028A88
-	.text       start:0x801502C8 end:0x801550FC
+	extab       start:0x8000DC54 end:0x8000DCFC
+	extabindex  start:0x80028968 end:0x80028A64
+	.text       start:0x801502C8 end:0x80154E40
 	.ctors      start:0x8056F320 end:0x8056F324
 	.data       start:0x805A2BD8 end:0x805A4478
 	.bss        start:0x806A77D8 end:0x806A7820
 
 enemy/fn_801550FC.cpp:
-	extab       start:0x8000DD14 end:0x8000DFA4
-	extabindex  start:0x80028A88 end:0x80028E60
-	.text       start:0x801550FC end:0x8015D860
+	extab       start:0x8000DCFC end:0x8000DFA4
+	extabindex  start:0x80028A64 end:0x80028E60
+	.text       start:0x80154E40 end:0x8015D860
 	.ctors      start:0x8056F324 end:0x8056F328
 	.rodata     start:0x8056FA38 end:0x8056FB50
-	.data       start:0x805A48B4 end:0x805A5D14
+	.data       start:0x805A4518 end:0x805A5D48
 	.bss        start:0x806A7820 end:0x806A7868
 
 enemy/fn_8015D860.cpp:
@@ -774,38 +774,26 @@ enemy/fn_80191598.cpp:
 	.sbss       start:0x80794AA0 end:0x80794AA8
 
 enemy/fn_801926EC.cpp:
-	extab       start:0x8000EDF4 end:0x8000F084
-	extabindex  start:0x8002A3D8 end:0x8002A7B0
-	.text       start:0x801926EC end:0x801993E0
-	.rodata     start:0x80570050 end:0x80570150
-	.data       start:0x805AD3F4 end:0x805AE118
-
-enemy/fn_801993E0.cpp:
-	extab       start:0x8000F084 end:0x8000F14C
-	extabindex  start:0x8002A7B0 end:0x8002A8DC
-	.text       start:0x801993E0 end:0x8019ED34
+	extab       start:0x8000EDF4 end:0x8000F124
+	extabindex  start:0x8002A3D8 end:0x8002A8A0
+	.text       start:0x801926EC end:0x8019E670
 	.ctors      start:0x8056F340 end:0x8056F344
-	.data       start:0x805AE118 end:0x805AE71C
+	.rodata     start:0x80570050 end:0x80570150
+	.data       start:0x805AD3DC end:0x805AE750
 	.bss        start:0x806A7A70 end:0x806A7A88
 
 enemy/fn_8019ED34.cpp:
-	extab       start:0x8000F14C end:0x8000F304
-	extabindex  start:0x8002A8DC end:0x8002AB70
-	.text       start:0x8019ED34 end:0x801A4504
-	.rodata     start:0x80570150 end:0x80570190
-	.data       start:0x805B01B8 end:0x805B04D0
-
-enemy/fn_801A4504.cpp:
-	extab       start:0x8000F304 end:0x8000F324
-	extabindex  start:0x8002AB70 end:0x8002ABA0
-	.text       start:0x801A4504 end:0x801A9540
-	.data       start:0x805B04D0 end:0x805B069C
+	extab       start:0x8000F124 end:0x8000F374
+	extabindex  start:0x8002A8A0 end:0x8002AC18
+	.text       start:0x8019E670 end:0x801AA154
+	.rodata     start:0x80570150 end:0x805701A0
+	.data       start:0x805AE7C0 end:0x805B06D0
 
 enemy/fn_801A9540.cpp:
-	extab       start:0x8000F324 end:0x8000F54C
-	extabindex  start:0x8002ABA0 end:0x8002AEDC
-	.text       start:0x801A9540 end:0x801B0010
-	.rodata     start:0x80570190 end:0x80570260
+	extab       start:0x8000F374 end:0x8000F54C
+	extabindex  start:0x8002AC18 end:0x8002AEDC
+	.text       start:0x801AA154 end:0x801B0010
+	.rodata     start:0x805701A0 end:0x80570260
 	.data       start:0x805B073C end:0x805B0FCC
 
 enemy/fn_801B0010.cpp:
@@ -826,57 +814,52 @@ enemy/fn_801B4458.cpp:
 	.bss        start:0x806A7AA0 end:0x806A7AB8
 
 enemy/fn_801B7020.cpp:
-	extab       start:0x8000F7EC end:0x8000FACC
-	extabindex  start:0x8002B2CC end:0x8002B71C
-	.text       start:0x801B7020 end:0x801BD6C0
+	extab       start:0x8000F7EC end:0x8000F904
+	extabindex  start:0x8002B2CC end:0x8002B470
+	.text       start:0x801B7020 end:0x801B98C8
 	.ctors      start:0x8056F34C end:0x8056F350
-	.rodata     start:0x805702A0 end:0x80570320
-	.data       start:0x805B2188 end:0x805B29C8
+	.data       start:0x805B2188 end:0x805B2804
 	.bss        start:0x806A7AB8 end:0x806A7AD0
 
+enemy/em040_ai.cpp:
+	extab       start:0x8000F904 end:0x8000F9A4
+	extabindex  start:0x8002B470 end:0x8002B560
+	.text       start:0x801B98C8 end:0x801BB758
+	.data       start:0x805B2804 end:0x805B28D0
+
 enemy/fn_801BD6C0.cpp:
-	extab       start:0x8000FACC end:0x8000FDFC
-	extabindex  start:0x8002B71C end:0x8002BBE4
-	.text       start:0x801BD6C0 end:0x801CA004
+	extab       start:0x8000F9A4 end:0x8000FB84
+	extabindex  start:0x8002B560 end:0x8002B830
+	.text       start:0x801BB758 end:0x801C29F8
 	.ctors      start:0x8056F350 end:0x8056F354
-	.rodata     start:0x80570320 end:0x80570410
+	.rodata     start:0x805702A0 end:0x80570320
+	.data       start:0x805B28D0 end:0x805B3B7C
 	.bss        start:0x806A7AD0 end:0x806A7B18
 
 enemy/fn_801CA004.cpp:
-	extab       start:0x8000FDFC end:0x8000FF4C
-	extabindex  start:0x8002BBE4 end:0x8002BDDC
-	.text       start:0x801CA004 end:0x801CCBC4
+	extab       start:0x8000FB84 end:0x8000FE4C
+	extabindex  start:0x8002B830 end:0x8002BC5C
+	.text       start:0x801C29F8 end:0x801CA8DC
 	.ctors      start:0x8056F354 end:0x8056F358
-	.rodata     start:0x80570410 end:0x80570450
-	.data       start:0x805B3CA8 end:0x805B3D04
+	.rodata     start:0x80570320 end:0x80570410
+	.data       start:0x805B3BF0 end:0x805B4F8C
 	.bss        start:0x806A7B18 end:0x806A7B30
 
 enemy/fn_801CCBC4.cpp:
-	extab       start:0x8000FF4C end:0x800100D4
-	extabindex  start:0x8002BDDC end:0x8002C028
-	.text       start:0x801CCBC4 end:0x801D428C
-	.rodata     start:0x80570490 end:0x80570500
-	.data       start:0x805B5414 end:0x805B61F8
-
-enemy/fn_801D428C.cpp:
-	extab       start:0x800100D4 end:0x800101E4
-	extabindex  start:0x8002C028 end:0x8002C1C0
-	.text       start:0x801D428C end:0x801D80EC
+	extab       start:0x8000FE4C end:0x80010164
+	extabindex  start:0x8002BC5C end:0x8002C100
+	.text       start:0x801CA8DC end:0x801D71C4
 	.ctors      start:0x8056F358 end:0x8056F35C
-	.data       start:0x805B61F8 end:0x805B69A8
+	.rodata     start:0x80570410 end:0x80570500
+	.data       start:0x805B5000 end:0x805B69D8
 	.bss        start:0x806A7B30 end:0x806A7B90
 
 enemy/fn_801D80EC.cpp:
-	extab       start:0x800101E4 end:0x8001031C
-	extabindex  start:0x8002C1C0 end:0x8002C394
-	.text       start:0x801D80EC end:0x801DB8E0
+	extab       start:0x80010164 end:0x800103D4
+	extabindex  start:0x8002C100 end:0x8002C4A8
+	.text       start:0x801D71C4 end:0x801E0ADC
 	.rodata     start:0x80570500 end:0x805706C0
-	.data       start:0x805B6A90 end:0x805B71E0
-
-enemy/fn_801DB8E0.cpp:
-	extab       start:0x8001031C end:0x800103D4
-	extabindex  start:0x8002C394 end:0x8002C4A8
-	.text       start:0x801DB8E0 end:0x801E0ADC
+	.data       start:0x805B6A44 end:0x805B75E8
 
 lobby/fn_801E0ADC.cpp:
 	extab       start:0x800103D4 end:0x800105B4
@@ -1392,22 +1375,26 @@ enemy/em_act_mot.cpp:
 	.text       start:0x8037F940 end:0x80382310
 
 enemy/fn_80382310.cpp:
-	extab       start:0x80017E2C end:0x80018094
-	extabindex  start:0x80037BA8 end:0x80037F44
-	.text       start:0x80382310 end:0x80387844
+	extab       start:0x80017E2C end:0x8001803C
+	extabindex  start:0x80037BA8 end:0x80037EC0
+	.text       start:0x80382310 end:0x803868DC
 	.ctors      start:0x8056F3A8 end:0x8056F3B0
+	.data       start:0x805EF8C0 end:0x805EF990
+	.bss        start:0x806C23E8 end:0x806C5488
+	.sbss       start:0x80794C00 end:0x80794C08
 
 enemy/fn_80387844.cpp:
-	extab       start:0x80018094 end:0x8001819C
-	extabindex  start:0x80037F44 end:0x800380D0
-	.text       start:0x80387844 end:0x8038E8E8
+	extab       start:0x8001803C end:0x800181C4
+	extabindex  start:0x80037EC0 end:0x8003810C
+	.text       start:0x803868DC end:0x8038EC44
 	.rodata     start:0x80570B20 end:0x80570BA0
-	.data       start:0x805EFBD8 end:0x805F0C88
+	.data       start:0x805EFA00 end:0x805F0CB8
 
 lobby/lb_quest_ui.cpp:
-	extab       start:0x8001819C end:0x8001833C
-	extabindex  start:0x800380D0 end:0x80038340
-	.text       start:0x8038E8E8 end:0x80394038
+	extab       start:0x800181C4 end:0x8001833C
+	extabindex  start:0x8003810C end:0x80038340
+	.text       start:0x8038EC44 end:0x80394038
+	.data       start:0x805F0CB8 end:0x805F13D0
 
 lobby/lb_quest_board.cpp:
 	extab       start:0x8001833C end:0x8001843C

@@ -92,7 +92,7 @@ EmPopRec* em_roster_record_get(u32 index);
 /* 0x803B50A8 - the work state word's bit 21, with the `self == NULL -> singleton` fallback every
  * accessor in this band carries.  Moved here from `include/unsplit/unknown.h` when this unit
  * registered the address (rule 2: the owner's header carries it). */
-u32 em_work_state_bit21_ck(void);
+u32 em_work_state_bit21_ck(struct _ENEMY_WORK* self);
 /* 0x803B9588 - the per-slot effect/joint binding the range's entry points walk: r3 the work
  * record, r4 the slot index, r5 the slot pointer, r6/r7 two scalars. */
 void em_roster_slot_effect_set(struct _ENEMY_WORK* self, u16 index, s32* slot, s32 a, s32 b);

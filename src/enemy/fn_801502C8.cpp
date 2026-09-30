@@ -1,4 +1,4 @@
-/* enemy/fn_801502C8.cpp - the enemy em00x action band, `.text` 0x801502C8..0x801550FC (30 functions).
+/* enemy/fn_801502C8.cpp - the enemy em00x action band, `.text` 0x801502C8..0x80154E40 (26 functions).
  *
  * what it is.  One band of an enemy's action/state family, the same kind as the registered
  * `enemy/fn_80147CE0.cpp` below (0x80147CE0..0x80149D6C) and `enemy/fn_801550FC.cpp` above: every
@@ -12,7 +12,7 @@
  *   1. No `__FILE__` string covers the range.  The only `.data`/`.rodata` the range builds are the
  *      `.sdata2` pool, the three `jumptable_*` (`805A30B0`/`805A4064`/`805A408C`), the `.rodata`
  *      parameter tables `lbl_805A2BD8`/`2D68`/`2F28`/`30DC`/`3280`/`3860`/`3AE0`/`3C10`/`3DD0`/`3E90`/
- *      `3FC0`, and the vtable `lbl_805A5D18` - none is a source-file name.  (Discovery notes a
+ *      `3FC0`, and the `.bss` vector records - none is a source-file name.  (Discovery notes a
  *      candidate seam inside `enemy_control.cpp`, whose `__FILE__` string at 0x805A1BB8 is referenced
  *      only by the range below; the `tu` verdict is `unproven`, so this unit registers separately.)
  *   2. `python tools/symbols/dumpmap.py lookup` answers `zz_01502c8_` for the range's addresses (a
@@ -34,17 +34,21 @@
  * Rule 9: those are declared at C++ scope with the signature their mangling encodes and called through
  * it; every `fn_*` definition stays `extern "C"`.
  *
- * seam.  Unproven (the brief's own `tu` verdict).  The left edge at 0x801502C8 is where the registered
- * `enemy/fn_8014A1BC.c` ends and its extab/extabindex runs end exactly where this unit's begin
- * (extab 0x8000DAD4..0x8000DC54, extabindex 0x80028728..0x80028968); the right edge at 0x801550FC is
- * exact (the registered `enemy/fn_801550FC.cpp` starts there).
+ * seam.  The left edge at 0x801502C8 is where the registered `enemy/fn_8014A1BC.c` ends and its
+ * extab/extabindex runs end exactly where this unit's begin (extab 0x8000DAD4..0x8000DC54,
+ * extabindex 0x80028728..0x80028968).  The right edge at 0x80154E40 is proven three ways: `fn_80154D44`
+ * is this unit's static-initializer (the `.ctors` word below points at it, and MWCC places a TU's
+ * `__sinit` last in its `.text`); the value 0.0 is pooled at `lbl_80796E1C` (read up to `fn_80154D44`) and
+ * again at `lbl_807970C0` (first read by `fn_80154E90`), and one TU pools a value once; the next `.data`
+ * claim, `lbl_805A5D18` (the vtable `fn_80154F70` installs) and the `jumptable_805A4848` of `fn_80154FAC`
+ * tile `enemy/fn_801550FC.cpp`'s `.data`.  The four functions 0x80154E40..0x801550FC moved there (the old
+ * edge 0x801550FC was the start of the next registered unit, not a seam).
  *
- * sections.  `.text` 0x801502C8..0x801550FC (0x4E34 B), `extab` 0x8000DC54..0x8000DD14, `extabindex`
- * 0x80028968..0x80028A88, and the `.ctors` word 0x8056F320..0x8056F324.  The last is this unit's own
- * static constructor: its stored entry is `fn_80154D44` (the six-vector seeder above), the word the
- * linker placed between `enemy/enemy_control.cpp`'s `.ctors` (..0x8056F320) and
- * `enemy/fn_801550FC.cpp`'s (0x8056F324..); `dtk dol split` attributed it to this unit and the full
- * worktree `ninja` then linked `main.dol: OK` with it claimed.
+ * sections.  `.text` 0x801502C8..0x80154E40, `extab` 0x8000DC54..0x8000DCFC, `extabindex`
+ * 0x80028968..0x80028A64, `.ctors` 0x8056F320..0x8056F324 (its entry is `fn_80154D44`, the six-vector
+ * seeder), `.data` 0x805A2BD8..0x805A4478 (the parameter tables and `jumptable_*` this range reads) and `.bss` 0x806A77D8..0x806A7820 (the
+ * three 0x18-byte vector records `fn_80154D44` fills).  The `.data` and `.bss` claims are not emitted by
+ * the source yet.
  *
  * residuals (not written this pass):
  *   fn_801514BC (0x2CC8, 11464 B) - the band's giant case table over `jumptable_805A4104` (0xDC+1
@@ -55,11 +59,11 @@
  *     rule-1 header follow-up, not this unit's to force.
  * The measurement for each is in the worker's outbox.
  *
- * shape and residuals, measured (`recompile.py --measure`, the official report metric).  26 of the 28
+ * shape and residuals, measured (`recompile.py --measure`, the official report metric).  22 of the 24
  * written functions are at or above the 80 % bar, 12 of them byte-identical (`fn_801502C8`,
  * `fn_80150728`, `fn_80150FCC`, `fn_80151074`, `fn_801510C4`, `fn_801545B8`, `fn_80154784`,
  * `fn_80154928`, `fn_8015497C`, `fn_80154988`, `fn_80154CA4`, `fn_80154D44`).  The file default is
- * `#pragma peephole off` - like `enemy/fn_801DB8E0.cpp`, most of the band keeps the unfused
+ * `#pragma peephole off` - like `enemy/fn_801D80EC.cpp`, most of the band keeps the unfused
  * `clrlwi`+`cmpwi`/`extsh` forms the peephole pass folds - with a scoped `#pragma peephole on`
  * around the five functions that are the other way (`fn_801502C8` 96.43->100, `fn_80150728`
  * 97.56->100, `fn_801507CC` 96.88->99.79, `fn_80150FCC` 97.62->100, `fn_801545B8` 93.44->100).
@@ -103,7 +107,6 @@ void em_busy_set(struct _ENEMY_WORK* self);
 void em_mot_set_blend(struct _ENEMY_WORK* self, s32 a, s32 b, s32 c, s32 d);
 void em_mot_set(struct _ENEMY_WORK* self, s32 motion, s32 arg2, s32 arg3);
 u32 em_mot_end_ck(struct _ENEMY_WORK* self);
-void fn_8012FCC4(struct _ENEMY_WORK* self, s32 a, f32 b);
 void em_fall_height_get(struct _ENEMY_WORK* self);
 void fn_801303FC(f32 a);
 void em_fall_start(struct _ENEMY_WORK* self);
@@ -113,7 +116,6 @@ void fn_801369A0(struct _ENEMY_WORK* self, u8 a, s32 b, void* c, f32 d);
 u32 fn_8012E5A8(struct _ENEMY_WORK* self);
 u32 fn_8012EC3C(struct _ENEMY_WORK* self);
 u32 em_alt_mode_ck(struct _ENEMY_WORK* self);
-u32 fn_8012ECF0(struct _ENEMY_WORK* self);
 s16 em_demo_frame_get(void);
 u32 em_demo_time_ck(s32 label);
 void em_demo_pos_set(struct _ENEMY_WORK* self, f32 a, f32 b, f32 c);
@@ -153,7 +155,6 @@ void fn_8014FF10(struct _ENEMY_WORK* self);
 /* the ef/effect helpers the range drives. */
 void eft009_spawn_at_joint(struct _ENEMY_WORK* self, s32 a, u8 b, s32 c, f32 d);
 void eft_spawn_type10(struct _ENEMY_WORK* self, u32 a, u32 b, void* pos, f32 c);
-void fn_801057A4(struct _ENEMY_WORK* self, u32 a, void* pos, s32 b, f32 c);
 void eft_spawn_type11(struct _ENEMY_WORK* self, void* pos, u8 a, f32 b);
 void eft_spawn_pos_in_area(void* pos, u8 a, u8 b, s32 c, f32 d);
 
@@ -164,8 +165,6 @@ void assignVec3(void* dst, s32 src);
 void fn_800516F0(void* out);
 void draw_shape_arm(struct _ENEMY_WORK* self, s32 a, s32 b);
 void mhchar_mat_tev_set(void* self, s32 a, s32 b, u8 c, s32 d, s32 e, u8 f, f32 g);
-void em_res_user_data_set(void* self, s32 helper);
-s32 em_res_user_data_ck(void* self);
 void fn_8013918C(void* self, s32 a);
 void eft_em_spawn(struct _ENEMY_WORK* self, s32 a, s32 b, void* c, f32 d);
 void fn_805012E8(void* a, void* b);
@@ -186,7 +185,6 @@ u16 calcVecAngX(nw4r::math::VEC3* v);
 s32 calcVecAng2(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 f32 calcDistanceSqXZ(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 void rotVecY(nw4r::math::VEC3* v, u32 angle);
-void* operator new(unsigned long size);
 void operator delete(void* ptr) throw();
 
 /* ----------------------------------------------------------------------------------------------------
@@ -243,13 +241,9 @@ extern f32 lbl_807970AC;
 extern f32 lbl_807970B0;
 extern f32 lbl_807970B4;
 extern f32 lbl_807970B8;
-extern f32 lbl_807970C0;
-extern f32 lbl_807970C4;
-extern f32 lbl_807970C8;
-extern f32 lbl_807970CC;
 
-/* this range's own `.rodata` parameter tables and `.data` vtable (no `.data` range is registered for
- * the unit yet, so they stay the shared pool's bytes; only the ones the code loads are declared). */
+/* this range's own `.data` parameter tables (claimed in splits.txt, not emitted by the source yet, so
+ * they stay the original bytes; only the ones the code loads are declared). */
 extern u8 lbl_805A2BD8[];
 extern u8 lbl_805A20C8[];
 extern u8 lbl_805A20D4[];
@@ -263,7 +257,6 @@ extern u8 lbl_805A3C10[];
 extern u8 lbl_805A3DD0[];
 extern u8 lbl_805A3E90[];
 extern u8 lbl_805A3FC0[];
-extern u8 lbl_805A5D18[];
 extern VEC3 vec_pair_801502C8_0[2];
 extern VEC3 vec_pair_801502C8_1[2];
 extern VEC3 vec_pair_801502C8_2[2];
@@ -271,9 +264,6 @@ extern VEC3 vec_pair_801502C8_2[2];
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/* this unit's own forward declarations (the definitions follow in address order). */
-void fn_80154F70(void** self);
 
 /* ----------------------------------------------------------------------------------------------------
  * functions, in address order
@@ -1097,105 +1087,6 @@ void fn_80154D44(void) {
     assignVec3(&vec_pair_801502C8_1[1], (s32)setVec3(&d, lbl_80796E1C, lbl_807970B4, lbl_80796E1C));
     assignVec3(vec_pair_801502C8_2, (s32)setVec3(&e, lbl_80796E1C, lbl_80796E58, lbl_80796E1C));
     assignVec3(&vec_pair_801502C8_2[1], (s32)setVec3(&f, lbl_80796E1C, lbl_807970B8, lbl_80796E1C));
-}
-
-/* 0x80154E40 (0x50) - reset the effect slot set. */
-void fn_80154E40(struct _ENEMY_WORK* self) {
-    u8 i;
-
-    for (i = 0; i < 6; i++) {
-        self->init_0x328.slots_0x328[i] = 0xFF;
-    }
-    for (i = 6; i < 0x0F; i++) {
-        self->init_0x328.slots_0x328[i] = 0;
-    }
-    self->init_0x328.field_0x338 = 0;
-    self->init_0x328.field_0x33C = 0;
-}
-
-/* 0x80154E90 (0xE0) - attach the 0x0C-byte helper and arm the 0x1C72 effect at the work position. */
-void fn_80154E90(struct _ENEMY_WORK* self, u8 arg1) {
-    nw4r::math::VEC3 pos;
-    s32 helper;
-
-    VEC3_ctor(&pos);
-    if (arg1 != 0) {
-        fn_8012FCC4(self, 0, lbl_807970C0);
-        fn_8012FCC4(self, 0xA, lbl_807970C4);
-    }
-    if (em_res_user_data_ck(self) == 0) {
-        helper = (s32)operator new(0xC);
-        if (helper != 0) {
-            fn_80154F70((void**)helper);
-        }
-        em_res_user_data_set(self, helper);
-    }
-    if (self->field_0x009 == 0) {
-        setVector3(&pos, lbl_807970C0, lbl_807970C8, lbl_807970CC);
-        fn_801057A4(self, 0x1A, &pos, 0x1C72, lbl_807970C4);
-    }
-    self->flags_0x836 = (u16)(self->flags_0x836 | 0x8000);
-}
-
-/* 0x80154F70 (0x3C) - the 0x0C-byte helper's constructor (installs the `lbl_805A5D18` table). */
-void fn_80154F70(void** self) {
-    em_res_user_data_ctor(self);
-    *self = (void*)lbl_805A5D18;
-}
-
-/* 0x80154FAC (0x150) - remap the effect id when the action is past its first step. */
-void fn_80154FAC(struct _ENEMY_WORK* self, u8* arg1, u8* arg2) {
-    switch (*arg1) {
-    case 1:
-        if (fn_8012ECF0(self) == 1 || self->field_0x7C8 >= 0x29) {
-            switch (*arg2) {
-            case 8:
-                *arg2 = 0x19;
-                return;
-            case 13:
-                *arg2 = 0x1A;
-                return;
-            case 14:
-                *arg2 = 0x1B;
-                return;
-            case 15:
-                *arg2 = 0x1C;
-                return;
-            case 16:
-                *arg2 = 0x1D;
-                return;
-            case 17:
-                *arg2 = 0x1E;
-                return;
-            case 33:
-                *arg2 = 0x23;
-                return;
-            case 34:
-                *arg2 = 0x24;
-                return;
-            }
-        }
-        return;
-    case 2:
-        switch (*arg2) {
-        case 0:
-            if (fn_8012ECF0(self) == 1) {
-                *arg2 = 3;
-            }
-            return;
-        case 8:
-            if (fn_8012ECF0(self) == 1) {
-                *arg2 = 9;
-            }
-            return;
-        case 10:
-            if (fn_8012ECF0(self) == 1) {
-                *arg2 = 0xB;
-            }
-            return;
-        }
-        return;
-    }
 }
 
 #ifdef __cplusplus

@@ -1,4 +1,5 @@
-/* The enemy unit `enemy/fn_801DB8E0.cpp` (0x801DB8E0..0x801E0ADC): the enemy action band's
+/* The enemy unit `enemy/fn_801D80EC.cpp` (the em007 TU, 0x801D71C4..0x801E0ADC; the header was
+ * `enemy/fn_801DB8E0.h` until that unit folded in): the enemy action band's
  * per-part damage/effect helpers.
  *
  * Declarations for the symbols of that range OTHER units call (docs/plan.md 6.5 rule 2: an extern
@@ -6,8 +7,8 @@
  * `fn_801E01BC` as a local declaration, written when its range was still an unregistered gap;
  * the unit's registration made it owned, so the declaration moved here.
  */
-#ifndef MHTRI_ENEMY_FN_801DB8E0_H
-#define MHTRI_ENEMY_FN_801DB8E0_H
+#ifndef MHTRI_ENEMY_FN_801D80EC_H
+#define MHTRI_ENEMY_FN_801D80EC_H
 
 #include "types.h"
 
@@ -25,4 +26,4 @@ u32 fn_801E01BC(struct _ENEMY_WORK* self);
 }
 #endif
 
-#endif /* MHTRI_ENEMY_FN_801DB8E0_H */
+#endif /* MHTRI_ENEMY_FN_801D80EC_H */

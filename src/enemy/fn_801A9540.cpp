@@ -1,8 +1,10 @@
 /* enemy/fn_801A9540.cpp - the enemy per-action state-machine band between
- * `enemy/fn_801A4504.cpp` (ends at 0x801A9540) and the unclaimed run at 0x801B0010.
+ * `enemy/fn_8019ED34.cpp` (ends at 0x801AA154) and the unclaimed run at 0x801B0010.
  *
- * .text 0x801A9540..0x801B0010 (0x6AD0), 82 functions; extab 0x8000F324..0x8000F54C (69 records);
- * extabindex 0x8002ABA0..0x8002AEDC (69 x 12 B).  The extab/extabindex runs are the entries whose
+ * .text 0x801AA154..0x801B0010 (0x5EBC); extab 0x8000F374..0x8000F54C; extabindex 0x8002AC18..0x8002AEDC.
+ * The first 0x614 bytes of the original range (0x801A9540..0x801AA154, seven written functions) moved to
+ * `enemy/fn_8019ED34.cpp` in the 2026-09-30 recut (see its header); the figures below predate it.  The left edge 0x801AA154 is a GUESS
+ * inside the pool-dedupe window 0x801AA0F8..0x801AA154 (see `enemy/fn_8019ED34.cpp`).  The extab/extabindex runs are the entries whose
  * `funcStart` falls in this range, read out of the DOL: the entry before the first is
  * `0x8002AB94` (fn_801A94C4, the neighbour unit's last framed function) and the one after the last
  * is `0x8002AEE8` (fn_801B0010, the next proposal's first), so both runs are exactly this unit's.
@@ -17,7 +19,7 @@
  *   * class 2 (a runtime-dump name) fails: `python tools/symbols/dumpmap.py lookup 0x801A9540`
  *     answers the `zz_01a9540_` placeholder, which the brief states is not evidence.
  *   * class 3 decides the module: `enemy`.  Both bracketing registered units are `enemy/*`
- *     (`enemy/fn_801A4504.cpp` below, `enemy/fn_801B7020.cpp` above), and every callee out of the
+ *     (`enemy/fn_8019ED34.cpp` below, `enemy/fn_801B7020.cpp` above), and every callee out of the
  *     range is enemy-band (`em_act_ck`, `em_frame_check`, `em_get_mot_no`, `get_joint_wmat_em`,
  *     `get_move_work_adrs`, `em_action_finish`, `em_mot_set`, ...); every body drives the
  *     `_ENEMY_WORK` record `include/enemy/ENEMY_WORK.h` owns.
@@ -87,7 +89,7 @@
 #include "enemy/fn_8012BDF4.h"
 #include "enemy/fn_8012EC74.h"
 #include "unsplit/enemy.h"
-#include "enemy/fn_801993E0.h"
+#include "enemy/fn_8019ED34.h"
 #include "enemy/enemy_control.h"
 #include "enemy/fn_8011D448.h"
 #include "ef/fn_800CDB2C.h"
@@ -105,165 +107,12 @@ extern const f32 lbl_80798528;
 extern const f32 lbl_8079852C;
 extern const f32 lbl_80798538;
 extern const f32 lbl_80798560;
-extern const f32 lbl_807985C8;
-extern const f32 lbl_807985CC;
-extern const f32 lbl_80798664;
-extern const f32 lbl_807986A8;
-extern const f32 lbl_807988F4;
-extern const f32 lbl_807988F8;
-extern const f32 lbl_807988FC;
-extern const f32 lbl_80798900;
-extern const f32 lbl_80798904;
-extern const f32 lbl_8079893C;
-extern const f32 lbl_80798948;
-extern const f32 lbl_8079894C;
-extern const f32 lbl_80798950;
-extern const f32 lbl_80798954;
-extern const f32 lbl_80798958;
-extern const f32 lbl_8079895C;
-extern const f32 lbl_80798960;
-extern const f32 lbl_8079896C;
-extern const f32 lbl_80798974;
-extern const f32 lbl_80798978;
-extern const f32 lbl_8079897C;
-extern const f32 lbl_80798980;
-extern const f32 lbl_80798984;
-extern const f32 lbl_80798988;
-extern const f32 lbl_8079898C;
-extern const f32 lbl_80798990;
-extern const f32 lbl_80798994;
-extern const f32 lbl_80798998;
-extern const f32 lbl_8079899C;
-extern const f32 lbl_807989A0;
-extern const f32 lbl_807989A4;
-extern const f32 lbl_807989A8;
-extern const f32 lbl_807989AC;
-extern const f32 lbl_807989B0;
-extern const f32 lbl_807989B4;
-extern const f32 lbl_807989B8;
-extern const f32 lbl_807989BC;
-extern const f32 lbl_807989C0;
-extern const f32 lbl_807989C4;
-extern const f32 lbl_807989C8;
-extern const f32 lbl_807989CC;
-extern const f32 lbl_807989D0;
-extern const f32 lbl_80798A48;
-extern const f32 lbl_80798A4C;
-extern const f32 lbl_80798A70;
-extern const f32 lbl_80798A74;
-extern const f32 lbl_80798A78;
 
 extern u8 lbl_805701A0[];
 extern u8 lbl_805701E0[];
 extern u8 lbl_80570220[];
 
 extern "C" {
-
-/* 0x80339E04 `lobby/lb_companion_ui.cpp` (the companion/status UI band).  The declaration sits here,
- * not in `include/unsplit/unknown.h`, because that band may not carry a symbol a registered unit owns
- * (rule 2), and the owner's header cannot be included from this unit - it redeclares `system_w` as
- * `LbSystemView` against this unit's own view (measured - `(10563) identifier 'system_w' redeclared`).
- * The two-argument signature is this unit's call site; the callee reads only r3. */
-void lb_area_change_send(u8 a, s32 b);
-
-/* r3 the work record; the per-action entry: resets the joint-effect slots on the request, ticks the
- * motion, and walks the two live slots through `em_roster_slot_effect_set`. */
-void fn_801A9540(struct _ENEMY_WORK* self) {
-    s32* slots = self->handles_0x328;
-
-    if (fn_8012D1A0(self) == 1U) {
-        lb_area_change_send((u8)my_player_no(), 0);
-    }
-    fn_8013A9F4(self);
-    if (self->area_no == 2) {
-        em_move_mode_set(self, 0);
-        em_mot_set(self, 13, 0, 0);
-        fn_801303EC(self, lbl_80798538);
-        self->field_0x7B0 = lbl_807988F4;
-    }
-    fn_8019EA04(self);
-    em_roster_slot_effect_set(self, 3, slots, 0, 0);
-    if (slots[0] != -1) {
-        self->states_0x338[0] = 8;
-    }
-}
-
-/* r3 the work record, r4 the part kind (a byte); the "this part is attackable" predicate: the part
- * must be 2 or 3, its damage level must not be odd, and the per-part flag must be clear. */
-s32 fn_801A960C(struct _ENEMY_WORK* self, u8 kind) {
-    if ((u32)(kind - 2) <= 1U && (em_parts_damage_level_get(self, kind) & 1) == 0 &&
-        self->field_0x1E2 == 0) {
-        return 1;
-    }
-    return 0;
-}
-
-/* r3 the work record, r4 the part kind; raises the per-part damage flag the kind maps to.  Kinds 6
- * and 7 only raise theirs at damage level 2 or above. */
-void fn_801A9670(struct _ENEMY_WORK* self, u8 kind) {
-    switch (kind) {
-    case 0:
-        self->flags_0x836 |= 0x1000;
-        return;
-    case 1:
-        self->flags_0x836 |= 0x2000;
-        return;
-    case 6:
-        if (em_parts_damage_level_get(self, 6) >= 2U) {
-            self->flags_0x836 |= 0x8000;
-            return;
-        }
-        return;
-    case 7:
-        if (em_parts_damage_level_get(self, 7) >= 2U) {
-            self->flags_0x836 |= 0x4000;
-        }
-        return;
-    default:
-        return;
-    }
-}
-
-/* r3 the work record; asks the area table for action 13's slot, 2 in area 1 and 3 otherwise. */
-void fn_801A9724(struct _ENEMY_WORK* self) {
-    if (self->area_no == 1) {
-        fn_80128AEC(self, 13, 2);
-        return;
-    }
-    fn_80128AEC(self, 13, 3);
-}
-
-/* r3 the work record; the kind-3 request: clears its slot word, arms the aim motion and takes the
- * 3-byte area-table entry. */
-void fn_801A9C6C(struct _ENEMY_WORK* self) {
-    u8 sp8[8];
-
-    fn_8005D1AC(sp8, 0);
-    fn_8013A654(self, 3);
-}
-
-/* r3 the work record; releases the joint-effect slots and re-arms the two it owns. */
-void fn_801A9DF4(struct _ENEMY_WORK* self) {
-    s32* slot = self->handles_0x328;
-    u16 i;
-
-    fn_8019EA04(self);
-    for (i = 0; i < 2; i++) {
-        em_roster_slot_effect_set(self, i, slot + i, 5, 0);
-    }
-}
-
-/* r3 the record, r4 the sign-extended flag; releases the record's user data and frees it when the
- * flag is positive.  Returns r3 (the record). */
-s32 fn_801AA0F8(s32 record, s16 free_it) {
-    if (record != 0) {
-        fn_8013918C((struct _ENEMY_WORK*)record, 0);
-        if (free_it > 0) {
-            operator delete((void*)record);
-        }
-    }
-    return record;
-}
 
 /* r3 the work record; clears the first byte of its effect-slot block. */
 void fn_801AB048(struct _ENEMY_WORK* self) {
