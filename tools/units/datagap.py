@@ -670,6 +670,21 @@ def render_strict(report: dict, names_shown: int = 4) -> str:
     return "\n".join(lines)
 
 
+def classify_pairs(report: dict) -> dict[str, dict]:
+    """`{orphan_key: {verdict, cls, reason, pair}}` for every pair of a strict report's blocks. Pure.
+
+    The ONE classification both halves of the data-closure row read: the strict half refuses a `refuse` pair of a
+    touched unit, the add-only half defers a NEW pair whose class is deferred instead of refusing it.
+    """
+    return {orphan_key(p["unit"], p["section"], p["address"]):
+            {"verdict": run["verdict"], "cls": run["cls"], "reason": run["reason"], "pair": p}
+            for run in report["blocks"] for p in run["pairs"]}
+
+
+def pair_line(p: dict, reason: str) -> str:
+    return "%s %s 0x%08X (%s, %d site(s)): %s" % (p["unit"], p["name"], p["address"], p["section"], p["sites"], reason)
+
+
 def strict_verdict(report: dict, skip_keys=(), allowed=()) -> dict:
     """The strict row's decision. Pure.
 
@@ -684,21 +699,20 @@ def strict_verdict(report: dict, skip_keys=(), allowed=()) -> dict:
         except ValueError:
             continue
     refused, accepted, deferred, used = [], [], {}, set()
-    for run in report["blocks"]:
-        for p in run["pairs"]:
-            line = ("%s %s 0x%08X (%s, %d site(s)): %s" % (p["unit"], p["name"], p["address"], p["section"],
-                                                           p["sites"], run["reason"]))
-            if run["verdict"] == "deferred":
-                deferred.setdefault(run["cls"], []).append(line)
-                continue
-            if orphan_key(p["unit"], p["section"], p["address"]) in skip_keys:
-                continue
-            hit = [a for a in sanction if p["address"] <= a < p["address"] + max(int(p["size"]), 1)]
-            if hit:
-                used.update(hit)
-                accepted.append(line)
-            else:
-                refused.append(line)
+    for key, c in classify_pairs(report).items():
+        p = c["pair"]
+        line = pair_line(p, c["reason"])
+        if c["verdict"] == "deferred":
+            deferred.setdefault(c["cls"], []).append(line)
+            continue
+        if key in skip_keys:
+            continue
+        hit = [a for a in sanction if p["address"] <= a < p["address"] + max(int(p["size"]), 1)]
+        if hit:
+            used.update(hit)
+            accepted.append(line)
+        else:
+            refused.append(line)
     return {"refused": refused, "accepted": accepted, "deferred": deferred, "used": sorted(used),
             "unmatched_allowances": sorted("0x%08X" % a for a in sanction - used)}
 
@@ -829,13 +843,18 @@ def load_claims(root: str) -> dict:
         return parse_splits_text(fh.read())
 
 
-def claims_at_ref(root: str, ref: str) -> dict:
-    """`claimed_bytes` of the `splits.txt` as committed at `ref` (a what-if base for a branch's own diff)."""
+def splits_at_ref(root: str, ref: str) -> dict:
+    """The parsed `splits.txt` as committed at `ref` (a what-if base for a branch's own diff)."""
     import subprocess
 
     text = subprocess.run(["git", "show", "%s:config/%s/splits.txt" % (ref, GAME_DIR)], cwd=root,
                           capture_output=True, text=True, encoding="utf-8", errors="replace", check=True).stdout
-    return {sec: [list(r) for r in rows] for sec, rows in claimed_bytes(parse_splits_text(text)).items()}
+    return parse_splits_text(text)
+
+
+def claims_at_ref(root: str, ref: str) -> dict:
+    """`claimed_bytes` of the `splits.txt` as committed at `ref` (a what-if base for a branch's own diff)."""
+    return {sec: [list(r) for r in rows] for sec, rows in claimed_bytes(splits_at_ref(root, ref)).items()}
 
 
 def load_data_symbols(root: str) -> dict[str, dict]:
@@ -869,17 +888,162 @@ def census(root: str, units: list[str] | None = None, ranges: dict | None = None
     return census_records(unit_refs, load_data_symbols(root), ranges), len(registered), len(unit_refs)
 
 
-def snapshot_orphans(root: str) -> dict:
-    """The base snapshot `land.record_base` stores: every pre-existing orphan pair and the claimed bytes."""
+# -- which batch units the STRICT row judges: "touched" means a REAL change (owner, 2026-09-29: "Only real changes") --
+#
+# A unit is TOUCHED for the strict row only when the batch
+#   (a) registers it (it has claims now and none at the base),
+#   (b) recuts it: its merged `splits.txt` claims differ from the base's in any section, or
+#   (c) changes its COMPILED object `build/RMHE08/src/<unit>.o` against the base's (`object_fingerprint`): any
+#       section's bytes or flags, any defined symbol's section/offset/size/binding/type, any relocation's
+#       (section, offset, type, addend) or a relocation to a defined symbol whose own section/offset moved, or an
+#       EXTERNAL relocation whose target changed. An external target is the same when the two maps resolve the two
+#       names to the same ADDRESS (a rename sweep) or when the name is spelled the same (a map row renamed into
+#       an unresolved name the source already used; a name the map lacks resolves by its `linkage_stem`, the one
+#       symbol under two linkages `undefrefs` already equates); it differs only when both resolve and the addresses differ,
+#       or the spellings differ and one does not resolve. A pure rename sweep and an edit that compiles to the
+#       same object touch nothing.
+# A unit with no compiled object falls back to (a)/(b); a unit whose base snapshot carries no claims record (an old
+# `record-base`) is conservatively touched, reason "no base record"; a unit with an object and no base object is
+# touched ("no base object to compare"). A source file edited is NOT, by itself, a touch.
+
+UNSTABLE_SECTIONS = (".symtab", ".strtab", ".shstrtab", ".comment")
+
+
+def object_fingerprint(path: str, symbols: dict | None = None) -> dict | None:
+    """`{body, ext}` of a compiled object, or None when it cannot be read. See the TOUCHED rule above.
+
+    `body` hashes everything that is not an external target (sections, defined symbols, relocations to defined
+    symbols by the target's section/offset); `ext` is `{"section|offset|type|addend": [name, "SECTION:ADDR"|None]}`
+    for the external relocations, the address being what `symbols` (`{name: {section, address}}`, the tree's own
+    map) says. JSON-ready: this is what `record-base` stores per batch unit.
+    """
+    import hashlib
+
+    from units import dossier as dossier_mod  # noqa: PLC0415 - the one ELF reader
+    from units import undefrefs as uref  # noqa: PLC0415 - `linkage_stem`: one symbol under two linkages
+
+    try:
+        with open(path, "rb") as fh:
+            blob = fh.read()
+        sections, syms, relocs = dossier_mod.parse_elf(blob)
+    except (OSError, ValueError):
+        return None
+    symbols = symbols or {}
+    h = hashlib.sha1()
+    for sec in sections:
+        if sec["name"] in UNSTABLE_SECTIONS or sec["typ"] == 4 or not sec["name"]:
+            continue
+        h.update(("S|%s|%d|%d|%d|%d|" % (sec["name"], sec["typ"], sec["flags"], sec["align"], sec["size"])).encode())
+        h.update(sec["data"] if sec["typ"] != 8 else b"")
+    by_name = {s["name"]: s for s in syms if s["name"] and s["shndx"]}
+    rows = ["D|%s|%d|%d|%d|%d" % (s["section"], s["value"], s["size"], s["bind"], s["type"])
+            for s in syms if s["name"] and s["shndx"]]
+    ext: dict[str, list] = {}
+    for r in relocs:
+        name = r["symbol"] or ""
+        own = by_name.get(name)
+        if own is not None:
+            rows.append("R|%s|%d|%d|%d|L|%s|%d" % (r["target"], r["offset"], r["type"], r["addend"], own["section"],
+                                                   own["value"]))
+            continue
+        rows.append("R|%s|%d|%d|%d|X" % (r["target"], r["offset"], r["type"], r["addend"]))
+        entry = symbols.get(name) or symbols.get(uref.linkage_stem(name))
+        ext["%s|%d|%d|%d" % (r["target"], r["offset"], r["type"], r["addend"])] = \
+            [name, "%s:%d" % (entry["section"], entry["address"]) if entry else None]
+    for row in sorted(rows):
+        h.update(row.encode() + b"\n")
+    return {"body": h.hexdigest(), "ext": ext}
+
+
+def fingerprints_equal(a: dict, b: dict) -> bool:
+    """Whether two `object_fingerprint`s are the same object under the TOUCHED rule above. Pure."""
+    if a.get("body") != b.get("body") or set(a.get("ext") or {}) != set(b.get("ext") or {}):
+        return False
+    for key, (name_a, addr_a) in (a.get("ext") or {}).items():
+        name_b, addr_b = b["ext"][key]
+        if addr_a is not None and addr_b is not None:
+            if addr_a != addr_b:
+                return False
+        elif name_a != name_b:
+            return False
+    return True
+
+
+def unit_claim_table(ranges: dict) -> dict[str, dict[str, list[list[int]]]]:
+    """`{unit: {section: merged [[start, end], ...]}}` from parsed claims - the per-unit base a recut is judged on."""
+    per: dict[str, dict[str, list]] = {}
+    for section, rows in ranges.items():
+        for start, end, unit in rows:
+            per.setdefault(unit, {}).setdefault(section, []).append((start, end))
+    return {u: {sec: [list(r) for r in merged(rs)] for sec, rs in secs.items()} for u, secs in per.items()}
+
+
+def object_path(root: str, unit: str) -> str:
+    return os.path.join(root, "build", GAME_DIR, "src", unit + ".o")
+
+
+def touch_verdicts(units: list[str], base: dict, now_claims: dict, now_objects: dict) -> dict[str, dict]:
+    """`{unit: {touched, reasons}}` under the TOUCHED rule above. Pure.
+
+    `base` is the recorded snapshot (`unit_claims`, `objects`), `now_claims` a `unit_claim_table`, `now_objects`
+    `{unit: fingerprint or None}`. `reasons` is ordered registered / claims changed / object changed; empty means
+    not touched. A snapshot with no `unit_claims` cannot tell, so every unit is touched ("no base record").
+    """
+    out = {}
+    base_claims = base.get("unit_claims")
+    base_objects = base.get("objects")
+    for unit in units:
+        if base_claims is None:
+            out[unit] = {"touched": True, "reasons": ["no base record of the claims (old record-base): judged touched"]}
+            continue
+        reasons = []
+        was, now = base_claims.get(unit) or {}, now_claims.get(unit) or {}
+        if now and not was:
+            reasons.append("registered")
+        elif was != now:
+            secs = sorted({sec for sec in set(was) | set(now) if was.get(sec) != now.get(sec)})
+            reasons.append("claims changed (%s)" % ", ".join(secs))
+        cur = now_objects.get(unit)
+        if cur is not None:
+            if base_objects is None or unit not in base_objects:
+                reasons.append("object changed (no base object to compare)")
+            elif not fingerprints_equal(base_objects[unit], cur):
+                reasons.append("object changed")
+        out[unit] = {"touched": bool(reasons), "reasons": reasons}
+    return out
+
+
+def render_touch(unit: str, verdict: dict) -> str:
+    if verdict["touched"]:
+        return "%-34s TOUCHED: %s" % (unit, "; ".join(verdict["reasons"]))
+    return "%-34s not touched (claims and compiled object unchanged: rename-only / no real change)" % unit
+
+
+def snapshot_orphans(root: str, units: list[str] | None = None) -> dict:
+    """The base snapshot `land.record_base` stores: every pre-existing orphan pair, the claimed bytes, each unit's
+    claims and the compiled-object fingerprint of `units` (none when None: the manual flow names no batch)."""
     ranges = load_claims(root)
     (records, _stats), _n, _have = census(root, ranges=ranges)
+    table = unit_claim_table(ranges)
+    symbols = load_data_symbols(root)
+    names = [os.path.splitext(u)[0] for u in units] if units is not None else []
+    objects = {}
+    for unit in names:
+        if os.path.exists(object_path(root, unit)):
+            fp = object_fingerprint(object_path(root, unit), symbols)
+            if fp is not None:
+                objects[unit] = fp
     return {"keys": sorted(orphan_keys(records)),
-            "claims": {sec: [list(r) for r in rows] for sec, rows in claimed_bytes(ranges).items()}}
+            "claims": {sec: [list(r) for r in rows] for sec, rows in claimed_bytes(ranges).items()},
+            "unit_claims": table, "objects": objects}
 
 
 def batch_orphans(root: str, units: list[str], base_snapshot: dict | None, allowed=(), strict=True,
-                  query="lazy") -> dict:
-    """The gate row's whole decision for the batch units against the recorded base (see `orphan_verdict`)."""
+                  query="lazy", touched=None) -> dict:
+    """The gate row's whole decision for the batch units against the recorded base (see `orphan_verdict`).
+
+    `touched` (`{unit: {touched, reasons}}`) overrides `touch_verdicts` - a test's or a caller's own judgement.
+    """
     ranges = load_claims(root)
     names = [os.path.splitext(u)[0] for u in units]
     (records, _stats), _n, _have = census(root, None, ranges=ranges)
@@ -887,16 +1051,42 @@ def batch_orphans(root: str, units: list[str], base_snapshot: dict | None, allow
     snap = base_snapshot or {}
     base_claims = {sec: [tuple(r) for r in rows] for sec, rows in (snap.get("claims") or {}).items()}
     shrinks = shrunk_claims(base_claims, claimed_bytes(ranges)) if base_claims else []
-    verdict = orphan_verdict(snap.get("keys") or [], after, shrinks, allowed)
-    verdict["have_base"] = "keys" in snap and "claims" in snap
-    # STRICT (owner, 2026-09-29): a unit the batch touches must claim the data only it references - the
-    # pre-existing pairs too. `strict_report` decides per block (refuse, or deferred with a named class); a pair
-    # the add-only half already refused or allowed is not refused twice.
     base_keys = set(snap.get("keys") or [])
-    strict = strict_report(root, records, ranges, names, query=query) if strict else None
-    if strict is not None:
+    # STRICT (owner, 2026-09-29): a unit the batch REALLY changes must claim the data only it references - the
+    # pre-existing pairs too. `strict_report` decides per block (refuse, or deferred with a named class) and
+    # `classify_pairs` is the one classification both halves read: the add-only half below defers a NEW pair whose
+    # block is deferred (isolated-run / pool-synth / span-blocked / ambiguous-owner) instead of refusing it.
+    report = strict_report(root, records, ranges, names, query=query) if strict else None
+    added_deferred: dict[str, dict] = {}
+    if report is not None:
+        classes = classify_pairs(report)
+        added_deferred = {k: classes[k] for k in after if k not in base_keys and k in classes
+                          and classes[k]["verdict"] == "deferred"}
+    refusable = {k: v for k, v in after.items() if k not in added_deferred}
+    verdict = orphan_verdict(snap.get("keys") or [], refusable, shrinks, allowed)
+    verdict["added_deferred"] = [pair_line(c["pair"], "deferred %s, a new pair, not refused: %s" % (c["cls"], c["reason"]))
+                                 for c in added_deferred.values()]
+    verdict["have_base"] = "keys" in snap and "claims" in snap
+    if report is not None:
+        symbols = load_data_symbols(root)
+        now_objects = {}
+        for unit in names:
+            if os.path.exists(object_path(root, unit)):
+                now_objects[unit] = object_fingerprint(object_path(root, unit), symbols)
+        touch = touched if touched is not None else touch_verdicts(names, snap, unit_claim_table(ranges), now_objects)
+
+        def is_touched(unit):
+            return touch.get(unit, {"touched": True})["touched"]
+
+        strict = dict(report, blocks=[b for b in report["blocks"] if is_touched(b["unit"])])
+        untouched_pairs: dict[str, int] = {}
+        for b in report["blocks"]:
+            if not is_touched(b["unit"]):
+                untouched_pairs[b["unit"]] = untouched_pairs.get(b["unit"], 0) + len(b["pairs"])
         sv = strict_verdict(strict, skip_keys=set(after) - base_keys, allowed=allowed)
         verdict["strict"] = sv
+        verdict["touch"] = touch
+        verdict["untouched_pairs"] = untouched_pairs
         verdict["strict_counts"] = strict_counts(strict)
         verdict["strict_blocks"] = strict["blocks"]
         verdict["strict_stats"] = strict["stats"]
@@ -913,6 +1103,10 @@ def batch_orphans(root: str, units: list[str], base_snapshot: dict | None, allow
         verdict["unmatched_allowances"] = sorted("0x%08X" % a for a in sanction - used)
         verdict["sole_owned_debt"] = sv["refused"] + sv["accepted"] + [ln for v in sv["deferred"].values() for ln in v]
     else:
+        verdict["strict"] = {"refused": [], "accepted": [], "deferred": {}, "used": [], "unmatched_allowances": []}
+        verdict["touch"], verdict["untouched_pairs"] = {}, {}
+        verdict["strict_counts"], verdict["strict_blocks"], verdict["strict_stats"] = {}, [], {}
+        verdict["unmatched_allowances"] = []
         verdict["sole_owned"], verdict["sole_owned_debt"] = [], []
     return verdict
 
@@ -1018,9 +1212,10 @@ def render_census(rep: dict, top: int, units_total: tuple[int, int]) -> str:
     return "\n".join(lines)
 
 
-def build_fixture_object(path: str, refs: list[str], defined: list[str] = ()) -> None:
+def build_fixture_object(path: str, refs: list[str], defined: list[str] = (), fill: int = 0) -> None:
     """Write a minimal ELF32-BE object: `.text` with one `R_PPC_ADDR16_HA` relocation per name in `refs`
-    (undefined symbols) and an empty `.data` defining each name in `defined`. Enough for `parse_elf`."""
+    (undefined symbols) and an empty `.data` defining each name in `defined`; `fill` is the `.text` byte value (a body edit).
+    Enough for `parse_elf`."""
     import struct
 
     names = list(refs) + list(defined)
@@ -1041,7 +1236,7 @@ def build_fixture_object(path: str, refs: list[str], defined: list[str] = ()) ->
     def name_off(s):
         return shstr.index(b"\0" + s.encode() + b"\0") + 1
 
-    bodies = [b"", b"\0" * max(4, 4 * len(refs)), b"\0" * 4, rela, syms, strtab, shstr]
+    bodies = [b"", bytes([fill]) * max(4, 4 * len(refs)), b"\0" * 4, rela, syms, strtab, shstr]
     heads = [(0, 0, 0, 0), (name_off(".text"), 1, 0, 0), (name_off(".data"), 1, 0, 0),
              (name_off(".rela.text"), 4, 4, 1), (name_off(".symtab"), 2, 5, 1),
              (name_off(".strtab"), 3, 0, 0), (name_off(".shstrtab"), 3, 0, 0)]
@@ -1229,17 +1424,20 @@ def selftest_strict(eq) -> None:
         build_fixture_object(os.path.join(tmp, "build", "RMHE08", "obj", "B", "b.o"), ["a1"])
         snap = snapshot_orphans(tmp)
         eq(snap["keys"], [orphan_key("A/a", ".data", 0x805E0010)], "the fixture's one pre-existing orphan is in the base")
-        touched = batch_orphans(tmp, ["A/a"], snap, query=None)
+        touched = batch_orphans(tmp, ["A/a"], snap, query=None,
+                                touched={"A/a": {"touched": True, "reasons": ["registered"]}})
         eq((touched["added"], len(touched["sole_owned"])), ([], 1),
            "a TOUCHED unit with a pre-existing sole-owned orphan is refused (not merely reported)")
         eq(touched["strict_counts"], {"refuse": 1}, "... with the counts alongside")
         untouched = batch_orphans(tmp, ["B/b"], snap, query=None)
         eq((untouched["added"], untouched["sole_owned"]), ([], []),
            "the same orphan with its unit UNTOUCHED is not refused")
-        allowed = batch_orphans(tmp, ["A/a"], snap, ["0x805E0010"], query=None)
+        allowed = batch_orphans(tmp, ["A/a"], snap, ["0x805E0010"], query=None,
+                                touched={"A/a": {"touched": True, "reasons": ["registered"]}})
         eq((allowed["sole_owned"], len(allowed["strict"]["accepted"]), allowed["unmatched_allowances"]), ([], 1, []),
            "--allow-orphan <addr> excuses it, recorded as accepted")
-        wrong = batch_orphans(tmp, ["A/a"], snap, ["0x805E0044"], query=None)
+        wrong = batch_orphans(tmp, ["A/a"], snap, ["0x805E0044"], query=None,
+                              touched={"A/a": {"touched": True, "reasons": ["registered"]}})
         eq((len(wrong["sole_owned"]), wrong["unmatched_allowances"]), (1, ["0x805E0044"]),
            "an allowance that matches nothing keeps the refusal and is listed as unmatched")
         off = batch_orphans(tmp, ["A/a"], snap, query=None, strict=False)
@@ -1264,6 +1462,108 @@ def selftest_strict(eq) -> None:
            True, "... with a partial-run note when our object emits less than the claim")
         eq(splits_plan(splits, "Z/z", [])["found"], False, "an unregistered unit has no block")
         eq("NOT applied" in render_plan(plan, "A/a"), True, "the rendering says it does not apply the edit")
+
+
+def selftest_touch(eq) -> None:
+    """The TOUCHED rule and the add-only half's deferral classes, end to end over fixture trees."""
+    import tempfile
+
+    same = {"body": "h", "ext": {"k": ["foo", ".text:1"]}}
+    eq(fingerprints_equal(same, {"body": "h", "ext": {"k": ["bar", ".text:1"]}}), True,
+       "an external relocation renamed to the same address is the same object")
+    eq(fingerprints_equal(same, {"body": "h", "ext": {"k": ["foo", ".text:2"]}}), False,
+       "... one that resolves to another address is not")
+    eq(fingerprints_equal({"body": "h", "ext": {"k": ["foo__Fv", None]}},
+                          {"body": "h", "ext": {"k": ["foo__Fv", ".text:1"]}}),
+       True, "an unresolved name the map later resolves, spelled the same, is the same object")
+    eq(fingerprints_equal({"body": "h", "ext": {"k": ["foo__Fv", None]}},
+                          {"body": "h", "ext": {"k": ["baz", ".text:1"]}}),
+       False, "an unresolved name replaced by another spelling is judged changed")
+    eq(fingerprints_equal(same, dict(same, body="g")), False, "a different body is a different object")
+
+    base = {"unit_claims": {"A/a": {".data": [[1, 5]]}}, "objects": {"A/a": same}}
+    now_claims = {"A/a": {".data": [[1, 5]]}, "C/c": {".data": [[8, 9]]}}
+    got = touch_verdicts(["A/a", "C/c"], base, now_claims, {"A/a": same})
+    eq((got["A/a"]["touched"], got["A/a"]["reasons"]), (False, []), "same claims and object: not touched")
+    eq(got["C/c"]["reasons"], ["registered"], "a unit with claims now and none at the base is registered")
+    eq(touch_verdicts(["A/a"], base, {"A/a": {".data": [[1, 9]]}}, {})["A/a"]["reasons"], ["claims changed (.data)"],
+       "a recut is named with its section; no object falls back to the claims")
+    eq(touch_verdicts(["A/a"], {}, now_claims, {})["A/a"]["touched"], True, "an old base with no record is touched")
+    eq(touch_verdicts(["A/a"], base, now_claims, {"A/a": dict(same, body="g")})["A/a"]["reasons"], ["object changed"],
+       "a changed body is an object change")
+
+    splits = ("Sections:\n\t.text type:code align:32\n\nA/a.cpp:\n\t.text start:0x80010000 end:0x80010100\n"
+              "\t.data start:0x805E0000 end:0x805E0010\n")
+    symbols = ("a1 = .data:0x805E0000; // type:object size:0x4\np1 = .data:0x805E0010; // type:object size:0x4\n"
+               "ro = .rodata:0x80500040; // type:object size:0x4\ns1 = .sdata:0x80792300; // type:object size:0x4\n")
+    with tempfile.TemporaryDirectory() as tmp:
+        def put(rel, text):
+            path = os.path.join(tmp, rel)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(text)
+
+        def objs(refs, fill=0, target=None):
+            for kind, names in (("src", refs), ("obj", target if target is not None else refs)):
+                path = os.path.join(tmp, "build", "RMHE08", kind, "A", "a.o")
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                build_fixture_object(path, names, fill=fill)
+
+        def row(snap, **kw):
+            return batch_orphans(tmp, ["A/a"], snap, query=None, **kw)
+
+        put("config/RMHE08/splits.txt", splits)
+        put("config/RMHE08/symbols.txt", symbols)
+        objs(["p1"])
+        snap = snapshot_orphans(tmp, ["A/a"])
+        eq(sorted(snap["objects"]), ["A/a"], "the snapshot fingerprints the named units' compiled objects")
+        eq(sorted(snap["unit_claims"]["A/a"]), [".data", ".text"], "... and records each unit's claims")
+        v = row(snap)
+        eq((v["touch"]["A/a"]["touched"], v["sole_owned"], v["untouched_pairs"]), (False, [], {"A/a": 1}),
+           "an unchanged unit is not touched: its sole-owned pair is reported, not demanded")
+        eq("rename-only" in render_touch("A/a", v["touch"]["A/a"]), True, "... and the row says why")
+
+        # rename-only: the map row and the object's relocation name change, the address does not
+        put("config/RMHE08/symbols.txt", symbols.replace("p1 =", "p1_renamed ="))
+        objs(["p1_renamed"])
+        v = row(snap)
+        eq((v["touch"]["A/a"]["touched"], v["sole_owned"]), (False, []), "a pure rename sweep does not touch the unit")
+
+        # a body edit that changes bytes touches it, and the pair is demanded
+        put("config/RMHE08/symbols.txt", symbols)
+        objs(["p1"], fill=1)
+        v = row(snap)
+        eq((v["touch"]["A/a"]["reasons"], len(v["sole_owned"])), (["object changed"], 1),
+           "an edit that changes the compiled bytes touches the unit")
+        objs(["p1"])
+        eq(row(snap)["touch"]["A/a"]["touched"], False, "a source edit that compiles to the same object does not")
+
+        # a claim change touches it
+        put("config/RMHE08/splits.txt", splits.replace("0x805E0010", "0x805E0008"))
+        v = row(snap)
+        eq((v["touch"]["A/a"]["reasons"], len(v["sole_owned"])), (["claims changed (.data)"], 1),
+           "a splits.txt claim change touches the unit")
+        put("config/RMHE08/splits.txt", splits)
+
+        # registration: a unit that has claims now and none in the base
+        put("config/RMHE08/splits.txt", splits + "\nB/b.cpp:\n\t.text start:0x80010100 end:0x80010200\n")
+        bobj = os.path.join(tmp, "build", "RMHE08", "obj", "B", "b.o")
+        os.makedirs(os.path.dirname(bobj), exist_ok=True)
+        build_fixture_object(bobj, ["p1"])
+        v = batch_orphans(tmp, ["B/b"], snap, query=None)
+        eq(v["touch"]["B/b"]["reasons"], ["registered"], "a newly registered unit is touched (registered)")
+        put("config/RMHE08/splits.txt", splits)
+        os.remove(bobj)
+
+        # DEFECT 1: a widened claim re-splits the target object; its new pairs are classified, not refused
+        put("config/RMHE08/splits.txt", splits.replace("0x805E0010", "0x805E0014"))
+        objs(["p1"], target=["p1", "s1", "ro"])
+        v = row(snap)
+        eq(len(v["added_deferred"]), 1, "a NEW .sdata pair whose class is deferred (isolated-run) is reported deferred")
+        eq("isolated-run" in v["added_deferred"][0], True, "... with its class and reason")
+        eq(len(v["added"]), 1, "a NEW unclaimed .rodata word (refusable) still refuses")
+        eq("ro" in v["added"][0], True, "... and it is that word")
+        eq(row(snap, strict=False)["added_deferred"], [], "strict=False has no classification: the old add-only row")
 
 
 def selftest() -> int:
@@ -1341,6 +1641,7 @@ def selftest() -> int:
 
     selftest_census(eq)
     selftest_strict(eq)
+    selftest_touch(eq)
 
     print(f"datagap selftest: {checks} checks OK")
     return 0
@@ -1367,6 +1668,9 @@ def main(argv=None) -> int:
     ap.add_argument("--base-root", default=None, help="--row: the base tree (default: --root)")
     ap.add_argument("--base-ref", default=None, help="--row: revision whose splits.txt is the claimed-bytes base")
     ap.add_argument("--allow-orphan", action="append", default=[], metavar="ADDR", help="--row: an allowance")
+    ap.add_argument("--touched-by", action="store_true",
+                    help="--row: only list, per unit, whether the batch really touches it and why (registered / "
+                         "claims changed / object changed) against the base")
     ap.add_argument("--write-snapshot", metavar="FILE", help="write --root's base snapshot (what record-base stores)")
     ap.add_argument("--base-snapshot", metavar="FILE", help="--row: a snapshot written by --write-snapshot")
     ap.add_argument("--no-readers", action="store_true", help="--census: skip the callers.py reader index")
@@ -1379,7 +1683,8 @@ def main(argv=None) -> int:
         return selftest()
     if args.write_snapshot:
         with open(args.write_snapshot, "w", encoding="utf-8") as fh:
-            json.dump(snapshot_orphans(args.root), fh)
+            json.dump(snapshot_orphans(args.root, [os.path.splitext(u.strip())[0] for u in args.row.split(",")]
+                                       if args.row else None), fh)
         print(f"wrote {args.write_snapshot}")
         return 0
     if args.row:
@@ -1388,11 +1693,24 @@ def main(argv=None) -> int:
             with open(args.base_snapshot, encoding="utf-8") as fh:
                 snap = json.load(fh)
         else:
-            snap = snapshot_orphans(base_root)
+            snap = snapshot_orphans(base_root, [os.path.splitext(u.strip())[0] for u in args.row.split(",") if u.strip()])
         if args.base_ref:
             snap["claims"] = claims_at_ref(args.root, args.base_ref)
+            snap["unit_claims"] = unit_claim_table(splits_at_ref(args.root, args.base_ref))
         units = [u.strip() for u in args.row.split(",") if u.strip()]
         verdict = batch_orphans(args.root, units, snap, args.allow_orphan)
+        if args.touched_by:
+            for unit in units:
+                print(render_touch(os.path.splitext(unit)[0], verdict["touch"].get(os.path.splitext(unit)[0],
+                                   {"touched": True, "reasons": ["not a batch unit"]})))
+            return 0
+        for unit in units:
+            name = os.path.splitext(unit)[0]
+            print(render_touch(name, verdict["touch"].get(name, {"touched": True, "reasons": ["unjudged"]})))
+        for line in verdict["added_deferred"][:6]:
+            print("deferred (new pair) " + line)
+        if len(verdict["added_deferred"]) > 6:
+            print("deferred (new pair) ... %d more" % (len(verdict["added_deferred"]) - 6))
         for line in verdict["added"]:
             print("REFUSED  " + line)
         for line in verdict["sole_owned"]:
@@ -1411,6 +1729,8 @@ def main(argv=None) -> int:
             row["refuse" if block["verdict"] == "refuse" else "deferred"] += len(block["pairs"])
         for unit, row in sorted(per_unit.items()):
             print("  %-34s refusable pairs %3d, deferred pairs %3d" % (unit, row["refuse"], row["deferred"]))
+        for unit, count in sorted(verdict["untouched_pairs"].items()):
+            print("  %-34s not touched: %3d sole-owned pair(s) reported, not demanded" % (unit, count))
         print("pre-existing (reported, not refused): %d" % len(verdict["pre_existing"]))
         failed = bool(verdict["added"] or verdict["sole_owned"])
         print("row: %s" % ("FAIL, %d added + %d sole-owned pair(s) unclaimed" % (len(verdict["added"]),

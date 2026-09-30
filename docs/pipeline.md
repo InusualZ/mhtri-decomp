@@ -417,9 +417,19 @@ refuses a batch, names the row that refused, and the landing either passes every
   (playbook 23: a claim our object cannot reproduce lowers the score; an allowance that matches nothing keeps the
   refusal).
 * **The strict half of the same row** (owner, 2026-09-29: "Yes, refuse (strict)" - no data is left behind when a
-  unit is touched): the check "no batch unit still has data only it references left unclaimed" refuses, for every
-  batch unit, each **sole-owned** orphan pair - exactly one registered object references the address and
-  `callers.py` finds no unsplit reader - pre-existing ones included. Untouched units are only reported. A pair that
+  unit is touched): the check "no batch unit the batch really changes still has data only it references left
+  unclaimed" refuses, for every **touched** batch unit, each **sole-owned** orphan pair - exactly one registered object references the address and
+  `callers.py` finds no unsplit reader - pre-existing ones included. **Touched means a real change (owner,
+  2026-09-29, "Only real changes"):** the batch (a) registers the unit, (b) recuts it (merged claims differ from the
+  base's in any section) or (c) changes its compiled object `build/RMHE08/src/<unit>.o` against the base's -
+  `datagap.object_fingerprint`: section bytes/flags, defined symbols, relocation slots, relocations to defined
+  symbols by section+offset, and an external relocation's target compared by ADDRESS through each tree's own map (a
+  name the map lacks resolves by its `linkage_stem`, or stays a name and must be spelled the same). A forced callee
+  rename sweep (same bytes, relocations to the same addresses) therefore touches nothing; a source edit that compiles
+  to the same object does not either; a unit with no object falls back to (a)/(b); a base with no record is
+  judged touched. `record-base --units` stores each batch unit's claims and object fingerprint (compile happens
+  first). The row prints, per unit, TOUCHED (registered / claims changed / object changed) or "not touched", and
+  the untouched units' sole-owned pairs are reported, not demanded; lane-side: `datagap.py --row <units> --touched-by`. A pair that
   cannot be claimed on its own is *deferred*, printed with its class, never refused: `pool-synth` (`.sdata`/`.sdata2`
   and our object still emits more of the section than the claim carries - playbook 23/29/58), `ambiguous-owner`
   (the neighbouring claims' `.text` order does not bracket the unit), `span-blocked` (a second range separated
@@ -432,7 +442,12 @@ refuses a batch, names the row that refused, and the landing either passes every
   lane-side view is `datagap.py --census --unit <unit>`, the tree-wide one `datagap.py --row <units> --root <tree>`.
   A pair a lane truly cannot claim is named in its report with the reason and the orchestrator passes
   `--allow-orphan <hex addr>` (an address inside the pair's object excuses it; an allowance that matches nothing
-  excuses nothing and is printed as unmatched). Units with refusable pairs are `data-claim` backlog items
+  excuses nothing and is printed as unmatched). **The add-only half uses the same classes (2026-09-29):** a NEW pair (one the base snapshot
+  did not have - typically because a widened claim re-split the unit's target object and its relocations now name
+  more data; the key was already address-based, so renames are not the cause) whose block is `pool-synth` /
+  `isolated-run` / `span-blocked` / `ambiguous-owner` is printed "deferred ... a new pair" and not refused
+  (`classify_pairs` is the one classification both halves read); a new pair in a refusable block still refuses.
+  Units with refusable pairs are `data-claim` backlog items
   (`backlog.py`, weight = pair count) that `triage` closes when the rule stops refusing the unit.
 * **A committed scratch file refuses the batch** (`.tmp_dg.json`): remove it on the branch, never `--no-outbox`.
 * **`--already-applied` and the commit-sweep guard.** A tracked file dirty at `record-base` rides the next unit
@@ -947,6 +962,7 @@ These are decisions, not lessons. Do not relax one without the owner.
 | 2026-09-27 | The `@etb_`/`@eti_` post-compile build step (`objextab.py`) was owner-approved; changing compiler flags, `mw_version` or tool tags still needs concrete evidence and an explicit call-out (rule 3). |
 | 2026-09-28 | The `.init` TRK-image request was landed; the residual 164 B is closed as unclaimable (§8). Parked decisions still standing: `memcpy.c`/`memset.c` stay separate; `-func_align 4` waits for `Runtime.PPCEABI.H`'s next pass; one `Matching` flip per commit. |
 | 2026-09-29 | **No `--allow-rule12` (and no `--no-outbox` for a code row) unless the owner rules.** `land.py --allow-rule12 <token>` is a recorded allowance and using it is the owner's call, not a lane's. The owner ruled once, for `DWCi_natProbeStatus` (`.sbss` 0x80795818, landed with `DWCi/DWCi_NatNeg`); its claim is scheduled in `.pi/data-requests.json` until the unregistered `fn_8050C770` band, which writes the word, becomes a unit. For `network_transport` the owner chose the real fix (peer classes + a `.data` claim) over an exemption. |
+| 2026-09-29 | **"Touched" is a real change, not an edited file** (owner: "Only real changes"): the strict data-closure row demands a unit's sole-owned orphans only when the batch registers it, recuts it, or changes its compiled object (name-insensitive, relocations by address); a rename sweep does not touch. The add-only half defers NEW pairs by the same classes the strict half uses; `isolated-run` stays as landed. See the gate list. |
 | standing | A rule enforced by remembering is not a rule: a rule change ships with its tool row (`stylelint`, `vtableaudit`, `sync_profiles`) in the same batch. |
 
 ---
