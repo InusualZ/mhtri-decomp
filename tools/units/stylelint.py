@@ -2378,8 +2378,57 @@ def removed_identities(before_findings: list[dict], after_findings: list[dict],
     return out
 
 
+def _unit_stem(path: str) -> "str | None":
+    """`src/enemy/fn_x.cpp` -> `enemy/fn_x` (the unit name `splits.txt` uses); None outside `src/`."""
+    return os.path.splitext(path[4:])[0] if path.startswith("src/") else None
+
+
+def file_absorbers(absorbs: dict, before_paths: "list[str]", after_paths: "list[str]") -> dict:
+    """`{F: [G, ...]}` - for each source file F, the files whose unit received F's bytes. Pure.
+
+    `absorbs` is `datagap.derive_absorption`'s `{NEW unit: [OLD unit, ...]}` (an OLD's base byte range now claimed by
+    NEW: a fold, a shrunk unit's moved part, a rename).  `before_paths` are the files that existed at the base
+    (deleted, renamed or edited), `after_paths` the files the batch leaves; units map to files by stem.
+    """
+    by_old: dict = {}
+    for path in before_paths:
+        stem = _unit_stem(path)
+        if stem:
+            by_old[stem] = path
+    by_new: dict = {}
+    for path in after_paths:
+        stem = _unit_stem(path)
+        if stem:
+            by_new[stem] = path
+    out: dict = {}
+    for new, olds in absorbs.items():
+        for old in olds:
+            if old in by_old and new in by_new and by_old[old] != by_new[new]:
+                out.setdefault(by_old[old], []).append(by_new[new])
+    return {f: sorted(set(gs)) for f, gs in out.items()}
+
+
+def derive_file_absorbers(root: str, base: str, ref: "str | None", pairs: list, deleted: "list[str]") -> dict:
+    """The absorber map for this comparison: the datagap fold map over `splits.txt` at `base` vs `ref` (or the tree).
+
+    Evidence only (address ranges), never a name guess; an unreadable map yields no absorbers, so the credit degrades
+    to the plain one-per-removal rule.
+    """
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from units import datagap as dg  # noqa: PLC0415
+        base_table = dg.unit_claim_table(dg.splits_at_ref(root, base))
+        now_table = dg.unit_claim_table(dg.splits_at_ref(root, ref) if ref else dg.load_claims(root))
+        absorbs = dg.derive_absorption(base_table, now_table)
+    except Exception:                                                        # noqa: BLE001 - evidence only
+        return {}
+    before_paths = [b for b, _a in pairs if b] + list(deleted)
+    return file_absorbers(absorbs, before_paths, [a for _b, a in pairs])
+
+
 def apply_move_credits(fresh: dict, before_findings: list[dict], after_findings: list[dict],
-                       symbols: "dict | None" = None, files: "dict | None" = None) -> tuple[dict, list[dict]]:
+                       symbols: "dict | None" = None, files: "dict | None" = None,
+                       absorbers: "dict | None" = None) -> tuple[dict, list[dict]]:
     """Credit an added identity that another file of the same batch **gave up**: a move, not growth.
 
     `--diff` grandfathers per file, so functions moved from an old file into a new one read as additions
@@ -2395,11 +2444,36 @@ def apply_move_credits(fresh: dict, before_findings: list[dict], after_findings:
     pool = {k: list(v) for k, v in removed.items()}
     left: dict = {}
     moves: list[dict] = []
+    # SPLIT CREDIT (owner's delegate, 2026-09-30): a source file that lost an identity (deleted, or it stopped
+    # carrying it) whose bytes were absorbed by N files (`absorbers`, the derived fold map) earns up to N credits
+    # for it - one per absorber that newly carries it - because the one base identity is now legitimately needed
+    # in each. Only real absorbers qualify, a rule-1 duplicate never does, and the origin's own removal is
+    # consumed once, so no arbitrary file can also draw on it.
+    used_pairs: set = set()
+    split_done: set = set()                 # (key, id(finding)): credited by the absorber pass
+    for key in sorted(fresh):               # absorber pass FIRST, so no arbitrary file draws on an origin before them
+        rule, file = key
+        if not absorbers or rule == 1:
+            continue
+        for f in fresh[key]:
+            ident = (rule, f.get("token"), f["detail"])
+            for cand in removed.get(ident, ()):
+                if file in absorbers.get(cand, ()) and (cand, file, ident) not in used_pairs:
+                    used_pairs.add((cand, file, ident))
+                    if cand in pool.get(ident, []):
+                        pool[ident].remove(cand)
+                    moves.append({"rule": rule, "token": f.get("token"), "detail": f["detail"],
+                                  "from": cand, "to": file, "split": True})
+                    split_done.add((key, id(f)))
+                    break
     for key in sorted(fresh):
         rule, file = key
         keep = []
         for f in fresh[key]:
-            src = pool.get((rule, f.get("token"), f["detail"]))
+            if (key, id(f)) in split_done:
+                continue
+            ident = (rule, f.get("token"), f["detail"])
+            src = pool.get(ident)
             if src:
                 origin = src.pop(0)
                 moves.append({"rule": rule, "token": f.get("token"), "detail": f["detail"],
@@ -2415,10 +2489,21 @@ def move_credit_lines(moves: list[dict]) -> list[str]:
     """`--diff`'s report of what it credited as moved: never silent, names the old and the new file."""
     out = []
     if moves:
+        plain = [m for m in moves if not m.get("split")]
+        splits: dict = {}
+        for m in moves:
+            if m.get("split"):
+                splits.setdefault((m["rule"], m["token"] or m["detail"], m["from"]), []).append(m["to"])
         out.append("  moved (credited, one per removal from another file of the batch): %d finding(s)"
                    % len(moves))
-        for m in moves:
+        for m in plain:
             out.append("    moved rule %d %s: %s -> %s" % (m["rule"], m["token"] or m["detail"], m["from"], m["to"]))
+        for (rule, token, origin), dests in sorted(splits.items()):
+            if len(dests) == 1:
+                out.append("    moved rule %d %s: %s -> %s" % (rule, token, origin, dests[0]))
+                continue
+            out.append("    moved (split across %d absorbers) rule %d: %s: %s -> %s"
+                       % (len(dests), rule, token, origin, ", ".join(sorted(dests))))
     return out
 
 
@@ -4437,6 +4522,49 @@ def selftest() -> int:
         finally:
             os.chdir(old_cwd)
 
+    # --- SPLIT credit: a deleted/shrunk file whose bytes went to N absorbers earns up to N credits (2026-09-30) ---
+    def _fnd(rule, file, token, line=1):
+        return {"rule": rule, "file": file, "line": line, "token": token,
+                "detail": "`%s` has no registered owner" % token}
+
+    F, G1, G2, G3 = "src/A/f.cpp", "src/A/g1.cpp", "src/A/g2.cpp", "src/A/g3.cpp"
+    absorb = {F: [G1, G2]}
+
+    def _split(rule, before, after, absorbers=absorb):
+        fresh0 = added_identities(before, after)
+        left, moves = apply_move_credits(fresh0, before, after, absorbers=absorbers)
+        return sorted(k[1] for k in left), sorted(m["to"] for m in moves)
+
+    base_f = [_fnd(2, F, "lbl_1")]
+    check("(split 1) a deleted file split into two absorbers is credited twice",
+          _split(2, base_f, [_fnd(2, G1, "lbl_1"), _fnd(2, G2, "lbl_1")]), ([], [G1, G2]))
+    check("(split 2) a non-absorber copy of the same token is refused, the absorbers still credited",
+          _split(2, base_f, [_fnd(2, G1, "lbl_1"), _fnd(2, G2, "lbl_1"), _fnd(2, G3, "lbl_1")]),
+          ([G3], [G1, G2]))
+    check("(split 3) the token also new in a third file, absorbers sorted after it: the third still refuses",
+          _split(2, base_f, [_fnd(2, "src/A/a0.cpp", "lbl_1"), _fnd(2, G1, "lbl_1"), _fnd(2, G2, "lbl_1")]),
+          (["src/A/a0.cpp"], [G1, G2]))
+    base_1 = [dict(_fnd(1, F, "T"), detail="type `T` is defined in X and again in Y")]
+    check("(split 4) a rule-1 duplicate is never credited by absorption",
+          _split(1, base_1, [dict(_fnd(1, G1, "T"), detail=base_1[0]["detail"]),
+                              dict(_fnd(1, G2, "T"), detail=base_1[0]["detail"])]),
+          ([G2], [G1]))
+    check("(split 5) a copy that leaves the original intact earns nothing",
+          _split(2, base_f, [_fnd(2, F, "lbl_1"), _fnd(2, G1, "lbl_1"), _fnd(2, G2, "lbl_1")]), ([G1, G2], []))
+    check("(split 6) an identity new in an absorber that F never carried earns nothing",
+          _split(2, base_f, [_fnd(2, G1, "lbl_9")]), ([G1], []))
+    check("(split 7) no absorber map: the plain one-credit-per-removal rule",
+          _split(2, base_f, [_fnd(2, G1, "lbl_1"), _fnd(2, G2, "lbl_1")], absorbers={}), ([G2], [G1]))
+    _fr, _mv = apply_move_credits(added_identities(base_f, [_fnd(2, G1, "lbl_1"), _fnd(2, G2, "lbl_1")]), base_f,
+                                  [_fnd(2, G1, "lbl_1"), _fnd(2, G2, "lbl_1")], absorbers=absorb)
+    check("(split 8) the gate log names the split and its absorbers",
+          [ln.strip() for ln in move_credit_lines(_mv)][1:],
+          ["moved (split across 2 absorbers) rule 2: lbl_1: src/A/f.cpp -> src/A/g1.cpp, src/A/g2.cpp"])
+    check("... and the --json moved entries carry the split flag", [m.get("split") for m in _mv], [True, True])
+    check("file_absorbers maps units to files by stem and skips unknown units",
+          file_absorbers({"A/g1": ["A/f", "A/zz"], "A/g2": ["A/f"], "A/g3": ["A/zz"]}, [F], [G1, G2, G3]),
+          {F: [G1, G2]})
+
     if fails:
         print("FAIL (%d)" % len(fails))
         for f in fails:
@@ -4582,7 +4710,8 @@ def ref_comparison(root: str, branch: str, ownership: "Ownership | None", as_jso
                                {f.get("token") for f in before_findings if f.get("token")})
     fresh, moves = apply_move_credits(
         added_identities(before_findings, after_findings, symbol_rename, rename),
-        before_findings, after_findings, symbol_rename, rename)
+        before_findings, after_findings, symbol_rename, rename,
+        absorbers=derive_file_absorbers(root, base, branch, pairs, deleted_src_files(root, base, branch)))
     added, credits = apply_rename_credits(
         added_rows(fresh, before, after),
         touched, base_ownership, after_ownership, base_symbols,
@@ -4719,7 +4848,8 @@ def main(argv: list[str] | None = None) -> int:
                                    {f.get("token") for f in before_findings if f.get("token")})
         fresh, moves = apply_move_credits(
             added_identities(before_findings, after_findings, symbol_rename, rename),
-            before_findings, after_findings, symbol_rename, rename)
+            before_findings, after_findings, symbol_rename, rename,
+            absorbers=derive_file_absorbers(root, args.diff, None, pairs, deleted_src_files(root, args.diff)))
         added, credits = apply_rename_credits(
             added_rows(fresh, before, after),
             touched, base_ownership, ownership, base_symbols,
