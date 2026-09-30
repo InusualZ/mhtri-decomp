@@ -22,7 +22,7 @@
 typedef struct NetworkErrorInfo NetworkErrorInfo;
 typedef struct NetId NetId;                 /* include/Network/NetworkLayerPat.h */
 typedef struct NetLayerRequest NetLayerRequest; /* include/Network/NetworkLayerPat.h */
-/* the record's layout lives in `include/Network/fn_803D3CE8.h`, beside the GameSpy handshake that
+/* the record's layout lives in `include/Network/NetworkSessionManager.h`, beside the GameSpy handshake that
  * fills it: `NetworkInstance::postError` below only takes a pointer to it. */
 
 /* the DWC callbacks are installed as unprototyped pointers and the callee casts them back */
@@ -387,7 +387,7 @@ extern const char lbl_80603680[];
 extern const char lbl_806036B0[];
 
 /* The Network band's constants live in the data-only sibling header (see its comment for why a
- * unit that also includes `Network/fn_803D3CE8.h` cannot take them from here). */
+ * unit that also includes `Network/NetworkSessionManager.h` cannot take them from here). */
 #include "unsplit/NetworkData.h"
 
 /* ---- the layer request state machine's callees (0x803DECF0..0x803EF4C8, 0x8040144C..0x80401B68) ---- */
@@ -401,8 +401,8 @@ typedef struct NetworkRequestError {
 } NetworkRequestError;   /* size: 0x0C */
 
 class NetworkLayerPat;             /* include/Network/NetworkLayerPat.h */
-class NetworkSessionManagerPat;    /* include/Network/fn_803D3CE8.h */
-typedef struct NetworkRequest NetworkRequest;   /* include/Network/fn_803D3CE8.h */
+class NetworkSessionManagerPat;    /* include/Network/NetworkSessionManager.h */
+typedef struct NetworkRequest NetworkRequest;   /* include/Network/NetworkSessionManager.h */
 
 /* 0x803E3598 - copies the request's error record out under its mutex; false while none is set. */
 s32 NetworkRequest_getError(NetworkRequest* request, NetworkRequestError* out);

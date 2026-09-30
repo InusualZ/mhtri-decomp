@@ -1400,16 +1400,17 @@ Network/NetworkSessionBase.cpp:
 	.data       start:0x805F99A0 end:0x805F9A40
 
 Network/NetworkSessionStable.cpp:
-	extab       start:0x80019AB4 end:0x80019E5C
-	extabindex  start:0x8003A344 end:0x8003A524
-	.text       start:0x803CF6D8 end:0x803D3CE8
-	.data       start:0x805F9A40 end:0x805FA4EC
+	extab       start:0x80019AB4 end:0x80019F3C
+	extabindex  start:0x8003A344 end:0x8003A5A8
+	.text       start:0x803CF6D8 end:0x803D4904
+	.data       start:0x805F9A40 end:0x805FA788
 
-Network/fn_803D3CE8.cpp:
-	extab       start:0x80019E5C end:0x8001A348
-	extabindex  start:0x8003A524 end:0x8003A8B4
-	.text       start:0x803D3CE8 end:0x803D70B8
-	.data       start:0x805FA908 end:0x805FAAD0
+Network/NetworkSessionManager.cpp:
+	extab       start:0x80019F3C end:0x8001A348
+	extabindex  start:0x8003A5A8 end:0x8003A8B4
+	.text       start:0x803D4904 end:0x803D70B8
+	.data       start:0x805FA788 end:0x805FAB48
+	.sbss       start:0x80794CA0 end:0x80794CA8
 
 Network/NetworkSessionManagerPat.cpp:
 	extab       start:0x8001A348 end:0x8001A350
@@ -1493,6 +1494,10 @@ quest/arenatask.cpp:
 
 Runtime.PPCEABI.H/global_destructor_chain.c:
 	.text       start:0x804566A4 end:0x80456704
+
+Runtime.PPCEABI.H/ptmf.c:
+	.text       start:0x80456C88 end:0x80456CE0
+	.rodata     start:0x80572428 end:0x80572438
 
 Runtime.PPCEABI.H/__init_cpp_exceptions.cpp:
 	.text       start:0x80457420 end:0x80457490

@@ -33,25 +33,9 @@ extern f32 networkSessionTimeoutSeconds;
 extern f32 networkSessionIntervalSeconds;
 extern f32 networkSessionPeriodSeconds;
 
-/* 0x80572428 - the four-word all-zero `.rodata` descriptor the session initialises a request's
- * `desc_98/9C/A0` from (the bytes are 16 x 0x00). */
-extern u32 NetworkRequest_defaultDescriptor[4];
-
-/* 0x80794CA0 - the request-id source: `requestId_70 = counter; counter = requestId_70 + 1`. */
-extern u32 NetworkRequest_idCounter;
-
 /* 0x80794CC0 - the `.sbss` mediator singleton slot the `constructNetworkWiiMediator` constructor
  * publishes into. */
 extern void* sNetworkWiiMediatorInstance;
-
-/* The `.data` messages the session band logs, read off the DOL - they name their own emitters, which
- * is how the two functions that load them were identified:
- *   0x805FA8C8 = "NetworkSessionManager::deleteRequest: request is moving.
-"
- *   0x805FAAD0 = "NetworkRequest::getArgument: arg no over %d <= %d
-" */
-extern const char NetworkSessionManager_deleteRequestMessage[0x3A];
-extern const char NetworkRequest_getArgumentMessage[0x33];
 
 #ifdef __cplusplus
 }

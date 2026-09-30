@@ -21,7 +21,7 @@
  */
 #include "types.h"
 #include "Network/network_transport.h"
-#include "Network/fn_803D3CE8.h"
+#include "Network/NetworkSessionManager.h"
 #include "unsplit/NetworkData.h"
 #include "unsplit/NetworkStream.h"
 /* `unsplit/Network.h` is the Network band's code half (`getNetworkLogger` and the socket-pool helpers).  It
@@ -84,21 +84,21 @@ s32 NetworkPeerBuffer::receive(u8* out, s32* size, u8* out2, s32* size2, u8* kin
     *kind = 0;
     networkStreamReader_attach(&stream, this->payload_10, this->used_2010);
     if (make_sure_enough_space(&stream) == 0) {
-        dtor_803CB8FC(&stream, -1);
+        networkStreamWriterDefault_dtor(&stream, -1);
         return 0;
     }
     if (capacity < read_size_from_buffer(&stream)) {
-        dtor_803CB8FC(&stream, -1);
+        networkStreamWriterDefault_dtor(&stream, -1);
         return 0;
     }
     length = copy_from_buffer(&stream, out, capacity);
     if (length < 0) {
-        dtor_803CB8FC(&stream, -1);
+        networkStreamWriterDefault_dtor(&stream, -1);
         return 0;
     }
     this->used_2010 -= networkStreamReader_consumePacket(&stream);
     *size = length;
-    dtor_803CB8FC(&stream, -1);
+    networkStreamWriterDefault_dtor(&stream, -1);
     return length;
 }
 

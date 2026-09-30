@@ -2,7 +2,7 @@
  *
  * `.text` 0x803AA4A4..0x803B0F98 (27380 B, 70 functions), `extab` 0x80018A6C..0x80018C54 (60 records),
  * `extabindex` 0x80038E08..0x800390E4 (60 x 12 B) - each run is exactly the gap between the bracketing
- * registrations (`menu/multi_result.cpp` below, `Network/fn_803D3CE8.cpp` above).  Registered from
+ * registrations (`menu/multi_result.cpp` below, `Network/NetworkSessionManager.cpp` above).  Registered from
  * `proposal/803AA4A4_fn_803AA4A4.cpp`; the seam is UNPROVEN (the discovery `--max-bytes` cap) and the run
  * is plainly a *sequence* of objects, so the edges are hints, not proven TU boundaries.
  *

@@ -21,7 +21,7 @@
  */
 #include "types.h"
 #include "Network/network_transport.h"
-#include "Network/fn_803D3CE8.h"
+#include "Network/NetworkSessionManager.h"
 #include "unsplit/NetworkData.h"
 #include "unsplit/NetworkStream.h"
 /* `unsplit/Network.h` is the Network band's code half (`getNetworkLogger` and the socket-pool helpers).  It

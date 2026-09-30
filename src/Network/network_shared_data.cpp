@@ -7,7 +7,7 @@
  *
  * WHAT IT IS FOR.  Both runs are unowned in `splits.txt` and read by more than one party, so rule 12
  * fires on every consumer that spells a word of them: the reader census answers
- * the Network transport units *and* `Network/fn_803D3CE8.cpp` for 0x8079C6EC/0x8079C6F0/0x8079C6F8/
+ * the Network transport units *and* `Network/NetworkSessionManager.cpp` for 0x8079C6EC/0x8079C6F0/0x8079C6F8/
  * 0x8079C708/0x8079C718/0x8079C730..0x8079C754 (`callers.py 0x8079C6EC`), and an unsplit (Network)
  * object reads 0x8079C690 and 0x8079C750 on top of that.  A pool with several readers is the
  * `named-owner-unit` case, not a `claim-into-unit` one: claiming it into either consumer would take
@@ -19,7 +19,7 @@
  * SOURCE DEFINES NOTHING.  The bytes are the original's and a `NonMatching` unit contributes exactly
  * those bytes to the link, so the DOL is untouched; what the registration buys is the ownership, plus
  * `include/Network/network_shared_data.h` as the one place a consumer declares a word (rule 2).  The
- * 14 declarations that header carries were moved there verbatim from `include/Network/fn_803D3CE8.h`,
+ * 14 declarations that header carries were moved there verbatim from `include/Network/NetworkSessionManager.h`,
  * where they were rule 12's finding while the run had no owner.
  *
  * EXTENTS (both 4-aligned, both ends proven by the reader set, not by a byte cap):

@@ -418,7 +418,7 @@ extern void* sGameSpyInterfaceThread;    /* 0x80794CE4 (.sbss) - the live GameSp
 /* Declarations of symbols *other* registered units own.  They sit here because the owners' headers do
  * not all carry them yet: `include/DWCi/fn_805113B0.h` does not exist, and
  * `include/sound/fn_800E46E8.h` declares only its own `fn_*` entry points, not `getInstance`.  The
- * `Network/` owner's header (`include/Network/fn_803D3CE8.h`) *does* carry this block's one such
+ * `Network/` owner's header (`include/Network/NetworkSessionManager.h`) *does* carry this block's one such
  * declaration, and the spelling here matches it.  The spellings are the map rows too, which is the
  * point: `objdiff` scores a `bl` by its instruction whatever name it carries, so a referrer that
  * spells a name no map row carries scores 100 % and links to nothing - that is the `flipcheck.py`
@@ -427,7 +427,7 @@ extern void* sGameSpyInterfaceThread;    /* 0x80794CE4 (.sbss) - the live GameSp
 
 extern "C" {
 
-/* owner: src/Network/fn_803D3CE8.cpp - returns this unit's thread object, so it stays `void*` here */
+/* owner: src/Network/NetworkSessionManager.cpp - returns this unit's thread object, so it stays `void*` here */
 void* GameSpyInterfaceThread_getInstance(void);
 
 /* owner: src/DWCi/fn_805113B0.c */

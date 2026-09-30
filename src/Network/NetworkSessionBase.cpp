@@ -23,11 +23,11 @@
  * FLAGS.  C++ under `cflags_network` (`-Cpp_exceptions on` gives the `extab`), per-unit `-O3`/`-pool off` (`configure.py`);
  * file-scope `#pragma peephole off` (playbook 39); each `dont_inline` region keeps a retail `bl` that `-inline auto` folds.
  *
- * RESIDUALS.  The constructor (0x803CF674, 32 B) and `getSomething5` (8 B) are not written.
+ * RESIDUALS.  `getSomething5` (8 B, a byte read at +0x6134 of another band's object) is not written.
  */
 #include "types.h"
 #include "Network/network_transport.h"
-#include "Network/fn_803D3CE8.h"
+#include "Network/NetworkSessionManager.h"
 #include "unsplit/NetworkData.h"
 #include "unsplit/NetworkStream.h"
 /* `unsplit/Network.h` is the Network band's code half (`getNetworkLogger` and the socket-pool helpers).  It
@@ -66,6 +66,14 @@ void LockMutex(void* mutex)
 void NetworkSessionStable_setNotifyValue(u32 value)
 {
     networkSessionNotifyValue = value;
+}
+
+/* Builds the base: its table, then an empty callback, user pointer and host flag. */
+NetworkSessionBase::NetworkSessionBase()
+{
+    callback_04 = NULL;
+    user_08 = NULL;
+    isHost_0C = 0;
 }
 
 #pragma dont_inline on

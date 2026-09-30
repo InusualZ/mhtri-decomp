@@ -1,8 +1,12 @@
 /*
- * fn_803D3CE8.cpp - the Network session band, `.text` 0x803D3CE8..0x803D70B8 (101 functions).
+ * NetworkSessionManager.cpp - the Network session band, `.text` 0x803D4904..0x803D70B8.  The twelve
+ * `NetworkSessionStable` functions that used to open the range (0x803D3CE8..0x803D4904: the op-code
+ * packet writers, the rate governor, `moveOutOfBand`, `getUsableSlot`) now live in
+ * `Network/NetworkSessionStable.cpp`: the `.data` order puts their strings before that unit's tables.
+ * The unit opens with `NetworkSessionManager::NetworkSessionManager` (0x803D4904), which names the file (a GUESS:
+ * the tile spans more than one original TU and no `__FILE__` string evidences a name).
  *
- * WHAT IT IS.  The serialization/state half of the Wii network session subsystem: the op-code
- * packet writers of `NetworkSessionStable`, the request pool and its state machine on
+ * WHAT IT IS.  The serialization/state half of the Wii network session subsystem: the request pool and its state machine on
  * `NetworkSessionManager` (21 request slots, a two-slot `NetworkRequest` pool at +0x7C, virtual
  * dispatch), and the `NetworkSessionManagerPat` half that owns its own request pair, the per-player
  * records and the 32-entry circle list.
@@ -12,12 +16,10 @@
  * the class log strings, never to a source-file-name literal.  2. `dumpmap.py lookup` answers only
  * `zz_XXXXXXXX_` for the code.  3. The code and the vtables place the band in `Network` (the
  * registered neighbour is `Network/NetworkWiiMediator.cpp`).  The tile spans more than one original TU,
- * so no single evidenced file name covers it and the file keeps the map's `fn_803D3CE8` stem.
+ * so no single evidenced file name covers it.
  *
  * HOW THE NAMES WERE RECOVERED (rule 7).  The `.data` log strings name their own emitters, and each is
- * loaded by exactly one function in the range: "NetworkSessionStable::downPerformance: ..." (0x805FA550,
- * 0x805FA590) -> `downPerformance`; "::upPerformance ..." (0x805FA5D4, 0x805FA610) -> `upPerformance`;
- * "NetworkSessionStable::move: oob sqn send. ..." (0x805FA64C) -> `move`; "NetworkSessionManager::move:
+ * loaded by exactly one function in the range: "NetworkSessionManager::move:
  * request[%d] is moving ..." (0x805FA788) -> `NetworkSessionManager::move` (the old `slot_18`);
  * "NetworkSessionManagerPat::final ..." (0x805FAB08) -> the Pat flush.  The 21 request descriptors are
  * 12-byte `{0, opcode, 0}` records, so each `requestNNN` is named by its own op code.  The float
@@ -51,9 +53,9 @@
  *
  * RULE 10 - the two dispatches.  `.data` 0x805FA908..0x805FAAD0 (456 B, the base
  * `NetworkSessionManager` table, 51 relocations) is claimed and byte-identical; `NetworkBuffer`
- * (table at 0x805F9150) and `NetworkSessionStable` (0x805FA6E8) are another band's and are
- * *declared* classes with no virtual defined here, so MWCC emits no table for them (the
- * `NetworkBuffer` conversion took 11 rows to 100 % and 9 more up - measured, no row down).  The
+ * (table at 0x805F9150) is another band's and a *declared* class with no virtual defined here, so MWCC
+ * emits no table for it (the `NetworkBuffer` conversion took 11 rows to 100 % and 9 more up - measured, no
+ * row down); `NetworkSessionStable`'s table (0x805FA6E8) is emitted by `Network/NetworkSessionStable.cpp`.  The
  * four record classes stay structs with a vtable member: a class makes MWCC initialise the vptr of
  * every element of the `__construct_array`-built arrays (Pat constructor 252 -> 544 B).
  *
@@ -74,11 +76,6 @@
  *  - `networkSessionReflectCallback` 54.58 %: the target saves all six incoming argument registers
  *    before building the callee's, ours does the minimal four-move rotation; the two are equivalent
  *    and the naive form is not reachable from the source side (48 B).
- *  - `NetworkSessionStable_getUsableSlot`/`updateRate`/`downPerformance`/`upPerformance`/`move`
- *    81-95 %: the `-O3` colouring of the slot pointer and of the two `f32` rates (identical
- *    instruction multiset, `fmuls f2,f2,f0` against `fmuls f0,f2,f0`, and one `extsb.` retail keeps
- *    unfolded), plus `updateRate`'s other dispatch, `self->vtable->getFloat_8C` (the one
- *    `NetworkSessionStable` call site left as a vtable-member read).
  *  - `NetworkRequest_begin` 91.38 %: the target inlines the three-word `va_list` setup, ours calls
  *    the `__va_start` intrinsic, because the pinned toolchain ships no `<stdarg.h>` and the
  *    CodeWarrior macro form is not reachable (`__builtin_va_start` does not exist).
@@ -95,10 +92,18 @@
  *    named constant.
  *  - `extab` 0x2E4 vs 0x4EC and `extabindex` vs the target are short because 284 B of `.text` is
  *    still compressed away.
+ *  - `.data` 0x805FA788..0x805FAB48 is claimed and written (the request descriptors as globals placed after
+ *    `move`, the four log strings as literals) but does not byte-match: retail puts the base table between
+ *    `deleteRequest`'s string and `getArgument`'s, so the original TU ends after the table (emission-order seam,
+ *    `datagap.py --unit`: boundary in 0x805FAAD0..0x805FB0F0, `.text` 0x803D6514..0x803D65F4) while ours emits it
+ *    last; the tile needs a split there (not drawn).  `.sbss` 0x80794CA0 is claimed at its 8 B map extent, the
+ *    object emits the 4 B word.  0x80572428 (`.rodata`, 16 zero bytes) is the runtime's `__ptmf_null`, owned by
+ *    `Runtime.PPCEABI.H/ptmf.c`, not by this unit: the rodata order puts it after `network_pat_control`'s
+ *    0x80571EA0..0x80572240, so claiming it here is a dtk link-order cycle.
  */
 
 #include "types.h"
-#include "Network/fn_803D3CE8.h"
+#include "Network/NetworkSessionManager.h"
 
 /* `NetworkVaState` and the two variadic intrinsics live in this unit's header (rule 2 keeps the
    declaration with the TU that needs it). */
@@ -122,15 +127,6 @@
 
 /* ---- this unit's own forward declarations ---- */
 extern "C" {
-void fn_803D3CE8(NetworkSessionStable*, u32);
-void NetworkSessionStable_send8(NetworkSessionStable*);
-void NetworkSessionStable_send6(NetworkSessionStable*, s8);
-void NetworkSessionStable_send10(NetworkSessionStable*, s8);
-void NetworkSessionStable_send11(NetworkSessionStable*, s8, u32, u32, s8, f32);
-void NetworkSessionStable_send8or9(NetworkSessionStable*, u32, s8);
-void NetworkSessionStable_send4(NetworkSessionStable*, const void*, u32, s8);
-void NetworkSessionStable_updateRate(NetworkSessionStable*, s8);
-s8 NetworkSessionStable_getUsableSlot(NetworkSessionStable*, s8);
 
 void NetworkRequest_reset(NetworkRequest*);
 void* NetworkRequest_deleteElement(NetworkRequest*, s16);
@@ -154,336 +150,6 @@ s32 NetworkRequest_getArgument(NetworkRequest*, u32);
    file's own header declares `dtor_803CA338(void*)`, and including both fails to compile - the
    reason `include/unsplit/NetworkData.h` exists.  `getNetworkLogger` and the logger type live in this
    unit's own header. */
-
-/* ----------------------------------------------------------------------------------------- */
-/* NetworkSessionStable - op-code packet writers                                             */
-/* ----------------------------------------------------------------------------------------- */
-
-extern "C" void fn_803D3CE8(NetworkSessionStable* self, u32 value)
-{
-    NetworkStreamWriter stream;
-    s8 term;
-    u16 n;
-
-    fn_803CB9B4(&stream);
-    fn_803F89D0(&stream, self->sendBuffer_0D, 0x400);
-    fn_803F8A14(&stream, 0);
-    n = writeByte(&stream, 1);
-    writeSize(&stream, (u16)(n + writeUInt(&stream, value)));
-    term = -1;
-    NetworkSessionStable_sendStream(self, &stream, 0, 1, &term, 0xFF);
-    dtor_803CB958(&stream, -1);
-}
-
-extern "C" void NetworkSessionStable_send8(NetworkSessionStable* self)
-{
-    NetworkStreamWriter stream;
-    s8 term;
-
-    fn_803CB9B4(&stream);
-    fn_803F89D0(&stream, self->sendBuffer_0D, 0x400);
-    fn_803F8A14(&stream, 0);
-    writeSize(&stream, writeByte(&stream, 2));
-    term = -1;
-    NetworkSessionStable_sendStream(self, &stream, 0, 1, &term, 0xFF);
-    dtor_803CB958(&stream, -1);
-}
-
-extern "C" void NetworkSessionStable_send6(NetworkSessionStable* self, s8 value)
-{
-    NetworkStreamWriter stream;
-    s8 term;
-
-    fn_803CB9B4(&stream);
-    fn_803F89D0(&stream, self->sendBuffer_0D, 0x400);
-    fn_803F8A14(&stream, 0);
-    writeSize(&stream, writeByte(&stream, 6));
-    term = value;
-    NetworkSessionStable_sendStream(self, &stream, 0, 1, &term, 0xFF);
-    dtor_803CB958(&stream, -1);
-}
-
-extern "C" void NetworkSessionStable_send10(NetworkSessionStable* self, s8 idx)
-{
-    NetworkStreamWriter stream;
-    s8 term;
-    u16 n;
-
-    fn_803CB9B4(&stream);
-    fn_803F89D0(&stream, self->sendBuffer_0D, 0x400);
-    fn_803F8A14(&stream, 0);
-    n = writeByte(&stream, 10);
-    writeSize(&stream, (u16)(n + fn_803F8BDC(&stream, &self->slots_14838[idx].state_20)));
-    term = -2;
-    NetworkSessionStable_sendStream(self, &stream, 0, 1, &term, 0xFF);
-    dtor_803CB958(&stream, -1);
-}
-
-extern "C" void NetworkSessionStable_send11(NetworkSessionStable* self, s8 a, u32 b, u32 c, s8 d, f32 f)
-{
-    NetworkStreamWriter stream;
-    s8 term;
-    u32 scaled;
-    u16 n;
-    u32 n2;
-    u32 n3;
-    u32 n4;
-
-    scaled = 0;
-    fn_803CB9B4(&stream);
-    scaled = (u32)(networkMillisecondsPerSecond * f);
-    fn_803F89D0(&stream, self->sendBuffer_0D, 0x400);
-    fn_803F8A14(&stream, 0);
-    n = writeByte(&stream, 11);
-    n2 = n + fn_803F8BDC(&stream, (const void*)b);
-    n3 = n2 + writeUInt(&stream, c);
-    n4 = n3 + writeUInt(&stream, scaled);
-    writeSize(&stream, (u16)(n4 + writeByte(&stream, (u32)d)));
-    term = a;
-    NetworkSessionStable_sendStream(self, &stream, 0, 1, &term, 0xFF);
-    dtor_803CB958(&stream, -1);
-}
-
-extern "C" void NetworkSessionStable_send8or9(NetworkSessionStable* self, u32 has_extra, s8 idx)
-{
-    NetworkStreamWriter stream;
-    s8 term;
-    u16 n;
-
-    fn_803CB9B4(&stream);
-    fn_803F89D0(&stream, self->sendBuffer_0D, 0x400);
-    fn_803F8A14(&stream, 0);
-    if (has_extra != 0) {
-        n = writeByte(&stream, 9);
-    } else {
-        n = writeByte(&stream, 8);
-    }
-    n = (u16)(n + writeUInt(&stream, self->slots_14838[idx].playerId_40));
-    writeSize(&stream, (u16)(n + writeUInt(&stream, self->tick_16CD8)));
-    term = idx;
-    NetworkSessionStable_sendStream(self, &stream, 0, 1, &term, 0xFF);
-    dtor_803CB958(&stream, -1);
-}
-
-extern "C" void NetworkSessionStable_send4(NetworkSessionStable* self, const void* data, u32 len, s8 idx)
-{
-    NetworkStreamWriter stream;
-    s8 term;
-    u16 n;
-
-    fn_803CB9B4(&stream);
-    fn_803F89D0(&stream, self->sendBuffer_0D, 0x400);
-    fn_803F8A14(&stream, 0);
-    n = writeByte(&stream, 4);
-    writeSize(&stream, (u16)(n + writeBytes(&stream, data, len)));
-    term = idx;
-    NetworkSessionStable_sendStream(self, &stream, 0, 1, &term, 0xFF);
-    dtor_803CB958(&stream, -1);
-}
-
-/* ----------------------------------------------------------------------------------------- */
-/* NetworkSessionStable - performance / state                                                */
-/* ----------------------------------------------------------------------------------------- */
-
-extern "C" void NetworkSessionStable_updateRate(NetworkSessionStable* self, s8 idx)
-{
-    NetworkSessionSlot* slot;
-    f32 a;
-    f32 b;
-    f32 r;
-
-    if (NetworkSessionStable_getUsableSlot(self, idx) < 0) {
-        return;
-    }
-    a = networkRateScale * self->vtable->getFloat_8C(self, idx);
-    slot = &self->slots_14838[idx];
-    b = networkRateScale * slot->rate2_BC;
-    r = a;
-    if (b > r) {
-        r = b;
-    }
-    if (r < networkRateMin) {
-        r = networkRateMin;
-    }
-    if (r > networkRateMax) {
-        r = networkRateMax;
-    }
-    slot->rate_B8 = r;
-}
-
-/* Runs once every tick: decays the slot's pack interval towards the floor and reports it. */
-extern "C" void NetworkSessionStable_downPerformance(NetworkSessionStable* self, s8 idx)
-{
-    NetworkSessionSlot* slot;
-    NetworkSessionManagerLogger* log;
-    s32 step;
-    f32 t;
-    f32 delta;
-
-    slot = &self->slots_14838[idx];
-    t = self->time_16CDC;
-    if (t < slot->limit2_D8 + networkRateMax) {
-        return;
-    }
-    slot->limit2_D8 = t;
-    if (slot->flag_D0 == 0) {
-        slot->flag_D0 = 1;
-        slot->base_C8 = slot->rate2_BC;
-        slot->limit_CC = slot->counter_C0;
-    }
-    slot->last_C4 = self->time_16CDC;
-    if (slot->rate2_BC < self->limit_16CF8) {
-        delta = self->limit_16CF8 - slot->rate2_BC;
-        delta = delta * networkRateUpLerp;
-        if (delta < networkRateDownStep) {
-            slot->rate2_BC = self->limit_16CF8;
-        } else {
-            slot->rate2_BC = slot->rate2_BC + delta;
-        }
-        log = (NetworkSessionManagerLogger*)getNetworkLogger();
-        log->vtable->verbose_0C(log, 1, NetworkSessionStable_downPerformancePackMessage, (u32)idx,
-                                slot->rate2_BC);
-    }
-    if (slot->counter_C0 > self->count_16CFC) {
-        step = (slot->counter_C0 - self->count_16CFC) / 2;
-        if (step < 16) {
-            slot->counter_C0 = self->count_16CFC;
-        } else {
-            slot->counter_C0 = slot->counter_C0 - step;
-        }
-        log = (NetworkSessionManagerLogger*)getNetworkLogger();
-        log->vtable->verbose_0C(log, 1, NetworkSessionStable_downPerformanceByteMessage, (u32)idx,
-                                slot->counter_C0);
-    }
-}
-
-/* Runs once every tick: grows the slot's pack interval towards the ceiling and reports it. */
-extern "C" void NetworkSessionStable_upPerformance(NetworkSessionStable* self, s8 idx)
-{
-    NetworkSessionSlot* slot;
-    NetworkSessionManagerLogger* log;
-    f32 t;
-
-    slot = &self->slots_14838[idx];
-    t = self->time_16CDC;
-    if (t < slot->accel_D4 + networkRateMax) {
-        return;
-    }
-    slot->accel_D4 = t;
-    if (slot->last_C4 + networkRateMax < t) {
-        slot->last_C4 = t;
-        slot->base_C8 = slot->base_C8 - networkRateDecay;
-        if (slot->base_C8 < networkRateFloor) {
-            slot->base_C8 = networkRateFloor;
-        }
-        slot->limit_CC = slot->limit_CC + 4;
-        if (slot->limit_CC > 1024) {
-            slot->limit_CC = 1024;
-        }
-    }
-    if (slot->flag_D0 != 0) {
-        slot->flag_D0 = 0;
-        slot->base_C8 = slot->base_C8 + (slot->rate2_BC - slot->base_C8) * networkRateDownLerp;
-        slot->limit_CC = slot->limit_CC - (slot->limit_CC - slot->counter_C0) / 4;
-    }
-    if (slot->base_C8 < slot->rate2_BC) {
-        if (slot->rate2_BC < slot->base_C8 + networkRateUpStep) {
-            slot->rate2_BC = slot->base_C8;
-        } else {
-            slot->rate2_BC = slot->rate2_BC - (slot->rate2_BC - slot->base_C8) * networkRateUpLerp;
-        }
-        log = (NetworkSessionManagerLogger*)getNetworkLogger();
-        log->vtable->verbose_0C(log, 1, NetworkSessionStable_upPerformancePackMessage, (u32)idx,
-                                slot->rate2_BC);
-    }
-    if (slot->limit_CC < slot->counter_C0) {
-        if (slot->limit_CC - 32 < slot->counter_C0) {
-            slot->counter_C0 = slot->limit_CC;
-        } else {
-            slot->counter_C0 = slot->counter_C0 + (slot->limit_CC - slot->counter_C0) / 2;
-        }
-        log = (NetworkSessionManagerLogger*)getNetworkLogger();
-        log->vtable->verbose_0C(log, 1, NetworkSessionStable_upPerformanceByteMessage, (u32)idx,
-                                slot->counter_C0);
-    }
-}
-
-/* Packs the slot's current record into the session's stream buffer and hands it to the socket. */
-extern "C" void NetworkSessionStable_move(NetworkSessionStable* self, s8 idx)
-{
-    NetworkStreamWriterDefault stream;
-    NetworkSessionSlot* slot;
-    NetworkSessionSlot* used;
-    NetworkBuffer* buffer;
-    NetworkSessionManagerLogger* log;
-    s8 slotIndex;
-    s32 size44;
-    s32 size5C;
-
-    networkStreamWriter_constructDefault(&stream);
-    slotIndex = NetworkSessionStable_getUsableSlot(self, idx);
-    if (slotIndex < 0) {
-        dtor_803CB8FC(&stream, -1);
-        return;
-    }
-    slot = &self->slots_14838[slotIndex];
-    buffer = slot->active_1C;
-    networkStreamWriter_putBytes(&stream, self->sendBuffer_0D, 0x400);
-    networkStreamWriter_flush(&stream);
-    networkStreamWriter_setMode(&stream, 0);
-    used = &self->slots_14838[idx];
-    networkStreamWriter_putU16(&stream, networkStreamWriter_size(&used->bits_44) & 0xFFFF);
-    networkStreamWriter_putU16b(&stream, networkStreamWriter_size(&used->bits_5C) & 0xFFFF);
-    networkStreamWriter_putU32(&stream, self->tick_16CD8);
-    networkStreamWriter_putU32b(&stream, used->playerId_40);
-    networkStreamWriter_enable1(&stream, 1);
-    networkStreamWriter_enable2(&stream, 1);
-    networkStreamWriter_enable3(&stream, 1);
-    networkStreamWriter_commit(&stream);
-    networkStreamWriter_bytes(&stream);
-    networkStreamWriter_attach(buffer, &stream);
-    networkStreamWriter_reserve(buffer, 0, 0, 0);
-    size5C = networkStreamWriter_size(&used->bits_5C) & 0xFFFF;
-    size44 = networkStreamWriter_size(&used->bits_44) & 0xFFFF;
-    log = (NetworkSessionManagerLogger*)getNetworkLogger();
-    log->vtable->verbose_0C(log, 3, NetworkSessionStable_moveOutOfBandMessage,
-                            (u32)self->field_14826, (u32)slotIndex, (u32)idx, (u32)size44, (u32)size5C);
-    dtor_803CB8FC(&stream, -1);
-}
-
-/* Resolves the slot the session should transmit on: the slot itself, else its owning slot. */
-extern "C" s8 NetworkSessionStable_getUsableSlot(NetworkSessionStable* self, s8 idx)
-{
-    NetworkSessionSlot* slot;
-    NetworkSessionSlot* sub;
-    s8 subIdx;
-
-    if (idx < 0 || idx >= 4) {
-        return -1;
-    }
-    slot = &self->slots_14838[idx];
-    if (slot->active_1C == 0) {
-        return -1;
-    }
-    if (slot->linked_09 != 0) {
-        return idx;
-    }
-    subIdx = slot->ownerIndex_00;
-    if (subIdx < 0) {
-        return -1;
-    }
-    sub = &self->slots_14838[subIdx];
-    if (sub->active_1C == 0) {
-        return -1;
-    }
-    if (sub->linked_09 != 0) {
-        return subIdx;
-    }
-    if (sub->ready_0B != 0) {
-        return subIdx;
-    }
-    return -1;
-}
 
 /* ----------------------------------------------------------------------------------------- */
 /* NetworkSessionManager - construction / pool                                                */
@@ -517,9 +183,9 @@ extern "C" void NetworkRequest_reset(NetworkRequest* self)
     self->unused_24 = 0;
     self->cancelled_74 = 0;
     self->owner_94 = 0;
-    self->desc_98 = NetworkRequest_defaultDescriptor[0];
-    self->desc_9C = NetworkRequest_defaultDescriptor[1];
-    self->desc_A0 = NetworkRequest_defaultDescriptor[2];
+    self->desc_98 = __ptmf_null.this_delta;
+    self->desc_9C = __ptmf_null.vtbl_offset;
+    self->desc_A0 = __ptmf_null.func_data;
     self->count_28 = 0;
     self->record_54 = 0;
     self->record_58 = 0;
@@ -657,7 +323,7 @@ void NetworkSessionManager::move()
                         break;
                     }
                     log = (NetworkSessionManagerLogger*)getNetworkLogger();
-                    log->vtable->log_14(log, NetworkSessionManager_moveStandByMessage, j);
+                    log->vtable->log_14(log, "NetworkSessionManager::move: request[%d] is moving, stand by...\n", j);
                     continue;
                 }
             case 3:
@@ -712,6 +378,33 @@ extern "C" void zz_03d5084_ptmf_scall(NetworkRequest* self)
         NetworkRequest_clear(self);
     }
 }
+
+/* The request descriptors `request364`..`request444` pass by value: `{0, op code, 0}`, in the order the
+   target lays them out. */
+NetworkRequestDesc networkRequestDesc364 = {0, 364, 0};
+NetworkRequestDesc networkRequestDesc368 = {0, 368, 0};
+NetworkRequestDesc networkRequestDesc372 = {0, 372, 0};
+NetworkRequestDesc networkRequestDesc376 = {0, 376, 0};
+NetworkRequestDesc networkRequestDesc380 = {0, 380, 0};
+NetworkRequestDesc networkRequestDesc384 = {0, 384, 0};
+NetworkRequestDesc networkRequestDesc388 = {0, 388, 0};
+NetworkRequestDesc networkRequestDesc432 = {0, 432, 0};
+NetworkRequestDesc networkRequestDesc416 = {0, 416, 0};
+NetworkRequestDesc networkRequestDesc420 = {0, 420, 0};
+NetworkRequestDesc networkRequestDesc424 = {0, 424, 0};
+NetworkRequestDesc networkRequestDesc404 = {0, 404, 0};
+NetworkRequestDesc networkRequestDesc436 = {0, 436, 0};
+NetworkRequestDesc networkRequestDesc440 = {0, 440, 0};
+NetworkRequestDesc networkRequestDesc444 = {0, 444, 0};
+NetworkRequestDesc networkRequestDesc408 = {0, 408, 0};
+NetworkRequestDesc networkRequestDesc412 = {0, 412, 0};
+NetworkRequestDesc networkRequestDesc392 = {0, 392, 0};
+NetworkRequestDesc networkRequestDesc396 = {0, 396, 0};
+NetworkRequestDesc networkRequestDesc400 = {0, 400, 0};
+NetworkRequestDesc networkRequestDesc428 = {0, 428, 0};
+
+/* The request-id source `NetworkRequest_begin` post-increments. */
+u32 NetworkRequest_idCounter;
 
 #pragma peephole off
 void NetworkSessionManager::request364()
@@ -1288,7 +981,7 @@ extern "C" void NetworkSessionManager_deleteRequest(NetworkSessionManager* self,
     if (*slot != 0) {
         if (NetworkRequest_isOwned(*slot) != 0) {
             NetworkSessionManagerLogger* log = (NetworkSessionManagerLogger*)getNetworkLogger();
-            log->vtable->log_14(log, NetworkSessionManager_deleteRequestMessage);
+            log->vtable->log_14(log, "NetworkSessionManager::deleteRequest: request is moving.\n");
         }
         NetworkRequest_clear(*slot);
     }
@@ -1328,7 +1021,7 @@ extern "C" s32 NetworkRequest_getArgument(NetworkRequest* self, u32 idx)
     count = self->count_28;
     if (count <= idx) {
         log = (NetworkSessionManagerLogger*)getNetworkLogger();
-        log->vtable->warn_10(log, NetworkRequest_getArgumentMessage, count, idx);
+        log->vtable->warn_10(log, "NetworkRequest::getArgument: arg no over %d <= %d\n", count, idx);
         return 0;
     }
     return (s32)self->args_2C[idx];
@@ -1389,7 +1082,7 @@ extern "C" NetworkSessionSlotInfo* NetworkSessionSlotInfo_construct(NetworkSessi
 extern "C" NetworkSessionSlotInfo* NetworkSessionSlotInfo_dtor(NetworkSessionSlotInfo* self, s16 flags)
 {
     if (self != 0) {
-        networkSmallObject_dtor(&self->smallObject_00, -1);
+        NetworkSmallObjectSink::destroy(&self->smallObject_00);
         if (flags > 0) {
             operator delete(self);
         }
@@ -1430,7 +1123,7 @@ extern "C" NetworkSessionCircleInfo* NetworkSessionCircleInfo_construct(NetworkS
 extern "C" NetworkSessionCircleInfo* NetworkSessionCircleInfo_dtor(NetworkSessionCircleInfo* self, s16 flags)
 {
     if (self != 0) {
-        networkSmallObject_dtor(&self->smallObject_108, -1);
+        NetworkSmallObjectSink::destroy(&self->smallObject_108);
         if (flags > 0) {
             operator delete(self);
         }
@@ -1453,7 +1146,7 @@ extern "C" NetworkSessionCircleList* NetworkSessionCircleList_construct(NetworkS
 extern "C" NetworkSessionPlayerRecord* NetworkSessionPlayerRecord_dtor(NetworkSessionPlayerRecord* self, s16 flags)
 {
     if (self != 0) {
-        networkSmallObject_dtor(&self->smallObject_08, -1);
+        NetworkSmallObjectSink::destroy(&self->smallObject_08);
         if (flags > 0) {
             operator delete(self);
         }
@@ -1497,9 +1190,9 @@ extern "C" void NetworkRequestPat_reset(NetworkRequest* self)
     self->unused_24 = 0;
     self->cancelled_74 = 0;
     self->owner_94 = 0;
-    self->desc_98 = NetworkRequest_defaultDescriptor[0];
-    self->desc_9C = NetworkRequest_defaultDescriptor[1];
-    self->desc_A0 = NetworkRequest_defaultDescriptor[2];
+    self->desc_98 = __ptmf_null.this_delta;
+    self->desc_9C = __ptmf_null.vtbl_offset;
+    self->desc_A0 = __ptmf_null.func_data;
     self->count_28 = 0;
     self->record_54 = 0;
     self->record_58 = 0;
@@ -1564,7 +1257,7 @@ NetworkSessionManagerPat::~NetworkSessionManagerPat()
         this->release();
         NetworkSessionCircleList_dtor(&this->circleList_AF0, -1);
         __destroy_arr(&this->players_538[0], (void*)NetworkSessionPlayerRecord_dtor, 72, 4);
-        networkSmallObject_dtor(&this->field_3CC, -1);
+        ((NetworkSmallObjectSink*)&this->field_3CC)->NetworkSmallObjectSink::~NetworkSmallObjectSink();
         __destroy_arr(&this->pool2_1C4[0], (void*)NetworkRequestPat_dtor, 0xA4, 2);
     }
 }
@@ -1641,7 +1334,7 @@ void NetworkSessionManagerPat::release()
     if (GameSpyInterfaceThread_getInstance() != 0) {
         if (this->field_6E75 != 0) {
             NetworkSessionManagerLogger* log = (NetworkSessionManagerLogger*)getNetworkLogger();
-            log->vtable->warn_10(log, NetworkSessionManagerPat_finalMessage);
+            log->vtable->warn_10(log, "NetworkSessionManagerPat::final: finalNetwork have not done.\n");
             this->field_6E75 = 0;
             thread = GameSpyInterfaceThread_getInstance();
             thread->canClose();
