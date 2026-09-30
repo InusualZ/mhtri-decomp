@@ -589,7 +589,11 @@ finding names the band directory rather than guess a header; a symbol the map do
 duplicate map row, stay counted gaps because the map cannot judge them. Rule 7 has **no exemption and no
 deferral**: every `fn_XXXXXXXX`, `lbl_XXXXXXXX`, `loc_XXXXXXXX` and bare `unkNN` in `src/` is a finding,
 whoever owns the symbol. The **only** grandfather is the gate's `--diff`: an existing finding never blocks a
-landing, while an *added* one refuses - so committed work is not revoked, and the mounted debt cannot grow. A
+landing, while an *added* one refuses - so committed work is not revoked, and the mounted debt cannot grow. **A move is credited, a copy is
+not**: an identity new to a file (rule, token, detail) is credited only when another file of the same batch *stopped*
+carrying it, one credit per removal, and it is printed as `moved rule R <token>: <old file> -> <new file>` (also the
+`--json` `moved` key) - never silently dropped; a copy that leaves the original intact, a removal of a different
+rule, or a name that grew across the batch is still refused. A
 file with no bodies is held to the rule too, and a `rule 7 deferred` comment exempts nothing. **Rule 11 is
 checked the same way**: a `void *` parameter or return type is a finding by default and the only exemption is
 a per-declaration `/* untyped: <reason> */` marker whose reason names which genuinely-untyped case it is - a
