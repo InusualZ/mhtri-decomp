@@ -28,7 +28,7 @@
  * Status.  64 of the 71 symbols are written; 60 of those measure >= 80 % and 42 are byte-identical
  * (`fuzzy_match_percent` 70.13, `matched_code` 3796 of 11124).  The 7 still unwritten are
  * `fn_8012C9AC` (1096 B), `fn_8012D23C` (420), `fn_8012D498` (384), `fn_8012D618` (484),
- * `fn_8012E708`, `fn_8012E718` and `fn_8012E728` - each needs a struct or a switch shape the written
+ * `fn_8012E708`, `fn_8012E718` and `em_act_end` - each needs a struct or a switch shape the written
  * ones did not settle.
  *
  * Residuals (the four written functions still under the bar):
@@ -42,8 +42,15 @@
  *     `clrlwi` at each call site, this build hoists them out of the loop.  The sub-functions they call
  *     are 100 %, so the masks cannot move into the callee's prototype without losing those two.
  *
- * Pool literals (`lbl_805A0FF8`, `lbl_80796C90`, ...) belong to the data pass: they are declared, never
- * defined, so the load operands pair with the target's pooled constants (playbook 29).
+ * `.data` 0x805A0FF8-0x805A1078 (128 B: the three built-in action-table sets `lbl_805A0FF8`,
+ * `lbl_805A1034`, `lbl_805A106C` and the parameter blocks they point at) is claimed and claim-only: the
+ * sets point at `lbl_805A0FB0`/`lbl_805A0FC0`/`lbl_805A0FDC`/`lbl_807919E0`, which no unit owns yet, so
+ * defining them here would need extern declarations of unowned data.  The gate's strict data row
+ * demanded the claim: this unit's object changed with the shared `ENEMY_WORK.h` edit of the
+ * `hud/net_char_sync` batch.
+ *
+ * Pool literals (`lbl_80796C90`, ...) belong to the data pass: they are declared, never defined, so the
+ * load operands pair with the target's pooled constants (playbook 29).
  */
 
 #include "types.h"
@@ -294,7 +301,7 @@ extern "C" f32 lbl_80796C94;
 extern "C" s32 fn_8012D0B4(_ENEMY_WORK* enemy, _PLW* work);
 extern "C" s32 fn_8012D1A8(u32 index);
 extern "C" s32 fn_8012D188(_ENEMY_WORK* enemy, _PLW* work);
-extern "C" u32 fn_8012D1A0(_ENEMY_WORK* enemy);
+extern "C" u32 em_busy_ck(_ENEMY_WORK* enemy);
 extern "C" s32 fn_8012CF2C(_ENEMY_WORK* enemy);
 extern "C" s32 fn_8012CF90(_ENEMY_WORK* enemy, u32 value);
 extern "C" u32 fn_8012C6F4(_ENEMY_WORK* enemy, u32 mask, s32 arg2);
@@ -543,7 +550,7 @@ extern "C" void fn_8012C600(_ENEMY_WORK* enemy)
 {
     if (enemy->flags_0xA04 != 0) {
         if ((enemy->flags_0xA04 & 2) != 0) {
-            fn_80130778(1);
+            em_status_set(enemy, 1);
             enemy->flags_0xA04 &= 0xFD;
         }
         if ((enemy->flags_0xA04 & 1) != 0) {
@@ -594,7 +601,7 @@ extern "C" u32 fn_8012C6F4(_ENEMY_WORK* enemy, u32 mask, s32 arg2)
     if (enemy->field_0x95C == 5) {
         return 0;
     }
-    fn_80130778(1);
+    em_status_set(enemy, 1);
     if (fn_8013A884(enemy, 5) == 1) {
         max = get_move_work_max(2);
         work = get_move_work_adrs(2);
@@ -641,7 +648,7 @@ extern "C" u32 fn_8012C870(_ENEMY_WORK* enemy, u32 mask)
     if ((enemy->field_0x38C & 1) == 0) {
         return 0;
     }
-    fn_80130778(2);
+    em_status_set(enemy, 2);
     if (fn_8013A884(enemy, 4) == 1) {
         max = get_move_work_max(2);
         work = get_move_work_adrs(2);
@@ -792,7 +799,7 @@ extern "C" s32 fn_8012D188(_ENEMY_WORK* enemy, _PLW* work)
 }
 
 /* The enemy's activity byte. */
-extern "C" u32 fn_8012D1A0(_ENEMY_WORK* enemy)
+extern "C" u32 em_busy_ck(_ENEMY_WORK* enemy)
 {
     return enemy->field_0x1F5;
 }

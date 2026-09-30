@@ -2774,7 +2774,7 @@ extern "C" {
 void fn_801A9540(struct _ENEMY_WORK* self) {
     s32* slots = self->handles_0x328;
 
-    if (fn_8012D1A0(self) == 1U) {
+    if (em_busy_ck(self) == 1U) {
         lb_area_change_send((u8)my_player_no(), 0);
     }
     fn_8013A9F4(self);

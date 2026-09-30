@@ -179,7 +179,7 @@ struct _PLW {
         struct {
             /* +0x00E */ u8 field_0x00E;     /* set to 1 by the act-state entry (`pl_act_enter`) */
             /* +0x00F */ u8 prev_act_kind;   /* the +0x00A act kind as it was before the entry,
-                                              * saved by `fn_802756F0` */
+                                              * saved by `pl_act_enter_raw` */
             /* +0x010 */ u16 prev_act_no;    /* the +0x00C act number the entry replaced */
             /* +0x012 */ u16 field_0x012;    /* set to 0xF when the new act is the master's */
         };
@@ -229,8 +229,8 @@ struct _PLW {
     /* +0x01D */ u8 se_name_idx;   /* indexes the `fn_800EFAC0` name table */
     /* +0x01E */ u8 field_0x01E;   /* non-zero suppresses the up-swing gate in `Pl/fn_80224AC4.cpp` */
     /* +0x01F */ union {   /* one byte, two spellings (rule 5) */
-        /* +0x01F */ s8 field_0x01F;   /* the act's follow-up stage latch: `pl_act_stage_latch_set` arms it,
-                                       * `fn_80274794` tests it and `fn_80274808` reads it */
+        /* +0x01F */ u8 field_0x01F;   /* the act's follow-up stage latch: `pl_act_stage_latch_set` arms it,
+                                       * `fn_80274794` tests it and `pl_act_stage_get` reads it */
         /* +0x01F */ u8 pad_0x01F[0x1]; /* the pre-merge padding spelling of the same byte */
     };
     /* +0x020 */ union {   /* one u32, two spellings (rule 5) */
@@ -260,7 +260,7 @@ struct _PLW {
                 };
             };
         };
-        struct {   /* the act unit's own view: the act word the act entry clears (`fn_802756F0`) */
+        struct {   /* the act unit's own view: the act word the act entry clears (`pl_act_enter_raw`) */
             /* +0x030 */ s16 field_0x030;
             /* +0x032 */ u8 pad_0x32[0xA];
         };
@@ -309,9 +309,14 @@ struct _PLW {
                                 /* +0x048 */ VEC3 vec_0x048;
         };
     };
-    /* +0x054 */ u32 param_0x54;
-    /* +0x058 */ u32 field_0x058;
-    /* +0x05C */ u32 unk5C;
+    /* +0x054 */ union {   /* the 0x0C-byte rotation run: one _CP_VECTOR, or its three words */
+        /* +0x054 */ _CP_VECTOR rot_0x54;
+        struct {
+            /* +0x054 */ u32 param_0x54;
+            /* +0x058 */ u32 field_0x058;
+            /* +0x05C */ u32 rot_z_0x5C;
+        };
+    };
     /* +0x060 */ f32 ground_y_0x060;  /* the player's base/target y the effect sits on */
     /* +0x064 */ union {   /* one f32, two spellings of the same 4 bytes (rule 5, one member per
                             * offset): the pre-merge `unk064` (`Pl/pl_act.cpp` reads it as the
@@ -362,7 +367,7 @@ struct _PLW {
         /* +0x077 */ u8 pad_merge_0x077[0x19];
         };
     };
-    /* +0x090 */ f32 unk090[3];
+    /* +0x090 */ VEC3 target_pos_0x090;   /* the position the blend walks the actor to (`pl_pos_blend_start` divides the gap to it by its frame count); the net receivers write it */
     /* +0x09C */ f32 unk09C;
     /* +0x0A0 */ f32 unk0A0;
     /* +0x0A4 */ f32 unk0A4;
@@ -439,7 +444,7 @@ struct _PLW {
     /* +0x25C */ u8 field_0x25C[0x8];  /* passed to `fn_80223708` by `Pl/fn_80224AC4.cpp` */
     /* +0x264 */ union {
         /* +0x264 */ s16 unk264;
-        /* +0x264 */ s16 field_0x264;  /* cleared by the act entry (`fn_802756F0`) */
+        /* +0x264 */ s16 field_0x264;  /* cleared by the act entry (`pl_act_enter_raw`) */
     };
     /* +0x266 */ union {   /* the pre-merge 3-byte run, with main's named split inside it */
         /* +0x266 */ u8 unk266[0x269 - 0x266];
@@ -452,7 +457,7 @@ struct _PLW {
     /* +0x269 */ u8 unk269;
     /* +0x26A */ u8 unk26A;
     /* +0x26B */ u8 unk26B;
-    /* +0x26C */ u8 unk26C;
+    /* +0x26C */ u8 held_item_kind_0x26C;   /* the held item's kind `fn_80279B84` derives from its item id (GUESS) */
     /* +0x26D */ u8 unk26D;
     /* +0x26E */ u16 unk26E;
     /* +0x270 */ s16 unk270;
@@ -771,8 +776,9 @@ struct _PLW {
                                 /* +0x3B5 */ u8 field_0x3B5;
         };
     };
-    /* +0x3B6 */ u8 pad_0x3B6[0x2];
-    /* +0x3B8 */ u16 unk3B8;
+    /* +0x3B6 */ u8 sub_area_0x3B6;   /* sent in the state message next to the area byte (GUESS) */
+    /* +0x3B7 */ u8 pad_0x3B7;
+    /* +0x3B8 */ u16 skill_point_0x3B8;   /* the skill point total (capped at 700) whose fraction +0x3BC holds */
     /* +0x3BA */ u16 unk3BA;
     /* +0x3BC */ f32 unk3BC;
     /* +0x3C0 */ f32 unk3C0;
@@ -920,7 +926,7 @@ struct _PLW {
             /* +0x44E */ u8 unk44E_start[0x450 - 0x44E];
             /* +0x450 */ u8 field_0x450;   /* set by `fn_8027D6A4`, with the s16 at +0x454 */
             /* +0x451 */ u8 field_0x451;   /* set by `fn_8027D6C0`, with the s16 at +0x456 */
-            /* +0x452 */ u8 field_0x452;   /* set by `fn_8027D698`, with the s16 at +0x458 */
+            /* +0x452 */ s8 field_0x452;   /* set by `fn_8027D698`, with the s16 at +0x458 */
             /* +0x453 */ u8 pad_0x453[0x1];
             /* +0x454 */ s16 field_0x454;  /* raised to the argument, never lowered (`fn_8027D6A4`) */
             /* +0x456 */ s16 field_0x456;  /* raised to the argument, never lowered (`fn_8027D6C0`) */
@@ -1078,7 +1084,7 @@ struct _PLW {
     };
     /* +0x580 */ s16 unk580;
     /* +0x582 */ u8 unk582;
-    /* +0x583 */ s8 shell_ang_0x583; /* the player's shell-frame angle: `ef/eft053.cpp`'s shell
+    /* +0x583 */ u8 shell_ang_0x583; /* the player's shell-frame angle: `ef/eft053.cpp`'s shell
                                       * projection reads it as a signed per-frame step (its sign
                                       * selects the 45/35 degrees it adds), and `Pl/pl_act.cpp`
                                       * clamps its own copy of the same byte to +/-100 */
@@ -1150,6 +1156,11 @@ struct _PLW {
                     /* +0x5C5 */ union {   /* the run's 3-byte head, two spellings (rule 5) */
                         /* +0x5C5 */ u8 pad_0x5C5[0x3];
                         /* +0x5C5 */ u8 unk5C5_start[0x5C8 - 0x5C5];
+                        struct {
+                            /* +0x5C5 */ u8 pad_0x5C5_head;
+                            /* +0x5C6 */ u8 field_0x5C6;   /* cleared by the paired act entry (`Pl_act_pair_enter`) */
+                            /* +0x5C7 */ u8 pad_0x5C7_tail;
+                        };
                     };
                     /* +0x5C8 */ u8 field_0x5C8;   /* the armed weapon class `fn_802745DC` reads; non-zero
                                                     * also lets main's `fn_8027D6DC` send its motion
@@ -1208,9 +1219,9 @@ struct _PLW {
             /* +0x648 */ s16 field_0x648;
             /* +0x64A */ s16 field_0x64A;
             /* +0x64C */ u8 pad_0x64C[0x3];
-            /* +0x64F */ union {   /* one s8, two spellings (rule 5) */
-                /* +0x64F */ s8 unk64F;
-                /* +0x64F */ s8 field_0x64F;  /* cleared by the act entry */
+            /* +0x64F */ union {   /* one u8, two spellings (rule 5) */
+                /* +0x64F */ u8 unk64F;
+                /* +0x64F */ u8 field_0x64F;  /* cleared by the act entry */
             };
         };
     };

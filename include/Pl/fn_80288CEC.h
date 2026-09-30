@@ -45,7 +45,7 @@ struct PlRootArea {
 
 /* size: 0x2300 (lower bound) */
 struct _PL_ROOT {
-    /* +0x0000 */ u8 mode_0x00;         /* `fn_8028BD54` tests `== 2` */
+    /* +0x0000 */ u8 mode_0x00;         /* `root_mode2_ck` tests `== 2` */
     /* +0x0001 */ u8 seq_0x01;
     /* +0x0002 */ u8 kind_0x02;
     /* +0x0003 */ u8 unused_0x0003[0x0004 - 0x0003];
@@ -91,6 +91,9 @@ extern "C" {
 
 /* 0x8028EF30 - the per-player flag byte at +0x136 of the player move work (0 when the work is missing). */
 u8 Pl_area_flag_get(u8 index);
+
+/* 0x8028BD54 - is the root work in mode 2?  (`Pl_net_can_send` asks before it lets a client send.) */
+u32 root_mode2_ck(void);
 
 #ifdef __cplusplus
 }

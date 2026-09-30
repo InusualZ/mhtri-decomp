@@ -23,7 +23,7 @@ extern "C" {
 
 /* 0x802756F0 - resets every per-act field of the player work and arms `+0x00A`/`+0x00C` from the
  * act's flag word. */
-void fn_802756F0(struct _PLW* plw, u8 kind, u16 no, u16 mask);
+void pl_act_enter_raw(struct _PLW* plw, u8 kind, u16 no, u16 mask);
 
 /* 0x80275AC4 / 0x80275ADC - the two act-state entries that also set a marker byte. */
 void pl_act_enter(struct _PLW* self, s32 a, u16 b, u16 c);
@@ -118,7 +118,7 @@ void fn_802744A0(struct _PLW* plw);
 s32 fn_80274794(struct _PLW* plw);
 
 /* 0x80274808 / 0x80275AFC - the follow-up stage byte and the act kind byte. */
-s8 fn_80274808(struct _PLW* plw);
+u8 pl_act_stage_get(struct _PLW* plw);
 void fn_80275AFC(struct _PLW* plw, s8 value);
 
 /* 0x802761DC - the motion-parameter act-state entry. */

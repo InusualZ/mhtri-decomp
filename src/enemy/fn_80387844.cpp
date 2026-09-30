@@ -282,7 +282,7 @@ extern "C" void fn_80387844(_ENEMY_WORK* self)
         fn_8013221C(self, lbl_8079C024, 1, 0xF);
         if (--self->timer_0x020 <= 0) {
             found = 1;
-        } else if (fn_8012D1A0(self) == 1) {
+        } else if (em_busy_ck(self) == 1) {
             count = get_move_work_max(2);
             move = (u8*)get_move_work_adrs(2);
             found = 0;

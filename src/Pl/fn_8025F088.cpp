@@ -501,15 +501,15 @@ s32 fn_8025F588(_PLW* self) {
         case 2:
             if ((self->field_0x5C4 & 0xF) != 0) {
                 self->field_0x5C4 = (self->field_0x5C4 & 0xF0) | 5;
-                fn_802756F0(self, 12, 6, 0);
+                pl_act_enter_raw(self, 12, 6, 0);
                 return 1;
             }
             if (fn_80278C7C(self) == 1) {
-                fn_802756F0(self, 6, 49, 0);
+                pl_act_enter_raw(self, 6, 49, 0);
                 return 1;
             }
             if (fn_80278CD0(self) == 1) {
-                fn_802756F0(self, 6, 69, 0);
+                pl_act_enter_raw(self, 6, 69, 0);
                 return 1;
             }
             self->kind_0x09 = 0;
@@ -523,15 +523,15 @@ s32 fn_8025F588(_PLW* self) {
                     self->kind_0x09 = 2;
                     if ((self->field_0x5C4 & 0xF) != 0) {
                         self->field_0x5C4 = (self->field_0x5C4 & 0xF0) | 5;
-                        fn_802756F0(self, 12, 6, 0);
+                        pl_act_enter_raw(self, 12, 6, 0);
                         return 1;
                     }
                     if (fn_80278C7C(self) == 1) {
-                        fn_802756F0(self, 6, 49, 0);
+                        pl_act_enter_raw(self, 6, 49, 0);
                         return 1;
                     }
                     if (fn_80278CD0(self) == 1) {
-                        fn_802756F0(self, 6, 69, 0);
+                        pl_act_enter_raw(self, 6, 69, 0);
                         return 1;
                     }
                     pl_act_enter(self, 2, 1, 0);
@@ -554,15 +554,15 @@ s32 fn_8025F588(_PLW* self) {
                 } else {
                     if ((self->field_0x5C4 & 0xF) != 0) {
                         self->field_0x5C4 = (self->field_0x5C4 & 0xF0) | 5;
-                        fn_802756F0(self, 12, 6, 0);
+                        pl_act_enter_raw(self, 12, 6, 0);
                         return 1;
                     }
                     if (fn_80278C7C(self) == 1) {
-                        fn_802756F0(self, 6, 49, 0);
+                        pl_act_enter_raw(self, 6, 49, 0);
                         return 1;
                     }
                     if (fn_80278CD0(self) == 1) {
-                        fn_802756F0(self, 6, 69, 0);
+                        pl_act_enter_raw(self, 6, 69, 0);
                         return 1;
                     }
                 }
@@ -585,9 +585,9 @@ s32 fn_8025F588(_PLW* self) {
             if ((self->field_0x5C4 & 0xF) != 0) {
                 pl_act_enter(self, 12, 6, 0);
             } else if (fn_80278C7C(self) == 1) {
-                fn_802756F0(self, 6, 49, 0);
+                pl_act_enter_raw(self, 6, 49, 0);
             } else if (fn_80278CD0(self) == 1) {
-                fn_802756F0(self, 6, 69, 0);
+                pl_act_enter_raw(self, 6, 69, 0);
             } else {
                 pl_act_enter(self, 2, 1, 0);
             }
@@ -661,7 +661,7 @@ s32 fn_80262688(_PLW* self) {
             }
             if (isServerSelectState() == 1) {
                 if (Pl_master_ck(self) == 1) {
-                    fn_80335CE8(self, 7, (u16)work->chunk_ofs);
+                    Pl_net_send(self, 7, (u16)work->chunk_ofs);
                 }
             } else {
                 pl_item_add(work, work->field_0x650, (s16)(-work->field_0x652));
@@ -669,8 +669,8 @@ s32 fn_80262688(_PLW* self) {
                 pl_item_add(self, self->field_0x650, self->field_0x652);
                 self->field_0x656 = 1;
                 pl_model_state_set(self, 2, 29, self->field_0x650);
-                if ((u16)fn_8004EB18(self->field_0x650) == 1) {
-                    fn_800F16D4(4);
+                if ((u16)item_se_ck(self->field_0x650) == 1) {
+                    se_slot_req(4);
                 }
             }
             return 1;

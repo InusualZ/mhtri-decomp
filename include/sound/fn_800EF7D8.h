@@ -15,6 +15,7 @@
 #include "types.h"
 
 #ifdef __cplusplus
+extern "C" void se_slot_req(u8 arg0); /* 0x800F16D4 - requests the sound-effect slot `arg0` */
 extern "C" {
 void snd_bank_layout(u8 mode);
 void scene_se_bank_load(u8 a, u8 b);

@@ -41,7 +41,7 @@
  *     (35 labels - `A080`-`A0B8`, with the two int->float magics as f64s at `A0A0` and `A0B8`, then
  *     `A0C0`-`A110`). All of them are `extern`-declared and used as load operands (`A0C0`, `A0D4`,
  *     `A0D8`, `A0F8` came in with the last bodies), so the `.sdata2` rows pair by name. Three entries
- *     are *shared*: `A080`, `A084` and `A088` are also loaded by `fn_802756F0` / `fn_8027633C` (the
+ *     are *shared*: `A080`, `A084` and `A088` are also loaded by `pl_act_enter_raw` / `fn_8027633C` (the
  *     unsplit run before the unit) and `fn_8027D968` (after it), so no contiguous claim can make those
  *     three private - the claim has to leave them global. The only pool-*address* mismatch left is
  *     `.sdata` `lbl_80792150` (`.sdata 0x80792150-0x80792158`), which needs the claim plus the scalar
@@ -515,7 +515,7 @@ void Pl_get_gunner_pos(_PLW*, nw4r::math::VEC3*, s32);
 void cpSetRotMatrixZXY(_CP_VECTOR*, nw4r::math::MTX34*);
 void rotVecXYZ(nw4r::math::VEC3*, _CP_VECTOR*);
 
-extern "C" void fn_800FC0D4(_CP_VECTOR*, void*);
+extern "C" void eft_rot_vec_copy(_CP_VECTOR*, void*);
 extern "C" f32 fn_80050EF4(void*, void*);
 extern "C" u32 ef_inst_spawn(_PLW*, s32);
 extern "C" u32 stage_map_kind_get(u8);
@@ -1489,7 +1489,7 @@ extern "C" u8 fn_8027D050(_PLW* self)
 
 /* 0x8027D5A4: applies a signed charge delta to the actor's stored charge, scaled by the two
  * charge skills, and clamps it to 0..100. */
-extern "C" void fn_8027D5A4(_PLW* self, s32 arg1)
+extern "C" void pl_act_add_charge(_PLW* self, s32 arg1)
 {
     f32 f = (f32)(s16)arg1;
     if (f > lbl_8079A084) {
@@ -1605,7 +1605,7 @@ extern "C" void fn_8027CD0C(_PLW* self, nw4r::math::MTX34* mtx)
     _CP_VECTOR pos;
     nw4r::math::VEC3 v;
     VEC3_ctor(&v);
-    fn_800FC0D4(&pos, (u8*)self + 84);
+    eft_rot_vec_copy(&pos, (u8*)self + 84);
     f32 t = (f32)self->unk64F / lbl_8079A0D0;
     t = lbl_8079A110 * t * lbl_8079A0DC / lbl_8079A0E4 + lbl_8079A088;
     pos.x = pos.x + (u16)t;
@@ -1639,7 +1639,7 @@ void Pl_get_gunner_pos(_PLW* self, nw4r::math::VEC3* out, s32 arg2)
 
 /* 0x8027AE28: sets the actor's residual-velocity timer from a target position over the given
  * number of frames. */
-extern "C" void fn_8027AE28(_PLW* self, s32 arg1)
+extern "C" void pl_pos_blend_start(_PLW* self, s32 arg1)
 {
     if (fn_80050EF4((u8*)self + 60, (u8*)self + 144) >= lbl_8079A0F4 || (s16)arg1 == 0) {
         self->unk0B4 = 0;

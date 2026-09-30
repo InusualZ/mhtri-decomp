@@ -98,7 +98,7 @@ extern "C" s32 fn_8027D684(_PLW* self) {
 }
 
 /* Stores the raw pair the +0x452/+0x458 group holds. */
-extern "C" void fn_8027D698(_PLW* self, u8 arg1, s16 arg2) {
+extern "C" void fn_8027D698(_PLW* self, s8 arg1, s16 arg2) {
     self->field_0x452 = arg1;
     self->field_0x458 = arg2;
 }
@@ -124,7 +124,7 @@ extern "C" void fn_8027D6DC(_PLW* self, s16 value) {
     self->field_0x5C9 = 1;
     if (self->field_0x5C8 != 0) {
         u32 motion = fn_802745DC(self, value);
-        fn_802756F0(self, 0xB, (u16)motion, 0);
+        pl_act_enter_raw(self, 0xB, (u16)motion, 0);
     }
 }
 

@@ -134,10 +134,10 @@ extern "C" u8 lbl_805A6D28[];
 
 /* Declared in a shared header: `em_move_mode_set`, `em_mot_set`, `em_mot_set_ck`, `em_mot_end_ck`,
  * `em_action_finish`, `em_state_set`, `fn_8013032C`, `fn_801303EC`, `fn_80130CDC`, `em_busy_timer_reset`,
- * `fn_80133BB4`, `fn_80133BC0`, `em_part_hit_set`, `fn_80136D14`, `fn_801376B4`, `fn_8013221C`,
+ * `fn_80133BB4`, `em_state_refresh`, `em_part_hit_set`, `fn_80136D14`, `fn_801376B4`, `fn_8013221C`,
  * `fn_80132224`, `fn_80132264`, `em_spawn_request`, `fn_8012EC3C` (`unsplit/enemy.h`);
  * `fn_80128A8C`, `fn_80128AAC`, `em_hit_window_set`, `fn_801280F4` (`enemy/fn_801251D0.h`);
- * `fn_8012D1A0` (`enemy/fn_8012BDF4.h`); `em_res_user_data_ck`, `em_res_user_data_set` (`enemy/fn_80138074.h`);
+ * `em_busy_ck` (`enemy/fn_8012BDF4.h`); `em_res_user_data_ck`, `em_res_user_data_set` (`enemy/fn_80138074.h`);
  * `em_res_user_data_ctor` (`enemy/fn_80147CE0.h`); `VEC3_ctor` (`ef.h`); `fn_801057A4`
  * (`ef/fn_80105314.h`); `draw_shape_arm` (`draw_shape.h`); `setVector3` (`nw4r/math.h`);
  * `system_w` (`unsplit/unknown.h`). */
@@ -273,7 +273,7 @@ extern "C" void fn_8015D9C8(_ENEMY_WORK* self, u32 arg) {
       case 2:
         em_move_mode_set(self, 4);
         fn_80128A8C(self, 6, 5);
-        fn_80133BC0(self);
+        em_state_refresh(self);
         break;
     }
     fn_8015D860(self);
@@ -321,7 +321,7 @@ extern "C" void fn_8015DAE4(_ENEMY_WORK* self, u8* state, u8* sub) {
 }
 
 /* 0x8015DB68 - the second transition table: action 1 arms the +0x32A countdown (sub 6), spawns the
- * joint effect when `fn_8012D1A0` answers (sub 8) and hands over to `fn_801376B4` (sub 9);
+ * joint effect when `em_busy_ck` answers (sub 8) and hands over to `fn_801376B4` (sub 9);
  * action 0xA's sub 0xC3/0xC8 arms the flag byte's bit 0/bit 5, stores the +0x491 byte, and both
  * arms spawn an effect at the enemy's position. */
 extern "C" void fn_8015DB68(_ENEMY_WORK* self, u8 arg, u8 sub) {
@@ -337,7 +337,7 @@ extern "C" void fn_8015DB68(_ENEMY_WORK* self, u8 arg, u8 sub) {
             self->timer_0x32A = 0x384;
             break;
           case 8:
-            if (fn_8012D1A0(self) == 1) {
+            if (em_busy_ck(self) == 1) {
                 get_joint_wpos_em(self, 0x14, &v2);
                 em_spawn_request(self->field_0x01A, 0x21, 0, self->area_no, 0xFF, 1, 0xFF, 1, 0xFF,
                             &v2, 0);

@@ -1562,7 +1562,7 @@ extern "C" void fn_80119BB0(u8 kind, nw4r::math::VEC3* pos, _CP_VECTOR* rot, f32
     work = (_EFT28_WORK*)rec->work_0x38;
     work->field_0x10 = scale;
     copyVec3(&rec->pos_0x18, pos);
-    fn_800FC0D4(&rec->rot_0x24, rot);
+    eft_rot_vec_copy(&rec->rot_0x24, rot);
     rec->timer_0x0C = timer;
 }
 

@@ -8,20 +8,13 @@
  * unit owns the addresses, so this is their home: the consumers include this header and keep no
  * declaration of their own.  `struct EftSlot` is this unit's own view of the 0x3C-byte record it
  * hands back, forward-declared so a caller with its own view (`_ENEMY_DATA`) can pass its pointer
- * meaning what this unit means; the type itself is defined in `src/ef/eft_slot.cpp`.
+ * meaning what this unit means; the type itself is defined in `include/ef/EftSlot.h`.
  *
- * `fn_803386C4` (0x803386C4, size 0x144) is the ef band's slot-state setter: r3 the slot record, r4
- * the mode, r5 the value the mode carries.  `ef/eft_slot.cpp` calls it nine times.  main's
- * registration owns the address in `hud/fn_80334568.cpp` (its band is 0x80334568..0x80338808, so
- * 0x803386C4 is that unit's tail function), and its header is the declaration's rule-2 home.
- *
- * It cannot be included from here, twice over - measured, not assumed:
- *   * `hud/fn_80334568.h` pulls `enemy.h`, whose `_ENEMY_WORK` copy collides with
- *     `enemy/ENEMY_WORK.h`'s, which this unit's bodies need (`(10296) class redefined`); the two
- *     copies are main's parked rule-1 fold;
- *   * including it anyway (with that fold bypassed) perturbs this unit's codegen: the header's
- *     declaration surface changed `eft_slot_work_update` from 92.87 to 90.24, so the two views are not
- *     interchangeable for this unit's call sites.
+ * `eft_net_send` (0x803386C4, size 0x144) is the ef band's slot-state sender: r3 the slot record, r4 the
+ * mode, r5 the value the mode carries.  `ef/eft_slot.cpp` calls it nine times.  `hud/net_char_sync.cpp` owns
+ * the address (its band is 0x80334568..0x80338808); the declaration is repeated here with the owner's own
+ * signature, so this unit does not include `hud/net_char_sync.h`, which drags in the whole net message
+ * family (an earlier probe measured that the wider declaration surface moved `eft_slot_work_update`).
  *
  * `copyVec3` itself (0x80041E40, `src/mh3_pad.cpp`) is no longer one of these: it comes from
  * `include/mh3_pad.h`, which this unit includes (the `(10197)` clash that used to make that header
@@ -31,12 +24,13 @@
 #define MHTRI_EF_EFT_SLOT_H
 
 #include "types.h"
+#include "hud/eft_net_send.h" /* the owner's leaf header (rule 2) */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* This unit's own view of the record its table hands back (the enemy band's is `_ENEMY_DATA`). */
+/* This unit's own view of the record its table hands back (the enemy band's is `_ENEMY_DATA`); the definition is `ef/EftSlot.h`. */
 struct EftSlot;
 
 /* The 10-entry table lookup: r3 the group index `enemy_data_grp` produced, r4 the enemy-data id;
@@ -56,7 +50,14 @@ u8 eft_slot_effect_key(struct EftSlot* slot);
  * unwritten, so the declaration keeps the caller's view (`r3`/`r4`, no result). */
 void fn_80346268(u32 a, u32 b);
 
-void fn_803386C4(void* slot, u32 mode, u32 value);
+
+struct _ENEMY_WORK;
+u32 eft_slot_armed_ck(struct EftSlot* slot);
+u32 eft_slot_persist_ck(struct EftSlot* slot);
+void eft_slot_kind_set(struct EftSlot* slot, u8 key, u8 force);
+void eft_slot_state_set(struct EftSlot* slot, u8 state, struct _ENEMY_WORK* work, u8 index);
+/* 0x803461EC - stores the two marks a received mark message carries on the slot. */
+void eft_slot_marks_set(struct EftSlot* slot, u8 a, u8 b);
 
 /* 0x80349914 - the two-byte copy MWCC emits for a `u16` pair assignment (`*dst = *src`).  Added with
  * `menu/menu_row.cpp`, its consumer (rule 2: the address is in this unit's range). */

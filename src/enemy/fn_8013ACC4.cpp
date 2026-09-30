@@ -332,8 +332,8 @@ u32 fn_8012EC3C(EmWork* self);
 u8 fn_801408B4(EmWork* self);
 void fn_801409C8(EmWork* self);
 u8* fn_80130DF8(EmWork* self);
-u32 fn_80130778(EmWork* self, u32 kind);
-void fn_80133BC0(EmWork* self);
+u32 em_status_set(EmWork* self, u32 kind);
+void em_state_refresh(EmWork* self);
 void fn_80140AF8(EmWork* self, u32 a, u8 b);
 
 /* the stream readers `enemy/fn_8013F764.cpp` owns */
@@ -815,7 +815,7 @@ extern "C" u32 fn_8013ACC4(EmWork* self) {
         case 0x6B:
             self->field_0x38E = 0;
             self->field_0x38F = 0;
-            fn_80130778(self, 0);
+            em_status_set(self, 0);
             break;
         case 0x6C:
             self->stream_0x958 += (s16)fn_80140670(self, self->stream_0x958);
@@ -958,7 +958,7 @@ extern "C" u32 fn_8013ACC4(EmWork* self) {
 
         if (finished != 0) {
             if (aborted == 0) {
-                fn_80133BC0(self);
+                em_state_refresh(self);
                 return 1;
             }
             return 0;

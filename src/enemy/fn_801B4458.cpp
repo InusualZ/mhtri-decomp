@@ -135,7 +135,7 @@ void eft_spawn_pos_in_area(void* pos, u8 area, u8 kind, s32 mode, f32 scale);
 void eft009_spawn_at_joint(struct _ENEMY_WORK* self, u32 id, u32 type, s32 joint, f32 scale);
 void fn_801049D0(struct _ENEMY_WORK* self, u32 id, u32 type, s32 joint, nw4r::math::VEC3* pos,
                  f32 scale);
-void fn_800FC0D4(void* dst, void* src);
+void eft_rot_vec_copy(void* dst, void* src);
 s32 em_roster_record_slot_id_get(s32 handle);
 void em_roster_record_release(s32 handle);
 
@@ -1638,7 +1638,7 @@ extern "C" void fn_801B6C84(_ENEMY_WORK* self, s8* out_state, s8* out_flag) {
         *out_flag = 0;
         if (fn_801421E4(self->field_0x01A, &rec) == 1) {
             copyVec3(&self->pos, &rec.pos_0x08);
-            fn_800FC0D4(&self->field_0x1BC, &rec.field_0x14);
+            eft_rot_vec_copy(&self->field_0x1BC, &rec.field_0x14);
         }
     } else {
         em_move_mode_set(self, 0);

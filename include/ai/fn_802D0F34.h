@@ -62,7 +62,7 @@ s32 fn_8029208C(nw4r::math::VEC3* probe, nw4r::math::VEC3* current, nw4r::math::
 void hit_attack_list_push(struct _HIT_W* hit);
 void hit_data_apply(struct _HIT_W* hit, void* owner, f32 value);
 void hit_flags_clear(struct _HIT_W* hit);
-void fn_800FC0D4(struct _CP_VECTOR* dst, struct _CP_VECTOR* src);
+void eft_rot_vec_copy(struct _CP_VECTOR* dst, struct _CP_VECTOR* src);
 void fn_801006A0(u8 id, nw4r::math::VEC3* pos, s32 a, u8 area, s32 b, f32 scale);
 void fn_801075AC(struct _AINPC_W* self, nw4r::math::VEC3* pos, s32 a, s32 b, f32 c);
 void fn_8012A624(nw4r::math::VEC3* out);

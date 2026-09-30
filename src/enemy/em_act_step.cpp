@@ -238,7 +238,7 @@ void fn_8032DD04(struct _EM_CHARA_WORK* self);
 f32 calcVecDistXZ(const void* a, const void* b);
 void fn_8012E694(struct _ENEMY_WORK* self);
 void fn_80136DF4(struct _ENEMY_WORK* self);
-void fn_800FC0D4(_CP_VECTOR* dst, const _CP_VECTOR* src);
+void eft_rot_vec_copy(_CP_VECTOR* dst, const _CP_VECTOR* src);
 u32 quest_sub_state_end_ck(u32 a);
 void fn_80130350(struct _ENEMY_WORK* self, void* vec);
 void fn_8027D3F0(struct _PLW* self, u8 a);
@@ -301,7 +301,7 @@ struct _EM_CHARA_WORK {
     /* +0x188 */ nw4r::math::VEC3 pos;  /* one position, the effect anchor */
     /* +0x194 */ u8 unused_0x194[0x1BC - 0x194];
     /* +0x1BC */ union {
-        _CP_VECTOR rot;                /* the rotation triple `fn_800FC0D4` copies in whole */
+        _CP_VECTOR rot;                /* the rotation triple `eft_rot_vec_copy` copies in whole */
         struct {                       /* size: 0x0C */
             /* +0x1BC */ u32 rot_x;
             /* +0x1C0 */ u32 rot_y;     /* the angle `rotVecY` turns the effect by */
@@ -433,7 +433,7 @@ extern "C" void em_eff_ground_set(_EM_CHARA_WORK* self)
     fn_80125F54(&rec);
     if (fn_801421E4(self->field_0x01A, &rec) != 0) {
         fn_80051B7C(&self->pos, &rec.pos_0x08, lbl_8079B114, 0);
-        fn_800FC0D4(&self->rot, (_CP_VECTOR*)&rec.field_0x14);
+        eft_rot_vec_copy(&self->rot, (_CP_VECTOR*)&rec.field_0x14);
     }
 }
 

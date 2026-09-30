@@ -41,12 +41,36 @@ struct SenkoRec {
 };
 
 /* one 0x24-byte record of the second marker array at `emc_work + 0x1F8` (the ten entries
- * `fn_80141B2C` clears the +0x09 byte of).
+ * `fn_80141B2C` clears the +0x09 byte of; `hud/net_char_sync.cpp` packs a record into a net message).
  * size: 0x24 */
 struct Marker2Rec {
-    /* +0x00 */ u8 unused_0x00[0x09];
+    /* +0x00 */ u16 field_0x00;
+    /* +0x02 */ u16 enemy_id_0x02;   /* the `em_get_unique_work` key of the enemy the marker belongs to */
+    /* +0x04 */ u8 field_0x04;
+    /* +0x05 */ u8 field_0x05;
+    /* +0x06 */ u8 field_0x06;
+    /* +0x07 */ u8 field_0x07;
+    /* +0x08 */ u8 field_0x08;
     /* +0x09 */ u8 field_0x09;
-    /* +0x0A */ u8 unused_0x0A[0x24 - 0x0A];
+    /* +0x0A */ u8 field_0x0A;
+    /* +0x0B */ u8 pad_0x0B;
+    /* +0x0C */ nw4r::math::VEC3 pos_0x0C;
+    /* +0x18 */ u32 field_0x18;
+    /* +0x1C */ u32 field_0x1C;
+    /* +0x20 */ u32 field_0x20;
+};
+
+/* the last enemy-control event the net sync replays: the enemy's id, phase and step and the event kind and
+ * its three values.  size: 0x8 */
+struct EmcStatus {
+    void assign(const EmcStatus* src);   /* copies the record field by field */
+    /* +0x0 */ u16 enemy_id;
+    /* +0x2 */ u8 phase;
+    /* +0x3 */ u8 step;
+    /* +0x4 */ u8 kind;
+    /* +0x5 */ u8 value_0x05;
+    /* +0x6 */ u8 value_0x06;
+    /* +0x7 */ u8 value_0x07;
 };
 
 /* the enemy-control work blob `emc_work`, as far as this unit's reconstructed functions read it.
@@ -62,7 +86,9 @@ struct EmcWork {
     /* +0x368 */ s16 field_0x368;
     /* +0x36A */ u8 field_0x36A;
     /* +0x36B */ u8 field_0x36B;
-    /* +0x36C */ u8 unused_0x36C[0xF48 - 0x36C];
+    /* +0x36C */ u8 unused_0x36C[0xD9C - 0x36C];
+    /* +0xD9C */ EmcStatus status_0xD9C;   /* the last event `hud/net_char_sync.cpp` replays to its peers */
+    /* +0xDA4 */ u8 unused_0xDA4[0xF48 - 0xDA4];
     /* +0xF48 */ u32* field_0xF48;
     /* +0xF4C */ u32 field_0xF4C;
 };
@@ -71,9 +97,21 @@ struct EmcWork {
 
 struct _ENEMY_WORK;
 
+struct _ENEMY_MINI_WORK;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* The mini-enemy event handlers the net sync (`hud/net_char_sync.cpp`) drives; the signatures are the call
+ * sites' (GUESS: the roles). */
+void emc_mini_event_b(struct _ENEMY_MINI_WORK* mini, s32 mode);
+void emc_mini_event_a(struct _ENEMY_MINI_WORK* mini, s32 a, s32 b);
+void emc_mini_step(struct _ENEMY_MINI_WORK* mini);
+/* 0x80141F6C - replays a marker on a mini enemy: the marker's kinds, id and position, then a value list
+ * (the last two arguments travel on the stack). */
+void emc_marker_replay(struct _ENEMY_MINI_WORK* mini, u8 a, u8 b, u16 id, u8 c, u8 d, u8 e, const nw4r::math::VEC3* pos,
+                 s32* values, s32 count);
 
 /* the entry points this unit publishes to its consumers (docs/plan.md 6.5 rule 2).  `fn_80143174`
  * is `src/Pl/pl_act.cpp`'s - it is registered but not yet reconstructed (see the unit source's

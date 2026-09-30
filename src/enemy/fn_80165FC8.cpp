@@ -523,7 +523,7 @@ void fn_80166DF8(_ENEMY_WORK* self, u32 kind) {
     case 2:
         fn_8016C674(self, &a, &b);
         fn_80128A8C(self, a, b);
-        fn_80133BC0(self);
+        em_state_refresh(self);
         break;
     case 3:
         map = stage_map_kind_get(self->field_0x1E0);
@@ -583,7 +583,7 @@ void fn_80166DF8(_ENEMY_WORK* self, u32 kind) {
             fn_8016C674(self, &a, &b);
             fn_80128A8C(self, a, b);
         }
-        fn_80133BC0(self);
+        em_state_refresh(self);
         break;
     }
 }

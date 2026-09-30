@@ -37,21 +37,21 @@
  * 0x8079B2A0 (0.8) - and it stays **unclaimed**: a `.sdata2` claim links only while the object emits
  * no pool of its own (playbook 23/58), so the labels are declared and used as load operands only
  * (playbook 29).  Its `.data` run 0x805E0510..0x805E201C is deliberately **not claimed** either: the
- * next band's `fn_803346B4` owns an object at 0x805E1ED0 inside that address range, so the run is not
+ * next band's `Pl_act_step_table_enter` owns an object at 0x805E1ED0 inside that address range, so the run is not
  * claimable whole, and a run with an unclaimed hole in it becomes an `auto_*_data` unit in the middle
  * of the unit's range (playbook 53).  The measured object list, for the data pass that claims it:
  * 0x805E0510 / 0x805E0540 / 0x805E0570 (0x30 each), 0x805E05A0 (0x38), 0x805E05D8 (0xC),
  * jumptable_805E05E4 (0x50) - all `fn_803305F8`; 0x805E0638 / 0x805E0688 / 0x805E06D8 (0x50 each, no
  * referrer); 0x805E0728 (0xC) + 0x805E0734 (0x32C) - `fn_80331238`; then one object per function from
- * 0x805E0A60 (`fn_80331868`) to 0x805E1E20 (`fn_80333FB8`), plus 0x805E1F6C (`fn_803341B0`) and
- * 0x805E1F98 (`fn_80334398`).
+ * 0x805E0A60 (`pl_act_handler_00`) to 0x805E1E20 (`pl_act_handler_27`), plus 0x805E1F6C (`pl_act_handler_28`) and
+ * 0x805E1F98 (`pl_act_handler_29`).
  *
  * MODULE AND NAME - the pass that writes the bodies decides, and this is the hint it starts from.  No
  * `__FILE__` string is reachable and `tools/symbols/dumpmap.py lookup` answers `zz_XXXXXXXX_` for every
  * address of the range, so the map has no name for the file either.  Module `enemy` is the link
  * band's: 0x803250B0..0x80334568 is the enemy band (`enemy/em_action.cpp` and
  * `enemy/em_act_step.cpp` bracket it) and the neighbouring files are `enemy/`.  The honest caveat, of
- * the same kind `hud/fn_80334568.cpp` records for its band: the content is the *player* work.  This
+ * the same kind `hud/net_char_sync.cpp` records for its band: the content is the *player* work.  This
  * half drives the player work record (`_PLW` reached with `get_move_work_adrs(2)`, then
  * `Pl_frame_check` / `Get_motion_no` / `Pl_chr_setX` / `Pl_master_ck`, and the documented `+4` ->
  * `get_joint_wpos` idiom) and it owns a second class's table family (vtable 0x805E0510 plus

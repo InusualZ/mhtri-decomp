@@ -7,7 +7,7 @@
  *   * 0x80137604..0x801376B4 - the small state accessors: two field setters, the action/sub-state test
  *     (`fn_80137614`), the `field_0x43F` flag pair (`fn_8013763C`/`fn_80137648`), the sound/effect kick
  *     (`fn_8013765C`) and the `flags_0x8B3` bit helpers (`fn_801376B4`/`BC`/`DC`/`04`).
- *   * 0x80137720..0x801378A0 - the motion-mode hook (`fn_80137720`, clears or arms the motion timer
+ *   * 0x80137720..0x801378A0 - the motion-mode hook (`em_motion_mode_set`, clears or arms the motion timer
  *     through `fn_80126494`/`fn_801376B4`), the move-work slot picker (`fn_801377D0`) and the light
  *     table install (`fn_801378A0`).
  *   * 0x8013791C..0x80138074 - the per-frame driver `fn_8013791C` (an outer `field_0x004` phase switch
@@ -51,7 +51,7 @@
  *
  * Rule 2 note.  The callees this unit calls are declared in its linkage block because their owning
  * units' headers do not carry them yet - the interim home `enemy/fn_80177890.cpp` uses for the same
- * band.  `fn_80130778` and `fn_80144584` are the two whose *spelling* differs between consumers (one
+ * band.  `em_status_set` and `fn_80144584` are the two whose *spelling* differs between consumers (one
  * argument in `enemy/fn_8012BDF4.cpp`, two here); this unit writes the two-argument form its own call
  * sites show, and the reconciliation belongs to whichever unit registers their range.
  *
@@ -79,6 +79,7 @@
  */
 
 #include "types.h"
+#include "hud/em_net_send.h" /* the owner's leaf header (rule 2) */
 #include "nw4r/math.h"
 #include "enemy/ENEMY_WORK.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
@@ -150,7 +151,7 @@ void fn_801376DC(_ENEMY_WORK* self, u8 flag);
 void fn_80137C94(_ENEMY_WORK* self);
 
 /* `enemy/fn_801251D0.cpp` */
-void fn_8012555C(_ENEMY_WORK* self, u32 kind);
+void em_act_advance(_ENEMY_WORK* self, u32 kind);
 u32 fn_801260BC(_ENEMY_WORK* self);
 u32 fn_801260E0(_ENEMY_WORK* self);
 s16* fn_80126494(_ENEMY_WORK* self);
@@ -160,8 +161,8 @@ void fn_8012820C(_ENEMY_WORK* self);
 void fn_80128A30(_ENEMY_WORK* self, u32 a, u32 b);
 
 /* `enemy/fn_8012BDF4.cpp` */
-u32 fn_8012D1A0(_ENEMY_WORK* self);
-void fn_8012E728(_ENEMY_WORK* self, u32 mode);
+u32 em_busy_ck(_ENEMY_WORK* self);
+void em_act_end(_ENEMY_WORK* self, u32 mode);
 
 /* `enemy/fn_80138074.c` */
 void fn_8013823C(_ENEMY_WORK* self);
@@ -184,14 +185,14 @@ void fn_800E0914(struct MHchar* model);
 /* the enemy band's still-unregistered helpers (the 0x8011xxxx/0x8012xxxx/0x8013xxxx proposals) */
 void fn_8011E5EC(_ENEMY_WORK* self);
 void fn_8011E960(_ENEMY_WORK* self);
-u32 fn_80130778(_ENEMY_WORK* self, s32 kind);
+u32 em_status_set(_ENEMY_WORK* self, s32 kind);
 void fn_80130844(_ENEMY_WORK* self);
 void fn_80130B28(_ENEMY_WORK* self);
 void fn_80131DB4(_ENEMY_WORK* self);
 void fn_80131DF4(_ENEMY_WORK* self);
 void fn_80132064(_ENEMY_WORK* self);
 void fn_801322B4(_ENEMY_WORK* self, u32 kind);
-void fn_80133BC0(_ENEMY_WORK* self);
+void em_state_refresh(_ENEMY_WORK* self);
 u32 fn_80133C48(void);
 u16 fn_80133DB0(u16 a, u16 b, u16 c);
 u8 fn_8014278C(u16 a, u16 b);
@@ -199,7 +200,6 @@ f32 fn_80142958(u16 a, u16 b);
 void fn_80144584(_ENEMY_WORK* self, s32 mode);
 
 /* the 0x803xxxxx helpers the band shares */
-void fn_8033737C(_ENEMY_WORK* self, u32 a, u32 b);
 void lb_sub0e_send(u8 a, u16 b, u8 c, u16 d);
 
 #ifdef __cplusplus
@@ -243,10 +243,10 @@ extern "C" u32 fn_80137648(_ENEMY_WORK* self)
     return self->field_0x43F == 1;
 }
 
-/* Kicks `lb_sub0e_send` for the record when `fn_8012D1A0` says the action is armed. */
+/* Kicks `lb_sub0e_send` for the record when `em_busy_ck` says the action is armed. */
 extern "C" void fn_8013765C(_ENEMY_WORK* self, u32 arg1)
 {
-    if (fn_8012D1A0(self) == 1) {
+    if (em_busy_ck(self) == 1) {
         lb_sub0e_send(my_player_no(), arg1, 1, self->field_0x01A);
     }
 }
@@ -284,7 +284,7 @@ extern "C" u32 fn_80137704(_ENEMY_WORK* self, u8 flag)
  * ------------------------------------------------------------------------------------------------ */
 
 /* Latches the record's motion mode and, for mode 2, arms the timer `fn_80126494` returns. */
-extern "C" void fn_80137720(_ENEMY_WORK* self, u8 mode)
+extern "C" void em_motion_mode_set(_ENEMY_WORK* self, u8 mode)
 {
     if ((self->field_0x1C8 & 1) == 0 || (self->field_0x1C8 & 0x80000) != 0) {
         self->field_0x89F = 0;
@@ -367,7 +367,7 @@ extern "C" void fn_8013791C(_ENEMY_WORK* self)
     case 1:
         if (self->field_0xAEE != 0) {
             if ((self->field_0x1C8 & 8) != 0 && (self->field_0x1C8 & 1) != 0) {
-                fn_8033737C(self, 3, 0);
+                em_net_send(self, 3, 0);
             }
             self->field_0xAEE = 0;
         }
@@ -378,7 +378,7 @@ extern "C" void fn_8013791C(_ENEMY_WORK* self)
         switch (self->state_0x017) {
         case 0:
             if (self->field_0x011 == 2) {
-                fn_8012E728(self, 1);
+                em_act_end(self, 1);
             } else {
                 self->field_0x1DE = 1;
             }
@@ -394,11 +394,11 @@ extern "C" void fn_8013791C(_ENEMY_WORK* self)
                 self->field_0x7C8 = fn_8014278C(self->field_0x01A, rnd);
                 rnd = ran_suu(1);
                 self->field_0x1D0 = fn_80142958(self->field_0x01A, rnd);
-                fn_8033737C(self, 4, 0);
+                em_net_send(self, 4, 0);
             } else {
                 fn_80144584(self, 2);
             }
-            fn_8012555C(self, 1);
+            em_act_advance(self, 1);
             refresh = 1;
             break;
 
@@ -411,14 +411,14 @@ extern "C" void fn_8013791C(_ENEMY_WORK* self)
                 self->field_0x7C8 = fn_8014278C(self->field_0x01A, rnd);
                 rnd = ran_suu(1);
                 self->field_0x1D0 = fn_80142958(self->field_0x01A, rnd);
-                fn_8033737C(self, 4, 0);
-                fn_8012555C(self, 1);
+                em_net_send(self, 4, 0);
+                em_act_advance(self, 1);
                 refresh = 1;
             }
             break;
 
         case 3:
-            fn_8012E728(self, 0);
+            em_act_end(self, 0);
             break;
 
         case 4:
@@ -430,12 +430,12 @@ extern "C" void fn_8013791C(_ENEMY_WORK* self)
             rnd = ran_suu(1);
                 self->field_0x1D0 = fn_80142958(self->field_0x01A, rnd);
             }
-            fn_8033737C(self, 4, 1);
-            fn_8012E728(self, 0);
+            em_net_send(self, 4, 1);
+            em_act_end(self, 0);
             break;
 
         case 5:
-            fn_8012E728(self, 2);
+            em_act_end(self, 2);
             break;
         }
 
@@ -473,10 +473,10 @@ extern "C" void fn_80137C20(_ENEMY_WORK* self)
     fn_8013A978(self);
 }
 
-/* Hands the record's `field_0x00E` to `fn_8012555C`. */
+/* Hands the record's `field_0x00E` to `em_act_advance`. */
 extern "C" void fn_80137C94(_ENEMY_WORK* self)
 {
-    fn_8012555C(self, self->field_0x00E);
+    em_act_advance(self, self->field_0x00E);
 }
 
 /* The action callback `fn_8013791C` runs each frame: the `fn_80139024` step, or the caller's own
@@ -491,7 +491,7 @@ extern "C" s32 fn_80137C9C(_ENEMY_WORK* self, void (*callback)(_ENEMY_WORK*))
     }
     if (self->field_0x011 == 2) {
         if ((self->field_0x1C8 & 8) != 0) {
-            fn_80130778(self, 0);
+            em_status_set(self, 0);
             fn_80130844(self);
             fn_80130B28(self);
             fn_801322B4(self, 247);
@@ -506,7 +506,7 @@ extern "C" s32 fn_80137C9C(_ENEMY_WORK* self, void (*callback)(_ENEMY_WORK*))
             self->field_0x1E7 = 1;
             self->field_0x018 = fn_80126844(self);
             fn_80128A30(self, 12, 255);
-            fn_80133BC0(self);
+            em_state_refresh(self);
             return 1;
         }
         return 0;

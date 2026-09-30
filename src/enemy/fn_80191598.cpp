@@ -92,7 +92,7 @@
  *     the callee's own body reads +0x04/+0x08 (settled from the callee, rule 6 of the playbook).
  *   * the plain prototypes at the top of this file (`em_move_mode_set`, `fn_80126324`, `fn_80129xxx`,
  *     `fn_8013918C`, `joint_mtx_store`, `joint_mtx_load`, `fn_8013A654`, `fn_8008E8D0`, `fn_8008EE68`,
- *     `fn_800FBB90`, `fn_800FC0D4`, `fn_805012E8`, `mtx34_trans_add`, `mtx34_trans_get`, `MTX34_ctor`,
+ *     `fn_800FBB90`, `eft_rot_vec_copy`, `fn_805012E8`, `mtx34_trans_add`, `mtx34_trans_get`, `MTX34_ctor`,
  *     `fn_800516F0`, `setVec3`, `copyVec3`, `VEC3_ctor`, `assignVec3`, `stage_map_kind_get`,
  *     `fn_80182D5C`) belong in their owners' headers / `include/unsplit/enemy.h`; `setVec3`'s
  *     `void` return in `include/mh3_pad.h` is wrong for this range's call sites, which read its r3.
@@ -329,7 +329,7 @@ void fn_8013A654(EmUserData* self, u32 flags);
 void fn_8008E8D0(void* holder, void* vec);
 void fn_8008EE68(void* holder, void* mtx);
 void fn_800FBB90(MTX34* mtx, VEC3* vec);
-void fn_800FC0D4(void* dst, void* src);
+void eft_rot_vec_copy(void* dst, void* src);
 void fn_805012E8(EmMtx33* dst, const MTX34* src);
 void mtx34_trans_add(MTX34* mtx, VEC3* vec);
 void mtx34_trans_get(MTX34* mtx, VEC3* out);
@@ -663,13 +663,13 @@ void fn_80191CE4(EmUserData* self, EmMtxHolder* holder, u32 a2, u32 a3, u32 kind
             fn_8008EE68(holder, &dst);
             break;
         case 25:
-            fn_800FC0D4(&rot, &work->aim_0x328.rot_0x04);
+            eft_rot_vec_copy(&rot, &work->aim_0x328.rot_0x04);
             cpSetRotMatrix((struct _CP_VECTOR*)&rot, &mtx);
             fn_805012E8(&dst, &mtx);
             fn_8008EE68(holder, &dst);
             break;
         case 26:
-            fn_800FC0D4(&rot, &work->aim_0x328.rot_0x10);
+            eft_rot_vec_copy(&rot, &work->aim_0x328.rot_0x10);
             cpSetRotMatrix((struct _CP_VECTOR*)&rot, &mtx);
             fn_805012E8(&dst, &mtx);
             fn_8008EE68(holder, &dst);

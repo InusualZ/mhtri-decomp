@@ -10,6 +10,8 @@
 
 #include "types.h"
 
+struct _ENEMY_WORK;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -17,6 +19,8 @@ extern "C" {
 /* 0x801377D0 - the move-work slot picker: r3 the mode and r4 the mask (the owner's own definition is
  * `u8* fn_801377D0(u8 mode, u8 mask)`, and it answers the picked record). */
 u8* fn_801377D0(u8 mode, u8 mask);
+/* 0x80137720 - latches the record's motion mode (declared with the owner's own `u8` parameter). */
+void em_motion_mode_set(struct _ENEMY_WORK* self, u8 mode);
 
 #ifdef __cplusplus
 }

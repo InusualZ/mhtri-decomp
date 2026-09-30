@@ -500,7 +500,7 @@ extern f32 calcVecDistXZ(Vec3 *a, Vec3 *b);
 extern f32 sqrt_f32(f32 x);
 extern f32 atan2f(f32 y, f32 x);
 extern u32 fn_80125FF0(u8 a, u8 b);
-extern void fn_801285C0(_ENEMY_WORK *self, u32 a, u32 b, u32 c);
+extern void em_act_step_arm(_ENEMY_WORK *self, u32 a, u32 b, u32 c);
 extern void fn_80126278(_ENEMY_WORK *self, u16 a, Vec3 *out);
 extern void fn_8012B380(_ENEMY_WORK *self, u32 a, u32 b, u32 c);
 extern void em_target_pos_set(_ENEMY_WORK *self, u32 a);
@@ -511,7 +511,7 @@ extern u32 fn_801272C4(_ENEMY_WORK *self, Vec3 *pos, u32 a);
 extern void fn_8013C57C(_ENEMY_WORK *self, u8 *in, u32 flag);
 extern u32 fn_801275F0(_ENEMY_WORK *self, u32 a);
 extern u32 fn_80127A7C(_ENEMY_WORK *self, u32 a);
-extern void fn_8012A658(_ENEMY_WORK *self, u32 a);
+extern void em_area_change(_ENEMY_WORK *self, u32 a);
 extern void fn_802B01AC(Vec3 *out, Vec3 *in, u32 idx);
 extern f32 fn_802B0430(u32 idx);
 extern void get_worldworld_pos__FPQ34nw4r4math4VEC3Uc(Vec3 *out, Vec3 *pos, u8 act);
@@ -1087,7 +1087,7 @@ void fn_8013C458(_ENEMY_WORK *self, u8 *in) {
             break;
         }
     }
-    fn_801285C0(self, value, sub, 0);
+    em_act_step_arm(self, value, sub, 0);
 }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -1457,7 +1457,7 @@ void fn_8013C988(_ENEMY_WORK *self, u8 *in) {
             fn_802B01AC(&d, &a, self->state_0x9F7);
             copyVec3(&self->pos, &d);
             self->pos.y = fn_802B0430(self->state_0x9F7);
-            fn_8012A658(self, 0);
+            em_area_change(self, 0);
             em_target_pos_set(self, 0);
         }
         break;
@@ -1496,7 +1496,7 @@ void fn_8013CAA0(_ENEMY_WORK *self, u8 *in) {
     fn_80140AF8(self, 3, self->state_0x95C);
     fn_80140B10(self, 0, self->id_0x03);
     if (self->state_0x9F7 != 255) {
-        fn_8012A658(self, 0);
+        em_area_change(self, 0);
     }
     self->state_0x95C = self->state_0x99C;
     self->state_0x95D = self->state_0x99D;

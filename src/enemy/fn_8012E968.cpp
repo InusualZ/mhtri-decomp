@@ -185,7 +185,7 @@ extern "C" s32 fn_8012EC3C(_ENEMY_WORK* self)
     return (u32)(self->field_0x89F - 2) <= 1;
 }
 
-/* Whether the record's latched mode is 1 (`fn_80130A10` latches it, 0/1). */
+/* Whether the record's latched mode is 1 (`em_alt_mode_set` latches it, 0/1). */
 extern "C" s32 em_alt_mode_ck(_ENEMY_WORK* self)
 {
     return self->mode_0x8AA == 1;

@@ -38,7 +38,7 @@
  * from the switch below; it is the only data our object emits.  The two string labels above are
  * declared, never defined (playbook 29: a definition emits a second copy and grows `.data`), so the
  * bytes stay where the DOL has them - inside the `auto_07_805E27B0_data` chunk, whose bracketing
- * registered units (`hud/fn_80334568.cpp` below, `fn_80423E74.cpp` above) disagree on a module, so
+ * registered units (`hud/net_char_sync.cpp` below, `fn_80423E74.cpp` above) disagree on a module, so
  * rule 2's home for them is a named gap and the declarations stay here.
  *
  * Flags: the lib's `cflags_menu` (`-O3 -inline noauto -opt nopeephole -Cpp_exceptions on`, mw

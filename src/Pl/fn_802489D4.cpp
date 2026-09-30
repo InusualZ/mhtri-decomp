@@ -10,7 +10,7 @@
  * gates (`Pl_master_ck`, `Pl_Skill_ck`, `Pl_act_ck`, `Pl_cat_skill_ck`, `Pl_frame_check`,
  * `Pl_chr_setX`, `PlayMode_ck`) plus the 0x8026xxxx/0x8027xxxx Pl helpers.  Four of the 42 are
  * small `switch`-on-an-id classifiers shared by the rest (`fn_8024AA04`, `fn_8024CD8C`,
- * `fn_8024D094`, `fn_8024D3C8`), and `fn_8024D61C` (0x15E0 B) is the band's main dispatcher.
+ * `pl_act_net_hook_c`, `fn_8024D3C8`), and `pl_act_net_hook_main` (0x15E0 B) is the band's main dispatcher.
  *
  * MODULE AND NAME (brief section 2, evidence order).
  *   - Class 1 (`__FILE__` string): out.  The `.data` source-name pool has no name for this band
@@ -72,19 +72,19 @@
 extern "C" {
 
 /* This unit's own helpers, defined further down but called from the handlers above them. */
-void fn_8024D144(_PLW* self);
-void fn_8024D094(_PLW* self);
+void pl_act_net_hook_a(_PLW* self);
+void pl_act_net_hook_c(_PLW* self);
 void fn_8024D3C8(_PLW* self);
 void fn_8024D44C(_PLW* self, s32 a, s32 b, s32 c);
 s32 fn_8024D5AC(_PLW* self, _PLW* other);
-void fn_8024D61C(_PLW* self, s32 a);
+void pl_act_net_hook_main(_PLW* self, s32 a);
 s16 fn_8024CD8C(_PLW* self, s16 value);
-void fn_8024CE54(_PLW* self);
+void pl_act_net_hook_b(_PLW* self);
 void fn_8024CA50(_PLW* self, s32 a);
 void fn_8024CAC8(_PLW* self);
 void fn_8024BCB0(_PLW* self, s32 a, s32 b, s32 c);
 void fn_8024B9FC(_PLW* self);
-void fn_8024EBFC(_PLW* self);
+void pl_act_net_hook_d(_PLW* self);
 
 /* 0x80249424 - the "down/knock-down" act handler: arms the down motion, then ends the act once the
  * master gate and the hit check agree. */
@@ -680,7 +680,7 @@ void fn_8024B868(_PLW* self, s32 arg1) {
         }
         self->field_0x28 = 0;
         if (Pl_master_ck(self) == 1) {
-            fn_8024D144(self);
+            pl_act_net_hook_a(self);
             if (Pl_motion_input_ck(1) == 0) {
                 pl_item_add(self, self->field_0x306, -1);
                 return;
@@ -719,7 +719,7 @@ void fn_8024C75C(_PLW* self) {
         Pl_act_set_motion(self, 0, 0, 0);
         Pl_chr_set_attr_default(self, 0x136, 0, 0x3C);
         if (Pl_master_ck(self) == 1) {
-            fn_8024D094(self);
+            pl_act_net_hook_c(self);
             if (Pl_motion_input_ck(1) == 0) {
                 pl_item_add(self, self->field_0x306, -1);
             }
@@ -778,7 +778,7 @@ void fn_8024C96C(_PLW* self) {
         Pl_act_set_motion(self, 3, 0, 0);
         Pl_chr_set_attr_default(self, 0x16B, 0, 0xD0);
         if (Pl_master_ck(self) == 1) {
-            fn_8024D094(self);
+            pl_act_net_hook_c(self);
             if (Pl_motion_input_ck(1) == 0) {
                 pl_item_add(self, self->field_0x306, -1);
             }

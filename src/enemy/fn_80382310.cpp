@@ -179,7 +179,7 @@ extern "C" {
 void res_file_ctor(void* obj, s32 flag);
 void fn_800D8E44(s32 handle);
 void fn_800E26C4(void* chr);
-void fn_800FC0D4(void* dst, void* src);
+void eft_rot_vec_copy(void* dst, void* src);
 void g3d_root_model_bind(s32 root, u32 id);
 void em_move_mode_set(_ENEMY_WORK* self, u32 a);
 void fn_80385828(NoteWork* self);
@@ -757,12 +757,12 @@ extern "C" void fn_803861F8(NoteWork* self) {
         fn_80385BF4(self, 2, 0, 0);
         self->field_0x1B0 = lbl_8079BF90;
         copyVec3(&self->vec_0x170, (nw4r::math::VEC3*)(work + 0x3C));
-        fn_800FC0D4(&self->field_0x188, work + 0x54);
+        eft_rot_vec_copy(&self->field_0x188, work + 0x54);
         fn_80385C98((_QNPC_W*)self, 90);
     } else if (v == 1) {
         if (Pl_act_ck((_PLW*)work, 9, 0) == 1) {
             copyVec3(&self->vec_0x170, (nw4r::math::VEC3*)(work + 0x3C));
-            fn_800FC0D4(&self->field_0x188, work + 0x54);
+            eft_rot_vec_copy(&self->field_0x188, work + 0x54);
             fn_80385C98((_QNPC_W*)self, 90);
         } else {
             if (Pl_act_ck((_PLW*)work, 9, 1) == 1) {

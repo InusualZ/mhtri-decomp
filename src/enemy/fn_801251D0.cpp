@@ -5,7 +5,7 @@
  * What it is.  The enemy-side work block's taken/seated-state bookkeeping: the small accessors that
  * flip the `_ENEMY_WORK` flags around an action change (`fn_801251E0`/`fn_801252C0`), the per-part
  * helpers, and `get_enemy_data`, the accessor that turns an enemy's group + kind into its static data
- * record (`fn_80140C00`).  The large movers (`fn_8012555C`, 2552 B; `em_target_pos_set`, 1860 B;
+ * record (`fn_80140C00`).  The large movers (`em_act_advance`, 2552 B; `em_target_pos_set`, 1860 B;
  * `fn_8012A9E8`, 2456 B) are the unit's update/state-machine bodies; the rest are the getters and
  * setters that surround them.  The .data pool the unit references (`lbl_805A1ADC`,
  * `lbl_807919D0`, the jump tables) belongs to the data pass and is declared, never defined
@@ -29,7 +29,7 @@
  * (a register-colouring difference: retail keeps the mask in r6 and the shift count in r5, this
  * build swaps the two; every instruction and branch is otherwise right).  The remaining 102 symbols
  * are unwritten and keep their original bytes in the target object; the large bodies
- * (`fn_8012555C`, `em_target_pos_set`, `fn_8012A9E8`, ...) need the unit's full state-machine layout, which
+ * (`em_act_advance`, `em_target_pos_set`, `fn_8012A9E8`, ...) need the unit's full state-machine layout, which
  * the written accessors only partly pin.
  *
  * Source shape worth keeping: the unit needs `#pragma peephole off`.  With the peephole pass on,
@@ -45,11 +45,13 @@
  */
 
 #include "types.h"
+#include "hud/em_net_send.h" /* the owner's leaf header (rule 2) */
 
 #include "nw4r/math.h"
 #include "enemy.h"
 #include "enemy/fn_801251D0.h"
 #include "unsplit/enemy.h"
+#include "unsplit/enemy_pool.h" /* the band's unowned .data pools (rule 2) */
 
 #pragma peephole off
 
@@ -67,14 +69,11 @@ extern "C" void fn_80124C5C(u32 a, u32 b, u8 c);
 extern "C" void em_hit_window_set(struct _ENEMY_WORK* self, u8 a, u32 b, u32 c);
 extern "C" u32 stage_map_kind_get(u32 kind);
 
-/* `fn_8033737C` (0x8033737C) sits in the unclaimed run 0x803250B0..0x8033737C+: its bracketing
+/* `em_net_send` (0x8033737C) sits in the unclaimed run 0x803250B0..0x8033737C+: its bracketing
  * *registered* units are `hud/fn_80324F7C.c` and `Network/NetworkWiiMediator.c`, different modules,
  * so rule 2 has no sound header (the named gap). */
-extern "C" void fn_8033737C(struct _ENEMY_WORK* self, u32 a, u32 b);
 
 /* Pool literals (declared, never defined - playbook 29). */
-extern "C" u8 lbl_805A1ADC[];
-extern "C" u8 lbl_805A1078[];
 extern "C" u8 lbl_807919D0;
 
 /* ---------------------------------------------------------------------------------------------- *
@@ -95,7 +94,7 @@ extern "C" void fn_801252C0(struct _ENEMY_WORK* self, u8 a)
 {
     self->field_0x1F6 = (s8)a;
     self->field_0x1F5 = 0;
-    fn_8033737C(self, 2, 0);
+    em_net_send(self, 2, 0);
 }
 
 extern "C" void fn_8012554C(struct _ENEMY_WORK* self)
@@ -275,7 +274,7 @@ extern "C" void fn_8012B604(void)
  * ---------------------------------------------------------------------------------------------- */
 
 extern "C" void fn_80128998(struct _ENEMY_WORK* self, u8 a, u8 b);
-extern "C" void fn_801285C0(struct _ENEMY_WORK* self, u8 a, u8 b, u32 c);
+extern "C" void em_act_step_arm(struct _ENEMY_WORK* self, u8 a, u8 b, u32 c);
 
 extern "C" void em_state_set(struct _ENEMY_WORK* self, u32 a, u32 b)
 {
@@ -287,7 +286,7 @@ extern "C" void em_state_set(struct _ENEMY_WORK* self, u32 a, u32 b)
 
 extern "C" void fn_80128A30(struct _ENEMY_WORK* self, u32 a, u32 b)
 {
-    fn_801285C0(self, (u8)a, (u8)b, 1);
+    em_act_step_arm(self, (u8)a, (u8)b, 1);
     fn_801281EC(self);
 }
 
@@ -304,7 +303,7 @@ extern "C" void fn_80128A8C(struct _ENEMY_WORK* self, u8 a, u8 b)
     if (self->action_0x1E5 == 11) {
         return;
     }
-    fn_801285C0(self, a, b, 1);
+    em_act_step_arm(self, a, b, 1);
 }
 
 extern "C" void fn_80128AAC(struct _ENEMY_WORK* self, u32 a, u32 b)
@@ -312,7 +311,7 @@ extern "C" void fn_80128AAC(struct _ENEMY_WORK* self, u32 a, u32 b)
     if (self->action_0x1E5 == 11) {
         return;
     }
-    fn_801285C0(self, (u8)a, (u8)b, 2);
+    em_act_step_arm(self, (u8)a, (u8)b, 2);
 }
 
 extern "C" void fn_80128ACC(struct _ENEMY_WORK* self, u32 a, u32 b)
@@ -320,7 +319,7 @@ extern "C" void fn_80128ACC(struct _ENEMY_WORK* self, u32 a, u32 b)
     if (self->action_0x1E5 == 11) {
         return;
     }
-    fn_801285C0(self, (u8)a, (u8)b, 5);
+    em_act_step_arm(self, (u8)a, (u8)b, 5);
 }
 
 extern "C" void fn_80128AEC(struct _ENEMY_WORK* self, u32 a, u32 b)
@@ -328,7 +327,7 @@ extern "C" void fn_80128AEC(struct _ENEMY_WORK* self, u32 a, u32 b)
     if (self->action_0x1E5 == 11) {
         return;
     }
-    fn_801285C0(self, (u8)a, (u8)b, 0);
+    em_act_step_arm(self, (u8)a, (u8)b, 0);
 }
 
 extern "C" void fn_801299D8(struct _ENEMY_WORK* self)

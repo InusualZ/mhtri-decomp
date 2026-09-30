@@ -364,7 +364,7 @@ extern "C" u8 fn_800F1398(SndFlag3* work, u8 kind);
 extern "C" void fn_800F13D8(u8 arg0, u8 arg1);
 extern "C" void fn_800F15B0(void);
 extern "C" void fn_800F1620(s32 arg0);
-extern "C" void fn_800F16D4(u8 arg0);
+extern "C" void se_slot_req(u8 arg0);
 extern "C" void fn_800F1700(u8 arg0, u8 arg1, u8 arg2);
 extern "C" s32 fn_800F1DE0(void);
 extern "C" void fn_800F1FCC(void);
@@ -1207,7 +1207,7 @@ extern "C" void fn_800F1620(s32 arg0)
     }
 }
 
-extern "C" void fn_800F16D4(u8 arg0)
+extern "C" void se_slot_req(u8 arg0)
 {
     if (lbl_80794A2C->demo_id == arg0) {
         fn_800E80DC(0x2F, 0, 0);

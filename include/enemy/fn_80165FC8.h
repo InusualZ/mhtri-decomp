@@ -93,7 +93,7 @@ void em_frame_flag_set(void);
 void fn_80131DF4(struct _ENEMY_WORK* self);
 void em_busy_timer_reset(struct _ENEMY_WORK* self);
 u32 fn_801337FC(struct _ENEMY_WORK* self);
-void fn_80133BC0(struct _ENEMY_WORK* self);
+void em_state_refresh(struct _ENEMY_WORK* self);
 void em_move_vec2_clr(struct _ENEMY_WORK* self);
 void em_move_offset_step(struct _ENEMY_WORK* self, void* p);
 void em_wave_amp(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 scale, u32 mode, u16 angle);

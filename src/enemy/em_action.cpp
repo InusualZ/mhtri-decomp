@@ -45,7 +45,7 @@
  * Naming note: the file's own 14 symbols are named above; what the escape still covers is
  * precisely the names this file *references* in other units - 25 callee symbols in **42**
  * occurrences (em_move_mode_set x5, fn_80126324 x4, em_mot_end_ck x3, fn_801303EC x2, fn_8012F5C4 x2,
- * fn_8013072C x2, fn_80133BC0 x2, enemy_data_find x2, enemy_data_grp x2, ...; 21 of the 25 answer `zz_` in
+ * fn_8013072C x2, em_state_refresh x2, enemy_data_find x2, enemy_data_grp x2, ...; 21 of the 25 answer `zz_` in
  * the dump too).  Renaming those is a cross-unit rename batch in ~10 owner units, not this lane's
  * change, so the escape stays until that batch runs.
  *
@@ -203,13 +203,13 @@ void em_act_entry_start(_ENEMY_WORK* self, u8 mode) {
     case 0:
         em_move_mode_set(self, 4);
         fn_80128A8C(self, 6, 0x20);
-        fn_80133BC0(self);
+        em_state_refresh(self);
         break;
     case 3:
         em_move_mode_set(self, 4);
         fn_80128A8C(self, 6, 0x16);
         em_rot_reset(self);
-        fn_80133BC0(self);
+        em_state_refresh(self);
         break;
     }
     self->field_0x835 = 1;

@@ -191,7 +191,7 @@ u32 fn_800F9D80(void* self);
 void fn_800F9DF4(void* self, u8 a, u8 b);
 void fn_800FBB90(nw4r::math::MTX34* m, nw4r::math::VEC3* v);
 s32 fn_8012E2D4(u32 state, u32 action);
-u32 fn_801322CC(_ENEMY_WORK* enemy, s32 value);
+u32 em_status_ck(_ENEMY_WORK* enemy, s32 value);
 u32 fn_80137614(_ENEMY_WORK* enemy);
 u32 fn_80137648(_ENEMY_WORK* enemy);
 void fn_8026A394(_PLW* plw, s32 id, nw4r::math::MTX34* mtx);
@@ -477,7 +477,7 @@ extern "C" void fn_8010C8F8(_EFT* self)
         }
         switch (self->type_0x02) {
         case 0:
-            if (((fn_801322CC((_ENEMY_WORK*)self->source_0x30, 0x10) == 1 &&
+            if (((em_status_ck((_ENEMY_WORK*)self->source_0x30, 0x10) == 1 &&
                   fn_8012E2D4(em->field_0x1e5, em->field_0x1e6) == 1 && em->field_0x950 > 0) ||
                  fn_80137614((_ENEMY_WORK*)self->source_0x30) == 1 ||
                  fn_80137648((_ENEMY_WORK*)self->source_0x30) == 1)) {
@@ -494,7 +494,7 @@ extern "C" void fn_8010C8F8(_EFT* self)
             self->flag_0x01 = 0;
             return;
         case 2:
-            if (((fn_801322CC((_ENEMY_WORK*)self->source_0x30, 0x10) == 1 &&
+            if (((em_status_ck((_ENEMY_WORK*)self->source_0x30, 0x10) == 1 &&
                   fn_8012E2D4(em->field_0x1e5, em->field_0x1e6) == 1 && em->field_0x950 > 0) ||
                  fn_80137614((_ENEMY_WORK*)self->source_0x30) == 1 ||
                  fn_80137648((_ENEMY_WORK*)self->source_0x30) == 1)) {

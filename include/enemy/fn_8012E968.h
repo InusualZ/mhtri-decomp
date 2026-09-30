@@ -18,7 +18,7 @@ extern "C" {
 /* 0x8012EC3C - whether the record's `field_0x89F` is 2 or 3. */
 u32 fn_8012EC3C(struct _ENEMY_WORK* self);
 
-/* 0x8012EC60 - whether the record's latched mode is 1 (`fn_80130A10` latches it, 0/1).  The real
+/* 0x8012EC60 - whether the record's latched mode is 1 (`em_alt_mode_set` latches it, 0/1).  The real
  * signature takes the record: the body loads `+0x8AA` straight out of r3 (`lbz r3,2218(r3)`), and
  * every target call site that must set r3 does so explicitly (`em_act_effect_ck`'s `mr r3,r31`).  This
  * header owns that signature; the old `(void)` spelling was the workaround (a caller had to reach the

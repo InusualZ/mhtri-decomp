@@ -112,6 +112,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "enemy/ENEMY_WORK.h"
+#include "unsplit/enemy_pool.h" /* the band's unowned .data pools (rule 2) */
 #include "enemy/em_pop.h" /* quest_flag_100000_ck, quest_flag_10_ck (rule 2: their owner) */
 #include "ef/nw_res_manager.h"
 
@@ -123,11 +124,8 @@
  * ------------------------------------------------------------------------------------------------ */
 
 /* the 0x6D-byte command-length table `fn_801406E0` reads */
-extern u8 lbl_805A1530[];
 /* the `em001_prog_tbl`..`em040_prog_tbl` pointer array, NULL-terminated (`fn_80140B20` arms it) */
-extern u32 lbl_805A1B34[];
 /* the per-enemy byte table `em_kind_release` reads (`lbzx` + `extsb`, so it is signed) */
-extern s8 lbl_805A1B08[];
 /* the two `{key, name}` file tables `em_kind_release` walks */
 extern EmFileEntry lbl_80581E20[];
 extern EmFileEntry lbl_80582348[];
@@ -259,13 +257,13 @@ void em_target_pos_set(_ENEMY_WORK* self, u32 mode);
 void fn_8013C36C(_ENEMY_WORK* self, u8 a, u8* in);
 void fn_8013BDE4(u8** in, u8 code, s16* out);
 void fn_8013AA00(_ENEMY_WORK* self);
-u32 fn_801339AC(_ENEMY_WORK* self);
+u32 em_break_state_ck(_ENEMY_WORK* self);
 u32 fn_8013023C(_ENEMY_WORK* self);
 u32 fn_801321B0(_ENEMY_WORK* self);
 u32 fn_80137704(_ENEMY_WORK* self, u32 kind);
 u32 fn_801358D0(_ENEMY_WORK* self, u8 idx);
 void fn_80130CDC(_ENEMY_WORK* self, s32 value);
-void fn_80137720(_ENEMY_WORK* self, u32 mode);
+void em_motion_mode_set(_ENEMY_WORK* self, u32 mode);
 void fn_80130858(_ENEMY_WORK* self, s32 value);
 EmActList* fn_80126494(_ENEMY_WORK* self);
 u32 fn_8027D530(EmAreaWork* rec);
@@ -395,7 +393,7 @@ s16 fn_8013F9D8(_ENEMY_WORK* self, u8* in) {                    /* 0x50 */
 
     switch (in[0]) {
     case 0:
-        if (fn_801339AC(self) != 0) {
+        if (em_break_state_ck(self) != 0) {
             break;
         }
         in += fn_801406E0(0x50, in[0]);
@@ -969,7 +967,7 @@ void fn_801409C8(_ENEMY_WORK* self) {
         }
     }
     fn_80130CDC(self, value);
-    fn_80137720(self, 0);
+    em_motion_mode_set(self, 0);
     {
         s16* limit = ((EmEnemyData*)(void*)data)->sub_0xA0->value_0x28;
         if ((f32)self->field_0x8A6 == lbl_80796DC4 * (f32)(limit != NULL ? *limit : 0x258)) {

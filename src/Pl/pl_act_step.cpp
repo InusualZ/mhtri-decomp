@@ -62,7 +62,7 @@
  *     the same hand-off with the two trailing arguments 0;
  *   * `Pl_act_set_step_table` (0x802770E8, `Pl/pl_act.cpp`) - installs the per-act `.data` record at
  *     `+0x318` and clears the `+0x313`/`+0x322` state it drives.
- * The four declarations those names had in `include/hud/fn_80334568.h` moved to their owner's header
+ * The four declarations those names had in `include/hud/net_char_sync.h` moved to their owner's header
  * in the same change (the hud unit includes it), and `include/unsplit/Pl.h`'s copies are gone.
  *
  * Language: C++ - the map's undefined set carries real manglings (`Pl_Skill_ck__FP4_PLWUs`,

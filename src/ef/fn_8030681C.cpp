@@ -418,7 +418,7 @@ void eft042_set2(_ENEMY_WORK* source, u8 type, nw4r::math::VEC3* pos, _CP_VECTOR
             eft->type_0x02 = 4;
         }
         copyVec3(&eft->pos_0x18, pos);
-        fn_800FC0D4(&eft->rot_0x24, rot);
+        eft_rot_vec_copy(&eft->rot_0x24, rot);
         eft->source_0x30 = source;
         eft->timer_0x0C = 0;
     }
@@ -476,7 +476,7 @@ extern "C" void fn_80306D14(MHchar* model, u8 type)
     _EFT* eft = fn_80306E04(type, model->area_0x16);
 
     if (eft != NULL) {
-        fn_800FC0D4(&eft->rot_0x24, &model->rot_0x54);
+        eft_rot_vec_copy(&eft->rot_0x24, &model->rot_0x54);
         eft->source_0x30 = model;
     }
 }
@@ -490,7 +490,7 @@ extern "C" void fn_80306D6C(void* source, u8 type, nw4r::math::VEC3* pos, _CP_VE
 
     if (eft != NULL) {
         copyVec3(&eft->pos_0x18, pos);
-        fn_800FC0D4(&eft->rot_0x24, rot);
+        eft_rot_vec_copy(&eft->rot_0x24, rot);
         eft->source_0x30 = NULL;
         eft->source_0x30 = source;
         ((Eft042Work*)eft->work_0x38)->models[0].v_0x04.scale = scale;
@@ -751,7 +751,7 @@ extern "C" void fn_80307C54(_EFT* self)
     }
 
     copyVec3(&model->pos_0x04, &self->pos_0x18);
-    fn_800FC0D4((_CP_VECTOR*)&model->field_0x28, &self->rot_0x24);
+    eft_rot_vec_copy((_CP_VECTOR*)&model->field_0x28, &self->rot_0x24);
     model->field_0x2C += 16384;
     model->field_0x28 += ran_suu(0);
     model->setVisibility(1, false);
@@ -838,7 +838,7 @@ extern "C" void fn_80308D00(_EFT* self)
         work->v_0x0C.color.a -= self->demo_flag_0x08;
         get_joint_wpos_em(source, lbl_805DCB1C[self->type_0x02], &self->pos_0x18);
         copyVec3(&work->model->pos_0x04, &self->pos_0x18);
-        fn_800FC0D4(&work->model->rot_0x54, (_CP_VECTOR*)&source->field_0x1BC);
+        eft_rot_vec_copy(&work->model->rot_0x54, (_CP_VECTOR*)&source->field_0x1BC);
         work->model->setMatColor(0, GX_COLOR0A0, work->v_0x0C.color, false);
         work->model->move(0);
         fn_800F93D8(self, (void**)&work->model, 2, work->count, NULL);

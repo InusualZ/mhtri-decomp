@@ -14,7 +14,7 @@
  * the handlers above with a (variant, arg) pair.  It is called only from `Pl/fn_80258FCC.cpp`'s
  * `fn_8025DE38` (`b fn_8034EE18` at 0x8025DEB0), whose `jumptable_805C5648` selects one dispatcher
  * per `_PLW::field_0x002` value: 0 `fn_802829B4`, 1 `fn_802840DC`, 2 `fn_80286DF8`, **3
- * `fn_8034EE18`**, 4-6 `fn_80288848`, 7 `fn_8028B330`, 8 `fn_80334758`.  The other dispatchers sit in
+ * `fn_8034EE18`**, 4-6 `fn_80288848`, 7 `fn_8028B330`, 8 `Pl_act_frame_dispatch`.  The other dispatchers sit in
  * their own registered `Pl` units, so this is the class-3 band.
  *
  * MODULE AND NAME (evidence order).  1. No `__FILE__` string is reachable from the range.  2. The

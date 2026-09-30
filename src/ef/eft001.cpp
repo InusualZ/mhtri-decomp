@@ -239,7 +239,7 @@ extern "C" void fn_800FBBBC(_EFT* self)
 }
 
 /* Copies a 12-byte rotation triple. */
-extern "C" void fn_800FC0D4(_CP_VECTOR* dst, _CP_VECTOR* src)
+extern "C" void eft_rot_vec_copy(_CP_VECTOR* dst, _CP_VECTOR* src)
 {
     *dst = *src;
 }
@@ -419,7 +419,7 @@ extern "C" void fn_800FC0F0(nw4r::math::VEC3* pos, u32 type, u32 field_08, u32 a
     effect->field_0x03 = 1;
     effect->timer_0x0C = 0;
     copyVec3(&effect->pos_0x18, pos);
-    fn_800FC0D4(&effect->rot_0x24, rot);
+    eft_rot_vec_copy(&effect->rot_0x24, rot);
     effect->area_0x44 = (u8)area;
     work->value_0x18 = scale;
     effect->field_0x07 = 4;
@@ -468,7 +468,7 @@ extern "C" void fn_800FC7EC(_EFT* self)
     model = (MHchar*)work->effect_0x08;
     SetRootMtxTrans(work->effect_0x04, &self->pos_0x18);
     copyVec3(&model->pos_0x04, &self->pos_0x18);
-    fn_800FC0D4(&model->rot_0x54, &self->rot_0x24);
+    eft_rot_vec_copy(&model->rot_0x54, &self->rot_0x24);
 
     model->field_0x2C -= 3641;
     model->field_0x2C += ran_suu(0) & 0x1FFF;
