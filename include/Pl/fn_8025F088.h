@@ -16,6 +16,8 @@
  * to declare it `u32` while the owner defines it `void` - the `(10505) illegal overloading` this
  * include clears (docs/plan.md 6.5 rule 2). */
 #include "Pl/fn_80262940.h"
+#include "hud/Pl_net_send.h" /* the owner's leaf header (rule 2) */
+#include "fn_8004CAD8/item_se_ck.h" /* the owner's leaf header (rule 2) */
 
 struct _PLW;
 
@@ -43,7 +45,7 @@ void fn_802621B0(struct _PLW* self);
 s32 fn_80262688(struct _PLW* self);
 
 /* ---- Pl-band callees with no registered owner (`include/unsplit/Pl.h`'s home) ---- */
-/* `fn_802756F0` is declared by that band header itself (`include/unsplit/Pl.h`, `void`, `u8`/`u16`/`u32`,
+/* `pl_act_enter_raw` is declared by that band header itself (`include/unsplit/Pl.h`, `void`, `u8`/`u16`/`u32`,
  * the callee's own prologue's widths) - the `u32`/`s32`/`u16` copy that stood here clashed with it
  * ((10197) illegal function overloading) as soon as MAIN's landing put the declaration there (rule 2). */
 u32 fn_8024676C(void);
@@ -102,14 +104,12 @@ u32 pl_act_kind_get(struct _PLW* self);
 /* ---- library callees (the owners' headers do not declare these) ---- */
  /* 0x80041E40 - copies a 0xC-byte record and
     * returns `dst` (the owner's body); normalised with the declaration fold-in, 2026-09-27 */
-u32 fn_8004EB18(u16 item_id);
 u32 fn_80050A40(f32 a, f32 b, f32 c, f32 d);
 u32 fn_800524C0(f32 a, void* b, void* c, void* d, void* e);
 u32 fn_800E0914(void* p);
 u32 fn_803C482C(void);
-u32 fn_800F16D4(s32 value);
+u32 se_slot_req(s32 value);
 u32 fn_8033112C(void* p);
-u32 fn_80335CE8(struct _PLW* self, s32 a, u16 b);
 u32 fn_803BA9B0(void* p);
 
 /* ---- mangled callees at C++ scope, so the front-end reproduces the map's spelling (rule 9) ---- */

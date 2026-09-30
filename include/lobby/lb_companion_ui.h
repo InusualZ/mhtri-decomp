@@ -15,6 +15,9 @@
 #define MHTRI_LOBBY_LB_COMPANION_UI_H
 
 #include "types.h"
+#include "hud/Pl_net_can_send.h"
+#include "hud/eft_net_recv_state.h"
+#include "hud/NetMsgHeader.h" /* `NetMsgHeader::fill` writes each command packet's 4-byte header */
 #include "quest/arenatask.h" /* arena_other_player_eq_set: this band's act 25 calls it (rule 2) */
 #include "stage/shell.h" /* ShellSerialEntry, serial_find, serial_state_set_word (rule 2) */
 
@@ -463,16 +466,6 @@ extern u16 lbl_805E728C[];         /* .data */
 
 /* The unsplit plain-C callees.  A `fn_XXXXXXXX` stem is the map's own placeholder, so these take C
  * linkage; each is declared with the argument count and widths the target's call site shows. */
-void fn_80334A34(void* cmd, u8 a, u32 cls, u8 sub);
-s32 fn_80334A4C(u8 index);
-void fn_80337E78(void* entry, LbActReq* req);
-void fn_80337FB8(u32 entry, LbActReq* req);
-void fn_803380E4(u32 entry, LbActReq* req);
-void fn_803381E0(u32 entry, LbActReq* req);
-void fn_803382E8(u32 entry, LbActReq* req, u8 index);
-void fn_80338434(u32 entry, LbActReq* req);
-void fn_803384D8(u32 entry, LbActReq* req);
-void fn_80338600(u32 entry, LbActReq* req);
 void* fn_803438E4(u8 a, u8 b);
 void* fn_80343B74(u8 a, u8 b, u8 c);
 s32 fn_80343B44(void* entry);

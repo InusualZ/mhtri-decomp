@@ -121,7 +121,7 @@
 #include "sound/fn_800DD1F0.h" /* map_se_req (the map SE the same state fires) */
 #include "unsplit/Pl.h"        /* PlSlotGate lbl_806BB7A0 (the family's timing block) */
 #include "ef/fn_800CDB2C.h"    /* ran_suu (the family's frame randomiser) */
-#include "ef/eft001.h"         /* fn_800FC0D4 (the rotation copy) */
+#include "ef/eft001.h"         /* eft_rot_vec_copy (the rotation copy) */
 #include "g3d/g3d_calcworld.h"  /* addVec3To (the vector add) */
 
 /* ---------------------------------------------------------------------------------------------------
@@ -293,8 +293,8 @@ extern "C" void eft053_shell_pos_project(_PLW* plw, VEC3* out)
 
     MTX34_ctor(&mtx);
     setVector3(out, lbl_8079B740, lbl_8079B740, lbl_8079B740);
-    fn_800FC0D4(&rot, (_CP_VECTOR*)&plw->param_0x54); /* +0x54 is the actor's 3-word rotation */
-    a = plw->shell_ang_0x583;
+    eft_rot_vec_copy(&rot, (_CP_VECTOR*)&plw->param_0x54); /* +0x54 is the actor's 3-word rotation */
+    a = (s8)plw->shell_ang_0x583;
     if (a >= 0) {
         t = lbl_8079B750 * (f32)a;
         t = t * lbl_8079B74C;

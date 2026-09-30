@@ -204,7 +204,7 @@ void em_hit_window_set_default(struct _ENEMY_WORK* self, u32 a, u32 b);
 /* enemy/fn_8012BDF4.cpp (0x8012BDF4..0x8012E968) */
 void fn_8012B380(struct _ENEMY_WORK* self, u32 a, u32 b);
 void em_busy_set(struct _ENEMY_WORK* self);
-u32 fn_8012D1A0(struct _ENEMY_WORK* self);
+u32 em_busy_ck(struct _ENEMY_WORK* self);
 u32 fn_8012D23C(struct _ENEMY_WORK* self, u32 a, u8 b);
 u8 fn_8012D3E0(struct _ENEMY_WORK* self, u32 a);
 
@@ -1106,7 +1106,7 @@ extern "C" void fn_801D9CE4(struct _ENEMY_WORK* self) {
             shell_set_func_ptr->method_0x2C(self, 5, 0x21, &sp14, lbl_807994F8, self->field_0xAEA,
                                            shell_set_func_ptr);
         }
-        if ((em_frame_check(self, 1, lbl_807995FC, lbl_807994FC) == 1) && (fn_8012D1A0(self) == 1)) {
+        if ((em_frame_check(self, 1, lbl_807995FC, lbl_807994FC) == 1) && (em_busy_ck(self) == 1)) {
             if (fn_8012D3E0(self, 0) != 0xFF) {
                 fn_8012B380(self, 1, 2);
                 em_state_set(self, 8, 0);
@@ -1338,7 +1338,7 @@ extern "C" void fn_801DA514(struct _ENEMY_WORK* self) {
         if (temp_r0 < 0) {
             self->timer_0x020 = 0;
         }
-        if (fn_8012D1A0(self) == 1) {
+        if (em_busy_ck(self) == 1) {
             if (fn_801DA410(self, self->field_0x382) == 1) {
                 if (fn_8012D23C(self, 1, self->field_0x382) == 1) {
                     self->field_0x1E7 = 5;
@@ -1384,7 +1384,7 @@ extern "C" void fn_801DA7B4(struct _ENEMY_WORK* self) {
         em_mot_set_ck(self, 0x35, 4, 0);
         return;
     case 1:
-        if (fn_8012D1A0(self) == 1) {
+        if (em_busy_ck(self) == 1) {
             if ((fn_8012D23C(self, 1, self->field_0x382) == 1) &&
                 (fn_801DA410(self, self->field_0x382) == 1)) {
                 temp_r0 = self->field_0x1E7 - 1;
@@ -1444,7 +1444,7 @@ extern "C" void fn_801DA8DC(struct _ENEMY_WORK* self, u8 arg1) {
                 self->state_0x006 = self->state_0x006 + 1;
                 em_mot_set(self, 0x35, 4, 0);
             case 1:
-                if (fn_8012D1A0(self) == 1) {
+                if (em_busy_ck(self) == 1) {
                     if ((fn_8012D23C(self, 1, self->field_0x382) == 1) &&
                         (fn_801DA410(self, self->field_0x382) == 1)) {
                         em_state_set(self, 9, 0);
@@ -1635,7 +1635,7 @@ extern "C" void fn_801DB1C8(struct _ENEMY_WORK* self) {
             shell_set_func_ptr->method_0x2C(self, 5, 0x21, &sp14, lbl_807994F8, self->field_0xAEA,
                                            shell_set_func_ptr);
         }
-        if ((em_frame_check(self, 1, lbl_807995FC, lbl_807994FC) == 1) && (fn_8012D1A0(self) == 1)) {
+        if ((em_frame_check(self, 1, lbl_807995FC, lbl_807994FC) == 1) && (em_busy_ck(self) == 1)) {
             if (fn_801E0058(self, 0) == 1) {
                 em_state_set(self, 0xD, 3);
                 return;
@@ -1683,7 +1683,7 @@ extern "C" void fn_801DB3F8(struct _ENEMY_WORK* self) {
         }
         return;
     case 2:
-        if (fn_8012D1A0(self) == 1) {
+        if (em_busy_ck(self) == 1) {
             if (fn_801E0058(self, 1) == 1) {
                 em_state_set(self, 0xD, 4);
                 return;

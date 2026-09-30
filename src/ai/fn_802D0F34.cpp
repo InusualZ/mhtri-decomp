@@ -378,7 +378,7 @@ void fn_802D1954(struct _AINPC_W* self)
             self->field_0x486 = 0x5A;
         }
         self->area = plw->area_0x16;
-        fn_800FC0D4(&self->vec_0x190, (_CP_VECTOR*)&plw->param_0x54);
+        eft_rot_vec_copy(&self->vec_0x190, (_CP_VECTOR*)&plw->param_0x54);
         setVector3(&offset, lbl_8079A7AC, lbl_8079A670, lbl_8079A7B0);
         rotVecY(&offset, self->vec_0x190.y);
         addVec3(&position, &plw->vec_0x03C, &offset);

@@ -465,7 +465,7 @@ void eft019_set_vec(nw4r::math::VEC3* pos, _CP_VECTOR* rot, u8 area, u8 type, f3
         work = (_EFT019_WORK*)effect->work_0x38;
         work->scale_a_0x44 = scale;
         work->scale_b_0x48 = scale;
-        fn_800FC0D4(&effect->rot_0x24, rot);
+        eft_rot_vec_copy(&effect->rot_0x24, rot);
     }
 }
 

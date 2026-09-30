@@ -688,23 +688,23 @@ config.libs = [
             # and all 50 relocations agree on offset, type, addend and target section, so this
             # registration substitutes the object rather than leaving the range's original bytes.
             Object(Matching, "hud/move_work_update.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `80334568_fn_80334568.cpp` - the character-state network sync (`.text`
-            # 0x80334568..0x80338808, 77 functions / 17056 B; extab 0x8001677C..0x80016994 and
-            # extabindex 0x800359A0..0x80035CC4, one 8- and one 12-byte record per framed function).
-            # Its builders pack `_PLW`/`_ENEMY_WORK` state into small local messages and send them
-            # with `fn_8042C9C8` (the `NetworkSessionManagerPat` slot 0x128 send, guarded by
-            # `fn_8042CB9C()`); its receivers unpack them back.  No `__FILE__` string covers the range
-            # (its only data refs are `lbl_805E1ED0`, the three switch tables and one `.sdata2`
-            # constant) and the runtime dump answers `zz_` for all 77 addresses, so the file keeps the
-            # map stem (brief section 2, class 4).  Module `hud` is the flag-evidence choice:
-            # `cflags_hud` is the group whose `-opt nopeephole` (8 of the range's 75 target objects
-            # keep a redundant `clrlwi` before a narrowing store) and `-Cpp_exceptions on` (67 framed
-            # functions, 67 extab records) reproduce the target, and `hud` is also the nearest
-            # preceding registered unit (`hud/fn_80324F7C.c`).  The *content* reads as network rather
-            # than HUD, which the unit header records as this unit's first promotion candidate.
-            # Claims .text + extab + extabindex only.  The seam is unproven (brief section 8.3).
-            Object(NonMatching, "hud/fn_80334568.cpp"),
+            # Registered once, at its final home (docs/plan.md 12): the character-state network sync
+            # (`.text` 0x80334568..0x80338808, 77 functions / 17056 B; extab 0x8001677C..0x80016994 and
+            # extabindex 0x800359A0..0x80035CC4, one 8- and one 12-byte record per framed function;
+            # `.data` 0x805E2788..0x805E27D4, the two switch tables its bodies emit).  Its builders pack
+            # `_PLW`/`_ENEMY_WORK`/`EmcWork`/`EftSlot` state into small local messages and send them with
+            # `broadcastSessionCommand` (the `NetworkSessionManagerPat` slot 0x128 send, guarded by
+            # `isServerSelectState()`); its receivers unpack them back.  No `__FILE__` string covers the
+            # range and the runtime dump answers `zz_` for all 77 addresses; the file stem names the
+            # role (`net_char_sync`, a GUESS).  Module `hud` is the flag-evidence choice: `cflags_hud`
+            # is the group whose `-opt nopeephole` (keeps a redundant `clrlwi` before a narrowing
+            # store) and `-Cpp_exceptions on` (67 framed functions, 67 extab records) reproduce the
+            # target, and `hud` is also the nearest preceding registered unit (`hud/fn_80324F7C.c`).
+            # The *content* reads as network rather than HUD, which the unit header records as this
+            # unit's first promotion candidate.  Not `Matching`: our object also emits the 0x164-byte
+            # dispatcher switch table (`jumptable_805E0EA0`), which stays unclaimed (span-blocked by
+            # `enemy/em_pl_frame`), and an 8-byte `.sdata2` pool entry.  The seam is unproven.
+            Object(NonMatching, "hud/net_char_sync.cpp"),
         ],
     },
 

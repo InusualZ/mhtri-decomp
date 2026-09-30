@@ -112,7 +112,7 @@ void em020_hit_info_get(struct _ENEMY_WORK* self, struct Em020HitInfo* out)
         if (em_parts_damage_level_get(self, 5) >= 1) {
             out->levels_0x01 |= 8;
         }
-        out->angle_0x02 = self->field_0x83C;
+        out->angle_0x02 = self->parts_0x838[0].value_0x04;
         out->damage_0x04 = self->field_0x7A0;
     } else {
         out->hit_0x00 = 0;

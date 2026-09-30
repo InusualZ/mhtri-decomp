@@ -62,7 +62,7 @@
  * Naming note: the 34 symbols this file defines are named above, so the escape covers only the
  * names it REFERENCES - this range's own still-unwritten entries (`fn_803432B4`, `fn_80345A2C`) and
  * eight callees other units own (`fn_800F886C`, `fn_80125FF0`, `fn_8012A9E8`, `fn_8012D1A8`,
- * `fn_80143BF8`, `fn_803386C4`, `isServerSelectState`, `isReadyCountOne`).
+ * `fn_80143BF8`, `eft_net_send`, `isServerSelectState`, `isReadyCountOne`).
  *
  * SEAM (UNPROVEN - not settled; the merger round re-checked it from the DOL and left it that way).  The
  * range is an `attribute.py` `--max-bytes` cut, and the code band above it (0x8033F270..0x803432B4) is
@@ -120,10 +120,13 @@
  * (`eft_def_get`, `eft_def_flags`, `eft_def_handler`), no referrer outside the band - and it is contiguous
  * with the compiler-emitted table, so the two are one object's `.data` chunk.  Both sides now carry
  * `.data` 128 B and `.rela.data` 372 B, `.data` is 100 % fuzzy and `matched_data` is 128 of 1496 B.  The
- * remaining `.data`/`.sdata`/`.sdata2` words (0x8079B320..0x8079B360, `lbl_806BF0A0`, `lbl_806A54E0`)
- * are `extern`-declared by their map names and never defined (playbook 29); the EftDef records the table
- * points at (0x805E7FC0..0x805E9150, and `lbl_806BF2F8` in `.bss`) are still unclaimed and are named
- * only as the table's targets - claiming the 0x805E7F80..0x805E9168 band is a separate, unproven step.
+ * remaining `.sdata`/`.sdata2` words (0x8079B320..0x8079B360) and `lbl_806A54E0` are `extern`-declared by
+ * their map names and never defined (playbook 29).  The EftDef records the table points at are claimed:
+ * `.data` 0x805E7FC0-0x805E91E8 (4648 B, every byte the original's - only the table at 0x805E9168 is
+ * emitted, the records and the parameter blocks between them are claim-only) and `.bss`
+ * 0x806BF0A0-0x806BF310 (`lbl_806BF0A0` and `lbl_806BF2F8`, both defined and byte-for-byte the target's
+ * 624 B).  The gate's strict data row demanded the claim: this unit's object changed with the shared
+ * `EftSlot.h` edit of the `hud/net_char_sync` batch, which makes its sole-owned pairs refusable.
  *
  * STATUS / RESIDUALS (measured with `recompile.py --measure`, official report metric).  33 of the
  * range's 92 functions are reconstructed; 16 are byte-identical and every one but `eft_def_model_block` is
@@ -166,7 +169,7 @@
  * fn_80344E9C (0x288), fn_80345124 (0xEC), fn_803455F0 (0xC4), fn_803457A8 (0xEC), fn_80345894
  * (0x100), fn_80345994 (0x98), fn_80345A2C (0x40), fn_80345A6C (0x184), fn_80345BF0 (0xD0),
  * fn_80345CC0 (0xCC), fn_80345D8C (0x158), fn_80345EE4 (0x68), fn_80345F4C (0x124),
- * fn_80346070 (0xCC), fn_8034613C (0xB0), fn_803461EC (0x7C), fn_80346268 (0x4C),
+ * fn_80346070 (0xCC), fn_8034613C (0xB0), eft_slot_marks_set (0x7C), fn_80346268 (0x4C),
  * fn_803462B4 (0xAC), fn_80346360 (0x124), fn_80346484 (0x50), fn_803464D4 (0xDC),
  * fn_803465B0 (0x428), fn_803469D8 (0x54), fn_80346A2C (0x4), fn_80346A30 (0x5C),
  * fn_80346A8C (0x57C), fn_80347008 (0xDC), fn_803470E4 (0x124), fn_80347208 (0x50),
@@ -196,56 +199,12 @@
 #include "Network/network_pat_control.h" /* isReadyCountOne */
 #include "camera/camera.h" /* get_camera_pos / get_camera_direction / fn_802BE088 */
 #include "ef/fn_800CDB2C.h" /* my_player_no (`fn_800CF384` before the hud/move_work_update landing named it) */
-#include "ef/eft_slot.h" /* fn_803386C4 - its owner (`hud/fn_80334568.cpp`) owns the address, its header is unreachable here */
+#include "ef/EftSlot.h"
+#include "ef/eft_slot.h" /* eft_net_send - its owner (`hud/net_char_sync.cpp`) owns the address, its header is unreachable here */
 #include "enemy/ENEMY_WORK.h" /* the move-work records `eft_slot_spawn_targets`/`eft_slot_work_bind` walk */
 #include "enemy/fn_8012BDF4.h" /* em_work_die_ck, fn_8012D1A8 */
 #include "enemy/fn_801251D0.h" /* fn_80125FF0, fn_8012A9E8 */
 #include "enemy/enemy_control.h" /* fn_80143BF8 */
-
-/* The 0x3C-byte slot pool `lbl_806BF0A0` (10 entries) the family's spawn/reset pair walks: `key_0x00`
- * is the definition-table index (`eft_def_get`..`eft_def_handler`), `field_0x14` is stamped 255 by the
- * pool reset, and the +0x18 block holds the slot's per-instance state. size: 0x3C */
-struct EftSlot {
-    /* +0x00 */ u8 key_0x00;
-    /* +0x01 */ u8 key_0x01;
-    /* +0x02 */ u8 armed_0x02;  /* set by `eft_slot_work_bind` when the slot has no move work yet */
-    /* +0x03 */ s8 work_0x03;   /* the move-work index, -1 = none */
-    /* +0x04 */ u8 field_0x04;
-    /* +0x05 */ u8 field_0x05;
-    /* +0x06 */ u16 field_0x06;
-    /* +0x08 */ u8 field_0x08;  /* the state byte `eft_slot_state_set` writes */
-    /* +0x09 */ u8 field_0x09;  /* the pending state `eft_slot_state_request` records when the slot is idle */
-    /* +0x0A */ u8 field_0x0A;
-    /* +0x0B */ u8 field_0x0B;
-    /* +0x0C */ u8 field_0x0C;   /* the work index the previous tick settled on */
-    /* +0x0D */ u8 field_0x0D;
-    /* +0x0E */ u8 field_0x0E;
-    /* +0x0F */ u8 field_0x0F;  /* the mode `eft_slot_effect_key` selects the +0x14 byte on */
-    /* +0x10 */ u8 field_0x10;
-    /* +0x11 */ u8 field_0x11;
-    /* +0x12 */ u8 field_0x12;
-    /* +0x13 */ u8 field_0x13;   /* the map number `get_now_mapno` seeds */
-    /* +0x14 */ u8 field_0x14;   /* the "slot live" byte the reset stamps 255 */
-    /* +0x15 */ u8 field_0x15;
-    /* +0x16 */ u8 field_0x16;
-    /* +0x17 */ u8 field_0x17;
-    /* +0x18 */ u32 field_0x18;  /* `eft_slot_live_ck` gates on it being non-zero */
-    /* +0x1C */ s16 field_0x1C;
-    /* +0x1E */ u16 field_0x1E;
-    /* +0x20 */ u16 field_0x20;
-    /* +0x22 */ u16 field_0x22;
-    /* +0x24 */ f32 field_0x24;
-    /* +0x28 */ f32 field_0x28;
-    /* +0x2C */ f32 field_0x2C;
-    /* +0x30 */ f32 field_0x30;
-    /* +0x34 */ s16 field_0x34;
-    /* +0x36 */ u8 field_0x36;
-    /* +0x37 */ u8 field_0x37;
-    /* +0x38 */ u8 field_0x38;
-    /* +0x39 */ u8 field_0x39;
-    /* +0x3A */ u8 field_0x3A;
-    /* +0x3B */ u8 field_0x3B;
-};
 
 struct EftEntry;
 /* One record of the definition table `lbl_805E9168`, indexed by `EftSlot::key_0x00`.  `kind_0x00` is
@@ -303,7 +262,9 @@ struct EftTargetRecord {
 
 /* The 10-slot pool `eft_slot_pool_clear` clears, `eft_slot_find_free` scans for a free entry and `enemy_data_find`
  * looks a key up in. */
-extern "C" EftSlot lbl_806BF0A0[10];
+extern "C" {
+EftSlot lbl_806BF0A0[10]; /* .bss 0x806BF0A0, 0x258 B */
+}
 /* The definition table the slot's `key_0x00` indexes (36 B, 9 entries; index 0 is the "no definition"
  * slot).  This unit owns it: its only referrers are this range's own functions (`eft_def_get`,
  * `eft_def_flags`, `eft_def_handler` - 6 relocs, 2 per caller, and no object outside the band names it), it
@@ -311,7 +272,9 @@ extern "C" EftSlot lbl_806BF0A0[10];
  * 0x805E9168..0x805E91E8 so the object is the target object.  The values and their order are the DOL's
  * words at 0x805E9168..0x805E918C; the eight non-null entries point at the 0x18-byte `EftDef` records
  * the band's `.data` band holds (playbook 58: a unit's sole-referencer data is claimed, not extern'd). */
-extern "C" EftDef lbl_806BF2F8;   /* .bss  0x806BF2F8 */
+extern "C" {
+EftDef lbl_806BF2F8;   /* .bss  0x806BF2F8, 0x18 B */
+}
 extern "C" EftDef lbl_805E7FC0;   /* .data 0x805E7FC0 */
 extern "C" EftDef lbl_805E7FD8;   /* .data 0x805E7FD8 */
 extern "C" EftDef lbl_805E8800;   /* .data 0x805E8800 */
@@ -359,7 +322,7 @@ extern "C" u8 eft_slot_find_free(void);  /* first entry whose `key_0x00` is zero
 extern "C" EftDef* eft_def_get(EftSlot* slot);  /* `lbl_805E9168[slot->key_0x00]` */
 extern "C" u8 eft_def_flags(EftSlot* slot);  /* the definition's first byte; callers test bits 0, 1, 2 and 3 */
 extern "C" void (*eft_def_handler(EftSlot* slot, u8 kind))(_EFT*);  /* `def->handlers_0x14[kind]`, NULL when absent */
-extern "C" u8 eft_slot_armed_ck(EftSlot* slot);  /* returns the entry's `armed_0x02` byte */
+extern "C" u32 eft_slot_armed_ck(EftSlot* slot);  /* returns the entry's `armed_0x02` byte */
 extern "C" u32 eft_slot_live_ck(EftSlot* slot);  /* a definition flag bit set AND `field_0x18` (the live work) non-zero */
 extern "C" u32 eft_slot_persist_ck(EftSlot* slot);  /* the definition's bit 1 clear = the instance survives its work */
 extern "C" EftSlot* eft_slot_spawn(u8 key1, u8 key0, u8 index);  /* find-or-allocate, then seed the whole 0x3C block */
@@ -502,7 +465,7 @@ extern "C" void (*eft_def_handler(EftSlot* slot, u8 kind))(_EFT*) {
 }
 
 /* Returns the slot's own kind byte. */
-extern "C" u8 eft_slot_armed_ck(EftSlot* slot) {
+extern "C" u32 eft_slot_armed_ck(EftSlot* slot) {
     return slot->armed_0x02;
 }
 
@@ -663,14 +626,14 @@ extern "C" void eft_slot_work_update(EftSlot* slot) {
             if (found == 1) {
                 if ((s8)slot->work_0x03 == current) {
                     slot->armed_0x02 = 1;
-                    fn_803386C4(slot, 5, 0);
+                    eft_net_send(slot, 5, 0);
                     return;
                 }
-                fn_803386C4(slot, 7, slot->work_0x03);
+                eft_net_send(slot, 7, slot->work_0x03);
                 return;
             }
             if (fn_80143BF8() == 1) {
-                fn_803386C4(slot, 7, slot->work_0x03);
+                eft_net_send(slot, 7, slot->work_0x03);
             }
         } else {
             s16 timer = slot->field_0x06;
@@ -679,12 +642,12 @@ extern "C" void eft_slot_work_update(EftSlot* slot) {
                 slot->field_0x06 = timer + 1;
                 return;
             }
-            fn_803386C4(slot, 8, 0);
+            eft_net_send(slot, 8, 0);
         }
     } else {
         if (fn_80143BF8() == 1) {
             slot->armed_0x02 = 1;
-            fn_803386C4(slot, 5, 0);
+            eft_net_send(slot, 5, 0);
             return;
         }
         {
@@ -705,7 +668,7 @@ extern "C" void eft_slot_work_update(EftSlot* slot) {
                         slot->field_0x14 == record->field_0x016) {
                         slot->work_0x03 = (s8)next;
                         slot->armed_0x02 = 0;
-                        fn_803386C4(slot, 5, 0);
+                        eft_net_send(slot, 5, 0);
                         return;
                     }
                 }
@@ -864,7 +827,7 @@ extern "C" void eft_slot_kind_set(EftSlot* slot, u8 key, u8 force) {
             slot->field_0x34 = 0;
             fn_80345A2C(slot);
             if (force == 0 && (eft_def_flags(slot) & 4) == 0) {
-                fn_803386C4(slot, 3, 0);
+                eft_net_send(slot, 3, 0);
             }
         }
     }
@@ -914,7 +877,7 @@ extern "C" void eft_slot_state_request(EftSlot* slot, u8 state, _ENEMY_WORK* wor
         }
         eft_slot_state_set(slot, state, work, index);
         if (eft_slot_live_ck(slot) == 0 || (eft_def_flags(slot) & 4) == 0) {
-            fn_803386C4(slot, 1, 0);
+            eft_net_send(slot, 1, 0);
         }
     } else {
         slot->field_0x09 = state;
@@ -950,7 +913,7 @@ extern "C" void eft_slot_mode_set(EftSlot* slot, u8 mode, u8 value, u8 immediate
             slot->field_0x10 = value;
             slot->field_0x1C = 0;
             if ((eft_def_flags(slot) & 4) == 0) {
-                fn_803386C4(slot, 2, 0);
+                eft_net_send(slot, 2, 0);
             }
         }
     }

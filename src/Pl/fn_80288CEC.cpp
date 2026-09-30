@@ -244,7 +244,7 @@ void fn_8028BCF4(PlHandleSet* self) {
 }
 
 /* 0x8028BD54 - is the root work in mode 2? */
-u32 fn_8028BD54(void) {
+u32 root_mode2_ck(void) {
     _PL_ROOT* root = (_PL_ROOT*)get_move_work_adrs(0);
     if (root == 0) {
         return 0;

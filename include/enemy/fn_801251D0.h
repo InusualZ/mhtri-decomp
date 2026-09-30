@@ -13,11 +13,26 @@
 
 struct _ENEMY_WORK;
 
+/* The per-enemy part limits `em_get_part_limit` returns: only the field the net sync tests is named.
+ * size: 0x6 (approximate - the record is larger, its extent is not measured here) */
+struct EmPartLimit {
+    /* +0x0 */ u8 unused_0x0[0x4];
+    /* +0x4 */ s16 break_limit_0x04;   /* part break data exists when this is positive */
+};
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 struct _HIT_W;
+/* 0x801268B0 - the enemy's part limit record. */
+struct EmPartLimit* em_get_part_limit(struct _ENEMY_WORK* work);
+/* 0x80127158 - re-applies the special part selected by `selector`. */
+void em_special_part_apply(struct _ENEMY_WORK* work, u8 selector);
+/* 0x801285C0 - arms the action step; the net receiver passes the two bytes of the message and 4. */
+void em_act_step_arm(struct _ENEMY_WORK* work, u8 a, u8 b, u32 c);
+/* 0x8012555C - advances the running action to its next step; `mode` is 1 for a restart. */
+void em_act_advance(struct _ENEMY_WORK* work, u8 mode);
 /* 0x80129674 - registers the hit record `hit` (a shell's embedded record) with the enemy `self`. */
 void em_hit_buff_apply(struct _ENEMY_WORK* self, struct _HIT_W* hit);
 void fn_801252DC(struct _ENEMY_WORK* work);
@@ -37,7 +52,7 @@ void fn_801281EC(struct _ENEMY_WORK* work);
 void fn_801281F8(struct _ENEMY_WORK* work);
 /* 0x80128A8C / 0x8012933C - this unit's own definitions (the first is defined here, the second is an
  * address inside its range).  `fn_80128A8C` takes two **u8** arguments: its body narrows both with
- * `clrlwi r4,r4,24` / `clrlwi r5,r5,24` before the tail call to `fn_801285C0`.  This unit is built
+ * `clrlwi r4,r4,24` / `clrlwi r5,r5,24` before the tail call to `em_act_step_arm`.  This unit is built
  * with `#pragma peephole off`, and under it a u8 parameter keeps that target `clrlwi` (with the pass
  * on the pair is folded away, so the spelling is load-bearing - the same reason the unit's note gives
  * for `fn_80128590`/`fn_801285A0`).  The narrower spelling is the one `include/enemy/fn_80165FC8.h`
@@ -71,7 +86,7 @@ void em_target_pos_set(struct _ENEMY_WORK* work, VEC3* pos);
 void fn_8012987C(struct _ENEMY_WORK* work);
 void fn_8012A3B4(struct _ENEMY_WORK* work);
 void fn_8012A414(struct _ENEMY_WORK* work);
-void fn_8012A658(struct _ENEMY_WORK* work, s32 arg1);
+void em_area_change(struct _ENEMY_WORK* work, s32 arg1);
 void fn_8012B64C(struct _ENEMY_WORK* work);
 
 /* 0x801251D0 - the same two views as `em_se_tbl_play_alt` below: the C consumers pass the table in r3

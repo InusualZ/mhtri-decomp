@@ -1,6 +1,6 @@
 /* The player act-entry/parameter unit, `Pl` band, `.text` 0x80273B14-0x80276B58 (0x3044 B, 68
  * functions).  It sits between `Pl/pl_skill.cpp` (0x80270018-0x80273B14) and `Pl/pl_act.cpp`
- * (0x80276B58-0x8027D684) and is the band's act-selection front end: `fn_802756F0` resets the
+ * (0x80276B58-0x8027D684) and is the band's act-selection front end: `pl_act_enter_raw` resets the
  * player work and arms a new act from its flag word, `fn_80275C34` picks the act's entry motion,
  * and the `fn_80274988`/`fn_80274B5C`/`fn_80274E6C`/`fn_80275014`/`fn_802751B4` family sums the
  * weapon/skill bonus records the player's equipment slots point at.
@@ -13,6 +13,13 @@
  * neighbouring units' runs exactly, and every extabindex record's function address (0x80273B14 ..
  * 0x80276A3C) is one of this unit's - read out of the DOL.  The pooled `.sdata2` constants
  * (0x8079A000 / 0x8079A044 / 0x8079A080 / 0x8079A084) are declared, never defined (playbook 29).
+ * `.data` 0x805C5FEC-0x805C6100 (276 B: the two switch tables MWCC emits for `fn_80273B14` and
+ * `fn_80274B5C`, the two act-number lists and the pick table) is claimed and emitted; retail has a
+ * 4-byte zero word between the second table and the pick table (0x805C60A4) that this build does not
+ * reproduce - MWCC puts a zero-initialised variable in `.bss`/`.sdata` and 8-aligns the 88-byte table
+ * after it (measured: `.data` 280 B with the word forced in, 272 B without, target 276 B) - so the pick
+ * table sits 4 bytes early.  The gate's strict data row demanded the claim: this unit's object changed
+ * with the shared `include/pl.h` edit of the `hud/net_char_sync` batch.
  *
  * Residuals (measured per function; see the branch's outbox for the numbers):
  *   * `fn_802751B4` is the one row that does not reach 100 %.  Retail saves/restores `f31` through
@@ -22,7 +29,7 @@
  *   * `fn_80273B14` and `fn_80274B5C` both switch through a compiler-emitted `.data` jump table
  *     (0x805C5FEC, 17 entries, and 0x805C6068, 15 entries).  The case bodies are written in the
  *     order the table's addresses put them in, not in case-value order.
- *   * rule 2 residual, `fn_80335CE8`: the address is owned by `src/hud/fn_80334568.cpp`, whose
+ *   * rule 2 residual, `Pl_net_send`: the address is owned by `src/hud/net_char_sync.cpp`, whose
  *     prototype is three-parameter and right (that unit's definition is 100 % byte-identical), while
  *     retail's Pl call sites must keep the two-parameter view they were built with - so the
  *     declaration is local, with both measurements in the comment on it below.  The prototype family
@@ -45,6 +52,7 @@
  * against the body's own 1/2/0x10 masks) and is marked as one at the declaration.
  */
 #include "types.h"
+#include "hud/Pl_net_send.h"
 #include "pl.h"
 #include "mh3_pad/control.h"
 #include "Pl/pl_act.h"
@@ -68,18 +76,13 @@
  * above), so no band header owns it; `nw_resource.cpp` declares the same shape locally. */
 char* strcpy(char* dst, const char* src);
 
-/* 0x80335CE8 - the client-side act-message sender `fn_802756F0`'s tail calls (owner:
- * `src/hud/fn_80334568.cpp`, rule 2).  Retail's own build carried this one address under two
- * prototypes: the owner's definition takes a third `u16 param` and passes it on to the message
- * builders (its reconstruction is 100 % byte-identical against the target), while this band's call
- * sites pass two arguments - retail's `bl fn_80335CE8` is preceded by only `mr r3, r30` and
- * `li r4, X`, with no third register materialised (read off the target's instruction stream).  MWCC
- * rejects the two-argument call against the owner's three-parameter prototype ((10248) `function
- * call ... does not match`, measured on a probe), and supplying the third argument would emit the
- * missing `li r5, X` at all three call sites, so the faithful two-parameter view is the only shape
- * that reproduces retail's bytes.  `extern "C"` keeps the emitted name the map's, as the owner's
- * header does. */
-extern "C" void fn_80335CE8(struct _PLW* plw, s32 kind);
+/* 0x80335CE8 - the client-side act-message sender `pl_act_enter_raw`'s tail calls (owner:
+ * `src/hud/net_char_sync.cpp`, declared by its leaf header `hud/Pl_net_send.h`).  Retail's own build carried
+ * this one address under two prototypes: the owner's definition takes a third `u16 param` and passes it on to
+ * the message builders, while this band's call sites pass two arguments (`bl Pl_net_send` is preceded by only
+ * `mr r3, r30` and `li r4, X`).  Supplying the third argument would emit a `li r5, X` at all three call
+ * sites, so they call the owner's function through its two-parameter view. */
+typedef void (*PlNetSend2)(struct _PLW* plw, s32 kind);
 
 /* The three equipment-slot records `fn_8027ECAC`/`fn_8027ED18`/`fn_8027E344` hand back.  Only this
  * unit reads them, so they live here (rule 1); each offset/width is the one its readers narrow to.
@@ -518,6 +521,13 @@ void fn_80274584(s8 value)
     }
 }
 
+/* The act-number lists `fn_802745DC` (by armed slot) and `fn_80274624` (by act number) walk: the
+ * melee family, then the ranged family; slot 0 is unused and 0xFFFF ends a list.  size: 0x1C each */
+u16 pl_act_no_tbl_melee[14] = {0x0000, 0x000A, 0x0004, 0x0003, 0x0008, 0x0000, 0x0002,
+                               0x0001, 0x0009, 0x0005, 0x0006, 0x000B, 0x0007, 0xFFFF};
+u16 pl_act_no_tbl_ranged[14] = {0x000E, 0x0018, 0x0012, 0x0011, 0x0016, 0x000E, 0x0010,
+                                0x000F, 0x0017, 0x0013, 0x0014, 0x0019, 0x0015, 0xFFFF};
+
 /* Reads the armed slot's value table for the given kind. */
 u32 fn_802745DC(struct _PLW* plw, s16 kind)
 {
@@ -527,9 +537,9 @@ u32 fn_802745DC(struct _PLW* plw, s16 kind)
         return 0;
     }
     if (kind == 0) {
-        return lbl_805C6030[slot];
+        return pl_act_no_tbl_melee[slot];
     }
-    return lbl_805C604C[slot];
+    return pl_act_no_tbl_ranged[slot];
 }
 
 /* Finds the index the player's act number occupies in one of the two act tables. */
@@ -541,7 +551,7 @@ s32 fn_80274624(struct _PLW* plw)
     if (plw->field_0x00A != 0xB) {
         return 0;
     }
-    row = lbl_805C6030;
+    row = pl_act_no_tbl_melee;
     index = 1;
     while (row[1] != 0xFFFF) {
         switch (row[1]) {
@@ -564,7 +574,7 @@ s32 fn_80274624(struct _PLW* plw)
         index++;
         row += 1;
     }
-    row = lbl_805C604C;
+    row = pl_act_no_tbl_ranged;
     index = 1;
     while (row[1] != 0xFFFF) {
         switch (row[1]) {
@@ -591,7 +601,7 @@ s32 fn_80274624(struct _PLW* plw)
 }
 
 /* Latches the act's follow-up stage and arms its two-frame hold. */
-void pl_act_stage_latch_set(struct _PLW* plw, s8 stage)
+void pl_act_stage_latch_set(struct _PLW* plw, u8 stage)
 {
     if (Pl_master_ck(plw) != 0) {
         plw->field_0x01F = stage;
@@ -615,7 +625,7 @@ s32 fn_80274794(struct _PLW* plw)
 }
 
 /* The act's follow-up stage byte. */
-s8 fn_80274808(struct _PLW* plw)
+u8 pl_act_stage_get(struct _PLW* plw)
 {
     return plw->field_0x01F;
 }
@@ -1076,11 +1086,22 @@ void fn_8027552C(struct _PLW* plw, const char* src)
     strcpy((char*)plw->name_0xB05, src);
 }
 
+/* The 11 act/motion pick rows `Pl_decide_mot_get` walks: motion, parameter and the two control
+ * words each row is gated on. size: 0x58 */
+PlMotRow pl_mot_pick_tbl[11] = {
+    {0x02D1, 0x02BD, 0x2000, 0x2000}, {0x02D3, 0x02BF, 0x0800, 0x0800},
+    {0x02D5, 0x02C3, 0x0400, 0x0400}, {0x02D7, 0x02C4, 0x1000, 0x1000},
+    {0x02DA, 0x02C7, 0x2000, 0x2000}, {0x02D2, 0x02BE, 0x0800, 0x0800},
+    {0x02D4, 0x02C0, 0x0400, 0x0400}, {0x02D6, 0x02C5, 0x1000, 0x1000},
+    {0x02D8, 0x02C6, 0x0040, 0x4000}, {0x02D9, 0x02C1, 0x0080, 0x8000},
+    {0x02DB, 0x02C2, 0x0030, 0x0014},
+};
+
 /* Picks the motion/parameter pair the player's current control state maps to. */
 void Pl_decide_mot_get(u16* motion, u16* param)
 {
     u16 index = (u16)(ran_suu(1) % 5);
-    PlMotRow* row = (PlMotRow*)lbl_805C60A8;
+    PlMotRow* row = pl_mot_pick_tbl;
     s32 i;
 
     for (i = 0; i < 11; i++) {
@@ -1120,7 +1141,7 @@ void Pl_decide_mot_get(u16* motion, u16* param)
 }
 
 /* Resets every per-act field, then arms the new act's kind/number from its flag word `mask`. */
-void fn_802756F0(struct _PLW* plw, u8 kind, u16 no, u16 mask)
+void pl_act_enter_raw(struct _PLW* plw, u8 kind, u16 no, u16 mask)
 {
     u32 i;
 
@@ -1217,11 +1238,11 @@ void fn_802756F0(struct _PLW* plw, u8 kind, u16 no, u16 mask)
     plw->field_0x566 = 0;
     if (Pl_master_ck(plw) == 1U && (mask & 2) == 0) {
         if ((mask & 0x10) != 0) {
-            fn_80335CE8(plw, 6);
+            ((PlNetSend2)Pl_net_send)(plw, 6);
         } else if ((mask & 0x40) != 0) {
-            fn_80335CE8(plw, 9);
+            ((PlNetSend2)Pl_net_send)(plw, 9);
         } else {
-            fn_80335CE8(plw, 1);
+            ((PlNetSend2)Pl_net_send)(plw, 1);
         }
         plw->field_0x012 = 0xF;
     }
@@ -1231,7 +1252,7 @@ void fn_802756F0(struct _PLW* plw, u8 kind, u16 no, u16 mask)
 void pl_act_enter(struct _PLW* plw, s32 a, u16 b, u16 c)
 {
     plw->field_0x00E = 1;
-    fn_802756F0(plw, a, b, c);
+    pl_act_enter_raw(plw, a, b, c);
 }
 
 /* The "2" marker's act entry, with the +0x256 timer preset. */
@@ -1239,7 +1260,7 @@ void fn_80275ADC(struct _PLW* plw, s32 a, u16 b, u16 c)
 {
     plw->field_0x584 = 1;
     plw->field_0x256 = 0x1C2;
-    fn_802756F0(plw, a, b, c);
+    pl_act_enter_raw(plw, a, b, c);
 }
 
 /* Writes the player's act kind byte. */
@@ -1510,7 +1531,7 @@ s32 fn_8027633C(struct _PLW* plw, s16 delta, s8* out)
             return 1;
         }
         if (plw->field_0x00A != 6 && Pl_act_ck(plw, 2, 1) == 0) {
-            fn_802756F0(plw, 2, 1, 0);
+            pl_act_enter_raw(plw, 2, 1, 0);
         }
     }
     return 0;

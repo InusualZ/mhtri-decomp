@@ -250,7 +250,7 @@ extern "C" void em_act_prog_4(_ENEMY_WORK* self) {
 /* The enemy work's action-program channel 5: the two per-frame hooks run unconditionally, then
  * phase 0 arms motion 202, resets the +0x1CC sequence and the part 255 scale and opens two
  * `em_hit_window_set` hit windows; phase 1 sequences three `em_frame_check` windows, and once the motion
- * and `fn_8012D1A0` both report done it either lands the part 13/6 hit or ends the program. */
+ * and `em_busy_ck` both report done it either lands the part 13/6 hit or ends the program. */
 extern "C" void em_act_prog_5(_ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
 
@@ -282,7 +282,7 @@ extern "C" void em_act_prog_5(_ENEMY_WORK* self) {
                                                         lbl_8079BD08));
             ((ShellJobInjectFn)shell_set_func_ptr->method_0x2C)(self, 9, 1, &pos, lbl_8079BC94, self->field_0xAEA);
         }
-        if (em_mot_end_ck(self) == 1 && fn_8012D1A0(self) == 1) {
+        if (em_mot_end_ck(self) == 1 && em_busy_ck(self) == 1) {
             if (fn_80382E48(self, 0) == 1)
                 em_state_set(self, 13, 6);
             else
@@ -295,7 +295,7 @@ extern "C" void em_act_prog_5(_ENEMY_WORK* self) {
 /* The enemy work's action-program channel 6: the four phases drive the +0x36C target vector - phase
  * 0 measures the bearing to it, picks the +0x006 turn direction off the +0x1C0 heading, arms motion
  * 31 or 32 and builds the +0x310 offset vector and the +0x318 radius; phases 1 and 2 run the turn
- * and the `lbl_80570AE0` sequence, phase 3 hands the result on once `fn_8012D1A0` reports done. */
+ * and the `lbl_80570AE0` sequence, phase 3 hands the result on once `em_busy_ck` reports done. */
 extern "C" void em_act_prog_6(_ENEMY_WORK* self) {
     switch (self->state) {
     case 0: {
@@ -364,14 +364,14 @@ extern "C" void em_act_prog_6(_ENEMY_WORK* self) {
         case 0:
             if (em_approach_step(self, 0, 128) == 1) {
                 self->state_0x006++;
-                if (fn_8012D1A0(self) == 0)
+                if (em_busy_ck(self) == 0)
                     fn_8012F5C4(self, 20, 20, 0, 1);
             }
             break;
         case 1:
             break;
         }
-        if (fn_8012D1A0(self) == 1) {
+        if (em_busy_ck(self) == 1) {
             if (fn_80382E48(self, 1) == 1)
                 em_state_set(self, 13, 7);
             else

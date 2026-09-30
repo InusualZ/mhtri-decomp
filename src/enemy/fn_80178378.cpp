@@ -118,7 +118,7 @@
 #include "enemy.h"
 #include "unsplit/enemy.h"
 #include "enemy/fn_801251D0.h" /* em_se_tbl_play_alt/fn_80128030/fn_8012933C/fn_80129668/fn_80129724 */
-#include "enemy/fn_8012BDF4.h" /* em_busy_set/fn_8012D1A0 */
+#include "enemy/fn_8012BDF4.h" /* em_busy_set/em_busy_ck */
 #include "enemy/fn_80176C58.h" /* fn_801775C0 */
 #include "enemy/fn_80177890.h" /* fn_80177BA4 */
 #include "enemy/fn_80178128.h" /* fn_8017827C (the master dispatcher's case 2) */
@@ -788,7 +788,7 @@ extern "C" void fn_8017DE8C(_ENEMY_WORK* self) {
             fn_80136D4C(self, lbl_80797B70);
             em_turn_to_target(self, 0x80);
         }
-        if (em_mot_end_ck(self) == 1 && fn_8012D1A0(self) == 1) {
+        if (em_mot_end_ck(self) == 1 && em_busy_ck(self) == 1) {
             if (fn_80182430(self, 0) == 1) {
                 em_state_set(self, 0xD, 3);
             } else {

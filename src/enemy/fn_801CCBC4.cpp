@@ -210,7 +210,7 @@ void em_hit_window_clear(struct _ENEMY_WORK* self, u32 a);
 void fn_8012B380(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 void CancelFade(struct _ENEMY_WORK* self);
 void em_busy_set(struct _ENEMY_WORK* self);
-u32 fn_8012D1A0(struct _ENEMY_WORK* self);
+u32 em_busy_ck(struct _ENEMY_WORK* self);
 
 /* enemy/fn_8012E968.cpp (0x8012E968..0x8012EC74) */
 u32 fn_8012EC3C(struct _ENEMY_WORK* self);
@@ -864,7 +864,7 @@ void fn_801CD944(struct _ENEMY_WORK* self) {
                 self->state++;
                 em_move_mode_set(self, 3);
                 em_mot_set(self, 0x1D, 6, 0);
-            } else if (fn_8012D1A0(self) == 1) {
+            } else if (em_busy_ck(self) == 1) {
                 em_action_finish_fall(self);
             }
         }

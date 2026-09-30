@@ -76,7 +76,7 @@
  *   0x8011E6E4 fn_8011E6E4 0x08 100.0   step the gauge by the data record's ratio
  *   0x8011E6EC fn_8011E6EC 0x74 100.0   step the gauge every `period` system ticks
  *   0x8011E760 fn_8011E760 0x78 100.0   force the gauge to a value, clamped
- *   0x8011E7D8 fn_8011E7D8 0x1C 100.0   accumulate one part's damage level
+ *   0x8011E7D8 em_parts_damage_add 0x1C 100.0   accumulate one part's damage level
  *   0x8011E9DC em_parts_damage_level_get 0x14 100.0  one part's damage level (the map's one real name)
  *   0x8011F230 fn_8011F230 0x10 100.0   OR a mask into `mask_0x80E`
  * Measured (official `report generate` metric): matched bytes 2288.4 of 32136 = 7.12 %.
@@ -120,17 +120,17 @@
  * The remaining 75 functions are unwritten and keep their original bytes in the target object; the
  * follow-up queue, in address order, is:
  *   fn_8011DA24 0x150, fn_8011DB74 0x2B8, fn_8011DE5C 0x2DC, fn_8011E138 0x240, fn_8011E3A8 0x174,
- *   fn_8011E898 0x1C, fn_8011E8B4 0xAC, fn_8011E960 0x7C, fn_8011E9F0 0x14, fn_8011EA04 0x8C,
- *   fn_8011EA90 0x2A8, fn_8011ED38 0x14C, fn_8011EE84 0xA0, fn_8011EF24 0x98, fn_8011EFBC 0x190,
+ *   fn_8011E898 0x1C, fn_8011E8B4 0xAC, fn_8011E960 0x7C, em_parts_state_get 0x14, em_parts_break 0x8C,
+ *   em_parts_refresh 0x2A8, fn_8011ED38 0x14C, fn_8011EE84 0xA0, fn_8011EF24 0x98, fn_8011EFBC 0x190,
  *   fn_8011F14C 0x20, fn_8011F16C 0xC4, fn_8011F240 0x1E0, fn_8011F420 0xB0, fn_8011F4D0 0x50,
  *   fn_8011F520 0x50, fn_8011F570 0x50, fn_8011F5C0 0x94, fn_8011F654 0xB44, fn_80120198 0x2FC,
  *   fn_80120494 0x18, fn_801204AC 0x8, fn_801204B4 0x3C, fn_801204F0 0x40, fn_80120530 0x198,
- *   fn_801206C8 0x4BC, fn_80120B84 0x27C, fn_80120E00 0x3D4, fn_801211D4 0x3D4, fn_801215A8 0x3D4,
+ *   em_event_settle 0x4BC, fn_80120B84 0x27C, fn_80120E00 0x3D4, fn_801211D4 0x3D4, fn_801215A8 0x3D4,
  *   fn_8012197C 0xDC, fn_80121A58 0xFC, fn_80121B54 0x40, fn_80121B94 0x1BC, fn_80121D50 0x1BC,
  *   fn_80121F0C 0x98, fn_80121FA4 0x204, fn_801221A8 0x60, fn_80122208 0x170, fn_80122378 0xF8,
  *   fn_80122470 0xF8, fn_80122568 0x44, fn_801225AC 0x6C, fn_80122618 0x184, fn_8012279C 0x9C,
- *   fn_80122838 0x80, fn_801228B8 0x3AC, fn_80122C64 0x48, fn_80122CAC 0xFC, fn_80122DA8 0x2C,
- *   fn_80122DD4 0xB8, fn_80122E8C 0x2C, fn_80122EB8 0x60, fn_80122F18 0xAC, fn_80122FC4 0xFC,
+ *   fn_80122838 0x80, em_event_settle_kind17 0x3AC, fn_80122C64 0x48, fn_80122CAC 0xFC, em_event_settle_kind20 0x2C,
+ *   em_event_settle_kind21 0xB8, fn_80122E8C 0x2C, fn_80122EB8 0x60, fn_80122F18 0xAC, fn_80122FC4 0xFC,
  *   fn_801230C0 0x2C, fn_801230EC 0xA4, fn_80123190 0x24, fn_801231B4 0xE0, fn_80123294 0x134,
  *   fn_801233C8 0x178, fn_80123540 0x44, fn_80123584 0x14C, fn_801236D0 0xA80, fn_80124150 0x450,
  *   fn_801245A0 0x344, fn_801248E4 0xA8, fn_8012498C 0x2D0, fn_80124C5C 0x574.
@@ -636,7 +636,7 @@ extern "C" void fn_8011E760(_ENEMY_WORK* self, s32 value)
 }
 
 /* 0x8011E7D8 - accumulate one part's damage level. */
-extern "C" void fn_8011E7D8(_ENEMY_WORK* self, u8 part, u8 add)
+extern "C" void em_parts_damage_add(_ENEMY_WORK* self, u8 part, u8 add)
 {
     self->parts_0x838[part].damage_level += add;
 }

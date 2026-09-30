@@ -74,7 +74,7 @@ void fn_80170610(_ENEMY_WORK *self, u8 a) {
     if ((a & 0xFF) == 2) {
         fn_80176090(self, &b, &c);
         fn_80128A8C(self, b, c);
-        fn_80133BC0(self);
+        em_state_refresh(self);
     }
     if (self->field_0x009 == 0) {
         setVector3(&v, 0.0f, 0.0f, 45.0f);
@@ -104,12 +104,12 @@ void fn_80170758(_ENEMY_WORK *self, u8 a, u8 b) {
             self->field_0x32A = 0;
             break;
         case 0xC:
-            if (fn_8012D1A0(self) == 1) {
+            if (em_busy_ck(self) == 1) {
                 fn_801706B8(self);
             }
             break;
         case 0xD:
-            if (fn_8012D1A0(self) == 1) {
+            if (em_busy_ck(self) == 1) {
                 fn_801706B8(self);
             }
             break;

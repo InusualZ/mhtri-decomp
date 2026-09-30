@@ -28,6 +28,10 @@ extern "C" {
  * returns) with the retail `VEC3 v; VEC3_ctor(&v);` call-site idiom in front of it. */
 void note_pane_get_motion(struct NoteWork* self);
 
+/* 0x803A9B7C - the enemy spawn request a received enemy-control event forwards: the event's three values, the
+ * enemy id and a fixed 0 (GUESS: the role; the signature is the call site's). */
+void quest_enemy_spawn_req(u8 a, u16 id, u16 b, s32 c, u8 d);
+
 /* The range's quest-work accessors, moved here from `include/unsplit/menu.h` when this unit
  * registered over their addresses (docs/plan.md 6.5 rule 2).  Their bodies are still unwritten, so
  * they keep the map's stems; renaming them is the batch that writes them (rule 7's unblock is the

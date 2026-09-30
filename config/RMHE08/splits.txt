@@ -589,6 +589,7 @@ enemy/fn_8012BDF4.cpp:
 	extab       start:0x8000CBE4 end:0x8000CD2C
 	extabindex  start:0x800270C0 end:0x800272AC
 	.text       start:0x8012BDF4 end:0x8012E968
+	.data       start:0x805A0FF8 end:0x805A1078
 
 enemy/fn_8012E968.cpp:
 	extab       start:0x8000CD2C end:0x8000CD34
@@ -1021,6 +1022,7 @@ Pl/fn_80273B14.cpp:
 	extab       start:0x8001280C end:0x8001294C
 	extabindex  start:0x8002FA90 end:0x8002FC70
 	.text       start:0x80273B14 end:0x80276B58
+	.data       start:0x805C5FEC end:0x805C6100
 
 Pl/pl_act.cpp:
 	extab       start:0x8001294C end:0x80012B54
@@ -1252,11 +1254,11 @@ enemy/em_pl_frame.cpp:
 	extabindex  start:0x800357A8 end:0x800359A0
 	.text       start:0x8033041C end:0x80334568
 
-hud/fn_80334568.cpp:
+hud/net_char_sync.cpp:
 	extab       start:0x8001677C end:0x80016994
 	extabindex  start:0x800359A0 end:0x80035CC4
 	.text       start:0x80334568 end:0x80338808
-	.data       start:0x805E2788 end:0x805E27B0
+	.data       start:0x805E2788 end:0x805E27D4
 
 lobby/lb_companion_ui.cpp:
 	extab       start:0x80016994 end:0x80016CA4
@@ -1280,7 +1282,8 @@ ef/eft_slot.cpp:
 	extabindex  start:0x800362F4 end:0x8003663C
 	.text       start:0x803432B4 end:0x80349DD8
 	.ctors      start:0x8056F3A4 end:0x8056F3A8
-	.data       start:0x805E9168 end:0x805E91E8
+	.data       start:0x805E7FC0 end:0x805E91E8
+	.bss        start:0x806BF0A0 end:0x806BF310
 
 menu/menu_item_page.cpp:
 	extab       start:0x80016FE4 end:0x80017094

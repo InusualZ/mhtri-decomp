@@ -60,26 +60,12 @@
 #include "unsplit/sound.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "unsplit/enemy_pool.h" /* the band's unowned .data pools (rule 2) */
 
 /* --------------------------------------------------------------------------------------------- */
 /* shared pool symbols (another unit owns the bytes)                                              */
 /* --------------------------------------------------------------------------------------------- */
 
-extern const char lbl_805A1398[];
-extern const char lbl_805A13A4[];
-extern const char lbl_805A13C0[];
-extern const char lbl_805A13D4[];
-extern const char lbl_805A13FC[];
-extern const char lbl_805A1410[];
-extern const char lbl_805A1420[];
-extern const char lbl_805A143C[];
-extern const char lbl_805A1450[];
-extern const char lbl_805A146C[];
-extern const char lbl_805A1480[];
-extern const char lbl_805A14C4[];
-extern const char lbl_805A14D8[];
-extern const char lbl_805A151C[];
-extern const char* const lbl_805A1358[];
 extern const char lbl_807919F0[];
 extern const char lbl_807919F4[];
 extern const char lbl_807919F8[];
@@ -277,7 +263,7 @@ extern void em_target_pos_set(EnemyWork* work, s32 arg1);
 extern void fn_8012987C(EnemyWork* work);
 extern void fn_8012A3B4(EnemyWork* work);
 extern void fn_8012A414(EnemyWork* work);
-extern void fn_8012A658(EnemyWork* work, s32 arg1);
+extern void em_area_change(EnemyWork* work, s32 arg1);
 extern void fn_8012B64C(EnemyWork* work);
 extern void em_busy_set(EnemyWork* work);
 extern u32 fn_80133BCC(EnemyWork* work);
@@ -632,7 +618,7 @@ void fn_8013817C(EnemyWork* self) {
     } else {
         fn_80126278(data->field_0x08, &self->field_0x188);
         self->field_0x1C0 = data->field_0x0A;
-        fn_8012A658(self, 0);
+        em_area_change(self, 0);
     }
     fn_801408B4(self);
 }
@@ -703,7 +689,7 @@ void fn_8013823C(EnemyWork* self) {
     fn_801252DC(self);
     if (self->field_0x1F9 == 1 && self->field_0x1E1 != self->field_0x9F7) {
         if (self->field_0x380 == 8) {
-            if (fn_8012D1A0(self) == 1 && (self->field_0x99A & 1) == 0 && self->field_0x99B == 1 &&
+            if (em_busy_ck(self) == 1 && (self->field_0x99A & 1) == 0 && self->field_0x99B == 1 &&
                 self->field_0x382 == 0) {
                 if (calcVecDistXZ(&self->field_0x188, &self->field_0x36C) <=
                     self->field_0x9A4->records->field_0x04) {
@@ -740,7 +726,7 @@ void fn_8013823C(EnemyWork* self) {
                 fn_802B01AC(&v14, &vD4, self->field_0x9F7);
                 copyVec3(&self->field_0x188, &v14);
                 self->field_0x188.y = fn_802B0430(self->field_0x9F7);
-                fn_8012A658(self, 0);
+                em_area_change(self, 0);
             }
         }
     }
@@ -797,7 +783,7 @@ void fn_8013823C(EnemyWork* self) {
         }
     }
     if (flag == 1) {
-        fn_80133BC0(self);
+        em_state_refresh(self);
     } else if (fn_80133BCC(self) == 1 && self->field_0x46A == 0) {
         fn_8013ACC4(self);
     } else if ((self->flags_0x1C8 & 8) == 0) {
@@ -1078,7 +1064,7 @@ void fn_80139024(EnemyWork* self) {
         if (self->field_0x018 > 0) {
             return;
         }
-        if (fn_8012D1A0(self) != 1) {
+        if (em_busy_ck(self) != 1) {
             return;
         }
         if (self->field_0x1E7 != 0) {
@@ -1755,7 +1741,7 @@ void fn_8013AAC4(EnemyWork* work) {
 
 /* Tears down the work's user-data state, keeping the key table when it is still in use. */
 void fn_8013AACC(EnemyWork* work, u8 arg1) {
-    if (fn_8012D1A0(work) == 1) {
+    if (em_busy_ck(work) == 1) {
         work->field_0x1F9 = 0;
     }
     work->field_0x95F = 0;

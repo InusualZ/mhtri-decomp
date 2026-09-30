@@ -35,7 +35,7 @@
  * (`fn_802430E8`, `pl_act_clear_wait`, `fn_80245E20`, `fn_80246158`, `fn_802466C4`, `fn_802478A4`,
  * `fn_80247C2C`, `fn_80247EF0`, `fn_802488D4`).  The other 21 - `fn_80244E88` (0xE68 B, the
  * per-motion effect dispatcher `Pl/fn_80229ECC.cpp` calls with `&_PLW::field_0xAF4`) and
- * `fn_80245CF0`/`fn_80245E6C`/`fn_80245F40`/`fn_80245FD8`/`fn_802461F0`/`fn_802462FC`/`fn_80246654`/
+ * `fn_80245CF0`/`fn_80245E6C`/`fn_80245F40`/`fn_80245FD8`/`fn_802461F0`/`pl_hit_effect_spawn`/`fn_80246654`/
  * `fn_8024676C`/`fn_80246AB4`/`fn_80246B7C`/`fn_80246D7C`/`fn_802470E4`/`fn_80247534`/`fn_802476A0`/
  * `fn_8024794C`/`fn_80247CC4`/`fn_80247D74`/`fn_80248018`/`fn_802482C4`/`fn_802485C8` - are declared
  * here only as far as a written caller needs them, and build as undefined relocations; the inventory
@@ -59,10 +59,10 @@
  * range 0x8025F088-0x80262940) and carries the unregistered `GetItemData` declaration, so this unit
  * takes both from it rather than keeping copies (rule 2).  The header also declares
  * `copyVec3`, which this header no longer declares (its owner `mh3_pad.h` does).  The
- * `fn_80335CE8` macro still guards that header's own duplicate. */
-#define fn_80335CE8 mhtri_fn8025f088_h_fn_80335CE8
+ * `Pl_net_send` macro still guards that header's own duplicate. */
+#define Pl_net_send mhtri_fn8025f088_h_fn_80335CE8
 #include "Pl/fn_8025F088.h"
-#undef fn_80335CE8
+#undef Pl_net_send
 #include "Pl/fn_802693C4.h"
 #include "Pl/pl_act.h"
 #include "Pl/pl_master.h"
@@ -72,7 +72,7 @@
 /* The unit's own unwritten siblings, in address order: their callers below need the signature the
  * target's call sites set up.  Each is declared here (the owner's file, docs/plan.md 6.5 rule 2) and
  * is added with its body. */
-extern "C" void fn_802462FC(_PLW* self, u32 a, u16 b, u8 c, u8 d, u32 e);
+extern "C" void pl_hit_effect_spawn(_PLW* self, u32 a, u16 b, u8 c, u8 d, u32 e);
 extern "C" void fn_80247CC4(_PLW* self);
 
 extern "C" void fn_802430E8(_PLW* work, u8 part) {

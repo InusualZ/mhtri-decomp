@@ -47,6 +47,7 @@
 #include "unsplit/enemy.h"
 #include "enemy/fn_8012EC74.h" /* fn_80136D4C (its owner) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "unsplit/enemy_pool.h" /* the band's unowned .data pools (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------------
  * nw4r math types
@@ -136,7 +137,6 @@ extern SystemWork system_w;
 extern f32 lbl_80796EEC;
 extern f32 lbl_80796EF0;
 extern f32 lbl_80796EF4;
-extern f32 lbl_805A1CC8[];
 
 extern void em_busy_set();
 extern f32 fn_802B0430(u8 id);
@@ -166,9 +166,6 @@ extern f32 lbl_80796E20;
 extern f32 lbl_80796EA8;
 extern u32 lbl_8056F9A0[];
 extern u32 lbl_8056FA0C[];
-extern f32 lbl_805A1D88[];
-extern f32 lbl_805A1FF0[];
-extern f32 lbl_805A2028[];
 extern f32 lbl_80796E38;
 extern f32 lbl_80796E3C;
 extern f32 lbl_80796E4C;
@@ -192,13 +189,6 @@ extern void fn_80154C74(_ENEMY_WORK *self);
 extern void em_hit_window_set(_ENEMY_WORK *self, u32 a, u32 b, u32 c);
 extern void em_hit_window_clear(_ENEMY_WORK *self, u32 a);
 
-extern f32 lbl_805A1D18[];
-extern f32 lbl_805A1D40[];
-extern f32 lbl_805A1DD8[];
-extern f32 lbl_805A1E20[];
-extern f32 lbl_805A1E50[];
-extern f32 lbl_805A1E90[];
-extern f32 lbl_805A1F00[];
 extern f32 lbl_80796E24;
 extern f32 lbl_80796EA4;
 extern f32 lbl_80796F60;
@@ -292,9 +282,6 @@ extern f32 lbl_80796F8C;
 extern f32 lbl_80796F90;
 extern void fn_801545B8();
 
-extern f32 lbl_805A1F98[];
-extern f32 lbl_805A2078[];
-extern f32 lbl_805A20A0[];
 extern f32 lbl_80796F40;
 extern f32 lbl_80796F44;
 extern f32 lbl_80796F48;
@@ -565,7 +552,7 @@ void fn_8014A418(_ENEMY_WORK *self) {
                 em_mot_set(self, 0x1D, 6, 0);
                 return;
             }
-            if (fn_8012D1A0(self) == 1U) {
+            if (em_busy_ck(self) == 1U) {
                 em_action_finish_fall(self);
                 return;
             }
@@ -1850,7 +1837,7 @@ void fn_8014D504(_ENEMY_WORK *self) {
             if (em_frame_check__FP11_ENEMY_WORKUsff(self, 1, lbl_80796EFC, lbl_80796E1C) == 1U) {
                 self->sub_state = (u8) (self->sub_state + 1);
             case 1:                                 /* switch 2 */
-                if (fn_8012D1A0(self) == 1U) {
+                if (em_busy_ck(self) == 1U) {
                     if (fn_8012D3E0(self, 0) != 0xFF) {
                         fn_8012B380(self, 1, 2);
                         em_state_set(self, 8, 0);
@@ -2056,7 +2043,7 @@ void fn_8014EA84(_ENEMY_WORK *self) {
             if (em_mot_end_ck(self) == 1U) {
                 self->sub_state = (u8) (self->sub_state + 1);
             case 1:                                 /* switch 2 */
-                if (fn_8012D1A0(self) == 1U) {
+                if (em_busy_ck(self) == 1U) {
                     if ((fn_8012D23C(self, 1, self->field_0x382) == 1U) && (fn_8014E670(self, self->field_0x382) == 1U)) {
                         temp_r0_2 = self->field_0x1e7 - 1;
                         self->field_0x1e7 = temp_r0_2;
@@ -2124,7 +2111,7 @@ void fn_8014EC50(_ENEMY_WORK *self) {
                 self->sub_state = (u8) (self->sub_state + 1);
                 em_mot_set(self, 0xCA, 4, 0);
             case 1:                                 /* switch 3 */
-                if (fn_8012D1A0(self) == 1U) {
+                if (em_busy_ck(self) == 1U) {
                     if ((fn_8012D23C(self, 1, self->field_0x382) == 1U) && (fn_8014E670(self, self->field_0x382) == 1U)) {
                         em_state_set(self, 9, 0);
                         return;
@@ -2360,7 +2347,7 @@ void fn_8014FA34(_ENEMY_WORK *self) {
             if (em_frame_check__FP11_ENEMY_WORKUsff(self, 1, lbl_80796EFC, lbl_80796E1C) == 1U) {
                 self->sub_state = (u8) (self->sub_state + 1);
             case 1:                                 /* switch 2 */
-                if (fn_8012D1A0(self) == 1U) {
+                if (em_busy_ck(self) == 1U) {
                     if (fn_80154638(self, 0) == 1U) {
                         em_state_set(self, 0xD, 3);
                         return;
@@ -2667,7 +2654,7 @@ void fn_8014CEF8(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
             em_move_mode_set(self, 3);
             em_mot_set(self, 0x3F, 6, 0);
             fn_801303EC(self, lbl_80796F34);
-        } else if (((s32) self->field_0x20 > 0x96) && (fn_8012D1A0(self) == 1U)) {
+        } else if (((s32) self->field_0x20 > 0x96) && (em_busy_ck(self) == 1U)) {
             em_action_finish_fall(self);
         }
         if (self->v_0x310.z > lbl_80796E34) {
@@ -2850,7 +2837,7 @@ void fn_8014FC24(_ENEMY_WORK *self) {
         }
         return;
     case 2:
-        if (fn_8012D1A0(self) == 1U) {
+        if (em_busy_ck(self) == 1U) {
             if (fn_80154638(self, 1) == 1U) {
                 em_state_set(self, 0xD, 4);
                 return;
@@ -3308,7 +3295,7 @@ void fn_8014E774(_ENEMY_WORK *self) {
         if (temp_r0 < 0) {
             self->field_0x20 = 0;
         }
-        if (fn_8012D1A0(self) == 1U) {
+        if (em_busy_ck(self) == 1U) {
             if (fn_8014E670(self, self->field_0x382) == 1U) {
                 if (fn_8012D23C(self, 1, self->field_0x382) == 1U) {
                     self->field_0x1e7 = 3;

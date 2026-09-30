@@ -80,7 +80,7 @@ extern "C" void fn_800F886C(void* self);
 extern "C" void* fn_800F8788(u32 pool_id);
 extern "C" void fn_800F9DF4(void* self, u8 a, u8 b);
 struct _CP_VECTOR;
-extern "C" void fn_800FC0D4(_CP_VECTOR* dst, const _CP_VECTOR* src);
+extern "C" void eft_rot_vec_copy(_CP_VECTOR* dst, const _CP_VECTOR* src);
 
 /* ===================================================================================================
  * BLOCK A - the `em` (monster/effect) controller family, 0x80101FA4..0x80102994
@@ -564,7 +564,7 @@ struct Effect { /* size: 0x04 - lower bound, an approximation (opaque here) */
 }  // namespace ef
 }  // namespace nw4r
 
-/* The engine's three-word rotation vector the setters copy in; `fn_800FC0D4` fills it and
+/* The engine's three-word rotation vector the setters copy in; `eft_rot_vec_copy` fills it and
  * `rotLocalMatX/Y` take its x/y as the joint ids.  The SDK type is a float triple, but THIS unit reads
  * x/y as the joint ids `rotLocalMatX/Y` take (unsigned long) and passes the triple by pointer, so the
  * `f32` spelling changes the codegen (546 instructions in the object) even though the single-symbol
@@ -822,7 +822,7 @@ void eft007_set_vec(_PLW* self, u8 type, u8 colour, unsigned long id, nw4r::math
     effect->field_0x03 = 2;
     effect->timer_0x0C = 0;
     effect->flag_0x01 = 1;
-    fn_800FC0D4(&effect->rot_0x24, rot);
+    eft_rot_vec_copy(&effect->rot_0x24, rot);
     effect->area_0x44 = self->area_0x16;
     effect->colour_index_0x08 = colour;
     effect->rot_flag_0x07 = 1;
@@ -1297,7 +1297,7 @@ extern "C" void fn_8010383C(_EFT007* self, nw4r::math::MTX34* mtx)
  *     `== 7` test and `cmpwi` for the `== 0x24` test, exactly as retail does.
  *
  * Types and callees shared with BLOCK A/B (`Vec`, `_CP_VECTOR`, `_ENEMY_WORK`, `nw4r::ef::Effect`,
- * `fn_800F8788`, `fn_800F9DF4`, `fn_800FC0D4`, `vec_to_mh_vec3`, `push_eft_effect_heap_num`) are
+ * `fn_800F8788`, `fn_800F9DF4`, `eft_rot_vec_copy`, `vec_to_mh_vec3`, `push_eft_effect_heap_num`) are
  * declared here once - dedupe them when this block is merged with BLOCK A/B.  `nw4r::math::MTX34` is
  * not declared here: it comes from `include/nw4r/math.h`.
  * =================================================================================================== */
@@ -1309,7 +1309,7 @@ struct Effect;
 }  // namespace nw4r
 
 
-/* The engine's 3-word position/rotation triple that `fn_800FC0D4` copies (`Pl/pl_act.cpp` spells it
+/* The engine's 3-word position/rotation triple that `eft_rot_vec_copy` copies (`Pl/pl_act.cpp` spells it
  * the same way). */
 /* The enemy the emitter hangs off.  Only the bytes this block reads are named: the joint position the
  * emitter copies out of (its y component is added to the caller's height), the area number
@@ -1494,7 +1494,7 @@ extern "C" _EFT_EMITTER* fn_80103B60(_ENEMY_WORK* enemy, u8 part)
     }
 
     emitter->unused_0x10 = 0;
-    fn_800FC0D4(&emitter->pos, &enemy->pos_0x1BC);
+    eft_rot_vec_copy(&emitter->pos, &enemy->pos_0x1BC);
 
     fn_800F9DF4(emitter, 0, 0);
     get_joint_wmat_em(enemy, lbl_8059DCF8[emitter->type], &joint->mtx);

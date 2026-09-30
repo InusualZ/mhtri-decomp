@@ -62,7 +62,7 @@ void fn_800B54B4(const void* src, Vec3* out);
  * tail-calls.  It sits at the head of the next unclaimed range, so it has no registered owner yet. */
 struct _EFT;
 
-/* fn_803386C4 (0x803386C4) has an owner now - `hud/fn_80334568.cpp` registered the band that covers
+/* eft_net_send (0x803386C4) has an owner now - `hud/net_char_sync.cpp` registered the band that covers
  * it - so it does not belong in this fallback band (rule 2: the band is the home for a symbol no unit
  * owns).  Its call-site declaration is in `include/ef/eft_slot.h`, the calling unit's own header,
  * because the owner's header cannot be included from the ef band; that file records why. */

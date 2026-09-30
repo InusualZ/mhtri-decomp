@@ -35,7 +35,9 @@ void fn_8012C600(struct _ENEMY_WORK* work);
 void fn_8012C9AC(struct _ENEMY_WORK* work);
 s32 fn_8012D0B4(struct _ENEMY_WORK* enemy, void* move);
 s32 fn_8012D188(struct _ENEMY_WORK* enemy, struct _ENEMY_WORK* other);
-u32 fn_8012D1A0(struct _ENEMY_WORK* work);
+u32 em_busy_ck(struct _ENEMY_WORK* work);
+/* 0x8012E728 - ends the running action; `mode` is the caller's 0. */
+void em_act_end(struct _ENEMY_WORK* work, s32 mode);
 s32 fn_8012D1A8(u8 arg0);
 u32 fn_8012D23C();
 u8 fn_8012D3E0();

@@ -19,6 +19,7 @@ extern "C" {
 #endif
 
 s32 fn_8027AC18(void* arg);
+void pl_pos_blend_start(struct _PLW* self, s32 frames); /* 0x8027AE28 - starts the blend of the actor's position to `target_pos_0x090` over `frames` */
 u32 Pl_motion_input_ck(s32 arg);
 
 /* Declarations added with `Pl/fn_80262940.cpp` (the player main/control cluster 0x80262940-0x802693C4),
@@ -26,6 +27,9 @@ u32 Pl_motion_input_ck(s32 arg);
 void fn_80276B58(struct _PLW* self, s32 value);
 void Pl_act_set_step_table(struct _PLW* self, u32 table, s32 arg2);   /* the owner's own `void` definition */
 void fn_8027AC00(struct _PLW* self);
+/* 0x8027D5A4 - applies a signed charge delta to the actor's stored charge, scaled by the two charge skills, and
+ * clamps it to 0..100. */
+void pl_act_add_charge(struct _PLW* self, s32 delta);
 void pl_act_clear_flag5bb(struct _PLW* self);
 void fn_8027D4F0(struct _PLW* self);
 void fn_8027D510(struct _PLW* self);

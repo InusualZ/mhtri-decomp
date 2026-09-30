@@ -52,7 +52,7 @@
  * spelling was added to its owner's header in the same landing as this file because the header only
  * carried the mangled `em_area_ck__FP11_ENEMY_WORK` spelling before.  `fn_8012D8D0`, `fn_8012DB3C` and
  * `fn_8012E21C` are declared in their owner's header for the same reason.  The in-range helpers this
- * block calls (`em_get_rank`, `fn_80130134`, `fn_8013032C`, `fn_801322CC`, `fn_80132270`) are
+ * block calls (`em_get_rank`, `fn_80130134`, `fn_8013032C`, `em_status_ck`, `fn_80132270`) are
  * forward-declared here and are part of the follow-up queue.
  *
  * Flags.  The unit's command line is the `enemy` lib's (`configure.py`), and it carries the same
@@ -127,7 +127,7 @@ extern "C" f32 fn_8012EC74(_ENEMY_WORK* self);
 extern "C" u32 em_get_rank(_ENEMY_WORK* self);
 extern "C" u32 fn_80130134(_ENEMY_WORK* self, u32 flag);
 extern "C" f32 fn_8013032C(_ENEMY_WORK* self);
-extern "C" u32 fn_801322CC(_ENEMY_WORK* self, u32 flag);
+extern "C" u32 em_status_ck(_ENEMY_WORK* self, u32 flag);
 extern "C" u32 fn_80132270(_ENEMY_WORK* self);
 
 /* The other in-range mangled entry point this block calls (rule 9: the owner's real spelling). */
@@ -292,7 +292,7 @@ u32 em_sleep_ck(_ENEMY_WORK* self, u8 kind)
 {
     switch (kind) {
     case 0:
-        if (fn_801322CC(self, 1) == 1 || fn_80132270(self) == 1) return 1;
+        if (em_status_ck(self, 1) == 1 || fn_80132270(self) == 1) return 1;
         return 0;
     case 1:
         if (fn_8012E21C(self->action, self->state_sub) == 1 || fn_80132270(self) == 1) return 1;

@@ -99,9 +99,9 @@ void fn_801303FC();
 void fn_80130438(struct _ENEMY_WORK* work);
 void em_move_mode_set(struct _ENEMY_WORK *self, u32 a);
 void em_fall_start(struct _ENEMY_WORK *self);
-u32 fn_80130778(s32 kind);
+u32 em_status_set(struct _ENEMY_WORK* work, s32 kind);
 void fn_80130858(struct _ENEMY_WORK* enemy, s16 value);
-void fn_80130A10(struct _ENEMY_WORK* enemy, s32 value);
+void em_alt_mode_set(struct _ENEMY_WORK* enemy, s32 value);
 /* 0x80130CDC - r3 (`self`) and r4, which it sign-extends (`extsh r4,r4`) before tail-calling
  * 0x80130B6C; `enemy/fn_8014A1BC.c` calls it with two arguments, so the prototype is safe for C. */
 void fn_80130CDC(struct _ENEMY_WORK* self, u32 a);
@@ -120,12 +120,12 @@ void fn_801321B0(struct _ENEMY_WORK* work);
 void fn_80131EC0();
 void fn_801320A4(struct _ENEMY_WORK* work);
 u32 fn_80132184(void);
-u32 fn_801322CC(struct _ENEMY_WORK* enemy, s32 value);
+u32 em_status_ck(struct _ENEMY_WORK* enemy, s32 value);
 void fn_801324E0(struct _ENEMY_WORK* work);
 void fn_801333E0(struct _ENEMY_WORK* work);
 void fn_80133B5C(struct _ENEMY_WORK* work);
 void fn_80133BB4(struct _ENEMY_WORK* enemy);
-void fn_80133BC0(struct _ENEMY_WORK* work);
+void em_state_refresh(struct _ENEMY_WORK* work);
 void fn_80133C30(struct _ENEMY_WORK* work);
 void fn_80133C3C(struct _ENEMY_WORK *self);
 u32 em_turn_to_target(struct _ENEMY_WORK *self, u32 a);

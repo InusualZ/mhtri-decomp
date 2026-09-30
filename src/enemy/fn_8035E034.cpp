@@ -629,7 +629,7 @@ extern "C" void fn_8035F060(_ENEMY_WORK* self, u8 a)
             self->run_angle_0xB10 = (u16)self->pos_0x1BC.y;
             copyVec3((VEC3*)&self->run_0xB04[0], &self->pos);
         }
-        fn_80133BC0(self);
+        em_state_refresh(self);
         break;
     case 0:
         if (self->field_0x00A != 0) {

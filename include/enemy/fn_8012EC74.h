@@ -19,6 +19,23 @@ struct _ENEMY_WORK;
 extern "C" {
 #endif
 
+/* The status and action-flag helpers the enemy net receiver (`hud/net_char_sync.cpp`) drives. */
+u32 em_status_set(struct _ENEMY_WORK* work, s32 kind);
+void em_alt_mode_set(struct _ENEMY_WORK* work, s32 value);
+void em_level_raise(struct _ENEMY_WORK* work, s32 amount);
+u32 em_status_ck(struct _ENEMY_WORK* work, s32 value);
+void em_status_start(struct _ENEMY_WORK* work);
+void em_status_advance(struct _ENEMY_WORK* work);
+void em_net_flag_apply_0(struct _ENEMY_WORK* work);
+void em_net_flag_apply_1(struct _ENEMY_WORK* work);
+void em_net_flag_apply_2(struct _ENEMY_WORK* work);
+void em_net_flag_apply_4(struct _ENEMY_WORK* work);
+void em_net_flag_apply_5(struct _ENEMY_WORK* work);
+void em_net_flag_apply_7(struct _ENEMY_WORK* work);
+void em_net_flag_apply_3(struct _ENEMY_WORK* work);
+void em_net_flag_apply_6(struct _ENEMY_WORK* work);
+void em_state_refresh(struct _ENEMY_WORK* work);
+
 /* 0x8012ED68 / 0x8012EE80 - the team-wide damage window scans: whether a live record of `team` has taken at
  * most (100 - `kind`) % / at least `kind` % of its health.  GUESS names from the two ratios they compare. */
 u32 em_team_damage_under_ck(u8 team, u8 kind);
@@ -66,7 +83,7 @@ u8 em_get_rank(struct _ENEMY_WORK* self);
 void fn_80132154(struct _ENEMY_WORK* self);
 /* 0x801339AC - this unit's own definition, added by `enemy/fn_801B0010.cpp` (rule 2): r3 the work
  * record, the answer in r3 (compared against 1 by every call site). */
-u32 fn_801339AC(struct _ENEMY_WORK* self);
+u32 em_break_state_ck(struct _ENEMY_WORK* self);
 /* 0x80133DB0 - the angle stepper this unit owns.  MOVED here from `include/unsplit/enemy.h` (rule 2:
  * the owner is this unit, and the band header's `u16 fn_80133DB0()` was the no-prototype form).  The
  * signature is the owner's consumers': `enemy/fn_80137604.cpp` declares `(u16, u16, u16)` and

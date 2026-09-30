@@ -13,7 +13,7 @@
  * Naming note: the file's own 79 symbols are named above.  What the escape still covers is
  * precisely the names this file *references* in other units - the 40-odd unsplit lobby/runtime
  * callees (`fn_80334A34`, `broadcastSessionCommand`, `fn_800CF384`, ...) and the two neighbouring handlers
- * `fn_80337E78`..`fn_80338600` - which are not this lane's to rename; the dump answers `zz_` for
+ * `eft_net_recv_state`..`eft_net_recv_release` - which are not this lane's to rename; the dump answers `zz_` for
  * them too and no `__FILE__` string covers the region.  Removing the escape would put every one of
  * those occurrences into rule 7's `fn_` half, and this file is new to `main`, so every finding would
  * be an addition the gate's style-lint row refuses.
@@ -54,10 +54,10 @@
  *    edges with ascending owners (fn_8033F13C -> fn_8033F270).  That is the `candidate, never
  *    proof` class: a contiguous data run with ascending owners looks identical whether it is one
  *    object or two adjacent ones, which is why the DOL alone cannot settle this seam.
- * What does agree with the extent: the unwind pair (extab starts where `fn_803386C4`'s record ends,
+ * What does agree with the extent: the unwind pair (extab starts where `eft_net_send`'s record ends,
  * 0x8001698C + 8 = 0x80016994, and ends where the next function's begins, 0x80016CA4; extabindex
  * 0x80035CB8 + 0xC = 0x80035CC4 .. 0x8003615C) and the two bracketing registrations
- * (`hud/fn_80334568.cpp` ends at 0x80338808, `ef/eft050.cpp` starts at 0x8033F270).  The
+ * (`hud/net_char_sync.cpp` ends at 0x80338808, `ef/eft050.cpp` starts at 0x8033F270).  The
  * "game-root dispatcher calls both sides" argument is NOT evidence - a dispatcher calls handlers
  * from several TUs.  Registered whole; a re-cut needs evidence that does not exist yet.
  *
@@ -136,14 +136,14 @@ void lb_sub0e_send(u8 index, u16 id, u8 flag, u16 value);
 void lb_name_tail_copy(LbNameTail* dst, LbNameTail* src);
 LbCmdSub0F* lb_sub0f_init(LbCmdSub0F* cmd);
 
-/* The per-act entry point: gate the request against `fn_80334A4C`/`fn_800CF384`, look the entry up
+/* The per-act entry point: gate the request against `Pl_net_can_send`/`fn_800CF384`, look the entry up
  * from the request's two ids, and dispatch on its act byte to the matching handler.
- * Name: the band's per-act entry: gate (`fn_80334A4C`), entry lookup (`fn_803438E4`/`fn_80343B74`) and
+ * Name: the band's per-act entry: gate (`Pl_net_can_send`), entry lookup (`fn_803438E4`/`fn_80343B74`) and
  *   a switch on `act_0x03` 1..8 into the neighbouring band's handlers */
 void lb_act_dispatch(u8 index, LbActReq* req) {
     void* entry;
 
-    if (fn_80334A4C(index) != 0 && (s32)req->index_0x01 != fn_800CF384()) {
+    if (Pl_net_can_send() != 0 && (s32)req->index_0x01 != fn_800CF384()) {
         entry = fn_803438E4(req->sel_0x04.bytes_0x00.a_0x00, req->sel_0x04.bytes_0x00.b_0x01);
         if (entry == NULL) {
             entry = fn_80343B74(req->sel_0x04.bytes_0x00.b_0x01, req->sel_0x04.bytes_0x00.a_0x00,
@@ -152,28 +152,28 @@ void lb_act_dispatch(u8 index, LbActReq* req) {
         if (fn_80343B44(entry) != 0) {
             switch (req->act_0x03) {
             case 1:
-                fn_80337E78(entry, req);
+                eft_net_recv_state((EftSlot*)entry, (NetEftStateMsg*)req);
                 return;
             case 2:
-                fn_80337FB8((u32)entry, req);
+                eft_net_recv_step((EftSlot*)entry, (NetEftStepMsg*)req);
                 return;
             case 3:
-                fn_803380E4((u32)entry, req);
+                eft_net_recv_live((EftSlot*)entry, (NetEftLiveMsg*)req);
                 return;
             case 4:
-                fn_803381E0((u32)entry, req);
+                eft_net_recv_pos((EftSlot*)entry, (NetEftPosMsg*)req);
                 return;
             case 5:
-                fn_803382E8((u32)entry, req, fn_800CF384());
+                eft_net_recv_work((EftSlot*)entry, (NetEftWorkMsg*)req, fn_800CF384());
                 return;
             case 6:
-                fn_80338434((u32)entry, req);
+                eft_net_recv_mark((EftSlot*)entry, (NetEftMarkMsg*)req);
                 return;
             case 7:
-                fn_803384D8((u32)entry, req);
+                eft_net_recv_bind((EftSlot*)entry, (NetEftBindMsg*)req);
                 return;
             case 8:
-                fn_80338600((u32)entry, req);
+                eft_net_recv_release((EftSlot*)entry, (NetEftReleaseMsg*)req);
                 break;
             }
         }
@@ -187,7 +187,7 @@ void lb_entry_selected_send(LbActReq* req) {
     LbCmdSub05 cmd;
 
     if (isServerSelectState() != 0) {
-        fn_80334A34(&cmd, req->mask_0x08.byte_0x00, 0xD, 5);
+        ((NetMsgHeader*)&cmd)->fill(req->mask_0x08.byte_0x00, 0xD, 5);
         broadcastSessionCommand(&cmd, 4);
     }
 }
@@ -199,7 +199,7 @@ void lb_entry_notify_send(s32 index, u8 entry) {
     LbCmdSub05 cmd;
 
     if (isServerSelectState() != 0) {
-        fn_80334A34(&cmd, entry, 0xD, (u8)(index + 6));
+        ((NetMsgHeader*)&cmd)->fill(entry, 0xD, (u8)(index + 6));
         broadcastSessionCommand(&cmd, 4);
     }
 }
@@ -262,7 +262,7 @@ void lb_sub0a_send(u8 index, u8 value) {
     LbCmdSub0A cmd;
 
     if (isServerSelectState() != 0) {
-        fn_80334A34(&cmd, index, 0xD, 10);
+        ((NetMsgHeader*)&cmd)->fill(index, 0xD, 10);
         cmd.value_0x04 = value;
         broadcastSessionCommand(&cmd, 8);
     }
@@ -280,7 +280,7 @@ void lb_sub0b_send(u8 index, u8 value) {
     LbCmdSub0A cmd;
 
     if (isServerSelectState() != 0) {
-        fn_80334A34(&cmd, index, 0xD, 11);
+        ((NetMsgHeader*)&cmd)->fill(index, 0xD, 11);
         cmd.value_0x04 = value;
         broadcastSessionCommand(&cmd, 8);
     }
@@ -381,12 +381,12 @@ void lb_entry_handover_send(u8 kind, u8 index, u8 value) {
         companion = work->companion_0xDC;
         if (companion != NULL && isServerSelectState() != 0) {
             if (kind == 1) {
-                fn_80334A34(&cmd, index, 0xD, 1);
+                ((NetMsgHeader*)&cmd)->fill(index, 0xD, 1);
                 cmd.pad_index_0x04 = index;
                 cmd.flag_0x05 = 0;
                 cmd.value_0x07 = value;
             } else {
-                fn_80334A34(&cmd, index, 0xD, 12);
+                ((NetMsgHeader*)&cmd)->fill(index, 0xD, 12);
                 cmd.pad_index_0x04 = fn_800CF384();
                 cmd.entry_0x06 = index;
                 cmd.flag_0x05 = 1;
@@ -453,7 +453,7 @@ void lb_sub0d_send(u8 index, LbActReq* req, s8 flag) {
     LbCmdSub0D cmd;
 
     if (isServerSelectState() != 0) {
-        fn_80334A34(&cmd, index, 0xD, 0xD);
+        ((NetMsgHeader*)&cmd)->fill(index, 0xD, 0xD);
         cmd.value_0x04 = req->sel_0x04.bytes_0x00.b_0x01;
         cmd.index_0x05 = req->sel_0x04.bytes_0x00.c_0x02;
         cmd.flag_0x06 = flag;
@@ -494,7 +494,7 @@ void lb_sub0e_send(u8 index, u16 id, u8 flag, u16 value) {
     if ((s32)set == 0) {
         set = 1;
     }
-    fn_80334A34(&cmd, index, 0xD, 0xE);
+    ((NetMsgHeader*)&cmd)->fill(index, 0xD, 0xE);
     cmd.value_0x04 = set;
     cmd.flag_0x05 = 0;
     cmd.id_0x06 = id;
@@ -531,7 +531,7 @@ void lb_sub0f_send(u8 index, u8 value, void* text, u16 id, u8 flag, f32 scale) {
         fn_80142C58(value, text, id, flag, scale);
         return;
     }
-    fn_80334A34(&cmd, index, 0xD, 0xF);
+    ((NetMsgHeader*)&cmd)->fill(index, 0xD, 0xF);
     cmd.value_0x04 = value;
     lb_name_tail_copy(&cmd.text_0x0C, (LbNameTail*)text);
     cmd.id_0x06 = id;
@@ -579,7 +579,7 @@ void lb_sub10_send(u8 index, s8 value) {
         fn_80146C00(value, index);
         return;
     }
-    fn_80334A34(&cmd, index, 0xD, 0x10);
+    ((NetMsgHeader*)&cmd)->fill(index, 0xD, 0x10);
     cmd.value_0x04 = value;
     broadcastSessionCommand(&cmd, 5);
 }
@@ -596,7 +596,7 @@ void lb_sub11_send(s8 a, s8 b) {
     LbCmdSub11 cmd;
 
     if (isServerSelectState() != 0) {
-        fn_80334A34(&cmd, fn_800CF384(), 0xD, 0x11);
+        ((NetMsgHeader*)&cmd)->fill(fn_800CF384(), 0xD, 0x11);
         cmd.value_0x04 = a;
         cmd.value_0x05 = b;
         broadcastSessionCommand(&cmd, 6);
@@ -618,7 +618,7 @@ void lb_sub12_send(u8 value) {
         fn_802B45F4(value);
         return;
     }
-    fn_80334A34(&cmd, fn_800CF384(), 0xD, 0x12);
+    ((NetMsgHeader*)&cmd)->fill(fn_800CF384(), 0xD, 0x12);
     cmd.value_0x04 = value;
     broadcastSessionCommand(&cmd, 5);
 }
@@ -635,7 +635,7 @@ void lb_sub13_send(s16 first, s16 second, u8 value) {
     LbCmdSub13 cmd;
 
     if (isServerSelectState() != 0) {
-        fn_80334A34(&cmd, fn_800CF384(), 0xD, 0x13);
+        ((NetMsgHeader*)&cmd)->fill(fn_800CF384(), 0xD, 0x13);
         cmd.value_0x04 = value;
         cmd.first_0x08 = first;
         cmd.second_0x0A = second;
@@ -659,7 +659,7 @@ void lb_sub14_send(s8 value) {
     LbCmdSub10 cmd;
 
     if (isServerSelectState() != 0) {
-        fn_80334A34(&cmd, fn_800CF384(), 0xD, 0x14);
+        ((NetMsgHeader*)&cmd)->fill(fn_800CF384(), 0xD, 0x14);
         cmd.value_0x04 = value;
         broadcastSessionCommand(&cmd, 5);
     }
@@ -685,7 +685,7 @@ void lb_act_limit_set(u8 unused, LbActReq* req) {
 void lb_sub15_send(void) {
     LbCmdSub05 cmd;
 
-    fn_80334A34(&cmd, fn_800CF384(), 0xD, 0x15);
+    ((NetMsgHeader*)&cmd)->fill(fn_800CF384(), 0xD, 0x15);
     broadcastSessionCommand(&cmd, 4);
 }
 
@@ -709,7 +709,7 @@ void lb_companion_tick(void) {
 void lb_sub1c_send(void) {
     LbCmdSub05 cmd;
 
-    fn_80334A34(&cmd, fn_800CF384(), 0xD, 0x1C);
+    ((NetMsgHeader*)&cmd)->fill(fn_800CF384(), 0xD, 0x1C);
     broadcastSessionCommand(&cmd, 4);
 }
 
@@ -719,7 +719,7 @@ void lb_sub16_send(s32 value, s8 flag) {
     LbCmdSub16 cmd;
 
     if (isServerSelectState() != 0) {
-        fn_80334A34(&cmd, fn_800CF384(), 0xD, 0x16);
+        ((NetMsgHeader*)&cmd)->fill(fn_800CF384(), 0xD, 0x16);
         cmd.flag_0x08 = flag;
         cmd.value_0x04 = value;
         cmd.value_0x09 = 0;
@@ -743,7 +743,7 @@ void lb_act_slot_write(u8 unused, LbActReq* req) {
                 if (isReadyCountOne() != 0 && quest_sub_state_end_ck(1) == 0 &&
                     quest_element_pick_ck((QuestWork*)companion, req->mask_0x08.byte_0x00, 1) != 1 &&
                     (s8)companion->step_0x2C != 4) {
-                    fn_80334A34(&cmd, fn_800CF384(), 0xD, 0x16);
+                    ((NetMsgHeader*)&cmd)->fill(fn_800CF384(), 0xD, 0x16);
                     cmd.flag_0x08 = req->mask_0x08.byte_0x00;
                     cmd.value_0x04 = req->sel_0x04.word_0x00;
                     cmd.value_0x09 = 1;
@@ -763,7 +763,7 @@ void lb_act_slot_write(u8 unused, LbActReq* req) {
 void lb_sub17_send(s16 value, s8 first, s8 second, s8 third) {
     LbCmdSub17 cmd;
 
-    fn_80334A34(&cmd, fn_800CF384(), 0xD, 0x17);
+    ((NetMsgHeader*)&cmd)->fill(fn_800CF384(), 0xD, 0x17);
     cmd.value_0x04 = value;
     cmd.first_0x06 = first;
     cmd.second_0x07 = second;
@@ -801,7 +801,7 @@ void lb_act_best_keep(u8 unused, LbActReq* req) {
 void lb_sub18_send(void) {
     LbCmdSub05 cmd;
 
-    fn_80334A34(&cmd, fn_800CF384(), 0xD, 0x18);
+    ((NetMsgHeader*)&cmd)->fill(fn_800CF384(), 0xD, 0x18);
     broadcastSessionCommand(&cmd, 4);
 }
 
@@ -836,7 +836,7 @@ void lb_entry_start_send(LbCompanionWork* companion, s8 value, s32 arg, u8 flag)
             return;
         }
     }
-    fn_80334A34(&cmd, fn_800CF384(), 0xD, 0x19);
+    ((NetMsgHeader*)&cmd)->fill(fn_800CF384(), 0xD, 0x19);
     cmd.value_0x04 = arg;
     cmd.value_0x08 = companion->slots_0x94[0].value_0x00;
     cmd.value_0x0C = companion->slots_0x94[1].value_0x00;
@@ -879,7 +879,7 @@ void lb_act_entry_start(u8 unused, LbCmdSub19* req) {
         if (companion != NULL) {
             if (companion->index_0x6A68 == 0) {
                 if (isReadyCountOne() != 0 && companion->started_0x6A40 == 0) {
-                    fn_80334A34(&cmd, fn_800CF384(), 0xD, 0x19);
+                    ((NetMsgHeader*)&cmd)->fill(fn_800CF384(), 0xD, 0x19);
                     cmd.value_0x04 = req->value_0x04;
                     cmd.value_0x08 = req->value_0x08;
                     cmd.value_0x0C = req->value_0x0C;
@@ -923,7 +923,7 @@ void lb_sub1a_send(u8 index, s8 value) {
     LbCmdSub1A cmd;
 
     if (isServerSelectState() != 0) {
-        fn_80334A34(&cmd, index, 0xD, 0x1A);
+        ((NetMsgHeader*)&cmd)->fill(index, 0xD, 0x1A);
         cmd.value_0x04 = value;
         broadcastSessionCommand(&cmd, 5);
     }
@@ -947,7 +947,7 @@ void lb_area_change_send(u8 index) {
             work->flag_0x22E3 = 1;
         }
     } else {
-        fn_80334A34(&cmd, index, 0xD, 0x1B);
+        ((NetMsgHeader*)&cmd)->fill(index, 0xD, 0x1B);
         broadcastSessionCommand(&cmd, 4);
     }
 }
@@ -968,7 +968,7 @@ void lb_area_change_flag(void) {
 void lb_sub1d_send(u8 value, s8 flag) {
     LbCmdSub1D cmd;
 
-    fn_80334A34(&cmd, value, 0xD, 0x1D);
+    ((NetMsgHeader*)&cmd)->fill(value, 0xD, 0x1D);
     cmd.value_0x04 = value;
     cmd.value_0x05 = flag;
     broadcastSessionCommand(&cmd, 8);

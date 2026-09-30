@@ -138,7 +138,7 @@ extern "C" SeSlot* fn_800DBFAC(s32 kind, s32 id, nw4r::math::VEC3* pos);
 extern "C" SeSlot* fn_800D8E58(_se_w* work, s32 id);
 extern "C" u32 fn_800D8D8C(nw4r::math::VEC3* pos);
 extern "C" s32 fn_800DBB78(s32 bank, s32 id);
-extern "C" s32 fn_800F16D4(s32 value);
+extern "C" s32 se_slot_req(s32 value);
 extern "C" SeWork* get_move_work_adrs__FUc(u8 kind);
 
 /* The non-positional entry point; `sysSE_req__Fl` is the map's mangled spelling of it. */
@@ -334,7 +334,7 @@ extern "C" void fn_800DCC0C(void) { fn_800DBB78(28, 27); }
 
 extern "C" void fn_800DCC18(void) { fn_800DBB78(28, 35); }
 
-extern "C" void fn_800DCFC0(void) { fn_800F16D4(0); }
+extern "C" void fn_800DCFC0(void) { se_slot_req(0); }
 
 extern "C" void fn_800DCFE4(void) { sysSE_req(12); }
 
@@ -3202,7 +3202,7 @@ extern "C" void fn_800D7F54(void) {
 
 /* --- the code-driven handle helper ----------------------------------------------------------------- */
 
-extern "C" u32 fn_8004EB18(void);
+extern "C" u32 item_se_ck(void);
 
 /* Switches on the caller's sound code: a few codes are silent, two bump the global SE level, and the
  * rest open a per-frame voice whose rate is scaled like `fn_800DABF0`'s. */
@@ -3217,15 +3217,15 @@ extern "C" void fn_800DAADC(u16 code) {
         return;
     case 110:
     case 111:
-        fn_800F16D4(5);
+        se_slot_req(5);
         return;
     case 139:
         return;
     case 395:
         return;
     }
-    if (fn_8004EB18() == 1) {
-        fn_800F16D4(4);
+    if (item_se_ck() == 1) {
+        se_slot_req(4);
         return;
     }
     _se_w* se = work->se[1];

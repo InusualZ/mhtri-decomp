@@ -222,10 +222,7 @@ u32 fn_8027D8A0(struct _PLW* self, s32 a);
  * consumer) - the band must not declare a symbol a registered unit owns. */
 
 /* The `.data` tables the same unit reads. */
-extern const u16 lbl_805C6030[];  /* the act-id row table `fn_802745DC`/`fn_80274624` walk */
-extern const u16 lbl_805C604C[];  /* its sibling for the ranged family */
 extern const u16 lbl_805BF490[];  /* 4-byte {u16 id, u16 value} rows, `fn_80274B20` looks ids up */
-extern u8 lbl_805C60A8[];         /* the 11-row act/motion pick table `Pl_decide_mot_get` walks */
 extern u8 lbl_805C5F30[];         /* the melee act-name table rows `fn_80274918` picks */
 extern u8 lbl_805C5F50[];
 extern u8 lbl_805C5F70[];
@@ -243,7 +240,7 @@ extern const f32 lbl_8079A084;
  * `illegal function overloading` class (rule 2).  The owner's `u16` third parameter is what
  * retail's own callers narrow to (`pl_act_enter`/`fn_80275ADC` emit `clrlwi r6,r6,16`) and what
  * reproduces the callee's own `clrlwi` on the mask. */
-void fn_802756F0(struct _PLW* self, u8 kind, u16 no, u16 mask);
+void pl_act_enter_raw(struct _PLW* self, u8 kind, u16 no, u16 mask);
 
 /* The per-slot gate table at 0x806BB7A0 (`.bss`, 0x18 B = three 8-byte entries, the map's size).
  * size: 0x8 */

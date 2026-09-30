@@ -114,7 +114,7 @@ struct _AINPC_W {
     /* +0x176 */ u16 prev_motion_step;
     /* +0x178 */ nw4r::math::VEC3 pos_0x178;
     /* +0x184 */ nw4r::math::VEC3 pos_0x184;  /* the previous frame's position */
-    /* +0x190 */ _CP_VECTOR vec_0x190; /* the model rotation `fn_800FC0D4` copies out of the player
+    /* +0x190 */ _CP_VECTOR vec_0x190; /* the model rotation `eft_rot_vec_copy` copies out of the player
                                         * work; its y word is the model's facing angle */
     /* +0x19C */ f32 field_0x19C;      /* added to +0x188 before the move blend is applied */
     /* +0x1A0 */ f32 field_0x1A0;      /* the effect height offset */
