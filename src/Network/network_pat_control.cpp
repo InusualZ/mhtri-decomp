@@ -69,8 +69,8 @@ NetCtrlWk* net_ctrl_wk;
 void updateNetworkPatControl(void);
 void fn_8042C7FC(void);
 BOOL fn_8042C814(void);
-u8 fn_8042C844(void);
-s8 fn_8042C850(void);
+u8 net_selected_server_get(void);
+s8 net_occupied_slot_count(void);
 BOOL fn_8042C8B0(void);
 u8 fn_8042C8DC(void);
 void fn_8042C9C8(u32 a, u32 b);
@@ -107,7 +107,7 @@ BOOL fn_8042C814(void)
 /*
  * The currently selected server id.
  */
-u8 fn_8042C844(void)
+u8 net_selected_server_get(void)
 {
     return net_ctrl_wk->selected_server_0x06A;
 }
@@ -115,7 +115,7 @@ u8 fn_8042C844(void)
 /*
  * How many of the four server slots are occupied.
  */
-s8 fn_8042C850(void)
+s8 net_occupied_slot_count(void)
 {
     NetCtrlWk* work = net_ctrl_wk;
     s32 count = 0;

@@ -459,7 +459,7 @@ int main(void)
         if (lbl_807947A5 != 0 && system_w.unk2158 != 0) {
             system_w.unk2276();
         }
-        fn_800D8438();
+        sound_frame_entry();
         bgm_stop_all();
         fn_8043F290();
         if (lbl_807947A5 != 0) {

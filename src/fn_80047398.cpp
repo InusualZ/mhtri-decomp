@@ -466,8 +466,8 @@ extern "C" u32 fn_8004C004(const IdValue* table, s32 count)
     return free;
 }
 
-/* Copies one 4-byte `{id, value}` record. */
-extern "C" void fn_8004C4F0(u8* dst, const u8* src)
+/* Copies one 4-byte RGBA colour byte by byte. */
+extern "C" void color_rgba_copy(u8* dst, const u8* src)
 {
     dst[0] = src[0];
     dst[1] = src[1];

@@ -1637,9 +1637,9 @@ extern "C" void fn_802B58D4(void)
 {
     fn_802B5738((StageAreaObj*)lbl_806BB7E0);
     if (fn_80047058() != 0) {
-        fn_800CF394(1);
+        my_player_no_set(1);
         fn_802B5738((StageAreaObj*)(lbl_806BB7E0 + 0x4F8));
-        fn_800CF394(0);
+        my_player_no_set(0);
     }
 }
 
@@ -1651,8 +1651,8 @@ extern "C" void fn_802B592C(u8 index, s32 camera)
     s32 root;
 
     handle = ((nw4r::g3d::ScnRoot*)pRoot)->GetCamera(index);
-    fn_8004723C(&pos, &handle);
-    fn_80067E70(&root);
+    word_copy_return_dst(&pos, &handle);
+    camera_posture_info_ctor(&root);
     root = camera;
 }
 

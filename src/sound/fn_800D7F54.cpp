@@ -1984,7 +1984,7 @@ extern "C" u8 fn_800CF208(void);
 extern "C" {
 s32 my_player_no(void);
 }
-extern "C" void fn_800CF394(s32 value);
+extern "C" void my_player_no_set(s32 value);
 extern "C" u8 fn_802EED0C(SeMoveWork* work);
 extern "C" void fn_800532DC(Mtx34* dst, Mtx34* src);
 extern "C" void fn_800E8498(Mtx34* mtx, s32 index);
@@ -2044,19 +2044,19 @@ extern "C" void fn_800D80B8(void) {
         if (PlayMode_ck() == 2) {
             u8 idx = (u8)my_player_no();
 
-            fn_800CF394(0);
+            my_player_no_set(0);
             copyVec3(&self->field_0x004, &get_camera_pos());
             copyVec3(&self->field_0x010, &get_camera_direction());
             fn_800532DC(&self->field_0x29280, &get_current_view_mtx());
             fn_800E8498(&self->field_0x29280, 0);
 
-            fn_800CF394(1);
+            my_player_no_set(1);
             copyVec3(&self->field_0x01C, &get_camera_pos());
             copyVec3(&self->field_0x028, &get_camera_direction());
             fn_800532DC(&self->field_0x292B0, &get_current_view_mtx());
             fn_800E8498(&self->field_0x292B0, 1);
 
-            fn_800CF394((s8)idx);
+            my_player_no_set((s8)idx);
         } else {
             copyVec3(&self->field_0x004, &get_camera_pos());
             copyVec3(&self->field_0x010, &get_camera_direction());
@@ -2958,7 +2958,7 @@ extern "C" u32 event_demo_ck__Fv(void);
 extern "C" s32 get_fade_stat__Fl(s32 which);
 
 /* A one-line trampoline into the fade/sound-system helper. */
-extern "C" void fn_800D8438(void) {
+extern "C" void sound_frame_entry(void) {
     fn_800E8294();
 }
 

@@ -69,6 +69,7 @@
 #include "pl.h"
 #include "ai/ainpc.h"
 #include "unsplit/ai.h"
+#include "ai/fn_802D44F4.h"    /* the owner's own header (rule 2) */
 
 /* Retail keeps the unfused `clrlwi`+`slwi` / `clrlwi`+`cmpwi` forms (the peephole pass fuses them
  * into `clrlslwi` and a masked compare), so the unit is compiled with the pass off (playbook 39). */
@@ -117,7 +118,7 @@ void fn_800DCCF8(void* state, nw4r::math::VEC3* pos, s32 enable);
 /* The AI-NPC work record's own helpers, all inside this range and defined below. */
 s32 fn_802D77A0(u8 value);
 void fn_802D9544(void);
-void fn_802D9EB4(struct _AINPC_W* self);
+void fn_802D9EB4(void);
 s32 fn_802D77DC(u8 slot);
 void fn_802D9D30(struct _AINPC_W* self, s32 a, s32 b, s32 c, s32 d);
 void fn_802D4218(struct _AINPC_W* self);
@@ -724,10 +725,10 @@ s32 fn_802D9A50(struct _AINPC_W* self)
     return self->field_0x46C == 1;
 }
 
-/* 0x802D9EA4 - forwards to the reaction dispatcher. */
-void fn_802D9EA4(struct _AINPC_W* self)
+/* 0x802D9EA4 - forwards to the reaction dispatcher; the AI work pointer stays in the caller's r3. */
+void ai_npc_reaction_forward(void)
 {
-    fn_802D9EB4(self);
+    fn_802D9EB4();
 }
 
 /* 0x802D7804 - whether the AI NPC is close enough to the player to act on it. */

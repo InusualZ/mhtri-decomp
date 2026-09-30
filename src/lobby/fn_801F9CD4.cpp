@@ -131,8 +131,8 @@ typedef struct LbChgFileReq {
 extern "C" {
 s32 score_add_clamped(s32 delta, s32* value);
 void fn_80040DE8(u8 mode);
-s32 fn_80054FAC(void* dst, void* src);
-void* fn_80054FE8(void* out, u32 value);
+s32 res_file_assign(void* dst, void* src);
+void* res_file_ctor(void* out, u32 value);
 void fn_800D5CAC(void* rec);
 void fn_800E3358(u32 kind, u8 arg, void* str);
 void fn_800F6520(void);
@@ -322,7 +322,7 @@ void fn_801FB364(u8 index)
 {
     LbResRec dst;
 
-    fn_80054FE8(&dst, 0);
+    res_file_ctor(&dst, 0);
     {
         LbResId* ids = (LbResId*)lbl_80582B30;
         u32 name = ids[index + 1].b_0x04; /* the row's name pointer, a `u32` in the shared header */
@@ -331,7 +331,7 @@ void fn_801FB364(u8 index)
         if (res != 0) {
             u32 tmp;
 
-            fn_80054FAC(&dst, fn_80054FE8(&tmp, (u32)res->payload_0x44));
+            res_file_assign(&dst, res_file_ctor(&tmp, (u32)res->payload_0x44));
             fn_800E3358(0, 0, &dst);
         }
     }
@@ -341,7 +341,7 @@ void fn_801FB364(u8 index)
         if (res != 0) {
             u32 tmp;
 
-            fn_80054FAC(&dst, fn_80054FE8(&tmp, (u32)res->payload_0x44));
+            res_file_assign(&dst, res_file_ctor(&tmp, (u32)res->payload_0x44));
             fn_800E3358(3, 0, &dst);
         }
     }

@@ -272,12 +272,11 @@ void fn_800E3B8C(s32, u8, s32, s32, s32, void*, s32);
 void fn_800E0560(void*);
 void fn_800E0BE8(void*, s32);
 void fn_800E2228(void*, void*, void*, s32);
-void fn_80054FE8(void*, s32);
-void fn_80054FAC(void*, void*);
+void res_file_ctor(void*, s32);
+void res_file_assign(void*, void*);
 void fn_8007B878(void*, s32);
 void fn_8007BA08(void*, void*);
 extern s32 nwDelResource(s32);
-extern s32 push_res_mem(s32);
 extern s32 fn_800A4420(void*);
 extern void fn_800A8998(void*, u32);
 extern void* fn_800A5484(void*);
@@ -294,9 +293,6 @@ extern void* res_model_name_ptr;
  * `push_g3d_wk__FP9_g3d_work`), so they are declared at C++ scope, outside the extern "C" block
  * above (relocaudit). */
 struct _g3d_work;
-s32 nwAddResource(char* name, void* data);
-s32 pull_res_mem(char* path, u32 size, s32 mode);
-void* getResMemAdrs(s32 index);
 void* get_move_work_adrs(u8 index);
 u16 get_move_work_max(u8 index);
 u8 get_now_areano(void);

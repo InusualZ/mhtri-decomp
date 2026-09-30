@@ -225,7 +225,7 @@ extern "C" void fn_800F9E04(EftSpawnOwner* owner, void* target, u8 mode, EftColo
 extern "C" {
 
 /* the engine vector/matrix helpers */
-void fn_8004C4F0(void* dst, void* src);
+void color_rgba_copy(void* dst, void* src);
 void fn_800532DC(nw4r::math::MTX34* dst, const nw4r::math::MTX34* src);
 void fn_802BDE90(f32* out_a, f32* out_b);
 void fn_800834F0(void* out);
@@ -458,8 +458,8 @@ extern "C" void fn_800F99D4(void* effect, u8 mode, _GXColor* color, _GXColor* co
     EftParticleArgs args;
     fn_800F9A8C(&args);
     args.mode_0x00 = mode;
-    fn_8004C4F0(args.color_0x01, color);
-    fn_8004C4F0(args.color2_0x05, color2);
+    color_rgba_copy(args.color_0x01, color);
+    color_rgba_copy(args.color2_0x05, color2);
     args.scale_0x0C = scale;
     copyVec3(&args.pos_0x10, pos);
     ((nw4r::ef::Effect*)effect)->ForeachParticleManager((void (*)(void*, u32))fn_800F9A70, (u32)&args, flag != 0);

@@ -139,11 +139,15 @@ typedef struct SystemWork {
     /* +0x7D3 */ u8 field_0x7d3;    /* game_ready_ck: == 1 */
     /* +0x7D4 */ u8 pad_0x7d4[0x1];
     /* +0x7D5 */ u8 field_0x7d5;
-    /* +0x7D6 */ u8 pad_0x7d6[0x6];
+    /* +0x7D6 */ u8 leave_flag_0x7d6;   /* GUESS name: `arena_task` sets it to 1 with +0x7D5 when the arena hands back to the game mode */
+    /* +0x7D7 */ u8 pad_0x7d7[0x1];
+    /* +0x7D8 */ u32 leave_state_0x7d8;   /* GUESS name: cleared by `arena_task` in the same step as +0x7D6 */
     /* +0x7DC */ u8 field_0x7dc[4]; /* per-channel motor-on state */
     /* +0x7E0 */ u8 field_0x7e0[4];
     /* +0x7E4 */ u8 field_0x7e4[4];
-    /* +0x7E8 */ u8 pad_0x7e8[0x7B];
+    /* +0x7E8 */ u8 pad_0x7e8[0x68];
+    /* +0x850 */ u8 vs_player_pending_0x850[4];   /* GUESS name: per-player flag `arena_result_next` raises through the player's Vs block */
+    /* +0x854 */ u8 pad_0x854[0xF];
     /* +0x863 */ u8 unk2147;
     /* +0x864 */ u8 unk2148;
     /* +0x865 */ u8 field_0x865;
@@ -168,13 +172,18 @@ typedef struct SystemWork {
     /* +0x887 */ u8 pad_0x887[0x9];
     /* +0x890 */ u32 field_0x890;
     /* +0x894 */ u32 field_0x894;
-    /* +0x898 */ u8 pad_0x898[0x17];
+    /* +0x898 */ u8 pad_0x898[0x4];
+    /* +0x89C */ u8 vs_player_done_0x89c[4];   /* GUESS name: per-player flag `arena_result_next` tests before raising +0x850 */
+    /* +0x8A0 */ u8 pad_0x8a0[0xE];
+    /* +0x8AE */ u8 online_0x8ae;       /* GUESS name: 0 = offline play (`arena_result_next` then arms the solo flag), 1 = online */
     /* +0x8AF */ u8 field_0x8af;   /* non-zero selects the second column of `multi_arena_clr_time`
                                     * in `menu/arena_result.cpp`'s arena time formatter */
     /* +0x8B0 */ u8 vs_mode_0x8b0;  /* non-zero in VS/arena mode: `get_cfg`/`ck_cfg` then read the VS
                                     * user work's profile instead of `option_w` (0x803BE30C band) */
     /* +0x8B1 */ u8 field_0x8b1;
-    /* +0x8B2 */ u8 pad_0x8b2[0x22];
+    /* +0x8B2 */ u8 pad_0x8b2[0xF];
+    /* +0x8C1 */ u8 net_result_wait_0x8c1;   /* GUESS name: `arena_task` step 4 skips its network-result wait unless this is 1 */
+    /* +0x8C2 */ u8 pad_0x8c2[0x12];
     /* +0x8D4 */ void (*field_0x8d4)(void);
     /* +0x8D8 */ u32 (*unk2264)(void);
     /* +0x8DC */ void (*field_0x8dc)(void);
@@ -189,7 +198,9 @@ typedef struct SystemWork {
     /* +0x900 */ int (*kbd_close)(void);
     /* +0x904 */ void (*kbd_exit)(void);
     /* +0x908 */ int (*kbd_input)(void);
-    /* +0x90C */ u8 pad_0x90C[0x25];
+    /* +0x90C */ u8 pad_0x90C[0x3];
+    /* +0x90F */ u8 net_session_0x90f;   /* GUESS name: non-zero while the arena runs as a network session */
+    /* +0x910 */ u8 pad_0x910[0x21];
     /* +0x931 */ u8 unk2353;
     /* +0x932 */ u8 pad_0x932[0x16];
     /* +0x948 */ void* field_0x948;    /* work-heap base, cleared by fn_800CE5B4 */

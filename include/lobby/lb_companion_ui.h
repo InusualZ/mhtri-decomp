@@ -498,7 +498,7 @@ void fn_8042C9C8(void* cmd, u32 size);
 s32 fn_8042CB9C(void);
 u32 fn_8042CC20(void);
 s32 fn_8042CB6C(u8 index);
-s8 fn_8042C850(void);
+s8 net_occupied_slot_count(void);
 void fn_80125F54(void* text);
 void fn_80142C58(u8 value, void* text, u16 id, u8 flag, f32 scale);
 void fn_80146C00(s8 value, u8 index);

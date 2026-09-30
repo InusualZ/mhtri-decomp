@@ -30,7 +30,7 @@
  * 20 callee sites are lobby/hud symbols (`set_zmode`/`set_blendmode`, the 0x1877/0x1878/0x1879 panel
  * family `fn_80214EF0`/`fn_80214FB8`/`fn_802150DC`/`fn_80215170`, `fn_801E66A8`/`fn_801E677C`/
  * `fn_801E68B4`, `fn_801EF73C`/`fn_801F0834`, `fn_802142D8`/`fn_802179D4`/`fn_80217F4C`,
- * `fn_8033C1AC`) plus the Pl/HUD icon queries `fn_8027EFB4`/`fn_8027F1B8`/`fn_8027F21C` and the
+ * `fn_8033C1AC`) plus the Pl/HUD icon queries `equip_kind_table_class`/`fn_8027F1B8`/`fn_8027F21C` and the
  * 12-byte icon copy `fn_8004A20C`.
  *
  * NAMES: GUESS, derived from the two bodies (marked per the brief, for a later naming pass).  The pair
@@ -206,7 +206,7 @@ s32 fn_80215170(s32 page, s32 data);             /* its value */
 s32 fn_802179D4(LbIconRec* icon);                /* non-zero while the record is already held */
 s32 fn_80217F4C(LbIconRec* icon, u8 kind, u16 value); /* fills a record from a kind and a value */
 s32 fn_8021A5FC(void);                           /* 0x8021A5FC - the banner/message step */
-s32 fn_8027EFB4(u8 kind);                        /* the equipment kind's row-table class (Pl) */
+s32 equip_kind_table_class(u8 kind);                        /* the equipment kind's row-table class (Pl) */
 s32 fn_8027F1B8(LbIconRec* icon);                /* the record's stack count (Pl) */
 s32 fn_8027F21C(LbIconRec* icon);                /* the record's "held" test (Pl) */
 s32 fn_802DF6E4(s32 id);                         /* 0x802DF6E4 - the HUD/2D element release */
@@ -276,7 +276,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
                     fn_80217F4C(&icon, rec->kind_0x00, rec->value_0x04);
                 }
             }
-            if ((u8)fn_8027EFB4(icon.kind_0x00) == 1 && fn_802179D4(&icon) == 0) {
+            if ((u8)equip_kind_table_class(icon.kind_0x00) == 1 && fn_802179D4(&icon) == 0) {
                 msg_b = 78;
             }
             break;
@@ -345,7 +345,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
                 } else {
                     rec = &lbl_80794880->entries_0x0E00[self->icon_index_0x3C2];
 
-                    if ((u8)fn_8027EFB4(rec->kind_0x00) == 1 && rec->kind_0x00 != 11) {
+                    if ((u8)equip_kind_table_class(rec->kind_0x00) == 1 && rec->kind_0x00 != 11) {
                         if ((flags & 0x100) != 0) {
                             msg_b = 123;
                         } else if (fn_8027F1B8(rec) > 0) {
@@ -364,7 +364,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
         case 3:
             msg_a = 77;
             fn_8004A20C(&icon, &self->icons_0x20C[self->index_0x128]);
-            if ((u8)fn_8027EFB4(icon.kind_0x00) == 1 && fn_802179D4(&icon) == 0) {
+            if ((u8)equip_kind_table_class(icon.kind_0x00) == 1 && fn_802179D4(&icon) == 0) {
                 msg_b = 78;
             }
             fn_80215170(6265, self->data_0x200);

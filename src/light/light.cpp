@@ -320,9 +320,9 @@ extern "C" void* fn_802BEDE8(s8 bank)
     void* result;
 
     previous = my_player_no();
-    fn_800CF394(bank);
+    my_player_no_set(bank);
     result = (void*)(u32)camera_work_ck();
-    fn_800CF394(previous);
+    my_player_no_set(previous);
     return result;
 }
 
@@ -334,17 +334,17 @@ extern "C" void fn_802BEE3C(u8 id, void* arg)
 
     previous = my_player_no();
 
-    fn_800CF394(0);
+    my_player_no_set(0);
     if (!fn_802B0688(&fn_802BECD0()->resource->entry)) {
         fn_802BC564(id, arg);
     }
 
-    fn_800CF394(1);
+    my_player_no_set(1);
     if (!fn_802B0688(&fn_802BECD0()->resource->entry)) {
         fn_802BC564(id, arg);
     }
 
-    fn_800CF394(previous);
+    my_player_no_set(previous);
 }
 
 /* Constructs the two light-work records the module keeps. */
@@ -495,7 +495,7 @@ extern "C" void fn_802BF278(void)
 /* Copy-constructs a light record from the given source. */
 extern "C" void* fn_802BF430(u8* self, const u8* src)
 {
-    fn_8004C4F0(self, src);
+    color_rgba_copy(self, src);
     return self;
 }
 

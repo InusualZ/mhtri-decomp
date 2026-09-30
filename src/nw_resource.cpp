@@ -45,6 +45,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "nw_resource.h" /* `ResEntry` and the C++ entry points (this unit owns them) */
 
 /* The whole range is peephole-clean in retail: no record-form instruction (`add.`, `and.`, `extsb.`, ...)
  * occurs anywhere in the target object, and `fn_800D476C` encodes `~(align-1) & end` as `not`+`and`
@@ -78,14 +79,6 @@ struct ResMemEntry {
     /* +0x04 */ u32 size;
     /* +0x08 */ char name[64];
     /* +0x48 */ s32 refcount;
-}; /* size: 0x4C */
-
-/* One entry of the resource name table (`ResManager.resTable`, stride 0x4C). */
-struct ResEntry {
-    /* +0x00 */ char name[64];
-    /* +0x40 */ s32 index;
-    /* +0x44 */ void* data;
-    /* +0x48 */ u32 flag;
 }; /* size: 0x4C */
 
 /* The resource/"work" manager block, pointed to by the `.sbss` global 0x80794970. */
@@ -168,11 +161,6 @@ void fn_800832DC(void* root);
  * the map's `RESmemAlloc__FUl` and friends are the compiler's spelling of these). */
 void* RESmemAlloc(u32 size);
 void RESmemFree(void* p);
-void* getResMemAdrs(s32 index);
-s32 pull_res_mem(char* path, u32 size, s32 mode);
-s32 push_res_mem(s32 index);
-char* ckResourceName(char* path);
-s32 nwAddResource(char* name, void* data);
 s32 nwDelResource(s32 index);
 void nwWorkInitialize(void);
 void nwMoveStart(void);
@@ -330,7 +318,7 @@ s32 fn_800D4DD8(const char* path) {
 }
 
 /* 0x800D52A8 - find a resource-table entry by basename; NULL when absent. */
-char* ckResourceName(char* path) {
+ResEntry* ckResourceName(char* path) {
     ResManager* m = lbl_80794970;
     ResEntry* e = m->resTable;
     s32 i;
@@ -340,7 +328,7 @@ char* ckResourceName(char* path) {
     }
     for (i = 0; i < 1024; i++, e++) {
         if (e->index != -1 && e->name[0] != 0 && e->data != 0 && strcmp(e->name, path) == 0) {
-            return e->name;
+            return e;
         }
     }
     return 0;

@@ -55,7 +55,7 @@ extern u8* lbl_805B9B50[];
 /* Foreign unsplit callees whose bracketing registered units name different modules (rule 2's named
  * gap - Pl below, stage/sound above), so no `include/unsplit/<module>.h` is sound for them. */
 extern "C" {
-u8 fn_8027EFB4(u8 id);
+u8 equip_kind_table_class(u8 id);
 void* fn_8027EC50(u8 id, u16 sel);
 void* fn_8027E2A8(u8 id, u16 sel);
 void* fn_8027E344(u8 id);
@@ -167,7 +167,7 @@ s32 fn_802128A8(u8 kind, s32 arg, s32 sel)
     case 3:
     case 4:
     case 5:
-        if (fn_8027EFB4((u8)arg) != 1) {
+        if (equip_kind_table_class((u8)arg) != 1) {
             return 0;
         }
         if ((u8)arg == 11) {
@@ -184,7 +184,7 @@ s32 fn_802128A8(u8 kind, s32 arg, s32 sel)
     case 6:
     case 7:
     case 8:
-        if (fn_8027EFB4((u8)arg) != 1) {
+        if (equip_kind_table_class((u8)arg) != 1) {
             return 0;
         }
         if ((u8)arg == 11) {
@@ -553,7 +553,7 @@ s32 fn_80217B04(u8 kind, u16 sel)
 
     result = 0;
     k = (u8)kind;
-    switch (fn_8027EFB4((u8)kind)) {
+    switch (equip_kind_table_class((u8)kind)) {
     case 0:
         p = fn_8027E354((u8)kind, (u16)sel);
         if (p != NULL) {

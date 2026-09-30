@@ -17,4 +17,10 @@ extern "C" void fn_800F48F4(void);
 }
 #endif
 
+#ifdef __cplusplus
+/* 0x800F6334 - stops every BGM stream; the map's `bgm_stop_all__Fv`.  Added with `quest/arenatask.cpp`
+ * (rule 2: this range owns the address). */
+void bgm_stop_all(void);
+#endif
+
 #endif /* MHTRI_SOUND_FN_800F2A94_H */

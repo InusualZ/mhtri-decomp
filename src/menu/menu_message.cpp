@@ -129,7 +129,7 @@ extern "C" u8 menu_list_mode_get(MenuListWork* self)
             result = 1;
         } else if (quest_move_state_valid_ck() == 1) {
             result = 2;
-        } else if (fn_800CF3C4() > 1) {
+        } else if (player_count_get() > 1) {
             result = 3;
         } else {
             result = 0;

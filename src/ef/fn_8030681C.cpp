@@ -136,7 +136,7 @@
 /* The screen work record this range's tail reads (`fn_80308EC0`/`fn_80308F1C`) and the page count
  * they arm it from (`fn_8030A1D0`) live with their owner, `menu/menu_infomation.cpp`'s header: the
  * two screen bodies below the seam are all this unit needs from that unit.  The `EquipListWork`
- * record moved with `fn_8030B790`, its only reader.
+ * record moved with `equip_list_page_count`, its only reader.
  */
 
 /* One model record of the work area: the pooled model handle the spawner stores and the create

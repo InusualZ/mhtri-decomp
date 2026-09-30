@@ -614,13 +614,6 @@ extern "C" u32 fn_8006405C(void *p)
 
 typedef struct {
     /* +0x00 */ u32 head_0x00;
-    /* +0x04 */ Vec3f vec_0x04;
-    /* +0x10 */ Vec3f vec_0x10;
-    /* +0x1C */ Vec3f vec_0x1C;
-} G3dTripleVecObj; /* size: 0x28 */
-
-typedef struct {
-    /* +0x00 */ u32 head_0x00;
     /* +0x04 */ u32 head_0x04;
     /* +0x08 */ Vec3f vec_0x08;
 } G3dSingleVecObj; /* size: 0x14 */
@@ -636,12 +629,11 @@ extern "C" void *fn_80067B5C(void *self)
     return self;
 }
 
-extern "C" void *fn_80067E70(void *self)
+extern "C" nw4r::g3d::Camera::PostureInfo *camera_posture_info_ctor(nw4r::g3d::Camera::PostureInfo *self)
 {
-    G3dTripleVecObj *obj = (G3dTripleVecObj *)self;
-    VEC3_ctor(&obj->vec_0x04);
-    VEC3_ctor(&obj->vec_0x10);
-    VEC3_ctor(&obj->vec_0x1C);
+    VEC3_ctor((nw4r::math::VEC3 *)&self->mPosX);
+    VEC3_ctor((nw4r::math::VEC3 *)&self->mTargetX);
+    VEC3_ctor((nw4r::math::VEC3 *)&self->mUpX);
     return self;
 }
 

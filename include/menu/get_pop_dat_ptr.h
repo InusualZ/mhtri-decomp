@@ -30,6 +30,13 @@ extern "C" {
 /* 0x803BECA0 - `get_option_cfg`/`get_arena_cfg` picked by `system_w`'s VS/arena mode byte. */
 u8 get_cfg(u8 index, u8 value);
 
+/* 0x803BE8B8 - applies the player's arena profile: the SE/BGM volumes and the screen brightness the
+ * Vs user block of `player` stores (nothing when the Vs mode byte is clear or the block is absent).
+ * 0x803BEA94 - stores one clamped arena profile byte (`index`, `value`) into it and pushes a changed
+ * volume through.  Added with `quest/arenatask.cpp` (rule 2: this range owns both addresses). */
+void arena_cfg_apply(u8 player);
+void arena_cfg_set(u8 player, u8 index, u8 value);
+
 #ifdef __cplusplus
 }
 #endif

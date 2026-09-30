@@ -171,7 +171,7 @@ u32 PPCSync(void);
 u32 TheBeatMatchOutput(void);
 u32 VIGetTvFormat(void);
 u32 dtor_800813B8(u32);
-u32 fn_8004C4F0(s32, void*);
+u32 color_rgba_copy(s32, void*);
 u32 fn_800504D4(s32);
 u32 fn_80050850(void*, void*, f32, f32);
 u32 fn_800514FC(void*, s32, void*);
@@ -2270,7 +2270,7 @@ void fn_8007A1B8(s32 arg0, s32 *arg1, f32 *arg2, f32 *arg3, f32 *arg4, f32 *arg5
             *arg5 = ((RawView_45*)temp_r3)->field_0x10;
         }
         if (arg6 != 0) {
-            fn_8004C4F0((s32)(arg6), (void*)(&((RawView_45*)temp_r3)->field_0x14));
+            color_rgba_copy((s32)(arg6), (void*)(&((RawView_45*)temp_r3)->field_0x14));
         }
     }
 }

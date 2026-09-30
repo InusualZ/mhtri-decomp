@@ -12,6 +12,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "draw_shape.h"   /* `res_file_ctor`, owned by draw_shape.cpp (rule 2) */
 
 /* One of the 32 sound-slot records the SE work object carries at +0x3C.
  * size: 0x50 */
@@ -117,7 +118,6 @@ s32 fn_800DBB78(s32 bank, s32 id);
  * setVec3 conflict, filed 2026-09-27). */
 void fn_800D3ACC(void* sub);
 void fn_8007E498(void* obj);
-void fn_80054FE8(void* obj, s32 flag);
 void fn_800E2680(void* sub);
 int fn_80097F80(void* sub);
 u32 fn_80098868(void* sub);

@@ -62,7 +62,7 @@
  *     reaching it from here is the rule-1 move (two users) that must be measured against `mh3_pad`.
  *   - `multi_box_result_step` (0x284) takes an object whose `+0x150` is the screen - the caller that
  *     names that type is not in a registered unit, so its parameter has no evidence yet.
- *   - `fn_8039DBC8` (0x780) is the save/VS-wpad band: it needs `fn_8004F3B4`, `fn_802D9EA4` and
+ *   - `fn_8039DBC8` (0x780) is the save/VS-wpad band: it needs `fn_8004F3B4`, `ai_npc_reaction_forward` and
  *     `ai_torch_ck`'-style names whose bodies are outside this range.
  * The 24 renames this band needed are in the map (see the previous commit's message); the sweep is
  * complete, so a later pass can write the rest in place.

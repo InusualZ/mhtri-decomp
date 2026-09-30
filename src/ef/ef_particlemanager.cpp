@@ -71,7 +71,7 @@ void fn_800A4A1C(void* list, void* node);
 void fn_800A49B8(void* node);
 void fn_800A6554(void* em, void* self);
 void fn_800834F0(void* self);
-void fn_8004C4F0(void* dst, const void* src);
+void color_rgba_copy(void* dst, const void* src);
 void fn_80051424(void* dst, const void* src, f32 f);
 void fn_800513F0(void* dst, f32 f);
 void fn_800514FC(void* dst, const void* a, const void* b);
@@ -307,8 +307,8 @@ extern "C" void fn_800AC100(EfPmManager* self, u8 a, void* b, void* c, const nw4
 /* The setter fn_800AC0E4 forwards to. */
 extern "C" void fn_800AC100(EfPmManager* self, u8 a, void* b, void* c, const nw4r::math::VEC3* d, f32 f) {
     self->stateA.b.dirMode = a;
-    fn_8004C4F0(self->stateA.b.colorPri, b);
-    fn_8004C4F0(self->stateA.b.colorSec, c);
+    color_rgba_copy(self->stateA.b.colorPri, b);
+    color_rgba_copy(self->stateA.b.colorSec, c);
     self->stateA.b.scale = f;
     copyVec3(&self->stateA.b.vec, (const nw4r::math::VEC3*)d);
 }

@@ -178,8 +178,8 @@ void push_g3d_wk(_g3d_work* wk);
 
 /* The band's plain-name callees. */
 extern "C" {
-void fn_80054FE8(void* obj, s32 flag);
-void fn_80054FAC(void* dst, void* src);
+void res_file_ctor(void* obj, s32 flag);
+void res_file_assign(void* dst, void* src);
 void* fn_800D5418(s32 handle);
 void fn_800D8E44(s32 handle);
 void fn_800E0BE8(void* chr, s32 a);
@@ -698,7 +698,7 @@ extern "C" u32 fn_80384F80(u8 a, u8 b) {
 extern "C" void fn_80384FF8(u8 idx) {
     u8 local[16];
     NoteSlot* slot = &lbl_806C5460[idx];
-    fn_80054FE8(local, 0);
+    res_file_ctor(local, 0);
     slot->field_0x00 = idx;
     slot->field_0x01 = 0;
     slot->field_0x02 = 0xFF;

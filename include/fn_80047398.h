@@ -44,7 +44,7 @@ void* fn_80047398(void);
 s32 item_pair_index_find(u16 id, const IdValue* table, s32 count);
 /* 0x8004C4F0 - the record copy the light unit's copy constructor calls; added with the
  * `light/light.cpp` registration (rule 2: this range owns the address). */
-void fn_8004C4F0(u8* dst, const u8* src);
+void color_rgba_copy(u8* dst, const u8* src);
 /* 0x8004A240 - applies one 0x100-byte arena user-data record to a player's move-work record: it
  * copies the record's header bytes, unpacks its two packed big-endian words into the work's own
  * `+0x258`/`+0x25C` byte pairs, copies six `_EQUIP` records and two `{u16 id, s16 level}` arrays
@@ -76,6 +76,13 @@ void fn_8004BEA4(u16 id, s16 count, void* out);
 
 #ifdef __cplusplus
 }
+#endif
+
+#ifdef __cplusplus
+/* 0x80049070 - registers the sub-transition draw callback `func` (a code address; 0 clears it) for
+ * priority slot `slot`.  A C++ free function, the map's `subTransSetPrio__FUcUllPUl`.  Added with
+ * `quest/arenatask.cpp` (rule 2: this range owns the address). */
+void subTransSetPrio(u8 slot, u32 func, s32 arg, u32* out);
 #endif
 
 #endif /* MHTRI_FN_80047398_H */

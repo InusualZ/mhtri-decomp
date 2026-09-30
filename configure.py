@@ -2790,7 +2790,7 @@ config.libs = [
             # symbol (set_zmode/set_blendmode, the 0x1877/0x1878/0x1879 panel setters fn_80214EF0/
             # fn_80214FB8/fn_802150DC/fn_80215170, fn_801E66A8/fn_801E677C/fn_801E68B4,
             # fn_801EF73C/fn_801F0834, fn_8033C1AC) plus the Pl icon queries
-            # fn_8027EFB4/fn_8027F1B8/fn_8027F21C.  No `__FILE__` string covers the range and the
+            # equip_kind_table_class/fn_8027F1B8/fn_8027F21C.  No `__FILE__` string covers the range and the
             # dump answers only `zz_` placeholders, so the unit and its two symbols are named for
             # what the bodies do - `lb_menu_page_step` (the frame step) and `lb_menu_info_update`
             # (the text selector); both map rows were renamed with the source via `symedit.py`.

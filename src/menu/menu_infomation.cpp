@@ -114,7 +114,7 @@
  * `fn_80315274`/`fn_803153F8` now take the argument list the old 0x8030D338 half already called them
  * with (they were `void f(void)` placeholders in a separate TU), and `Set_equip_column_arrangement`
  * was written with `void*` parameters, which mangles to a name objdiff cannot pair; it now spells the
- * map's `Set_equip_column_arrangement__FP4_PLWP12_EQUIP_INDEXP6_EQUIP` (rule 9).  `fn_8030B790`
+ * map's `Set_equip_column_arrangement__FP4_PLWP12_EQUIP_INDEXP6_EQUIP` (rule 9).  `equip_list_page_count`
  * measures 81.48 -> 94.63 across the move because the merged unit compiles it with `cflags_menu`
  * (`-opt nopeephole`), which that body's target codegen wants.
  *
@@ -177,16 +177,6 @@ struct EquipSubInfo {
     /* +0x0C */ u8 field_0x0C;
 };
 
-/* The equip list record `fn_8030B790` counts over: one 16-bit slot id per row and a matching per-row
- * flag byte, 0x5F2 into the record.  Only those two arrays are reached, so the size is their extent.
- * size: 0x60C (the extent `fn_8030B790` proves) */
-typedef struct EquipListWork {
-    u8  pad_0x000[0x5F2];          /* +0x000 */
-    u16 slot_id[8];                /* +0x5F2  one id per row (stride 2) */
-    u8  row_flag[8];               /* +0x602  the per-row visible flag */
-    u8  pad_0x60A[2];              /* +0x60A */
-} EquipListWork;
-
 /* The equipment work record the status screens walk (the record `StatusScreenWork::equip` points
  * at).  Only the view these bodies prove is named: the seven 0x0C-byte piece records at 0x140..0x188
  * and the bowgun/ammo triple at 0x1D0/0x1E8/0x1F4.  size: 0x200 (approximate: max touched offset +
@@ -223,7 +213,6 @@ s32  fn_8030A1DC(void*, s32, s32, s32);
 s32  equip_page_count_step(void*, void*, u32, s32);
 s32  fn_8030A328(void*, void*, s32, s32, u16, s8);
 void equip_detail_page_refresh(EquipWork*, _EQUIP*, s8 page, s8 last, u16 flags);
-s32  fn_8030B790(EquipListWork*);
 void fn_8030BACC(StatusScreenWork*);
 s32  fn_8030CA50(void*, void*, u32, u32);
 s32  fn_8030CA68(void*, void*, s32, u16, u8);
@@ -375,7 +364,7 @@ void fn_8030BACC(StatusScreenWork* self)
 
 /* The number of equip rows the screen shows: every row whose slot id and flag are both set, rounded up
  * to the six-per-page step (`(n + 5) / 6`) and never below one page. */
-s32 fn_8030B790(EquipListWork* self)
+s32 equip_list_page_count(EquipListWork* self)
 {
     s32 count = 0;
     u32 i;

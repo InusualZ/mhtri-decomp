@@ -15,7 +15,7 @@ extern "C" {
 #endif
 
 /* The sound-module frame entry point `main.cpp` calls. */
-void fn_800D8438(void);
+void sound_frame_entry(void);
 
 
 /* Merged 2026-09-24: a second lane formalized into this shared header.  Declarations it

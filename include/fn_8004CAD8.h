@@ -23,12 +23,12 @@ struct _vs_user_data {
     /* +0x18 */ s32 point_0x18;      /* the credit `score_add_clamped` accumulates for the player */
     /* +0x1C */ u8 pad_0x1C[0x2C - 0x1C];
     /* +0x2C */ u32 item_0x2C[0x10]; /* the 16 four-byte item slots `item_count_find`/`item_take` walk */
-    /* +0x6C */ u32 slot_a_0x6C[7];  /* the first of the two per-slot flag runs `multi_box_phase_ck` counts */
-    /* +0x88 */ u8 pad_0x88[0x94 - 0x88];
-    /* +0x94 */ u32 slot_b_0x94[7];  /* its sibling; the two are read as a pair per slot */
-    /* +0xB0 */ u8 pad_0xB0[0xBC - 0xB0];
+    /* +0x6C */ u32 slot_a_0x6C[10]; /* the first of the two per-slot flag runs `multi_box_phase_ck` counts (ten words: `arena_result_next` walks them all) */
+    /* +0x94 */ u32 slot_b_0x94[10]; /* its sibling; the two are read as a pair per slot */
     /* +0xBC */ u16 ready_mask_0xBC; /* the per-player ready bits the phase gate tests against 0x380 */
-    /* +0xBE */ u8 pad_0xBE[0x100 - 0xBE];
+    /* +0xBE */ u8 pad_0xBE[0xCF - 0xBE];
+    /* +0xCF */ u8 player_0xCF;      /* the player's index into `system_w`'s per-player flag runs */
+    /* +0xD0 */ u8 pad_0xD0[0x100 - 0xD0];
 };
 
 /* 0x8004D14C - one of the two 0x100 B VS user slots, or null when the index is out of range (the
@@ -111,8 +111,18 @@ void fn_800504D4(void* pOut);
  * only needs those two takes the light one. */
 /* 0x80052BC0/0x800534B0 - the `ResTex`/`ResPltt` value-type constructors the
  * `g3d/g3d_resanmtexsrt.cpp` `ResFile` accessors use (rule 2: declared in their owner's header). */
-void* fn_80052BC0(void* out, u32 v);
-void* fn_800534B0(void* out, u32 v);
+void* res_tex_ctor(void* out, u32 v);
+void* res_pltt_ctor(void* out, u32 v);
+/* 0x80052B84/0x80053A90 - assign one `ResTex`/`ResPltt` handle from another (the source is the word a
+ * `ResFile` lookup returned); 0x800528DC - whether the texture has a palette (colour-indexed format);
+ * 0x80052844 - stores the texture/palette pair in the draw-shape work's slot `index` (the palette handle
+ * only when the texture has one); 0x800529A0 - clears the work's texture slots `first`..`last`.  Added
+ * with `quest/arenatask.cpp`'s `arena_resource_load` (rule 2: this range owns the addresses). */
+u32* res_tex_assign(u32* dst, const u32* src);
+u32* res_pltt_assign(u32* dst, const u32* src);
+s32 res_tex_has_pltt(const u32* tex);
+void draw_shape_tex_slot_set(const u32* tex, const u32* pltt, u16 index, s8 flag);
+void draw_shape_tex_slots_clear(u32 first, u32 last);
 /* 0x80050508 - the 4-byte `blr` twin of fn_8005050C.  Its body does not touch r3, and the retail
  * call sites use the pointer it hands back as the following call's first argument
  * (`GXLoadTexMtxImm(fn_80050508(&mtx), id, ...)` in `src/g3d/g3d_gpu.cpp`, `GXLoadPosMtxImm(
@@ -217,6 +227,13 @@ f32 fn_80050F80(const void* a, const void* b);
  * convert the family's placement-table entries. */
 struct Vec;
 void vec_to_mh_vec3(VEC3* dst, struct Vec* src);
+#endif
+
+#ifdef __cplusplus
+/* 0x8004D17C/0x8004D190 - clear the Fq result work / the quest result work.  C++ free functions, the map's
+ * `clear_FqResult_work__Fv` and `clear_qResult_work__Fv`.  Added with `quest/arenatask.cpp` (rule 2). */
+void clear_FqResult_work(void);
+void clear_qResult_work(void);
 #endif
 
 #endif /* MHTRI_FN_8004CAD8_H */

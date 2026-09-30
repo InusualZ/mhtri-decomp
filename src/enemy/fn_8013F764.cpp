@@ -217,7 +217,7 @@ struct SystemWorkTables {
 };
 
 /* the handle record `fn_800D5418` returns, as `fn_80140CA0`/`fn_80140EE8` read it (its +0x44 word
- * is handed to `fn_80054FAC`) */
+ * is handed to `res_file_assign`) */
 struct EmHandleRec {
     /* +0x00 */ u8 unused_0x00[0x44];
     /* +0x44 */ u32 field_0x44;
@@ -286,8 +286,8 @@ void fn_800F0F9C(u8 id);
 f32 fn_80050F80(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 u32 fn_803B4EC8(u32 a);
 u32 fn_803B5030(u32 a);
-void* fn_80054FE8(void* out, u32 a);
-void fn_80054FAC(void* dst, void* src);
+void* res_file_ctor(void* out, u32 a);
+void res_file_assign(void* dst, void* src);
 void fn_8007B878(void* out, u32 a);
 void fn_8007BA08(void* a, void* b);
 s32 fn_800D56F4(char* name, u32 data);
@@ -1041,7 +1041,7 @@ void fn_80140CA0(char* name, u32 data, u32 a, u32 b, u32 c, u32* ctx) {
     EmFileRow row;
     u8* rec;
 
-    fn_80054FE8(&h1, 0);
+    res_file_ctor(&h1, 0);
     fn_8007B878(&h2, 0);
     get_move_work_adrs(0);
     work->handle_0x08 = fn_800D56F4(name, data);
@@ -1053,7 +1053,7 @@ void fn_80140CA0(char* name, u32 data, u32 a, u32 b, u32 c, u32* ctx) {
     if (rec == NULL) {
         return;
     }
-    fn_80054FAC(&h1, fn_80054FE8(&tmp, ((struct EmHandleRec*)(rec))->field_0x44));
+    res_file_assign(&h1, res_file_ctor(&tmp, ((struct EmHandleRec*)(rec))->field_0x44));
     fn_801411B8(&h1);
     res = fn_800924CC(&h1, 0);
     fn_8007BA08(&h2, &res);
@@ -1085,12 +1085,12 @@ void fn_80140EE8(char* name, u32 size, u32 a, u32 b, u32 c, u32* ctx) {
     u32 h1;
     u32 tmp;
 
-    fn_80054FE8(&h1, 0);
+    res_file_ctor(&h1, 0);
     work->handle_0x10 = fn_800D56F4(name, size);
     if (work->handle_0x10 != -1) {
         u8* rec = (u8*)fn_800D5418(work->handle_0x10);
         if (rec != NULL) {
-            fn_80054FAC(&h1, fn_80054FE8(&tmp, ((struct EmHandleRec*)(rec))->field_0x44));
+            res_file_assign(&h1, res_file_ctor(&tmp, ((struct EmHandleRec*)(rec))->field_0x44));
             fn_801411B8(&h1);
             fn_800E3358(2, work->field_0x00, &h1);
             fn_800D5E30(work);

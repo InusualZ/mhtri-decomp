@@ -21,4 +21,10 @@ void system_copy_filter_clear(void);
 }
 #endif
 
+#ifdef __cplusplus
+/* 0x80058044 - starts fade `slot` toward table entry `table_index`; the map's `fade_set__Fll`.  Added with
+ * `quest/arenatask.cpp` (rule 2: this range owns the address). */
+void fade_set(s32 slot, s32 table_index);
+#endif
+
 #endif /* MHTRI_FN_80056F24_H */
