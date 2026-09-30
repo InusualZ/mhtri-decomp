@@ -679,6 +679,12 @@ def is_batch_path(main: str, entry: str, base: str | None = None) -> bool:
         return True
     if os.path.exists(os.path.join(main, entry)):
         return True
+    # A source-looking file OUTSIDE `src/` (a playbook demo `docs/matching/043-x.cpp`, a fixture) is a path too:
+    # `norm_unit` strips its `.cpp` before it reaches here, but a unit's source always lives under `src/`.
+    if not entry.startswith("src/"):
+        for ext in (".cpp", ".cp", ".c"):
+            if os.path.isfile(os.path.join(main, entry + ext)) or _exists_at(main, base, entry + ext):
+                return True
     return _exists_at(main, base, entry)
 
 
@@ -2945,6 +2951,14 @@ def selftest() -> int:
               is_batch_path(tmp, "src/menu/arena_result"), False)
         check("... and a deeper unit path is still a unit",
               is_batch_path(tmp, "Network/initNetworkSessionStable"), False)
+        os.makedirs(os.path.join(tmp, "docs", "matching"))
+        open(os.path.join(tmp, "docs", "matching", "043-demo.cpp"), "w").write("int f();")
+        os.makedirs(os.path.join(tmp, "src", "Network"))
+        open(os.path.join(tmp, "src", "Network", "unit_x.cpp"), "w").write("int g();")
+        check("a demo .cpp outside src/ (its extension stripped by norm_unit) is a batch path",
+              is_batch_path(tmp, "docs/matching/043-demo"), True)
+        check("... a unit whose source is under src/ is still a unit", is_batch_path(tmp, "Network/unit_x"), False)
+        check("... including the src/ spelling", is_batch_path(tmp, "src/Network/unit_x"), False)
 
         # a committed conflict marker: the build only reports it as a syntax error, so it is worth a row of
         # its own. `=======` alone is a banner, not evidence.
