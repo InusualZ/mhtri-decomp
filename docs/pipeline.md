@@ -415,8 +415,25 @@ refuses a batch, names the row that refused, and the landing either passes every
   Lane-side view of the same set: `python tools/units/datagap.py --census --unit <unit>`; what the row would say
   for a tree: `datagap.py --row <units> --base-snapshot <file>`. `--allow-orphan <hex addr>` is the recorded escape
   (playbook 23: a claim our object cannot reproduce lowers the score; an allowance that matches nothing keeps the
-  refusal). The row's info line also counts pre-existing orphans **only this unit's object references** - close
-  those while you are in the unit.
+  refusal).
+* **The strict half of the same row** (owner, 2026-09-29: "Yes, refuse (strict)" - no data is left behind when a
+  unit is touched): the check "no batch unit still has data only it references left unclaimed" refuses, for every
+  batch unit, each **sole-owned** orphan pair - exactly one registered object references the address and
+  `callers.py` finds no unsplit reader - pre-existing ones included. Untouched units are only reported. A pair that
+  cannot be claimed on its own is *deferred*, printed with its class, never refused: `pool-synth` (`.sdata`/`.sdata2`
+  and our object still emits more of the section than the claim carries - playbook 23/29/58), `ambiguous-owner`
+  (the neighbouring claims' `.text` order does not bracket the unit), `span-blocked` (a second range separated
+  from the unit's main one by another owner's data - the playbook 53 cycle) and `isolated-run` (`.sdata`/`.sdata2`
+  run, no claim of the unit's own, both neighbours other owners' or unowned). Measured 2026-09-30 over the whole
+  tree: 11329 sole-owned pairs = 4029 refusable + 2130 pool-synth + 3684 isolated-run + 1343 span-blocked + 143
+  ambiguous-owner, 235 units with something to claim (median 12 pairs, max 124). **Migration aid:** `python
+  tools/units/dataclaim.py --unit <unit>` ends with the exact `splits.txt` edit (lines to ADD in section order inside
+  the unit's block, or the spanning range that REPLACES its line, with a partial-run note, never applied); the
+  lane-side view is `datagap.py --census --unit <unit>`, the tree-wide one `datagap.py --row <units> --root <tree>`.
+  A pair a lane truly cannot claim is named in its report with the reason and the orchestrator passes
+  `--allow-orphan <hex addr>` (an address inside the pair's object excuses it; an allowance that matches nothing
+  excuses nothing and is printed as unmatched). Units with refusable pairs are `data-claim` backlog items
+  (`backlog.py`, weight = pair count) that `triage` closes when the rule stops refusing the unit.
 * **A committed scratch file refuses the batch** (`.tmp_dg.json`): remove it on the branch, never `--no-outbox`.
 * **`--already-applied` and the commit-sweep guard.** A tracked file dirty at `record-base` rides the next unit
   commit unless the batch names it (`CLAUDE.md`/`docs/plan.md` did): land the orchestrator-side tools/docs batch
@@ -736,7 +753,7 @@ by a unit other than `U`.
 | --- | --- |
 | `tools/units/stylelint.py` | **you changed `src/` or `include/`**: rules 1–12 with `file:line`; `--diff <ref>` is the gate's add-only comparison (a recut's *moved* findings are credited one per removal from another file of the batch and printed as `moved`, a copy is not), `--budget` a debt read. |
 | `tools/units/vtableaudit.py` | **a unit owns a code-pointer run**: find a vtable it owns but does not emit and a hand-written `+0x00` table store — rule 10 made mechanical, with `--diff` at the gate. |
-| `tools/units/datagap.py --census` | **before you report a unit**: the data its target object references that no claim covers (orphans, with neighbours, section and readers); the gate's data-closure row is this, add-only. |
+| `tools/units/datagap.py --census --unit <unit>` | **before you report a unit**: the data its target object references that no claim covers (orphans, with neighbours, section and readers) plus the strict view - the unit's sole-owned pairs as `REFUSE` or `deferred <class>`; `dataclaim.py --unit <unit>` prints the `splits.txt` edit that claims the refusable ones. |
 | `tools/units/declclash.py` | **a cross-unit lane hits `(10197) illegal function overloading`**: list the function names declared more than once with *different text* in one include closure, before any source is edited. |
 
 ### 9.6 The registers and the suite

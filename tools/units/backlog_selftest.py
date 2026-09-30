@@ -779,6 +779,87 @@ def selftest() -> int:
           bl.lane_task(adir, bl.Item(kind="undefrefs", target="mod/x", defect="unresolved", status="open",
                                      default_status="open", ask="x"))["agent"], "fixer")
 
+    # --- the fifth source: strict data claims, one item per unit with refusable sole-owned data ----------
+    # The rule is `datagap.strict_report`; this source reads it (through `dataclaim_counts`), never re-implements
+    # it. The fixture is a real split tree: a unit whose target object relocates one unclaimed `.data` word.
+    import datagap as dgap   # noqa: E402
+
+    splits_head = "Sections:\n\t.text type:code align:32\n\t.data type:data align:32\n\n"
+    splits_a = splits_head + "A/a.cpp:\n\t.text start:0x80010000 end:0x80010100\n"
+
+    def data_tree(prefix, with_object=True):
+        d = tempfile.mkdtemp(prefix=prefix)
+        for sub in ("build/RMHE08/obj/A", "config/RMHE08", ".pi/outbox", ".pi/notes"):
+            os.makedirs(os.path.join(d, sub))
+        with open(os.path.join(d, "config", "RMHE08", "splits.txt"), "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(splits_a)
+        with open(os.path.join(d, "config", "RMHE08", "symbols.txt"), "w", encoding="utf-8", newline="\n") as fh:
+            fh.write("w_orphan = .data:0x805EB000; // type:object size:0x4\n")
+        with open(os.path.join(d, "configure.py"), "w", encoding="utf-8") as fh:
+            fh.write("config.libs = [\n]\n")
+        if with_object:
+            dgap.build_fixture_object(os.path.join(d, "build", "RMHE08", "obj", "A", "a.o"), ["w_orphan"])
+        return d
+
+    check("the data-claim kind is declared once", bl.DATACLAIM_KIND, "data-claim")
+    check("the data-claim kind is in the carried kinds", "data-claim" in bl.NEW_KINDS, True)
+    ddir = data_tree("backlog-dataclaim-")
+    dobx = os.path.join(ddir, ".pi", "outbox")
+    dnotes = os.path.join(ddir, ".pi", "notes")
+    dnone = os.path.join(ddir, "none.md")
+    dreg = os.path.join(ddir, ".pi", "backlog.json")
+    ditems = bl.collect_dataclaim_items(ddir)
+    check("data-claim: one item per unit with refusable sole-owned data",
+          [(i.kind, i.target, i.defect, i.status, i.default_status) for i in ditems],
+          [("data-claim", "A/a", "sole-owned", "open", "open")])
+    check("data-claim: the pair count is the item's weight", ditems[0].weight, 1)
+    check_true("data-claim: the ask names the unit and the tool that prints the lines",
+               "A/a" in ditems[0].ask and "dataclaim.py --unit A/a" in ditems[0].ask)
+    dkeys = [i.key for i in ditems]
+    bl.write_register(ddir, ditems, "", {"open": 1, "done": 0, "parked": 0, "total": 1},
+                      {"claims": [], "ratio": 1}, dreg)
+    check("data-claim: the item is carried forward while the debt remains",
+          [i.key for i in bl.collect_dataclaim_items(ddir, dreg)], dkeys)
+    check("data-claim: a tree with no split objects contributes no items", bl.collect_dataclaim_items(tmp), [])
+    check("data-claim: ... and the rule reports it cannot run there", bl.dataclaim_counts(tmp), None)
+    check("data-claim: a built tree counts the unit's pairs", bl.dataclaim_counts(ddir), {"A/a": 1})
+
+    parked_d = bl.build_items(dobx, dnotes, dnone, {ditems[0].key: "parked"},
+                              dataclaim_items=bl.collect_dataclaim_items(ddir, dreg))
+    check("data-claim: a parked item earns no credit", bl.ledger_earned(parked_d), 0)
+    done_d = bl.build_items(dobx, dnotes, dnone, {ditems[0].key: "done"},
+                            dataclaim_items=bl.collect_dataclaim_items(ddir, dreg))
+    check("data-claim: the same item resolved `done` earns one credit", bl.ledger_earned(done_d), 1)
+    check("data-claim: the open item is ranked by its weight in the summed debt",
+          bl.weight_sums(bl.build_items(dobx, dnotes, dnone, {}, dataclaim_items=ditems)).get("data-claim"), 1)
+
+    dec_open, ev_open = bl._check_dataclaim(ddir, ditems[0], {})
+    check("data-claim: triage keeps the item open while the rule still refuses", dec_open, "open")
+    check_true("data-claim: ... and names the live count", "1 refusable" in (ev_open or ""))
+
+    # the unit claims its data: the rule stops refusing, the carried item is weight 0 and triage closes it
+    with open(os.path.join(ddir, "config", "RMHE08", "splits.txt"), "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(splits_a + "\t.data start:0x805EB000 end:0x805EB004\n")
+    os.utime(os.path.join(ddir, "config", "RMHE08", "splits.txt"), (1, 2000000000))   # the cache keys on mtime
+    carried_d = bl.collect_dataclaim_items(ddir, dreg)
+    check("data-claim: a claimed unit's item is carried forward, not dropped", [i.key for i in carried_d], dkeys)
+    check("data-claim: ... and its live count is now zero", [i.weight for i in carried_d], [0])
+    dec_done, ev_done = bl._check_dataclaim(ddir, ditems[0], {})
+    check("data-claim: triage resolves it once the rule no longer refuses", dec_done, "resolved")
+    check_true("data-claim: ... and says it re-ran the rule", "re-ran datagap.strict_report" in (ev_done or ""))
+    ddecs, _ = bl.triage(ddir, outbox=dobx, notes=dnotes, tooling_register=dnone, register=dreg)
+    check("data-claim: triage classifies the carried item resolved",
+          [d for it, d, _ in ddecs if it.key == ditems[0].key], ["resolved"])
+    dout = bl.apply_triage(ddir, ddecs, register=dreg, outbox=dobx, notes=dnotes, tooling_register=dnone)
+    check("data-claim: triage --apply marks it done", dout["changed"]["done"], 1)
+    check("data-claim: ... and the resolution earns one credit", dout["summary"]["earned"], 1)
+    check("data-claim: a unit with no target object stays open (no evidence)",
+          bl._check_dataclaim(ddir, bl.Item(kind="data-claim", target="A/gone", defect="sole-owned",
+                                            status="open", default_status="open", ask="x"), {})[0], "open")
+    check("a data-claim item gets a decompiler lane",
+          bl.lane_task(ddir, bl.Item(kind="data-claim", target="A/a", defect="sole-owned", status="open",
+                                     default_status="open", ask="x"))["agent"], "decompiler")
+
     # --- --check semantics -------------------------------------------------------------------------
     import contextlib
     import io

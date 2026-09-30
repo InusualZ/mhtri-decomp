@@ -2676,17 +2676,26 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
               remedy="declare the class with its `virtual` methods and let MWCC emit the table and the "
                      "store (rule 10 / playbook 52), or claim the `.data` range and emit it; run "
                      "`python tools/units/vtableaudit.py --unit <unit>` for the detail")
-    # the data-closure row (2026-09-30, owner: "no data should be left behind"): every data address a batch
-    # unit's TARGET object relocates against must be covered by some `splits.txt` claim, and a recut must not
-    # leave a previously claimed byte unclaimed. ADD-only like rule 10's: the tree carries ~13k pre-existing
-    # (unit, orphan) pairs, snapshotted at `record-base`, reported and never refused. No per-file exemption;
+    # the data-closure row (2026-09-30, owner: "no data should be left behind"; made STRICT 2026-09-29/30, owner
+    # "Yes, refuse (strict)"): every data address a batch unit's TARGET object relocates against must be covered
+    # by some `splits.txt` claim, a recut must not leave a claimed byte unclaimed, and a TOUCHED unit must also
+    # claim the data only it references (sole-owned: one registered object references it, `callers.py` finds no
+    # unsplit reader) - pre-existing pairs included - unless the pair is not claimable on its own
+    # (`datagap.STRICT_CLASSES`, each deferred pair printed with its class and reason). No per-file exemption;
     # `--allow-orphan <addr>` is a recorded command-line allowance (an allowance that matches nothing keeps the
-    # refusal). `python tools/units/datagap.py --census --unit <unit>` is the lane-side view of the same set.
+    # refusal and is printed as unmatched). `python tools/units/datagap.py --census --unit <unit>` is the
+    # lane-side view, `python tools/units/dataclaim.py --unit <unit>` prints the `splits.txt` lines to add.
     if unit_units:
         orphans = dg.batch_orphans(main, unit_units, recorded.get("orphans"), ALLOW_ORPHAN)
-        if orphans["accepted"]:
+        if orphans["accepted"] or orphans["strict"]["accepted"]:
             print("data closure: %d authorised by --allow-orphan (recorded, not a file-level exemption): %s"
-                  % (len(orphans["accepted"]), "; ".join(orphans["accepted"][:6])))
+                  % (len(orphans["accepted"]) + len(orphans["strict"]["accepted"]),
+                     "; ".join((orphans["accepted"] + orphans["strict"]["accepted"])[:6])))
+        if orphans["unmatched_allowances"]:
+            print("data closure: --allow-orphan %s matched no refusal (it excuses nothing)"
+                  % ", ".join(orphans["unmatched_allowances"]))
+        for cls, lines in sorted(orphans["strict"]["deferred"].items()):
+            print("data closure: deferred %s, %d pair(s), not refused: %s" % (cls, len(lines), lines[0]))
         if not orphans["have_base"]:
             check("the batch base carries a data-closure snapshot", False,
                   "record-base did not snapshot the orphan set", kind=KIND_BOOKKEEPING,
@@ -2694,16 +2703,25 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
                          "(it reads every registered unit's target object)")
         check("no batch unit's target object references data no claim covers (unowned data stays behind)",
               not orphans["added"], "%d added: %s" % (len(orphans["added"]), "; ".join(orphans["added"][:4])),
-              info=("pre-existing, reported: %d orphan reference(s) in the batch's units (%d referenced by no "
-                    "other registered unit - close those while you are in the unit), e.g. %s"
-                    % (len(orphans["pre_existing"]), len(orphans["sole_owned_debt"]),
-                       "; ".join((orphans["sole_owned_debt"] or orphans["pre_existing"])[:2])))
+              info=("pre-existing, reported: %d orphan reference(s) in the batch's units, e.g. %s"
+                    % (len(orphans["pre_existing"]), "; ".join(orphans["pre_existing"][:2])))
                    if orphans["pre_existing"] else "no orphan data reference in the batch's units",
               remedy="claim the data: add a `splits.txt` range for it to the unit that owns it (or a named "
                      "data-only unit for a pool several units share - `python tools/units/dataclaim.py "
                      "--unit <unit>` prints the exact text), or restore the claim a recut dropped. Run "
                      "`python tools/units/datagap.py --census --unit <unit>` for the orphan list with its "
                      "neighbours and readers. An unavoidable case takes `--allow-orphan <addr>`")
+        counts = orphans["strict_counts"]
+        check("no batch unit still has data only it references left unclaimed (touching a unit means claiming its data)",
+              not orphans["sole_owned"],
+              "%d pair(s) refused: %s" % (len(orphans["sole_owned"]), "; ".join(orphans["sole_owned"][:4])),
+              info="strict data claim: refusable %d, deferred %s (every deferred pair is named with its class)"
+                   % (counts.get("refuse", 0), ", ".join("%s %d" % (c, counts.get(c, 0))
+                                                          for c in dg.STRICT_CLASSES)),
+              remedy="claim the unit's own data: `python tools/units/dataclaim.py --unit <unit>` prints the exact "
+                     "`splits.txt` lines (link-order position, sections, start/end, partial-run note) for every "
+                     "refusable run; apply them, force a re-split and re-measure (playbook 23). A pair you cannot "
+                     "claim is named in the lane's report and the orchestrator passes `--allow-orphan <addr>`")
     # the split target objects after the re-split: a unit the batch does not name must be byte-identical.
     after_targets = vu.target_object_snapshot(main)
     drift = vu.target_drift_problems(before_targets, after_targets, unit_units)

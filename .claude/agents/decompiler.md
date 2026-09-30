@@ -225,7 +225,13 @@ is not measured), so measure it yourself before you report.
     python tools/units/datagap.py --census --unit <unit>   # data closure: every orphan row is data your target
                                                  # object references that no splits.txt range covers - claim it
                                                  # (dataclaim.py --unit) or the land gate's data-closure row
-                                                 # refuses; report the orphan count before/after
+                                                 # refuses; report the orphan count before/after. STRICT: the
+                                                 # `strict data claim` block lists your unit's sole-owned
+                                                 # pairs - every `REFUSE` must be claimed before you report
+                                                 # (dataclaim.py --unit prints the splits.txt edit); a
+                                                 # `deferred <class>` pair needs no claim, one you cannot
+                                                 # claim goes in your report with the reason so the
+                                                 # orchestrator passes --allow-orphan <addr>
     python tools/units/flipcheck.py <unit>       # a unit at ~100 %: names the section that would break a flip
                                                  # (extab, a data claim, an undefined reference); READY is
                                                  # necessary, not sufficient - the DOL hash is the proof
