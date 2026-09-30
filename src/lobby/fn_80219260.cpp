@@ -157,7 +157,7 @@ struct LbRow16 {
 
 /* The page's work object: the equipment kind it edits, the player whose set it stages, and the six
  * staged records (three per page side, see the `page` argument of `fn_80219340`).  Reached through
- * the `.sbss` pointer `lbl_80794880`. */
+ * the `.sbss` pointer `lobby_world_block`. */
 struct LbEquipWork {
     /* +0x0000 */ u8 kind_0x00;    /* the equipment kind the page edits (1-15) */
     /* +0x0001 */ u8 unused_0x01[2];

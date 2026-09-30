@@ -388,14 +388,14 @@ extern "C" u32 item_page_item_price(MenuSlot* slot, u16 id)
     s32 base;
 
     if (fn_800CF208() == 2) {
-        return fn_8004B0A4(id, (void*)lbl_80794880);
+        return fn_8004B0A4(id, (void*)lobby_world_block);
     }
     base = fn_802731B4(worker, id);
-    base += fn_8004B70C(id, (void*)&lbl_80794880->field_0x0180, fn_8004AE70((void*)lbl_80794880));
+    base += fn_8004B70C(id, (void*)&lobby_world_block->field_0x0180, fn_8004AE70((void*)lobby_world_block));
     if (fn_8026FE44(worker) == 1) {
-        return base + item_count_find(id, fn_8004AF60((void*)lbl_80794880, 0), fn_8004AF0C(0));
+        return base + item_count_find(id, fn_8004AF60((void*)lobby_world_block, 0), fn_8004AF0C(0));
     }
-    return base + item_count_find(id, fn_8004AF60((void*)lbl_80794880, 1), fn_8004AF0C(1));
+    return base + item_count_find(id, fn_8004AF60((void*)lobby_world_block, 1), fn_8004AF0C(1));
 }
 
 /* 0x8034A914: the page-0 detail panel - the panel frame, then the row record's own fields rendered
@@ -457,7 +457,7 @@ extern "C" void item_page_draw_detail0(MenuSlot* slot)
             fn_802E23D0(0x4FC, id, (s8*)((u8**)get_str_tbl(0x44))[5], 0, &pos);
             sprintf(text, "%d", data->item_id);
             fn_802E23D0(0x4F7, id, text, 2, &pos);
-            sprintf(text, "%d", lbl_80794880->field_0x3F04);
+            sprintf(text, "%d", lobby_world_block->field_0x3F04);
             fn_802E23D0(0x4F8, id, text, 2, &pos);
             fn_802E23D0(0x4F0, id, (s8*)((u8**)get_str_tbl(0x44))[7], 0, &pos);
             break;

@@ -59,6 +59,7 @@
 #include "Pl/fn_802693C4.h"   /* 0x802693C4-0x8026BA1C - the owner of the Pl_chr_set_attr_default/33C/644 group */
 #include "unsplit/Pl.h"
 #include "unsplit/unknown.h"
+#include "Network/network_pat_control.h"   /* isServerSelectState (owner header, rule 2) */
 #include "unsplit/ef.h"
 #include "ef/eft004.h"
 #include "ef.h"
@@ -191,7 +192,7 @@ void fn_80249768(_PLW* self, s32 arg1) {
             Pl_chr_setX(self, 0x64, 6, 0);
         }
         pl_act_set_frame_timer(self);
-        if (fn_8042CB9C() == 1) {
+        if (isServerSelectState() == 1) {
             self->act_end_request = 0;
         }
         self->field_0x28 = 0;

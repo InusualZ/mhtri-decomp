@@ -108,7 +108,7 @@ struct NotePane {
  */
 
 /* The band's own data / unsplit globals (referenced, never defined - rule 2/10). */
-extern u8* lbl_80794880;         /* .sbss 0x80794880 - the 4-byte block pointer `fn_803836EC` reads */
+extern u8* lobby_world_block;         /* .sbss 0x80794880 - the 4-byte block pointer `fn_803836EC` reads */
 extern NoteWork lbl_806C4A88[5]; /* .bss  0x806C4A88 - the retail 5-record note array (0x9D8) */
 extern NoteSlot lbl_806C5460[3]; /* .bss  0x806C5460 - the 3-slot seat set (0x28) */
 extern NoteLayout lbl_806C2418;  /* .bss  0x806C2418 - the note layout state (0x2670) */
@@ -261,10 +261,10 @@ extern "C" void fn_803831B0(void) {
 }
 
 /* 0x803836EC - the note band's per-frame step: refresh, then rebuild the note pane from the block
- * `lbl_80794880` points at. */
+ * `lobby_world_block` points at. */
 extern "C" void fn_803836EC(void) {
     fn_802125C8();
-    fn_8021F248(lbl_80794880[15872]);
+    fn_8021F248(lobby_world_block[15872]);
     fn_802B4C5C();
     fn_801FC2F0();
 }

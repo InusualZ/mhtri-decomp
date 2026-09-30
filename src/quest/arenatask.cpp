@@ -64,7 +64,7 @@
  *   - `arena_task` 83.50 %: the Vs start (`arena_vs_mode_enter`) is one shared block in retail that steps 0
  *     and 1 both jump into.  Two goto-free shapes are measured: inlined twice (committed, 83.50 %, 1728 B
  *     against the target's 1484 B) and a `vs_enter` flag shape (65.33 %, 1516 B).  A `goto` into the else branch scores
- *     99.70 % and rule 8 forbids landing it.  Also `net_selected_server_get()`'s `extsb` lands in r0 here
+ *     99.70 % and rule 8 forbids landing it.  Also `NetCtrlWk::getSelectedServer()`'s `extsb` lands in r0 here
  *     (in place in r3 in retail).
  *   - `arena_resource_load` 91.30 % (+4 B): retail materialises the resource record's address twice
  *     (`li r30`/`li r31, sda21`) and the texture-name table address only at the loop; ours keeps one
@@ -733,7 +733,7 @@ extern "C" void arena_task(TaskSlot* task) {
                     return;
                 }
             } else {
-                s8 server = (s8)net_selected_server_get();
+                s8 server = (s8)NetCtrlWk::getSelectedServer();
                 s8 count;
 
                 if (server < 0) {
@@ -741,7 +741,7 @@ extern "C" void arena_task(TaskSlot* task) {
                 } else {
                     my_player_no_set(server);
                 }
-                count = net_occupied_slot_count();
+                count = countOccupiedServerSlots();
                 if (count <= 0) {
                     player_count_set(1);
                 } else {
@@ -827,7 +827,7 @@ extern "C" void arena_task(TaskSlot* task) {
         }
         break;
     case 4:
-        if (system_w.net_result_wait_0x8c1 != 1 || net_sub_result_get() == 2) {
+        if (system_w.net_result_wait_0x8c1 != 1 || NetCtrlWk::getLobbyReadyByte() == 2) {
             if (arena_draw_func[3] != 0) {
                 if (get_network_sub_error_msg() == 0) {
                     task->wait_0x0C = 0;
@@ -856,7 +856,7 @@ extern "C" void arena_task(TaskSlot* task) {
             task->wait_0x0C--;
             return;
         }
-        net_result_flag_clear();
+        NetCtrlWk::clearSubError();
         system_w.field_0x7d5 = 1;
         system_w.leave_flag_0x7d6 = 1;
         system_w.leave_state_0x7d8 = 0;
@@ -1152,9 +1152,9 @@ extern "C" void arena_result_next(ArenaWork* work) {
         }
         arena_cfg_apply(0);
     } else {
-        net_quest_record_set(quest_init(0)->record_0x03C);
+        NetCtrlWk::copyStaging((u8*)quest_init(0)->record_0x03C);
         work->mode_0x04 = 2;
-        work->player_count_0x05 = net_occupied_slot_count();
+        work->player_count_0x05 = countOccupiedServerSlots();
         for (i = 0; i < work->player_count_0x05; i++) {
             arena_eqdata_reset(work, &work->slot_0x14[i], i);
         }

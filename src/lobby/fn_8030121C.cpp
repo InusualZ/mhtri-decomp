@@ -1,7 +1,7 @@
 /* The lobby UI band, `.text` 0x8030121C..0x803066F0 (21 716 B, 52 map symbols).
  *
  * Registered once, at its final home (docs/plan.md 12) from proposal `8030121C_fn_8030121C.cpp`.
- * Module `lobby` (class 3): the range's own predicates read the lobby pointer block `lbl_80794880`
+ * Module `lobby` (class 3): the range's own predicates read the lobby pointer block `lobby_world_block`
  * (`.sbss`), and its callees are the lobby/menu UI API - `LbStr__FUcUs` (18 call sites),
  * `get_lsp_data__FUsP10_mh_ivec2_` (58), `draw_sprite_ary__FPCUsPC10_mh_ivec2_` (16),
  * `draw_font_idx__FUsPScUlPC10_mh_ivec2_` (14), `put_menu_cursor__FPUsUsPC10_mh_ivec2_` (5),
@@ -98,7 +98,7 @@ s32 fn_8035A7D8(s32, const void*, const void*, s32, s32);
 /* C-linkage object/data the range reads that no registered unit has claimed (rule 2's unsplit home;
  * these sit in the range's own unclaimed `.data`/`.sbss` runs). */
 extern void* lb_tr_flag_data;             /* .sbss 0x80794AF4 - the `_tr_flag` table base */
-extern void* lbl_80794880;                /* .sbss - the lobby pointer block */
+extern void* lobby_world_block;                /* .sbss - the lobby pointer block */
 extern const u16 lbl_805DB120[];          /* .data 0x805DB120 */
 extern const u16 lbl_805DB1B0[];          /* .data 0x805DB1B0 */
 extern const u16 lbl_805DB1D8[];          /* .data 0x805DB1D8 */
@@ -355,9 +355,9 @@ void fn_80306614(_EFT* self) {
 }
 
 /* 0x80304088 - draws the hunt-report row: the `0x22ED` frame, the `0x22EE`/`0x22EF` labels and the
- * count read out of the lobby block (`lbl_80794880` +0x4834) as a negative. */
+ * count read out of the lobby block (`lobby_world_block` +0x4834) as a negative. */
 void fn_80304088(void) {
-    u8* lobby = (u8*)lbl_80794880;
+    u8* lobby = (u8*)lobby_world_block;
     s8 count = -lobby[0x4834];
     _mh_ivec2_ pos;
     char buf[0x80];

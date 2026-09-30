@@ -5,7 +5,7 @@
  * map's own type names (`_mh_ivec2_` must be a type with exactly that name for MWCC to re-emit
  * `get_lsp_data__FUsP10_mh_ivec2_`, `LbStr__FUcUs`, ...), and a name that more than one file needs
  * belongs in one header (docs/plan.md 6.5 rule 1).  `_mh_ivec2_` is also defined by
- * `include/unsplit/lobby.h`; this unit cannot include that header, because it spells `lbl_80794880`
+ * `include/unsplit/lobby.h`; this unit cannot include that header, because it spells `lobby_world_block`
  * as a byte array where this range loads the 4-byte pointer the map records (`size:0x4 data:4byte`)
  * and it gives `lb_param_w` a view without the +0x26..+0x30 fields this range writes.
  *
@@ -173,7 +173,7 @@ typedef struct LbMoveEntry {
 } LbMoveEntry; /* size: 0xB20 */
 
 /* The lobby command packets `fn_80334A34` builds (a 4-byte header it fills with the command class
- * and the sub-command, then the caller's payload) and `fn_8042C9C8` sends.  Each sub-command has its
+ * and the sub-command, then the caller's payload) and `broadcastSessionCommand` sends.  Each sub-command has its
  * own payload shape, which is why there is one type per sub-command rather than one generic buffer -
  * the same bytes carry a byte at +0x06 for sub 0x0D and a halfword there for sub 0x0E.  The size is
  * the send size rounded up to 4 (it is what the frame shows). */
@@ -347,7 +347,7 @@ typedef struct LbParamWork {
     /* +0x32 */ u8 unused_0x32[0x6A];
 } LbParamWork; /* size: 0x9C */
 
-/* The block the `.sbss` pointer `lbl_80794880` (0x80794880, a 4-byte pointer) points at: the page
+/* The block the `.sbss` pointer `lobby_world_block` (0x80794880, a 4-byte pointer) points at: the page
  * block's selected-entry byte at +0x3E03, the two entry tables at +0x5180/+0x51A0 and the per-entry
  * u16 run at +0x51A6.  Everything between them carries its offset.  size: 0x6010 (the neighbour views'
  * extent; this band reads nothing above +0x69A4) */
@@ -450,7 +450,7 @@ typedef struct LbRowRef {
 extern "C" {
 #endif
 
-extern LbDataBlock* lbl_80794880;  /* .sbss 0x80794880 */
+extern LbDataBlock* lobby_world_block;  /* .sbss 0x80794880 */
 extern LbParamWork lb_param_w;     /* .bss 0x806590B4 */
 extern LbSystemView system_w;      /* .bss 0x806585E0 */
 extern LbScreenView Screen_w;      /* .bss 0x8065903C */
@@ -494,11 +494,6 @@ void fn_803AF98C(u8 index);
 void quest_slot_arm_all_a(s8 index);
 void fn_80272E30(u16 id, s16 value);
 void fn_802E5D68(u16 id, s8 index);
-void fn_8042C9C8(void* cmd, u32 size);
-s32 fn_8042CB9C(void);
-u32 fn_8042CC20(void);
-s32 fn_8042CB6C(u8 index);
-s8 net_occupied_slot_count(void);
 void fn_80125F54(void* text);
 void fn_80142C58(u8 value, void* text, u16 id, u8 flag, f32 scale);
 void fn_80146C00(s8 value, u8 index);
@@ -513,7 +508,7 @@ void fn_802AB760(LbRowWork* row, u8 value, u16 word);
 s8 fn_800CF384(void);
 /* The runtime byte-compare (its symbol is defined by `Runtime.PPCEABI.H/memcmp.c`, which no band
  * header declares yet; the sibling units declare it the same way). */
-s32 memcmp(const void* a, const void* b, u32 n);
+int memcmp(const void* a, const void* b, u32 n);
 void* fn_803B33B0(u32 id);
 /* `quest/quest_entry.cpp`'s item-record copy (owner: `quest/quest_entry.cpp`); only the pointer is
  * needed here, so the type stays incomplete. */
@@ -538,11 +533,15 @@ s8 fn_8033AED0(s16* out, s32 a, s32 b);
 s8 fn_800CF384(void);
 /* The runtime byte-compare (its symbol is defined by `Runtime.PPCEABI.H/memcmp.c`, which no band
  * header declares yet; the sibling units declare it the same way). */
-s32 memcmp(const void* a, const void* b, u32 n);
+int memcmp(const void* a, const void* b, u32 n);
+
 
 #ifdef __cplusplus
 }
 #endif
+
+/* 0x80338A84 - clears the lobby entry flags (the leaf header carries the prototype). */
+#include "lobby/lb_entry_flags_clear.h"
 
 #ifdef __cplusplus
 /* The C++-linkage AI/move-work accessor whose map name is `get_move_work_adrs__FUc` (rule 9). */

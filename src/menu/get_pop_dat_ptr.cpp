@@ -49,7 +49,7 @@
  *
  * Residuals (this pass).
  *   * 83 of the 110 functions are unwritten and measure 0 %.  The ones that need a heavily shared
- *     `lbl_` global (`lbl_806BF530` - 26 referrers outside the range - `lbl_80794880` - 90 - and the
+ *     `lbl_` global (`lbl_806BF530` - 26 referrers outside the range - `lobby_world_block` - 90 - and the
  *     `fn_802B0668` / `fn_80217934` / `fn_800F886C` / `fn_800F8A44` callee set, each declared across
  *     30+ files) are deliberately left out: rule 7 makes naming them this batch's job, and that is a
  *     cross-unit rename batch, not this unit's registration.  They are the first follow-up.

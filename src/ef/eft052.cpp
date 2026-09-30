@@ -44,7 +44,7 @@
  *   * the enemy part report the family draws from: `eft052_part_damage_ck` (one flag per queried part
  *     index), `eft052_part_level_even_ck` (whether the part's damage level is even) and
  *     `eft052_part_gauge_add` (step the part gauge and clamp it to 0..500);
- *   * the item page (`lbl_80794880`): `eft052_item_value_get`/`eft052_item_half_get` (the item
+ *   * the item page (`lobby_world_block`): `eft052_item_value_get`/`eft052_item_half_get` (the item
  *     record's +0x010 value / its +0x00C value halved, floored at 1), `eft052_page_counts_get` (the
  *     three counts of one id, through optional out pointers), `eft052_page_count_add` (move one id's
  *     count by `delta`), `eft052_page_take`/`eft052_page_put` (the two moves between the page and the
@@ -439,15 +439,15 @@ extern "C" void eft052_hold_entry_copy(CockpitHoldEntry* dst, CockpitHoldEntry* 
  * ---------------------------------------------------------------------------------------------- */
 extern "C" u32 eft052_page_counts_get(u16 id, u32* out1, u32* out2, u32* out3)
 {
-    u32 a = fn_8004AF20(lbl_80794880);
-    u32 b = item_count_find(id, fn_8004AF78(lbl_80794880), a);
-    u32 c = fn_8004B70C(id, &lbl_80794880->field_0x0180, fn_8004AE70(lbl_80794880));
+    u32 a = fn_8004AF20(lobby_world_block);
+    u32 b = item_count_find(id, fn_8004AF78(lobby_world_block), a);
+    u32 c = fn_8004B70C(id, &lobby_world_block->field_0x0180, fn_8004AE70(lobby_world_block));
     u32 d;
 
-    if (fn_8004AEC0(lbl_80794880) == 1)
-        d = item_count_find(id, fn_8004AF60(lbl_80794880, 0), fn_8004AF0C(0));
+    if (fn_8004AEC0(lobby_world_block) == 1)
+        d = item_count_find(id, fn_8004AF60(lobby_world_block, 0), fn_8004AF0C(0));
     else
-        d = item_count_find(id, fn_8004AF60(lbl_80794880, 1), fn_8004AF0C(1));
+        d = item_count_find(id, fn_8004AF60(lobby_world_block, 1), fn_8004AF0C(1));
     if (out1 != NULL)
         *out1 = b;
     if (out2 != NULL)
@@ -463,7 +463,7 @@ extern "C" u32 eft052_page_counts_get(u16 id, u32* out1, u32* out2, u32* out3)
 extern "C" void eft052_page_count_add(u16 id, s16 delta)
 {
     if (id != 0)
-        fn_8004B200(lbl_80794880, id, -delta);
+        fn_8004B200(lobby_world_block, id, -delta);
 }
 
 /* ---------------------------------------------------------------------------------------------- *
@@ -478,9 +478,9 @@ extern "C" void eft052_page_take(u16 id, s16 count, u8 flag)
     avail = eft052_page_count_ck(id, 0);
     if (avail > 0) {
         if (avail < count) {
-            fn_8004BCBC(lbl_80794880, id, avail, 1);
+            fn_8004BCBC(lobby_world_block, id, avail, 1);
         } else {
-            fn_8004BCBC(lbl_80794880, id, count, 1);
+            fn_8004BCBC(lobby_world_block, id, count, 1);
             return;
         }
     }
@@ -507,7 +507,7 @@ extern "C" void eft052_page_put(u16 id, s16 count, u8 flag)
         left -= avail;
     }
     if (flag == 1 && left != 0)
-        fn_8004BCBC(lbl_80794880, id, left, 1);
+        fn_8004BCBC(lobby_world_block, id, left, 1);
 }
 
 /* ---------------------------------------------------------------------------------------------- *
@@ -516,8 +516,8 @@ extern "C" void eft052_page_put(u16 id, s16 count, u8 flag)
 extern "C" s16 eft052_page_count_ck(u16 id, u8 use_rows)
 {
     if (use_rows == 0)
-        return fn_8004B624(lbl_80794880, id);
-    return fn_8004B7B0(id, &lbl_80794880->field_0x0180, fn_8004AE70(lbl_80794880));
+        return fn_8004B624(lobby_world_block, id);
+    return fn_8004B7B0(id, &lobby_world_block->field_0x0180, fn_8004AE70(lobby_world_block));
 }
 
 /* ---------------------------------------------------------------------------------------------- *

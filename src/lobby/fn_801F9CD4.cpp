@@ -27,7 +27,7 @@
  *   - `unsplit/unknown.h`: `system_w` +0x2D/+0x7CE/+0x8B1 split out of padding, and `unk2149` renamed
  *     to `field_0x865` (main.cpp's one use renamed with it).
  *   - two spellings in those headers disagree with the DOL and are worked around here rather than
- *     edited under another unit: `lbl_80794880` is a `.sbss` **pointer** (`lwz` in every reader, and
+ *     edited under another unit: `lobby_world_block` is a `.sbss` **pointer** (`lwz` in every reader, and
  *     `get_userdata` writes it), and `fn_80215C98` takes **five** arguments (all four DOL call sites
  *     pass `r7`).  Both are declared in the `lb_chg` scope below with the real shape.
  *
@@ -57,18 +57,19 @@
 #include "lobby/lb_npc.h" /* LbResId / LbResource / LbResRec - the lobby resource types (rule 2) */
 #include "unsplit/lobby.h"
 #include "unsplit/unknown.h" /* SystemWork / system_w */
+#include "Network/network_pat_control.h" /* the owner's header (rule 2) */
 
 #pragma peephole off
 
 /* ---------------------------------------------------------------------------------------------------
- * The two shared spellings that disagree with the DOL (see the header): `lbl_80794880` is a pointer,
+ * The two shared spellings that disagree with the DOL (see the header): `lobby_world_block` is a pointer,
  * and `fn_80215C98` takes five arguments.  A scoped `extern "C"` declaration cannot be beaten by a
  * global re-declaration - MWCC reports `illegal function overloading` (10197) - so the correct shape
  * lives in this scope, which names the same symbols.
  * ------------------------------------------------------------------------------------------------- */
 namespace lb_chg {
 extern "C" {
-u8* lbl_80794880;
+u8* lobby_world_block;
 s32 fn_80215C98(s32 text, u8 flag, s16* pos, s32 color, u8 mode);
 }
 }  // namespace lb_chg
@@ -175,7 +176,6 @@ void fn_8035A9E4(void);
 void fn_803A75D8(void);
 void fn_803C3A70(void);
 void fn_803C3F60(void);
-s32 fn_8042CC38(void);
 s32 fn_80449860(void);
 s32 fn_804498C8(void);
 s32 fn_804498CC(void);
@@ -308,7 +308,7 @@ void fn_801FB2A8(u8 a, u8 b, u8 c)
     fn_801FCA80(a);
     fn_800F6520();
     fn_800F6710();
-    if (fn_8042CC38() == 0 || system_w.field_0x8b1 == 1) {
+    if (isCityMode() == 0 || system_w.field_0x8b1 == 1) {
         village_tex_load();
     }
     fn_80040DE8(b);
@@ -391,7 +391,7 @@ void fn_801FBAE4(void)
     LbChgQResult* q = (LbChgQResult*)get_qResult_work();
 
     if (q->mode_0x1E2 == 3 && q->value_0x3F0 > 0) {
-        score_add_clamped(q->value_0x3F0, (s32*)(lb_chg::lbl_80794880 + 0x18));
+        score_add_clamped(q->value_0x3F0, (s32*)(lb_chg::lobby_world_block + 0x18));
     }
     lb_param_w.field_0x00 = 0;
     lb_param_w.field_0x04 = 0;

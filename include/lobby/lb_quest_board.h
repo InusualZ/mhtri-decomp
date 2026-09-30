@@ -86,7 +86,7 @@ extern LbQuestBoardLobby lobby_w;   /* .bss 0x806AAB44 */
  * bracket this one, 0x8038E8E8 and 0x803D3CE8, both registered as `enemy`/`Network` placeholders
  * whose `fn_` names the map still carries). */
 void fn_8004DF10(void* work, u32* out_a, u32* out_b);
-void fn_800DBC84(u32 id);
+void sysSE_stop(u32 id);
 void fn_800F886C(void* work);
 void fn_800F8A44(void* list, s32 count);
 void fn_80214EF0(u32 panel, u32 value);
@@ -102,5 +102,8 @@ u16* fn_804338E0(s32 index);
 void set_zmode(bool depth_test, u8 arg1, bool arg2);      /* set_zmode__FbUcb */
 void set_blendmode(u8 src, u8 dst, u8 op);                /* set_blendmode__FUcUcUc */
 void sysSE_req(long id);                                  /* sysSE_req__Fl */
+
+/* 0x80395C84 - resets the quest board: the prototype is the leaf header's (`lb_quest_board_reset` has C linkage). */
+#include "lobby/lb_quest_board_reset.h"
 
 #endif /* MHTRI_LOBBY_LB_QUEST_BOARD_H */

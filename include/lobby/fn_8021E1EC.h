@@ -6,7 +6,7 @@
  * (docs/plan.md 6.5 rule 1).  NOTE for the next pass: `_mh_ivec2_` is also defined locally by
  * `src/hud/fn_80324F7C.c` (that file's own rule-1 backlog) and by `include/unsplit/lobby.h`; the three
  * copies are identical (`s16 x; s16 y;`) and should collapse to the unsplit lobby header - this unit
- * cannot include that header, because its `lobby_w`/`lbl_80794880` views are not the ones this range
+ * cannot include that header, because its `lobby_w`/`lobby_world_block` views are not the ones this range
  * reads (see the source's file header).  Recorded as a config_request.
  *
  * docs/plan.md 6.5 rules 3/4/5: every type states its size, every field its offset and a name.
@@ -31,7 +31,7 @@ typedef struct LbMenuLobbyWork {
     /* +0x0B2 */ u8 unused_0x0B2[0xCA];
 } LbMenuLobbyWork; /* size: 0x17C (the map's own record) */
 
-/* The block `lbl_80794880` (a 4-byte pointer in `.sbss`) points at.  This range reads the one byte the
+/* The block `lobby_world_block` (a 4-byte pointer in `.sbss`) points at.  This range reads the one byte the
  * item-list page mirrors. */
 /* One 8-byte item-page row at `LbMenuBigBlock::rows_0x4654`: the row's open/ready bytes and its state
  * word (`fn_802208D4` reads the word, `fn_80220038` sets the two bytes of row 0). */
@@ -192,7 +192,7 @@ extern "C" {
 extern LbMenuLobbyWork lobby_w;      /* .bss 0x806AAB44 */
 extern LbMenuScratch lbl_806AA8C8;   /* .bss 0x806AA8C8 */
 extern LbMenuItemState lbl_806AAA88; /* .bss 0x806AAA88 */
-extern LbMenuBigBlock* lbl_80794880; /* .sbss 0x80794880, a 4-byte pointer (map: size:0x4 data:4byte) */
+extern LbMenuBigBlock* lobby_world_block; /* .sbss 0x80794880, a 4-byte pointer (map: size:0x4 data:4byte) */
 extern u8* lbl_80794B18;             /* .sbss 0x80794B18 */
 extern const f32 lbl_80799C60;       /* .sdata2 0x80799C60 - the y-window this range tests against */
 extern u8* lbl_807922B0[];           /* .sdata 0x807922B0 - the 8-byte row tables `fn_80223A18` indexes */
@@ -238,7 +238,7 @@ typedef struct _mh_ivec2_ {
 /* The lobby UI ABI this range calls.  C++ linkage (the map's `__F...` manglings with C++ parameter
  * types), so they sit outside `extern "C"`; the front-end reproduces the map's names from these exact
  * signatures (rule 9).  They are declared here rather than included from `include/unsplit/lobby.h`
- * because that header's `lobby_w`/`lbl_80794880` views conflict with this unit's (see the file
+ * because that header's `lobby_w`/`lobby_world_block` views conflict with this unit's (see the file
  * header). */
 void* get_lsp_data(u16 id, _mh_ivec2_* out);
 void draw_sprite_ary(const u16* table, const _mh_ivec2_* pos);

@@ -64,6 +64,8 @@ u32 fn_8004D27C(s32 id);
  * `src/lobby/fn_802FA9A0.cpp` as the second consumer (it was declared locally by four
  * `src/lobby/*.cpp` files, which is the rule-2 backlog this declaration closes). */
 s32 fn_8004D70C(s32 id);
+/* 0x8004DE7C - the hunter-rank cap for the lobby data block `block` (its rank byte and the user record). */
+u16 get_hunter_rank_max(const u8* block);
 #endif
 /* 0x8004D0E8 - clamp `*value += delta` into [0, 9999999], the score/point accumulator the VS result
  * and skill bands credit.  The owner defines it at C linkage, so the declaration sits inside the

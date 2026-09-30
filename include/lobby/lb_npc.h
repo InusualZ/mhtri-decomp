@@ -15,7 +15,7 @@
 /* ---------------------------------------------------------------------------------------------------
  * Types
  */
-/* The block `lbl_80794880` points at (a 4-byte pointer in .sbss).  Only the fields this unit touches
+/* The block `lobby_world_block` points at (a 4-byte pointer in .sbss).  Only the fields this unit touches
  * are named; the rest is padding and carries its offset. */
 typedef struct LbNpcUserData {
     /* +0x0000 */ u8 pad_0x0000[0x3E00];
@@ -181,7 +181,7 @@ typedef struct _LB_NPC {
  * symbol.  The names are unmangled in the map, so the declarations are `extern "C"` (rule 9).
  */
 /* The `.bss` lobby work block (`lobby_w`, 0x17C B).  Its view here is this unit's own (see the note
- * above): `include/unsplit/lobby.h` carries the menu-layer unit's partial view, whose `lbl_80794880`
+ * above): `include/unsplit/lobby.h` carries the menu-layer unit's partial view, whose `lobby_world_block`
  * is declared as an array rather than the pointer the target loads, so the two views cannot be one. */
 typedef struct LbNpcLobbyWork {
     /* +0x000 */ u8 field_0x000;

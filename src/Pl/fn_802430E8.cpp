@@ -53,6 +53,7 @@
 #include "sound/fn_800D7F54.h"
 #include "unsplit/Pl.h"
 #include "unsplit/unknown.h"
+#include "Network/network_pat_control.h"   /* isServerSelectState (owner header, rule 2) */
 #include "ef/fn_800CDB2C.h"
 /* `include/Pl/fn_8025F088.h` is the owner of `fn_80260198` (0x80260198 sits inside that unit's
  * range 0x8025F088-0x80262940) and carries the unregistered `GetItemData` declaration, so this unit
@@ -534,7 +535,7 @@ extern "C" void pl_act_clear_wait(_PLW* self, u8 a) {
 
 /* Reports the input-hold latch, defaulting to "held" while the pad layer has nothing to say. */
 extern "C" s32 fn_80245E20(_PLW* self) {
-    if (fn_8042CB9C() == 0) {
+    if (isServerSelectState() == 0) {
         return 1;
     }
     return self->field_0x645 != 0;

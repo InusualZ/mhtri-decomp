@@ -28,7 +28,7 @@
  * What it is.  The cockpit item-hold band (0x8033F270..0x8033FDA8) draws the player's item hold: its
  * 2D elements come from the `hud` library (`draw_sprite_ary`, `draw_sprite_idx`, `draw_sprite_anim_ary`,
  * `draw_itemicon_item_id`, `fn_802E0DA8`, `get_lsp_data`, `set_blendmode`, `get_now_areano`), it reads
- * the shared block `lbl_80794880` and the `_PLW` weapon state through `Pl_act_ck`/`Pl_Skill_ck`/
+ * the shared block `lobby_world_block` and the `_PLW` weapon state through `Pl_act_ck`/`Pl_Skill_ck`/
  * `Pl_master_ck`.  The rest is the `eft050` family: `eft050_set` pools the effect record, installs its
  * `release_0x40`/`dispatch_0x34` hooks (`fn_8034305C`, `fn_803430F4`) and its 100-byte work block, and
  * `fn_8033FDA8` is the second spawn entry the hold band calls.  Each spawner stamps `_EFT::type_0x02`,
@@ -116,7 +116,7 @@ typedef struct CockpitSharedDb {
     /* +0x5228 */ u16 busy_flag_0x5228;
 } CockpitSharedDb;
 
-extern CockpitSharedDb* lbl_80794880;
+extern CockpitSharedDb* lobby_world_block;
 
 /* One slot of the hold list `CockpitItemBlock::items_0x24` points at: the item id the icon is drawn
  * from and the word behind it. size: 0x4 */
@@ -371,7 +371,7 @@ extern "C" void fn_8033F270(CockpitPanel* self, const _mh_ivec2_* pos)
 extern "C" void fn_8033F40C(CockpitPanel* self, const _mh_ivec2_* pos)
 {
     draw_sprite_ary(lbl_805E7438, pos);
-    u8 sel = lbl_80794880->player_slot_0x3E03 & 0x7F;
+    u8 sel = lobby_world_block->player_slot_0x3E03 & 0x7F;
     const u8* rows = fn_802D773C(sel);
     const u8* slots = lb_entry_id_get(sel);
     draw_font_idx(0x2043, get_player_name_str(sel), 1, pos);
@@ -395,7 +395,7 @@ extern "C" void fn_8033F560(CockpitPanel* self, const _mh_ivec2_* pos)
     fn_802152A4(0x205F, self->value_0x16 + self->value_delta_0x18, 1, pos);
     draw_font_idx(0x2060, LbStr(0, (u16)(self->label_0x1A + 0x1C2)), 1, pos);
     u16 digits[4];
-    fn_802D7754(lbl_80794880->clock_hour_0x51A4, lbl_80794880->clock_minute_0x51A5, digits);
+    fn_802D7754(lobby_world_block->clock_hour_0x51A4, lobby_world_block->clock_minute_0x51A5, digits);
     for (u16 i = 0; i < 4; i++) {
         draw_font_idx(lbl_80793098[i], get_digit_str((u8)digits[i]), 0, pos);
     }
@@ -501,7 +501,7 @@ extern "C" void fn_8033FA2C(void)
  * otherwise. */
 extern "C" s32 fn_8033FD78(void)
 {
-    CockpitSharedDb* db = lbl_80794880;
+    CockpitSharedDb* db = lobby_world_block;
     if (db->busy_flag_0x5228 != 0) {
         return 0;
     }

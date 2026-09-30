@@ -97,7 +97,7 @@
  *       is **pre-existing** (`git show main:src/menu/menu_infomation.cpp` spells it 9 times): the same
  *       `extern "C"` declaration, the same one-line fix, the same reason it is not in this commit.
  *   `put_equip_info_upper_page`/`put_equip_info_piece_page` additionally read `lbl_80792BF4` and
- *       `lbl_80794880`, unowned `.data`/`.sdata` of which this range is the only referrer: rule 12
+ *       `lobby_world_block`, unowned `.data`/`.sdata` of which this range is the only referrer: rule 12
  *       says the unit claims those runs and emits them, its own measured step (a `.data` claim can
  *       drop the target's `R_PPC_NONE` pool relocations) - deferred, not forgotten.
  *

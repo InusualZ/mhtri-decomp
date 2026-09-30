@@ -57,7 +57,7 @@ void  fn_802DFCD4(void);
 void  fn_802DA1B0(void);
 void* memset(void* dst, int value, u32 size);
 s32   fn_802087D4(void);
-void  fn_800DBC84(s32 value);
+void  sysSE_stop(s32 value);
 char* quest_result_field_text_get(MenuQuestWork* self, s32 index);
 s32   fn_803223B0(MenuQuestWork* self, u8 value);
 void  fn_80323204(MenuQuestWork* self, u16 a, s16 b);
@@ -355,7 +355,7 @@ extern "C" void fn_8032194C(void) {
         sysSE_req(9);
     }
     fn_802087D4();
-    fn_800DBC84(1);
+    sysSE_stop(1);
 }
 
 /* 0x80321990 - reset the edit screen for `mode`: seed the row count, mirror the label, clear both

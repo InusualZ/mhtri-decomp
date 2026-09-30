@@ -870,7 +870,7 @@ extern "C" void fn_800E4A24(u32 a, u32 b, u32 c)
 }
 
 /* Marks bank 1 pending, with interrupts off. */
-extern "C" void fn_800E4A7C(void)
+extern "C" void resumeSoundEngine(void)
 {
     u32 level = OSDisableInterrupts();
     fn_800E4ABC(fn_800E4A18(), 1);

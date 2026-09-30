@@ -54,6 +54,7 @@
 #include "enemy/fn_8012BA00.h"
 #include "enemy/fn_80138074.h"
 #include "unsplit/enemy.h"
+#include "Network/network_pat_control.h" /* the owner's header (rule 2) */
 
 #pragma peephole off
 
@@ -278,7 +279,6 @@ extern "C" void fn_8012B8F8(_ENEMY_WORK* enemy);
 extern "C" u8 fn_802B0668(u32 map_no);
 extern "C" u32 fn_802B0688(void* pos);
 extern "C" u8 fn_8028EF30(u32 value);
-extern "C" u32 fn_8042CB9C(s32 value);
 extern "C" s32 fn_8012B944(_ENEMY_WORK* enemy, u8 index, s32 value);
 extern "C" void fn_8012B988(_ENEMY_WORK* enemy, s32 value);
 extern "C" void fn_8012B9BC(_ENEMY_WORK* enemy, u8 index, s32 value);
@@ -813,7 +813,7 @@ extern "C" s32 fn_8012D1A8(u32 index)
 {
     _PLAYER_ROOT* root;
 
-    if (fn_8042CB9C(index) == 1) {
+    if (isServerSelectState() == 1) {
         root = (_PLAYER_ROOT*)get_move_work_adrs(0);
         if (root != NULL && root->player_state[(u8)index] == 4) {
             return 1;

@@ -136,58 +136,6 @@
 #include "Runtime.PPCEABI.H/memset.h"
 #include "unsplit/Runtime.PPCEABI.H.h"
 
-/* The mediator's field layout, traced from the disassembly: every offset below is one an instruction
- * in this unit addresses.  `buffer_A`/`buffer_B` are the two 0x106-byte blocks the accessors copy,
- * `reflect_page` the 0x400-byte page `getReflectPageBuffer` hands out, `line_table_a`/`line_table_b`
- * the two 1024-entry pointer arrays `parseReflectLines` clears and fills, and `line_table_c` the
- * one-entry array of its "single line" mode.  `pat_*` are the four words `initializeNetworkMediator`
- * and `updateOpeningState` keep the two `setPatRange` slots' address/length pairs in, and `stamp_*`
- * the 64-bit server timestamp.  `pad_*` is a gap the range never touches. */
-typedef struct NetworkWiiMediatorFields {
-    /* +0x000 */ u8  pad_000[0x1C];
-    /* +0x01C */ u8  flag_1C;
-    /* +0x01D */ u8  flag_1D;
-    /* +0x01E */ u8  flag_1E;
-    /* +0x01F */ u8  flag_1F;
-    /* +0x020 */ u8  pad_020;
-    /* +0x021 */ u8  flag_21;
-    /* +0x022 */ u8  pad_022[0x02];
-    /* +0x024 */ u32 field_24;
-    /* +0x028 */ u32 field_28;
-    /* +0x02C */ u32 field_2C;
-    /* +0x030 */ u32 field_30;
-    /* +0x034 */ u32 field_34;
-    /* +0x038 */ u32 field_38;
-    /* +0x03C */ u8  reflect_name_3C[0x20];
-    /* +0x05C */ u8  reflect_name_5C[0x0F];
-    /* +0x06B */ u8  field_6B;
-    /* +0x06C */ u8  pad_06C[0x10];
-    /* +0x07C */ u8  buffer_A[0x106];
-    /* +0x182 */ u8  buffer_B[0x106];
-    /* +0x288 */ u32 field_288;
-    /* +0x28C */ u8  pad_28C[0x3FE];
-    /* +0x68A */ u8  flag_68A;
-    /* +0x68B */ u8  name_buffer_68B;
-    /* +0x68C */ u8  pad_68C[0xFF];
-    /* +0x78B */ u8  flag_78B;
-    /* +0x78C */ u8  flag_78C;
-    /* +0x78D */ u8  reflect_page[0x400];
-    /* +0xB8D */ u8  pad_B8D[0x03];
-    /* +0xB90 */ u32 pat_terms_ptr;
-    /* +0xB94 */ u32 pat_maintenance_ptr;
-    /* +0xB98 */ u32 pat_terms_size;
-    /* +0xB9C */ u32 pat_maintenance_size;
-    /* +0xBA0 */ u8  pad_BA0[0x02];
-    /* +0xBA2 */ u8  single_line_buffer[0x02];
-    /* +0xBA4 */ char* line_table_a[0x400];
-    /* +0x1BA4 */ char* line_table_b[0x400];
-    /* +0x2BA4 */ char* line_table_c[0x01];
-    /* +0x2BA8 */ u8  pad_2BA8[0xE68];
-    /* +0x3A10 */ u64 stamp_3A10;
-    /* +0x3A18 */ u8  pad_3A18[0x26B9];
-    /* +0x60D1 */ u8  flag_60D1;
-} NetworkWiiMediatorFields;  /* size: 0x60D2 */
-
 /* The reflect sub-service the mediator starts, stops and agrees through.  This band only dispatches
  * into its `+0x08` slot (retail's `lwz r12, 0(r3)` / `lwz r12, 8(r12)`), so the class is declared with
  * the real virtual and never defined here - MWCC emits the table only for a class this TU defines,
@@ -245,7 +193,6 @@ void setMediatorFlag78B(NetworkWiiMediatorFields* self, u8 value);
 void getMediatorField288(NetworkWiiMediatorFields* self, u32* out);
 void setMediatorFlag78C(NetworkWiiMediatorFields* self, u8 value);
 void getMediatorFlag78C(NetworkWiiMediatorFields* self, u8* out);
-void resetMediatorState(NetworkWiiMediatorFields* self);
 void initializeNetworkMediator(NetworkWiiMediatorFields* self, u32 value);
 
 /* The thread accessor the opening's init reaches.  Its body sits in the `Network/fn_803D3CE8.cpp` band
@@ -258,10 +205,6 @@ u8    getMediatorFlag6B(NetworkWiiMediatorFields* self);
 u8    getMediatorFlag60D1(NetworkWiiMediatorFields* self);
 void  setMediatorTimestamp(NetworkWiiMediatorFields* self, u64 value);
 void  getMediatorState68A(NetworkWiiMediatorFields* self, u8* out);
-void  updatePatInterface180(NetworkWiiMediatorFields* self, u32 a, u32 b, u32 c);
-void  updateTermVersion(NetworkWiiMediatorFields* self, u32 value);
-void  resetMediatorFlags(NetworkWiiMediatorFields* self);
-void  resetMediatorFlag1D(NetworkWiiMediatorFields* self);
 u64   getMediatorTimestamp(NetworkWiiMediatorFields* self);
 s32   getAccountQuery1(NetworkWiiMediatorFields* self);
 s32   getAccountQuery2(NetworkWiiMediatorFields* self);
@@ -272,33 +215,19 @@ void  getReflectPageRange(NetworkWiiMediatorFields* self, u32* out1, u32* out2);
 void  getReflectField30(NetworkWiiMediatorFields* self, u32* out);
 void  getReflectField34(NetworkWiiMediatorFields* self, u32* out);
 void  getReflectField38(NetworkWiiMediatorFields* self, u32* out);
-s32   getWarningUInt(NetworkWiiMediatorFields* self);
 
-s32  dispatchReflectEvent();
 s32  getReflectModeFromLanguage();
-void loadPatInterfaceBuffers();
-void updateOpeningState(NetworkWiiMediatorFields* self, u32 slot, u32 address, u32 size);
 u64  updateServerTime(NetworkWiiMediatorFields* self);
 u64  setServerTimeResult(NetworkWiiMediatorFields* self);
 void setMediatorState68A(NetworkWiiMediatorFields* self, u8 value);
 s32  queryOpeningFlag208(NetworkWiiMediatorFields* self);
 s32  queryOpeningFlag250(NetworkWiiMediatorFields* self);
-s32  queryOpeningFlag278(NetworkWiiMediatorFields* self);
 s32  queryOpeningFlag290(NetworkWiiMediatorFields* self);
-s32  queryOpeningFlag2A8(NetworkWiiMediatorFields* self);
-s32  queryOpeningFlag2C0(NetworkWiiMediatorFields* self);
 char* getReflectPageText(char* self, char* out, u32 size);
-char* getAccountName(NetworkWiiMediatorFields* self, char* out, u32 size);
 void getReflectName3C(NetworkWiiMediatorFields* self, char* out, u32 size);
 void getMediaVersionString(NetworkWiiMediatorFields* self, char* out, u32 size);
 void getStr1String(NetworkWiiMediatorFields* self, char* out, u32 size);
 void getReflectName5C(NetworkWiiMediatorFields* self, char* out, u32 size);
-void setReflectPageRange(NetworkWiiMediatorFields* self, u32 address, u32 size);
-void setReflectField30(NetworkWiiMediatorFields* self, u32 value);
-void setReflectField34(NetworkWiiMediatorFields* self, u32 value);
-void setReflectField38(NetworkWiiMediatorFields* self, u32 value);
-void setReflectName3C(NetworkWiiMediatorFields* self, char* name);
-void setReflectName5C(NetworkWiiMediatorFields* self, char* name);
 void updatePatField854(NetworkWiiMediatorFields* self, u32 value);
 void updatePatField860(NetworkWiiMediatorFields* self, u32 value);
 s32  isNameSymbolChar(NetworkWiiMediatorFields* self, char value);

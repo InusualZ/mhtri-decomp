@@ -241,7 +241,7 @@ public:
     virtual void copyNameList(const u8* src) = 0;         /* +0x02C */
     virtual void copyNameListTail(const u8* src) = 0;     /* +0x030 */
     virtual void setSessionName(const char* name) = 0;    /* +0x034 */
-    virtual void setCircleRecords(u32 id, const u8* src, u32 count) = 0; /* +0x038 */
+    virtual void setCircleRecords(const u8* src, u32 count) = 0; /* +0x038 */
     virtual void setFlag79(s8 value);                      /* +0x03C */
     virtual void notify(s32 value);                        /* +0x040 */
     virtual void setFlag7A(s8 value);                      /* +0x044 */
@@ -429,7 +429,7 @@ public:
     virtual void copyNameList(const u8* src);             /* +0x02C */
     virtual void copyNameListTail(const u8* src);         /* +0x030 */
     virtual void setSessionName(const char* name);        /* +0x034 */
-    virtual void setCircleRecords(u32 id, const u8* src, u32 count); /* +0x038 */
+    virtual void setCircleRecords(const u8* src, u32 count); /* +0x038 */
     virtual void setFlag79(s8 value);                     /* +0x03C */
     virtual void slot_068();                              /* +0x068 */
     virtual void slot_06C();                              /* +0x06C */

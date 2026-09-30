@@ -92,6 +92,7 @@
 #include "fn_80047398.h" /* `arena_userdata_apply` (rule 2) */
 #include "quest/arenatask.h" /* `arena_user_data_buf` (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "Network/network_pat_control.h" /* the owner's header (rule 2) */
 
 /* ------------------------------------------------------------------------------------------------ *
  * The player-mode root work (`get_move_work_adrs(0)`).
@@ -194,7 +195,6 @@ void fn_803ADA70(void);
 u32 fn_803B4B74(void);
 u32 em_work_state_bit7_ck(void);
 void fn_803BA814(u8 idx);
-u32 fn_8042CB9C(void);
 void PSVECSubtract(void* dst, void* a, void* b);
 }
 
@@ -536,7 +536,7 @@ u32 fn_8028F368(void) {
         return 0;
     }
     mode[0x6A3E] = 4;
-    if (fn_8042CB9C() != 1) {
+    if (isServerSelectState() != 1) {
         root->seq_0xFC = 4;
     }
     return 1;

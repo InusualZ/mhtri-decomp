@@ -66,6 +66,9 @@ void fn_800DCC24(struct _se_w* work, s32 kind, u8 c);
  * `menu/menu_result.cpp` (rule 2: this TU owns the address). */
 void fn_800DBDD4(void);
 
+/* 0x800DBC84 - stops sound effect `id`. */
+void sysSE_stop(u32 id);
+
 #ifdef __cplusplus
 }
 

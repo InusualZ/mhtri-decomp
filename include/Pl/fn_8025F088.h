@@ -110,7 +110,6 @@ u32 fn_803C482C(void);
 u32 fn_800F16D4(s32 value);
 u32 fn_8033112C(void* p);
 u32 fn_80335CE8(struct _PLW* self, s32 a, u16 b);
-u32 fn_8042CB9C(void);
 u32 fn_803BA9B0(void* p);
 
 /* ---- mangled callees at C++ scope, so the front-end reproduces the map's spelling (rule 9) ---- */

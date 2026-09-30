@@ -26,8 +26,8 @@
  * class 4).
  *
  * Types and globals.  This unit carries its own view of the records it reads, the way
- * `src/lobby/lb_npc.cpp` does: `include/unsplit/lobby.h` spells `lbl_80794880` as an array and
- * `lobby_w` as `LbLobbyWork`, neither of which is the shape this range uses (it loads `lbl_80794880`
+ * `src/lobby/lb_npc.cpp` does: `include/unsplit/lobby.h` spells `lobby_world_block` as an array and
+ * `lobby_w` as `LbLobbyWork`, neither of which is the shape this range uses (it loads `lobby_world_block`
  * as the 4-byte pointer the map records, and reads `lobby_w` at +0x01/+0x27/+0x52/+0xB1).  The
  * per-unit view keeps the offsets honest instead of re-interpreting another unit's type.
  *
@@ -236,17 +236,17 @@ s32 fn_8021E484(s32 kind)
     }
     switch ((u8)kind) {
     case 0:
-        if (lbl_80794880->list_kind_0x484D) {
+        if (lobby_world_block->list_kind_0x484D) {
             return 0;
         }
         break;
     case 1:
-        if (lbl_80794880->list_kind_0x484D != 1) {
+        if (lobby_world_block->list_kind_0x484D != 1) {
             return 0;
         }
         break;
     case 2:
-        if (lbl_80794880->list_kind_0x484D != 2) {
+        if (lobby_world_block->list_kind_0x484D != 2) {
             return 0;
         }
         break;
@@ -501,7 +501,7 @@ s32 fn_80220B50(LbMenuItem* item, s32 count, u16 id)
 /* Opens the item page: arms the SE, then raises its own flags. */
 void fn_80220038(void)
 {
-    LbMenuBigBlock* block = lbl_80794880;
+    LbMenuBigBlock* block = lobby_world_block;
 
     fn_802FAFC8(0x19);
     block->rows_0x4654[0].open_0x00 = 1;
@@ -512,7 +512,7 @@ void fn_80220038(void)
 /* The three countdown bytes the item page runs down. */
 void fn_80220114(void)
 {
-    LbMenuRowSlot* row = &lbl_80794880->rows_0x4654[1];
+    LbMenuRowSlot* row = &lobby_world_block->rows_0x4654[1];
 
     if (row[0].open_0x00) {
         row[0].open_0x00--;
@@ -520,15 +520,15 @@ void fn_80220114(void)
     if (row[1].open_0x00) {
         row[1].open_0x00--;
     }
-    if (lbl_80794880->fade_c_0x466C) {
-        lbl_80794880->fade_c_0x466C--;
+    if (lobby_world_block->fade_c_0x466C) {
+        lobby_world_block->fade_c_0x466C--;
     }
 }
 
 /* The item row's per-row reset: the four flag bytes rise and fall around the row's state word. */
 void fn_802208D4(LbMenuItem* item)
 {
-    LbMenuBigBlock* block = lbl_80794880;
+    LbMenuBigBlock* block = lobby_world_block;
 
     item->flag_a_0x24 = 1;
     item->flag_b_0x25 = 1;

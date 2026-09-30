@@ -154,7 +154,8 @@ typedef struct SystemWork {
     /* +0x866 */ u8 field_0x866;
     /* +0x867 */ u8 field_0x867;      /* TPLtexLoad group: loading display flag */
     /* +0x868 */ u8 field_0x868;
-    /* +0x869 */ u8 pad_0x869[0x2];
+    /* +0x869 */ u8 pad_0x869[0x1];
+    /* +0x86A */ u8 field_0x86A;
     /* +0x86B */ u8 field_0x86b;      /* hbm_enable: == 1 keeps the menu suppressed */
     /* +0x86C */ u8 pad_0x86c[0x2];
     /* +0x86E */ u8 unk2158;
@@ -234,7 +235,6 @@ void fn_80306A98(struct _ENEMY_WORK* self, u32 a);
  * header carries it now (rule 2). */
 void fn_802D884C(u16* a, s16* b);
 void fn_802DE578(struct _PLW* self, void* work);
-u32 fn_8042CB9C(void);
 s32 fn_80331104(void);
 /* Added with `Pl/fn_80273B14.cpp`: 0x80335CE8 (hud below, enemy above) names different modules, so its
  * home is this file.  0x8029F73C moved to `include/menu/menu_item.h` (rule 2): `menu/menu_item.cpp`

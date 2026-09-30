@@ -6,8 +6,8 @@
  * a `LbStr(unsigned char, unsigned short)` definition) and because the symbols this range **owns**
  * belong with their owner, not in `include/unsplit/lobby.h` (docs/plan.md 6.5 rule 2).
  *
- * `lobby_w` and `lbl_80794880` are re-declared here with this range's own view because
- * `include/unsplit/lobby.h`'s view is not the one this range reads: that header spells `lbl_80794880`
+ * `lobby_w` and `lobby_world_block` are re-declared here with this range's own view because
+ * `include/unsplit/lobby.h`'s view is not the one this range reads: that header spells `lobby_world_block`
  * as a byte array where the map records a 4-byte `.sbss` pointer (this range loads it, so it is a
  * pointer), and it declares `fn_8021213C(s32, s16)` where this range defines it with one argument.
  * Recorded as a config_request; `include/lobby/fn_801F3294.h` and `include/lobby/fn_8021E1EC.h` carry
@@ -49,9 +49,9 @@ typedef struct LbLobbyWork {
 extern "C" {
 extern LbLobbyWork lobby_w;
 
-/* The lobby item-database pointer (`lbl_80794880`, `.sbss` 0x80794880, 4 bytes).  `fn_802125C8`
+/* The lobby item-database pointer (`lobby_world_block`, `.sbss` 0x80794880, 4 bytes).  `fn_802125C8`
  * toggles the byte 0x3E00 of the block it points at. */
-extern u8* lbl_80794880;
+extern u8* lobby_world_block;
 }
 
 /* The `lb_*_str` tables: four `.sbss` pointers to arrays of string pointers, indexed by species id -

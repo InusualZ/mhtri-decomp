@@ -62,7 +62,7 @@
 /* ---------------------------------------------------------------------------------------------------
  * Data
  */
-extern "C" LbNpcUserData* lbl_80794880;  /* .sbss pointer */
+extern "C" LbNpcUserData* lobby_world_block;  /* .sbss pointer */
 extern "C" LbNpcLobbyWork lobby_w;       /* .bss 0x806AAB44 */
 extern "C" _LB_NPC lb_npc[0x12];        /* .bss 0x806A7BA0 */
 extern "C" f32 lbl_80799880;
@@ -181,16 +181,16 @@ void fn_801FC268(void)
     switch (fn_802FB54C(0)) {
     case 0x1A:
         if (fn_802FB948() == 0) {
-            lbl_80794880->field_0x3E01 = 9;
+            lobby_world_block->field_0x3E01 = 9;
         } else {
-            lbl_80794880->field_0x3E01 = 0xFF;
+            lobby_world_block->field_0x3E01 = 0xFF;
         }
         break;
     case 0:
-        lbl_80794880->field_0x3E01 = 0;
+        lobby_world_block->field_0x3E01 = 0;
         break;
     default:
-        lbl_80794880->field_0x3E01 = 0xFF;
+        lobby_world_block->field_0x3E01 = 0xFF;
         break;
     }
 }

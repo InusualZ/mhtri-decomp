@@ -2,15 +2,15 @@
  *
  * The unit is the game's character-state network sync: its builders pack fields of a player work record
  * (`_PLW`, reached through `get_move_work_adrs(2)`, 0xB20 stride) or of an enemy work record
- * (`_ENEMY_WORK`) into a small local message and hand it to `fn_8042C9C8(message, size)` - the
- * `NetworkSessionManagerPat` send, guarded by `fn_8042CB9C()` (`net_ctrl_wk->0x11 == 7`), vtable slot
+ * (`_ENEMY_WORK`) into a small local message and hand it to `broadcastSessionCommand(message, size)` - the
+ * `NetworkSessionManagerPat` send, guarded by `isServerSelectState()` (`net_ctrl_wk->0x11 == 7`), vtable slot
  * 0x128 - and its receivers unpack one back into the work record.  The module is `hud` from the flags
  * and the placement (see the unit header); the content is network, so that call is recorded there as
  * the unit's first promotion candidate.
  *
  * Rule-2 debt, recorded rather than guessed.  The callees whose owner is a registered unit are included
  * from the owner's header; only the ones no header carries at all (`fn_8027D5A4`, `fn_8028BD54`,
- * `fn_8042C9C8`, `fn_8042CB9C`, `fn_8042CC20`, `em_get_unique_work`, `lbl_805E1ED0`) are re-declared
+ * `broadcastSessionCommand`, `isServerSelectState`, `isReadyCountOne`, `em_get_unique_work`, `lbl_805E1ED0`) are re-declared
  * below, and the fold into `Pl/pl_act.h`, `Pl/fn_80288CEC.h`, `Network/network_pat_control.h` and
  * `include/unsplit/unknown.h` is a `shared-file` request in this unit's outbox, not this unit's edit.
  */
@@ -235,9 +235,6 @@ void fn_80337648(NetEmStatus* dst, const NetEmStatus* src);
  * `hud/cockpit_quest.h`, which this unit does not include. */
 void fn_8027D5A4(struct _PLW* self, s32 param);                                 /* Pl/pl_act.cpp */
 u32 fn_8028BD54(void);                                                          /* Pl/fn_80288CEC.cpp */
-void fn_8042C9C8(const void* msg, u32 size);                                    /* Network/network_pat_control.cpp */
-u32 fn_8042CB9C(void);                                                          /* Network/network_pat_control.cpp */
-u32 fn_8042CC20(void);                                                          /* Network/network_pat_control.cpp */
 extern u8 lbl_805E1ED0[];                                                       /* .data 0x805E1ED0 */
 
 #ifdef __cplusplus

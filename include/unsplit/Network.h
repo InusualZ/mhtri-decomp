@@ -20,6 +20,8 @@
 #include "Network/network_transport.h"
 
 typedef struct NetworkErrorInfo NetworkErrorInfo;
+typedef struct NetId NetId;                 /* include/Network/NetworkLayerPat.h */
+typedef struct NetLayerRequest NetLayerRequest; /* include/Network/NetworkLayerPat.h */
 /* the record's layout lives in `include/Network/fn_803D3CE8.h`, beside the GameSpy handshake that
  * fills it: `NetworkInstance::postError` below only takes a pointer to it. */
 
@@ -39,7 +41,7 @@ public:
     /* +0x0C */ virtual void signal_0C(u32 level, const char* fmt, ...);
     /* +0x10 */ virtual void warn_10(const char* fmt, ...);
     /* +0x14 */ virtual void log_14(const char* fmt, ...);
-    /* +0x18 */ virtual void pad_18();
+    /* +0x18 (GUESS: takes the log level 3 the pat control sets) */ virtual void setLevel_18(s32 level);
     /* +0x1C */ virtual void pad_1C();
     /* +0x20 */ virtual void pad_20();
     /* +0x24 */ virtual void pad_24();
@@ -434,7 +436,74 @@ u32 sendReqLayerUserList(NetworkInstance* self);
 s32 net_session_close_start(void);
 s32 net_session_close_state_get(void);
 
+/* ---- the network control band's callees (`Network/network_pat_control.cpp`) ---------------------- */
+/* 0x803768F8-band clock: the network singleton's game time (GUESS: the caller passes the singleton). */
+u32 getGameTime(NetworkInstance* self);
+/* 0x80431324 / 0x804312B8 - the message for the network error / sub-error `-1` (a generic failure). */
+char* getDefaultErrorMessage(void);
+char* getDefaultSubErrorMessage(void);
+/* 0x80437040 - renders a network id as text into `out` (a `%` in the id prints as `*`). */
+void formatNetId(char* out, const NetId* id);
+/* 0x804370BC - imports a network id from `src` into `dst`. */
+void importNetId(NetId* dst, const NetId* src);
+/* 0x803DFC34 - initialises a layer request record. */
+void initNetLayerRequest(NetLayerRequest* request);
+/* 0x8043172C - switches the transfer mode (1 on / 0 off). */
+void setTransferMode(s32 mode);
+/* ---- the pat control's update callees (GUESS on every name: they come from the caller's use) ---- */
+struct PatTerms;
+struct NetRosterSync;
+struct NetworkPat;
+/* 0x803E247C - the terms object; 0x80416A18 - whether it reached its update-finished state. */
+struct PatTerms* getPatTerms(void);
+u32 isTermsUpdateFinished(struct PatTerms* terms);
+/* 0x804344DC.. - the handlers of the actions queued in the work record's action byte (1, 4, 5, 6, 7, 8). */
+void runPendingAction1(void);
+void runPendingAction5(void);
+void runPendingAction6(void);
+void runPendingAction7(void);
+void runPendingAction8(void);
+/* 0x804353A4 / 0x804356D0 / 0x80435BAC / 0x80435D1C - the friend roster sync helpers. */
+void buildRosterSync(struct NetRosterSync* sync);
+void flushRosterSync(void);
+void refreshRosterCache(void);
+void startRosterFetch(s32 mode);
+/* 0x80449968 / 0x8044996C / 0x80449918 / 0x8044991C - the boot and account loading steps. */
+void startBootLoad(void);
+s32 pollBootLoad(void);
+void startAccountLoad(void);
+s32 pollAccountLoad(s16 frame);
+/* 0x80413AEC - whether the server is in maintenance (the status word reads 1). */
+s32 isMaintenanceMode(class NetworkWiiMediator* self);
+/* 0x80416890 / 0x8041690C - start the terms check / the terms update on the mediator singleton. */
+void startTermsCheck(class NetworkWiiMediator* self);
+void startTermsUpdate(class NetworkWiiMediator* self);
+/* 0x80433384 / 0x8043339C / 0x80434FB4 / 0x80433B0C - the shutdown phase slots and the friend slot lookup. */
+void clearPhaseSlot(s32 slot);
+u32 isPhaseSlotDone(s32 slot);
+s8 lookupFriendSlot(const u8* id);
+void startShutdownTimer(void);
+/* 0x80431A9C / 0x804317E8 - the transfer queue and mode updates the control runs each frame. */
+void updateTransferQueue(void);
+void updateTransferMode(void);
+/* 0x80419C2C / 0x80419E1C - the Pat holder reset and the session-manager slot delete. */
+void clearNetworkPat(struct NetworkPat* holder);
+void deleteNetworkSessionManagerPat(struct NetworkPat* holder, s32 index);
+/* 0x803FE854 / 0x803FE860 / 0x803FE404 / 0x803FE73C - the network singleton's Pat setters. */
+void setPatField854(NetworkInstance* self, s32 value);
+void setPatField860(NetworkInstance* self, const char* name);
+void setPatByteD400(NetworkInstance* self, u8 value);
+void setPatByte6138On(NetworkInstance* self);
+/* 0x80433870 - reads the link state; 1 = the network link is up. */
+u32 getLinkStatus(void);
+/* 0x804333B0 - resets the link state the reconnect path relies on. */
+void resetLinkState(void);
+/* 0x804370CC - whether two network ids are equal (1). */
+u32 isSameNetId(const NetId* left, const NetId* right);
 }
+
+/* MH3GetErrorString2 (`MH3GetErrorString2__Fl`, C++ linkage) - the localized message for a network error code. */
+char* MH3GetErrorString2(s32 code);
 
 /* `__dl__FPv`'s real spelling (the caller's `operator delete`); see the ef units' convention.
  * It is a C++ operator, so it is declared outside the `extern "C"` block. */

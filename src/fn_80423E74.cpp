@@ -25,7 +25,7 @@
  * The array at 0x80603858 and the string at 0x806038D8 belong to the neighbour
  * `Network/network_pat_control.cpp`.
  *
- * Residuals: the two state machines `fn_804247D0` (0xE78, three jump tables) and `fn_80425790`
+ * Residuals: the two state machines `fn_804247D0` (0xE78, three jump tables) and `updateMessagePool`
  * (0x1580, one jump table) and the message-pool families that follow them are not reconstructed yet;
  * every function that is reconstructed below is listed in the outbox.  Re-measure with
  * `python tools/units/recompile.py fn_80423E74 --measure <symbol>`.
@@ -149,7 +149,7 @@ s32 PatCryptDecrypt(u8* buf, u16* len)
  * Point the record's three parallel 64-entry arrays at the shared 0x400-block arena, allocating the
  * arena on first use: arrA[k] gets the k-th 0x400 block, arrB/arrC are cleared.
  */
-void fn_80424198(NetCtrlWk* work)
+void setupArenaVectors(NetCtrlWk* work)
 {
     u8* base;
     u32 k;
@@ -237,7 +237,7 @@ void fn_804244D8(u32 block, u32 value)
 /*
  * Clear the arrB/arrC sides of all 64 entries of `work`.
  */
-void fn_80424518(NetCtrlWk* work)
+void resetNetSlots(NetCtrlWk* work)
 {
     u32 i;
 
@@ -399,14 +399,14 @@ char* fn_8042767C(s32 index)
 }
 
 /*
- * Forward the record's own state to fn_8042CC38, or 0 when the network layer is not up.
+ * Forward the record's own state to isCityMode, or 0 when the network layer is not up.
  */
 s32 fn_804276D8(void)
 {
     if (getNetworkLayerPat(getPatsObject(), 0) == 0) {
         return 0;
     }
-    return fn_8042CC38();
+    return isCityMode();
 }
 
 /*

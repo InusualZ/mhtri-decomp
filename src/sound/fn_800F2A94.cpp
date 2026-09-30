@@ -349,7 +349,7 @@ extern "C" void fn_800F5208(u8 arg) {
 
 /* 0x800F6334 - 4 B: the named entry, a tail call into the stream stop. */
 void bgm_stop_all() {
-    fn_800E4A7C();
+    resumeSoundEngine();
 }
 
 /* 0x800F6514 - 0xC: request id 5 on channel 0. */

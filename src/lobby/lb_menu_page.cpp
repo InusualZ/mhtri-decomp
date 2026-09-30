@@ -13,20 +13,20 @@
  * `lb_menu_info_update`.  That one turns the page's state into the two text ids the info panel shows:
  * it picks a page id (6263/6264/6265 = the map's 0x1877/0x1878/0x1879) and a primary/secondary id,
  * and pushes them with `fn_80214EF0(page, id)` and `fn_802150DC(page, id, a, b)`; the arms that need
- * an icon record copy one out of the shared lobby block (`lbl_80794880 + 0xE00`, stride 0xC) or use
+ * an icon record copy one out of the shared lobby block (`lobby_world_block + 0xE00`, stride 0xC) or use
  * the page's own record tables (+0x264 stride 0x18, +0x328 stride 0x10, +0x20C icons, +0x23C words,
  * +0x24C u16s).
  *
  * MODULE AND NAME (brief section 2, evidence order).  1. No `__FILE__` string: a relocation sweep of
  * both split objects finds no `.c`/`.cpp` literal at all - the range's only data references are the
- * `.sbss` pointer `lbl_80794880`, the `.data` jump table below and calls.  (The `menu_note.cpp`
+ * `.sbss` pointer `lobby_world_block`, the `.data` jump table below and calls.  (The `menu_note.cpp`
  * string the proposal's discovery note cites at 0x805E91F8 is NOT this unit's: it is referenced by
  * `src/menu/menu_note.cpp`'s object and by nothing else, and neither object here names it.)
  * 2. `dumpmap.py lookup 0x80365C84` / `0x8036640C` answer `zz_0365c84_` / `zz_036640c_` placeholders,
  * and `symedit.py range 0x80365C84 0x80366618` showed two bare stems before this lane named them.
  * 3. Module `lobby` and the unit's name come from the code: the frame step reads the lobby work block
  * `lobby_w` (.bss 0x806AAB44) at +0x0AC - the same menu pointer `lobby/fn_801E7530.cpp` uses - and
- * the selector reads the lobby page block `lbl_80794880` (.sbss 0x80794880, the 4-byte pointer); all
+ * the selector reads the lobby page block `lobby_world_block` (.sbss 0x80794880, the 4-byte pointer); all
  * 20 callee sites are lobby/hud symbols (`set_zmode`/`set_blendmode`, the 0x1877/0x1878/0x1879 panel
  * family `fn_80214EF0`/`fn_80214FB8`/`fn_802150DC`/`fn_80215170`, `fn_801E66A8`/`fn_801E677C`/
  * `fn_801E68B4`, `fn_801EF73C`/`fn_801F0834`, `fn_802142D8`/`fn_802179D4`/`fn_80217F4C`,
@@ -84,7 +84,7 @@
  *   retail                                          ours
  *   330 lha   r0,962(r3)    ; self->icon_index_0x3C2 330 lwz  r4,0(0)
  *   334 mulli r0,r0,12                               334 lha  r0,962(r3)
- *   338 lwz   r3,0(0)       ; lbl_80794880          338 mulli r0,r0,12
+ *   338 lwz   r3,0(0)       ; lobby_world_block          338 mulli r0,r0,12
  *   33c addi  r3,r3,3584                             33c add  r3,r4,r0
  *   340 add   r25,r3,r0                              340 addi r25,r3,3584
  *   344 lbz   r3,0(r25)                              344 lbz  r3,0(r25)
@@ -106,8 +106,8 @@
 #include "types.h"
 
 /* The types this unit's own bodies define (rules 1/3/4/5): the shared views of `lobby_w` and
- * `lbl_80794880` in `include/lobby/*.h` stop short of the offsets below, so each is this unit's
- * view with its own name.  `LbIconRec`/`LbWorldBlock`/`lbl_80794880`/`fn_8004A20C` come from the
+ * `lobby_world_block` in `include/lobby/*.h` stop short of the offsets below, so each is this unit's
+ * view with its own name.  `LbIconRec`/`LbWorldBlock`/`lobby_world_block`/`fn_8004A20C` come from the
  * owner's header (rule 2). */
 #include "lobby/fn_801F3294.h"
 
@@ -314,7 +314,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
                 msg_a = 97;
                 icon_flag = 1;
             }
-            fn_8004A20C(&icon, &lbl_80794880->entries_0x0E00[fn_801EF73C(&self->work_0x3A4)]);
+            fn_8004A20C(&icon, &lobby_world_block->entries_0x0E00[fn_801EF73C(&self->work_0x3A4)]);
             if (icon.kind_0x00 == 0) {
                 break;
             }
@@ -343,7 +343,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
                     msg_b = 82;
                     arg_d = 2;
                 } else {
-                    rec = &lbl_80794880->entries_0x0E00[self->icon_index_0x3C2];
+                    rec = &lobby_world_block->entries_0x0E00[self->icon_index_0x3C2];
 
                     if ((u8)equip_kind_table_class(rec->kind_0x00) == 1 && rec->kind_0x00 != 11) {
                         if ((flags & 0x100) != 0) {
@@ -421,7 +421,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
             }
             page = 6264;
             msg_a = 104;
-            fn_8004A20C(&icon, &lbl_80794880->entries_0x0E00[fn_801EF73C(&self->work_0x3A4)]);
+            fn_8004A20C(&icon, &lobby_world_block->entries_0x0E00[fn_801EF73C(&self->work_0x3A4)]);
             if (icon.kind_0x00 == 0) {
                 break;
             }
@@ -465,7 +465,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
             }
             page = 6264;
             msg_a = 111;
-            fn_8004A20C(&icon, &lbl_80794880->entries_0x0E00[fn_801EF73C(&self->work_0x3A4)]);
+            fn_8004A20C(&icon, &lobby_world_block->entries_0x0E00[fn_801EF73C(&self->work_0x3A4)]);
             if (icon.kind_0x00 == 0) {
                 break;
             }
