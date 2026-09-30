@@ -1,8 +1,8 @@
 ---
 id: 43
-title: Retail's per-string `lis`/`addi` addressing means `-str` had no `pool` - `-pool off` is not the lever
+title: Per-object `lis`/`addi` addressing is `-pool off` (or `-str` without `pool`) - `-pool` shares one base across 3+ objects
 status: works
-problem: Our string literals are addressed through one `@stringBase0` base register (one `lis`, then `addi` displacements) where retail materialises each string with its own `lis`/`addi` - 0x20 bytes of `.text` short, and the `.rela.text` records name a base symbol retail never had.
+problem: Retail materialises each string or table with its own `lis`/`addi` pair, where ours shares one base register (`lis r31,base@ha ; addi r3,r31,delta`, or an `@stringBase0` symbol) - a few bytes of `.text` short and the `.rela.text` records name a base symbol retail never had.
 tags: [flags, data]
 applies: [Wii/1.3]
 demo: 043-pool-off-string-addressing.cpp
@@ -10,58 +10,71 @@ reviewed: 2026-09-29
 related: [23, 44, 45, 64]
 ---
 
-# 43. Retail's per-string `lis`/`addi` addressing means `-str` had no `pool` - `-pool off` is not the lever
+# 43. Per-object `lis`/`addi` addressing is `-pool off` (or `-str` without `pool`) - `-pool` shares one base across 3+ objects
 
-**Problem.** Our string literals are addressed through one `@stringBase0` base register (one `lis`, then `addi`
-displacements) where retail materialises each string with its own `lis`/`addi` (`lis` = load-immediate-shifted,
-the `@ha` half of a 32-bit address; `addi` adds the `@l` half) - 0x20 bytes of `.text` short, and the
-`.rela.text` records name a base symbol retail never had. (Title corrected 2026-09-29: it used to name `-pool off`
-as the fix; that flag does not do this.)
+**Problem.** Retail materialises each string or table with its own `lis`/`addi` pair (`lis` = load-immediate-shifted,
+the `@ha` half of a 32-bit address; `addi` adds the `@l` half); ours addresses several of them off one base register
+(`lis r31,base@ha ; addi r31,r31,base@l`, then `addi r3,r31,delta`). The object is a few bytes short of the target
+and the `.rela.text` records name a base symbol retail never had (`@stringBase0`, or the section symbol
+`...data.0` / `...rodata.0`).
 
 **How it looks.**
 
 ```
-ours (-str ...,pool):     lis r31,@stringBase0@ha ; addi r3,r31,@stringBase0@l ; ... ; addi r3,r3,12
-retail:                   lis r3,str1@ha ; addi r3,r3,str1@l ; ... ; lis r3,str2@ha ; addi r3,r3,str2@l
+ours:    lis r31,base@ha ; addi r31,r31,base@l ; addi r3,r31,0 ; ... ; addi r3,r31,18 ; ... ; addi r3,r31,37
+retail:  lis r3,str1@ha ; addi r3,r3,str1@l ; ... ; lis r3,str2@ha ; addi r3,r3,str2@l ; ... (one pair per object)
 ```
 
-Every string reference in retail carries its own `R_PPC_ADDR16_HA/LO` relocation pair against its own (anonymous
-`@NN`) string symbol; ours share one `@stringBase0` symbol and one saved register.
+Every reference in retail carries its own `R_PPC_ADDR16_HA/LO` pair against its own symbol (`@NN` for a string, the
+table's name for a table); ours share one symbol and one saved register.
 
-**Why it happens.** `-str reuse,pool` (a `pool` sub-option of `-str`) makes the compiler put every string of the
-unit in a single data object named `@stringBase0` and address them as base + displacement. Without `pool` each
-literal is its own object. The separate `-pool[data] on|off` option ("pool like data objects", `mwcceppc -help`)
-is not the string switch: the original probe that named it did not record its command line and cannot be re-run,
-and the re-measurement below found **no** effect from it.
+**Why it happens.** Two independent switches produce the same shape, and they need telling apart:
 
-**How to work it.** Look at the unit's `-str` flags first: if retail addresses each string separately, remove
-`pool` (the project's base has `-str reuse`, which is per-string; `cflags_runtime` adds `-str reuse,pool,readonly`,
-which is pooled). It is a library/per-unit flag - there is no source pragma. Then check the string's *section*
-(idea 44) and the `.data` layout.
+* **`-pool` (on by default; `-pool off` disables).** A function that references **three or more distinct
+  data objects of one non-small-data section** defined in the same TU addresses all of them off ONE base register
+  (the section symbol, `...data.0` for strings, `...rodata.0` for `static const` tables). `-pool off` gives each its
+  own `lis`/`addi` pair. Below three objects the flag does nothing.
+* **`-str ...,pool`** (a sub-option of `-str`) merges every string of the unit into one object named `@stringBase0`
+  and addresses them base + displacement; with it two strings already share a base and `-pool off` cannot split
+  them (it is one object). Without `pool` each literal is its own object, and `-pool` then behaves as above.
 
-**When NOT to apply.** Do not add `-pool off` hoping for this; measured 2026-09-29, `-pool off` (either order, with
-or without `readonly`) leaves `@stringBase0` in place on **six** compilers (Wii 1.0, 1.1, 1.3, 1.5, 1.7 and GC
-2.7), and it changed nothing for `static const` tables, non-const arrays, scalars or float constants either. The
-project's `cflags_camellia` and `cflags_rso` carry `-pool off` from earlier evidence; it is harmless there, but
-for those units the per-symbol `lis`/`addi` pairs the flag was credited with come from *tables* that are addressed
-per symbol under every setting, so the credit was not demonstrated - a future pass could try dropping it from
-those groups (measure; do not edit `configure.py` on this note alone, non-negotiable 3).
+**How to work it.** First read the target: is each string/table addressed by its own pair? Then, per unit:
+(1) check the library's `-str` flags - if it has `pool`, drop it (per unit; there is no source pragma); (2) if the
+function references three or more distinct objects of one section and still shares a base, add `-pool off` (per
+library or unit, evidence in a comment next to it); (3) check the section the data lands in (idea 44) and the
+`.data` layout. Probe the shape first (below): a flag that leaves the object byte-identical is noise.
+
+**When NOT to apply.** Measured 2026-09-29 (scratch matrix in `.pi/notes/idea43.md`), `-pool off` is a
+byte-identical no-op when: a function references fewer than three distinct objects of one section (two strings,
+two tables - straight-line, in branches, around calls or in a loop); the objects are `extern` (not defined in this
+TU); the strings are small enough for `.sdata` (SDA `li r3,@NN@sda21` - never `lis`); or the strings are merged by
+`-str ...pool` (one `@stringBase0` object). A project audit (2026-09-29) measured the real object of every unit
+carrying the flag: it changed **Camellia** (`.text` 0x5F64 with the flag, 0x5F34 without; 7 functions 100 % ->
+98.9-99.4 % without it - the S-box tables) and `Network/network_socket_streams`
+(`NetworkMultipleUdp_receive` 94.06 % with, 89.53 % without - its log strings), and it was byte-identical on `RSO/runtime`
+and seven other `Network` objects, where the flag was removed. Do not add it "in case".
 
 **Example.**
 
 ```
--str reuse            # per-string lis/addi (verified: no @stringBase0, 2 lis + 2 addi for two strings)
--str reuse,pool       # one @stringBase0, one lis
+-str reuse             # default -pool: three strings -> lis r31,...data.0@ha once; 0x44 B
+-str reuse -pool off   # three strings -> lis/addi each; 0x40 B; relocs @7 @8 @9
+-str reuse,pool        # one @stringBase0 either way (-pool off changes nothing for strings)
 ```
 
-**Result.** Measured at the time on `auto/800CB948_fn_800CB948` (since retired): with the four `Panic` strings
-written as literals, `-pool off` was reported to move `.rela.text` 0x2C4 -> 0x3B4 (retail's per-string pairs) and
-`.text` 0xC44 -> 0xC64 with `.data` 0x00AD equal to retail. That result is the only evidence for `-pool off`
-and is **not reproduced**: the same shape (two strings) under the unit's likely flags gives `@stringBase0` with
-`-pool off` and per-string pairs only when `pool` is dropped. Treat the original attribution to `-pool off` as a
-probable confound and re-measure with `-str reuse` first.
+**Result.** Wii/1.3 `-O4,p -inline auto`, three strings in one function: `-str reuse` 0x44 B, 1 `lis`;
+`-str reuse -pool off` 0x40 B, 3 `lis`; `-str reuse,pool` 0x44 B with or without `-pool off`. Three `static const int[8]`
+tables: 0x7C B with `-pool`, 0x78 B with `-pool off`; two tables or two `extern` arrays: identical. Same on Wii 1.0, 1.5,
+1.7 and GC 2.7. The old attribution of `auto/800CB948_fn_800CB948`'s two-string result to `-pool off` remains
+unexplained (its command line was not recorded and two strings cannot show the effect); treat it as a confound.
 
-**Demonstration.** `043-pool-off-string-addressing.cpp` (`ideas.py demo-check 43`) compiles two strings with
-`-str reuse,pool -pool off`: `@stringBase0` is still present, one `lis`, 0x3C bytes. The other half of the
-statement (with `-str reuse` alone: two `lis`/`addi` pairs, 0x34 bytes, no `@stringBase0`) was verified by
-compiling the same file with that flag (the demo checker allows one `FLAGS:` line per file).
+**Demonstration.** `043-pool-off-string-addressing.cpp` (`ideas.py demo-check 43`) compiles under
+`-str reuse,pool -pool off` and asserts both levers: `strings3` keeps `@stringBase0` and one `lis` (`-pool off` cannot
+split a merged object), while `tables3` (three `static const` tables) has three `lis` and names `tabA`/`tabB`/`tabC`
+by their own relocations, no `...rodata.0`. The demo checker allows one `FLAGS:` line, so the other combinations were
+verified by compiling the same file: with `-str reuse` (default `-pool`) `strings3` and `tables3` each take **one**
+`lis` off `...data.0` / `...rodata.0`, `.text` 0xCC; with `-str reuse -pool off` each takes three `lis`, `.text` 0xB8.
+
+**Evidence.** `.pi/notes/idea43.md` (the flags x shape matrix); the whole-project audit table in MAIN's
+`.pi/notes/pool-audit.md` (landed 58991fa4b, 2026-09-29): Camellia and `network_socket_streams` demonstrated, RSO/runtime
+and seven Network units a no-op.
