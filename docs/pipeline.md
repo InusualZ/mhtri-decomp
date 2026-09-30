@@ -406,6 +406,17 @@ refuses a batch, names the row that refused, and the landing either passes every
 * **Lane-side pre-check for rule 7:** `land.rule7_defer_growth(<worktree>, <base>)` and
   `land.band_ownership_warnings(...)` must both return `[]`; two lanes were refused after a full unit for not
   running them. Rule 2/7 sweeps also need `handoff.py --check` at 0 errors.
+* **The data-closure row** ("no batch unit's target object references data no claim covers"): every data address a
+  batch unit's *target* object relocates against must sit in some `splits.txt` range, and a recut must not leave a
+  claimed byte unclaimed. Add-only over `(unit, address)` pairs - `record-base` snapshots the ~13.5k pre-existing
+  ones, which are reported, never refused. A *new* unit therefore owns all of its orphans at once; a unit that
+  already existed is charged only for what the batch adds. Fix: claim the run (`dataclaim.py --unit <unit>` prints
+  the `splits.txt` text; a pool several units read is a named data-only unit), or restore the shrunk claim.
+  Lane-side view of the same set: `python tools/units/datagap.py --census --unit <unit>`; what the row would say
+  for a tree: `datagap.py --row <units> --base-snapshot <file>`. `--allow-orphan <hex addr>` is the recorded escape
+  (playbook 23: a claim our object cannot reproduce lowers the score; an allowance that matches nothing keeps the
+  refusal). The row's info line also counts pre-existing orphans **only this unit's object references** - close
+  those while you are in the unit.
 * **A committed scratch file refuses the batch** (`.tmp_dg.json`): remove it on the branch, never `--no-outbox`.
 * **`--already-applied` and the commit-sweep guard.** A tracked file dirty at `record-base` rides the next unit
   commit unless the batch names it (`CLAUDE.md`/`docs/plan.md` did): land the orchestrator-side tools/docs batch
@@ -725,6 +736,7 @@ by a unit other than `U`.
 | --- | --- |
 | `tools/units/stylelint.py` | **you changed `src/` or `include/`**: rules 1–12 with `file:line`; `--diff <ref>` is the gate's add-only comparison (a recut's *moved* findings are credited one per removal from another file of the batch and printed as `moved`, a copy is not), `--budget` a debt read. |
 | `tools/units/vtableaudit.py` | **a unit owns a code-pointer run**: find a vtable it owns but does not emit and a hand-written `+0x00` table store — rule 10 made mechanical, with `--diff` at the gate. |
+| `tools/units/datagap.py --census` | **before you report a unit**: the data its target object references that no claim covers (orphans, with neighbours, section and readers); the gate's data-closure row is this, add-only. |
 | `tools/units/declclash.py` | **a cross-unit lane hits `(10197) illegal function overloading`**: list the function names declared more than once with *different text* in one include closure, before any source is edited. |
 
 ### 9.6 The registers and the suite

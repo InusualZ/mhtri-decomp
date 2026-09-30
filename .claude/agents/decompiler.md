@@ -222,6 +222,10 @@ is not measured), so measure it yourself before you report.
     python tools/units/stylelint.py --diff main  # must add no new section 6.5 violation
     python tools/units/datagap.py --unit <stem>  # data: no `ours-extra` row, and no `target-extra` row for a
                                                  # section your splits block claims (see *Data*)
+    python tools/units/datagap.py --census --unit <unit>   # data closure: every orphan row is data your target
+                                                 # object references that no splits.txt range covers - claim it
+                                                 # (dataclaim.py --unit) or the land gate's data-closure row
+                                                 # refuses; report the orphan count before/after
     python tools/units/flipcheck.py <unit>       # a unit at ~100 %: names the section that would break a flip
                                                  # (extab, a data claim, an undefined reference); READY is
                                                  # necessary, not sufficient - the DOL hash is the proof
