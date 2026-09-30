@@ -77,17 +77,12 @@
  * codegen pragma out of the shared header. */
 #pragma peephole off
 
-/* This band's view of the shell object `shell_set_func_ptr` points at: +0x2C is the job-injection
- * slot (`lwz r12, 44(r8)` + `mtctr` + `bctrl`, with the work record, two ids, a VEC3, a scale and the
- * +0xAEA flag word as its arguments).  `include/stage/fn_802B2AA0.h` owns the pointer and the
- * +0x80/+0x84 view of the other band.
- * size: 0x30 (approximate: only +0x00..+0x2C is read). */
-typedef struct EmShellFuncs {
-    /* +0x000 */ u8 pad_0x00[0x2C];
-    /* +0x02C */ void (*method_0x2C)(struct _ENEMY_WORK* self, s32 a, s32 b, nw4r::math::VEC3* pos,
-                                     f32 scale, u16 flags);
-} EmShellFuncs;
-
+/* This band's call of the +0x2C job-injection slot of `ShellSetFuncs` (`stage/shell_set_func_ptr.h`): the
+ * target passes the work record, two ids, a VEC3, a scale and the +0xAEA flag word and no table argument,
+ * which the shared 7-argument slot type cannot express (passing the table hoists its load, em_act_prog_5
+ * 100 -> 97.83), so the call goes through this 6-argument spelling of the same slot. */
+typedef void (*ShellJobInjectFn)(struct _ENEMY_WORK* self, s32 a, s32 b, nw4r::math::VEC3* pos, f32 scale,
+                                 u16 flags);
 /* The `.rodata` motion table `fn_80134964`/`fn_80134B0C` walk (0x80570AE0..0x80570B20, 64 B). */
 extern "C" u8 lbl_80570AE0[];
 
@@ -287,8 +282,7 @@ extern "C" void em_act_prog_5(_ENEMY_WORK* self) {
             fn_80136B50(self, -1, 5);
             copyVec3(&pos, ((Fn80041E8C)setVec3)(&off, lbl_8079BC88, lbl_8079BC88,
                                                         lbl_8079BD08));
-            ((EmShellFuncs*)shell_set_func_ptr)
-                ->method_0x2C(self, 9, 1, &pos, lbl_8079BC94, self->field_0xAEA);
+            ((ShellJobInjectFn)shell_set_func_ptr->method_0x2C)(self, 9, 1, &pos, lbl_8079BC94, self->field_0xAEA);
         }
         if (em_mot_end_ck(self) == 1 && fn_8012D1A0(self) == 1) {
             if (fn_80382E48(self, 0) == 1)

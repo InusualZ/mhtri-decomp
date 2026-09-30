@@ -19,6 +19,7 @@
 #include "Pl/pl_master.h"
 #include "fn_8004CAD8.h"
 #include "ef/fn_800CDB2C.h"
+#include "stage/shell_set_func_ptr.h" /* `ShellSetFuncs` and the pointer this unit defines */
 
 /* The band's `#pragma peephole off` is NOT here: a codegen pragma in a shared header leaks into every
  * including TU, so a lane matched a file only because of the leak and another lost rows until the
@@ -227,20 +228,10 @@ typedef struct StageBlendRec {
     /* +0x08 */ StageBlendGroup group[3];
 } StageBlendRec;
 
-/* The per-area job table `shell_set_func_ptr` points at: only the +0x80 and +0x88 entries are called,
- * and both take the table pointer itself as their last argument. */
-/* size: 0x8C */
-typedef struct ShellSetFuncs {
-    /* +0x00 */ u8 pad_0x00[0x80];
-    /* +0x80 */ void (*method_0x80)(nw4r::math::VEC3* pos, u32 kind, s32 id, ShellSetFuncs* self);
-    /* +0x84 */ u8 pad_0x84[4];
-    /* +0x88 */ void (*method_0x88)(nw4r::math::VEC3* pos, u32 kind, s32 id, ShellSetFuncs* self);
-} ShellSetFuncs;
-
 #include "g3d/g3d_scnroot.h" /* `nw4r::g3d::ScnRoot`, the scene root the two camera calls go through */
 
 /* ------------------------------------------------------------------------------------------------
- * the block symbols (.bss / .sbss: no registered unit owns them, so the declarations live here)
+ * the block symbols (.bss: no registered unit owns them, so the declarations live here)
  * ------------------------------------------------------------------------------------------------ */
 
 extern "C" u8 stage_w[];
@@ -248,7 +239,6 @@ extern "C" u8 lbl_806BB7B8[];
 extern "C" u8 lbl_806BB7C4[];
 extern "C" u8 lbl_806BB7D0[];
 extern "C" u8 lbl_806BB7E0[];
-extern "C" ShellSetFuncs* shell_set_func_ptr;
 
 /* ------------------------------------------------------------------------------------------------
  * the pooled `.data` / `.sdata2` constants (declared, never defined: the pool belongs to the data pass)

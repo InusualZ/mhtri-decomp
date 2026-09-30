@@ -47,22 +47,7 @@
 #include "mh3_pad.h"
 #include "unsplit/enemy.h"
 #include "unsplit/unknown.h"
-
-/* The shell-callback table `shell_set_func_ptr` points at: this band calls its +0x18 and +0x2C
- * slots (the `ai` band's view names +0x80/+0x88).  A local view with its own name (the shared
- * `ShellSetFuncs` in `include/stage/fn_802B2AA0.h` carries the other view). */
-struct EmShellSet;
-typedef void (*EmShellFn18)(_ENEMY_WORK*, nw4r::math::VEC3*, void*, u32, u32, u32, EmShellSet*);
-typedef void (*EmShellFn2C)(_ENEMY_WORK*, u32, u32, nw4r::math::VEC3*, f32, u32, EmShellSet*);
-/* size: 0x8C */
-struct EmShellSet {
-    /* +0x00 */ u8 pad_0x00[0x18];
-    /* +0x18 */ EmShellFn18 method_0x18;
-    /* +0x1C */ u8 pad_0x1C[0x2C - 0x1C];
-    /* +0x2C */ EmShellFn2C method_0x2C;
-    /* +0x30 */ u8 pad_0x30[0x8C - 0x30];
-};
-extern "C" EmShellSet* shell_set_func_ptr;
+#include "stage/shell_set_func_ptr.h" /* `shell_set_func_ptr` and its slots (rule 2: the owner's header) */
 
 /* The band's pooled `.sdata2` constants (declared, never defined: the pool belongs to the data pass,
  * playbook 29). */

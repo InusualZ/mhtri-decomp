@@ -86,6 +86,7 @@
 #include "unsplit/unknown.h" /* SystemWork / system_w */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "stage/shell_set_func_ptr.h" /* `shell_set_func_ptr` and its slots (rule 2: the owner's header) */
 
 #ifdef __cplusplus
 extern "C" {
@@ -187,21 +188,6 @@ f32 calcDistanceSqXZ(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 void rotVecY(nw4r::math::VEC3* v, u32 angle);
 void* operator new(unsigned long size);
 void operator delete(void* ptr) throw();
-
-/* the shell callback table `shell_set_func_ptr` points at; only its +0x28 entry is used by this unit
- * (the entry `fn_801513FC` calls as `(self, &pos, mode, id, table, scale)`).  Same record as
- * `enemy/fn_80147CE0.cpp`'s private `EmShellSetFunc` (rule-1 follow-up: the copies should move to one
- * header). size: 0x40 */
-typedef struct EmShellSetFuncTbl {
-    /* +0x00 */ u8 unused_0x00[0x28];
-    /* +0x28 */ void (*field_0x28)(struct _ENEMY_WORK* self, void* pos, s32 mode, s32 id,
-                                   void* table, f32 scale);
-    /* +0x2C */ u8 unused_0x2C[0x3C - 0x2C];
-    /* +0x3C */ void (*field_0x3c)(struct _ENEMY_WORK* self, void* rec, u32 mode, void* table);
-} EmShellSetFuncTbl;
-
-/* the table pointer itself (`.sbss`, no registered range) */
-extern EmShellSetFuncTbl* shell_set_func_ptr;
 
 /* ----------------------------------------------------------------------------------------------------
  * the pool the range reads (owned elsewhere; declared, never defined)
@@ -736,7 +722,7 @@ void fn_801513FC(struct _ENEMY_WORK* self) {
             pos.x = self->pos.x;
             pos.y = self->field_0x20C;
             pos.z = self->pos.z;
-            shell_set_func_ptr->field_0x28(self, &pos, 0, 0xFFFF, shell_set_func_ptr, lbl_80796E20);
+            shell_set_func_ptr->method_0x28(self, &pos, 0, 0xFFFF, shell_set_func_ptr, lbl_80796E20);
         }
     }
 }

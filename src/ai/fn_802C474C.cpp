@@ -37,8 +37,8 @@
  * RESIDUAL.
  *   * the four tables are declared, never defined (playbook 29): `.data` 0x805D4784..0x805D4964 is this
  *     band's own run (`leak 0`, four labels) and belongs to the measured data pass, so they are
- *     `extern`-declared here and used as load operands.  `shell_set_func_ptr` (`.sbss` 0x80794B60) and
- *     the `.sdata2` constants are the same case.
+ *     `extern`-declared here and used as load operands.  The `.sdata2`
+ *     constants are the same case (`shell_set_func_ptr` comes from `stage/shell_set_func_ptr.h`).
  *   * the record's tail fields (+0x3C2..+0x498) are new in `include/ai/ainpc.h`; its owner
  *     `src/ai/fn_802CC794.cpp` still carries its own inline copy of the union and has to include the
  *     header instead (rule 1).
@@ -62,6 +62,7 @@
 #include "fn_8004CAD8.h"       /* `rotVecY`, `fn_80050CA0`, `fn_80051378` */
 #include "sound/fn_800D7F54.h" /* `fn_800DCC24` */
 #include "ai/ainpc.h"
+#include "stage/shell_set_func_ptr.h" /* `shell_set_func_ptr` and its `set_target`/`request` slots (rule 2) */
 
 /* This band keeps the unfused forms retail has: the tables' index math is `clrlwi` + `slwi` separate
  * (the peephole folds them into one `clrlslwi`), so the pass is off for the whole file. */
@@ -112,20 +113,6 @@ extern f32 lbl_8079A6AC;
 extern f32 lbl_8079A6B0;
 extern f32 lbl_8079A6B4;
 extern f32 lbl_8079A6B8;
-
-/* `shell_set_func_ptr` (`.sbss` 0x80794B60) - the pointer the band's two outbound effect calls go
- * through.  Slots +0x24 and +0x38 are the only ones evidenced here, and the two take a different
- * argument list, so the table is a record of typed function pointers reached field by field (rule 6:
- * no pointer arithmetic; rule 10: a table outside our ranges is referenced, not written).
- * size: 0x3C */
-struct AINPCShellFuncs {
-    /* +0x00 */ u8 unused_0x00[0x24];
-    /* +0x24 */ void (*set_target)(struct _AINPC_W* self, struct AINPCShellFuncs* shell);
-    /* +0x28 */ u8 unused_0x28[0x38 - 0x28];
-    /* +0x38 */ void (*request)(struct _AINPC_W* self, s32 id, struct AINPCShellFuncs* shell);
-};
-
-extern struct AINPCShellFuncs* shell_set_func_ptr;
 
 /* The band's shared helpers: all unowned (their address band interleaves modules, so rule 2 leaves
  * them here rather than guessing a module header).  Signatures are the call sites' own argument

@@ -30,14 +30,21 @@
  * 0x80031A4C-0x80031BD8 (33 x 12 B).  The six functions with no record (fn_802B2F3C, fn_802B3250,
  * fn_802B3260, fn_802B45BC, fn_802B45D4, fn_802B46DC) are exactly the ones with no call at all.
  *
- * Data.  `.data` 0x805CF728-0x805CF784 (92 B) is claimed and 100 %: it is the 23-entry switch table
- * MWCC emits for fn_802B3270's `switch (st->mapno)` (arms read out of `main.elf`; the table is our
- * object's whole `.data`, so the claim is exactly what the object emits, plan 8.4).  The rest of the
- * run the data queue attributes to `auto/802B2AA0_fn_802B2AA0` - the hand-written tables
- * 0x805CF60C-0x805CFBE8 minus that table, 19 labels - stays **unclaimed**: our object does not emit
- * them, so claiming them would only add target bytes nothing reproduces (playbook 23 / 8.4); the
- * `range` config_request in this unit's outbox carries the evidence.  Every pooled constant is
- * therefore still `extern`-declared and never defined (playbook 29).
+ * Data.  `.data` 0x805CF56C-0x805CFBE8 (1660 B) is claimed: the 23-entry switch table MWCC emits for
+ * fn_802B3270's `switch (st->mapno)` (0x805CF728, 92 B, arms read out of `main.elf`) sits inside it, and the
+ * rest is the band's hand-written tables, which our object does not emit yet (the target object carries
+ * 1660 B of `.data`, ours 92 B, so the unit's data row reads 0 % until they are reconstructed).  Every
+ * pooled constant is `extern`-declared and never defined (playbook 29).
+ *
+ * `.sbss` 0x80794B60-0x80794B68 is claimed for `shell_set_func_ptr` (the shell-set job table pointer, typed
+ * in `include/stage/shell_set_func_ptr.h`; 111 functions in 38 units read it, nothing in the DOL stores it, an
+ * RSO does).  Definer: LOW confidence (about one in three) - `.sbss` follows the text order of the defining
+ * TUs, which brackets the word between Pl/fn_8028F66C|fn_80295EF4 (0x80794B58, a `u8`) and light/light.cpp
+ * (0x80794B68), i.e. any of menu_item, menu_message, stage/shell, Pl/pl_yure, stage/stg_w, this unit or
+ * camera/fn_802B5C58; none of them stores it, and stg_w and this unit are the only ones of those that
+ * read it.  This unit is taken as the definer because it is the stage band's shell-effect driver and
+ * already owned the declaration.  The claim is the map's 8-byte row: our object emits the pointer only, so
+ * `.sbss` is 4 B against the target's 8 B (the word at 0x80794B64 is read by nothing).
  *
  * Flags.  The whole band is peephole-OFF, measured rather than inferred: with the lib's `-O3` peephole
  * on, MWCC restores a saved `f32` with `psq_l f31,N(r1)` where retail has the unfused `li r0,N` +
@@ -114,6 +121,9 @@
 #pragma peephole off
 
 #include "stage/fn_802B2AA0.h"
+
+/* The shell-set job table pointer (`.sbss` 0x80794B60); an RSO stores it, nothing in the DOL does. */
+ShellSetFuncs* shell_set_func_ptr;
 
 /* ------------------------------------------------------------------------------------------------
  * the range, in address order

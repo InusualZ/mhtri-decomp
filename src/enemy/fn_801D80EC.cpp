@@ -80,6 +80,7 @@
 #include "unsplit/unknown.h" /* SystemWork / system_w */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "stage/shell_set_func_ptr.h" /* `shell_set_func_ptr` and its slots (rule 2: the owner's header) */
 
 /* ----------------------------------------------------------------------------------------------------
  * the pool the range reads (owned elsewhere; declared, never defined - playbook 29)
@@ -229,22 +230,6 @@ void get_joint_wmat_em(struct _ENEMY_WORK* self, u32 joint, nw4r::math::MTX34* o
 void* get_move_work_adrs(u8 index);             /* get_move_work_adrs__FUc */
 u16 get_move_work_max(u8 index);                /* get_move_work_max__FUc */
 void CancelFade(struct _ENEMY_WORK* self);      /* CancelFade */
-
-/* The shell callback table `shell_set_func_ptr` points at, as this band reads it.  Same record as
- * `enemy/fn_80147CE0.cpp`'s `EmShellTbl`; only the slots this unit reaches are named.
- * size: 0x58 */
-typedef struct EmShellTbl801D80EC {
-    /* +0x00 */ u8 unused_0x00[0x14];
-    /* +0x14 */ void (*field_0x14)(struct _ENEMY_WORK* self, void* p, u32 a, u32 b, u16 c, void* table);
-    /* +0x18 */ u8 unused_0x18[0x2C - 0x18];
-    /* +0x2C */ void (*field_0x2c)(struct _ENEMY_WORK* self, u32 a, u32 b, void* p, u16 c, void* table, f32 d);
-    /* +0x30 */ u8 unused_0x30[0x3C - 0x30];
-    /* +0x3C */ void (*field_0x3c)(struct _ENEMY_WORK* self, void* p, u32 a, void* table);
-    /* +0x40 */ u8 unused_0x40[0x54 - 0x40];
-    /* +0x54 */ void (*field_0x54)(struct _ENEMY_WORK* self, u32 a, u32 b, void* p, void* table);
-} EmShellTbl801D80EC;
-
-extern "C" EmShellTbl801D80EC* shell_set_func_ptr;
 
 #ifdef __cplusplus
 extern "C" {
@@ -1001,7 +986,7 @@ extern "C" void fn_801D9708(struct _ENEMY_WORK* self, u8 arg1) {
         }
         if (em_frame_check(self, 0, lbl_807995B4, lbl_807994FC) == 1) {
             setVector3(&sp8, lbl_807994FC, lbl_807995B8, lbl_807994FC);
-            shell_set_func_ptr->field_0x54(self, 2, 0x16, &sp8, shell_set_func_ptr);
+            shell_set_func_ptr->method_0x54(self, 2, 0x16, &sp8, shell_set_func_ptr);
         }
         if (em_frame_check(self, 0, lbl_807995BC, lbl_807994FC) == 1) {
             fn_801039B0(self, 0x1C, 0xE39, 0);
@@ -1127,7 +1112,7 @@ extern "C" void fn_801D9918(struct _ENEMY_WORK* self, u8 arg1, u8 arg2) {
                 break;
             }
             if (temp_r29 == 0) {
-                shell_set_func_ptr->field_0x3c(self, &sp48, var_r31, shell_set_func_ptr);
+                shell_set_func_ptr->method_0x3C(self, &sp48, var_r31, shell_set_func_ptr);
             }
         }
         if (em_mot_end_ck(self) == 1) {
@@ -1173,8 +1158,8 @@ extern "C" void fn_801D9CE4(struct _ENEMY_WORK* self) {
         if (em_frame_check(self, 0, lbl_807995F8, lbl_807994FC) == 1) {
             fn_80136B50(self, (u32)-1, 1);
             copyVec3(&sp14, setVec3(&sp8, lbl_807994FC, lbl_807994FC, lbl_807994FC));
-            shell_set_func_ptr->field_0x2c(self, 5, 0x21, &sp14, self->field_0xAEA,
-                                           shell_set_func_ptr, lbl_807994F8);
+            shell_set_func_ptr->method_0x2C(self, 5, 0x21, &sp14, lbl_807994F8, self->field_0xAEA,
+                                           shell_set_func_ptr);
         }
         if ((em_frame_check(self, 1, lbl_807995FC, lbl_807994FC) == 1) && (fn_8012D1A0(self) == 1)) {
             if (fn_8012D3E0(self, 0) != 0xFF) {
@@ -1258,14 +1243,14 @@ extern "C" void fn_801DA0D8(struct _ENEMY_WORK* self) {
     case 1:
         if (em_frame_check(self, 0, lbl_80799608, lbl_807994FC) == 1) {
             get_joint_wpos_em(self, 0x29, &sp14);
-            shell_set_func_ptr->field_0x14(self, &sp14, 0x18, self->area_no, self->field_0xAEA,
+            shell_set_func_ptr->method_0x14(self, &sp14, 0x18, self->area_no, self->field_0xAEA,
                                            shell_set_func_ptr);
         }
         if (em_frame_check(self, 0, lbl_8079960C, lbl_807994FC) == 1) {
             fn_80136B50(self, 0x29, 5);
             setVector3(&sp8, lbl_80799610, lbl_807994FC, lbl_807994FC);
-            shell_set_func_ptr->field_0x2c(self, 9, 0x29, &sp8, self->field_0xAEA,
-                                           shell_set_func_ptr, lbl_80799614);
+            shell_set_func_ptr->method_0x2C(self, 9, 0x29, &sp8, lbl_80799614, self->field_0xAEA,
+                                           shell_set_func_ptr);
             fn_802B43A8(&self->pos, self->area_no, self->bits_0x1EC);
         }
         if (em_mot_end_ck(self) == 1) {
@@ -1702,8 +1687,8 @@ extern "C" void fn_801DB1C8(struct _ENEMY_WORK* self) {
         if (em_frame_check(self, 0, lbl_807995F8, lbl_807994FC) == 1) {
             fn_80136B50(self, (u32)-1, 1);
             copyVec3(&sp14, setVec3(&sp8, lbl_807994FC, lbl_807994FC, lbl_807994FC));
-            shell_set_func_ptr->field_0x2c(self, 5, 0x21, &sp14, self->field_0xAEA,
-                                           shell_set_func_ptr, lbl_807994F8);
+            shell_set_func_ptr->method_0x2C(self, 5, 0x21, &sp14, lbl_807994F8, self->field_0xAEA,
+                                           shell_set_func_ptr);
         }
         if ((em_frame_check(self, 1, lbl_807995FC, lbl_807994FC) == 1) && (fn_8012D1A0(self) == 1)) {
             if (fn_801E0058(self, 0) == 1) {
