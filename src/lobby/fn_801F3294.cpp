@@ -76,7 +76,7 @@ extern "C" {
 u32 fn_801F3294(LbPageOwner* self, LbPage* req)
 {
     u32 ret = 0;
-    LbWorldBlock* world = lbl_80794880;
+    LbWorldBlock* world = lobby_world_block;
     LbPage* sub = self->page_0x010;
 
     switch (req->state_0x000) {
@@ -102,7 +102,7 @@ u32 fn_801F3294(LbPageOwner* self, LbPage* req)
                     LbStepArg arg;
 
                     req->state_0x000++;
-                    fn_800DBC84(3);
+                    sysSE_stop(3);
                     fn_8004D0D8(world, (u8)req->value_0x004);
                     sub->flag_0x01C = world->count_0x009E;
                     memset(&arg, 0, sizeof(arg));
@@ -124,7 +124,7 @@ u32 fn_801F3294(LbPageOwner* self, LbPage* req)
             case 1:
                 if (world->count_0x0002 != req->value_0x004) {
                     req->state_0x000++;
-                    fn_800DBC84(0x28);
+                    sysSE_stop(0x28);
                     fn_8004D0E0(world, (u8)req->value_0x004);
                     fn_80273998(sub, 5, world->count_0x0002);
                     fn_801EC7AC(self);
@@ -245,7 +245,7 @@ void fn_801F3DEC(LbPage* self, LbPage* next, u8 kind)
     if (kind == 1 && fn_8004D70C(19001) == 1) {
         self->kind_0x003 = 2;
     }
-    self->mode_0x002 = lbl_80794880->field_0x39BA;
+    self->mode_0x002 = lobby_world_block->field_0x39BA;
     self->value_0x004 = 0;
     self->count_0x006 = 0;
     self->field_0x008 = 0;
@@ -368,7 +368,7 @@ s16 fn_801F5534(LbPage* self)
         s16 extra = self->field_0x008 + 1;
 
         value += extra;
-        if ((u16)self->count_0x006 <= 1 && self->field_0x008 == 1 && fn_8004AEC0(lbl_80794880) == 0) {
+        if ((u16)self->count_0x006 <= 1 && self->field_0x008 == 1 && fn_8004AEC0(lobby_world_block) == 0) {
             value = (s16)(value + 1);
         }
     }
@@ -453,7 +453,7 @@ void fn_801F865C(LbPage* self, u32 id_a, void* page_b, u32 id_c, u8* ptr_f)
  * is the "none" marker, then OR the record's bit into the caller's flag word. */
 void fn_801F86FC(LbIconRec* recs, u32 id, u32 sel, u32 kind, u32 mode, u16* flags)
 {
-    LbIconRec* src = lbl_80794880->entries_0x0E00;
+    LbIconRec* src = lobby_world_block->entries_0x0E00;
     LbIconRec* rec;
 
     if ((u16)id != 0xFFFF) {

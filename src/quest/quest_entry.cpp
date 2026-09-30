@@ -183,7 +183,7 @@
  *     is the difference between 99.5 and 100 % (the other order colours the first walk's pointer and
  *     accumulator the other way); and `quest_element_state_ck` must return **`u32`**, not `s32`, or its
  *     `== 1` compares `cmpwi` where the target has `cmplwi`.
- *   * FILED, not half-done: `fn_8042CB9C` (`Network/network_pat_control.cpp`) - **43 reference sites in
+ *   * FILED, not half-done: `isServerSelectState` (`Network/network_pat_control.cpp`) - **43 reference sites in
  *     16 files + 5 headers** - blocks `fn_803AB0FC` and through it the whole entry/loader group, and
  *     the `Network/` tree is another lane's this wave; `fn_80125F54` (21 sites/9 files),
  *     `fn_80137604` (13/11), `fn_80141B88` (11/6), `fn_80272E30` (29/14) block `fn_803AE030` (1012 B),
@@ -213,6 +213,7 @@
 #include "unsplit/menu.h"       /* `quest_work_ptr` - the band data no registered unit claims */
 #include "unsplit/lobby.h"      /* `lb_param_w` - the option block no registered unit claims */
 #include "unsplit/unknown.h"    /* `system_w` - the system block no registered unit claims */
+#include "Network/network_pat_control.h"   /* isServerSelectState (owner header, rule 2) */
 #include "enemy/em_pop.h"       /* `quest_flag_*_ck` - owned by enemy/em_pop.cpp (rule 2) */
 #include "enemy/fn_801251D0.h"  /* `enemy_kind_same_ck` - owned by enemy/fn_801251D0.cpp (rule 2) */
 #include "Runtime.PPCEABI.H/memset.h"  /* memset (owner: the Runtime.PPCEABI.H lib) */

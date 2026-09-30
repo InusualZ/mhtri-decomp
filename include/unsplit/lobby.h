@@ -111,12 +111,22 @@ typedef struct LbLobbyWork {
     };
     /* +0x07D */ u8 slots_0x07D[0x2F];
     /* +0x0AC */ LbMenuWork* menu_0xAC;
-    /* +0x0B0 */ u8 unused_0x0B0[0x7C];
+    /* +0x0B0 */ u8 field_0x0B0;
+    /* +0x0B1 */ u8 unused_0x0B1[0x7B];
     /* +0x12C */ u8 field_0x12C;   /* 1 puts the lobby act layer on hold */
     /* +0x12D */ u8 param_0x12D;
     /* +0x12E */ u8 unused_0x12E[0x1];
     /* +0x12F */ u8 param_0x12F;
-    /* +0x130 */ u8 unused_0x130[0x4C];
+    /* +0x130 */ u8 unused_0x130[0x2C];
+    /* +0x15C */ u8 field_0x15C;
+    /* +0x15D */ u8 field_0x15D;
+    /* +0x15E */ u8 field_0x15E;
+    /* +0x15F */ u8 field_0x15F;
+    /* +0x160 */ u8 field_0x160;
+    /* +0x161 */ u8 field_0x161;
+    /* +0x162 */ u8 unused_0x162[0x14];
+    /* +0x176 */ u8 field_0x176;
+    /* +0x177 */ u8 unused_0x177[0x5];
 } LbLobbyWork; /* size: 0x17C */
 
 /* The lobby's NPC move table block (`lb_npc_move_data`, .bss): +0x0C is the `LbNpcMotionEntry` array
@@ -165,7 +175,7 @@ typedef struct LbStrBlock {
     /* +0x06 */ u16 code_0x06;
 } LbStrBlock; /* size: 0x8 */
 
-/* One 0xC-byte lobby part slot at `lbl_80794880 + 0x3F38 + i * 0xC`. */
+/* One 0xC-byte lobby part slot at `lobby_world_block + 0x3F38 + i * 0xC`. */
 typedef struct LbPartSlot {
     /* +0x00 */ u8 kind_0x00;
     /* +0x01 */ u8 sub_0x01;
@@ -215,7 +225,7 @@ typedef struct LbSeParam {
     /* +0x18 */ s8 flag_0x18;
 } LbSeParam; /* size: 0x1C */
 
-/* The big lobby data block at `lbl_80794880`; this unit reads two byte fields and one string run. */
+/* The big lobby data block at `lobby_world_block`; this unit reads two byte fields and one string run. */
 typedef struct LbBigBlock {
     /* +0x0000 */ u8 unused_0x0000[0x4068];
     /* +0x4068 */ u8 name_0x4068[4];
@@ -251,7 +261,9 @@ typedef struct LbParamWork {
 typedef struct LbPswBlock {
     /* +0x000 */ u8 pad_0x000[0x2C4];
     /* +0x2C4 */ u16 status_0x2C4;
-    /* +0x2C6 */ u8 pad_0x2C6[0x8A];
+    /* +0x2C6 */ u8 pad_0x2C6[0xE];
+    /* +0x2D4 */ u16 status2_0x2D4;
+    /* +0x2D6 */ u8 pad_0x2D6[0x7A];
 } LbPswBlock; /* size: 0x350 */
 
 extern LbPswBlock Psw[4];
@@ -394,7 +406,7 @@ extern u8 lbl_80791C38[8];
 extern u8 lbl_80791C40[2];
 extern u8 lbl_80791C44[5];
 extern u8 lbl_80791C50[8];
-extern u8 lbl_80794880[];
+extern u8 lobby_world_block[];
 /* The four 6-entry sprite/index tables `fn_803A4F7C`/`fn_803A5070` search, and the flat u16 run
  * their search continues into (both terminated by a 0 entry).  The addresses are in the unclaimed
  * `.data` run 0x805F2038..0x805F2A38 / `.sdata` run 0x80793530.., which no registered unit owns
@@ -558,7 +570,6 @@ extern u8 lbl_806AA6F0[0x20];   /* .bss 0x806AA6F0 - the lobby sub-scene latch b
 extern f32 lbl_80799B18;
 extern f32 lbl_80799B1C;
 extern f32 lbl_80799B20;
-void fn_8042E9A4(u32 id, u8* table);
 
 #ifdef __cplusplus
 }

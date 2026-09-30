@@ -33,7 +33,7 @@
  *
  * MODULE AND NAME (brief section 2).  Class 1 (no `__FILE__`) and class 2 (no dump name) have no
  * evidence.  Class 3: the range's globals are the lobby's (`lobby_w` 0x806AAB44, `lb_param_w`,
- * `Screen_w`, `lbl_80794880`), its dominant API is the lobby's (`LbStr`, `lb_item_get_data`,
+ * `Screen_w`, `lobby_world_block`), its dominant API is the lobby's (`LbStr`, `lb_item_get_data`,
  * `subTransSet`, `menu_cursor_step`) and the nearest registered same-lib family is
  * `lobby/lb_quest_ui.cpp` / `lobby/lb_quest_board.cpp`; the direct left neighbour is
  * `menu/multi_result.cpp`.  So the module is `lobby` and `lb_quest_screen.cpp` is a **GUESS** derived
@@ -99,7 +99,7 @@ void note_pane_state_9(NoteWork* self);
  * The note-pane band (0x803A3A50..0x803A52A4).
  * ------------------------------------------------------------------------------------------------- */
 
-/* The lobby lifetime/timer record at `lbl_80794880 + 0x5270` that `note_timer_*` reads: a flag, a
+/* The lobby lifetime/timer record at `lobby_world_block + 0x5270` that `note_timer_*` reads: a flag, a
  * two-refresh counter and a four-entry field whose refresh loop runs 50 times per entry (the retail
  * source's own leftover nesting, which the target's codegen reproduces exactly).
  * size: 0x18 */

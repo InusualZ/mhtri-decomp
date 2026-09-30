@@ -18,7 +18,7 @@
  *
  * Build: `cflags_main` plus a file-scope `#pragma peephole off` and a file-scope
  * `#pragma optimization_level 4`. The retail object keeps `clrlwi`+`cmpwi`
- * unfused and uses non-record forms in `sysSE_req`, `fn_800DBC84`, `fn_800DB4EC`, `fn_800DC53C` and
+ * unfused and uses non-record forms in `sysSE_req`, `sysSE_stop`, `fn_800DB4EC`, `fn_800DC53C` and
  * `fn_800DAADC`; `-opt nopeephole` reproduces all of them and changes none of the other functions, so the
  * pragma is a stand-in for the per-unit cflags group the outbox requests (playbook 33). The level-4
  * pragma is measured too: it moves `fn_800D9B6C` 96.667 -> 99.483 (retail's contiguous-case dispatch is
@@ -373,7 +373,7 @@ void sysSE_req(s32 id) {
     }
 }
 
-extern "C" void fn_800DBC84(s32 id) {
+extern "C" void sysSE_stop(s32 id) {
     if (fn_803C482C() == 0 && fn_800F04FC(30) != 0) {
         fn_800DBB78(30, id);
     }

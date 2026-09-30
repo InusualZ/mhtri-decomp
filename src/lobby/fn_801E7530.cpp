@@ -44,7 +44,7 @@ s32 fn_8004D334(s32 a);
 void uv_pair_copy(_mh_ivec2_* dst, const _mh_ivec2_* src);
 u16 fn_800CEF18(u16 id);
 u32 game_ready_ck(void);
-s32 fn_800DBC84(s32 id);
+s32 sysSE_stop(s32 id);
 }
 
 /* This unit's own functions that earlier bodies call; C linkage, like their definitions. */
@@ -282,7 +282,7 @@ void fn_801E79E4(void)
             self->value_0x38 = -1;
             self->value_0x3C = 3;
             fn_802BBA64(1);
-            fn_800DBC84(0x29);
+            sysSE_stop(0x29);
         }
         /* fall through */
     default:
@@ -392,7 +392,7 @@ void fn_801E79E4(void)
         switch (fn_801E7178(self)) {
         case 1:
             self->state_0x00 = 5U;
-            fn_80359D98(lbl_80794880 + 0x4860, lb_item_get_data + 0x20);
+            fn_80359D98(lobby_world_block + 0x4860, lb_item_get_data + 0x20);
             break;
         case 2:
             self->state_0x00 = 1U;
@@ -570,7 +570,7 @@ void fn_801E843C(LbMenuWork* self)
     s32 i;
     u16 shown;
 
-    big = (LbBigBlock*)lbl_80794880;
+    big = (LbBigBlock*)lobby_world_block;
     if (chk_pointer() == 0) {
         get_lsp_data(0x1D8BU, &anchor);
         draw_sprite_ary((const u16*)lbl_80791B90, &anchor);
@@ -590,7 +590,7 @@ void fn_801E843C(LbMenuWork* self)
         kind = big->tail_0x6010[0];
     } else {
         type = 0x1D71;
-        { u8* entry = lbl_80794880 + 0x4850; fn_801E88C4((LbStrBlock*)name, (const LbStrBlock*)(entry + (self->list_mode_0x0C - 1) * 8)); }
+        { u8* entry = lobby_world_block + 0x4850; fn_801E88C4((LbStrBlock*)name, (const LbStrBlock*)(entry + (self->list_mode_0x0C - 1) * 8)); }
         idx = name[4];
         kind = name[6];
     }
@@ -978,7 +978,7 @@ void fn_801E92B0(void)
     const LbPartRec* src;
     s32 i;
 
-    dst = (LbPartRec*)(lbl_80794880 + 0x3F98);
+    dst = (LbPartRec*)(lobby_world_block + 0x3F98);
     src = (const LbPartRec*)lbl_805B7F28;
     for (i = 0; i < 0xD; i++) {
         fn_801E9318(dst, src);
@@ -991,7 +991,7 @@ void fn_801E9AA8(u8 arg0)
 {
     LbPartSlot* slot;
 
-    slot = (LbPartSlot*)(lbl_80794880 + 0x3F38);
+    slot = (LbPartSlot*)(lobby_world_block + 0x3F38);
     if (slot[0].kind_0x00 != 2) {
         lobby_w.slots_0x07D[0] = 0U;
     } else if (lobby_w.slots_0x07D[0] == 0 && arg0 != 0) {

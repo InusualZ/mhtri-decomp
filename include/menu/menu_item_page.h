@@ -129,7 +129,7 @@ typedef struct LbItemDb {
     /* +0x0181 */ u8 unused_0x0181[0x3F04 - 0x0181];
     /* +0x3F04 */ u16 field_0x3F04;    /* the value the "%d" price line prints */
 } LbItemDb;
-extern LbItemDb* lbl_80794880;
+extern LbItemDb* lobby_world_block;
 
 s32 item_page_option_item_id(u8 kind, u8 row);
 s32 quest_record_a_count_get_wide(s32 kind);
@@ -148,7 +148,7 @@ s32 strcmp(const s8* a, const s8* b);
 #ifdef __cplusplus
 
 /* The sprite/font library `hud/layout.cpp` owns (the shapes `include/unsplit/lobby.h` carries, minus
- * its `lbl_80794880` array view - this unit needs the pointer the map records). */
+ * its `lobby_world_block` array view - this unit needs the pointer the map records). */
 void* get_lsp_data(u16 id, _mh_ivec2_* out);
 void draw_sprite(const _SPR_DATA_& spr, const _mh_ivec2_* pos);
 void draw_font(const _SPR_DATA_& spr, s8* text, u32 flag, const _mh_ivec2_* pos);

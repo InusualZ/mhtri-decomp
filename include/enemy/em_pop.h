@@ -163,6 +163,10 @@ s32 quest_arena_need_get(s32 index);
  * 0x404 or 0x414.  Forces the pair rolls in `quest_pair_roll_all` (0x803B5E2C). */
 u32 quest_element_state_ck(void);
 
+/* 0x803B7434 - whether the downloaded file in `buffer` carries `version` (its u16 at +0x2C); the
+ * network band's staging download checks with it. */
+u32 matchesFileVersion(const u8* buffer, u16 version);
+
 #ifdef __cplusplus
 }
 #endif

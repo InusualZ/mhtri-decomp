@@ -526,7 +526,7 @@ f32 GetGroundHit2(nw4r::math::VEC3*, u32, u8, u8*);
 void rotVecY(nw4r::math::VEC3*, u32);
 
 extern "C" s32 fn_802E5CFC(s32);
-extern "C" u32 fn_8042CB9C(s32);
+extern "C" u32 isServerSelectState(s32);
 /* 0x80338E04 `lobby/lb_companion_ui.cpp` (the companion/status UI band).  The owner's header cannot be
  * included from this unit - it declares `Pl_cat_skill_ck` returning `void` against this file's `u32`
  * (measured: `(10505) illegal overloading 'Pl_cat_skill_ck(_PLW *, unsigned short)'`), and
@@ -1893,7 +1893,7 @@ extern "C" void fn_8027AF88(_PLW* self)
     if (q == 0) {
         return;
     }
-    if (fn_8042CB9C(fn_802E5CFC(*(s8*)(q + 1505))) == 1) {
+    if (isServerSelectState(fn_802E5CFC(*(s8*)(q + 1505))) == 1) {
         *(s16*)((u8*)self + 1626) = 900;
         *((u8*)self + 1625) = 1;
         lb_entry_handover_send(1, (u8)my_player_no(), *(u8*)(q + 1505));

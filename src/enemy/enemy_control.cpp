@@ -151,8 +151,8 @@ void fn_80146E54(u8 kind);
 void fn_801472D8(u8 kind);
 void* fn_80147AC8(EmcWork* work);
 void fn_80143A40(void* self);
-u32  fn_8042CB9C(void);
-u8   fn_8042CC20(void);
+u32  isServerSelectState(void);
+u8   isReadyCountOne(void);
 
 /* ----------------------------------------------------------------------------------------------- *
  * the emc_work control block and the 0x90/0xA0 record arrays
@@ -203,8 +203,8 @@ void fn_8014128C(void) {
     fn_80145620();
     fn_80145390();
     fn_80145C84();
-    if (fn_8042CB9C() == 1) {
-        emc_work.field_0x36A = fn_8042CC20();
+    if (isServerSelectState() == 1) {
+        emc_work.field_0x36A = isReadyCountOne();
     } else {
         emc_work.field_0x36A = 1;
     }

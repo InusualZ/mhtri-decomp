@@ -32,7 +32,14 @@ void fn_800E84F0(s32 volume);
 void fn_800E85E8(u32 idx);
 void fn_800E8634(u32 idx, u32 entry_idx);
 /* The stream stop `bgm_stop_all()` in `sound/fn_800F2A94.cpp` tail-calls. */
-void fn_800E4A7C(void);
+void resumeSoundEngine(void);
+
+/* 0x800E4A7C - resumes the sound engine after the mute of the login screens (GUESS). */
+void resumeSoundEngine(void);
+/* 0x800E89D8 - the network mediator singleton (`getInstance`, an 8-byte accessor); the Network headers
+ * carry their own `void*` spelling of it. */
+class NetworkWiiMediator;
+NetworkWiiMediator* getInstance(void);
 
 #ifdef __cplusplus
 }

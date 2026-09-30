@@ -12,7 +12,7 @@
  *
  * Naming note: the file's own 79 symbols are named above.  What the escape still covers is
  * precisely the names this file *references* in other units - the 40-odd unsplit lobby/runtime
- * callees (`fn_80334A34`, `fn_8042C9C8`, `fn_800CF384`, ...) and the two neighbouring handlers
+ * callees (`fn_80334A34`, `broadcastSessionCommand`, `fn_800CF384`, ...) and the two neighbouring handlers
  * `fn_80337E78`..`fn_80338600` - which are not this lane's to rename; the dump answers `zz_` for
  * them too and no `__FILE__` string covers the region.  Removing the escape would put every one of
  * those occurrences into rule 7's `fn_` half, and this file is new to `main`, so every finding would
@@ -46,7 +46,7 @@
  *    band's pool run is an ordered disjoint partition - 0x8079B2B0 (below) | 0x8079B2B8/BC (here)
  *    | 0x8079B2C0+ (above);
  *  - nothing private crosses an edge: no `.sdata2`/`.sdata`/`.data` label is cited from both
- *    sides (only the globals `lbl_80794880`, `lobby_w` and the `_savegpr_*` helpers are), so no
+ *    sides (only the globals `lobby_world_block`, `lobby_w` and the `_savegpr_*` helpers are), so no
  *    must-link exists in either direction;
  *  - the `scope:local` anchors (654 `.data` labels, 0/653 owner-order inversions DOL-wide) put
  *    this band's three switch tables in order - 0x805E27D4 <- lb_act_dispatch, 0x805E27F8 <-
@@ -84,7 +84,7 @@
  * per-file pragma, measured over this whole file:
  *   * `-Cpp_exceptions on` - the target object carries the 98 unwind records the old default
  *     (`-Cpp_exceptions off`) did not emit.
- *   * `#pragma peephole off` - retail keeps the unfused narrow forms (`clrlwi` + `slwi`, `lbl_80794880
+ *   * `#pragma peephole off` - retail keeps the unfused narrow forms (`clrlwi` + `slwi`, `lobby_world_block
  *     + (i >> 3)` kept in a register) that the pass folds into one `rlwinm`/`addi`.  A/B over the whole
  *     file: 24 -> 47 functions byte-identical and 60 -> 73 of the 133 at or above the 80 % bar.
  *
@@ -96,7 +96,7 @@
  * (816 B), `fn_8033B380` (764 B), `fn_8033D1F8` (740 B), `fn_8033C77C` (564 B) and `fn_8033EDAC`
  * (504 B) - the tutorial/quest state machine, the page/dialog update chain and the drawing helpers.
  * Two written functions are the honest residual (measured with `recompile.py --measure`):
- *   * `lb_page_entry_bit_set` 29.58 % - retail computes `lbl_80794880 + (index >> 3)` into a register and keeps
+ *   * `lb_page_entry_bit_set` 29.58 % - retail computes `lobby_world_block + (index >> 3)` into a register and keeps
  *     the bit-field offset as the load displacement (`add r5,r3,r0` + `lbz r4,14688(r5)`); ours folds
  *     the offset into the base (`addi r5,r3,14688`) and indexes by the raw shift, so the two
  *     addressing idioms differ on every instruction of this 48-byte helper.
@@ -116,6 +116,7 @@
 
 #include "types.h"
 #include "lobby/lb_companion_ui.h"
+#include "Network/network_pat_control.h" /* the owner's header (rule 2) */
 
 #pragma peephole off
 
@@ -179,9 +180,9 @@ void lb_act_dispatch(u8 index, LbActReq* req) {
 void lb_entry_selected_send(LbActReq* req) {
     LbCmdSub05 cmd;
 
-    if (fn_8042CB9C() != 0) {
+    if (isServerSelectState() != 0) {
         fn_80334A34(&cmd, req->mask_0x08.byte_0x00, 0xD, 5);
-        fn_8042C9C8(&cmd, 4);
+        broadcastSessionCommand(&cmd, 4);
     }
 }
 
@@ -191,9 +192,9 @@ void lb_entry_selected_send(LbActReq* req) {
 void lb_entry_notify_send(s32 index, u8 entry) {
     LbCmdSub05 cmd;
 
-    if (fn_8042CB9C() != 0) {
+    if (isServerSelectState() != 0) {
         fn_80334A34(&cmd, entry, 0xD, (u8)(index + 6));
-        fn_8042C9C8(&cmd, 4);
+        broadcastSessionCommand(&cmd, 4);
     }
 }
 
@@ -207,7 +208,7 @@ void lb_act_announce(u8 unused, LbActReq* req) {
 
     switch (req->act_0x03) {
     case 6:
-        if (fn_8042CC20() != 0) {
+        if (isReadyCountOne() != 0) {
             work = get_move_work_adrs(0);
             if (work != NULL) {
                 companion = work->companion_0xDC;
@@ -254,10 +255,10 @@ void lb_entry_flags_clear(void) {
 void lb_sub0a_send(u8 index, u8 value) {
     LbCmdSub0A cmd;
 
-    if (fn_8042CB9C() != 0) {
+    if (isServerSelectState() != 0) {
         fn_80334A34(&cmd, index, 0xD, 10);
         cmd.value_0x04 = value;
-        fn_8042C9C8(&cmd, 8);
+        broadcastSessionCommand(&cmd, 8);
     }
 }
 
@@ -272,10 +273,10 @@ void lb_act_seen_set(u8 bit, LbActReq* req) {
 void lb_sub0b_send(u8 index, u8 value) {
     LbCmdSub0A cmd;
 
-    if (fn_8042CB9C() != 0) {
+    if (isServerSelectState() != 0) {
         fn_80334A34(&cmd, index, 0xD, 11);
         cmd.value_0x04 = value;
-        fn_8042C9C8(&cmd, 8);
+        broadcastSessionCommand(&cmd, 8);
     }
 }
 
@@ -288,7 +289,7 @@ void lb_act_handled_set(u8 bit, LbActReq* req) {
 /* Act 9: publishes the entry's id into the system block's ring cell 3 unless the pad owns it.
  * Name: act 9: writes the entry id into `system_w.ring_0x18[3]` unless the pad owns it */
 void lb_act_entry_publish(u8 unused, LbActReq* req) {
-    if (fn_8042CC20() != 1) {
+    if (isReadyCountOne() != 1) {
         system_w.ring_0x18[3] = (u16)req->sel_0x04.word_0x00;
     }
 }
@@ -306,7 +307,7 @@ void lb_handled_set(u8 unused, u8 index) {
 }
 
 /* Whether every set bit of `lbl_80794B90[index]`'s low nibble belongs to a pad that is present.
- * Name: counts the set low-nibble bits whose pad is present and compares the count with `net_occupied_slot_count()` */
+ * Name: counts the set low-nibble bits whose pad is present and compares the count with `countOccupiedServerSlots()` */
 s32 lb_seen_pad_ck(u8 index) {
     s32 count;
     u8 bits;
@@ -316,13 +317,13 @@ s32 lb_seen_pad_ck(u8 index) {
     bits = lbl_80794B90[index] & 0xF;
     i = 0;
     do {
-        if ((bits & 1) != 0 && fn_8042CB6C(i) != 0) {
+        if ((bits & 1) != 0 && isServerSlotOccupied(i) != 0) {
             count += 1;
         }
         bits = (u8)((s32)bits >> 1);
         i += 1;
     } while ((s32)i < 4);
-    return count == net_occupied_slot_count();
+    return count == countOccupiedServerSlots();
 }
 
 /* Whether the per-entry byte `lbl_80794B98[index]` is set.
@@ -337,7 +338,7 @@ void lb_act_award_handover(u8 unused, LbActReq* req) {
     LbMoveWork* work;
     LbCompanionWork* companion;
 
-    if (fn_8042CB9C() != 0) {
+    if (isServerSelectState() != 0) {
         work = get_move_work_adrs(0);
         if (work != NULL) {
             companion = work->companion_0xDC;
@@ -372,7 +373,7 @@ void lb_entry_handover_send(u8 kind, u8 index, u8 value) {
     work = get_move_work_adrs(0);
     if (work != NULL) {
         companion = work->companion_0xDC;
-        if (companion != NULL && fn_8042CB9C() != 0) {
+        if (companion != NULL && isServerSelectState() != 0) {
             if (kind == 1) {
                 fn_80334A34(&cmd, index, 0xD, 1);
                 cmd.pad_index_0x04 = index;
@@ -387,7 +388,7 @@ void lb_entry_handover_send(u8 kind, u8 index, u8 value) {
                 cmd.mask_0x08 = companion->bits_0x684[0];
                 cmd.mask_0x0C = companion->bits_0x684[1];
             }
-            fn_8042C9C8(&cmd, 0x10);
+            broadcastSessionCommand(&cmd, 0x10);
         }
     }
 }
@@ -407,7 +408,7 @@ void lb_act_handover(u8 unused, LbActReq* req) {
         companion = work->companion_0xDC;
         if (companion != NULL) {
             if (req->sel_0x04.bytes_0x00.b_0x01 == 0) {
-                if (fn_8042CC20() == 1) {
+                if (isReadyCountOne() == 1) {
                     index = req->sel_0x04.bytes_0x00.d_0x03;
                     bit = 1 << (index & 0x1F);
                     if ((companion->bits_0x684[index >> 5] & bit) != 0) {
@@ -445,13 +446,13 @@ void lb_act_handover(u8 unused, LbActReq* req) {
 void lb_sub0d_send(u8 index, LbActReq* req, s8 flag) {
     LbCmdSub0D cmd;
 
-    if (fn_8042CB9C() != 0) {
+    if (isServerSelectState() != 0) {
         fn_80334A34(&cmd, index, 0xD, 0xD);
         cmd.value_0x04 = req->sel_0x04.bytes_0x00.b_0x01;
         cmd.index_0x05 = req->sel_0x04.bytes_0x00.c_0x02;
         cmd.flag_0x06 = flag;
         cmd.word_0x08 = req->mask_0x08.half_0x00;
-        fn_8042C9C8(&cmd, 0xA);
+        broadcastSessionCommand(&cmd, 0xA);
     }
 }
 
@@ -463,7 +464,7 @@ void lb_act_row_update(u8 unused, LbActReq* req) {
 
     row = fn_802AB538(req->sel_0x04.bytes_0x00.a_0x00, req->sel_0x04.bytes_0x00.b_0x01);
     if (row != NULL) {
-        if (fn_8042CC20() == 1 && req->sel_0x04.bytes_0x00.c_0x02 == 3 && row->state_0x07 <= 3) {
+        if (isReadyCountOne() == 1 && req->sel_0x04.bytes_0x00.c_0x02 == 3 && row->state_0x07 <= 3) {
             row->value_0x08 = req->mask_0x08.half_0x00;
             row->state_0x07 = 4;
             lb_sub0d_send(row->index_0x05, req, 4);
@@ -480,7 +481,7 @@ void lb_sub0e_send(u8 index, u16 id, u8 flag, u16 value) {
     LbCmdSub0E cmd;
     u8 set = flag;
 
-    if (fn_8042CB9C() == 0) {
+    if (isServerSelectState() == 0) {
         fn_803B6998(id, value);
         return;
     }
@@ -492,7 +493,7 @@ void lb_sub0e_send(u8 index, u16 id, u8 flag, u16 value) {
     cmd.flag_0x05 = 0;
     cmd.id_0x06 = id;
     cmd.word_0x08 = value;
-    fn_8042C9C8(&cmd, 0xA);
+    broadcastSessionCommand(&cmd, 0xA);
 }
 
 /* Act 14: 1 sends the row over when this pad owns it, anything else updates it locally.
@@ -504,7 +505,7 @@ void lb_act_row_apply(u8 unused, LbActReq* req) {
     kind = req->sel_0x04.bytes_0x00.a_0x00;
     if ((s32)kind != 0) {
         if (kind == 1) {
-            if (fn_8042CC20() == 1) {
+            if (isReadyCountOne() == 1) {
                 lb_sub0e_send(0, req->sel_0x04.bytes_0x00.c_0x02, 2, req->mask_0x08.half_0x00);
             }
         } else {
@@ -520,7 +521,7 @@ void lb_sub0f_send(u8 index, u8 value, void* text, u16 id, u8 flag, f32 scale) {
     LbCmdSub0F cmd;
 
     lb_sub0f_init(&cmd);
-    if (fn_8042CB9C() == 0) {
+    if (isServerSelectState() == 0) {
         fn_80142C58(value, text, id, flag, scale);
         return;
     }
@@ -530,7 +531,7 @@ void lb_sub0f_send(u8 index, u8 value, void* text, u16 id, u8 flag, f32 scale) {
     cmd.id_0x06 = id;
     cmd.flag_0x05 = flag;
     cmd.scale_0x08 = scale;
-    fn_8042C9C8(&cmd, 0x2C);
+    broadcastSessionCommand(&cmd, 0x2C);
 }
 
 /* Copies the 0x20-byte text block: its first 8 bytes a byte at a time, the rest word-wise (MWCC's
@@ -568,13 +569,13 @@ void lb_text_apply(u8 unused, LbCmdSub0F* cmd) {
 void lb_sub10_send(u8 index, s8 value) {
     LbCmdSub10 cmd;
 
-    if (fn_8042CB9C() == 0) {
+    if (isServerSelectState() == 0) {
         fn_80146C00(value, index);
         return;
     }
     fn_80334A34(&cmd, index, 0xD, 0x10);
     cmd.value_0x04 = value;
-    fn_8042C9C8(&cmd, 5);
+    broadcastSessionCommand(&cmd, 5);
 }
 
 /* Act 16: hands the request's byte and index to the local handler.
@@ -588,11 +589,11 @@ void lb_act_byte_apply(u8 unused, LbActReq* req) {
 void lb_sub11_send(s8 a, s8 b) {
     LbCmdSub11 cmd;
 
-    if (fn_8042CB9C() != 0) {
+    if (isServerSelectState() != 0) {
         fn_80334A34(&cmd, fn_800CF384(), 0xD, 0x11);
         cmd.value_0x04 = a;
         cmd.value_0x05 = b;
-        fn_8042C9C8(&cmd, 6);
+        broadcastSessionCommand(&cmd, 6);
     }
 }
 
@@ -607,13 +608,13 @@ void lb_act_pair_apply(u8 unused, LbActReq* req) {
 void lb_sub12_send(u8 value) {
     LbCmdSub12 cmd;
 
-    if (fn_8042CB9C() == 0) {
+    if (isServerSelectState() == 0) {
         fn_802B45F4(value);
         return;
     }
     fn_80334A34(&cmd, fn_800CF384(), 0xD, 0x12);
     cmd.value_0x04 = value;
-    fn_8042C9C8(&cmd, 5);
+    broadcastSessionCommand(&cmd, 5);
 }
 
 /* Act 18: hands the request's byte to the local handler.
@@ -627,13 +628,13 @@ void lb_act_index_apply(u8 unused, LbActReq* req) {
 void lb_sub13_send(s16 first, s16 second, u8 value) {
     LbCmdSub13 cmd;
 
-    if (fn_8042CB9C() != 0) {
+    if (isServerSelectState() != 0) {
         fn_80334A34(&cmd, fn_800CF384(), 0xD, 0x13);
         cmd.value_0x04 = value;
         cmd.first_0x08 = first;
         cmd.second_0x0A = second;
         cmd.pad_index_0x0C = fn_800CF384();
-        fn_8042C9C8(&cmd, 0x10);
+        broadcastSessionCommand(&cmd, 0x10);
     }
 }
 
@@ -651,10 +652,10 @@ void lb_act_value_apply(u8 unused, LbActReq* req) {
 void lb_sub14_send(s8 value) {
     LbCmdSub10 cmd;
 
-    if (fn_8042CB9C() != 0) {
+    if (isServerSelectState() != 0) {
         fn_80334A34(&cmd, fn_800CF384(), 0xD, 0x14);
         cmd.value_0x04 = value;
-        fn_8042C9C8(&cmd, 5);
+        broadcastSessionCommand(&cmd, 5);
     }
 }
 
@@ -679,7 +680,7 @@ void lb_sub15_send(void) {
     LbCmdSub05 cmd;
 
     fn_80334A34(&cmd, fn_800CF384(), 0xD, 0x15);
-    fn_8042C9C8(&cmd, 4);
+    broadcastSessionCommand(&cmd, 4);
 }
 
 /* Increments the companion work's tick counter.
@@ -703,7 +704,7 @@ void lb_sub1c_send(void) {
     LbCmdSub05 cmd;
 
     fn_80334A34(&cmd, fn_800CF384(), 0xD, 0x1C);
-    fn_8042C9C8(&cmd, 4);
+    broadcastSessionCommand(&cmd, 4);
 }
 
 /* Sends the sub-0x16 command with a word and two signed bytes.
@@ -711,12 +712,12 @@ void lb_sub1c_send(void) {
 void lb_sub16_send(s32 value, s8 flag) {
     LbCmdSub16 cmd;
 
-    if (fn_8042CB9C() != 0) {
+    if (isServerSelectState() != 0) {
         fn_80334A34(&cmd, fn_800CF384(), 0xD, 0x16);
         cmd.flag_0x08 = flag;
         cmd.value_0x04 = value;
         cmd.value_0x09 = 0;
-        fn_8042C9C8(&cmd, 0xC);
+        broadcastSessionCommand(&cmd, 0xC);
     }
 }
 
@@ -733,14 +734,14 @@ void lb_act_slot_write(u8 unused, LbActReq* req) {
         companion = work->companion_0xDC;
         if (companion != NULL) {
             if (req->sel_0x04.bytes_0x00.d_0x03 == 0) {
-                if (fn_8042CC20() != 0 && fn_803AA41C(1) == 0 &&
+                if (isReadyCountOne() != 0 && fn_803AA41C(1) == 0 &&
                     quest_element_pick_ck((QuestWork*)companion, req->mask_0x08.byte_0x00, 1) != 1 &&
                     (s8)companion->step_0x2C != 4) {
                     fn_80334A34(&cmd, fn_800CF384(), 0xD, 0x16);
                     cmd.flag_0x08 = req->mask_0x08.byte_0x00;
                     cmd.value_0x04 = req->sel_0x04.word_0x00;
                     cmd.value_0x09 = 1;
-                    fn_8042C9C8(&cmd, 0xC);
+                    broadcastSessionCommand(&cmd, 0xC);
                 }
             } else if (work->state_0xFA <= 2 && fn_803AA41C(1) == 0 &&
                        quest_element_pick_ck((QuestWork*)companion, req->mask_0x08.byte_0x00, 1) != 1) {
@@ -761,7 +762,7 @@ void lb_sub17_send(s16 value, s8 first, s8 second, s8 third) {
     cmd.first_0x06 = first;
     cmd.second_0x07 = second;
     cmd.third_0x08 = third;
-    fn_8042C9C8(&cmd, 0xA);
+    broadcastSessionCommand(&cmd, 0xA);
 }
 
 /* Act 22: keeps the companion work's high score and hands the row on.
@@ -795,7 +796,7 @@ void lb_sub18_send(void) {
     LbCmdSub05 cmd;
 
     fn_80334A34(&cmd, fn_800CF384(), 0xD, 0x18);
-    fn_8042C9C8(&cmd, 4);
+    broadcastSessionCommand(&cmd, 4);
 }
 
 /* Puts the companion work into mode 3 (the area-change announcement).
@@ -823,7 +824,7 @@ void lb_entry_start_send(LbCompanionWork* companion, s8 value, s32 arg, u8 flag)
 
     started = flag;
     if (flag == 1) {
-        if (fn_8042CC20() == 0) {
+        if (isReadyCountOne() == 0) {
             started = 0;
         } else if (companion->started_0x6A40 != 0) {
             return;
@@ -847,7 +848,7 @@ void lb_entry_start_send(LbCompanionWork* companion, s8 value, s32 arg, u8 flag)
     } else {
         cmd.started_0x1B = 0;
     }
-    fn_8042C9C8(&cmd, 0x1C);
+    broadcastSessionCommand(&cmd, 0x1C);
     companion->index_0x6A68 = value;
     companion->value_0x20 = arg;
     companion->step_0x2C = 4;
@@ -871,7 +872,7 @@ void lb_act_entry_start(u8 unused, LbCmdSub19* req) {
         companion = work->companion_0xDC;
         if (companion != NULL) {
             if (companion->index_0x6A68 == 0) {
-                if (fn_8042CC20() != 0 && companion->started_0x6A40 == 0) {
+                if (isReadyCountOne() != 0 && companion->started_0x6A40 == 0) {
                     fn_80334A34(&cmd, fn_800CF384(), 0xD, 0x19);
                     cmd.value_0x04 = req->value_0x04;
                     cmd.value_0x08 = req->value_0x08;
@@ -882,7 +883,7 @@ void lb_act_entry_start(u8 unused, LbCmdSub19* req) {
                     cmd.value_0x16 = req->value_0x16;
                     cmd.value_0x17 = req->value_0x17;
                     cmd.started_0x1B = 1;
-                    fn_8042C9C8(&cmd, 0x1C);
+                    broadcastSessionCommand(&cmd, 0x1C);
                     companion->started_0x6A40 = 1;
                 }
             } else if (work->state_0xFA <= 2) {
@@ -915,10 +916,10 @@ void lb_act_entry_start(u8 unused, LbCmdSub19* req) {
 void lb_sub1a_send(u8 index, s8 value) {
     LbCmdSub1A cmd;
 
-    if (fn_8042CB9C() != 0) {
+    if (isServerSelectState() != 0) {
         fn_80334A34(&cmd, index, 0xD, 0x1A);
         cmd.value_0x04 = value;
-        fn_8042C9C8(&cmd, 5);
+        broadcastSessionCommand(&cmd, 5);
     }
 }
 
@@ -934,14 +935,14 @@ void lb_area_change_send(u8 index) {
     LbCmdSub1B cmd;
     LbMoveWork* work;
 
-    if (fn_8042CB9C() == 0) {
+    if (isServerSelectState() == 0) {
         work = get_move_work_adrs(0);
         if (work != NULL) {
             work->flag_0x22E3 = 1;
         }
     } else {
         fn_80334A34(&cmd, index, 0xD, 0x1B);
-        fn_8042C9C8(&cmd, 4);
+        broadcastSessionCommand(&cmd, 4);
     }
 }
 
@@ -964,7 +965,7 @@ void lb_sub1d_send(u8 value, s8 flag) {
     fn_80334A34(&cmd, value, 0xD, 0x1D);
     cmd.value_0x04 = value;
     cmd.value_0x05 = flag;
-    fn_8042C9C8(&cmd, 8);
+    broadcastSessionCommand(&cmd, 8);
 }
 
 /* Act 25: hands the request's two bytes to the pad handler.
@@ -1080,12 +1081,12 @@ s8 lb_page_row_ck(u16 id, u16 value, s16* out) {
 }
 
 /* Sets the page block's per-entry bit for `index`.
- * Name: sets the bit for `index` in `lbl_80794880->bits_0x3960` */
+ * Name: sets the bit for `index` in `lobby_world_block->bits_0x3960` */
 void lb_page_entry_bit_set(u8 unused, LbActReq* req) {
     u8 index = req->sel_0x04.bytes_0x00.c_0x02;
 
-    lbl_80794880->bits_0x3960[index >> 3] =
-        lbl_80794880->bits_0x3960[index >> 3] | (u8)(1 << (index & 7));
+    lobby_world_block->bits_0x3960[index >> 3] =
+        lobby_world_block->bits_0x3960[index >> 3] | (u8)(1 << (index & 7));
 }
 
 /* Copies the 0xC-byte settings record from one owner to another.
@@ -1106,16 +1107,16 @@ void lb_area_name_apply(void) {
 }
 
 /* The page block's id-table row `index` (the entry the companion page binds).
- * Name: `&lbl_80794880->ids_0x5180[index]`; `ef/eft050.cpp` calls it */
+ * Name: `&lobby_world_block->ids_0x5180[index]`; `ef/eft050.cpp` calls it */
 LbEntryId* lb_entry_id_get(u8 index) {
-    return &lbl_80794880->ids_0x5180[index];
+    return &lobby_world_block->ids_0x5180[index];
 }
 
 /* Clears the block's "changed" bit and republishes the entry byte to `lb_param_w`.
  * Name: clears the block's 0x80 "changed" bit and republishes the entry byte to `lb_param_w` */
 void lb_entry_changed_clr(void) {
-    lbl_80794880->entry_0x3E03 = (u8)(lbl_80794880->entry_0x3E03 & 0x7F);
-    lb_param_w.entry_0x08 = (u8)lbl_80794880->entry_0x3E03;
+    lobby_world_block->entry_0x3E03 = (u8)(lobby_world_block->entry_0x3E03 & 0x7F);
+    lb_param_w.entry_0x08 = (u8)lobby_world_block->entry_0x3E03;
 }
 
 /* Republishes the selected entry's id and its five sub-values into `lb_param_w`.
@@ -1124,32 +1125,32 @@ void lb_entry_publish(void) {
     LbEntryId* entry;
     u8 index;
 
-    lb_param_w.entry_0x08 = lbl_80794880->entry_0x3E03;
-    index = lbl_80794880->entry_0x3E03 & 0x7F;
+    lb_param_w.entry_0x08 = lobby_world_block->entry_0x3E03;
+    index = lobby_world_block->entry_0x3E03 & 0x7F;
     entry = lb_entry_id_get(index);
-    lb_param_w.sub_0x30 = lbl_80794880->ids_0x51A6[index];
+    lb_param_w.sub_0x30 = lobby_world_block->ids_0x51A6[index];
     lb_param_w.sub_0x26 = entry->byte_0x01;
     lb_param_w.sub_0x27 = entry->byte_0x02;
     lb_param_w.sub_0x28 = entry->byte_0x03;
-    lb_param_w.sub_0x29 = lbl_80794880->byte_0x51A4;
-    lb_param_w.sub_0x2A = lbl_80794880->byte_0x51A5;
-    lb_param_w.sub_0x2C = lbl_80794880->word_0x51A0;
-    lb_param_w.sub_0x2E = lbl_80794880->word_0x51A2;
+    lb_param_w.sub_0x29 = lobby_world_block->byte_0x51A4;
+    lb_param_w.sub_0x2A = lobby_world_block->byte_0x51A5;
+    lb_param_w.sub_0x2C = lobby_world_block->word_0x51A0;
+    lb_param_w.sub_0x2E = lobby_world_block->word_0x51A2;
 }
 
 /* Recomputes the block's page flags from the entry's model id.
  * Name: ORs `fn_802D8F84(fn_802D7B5C(word_0x51A0))` into `flags_0x519C` */
 void lb_page_flags_update(void) {
-    lbl_80794880->flags_0x519C =
-        lbl_80794880->flags_0x519C | fn_802D8F84(fn_802D7B5C(lbl_80794880->word_0x51A0));
+    lobby_world_block->flags_0x519C =
+        lobby_world_block->flags_0x519C | fn_802D8F84(fn_802D7B5C(lobby_world_block->word_0x51A0));
 }
 
 /* Publishes the selected entry's model id into the block's id table.
  * Name: stores `fn_802D7C6C(ids_0x51A6[entry])` into the id-table row */
 void lb_entry_model_publish(void) {
-    u8 entry = lbl_80794880->entry_0x3E03 & 0x7F;
+    u8 entry = lobby_world_block->entry_0x3E03 & 0x7F;
 
-    lbl_80794880->ids_0x5180[entry].word_0x00 = fn_802D7C6C(lbl_80794880->ids_0x51A6[entry]);
+    lobby_world_block->ids_0x5180[entry].word_0x00 = fn_802D7C6C(lobby_world_block->ids_0x51A6[entry]);
 }
 
 /* Both of the block's refresh steps, in order.
@@ -1172,7 +1173,7 @@ void lb_page_bits_set(LbPageWork* page) {
     u8 i;
     u32 selected;
 
-    selected = lbl_80794880->entry_0x3E03 & 0x7F;
+    selected = lobby_world_block->entry_0x3E03 & 0x7F;
     page->saved_0x76 = page->count_0x06;
     for (i = 0; i < page->count_0x06; i++) {
         if (selected == page->ids_0x08[i]) {

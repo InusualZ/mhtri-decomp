@@ -41,7 +41,7 @@
  *
  * Naming note: references only to OTHER units' unrenamed fn_XXXXXXXX symbols - every `fn_` this
  * file names (`fn_80396070`, `fn_80396248`, `fn_8039631C`, `fn_803963F4`, `fn_80396654`,
- * `fn_803967F0`, `fn_80396934`, `fn_80396944`, `fn_80395DF4`, `fn_8004DF10`, `fn_800DBC84`,
+ * `fn_803967F0`, `fn_80396934`, `fn_80396944`, `fn_80395DF4`, `fn_8004DF10`, `sysSE_stop`,
  * `fn_80214EF0`, `fn_80215170`, `fn_803772A8`, `fn_803B7154`, `fn_804338E0`) is still
  * `fn_XXXXXXXX` in the map and none is a row this unit defines (checked with
  * `python tools/symbols/symedit.py range 0x80394000 0x80397000` against the 18 renamed rows this
@@ -109,7 +109,7 @@ extern "C" void lb_quest_board_open_board(LbQuestBoardData* data) {
     lobby_w.active_0x008 = 1;
     lobby_w.state_0x000 = 19;
     lobby_w.value_0x082 = 0;
-    fn_800DBC84(32);
+    sysSE_stop(32);
     fn_8004DF10(&work->value_0x38C, &value_a, &value_b);
 }
 
@@ -130,13 +130,13 @@ extern "C" void lb_quest_board_close(void) {
 extern "C" s32 lb_quest_board_cursor_step(s32 index, s32 count, u32 current, u32 next, u32 prev) {
     if (count > 1) {
         if (((u16)current & (u16)next) != 0) {
-            fn_800DBC84(33);
+            sysSE_stop(33);
             index = index - 1;
             if (index < 0) {
                 index = count - 1;
             }
         } else if (((u16)current & (u16)prev) != 0) {
-            fn_800DBC84(33);
+            sysSE_stop(33);
             index = index + 1;
             if (index >= count) {
                 index = 0;

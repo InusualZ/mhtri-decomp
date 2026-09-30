@@ -53,7 +53,7 @@
  *     at 0x8035FC18;
  *   * from 0x8035FC18 the callee mix changes completely: `fn_8035FC80`/`fn_8035FD08` drive the lobby
  *     work block `lobby_w` (`.bss` 0x806AAB44: `memset` of the 0x2000-byte buffer at `lobby_w+0xAC`,
- *     `fn_8021CBB0`, `fn_80217934`, `fn_80377664` on `lbl_80794880`), `fn_8035FC30`/`fn_803602A4` run
+ *     `fn_8021CBB0`, `fn_80217934`, `fn_80377664` on `lobby_world_block`), `fn_8035FC30`/`fn_803602A4` run
  *     the crafting-screen path (`seisan_data`, `fn_80217F4C`, `fn_802190FC`,
  *     `Gunner_opt_ok_ck(_EQUIP*)`, `Get_pl_type` on the two `_EQUIP` records at player+0x1D0/+0x1E8),
  *     and `fn_803602A4` reads back the pointer `fn_8035FC80` stores at buffer+0x204 - a screen record,

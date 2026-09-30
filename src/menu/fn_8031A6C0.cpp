@@ -57,7 +57,7 @@ s32  fn_8004B3A0(u16 a, s32 b, s32 c);
 void fn_800DCFC0(void);
 void fn_80349184(void* a);
 void fn_800F886C(void* a);
-extern MenuSharedSlots* lbl_80794880;
+extern MenuSharedSlots* lobby_world_block;
 
 } /* extern "C" */
 
@@ -110,15 +110,15 @@ extern "C" void fn_8031AD9C(u16 id, s32 a, s32 b) {
 /* ============================================================================================== */
 extern "C" u16 fn_8031B2D0(s16 idx) {
     if (idx >= 8) return 0xFFFF;
-    return lbl_80794880->ids_0x39A2[idx];
+    return lobby_world_block->ids_0x39A2[idx];
 }
 
 extern "C" void fn_8031B2FC(s16 idx, s16 value) {
-    if (idx < 8) lbl_80794880->ids_0x39A2[idx] = (u16)value;
+    if (idx < 8) lobby_world_block->ids_0x39A2[idx] = (u16)value;
 }
 
 extern "C" void fn_8031B31C(s16 idx) {
-    if (idx < 8) lbl_80794880->ids_0x39A2[idx] = 0xFFFF;
+    if (idx < 8) lobby_world_block->ids_0x39A2[idx] = 0xFFFF;
 }
 
 /* 0x8031B344 - mark the visible window's entries available */

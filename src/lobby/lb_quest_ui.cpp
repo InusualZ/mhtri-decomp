@@ -72,7 +72,7 @@
  * STATUS and RESIDUALS.  21 of the 70 functions carry a body, 13 of them byte-identical (unit fuzzy
  * 5.6330, matched_functions 13 of 70, matched_code 536 of 22352 `.text` bytes).  `lb_ui_tri_sum` has a
  * body and scores 0.0, and seven written bodies sit below the bar (see the list below).  Measured residuals on the written bodies: `lb_ui_page_flag_ck` 81.22 /
- * `lb_ui_page_flag_set` 79.23 - the `.sbss` page pointer is declared `u8 lbl_80794880[]` in
+ * `lb_ui_page_flag_set` 79.23 - the `.sbss` page pointer is declared `u8 lobby_world_block[]` in
  * `include/unsplit/lobby.h`, so this unit loads it with `lis`/`lwz` where retail uses one `lwz @sda21`
  * (the fix is re-typing that shared declaration, which eight other units also include);
  * `lb_ui_pair_offset` 77.14 (argument register order), `lb_ui_clear` 94.52 (`memset` argument setup
@@ -323,10 +323,10 @@ u16* lb_ui_pair_lookup(u8 kind, u8 a, u8 b) {
 void lb_ui_page_flag_set(u16 a, u16 b) {
     u32 key = lb_ui_pair_offset((u16)a, (u16)b);
     if (game_ready_ck() == 0) {
-        u8* page = *(u8**)lbl_80794880;
+        u8* page = *(u8**)lobby_world_block;
         page[(key >> 3) + 0x516C] |= (u8)(1 << (key & 7));
     } else {
-        u8* page = *(u8**)lbl_80794880;
+        u8* page = *(u8**)lobby_world_block;
         page[(key >> 3) + 0x525C] |= (u8)(1 << (key & 7));
     }
 }
@@ -335,10 +335,10 @@ void lb_ui_page_flag_set(u16 a, u16 b) {
 int lb_ui_page_flag_ck(u16 a, u16 b) {
     u32 key = lb_ui_pair_offset((u16)a, (u16)b);
     if (game_ready_ck() == 0) {
-        u8* page = *(u8**)lbl_80794880;
+        u8* page = *(u8**)lobby_world_block;
         return (page[(key >> 3) + 0x516C] & (u8)(1 << (key & 7))) != 0;
     }
-    u8* page = *(u8**)lbl_80794880;
+    u8* page = *(u8**)lobby_world_block;
     return (page[(key >> 3) + 0x525C] & (u8)(1 << (key & 7))) != 0;
 }
 

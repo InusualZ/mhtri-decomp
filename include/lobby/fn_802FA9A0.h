@@ -6,7 +6,7 @@
  * and its callees are the lobby UI API (`LbStr`).  The addresses below are unclaimed in splits.txt (or
  * lie inside this range's own unclaimed data runs), so this header is their rule-2 home - the same
  * pattern as `include/lobby/fn_8021E1EC.h` and `include/lobby/fn_8020C588.h`, whose `lobby_w` and
- * `lbl_80794880` views are also this-range-specific.
+ * `lobby_world_block` views are also this-range-specific.
  */
 #ifndef MHTRI_LOBBY_FN_802FA9A0_H
 #define MHTRI_LOBBY_FN_802FA9A0_H
@@ -28,7 +28,7 @@ typedef struct LbLobbyView {
     /* +0x162 */ u8 unused_0x162[0x1A];
 } LbLobbyView; /* size: 0x17C */
 
-/* The sub-record at +0x4832 of the block `lbl_80794880` points at, passed to its own helpers by
+/* The sub-record at +0x4832 of the block `lobby_world_block` points at, passed to its own helpers by
  * address (`fn_802FF248` hands `&block->work_0x4832` to `fn_802FF478`, which writes its +0x04).
  * size: 0x0C (the extent this range reads; the parent block's filler covers the gap to its next
  * field) */
@@ -42,7 +42,7 @@ typedef struct LbKujiraWork {
     /* +0x06 */ u8 unused_0x06[0x6];
 } LbKujiraWork; /* size: 0x0C */
 
-/* The block the `.sbss` pointer `lbl_80794880` (0x80794880) points at, as this range sees it: the
+/* The block the `.sbss` pointer `lobby_world_block` (0x80794880) points at, as this range sees it: the
  * mode byte at +0x3E01 (`fn_802FB5E4`), the per-kind state bytes at +0x4654 (`fn_802FB8EC`) and the
  * flag bytes at +0x4832..+0x4834 (`fn_802FF248`/`fn_802FF234`/`fn_802FF29C`).  Everything between them
  * is filler.  size: 0x6010 (the neighbour view's extent - `include/lobby/fn_8021E1EC.h`; this range
@@ -86,7 +86,7 @@ extern "C" {
 #endif
 
 extern LbLobbyView lobby_w;      /* .bss 0x806AAB44 */
-extern LbBlockView* lbl_80794880; /* .sbss 0x80794880 */
+extern LbBlockView* lobby_world_block; /* .sbss 0x80794880 */
 
 /* The two id tables this range's predicates walk (both inside the range's own unclaimed `.data` run
  * 0x805D8B00..0x805DAFE8): 28 entries (ids 0..27) at 0x805D8BA0 and 12 (ids 28..39) at 0x805D8C10.

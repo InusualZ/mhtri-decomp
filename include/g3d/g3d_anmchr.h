@@ -86,6 +86,15 @@ void font_print_ex(s16 x, s16 y, s16 flag, s8* fmt, ...);
  * parameter name (`g3d_anmchr.cpp:599` defines `s32 flfntStrLen(char* s)`) - a second, differently
  * spelled copy on the same type is the `illegal function overloading` trap. */
 s32 flfntStrLen(char* s);
+/* The font cluster's position/size/colour setters and the print-flush-reset sequence the network band's
+ * message renderer drives (owner: this range; C++ scope so a consumer's call mangles to `__Fll`, `__FUl`,
+ * `__FPce`, `__Fv`). */
+void flfntSetPos(s32 x, s32 y);
+void flfntSetSize(s32 x, s32 y);
+void flfntSetColor(u32 color);
+void flfntPrintf(char* fmt, ...);
+void flfntFlush(void);
+void flfntStackReset(void);
 void msg_str_gen(char* src, char* dst);
 char* flKnjMsgNumPtr(char* s, s32 index);
 /* 0x8005C7E0 - the substring search the font helpers share (a thin `strchr`); the owner defines it

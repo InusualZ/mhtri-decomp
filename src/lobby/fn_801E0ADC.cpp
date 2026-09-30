@@ -8,7 +8,7 @@
  *
  * Module `lobby`.  Every foreign call is a lobby/HUD symbol (`LbStr`, `GetMenuFontColor`, `get_lsp_data`,
  * `draw_sprite_*`, `ItemName`) or a call into the registered `lobby/fn_80212810.cpp` (23 sites); the
- * range's data lives in the lobby `.sbss`/`.data` runs (`lbl_80794880`, `lbl_805B75E8`), and both link
+ * range's data lives in the lobby `.sbss`/`.data` runs (`lobby_world_block`, `lbl_805B75E8`), and both link
  * neighbours are the enemy/lobby units.  Language C++: every call out is a mangled symbol.
  *
  * Name.  The map has only `fn_XXXXXXXX` for this range and the runtime dump answers only `zz_`
@@ -59,7 +59,7 @@ s32 fn_80217934(void);
 extern u8 lbl_805B75E8[];
 extern u8 lbl_805B75F8[];
 
-/* The big lobby work block `lbl_80794880` points at.  Only the two 41-entry u16 flag arrays this unit
+/* The big lobby work block `lobby_world_block` points at.  Only the two 41-entry u16 flag arrays this unit
  * reaches are named; the front of the block is untouched here.  Size is an approximation - the block
  * continues past the last named field. */
 typedef struct LbEftFlagBlock {
@@ -69,7 +69,7 @@ typedef struct LbEftFlagBlock {
     /* +0x49D8 */ u16 active_0x49D8[41];
 } LbEftFlagBlock; /* size: 0x4A2A (approximate) */
 
-extern LbEftFlagBlock* lbl_80794880;
+extern LbEftFlagBlock* lobby_world_block;
 
 /* The player status block the item page reads its button flags from (a 0xD40-byte object in the map). */
 typedef struct LbPadStatus {
@@ -317,7 +317,7 @@ s32 fn_801E6DD0(s32 id)
 /* Returns the 16-bit flag a slot id carries: kind 0 the set table, 1 the active table, 2 their sum. */
 s32 fn_801E6EA8(u16 idx, u8 kind)
 {
-    LbEftFlagBlock* blk = lbl_80794880;
+    LbEftFlagBlock* blk = lobby_world_block;
 
     switch (kind) {
     case 2:
@@ -473,7 +473,7 @@ void fn_801E4E44(LbEftWork* self)
 /* Frees the work block's effect handle and drives it to its next state. */
 void fn_801E4F78(LbEftWork* self)
 {
-    fn_8004C038((void*)self->handle_0x12C, lbl_80794880);
+    fn_8004C038((void*)self->handle_0x12C, lobby_world_block);
     if (self->kind_0x428[self->slot_0x104] == 3) {
         fn_802754B4((void*)self->handle_0x12C);
     } else if (self->flag_0x101 != 0) {

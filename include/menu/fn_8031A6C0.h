@@ -68,7 +68,7 @@ struct MenuSelSlot {
 };
 /* size: 0x04 */
 
-/* The shared slot-id table `lbl_80794880` points at: this band reads the eight `u16` ids at +0x39A2
+/* The shared slot-id table `lobby_world_block` points at: this band reads the eight `u16` ids at +0x39A2
  * (the menu library's own view of the same block).  Declared here as this band's view. */
 struct MenuSharedSlots {
     /* +0x39A2 */ u16 ids_0x39A2[8];

@@ -62,7 +62,7 @@
  * Naming note: the 34 symbols this file defines are named above, so the escape covers only the
  * names it REFERENCES - this range's own still-unwritten entries (`fn_803432B4`, `fn_80345A2C`) and
  * eight callees other units own (`fn_800F886C`, `fn_80125FF0`, `fn_8012A9E8`, `fn_8012D1A8`,
- * `fn_80143BF8`, `fn_803386C4`, `fn_8042CB9C`, `fn_8042CC20`).
+ * `fn_80143BF8`, `fn_803386C4`, `isServerSelectState`, `isReadyCountOne`).
  *
  * SEAM (UNPROVEN - not settled; the merger round re-checked it from the DOL and left it that way).  The
  * range is an `attribute.py` `--max-bytes` cut, and the code band above it (0x8033F270..0x803432B4) is
@@ -193,7 +193,7 @@
 #include "unsplit/unknown.h"
 #include "unsplit/ef.h"
 #include "fn_8004CAD8.h" /* the vector/geometry helpers the range calls */
-#include "Network/network_pat_control.h" /* fn_8042CC20 */
+#include "Network/network_pat_control.h" /* isReadyCountOne */
 #include "camera/camera.h" /* get_camera_pos / get_camera_direction / fn_802BE088 */
 #include "ef/fn_800CDB2C.h" /* my_player_no (`fn_800CF384` before the hud/move_work_update landing named it) */
 #include "ef/eft_slot.h" /* fn_803386C4 - its owner (`hud/fn_80334568.cpp`) owns the address, its header is unreachable here */
@@ -639,13 +639,13 @@ extern "C" void eft_slot_work_update(EftSlot* slot) {
     if ((eft_def_flags(slot) & 2) != 0) {
         return;
     }
-    if (fn_8042CB9C() != 1) {
+    if (isServerSelectState() != 1) {
         return;
     }
     work = (_ENEMY_WORK*)get_move_work_adrs(2);
     count = get_move_work_max(2);
     if (eft_slot_armed_ck(slot) == 0) {
-        if (fn_8042CC20() == 1) {
+        if (isReadyCountOne() == 1) {
             u32 found = 0;
 
             if (work[(s8)slot->work_0x03].active == 0 ||

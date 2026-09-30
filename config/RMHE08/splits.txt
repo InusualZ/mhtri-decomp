@@ -1461,13 +1461,13 @@ Network/network_pat_control.cpp:
 	extab       start:0x8001D368 end:0x8001D558
 	extabindex  start:0x8003DE54 end:0x8003E0DC
 	.text       start:0x80429B94 end:0x8043065C
+	.rodata     start:0x80571EA0 end:0x80572240
 	.data       start:0x806038E8 end:0x8060391C
 	.data       start:0x8060391C end:0x80603BF0
 	.data       start:0x80603BF0 end:0x80603C14
 	.data       start:0x80603C14 end:0x80603C40
 	.data       start:0x80603C40 end:0x80603C6C
-	.data       start:0x80603C6C end:0x80603CE4
-	.data       start:0x80603CE4 end:0x80603D10
+	.data       start:0x80603C6C end:0x80603CB8
 	.sbss       start:0x80794CF8 end:0x80794CFC
 
 quest/arenatask.cpp:

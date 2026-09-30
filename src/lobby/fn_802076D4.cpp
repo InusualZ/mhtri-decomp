@@ -45,7 +45,8 @@
 
 #include "ef/fn_800CDB2C.h"      /* my_player_no */
 #include "unsplit/Pl.h"          /* Get_motion_no, Pl_chr_setX, Pl_frame_check */
-#include "unsplit/lobby.h"       /* LbStr, fn_8042E9A4, lbl_806AA6F0, lbl_80799Bxx */
+#include "unsplit/lobby.h"       /* LbStr, lbl_806AA6F0, lbl_80799Bxx */
+#include "Network/network_pat_control.h" /* checkOtherInvite (rule 2: its owner's header) */
 #include "Pl/pl_master.h"        /* Pl_master_ck, Pl_act_ck, fn_8026FD0C */
 #include "Pl/fn_802693C4.h"
 #include "ef/eft004.h"
@@ -451,7 +452,7 @@ void fn_8020AD14(_LB_NPC* self)
         Pl_chr_setX((_PLW*)self, 610, 4, 0);
         if (Pl_master_ck((_PLW*)self) == 1 && game_ready_ck() == 1) {
             index = self->field_0x182;
-            fn_8042E9A4(index + 1, &lobby_w.param_0x12F);
+            checkOtherInvite(index + 1, (s8*)&lobby_w.param_0x12F);
         }
         break;
     }

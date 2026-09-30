@@ -3,7 +3,7 @@
  * Registered once, at its final home (docs/plan.md 12) from proposal `802FA9A0_fn_802FA9A0.cpp`.
  * Module `lobby` (class 3): the range's own predicates read the lobby work block `lobby_w`
  * (`.bss` 0x806AAB44) at +0x003/+0x15F/+0x161, its `.sbss` run is the lobby pointer block
- * `lbl_80794880`, and its callees are the lobby UI API (`LbStr`) plus the `ef`/`enemy` helpers the
+ * `lobby_world_block`, and its callees are the lobby UI API (`LbStr`) plus the `ef`/`enemy` helpers the
  * lobby screens drive.  No `__FILE__` string is reachable from the range (the literal runs it
  * addresses are id/mask tables) and the runtime dump answers `zz_` for every in-range address, so the
  * file keeps the map's stem - brief section 2, class 4.  `LbCheckKujiraEvent` (0x802FB9DC) is the one
@@ -157,9 +157,9 @@ u16 fn_802FB54C(u32 raw) {
     return 0;
 }
 
-/* The mode byte of the block `lbl_80794880` points at, +0x3E01. */
+/* The mode byte of the block `lobby_world_block` points at, +0x3E01. */
 u8 fn_802FB5E4(void) {
-    return lbl_80794880->mode_0x3E01;
+    return lobby_world_block->mode_0x3E01;
 }
 
 /* The lobby work block's scene byte at +0x003. */
@@ -172,9 +172,9 @@ u8 fn_802FB8C4(void) {
     return fn_802FB4BC(5);
 }
 
-/* A per-kind state byte of the block `lbl_80794880` points at, +0x4654. */
+/* A per-kind state byte of the block `lobby_world_block` points at, +0x4654. */
 u8 fn_802FB8EC(u32 raw) {
-    return lbl_80794880->states_0x4654[(u8)raw];
+    return lobby_world_block->states_0x4654[(u8)raw];
 }
 
 /* Whether id 22 is accepted and the 0x58 event flag is up. */
@@ -268,13 +268,13 @@ void fn_802FF0A4(void) {
 
 /* Whether the whale-event work's countdown byte has gone negative. */
 u32 fn_802FF234(void) {
-    return lbl_80794880->work_0x4832.count_0x02 < 0;
+    return lobby_world_block->work_0x4832.count_0x02 < 0;
 }
 
 /* Re-opens the whale-event work: clears the bit field, mirrors it into the flag byte, draws a new
  * timer and seeds the countdown. */
 void fn_802FF248(void) {
-    LbKujiraWork* work = &lbl_80794880->work_0x4832;
+    LbKujiraWork* work = &lobby_world_block->work_0x4832;
 
     work->bits_0x01 = 0;
     fn_802FF29C(0);
@@ -285,7 +285,7 @@ void fn_802FF248(void) {
 
 /* Sets the `kind`-th bit of the whale-event work's bit field. */
 void fn_802FF29C(u32 raw) {
-    lbl_80794880->work_0x4832.bits_0x01 |= (u8)(1 << (u8)raw);
+    lobby_world_block->work_0x4832.bits_0x01 |= (u8)(1 << (u8)raw);
 }
 
 /* The whale-event work's timer draw. */

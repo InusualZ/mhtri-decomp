@@ -49,6 +49,7 @@
 #include "Pl/pl_frame_data.h" /* the owner of the Pl band's shared .sdata2 pool 0x80799E00-0x80799F98 (rule 2) */
 #include "Pl/pl_act_data.h" /* the owner of the pool's second run, 0x80799F98-0x80799FDC (rule 2) */
 #include "Pl/bss_pool.h" /* the owner of the `.bss` move-work table `pl_move_work` (rule 2) */
+#include "Network/network_pat_control.h" /* the owner's header (rule 2) */
 
 /* One entry of `pl_move_work` is `PlMoveEntry`, declared by its owner's header (rule 1/2). */
 
@@ -636,7 +637,7 @@ s32 fn_80262688(_PLW* self) {
     count = (u16)get_move_work_max(2);
     for (i = 0; i < count; i++, work++) {
         if (work->slot_active != 0 &&
-            (fn_8042CB9C() == 1 ? Pl_master_ck(work) != 1 : work->chunk_ofs != self->chunk_ofs) &&
+            (isServerSelectState() == 1 ? Pl_master_ck(work) != 1 : work->chunk_ofs != self->chunk_ofs) &&
             (work->field_0x655 == self->chunk_ofs || work->field_0x655 == 0xFF) &&
             (Pl_act_ck(work, 0, 20) != 0 || Pl_act_ck(work, 0, 158) != 0) &&
             self->area_0x16 == work->area_0x16 &&
@@ -658,7 +659,7 @@ s32 fn_80262688(_PLW* self) {
             } else {
                 pl_act_enter(self, 0, 91, 0);
             }
-            if (fn_8042CB9C() == 1) {
+            if (isServerSelectState() == 1) {
                 if (Pl_master_ck(self) == 1) {
                     fn_80335CE8(self, 7, (u16)work->chunk_ofs);
                 }

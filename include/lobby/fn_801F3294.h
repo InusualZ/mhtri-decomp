@@ -6,7 +6,7 @@
  * (docs/plan.md 6.5 rule 1).  `_mh_ivec2_` is also defined by `include/unsplit/lobby.h` and by
  * `src/hud/fn_80324F7C.c` (that file's own rule-1 backlog); the copies are identical (`s16 x; s16 y;`)
  * and this unit's one is here because it cannot include the unsplit header - that header spells
- * `lbl_80794880` as a byte array where this range loads the 4-byte pointer the map records, and it
+ * `lobby_world_block` as a byte array where this range loads the 4-byte pointer the map records, and it
  * declares `fn_8021213C` with two parameters where this range calls it with one.  Recorded as a
  * config_request.
  *
@@ -43,7 +43,7 @@ typedef struct LbIconRec {
     /* +0x01 */ u8 unused_0x01[0xB];
 } LbIconRec; /* size: 0xC */
 
-/* The big lobby data block `lbl_80794880` points at (a 4-byte pointer in `.sbss`).  Only the fields
+/* The big lobby data block `lobby_world_block` points at (a 4-byte pointer in `.sbss`).  Only the fields
  * this unit touches are named; the rest carries its offset.  The highest offset read here is 0x9E, so
  * the tail is left open and the stated size is that lower bound. */
 typedef struct LbWorldBlock {
@@ -140,7 +140,7 @@ typedef struct LbStepArg {
 extern "C" {
 #endif
 
-extern LbWorldBlock* lbl_80794880; /* .sbss 0x80794880, the 4-byte pointer the map records */
+extern LbWorldBlock* lobby_world_block; /* .sbss 0x80794880, the 4-byte pointer the map records */
 extern LbLobbyWork lobby_w;        /* .bss 0x806AAB44 */
 
 extern LbSelRec lbl_805B8674[];    /* .data 0x805B8674, 0xA-byte stride selection table */
@@ -174,7 +174,7 @@ void fn_801F8318(LbPage* self, s16 x, s16 y);
 void fn_801F6DBC(void* dst, s16 x, s16 y, u8* ptr);
 void fn_801F353C(const s16* table, s16* out_max, s16* out_count);
 void fn_801F6168(u8* slots, u8* rows, u32 row, u8 kind, s16 value, u8* extra, LbPage* page);
-void fn_800DBC84(s32 id);
+void sysSE_stop(s32 id);
 void fn_8004D0D8(LbWorldBlock* world, u8 id);
 void fn_8004D0E0(LbWorldBlock* world, u8 id);
 void fn_8004C038(LbPage* page, LbWorldBlock* world);

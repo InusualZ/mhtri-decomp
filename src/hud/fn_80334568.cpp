@@ -20,8 +20,8 @@
  *     `cflags_pl` and `cflags_menu` are token-identical, so the flags do not choose between them;
  *     `hud` is also the nearest *preceding* registered unit (`hud/fn_80324F7C.c`, ends 0x803250B0).
  *     Honest caveat: the **content is network, not HUD** - every builder of this unit packs a `_PLW`
- *     or `_ENEMY_WORK` record into a local message and sends it with `fn_8042C9C8`, the
- *     `NetworkSessionManagerPat` slot 0x128 send guarded by `fn_8042CB9C()` (`net_ctrl_wk->0x11 == 7`).
+ *     or `_ENEMY_WORK` record into a local message and sends it with `broadcastSessionCommand`, the
+ *     `NetworkSessionManagerPat` slot 0x128 send guarded by `isServerSelectState()` (`net_ctrl_wk->0x11 == 7`).
  *     If a `Network` lib ever becomes the right home for the multiplayer sync, this unit is the first
  *     candidate to re-home.
  *   - the seam is unproven (brief section 8.3): `tudiscover.py at 0x80334568` must-links only
@@ -87,6 +87,7 @@
 #include "Pl/fn_802693C4.h"
 #include "Pl/fn_80273B14.h" /* the owner header of the act-motion setters (rule 2) */
 #include "hud/fn_80334568.h"
+#include "Network/network_pat_control.h" /* the owner's header (rule 2) */
 
 /* Advances the act-change state machine: step 0 enters the act (its motion, its SE and the paired
  * `Pl_act_set_motion` step) and step 1 waits for the act's frame check before handing the act's motion on. */
@@ -152,7 +153,7 @@ void fn_8033502C(_PLW* plw, u8 from, u8 to, u8 kind) {
     msg.health_max = plw->health_max;
     msg.field_0x37a = plw->field_0x37A;
     msg.field_0x37e = plw->field_0x37E;
-    fn_8042C9C8(&msg, 0x30);
+    broadcastSessionCommand(&msg, 0x30);
 }
 
 /* Constructs the 0x30-byte player message's position sub-object and returns the message. */
@@ -171,7 +172,7 @@ void fn_80335200(u8 attack_kind, const VEC3* pos, u16 param, u8 kind) {
 
     fn_80335328(&msg);
     memset(&msg, 0, sizeof(msg));
-    if (fn_8042CB9C() == 0) {
+    if (isServerSelectState() == 0) {
         return;
     }
     if (fn_80334A4C() == 0) {
@@ -201,7 +202,7 @@ void fn_80335200(u8 attack_kind, const VEC3* pos, u16 param, u8 kind) {
     msg.field_0x009 = work->pl.kind_0x09;
     msg.field_0x001 = work->pl.field_0x001;
     work->pl.field_0x645 = 1;
-    fn_8042C9C8(&msg, 0x28);
+    broadcastSessionCommand(&msg, 0x28);
 }
 
 /* Constructs the 0x28-byte attack message's position sub-object and returns the message. */
@@ -245,7 +246,7 @@ void fn_80335468(_PLW* plw, u8 from, u8 to, u8 kind, u16 param) {
     msg.field_0x650 = plw->field_0x650;
     msg.field_0x652 = plw->field_0x652;
     msg.field_0x655 = plw->field_0x655;
-    fn_8042C9C8(&msg, 0x38);
+    broadcastSessionCommand(&msg, 0x38);
 }
 
 /* Constructs the 0x38-byte player message's position sub-object and returns the message. */
@@ -272,7 +273,7 @@ void fn_803356F0(_PLW* plw, u8 from, u8 to, u8 kind, u16 param) {
         msg.field_0x650 = plw->field_0x650;
         msg.field_0x652 = plw->field_0x652;
     }
-    fn_8042C9C8(&msg, 0xC);
+    broadcastSessionCommand(&msg, 0xC);
 }
 
 /* Constructs the 0x4C-byte player-state message's position sub-object and returns the message. */
@@ -287,7 +288,7 @@ void fn_80335CE8(_PLW* plw, u8 kind, u16 param) {
     u8 my;
     u8 next;
 
-    if (fn_8042CB9C() == 0) {
+    if (isServerSelectState() == 0) {
         return;
     }
     if (fn_80334A4C() == 0) {
@@ -363,7 +364,7 @@ void fn_80335DD8(u8 slot, const NetMsgHeader* msg) {
 void fn_8033737C(_ENEMY_WORK* work, u8 kind, u16 param) {
     u8 own;
 
-    if (fn_8042CB9C() == 0) {
+    if (isServerSelectState() == 0) {
         return;
     }
     if (work->field_0x01A == 0xFFFF) {
