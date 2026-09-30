@@ -217,6 +217,9 @@ from units import vtableaudit as vta  # noqa: E402
 # (`quest/arenatask`'s wrong struct tag, `hud/cockpit_quest`'s C-linkage spelling). The row is the
 # actionable half - does our object relocate a name nothing can provide - not a relocation diff.
 from units import undefrefs as uref  # noqa: E402
+# `datagap` owns the data-closure census: the data a unit's TARGET object relocates against that no
+# `splits.txt` claim covers ("orphan": unowned data stays behind). The gate row is add-only, like rule 10's.
+from units import datagap as dg  # noqa: E402
 
 ALLOWED_PREFIXES = ("src/", "include/", "docs/", "tools/", ".claude/", ".github.example/")
 # Root documents and repo-config files a docs/tooling batch legitimately edits (commit categories
@@ -329,6 +332,14 @@ def record_base(main: str, units: list[str] | None = None) -> dict:
         if targets:
             run(["ninja"] + targets, main)       # best effort: a failed compile leaves the object missing
     data["undefrefs"] = uref.snapshot_base(main, norm or None)
+    # The data-closure row's base: every (unit, orphan data address) pair the base's target objects carry and
+    # the claimed bytes, so the gate refuses only a pair a batch ADDS or a claim it SHRINKS. Target objects
+    # only (no compile), a few seconds; a tree with no split objects records nothing and the row says so.
+    try:
+        if all(os.path.exists(os.path.join(main, "config", "RMHE08", f)) for f in ("splits.txt", "symbols.txt")):
+            data["orphans"] = dg.snapshot_orphans(main)
+    except Exception as exc:                                  # noqa: BLE001 - never block record-base on it
+        print("record-base: data-closure snapshot failed (%s)" % exc, file=sys.stderr)
     os.makedirs(os.path.join(main, ".pi"), exist_ok=True)
     with open(os.path.join(main, BASE_FILE), "w", encoding="utf-8") as fh:
         json.dump(data, fh, indent=1)
@@ -1695,6 +1706,20 @@ def rule10_growth(before: dict, after: dict, units: list[str]) -> tuple[list[str
     return grew, touched
 
 
+ALLOW_ORPHAN: list[str] = []
+
+
+def set_allow_orphan(addresses: list[str] | None) -> None:
+    """Record the data addresses *this invocation* accepts as deliberately left unclaimed.
+
+    Mirrors `set_allow_rule10`: set only from a command line (`--allow-orphan 0x8079B83C`), printed by the
+    row, never a key in a file. The address is the orphan data object's (or a byte inside a shrunk claim);
+    an allowance that matches nothing excuses nothing, so the refusal it was meant for stands.
+    """
+    global ALLOW_ORPHAN                                                   # noqa: PLW0603 - one invocation
+    ALLOW_ORPHAN = [a.strip() for a in (addresses or []) if a and a.strip()]
+
+
 ALLOW_RULE12: list[str] = []
 
 
@@ -2651,6 +2676,34 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
               remedy="declare the class with its `virtual` methods and let MWCC emit the table and the "
                      "store (rule 10 / playbook 52), or claim the `.data` range and emit it; run "
                      "`python tools/units/vtableaudit.py --unit <unit>` for the detail")
+    # the data-closure row (2026-09-30, owner: "no data should be left behind"): every data address a batch
+    # unit's TARGET object relocates against must be covered by some `splits.txt` claim, and a recut must not
+    # leave a previously claimed byte unclaimed. ADD-only like rule 10's: the tree carries ~13k pre-existing
+    # (unit, orphan) pairs, snapshotted at `record-base`, reported and never refused. No per-file exemption;
+    # `--allow-orphan <addr>` is a recorded command-line allowance (an allowance that matches nothing keeps the
+    # refusal). `python tools/units/datagap.py --census --unit <unit>` is the lane-side view of the same set.
+    if unit_units:
+        orphans = dg.batch_orphans(main, unit_units, recorded.get("orphans"), ALLOW_ORPHAN)
+        if orphans["accepted"]:
+            print("data closure: %d authorised by --allow-orphan (recorded, not a file-level exemption): %s"
+                  % (len(orphans["accepted"]), "; ".join(orphans["accepted"][:6])))
+        if not orphans["have_base"]:
+            check("the batch base carries a data-closure snapshot", False,
+                  "record-base did not snapshot the orphan set", kind=KIND_BOOKKEEPING,
+                  remedy="re-run `python tools/units/land.py record-base --units <batch units>` at the base "
+                         "(it reads every registered unit's target object)")
+        check("no batch unit's target object references data no claim covers (unowned data stays behind)",
+              not orphans["added"], "%d added: %s" % (len(orphans["added"]), "; ".join(orphans["added"][:4])),
+              info=("pre-existing, reported: %d orphan reference(s) in the batch's units (%d referenced by no "
+                    "other registered unit - close those while you are in the unit), e.g. %s"
+                    % (len(orphans["pre_existing"]), len(orphans["sole_owned_debt"]),
+                       "; ".join((orphans["sole_owned_debt"] or orphans["pre_existing"])[:2])))
+                   if orphans["pre_existing"] else "no orphan data reference in the batch's units",
+              remedy="claim the data: add a `splits.txt` range for it to the unit that owns it (or a named "
+                     "data-only unit for a pool several units share - `python tools/units/dataclaim.py "
+                     "--unit <unit>` prints the exact text), or restore the claim a recut dropped. Run "
+                     "`python tools/units/datagap.py --census --unit <unit>` for the orphan list with its "
+                     "neighbours and readers. An unavoidable case takes `--allow-orphan <addr>`")
     # the split target objects after the re-split: a unit the batch does not name must be byte-identical.
     after_targets = vu.target_object_snapshot(main)
     drift = vu.target_drift_problems(before_targets, after_targets, unit_units)
@@ -3590,6 +3643,25 @@ def selftest() -> int:
     check("rule10: a batch touching a file that already has one passes",
           module.rule10_growth(existing, existing, ["ai/fn_802CC794"]),
           ([], ["ai/fn_802CC794.cpp .data"]))
+
+    # --- the data-closure row: ADD-only over (unit, orphan address) pairs; datagap's own selftest has the
+    # end-to-end fixtures (real objects), this pins the allowance plumbing and the row's decision shape.
+    rec = {"unit": "new/unit", "name": "lbl_80500040", "section": ".rodata", "address": 0x80500040, "sites": 2}
+    key = module.dg.orphan_key("new/unit", ".rodata", 0x80500040)
+    check("orphan: a new (unit, orphan) pair is refused",
+          len(module.dg.orphan_verdict([], {key: rec}, [])["added"]), 1)
+    check("orphan: the same pair at the base is pre-existing debt, reported not refused",
+          module.dg.orphan_verdict([key], {key: rec}, [])["added"], [])
+    module.set_allow_orphan([" 0x80500040 ", "", None])
+    check("orphan: set_allow_orphan trims and drops blanks", module.ALLOW_ORPHAN, ["0x80500040"])
+    check("orphan: a recorded allowance excuses exactly that address",
+          module.dg.orphan_verdict([], {key: rec}, [], module.ALLOW_ORPHAN)["added"], [])
+    module.set_allow_orphan(["0x80500044"])
+    check("orphan: an allowance that matches nothing keeps the refusal",
+          len(module.dg.orphan_verdict([], {key: rec}, [], module.ALLOW_ORPHAN)["added"]), 1)
+    module.set_allow_orphan([])
+    check("orphan: a shrunk claim is a refusal with no pair involved",
+          len(module.dg.orphan_verdict([], {}, [(".rodata", 0x80500008, 0x8050000C)])["added"]), 1)
 
     # --- rule 12: the style-lint row's allowance, applied to stylelint's own --diff JSON -----------
     # Rule 12 is refused inside the style lint, so `--allow-rule12 <token>` is applied to that row's
@@ -4762,6 +4834,9 @@ def main() -> int:
                    help="rule-12 token (the unowned data symbol an `extern` names) a landing accepts "
                         "deliberately, with the claim already scheduled; repeatable, recorded in the "
                         "landing log, never a key in a file")
+    v.add_argument("--allow-orphan", action="append", default=[], metavar="ADDR",
+                   help="hex address of a data object the data-closure row accepts as deliberately "
+                        "unclaimed (see `land --allow-orphan`); repeatable, recorded in the log")
     v.add_argument("--no-selftests", action="store_true", dest="no_selftests",
                    help="skip the all-tool-selftests row (the fast path; `python tools/selftest.py "
                         "--changed` is the narrower lane loop)")
@@ -4785,6 +4860,10 @@ def main() -> int:
                          "`run:.data:805FB0F8` for the Pat vtable the owner ruled stays claimed while "
                          "its slots are written; repeatable, recorded in the landing log, never a key "
                          "in a file")
+    ld.add_argument("--allow-orphan", action="append", default=[], metavar="ADDR",
+                    help="hex address of a data object (or a byte inside a shrunk claim) the data-closure "
+                         "row accepts as deliberately unclaimed; repeatable, recorded in the landing log, "
+                         "never a key in a file, and an address that matches nothing keeps the refusal")
     ld.add_argument("--allow-rule12", action="append", default=[], metavar="TOKEN",
                     help="rule-12 token (the unowned data symbol an `extern` names) a landing accepts "
                          "deliberately, with the claim already scheduled; repeatable, recorded in the "
@@ -4829,6 +4908,7 @@ def main() -> int:
             return 1
         units = [u.strip() for u in (args.units or "").split(",") if u.strip()]
         set_allow_rule12(args.allow_rule12)
+        set_allow_orphan(args.allow_orphan)
         return verify(main, units, args.base, args.dry_run, args.no_build, args.allow_regression,
                       check_outbox=not args.no_outbox, release_claims=not args.no_release,
                       no_selftests=args.no_selftests)
@@ -4837,6 +4917,7 @@ def main() -> int:
             units = [u.strip() for u in (args.units or "").split(",") if u.strip()]
             set_allow_rule10(args.allow_rule10)
             set_allow_rule12(args.allow_rule12)
+            set_allow_orphan(args.allow_orphan)
             return land_branch(main, args.branch, units=units, base=args.base, no_build=args.no_build,
                                allow_regression=args.allow_regression,
                                check_outbox=not args.no_outbox, release_claims=not args.no_release,
@@ -4847,6 +4928,7 @@ def main() -> int:
         units = [u.strip() for u in args.units.split(",") if u.strip()]
         set_allow_rule10(args.allow_rule10)
         set_allow_rule12(args.allow_rule12)
+        set_allow_orphan(args.allow_orphan)
         return land(main, units, args.base, args.no_build, args.allow_regression,
                     allow_rule10=args.allow_rule10,
                     check_outbox=not args.no_outbox, release_claims=not args.no_release,
