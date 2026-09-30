@@ -77,6 +77,10 @@ brand-new `fn_XXXXXXXX`/unowned-data extern still refuses. That is the owner's "
 progress" - the mounted debt is worked slowly through the backlog register (`tools/units/backlog.py`),
 never through a per-file escape hatch. **Rules 1-6, 8, 9, 10 and 11 apply as before.**
 
+**A move is credited, a copy is not.** A token new to one file is credited when another file of the same batch
+stopped carrying the same (rule, token, detail): one credit per removal, reported as `moved rule R <token>: <old> ->
+<new>` (and the `--json` `moved` key). A copy, a removal of another rule, or net growth still refuses.
+
 **`--diff` says how many; `--list-added` says which.** A `+N rule R <file>` row names no occurrence, so a
 lane that reads `+76 rule 7` cannot tell which of its renames are load-bearing: one dropped three whole
 bodies to find out, then re-added them (2026-09-30). The flag names every added finding as `rule R
@@ -2319,6 +2323,77 @@ def added_identities(before_findings: list[dict], after_findings: list[dict],
     return out
 
 
+def removed_identities(before_findings: list[dict], after_findings: list[dict],
+                       symbols: "dict | None" = None, files: "dict | None" = None) -> dict:
+    """`{(rule, token, detail): [file, ...]}` - one entry per base identity a file **stopped** carrying.
+
+    The mirror of `added_identities`: an identity is removed from a file when the after side of that file
+    no longer spells it under any spelling a rename gives it (`renamed_finding`).  One entry per identity
+    per file, so thirty occurrences of one name leaving a file are one removal - the same unit
+    `added_identities` counts an addition in.
+    """
+    after: dict = {}
+    for f in after_findings:
+        after.setdefault((f["rule"], f["file"]), set()).add(finding_identity(f))
+    out: dict = {}
+    seen: set = set()
+    for f in before_findings:
+        ident = finding_identity(f)
+        if ident in seen:
+            continue
+        seen.add(ident)
+        moved = renamed_finding(f, symbols or {}, files)
+        here = after.get((f["rule"], f["file"]), set())
+        if ident in here or finding_identity(moved) in here:
+            continue
+        out.setdefault((f["rule"], f.get("token"), f["detail"]), []).append(f["file"])
+    return out
+
+
+def apply_move_credits(fresh: dict, before_findings: list[dict], after_findings: list[dict],
+                       symbols: "dict | None" = None, files: "dict | None" = None) -> tuple[dict, list[dict]]:
+    """Credit an added identity that another file of the same batch **gave up**: a move, not growth.
+
+    `--diff` grandfathers per file, so functions moved from an old file into a new one read as additions
+    in the new file although the old file lost the same findings.  Here every identity new to a file
+    (`fresh`, `added_identities`' shape) is matched against the identities other files lost
+    (`removed_identities`), keyed `(rule, token, detail)` - the same rule and the same at-fault token, never
+    a look-alike of another rule.  **One credit per removal** (a multiset match): a copy that leaves the
+    original intact removes nothing and earns nothing, and a name that grew across the batch (two files
+    gained it, one lost it) still leaves the surplus refused.  Returns `(fresh_left, moves)`, each move
+    `{rule, token, detail, from, to}`; a batch without a move returns `fresh` unchanged and `[]`.
+    """
+    removed = removed_identities(before_findings, after_findings, symbols, files)
+    pool = {k: list(v) for k, v in removed.items()}
+    left: dict = {}
+    moves: list[dict] = []
+    for key in sorted(fresh):
+        rule, file = key
+        keep = []
+        for f in fresh[key]:
+            src = pool.get((rule, f.get("token"), f["detail"]))
+            if src:
+                origin = src.pop(0)
+                moves.append({"rule": rule, "token": f.get("token"), "detail": f["detail"],
+                              "from": origin, "to": file})
+            else:
+                keep.append(f)
+        if keep:
+            left[key] = keep
+    return left, moves
+
+
+def move_credit_lines(moves: list[dict]) -> list[str]:
+    """`--diff`'s report of what it credited as moved: never silent, names the old and the new file."""
+    out = []
+    if moves:
+        out.append("  moved (credited, one per removal from another file of the batch): %d finding(s)"
+                   % len(moves))
+        for m in moves:
+            out.append("    moved rule %d %s: %s -> %s" % (m["rule"], m["token"] or m["detail"], m["from"], m["to"]))
+    return out
+
+
 def added_rows(fresh: dict, before_counts: dict, after_counts: dict) -> list[dict]:
     """The `+N rule R <file> (before -> after)` rows the message prints, from `added_identities`.
 
@@ -2335,7 +2410,8 @@ def added_rows(fresh: dict, before_counts: dict, after_counts: dict) -> list[dic
 
 
 def added_finding_detail(added: list[dict], after_findings: list[dict], before_findings: list[dict],
-                         symbols: "dict | None" = None, files: "dict | None" = None) -> list[dict]:
+                         symbols: "dict | None" = None, files: "dict | None" = None,
+                         fresh: "dict | None" = None) -> list[dict]:
     """The findings behind `added`'s `+N rule R <file>` rows, named: rule, file, line and token.
 
     `added` is `added_rows`' new-identity rows, so by itself it says how many new tokens a file gained but
@@ -2346,7 +2422,8 @@ def added_finding_detail(added: list[dict], after_findings: list[dict], before_f
     The returned rows carry only what a reader needs - the file and line that locate the occurrence and the
     token that names it - so the `--diff --json` `detail` key is stable whatever the internal finding adds.
     """
-    fresh = added_identities(before_findings, after_findings, symbols, files)
+    if fresh is None:
+        fresh = added_identities(before_findings, after_findings, symbols, files)
     out = []
     for row in sorted(added, key=lambda a: (a["rule"], -a["added"], a["file"])):
         key = (row["rule"], row["file"])
@@ -4150,6 +4227,96 @@ def selftest() -> int:
         finally:
             os.chdir(old_cwd)
 
+    # --- a MOVE is not growth: an identity another file of the batch gave up is credited (2026-09-29) ------
+    # `--diff` grandfathered per file, so functions moved from an old file into a new one (a recut) read as
+    # additions in the new file though the old one lost the same findings.  The credit is earned by the diff:
+    # one per removal from another file, the same (rule, token, detail), never silent.
+    with tempfile.TemporaryDirectory() as tmp:
+        def mgit(*args: str) -> None:
+            subprocess.run(["git", "-c", "user.email=selftest@example.invalid",
+                            "-c", "user.name=selftest", "-c", "commit.gpgsign=false", *args],
+                           cwd=tmp, capture_output=True, check=True)
+
+        def mput(rel: str, text: str) -> None:
+            p = os.path.join(tmp, rel)
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            with open(p, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(text)
+
+        mgit("init", "-q")
+        mgit("checkout", "-q", "-b", "main")
+        mput("config/RMHE08/symbols.txt",
+             "unowned_data = .data:0x80400000; // type:object size:0x10\n"
+             "fn_80040598 = .text:0x80201000; // type:function size:0x10\n"
+             "fn_80275B04 = .text:0x80201010; // type:function size:0x10\n")
+        mput("config/RMHE08/splits.txt", "Pl/pl_act.cpp:\n\t.text       start:0x80201000 end:0x80202000\n")
+        old_body = ("void fn_80040598(void) {}\n"
+                    "void fn_80275B04(void) {}\n")
+        mput("src/Pl/pl_act.cpp", old_body + "extern u8 unowned_data[];\n")
+        mgit("add", "-A")
+        mgit("commit", "-q", "-m", "base")
+        m_base = subprocess.run(["git", "rev-parse", "HEAD"], cwd=tmp, capture_output=True, text=True,
+                                encoding="utf-8", errors="replace").stdout.strip()
+        old_cwd = os.getcwd()
+        os.chdir(tmp)
+        try:
+            def mrun(*extra: str) -> tuple:
+                _OWNERSHIP_CACHE.clear()
+                out = io.StringIO()
+                with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                    rc = main(["--diff", m_base, *extra])
+                return rc, out.getvalue()
+
+            def moved_lines(text: str) -> list:
+                return [ln.strip() for ln in text.splitlines() if ln.strip().startswith("moved rule")]
+
+            # (1) a pure move: both rule-7 tokens leave the old file and land in the new one
+            mput("src/Pl/pl_act.cpp", "extern u8 unowned_data[];\n")
+            mput("src/Pl/pl_new.cpp", old_body)
+            rc, out = mrun()
+            check("(move 1) a pure move is credited and the verdict is clean", rc, 0)
+            check("... reported as moved, naming the old and the new file",
+                  moved_lines(out),
+                  ["moved rule 7 fn_80040598: src/Pl/pl_act.cpp -> src/Pl/pl_new.cpp",
+                   "moved rule 7 fn_80275B04: src/Pl/pl_act.cpp -> src/Pl/pl_new.cpp"])
+            rc, out = mrun("--json")
+            check("... and the --json payload carries the moves", len(json.loads(out)["moved"]), 2)
+
+            # (2) a move plus one genuinely new finding: only the new one refuses
+            mput("src/Pl/pl_new.cpp", old_body + "void extra(void) { fn_80ABCDEF(); }\n")
+            rc, out = mrun("--list-added")
+            check("(move 2) a move plus one new finding refuses", rc, 1)
+            check("... naming only the new token",
+                  [ln.strip() for ln in out.splitlines() if ln.strip().startswith("rule 7 src/")],
+                  ["rule 7 src/Pl/pl_new.cpp:3 fn_80ABCDEF"])
+            check("... the row counts one addition, not three",
+                  [ln for ln in out.splitlines() if ln.startswith("  +")],
+                  ["  +1 rule 7  src/Pl/pl_new.cpp  (0 -> 3)"])
+            check("... and the credited moves are still reported", len(moved_lines(out)), 2)
+
+            # (3) a copy that leaves the original intact: nothing was removed, nothing is credited
+            mput("src/Pl/pl_act.cpp", old_body + "extern u8 unowned_data[];\n")
+            mput("src/Pl/pl_new.cpp", old_body)
+            rc, out = mrun()
+            check("(move 3) a copy that leaves the original intact is net growth and refuses", rc, 1)
+            check("... with no move credited", moved_lines(out), [])
+
+            # (4) a finding of a different rule leaves: no credit for a rule-7 addition
+            mput("src/Pl/pl_act.cpp", old_body)          # the rule-12 extern is gone
+            mput("src/Pl/pl_new.cpp", "void fn_80ABCDEF(void) {}\n")
+            rc, out = mrun()
+            check("(move 4) a removal of another rule earns no credit", (rc, moved_lines(out)), (1, []))
+
+            # (5) net growth across the batch: two files gain a name one file lost - one credit only
+            mput("src/Pl/pl_act.cpp", "extern u8 unowned_data[];\n")
+            mput("src/Pl/pl_new.cpp", "void fn_80040598(void) {}\n")
+            mput("src/Pl/pl_new2.cpp", "void fn_80040598(void) {}\n")
+            rc, out = mrun()
+            check("(move 5) a name that grew across the batch still refuses (one credit per removal)",
+                  (rc, len(moved_lines(out))), (1, 1))
+        finally:
+            os.chdir(old_cwd)
+
     if fails:
         print("FAIL (%d)" % len(fails))
         for f in fails:
@@ -4292,16 +4459,18 @@ def ref_comparison(root: str, branch: str, ownership: "Ownership | None", as_jso
     # both spellings, so a rename reads as a rename and never as removal + addition.
     symbol_rename = rename_map(base_ownership, after_ownership,
                                {f.get("token") for f in before_findings if f.get("token")})
+    fresh, moves = apply_move_credits(
+        added_identities(before_findings, after_findings, symbol_rename, rename),
+        before_findings, after_findings, symbol_rename, rename)
     added, credits = apply_rename_credits(
-        added_rows(added_identities(before_findings, after_findings, symbol_rename, rename),
-                   before, after),
+        added_rows(fresh, before, after),
         touched, base_ownership, after_ownership, base_symbols,
         {p: len(names) for p, names in freed_gaps.items()})
-    credit_lines = rename_credit_lines(credits, freed_gaps)
-    detail = added_finding_detail(added, after_findings, before_findings, symbol_rename, rename)
+    credit_lines = rename_credit_lines(credits, freed_gaps) + move_credit_lines(moves)
+    detail = added_finding_detail(added, after_findings, before_findings, symbol_rename, rename, fresh)
     if as_json:
         print(json.dumps({"ref": branch, "base": base, "added": added, "detail": detail,
-                          "changed": rels,
+                          "moved": moves, "changed": rels,
                           "rename_credits": [{"rule": r, "file": p, "count": n,
                                               "stopped_spelling": sorted(freed_gaps.get(p, ()))}
                                              for (r, p), n in sorted(credits.items())],
@@ -4426,15 +4595,18 @@ def main(argv: list[str] | None = None) -> int:
         # under both spellings, so a rename reads as a rename and never as removal + addition.
         symbol_rename = rename_map(base_ownership, ownership,
                                    {f.get("token") for f in before_findings if f.get("token")})
+        fresh, moves = apply_move_credits(
+            added_identities(before_findings, after_findings, symbol_rename, rename),
+            before_findings, after_findings, symbol_rename, rename)
         added, credits = apply_rename_credits(
-            added_rows(added_identities(before_findings, after_findings, symbol_rename, rename),
-                       before, after),
+            added_rows(fresh, before, after),
             touched, base_ownership, ownership, base_symbols,
             {p: len(names) for p, names in freed_gaps.items()})
-        credit_lines = rename_credit_lines(credits, freed_gaps)
-        detail = added_finding_detail(added, after_findings, before_findings, symbol_rename, rename)
+        credit_lines = rename_credit_lines(credits, freed_gaps) + move_credit_lines(moves)
+        detail = added_finding_detail(added, after_findings, before_findings, symbol_rename, rename, fresh)
         if args.json:
-            print(json.dumps({"ref": args.diff, "added": added, "detail": detail, "changed": rels,
+            print(json.dumps({"ref": args.diff, "added": added, "detail": detail, "moved": moves,
+                              "changed": rels,
                               "rename_credits": [{"rule": r, "file": p, "count": n,
                                                   "stopped_spelling": sorted(freed_gaps.get(p, ()))}
                                                  for (r, p), n in sorted(credits.items())],
