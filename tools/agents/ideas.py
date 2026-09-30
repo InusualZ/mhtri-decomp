@@ -5,7 +5,8 @@
     python tools/agents/ideas.py show N
     python tools/agents/ideas.py where N
     python tools/agents/ideas.py new --title T --tags a,b [--kind codegen|process] [--slug s] [--applies a,b]
-    python tools/agents/ideas.py check
+    python tools/agents/ideas.py check [--demos]
+    python tools/agents/ideas.py demo-check [N ...|--all|--changed REF]
     python tools/agents/ideas.py --selftest
 
 `find` ranks ideas by the query words against the title, tags, slug and problem sentence (the problem is written
@@ -14,7 +15,10 @@ path and the compile line. `new` allocates the next free id ATOMICALLY (an exclu
 so two lanes racing in one tree cannot take one id), scaffolds the idea (a `codegen` idea also gets a demo
 `.cpp` with the header below) and regenerates the index and the skill's copy. `check` is the whole gate: front
 matter schema, unique ids, file names agreeing with ids, the H1 agreeing with the title, index and skill copy
-fresh, every `demo:` existing, no orphan demo file, every demo header well-formed.
+fresh, every `demo:` existing, no orphan demo file, every demo header well-formed (`--demos` also compiles them,
+as `demo-check --all`). `demo-check` compiles each demo with the real MWCC (the base cflags read from
+configure.py, the demo's FLAGS replacing same-family flags) and tests its EXPECT lines against
+`objdump -d -r -t -h`; the vocabulary is `ideas_demo.py`'s.
 
 The parser is `sync_playbook_index.py`'s - this tool imports it and never forks it.
 
@@ -23,8 +27,8 @@ DEMO HEADER (`NNN-slug.cpp`, one per codegen idea; stage 3 compiles it and check
     /* Demo for idea NNN.
      * FLAGS: -O4,p -inline auto       flags appended to the unit's base cflags (one line)
      * MWCC: Wii/1.3                   compiler; optional, default Wii/1.3
-     * EXPECT: contains fmuls          repeatable; one assertion about the compiled object per line:
-     * EXPECT: absent fmadds             contains|absent <mnemonic or symbol>, size <symbol> <bytes>
+     * EXPECT: contains fmuls          repeatable; one assertion about the compiled object per line
+     * EXPECT: absent fmadds             (vocabulary: ideas_demo.py / docs/matching/README.md)
      */
 """
 import argparse
@@ -33,15 +37,16 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import sync_playbook_index as spi  # noqa: E402
+import ideas_demo  # noqa: E402
 
 DEFAULT_MWCC = "Wii/1.3"
 SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 DEMO_KEYS = ("FLAGS", "MWCC", "EXPECT")
-EXPECT_RE = re.compile(r"^(contains|absent)\s+\S+|^size\s+\S+\s+(0x[0-9a-fA-F]+|\d+)$")
 SKILL_SYNC = ".claude/skills/mwcc-unit-matching/scripts/sync_reference.py"
 
 SCAFFOLD = """
@@ -63,8 +68,8 @@ SCAFFOLD = """
 DEMO_SKELETON = """/* Demo for idea {n}: {title}
  * FLAGS: -O4,p -inline auto
  * MWCC: Wii/1.3
- * EXPECT: contains <mnemonic or symbol the fix must produce>
- * EXPECT: absent <mnemonic or symbol the wrong shape produces>
+ * EXPECT: contains TODO_symbol    what the fix must produce (a mnemonic or symbol)
+ * EXPECT: absent TODO_symbol      what the wrong shape produces
  */
 
 /* The smallest translation unit that shows the idea. */
@@ -109,8 +114,8 @@ def demo_header(text):
     if not info["EXPECT"]:
         defects.append("no `EXPECT:` line")
     for e in info["EXPECT"]:
-        if not EXPECT_RE.match(e):
-            defects.append("EXPECT `%s` is not `contains|absent <x>` or `size <symbol> <bytes>`" % e)
+        if not ideas_demo.expect_ok(e):
+            defects.append("EXPECT `%s` is not one of: %s" % (e, ideas_demo.EXPECT_HELP))
     return info, defects
 
 
@@ -362,6 +367,81 @@ def check_root(root, skill=True):
     return out, ideas
 
 
+def demo_files(root, ideas):
+    """[(idea, absolute demo path)] for every idea with a demo, in id order."""
+    d = os.path.join(root, *spi.DIR_REL.split("/"))
+    return [(i, os.path.join(d, i["demo"])) for i in ideas if i["demo"]]
+
+
+def changed_paths(root, ref):
+    """Repo-relative paths changed since `ref` (committed diff, working tree, and untracked)."""
+    out = set()
+    for argv in (["git", "diff", "--name-only", ref], ["git", "ls-files", "--others", "--exclude-standard"]):
+        p = subprocess.run(argv, cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        if p.returncode != 0:
+            raise SystemExit("`%s` failed: %s" % (" ".join(argv), (p.stderr or "").strip()))
+        out.update(x.strip().replace("\\", "/") for x in p.stdout.splitlines() if x.strip())
+    return out
+
+
+def run_demos(root, picked, out, compile_fn=ideas_demo.compile_demo):
+    """Check every (idea, path); returns (pass, fail, skip)."""
+    counts = {"PASS": 0, "FAIL": 0, "SKIP": 0}
+    for i, path in picked:
+        info, dd = demo_header(spi.read(path))
+        if dd:
+            status, rep = "FAIL", ["  header: " + x for x in dd]
+        else:
+            status, rep = ideas_demo.check_demo(root, info, path, compile_fn)
+        counts[status] += 1
+        out.write("%s  %03d  %s\n" % (status, i["id"], i["demo"]))
+        for r in rep:
+            out.write(r + "\n")
+    return counts["PASS"], counts["FAIL"], counts["SKIP"]
+
+
+def cmd_demo_check(root, a, out=None, compile_fn=ideas_demo.compile_demo):
+    out = out or sys.stdout
+    ideas, defects = load(root)
+    if defects:
+        for d in defects:
+            print("refusing: %s" % d, file=sys.stderr)
+        return 1
+    every = demo_files(root, ideas)
+    if a.changed:
+        ch = changed_paths(root, a.changed)
+        prefix = spi.DIR_REL + "/"
+        picked = [(i, p) for i, p in every
+                  if prefix + i["demo"] in ch or prefix + i["file"] in ch]
+        if not picked:
+            out.write("demo-check: no demo changed since %s\n" % a.changed)
+            return 0
+    elif a.ids:
+        by = {i["id"]: (i, p) for i, p in every}
+        missing = [n for n in a.ids if n not in by]
+        if missing:
+            print("demo-check: no demo for idea(s) %s" % ", ".join(str(n) for n in missing), file=sys.stderr)
+            return 1
+        picked = [by[n] for n in a.ids]
+    elif a.all:
+        picked = every
+    else:
+        print("demo-check: name idea ids, or pass --all or --changed REF", file=sys.stderr)
+        return 2
+    if a.dump:
+        for i, path in picked:
+            info, dd = demo_header(spi.read(path))
+            obj, log = compile_fn(root, info, path)
+            out.write("==== %03d %s\n%s\n" % (i["id"], i["demo"], obj.text if obj else log))
+        return 0
+    t0 = time.time()
+    p, f, s = run_demos(root, picked, out, compile_fn)
+    out.write("demo-check: %d pass, %d fail, %d skip (%.1f s)\n" % (p, f, s, time.time() - t0))
+    if f:
+        return 1
+    return 3 if s else 0
+
+
 def cmd_check(root, a, out=None):
     out = out or sys.stdout
     defects, ideas = check_root(root)
@@ -370,13 +450,18 @@ def cmd_check(root, a, out=None):
             print("FAIL: %s" % x, file=sys.stderr)
         return 1
     demos = [i for i in ideas if i["demo"]]
+    if getattr(a, "demos", False):
+        p, f, s = run_demos(root, demo_files(root, ideas), out)
+        out.write("demos: %d pass, %d fail, %d skip\n" % (p, f, s))
+        if f or s:
+            return 1 if f else 3
     by = {}
     for i in ideas:
         by[i["status"]] = by.get(i["status"], 0) + 1
     out.write("ok: %d ideas (%s), ids %d-%d; %d demo(s)%s\n"
               % (len(ideas), ", ".join("%d %s" % (v, k) for k, v in sorted(by.items())), ideas[0]["id"],
-                 ideas[-1]["id"], len(demos), " - demos are listed, not compiled (the checker is stage 3): %s"
-                 % ", ".join(i["demo"] for i in demos) if demos else ""))
+                 ideas[-1]["id"], len(demos), " - `check --demos` (or demo-check --all) compiles them"
+                 if demos else ""))
     return 0
 
 
@@ -401,7 +486,13 @@ def main(argv=None):
     nw.add_argument("--kind", default="process", choices=("codegen", "process"))
     nw.add_argument("--slug")
     nw.add_argument("--applies", default="")
-    sub.add_parser("check", help="the whole playbook gate")
+    c = sub.add_parser("check", help="the whole playbook gate")
+    c.add_argument("--demos", action="store_true", help="also compile every demo and test its EXPECT lines")
+    d = sub.add_parser("demo-check", help="compile demos with the real MWCC and test their EXPECT lines")
+    d.add_argument("ids", nargs="*", type=int)
+    d.add_argument("--all", action="store_true")
+    d.add_argument("--dump", action="store_true", help="print each demo's objdump instead of checking it (for writing EXPECTs)")
+    d.add_argument("--changed", metavar="REF", help="demos (or their idea files) changed since REF")
     a = ap.parse_args(argv)
     if a.selftest:
         return subprocess.call([sys.executable, os.path.join(HERE, "ideas_selftest.py")])
@@ -409,7 +500,7 @@ def main(argv=None):
         ap.print_help()
         return 2
     root = spi.find_root(a.repo)
-    return {"find": cmd_find, "show": cmd_show, "where": cmd_where, "new": cmd_new, "check": cmd_check}[a.cmd](root, a)
+    return {"find": cmd_find, "show": cmd_show, "where": cmd_where, "new": cmd_new, "check": cmd_check, "demo-check": cmd_demo_check}[a.cmd](root, a)
 
 
 if __name__ == "__main__":

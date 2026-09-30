@@ -5,7 +5,7 @@ status: works
 problem: A store into a narrow field (`u8`/`u16`) comes out masked - a `clrlwi` before the `stb` - where retail stores the value as it stands. The function sits at 82-94 % with one extra instruction and every later register shifted, and no cast, temporary or operand order in the store itself moves it.
 tags: [source-shape]
 applies: []
-demo:
+demo: 038-s16-compound-raw-store.cpp
 ---
 
 # 38. An `s16` parameter with a compound assignment is what makes a field store raw
@@ -36,3 +36,9 @@ void fn_8027A044(s16 amount) {   /* s16, not s32 and not u32 */
     self->field += amount;       /* compound assignment, not self->field = self->field + amount */
 }
 ```
+
+**Demonstration.** `038-s16-compound-raw-store.cpp` (`ideas.py demo-check 38`). In isolation both spellings store the
+field raw (`sth`), and the difference is the opposite of the prose above: the `s16` parameter with `+=` adds a `clrlwi`
+that narrows the *operand* (0x14 B), while an `s32` parameter with a plain assignment has no mask at all (0x10 B). No
+masked store was reproduced with a `u16` field, so the retail shape this idea closed depends on more than the
+parameter type and the compound assignment; the demo records what the compiler does with these two spellings.

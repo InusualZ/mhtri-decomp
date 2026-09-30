@@ -5,7 +5,7 @@ status: works
 problem: A `switch` whose default dispatches into a helper comes out a few bytes too big - 364 against the target's 360 - with the default body sitting in the middle of the compare chain and the function stuck around 94 %, even though every case body is right. It reads as a missing case or a wrong table.
 tags: [source-shape]
 applies: []
-demo:
+demo: 037-switch-default-first.cpp
 ---
 
 # 37. A switch's `default` arm goes first in the source
@@ -34,3 +34,6 @@ case 1:
     ...
 }
 ```
+
+**Demonstration.** `037-switch-default-first.cpp` (`ideas.py demo-check 37`) reproduces the effect: the same five-arm
+`switch` is 0x48 B with `default:` first and 0x4C B with it last (4 bytes, as in the 360/364 above).

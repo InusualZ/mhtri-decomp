@@ -5,7 +5,7 @@ status: works
 problem: A wrapper (or any caller) sits at 50-90 % and the first divergence is one instruction at the `bl`: retail masks or sign-extends the argument (`clrlwi r4,r4,16`, `extsh r5,r5`, a `slwi`/`srawi` pair) and ours passes it straight through. It reads as a scheduling or inlining residual, nothing in the caller's own source hints at a mask, and the search goes to flags and to the caller's statement order - where the mask cannot exist.
 tags: [source-shape]
 applies: []
-demo:
+demo: 057-call-site-mask-param-width.cpp
 ---
 
 # 57. A call-site mask means the callee's parameter is declared wider than the value
@@ -69,3 +69,6 @@ when they are declarations (reported), and reported but not carried when they ar
 merge that produced this section (`089491a7b`'s header and the `802d44f4` view) it reproduces the 36
 splices, the 33 filler splits and the `0x3F8` decision exactly, and keeps one trailing comment the hand
 pass typed away. It is still only the edit: **the proof remains the whole-tree build plus `ninja changes`.**
+
+**Demonstration.** `057-call-site-mask-param-width.cpp` (`ideas.py demo-check 57`): passing a `u32` to a callee declared
+`u16` costs a `clrlwi` at the call site; the same call to a `u32` parameter costs none.

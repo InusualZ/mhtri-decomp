@@ -5,7 +5,7 @@ status: works
 problem: Our string literals are addressed through one `@stringBase0` base register (one `lis`, then `addi` displacements) where retail materialises each string with its own `lis`/`addi` - 0x20 bytes of `.text` short, and the `.rela.text` records name a base symbol retail never had.
 tags: [flags, data]
 applies: []
-demo:
+demo: 043-pool-off-string-addressing.cpp
 ---
 
 # 43. Retail's per-string `lis`/`addi` addressing means the unit was built with `-pool off`
@@ -23,3 +23,10 @@ demo:
 ```
 -pool off
 ```
+
+**Demonstration.** `043-pool-off-string-addressing.cpp` (`ideas.py demo-check 43`). In isolation `-pool off` was
+**not** the lever for string literals: with `-str reuse,pool` the strings stay behind one `@stringBase0` whether
+`-pool off` comes before or after it, with or without `readonly`, and `static const` arrays are addressed per symbol
+(one `lis`/`addi` each) with or without the flag. The per-string `lis`/`addi` shape reproduces when `-str` carries no
+`pool` (the base `-str reuse`), which is what the demo asserts; whether `-pool off` matters for a unit is decided by
+that unit's `-str` flags, not by this section's claim alone.

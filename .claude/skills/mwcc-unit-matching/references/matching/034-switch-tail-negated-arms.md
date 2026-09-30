@@ -5,7 +5,7 @@ status: works
 problem: A `switch` whose default is `return 1` and whose allowed cases `break` leaves the target as `return 0` looks like a missing arm: the diff shows the target loading a constant and branching while ours returns early per case, and the function sits at ~94 % with the same opcodes in a different order.
 tags: [source-shape]
 applies: []
-demo:
+demo: 034-switch-tail-negated-arms.cpp
 ---
 
 # 34. A switch tail's constant returns are if-converted, so write the arms negated
@@ -65,3 +65,11 @@ if-conversion pair this row's negation rule already covers, and `default: return
 trailing `return 0;`: `handleNetworkState1` 0.23 -> **82.50230 %**, `handleNetworkState2` 0.34 ->
 **91.28178 %**, `handleNetworkState2Fmp` 0.34 -> **81.01007 %** (the function scores with the batch's other
 levers - the per-unit `-O3`, `#pragma exceptions on` and section 61's `dont_inline` pair).
+
+**Demonstration.** `034-switch-tail-negated-arms.cpp` (Wii/1.3, base cflags, `ideas.py demo-check 34`). Measured in
+isolation: `default: return 0` plus a trailing `return 0` folds the case test into a branchless `cntlzw`/`srwi` and
+leaves ONE `li r3,0` block (0x2C B), while `default: break` keeps explicit `li 1` / `li 0` blocks (0x30 B) - so the
+spelling does change the tail, but the direction the refinement above states (`default: return 0` emitting a
+*second* return-0 block) was **not reproduced** here. The negated-arms rule was not reproduced either: `if (!allowed)
+return 1; ... return 0` and `if (allowed) return 0; ... return 1` compile to identical code (both 0x2C B), so that
+rule's effect depends on the surrounding function, not on the switch shape alone.

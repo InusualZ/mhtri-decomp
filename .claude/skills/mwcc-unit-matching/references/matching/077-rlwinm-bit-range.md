@@ -5,7 +5,7 @@ status: works
 problem: `quest_move_state_ck` measured **94.16666 %** and the lane's residual said "front-end artefact": the target reads `lbz r0,0x22D4(r3)` then `rlwinm r3,r0,0,24,24` where our build emits a bare `lbz`. Twelve spellings (u8/u32 locals, `(u8)`, `& 0xFF`, `> 0`, `!!x`, `x ? 1 : 0`, an 8-bit bitfield, a `u8*` view) were compiled with the unit's own flags and all folded to the same short form, so the search was "exhausted" and the row was written off. It was not a codegen residual: the body was **semantically wrong**, and the 94 % hid it.
 tags: [source-shape, measurement]
 applies: []
-demo:
+demo: 077-rlwinm-bit-range.cpp
 ---
 
 # 77. `rlwinm x,x,0,MB,ME` keeps an inclusive BIT RANGE - so `MB=ME` is a single-bit test, never an extend
@@ -31,3 +31,6 @@ no pragma needed. The fix also forced the row's **name** to change (`quest_move_
 rule for the next residual of this shape: read `MB`/`ME` first - `MB == ME` is a single-bit test, `MB=0,ME=31` is a
 plain copy, and `ME-MB+1 < 8` is a field extraction. "Several spellings fold to the same short form" is evidence
 about the *spellings*, never about what the retained instruction means.
+
+**Demonstration.** `077-rlwinm-bit-range.cpp` (`ideas.py demo-check 77`): `x & 0x80` on a byte field is `rlwinm r3,r0,0,24,24`,
+`(x & 0x80) != 0` is `rlwinm r3,r0,25,31,31`, and a plain `!= 0` test has no `rlwinm` at all.

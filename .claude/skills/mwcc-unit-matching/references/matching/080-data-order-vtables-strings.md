@@ -5,7 +5,7 @@ status: works
 problem: `Network/network_transport` converted its peer types to real classes so the compiler would emit their vtables, and every table came out at the right size - yet the unit's `.data` section scored 10.4 % of 4108 B. The retail run `0x805F94E0..0x805FA4EC` interleaves vtables with strings, and no source spelling of one TU produces that order. It reads as a data-claim or class-model problem and invites more class rewrites.
 tags: [data, vtable]
 applies: [Network, Wii/*, GC/3.0a3]
-demo:
+demo: 080-data-order-vtables-strings.cpp
 ---
 
 # 80. A TU's `.data` is globals, strings, vtables in reverse, then inline-function strings - two vtable groups with strings between them are two TUs
@@ -38,3 +38,7 @@ pairs there - candidate seams for proposals no tool could cut (`python tools/spl
 
 **Example.** `network_transport`: gaps at 0x805F9570, 0x805F9610 and 0x805F9958 (a vtable follows each) split the
 unit's `.data` into per-class TUs; 0x805F9A40 follows the last vtable and may be an inline tail.
+
+**Demonstration.** `080-data-order-vtables-strings.cpp` (`ideas.py demo-check 80`) reproduces the order on Wii/1.3: the two
+initialised globals, then the out-of-line strings, then `__vt__1B` before `__vt__1A` (reverse class order), then the
+inline function's string; strings of 8 B or less go to `.sdata` and stay out of the run.
