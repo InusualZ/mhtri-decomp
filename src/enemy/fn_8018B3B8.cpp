@@ -74,8 +74,7 @@
  *     `fn_80184488`, `fn_80184BF8`, `fn_801861E4`, `fn_80186960`, `fn_80189C7C`, `fn_8018A974`,
  *     `fn_8018AB64`, `fn_8018AB94`..`fn_8018B258`) belong in `include/unsplit/enemy.h` or their
  *     owner's header (rule 2); they are elected `_ENEMY_WORK*`-typed here.
- *   * `EmShellTbl` is the same 0x40-byte record as `enemy/fn_80147CE0.cpp`'s `EmShellSetFunc` (rule-1
- *     follow-up: fold both into one header).
+ *   * the shell callback table is the shared `ShellSetFuncs` of `stage/shell_set_func_ptr.h`.
  *   * the +0x350..+0x35E TEV union members added to `include/enemy/ENEMY_WORK.h` (`tev_0x350`,
  *     `tev_0x354`, the +0x358 union member) are this unit's signed-short view; they should be named
  *     once for the band.
@@ -89,6 +88,7 @@
 #include "unsplit/unknown.h" /* SystemWork / system_w */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "stage/shell_set_func_ptr.h" /* `shell_set_func_ptr` and its slots (rule 2: the owner's header) */
 
 /* ------------------------------------------------------------------------------------------------ *
  * The mangled callees, outside `extern "C"` so the front-end mangles them the way the map spells
@@ -105,18 +105,6 @@ f32 get_em_scale(struct _ENEMY_WORK* self);
 void get_joint_wmat_em(struct _ENEMY_WORK* self, u32 joint, nw4r::math::MTX34* out);
 void get_joint_wpos_em(struct _ENEMY_WORK* self, u32 joint, nw4r::math::VEC3* out);
 void rotVecY(nw4r::math::VEC3* v, u32 angle);
-
-/* The shell callback table `shell_set_func_ptr` points at, as this band reads it (`fn_8018D8C8`
- * calls +0x2C and +0x30).  Same record as `enemy/fn_80147CE0.cpp`'s `EmShellTbl` (rule-1
- * follow-up: the two copies should move to one header).
- * size: 0x40 */
-typedef struct EmShellTbl {
-    /* +0x00 */ u8 unused_0x00[0x2C];
-    /* +0x2C */ void (*field_0x2c)(_ENEMY_WORK* self, u32 a, u32 b, void* params, u32 c, void* table, void* table2);
-    /* +0x30 */ void (*field_0x30)(_ENEMY_WORK* self, u32 a, void* a1, void* a2, u32 b, void* table, void* table2);
-    /* +0x34 */ u8 unused_0x34[0x40 - 0x34];
-} EmShellTbl;
-extern "C" EmShellTbl* shell_set_func_ptr;
 
 extern "C" {
 
@@ -1756,7 +1744,7 @@ void fn_8018D8C8(_ENEMY_WORK* self) {
                 sp14.x = lbl_80797E88;
                 sp14.y = lbl_807981B8;
                 sp14.z = lbl_80797F5C;
-                shell_set_func_ptr->field_0x2c(self, 3, 1, &sp14, 0xFFFF, shell_set_func_ptr, (void*)&lbl_807981BC);
+                shell_set_func_ptr->method_0x2C(self, 3, 1, &sp14, lbl_807981BC, 0xFFFF, shell_set_func_ptr);
             }
             break;
         case 0x3B:                                  /* switch 2 */
@@ -1823,7 +1811,7 @@ void fn_8018D8C8(_ENEMY_WORK* self) {
                     temp_f1 = lbl_807981CC * get_em_chg_scale(self);
                     sp2C.y -= temp_f1;
                     sp20.y += lbl_807981CC * get_em_chg_scale(self);
-                    shell_set_func_ptr->field_0x30(self, 4, &sp2C, &sp20, 0xFFFF, shell_set_func_ptr, (void*)&lbl_807981BC);
+                    shell_set_func_ptr->method_0x30(self, 4, &sp2C, &sp20, lbl_807981BC, 0xFFFF, shell_set_func_ptr);
                 }
             }
             if (em_after_frame_check(self, 0, lbl_8079817C, lbl_80797E88) == 1U) {

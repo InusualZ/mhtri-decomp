@@ -715,6 +715,7 @@ enemy/fn_8018B3B8.cpp:
 	extab       start:0x8000ECC4 end:0x8000ED64
 	extabindex  start:0x8002A210 end:0x8002A300
 	.text       start:0x8018B3B8 end:0x80191598
+	.data       start:0x805ABD90 end:0x805AD310
 
 enemy/fn_80191598.cpp:
 	extab       start:0x8000ED64 end:0x8000EDF4
@@ -793,6 +794,8 @@ enemy/fn_801D80EC.cpp:
 	extab       start:0x800101E4 end:0x8001031C
 	extabindex  start:0x8002C1C0 end:0x8002C394
 	.text       start:0x801D80EC end:0x801DB8E0
+	.rodata     start:0x80570500 end:0x805706C0
+	.data       start:0x805B6A90 end:0x805B71E0
 
 enemy/fn_801DB8E0.cpp:
 	extab       start:0x8001031C end:0x800103D4
@@ -1016,7 +1019,8 @@ stage/fn_802B2AA0.cpp:
 	extabindex  start:0x80031A4C end:0x80031BD8
 	.text       start:0x802B2AA0 end:0x802B5C58
 	.ctors      start:0x8056F37C end:0x8056F380
-	.data       start:0x805CF728 end:0x805CF784
+	.data       start:0x805CF56C end:0x805CFBE8
+	.sbss       start:0x80794B60 end:0x80794B68
 
 camera/fn_802B5C58.cpp:
 	extab       start:0x80013E3C end:0x80014194

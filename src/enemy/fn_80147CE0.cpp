@@ -71,8 +71,8 @@
  * +0x464).  Two records this unit uses are private copies of records another unit also carries and are
  * a rule-1 follow-up (outbox `config_requests[1]`): the 12-byte vtable helper
  * (`Helper_80147CE0` here, `Helper_80176E50` in `enemy/fn_80176C58.cpp`) and the 0x18-byte spawn
- * record (`EmSpawnRec` here, `ShellParams` in `enemy/fn_8014A1BC.c`) with the shell callback table
- * (`EmShellSetFunc` here, `ShellSetFunc` there).
+ * record (`EmSpawnRec` here, `ShellParams` in `enemy/fn_8014A1BC.c`); the shell callback table is the
+ * shared `ShellSetFuncs` of `stage/shell_set_func_ptr.h` (`enemy/fn_8014A1BC.c` keeps a private `ShellSetFunc`).
  *
  * Sections.  Besides `.text` the unit owns `extab` 0x8000D9DC..0x8000DACC and `extabindex`
  * 0x800285B4..0x8002871C, both taken from the target's OWN per-function entry boundaries (30 of the 36
@@ -177,6 +177,7 @@
 #include "sys_mem.h"
 #include "fn_8004CAD8.h"
 #include "draw_shape.h"
+#include "stage/shell_set_func_ptr.h" /* `shell_set_func_ptr` and its slots (rule 2: the owner's header) */
 
 #pragma peephole off
 
@@ -275,17 +276,6 @@ extern "C" u8 lbl_8056F920[];
 /* the two `.data` tables `fn_80135644`/`fn_801354F4` read */
 extern "C" u8 lbl_805A1DA0[];
 extern "C" u8 lbl_805A1F70[];
-/* The shell callback table `shell_set_func_ptr` points at; only its +0x3C entry is used by this unit
- * (the entry `fn_801493A8` calls as `(self, &rec, mode, shell_set_func_ptr)`).  Same record as
- * `enemy/fn_8014A1BC.c`'s private `ShellSetFunc` (rule-1 follow-up: the two copies should move to one
- * header). size: 0x40 */
-typedef struct EmShellSetFunc {
-    /* +0x00 */ u8 unused_0x00[0x3C];
-    /* +0x3C */ void (*field_0x3c)(_ENEMY_WORK* self, void* params, u32 mode, void* table);
-} EmShellSetFunc;
-
-/* the table pointer itself (`.sbss`, no registered range, so rule 2 leaves the declaration here) */
-extern "C" EmShellSetFunc* shell_set_func_ptr;
 /* ------------------------------------------------------------------------------------------------ *
  * this unit's own forward declarations
  * ------------------------------------------------------------------------------------------------ */
@@ -1253,11 +1243,11 @@ extern "C" void fn_801493A8(_ENEMY_WORK* self, u32 arg1, s32 arg2, u32 arg3) {
                 if ((arg3 & 0xFF) == 1) {
                     rec.field_0x10 |= 128;
                 }
-                shell_set_func_ptr->field_0x3c(self, &rec, 0, shell_set_func_ptr);
+                shell_set_func_ptr->method_0x3C(self, &rec, 0, shell_set_func_ptr);
                 fn_801039B0(self, 23, rec.field_0x12, rec.field_0x14);
                 fn_801039B0(self, 2, rec.field_0x12, rec.field_0x14);
             } else if ((u8)arg2 - 3 <= 1) {
-                shell_set_func_ptr->field_0x3c(self, &rec, 1, shell_set_func_ptr);
+                shell_set_func_ptr->method_0x3C(self, &rec, 1, shell_set_func_ptr);
                 fn_801039B0(self, 4, rec.field_0x12, rec.field_0x14);
             }
         }
