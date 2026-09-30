@@ -680,6 +680,19 @@ def splits_range_line(section: str, start: int, end: int, indent: str = "\t") ->
     return "%s%s start:0x%08X end:0x%08X" % (indent, section, start, end)
 
 
+def splits_claim_text(section: str, start: int, end: int, unit_ranges: list[tuple[int, int]]) -> str:
+    """The `splits.txt` text for claiming `[start, end)`: a bare range line, or - when the unit already owns
+    a range of this section inside the new one - a single `REPLACE old WITH new` line (the widened claim
+    replaces the old line; printing the new range alone reads as an extra range beside it, and two ranges
+    with a gap between them is the playbook 53 cycle)."""
+    new = splits_range_line(section, start, end)
+    inside = sorted(r for r in unit_ranges if start <= r[0] and r[1] <= end)
+    if not inside:
+        return new
+    old = " + ".join(splits_range_line(section, a, b, indent="").strip() for a, b in inside)
+    return "REPLACE %s WITH %s" % (old, new.strip())
+
+
 def splits_unit_block(unit: str, section: str, start: int, end: int) -> str:
     return "%s.cpp:\n%s" % (unit, splits_range_line(section, start, end))
 
@@ -801,11 +814,11 @@ def recommend(rec: dict, unit: str, unit_ranges: list[tuple[int, int]]) -> dict:
                 "range and `dtk dol split` dies with a link-order cycle (playbook 53)"
                 % (unit, section, rs, re_))
         return {"remedy": "span-claim", "claim_start": s, "claim_end": e,
-                "splits": splits_range_line(section, s, e), "symbols": None,
+                "splits": splits_claim_text(section, s, e, unit_ranges), "symbols": None,
                 "note": (round_note + "; " + note) if rounded else note}
     note = "the range is free: claim it into `%s`, covering the whole map symbol extent" % unit
     return {"remedy": "claim-into-unit", "claim_start": start, "claim_end": end,
-            "splits": splits_range_line(section, start, end), "symbols": None,
+            "splits": splits_claim_text(section, start, end, unit_ranges), "symbols": None,
             "note": (round_note + "; " + note) if rounded else note}
 
 
@@ -1380,6 +1393,13 @@ def selftest() -> int:
     check("remedy: the span starts at the unit's own run", span["claim_start"], 0x1F00)
     check("remedy: the span includes the gap and the symbol", span["claim_end"], 0x2008)
     check("remedy: the span names playbook 53's cycle", "link-order cycle" in span["note"], True)
+    check("remedy: a widened claim is ONE REPLACE line, not a second range beside the old one", span["splits"],
+          "REPLACE .data start:0x00001F00 end:0x00001FF0 WITH .data start:0x00001F00 end:0x00002008")
+    check("claim text: a range inside the new claim is replaced, a range outside it is not",
+          (splits_claim_text(".data", 0x2000, 0x2100, [(0x2010, 0x2020), (0x2100, 0x2110)]),
+           splits_claim_text(".data", 0x2000, 0x2100, [(0x1000, 0x1010)])),
+          ("REPLACE .data start:0x00002010 end:0x00002020 WITH .data start:0x00002000 end:0x00002100",
+           "\t.data start:0x00002000 end:0x00002100"))
 
     header = recommend(rec("t", ".data", 0x2000, 0x8, owner="Other/unit"), "Pl/pl_act", [])
     check("remedy: data another unit owns is rule 2's, not a claim", header["remedy"], "owner-header")

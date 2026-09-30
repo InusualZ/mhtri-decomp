@@ -44,6 +44,10 @@ junction it.
 * **Run the suite after your commit, not during a merge.** A mid-merge run reports a false red, because the tests
   that inspect git state cannot see a settled tree.
 * **Never run `claims.py release`.** Teardown is the orchestrator's; from inside a worktree it can empty it.
+* **Edit through the line-ending-safe helper.** Working copies mix CRLF and LF files while the index is LF, so a
+  scripted `str.replace` with `\n` silently matches nothing on a CRLF file. Use `python tools/agents/edit.py replace
+  FILE --old-file A --new-file B [--count N]` (keeps the file's endings, refuses 0 or more than N matches with their
+  line numbers), `edit.py normalise FILE...` and `edit.py check [--fix]`.
 
 ## Commit messages
 

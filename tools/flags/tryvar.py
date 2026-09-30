@@ -54,10 +54,11 @@ def load_variants(path):
 def default_variants_path(unit):
     """`tools/flags/variants/<lib>.py`, falling back to the lower-case spelling (case-sensitive FS)."""
     d = os.path.join(os.path.dirname(os.path.abspath(__file__)), "variants")
-    for name in (unit.lib + ".py", unit.lib.lower() + ".py"):
+    lib = unit.lib or "main"            # a top-level unit has no directory: its variants file is main.py
+    for name in (lib + ".py", lib.lower() + ".py"):
         if os.path.exists(os.path.join(d, name)):
             return os.path.join(d, name)
-    return os.path.join(d, unit.lib + ".py")
+    return os.path.join(d, lib + ".py")
 
 
 def match_pcts(probe_obj, target_obj, symbol=None):
