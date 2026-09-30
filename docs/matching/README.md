@@ -64,6 +64,12 @@ demo:                    # NNN-slug.cpp when a compilable demonstration exists
 ---
 ```
 
+  Three OPTIONAL keys follow `demo:` once an idea has been reviewed (a stage-4 pass sets them; absent means
+  unreviewed): `reviewed: YYYY-MM-DD` (the day the idea was verified and refined), `related: [2, 44]` (ideas a
+  reader should also open; each must exist and not be the idea itself) and `superseded_by: N` (required when
+  `status: superseded`; must name an existing idea). Ids are never renumbered: a replaced idea stays and points
+  forward.
+
   followed by a blank line, `# N. Title`, and the body (**Problem. / Why it happens. / How to work it. /
   Result. / Example.**). Record an idea in the session it works: a win that exists only in chat or a scratch
   report is lost at the next compaction.

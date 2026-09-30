@@ -42,6 +42,12 @@ TAGS = ("flags", "pragma", "source-shape", "allocator", "data", "vtable", "linke
         "relocations", "measurement", "process", "tooling")
 STATUSES = ("works", "ruled-out", "todo", "superseded")
 KEYS = ("id", "title", "status", "problem", "tags", "applies", "demo")
+# Optional keys (a stage-4 review sets them; absent means unreviewed / no relations):
+#   reviewed: YYYY-MM-DD   the date the idea was verified and refined
+#   related: [ids]         ideas a reader should also open
+#   superseded_by: N       the idea that replaces this one (status superseded)
+OPTIONAL_KEYS = ("reviewed", "related", "superseded_by")
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 FILE_RE = re.compile(r"^(\d{3})-([a-z0-9]+(?:-[a-z0-9]+)*)\.md$")
 # The problem sentence in both house styles: the current `**Problem.**` and the older `Problem:`.
 PROBLEM_RES = (re.compile(r"^\*\*Problem\.\*\*\s*(.*)$"), re.compile(r"^Problem:\s*(.*)$"))
@@ -129,7 +135,7 @@ def parse_front_matter(text):
         line = lines[i].rstrip("\r")
         if line == "---":
             return fm, "\n".join(lines[i + 1:])
-        m = re.match(r"^([a-z]+):(?:\s(.*))?$", line)
+        m = re.match(r"^([a-z_]+):(?:\s(.*))?$", line)
         if not m:
             raise ValueError("malformed front-matter line %d: %r" % (i + 1, line[:60]))
         if m.group(1) in fm:
@@ -162,7 +168,7 @@ def load_idea(path, name):
         if k not in fm:
             defects.append("%s: front-matter key `%s` is missing" % (name, k))
     for k in fm:
-        if k not in KEYS:
+        if k not in KEYS and k not in OPTIONAL_KEYS:
             defects.append("%s: unknown front-matter key `%s`" % (name, k))
     if defects:
         return None, defects
@@ -193,6 +199,20 @@ def load_idea(path, name):
         defects.append("%s: applies must be a bracket list, e.g. [Wii/1.3] or []" % name)
         applies = []
     idea["applies"] = applies
+    reviewed = fm.get("reviewed", "")
+    if reviewed and not DATE_RE.match(reviewed):
+        defects.append("%s: reviewed `%s` is not a YYYY-MM-DD date" % (name, reviewed))
+    idea["reviewed"] = reviewed
+    related = parse_list(fm.get("related", "[]"))
+    if related is None or not all(re.match(r"^\d+$", x) for x in related):
+        defects.append("%s: related must be a bracket list of idea ids, e.g. [43, 44] or []" % name)
+        related = []
+    idea["related"] = [int(x) for x in related]
+    sup = fm.get("superseded_by", "")
+    if sup and not re.match(r"^\d+$", sup):
+        defects.append("%s: superseded_by `%s` is not an idea id" % (name, sup))
+        sup = ""
+    idea["superseded_by"] = int(sup) if sup else None
     if fm["demo"]:
         if os.path.basename(fm["demo"]) != fm["demo"] or not fm["demo"].startswith("%03d-" % fid):
             defects.append("%s: demo `%s` must be a `%03d-*` file beside the idea" % (name, fm["demo"], fid))
@@ -220,6 +240,16 @@ def load_ideas(root):
     for n in sorted(seen):
         if len(seen[n]) > 1:
             defects.append("id %d appears %d times (%s)" % (n, len(seen[n]), ", ".join(seen[n])))
+    ids = {i["id"] for i in ideas}
+    for i in ideas:
+        for r in i["related"]:
+            if r not in ids or r == i["id"]:
+                defects.append("%s: related id %d is not another existing idea" % (i["file"], r))
+        sup = i["superseded_by"]
+        if sup is not None and (sup not in ids or sup == i["id"]):
+            defects.append("%s: superseded_by %d is not another existing idea" % (i["file"], sup))
+        if i["status"] == "superseded" and sup is None:
+            defects.append("%s: status superseded needs `superseded_by: N`" % i["file"])
     if not ideas and not defects:
         defects.append("no NNN-slug.md idea file was found in %s" % DIR_REL)
     return sorted(ideas, key=lambda i: (i["id"], i["file"])), defects
