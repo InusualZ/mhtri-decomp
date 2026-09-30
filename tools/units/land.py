@@ -334,10 +334,12 @@ def record_base(main: str, units: list[str] | None = None) -> dict:
     data["undefrefs"] = uref.snapshot_base(main, norm or None)
     # The data-closure row's base: every (unit, orphan data address) pair the base's target objects carry and
     # the claimed bytes, so the gate refuses only a pair a batch ADDS or a claim it SHRINKS. Target objects
-    # only (no compile), a few seconds; a tree with no split objects records nothing and the row says so.
+    # only (no compile), a few seconds; a tree with no split objects records nothing and the row says so. The
+    # strict half's "touched" test also needs the base's per-unit claims and the batch units' compiled-object
+    # fingerprints (name-insensitive, `datagap.object_fingerprint`) - the objects were compiled just above.
     try:
         if all(os.path.exists(os.path.join(main, "config", "RMHE08", f)) for f in ("splits.txt", "symbols.txt")):
-            data["orphans"] = dg.snapshot_orphans(main)
+            data["orphans"] = dg.snapshot_orphans(main, norm or None)
     except Exception as exc:                                  # noqa: BLE001 - never block record-base on it
         print("record-base: data-closure snapshot failed (%s)" % exc, file=sys.stderr)
     os.makedirs(os.path.join(main, ".pi"), exist_ok=True)
@@ -2694,6 +2696,11 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
         if orphans["unmatched_allowances"]:
             print("data closure: --allow-orphan %s matched no refusal (it excuses nothing)"
                   % ", ".join(orphans["unmatched_allowances"]))
+        for unit, verdict_t in sorted(orphans["touch"].items()):
+            print("data closure: %s" % dg.render_touch(unit, verdict_t))
+        if orphans["added_deferred"]:
+            print("data closure: %d NEW pair(s) deferred by class, not refused: %s"
+                  % (len(orphans["added_deferred"]), orphans["added_deferred"][0]))
         for cls, lines in sorted(orphans["strict"]["deferred"].items()):
             print("data closure: deferred %s, %d pair(s), not refused: %s" % (cls, len(lines), lines[0]))
         if not orphans["have_base"]:
@@ -2712,12 +2719,15 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
                      "`python tools/units/datagap.py --census --unit <unit>` for the orphan list with its "
                      "neighbours and readers. An unavoidable case takes `--allow-orphan <addr>`")
         counts = orphans["strict_counts"]
-        check("no batch unit still has data only it references left unclaimed (touching a unit means claiming its data)",
+        check("no batch unit the batch really changes still has data only it references left unclaimed "
+              "(touched = registered, recut or compiled object changed)",
               not orphans["sole_owned"],
               "%d pair(s) refused: %s" % (len(orphans["sole_owned"]), "; ".join(orphans["sole_owned"][:4])),
-              info="strict data claim: refusable %d, deferred %s (every deferred pair is named with its class)"
+              info="strict data claim: refusable %d, deferred %s (every deferred pair is named with its class); "
+                   "%d sole-owned pair(s) of %d untouched unit(s) reported, not demanded"
                    % (counts.get("refuse", 0), ", ".join("%s %d" % (c, counts.get(c, 0))
-                                                          for c in dg.STRICT_CLASSES)),
+                                                          for c in dg.STRICT_CLASSES),
+                      sum(orphans["untouched_pairs"].values()), len(orphans["untouched_pairs"])),
               remedy="claim the unit's own data: `python tools/units/dataclaim.py --unit <unit>` prints the exact "
                      "`splits.txt` lines (link-order position, sections, start/end, partial-run note) for every "
                      "refusable run; apply them, force a re-split and re-measure (playbook 23). A pair you cannot "
