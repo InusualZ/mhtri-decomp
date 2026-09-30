@@ -1,0 +1,1591 @@
+#!/usr/bin/env python3
+"""splitcheck.py - a read-only checker for a `splits.txt`: does every unit and every boundary satisfy what we know?
+
+    python tools/splits/splitcheck.py --baseline [--json F] [--all] [--only INV[,INV]] [--unit REGEX]
+    python tools/splits/splitcheck.py --proposal F [--proposal G ...] [--emit-splits OUT] [--json F]
+    python tools/splits/splitcheck.py --selftest
+
+`--baseline` checks the repository's current `config/RMHE08/splits.txt` and prints the audit list (phase 5 of the
+splits program, `docs/splits-program.md`): per invariant PASS/FAIL/UNKNOWN counts, the top defects, the suspected
+seams (the seam requests in `.pi/outbox/*.json`, the pool groups of `docs/pool-seams.md`).  `--proposal` renders a
+proposal file (`.pi/splits/phase<N>-<band>.json`, format in `docs/splits-program.md`) into a candidate `splits.txt`
+(strong + medium cuts applied, `guess` cuts merged, never emitted), lints the proposal, checks the candidate and
+prints the delta against the baseline.  Nothing is written except `--json` / `--emit-splits`.
+
+Invariants (one verdict per unit per invariant; PASS / FAIL / UNKNOWN, `-` = not applicable; evidence = an address):
+
+  order       link order: no overlapping ranges, one range per section, no cycle between the units' section orders
+              (`.bss`/`.sbss`/data sequences against the text sequence are the same graph)
+  coverage    every map symbol sits inside exactly one unit's range of its section (no gap under a symbol, no straddle)
+  text-cut    a unit's `.text` starts and ends on a function symbol
+  extab       every `extabindex` entry is owned by the unit that owns its function and its `extab` record
+  ctors/dtors the `.ctors`/`.dtors` word points at a function of the unit; a `.ctors` word is the unit's LAST function
+              (`__sinit`), and a unit has one
+  pool        idea 94: the `.sdata2` float/double and `.sdata` string pool of a unit is read only by that unit, runs in
+              first-use order, and holds each value once
+  data-order  docs/data-order-seams.md: no strong V->S / zigzag seam strictly inside the unit's `.data`
+  vtable      a vtable sits in the unit whose text holds one of its slots or stores it
+  jumptable   a jump table sits in the unit that reads it and branches into
+  bss         a local `.bss`/`.sbss` object is read by the unit that holds it
+
+The text references (pool first-use, jump table and bss readers) are decoded from the retail `.text`: a `lis` + `addi`/
+`ori`/load pair, or an r13/r2 small-data access.  That is heuristic evidence (a register reused across a branch can
+fool it) and is stated as such in every finding that depends on it.
+"""
+from __future__ import annotations
+
+import argparse
+import bisect
+import collections
+import json
+import os
+import re
+import struct
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+TOOLS = os.path.dirname(HERE)
+for _p in (TOOLS, HERE):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+GAME = "RMHE08"
+PASS, FAIL, UNKNOWN, NA = "PASS", "FAIL", "UNKNOWN", "-"
+RANK = {NA: 0, PASS: 1, UNKNOWN: 2, FAIL: 3}
+INVARIANTS = ("order", "coverage", "text-cut", "extab", "ctors", "dtors", "pool", "data-order", "vtable",
+              "jumptable", "bss")
+#: how bad a defect of this invariant is, for the top-N list (higher first)
+WEIGHT = {"order": 100, "coverage": 95, "extab": 90, "ctors": 85, "dtors": 80, "text-cut": 75, "pool": 60,
+          "vtable": 55, "jumptable": 50, "data-order": 45, "bss": 40}
+SECTION_ORDER = [".init", "extab", "extabindex", ".text", ".ctors", ".dtors", ".rodata", ".data", ".bss", ".sdata",
+                 ".sbss", ".sdata2", ".sbss2"]
+CODE_SECTIONS = (".init", ".text")
+SYMBOL_RE = re.compile(r"^(\S+) = (\S+):0x([0-9A-Fa-f]+);(.*)$")
+RANGE_RE = re.compile(r"^\s+(\S+)\s+start:0x([0-9A-Fa-f]+)\s+end:0x([0-9A-Fa-f]+)(.*)$")
+UNIT_RE = re.compile(r"^(\S.*?):(?:\s+(.*))?$")
+GRADES = ("strong", "medium", "guess")
+#: a window (in instructions) a `lis` value stays live for the reference decoder
+LIS_WINDOW = 200
+
+
+# ---- locating the inputs ---------------------------------------------------------------------------------------------
+
+def tree_root():
+    import unitutil as uu
+    return uu.ROOT
+
+
+def main_root(root=None):
+    """The primary checkout (the parent of the git common dir), or None outside git."""
+    root = root or tree_root()
+    try:
+        out = subprocess.run(["git", "rev-parse", "--git-common-dir"], cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                             timeout=20).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if not out:
+        return None
+    out = os.path.normpath(out if os.path.isabs(out) else os.path.join(root, out))
+    return os.path.dirname(out) if os.path.basename(out) == ".git" else None
+
+
+def find_file(rel, root=None):
+    """`rel` under the tree, else under the primary checkout (orig/ and build/ are not in a worktree)."""
+    root = root or tree_root()
+    for base in (root, main_root(root)):
+        if base and os.path.isfile(os.path.join(base, rel)):
+            return os.path.join(base, rel)
+    return os.path.join(root, rel)
+
+
+# ---- splits.txt ------------------------------------------------------------------------------------------------------
+
+class Unit:
+    """One `splits.txt` entry: name, raw file attributes, and `section -> [(start, end, raw_attrs)]`."""
+
+    def __init__(self, name, attrs="", ranges=None):
+        self.name = name
+        self.attrs = attrs or ""
+        self.ranges = ranges if ranges is not None else {}
+
+    def rs(self, sec):
+        return [(s, e) for s, e, _a in self.ranges.get(sec, [])]
+
+    def first(self, sec):
+        r = self.ranges.get(sec)
+        return r[0][0] if r else None
+
+    def size(self, sec):
+        return sum(e - s for s, e, _a in self.ranges.get(sec, []))
+
+    def lo(self):
+        """The unit's anchor address: its first `.text` start, else its lowest range start."""
+        t = self.first(".text")
+        if t is not None:
+            return t
+        starts = [s for rr in self.ranges.values() for s, _e, _a in rr]
+        return min(starts) if starts else 0
+
+
+class Splits:
+    def __init__(self, header, units):
+        self.header = header          # the raw lines up to and including the last `Sections:` row
+        self.units = units            # in file order
+
+    def by_name(self):
+        return {u.name: u for u in self.units}
+
+
+def parse_splits(text):
+    header, units, cur = [], [], None
+    in_header = True
+    for ln in text.splitlines():
+        if in_header:
+            if ln.startswith("Sections:") or (header and ln[:1].isspace() and ln.strip()):
+                header.append(ln)
+                continue
+            in_header = False
+        if not ln.strip():
+            continue
+        m = RANGE_RE.match(ln)
+        if m and cur is not None:
+            cur.ranges.setdefault(m.group(1), []).append((int(m.group(2), 16), int(m.group(3), 16),
+                                                          m.group(4).rstrip()))
+            continue
+        m = UNIT_RE.match(ln)
+        if m and not ln[0].isspace():
+            cur = Unit(m.group(1), m.group(2) or "")
+            units.append(cur)
+    return Splits(header, units)
+
+
+def render_splits(sp):
+    out = list(sp.header) + [""]
+    order = {s: i for i, s in enumerate(SECTION_ORDER)}
+    for u in sp.units:
+        out.append("%s:%s" % (u.name, (" " + u.attrs) if u.attrs else ""))
+        for sec in sorted(u.ranges, key=lambda s: order.get(s, 99)):
+            for s, e, a in sorted(u.ranges[sec]):
+                out.append("\t%-11s start:0x%08X end:0x%08X%s" % (sec, s, e, (" " + a.strip()) if a.strip() else ""))
+        out.append("")
+    return "\n".join(out)
+
+
+# ---- symbols.txt and the DOL ------------------------------------------------------------------------------------------
+
+def parse_symbols(lines):
+    """Map rows as dicts (`name section addr size type scope kind`); the map is streamed, never printed."""
+    out = []
+    for ln in lines:
+        m = SYMBOL_RE.match(ln.rstrip("\n"))
+        if not m:
+            continue
+        rest = m.group(4)
+        sz = re.search(r"size:0x([0-9A-Fa-f]+)", rest)
+        ty = re.search(r"type:(\w+)", rest)
+        sc = re.search(r"scope:(\w+)", rest)
+        kd = re.search(r"(?<![\w.])data:(\S+)", rest)
+        out.append({"name": m.group(1), "section": m.group(2), "addr": int(m.group(3), 16),
+                    "size": int(sz.group(1), 16) if sz else 0, "type": ty.group(1) if ty else "",
+                    "scope": sc.group(1) if sc else "", "kind": kd.group(1) if kd else ""})
+    return out
+
+
+class Dol:
+    """Address -> bytes of the retail image through the DOL section table."""
+
+    def __init__(self, data):
+        self.data = data
+        h = data
+        toff = struct.unpack(">7I", h[0x00:0x1C])
+        doff = struct.unpack(">11I", h[0x1C:0x48])
+        taddr = struct.unpack(">7I", h[0x48:0x64])
+        daddr = struct.unpack(">11I", h[0x64:0x90])
+        tsize = struct.unpack(">7I", h[0x90:0xAC])
+        dsize = struct.unpack(">11I", h[0xAC:0xD8])
+        self.secs = [(a, s, o) for a, s, o in zip(taddr + daddr, tsize + dsize, toff + doff) if s]
+
+    def read(self, addr, n):
+        for a, s, o in self.secs:
+            if a <= addr and addr + n <= a + s:
+                return self.data[o + (addr - a):o + (addr - a) + n]
+        return None
+
+    def word(self, addr):
+        b = self.read(addr, 4)
+        return struct.unpack(">I", b)[0] if b else None
+
+
+# ---- instruction decoding: who reads which data address -----------------------------------------------------------------
+
+LOADS_INT = (32, 33, 34, 35, 40, 41, 42, 43)          # write rD
+STORES = (36, 37, 38, 39, 44, 45, 47)
+FP_MEM = (48, 49, 50, 51, 52, 53, 54, 55)
+
+
+def find_sda_bases(dol, code_words):
+    """`(r13, r2)` values: the `lis rN / ori|addi rN` pair in the start-up code (`__init_registers`)."""
+    out = {13: None, 2: None}
+    lis = {}
+    for addr, w in code_words:
+        op = w >> 26
+        rd, ra = (w >> 21) & 31, (w >> 16) & 31
+        if op == 15 and ra == 0 and rd in out:
+            lis[rd] = (w & 0xFFFF) << 16
+        elif op == 24 and rd in lis and ra == rd and out[rd] is None:         # ori rA,rS,UI
+            out[rd] = lis[rd] | (w & 0xFFFF)
+        elif op == 14 and ra in lis and rd == ra and out[rd] is None:         # addi rD,rA,SIMM
+            s = w & 0xFFFF
+            out[rd] = (lis[rd] + (s - 0x10000 if s & 0x8000 else s)) & 0xFFFFFFFF
+    return out[13], out[2]
+
+
+def scan_refs(code, start, sda13, sda2, is_data, fn_starts=()):
+    """`{target_address: [site, ...]}` for every absolute/small-data address a function materialises or accesses.
+
+    `code` is the big-endian bytes of a code range starting at `start`; `is_data(addr)` says whether a computed
+    address is worth recording; a `lis` value is forgotten at a function start (`fn_starts`).
+    """
+    refs = collections.defaultdict(list)
+    n = len(code) // 4
+    words = struct.unpack(">%dI" % n, code[:n * 4])
+    fs = set(fn_starts)
+    lis = {}
+    for i, w in enumerate(words):
+        site = start + i * 4
+        if site in fs:
+            lis.clear()
+        op = w >> 26
+        if op == 15:                                   # addis rD,rA,SIMM  (lis when rA == 0)
+            rd, ra = (w >> 21) & 31, (w >> 16) & 31
+            if ra == 0:
+                lis[rd] = ((w & 0xFFFF) << 16, i)
+            else:
+                lis.pop(rd, None)
+            continue
+        if op == 24:                                   # ori rA,rS,UI : base is rS, result goes to rA
+            rs, ra = (w >> 21) & 31, (w >> 16) & 31
+            if rs in lis and i - lis[rs][1] <= LIS_WINDOW:
+                t = lis[rs][0] | (w & 0xFFFF)
+                if is_data(t):
+                    refs[t].append(site)
+            if ra != rs:
+                lis.pop(ra, None)
+            continue
+        if op == 14 or 32 <= op <= 55:
+            rt, ra = (w >> 21) & 31, (w >> 16) & 31
+            s = w & 0xFFFF
+            simm = s - 0x10000 if s & 0x8000 else s
+            t = None
+            if ra == 13 and sda13 is not None:
+                t = (sda13 + simm) & 0xFFFFFFFF
+            elif ra == 2 and sda2 is not None:
+                t = (sda2 + simm) & 0xFFFFFFFF
+            elif ra != 0 and ra in lis and i - lis[ra][1] <= LIS_WINDOW:
+                t = (lis[ra][0] + simm) & 0xFFFFFFFF
+            if t is not None and is_data(t):
+                refs[t].append(site)
+            writes = op == 14 or op in LOADS_INT
+            if writes:
+                lis.pop(rt, None)
+            elif op == 46:                               # lmw rD: rD..r31 written
+                for r in range(rt, 32):
+                    lis.pop(r, None)
+    return refs
+
+
+# ---- the context: everything the invariants read --------------------------------------------------------------------------
+
+class Ctx:
+    """A splits file + the map + the retail image, with the indices every invariant uses."""
+
+    def __init__(self, splits, symbols, dol, sda13=None, sda2=None, scan=True):
+        self.splits, self.symbols, self.dol = splits, symbols, dol
+        self.units = splits.units
+        self.by_name = splits.by_name()
+        self.sec_index = collections.defaultdict(list)        # section -> sorted [(start, end, unit)]
+        for u in self.units:
+            for sec, rr in u.ranges.items():
+                for s, e, _a in rr:
+                    self.sec_index[sec].append((s, e, u))
+        for v in self.sec_index.values():
+            v.sort(key=lambda t: (t[0], t[1]))
+        self._starts = {sec: [t[0] for t in v] for sec, v in self.sec_index.items()}
+        self.fns = sorted((s for s in symbols if s["type"] == "function" and s["section"] in CODE_SECTIONS),
+                          key=lambda s: s["addr"])
+        self._fn_starts = [s["addr"] for s in self.fns]
+        self.data_syms = sorted((s for s in symbols if s["section"] not in CODE_SECTIONS
+                                 and s["section"] in SECTION_ORDER), key=lambda s: (s["addr"], s["section"]))
+        self._ds_addr = [s["addr"] for s in self.data_syms]
+        self.sda13, self.sda2 = sda13, sda2
+        self.refs = {}                                        # data symbol index -> [sites]
+        self.scanned = False
+        if scan:
+            self.scan()
+
+    # lookups
+    def owner(self, sec, addr):
+        v = self.sec_index.get(sec)
+        if not v:
+            return None
+        i = bisect.bisect_right(self._starts[sec], addr) - 1
+        for j in range(i, max(i - 8, -1), -1):
+            s, e, u = v[j]
+            if s <= addr < e:
+                return u
+        return None
+
+    def text_owner(self, addr):
+        return self.owner(".text", addr) or self.owner(".init", addr)
+
+    def fn_at(self, addr):
+        i = bisect.bisect_right(self._fn_starts, addr) - 1
+        if i < 0:
+            return None
+        f = self.fns[i]
+        end = f["addr"] + (f["size"] or 4)
+        return f if f["addr"] <= addr < end else None
+
+    def data_sym_at(self, addr):
+        i = bisect.bisect_right(self._ds_addr, addr) - 1
+        if i < 0:
+            return None, None
+        s = self.data_syms[i]
+        end = s["addr"] + (s["size"] or 4)
+        if s["addr"] <= addr < end:
+            return i, s
+        return None, None
+
+    def section_extent(self, sec):
+        v = self.sec_index.get(sec)
+        return (min(t[0] for t in v), max(t[1] for t in v)) if v else None
+
+    # the text reference index
+    def scan(self):
+        data_lo = None
+        for sec in (".ctors", ".dtors", ".rodata", ".data", ".bss", ".sdata", ".sbss", ".sdata2", ".sbss2"):
+            ext = self.section_extent(sec)
+            if ext:
+                data_lo = ext[0] if data_lo is None else min(data_lo, ext[0])
+        hi = max((e for sec in self.sec_index for _s, e, _u in self.sec_index[sec]), default=0)
+
+        def is_data(t):
+            return data_lo is not None and data_lo <= t < hi
+
+        ranges = []
+        for sec in CODE_SECTIONS:
+            ext = self.section_extent(sec)
+            if ext:
+                ranges.append(ext)
+        chunks = [(lo, self.read_span(lo, hi2)) for lo, hi2 in ranges]
+        if self.sda13 is None and self.sda2 is None:
+            init = next((f for f in self.fns if f["name"] == "__init_registers"), None)
+            if init:
+                b = self.dol.read(init["addr"], init["size"] or 0x90)
+                if b:
+                    ws = [(init["addr"] + i * 4, w) for i, w in enumerate(struct.unpack(">%dI" % (len(b) // 4), b))]
+                    self.sda13, self.sda2 = find_sda_bases(self.dol, ws)
+        raw = collections.defaultdict(list)
+        for lo, blob in chunks:
+            if not blob:
+                continue
+            for t, sites in scan_refs(blob, lo, self.sda13, self.sda2, is_data, self._fn_starts).items():
+                raw[t].extend(sites)
+        for t, sites in raw.items():
+            i, _s = self.data_sym_at(t)
+            if i is not None:
+                self.refs.setdefault(i, []).extend(sites)
+        self.scanned = True
+
+    def read_span(self, lo, hi):
+        """Bytes of `[lo, hi)`, reading across DOL section borders (a hole is zero-filled)."""
+        out = bytearray()
+        a = lo
+        while a < hi:
+            nxt = None
+            for s, size, _o in self.dol.secs:
+                if s <= a < s + size:
+                    nxt = s + size
+                    break
+            if nxt is None:
+                nxt = min([s for s, _z, _o in self.dol.secs if s > a] + [hi])
+                out += b"\0" * (min(nxt, hi) - a)
+            else:
+                n = min(nxt, hi) - a
+                out += self.dol.read(a, n) or b"\0" * n
+            a = min(nxt, hi)
+        return bytes(out)
+
+    def readers(self, sym):
+        """The sites (text addresses) that read this map row, by identity."""
+        i, _ = self.data_sym_at(sym["addr"])
+        return self.refs.get(i, []) if i is not None and self.data_syms[i] is sym else []
+
+
+# ---- the result store ---------------------------------------------------------------------------------------------------
+
+class Results:
+    def __init__(self):
+        self.units = collections.OrderedDict()
+        self.extra = []                      # defects not attached to a unit (unowned symbols, ...)
+
+    def add(self, unit, inv, status, addr=None, finding="", item=None):
+        rec = self.units.setdefault(unit, {}).setdefault(inv, {"status": NA, "addr": None, "finding": "",
+                                                               "items": [], "n_fail": 0, "n_pass": 0})
+        if status == FAIL:
+            rec["n_fail"] += 1
+        elif status == PASS:
+            rec["n_pass"] += 1
+        if RANK[status] > RANK[rec["status"]]:
+            rec["status"] = status
+            rec["addr"] = addr
+            rec["finding"] = finding
+        if status in (FAIL, UNKNOWN) and len(rec["items"]) < 12:
+            rec["items"].append({"status": status, "addr": addr, "finding": finding, **(item or {})})
+
+    def summary(self):
+        out = {inv: {PASS: 0, FAIL: 0, UNKNOWN: 0, NA: 0} for inv in INVARIANTS}
+        for recs in self.units.values():
+            for inv, r in recs.items():
+                out[inv][r["status"]] += 1
+        return out
+
+
+def hx(a):
+    return "0x%08X" % a if a is not None else "-"
+
+
+# ---- the invariants -----------------------------------------------------------------------------------------------------
+
+def check_order(ctx, res):
+    """One range per section, no overlap, no cycle in the union of the per-section orders."""
+    for u in ctx.units:
+        for sec, rr in u.ranges.items():
+            plain = sorted((s, e) for s, e, a in rr if "rename:" not in a and "common" not in a)
+            if len(plain) > 1:
+                gaps = [(pe, s) for (_ps, pe), (s, _e) in zip(plain, plain[1:]) if s != pe]
+                if gaps:
+                    res.add(u.name, "order", FAIL, plain[1][0], "%s has %d ranges with a gap at %s (dtk takes one)" % (sec, len(plain), hx(gaps[0][0])))
+                else:
+                    res.add(u.name, "order", UNKNOWN, plain[1][0], "%s has %d abutting ranges (one range in effect)" % (sec, len(plain)))
+            for s, e, _a in rr:
+                if e <= s:
+                    res.add(u.name, "order", FAIL, s, "%s range is empty or reversed (%s..%s)" % (sec, hx(s), hx(e)))
+    edges = collections.defaultdict(set)
+    where = {}
+    for sec, v in ctx.sec_index.items():
+        prev = None
+        for s, e, u in v:
+            if "rename:" in next((a for x, y, a in u.ranges[sec] if x == s), ""):
+                continue                     # `.ctors$10` / `.dtors$15`: the linker script orders these, not the unit order
+            if prev is not None:
+                ps, pe, pu = prev
+                if s < pe and pu is not u:
+                    res.add(pu.name, "order", FAIL, s, "%s overlaps %s at %s..%s" % (sec, u.name, hx(s), hx(min(e, pe))))
+                    res.add(u.name, "order", FAIL, s, "%s overlaps %s at %s..%s" % (sec, pu.name, hx(s), hx(min(e, pe))))
+                if pu is not u:
+                    edges[pu.name].add(u.name)
+                    where[(pu.name, u.name)] = (sec, s)
+            prev = (s, e, u) if prev is None or e > prev[1] else prev
+    for comp in _sccs(edges):
+        if len(comp) < 2:
+            continue
+        cs = set(comp)
+        for name in comp:
+            ev = [(where[(a, b)], a, b) for a in comp for b in edges[a] if b in cs and (a, b) in where]
+            (sec, addr), a, b = min(ev, key=lambda t: t[0][1])
+            res.add(name, "order", FAIL, addr, "link-order cycle of %d units (%s before %s at %s %s)"
+                    % (len(comp), a, b, sec, hx(addr)), {"cycle": sorted(comp)[:8]})
+    for u in ctx.units:
+        res.add(u.name, "order", PASS)
+
+
+def _sccs(edges):
+    """Strongly connected components (iterative Tarjan)."""
+    index, low, on, stack, out = {}, {}, set(), [], []
+    counter = [0]
+    nodes = set(edges) | {b for v in edges.values() for b in v}
+    for root in sorted(nodes):
+        if root in index:
+            continue
+        work = [(root, iter(sorted(edges.get(root, ()))))]
+        index[root] = low[root] = counter[0]
+        counter[0] += 1
+        stack.append(root)
+        on.add(root)
+        while work:
+            node, it = work[-1]
+            adv = False
+            for nxt in it:
+                if nxt not in index:
+                    index[nxt] = low[nxt] = counter[0]
+                    counter[0] += 1
+                    stack.append(nxt)
+                    on.add(nxt)
+                    work.append((nxt, iter(sorted(edges.get(nxt, ())))))
+                    adv = True
+                    break
+                if nxt in on:
+                    low[node] = min(low[node], index[nxt])
+            if adv:
+                continue
+            work.pop()
+            if work:
+                low[work[-1][0]] = min(low[work[-1][0]], low[node])
+            if low[node] == index[node]:
+                comp = []
+                while True:
+                    w = stack.pop()
+                    on.discard(w)
+                    comp.append(w)
+                    if w == node:
+                        break
+                out.append(comp)
+    return out
+
+
+def check_coverage(ctx, res):
+    """Every map symbol is inside exactly one unit's range of its section; the unowned runs are summarised."""
+    runs = collections.defaultdict(list)                 # section -> [[start, end, n_symbols, last_owned_unit]]
+    last_owned = {}
+    for s in sorted(ctx.symbols, key=lambda x: (x["section"], x["addr"])):
+        sec = s["section"]
+        if sec not in SECTION_ORDER or sec not in ctx.sec_index or (s["type"] == "label" and not s["size"]):
+            continue
+        a, size = s["addr"], s["size"]
+        u = ctx.owner(sec, a)
+        if u is None:
+            r = runs[sec]
+            if r and r[-1][3] == last_owned.get(sec):
+                r[-1][1] = a + size
+                r[-1][2] += 1
+            else:
+                r.append([a, a + size, 1, last_owned.get(sec)])
+            continue
+        last_owned[sec] = u.name
+        if size and sec != ".bss":
+            e = ctx.owner(sec, a + size - 1)
+            if e is not u:
+                res.add(u.name, "coverage", FAIL, a, "%s %s (0x%X B) straddles the end of the unit's %s range"
+                        % (s["type"] or "symbol", s["name"], size, sec))
+    for u in ctx.units:
+        res.add(u.name, "coverage", PASS)
+    ctx.coverage_gaps = {sec: {"runs": len(r), "symbols": sum(x[2] for x in r), "bytes": sum(x[1] - x[0] for x in r),
+                               "largest": [{"start": hx(x[0]), "end": hx(x[1]), "symbols": x[2]}
+                                           for x in sorted(r, key=lambda x: -(x[1] - x[0]))[:3]]}
+                         for sec, r in runs.items()}
+
+
+def check_text_cut(ctx, res):
+    for u in ctx.units:
+        for sec in CODE_SECTIONS:
+            for s, e, _a in u.ranges.get(sec, []):
+                f = ctx.fn_at(s)
+                if f is None or f["addr"] != s:
+                    if f is None and not any(x["addr"] == s for x in ctx.symbols if False):
+                        pass
+                    res.add(u.name, "text-cut", FAIL if f is not None else UNKNOWN, s,
+                            "%s starts %s" % (sec, ("inside %s (+0x%X)" % (f["name"], s - f["addr"])) if f
+                                              else "where no function symbol is"))
+                    continue
+                last = ctx.fn_at(e - 1)
+                if last is not None and last["addr"] + (last["size"] or 0) > e:
+                    res.add(u.name, "text-cut", FAIL, e, "%s ends inside %s (+0x%X)" % (sec, last["name"], e - last["addr"]))
+                else:
+                    res.add(u.name, "text-cut", PASS)
+
+
+def check_extab(ctx, res):
+    ext = ctx.section_extent("extabindex")
+    if not ext:
+        return
+    for a in range(ext[0], ext[1] - 11, 12):
+        fn = ctx.dol.word(a)
+        size = ctx.dol.word(a + 4)
+        ex = ctx.dol.word(a + 8)
+        if fn is None or size is None or ex is None:
+            continue
+        ue = ctx.owner("extabindex", a)
+        uf = ctx.text_owner(fn)
+        ux = ctx.owner("extab", ex)
+        if ue is None:
+            continue
+        if uf is None or ux is None or uf is not ue or ux is not ue or (uf and fn + size > uf.ranges.get(".text", [(0, 0, "")])[-1][1] + 0 and ctx.text_owner(fn + size - 1) is not uf):
+            why = []
+            if uf is not ue:
+                why.append("function %s is in %s" % (hx(fn), uf.name if uf else "no unit"))
+            if ux is not ue:
+                why.append("extab %s is in %s" % (hx(ex), ux.name if ux else "no unit"))
+            if not why:
+                why.append("function %s..%s runs past the unit's text" % (hx(fn), hx(fn + size)))
+            res.add(ue.name, "extab", FAIL, a, "entry %s: %s" % (hx(a), "; ".join(why)))
+            for other in (uf, ux):
+                if other is not None and other is not ue:
+                    res.add(other.name, "extab", FAIL, a, "entry %s in %s points at this unit's %s"
+                            % (hx(a), ue.name, "text" if other is uf else "extab"))
+        else:
+            res.add(ue.name, "extab", PASS)
+    for u in ctx.units:
+        if u.ranges.get("extabindex") or u.ranges.get("extab"):
+            res.add(u.name, "extab", PASS)
+
+
+def check_ctors(ctx, res):
+    for sec, inv in ((".ctors", "ctors"), (".dtors", "dtors")):
+        for u in ctx.units:
+            words = []
+            for s, e, _a in u.ranges.get(sec, []):
+                words += [(a, ctx.dol.word(a)) for a in range(s, e - 3, 4)]
+            if not words:
+                continue
+            tr = u.ranges.get(".text", [])
+            if sec == ".ctors" and len(words) > 1:
+                res.add(u.name, inv, FAIL, words[1][0], "%d .ctors words: one TU has one __sinit, so this is %d or more TUs"
+                        % (len(words), len(words)))
+            for a, w in words:
+                if not w:
+                    res.add(u.name, inv, UNKNOWN, a, "zero word")
+                    continue
+                f = ctx.fn_at(w)
+                if f is None:
+                    res.add(u.name, inv, FAIL, a, "word %s is not a function" % hx(w))
+                    continue
+                tu = ctx.text_owner(w)
+                if f["name"] in CRT_CHAIN:
+                    res.add(u.name, inv, PASS)
+                elif tu is not u:
+                    res.add(u.name, inv, FAIL, a, "word %s is %s, which is in %s" % (hx(w), f["name"],
+                                                                                     tu.name if tu else "no unit"))
+                elif sec == ".ctors":
+                    end = tr[-1][1] if tr else 0
+                    if f["addr"] + (f["size"] or 0) + SINIT_SLACK < end or f["addr"] + (f["size"] or 0) > end:
+                        res.add(u.name, inv, FAIL, a, "%s is not the unit's last function (text ends %s, it ends %s): a TU boundary is at %s"
+                                % (f["name"], hx(end), hx(f["addr"] + f["size"]), hx(f["addr"] + f["size"])),
+                                {"cut_at": f["addr"] + f["size"]})
+                    else:
+                        res.add(u.name, inv, PASS)
+                else:
+                    res.add(u.name, inv, PASS)
+
+
+LITERAL_KINDS = ("float", "double")
+#: alignment padding a unit may keep after its last function (a 16-byte-aligned function start)
+SINIT_SLACK = 0xC
+#: crt chain entries a runtime unit registers for another unit's function
+CRT_CHAIN = ("__destroy_global_chain", "__init_cpp_exceptions", "__fini_cpp_exceptions")
+
+
+def pool_literals(ctx, u):
+    """(symbol, is_dedupe_witness) for the literals of a unit's `.sdata2` / `.sdata` ranges."""
+    out = []
+    for sec in (".sdata2", ".sdata"):
+        for s, e, _a in u.ranges.get(sec, []):
+            i = bisect.bisect_left(ctx._ds_addr, s)
+            while i < len(ctx.data_syms) and ctx._ds_addr[i] < e:
+                sym = ctx.data_syms[i]
+                i += 1
+                if sym["section"] != sec:
+                    continue
+                if sec == ".sdata2" and sym["size"] in (4, 8) and sym["type"] == "object":
+                    out.append((sym, sym["kind"] in LITERAL_KINDS))
+                elif sec == ".sdata" and sym["kind"] == "string":
+                    out.append((sym, False))
+    return out
+
+
+def is_literal(sym):
+    return ((sym["section"] == ".sdata2" and sym["size"] in (4, 8) and sym["type"] == "object")
+            or (sym["section"] == ".sdata" and sym["kind"] == "string"))
+
+
+def check_pool(ctx, res):
+    """Idea 94.  Two halves: what a unit's own pool claim holds, and what its text reads wherever the pool lives."""
+    ctx.pool_edges = collections.defaultdict(set)              # (unit, other) -> literal addresses
+    per_unit = collections.defaultdict(lambda: collections.defaultdict(list))   # unit -> (size, value) -> [literal sym]
+    reads = collections.defaultdict(int)
+    for i, sym in enumerate(ctx.data_syms):
+        if not is_literal(sym):
+            continue
+        sites = ctx.refs.get(i, [])
+        units = collections.OrderedDict()
+        for x in sites:
+            u = ctx.text_owner(x)
+            if u is not None:
+                units.setdefault(u.name, u)
+        for n in units:
+            reads[n] += 1
+        if len(units) >= 2:
+            names = list(units)
+            for n in names:
+                others = [o for o in names if o != n]
+                for o in others:
+                    ctx.pool_edges[(n, o)].add(sym["addr"])
+                res.add(n, "pool", FAIL, sym["addr"], "literal %s is also read by %s (one pool per TU: the units are one TU, or one read is a false decode)"
+                        % (sym["name"], ", ".join(others[:3])))
+        if sym["kind"] in LITERAL_KINDS:
+            v = ctx.dol.read(sym["addr"], sym["size"])
+            for n in units:
+                per_unit[n][(sym["size"], v)].append(sym)
+    for n, vals in per_unit.items():
+        for (size, v), lits in vals.items():
+            if len(lits) > 1 and v is not None:
+                res.add(n, "pool", FAIL, lits[1]["addr"], "reads value 0x%s at %s and at %s (one entry per value per TU: two TUs)"
+                        % (v.hex(), hx(lits[0]["addr"]), hx(lits[1]["addr"])))
+    for u in ctx.units:
+        lits = pool_literals(ctx, u)
+        if lits:
+            own_first = []
+            seen = {}
+            for sym, witness in lits:
+                own = [x for x in ctx.readers(sym) if ctx.text_owner(x) is u]
+                if witness:
+                    v = ctx.dol.read(sym["addr"], sym["size"])
+                    key = (sym["size"], v)
+                    if v is not None and key in seen:
+                        res.add(u.name, "pool", FAIL, sym["addr"], "claimed pool holds value 0x%s at %s and again at %s (one entry per value per TU)"
+                                % (v.hex(), hx(seen[key]), hx(sym["addr"])))
+                    elif v is not None:
+                        seen[key] = sym["addr"]
+                if own:
+                    own_first.append((sym["addr"], min(own), sym["name"]))
+            own_first.sort()
+            bad = next(((a, f, n, pf) for (_pa, pf, _pn), (a, f, n) in zip(own_first, own_first[1:]) if f < pf), None)
+            if bad:
+                res.add(u.name, "pool", FAIL, bad[0], "claimed pool: first use of %s (%s) precedes the literal before it (%s): not text order"
+                        % (bad[2], hx(bad[1]), hx(bad[3])))
+            foreign_only = [sym for sym, _w in lits if ctx.readers(sym) and not any(ctx.text_owner(x) is u for x in ctx.readers(sym))]
+            if foreign_only and not any(ctx.text_owner(x) is u for sym, _w in lits for x in ctx.readers(sym)):
+                res.add(u.name, "pool", FAIL, foreign_only[0]["addr"], "claimed pool %s is read by no code of this unit (readers: %s)"
+                        % (foreign_only[0]["name"], sorted({ctx.text_owner(x).name for x in ctx.readers(foreign_only[0]) if ctx.text_owner(x)})[0]))
+        if reads.get(u.name) or lits:
+            res.add(u.name, "pool", PASS if reads.get(u.name) or any(ctx.readers(sym) for sym, _w in lits) else UNKNOWN,
+                    None, "no literal is read by decoded code")
+
+
+def check_data_order(ctx, res, rows):
+    import dataorder as do
+    reader = ctx.dol
+    syms = do.classify_all(rows, reader)
+    ctx.data_order = syms
+    found = do.seams(syms)
+    for u in ctx.units:
+        for s, e, _a in u.ranges.get(".data", []):
+            inside = [x for x in found if x["kind"] in do.STRONG_KINDS and s < x["addr"] < e]
+            has_v = any(s <= y.addr < e and y.kind == do.VTABLE for y in syms)
+            if inside:
+                x = inside[0]
+                res.add(u.name, "data-order", FAIL, x["addr"], "strong %s seam at %s inside the unit's .data (a boundary in [%s, %s)): at least %d TUs"
+                        % (x["kind"], hx(x["addr"]), hx(x["addr"]), hx(x.get("latest", x["addr"])), len(inside) + 1))
+            elif has_v:
+                res.add(u.name, "data-order", PASS)
+
+
+def check_vtable(ctx, res):
+    syms = getattr(ctx, "data_order", None)
+    if syms is None:
+        return
+    for y in syms:
+        if y.kind != "V":
+            continue
+        u = ctx.owner(".data", y.addr)
+        if u is None:
+            continue
+        slots = [ctx.dol.word(y.addr + o) for o in range(8, y.size - 3, 4)]
+        slots = [w for w in slots if w]
+        in_unit = [w for w in slots if ctx.text_owner(w) is u]
+        if in_unit:
+            res.add(u.name, "vtable", PASS)
+            continue
+        ds = next((s for s in ctx.data_syms if s["addr"] == y.addr and s["section"] == ".data"), None)
+        stores = [x for x in (ctx.readers(ds) if ds else []) if ctx.text_owner(x) is u]
+        if stores:
+            res.add(u.name, "vtable", PASS)
+            continue
+        owners = sorted({ctx.text_owner(w).name for w in slots if ctx.text_owner(w)})
+        if owners:
+            res.add(u.name, "vtable", FAIL, y.addr, "vtable %s has no slot in this unit; its slots are in %s" % (y.name, ", ".join(owners[:3])))
+        else:
+            res.add(u.name, "vtable", UNKNOWN, y.addr, "vtable %s: no slot or constructor store is owned by any unit" % y.name)
+
+
+def check_jumptable(ctx, res):
+    for s in ctx.symbols:
+        if not s["name"].startswith("jumptable_") or s["section"] not in (".data", ".rodata"):
+            continue
+        u = ctx.owner(s["section"], s["addr"])
+        if u is None:
+            continue
+        targets = [ctx.dol.word(s["addr"] + o) for o in range(0, s["size"] - 3, 4)]
+        targets = [t for t in targets if t]
+        tu = {ctx.text_owner(t) for t in targets if ctx.fn_at(t)}
+        rsites = ctx.readers(s)
+        ru = {ctx.text_owner(x) for x in rsites if ctx.text_owner(x)}
+        bad = [x for x in ru if x is not u]
+        if bad:
+            res.add(u.name, "jumptable", FAIL, s["addr"], "%s is read by %s, not by this unit" % (s["name"], bad[0].name))
+        elif tu and tu != {u}:
+            other = sorted(x.name if x else "no unit" for x in tu - {u})
+            res.add(u.name, "jumptable", FAIL, s["addr"], "%s branches into %s" % (s["name"], ", ".join(other[:3])))
+        elif ru or tu:
+            res.add(u.name, "jumptable", PASS)
+        else:
+            res.add(u.name, "jumptable", UNKNOWN, s["addr"], "%s: no decoded reader and no code target" % s["name"])
+
+
+def check_bss(ctx, res):
+    """A local `.bss`/`.sbss` object is read by the unit that holds it; a unit whose range no decoded code touches is UNKNOWN."""
+    for u in ctx.units:
+        own = foreign_global = 0
+        for sec in (".bss", ".sbss", ".sbss2"):
+            for s0, e0, _a in u.ranges.get(sec, []):
+                i = bisect.bisect_left(ctx._ds_addr, s0)
+                while i < len(ctx.data_syms) and ctx._ds_addr[i] < e0:
+                    sym = ctx.data_syms[i]
+                    i += 1
+                    if sym["section"] != sec:
+                        continue
+                    ous = {ctx.text_owner(x) for x in ctx.readers(sym) if ctx.text_owner(x)}
+                    if not ous:
+                        continue
+                    if u in ous:
+                        own += 1
+                    elif sym["scope"] == "local":
+                        res.add(u.name, "bss", FAIL, sym["addr"], "local %s is read only by %s" % (sym["name"], sorted(o.name for o in ous)[0]))
+                    else:
+                        foreign_global += 1
+        if u.ranges.get(".bss") or u.ranges.get(".sbss") or u.ranges.get(".sbss2"):
+            res.add(u.name, "bss", PASS if own else UNKNOWN, None,
+                    "" if own else "no object of the range is read by this unit's decoded code (%d read only elsewhere)" % foreign_global)
+
+
+def boundaries(ctx, res):
+    """One record per adjacent pair of text units: the function start and the pool literals read across it."""
+    tu = sorted((u for u in ctx.units if u.ranges.get(".text")), key=lambda u: u.first(".text"))
+    out = []
+    for a, b in zip(tu, tu[1:]):
+        addr = b.first(".text")
+        rec = {"addr": addr, "left": a.name, "right": b.name, "checks": {}}
+        f = ctx.fn_at(addr)
+        rec["checks"]["fn-start"] = PASS if f and f["addr"] == addr else FAIL
+        shared = sorted(ctx.pool_edges.get((a.name, b.name), set()) | ctx.pool_edges.get((b.name, a.name), set())) \
+            if getattr(ctx, "pool_edges", None) else []
+        rec["checks"]["pool-shared"] = FAIL if shared else PASS
+        if shared:
+            rec["pool_shared"] = [hx(x) for x in shared[:6]]
+        out.append(rec)
+    return out
+
+
+def run_checks(ctx, rows_for_dataorder=None, only=None):
+    res = Results()
+    want = set(only or INVARIANTS)
+    if "order" in want:
+        check_order(ctx, res)
+    if "coverage" in want:
+        check_coverage(ctx, res)
+    if "text-cut" in want:
+        check_text_cut(ctx, res)
+    if "extab" in want:
+        check_extab(ctx, res)
+    if want & {"ctors", "dtors"}:
+        check_ctors(ctx, res)
+    if "pool" in want or True:
+        check_pool(ctx, res)
+    if want & {"data-order", "vtable"} and rows_for_dataorder is not None:
+        check_data_order(ctx, res, rows_for_dataorder)
+        check_vtable(ctx, res)
+    if "jumptable" in want:
+        check_jumptable(ctx, res)
+    if "bss" in want:
+        check_bss(ctx, res)
+    if only:
+        for name in list(res.units):
+            for inv in list(res.units[name]):
+                if inv not in want:
+                    del res.units[name][inv]
+    return res
+
+
+# ---- the audit list -------------------------------------------------------------------------------------------------------
+
+def top_defects(ctx, res, limit=10):
+    items = []
+    for name, recs in res.units.items():
+        for inv, r in recs.items():
+            if r["status"] != FAIL:
+                continue
+            u = ctx.by_name.get(name)
+            size = u.size(".text") if u else 0
+            items.append({"unit": name, "invariant": inv, "addr": r["addr"], "finding": r["finding"],
+                          "fails": r["n_fail"], "score": WEIGHT.get(inv, 10) * 1000 + min(r["n_fail"], 99) * 10 + size // 0x1000})
+    items.sort(key=lambda d: -d["score"])
+    return items[:limit]
+
+
+def pool_groups(ctx):
+    """Units chained by a literal two of them read: the `docs/pool-seams.md` groups, recomputed from the decode."""
+    parent = {}
+
+    def find(x):
+        while parent.setdefault(x, x) != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for (a, b) in getattr(ctx, "pool_edges", {}):
+        parent[find(a)] = find(b)
+    groups = collections.defaultdict(set)
+    for (a, b) in getattr(ctx, "pool_edges", {}):
+        groups[find(a)].update((a, b))
+    out = []
+    for members in groups.values():
+        us = sorted(members, key=lambda n: ctx.by_name[n].lo() if n in ctx.by_name else 0)
+        out.append({"units": us, "lo": hx(ctx.by_name[us[0]].lo()) if us[0] in ctx.by_name else "-",
+                    "literals": sum(len(v) for k, v in ctx.pool_edges.items() if k[0] in members and k[1] in members)})
+    out.sort(key=lambda g: -len(g["units"]))
+    return out
+
+
+def seam_requests(ctx, outbox):
+    """Every `{"kind": "seam"}` request in the lane outbox, with the unit that owns its address."""
+    out = []
+    if not outbox or not os.path.isdir(outbox):
+        return out
+
+    def num(v):
+        if isinstance(v, int):
+            return v
+        try:
+            return int(str(v), 16) if str(v).lower().startswith("0x") else int(v)
+        except (TypeError, ValueError):
+            return None
+
+    def walk(o, f):
+        if isinstance(o, dict):
+            if o.get("kind") == "seam":
+                addr = next((num(o[k]) for k in ("new", "addr", "start", "old") if k in o and num(o[k]) is not None), None)
+                u = ctx.text_owner(addr) if addr is not None else None
+                out.append({"file": f, "addr": hx(addr) if addr is not None else "-", "unit": u.name if u else None,
+                            "section": o.get("section", ".text"), "evidence": str(o.get("evidence", ""))[:200]})
+            for v in o.values():
+                walk(v, f)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v, f)
+
+    for fn in sorted(os.listdir(outbox)):
+        if fn.endswith(".json"):
+            try:
+                with open(os.path.join(outbox, fn), encoding="utf-8") as fh:
+                    walk(json.load(fh), fn)
+            except (OSError, ValueError):
+                pass
+    return out
+
+
+# ---- proposals ------------------------------------------------------------------------------------------------------------
+
+def to_int(v):
+    if isinstance(v, int):
+        return v
+    return int(str(v), 16) if str(v).lower().startswith("0x") else int(v)
+
+
+def load_proposal(path):
+    with open(path, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def norm_units(proposal):
+    """The proposal's units with integer ranges and cuts, in text order."""
+    out = []
+    for pu in proposal.get("units", []):
+        rng = {sec: sorted((to_int(a), to_int(b)) for a, b in rr) for sec, rr in (pu.get("ranges") or {}).items()}
+        cuts = []
+        for c in pu.get("cuts", []):
+            cuts.append(dict(c, addr=to_int(c["addr"])))
+        out.append({"name": "%s/%s.cpp" % (pu["module"], pu["derived_name"]), "derived_name": pu["derived_name"],
+                    "module": pu["module"], "ranges": rng, "cuts": cuts, "open_questions": pu.get("open_questions", []),
+                    "merged": []})
+    out.sort(key=lambda u: (u["ranges"].get(".text") or [(min(a for rr in u["ranges"].values() for a, _b in rr), 0)])[0][0]
+             if u["ranges"] else 0)
+    return out
+
+
+def lint_proposal(proposal):
+    """Structural problems of a proposal file: a list of strings (empty = well-formed)."""
+    issues = []
+    if not isinstance(proposal.get("units"), list) or not proposal["units"]:
+        return ["no units"]
+    seen = collections.defaultdict(list)
+    for pu in proposal["units"]:
+        who = pu.get("derived_name", "?")
+        for k in ("derived_name", "module", "ranges"):
+            if not pu.get(k):
+                issues.append("%s: missing %s" % (who, k))
+        if not re.match(r"^[A-Za-z0-9_]+$", str(pu.get("derived_name", ""))):
+            issues.append("%s: derived_name must be a plain identifier" % who)
+        try:
+            ranges = {sec: [(to_int(a), to_int(b)) for a, b in rr] for sec, rr in (pu.get("ranges") or {}).items()}
+        except (TypeError, ValueError):
+            issues.append("%s: a range is not [start, end]" % who)
+            continue
+        for sec, rr in ranges.items():
+            if sec not in SECTION_ORDER:
+                issues.append("%s: unknown section %s" % (who, sec))
+            for a, b in rr:
+                if b <= a:
+                    issues.append("%s: %s range %s..%s is empty" % (who, sec, hx(a), hx(b)))
+                seen[sec].append((a, b, who))
+        starts = {(sec, a) for sec, rr in ranges.items() for a, _b in rr}
+        cut_keys = set()
+        for c in pu.get("cuts", []):
+            if c.get("grade") not in GRADES:
+                issues.append("%s: cut %s has grade %r (strong|medium|guess)" % (who, c.get("addr"), c.get("grade")))
+            if not c.get("reproduce"):
+                issues.append("%s: cut %s has no reproduce command" % (who, c.get("addr")))
+            if c.get("grade") in ("strong", "medium") and not c.get("evidence"):
+                issues.append("%s: %s cut %s has no evidence" % (who, c.get("grade"), c.get("addr")))
+            for ev in c.get("evidence") or []:
+                if not all(ev.get(k) for k in ("tool", "command", "finding")):
+                    issues.append("%s: cut %s evidence needs tool, command and finding" % (who, c.get("addr")))
+            try:
+                cut_keys.add((c.get("section"), to_int(c["addr"])))
+            except (KeyError, TypeError, ValueError):
+                issues.append("%s: cut without a numeric addr" % who)
+        text_first = min((a for a, _b in ranges.get(".text", [])), default=None)
+        for sec, a in sorted(starts):
+            if sec == ".text" and (sec, a) not in cut_keys and pu is not proposal["units"][0]:
+                issues.append("%s: .text starts at %s with no cut recording why" % (who, hx(a)))
+        for sec, a in cut_keys:
+            if (sec, a) not in starts:
+                issues.append("%s: cut %s %s is not the start of one of the unit's ranges" % (who, sec, hx(a)))
+    for sec, v in seen.items():
+        v.sort()
+        for (a, b, w), (c, d, x) in zip(v, v[1:]):
+            if c < b:
+                issues.append("%s and %s overlap in %s at %s" % (w, x, sec, hx(c)))
+    return issues
+
+
+def coalesce(rr):
+    out = []
+    for a, b in sorted(rr):
+        if out and a <= out[-1][1]:
+            out[-1] = (out[-1][0], max(out[-1][1], b))
+        else:
+            out.append((a, b))
+    return out
+
+
+def merge_guess(units):
+    """Fold every unit whose left edge carries a `guess` cut into its text neighbour; the merged cut is recorded."""
+    out = []
+    for u in units:
+        guess = [c for c in u["cuts"] if c.get("grade") == "guess"]
+        if out and guess:
+            a = out[-1]
+            big, small = (a, u) if sum(e - s for s, e in a["ranges"].get(".text", [])) >= sum(e - s for s, e in u["ranges"].get(".text", [])) else (u, a)
+            merged = {"name": big["name"], "derived_name": big["derived_name"], "module": big["module"],
+                      "ranges": {}, "cuts": [c for c in a["cuts"] + u["cuts"] if c.get("grade") != "guess"],
+                      "open_questions": a["open_questions"] + u["open_questions"],
+                      "merged": a["merged"] + u["merged"] + [{"candidate_cut": hx(c["addr"]), "section": c.get("section"),
+                                                              "absorbed": small["name"], "grade": "guess"} for c in guess]}
+            for sec in set(a["ranges"]) | set(u["ranges"]):
+                merged["ranges"][sec] = coalesce(a["ranges"].get(sec, []) + u["ranges"].get(sec, []))
+            out[-1] = merged
+        else:
+            out.append(u)
+    return out
+
+
+def subtract(rr, cuts):
+    """The parts of the ranges `rr` that lie outside every `(a, b)` of `cuts`."""
+    cuts = coalesce(cuts)
+    out = []
+    for s, e in rr:
+        cur = s
+        for a, b in cuts:
+            if b <= cur or a >= e:
+                continue
+            if a > cur:
+                out.append((cur, a))
+            cur = max(cur, b)
+        if cur < e:
+            out.append((cur, e))
+    return out
+
+
+def derive_attached(units, base, dol, symbols):
+    """Fill the sections a text cut determines by itself: `extabindex`/`extab` (by the function of every entry) and
+    `.ctors`/`.dtors` (by the function each word points at).  A unit that lists a section keeps its own range."""
+    tv = sorted((a, b, i) for i, u in enumerate(units) for a, b in u["ranges"].get(".text", []))
+    starts = [t[0] for t in tv]
+
+    def unit_of_text(addr):
+        k = bisect.bisect_right(starts, addr) - 1
+        return tv[k][2] if k >= 0 and tv[k][0] <= addr < tv[k][1] else None
+
+    def extent(sec):
+        rr = [(s0, e0) for bu in base.units for s0, e0, _a in bu.ranges.get(sec, [])]
+        return (min(r[0] for r in rr), max(r[1] for r in rr)) if rr else None
+
+    etb = {x["addr"]: x["size"] for x in symbols if x["section"] == "extab"}
+    got = collections.defaultdict(lambda: collections.defaultdict(list))
+    ext = extent("extabindex")
+    if ext:
+        for a in range(ext[0], ext[1] - 11, 12):
+            fn, ex = dol.word(a), dol.word(a + 8)
+            i = unit_of_text(fn) if fn else None
+            if i is not None:
+                got[i]["extabindex"].append((a, a + 12))
+                got[i]["extab"].append((ex, ex + etb.get(ex, 8)))
+    for sec in (".ctors", ".dtors"):
+        ext = extent(sec)
+        if ext:
+            for a in range(ext[0], ext[1] - 3, 4):
+                w = dol.word(a)
+                i = unit_of_text(w) if w else None
+                if i is not None:
+                    got[i][sec].append((a, a + 4))
+    derived = []
+    for i, secs in got.items():
+        for sec, rr in secs.items():
+            if sec not in units[i]["ranges"]:
+                units[i]["ranges"][sec] = coalesce(rr)
+                derived.append("%s %s" % (units[i]["name"], sec))
+    return derived
+
+
+def render(base, proposals, dol=None, symbols=None):
+    """`(candidate Splits, info)`: the baseline with every proposal's units cut in (guess cuts merged).
+
+    With `dol` and `symbols` the sections a text cut determines (extab, extabindex, ctors, dtors) are derived.
+    """
+    info = {"issues": [], "merged": [], "units": [], "derived": []}
+    units = []
+    for p in proposals:
+        for issue in lint_proposal(p):
+            info["issues"].append(issue)
+        units += norm_units(p)
+    units.sort(key=lambda u: (u["ranges"].get(".text") or [(0, 0)])[0][0])
+    units = merge_guess(units)
+    if dol is not None and symbols is not None:
+        info["derived"] = derive_attached(units, base, dol, symbols)
+    for u in units:
+        info["merged"] += u["merged"]
+        info["units"].append(u["name"])
+    claimed = collections.defaultdict(list)
+    for u in units:
+        for sec, rr in u["ranges"].items():
+            claimed[sec] += rr
+    kept = []                       # [(anchor, Unit)]: a unit's anchor is its original text start (data-only: its predecessor's)
+    anchor = 0
+    for bu in base.units:
+        if bu.first(".text") is not None:
+            anchor = bu.first(".text")
+        nu = Unit(bu.name, bu.attrs)
+        for sec, rr in bu.ranges.items():
+            frags = []
+            for s, e, a in rr:
+                for fs, fe in subtract([(s, e)], claimed.get(sec, [])):
+                    frags.append((fs, fe, a))
+            touched = [(fs, fe) for fs, fe, _a in frags] != [(x, y) for x, y, _z in rr]
+            plain = sorted((fs, fe) for fs, fe, a in frags if "rename:" not in a and "common" not in a)
+            holey = any(b != c for (_x, b), (c, _y) in zip(plain, plain[1:]))
+            if touched and len(frags) > 1 and holey:
+                info["issues"].append("baseline unit %s is left with %d %s fragments (%s): the proposal punches a hole"
+                                      % (bu.name, len(frags), sec, ", ".join("%s..%s" % (hx(a), hx(b)) for a, b, _x in frags)))
+            if frags:
+                nu.ranges[sec] = frags
+        if nu.ranges:
+            kept.append((anchor, nu))
+    for u in units:
+        nu = Unit(u["name"], "", {sec: [(a, b, "") for a, b in rr] for sec, rr in u["ranges"].items()})
+        at = nu.first(".text")
+        pos = len(kept)
+        if at is not None:
+            for i, (anc, _k) in enumerate(kept):
+                if anc >= at:
+                    pos = i
+                    break
+        kept.insert(pos, (at if at is not None else (kept[pos - 1][0] if pos else 0), nu))
+    names = collections.Counter(k.name for _a, k in kept)
+    for n, c in names.items():
+        if c > 1:
+            info["issues"].append("unit name %s is used %d times in the candidate (a proposal unit reuses a baseline unit's name)" % (n, c))
+    return Splits(list(base.header), [k for _a, k in kept]), info
+
+
+# ---- output -----------------------------------------------------------------------------------------------------------------
+
+def report_json(ctx, res, bounds, extra=None):
+    return {"units": res.units, "coverage_gaps": getattr(ctx, "coverage_gaps", {}), "summary": res.summary(), "boundaries": bounds,
+            "top_defects": top_defects(ctx, res, 10), **(extra or {})}
+
+
+def print_table(ctx, res, show_all=False, limit=40):
+    summ = res.summary()
+    print("%-11s %6s %6s %8s %6s" % ("invariant", "PASS", "FAIL", "UNKNOWN", "-"))
+    for inv in INVARIANTS:
+        s = summ[inv]
+        print("%-11s %6d %6d %8d %6d" % (inv, s[PASS], s[FAIL], s[UNKNOWN], s[NA] + len(ctx.units) - sum(s.values())))
+    rows = []
+    for u in ctx.units:
+        recs = res.units.get(u.name, {})
+        worst = max((RANK[r["status"]] for r in recs.values()), default=0)
+        if show_all or worst >= RANK[FAIL]:
+            rows.append((u.name, recs))
+    print("\nunits with a FAIL: %d of %d%s" % (sum(1 for n, r in rows if any(x["status"] == FAIL for x in r.values())), len(ctx.units),
+                                             "" if show_all else " (--all lists every unit)"))
+    print("%-44s %s" % ("unit", " ".join("%-4s" % i[:4] for i in INVARIANTS)))
+    for name, recs in rows[:limit if not show_all else None]:
+        cells = []
+        for inv in INVARIANTS:
+            r = recs.get(inv)
+            cells.append("%-4s" % ({PASS: "ok", FAIL: "FAIL", UNKNOWN: "?", NA: "-"}[r["status"]] if r else "-"))
+        print("%-44s %s" % (name[:44], " ".join(cells)))
+    if len(rows) > limit and not show_all:
+        print("... %d more" % (len(rows) - limit))
+
+
+def print_defects(items):
+    print("\ntop defects")
+    for i, d in enumerate(items, 1):
+        print("%2d. [%s] %s @ %s  %s" % (i, d["invariant"], d["unit"], hx(d["addr"]), d["finding"][:150]))
+
+
+# ---- entry points -------------------------------------------------------------------------------------------------------------
+
+def load_ctx(splits_path=None, symbols_path=None, dol_path=None, scan=True):
+    root = tree_root()
+    splits_path = splits_path or os.path.join(root, "config", GAME, "splits.txt")
+    symbols_path = symbols_path or os.path.join(root, "config", GAME, "symbols.txt")
+    dol_path = dol_path or find_file(os.path.join("orig", GAME, "sys", "main.dol"), root)
+    with open(splits_path, encoding="utf-8", errors="replace") as fh:
+        splits = parse_splits(fh.read())
+    with open(symbols_path, encoding="utf-8", errors="replace") as fh:
+        symbols = parse_symbols(fh)
+    with open(dol_path, "rb") as fh:
+        dol = Dol(fh.read())
+    return splits, symbols, dol
+
+
+def dataorder_rows(symbols):
+    return [(s["section"], s["addr"], s["size"] or None, s["name"]) for s in symbols]
+
+
+def analyse(splits, symbols, dol, only=None, outbox=None, sda=(None, None)):
+    ctx = Ctx(splits, symbols, dol, sda[0], sda[1])
+    res = run_checks(ctx, dataorder_rows(symbols), only)
+    bounds = boundaries(ctx, res)
+    return ctx, res, bounds
+
+
+def cmd_baseline(args):
+    splits, symbols, dol = load_ctx(args.splits, args.symbols, args.dol)
+    ctx, res, bounds = analyse(splits, symbols, dol, args.only.split(",") if args.only else None)
+    if args.unit:
+        keep = re.compile(args.unit)
+        ctx.units = [u for u in ctx.units if keep.search(u.name)]
+        res.units = collections.OrderedDict((k, v) for k, v in res.units.items() if keep.search(k))
+        bounds = [b for b in bounds if keep.search(b["left"]) or keep.search(b["right"])]
+    outbox = args.outbox or os.path.join(main_root() or tree_root(), ".pi", "outbox")
+    seams = seam_requests(ctx, outbox)
+    groups = pool_groups(ctx)
+    print("baseline: %d units, %d map symbols, r13=%s r2=%s" % (len(ctx.units), len(symbols), hx(ctx.sda13), hx(ctx.sda2)))
+    print_table(ctx, res, args.all, args.limit)
+    print_defects(top_defects(ctx, res, 10))
+    print("\none worst defect per failing invariant")
+    allf = top_defects(ctx, res, 100000)
+    for inv in INVARIANTS:
+        d = next((x for x in allf if x["invariant"] == inv), None)
+        if d:
+            print("  [%s] %d units fail; e.g. %s @ %s  %s" % (inv, sum(1 for x in allf if x["invariant"] == inv), d["unit"], hx(d["addr"]), d["finding"][:120]))
+    bad_b = [b for b in bounds if FAIL in b["checks"].values()]
+    print("\nboundaries: %d text cuts, %d with a failing check (fn-start %d, pool-shared %d)"
+          % (len(bounds), len(bad_b), sum(1 for b in bounds if b["checks"]["fn-start"] == FAIL),
+             sum(1 for b in bounds if b["checks"]["pool-shared"] == FAIL)))
+    print("suspected: %d seam requests in the outbox (%d with an owning unit), %d pool groups (largest %s)"
+          % (len(seams), sum(1 for s in seams if s["unit"]), len(groups), len(groups[0]["units"]) if groups else 0))
+    gaps = getattr(ctx, "coverage_gaps", {})
+    print("unowned (no unit range): " + ", ".join("%s %d syms/%d runs" % (k, v["symbols"], v["runs"]) for k, v in sorted(gaps.items())))
+    if args.json:
+        with open(args.json, "w", encoding="utf-8") as fh:
+            json.dump(report_json(ctx, res, bounds, {"seam_requests": seams, "pool_groups": groups,
+                                                     "sda": {"r13": ctx.sda13, "r2": ctx.sda2}}), fh, indent=1)
+    return 0
+
+
+def cmd_proposal(args):
+    splits, symbols, dol = load_ctx(args.splits, args.symbols, args.dol)
+    proposals = [load_proposal(p) for p in args.proposal]
+    cand, info = render(splits, proposals, dol, symbols)
+    for i in info["issues"]:
+        print("lint: " + i)
+    if info["derived"]:
+        print("derived %d attached ranges (extab/extabindex/ctors/dtors) from the text cuts" % len(info["derived"]))
+    for m in info["merged"]:
+        print("merged guess cut %s (%s): %s absorbed" % (m["candidate_cut"], m["section"], m["absorbed"]))
+    if args.emit_splits:
+        with open(args.emit_splits, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(render_splits(cand))
+    only = args.only.split(",") if args.only else None
+    bctx, bres, _bb = analyse(splits, symbols, dol, only, sda=(None, None))
+    cctx, cres, cb = analyse(cand, symbols, dol, only, sda=(bctx.sda13, bctx.sda2))
+    bs, cs = bres.summary(), cres.summary()
+    print("\ncandidate: %d units (baseline %d); proposal units: %s" % (len(cctx.units), len(bctx.units), ", ".join(info["units"][:12])))
+    print("%-11s %10s %10s" % ("invariant", "FAIL base", "FAIL cand"))
+    for inv in INVARIANTS:
+        print("%-11s %10d %10d" % (inv, bs[inv][FAIL], cs[inv][FAIL]))
+    mine = set(info["units"])
+    print("\nproposal units:")
+    for n in info["units"]:
+        recs = cres.units.get(n, {})
+        bad = {k: r for k, r in recs.items() if r["status"] == FAIL}
+        unk = [k for k, r in recs.items() if r["status"] == UNKNOWN]
+        print("  %-40s %s%s" % (n, "all checked PASS" if not bad else "FAIL " + ", ".join("%s@%s" % (k, hx(r["addr"])) for k, r in bad.items()),
+                                ("  unknown: " + ", ".join(unk)) if unk else ""))
+    new = []
+    for name, recs in cres.units.items():
+        for inv, r in recs.items():
+            if r["status"] == FAIL and name not in mine and bres.units.get(name, {}).get(inv, {}).get("status") != FAIL:
+                new.append((name, inv, r))
+    print("\nnew failures outside the proposal units: %d" % len(new))
+    for name, inv, r in new[:10]:
+        print("  [%s] %s @ %s  %s" % (inv, name, hx(r["addr"]), r["finding"][:140]))
+    if args.json:
+        with open(args.json, "w", encoding="utf-8") as fh:
+            json.dump({"lint": info["issues"], "merged": info["merged"], "candidate": report_json(cctx, cres, cb),
+                       "baseline_summary": bs, "new_failures": [{"unit": n, "invariant": i, "addr": r["addr"],
+                                                                  "finding": r["finding"]} for n, i, r in new]}, fh, indent=1)
+    return 1 if info["issues"] or new or any(r["status"] == FAIL for n in mine for r in cres.units.get(n, {}).values()) else 0
+
+
+# ---- selftest -----------------------------------------------------------------------------------------------------------------
+
+def _w(op, rt, ra, imm):
+    return (op << 26) | (rt << 21) | (ra << 16) | (imm & 0xFFFF)
+
+
+def _lis(rd, hi):
+    return _w(15, rd, 0, hi)
+
+
+def _make_dol(blobs):
+    """A minimal DOL image: `blobs` = [(address, bytes)] as text0.. / data0.. sections."""
+    head = bytearray(0x100)
+    toff, taddr, tsize = [0] * 7, [0] * 7, [0] * 7
+    body = bytearray()
+    for i, (a, b) in enumerate(blobs[:7]):
+        toff[i], taddr[i], tsize[i] = 0x100 + len(body), a, len(b)
+        body += b
+    head[0x00:0x1C] = struct.pack(">7I", *toff)
+    head[0x48:0x64] = struct.pack(">7I", *taddr)
+    head[0x90:0xAC] = struct.pack(">7I", *tsize)
+    return Dol(bytes(head) + bytes(body))
+
+
+NCHECKS = [0]
+
+
+def selftest():
+    NCHECKS[0] = 0
+    fails = []
+
+    def check(name, got, want):
+        NCHECKS[0] += 1
+        ok = got == want
+        print("%s %s%s" % ("ok  " if ok else "FAIL", name, "" if ok else "  got %r want %r" % (got, want)))
+        if not ok:
+            fails.append(name)
+
+    # -- fixture: two units, text 0x80100000.., sdata2 pool at 0x80300000, ctors at 0x80200000
+    T0, S2 = 0x80100000, 0x80300000
+    a_fn1 = [_lis(3, 0x8030), _w(48, 1, 3, 0), _w(48, 2, 3, 4), 0x4E800020]                 # A.fn1: reads lit0, lit1
+    a_sinit = [_lis(4, 0x8030), _w(48, 1, 4, 4), 0x4E800020, 0x60000000]                      # A.__sinit: reads lit1 (first use later)
+    b_fn = [_lis(3, 0x8030), _w(48, 1, 3, 8), _w(48, 2, 3, 4), 0x4E800020]                   # B.fn: reads lit2, lit1 (shared!)
+    code = struct.pack(">16I", *(a_fn1 + a_sinit + b_fn + [0x60000000] * 4))
+    pool = struct.pack(">fff", 1.5, 2.5, 3.5)
+    ctors = struct.pack(">II", T0 + 0x10, T0 + 0x20)                                          # A -> its sinit, B -> fn in B? (wrong: mid-unit)
+    eti = struct.pack(">3I", T0, 0x10, 0x80000100) + struct.pack(">3I", T0 + 0x20, 0x10, 0x80000108)
+    dol = _make_dol([(T0, code), (0x80200000, ctors), (S2, pool), (0x80400000, eti)])
+    syms = parse_symbols([
+        "A_fn1 = .text:0x%X; // type:function size:0x10 scope:global" % T0,
+        "A_sinit = .text:0x%X; // type:function size:0x10 scope:local" % (T0 + 0x10),
+        "B_fn = .text:0x%X; // type:function size:0x10 scope:global" % (T0 + 0x20),
+        "B_pad = .text:0x%X; // type:function size:0x10 scope:global" % (T0 + 0x30),
+        "lit0 = .sdata2:0x%X; // type:object size:0x4 scope:local data:float" % S2,
+        "lit1 = .sdata2:0x%X; // type:object size:0x4 scope:local data:float" % (S2 + 4),
+        "lit2 = .sdata2:0x%X; // type:object size:0x4 scope:local data:float" % (S2 + 8),
+        "ct = .ctors:0x80200000; // type:object size:0x8 scope:local",
+        "@eti_a = extabindex:0x80400000; // type:object size:0xC scope:local",
+        "@eti_b = extabindex:0x8040000C; // type:object size:0xC scope:local",
+        "@etb_a = extab:0x80000100; // type:object size:0x8 scope:local",
+        "@etb_b = extab:0x80000108; // type:object size:0x8 scope:local",
+    ])
+    sp_text = """Sections:
+\t.text       type:code align:32
+\textab       type:rodata align:32
+\textabindex  type:rodata align:32
+\t.ctors      type:rodata align:16
+\t.sdata2     type:rodata align:4
+
+u_a.cpp:
+\textab       start:0x80000100 end:0x80000108
+\textabindex  start:0x80400000 end:0x8040000C
+\t.text       start:0x80100000 end:0x80100020
+\t.ctors      start:0x80200000 end:0x80200008
+\t.sdata2     start:0x80300000 end:0x80300004
+
+u_b.cpp: comment:0
+\textab       start:0x80000108 end:0x80000110
+\textabindex  start:0x8040000C end:0x80400018
+\t.text       start:0x80100020 end:0x80100038
+\t.sdata2     start:0x80300004 end:0x8030000C
+"""
+    sp = parse_splits(sp_text)
+    check("parse units", [u.name for u in sp.units], ["u_a.cpp", "u_b.cpp"])
+    check("parse attrs kept", sp.units[1].attrs, "comment:0")
+    check("render round-trips ranges", [(u.name, u.ranges) for u in parse_splits(render_splits(sp)).units],
+          [(u.name, u.ranges) for u in sp.units])
+    ctx = Ctx(sp, syms, dol, 0x80500000, 0x80600000)
+    i0, _ = ctx.data_sym_at(S2)
+    check("ref decode: lis + lfs", sorted(ctx.refs.get(i0, [])), [T0 + 4])
+    i1, s1 = ctx.data_sym_at(S2 + 4)
+    check("ref decode: lit1 read by both units", sorted(ctx.refs[i1]), [T0 + 8, T0 + 0x14, T0 + 0x28])
+    res = run_checks(ctx, None)
+    check("order pass", res.units["u_a.cpp"]["order"]["status"], PASS)
+    check("pool: A's literal lit1 (in B's range) is read by A and B -> B fails", res.units["u_b.cpp"]["pool"]["status"], FAIL)
+    check("pool: A reads lit1 too, so the shared literal fails both", res.units["u_a.cpp"]["pool"]["status"], FAIL)
+    check("pool edges both ways", sorted(ctx.pool_edges), [("u_a.cpp", "u_b.cpp"), ("u_b.cpp", "u_a.cpp")])
+    check("ctors: A's last function is __sinit", res.units["u_a.cpp"]["ctors"]["status"], FAIL)   # 2 words -> multi-TU
+    check("ctors: 2 words finding", "2 .ctors words" in res.units["u_a.cpp"]["ctors"]["finding"], True)
+    check("ctors: second word targets B", any("u_b.cpp" in i["finding"] for i in res.units["u_a.cpp"]["ctors"]["items"]), True)
+    check("extab pass for A and B", (res.units["u_a.cpp"]["extab"]["status"], res.units["u_b.cpp"]["extab"]["status"]), (PASS, PASS))
+    eti_bad = struct.pack(">3I", T0, 0x10, 0x80000100) + struct.pack(">3I", T0 + 0x10, 0x10, 0x80000108)
+    dol_bad = _make_dol([(T0, code), (0x80200000, ctors), (S2, pool), (0x80400000, eti_bad)])
+    rx = run_checks(Ctx(sp, syms, dol_bad, None, None, scan=False), None, ["extab"])
+    check("extab FAIL for B (function is A's) and A is named", (rx.units["u_b.cpp"]["extab"]["status"], rx.units["u_a.cpp"]["extab"]["status"]), (FAIL, FAIL))
+    check("text-cut pass", res.units["u_a.cpp"]["text-cut"]["status"], PASS)
+    # order: overlap + cycle
+    bad = parse_splits(sp_text.replace("start:0x80100020 end:0x80100038", "start:0x8010001C end:0x80100038"))
+    cb = Ctx(bad, syms, dol, 0x80500000, 0x80600000, scan=False)
+    rb = run_checks(cb, None, ["order", "text-cut"])
+    check("overlap is an order FAIL", rb.units["u_b.cpp"]["order"]["status"], FAIL)
+    check("text cut inside a function", rb.units["u_b.cpp"]["text-cut"]["status"], FAIL)
+    cyc = parse_splits(sp_text + "\nu_c.cpp:\n\t.text       start:0x80100038 end:0x80100040\n\t.sdata2     start:0x80300000 end:0x80300000\n")
+    cyc.units[0].ranges[".ctors"] = [(0x80200010, 0x80200014, "")]
+    cyc.units[2].ranges[".ctors"] = [(0x80200000, 0x80200004, "")]
+    rc = run_checks(Ctx(cyc, syms, dol, None, None, scan=False), None, ["order"])
+    check("cycle between units is an order FAIL", rc.units["u_c.cpp"]["order"]["status"], FAIL)
+    # coverage
+    sp2 = parse_splits(sp_text.replace("end:0x8030000C", "end:0x80300008"))
+    c2 = Ctx(sp2, syms, dol, None, None, scan=False)
+    run_checks(c2, None, ["coverage"])
+    check("an uncovered symbol is reported", c2.coverage_gaps[".sdata2"]["symbols"], 1)
+    # proposal render / merge / lint
+    p = {"phase": 1, "band": "x", "units": [
+        {"derived_name": "one", "module": "m", "ranges": {".text": [["0x80100000", "0x80100010"]]},
+         "cuts": [], "open_questions": []},
+        {"derived_name": "two", "module": "m", "ranges": {".text": [["0x80100010", "0x80100020"]]},
+         "cuts": [{"addr": "0x80100010", "section": ".text", "grade": "guess", "evidence": [], "reproduce": "tudiscover.py at 0x80100010"}]},
+        {"derived_name": "three", "module": "m", "ranges": {".text": [["0x80100020", "0x80100038"]]},
+         "cuts": [{"addr": "0x80100020", "section": ".text", "grade": "strong",
+                   "evidence": [{"tool": "t", "command": "c", "finding": "f"}], "reproduce": "r"}]}]}
+    check("lint accepts a well-formed proposal", lint_proposal(p), [])
+    cand, info = render(sp, [p])
+    check("guess cut merged", [m["candidate_cut"] for m in info["merged"]], ["0x80100010"])
+    check("candidate units", [(u.name, u.ranges[".text"][0][:2]) for u in cand.units if u.name.startswith("m/")],
+          [("m/one.cpp", (0x80100000, 0x80100020)), ("m/three.cpp", (0x80100020, 0x80100038))])
+    check("proposal units sit before the baseline units they cut", [u.name for u in cand.units],
+          ["m/one.cpp", "u_a.cpp", "m/three.cpp", "u_b.cpp"])
+    q = json.loads(json.dumps(p))
+    q["units"][2]["cuts"][0]["grade"] = "weak"
+    q["units"][1]["derived_name"] = "bad name"
+    check("lint reports bad grade and name", sorted(i.split(":")[0] for i in lint_proposal(q) if "grade" in i or "identifier" in i),
+          ["bad name", "three"])
+    # sinit-not-last: the word targets A_fn1 (ends at the middle of A): boundary evidence
+    ct2 = struct.pack(">II", T0 + 0x00, 0)
+    dol_s = _make_dol([(T0, code), (0x80200000, ct2), (S2, pool), (0x80400000, eti)])
+    rs = run_checks(Ctx(sp, syms, dol_s, None, None, scan=False), None, ["ctors"])
+    cuts = [i.get("cut_at") for i in rs.units["u_a.cpp"]["ctors"]["items"] if i.get("cut_at")]
+    check("ctors: not-last sinit names the cut", (rs.units["u_a.cpp"]["ctors"]["status"], cuts), (FAIL, [T0 + 0x10]))
+    # dtors: the crt chain entry is exempt
+    sp_d = parse_splits(sp_text.replace("	.ctors      start:0x80200000 end:0x80200008", "	.dtors      start:0x80200000 end:0x80200004"))
+    syms_d = syms + parse_symbols(["__destroy_global_chain = .text:0x%X; // type:function size:0x10 scope:global" % (T0 + 0x30)])
+    dol_d = _make_dol([(T0, code), (0x80200000, struct.pack(">I", T0 + 0x30)), (S2, pool), (0x80400000, eti)])
+    rd = run_checks(Ctx(sp_d, syms_d, dol_d, None, None, scan=False), None, ["dtors"])
+    check("dtors: __destroy_global_chain entry passes", rd.units["u_a.cpp"]["dtors"]["status"], PASS)
+    # bss: a local object read only by the other unit
+    syms_b = syms + parse_symbols(["bssvar = .bss:0x80700000; // type:object size:0x4 scope:local"])
+    sp_b = parse_splits(sp_text.replace("	.sdata2     start:0x80300000 end:0x80300004", "	.sdata2     start:0x80300000 end:0x80300004\n\t.bss        start:0x80700000 end:0x80700004", 1))
+    cb2 = Ctx(sp_b, syms_b, dol, 0x80500000, 0x80600000, scan=False)
+    cb2.refs[cb2.data_sym_at(0x80700000)[0]] = [T0 + 0x24]
+    rb2 = run_checks(cb2, None, ["bss"])
+    check("bss: local object read only by another unit fails", rb2.units["u_a.cpp"]["bss"]["status"], FAIL)
+    # data-order + vtable
+    D0 = 0x80600000
+    blob = struct.pack(">3I", 0, 0, T0) + b"hello\x00\x00\x00" + struct.pack(">3I", 0, 0, T0 + 0x20)
+    dol_v = _make_dol([(T0, code), (0x80200000, ctors), (S2, pool), (0x80400000, eti), (D0, blob)])
+    syms_v = syms + parse_symbols(["__vt__A = .data:0x%X; // type:object size:0xC scope:global" % D0,
+                                   "str_h = .data:0x%X; // type:object size:0x8 scope:local data:string" % (D0 + 12),
+                                   "__vt__B = .data:0x%X; // type:object size:0xC scope:global" % (D0 + 20)])
+    sp_v = parse_splits(sp_text.replace("	.sdata2     start:0x80300000 end:0x80300004",
+                                        "	.sdata2     start:0x80300000 end:0x80300004\n\t.data       start:0x%X end:0x%X" % (D0, D0 + 32), 1))
+    cv = Ctx(sp_v, syms_v, dol_v, None, None, scan=False)
+    rv = run_checks(cv, dataorder_rows(syms_v), ["data-order", "vtable"])
+    check("data-order: a V->S seam inside one unit's .data fails", rv.units["u_a.cpp"]["data-order"]["status"], FAIL)
+    check("vtable: B's slot is in unit B, so A's .data holding it fails", rv.units["u_a.cpp"]["vtable"]["status"], FAIL)
+    # derived attached ranges + name clash + hole
+    der = render(sp, [p], dol, syms)[1]["derived"]
+    check("derive: extab/extabindex/ctors follow the text cut", sorted(d.split(" ", 1)[1] for d in der if d.startswith("m/one")),
+          [".ctors", "extab", "extabindex"])
+    p_clash = json.loads(json.dumps(p))
+    p_clash["units"][0]["derived_name"] = "u_a"
+    p_clash["units"][0]["module"] = "."
+    p_clash["units"][0]["ranges"] = {".text": [["0x80100000", "0x80100010"]]}
+    hole = {"units": [{"derived_name": "h", "module": "m", "ranges": {".text": [["0x80100008", "0x80100010"]]}, "cuts": []}]}
+    check("render reports a hole punched in a baseline unit", any("punches a hole" in i for i in render(sp, [hole])[1]["issues"]), True)
+    # jump-table ownership
+    jt = struct.pack(">II", T0 + 0x04, T0 + 0x24)
+    dol3 = _make_dol([(T0, code), (0x80200000, ctors), (S2, pool), (0x80400000, eti), (0x80500000, jt)])
+    syms3 = syms + parse_symbols(["jumptable_80500000 = .data:0x80500000; // type:object size:0x8 scope:local"])
+    sp3 = parse_splits(sp_text.replace("\t.sdata2     start:0x80300000 end:0x80300004",
+                                       "\t.sdata2     start:0x80300000 end:0x80300004\n\t.data       start:0x80500000 end:0x80500008"))
+    r3 = run_checks(Ctx(sp3, syms3, dol3, None, None, scan=False), None, ["jumptable"])
+    check("jump table branching into another unit fails", r3.units["u_a.cpp"]["jumptable"]["status"], FAIL)
+    # ranking
+    td = top_defects(ctx, res, 50)
+    check("defects are ranked by score", [d["score"] for d in td] == sorted((d["score"] for d in td), reverse=True) and bool(td), True)
+    print("\n%d checks, %d failed" % (NCHECKS[0], len(fails)))
+    return 1 if fails else 0
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--baseline", action="store_true", help="check the current splits.txt")
+    ap.add_argument("--proposal", action="append", help="proposal file (repeatable); render + check the candidate")
+    ap.add_argument("--emit-splits", help="with --proposal: write the candidate splits.txt here")
+    ap.add_argument("--splits"), ap.add_argument("--symbols"), ap.add_argument("--dol")
+    ap.add_argument("--outbox", help="lane outbox with seam requests (default: the primary checkout's .pi/outbox)")
+    ap.add_argument("--only", help="comma list of invariants")
+    ap.add_argument("--unit", help="regex: report only the units whose name matches (--baseline)")
+    ap.add_argument("--json", help="write the machine-readable report here")
+    ap.add_argument("--all", action="store_true", help="list every unit, not only the failing ones")
+    ap.add_argument("--limit", type=int, default=40)
+    ap.add_argument("--selftest", action="store_true")
+    args = ap.parse_args(argv)
+    if args.selftest:
+        return selftest()
+    if args.proposal:
+        return cmd_proposal(args)
+    if args.baseline:
+        return cmd_baseline(args)
+    ap.print_help()
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())
