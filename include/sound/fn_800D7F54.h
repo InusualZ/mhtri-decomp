@@ -114,6 +114,10 @@ void fn_800DB2DC(void);
  * above.  Added with `menu/menu_item.cpp` (rule 2: this TU owns the address). */
 void sysSE_req(s32 id);
 
+/* 0x800DBE50 - the title-bank twin of `sysSE_req` (`titleSE_req__Fl`, C++ scope in the owner, fn_800D7F54.cpp:419).
+ * Added with `quest/arenatask.cpp` (rule 2: this TU owns the address). */
+void titleSE_req(s32 id);
+
 /* Added by `enemy/em_action.cpp` (rule 2: the declaration belongs with the owner TU, which
  * had not declared it yet). */
 void fn_800DC9A4(struct _se_w* work, VEC3* pos);

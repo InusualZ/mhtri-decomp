@@ -496,6 +496,13 @@ void setPatByteD400(NetworkInstance* self, u8 value);
 void setPatByte6138On(NetworkInstance* self);
 /* 0x80433870 - reads the link state; 1 = the network link is up. */
 u32 getLinkStatus(void);
+/* 0x804344A0 - whether the session-start request has completed (`net_ctrl_wk` +0xC153, set by the start
+ * request's completion callback and cleared by `net_session_close_start`).  GUESS name from those writers. */
+u32 isSessionStartDone(void);
+/* 0x80434800 - drops the session after a link loss: clears `net_ctrl_wk` +0x98 and raises pending action 8
+ * (`runPendingAction8`); returns 0 when there is no work record.  GUESS name from its callers, which are the
+ * link-loss exits of the arena and the lobby. */
+s32 net_session_abort_start(void);
 /* 0x804333B0 - resets the link state the reconnect path relies on. */
 void resetLinkState(void);
 /* 0x804370CC - whether two network ids are equal (1). */

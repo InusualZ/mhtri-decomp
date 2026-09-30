@@ -108,6 +108,10 @@ void fn_8028F558(void* a, void* b);
 extern "C" {
 void pl_warp_start(u8 mode, nw4r::math::VEC3* pos, u16 angle);
 }
+
+/* 0x8028C5B4 - loads the players' motion resources (`pl_motion_set__Fv`, C++ scope).  Added with
+ * `quest/arenatask.cpp` (rule 2: this range owns the address). */
+void pl_motion_set(void);
 #endif
 
 #endif /* MHTRI_PL_FN_80288CEC_H */

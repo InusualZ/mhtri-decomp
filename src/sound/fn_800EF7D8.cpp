@@ -24,7 +24,8 @@
  *
  * Naming note: the symbol map has only fn_XXXXXXXX for 54 of this range's 62 symbols (checked
  * with `python tools/symbols/dumpmap.py lookup <addr>`: the runtime dump answers `zz_XXXXXXXX_`,
- * which is not a name), so the map's stems are kept as the definitions' names.
+ * which is not a name), so the map's stems are kept as the definitions' names (two were later renamed:
+ * `snd_bank_layout` 0x800EF7D8, `scene_se_bank_load` 0x800EF9C0).
  *
  * ## What the unit is
  *
@@ -35,7 +36,7 @@
  * +0x9682 / +0x96B3 / +0x9774, the 16 SE-slot records at +0x96E4, the six BGM slots at
  * +0x9704..+0x971B and the BGM/stream flags from +0x97A8 on.
  *
- * `fn_800EF7D8` walks the six `SndChunk*` tables at `lbl_80598F68` and lays the cumulative file
+ * `snd_bank_layout` walks the six `SndChunk*` tables at `lbl_80598F68` and lays the cumulative file
  * offsets into those four tables; `fn_800F0230` / `fn_800F033C` / `fn_800F0448` are the
  * `load_file_req` completion callbacks that flip the per-chunk ready flags (and start the stream once
  * both halves are in); `system_se_load` / `title_se_load` / `demo_bgm_load` / `quest_bgm_load` /
@@ -124,7 +125,7 @@ typedef struct SndWork {
     /* +0x0000 */ u8   pad_0000[0x04];
     /* +0x0004 */ u32  total_size;      /* the running file offset both bank walkers leave behind */
     /* +0x0008 */ u32  bank_base_2;     /* cursor `fn_800F0D88` walks from */
-    /* +0x000C */ u32  bank_base_1;     /* cursor `fn_800EF7D8` walks from */
+    /* +0x000C */ u32  bank_base_1;     /* cursor `snd_bank_layout` walks from */
     /* +0x0010 */ u32  whd_ofs[0x31];   /* per chunk: the `whd` half's offset */
     /* +0x00D4 */ u32  whd_size[0x31];  /*               ... and its size */
     /* +0x0198 */ u32  tsb_ofs[0x31];   /* per chunk: the `tsb` half's offset */
@@ -141,7 +142,7 @@ typedef struct SndWork {
     /* +0x9710 */ u8   se_slot_bank[6]; /* get_em_se_bank returns it */
     /* +0x9716 */ u8   se_slot_idx[6];  /* the request id fn_800F0F9C loads for it */
     /* +0x971C */ u8   se_auto[2];      /* fn_800F0D88's {start, count} */
-    /* +0x971E */ u8   chunk_handle[0x31]; /* fn_800EF7D8 clears it to 0xFF; nothing reads it here */
+    /* +0x971E */ u8   chunk_handle[0x31]; /* snd_bank_layout clears it to 0xFF; nothing reads it here */
     /* +0x974F */ u8   pad_974F[0x25];
     /* +0x9774 */ u8   chunk_ready[0x31]; /* both halves are in */
     /* +0x97A5 */ u8   stream_ready[3];  /* the three BGM streams (`fn_800F0448`, `srt_ready_ck`) */
@@ -329,11 +330,12 @@ extern const char lbl_8059B134[]; /* "16/srt/demo/MH3_MOVIE.srt" */
 extern const char lbl_8059B150[]; /* "16/srt/bgm/MH3BGM_LOBBY.srt" */
 
 /* ------------------------------------------------------------------------------------------------
- * This unit's own symbols (the `fn_*` stems are the map's own placeholders, so they are declared
- * `extern "C"` exactly as the map spells them).
+ * This unit's own symbols (plain map names - the remaining `fn_*` stems are the map's own placeholders and
+ * `snd_bank_layout` / `scene_se_bank_load` were renamed from two of them - so they are declared `extern "C"`
+ * exactly as the map spells them).
  * --------------------------------------------------------------------------------------------- */
-extern "C" void fn_800EF7D8(u8 mode);
-extern "C" void fn_800EF9C0(u8 a, u8 b);
+extern "C" void snd_bank_layout(u8 mode);
+extern "C" void scene_se_bank_load(u8 a, u8 b);
 extern "C" void fn_800EFAC0(u8 arg0);
 extern "C" void fn_800EFC68(_PLW* work);
 extern "C" s32 fn_800EFD88(u8 id, u32 kind);
@@ -404,7 +406,7 @@ void set_BGM_volume(u8 index);
 
 /* Lays the six bank tables out from the current file cursor.  Chunk 0 is skipped (the system SE
  * bank, `system_se_load` loads it by hand). */
-extern "C" void fn_800EF7D8(u8 mode)
+extern "C" void snd_bank_layout(u8 mode)
 {
     SndChunkRec* rec = lbl_80598F68[4];
     u32 cur = lbl_80794A2C->bank_base_1;
@@ -570,7 +572,7 @@ extern "C" void fn_800F0560(u8 a, u8 b)
 }
 
 /* The scene SE-bank loader: bank catalogue, per-kind banks, then the SE bank itself. */
-extern "C" void fn_800EF9C0(u8 a, u8 b)
+extern "C" void scene_se_bank_load(u8 a, u8 b)
 {
     char name[0x100];
 
@@ -778,7 +780,7 @@ extern "C" void fn_800EFDD8(_PLW* work)
 void title_snd_init(void)
 {
     fn_800F0554();
-    fn_800EF7D8(0);
+    snd_bank_layout(0);
     title_se_load();
 }
 

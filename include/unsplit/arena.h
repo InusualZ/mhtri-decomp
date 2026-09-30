@@ -74,22 +74,22 @@ typedef struct ArenaStageRecord {
 struct _vs_user_data;
 typedef struct ArenaEqSlot {
     /* +0x00 */ u8 player_0x00;       /* the move-work player index `arena_eqdata_apply` scales by 0xB20 */
-    /* +0x01 */ u8 mode_0x01;         /* 3 / 4 / 5 */
-    /* +0x02 */ u8 clear_0x02;        /* zeroed by `arena_eqdata_apply` */
-    /* +0x03 */ u8 state_0x03;        /* 0 / 5 / 4 / 3 */
-    /* +0x04 */ u8 stage_col_0x04;    /* the stage's column on the `pair_a_0x06`-wide stage grid (stage % width) */
+    /* +0x01 */ u8 player_limit_0x01; /* GUESS name: the exclusive end of the `player_0x00` cursor (3 / 4 / 5) */
+    /* +0x02 */ u8 page_0x02;         /* GUESS name: the page cursor (zeroed by `arena_eqdata_apply`, saved to `mirror_0x0D` on confirm) */
+    /* +0x03 */ u8 page_limit_0x03;   /* the exclusive end of the `page_0x02` cursor (0 / 5 / 4 / 3) */
+    /* +0x04 */ u8 stage_col_0x04;    /* the stage's column on the `stage_cols_0x06`-wide stage grid (stage % width) */
     /* +0x05 */ u8 stage_row_0x05;    /* its row (stage / width) */
-    /* +0x06 */ u8 pair_a_0x06;       /* 3 / 4; also the stage grid's width in `arena_result_next`'s mode 1 */
-    /* +0x07 */ u8 pair_b_0x07;       /* 2 */
+    /* +0x06 */ u8 stage_cols_0x06;   /* 3 / 4 / 5: the stage grid's width (the column cursor's exclusive end) */
+    /* +0x07 */ u8 stage_rows_0x07;   /* 2 / 4: the stage grid's height (the row cursor's exclusive end) */
     /* +0x08 */ u8 kind_0x08;         /* the `arena_eqdata_apply` kind */
-    /* +0x09 */ u8 state_0x09;        /* 3 when the owner's +0x04 is 2, else 4 */
-    /* +0x0A */ u8 cleared_0x0A;      /* only ever cleared by `arena_eqdata_reset` */
-    /* +0x0B */ u8 flag_0x0B;
-    /* +0x0C */ u8 pair_0x0C;
+    /* +0x09 */ u8 kind_limit_0x09;   /* the exclusive end of the `kind_0x08` cursor: 3 when the owner's +0x04 is 2, else 4 */
+    /* +0x0A */ u8 kind_open_0x0A;    /* GUESS name: 1 while the kind picker is open (set by the confirm-style bit, cleared otherwise) */
+    /* +0x0B */ u8 ready_0x0B;        /* GUESS name: 0 = still choosing, 1 = the player confirmed */
+    /* +0x0C */ u8 grid_mode_0x0C;    /* GUESS name: toggled by the 0x2000 button; 1 steers the stage grid instead of the equip cursors */
     /* +0x0D */ u8 mirror_0x0D;       /* a `get_arena_cfg` byte */
-    /* +0x0E */ u16 value_0x0E;
-    /* +0x10 */ u16 value_0x10;
-    /* +0x12 */ u16 value_0x12;
+    /* +0x0E */ u16 arrow_l_timer_0x0E; /* GUESS name: counts 1..10 after a left step, then clears */
+    /* +0x10 */ u16 arrow_r_timer_0x10; /* GUESS name: counts 1..10 after a right step, then clears */
+    /* +0x12 */ u16 moved_0x12;       /* the cursor step's output flags (0x4 / 0x8 = a horizontal step, 0x3 = a change) */
     /* +0x14 */ struct _vs_user_data* user_0x14;   /* the player's Vs user block (`get_vsUser_work`) */
 } ArenaEqSlot; /* size: 0x18 */
 
@@ -99,22 +99,23 @@ typedef struct ArenaEqSlot {
  * `ArenaEqParams` view was this same record's first 0x4C bytes).  Only the offsets the band's functions
  * touch are named; the rest is filler so the size and the offsets stay checkable. size: 0x58 */
 typedef struct ArenaWork {
-    /* +0x00 */ u8 mode_0x00;         /* the setup's own 0/1/2 mode */
-    /* +0x01 */ u8 timer_0x01;        /* GUESS name: 0xC8 in the Vs setups, cleared by every setup */
-    /* +0x02 */ u8 unused_0x02;       /* only ever cleared */
+    /* +0x00 */ u8 state_0x00;       /* the setup's own 0/1/2 state: `arena_game_task`'s outermost switch (select, arena, result) */
+    /* +0x01 */ u8 phase_0x01;        /* the state's phase (0xC8 / 0xC9 in the network setup, 0x64 after a network confirm); cleared by every setup */
+    /* +0x02 */ u8 step_0x02;         /* the phase's step; cleared by every setup */
     /* +0x03 */ u8 round_0x03;        /* GUESS name: counts `arena_player_init` passes; its `<< 8` is the high byte of the players' motion word */
     /* +0x04 */ u8 mode_0x04;         /* 0 = one-player, 1 = two-player Vs, 2 = network Vs; 2 selects the acdata -> eqdata conversion */
     /* +0x05 */ u8 player_count_0x05; /* the network Vs player count */
-    /* +0x06 */ u8 pad_0x06[0x02];
+    /* +0x06 */ s16 wait_0x06;       /* GUESS name: a frame counter the fades wait on (16 frames) */
     /* +0x08 */ u16 ready_mask_0x08;  /* the players' ready bits, ORed from their user blocks */
     /* +0x0A */ u16 item_mask_0x0A;   /* one bit per non-empty item slot of the players' user blocks */
     /* +0x0C */ s32 stage_0x0C;       /* 0..9, the arena stage index (-1 once the task leaves the stage select); `arena_task` writes `0x2328 + stage` to `lb_param_w+0x00` and indexes the 0x3B0-byte config record with it */
     /* +0x10 */ const ArenaStageRecord* eq_data_0x10;   /* the stage's 0xEC-byte acdata equip records, indexed by a slot's `player_0x00` */
     /* +0x14 */ ArenaEqSlot slot_0x14[2];
-    /* +0x44 */ u16 value_0x44;
-    /* +0x46 */ u16 value_0x46;
-    /* +0x48 */ u16 value_0x48;
-    /* +0x4A */ u8 pad_0x4A[0x04];
+    /* +0x44 */ u16 blink_0x44;       /* GUESS name: a blink counter, wraps past 20 (past 35 in the network state) */
+    /* +0x46 */ u16 blink_0x46;       /* GUESS name: a second blink counter, wraps past 40 */
+    /* +0x48 */ s16 select_countdown_0x48; /* GUESS name: the network selection countdown (0x1518 frames), counts down to 0 */
+    /* +0x4A */ s16 sync_sent_0x4A;   /* GUESS name: 1 once the lobby sync command has been sent */
+    /* +0x4C */ s16 sync_tick_0x4C;   /* GUESS name: frame tick, the lobby sync command repeats every 32 frames */
     /* +0x4E */ s16 sub_mode_0x4E;    /* compared against 3 by `arena_task`, set from the flag `arena_sub_mode_set` takes */
     /* +0x50 */ u8 solo_0x50;         /* 1 when the play is not online (`system_w`'s +0x8AE is 0) */
     /* +0x51 */ u8 pad_0x51[0x07];
