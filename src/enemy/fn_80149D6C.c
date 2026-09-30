@@ -2,8 +2,8 @@
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * What it is.  The unit is one `_ENEMY_WORK` action.  A two-state machine on `state_0x05` (state 0
- * initialises through `fn_80134F70`/`fn_80134004`/`fn_80130248`/`fn_80135584`, state 1 runs the action)
- * plus a `phase_0x06`/`step_0x07` pair picks the body; the shared tail first asks `fn_80134114`
+ * initialises through `fn_80134F70`/`em_approach_start`/`em_fall_height_get`/`fn_80135584`, state 1 runs the action)
+ * plus a `phase_0x06`/`step_0x07` pair picks the body; the shared tail first asks `em_approach_step`
  * whether the enemy is in the released group and then either sets an act id
  * (`em_state_set`/`fn_80128A70`) or hands the parameter table `lbl_8056F9E0` to `fn_80135000`.  The
  * `u8` argument is the action index the dispatcher in this region tail-calls the function with (0/1/2).
@@ -86,7 +86,7 @@ typedef struct _ENEMY_WORK {
 /* ---- callees ---- */
 
 extern void em_busy_set(_ENEMY_WORK* self);
-extern void fn_80134004(_ENEMY_WORK* self, f32 scale, u16 id);
+extern void em_approach_start(_ENEMY_WORK* self, f32 scale, u16 id);
 extern u32 fn_8012EC3C(_ENEMY_WORK* self);
 extern u32 fn_80131BD4(_ENEMY_WORK* self);
 extern void fn_8012B380(_ENEMY_WORK* self, u8 a, u8 b, u8 c);
@@ -112,8 +112,8 @@ void fn_80149D6C(_ENEMY_WORK* self, u8 arg)
         self->phase_0x06 = 0;
         self->step_0x07 = 0;
         fn_80134F70(self, lbl_8056F9E0);
-        fn_80134004(self, lbl_80796E1C, 25);
-        fn_80130248(self);
+        em_approach_start(self, lbl_80796E1C, 25);
+        em_fall_height_get(self);
         fn_80135584(self, &self->pos_0x1BC);
         return;
 
@@ -175,7 +175,7 @@ void fn_80149D6C(_ENEMY_WORK* self, u8 arg)
             }
         }
 
-        if (fn_80134114(self, 0, 0) == 1) {
+        if (em_approach_step(self, 0, 0) == 1) {
             switch (arg) {
             case 0:
                 fn_801481FC(self);
@@ -250,7 +250,7 @@ void fn_80149D6C(_ENEMY_WORK* self, u8 arg)
                 fn_80135000(self, 0, lbl_8056F9E0);
                 break;
             }
-            fn_80130248(self);
+            em_fall_height_get(self);
             fn_80135584(self, &self->pos_0x1BC);
         }
         break;

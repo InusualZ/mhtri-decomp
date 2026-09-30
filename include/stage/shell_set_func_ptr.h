@@ -11,7 +11,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 
-/* size: 0x8C */
+/* size: 0x90 */
 struct ShellSetFuncs {
     /* +0x00 */ u8 pad_0x00[0x14];
     /* +0x14 */ void (*method_0x14)(struct _ENEMY_WORK* self, nw4r::math::VEC3* pos, u32 a, u32 b, u16 c,
@@ -34,10 +34,16 @@ struct ShellSetFuncs {
     /* +0x54 */ void (*method_0x54)(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos,
                                     ShellSetFuncs* table);
     /* +0x58 */ void (*method_0x58)(struct _ENEMY_WORK* self, u32 id);
-    /* +0x5C */ u8 pad_0x5C[0x80 - 0x5C];
+    /* +0x5C */ u8 pad_0x5C[0x74 - 0x5C];
+    /* +0x74 */ void (*method_0x74)(struct _ENEMY_WORK* self, u32 kind, u32 joint, nw4r::math::VEC3* pos, f32 scale,
+                                    u32 a, u16 b, ShellSetFuncs* table);
+    /* +0x78 */ u8 pad_0x78[0x80 - 0x78];
     /* +0x80 */ void (*method_0x80)(nw4r::math::VEC3* pos, u32 kind, s32 id, ShellSetFuncs* table);
-    /* +0x84 */ u8 pad_0x84[0x88 - 0x84];
+    /* +0x84 */ void (*method_0x84)(struct _ENEMY_WORK* self, u32 kind, nw4r::math::VEC3* pos, f32 scale, u32 id,
+                                    ShellSetFuncs* table);
     /* +0x88 */ void (*method_0x88)(nw4r::math::VEC3* pos, u32 kind, s32 id, ShellSetFuncs* table);
+    /* +0x8C */ void (*method_0x8C)(struct _ENEMY_WORK* self, u32 kind, nw4r::math::VEC3* pos, f32 scale, u32 id,
+                                    ShellSetFuncs* table);
 };
 
 extern ShellSetFuncs* shell_set_func_ptr;

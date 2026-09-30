@@ -7,7 +7,7 @@
  *     and `fn_80138B60` (the sleep/death half) walk the work block's move table, user-data list and
  *     MHchar base, and the small helpers around them (`fn_80138E64` pushes the work's scale/rotation into
  *     the MHchar, `fn_80138EC8` advances one of the two 0x5C-byte effect slots, `fn_80138F3C` fills the
- *     per-move `-1` markers, `fn_80139024` is the action-state step, `fn_801390FC` installs a callback).
+ *     per-move `-1` markers, `fn_80139024` is the action-state step, `em_res_user_data_set` installs a callback).
  *   * 0x801394B8..0x8013AC08 - the `g3d_resuser_ac.h` accessor: `ResUserDataAc` (vtable at +0, the
  *     `ENEMY_WORK*` at +4, a 32-bit flag word at +8) reads `ResUserData` values out of the work's
  *     `EnemyData` (`get_enemy_data(work)->0x94` is the 0x18-byte item list) and drives the per-entity
@@ -156,9 +156,9 @@ void fn_80138E64(EnemyWork* self);
 void fn_80138EC8(EnemyWork* self, u32 arg1);
 void fn_80138F3C(EnemyWork* self);
 void fn_80139024(EnemyWork* self);
-void fn_801390FC(EnemyWork* self, ResUserDataAc* arg1);
+void em_res_user_data_set(EnemyWork* self, ResUserDataAc* arg1);
 void fn_8013918C(void* arg0, s16 arg1);
-s32 fn_801391E8(EnemyWork* self);
+s32 em_res_user_data_ck(EnemyWork* self);
 void fn_801391FC(EnemyWork* self);
 void fn_801394B8(ResUserDataAc* self);
 void fn_801394C0(UserDataCursor* self, u32 arg1);
@@ -227,10 +227,10 @@ extern void Panic__Q24nw4r2dbFPCciPCce(const char* file, s32 line, const char* m
 extern s32 strcmp(const char* a, const char* b);
 
 extern void fn_800504D4(void* mtx);
-extern void fn_80050CA0(Vec3* out, const Vec3* a, const Vec3* b);
+extern void subVec3(Vec3* out, const Vec3* a, const Vec3* b);
 extern f32 fn_80050EF4(const Vec3* a, const Vec3* b);
-extern f32 fn_80050F80(const Vec3* a, const Vec3* b);
-extern void fn_80051378(Vec3* out, const Vec3* a, const Vec3* b);
+extern f32 calcVecDistXZ(const Vec3* a, const Vec3* b);
+extern void addVec3(Vec3* out, const Vec3* a, const Vec3* b);
 extern void fn_800516F0(Mtx34* mtx);
 extern void fn_80051894(Mtx34* out, const Mtx34* a, const Mtx34* b, s32 arg3, f32 t, f32 u);
 extern void fn_80051EE0(Vec3* out, const Vec3* v, f32 scale);
@@ -267,12 +267,12 @@ extern void fn_801252DC(EnemyWork* work);
 extern s32 fn_80126098(void);
 extern void fn_80126278(u16 id, Vec3* out);
 extern void (*fn_801264BC(EnemyWork* work, s32 index))(EnemyWork*);
-extern u16 fn_80127E78(EnemyWork* work);
+extern u16 em_hit_mask_get(EnemyWork* work);
 extern void fn_801281EC(EnemyWork* work);
 extern void fn_801281F8(EnemyWork* work);
 extern u32 fn_80128204(EnemyWork* work);
 extern void fn_80128308(EnemyWork* work);
-extern void fn_80128BF8(EnemyWork* work, s32 arg1);
+extern void em_target_pos_set(EnemyWork* work, s32 arg1);
 extern void fn_8012987C(EnemyWork* work);
 extern void fn_8012A3B4(EnemyWork* work);
 extern void fn_8012A414(EnemyWork* work);
@@ -612,13 +612,13 @@ void fn_80138074(EnemyWork* self, u8 arg1) {
             copyVec3(&saved, &self->field_0x188);
             setVector3__FPQ34nw4r4math4VEC3fff(&offset, lbl_80796D40, lbl_80796D40, lbl_80796D44);
             rotVecY__FPQ34nw4r4math4VEC3Ul(&offset, self->field_0x1C0);
-            fn_80073F68(&self->field_0x188, &offset);
-            fn_80295578(self, arg1, fn_80127E78(self));
+            addVec3To(&self->field_0x188, &offset);
+            fn_80295578(self, arg1, em_hit_mask_get(self));
             if (self->field_0x218 == 0) {
                 copyVec3(&self->field_0x188, &saved);
             }
         } else {
-            fn_80295578(self, arg1, fn_80127E78(self));
+            fn_80295578(self, arg1, em_hit_mask_get(self));
         }
     }
 }
@@ -705,7 +705,7 @@ void fn_8013823C(EnemyWork* self) {
         if (self->field_0x380 == 8) {
             if (fn_8012D1A0(self) == 1 && (self->field_0x99A & 1) == 0 && self->field_0x99B == 1 &&
                 self->field_0x382 == 0) {
-                if (fn_80050F80(&self->field_0x188, &self->field_0x36C) <=
+                if (calcVecDistXZ(&self->field_0x188, &self->field_0x36C) <=
                     self->field_0x9A4->records->field_0x04) {
                     fn_801381F4(self);
                     fn_8013817C(self);
@@ -729,12 +729,12 @@ void fn_8013823C(EnemyWork* self) {
             copyVec3(&vBC, &v5C);
             get_worldworld_pos__FPQ34nw4r4math4VEC3Uc(&v50, &self->field_0x188, self->field_0x1E1);
             copyVec3(&vD4, &v50);
-            fn_80051378(&v74, &vC8, &vBC);
+            addVec3(&v74, &vC8, &vBC);
             fn_80051EE0(&v80, &v74, lbl_80796D50);
             copyVec3(&vB0, &v80);
-            fn_80050CA0(&v2C, &vBC, &vB0);
+            subVec3(&v2C, &vBC, &vB0);
             copyVec3(&vA4, &v2C);
-            fn_80050CA0(&v20, &vD4, &vB0);
+            subVec3(&v20, &vD4, &vB0);
             copyVec3(&v98, &v20);
             if (fn_80052214(&vA4, &v98) >= lbl_80796D40) {
                 fn_802B01AC(&v14, &vD4, self->field_0x9F7);
@@ -801,7 +801,7 @@ void fn_8013823C(EnemyWork* self) {
     } else if (fn_80133BCC(self) == 1 && self->field_0x46A == 0) {
         fn_8013ACC4(self);
     } else if ((self->flags_0x1C8 & 8) == 0) {
-        fn_80128BF8(self, 0);
+        em_target_pos_set(self, 0);
     }
     if ((u32)(self->field_0x1E5 - 8) > 1) {
         if (self->field_0x1E5 == 0xB) {
@@ -833,7 +833,7 @@ void fn_8013823C(EnemyWork* self) {
             }
         }
         if (self->field_0x784 != 0) {
-            fn_80131E74(self);
+            em_busy_timer_reset(self);
             em_busy_set(self);
             fn_80131D9C(self);
         }
@@ -899,7 +899,7 @@ void fn_8013823C(EnemyWork* self) {
             }
             break;
         }
-        fn_80050CA0(&v8, &self->field_0x188, &self->field_0x194);
+        subVec3(&v8, &self->field_0x188, &self->field_0x194);
         copyVec3(&self->field_0x470, &v8);
         fn_80138074(self, 0);
         fn_8012A3B4(self);
@@ -922,7 +922,7 @@ void fn_80138B60(EnemyWork* self) {
 
     if (self->field_0x1DE != 0) {
         if (self->field_0x8C0 != 0) {
-            fn_80073F68(&self->field_0x188, &self->field_0x8B4);
+            addVec3To(&self->field_0x188, &self->field_0x8B4);
             fn_80138074(self, 1);
             fn_8012A3B4(self);
             fn_8012FF38(self);
@@ -1095,7 +1095,7 @@ void fn_80139024(EnemyWork* self) {
 }
 
 /* Installs (or clears) the work's user-data accessor callback. */
-void fn_801390FC(EnemyWork* self, ResUserDataAc* arg1) {
+void em_res_user_data_set(EnemyWork* self, ResUserDataAc* arg1) {
     ResUserDataAc* old = self->field_0x484;
 
     if (old != NULL) {
@@ -1121,7 +1121,7 @@ void fn_8013918C(void* arg0, s16 arg1) {
 }
 
 /* Reports whether the work has a user-data accessor installed. */
-s32 fn_801391E8(EnemyWork* self) {
+s32 em_res_user_data_ck(EnemyWork* self) {
     return self->field_0x484 != NULL;
 }
 

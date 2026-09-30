@@ -4,7 +4,7 @@
  * what it is.  One enemy's effect and part-selection band, the same family as the registered units
  * `enemy/fn_801D428C.cpp` (the band below, 0x801D428C..0x801D80EC) and `enemy/fn_801993E0.cpp`: every
  * function takes the shared `_ENEMY_WORK`, reads its part table (`+0x38`) and drives the per-effect
- * clusters through `eft009_set_pos`/`fn_801048B4`/`fn_8010D2B0`/`fn_80106694`, the `MHchar` at
+ * clusters through `eft009_set_pos`/`eft009_spawn_at_joint`/`eft_spawn_pos_in_area`/`eft_spawn_type11`, the `MHchar` at
  * `+0x024`, and the res-effect API (`res_eft_create`, `res_eft_model_create_light`).  The range is one
  * band of `fn_801DBE0C`, the 0x34EC motion dispatcher, over the whole file.
  *
@@ -123,7 +123,7 @@ extern "C" {
  * -------------------------------------------------------------------------------------------------- */
 
 /* enemy/fn_8012E968.cpp (0x8012E968..0x8012EC74) - both bodies read the work record. */
-u32 fn_8012EC60(struct _ENEMY_WORK* self);
+u32 em_alt_mode_ck(struct _ENEMY_WORK* self);
 u32 fn_8012EC3C(struct _ENEMY_WORK* self);
 
 /* enemy/fn_801251D0.cpp (0x801251D0..0x8012BA00). */
@@ -142,8 +142,8 @@ void em_move_mode_set(struct _ENEMY_WORK* self, u32 a);
 struct _ENEMY_WORK* fn_80131034(struct _ENEMY_WORK* self, u8 kind, u8 distance_check);
 u32 fn_8013023C(struct _ENEMY_WORK* self);
 u8* fn_801377D0(u8 index);
-void fn_80136B50(struct _ENEMY_WORK* self, u32 a, u32 b);
-u32 fn_80135748(struct _ENEMY_WORK* self, u32 a);
+void em_camera_req(struct _ENEMY_WORK* self, u32 a, u32 b);
+u32 em_flags836_ck(struct _ENEMY_WORK* self, u32 a);
 void fn_8013A654(struct _ENEMY_WORK* self, u32 a);
 
 /* enemy/fn_80138074.c (0x80138074..0x8013ACC4). */
@@ -165,14 +165,14 @@ void fn_801E1A2C(struct EmEftPartsMan* self);
 void fn_801E1A3C(struct EmEftPartsMan* self);
 
 /* ef module - the effect clusters. */
-void fn_801048B4(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, f32 d);
-void fn_8010562C(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c);
-void fn_80106694(struct _ENEMY_WORK* self, void* pos, u8 a, f32 b);
-void fn_8010D2B0(void* pos, u8 a, u8 b, s32 c, f32 d);
+void eft009_spawn_at_joint(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, f32 d);
+void eft_spawn_type10(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c);
+void eft_spawn_type11(struct _ENEMY_WORK* self, void* pos, u8 a, f32 b);
+void eft_spawn_pos_in_area(void* pos, u8 a, u8 b, s32 c, f32 d);
 
 /* the base runtime helpers the range reaches. */
 f32 fn_80050EF4(void* a, void* b);
-void fn_80051378(void* out, void* a, void* b);
+void addVec3(void* out, void* a, void* b);
 void fn_8005D0CC(void* out, void* src);
 void fn_8005D1AC(void* out, u32 a);
 void fn_8006FDCC(void* a);
@@ -189,17 +189,17 @@ void fn_800810DC(void* self, u32 a);
 void fn_801DB8E0(struct _ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
     VEC3_ctor(&pos);
-    if (fn_8012EC60(self) == 1) {
+    if (em_alt_mode_ck(self) == 1) {
         if (system_w.field_0x0c % 0x18 == 0) {
             setVector3(&pos, lbl_807994FC, lbl_8079964C, lbl_80799650);
-            fn_8010562C(self, 0x13, 0x16, &pos, lbl_807994F8);
+            eft_spawn_type10(self, 0x13, 0x16, &pos, lbl_807994F8);
         }
     }
 }
 
 /* 0x801DB978 (0x494) - the effect-spawn dispatcher: one case per effect id, each either calling the
  * owner's `eft009_set_pos` directly (when the joint is 0xFF) or handing the joint to
- * `fn_801048B4`/`fn_8010D2B0`/`fn_80106694`. */
+ * `eft009_spawn_at_joint`/`eft_spawn_pos_in_area`/`eft_spawn_type11`. */
 void fn_801DB978(struct _ENEMY_WORK* self, u8 mode, u8 kind, u32 joint, u32 id, f32 scale) {
     nw4r::math::VEC3 pos;
     VEC3_ctor(&pos);
@@ -214,7 +214,7 @@ void fn_801DB978(struct _ENEMY_WORK* self, u8 mode, u8 kind, u32 joint, u32 id, 
                     pos.z = self->pos.z;
                     eft009_set_pos(0xf, &pos, (void*)&self->field_0x1BC, scale, self->area_no);
                 } else {
-                    fn_801048B4(self, joint, 0xf, id, scale);
+                    eft009_spawn_at_joint(self, joint, 0xf, id, scale);
                 }
                 break;
             case 2:
@@ -225,7 +225,7 @@ void fn_801DB978(struct _ENEMY_WORK* self, u8 mode, u8 kind, u32 joint, u32 id, 
                     pos.z = self->pos.z;
                     eft009_set_pos(0xe, &pos, (void*)&self->field_0x1BC, scale, self->area_no);
                 } else {
-                    fn_801048B4(self, joint, 0xe, id, scale);
+                    eft009_spawn_at_joint(self, joint, 0xe, id, scale);
                 }
                 break;
             case 4:
@@ -236,7 +236,7 @@ void fn_801DB978(struct _ENEMY_WORK* self, u8 mode, u8 kind, u32 joint, u32 id, 
                     pos.z = self->pos.z;
                     eft009_set_pos(0xe, &pos, (void*)&self->field_0x1BC, scale, self->area_no);
                 } else {
-                    fn_801048B4(self, joint, 0xe, id, scale);
+                    eft009_spawn_at_joint(self, joint, 0xe, id, scale);
                 }
                 break;
             case 1:
@@ -271,7 +271,7 @@ void fn_801DB978(struct _ENEMY_WORK* self, u8 mode, u8 kind, u32 joint, u32 id, 
         if (joint == 0xff) {
             eft009_set_pos(kind, &pos, (void*)&self->field_0x1BC, scale, self->area_no);
         } else {
-            fn_801048B4(self, joint, kind, id, scale);
+            eft009_spawn_at_joint(self, joint, kind, id, scale);
         }
     } else if (mode == 1) {
         if ((self->field_0x228 & 0x6) != 0) {
@@ -284,7 +284,7 @@ void fn_801DB978(struct _ENEMY_WORK* self, u8 mode, u8 kind, u32 joint, u32 id, 
                     pos.z = self->pos.z;
                     eft009_set_pos(0x11, &pos, (void*)&self->field_0x1BC, scale, self->area_no);
                 } else {
-                    fn_801048B4(self, joint, 0x11, id, scale);
+                    eft009_spawn_at_joint(self, joint, 0x11, id, scale);
                 }
                 break;
             }
@@ -295,7 +295,7 @@ void fn_801DB978(struct _ENEMY_WORK* self, u8 mode, u8 kind, u32 joint, u32 id, 
                     pos.z = self->pos.z;
                     eft009_set_pos(0x10, &pos, (void*)&self->field_0x1BC, scale, self->area_no);
                 } else {
-                    fn_801048B4(self, joint, 0x10, id, scale);
+                    eft009_spawn_at_joint(self, joint, 0x10, id, scale);
                 }
                 break;
             }
@@ -306,7 +306,7 @@ void fn_801DB978(struct _ENEMY_WORK* self, u8 mode, u8 kind, u32 joint, u32 id, 
                     pos.z = self->pos.z;
                     eft009_set_pos(0x14, &pos, (void*)&self->field_0x1BC, scale, self->area_no);
                 } else {
-                    fn_801048B4(self, joint, 0x14, id, scale);
+                    eft009_spawn_at_joint(self, joint, 0x14, id, scale);
                 }
                 break;
             }
@@ -321,7 +321,7 @@ void fn_801DB978(struct _ENEMY_WORK* self, u8 mode, u8 kind, u32 joint, u32 id, 
             }
             pos.y = self->field_0x20C;
             scale = scale * get_em_chg_scale(self);
-            fn_8010D2B0(&pos, self->area_no, kind, id, scale);
+            eft_spawn_pos_in_area(&pos, self->area_no, kind, id, scale);
         }
     } else if (mode == 2) {
         if (joint == 0xff) {
@@ -331,7 +331,7 @@ void fn_801DB978(struct _ENEMY_WORK* self, u8 mode, u8 kind, u32 joint, u32 id, 
         }
         pos.y = self->field_0x20C;
         scale = scale * get_em_chg_scale(self);
-        fn_80106694(self, &pos, kind, scale);
+        eft_spawn_type11(self, &pos, kind, scale);
     }
 }
 
@@ -342,7 +342,7 @@ void fn_801DF2F8(struct _ENEMY_WORK* self) {
     _GXColor color;
     u32 strength;
     u32 scaled;
-    if (fn_8012EC60(self) == 1) {
+    if (em_alt_mode_ck(self) == 1) {
         self->action_0x328.field_0x340 += lbl_8079975C;
         if (self->action_0x328.field_0x340 > lbl_80799760) {
             self->action_0x328.field_0x340 = lbl_80799760;
@@ -377,7 +377,7 @@ void fn_801DF2F8(struct _ENEMY_WORK* self) {
     color.a = strength;
     ((MHchar*)self->char_0x024)->setTevKColor(2, GX_KCOLOR3, color);
     ((MHchar*)self->char_0x024)->getTevKColor(3, GX_KCOLOR3, &color);
-    if (fn_80135748(self, 1) == 1) {
+    if (em_flags836_ck(self, 1) == 1) {
         u32 fade = 0;
         if (strength == 4 && (self->field_0x48E == 4 || self->field_0x48E == 6)) {
             fade = 1;
@@ -492,7 +492,7 @@ u32 fn_801DF810(struct _ENEMY_WORK* self, u8 part) {
     if (self->field_0x1E2 == 0) {
         switch (part) {
         case 0:
-            if (fn_8012EC60(self) == 1) {
+            if (em_alt_mode_ck(self) == 1) {
                 return 1;
             }
             break;
@@ -633,11 +633,11 @@ u32 fn_801DF8EC(struct _ENEMY_WORK* self, u16 a) {
     return fn_8012A204(self) == 1;
 }
 
-/* 0x801DFC08 (0x134) - step the four action-block floats toward their clamps (up when `fn_8012EC60`
+/* 0x801DFC08 (0x134) - step the four action-block floats toward their clamps (up when `em_alt_mode_ck`
  * answers 1, down otherwise). */
 void fn_801DFC08(struct _ENEMY_WORK* self) {
     EmActionBlock* blk = &self->action_0x328;
-    if (fn_8012EC60(self) == 1) {
+    if (em_alt_mode_ck(self) == 1) {
         blk->vec_0x328.x += lbl_80799768;
         if (blk->vec_0x328.x > lbl_80799614) {
             blk->vec_0x328.x = lbl_80799614;
@@ -694,14 +694,14 @@ void fn_801DFD3C(struct _ENEMY_WORK* self, nw4r::math::VEC3* out, u16* angleOut,
         f32 base = fn_80050EF4(&dir, &self->pos);
         setVector3(&rot, lbl_807994FC, lbl_807994FC, base - scale);
         rotVecY(&rot, *angleOut);
-        fn_80051378(&tmp, &self->pos, &rot);
+        addVec3(&tmp, &self->pos, &rot);
         copyVec3(out, &tmp);
     } else {
         u16 a2 = (delta < 0x8000) ? 0x4000 : 0xc000;
         *angleOut = (u16)(a2 + self->field_0x1C0);
         setVector3(&rot, lbl_807994FC, lbl_807994FC, -scale);
         rotVecY(&rot, *angleOut);
-        fn_80051378(&res, &dir, &rot);
+        addVec3(&res, &dir, &rot);
         copyVec3(out, &res);
     }
 }

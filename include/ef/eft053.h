@@ -2,7 +2,7 @@
  * `ef/eft053.cpp`'s own header.
  *
  * It carries NO declarations any more (2026-09-27): every callee comes from its owner's header.
- * `fn_80050F80`, `fn_80051378`, `fn_80050850` and `vec_to_mh_vec3` are `include/fn_8004CAD8.h`'s,
+ * `calcVecDistXZ`, `addVec3`, `fn_80050850` and `vec_to_mh_vec3` are `include/fn_8004CAD8.h`'s,
  * and `copyVec3` (0x80041E40, `src/mh3_pad.cpp`) now comes from `include/mh3_pad.h` - the
  * `(10197)` clash this file's comment used to record (`ef.h` spelling `VEC3_ctor`/`setVec3` as
  * `VEC3*`/`Vec*` against `mh3_pad.h`'s `void*`) is closed: both headers spell them identically.
@@ -17,7 +17,7 @@
 #include "nw4r/math.h"
 #include "ef.h"
 
-/* `copyVec3`, `fn_80050F80`, `fn_80051378`, `fn_80050850` and `vec_to_mh_vec3` all come from their
+/* `copyVec3`, `calcVecDistXZ`, `addVec3`, `fn_80050850` and `vec_to_mh_vec3` all come from their
  * owners' headers now (`include/mh3_pad.h` and `include/fn_8004CAD8.h`), which this unit includes. */
 
 #endif /* MHTRI_EF_EFT053_H */

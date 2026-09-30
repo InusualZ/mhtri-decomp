@@ -9,7 +9,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
-/* The owner header for the 0x8012E968 predicates (`enemy/fn_8012E968.cpp`) owns `fn_8012EC60`'s
+/* The owner header for the 0x8012E968 predicates (`enemy/fn_8012E968.cpp`) owns `em_alt_mode_ck`'s
  * argument-accepting spelling; the band re-exports it so the existing consumers that include this
  * header (rule 2: a declaration belongs with its owner's TU). */
 #include "enemy/fn_8012E968.h"
@@ -42,7 +42,7 @@ void em_mot_set(struct _ENEMY_WORK* self, s32 a, s32 b, s32 c);
 /* 0x8012F504 - the five-argument motion setter `em_mot_set` tail-calls; moved here from
  * `enemy/fn_801550FC.cpp` on landing (rule 2).  `em_mot_set` narrows its second argument to u16
  * (`clrlwi r4,r4,16`) before the tail call, so the owner's first argument is u16. */
-void fn_8012F504(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d);
+void em_mot_set_blend(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d);
 void em_mot_set_ck(struct _ENEMY_WORK *self, u32 a, u32 b, u32 c);
 /* 0x8012F7D4 - reads r3, r4, r5, r6 and f1 (its body does `mr r4,r5` / `mr r5,r6` before the tail
  * call to 0x8012F758), so the four scalar arguments and the float are in the call sites' order. */
@@ -61,7 +61,7 @@ void em_mot_speed_set(struct _ENEMY_WORK* self, f32 a);
 #else
 void em_mot_speed_set();
 #endif
-f32 fn_8012F8E4(struct _ENEMY_WORK *self);
+f32 get_em_base_scale(struct _ENEMY_WORK *self);
 f32 fn_8012F8EC(struct _ENEMY_WORK *self);
 f32 fn_8012F8F4(struct _ENEMY_WORK *self);
 u32 em_mot_end_ck(struct _ENEMY_WORK *self);
@@ -73,14 +73,14 @@ void fn_8012FF38(struct _ENEMY_WORK* work);
 /* 0x80130008 - r3 (`self`) and f1 (it does `fmr f31,f1` and uses it against `get_em_scale`), return
  * in r3 (1/0).  C keeps the old-style declaration because `enemy/fn_8014A1BC.c` calls it both with
  * one and with two arguments; C++ gets the one-argument form `enemy/fn_801550FC.cpp` uses (it leaves
- * f1 as the tail of the preceding `fn_80130248` call, exactly as the target does). */
+ * f1 as the tail of the preceding `em_fall_height_get` call, exactly as the target does). */
 #ifdef __cplusplus
-u32 fn_80130008(struct _ENEMY_WORK* self);
+u32 em_ground_ck(struct _ENEMY_WORK* self);
 #else
-u32 fn_80130008();
+u32 em_ground_ck();
 #endif
 u8 fn_8013023C(struct _ENEMY_WORK* work);
-f32 fn_80130248(struct _ENEMY_WORK* self);
+f32 em_fall_height_get(struct _ENEMY_WORK* self);
 f32 fn_801302E4(struct _ENEMY_WORK* work);
 /* 0x801303EC - r3 (`self`) and f1 (stored at +0x1ac); 0x801303FC tail-calls it with `f0 + f1`.
  * `enemy/fn_8014A1BC.c` calls both with two arguments, so a real two-argument prototype is safe for
@@ -98,7 +98,7 @@ void fn_801303FC();
 #endif
 void fn_80130438(struct _ENEMY_WORK* work);
 void em_move_mode_set(struct _ENEMY_WORK *self, u32 a);
-void fn_801305C4(struct _ENEMY_WORK *self);
+void em_fall_start(struct _ENEMY_WORK *self);
 u32 fn_80130778(s32 kind);
 void fn_80130858(struct _ENEMY_WORK* enemy, s16 value);
 void fn_80130A10(struct _ENEMY_WORK* enemy, s32 value);
@@ -112,7 +112,7 @@ void fn_80131D9C(struct _ENEMY_WORK* work);
 void fn_80131DB4(struct _ENEMY_WORK* work);
 void fn_80131DF4(struct _ENEMY_WORK* work);
 void fn_80131E0C(struct _ENEMY_WORK* work);
-void fn_80131E74(struct _ENEMY_WORK* work);
+void em_busy_timer_reset(struct _ENEMY_WORK* work);
 void fn_80131E00(struct _ENEMY_WORK* work);
 f32 fn_8013032C(struct _ENEMY_WORK* work);
 u32 fn_80132198(struct _ENEMY_WORK* work);
@@ -128,9 +128,9 @@ void fn_80133BB4(struct _ENEMY_WORK* enemy);
 void fn_80133BC0(struct _ENEMY_WORK* work);
 void fn_80133C30(struct _ENEMY_WORK* work);
 void fn_80133C3C(struct _ENEMY_WORK *self);
-u32 fn_80133C50(struct _ENEMY_WORK *self, u32 a);
+u32 em_turn_to_target(struct _ENEMY_WORK *self, u32 a);
 void fn_80133CC8(struct _ENEMY_WORK *self, u32 a, u32 b);
-void fn_80133E3C(struct _ENEMY_WORK *self, s32 a, f32 b, f32 c);
+void em_turn_in_window(struct _ENEMY_WORK* self, f32 lo, f32 hi, s32 angle);
 /* 0x80133F4C - r3 (`self`), f1, f2 and r4 (the callee's body does `fmr f30,f1` / `fmr f31,f2` /
  * `mr r31,r4`), so the real signature is four-argument; `enemy/fn_8014BDF8` (C) leaves r4 as the
  * tail of its preceding call, so C keeps the old-style declaration (docs/plan.md 6.5 rule 6). */
@@ -139,41 +139,41 @@ void fn_80133F4C(struct _ENEMY_WORK* self, f32 a, f32 b, s32 c);
 #else
 void fn_80133F4C();
 #endif
-u32 fn_80134114(struct _ENEMY_WORK* self, s32 a, s32 b);
-void fn_80134964(struct _ENEMY_WORK* self, void* tbl, s32 a, s32 b, s32 c);
-u32 fn_80134B0C(struct _ENEMY_WORK *self, void *tbl);
-void fn_80134DF4(struct _ENEMY_WORK *self);
-void fn_80134E28(struct _ENEMY_WORK *self);
-void fn_80134E8C(struct _ENEMY_WORK *self);
-void fn_80134F18(struct _ENEMY_WORK *self);
+u32 em_approach_step(struct _ENEMY_WORK* self, s32 a, s32 b);
+void em_turn_seq_start(struct _ENEMY_WORK* self, void* tbl, s32 a, s32 b, s32 c);
+u32 em_turn_seq_step(struct _ENEMY_WORK *self, void *tbl);
+void em_lift_start(struct _ENEMY_WORK *self);
+void em_lift_step(struct _ENEMY_WORK *self);
+void em_dive_start(struct _ENEMY_WORK *self);
+void em_dive_step(struct _ENEMY_WORK *self);
 void fn_80134F70(struct _ENEMY_WORK* self, void* tbl);
 void fn_80135000(struct _ENEMY_WORK* self, u32 a, void* tbl);
-void fn_801353E4(struct _ENEMY_WORK *self);
-void fn_801353F8(struct _ENEMY_WORK *self);
-void fn_80135418(struct _ENEMY_WORK *self);
-void fn_801354F4(struct _ENEMY_WORK *self, void *p);
+void em_move_vec_clr(struct _ENEMY_WORK *self);
+void em_move_vec2_clr(struct _ENEMY_WORK *self);
+void em_move_offset_apply(struct _ENEMY_WORK *self);
+void em_move_offset_rot_apply(struct _ENEMY_WORK *self, void *p);
 void fn_80135584(struct _ENEMY_WORK* self, void* p);
-/* 0x801355C8 - r3 (`self`) and r4, the pointer it forwards to `fn_801354F4` unchanged; the C
+/* 0x801355C8 - r3 (`self`) and r4, the pointer it forwards to `em_move_offset_rot_apply` unchanged; the C
  * callers pass `&self->field_0x1bc`, so the owner's argument is a pointer, not the integer the
  * consumer used to spell. */
-void fn_801355C8(struct _ENEMY_WORK* self, void* p);
-/* 0x80135600 - r3 (`self`), the r4 pointer it forwards to `fn_801355C8`, and the f1 it holds for
+void em_move_offset_step(struct _ENEMY_WORK* self, void* p);
+/* 0x80135600 - r3 (`self`), the r4 pointer it forwards to `em_move_offset_step`, and the f1 it holds for
  * `UpdateValue`; `enemy/fn_8014A1BC.c` calls it with two and with three arguments, so C keeps the
  * old-style declaration and C++ gets the two-argument form the call site uses. */
 #ifdef __cplusplus
-void fn_80135600(struct _ENEMY_WORK* self, void* p);
+void em_move_offset_step_update(struct _ENEMY_WORK* self, void* p);
 #else
-u32 fn_80135600();
+u32 em_move_offset_step_update();
 #endif
-f32 fn_80135644(struct _ENEMY_WORK *self, void *tbl);
+f32 em_key_curve_eval(struct _ENEMY_WORK *self, void *tbl);
 f32 fn_801356A8(struct _ENEMY_WORK *self, f32 a, f32 b, f32 c);
 /* 0x80135748 - the part-mask probe: r3 (`self`) and r4, which it narrows to u16 (`clrlwi r4,r4,16`)
  * before ANDing it against the record's `flags_0x836`; the body's `neg`/`or`/`srwi 31` returns 1
  * when any masked bit is set, so the result is a u32 0/1 and every call site compares it with
- * `cmplwi`.  The old-style `s32 fn_80135748()` declaration could not carry the two arguments the
+ * `cmplwi`.  The old-style `s32 em_flags836_ck()` declaration could not carry the two arguments the
  * landed callers pass (`enemy/fn_8014A1BC.c` and `enemy/fn_801DB8E0.cpp` both call it
  * `(self, mask)`). */
-u32 fn_80135748(struct _ENEMY_WORK* self, u32 a);
+u32 em_flags836_ck(struct _ENEMY_WORK* self, u32 a);
 u32 fn_80135BC4(struct _ENEMY_WORK* work, s32 arg1);
 void fn_801363F8(struct _ENEMY_WORK* work);
 /* Declarations for the action band 0x80178378.. (`enemy/fn_80178378.cpp`): the arming helpers its 64
@@ -239,14 +239,14 @@ void fn_8012F5C4(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d);
 u32 fn_8012EC3C(struct _ENEMY_WORK* self);
 void fn_80130F74(struct _ENEMY_WORK* self);
 void fn_801376B4(struct _ENEMY_WORK* self);
-void fn_80135C5C(struct _ENEMY_WORK* self, u32 a, u32 b);
+void em_part_hit_set(struct _ENEMY_WORK* self, u32 a, u32 b);
 /* Declarations moved here from `enemy/fn_801679B0.cpp` (docs/plan.md 6.5 rule 2): enemy-band
  * symbols no registered unit owns.  Guarded for C++ because the C consumers carry their own
- * ABI-equivalent spellings of `fn_80134004` (`f32,u16` in `enemy/fn_80149D6C.c`, `u32,f32` in
+ * ABI-equivalent spellings of `em_approach_start` (`f32,u16` in `enemy/fn_80149D6C.c`, `u32,f32` in
  * `enemy/fn_8014A1BC.c`), which MWCC's C front-end treats as a conflicting redeclaration. */
 #ifdef __cplusplus
-void fn_80131D84(struct _ENEMY_WORK* self);
-void fn_80134004(struct _ENEMY_WORK* self, u32 a, f32 b);
+void em_frame_flag_set(struct _ENEMY_WORK* self);
+void em_approach_start(struct _ENEMY_WORK* self, f32 speed, u32 flags);
 void fn_80167404(struct _ENEMY_WORK* self);
 void fn_80167968(struct _ENEMY_WORK* self);
 void fn_801321C4(struct _ENEMY_WORK* self);
@@ -439,6 +439,10 @@ extern const f32 lbl_8079AF60;   /* the low word of the 0.0 double at 0x8079AF60
 /* The word the 0xC-byte action record's first field is set to (the shared vtable of that
  * record's class; the table itself is outside this unit's ranges - rule 10). */
 extern u32 lbl_805DFC00[];
+
+/* Two 0x40-byte `.rodata` effect tables `em_turn_seq_start`/`em_turn_seq_step` walk (no registered owner). */
+extern u8 lbl_80570740[];
+extern u8 lbl_80570780[];
 
 /* Added with `enemy/em_act_step.cpp`'s registration (rule 2): the `.sdata2` pool half
  * 0x8079B108..0x8079B210 that unit's 74 functions load their constants from, and the class vtable

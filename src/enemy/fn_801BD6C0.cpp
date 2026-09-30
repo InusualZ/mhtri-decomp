@@ -38,7 +38,7 @@
  * 116 rows of the range are a residual of the round (unwritten), not a claim.
  *
  * Residual - `fn_801BD838` 97.67 %.  Same 86 instructions and same 344 B; the only difference is the
- * order of the `li r4, 0` and `lfs f1, lbl_80798EA8@sda21` pair before the `fn_80134004(self, 0,
+ * order of the `li r4, 0` and `lfs f1, lbl_80798EA8@sda21` pair before the `em_approach_start(self, 0,
  * lbl_80798EA8)` call (retail loads f1 first, this build materialises the integer first).  Tried: a
  * `f32 scale = lbl_80798EA8;` local before the call (unchanged, 97.67 %).  The one other scheduling
  * difference the range first showed (`fn_801BD6C0`'s `li r4, 0x2D`) was closed by spelling the limit
@@ -144,7 +144,7 @@ extern "C" void fn_801BD6C0(_ENEMY_WORK* self, u8 arg1)
         if ((self->timer_0x020 & 0x1F) == 0) {
             u32 type;
 
-            fn_80136B50(self, -1, 5);
+            em_camera_req(self, -1, 5);
             get_joint_wpos_em(self, 3, &pos);
             if ((self->field_0x228 & 6) != 0) {
                 type = 0x54;
@@ -153,7 +153,7 @@ extern "C" void fn_801BD6C0(_ENEMY_WORK* self, u8 arg1)
                 type = 0x53;
                 pos.y = lbl_80798EA4 + self->field_0x20C;
             }
-            fn_801048B4(self, 3, type, 0, lbl_80798E58);
+            eft009_spawn_at_joint(self, 3, type, 0, lbl_80798E58);
             if (self->area_no == get_now_areano()) {
                 se_req_pos_ps(self->se_0xB14, 0x27, 2, &pos);
             }
@@ -186,8 +186,8 @@ extern "C" void fn_801BD838(_ENEMY_WORK* self)
         em_move_mode_set(self, 4);
         em_mot_set(self, 8, 0, 0);
         em_mot_speed_set(self, lbl_80798E90);
-        fn_8012933C(self, 0, 0x21, 2);
-        fn_80134004(self, 0, lbl_80798EA8);
+        em_hit_window_set(self, 0, 0x21, 2);
+        em_approach_start(self, lbl_80798EA8, 0);
         fn_801303EC(self, fn_8013032C(self));
         self->timer_0x020 = 0x14;
         break;
@@ -196,7 +196,7 @@ extern "C" void fn_801BD838(_ENEMY_WORK* self)
             get_joint_wpos_em(self, 3, &pos);
             shell_se_req(self->se_0xB14, &pos, 8, self->field_0x01A);
         }
-        if (self->state_0x006 == 0 && fn_80134114(self, 0, 0x40) == 1) {
+        if (self->state_0x006 == 0 && em_approach_step(self, 0, 0x40) == 1) {
             self->state_0x006 = 1;
         }
         if (--self->timer_0x020 <= 0 && self->state_0x006 == 1) {
@@ -218,8 +218,8 @@ extern "C" void fn_801BDA28(_ENEMY_WORK* self)
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x2F, 4, 0);
-        fn_80129668(self, 0, 1);
-        fn_80129668(self, 1, 2);
+        em_hit_window_set_default(self, 0, 1);
+        em_hit_window_set_default(self, 1, 2);
         break;
     case 1:
         if (em_mot_end_ck(self) == 1) {
@@ -237,8 +237,8 @@ extern "C" void fn_801BDEF8(_ENEMY_WORK* self)
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0xD1, 6, 0);
-        fn_80129668(self, 0, 6);
-        fn_80129668(self, 1, 0x18);
+        em_hit_window_set_default(self, 0, 6);
+        em_hit_window_set_default(self, 1, 0x18);
         break;
     case 1:
         if (em_mot_end_ck(self) == 1) {
@@ -256,7 +256,7 @@ extern "C" void fn_801BDF94(_ENEMY_WORK* self)
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0xD2, 6, 0);
-        fn_80129668(self, 0, 7);
+        em_hit_window_set_default(self, 0, 7);
         break;
     case 1:
         if (em_mot_end_ck(self) == 1) {
@@ -274,17 +274,17 @@ extern "C" void fn_801BE508(_ENEMY_WORK* self)
         self->state++;
         em_move_mode_set(self, 4);
         em_mot_set(self, 0xCE, 0, 0);
-        fn_80129668(self, 0, 0x16);
+        em_hit_window_set_default(self, 0, 0x16);
         fn_801303EC(self, fn_8013032C(self));
         fn_80130CDC(self, -0xA);
         em_busy_set(self);
-        fn_80131E74(self);
+        em_busy_timer_reset(self);
         fn_80136D14(self);
         fn_80131E00(self);
         break;
     case 1:
         em_busy_set(self);
-        fn_80131E74(self);
+        em_busy_timer_reset(self);
         if (em_frame_check(self, 2, lbl_80798E54, lbl_80798E40) == 1) {
             fn_80131E00(self);
         }
@@ -311,19 +311,19 @@ extern "C" void fn_801BE198(_ENEMY_WORK* self, u8 arg1)
         em_move_mode_set(self, 0);
         em_mot_set(self, 0xD4, 6, 0);
         fn_80130CDC(self, -6);
-        fn_8012933C(self, 0, 9, 8);
-        fn_8012933C(self, 1, 0x29, 0x18);
+        em_hit_window_set(self, 0, 9, 8);
+        em_hit_window_set(self, 1, 0x29, 0x18);
         break;
     case 1:
         if (em_frame_check(self, 0, lbl_80798ECC, lbl_80798E40) == 1) {
-            fn_8012933C(self, 0, 0xA, 0x10);
+            em_hit_window_set(self, 0, 0xA, 0x10);
         }
         if (arg1 == 1) {
             if (em_frame_check(self, 0, lbl_80798ED0, lbl_80798E40) == 1) {
                 self->state++;
                 em_mot_set(self, 0xD9, 0, 0);
-                fn_8012933C(self, 0, 0x1A, 8);
-                fn_8012933C(self, 1, 0x2A, 0x18);
+                em_hit_window_set(self, 0, 0x1A, 8);
+                em_hit_window_set(self, 1, 0x2A, 0x18);
                 return;
             }
         } else {
@@ -334,7 +334,7 @@ extern "C" void fn_801BE198(_ENEMY_WORK* self, u8 arg1)
         break;
     case 2:
         if (em_frame_check(self, 0, lbl_80798E7C, lbl_80798E40) == 1) {
-            fn_8012933C(self, 0, 0x1B, 0x10);
+            em_hit_window_set(self, 0, 0x1B, 0x10);
         }
         if (em_mot_end_ck(self) == 1) {
             em_action_finish(self);

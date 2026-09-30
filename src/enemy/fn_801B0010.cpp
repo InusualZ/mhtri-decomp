@@ -200,8 +200,8 @@ void* get_move_work_adrs(u8 index);
 u16 get_move_work_max(u8 index);
 
 /* The two `fn_8004CAD8.cpp` vector helpers this range calls now come from that unit's owner header
- * (`include/fn_8004CAD8.h`, rule 2): `fn_80050F80` measures the distance between two positions and
- * `fn_80050CA0` subtracts them.  Their signatures there were settled from the callees' own bodies. */
+ * (`include/fn_8004CAD8.h`, rule 2): `calcVecDistXZ` measures the distance between two positions and
+ * `subVec3` subtracts them.  Their signatures there were settled from the callees' own bodies. */
 
 /* The shared `.sdata2` pool constants this range loads (never defined here - redefining them would
  * rebuild the pool instead of addressing the target's, playbook 29). */
@@ -547,8 +547,8 @@ extern "C" u32 fn_801B0810(_ENEMY_WORK* work) {
  * motion helpers, then the record's em030 block is cleared and the "active" bit re-armed. */
 extern "C" void fn_801B08BC(_ENEMY_WORK* work, u8 kind) {
     if (kind == 2) {
-        fn_80130248(work);
-        fn_801305C4(work);
+        em_fall_height_get(work);
+        em_fall_start(work);
         fn_80128A8C(work, 0x0C, 0);
         fn_80133BC0(work);
     }
@@ -1089,7 +1089,7 @@ extern "C" void fn_801B16A4(_ENEMY_WORK* work, u32 kind, u32 flag) {
             if ((u8)kind == 3) {
                 em_mot_speed_set(work, lbl_80798B54);
             }
-            fn_80134004(work, 0, scale);
+            em_approach_start(work, scale, 0);
         }
         if ((u8)flag == 1) {
             work->timer_0x020 = 0x3C;
@@ -1098,7 +1098,7 @@ extern "C" void fn_801B16A4(_ENEMY_WORK* work, u32 kind, u32 flag) {
         }
         break;
     case 1:
-        if (fn_80134114(work, 0, 0x800) == 1 || --work->timer_0x020 <= 0) {
+        if (em_approach_step(work, 0, 0x800) == 1 || --work->timer_0x020 <= 0) {
             em_action_finish(work);
         }
         if (work->timer_0x020 > 0x0F) {
@@ -1124,12 +1124,12 @@ extern "C" void fn_801B1814(_ENEMY_WORK* work) {
         if (em_mot_end_ck(work) == 1) {
             work->state = work->state + 1;
             em_mot_set(work, 0x05, 4, 0);
-            fn_80134004(work, 0, lbl_80798B58);
+            em_approach_start(work, lbl_80798B58, 0);
             work->timer_0x020 = 0x12C;
         }
         break;
     case 2:
-        if (fn_80134114(work, 0, 0x100) == 1 || --work->timer_0x020 <= 0) {
+        if (em_approach_step(work, 0, 0x100) == 1 || --work->timer_0x020 <= 0) {
             work->state = work->state + 1;
             em_mot_set(work, 0x19, 4, 0);
         }
@@ -1155,11 +1155,11 @@ extern "C" void fn_801B1958(_ENEMY_WORK* work) {
         work->state = work->state + 1;
         em_move_mode_set(work, 0);
         em_mot_set(work, 0x06, 4, 0);
-        fn_80134004(work, 0, lbl_80798B4C);
+        em_approach_start(work, lbl_80798B4C, 0);
         work->timer_0x020 = 0x12C;
         break;
     case 1:
-        if (fn_80134114(work, 0, 0x800) == 1 || --work->timer_0x020 <= 0) {
+        if (em_approach_step(work, 0, 0x800) == 1 || --work->timer_0x020 <= 0) {
             work->state = work->state + 1;
             em_mot_set(work, 0x19, 4, 0);
         }
@@ -1201,21 +1201,21 @@ extern "C" void fn_801B1A40(_ENEMY_WORK* work) {
     }
 }
 
-/* 0x801B1B30 (0xA0).  The motion-0x04 recovery: the float-armed `fn_80130008` check, then the
+/* 0x801B1B30 (0xA0).  The motion-0x04 recovery: the float-armed `em_ground_ck` check, then the
  * position latch and the three teardown helpers. */
 extern "C" void fn_801B1B30(_ENEMY_WORK* work) {
     switch (work->state) {
     case 0:
         work->state = work->state + 1;
-        fn_80130248(work);
-        fn_801305C4(work);
+        em_fall_height_get(work);
+        em_fall_start(work);
         em_mot_set(work, 0x04, 4, 0);
         break;
     case 1:
-        if (fn_80130008(work) != 0) {
+        if (em_ground_ck(work) != 0) {
             work->pos.y = work->field_0x20C;
             em_move_mode_set(work, 0);
-            fn_801353F8(work);
+            em_move_vec2_clr(work);
             em_action_finish(work);
         }
         break;
@@ -1234,7 +1234,7 @@ extern "C" void fn_801B1BD0(_ENEMY_WORK* work) {
         break;
     case 1:
         fn_80132154(work);
-        if (fn_80133C50(work, 0x400) == 1) {
+        if (em_turn_to_target(work, 0x400) == 1) {
             em_action_finish(work);
         }
         break;
@@ -1248,10 +1248,10 @@ extern "C" void fn_801B1C60(_ENEMY_WORK* work) {
         work->state = work->state + 1;
         em_move_mode_set(work, 0);
         em_mot_set(work, 0x22, 6, 0);
-        fn_80134004(work, 0, lbl_80798B48);
+        em_approach_start(work, lbl_80798B48, 0);
         break;
     case 1:
-        if (fn_80134114(work, 0, 0x80) == 1) {
+        if (em_approach_step(work, 0, 0x80) == 1) {
             em_action_finish(work);
         }
         break;
@@ -1278,7 +1278,7 @@ extern "C" void fn_801B1CF4(_ENEMY_WORK* work, u32 kind) {
         break;
     case 1:
         {
-            f32 v = fn_80050F80(&work->vec_0x36C, &work->pos) - lbl_80798B5C;
+            f32 v = calcVecDistXZ(&work->vec_0x36C, &work->pos) - lbl_80798B5C;
             s32 step;
 
             if (v < lbl_80798B48) {
@@ -1288,7 +1288,7 @@ extern "C" void fn_801B1CF4(_ENEMY_WORK* work, u32 kind) {
             if (step < 0) {
                 step = 0;
             }
-            fn_80050CA0(&diff, &work->vec_0x36C, &work->pos);
+            subVec3(&diff, &work->vec_0x36C, &work->pos);
             copyVec3(&vec, &diff);
             calcVecAngXY(&vec, &angA, &angB);
             if ((u8)kind == 1) {
@@ -1380,11 +1380,11 @@ extern "C" void fn_801B1F04(_ENEMY_WORK* work) {
  * helper, and the +0x310 angle triple the kind arms before `rotVecY` turns it by the record's
  * second angle. */
 extern "C" void fn_801B1F94(_ENEMY_WORK* work, u32 kind) {
-    fn_80130248(work);
-    fn_801305C4(work);
+    em_fall_height_get(work);
+    em_fall_start(work);
     em_mot_set(work, 0x0E, 0, 0);
-    fn_80129668(work, 0, 1);
-    fn_801353F8(work);
+    em_hit_window_set_default(work, 0, 1);
+    em_move_vec2_clr(work);
     work->offset_0x30C.vec_0x310.y = lbl_80798B60;
     if ((u8)kind == 1) {
         work->offset_0x30C.vec_0x310.z = lbl_80798B64;
@@ -1431,11 +1431,11 @@ extern "C" void fn_801B203C(_ENEMY_WORK* work, u32 kind) {
             if (fn_801B0230(work, work->plw_0xA34) == 1) {
                 fn_8013072C(work, 1, 0);
             }
-            fn_80129724(work, 0);
+            em_hit_window_clear(work, 0);
             work->state_0x006 = 1;
         }
         if (em_mot_end_ck(work) == 1) {
-            fn_80130248(work);
+            em_fall_height_get(work);
             if (UpdateValue(work) != 0) {
                 u16 motion;
 
@@ -1484,14 +1484,14 @@ extern "C" void fn_801B2298(_ENEMY_WORK* work, u32 kind) {
         work->state_0x006 = 0;
         em_move_mode_set(work, 0);
         em_mot_set(work, 0x06, 4, 0);
-        fn_8012933C(work, 0, 2, 3);
+        em_hit_window_set(work, 0, 2, 3);
         if ((u8)kind == 1) {
             work->timer_0x020 = 0x78;
             em_mot_speed_set(work, lbl_80798B70);
         } else {
             work->timer_0x020 = 0x3C;
         }
-        fn_80050CA0(&diff, &work->vec_0x36C, &work->pos);
+        subVec3(&diff, &work->vec_0x36C, &work->pos);
         copyVec3(&vec, &diff);
         calcVecAngXY(&vec, &angA, &angB);
         work->field_0x37C = angB;
@@ -1500,17 +1500,17 @@ extern "C" void fn_801B2298(_ENEMY_WORK* work, u32 kind) {
         if (work->field_0xA16 != 0xFF && work->field_0xA38 == 0) {
             work->state = work->state + 1;
             work->state_0x006 = 1;
-            fn_80129724(work, 0);
+            em_hit_window_clear(work, 0);
             em_mot_set(work, 0x19, 4, 0);
             break;
         }
         work->timer_0x020--;
         if (work->timer_0x020 <= 0) {
             work->state = work->state + 1;
-            fn_80129724(work, 0);
+            em_hit_window_clear(work, 0);
             em_mot_set(work, 0x19, 4, 0);
         } else if ((u8)kind == 1) {
-            fn_80133C50(work, 0x800);
+            em_turn_to_target(work, 0x800);
         } else {
             work->field_0x1C0 = fn_80133DB0((u16)work->field_0x37C, (u16)work->field_0x1C0, 0x800);
         }

@@ -126,9 +126,9 @@ void player_init_data_load(void);
 
 extern "C" {
 /* `arena_userdata_apply` (0x8004A240) is `fn_80047398.cpp`'s and now comes from its owner header. */
-f32 fn_80050CA0(void* dst, void* a, void* b);
+f32 subVec3(void* dst, void* a, void* b);
 f32 fn_80050EF4(void* a, void* b);
-void fn_80051378(void* dst, void* a, void* b);
+void addVec3(void* dst, void* a, void* b);
 void fn_80051EE0(void* dst, void* a, f32 scale);
 void fn_800553B4(u8 idx);
 void fn_800D8E44(void* handle);
@@ -502,7 +502,7 @@ void fn_8028F44C(PlBox* a, PlBox* b) {
 
     copyVec3(&b->vec_0x00, &a->vec_0x00);
     copyVec3(&b->vec_0x0C, &a->vec_0x0C);
-    fn_80050CA0(cross, &a->vec_0x0C, &a->vec_0x00);
+    subVec3(cross, &a->vec_0x0C, &a->vec_0x00);
     copyVec3(&b->vec_0x18, (const nw4r::math::VEC3*)cross);
 }
 

@@ -215,12 +215,12 @@ extern SystemWork system_w;
 
 /* The unowned C helpers `enemy/fn_801A4504.cpp` calls: addresses whose bracketing registered units
  * name different modules (0x802B/0x803), so no `<module>.h` is sound - the rule 2 named gap.  The
- * signatures are the call sites' (r3 the work record; `fn_80304510`'s fifth argument is the s32
+ * signatures are the call sites' (r3 the work record; `eft_em_spawn_param`'s fifth argument is the s32
  * `0`/0xF4A0/0xB61 the target materialises; `fn_803B50A8` returns the r3 word compared against 1). */
 /* `fn_802BE638` (0x802BE638) is in `camera/fn_802B5C58.cpp`'s range 0x802B5C58-0x802BEAAC, so the
  * owner's header declares it and this one includes it (rule 2). */
-void fn_80304510(struct _ENEMY_WORK* self, u32 a, u32 b, void* v, s32 d, f32 s);
-void fn_80306A98(struct _ENEMY_WORK* self, u32 a);
+void eft_em_spawn_param(struct _ENEMY_WORK* self, u32 a, u32 b, void* v, f32 s, s32 d);
+void eft_spawn_type_at_area(struct _ENEMY_WORK* self, u32 a);
 /* `enemy_data_find`/`enemy_data_grp` (0x803438E4 / 0x803439D4) are declared in their owner's
  * header, `include/ef/eft_slot.h`, since `ef/eft_slot.cpp` registered the band that defines them -
  * a declaration here of a symbol a registered unit owns is rule 2's finding.  Their consumers

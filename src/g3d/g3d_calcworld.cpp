@@ -179,7 +179,7 @@ u32 fn_80073E80(u32 value, u32 low);
 u32 fn_80073E8C(void* pSelf);
 void fn_80073F00(NodeCallback* pSelf, u32 id, s32* pMtx, s32* pMtxID);
 void fn_80073F64(void);
-nw4r::math::VEC3* fn_80073F68(nw4r::math::VEC3* pOut, const nw4r::math::VEC3* pIn);
+nw4r::math::VEC3* addVec3To(nw4r::math::VEC3* pOut, const nw4r::math::VEC3* pIn);
 void fn_80073FA0(NodeMtxRec* pDst, const NodeMtxRec* pSrc);
 s32 fn_8007403C(u32 flags);
 s32 fn_80074050(const void* p);
@@ -310,7 +310,7 @@ void fn_800737CC(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx, R
                     rec.mUnk00 |= 0x200;
                     fn_80098D5C(&s1C, &rec);
                     fn_8008E1C0(&rec, &vB);
-                    fn_80073F68(&vB, &vA);
+                    addVec3To(&vB, &vA);
                     fn_8008F148(&rec, &vB);
                 }
                 if (pNodeCallback2 != NULL) {
@@ -443,7 +443,7 @@ void fn_80073F00(NodeCallback* pSelf, u32 id, s32* pMtx, s32* pMtxID) {
 void fn_80073F64(void) {
 }
 
-nw4r::math::VEC3* fn_80073F68(nw4r::math::VEC3* pOut, const nw4r::math::VEC3* pIn) {
+nw4r::math::VEC3* addVec3To(nw4r::math::VEC3* pOut, const nw4r::math::VEC3* pIn) {
     fn_800513CC(pOut, pIn);
     return pOut;
 }

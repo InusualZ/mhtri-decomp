@@ -8,21 +8,21 @@
  *
  *   * `fn_80147CE0(self, arg)` is the per-tick entry of one action (the same opening as
  *     `enemy/fn_80176C58.cpp`'s `fn_80176C58`): it attaches the 12-byte vtable helper through
- *     `fn_801390FC` when `fn_801391E8` reports none, advances the effect timer for the `2` step and
+ *     `em_res_user_data_set` when `em_res_user_data_ck` reports none, advances the effect timer for the `2` step and
  *     spawns the 0x1C72 effect (`fn_801057A4`).
  *   * the long state-machine family - `fn_80148248`, `fn_801482D0`, `fn_8014834C`, `fn_801483C8`,
  *     `fn_80148448`, `fn_80148528`, `fn_801486A4`, `fn_80148720`, `fn_8014879C`, `fn_80148828`,
  *     `fn_80148BD0`, `fn_80148E6C`, `fn_80148F88`, `fn_801492B8`, `fn_801498C8`, `fn_80149A08`,
  *     `fn_80149AFC`, `fn_80149C58` - each opens with `switch (self->state)` (+0x05), state 0 arming the
  *     action (`em_move_mode_set` + a motion setter + `field_0x020` timer) and state 1 waiting for the motion
- *     to end (`em_mot_end_ck`) before closing it (`em_action_finish`/`fn_80127FE4`/`fn_801280AC`).
+ *     to end (`em_mot_end_ck`) before closing it (`em_action_finish`/`em_action_finish_fall`/`em_action_finish_walk`).
  *   * three sub-state dispatchers keyed on `_ENEMY_WORK::state_sub` (+0x1E6) - `fn_801484D4`,
  *     `fn_80149004`, `fn_80149814` (11- and 14-entry jump tables) - and `fn_80147F48`, the 14-way
  *     dispatch on the action argument with its own `jumptable_805A20E0`.
  *   * the frame helpers `fn_80147E68` (the action-cancel/transition step), `fn_801481D8` (the 50-frame
  *     counter), `fn_801481FC` and `fn_80147F00` (the motion-selection tail).
  *   * the second action's own step family - `fn_80149068`, `fn_80149170`, `fn_80149214`, `fn_801492B8`,
- *     `fn_801493A8` (the six-state spawn body with the shell callback), `fn_80149788` (the spawn
+ *     `fn_801493A8` (the six-state spawn body with the shell callback), `em_spawn_rec_init` (the spawn
  *     record's position reset), `fn_801497BC` and the joint/effect helpers `fn_801498C8`,
  *     `fn_80149A08`, `fn_80149AFC`, `fn_80149C54`, `fn_80149C58`.
  *
@@ -48,12 +48,12 @@
  *   * `proposal/801411B8` carries the only `__FILE__` evidence in the run - `enemy_control.cpp`,
  *     referenced from 0x801411DC/0x80141258 - and this piece's code references no source name at all,
  *     which is what a continuation of that file looks like;
- *   * the two `.data` tables this range's constructors install (`lbl_805A1368` for `fn_80147E2C`,
+ *   * the two `.data` tables this range's constructors install (`lbl_805A1368` for `em_res_user_data_ctor`,
  *     `lbl_805A4478` for `fn_80147DF0`, both 0x30 B) are vtables whose entries point at
  *     0x8013918C/0x801394D4/0x80139858/... - virtual functions of the range BELOW - so the classes
  *     this unit constructs are declared there;
  *   * the `.sdata2` pool runs continuously across the cut (0x80796DC8..0x80796EE0), and
- *     `enemy/fn_80176C58.cpp` (a landed unit 0x2A000 B above) calls this unit's `fn_80147E2C` as the
+ *     `enemy/fn_80176C58.cpp` (a landed unit 0x2A000 B above) calls this unit's `em_res_user_data_ctor` as the
  *     base constructor of its own 12-byte helper.
  * The registration stays separate because that is what this worker was briefed to register; the merge
  * into one `enemy/enemy_control.cpp` is the orchestrator's re-split decision and is requested in the
@@ -86,24 +86,24 @@
  * --measure <symbol>`, against the split's own single-symbol objects).  28 of the 36 bodies are
  * byte-identical (100.00 %); every function is above the 80 % bar; our `.text` is 0x2064 B against the
  * target's 0x208C B.  By size:
- *   * 100.00: fn_80147DF0, fn_80147E2C, fn_80147F00, fn_801481D8, fn_801481FC, fn_80148248,
+ *   * 100.00: fn_80147DF0, em_res_user_data_ctor, fn_80147F00, fn_801481D8, fn_801481FC, fn_80148248,
  *     fn_801482D0, fn_8014834C, fn_801483C8, fn_80148448, fn_801484D4, fn_80148528, fn_801486A4,
  *     fn_80148720, fn_8014879C, fn_80148BD0, fn_80148E6C, fn_80148F88, fn_80149004, fn_80149170,
- *     fn_80149214, fn_80149788, fn_801497BC, fn_80149814, fn_801498C8, fn_80149A08, fn_80149AFC,
+ *     fn_80149214, em_spawn_rec_init, fn_801497BC, fn_80149814, fn_801498C8, fn_80149A08, fn_80149AFC,
  *     fn_80149C54.
  *   * fn_80149C58 99.86, fn_80147E68 98.42, fn_80148828 96.40, fn_801493A8 93.99, fn_80147CE0 92.43,
  *     fn_80149068 90.91, fn_801492B8 90.00, fn_80147F48 89.34.
  *
  * Residuals, by measurement (each is a codegen shape, not comprehension):
  *   * ARGUMENT EVALUATION ORDER (fn_80147CE0 92.43, fn_80149068 90.91, fn_801492B8 90.00).  The
- *     target evaluates the FLOAT argument of `fn_8012FCC4(self, 0, 0.0f)` / `fn_80134004(self, 0, x)`
+ *     target evaluates the FLOAT argument of `fn_8012FCC4(self, 0, 0.0f)` / `em_approach_start(self, 0, x)`
  *     BEFORE the integer one (`lfs f1,pool` then `li r4,imm`); MWCC evaluates arguments in
  *     declaration order, so that order is what a declaration of `(self, f32, s32)` produces.
  *     Measured directly: with the band header's `(self, s32, f32)` the same call site emits
  *     `li r4,imm` then `lfs f1,pool` (both orders reproduce the same ABI - one FPR and one GPR slot -
  *     so this is a declaration-order artefact of the original TU, not a wrong call).  Fixing it means
  *     flipping the parameter order in `include/unsplit/enemy.h`'s C++ view of `fn_8012FCC4`/
- *     `fn_80134004` AND the call sites in `src/enemy/fn_801550FC.cpp` (another unit's file), so it is
+ *     `em_approach_start` AND the call sites in `src/enemy/fn_801550FC.cpp` (another unit's file), so it is
  *     recorded rather than done here.
  *   * MASKED-VALUE CSE (fn_80147CE0 92.43).  `(arg & 0xFF)` used twice CSEs into one register
  *     (`clrlwi r31,r31,24` reused) where the target re-masks into a fresh scratch each time
@@ -149,12 +149,12 @@
  * Declarations.  Rule 2 sent every callee to the header that owns it: this unit's own entry points are
  * published in `include/enemy/fn_80147CE0.h` (moved out of `include/unsplit/enemy.h`, whose old-style
  * spellings the C consumers keep), and `fn_80154CA4`/`fn_801545B8` (enemy band, unowned) went the
- * other way into `include/unsplit/enemy.h`.  The band header's `fn_80128A8C`, `fn_8012933C`,
- * `fn_80127FE4`, `fn_801280AC` and `fn_80128BF8` moved to their owner's header
- * (`include/enemy/fn_801251D0.h`), and `fn_80056A54`'s owner (`src/draw_shape.cpp`) got its first
+ * other way into `include/unsplit/enemy.h`.  The band header's `fn_80128A8C`, `em_hit_window_set`,
+ * `em_action_finish_fall`, `em_action_finish_walk` and `em_target_pos_set` moved to their owner's header
+ * (`include/enemy/fn_801251D0.h`), and `draw_shape_arm`'s owner (`src/draw_shape.cpp`) got its first
  * header (`include/draw_shape.h`).  `include/fn_8004CAD8.h` gained `calcVecAng2` (C++ linkage, the
  * mangling the map names) and `include/ef/eft007.h`/`eft009.h` gained the C++ views of
- * `fn_801039B0`/`fn_801049D0` (one view per TU - declaring both spellings is `(10197) illegal
+ * `eft007_part_spawn`/`fn_801049D0` (one view per TU - declaring both spellings is `(10197) illegal
  * function overloading`, measured).
  *
  * Inventory, addresses and sizes: `python tools/units/ledger.py unit enemy/fn_80147CE0.cpp`.
@@ -187,7 +187,7 @@
 
 /* The helper `fn_80147CE0` allocates and `fn_80147DF0` constructs: a 12-byte record whose +0x00 word
  * is the address of a `.data` function/parameter table.  Same record as `enemy/fn_80176C58.cpp`'s
- * private `Helper_80176E50` (that unit's constructor `fn_80176E50` calls this unit's `fn_80147E2C`,
+ * private `Helper_80176E50` (that unit's constructor `fn_80176E50` calls this unit's `em_res_user_data_ctor`,
  * and the allocation is the same `operator new(0xC)`); the shared home for both is a rule-1 follow-up.
  * size: 0xC (traced from the `operator new(0xC)` call in `fn_80147CE0`). */
 typedef struct Helper_80147CE0 {
@@ -196,7 +196,7 @@ typedef struct Helper_80147CE0 {
     /* +0x8 */ u32 unused_0x8;
 } Helper_80147CE0;
 
-/* The two `.data` tables the constructors install (`lbl_805A1368` is the base `fn_80147E2C` sets,
+/* The two `.data` tables the constructors install (`lbl_805A1368` is the base `em_res_user_data_ctor` sets,
  * `lbl_805A4478` the derived one `fn_80147DF0` overrides it with; both are 0x30 B). */
 extern "C" u8 lbl_805A1368[];
 extern "C" u8 lbl_805A4478[];
@@ -208,7 +208,7 @@ extern "C" u8 lbl_805A4478[];
  * ------------------------------------------------------------------------------------------------ */
 
 /* 0x80304508 - between `ai/fn_802D0DCC.c` and `ef/fn_803066F0.c`: `(self, u32, u32, void*, f32)`. */
-extern "C" void fn_80304508(_ENEMY_WORK* self, u32 a, u32 b, void* v, f32 s);
+extern "C" void eft_em_spawn(_ENEMY_WORK* self, u32 a, u32 b, void* v, f32 s);
 /* 0x802B9574 - between `stage/fn_802B2978.c` and `ai/fn_802D0DCC.c`: one byte argument. */
 extern "C" void fn_802B9574(u32 a);
 /* 0x803B9BA0 - between `hud/fn_80324F7C.c` and `Network/NetworkWiiMediator.c`: `(self, void*, s32)`. */
@@ -273,7 +273,7 @@ extern f32 lbl_80796EDC; /* 0.04 */
 /* the two 0x40-byte `.rodata` tables the joint-lookup family indexes */
 extern "C" u8 lbl_8056F8E0[];
 extern "C" u8 lbl_8056F920[];
-/* the two `.data` tables `fn_80135644`/`fn_801354F4` read */
+/* the two `.data` tables `em_key_curve_eval`/`em_move_offset_rot_apply` read */
 extern "C" u8 lbl_805A1DA0[];
 extern "C" u8 lbl_805A1F70[];
 /* ------------------------------------------------------------------------------------------------ *
@@ -296,20 +296,20 @@ extern "C" void fn_80147CE0(_ENEMY_WORK* self, s32 arg) {
     VEC3_ctor(&v);
     if ((arg & 0xFF) == 2) {
         self->pos.y += lbl_80796E18;
-        fn_80130248(self);
-        fn_801305C4(self);
+        em_fall_height_get(self);
+        em_fall_start(self);
         fn_80128A8C(self, 0, 3);
     }
     if ((arg & 0xFF) != 0) {
         fn_8012FCC4(self, 0, lbl_80796E1C);
         fn_8012FCC4(self, 10, lbl_80796E20);
     }
-    if (fn_801391E8(self) == 0) {
+    if (em_res_user_data_ck(self) == 0) {
         helper = (Helper_80147CE0*)operator new(0xC);
         if (helper != 0) {
             fn_80147DF0(helper);
         }
-        fn_801390FC(self, helper);
+        em_res_user_data_set(self, helper);
     }
     if (self->field_0x009 == 0) {
         setVector3(&v, lbl_80796E1C, lbl_80796E24, lbl_80796E28);
@@ -319,7 +319,7 @@ extern "C" void fn_80147CE0(_ENEMY_WORK* self, s32 arg) {
 
 /* The derived helper's constructor: run the base and override the table with its own. */
 extern "C" Helper_80147CE0* fn_80147DF0(Helper_80147CE0* self) {
-    fn_80147E2C(self);
+    em_res_user_data_ctor(self);
     self->tbl = lbl_805A4478;
     return self;
 }
@@ -327,7 +327,7 @@ extern "C" Helper_80147CE0* fn_80147DF0(Helper_80147CE0* self) {
 /* The helper's base constructor (the engine's own joint-table install, then the base table).  The
  * signature is the one `include/unsplit/enemy.h` publishes for the consumer
  * `enemy/fn_80176C58.cpp`; the body's trailing `mr r3,r31` is the target's `return self`. */
-extern "C" void* fn_80147E2C(void* self) {
+extern "C" void* em_res_user_data_ctor(void* self) {
     Helper_80147CE0* helper = (Helper_80147CE0*)self;
 
     fn_800E3B2C((MHchar*)self);
@@ -449,7 +449,7 @@ extern "C" void fn_80147F48(_ENEMY_WORK* self, u32 arg, u32 sub) {
           case 202:
             fn_80147F00(self, 0);
             fn_80147F00(self, 1);
-            fn_80135C5C(self, 0, 0);
+            em_part_hit_set(self, 0, 0);
             break;
           case 26:
           case 27:
@@ -479,8 +479,8 @@ extern "C" void fn_801481D8(_ENEMY_WORK* self) {
 
 /* The action's opening step. */
 extern "C" void fn_801481FC(_ENEMY_WORK* self) {
-    fn_80130248(self);
-    fn_801305C4(self);
+    em_fall_height_get(self);
+    em_fall_start(self);
     fn_80128AAC(self, 3, 11);
     fn_80133BB4(self);
 }
@@ -537,24 +537,24 @@ extern "C" void fn_8014834C(_ENEMY_WORK* self) {
 }
 
 /* The same two-step shape with the motion `em_mot_set_ck(self, 26, 6, 0)` and the second action-end tail
- * (`fn_80127FE4`). */
+ * (`em_action_finish_fall`). */
 extern "C" void fn_801483C8(_ENEMY_WORK* self) {
     switch (self->state) {
       case 0:
         self->state++;
-        fn_80130248(self);
-        fn_801305C4(self);
+        em_fall_height_get(self);
+        em_fall_start(self);
         em_mot_set_ck(self, 26, 6, 0);
         break;
       case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_80127FE4(self);
+            em_action_finish_fall(self);
         }
         break;
     }
 }
 
-/* The same shape with `fn_80154CA4`'s clamp on both steps and `fn_801280AC` as the end tail. */
+/* The same shape with `fn_80154CA4`'s clamp on both steps and `em_action_finish_walk` as the end tail. */
 extern "C" void fn_80148448(_ENEMY_WORK* self) {
     switch (self->state) {
       case 0:
@@ -566,7 +566,7 @@ extern "C" void fn_80148448(_ENEMY_WORK* self) {
       case 1:
         fn_80154CA4(self);
         if (em_mot_end_ck(self) == 1) {
-            fn_801280AC(self);
+            em_action_finish_walk(self);
         }
         break;
     }
@@ -609,21 +609,21 @@ extern "C" void fn_80148528(_ENEMY_WORK* self) {
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set(self, 5, 10, 0);
-        fn_80129668(self, 0, 19);
+        em_hit_window_set_default(self, 0, 19);
         self->timer_0x020 = 0;
         break;
       case 1:
         if (em_frame_check(self, 0, lbl_80796E34, lbl_80796E1C) == 1) {
-            fn_8012933C(self, 1, 8, 5);
-            fn_80056A54((u32)self, 27, 10);
+            em_hit_window_set(self, 1, 8, 5);
+            draw_shape_arm((u32)self, 27, 10);
         }
         setVector3(&v, lbl_80796E1C, lbl_80796E38, lbl_80796E3C);
         if (em_frame_check(self, 0, lbl_80796E34, lbl_80796E1C) == 1) {
-            fn_80304508(self, 0, 26, &v, lbl_80796E20);
+            eft_em_spawn(self, 0, 26, &v, lbl_80796E20);
         }
         if (em_frame_check(self, 3, lbl_80796E40, lbl_80796E44) == 1) {
             if ((self->timer_0x020 & 7) == 0) {
-                fn_80304508(self, 1, 26, &v, lbl_80796E20);
+                eft_em_spawn(self, 1, 26, &v, lbl_80796E20);
             }
             self->timer_0x020++;
         }
@@ -666,13 +666,13 @@ extern "C" void fn_80148720(_ENEMY_WORK* self) {
     }
 }
 
-/* The same shape with the five-argument motion setter `fn_8012F504(self, 2, 50, 0, 1)`. */
+/* The same shape with the five-argument motion setter `em_mot_set_blend(self, 2, 50, 0, 1)`. */
 extern "C" void fn_8014879C(_ENEMY_WORK* self) {
     switch (self->state) {
       case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        fn_8012F504(self, 2, 50, 0, 1);
+        em_mot_set_blend(self, 2, 50, 0, 1);
         break;
       case 1:
         if (em_frame_check(self, 1, lbl_80796E48, lbl_80796E1C) == 1) {
@@ -684,7 +684,7 @@ extern "C" void fn_8014879C(_ENEMY_WORK* self) {
 
 /* The action's long body: `em_busy_set` on the opening call, a 300-frame timer armed with
  * `em_mot_set(self, 19, 6, 0)`, then (on `arg == 1`) six `em_frame_check` windows whose hits spawn the
- * two effects through `fn_80304508`/`fn_801049D0`; when the timer runs out the action is released
+ * two effects through `eft_em_spawn`/`fn_801049D0`; when the timer runs out the action is released
  * through `em_state_set(self, 1, 8)` (or 5 on the other argument). */
 extern "C" void fn_80148828(_ENEMY_WORK* self, u32 arg) {
     VEC3 v;
@@ -705,7 +705,7 @@ extern "C" void fn_80148828(_ENEMY_WORK* self, u32 arg) {
             if (em_frame_check(self, 0, lbl_80796E4C, lbl_80796E1C) == 1 ||
                 em_frame_check(self, 0, lbl_80796E50, lbl_80796E1C) == 1) {
                 setVector3(&v, lbl_80796E1C, lbl_80796E54, lbl_80796E58);
-                fn_80304508(self, 51, 26, &v, lbl_80796E20);
+                eft_em_spawn(self, 51, 26, &v, lbl_80796E20);
             }
             if (em_frame_check(self, 0, lbl_80796E5C, lbl_80796E1C) == 1) {
                 setVector3(&v, lbl_80796E1C, lbl_80796E1C, lbl_80796E60);
@@ -715,14 +715,14 @@ extern "C" void fn_80148828(_ENEMY_WORK* self, u32 arg) {
                 em_frame_check(self, 3, lbl_80796E70, lbl_80796E74) == 1) {
                 if ((system_w.field_0x0c & 3) == 0) {
                     setVector3(&v, lbl_80796E1C, lbl_80796E54, lbl_80796E58);
-                    fn_80304508(self, 52, 26, &v, lbl_80796E20);
+                    eft_em_spawn(self, 52, 26, &v, lbl_80796E20);
                 }
             }
             if (em_frame_check(self, 0, lbl_80796E78, lbl_80796E1C) == 1 ||
                 em_frame_check(self, 0, lbl_80796E7C, lbl_80796E1C) == 1 ||
                 em_frame_check(self, 0, lbl_80796E80, lbl_80796E1C) == 1) {
                 setVector3(&v, lbl_80796E1C, lbl_80796E54, lbl_80796E58);
-                fn_80304508(self, 51, 26, &v, lbl_80796E84);
+                eft_em_spawn(self, 51, 26, &v, lbl_80796E84);
             }
             if (em_frame_check(self, 0, lbl_80796E50, lbl_80796E1C) == 1) {
                 setVector3(&v, lbl_80796E1C, lbl_80796E1C, lbl_80796E60);
@@ -732,12 +732,12 @@ extern "C" void fn_80148828(_ENEMY_WORK* self, u32 arg) {
                 em_frame_check(self, 3, lbl_80796E90, lbl_80796E94) == 1) {
                 if ((system_w.field_0x0c & 3) == 0) {
                     setVector3(&v, lbl_80796E1C, lbl_80796E54, lbl_80796E58);
-                    fn_80304508(self, 52, 26, &v, lbl_80796E98);
+                    eft_em_spawn(self, 52, 26, &v, lbl_80796E98);
                 }
             }
             if (em_frame_check(self, 0, lbl_80796E9C, lbl_80796E1C) == 1) {
                 setVector3(&v, lbl_80796E1C, lbl_80796E54, lbl_80796E58);
-                fn_80304508(self, 51, 26, &v, lbl_80796E2C);
+                eft_em_spawn(self, 51, 26, &v, lbl_80796E2C);
             }
         }
         if (--self->timer_0x020 <= 0) {
@@ -768,30 +768,30 @@ extern "C" void fn_80148BD0(_ENEMY_WORK* self, u32 arg) {
         if ((arg & 0xFF) == 1) {
             if (em_frame_check(self, 0, lbl_80796EA0, lbl_80796E1C) == 1) {
                 setVector3(&v, lbl_80796E1C, lbl_80796E54, lbl_80796E58);
-                fn_80304508(self, 51, 26, &v, lbl_80796E98);
+                eft_em_spawn(self, 51, 26, &v, lbl_80796E98);
             }
             if (em_frame_check(self, 3, lbl_80796EA4, lbl_80796EA8) == 1 &&
                 (system_w.field_0x0c & 3) == 0) {
                 setVector3(&v, lbl_80796E1C, lbl_80796E54, lbl_80796E58);
-                fn_80304508(self, 52, 26, &v, lbl_80796E20);
+                eft_em_spawn(self, 52, 26, &v, lbl_80796E20);
             }
             if (em_frame_check(self, 0, lbl_80796EAC, lbl_80796E1C) == 1) {
                 setVector3(&v, lbl_80796E1C, lbl_80796E54, lbl_80796E58);
-                fn_80304508(self, 51, 26, &v, lbl_80796EB0);
+                eft_em_spawn(self, 51, 26, &v, lbl_80796EB0);
             }
             if (em_frame_check(self, 3, lbl_80796E60, lbl_80796EB4) == 1 &&
                 (system_w.field_0x0c & 3) == 0) {
                 setVector3(&v, lbl_80796E1C, lbl_80796E54, lbl_80796E58);
-                fn_80304508(self, 52, 26, &v, lbl_80796E20);
+                eft_em_spawn(self, 52, 26, &v, lbl_80796E20);
             }
             if (em_frame_check(self, 0, lbl_80796EB8, lbl_80796E1C) == 1) {
                 setVector3(&v, lbl_80796E1C, lbl_80796E54, lbl_80796E58);
-                fn_80304508(self, 51, 26, &v, lbl_80796E20);
+                eft_em_spawn(self, 51, 26, &v, lbl_80796E20);
             }
             if (em_frame_check(self, 3, lbl_80796EBC, lbl_80796E40) == 1 &&
                 (system_w.field_0x0c & 3) == 0) {
                 setVector3(&v, lbl_80796E1C, lbl_80796E54, lbl_80796E58);
-                fn_80304508(self, 52, 26, &v, lbl_80796E20);
+                eft_em_spawn(self, 52, 26, &v, lbl_80796E20);
             }
         }
         if (em_mot_end_ck(self) == 1) {
@@ -890,7 +890,7 @@ extern "C" void fn_80149004(_ENEMY_WORK* self) {
     }
 }
 
-/* The third action's body: `em_busy_set` on the opening call, `fn_80134004`'s rotation seed picked by
+/* The third action's body: `em_busy_set` on the opening call, `em_approach_start`'s rotation seed picked by
  * the argument (the `-500` default, `0` for 1, and `0` clamped to 700 for 2), the motion
  * `em_mot_set(self, 6, 6, 0)`, then the 64-frame release test. */
 extern "C" void fn_80149068(_ENEMY_WORK* self, s32 arg1, u32 arg2) {
@@ -903,13 +903,13 @@ extern "C" void fn_80149068(_ENEMY_WORK* self, s32 arg1, u32 arg2) {
         em_move_mode_set(self, 0);
         switch (arg1 & 0xFF) {
           default:
-            fn_80134004(self, 0, lbl_80796EC0);
+            em_approach_start(self, lbl_80796EC0, 0);
             break;
           case 1:
-            fn_80134004(self, 0, lbl_80796E1C);
+            em_approach_start(self, lbl_80796E1C, 0);
             break;
           case 2:
-            fn_80134004(self, 0, lbl_80796E1C);
+            em_approach_start(self, lbl_80796E1C, 0);
             if (self->value_0x378 > lbl_80796EC4) {
                 self->value_0x378 = lbl_80796EC4;
             }
@@ -918,14 +918,14 @@ extern "C" void fn_80149068(_ENEMY_WORK* self, s32 arg1, u32 arg2) {
         em_mot_set(self, 6, 6, 0);
         break;
       case 1:
-        if (fn_80134114(self, 0, 64) == 1) {
+        if (em_approach_step(self, 0, 64) == 1) {
             em_action_finish(self);
         }
         break;
     }
 }
 
-/* The fourth action's body: the joint-table pair `lbl_8056F8E0` (`fn_80134964` to arm, `fn_80134B0C`
+/* The fourth action's body: the joint-table pair `lbl_8056F8E0` (`em_turn_seq_start` to arm, `em_turn_seq_step`
  * to test). */
 extern "C" void fn_80149170(_ENEMY_WORK* self, u32 arg) {
     if ((arg & 0xFF) == 1) {
@@ -935,10 +935,10 @@ extern "C" void fn_80149170(_ENEMY_WORK* self, u32 arg) {
       case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        fn_80134964(self, lbl_8056F8E0, 0, 0, 0);
+        em_turn_seq_start(self, lbl_8056F8E0, 0, 0, 0);
         break;
       case 1:
-        if (fn_80134B0C(self, lbl_8056F8E0) == 1) {
+        if (em_turn_seq_step(self, lbl_8056F8E0) == 1) {
             em_action_finish(self);
         }
         break;
@@ -955,10 +955,10 @@ extern "C" void fn_80149214(_ENEMY_WORK* self, u32 arg) {
       case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        fn_80134964(self, lbl_8056F920, 0, 1, 0);
+        em_turn_seq_start(self, lbl_8056F920, 0, 1, 0);
         break;
       case 1:
-        if (fn_80134B0C(self, lbl_8056F920) == 1) {
+        if (em_turn_seq_step(self, lbl_8056F920) == 1) {
             em_action_finish(self);
         }
         break;
@@ -966,7 +966,7 @@ extern "C" void fn_80149214(_ENEMY_WORK* self, u32 arg) {
 }
 
 /* The spawn record's position reset: zero the VEC3 at +0x04 and hand the record back. */
-extern "C" EmSpawnRec* fn_80149788(EmSpawnRec* rec) {
+extern "C" EmSpawnRec* em_spawn_rec_init(EmSpawnRec* rec) {
     VEC3_ctor(&rec->pos);
     return rec;
 }
@@ -979,7 +979,7 @@ extern "C" void fn_801497BC(_ENEMY_WORK* self, u32 arg, u32 flag) {
     fn_801493A8(self, (u8)arg, 0, 0);
 }
 
-/* The third action's second half: the same `fn_80134004` seed pick as `fn_80149068` with the motion
+/* The third action's second half: the same `em_approach_start` seed pick as `fn_80149068` with the motion
  * `em_mot_set(self, 7, 10, 0)` and the same 64-frame release test. */
 extern "C" void fn_801492B8(_ENEMY_WORK* self, s32 arg) {
     switch (self->state) {
@@ -988,13 +988,13 @@ extern "C" void fn_801492B8(_ENEMY_WORK* self, s32 arg) {
         em_move_mode_set(self, 0);
         switch (arg & 0xFF) {
           default:
-            fn_80134004(self, 0, lbl_80796EC0);
+            em_approach_start(self, lbl_80796EC0, 0);
             break;
           case 1:
-            fn_80134004(self, 0, lbl_80796E1C);
+            em_approach_start(self, lbl_80796E1C, 0);
             break;
           case 2:
-            fn_80134004(self, 0, lbl_80796E1C);
+            em_approach_start(self, lbl_80796E1C, 0);
             if (self->value_0x378 > lbl_80796EC4) {
                 self->value_0x378 = lbl_80796EC4;
             }
@@ -1003,15 +1003,15 @@ extern "C" void fn_801492B8(_ENEMY_WORK* self, s32 arg) {
         em_mot_set(self, 7, 10, 0);
         break;
       case 1:
-        if (fn_80134114(self, 0, 64) == 1) {
+        if (em_approach_step(self, 0, 64) == 1) {
             em_action_finish(self);
         }
         break;
     }
 }
 
-/* The fourth action's four-step body: motion 41, then 67 with `fn_801353E4`'s joint setup, then the
- * `lbl_805A1DA0` scale through `fn_80135644`/`fn_80135584`, then motion 26 and `fn_80133C50`'s
+/* The fourth action's four-step body: motion 41, then 67 with `em_move_vec_clr`'s joint setup, then the
+ * `lbl_805A1DA0` scale through `em_key_curve_eval`/`fn_80135584`, then motion 26 and `em_turn_to_target`'s
  * 0x100-keyed release. */
 extern "C" void fn_801498C8(_ENEMY_WORK* self) {
     switch (self->state) {
@@ -1023,15 +1023,15 @@ extern "C" void fn_801498C8(_ENEMY_WORK* self) {
       case 1:
         if (em_mot_end_ck(self) == 1) {
             self->state++;
-            fn_80130248(self);
-            fn_801305C4(self);
+            em_fall_height_get(self);
+            em_fall_start(self);
             em_mot_set(self, 67, 0, 0);
-            fn_801353E4(self);
+            em_move_vec_clr(self);
         }
         break;
       case 2:
-        self->field_0x314 = fn_80135644(self, lbl_805A1DA0);
-        fn_80130248(self);
+        self->field_0x314 = em_key_curve_eval(self, lbl_805A1DA0);
+        em_fall_height_get(self);
         fn_80135584(self, &self->field_0x1BC);
         if (em_mot_end_ck(self) == 1) {
             self->state++;
@@ -1039,7 +1039,7 @@ extern "C" void fn_801498C8(_ENEMY_WORK* self) {
         }
         break;
       case 3:
-        fn_80133C50(self, 256);
+        em_turn_to_target(self, 256);
         if (em_mot_end_ck(self) == 1) {
             fn_80128A70(self, 3, 2);
         }
@@ -1047,7 +1047,7 @@ extern "C" void fn_801498C8(_ENEMY_WORK* self) {
     }
 }
 
-/* The same shape as `fn_801498C8` without its fourth step: the release tail is `fn_80127FE4`. */
+/* The same shape as `fn_801498C8` without its fourth step: the release tail is `em_action_finish_fall`. */
 extern "C" void fn_80149A08(_ENEMY_WORK* self) {
     switch (self->state) {
       case 0:
@@ -1058,18 +1058,18 @@ extern "C" void fn_80149A08(_ENEMY_WORK* self) {
       case 1:
         if (em_mot_end_ck(self) == 1) {
             self->state++;
-            fn_80130248(self);
-            fn_801305C4(self);
+            em_fall_height_get(self);
+            em_fall_start(self);
             em_mot_set(self, 67, 0, 0);
-            fn_801353E4(self);
+            em_move_vec_clr(self);
         }
         break;
       case 2:
-        self->field_0x314 = fn_80135644(self, lbl_805A1DA0);
-        fn_80130248(self);
+        self->field_0x314 = em_key_curve_eval(self, lbl_805A1DA0);
+        em_fall_height_get(self);
         fn_80135584(self, &self->field_0x1BC);
         if (em_mot_end_ck(self) == 1) {
-            fn_80127FE4(self);
+            em_action_finish_fall(self);
         }
         break;
     }
@@ -1128,21 +1128,21 @@ extern "C" void fn_80149814(_ENEMY_WORK* self) {
     }
 }
 
-/* The sixth action's five-step body: motions 26 (`fn_80134E8C`), 29, 46 and 65, the `fn_80130008`
- * gate on the second step and the `fn_80134F18` joint refresh on it. */
+/* The sixth action's five-step body: motions 26 (`em_dive_start`), 29, 46 and 65, the `em_ground_ck`
+ * gate on the second step and the `em_dive_step` joint refresh on it. */
 extern "C" void fn_80149AFC(_ENEMY_WORK* self) {
     switch (self->state) {
       case 0:
         self->state++;
-        fn_80130248(self);
-        fn_801305C4(self);
+        em_fall_height_get(self);
+        em_fall_start(self);
         em_mot_set(self, 26, 6, 0);
-        fn_80134E8C(self);
+        em_dive_start(self);
         break;
       case 1:
-        fn_80134F18(self);
-        fn_80130248(self);
-        if (fn_80130008(self) == 1) {
+        em_dive_step(self);
+        em_fall_height_get(self);
+        if (em_ground_ck(self) == 1) {
             self->state++;
             em_move_mode_set(self, 3);
             em_mot_set(self, 29, 6, 0);
@@ -1169,7 +1169,7 @@ extern "C" void fn_80149AFC(_ENEMY_WORK* self) {
     }
 }
 
-/* The seventh action's body: motion 31, then `fn_80128BF8`'s release with the target-angle rate
+/* The seventh action's body: motion 31, then `em_target_pos_set`'s release with the target-angle rate
  * (`calcVecAng2` against `vec_0x36C` minus the object's own angle, normalised to turns per frame at
  * 60 fps) fed to `fn_8012F860`, and the frame count from `fn_8012F8EC` handed to `fn_8012F7D4`
  * with the motion parameter at +0x464. */
@@ -1181,13 +1181,13 @@ extern "C" void fn_80149C58(_ENEMY_WORK* self) {
     switch (self->state) {
       case 0:
         self->state++;
-        fn_80130248(self);
-        fn_801305C4(self);
+        em_fall_height_get(self);
+        em_fall_start(self);
         fn_8012F810(self);
         em_mot_set(self, 31, 0, 0);
         break;
       case 1:
-        fn_80128BF8(self, 0);
+        em_target_pos_set(self, 0);
         angle = (u16)calcVecAng2(&self->pos, &self->vec_0x36C);
         diff = (u16)(angle - self->field_0x1C0);
         if (diff != 0) {
@@ -1201,15 +1201,15 @@ extern "C" void fn_80149C58(_ENEMY_WORK* self) {
     }
 }
 
-/* The sixth action's six-state spawn body: motion 214, the `fn_80133C50` gate on arguments 2/4, then
+/* The sixth action's six-state spawn body: motion 214, the `em_turn_to_target` gate on arguments 2/4, then
  * motion 215 with the `lbl_805A1F70` scale, `fn_801303EC`'s angle and the `fn_803B9BA0` shell call,
  * then the two `fn_801545B8`/shell-callback spawn paths keyed on the argument pair, and finally
- * motion 27/216/217 with `fn_801280AC`'s release. */
+ * motion 27/216/217 with `em_action_finish_walk`'s release. */
 extern "C" void fn_801493A8(_ENEMY_WORK* self, u32 arg1, s32 arg2, u32 arg3) {
     EmSpawnRec rec;
     u32 v;
 
-    fn_80149788(&rec);
+    em_spawn_rec_init(&rec);
     switch (self->state) {
       case 0:
         self->state++;
@@ -1218,16 +1218,16 @@ extern "C" void fn_801493A8(_ENEMY_WORK* self, u32 arg1, s32 arg2, u32 arg3) {
         break;
       case 1:
         if ((arg2 & 0xFF) == 2 || (arg2 & 0xFF) == 4) {
-            fn_80133C50(self, 1024);
+            em_turn_to_target(self, 1024);
         }
         if (em_mot_end_ck(self) == 1) {
             self->state++;
             em_move_mode_set(self, 3);
             fn_801303EC(self, lbl_80796E60);
             em_mot_set(self, 215, 0, 0);
-            fn_801353F8(self);
-            self->field_0x318 = fn_80135644(self, lbl_805A1F70);
-            fn_801354F4(self, &self->field_0x1BC);
+            em_move_vec2_clr(self);
+            self->field_0x318 = em_key_curve_eval(self, lbl_805A1F70);
+            em_move_offset_rot_apply(self, &self->field_0x1BC);
             if ((arg3 & 0xFF) == 1) {
                 fn_803B9BA0(self, &self->pos, 100);
                 fn_802B9574(0);
@@ -1244,26 +1244,26 @@ extern "C" void fn_801493A8(_ENEMY_WORK* self, u32 arg1, s32 arg2, u32 arg3) {
                     rec.field_0x10 |= 128;
                 }
                 shell_set_func_ptr->method_0x3C(self, &rec, 0, shell_set_func_ptr);
-                fn_801039B0(self, 23, rec.field_0x12, rec.field_0x14);
-                fn_801039B0(self, 2, rec.field_0x12, rec.field_0x14);
+                eft007_part_spawn(self, 23, rec.field_0x12, rec.field_0x14);
+                eft007_part_spawn(self, 2, rec.field_0x12, rec.field_0x14);
             } else if ((u8)arg2 - 3 <= 1) {
                 shell_set_func_ptr->method_0x3C(self, &rec, 1, shell_set_func_ptr);
-                fn_801039B0(self, 4, rec.field_0x12, rec.field_0x14);
+                eft007_part_spawn(self, 4, rec.field_0x12, rec.field_0x14);
             }
         }
         if (em_mot_end_ck(self) == 1) {
             self->state++;
             self->state_0x006 = 0;
             self->field_0x324 = lbl_80796ECC;
-            fn_801355C8(self, &self->field_0x1BC);
+            em_move_offset_step(self, &self->field_0x1BC);
             em_mot_set(self, 27, 6, 0);
         } else {
-            self->field_0x318 = fn_80135644(self, lbl_805A1F70);
-            fn_801354F4(self, &self->field_0x1BC);
+            self->field_0x318 = em_key_curve_eval(self, lbl_805A1F70);
+            em_move_offset_rot_apply(self, &self->field_0x1BC);
         }
         break;
       case 3:
-        fn_801355C8(self, &self->field_0x1BC);
+        em_move_offset_step(self, &self->field_0x1BC);
         if (self->field_0x318 > lbl_80796E1C) {
             self->field_0x318 = lbl_80796E1C;
         }
@@ -1282,7 +1282,7 @@ extern "C" void fn_801493A8(_ENEMY_WORK* self, u32 arg1, s32 arg2, u32 arg3) {
                 }
                 break;
               case 1:
-                fn_801280AC(self);
+                em_action_finish_walk(self);
                 break;
             }
         }

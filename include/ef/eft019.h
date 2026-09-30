@@ -22,6 +22,12 @@ void eft019_set_core(nw4r::math::VEC3* pos, u8 area, u8 param, f32 scale_a, f32 
  * first consumer to need the three-argument form. */
 void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 param);
 
+/* 0x80112664 - the vector-carrying spawner (`eft019_set_vec__FPQ34nw4r4math4VEC3P10_CP_VECTORUcUcf`):
+ * the position, the rotation triple, the area byte, the parameter id and one scale.  The owner defines it
+ * at C++ scope (`src/ef/eft019.cpp`).  Added with `enemy/em024_ai.cpp`. */
+struct _CP_VECTOR;
+void eft019_set_vec(nw4r::math::VEC3* pos, struct _CP_VECTOR* rot, u8 area, u8 type, f32 scale);
+
 #endif
 
 #endif /* MHTRI_EF_EFT019_H */

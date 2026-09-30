@@ -146,7 +146,7 @@ extern "C" void fn_802B2AA0(StageBlendRec* rec, void* obj, u8 store)
 
     VEC3_ctor(&poly);
     base = camera_angle_y_get();
-    fn_80050CA0(&world, &get_camera_pos(), obj);
+    subVec3(&world, &get_camera_pos(), obj);
     copyVec3(&poly, &world);
     calcVecAngXY(&poly, &ang_x, &ang_y);
 
@@ -1634,7 +1634,7 @@ extern "C" void fn_802B5738(StageAreaObj* area)
     fn_802BEAAC(area, kind);
     fn_802BE1EC(area);
     fn_802BDDB0(&pos);
-    fn_80050CA0(&world, &get_camera_pos(), &pos);
+    subVec3(&world, &get_camera_pos(), &pos);
     copyVec3(&poly, &world);
     if (screen_split_mode_ck() != 0) {
         setVector3(&poly, lbl_8079A4D8, lbl_8079A4DC, lbl_8079A4E0);
@@ -1695,7 +1695,7 @@ extern "C" void fn_802B59F8(StageAreaObj* area)
     area->pitch = lbl_8079A4D8;
     fn_802B592C(0, 2);
     fn_802BE0F4(0, area, &area->seat_pos2, area->span, area->pitch);
-    fn_80050CA0(&world, &area->seat_pos, &area->seat_pos2);
+    subVec3(&world, &area->seat_pos, &area->seat_pos2);
     copyVec3(&poly, &world);
     calcVecAngXY(&poly, &area->ang_x, &area->ang_y);
     area->field_0x06C = area->ang_x;

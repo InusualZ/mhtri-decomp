@@ -269,7 +269,7 @@ extern "C" u32 fn_80100330(u32* p)
 }
 
 /* Copies a matrix's translation column into a vector. */
-extern "C" void fn_8010140C(nw4r::math::MTX34* mtx, nw4r::math::VEC3* out)
+extern "C" void mtx34_trans_get(nw4r::math::MTX34* mtx, nw4r::math::VEC3* out)
 {
     out->x = mtx->m[0][3];
     out->y = mtx->m[1][3];
@@ -277,7 +277,7 @@ extern "C" void fn_8010140C(nw4r::math::MTX34* mtx, nw4r::math::VEC3* out)
 }
 
 /* Adds a vector to a matrix's translation column. */
-extern "C" void fn_80101428(nw4r::math::MTX34* mtx, nw4r::math::VEC3* v)
+extern "C" void mtx34_trans_add(nw4r::math::MTX34* mtx, nw4r::math::VEC3* v)
 {
     mtx->m[0][3] += v->x;
     mtx->m[1][3] += v->y;

@@ -81,7 +81,7 @@ typedef union CamWord040 {
 } CamWord040; /* size: 0x04 */
 
 /* One quake slot: CamWork carries three of them, at +0x4A8 / +0x4BC / +0x4D0 (the `cam + 1192`,
- * `+ 1212`, `+ 1232` of fn_802BE4FC / fn_802BE568 / fn_802BE714 / fn_802BE77C). size: 0x14 */
+ * `+ 1212`, `+ 1232` of fn_802BE4FC / fn_802BE568 / fn_802BE714 / camera_shake_req). size: 0x14 */
 typedef struct CamQuake {
     /* +0x00 */ nw4r::math::VEC3 vec_0x00;   /* origin, or direction */
     /* +0x0C */ u8 active_0x0C;              /* set by every arm */
@@ -779,7 +779,7 @@ void fn_802BE714(CamWorkSrc* work, u8 kind)
 /*
  * Starts the third quake slot from the zero vector, with the kind's high bits set.
  */
-void fn_802BE77C(u8 kind)
+void camera_shake_req(u8 kind)
 {
     CamWork* self = (CamWork*)fn_802BECD0();
     nw4r::math::VEC3 origin;
@@ -878,7 +878,7 @@ void fn_802BC7C8(u8 mode, u32 arg)
 /*
  * Clears the quake/fade state and switches mode, but only from the +0x284 == 1 state.
  */
-void fn_802BC89C(u8 mode, u32 arg)
+void camera_event_set(u8 mode, u32 arg)
 {
     if (camera_work_ck()) {
         fn_802BC468();

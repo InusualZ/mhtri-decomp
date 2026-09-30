@@ -16,17 +16,23 @@ struct _ENEMY_WORK;
 extern "C" {
 #endif
 
-void fn_80103960();
+/* The part-flag setter wrapper; the C++ consumers (`enemy/em024_ai.cpp`) call it with the work record and
+ * the part id, the C ones keep the old-style declaration. */
+#ifdef __cplusplus
+void eft007_part_set(struct _ENEMY_WORK* enemy, u32 part);
+#else
+void eft007_part_set();
+#endif
 
 /* The real signature, from the owner's own definition (`src/ef/eft007.cpp`:
- * `void fn_801039B0(_ENEMY_WORK* enemy, u8 part, s32 pos_x, s32 pos_y)`).  C++ gets it because
+ * `void eft007_part_spawn(_ENEMY_WORK* enemy, u8 part, s32 pos_x, s32 pos_y)`).  C++ gets it because
  * `enemy/fn_80147CE0.cpp` calls it with four arguments; the C consumers keep the old-style
  * declaration (they call it with four arguments too, which C allows).  One view per TU: declaring
  * both spellings is `(10197) illegal function overloading`. */
 #ifdef __cplusplus
-void fn_801039B0(struct _ENEMY_WORK* enemy, u8 part, s32 pos_x, s32 pos_y);
+void eft007_part_spawn(struct _ENEMY_WORK* enemy, u8 part, s32 pos_x, s32 pos_y);
 #else
-void fn_801039B0();
+void eft007_part_spawn();
 #endif
 
 

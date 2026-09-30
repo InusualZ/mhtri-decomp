@@ -105,7 +105,7 @@
 #include "pl.h"
 #include "fn_8004CAD8.h"               /* MTX34_ctor */
 #include "Pl/fn_8028F66C.h"            /* copyVec3 */
-#include "g3d/g3d_calcworld.h"         /* fn_80073F68 */
+#include "g3d/g3d_calcworld.h"         /* addVec3To */
 #include "sound/fn_800D7F54.h"         /* em015_denki_eft_se_req, se_req_pos_ps */
 #include "stage/stg_w.h"               /* get_now_areano */
 #include "Runtime.PPCEABI.H/memset.h"  /* memset - owner Runtime.PPCEABI.H/memset.c */

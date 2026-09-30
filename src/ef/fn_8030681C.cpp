@@ -61,7 +61,7 @@
  *   100.00  fn_80306A84  fn_80306A94  fn_80306FB4  fn_80307E08  fn_80308E34
  *    98.68  fn_80307AE8      97.27  fn_80306D14      96.50  fn_80306B10      95.65  fn_80308EC0
  *    93.99  fn_80306BFC      93.72  fn_80306E04      93.20  fn_80306FF0      93.07  fn_80306F40
- *    89.17  fn_80306A98      88.86  fn_8030681C      87.93  fn_80307C54      86.41  eft042_set2
+ *    89.17  eft_spawn_type_at_area      88.86  fn_8030681C      87.93  fn_80307C54      86.41  eft042_set2
  *    86.27  fn_80308D00      85.29  fn_80308E38      84.96  fn_803088FC      84.87  fn_80308F1C
  *    82.50  fn_80306F10      82.11  fn_80306D6C
  *
@@ -246,7 +246,7 @@ extern u32 lbl_805DCB1C[];     /* per-type joint number (the type-7 state-2 body
 extern "C" void fn_8030681C(_EFT* self);
 extern "C" void fn_80306A84(_EFT* self);
 extern "C" void fn_80306A94(_EFT* self);
-extern "C" void fn_80306A98(_ENEMY_WORK* source, u8 type);
+extern "C" void eft_spawn_type_at_area(_ENEMY_WORK* source, u8 type);
 extern "C" void fn_80306B10(_ENEMY_WORK* source, u8 type, s32 timer);
 extern "C" _EFT* fn_80306BFC(u8 type, u8 area);
 extern "C" void fn_80306D14(MHchar* model, u8 type);
@@ -382,7 +382,7 @@ extern "C" void fn_80306A94(_EFT* self)
 /* Spawns effect 42 for `source` and files it: type 3 from a source whose +0x228 flags word has either
  * of bits 1-2 set becomes the type-4 model, the source is stored as the effect's origin and the step
  * timer starts at 0. */
-extern "C" void fn_80306A98(_ENEMY_WORK* source, u8 type)
+extern "C" void eft_spawn_type_at_area(_ENEMY_WORK* source, u8 type)
 {
     _EFT* eft = fn_80306BFC(type, source->area_no);
 
@@ -807,7 +807,7 @@ extern "C" void fn_803088FC(_EFT* self)
         self->state_0x05++;
     } else {
         work->v_0x0C.offset.y -= work->field_0x18;
-        fn_80073F68(&self->pos_0x18, &work->v_0x0C.offset);
+        addVec3To(&self->pos_0x18, &work->v_0x0C.offset);
         self->rot_0x24.x -= 2185;
         fn_800504D4(&mtx);
         rotLocalMatY(self->rot_0x24.y, &mtx);

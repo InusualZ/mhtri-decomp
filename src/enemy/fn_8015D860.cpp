@@ -16,7 +16,7 @@
  * `.data` table at `jumptable_805A5DC0`, which the split leaves in the auto band - this unit does
  * not claim it, as the two bracketing registered units do not claim their own tables either).
  * `fn_8015D860` seeds the `field_0x1E4` flag byte from `em_parts_damage_level_get(self, 2)` and
- * two `fn_80135748` mask probes; `fn_8015D8F0`/`fn_8015D908`/`fn_8015D934` are its predicates;
+ * two `em_flags836_ck` mask probes; `fn_8015D8F0`/`fn_8015D908`/`fn_8015D934` are its predicates;
  * `fn_8015D9B8`/`fn_8015DD6C` own the two +0x328/+0x32A countdowns; `fn_8015D9C8` is the per-tick
  * entry that attaches the 0xC-byte vtable helper `fn_8015DAA8` constructs; `fn_8015DAE4` and
  * `fn_8015DB68` are the `(state, sub-state)` transition tables.
@@ -99,7 +99,7 @@
 #include "unsplit/unknown.h" /* SystemWork / system_w */
 #include "ef.h"              /* VEC3_ctor */
 #include "ef/fn_80105314.h"  /* fn_801057A4 */
-#include "draw_shape.h"      /* fn_80056A54 */
+#include "draw_shape.h"      /* draw_shape_arm */
 #include "enemy/fn_801251D0.h"
 #include "enemy/fn_8012BDF4.h"
 #include "enemy/fn_80138074.h"
@@ -114,7 +114,7 @@
 /* The helper `fn_8015D9C8` allocates and `fn_8015DAA8` constructs: a 12-byte record whose +0x00
  * word is the address of a `.data` table (`lbl_805A6D28`, the same shape as
  * `enemy/fn_80147CE0.cpp`'s `Helper_80147CE0` and `enemy/fn_80176C58.cpp`'s `Helper_80176E50` -
- * all three constructors call this band's base `fn_80147E2C` first and then store their own
+ * all three constructors call this band's base `em_res_user_data_ctor` first and then store their own
  * table).  Only the table slot is touched by this unit; the rest is padding.
  * size: 0xC (traced from the `operator new(0xC)` call in `fn_8015D9C8`). */
 typedef struct Helper_8015DAA8 {
@@ -132,13 +132,13 @@ extern "C" u8 lbl_805A6D28[];
  * ------------------------------------------------------------------------------------------------- */
 
 /* Declared in a shared header: `em_move_mode_set`, `em_mot_set`, `em_mot_set_ck`, `em_mot_end_ck`,
- * `em_action_finish`, `em_state_set`, `fn_8013032C`, `fn_801303EC`, `fn_80130CDC`, `fn_80131E74`,
- * `fn_80133BB4`, `fn_80133BC0`, `fn_80135C5C`, `fn_80136D14`, `fn_801376B4`, `fn_8013221C`,
+ * `em_action_finish`, `em_state_set`, `fn_8013032C`, `fn_801303EC`, `fn_80130CDC`, `em_busy_timer_reset`,
+ * `fn_80133BB4`, `fn_80133BC0`, `em_part_hit_set`, `fn_80136D14`, `fn_801376B4`, `fn_8013221C`,
  * `fn_80132224`, `fn_80132264`, `fn_80141B88`, `fn_8012EC3C` (`unsplit/enemy.h`);
- * `fn_80128A8C`, `fn_80128AAC`, `fn_8012933C`, `fn_801280F4` (`enemy/fn_801251D0.h`);
- * `fn_8012D1A0` (`enemy/fn_8012BDF4.h`); `fn_801391E8`, `fn_801390FC` (`enemy/fn_80138074.h`);
- * `fn_80147E2C` (`enemy/fn_80147CE0.h`); `VEC3_ctor` (`ef.h`); `fn_801057A4`
- * (`ef/fn_80105314.h`); `fn_80056A54` (`draw_shape.h`); `setVector3` (`nw4r/math.h`);
+ * `fn_80128A8C`, `fn_80128AAC`, `em_hit_window_set`, `fn_801280F4` (`enemy/fn_801251D0.h`);
+ * `fn_8012D1A0` (`enemy/fn_8012BDF4.h`); `em_res_user_data_ck`, `em_res_user_data_set` (`enemy/fn_80138074.h`);
+ * `em_res_user_data_ctor` (`enemy/fn_80147CE0.h`); `VEC3_ctor` (`ef.h`); `fn_801057A4`
+ * (`ef/fn_80105314.h`); `draw_shape_arm` (`draw_shape.h`); `setVector3` (`nw4r/math.h`);
  * `system_w` (`unsplit/unknown.h`). */
 
 /* The three C++ free functions, declared by their real signatures so the front-end mangles them to
@@ -174,7 +174,7 @@ extern "C" void fn_8015E788(_ENEMY_WORK* self);
  * `(self, u32, u32, VEC3*, f32, s32)`. */
 extern "C" void fn_80305924(_ENEMY_WORK* self, u32 a, u32 b, void* v, f32 s, s32 id);
 /* 0x80304508 - the same band: `(self, u32, u32, VEC3*, f32)`. */
-extern "C" void fn_80304508(_ENEMY_WORK* self, u32 a, u32 b, void* v, f32 s);
+extern "C" void eft_em_spawn(_ENEMY_WORK* self, u32 a, u32 b, void* v, f32 s);
 /* 0x803B9BA0 - between `hud/fn_80324F7C.c` and `Network/NetworkWiiMediator.c`:
  * `(self, VEC3*, s32)`. */
 extern "C" void fn_803B9BA0(_ENEMY_WORK* self, void* pos, s32 value);
@@ -206,10 +206,10 @@ extern "C" void fn_8015D860(_ENEMY_WORK* self) {
     if (em_parts_damage_level_get(self, 2) >= 2) {
         self->field_0x1E4 |= 4;
     }
-    if (fn_80135748(self, 2) == 1) {
+    if (em_flags836_ck(self, 2) == 1) {
         self->field_0x1E4 |= 1;
     }
-    if (fn_80135748(self, 1) == 1) {
+    if (em_flags836_ck(self, 1) == 1) {
         self->field_0x1E4 |= 0x20;
     }
 }
@@ -276,12 +276,12 @@ extern "C" void fn_8015D9C8(_ENEMY_WORK* self, u32 arg) {
         break;
     }
     fn_8015D860(self);
-    if (fn_801391E8(self) == 0) {
+    if (em_res_user_data_ck(self) == 0) {
         helper = (Helper_8015DAA8*)operator new(0xC);
         if (helper != 0) {
             fn_8015DAA8(helper);
         }
-        fn_801390FC(self, helper);
+        em_res_user_data_set(self, helper);
     }
     if (self->field_0x009 == 0) {
         setVector3(&v, lbl_80797330, lbl_80797334, lbl_80797338);
@@ -291,7 +291,7 @@ extern "C" void fn_8015D9C8(_ENEMY_WORK* self, u32 arg) {
 
 /* 0x8015DAA8 - the helper's constructor: base first, then this class's table. */
 extern "C" Helper_8015DAA8* fn_8015DAA8(Helper_8015DAA8* self) {
-    fn_80147E2C(self);
+    em_res_user_data_ctor(self);
     self->vtbl = lbl_805A6D28;
     return self;
 }
@@ -350,7 +350,7 @@ extern "C" void fn_8015DB68(_ENEMY_WORK* self, u8 arg, u8 sub) {
       case 0xA:
         switch (sub) {
           case 0xC3:
-            fn_80135C5C(self, 1, 0);
+            em_part_hit_set(self, 1, 0);
             if (fn_8015D8F0(self, 1) == 1) {
                 self->field_0x1E4 |= 1;
                 setVector3(&v1, lbl_80797330, lbl_80797340, lbl_80797344);
@@ -359,7 +359,7 @@ extern "C" void fn_8015DB68(_ENEMY_WORK* self, u8 arg, u8 sub) {
             }
             break;
           case 0xC8:
-            fn_80135C5C(self, 0, 0);
+            em_part_hit_set(self, 0, 0);
             self->field_0x491 = 1;
             if (fn_8015D8F0(self, 0x20) == 1) {
                 self->field_0x1E4 |= 0x20;
@@ -457,7 +457,7 @@ extern "C" void fn_8015DF40(_ENEMY_WORK* self) {
 /* 0x8015DFBC - the two-step state that also refreshes the scene: motion set (1, 0, 0) and the
  * height pair on entry, `fn_801280F4` on the wait. */
 extern "C" void fn_8015DFBC(_ENEMY_WORK* self) {
-    fn_80131E74(self);
+    em_busy_timer_reset(self);
     fn_80136D14(self);
     switch (self->state) {
       case 0:
@@ -552,17 +552,17 @@ extern "C" void fn_8015E1C4(_ENEMY_WORK* self) {
         break;
       case 1:
         if (em_frame_check(self, 0, lbl_80797348, lbl_80797330) == 1) {
-            fn_8012933C(self, 1, 0x12, 5);
-            fn_80056A54((u32)self, 0x14, 0xA);
+            em_hit_window_set(self, 1, 0x12, 5);
+            draw_shape_arm((u32)self, 0x14, 0xA);
         }
         if (em_frame_check(self, 0, lbl_80797348, lbl_80797330) == 1) {
             setVector3(&v, lbl_80797330, lbl_8079734C, lbl_80797338);
-            fn_80304508(self, 0, 0x13, &v, lbl_8079733C);
+            eft_em_spawn(self, 0, 0x13, &v, lbl_8079733C);
         }
         if (em_frame_check(self, 3, lbl_80797350, lbl_80797354) == 1) {
             if ((system_w.field_0x0c & 7) == 0) {
                 setVector3(&v, lbl_80797330, lbl_8079734C, lbl_80797338);
-                fn_80304508(self, 1, 0x13, &v, lbl_8079733C);
+                eft_em_spawn(self, 1, 0x13, &v, lbl_8079733C);
             }
         }
         if (em_mot_end_ck(self) == 1) {
@@ -640,7 +640,7 @@ extern "C" void fn_8015E4F8(_ENEMY_WORK* self) {
 }
 
 /* 0x8015E568 - the two-step state that counts two motion waits: motion set (0x24, 6) plus the
- * `fn_8012933C` hand-off and the +0x20 counter cleared, then the second motion set (1, 7) once the
+ * `em_hit_window_set` hand-off and the +0x20 counter cleared, then the second motion set (1, 7) once the
  * counter reaches 2. */
 extern "C" void fn_8015E568(_ENEMY_WORK* self) {
     switch (self->state) {
@@ -648,7 +648,7 @@ extern "C" void fn_8015E568(_ENEMY_WORK* self) {
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x24, 6, 0);
-        fn_8012933C(self, 1, 0xB, 2);
+        em_hit_window_set(self, 1, 0xB, 2);
         self->timer_0x020 = 0;
         /* falls through to the wait arm */
       case 1:

@@ -83,7 +83,7 @@
  * 100 -> 97.83), so the call goes through this 6-argument spelling of the same slot. */
 typedef void (*ShellJobInjectFn)(struct _ENEMY_WORK* self, s32 a, s32 b, nw4r::math::VEC3* pos, f32 scale,
                                  u16 flags);
-/* The `.rodata` motion table `fn_80134964`/`fn_80134B0C` walk (0x80570AE0..0x80570B20, 64 B). */
+/* The `.rodata` motion table `em_turn_seq_start`/`em_turn_seq_step` walk (0x80570AE0..0x80570B20, 64 B). */
 extern "C" u8 lbl_80570AE0[];
 
 /* The band's pooled floats (`.sdata2` 0x8079BC88..0x8079BE88), declared never defined: none is this
@@ -121,8 +121,6 @@ typedef nw4r::math::VEC3* (*Fn80041E8C)(nw4r::math::VEC3* out, f32 x, f32 y, f32
  * `enemy/em_action.cpp` record).  The `fn_8037...`/`fn_80378...` group is the em019 band's own
  * functions, which `enemy/em019_ai.cpp` (the rest of this file) owns. */
 extern "C" {
-u8 fn_80127CC4(struct _ENEMY_WORK* self, u32 a);
-void fn_80127D20(struct _ENEMY_WORK* self, u32 a, u32 b);
 u8 fn_80378F9C(struct _ENEMY_WORK* self, u32 a);
 u8 fn_8037900C(struct _ENEMY_WORK* self, u32 a);
 void fn_803797F4(struct _ENEMY_WORK* self);
@@ -152,9 +150,9 @@ extern "C" void em_act_prog_1(_ENEMY_WORK* self) {
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set(self, 20, 0, 0);
-        fn_80146058(self, lbl_8079BC88, lbl_8079BC88, lbl_8079BC88);
-        fn_8014610C(self, lbl_8079BC88, lbl_8079BC88, lbl_8079BC88);
-        fn_8014619C(self);
+        em_demo_pos_set(self, lbl_8079BC88, lbl_8079BC88, lbl_8079BC88);
+        em_demo_rot_set(self, lbl_8079BC88, lbl_8079BC88, lbl_8079BC88);
+        em_demo_enable(self);
         self->field_0x1E4 = 0;
         for (i = 0; i < 4; i++) {
             part->colour_id[i] = 0;
@@ -192,11 +190,11 @@ extern "C" void em_act_prog_2(_ENEMY_WORK* self) {
         if (em_frame_check(self, 1, lbl_8079BCEC, lbl_8079BC88) == 1)
             fn_80136D14(self);
         if (em_frame_check(self, 0, lbl_8079BCF0, lbl_8079BC88) == 1)
-            fn_8012933C(self, 0, 13, 10);
+            em_hit_window_set(self, 0, 13, 10);
         if (em_frame_check(self, 0, lbl_8079BCF4, lbl_8079BC88) == 1)
-            fn_8012933C(self, 0, 24, 26);
+            em_hit_window_set(self, 0, 24, 26);
         if (em_frame_check(self, 0, lbl_8079BCF8, lbl_8079BC88) == 1)
-            fn_80129724(self, 0);
+            em_hit_window_clear(self, 0);
         if (em_mot_end_ck(self) == 1) {
             em_move_mode_set(self, 4);
             fn_801303EC(self, fn_8013032C(self));
@@ -215,13 +213,13 @@ extern "C" void em_act_prog_3(_ENEMY_WORK* self) {
     case 0:
         self->state++;
         em_move_mode_set(self, 4);
-        fn_80134964(self, lbl_80570AE0, 0, 0, 0);
+        em_turn_seq_start(self, lbl_80570AE0, 0, 0, 0);
         em_mot_speed_set(self, lbl_8079BCE8);
         fn_801303EC(self, fn_8013032C(self));
         fn_80378F9C(self, 255);
         break;
     case 1:
-        if (fn_80134B0C(self, lbl_80570AE0) == 1)
+        if (em_turn_seq_step(self, lbl_80570AE0) == 1)
             em_state_set(self, 13, 4);
         break;
     }
@@ -237,13 +235,13 @@ extern "C" void em_act_prog_4(_ENEMY_WORK* self) {
         self->state++;
         em_move_mode_set(self, 4);
         em_mot_set(self, 89, 0, 0);
-        fn_80134004(self, 0, lbl_8079BC88);
+        em_approach_start(self, lbl_8079BC88, 0);
         em_mot_speed_set(self, lbl_8079BCE8);
         fn_801303EC(self, fn_8013032C(self));
         fn_80378F9C(self, 255);
         break;
     case 1:
-        if (fn_80134114(self, 0, 256) == 1)
+        if (em_approach_step(self, 0, 256) == 1)
             em_state_set(self, 13, 5);
         break;
     }
@@ -251,14 +249,14 @@ extern "C" void em_act_prog_4(_ENEMY_WORK* self) {
 
 /* The enemy work's action-program channel 5: the two per-frame hooks run unconditionally, then
  * phase 0 arms motion 202, resets the +0x1CC sequence and the part 255 scale and opens two
- * `fn_8012933C` hit windows; phase 1 sequences three `em_frame_check` windows, and once the motion
+ * `em_hit_window_set` hit windows; phase 1 sequences three `em_frame_check` windows, and once the motion
  * and `fn_8012D1A0` both report done it either lands the part 13/6 hit or ends the program. */
 extern "C" void em_act_prog_5(_ENEMY_WORK* self) {
     nw4r::math::VEC3 pos;
 
     VEC3_ctor(&pos);
     em_busy_set(self);
-    fn_80131E74(self);
+    em_busy_timer_reset(self);
     switch (self->state) {
     case 0:
         self->state++;
@@ -267,8 +265,8 @@ extern "C" void em_act_prog_5(_ENEMY_WORK* self) {
         fn_801303EC(self, lbl_8079BC88);
         fn_80378F9C(self, 255);
         fn_80136D14(self);
-        fn_8012933C(self, 0, 32, 8);
-        fn_8012933C(self, 1, 31, 24);
+        em_hit_window_set(self, 0, 32, 8);
+        em_hit_window_set(self, 1, 31, 24);
         fn_80131E00(self);
         break;
     case 1:
@@ -279,7 +277,7 @@ extern "C" void em_act_prog_5(_ENEMY_WORK* self) {
         if (em_frame_check(self, 0, lbl_8079BCB4, lbl_8079BC88) == 1) {
             nw4r::math::VEC3 off;
 
-            fn_80136B50(self, -1, 5);
+            em_camera_req(self, -1, 5);
             copyVec3(&pos, ((Fn80041E8C)setVec3)(&off, lbl_8079BC88, lbl_8079BC88,
                                                         lbl_8079BD08));
             ((ShellJobInjectFn)shell_set_func_ptr->method_0x2C)(self, 9, 1, &pos, lbl_8079BC94, self->field_0xAEA);
@@ -326,22 +324,22 @@ extern "C" void em_act_prog_6(_ENEMY_WORK* self) {
                 angle = (u16)-0x2000;
             break;
         }
-        fn_801353F8(self);
-        self->field_0x318 = lbl_8079BCD8 * fn_8012F8E4(self) * get_em_chg_scale(self);
+        em_move_vec2_clr(self);
+        self->field_0x318 = lbl_8079BCD8 * get_em_base_scale(self) * get_em_chg_scale(self);
         rotVecY(&self->offset_0x30C.vec_0x310, self->field_0x1C0 + angle);
         if (angle > 0x8000)
             angle = (u16)(0x10000 - angle);
         self->timer_0x020 = (s16)angle;
-        fn_80129668(self, 0, 30);
+        em_hit_window_set_default(self, 0, 30);
         break;
     }
     case 1:
         switch (self->state_0x006) {
         case 0:
-            fn_80133E3C(self, self->timer_0x020, lbl_8079BCDC, lbl_8079BCE0);
+            em_turn_in_window(self, lbl_8079BCDC, lbl_8079BCE0, self->timer_0x020);
             break;
         case 1:
-            fn_80133E3C(self, -self->timer_0x020, lbl_8079BCDC, lbl_8079BCE0);
+            em_turn_in_window(self, lbl_8079BCDC, lbl_8079BCE0, -self->timer_0x020);
             break;
         }
         if (em_frame_check(self, 3, lbl_8079BCC4, lbl_8079BCE4) == 1)
@@ -349,22 +347,22 @@ extern "C" void em_act_prog_6(_ENEMY_WORK* self) {
         if (em_mot_end_ck(self) == 1) {
             self->state++;
             em_move_mode_set(self, 0);
-            fn_80134964(self, lbl_80570AE0, 0, 0, 0);
+            em_turn_seq_start(self, lbl_80570AE0, 0, 0, 0);
         }
         break;
     case 2:
-        if (fn_80134B0C(self, lbl_80570AE0) == 1) {
+        if (em_turn_seq_step(self, lbl_80570AE0) == 1) {
             self->state++;
             self->state_0x006 = 0;
             em_move_mode_set(self, 0);
             em_mot_set(self, 2, 10, 0);
-            fn_80134004(self, 0, lbl_8079BCD4);
+            em_approach_start(self, lbl_8079BCD4, 0);
         }
         break;
     case 3:
         switch (self->state_0x006) {
         case 0:
-            if (fn_80134114(self, 0, 128) == 1) {
+            if (em_approach_step(self, 0, 128) == 1) {
                 self->state_0x006++;
                 if (fn_8012D1A0(self) == 0)
                     fn_8012F5C4(self, 20, 20, 0, 1);
@@ -508,56 +506,56 @@ extern "C" void em_act_run(_ENEMY_WORK* self) {
     }
     if (self->field_0x1E2 == 1) {
         em_busy_set(self);
-        fn_80131E74(self);
+        em_busy_timer_reset(self);
     }
 }
 
 /* The per-part damage check: for each of the seven slots, either raises the slot's damage meter
- * (`fn_80127CC4`) while its `fn_8037900C` arm byte is clear and its damage level is still below the
- * slot's threshold, or ticks it down (`fn_80127D20`) through the pair of ids. */
+ * (`em_part_rec_reset`) while its `fn_8037900C` arm byte is clear and its damage level is still below the
+ * slot's threshold, or ticks it down (`em_part_rec_alt_set`) through the pair of ids. */
 extern "C" void em_parts_damage_ck(_ENEMY_WORK* self) {
     if (fn_8037900C(self, 2) == 0 && em_parts_damage_level_get(self, 0) < 2)
-        fn_80127CC4(self, 0);
+        em_part_rec_reset(self, 0);
     else
-        fn_80127D20(self, 0, 0);
+        em_part_rec_alt_set(self, 0, 0);
     if (fn_8037900C(self, 0) == 0 && em_parts_damage_level_get(self, 6) < 2)
-        fn_80127CC4(self, 1);
+        em_part_rec_reset(self, 1);
     else
-        fn_80127D20(self, 1, 1);
+        em_part_rec_alt_set(self, 1, 1);
     if (fn_8037900C(self, 1) == 0 && em_parts_damage_level_get(self, 1) < 2)
-        fn_80127CC4(self, 2);
+        em_part_rec_reset(self, 2);
     else
-        fn_80127D20(self, 2, 2);
+        em_part_rec_alt_set(self, 2, 2);
     if (fn_8037900C(self, 0) == 0 &&
         (em_parts_damage_level_get(self, 2) < 1 || em_parts_damage_level_get(self, 3) < 1))
-        fn_80127CC4(self, 3);
+        em_part_rec_reset(self, 3);
     else
-        fn_80127D20(self, 3, 3);
+        em_part_rec_alt_set(self, 3, 3);
     if (fn_8037900C(self, 0) == 0 &&
         (em_parts_damage_level_get(self, 4) < 1 || em_parts_damage_level_get(self, 5) < 1))
-        fn_80127CC4(self, 4);
+        em_part_rec_reset(self, 4);
     else
-        fn_80127D20(self, 4, 4);
+        em_part_rec_alt_set(self, 4, 4);
     if (fn_8037900C(self, 0) == 0 && em_parts_damage_level_get(self, 6) < 2)
-        fn_80127CC4(self, 5);
+        em_part_rec_reset(self, 5);
     else
-        fn_80127D20(self, 5, 5);
+        em_part_rec_alt_set(self, 5, 5);
     if (fn_8037900C(self, 3) == 0 && em_parts_damage_level_get(self, 7) < 1)
-        fn_80127CC4(self, 6);
+        em_part_rec_reset(self, 6);
     else
-        fn_80127D20(self, 6, 6);
+        em_part_rec_alt_set(self, 6, 6);
 }
 
 /* Every twentieth frame, drops the record's own ground-stamp vector: builds the (0, -20, 100) offset
- * and hands it to `fn_8010562C` with the record's own flag. */
+ * and hands it to `eft_spawn_type10` with the record's own flag. */
 extern "C" void em_act_effect_ck(_ENEMY_WORK* self) {
     nw4r::math::VEC3 off;
 
     VEC3_ctor(&off);
-    if (fn_8012EC60(self) == 1) {
+    if (em_alt_mode_ck(self) == 1) {
         if (system_w.field_0x0c % 20 == 0) {
             setVector3(&off, lbl_8079BC88, lbl_8079BE88, lbl_8079BD24);
-            fn_8010562C(self, 25, 25, &off, lbl_8079BCA8);
+            eft_spawn_type10(self, 25, 25, &off, lbl_8079BCA8);
         }
     }
 }

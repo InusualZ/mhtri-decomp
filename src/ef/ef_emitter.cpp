@@ -162,7 +162,7 @@ void fn_8009CC20(void* out, void* mtx, void* in);
 void fn_8009CCAC(void* out, void* mtx, void* in);
 f32 fn_8009CD64(void* vec, s32 index);
 f32 fn_80050BC0(f32 x);
-void fn_80050CA0(void* dst, void* a, void* b);
+void subVec3(void* dst, void* a, void* b);
 void* fn_800508AC(void* vec);
 f32 PSVECSquareDistance(void* a, void* b);
 void fn_800504D4(void* mtx);
@@ -1044,7 +1044,7 @@ extern "C" EfVec* fn_800A7F00(EfParticleRec* self, EfVec* result) {
     NW4R_POINTER_ASSERT(lbl_80592C08, result, lbl_80592BD0);
     {
         EfVec v;
-        fn_80050CA0(&v, &self->offset, &self->position);
+        subVec3(&v, &self->offset, &self->position);
         copyVec3(result, &v);
     }
     return result;

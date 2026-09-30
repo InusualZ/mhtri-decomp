@@ -337,8 +337,8 @@ extern "C" void fn_800F93D8(void* self, void* list, u32 mode, s32 count, u32 arg
 extern "C" u8 fn_800CF208(void);
 
 extern "C" void fn_800532DC(void* dst, void* src);
-extern "C" void fn_80073F68(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
-extern "C" void fn_8010140C(nw4r::math::MTX34* mtx, nw4r::math::VEC3* pos, f32 z);
+extern "C" void addVec3To(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
+extern "C" void mtx34_trans_get(nw4r::math::MTX34* mtx, nw4r::math::VEC3* pos, f32 z);
 extern "C" void fn_80059374(s32 a);
 extern "C" void fn_80059420(void);
 extern "C" void fn_8005D1AC(void* out, s32 a);
@@ -541,7 +541,7 @@ extern "C" void fn_80115100(_EFT* self)
         copyVec3(&v, &lbl_806A4538);
         get_joint_wpos__6MHcharFUlPQ34nw4r4math4VEC3(
             &((_PLW*)self->source_0x30)->physics_0x13C->chr_0x04, 3, &self->pos_0x18);
-        fn_80073F68(&self->pos_0x18, &v);
+        addVec3To(&self->pos_0x18, &v);
         if (Pl_master_ck((_PLW*)self->source_0x30) == 1) {
             flags = fn_800F9380((_PLW*)self->source_0x30) | 1;
         }
@@ -1293,7 +1293,7 @@ extern "C" void fn_801156A0(_EFT* self)
         work->mtx[i][0].m[0][3] += v.x;
         work->mtx[i][0].m[1][3] += v.y;
         work->mtx[i][0].m[2][3] = z + v.z;
-        fn_8010140C(&work->mtx[i][0], &self->pos_0x18, z);
+        mtx34_trans_get(&work->mtx[i][0], &self->pos_0x18, z);
         copyVec3(&work->models[i]->pos_0x04, &self->pos_0x18);
         work->models[i]->field_0x28 = self->field_0x24;
         work->models[i]->field_0x2C = self->field_0x28;
@@ -1485,7 +1485,7 @@ extern "C" void fn_80115A80(_EFT* self)
         work->mtx[i][0].m[0][3] += v.x;
         work->mtx[i][0].m[1][3] += v.y;
         work->mtx[i][0].m[2][3] = f1 + v.z;
-        fn_8010140C(&work->mtx[i][0], &self->pos_0x18, f1);
+        mtx34_trans_get(&work->mtx[i][0], &self->pos_0x18, f1);
         copyVec3(&work->models[i]->pos_0x04, &self->pos_0x18);
         work->models[i]->field_0x28 = self->field_0x24;
         work->models[i]->field_0x2C = self->field_0x28;

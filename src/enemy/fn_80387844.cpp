@@ -6,7 +6,7 @@
  * WHAT IT IS.  The per-action state machines of an enemy monster's AI: every body takes the shared
  * `_ENEMY_WORK` record and drives its `state` (+0x005) through a small machine whose steps call the
  * motion API (`em_mot_set`, `em_move_mode_set`, `em_mot_end_ck`), test frames (`em_frame_check`), spawn
- * effects (`eft009_set_pos`, `fn_801048B4`, `fn_80304508`, `fn_8010562C`) and rotate the work
+ * effects (`eft009_set_pos`, `eft009_spawn_at_joint`, `eft_em_spawn`, `eft_spawn_type10`) and rotate the work
  * (`rotVecY`).  Four dispatch tables pick the machine by the work's `action` (+0x1E5) or
  * `state_sub` (+0x1E6): `fn_80388144`/`fn_80388B98`/`fn_80389634`/`fn_8038BA34` (state_sub),
  * `fn_8038CBD4` (action).  The band is the enemy module's action-program block; its `.data` holds
@@ -44,6 +44,7 @@
 #include "ef/fn_80105314.h"
 #include "ef/fn_8010D1A8.h"
 #include "enemy/fn_80387844.h"
+#include "lobby/fn_8030121C.h" /* eft_em_spawn, C linkage (rule 2: the owner's header) */
 #include "mh3_pad.h"
 #include "unsplit/enemy.h"
 #include "unsplit/unknown.h"
@@ -129,7 +130,7 @@ extern "C" void fn_80387844(_ENEMY_WORK* self)
     u8* move;
 
     em_busy_set(self);
-    fn_80131E74(self);
+    em_busy_timer_reset(self);
     switch (self->state) {
     case 0:
         self->state++;
@@ -184,12 +185,12 @@ extern "C" void fn_803879EC(_ENEMY_WORK* self)
         return;
     case 1:
         if (em_frame_check(self, 0, lbl_8079C028, lbl_8079BFF8) == 1) {
-            fn_80306A98(self, 0x10);
+            eft_spawn_type_at_area(self, 0x10);
         }
         if (em_frame_check(self, 1, lbl_8079C02C, lbl_8079C030) == 1
             && (system_w.field_0x0c & 7) == 0) {
             setVector3(&v, lbl_8079BFF8, lbl_8079C034, lbl_8079C038);
-            fn_80304508(self, 0x90, 0x15, &v, lbl_8079C00C);
+            eft_em_spawn(self, 0x90, 0x15, &v, lbl_8079C00C);
         }
         if (em_after_frame_check(self, 0, lbl_8079C03C, lbl_8079BFF8) == 1
             || em_after_frame_check(self, 0, lbl_8079C040, lbl_8079BFF8) == 1
@@ -200,7 +201,7 @@ extern "C" void fn_803879EC(_ENEMY_WORK* self)
             || em_after_frame_check(self, 0, lbl_8079C054, lbl_8079BFF8) == 1
             || em_after_frame_check(self, 0, lbl_8079C058, lbl_8079BFF8) == 1) {
             setVector3(&v, lbl_8079BFF8, lbl_8079C034, lbl_8079C038);
-            fn_80304508(self, 0x8F, 0x15, &v, lbl_8079C00C);
+            eft_em_spawn(self, 0x8F, 0x15, &v, lbl_8079C00C);
         }
         if (em_mot_end_ck(self) == 1) {
             self->state++;
@@ -235,7 +236,7 @@ extern "C" void fn_80387C28(_ENEMY_WORK* self)
 extern "C" void fn_80387CA4(_ENEMY_WORK* self)
 {
     em_busy_set(self);
-    fn_80131E74(self);
+    em_busy_timer_reset(self);
     switch (self->state) {
     case 0:
         self->state++;
@@ -265,24 +266,24 @@ extern "C" void fn_80387CA4(_ENEMY_WORK* self)
         if (em_mot_end_ck(self) == 1) {
             self->state++;
             em_move_mode_set(self, 4);
-            fn_80134964(self, lbl_80570B20, 0, 0, 0);
+            em_turn_seq_start(self, lbl_80570B20, 0, 0, 0);
             fn_8013032C(self);
             fn_801303EC(self, lbl_8079BFF8);
         }
         return;
     case 4:
-        if (fn_80134B0C(self, lbl_80570B20) == 1) {
+        if (em_turn_seq_step(self, lbl_80570B20) == 1) {
             self->state++;
             em_move_mode_set(self, 4);
             em_mot_set(self, 0xA, 0, 0);
-            fn_80134004(self, 0, lbl_8079BFF8);
+            em_approach_start(self, lbl_8079BFF8, 0);
             fn_8013032C(self);
             fn_801303EC(self, lbl_8079BFF8);
         }
         return;
     case 5:
-        fn_80131D84(self);
-        if (fn_80134114(self, 0, 0x100) == 1) {
+        em_frame_flag_set(self);
+        if (em_approach_step(self, 0, 0x100) == 1) {
             self->state++;
             em_move_mode_set(self, 0);
             em_mot_set(self, 0x27, 0, 0);
@@ -293,7 +294,7 @@ extern "C" void fn_80387CA4(_ENEMY_WORK* self)
     case 6:
         if (em_frame_check(self, 2, lbl_8079C060, lbl_8079BFF8) == 1) {
             em_busy_set(self);
-            fn_80131E74(self);
+            em_busy_timer_reset(self);
         }
         if (em_frame_check(self, 3, lbl_8079C064, lbl_8079BFF8) == 1) {
             fn_80136D14(self);
@@ -321,10 +322,10 @@ extern "C" void fn_80387FF4(_ENEMY_WORK* self)
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        fn_80134964(self, lbl_80570B20, 0, 1, 0);
+        em_turn_seq_start(self, lbl_80570B20, 0, 1, 0);
         return;
     case 1:
-        if (fn_80134B0C(self, lbl_80570B20) == 1) {
+        if (em_turn_seq_step(self, lbl_80570B20) == 1) {
             self->state++;
             em_move_mode_set(self, 0);
             em_mot_set_ck(self, 2, 6, 0);
@@ -385,17 +386,17 @@ extern "C" void fn_80388190(_ENEMY_WORK* self, u8 a, u8 b)
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0xA, 4, 0);
-        fn_8012933C(self, 0, 0xC, 2);
+        em_hit_window_set(self, 0, 0xC, 2);
         switch (a) {
-        case 0: fn_80134004(self, 0, lbl_8079BFF8); return;
-        case 1: fn_80134004(self, 0, lbl_8079C068); return;
-        case 2: fn_80134004(self, 0, lbl_8079C06C); return;
-        case 3: fn_80134004(self, 0, lbl_8079C070); return;
-        case 4: fn_80134004(self, 0, lbl_8079BFF8); return;
+        case 0: em_approach_start(self, lbl_8079BFF8, 0); return;
+        case 1: em_approach_start(self, lbl_8079C068, 0); return;
+        case 2: em_approach_start(self, lbl_8079C06C, 0); return;
+        case 3: em_approach_start(self, lbl_8079C070, 0); return;
+        case 4: em_approach_start(self, lbl_8079BFF8, 0); return;
         }
         return;
     case 1:
-        if (fn_80134114(self, 0, 0x80) == 1 && fn_8012F948(self) == 0) {
+        if (em_approach_step(self, 0, 0x80) == 1 && fn_8012F948(self) == 0) {
             switch (b) {
             case 0:
                 self->state++;
@@ -424,14 +425,14 @@ extern "C" void fn_8038833C(_ENEMY_WORK* self, u8 a)
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        fn_80134964(self, lbl_80570B20, 0, 1, 0);
+        em_turn_seq_start(self, lbl_80570B20, 0, 1, 0);
         return;
     case 1:
         if (a == 1 && em_mot_end_ck(self) == 1) {
             em_action_finish(self);
             return;
         }
-        if (fn_80134B0C(self, lbl_80570B20) == 1) {
+        if (em_turn_seq_step(self, lbl_80570B20) == 1) {
             em_action_finish(self);
         }
         return;
@@ -453,8 +454,8 @@ extern "C" void fn_803883F0(_ENEMY_WORK* self)
         return;
     case 1:
         if (em_frame_check(self, 3, lbl_8079BFF8, lbl_8079C074) == 1) {
-            ratio = (lbl_8079C07C * (lbl_8079C080 * fn_8012F8E4(self))) / lbl_8079C03C;
-            fn_80133C50(self, (u16)(s32)(lbl_8079C078 + ratio));
+            ratio = (lbl_8079C07C * (lbl_8079C080 * get_em_base_scale(self))) / lbl_8079C03C;
+            em_turn_to_target(self, (u16)(s32)(lbl_8079C078 + ratio));
         }
         if (em_mot_end_ck(self) == 1) {
             em_action_finish(self);
@@ -473,10 +474,10 @@ extern "C" void fn_803884C8(_ENEMY_WORK* self)
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x10, 0xA, 0);
-        fn_80134004(self, 0, lbl_8079BFF8);
+        em_approach_start(self, lbl_8079BFF8, 0);
         return;
     case 1:
-        if (fn_80134114(self, 0, 0x80) == 1) {
+        if (em_approach_step(self, 0, 0x80) == 1) {
             em_action_finish(self);
         }
         return;
@@ -494,10 +495,10 @@ extern "C" void fn_8038855C(_ENEMY_WORK* self)
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        fn_80134964(self, lbl_80570B60, 0, 1, 0);
-        fn_801353F8(self);
+        em_turn_seq_start(self, lbl_80570B60, 0, 1, 0);
+        em_move_vec2_clr(self);
         scale = get_em_chg_scale(self);
-        self->field_0x318 = lbl_8079C084 * fn_8012F8E4(self) * scale;
+        self->field_0x318 = lbl_8079C084 * get_em_base_scale(self) * scale;
         self->field_0x324 = lbl_8079BFF8;
         rotVecY(&self->offset_0x30C.vec_0x310, calcVecAng2(&self->pos, &self->vec_0x36C));
         rotVecY(&self->vec_0x31C, calcVecAng2(&self->pos, &self->vec_0x36C));
@@ -506,7 +507,7 @@ extern "C" void fn_8038855C(_ENEMY_WORK* self)
         if (em_frame_check(self, 3, lbl_8079BFF8, lbl_8079C088) == 1) {
             CancelFade(self);
         }
-        if (fn_80134B0C(self, lbl_80570B60) == 1) {
+        if (em_turn_seq_step(self, lbl_80570B60) == 1) {
             em_action_finish(self);
         }
         return;
@@ -526,7 +527,7 @@ extern "C" void fn_80388684(_ENEMY_WORK* self, u8 a)
         return;
     case 1:
         if (em_frame_check(self, 3, lbl_8079C08C, lbl_8079C090) == 1) {
-            fn_80133C50(self, 0x100);
+            em_turn_to_target(self, 0x100);
         }
         if (em_mot_end_ck(self) == 1) {
             em_action_finish(self);
@@ -550,16 +551,16 @@ extern "C" void fn_8038874C(_ENEMY_WORK* self)
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x17, 6, 0);
-        fn_80134004(self, 0x10, lbl_8079BFF8);
-        fn_801353F8(self);
+        em_approach_start(self, lbl_8079BFF8, 0x10);
+        em_move_vec2_clr(self);
         self->offset_0x30C.vec_0x310.x = lbl_8079BFF8;
         self->field_0x314 = lbl_8079BFF8;
         s1 = get_em_chg_scale(self);
-        self->field_0x318 = lbl_8079C094 * fn_8012F8E4(self) * s1;
+        self->field_0x318 = lbl_8079C094 * get_em_base_scale(self) * s1;
         self->vec_0x31C.x = lbl_8079BFF8;
         self->field_0x320 = lbl_8079BFF8;
         s2 = get_em_chg_scale(self);
-        self->field_0x324 = fn_8012F8E4(self) * s2;
+        self->field_0x324 = get_em_base_scale(self) * s2;
         return;
     case 1:
         if (em_frame_check(self, 1, lbl_8079C098, lbl_8079BFF8) == 1
@@ -570,22 +571,22 @@ extern "C" void fn_8038874C(_ENEMY_WORK* self)
                 eft009_set_pos(0x8B, &v, (struct _CP_VECTOR*)&self->field_0x1BC, lbl_8079C00C, self->area_no);
             } else {
                 setVector3(&v, lbl_8079BFF8, lbl_8079BFF8, lbl_8079C028);
-                fn_80304508(self, 0x44, 1, &v, lbl_8079C00C);
-                fn_80304508(self, 0x82, 1, &v, lbl_8079C00C);
+                eft_em_spawn(self, 0x44, 1, &v, lbl_8079C00C);
+                eft_em_spawn(self, 0x82, 1, &v, lbl_8079C00C);
             }
         }
         if (em_frame_check(self, 0, lbl_8079C0A0, lbl_8079BFF8) == 1) {
-            fn_8012933C(self, 0, 6, 0xA);
+            em_hit_window_set(self, 0, 6, 0xA);
         }
         if (em_frame_check(self, 1, lbl_8079C0A4, lbl_8079BFF8) == 1) {
-            fn_801355C8(self, &self->field_0x1BC);
+            em_move_offset_step(self, &self->field_0x1BC);
             if (self->field_0x318 > lbl_8079C0A8) {
                 self->field_0x318 = lbl_8079C0A8;
             } else {
                 em_mot_speed_set(self, lbl_8079C0AC + self->field_0x7C4);
             }
         }
-        if (fn_80134114(self, 0, 0x80) == 1) {
+        if (em_approach_step(self, 0, 0x80) == 1) {
             self->state++;
             em_mot_set(self, 0x18, 0, 0);
             self->field_0x318 *= lbl_8079C0B0;
@@ -603,7 +604,7 @@ extern "C" void fn_8038874C(_ENEMY_WORK* self)
                 eft009_set_pos(0x8C, &v, (struct _CP_VECTOR*)&self->field_0x1BC, lbl_8079C00C, self->area_no);
             } else {
                 setVector3(&v, lbl_8079BFF8, lbl_8079BFF8, lbl_8079BFF8);
-                fn_80304508(self, 0x45, 0x23, &v, lbl_8079C00C);
+                eft_em_spawn(self, 0x45, 0x23, &v, lbl_8079C00C);
             }
         }
         if (em_frame_check(self, 1, lbl_8079C0BC, lbl_8079C0C0) == 1
@@ -614,13 +615,13 @@ extern "C" void fn_8038874C(_ENEMY_WORK* self)
                 eft009_set_pos(0x8C, &v, (struct _CP_VECTOR*)&self->field_0x1BC, lbl_8079C00C, self->area_no);
             } else {
                 setVector3(&v, lbl_8079BFF8, lbl_8079BFF8, lbl_8079BFF8);
-                fn_80304508(self, 0x45, 0x23, &v, lbl_8079C00C);
+                eft_em_spawn(self, 0x45, 0x23, &v, lbl_8079C00C);
             }
         }
         if (em_frame_check(self, 0, lbl_8079C0C4, lbl_8079BFF8) == 1) {
-            fn_80129724(self, 0);
+            em_hit_window_clear(self, 0);
         }
-        fn_801355C8(self, &self->field_0x1BC);
+        em_move_offset_step(self, &self->field_0x1BC);
         if (self->field_0x318 < lbl_8079BFF8) {
             self->field_0x318 = lbl_8079BFF8;
         }
@@ -660,14 +661,14 @@ extern "C" void fn_80388B98(_ENEMY_WORK* self)
 extern "C" void fn_80388C38(_ENEMY_WORK* self)
 {
     em_busy_set(self);
-    fn_80131E74(self);
+    em_busy_timer_reset(self);
     switch (self->state) {
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x26, 4, 0);
-        fn_80129668(self, 0, 0x10);
-        fn_80129668(self, 1, 0x11);
+        em_hit_window_set_default(self, 0, 0x10);
+        em_hit_window_set_default(self, 1, 0x11);
         return;
     case 1:
         if (em_frame_check(self, 1, lbl_8079C05C, lbl_8079BFF8) == 1) {
@@ -688,7 +689,7 @@ extern "C" void fn_80388C38(_ENEMY_WORK* self)
 extern "C" void fn_80388D1C(_ENEMY_WORK* self)
 {
     em_busy_set(self);
-    fn_80131E74(self);
+    em_busy_timer_reset(self);
     switch (self->state) {
     case 0:
         self->state++;
@@ -712,19 +713,19 @@ extern "C" void fn_80388D1C(_ENEMY_WORK* self)
 extern "C" void fn_80388DC8(_ENEMY_WORK* self)
 {
     em_busy_set(self);
-    fn_80131E74(self);
-    fn_80131D84(self);
+    em_busy_timer_reset(self);
+    em_frame_flag_set(self);
     switch (self->state) {
     case 0:
         self->state++;
         em_move_mode_set(self, 4);
         em_mot_set(self, 6, 0, 0);
-        fn_80134004(self, 0, lbl_8079C0C8);
+        em_approach_start(self, lbl_8079C0C8, 0);
         fn_8013032C(self);
         fn_801303EC(self, lbl_8079BFF8);
         return;
     case 1:
-        if (fn_80134114(self, 0, 0x100) == 1) {
+        if (em_approach_step(self, 0, 0x100) == 1) {
             fn_801280F4(self);
         }
         return;
@@ -739,8 +740,8 @@ extern "C" void fn_80388E88(_ENEMY_WORK* self, u8 a)
     f32 end = lbl_8079BFF8;
 
     em_busy_set(self);
-    fn_80131E74(self);
-    fn_80131D84(self);
+    em_busy_timer_reset(self);
+    em_frame_flag_set(self);
     switch (self->state) {
     case 0:
         self->state++;
@@ -750,12 +751,12 @@ extern "C" void fn_80388E88(_ENEMY_WORK* self, u8 a)
         if (a == 0) {
             end = lbl_8079C0D0;
         }
-        fn_80134004(self, 0, end);
+        em_approach_start(self, end, 0);
         fn_8013032C(self);
         fn_801303EC(self, lbl_8079BFF8);
         return;
     case 1:
-        if (fn_80134114(self, 0, 0x100) == 1) {
+        if (em_approach_step(self, 0, 0x100) == 1) {
             fn_801280F4(self);
         }
         return;
@@ -768,17 +769,17 @@ extern "C" void fn_80388E88(_ENEMY_WORK* self, u8 a)
 extern "C" void fn_80388F88(_ENEMY_WORK* self)
 {
     em_busy_set(self);
-    fn_80131E74(self);
+    em_busy_timer_reset(self);
     switch (self->state) {
     case 0:
         self->state++;
         em_move_mode_set(self, 4);
-        fn_80134964(self, lbl_80570B20, 0, 0, 0);
+        em_turn_seq_start(self, lbl_80570B20, 0, 0, 0);
         fn_8013032C(self);
         fn_801303EC(self, lbl_8079BFF8);
         return;
     case 1:
-        if (fn_80134B0C(self, lbl_80570B20) == 1) {
+        if (em_turn_seq_step(self, lbl_80570B20) == 1) {
             fn_801280F4(self);
         }
         return;
@@ -791,15 +792,15 @@ extern "C" void fn_80388F88(_ENEMY_WORK* self)
 extern "C" void fn_80389038(_ENEMY_WORK* self)
 {
     em_busy_set(self);
-    fn_80131E74(self);
+    em_busy_timer_reset(self);
     switch (self->state) {
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x27, 0, 0);
         fn_801303EC(self, lbl_8079BFF8);
-        fn_80129668(self, 0, 0x13);
-        fn_80129668(self, 1, 0x14);
+        em_hit_window_set_default(self, 0, 0x13);
+        em_hit_window_set_default(self, 1, 0x14);
         fn_80136D14(self);
         return;
     case 1:
@@ -819,14 +820,14 @@ extern "C" void fn_80389038(_ENEMY_WORK* self)
 extern "C" void fn_80389120(_ENEMY_WORK* self, u8 a)
 {
     em_busy_set(self);
-    fn_80131E74(self);
+    em_busy_timer_reset(self);
     switch (self->state) {
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x26, 4, 0);
-        fn_80129668(self, 0, 0x10);
-        fn_80129668(self, 1, 0x11);
+        em_hit_window_set_default(self, 0, 0x10);
+        em_hit_window_set_default(self, 1, 0x11);
         return;
     case 1:
         if (em_frame_check(self, 1, lbl_8079C05C, lbl_8079BFF8) == 1) {
@@ -845,33 +846,33 @@ extern "C" void fn_80389120(_ENEMY_WORK* self, u8 a)
             } else {
                 fn_8012B380(self, 5, 8, 8);
             }
-            fn_80128BF8(self, 0);
+            em_target_pos_set(self, 0);
             em_move_mode_set(self, 4);
-            fn_80134964(self, lbl_80570B20, 0, 0, 0);
+            em_turn_seq_start(self, lbl_80570B20, 0, 0, 0);
             fn_8013032C(self);
             fn_801303EC(self, lbl_8079BFF8);
         }
         return;
     case 2:
-        if (fn_80134B0C(self, lbl_80570B20) == 1) {
+        if (em_turn_seq_step(self, lbl_80570B20) == 1) {
             self->state++;
             em_mot_set(self, 0xA, 0, 0);
             em_mot_speed_set(self, lbl_8079C0CC);
-            fn_80134004(self, 0, lbl_8079BFF8);
+            em_approach_start(self, lbl_8079BFF8, 0);
             fn_8013032C(self);
             fn_801303EC(self, lbl_8079BFF8);
-            fn_80131D84(self);
+            em_frame_flag_set(self);
         }
         return;
     case 3:
-        fn_80131D84(self);
-        if (fn_80134114(self, 0, 0x100) == 1) {
+        em_frame_flag_set(self);
+        if (em_approach_step(self, 0, 0x100) == 1) {
             if ((u32)(a - 3) > 6) {
                 if (a <= 2 || (u32)(a - 0xA) <= 2) {
                     self->state++;
                     fn_8012B380(self, 5, 8, 2);
-                    fn_80128BF8(self, 0);
-                    fn_80134964(self, lbl_80570B20, 0, 0, 0);
+                    em_target_pos_set(self, 0);
+                    em_turn_seq_start(self, lbl_80570B20, 0, 0, 0);
                     fn_8013032C(self);
                     fn_801303EC(self, lbl_8079BFF8);
                     return;
@@ -884,21 +885,21 @@ extern "C" void fn_80389120(_ENEMY_WORK* self, u8 a)
                 self->field_0x1C0 = 0xDC00;
                 self->field_0x1C4 = 0;
                 fn_801303EC(self, lbl_8079BFF8);
-                fn_80129668(self, 0, 0x13);
-                fn_80129668(self, 1, 0x14);
+                em_hit_window_set_default(self, 0, 0x13);
+                em_hit_window_set_default(self, 1, 0x14);
                 fn_80136D14(self);
                 return;
             }
         }
         return;
     case 4:
-        if (fn_80134B0C(self, lbl_80570B20) == 1) {
+        if (em_turn_seq_step(self, lbl_80570B20) == 1) {
             self->state++;
             em_move_mode_set(self, 0);
             em_mot_set(self, 0x27, 0, 0);
             fn_801303EC(self, lbl_8079BFF8);
-            fn_80129668(self, 0, 0x13);
-            fn_80129668(self, 1, 0x14);
+            em_hit_window_set_default(self, 0, 0x13);
+            em_hit_window_set_default(self, 1, 0x14);
             fn_80136D14(self);
         }
         return;
@@ -974,7 +975,7 @@ extern "C" void fn_803896E8(_ENEMY_WORK* self)
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x12, 4, 0);
-        fn_8012933C(self, 0, 1, 8);
+        em_hit_window_set(self, 0, 1, 8);
         fn_80130CDC(self, -0x1E);
         ang = (u16)(calcVecAng2(&self->pos, &self->vec_0x36C) - self->field_0x1C0);
         if (ang >= 0x8000) {
@@ -989,8 +990,8 @@ extern "C" void fn_803896E8(_ENEMY_WORK* self)
         if (em_frame_check(self, 1, lbl_8079C0A8, lbl_8079C008) == 1) {
             f = lbl_8079C03C * (f32)self->timer_0x020;
             g = f / lbl_8079C07C;
-            f = (lbl_8079C07C * ((g / lbl_8079C0A8) * fn_8012F8E4(self))) / lbl_8079C03C;
-            fn_80133C50(self, (u16)(s32)(lbl_8079C078 + f));
+            f = (lbl_8079C07C * ((g / lbl_8079C0A8) * get_em_base_scale(self))) / lbl_8079C03C;
+            em_turn_to_target(self, (u16)(s32)(lbl_8079C078 + f));
         }
         if (em_frame_check(self, 0, lbl_8079C010, lbl_8079BFF8) == 1) {
             get_joint_wmat_em(self, 0x14, &mtx);
@@ -999,7 +1000,7 @@ extern "C" void fn_803896E8(_ENEMY_WORK* self)
             shell_set_func_ptr->method_0x18(self, &v, &self->field_0x1BC, 0x2F, self->area_no, self->field_0xAEA, shell_set_func_ptr);
         }
         if (em_frame_check(self, 0, lbl_8079C0D8, lbl_8079BFF8) == 1) {
-            fn_80136B50(self, 0x15, 6);
+            em_camera_req(self, 0x15, 6);
             setVector3(&v, lbl_8079BFF8, lbl_8079C0DC, lbl_8079C0E0);
             shell_set_func_ptr->method_0x2C(self, 9, 0x15, &v, lbl_8079C0E4, self->field_0xAEA, shell_set_func_ptr);
         }
@@ -1026,9 +1027,9 @@ extern "C" void fn_8038995C(_ENEMY_WORK* self, u8 a)
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x15, 4, 0);
-        fn_801353F8(self);
+        em_move_vec2_clr(self);
         self->angle_0x328 = self->field_0x1C0;
-        fn_8012933C(self, 0, 2, 8);
+        em_hit_window_set(self, 0, 2, 8);
         return;
     case 1:
         if (em_frame_check(self, 3, lbl_8079C0F0, lbl_8079BFF8) == 1) {
@@ -1036,19 +1037,19 @@ extern "C" void fn_8038995C(_ENEMY_WORK* self, u8 a)
         } else {
             em_mot_speed_set(self, lbl_8079C00C);
         }
-        fn_80133E3C(self, 0x4000, lbl_8079C0F8, lbl_8079C0FC);
-        fn_80133E3C(self, 0x4000, lbl_8079C0FC, lbl_8079C0D8);
-        fn_80133E3C(self, 0x4000, lbl_8079C0D8, lbl_8079C100);
-        fn_80133E3C(self, 0x4000, lbl_8079C100, lbl_8079C104);
-        fn_80133E3C(self, 0x4000, lbl_8079C104, lbl_8079C108);
+        em_turn_in_window(self, lbl_8079C0F8, lbl_8079C0FC, 0x4000);
+        em_turn_in_window(self, lbl_8079C0FC, lbl_8079C0D8, 0x4000);
+        em_turn_in_window(self, lbl_8079C0D8, lbl_8079C100, 0x4000);
+        em_turn_in_window(self, lbl_8079C100, lbl_8079C104, 0x4000);
+        em_turn_in_window(self, lbl_8079C104, lbl_8079C108, 0x4000);
         self->offset_0x30C.vec_0x310.x = lbl_8079BFF8;
         self->field_0x314 = lbl_8079BFF8;
-        s = fn_8012F8E4(self);
-        t = fn_80135644(self, lbl_805EFA00) * s;
+        s = get_em_base_scale(self);
+        t = em_key_curve_eval(self, lbl_805EFA00) * s;
         s = get_em_chg_scale(self) * t;
         self->field_0x318 = lbl_8079C10C * s;
         rotVecY(&self->offset_0x30C.vec_0x310, self->angle_0x328);
-        fn_80135418(self);
+        em_move_offset_apply(self);
         if (a > 1) {
             if (a == 2 && em_mot_end_ck(self) == 1) {
                 em_action_finish(self);
@@ -1090,11 +1091,11 @@ extern "C" void fn_80389C50(_ENEMY_WORK* self)
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set_ck(self, 0x15, 0, 0);
-        fn_801353F8(self);
+        em_move_vec2_clr(self);
         if (self->field_0xAE9 == 1) {
-            fn_8012933C(self, 0, 2, 0x10);
+            em_hit_window_set(self, 0, 2, 0x10);
         } else {
-            fn_80129668(self, 0, 2);
+            em_hit_window_set_default(self, 0, 2);
         }
         /* fallthrough */
     case 1:
@@ -1103,19 +1104,19 @@ extern "C" void fn_80389C50(_ENEMY_WORK* self)
         } else {
             em_mot_speed_set(self, lbl_8079C00C);
         }
-        fn_80133E3C(self, 0x4000, lbl_8079C0F8, lbl_8079C0FC);
-        fn_80133E3C(self, 0x4000, lbl_8079C0FC, lbl_8079C0D8);
-        fn_80133E3C(self, 0x4000, lbl_8079C0D8, lbl_8079C100);
-        fn_80133E3C(self, 0x4000, lbl_8079C100, lbl_8079C104);
-        fn_80133E3C(self, 0x4000, lbl_8079C104, lbl_8079C108);
+        em_turn_in_window(self, lbl_8079C0F8, lbl_8079C0FC, 0x4000);
+        em_turn_in_window(self, lbl_8079C0FC, lbl_8079C0D8, 0x4000);
+        em_turn_in_window(self, lbl_8079C0D8, lbl_8079C100, 0x4000);
+        em_turn_in_window(self, lbl_8079C100, lbl_8079C104, 0x4000);
+        em_turn_in_window(self, lbl_8079C104, lbl_8079C108, 0x4000);
         self->offset_0x30C.vec_0x310.x = lbl_8079BFF8;
         self->field_0x314 = lbl_8079BFF8;
-        s = fn_8012F8E4(self);
-        t = fn_80135644(self, lbl_805EFA00) * s;
+        s = get_em_base_scale(self);
+        t = em_key_curve_eval(self, lbl_805EFA00) * s;
         s = get_em_chg_scale(self) * t;
         self->field_0x318 = lbl_8079C10C * s;
         rotVecY(&self->offset_0x30C.vec_0x310, self->angle_0x328);
-        fn_80135418(self);
+        em_move_offset_apply(self);
         if (em_mot_end_ck(self) == 1) {
             em_action_finish(self);
         }
@@ -1157,23 +1158,23 @@ extern "C" void fn_80389E1C(_ENEMY_WORK* self, u8 a)
         if (em_after_frame_check(self, 3, lbl_8079C000, lbl_8079C118) == 1
             && (system_w.field_0x0c & 3) == 0) {
             setVector3(&v, lbl_8079BFF8, lbl_8079BFF8, lbl_8079BFF8);
-            fn_80304508(self, id1, 3, &v, lbl_8079C00C);
+            eft_em_spawn(self, id1, 3, &v, lbl_8079C00C);
         }
         if (em_after_frame_check(self, 3, lbl_8079C11C, lbl_8079C120) == 1
             && (system_w.field_0x0c & 7) == 0) {
             if (self->state_0x007 == 0) {
                 self->state_0x007 = 1;
                 setVector3(&v, lbl_8079BFF8, lbl_8079C0C8, lbl_8079BFF8);
-                fn_80304510(self, id2, 3, &v, 0, lbl_8079C00C);
+                eft_em_spawn_param(self, id2, 3, &v, lbl_8079C00C, 0);
             } else {
                 self->state_0x007 = 0;
                 setVector3(&v, lbl_8079BFF8, lbl_8079C0C8, lbl_8079BFF8);
-                fn_80304510(self, id2, 3, &v, 0x2000, lbl_8079C00C);
+                eft_em_spawn_param(self, id2, 3, &v, lbl_8079C00C, 0x2000);
             }
         }
         if (em_frame_check(self, 0, lbl_8079C100, lbl_8079BFF8) == 1) {
             self->state++;
-            fn_8012933C(self, 0, kind, 2);
+            em_hit_window_set(self, 0, kind, 2);
         }
         return;
     case 2:
@@ -1182,17 +1183,17 @@ extern "C" void fn_80389E1C(_ENEMY_WORK* self, u8 a)
             if (self->state_0x007 == 0) {
                 self->state_0x007 = 1;
                 setVector3(&v, lbl_8079BFF8, lbl_8079C0C8, lbl_8079BFF8);
-                fn_80304510(self, id2, 3, &v, 0, lbl_8079C00C);
+                eft_em_spawn_param(self, id2, 3, &v, lbl_8079C00C, 0);
             } else {
                 self->state_0x007 = 0;
                 setVector3(&v, lbl_8079BFF8, lbl_8079C0C8, lbl_8079BFF8);
-                fn_80304510(self, id2, 3, &v, 0x2000, lbl_8079C00C);
+                eft_em_spawn_param(self, id2, 3, &v, lbl_8079C00C, 0x2000);
             }
         }
         if (em_mot_end_ck(self) == 1) {
             self->state_0x006++;
             if (a == 0 && self->state_0x006 == 3) {
-                fn_8012933C(self, 0, kind, 2);
+                em_hit_window_set(self, 0, kind, 2);
             }
         }
         if (self->state_0x006 >= 4) {
@@ -1219,7 +1220,7 @@ extern "C" void fn_8038B888(_ENEMY_WORK* self)
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x1A, 4, 0);
-        fn_80129668(self, 0, 5);
+        em_hit_window_set_default(self, 0, 5);
         return;
     case 1:
         if (em_mot_end_ck(self) == 1) {
@@ -1240,19 +1241,19 @@ extern "C" void fn_8038B914(_ENEMY_WORK* self, u8 a)
         em_move_mode_set(self, 0);
         if (a == 0) {
             em_mot_set(self, 0x1D, 4, 0);
-            fn_80129668(self, 0, 7);
-            fn_80129668(self, 1, 8);
+            em_hit_window_set_default(self, 0, 7);
+            em_hit_window_set_default(self, 1, 8);
             return;
         }
         em_mot_set(self, 0x1C, 4, 0);
-        fn_80129668(self, 0, 9);
-        fn_80129668(self, 1, 0xA);
+        em_hit_window_set_default(self, 0, 9);
+        em_hit_window_set_default(self, 1, 0xA);
         return;
     case 1:
         if (a == 0) {
-            fn_80133E3C(self, 0x4000, lbl_8079BFF8, lbl_8079C0A8);
+            em_turn_in_window(self, lbl_8079BFF8, lbl_8079C0A8, 0x4000);
         } else {
-            fn_80133E3C(self, -0x4000, lbl_8079BFF8, lbl_8079C0A8);
+            em_turn_in_window(self, lbl_8079BFF8, lbl_8079C0A8, -0x4000);
         }
         if (em_mot_end_ck(self) == 1) {
             em_action_finish(self);
@@ -1267,34 +1268,34 @@ extern "C" void fn_8038B914(_ENEMY_WORK* self, u8 a)
 extern "C" void fn_8038BD28(_ENEMY_WORK* self)
 {
     switch (self->state_sub) {
-    case 0x17: fn_801251D0(self, lbl_805EFF68, 0, 0x17); return;
-    case 0x18: fn_801251D0(self, lbl_805EFF90, 0, 0x18); return;
-    case 0x19: fn_801251D0(self, lbl_805EFFB8, 0, 0x19); return;
-    case 0x1A: fn_801251D0(self, lbl_805EFF90, 0, 0x1A); return;
-    case 0x1B: fn_801251D0(self, lbl_805F0018, 0, 0x1B); return;
-    case 0x1C: fn_801251D0(self, lbl_805F0088, 0, 0x1C); return;
-    case 0x1D: fn_801251D0(self, lbl_805F00C8, 0, 0x1D); return;
-    case 0x7A: fn_801251D0(self, lbl_805F00F0, 0, 0x7A); return;
-    case 0x7B: fn_801251D0(self, lbl_805F0118, 0, 0x7B); return;
-    case 0x9F: fn_801251D0(self, lbl_805F0140, 0, 0x9F); return;
-    case 0xA0: fn_801251D0(self, lbl_805F0140, 0, 0xA0); return;
-    case 0x7C: fn_801251D0(self, lbl_805F0168, 0, 0x7C); return;
-    case 0x8D: fn_801251D0(self, lbl_805F0190, 0, 0x8D); return;
-    case 0x78: fn_801251D0(self, lbl_805F01B8, 0, 0x78); return;
-    case 0xA8: fn_801251D0(self, lbl_805F02D8, 0, 0xA8); return;
-    case 0x7E: fn_801251D0(self, lbl_805F0210, 0, 0x7E); return;
-    case 0x7F: fn_801251D0(self, lbl_805F0278, 0, 0x7F); return;
-    case 0x8E: fn_801251D0(self, lbl_805F02B0, 0, 0x8E); return;
-    case 0xB6: fn_801251D0(self, lbl_805F0300, 0, 0xB6); return;
-    case 0xB7: fn_801251D0(self, lbl_805F0328, 0, 0xB7); return;
-    case 0xB8: fn_801251D0(self, lbl_805F0350, 0, 0xB8); return;
-    case 0xB9: fn_801251D0(self, lbl_805F0378, 0, 0xB9); return;
-    case 0xBA: fn_801251D0(self, lbl_805F03A0, 0, 0xBA); return;
-    case 0xBB: fn_801251D0(self, lbl_805F03C8, 0, 0xBB); return;
-    case 0xBC: fn_801251D0(self, lbl_805F03C8, 0, 0xBC); return;
-    case 0xBF: fn_801251D0(self, lbl_805F0408, 0, 0xBF); return;
-    case 0xC1: fn_801251D0(self, lbl_805F0190, 0, 0xC1); return;
-    case 0xC9: fn_801251D0(self, lbl_805F0478, 0, 0xC9); return;
+    case 0x17: em_se_tbl_play(self, lbl_805EFF68, 0, 0x17); return;
+    case 0x18: em_se_tbl_play(self, lbl_805EFF90, 0, 0x18); return;
+    case 0x19: em_se_tbl_play(self, lbl_805EFFB8, 0, 0x19); return;
+    case 0x1A: em_se_tbl_play(self, lbl_805EFF90, 0, 0x1A); return;
+    case 0x1B: em_se_tbl_play(self, lbl_805F0018, 0, 0x1B); return;
+    case 0x1C: em_se_tbl_play(self, lbl_805F0088, 0, 0x1C); return;
+    case 0x1D: em_se_tbl_play(self, lbl_805F00C8, 0, 0x1D); return;
+    case 0x7A: em_se_tbl_play(self, lbl_805F00F0, 0, 0x7A); return;
+    case 0x7B: em_se_tbl_play(self, lbl_805F0118, 0, 0x7B); return;
+    case 0x9F: em_se_tbl_play(self, lbl_805F0140, 0, 0x9F); return;
+    case 0xA0: em_se_tbl_play(self, lbl_805F0140, 0, 0xA0); return;
+    case 0x7C: em_se_tbl_play(self, lbl_805F0168, 0, 0x7C); return;
+    case 0x8D: em_se_tbl_play(self, lbl_805F0190, 0, 0x8D); return;
+    case 0x78: em_se_tbl_play(self, lbl_805F01B8, 0, 0x78); return;
+    case 0xA8: em_se_tbl_play(self, lbl_805F02D8, 0, 0xA8); return;
+    case 0x7E: em_se_tbl_play(self, lbl_805F0210, 0, 0x7E); return;
+    case 0x7F: em_se_tbl_play(self, lbl_805F0278, 0, 0x7F); return;
+    case 0x8E: em_se_tbl_play(self, lbl_805F02B0, 0, 0x8E); return;
+    case 0xB6: em_se_tbl_play(self, lbl_805F0300, 0, 0xB6); return;
+    case 0xB7: em_se_tbl_play(self, lbl_805F0328, 0, 0xB7); return;
+    case 0xB8: em_se_tbl_play(self, lbl_805F0350, 0, 0xB8); return;
+    case 0xB9: em_se_tbl_play(self, lbl_805F0378, 0, 0xB9); return;
+    case 0xBA: em_se_tbl_play(self, lbl_805F03A0, 0, 0xBA); return;
+    case 0xBB: em_se_tbl_play(self, lbl_805F03C8, 0, 0xBB); return;
+    case 0xBC: em_se_tbl_play(self, lbl_805F03C8, 0, 0xBC); return;
+    case 0xBF: em_se_tbl_play(self, lbl_805F0408, 0, 0xBF); return;
+    case 0xC1: em_se_tbl_play(self, lbl_805F0190, 0, 0xC1); return;
+    case 0xC9: em_se_tbl_play(self, lbl_805F0478, 0, 0xC9); return;
     default: em_action_finish(self); return;
     }
 }
@@ -1305,11 +1306,11 @@ extern "C" void fn_8038BD28(_ENEMY_WORK* self)
 extern "C" void fn_8038C080(_ENEMY_WORK* self)
 {
     switch (self->state_sub) {
-    case 0: fn_801251D8(self, lbl_805F04C0, 0, 0); return;
-    case 15: fn_801251D8(self, lbl_805F04F0, 0, 0xF); return;
-    case 26: fn_801251D8(self, lbl_805F0558, 0, 0x1A); return;
-    case 28: fn_801251D8(self, lbl_805F0518, 0, 0x1C); return;
-    default: fn_801251D8(self, lbl_805F04C0, 0, 0); return;
+    case 0: em_se_tbl_play_alt(self, lbl_805F04C0, 0, 0); return;
+    case 15: em_se_tbl_play_alt(self, lbl_805F04F0, 0, 0xF); return;
+    case 26: em_se_tbl_play_alt(self, lbl_805F0558, 0, 0x1A); return;
+    case 28: em_se_tbl_play_alt(self, lbl_805F0518, 0, 0x1C); return;
+    default: em_se_tbl_play_alt(self, lbl_805F04C0, 0, 0); return;
     }
 }
 
@@ -1420,8 +1421,8 @@ extern "C" void fn_8038CB0C(_ENEMY_WORK* self)
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set(self, 2, 0, 0);
-        fn_80146058(self, lbl_8079C1F8, lbl_8079C1A8, lbl_8079C1FC);
-        fn_8014610C(self, lbl_8079BFF8, lbl_8079C1D4, lbl_8079BFF8);
+        em_demo_pos_set(self, lbl_8079C1F8, lbl_8079C1A8, lbl_8079C1FC);
+        em_demo_rot_set(self, lbl_8079BFF8, lbl_8079C1D4, lbl_8079BFF8);
         return;
     case 1:
         if (em_mot_end_ck(self) == 1) {
@@ -1468,9 +1469,9 @@ extern "C" void fn_8038CC20(_ENEMY_WORK* self)
     nw4r::math::VEC3 v;
 
     VEC3_ctor(&v);
-    if (fn_8012EC60(self) == 1 && (system_w.field_0x0c & 0x1F) == 0) {
+    if (em_alt_mode_ck(self) == 1 && (system_w.field_0x0c & 0x1F) == 0) {
         setVector3(&v, lbl_8079BFF8, lbl_8079BFF8, lbl_8079C000);
-        fn_8010562C(self, 0x18, 0x14, &v, lbl_8079C00C);
+        eft_spawn_type10(self, 0x18, 0x14, &v, lbl_8079C00C);
     }
 }
 
@@ -1515,76 +1516,76 @@ extern "C" void fn_8038A198(_ENEMY_WORK* self, u8 a)
         return;
     case 1:
         if (em_frame_check(self, 0, lbl_8079C000, lbl_8079BFF8) == 1) {
-            fn_8012933C(self, 0, 4, 0xA);
+            em_hit_window_set(self, 0, 4, 0xA);
         }
         if (em_frame_check(self, 0, lbl_8079C128, lbl_8079BFF8) == 1) {
-            fn_80129724(self, 0);
+            em_hit_window_clear(self, 0);
         }
         if (em_frame_check(self, 0, lbl_8079C12C, lbl_8079BFF8) == 1) {
-            fn_8012933C(self, 0, 4, 0x1A);
+            em_hit_window_set(self, 0, 4, 0x1A);
         }
         if (em_frame_check(self, 0, lbl_8079C130, lbl_8079BFF8) == 1) {
-            fn_80129724(self, 0);
+            em_hit_window_clear(self, 0);
         }
         if (em_frame_check(self, 0, lbl_8079C134, lbl_8079BFF8) == 1) {
-            fn_8012933C(self, 0, 4, 0x1A);
+            em_hit_window_set(self, 0, 4, 0x1A);
         }
         if (em_frame_check(self, 0, lbl_8079C138, lbl_8079BFF8) == 1) {
-            fn_80129724(self, 0);
+            em_hit_window_clear(self, 0);
         }
         if (em_frame_check(self, 0, lbl_8079C13C, lbl_8079BFF8) == 1) {
-            fn_8012933C(self, 0, 4, 0x1A);
+            em_hit_window_set(self, 0, 4, 0x1A);
         }
         if (em_frame_check(self, 0, lbl_8079C140, lbl_8079BFF8) == 1) {
-            fn_80129724(self, 0);
+            em_hit_window_clear(self, 0);
         }
         if (em_frame_check(self, 0, lbl_8079C128, lbl_8079BFF8) == 1) {
             get_joint_wmat_em(self, 0x14, &mtx);
             setVector3(&v, lbl_8079BFF8, lbl_8079C0D4, lbl_8079C060);
             mulVecMatAddTrans(&v, &mtx);
             shell_set_func_ptr->method_0x18(self, &v, &self->field_0x1BC, 0x31, self->area_no, self->field_0xAEA, shell_set_func_ptr);
-            fn_80136B50(self, 0x15, 9);
+            em_camera_req(self, 0x15, 9);
         }
         if (em_frame_check(self, 0, lbl_8079C130, lbl_8079BFF8) == 1) {
             get_joint_wmat_em(self, 0x14, &mtx);
             setVector3(&v, lbl_8079BFF8, lbl_8079C0D4, lbl_8079C060);
             mulVecMatAddTrans(&v, &mtx);
             shell_set_func_ptr->method_0x18(self, &v, &self->field_0x1BC, 0x31, self->area_no, self->field_0xAEA, shell_set_func_ptr);
-            fn_80136B50(self, 0x15, 9);
+            em_camera_req(self, 0x15, 9);
         }
         if (em_frame_check(self, 0, lbl_8079C138, lbl_8079BFF8) == 1) {
             get_joint_wmat_em(self, 0x14, &mtx);
             setVector3(&v, lbl_8079BFF8, lbl_8079C0D4, lbl_8079C060);
             mulVecMatAddTrans(&v, &mtx);
             shell_set_func_ptr->method_0x18(self, &v, &self->field_0x1BC, 0x31, self->area_no, self->field_0xAEA, shell_set_func_ptr);
-            fn_80136B50(self, 0x15, 9);
+            em_camera_req(self, 0x15, 9);
         }
         if (em_frame_check(self, 0, lbl_8079C140, lbl_8079BFF8) == 1) {
             get_joint_wmat_em(self, 0x14, &mtx);
             setVector3(&v, lbl_8079BFF8, lbl_8079C0D4, lbl_8079C060);
             mulVecMatAddTrans(&v, &mtx);
             shell_set_func_ptr->method_0x18(self, &v, &self->field_0x1BC, 0x31, self->area_no, self->field_0xAEA, shell_set_func_ptr);
-            fn_80136B50(self, 0x15, 9);
+            em_camera_req(self, 0x15, 9);
         }
         switch (a) {
         default:
             if (em_frame_check(self, 1, lbl_8079C144, lbl_8079C148) == 1) {
                 f = lbl_8079C03C * (f32)self->timer_0x020;
                 g = f / lbl_8079C07C;
-                h = (lbl_8079C07C * ((g / lbl_8079C14C) * fn_8012F8E4(self))) / lbl_8079C03C;
-                fn_80133C50(self, (u16)(s32)(lbl_8079C078 + h));
+                h = (lbl_8079C07C * ((g / lbl_8079C14C) * get_em_base_scale(self))) / lbl_8079C03C;
+                em_turn_to_target(self, (u16)(s32)(lbl_8079C078 + h));
             }
             break;
         case 4: case 6:
-            fn_80133E3C(self, 0x3000, lbl_8079C144, lbl_8079C148);
+            em_turn_in_window(self, lbl_8079C144, lbl_8079C148, 0x3000);
             break;
         case 5: case 7:
-            fn_80133E3C(self, -0x4000, lbl_8079C144, lbl_8079C148);
+            em_turn_in_window(self, lbl_8079C144, lbl_8079C148, -0x4000);
             break;
         }
         switch (self->state_0x007) {
-        case 1: fn_80133E3C(self, 0x3000, lbl_8079C014, lbl_8079C150); break;
-        case 2: fn_80133E3C(self, -0x4000, lbl_8079C014, lbl_8079C150); break;
+        case 1: em_turn_in_window(self, lbl_8079C014, lbl_8079C150, 0x3000); break;
+        case 2: em_turn_in_window(self, lbl_8079C014, lbl_8079C150, -0x4000); break;
         }
         if (em_mot_end_ck(self) == 1) {
             em_action_finish(self);
@@ -1602,79 +1603,79 @@ extern "C" void fn_8038C124(_ENEMY_WORK* self)
 
     VEC3_ctor(&v);
     self->timer_0x020++;
-    fn_80131D84(self);
+    em_frame_flag_set(self);
     switch (self->state) {
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
         em_mot_set(self, 1, 0, 0);
-        fn_8014616C(self, 0);
+        em_demo_reset(self, 0);
         self->timer_0x020 = 0;
         return;
     case 1:
-        if (fn_80146008(0x8C) == 1) {
+        if (em_demo_time_ck(0x8C) == 1) {
             self->state++;
-            fn_8014619C(self);
-            fn_801305C4(self);
+            em_demo_enable(self);
+            em_fall_start(self);
             em_mot_set(self, 0x17, 0, 0xA4);
-            fn_801461A8(self, (s16)self->timer_0x020, lbl_805F0570, (void*)0);
-            fn_8014610C(self, lbl_8079BFF8, lbl_8079C198, lbl_8079BFF8);
+            em_demo_key3_apply(self, (s16)self->timer_0x020, lbl_805F0570, (void*)0);
+            em_demo_rot_set(self, lbl_8079BFF8, lbl_8079C198, lbl_8079BFF8);
         }
         return;
     case 2:
-        if (em_frame_check(self, 1, lbl_8079C098, lbl_8079BFF8) == 1 && (fn_80145FE4() & 3) == 0) {
+        if (em_frame_check(self, 1, lbl_8079C098, lbl_8079BFF8) == 1 && (em_demo_frame_get() & 3) == 0) {
             setVector3(&v, lbl_8079BFF8, lbl_8079BFF8, lbl_8079C028);
-            fn_80304508(self, 0x44, 1, &v, lbl_8079C00C);
+            eft_em_spawn(self, 0x44, 1, &v, lbl_8079C00C);
         }
-        fn_801461A8(self, (s16)self->timer_0x020, lbl_805F0570, (void*)0);
-        if (fn_80146008(0xF2) == 1) {
+        em_demo_key3_apply(self, (s16)self->timer_0x020, lbl_805F0570, (void*)0);
+        if (em_demo_time_ck(0xF2) == 1) {
             self->state++;
             self->timer_0x020 = 0;
-            fn_8014610C(self, lbl_8079BFF8, lbl_8079C19C, lbl_8079BFF8);
-            fn_801462A4(self, (s16)self->timer_0x020, lbl_805F0620, lbl_805F0790, 7, 2);
+            em_demo_rot_set(self, lbl_8079BFF8, lbl_8079C19C, lbl_8079BFF8);
+            em_demo_key_apply(self, (s16)self->timer_0x020, lbl_805F0620, lbl_805F0790, 7, 2);
         }
         return;
     case 3:
-        if (em_frame_check(self, 1, lbl_8079C098, lbl_8079BFF8) == 1 && (fn_80145FE4() & 3) == 0) {
+        if (em_frame_check(self, 1, lbl_8079C098, lbl_8079BFF8) == 1 && (em_demo_frame_get() & 3) == 0) {
             setVector3(&v, lbl_8079BFF8, lbl_8079BFF8, lbl_8079C028);
-            fn_80304508(self, 0x44, 1, &v, lbl_8079C00C);
+            eft_em_spawn(self, 0x44, 1, &v, lbl_8079C00C);
         }
-        if (fn_80145FE4() == 0x8F) {
-            fn_801048B4(self, 1, 6, 0, lbl_8079C00C);
+        if (em_demo_frame_get() == 0x8F) {
+            eft009_spawn_at_joint(self, 1, 6, 0, lbl_8079C00C);
         }
-        if (fn_80145FE4() == 0xC1 || fn_80145FE4() == 0xE5) {
+        if (em_demo_frame_get() == 0xC1 || em_demo_frame_get() == 0xE5) {
             copyVec3(&v, &self->pos);
             v.y = lbl_8079C09C + self->field_0x20C;
-            fn_8010D2B0(&v, self->area_no, 1, 0, lbl_8079C1A0);
+            eft_spawn_pos_in_area(&v, self->area_no, 1, 0, lbl_8079C1A0);
         }
-        fn_801462A4(self, (s16)self->timer_0x020, lbl_805F0620, lbl_805F0790, 7, 2);
-        if (fn_80146008(0x1DE) == 1) {
+        em_demo_key_apply(self, (s16)self->timer_0x020, lbl_805F0620, lbl_805F0790, 7, 2);
+        if (em_demo_time_ck(0x1DE) == 1) {
             self->state++;
             em_mot_speed_set(self, lbl_8079C0F4);
         }
         return;
     case 4:
-        if (em_frame_check(self, 1, lbl_8079C098, lbl_8079BFF8) == 1 && (fn_80145FE4() & 3) == 0) {
+        if (em_frame_check(self, 1, lbl_8079C098, lbl_8079BFF8) == 1 && (em_demo_frame_get() & 3) == 0) {
             setVector3(&v, lbl_8079BFF8, lbl_8079BFF8, lbl_8079C028);
-            fn_80304508(self, 0x44, 1, &v, lbl_8079C00C);
+            eft_em_spawn(self, 0x44, 1, &v, lbl_8079C00C);
         }
-        fn_801462A4(self, (s16)self->timer_0x020, lbl_805F0620, lbl_805F0790, 7, 2);
-        if (fn_80146008(0x26C) == 1) {
+        em_demo_key_apply(self, (s16)self->timer_0x020, lbl_805F0620, lbl_805F0790, 7, 2);
+        if (em_demo_time_ck(0x26C) == 1) {
             self->state++;
             self->timer_0x020 = 0;
             em_mot_set(self, 0x17, 0, 0xD6);
-            fn_80146058(self, lbl_8079C1A4, lbl_8079C1A8, lbl_8079C1AC);
-            fn_801462A4(self, (s16)self->timer_0x020, lbl_805F07B8, NULL, 5, 0);
-            fn_8014610C(self, lbl_8079BFF8, lbl_8079C1B0, lbl_8079BFF8);
+            em_demo_pos_set(self, lbl_8079C1A4, lbl_8079C1A8, lbl_8079C1AC);
+            em_demo_key_apply(self, (s16)self->timer_0x020, lbl_805F07B8, NULL, 5, 0);
+            em_demo_rot_set(self, lbl_8079BFF8, lbl_8079C1B0, lbl_8079BFF8);
         }
         return;
     case 5:
-        if (em_frame_check(self, 1, lbl_8079C1B4, lbl_8079C1B8) == 1 && (fn_80145FE4() & 3) == 0) {
+        if (em_frame_check(self, 1, lbl_8079C1B4, lbl_8079C1B8) == 1 && (em_demo_frame_get() & 3) == 0) {
             setVector3(&v, lbl_8079BFF8, lbl_8079BFF8, lbl_8079C028);
-            fn_80304508(self, 0x44, 1, &v, lbl_8079C00C);
+            eft_em_spawn(self, 0x44, 1, &v, lbl_8079C00C);
         }
-        fn_801462A4(self, (s16)self->timer_0x020, lbl_805F07B8, NULL, 5, 0);
-        if (fn_80146008(0x280) == 1) {
+        em_demo_key_apply(self, (s16)self->timer_0x020, lbl_805F07B8, NULL, 5, 0);
+        if (em_demo_time_ck(0x280) == 1) {
             self->state++;
             em_mot_set(self, 0x18, 0xA, 0xA);
         }
@@ -1683,85 +1684,85 @@ extern "C" void fn_8038C124(_ENEMY_WORK* self)
         if (em_frame_check(self, 0, lbl_8079BFFC, lbl_8079BFF8) == 1) {
             get_joint_wpos_em(self, 3, &v);
             v.y = lbl_8079C09C + self->field_0x20C;
-            fn_8010D2B0(&v, self->area_no, 4, 0, lbl_8079C00C);
+            eft_spawn_pos_in_area(&v, self->area_no, 4, 0, lbl_8079C00C);
         }
-        if (em_frame_check(self, 1, lbl_8079BFFC, lbl_8079C0B8) == 1 && (fn_80145FE4() % 3) == 0) {
-            fn_80304508(self, 0x45, 0x23, NULL, lbl_8079C00C);
+        if (em_frame_check(self, 1, lbl_8079BFFC, lbl_8079C0B8) == 1 && (em_demo_frame_get() % 3) == 0) {
+            eft_em_spawn(self, 0x45, 0x23, NULL, lbl_8079C00C);
         }
-        if (em_frame_check(self, 1, lbl_8079C144, lbl_8079C038) == 1 && (fn_80145FE4() % 3) == 1) {
-            fn_80304508(self, 0x45, 0x1C, NULL, lbl_8079C00C);
+        if (em_frame_check(self, 1, lbl_8079C144, lbl_8079C038) == 1 && (em_demo_frame_get() % 3) == 1) {
+            eft_em_spawn(self, 0x45, 0x1C, NULL, lbl_8079C00C);
         }
-        if (em_frame_check(self, 1, lbl_8079C0BC, lbl_8079C0C0) == 1 && (fn_80145FE4() % 3) == 0) {
-            fn_80304508(self, 0x45, 0x23, NULL, lbl_8079C00C);
+        if (em_frame_check(self, 1, lbl_8079C0BC, lbl_8079C0C0) == 1 && (em_demo_frame_get() % 3) == 0) {
+            eft_em_spawn(self, 0x45, 0x23, NULL, lbl_8079C00C);
         }
-        fn_801462A4(self, (s16)self->timer_0x020, lbl_805F07B8, NULL, 5, 0);
-        if (fn_80146008(0x2BE) == 1) {
+        em_demo_key_apply(self, (s16)self->timer_0x020, lbl_805F07B8, NULL, 5, 0);
+        if (em_demo_time_ck(0x2BE) == 1) {
             self->state++;
             em_mot_set(self, 0x18, 0, 0x48);
-            fn_80146058(self, lbl_8079C1BC, lbl_8079C1C0, lbl_8079C1C4);
-            fn_8014610C(self, lbl_8079BFF8, lbl_8079C1C8, lbl_8079BFF8);
+            em_demo_pos_set(self, lbl_8079C1BC, lbl_8079C1C0, lbl_8079C1C4);
+            em_demo_rot_set(self, lbl_8079BFF8, lbl_8079C1C8, lbl_8079BFF8);
         }
         return;
     case 7:
-        if (em_frame_check(self, 1, lbl_8079C0BC, lbl_8079C0C0) == 1 && (fn_80145FE4() % 3) == 0) {
-            fn_80304508(self, 0x45, 0x23, NULL, lbl_8079C00C);
+        if (em_frame_check(self, 1, lbl_8079C0BC, lbl_8079C0C0) == 1 && (em_demo_frame_get() % 3) == 0) {
+            eft_em_spawn(self, 0x45, 0x23, NULL, lbl_8079C00C);
         }
         if (em_frame_check(self, 0, lbl_8079C0BC, lbl_8079BFF8) == 1) {
             get_joint_wpos_em(self, 3, &v);
             v.y = lbl_8079C09C + self->field_0x20C;
-            fn_8010D2B0(&v, self->area_no, 4, 0, lbl_8079C00C);
+            eft_spawn_pos_in_area(&v, self->area_no, 4, 0, lbl_8079C00C);
         }
-        if (fn_80146008(0x34C) == 1) {
+        if (em_demo_time_ck(0x34C) == 1) {
             self->state++;
             em_mot_set(self, 2, 6, 0);
-            fn_8014610C(self, lbl_8079BFF8, lbl_8079C1C8, lbl_8079BFF8);
+            em_demo_rot_set(self, lbl_8079BFF8, lbl_8079C1C8, lbl_8079BFF8);
         }
         return;
     case 8:
-        if (fn_80146008(0x428) == 1) {
+        if (em_demo_time_ck(0x428) == 1) {
             self->state++;
             em_mot_set(self, 0x12, 0, 0);
-            fn_80146058(self, lbl_8079C1CC, lbl_8079C1C0, lbl_8079C1D0);
-            fn_8014610C(self, lbl_8079BFF8, lbl_8079C1D4, lbl_8079BFF8);
+            em_demo_pos_set(self, lbl_8079C1CC, lbl_8079C1C0, lbl_8079C1D0);
+            em_demo_rot_set(self, lbl_8079BFF8, lbl_8079C1D4, lbl_8079BFF8);
         }
         return;
     case 9:
-        if (fn_80146008(0x4B6) == 1) {
+        if (em_demo_time_ck(0x4B6) == 1) {
             self->state++;
             em_mot_set(self, 0x12, 0, 0x6E);
-            fn_80146058(self, lbl_8079C1D8, lbl_8079C1A8, lbl_8079C1DC);
-            fn_8014610C(self, lbl_8079BFF8, lbl_8079C1D4, lbl_8079BFF8);
+            em_demo_pos_set(self, lbl_8079C1D8, lbl_8079C1A8, lbl_8079C1DC);
+            em_demo_rot_set(self, lbl_8079BFF8, lbl_8079C1D4, lbl_8079BFF8);
         }
         return;
     case 10:
-        if (fn_80146008(0x4F2) == 1) {
+        if (em_demo_time_ck(0x4F2) == 1) {
             self->state++;
             em_mot_set(self, 0x12, 0, 0xA0);
-            fn_80146058(self, lbl_8079C1E0, lbl_8079C1A8, lbl_8079C1E4);
+            em_demo_pos_set(self, lbl_8079C1E0, lbl_8079C1A8, lbl_8079C1E4);
         }
         return;
     case 11:
-        if (fn_80146008(0x526) == 1) {
+        if (em_demo_time_ck(0x526) == 1) {
             self->state++;
             em_mot_set(self, 0x12, 0, 0xA6);
-            fn_80146058(self, lbl_8079C1E8, lbl_8079C1A8, lbl_8079C1EC);
-            fn_8014610C(self, lbl_8079BFF8, lbl_8079C1D4, lbl_8079BFF8);
+            em_demo_pos_set(self, lbl_8079C1E8, lbl_8079C1A8, lbl_8079C1EC);
+            em_demo_rot_set(self, lbl_8079BFF8, lbl_8079C1D4, lbl_8079BFF8);
         }
         return;
     case 12:
-        if (fn_80146008(0x5CE) == 1) {
+        if (em_demo_time_ck(0x5CE) == 1) {
             self->state++;
             em_mot_set(self, 0x12, 0, 0x164);
-            fn_80146058(self, lbl_8079C1F0, lbl_8079C1A8, lbl_8079C1F4);
-            fn_8014610C(self, lbl_8079BFF8, lbl_8079C1D4, lbl_8079BFF8);
+            em_demo_pos_set(self, lbl_8079C1F0, lbl_8079C1A8, lbl_8079C1F4);
+            em_demo_rot_set(self, lbl_8079BFF8, lbl_8079C1D4, lbl_8079BFF8);
         }
         return;
     case 13:
-        if (fn_80146008(0x624) == 1) {
+        if (em_demo_time_ck(0x624) == 1) {
             self->state++;
             em_mot_set(self, 2, 6, 0);
-            fn_80146058(self, lbl_8079C1F8, lbl_8079C1A8, lbl_8079C1FC);
-            fn_8014610C(self, lbl_8079BFF8, lbl_8079C1D4, lbl_8079BFF8);
+            em_demo_pos_set(self, lbl_8079C1F8, lbl_8079C1A8, lbl_8079C1FC);
+            em_demo_rot_set(self, lbl_8079BFF8, lbl_8079C1D4, lbl_8079BFF8);
         }
         return;
     }
@@ -1806,7 +1807,7 @@ extern "C" void fn_8038CCA4(_ENEMY_WORK* self, u8 a, u8 b, u32 c, s32 d, f32 sca
         if (c == 0xFF) {
             eft009_set_pos(kind, &v, (struct _CP_VECTOR*)&self->field_0x1BC, scale, self->area_no);
         } else {
-            fn_801048B4(self, c, kind, d, scale);
+            eft009_spawn_at_joint(self, c, kind, d, scale);
         }
         return;
     case 1:
@@ -1819,7 +1820,7 @@ extern "C" void fn_8038CCA4(_ENEMY_WORK* self, u8 a, u8 b, u32 c, s32 d, f32 sca
                     v.z = self->pos.z;
                     eft009_set_pos(0x11, &v, (struct _CP_VECTOR*)&self->field_0x1BC, scale, self->area_no);
                 } else {
-                    fn_801048B4(self, c, 0x11, d, scale);
+                    eft009_spawn_at_joint(self, c, 0x11, d, scale);
                 }
                 return;
             case 1:
@@ -1829,7 +1830,7 @@ extern "C" void fn_8038CCA4(_ENEMY_WORK* self, u8 a, u8 b, u32 c, s32 d, f32 sca
                     v.z = self->pos.z;
                     eft009_set_pos(0x10, &v, (struct _CP_VECTOR*)&self->field_0x1BC, scale, self->area_no);
                 } else {
-                    fn_801048B4(self, c, 0x10, d, scale);
+                    eft009_spawn_at_joint(self, c, 0x10, d, scale);
                 }
                 return;
             default: return;
@@ -1841,7 +1842,7 @@ extern "C" void fn_8038CCA4(_ENEMY_WORK* self, u8 a, u8 b, u32 c, s32 d, f32 sca
             get_joint_wpos_em(self, c, &v);
         }
         v.y = self->field_0x20C;
-        fn_8010D2B0(&v, self->area_no, kind, d, scale * get_em_chg_scale(self));
+        eft_spawn_pos_in_area(&v, self->area_no, kind, d, scale * get_em_chg_scale(self));
         return;
     case 2:
         if (c == 0xFF) {
@@ -1850,7 +1851,7 @@ extern "C" void fn_8038CCA4(_ENEMY_WORK* self, u8 a, u8 b, u32 c, s32 d, f32 sca
             get_joint_wpos_em(self, c, &v);
         }
         v.y = self->field_0x20C;
-        fn_80106694(self, &v, kind, scale * get_em_chg_scale(self));
+        eft_spawn_type11(self, &v, kind, scale * get_em_chg_scale(self));
         return;
     }
 }

@@ -4,7 +4,7 @@
  * What it is.  The unit drives the nw4r effects a player action spawns: an `Eft` record carries a
  * `state_0x05` the per-variant handler advances and a `type_0x02` selecting the variant body, and its
  * `EftWork` block holds the nw4r effect handle (`effect`), its colour and scale, the per-variant light
- * handles and the joint matrix.  The entry points are the spawn helpers (`fn_8010D2B0`, `fn_8010D608`,
+ * handles and the joint matrix.  The entry points are the spawn helpers (`eft_spawn_pos_in_area`, `fn_8010D608`,
  * `fn_8010D678`, `fn_8010D688`), which build the record through `fn_800F8788`/`fn_8010D70C` and install
  * `fn_8010D3C4`/`fn_8010D8B0` as the update hook; the variants then create effects, lights and colours
  * through `res_eft_create`/`res_eft_model_create_light` and the `change_*_eff` helpers.  The day-cycle
@@ -16,7 +16,7 @@
  *   * the colour split in `fn_8010D400` is written with explicit `(color & mask) >> shift` terms; the
  *     `(color >> shift) & 0xFF` form folds into one `rlwinm` and loses the target's three-instruction
  *     window.
- *   * `fn_8010D2B0`'s areano parameter is `s8` compared as `(u8)arg1`; `fn_8010D70C`'s last two are `s32`
+ *   * `eft_spawn_pos_in_area`'s areano parameter is `s8` compared as `(u8)arg1`; `fn_8010D70C`'s last two are `s32`
  *     narrowed with `(u8)` - the mask is in the target and only appears from the cast.
  *   * `fn_8010D8B0`'s outer switch lists case 0 last so MWCC emits the per-state tail calls before the
  *     nested per-type switch (the compare chain is then 1,2,3,0 where retail has 0,1,2,3).
@@ -327,7 +327,7 @@ void fn_8010D2AC(Eft* self)
     fn_800F886C(self);
 }
 
-void fn_8010D2B0(void* arg0, s8 arg1, s8 arg2, u32 arg3, f32 farg0)
+void eft_spawn_pos_in_area(void* arg0, s8 arg1, s8 arg2, u32 arg3, f32 farg0)
 {
     Eft* eft;
     EftWork* work;
@@ -408,7 +408,7 @@ void fn_8010D400(Eft* self)
         return;
     }
     cpSetRotMatrix__FP10_CP_VECTORPQ34nw4r4math5MTX34(&self->rot_0x24.vec, &mtx);
-    fn_80101428(&mtx, &self->pos_0x18);
+    mtx34_trans_add(&mtx, &self->pos_0x18);
     SetRootMtx__Q34nw4r2ef6EffectFRCQ34nw4r4math5MTX34(work->effect, &mtx);
     self->flag_0x01 = 1;
     color = get_stg_eft_col__FUcUc(self->areano_0x44, 0);

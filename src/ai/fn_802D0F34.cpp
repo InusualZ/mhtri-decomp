@@ -109,7 +109,7 @@ void fn_802D0F34(struct _AINPC_W* self)
             if (self->variant == 2) {
                 self->field_0x1C0 = fn_80050EF4(&self->pos_0x1B0, &self->pos_0x178);
             } else {
-                self->field_0x1C0 = fn_80050F80(&self->pos_0x1B0, &self->pos_0x178);
+                self->field_0x1C0 = calcVecDistXZ(&self->pos_0x1B0, &self->pos_0x178);
             }
             if (self->field_0x1CD != 0) {
                 if (self->field_0x1CF != 0) {
@@ -380,7 +380,7 @@ void fn_802D1954(struct _AINPC_W* self)
         fn_800FC0D4(&self->vec_0x190, (_CP_VECTOR*)&plw->param_0x54);
         setVector3(&offset, lbl_8079A7AC, lbl_8079A670, lbl_8079A7B0);
         rotVecY(&offset, self->vec_0x190.y);
-        fn_80051378(&position, &plw->vec_0x03C, &offset);
+        addVec3(&position, &plw->vec_0x03C, &offset);
         copyVec3(&self->pos_0x184, &position);
         copyVec3(&self->pos_0x178, &self->pos_0x184);
         if (plw->kind_0x09 != 3) {
@@ -1173,14 +1173,14 @@ void fn_802D3210(struct _AINPC_W* self, u32* angles)
     copyVec3(&offset, &self->pos_0x1D4);
     rotVecX(&offset, angles[0]);
     rotVecY(&offset, angles[1]);
-    fn_80073F68(&self->pos_0x178, &offset);
+    addVec3To(&self->pos_0x178, &offset);
 }
 
 /* 0x802D327C - the stored variant, then the same offset walk from +0x1D4. */
 void fn_802D327C(struct _AINPC_W* self, u32* angles)
 {
     fn_802D3210(self, angles);
-    fn_80073F68(&self->pos_0x1D4, &self->pos_0x1E0);
+    addVec3To(&self->pos_0x1D4, &self->pos_0x1E0);
 }
 
 /* 0x802D32B4 - rolls one of the six-byte attack rows the skill table points at, weighted by the

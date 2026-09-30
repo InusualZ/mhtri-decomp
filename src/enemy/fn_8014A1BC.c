@@ -140,7 +140,7 @@ extern f32 lbl_805A1CC8[];
 
 extern void em_busy_set();
 extern f32 fn_802B0430(u8 id);
-extern void fn_80127FE4(_ENEMY_WORK *self);
+extern void em_action_finish_fall(_ENEMY_WORK *self);
 
 /* ---------------------------------------------------------------------------------------------------
  * fn_8014A1BC - advance the object's two-level state machine and gate one timer-driven action
@@ -156,8 +156,8 @@ extern f32 lbl_80796F08;
 extern f32 lbl_80796F0C;
 extern f32 lbl_80796F10;
 extern f32 lbl_80796F14;
-extern void fn_80134004(_ENEMY_WORK *self, u32 a, f32 b);
-extern void fn_801280AC(_ENEMY_WORK *self);
+extern void em_approach_start(_ENEMY_WORK* self, f32 speed, u32 flags);
+extern void em_action_finish_walk(_ENEMY_WORK *self);
 extern f32 lbl_80796F18;
 extern void fn_80154CA4(_ENEMY_WORK *self);
 extern f32 lbl_80796EBC;
@@ -177,10 +177,10 @@ extern f32 lbl_80796F20;
 extern f32 lbl_80796F24;
 extern f32 lbl_80796F28;
 extern f32 lbl_80796F2C;
-extern void fn_80056A54(_ENEMY_WORK *self, u32 a, u32 b);
+extern void draw_shape_arm(_ENEMY_WORK *self, u32 a, u32 b);
 extern void setVector3__FPQ34nw4r4math4VEC3fff(VEC3 *v, f32 x, f32 y, f32 z);
-extern void fn_80304508(_ENEMY_WORK *self, u32 a, u32 b, VEC3 *v, f32 s);
-extern void fn_80129668(_ENEMY_WORK *self, u32 a, u32 b);
+extern void eft_em_spawn(_ENEMY_WORK *self, u32 a, u32 b, VEC3 *v, f32 s);
+extern void em_hit_window_set_default(_ENEMY_WORK *self, u32 a, u32 b);
 extern f32 lbl_80796E0C;
 extern f32 lbl_80796E34;
 extern f32 lbl_80796E60;
@@ -189,8 +189,8 @@ extern f32 lbl_80796F34;
 extern f32 lbl_80796F38;
 extern f32 lbl_80796F3C;
 extern void fn_80154C74(_ENEMY_WORK *self);
-extern void fn_8012933C(_ENEMY_WORK *self, u32 a, u32 b, u32 c);
-extern void fn_80129724(_ENEMY_WORK *self, u32 a);
+extern void em_hit_window_set(_ENEMY_WORK *self, u32 a, u32 b, u32 c);
+extern void em_hit_window_clear(_ENEMY_WORK *self, u32 a);
 
 extern f32 lbl_805A1D18[];
 extern f32 lbl_805A1D40[];
@@ -219,7 +219,7 @@ extern f32 lbl_80796F84;
 extern f32 lbl_80796F9C;
 extern f32 lbl_80796FA0;
 extern void fn_8011E6EC();
-extern void fn_801251D8();
+extern void em_se_tbl_play_alt();
 extern u32 fn_8012EC3C();
 extern u32 fn_80154638();
 extern void fn_802B9574();
@@ -253,7 +253,7 @@ extern f32 lbl_805A2978[];
 extern f32 lbl_805A29A0[];
 extern f32 lbl_805A29E0[];
 extern f32 lbl_805A2A58[];
-extern void fn_801251D0();
+extern void em_se_tbl_play();
 
 extern f32 lbl_80796E2C;
 extern f32 lbl_80796E50;
@@ -276,15 +276,15 @@ extern f32 lbl_80796E98;
 extern f32 lbl_80796E9C;
 extern f32 lbl_80796F6C;
 extern f32 lbl_80796F70;
-extern void fn_80050CA0();
+extern void subVec3();
 
 extern f32 lbl_8056F960[];
 extern f32 lbl_80796F94;
 extern f32 lbl_80796F98;
 extern f32 fn_80050EAC();
-extern void fn_80051378();
+extern void addVec3();
 extern void fn_80051EE0();
-extern void fn_80128BF8();
+extern void em_target_pos_set();
 extern void fn_80154B04();
 
 
@@ -303,7 +303,7 @@ extern f32 lbl_80796F80;
 
 
 extern f32 lbl_80796F88;
-extern f32 fn_80050F80();
+extern f32 calcVecDistXZ();
 extern void fn_800AD9C0();
 
 
@@ -389,26 +389,26 @@ void fn_8014A1BC(_ENEMY_WORK *self, s32 arg1, s32 arg2) {
         self->state = (u8) (temp_r3 + 1);
         self->sub_state = 0U;
         self->step_count = 0U;
-        fn_80130248(self);
-        fn_801305C4(self);
+        em_fall_height_get(self);
+        em_fall_start(self);
         em_mot_set(self, 0x1A, 6, 0);
-        fn_801353E4(self);
+        em_move_vec_clr(self);
         return;
     case 1:
         temp_r0 = self->sub_state;
         switch ((s32) temp_r0) {
         case 0:
-            self->v_0x310.y = fn_80135644(self, &lbl_805A1CC8);
-            fn_80135418(self);
+            self->v_0x310.y = em_key_curve_eval(self, &lbl_805A1CC8);
+            em_move_offset_apply(self);
             if (em_mot_end_ck(self) == 1U) {
                 if (++self->step_count >= 2U) {
                     self->sub_state = (u8) (self->sub_state + 1);
-                    fn_80134DF4(self);
+                    em_lift_start(self);
                 }
             }
             break;
         case 1:
-            fn_80134E28(self);
+            em_lift_step(self);
             break;
         }
         if ((arg1 & 0xFF) != 1) {
@@ -421,7 +421,7 @@ void fn_8014A1BC(_ENEMY_WORK *self, s32 arg1, s32 arg2) {
             var_f3 = lbl_80796EF4 + self->v_0x36c.y;
         }
         if (self->v_0x188.y >= var_f3) {
-            fn_80127FE4(self);
+            em_action_finish_fall(self);
         }
         return;
     }
@@ -443,15 +443,15 @@ void fn_8014A334(_ENEMY_WORK *self, s32 arg1) {
     switch ((s32) temp_r3) {
     case 0:
         self->state = (u8) (temp_r3 + 1);
-        fn_80130248(self);
-        fn_801305C4(self);
+        em_fall_height_get(self);
+        em_fall_start(self);
         em_mot_set(self, 0x1A, 6, 0);
         break;
     case 1:
-        if (fn_80133C50(self, 0x200) == 1U) {
+        if (em_turn_to_target(self, 0x200) == 1U) {
             if ((arg1 & 0xFF) != 2) {
                 if ((arg1 & 0xFF) != 3) {
-                    fn_80127FE4(self);
+                    em_action_finish_fall(self);
                     break;
                 }
                 em_state_set(self, 3, 0x15);
@@ -478,8 +478,8 @@ void fn_8014A418(_ENEMY_WORK *self) {
     switch ((s32) temp_r3) {
     case 0:
         self->state = (u8) (temp_r3 + 1);
-        fn_80130248(self);
-        fn_801305C4(self);
+        em_fall_height_get(self);
+        em_fall_start(self);
         em_mot_set(self, 0x2D, 6, 0);
         return;
     case 1:
@@ -499,16 +499,16 @@ void fn_8014A418(_ENEMY_WORK *self) {
             fn_80133CC8(self, 0x100, 0x100);
             if (em_frame_check__FP11_ENEMY_WORKUsff(self, 1, lbl_80796EFC, lbl_80796E1C) == 1U) {
                 self->sub_state = (u8) (self->sub_state + 1);
-                fn_801353F8(self);
+                em_move_vec2_clr(self);
                 self->v_0x310.z = lbl_80796F00;
                 self->v_0x320.y = lbl_80796F04;
-                fn_80134004(self, 0x10, lbl_80796F08);
+                em_approach_start(self, lbl_80796F08, 0x10);
             }
             break;
         case 1:
-            fn_80130248(self);
-            fn_80135600(self, &self->field_0x1bc);
-            fn_80134114(self, 0, 0x80U);
+            em_fall_height_get(self);
+            em_move_offset_step_update(self, &self->field_0x1bc);
+            em_approach_step(self, 0, 0x80U);
             if (self->v_0x310.z > lbl_80796E58) {
                 self->v_0x310.z = lbl_80796E58;
             }
@@ -522,18 +522,18 @@ void fn_8014A418(_ENEMY_WORK *self) {
         break;
     case 3:
         fn_80133C3C(self);
-        if (fn_80134114(self, 0, 0x80U) == 1) {
+        if (em_approach_step(self, 0, 0x80U) == 1) {
             self->state = (u8) (self->state + 1);
             em_mot_set(self, 0x2D, 6, 0);
             self->sub_state = 0U;
             self->v_0x310.y = lbl_80796F0C;
             self->v_0x320.y = lbl_80796F10;
-            fn_80130248(self);
-            fn_80135600(self, &self->field_0x1bc);
+            em_fall_height_get(self);
+            em_move_offset_step_update(self, &self->field_0x1bc);
             return;
         }
-        fn_80130248(self);
-        fn_80135600(self, &self->field_0x1bc);
+        em_fall_height_get(self);
+        em_move_offset_step_update(self, &self->field_0x1bc);
         if (self->v_0x310.z > lbl_80796E58) {
             self->v_0x310.z = lbl_80796E58;
             return;
@@ -543,16 +543,16 @@ void fn_8014A418(_ENEMY_WORK *self) {
         temp_r0_2 = self->sub_state;
         switch ((s32) temp_r0_2) {
         case 0:
-            fn_80130248(self);
-            var_r30 = fn_80135600(self, &self->field_0x1bc);
+            em_fall_height_get(self);
+            var_r30 = em_move_offset_step_update(self, &self->field_0x1bc);
             if (em_frame_check__FP11_ENEMY_WORKUsff(self, 1, lbl_80796EFC, lbl_80796E1C) == 1U) {
                 self->sub_state = (u8) (self->sub_state + 1);
                 self->v_0x320.y = lbl_80796F14;
             }
             break;
         case 1:
-            fn_80130248(self);
-            var_r30 = fn_80135600(self, &self->field_0x1bc);
+            em_fall_height_get(self);
+            var_r30 = em_move_offset_step_update(self, &self->field_0x1bc);
             if (self->v_0x310.z < lbl_80796E1C) {
                 self->v_0x310.z = lbl_80796E1C;
             }
@@ -566,7 +566,7 @@ void fn_8014A418(_ENEMY_WORK *self) {
                 return;
             }
             if (fn_8012D1A0(self) == 1U) {
-                fn_80127FE4(self);
+                em_action_finish_fall(self);
                 return;
             }
         }
@@ -574,7 +574,7 @@ void fn_8014A418(_ENEMY_WORK *self) {
     case 5:
         if (em_mot_end_ck(self) == 1U) {
             em_move_mode_set(self, 3);
-            fn_801280AC(self);
+            em_action_finish_walk(self);
         }
         break;
     }
@@ -593,16 +593,16 @@ void fn_8014A7B0(_ENEMY_WORK *self, s32 arg1) {
     switch ((s32) temp_r3) {
     case 0:
         self->state = (u8) (temp_r3 + 1);
-        fn_80130248(self);
-        fn_801305C4(self);
+        em_fall_height_get(self);
+        em_fall_start(self);
         em_mot_set(self, 0x2D, 6, 0);
         break;
     case 1:
         if ((arg1 & 0xFF) == 1) {
-            fn_80133C50(self, 0x180);
+            em_turn_to_target(self, 0x180);
         }
         if (em_mot_end_ck(self) == 1U) {
-            fn_80127FE4(self);
+            em_action_finish_fall(self);
         }
         break;
     }
@@ -620,8 +620,8 @@ void fn_8014A860(_ENEMY_WORK *self) {
     switch ((s32) temp_r4) {
     case 0:
         self->state = (u8) (temp_r4 + 1);
-        fn_80130248(self);
-        fn_801305C4(self);
+        em_fall_height_get(self);
+        em_fall_start(self);
         em_mot_set_ck(self, 0x1F, 4, 0);
         self->field_0x20 = 0x3C;
         break;
@@ -649,8 +649,8 @@ void fn_8014A8EC(_ENEMY_WORK *self, s32 arg1) {
     case 0:
         self->state = (u8) (temp_r3 + 1);
         self->sub_state = 0U;
-        fn_80130248(self);
-        fn_801305C4(self);
+        em_fall_height_get(self);
+        em_fall_start(self);
         em_mot_set(self, 0x3D, 6, 0);
         break;
     case 1:
@@ -659,14 +659,14 @@ void fn_8014A8EC(_ENEMY_WORK *self, s32 arg1) {
         case 0:
             if (em_frame_check__FP11_ENEMY_WORKUsff(self, 1, lbl_80796E58, lbl_80796E1C) == 1U) {
                 self->sub_state = (u8) (self->sub_state + 1);
-                fn_801353F8(self);
+                em_move_vec2_clr(self);
                 self->v_0x310.z = lbl_80796F00;
                 self->v_0x320.y = lbl_80796F04;
             }
             break;
         case 1:
-            fn_80130248(self);
-            fn_80135600(self, &self->field_0x1bc);
+            em_fall_height_get(self);
+            em_move_offset_step_update(self, &self->field_0x1bc);
             if (self->v_0x310.z > lbl_80796F18) {
                 self->v_0x310.z = lbl_80796F18;
             }
@@ -747,7 +747,7 @@ void fn_8014AB24(_ENEMY_WORK *self) {
     case 2:
         fn_80154CA4(self);
         if (em_mot_end_ck(self) == 1U) {
-            fn_801280AC(self);
+            em_action_finish_walk(self);
         }
         break;
     }
@@ -800,22 +800,22 @@ void fn_8014ACAC(_ENEMY_WORK *self) {
     case 1:
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 1, lbl_80796EFC, lbl_80796E1C) == 1U) {
             self->state = (u8) (self->state + 1);
-            fn_80130248(self);
-            fn_801305C4(self);
-            fn_801353F8(self);
-            self->v_0x310.y = lbl_80796F00 * fn_8012F8E4(self);
-            self->v_0x320.x = lbl_80796F1C * fn_8012F8E4(self);
+            em_fall_height_get(self);
+            em_fall_start(self);
+            em_move_vec2_clr(self);
+            self->v_0x310.y = lbl_80796F00 * get_em_base_scale(self);
+            self->v_0x320.x = lbl_80796F1C * get_em_base_scale(self);
             return;
         }
         return;
     case 2:
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 1, lbl_80796EBC, lbl_80796E1C) == 0) {
-            fn_80135418(self);
+            em_move_offset_apply(self);
         } else {
             CancelFade(self);
         }
         if (em_mot_end_ck(self) == 1U) {
-            fn_80127FE4(self);
+            em_action_finish_fall(self);
         }
         break;
     }
@@ -833,15 +833,15 @@ void fn_8014ADC8(_ENEMY_WORK *self) {
     switch ((s32) temp_r4) {
     case 0:
         self->state = (u8) (temp_r4 + 1);
-        fn_80130248(self);
-        fn_801305C4(self);
+        em_fall_height_get(self);
+        em_fall_start(self);
         em_mot_set(self, 0x1A, 6, 0);
-        fn_80134E8C(self);
+        em_dive_start(self);
         break;
     case 1:
-        fn_80134F18(self);
-        fn_80130248(self);
-        if (fn_80130008(self) == 1U) {
+        em_dive_step(self);
+        em_fall_height_get(self);
+        if (em_ground_ck(self) == 1U) {
             self->state = (u8) (self->state + 1);
             em_move_mode_set(self, 3);
             em_mot_set(self, 0x1D, 6, 0);
@@ -851,7 +851,7 @@ void fn_8014ADC8(_ENEMY_WORK *self) {
     case 2:
         fn_80154CA4(self);
         if (em_mot_end_ck(self) == 1U) {
-            fn_801280AC(self);
+            em_action_finish_walk(self);
         }
         break;
     }
@@ -870,11 +870,11 @@ void fn_8014AEAC(_ENEMY_WORK *self) {
     case 0:
         self->state = (u8) (temp_r3 + 1);
         em_move_mode_set(self, 3);
-        fn_80134964(self, &lbl_8056F9A0, 0, 0, 0U);
+        em_turn_seq_start(self, &lbl_8056F9A0, 0, 0, 0U);
         break;
     case 1:
-        if (fn_80134B0C(self, &lbl_8056F9A0) == 1U) {
-            fn_801280AC(self);
+        if (em_turn_seq_step(self, &lbl_8056F9A0) == 1U) {
+            em_action_finish_walk(self);
         }
         break;
     }
@@ -894,17 +894,17 @@ void fn_8014AF44(_ENEMY_WORK *self) {
         self->state = (u8) (temp_r3 + 1);
         em_move_mode_set(self, 3);
         em_mot_set(self, 0x1B, 4, 0);
-        fn_80134004(self, 0, lbl_80796F08);
-        fn_801353F8(self);
+        em_approach_start(self, lbl_80796F08, 0);
+        em_move_vec2_clr(self);
         self->v_0x310.z = lbl_80796EA8;
         self->v_0x320.y = lbl_80796E20;
         break;
     case 1:
-        if (fn_80134114(self, 0, 0x80U) == 1) {
-            fn_801280AC(self);
+        if (em_approach_step(self, 0, 0x80U) == 1) {
+            em_action_finish_walk(self);
             return;
         }
-        fn_801355C8(self, &self->field_0x1bc);
+        em_move_offset_step(self, &self->field_0x1bc);
         if (self->v_0x310.z > lbl_80796E58) {
             self->v_0x310.z = lbl_80796E58;
         }
@@ -927,15 +927,15 @@ void fn_8014B020(_ENEMY_WORK *self) {
         self->state = (u8) (temp_r3 + 1);
         em_move_mode_set(self, 3);
         fn_80134F70(self, &lbl_8056FA0C);
-        fn_80134004(self, 9, lbl_80796E1C);
+        em_approach_start(self, lbl_80796E1C, 9);
         break;
     case 1:
-        if (fn_80134114(self, 0, 0U) == 1) {
-            fn_801280AC(self);
+        if (em_approach_step(self, 0, 0U) == 1) {
+            em_action_finish_walk(self);
             return;
         }
         fn_80135000(self, 0, &lbl_8056FA0C);
-        fn_80130248(self);
+        em_fall_height_get(self);
         fn_80135584(self, &self->field_0x1bc);
         return;
     }
@@ -954,24 +954,24 @@ void fn_8014B0E8(_ENEMY_WORK *self) {
         self->state = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x21, 4, 0);
-        fn_801353E4(self);
+        em_move_vec_clr(self);
         break;
     case 1:
         if (em_mot_end_ck(self) == 1U) {
             self->state = (u8) (self->state + 1);
             em_move_mode_set(self, 3);
             em_mot_set(self, 0x42, 0, 0);
-            self->v_0x310.z = fn_80135644(self, &lbl_805A1D88);
-            fn_801354F4(self, &self->field_0x1bc);
+            self->v_0x310.z = em_key_curve_eval(self, &lbl_805A1D88);
+            em_move_offset_rot_apply(self, &self->field_0x1bc);
             return;
         }
         return;
     case 2:
         fn_80154CA4(self);
-        self->v_0x310.z = fn_80135644(self, &lbl_805A1D88);
-        fn_801354F4(self, &self->field_0x1bc);
+        self->v_0x310.z = em_key_curve_eval(self, &lbl_805A1D88);
+        em_move_offset_rot_apply(self, &self->field_0x1bc);
         if (em_mot_end_ck(self) == 1U) {
-            fn_801280AC(self);
+            em_action_finish_walk(self);
         }
         break;
     }
@@ -998,25 +998,25 @@ void fn_8014B1F8(_ENEMY_WORK *self, s32 arg1) {
         } else {
             em_mot_set(self, 0xCF, 6, 0);
         }
-        fn_801353E4(self);
+        em_move_vec_clr(self);
         self->field_0x37c = self->field_0x1c0;
         self->v_0x320.z = fn_801356A8(self, lbl_80796E20, lbl_80796F20, lbl_80796F24);
         break;
     case 1:
         if (arg1 == 0) {
-            fn_80133E3C(self, -0x4000, lbl_80796ED8, lbl_80796F28);
-            self->v_0x310.x = fn_80135644(self, &lbl_805A1FF0);
+            em_turn_in_window(self, lbl_80796ED8, lbl_80796F28, -0x4000);
+            self->v_0x310.x = em_key_curve_eval(self, &lbl_805A1FF0);
         } else {
-            fn_80133E3C(self, 0x4000, lbl_80796ED8, lbl_80796F28);
-            self->v_0x310.x = -fn_80135644(self, &lbl_805A1FF0);
+            em_turn_in_window(self, lbl_80796ED8, lbl_80796F28, 0x4000);
+            self->v_0x310.x = -em_key_curve_eval(self, &lbl_805A1FF0);
         }
-        self->v_0x310.z = self->v_0x320.z * fn_80135644(self, &lbl_805A2028);
+        self->v_0x310.z = self->v_0x320.z * em_key_curve_eval(self, &lbl_805A2028);
         sp8 = 0;
         spC = self->field_0x37c;
         sp10 = 0;
-        fn_801354F4(self, &sp8);
+        em_move_offset_rot_apply(self, &sp8);
         if (em_mot_end_ck(self) == 1U) {
-            fn_801280AC(self);
+            em_action_finish_walk(self);
         }
         break;
     }
@@ -1042,21 +1042,21 @@ void fn_8014B378(_ENEMY_WORK *self) {
         break;
     case 1:
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 0, lbl_80796F18, lbl_80796E1C) == 1U) {
-            fn_8012933C(self, 0, 8, 5);
-            fn_80056A54(self, 0x1B, 0xA);
+            em_hit_window_set(self, 0, 8, 5);
+            draw_shape_arm(self, 0x1B, 0xA);
         }
         setVector3__FPQ34nw4r4math4VEC3fff(&sp8, lbl_80796E1C, lbl_80796E38, lbl_80796E3C);
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 0, lbl_80796F18, lbl_80796E1C) == 1U) {
-            fn_80304508(self, 0, 0x1A, &sp8, lbl_80796E20);
+            eft_em_spawn(self, 0, 0x1A, &sp8, lbl_80796E20);
         }
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 2, lbl_80796E4C, lbl_80796F2C) == 1U) {
             if ((self->field_0x20 & 7) == 0) {
-                fn_80304508(self, 1, 0x1A, &sp8, lbl_80796E20);
+                eft_em_spawn(self, 1, 0x1A, &sp8, lbl_80796E20);
             }
             self->field_0x20 = self->field_0x20 + 1;
         }
         if (em_mot_end_ck(self) == 1U) {
-            fn_801280AC(self);
+            em_action_finish_walk(self);
         }
         return;
     }
@@ -1091,7 +1091,7 @@ void fn_8014B4EC(_ENEMY_WORK *self, s32 arg1) {
             temp_r0 = self->sub_state + 1;
             self->sub_state = temp_r0;
             if (temp_r0 >= var_r31) {
-                fn_801280AC(self);
+                em_action_finish_walk(self);
             }
         }
         return;
@@ -1135,8 +1135,8 @@ void fn_8014B630(_ENEMY_WORK *self) {
         self->state = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x2F, 4, 0);
-        fn_80129668(self, 0, 1);
-        fn_80129668(self, 1, 9);
+        em_hit_window_set_default(self, 0, 1);
+        em_hit_window_set_default(self, 1, 9);
         break;
     case 1:
         if (em_mot_end_ck(self) == 1U) {
@@ -1179,18 +1179,18 @@ void fn_8014B6CC(_ENEMY_WORK *self, s32 arg1) {
         temp_r0 = self->sub_state;
         switch ((s32) temp_r0) {
         case 0:
-            fn_80133C50(self, 0x100);
+            em_turn_to_target(self, 0x100);
             if (em_frame_check__FP11_ENEMY_WORKUsff(self, 1, lbl_80796E60, lbl_80796E1C) != 1U) {
                 return;
             }
             self->sub_state = (u8) (self->sub_state + 1);
-            fn_801353F8(self);
+            em_move_vec2_clr(self);
             self->v_0x320.y = lbl_80796F04;
-            fn_80134004(self, 0x10, lbl_80796E1C);
-            fn_8012933C(self, 0, 0xE, 3);
+            em_approach_start(self, lbl_80796E1C, 0x10);
+            em_hit_window_set(self, 0, 0xE, 3);
             return;
         case 1:
-            fn_801355C8(self, &self->field_0x1bc);
+            em_move_offset_step(self, &self->field_0x1bc);
             if (self->v_0x310.z > lbl_80796E34) {
                 self->v_0x310.z = lbl_80796E34;
             }
@@ -1204,11 +1204,11 @@ void fn_8014B6CC(_ENEMY_WORK *self, s32 arg1) {
         break;
     case 2:
         fn_801303EC(self, lbl_80796F34);
-        fn_801355C8(self, &self->field_0x1bc);
+        em_move_offset_step(self, &self->field_0x1bc);
         if (self->v_0x310.z > lbl_80796E34) {
             self->v_0x310.z = lbl_80796E34;
         }
-        if ((u8) fn_80134114(self, 0, 0U) == 1) {
+        if ((u8) em_approach_step(self, 0, 0U) == 1) {
             self->state = (u8) (self->state + 1);
             self->sub_state = 0U;
             switch (arg1 & 0xFF) {
@@ -1238,14 +1238,14 @@ void fn_8014B6CC(_ENEMY_WORK *self, s32 arg1) {
                 fn_801303EC(self, (lbl_80796F3C * (f32) (0x14 - temp_r0_2)) / lbl_80796E0C);
             }
             if (em_frame_check__FP11_ENEMY_WORKUsff(self, 0, lbl_80796EFC, lbl_80796E1C) == 1U) {
-                fn_80129724(self, 0);
+                em_hit_window_clear(self, 0);
             }
-            fn_801355C8(self, &self->field_0x1bc);
+            em_move_offset_step(self, &self->field_0x1bc);
             if (self->v_0x310.z < lbl_80796E1C) {
                 self->v_0x310.z = lbl_80796E1C;
             }
             if (em_mot_end_ck(self) == 1U) {
-                fn_801280AC(self);
+                em_action_finish_walk(self);
                 return;
             }
             break;
@@ -1261,7 +1261,7 @@ void fn_8014B6CC(_ENEMY_WORK *self, s32 arg1) {
                 break;
             case 1:
                 if (em_frame_check__FP11_ENEMY_WORKUsff(self, 0, lbl_80796EFC, lbl_80796E1C) == 1U) {
-                    fn_80129724(self, 0);
+                    em_hit_window_clear(self, 0);
                 }
                 if (em_mot_end_ck(self) == 1U) {
                     em_action_finish(self);
@@ -1282,7 +1282,7 @@ void fn_8014B6CC(_ENEMY_WORK *self, s32 arg1) {
                 }
                 if (em_mot_end_ck(self) == 1U) {
                     self->sub_state = (u8) (self->sub_state + 1);
-                    fn_80129724(self, 0);
+                    em_hit_window_clear(self, 0);
                     em_move_mode_set(self, 0);
                     em_mot_set(self, 0x3C, 0, 0);
                     return;
@@ -1359,22 +1359,22 @@ void fn_8014BDF8(_ENEMY_WORK *self, s32 arg1) {
         self->sub_state = 0U;
         em_move_mode_set(self, 0);
         em_mot_set(self, var_r30, 4, 0);
-        fn_8012933C(self, 0, var_r29, 8);
-        fn_8012933C(self, 1, var_r28, 0x18);
+        em_hit_window_set(self, 0, var_r29, 8);
+        em_hit_window_set(self, 1, var_r28, 0x18);
         break;
     case 1:
         fn_80133F4C(self, lbl_80796E1C, lbl_80796F28);
         temp_r3 = self->sub_state;
         if ((temp_r3 == 0) && (self->field_0xa69 == 0)) {
             self->sub_state = (u8) (temp_r3 + 1);
-            fn_8012933C(self, 1, var_r27, 0x10);
+            em_hit_window_set(self, 1, var_r27, 0x10);
         }
         if (em_mot_end_ck(self) == 1U) {
             self->state = (u8) (self->state + 1);
             self->sub_state = 0U;
             em_mot_set(self, var_r30, 0, 0);
-            fn_8012933C(self, 0, var_r29, 8);
-            fn_8012933C(self, 1, var_r28, 0x18);
+            em_hit_window_set(self, 0, var_r29, 8);
+            em_hit_window_set(self, 1, var_r28, 0x18);
             return;
         }
         return;
@@ -1383,7 +1383,7 @@ void fn_8014BDF8(_ENEMY_WORK *self, s32 arg1) {
         temp_r3_2 = self->sub_state;
         if ((temp_r3_2 == 0) && (self->field_0xa69 == 0)) {
             self->sub_state = (u8) (temp_r3_2 + 1);
-            fn_8012933C(self, 1, var_r27, 0x10);
+            em_hit_window_set(self, 1, var_r27, 0x10);
         }
         if (em_mot_end_ck(self) == 1U) {
             em_action_finish(self);
@@ -1407,7 +1407,7 @@ void fn_8014BFE4(_ENEMY_WORK *self, s32 arg1) {
         em_move_mode_set(self, 3);
         fn_80154C74(self);
         em_mot_set(self, 0xCE, 0xA, 0);
-        fn_80129668(self, 0, 0x1B);
+        em_hit_window_set_default(self, 0, 0x1B);
         break;
     case 1:
         em_busy_set();
@@ -1416,11 +1416,11 @@ void fn_8014BFE4(_ENEMY_WORK *self, s32 arg1) {
             if (arg1 == 0) {
                 em_move_mode_set(self, 0);
                 em_mot_set(self, 0xCF, 0, 0);
-                fn_80129668(self, 0, 0x16);
+                em_hit_window_set_default(self, 0, 0x16);
                 return;
             }
             em_move_mode_set(self, 3);
-            fn_801280AC(self);
+            em_action_finish_walk(self);
             return;
         }
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 1, lbl_80796F4C, lbl_80796E1C) == 1U) {
@@ -1463,29 +1463,29 @@ void fn_8014C16C(_ENEMY_WORK *self, s32 arg1) {
         em_move_mode_set(self, 0);
         fn_80154C74(self);
         em_mot_set(self, 8, 4, 0);
-        fn_8012933C(self, 0, 5, 3);
+        em_hit_window_set(self, 0, 5, 3);
         self->field_0x20 = 0;
         switch (arg1) {
         case 0:
-            fn_80134004(self, 0x10, lbl_80796F08);
+            em_approach_start(self, lbl_80796F08, 0x10);
             self->field_0x20 = 0x14;
             return;
         case 1:
-            fn_80134004(self, 0x10, lbl_80796F50);
+            em_approach_start(self, lbl_80796F50, 0x10);
             self->field_0x20 = 0xA;
             return;
         case 2:
-            fn_80134004(self, 0, lbl_80796F08);
+            em_approach_start(self, lbl_80796F08, 0);
             if (self->field_0x378 == lbl_80796EEC) {
                 self->field_0x378 = lbl_80796EEC;
                 return;
             }
             return;
         default:
-            fn_80134004(self, 0, lbl_80796F08);
+            em_approach_start(self, lbl_80796F08, 0);
             return;
         case 4:
-            fn_80134004(self, 0x10, lbl_80796F54);
+            em_approach_start(self, lbl_80796F54, 0x10);
             return;
         }
         break;
@@ -1499,12 +1499,12 @@ void fn_8014C16C(_ENEMY_WORK *self, s32 arg1) {
         if (arg1 == 0) {
             var_r5 = 0x80;
         }
-        if ((fn_80134114(self, 0, var_r5) == 1) && (self->field_0x20 <= 0)) {
+        if ((em_approach_step(self, 0, var_r5) == 1) && (self->field_0x20 <= 0)) {
             self->state = (u8) (self->state + 1);
             self->sub_state = 0U;
             switch (arg1) {
             default:
-                fn_80129724(self, 0);
+                em_hit_window_clear(self, 0);
                 em_mot_set(self, 9, 4, 0);
                 return;
             case 2:
@@ -1514,7 +1514,7 @@ void fn_8014C16C(_ENEMY_WORK *self, s32 arg1) {
                 em_mot_set(self, 0x30, 4, 0);
                 return;
             case 4:
-                fn_80129724(self, 0);
+                em_hit_window_clear(self, 0);
                 fn_80128A70(self, 4, 7);
                 return;
             }
@@ -1525,13 +1525,13 @@ void fn_8014C16C(_ENEMY_WORK *self, s32 arg1) {
         case 2:
             if ((self->sub_state == 0) && (em_frame_check__FP11_ENEMY_WORKUsff(self, 1, lbl_80796F28, lbl_80796E1C) == 1U)) {
                 self->sub_state = (u8) (self->sub_state + 1);
-                fn_80129724(self, 0);
+                em_hit_window_clear(self, 0);
             }
             break;
         case 3:
             if ((self->sub_state == 0) && (em_frame_check__FP11_ENEMY_WORKUsff(self, 1, lbl_80796F58, lbl_80796E1C) == 1U)) {
                 self->sub_state = (u8) (self->sub_state + 1);
-                fn_80129668(self, 0, 0xD);
+                em_hit_window_set_default(self, 0, 0xD);
             }
             break;
         }
@@ -1556,14 +1556,14 @@ void fn_8014CBA0(_ENEMY_WORK *self) {
         em_move_mode_set(self, 0);
         fn_80154C74(self);
         em_mot_set(self, 8, 4, 0);
-        fn_8012933C(self, 0, 5, 2);
-        fn_80134004(self, 0, lbl_80796F08);
+        em_hit_window_set(self, 0, 5, 2);
+        em_approach_start(self, lbl_80796F08, 0);
         break;
     case 1:
-        if (fn_80134114(self, 0, 0x40) == 1) {
+        if (em_approach_step(self, 0, 0x40) == 1) {
             self->state = (u8) (self->state + 1);
             em_mot_set(self, 0x2F, 0, 0);
-            fn_80129668(self, 0, 1);
+            em_hit_window_set_default(self, 0, 1);
             return;
         }
         return;
@@ -1591,8 +1591,8 @@ void fn_8014CC98(_ENEMY_WORK *self) {
         em_move_mode_set(self, 3);
         fn_80154C74(self);
         em_mot_set(self, 0x36, 2, 0);
-        fn_80129668(self, 0, 0xC);
-        fn_801353E4(self);
+        em_hit_window_set_default(self, 0, 0xC);
+        em_move_vec_clr(self);
         temp_f1 = fn_80050EF4(&self->v_0x188, &self->v_0x36c);
         if (temp_f1 > lbl_80796EF8) {
             self->v_0x310.z = lbl_80796EA0;
@@ -1606,12 +1606,12 @@ void fn_8014CC98(_ENEMY_WORK *self) {
         return;
     case 1:
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 1, lbl_80796ED8, lbl_80796E1C) == 0) {
-            fn_801354F4(self, &self->field_0x1bc);
-            fn_80133C50(self, 0x40);
+            em_move_offset_rot_apply(self, &self->field_0x1bc);
+            em_turn_to_target(self, 0x40);
         }
         if (em_mot_end_ck(self) == 1U) {
             self->state = (u8) (self->state + 1);
-            fn_801280AC(self);
+            em_action_finish_walk(self);
         }
         return;
     }
@@ -1632,9 +1632,9 @@ void fn_8014CDD0(_ENEMY_WORK *self, s32 arg1) {
         em_move_mode_set(self, 3);
         fn_80154C74(self);
         em_mot_set(self, 0x37, 2, 0);
-        fn_80129668(self, 0, 2);
+        em_hit_window_set_default(self, 0, 2);
         if ((arg1 & 0xFF) == 1) {
-            fn_801353F8(self);
+            em_move_vec2_clr(self);
             self->v_0x310.z = lbl_80796E0C;
             self->v_0x320.y = lbl_80796F68;
             return;
@@ -1643,11 +1643,11 @@ void fn_8014CDD0(_ENEMY_WORK *self, s32 arg1) {
     case 1:
         if (em_mot_end_ck(self) == 1U) {
             self->state = (u8) (self->state + 1);
-            fn_801280AC(self);
+            em_action_finish_walk(self);
             return;
         }
         if (((arg1 & 0xFF) == 1) && (em_frame_check__FP11_ENEMY_WORKUsff(self, 1, lbl_80796ED8, lbl_80796E1C) == 0)) {
-            fn_801355C8(self, &self->field_0x1bc);
+            em_move_offset_step(self, &self->field_0x1bc);
             if (self->v_0x310.z < lbl_80796E1C) {
                 self->v_0x310.z = lbl_80796E1C;
             }
@@ -1676,23 +1676,23 @@ void fn_8014C6DC(_ENEMY_WORK *self, u8 arg1) {
         if (em_mot_end_ck(self) == 1U) {
             self->state = (u8) (self->state + 1);
             self->sub_state = 0U;
-            fn_80130248(self);
-            fn_801305C4(self);
+            em_fall_height_get(self);
+            em_fall_start(self);
             em_mot_set(self, 0xCE, 0, 0);
-            fn_80129668(self, 0, 7);
-            fn_801353F8(self);
-            self->v_0x310.z = (f32) (lbl_80796F60 * fn_8012F8E4(self));
-            self->v_0x320.y = (f32) (lbl_80796F38 * fn_8012F8E4(self));
+            em_hit_window_set_default(self, 0, 7);
+            em_move_vec2_clr(self);
+            self->v_0x310.z = (f32) (lbl_80796F60 * get_em_base_scale(self));
+            self->v_0x320.y = (f32) (lbl_80796F38 * get_em_base_scale(self));
             return;
         }
         return;
     case 2:                                         /* switch 1 */
-        self->v_0x310.y = fn_80135644(self, &lbl_805A1E50);
-        temp_f31 = fn_80130248(self);
+        self->v_0x310.y = em_key_curve_eval(self, &lbl_805A1E50);
+        temp_f31 = em_fall_height_get(self);
         temp_r0 = self->sub_state;
         switch ((s32) temp_r0) {                    /* switch 2; irregular */
         case 0:                                     /* switch 2 */
-            fn_80135600(self, &self->field_0x1bc);
+            em_move_offset_step_update(self, &self->field_0x1bc);
             if ((em_frame_check__FP11_ENEMY_WORKUsff(self, 1, lbl_80796EA4, lbl_80796E1C) == 1U) || (self->v_0x310.z < lbl_80796E1C)) {
                 self->sub_state = (u8) (self->sub_state + 1);
                 self->v_0x310.z = (f32) lbl_80796E1C;
@@ -1702,13 +1702,13 @@ void fn_8014C6DC(_ENEMY_WORK *self, u8 arg1) {
             fn_80135584(self, &self->field_0x1bc);
             break;
         }
-        if ((fn_80130008(self, temp_f31) == 1U) && (em_mot_end_ck(self) == 1U)) {
+        if ((em_ground_ck(self, temp_f31) == 1U) && (em_mot_end_ck(self) == 1U)) {
             self->state = (u8) (self->state + 1);
             switch ((arg1 & 0xFF)) {                   /* switch 3; irregular */
             case 0:                                 /* switch 3 */
                 em_move_mode_set(self, 0);
                 em_mot_set(self, 0xCF, 0, 0);
-                fn_80129668(self, 0, 0x16);
+                em_hit_window_set_default(self, 0, 0x16);
                 return;
             case 1:                                 /* switch 3 */
                 em_move_mode_set(self, 3);
@@ -1717,7 +1717,7 @@ void fn_8014C6DC(_ENEMY_WORK *self, u8 arg1) {
             case 2:                                 /* switch 3 */
                 em_move_mode_set(self, 0);
                 em_mot_set(self, 0xD2, 0, 0);
-                fn_80129668(self, 0, 0x16);
+                em_hit_window_set_default(self, 0, 0x16);
                 return;
             default:                                /* switch 3 */
                 return;
@@ -1739,7 +1739,7 @@ void fn_8014C6DC(_ENEMY_WORK *self, u8 arg1) {
         case 1:                                     /* switch 4 */
             fn_80154CA4(self);
             if (em_mot_end_ck(self) == 1U) {
-                fn_801280AC(self);
+                em_action_finish_walk(self);
                 return;
             }
             /* Duplicate return node #51. Try simplifying control flow for better match */
@@ -1760,24 +1760,24 @@ void fn_8014C6DC(_ENEMY_WORK *self, u8 arg1) {
         if (em_mot_end_ck(self) == 1U) {
             self->state = (u8) (self->state + 1);
             self->sub_state = 0U;
-            fn_80130248(self);
-            fn_801305C4(self);
+            em_fall_height_get(self);
+            em_fall_start(self);
             em_mot_set(self, 0xCE, 0, 0);
-            fn_80129668(self, 0, 7);
-            fn_801353F8(self);
-            self->v_0x310.z = (f32) (lbl_80796F60 * fn_8012F8E4(self));
-            self->v_0x320.y = (f32) (lbl_80796F38 * fn_8012F8E4(self));
+            em_hit_window_set_default(self, 0, 7);
+            em_move_vec2_clr(self);
+            self->v_0x310.z = (f32) (lbl_80796F60 * get_em_base_scale(self));
+            self->v_0x320.y = (f32) (lbl_80796F38 * get_em_base_scale(self));
             return;
         }
         /* Duplicate return node #51. Try simplifying control flow for better match */
         return;
     case 5:                                         /* switch 1 */
-        self->v_0x310.y = fn_80135644(self, &lbl_805A1E50);
-        temp_f31_2 = fn_80130248(self);
+        self->v_0x310.y = em_key_curve_eval(self, &lbl_805A1E50);
+        temp_f31_2 = em_fall_height_get(self);
         temp_r0_2 = self->sub_state;
         switch ((s32) temp_r0_2) {                  /* switch 5; irregular */
         case 0:                                     /* switch 5 */
-            fn_80135600(self, &self->field_0x1bc);
+            em_move_offset_step_update(self, &self->field_0x1bc);
             if ((em_frame_check__FP11_ENEMY_WORKUsff(self, 1, lbl_80796EA4, lbl_80796E1C) == 1U) || (self->v_0x310.z < lbl_80796E1C)) {
                 self->sub_state = (u8) (self->sub_state + 1);
                 self->v_0x310.z = (f32) lbl_80796E1C;
@@ -1787,11 +1787,11 @@ void fn_8014C6DC(_ENEMY_WORK *self, u8 arg1) {
             fn_80135584(self, &self->field_0x1bc);
             break;
         }
-        if ((fn_80130008(self, temp_f31_2) == 1U) && (em_mot_end_ck(self) == 1U)) {
+        if ((em_ground_ck(self, temp_f31_2) == 1U) && (em_mot_end_ck(self) == 1U)) {
             self->state = (u8) (self->state + 1);
             em_move_mode_set(self, 0);
             em_mot_set(self, 0xCF, 0, 0);
-            fn_80129668(self, 0, 0x16);
+            em_hit_window_set_default(self, 0, 0x16);
             return;
         }
         /* Duplicate return node #51. Try simplifying control flow for better match */
@@ -1820,21 +1820,21 @@ void fn_8014D504(_ENEMY_WORK *self) {
         em_move_mode_set(self, 3);
         fn_80154C74(self);
         em_mot_set(self, 0xC8, 6, 0);
-        fn_80129668(self, 0, 0x17);
-        fn_801353F8(self);
+        em_hit_window_set_default(self, 0, 0x17);
+        em_move_vec2_clr(self);
         self->v_0x320.z = fn_801356A8(self, lbl_80796F74, lbl_80796E20, lbl_80796F78);
         return;
     case 1:                                         /* switch 1 */
-        fn_80135644(self, &lbl_805A1DD8);
+        em_key_curve_eval(self, &lbl_805A1DD8);
         fn_801303FC(self);
         if (self->field_0x1ac < lbl_80796E24) {
             self->field_0x1ac = (f32) lbl_80796E24;
         }
-        self->v_0x310.z = (f32) (self->v_0x320.z * fn_80135644(self, &lbl_805A1E20));
-        fn_80130248(self);
+        self->v_0x310.z = (f32) (self->v_0x320.z * em_key_curve_eval(self, &lbl_805A1E20));
+        em_fall_height_get(self);
         fn_80135584(self, &self->field_0x1bc);
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 1, lbl_80796F58, lbl_80796E1C) == 0) {
-            fn_80133C50(self, 0x100);
+            em_turn_to_target(self, 0x100);
         }
         if (em_mot_end_ck(self) == 1U) {
             self->state = (u8) (self->state + 1);
@@ -1877,21 +1877,21 @@ void fn_8014D714(_ENEMY_WORK *self) {
         em_move_mode_set(self, 3);
         fn_80154C74(self);
         em_mot_set(self, 0xD1, 6, 0);
-        fn_8012933C(self, 0, 6, 8);
-        fn_8012933C(self, 1, 3, 0x10);
+        em_hit_window_set(self, 0, 6, 8);
+        em_hit_window_set(self, 1, 3, 0x10);
         if ((u8) self->field_0x03 == 2) {
             self->field_0xa7e = 0xDE;
         } else {
             self->field_0xa7e = 0xD4;
         }
-        fn_801353F8(self);
+        em_move_vec2_clr(self);
         fn_801303EC(self, lbl_80796E1C);
         return;
     case 1:
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 1, lbl_80796E3C, lbl_80796E1C) == 0) {
-            fn_80133C50(self, 0x80);
+            em_turn_to_target(self, 0x80);
         }
-        fn_80135644(self, &lbl_805A1E90);
+        em_key_curve_eval(self, &lbl_805A1E90);
         fn_801303FC(self);
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 1, lbl_80796F7C, lbl_80796E1C) == 1U) {
             if (self->field_0x1ac < lbl_80796E1C) {
@@ -1900,8 +1900,8 @@ void fn_8014D714(_ENEMY_WORK *self) {
         } else if (self->field_0x1ac < lbl_80796F34) {
             self->field_0x1ac = (f32) lbl_80796F34;
         }
-        self->v_0x310.z = fn_80135644(self, &lbl_805A1F00);
-        fn_801354F4(self, &self->field_0x1bc);
+        self->v_0x310.z = em_key_curve_eval(self, &lbl_805A1F00);
+        em_move_offset_rot_apply(self, &self->field_0x1bc);
         if (em_mot_end_ck(self) == 1U) {
             self->state = (u8) (self->state + 1);
             em_move_mode_set(self, 0);
@@ -1929,15 +1929,15 @@ void fn_8014E160(_ENEMY_WORK *self) {
         em_move_mode_set(self, 3);
         fn_80154C74(self);
         em_mot_set(self, 0x38, 6, 0);
-        fn_801353F8(self);
+        em_move_vec2_clr(self);
         fn_801303EC(self, lbl_80796E1C);
-        fn_80129668(self, 0, 0x1E);
+        em_hit_window_set_default(self, 0, 0x1E);
         return;
     case 1:
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 1, lbl_80796E60, lbl_80796E1C) == 0) {
-            fn_80133C50(self, 0x100);
+            em_turn_to_target(self, 0x100);
         }
-        fn_80135644(self, &lbl_805A1D18);
+        em_key_curve_eval(self, &lbl_805A1D18);
         fn_801303FC(self);
         temp_f1 = self->field_0x1ac;
         if (temp_f1 > lbl_80796E1C) {
@@ -1945,10 +1945,10 @@ void fn_8014E160(_ENEMY_WORK *self) {
         } else if (temp_f1 < lbl_80796F08) {
             self->field_0x1ac = (f32) lbl_80796F08;
         }
-        self->v_0x310.z = fn_80135644(self, &lbl_805A1D40);
-        fn_801354F4(self, &self->field_0x1bc);
+        self->v_0x310.z = em_key_curve_eval(self, &lbl_805A1D40);
+        em_move_offset_rot_apply(self, &self->field_0x1bc);
         if (em_mot_end_ck(self) == 1U) {
-            fn_801280AC(self);
+            em_action_finish_walk(self);
         }
         return;
     }
@@ -2106,13 +2106,13 @@ void fn_8014EC50(_ENEMY_WORK *self) {
         temp_r0 = self->field_0x1e7;
         switch ((s32) temp_r0) {                    /* switch 2; irregular */
         case 3:                                     /* switch 2 */
-            fn_80129668(self, 0, 0x18);
+            em_hit_window_set_default(self, 0, 0x18);
             return;
         case 2:                                     /* switch 2 */
-            fn_80129668(self, 0, 0x19);
+            em_hit_window_set_default(self, 0, 0x19);
             return;
         case 1:                                     /* switch 2 */
-            fn_80129668(self, 0, 0x1A);
+            em_hit_window_set_default(self, 0, 0x1A);
             return;
         }
         break;
@@ -2158,24 +2158,24 @@ void fn_8014EDC8(_ENEMY_WORK *self) {
             self->state = (u8) (self->state + 1);
             self->sub_state = 0U;
             fn_803B9BA0(self, &self->v_0x188, 0x64);
-            fn_80130248(self);
-            fn_801305C4(self);
+            em_fall_height_get(self);
+            em_fall_start(self);
             em_mot_set(self, 0xCE, 0, 0);
-            fn_80129668(self, 0, 0x1C);
-            fn_801353F8(self);
-            self->v_0x310.z = (f32) (lbl_80796F60 * fn_8012F8E4(self));
-            self->v_0x320.y = (f32) (lbl_80796F38 * fn_8012F8E4(self));
+            em_hit_window_set_default(self, 0, 0x1C);
+            em_move_vec2_clr(self);
+            self->v_0x310.z = (f32) (lbl_80796F60 * get_em_base_scale(self));
+            self->v_0x320.y = (f32) (lbl_80796F38 * get_em_base_scale(self));
             fn_802B9574(0);
             return;
         }
         return;
     case 2:                                         /* switch 1 */
-        self->v_0x310.y = fn_80135644(self, &lbl_805A1E50);
-        temp_f31 = fn_80130248(self);
+        self->v_0x310.y = em_key_curve_eval(self, &lbl_805A1E50);
+        temp_f31 = em_fall_height_get(self);
         temp_r0 = self->sub_state;
         switch ((s32) temp_r0) {                    /* switch 2; irregular */
         case 0:                                     /* switch 2 */
-            fn_80135600(self, &self->field_0x1bc);
+            em_move_offset_step_update(self, &self->field_0x1bc);
             if ((em_frame_check__FP11_ENEMY_WORKUsff(self, 1, lbl_80796EA4, lbl_80796E1C) == 1U) || (self->v_0x310.z < lbl_80796E1C)) {
                 self->sub_state = (u8) (self->sub_state + 1);
                 self->v_0x310.z = (f32) lbl_80796E1C;
@@ -2185,12 +2185,12 @@ void fn_8014EDC8(_ENEMY_WORK *self) {
             fn_80135584(self, &self->field_0x1bc);
             break;
         }
-        if ((fn_80130008(self, temp_f31) == 1U) && (em_mot_end_ck(self) == 1U)) {
+        if ((em_ground_ck(self, temp_f31) == 1U) && (em_mot_end_ck(self) == 1U)) {
             self->state = (u8) (self->state + 1);
             em_move_mode_set(self, 0);
             em_mot_set(self, 0xCF, 0, 0);
-            if (fn_80135748(self, 1) == 0) {
-                fn_80129668(self, 0, 0x16);
+            if (em_flags836_ck(self, 1) == 0) {
+                em_hit_window_set_default(self, 0, 0x16);
                 return;
             }
         }
@@ -2248,22 +2248,22 @@ void fn_8014F530(_ENEMY_WORK *self) {
     temp_r0 = self->field_0x1e6;
     switch ((s32) temp_r0) {                        /* irregular */
     case 0:
-        fn_801251D8(&lbl_805A2AA0, 0, 0);
+        em_se_tbl_play_alt(&lbl_805A2AA0, 0, 0);
         return;
     case 5:
-        fn_801251D8(&lbl_805A2B00, 1, 5);
+        em_se_tbl_play_alt(&lbl_805A2B00, 1, 5);
         return;
     case 15:
-        fn_801251D8(&lbl_805A2B50, 0, 0xF);
+        em_se_tbl_play_alt(&lbl_805A2B50, 0, 0xF);
         return;
     case 26:
-        fn_801251D8(&lbl_805A2B98, 0, 0x1A);
+        em_se_tbl_play_alt(&lbl_805A2B98, 0, 0x1A);
         return;
     case 28:
-        fn_801251D8(&lbl_805A2BC8, 0, 0x1C);
+        em_se_tbl_play_alt(&lbl_805A2BC8, 0, 0x1C);
         return;
     default:
-        fn_801251D8(&lbl_805A2AA0, 0, 0);
+        em_se_tbl_play_alt(&lbl_805A2AA0, 0, 0);
         return;
     }
 }
@@ -2292,24 +2292,24 @@ void fn_8014F5F0(_ENEMY_WORK *self) {
     switch ((s32) temp_r4) {                        /* irregular */
     case 0:
         self->state = (u8) (temp_r4 + 1);
-        fn_80130248(self);
-        fn_801305C4(self);
+        em_fall_height_get(self);
+        em_fall_start(self);
         em_mot_set(self, 0x1A, 0xA, 0);
-        fn_80134E8C(self);
+        em_dive_start(self);
         self->field_0x20 = 0x12C;
         return;
     case 1:
         temp_f1 = self->v_0x188.y;
         temp_f2 = self->v_0x36c.y - temp_f1;
         if (temp_f2 < lbl_80796FA0) {
-            fn_80134F18(self);
+            em_dive_step(self);
         } else if (temp_f2 > lbl_80796F54) {
             self->v_0x188.y = (f32) (temp_f1 + lbl_80796F84);
         }
         temp_f31 = self->v_0x36c.y - self->v_0x188.y;
         temp_r0 = self->field_0x20 - 1;
         self->field_0x20 = temp_r0;
-        if ((temp_r0 <= 0) || ((fn_80133C50(self, 0x180) == 1U) && (temp_f31 >= lbl_80796FA4) && (temp_f31 <= lbl_80796FA8))) {
+        if ((temp_r0 <= 0) || ((em_turn_to_target(self, 0x180) == 1U) && (temp_f31 >= lbl_80796FA4) && (temp_f31 <= lbl_80796FA8))) {
             em_state_set(self, 0xD, 1);
         }
         return;
@@ -2329,22 +2329,22 @@ void fn_8014FA34(_ENEMY_WORK *self) {
         self->state = (u8) (temp_r4 + 1);
         em_move_mode_set(self, 3);
         em_mot_set(self, 0xC8, 0x14, 0);
-        fn_80129668(self, 0, 0xB);
-        fn_801353F8(self);
+        em_hit_window_set_default(self, 0, 0xB);
+        em_move_vec2_clr(self);
         fn_801303EC(self, lbl_80796E1C);
         self->v_0x320.z = fn_801356A8(self, lbl_80796F74, lbl_80796E20, lbl_80796F78);
         return;
     case 1:                                         /* switch 1 */
-        fn_80135644(self, &lbl_805A1DD8);
+        em_key_curve_eval(self, &lbl_805A1DD8);
         fn_801303FC(self);
         if (self->field_0x1ac < lbl_80796E24) {
             self->field_0x1ac = (f32) lbl_80796E24;
         }
-        self->v_0x310.z = (f32) (self->v_0x320.z * fn_80135644(self, &lbl_805A1E20));
-        fn_80130248(self);
+        self->v_0x310.z = (f32) (self->v_0x320.z * em_key_curve_eval(self, &lbl_805A1E20));
+        em_fall_height_get(self);
         fn_80135584(self, &self->field_0x1bc);
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 1, lbl_80796F58, lbl_80796E1C) == 0) {
-            fn_80133C50(self, 0x100);
+            em_turn_to_target(self, 0x100);
         }
         if (em_mot_end_ck(self) == 1U) {
             self->state = (u8) (self->state + 1);
@@ -2416,103 +2416,103 @@ void fn_8014F138(_ENEMY_WORK *self) {
     temp_r0 = self->field_0x1e6;
     switch ((s32) temp_r0) {                        /* irregular */
     case 0x17:
-        fn_801251D0(&lbl_805A2338, 0, 0x17);
+        em_se_tbl_play(&lbl_805A2338, 0, 0x17);
         return;
     case 0x18:
-        fn_801251D0(&lbl_805A2490, 0, 0x18);
+        em_se_tbl_play(&lbl_805A2490, 0, 0x18);
         return;
     case 0x19:
-        fn_801251D0(&lbl_805A2490, 0, 0x19);
+        em_se_tbl_play(&lbl_805A2490, 0, 0x19);
         return;
     case 0x1A:
-        fn_801251D0(&lbl_805A23E0, 0, 0x1A);
+        em_se_tbl_play(&lbl_805A23E0, 0, 0x1A);
         return;
     case 0x1B:
-        fn_801251D0(&lbl_805A2450, 0, 0x1B);
+        em_se_tbl_play(&lbl_805A2450, 0, 0x1B);
         return;
     case 0x1C:
-        fn_801251D0(&lbl_805A2360, 0, 0x1C);
+        em_se_tbl_play(&lbl_805A2360, 0, 0x1C);
         return;
     case 0x1D:
-        fn_801251D0(&lbl_805A2388, 0, 0x1D);
+        em_se_tbl_play(&lbl_805A2388, 0, 0x1D);
         return;
     case 0x1E:
-        fn_801251D0(&lbl_805A2360, 0, 0x1E);
+        em_se_tbl_play(&lbl_805A2360, 0, 0x1E);
         return;
     case 0x23:
-        fn_801251D0(&lbl_805A2518, 1, 0x23);
+        em_se_tbl_play(&lbl_805A2518, 1, 0x23);
         return;
     case 0x7A:
-        fn_801251D0(&lbl_805A2588, 0, 0x7A);
+        em_se_tbl_play(&lbl_805A2588, 0, 0x7A);
         return;
     case 0x7B:
-        fn_801251D0(&lbl_805A25B0, 0, 0x7B);
+        em_se_tbl_play(&lbl_805A25B0, 0, 0x7B);
         return;
     case 0x7C:
-        fn_801251D0(&lbl_805A2620, 0, 0x7C);
+        em_se_tbl_play(&lbl_805A2620, 0, 0x7C);
         return;
     case 0x8D:
-        fn_801251D0(&lbl_805A2718, 0, 0x8D);
+        em_se_tbl_play(&lbl_805A2718, 0, 0x8D);
         return;
     case 0x7E:
-        fn_801251D0(&lbl_805A2678, 0, 0x7E);
+        em_se_tbl_play(&lbl_805A2678, 0, 0x7E);
         return;
     case 0x7F:
-        fn_801251D0(&lbl_805A26E0, 0, 0x7F);
+        em_se_tbl_play(&lbl_805A26E0, 0, 0x7F);
         return;
     case 0x8E:
-        fn_801251D0(&lbl_805A2718, 0, 0x8E);
+        em_se_tbl_play(&lbl_805A2718, 0, 0x8E);
         return;
     case 0x78:
-        fn_801251D0(&lbl_805A2808, 0, 0x78);
+        em_se_tbl_play(&lbl_805A2808, 0, 0x78);
         return;
     case 0x84:
-        fn_801251D0(&lbl_805A27A0, 1, 0x84);
+        em_se_tbl_play(&lbl_805A27A0, 1, 0x84);
         return;
     case 0x9F:
-        fn_801251D0(&lbl_805A25F0, 0, 0x9F);
+        em_se_tbl_play(&lbl_805A25F0, 0, 0x9F);
         return;
     case 0xA0:
-        fn_801251D0(&lbl_805A25F0, 0, 0xA0);
+        em_se_tbl_play(&lbl_805A25F0, 0, 0xA0);
         return;
     case 0xA8:
-        fn_801251D0(&lbl_805A2830, 0, 0xA8);
+        em_se_tbl_play(&lbl_805A2830, 0, 0xA8);
         return;
     case 0xA9:
-        fn_801251D0(&lbl_805A2518, 1, 0xA9);
+        em_se_tbl_play(&lbl_805A2518, 1, 0xA9);
         return;
     case 0xB6:
-        fn_801251D0(&lbl_805A2858, 0, 0xB6);
+        em_se_tbl_play(&lbl_805A2858, 0, 0xB6);
         return;
     case 0xB7:
-        fn_801251D0(&lbl_805A2880, 0, 0xB7);
+        em_se_tbl_play(&lbl_805A2880, 0, 0xB7);
         return;
     case 0xB8:
-        fn_801251D0(&lbl_805A28F0, 1, 0xB8);
+        em_se_tbl_play(&lbl_805A28F0, 1, 0xB8);
         return;
     case 0xB9:
-        fn_801251D0(&lbl_805A2978, 0, 0xB9);
+        em_se_tbl_play(&lbl_805A2978, 0, 0xB9);
         return;
     case 0xBA:
-        fn_801251D0(&lbl_805A29A0, 0, 0xBA);
+        em_se_tbl_play(&lbl_805A29A0, 0, 0xBA);
         return;
     case 0xBB:
-        fn_801251D0(&lbl_805A2950, 0, 0xBB);
+        em_se_tbl_play(&lbl_805A2950, 0, 0xBB);
         return;
     case 0xBC:
-        fn_801251D0(&lbl_805A2950, 0, 0xBC);
+        em_se_tbl_play(&lbl_805A2950, 0, 0xBC);
         return;
     case 0xBF:
-        fn_801251D0(&lbl_805A29E0, 0, 0xBF);
+        em_se_tbl_play(&lbl_805A29E0, 0, 0xBF);
         return;
     case 0xC1:
-        fn_801251D0(&lbl_805A2718, 0, 0xC1);
+        em_se_tbl_play(&lbl_805A2718, 0, 0xC1);
         return;
     case 0xCA:
-        fn_801251D0(&lbl_805A2A58, 0, 0xCA);
+        em_se_tbl_play(&lbl_805A2A58, 0, 0xCA);
         return;
     case 0xF0:
-        fn_801251D0(&lbl_805A2830, 0, 0xF0);
+        em_se_tbl_play(&lbl_805A2830, 0, 0xF0);
         return;
     default:
         em_action_finish(self);
@@ -2554,7 +2554,7 @@ void fn_8014FF10(_ENEMY_WORK *self) {
     case 1:
         if ((em_frame_check__FP11_ENEMY_WORKUsff(self, 0, lbl_80796E4C, lbl_80796E1C) == 1U) || (em_frame_check__FP11_ENEMY_WORKUsff(self, 0, lbl_80796E50, lbl_80796E1C) == 1U)) {
             setVector3__FPQ34nw4r4math4VEC3fff(&sp8, lbl_80796E1C, lbl_80796E54, lbl_80796E58);
-            fn_80304508(self, 0x33, 0x1A, &sp8, lbl_80796E20);
+            eft_em_spawn(self, 0x33, 0x1A, &sp8, lbl_80796E20);
         }
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 0, lbl_80796E5C, lbl_80796E1C) == 1U) {
             setVector3__FPQ34nw4r4math4VEC3fff(&sp8, lbl_80796E1C, lbl_80796E1C, lbl_80796E60);
@@ -2562,11 +2562,11 @@ void fn_8014FF10(_ENEMY_WORK *self) {
         }
         if ((em_frame_check__FP11_ENEMY_WORKUsff(self, 2, lbl_80796E68, lbl_80796E6C) == 1U) && ((s32) (system_w.field_0x0c & 3) == 0)) {
             setVector3__FPQ34nw4r4math4VEC3fff(&sp8, lbl_80796E1C, lbl_80796E54, lbl_80796E58);
-            fn_80304508(self, 0x34, 0x1A, &sp8, lbl_80796E20);
+            eft_em_spawn(self, 0x34, 0x1A, &sp8, lbl_80796E20);
         }
         if ((em_frame_check__FP11_ENEMY_WORKUsff(self, 0, lbl_80796E78, lbl_80796E1C) == 1U) || (em_frame_check__FP11_ENEMY_WORKUsff(self, 0, lbl_80796E7C, lbl_80796E1C) == 1U) || (em_frame_check__FP11_ENEMY_WORKUsff(self, 0, lbl_80796E80, lbl_80796E1C) == 1U)) {
             setVector3__FPQ34nw4r4math4VEC3fff(&sp8, lbl_80796E1C, lbl_80796E54, lbl_80796E58);
-            fn_80304508(self, 0x33, 0x1A, &sp8, lbl_80796E84);
+            eft_em_spawn(self, 0x33, 0x1A, &sp8, lbl_80796E84);
         }
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 0, lbl_80796E50, lbl_80796E1C) == 1U) {
             setVector3__FPQ34nw4r4math4VEC3fff(&sp8, lbl_80796E1C, lbl_80796E1C, lbl_80796E60);
@@ -2574,19 +2574,19 @@ void fn_8014FF10(_ENEMY_WORK *self) {
         }
         if ((em_frame_check__FP11_ENEMY_WORKUsff(self, 2, lbl_80796E70, lbl_80796E74) == 1U) && ((s32) (system_w.field_0x0c & 3) == 0)) {
             setVector3__FPQ34nw4r4math4VEC3fff(&sp8, lbl_80796E1C, lbl_80796E54, lbl_80796E58);
-            fn_80304508(self, 0x34, 0x1A, &sp8, lbl_80796E20);
+            eft_em_spawn(self, 0x34, 0x1A, &sp8, lbl_80796E20);
         }
         if ((em_frame_check__FP11_ENEMY_WORKUsff(self, 2, lbl_80796E88, lbl_80796E8C) == 1U) && ((s32) (system_w.field_0x0c & 3) == 0)) {
             setVector3__FPQ34nw4r4math4VEC3fff(&sp8, lbl_80796E1C, lbl_80796E54, lbl_80796E58);
-            fn_80304508(self, 0x34, 0x1A, &sp8, lbl_80796E98);
+            eft_em_spawn(self, 0x34, 0x1A, &sp8, lbl_80796E98);
         }
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 0, lbl_80796E9C, lbl_80796E1C) == 1U) {
             setVector3__FPQ34nw4r4math4VEC3fff(&sp8, lbl_80796E1C, lbl_80796E54, lbl_80796E58);
-            fn_80304508(self, 0x33, 0x1A, &sp8, lbl_80796E2C);
+            eft_em_spawn(self, 0x33, 0x1A, &sp8, lbl_80796E2C);
         }
         if ((em_frame_check__FP11_ENEMY_WORKUsff(self, 2, lbl_80796E90, lbl_80796E94) == 1U) && ((s32) (system_w.field_0x0c & 3) == 0)) {
             setVector3__FPQ34nw4r4math4VEC3fff(&sp8, lbl_80796E1C, lbl_80796E54, lbl_80796E58);
-            fn_80304508(self, 0x34, 0x1A, &sp8, lbl_80796E98);
+            eft_em_spawn(self, 0x34, 0x1A, &sp8, lbl_80796E98);
         }
         return;
     }
@@ -2613,12 +2613,12 @@ void fn_8014CEF8(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
     switch ((s32) temp_r3) {                        /* switch 1; irregular */
     case 0:                                         /* switch 1 */
         self->state = (u8) (temp_r3 + 1);
-        fn_80130248(self);
-        fn_801305C4(self);
+        em_fall_height_get(self);
+        em_fall_start(self);
         fn_80154C74(self);
         em_mot_set(self, 0x45, 6, 0);
         self->sub_state = 0U;
-        fn_801353F8(self);
+        em_move_vec2_clr(self);
         self->v_0x310.y = (f32) lbl_80796F6C;
         self->v_0x310.z = (f32) lbl_80796E60;
         return;
@@ -2636,7 +2636,7 @@ void fn_8014CEF8(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
             spC = 0x1800;
             break;
         default:                                    /* switch 2 */
-            fn_80050CA0(&sp10, &self->v_0x36c, &self->v_0x188);
+            subVec3(&sp10, &self->v_0x36c, &self->v_0x188);
             copyVec3(&sp1C, &sp10);
             calcVecAngXY__FPQ34nw4r4math4VEC3PUlPUl(&sp1C, &spC, &sp8);
             if (spC > 0x3000U) {
@@ -2645,8 +2645,8 @@ void fn_8014CEF8(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
             break;
         }
         self->field_0x1bc = (s32) fn_80133DB0((u16) spC, (u16) self->field_0x1bc, 0x180);
-        fn_80133C50(self, 0x280);
-        fn_80135600(self, &self->field_0x1bc, fn_80130248(self) - lbl_80796F4C);
+        em_turn_to_target(self, 0x280);
+        em_move_offset_step_update(self, &self->field_0x1bc, em_fall_height_get(self) - lbl_80796F4C);
         if (self->v_0x310.z > lbl_80796F28) {
             self->v_0x310.z = (f32) lbl_80796F28;
         }
@@ -2654,7 +2654,7 @@ void fn_8014CEF8(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
             self->state = (u8) (self->state + 1);
             em_mot_set(self, 0x3E, 6, 0);
             self->field_0x20 = 0;
-            fn_8012933C(self, 0, 0xE, 3);
+            em_hit_window_set(self, 0, 0xE, 3);
             self->v_0x320.y = (f32) lbl_80796F04;
             return;
         }
@@ -2662,13 +2662,13 @@ void fn_8014CEF8(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
     case 2:                                         /* switch 1 */
         fn_80133C3C(self);
         self->field_0x20 = (s32) (self->field_0x20 + 1);
-        if (fn_80135600(self, &self->field_0x1bc, fn_80130248(self) - lbl_80796F4C) == 1U) {
+        if (em_move_offset_step_update(self, &self->field_0x1bc, em_fall_height_get(self) - lbl_80796F4C) == 1U) {
             self->state = (u8) (self->state + 1);
             em_move_mode_set(self, 3);
             em_mot_set(self, 0x3F, 6, 0);
             fn_801303EC(self, lbl_80796F34);
         } else if (((s32) self->field_0x20 > 0x96) && (fn_8012D1A0(self) == 1U)) {
-            fn_80127FE4(self);
+            em_action_finish_fall(self);
         }
         if (self->v_0x310.z > lbl_80796E34) {
             self->v_0x310.z = (f32) lbl_80796E34;
@@ -2677,7 +2677,7 @@ void fn_8014CEF8(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
         break;
     case 3:                                         /* switch 1 */
         fn_801303EC(self, lbl_80796F34);
-        fn_801354F4(self, &self->field_0x1bc);
+        em_move_offset_rot_apply(self, &self->field_0x1bc);
         if (em_mot_end_ck(self) == 1U) {
             self->state = (u8) (self->state + 1);
             em_mot_set(self, 0xD0, 0, 0);
@@ -2687,7 +2687,7 @@ void fn_8014CEF8(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
         break;
     case 4:                                         /* switch 1 */
         fn_801303EC(self, lbl_80796F34);
-        fn_801354F4(self, &self->field_0x1bc);
+        em_move_offset_rot_apply(self, &self->field_0x1bc);
         temp_r0 = self->field_0x20 + 1;
         self->field_0x20 = temp_r0;
         if (temp_r0 > 6) {
@@ -2719,14 +2719,14 @@ void fn_8014CEF8(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
                     fn_801303EC(self, (lbl_80796F3C * (f32) (0x14 - temp_r0_2)) / lbl_80796E0C);
                 }
                 if (em_frame_check__FP11_ENEMY_WORKUsff(self, 0, lbl_80796EFC, lbl_80796E1C) == 1U) {
-                    fn_80129724(self, 0);
+                    em_hit_window_clear(self, 0);
                 }
-                fn_801355C8(self, &self->field_0x1bc);
+                em_move_offset_step(self, &self->field_0x1bc);
                 if (self->v_0x310.z < lbl_80796E1C) {
                     self->v_0x310.z = (f32) lbl_80796E1C;
                 }
                 if (em_mot_end_ck(self) == 1U) {
-                    fn_801280AC(self);
+                    em_action_finish_walk(self);
                     return;
                 }
             } else {
@@ -2741,7 +2741,7 @@ void fn_8014CEF8(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
                     }
                     if (em_mot_end_ck(self) == 1U) {
                         self->sub_state = (u8) (self->sub_state + 1);
-                        fn_80129724(self, 0);
+                        em_hit_window_clear(self, 0);
                         em_move_mode_set(self, 0);
                         em_mot_set(self, 0x3C, 0, 0);
                         return;
@@ -2766,7 +2766,7 @@ void fn_8014CEF8(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
                 break;
             case 1:                                 /* switch 3 */
                 if (em_frame_check__FP11_ENEMY_WORKUsff(self, 0, lbl_80796EFC, lbl_80796E1C) == 1U) {
-                    fn_80129724(self, 0);
+                    em_hit_window_clear(self, 0);
                 }
                 if (em_mot_end_ck(self) == 1U) {
                     em_action_finish(self);
@@ -2797,7 +2797,7 @@ u32 fn_8014E670(_ENEMY_WORK *self, u8 arg1) {
             setVector3__FPQ34nw4r4math4VEC3fff(&sp2C, lbl_80796E1C, lbl_80796E1C, lbl_80796E20);
             rotVecY__FPQ34nw4r4math4VEC3Ul(&sp2C, self->field_0x1c0);
             fn_80051EE0(&sp8, &sp2C, lbl_80796F64 * get_em_chg_scale__FP11_ENEMY_WORK(self));
-            fn_80051378(&sp14, &self->v_0x188, &sp8);
+            addVec3(&sp14, &self->v_0x188, &sp8);
             copyVec3(&sp20, &sp14);
             if (fn_80050EAC(temp_r31_2 + 0x3C, &sp20) <= lbl_80796F94) {
                 return 1U;
@@ -2827,12 +2827,12 @@ void fn_8014FC24(_ENEMY_WORK *self) {
         self->sub_state = 0;
         em_move_mode_set(self, 0);
         fn_80154B04(self, &sp3C, &sp8, lbl_80796F64);
-        fn_80050CA0(&sp24, &sp3C, &self->v_0x188);
+        subVec3(&sp24, &sp3C, &self->v_0x188);
         copyVec3(&sp30, &sp24);
-        fn_80128BF8(self, &sp3C);
-        fn_80134964(self, &lbl_8056F960, 2, 1, sp8);
-        fn_801353E4(self);
-        temp_f31 = fn_8012F8E4(self);
+        em_target_pos_set(self, &sp3C);
+        em_turn_seq_start(self, &lbl_8056F960, 2, 1, sp8);
+        em_move_vec_clr(self);
+        temp_f31 = get_em_base_scale(self);
         fn_80051EE0(&spC, &sp30, lbl_80796F98);
         fn_80051EE0(&sp18, &spC, temp_f31);
         copyVec3(&self->v_0x310, &sp18);
@@ -2840,8 +2840,8 @@ void fn_8014FC24(_ENEMY_WORK *self) {
         return;
     case 1:
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 2, lbl_80796EA0, lbl_80796E60) == 1U) {
-            fn_80135418(self);
-            fn_80134B0C(self, &lbl_8056F960);
+            em_move_offset_apply(self);
+            em_turn_seq_step(self, &lbl_8056F960);
         }
         if (em_mot_end_ck(self) == 1U) {
             self->state = (u8) (self->state + 1);
@@ -2871,7 +2871,7 @@ void fn_8014E290(_ENEMY_WORK *self) {
     ShellParams sp8;
     u8 temp_r3;
 
-    fn_80149788(&sp8);
+    em_spawn_rec_init(&sp8);
     temp_r3 = self->state;
     switch ((s32) temp_r3) {                        /* irregular */
     case 0:
@@ -2882,11 +2882,11 @@ void fn_8014E290(_ENEMY_WORK *self) {
         return;
     case 1:
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 0, lbl_80796F8C, lbl_80796E1C) == 1U) {
-            fn_80103960(self, 0x16);
+            eft007_part_set(self, 0x16);
         }
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 0, lbl_80796F90, lbl_80796E1C) == 1U) {
             fn_801545B8(&sp8, 0, 0x11C7U, 0);
-            fn_801039B0(self, 0x15, sp8.field_0x12, sp8.field_0x14);
+            eft007_part_spawn(self, 0x15, sp8.field_0x12, sp8.field_0x14);
             shell_set_func_ptr->field_0x3c(self, &sp8, 3, shell_set_func_ptr);
         }
         if (em_mot_end_ck(self) == 1U) {
@@ -2902,7 +2902,7 @@ void fn_8014BB40(_ENEMY_WORK *self, u8 arg1) {
     u16 var_r31;
     u8 temp_r3;
 
-    fn_80149788(&sp8);
+    em_spawn_rec_init(&sp8);
     temp_r3 = self->state;
     switch ((s32) temp_r3) {                        /* irregular */
     case 0:
@@ -2923,11 +2923,11 @@ void fn_8014BB40(_ENEMY_WORK *self, u8 arg1) {
             em_mot_speed_set(self);
         }
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 0, lbl_80796F40, lbl_80796E1C) == 1U) {
-            fn_80103960(self, 3);
+            eft007_part_set(self, 3);
         }
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 1, lbl_80796F44, lbl_80796E1C) == 0) {
             if ((s32) (self->field_0x20 & 7) == 0) {
-                fn_80103960(self, 1);
+                eft007_part_set(self, 1);
             }
             self->field_0x20 = (s32) (self->field_0x20 + 1);
         }
@@ -2944,13 +2944,13 @@ void fn_8014BB40(_ENEMY_WORK *self, u8 arg1) {
             if (em_frame_check__FP11_ENEMY_WORKUsff(self, 0, lbl_80796F48, lbl_80796E1C) == 1U) {
                 fn_801545B8(&sp8, 0, var_r31, 0);
                 shell_set_func_ptr->field_0x3c(self, &sp8, 0, shell_set_func_ptr);
-                fn_801039B0(self, 0, sp8.field_0x12, sp8.field_0x14);
-                fn_801039B0(self, 2, sp8.field_0x12, sp8.field_0x14);
+                eft007_part_spawn(self, 0, sp8.field_0x12, sp8.field_0x14);
+                eft007_part_spawn(self, 2, sp8.field_0x12, sp8.field_0x14);
             }
         } else if (em_frame_check__FP11_ENEMY_WORKUsff(self, 0, lbl_80796F48, lbl_80796E1C) == 1U) {
             fn_801545B8(&sp8, 0, 0U, 0);
             shell_set_func_ptr->field_0x3c(self, &sp8, 1, shell_set_func_ptr);
-            fn_801039B0(self, 4, 0U, 0U);
+            eft007_part_spawn(self, 4, 0U, 0U);
         }
         if (em_mot_end_ck(self) == 1U) {
             em_action_finish(self);
@@ -2965,7 +2965,7 @@ void fn_8014C464(_ENEMY_WORK *self, u8 arg1) {
     s32 var_r31;
     u8 temp_r3;
 
-    fn_80149788(&sp8);
+    em_spawn_rec_init(&sp8);
     temp_r3 = self->state;
     switch ((s32) temp_r3) {                        /* irregular */
     case 0:
@@ -2981,11 +2981,11 @@ void fn_8014C464(_ENEMY_WORK *self, u8 arg1) {
             em_mot_speed_set(self);
         }
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 0, lbl_80796F40, lbl_80796E1C) == 1U) {
-            fn_80103960(self, 3);
+            eft007_part_set(self, 3);
         }
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 1, lbl_80796F44, lbl_80796E1C) == 0) {
             if ((s32) (self->field_0x20 & 7) == 0) {
-                fn_80103960(self, 1);
+                eft007_part_set(self, 1);
             }
             self->field_0x20 = (s32) (self->field_0x20 + 1);
         }
@@ -3005,13 +3005,13 @@ void fn_8014C464(_ENEMY_WORK *self, u8 arg1) {
         if (var_r31 != 0) {
             if ((arg1 & 0xFF) == 0) {
                 shell_set_func_ptr->field_0x3c(self, &sp8, 0, shell_set_func_ptr);
-                fn_801039B0(self, 0, sp8.field_0x12, sp8.field_0x14);
+                eft007_part_spawn(self, 0, sp8.field_0x12, sp8.field_0x14);
                 if ((u32) var_r31 == 2U) {
-                    fn_801039B0(self, 2, sp8.field_0x12, sp8.field_0x14);
+                    eft007_part_spawn(self, 2, sp8.field_0x12, sp8.field_0x14);
                 }
             } else {
                 shell_set_func_ptr->field_0x3c(self, &sp8, 1, shell_set_func_ptr);
-                fn_801039B0(self, 4, sp8.field_0x12, sp8.field_0x14);
+                eft007_part_spawn(self, 4, sp8.field_0x12, sp8.field_0x14);
             }
         }
         if (em_mot_end_ck(self) == 1U) {
@@ -3027,7 +3027,7 @@ void fn_8014D8F0(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
     u16 var_r5;
     u8 temp_r3;
 
-    fn_80149788(&sp8);
+    em_spawn_rec_init(&sp8);
     fn_80154CA4(self);
     temp_r3 = self->state;
     switch ((s32) temp_r3) {                        /* irregular */
@@ -3036,19 +3036,19 @@ void fn_8014D8F0(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
         em_move_mode_set(self, 3);
         fn_80154C74(self);
         em_mot_set(self, 0xCD, 6, 0);
-        fn_801353E4(self);
+        em_move_vec_clr(self);
         return;
     case 1:
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 1, lbl_80796EA8, lbl_80796E1C) == 0) {
             if ((u8) self->field_0x7c8 <= 0x28U) {
-                fn_80133C50(self, 0x80);
+                em_turn_to_target(self, 0x80);
             } else {
-                fn_80133C50(self, 0x100);
+                em_turn_to_target(self, 0x100);
             }
         }
         if ((s32) arg2 == 0) {
-            self->v_0x310.z = fn_80135644(self, &lbl_805A1F98);
-            fn_801354F4(self, &self->field_0x1bc);
+            self->v_0x310.z = em_key_curve_eval(self, &lbl_805A1F98);
+            em_move_offset_rot_apply(self, &self->field_0x1bc);
         }
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 0, lbl_80796F80, lbl_80796E1C) == 1U) {
             if ((arg1 & 0xFF) != 1) {
@@ -3063,15 +3063,15 @@ void fn_8014D8F0(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
             fn_801545B8(&sp8, 1, var_r5, 0);
             if (arg1 == 3) {
                 shell_set_func_ptr->field_0x3c(self, &sp8, 1, shell_set_func_ptr);
-                fn_801039B0(self, 4, sp8.field_0x12, sp8.field_0x14);
+                eft007_part_spawn(self, 4, sp8.field_0x12, sp8.field_0x14);
             } else {
                 shell_set_func_ptr->field_0x3c(self, &sp8, 0, shell_set_func_ptr);
-                fn_801039B0(self, 0x17, sp8.field_0x12, sp8.field_0x14);
-                fn_801039B0(self, 2, sp8.field_0x12, sp8.field_0x14);
+                eft007_part_spawn(self, 0x17, sp8.field_0x12, sp8.field_0x14);
+                eft007_part_spawn(self, 2, sp8.field_0x12, sp8.field_0x14);
             }
         }
         if (em_mot_end_ck(self) == 1U) {
-            fn_801280AC(self);
+            em_action_finish_walk(self);
         }
         return;
     }
@@ -3084,31 +3084,31 @@ void fn_8014DAF4(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
     u8 temp_r0;
     u8 temp_r3;
 
-    fn_80149788(&sp8);
+    em_spawn_rec_init(&sp8);
     temp_r3 = self->state;
     switch ((s32) temp_r3) {                        /* switch 1; irregular */
     case 0:                                         /* switch 1 */
         self->state = (u8) (temp_r3 + 1);
-        fn_80130248(self);
-        fn_801305C4(self);
+        em_fall_height_get(self);
+        em_fall_start(self);
         fn_80154C74(self);
         em_mot_set(self, 0xD3, 6, 0);
         if ((u32) (arg1 - 2) > 1U) {
             if ((arg1 & 0xFF) != 4) {
                 return;
             }
-            fn_801353E4(self);
+            em_move_vec_clr(self);
             self->v_0x310.z = (f32) lbl_80796F0C;
             self->v_0x310.y = (f32) lbl_80796F6C;
             return;
         }
-        fn_801353E4(self);
+        em_move_vec_clr(self);
         self->v_0x310.z = (f32) lbl_80796F84;
         return;
     case 1:                                         /* switch 1 */
-        fn_80133C50(self, 0x40);
+        em_turn_to_target(self, 0x40);
         if ((u32) (arg1 - 2) <= 2U) {
-            fn_801354F4(self, &self->field_0x1bc);
+            em_move_offset_rot_apply(self, &self->field_0x1bc);
         }
         if (em_mot_end_ck(self) == 1U) {
             self->state = (u8) (self->state + 1);
@@ -3120,10 +3120,10 @@ void fn_8014DAF4(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
     case 2:                                         /* switch 1 */
         if ((u32) (arg1 - 2) > 2U) {
             if ((arg1 & 0xFF) == 1) {
-                fn_80133C50(self, 0x40);
+                em_turn_to_target(self, 0x40);
             }
         } else {
-            fn_801354F4(self, &self->field_0x1bc);
+            em_move_offset_rot_apply(self, &self->field_0x1bc);
         }
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 0, lbl_80796EA8, lbl_80796E1C) == 1U) {
             if ((arg1 & 0xFF) != 1) {
@@ -3145,11 +3145,11 @@ void fn_8014DAF4(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
             fn_801545B8(&sp8, 1, var_r5, 0);
             if ((s32) arg2 == 0) {
                 shell_set_func_ptr->field_0x3c(self, &sp8, 0, shell_set_func_ptr);
-                fn_801039B0(self, 0x17, sp8.field_0x12, sp8.field_0x14);
-                fn_801039B0(self, 2, sp8.field_0x12, sp8.field_0x14);
+                eft007_part_spawn(self, 0x17, sp8.field_0x12, sp8.field_0x14);
+                eft007_part_spawn(self, 2, sp8.field_0x12, sp8.field_0x14);
             } else {
                 shell_set_func_ptr->field_0x3c(self, &sp8, 1, shell_set_func_ptr);
-                fn_801039B0(self, 4, sp8.field_0x12, sp8.field_0x14);
+                eft007_part_spawn(self, 4, sp8.field_0x12, sp8.field_0x14);
             }
             self->sub_state = (u8) (self->sub_state + 1);
         }
@@ -3161,7 +3161,7 @@ void fn_8014DAF4(_ENEMY_WORK *self, u8 arg1, u8 arg2) {
         break;
     case 3:                                         /* switch 1 */
         if (em_mot_end_ck(self) == 1U) {
-            fn_80127FE4(self);
+            em_action_finish_fall(self);
         }
         break;
     }
@@ -3184,34 +3184,34 @@ void fn_8014DDEC(_ENEMY_WORK *self) {
     case 0:
         self->state = (u8) (temp_r4 + 1);
         self->sub_state = 0;
-        fn_80130248(self);
-        fn_801305C4(self);
+        em_fall_height_get(self);
+        em_fall_start(self);
         fn_80154C74(self);
         em_mot_set(self, 0xDB, 6, 0);
-        fn_80129668(self, 0, 0x1F);
+        em_hit_window_set_default(self, 0, 0x1F);
         copyVec3(&self->v_0x1b0, &self->v_0x188);
         self->field_0x32c = (u16) self->field_0x1c0;
-        fn_801353F8(self);
-        self->field_0x20 = (s32) (s16) (lbl_80796EA8 / fn_8012F8E4(self));
+        em_move_vec2_clr(self);
+        self->field_0x20 = (s32) (s16) (lbl_80796EA8 / get_em_base_scale(self));
         return;
     case 1:
         em_busy_set(self);
-        fn_80128BF8(self, NULL);
+        em_target_pos_set(self, NULL);
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 3e-45f, lbl_80796E34, lbl_80796E1C) == 1U) {
-            fn_80133C50(self, 0x300);
+            em_turn_to_target(self, 0x300);
         }
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 2, lbl_80796ED8, lbl_80796F88) == 1U) {
             if ((s32) self->field_0x20 > 0) {
                 self->v_0x310.x = (f32) lbl_80796E1C;
                 temp_f31 = get_em_chg_scale__FP11_ENEMY_WORK(self);
-                temp_f1 = ((self->v_0x36c.y - self->v_0x188.y) + ((fn_80130248(self) - lbl_80796F88) * temp_f31)) / (f32) self->field_0x20;
+                temp_f1 = ((self->v_0x36c.y - self->v_0x188.y) + ((em_fall_height_get(self) - lbl_80796F88) * temp_f31)) / (f32) self->field_0x20;
                 self->v_0x310.y = temp_f1;
                 if (temp_f1 > lbl_80796E1C) {
                     self->v_0x310.y = (f32) lbl_80796E1C;
                 }
                 if ((u16) ((calcVecAng2__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3(&self->v_0x188, &self->v_0x36c) - self->field_0x1c0) + 0x4000) < -0x8000U) {
                     temp_f31_2 = lbl_80796F88 * get_em_chg_scale__FP11_ENEMY_WORK(self);
-                    temp_f1_2 = (fn_80050F80(&self->v_0x36c, &self->v_0x188) - temp_f31_2) / (f32) self->field_0x20;
+                    temp_f1_2 = (calcVecDistXZ(&self->v_0x36c, &self->v_0x188) - temp_f31_2) / (f32) self->field_0x20;
                     self->v_0x310.z = temp_f1_2;
                     if (temp_f1_2 == lbl_80796EFC) {
                         self->v_0x310.z = (f32) lbl_80796EFC;
@@ -3219,31 +3219,31 @@ void fn_8014DDEC(_ENEMY_WORK *self) {
                 } else {
                     self->v_0x310.z = (f32) lbl_80796EFC;
                 }
-                fn_80130248(self);
+                em_fall_height_get(self);
                 fn_80135584(self, &self->field_0x1bc);
             }
             self->field_0x20 = (s32) (self->field_0x20 - 1);
         }
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 1, lbl_80796F7C, lbl_80796E1C) == 1U) {
             self->state = (u8) (self->state + 1);
-            temp_f31_3 = fn_8012F8E4(self);
+            temp_f31_3 = get_em_base_scale(self);
             self->field_0x20 = (s32) (s16) ((lbl_80796F4C - fn_8012F8EC(self)) / temp_f31_3);
             return;
         }
         return;
     case 2:
         self->field_0x1c0 = (s32) fn_80133DB0(self->field_0x32c, (u16) self->field_0x1c0, 0x300);
-        fn_801353E4(self);
+        em_move_vec_clr(self);
         temp_r30 = self->field_0x20;
         if (temp_r30 > 0) {
-            fn_80050CA0(&sp8, &self->v_0x1b0, &self->v_0x188);
+            subVec3(&sp8, &self->v_0x1b0, &self->v_0x188);
             fn_800AD9C0(&sp14, &sp8, (f32) temp_r30);
             copyVec3(&self->v_0x310, &sp14);
-            fn_80135418(self);
+            em_move_offset_apply(self);
         }
         self->field_0x20 = (s32) (self->field_0x20 - 1);
         if (em_mot_end_ck(self) == 1U) {
-            fn_80127FE4(self);
+            em_action_finish_fall(self);
         }
         return;
     default:
@@ -3275,12 +3275,12 @@ void fn_8014E774(_ENEMY_WORK *self) {
         self->sub_state = 0;
         em_move_mode_set(self, 0);
         fn_80154B04(self, &sp48, &sp8, lbl_80796F64);
-        fn_80050CA0(&sp24, &sp48, &self->v_0x188);
+        subVec3(&sp24, &sp48, &self->v_0x188);
         copyVec3(&sp3C, &sp24);
-        fn_80128BF8(self, &sp48);
-        fn_80134964(self, &lbl_8056F960, 2, 1, sp8);
-        fn_801353E4(self);
-        temp_f31 = fn_8012F8E4(self);
+        em_target_pos_set(self, &sp48);
+        em_turn_seq_start(self, &lbl_8056F960, 2, 1, sp8);
+        em_move_vec_clr(self);
+        temp_f31 = get_em_base_scale(self);
         fn_80051EE0(&spC, &sp3C, lbl_80796F98);
         fn_80051EE0(&sp18, &spC, temp_f31);
         copyVec3(&self->v_0x310, &sp18);
@@ -3288,8 +3288,8 @@ void fn_8014E774(_ENEMY_WORK *self) {
         return;
     case 1:
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 2, lbl_80796EA0, lbl_80796E60) == 1U) {
-            fn_80135418(self);
-            fn_80134B0C(self, &lbl_8056F960);
+            em_move_offset_apply(self);
+            em_turn_seq_step(self, &lbl_8056F960);
         }
         if (em_frame_check__FP11_ENEMY_WORKUsff(self, 1, lbl_80796E60, lbl_80796E1C) == 1U) {
             fn_80131EC0(self);
@@ -3353,18 +3353,18 @@ void fn_8014F71C(_ENEMY_WORK *self) {
     switch ((s32) temp_r3) {                        /* switch 1; irregular */
     case 0:                                         /* switch 1 */
         self->state = (u8) (temp_r3 + 1);
-        fn_80130248(self);
-        fn_801305C4(self);
+        em_fall_height_get(self);
+        em_fall_start(self);
         em_mot_set(self, 0x3D, 6, 0);
-        fn_801353F8(self);
+        em_move_vec2_clr(self);
         self->v_0x310.z = (f32) lbl_80796E38;
         self->v_0x320.y = (f32) lbl_80796ECC;
         return;
     case 1:                                         /* switch 1 */
         fn_80133C3C(self);
-        fn_80130248(self);
-        fn_80135600(self, &self->field_0x1bc);
-        fn_80050CA0(&sp10, &self->v_0x36c, &self->v_0x188);
+        em_fall_height_get(self);
+        em_move_offset_step_update(self, &self->field_0x1bc);
+        subVec3(&sp10, &self->v_0x36c, &self->v_0x188);
         copyVec3(&sp1C, &sp10);
         calcVecAngXY__FPQ34nw4r4math4VEC3PUlPUl(&sp1C, &spC, &sp8);
         var_r0 = spC + 0x400;
@@ -3377,29 +3377,29 @@ void fn_8014F71C(_ENEMY_WORK *self) {
         self->field_0x1c0 = (s32) fn_80133DB0((u16) sp8, (u16) self->field_0x1c0, 0x40);
         if (em_mot_end_ck(self) == 1U) {
             self->state = (u8) (self->state + 1);
-            fn_801353E4(self);
+            em_move_vec_clr(self);
             self->v_0x310.z = (f32) lbl_80796E3C;
             self->v_0x320.y = (f32) lbl_80796ECC;
             self->v_0x310.y = (f32) lbl_80796F6C;
             em_mot_set(self, 0x3E, 6, 0);
-            fn_80134004(self, 0x12, lbl_80796FAC);
+            em_approach_start(self, lbl_80796FAC, 0x12);
             return;
         }
         return;
     case 2:                                         /* switch 1 */
         fn_80133C3C(self);
-        if (fn_80134114(self, 0, 0x80U) == 1) {
+        if (em_approach_step(self, 0, 0x80U) == 1) {
             self->state = (u8) (self->state + 1);
             self->sub_state = 0U;
             em_mot_set(self, 0x2D, 6, 0);
             self->v_0x310.y = (f32) lbl_80796FB0;
             self->v_0x320.y = (f32) lbl_80796FB4;
-            fn_80130248(self);
-            fn_80135600(self, &self->field_0x1bc);
+            em_fall_height_get(self);
+            em_move_offset_step_update(self, &self->field_0x1bc);
             return;
         }
-        fn_80130248(self);
-        fn_80135600(self, &self->field_0x1bc);
+        em_fall_height_get(self);
+        em_move_offset_step_update(self, &self->field_0x1bc);
         if (self->v_0x310.z > lbl_80796F7C) {
             self->v_0x310.z = (f32) lbl_80796F7C;
             return;
@@ -3409,16 +3409,16 @@ void fn_8014F71C(_ENEMY_WORK *self) {
         temp_r0 = self->sub_state;
         switch ((s32) temp_r0) {                    /* switch 2; irregular */
         case 0:                                     /* switch 2 */
-            fn_80130248(self);
-            var_r30 = fn_80135600(self, &self->field_0x1bc);
+            em_fall_height_get(self);
+            var_r30 = em_move_offset_step_update(self, &self->field_0x1bc);
             if (em_frame_check__FP11_ENEMY_WORKUsff(self, 1, lbl_80796EFC, lbl_80796E1C) == 1U) {
                 self->sub_state = (u8) (self->sub_state + 1);
                 self->v_0x320.y = (f32) lbl_80796F14;
             }
             break;
         case 1:                                     /* switch 2 */
-            fn_80130248(self);
-            var_r30 = fn_80135600(self, &self->field_0x1bc);
+            em_fall_height_get(self);
+            var_r30 = em_move_offset_step_update(self, &self->field_0x1bc);
             if (self->v_0x310.z < lbl_80796E1C) {
                 self->v_0x310.z = (f32) lbl_80796E1C;
             }
@@ -3430,7 +3430,7 @@ void fn_8014F71C(_ENEMY_WORK *self) {
                 em_state_set(self, 0xD, 2);
                 return;
             }
-            fn_80127FE4(self);
+            em_action_finish_fall(self);
         }
         break;
     }

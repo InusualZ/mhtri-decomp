@@ -172,7 +172,7 @@ void fn_800513F0(nw4r::math::VEC3* v, f32 s);
 void fn_800532DC(nw4r::math::MTX34* dst, nw4r::math::MTX34* src);
 void fn_8007100C(nw4r::math::MTX34* dst, nw4r::math::MTX34* src);
 void fn_800710BC(nw4r::math::MTX34* a, nw4r::math::MTX34* b, nw4r::math::MTX34* m);
-void fn_80073F68(nw4r::math::VEC3* out, nw4r::math::VEC3* in);
+void addVec3To(nw4r::math::VEC3* out, nw4r::math::VEC3* in);
 void fn_8007F0CC(s32 root, u32 id);
 void fn_800883C4(nw4r::math::MTX34* out, nw4r::math::MTX34* src);
 s32 fn_80097EB0(void* handle, s32 index);
@@ -787,14 +787,14 @@ extern "C" void fn_8010C0E0(_EFT* self)
                 work->entries[i].state_0x00++;
                 rotVecY(&work->entries[i].vecB_0x14, self->rot_0x24.y);
                 rotLocalMatY(work->entries[i].angle_0x30, &mtx);
-                fn_80073F68(&work->entries[i].vecC_0x20, &work->entries[i].vecB_0x14);
+                addVec3To(&work->entries[i].vecC_0x20, &work->entries[i].vecB_0x14);
                 fn_800FBB90(&mtx, &work->entries[i].vecC_0x20);
                 work->entries[i].model_0x04->move2(&mtx, 0);
                 fn_800F93D8(self, &work->entries[i].model_0x04, 2, 1, NULL);
             } else {
                 fn_800FBB90(&mtx, &work->entries[i].vecC_0x20);
                 work->entries[i].model_0x04->move2(&mtx, 0);
-                fn_80073F68(&work->entries[i].vecC_0x20, &work->entries[i].vecA_0x08);
+                addVec3To(&work->entries[i].vecC_0x20, &work->entries[i].vecA_0x08);
                 fn_800F93D8(self, &work->entries[i].model_0x04, 2, 1, NULL);
             }
             break;
@@ -809,8 +809,8 @@ extern "C" void fn_8010C0E0(_EFT* self)
                 work->entries[i].model_0x04->move2(&mtx, 0);
                 work->entries[i].vecB_0x14.y = work->entries[i].vecB_0x14.y - work->scale_a_0x94;
                 fn_800513F0(&work->entries[i].vecA_0x08, work->scale_b_0x98);
-                fn_80073F68(&work->entries[i].vecC_0x20, &work->entries[i].vecB_0x14);
-                fn_80073F68(&work->entries[i].vecC_0x20, &work->entries[i].vecA_0x08);
+                addVec3To(&work->entries[i].vecC_0x20, &work->entries[i].vecB_0x14);
+                addVec3To(&work->entries[i].vecC_0x20, &work->entries[i].vecA_0x08);
                 work->entries[i].angle_0x30 = work->entries[i].angle_0x30 + work->entries[i].step_0x3c;
                 fn_800F93D8(self, &work->entries[i].model_0x04, 2, 1, NULL);
             }
@@ -827,8 +827,8 @@ extern "C" void fn_8010C0E0(_EFT* self)
                 work->entries[i].model_0x04->move2(&mtx, 0);
                 work->entries[i].vecB_0x14.y = work->entries[i].vecB_0x14.y - work->scale_a_0x94;
                 fn_800513F0(&work->entries[i].vecA_0x08, work->scale_b_0x98);
-                fn_80073F68(&work->entries[i].vecC_0x20, &work->entries[i].vecB_0x14);
-                fn_80073F68(&work->entries[i].vecC_0x20, &work->entries[i].vecA_0x08);
+                addVec3To(&work->entries[i].vecC_0x20, &work->entries[i].vecB_0x14);
+                addVec3To(&work->entries[i].vecC_0x20, &work->entries[i].vecA_0x08);
                 work->entries[i].angle_0x30 = work->entries[i].angle_0x30 + work->entries[i].step_0x3c;
                 work->entries[i].angle_0x2c = work->entries[i].angle_0x2c + work->entries[i].step_0x38;
                 fn_800F93D8(self, &work->entries[i].model_0x04, 2, 1, NULL);

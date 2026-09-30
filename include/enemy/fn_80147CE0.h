@@ -15,7 +15,7 @@
 
 struct _ENEMY_WORK;
 
-/* The 0x18-byte spawn record the unit's `fn_80149788`/`fn_801545B8` fill and `fn_801493A8` builds on
+/* The 0x18-byte spawn record the unit's `em_spawn_rec_init`/`fn_801545B8` fill and `fn_801493A8` builds on
  * its stack.  Same layout as `enemy/fn_8014A1BC.c`'s private `ShellParams` (its +0x12/+0x14 u16 pair
  * is the one that unit reads back); the shared home for both is a rule-1 follow-up.
  * size: 0x18 */
@@ -33,12 +33,12 @@ extern "C" {
 
 /* The helper's base constructor (the same 12-byte record `enemy/fn_80176C58.cpp` names
  * `Helper_80176E50`; the parameter stays `void*` until that type moves to a shared header). */
-void* fn_80147E2C(void* self);
+void* em_res_user_data_ctor(void* self);
 
 #ifdef __cplusplus
 void fn_801481FC(struct _ENEMY_WORK* self);
 void fn_801493A8(struct _ENEMY_WORK* self, u32 arg1, s32 arg2, u32 arg3);
-EmSpawnRec* fn_80149788(EmSpawnRec* rec);
+EmSpawnRec* em_spawn_rec_init(EmSpawnRec* rec);
 void fn_801498C8(struct _ENEMY_WORK* self);
 void fn_80149A08(struct _ENEMY_WORK* self);
 void fn_80149AFC(struct _ENEMY_WORK* self);
@@ -48,7 +48,7 @@ void fn_80149C58(struct _ENEMY_WORK* self);
 /* The consumers' old-style spellings (C only). */
 void fn_801481FC();
 void fn_801493A8();
-void fn_80149788();
+void em_spawn_rec_init();
 void fn_801498C8();
 void fn_80149A08();
 void fn_80149AFC();

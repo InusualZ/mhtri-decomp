@@ -92,7 +92,7 @@
  *     the callee's own body reads +0x04/+0x08 (settled from the callee, rule 6 of the playbook).
  *   * the plain prototypes at the top of this file (`em_move_mode_set`, `fn_80126324`, `fn_80129xxx`,
  *     `fn_8013918C`, `fn_80139A64`, `fn_80139A7C`, `fn_8013A654`, `fn_8008E8D0`, `fn_8008EE68`,
- *     `fn_800FBB90`, `fn_800FC0D4`, `fn_805012E8`, `fn_80101428`, `fn_8010140C`, `MTX34_ctor`,
+ *     `fn_800FBB90`, `fn_800FC0D4`, `fn_805012E8`, `mtx34_trans_add`, `mtx34_trans_get`, `MTX34_ctor`,
  *     `fn_800516F0`, `setVec3`, `copyVec3`, `VEC3_ctor`, `fn_80051490`, `stage_map_kind_get`,
  *     `fn_80182D5C`) belong in their owners' headers / `include/unsplit/enemy.h`; `setVec3`'s
  *     `void` return in `include/mh3_pad.h` is wrong for this range's call sites, which read its r3.
@@ -311,7 +311,7 @@ void em_move_mode_set(EmActWork* self, u32 mode);
 void fn_80126324(EmActWork* self, u8 a, u8 b, f32 value);
 void fn_80182D5C(void);
 u8 stage_map_kind_get(u8 key);
-u32 fn_8012EC60(EmActWork* self);
+u32 em_alt_mode_ck(EmActWork* self);
 u32 fn_8012EC3C(EmActWork* self);
 u32 fn_801321DC(EmActWork* self);
 u32 fn_80129D3C(EmActWork* self);
@@ -322,7 +322,7 @@ s32 fn_8012A204(EmActWork* self);
 void em_mot_set(EmActWork* self, s32 a, s32 b, s32 c);
 void fn_803B9BA0(EmActWork* self, VEC3* pos, s32 value);
 void fn_8013918C(void* p, s16 flag);
-void fn_8012933C(EmActWork* self, u8 a, u32 b, u32 c);
+void em_hit_window_set(EmActWork* self, u8 a, u32 b, u32 c);
 void fn_80139A64(EmMtxHolder* holder, void* src);
 void fn_80139A7C(EmMtxHolder* holder, void* mtx);
 void fn_8013A654(EmUserData* self, u32 flags);
@@ -331,8 +331,8 @@ void fn_8008EE68(void* holder, void* mtx);
 void fn_800FBB90(MTX34* mtx, VEC3* vec);
 void fn_800FC0D4(void* dst, void* src);
 void fn_805012E8(EmMtx33* dst, const MTX34* src);
-void fn_80101428(MTX34* mtx, VEC3* vec);
-void fn_8010140C(MTX34* mtx, VEC3* out);
+void mtx34_trans_add(MTX34* mtx, VEC3* vec);
+void mtx34_trans_get(MTX34* mtx, VEC3* out);
 void fn_800516F0(void* mtx);
 void fn_80051490(void* dst, const void* src);
 
@@ -546,7 +546,7 @@ u32 fn_80191A6C(EmActWork* self) {
         if (self->state_0x1E2 == 4 && fn_801321DC(self) == 1) {
             return 1;
         }
-    } else if (self->state_0x1E2 == 2 && fn_8012EC60(self) == 0) {
+    } else if (self->state_0x1E2 == 2 && em_alt_mode_ck(self) == 0) {
         return 1;
     }
     return 0;
@@ -716,7 +716,7 @@ void fn_80191EF8(EmActWork* self) {
     EmAimRec* rec = &self->aim_0x328;
     u32 v;
 
-    if (fn_8012EC60(self) == 1) {
+    if (em_alt_mode_ck(self) == 1) {
         v = rec->angle_0x00 + 546;
         rec->angle_0x00 = v;
         if ((s16)v > 0) {
@@ -928,12 +928,12 @@ void fn_8019255C(EmActWork* self) {
     VEC3_ctor(&out);
     VEC3_ctor(&ofs);
     MTX34_ctor(&mtx);
-    fn_8012933C(self, 0, 0x12, 0x205);
+    em_hit_window_set(self, 0, 0x12, 0x205);
     setVector3(&ofs, lbl_80797E88, lbl_80797E88, lbl_8079800C);
     get_joint_wmat_em((struct _ENEMY_WORK*)self, 0x1A, &mtx);
     mulVecMat(&ofs, &mtx);
-    fn_80101428(&mtx, &ofs);
-    fn_8010140C(&mtx, &out);
+    mtx34_trans_add(&mtx, &ofs);
+    mtx34_trans_get(&mtx, &out);
     senko_set(&out, lbl_80798238 * get_em_scale((struct _ENEMY_WORK*)self), self->act_id, 0);
 }
 

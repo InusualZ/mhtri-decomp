@@ -509,10 +509,10 @@ void fn_80166DF8(_ENEMY_WORK* self, u32 kind) {
             if (data != 0) {
                 if (self->area_no == data->field_0x14) {
                     fn_80127308(self, &data->vec_0x24, &self->pos, 0);
-                    fn_80135764(&self->pos, &self->pos, 0, (u16)ran_suu(0), lbl_807974F0);
+                    em_wave_amp(&self->pos, &self->pos, lbl_807974F0, 0, (u16)ran_suu(0));
                 } else {
                     fn_80127308(self, &origin, &self->pos, 0);
-                    fn_80135764(&self->pos, &self->pos, 0, (u16)ran_suu(0), lbl_807974F0);
+                    em_wave_amp(&self->pos, &self->pos, lbl_807974F0, 0, (u16)ran_suu(0));
                 }
                 self->field_0x1C4 = 0;
                 self->field_0x1BC = 0;
@@ -761,8 +761,8 @@ void fn_80167648(_ENEMY_WORK* self) {
 void fn_801676C4(_ENEMY_WORK* self) {
     u8 state;
 
-    fn_80131D84();
-    fn_80131E74(self);
+    em_frame_flag_set();
+    em_busy_timer_reset(self);
     fn_80131DF4(self);
     state = self->state;
     switch (state) {
@@ -783,8 +783,8 @@ void fn_801676C4(_ENEMY_WORK* self) {
 void fn_80167770(_ENEMY_WORK* self) {
     u8 state;
 
-    fn_80131D84();
-    fn_80131E74(self);
+    em_frame_flag_set();
+    em_busy_timer_reset(self);
     fn_80131DF4(self);
     state = self->state;
     switch (state) {
@@ -796,9 +796,9 @@ void fn_80167770(_ENEMY_WORK* self) {
     case 1:
         if (em_frame_check(self, 0, lbl_80797508, lbl_807974FC) == 1) {
             self->state = self->state + 1;
-            fn_80130248(self);
-            fn_801305C4(self);
-            fn_801353F8(self);
+            em_fall_height_get(self);
+            em_fall_start(self);
+            em_move_vec2_clr(self);
             self->field_0x314 = lbl_8079750C;
             self->field_0x318 = lbl_80797510;
             self->field_0x320 = lbl_80797514;
@@ -806,7 +806,7 @@ void fn_80167770(_ENEMY_WORK* self) {
         }
         break;
     case 2:
-        fn_801355C8(self, &self->field_0x1BC);
+        em_move_offset_step(self, &self->field_0x1BC);
         if (self->field_0x1D4 <= lbl_807974FC || self->pos.y <= self->field_0x20C) {
             fn_8012E694(self);
         }
@@ -817,8 +817,8 @@ void fn_80167770(_ENEMY_WORK* self) {
 void fn_801678A0(_ENEMY_WORK* self) {
     u8 state;
 
-    fn_80131D84();
-    fn_80131E74(self);
+    em_frame_flag_set();
+    em_busy_timer_reset(self);
     fn_80131DF4(self);
     state = self->state;
     switch (state) {

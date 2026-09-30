@@ -24,11 +24,11 @@ u32 fn_8012EC3C(struct _ENEMY_WORK* self);
  * header owns that signature; the old `(void)` spelling was the workaround (a caller had to reach the
  * callee through a pointer string it could not name in the header).  A lander whose target call site
  * leaves the record already in r3 with no setup - the C handler `fn_8013BE60.c`'s `fn_8013D4C4` - is
- * the same spelling, `fn_8012EC60(self)`, and the compiler emits no setup because r3 already holds it.
+ * the same spelling, `em_alt_mode_ck(self)`, and the compiler emits no setup because r3 already holds it.
  * If a unit's target genuinely sets nothing (it cannot name `self`), it uses a local function-pointer
  * typedef, never a second declaration - MWCC rejects two declarations of one C symbol
  * (`(10197)`/`(10248)`). */
-u32 fn_8012EC60(struct _ENEMY_WORK* self);
+u32 em_alt_mode_ck(struct _ENEMY_WORK* self);
 
 #ifdef __cplusplus
 }

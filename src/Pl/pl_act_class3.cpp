@@ -27,9 +27,9 @@
  * SEAMS.  Left edge 0x8034D2B0: the `extabindex` run breaks there (`fn_8034CDDC` is the last menu
  * record, `fn_8034D2B0` the first player one), the `.sdata2` pool run breaks (0x8079B3A0 is
  * the menu unit's last word, 0x8079B3A8 the first `_PLW` constant) and the callee set changes.
- * Right edge 0x8034F138: `fn_8034F138` reads `_ENEMY_WORK::action`/`state_sub` and its only caller
+ * Right edge 0x8034F138: `em024_action11_state5_ck` reads `_ENEMY_WORK::action`/`state_sub` and its only caller
  * (`camera/fn_802B5C58.cpp`, `fn_802BC564`) gates it on the enemy id byte == 0x18, so it opens the
- * em024 unit; the first enemy `extabindex` record is `fn_8034F164` and `.sdata2` 0x8079B3C8 is
+ * em024 unit; the first enemy `extabindex` record is `em024_front_ray_hit_ck` and `.sdata2` 0x8079B3C8 is
  * the enemy pool's first word.
  *
  * DATA.  The `.data` run 0x805E9248..0x805EBBE0 is contiguous from `menu/menu_note.cpp`'s

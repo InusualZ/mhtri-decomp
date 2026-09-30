@@ -236,7 +236,7 @@ extern "C" u8 fn_80133BCC(void);
 extern "C" void* fn_8028EF7C(u16 id);
 extern "C" u32 fn_8012B5C4(_ENEMY_WORK* enemy, u32 a, u32 b, u8 slot);
 extern "C" f32 fn_80050EF4(void* ref, nw4r::math::VEC3* pos);
-extern "C" f32 fn_80050F80(void* ref, nw4r::math::VEC3* pos);
+extern "C" f32 calcVecDistXZ(void* ref, nw4r::math::VEC3* pos);
 extern "C" s32 quest_time_limit_get(void);
 extern "C" s32 quest_time_elapsed_get(void);
 extern "C" u8 fn_8012B86C(_ENEMY_WORK* enemy);
@@ -974,7 +974,7 @@ extern "C" u32 ana_em_ck_sub__FP11_ENEMY_WORKUcPQ34nw4r4math4VEC3fUc(
     if (fn_8012D8D0(enemy) == 0) {
         return 0;
     }
-    return fn_80050F80(pos, &enemy->pos) <= radius;
+    return calcVecDistXZ(pos, &enemy->pos) <= radius;
 }
 
 /* The first analysable enemy of the given area within `radius` of `pos`. */
@@ -1015,7 +1015,7 @@ extern "C" u32 shibire_em_ck_sub__FP11_ENEMY_WORKUcPQ34nw4r4math4VEC3fUc(
         if (fn_80050EF4(pos, &enemy->pos) <= radius) {
             return 1;
         }
-    } else if (fn_80050F80(pos, &enemy->pos) <= radius) {
+    } else if (calcVecDistXZ(pos, &enemy->pos) <= radius) {
         return 1;
     }
     return 0;

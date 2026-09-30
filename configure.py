@@ -1235,7 +1235,7 @@ config.libs = [
             # `Pl/pl_act_class3.cpp` took the head and the player band.  One TU from here: the pool
             # float `lbl_8079B3CC` is loaded by 28 functions across the range and by nothing outside.
             # File name a GUESS from `em024_prog_tbl` and the enemy id 0x18 tested by the caller of
-            # `fn_8034F138`.  C++; every plain `fn_` definition is `extern "C"`.
+            # `em024_action11_state5_ck`.  C++; every plain `fn_` definition is `extern "C"`.
             Object(NonMatching, "enemy/em024_ai.cpp"),
             # Registered from proposal/8035F2B4_fn_8035F2B4.cpp, re-cut to the em035 program's own
             # half: `.text` 0x8035F2B4..0x8035FC18 (20 functions / 2404 B) plus its extab run

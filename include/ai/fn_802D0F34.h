@@ -67,12 +67,12 @@ void fn_801075AC(struct _AINPC_W* self, nw4r::math::VEC3* pos, s32 a, s32 b, f32
 void fn_8012A624(nw4r::math::VEC3* out);
 void fn_800524C0(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b,
                   nw4r::math::VEC3* c, f32 d);
-void fn_80073F68(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
+void addVec3To(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 void fn_8007F0CC(s32 a, u32 b);
 void fn_80051EE0(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 scale);
 f32 fn_80050EF4(void* a, void* b);
-f32 fn_80050F80(const void* a, const void* b);
-void fn_80051378(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
+f32 calcVecDistXZ(const void* a, const void* b);
+void addVec3(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 f32 calcDistanceSqXZ(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 s32 calcVecAng2(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
  /* owner `src/mh3_pad.cpp`; normalised to its body

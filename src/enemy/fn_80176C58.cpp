@@ -12,7 +12,7 @@
  *
  * The rest is the enemy's damage/death bookkeeping:
  *   - `fn_80176C58(self, arg)` is the per-tick entry: it attaches a 12-byte helper (the vtable object
- *     `lbl_805AA900`, constructed by `fn_80176E50`) when `fn_801391E8` says the enemy has none, then
+ *     `lbl_805AA900`, constructed by `fn_80176E50`) when `em_res_user_data_ck` says the enemy has none, then
  *     resets `field_0x1E4`, picks a motion set from `stage_map_kind_get(self->field_0x1E0)`, and - when the
  *     enemy's `state_0x009` is clear - spawns the effect (`setVector3` + `fn_801057A4` + `fn_8010A7D4`).
  *   - `fn_80176E8C` / `fn_8017708C` are the two state transition tables, keyed on the current
@@ -98,7 +98,7 @@ extern "C" u32 quest_id_get(void);
 extern "C" void fn_8012A354(_ENEMY_WORK* self);
 extern "C" void fn_8012999C(_ENEMY_WORK* self);
 extern "C" void fn_801823A0(_ENEMY_WORK* self, u32 a);
-extern "C" void fn_80128BF8(_ENEMY_WORK* self, u32 a);
+extern "C" void em_target_pos_set(_ENEMY_WORK* self, u32 a);
 extern "C" void em_action_finish(_ENEMY_WORK* self);
 extern "C" void fn_80128030(_ENEMY_WORK* self);
 
@@ -124,12 +124,12 @@ extern "C" void fn_80176C58(_ENEMY_WORK* self, u32 arg) {
     u8 mode;
 
     VEC3_ctor(&v);
-    if (fn_801391E8(self) == 0) {
+    if (em_res_user_data_ck(self) == 0) {
         helper = (Helper_80176E50*)operator new(0xC);
         if (helper != 0) {
             fn_80176E50(helper);
         }
-        fn_801390FC(self, helper);
+        em_res_user_data_set(self, helper);
     }
     fn_80182978(self);
     self->field_0x1E4 = 0;
@@ -178,7 +178,7 @@ extern "C" void fn_80176C58(_ENEMY_WORK* self, u32 arg) {
 }
 
 extern "C" Helper_80176E50* fn_80176E50(Helper_80176E50* self) {
-    fn_80147E2C(self);
+    em_res_user_data_ctor(self);
     self->vtbl = lbl_805AA900;
     return self;
 }
@@ -347,7 +347,7 @@ extern "C" void fn_8017708C(_ENEMY_WORK* self, u32 kind, u32 sub) {
             break;
           case 0xC9:
           case 0xD1:
-            fn_80135C5C(self, 0, 0);
+            em_part_hit_set(self, 0, 0);
             break;
         }
         break;
@@ -389,7 +389,7 @@ extern "C" void fn_80177314(_ENEMY_WORK* self) {
         fn_8012F5C4(self, 1, 0x14, 0, 1);
         break;
       case 1:
-        fn_80128BF8(self, 0);
+        em_target_pos_set(self, 0);
         if (em_mot_end_ck(self) == 1) {
             em_action_finish(self);
         }

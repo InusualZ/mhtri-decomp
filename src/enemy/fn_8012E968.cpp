@@ -12,7 +12,7 @@
  *     area/group table at `lbl_806A54E0` (32 groups of four 0x44-byte entries, 0x2200 B), and returns
  *     0 as soon as one record matches `field_0x00A` and `group`;
  *   * any other mode falls out of the switch to `return 0`.
- * `fn_8012EC3C` and `fn_8012EC60` are the two one-byte predicates `enemy/fn_8013BE60.c`'s handlers
+ * `fn_8012EC3C` and `em_alt_mode_ck` are the two one-byte predicates `enemy/fn_8013BE60.c`'s handlers
  * call on the same record: "`field_0x89F` is 2 or 3" and "`mode_0x8AA` is 1".
  *
  * Registration.  This is the run discovery proposed (`proposal/8012E968_fn_8012E968`), registered once
@@ -57,10 +57,10 @@
  * scoped `#pragma peephole off` as its neighbour `enemy/fn_8012BDF4.cpp`.  Measured on this unit:
  * with the pragma `fn_8012E968` is 99.03 % (724 B, the target's size); without it the `-O3` peephole
  * fuses retail's `clrlwi` + `cmpwi` on the mode argument into `clrlwi.` and the body is 716 B,
- * 97.71 %.  `fn_8012EC3C`/`fn_8012EC60` are 100.00 % either way.
+ * 97.71 %.  `fn_8012EC3C`/`em_alt_mode_ck` are 100.00 % either way.
  *
  * Status and residual.
- *   * `fn_8012EC60` 100.0 %, `fn_8012EC3C` 100.0 % (both byte-identical);
+ *   * `em_alt_mode_ck` 100.0 %, `fn_8012EC3C` 100.0 % (both byte-identical);
  *   * `fn_8012E968` 99.03 % - every instruction is the target's, in the target's order, at the
  *     target's size (724 B); the residual is *register naming* in the mode-6 table walk: retail keeps
  *     the walk pointer in r5 and the four blocks' load scratch in r3, this build has that pair the
@@ -186,7 +186,7 @@ extern "C" s32 fn_8012EC3C(_ENEMY_WORK* self)
 }
 
 /* Whether the record's latched mode is 1 (`fn_80130A10` latches it, 0/1). */
-extern "C" s32 fn_8012EC60(_ENEMY_WORK* self)
+extern "C" s32 em_alt_mode_ck(_ENEMY_WORK* self)
 {
     return self->mode_0x8AA == 1;
 }

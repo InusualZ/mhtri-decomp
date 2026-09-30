@@ -5,7 +5,7 @@
  *
  * What it is: a two-function slice of one enemy action - `fn_80177608` seeds a VEC3 from the engine's
  * vector helper, walks `state_0x05` through two steps and drives the effect/frame helpers
- * (`em_frame_check`, the `setVector3`/`fn_80304508` effect spawns); `fn_80177774` is the four-step
+ * (`em_frame_check`, the `setVector3`/`eft_em_spawn` effect spawns); `fn_80177774` is the four-step
  * sibling that opens the action, waits on `em_mot_end_ck`, counts `field_0x20` down and closes it.
  *
  * Object: `_ENEMY_WORK` (name evidence: the mangled callee
@@ -28,7 +28,7 @@
  * Declarations: `em_move_mode_set`, `em_mot_set`, `em_mot_end_ck` and `VEC3_ctor` come from the shared
  * headers (`include/unsplit/enemy.h`, `include/ef.h`); their signatures are the shared ones.  The
  * symbols whose owning unit is not registered and whose band has no sound header
- * (`fn_80304508`, `fn_80056A54`, `fn_8012933C`, `em_action_finish`) are declared here, as the landed
+ * (`eft_em_spawn`, `draw_shape_arm`, `em_hit_window_set`, `em_action_finish`) are declared here, as the landed
  * `enemy/fn_8014A1BC.c` does.  `fn_8013221C`, `fn_80132224`, `fn_80132264` belong to the `enemy` band
  * too, but `include/unsplit/enemy.h` does not carry them yet - see the outbox `shared-file` request.
  */
@@ -53,9 +53,9 @@ u32 em_frame_check(_ENEMY_WORK* self, u16 a, f32 b, f32 c);
 extern "C" {
 /* Not registered yet, and the two bracketing registered units of their address bands name different
  * modules, so there is no sound `include/unsplit/<module>.h` to move them to (rule 2's named gap). */
-void fn_80304508(_ENEMY_WORK* self, u32 a, u32 b, VEC3* v, f32 s);
-void fn_80056A54(_ENEMY_WORK* self, u32 a, u32 b);
-void fn_8012933C(_ENEMY_WORK* self, u32 a, u32 b, u32 c);
+void eft_em_spawn(_ENEMY_WORK* self, u32 a, u32 b, VEC3* v, f32 s);
+void draw_shape_arm(_ENEMY_WORK* self, u32 a, u32 b);
+void em_hit_window_set(_ENEMY_WORK* self, u32 a, u32 b, u32 c);
 void em_action_finish(_ENEMY_WORK* self);
 
 /* `enemy`-band, not yet in include/unsplit/enemy.h (see the outbox `shared-file` request). */
@@ -91,15 +91,15 @@ extern "C" void fn_80177608(_ENEMY_WORK* self) {
     case 1:
         setVector3(&v, lbl_80797B18, lbl_80797B28, lbl_80797B2C);
         if (em_frame_check(self, 0, lbl_80797B30, lbl_80797B18) == 1U) {
-            fn_80304508(self, 0, 0x18, &v, lbl_80797B34);
+            eft_em_spawn(self, 0, 0x18, &v, lbl_80797B34);
         }
         if (em_frame_check(self, 0, lbl_80797B38, lbl_80797B18) == 1U) {
-            fn_80056A54(self, 0x1A, 0xA);
-            fn_8012933C(self, 0, 0x1C, 5);
+            draw_shape_arm(self, 0x1A, 0xA);
+            em_hit_window_set(self, 0, 0x1C, 5);
         }
         if (em_frame_check(self, 3, lbl_80797B3C, lbl_80797B40) == 1U) {
             if ((self->field_0x20 & 7) == 0) {
-                fn_80304508(self, 1, 0x18, &v, lbl_80797B34);
+                eft_em_spawn(self, 1, 0x18, &v, lbl_80797B34);
             }
             self->field_0x20 = self->field_0x20 + 1;
         }

@@ -542,7 +542,7 @@ extern "C" void fn_8011E530(_EFT* self, nw4r::ef::Effect* effect, u8 part)
     copyVec3(&target, &work->target_0x98);
     mulVecMat(&target, &mtx);
     get_joint_wpos_em(owner, work->ids_0x90[part], &joint);
-    fn_80073F68(&joint, &target);
+    addVec3To(&joint, &target);
     fn_800FBB90(&mtx, &joint);
     effect->SetRootMtx(mtx);
 }

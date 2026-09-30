@@ -36,7 +36,7 @@
  *  - fn_800565E4 62.50 and fn_80056954 62.50: retail sign/zero-extends each argument (`extsh`/`clrlwi`)
  *    before the FIFO store; every source spelling tried (s16/u16 param, int + cast, a `s16`/`u16` local)
  *    makes MWCC fold the extension away, because the store truncates anyway.  Two instructions each.
- *  - fn_80056A54 70.42 and fn_80056E00 71.43: register colouring only - retail materialises the base in
+ *  - draw_shape_arm 70.42 and fn_80056E00 71.43: register colouring only - retail materialises the base in
  *    r7/r3 before the zero constant, ours the other way round.
  *
  * Not reconstructed (13): the four named resource loaders itemicon_tex_load/gpframe_tex_load/
@@ -492,7 +492,7 @@ extern "C" void fn_80056A3C(void) {
     s->field_0x70 = 0;
 }
 
-extern "C" void fn_80056A54(u32 a, u32 b, u32 c) {
+extern "C" void draw_shape_arm(u32 a, u32 b, u32 c) {
     DrawShapeState* s = &lbl_8066ACF8;
 
     s->field_0x5C = 1;

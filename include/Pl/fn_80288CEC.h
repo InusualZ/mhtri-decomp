@@ -13,7 +13,7 @@
 #ifdef __cplusplus
 
 /* The 0x24-byte record the box builders fill: three 0xC-byte vectors.  `copyVec3` copies one
- * 0xC-byte record and `fn_80050CA0` writes `vec_0x0C - vec_0x00` into the third, so +0x00/+0x0C are
+ * 0xC-byte record and `subVec3` writes `vec_0x0C - vec_0x00` into the third, so +0x00/+0x0C are
  * the two endpoints and +0x18 their difference.  size: 0x24 */
 struct PlBox {
     /* +0x00 */ nw4r::math::VEC3 vec_0x00;

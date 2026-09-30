@@ -155,8 +155,8 @@ f32 GetGroundHit(nw4r::math::VEC3* pos, u32 ground, u8 flag);
 extern "C" {
 void fn_800504D4(nw4r::math::MTX34* m);
 void fn_80050850(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
-void fn_80050CA0(nw4r::math::VEC3* out, nw4r::math::MTX34* m, nw4r::math::VEC3* v);
-void fn_80051378(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
+void subVec3(nw4r::math::VEC3* out, nw4r::math::MTX34* m, nw4r::math::VEC3* v);
+void addVec3(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 void fn_800513F0(nw4r::math::VEC3* v, f32 s);
 void fn_80051EE0(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 s);
 void fn_800834F0(void* p);

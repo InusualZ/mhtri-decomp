@@ -94,7 +94,7 @@
  */
 extern "C" {
 f32 fn_80050EF4(VEC3* a, VEC3* b);
-void fn_80051378(VEC3* out, const VEC3* a, const VEC3* b);
+void addVec3(VEC3* out, const VEC3* a, const VEC3* b);
 void fn_801FDD9C(_LB_NPC* self, f32 duration);
 s32 fn_801FDE3C(_LB_NPC* self, VEC3* target);
 void fn_801FDEB4(_LB_NPC* self, s32 to, s32 ticks);
@@ -356,7 +356,7 @@ __declspec(noinline) void fn_80202F00(_LB_NPC* self)
         if (fn_80050EF4(&self->pos_0x10, &self->field_0x214->vec_0x3C) < lbl_807999CC) {
             setVector3(&offset, lbl_807999A0, lbl_807999A0, lbl_807999CC);
             rotVecY(&offset, calcVecAng2(&self->field_0x214->vec_0x3C, &self->pos_0x10));
-            fn_80051378(&delta, &self->field_0x214->vec_0x3C, &offset);
+            addVec3(&delta, &self->field_0x214->vec_0x3C, &offset);
             copyVec3(&self->target_0x1EC, &delta);
             fn_801FDD9C(self, lbl_807999D0);
             fn_801FE13C(self, 44);

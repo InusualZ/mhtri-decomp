@@ -242,7 +242,7 @@ extern "C" void fn_802C5ECC(struct _AINPC_W* self)
         setVec3(&offset, lbl_8079A670, lbl_8079A670, lbl_8079A6C4);
         copyVec3(&vec, &offset);
         rotVecY(&vec, self->field_0x194);
-        fn_80073F68(&vec, &self->vec_0x178);
+        addVec3To(&vec, &self->vec_0x178);
         vec.y = self->field_0x19C;
         fn_8010072C((struct _PLW*)self, 42, &vec, 0, lbl_8079A678);
         self->field_0x1AC = lbl_80792598[fn_802D66B8(self)];
@@ -324,7 +324,7 @@ extern "C" void fn_802C6110(struct _AINPC_W* self)
             setVec3(&offset, lbl_8079A670, lbl_8079A670, lbl_8079A6CC);
             copyVec3(&vec, &offset);
             rotVecY(&vec, self->field_0x194);
-            fn_80073F68(&vec, &self->vec_0x178);
+            addVec3To(&vec, &self->vec_0x178);
             if (fn_8027DCE0(self->plw_0x16C, 0) == 1) {
                 fn_8010072C((struct _PLW*)self, 42, &vec, 0, lbl_8079A678);
             }
@@ -375,7 +375,7 @@ extern "C" void fn_802C6318(struct _AINPC_W* self, u8 flag)
         }
         fn_802D2B88(self, 2);
         rotVecY(&vec, self->field_0x194);
-        fn_80073F68(&vec, &self->vec_0x178);
+        addVec3To(&vec, &self->vec_0x178);
         fn_8010072C((struct _PLW*)self, 42, &vec, 0, lbl_8079A678);
         break;
     case 1: {
@@ -606,7 +606,7 @@ extern "C" void fn_802C6BE0(struct _AINPC_W* self, u32 flag)
             fn_802D2AD4(self, 0);
             break;
         }
-        fn_80050CA0(&diff, &self->vec_0x1B0, &self->vec_0x178);
+        subVec3(&diff, &self->vec_0x1B0, &self->vec_0x178);
         copyVec3(&start, &diff);
         calcVecAngXY(&start, &ang_a, &ang_b);
         self->field_0x194 = fn_802D30F8((u16)ang_b, (u16)self->field_0x194, 2048);
@@ -664,7 +664,7 @@ extern "C" void fn_802C6E3C(struct _AINPC_W* self, u32 flag)
                 break;
             }
         }
-        fn_80050CA0(&diff, &self->vec_0x1B0, &self->vec_0x178);
+        subVec3(&diff, &self->vec_0x1B0, &self->vec_0x178);
         copyVec3(&start, &diff);
         calcVecAngXY(&start, &ang_a, &ang_b);
         self->field_0x194 = fn_802D30F8((u16)ang_b, (u16)self->field_0x194,
@@ -703,7 +703,7 @@ extern "C" void fn_802C703C(struct _AINPC_W* self, u32 flag)
         self->field_0x1AC = 90;
         break;
     case 1:
-        fn_80050CA0(&diff, &self->vec_0x1B0, &self->vec_0x178);
+        subVec3(&diff, &self->vec_0x1B0, &self->vec_0x178);
         copyVec3(&start, &diff);
         calcVecAngXY(&start, &ang_a, &ang_b);
         if ((flag & 0xFF) == 1) {
@@ -766,7 +766,7 @@ extern "C" void fn_802C722C(struct _AINPC_W* self, u32 flag)
             fn_802D2AD4(self, 0);
             break;
         }
-        fn_80050CA0(&diff, &self->vec_0x1B0, &self->vec_0x178);
+        subVec3(&diff, &self->vec_0x1B0, &self->vec_0x178);
         copyVec3(&start, &diff);
         calcVecAngXY(&start, &ang_a, &ang_b);
         self->field_0x194 = fn_802D30F8((u16)ang_b, (u16)self->field_0x194,
@@ -816,7 +816,7 @@ extern "C" void fn_802C73E4(struct _AINPC_W* self)
             fn_802D2AD4(self, 0);
             break;
         }
-        fn_80050CA0(&diff, &self->vec_0x1B0, &self->vec_0x178);
+        subVec3(&diff, &self->vec_0x1B0, &self->vec_0x178);
         copyVec3(&start, &diff);
         calcVecAngXY(&start, &ang_a, &ang_b);
         ang_b -= 16384;
