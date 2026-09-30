@@ -171,6 +171,15 @@ def estimate_member_mangling(type_name: str, method: str, rest_params: list[str]
                               "".join(codes) if codes else "v")
 
 
+def estimate_static_mangling(type_name: str, method: str, params: list[str]) -> str | None:
+    """`method__<len>TypeF<params>` for `static Type::method(params...)`.
+
+    A static member has no `this` and no cv-qualifier on the class, so the mangling is the non-const member
+    one over the full parameter list (`getInstance__20GameSpyInterfaceThreadFv`).
+    """
+    return estimate_member_mangling(type_name, method, params, const_self=False)
+
+
 def rename_command(old: str, new: str) -> str:
     """The other half of the edit, as the command that performs it (never by hand - skill rule)."""
     return "python tools/symbols/symedit.py rename %s %s" % (old, new)
@@ -231,6 +240,12 @@ def selftest() -> int:
           "send__16NetworkSingleTcpFPCUcl")
     check("estimate: no parameters is Fv", estimate_member_mangling("A", "get", []), "get__1AFv")
     check("estimate: a lone void is Fv", estimate_member_mangling("A", "get", ["void"]), "get__1AFv")
+    check("estimate: a static member is the non-const member mangling over all parameters",
+          estimate_static_mangling("GameSpyInterfaceThread", "getInstance", []),
+          "getInstance__22GameSpyInterfaceThreadFv")
+    check("estimate: a static member with an argument",
+          estimate_static_mangling("NetworkSessionStable", "setNotifyValue", ["u32 v"]),
+          "setNotifyValue__20NetworkSessionStableFUl")
     check("estimate: a const self is the C qualifier",
           estimate_member_mangling("A", "get", [], const_self=True), "get__1ACFv")
     check("estimate: a class pointer is P<len><Name>",

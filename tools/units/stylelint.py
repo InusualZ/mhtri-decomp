@@ -1493,6 +1493,10 @@ RULE13_FIRST_PARAM_RE = re.compile(
     r"^\s*(?P<pre>(?:(?:const|volatile|register|struct|class)\s+)*)(?P<type>[A-Za-z_]\w*)\s*"
     r"(?P<mid>(?:const\s*|volatile\s*)*)(?P<decl>[*&])\s*(?P<post>(?:(?:const|volatile)\s+)*)"
     r"(?:[A-Za-z_]\w*)?\s*$")
+# A `<Type>_ctor(Other* out)` / `_dtor` / `_construct` / `_destruct` whose first parameter points at a *different*
+# type is a C-style SDK helper that initialises `Other` (`VEC3_ctor(MHTRI_PAD_VEC3*)`, `MTX34_ctor(MHTRI_MTX34*)`),
+# not a static member of `Type`: measured 2026-09-29, these two are the only such shapes in the tree.
+RULE13_CTOR_HELPER_RE = re.compile(r"^(?:ctor|dtor|construct|destruct)$")
 RULE13_CPP_SUFFIXES = (".cpp", ".cp", ".cc")
 _INCLUDE_RE = re.compile(r'^[ \t]*#[ \t]*include[ \t]*["<]([^">]+)[">]', re.M)
 
@@ -1597,7 +1601,7 @@ def _rule13_prefix_type(name: str, types: set) -> str | None:
 
 
 def _rule13_scan(src: Source) -> tuple[list[dict], set]:
-    """`(findings, static_like_names)` for one file. Static-like is informational, never a finding."""
+    """`(findings, static_like_names)` for one file; the static form's findings carry `static=True`."""
     ctx = _RULE13_CTX
     if not _rule13_in_scope(src.rel, ctx):
         return [], set()
@@ -1617,13 +1621,37 @@ def _rule13_scan(src: Source) -> tuple[list[dict], set]:
         if owner is None:
             continue
         selfy = _rule13_self_type(first)
-        if selfy is None or selfy[0] != owner:
-            # no `self`: `getInstance(void)` / `setNotifyValue(u32)` - a static-shaped name, counted for the owner
-            if not first.strip() or first.strip() == "void" or not re.search(r"[*&]", first):
-                static_like.add(name)
-            continue
+        is_static = selfy is None or selfy[0] != owner
         marker = _untyped_marker(src, d["start_line"], d["end_line"], RULE13_MARKER_RE)
-        if marker is not None and marker.strip() and RULE13_REASON_RE.search(marker):
+        marked = marker is not None and marker.strip() and RULE13_REASON_RE.search(marker)
+        if is_static:
+            # no `Type* self`: `getInstance(void)` / `setNotifyValue(u32)` - a static member spelled the C way
+            method = name[len(owner) + 1:]
+            if RULE13_CTOR_HELPER_RE.match(method) and re.search(r"[*&]", first) and (
+                    selfy is None or selfy[0] != owner):
+                continue                                     # a C-style helper that initialises another type
+            static_like.add(name)
+            if marked:
+                continue
+            params = [c.strip() for c, _o in chunks] if first.strip() not in ("", "void") else []
+            mangled = None
+            try:
+                import mangle as _mg
+                mangled = _mg.estimate_static_mangling(owner, method, params)
+            except Exception:                                # the estimate is a courtesy, never a failure
+                mangled = None
+            sig = "static %s %s::%s(%s)" % (d["ret"].strip() or "auto", owner, method, ", ".join(params))
+            detail = ("`%s` is the static member `%s::%s` spelled the C way (no `%s` self) - declare `%s;` in the "
+                      "class, define `%s::%s`, call it `%s::%s(...)`, and rename the map row to %s "
+                      "(`python tools/units/methodize.py %s`); or mark a genuine C function "
+                      "`/* free: <retail C linkage evidenced|SDK C struct> */`"
+                      % (name, owner, method, owner, sig, owner, method, owner, method,
+                         "`%s` (estimated)" % mangled if mangled else "the compiler's mangling", owner))
+            findings.append(dict(_finding(src, 13, d["line"], detail, token=name), symbol=name,
+                                 owner=owner, method=method, params=params, const_self=False, static=True,
+                                 ret=d["ret"].strip(), mangled=mangled, has_body=bool(d.get("body"))))
+            continue
+        if marked:
             continue
         method = name[len(owner) + 1:]
         rest = [c.strip() for c, _o in chunks[1:]]
@@ -1642,7 +1670,7 @@ def _rule13_scan(src: Source) -> tuple[list[dict], set]:
                   % (name, owner, method, owner, sig, owner, method, method,
                      "`%s` (estimated)" % mangled if mangled else "the compiler's mangling", owner))
         findings.append(dict(_finding(src, 13, d["line"], detail, token=name), symbol=name,
-                             owner=owner, method=method, params=rest, const_self=selfy[1],
+                             owner=owner, method=method, params=rest, const_self=selfy[1], static=False,
                              ret=d["ret"].strip(), mangled=mangled, has_body=bool(d.get("body"))))
     return findings, static_like
 
@@ -1653,7 +1681,7 @@ def rule13_findings(src: Source) -> list[dict]:
 
 
 def rule13_static_like(src: Source) -> set:
-    """The `<Type>_<name>` names with no `self` in the file - the weaker static-member variant, counted only."""
+    """The `<Type>_<name>` names with no `self` in the file - the static-member form of rule 13."""
     return _rule13_scan(src)[1]
 
 
@@ -1903,7 +1931,7 @@ def header_rule13_findings_at_ref(root: str, ref: str, rename: dict | None = Non
 
 
 def rule13_static_like_total(root: str) -> int:
-    """Distinct `<Type>_<name>` static-shaped names in `src/` and `include/` - the informational count."""
+    """Distinct `<Type>_<name>` static-shaped names in `src/` and `include/` (each is a rule 13 finding)."""
     set_rule13_context(root)
     names: set = set()
     for s in all_sources(root):
@@ -2593,9 +2621,10 @@ def print_budget(findings: list[dict], ownership: "Ownership | None" = None,
     r13 = [f for f in findings if f["rule"] == 13]
     print("rule 13 (a method is a member): %d finding(s) over %d file(s), %d distinct function name(s)"
           % (len(r13), len(source_files_of(r13)), len({f["token"] for f in r13})))
-    if root is not None:
-        print("rule 13 note: %d static-shaped `<Type>_<name>` name(s) with no `self` - not findings, counted "
-              "so the owner can decide on a static-member rule" % rule13_static_like_total(root))
+    print("rule 13 static form (`<Type>_<name>` with no `Type* self`, a static member): %d finding(s) over %d "
+          "file(s), %d distinct name(s)" % (len([f for f in r13 if f.get("static")]),
+                                            len(source_files_of([f for f in r13 if f.get("static")])),
+                                            len({f["token"] for f in r13 if f.get("static")})))
     print_rule2_report(ownership)
     for num, what in UNCHECKED:
         print("not checked (cross-file): rule %d - %s" % (num, what))
@@ -3419,11 +3448,31 @@ def selftest() -> int:
           r13(CLS + "inline int Tcp_get(Tcp* self) {\n    return self->a;\n}\n"), [5])
     check("rule13: an `extern \"C\"` block in a .cpp is judged (the owner's own case)",
           r13(CLS + 'extern "C" {\ns32 Tcp_send(Tcp* self);\n}\n'), [6])
-    check("rule13: a static-like name with no self is not a finding",
-          r13(CLS + "Tcp* Tcp_getInstance(void);\nvoid Tcp_setValue(u32 v);\n"), [])
-    check("rule13: a different first-parameter type is not a finding",
-          r13(CLS + "struct Other {\n    int b;\n};\nint Tcp_get(Other* self);\n"), [])
-    check("rule13: a `Type**` first parameter is not a self", r13(CLS + "int Tcp_get(Tcp** self);\n"), [])
+    check("rule13 static: a `Type_name(void)` / `Type_name(u32)` name with no self is a finding",
+          r13(CLS + "Tcp* Tcp_getInstance(void);\nvoid Tcp_setValue(u32 v);\n"), [5, 6])
+    check("rule13 static: a different pointer first parameter is a static member, not a self",
+          r13(CLS + "struct Other {\n    int b;\n};\nint Tcp_get(Other* self);\n"), [8])
+    check("rule13 static: a `Type**` first parameter is not a self, so it is static",
+          r13(CLS + "int Tcp_get(Tcp** self);\n"), [5])
+    check("rule13 static: the marker exempts it",
+          r13(CLS + "/* free: retail C linkage, the dump names it unmangled */\nTcp* Tcp_getInstance(void);\n"), [])
+    check("rule13 static: a prefix that is not a defined type is not a finding",
+          r13(CLS + "int Nope_getInstance(void);\n"), [])
+    check("rule13 static: a C file has no members", r13(CLS + "int Tcp_get(void);\n", "x.c"), [])
+    check("rule13 static: a body's call is not a declaration",
+          r13(CLS + "void f(void) {\n    Tcp_get();\n}\n"), [])
+    check("rule13 static: a static member definition is not a finding",
+          r13("struct Tcp {\n    static int get(void);\n};\nint Tcp::get(void) {\n    return 0;\n}\n"), [])
+    check("rule13 static: `Type_ctor(Other*)` is a C-style helper, not a finding",
+          r13(CLS + "struct Other {\n    int b;\n};\nvoid Tcp_ctor(Other* out);\nvoid Tcp_dtor(Other& out);\n"), [])
+    check("rule13 static: `Type_ctor(void)` is a static finding", r13(CLS + "void Tcp_ctor(void);\n"), [5])
+    check("rule13 static: `Type_ctor(Type* self)` is still the member finding",
+          r13(CLS + "void Tcp_ctor(Tcp* self);\n"), [5])
+    check("rule13 static: the detail names the static member, the call form and the mangling",
+          [(f["static"], "static u32 Tcp::count()" in f["detail"], "Tcp::count(...)" in f["detail"],
+            "count__3TcpFv" in f["detail"])
+           for f in lint_source(Source("x.cpp", "x.cpp", CLS + "u32 Tcp_count(void);\n"), None)
+           if f["rule"] == 13], [(True, True, True, True)])
     check("rule13: a name whose prefix is not a defined type is not a finding",
           r13(CLS + "int Nope_get(Tcp* self);\n"), [])
     check("rule13: a type the tool cannot see is not a finding", r13("int Tcp_get(Tcp* self);\n"), [])
@@ -3457,7 +3506,7 @@ def selftest() -> int:
           r13(CLS + "int Tcp_a(Tcp* self);\nint Tcp_b(Tcp* self);\n"), [5, 6])
     check("rule13: a body is not a declaration (a call inside a definition)",
           r13(CLS + "void f(Tcp* t) {\n    Tcp_get(t);\n}\n"), [])
-    check("rule13: static-like names are counted, not reported",
+    check("rule13: static-like names are collected (they are findings too)",
           sorted(rule13_static_like(Source("x.cpp", "x.cpp", CLS + "Tcp* Tcp_getInstance(void);\n"
                                            "void Tcp_setValue(u32 v);\nint Tcp_get(Tcp* self);\n"))),
           ["Tcp_getInstance", "Tcp_setValue"])
