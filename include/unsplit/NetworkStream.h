@@ -1,7 +1,7 @@
 /*
  * Network stream and socket helpers with no registered owner (docs/plan.md 6.5 rule 2) - the packet
  * reader/writer band at 0x803F7540..0x803FAE00 and the small socket-handle accessors the transport
- * band (`Network/network_transport.cpp`) calls.
+ * band (the Network transport units, `Network/network_transport.h`) calls.
  *
  * Every address is outside a registered range, so no owner header exists and the declarations live here,
  * with the band.  The stream object is the `NetworkStreamWriterDefault` local the session band reserves

@@ -1326,13 +1326,56 @@ menu/get_pop_dat_ptr.cpp:
 	.text       start:0x803BE30C end:0x803C4BA0
 	.ctors      start:0x8056F3B8 end:0x8056F3BC
 
-Network/network_transport.cpp:
-	extab       start:0x800198C8 end:0x80019E5C
-	extabindex  start:0x8003A0BC end:0x8003A524
-	.text       start:0x803CCDF8 end:0x803D3CE8
-	.data       start:0x805F94E0 end:0x805FA4EC
-	.bss        start:0x806D2C60 end:0x806D3650
+Network/NetworkPeerBase.cpp:
+	extab       start:0x800198C8 end:0x800198E0
+	extabindex  start:0x8003A0BC end:0x8003A0E0
+	.text       start:0x803CCDF8 end:0x803CCF30
+	.data       start:0x805F94E0 end:0x805F9510
+
+Network/NetworkPeerBuffer.cpp:
+	extab       start:0x800198E0 end:0x80019940
+	extabindex  start:0x8003A0E0 end:0x8003A134
+	.text       start:0x803CCF30 end:0x803CD248
+	.data       start:0x805F9510 end:0x805F9540
+
+Network/NetworkPeerUdp.cpp:
+	extab       start:0x80019940 end:0x80019968
+	extabindex  start:0x8003A134 end:0x8003A170
+	.text       start:0x803CD248 end:0x803CD764
+	.data       start:0x805F9540 end:0x805F9570
+	.bss        start:0x806D2C60 end:0x806D3240
+
+Network/NetworkPeerMcs.cpp:
+	extab       start:0x80019968 end:0x800199B0
+	extabindex  start:0x8003A170 end:0x8003A1DC
+	.text       start:0x803CD764 end:0x803CE060
+	.data       start:0x805F9570 end:0x805F9610
+	.bss        start:0x806D3240 end:0x806D3650
 	.sbss       start:0x80794C98 end:0x80794CA0
+
+Network/network_socket_streams.cpp:
+	extab       start:0x800199B0 end:0x80019A68
+	extabindex  start:0x8003A1DC end:0x8003A2F0
+	.text       start:0x803CE060 end:0x803CF14C
+	.data       start:0x805F9610 end:0x805F9958
+
+Network/NetworkResolverWii.cpp:
+	extab       start:0x80019A68 end:0x80019AAC
+	extabindex  start:0x8003A2F0 end:0x8003A338
+	.text       start:0x803CF14C end:0x803CF654
+	.data       start:0x805F9958 end:0x805F99A0
+
+Network/NetworkSessionBase.cpp:
+	extab       start:0x80019AAC end:0x80019AB4
+	extabindex  start:0x8003A338 end:0x8003A344
+	.text       start:0x803CF654 end:0x803CF6D8
+	.data       start:0x805F99A0 end:0x805F9A40
+
+Network/NetworkSessionStable.cpp:
+	extab       start:0x80019AB4 end:0x80019E5C
+	extabindex  start:0x8003A344 end:0x8003A524
+	.text       start:0x803CF6D8 end:0x803D3CE8
+	.data       start:0x805F9A40 end:0x805FA4EC
 
 Network/fn_803D3CE8.cpp:
 	extab       start:0x80019E5C end:0x8001A348

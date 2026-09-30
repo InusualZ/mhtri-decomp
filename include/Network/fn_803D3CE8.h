@@ -385,8 +385,9 @@ typedef struct PatCircleInfo {
 } PatCircleInfo;   /* size: 0x37C */
 
 /* The Pat band's helpers.  `receivePatInterfaces` (0x803CE064) and `flushPatRequests` (0x803CE5F0)
- * sit inside `Network/network_transport.cpp`'s claimed range, so rule 2 gives their declarations to
- * that unit's header (`Network/network_transport.h`, included at the top of this file).  The rest have
+ * sit inside `Network/network_socket_streams.cpp`'s claimed range, so rule 2 gives their declarations to
+ * that unit's header (`Network/network_socket_streams.h`, reached through `Network/network_transport.h`,
+ * included at the top of this file).  The rest have
  * no registered owner, and this header - not `include/unsplit/Network.h` - is where this band's
  * unowned helpers already live (`networkPatAttachBuffer`, `networkPatResetCircleInfo`, `PatInterface_*`),
  * so they are declared beside the records they take.  The first three of the five were the map's
@@ -701,7 +702,8 @@ void networkStreamWriter_bytes(NetworkStreamWriterDefault* self);
 u32 networkStreamWriter_size(const void* sub);
 
 /* the send/flush tail (`NetworkSessionStable_sendStream`) is declared by its owner,
-   `Network/network_transport.h`, which this header includes at the top. */
+   `Network/NetworkSessionStable.h`, reached through `Network/network_transport.h`, which this header includes
+   at the top. */
 
 /* The manager logger accessor `getNetworkLogger` is *not* declared here: no registered unit owns it,
    so rule 2 puts it in the band header `include/unsplit/Network.h` (which types it as the class
