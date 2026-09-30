@@ -65,7 +65,7 @@
  * fn_8028A1E8, fn_8028A2F8, fn_8028A400, fn_8028A62C, fn_8028A760, fn_8028A8D8, fn_8028A9D4,
  * fn_8028AC14, fn_8028ADB8, fn_8028AEB8, fn_8028AF50, fn_8028B0F4, fn_8028B198, fn_8028B298,
  * fn_8028B330, fn_8028B524, fn_8028BAA8, fn_8028BD98, fn_8028BF1C, fn_8028C168, fn_8028C468,
- * fn_8028C6CC, fn_8028CC7C, fn_8028CD3C, fn_8028CDB0, fn_8028D0EC, fn_8028D2DC, fn_8028D5F4,
+ * fn_8028C6CC, fn_8028CC7C, fn_8028CD3C, fn_8028CDB0, pl_warp_start, fn_8028D2DC, fn_8028D5F4,
  * fn_8028D778, fn_8028DDCC, fn_8028DF58, fn_8028E0B8, fn_8028E24C, fn_8028E3EC, fn_8028E528,
  * fn_8028E694, fn_8028E718, fn_8028EA84, fn_8028EC28, fn_8028EF7C's tail-call partner
  * `pl_motion_set` (needs the local string-object shape) and the remaining box builders
@@ -93,6 +93,7 @@
 #include "quest/arenatask.h" /* `arena_user_data_buf` (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "Network/network_pat_control.h" /* the owner's header (rule 2) */
+#include "quest/quest_entry.h" /* quest_monsters_release (the owner's header, rule 2) */
 
 /* The player-mode root work `_PL_ROOT` (`get_move_work_adrs(0)`) is declared in `Pl/fn_80288CEC.h`, shared with
  * `hud/cockpit_quest.cpp` (rule 1). */
@@ -139,7 +140,6 @@ u32 fn_8027CB1C(void* self);
 u32 stage_map_kind_get(u8 idx);
 void fn_802BE568(void* self, u32 sub);
 u32 fn_803A7E1C(void);
-void fn_803ADA70(void);
 u32 fn_803B4B74(void);
 u32 em_work_state_bit7_ck(void);
 void fn_803BA814(u8 idx);
@@ -274,7 +274,7 @@ void fn_8028D5B8(s32 value) {
 void fn_8028C570(_PL_ROOT* self) {
     player_init_data_load();
     fn_800F6710();
-    fn_803ADA70();
+    quest_monsters_release();
     fn_803BA814(self->area_no_0xED);
     fn_800553B4(self->area_no_0xED);
 }

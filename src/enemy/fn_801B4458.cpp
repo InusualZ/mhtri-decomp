@@ -120,7 +120,7 @@ void fn_8012CEB4(struct _ENEMY_WORK* self, s16 timer, u8 index);
 u32 fn_80132184(void);
 
 /* the base vector/effect helpers (owned elsewhere; declared, never defined - playbook 29). */
-void fn_80051490(void* out, void* in);
+void assignVec3(void* out, void* in);
 void addVec3(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 void fn_8004FFC8(void* a, void* b, void* c, f32 d);
 void fn_800AD9C0(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 scale);
@@ -1674,9 +1674,9 @@ extern "C" void fn_801B6FB0(void) {
     nw4r::math::VEC3 tmp;
 
     setVec3(&tmp, lbl_80798C74, lbl_80798CE8, lbl_80798CEC);
-    fn_80051490(vec_pair_801B4458_0, &tmp);
+    assignVec3(vec_pair_801B4458_0, &tmp);
     setVec3(&tmp, lbl_80798C74, lbl_80798CF0, lbl_80798CF4);
-    fn_80051490(&vec_pair_801B4458_0[1], &tmp);
+    assignVec3(&vec_pair_801B4458_0[1], &tmp);
 }
 
 /* 0x801B701C (0x4).  The tail-call slot the neighbouring unit's table keeps. */

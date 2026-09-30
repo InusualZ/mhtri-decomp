@@ -30,7 +30,7 @@
  *     helpers retail compiled to nothing), `fn_801408B4` (the interpreter's save/restore stack),
  *     `fn_801409C8` (the action-timeout setup), `fn_80140B20` (the program-table pointer arm),
  *     `fn_80140C00` (the per-enemy extra-table lookup) and the enemy file loader
- *     `fn_80140CA0`/`fn_80140DAC`/`fn_80140E48`/`fn_80140EE8`/`fn_80140FB0`/`fn_80141050` that
+ *     `fn_80140CA0`/`fn_80140DAC`/`fn_80140E48`/`fn_80140EE8`/`fn_80140FB0`/`em_kind_release` that
  *     `load_file_req` drives.
  *
  * Naming evidence (brief section 2, in order).  1. No `__FILE__` string is reachable from this range:
@@ -89,7 +89,7 @@
  * The rest, by size: `fn_80140AF8` 88.00 (an extra `mr r0,r4`: MWCC shuffles the second argument into
  * r4 before masking the first, where retail masks r4 into r3 first; measured with the parameters
  * declared u32/u8/u8 and with the cast pulled out into a local), `fn_801409C8` 88.09,
- * `fn_80140778` 88.23, `fn_80141050` 90.28 (register allocation: retail keeps the id in r30 and its
+ * `fn_80140778` 88.23, `em_kind_release` 90.28 (register allocation: retail keeps the id in r30 and its
  * counter in r31 and spends r28/r29 on the index and the sub-command), `fn_80140CA0` 92.00,
  * `fn_8014001C` 94.32, `fn_80140E48`/`fn_80140FB0` 94.50, `fn_80140B20` 96.88, `fn_80140C00` 96.58,
  * `fn_8014026C` 99.09 (retail keeps an `extsh` after the `clrlwi` on the value it forwards;
@@ -106,12 +106,13 @@
  * 99.71, `fn_80140C00` 76.20 -> 96.58 (the signed `(s32)(u8)sel` comparison plus the typed
  * `SystemWorkTables` view),
  * `fn_80140778` 85.76 -> 88.23, `fn_801408B4` 59.57 -> 67.70, `fn_80140B20` 93.30 -> 96.88,
- * `fn_80141050` 79.17 -> 90.28; no symbol moved down.
+ * `em_kind_release` 79.17 -> 90.28; no symbol moved down.
  */
 
 #include "types.h"
 #include "nw4r/math.h"
 #include "enemy/ENEMY_WORK.h"
+#include "enemy/em_pop.h" /* quest_flag_100000_ck, quest_flag_10_ck (rule 2: their owner) */
 #include "ef/nw_res_manager.h"
 
 #pragma peephole off
@@ -125,9 +126,9 @@
 extern u8 lbl_805A1530[];
 /* the `em001_prog_tbl`..`em040_prog_tbl` pointer array, NULL-terminated (`fn_80140B20` arms it) */
 extern u32 lbl_805A1B34[];
-/* the per-enemy byte table `fn_80141050` reads (`lbzx` + `extsb`, so it is signed) */
+/* the per-enemy byte table `em_kind_release` reads (`lbzx` + `extsb`, so it is signed) */
 extern s8 lbl_805A1B08[];
-/* the two `{key, name}` file tables `fn_80141050` walks */
+/* the two `{key, name}` file tables `em_kind_release` walks */
 extern EmFileEntry lbl_80581E20[];
 extern EmFileEntry lbl_80582348[];
 /* the `.sdata2` pool the range's float work reads */
@@ -284,8 +285,6 @@ void fn_800F0F9C(u8 id);
 
 /* the shared layers the range's helpers call */
 f32 calcVecDistXZ(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
-u32 fn_803B4EC8(u32 a);
-u32 fn_803B5030(u32 a);
 void* res_file_ctor(void* out, u32 a);
 void res_file_assign(void* dst, void* src);
 void fn_8007B878(void* out, u32 a);
@@ -952,7 +951,7 @@ void fn_801409C8(_ENEMY_WORK* self) {
     struct EnemyData* data = get_enemy_data(self);
     s32 value;
 
-    if (fn_803B4EC8(0) == 1 || fn_803B5030(0) == 1) {
+    if (quest_flag_100000_ck(0) == 1 || quest_flag_10_ck(0) == 1) {
         value = 0x3E8;
     } else {
         EmActList* list = fn_80126494(self);
@@ -1114,7 +1113,7 @@ s32 fn_80140FB0(char* name, u32 size, u8 flag) {
     return (s32)file;
 }
 
-s32 fn_80141050(u8 id) {
+s32 em_kind_release(u8 id) {
     s32 loaded = 0;
 
     if (fn_801414D4(id) != 0xFF) {

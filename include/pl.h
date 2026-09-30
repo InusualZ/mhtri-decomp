@@ -229,7 +229,7 @@ struct _PLW {
     /* +0x01D */ u8 se_name_idx;   /* indexes the `fn_800EFAC0` name table */
     /* +0x01E */ u8 field_0x01E;   /* non-zero suppresses the up-swing gate in `Pl/fn_80224AC4.cpp` */
     /* +0x01F */ union {   /* one byte, two spellings (rule 5) */
-        /* +0x01F */ s8 field_0x01F;   /* the act's follow-up stage latch: `fn_80274748` arms it,
+        /* +0x01F */ s8 field_0x01F;   /* the act's follow-up stage latch: `pl_act_stage_latch_set` arms it,
                                        * `fn_80274794` tests it and `fn_80274808` reads it */
         /* +0x01F */ u8 pad_0x01F[0x1]; /* the pre-merge padding spelling of the same byte */
     };
@@ -488,7 +488,7 @@ struct _PLW {
     /* +0x2E0 */ _SLOTENT spare_slot_id[8];
     /* +0x300 */ u8 unk300[0x304 - 0x300];
     /* +0x304 */ u16 field_0x304;
-    /* +0x306 */ union { /* the effect/motion id `fn_80272E30` is fed and indexed on; one member per
+    /* +0x306 */ union { /* the effect/motion id `pl_item_add` is fed and indexed on; one member per
                           * offset, both spellings kept (rule 5); `Pl/pl_act_step.cpp` and
                           * `Pl/fn_802489D4.cpp` read it */
         /* +0x306 */ u16 field_0x306;
@@ -704,7 +704,7 @@ struct _PLW {
     /* +0x394 */ s16 unk394;
     /* +0x396 */ union {   /* one s16, two spellings (rule 5) */
         /* +0x396 */ s16 unk396;
-        /* +0x396 */ s16 field_0x396;  /* armed with the 2-frame hold by `fn_80274748`; > 0 is also
+        /* +0x396 */ s16 field_0x396;  /* armed with the 2-frame hold by `pl_act_stage_latch_set`; > 0 is also
                                        * the first gate this unit's `fn_8027D684` peer tests */
     };
     /* +0x398 */ u16 field_0x398;        /* running damage dealt, `fn_80264940` accumulates into it */
@@ -1214,7 +1214,7 @@ struct _PLW {
             };
         };
     };
-    /* +0x650 */ u16 field_0x650;   /* the id `Pl_item_timer_get`/`fn_80272E30` are handed */
+    /* +0x650 */ u16 field_0x650;   /* the id `Pl_item_timer_get`/`pl_item_add` are handed */
     /* +0x652 */ s16 field_0x652;   /* the amount `fn_8027D76C` compares against and negates */
     /* +0x654 */ union { /* MAIN's arm first; the second arm is this branch's view of
                           * the same 16 bytes, so `Pl/fn_8025F088.cpp` keeps the names

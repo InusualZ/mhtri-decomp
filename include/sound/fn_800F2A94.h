@@ -12,6 +12,19 @@ extern "C" {
 #endif
 
 extern "C" void fn_800F48F4(void);
+/* 0x800F4734 - switches the BGM for the quest scene (`quest_play_state_ck` picks the stream); the quest
+ * entry's notify path and the lobby's entry dispatch call it.  GUESS name from those uses. */
+extern "C" void snd_quest_scene_set(void);
+/* 0x800F486C / 0x800F4538 - BGM request flags of the quest result / quest start scenes (set the quest
+ * work's stream flags and re-arm the stream).  GUESS names from the scene they are called for. */
+extern "C" void snd_quest_result_bgm_set(void);
+extern "C" void snd_quest_start_bgm_set(void);
+/* 0x800F46D8 - sets the bit of player `player` in the BGM work's +0x1D7 mask (a no-op without the BGM work).
+ * GUESS name. */
+extern "C" void snd_player_mask_set(u8 player);
+/* 0x800F4704 - clears the bit of player `player` in the same +0x1D7 mask (a no-op without the BGM work).
+ * GUESS name, the pair of `snd_player_mask_set`. */
+extern "C" void snd_player_mask_clear(u8 player);
 
 #ifdef __cplusplus
 }

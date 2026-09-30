@@ -58,6 +58,8 @@
 #include "unsplit/lobby.h"
 #include "unsplit/unknown.h" /* SystemWork / system_w */
 #include "Network/network_pat_control.h" /* the owner's header (rule 2) */
+#include "fn_8004CAD8/get_qResult_work.h" /* get_qResult_work (rule 2) */
+#include "quest/quest_result_work.h"        /* Q_ResultWork (rule 1) */
 
 #pragma peephole off
 
@@ -107,15 +109,6 @@ typedef struct LbChgSeqWork {
     /* +0x0A */ u8 step_0x0A;
     /* +0x0B */ u8 state_0x0B;
 } LbChgSeqWork; /* size: 0xC */
-
-/* The loaded-resource record `get_qResult_work` returns, as far as this unit reads it. */
-typedef struct LbChgQResult {
-    /* +0x000 */ u8 pad_0x000[0x1E2];
-    /* +0x1E2 */ u8 mode_0x1E2;
-    /* +0x1E3 */ u8 kind_0x1E3;
-    /* +0x1E4 */ u8 pad_0x1E4[0x20C];
-    /* +0x3F0 */ s32 value_0x3F0;
-} LbChgQResult; /* size: 0x3F4 */
 
 /* One 8-byte row of the archive table `fn_801FB478` streams: the byte count and the source name. */
 typedef struct LbChgFileReq {
@@ -187,7 +180,6 @@ s32 chg_nand_err2msgcode(void);
 void* ckResourceName(char* name);
 s32 create_move_work(long kind);
 s32 file_loading_ck(char* name, s32* out);
-void* get_qResult_work(void);
 void init_player_work(void);
 void light_init(void);
 void load_file(char* name, u32 dst, long size);
@@ -388,10 +380,10 @@ void fn_801FB478(void)
  * block back to its empty state. */
 void fn_801FBAE4(void)
 {
-    LbChgQResult* q = (LbChgQResult*)get_qResult_work();
+    Q_ResultWork* q = get_qResult_work();
 
-    if (q->mode_0x1E2 == 3 && q->value_0x3F0 > 0) {
-        score_add_clamped(q->value_0x3F0, (s32*)(lb_chg::lobby_world_block + 0x18));
+    if (q->phase_0x1E2 == 3 && q->credit_0x3F0 > 0) {
+        score_add_clamped(q->credit_0x3F0, (s32*)(lb_chg::lobby_world_block + 0x18));
     }
     lb_param_w.field_0x00 = 0;
     lb_param_w.field_0x04 = 0;
@@ -413,7 +405,7 @@ s32 fn_801FB524(LbChgSeqWork* self)
 {
     u16 status = Psw[0].pressed_0x2C4;
     s32 done = 0;
-    LbChgQResult* q;
+    Q_ResultWork* q;
     s32 v;
 
     switch (self->state_0x0B) {
@@ -431,7 +423,7 @@ s32 fn_801FB524(LbChgSeqWork* self)
         fn_801FC874();
         fn_801FC8C8();
         fn_801E92B0();
-        q = (LbChgQResult*)get_qResult_work();
+        q = get_qResult_work();
         if (q != NULL && system_w.field_0x2d == 0 &&
             (q->kind_0x1E3 == 1 || q->kind_0x1E3 == 3)) {
             if (fn_80449860() != 0) {

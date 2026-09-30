@@ -167,7 +167,7 @@ void* fn_800508AC(void* vec);
 f32 PSVECSquareDistance(void* a, void* b);
 void mtx34_identity(void* mtx);
 void fn_80051424(void* dst, void* src, f32 scale);
-void fn_80051490(void* dst, void* src);
+void assignVec3(void* dst, void* src);
 void fn_800514FC(void* dst, void* mtx, void* vec);
 void fn_8007100C(void* dst, void* src);
 void fn_800710BC(void* dst, void* a, void* b);
@@ -814,7 +814,7 @@ extern "C" EfEmitterObj* fn_800A7378(EfEmitterObj* self, void* em, const EfEmitt
     {
         EfVec v;
         nw4r::math::MTX34 m1, m2;
-        fn_80051490(&v, &e->position);
+        assignVec3(&v, &e->position);
         e->position.x = lbl_80796004;
         e->position.y = lbl_80796004;
         e->position.z = lbl_80796004;
@@ -915,7 +915,7 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
         }
         {
             EfVec pos;
-            fn_80051490(&pos, &e.position);
+            assignVec3(&pos, &e.position);
             e.position.x = lbl_80796004;
             e.position.y = lbl_80796004;
             e.position.z = lbl_80796004;

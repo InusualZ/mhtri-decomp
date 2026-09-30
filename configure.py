@@ -862,6 +862,7 @@ config.libs = [
             # link neighbour `menu/multi_result.cpp` (cflags_menu: the band carries 0 record-form
             # instructions and needs `-Cpp_exceptions on`, which every one of its 60 framed functions
             # shows in its own extab record).
+            Object(NonMatching, "quest/quest_item_slot.cpp"),
             Object(NonMatching, "quest/quest_entry.cpp"),
             # Registered once, at its final home, from proposal/803B465C_fn_803B465C.cpp: the field-side
             # enemy population/roster manager (`.text` 0x803B465C..0x803BE30C, 139 functions / 40112 B;

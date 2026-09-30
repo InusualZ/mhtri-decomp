@@ -20,7 +20,7 @@
 
 /* `include/lobby/lb_quest_screen.h` (where `quest_element_pick_ck` belongs) cannot be included from
  * here: it declares `fmt_803AA41C(s32, f32)` (the owner's two-argument form) where this header's own
- * list carries the one-argument `fn_803AA41C(s32)`, so the pair trips `illegal function overloading`.
+ * list carries the one-argument `quest_sub_state_end_ck(s32)`, so the pair trips `illegal function overloading`.
  * The declaration below is the owner's own signature, so a TU that sees both still agrees. */
 struct QuestWork;
 
@@ -84,7 +84,7 @@ typedef struct LbActReq {
     /* +0x10 */ u8 unused_0x10[0x4];
 } LbActReq; /* size: 0x14 */
 
-/* One 4-byte companion entry of `LbCompanionWork::pairs_0x5E2` (`fn_80272E30`/`fn_802E5D68` are handed
+/* One 4-byte companion entry of `LbCompanionWork::pairs_0x5E2` (`pl_item_add`/`fn_802E5D68` are handed
  * its two halves).  size: 0x4 */
 typedef struct LbCompanionPair {
     /* +0x00 */ u16 id_0x00;
@@ -476,12 +476,9 @@ void fn_80338600(u32 entry, LbActReq* req);
 void* fn_803438E4(u8 a, u8 b);
 void* fn_80343B74(u8 a, u8 b, u8 c);
 s32 fn_80343B44(void* entry);
-void fn_803A9130(s32 delay, f32 scale);
 void fn_802A0188(void);
-void fn_800F4538(void);
-void fn_803AF98C(u8 index);
+void snd_quest_start_bgm_set(void);
 void quest_slot_arm_all_a(s8 index);
-void fn_80272E30(u16 id, s16 value);
 void fn_802E5D68(u16 id, s8 index);
 void fn_80125F54(void* text);
 void fn_80142C58(u8 value, void* text, u16 id, u8 flag, f32 scale);
@@ -490,21 +487,13 @@ void fn_802B09B8(u8 a, u8 b);
 void fn_802B45F4(u8 index);
 void fn_803B3074(u8 value, u16 a, s16 b);
 void fn_803B6998(u16 a, u16 b);
-s32 fn_803AA41C(s32 a);
+s32 quest_sub_state_end_ck(s32 a);
 u32 quest_element_pick_ck(struct QuestWork* work, u8 index, s32 use_alt);
 void fn_803A9F28(LbCompanionWork* work, LbCompanionSlot* slot, u16 index, u32 a);
 s8 fn_800CF384(void);
 /* The runtime byte-compare (its symbol is defined by `Runtime.PPCEABI.H/memcmp.c`, which no band
  * header declares yet; the sibling units declare it the same way). */
 int memcmp(const void* a, const void* b, u32 n);
-void* fn_803B33B0(u32 id);
-/* `quest/quest_entry.cpp`'s item-record copy (owner: `quest/quest_entry.cpp`); only the pointer is
- * needed here, so the type stays incomplete. */
-struct Q_ItemPair;
-void quest_item_pair_copy_row(Q_ItemPair* dst, u16 id, s8 row, u8 kind);
-void fn_8035B5FC(u32 a, void* p);
-void fn_803AFE4C(LbCompanionWork* work, u8 index);
-void fn_803AFF34(LbCompanionWork* work);
 void fn_802BC000(u8 index, u8 value);
 s32 fn_802D8F84(s32 a);
 s32 fn_802D7B5C(u16 id);
@@ -556,7 +545,6 @@ void draw_sprite_anim_idx(u16 id, u16 index, const _mh_ivec2_* pos);
 void draw_font_idx(u16 id, s8* text, u32 len, const _mh_ivec2_* pos);
 u8 get_now_areano(void);
 u16 ran_suu(s32 index);
-void* GetItemData(u16 id);
 void Pl_cat_skill_ck(struct _PLW* plw, u16 skill);
 
 #endif /* __cplusplus */

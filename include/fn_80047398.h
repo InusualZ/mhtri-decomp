@@ -9,6 +9,7 @@
 
 #include "types.h"
 #include "id_value.h"
+#include "fn_80047398/userdata_gunner_ck.h"   /* userdata_gunner_ck (leaf header) */
 
 /* The 2D sprite record `drawSpr2TF` consumes. size: 0x18 */
 typedef struct fltSpr2TF {
@@ -61,11 +62,12 @@ void arena_userdata_apply(u8* user_data, u8* work);
  * initialiser hands it the row state it was given (rule 2: this TU owns the address). */
 void item_pair_copy(void* dst, const void* src);
 u16 fn_8004AE70(void* userdata);
-s32 fn_8004AEC0(void* userdata);
+/* 0x8004AEC0 - `userdata_gunner_ck`: declared in the leaf header `fn_80047398/userdata_gunner_ck.h`. */
 s32 fn_8004AF0C(u8 idx);
 s16 fn_8004AF20(void* userdata);
 void* fn_8004AF60(void* userdata, u8 idx);
-void* fn_8004AF78(void* userdata);
+/* 0x8004AF78 - the item-slot run `userdata_gunner_ck` selects (`fn_8004AF60`'s set 1 for a gunner set, else set 0).  GUESS name. */
+void* userdata_equip_item_slots_get(void* userdata);
 u32 item_count_find(u16 id, void* a, s32 b);
 u32 fn_8004B70C(u16 id, void* a, u16 b);
 void fn_8004B200(void* userdata, u16 id, s16 delta);

@@ -18,6 +18,7 @@
  * included from `include/unsplit/menu.h`, which the whole menu band takes. */
 struct NoteWork;
 struct QuestWork;
+struct Q_MoveWork;
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,7 +37,29 @@ s32 quest_time_elapsed_get(void);
 s32 fn_803A881C(void);
 s32 quest_time_limit_get(void);
 s32 fn_803A9690(void);
-s32 fn_803AA41C(s32, f32);
+s32 quest_sub_state_end_ck(s32 flag);
+
+/* 0x803A8DA4 - seeds the quest random source: the item work's 0x5A halfword becomes the sum of its seven
+ * (low, high << 8) halfword pairs at +0x6C (halfwords 0..13 of the 15-entry clock snapshot; the last is
+ * unread), and 451 when that sum is 0.  Names are GUESSes (the pair is a clock snapshot the quest start
+ * stores). */
+void quest_rand_seed_set(void);
+/* 0x803A8EE4 - the quest random source: the next value of the item work's 0x5A halfword, a multiplicative
+ * step (x176 mod 65363, `mulli 176` then `lis 1; subi 0xAD`; state 0 is taken as 1) kept in the
+ * halfword; 0 when the item work is missing.  The value is 16 bits wide;
+ * `enemy/fn_801993E0.cpp` masks it, so the return stays `u32` as that caller reads it. */
+u32 quest_rand_next(void);
+
+/* 0x803A7E68 - sets the lobby area up from `count` area entry handles (the quest work's +0x69A8 list), spawning
+ * the quest's monsters into the slot's move work.  GUESS name from the allocation, the `memset` and the
+ * monster setup it drives. */
+void quest_area_spawn_setup(struct Q_MoveWork* work, u32* area, u8 count, u8 flag);
+/* 0x803A8128 - applies the area `index`'s spawn for sub-state `sub` to the slot's move work.  GUESS name. */
+void quest_area_spawn_apply(struct Q_MoveWork* work, u8 index, u8 sub);
+
+/* 0x803A9130 - sets the item work's time limit (+0x24, in frames) and its floating copy at +0x6A60.  GUESS
+ * name from those two stores. */
+void quest_time_limit_set(s32 frames);
 
 /* 0x803A8D4C - the current quest id: the option block's selected id while the local slot has a quest
  * in progress, else the item work's own +0x10 key.  Read by `enemy/fn_80176C58.cpp` (its 0x3EC

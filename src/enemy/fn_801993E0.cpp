@@ -108,6 +108,7 @@
 #include "enemy/fn_80138074.h" /* fn_8013A654, fn_8013918C */
 #include "enemy/fn_80191598.h" /* fn_80192370, fn_80192618 */
 #include "fn_8004CAD8.h"       /* calcDistanceSqXZ */
+#include "lobby/lb_quest_screen.h" /* quest_rand_next (the owner's header, rule 2) */
 #include "Runtime.PPCEABI.H/memset.h"
 #include "unsplit/enemy.h"
 
@@ -149,8 +150,6 @@ u32 stage_map_kind_get(u32 kind);
 u32 em_work_state_bit21_ck(u32 a);
 /* 0x803B9994 - releases one handle of the enemy-control slot set (r3 = the handle). */
 void em_roster_record_release(s32 handle);
-/* 0x803A8EE4 - the RSO-side random source; `fn_8019EA80` masks its low 16 bits. */
-u32 fn_803A8EE4(void);
 
 /* ------------------------------------------------------------------------------------------------
  * This unit's own functions: declared up front so the dispatchers can call them.
@@ -657,7 +656,7 @@ u32 fn_8019EA80(struct _ENEMY_WORK* self, u16 idx) {
     if (n <= 4) {
         return 255;
     }
-    s32 value = ((fn_803A8EE4() & 0xFFFF) + 0x157E7) >> (idx & 0xFFFF);
+    s32 value = ((quest_rand_next() & 0xFFFF) + 0x157E7) >> (idx & 0xFFFF);
     value = (value * 13) & 0xFFFF;
     return avail[value % (s32)n];
 }

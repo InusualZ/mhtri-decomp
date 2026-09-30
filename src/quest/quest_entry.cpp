@@ -1,214 +1,81 @@
-/* quest/quest_entry.cpp - the quest entry/init band's record counters and item-slot copies.
+/* quest/quest_entry.cpp - the body of the quest entry band: pair-table lot picks and rolls, the quest work block's
+ * state code, the area lists and the entry/finish steps.
  *
- * `.text` 0x803AA4A4..0x803B0F98 (27380 B, 70 functions), `extab` 0x80018A6C..0x80018C54 (60 records),
- * `extabindex` 0x80038E08..0x800390E4 (60 x 12 B) - each run is exactly the gap between the bracketing
- * registrations (`menu/multi_result.cpp` below, `Network/NetworkSessionManager.cpp` above).  Registered from
- * `proposal/803AA4A4_fn_803AA4A4.cpp`; the seam is UNPROVEN (the discovery `--max-bytes` cap) and the run
- * is plainly a *sequence* of objects, so the edges are hints, not proven TU boundaries.
+ * `.text` 0x803AB3BC..0x803B0F98 (46 functions), `extab` 0x80018B0C..0x80018C54, `extabindex`
+ * 0x80038EF8..0x800390E4.  The band's head (0x803AA4A4..0x803AB3BC) is `quest/quest_item_slot.cpp`: the cut is
+ * the `.data` emission-order seam that unit's static initialiser and its five zone tables sit on.  The upper
+ * end is the start of `menu/arena_result.cpp`; the seam to it is UNPROVEN (discovery's
+ * `--max-bytes` cap).
  *
- * NAME - which evidence class decided it.  Class 1 (`__FILE__` string) FAILS: the range references no
- * `.cpp`/`.c` string at all (its `.data` references are item-pair tables, jump tables and pool floats -
- * checked by relocating every `.text` data reference of the 70 auto objects).  Class 2 (runtime-dump name)
- * fails for the range itself (`dumpmap.py lookup 0x803AA4A4` answers `zz_03aa4a4_` for 69 of the 70
- * addresses), but it *does* name the band's own globals: `q_result_msg_adrs` 0x806C5528,
- * `quest_ex_condition_tbl` 0x80794C48, `em_bui_tbl`/`em_bui_rem_l,h`/`em_hokaku_rem_l,h` 0x80794C28-0x80794C38,
- * `q_npc_snd_func` 0x80794C00 - the `q_`/`quest_`/`em_` family the module is named from, together with the
- * range's one real function name, `quest_init(unsigned char)` at 0x803AD47C.  Class 3 therefore decides the
- * MODULE (`quest`) and the file name: the range drives the quest entry/start flow (`quest_init`, the
- * entry state machine that sends `lb_entry_start_send`, `lb_quest_work_init`) and owns its counters.
- * MARKED GUESS: the file name itself - the original source file name is not evidenced, so
- * `quest_entry.cpp` is derived from what the band does.
+ * NAME - class 3 (behaviour).  No `__FILE__` string, and the runtime dump answers `zz_` for 69 of the 70
+ * addresses of the band, but it names the band's globals (`q_result_msg_adrs`, `quest_ex_condition_tbl`,
+ * `em_bui_tbl`, `em_bui_rem_l/h`, `em_hokaku_rem_l/h`, `q_npc_snd_func`) and the one real function,
+ * `quest_init(unsigned char)` (0x803AD47C), so the module is `quest`.  `quest_entry.cpp` is a GUESS.
  *
- * The rename's reference half was swept with it: `fn_803B0CD4` -> `quest_entry_active_ck` in
- * `src/enemy/fn_8012EC74.cpp` (2 sites), the only reference site outside this file.
+ * NAMES.  Every symbol without a dump name is a GUESS derived from its body and callers (rule 7).  Guessed here:
+ * the function names of this unit and of `quest_item_slot`, `assignVec3` (0x80051490, an `out = in` 12-byte
+ * copy), `quest_list_file`/`quest_list_pool` (the `work_mem_alloc` list block and its `load_file` window) and
+ * the unit's `.sdata` rows.  Callee names swept from their generated stems by this unit's passes are in the
+ * map (owner in brackets where a header moved): userdata_*, quest_rand_*, quest_area_spawn_*,
+ * quest_time_limit_set, em_kind_release, em_area_entry_make, em_spawn_request, stage_*_get, pl_item_add,
+ * hud_msg_push, snd_*, quest_objective_get, quest_result_stat_fill, quest_warp_hub, ai_slots_clear.
+ * `quest_sub_state_end_ck` takes one argument (the body reads one); passing a stale float moved
+ * `menu/fn_802E4978.cpp`'s `fn_802E4B8C` from 97.34 to 99.97 once it was dropped.
  *
- * DATA / RULE 12 - the `.bss` claim (this pass).  This unit owns `.bss` 0x806C5558..0x806C5858 in
- * `config/RMHE08/splits.txt`: the band's four 0xC0-byte picked-pair tables `quest_item_pair_tbl_a/b/c/d`
- * (0x806C5558/0x806C5618/0x806C56D8/0x806C5798, 48 four-byte pairs each).  Evidence: the four rows tile
- * the run exactly, `q_result_msg_adrs` (0x806C5528, read by `menu/menu_result.cpp`) ends at its start and
- * `quest_work` (0x806C5858) begins at its end, and every address-taken site of all four is in this file
- * (`callers.py`: 16/8/8/8 sites, in `quest_item_pair_tbl_copy`, `quest_pair_roll_all`/`_first`/
- * `_last`/`fn_803ABE44`/`fn_803AC6B0`, `quest_monster_setup` and `quest_element_clear`).  The two
- * rows still spelled `lbl_806C56D8`/`lbl_806C5798` were renamed `quest_item_pair_tbl_c`/`_d` in the same
- * change and all four are DEFINED in this file (rule 12: an `extern` for data the unit owns would leave
- * `matched_data` at zero), so `datagap.py --unit quest/quest_entry` has no `target-extra` for the run.
+ * DATA (rule 12).  Claimed and emitted here: `.bss` 0x806C5558..0x806C5858 (the four pair tables), `.data`
+ * 0x805F7AB0..0x805F7AF8 (chance/reward tables), `.sdata` 0x807935D8..0x8079367C (163 of 164 B: the last byte is
+ * the section's trailing alignment pad) and `.sbss` 0x80794C1C..0x80794C3C (the list block's three words and
+ * `em_bui_tbl`, `em_bui_rem_l/h`, `em_hokaku_rem_l/h`).  The `.sdata` layout is MWCC's size-keyed alignment at
+ * work: an object of 4-7 bytes is 4-aligned, of 8 or more 8-aligned, so the twelve time rows are `u16[3]`
+ * (6 B, stride 8) and the rank weights `u8[7]` - a `u16[4]`/`u32[2]` row lands 4 B late.
+ * Not claimable, with the reason:
+ *   * `.data` 0x805F2A98 (read by `quest_init`) and 0x805F4F80 (`quest_monsters_spawn`): a second run of this
+ *     unit's `.data`, with other units' data between it and 0x805F7AB0 - one spanning claim is impossible and
+ *     two runs make dtk's `.data` order cyclic through the unclaimed unit between them (playbook 53).
+ *   * `lbl_8058AFC8`/`lbl_8058AFE8` (.data pool shared with `enemy/em_pop`, `lobby/fn_801F9CD4`), `lbl_805F78C4`,
+ *     `lbl_805F7B50/64` (second `.data` runs), `lbl_805F76A0`/`nora_set_proc` (shared with
+ *     `enemy/enemy_control`, `menu/arena_result`), the `.sdata2` floats (a partial pool does not link): the
+ *     bodies that read them are unwritten.
  *
- * The picked candidates that are still NOT written, and the one thing each waits for:
- *   * `quest_pair_apply` (0x803AE990, 376 B) needs `lbl_805F76A0` (`.data` 0x805F76A0, 0xA4) - unowned
- *     but NOT this unit's to claim: `menu/arena_result.cpp`'s `fn_803B0F98`/`fn_803B177C` and
- *     `enemy/enemy_control.cpp`'s `fn_8014246C` also take its address (playbook 58: claimable only while
- *     the unit is the sole referencer), so it waits for an owner header.
+ * UNWRITTEN (size, blocker): `fn_803ABE44` 2156 / `fn_803AC6B0` 1632 (reward rolls: data ready, the inlined fill
+ * loops are not reproduced), `quest_monster_setup` 384 (`nora_set_proc`), `quest_list_load_hunt` 636 /
+ * `quest_list_load_arena` 532 / `quest_init` 612 (`lbl_8058AFC8`, `lbl_805F2A98`), `quest_pair_apply` 376,
+ * `quest_monsters_spawn` 1296 / `quest_monster_spawn_area` 1012 (`lbl_805F76A0`, `lbl_805F4F80`),
+ * `quest_entry_setup` 264 (not attempted: it stores through `Q_ItemWork` offsets +0x58/+0x59/+0x8B/+0x8E/+0x8F/
+ * +0x5E0/+0x5E2/+0x684/+0x688 that the record does not name yet), `fn_803AEED0` 1508 / `fn_803AF4B4` 1240 /
+ * `fn_803B01C4` 2832 (the entry state machine: `lbl_805F7B50/64`, `lbl_805F78C4`, `lbl_8058AFE8`, `nora_set_proc`
+ * and ~20 unnamed callees).  The last three are the orchestration of everything above.
  *
- * RESIDUAL / KNOWN DEBT.
- *   * `quest_item_pair_copy_cell` / `_block` / `_row` stop at 89-94 %: the residual is the callee-saved
- *     register assignment only (the target colours `rec`=r29, `dst`/`flagged`=r30, `kind`=r31; ours is a
- *     cyclic shift of that), plus `quest_item_slot_find`'s mask/load scheduling order.  No source shape
- *     tried moved them further; both were kept at the best measured form.
- *   * `quest_item_slot_add` 92.50 %: the residual is the `extsh` temp (`extsh r0,r3` in the target
- *     against our in-place `extsh r3,r3`), the target's unsigned `cmplwi r3,5` against our signed
- *     `cmpwi`, and the target's preserved loop counter (`addi r5,r5,1`; ours is dead-code eliminated).
- *     Three shapes moved it and were kept: the `Q_ItemCount* slot = slots;` declaration belongs *inside*
- *     the branch (+3 points), `Q_ItemCount::num` is `s8` and not `u8` - the target's `stb` stores the
- *     `extsb`'d value raw, where a `u8` member costs a `clrlwi` (+3.8 points, and it took
- *     `quest_item_slot_find` 90.15 -> 91.67 with it) - and the `slots[i]` indexed spelling is *worse*
- *     (84.92, measured), so the moving pointer stays.
- *   * `quest_element_build` is 100 %: its `total`/`entry` assignment order and their declaration order
- *     are load-bearing (the target's accumulator is the lower register), recorded here because both
- *     were needed.
- *   * `quest_element_copy` 85.52 %: instruction-identical, and the 6 trailing word copies are load/store
- *     paired in the target (`lwz r5,8; lwz r0,0xc; stw r5,8; stw r0,0xc; ...`) where ours does one word at
- *     a time.  Same source shape, scheduler placement - recorded, not chased.
- *   * `quest_lot_pick_first` 97.32 / `quest_lot_pick_last` 97.20 / `quest_lot_pick` 97.02: the residual is
- *     the callee-saved colouring (the target maps `chance`->r25, `table`->r26, `out`->r27, `count`->r28,
- *     `picked`->r29, `i`->r30, `entry`->r31; ours keeps the same values in a rotated set) plus, in
- *     `quest_lot_pick_first` rows 40/41 and `quest_lot_pick_last` rows 37/38, the weight-sum compare's
- *     operand order and branch polarity - the target's `cmplw r4,r0; bge` against our `cmplw r0,r4; ble`
- *     - and in all three the two narrow-load REPLACEs (target `cmplwi r6,1` / `extsh r0,r0`, ours
- *     `cmpwi` / `extsb`).
- *     Declaring `chance` as the walked pointer (`u8*`, incremented in the `for`) rather than a separate
- *     `const u8* ch` copy was worth +4 points - the target increments the parameter's own register.
- *   * Foreign callees whose bands are still unregistered keep names derived from their own bodies and
- *     renamed in the map (`move_work_state_ck`, `move_work_item_work_get`, `quest_slot_progress_get` -
- *     the rename swept their 12 reference sites in the five units that already called them).  Each name
- *     is a GUESS; a pass with the runtime dump's own names can sharpen them.
- *   * `quest_item_work_notify` (0x803AB190, 96 B) was unwritten; it is written now (the map's 0x58 B
- *     row is 0x60 on the report and the unit's earlier note had it 0x58).  Its declaration moved here
- *     from `include/unsplit/menu.h`, whose band no longer owns the address (`Pl/pl_act.cpp` is its one
- *     consumer and keeps a local `extern`).
- *   * `get_move_work_adrs` is declared in this unit's own header although its owner is
- *     `ef/fn_800CDB2C.cpp`: that owner's header cannot carry it, because `include/hud/cockpit_quest.h`
- *     (`u8*`), `include/lobby/lb_companion_ui.h` (`LbMoveWork*`) and `include/unsplit/ef.h` (`void*`, and
- *     at C scope, i.e. the wrong mangling) each spell the same mangling with a different return type, so a
- *     fourth spelling in the owner header breaks the ten units that include it.  Declared at C++ scope so
- *     the front-end reproduces the map's mangling `get_move_work_adrs__FUc` (a C-scope spelling is
- *     `undefined` at flip time).  The declaration carries a rule-11 marker and the file's rule-2 set is
- *     left at its previous size by moving `move_work_state_ck` to that owner's header, where it already
- *     lived.
- *   * `quest_record_state_get` (0x803ADF48) is renamed but unwritten: its callee `quest_record_get` is
- *     declared only inside `src/menu/arena_result.cpp`, and that unit is another lane's this wave, so the
- *     declaration waits for its owner header.
- *   * Small functions still blocked by a *foreign* name in another lane's registered range (writing them
- *     would add a rule-7 finding to this file): `quest_monster_setup`, `quest_list_load_hunt`/`_arena`,
- *     `quest_grade_set`.  (`quest_element_build` was one until it was written; `quest_pair_apply`'s own
- *     blocker is the unowned-and-shared `lbl_805F76A0`, below.)
- *   * The `Q_UserData`/`Q_ItemWork`/`Q_MoveWork` views are partial: only the offsets this unit reads are
- *     named, everything between them is padding.  All three SIZES are measured, not approximate -
- *     `Q_UserData` 0x6000 (its own pass), `Q_ItemWork` 0x6AB8 and `Q_MoveWork` 0x22E8 (this pass; the
- *     evidence is in each record's comment in `include/quest/quest_entry.h`).
- *   * `get_userdata` is declared at C++ scope now, not inside the header's `extern "C"` block: the
- *     map's row is the mangling `get_userdata__Fv`, so the C-scope spelling relocated an unmangled
- *     `get_userdata` that nothing defines - `undefrefs.py quest/quest_entry` answered NOT READY before
- *     the fix and is clean after it.  No row moved (2724 B and 25 of 70 both sides).
- *   * `menu/menu_item_page.h` and `lobby/lb_companion_ui.h` still declare this unit's symbols themselves
- *     instead of including this header (rule 2's debt; both are headers, so the lint does not fire).  The
- *     `lobby` one also reads `lb_act_best_keep`'s argument as a u16 (`LbActSel::half_0x00`, added with
- *     this change) where it used to read a byte - the target loads `lhz` there, and the fix took that
- *     function 94.03 -> 99.59 %.
- *   * `include/menu/menu_item.h`'s `ItemDataRecord` byte at +0x003 was `unused_0x003` until this pass;
- *     `quest_item_slot_add` reads it as the signed cap a slot's count is clamped to, so it is named
- *     `max_num_0x003` now.
- *   * `quest_pl_skill_slot_set` (0x803AB438, 476 B) is still unwritten although every callee it needs
- *     (`Pl_Skill_ck`, `Pl_cat_skill_ck`, `ran_suu`) is declared: its 16-element byte fix-up loop is
- *     unrolled by 8 and the target keeps a live counter the source shape for is not obvious
- *     (`addi r4,r4,7` per iteration, so the counter is not the element index).
- *   * The `.ctors` word (0x8056F3B0, 4 B) this unit's block claims has no emitter here - pre-existing
- *     (the register records its target as `fn_803AB1F0`'s static initializer), and the fix rides that
- *     body's pass.
+ * RESIDUAL.
+ *   * `quest_lot_pick_first` 97.3 / `_last` 97.2 / `quest_lot_pick` 97.0 %: callee-saved colouring, the weight-sum
+ *     compare's operand order and two narrow loads (`cmplwi`/`extsh` against our `cmpwi`/`extsb`).
+ *   * `quest_pl_skill_slot_set` 97.38 %: the target keeps a dead `addi r4,r4,7` counter in the two-pass fix-up
+ *     loop; a `for`, the unrolled form and a live extra variable were tried and the optimizer removes it.
+ *   * `quest_work_start_reset` 97.50 %, `quest_monsters_release` 99.62 %: the colours of two callee-saved
+ *     registers are swapped (declaration order moves the loop counters, not these).
+ *   * `quest_grade_set` 96.52 %: the target hoists `li r4,0` across the three grade-pair stores and keeps the
+ *     element pointer in r5; a hoisted `u8` zero did not move it.
+ *   * `quest_element_copy` 85.52 %: instruction-identical, the target pairs its last six word copies load/store.
  *
- * THE `.bss` PASS wrote two bodies and moved the four tables' definitions to the foot of the file:
- *   * `quest_item_pair_tbl_copy` (0x803AB3BC) 100 %, `quest_element_clear` (0x803ACE90) 100 % - unit
- *     12.31 -> 14.14 %, 14 -> 16 functions at 100 %.
- *   * WHERE the tables are DEFINED is load-bearing: with the definitions above the bodies MWCC folds
- *     the four `.bss` addresses of `quest_element_clear`'s four `memset`s into one section base plus
- *     three `addi` displacements (372 B, 91.20 %), where the target - and our object, with the
- *     definitions at the foot - emits a `lis`/`addi` pair per symbol (376 B, 100 %).  The target's own
- *     `.rela.text` carries per-symbol `R_PPC_ADDR16_HA/LO` for all four, so its compiler saw them as
- *     `extern` at the use sites too: the bytes are this unit's object's (rule 12) but their definitions
- *     sit where the original's codegen says they did.
- *   * `quest_item_pair_tbl_copy`'s own shape is that same lever one level down: its counter's `li` is
- *     emitted first while MWCC colours locals in declaration order, so `a`/`b` are declared (empty)
- *     before `i` and assigned after it.
+ * SHAPES that decided a row (playbook 63 unless noted): `quest_move_state_valid_ck` masks 0x80 (`rlwinm` MB=ME=24);
+ * `quest_work_busy_ck` ends `if (record != 0) return ...; return 1;`; `quest_element_find` declares `i` before
+ * the element pointer; the rolls declare `item; u16 total; Q_LotEntry* entry;`; `quest_element_clear`'s tables
+ * are defined after the bodies (before them MWCC folds the four `.bss` bases); `quest_area_list_init` keeps
+ * `count` a `u8` compared as `(s32)count > 32`; `quest_area_list_refill` takes the unused item work first; u8
+ * counters use `+= 1` (`x = x + 1` adds a `clrlwi`); `quest_work_pouch_load` and `quest_monsters_release` depend
+ * on declaration order.  The `.sdata` definitions sit above every function so the `"%s"` object is last.
  *
- * THE STATE-PROBE PASS wrote nine bodies and the fix-up pass took the tenth: 14.14 -> 17.34 %, code
- * 1848 -> 2724 B, 16 -> 25 functions at 100 %.
- *   * `quest_move_state_valid_ck` (0x803AB028, 72 B, 100 %) was WRONG when that pass landed it, and the
- *     residual it recorded misread the target: `lbz r0,0x22d4(r3)` + `rlwinm r3,r0,0,24,24` has
- *     MB=ME=24, which selects bit 24 of the loaded value - the mask is **0x00000080**, not a widening
- *     of the byte - so the body is `(state_0x22D4 & 0x80) != 0`, and `neg`/`or`/`srwi 31` booleanizes
- *     the MASKED value.  The twelve spellings the old residual listed were all `!= 0`-shaped, and a
- *     plain nonzero test folds to a direct `lbz`, so none of them could ever reach the mask - the
- *     shape was never missing, the question was the wrong one.  The bit's meaning is corroborated: the
- *     sibling `quest_move_state_get` masks the SAME byte with `0x7F`, and `fn_803B849C`/`fn_803AEED0`
- *     read bit 7 and then hand the low seven bits to `fn_800EF270` - bit 7 is "a state code follows",
- *     the low seven bits are the code.  Peephole ON is enough - no pragma: with the mask in the source
- *     the pair stays `rlwinm` + `srwi` and the row is byte-identical to the target.
- *   * SHAPES that were load-bearing here (each one was the difference between 74-82 % and 100 %):
- *     `quest_item_work_merge`'s `item_value_0x10E` must be **`s16`** - a `u16` member masks the stored
- *     `s16` into `clrlwi`+`sth` where the target stores it raw; `quest_select_ready_ck` wants the two
- *     option-block tests joined by `&&` inside one `if` (an `if (...) return 0;` chain is if-converted
- *     into a boolean AND); `quest_work_busy_ck` wants three flat `if (...) return 1;` arms with the
- *     LAST arm written `if (record != 0) return ...;  return 1;` (a nested `if` collapses all three
- *     into one shared return block); `quest_id_head_ck`/`_tail_ck` compare `(u16)(quest_id_get() +
- *     0xFFFF)` (a `- 1` spelling loses the `addis`, and the comparison constant is `<= 2` / `> 3`, not
- *     the `< 2` / `< 3` the ranges suggest); `quest_element_find` wants `i` declared BEFORE the element
- *     pointer (register colouring, playbook 63) and both sides of the id test cast to `u32` for the
- *     target's `cmplw`.
- *   * RENAMES this pass made, each with its referrer half swept in the same change (all were map rows
- *     whose owners are other registered units, so the sweep is the rename's other half - rule 7 has no
- *     deferral): `fn_803A8D4C` -> `quest_id_get` (owner `lobby/lb_quest_screen.cpp`; its declaration
- *     now sits in that unit's own header, swept in `src/enemy/fn_80176C58.cpp`), `fn_80125F9C` ->
- *     `enemy_kind_same_ck` (owner `enemy/fn_801251D0.cpp`, 2 sites in its own source + header), and
- *     this unit's own `fn_803AAB80`/`fn_803AB028`/`fn_803AB070`/`fn_803AAEC0`/`fn_803AAF3C`/
- *     `fn_803AAF88`/`fn_803AAFE0`/`fn_803ADF84` (their 22 reference sites across `ai`, `ef`, `menu`,
- *     `stage`, `enemy` were swept with the map edit).  The fix-up pass renamed `quest_move_state_ck`
- *     -> `quest_move_state_valid_ck`: the old name came from the wrong `!= 0` body, and the map row
- *     plus its 11 code sites in `ai`/`menu` and this unit moved together.
- *
- * THE ROLL PASS (this pass) wrote the three pair rolls and the notify, claimed their two data runs and
- * named the band they call: 17.34 -> 22.54 %, code 2724 -> 4148 B, 25 -> 29 of 70 rows.  All four rows
- * are 100 %.  What it cost and what it left:
- *   * the `.data` run 0x805F7AB0..0x805F7AF8 is CLAIMED and emitted (four tables, bytes identical);
- *     `quest_pair_roll_all` also needed the 4-byte `.sdata` run 0x80793600..0x80793604, claimed and
- *     emitted.  With both claims in `splits.txt` the split still links and the DOL is unchanged.
- *   * NAMING: `fn_803AA060` -> `quest_element_pick_ck` - its declaration moved OUT of
- *     `include/lobby/lb_companion_ui.h` into its owner's header `include/lobby/lb_quest_screen.h`, and
- *     the two `lobby/lb_companion_ui.cpp` call sites pass their own view (`(QuestWork*)companion`).
- *     `lb_companion_ui.h` cannot include the owner's header: the owner declares `fmt_803AA41C(s32,
- *     f32)` where that header's own list has the one-argument `fn_803AA41C(s32)`, so the pair trips
- *     `illegal function overloading` (measured) - the re-declaration is the same signature as the
- *     owner's, so both spellings agree.  `fn_803B5E2C` -> `quest_element_state_ck` (owner
- *     `enemy/em_pop.h`) and this unit's `fn_803ABB74`/`fn_803ABCDC`/`fn_803AB914` ->
- *     `quest_pair_roll_first`/`_last`/`_all`.  Names remain GUESSes where the runtime dump has none.
- *   * SHAPES: the rolls are playbook 63 - the declaration order `item; u16 total; Q_LotEntry* entry;`
- *     is the difference between 99.5 and 100 % (the other order colours the first walk's pointer and
- *     accumulator the other way); and `quest_element_state_ck` must return **`u32`**, not `s32`, or its
- *     `== 1` compares `cmpwi` where the target has `cmplwi`.
- *   * FILED, not half-done: `isServerSelectState` (`Network/network_pat_control.cpp`) - **43 reference sites in
- *     16 files + 5 headers** - blocks `fn_803AB0FC` and through it the whole entry/loader group, and
- *     the `Network/` tree is another lane's this wave; `fn_80125F54` (21 sites/9 files),
- *     `fn_80137604` (13/11), `fn_80141B88` (11/6), `fn_80272E30` (29/14) block `fn_803AE030` (1012 B),
- *     `fn_803AE424` (1296 B) and `fn_803AAC0C` (624 B).
- *   * still blocked by an unowned, shared symbol: `lbl_805F76A0` (`.data` 0x805F76A0, 0xA4) - read by
- *     `quest_pair_apply`, `fn_803AE030`, `menu/arena_result.cpp` and `enemy/enemy_control.cpp`, so not
- *     this unit's to claim (playbook 58).
- *   * still unwritten from the FIRST `.data` run this pass claimed: `fn_803ABE44` (2156 B, whose only
- *     external is `quest_reward_group_tbl`, now named) and `quest_monster_setup` (384 B) - the latter
- *     needs the item work's +0x6980/+0x6984 words AND the indirect call through the function-pointer
- *     table at 0x806DC410 (no map row at all: it sits inside `auto_08_806D2AF8_bss`, so it needs a new
- *     symbol row and a `.bss` claim before a body can name it).
- *   * the second `.data` run 0x805F7B50..0x805F7B78 is NOT this unit's: the 88 B between the two runs
- *     holds `arena_time_table` (0x805F7AF8, 0x30) and `multi_arena_clr_time` (0x805F7B28, 0x28), read
- *     by three other units (`menu/menu_result.cpp` 1 site, `menu/arena_result.cpp` 2 + 2,
- *     `quest/arenatask.cpp` 1), and playbook 53 would make this unit own those bytes between two
- *     claimed runs of one section.  `fn_803AC6B0` references none of the span.
- *   * `Q_ItemWork` now carries `record_0x3C` and the `Q_ResultRow` prefix view (the +0x310 word the
- *     roll gate reads).  `menu/arena_result.cpp`'s `QuestRecord` in `include/unsplit/menu.h` is the
- *     full view of the same row and that header is not this lane's to extend, so the prefix is
- *     duplicated here - merging the views is a follow-up, as is folding `LbCompanionWork` and
- *     `Q_ItemWork` into one type.
+ * TYPES.  `Q_ItemWork` (0x6AB8, `quest/quest_types.h`) is the same block as `quest_work`/`get_move_work_adrs(0)->0xDC`:
+ * its `0x94..0x490` run is a union of the quest view (`elements_0x94` ...) and the arena lot-table view, told
+ * apart by `Q_MoveWork::kind_0xFC == 4` (evidence in the type's comment).  `Q_ResultRow` is a prefix of
+ * `QuestRecord`, `Q_MoveWork` of the slot's move work.  `Q_ResultWork` (`quest/quest_result_work.h`) is the one
+ * view of `get_qResult_work`'s 0x438-byte block, shared with `menu/menu_result.cpp` and `lobby/fn_801F9CD4.cpp`.
+ * `Q_ItemWork`, the lobby's `LbCompanionWork` and `unsplit/menu.h`'s `QuestWork` are still three views of one block
+ * (the merge is a follow-up).  The player work is `_PLW` (`pl.h`), not a view of ours.
  */
 
 #include "quest/quest_entry.h"
+#include "quest/quest_item_slot.h"
 #include "ef/fn_800CDB2C.h"    /* `move_work_state_ck` - owned by ef/fn_800CDB2C.cpp (rule 2) */
 #include "unsplit/menu.h"       /* `quest_work_ptr` - the band data no registered unit claims */
 #include "unsplit/lobby.h"      /* `lb_param_w` - the option block no registered unit claims */
@@ -216,6 +83,26 @@
 #include "Network/network_pat_control.h"   /* isServerSelectState (owner header, rule 2) */
 #include "enemy/em_pop.h"       /* `quest_flag_*_ck` - owned by enemy/em_pop.cpp (rule 2) */
 #include "enemy/fn_801251D0.h"  /* `enemy_kind_same_ck` - owned by enemy/fn_801251D0.cpp (rule 2) */
+#include "fn_8004CAD8.h"    /* get_qResult_work, userdata_record_*_add, userdata_quest_stat_set - owned by fn_8004CAD8.cpp (rule 2) */
+#include "lobby/lb_quest_screen.h"  /* quest_rand_seed_set, quest_rand_next - owned by lobby/lb_quest_screen.cpp (rule 2) */
+#include "menu/arena_result.h"  /* quest_record_get - owned by menu/arena_result.cpp (rule 2) */
+#include "pl.h"                 /* _PLW - the player work (rule 1) */
+#include "lobby/lb_entry_notify_send.h" /* lb_entry_notify_send - owned by lobby/lb_companion_ui.cpp (rule 2) */
+#include "unsplit/Runtime.PPCEABI.H.h" /* sprintf, strcat (the MSL band has no registered owner) */
+#include "ai/fn_802D44F4.h"    /* ai_slots_clear - owned by ai/fn_802D44F4.cpp (rule 2) */
+#include "fn_80056F24.h"        /* system_copy_filter_request - owned by fn_80056F24.cpp (rule 2) */
+#include "sound/fn_800F2A94.h" /* snd_quest_scene_set - owned by sound/fn_800F2A94.cpp (rule 2) */
+#include "lobby/lb_sub18_send.h" /* lb_sub18_send - owned by lobby/lb_companion_ui.cpp (rule 2) */
+#include "ef/eft052.h"          /* hud_item_msg_push - owned by ef/eft052.cpp (rule 2) */
+#include "enemy/enemy_control.h" /* em_area_entry_make, em_spawn_request - owned by enemy/enemy_control.cpp (rule 2) */
+#include "enemy/fn_8013F764.h"   /* em_kind_release - owned by enemy/fn_8013F764.cpp (rule 2) */
+#include "Pl/pl_act_stage_latch_set.h"  /* pl_act_stage_latch_set, my_player_work_get - owned by Pl/fn_80273B14.cpp (rule 2) */
+#include "Pl/fn_80288CEC.h"   /* pl_warp_start - owned by Pl/fn_80288CEC.cpp (rule 2) */
+#include "mh3_pad.h"          /* setVec3 (rule 2) */
+#include "stage/stg_w.h"        /* stage_map_area_count_get - owned by stage/stg_w.cpp (rule 2) */
+#include "sound/fn_800D7F54.h"  /* snd_item_fail_play - owned by sound/fn_800D7F54.cpp (rule 2) */
+#include "Pl/pl_master.h"    /* Pl_master_ck - owned by Pl/pl_master.cpp (rule 2) */
+#include "Pl/pl_skill.h"    /* Pl_Skill_ck, Pl_cat_skill_ck - owned by Pl/pl_skill.cpp (rule 2) */
 #include "Runtime.PPCEABI.H/memset.h"  /* memset (owner: the Runtime.PPCEABI.H lib) */
 #include "Runtime.PPCEABI.H/memcpy.h"  /* memcpy (owner: the Runtime.PPCEABI.H lib) */
 
@@ -224,95 +111,53 @@
  * offsets, so the two views are cast rather than merged. */
 #define QUEST_WORK ((Q_ItemWork*)quest_work_ptr)
 
-/* ---- the item-slot family (0x803AA9D0) ---- */
+/* This unit's own `.sdata` (`splits.txt` `.sdata 0x807935D0..0x8079367C`, the rows tile it in address order;
+ * the twelve `quest_grade_time_*` rows and the two `quest_rank_weight_*` rows are separate objects because
+ * `.sdata` only takes objects of at most 8 bytes).
+ * Every row is referenced by this unit's code only, except the three bytes tables at 0x807935F0..0x80793600
+ * and the 0x80793604 table, which no symbol reads (they sit inside the claim as unreferenced data). */
 
-/* Adds `count` of `id` to the five-slot list.  An id already in the list is merged into its slot and
- * clamped to the item record's own cap; a new id takes the first free slot, or the round-robin slot
- * the caller's rotation byte points at. */
-s32 quest_item_slot_add(Q_ItemCount* slots, u8* rot, u16 id, s16 count) {
-    ItemDataRecord* rec = GetItemData(id);
-    s32 result;
-    s32 i;
+/* The zero-terminated resource id lists the entry state loads for quest kinds 7 (arena; the list starts one
+ * entry in when the stat block is live), 0xB and 6, and the per-kind id table (indexed 1..5) it loads for a
+ * quick quest. */
+u8 quest_res_ids_arena[5] = { 0x2B, 0x2C, 0x2D, 0x2E, 0 };
+u8 quest_res_ids_kind_b[4] = { 0x2F, 0x30, 0x31, 0 };
+u8 quest_res_ids_kind_6[4] = { 0x28, 0x29, 0x2A, 0 };
+u8 quest_res_id_by_kind[8] = { 0, 2, 0x0F, 0x10, 0x11, 0x12, 0, 0 };
 
-    if (rec == NULL) {
-        return 1;
-    }
-    result = quest_item_slot_find(slots, id);
-    if (result == 0) {
-        result = 5;
-        Q_ItemCount* slot = slots;
+/* Unreferenced rows (GUESS names: pairs of small thresholds, sole readers unknown). */
+u8 quest_sdata_tbl_a[8] = { 0x08, 0x20, 0x06, 0x30, 0x04, 0x10, 0, 0 };
+u8 quest_sdata_tbl_b[4] = { 0x64, 0, 0xFF, 0 };
+u8 quest_sdata_tbl_c[4] = { 0x64, 1, 0xFF, 0 };
 
-        for (i = 0; i < 5; i++, slot++) {
-            if (slot->id == 0 && count > 0) {
-                slot->id = id;
-                slot->num = (s8)count;
-                result = 0;
-                break;
-            }
-        }
-        if (result == 5) {
-            slot = &slots[(s8)*rot];
-            slot->id = id;
-            slot->num = (s8)count;
-            *rot = *rot + 1;
-            if ((s8)*rot >= 5) {
-                *rot = 0;
-            }
-        }
-    } else {
-        Q_ItemCount* slot = slots;
+/* The four-byte chance table `quest_pair_roll_all` copies over the head of its 16-byte roll buffer before
+ * the last two picks.  The row's sole referrer is that function. */
+u8 quest_pair_chance_tbl_d[0x4] = { 32, 22, 22, 22 };
 
-        for (i = 0; i < 5; i++, slot++) {
-            if (slot->id == id) {
-                s8 cap = (s8)rec->max_num_0x003;
+/* Twelve separate 8-byte rows (clear time, par time, 3000, 0) - one object each, which is what keeps them in
+ * `.sdata`; no symbol reads them (GUESS names). */
+u16 quest_grade_time_00[3] = { 0x00B4, 0x00F0, 0x0BB8 };
+u16 quest_grade_time_01[3] = { 0x00D2, 0x012C, 0x0BB8 };
+u16 quest_grade_time_02[3] = { 0x010E, 0x0168, 0x0BB8 };
+u16 quest_grade_time_03[3] = { 0x010E, 0x0168, 0x0BB8 };
+u16 quest_grade_time_04[3] = { 0x01A4, 0x021C, 0x0BB8 };
+u16 quest_grade_time_05[3] = { 0x02D0, 0x0384, 0x0BB8 };
+u16 quest_grade_time_06[3] = { 0x0258, 0x02D0, 0x0BB8 };
+u16 quest_grade_time_07[3] = { 0x021C, 0x0294, 0x0BB8 };
+u16 quest_grade_time_08[3] = { 0x0258, 0x02D0, 0x0BB8 };
+u16 quest_grade_time_09[3] = { 0x02D0, 0x0348, 0x0BB8 };
+u16 quest_grade_time_0A[3] = { 0x0258, 0x02D0, 0x0BB8 };
+u16 quest_grade_time_0B[3] = { 0x03C0, 0x0474, 0x0BB8 };
 
-                if (count > 0 && (s8)slot->num >= cap) {
-                    slot->num = cap;
-                    result = 3;
-                    break;
-                }
-                slot->num = slot->num + (s8)count;
-                if ((s8)slot->num <= 0) {
-                    slot->id = 0;
-                    slot->num = 0;
-                    result = 4;
-                    break;
-                }
-                if ((s8)slot->num > cap) {
-                    slot->num = cap;
-                    result = 2;
-                    break;
-                }
-                result = 1;
-                break;
-            }
-        }
-    }
-    return result;
-}
+/* The rank weights `fn_803AEED0` indexes by the quest's rank byte (0..6), and the four zero bytes after
+ * them. */
+u8 quest_rank_weight_tbl[7] = { 0, 100, 80, 60, 40, 20, 10 };
 
-/* Records the item a caller hands over in the local slot's move work, then merges it into the item
- * work's own five-slot list with the negated value (the callers pass -1, so the merge adds one).
- * `owner` is the player work record `src/enemy/fn_801B0010.cpp` passes and the target never reads. */
-void quest_item_work_merge(_PLW* owner, u16 id, s16 value) {
-    Q_MoveWork* work = (Q_MoveWork*)get_move_work_adrs(0);
-    Q_ItemWork* item;
+/* The quest grade each bonus-element mask maps to (`quest_grade_set`; sole referrer). */
+u8 quest_grade_table[8] = { 0, 1, 1, 3, 1, 6, 5, 3 };
 
-    if (work == NULL) {
-        return;
-    }
-    work->item_id_0x10C = id;
-    work->item_value_0x10E = value;
-    work->item_flag_0x110 = 1;
-    item = work->item_work;
-    if (item == NULL) {
-        return;
-    }
-    quest_item_slot_add(item->slots_0x40, &item->rot_0x54, id, (s16)-value);
-    item->flag_0x55 = 1;
-}
-
-/* ---- the picked-pair table copy (0x803AB3BC) ---- */
+/* The `"%s"` format `quest_reward_faint_penalty` prints a player name through. */
+char quest_entry_fmt_str[3] = "%s";
 
 /* Copies both of the band's first two picked-pair tables into a result record's own two adjacent
  * 0xC0 buffers, one four-byte pair at a time. */
@@ -331,214 +176,72 @@ void quest_item_pair_tbl_copy(Q_ItemPair* dst_a, Q_ItemPair* dst_b) {
     }
 }
 
-/* ---- the band's small state getters ---- */
+/* Replaces the placeholder skill slot (0x16) of the 16-entry chance buffer with the skill slot the
+ * player's equipped skills select, then, for the two quest-reward skills, forces slot 2 (and its
+ * partner) to the top-rank marker 0x20. */
+void quest_pl_skill_slot_set(_PLW* owner, u8* chance, u8 mode) {
+    u8 fill = 0x16;
+    u8* p;
+    s32 n;
+    u32 top;
 
-/* The current quest id when it is a low-table key (below 0x64), and 0 otherwise. */
-u32 quest_id_low_get(void) {
-    u32 id = quest_id_get();
-
-    return quest_item_id_low_ck((u16)id) == 1 ? (u8)id : 0;
-}
-
-/* Whether the current quest id is one of the three at the head of the low list, and the local slot has
- * a quest selected at all (`(u16)(id + 0xFFFF) <= 2`, i.e. id is 1, 2 or 3). */
-u32 quest_id_head_ck(void) {
-    if (quest_select_ready_ck() == 0) {
-        return 0;
+    if (Pl_Skill_ck(owner, 0x91) == 1) {
+        fill = 0x1A;
     }
-    return (u16)(quest_id_get() + 0xFFFF) <= 2;
-}
-
-/* The complementary probe for a slot whose move work is not yet in its quest state: the current quest
- * id is past the head of the low list (`(u16)(id + 0xFFFF) > 3`, i.e. id is 5 or above). */
-u32 quest_id_tail_ck(void) {
-    if (move_work_state_ck() == 1) {
-        return 0;
+    if (Pl_Skill_ck(owner, 0x92) == 1) {
+        fill = 0x1D;
     }
-    return (u16)(quest_id_get() + 0xFFFF) > 3;
-}
-
-/* Whether the local slot's move work carries a state: bit 7 of the +0x22D4 byte (`rlwinm` MB=ME=24
- * selects 0x00000080).  `fn_803B849C`/`fn_803AEED0` read the same bit before handing the low seven
- * bits to `fn_800EF270`, so it is the "there is a state code here" flag, not a mere nonzero test. */
-u32 quest_move_state_valid_ck(void) {
-    Q_MoveWork* work = (Q_MoveWork*)get_move_work_adrs(0);
-
-    if (work == NULL) {
-        return 0;
+    if (Pl_Skill_ck(owner, 0x93) == 1) {
+        fill = 0x10;
     }
-    return (work->state_0x22D4 & 0x80) != 0;
-}
-
-/* The state code itself: the low seven bits of that same byte, or 0xFF when the slot has no move work
- * or no state. */
-u32 quest_move_state_get(void) {
-    Q_MoveWork* work = (Q_MoveWork*)get_move_work_adrs(0);
-    u8 state;
-
-    if (work == NULL) {
-        return 0xFF;
+    if (Pl_Skill_ck(owner, 0x94) == 1) {
+        fill = 8;
     }
-    state = work->state_0x22D4;
-    if (state == 0) {
-        return 0xFF;
+    p = chance;
+    n = 2;
+    do {
+        if (p[0] == 0x16) {
+            p[0] = fill;
+        }
+        if (p[1] == 0x16) {
+            p[1] = fill;
+        }
+        if (p[2] == 0x16) {
+            p[2] = fill;
+        }
+        if (p[3] == 0x16) {
+            p[3] = fill;
+        }
+        if (p[4] == 0x16) {
+            p[4] = fill;
+        }
+        if (p[5] == 0x16) {
+            p[5] = fill;
+        }
+        if (p[6] == 0x16) {
+            p[6] = fill;
+        }
+        if (p[7] == 0x16) {
+            p[7] = fill;
+        }
+        p += 8;
+    } while (--n != 0);
+    top = 0;
+    if (Pl_cat_skill_ck(owner, 0x10) == 1) {
+        top = 1;
+    } else if (Pl_cat_skill_ck(owner, 0x11) == 1 && (s32)(ran_suu(0) % 100) < 0x32) {
+        top = 1;
     }
-    return state & 0x7F;
-}
-
-/* Whether the local slot has a quest selected: the player's move work must be live and the option
- * block must carry both the selected flag and a nonzero quest id. */
-u32 quest_select_ready_ck(void) {
-    if (move_work_state_ck() != 1) {
-        return 0;
-    }
-    if (lb_param_w.flag_0x0b == 1 && lb_param_w.field_0x00 != 0) {
-        return 1;
-    }
-    return 0;
-}
-
-/* Whether the local slot's move work has its +0x22DC flag byte set. */
-u32 quest_move_flag_ck(void) {
-    Q_MoveWork* work = (Q_MoveWork*)get_move_work_adrs(0);
-
-    if (work == NULL) {
-        return 0;
-    }
-    return work->flag_0x22DC != 0;
-}
-
-/* Whether an item id belongs to the low pair table (every id below 0x64); id 0 is the empty slot. */
-u32 quest_item_id_low_ck(u16 id) {
-    if (id == 0) {
-        return 0;
-    }
-    return id < 100;
-}
-
-/* The quest phase the whole game switches on while no entry is running - 1 unless the slot is in its
- * entry state, in which case the pause gate decides. */
-u32 quest_play_state_ck(void) {
-    if (move_work_state_ck() == 0) {
-        return quest_work_busy_ck();
-    }
-    return 1;
-}
-
-/* The local slot's quest phase byte (+0xE9 of the move work). */
-u8 quest_phase_get(void) {
-    Q_MoveWork* work = (Q_MoveWork*)get_move_work_adrs(0);
-
-    if (work == NULL) {
-        return 0;
-    }
-    return work->phase_0xE9;
-}
-
-/* Whether the local slot's item work has its arena item count set. */
-u32 quest_item_work_flag_ck(void) {
-    Q_MoveWork* work = (Q_MoveWork*)get_move_work_adrs(0);
-    Q_ItemWork* item;
-
-    if (work == NULL) {
-        return 0;
-    }
-    item = work->item_work;
-    if (item == NULL) {
-        return 0;
-    }
-    return (s8)item->count_0x6A2A != 0;
-}
-
-/* The index of the quest-work element `kind` names: the first of the three whose +0x00 gate bit is set
- * and whose +0x04 id either equals `kind` or maps to the same enemy kind, or -1 when none does. */
-s32 quest_element_find(u8 kind) {
-    s32 i;
-    QuestElement* e = quest_work.elements_0x0094;
-
-    if (e == NULL) {
-        return -1;
-    }
-    for (i = 0; i < 3; i++, e++) {
-        if (e->flags & 1) {
-            if ((u32)e->id == (u32)kind) {
-                return i;
-            }
-            if (enemy_kind_same_ck((u8)e->id, kind) == 1) {
-                return i;
-            }
+    if (top == 1) {
+        chance[2] = 0x20;
+        if (mode == 0) {
+            chance[10] = 0x20;
+        } else {
+            chance[9] = 0x20;
+            chance[13] = 0x20;
         }
     }
-    return -1;
 }
-
-/* Whether the quest work is busy: either of the system block's two pre-quest flags, or a live work
- * whose record is missing or whose +0x2E8 counter is set. */
-u32 quest_work_busy_ck(void) {
-    if (system_w.field_0x7d2 == 1) {
-        return 1;
-    }
-    if (system_w.field_0x7d1 == 1) {
-        return 1;
-    }
-    if (quest_work_ptr->record_0x03C != 0) {
-        return quest_work_ptr->field_0x2E8 > 0;
-    }
-    return 1;
-}
-
-/* Whether the local slot's sub-state byte is the entry pair (6 or 7), or 4. */
-u32 quest_move_sub_state_ck(void) {
-    Q_MoveWork* work = (Q_MoveWork*)get_move_work_adrs(0);
-    u8 state;
-
-    if (work == NULL) {
-        return 0;
-    }
-    state = work->sub_0xFA;
-    if (state == 4) {
-        return 1;
-    }
-    return (u8)(state + 250) <= 1;
-}
-
-/* ---- the two entry predicates (0x803B0CD4, 0x803B0CFC) ---- */
-
-/* Whether the quest work's entry-send header has been started. */
-u32 quest_entry_active_ck(void) {
-    if (quest_work_ptr == NULL) {
-        return 0;
-    }
-    return QUEST_WORK->entry_send_0x6A3A[0] != 0;
-}
-
-/* Whether the entry may start: the header must be live and the quest's 0x800000 condition satisfied. */
-u32 quest_entry_ready_ck(void) {
-    if (quest_work_ptr == NULL) {
-        return 0;
-    }
-    if (QUEST_WORK->entry_send_0x6A3A[0] == 0) {
-        return 0;
-    }
-    if (quest_flag_800000_ck(NULL) == 0) {
-        return 0;
-    }
-    return quest_entry_active_ck();
-}
-
-/* ---- the two block copies (0x803AEB7C, 0x803AEB08) ---- */
-
-/* Copies the 8-byte slot pair a result row is built from. */
-void quest_pair_copy(Q_SlotPair* dst, const Q_SlotPair* src) {
-    *dst = *src;
-}
-
-/* Copies the 0x20-byte key block one of those rows carries. */
-void quest_element_copy(Q_ElementBlock* dst, const Q_ElementBlock* src) {
-    *dst = *src;
-}
-
-/* ---- the weighted lot-table picks (0x803AB614, 0x803AB728, 0x803AB80C) ---- */
 
 /* Walks `count` rows of `chance`, and for each row whose chance byte admits it rolls a `total`-wide
  * number into the weighted table and appends the entry the roll lands on.  The first row always
@@ -619,20 +322,42 @@ s32 quest_lot_pick(u8* chance, const Q_LotEntry* table, Q_ItemPair* out, s32 cou
     return picked;
 }
 
-/* ---- the arena pair rolls (0x803AB914, 0x803ABB74, 0x803ABCDC) ---- */
+/* The same walk for the band that gates on the row's own chance byte only. */
+s32 quest_lot_pick_last(u8* chance, const Q_LotEntry* table, Q_ItemPair* out, s32 count, u16 total) {
+    s32 picked = 0;
+    s32 i;
 
-/* Hands the local slot's item work to the pick gate for slot `idx`, or 0 when the slot has no move
- * work (or no item work) to hand over. */
-u32 quest_item_work_notify(s32 idx) {
-    Q_MoveWork* work = (Q_MoveWork*)get_move_work_adrs(0);
+    for (i = 0; i < count; i++, chance++) {
+        const Q_LotEntry* entry = table;
+        u16 roll;
+        u16 acc;
+        s32 hit;
 
-    if (work == NULL) {
-        return 0;
+        if (entry->id == 0) {
+            break;
+        }
+        if (*chance <= ((u16)ran_suu(0) & 0x1F)) {
+            break;
+        }
+        roll = (u16)ran_suu(0) % total;
+        hit = 0;
+        acc = 0;
+        while (entry->id != 0) {
+            acc += entry->weight;
+            if (acc > roll) {
+                hit = 1;
+                break;
+            }
+            entry++;
+        }
+        if (hit == 1 && entry->id != 0) {
+            out->id = entry->id;
+            out->num = (s8)entry->value;
+            out++;
+            picked++;
+        }
     }
-    if (work->item_work == NULL) {
-        return 0;
-    }
-    return quest_element_pick_ck((QuestWork*)work->item_work, (u8)idx, 1);
+    return picked;
 }
 
 /* The four-group roll: once the result row's live bit, the element state probe or the first pick gate
@@ -783,56 +508,6 @@ void quest_pair_roll_last(_PLW* owner, u8 state) {
     }
 }
 
-/* ---- the arena element builder (0x803AD008) ---- */
-
-/* Clears the element's payload, then fills it from the item work's own weighted lot table: a table of
- * 3 or 5 rows, chosen by the element's own sub-flag, and only when the caller passed the arena kind. */
-/* untyped: caller-owned context payload the target never reads */
-void quest_element_build(void* owner, u32 kind, Q_ArenaElement* element) {
-    u8 chance[6];
-    u16 total;
-    Q_LotEntry* entry;
-    s32 rows;
-
-    memset(element->payload_0x3F4, 0, sizeof(element->payload_0x3F4));
-    if ((u8)kind != 4) {
-        return;
-    }
-    {
-        Q_ItemWork* item = move_work_item_work_get();
-
-        memset(chance, 0, sizeof(chance));
-        if (element->flag_0x434 == 0) {
-            chance[0] = 32;
-            chance[1] = 22;
-            chance[2] = 12;
-            rows = 3;
-        } else {
-            chance[0] = 32;
-            chance[1] = 22;
-            chance[2] = 22;
-            chance[3] = 12;
-            chance[4] = 12;
-            rows = 5;
-        }
-        if ((u8)kind != 4) {
-            return;
-        }
-        entry = item->lot_0x9C;
-        total = 0;
-        while (entry->id != 0) {
-            total += entry->weight;
-            entry++;
-        }
-        if (total == 0) {
-            return;
-        }
-        quest_lot_pick_first(chance, item->lot_0x9C, element->payload_0x3F4, rows, total);
-    }
-}
-
-/* ---- the persisted pair-table builder (0x803ACE90) ---- */
-
 /* The same build for the band's persisted pair tables: zeroes all four, then refills the first from
  * the item work's own weighted lot table - 3, 5 or 8 rows, chosen by the element's sub-flag. */
 /* untyped: caller-owned context payload the target never reads */
@@ -889,230 +564,682 @@ void quest_element_clear(void* owner, u32 kind, Q_ArenaElement* element) {
     }
 }
 
-/* The same walk for the band that gates on the row's own chance byte only. */
-s32 quest_lot_pick_last(u8* chance, const Q_LotEntry* table, Q_ItemPair* out, s32 count, u16 total) {
-    s32 picked = 0;
-    s32 i;
+/* Clears the element's payload, then fills it from the item work's own weighted lot table: a table of
+ * 3 or 5 rows, chosen by the element's own sub-flag, and only when the caller passed the arena kind. */
+/* untyped: caller-owned context payload the target never reads */
+void quest_element_build(void* owner, u32 kind, Q_ArenaElement* element) {
+    u8 chance[6];
+    u16 total;
+    Q_LotEntry* entry;
+    s32 rows;
 
-    for (i = 0; i < count; i++, chance++) {
-        const Q_LotEntry* entry = table;
-        u16 roll;
-        u16 acc;
-        s32 hit;
-
-        if (entry->id == 0) {
-            break;
-        }
-        if (*chance <= ((u16)ran_suu(0) & 0x1F)) {
-            break;
-        }
-        roll = (u16)ran_suu(0) % total;
-        hit = 0;
-        acc = 0;
-        while (entry->id != 0) {
-            acc += entry->weight;
-            if (acc > roll) {
-                hit = 1;
-                break;
-            }
-            entry++;
-        }
-        if (hit == 1 && entry->id != 0) {
-            out->id = entry->id;
-            out->num = (s8)entry->value;
-            out++;
-            picked++;
-        }
+    memset(element->payload_0x3F4, 0, sizeof(element->payload_0x3F4));
+    if ((u8)kind != 4) {
+        return;
     }
-    return picked;
-}
+    {
+        Q_ItemWork* item = move_work_item_work_get();
 
-/* The recorded count of `kind` in the first record set, plus the live item work's copy of it.  The index
- * spelling 0x24..0x27 sums the set's four group totals instead of reading a count. */
-s32 quest_record_a_count_get(u32 kind) {
-    Q_UserData* user = get_userdata();
-    s32 recorded;
-
-    if ((u8)(kind + 0xDC) <= 3) {
-        s32 sum = user->set_a.total[0] + user->set_a.total[1];
-        sum += user->set_a.total[2];
-        sum += user->set_a.total[3];
-        recorded = sum;
-    } else {
-        recorded = user->set_a.count[(u8)kind];
-    }
-    if (move_work_state_ck() == 1) {
-        return recorded;
-    }
-    Q_ItemWork* work = move_work_item_work_get();
-    if (work == NULL) {
-        return recorded;
-    }
-    s32 live;
-    if ((u8)(kind + 0xDC) <= 3) {
-        s32 sum = work->set_c.total[0] + work->set_c.total[1];
-        sum += work->set_c.total[2];
-        sum += work->set_c.total[3];
-        live = sum;
-    } else {
-        live = work->set_c.count[(u8)kind];
-    }
-    return (u16)(recorded + live);
-}
-
-/* The same accessor for a caller that passes the index wider than a byte. */
-s32 quest_record_a_count_get_wide(s32 kind) {
-    return quest_record_a_count_get((u8)kind);
-}
-
-/* The recorded count of `kind` in the second record set, plus the live item work's copy of it. */
-s32 quest_record_b_count_get(u32 kind) {
-    Q_UserData* user = get_userdata();
-    s32 recorded;
-
-    if ((u8)(kind + 0xDC) <= 3) {
-        s32 sum = user->set_b.total[0] + user->set_b.total[1];
-        sum += user->set_b.total[2];
-        sum += user->set_b.total[3];
-        recorded = sum;
-    } else {
-        recorded = user->set_b.count[(u8)kind];
-    }
-    if (move_work_state_ck() == 1) {
-        return recorded;
-    }
-    Q_ItemWork* work = move_work_item_work_get();
-    if (work == NULL) {
-        return recorded;
-    }
-    s32 live;
-    if ((u8)(kind + 0xDC) <= 3) {
-        s32 sum = work->set_d.total[0] + work->set_d.total[1];
-        sum += work->set_d.total[2];
-        sum += work->set_d.total[3];
-        live = sum;
-    } else {
-        live = work->set_d.count[(u8)kind];
-    }
-    return (u16)(recorded + live);
-}
-
-/* The same accessor for a caller that passes the index wider than a byte. */
-s32 quest_record_b_count_get_wide(s32 kind) {
-    return quest_record_b_count_get((u8)kind);
-}
-
-/* Zeroes the first slot, then copies the item record's leading slice into it: 0x10 slots while the
- * caller's `kind` is 2 or the slot's own progress flag is set, 0x18 otherwise. */
-void quest_item_pair_copy_block(Q_ItemPair* dst, u16 id, u8 kind) {
-    dst[0].id = 0;
-    dst[0].num = 0;
-    if (id != 0xFFFF) {
-        Q_ItemPair* rec;
-        s32 flagged = 0;
-
-        if (id >= 0x64) {
-            rec = q_item_pair_tbl_high[id - 0x64];
+        memset(chance, 0, sizeof(chance));
+        if (element->flag_0x434 == 0) {
+            chance[0] = 32;
+            chance[1] = 22;
+            chance[2] = 12;
+            rows = 3;
         } else {
-            rec = q_item_pair_tbl_low[id];
-            if (quest_slot_progress_get(0) == 1) {
-                flagged = 1;
-            }
+            chance[0] = 32;
+            chance[1] = 22;
+            chance[2] = 22;
+            chance[3] = 12;
+            chance[4] = 12;
+            rows = 5;
         }
-        if (kind == 2) {
-            flagged = 1;
-        }
-        if (rec != 0) {
-            s32 n = 0x10;
-            if (flagged == 0) {
-                n = 0x18;
-            }
-            for (s32 i = 0; i < n; i++) {
-                item_pair_copy(dst, rec);
-                dst++;
-                rec++;
-            }
-        }
-    }
-}
-
-/* Copies one 8-slot row of an item record into the caller's buffer, when the row's `kind` admits it. */
-void quest_item_pair_copy_row(Q_ItemPair* dst, u16 id, s8 row, u8 kind) {
-    if (row < 1) {
-        return;
-    }
-    if (id == 0xFFFF) {
-        return;
-    }
-    if (kind == 1) {
-        if (quest_slot_progress_get(0) != 1) {
+        if ((u8)kind != 4) {
             return;
         }
-    } else if (kind != 2) {
-        return;
-    }
-    if (kind != 2 && id >= 0x64) {
-        return;
-    }
-    Q_ItemPair* rec;
-    if (id >= 0x64) {
-        rec = q_item_pair_tbl_high[id - 0x64];
-    } else {
-        rec = q_item_pair_tbl_low[id];
-    }
-    if (rec == 0) {
-        return;
-    }
-    rec += (row - 1) * 8 + 0x10;
-    dst += (row - 1) * 8 + 0x10;
-    for (s32 i = 0; i < 8; i++) {
-        item_pair_copy(dst, rec);
-        dst++;
-        rec++;
+        entry = item->lot_0x9C;
+        total = 0;
+        while (entry->id != 0) {
+            total += entry->weight;
+            entry++;
+        }
+        if (total == 0) {
+            return;
+        }
+        quest_lot_pick_first(chance, item->lot_0x9C, element->payload_0x3F4, rows, total);
     }
 }
 
-/* Copies one 4-slot cell of an item record into the caller's buffer at the cell's own offset. */
-void quest_item_pair_copy_cell(Q_ItemPair* dst, u16 id, s8 col) {
-    if (id == 0xFFFF) {
+/* Credits a finished quest's two count runs (and, for a finished row, its stat) to the save block, then
+ * clears every block of the quest result work. */
+void quest_result_work_flush(void) {
+    Q_ResultWork* result = get_qResult_work();
+    Q_MoveWork* work = (Q_MoveWork*)get_move_work_adrs(0);
+    Q_ItemWork* item;
+
+    if (work == NULL) {
         return;
     }
-    Q_ItemPair* rec;
-    if (id >= 0x64) {
-        rec = q_item_pair_tbl_high[id - 0x64];
-    } else {
-        rec = q_item_pair_tbl_low[id];
+    item = move_work_item_work_get();
+    if (work->sub_0xFA != 7) {
+        userdata_record_a_count_add(result->count_a);
+        userdata_record_b_count_add(result->count_b);
+        if (item->record_0x3C->state_0x8B == 7) {
+            userdata_quest_stat_set(&result->stat_0x3E0);
+        }
     }
-    if (rec == 0) {
-        return;
+    memset(result->count_a, 0, sizeof(result->count_a));
+    memset(result->count_b, 0, sizeof(result->count_b));
+    memset(result->block_0x0A4, 0, sizeof(result->block_0x0A4));
+    result->field_0x1E4 = 0;
+    result->field_0x1E8 = 0;
+    memset(result->block_0x304, 0, sizeof(result->block_0x304));
+    result->present_0x3A4 = 0;
+    memset(&result->stat_0x3E0, 0, sizeof(result->stat_0x3E0));
+}
+
+/* The local slot's quest phase byte (+0xE9 of the move work). */
+u8 quest_phase_get(void) {
+    Q_MoveWork* work = (Q_MoveWork*)get_move_work_adrs(0);
+
+    if (work == NULL) {
+        return 0;
     }
-    dst += col * 4 + 0x20;
-    rec += col * 4 + 0x20;
-    for (s32 i = 0; i < 4; i++) {
-        item_pair_copy(dst, rec);
-        dst++;
-        rec++;
+    return work->phase_0xE9;
+}
+
+/* Loads the carried-item pouch into the quest work: the local player's own gear in a network session, else
+ * the two runs the player's record of the third move-work array carries. */
+void quest_work_pouch_load(void) {
+    _PLW* me;
+    Q_ItemPair* src;
+    Q_UserData* user = get_userdata();
+    s32 i;
+
+    if (quest_work_ptr != NULL) {
+        me = (_PLW*)get_move_work_adrs(2);
+
+        if (me != NULL) {
+            me += (s8)my_player_no();
+
+            memset(QUEST_WORK->pouch_0x6778, 0, 0x8C);
+            if (system_w.net_session_0x90f == 1) {
+                src = (Q_ItemPair*)userdata_equip_item_slots_get(user);
+
+                for (i = 0; i < 0x18; i++, src++) {
+                    item_pair_copy(&QUEST_WORK->pouch_0x6778[i], src);
+                }
+                if ((u32)userdata_gunner_ck(user) == 1) {
+                    for (i = 0; i < 8; i++, src++) {
+                        item_pair_copy(&QUEST_WORK->pouch_0x6778[i + 0x18], src);
+                    }
+                }
+            } else {
+                memcpy(QUEST_WORK->pouch_0x6778, me->slot_id, 0x60);
+                memcpy(&QUEST_WORK->pouch_0x6778[0x18], me->spare_slot_id, 0x20);
+            }
+        }
     }
 }
 
-/* The count of the five-slot list's entry for `id`, or 0 when the list has none. */
-s16 quest_item_slot_find(Q_ItemCount* slots, u16 id) {
-    if (slots[0].id == id) {
-        return (s8)slots[0].num;
+/* Releases the monsters of every armed element (stopping early when the quest kind says the hunt is over),
+ * then loads the lobby area for the hand-off and leaves the quest play mode. */
+void quest_monsters_release(void) {
+    u8 mode;
+    Q_MoveWork* work;
+    u32 active;
+    s32 i;
+    s32 released;
+
+    if (quest_work_ptr != NULL) {
+        work = (Q_MoveWork*)get_move_work_adrs(0);
+        if (work != NULL) {
+            active = 0;
+            mode = PlayMode_ck();
+            if (quest_work_ptr != NULL && QUEST_WORK->hunt_active_0x675C != 0) {
+                active = 1;
+            }
+            if (active == 1) {
+                released = 0;
+                for (i = 0; i < 3; i++) {
+                    if (QUEST_WORK->armed_0x2D4[i] != 0) {
+                        em_kind_release(QUEST_WORK->armed_0x2D4[i]);
+                        released++;
+                        if (quest_flag_4000000_ck(NULL) == 1) {
+                            QUEST_WORK->hunt_end_0x6977 = 1;
+                            QUEST_WORK->result_kind_0x308 = 1;
+                            break;
+                        }
+                        if (quest_flag_80000000_ck(NULL) == 1) {
+                            QUEST_WORK->hunt_end_0x6977 = 1;
+                            QUEST_WORK->result_kind_0x308 = 1;
+                            break;
+                        }
+                        if (quest_flag_100_ck(NULL) == 1 && released == 2) {
+                            QUEST_WORK->hunt_end_0x6977 = 1;
+                            QUEST_WORK->result_kind_0x308 = 2;
+                            break;
+                        }
+                    }
+                }
+                if (quest_flag_4000000_ck(NULL) == 0) {
+                    if (quest_flag_100_ck(NULL) == 1) {
+                        em_kind_release(QUEST_WORK->release_kind_0x6760);
+                    } else if (QUEST_WORK->release_kind_0x6760 != 0 && released <= 1) {
+                        em_kind_release(QUEST_WORK->release_kind_0x6760);
+                    }
+                }
+                quest_area_spawn_setup(work, QUEST_WORK->area_0x69A8, QUEST_WORK->area_count_0x69A5, 0);
+                quest_area_spawn_apply(work, quest_byte_table[work->phase_0xE9], work->sub_0xEA);
+                if (mode == 6) {
+                    PlayMode_set(3);
+                }
+            }
+        }
     }
-    if (slots[1].id == id) {
-        return (s8)slots[1].num;
+}
+
+/* Re-rolls the quest work's clock words, reseeds the quest random source from them and clears the
+ * per-quest state. */
+void quest_work_start_reset(void) {
+    s32 i;
+    Q_ItemWork* work = QUEST_WORK;
+
+    if (work == NULL) {
+        return;
     }
-    if (slots[2].id == id) {
-        return (s8)slots[2].num;
+    for (i = 0; i < 15; i++) {
+        work->rand_words_0x6C[i] = (u8)ran_suu(0);
     }
-    if (slots[3].id == id) {
-        return (s8)slots[3].num;
+    quest_rand_seed_set();
+    quest_rand_next();
+    for (i = 0; i < 4; i++) {
+        work->rand_words_0x6C[i] = (u8)quest_rand_next();
     }
-    if (slots[4].id == id) {
-        return (s8)slots[4].num;
+    work->field_0x60 = 0;
+    work->field_0x5C = 0;
+    work->field_0x16 = 0;
+    work->field_0x30C = 0;
+    work->rot_0x54 = 0;
+    work->flag_0x55 = 0;
+    work->field_0x00 = 0;
+    work->field_0x01 = 0;
+    work->time_limit_0x24 = 0;
+    work->field_0x14 = 0;
+    work->armed_0x2D4[0] = 0;
+    work->slot_key_0x46C[0] = 0xFFFF;
+    work->armed_0x2D4[1] = 0;
+    work->slot_key_0x46C[1] = 0xFFFF;
+    work->armed_0x2D4[2] = 0;
+    work->slot_key_0x46C[2] = 0xFFFF;
+}
+
+/* Marks every live element as graded and derives the quest grade from which of them the bonus flag
+ * covers, then copies each finished element's value into its grade pair. */
+void quest_grade_set(void) {
+    Q_Element* e = QUEST_WORK->elements_0x94;
+    u32 bonus = 0;
+    s32 i;
+    u8 mask;
+
+    if (quest_flag_2000000_ck(NULL) == 1) {
+        bonus = 1;
     }
-    return 0;
+    mask = 0;
+    for (i = 0; i < 3; i++, e++) {
+        if ((e->flags & 1) || (e->flags & 2) || (e->flags & 0x1000) || (e->flags & 0x2000) || (e->flags & 4)) {
+            e->flags = e->flags | 8;
+            if (bonus == 1) {
+                mask = (u8)(mask | (u8)(1 << i));
+            }
+        }
+    }
+    if (bonus == 1) {
+        QUEST_WORK->grade_0x93 = quest_grade_table[mask];
+    }
+    if (quest_flag_80000000_ck(NULL) == 1) {
+        QUEST_WORK->grade_0x93 = 2;
+    }
+    {
+        Q_ItemWork* w = QUEST_WORK;
+
+        if ((w->elements_0x94[0].flags & 2) && w->elements_0x94[0].id == 0) {
+            w->grade_pair_0x68F[0].flag = 0;
+            QUEST_WORK->grade_pair_0x68F[0].value = (s8)w->elements_0x94[0].value;
+        }
+        if ((w->elements_0x94[1].flags & 2) && w->elements_0x94[1].id == 0) {
+            QUEST_WORK->grade_pair_0x68F[1].flag = 0;
+            QUEST_WORK->grade_pair_0x68F[1].value = (s8)w->elements_0x94[1].value;
+        }
+        if ((w->elements_0x94[2].flags & 2) && w->elements_0x94[2].id == 0) {
+            QUEST_WORK->grade_pair_0x68F[2].flag = 0;
+            QUEST_WORK->grade_pair_0x68F[2].value = (s8)w->elements_0x94[2].value;
+        }
+    }
+    {
+        Q_ItemWork* w = QUEST_WORK;
+
+        if ((w->elements_0x94[0].flags & 0x2000) && w->elements_0x94[0].id == 4) {
+            w->score_0x5D8 = w->elements_0x94[0].value;
+        }
+        if ((w->elements_0x94[1].flags & 0x2000) && w->elements_0x94[1].id == 4) {
+            QUEST_WORK->score_0x5D8 = w->elements_0x94[1].value;
+        }
+        if ((w->elements_0x94[2].flags & 0x2000) && w->elements_0x94[2].id == 4) {
+            QUEST_WORK->score_0x5D8 = w->elements_0x94[2].value;
+        }
+    }
+}
+
+/* Spawns the current quest work's monsters. */
+void quest_monsters_spawn_now(void) {
+    quest_monsters_spawn(QUEST_WORK);
+}
+
+/* The state byte of a result row (the current one when `rec` is NULL), 0 when there is none. */
+u8 quest_record_state_get(QuestRecord* rec) {
+    if (rec == NULL) {
+        rec = quest_record_get();
+        if (rec == NULL) {
+            return 0;
+        }
+    }
+    return rec->field_0x08B;
+}
+
+/* The index of the quest-work element `kind` names: the first of the three whose +0x00 gate bit is set
+ * and whose +0x04 id either equals `kind` or maps to the same enemy kind, or -1 when none does. */
+s32 quest_element_find(u8 kind) {
+    s32 i;
+    QuestElement* e = quest_work.elements_0x0094;
+
+    if (e == NULL) {
+        return -1;
+    }
+    for (i = 0; i < 3; i++, e++) {
+        if (e->flags & 1) {
+            if ((u32)e->id == (u32)kind) {
+                return i;
+            }
+            if (enemy_kind_same_ck((u8)e->id, kind) == 1) {
+                return i;
+            }
+        }
+    }
+    return -1;
+}
+
+/* Whether the local slot's item work has its arena item count set. */
+u32 quest_item_work_flag_ck(void) {
+    Q_MoveWork* work = (Q_MoveWork*)get_move_work_adrs(0);
+    Q_ItemWork* item;
+
+    if (work == NULL) {
+        return 0;
+    }
+    item = work->item_work;
+    if (item == NULL) {
+        return 0;
+    }
+    return (s8)item->count_0x6A2A != 0;
+}
+
+/* Copies the 0x20-byte key block one of those rows carries. */
+void quest_element_copy(Q_ElementBlock* dst, const Q_ElementBlock* src) {
+    *dst = *src;
+}
+
+/* Copies the 8-byte slot pair a result row is built from. */
+void quest_pair_copy(Q_SlotPair* dst, const Q_SlotPair* src) {
+    *dst = *src;
+}
+
+/* Clears the area handle list, loads the result row's two arena items and builds one handle per entry of
+ * its area block (at most 32). */
+void quest_area_list_init(void) {
+    Q_ResultRow* rec;
+    u8* area;
+    u8 count;
+    s32 i;
+
+    for (i = 0; i < 0x20; i++) {
+        QUEST_WORK->area_0x69A8[i] = 0;
+    }
+    rec = QUEST_WORK->record_0x3C;
+    if (rec->items_0x384[0].id == 0) {
+        QUEST_WORK->arena_items_0x6A2C[0].id = 0;
+        QUEST_WORK->arena_items_0x6A2C[0].count = 0;
+        QUEST_WORK->arena_items_0x6A2C[0].remaining = 0;
+    } else {
+        QUEST_WORK->arena_items_0x6A2C[0].id = rec->items_0x384[0].id;
+        QUEST_WORK->arena_items_0x6A2C[0].count = rec->items_0x384[0].count;
+        QUEST_WORK->arena_items_0x6A2C[0].remaining = rec->items_0x384[0].remaining;
+    }
+    if (rec->items_0x384[1].id == 0) {
+        QUEST_WORK->arena_items_0x6A2C[1].id = 0;
+        QUEST_WORK->arena_items_0x6A2C[1].count = 0;
+        QUEST_WORK->arena_items_0x6A2C[1].remaining = 0;
+    } else {
+        QUEST_WORK->arena_items_0x6A2C[1].id = rec->items_0x384[1].id;
+        QUEST_WORK->arena_items_0x6A2C[1].count = rec->items_0x384[1].count;
+        QUEST_WORK->arena_items_0x6A2C[1].remaining = rec->items_0x384[1].remaining;
+    }
+    QUEST_WORK->area_state_0x6A28 = 0;
+    QUEST_WORK->flag_0x6A29 = 0;
+    QUEST_WORK->count_0x6A2A = 0;
+    if (rec->area_ofs_0x37C != 0) {
+        area = (u8*)(rec->area_ofs_0x37C + (u32)QUEST_WORK->record_0x3C);
+    } else {
+        area = NULL;
+    }
+    count = (u8)stage_map_area_count_get(QUEST_WORK->record_0x3C->state_0x8B);
+    if ((s32)count > 32) {
+        count = 32;
+    }
+    QUEST_WORK->area_count_0x69A5 = count;
+    if (area != NULL) {
+        for (i = 0; i < count; i++) {
+            QUEST_WORK->area_0x69A8[i] = em_area_entry_make(area, 0, (u8)i);
+        }
+    }
+    QUEST_WORK->hunt_active_0x675C = 1;
+}
+
+/* Rebuilds the area handle list for entry kind `kind`, once: only while the list still waits in state 1. */
+void quest_area_list_refill(Q_ItemWork* item, u8 kind) {
+    Q_ResultRow* rec;
+    s32 i;
+    u8 count;
+    u8* area;
+
+    if ((s8)QUEST_WORK->area_state_0x6A28 == 1) {
+        rec = QUEST_WORK->record_0x3C;
+        count = (u8)stage_map_area_count_get(rec->state_0x8B);
+        if (rec->area_ofs_0x37C != 0) {
+            area = (u8*)(rec->area_ofs_0x37C + (u32)QUEST_WORK->record_0x3C);
+            for (i = 0; i < count; i++) {
+                QUEST_WORK->area_0x69A8[i] = em_area_entry_make(area, kind, (u8)i);
+            }
+            QUEST_WORK->area_state_0x6A28 = 2;
+        }
+    }
+}
+
+/* Charges one faint of `player` against the quest reward: announces it, and ends the quest when the reward
+ * is gone. */
+void quest_reward_faint_penalty(u8 player) {
+    char text[128];
+    s32 amount;
+
+    if (system_w.field_0x7d2 == 1) {
+        return;
+    }
+    if (system_w.field_0x7d1 == 1) {
+        return;
+    }
+    if (QUEST_WORK->record_0x3C == NULL) {
+        return;
+    }
+    if (QUEST_WORK->reward_0x2E8 <= 0) {
+        return;
+    }
+    if (quest_sub_state_end_ck(1) != 0) {
+        return;
+    }
+    amount = QUEST_WORK->penalty_0x2F4;
+    if (QUEST_WORK->reward_0x2E8 < amount) {
+        amount = QUEST_WORK->reward_0x2E8;
+    }
+    QUEST_WORK->reward_0x2E8 = QUEST_WORK->reward_0x2E8 - amount;
+    if (player == (s8)my_player_no()) {
+        QUEST_WORK->my_faint_count_0x92 += 1;
+    }
+    QUEST_WORK->faint_count_0x91 += 1;
+    if (isServerSelectState() == 1) {
+        if (player == (s8)my_player_no()) {
+            hud_item_msg_push(1, 2, 0);
+        } else {
+            sprintf(text, quest_entry_fmt_str, ((_PLW*)get_move_work_adrs(2))[player].user_profile_0x5CA);
+            strcat(text, quest_str_tbl_4_get(0x25));
+            hud_msg_push(0, text);
+        }
+    } else {
+        hud_item_msg_push(1, 2, 0);
+    }
+    sprintf(text, quest_str_tbl_35_get(9), amount);
+    hud_msg_push(0, text);
+    if (QUEST_WORK->reward_0x2E8 <= 0) {
+        QUEST_WORK->reward_0x2E8 = 0;
+        hud_msg_push(0, quest_str_tbl_35_get(10));
+        hud_msg_push(0, quest_str_tbl_35_get(0x13));
+        return;
+    }
+    if (player == (s8)my_player_no()) {
+        snd_quest_scene_set();
+        snd_player_mask_set(player);
+        hud_msg_push(0, quest_str_tbl_35_get(0x12));
+    }
+}
+
+/* Whether the quest work is busy: either of the system block's two pre-quest flags, or a live work
+ * whose record is missing or whose +0x2E8 counter is set. */
+u32 quest_work_busy_ck(void) {
+    if (system_w.field_0x7d2 == 1) {
+        return 1;
+    }
+    if (system_w.field_0x7d1 == 1) {
+        return 1;
+    }
+    if (quest_work_ptr->record_0x03C != 0) {
+        return quest_work_ptr->field_0x2E8 > 0;
+    }
+    return 1;
+}
+
+/* Warps the player to the quest's start position: the local one for a network quest, a fixed spot for the
+ * two arena phases, else the stage's own start. */
+void quest_start_warp(_PLW* plw) {
+    nw4r::math::VEC3 pos;
+    s32 angle;
+    Q_MoveWork* work;
+    u8 saved;
+    u8 phase;
+
+    setVec3(&pos, 0.0f, 0.0f, 0.0f);
+    work = (Q_MoveWork*)get_move_work_adrs(0);
+    if (quest_work_busy_ck() != 0) {
+        if (PlayMode_ck() == 2) {
+            saved = my_player_no();
+            my_player_no_set((s8)plw->chunk_ofs);
+            stage_area_start_get(work->sub_0xEA, &pos, &angle);
+            pl_act_stage_latch_set(my_player_work_get(), 2);
+            pl_warp_start(0xFF, &pos, (u16)angle);
+            my_player_no_set((s8)saved);
+            return;
+        }
+        phase = work->phase_0xE9;
+        if ((phase == 6 || phase == 0x11) && plw->area_0x16 == 2) {
+            pos.x = 9960.0f;
+            pos.y = 230.0f;
+            pos.z = 300.0f;
+            angle = 0xC000;
+            pl_act_stage_latch_set(my_player_work_get(), 2);
+            pl_warp_start(2, &pos, (u16)angle);
+            return;
+        }
+        stage_start_get(phase, &pos, &angle);
+        pl_act_stage_latch_set(my_player_work_get(), 2);
+        pl_warp_start(0, &pos, (u16)angle);
+    }
+}
+
+/* Enters the quest result state (sub-state 5): latches the time limit, clears the AI slots, fills the
+ * result stat and posts the kind's message. */
+void quest_result_enter(Q_ItemWork* item, Q_MoveWork* work, u8 kind) {
+    work->sub_0xFA = 5;
+    item->time_base_0x20 = item->time_limit_0x24;
+    item->step_0x2C = 2;
+    item->field_0x2D = 0;
+    quest_time_limit_set((s32)(quest_grade_ratio_10f * Screen_w.frame_scale));
+    ai_slots_clear();
+    quest_result_stat_fill(item);
+    if (kind == 1) {
+        hud_msg_push(0, quest_str_tbl_35_get(8));
+    }
+    if (kind == 2) {
+        hud_msg_push(0, quest_str_tbl_35_get(0x1E));
+    }
+    if (kind == 3) {
+        hud_msg_push(0, quest_str_tbl_35_get(0x21));
+    }
+    snd_quest_result_bgm_set();
+}
+
+/* Enters the quest start state (sub-state 3): latches the time limit and posts the entry message the
+ * quest's objective and the entry-send header select. */
+void quest_start_enter(Q_ItemWork* item, Q_MoveWork* work) {
+    u8 objective;
+    Q_ResultRow* rec;
+
+    work->sub_0xFA = 3;
+    system_copy_filter_request();
+    item->time_base_0x20 = item->time_limit_0x24;
+    item->step_0x2C = 2;
+    item->field_0x2D = 0;
+    if (work->kind_0xFC != 4) {
+        if (item->entry_send_0x6A3A[0] == 0) {
+            hud_msg_push(0, quest_str_tbl_35_get(0x17));
+        } else {
+            switch (item->entry_send_0x6A3A[1]) {
+            case 0:
+                hud_msg_push(0, quest_str_tbl_35_get(0x17));
+                break;
+            case 1:
+                hud_msg_push(0, quest_str_tbl_35_get(0x1F));
+                break;
+            case 2:
+                hud_msg_push(0, quest_str_tbl_35_get(0x20));
+                break;
+            }
+        }
+    }
+    if (work->kind_0xFC == 4) {
+        quest_time_limit_set((s32)(quest_grade_ratio_10f * Screen_w.frame_scale));
+        if (system_w.field_0x7cf == 0x15) {
+            hud_msg_push(0, quest_str_tbl_35_get(0));
+        } else {
+            hud_msg_push(0, quest_str_tbl_35_get(1));
+        }
+    } else {
+        rec = (Q_ResultRow*)quest_record_get();
+        if ((rec != NULL && (rec->flags_0x310 & 0x20000000) != 0) || (objective = quest_objective_get(NULL), objective == 1) ||
+            objective == 4) {
+            quest_time_limit_set((s32)(20.0f * Screen_w.frame_scale));
+            if (PlayMode_ck() == 2) {
+                hud_msg_push(0, quest_str_tbl_35_get(0x27));
+            } else if (system_w.field_0x7cf == 0x15) {
+                hud_msg_push(0, quest_str_tbl_35_get(2));
+            } else {
+                hud_msg_push(0, quest_str_tbl_35_get(3));
+            }
+        } else {
+            quest_time_limit_set((s32)(frames_per_second_60f * Screen_w.frame_scale));
+            if (system_w.field_0x7cf == 0x15) {
+                hud_msg_push(0, quest_str_tbl_35_get(4));
+            } else {
+                hud_msg_push(0, quest_str_tbl_35_get(5));
+            }
+        }
+    }
+    snd_quest_start_bgm_set();
+}
+
+/* Whether the quest work's entry-send header has been started. */
+u32 quest_entry_active_ck(void) {
+    if (quest_work_ptr == NULL) {
+        return 0;
+    }
+    return QUEST_WORK->entry_send_0x6A3A[0] != 0;
+}
+
+/* Whether the entry may start: the header must be live and the quest's 0x800000 condition satisfied. */
+u32 quest_entry_ready_ck(void) {
+    if (quest_work_ptr == NULL) {
+        return 0;
+    }
+    if (QUEST_WORK->entry_send_0x6A3A[0] == 0) {
+        return 0;
+    }
+    if (quest_flag_800000_ck(NULL) == 0) {
+        return 0;
+    }
+    return quest_entry_active_ck();
+}
+
+/* Whether the local slot's sub-state byte is the entry pair (6 or 7), or 4. */
+u32 quest_move_sub_state_ck(void) {
+    Q_MoveWork* work = (Q_MoveWork*)get_move_work_adrs(0);
+    u8 state;
+
+    if (work == NULL) {
+        return 0;
+    }
+    state = work->sub_0xFA;
+    if (state == 4) {
+        return 1;
+    }
+    return (u8)(state + 250) <= 1;
+}
+
+/* Steps the quest finish sequence: waits (the hunt-end wait is five seconds of frames), then respawns the
+ * quest's monster once for the session and hands over to the lobby. */
+void quest_finish_step(void) {
+    Q_ItemWork* work;
+
+    if (quest_flag_80000000_ck(NULL) == 0) {
+        return;
+    }
+    if (get_move_work_adrs(0) == NULL) {
+        return;
+    }
+    work = QUEST_WORK;
+    if (work == NULL) {
+        return;
+    }
+    switch (work->phase_0x6978) {
+    case 0:
+        work->counter_0x697C = work->counter_0x697C + 1;
+        if (work->hunt_end_0x6977 != 0) {
+            if ((f32)work->counter_0x697C < 5.0f * (frames_per_second_60f * Screen_w.frame_scale)) {
+                return;
+            }
+        }
+        if (isServerSelectState() == 1) {
+            work->phase_0x6978 = 2;
+        } else {
+            work->phase_0x6978 = 1;
+        }
+        break;
+    case 1:
+        if (isServerSelectState() == 1) {
+            if (isReadyCountOne() != 0) {
+                if (work->respawn_kind_0x321 != 0 && work->respawn_gate_0x323 == 3) {
+                    em_spawn_request(0xFFFF, work->respawn_kind_0x321, 0, 0xFF, 0xFF, 1, 1, 0, 0xFF, NULL, 0);
+                    lb_sub18_send();
+                }
+                work->phase_0x6978 = 3;
+            }
+        } else {
+            work->phase_0x6978 = 2;
+        }
+        break;
+    case 2:
+        if (work->respawn_kind_0x321 != 0 && work->respawn_gate_0x323 == 3) {
+            em_spawn_request(0xFFFF, work->respawn_kind_0x321, 0, 0xFF, 0xFF, 1, 1, 0, 0xFF, NULL, 0);
+        }
+        work->phase_0x6978 = 3;
+        break;
+    }
 }
 
 /* This unit's own `.bss` (`config/RMHE08/splits.txt`, `.bss 0x806C5558..0x806C5858`): the band's four
@@ -1141,7 +1268,18 @@ u8 quest_pair_chance_tbl_c[0x10] = {
     32, 32, 22, 22, 22, 22, 22, 22, 32, 32, 22, 22, 22, 22, 22, 22,
 };
 
-/* This unit's own `.sdata` (`splits.txt` `.sdata 0x80793600..0x80793604`): the four-byte chance
- * table `quest_pair_roll_all` copies over the head of its 16-byte roll buffer before the last two
- * picks.  The row's sole referrer is that function. */
-u8 quest_pair_chance_tbl_d[0x4] = { 32, 22, 22, 22 };
+/* This unit's own `.sbss` (`splits.txt` `.sbss 0x80794C1C..0x80794C3C`, in address order): the quest list
+ * block `quest_list_load_hunt`/`_arena` allocate (GUESS names: `quest_list_pool` is the 0x4400-byte
+ * `work_mem_alloc` block, `quest_list_values` is pool + 0x1A0 - read by `menu/arena_result.cpp`, see
+ * `quest/quest_list_values.h` - and `quest_list_file` is that + 0xE0, the `load_file` destination), then the
+ * five table pointers the roll functions read - the per-kind entry lists and the two pairs of remaining-lot
+ * tables by count (GUESS: the dump names them `em_bui_tbl`, `em_bui_rem_l/h` and `em_hokaku_rem_l/h`).  Set
+ * outside this unit. */
+u8* quest_list_file;
+u8* quest_list_pool;
+u16* quest_list_values;
+u8** em_bui_tbl;
+Q_LotEntry** em_bui_rem_l;
+Q_LotEntry** em_bui_rem_h;
+Q_LotEntry** em_hokaku_rem_l;
+Q_LotEntry** em_hokaku_rem_h;

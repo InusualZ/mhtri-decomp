@@ -11,6 +11,9 @@
 extern "C" {
 #endif
 
+/* 0x80058BB0 - request the copy filter: +0x868 becomes 1 unless it already is (the handshake's first
+ * step; `system_copy_filter_arm` follows it).  GUESS name. */
+void system_copy_filter_request(void);
 /* 0x80058EE8 - arm the system block's copy-filter handshake: it flags +0x869 only while +0x868 is
  * already 2 (i.e. the filter is preparing). */
 void system_copy_filter_arm(void);

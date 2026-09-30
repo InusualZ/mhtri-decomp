@@ -90,7 +90,7 @@ u32 fn_80278578(struct _PLW* self, s32 v);
 u32 fn_80278D1C(struct _PLW* self);
 u32 fn_80279C20(struct _PLW* self);
 u32 fn_8027AF34(struct _PLW* self);
-/* `fn_80272E30` is declared by its owner, `include/Pl/pl_skill.h` (`extern "C" s16`,
+/* `pl_item_add` is declared by its owner, `include/Pl/pl_skill.h` (`extern "C" s16`,
  * `Pl/pl_skill.cpp:1233`), which this unit includes - the `u32` copy that stood here clashed with it
  * ((10505) illegal function overloading) the moment the owner registered its declaration (rule 2). */
 s32 fn_80273228(struct _PLW* self, u16 item_id, s16 value);

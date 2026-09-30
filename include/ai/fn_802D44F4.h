@@ -29,7 +29,9 @@ typedef struct HudNotice {
 
 /* 0x802DA1A8 - stores the watched flag pointer into the slot `hud_notice_spawn` returned. */
 void hud_notice_set_flag_ptr(HudNotice* notice, u8* flag);
-void fn_802DA1B0(void* work);            /* 0x802DA1B0 */
+/* 0x802DA1B0 - clears the sixteen 0x20-byte AI slot records at 0x806BD808 (each body is a byte store); the
+ * function reads no argument.  Renamed with `quest/quest_entry.cpp`; GUESS name from that loop. */
+void ai_slots_clear(void);
 void fn_802DA344(void);                  /* 0x802DA344 */
 /* 0x802DA454 - claims a free slot of the notice pool and fills it from the arguments (kind, id, the
  * position and three mode bytes); returns the slot. */

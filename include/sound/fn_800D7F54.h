@@ -69,6 +69,10 @@ void fn_800DBDD4(void);
 /* 0x800DBC84 - stops sound effect `id`. */
 void sysSE_stop(u32 id);
 
+/* 0x800DACA8 - plays the "item could not be used" sound for the local hunter (the `fn_800F0C14` voice of its
+ * move work's +0x13C record).  GUESS name from its two callers, which raise the "cannot use" message first. */
+void snd_item_fail_play(void);
+
 #ifdef __cplusplus
 }
 

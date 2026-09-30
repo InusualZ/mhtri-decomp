@@ -141,7 +141,7 @@ void fn_80249558(_PLW* self, s32 arg1) {
 }
 
 /* 0x8024963C - the get-up handler with an item-recovery arm: on `arg2 == 1` it reads the pending
- * recovery item and feeds it to `fn_80272E30`. */
+ * recovery item and feeds it to `pl_item_add`. */
 void fn_8024963C(_PLW* self, s32 arg1, s32 arg2) {
     u16 item;
     s16 value;
@@ -161,7 +161,7 @@ void fn_8024963C(_PLW* self, s32 arg1, s32 arg2) {
         if (arg2 == 1) {
             fn_802D884C(&item, &value);
             if (Pl_motion_input_ck(1) == 0 && value > 0) {
-                fn_80272E30(self, item, value);
+                pl_item_add(self, item, value);
             }
         }
         return;
@@ -682,7 +682,7 @@ void fn_8024B868(_PLW* self, s32 arg1) {
         if (Pl_master_ck(self) == 1) {
             fn_8024D144(self);
             if (Pl_motion_input_ck(1) == 0) {
-                fn_80272E30(self, self->field_0x306, -1);
+                pl_item_add(self, self->field_0x306, -1);
                 return;
             }
         }
@@ -721,7 +721,7 @@ void fn_8024C75C(_PLW* self) {
         if (Pl_master_ck(self) == 1) {
             fn_8024D094(self);
             if (Pl_motion_input_ck(1) == 0) {
-                fn_80272E30(self, self->field_0x306, -1);
+                pl_item_add(self, self->field_0x306, -1);
             }
         }
         if (Pl_Skill_ck(self, 0xB8) == 1) {
@@ -780,7 +780,7 @@ void fn_8024C96C(_PLW* self) {
         if (Pl_master_ck(self) == 1) {
             fn_8024D094(self);
             if (Pl_motion_input_ck(1) == 0) {
-                fn_80272E30(self, self->field_0x306, -1);
+                pl_item_add(self, self->field_0x306, -1);
             }
         }
         if (Pl_Skill_ck(self, 0xB8) == 1) {

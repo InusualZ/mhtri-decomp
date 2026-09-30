@@ -108,6 +108,17 @@ void em_demo_key3_apply(struct _ENEMY_WORK* self, s16 slot, void* a, void* b);
  * `enemy/fn_80387844.cpp` (rule 2). */
 void em_demo_key_apply(struct _ENEMY_WORK* self, s16 slot, void* a, void* b, s32 c, s32 d);
 
+/* 0x80141B88 - the enemy spawn request (GUESS name).  The tenth argument is a placement `VEC3*` or null: the
+ * callee loads the outgoing stack word into r21 and hands it to `copyVec3` as the second argument when it is
+ * non-null (`enemy/fn_8015D860.cpp` passes a vector, `enemy/fn_80170600.cpp` null). */
+namespace nw4r { namespace math { struct VEC3; } }
+void em_spawn_request(u16 a, s32 b, s32 c, u8 d, u8 e, s32 f, s32 g, s32 h, s32 i, nw4r::math::VEC3* j, s32 k);
+
+/* 0x80147894 - builds the spawn handle of entry `index` of the area block `area` for the entry kind
+ * `kind` (`quest/quest_entry.cpp`'s area list stores the result).  GUESS name and signature from that
+ * call site. */
+u32 em_area_entry_make(u8* area, u8 kind, u8 index);
+
 /* 0x80143BF8 - no arguments; returns a word the effect band's slot scan compares with 1.  Added with
  * `ef/eft_slot.cpp` (rule 2: this unit owns the address). */
 u8 fn_80143BF8(void);

@@ -167,6 +167,18 @@ u32 quest_element_state_ck(void);
  * network band's staging download checks with it. */
 u32 matchesFileVersion(const u8* buffer, u16 version);
 
+struct Q_ItemWork;
+/* 0x803B5658 - fills the quest result work's stat block (+0x3E0) from the item work at the end of a hunt of
+ * a finished quest: cleared when the item work carries a stat, else the em020 hit info.  GUESS name. */
+void quest_result_stat_fill(struct Q_ItemWork* item);
+/* 0x803B5408 - the objective code of a result row (the current one when `rec` is NULL), from its +0x310
+ * flag word: 1, 9, 2, 3 or 4, and 0 while the slot is in its entry state or no row exists.  GUESS name. */
+u8 quest_objective_get(QuestRecord* rec);
+
+/* 0x803B8650 - warps the local player to the start of stage 1 (the hub): the stage's start position and
+ * facing go through `pl_warp_start` with the player's chunk offset.  GUESS name from that use. */
+void quest_warp_hub(void);
+
 #ifdef __cplusplus
 }
 #endif

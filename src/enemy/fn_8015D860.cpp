@@ -96,6 +96,7 @@
 #include "enemy/ENEMY_WORK.h"
 #include "enemy/fn_8015D860.h"
 #include "unsplit/enemy.h"
+#include "enemy/enemy_control.h" /* em_spawn_request (the owner's header, rule 2) */
 #include "unsplit/unknown.h" /* SystemWork / system_w */
 #include "ef.h"              /* VEC3_ctor */
 #include "ef/fn_80105314.h"  /* fn_801057A4 */
@@ -134,7 +135,7 @@ extern "C" u8 lbl_805A6D28[];
 /* Declared in a shared header: `em_move_mode_set`, `em_mot_set`, `em_mot_set_ck`, `em_mot_end_ck`,
  * `em_action_finish`, `em_state_set`, `fn_8013032C`, `fn_801303EC`, `fn_80130CDC`, `em_busy_timer_reset`,
  * `fn_80133BB4`, `fn_80133BC0`, `em_part_hit_set`, `fn_80136D14`, `fn_801376B4`, `fn_8013221C`,
- * `fn_80132224`, `fn_80132264`, `fn_80141B88`, `fn_8012EC3C` (`unsplit/enemy.h`);
+ * `fn_80132224`, `fn_80132264`, `em_spawn_request`, `fn_8012EC3C` (`unsplit/enemy.h`);
  * `fn_80128A8C`, `fn_80128AAC`, `em_hit_window_set`, `fn_801280F4` (`enemy/fn_801251D0.h`);
  * `fn_8012D1A0` (`enemy/fn_8012BDF4.h`); `em_res_user_data_ck`, `em_res_user_data_set` (`enemy/fn_80138074.h`);
  * `em_res_user_data_ctor` (`enemy/fn_80147CE0.h`); `VEC3_ctor` (`ef.h`); `fn_801057A4`
@@ -338,7 +339,7 @@ extern "C" void fn_8015DB68(_ENEMY_WORK* self, u8 arg, u8 sub) {
           case 8:
             if (fn_8012D1A0(self) == 1) {
                 get_joint_wpos_em(self, 0x14, &v2);
-                fn_80141B88(self->field_0x01A, 0x21, 0, self->area_no, 0xFF, 1, 0xFF, 1, 0xFF,
+                em_spawn_request(self->field_0x01A, 0x21, 0, self->area_no, 0xFF, 1, 0xFF, 1, 0xFF,
                             &v2, 0);
             }
             break;

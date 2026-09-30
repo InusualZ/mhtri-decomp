@@ -95,7 +95,7 @@ typedef signed char s8;
 typedef float f32;
 typedef double f64;
 
-/* nw4r::math::VEC3, the type fn_80051490/fn_80050EDC and this unit's three vector locals use. */
+/* nw4r::math::VEC3, the type assignVec3/fn_80050EDC and this unit's three vector locals use. */
 typedef struct {
     f32 x; /* +0x0 */
     f32 y; /* +0x4 */
@@ -129,7 +129,7 @@ namespace nw4r { namespace db { void Panic(const char* file, int line, const cha
  * (fn_8009C484__FP4Vec3P4Vec3) and it no longer pairs (relocaudit). */
 extern "C" {
 extern void fn_8009C484(Vec3* dst, Vec3* src);
-extern void fn_80051490(Vec3* dst, const Vec3* src);
+extern void assignVec3(Vec3* dst, const Vec3* src);
 extern f32 fn_80050EDC(const Vec3* v);
 extern f32 fn_800A8A08(const void* p);
 extern u16 fn_800A9FB0(u32 a, u16 b, f32 f, void* em);
@@ -202,14 +202,14 @@ void fn_800C9DD0(u32 a, Vec3* b, Vec3* c, Em* em, Pm* pm, u16 d, f32 f, u32 e)
     }
 
     fn_8009C484(c, c);
-    fn_80051490(&v1, b);
+    assignVec3(&v1, b);
     if (fn_80050EDC(&v1) <= lbl_80796240) {
         v1.x = fn_800A8A08(&em->field_0xEC) * lbl_80796244 - lbl_80796248;
         v1.y = fn_800A8A08(&em->field_0xEC) * lbl_80796244 - lbl_80796248;
         v1.z = fn_800A8A08(&em->field_0xEC) * lbl_80796244 - lbl_80796248;
     }
     fn_8009C484(&v1, &v1);
-    fn_80051490(&v2, b);
+    assignVec3(&v2, b);
     v2.y = lbl_8079624C;
     if (fn_80050EDC(&v2) <= lbl_80796240) {
         v2.x = fn_800A8A08(&em->field_0xEC) * lbl_80796244 - lbl_80796248;

@@ -19,6 +19,7 @@
 /* The owner's header for `menu_cursor_step` (0x802A8EFC, the menu range `menu/menu_message.cpp` owns): the
  * declaration lives there now and this header re-exports it (docs/plan.md 6.5 rule 2). */
 #include "menu/menu_message.h"
+#include "fn_80047398/userdata_gunner_ck.h"   /* userdata_gunner_ck (rule 2) */
 
 /* The 2D integer vector the lobby/HUD helpers exchange (`_mh_ivec2_` in the map's mangling).
  * size: 0x4 */
@@ -166,7 +167,6 @@ void fn_80273998(LbPage* page, s32 kind, u8 value);
 u8 fn_802738B8(u8 index);
 void fn_80223258(LbPage* page, u8 value);
 u32 fn_8004D70C(s32 id);
-s32 fn_8004AEC0(LbWorldBlock* world);
 void fn_802DB140(u16* rows, s16 a, s16 b, u16 c, const _mh_ivec2_* pos);
 void sprite_frame_apply(_SPR_DATA_* spr, u32 id, u8 flag, s32 arg);
 void fn_8004A20C(LbIconRec* dst, const LbIconRec* src);

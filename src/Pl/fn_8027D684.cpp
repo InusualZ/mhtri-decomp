@@ -149,7 +149,7 @@ extern "C" void fn_8027D76C(_PLW* self) {
         self->act_end_request = 1;
         s16 timer = self->field_0x652;
         if (Pl_item_timer_get(self, self->field_0x650) >= timer) {
-            fn_80272E30(self, self->field_0x650, -timer);
+            pl_item_add(self, self->field_0x650, -timer);
         }
     }
 }

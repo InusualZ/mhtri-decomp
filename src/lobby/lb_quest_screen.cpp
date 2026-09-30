@@ -53,7 +53,7 @@
  *
  * RESIDUAL / NEXT PASS.
  *   - 12 of the 95 functions are written (the note-pane head).  The 83 unwritten ones carry 25620 of
- *     27220 `.text` bytes; the biggest are `fn_803A3A50` 0x694, `fn_803A8128` 0x5C4, `fn_803A5B60`
+ *     27220 `.text` bytes; the biggest are `fn_803A3A50` 0x694, `quest_area_spawn_apply` 0x5C4, `fn_803A5B60`
  *     0x4FC, `fn_803A96C4` 0x4B8, `fn_803A5680` 0x4A8, `fn_803A52A8` 0x3A8, `fn_803A6A48` 0x394,
  *     `fn_803A8994` 0x3B8, `fn_803A79C0` 0x318.
  *   - the lobby screen band (0x803A52A4..0x803A75D8) is BLOCKED on a view merge, not on effort: it

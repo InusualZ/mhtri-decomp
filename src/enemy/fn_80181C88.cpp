@@ -86,8 +86,8 @@
  *    `enemy/fn_801D428C.cpp`/`enemy/fn_801DB8E0.cpp` call sites.
  *
  * fn_80182B94 seals its four table entries with the `copyVec3` 0xC-byte copy (mh3_pad.h) rather
- * than the target's `fn_80051490`: the target's reloc pairs identically in the report metric (both
- * measured 81.40 %) and declaring `fn_80051490` in its owner header collides with the
+ * than the target's `assignVec3`: the target's reloc pairs identically in the report metric (both
+ * measured 81.40 %) and declaring `assignVec3` in its owner header collides with the
  * `Vec*`-spelling locals in `ef/ef_cylinder.cpp` (a pre-existing rule-2 conflict, not this unit's).
  */
 #include "types.h"

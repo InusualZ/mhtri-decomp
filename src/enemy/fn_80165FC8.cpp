@@ -157,10 +157,10 @@ void fn_80166330(void) {
 
     /* `setVec3` returns its first argument (the retail call site keeps it in r4 across the `bl`), so
      * the cast back to the callee's `VEC3*` costs no instruction. */
-    fn_80051490(&vec_pair_80165FC8_0[0], (VEC3*)setVec3(&v0, lbl_80797330, lbl_80797338, lbl_80797330));
-    fn_80051490(&vec_pair_80165FC8_0[1], (VEC3*)setVec3(&v1, lbl_80797330, lbl_807974EC, lbl_80797330));
-    fn_80051490(&vec_pair_80165FC8_1[0], (VEC3*)setVec3(&v2, lbl_80797330, lbl_80797330, lbl_80797330));
-    fn_80051490(&vec_pair_80165FC8_1[1], (VEC3*)setVec3(&v3, lbl_80797330, lbl_807974EC, lbl_80797330));
+    assignVec3(&vec_pair_80165FC8_0[0], (VEC3*)setVec3(&v0, lbl_80797330, lbl_80797338, lbl_80797330));
+    assignVec3(&vec_pair_80165FC8_0[1], (VEC3*)setVec3(&v1, lbl_80797330, lbl_807974EC, lbl_80797330));
+    assignVec3(&vec_pair_80165FC8_1[0], (VEC3*)setVec3(&v2, lbl_80797330, lbl_80797330, lbl_80797330));
+    assignVec3(&vec_pair_80165FC8_1[1], (VEC3*)setVec3(&v3, lbl_80797330, lbl_807974EC, lbl_80797330));
 }
 
 u32 fn_801663E4(_ENEMY_WORK* self) {

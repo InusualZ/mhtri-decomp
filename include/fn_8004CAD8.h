@@ -9,9 +9,19 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "fn_8004CAD8/mtx.h" /* MTX34_ctor / set_slot_none - the two this unit's consumers share */
+#include "fn_8004CAD8/get_qResult_work.h" /* get_qResult_work (leaf header) */
 
 #ifdef __cplusplus
 void wii_sysmsg_gen(long id, char* buf, long a);
+
+/* 0x8004D140 - the quest-result record accessor this range owns (`get_qResult_work__Fv`, a
+ * 12-byte `lis`/`addi`/`blr` over the 0x438 B `qResult` buffer `src/fn_8004CAD8.cpp` defines).
+ * Added with `menu/menu_result.cpp`, whose whole band reads the record (rule 2: the declaration
+ * belongs with the owner, which had not declared it yet - `src/lobby/fn_801F9CD4.cpp` carried a
+ * local copy of this spelling). */
+/* (C++ scope: the owner defines it without `extern "C"`, so the map row is the mangling and the
+ * declaration reproduces it - `quest/quest_entry.cpp`'s relocations name `get_qResult_work__Fv`.  It is
+ * declared in the leaf header `fn_8004CAD8/get_qResult_work.h`, included below the guard.) */
 
 /* The 0x100 B VS user block `get_vsUser_work` indexes (the two slots at 0x8066A620/0x8066A720).
  * The block's own name is the mangling's (`ck_mydata_vs__FP13_vs_user_dataP13_vs_user_data`), so a
@@ -72,12 +82,6 @@ u16 get_hunter_rank_max(const u8* block);
  * `extern "C"` region (rule 2: added with `menu/multi_result.cpp`, its second consumer). */
 void score_add_clamped(s32 delta, s32* value);
 u32 fn_80051570(u32);
-/* 0x8004D140 - the quest-result record accessor this range owns (`get_qResult_work__Fv`, a
- * 12-byte `lis`/`addi`/`blr` over the 0x438 B `qResult` buffer `src/fn_8004CAD8.cpp` defines).
- * Added with `menu/menu_result.cpp`, whose whole band reads the record (rule 2: the declaration
- * belongs with the owner, which had not declared it yet - `src/lobby/fn_801F9CD4.cpp` carried a
- * local copy of this spelling). */
-void* get_qResult_work(void);
 /* 0x8005220C - an 8-byte `fabs f1,f1; blr` helper (caller: `gx/fn_8009ACE4.c`, rule 2: this range
  * owns the address). */
 f32 fn_8005220C(f32 value);
@@ -280,6 +284,22 @@ void vec_to_mh_vec3(VEC3* dst, struct Vec* src);
  * `clear_FqResult_work__Fv` and `clear_qResult_work__Fv`.  Added with `quest/arenatask.cpp` (rule 2). */
 void clear_FqResult_work(void);
 void clear_qResult_work(void);
+#endif
+
+#ifdef __cplusplus
+/* The save block's quest-stat record (16 bytes), copied whole by `quest_stat_copy`; `quest/quest_entry.h`
+ * names its fields. */
+struct Q_QuestStat;
+extern "C" {
+/* 0x8004E434 / 0x8004E484 - add 41 halfword counts into the save block's record set a (+0x39C0) / b
+ * (+0x3AC0), each clamped to 9999.  Names are GUESSes from the destination sets. */
+void userdata_record_a_count_add(const u16* counts);
+void userdata_record_b_count_add(const u16* counts);
+/* 0x8004E700 - stores a quest stat into the save block's own record (+0x3F28). */
+void userdata_quest_stat_set(const Q_QuestStat* src);
+/* 0x8004E710 - copies one 16-byte quest stat. */
+void quest_stat_copy(Q_QuestStat* dst, const Q_QuestStat* src);
+}
 #endif
 
 #endif /* MHTRI_FN_8004CAD8_H */

@@ -58,6 +58,7 @@
 #include "sound/fn_800D7F54.h"
 #include "fn_8004CAD8.h"
 #include "fn_80047398.h"
+#include "enemy/em_pop.h"   /* quest_flag_10_ck (rule 2: its owner) */
 
 /* The `sprintf`/`strcpy`/`strcat` family sits in an address band whose bracketing registered units
  * name different modules, so rule 2's home for them is `include/unsplit/*.h`'s documented gap and
@@ -127,7 +128,7 @@ BOOL q_result_work_clear(QResultScreen* self)
 u32 q_result_file_ready(QResultScreen* self)
 {
     (void)self;
-    return fn_803B5030(0) == 1;
+    return quest_flag_10_ck(0) == 1;
 }
 
 /* The `ready_flag` gate `fn_80396F34` switches on. */
@@ -146,14 +147,14 @@ u8 q_result_swap_counter_get(QResultScreen* self)
 u32 q_result_phase_is_2(QResultScreen* self)
 {
     (void)self;
-    return ((QResultWork*)get_qResult_work())->field_0x1E2 == 2;
+    return get_qResult_work()->phase_0x1E2 == 2;
 }
 
 /* Whether the result record reports load phase 3 (loaded). */
 u32 q_result_phase_is_3(QResultScreen* self)
 {
     (void)self;
-    return ((QResultWork*)get_qResult_work())->field_0x1E2 == 3;
+    return get_qResult_work()->phase_0x1E2 == 3;
 }
 
 /* Latches the one-shot `init_flag` at +0x3027. */
@@ -216,7 +217,7 @@ void q_result_page_step_b(QResultScreen* self)
  * phase waits for, and the return says the phase may advance. */
 BOOL q_result_phase_ck(QResultScreen* self, u8 mode)
 {
-    QResultWork* q = (QResultWork*)get_qResult_work();
+    Q_ResultWork* q = get_qResult_work();
 
     switch (mode) {
     case 0:
@@ -241,7 +242,7 @@ BOOL q_result_phase_ck(QResultScreen* self, u8 mode)
         }
         break;
     case 3:
-        if (q->field_0x3A4 == 0) {
+        if (q->present_0x3A4 == 0) {
             return FALSE;
         }
         if (q_result_phase_is_3(self) == 1) {
@@ -256,7 +257,7 @@ BOOL q_result_phase_ck(QResultScreen* self, u8 mode)
         }
         break;
     case 6:
-        if (q->field_0x1E0 < 10000) {
+        if (q->progress_0x1E0 < 10000) {
             return FALSE;
         }
         if (q_result_phase_is_3(self) == 1) {

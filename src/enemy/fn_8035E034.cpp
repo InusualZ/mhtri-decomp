@@ -58,6 +58,7 @@
 #include "enemy.h"
 #include "unsplit/unknown.h"
 #include "unsplit/enemy.h"
+#include "enemy/enemy_control.h" /* em_spawn_request (the owner's header, rule 2) */
 #include "fn_8004CAD8.h"
 #include "enemy/fn_801251D0.h"
 #include "enemy/fn_8012EC74.h"
@@ -672,8 +673,8 @@ extern "C" void fn_8035F178(_ENEMY_WORK* self, u8 a, u8 b)
             s[0] = 0;
             s[1] = (u32)((ran_suu(0) & 0xFF) << 8);
             s[2] = 0;
-            fn_80141B88(self->field_0x01A, 0x1A, 4, self->act_id, 0xFF, 1, 0x20, 1,
-                        0xFF, (void*)&self->pos, (s32)s);
+            em_spawn_request(self->field_0x01A, 0x1A, 4, self->act_id, 0xFF, 1, 0x20, 1,
+                        0xFF, &self->pos, (s32)s);
             self->init_0x320.field_0x32A = 0xF0;
         }
         break;
@@ -682,8 +683,8 @@ extern "C" void fn_8035F178(_ENEMY_WORK* self, u8 a, u8 b)
             s[0] = 0;
             s[1] = (u32)((ran_suu(0) & 0xFF) << 8);
             s[2] = 0;
-            fn_80141B88(self->field_0x01A, 0x1A, 5, self->act_id, 0xFF, 1, 0x20, 1,
-                        0xFF, (void*)&self->pos, (s32)s);
+            em_spawn_request(self->field_0x01A, 0x1A, 5, self->act_id, 0xFF, 1, 0x20, 1,
+                        0xFF, &self->pos, (s32)s);
             self->init_0x320.field_0x32A = 0xF0;
         }
         break;

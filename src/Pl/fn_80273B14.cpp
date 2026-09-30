@@ -591,7 +591,7 @@ s32 fn_80274624(struct _PLW* plw)
 }
 
 /* Latches the act's follow-up stage and arms its two-frame hold. */
-void fn_80274748(struct _PLW* plw, s8 stage)
+void pl_act_stage_latch_set(struct _PLW* plw, s8 stage)
 {
     if (Pl_master_ck(plw) != 0) {
         plw->field_0x01F = stage;
@@ -621,9 +621,9 @@ s8 fn_80274808(struct _PLW* plw)
 }
 
 /* The player's own move work record. */
-void* fn_80274810(void)
+struct _PLW* my_player_work_get(void)
 {
-    return (u8*)get_move_work_adrs(2) + (s8)my_player_no() * 0xB20;
+    return (struct _PLW*)((u8*)get_move_work_adrs(2) + (s8)my_player_no() * 0xB20);
 }
 
 /* The first move work record whose slot byte differs from this player's. */

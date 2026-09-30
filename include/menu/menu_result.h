@@ -21,20 +21,7 @@
 #define MHTRI_MENU_MENU_RESULT_H
 
 #include "types.h"
-
-/* The quest-result record `get_qResult_work()` returns (the owner's buffer is 0x438 B). Only the
- * bytes this unit reads are named. size: 0x438 */
-typedef struct QResultWork {
-    /* +0x000 */ u8 pad_0x000[0x100 - 0x000];
-    /* +0x100 */ s32 field_0x100;      /* the band's `fn_80396F34` gate: `> 0` */
-    /* +0x104 */ u8 pad_0x104[0x1E0 - 0x104];
-    /* +0x1E0 */ u16 field_0x1E0;      /* compared against 10000 (`0x2710`) */
-    /* +0x1E2 */ u8 field_0x1E2;       /* the load phase: 2 while loading, 3 when done */
-    /* +0x1E3 */ u8 pad_0x1E3[0x3A4 - 0x1E3];
-    /* +0x3A4 */ u8 field_0x3A4;       /* a "records present" flag */
-    /* +0x3A5 */ u8 pad_0x3A5[0x3DE4 - 0x3A5];
-    /* +0x3DE4 */ u16 field_0x3DE4;
-} QResultWork; /* size: 0x438 */
+#include "quest/quest_result_work.h"   /* Q_ResultWork: the one view of the 0x438-byte quest result record (rule 1) */
 
 /* The 0x350C-byte work buffer `QResultScreen::work` points at; only its first byte is read here.
  * size: 0x350C */
@@ -113,7 +100,6 @@ extern u8 system_w[];
 /* `get_qResult_work()` comes from its owner's header, `fn_8004CAD8.h`, which this unit includes. */
 
 void fn_802DF6E4(u16 sprite_id);
-s32 fn_803B5030(void* unused);
 void q_result_font_print_row(s16 row, s32 flag, s32 sub, u8 sprite_id);
 void q_result_page_set(QResultScreen* self, s32 mode);
 

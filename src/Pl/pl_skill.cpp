@@ -77,7 +77,7 @@
  *   - the walk over a record's three skill ids must index the typed array (`rec->skill_id[i]`), not step a
  *     byte pointer: the typed form is what keeps the record in the target's register (r29) and closes the
  *     old `mr r28, r29` placement residual.
- *   - fn_80272E30's "skip the second lookup when the spare-slot one resolved" is a single-iteration
+ *   - pl_item_add's "skip the second lookup when the spare-slot one resolved" is a single-iteration
  *     `for (;;)` with `break` (rule 8; the label chain it replaces measured the same 100 %).
  *   - fn_80273044 / fn_80273228's 24-entry slot scan has to be a *flat* `for (i = 0; i < 24; i++)` over
  *     `plw->slot_id[i]`, not the nested 3x8: MWCC unrolls the flat form eight-wide under an `mtctr 3` outer
@@ -103,10 +103,10 @@
  * Other load-bearing shapes, from the earlier pass:
  *   - A helper's narrow return type is *not* trusted sign-extended, so it decides where MWCC re-emits the
  *     conversion: `item_take` must return `s16` (the `(u32)(s16)v` tests then keep their own `extsh` and
- *     the two 8/24-slot call blocks stay separate) and fn_80272E30 must return `s16` for `return v` to stay
+ *     the two 8/24-slot call blocks stay separate) and pl_item_add must return `s16` for `return v` to stay
  *     a bare `mr`. fn_802724E8's `a` and 7th parameter are signed-byte typed (`s8*`, `s8 aval`) - as `u8`
  *     it masks the level the target passes raw - and fn_8027252C's third parameter follows it to `s8*`.
- *   - fn_80272E30's `case 4` compares `plw->unk26E` against the *first* slot lookup, not the resolved one;
+ *   - pl_item_add's `case 4` compares `plw->unk26E` against the *first* slot lookup, not the resolved one;
  *     only `case 0` and the 1-3 block use the resolved slot.
  *   - fn_8027252C's locals are declared `tv, tb, ta` - that order fixes both the stack slots (0x20/0x18/
  *     0x10) and the register order (r7/r8/the table pointer/ta). Its value loop has to be
@@ -1230,7 +1230,7 @@ extern "C" void fn_80272B10(_PLW* plw, s32 slot) {
 }
 
 /* Resolves the equipment slot for a changed slot and re-selects the skill to display. */
-extern "C" s16 fn_80272E30(_PLW* plw, u16 item, s16 value) {
+extern "C" s16 pl_item_add(_PLW* plw, u16 item, s16 value) {
     u8* data = GetItemData__FUs(item);
     u16 cur = fn_80273044(plw, item);
     s16 v;
