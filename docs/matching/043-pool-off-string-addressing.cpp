@@ -1,10 +1,10 @@
-/* Demo for idea 43: Retail's per-string lis/addi addressing means the unit was built without string pooling
- * FLAGS: -O4,p -inline auto -str reuse
+/* Demo for idea 43: `-pool off` does not remove @stringBase0 - dropping `pool` from `-str` does
+ * FLAGS: -O4,p -inline auto -str reuse,pool -pool off
  * MWCC: Wii/1.3
- * EXPECT: absent @stringBase0          no shared string base symbol
- * EXPECT: count lis 2 in greet         one lis/addi pair per string
- * EXPECT: size greet 0x34
- * EXPECT: section .data 0x18           the pool itself is still emitted (two 12-byte strings)
+ * EXPECT: contains @stringBase0        `-pool off` is on the line, the shared string base is still there
+ * EXPECT: count lis 1 in greet         one lis for both strings (compile with `-str reuse` alone and it is two lis + two addi)
+ * EXPECT: size greet 0x3c
+ * EXPECT: section .data 0x18           the two strings' pool
  */
 extern "C" {
 
