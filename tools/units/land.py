@@ -364,6 +364,8 @@ def land_subject(units):
         cat = "tools/" + (parts[1] if len(parts) > 1 else "tools")
     elif lo == "docs":
         cat = "docs/" + (parts[1][:-3] if len(parts) > 1 and parts[1].endswith(".md") else (parts[1] if len(parts) > 1 else "docs"))
+    elif lo == "configure.py":
+        cat = "config/flags"
     elif lo == "config":
         base = parts[-1]
         cat = "config/" + {"symbols.txt": "symbols", "splits.txt": "splits", "configure.py": "flags"}.get(base, "config")
@@ -3063,6 +3065,8 @@ def selftest() -> int:
     # to the fixture, not this checkout), so its verdict is the convention's, not a stub's restatement.
     check("a unit under src/ composes a game/<module> subject",
           land_subject(["Network/network_transport"]), "game/network: land Network/network_transport")
+    check("subject: a batch of configure.py alone is config/flags, not a game member",
+          land_subject(["configure.py"]), "config/flags: land configure.py")
     check("a tool path composes the grouping category",
           land_subject(["tools/units/land.py"]), "tools/units: land tools/units/land.py")
     check("no units still yields a conventional subject",
