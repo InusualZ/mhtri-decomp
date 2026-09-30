@@ -430,6 +430,15 @@ must be brought current before landing.
 * **A `src/**` block is never unioned.** Source is one writer per file (R5). Unioning a `src/` block is how a
   marker-free file — one that happens not to carry conflict markers — is silently **skipped** and left at
   `main`'s version, taking the branch's work with it.
+* **A GENERATED file is regenerated, never merged.** `docs/matching/index.md` and everything under
+  `.claude/skills/mwcc-unit-matching/references/matching/` are outputs (of `sync_playbook_index.py` and
+  `sync_reference.py`). A conflict in one is resolved by taking either side and running
+  `python tools/agents/sync_playbook_index.py && python .claude/skills/mwcc-unit-matching/scripts/sync_reference.py`
+  (then `python tools/agents/ideas.py check`), never by union - a union leaves an index row for an idea file that
+  the other side renamed. `mergebranch.py` has no per-class hook for it: its resolver is a multi-stage merge over
+  facts with an owner, and a regeneration class would need a generator call inside the merge plus its own fixture,
+  which is not small. Two branches that each ran `ideas.py new` can take the same id: `ideas.py check` names the
+  duplicate, and the later landing gives its new file the next free id (a cited id is never renumbered).
 * **The rule-2 address sweep.** Because a declaration belongs with the unit that owns the symbol (§6.5 of the
   plan), a merge that moves a symbol's ownership must sweep the *references* by **address**, not by name — the
   asm dump is stale and the name may not have moved with the address.
