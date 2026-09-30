@@ -1052,6 +1052,25 @@ def render_references(payload: dict) -> str:
     return "\n".join(lines)
 
 
+def fixpoint_cli(unit: str, root: str = ROOT, as_json: bool = False) -> int:
+    """`--unit U --fixpoint`: claim, re-judge, repeat (`datagap.fixpoint_plan`) and print the converged plan or the
+    exact blocker. Read-only; `root` defaults to this tool's tree (a read-only look at another tree is `--root`)."""
+    from units import datagap as datagap_mod  # noqa: PLC0415 - the strict row's own reading
+
+    unit = os.path.splitext(unit.replace("\\", "/"))[0]
+    for line in datagap_mod.render_freshness("this tree's", datagap_mod.tree_freshness(root)):
+        print(line, file=sys.stderr)
+    fp = datagap_mod.fixpoint_plan(root, unit)
+    if as_json:
+        out = {k: v for k, v in fp.items() if k not in ("plans", "final", "text")}
+        out["blockers"] = [{k: v for k, v in b.items() if k != "pairs"} | {"pairs": len(b["pairs"])}
+                           for b in fp["blockers"]]
+        sys.stdout.write(json.dumps(out, indent=1, sort_keys=True, default=list) + "\n")
+    else:
+        sys.stdout.write(datagap_mod.render_fixpoint(fp) + "\n")
+    return 0 if fp["converged"] else 1
+
+
 def reference_cli(unit: str, as_json: bool = False, dry_run: bool = False) -> int:
     unit = os.path.splitext(unit.replace("\\", "/"))[0]
     if dry_run:
@@ -1472,6 +1491,32 @@ def selftest() -> int:
           reference_record("Pl/pl_act", rec("t", ".data", 0x2000, 0x8), 8, "map", None, None, [], None,
                            {}, strong)["seam_warning"], None)
 
+    # `--unit U --fixpoint`: the converged plan (or the blocker) over a fixture tree, read-only
+    import contextlib
+    import io
+    from units import datagap as dg  # noqa: PLC0415
+
+    with tempfile.TemporaryDirectory() as tmp:
+        def put(rel, text):
+            path = os.path.join(tmp, rel)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(text)
+
+        put("config/RMHE08/splits.txt", "Sections:\n\t.text type:code align:32\n\n"
+            "A/a.cpp:\n\t.text start:0x80010000 end:0x80010004\n\t.data start:0x805E1000 end:0x805E1010\n")
+        put("config/RMHE08/symbols.txt", "a1 = .data:0x805E1000; // type:object size:0x4\n"
+            "near = .data:0x805E1010; // type:object size:0x4\n")
+        os.makedirs(os.path.join(tmp, "build", "RMHE08", "obj", "A"), exist_ok=True)
+        dg.build_fixture_object(os.path.join(tmp, "build", "RMHE08", "obj", "A", "a.o"), ["near"])
+        buf, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(err):
+            code = fixpoint_cli("A/a", tmp)
+        out = buf.getvalue()
+        check("--fixpoint prints the converged plan and exits 0", (code, "converged after 1 claim step(s)" in out,
+                                                                   "+ .data       start:0x805E1000 end:0x805E1014" in out),
+              (0, True, True))
+
     if fails:
         print("FAIL (%d)" % len(fails))
         for failure in fails:
@@ -1491,6 +1536,11 @@ def main() -> int:
                     help="rule 12: the data symbols unit U references but does not own, with a "
                          "recommended remedy and the exact splits.txt text to paste (read-only; "
                          "splits.txt is never written)")
+    ap.add_argument("--fixpoint", action="store_true",
+                    help="with --unit: apply each plan to an in-memory splits.txt and re-judge until the plan is stable; "
+                         "prints the converged plan or the exact blocker (exit 1 when it does not converge)")
+    ap.add_argument("--root", default=ROOT, metavar="TREE",
+                    help="--fixpoint: the tree to read (default: this tool's tree; read-only either way)")
     ap.add_argument("--dry-run", action="store_true", dest="dry_run",
                     help="assert the reference listing is read-only (the default and only mode)")
     ap.add_argument("--queue-unit", default=None, metavar="U",
@@ -1504,6 +1554,8 @@ def main() -> int:
     if args.selftest:
         return selftest()
 
+    if args.unit and args.fixpoint:
+        return fixpoint_cli(args.unit, args.root, as_json=args.json)
     if args.unit:
         return reference_cli(args.unit, as_json=args.json, dry_run=args.dry_run)
 

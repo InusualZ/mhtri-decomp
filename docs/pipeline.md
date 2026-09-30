@@ -447,6 +447,13 @@ refuses a batch, names the row that refused, and the landing either passes every
   more data; the key was already address-based, so renames are not the cause) whose block is `pool-synth` /
   `isolated-run` / `span-blocked` / `ambiguous-owner` is printed "deferred ... a new pair" and not refused
   (`classify_pairs` is the one classification both halves read); a new pair in a refusable block still refuses.
+  **A span never covers another unit's read (2026-09-30):** the unit's existing claim is the main block even when it
+  carries no pair (dropping it made a far run "main" and the plan spanned foreign data - `enemy/fn_80147CE0`'s
+  `REPLACE .data out to 0x805A1368`, `quest_entry`'s `Cyclic dependency`); every other block is `span-blocked`, printed
+  "blocked by <unit> reads <symbol> (<addr>)" with NO plan line. `dataclaim.py --unit <unit> --fixpoint [--root <tree>]`
+  applies each plan to an in-memory `splits.txt` and re-judges until stable (converged plan or exact blocker). A pair
+  that appears only with `--base-root` is named by `datagap.py --row`: `EXPOSED BY THE CLAIM` (the unit's newly claimed
+  data carries relocations to it) or a WARNING when base objects do not match their unit's claims (stale census).
   Units with refusable pairs are `data-claim` backlog items
   (`backlog.py`, weight = pair count) that `triage` closes when the rule stops refusing the unit.
 * **A committed scratch file refuses the batch** (`.tmp_dg.json`): remove it on the branch, never `--no-outbox`.
