@@ -2500,17 +2500,17 @@ def main(argv=None) -> int:
                            if failed else "PASS"))
         return 1 if failed else 0
     if args.pool_seams:
-        census = poolseams.load_census(args.root, True)
+        pool_census = poolseams.load_census(args.root, True)
         if args.json:
             with open(args.json, "w", encoding="utf-8") as fh:
-                json.dump(census, fh, indent=1, default=list)
+                json.dump(pool_census, fh, indent=1, default=list)
             print(f"wrote {args.json}")
         if args.unit:
             for unit in args.unit:
-                group = poolseams.group_of(census, unit)
+                group = poolseams.group_of(pool_census, unit)
                 print("\n".join(poolseams.render_group(group)) if group else f"{unit}: no pool-sharing group")
             return 0
-        print(poolseams.render_census(census, min(args.top, 25)))
+        print(poolseams.render_census(pool_census, min(args.top, 25)))
         return 0
     if args.census:
         ranges = load_claims(args.root)
