@@ -105,9 +105,10 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 89 | [Perturbation probe](089-perturbation-probe.md) | ruled-out | source-shape, allocator | The slot outcome is sensitive to IR shape (level 4 flips the frame). Deliberately perturb one independent statement, watch whether `subL[29]` coalesces, then look for the natural source form that produces the same... |
 | 90 | [Absorb `dw` / `CAMELLIA_RL1` IR shape](090-absorb-rl1-ir-shape.md) | ruled-out | source-shape, allocator | The level-4 near-miss changes exactly this chain, and it is the only region whose IR shape demonstrably moves the frame. Rewrites here (temps, ordering, expression form) are the highest-probability remaining lever. |
 
-## Not tried yet (2)
+## Not tried yet (3)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
 | 91 | [Pragma combination search](091-pragma-combination-search.md) | todo | pragma, flags | With the level-4 pragma the frame is correct and only a 12-row window differs; a pragma that suppresses the level-4 reorder would finish the job. |
 | 92 | [Level-4 pragma + window source forms](092-level4-window-source-forms.md) | todo | pragma, allocator, source-shape | The window is 12 rows of register choice plus `CAMELLIA_RL1` placement; a source form that makes level 4 emit the target order there would be a 100 % match. |
+| 93 | [A Type_name(Type* self) free function is a member: define Type::name and rename the map row to the mangling](093-type-name-type-self.md) | todo | source-shape, symbols | A function is spelled Type_name(Type* self, ...) and its map row is the unmangled Type_name - the compiler will mangle the real member (name__<len>Type...), so the retail symbol reads as a member the source never... |

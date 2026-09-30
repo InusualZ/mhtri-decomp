@@ -433,8 +433,13 @@ def selftest() -> int:
     check("lint_counts: the other rules are not backlog",
           bl.lint_counts([{"rule": r, "file": "src/a.c", "line": 1} for r in (1, 3, 4, 5, 6, 8, 9, 10)]), {})
     check("the lint item kinds are declared once", sorted(bl.LINT_KINDS),
-          ["band-header", "naming", "untyped"])
-    check("the lint item rules are fixed", bl.LINT_RULES, {"naming": 7, "band-header": 2, "untyped": 11})
+          ["band-header", "method", "naming", "untyped"])
+    check("the lint item rules are fixed", bl.LINT_RULES,
+          {"naming": 7, "band-header": 2, "untyped": 11, "method": 13})
+    check("lint_counts: rule 13 aggregates under `method`",
+          bl.lint_counts([{"rule": 13, "file": "src/e.cpp", "line": 3}]), {("method", "src/e.cpp"): 1})
+    check("the debt-claim kinds are unchanged (a method item is a lane item, not a name claim)",
+          bl.DEBT_KINDS, ("naming", "band-header"))
     check("a lint item keeps the new kind and a stable defect (the key survives a partial fix)",
           [(i.kind, i.target, i.defect) for i in bl.build_items(
               obx, notes, os.path.join(tmp, "x"), {},
@@ -547,6 +552,63 @@ def selftest() -> int:
                                        status="open", default_status="open", ask="x"),
                          {"splits": bl._splits_ranges(ldir)})[0], "open")
     check("a tree with no src/ contributes no lint items", bl.collect_lint_items(tmp), [])
+
+    # --- the `method` kind (rule 13): one item per file, weight = the finding count, triage re-lints ----
+    mdir = tempfile.mkdtemp(prefix="backlog-method-")
+    for d in ("src/mod", "include/mod", "config/RMHE08", ".pi/outbox", ".pi/notes"):
+        os.makedirs(os.path.join(mdir, d))
+    open(os.path.join(mdir, "configure.py"), "w", encoding="utf-8").write("config.libs = [\n]\n")
+    for cfg in ("symbols.txt", "splits.txt"):
+        open(os.path.join(mdir, "config", "RMHE08", cfg), "w", encoding="utf-8").write("")
+    open(os.path.join(mdir, "include", "mod", "tcp.h"), "w", encoding="utf-8", newline="\n").write(
+        "struct Tcp {\n    int a;\n};\nint Tcp_get(Tcp* self);\nint Tcp_put(Tcp* self, int v);\n")
+    open(os.path.join(mdir, "src", "mod", "tcp.cpp"), "w", encoding="utf-8", newline="\n").write(
+        '#include "mod/tcp.h"\nint Tcp_get(Tcp* self) {\n    return self->a;\n}\n'
+        "int Tcp_put(Tcp* self, int v) {\n    self->a = v;\n    return v;\n}\n")
+    mit = {(i.kind, i.target): i for i in bl.collect_lint_items(mdir)}
+    check("the method source files one item per file carrying rule 13",
+          sorted(k for k in mit if k[0] == "method"), [("method", "include/mod/tcp.h"), ("method", "src/mod/tcp.cpp")])
+    check("a method item's weight is the finding count (the .cpp: definition x2)",
+          mit[("method", "src/mod/tcp.cpp")].weight, 2)
+    check("... and the header's: declaration x2", mit[("method", "include/mod/tcp.h")].weight, 2)
+    check("a method item carries no name list (the finding count is the work, like `untyped`)",
+          mit[("method", "src/mod/tcp.cpp")].names, [])
+    check("the method ask names the rule, the fix and the marker",
+          all(w in mit[("method", "src/mod/tcp.cpp")].ask for w in ("rule-13", "methodize.py", "free:")), True)
+    check("a method item is open by default and its defect is stable",
+          (mit[("method", "src/mod/tcp.cpp")].status, mit[("method", "src/mod/tcp.cpp")].defect), ("open", "rule 13"))
+    check("a method item is not claimable as a name-debt item (names empty)",
+          bl.debt_items(list(mit.values())), [])
+    check("a method item is a fixer lane",
+          bl.lane_task(mdir, mit[("method", "src/mod/tcp.cpp")])["agent"], "fixer")
+    check("the summed weight lists the method debt",
+          bl.weight_sums(list(mit.values())).get("method"), 4)
+    mreg = os.path.join(mdir, ".pi", "backlog.json")
+    bl.write_register(mdir, list(mit.values()), "", {"open": 2, "done": 0, "parked": 0, "total": 2},
+                      {"claims": [], "ratio": 1}, mreg)
+    mm, mme = bl._check_lint(mdir, mit[("method", "src/mod/tcp.cpp")], {"splits": {}})
+    check("triage: a method item stays open while rule 13 fires", mm, "open")
+    check_true("... naming the live count", "rule-13" in (mme or ""))
+    open(os.path.join(mdir, "src", "mod", "tcp.cpp"), "w", encoding="utf-8", newline="\n").write(
+        '#include "mod/tcp.h"\n/* free: retail C linkage, the dump names it unmangled */\n'
+        "int Tcp_get(Tcp* self) {\n    return self->a;\n}\n"
+        "/* free: SDK C struct */\nint Tcp_put(Tcp* self, int v) {\n    self->a = v;\n    return v;\n}\n")
+    mm2, mme2 = bl._check_lint(mdir, mit[("method", "src/mod/tcp.cpp")], {"splits": {}})
+    check("triage: the method item resolves once every declaration is marked", mm2, "resolved")
+    check_true("... and says it re-linted the file", "re-linted" in (mme2 or ""))
+    open(os.path.join(mdir, "src", "mod", "tcp.cpp"), "w", encoding="utf-8", newline="\n").write(
+        '#include "mod/tcp.h"\nint Tcp::get() {\n    return a;\n}\n')
+    check("triage: a member definition resolves it too",
+          bl._check_lint(mdir, mit[("method", "src/mod/tcp.cpp")], {"splits": {}})[0], "resolved")
+    mdec, _ = bl.triage(mdir, outbox=bl.outbox_dir(mdir), notes=bl.notes_dir(mdir),
+                        tooling_register=os.path.join(mdir, "none.md"), register=mreg)
+    check("triage classifies the carried .cpp method item as resolved and the header item as open",
+          sorted((it.target, d) for it, d, _ in mdec if it.kind == "method"),
+          [("include/mod/tcp.h", "open"), ("src/mod/tcp.cpp", "resolved")])
+    # the credit arithmetic does not care what kind an item is
+    check("a method item earns one credit when done, like any item",
+          bl.ledger_summary([bl.Item(kind="method", target="src/x.cpp", defect="rule 13", status="done",
+                                     default_status="open", ask="a")], [])["earned"], 1)
 
     # --- (a) the weight is distinct names, not occurrences ------------------------------------------
     # The owner's ruling: a landing is refused only for a name NEW to the file, so the register must

@@ -931,6 +931,9 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
     lines.append("return `void *` - name the real type, or mark the declaration")
     lines.append("`/* untyped: <byte range|opaque handle|caller-owned payload> */`; a cast in a body is not")
     lines.append("a finding, and `grep -rn \"untyped:\" src include` lists every exemption).")
+    lines.append("**Rule 13**: a `<Type>_<name>(<Type>* self, ...)` free function is `Type::name` spelled the C way -")
+    lines.append("write the member (the map row then carries the mangling; `tools/units/methodize.py <Type>` prints")
+    lines.append("the plan), or mark a genuine C function `/* free: <retail C linkage evidenced|SDK C struct> */`.")
     _precommit_lines(lines)
     if b["handoff"]["claimed"]:
         lines.append("* `%s` - the outbox `land.py`'s gate reads. It is named after your claim's branch "
@@ -1339,6 +1342,9 @@ def render_proposal(main: str, b: dict, task: str | None, pool: bool = False) ->
     lines.append("return `void *` - name the real type, or mark the declaration")
     lines.append("`/* untyped: <byte range|opaque handle|caller-owned payload> */`; a cast in a body is not")
     lines.append("a finding, and `grep -rn \"untyped:\" src include` lists every exemption).")
+    lines.append("**Rule 13**: a `<Type>_<name>(<Type>* self, ...)` free function is `Type::name` spelled the C way -")
+    lines.append("write the member (the map row then carries the mangling; `tools/units/methodize.py <Type>` prints")
+    lines.append("the plan), or mark a genuine C function `/* free: <retail C linkage evidenced|SDK C struct> */`.")
     _precommit_lines(lines)
     if b["handoff"]["claimed"]:
         lines.append("* `%s` - the outbox `land.py`'s gate reads. It is named after your claim's branch, so"

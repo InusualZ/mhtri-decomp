@@ -2396,7 +2396,12 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
                      "register a named data-only unit when several units read the pool - "
                      "`python tools/units/dataclaim.py --unit <unit>` prints the claim. A rule-12 "
                      "addition a landing must take now, with the claim already scheduled, is accepted "
-                     "by `--allow-rule12 <token>` (recorded in the landing log).")
+                     "by `--allow-rule12 <token>` (recorded in the landing log). Rule 13 refuses a "
+                     "`<Type>_<name>(<Type>* self, ...)` free function (a member spelled the C way): "
+                     "declare `name` in the class, define `Type::name`, rename the map row to the "
+                     "mangling and sweep the call sites (`python tools/units/methodize.py <Type>` prints "
+                     "the plan), or mark a genuine C function `/* free: <retail C linkage evidenced|SDK "
+                     "C struct> */` on the declaration.")
     else:
         check("style lint (§6.5)", True, info="not built yet (roadmap 7.21) - skipped")
 
