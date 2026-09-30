@@ -161,6 +161,11 @@ struct NetworkSingleTcp : public NetworkSocketUser {
     NetworkPeerMcs* peers_10[4];  /* +0x10..+0x1F - the peers registered on it */
     u8  recv_20[0x2400];             /* +0x20..+0x241F */
     u32 recvUsed_2420;               /* +0x2420 - bytes received */
+
+    s32 add(NetworkPeerMcs* peer);
+    void remove(NetworkPeerMcs* peer);
+    s32 send(const u8* data, s32 size);
+    s32 getError();
 };   /* size: 0x2424 */
 
 /* `NetworkMultipleUdp`: one socket shared by up to four peers, each with its own address at +0x0E and
@@ -177,6 +182,12 @@ struct NetworkMultipleUdp : public NetworkSocketUser {
     u8  received_602[4][0x1770];     /* +0x602..+0x63C1 - each peer's queued bytes */
     u8  pad_63C2[0x02];              /* +0x63C2..+0x63C3 */
     s32 used_63C4[4];                /* +0x63C4..+0x63D3 - bytes queued per peer */
+
+    void remove(const NetworkPeerAddress* address);
+    void reset(s32 peerIndex);
+    s32 send(s32 peerIndex, const u8* data, s32 size);
+    s32 receive(s32 peerIndex, u8* out, s32 capacity);
+    s32 getError();
 };   /* size: 0x63D4 (approximation - see above) */
 
 /* ---------------- the peers ------------------------------------------------------------------- */

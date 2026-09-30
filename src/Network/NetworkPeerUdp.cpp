@@ -98,9 +98,9 @@ s32 NetworkPeerUdp::send(const u8* data, s32 size, const u8* data2, s32 size2, s
     if (getNetworkLogger()->flag_48(prefix) == 0 && getNetworkLogger()->flag_48(prefix2) == 0) {
         return 0;
     }
-    result = NetworkMultipleUdp_send(this->udp_14, this->peerIndex_10, networkUdpPacketBuffer, total);
+    result = this->udp_14->send(this->peerIndex_10, networkUdpPacketBuffer, total);
     if (result < 0) {
-        s32 error = NetworkMultipleUdp_getError(this->udp_14);
+        s32 error = this->udp_14->getError();
         networkPeerError_set(this, (const void*)NETWORK_ERROR_PEER_SEND, getAvailableToRead(this->udp_14), error);
         result = -1;
     }
@@ -127,9 +127,9 @@ s32 NetworkPeerUdp::receive(u8* out, s32* size, u8* out2, s32* size2, u8* kind)
         networkPeerError_set(this, (const void*)NETWORK_ERROR_UDP_UNATTACHED, 0, 0);
         return -1;
     }
-    received = NetworkMultipleUdp_receive(this->udp_14, this->peerIndex_10, networkUdpPacketBuffer, 0x5DC);
+    received = this->udp_14->receive(this->peerIndex_10, networkUdpPacketBuffer, 0x5DC);
     if (received < 0) {
-        s32 error = NetworkMultipleUdp_getError(this->udp_14);
+        s32 error = this->udp_14->getError();
         networkPeerError_set(this, (const void*)NETWORK_ERROR_PEER_RECEIVE, getAvailableToRead(this->udp_14), error);
         return -1;
     }
@@ -173,7 +173,7 @@ s32 NetworkPeerUdp::move()
         networkPeerError_set(this, (const void*)NETWORK_ERROR_UDP_UNATTACHED, 0, 0);
         return -1;
     }
-    NetworkMultipleUdp_reset(this->udp_14, this->peerIndex_10);
+    this->udp_14->reset(this->peerIndex_10);
     return 1;
 }
 
@@ -195,7 +195,7 @@ void NetworkPeerUdp::reset()
         networkPeerError_set(this, (const void*)NETWORK_ERROR_UDP_UNATTACHED, 0, 0);
         return;
     }
-    NetworkMultipleUdp_reset(this->udp_14, this->peerIndex_10);
+    this->udp_14->reset(this->peerIndex_10);
 }
 
 /* Deleting destructor: chains the base destructor, then frees on request. */
