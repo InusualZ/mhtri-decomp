@@ -107,7 +107,8 @@
  * unit's symbol, so the sweep is theirs to take): `fn_802E1C74` and `fn_802E29F4` call
  * `uv_pair_copy` (`fn_8004CAD8.cpp`, 16 referrer lines in 5 files, 66 call sites in the DOL);
  * `fn_802E2D84` calls `fn_802A2550` (`menu/menu_item.cpp`, 3 referrer lines); the two font-order
- * entries call `fn_802A9508`/`fn_802A9630`/`fn_802A9558` (`menu/fn_802A6624.cpp`, 11 call sites) and
+ * entries call `menu_text_center_x`/`menu_text_center_x_by_gaps`/`menu_text_block_center_x`
+ * (`menu/menu_message.cpp`, already renamed there; 11 call sites) and
  * `fn_802E21C0` also `fn_8005C8F0` (`g3d/g3d_anmchr.cpp`, 4 call sites); `fn_802E23D0` calls
  * `fn_802E0AD4` (this unit's own row, but 44 referrer lines across 8 files).  `fn_802E2440`,
  * `fn_802E2524`, `fn_802E4798`/`fn_802E4828`, the four 0x802E33B4-family layout entries and

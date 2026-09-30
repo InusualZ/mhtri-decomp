@@ -101,8 +101,9 @@ struct ItemDataRecord {
                                        * out of the `unused_0x003[2]` filler this record carried, one
                                        * byte at +0x004, so no member's offset moved (playbook 56). */
     /* +0x005 */ u8 kind;             /* indexes the .data colour table `lbl_805CDE78` */
-    /* +0x006 */ u8 unused_0x006[0x00A - 0x006];
-    /* +0x00A */ u16 species;         /* indexes the .data record table `lbl_805DBFB8` */
+    /* +0x006 */ u16 sort_order_0x006; /* the high half of the key `item_pair_sort_key` orders a list by */
+    /* +0x008 */ u8 unused_0x008[0x00A - 0x008];
+    /* +0x00A */ u16 species;        /* indexes the .data record table `lbl_805DBFB8` */
     /* +0x00C */ s32 field_0x00C;      /* the value `eft052_item_half_get` halves (added by
                                        * `ef/eft052.cpp`) */
     /* +0x010 */ u32 field_0x010;      /* the per-item value `eft052_item_value_get` hands back (added by the
@@ -161,20 +162,20 @@ struct MenuEntry {
 };
 
 /* The 0x0C-byte list-scroll work record embedded in a `MenuSlot` at +0x1A4: the two cursors (`row`,
- * `col`) the menu band's scroller (`fn_802A9368`) moves by a button word, clamped against the row
+ * `col`) the menu band's scroller (`menu_scroll_step`) moves by a button word, clamped against the row
  * and column counts, plus the `move_flags` word it sets for the frame and the two option-card
  * colours.  `menu/menu_item_page.cpp` is the record's own reader (`item_page_fill_rows` reads the counts and
  * the cursor pair); the fields it does not touch keep their offsets.
  * size: 0x0C (its own byte run: `MenuSlot`'s +0x1A4 pad and this record's +0x0C end agree) */
 struct MenuScroll {
-    /* +0x000 */ u16 unused_0x000;
-    /* +0x002 */ u8 rows_per_page;    /* the row count `fn_802A9368` clamps `row` against */
+    /* +0x000 */ u16 index;          /* the flat entry index: `row + rows_per_page * col` */
+    /* +0x002 */ u8 rows_per_page;    /* the row count `menu_scroll_step` clamps `row` against */
     /* +0x003 */ u8 row;             /* the row cursor */
     /* +0x004 */ u8 col;             /* the column cursor */
     /* +0x005 */ u8 row_limit;       /* the row count the cursor is bounded by */
     /* +0x006 */ u8 col_count;       /* the column count `col` wraps at */
-    /* +0x007 */ u8 field_0x007;     /* `fn_802A9368` copies it into `row_limit` at the last column */
-    /* +0x008 */ u16 move_flags;     /* the move bits `fn_802A9368` ORs in (1/2/4/8) */
+    /* +0x007 */ u8 field_0x007;     /* `menu_scroll_step` copies it into `row_limit` at the last column */
+    /* +0x008 */ u16 move_flags;     /* the move bits `menu_scroll_step` ORs in (1/2/4/8) */
     /* +0x00A */ s8 light_colour;    /* the option card's light colour */
     /* +0x00B */ s8 dark_colour;     /* its dark colour */
 };
@@ -228,10 +229,10 @@ struct MenuSlot {
     /* +0x19C */ u8 unused_0x19C[0x19E - 0x19C];
     /* +0x19E */ u16 field_0x19E;     /* the value `menu/menu_item.cpp`'s view calls `field_0x19E` */
     /* +0x1A0 */ u8 field_0x1A0;      /* the column the equipment panel puts the cursor in */
-    /* +0x1A1 */ s8 field_0x1A1;      /* its row (`fn_802A8F14` resolves the height into it) */
+    /* +0x1A1 */ s8 field_0x1A1;      /* its row (`menu_page_count` resolves the height into it) */
     /* +0x1A2 */ u8 field_0x1A2;
     /* +0x1A3 */ u8 field_0x1A3;
-    /* +0x1A4 */ MenuScroll scroll;   /* the list-scroll cursors `fn_802A9368` moves */
+    /* +0x1A4 */ MenuScroll scroll;   /* the list-scroll cursors `menu_scroll_step` moves */
     /* +0x1B0 */ u8 field_0x1B0;
     /* +0x1B1 */ u8 unused_0x1B1[0x1EC - 0x1B1];
     /* +0x1EC */ u8 field_0x1EC[0x1F0 - 0x1EC];  /* the embedded selection cursor */

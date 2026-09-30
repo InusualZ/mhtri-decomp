@@ -19,6 +19,7 @@
 #define MHTRI_LOBBY_FN_8020C588_H
 
 #include "types.h"
+#include "menu/menu_message.h"
 
 /* The `.bss` lobby work block (`lobby_w`, 0x806AAB44, 0x17C bytes in the map).  The two in-use player
  * slots sit on a 10-byte stride from +0x84; the rest of the record belongs to the band's other units.
@@ -102,9 +103,8 @@ s16 fn_80212724(u8* table, s16 count, u32 value);
 /* ------------------------------------------------------------------ *
  * Foreign callees
  *
- * Declared here (this unit's header) because no header of theirs does it yet - `toggle_word_step_dpad` and
- * `fn_803768F8` have no owner at all, `fn_801E9888`/`fn_801E9C58`'s owner (`src/lobby/fn_801E7530.cpp`)
- * has no header, and `fn_8021F238`/`fn_80220114`'s owner (`src/lobby/fn_8021E1EC.cpp`) does not declare
+ * Declared here (this unit's header) because no header of theirs does it yet - `fn_803768F8` has no owner at all,
+ * `fn_801E9888`/`fn_801E9C58`'s owner (`src/lobby/fn_801E7530.cpp`) has no header, and `fn_8021F238`/`fn_80220114`'s owner (`src/lobby/fn_8021E1EC.cpp`) does not declare
  * them.  Recorded as config_requests; the argument types are the ones the callees' own bodies show.
  * ------------------------------------------------------------------ */
 
@@ -117,7 +117,6 @@ s32 game_ready_ck(void);
 void fn_801E9888(void);
 void fn_801E9C58(void);
 void fn_80220114(void);
-void toggle_word_step_dpad(void* self, u16 value, s32 a, s32 b);  /* untyped: the callers pass their own `s32 stepper_*` / `u32` state word */
 void fn_802FF2C0(void);
 u32 fn_803768F8(void);
 }

@@ -107,7 +107,7 @@ u32 item_page_colour_table[4] = {0x704A34E6, 0x787D28E6, 0x467873E6, 0x3C7291E6}
 /* 0x80349DD8: re-runs the row build for a scroll record the caller just scrolled, if it moved. */
 extern "C" void item_page_scroll_rows(MenuScroll* scroll, MenuEntry* rows, u16 buttons)
 {
-    fn_802A9368(scroll, buttons, 6);
+    menu_scroll_step(scroll, buttons, 6);
     if (scroll->move_flags != 0) {
         fn_80349C9C(scroll, rows);
     }
@@ -164,7 +164,7 @@ extern "C" void item_page_update_rows(MenuSlot* slot, u16 buttons)
     MenuScroll* scroll = &slot->scroll;
 
     if (slot->field_0x002 != 0xA) {
-        fn_802A9368(scroll, buttons, 6);
+        menu_scroll_step(scroll, buttons, 6);
         if (scroll->move_flags != 0) {
             item_page_fill_rows(slot);
         }

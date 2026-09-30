@@ -160,6 +160,7 @@
  */
 
 #include "types.h"
+#include "id_value.h"
 #include "menu/menu_item.h"
 #include "Pl/pl_act.h"
 #include "unsplit/unknown.h"
@@ -240,12 +241,6 @@ typedef struct MENU_ITEM_SLOT {
     /* +0x03 */ u8 unused_0x03[0x15];
 } MENU_ITEM_SLOT;
 
-/* One 4-byte entry of the two lists `fn_802A9DE0` indexes (stride 4, `self` +0x194/+0x198). */
-typedef struct MENU_ITEM_ENTRY {
-    /* +0x00 */ u16 id;      /* the item id `GetItemData`/`fn_802D72EC` resolve */
-    /* +0x02 */ s16 value;   /* the amount `fn_802A6438` compares against */
-} MENU_ITEM_ENTRY; /* size: 0x4 */
-
 /* The item record `GetItemData` hands back.  Only the two bytes this range tests are named.
 
 /* The sprite-data block the `draw_font`/`draw_sprite` family takes by reference: only the colour word
@@ -282,8 +277,8 @@ typedef struct MENU_ITEM_W {
     /* +0x06C */ MENU_ITEM_SLOT slots_0x06C[12]; /* the run to +0x18C (12 x 0x18) */
     /* +0x18C */ u32 field_0x18C;  /* the pick-state word `toggle_word_step_dpad` advances (its low byte is the state `fn_802A9F48` draws) */
     /* +0x190 */ _PLW* plw;         /* the player work record the item list acts on */
-    /* +0x194 */ MENU_ITEM_ENTRY* page_0x194; /* the first page's entries */
-    /* +0x198 */ MENU_ITEM_ENTRY* page_0x198; /* the second page's entries (see `two_page`) */
+    /* +0x194 */ IdValue* page_0x194; /* the first page's entries */
+    /* +0x198 */ IdValue* page_0x198; /* the second page's entries (see `two_page`) */
     /* +0x19C */ u16 field_0x19C;   /* the key word `menu_cursor_column_step` is handed */
     /* +0x19E */ u16 field_0x19E;   /* its output word */
     /* +0x1A0 */ u8 grid_w;         /* the grid's column count */
@@ -295,7 +290,7 @@ typedef struct MENU_ITEM_W {
     /* +0x1B1 */ u8 flag_0x1B1;
     /* +0x1B2 */ u16 field_0x1B2;
     /* +0x1B4 */ s16 field_0x1B4;
-    /* +0x1B6 */ s16 cursor;        /* the cursor `fn_802A91AC` moves */
+    /* +0x1B6 */ s16 cursor;        /* the cursor `menu_cursor_page_move` moves */
     /* +0x1B8 */ s16 cursor_max;    /* its bound */
     /* +0x1BA */ s8 item_cursor;    /* the entry cursor (`items_0x1BE`) */
     /* +0x1BB */ u8 item_count;     /* how many entries `items_0x1BE` holds */
@@ -307,7 +302,7 @@ typedef struct MENU_ITEM_W {
     /* +0x1E6 */ s8 field_0x1E6;    /* the entry index `fn_802A6438` re-tests */
     /* +0x1E7 */ u8 field_0x1E7;    /* whether that entry may be picked (its high bit colours the row) */
     /* +0x1E8 */ u8 pad_0x1E8[0x50];
-    /* +0x238 */ u16 move_result_0x238;/* which button last moved the cursor (`fn_802A91AC` writes it) */
+    /* +0x238 */ u16 move_result_0x238;/* which button last moved the cursor (`menu_cursor_page_move` writes it) */
     /* +0x23A */ u8 timer_0x23A;    /* the draw's cooldown, counted up to 3 */
     /* +0x23B */ u8 pad_0x23B[0x01];
 } MENU_ITEM_W;
@@ -330,13 +325,10 @@ s32 menu_list_names_set(MENU_ITEM_W* self, u8 index);
 void menu_cursor_column_step(void* key);
 void menu_frame_entries_build(void* page_a, void* page_b, s8 rows, s32 id, s32 flag);
 void menu_frame_draw_page(void* page, void* slots, s8 cols, s8 rows, u16 timer, u32 flags);
-s32 toggle_word_step_dpad(void* key, u16 keys, s32 a, s32 b);  /* untyped: the callers pass their own `s32 stepper_*` / `u32` state word */
-s32 fn_802A91AC(s16* cursor, s16 max, u16 keys, u16 held, u16* changed);
-void fn_802A9BB8(void* page_a, void* page_b);
 void fn_802A9BCC(_PLW* plw, void* page_a, void* page_b);
-u8 fn_802A9D50(MENU_ITEM_W* self, s16 index);
-u32 fn_802A9D78(MENU_ITEM_W* self, u16 item_id, s16 index);
-MENU_ITEM_ENTRY* fn_802A9DE0(MENU_ITEM_W* self, s16 index);
+u8 menu_slot_index_is_page_b(MENU_ITEM_W* self, s16 index);
+u32 menu_item_slot_accepts(MENU_ITEM_W* self, u16 item_id, s16 index);
+IdValue* menu_slot_get(MENU_ITEM_W* self, s16 index);
 void fn_802A9F48(u8 value, u16 kind, s8* text, const _mh_ivec2_* pos, s32 flag);
 void fn_802AA0DC(void* panel, s32 index, const _mh_ivec2_* pos);
 void fn_802E2358(_SPR_DATA_* spr, s8* text, u32 length, const _mh_ivec2_* pos);
@@ -381,8 +373,8 @@ extern "C" s32 fn_802A5444(MENU_ITEM_W* self) {
 
     switch (self->phase) {
     case 0:
-        switch (fn_802A91AC(&self->cursor, self->cursor_max, self->field_0x004, self->field_0x008,
-                            &self->move_result_0x238)) {
+        switch (menu_cursor_page_move(&self->cursor, self->cursor_max, self->field_0x004, self->field_0x008,
+                                      &self->move_result_0x238)) {
         case 1:
             if (mode == 1) {
                 sysSE_req(0);
@@ -441,7 +433,7 @@ extern "C" s32 fn_802A5444(MENU_ITEM_W* self) {
             result = 2;
             break;
         }
-        plw->field_0x650 = fn_802A9DE0(self, (s16)((s8)self->grid_row + (s8)self->grid_col * (s8)self->grid_w))->id;
+        plw->field_0x650 = menu_slot_get(self, (s16)((s8)self->grid_row + (s8)self->grid_col * (s8)self->grid_w))->id;
         plw->field_0x652 = self->cursor;
         plw->pad_0x654[0] = 1;
         self->flag_0x1BC = 0;
@@ -495,8 +487,8 @@ extern "C" s32 fn_802A579C(MENU_ITEM_W* self) {
 
     switch (self->phase) {
     case 0:
-        switch (fn_802A91AC(&self->cursor, self->cursor_max, self->field_0x004, self->field_0x008,
-                            &self->move_result_0x238)) {
+        switch (menu_cursor_page_move(&self->cursor, self->cursor_max, self->field_0x004, self->field_0x008,
+                                      &self->move_result_0x238)) {
         case 1:
             self->phase = 1;
             sysSE_req(0);
@@ -513,7 +505,7 @@ extern "C" s32 fn_802A579C(MENU_ITEM_W* self) {
         s16 cell = (s16)((s8)self->grid_row + (s8)self->grid_col * (s8)self->grid_w);
         plw = self->plw;
         plw->field_0x655 = self->items_0x1BE[0];
-        plw->field_0x650 = fn_802A9DE0(self, cell)->id;
+        plw->field_0x650 = menu_slot_get(self, cell)->id;
         plw->field_0x652 = self->cursor;
         plw->pad_0x654[0] = 1;
         self->flag_0x1BC = 0;
@@ -556,7 +548,7 @@ extern "C" s32 fn_802A598C(MENU_ITEM_W* self) {
     MENU_ITEM_W* unused_self = self;
     s32 result = 0;
     u16 keys = (u16)(self->field_0x004 | (self->field_0x008 & 0xF));
-    MENU_ITEM_ENTRY* entry;
+    IdValue* entry;
     u8 mode;
     s32 pick;
     s8 index;
@@ -573,7 +565,7 @@ extern "C" s32 fn_802A598C(MENU_ITEM_W* self) {
             switch (toggle_word_step_dpad(&self->field_0x18C, keys, 1, 2)) {
             case 1:
                 if (self->menu_kind == 2) {
-                    fn_802A9BB8(self->page_0x194, self->page_0x198);
+                    item_pages_sort(self->page_0x194, self->page_0x198);
                 } else {
                     fn_802A9BCC(self->plw, self->page_0x194, self->page_0x198);
                 }
@@ -624,7 +616,7 @@ extern "C" s32 fn_802A598C(MENU_ITEM_W* self) {
         break;
 
     case 1:
-        entry = fn_802A9DE0(self, (s16)((s8)self->grid_row + (s8)self->grid_col * (s8)self->grid_w));
+        entry = menu_slot_get(self, (s16)((s8)self->grid_row + (s8)self->grid_col * (s8)self->grid_w));
         if (entry->id == 0) {
             self->state = 0;
             break;
@@ -742,7 +734,7 @@ extern "C" void fn_802A5E64(MENU_ITEM_W* self) {
     u32 two_page;
     _mh_ivec2_ pos;
     _SPR_DATA_ spr;
-    MENU_ITEM_ENTRY* entry;
+    IdValue* entry;
     MENU_MOVE_WORK* move_work;
     u8 item;
     s32 i;
@@ -754,7 +746,7 @@ extern "C" void fn_802A5E64(MENU_ITEM_W* self) {
     if (self->field_0x19E & 8) {
         flags |= 16;
     }
-    two_page = fn_802A9D50(self, (s16)((s8)self->grid_w * (s8)self->grid_col));
+    two_page = menu_slot_index_is_page_b(self, (s16)((s8)self->grid_w * (s8)self->grid_col));
 
     switch (self->state) {
     case 0:
@@ -796,7 +788,7 @@ extern "C" void fn_802A5E64(MENU_ITEM_W* self) {
             if (two_page == 0) {
                 break;
             }
-            entry = fn_802A9DE0(self, self->field_0x1E6);
+            entry = menu_slot_get(self, self->field_0x1E6);
             if (entry->id == 0) {
                 break;
             }
@@ -935,7 +927,7 @@ extern "C" s32 fn_802A6434(_PLW* plw) {
 
 /* Re-tests the entry the cursor sits on and records whether it may be picked. */
 extern "C" u32 fn_802A6438(MENU_ITEM_W* self, s16 index) {
-    if (fn_802A9D78(self, fn_802A9DE0(self, self->field_0x1E6)->id, index) != 0) {
+    if (menu_item_slot_accepts(self, menu_slot_get(self, self->field_0x1E6)->id, index) != 0) {
         self->field_0x1E7 = 1;
         return 1;
     }
@@ -952,7 +944,7 @@ extern "C" s32 fn_802A64B0(MENU_ITEM_W* self) {
         return 0;
     }
 
-    item_id = fn_802A9DE0(self, (s16)((s8)self->grid_row + (s8)self->grid_col * (s8)self->grid_w))->id;
+    item_id = menu_slot_get(self, (s16)((s8)self->grid_row + (s8)self->grid_col * (s8)self->grid_w))->id;
 
     switch ((u8)menu_list_mode_get(self)) {
     default:

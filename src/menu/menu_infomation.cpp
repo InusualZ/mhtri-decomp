@@ -323,13 +323,9 @@ void fn_8031A638(MenuSlot*);
  * (`fn_8027FF88`, `fn_8027F11C`, `fn_8027ECAC`, `fn_8027FFFC` in `Pl/fn_8027D684.h`; `Pl_Skill_slot_item_get`
  * and `fn_80272E30` in `Pl/pl_skill.h`; `fn_8029FFFC` and `get_menu_lsp_tbl` in `menu/menu_item.h`;
  * `fn_800CF208` in `ef/fn_800CDB2C.h`; `put_lsp_anchor_offset` and `get_str_tbl` in `include/unsplit/menu.h`).
- * The three below cannot: `fn_802A8F14`'s owner header (`menu/menu_message.h`) is included by
- * `menu/fn_8031A6C0.cpp`, which declares the same address itself as `s8 fn_802A8F14(s32, s32)`, so a
- * declaration there is an `(10197) illegal function overloading` in a landed unit; and
- * `fn_8031AE38`/`fn_8031BFEC` are owned by `menu/fn_8031A6C0.cpp`, whose header declares neither and
- * `include/unsplit/menu.h` (their old home) may not.  Declared here as this unit's view, the way
- * `lobby/fn_801EC9F8.cpp` declares its own. */
-s16  fn_802A8F14(s16 a, s16 b);
+ * The two below cannot: `fn_8031AE38`/`fn_8031BFEC` are owned by `menu/fn_8031A6C0.cpp`, whose header
+ * declares neither and `include/unsplit/menu.h` (their old home) may not.  Declared here as this unit's
+ * view, the way `lobby/fn_801EC9F8.cpp` declares its own. */
 void fn_8031AE38(MenuSlot* self);
 void fn_8031BFEC(void* cursor, s32 kind, MenuSlot* owner);
 
@@ -1130,7 +1126,7 @@ void fn_8031A58C(MenuSlot* self) {
     self->entry_count_b = 8;
     self->field_0x1A3 = 8;
     self->field_0x1A0 = 0;
-    s16 h = fn_802A8F14(size, 8);
+    s16 h = menu_page_count(size, 8);
     self->field_0x1A1 = (s8)h;
     self->field_0x1A2 = 0;
     fn_8029FFFC(self, 0);
