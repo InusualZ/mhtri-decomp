@@ -416,6 +416,16 @@ refuses a batch, names the row that refused, and the landing either passes every
   for a tree: `datagap.py --row <units> --base-snapshot <file>`. `--allow-orphan <hex addr>` is the recorded escape
   (playbook 23: a claim our object cannot reproduce lowers the score; an allowance that matches nothing keeps the
   refusal).
+* **Folds, deleted units and renames in the data-closure row** (2026-09-30): the base snapshot is keyed by unit name,
+  so `batch_orphans` first re-keys it onto today's names. The map is derived, never guessed: a base byte range one
+  unit owned that a *different* unit claims now (`splits.txt` at the base vs now - a fold, a shrunk unit's moved part
+  and a 1:1 rename all show), plus git's `-M` rename detection over `src/**`. Several OLDs folding into one NEW
+  are **merged** (pairs unioned, NEW's base claims gain what it took), a deleted OLD's own keys and object fingerprint
+  go with it (its bytes belong to the absorbers by claim; the claimed-bytes check still applies). The derived map is
+  printed in the gate log (`data closure: unit map ...`); `--unit-rename OLD=NEW` overrides it for that OLD and
+  `OLD=` says its base pairs are simply gone (`land.py` and `datagap.py --row`). The freshness warning and
+  `explain_added` are scoped to the batch's units. Same rule for `stylelint --diff/--ref`: a deleted file's base
+  findings are read from the base blob, so a fold's removals are credited as moves.
 * **The strict half of the same row** (owner, 2026-09-29: "Yes, refuse (strict)" - no data is left behind when a
   unit is touched): the check "no batch unit the batch really changes still has data only it references left
   unclaimed" refuses, for every **touched** batch unit, each **sole-owned** orphan pair - exactly one registered object references the address and

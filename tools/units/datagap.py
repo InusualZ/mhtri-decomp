@@ -1078,14 +1078,16 @@ def render_fixpoint(fp: dict) -> str:
 FRESH_SECTIONS = (".text",) + CENSUS_SECTIONS
 
 
-def tree_freshness(root: str, tolerance: float = 2.0) -> dict:
+def tree_freshness(root: str, tolerance: float = 2.0, units: "list[str] | set[str] | None" = None) -> dict:
     """`{total, stale, older, newest, worst_age, examples}` for `root`'s target objects against its `splits.txt`.
 
     `stale` counts the registered units whose object has a `.text`/data section of a different size than the
     unit's claims total; `examples` are the first five `(unit, section, claimed, object)`. `older` counts the
     objects whose file time predates `splits.txt`/`symbols.txt` by more than `tolerance` seconds (information
-    only). A tree with no objects or no map files has `total` 0.
+    only). A tree with no objects or no map files has `total` 0. `units` (extensionless unit names) scopes the
+    scan to the batch: a stale object of a unit the batch does not touch is not this row's business.
     """
+    want = {os.path.splitext(u)[0] for u in units} if units is not None else None
     cfg = os.path.join(root, "config", GAME_DIR)
     stamps = {}
     for fn in ("splits.txt", "symbols.txt"):
@@ -1103,7 +1105,7 @@ def tree_freshness(root: str, tolerance: float = 2.0) -> dict:
     for section, rows in ranges.items():
         for start, end, unit in rows:
             claimed.setdefault(unit, {})[section] = claimed.get(unit, {}).get(section, 0) + (end - start)
-    for unit in sorted(claimed):
+    for unit in sorted(u for u in claimed if want is None or u in want):
         path = os.path.join(root, "build", GAME_DIR, "obj", unit + ".o")
         try:
             mtime = os.stat(path).st_mtime
@@ -1151,7 +1153,7 @@ def explain_added(root: str, base_root: str, units: list[str], base_keys, base_r
     new = [r for k, r in sorted(orphan_keys(records, names).items()) if k not in base_keys]
     if not new:
         return []
-    base_stale = tree_freshness(base_root)["units"]
+    base_stale = tree_freshness(base_root, units=names)["units"]
     cache: dict[str, tuple] = {}
     causes: dict[tuple, list[str]] = {}
     for r in new:
@@ -1405,6 +1407,138 @@ def snapshot_orphans(root: str, units: list[str] | None = None) -> dict:
             "unit_claims": table, "objects": objects}
 
 
+# -- folds: the base snapshot is keyed by UNIT NAME, a recut changes the names (2026-09-30) -----------------------
+#
+# A batch that folds units (deletes `A`, `B` into `C`), shrinks one (function moved to a neighbour) or renames one
+# leaves the snapshot's `orphan:<unit>:...` keys, `unit_claims` and `objects` naming units that no longer exist or no
+# longer hold those bytes, so the pre-existing pairs of the folded unit read as pairs the absorber ADDED. The map
+# below is the unit-name bridge: `{NEW: [OLD, ...]}` - NEW inherits OLD's base pairs and (intersected with what NEW
+# holds now) claims. It is derived from evidence, never guessed: a base byte range owned by OLD that a DIFFERENT unit
+# claims now (`splits.txt` at the base vs now), plus git's own rename detection over `src/**`. An explicit
+# `OLD=NEW` (`--unit-rename`) overrides the derivation for that OLD; `OLD=` (no NEW) says its pairs are simply gone.
+
+def _intersect(a: list, b: list) -> list:
+    """Intersection of two sorted-or-not `[[start, end], ...]` range lists, merged."""
+    out = []
+    for s1, e1 in a:
+        for s2, e2 in b:
+            lo, hi = max(s1, s2), min(e1, e2)
+            if lo < hi:
+                out.append((lo, hi))
+    return [list(r) for r in merged(out)]
+
+
+def derive_absorption(base_table: dict, now_table: dict, git_renames: dict | None = None) -> dict[str, list[str]]:
+    """`{NEW: sorted [OLD, ...]}` - which unit now holds bytes another unit held at the base. Pure.
+
+    `base_table`/`now_table` are `unit_claim_table`s. OLD donates to NEW when a range OLD owned in a section is (in
+    part) owned by a different NEW now: a deleted or renamed unit's whole claim, a shrunk unit's moved part. A
+    renamed unit's bytes move wholesale, so the evidence covers the 1:1 rename too. `git_renames` (`{old unit: new
+    unit}` from git's rename detection) adds the pairs a pure `git mv` shows.
+    """
+    out: dict[str, set] = {}
+    for section in sorted({s for t in (base_table, now_table) for secs in t.values() for s in secs}):
+        base = sorted((lo, hi, unit) for unit, secs in base_table.items() for lo, hi in secs.get(section, ()))
+        now = sorted((lo, hi, unit) for unit, secs in now_table.items() for lo, hi in secs.get(section, ()))
+        j = 0
+        for lo, hi, old in base:
+            while j < len(now) and now[j][1] <= lo:
+                j += 1
+            k = j
+            while k < len(now) and now[k][0] < hi:
+                if now[k][2] != old:
+                    out.setdefault(now[k][2], set()).add(old)
+                k += 1
+    for old, new in (git_renames or {}).items():
+        if old != new and old in base_table:
+            out.setdefault(new, set()).add(old)
+    return {new: sorted(olds) for new, olds in sorted(out.items())}
+
+
+def explicit_absorption(absorbs: dict[str, list[str]], explicit: dict[str, str]) -> dict[str, list[str]]:
+    """`absorbs` with the explicit `OLD=NEW` pairs applied: each OLD is taken out of every derived absorber and (when
+    it names a NEW) put under that one; `OLD=` (empty NEW) leaves it with no absorber at all. Pure."""
+    out = {new: [o for o in olds if o not in explicit] for new, olds in absorbs.items()}
+    for old, new in explicit.items():
+        if new:
+            out.setdefault(new, []).append(old)
+    return {new: sorted(set(olds)) for new, olds in sorted(out.items()) if olds}
+
+
+def fold_snapshot(snap: dict, absorbs: dict[str, list[str]], now_table: dict, explicit: dict[str, str] | None = None) -> dict:
+    """The base snapshot re-keyed onto today's unit names. Pure; `snap` is left untouched.
+
+    * `keys` - a base pair `(OLD, section, address)` also holds under every NEW that absorbed OLD (several OLDs folding
+      into one NEW are a union). An OLD that is no longer registered, or was renamed/dropped explicitly, loses its own
+      key: its bytes now belong to its absorbers by claim, and the claimed-bytes check still applies to them.
+    * `unit_claims` - NEW's base claims gain the part of each OLD's claims NEW holds now (a fold is not a claim
+      change); a vanished OLD's entry is removed.
+    * `objects` - a vanished OLD's fingerprint is dropped; NEW keeps only its own (a fold changes its object, and a
+      compiled object cannot be unioned: the row then says `object changed`, which is true).
+    """
+    explicit = explicit or {}
+    vanished = {o for o in set(snap.get("unit_claims") or {}) | {k[7:].rsplit(":", 2)[0] for k in snap.get("keys") or []
+                                                               if k.startswith("orphan:")}
+                if o not in now_table or o in explicit}
+    targets: dict[str, set] = {}
+    for new, olds in absorbs.items():
+        for old in olds:
+            targets.setdefault(old, set()).add(new)
+    out = dict(snap)
+    keys = set()
+    for key in snap.get("keys") or []:
+        if not key.startswith("orphan:"):
+            keys.add(key)
+            continue
+        unit, section, addr = key[7:].rsplit(":", 2)
+        if unit not in vanished:
+            keys.add(key)
+        for new in targets.get(unit, ()):
+            keys.add("orphan:%s:%s:%s" % (new, section, addr))
+    out["keys"] = sorted(keys)
+    if snap.get("unit_claims") is not None:
+        claims = {u: {s: [list(r) for r in rs] for s, rs in secs.items()}
+                  for u, secs in snap["unit_claims"].items() if u not in vanished}
+        for new, olds in absorbs.items():
+            for old in olds:
+                for section, rows in (snap["unit_claims"].get(old) or {}).items():
+                    moved = _intersect(rows, (now_table.get(new) or {}).get(section, []))
+                    if moved:
+                        have = claims.setdefault(new, {}).setdefault(section, [])
+                        claims[new][section] = [list(r) for r in merged([tuple(r) for r in have + moved])]
+        out["unit_claims"] = claims
+    if snap.get("objects") is not None:
+        out["objects"] = {u: fp for u, fp in snap["objects"].items() if u not in vanished}
+    return out
+
+
+def git_unit_renames(root: str, base_ref: str) -> dict[str, str]:
+    """`{old unit: new unit}` for the `src/**` source files git detects as renamed between `base_ref` and the tree. IO.
+
+    Unit names are the path under `src/` without its extension - what `splits.txt` and the snapshot key on.
+    """
+    import subprocess
+
+    p = subprocess.run(["git", "diff", "--name-status", "-M", base_ref, "--", "src"], cwd=root, capture_output=True,
+                       text=True, encoding="utf-8", errors="replace")
+    out: dict[str, str] = {}
+    for line in p.stdout.splitlines():
+        parts = line.split("\t")
+        if len(parts) == 3 and parts[0].startswith("R") and parts[1].startswith("src/") and parts[2].startswith("src/"):
+            out[os.path.splitext(parts[1][4:])[0]] = os.path.splitext(parts[2][4:])[0]
+    return out
+
+
+def render_unit_map(absorbs: dict[str, list[str]], explicit: dict[str, str] | None = None) -> list[str]:
+    """The fold map as gate-log lines: what was derived and what an explicit `--unit-rename` overrode."""
+    lines = ["data closure: unit map (base pairs follow the bytes): %s" % "; ".join(
+        "%s <- %s" % (new, ", ".join(olds)) for new, olds in absorbs.items())] if absorbs else []
+    if explicit:
+        lines.append("data closure: explicit --unit-rename overrides: %s" % ", ".join(
+            "%s=%s" % (o, n) for o, n in sorted(explicit.items())))
+    return lines
+
+
 def claim_exposed_pairs(root: str, new: dict[str, dict], base_unit_claims: dict, now_unit_claims: dict) -> dict[str, dict]:
     """`{orphan_key: {reason, ranges, via, pair}}` for the NEW pairs the batch's own claim exposed. Pure but for IO.
 
@@ -1462,16 +1596,27 @@ def tree_claim_exposed(root: str, records: list[dict], symbols: dict | None = No
 
 
 def batch_orphans(root: str, units: list[str], base_snapshot: dict | None, allowed=(), strict=True,
-                  query="lazy", touched=None) -> dict:
+                  query="lazy", touched=None, unit_map=None, git_renames=None) -> dict:
     """The gate row's whole decision for the batch units against the recorded base (see `orphan_verdict`).
 
     `touched` (`{unit: {touched, reasons}}`) overrides `touch_verdicts` - a test's or a caller's own judgement.
+    `unit_map` is the explicit `{OLD: NEW or ""}` (`--unit-rename`); `git_renames` git's `{old: new}` detection. The
+    snapshot is re-keyed onto today's unit names first (`derive_absorption`/`fold_snapshot`), and the derived map is
+    returned as `verdict["unit_map_lines"]` for the gate log.
     """
     ranges = load_claims(root)
     names = [os.path.splitext(u)[0] for u in units]
     (records, _stats), _n, _have = census(root, None, ranges=ranges)
     after = orphan_keys(records, names)
     snap = base_snapshot or {}
+    unit_map_lines: list[str] = []
+    if snap.get("unit_claims") is not None:
+        now_table = unit_claim_table(ranges)
+        absorbs = derive_absorption(snap["unit_claims"], now_table, git_renames)
+        explicit = {os.path.splitext(o)[0]: os.path.splitext(n)[0] if n else "" for o, n in (unit_map or {}).items()}
+        absorbs = explicit_absorption(absorbs, explicit)
+        snap = fold_snapshot(snap, absorbs, now_table, explicit)
+        unit_map_lines = render_unit_map(absorbs, explicit)
     base_claims = {sec: [tuple(r) for r in rows] for sec, rows in (snap.get("claims") or {}).items()}
     shrinks = shrunk_claims(base_claims, claimed_bytes(ranges)) if base_claims else []
     base_keys = set(snap.get("keys") or [])
@@ -1502,6 +1647,8 @@ def batch_orphans(root: str, units: list[str], base_snapshot: dict | None, allow
                                        "section": c["pair"]["section"], "address": c["pair"]["address"],
                                        "reason": c["reason"]} for c in exposed.values()]
     verdict["have_base"] = "keys" in snap and "claims" in snap
+    verdict["unit_map_lines"] = unit_map_lines
+    verdict["base_keys"] = list(snap.get("keys") or [])       # the FOLDED keys: what `explain_added` must compare
     if report is not None:
         symbols = load_data_symbols(root)
         now_objects = {}
@@ -2118,6 +2265,87 @@ def selftest_exposed(eq) -> None:
            "the tree view lists the orphan only claimed data references, not the code-read one")
 
 
+def selftest_fold(eq) -> None:
+    """Folds, deleted units and renames: the base snapshot follows the bytes, not the unit name (2026-09-30)."""
+    import tempfile
+
+    base_t = {"A/a": {".text": [[0x100, 0x200]]}, "A/b": {".text": [[0x200, 0x300]]}, "A/k": {".text": [[0x300, 0x400]]},
+              "A/r": {".text": [[0x500, 0x600]]}}
+    now_t = {"A/c": {".text": [[0x100, 0x300]]}, "A/k": {".text": [[0x300, 0x380]]}, "A/n": {".text": [[0x380, 0x400]]},
+             "A/r2": {".text": [[0x500, 0x600]]}}
+    got = derive_absorption(base_t, now_t)
+    eq(got, {"A/c": ["A/a", "A/b"], "A/n": ["A/k"], "A/r2": ["A/r"]},
+       "a fold (two units into one), a shrunk unit's moved part and a 1:1 rename are all derived from the ranges")
+    eq(derive_absorption(base_t, base_t), {}, "an unchanged claim table derives nothing")
+    eq(derive_absorption({"A/a": {}}, {"A/z": {}}, {"A/a": "A/z"}), {"A/z": ["A/a"]}, "git's rename pairs are added")
+    eq(explicit_absorption(got, {"A/b": "A/x", "A/r": ""}),
+       {"A/c": ["A/a"], "A/n": ["A/k"], "A/x": ["A/b"]},
+       "an explicit OLD=NEW moves OLD to that NEW; OLD= leaves it with no absorber")
+
+    snap = {"keys": ["orphan:A/a:.data:80798244", "orphan:A/b:.data:80798250", "orphan:A/k:.data:80798254",
+                     "orphan:A/r:.data:80798258"],
+            "claims": {}, "unit_claims": base_t, "objects": {"A/a": {"body": "1"}, "A/c": {"body": "2"}}}
+    f = fold_snapshot(snap, got, now_t)
+    eq(f["keys"], ["orphan:A/c:.data:80798244", "orphan:A/c:.data:80798250", "orphan:A/k:.data:80798254",
+                   "orphan:A/n:.data:80798254", "orphan:A/r2:.data:80798258"],
+       "pairs of both folded units merge under the absorber, the deleted units' own keys go, a survivor keeps its own")
+    eq(f["unit_claims"]["A/c"], {".text": [[0x100, 0x300]]}, "the absorber's base claims are the union of what it took")
+    eq("A/a" in f["unit_claims"] or "A/b" in f["unit_claims"], False, "a deleted unit's claims are dropped")
+    eq(f["unit_claims"]["A/k"], base_t["A/k"], "a survivor's own base claims are untouched")
+    eq(sorted(f["objects"]), ["A/c"], "a deleted unit's object fingerprint is dropped, the absorber keeps its own")
+    eq(sorted(snap["keys"])[0], "orphan:A/a:.data:80798244", "the recorded snapshot is left untouched")
+    eq(fold_snapshot(snap, {}, now_t, {"A/a": ""})["keys"].count("orphan:A/a:.data:80798244"), 0,
+       "OLD= drops the pairs with the unit")
+
+    splits_base = ("Sections:\n\t.text type:code align:32\n\nA/a.cpp:\n\t.text start:0x80010000 end:0x80010100\n\n"
+                   "A/b.cpp:\n\t.text start:0x80010100 end:0x80010200\n")
+    splits_now = "Sections:\n\t.text type:code align:32\n\nA/c.cpp:\n\t.text start:0x80010000 end:0x80010200\n"
+    symbols = ("w1 = .bss:0x806A0000; // type:object size:0x4\nw2 = .bss:0x806A0004; // type:object size:0x4\n"
+               "w3 = .bss:0x806A0008; // type:object size:0x4\n")
+    with tempfile.TemporaryDirectory() as tmp:
+        def put(rel, text):
+            path = os.path.join(tmp, rel)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(text)
+
+        def obj(unit, refs):
+            for kind in ("src", "obj"):
+                path = os.path.join(tmp, "build", "RMHE08", kind, unit + ".o")
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                build_fixture_object(path, refs)
+
+        put("config/RMHE08/symbols.txt", symbols)
+        put("config/RMHE08/splits.txt", splits_base)
+        obj("A/a", ["w1"])
+        obj("A/b", ["w2"])
+        base = snapshot_orphans(tmp, ["A/a", "A/b"])
+        put("config/RMHE08/splits.txt", splits_now)
+        for kind in ("src", "obj"):
+            for gone in ("a", "b"):
+                os.remove(os.path.join(tmp, "build", "RMHE08", kind, "A", gone + ".o"))
+        obj("A/c", ["w1", "w2"])
+        unmapped = batch_orphans(tmp, ["A/c"], {k: v for k, v in base.items() if k != "unit_claims"}, query=None)
+        eq(len(unmapped["added"]), 2, "without the base claims the fold cannot be derived: both pre-existing pairs read as added")
+        v = batch_orphans(tmp, ["A/c"], base, query=None)
+        eq(v["added"], [], "a fold of two units: their pre-existing pairs are merged under the absorber, no false additions")
+        eq(len(v["pre_existing"]), 2, "... and they are reported as pre-existing")
+        eq(v["unit_map_lines"], ["data closure: unit map (base pairs follow the bytes): A/c <- A/a, A/b"],
+           "... and the derived map is printed for the gate log")
+        obj("A/c", ["w1", "w2", "w3"])
+        v = batch_orphans(tmp, ["A/c"], base, query=None)
+        eq(len(v["added"]), 1, "a genuinely new pair in the absorber still refuses")
+        obj("A/c", ["w1", "w2"])
+        v = batch_orphans(tmp, ["A/c"], base, query=None, unit_map={"A/b": ""})
+        eq(len(v["added"]), 1, "an explicit OLD= override takes that unit's pair out of the merge: its pair is added")
+        v = batch_orphans(tmp, ["A/c"], base, query=None, unit_map={"A/a": "A/c", "A/b": "A/c"})
+        eq(v["added"], [], "explicit OLD=NEW pairs sharing one NEW merge rather than overwrite")
+
+    # the freshness scan is scoped to the batch's units
+    with tempfile.TemporaryDirectory() as tmp:
+        eq(tree_freshness(tmp, units=["A/c"])["total"], 0, "a tree with no map files has nothing to be stale for the batch")
+
+
 def selftest_span(eq) -> None:
     """A claim span never covers another unit's read; the anchor survives; the fixpoint; the census freshness."""
     import tempfile
@@ -2385,6 +2613,7 @@ def selftest() -> int:
     selftest_strict(eq)
     selftest_touch(eq)
     selftest_exposed(eq)
+    selftest_fold(eq)
     selftest_span(eq)
 
     print(f"datagap selftest: {checks} checks OK")
@@ -2416,6 +2645,9 @@ def main(argv=None) -> int:
     ap.add_argument("--base-root", default=None, help="--row: the base tree (default: --root)")
     ap.add_argument("--base-ref", default=None, help="--row: revision whose splits.txt is the claimed-bytes base")
     ap.add_argument("--allow-orphan", action="append", default=[], metavar="ADDR", help="--row: an allowance")
+    ap.add_argument("--unit-rename", action="append", default=[], metavar="OLD=NEW",
+                    help="--row: override the derived fold map for OLD (several OLDs may share one NEW; `OLD=` means "
+                         "its base pairs are gone with the unit)")
     ap.add_argument("--touched-by", action="store_true",
                     help="--row: only list, per unit, whether the batch really touches it and why (registered / "
                          "claims changed / object changed) against the base")
@@ -2446,11 +2678,19 @@ def main(argv=None) -> int:
             snap["claims"] = claims_at_ref(args.root, args.base_ref)
             snap["unit_claims"] = unit_claim_table(splits_at_ref(args.root, args.base_ref))
         units = [u.strip() for u in args.row.split(",") if u.strip()]
-        verdict = batch_orphans(args.root, units, snap, args.allow_orphan)
+        explicit = {}
+        for item in args.unit_rename:
+            old, _eq, new = item.partition("=")
+            if old.strip():
+                explicit[old.strip().strip("/")] = new.strip().strip("/")
+        renames = git_unit_renames(args.root, args.base_ref) if args.base_ref else None
+        verdict = batch_orphans(args.root, units, snap, args.allow_orphan, unit_map=explicit, git_renames=renames)
+        for line in verdict["unit_map_lines"]:
+            print(line)
         for label, tree in (("base", base_root), ("tree", args.root)):
             if label == "tree" and os.path.abspath(tree) == os.path.abspath(base_root):
                 continue
-            for line in render_freshness(label, tree_freshness(tree)):
+            for line in render_freshness(label, tree_freshness(tree, units=units)):
                 print(line)
         if args.touched_by:
             for unit in units:
@@ -2472,7 +2712,7 @@ def main(argv=None) -> int:
             print("REFUSED  " + line)
         if verdict["added"] and os.path.abspath(base_root) != os.path.abspath(args.root):
             base_ranges = splits_at_ref(args.root, args.base_ref) if args.base_ref else load_claims(base_root)
-            for line in explain_added(args.root, base_root, units, snap.get("keys") or [], base_ranges):
+            for line in explain_added(args.root, base_root, units, verdict["base_keys"], base_ranges):
                 print(line)
         for line in verdict["sole_owned"]:
             print("REFUSED  sole-owned: " + line)

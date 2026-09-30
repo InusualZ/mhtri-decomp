@@ -1762,16 +1762,39 @@ def set_unit_renames(pairs: list[str] | None) -> None:
     for item in pairs or []:
         if "=" in item:
             old, new = item.split("=", 1)
-            if old.strip() and new.strip():
-                out[claims.norm_unit(old.strip().strip("/"))] = claims.norm_unit(new.strip().strip("/"))
+            if old.strip():
+                # several OLDs may share one NEW (a fold); `OLD=` with no NEW says the unit's base entries go with it
+                out[claims.norm_unit(old.strip().strip("/"))] = (claims.norm_unit(new.strip().strip("/"))
+                                                                 if new.strip() else "")
     UNIT_RENAMES = out
 
 
 def rename_snapshot_keys(snapshot: dict) -> dict:
-    """The base snapshot with every renamed unit's key moved to its new name (declared renames only)."""
+    """The base snapshot with every renamed unit's key moved to its new name (declared renames only).
+
+    Several OLDs declared onto one NEW (a fold) are **merged** under NEW - refs unioned, the first entry's other
+    fields kept - never overwritten by whichever came last; `OLD=` (no NEW) drops the entry with the unit.
+    """
     if not UNIT_RENAMES or not snapshot:
         return snapshot
-    return {UNIT_RENAMES.get(k, k): v for k, v in snapshot.items()}
+    out: dict = {}
+    for k, v in sorted(snapshot.items(), key=lambda kv: UNIT_RENAMES.get(kv[0], kv[0]) != kv[0]):   # NEW's own first
+        nk = UNIT_RENAMES.get(k, k)
+        if not nk:
+            continue
+        if nk not in out:
+            out[nk] = v
+        elif isinstance(out[nk], dict) and isinstance(v, dict):
+            out[nk] = dict(out[nk], refs=sorted(set(out[nk].get("refs") or []) | set(v.get("refs") or [])))
+    return out
+
+
+def _git_unit_renames_since(main: str, base: str | None) -> dict:
+    """git's `{old unit: new unit}` rename detection between the recorded base and the tree (empty when unknown)."""
+    try:
+        return dg.git_unit_renames(main, base) if base else {}
+    except Exception:                                         # noqa: BLE001 - evidence only, never blocks the row
+        return {}
 
 
 ALLOW_RULE12: list[str] = []
@@ -2760,7 +2783,11 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     # refusal and is printed as unmatched). `python tools/units/datagap.py --census --unit <unit>` is the
     # lane-side view, `python tools/units/dataclaim.py --unit <unit>` prints the `splits.txt` lines to add.
     if unit_units:
-        orphans = dg.batch_orphans(main, unit_units, recorded.get("orphans"), ALLOW_ORPHAN)
+        orphans = dg.batch_orphans(main, unit_units, recorded.get("orphans"), ALLOW_ORPHAN,
+                                   unit_map=UNIT_RENAMES,
+                                   git_renames=_git_unit_renames_since(main, recorded.get("base")))
+        for line in orphans["unit_map_lines"]:
+            print(line)
         if orphans["accepted"] or orphans["strict"]["accepted"]:
             print("data closure: %d authorised by --allow-orphan (recorded, not a file-level exemption): %s"
                   % (len(orphans["accepted"]) + len(orphans["strict"]["accepted"]),
@@ -3133,6 +3160,13 @@ def selftest() -> int:
     check("unit renames: a snapshot key follows the new name",
           rename_snapshot_keys({"Network/fn_803D3CE8": {"x": 1}, "OS/a": {"y": 2}}),
           {"Network/NetworkSessionManager": {"x": 1}, "OS/a": {"y": 2}})
+    set_unit_renames(["E/a=E/c", "E/b=E/c", "E/gone="])
+    check("unit renames: several OLDs share one NEW, OLD= is kept as a drop",
+          UNIT_RENAMES, {"E/a": "E/c", "E/b": "E/c", "E/gone": ""})
+    check("unit renames: a fold merges its OLDs' entries under NEW (refs unioned), OLD= drops the entry",
+          rename_snapshot_keys({"E/a": {"source": "1", "refs": ["x"]}, "E/b": {"source": "2", "refs": ["y"]},
+                                "E/c": {"source": "3", "refs": ["z"]}, "E/gone": {"refs": ["q"]}}),
+          {"E/c": {"source": "3", "refs": ["x", "y", "z"]}})
     set_unit_renames(None)
     check("unit renames: none declared leaves the snapshot alone",
           rename_snapshot_keys({"OS/a": {"y": 2}}), {"OS/a": {"y": 2}})
