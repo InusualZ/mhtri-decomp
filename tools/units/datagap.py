@@ -511,7 +511,7 @@ def _gap_blocker(lo: int, hi: int, unit: str, section: str, ctx: dict) -> str | 
 
     for s, e, u in ctx["ranges"].get(section, []):
         if u != unit and s < hi and lo < e:
-            return "%s's claim 0x%08X-0x%08X" % (u, s, e)
+            return "%s claims 0x%08X-0x%08X" % (u, s, e)
     rows = ctx["rows"].get(section, [])
     query = ctx.get("query")
     for address, name, _size in rows[bisect.bisect_left(rows, (lo,)):]:
@@ -520,13 +520,13 @@ def _gap_blocker(lo: int, hi: int, unit: str, section: str, ctx: dict) -> str | 
         units = ctx["group_units"].get((section, address))
         if units:
             if units != {unit}:
-                return "%s (0x%08X), referenced by %s" % (name, address, ",".join(sorted(units)[:3]))
+                return "%s reads %s (0x%08X)" % (",".join(sorted(units - {unit})[:3]), name, address)
             continue
         if query is not None:
             readers, unsplit = query(address)
             if unsplit or not set(readers) <= {unit}:
-                return "%s (0x%08X), read by %s" % (name, address,
-                                                    ",".join(sorted(readers)[:3]) if readers else "unsplit code")
+                foreign = sorted(set(readers) - {unit})
+                return "%s reads %s (0x%08X)" % (",".join(foreign[:3]) if foreign else "unsplit code", name, address)
     return None
 
 
@@ -534,10 +534,13 @@ def judge_blocks(unit: str, section: str, runs: list[dict], ctx: dict) -> list[d
     """The blocks one unit's runs in one section merge into, each with its verdict. Pure given `ctx`.
 
     Runs (and the unit's existing claims, as anchors) merge into one block while the gap between them holds no
-    `_gap_blocker`. The block holding an existing claim - or, with none, the block with the most pairs - is the
-    **main** one: its verdict is `refuse` unless a class below defers it. Every other block is `span-blocked`:
-    claiming it is a second range of the section separated by another owner's data. Per block, in order:
-    `pool-synth`, `ambiguous-owner`, then for the main block `isolated-run`. `ctx` carries `ranges`, `rows`,
+    `_gap_blocker`. The **main** block is the one holding an existing claim - kept even when it carries no pairs,
+    because a unit's own claim is what every other range must be reachable from (the `enemy/fn_80147CE0` and
+    `quest/quest_entry` bug: dropping it made a far run the "main" one and the plan spanned foreign data) - or,
+    with no claim, the block with the most pairs. The main block's verdict is `refuse` unless a class below defers
+    it. Every other block is `span-blocked`, and its reason names the foreign reader or claim between it and the
+    main block ("blocked by <unit> reads <symbol> (<addr>)"). Only blocks with pairs are returned. Per block, in
+    order: `pool-synth`, `ambiguous-owner`, then for the main block `isolated-run`. `ctx` carries `ranges`, `rows`,
     `group_units`, `text_start`, `our_sizes` and `query` (see `strict_report`).
     """
     import bisect
@@ -547,6 +550,8 @@ def judge_blocks(unit: str, section: str, runs: list[dict], ctx: dict) -> list[d
     claimed = sum(e - s for s, e in mine)
     items = ([{"start": s, "end": e, "pairs": [], "anchor": True} for s, e in mine]
              + [dict(r, anchor=False) for r in runs])
+    for item in items:
+        item["anchors"] = [(item["start"], item["end"])] if item["anchor"] else []
     items.sort(key=lambda r: r["start"])
     blocks: list[dict] = []
     for item in items:
@@ -557,13 +562,16 @@ def judge_blocks(unit: str, section: str, runs: list[dict], ctx: dict) -> list[d
                 blocks[-1]["end"] = max(blocks[-1]["end"], item["end"])
                 blocks[-1]["pairs"] += item["pairs"]
                 blocks[-1]["anchor"] = blocks[-1]["anchor"] or item["anchor"]
+                blocks[-1]["anchors"] += item["anchors"]
                 continue
             item["gap_before"] = gap
         blocks.append({"unit": unit, "section": section, "start": item["start"], "end": item["end"],
-                       "pairs": list(item["pairs"]), "anchor": item["anchor"], "gap_before": item.get("gap_before")})
-    blocks = [b for b in blocks if b["pairs"]]
+                       "pairs": list(item["pairs"]), "anchor": item["anchor"], "anchors": list(item["anchors"]),
+                       "gap_before": item.get("gap_before")})
     anchored = [b for b in blocks if b["anchor"]]
-    main = anchored[0] if anchored else (max(blocks, key=lambda b: (len(b["pairs"]), -b["start"])) if blocks else None)
+    by_weight = lambda b: (len(b["pairs"]), b["end"] - b["start"], -b["start"])          # noqa: E731
+    main = max(anchored, key=by_weight) if anchored else (max(blocks, key=by_weight) if blocks else None)
+    blocks = [b for b in blocks if b["pairs"]]                        # an anchor with no pair is judged, not reported
     our = ctx.get("our_sizes", {}).get(unit)
     tstart = ctx["text_start"]
     mine_t = tstart.get(unit)
@@ -590,10 +598,12 @@ def judge_blocks(unit: str, section: str, runs: list[dict], ctx: dict) -> list[d
             if b["verdict"] == "deferred":
                 continue
         if b is not main:
+            lo, hi = (main["end"], start) if start >= main["end"] else (end, main["start"])
+            why = _gap_blocker(lo, hi, unit, section, ctx) or b.get("gap_before") or "other data"
             b["verdict"], b["cls"] = "deferred", "span-blocked"
-            b["reason"] = ("a second %s range for the unit: %s separates it from the unit's main range (one "
-                           "spanning claim is impossible, two is the playbook 53 cycle)"
-                           % (section, b.get("gap_before") or "other data"))
+            b["blocker"] = why
+            b["reason"] = ("a second %s range for the unit: blocked by %s between it and the unit's main range "
+                           "(one spanning claim is impossible, two is the playbook 53 cycle)" % (section, why))
             continue
         if b["anchor"]:
             b["reason"] = ("extends the unit's own %s claim (span claim, unreferenced padding included)" % section)
@@ -743,7 +753,7 @@ def strict_verdict(report: dict, skip_keys=(), allowed=()) -> dict:
             "unmatched_allowances": sorted("0x%08X" % a for a in sanction - used)}
 
 
-def splits_plan(text: str, unit: str, blocks: list[dict], our_sizes: dict | None = None) -> dict:
+def splits_plan(text: str, unit: str, blocks: list[dict], our_sizes: dict | None = None, blocker=None) -> dict:
     """The exact `splits.txt` edit that claims `unit`'s refusable blocks, in link-order position. Pure.
 
     The unit's block in `text` is already where the link order wants it (units are listed in address order), so
@@ -752,6 +762,11 @@ def splits_plan(text: str, unit: str, blocks: list[dict], our_sizes: dict | None
     range (two ranges with a gap between them is the playbook 53 cycle). Returns `{header, edits, result,
     deferred, found}`: `edits` are `{action, section, old, new, start, end, note}`, `result` is the unit's block
     as it would read, `deferred` the blocks the row would not refuse, with their class. Never applied.
+
+    A replacement folds in only the unit's lines that lie INSIDE the block (`judge_blocks` merged them across a
+    clean gap); a same-section line elsewhere is left alone, and a block that would need it is `span-blocked`.
+    `blocker(section, start, end) -> str | None` is the last line of defence: a span that still covers an address
+    another unit reads or claims is turned into a `span-blocked` entry with the reader named and NO edit line.
     """
     import re
 
@@ -782,10 +797,22 @@ def splits_plan(text: str, unit: str, blocks: list[dict], our_sizes: dict | None
             deferred.append(block)
             continue
         section = block["section"]
-        same = [r for r in parsed if r["section"] == section]
         start, end = block["start"], block["end"]
-        for r in same:
-            start, end = min(start, r["start"]), max(end, r["end"])
+        same = [r for r in parsed if r["section"] == section and start <= r["start"] and r["end"] <= end]
+        elsewhere = [r for r in parsed if r["section"] == section and r not in same
+                     and (not same or (r["start"] < end and start < r["end"]))]
+        why = None
+        if elsewhere:
+            why = ("the unit already claims %s 0x%08X-0x%08X outside this block: a second range is the playbook 53 "
+                   "cycle, one spanning range would cover what lies between" % (section, elsewhere[0]["start"],
+                                                                                 elsewhere[0]["end"]))
+        elif blocker is not None:
+            why = blocker(section, start, end)
+            why = ("blocked by %s" % why) if why else None
+        if why:
+            deferred.append(dict(block, verdict="deferred", cls="span-blocked", blocker=why,
+                                 reason="the claim span 0x%08X-0x%08X cannot be claimed: %s" % (start, end, why)))
+            continue
         new_line = splits_line(section, start, end)
         ours = None if our_sizes is None else our_sizes.get(section, 0)
         total = end - start
@@ -843,8 +870,9 @@ def render_plan(plan: dict, unit: str) -> str:
                          % (e["new"].strip(), e["pairs"]))
         lines.append("          %s" % e["note"])
     for b in plan["deferred"]:
-        lines.append("  deferred %s %s 0x%08X-0x%08X (%d pair(s)): %s"
-                     % (b["cls"], b["section"], b["start"], b["end"], len(b["pairs"]), b["reason"]))
+        lines.append("  %s %s %s 0x%08X-0x%08X (%d pair(s)): %s"
+                     % ("blocked " if b["cls"] == "span-blocked" else "deferred", b["cls"], b["section"], b["start"],
+                        b["end"], len(b["pairs"]), b["reason"]))
     lines.append("resulting block (+ = new):")
     lines.append("  " + plan["header"])
     lines += ["  " + r for r in plan["result"]]
@@ -860,7 +888,287 @@ def unit_plan(root: str, unit: str) -> dict:
     with open(os.path.join(root, "config", GAME_DIR, "splits.txt"), encoding="utf-8", errors="replace") as fh:
         text = fh.read()
     blocks = [b for b in report["blocks"] if b["unit"] == unit]
-    return {"plan": splits_plan(text, unit, blocks, report["ctx"]["our_sizes"].get(unit)), "report": report}
+    ctx = report["ctx"]
+    return {"plan": splits_plan(text, unit, blocks, ctx["our_sizes"].get(unit), span_blocker(ctx, unit)),
+            "report": report, "text": text}
+
+
+def span_blocker(ctx: dict, unit: str):
+    """`blocker(section, start, end)` for `splits_plan`: the first foreign claim or reader in `[start, end)`.
+
+    The unit's own claims inside the span are skipped (they are the unit's); everything else goes through
+    `_gap_blocker` (another unit's claim, a row another registered unit references, a row `callers.py` shows a
+    foreign or unsplit reader for).
+    """
+    def blocker(section: str, start: int, end: int):
+        cur = start
+        for s, e in sorted(unit_claims(ctx["ranges"], unit, section)):
+            if e <= cur or s >= end:
+                continue
+            if s > cur:
+                why = _gap_blocker(cur, s, unit, section, ctx)
+                if why:
+                    return why
+            cur = max(cur, e)
+        return _gap_blocker(cur, end, unit, section, ctx) if cur < end else None
+
+    return blocker
+
+
+# -- the fixpoint: claim, re-judge, repeat until the plan is stable (owner ask, 2026-09-30) -----------------------
+#
+# One plan is judged against the claims as they stand. Applying it moves a claim, which can change the next verdict
+# (a span now touches another unit's claim, a neighbour's text-window order changes, a pool the claim completes).
+# A lane that applies the first plan and asks again must not be handed a plan that exists only because of the
+# first one. `fixpoint_plan` applies each plan to an in-memory copy of `splits.txt` and re-judges until no edit is
+# left, or names why it cannot: the blockers of the final state, or the loop.
+
+def _unit_head(lines: list[str], unit: str) -> int | None:
+    import re
+
+    for i, line in enumerate(lines):
+        m = re.match(r"^([^\s:][^:]*):\s*$", line)
+        if m and os.path.splitext(m.group(1))[0] == unit:
+            return i
+    return None
+
+
+def _unit_lines(lines: list[str], unit: str) -> list[str]:
+    head = _unit_head(lines, unit)
+    if head is None:
+        return []
+    out, j = [], head + 1
+    while j < len(lines) and lines[j].strip():
+        out.append(lines[j])
+        j += 1
+    return out
+
+
+def apply_plan_text(text: str, unit: str, plan: dict) -> str:
+    """`text` with the unit's block replaced by the plan's `result` (the `+ `/`  ` markers stripped). Pure."""
+    lines = text.splitlines()
+    head = _unit_head(lines, unit)
+    if head is None or not plan.get("found"):
+        return text
+    end = head + 1 + len(_unit_lines(lines, unit))
+    body = [r[2:] for r in plan["result"]]
+    return "\n".join(lines[:head + 1] + body + lines[end:]) + ("\n" if text.endswith("\n") else "")
+
+
+def fixpoint_plan(root: str, unit: str, max_steps: int = 8, text: str | None = None,
+                  unit_refs: dict | None = None, symbols: dict | None = None, query="lazy") -> dict:
+    """`{converged, stop, steps, plans, final, blockers, net, text}` for one unit; writes nothing.
+
+    `steps` counts the plans that carried an edit; `plans` is every plan judged (the last has no edit when it
+    converged); `blockers` are the final state's blocks that are not claimable, with their reasons; `net` is the
+    unit's `splits.txt` block before and after; `converged` is False when the loop hit `max_steps` or returned to
+    a state it had already judged (`stop` says which). The inputs default to `root`'s files; a test passes them.
+    """
+    unit = os.path.splitext(unit.replace("\\", "/"))[0]
+    if text is None:
+        with open(os.path.join(root, "config", GAME_DIR, "splits.txt"), encoding="utf-8", errors="replace") as fh:
+            text = fh.read()
+    if unit_refs is None:
+        unit_refs, _n = census_inputs(root, None, parse_splits_text(text))
+    symbols = symbols if symbols is not None else load_data_symbols(root)
+    if query == "lazy":
+        try:
+            query = readers_index(root)
+        except Exception:                                                    # noqa: BLE001 - no index: reloc-only
+            query = None
+    start_text, seen, plans, stop = text, {text}, [], None
+    for _ in range(max_steps + 1):
+        ranges = parse_splits_text(text)
+        records, _stats = census_records(unit_refs, symbols, ranges)
+        report = strict_report(root, records, ranges, [unit], query=query, symbols=symbols)
+        ctx = report["ctx"]
+        blocks = [b for b in report["blocks"] if b["unit"] == unit]
+        plan = splits_plan(text, unit, blocks, (ctx["our_sizes"].get(unit)), span_blocker(ctx, unit))
+        plans.append({"plan": plan, "blocks": blocks})
+        if not plan["edits"]:
+            break
+        text = apply_plan_text(text, unit, plan)
+        if text in seen:
+            stop = "the plan returned to a state already judged: no fixpoint"
+            break
+        seen.add(text)
+    else:
+        stop = "no fixpoint after %d step(s): every plan still carries an edit" % max_steps
+    last = plans[-1]["plan"]
+    return {"unit": unit, "converged": stop is None, "stop": stop,
+            "steps": sum(1 for p in plans if p["plan"]["edits"]), "plans": plans, "final": last,
+            "blockers": list(last["deferred"]), "text": text,
+            "net": {"before": _unit_lines(start_text.splitlines(), unit), "after": _unit_lines(text.splitlines(), unit)},
+            "readers_checked": query is not None}
+
+
+def render_fixpoint(fp: dict) -> str:
+    """The converged plan, or the exact blocker, as text a lane can act on."""
+    unit = fp["unit"]
+    lines = [("fixpoint for `%s`: converged after %d claim step(s)" % (unit, fp["steps"])) if fp["converged"]
+             else "fixpoint for `%s`: NOT converged - %s" % (unit, fp["stop"])]
+    if not fp["readers_checked"]:
+        lines.append("  WARNING: callers index unavailable - a foreign reader of an unreferenced gap row is invisible")
+    if not fp["final"]["found"]:
+        lines.append("  no `%s` block in splits.txt: register the unit first" % unit)
+        return "\n".join(lines)
+    for k, p in enumerate(fp["plans"], 1):
+        if not p["plan"]["edits"]:
+            continue
+        lines.append("  step %d%s:" % (k, "" if k == 1 else " (exists only because step %d moved the claims)" % (k - 1)))
+        for e in p["plan"]["edits"]:
+            lines.append("    %s %s 0x%08X-0x%08X (%d pair(s))" % (e["action"].upper(), e["section"], e["start"],
+                                                                 e["end"], e["pairs"]))
+    before, after = fp["net"]["before"], fp["net"]["after"]
+    if before != after:
+        lines.append("  net change of the unit's splits.txt block (apply exactly this, once):")
+        lines += ["    - " + ln.strip() for ln in before if ln not in after]
+        lines += ["    + " + ln.strip() for ln in after if ln not in before]
+    else:
+        lines.append("  nothing to claim: the unit's block is already at its fixpoint")
+    for b in fp["blockers"]:
+        lines.append("  %s %s %s 0x%08X-0x%08X (%d pair(s)): %s"
+                     % ("blocked " if b["cls"] == "span-blocked" else "deferred", b["cls"], b["section"], b["start"],
+                        b["end"], len(b["pairs"]), b["reason"]))
+    return "\n".join(lines)
+
+
+# -- is the census itself current? (the `--base-root` discrepancy, 2026-09-30) ------------------------------------
+#
+# The census reads `build/RMHE08/obj/<unit>.o`, the TARGET objects `dtk dol split` writes from `splits.txt` +
+# `symbols.txt`. An object cut from other claims references other symbols (a range a unit claimed since is no
+# longer an external reference), so a base census built from it and a branch census built from current objects
+# disagree about which pairs are orphans - and the row reports the difference as pairs the batch "added". That is a
+# stale base, not a claims effect. `tree_freshness` decides it by CONTENT: a current object's `.text` and data
+# sections are exactly as large as the unit's claims in `splits.txt`. (File times are reported too but decide
+# nothing: dtk leaves an unchanged object alone, so a current object can be much older than `splits.txt`.)
+
+FRESH_SECTIONS = (".text",) + CENSUS_SECTIONS
+
+
+def tree_freshness(root: str, tolerance: float = 2.0) -> dict:
+    """`{total, stale, older, newest, worst_age, examples}` for `root`'s target objects against its `splits.txt`.
+
+    `stale` counts the registered units whose object has a `.text`/data section of a different size than the
+    unit's claims total; `examples` are the first five `(unit, section, claimed, object)`. `older` counts the
+    objects whose file time predates `splits.txt`/`symbols.txt` by more than `tolerance` seconds (information
+    only). A tree with no objects or no map files has `total` 0.
+    """
+    cfg = os.path.join(root, "config", GAME_DIR)
+    stamps = {}
+    for fn in ("splits.txt", "symbols.txt"):
+        try:
+            stamps[fn] = os.stat(os.path.join(cfg, fn)).st_mtime
+        except OSError:
+            continue
+    out = {"total": 0, "stale": 0, "older": 0, "newest": None, "worst_age": 0.0, "examples": [], "units": {}}
+    if not stamps or not os.path.exists(os.path.join(cfg, "splits.txt")):
+        return out
+    newest = max(stamps, key=stamps.get)
+    out["newest"] = newest
+    ranges = load_claims(root)
+    claimed: dict[str, dict[str, int]] = {}
+    for section, rows in ranges.items():
+        for start, end, unit in rows:
+            claimed.setdefault(unit, {})[section] = claimed.get(unit, {}).get(section, 0) + (end - start)
+    for unit in sorted(claimed):
+        path = os.path.join(root, "build", GAME_DIR, "obj", unit + ".o")
+        try:
+            mtime = os.stat(path).st_mtime
+            sizes = section_sizes(path)
+        except Exception:                                                    # noqa: BLE001 - no/unreadable object
+            continue
+        out["total"] += 1
+        age = stamps[newest] - mtime
+        if age > tolerance:
+            out["older"] += 1
+            out["worst_age"] = max(out["worst_age"], age)
+        for sec in FRESH_SECTIONS:
+            if sizes.get(sec, 0) != claimed[unit].get(sec, 0):
+                out["stale"] += 1
+                out["units"][unit] = (sec, claimed[unit].get(sec, 0), sizes.get(sec, 0))
+                if len(out["examples"]) < 5:
+                    out["examples"].append((unit, sec, claimed[unit].get(sec, 0), sizes.get(sec, 0)))
+                break
+    return out
+
+
+def render_freshness(label: str, fr: dict) -> list[str]:
+    """The WARNING line for a stale census (none when every object matches its unit's claims)."""
+    if not fr["stale"]:
+        return []
+    return ["WARNING: %s census built from objects older than splits.txt/symbols.txt: %d of %d target object(s) do not "
+            "match their unit's claims (e.g. %s; %d object file(s) predate %s, oldest by %.1f h) - they were cut "
+            "from different claims, so pairs may differ for that reason alone; re-split (`rm "
+            "build/RMHE08/config.json` + ninja) before trusting it"
+            % (label, fr["stale"], fr["total"],
+               ", ".join("%s %s claimed 0x%X, object 0x%X" % e for e in fr["examples"][:2]), fr["older"],
+               fr["newest"], fr["worst_age"] / 3600.0)]
+
+
+def explain_added(root: str, base_root: str, units: list[str], base_keys, base_ranges: dict) -> list[str]:
+    """One line per (unit, cause) for the pairs the tree has and the base does not: WHY the two censuses differ.
+
+    Causes, in the order they are tested: the base tree has no target object for the unit; its object does not
+    reference the symbol (the objects differ - `stale` when the base object predates the base's map files);
+    the base's claims cover the address (a claims effect); else the snapshot and the base tree disagree.
+    """
+    from units import undefrefs as uref  # noqa: PLC0415 - the one relocation reader
+
+    names = [os.path.splitext(u)[0] for u in units]
+    (records, _stats), _n, _have = census(root, names)
+    base_keys = set(base_keys)
+    new = [r for k, r in sorted(orphan_keys(records, names).items()) if k not in base_keys]
+    if not new:
+        return []
+    base_stale = tree_freshness(base_root)["units"]
+    cache: dict[str, tuple] = {}
+    causes: dict[tuple, list[str]] = {}
+    for r in new:
+        unit = r["unit"]
+        if unit not in cache:
+            bo = os.path.join(base_root, "build", GAME_DIR, "obj", unit + ".o")
+            ro = os.path.join(root, "build", GAME_DIR, "obj", unit + ".o")
+            sources: dict[str, set] = {}
+            loaded = uref.load_object(ro) if os.path.exists(ro) else None
+            for rel in (loaded or {}).get("relocs", ()):
+                if rel["symbol"]:
+                    sources.setdefault(rel["symbol"], set()).add(rel["target"] or "")
+            cache[unit] = (object_data_refs(bo) if os.path.exists(bo) else None, _sha(bo), _sha(ro), sources)
+        refs, bsha, rsha, sources = cache[unit]
+        if refs is None:
+            why = "the base tree has no target object for this unit (a unit the batch registers)"
+        elif r["name"] not in refs:
+            via = sorted(t for t in sources.get(r["name"], ()) if t and not t.startswith((".text", "extab")))
+            if via and not any(t.startswith((".text", "extab")) for t in sources.get(r["name"], ())):
+                why = ("EXPOSED BY THE CLAIM: the base object does not reference it; in the tree only the unit's "
+                       "claimed %s reference it (claimed data carries its own relocations - the next plan only exists "
+                       "because the claim was made: run `dataclaim.py --unit %s --fixpoint`)" % (", ".join(via), unit))
+            else:
+                why = ("the base tree's target object does not reference it (objects differ: base %s, tree %s)"
+                       % (bsha, rsha))
+            if unit in base_stale:
+                why += ("; STALE base census: its %s is 0x%X but the base's claims total 0x%X"
+                        % (base_stale[unit][0], base_stale[unit][2], base_stale[unit][1]))
+        else:
+            status = classify_address(r["section"], r["address"], base_ranges, unit)
+            if status["status"] != "orphan":
+                why = "the base's claims cover it (%s %s): a claims effect" % (status["status"], status["owner"])
+            else:
+                why = "referenced and unclaimed at the base too: the snapshot's keys come from another census"
+        causes.setdefault((unit, why), []).append(r["name"])
+    return ["cause: %s: %d pair(s) (%s%s): %s" % (unit, len(ns), ", ".join(ns[:3]), " ..." if len(ns) > 3 else "", why)
+            for (unit, why), ns in sorted(causes.items())]
+
+
+def _sha(path: str) -> str | None:
+    import hashlib
+
+    try:
+        with open(path, "rb") as fh:
+            return hashlib.sha1(fh.read()).hexdigest()[:8]
+    except OSError:
+        return None
 
 
 def load_claims(root: str) -> dict:
@@ -899,8 +1207,8 @@ def load_data_symbols(root: str) -> dict[str, dict]:
     return out
 
 
-def census(root: str, units: list[str] | None = None, ranges: dict | None = None):
-    """`(records, stats), registered, read` for the registered units' TARGET objects as they stand in `root`."""
+def census_inputs(root: str, units: list[str] | None = None, ranges: dict | None = None) -> tuple[dict, int]:
+    """`({unit: {name: sites}}, registered)`: what each registered unit's TARGET object in `root` references."""
     ranges = ranges if ranges is not None else load_claims(root)
     registered = sorted({u for rows in ranges.values() for _s, _e, u in rows})
     if units is not None:
@@ -911,7 +1219,14 @@ def census(root: str, units: list[str] | None = None, ranges: dict | None = None
         path = os.path.join(root, "build", GAME_DIR, "obj", unit + ".o")
         if os.path.exists(path):
             unit_refs[unit] = object_data_refs(path)
-    return census_records(unit_refs, load_data_symbols(root), ranges), len(registered), len(unit_refs)
+    return unit_refs, len(registered)
+
+
+def census(root: str, units: list[str] | None = None, ranges: dict | None = None):
+    """`(records, stats), registered, read` for the registered units' TARGET objects as they stand in `root`."""
+    ranges = ranges if ranges is not None else load_claims(root)
+    unit_refs, registered = census_inputs(root, units, ranges)
+    return census_records(unit_refs, load_data_symbols(root), ranges), registered, len(unit_refs)
 
 
 # -- which batch units the STRICT row judges: "touched" means a REAL change (owner, 2026-09-29: "Only real changes") --
@@ -1339,6 +1654,11 @@ def selftest_census(eq) -> None:
         syms = ("w_claimed = .rodata:0x80500004; // type:object size:0x4\n"
                 "w_orphan = .rodata:0x80500040; // type:object size:0x4\n")
         write("config/RMHE08/symbols.txt", syms)
+        # A/a claims no .rodata here: a run beyond another unit's claim is a SECOND range for a unit that has one
+        # (span-blocked), so the "unclaimed word is refused" shape needs a unit with no claim in the section
+        splits = (splits.replace("A/a.cpp:\n\t.rodata start:0x80500000 end:0x80500010\n", "A/a.cpp:\n")
+                  .replace("start:0x80500010 end:0x80500020", "start:0x80500000 end:0x80500020"))
+        ranges = parse_splits_text(splits)
         write("config/RMHE08/splits.txt", splits)
         build_fixture_object(write("build/RMHE08/obj/A/a.o"), ["w_orphan"])
         build_fixture_object(write("build/RMHE08/obj/B/b.o"), ["w_claimed"])
@@ -1603,6 +1923,196 @@ def selftest_touch(eq) -> None:
         eq(row(snap, strict=False)["added_deferred"], [], "strict=False has no classification: the old add-only row")
 
 
+def selftest_span(eq) -> None:
+    """A claim span never covers another unit's read; the anchor survives; the fixpoint; the census freshness."""
+    import tempfile
+
+    splits = ("Sections:\n\t.text type:code align:32\n\n"
+              "A/a.cpp:\n\t.text start:0x80010000 end:0x80010100\n\t.data start:0x805E1000 end:0x805E1010\n\n"
+              "B/b.cpp:\n\t.text start:0x80010100 end:0x80010200\n\n"
+              "C/c.cpp:\n\t.text start:0x80010200 end:0x80010300\n\t.data start:0x805E2000 end:0x805E2010\n")
+    ranges = parse_splits_text(splits)
+
+    def sym(section, address, size=4):
+        return {"section": section, "address": address, "size": size, "type": "object"}
+
+    # the 0x805A1368 shape: A/a's own claim carries no pair; its sole-owned word sits far below it with a word
+    # another unit reads in between (and a second word of its own below that one)
+    symbols = {"a1": sym(".data", 0x805E1000), "far": sym(".data", 0x805E0000), "theirs": sym(".data", 0x805E0100),
+               "mid": sym(".data", 0x805E0F00), "near": sym(".data", 0x805E1010)}
+    refs = {"A/a": {"far": 1}, "B/b": {"theirs": 1}}
+    records, _s = census_records(refs, symbols, ranges)
+    with tempfile.TemporaryDirectory() as tmp:
+        rep = strict_report(tmp, records, ranges, ["A/a"], query=None, symbols=symbols)
+        blocks = [b for b in rep["blocks"] if b["unit"] == "A/a"]
+        eq([(b["section"], b["start"], b["verdict"], b["cls"]) for b in blocks],
+           [(".data", 0x805E0000, "deferred", "span-blocked")],
+           "a word below the unit's own claim with another unit's read between is span-blocked, never main")
+        eq("blocked by B/b reads theirs (0x805E0100)" in blocks[0]["reason"], True,
+           "... and the reason names the foreign reader and the address")
+        plan = splits_plan(splits, "A/a", blocks, None, span_blocker(rep["ctx"], "A/a"))
+        eq(plan["edits"], [], "NO plan line is produced for it")
+        text = render_plan(plan, "A/a")
+        eq(("REPLACE" in text, "ADD " in text, "blocked  span-blocked" in text), (False, False, True),
+           "... the rendering says blocked, not REPLACE")
+        eq([r.strip() for r in plan["result"]], [ln.strip() for ln in _unit_lines(splits.splitlines(), "A/a")],
+           "... and the unit's block is unchanged")
+
+        # the quest_entry shape: the anchor has no pairs and the only pair is past a foreign claim
+        refs2 = {"A/a": {"near": 1}, "C/c": {"a1": 1}}
+        records2, _s = census_records(refs2, symbols, ranges)
+        rep2 = strict_report(tmp, records2, ranges, ["A/a"], query=None, symbols=symbols)
+        b2 = [b for b in rep2["blocks"] if b["unit"] == "A/a"]
+        eq([(b["start"], b["verdict"]) for b in b2], [(0x805E1000, "refuse")],
+           "a pair adjacent to the unit's claim merges into the anchor block and stays refusable")
+        eq((b2[0]["start"], b2[0]["end"], len(b2[0]["anchors"])), (0x805E1000, 0x805E1014, 1),
+           "... the block is the span and records the anchor it merged")
+        p2 = splits_plan(splits, "A/a", b2, None, span_blocker(rep2["ctx"], "A/a"))
+        eq([(e["action"], e["start"], e["end"]) for e in p2["edits"]], [("replace", 0x805E1000, 0x805E1014)],
+           "... and the replacement spans the claim and the word exactly")
+
+        # an anchor with no pair keeps every other block a SECOND range, even when several pairs are far away
+        symbols3 = dict(symbols, far2=sym(".data", 0x805E0010), far3=sym(".data", 0x805E0014))
+        refs3 = {"A/a": {"far": 1, "far2": 1, "far3": 1}, "B/b": {"theirs": 1}}
+        records3, _s = census_records(refs3, symbols3, ranges)
+        rep3 = strict_report(tmp, records3, ranges, ["A/a"], query=None, symbols=symbols3)
+        eq(sorted((b["start"], len(b["pairs"]), b["verdict"], b["cls"]) for b in rep3["blocks"] if b["unit"] == "A/a"),
+           [(0x805E0000, 3, "deferred", "span-blocked")],
+           "with the anchor as main, a far block of three pairs still does not become main")
+
+        # a foreign claim in the gap is named too
+        ranges4 = parse_splits_text(splits + "\nD/d.cpp:\n\t.text start:0x80010300 end:0x80010400\n"
+                                    "\t.data start:0x805E0800 end:0x805E0810\n")
+        records4, _s = census_records({"A/a": {"far": 1}}, symbols, ranges4)
+        rep4 = strict_report(tmp, records4, ranges4, ["A/a"], query=None, symbols=symbols)
+        eq("blocked by D/d claims 0x805E0800-0x805E0810" in rep4["blocks"][0]["reason"], True,
+           "another unit's claim between the ranges is named as the blocker")
+
+        # a reader only callers.py knows (an unsplit function) blocks the gap as well
+        rep5 = strict_report(tmp, records4, ranges, ["A/a"], query=lambda a: (({}, 1) if a == 0x805E0F00 else ({}, 0)),
+                             symbols=symbols)
+        eq("blocked by unsplit code reads mid (0x805E0F00)" in rep5["blocks"][0]["reason"], True,
+           "an unsplit reader found by callers is named as the blocker")
+
+    # the plan's own guard: a refusable block whose span still covers a foreign read is blocked, with no edit
+    ok_block = {"unit": "A/a", "section": ".data", "start": 0x805E1000, "end": 0x805E1014, "verdict": "refuse",
+                "cls": None, "pairs": [1], "reason": "x", "anchors": [(0x805E1000, 0x805E1010)]}
+    guard = splits_plan(splits, "A/a", [ok_block], None, lambda sec, lo, hi: "B/b reads theirs (0x805E1012)")
+    eq((guard["edits"], [b["cls"] for b in guard["deferred"]]), ([], ["span-blocked"]),
+       "the plan guard turns a span over a foreign read into a blocked entry")
+    eq("blocked by B/b reads theirs" in guard["deferred"][0]["reason"], True, "... naming the reader")
+    clean = splits_plan(splits, "A/a", [ok_block], None, lambda sec, lo, hi: None)
+    eq(len(clean["edits"]), 1, "a clean guard lets the edit through")
+    # a same-section line of the unit outside the block is never folded into the span
+    two = splits.replace("\t.data start:0x805E1000 end:0x805E1010\n",
+                         "\t.data start:0x805E1000 end:0x805E1010\n\t.data start:0x805E1800 end:0x805E1810\n")
+    far_block = dict(ok_block, start=0x805E1010, end=0x805E1014, anchors=[(0x805E1000, 0x805E1010)])
+    p_two = splits_plan(two, "A/a", [dict(far_block, start=0x805E1000, end=0x805E1014)], None)
+    eq([(e["start"], e["end"]) for e in p_two["edits"]], [(0x805E1000, 0x805E1014)],
+       "a replacement folds in only the lines inside the block: the unit's other .data line stays as it is")
+    eq(any("0x805E1800" in r for r in p_two["result"]), True, "... and is still in the resulting block")
+    p_none = splits_plan(two, "A/a", [dict(ok_block, start=0x805E0F00, end=0x805E0F04, anchors=[])], None)
+    eq(([e for e in p_none["edits"]], p_none["deferred"][0]["cls"]), ([], "span-blocked"),
+       "a block that would be a third/second range beside the unit's existing ones is blocked, not added")
+
+    # the fixpoint: apply, re-judge, stop when stable
+    refs_f = {"A/a": {"near": 1, "far": 1}, "B/b": {"theirs": 1}}
+    with tempfile.TemporaryDirectory() as tmp:
+        fp = fixpoint_plan(tmp, "A/a", text=splits, unit_refs=refs_f, symbols=symbols, query=None)
+        eq((fp["converged"], fp["steps"]), (True, 1), "one claim step reaches the fixpoint")
+        eq(fp["net"]["after"][-1].strip(), ".data       start:0x805E1000 end:0x805E1014", "the net edit is the span claim")
+        eq([b["cls"] for b in fp["blockers"]], ["span-blocked"], "the far word is reported blocked at the fixpoint")
+        eq("blocked by B/b reads theirs (0x805E0100)" in fp["blockers"][0]["reason"], True, "... with the reader named")
+        again = fixpoint_plan(tmp, "A/a", text=fp["text"], unit_refs=refs_f, symbols=symbols, query=None)
+        eq((again["converged"], again["steps"], again["net"]["before"] == again["net"]["after"]), (True, 0, True),
+           "asking again after applying the converged plan yields no plan: it is stable")
+        eq("converged after 1 claim step(s)" in render_fixpoint(fp) and "+ .data" in render_fixpoint(fp), True,
+           "the rendering carries the converged plan")
+        eq("already at its fixpoint" in render_fixpoint(again), True, "... or says nothing is left")
+        eq(fixpoint_plan(tmp, "Z/z", text=splits, unit_refs=refs_f, symbols=symbols, query=None)["final"]["found"],
+           False, "an unregistered unit has no block to fix")
+
+        # a plan that never settles is reported with its reason, not looped on
+        real = globals()["splits_plan"]
+        flip = [0]
+
+        def unstable(text, unit, blocks, our_sizes=None, blocker=None):
+            flip[0] += 1
+            end = 0x805E1020 if flip[0] % 2 else 0x805E1010
+            line = "\t.data       start:0x805E1000 end:0x%08X" % end
+            return {"found": True, "header": "A/a.cpp:", "deferred": [], "result": ["+ " + line],
+                    "edits": [{"action": "replace", "section": ".data", "start": 0x805E1000, "end": end, "pairs": 1}]}
+
+        globals()["splits_plan"] = unstable
+        try:
+            bad = fixpoint_plan(tmp, "A/a", text=splits, unit_refs=refs_f, symbols=symbols, query=None)
+        finally:
+            globals()["splits_plan"] = real
+        eq((bad["converged"], "no fixpoint" in bad["stop"]), (False, True), "an oscillating plan is reported, not looped")
+        eq("NOT converged" in render_fixpoint(bad), True, "... and the rendering names it")
+
+    # the census freshness: a current object's sections are as large as its unit's claims
+    with tempfile.TemporaryDirectory() as tmp:
+        def put(rel, text):
+            path = os.path.join(tmp, rel)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(text)
+
+        fsplits = ("Sections:\n\t.text type:code align:32\n\nA/a.cpp:\n\t.text start:0x80010000 end:0x80010004\n"
+                   "\t.data start:0x805E0000 end:0x805E0004\n")
+        put("config/RMHE08/splits.txt", fsplits)
+        put("config/RMHE08/symbols.txt", "p1 = .data:0x805E0010; // type:object size:0x4\n")
+        os.makedirs(os.path.join(tmp, "build", "RMHE08", "obj", "A"), exist_ok=True)
+        build_fixture_object(os.path.join(tmp, "build", "RMHE08", "obj", "A", "a.o"), ["p1"])
+        fr = tree_freshness(tmp)
+        eq((fr["total"], fr["stale"]), (1, 0), "an object whose sections equal the claims is current")
+        eq(render_freshness("base", fr), [], "... and no warning is printed")
+        put("config/RMHE08/splits.txt", fsplits.replace("0x805E0004", "0x805E0010"))
+        fr = tree_freshness(tmp)
+        eq((fr["stale"], fr["examples"][0][:3]), (1, ("A/a", ".data", 0x10)), "a claim the object does not carry is stale")
+        warn = render_freshness("base", fr)
+        eq(len(warn) == 1 and "base census built from objects older than splits.txt/symbols.txt" in warn[0], True,
+           "... with the WARNING naming the unit, section and sizes")
+        eq(tree_freshness(os.path.join(tmp, "nowhere"))["total"], 0, "a tree with no map files has nothing to be stale")
+
+    # the --base-root discrepancy: which cause made a pair appear only in the tree's census
+    with tempfile.TemporaryDirectory() as tmp:
+        def put2(root, rel, text):
+            path = os.path.join(root, rel)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(text)
+
+        esplits = ("Sections:\n\t.text type:code align:32\n\nA/a.cpp:\n\t.text start:0x80010000 end:0x80010004\n")
+        esyms = "p1 = .data:0x805E0010; // type:object size:0x4\n"
+        base, tree = os.path.join(tmp, "base"), os.path.join(tmp, "tree")
+        for root in (base, tree):
+            put2(root, "config/RMHE08/splits.txt", esplits)
+            put2(root, "config/RMHE08/symbols.txt", esyms)
+        os.makedirs(os.path.join(base, "build", "RMHE08", "obj", "A"), exist_ok=True)
+        build_fixture_object(os.path.join(base, "build", "RMHE08", "obj", "A", "a.o"), [])
+        os.makedirs(os.path.join(tree, "build", "RMHE08", "obj", "A"), exist_ok=True)
+        build_fixture_object(os.path.join(tree, "build", "RMHE08", "obj", "A", "a.o"), ["p1"])
+        lines = explain_added(tree, base, ["A/a"], [], parse_splits_text(esplits))
+        eq(len(lines), 1, "one cause line per (unit, cause)")
+        eq("does not reference it" in lines[0] and "EXPOSED" not in lines[0], True,
+           "a pair the base object never referenced is reported as differing objects")
+        from units import undefrefs as uref
+
+        real_load = uref.load_object
+        uref.load_object = lambda path: ({"relocs": [{"symbol": "p1", "target": ".data", "offset": 0}], "defined": {},
+                                          "refs": {"p1"}} if path.startswith(tree) else real_load(path))
+        try:
+            lines = explain_added(tree, base, ["A/a"], [], parse_splits_text(esplits))
+        finally:
+            uref.load_object = real_load
+        eq("EXPOSED BY THE CLAIM" in lines[0] and "--fixpoint" in lines[0], True,
+           "a pair only the unit's claimed .data references is named as exposed by the claim")
+        eq(explain_added(tree, base, ["A/a"], [orphan_key("A/a", ".data", 0x805E0010)], parse_splits_text(esplits)), [],
+           "a pair the base already has needs no explanation")
+
+
 def selftest() -> int:
     checks = 0
 
@@ -1679,6 +2189,7 @@ def selftest() -> int:
     selftest_census(eq)
     selftest_strict(eq)
     selftest_touch(eq)
+    selftest_span(eq)
 
     print(f"datagap selftest: {checks} checks OK")
     return 0
@@ -1740,6 +2251,11 @@ def main(argv=None) -> int:
             snap["unit_claims"] = unit_claim_table(splits_at_ref(args.root, args.base_ref))
         units = [u.strip() for u in args.row.split(",") if u.strip()]
         verdict = batch_orphans(args.root, units, snap, args.allow_orphan)
+        for label, tree in (("base", base_root), ("tree", args.root)):
+            if label == "tree" and os.path.abspath(tree) == os.path.abspath(base_root):
+                continue
+            for line in render_freshness(label, tree_freshness(tree)):
+                print(line)
         if args.touched_by:
             for unit in units:
                 print(render_touch(os.path.splitext(unit)[0], verdict["touch"].get(os.path.splitext(unit)[0],
@@ -1754,6 +2270,10 @@ def main(argv=None) -> int:
             print("deferred (new pair) ... %d more" % (len(verdict["added_deferred"]) - 6))
         for line in verdict["added"]:
             print("REFUSED  " + line)
+        if verdict["added"] and os.path.abspath(base_root) != os.path.abspath(args.root):
+            base_ranges = splits_at_ref(args.root, args.base_ref) if args.base_ref else load_claims(base_root)
+            for line in explain_added(args.root, base_root, units, snap.get("keys") or [], base_ranges):
+                print(line)
         for line in verdict["sole_owned"]:
             print("REFUSED  sole-owned: " + line)
         for line in verdict["accepted"] + verdict["strict"]["accepted"]:
