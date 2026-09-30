@@ -1886,6 +1886,34 @@ def flips_objects(main: str) -> bool:
     return bool(re.search(r"^\+.*Object\(\s*Matching", p.stdout or "", re.M))
 
 
+def flipped_units(main: str) -> list[str]:
+    """Units whose `Object(...)` line gains `Matching` in configure.py relative to HEAD (a flip, or a new Matching unit)."""
+    p = run(["git", "diff", "HEAD", "-U0", "--", "configure.py"], main)
+    out = []
+    for m in re.finditer(r'^\+.*Object\(\s*Matching\s*,\s*"([^"]+)"', p.stdout or "", re.M):
+        out.append(claims.norm_unit(m.group(1)))
+    return sorted(dict.fromkeys(out))
+
+
+def flipcheck_problems(main: str, units: list[str]) -> list[str]:
+    """`flipcheck.py` refusals for the units a batch flips: one line per unit with its reasons."""
+    if not units:
+        return []
+    p = run([sys.executable, os.path.join("tools", "units", "flipcheck.py"), *units], main)
+    problems, cur = [], None
+    for line in (p.stdout or "").splitlines():
+        if line.startswith("NOT READY"):
+            cur = [line.split(None, 2)[2].strip()]
+            problems.append(cur)
+        elif line.startswith("   - ") and cur is not None:
+            cur.append(line[5:].strip())
+        elif line.startswith("READY") or not line.strip():
+            cur = None
+        elif line.endswith("no splits.txt entry"):
+            problems.append([line.split(":")[0], "no splits.txt entry"])
+    return ["%s: %s" % (g[0], "; ".join(g[1:]) or "not ready") for g in problems]
+
+
 def regression_rows(changes_json: str) -> list[tuple[str, str, float, float]]:
     """(unit, measure, before, after) for every measure that went down, from a report_changes.json."""
     if not os.path.exists(changes_json):
@@ -2572,6 +2600,17 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
                      "register is where it is worked down)")
         for line in result["pre_existing"]:
             print("note: %s" % line, file=sys.stderr)
+        # the flip-readiness row (2026-09-29): a batch that turns a unit `Matching` links our object into
+        # main.dol, so `flipcheck.py` must call it READY first. Refusing here names the section (extab, a
+        # `.data` claim, an undefined reference) instead of a moved DOL hash after the slow link; READY stays
+        # necessary, not sufficient - the DOL hash row below is still the proof.
+        flips = flipped_units(main)
+        if flips:
+            fp = flipcheck_problems(main, [u for u in flips if u in unit_units] or flips)
+            check("every unit the batch flips to Matching is flipcheck READY", not fp, "; ".join(fp[:3]),
+                  info="flipped: %s" % ", ".join(flips),
+                  remedy="`python tools/units/flipcheck.py <unit>` names the section that does not match the "
+                         "claim; fix it, or keep the unit `NonMatching` (playbook 36/46/55/59/62)")
         if result["missing"]:
             check("the batch base carries an unresolved-reference snapshot for every unit", False,
                   "record-base did not snapshot: %s" % ", ".join(result["missing"][:4]),
@@ -2902,6 +2941,26 @@ def selftest() -> int:
     check("outside the batch: ground truth", outside_batch(["config/RMHE08/build.sha1"]),
           ["config/RMHE08/build.sha1"])
     check("outside the batch: the campaign state files", outside_batch([".pi/claims.json"]), [".pi/claims.json"])
+
+    # the flip-readiness row's input: which units configure.py turns Matching (2026-09-29). Real temporary repo.
+    with tempfile.TemporaryDirectory() as tmp:
+        def _f(*a):
+            subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *a], cwd=tmp, check=True,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        def _conf(*rows):
+            with open(os.path.join(tmp, "configure.py"), "w", newline="") as fh:
+                fh.write("".join('    Object(%s, "%s"),' % r + chr(10) for r in rows))
+        _f("init", "-q")
+        _conf(("NonMatching", "Pl/pl_act.cpp"), ("Matching", "OS/a.c"))
+        _f("add", "-A")
+        _f("commit", "-q", "-m", "base")
+        check("flipped_units: nothing flipped", flipped_units(tmp), [])
+        _conf(("Matching", "Pl/pl_act.cpp"), ("Matching", "OS/a.c"))
+        check("flipped_units: names only the unit that gained Matching", flipped_units(tmp), ["Pl/pl_act"])
+        _conf(("NonMatching", "Pl/pl_act.cpp"), ("Matching", "OS/a.c"), ("Matching", "New/b.cpp"))
+        check("flipped_units: a new Matching unit counts", flipped_units(tmp), ["New/b"])
+    check("flipcheck_problems: no units, no work", flipcheck_problems(".", []), [])
 
     # a batch that DELETES an extension-less file: after the apply the tree no longer has it, so only the
     # BASE's tree can say it was a path (`tools/git/hooks/post-commit`, 2026-09-28). Real temporary repo.
