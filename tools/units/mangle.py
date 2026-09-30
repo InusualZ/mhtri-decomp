@@ -90,6 +90,87 @@ def mangle(snippet: str, unit_spec: str | None = None, verbose: bool = False,
         return unitutil.function_names(obj), out
 
 
+# --------------------------------------------------------------------------------------------------
+# an estimate without the compiler (rule 13's finding detail and `methodize.py` use it)
+# --------------------------------------------------------------------------------------------------
+# MWCC spells a member `name__<len><Class>[C]F<params>`; the parameter codes below are the ones the project's
+# scalar typedefs (`include/types.h`) expand to. It is an ESTIMATE: an unknown identifier is read as a
+# class/struct/enum name (`<len><Name>`), and a shape it cannot spell (a function pointer, an array, a
+# repeated class type that the compiler folds into a `T`/`N` back-reference) returns None instead of a guess.
+# `mangle()` above is the exact answer (it compiles); call it to confirm before a map row is renamed.
+_PRIMITIVE_CODES = {
+    "u8": "Uc", "s8": "Sc", "u16": "Us", "s16": "s", "u32": "Ul", "s32": "l", "u64": "Ux", "s64": "x",
+    "f32": "f", "f64": "d", "BOOL": "i", "int": "i", "char": "c", "short": "s", "long": "l",
+    "float": "f", "double": "d", "bool": "b", "void": "v",
+    "unsigned char": "Uc", "signed char": "Sc", "unsigned short": "Us", "unsigned int": "Ui",
+    "unsigned": "Ui", "unsigned long": "Ul", "long long": "x", "unsigned long long": "Ux",
+    "short int": "s", "long int": "l", "unsigned short int": "Us", "unsigned long int": "Ul",
+}
+_QUALIFIERS = {"const", "volatile", "register", "struct", "class", "enum"}
+
+
+def _param_code(text: str) -> str | None:
+    """The mangling of one parameter declaration (`const u8* data`), or None when it cannot be spelled."""
+    t = text.split("=")[0].strip()
+    if not t or "(" in t or "[" in t or "::" in t or "<" in t or "..." in t:
+        return None
+    toks = re.findall(r"[A-Za-z_]\w*|\*|&", t)
+    # split the declaration into the base words and the declarator levels (`*`/`&`, each with its own const)
+    base: list[str] = []
+    base_const = False
+    levels: list[list] = []          # [char, const]
+    seen_decl = False
+    for tok in toks:
+        if tok in ("*", "&"):
+            levels.append([tok, False])
+            seen_decl = True
+        elif tok in ("const", "volatile"):
+            if levels:
+                levels[-1][1] = levels[-1][1] or tok == "const"
+            elif tok == "const":
+                base_const = True
+        elif tok in _QUALIFIERS:
+            continue
+        elif not seen_decl:
+            base.append(tok)
+        # an identifier after the declarators is the parameter's name
+    words = base[:]
+    prim = _PRIMITIVE_CODES.get(" ".join(words))
+    if prim is None and len(words) >= 2:
+        # the last word may be the parameter's own name (`s32 size`, `unsigned char c`)
+        prim = _PRIMITIVE_CODES.get(" ".join(words[:-1]))
+        if prim is not None or not levels:
+            words = words[:-1]
+    if prim is None:
+        if len(words) != 1:
+            return None
+        prim = "%d%s" % (len(words[0]), words[0])
+    code = ("C" if base_const else "") + prim
+    for ch, const in levels:
+        code = ("C" if const else "") + ("P" if ch == "*" else "R") + code
+    return code
+
+
+def estimate_member_mangling(type_name: str, method: str, rest_params: list[str],
+                             const_self: bool = False) -> str | None:
+    """`method__<len>Type[C]F<params>` for `Type::method(rest_params...)`, or None when it cannot be spelled.
+
+    `rest_params` is the parameter list **without** the `self`. An empty list (or a lone `void`) is `Fv`.
+    A class-typed parameter that repeats an earlier one is refused (the compiler back-references it).
+    """
+    params = [p.strip() for p in rest_params if p.strip() and p.strip() != "void"]
+    codes: list[str] = []
+    for p in params:
+        c = _param_code(p)
+        if c is None:
+            return None
+        if any(ch.isdigit() for ch in c) and c in codes:
+            return None              # a repeated class type is folded by the compiler: do not guess
+        codes.append(c)
+    return "%s__%d%s%sF%s" % (method, len(type_name), type_name, "C" if const_self else "",
+                              "".join(codes) if codes else "v")
+
+
 def rename_command(old: str, new: str) -> str:
     """The other half of the edit, as the command that performs it (never by hand - skill rule)."""
     return "python tools/symbols/symedit.py rename %s %s" % (old, new)
@@ -143,6 +224,27 @@ def selftest() -> int:
           stub_source("void f(void)", preamble=False).startswith('#include'), False)
     check("the rename command goes through symedit, not by hand",
           rename_command("fn_800CCCF8", "X__Fv"), "python tools/symbols/symedit.py rename fn_800CCCF8 X__Fv")
+
+    # the compiler-free estimate (rule 13's detail): the owner's own example, and the shapes around it
+    check("estimate: NetworkSingleTcp::send is the owner's example",
+          estimate_member_mangling("NetworkSingleTcp", "send", ["const u8* data", "s32 size"]),
+          "send__16NetworkSingleTcpFPCUcl")
+    check("estimate: no parameters is Fv", estimate_member_mangling("A", "get", []), "get__1AFv")
+    check("estimate: a lone void is Fv", estimate_member_mangling("A", "get", ["void"]), "get__1AFv")
+    check("estimate: a const self is the C qualifier",
+          estimate_member_mangling("A", "get", [], const_self=True), "get__1ACFv")
+    check("estimate: a class pointer is P<len><Name>",
+          estimate_member_mangling("A", "add", ["NetworkPeerMcs* peer"]), "add__1AFP14NetworkPeerMcs")
+    check("estimate: a reference is R", estimate_member_mangling("A", "f", ["const Foo& x"]), "f__1AFRC3Foo")
+    check("estimate: u16/s16/f32", estimate_member_mangling("A", "f", ["u16 a", "s16 b", "f32 c"]),
+          "f__1AFUssf")
+    check("estimate: a const pointer is C before P",
+          estimate_member_mangling("A", "f", ["u8* const p"]), "f__1AFCPUc")
+    check("estimate: a function pointer is not guessed",
+          estimate_member_mangling("A", "f", ["void (*cb)(int)"]), None)
+    check("estimate: a repeated class type is not guessed",
+          estimate_member_mangling("A", "f", ["Foo* a", "Foo* b"]), None)
+    check("estimate: an unnamed parameter", estimate_member_mangling("A", "f", ["s32", "u8*"]), "f__1AFlPUc")
 
     # the real thing: one compile with a unit's real command line
     names, _ = mangle("void mangle_probe_free(int a, unsigned char b)")

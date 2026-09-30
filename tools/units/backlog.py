@@ -132,20 +132,21 @@ from units import handoff as handoff_mod  # noqa: E402 (the outbox schema: FREE_
 
 STATUSES = ("open", "done", "parked")
 NEW_KINDS = ("shared-file", "range", "seam", "flag", "tooling", "naming", "band-header", "untyped",
-            "undefrefs")
+            "method", "undefrefs")
 # default open; a `rename` is never carried
 # The lint-derived kinds: `naming` is one item per file carrying rule-7 findings, `band-header` one per file
-# carrying rule-2 findings, `untyped` one per file carrying rule-11 findings (`build_items` /
+# carrying rule-2 findings, `untyped` one per file carrying rule-11 findings and `method` one per file carrying
+# rule-13 findings (a `<Type>_<name>(<Type>* self)` free function that is a member) (`build_items` /
 # `collect_lint_items`). All are ordinary open items, so the credit ratio rations new claims against them -
 # no special-casing.
-LINT_KINDS = ("naming", "band-header", "untyped")
-LINT_RULES = {"naming": 7, "band-header": 2, "untyped": 11}
+LINT_KINDS = ("naming", "band-header", "untyped", "method")
+LINT_RULES = {"naming": 7, "band-header": 2, "untyped": 11, "method": 13}
 # The name-based lint kinds: their weight is the number of **distinct at-fault names** - the token
 # `stylelint.finding_identity` carries - not the occurrence count. One name repeated 500 times is one
 # rename; 50 distinct names are 50 (`lint_index`). `untyped` is deliberately not one of them: a rule-11
 # finding is a declaration's `void *`, not a name to clear, so it keeps its occurrence count.
 NAME_KINDS = ("naming", "band-header")
-RULE_KIND = {7: "naming", 2: "band-header", 11: "untyped"}
+RULE_KIND = {7: "naming", 2: "band-header", 11: "untyped", 13: "method"}
 # The lint kinds the queue can hand out as a *claim* (`queue.py debt`): the item names a file and carries
 # its distinct name list, so a lane can be given "clean the N names in this file" exactly like a unit
 # proposal - the same `claims.py` claim, the same credit balance, one resolved item still earning one.
@@ -634,6 +635,12 @@ def collect_lint_items(main: str, register: str | None = None) -> list[Item]:
                    "`unk*` spellings the file already flagged) - name each from what it does or holds and "
                    "rename the map row in the same change"
                    % (target, live or last))
+        elif kind == "method":
+            ask = ("`%s` carries %d rule-13 finding(s) (a `<Type>_<name>(<Type>* self, ...)` free function - a "
+                   "member spelled the C way) - declare it in the class, define `Type::name`, rename the map "
+                   "row to the mangling and sweep the call sites (`python tools/units/methodize.py <Type>` "
+                   "prints the plan), or mark a genuine C function `/* free: <reason> */`"
+                   % (target, live or last))
         elif kind == "untyped":
             ask = ("`%s` carries %d rule-11 finding(s) (a `void *` parameter or return type) - name the "
                    "real type at every call site, or mark the declaration `/* untyped: <byte range|opaque "
@@ -1065,7 +1072,7 @@ def lane_task(main: str, item: Item, cwd: str | None = None, brief: str | None =
     if item.kind in DEBT_KINDS and item.names:
         return debt_task(main, item, cwd=cwd, brief=brief)
     profile = {"shared-file": "fixer", "range": "decompiler", "flag": "fixer",
-               "naming": "fixer", "band-header": "fixer", "untyped": "fixer",
+               "naming": "fixer", "band-header": "fixer", "untyped": "fixer", "method": "fixer",
                "undefrefs": "fixer",
                "tooling": "worker"}.get(item.kind, "worker")
     task = ("Work the campaign backlog item `%s` (%s %s): %s. "
@@ -1485,6 +1492,17 @@ def _check_lint(main: str, item: Item, ctx: dict):
     ownership = ctx.get("ownership")
     if rule == 2 and ownership is None:
         return ("open", "no check: config/RMHE08/symbols.txt or splits.txt is absent")
+    if rule == 13:
+        # Rule 13 reads the tree-wide type registry (`set_rule13_context`), built once per triage run and
+        # cached by `stylelint` itself; the file is re-linted with the same function that filed it.
+        if not ctx.get("rule13_ready"):
+            sl.set_rule13_context(main)
+            ctx["rule13_ready"] = True
+        findings = sl.rule13_findings(sl.Source(path, item.target, read(path)))
+        if findings:
+            return ("open", "%s still carries %d rule-13 finding(s)" % (item.target, len(findings)))
+        return ("resolved", "rule %d no longer fires in %s (re-linted with the same rule that filed it)"
+                % (rule, item.target))
     if rule == 11:
         # Rule 11 is source-local and has no ownership dependency, so it is read straight from the file:
         # `lint_source` returns early for the unsplit band (rule 2 only), which would call a band item

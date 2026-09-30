@@ -562,7 +562,7 @@ regression if the hash goes red.
     `unkNN` may survive in `src/`, every reconstructed type states its size, every field carries its offset and a
     context name (padding excepted), shared types live in one header, an `extern` lives with the unit that owns
     the symbol, and pointer arithmetic to reach a field is forbidden. `tools/units/stylelint.py` (roadmap 7.21)
-    enforces those twelve rules at the campaign's land gate (the table is `docs/plan.md` section 6.5;
+    enforces those thirteen rules at the campaign's land gate (the table is `docs/plan.md` section 6.5;
     regenerate the profiles with `tools/agents/sync_profiles.py` after a rule change).
 * **Style:** match the file you're editing (vendor sources mirror upstream formatting; new project code
   follows the surrounding 4-space-indent C style). Files are UTF-8 and **LF - in the repository and in the

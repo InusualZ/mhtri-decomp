@@ -180,6 +180,8 @@ RULE_NAMES = {
     10: "a codegen pragma lives in the TU that needs it, not in a shared header",
     11: "no `void *` parameter or return type (mark the declaration `/* untyped: <reason> */` if genuinely untyped)",
     12: "data no registered range claims is the unit's to claim and match (an `extern` for it is the finding)",
+    13: "a method is a member (`<Type>_<name>(<Type>* self, ...)` is `<Type>::<name>`; mark a genuine C function "
+        "`/* free: <reason> */`)",
 }
 
 # The codegen-affecting pragma names for rule 10.  A `#pragma` is lexically scoped to the rest of the
@@ -1377,8 +1379,12 @@ def function_declarations(src: Source) -> list[dict]:
     return out
 
 
-def _untyped_marker(src: Source, start_line: int, end_line: int) -> str | None:
+def _untyped_marker(src: Source, start_line: int, end_line: int,
+                    marker_re: "re.Pattern" = RULE11_MARKER_RE) -> str | None:
     """The reason of a `/* untyped: <reason> */` marker on the declaration or the line above it.
+
+    `marker_re` selects the marker: rule 13 reuses this with its `free:` pattern, so the window and the
+    standalone-line rule are one implementation.
 
     The window is `start_line - 1 .. end_line`, exactly the owner's "on the declaration or the line above
     it". The line above must be a **standalone** marker (its code view is blank): a trailing marker on the
@@ -1389,7 +1395,7 @@ def _untyped_marker(src: Source, start_line: int, end_line: int) -> str | None:
     for line in range(max(1, start_line - 1), end_line + 1):
         seg_start = src._starts[line - 1]
         seg_end = src._starts[line] if line < len(src._starts) else len(src.comments)
-        m = RULE11_MARKER_RE.search(src.comments[seg_start:seg_end])
+        m = marker_re.search(src.comments[seg_start:seg_end])
         if not m:
             continue
         if line == start_line - 1 and src.code[seg_start:seg_end].strip():
@@ -1463,6 +1469,192 @@ def rule11_local_count(src: Source) -> int:
         else:
             merged.append([a, b])
     return sum(len(RULE11_LOCAL_RE.findall(src.code[a + 1:b])) for a, b in merged)
+
+
+
+# --------------------------------------------------------------------------------------------------
+# rule 13: a method is a member - `<Type>_<name>(<Type>* self, ...)` is `<Type>::<name>` spelled the C way
+# --------------------------------------------------------------------------------------------------
+# A free function named `<Type>_<name>` whose first parameter is `<Type>*`, `const <Type>*` or `<Type>&`, for a
+# class or struct the project defines, is a member function written the C way. MWCC then emits the *mangled*
+# name (`send__16NetworkSingleTcpFPCUcl`), so the map row has to carry that mangling, the class lists the
+# method and call sites use `obj->name(...)`. The exemption is a per-declaration `/* free: <reason> */` marker
+# (retail C linkage evidenced, or an SDK C struct); a file can never exempt itself.
+#
+# Scope: `.cpp`-family sources and the headers a `.cpp` reaches (a C file has no members). The type must have
+# a definition the tool can see. The definition registry is built once per tree (`Rule13Context`) and applies
+# to both sides of a `--diff`, so a class added by the batch cannot turn an old free function into an "added"
+# finding - only text the batch adds can.
+RULE13_MARKER_RE = re.compile(r"\bfree\s*:\s*([^\n]*)")
+# The reason must say which case it is: evidenced C linkage, or a plain C struct from an SDK API.
+RULE13_REASON_RE = re.compile(
+    r"\bC[- ]linkage\b|\bunmangled\b|\brelocation\b|\bdump\b|\bevidence|\bSDK\b|\bC struct\b|\bretail\b", re.I)
+RULE13_FIRST_PARAM_RE = re.compile(
+    r"^\s*(?P<pre>(?:(?:const|volatile|register|struct|class)\s+)*)(?P<type>[A-Za-z_]\w*)\s*"
+    r"(?P<mid>(?:const\s*|volatile\s*)*)(?P<decl>[*&])\s*(?P<post>(?:(?:const|volatile)\s+)*)"
+    r"(?:[A-Za-z_]\w*)?\s*$")
+RULE13_CPP_SUFFIXES = (".cpp", ".cp", ".cc")
+_INCLUDE_RE = re.compile(r'^[ \t]*#[ \t]*include[ \t]*["<]([^">]+)[">]', re.M)
+
+
+class Rule13Context:
+    """The tree-wide facts rule 13 needs: the class/struct names the project defines under a C++ reach.
+
+    `types` holds every name defined in a `.cpp`-family source or in a header a `.cpp` includes (directly or
+    transitively); `headers` is the set of those headers' repo-relative paths - a header only a `.c` file
+    includes has no members to move a function into, so it is out of scope.
+    """
+
+    def __init__(self, types: set, headers: set):
+        self.types = types
+        self.headers = headers
+
+
+_RULE13_CTX: "Rule13Context | None" = None
+_RULE13_CACHE: dict = {}
+
+
+def _resolve_include(root: str, includer_rel: str, inc: str) -> str | None:
+    """The repo-relative path an `#include` names, or None (an SDK/system header this tree lacks)."""
+    for base in (HEADERS, os.path.dirname(includer_rel), SRC):
+        rel = os.path.normpath(os.path.join(base, inc)).replace(os.sep, "/")
+        if os.path.isfile(os.path.join(root, rel)):
+            return rel
+    return None
+
+
+def build_rule13_context(root: str) -> Rule13Context:
+    """Scan `src/` and `include/` once: the header set a `.cpp` reaches and the types defined there."""
+    files = {}
+    sig = []
+    for top in (SRC, HEADERS):
+        for dirpath, dirnames, filenames in os.walk(os.path.join(root, top)):
+            dirnames[:] = sorted(d for d in dirnames if d != "__pycache__")
+            for name in sorted(filenames):
+                if name.endswith(SUFFIXES):
+                    path = os.path.join(dirpath, name)
+                    files[rel_of(root, path)] = path
+                    sig.append((path, os.stat(path).st_mtime_ns))
+    key = (root, tuple(sig))
+    if key in _RULE13_CACHE:
+        return _RULE13_CACHE[key]
+    texts: dict = {}
+
+    def text_of(rel: str) -> str:
+        if rel not in texts:
+            texts[rel] = read_text(files[rel])
+        return texts[rel]
+
+    reach: set = set()
+    todo = [r for r in files if r.endswith(RULE13_CPP_SUFFIXES)]
+    seen = set(todo)
+    while todo:
+        rel = todo.pop()
+        for m in _INCLUDE_RE.finditer(text_of(rel)):
+            inc = _resolve_include(root, rel, m.group(1))
+            if inc is not None and inc in files and inc not in seen:
+                seen.add(inc)
+                reach.add(inc)
+                todo.append(inc)
+    types: set = set()
+    for rel in seen:
+        types.update(n for n, _line in type_defs(Source(files[rel], rel, text_of(rel))))
+    _RULE13_CACHE.clear()
+    _RULE13_CACHE[key] = ctx = Rule13Context(types, reach)
+    return ctx
+
+
+def set_rule13_context(root: str | None) -> None:
+    """Make `lint_source` read rule 13's type registry from `root` (None: per-file types only)."""
+    global _RULE13_CTX
+    _RULE13_CTX = build_rule13_context(root) if root else None
+
+
+def _rule13_in_scope(rel: str, ctx: "Rule13Context | None") -> bool:
+    rel = rel.replace("\\", "/")
+    if rel.endswith(RULE13_CPP_SUFFIXES):
+        return True
+    if rel.endswith(HEADER_SUFFIXES):
+        return ctx is None or rel in ctx.headers
+    return False
+
+
+def _rule13_self_type(first_chunk: str) -> tuple[str, bool] | None:
+    """`(Type, const_self)` when the first parameter is `Type*`, `const Type*` or `Type&`, else None."""
+    m = RULE13_FIRST_PARAM_RE.match(first_chunk)
+    if not m:
+        return None
+    return m.group("type"), bool(re.search(r"\bconst\b", m.group("pre")))
+
+
+def _rule13_prefix_type(name: str, types: set) -> str | None:
+    """The longest defined type `T` with `name == T + "_" + rest` (rest non-empty), or None."""
+    best = None
+    for i, ch in enumerate(name):
+        if ch == "_" and 0 < i < len(name) - 1 and name[:i] in types:
+            best = name[:i]
+    return best
+
+
+def _rule13_scan(src: Source) -> tuple[list[dict], set]:
+    """`(findings, static_like_names)` for one file. Static-like is informational, never a finding."""
+    ctx = _RULE13_CTX
+    if not _rule13_in_scope(src.rel, ctx):
+        return [], set()
+    types = ctx.types if ctx is not None else {n for n, _l in type_defs(src)}
+    if not types:
+        return [], set()
+    code = _mask_preproc(src.code)
+    findings: list[dict] = []
+    static_like: set = set()
+    for d in function_declarations(src):
+        name = d["name"]
+        if "::" in name or RULE9_MANGLED_RE.match(name):
+            continue
+        chunks = _split_parameters(code, d["params_pos"], d["params_pos"] + len(d["params"]))
+        first = chunks[0][0] if chunks else ""
+        owner = _rule13_prefix_type(name, types)
+        if owner is None:
+            continue
+        selfy = _rule13_self_type(first)
+        if selfy is None or selfy[0] != owner:
+            # no `self`: `getInstance(void)` / `setNotifyValue(u32)` - a static-shaped name, counted for the owner
+            if not first.strip() or first.strip() == "void" or not re.search(r"[*&]", first):
+                static_like.add(name)
+            continue
+        marker = _untyped_marker(src, d["start_line"], d["end_line"], RULE13_MARKER_RE)
+        if marker is not None and marker.strip() and RULE13_REASON_RE.search(marker):
+            continue
+        method = name[len(owner) + 1:]
+        rest = [c.strip() for c, _o in chunks[1:]]
+        mangled = None
+        try:
+            import mangle as _mg
+            mangled = _mg.estimate_member_mangling(owner, method, rest, const_self=selfy[1])
+        except Exception:                                    # the estimate is a courtesy, never a failure
+            mangled = None
+        sig = "%s %s::%s(%s)%s" % (d["ret"].strip() or "auto", owner, method, ", ".join(rest),
+                                   " const" if selfy[1] else "")
+        detail = ("`%s` is `%s::%s` spelled the C way (first parameter is the `%s` self) - declare `%s` in the "
+                  "class, define `%s::%s`, call it `obj->%s(...)`, and rename the map row to %s "
+                  "(`python tools/units/methodize.py %s`); or mark a genuine C function "
+                  "`/* free: <retail C linkage evidenced|SDK C struct> */`"
+                  % (name, owner, method, owner, sig, owner, method, method,
+                     "`%s` (estimated)" % mangled if mangled else "the compiler's mangling", owner))
+        findings.append(dict(_finding(src, 13, d["line"], detail, token=name), symbol=name,
+                             owner=owner, method=method, params=rest, const_self=selfy[1],
+                             ret=d["ret"].strip(), mangled=mangled, has_body=bool(d.get("body"))))
+    return findings, static_like
+
+
+def rule13_findings(src: Source) -> list[dict]:
+    """Rule 13 for one file: every `<Type>_<name>(<Type>* self, ...)` free function without a `free:` marker."""
+    return _rule13_scan(src)[0]
+
+
+def rule13_static_like(src: Source) -> set:
+    """The `<Type>_<name>` names with no `self` in the file - the weaker static-member variant, counted only."""
+    return _rule13_scan(src)[1]
 
 
 
@@ -1573,6 +1765,7 @@ def lint_source(src: Source, ownership: "Ownership | None" = None) -> list[dict]
         out.extend(rule12_findings(src, ownership))
 
     out.extend(rule11_findings(src))
+    out.extend(rule13_findings(src))
 
     out.sort(key=lambda f: (f["rule"], f["line"]))
     return out
@@ -1675,6 +1868,49 @@ def header_rule11_findings(root: str) -> list[dict]:
     for path in header_files(root):
         out.extend(rule11_findings(Source(path, rel_of(root, path), read_text(path))))
     return out
+
+
+def header_rule13_findings(root: str) -> list[dict]:
+    """Rule 13 over the whole shared-header tree (`include/`), including the unsplit band.
+
+    The declaration of `Type_name(Type* self)` lives in a header (`include/Network/network_socket_streams.h`),
+    so the finding has to be reachable there; `lint_source` leaves headers to their own walks, as for rule 11.
+    """
+    set_rule13_context(root)
+    out = []
+    for path in header_files(root):
+        out.extend(rule13_findings(Source(path, rel_of(root, path), read_text(path))))
+    return out
+
+
+def header_rule13_findings_at_ref(root: str, ref: str, rename: dict | None = None) -> list[dict]:
+    """Rule 13 for `include/` as it was at `ref`, keyed by the path the working tree spells (the back side).
+
+    The type registry is the working tree's (`set_rule13_context`), on both sides, so the comparison is of
+    text only - see the section comment.
+    """
+    rename = rename or {}
+    out = []
+    for path in git(root, "ls-tree", "-r", "--name-only", ref, "--", HEADERS).splitlines():
+        if not path.endswith(HEADER_SUFFIXES):
+            continue
+        try:
+            text = git_bytes(root, "show", "%s:%s" % (ref, path)).decode("utf-8", "replace")
+        except RuntimeError:
+            continue
+        out.extend(rule13_findings(Source(path, rename.get(path, path), text)))
+    return out
+
+
+def rule13_static_like_total(root: str) -> int:
+    """Distinct `<Type>_<name>` static-shaped names in `src/` and `include/` - the informational count."""
+    set_rule13_context(root)
+    names: set = set()
+    for s in all_sources(root):
+        names |= rule13_static_like(s)
+    for path in header_files(root):
+        names |= rule13_static_like(Source(path, rel_of(root, path), read_text(path)))
+    return len(names)
 
 
 def header_rule12_findings(root: str, ownership: "Ownership | None" = None) -> list[dict]:
@@ -1838,6 +2074,7 @@ def lint_tree(root: str, paths: list[str] | None = None,
     """
     if ownership is None:
         ownership = load_ownership(root)
+    set_rule13_context(root)
     out = []
     sources = all_sources(root) if paths is None else [
         Source(path, rel_of(root, path), read_text(path)) for path in paths]
@@ -1850,6 +2087,7 @@ def lint_all(root: str, ownership: "Ownership | None" = None) -> list[dict]:
     """Every checked finding: the per-file rules plus cross-file rule 1, in rule/file/line order."""
     if ownership is None:
         ownership = load_ownership(root)
+    set_rule13_context(root)
     sources = all_sources(root)
     out = []
     for src in sources:
@@ -1858,6 +2096,7 @@ def lint_all(root: str, ownership: "Ownership | None" = None) -> list[dict]:
     out.extend(header_pragma_findings(root))
     out.extend(header_rule2_findings(root, ownership))
     out.extend(header_rule11_findings(root))
+    out.extend(header_rule13_findings(root))
     out.extend(header_rule12_findings(root, ownership))
     out.sort(key=lambda f: (f["rule"], f["file"], f["line"]))
     return out
@@ -1885,7 +2124,8 @@ def unique_names(findings: list[dict]) -> dict:
             "label_names": len(names(7, "data")),
             "unk_fields": len(names(5, "")), "types": len(names(3, "")),
             "shared_types": len(names(1, "")), "extern_symbols": len(names(2, "")),
-            "mangled_names": len(names(9, "")), "unowned_data_symbols": len(names(12, ""))}
+            "mangled_names": len(names(9, "")), "unowned_data_symbols": len(names(12, "")),
+            "c_spelled_methods": len(names(13, ""))}
 
 
 def rule_enforced(rule: int, rel: str, src: "Source | None" = None) -> bool:
@@ -2350,6 +2590,12 @@ def print_budget(findings: list[dict], ownership: "Ownership | None" = None,
     if root is not None:
         print("rule 11 note: %d `void *` local variable(s) - out of the rule's scope, counted so the owner "
               "can decide" % rule11_local_total(root))
+    r13 = [f for f in findings if f["rule"] == 13]
+    print("rule 13 (a method is a member): %d finding(s) over %d file(s), %d distinct function name(s)"
+          % (len(r13), len(source_files_of(r13)), len({f["token"] for f in r13})))
+    if root is not None:
+        print("rule 13 note: %d static-shaped `<Type>_<name>` name(s) with no `self` - not findings, counted "
+              "so the owner can decide on a static-member rule" % rule13_static_like_total(root))
     print_rule2_report(ownership)
     for num, what in UNCHECKED:
         print("not checked (cross-file): rule %d - %s" % (num, what))
@@ -3155,8 +3401,173 @@ def selftest() -> int:
     check("rule11 locals: a nested block is not counted twice",
           rule11_local_count(Source("x.c", "x.c", "void f(void) {\n    if (1) {\n        void *p = 0;\n    }\n}\n")), 1)
 
+    # --- rule 13: a method is a member -------------------------------------------------------------
+    set_rule13_context(None)
+    CLS = "struct Tcp {\n    int a;\n};\n\n"
+
+    def r13(text: str, rel: str = "x.cpp") -> list[int]:
+        return [f["line"] for f in lint_source(Source("x.cpp", rel, text), None) if f["rule"] == 13]
+
+    check("rule13: `Type_name(Type* self)` is a finding",
+          r13(CLS + "s32 Tcp_send(Tcp* self, const u8* d, s32 n) {\n    return 0;\n}\n"), [5])
+    check("rule13: a prototype is judged too", r13(CLS + "s32 Tcp_send(Tcp* self);\n"), [5])
+    check("rule13: `const Type*` is a finding", r13(CLS + "int Tcp_get(const Tcp* self);\n"), [5])
+    check("rule13: `Type&` is a finding", r13(CLS + "int Tcp_get(Tcp& self);\n"), [5])
+    check("rule13: an unnamed self is a finding", r13(CLS + "int Tcp_get(Tcp*);\n"), [5])
+    check("rule13: `struct Type*` is a finding", r13(CLS + "int Tcp_get(struct Tcp* self);\n"), [5])
+    check("rule13: an `inline` free function is a finding like any other",
+          r13(CLS + "inline int Tcp_get(Tcp* self) {\n    return self->a;\n}\n"), [5])
+    check("rule13: an `extern \"C\"` block in a .cpp is judged (the owner's own case)",
+          r13(CLS + 'extern "C" {\ns32 Tcp_send(Tcp* self);\n}\n'), [6])
+    check("rule13: a static-like name with no self is not a finding",
+          r13(CLS + "Tcp* Tcp_getInstance(void);\nvoid Tcp_setValue(u32 v);\n"), [])
+    check("rule13: a different first-parameter type is not a finding",
+          r13(CLS + "struct Other {\n    int b;\n};\nint Tcp_get(Other* self);\n"), [])
+    check("rule13: a `Type**` first parameter is not a self", r13(CLS + "int Tcp_get(Tcp** self);\n"), [])
+    check("rule13: a name whose prefix is not a defined type is not a finding",
+          r13(CLS + "int Nope_get(Tcp* self);\n"), [])
+    check("rule13: a type the tool cannot see is not a finding", r13("int Tcp_get(Tcp* self);\n"), [])
+    check("rule13: a member definition is not a finding",
+          r13("struct Tcp {\n    int send(int n);\n};\nint Tcp::send(int n) {\n    return n;\n}\n"), [])
+    check("rule13: an already-mangled name is not a finding",
+          r13(CLS + "int Tcp_get__FP3Tcp(Tcp* self);\n"), [])
+    check("rule13: a C file has no members", r13(CLS + "int Tcp_get(Tcp* self);\n", "x.c"), [])
+    check("rule13: a header is judged (with the type in scope)",
+          r13(CLS + "int Tcp_get(Tcp* self);\n", "include/mod/a.h"), [])  # headers are walked, not linted here
+    check("rule13: the header walk reports it",
+          [f["line"] for f in rule13_findings(Source("a.h", "include/mod/a.h",
+                                                    CLS + "int Tcp_get(Tcp* self);\n"))], [5])
+    check("rule13: the marker on the line above exempts the declaration",
+          r13(CLS + "/* free: retail C linkage, the dump names it unmangled */\nint Tcp_get(Tcp* self);\n"), [])
+    check("rule13: a trailing marker exempts its own declaration",
+          r13(CLS + "int Tcp_get(Tcp* self); /* free: SDK C struct */\n"), [])
+    check("rule13: an SDK C struct is an accepted reason",
+          r13(CLS + "// free: SDK C struct\nint Tcp_get(Tcp* self);\n"), [])
+    check("rule13: an empty reason is still a finding",
+          r13(CLS + "/* free: */\nint Tcp_get(Tcp* self);\n"), [6])
+    check("rule13: a vague reason is still a finding",
+          r13(CLS + "/* free: it is fine */\nint Tcp_get(Tcp* self);\n"), [6])
+    check("rule13: a marker on an unrelated declaration does not leak",
+          r13(CLS + "/* free: SDK C struct */\nint Tcp_a(Tcp* self);\n\nint Tcp_b(Tcp* self);\n"), [8])
+    check("rule13: a trailing marker on the previous declaration does not exempt the next",
+          r13(CLS + "int Tcp_a(Tcp* self); /* free: SDK C struct */\nint Tcp_b(Tcp* self);\n"), [6])
+    check("rule13: a marker in a string is not a marker",
+          r13(CLS + 'const char* s = "free: SDK C struct";\nint Tcp_get(Tcp* self);\n'), [6])
+    check("rule13: two functions are two findings",
+          r13(CLS + "int Tcp_a(Tcp* self);\nint Tcp_b(Tcp* self);\n"), [5, 6])
+    check("rule13: a body is not a declaration (a call inside a definition)",
+          r13(CLS + "void f(Tcp* t) {\n    Tcp_get(t);\n}\n"), [])
+    check("rule13: static-like names are counted, not reported",
+          sorted(rule13_static_like(Source("x.cpp", "x.cpp", CLS + "Tcp* Tcp_getInstance(void);\n"
+                                           "void Tcp_setValue(u32 v);\nint Tcp_get(Tcp* self);\n"))),
+          ["Tcp_getInstance", "Tcp_setValue"])
+    det = [f for f in lint_source(Source("x.cpp", "x.cpp",
+                                         CLS + "s32 Tcp_send(Tcp* self, const u8* d, s32 n);\n"), None)
+           if f["rule"] == 13]
+    check("rule13: the detail names the type, the method, the member signature and the mangling",
+          ("Tcp::send" in det[0]["detail"], "s32 Tcp::send(const u8* d, s32 n)" in det[0]["detail"],
+           "send__3TcpFPCUcl" in det[0]["detail"], det[0]["token"]), (True, True, True, "Tcp_send"))
+
+    # the registry: a tree-wide type, C++ reach only, cached per tree
+    with tempfile.TemporaryDirectory() as tmp13:
+        def put13(rel: str, text: str) -> None:
+            path = os.path.join(tmp13, rel)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(text)
+
+        put13("include/mod/cls.h", "struct Tcp {\n    int a;\n};\n")
+        put13("include/mod/cstruct.h", "struct CTcp {\n    int a;\n};\n")
+        put13("include/mod/decl.h", '#include "mod/cls.h"\nint Tcp_get(Tcp* self);\n')
+        put13("include/mod/cdecl.h", '#include "mod/cstruct.h"\nint CTcp_get(CTcp* self);\n')
+        put13("src/mod/a.cpp", '#include "mod/decl.h"\nint Tcp_get(Tcp* self) {\n    return self->a;\n}\n')
+        put13("src/mod/b.c", '#include "mod/cdecl.h"\nint CTcp_get(CTcp* self) {\n    return self->a;\n}\n')
+        ctx13 = build_rule13_context(tmp13)
+        check("rule13 registry: a type a .cpp reaches through a header is known", "Tcp" in ctx13.types, True)
+        check("rule13 registry: a type only a .c file reaches is not", "CTcp" in ctx13.types, False)
+        check("rule13 registry: a header only a .c file includes is out of scope",
+              sorted(ctx13.headers), ["include/mod/cls.h", "include/mod/decl.h"])
+        set_rule13_context(tmp13)
+        check("rule13 registry: the declaration in a reachable header is a finding",
+              [f["line"] for f in header_rule13_findings(tmp13)], [2])
+        check("rule13 registry: the definition in the .cpp is a finding (type from another file)",
+              [f["line"] for f in lint_tree(tmp13, [os.path.join(tmp13, "src/mod/a.cpp")], None)
+               if f["rule"] == 13], [2])
+        check("rule13 registry: the .c file is never a finding",
+              [f for f in lint_tree(tmp13, [os.path.join(tmp13, "src/mod/b.c")], None) if f["rule"] == 13], [])
+        put13("src/mod/c.cpp", "struct Late {\n    int a;\n};\nint Late_get(Late* self);\n")
+        check("rule13 registry: the cache notices a new file",
+              "Late" in build_rule13_context(tmp13).types, True)
+        set_rule13_context(None)
+
+    # `--diff`: a base finding is grandfathered, an added one refuses (a real temporary repository)
+    import contextlib
+    import io
+    with tempfile.TemporaryDirectory() as tmp:
+        def r13git(*args: str) -> None:
+            subprocess.run(["git", "-c", "user.email=selftest@example.invalid", "-c", "user.name=selftest",
+                            "-c", "commit.gpgsign=false", *args], cwd=tmp, capture_output=True, check=True)
+
+        def r13put(rel: str, text: str) -> None:
+            path = os.path.join(tmp, rel)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(text)
+
+        def r13rev() -> str:
+            return subprocess.run(["git", "rev-parse", "HEAD"], cwd=tmp, capture_output=True, text=True,
+                                  encoding="utf-8", errors="replace").stdout.strip()
+
+        def r13diff(base: str) -> tuple[int, dict]:
+            old = os.getcwd()
+            os.chdir(tmp)
+            try:
+                buf = io.StringIO()
+                with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(io.StringIO()):
+                    rc = main(["--diff", base, "--json"])
+                return rc, json.loads(buf.getvalue())
+            finally:
+                os.chdir(old)
+
+        r13git("init", "-q")
+        r13git("checkout", "-q", "-b", "main")
+        r13put("config/RMHE08/symbols.txt", "Tcp_old = .text:0x80002000; // type:function size:0x10\n")
+        r13put("config/RMHE08/splits.txt", "mod/tcp.cpp:\n\t.text       start:0x80002000 end:0x80002010\n")
+        r13put("include/mod/tcp.h", "struct Tcp {\n    int a;\n};\nint Tcp_old(Tcp* self);\n")
+        r13put("src/mod/tcp.cpp", '#include "mod/tcp.h"\nint Tcp_old(Tcp* self) {\n    return self->a;\n}\n')
+        r13git("add", "-A")
+        r13git("commit", "-q", "-m", "base")
+        base13 = r13rev()
+        r13git("checkout", "-q", "-b", "lane")
+        r13put("src/mod/tcp.cpp", '#include "mod/tcp.h"\n// a comment edit\nint Tcp_old(Tcp* self) {\n'
+                                  "    return self->a;\n}\n")
+        r13git("commit", "-q", "-am", "touch the file that already carries rule 13")
+        rc_touch, out_touch = r13diff(base13)
+        check("rule13 --diff: a file that already carries the finding is grandfathered (exit 0)", rc_touch, 0)
+        check("... with no added row", out_touch["added"], [])
+        r13put("src/mod/tcp.cpp", '#include "mod/tcp.h"\nint Tcp_old(Tcp* self) {\n    return self->a;\n}\n'
+                                  "int Tcp_new(Tcp* self) {\n    return self->a;\n}\n")
+        r13git("commit", "-q", "-am", "add a second C-spelled method")
+        rc_add, out_add = r13diff(base13)
+        check("rule13 --diff: an added `Type_name(Type*)` refuses (exit 1)", rc_add, 1)
+        check("... as a rule-13 row on the .cpp",
+              [(a["rule"], a["file"], a["added"]) for a in out_add["added"]], [(13, "src/mod/tcp.cpp", 1)])
+        r13put("src/mod/tcp.cpp", '#include "mod/tcp.h"\nint Tcp_old(Tcp* self) {\n    return self->a;\n}\n'
+                                  "/* free: retail C linkage, the caller's relocation names it unmangled */\n"
+                                  "int Tcp_new(Tcp* self) {\n    return self->a;\n}\n")
+        r13git("commit", "-q", "-am", "mark the new one")
+        rc_mark, out_mark = r13diff(base13)
+        check("rule13 --diff: a marked addition does not refuse", (rc_mark, out_mark["added"]), (0, []))
+        r13put("include/mod/tcp.h", "struct Tcp {\n    int a;\n};\nint Tcp_old(Tcp* self);\n"
+                                    "int Tcp_hdr(Tcp* self);\n")
+        r13git("commit", "-q", "-am", "add a header declaration")
+        rc_hdr, out_hdr = r13diff(base13)
+        check("rule13 --diff: an added header declaration refuses",
+              (rc_hdr, [(a["rule"], a["file"]) for a in out_hdr["added"]]), (1, [(13, "include/mod/tcp.h")]))
+    set_rule13_context(None)
+
     # --- end-to-end over the fixtures -------------------------------------------------------------
-    check("e2e: rule list is complete", sorted(RULE_NAMES), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+    check("e2e: rule list is complete", sorted(RULE_NAMES), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13])
     check("e2e: no rule is declared unchecked", UNCHECKED, [])
     check("e2e: findings sort by rule then line",
           rules_of(text), sorted(rules_of(text)))
@@ -3812,6 +4223,7 @@ def ref_comparison(root: str, branch: str, ownership: "Ownership | None", as_jso
         + rule1_findings_at_ref(root, base, pairs)
         + header_pragma_findings_at_ref(root, base, rename)
         + header_rule11_findings_at_ref(root, base, rename)
+        + header_rule13_findings_at_ref(root, base, rename)
         + header_rule12_findings_at_ref(root, base, base_ownership, rename))
     before = rule_counts(before_findings)
     touched = findings_of_ref(root, branch, pairs, after_ownership)
@@ -3823,6 +4235,7 @@ def ref_comparison(root: str, branch: str, ownership: "Ownership | None", as_jso
         + rule1_findings_at_ref(root, branch, [])
         + header_pragma_findings_at_ref(root, branch)
         + header_rule11_findings_at_ref(root, branch)
+        + header_rule13_findings_at_ref(root, branch)
         + header_rule12_findings_at_ref(root, branch, after_ownership))
     after = rule_counts(after_findings)
     # a declaration the base side spelled under a name this batch renamed is the *same* declaration:
@@ -3899,6 +4312,7 @@ def main(argv: list[str] | None = None) -> int:
     root = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True, encoding="utf-8", errors="replace")
     root = root.stdout.strip() if root.returncode == 0 else os.getcwd()
     ownership = load_ownership(root)
+    set_rule13_context(root)
 
     if args.ref is not None:
         return ref_comparison(root, args.ref, ownership, args.json, args.list_added)
@@ -3924,6 +4338,7 @@ def main(argv: list[str] | None = None) -> int:
                 + rule1_findings_at_ref(root, args.diff, pairs)
                 + header_pragma_findings_at_ref(root, args.diff, rename)
                 + header_rule11_findings_at_ref(root, args.diff, rename)
+                + header_rule13_findings_at_ref(root, args.diff, rename)
                 + header_rule12_findings_at_ref(root, args.diff, base_ownership, rename))
             before = rule_counts(before_findings)
             # the base copy's rule-2 symbols, so a credit can only ever touch a name that is *new* to the
@@ -3954,6 +4369,7 @@ def main(argv: list[str] | None = None) -> int:
             + rule1_findings(all_sources(root))
             + header_pragma_findings(root)
             + header_rule11_findings(root)
+            + header_rule13_findings(root)
             + header_rule12_findings(root, ownership))
         after = rule_counts(after_findings)
         # a declaration the base side spelled under a name this batch renamed is the *same* declaration:
@@ -4014,6 +4430,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.json:
         print(json.dumps({"budget": budget(findings),
                           "rule11_locals": rule11_local_total(root),
+                          "rule13_static_like": rule13_static_like_total(root),
                           "rule2_gaps": dict(ownership.gaps) if ownership else {},
                           "rule2_unsplit_modules": (
                               {m: {"sites": n, "symbols": len(ownership.unsplit_symbols.get(m, ()))}
