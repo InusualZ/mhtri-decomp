@@ -15,11 +15,6 @@
 struct _ENEMY_WORK;
 
 #ifdef __cplusplus
-/* 0x80304508 - the single-effect spawner beside `fn_80304510`: r3 the work record, r4/r5 two scalars,
- * r6 the `VEC3*` and f1 the scale.  The address's bracketing registered units name different modules
- * (rule 2's named gap), and the two consumers that already carry a local copy (`enemy/fn_80147CE0.cpp`,
- * `ef/fn_801173AC.cpp`) must not be broken by a band-header copy, so this unit keeps its own. */
-void fn_80304508(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* v, f32 s);
 void* get_move_work_adrs(u8 kind);
 u32 get_move_work_max(u8 kind);
 #endif

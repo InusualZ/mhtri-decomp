@@ -59,7 +59,7 @@
 #include "pl.h"                /* `_PLW` - the record's +0x650/+0x652 the motion switch reads */
 #include "Pl/fn_8027D684.h"    /* `fn_8027D76C` (rule 2: the owner's header) */
 #include "Pl/fn_8028F66C.h"    /* `copyVec3`, `fn_8012A624`, `fn_80291B08` */
-#include "fn_8004CAD8.h"       /* `rotVecY`, `fn_80050CA0`, `fn_80051378` */
+#include "fn_8004CAD8.h"       /* `rotVecY`, `subVec3`, `addVec3` */
 #include "sound/fn_800D7F54.h" /* `fn_800DCC24` */
 #include "ai/ainpc.h"
 #include "stage/shell_set_func_ptr.h" /* `shell_set_func_ptr` and its `set_target`/`request` slots (rule 2) */
@@ -391,7 +391,7 @@ extern "C" void fn_802C4EA8(struct _AINPC_W* self, u8 arg) {
             fn_802D2B88(self, 1);
         }
         rotVecY(&shot, self->field_0x194);
-        fn_80051378(&out, &self->vec_0x178, &shot);
+        addVec3(&out, &self->vec_0x178, &shot);
         copyVec3(&self->vec_0x3E0, &out);
         self->field_0x3EC = (u16)self->field_0x194;
         self->field_0x3EE = 0;
@@ -403,7 +403,7 @@ extern "C" void fn_802C4EA8(struct _AINPC_W* self, u8 arg) {
         self->field_0x3EC += 0x1d1;
         self->field_0x194 = self->field_0x3EC;
         rotVecY(&shot, self->field_0x194);
-        fn_80050CA0(&out, &self->vec_0x3E0, &shot);
+        subVec3(&out, &self->vec_0x3E0, &shot);
         copyVec3(&self->vec_0x178, &out);
         if (arg >= 5) {
             self->field_0x190 = (u16)fn_802D30F8(0, self->field_0x190 & 0xffff, 0x600);
@@ -424,7 +424,7 @@ extern "C" void fn_802C4EA8(struct _AINPC_W* self, u8 arg) {
         self->field_0x3EC += 0x1d1;
         self->field_0x194 = self->field_0x3EC;
         rotVecY(&shot, self->field_0x194);
-        fn_80050CA0(&out, &self->vec_0x3E0, &shot);
+        subVec3(&out, &self->vec_0x3E0, &shot);
         copyVec3(&self->vec_0x178, &out);
         if (fn_802D2984(self) == 1) {
             if (self->sub_step == 0) {

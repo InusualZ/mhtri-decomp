@@ -29,7 +29,7 @@ s32 fn_80126104(struct _ENEMY_WORK* work);
  * three. */
 void fn_80126278(struct _ENEMY_WORK* self, u16 id, nw4r::math::VEC3* out);
 void (*fn_801264BC(struct _ENEMY_WORK* work, s32 index))(struct _ENEMY_WORK*);
-u16 fn_80127E78(struct _ENEMY_WORK* work);
+u16 em_hit_mask_get(struct _ENEMY_WORK* work);
 void fn_801281EC(struct _ENEMY_WORK* work);
 void fn_801281F8(struct _ENEMY_WORK* work);
 /* 0x80128A8C / 0x8012933C - this unit's own definitions (the first is defined here, the second is an
@@ -38,8 +38,8 @@ void fn_801281F8(struct _ENEMY_WORK* work);
  * with `#pragma peephole off`, and under it a u8 parameter keeps that target `clrlwi` (with the pass
  * on the pair is folded away, so the spelling is load-bearing - the same reason the unit's note gives
  * for `fn_80128590`/`fn_801285A0`).  The narrower spelling is the one `include/enemy/fn_80165FC8.h`
- * already carried; this header's old `u32` copy was the second, clashing declaration.  `fn_8012933C`
- * narrows its second argument to u8 itself (`clrlwi r4,r4,24` on the way into `fn_801251D8`) and the
+ * already carried; this header's old `u32` copy was the second, clashing declaration.  `em_hit_window_set`
+ * narrows its second argument to u8 itself (`clrlwi r4,r4,24` on the way into `em_se_tbl_play_alt`) and the
  * owner's own body calls it `(self, (u8)a, b, 0)`.  One declaration, hand-merged for the three
  * consumers that each moved it here (rule 2): `enemy/fn_80147CE0.cpp`, `enemy/fn_8015E854.cpp` and
  * `enemy/fn_80178378.cpp` - the sibling landings and this branch had put it in three times. */
@@ -49,36 +49,36 @@ void fn_80128A8C(struct _ENEMY_WORK* self, u8 a, u8 b);
  * and passes `clrlwi r6,r31,24` on to 0x8012B380) plus the f32 blend f1 it stores at +0x384.
  * Declared from the callee's own body (docs/plan.md 6.5 rule 6). */
 void fn_80126324(struct _ENEMY_WORK* self, u32 a, u32 b, f32 c);
-void fn_8012933C(struct _ENEMY_WORK* self, u8 a, u32 b, u32 c);
+void em_hit_window_set(struct _ENEMY_WORK* self, u8 a, u32 b, u32 c);
 /* 0x8012B380 - r3 (`self`) and three scalars; the motion/state setter the action band calls after
  * `em_mot_end_ck` reports done (this unit owns the address).  Added with `enemy/fn_80387844.cpp`
  * (rule 2; the same signature `include/enemy/fn_80165FC8.h` carried). */
 void fn_8012B380(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 /* 0x80127FE4 / 0x801280AC - one `self` argument, no return.  Moved here from
  * `enemy/fn_801550FC.cpp` on landing (rule 2): this unit owns the addresses. */
-void fn_80127FE4(struct _ENEMY_WORK* self);
-void fn_801280AC(struct _ENEMY_WORK* self);
+void em_action_finish_fall(struct _ENEMY_WORK* self);
+void em_action_finish_walk(struct _ENEMY_WORK* self);
 /* 0x80128A70 / 0x80128AAC - r3 (`self`) and two u8 arguments (`clrlwi r4,r4,24` /
  * `clrlwi r5,r5,24`); 0x80128AAC supplies the constant third argument itself. */
 void fn_80128A70(struct _ENEMY_WORK* self, u32 a, u32 b);
 void fn_80128AAC(struct _ENEMY_WORK* self, u32 a, u32 b);
 u32 fn_80128204(struct _ENEMY_WORK* work);
 void fn_80128308(struct _ENEMY_WORK* work);
-void fn_80128BF8(struct _ENEMY_WORK* work, s32 arg1);
+void em_target_pos_set(struct _ENEMY_WORK* work, VEC3* pos);
 void fn_8012987C(struct _ENEMY_WORK* work);
 void fn_8012A3B4(struct _ENEMY_WORK* work);
 void fn_8012A414(struct _ENEMY_WORK* work);
 void fn_8012A658(struct _ENEMY_WORK* work, s32 arg1);
 void fn_8012B64C(struct _ENEMY_WORK* work);
 
-/* 0x801251D0 - the same two views as `fn_801251D8` below: the C consumers pass the table in r3
+/* 0x801251D0 - the same two views as `em_se_tbl_play_alt` below: the C consumers pass the table in r3
  * (`enemy/fn_8014A1BC.c`), while the C++ ones (`enemy/fn_802F5138.cpp`, whose call sites set
  * r3 = the work record, r4 = the table, r5 = the selector and r6 = the id) get the four-argument
  * form.  The body forwards r3/r4/r5 to 0x80124C5C either way, so both views are the same code. */
 #ifdef __cplusplus
-void fn_801251D0(struct _ENEMY_WORK* self, void* tbl, u32 a, u32 b);
+void em_se_tbl_play(struct _ENEMY_WORK* self, void* tbl, u32 a, u32 b);
 #else
-void fn_801251D0(u32 a, u32 b, u32 c);
+void em_se_tbl_play(u32 a, u32 b, u32 c);
 #endif
 u32 fn_80129A70(struct _ENEMY_WORK* self, u16 a);
 u8 fn_80129DB8(struct _ENEMY_WORK* self);
@@ -92,15 +92,21 @@ void fn_80128B80(struct _ENEMY_WORK* self);
  * `enemy/fn_801550FC.cpp` calls it with four (`self`, table, selector, value), and the target sets
  * both r5 and r6, so C keeps the three-argument form and C++ gets the four-argument one. */
 #ifdef __cplusplus
-void fn_801251D8(struct _ENEMY_WORK* self, void* tbl, u32 a, u32 b);
+void em_se_tbl_play_alt(struct _ENEMY_WORK* self, void* tbl, u32 a, u32 b);
 #else
-void fn_801251D8(u32 a, u32 b, u32 c);
+void em_se_tbl_play_alt(u32 a, u32 b, u32 c);
 #endif
 /* 0x80128030 - r3 (`self`) only; the action band's completion hook.  Added by
  * `enemy/fn_80178378.cpp` (docs/plan.md 6.5 rule 2): this unit owns the address. */
 void fn_80128030(struct _ENEMY_WORK* self);
 /* 0x80129724 - r3 (`self`) and one scalar argument (every call site sets r4). */
-void fn_80129724(struct _ENEMY_WORK* self, u32 a);
+void em_hit_window_clear(struct _ENEMY_WORK* self, u32 a);
+/* 0x80127CC4 - installs the enemy data's default hit-part record for slot `slot`.  Added with
+ * `enemy/em024_ai.cpp` (rule 2: this unit owns the address). */
+void em_part_rec_reset(struct _ENEMY_WORK* self, u32 slot);
+/* 0x80127D20 - installs the enemy data's alternate hit-part record `sel` for slot `slot`. */
+void em_part_rec_alt_set(struct _ENEMY_WORK* self, u32 slot, u32 sel);
+
 /* 0x80129744 - r3 (`self`) only; the action band's release hook (`enemy/fn_80387844.cpp`'s
  * `fn_80389E1C` calls it when its sub-state count reaches 4).  Added with that unit (rule 2: this
  * range owns the address). */
@@ -121,7 +127,7 @@ void fn_801280F4(struct _ENEMY_WORK* self);
  * `enemy/fn_80182D5C.cpp`, whose state machines call it after `em_mot_end_ck` reports done; the
  * existing consumers (`enemy/fn_80176C58.cpp`, `enemy/fn_80178128.cpp`) spell it the same way. */
 void fn_80128030(struct _ENEMY_WORK* self);
-void fn_80129668(struct _ENEMY_WORK* self, u32 a, u32 b);
+void em_hit_window_set_default(struct _ENEMY_WORK* self, u32 a, u32 b);
 /* 0x80128AEC - r3 the work record, r4/r5 two scalars (its body reads both and tail-calls the
  * 0x80128A3C slot helper).  Added with `enemy/fn_801A9540.cpp`'s registration: that unit's
  * `fn_801A9724` asks the area table for action 13's slot through it. */

@@ -32,8 +32,16 @@ u32 em_mark_timer_ck(struct _ENEMY_WORK* self);
 u32 em_markable_ck(struct _ENEMY_WORK* self);
 /* 0x8012F1D8 - the motion-timer window test of the skill-0xBE blink. */
 u32 em_motion_window_ck(struct _ENEMY_WORK* self);
+/* 0x80131F2C - sets bit `bit` of the work's +0x820 status byte and re-arms its +0x821 hold to 2. */
+void em_status_bit_set(struct _ENEMY_WORK* self, u32 bit);
+/* 0x80135764 - the wave amplitude helper: mode 0 and 1 answer the sine/cosine of the angle's high bits,
+ * any other mode scales `scale` by the angle's low byte.  The two vector pointers the callers pass are
+ * not read by the body.  The float sits third because the callers evaluate it first. */
+#ifdef __cplusplus
+void em_wave_amp(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 scale, u32 mode, u16 angle);
+#endif
 /* r3 (`self`) and r4/r5; the arming helper the action band's functions call. */
-void fn_80136B50(struct _ENEMY_WORK* self, u32 a, u32 b);
+void em_camera_req(struct _ENEMY_WORK* self, u32 a, u32 b);
 /* r3 (`self`) and f1, the fade duration it stores and passes on.  `enemy/fn_8014A1BC.c` calls
  * it with two arguments too, but this is the form its own C++ consumer needs. */
 #ifdef __cplusplus
@@ -72,22 +80,22 @@ void fn_80131FA0(struct _ENEMY_WORK* self, u32 a);
 /* `em_mot_speed_set` is deliberately NOT declared here: it is one of the 0x8012F symbols whose C
  * consumer (`enemy/fn_8014A1BC.c`) calls it with `self` only and relies on the old-style
  * declaration, so `include/unsplit/enemy.h` carries its `#ifdef __cplusplus` / `#else void
- * em_mot_speed_set();` split form - the shape `fn_80130008`, `fn_801303FC`, `fn_80133F4C` and
- * `fn_80135600` keep there too, and the form the C++ consumers that do not include this header
+ * em_mot_speed_set();` split form - the shape `em_ground_ck`, `fn_801303FC`, `fn_80133F4C` and
+ * `em_move_offset_step_update` keep there too, and the form the C++ consumers that do not include this header
  * (`enemy/fn_801550FC.cpp`, `enemy/fn_8015E854.cpp`) reach it through.  A prototype here is an
  * MWCC 10563 redeclaration against that declaration as soon as a C consumer includes both
  * headers, which is what `enemy/fn_8014A1BC.c` does. */
-void fn_80134004(struct _ENEMY_WORK* self, u32 a, f32 b);
+void em_approach_start(struct _ENEMY_WORK* self, f32 speed, u32 flags);
 /* r3 the work record, r4/r5 two scalars; returns 1 while the running motion has not finished. */
-u32 fn_80134114(struct _ENEMY_WORK* self, s32 a, s32 b);
+u32 em_approach_step(struct _ENEMY_WORK* self, s32 a, s32 b);
 /* r3 the work record, r4 the effect table, r5/r6/r7 the three scalars the spawn helper takes. */
-void fn_80134964(struct _ENEMY_WORK* self, void* tbl, s32 a, s32 b, s32 c);
+void em_turn_seq_start(struct _ENEMY_WORK* self, void* tbl, s32 a, s32 b, s32 c);
 /* r3 the work record, r4 the effect table; returns 1 once the effect has finished. */
-u32 fn_80134B0C(struct _ENEMY_WORK* self, void* tbl);
+u32 em_turn_seq_step(struct _ENEMY_WORK* self, void* tbl);
 /* r3 the work record; the normalized motion-frame ratio. */
 f32 fn_8012F8EC(struct _ENEMY_WORK* self);
 /* r3 the work record; the per-frame motion tick the escaping actions run at their head. */
-void fn_80131D84(struct _ENEMY_WORK* self);
+void em_frame_flag_set(struct _ENEMY_WORK* self);
 /* r3 the work record; plays the armed motion's end reaction. */
 void fn_80132160(struct _ENEMY_WORK* self);
 

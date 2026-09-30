@@ -84,29 +84,31 @@
  * canonical spellings and are the follow-up).
  * ------------------------------------------------------------------------------------------------- */
 
+extern "C" {
+
 /* enemy/fn_8012EC74.cpp (0x8012EC74..0x80137604) - the action/motion arming helpers. */
 void fn_8013072C(struct _ENEMY_WORK* self, u32 mode, u32 value);
 
 /* enemy/fn_801251D0.cpp (0x801251D0..0x8012BA00) - the program/entry helpers. */
-void fn_801251D0(void* tbl, u32 a, u32 b);
-void fn_801251D8(void* tbl, u32 a, u32 b);
+void em_se_tbl_play(void* tbl, u32 a, u32 b);
+void em_se_tbl_play_alt(void* tbl, u32 a, u32 b);
 void* fn_80125F54(void* out);
 u32 fn_801421E4(u32 id, void* out);
 u8 stage_map_kind_get(u8 map);
 u32 fn_80126324(struct _ENEMY_WORK* self, u32 a, u32 b, f32 c);
-u32 fn_80129668(struct _ENEMY_WORK* self, u32 a, u32 b);
+u32 em_hit_window_set_default(struct _ENEMY_WORK* self, u32 a, u32 b);
 u32 fn_8012D0B4(struct _ENEMY_WORK* self, void* area);
 u32 fn_8012D1A8(u8 kind);
 
 /* enemy/fn_80137604.cpp (the 0x8013xxxx motion setters). */
 void fn_8013581C(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b, u32 c, u16 d,
                  f32 e);
-void fn_80135764(nw4r::math::VEC3* out, nw4r::math::VEC3* a, u32 c, u16 d, f32 e);
-void fn_80133E3C(struct _ENEMY_WORK* self, s32 a, f32 b, f32 c);
-void fn_80134004(struct _ENEMY_WORK* self, u32 a, f32 b);
-u32 fn_80134114(struct _ENEMY_WORK* self, s32 a, s32 b);
-u32 fn_80134964(struct _ENEMY_WORK* self, void* tbl, s32 a, s32 b, s32 c);
-u32 fn_80134B0C(struct _ENEMY_WORK* self, void* tbl);
+void em_wave_amp(nw4r::math::VEC3* out, nw4r::math::VEC3* a, f32 e, u32 c, u16 d);
+void em_turn_in_window(struct _ENEMY_WORK* self, f32 lo, f32 hi, s32 angle);
+void em_approach_start(struct _ENEMY_WORK* self, f32 speed, u32 flags);
+u32 em_approach_step(struct _ENEMY_WORK* self, s32 a, s32 b);
+u32 em_turn_seq_start(struct _ENEMY_WORK* self, void* tbl, s32 a, s32 b, s32 c);
+u32 em_turn_seq_step(struct _ENEMY_WORK* self, void* tbl);
 void em_move_mode_set(struct _ENEMY_WORK* self, u32 a);
 void fn_80131DF4(struct _ENEMY_WORK* self);
 void em_mot_set(struct _ENEMY_WORK* self, s32 a, s32 b, s32 c);
@@ -119,24 +121,28 @@ u32 fn_80132184(void);
 
 /* the base vector/effect helpers (owned elsewhere; declared, never defined - playbook 29). */
 void fn_80051490(void* out, void* in);
-void fn_80051378(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
+void addVec3(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 void fn_8004FFC8(void* a, void* b, void* c, f32 d);
 void fn_800AD9C0(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 scale);
 f32 fn_80050EF4(void* a, void* b);
-f32 fn_80050F80(void* a, void* b);
+f32 calcVecDistXZ(void* a, void* b);
 void fn_800FA378(void* out);
 u32 move_work_state_ck(void);
-s32 ran_suu(s32 a);
-void fn_800E2F40(void* self, s32 a, s32 b, u8 c, s32 d, s32 e, u8 f);
+void mhchar_mat_tev_set(void* self, s32 a, s32 b, u8 c, s32 d, s32 e, u8 f);
 s32 fn_8028F558(void* a, void* b);
 s32 fn_802907BC(void* a, void* b);
-void fn_8010D2B0(void* pos, u8 area, u8 kind, s32 mode, f32 scale);
-void fn_801048B4(struct _ENEMY_WORK* self, u32 id, u32 type, s32 joint, f32 scale);
+void eft_spawn_pos_in_area(void* pos, u8 area, u8 kind, s32 mode, f32 scale);
+void eft009_spawn_at_joint(struct _ENEMY_WORK* self, u32 id, u32 type, s32 joint, f32 scale);
 void fn_801049D0(struct _ENEMY_WORK* self, u32 id, u32 type, s32 joint, nw4r::math::VEC3* pos,
                  f32 scale);
 void fn_800FC0D4(void* dst, void* src);
 s32 em_roster_record_slot_id_get(s32 handle);
 void em_roster_record_release(s32 handle);
+
+} /* extern "C": the map rows of the callees above carry unmangled names */
+
+/* the callees whose map rows are manglings (rule 9). */
+s32 ran_suu(s32 a);
 void vec_to_mh_vec3(nw4r::math::VEC3* dst, Vec* src);
 
 /* the mangled callees, at their real signatures (rule 9). */
@@ -195,7 +201,7 @@ extern f32 lbl_80798CF4; /* 0.11f */
 extern u8 lbl_80570260[];
 extern u8 lbl_806A7AA0[0x18];
 
-/* the 0x805B1Bxx enemy-control program tables `fn_801251D0`/`fn_801251D8` walk. */
+/* the 0x805B1Bxx enemy-control program tables `em_se_tbl_play`/`em_se_tbl_play_alt` walk. */
 extern u8 lbl_805B1BB0[];
 extern u8 lbl_805B1BD8[];
 extern u8 lbl_805B1C30[];
@@ -246,7 +252,7 @@ extern "C" u8 fn_801B4458(_ENEMY_WORK* self, u8 kind) {
         if (list->code == 1) {
             vec_to_mh_vec3(&a, (Vec*)list->vec_0x04);
             vec_to_mh_vec3(&b, (Vec*)list->vec_0x10);
-            fn_80051378(&delta, &a, &b);
+            addVec3(&delta, &a, &b);
             fn_800AD9C0(&point, &delta, lbl_80798C6C);
             copyVec3(&mid, &point);
         } else {
@@ -294,7 +300,7 @@ extern "C" s32 fn_801B45B0(void* point, void* seat, f32 radius) {
 }
 
 /* 0x801B4694 (0x110).  Move the work record's aim to seat `index`: the two-point seats install a
- * segment (through `fn_8013581C`), a single-point seat the point itself (`fn_80135764`), each with
+ * segment (through `fn_8013581C`), a single-point seat the point itself (`em_wave_amp`), each with
  * the seat's own float and a random u16 phase. */
 extern "C" void fn_801B4694(_ENEMY_WORK* self, u8 index) {
     nw4r::math::VEC3 a;
@@ -317,7 +323,7 @@ extern "C" void fn_801B4694(_ENEMY_WORK* self, u8 index) {
             fn_8013581C(&self->aim, &a, &b, 0, phase, list[i].value_0x1C);
         } else {
             vec_to_mh_vec3(&a, (Vec*)list[i].vec_0x04);
-            fn_80135764(&self->aim, &a, 0, phase, list[i].value_0x1C);
+            em_wave_amp(&self->aim, &a, list[i].value_0x1C, 0, phase);
         }
     }
 }
@@ -427,7 +433,7 @@ extern "C" void fn_801B47A4(_ENEMY_WORK* self) {
             fn_801B4694(self, k);
         }
         if (self->field_0x43B == 3 && self->flag_0x329 == 0 &&
-            fn_80050F80(&self->pos, &self->aim) < lbl_80798C7C) {
+            calcVecDistXZ(&self->pos, &self->aim) < lbl_80798C7C) {
             self->flag_0x329 = 1;
         }
     } else {
@@ -825,10 +831,10 @@ extern "C" void fn_801B55A8(_ENEMY_WORK* self) {
         self->state = (u8)(state + 1);
         em_move_mode_set(self, 0);
         em_mot_set(self, 8, 4, 0);
-        fn_80134004(self, 0, lbl_80798C8C);
+        em_approach_start(self, lbl_80798C8C, 0);
         return;
     case 1:
-        if (fn_80134114(self, 0, 0xA0) == 1) {
+        if (em_approach_step(self, 0, 0xA0) == 1) {
             em_action_finish(self);
         }
         return;
@@ -839,8 +845,8 @@ extern "C" void fn_801B55A8(_ENEMY_WORK* self) {
  * then either finish or continue with 0x25/4. */
 extern "C" void fn_801B563C(_ENEMY_WORK* self, u8 kind) {
     u8 state = self->state;
-    u32 motion = 0x0D;
     f32 timer = lbl_80798C8C;
+    u32 motion = 0x0D;
 
     switch (state) {
     case 0:
@@ -850,10 +856,10 @@ extern "C" void fn_801B563C(_ENEMY_WORK* self, u8 kind) {
         if (kind == 1) {
             timer = lbl_80798C90;
         }
-        fn_80134004(self, 0, timer);
+        em_approach_start(self, timer, 0);
         return;
     case 1:
-        if (fn_80134114(self, 0, 0xA0) == 1) {
+        if (em_approach_step(self, 0, 0xA0) == 1) {
             if (kind == 0) {
                 em_action_finish(self);
                 return;
@@ -880,8 +886,8 @@ extern "C" void fn_801B563C(_ENEMY_WORK* self, u8 kind) {
  * flag/timer, then either finish or continue with 0x25/4. */
 extern "C" void fn_801B5774(_ENEMY_WORK* self, u8 kind, u8 flag) {
     u8 state = self->state;
-    u32 motion = 0x0D;
     f32 timer = lbl_80798C8C;
+    u32 motion = 0x0D;
     u32 done;
 
     switch (state) {
@@ -892,13 +898,13 @@ extern "C" void fn_801B5774(_ENEMY_WORK* self, u8 kind, u8 flag) {
         if (kind == 1) {
             timer = lbl_80798C90;
         }
-        fn_80134004(self, 0x10, timer);
+        em_approach_start(self, timer, 0x10);
         if (flag == 1) {
             self->state_0x006 = (u8)(((self->bits_0x1EC & 1) * 2) + 2);
         }
         return;
     case 1:
-        done = fn_80134114(self, 0, 0x100);
+        done = em_approach_step(self, 0, 0x100);
         if (flag == 1 && em_mot_end_ck(self) == 1) {
             if (self->state_0x006 != 0) {
                 self->state_0x006 = (u8)(self->state_0x006 - 1);
@@ -981,10 +987,10 @@ extern "C" void fn_801B5A08(_ENEMY_WORK* self, u8 flag) {
             em_action_finish(self);
         }
         if (flag == 0) {
-            fn_80133E3C(self, 0x7800, lbl_80798C74, lbl_80798C94);
+            em_turn_in_window(self, lbl_80798C74, lbl_80798C94, 0x7800);
             return;
         }
-        fn_80133E3C(self, -0x7800, lbl_80798C74, lbl_80798C94);
+        em_turn_in_window(self, lbl_80798C74, lbl_80798C94, -0x7800);
         return;
     }
 }
@@ -1015,10 +1021,10 @@ extern "C" void fn_801B5B60(_ENEMY_WORK* self) {
     case 0:
         self->state = (u8)(state + 1);
         em_move_mode_set(self, 0);
-        fn_80134964(self, lbl_80570260, 0, 1, 0);
+        em_turn_seq_start(self, lbl_80570260, 0, 1, 0);
         return;
     case 1:
-        if (fn_80134B0C(self, lbl_80570260) == 1) {
+        if (em_turn_seq_step(self, lbl_80570260) == 1) {
             em_action_finish(self);
         }
         return;
@@ -1063,7 +1069,7 @@ extern "C" void fn_801B5BEC(_ENEMY_WORK* self) {
             angle = -0x6000;
             break;
         }
-        fn_80133E3C(self, angle, lbl_80798C74, lbl_80798C94);
+        em_turn_in_window(self, lbl_80798C74, lbl_80798C94, angle);
         return;
     }
 }
@@ -1173,7 +1179,7 @@ extern "C" void fn_801B5ED4(_ENEMY_WORK* self, u8 flag) {
         self->state = (u8)(state + 1);
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x12, 4, 0);
-        fn_80129668(self, 0, 1);
+        em_hit_window_set_default(self, 0, 1);
         return;
     case 1:
         if (flag == 0) {
@@ -1193,7 +1199,7 @@ extern "C" void fn_801B5ED4(_ENEMY_WORK* self, u8 flag) {
         if (em_mot_end_ck(self) == 1) {
             self->state = (u8)(self->state + 1);
             em_mot_set(self, 0x14, 0, 8);
-            fn_80129668(self, 0, 2);
+            em_hit_window_set_default(self, 0, 2);
             return;
         }
         return;
@@ -1219,7 +1225,7 @@ extern "C" void fn_801B6010(_ENEMY_WORK* self) {
         if (em_mot_end_ck(self) == 1) {
             self->state = (u8)(self->state + 1);
             em_mot_set(self, 0x14, 0, 8);
-            fn_80129668(self, 0, 2);
+            em_hit_window_set_default(self, 0, 2);
             return;
         }
         return;
@@ -1247,56 +1253,56 @@ extern "C" void fn_801B60D4(_ENEMY_WORK* self) {
 }
 
 /* 0x801B610C (0x1FC).  The enemy-control program-set selector: map the +0x1E6 sub-state to the
- * `fn_801251D0` (table, flag, id) triple; the default finishes the action. */
+ * `em_se_tbl_play` (table, flag, id) triple; the default finishes the action. */
 extern "C" void fn_801B610C(_ENEMY_WORK* self) {
     switch (self->state_sub) {
     case 0x01:
-        fn_801251D0(lbl_805B1BB0, 0, 1);
+        em_se_tbl_play(lbl_805B1BB0, 0, 1);
         return;
     case 0x02:
-        fn_801251D0(lbl_805B1BD8, 0, 2);
+        em_se_tbl_play(lbl_805B1BD8, 0, 2);
         return;
     case 0x17:
-        fn_801251D0(lbl_805B1C30, 1, 0x17);
+        em_se_tbl_play(lbl_805B1C30, 1, 0x17);
         return;
     case 0x05:
-        fn_801251D0(lbl_805B1C30, 1, 5);
+        em_se_tbl_play(lbl_805B1C30, 1, 5);
         return;
     case 0x23:
-        fn_801251D0(lbl_805B1C30, 1, 0x23);
+        em_se_tbl_play(lbl_805B1C30, 1, 0x23);
         return;
     case 0x7A:
-        fn_801251D0(lbl_805B1C78, 0, 0x7A);
+        em_se_tbl_play(lbl_805B1C78, 0, 0x7A);
         return;
     case 0x7B:
-        fn_801251D0(lbl_805B1CA0, 0, 0x7B);
+        em_se_tbl_play(lbl_805B1CA0, 0, 0x7B);
         return;
     case 0x7C:
-        fn_801251D0(lbl_805B1CC8, 0, 0x7C);
+        em_se_tbl_play(lbl_805B1CC8, 0, 0x7C);
         return;
     case 0x8D:
-        fn_801251D0(lbl_805B1CF0, 0, 0x8D);
+        em_se_tbl_play(lbl_805B1CF0, 0, 0x8D);
         return;
     case 0x7D:
-        fn_801251D0(lbl_805B1D30, 0, 0x7D);
+        em_se_tbl_play(lbl_805B1D30, 0, 0x7D);
         return;
     case 0x8E:
-        fn_801251D0(lbl_805B1DA0, 0, 0x8E);
+        em_se_tbl_play(lbl_805B1DA0, 0, 0x8E);
         return;
     case 0x84:
-        fn_801251D0(lbl_805B1C30, 1, 0x84);
+        em_se_tbl_play(lbl_805B1C30, 1, 0x84);
         return;
     case 0x9F:
-        fn_801251D0(lbl_805B1DC8, 0, 0x9F);
+        em_se_tbl_play(lbl_805B1DC8, 0, 0x9F);
         return;
     case 0xA0:
-        fn_801251D0(lbl_805B1DC8, 0, 0xA0);
+        em_se_tbl_play(lbl_805B1DC8, 0, 0xA0);
         return;
     case 0xA8:
-        fn_801251D0(lbl_805B1E08, 0, 0xA8);
+        em_se_tbl_play(lbl_805B1E08, 0, 0xA8);
         return;
     case 0xA9:
-        fn_801251D0(lbl_805B1C30, 1, 0xA9);
+        em_se_tbl_play(lbl_805B1C30, 1, 0xA9);
         return;
     default:
         em_action_finish(self);
@@ -1304,33 +1310,33 @@ extern "C" void fn_801B610C(_ENEMY_WORK* self) {
     }
 }
 
-/* 0x801B6308 (0xE0).  The `fn_801251D8` sibling of 0x801B610C (the table is the second half of the
+/* 0x801B6308 (0xE0).  The `em_se_tbl_play_alt` sibling of 0x801B610C (the table is the second half of the
  * set; the default arms id 0 on the first table). */
 extern "C" void fn_801B6308(_ENEMY_WORK* self) {
     switch (self->state_sub) {
     case 0x00:
-        fn_801251D8(lbl_805B1E50, 1, 0);
+        em_se_tbl_play_alt(lbl_805B1E50, 1, 0);
         return;
     case 0x05:
-        fn_801251D8(lbl_805B1E50, 1, 5);
+        em_se_tbl_play_alt(lbl_805B1E50, 1, 5);
         return;
     case 0x1D:
-        fn_801251D8(lbl_805B1E90, 0, 0x1D);
+        em_se_tbl_play_alt(lbl_805B1E90, 0, 0x1D);
         return;
     case 0x1E:
-        fn_801251D8(lbl_805B1E50, 1, 0x1E);
+        em_se_tbl_play_alt(lbl_805B1E50, 1, 0x1E);
         return;
     case 0x38:
-        fn_801251D8(lbl_805B1F18, 0, 0x38);
+        em_se_tbl_play_alt(lbl_805B1F18, 0, 0x38);
         return;
     case 0x25:
-        fn_801251D8(lbl_805B1FF0, 0, 0x25);
+        em_se_tbl_play_alt(lbl_805B1FF0, 0, 0x25);
         return;
     case 0x2A:
-        fn_801251D8(lbl_805B20E8, 1, 0x2A);
+        em_se_tbl_play_alt(lbl_805B20E8, 1, 0x2A);
         return;
     default:
-        fn_801251D8(lbl_805B1E50, 0, 0);
+        em_se_tbl_play_alt(lbl_805B1E50, 0, 0);
         return;
     }
 }
@@ -1345,14 +1351,14 @@ extern "C" void fn_801B63E8(_ENEMY_WORK* self) {
         self->state = (u8)(state + 1);
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x0A, 4, 0);
-        fn_80134004(self, 0x10, lbl_80798C90);
+        em_approach_start(self, lbl_80798C90, 0x10);
         if (self->field_0x43B != 3 && self->field_0x43B != 2) {
             fn_801B4348(self);
             return;
         }
         return;
     case 1:
-        if (fn_80134114(self, 0, 0x100) == 1) {
+        if (em_approach_step(self, 0, 0x100) == 1) {
             u32 motion = 0x0D;
             self->state = (u8)(self->state + 1);
             if ((self->field_0x00A & 1) != 0) {
@@ -1438,12 +1444,12 @@ extern "C" void fn_801B65B8(_ENEMY_WORK* self, u8 kind, u8 id, s32 joint, s32 ar
             }
             break;
         }
-        fn_801048B4(self, joint, id, arg4, scale);
+        eft009_spawn_at_joint(self, joint, id, arg4, scale);
         return;
     case 1:
         get_joint_wpos_em(self, joint, &pos);
         pos.y = self->field_0x20C;
-        fn_8010D2B0(&pos, self->area_no, id, arg4, scale * get_em_chg_scale(self));
+        eft_spawn_pos_in_area(&pos, self->area_no, id, arg4, scale * get_em_chg_scale(self));
         return;
     default:
         return;
@@ -1503,7 +1509,7 @@ extern "C" void fn_801B670C(_ENEMY_WORK* self) {
     case 0x10:
         if (em_after_frame_check(self, 0, lbl_80798CA0, lbl_80798C74) == 1) {
             if ((self->field_0x228 & 6) != 0) {
-                fn_801048B4(self, 0x1A, 0x33, 0, lbl_80798CA4);
+                eft009_spawn_at_joint(self, 0x1A, 0x33, 0, lbl_80798CA4);
                 return;
             }
             setVector3(&pos, lbl_80798C74, lbl_80798C74, lbl_80798CC0);
@@ -1545,8 +1551,8 @@ extern "C" void fn_801B6B94(_ENEMY_WORK* self) {
     ratio = self->field_0x1D4;
     a = (s32)(lbl_80798CD0 * ratio);
     c = (s32)(lbl_80798CD4 * ratio);
-    fn_800E2F40(self->char_0x024, 0, 6, (u8)a, 0, 3, (u8)c);
-    fn_800E2F40(self->char_0x024, 1, 6, (u8)a, 0, 3, (u8)c);
+    mhchar_mat_tev_set(self->char_0x024, 0, 6, (u8)a, 0, 3, (u8)c);
+    mhchar_mat_tev_set(self->char_0x024, 1, 6, (u8)a, 0, 3, (u8)c);
 }
 
 /* 0x801B6C38 (0x4C).  Whether the latch kind is clear and the +0x888 handle can be re-armed (the

@@ -247,7 +247,7 @@ extern "C" {
 #endif
 
 void fn_802152A4(u16 id, s32 value, u32 mode, const _mh_ivec2_* pos);
-void fn_80073F68(VEC3* dst, const VEC3* src);
+void addVec3To(VEC3* dst, const VEC3* src);
 u32 fn_80050A40(f32 a, f32 b, f32 c, f32 d);
 const u8* fn_802D773C(u8 index);
 void fn_802D7754(u8 a, u8 b, u16* out);

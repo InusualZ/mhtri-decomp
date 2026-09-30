@@ -1,6 +1,6 @@
 /* The declarations `src/draw_shape.cpp` owns (docs/plan.md 6.5 rule 2): the draw-shape state block's
  * setters.  Created when `enemy/fn_80147CE0.cpp` registered as a consumer - the owner had no header.
- * The signature is the owner's own definition (`extern "C" void fn_80056A54(u32 a, u32 b, u32 c)`,
+ * The signature is the owner's own definition (`extern "C" void draw_shape_arm(u32 a, u32 b, u32 c)`,
  * which stores r3 and r5 as words and `(u8)r4`), so a caller with a pointer first argument casts it.
  */
 #ifndef MHTRI_DRAW_SHAPE_H
@@ -22,7 +22,7 @@ void set_arena_idx(u8 index);
 u32* res_file_ctor(u32* dst, u32 file_data);
 u32* res_file_assign(u32* dst, u32* src);
 /* 0x80056A54 - arm the draw-shape state block (`lbl_8066ACF8`). */
-void fn_80056A54(u32 a, u32 b, u32 c);
+void draw_shape_arm(u32 a, u32 b, u32 c);
 /* 0x80056A84 - the effect step's shape request: the position, the handle and the area byte.  Added
  * with `ef/eft053.cpp`, whose state machine fires it (`fn_80056A84(&pos, 10, area)`). */
 void fn_80056A84(const nw4r::math::VEC3* pos, u32 handle, u8 flag);

@@ -496,14 +496,14 @@ extern f32 lbl_80796DA0; /* 0.0f */
 extern f32 lbl_80796DA4; /* 0.5f */
 extern f32 lbl_80796DA8; /* 65536.0f */
 extern f32 lbl_80796DAC; /* 6.2831855f */
-extern f32 fn_80050F80(Vec3 *a, Vec3 *b);
+extern f32 calcVecDistXZ(Vec3 *a, Vec3 *b);
 extern f32 fn_80050BC0(f32 x);
 extern f32 fn_80463E08(f32 y, f32 x);
 extern u32 fn_80125FF0(u8 a, u8 b);
 extern void fn_801285C0(_ENEMY_WORK *self, u32 a, u32 b, u32 c);
 extern void fn_80126278(_ENEMY_WORK *self, u16 a, Vec3 *out);
 extern void fn_8012B380(_ENEMY_WORK *self, u32 a, u32 b, u32 c);
-extern void fn_80128BF8(_ENEMY_WORK *self, u32 a);
+extern void em_target_pos_set(_ENEMY_WORK *self, u32 a);
 extern u32 fn_80126DAC(_ENEMY_WORK *self, u32 a, u32 b);
 extern u32 fn_80126F80(_ENEMY_WORK *self, u32 a, u32 b);
 extern u32 fn_801272C4(_ENEMY_WORK *self, Vec3 *pos, u32 a);
@@ -581,7 +581,7 @@ s16 fn_8013D4C4(_ENEMY_WORK *self, u8 *in) {
 
     switch (in[0]) {
     case 0:
-        if (fn_8012EC60(self) == 0) {
+        if (em_alt_mode_ck(self) == 0) {
             in += (u8)fn_801406E0(28, in[0]);
             fn_8013BDE4(&in, 28, &result);
         }
@@ -994,7 +994,7 @@ void fn_8013E068(_ENEMY_WORK *self, u8 *in, u32 id, u32 sub, s32 value) {
 /* True when the angle between the record's position and its target is at or below the per-action
  * threshold indexed by the sub-state. */
 u32 fn_8013C254(_ENEMY_WORK *self) {
-    f32 angle = fn_80050F80(&self->pos, &self->target);
+    f32 angle = calcVecDistXZ(&self->pos, &self->target);
     _ENEMY_TABLE *table = (_ENEMY_TABLE *)self->ptr_0x9A4;
 
     return angle <= table->entries[self->state_0x382].value_0x04;
@@ -1425,7 +1425,7 @@ void fn_8013D34C(_ENEMY_WORK *self) {
     default:
         break;
     }
-    fn_80128BF8(self, 0);
+    em_target_pos_set(self, 0);
 }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -1447,7 +1447,7 @@ void fn_8013C988(_ENEMY_WORK *self, u8 *in) {
             self->state_0x1F9 = 1;
             self->state_0x1FA = 1;
             fn_8012B380(self, 9, self->state_0x9F7, 255);
-            fn_80128BF8(self, 0);
+            em_target_pos_set(self, 0);
         }
         break;
     case 255:
@@ -1458,7 +1458,7 @@ void fn_8013C988(_ENEMY_WORK *self, u8 *in) {
             copyVec3(&self->pos, &d);
             self->pos.y = fn_802B0430(self->state_0x9F7);
             fn_8012A658(self, 0);
-            fn_80128BF8(self, 0);
+            em_target_pos_set(self, 0);
         }
         break;
     default:
@@ -1484,7 +1484,7 @@ void fn_8013CAA0(_ENEMY_WORK *self, u8 *in) {
             value = ((_ENEMY_TABLE *)self->ptr_0x9A4)->entries[self->state_0x382].value_0x08;
         }
         if (fn_8013AB74(self, 2, (u8)value) == 1) {
-            fn_80128BF8(self, 0);
+            em_target_pos_set(self, 0);
             if (self->ptr_0x9A4 != 0 &&
                 (u32)((*(u8 *)self->ptr_0x9A4) - 252) > 3) {
                 self->state_0x1F9 = 1;
@@ -1521,7 +1521,7 @@ void fn_8013CDB4(_ENEMY_WORK *self, u8 *in) {
     } else {
         fn_8012B380(self, 10, 2, (u8)piece);
     }
-    fn_80128BF8(self, 0);
+    em_target_pos_set(self, 0);
     self->state_0x1E7 = in[0];
 }
 
@@ -1613,7 +1613,7 @@ s16 fn_8013E7C0(_ENEMY_WORK *self, u8 *in) {
                 fn_8013AB74(self, 10, 0);
             }
             fn_8012B380(self, 7, other->field_0x05, other->field_0x06);
-            fn_80128BF8(self, 0);
+            em_target_pos_set(self, 0);
         } else {
             in += (u8)fn_801406E0(58, in[0]);
             fn_8013BDE4(&in, 58, &result);

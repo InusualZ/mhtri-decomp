@@ -32,9 +32,9 @@
  *     fn_801CB82C, fn_801CB8C0, fn_801CB93C, fn_801CBBD8, fn_801CBC64.
  *   * fn_801CC5DC 96.15, fn_801CBB0C 92.16, fn_801CBA4C 91.67, fn_801CA004 87.77.
  *   * Residuals, by measurement: fn_801CC5DC (the two `fmuls` operand order and the argument
- *     evaluation order of the two `fn_80133E3C` calls), fn_801CBB0C / fn_801CBA4C (the float/int
- *     argument evaluation order of `fn_80134004` - target loads f1 before r4), fn_801CA004 (target
- *     364 B / ours 396 B - the `fn_8012EC60` gate and the colour blocks), fn_801CA170 77.33 (the
+ *     evaluation order of the two `em_turn_in_window` calls), fn_801CBB0C / fn_801CBA4C (the float/int
+ *     argument evaluation order of `em_approach_start` - target loads f1 before r4), fn_801CA004 (target
+ *     364 B / ours 396 B - the `em_alt_mode_ck` gate and the colour blocks), fn_801CA170 77.33 (the
  *     inner lookup loop lowers to a `mtctr`/`bdnz` countdown, the target walks a pointer with a
  *     counter) and fn_801CA8DC 75.02 (target 324 B / ours 336 B - the tail average loop).
  * The unwritten residual (16 functions): the TevKColor/motion band 0x801CA258..0x801CAE70 and the
@@ -163,8 +163,8 @@ u32 fn_801CA170(_ENEMY_WORK* self, u8 a, u32* out) {
 
 /* 0x801CA4CC - pick the motion by the map id, feed the aim slot and advance the aim height. */
 void fn_801CA4CC(_ENEMY_WORK* self, u8* out_mode, u8* out_flag) {
-    fn_80130248(self);
-    fn_801305C4(self);
+    em_fall_height_get(self);
+    em_fall_start(self);
     *out_mode = 0x0C;
     *out_flag = 0;
     switch (stage_map_kind_get(self->field_0x1E0)) {
@@ -239,7 +239,7 @@ void fn_801CA7F0(EmSpawnRec* rec, u8 a, u16 b, u16 c) {
 /* 0x801CA004 - the per-frame aim-height fade: track the pool float toward the map's direction and
  * drive the three MHchar TEV colours from it. */
 void fn_801CA004(_ENEMY_WORK* self) {
-    if (fn_8012EC60(self) == 1) {
+    if (em_alt_mode_ck(self) == 1) {
         self->timer_0x328.field_0x328 = self->timer_0x328.field_0x328 + lbl_80799214;
         if (self->timer_0x328.field_0x328 > lbl_80799218)
             self->timer_0x328.field_0x328 = lbl_80799218;
@@ -268,16 +268,16 @@ void fn_801CA004(_ENEMY_WORK* self) {
 
 /* 0x801CAF70 - enter the 0x0B motion. */
 void fn_801CAF70(_ENEMY_WORK* self) {
-    fn_80130248(self);
-    fn_801305C4(self);
+    em_fall_height_get(self);
+    em_fall_start(self);
     fn_80128AAC(self, 3, 0x0B);
     fn_80133BB4(self);
 }
 
 /* 0x801CAFBC - enter the 0x14 motion. */
 void fn_801CAFBC(_ENEMY_WORK* self) {
-    fn_80130248(self);
-    fn_801305C4(self);
+    em_fall_height_get(self);
+    em_fall_start(self);
     fn_80128AAC(self, 3, 0x14);
     fn_80133BB4(self);
 }
@@ -346,13 +346,13 @@ void fn_801CB20C(_ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state++;
-        fn_80130248(self);
-        fn_801305C4(self);
+        em_fall_height_get(self);
+        em_fall_start(self);
         em_mot_set_ck(self, 0x1A, 6, 0);
         break;
     case 1:
         if (em_mot_end_ck(self) == 1)
-            fn_80127FE4(self);
+            em_action_finish_fall(self);
         break;
     }
 }
@@ -367,7 +367,7 @@ void fn_801CB28C(_ENEMY_WORK* self) {
         break;
     case 1:
         if (em_mot_end_ck(self) == 1)
-            fn_801280AC(self);
+            em_action_finish_walk(self);
         break;
     }
 }
@@ -541,12 +541,12 @@ void fn_801CBA4C(_ENEMY_WORK* self, u8 a) {
         em_move_mode_set(self, 0);
         em_mot_set(self, 6, 4, 0);
         if ((s32)(u8)a != 1)
-            fn_80134004(self, 0, lbl_80799258);
+            em_approach_start(self, lbl_80799258, 0);
         else
-            fn_80134004(self, 0, lbl_80799220);
+            em_approach_start(self, lbl_80799220, 0);
         break;
     case 1:
-        if (fn_80134114(self, 0, 0x40) == 1)
+        if (em_approach_step(self, 0, 0x40) == 1)
             em_action_finish(self);
         break;
     }
@@ -561,12 +561,12 @@ void fn_801CBB0C(_ENEMY_WORK* self, u8 a) {
         em_mot_set(self, 7, 6, 0);
         em_mot_speed_set(self, lbl_8079925C);
         if ((s32)(u8)a != 1)
-            fn_80134004(self, 0, lbl_80799258);
+            em_approach_start(self, lbl_80799258, 0);
         else
-            fn_80134004(self, 0, lbl_80799220);
+            em_approach_start(self, lbl_80799220, 0);
         break;
     case 1:
-        if (fn_80134114(self, 0, 0x40) == 1)
+        if (em_approach_step(self, 0, 0x40) == 1)
             em_action_finish(self);
         break;
     }
@@ -578,10 +578,10 @@ void fn_801CBBD8(_ENEMY_WORK* self) {
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        fn_80134964(self, lbl_80570410, 0, 0, 0);
+        em_turn_seq_start(self, lbl_80570410, 0, 0, 0);
         break;
     case 1:
-        if (fn_80134B0C(self, lbl_80570410) == 1)
+        if (em_turn_seq_step(self, lbl_80570410) == 1)
             em_action_finish(self);
         break;
     }
@@ -593,14 +593,14 @@ void fn_801CBC64(_ENEMY_WORK* self, u8 a) {
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        fn_80134964(self, lbl_80570450, 0, 1, 0);
+        em_turn_seq_start(self, lbl_80570450, 0, 1, 0);
         if (self->field_0x482 == 1)
             em_mot_speed_set(self, lbl_80799260);
         break;
     case 1:
         if (a == 1 && em_mot_end_ck(self) == 1) {
             em_action_finish(self);
-        } else if (fn_80134B0C(self, lbl_80570450) == 1) {
+        } else if (em_turn_seq_step(self, lbl_80570450) == 1) {
             em_action_finish(self);
         }
         break;
@@ -613,13 +613,13 @@ void fn_801CC5DC(_ENEMY_WORK* self, u8 a) {
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        fn_801353F8(self);
+        em_move_vec2_clr(self);
         switch (a) {
         case 0: {
             em_mot_set(self, 0xD2, 4, 0);
             em_mot_speed_set(self, lbl_8079925C);
             f32 scale = get_em_chg_scale(self);
-            f32 rate = fn_8012F8E4(self);
+            f32 rate = get_em_base_scale(self);
             self->offset_0x30C.vec_0x310.x = lbl_807992A0 * rate * scale;
             break;
         }
@@ -627,21 +627,21 @@ void fn_801CC5DC(_ENEMY_WORK* self, u8 a) {
             em_mot_set(self, 0xD3, 4, 0);
             em_mot_speed_set(self, lbl_8079925C);
             f32 scale = get_em_chg_scale(self);
-            f32 rate = fn_8012F8E4(self);
+            f32 rate = get_em_base_scale(self);
             self->offset_0x30C.vec_0x310.x = lbl_807992A4 * rate * scale;
             break;
         }
         }
         rotVecY(&self->offset_0x30C.vec_0x310, self->field_0x1C0);
-        fn_80129668(self, 0, 0x18);
+        em_hit_window_set_default(self, 0, 0x18);
         break;
     case 1:
         switch (a) {
         case 0:
-            fn_80133E3C(self, 0x4000, lbl_80799220, lbl_807992A8);
+            em_turn_in_window(self, lbl_80799220, lbl_807992A8, 0x4000);
             break;
         case 1:
-            fn_80133E3C(self, -0x4000, lbl_80799220, lbl_807992A8);
+            em_turn_in_window(self, lbl_80799220, lbl_807992A8, -0x4000);
             break;
         }
         if (em_frame_check(self, 3, lbl_80799220, lbl_807992A8) == 1)

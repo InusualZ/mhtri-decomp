@@ -21,7 +21,7 @@
  * registered units are `hud/fn_80324F7C.c` (below) and `enemy/em_pl_frame.cpp` (the other half of this
  * proposal's range, above); this unit's own class (the vtable `lbl_805E04E0` its constructor
  * `em_work_ctor` installs) derives from the class whose
- * constructor is `fn_80147E2C` and whose vtable `lbl_805A1368` lives in the enemy band - eleven slots,
+ * constructor is `em_res_user_data_ctor` and whose vtable `lbl_805A1368` lives in the enemy band - eleven slots,
  * this range overrides three (the destructor `fn_803300CC`, `fn_8032FFEC`, `fn_8032FFF4`).  Class 4 (a
  * `fn_XXXXXXXX` file stem) was the registration's name for want of anything better; the naming pass
  * below replaced it with what the band *is*.
@@ -41,8 +41,8 @@
  *    `em_act_ck` matches) and its jump table's cases 0..3 call these four, so each one is the step of
  *    that action state and each switches on `+0x1E6 state_sub` for its phase;
  *  - `em_act_arm_<motion>[...]` = one phase of such a step, which arms a motion through the record's
- *    own setters (`em_mot_set(self, motion, mode, 0)`, `em_mot_set_ck`, `fn_8012F504`) and then ends the
- *    step when the motion's frame check (`em_mot_end_ck`, `fn_80133C50`, `fn_80134114`, `em_frame_check`)
+ *    own setters (`em_mot_set(self, motion, mode, 0)`, `em_mot_set_ck`, `em_mot_set_blend`) and then ends the
+ *    step when the motion's frame check (`em_mot_end_ck`, `em_turn_to_target`, `em_approach_step`, `em_frame_check`)
  *    reports done; `_hit<a>_<b>` is the pair handed to the damage handler `em_state_set`, `_f<frames>`
  *    the frame count the arm sets, `_mot_mode` an arm whose motion is the caller's mode argument;
  *  - the rest are named for the record's own state machine and helpers, not for a motion.
@@ -57,7 +57,7 @@
  *                                            then points `rot_y` at the reverse bearing (returns 1)
  *   fn_8032CC2C -> em_eff_ground_set         looks the +0x1A id up with `fn_801421E4` and places the
  *                                            effect at the ground record's position and rotation
- *   fn_8032CEA8 -> em_work_ctor              the record's class constructor: base ctor `fn_80147E2C`,
+ *   fn_8032CEA8 -> em_work_ctor              the record's class constructor: base ctor `em_res_user_data_ctor`,
  *                                            then stores this unit's vtable `lbl_805E04E0`
  *   fn_8032CEE4 -> em_work_dtor_del          the vtable's deleting-destructor half (empty in retail)
  *   fn_8032CEE8 -> em_work_noop              the vtable's other empty virtual stub
@@ -74,7 +74,7 @@
  *   fn_8032D210 -> em_act_arm_mot11          action 1 phase 5: the two motion counters, then motion 11
  *   fn_8032D2A0 -> em_act_arm_mot1_hit1_1    action 1 phase 6: motion 1, then the scan of the `+0x454`
  *                                            per-attacker values hands `em_state_set(self, 1, 1)`
- *   fn_8032D3F4 -> em_act_arm_mot1_f20       action 1 phase 7: `fn_8012F504(self, 1, 20, 0, 1)` - motion 1
+ *   fn_8032D3F4 -> em_act_arm_mot1_f20       action 1 phase 7: `em_mot_set_blend(self, 1, 20, 0, 1)` - motion 1
  *                                            with a 20-frame check
  *   fn_8032D480 -> em_act_step_1             the step function of action id 1: `state_sub` 0..7 (the
  *                                            eight-arm switch whose table is this unit's `.data`)
@@ -91,7 +91,7 @@
  *                                            step hands `em_state_set(self, 7, 2)`
  *   fn_8032DAE4 -> em_act_arm_mot203_204     action 3 phases 2/3: motion 203, or 204 when the mode is 1
  *   fn_8032DBAC -> em_act_arm_mot205         action 3 phase 4: motion 205, 120-frame countdown and a
- *                                            64-frame `fn_80134114` check
+ *                                            64-frame `em_approach_step` check
  *   fn_8032DC70 -> em_act_arm_mot207         action 3 phase 5: motion 207, waits 1024 frames
  *   fn_8032DF44 -> em_act_arm_mot210_hit3_10 action 3 phase 11: motion 210, then `em_state_set(self, 3,
  *                                            10)` and `em_eff_offset_set` at the end of every step
@@ -180,7 +180,7 @@
  *    +0x454 array.  Measured: `work[i]` (the stride spelling) costs 92.4 % on `em_act_arm_mot1_hit1_1`, so the
  *    `work->` spelling is kept.
  *  - em_act_arm_mot5 93.22 %, em_act_arm_mot7 93.22 %, em_act_arm_mot205 95.92 %: one argument-materialisation order
- *    - retail loads f1 before `li r4, 0` for the trailing `fn_80134004(self, 0, -200.0f)`, ours after
+ *    - retail loads f1 before `li r4, 0` for the trailing `em_approach_start(self, 0, -200.0f)`, ours after
  *    (the same three instructions, reordered).  The constants of both are the pool labels
  *    `lbl_8079B138` (the `f32` argument) and the record's own `bits_0x1EC * 0.1` factor.
  *  - em_act_arm_mot203_204 99.80 %: one register - retail masks the mode into r0 at the first test
@@ -232,9 +232,9 @@ extern "C" {
 /* The out-of-range callees whose owner's header does not declare them yet - each spelling is the
  * callee's own body (the same gap `camera/fn_802B5C58.cpp` and `ai/fn_802C5D10.cpp` recorded). */
 void fn_80051B7C(void* out, const void* in, f32 scale, s32 a);
-void fn_80127FE4(struct _ENEMY_WORK* self);
+void em_action_finish_fall(struct _ENEMY_WORK* self);
 void fn_8032DD04(struct _EM_CHARA_WORK* self);
-f32 fn_80050F80(const void* a, const void* b);
+f32 calcVecDistXZ(const void* a, const void* b);
 void fn_8012E694(struct _ENEMY_WORK* self);
 void fn_80136DF4(struct _ENEMY_WORK* self);
 void fn_800FC0D4(_CP_VECTOR* dst, const _CP_VECTOR* src);
@@ -243,7 +243,7 @@ u32 fn_803B88A8(void);
 void fn_80130350(struct _ENEMY_WORK* self, void* vec);
 void fn_8027D3F0(struct _PLW* self, u8 a);
 void fn_8012E664(struct _ENEMY_WORK* self);
-void* fn_80147E2C(void* self);
+void* em_res_user_data_ctor(void* self);
 u32 fn_801421E4(u16 id, EmGroundRec* rec);
 void fn_80125F54(EmGroundRec* rec);
 
@@ -410,12 +410,12 @@ extern "C" u32 em_act_face_away(_EM_CHARA_WORK* self, _PLW* pl)
     setVec3(&seed, lbl_8079B108, lbl_8079B108, lbl_8079B110);
     copyVec3(offset, &seed);
 
-    fn_80050CA0(&target, &self->pos, &pl->vec_0x03C);
+    subVec3(&target, &self->pos, &pl->vec_0x03C);
     copyVec3(&dir, &target);
     calcVecAngXY(&dir, &ang_a, &ang_b);
     rotVecY(offset, (u16)(ang_a - pl->field_0x058));
 
-    fn_80050CA0(&target, &pl->vec_0x03C, &self->pos);
+    subVec3(&target, &pl->vec_0x03C, &self->pos);
     copyVec3(&dir, &target);
     calcVecAngXY(&dir, &ang_a, &ang_b);
     self->rot_y = ang_a - pl->field_0x058;
@@ -440,7 +440,7 @@ extern "C" void em_eff_ground_set(_EM_CHARA_WORK* self)
 /* The class constructor: runs the base constructor, then installs this unit's vtable. */
 extern "C" _EM_CHARA_WORK* em_work_ctor(_EM_CHARA_WORK* self)
 {
-    fn_80147E2C((_ENEMY_WORK*)self);
+    em_res_user_data_ctor((_ENEMY_WORK*)self);
     self->vtable = (void**)lbl_805E04E0;
     return self;
 }
@@ -502,15 +502,15 @@ extern "C" void em_act_arm_mot201(_EM_CHARA_WORK* self)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130248((_ENEMY_WORK*)self);
-        fn_801305C4((_ENEMY_WORK*)self);
+        em_fall_height_get((_ENEMY_WORK*)self);
+        em_fall_start((_ENEMY_WORK*)self);
         em_mot_set_ck((_ENEMY_WORK*)self, 201, 6, 0);
         fn_80136DF4((_ENEMY_WORK*)self);
         break;
     case 1:
         fn_80136DF4((_ENEMY_WORK*)self);
         if (em_mot_end_ck((_ENEMY_WORK*)self) == 1) {
-            fn_80127FE4((_ENEMY_WORK*)self);
+            em_action_finish_fall((_ENEMY_WORK*)self);
         }
         break;
     }
@@ -667,7 +667,7 @@ extern "C" void em_act_arm_mot1_f20(_EM_CHARA_WORK* self)
     case 0:
         self->state += 1;
         em_move_mode_set((_ENEMY_WORK*)self, 0);
-        fn_8012F504((_ENEMY_WORK*)self, 1, 20, 0, 1);
+        em_mot_set_blend((_ENEMY_WORK*)self, 1, 20, 0, 1);
         break;
     case 1:
         if (em_frame_check((_ENEMY_WORK*)self, 0, lbl_8079B12C, lbl_8079B108) == 1) {
@@ -720,11 +720,11 @@ extern "C" void em_act_arm_mot5(_EM_CHARA_WORK* self)
         em_mot_set((_ENEMY_WORK*)self, 5, 4, 0);
         em_mot_speed_set((_ENEMY_WORK*)self,
                     lbl_8079B130 + lbl_8079B134 * (f32)(self->bits_0x1EC & 3));
-        fn_80134004((_ENEMY_WORK*)self, 0, lbl_8079B138);
+        em_approach_start((_ENEMY_WORK*)self, lbl_8079B138, 0);
         self->field_0x20 = 150;
         break;
     case 1:
-        if (fn_80134114((_ENEMY_WORK*)self, 0, 128) == 1 || --self->field_0x20 <= 0) {
+        if (em_approach_step((_ENEMY_WORK*)self, 0, 128) == 1 || --self->field_0x20 <= 0) {
             em_action_finish((_ENEMY_WORK*)self);
         }
         break;
@@ -741,11 +741,11 @@ extern "C" void em_act_arm_mot7(_EM_CHARA_WORK* self)
         em_mot_set((_ENEMY_WORK*)self, 7, 4, 0);
         em_mot_speed_set((_ENEMY_WORK*)self,
                     lbl_8079B148 + lbl_8079B14C * (f32)(self->bits_0x1EC & 3));
-        fn_80134004((_ENEMY_WORK*)self, 0, lbl_8079B138);
+        em_approach_start((_ENEMY_WORK*)self, lbl_8079B138, 0);
         self->field_0x20 = 120;
         break;
     case 1:
-        if (fn_80134114((_ENEMY_WORK*)self, 0, 128) == 1 || --self->field_0x20 <= 0) {
+        if (em_approach_step((_ENEMY_WORK*)self, 0, 128) == 1 || --self->field_0x20 <= 0) {
             em_action_finish((_ENEMY_WORK*)self);
         }
         break;
@@ -762,7 +762,7 @@ extern "C" void em_act_arm_mot12(_EM_CHARA_WORK* self)
         em_mot_set((_ENEMY_WORK*)self, 12, 4, 0);
         break;
     case 1:
-        if (fn_80133C50((_ENEMY_WORK*)self, 512) == 1) {
+        if (em_turn_to_target((_ENEMY_WORK*)self, 512) == 1) {
             em_action_finish((_ENEMY_WORK*)self);
         }
         break;
@@ -779,7 +779,7 @@ extern "C" void em_act_arm_mot13(_EM_CHARA_WORK* self)
         em_mot_set((_ENEMY_WORK*)self, 13, 4, 0);
         break;
     case 1:
-        if (fn_80133C50((_ENEMY_WORK*)self, 1024) == 1) {
+        if (em_turn_to_target((_ENEMY_WORK*)self, 1024) == 1) {
             em_action_finish((_ENEMY_WORK*)self);
         }
         break;
@@ -796,7 +796,7 @@ extern "C" void em_act_arm_mot10(_EM_CHARA_WORK* self)
         em_mot_set((_ENEMY_WORK*)self, 10, 4, 0);
         break;
     case 1:
-        fn_80133C50((_ENEMY_WORK*)self, 2048);
+        em_turn_to_target((_ENEMY_WORK*)self, 2048);
         if (em_mot_end_ck((_ENEMY_WORK*)self) == 1) {
             em_action_finish((_ENEMY_WORK*)self);
         }
@@ -853,15 +853,15 @@ extern "C" void em_act_arm_mot202(_EM_CHARA_WORK* self)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130248((_ENEMY_WORK*)self);
-        fn_801305C4((_ENEMY_WORK*)self);
+        em_fall_height_get((_ENEMY_WORK*)self);
+        em_fall_start((_ENEMY_WORK*)self);
         em_mot_set((_ENEMY_WORK*)self, 202, 6, 0);
         fn_80136DF4((_ENEMY_WORK*)self);
         break;
     case 1:
         fn_80136DF4((_ENEMY_WORK*)self);
         if (em_mot_end_ck((_ENEMY_WORK*)self) == 1) {
-            fn_80127FE4((_ENEMY_WORK*)self);
+            em_action_finish_fall((_ENEMY_WORK*)self);
         }
         break;
     }
@@ -874,8 +874,8 @@ extern "C" void em_act_arm_mot201_hit7_2(_EM_CHARA_WORK* self)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130248((_ENEMY_WORK*)self);
-        fn_801305C4((_ENEMY_WORK*)self);
+        em_fall_height_get((_ENEMY_WORK*)self);
+        em_fall_start((_ENEMY_WORK*)self);
         em_mot_set((_ENEMY_WORK*)self, 201, 0, 0);
         fn_80136DF4((_ENEMY_WORK*)self);
         self->field_0x20 = 0;
@@ -896,7 +896,7 @@ extern "C" void em_act_arm_mot201_hit7_2(_EM_CHARA_WORK* self)
                 if (work->slot_active == 0) {
                     continue;
                 }
-                if (fn_80050F80((VEC3*)&work->vec_0x03C, &self->pos) > lbl_8079B178) {
+                if (calcVecDistXZ((VEC3*)&work->vec_0x03C, &self->pos) > lbl_8079B178) {
                     continue;
                 }
                 em_state_set((_ENEMY_WORK*)self, 7, 2);
@@ -918,15 +918,15 @@ extern "C" void em_act_arm_mot203_204(_EM_CHARA_WORK* self, u32 action)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130248((_ENEMY_WORK*)self);
-        fn_801305C4((_ENEMY_WORK*)self);
+        em_fall_height_get((_ENEMY_WORK*)self);
+        em_fall_start((_ENEMY_WORK*)self);
         em_mot_set((_ENEMY_WORK*)self, (u16)(203 + ((action & 0xFF) == 1)), 0, 0);
         fn_80136DF4((_ENEMY_WORK*)self);
         break;
     case 1:
         fn_80136DF4((_ENEMY_WORK*)self);
         if (em_mot_end_ck((_ENEMY_WORK*)self) == 1) {
-            fn_80127FE4((_ENEMY_WORK*)self);
+            em_action_finish_fall((_ENEMY_WORK*)self);
         }
         break;
     }
@@ -938,17 +938,17 @@ extern "C" void em_act_arm_mot205(_EM_CHARA_WORK* self)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130248((_ENEMY_WORK*)self);
-        fn_801305C4((_ENEMY_WORK*)self);
+        em_fall_height_get((_ENEMY_WORK*)self);
+        em_fall_start((_ENEMY_WORK*)self);
         em_mot_set((_ENEMY_WORK*)self, 205, 4, 0);
-        fn_80134004((_ENEMY_WORK*)self, 0, lbl_8079B124);
+        em_approach_start((_ENEMY_WORK*)self, lbl_8079B124, 0);
         self->field_0x20 = 120;
         fn_80136DF4((_ENEMY_WORK*)self);
         break;
     case 1:
         fn_80136DF4((_ENEMY_WORK*)self);
-        if (fn_80134114((_ENEMY_WORK*)self, 0, 64) == 1 || --self->field_0x20 <= 0) {
-            fn_80127FE4((_ENEMY_WORK*)self);
+        if (em_approach_step((_ENEMY_WORK*)self, 0, 64) == 1 || --self->field_0x20 <= 0) {
+            em_action_finish_fall((_ENEMY_WORK*)self);
         }
         break;
     }
@@ -960,15 +960,15 @@ extern "C" void em_act_arm_mot207(_EM_CHARA_WORK* self)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130248((_ENEMY_WORK*)self);
-        fn_801305C4((_ENEMY_WORK*)self);
+        em_fall_height_get((_ENEMY_WORK*)self);
+        em_fall_start((_ENEMY_WORK*)self);
         em_mot_set((_ENEMY_WORK*)self, 207, 4, 0);
         fn_80136DF4((_ENEMY_WORK*)self);
         break;
     case 1:
         fn_80136DF4((_ENEMY_WORK*)self);
-        if (fn_80133C50((_ENEMY_WORK*)self, 1024) == 1) {
-            fn_80127FE4((_ENEMY_WORK*)self);
+        if (em_turn_to_target((_ENEMY_WORK*)self, 1024) == 1) {
+            em_action_finish_fall((_ENEMY_WORK*)self);
         }
         break;
     }
@@ -981,8 +981,8 @@ extern "C" void em_act_arm_mot210_hit3_10(_EM_CHARA_WORK* self)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130248((_ENEMY_WORK*)self);
-        fn_801305C4((_ENEMY_WORK*)self);
+        em_fall_height_get((_ENEMY_WORK*)self);
+        em_fall_start((_ENEMY_WORK*)self);
         em_mot_set((_ENEMY_WORK*)self, 210, 0, 0);
         break;
     case 1:
@@ -1001,8 +1001,8 @@ extern "C" void em_act_arm_mot201_hit7_6(_EM_CHARA_WORK* self)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130248((_ENEMY_WORK*)self);
-        fn_801305C4((_ENEMY_WORK*)self);
+        em_fall_height_get((_ENEMY_WORK*)self);
+        em_fall_start((_ENEMY_WORK*)self);
         em_mot_set((_ENEMY_WORK*)self, 201, 4, 0);
         self->field_0x20 = 0;
         break;
@@ -1021,7 +1021,7 @@ extern "C" void em_act_arm_mot201_hit7_6(_EM_CHARA_WORK* self)
                 if (work->slot_active == 0) {
                     continue;
                 }
-                if (fn_80050F80((VEC3*)&work->vec_0x03C, &self->pos) > lbl_8079B178) {
+                if (calcVecDistXZ((VEC3*)&work->vec_0x03C, &self->pos) > lbl_8079B178) {
                     continue;
                 }
                 em_state_set((_ENEMY_WORK*)self, 7, 6);
@@ -1040,8 +1040,8 @@ extern "C" void em_act_arm_mot203_hit3_20(_EM_CHARA_WORK* self)
     switch (self->state) {
     case 0:
         self->state += 1;
-        fn_80130248((_ENEMY_WORK*)self);
-        fn_801305C4((_ENEMY_WORK*)self);
+        em_fall_height_get((_ENEMY_WORK*)self);
+        em_fall_start((_ENEMY_WORK*)self);
         em_mot_set((_ENEMY_WORK*)self, 203, 0, 0);
         break;
     case 1:

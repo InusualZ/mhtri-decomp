@@ -24,7 +24,7 @@
  *
  * Inventory in address order (family clusters):
  *   0x80105314..0x8010724C  the `_EFT` enemy/emitter base cluster: per-frame handlers
- *                           (`fn_80105314`, `fn_8010562C`, ...), state dispatchers
+ *                           (`fn_80105314`, `eft_spawn_type10`, ...), state dispatchers
  *                           (`fn_801059AC`, `fn_80106920`, `fn_80106F20`), pool releases
  *                           (`fn_80105970`, `fn_801068E4`, `fn_80106EE4`), type dispatch tables
  *                           (`fn_80105564`, `fn_80105EFC`) and the setters (`fn_801057A4`,
@@ -263,7 +263,7 @@ struct _EFT014_POOL_C {
     /* +0x08 */ _EFT014_SLOT_C slots[1];
 };
 
-/* Pool block of the `fn_8010562C` / `fn_80105888` family: the type-table value at +0x00, the caller's
+/* Pool block of the `eft_spawn_type10` / `fn_80105888` family: the type-table value at +0x00, the caller's
  * first word at +0x10, the position copy at +0x14 and the scale at +0x20. */
 struct _EFT013_WORK_A {
     /* +0x00 */ s32 count;
@@ -279,7 +279,7 @@ struct _EFT013_WORK_A {
  * ------------------------------------------------------------------------------------------------- */
 
 extern "C" void fn_80050708(void* mtx, nw4r::math::VEC3* v);
-/* fn_8010140C comes from its owner's header (rule 2). */
+/* mtx34_trans_get comes from its owner's header (rule 2). */
 /* fn_800DC60C / fn_800DB964 come from their owner's header (rule 2). */
 extern "C" _EFT013* fn_80107640(void* self, u32 a, f32 scale, u32 areano);
 extern "C" void* fn_80107A18(void* self, u32 a, u32 b, f32 scale, u32 c);
@@ -1319,8 +1319,8 @@ extern "C" void fn_801065FC(_EFT013* self, _ENEMY_WORK* enemy, nw4r::math::VEC3*
     _EFT013_POOL* work = (_EFT013_POOL*)self->work_0x38;
     get_joint_wmat_em(enemy, joint, &mtx);
     mulVecMat(v, &mtx);
-    fn_80101428(&mtx, v);
-    fn_8010140C(&mtx, &self->pos_0x18);
+    mtx34_trans_add(&mtx, v);
+    mtx34_trans_get(&mtx, &self->pos_0x18);
     work->effects[(u8)index]->SetRootMtx(mtx);
 }
 
@@ -1382,7 +1382,7 @@ extern "C" void fn_80106ACC(_EFT013* self) {
 /* 0x8010562C - spawn an enemy effect: pool the object, seed the work block from the type table, gate on
  * the area and the enemy's sleep state, then copy the caller's position into either the effect's own
  * `pos_0x18` or the work block's `pos_0x14` (the type switch). */
-extern "C" void fn_8010562C(_ENEMY_WORK* self, u32 type, u32 a, nw4r::math::VEC3* b, f32 scale) {
+extern "C" void eft_spawn_type10(_ENEMY_WORK* self, u32 type, u32 a, nw4r::math::VEC3* b, f32 scale) {
     _EFT013* e = (_EFT013*)fn_800F8788(0x24);
     if (e == NULL) {
         return;

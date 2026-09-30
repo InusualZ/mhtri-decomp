@@ -57,7 +57,7 @@
  *     twelve functions); the residual is the fused pair only.
  *   * ARGUMENT EVALUATION ORDER - `fn_8018D370` 91.76 (488 B; ours 464) and `fn_80191038` 83.84
  *     (964 B; ours 912).  The target evaluates the float argument of `em_water_check`/
- *     `fn_801048B4` before the integer ones, and materialises the `_GXColor` byte record in the
+ *     `eft009_spawn_at_joint` before the integer ones, and materialises the `_GXColor` byte record in the
  *     order b,g,r,a; MWCC orders by declaration, so a few rows still differ.  Both spellings are
  *     ABI-equivalent.
  *   * `_GXColor` record - `fn_80191038` stores the four colour bytes through `_GXColor`; the
@@ -159,46 +159,46 @@ void fn_8018AE7C(_ENEMY_WORK* self);
 void fn_8018B1C4(_ENEMY_WORK* self);
 void fn_8018B258(_ENEMY_WORK* self);
 void em_action_finish(_ENEMY_WORK* self);
-void fn_80129668(_ENEMY_WORK* self, u32 a, u32 b);
+void em_hit_window_set_default(_ENEMY_WORK* self, u32 a, u32 b);
 void em_busy_set(_ENEMY_WORK* self);
-u32 fn_8012EC60(_ENEMY_WORK* self);
+u32 em_alt_mode_ck(_ENEMY_WORK* self);
 u32 fn_8012EC3C(_ENEMY_WORK* self);
-void fn_8012F504(_ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d);
+void em_mot_set_blend(_ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d);
 void em_mot_set(_ENEMY_WORK* self, s32 a, s32 b, s32 c);
 void em_mot_speed_set(_ENEMY_WORK* self, f32 a);
 u32 em_mot_end_ck(_ENEMY_WORK* self);
 f32 fn_8013026C(_ENEMY_WORK* self);
 void em_move_mode_set(_ENEMY_WORK* self, u32 a);
-void fn_801305C4(_ENEMY_WORK* self, f32 a);
-void fn_80131D84(_ENEMY_WORK* self);
-void fn_80131E74(_ENEMY_WORK* self);
+void em_fall_start(_ENEMY_WORK* self, f32 a);
+void em_frame_flag_set(_ENEMY_WORK* self);
+void em_busy_timer_reset(_ENEMY_WORK* self);
 u32 fn_801321DC(_ENEMY_WORK* self);
 void fn_80133C3C(_ENEMY_WORK* self);
 u16 fn_80133DB0(u16 a, u16 b, u16 c);
-void fn_80133E3C(_ENEMY_WORK* self, s32 a, f32 b, f32 c);
-u32 fn_80135748(_ENEMY_WORK* self, u32 a);
-void fn_80136B50(_ENEMY_WORK* self, u32 a, u32 b);
+void em_turn_in_window(_ENEMY_WORK* self, f32 lo, f32 hi, s32 angle);
+u32 em_flags836_ck(_ENEMY_WORK* self, u32 a);
+void em_camera_req(_ENEMY_WORK* self, u32 a, u32 b);
 void fn_80136D14(_ENEMY_WORK* self);
-s16 fn_80145FE4(void);
-u32 fn_80146008(u32 a);
-void fn_80146058(_ENEMY_WORK* self, f32 a, f32 b, f32 c);
-void fn_8014610C(_ENEMY_WORK* self, f32 a, f32 b, f32 c);
-void fn_8014616C(_ENEMY_WORK* self, u32 a);
-void fn_8014619C(_ENEMY_WORK* self);
-void fn_801461A8(_ENEMY_WORK* self, s16 a, const void* tbl, u32 b);
-void fn_801462A4(_ENEMY_WORK* self, s16 a, const void* tbl, const void* tbl2, u32 b, u32 c);
-void fn_801048B4(_ENEMY_WORK* self, u32 a, u32 b, u32 c, f32 d);
+s16 em_demo_frame_get(void);
+u32 em_demo_time_ck(u32 a);
+void em_demo_pos_set(_ENEMY_WORK* self, f32 a, f32 b, f32 c);
+void em_demo_rot_set(_ENEMY_WORK* self, f32 a, f32 b, f32 c);
+void em_demo_reset(_ENEMY_WORK* self, u32 a);
+void em_demo_enable(_ENEMY_WORK* self);
+void em_demo_key3_apply(_ENEMY_WORK* self, s16 a, const void* tbl, u32 b);
+void em_demo_key_apply(_ENEMY_WORK* self, s16 a, const void* tbl, const void* tbl2, u32 b, u32 c);
+void eft009_spawn_at_joint(_ENEMY_WORK* self, u32 a, u32 b, u32 c, f32 d);
 void fn_801049D0(_ENEMY_WORK* self, u32 a, u32 b, u32 c, nw4r::math::VEC3* p, f32 d);
-void fn_8010562C(_ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* p, f32 d);
-void fn_80106694(_ENEMY_WORK* self, nw4r::math::VEC3* p, u32 a, f32 d);
-void fn_8010D2B0(nw4r::math::VEC3* p, u8 a, u32 b, u32 c, f32 d);
+void eft_spawn_type10(_ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* p, f32 d);
+void eft_spawn_type11(_ENEMY_WORK* self, nw4r::math::VEC3* p, u32 a, f32 d);
+void eft_spawn_pos_in_area(nw4r::math::VEC3* p, u8 a, u32 b, u32 c, f32 d);
 void fn_80117E58(_ENEMY_WORK* self, u32 a, nw4r::math::VEC3* p, u32 b, f32 d);
 void fn_8011D448(_ENEMY_WORK* self, u32 a, u32 b, u32 c, f32 d);
 void fn_8011D4FC(_ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d, f32 e);
 void fn_8011D690(_ENEMY_WORK* self, u32 a, u32 b, f32 c);
-void fn_801E2D04(_ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* p, u32 c, f32 d);
-void fn_80304508(_ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* p, f32 c);
-void fn_80051378(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
+void eft_em_spawn_joint(_ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* p, u32 c, f32 d);
+void eft_em_spawn(_ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* p, f32 c);
+void addVec3(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 f32 fn_8005024C(u16 a);
 void fn_80191EF8(_ENEMY_WORK* self);
 void fn_80192080(_ENEMY_WORK* self);
@@ -461,134 +461,134 @@ void fn_8018B418(_ENEMY_WORK* self) {
     VEC3 sp8;
 
     VEC3_ctor(&sp8);
-    fn_80131D84(self);
+    em_frame_flag_set(self);
     switch (self->state) {
     case 0:
         self->state = (u8)(self->state + 1);
         em_move_mode_set(self, 2);
         em_mot_set(self, 0x28, 0, 0);
-        fn_8014616C(self, 0);
-        fn_80146058(self, lbl_80798010, lbl_80798014, lbl_80798018);
-        fn_8014610C(self, lbl_80797E88, lbl_8079801C, lbl_80797E88);
+        em_demo_reset(self, 0);
+        em_demo_pos_set(self, lbl_80798010, lbl_80798014, lbl_80798018);
+        em_demo_rot_set(self, lbl_80797E88, lbl_8079801C, lbl_80797E88);
         return;
     case 1:
-        if (fn_80146008(0x190) == 1U) {
+        if (em_demo_time_ck(0x190) == 1U) {
             self->state = (u8)(self->state + 1);
             em_mot_set(self, 0x37, 0, 0);
-            fn_8014619C(self);
+            em_demo_enable(self);
         }
         break;
     case 2:
         if (em_frame_check(self, 0, lbl_80797EB4, lbl_80797E88) == 1U) {
             setVector3(&sp8, lbl_80797E88, lbl_80797E88, lbl_80797F78);
-            fn_80304508(self, 0xCC, 0x16, &sp8, lbl_8079800C);
+            eft_em_spawn(self, 0xCC, 0x16, &sp8, lbl_8079800C);
         }
-        if (fn_80146008(0x1DE) == 1U) {
+        if (em_demo_time_ck(0x1DE) == 1U) {
             self->state = (u8)(self->state + 1);
-            fn_8012F504(self, 0x2C, 0x18, 0, 1);
-            fn_80146058(self, lbl_80798020, lbl_80798014, lbl_80798024);
+            em_mot_set_blend(self, 0x2C, 0x18, 0, 1);
+            em_demo_pos_set(self, lbl_80798020, lbl_80798014, lbl_80798024);
         }
         break;
     case 3:
-        if (em_frame_check(self, 3, lbl_80797F6C, lbl_80797F08) == 1U && (fn_80145FE4() & 3) == 0) {
+        if (em_frame_check(self, 3, lbl_80797F6C, lbl_80797F08) == 1U && (em_demo_frame_get() & 3) == 0) {
             setVector3(&sp8, lbl_80797E88, lbl_80797E88, lbl_80797F50);
-            fn_80304508(self, 0xCD, 0x26, &sp8, lbl_80797E9C);
+            eft_em_spawn(self, 0xCD, 0x26, &sp8, lbl_80797E9C);
         }
-        if (fn_80146008(0x1FA) == 1U) {
+        if (em_demo_time_ck(0x1FA) == 1U) {
             self->state = (u8)(self->state + 1);
             em_mot_set(self, 0x2C, 0, 0x1E);
-            fn_80146058(self, lbl_80798028, lbl_8079802C, lbl_80798030);
-            fn_8014610C(self, lbl_80797E88, lbl_8079801C, lbl_80797E88);
-            fn_801462A4(self, fn_80145FE4(), lbl_805ABDB8, NULL, 5, 0);
+            em_demo_pos_set(self, lbl_80798028, lbl_8079802C, lbl_80798030);
+            em_demo_rot_set(self, lbl_80797E88, lbl_8079801C, lbl_80797E88);
+            em_demo_key_apply(self, em_demo_frame_get(), lbl_805ABDB8, NULL, 5, 0);
         }
         break;
     case 4:
-        if (em_frame_check(self, 3, lbl_80797F80, lbl_80798034) == 1U && (fn_80145FE4() & 3) == 0) {
+        if (em_frame_check(self, 3, lbl_80797F80, lbl_80798034) == 1U && (em_demo_frame_get() & 3) == 0) {
             setVector3(&sp8, lbl_80797E88, lbl_80797E88, lbl_80797F50);
-            fn_80304508(self, 0xCD, 0x26, &sp8, lbl_80797EB8);
+            eft_em_spawn(self, 0xCD, 0x26, &sp8, lbl_80797EB8);
         }
         if (em_frame_check(self, 0, lbl_80798038, lbl_80797E88) == 1U) {
             setVector3(&sp8, lbl_80797E88, lbl_80797E88, lbl_80797ED4);
-            fn_80304508(self, 0xCC, 0x16, &sp8, lbl_8079800C);
+            eft_em_spawn(self, 0xCC, 0x16, &sp8, lbl_8079800C);
         }
         self->pos.y = lbl_8079802C;
-        fn_801462A4(self, fn_80145FE4(), lbl_805ABDB8, NULL, 5, 0);
-        if (fn_80146008(0x2B2) == 1U) {
+        em_demo_key_apply(self, em_demo_frame_get(), lbl_805ABDB8, NULL, 5, 0);
+        if (em_demo_time_ck(0x2B2) == 1U) {
             self->state = (u8)(self->state + 1);
-            fn_8012F504(self, 0x29, 0xE, 0, 1);
+            em_mot_set_blend(self, 0x29, 0xE, 0, 1);
         }
         break;
     case 5:
-        if (em_frame_check(self, 3, lbl_80797F6C, lbl_80797F08) == 1U && (fn_80145FE4() & 3) == 0) {
+        if (em_frame_check(self, 3, lbl_80797F6C, lbl_80797F08) == 1U && (em_demo_frame_get() & 3) == 0) {
             setVector3(&sp8, lbl_80797E88, lbl_80797E88, lbl_80797F50);
-            fn_80304508(self, 0xCD, 0x26, &sp8, lbl_80797E9C);
+            eft_em_spawn(self, 0xCD, 0x26, &sp8, lbl_80797E9C);
         }
-        if (em_frame_check(self, 3, lbl_80797F80, lbl_80798034) == 1U && (fn_80145FE4() & 3) == 0) {
+        if (em_frame_check(self, 3, lbl_80797F80, lbl_80798034) == 1U && (em_demo_frame_get() & 3) == 0) {
             setVector3(&sp8, lbl_80797E88, lbl_80797E88, lbl_80797F50);
-            fn_80304508(self, 0xCD, 0x26, &sp8, lbl_80797EB8);
+            eft_em_spawn(self, 0xCD, 0x26, &sp8, lbl_80797EB8);
         }
         if (em_frame_check(self, 0, lbl_80798038, lbl_80797E88) == 1U) {
             setVector3(&sp8, lbl_80797E88, lbl_80797E88, lbl_80797ED4);
-            fn_80304508(self, 0xCC, 0x16, &sp8, lbl_8079800C);
+            eft_em_spawn(self, 0xCC, 0x16, &sp8, lbl_8079800C);
         }
-        fn_801461A8(self, fn_80145FE4(), lbl_805ABF30, 0);
-        if (fn_80146008(0x382) == 1U) {
+        em_demo_key3_apply(self, em_demo_frame_get(), lbl_805ABF30, 0);
+        if (em_demo_time_ck(0x382) == 1U) {
             self->state = (u8)(self->state + 1);
-            fn_801305C4(self, lbl_80797E88);
-            fn_8012F504(self, 0x3C, 0xE, 0x6C, 1);
-            fn_80146058(self, lbl_8079803C, lbl_80798040, lbl_80798044);
+            em_fall_start(self, lbl_80797E88);
+            em_mot_set_blend(self, 0x3C, 0xE, 0x6C, 1);
+            em_demo_pos_set(self, lbl_8079803C, lbl_80798040, lbl_80798044);
         }
         break;
     case 6:
         if (em_frame_check(self, 0, lbl_80798048, lbl_80797E88) == 1U) {
             setVector3(&sp8, lbl_80797E88, lbl_80797E88, lbl_80797EA4);
-            fn_80304508(self, 0xCC, 0x16, &sp8, lbl_80797E9C);
+            eft_em_spawn(self, 0xCC, 0x16, &sp8, lbl_80797E9C);
         }
-        fn_801461A8(self, fn_80145FE4(), lbl_805ABF30, 0);
-        if (fn_80146008(0x3B0) == 1U) {
+        em_demo_key3_apply(self, em_demo_frame_get(), lbl_805ABF30, 0);
+        if (em_demo_time_ck(0x3B0) == 1U) {
             self->state = (u8)(self->state + 1);
             em_mot_set(self, 0x40, 0, 0);
             em_mot_speed_set(self, lbl_8079804C);
-            fn_80146058(self, lbl_80798050, lbl_80798054, lbl_80798058);
-            fn_8014610C(self, lbl_80797E88, lbl_8079805C, lbl_80797E88);
-            fn_801462A4(self, fn_80145FE4(), lbl_805AC1F0, NULL, 3, 0);
-            fn_801048B4(self, 3U, 0x11U, 0, lbl_80797EB8);
+            em_demo_pos_set(self, lbl_80798050, lbl_80798054, lbl_80798058);
+            em_demo_rot_set(self, lbl_80797E88, lbl_8079805C, lbl_80797E88);
+            em_demo_key_apply(self, em_demo_frame_get(), lbl_805AC1F0, NULL, 3, 0);
+            eft009_spawn_at_joint(self, 3U, 0x11U, 0, lbl_80797EB8);
         }
         break;
     case 7:
         if (em_frame_check(self, 0, lbl_80797FF8, lbl_80797E88) == 1U) {
             setVector3(&sp8, lbl_80797E88, lbl_80797F10, lbl_80797E88);
-            fn_80304508(self, 0x32, 3, &sp8, lbl_8079804C);
+            eft_em_spawn(self, 0x32, 3, &sp8, lbl_8079804C);
         }
-        fn_801462A4(self, fn_80145FE4(), lbl_805AC1F0, NULL, 3, 0);
-        if (fn_80146008(0x420) == 1U) {
+        em_demo_key_apply(self, em_demo_frame_get(), lbl_805AC1F0, NULL, 3, 0);
+        if (em_demo_time_ck(0x420) == 1U) {
             self->state = (u8)(self->state + 1);
             em_move_mode_set(self, 0);
             em_mot_set(self, 0x3D, 0, 0);
-            fn_80146058(self, lbl_80798060, lbl_80798064, lbl_80798068);
-            fn_8014610C(self, lbl_80797E88, lbl_8079806C, lbl_80797E88);
+            em_demo_pos_set(self, lbl_80798060, lbl_80798064, lbl_80798068);
+            em_demo_rot_set(self, lbl_80797E88, lbl_8079806C, lbl_80797E88);
         }
         break;
     case 8:
         if (em_frame_check(self, 0, lbl_80797EF8, lbl_80797E88) == 1U) {
-            fn_801048B4(self, 0x15U, 0x24U, 0, lbl_80797EC0);
+            eft009_spawn_at_joint(self, 0x15U, 0x24U, 0, lbl_80797EC0);
         }
-        if (fn_80146008(0x456) == 1U) {
+        if (em_demo_time_ck(0x456) == 1U) {
             self->state = (u8)(self->state + 1);
             em_mot_set(self, 1, 0, 0);
-            fn_80146058(self, lbl_80798070, lbl_80798074, lbl_80798078);
+            em_demo_pos_set(self, lbl_80798070, lbl_80798074, lbl_80798078);
         }
         break;
     case 9:
-        if (fn_80146008(0x4A6) == 1U) {
+        if (em_demo_time_ck(0x4A6) == 1U) {
             self->state = (u8)(self->state + 1);
-            fn_8012F504(self, 0x1A, 0xA, 0, 1);
+            em_mot_set_blend(self, 0x1A, 0xA, 0, 1);
         }
         break;
     case 10:
-        if (fn_80146008(0x582) == 1U) {
+        if (em_demo_time_ck(0x582) == 1U) {
             self->state = (u8)(self->state + 1);
-            fn_8012F504(self, 1, 0x1E, 0, 1);
+            em_mot_set_blend(self, 1, 0x1E, 0, 1);
         }
         break;
     default:
@@ -603,8 +603,8 @@ void fn_8018BBD8(_ENEMY_WORK* self) {
         self->state = (u8)(self->state + 1);
         em_move_mode_set(self, 0);
         em_mot_set(self, 1, 0, 0);
-        fn_80146058(self, lbl_80798070, lbl_80798074, lbl_80798078);
-        fn_8014610C(self, lbl_80797E88, lbl_8079806C, lbl_80797E88);
+        em_demo_pos_set(self, lbl_80798070, lbl_80798074, lbl_80798078);
+        em_demo_rot_set(self, lbl_80797E88, lbl_8079806C, lbl_80797E88);
         return;
     case 1:
         if (em_mot_end_ck(self) == 1U) {
@@ -623,66 +623,66 @@ void fn_8018BC7C(_ENEMY_WORK* self) {
         self->state = (u8)(self->state + 1);
         em_move_mode_set(self, 0);
         em_mot_set(self, 1, 0, 0);
-        fn_80146058(self, lbl_8079807C, lbl_80798080, lbl_80798084);
-        fn_8014610C(self, lbl_80797E88, lbl_80797F44, lbl_80797E88);
+        em_demo_pos_set(self, lbl_8079807C, lbl_80798080, lbl_80798084);
+        em_demo_rot_set(self, lbl_80797E88, lbl_80797F44, lbl_80797E88);
         return;
     case 1:
-        if (fn_80146008(0x1E) == 1U) {
+        if (em_demo_time_ck(0x1E) == 1U) {
             self->state = (u8)(self->state + 1);
             em_mot_set(self, 4, 0, 0);
             return;
         }
         break;
     case 2:
-        if (fn_80146008(0xD2) == 1U) {
+        if (em_demo_time_ck(0xD2) == 1U) {
             self->state = (u8)(self->state + 1);
             em_mot_set(self, 5, 0, 0x2A);
-            fn_80146058(self, lbl_80798088, lbl_80798080, lbl_8079808C);
+            em_demo_pos_set(self, lbl_80798088, lbl_80798080, lbl_8079808C);
             return;
         }
         break;
     case 3:
         if (em_frame_check(self, 0, lbl_80797F9C, lbl_80797E88) == 1U) {
-            fn_801048B4(self, 8U, 0x92U, 0, lbl_80798090);
+            eft009_spawn_at_joint(self, 8U, 0x92U, 0, lbl_80798090);
         }
-        if (fn_80146008(0x134) == 1U) {
+        if (em_demo_time_ck(0x134) == 1U) {
             self->state = (u8)(self->state + 1);
             em_mot_set(self, 1, 0, 0);
-            fn_80146058(self, lbl_80798094, lbl_80798098, lbl_8079809C);
-            fn_8014610C(self, lbl_80797E88, lbl_807980A0, lbl_80797E88);
+            em_demo_pos_set(self, lbl_80798094, lbl_80798098, lbl_8079809C);
+            em_demo_rot_set(self, lbl_80797E88, lbl_807980A0, lbl_80797E88);
             return;
         }
         break;
     case 4:
-        if (fn_80146008(0x190) == 1U) {
+        if (em_demo_time_ck(0x190) == 1U) {
             self->state = (u8)(self->state + 1);
-            fn_8014616C(self, 0);
+            em_demo_reset(self, 0);
             return;
         }
         break;
     case 5:
-        if (fn_80146008(0x456) == 1U) {
+        if (em_demo_time_ck(0x456) == 1U) {
             self->state = (u8)(self->state + 1);
             em_mot_set(self, 1, 0, 0);
-            fn_8014619C(self);
-            fn_80146058(self, lbl_807980A4, lbl_807980A8, lbl_807980AC);
-            fn_8014610C(self, lbl_80797E88, lbl_807980B0, lbl_80797E88);
+            em_demo_enable(self);
+            em_demo_pos_set(self, lbl_807980A4, lbl_807980A8, lbl_807980AC);
+            em_demo_rot_set(self, lbl_80797E88, lbl_807980B0, lbl_80797E88);
             return;
         }
         break;
     case 6:
-        if (fn_80146008(0x4AE) == 1U) {
+        if (em_demo_time_ck(0x4AE) == 1U) {
             self->state = (u8)(self->state + 1);
-            fn_8012F504(self, 2, 0x1E, 0, 1);
+            em_mot_set_blend(self, 2, 0x1E, 0, 1);
             return;
         }
         break;
     case 7:
         if (em_frame_check(self, 0, lbl_80797FA8, lbl_80797E88) == 1U) {
-            fn_801048B4(self, 8U, 0x92U, 0, lbl_80798090);
+            eft009_spawn_at_joint(self, 8U, 0x92U, 0, lbl_80798090);
         }
         if (em_frame_check(self, 0, lbl_80798004, lbl_80797E88) == 1U) {
-            fn_801048B4(self, 0xDU, 0x92U, 0, lbl_80798090);
+            eft009_spawn_at_joint(self, 0xDU, 0x92U, 0, lbl_80798090);
         }
         break;
     default:
@@ -697,8 +697,8 @@ void fn_8018BF4C(_ENEMY_WORK* self) {
         self->state = (u8)(self->state + 1);
         em_move_mode_set(self, 0);
         em_mot_set(self, 2, 0, 0);
-        fn_80146058(self, lbl_807980B4, lbl_807980A8, lbl_807980B8);
-        fn_8014610C(self, lbl_80797E88, lbl_807980B0, lbl_80797E88);
+        em_demo_pos_set(self, lbl_807980B4, lbl_807980A8, lbl_807980B8);
+        em_demo_rot_set(self, lbl_80797E88, lbl_807980B0, lbl_80797E88);
         return;
     case 1:
         if (em_mot_end_ck(self) == 1U) {
@@ -717,72 +717,72 @@ void fn_8018BFF0(_ENEMY_WORK* self) {
         self->state = (u8)(self->state + 1);
         em_move_mode_set(self, 0);
         em_mot_set(self, 1, 0, 0);
-        fn_80146058(self, lbl_807980BC, lbl_807980C0, lbl_807980C4);
-        fn_8014610C(self, lbl_80797E88, lbl_807980C8, lbl_80797E88);
+        em_demo_pos_set(self, lbl_807980BC, lbl_807980C0, lbl_807980C4);
+        em_demo_rot_set(self, lbl_80797E88, lbl_807980C8, lbl_80797E88);
         return;
     case 1:
-        if (fn_80146008(0x1E) == 1U) {
+        if (em_demo_time_ck(0x1E) == 1U) {
             self->state = (u8)(self->state + 1);
             em_mot_set(self, 1, 0, 0);
             return;
         }
         break;
     case 2:
-        if (fn_80146008(0xD2) == 1U) {
+        if (em_demo_time_ck(0xD2) == 1U) {
             self->state = (u8)(self->state + 1);
-            fn_8014616C(self, 0);
+            em_demo_reset(self, 0);
             return;
         }
         break;
     case 3:
-        if (fn_80146008(0x134) == 1U) {
+        if (em_demo_time_ck(0x134) == 1U) {
             self->state = (u8)(self->state + 1);
             em_mot_set(self, 1, 0, 0);
-            fn_8014619C(self);
-            fn_80146058(self, lbl_807980BC, lbl_807980C0, lbl_807980C4);
-            fn_8014610C(self, lbl_80797E88, lbl_807980CC, lbl_80797E88);
+            em_demo_enable(self);
+            em_demo_pos_set(self, lbl_807980BC, lbl_807980C0, lbl_807980C4);
+            em_demo_rot_set(self, lbl_80797E88, lbl_807980CC, lbl_80797E88);
             return;
         }
         break;
     case 4:
-        if (fn_80146008(0x190) == 1U) {
+        if (em_demo_time_ck(0x190) == 1U) {
             self->state = (u8)(self->state + 1);
-            fn_8014616C(self, 0);
+            em_demo_reset(self, 0);
             return;
         }
         break;
     case 5:
-        if (fn_80146008(0x420) == 1U) {
+        if (em_demo_time_ck(0x420) == 1U) {
             self->state = (u8)(self->state + 1);
             em_mot_set(self, 1, 0, 0);
-            fn_8014619C(self);
-            fn_80146058(self, lbl_807980D0, lbl_807980C0, lbl_807980D4);
-            fn_8014610C(self, lbl_80797E88, lbl_807980D8, lbl_80797E88);
+            em_demo_enable(self);
+            em_demo_pos_set(self, lbl_807980D0, lbl_807980C0, lbl_807980D4);
+            em_demo_rot_set(self, lbl_80797E88, lbl_807980D8, lbl_80797E88);
             return;
         }
         break;
     case 6:
-        if (fn_80146008(0x456) == 1U) {
+        if (em_demo_time_ck(0x456) == 1U) {
             self->state = (u8)(self->state + 1);
             em_mot_set(self, 0x18, 0, 0);
-            fn_80146058(self, lbl_807980D0, lbl_807980C0, lbl_807980D4);
-            fn_8014610C(self, lbl_80797E88, lbl_807980D8, lbl_80797E88);
+            em_demo_pos_set(self, lbl_807980D0, lbl_807980C0, lbl_807980D4);
+            em_demo_rot_set(self, lbl_80797E88, lbl_807980D8, lbl_80797E88);
             return;
         }
         break;
     case 7:
-        fn_80133E3C(self, 0x4000, lbl_807980DC, lbl_807980E0);
-        if (fn_80146008(0x49A) == 1U) {
+        em_turn_in_window(self, lbl_807980DC, lbl_807980E0, 0x4000);
+        if (em_demo_time_ck(0x49A) == 1U) {
             self->state = (u8)(self->state + 1);
-            fn_8012F504(self, 1, 0x1E, 0, 1);
-            fn_8014610C(self, lbl_80797E88, lbl_807980E4, lbl_80797E88);
+            em_mot_set_blend(self, 1, 0x1E, 0, 1);
+            em_demo_rot_set(self, lbl_80797E88, lbl_807980E4, lbl_80797E88);
             return;
         }
         break;
     case 8:
-        if (fn_80146008(0x51E) == 1U) {
+        if (em_demo_time_ck(0x51E) == 1U) {
             self->state = (u8)(self->state + 1);
-            fn_8012F504(self, 0x14, 0x28, 0, 1);
+            em_mot_set_blend(self, 0x14, 0x28, 0, 1);
         }
         break;
     default:
@@ -797,8 +797,8 @@ void fn_8018C2CC(_ENEMY_WORK* self) {
         self->state = (u8)(self->state + 1);
         em_move_mode_set(self, 0);
         em_mot_set(self, 7, 0, 0);
-        fn_80146058(self, lbl_807980D0, lbl_807980C0, lbl_807980D4);
-        fn_8014610C(self, lbl_80797E88, lbl_807980E8, lbl_80797E88);
+        em_demo_pos_set(self, lbl_807980D0, lbl_807980C0, lbl_807980D4);
+        em_demo_rot_set(self, lbl_80797E88, lbl_807980E8, lbl_80797E88);
         return;
     case 1:
         if (em_mot_end_ck(self) == 1U) {
@@ -820,11 +820,11 @@ void fn_8018C370(_ENEMY_WORK* self) {
         self->state = (u8)(self->state + 1);
         em_move_mode_set(self, 0);
         em_mot_set(self, 1, 0, 0);
-        fn_80146058(self, lbl_807980EC, lbl_807980F0, lbl_807980F4);
-        fn_8014610C(self, lbl_80797E88, lbl_807980F8, lbl_80797E88);
+        em_demo_pos_set(self, lbl_807980EC, lbl_807980F0, lbl_807980F4);
+        em_demo_rot_set(self, lbl_80797E88, lbl_807980F8, lbl_80797E88);
         return;
     case 1:
-        if (fn_80146008(0x1E) == 1U) {
+        if (em_demo_time_ck(0x1E) == 1U) {
             self->state = (u8)(self->state + 1);
             em_mot_set(self, 2, 0, 0);
             return;
@@ -835,19 +835,19 @@ void fn_8018C370(_ENEMY_WORK* self) {
             setVector3(&sp8, lbl_80797E88, lbl_807980FC, lbl_80797F34);
             fn_801049D0(self, 8, 0x16, 0, &sp8, lbl_80798100);
         }
-        if (fn_80146008(0xD2) == 1U) {
+        if (em_demo_time_ck(0xD2) == 1U) {
             self->state = (u8)(self->state + 1);
-            fn_8014616C(self, 0);
+            em_demo_reset(self, 0);
             return;
         }
         break;
     case 3:
-        if (fn_80146008(0x456) == 1U) {
+        if (em_demo_time_ck(0x456) == 1U) {
             self->state = (u8)(self->state + 1);
             em_mot_set(self, 1, 0, 0);
-            fn_8014619C(self);
-            fn_80146058(self, lbl_80798104, lbl_80798108, lbl_8079810C);
-            fn_8014610C(self, lbl_80797E88, lbl_80798110, lbl_80797E88);
+            em_demo_enable(self);
+            em_demo_pos_set(self, lbl_80798104, lbl_80798108, lbl_8079810C);
+            em_demo_rot_set(self, lbl_80797E88, lbl_80798110, lbl_80797E88);
         }
         break;
     default:
@@ -863,8 +863,8 @@ void fn_8018C528(_ENEMY_WORK* self) {
         self->state = (u8)(self->state + 1);
         em_move_mode_set(self, 0);
         em_mot_set(self, 1, 0, 0);
-        fn_80146058(self, lbl_80798104, lbl_80798108, lbl_8079810C);
-        fn_8014610C(self, lbl_80797E88, lbl_80798110, lbl_80797E88);
+        em_demo_pos_set(self, lbl_80798104, lbl_80798108, lbl_8079810C);
+        em_demo_rot_set(self, lbl_80797E88, lbl_80798110, lbl_80797E88);
         return;
     case 1:
         if (em_mot_end_ck(self) == 1U) {
@@ -887,29 +887,29 @@ void fn_8018C5CC(_ENEMY_WORK* self) {
         self->state = (u8)(self->state + 1);
         em_move_mode_set(self, 0);
         em_mot_set(self, 1, 0, 0);
-        fn_8014616C(self, 0);
+        em_demo_reset(self, 0);
         return;
     case 1:
-        if (fn_80146008(0x168) == 1U) {
+        if (em_demo_time_ck(0x168) == 1U) {
             self->state = (u8)(self->state + 1);
-            fn_8014619C(self);
-            fn_801305C4(self, lbl_80797E88);
+            em_demo_enable(self);
+            em_fall_start(self, lbl_80797E88);
             em_mot_set(self, 0x40, 0, 0);
-            fn_801461A8(self, fn_80145FE4(), lbl_805AC3C8, 0);
-            fn_8014610C(self, lbl_80797E88, lbl_80797FF8, lbl_80797E88);
+            em_demo_key3_apply(self, em_demo_frame_get(), lbl_805AC3C8, 0);
+            em_demo_rot_set(self, lbl_80797E88, lbl_80797FF8, lbl_80797E88);
             return;
         }
         return;
     case 2:
         if (em_frame_check(self, 0, lbl_80797EF8, lbl_80797E88) == 1U) {
-            fn_801048B4(self, 0x13U, 0xDU, 0x8000, lbl_80798090);
-            fn_801048B4(self, 0x13U, 0xFU, 0, lbl_80798090);
+            eft009_spawn_at_joint(self, 0x13U, 0xDU, 0x8000, lbl_80798090);
+            eft009_spawn_at_joint(self, 0x13U, 0xFU, 0, lbl_80798090);
         }
-        fn_801461A8(self, fn_80145FE4(), lbl_805AC3C8, 0);
-        if (fn_80146008(0x19E) == 1U) {
+        em_demo_key3_apply(self, em_demo_frame_get(), lbl_805AC3C8, 0);
+        if (em_demo_time_ck(0x19E) == 1U) {
             self->state = (u8)(self->state + 1);
             em_move_mode_set(self, 0);
-            fn_8012F504(self, 0x3B, 6, 6, 1);
+            em_mot_set_blend(self, 0x3B, 6, 6, 1);
             return;
         }
         break;
@@ -917,41 +917,41 @@ void fn_8018C5CC(_ENEMY_WORK* self) {
         if (em_frame_check(self, 0, lbl_80797F6C, lbl_80797E88) == 1U) {
             get_joint_wpos_em(self, 0x10U, &sp8);
             spC = lbl_80797EE8 + self->field_0x20C;
-            fn_8010D2B0(&sp8, self->area_no, 3U, self->field_0x1C0,
+            eft_spawn_pos_in_area(&sp8, self->area_no, 3U, self->field_0x1C0,
                         lbl_80797EC0 * get_em_chg_scale(self));
         }
-        fn_801461A8(self, fn_80145FE4(), lbl_805AC3C8, 0);
-        if (fn_80146008(0x242) == 1U) {
+        em_demo_key3_apply(self, em_demo_frame_get(), lbl_805AC3C8, 0);
+        if (em_demo_time_ck(0x242) == 1U) {
             self->state = (u8)(self->state + 1);
             em_mot_set(self, 2, 0xE, 0x6A);
             return;
         }
         break;
     case 4:
-        fn_801461A8(self, fn_80145FE4(), lbl_805AC3C8, 0);
-        if (fn_80146008(0x26C) == 1U) {
+        em_demo_key3_apply(self, em_demo_frame_get(), lbl_805AC3C8, 0);
+        if (em_demo_time_ck(0x26C) == 1U) {
             self->state = (u8)(self->state + 1);
-            fn_80146058(self, lbl_80798114, lbl_80798118, lbl_8079811C);
-            fn_8014610C(self, lbl_80797E88, lbl_80797FF8, lbl_80797E88);
+            em_demo_pos_set(self, lbl_80798114, lbl_80798118, lbl_8079811C);
+            em_demo_rot_set(self, lbl_80797E88, lbl_80797FF8, lbl_80797E88);
         }
         /* fallthrough */
     case 5:
-        if (fn_80146008(0x57A) == 1U) {
+        if (em_demo_time_ck(0x57A) == 1U) {
             self->state = (u8)(self->state + 1);
             em_mot_set(self, 0x18, 0, 0);
             em_mot_speed_set(self, lbl_80798120);
-            fn_80146058(self, lbl_80798124, lbl_80798128, lbl_8079812C);
-            fn_8014610C(self, lbl_80797E88, lbl_80798130, lbl_80797E88);
+            em_demo_pos_set(self, lbl_80798124, lbl_80798128, lbl_8079812C);
+            em_demo_rot_set(self, lbl_80797E88, lbl_80798130, lbl_80797E88);
             return;
         }
         break;
     case 6:
         self->field_0x1C0 = fn_80133DB0(0x49F5, (u16)self->field_0x1C0, 0x160);
-        if (fn_80146008(0x652) == 1U) {
+        if (em_demo_time_ck(0x652) == 1U) {
             self->state = (u8)(self->state + 1);
             em_mot_set(self, 0x14, 0xA, 0);
-            fn_80146058(self, lbl_80798124, lbl_80798128, lbl_8079812C);
-            fn_8014610C(self, lbl_80797E88, lbl_80798134, lbl_80797E88);
+            em_demo_pos_set(self, lbl_80798124, lbl_80798128, lbl_8079812C);
+            em_demo_rot_set(self, lbl_80797E88, lbl_80798134, lbl_80797E88);
         }
         break;
     default:
@@ -966,8 +966,8 @@ void fn_8018C998(_ENEMY_WORK* self) {
         self->state = (u8)(self->state + 1);
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x14, 0, 0);
-        fn_80146058(self, lbl_80798124, lbl_80798128, lbl_8079812C);
-        fn_8014610C(self, lbl_80797E88, lbl_80798134, lbl_80797E88);
+        em_demo_pos_set(self, lbl_80798124, lbl_80798128, lbl_8079812C);
+        em_demo_rot_set(self, lbl_80797E88, lbl_80798134, lbl_80797E88);
         return;
     case 1:
         if (em_mot_end_ck(self) == 1U) {
@@ -990,24 +990,24 @@ void fn_8018CA3C(_ENEMY_WORK* self) {
         self->state = (u8)(self->state + 1);
         em_move_mode_set(self, 0);
         em_mot_set(self, 1, 0, 0);
-        fn_8014616C(self, 0);
+        em_demo_reset(self, 0);
         return;
     case 1:
-        if (fn_80146008(0x1C2) == 1U) {
+        if (em_demo_time_ck(0x1C2) == 1U) {
             self->state = (u8)(self->state + 1);
-            fn_8014619C(self);
-            fn_801305C4(self, lbl_80797E88);
+            em_demo_enable(self);
+            em_fall_start(self, lbl_80797E88);
             em_mot_set(self, 0x40, 0, 0);
-            fn_8014610C(self, lbl_80797F14, lbl_80798138, lbl_80797E88);
-            fn_801462A4(self, fn_80145FE4(), lbl_805AC698, lbl_805AC9A8, 7, 3);
+            em_demo_rot_set(self, lbl_80797F14, lbl_80798138, lbl_80797E88);
+            em_demo_key_apply(self, em_demo_frame_get(), lbl_805AC698, lbl_805AC9A8, 7, 3);
             fn_80133C3C(self);
             return;
         }
         break;
     case 2:
-        fn_801462A4(self, fn_80145FE4(), lbl_805AC698, lbl_805AC9A8, 7, 3);
+        em_demo_key_apply(self, em_demo_frame_get(), lbl_805AC698, lbl_805AC9A8, 7, 3);
         fn_80133C3C(self);
-        if (fn_80146008(0x1F8) == 1U) {
+        if (em_demo_time_ck(0x1F8) == 1U) {
             self->state = (u8)(self->state + 1);
             em_move_mode_set(self, 0);
             em_mot_set(self, 0x3B, 0xC, 6);
@@ -1018,46 +1018,46 @@ void fn_8018CA3C(_ENEMY_WORK* self) {
         if (em_frame_check(self, 0, lbl_80797F6C, lbl_80797E88) == 1U) {
             get_joint_wpos_em(self, 0x10U, &sp8);
             spC = lbl_80797EE8 + self->field_0x20C;
-            fn_8010D2B0(&sp8, self->area_no, 3U, self->field_0x1C0,
+            eft_spawn_pos_in_area(&sp8, self->area_no, 3U, self->field_0x1C0,
                         lbl_80797EC0 * get_em_chg_scale(self));
         }
-        fn_801462A4(self, fn_80145FE4(), lbl_805AC698, lbl_805AC9A8, 7, 3);
+        em_demo_key_apply(self, em_demo_frame_get(), lbl_805AC698, lbl_805AC9A8, 7, 3);
         fn_80133C3C(self);
-        if (fn_80146008(0x26C) == 1U) {
+        if (em_demo_time_ck(0x26C) == 1U) {
             self->state = (u8)(self->state + 1);
-            fn_80146058(self, lbl_8079813C, lbl_80797ED0, lbl_80798140);
-            fn_8014610C(self, lbl_80797E88, lbl_80797F70, lbl_80797E88);
+            em_demo_pos_set(self, lbl_8079813C, lbl_80797ED0, lbl_80798140);
+            em_demo_rot_set(self, lbl_80797E88, lbl_80797F70, lbl_80797E88);
             return;
         }
         break;
     case 4:
-        if (fn_80146008(0x29C) == 1U) {
+        if (em_demo_time_ck(0x29C) == 1U) {
             self->state = (u8)(self->state + 1);
-            fn_8012F504(self, 2, 0x14, 0, 1);
+            em_mot_set_blend(self, 2, 0x14, 0, 1);
             return;
         }
         break;
     case 5:
-        if (fn_80146008(0x566) == 1U) {
+        if (em_demo_time_ck(0x566) == 1U) {
             self->state = (u8)(self->state + 1);
             em_mot_set(self, 0x19, 0, 0x14);
-            fn_80146058(self, lbl_80798144, lbl_80798148, lbl_8079814C);
-            fn_8014610C(self, lbl_80797E88, lbl_80798150, lbl_80797E88);
+            em_demo_pos_set(self, lbl_80798144, lbl_80798148, lbl_8079814C);
+            em_demo_rot_set(self, lbl_80797E88, lbl_80798150, lbl_80797E88);
             return;
         }
         break;
     case 6:
-        fn_80133E3C(self, -0x4000, lbl_80797ED0, lbl_80798154);
-        if (fn_80146008(0x5B8) == 1U) {
+        em_turn_in_window(self, lbl_80797ED0, lbl_80798154, -0x4000);
+        if (em_demo_time_ck(0x5B8) == 1U) {
             self->state = (u8)(self->state + 1);
-            fn_8012F504(self, 1, 0xA, 0, 1);
-            fn_80146058(self, lbl_80798144, lbl_80798148, lbl_8079814C);
-            fn_8014610C(self, lbl_80797E88, lbl_80798158, lbl_80797E88);
+            em_mot_set_blend(self, 1, 0xA, 0, 1);
+            em_demo_pos_set(self, lbl_80798144, lbl_80798148, lbl_8079814C);
+            em_demo_rot_set(self, lbl_80797E88, lbl_80798158, lbl_80797E88);
             return;
         }
         break;
     case 7:
-        if (fn_80146008(0x6F2) == 1U) {
+        if (em_demo_time_ck(0x6F2) == 1U) {
             self->state = (u8)(self->state + 1);
             em_mot_set(self, 0x14, 0xE, 0);
         }
@@ -1074,8 +1074,8 @@ void fn_8018CDE0(_ENEMY_WORK* self) {
         self->state = (u8)(self->state + 1);
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x14, 0, 0);
-        fn_80146058(self, lbl_80798144, lbl_80798148, lbl_8079814C);
-        fn_8014610C(self, lbl_80797E88, lbl_80798158, lbl_80797E88);
+        em_demo_pos_set(self, lbl_80798144, lbl_80798148, lbl_8079814C);
+        em_demo_rot_set(self, lbl_80797E88, lbl_80798158, lbl_80797E88);
         return;
     case 1:
         if (em_mot_end_ck(self) == 1U) {
@@ -1098,27 +1098,27 @@ void fn_8018CE84(_ENEMY_WORK* self) {
         self->state = (u8)(self->state + 1);
         em_move_mode_set(self, 0);
         em_mot_set(self, 1, 0, 0);
-        fn_8014616C(self, 0);
+        em_demo_reset(self, 0);
         return;
     case 1:
-        if (fn_80146008(0x4A8) == 1U) {
+        if (em_demo_time_ck(0x4A8) == 1U) {
             self->state = (u8)(self->state + 1);
-            fn_8014619C(self);
-            fn_801305C4(self, lbl_80797E88);
+            em_demo_enable(self);
+            em_fall_start(self, lbl_80797E88);
             em_mot_set(self, 0x40, 0, 0);
-            fn_8014610C(self, lbl_80797E88, lbl_80797E88, lbl_80797E88);
-            fn_801461A8(self, fn_80145FE4(), lbl_805ACC00, 0);
+            em_demo_rot_set(self, lbl_80797E88, lbl_80797E88, lbl_80797E88);
+            em_demo_key3_apply(self, em_demo_frame_get(), lbl_805ACC00, 0);
             return;
         }
         return;
     case 2:
         if (em_frame_check(self, 0, lbl_80797EF8, lbl_80797E88) == 1U) {
-            fn_801048B4(self, 0x13U, 0x10U, 0, lbl_8079804C);
+            eft009_spawn_at_joint(self, 0x13U, 0x10U, 0, lbl_8079804C);
         }
-        fn_801461A8(self, fn_80145FE4(), lbl_805ACC00, 0);
-        if (fn_80146008(0x4DE) == 1U) {
+        em_demo_key3_apply(self, em_demo_frame_get(), lbl_805ACC00, 0);
+        if (em_demo_time_ck(0x4DE) == 1U) {
             self->state = (u8)(self->state + 1);
-            fn_8012F504(self, 0x3B, 8, 6, 1);
+            em_mot_set_blend(self, 0x3B, 8, 6, 1);
             return;
         }
         break;
@@ -1126,31 +1126,31 @@ void fn_8018CE84(_ENEMY_WORK* self) {
         if (em_frame_check(self, 0, lbl_80797F6C, lbl_80797E88) == 1U) {
             get_joint_wpos_em(self, 0x10U, &sp8);
             spC = lbl_80797EE8 + self->field_0x20C;
-            fn_8010D2B0(&sp8, self->area_no, 3U, self->field_0x1C0,
+            eft_spawn_pos_in_area(&sp8, self->area_no, 3U, self->field_0x1C0,
                         lbl_80797EC0 * get_em_chg_scale(self));
         }
-        if (fn_80146008(0x4E6) == 0) {
-            fn_801461A8(self, fn_80145FE4(), lbl_805ACC00, 0);
+        if (em_demo_time_ck(0x4E6) == 0) {
+            em_demo_key3_apply(self, em_demo_frame_get(), lbl_805ACC00, 0);
         } else {
-            fn_801462A4(self, fn_80145FE4(), lbl_805ACD80, NULL, 5, 0);
+            em_demo_key_apply(self, em_demo_frame_get(), lbl_805ACD80, NULL, 5, 0);
         }
-        if (fn_80146008(0x584) == 1U) {
+        if (em_demo_time_ck(0x584) == 1U) {
             self->state = (u8)(self->state + 1);
             em_mot_set(self, 2, 0, 0);
-            fn_80146058(self, lbl_8079815C, lbl_80798160, lbl_80798164);
+            em_demo_pos_set(self, lbl_8079815C, lbl_80798160, lbl_80798164);
             return;
         }
         break;
     case 4:
-        if (fn_80146008(0x662) == 1U) {
+        if (em_demo_time_ck(0x662) == 1U) {
             self->state = (u8)(self->state + 1);
-            fn_8012F504(self, 1, 0xA, 0, 1);
-            fn_80146058(self, lbl_80798168, lbl_8079816C, lbl_80798170);
+            em_mot_set_blend(self, 1, 0xA, 0, 1);
+            em_demo_pos_set(self, lbl_80798168, lbl_8079816C, lbl_80798170);
             return;
         }
         break;
     case 5:
-        if (fn_80146008(0x768) == 1U) {
+        if (em_demo_time_ck(0x768) == 1U) {
             self->state = (u8)(self->state + 1);
             em_mot_set(self, 1, 2, 0);
         }
@@ -1167,8 +1167,8 @@ void fn_8018D1AC(_ENEMY_WORK* self) {
         self->state = (u8)(self->state + 1);
         em_move_mode_set(self, 0);
         em_mot_set(self, 1, 0, 0);
-        fn_80146058(self, lbl_80798168, lbl_8079816C, lbl_80798170);
-        fn_8014610C(self, lbl_80797E88, lbl_80797E88, lbl_80797E88);
+        em_demo_pos_set(self, lbl_80798168, lbl_8079816C, lbl_80798170);
+        em_demo_rot_set(self, lbl_80797E88, lbl_80797E88, lbl_80797E88);
         return;
     case 1:
         if (em_mot_end_ck(self) == 1U) {
@@ -1266,7 +1266,7 @@ void fn_8018D2B0(_ENEMY_WORK* self) {
     }
     if (self->team != 0x15 && self->field_0x1E2 == 1) {
         em_busy_set(self);
-        fn_80131E74(self);
+        em_busy_timer_reset(self);
     }
 }
 
@@ -1280,7 +1280,7 @@ void fn_8018D370(_ENEMY_WORK* self) {
 
     VEC3_ctor(&sp8);
     MTX34_ctor(&sp18);
-    if (fn_8012EC60(self) != 0) {
+    if (em_alt_mode_ck(self) != 0) {
         ang = calcVecAngX(&self->vec_0x76C);
         if ((u16)(ang + 0x8000) > 0x671B) {
             mot = em_get_mot_no(self);
@@ -1294,17 +1294,17 @@ void fn_8018D370(_ENEMY_WORK* self) {
                 if (em_water_check(self) == 1U && sp8.y < self->field_0x210) {
                     if ((system_w.field_0x0c & 0x1F) == 0) {
                         if ((u16)(ang + 0x8000) > 0x6E38U) {
-                            fn_8010562C(self, 3, 0x16, &sp8, lbl_8079800C);
+                            eft_spawn_type10(self, 3, 0x16, &sp8, lbl_8079800C);
                             return;
                         }
-                        fn_8010562C(self, 5, 0x16, &sp8, lbl_8079800C);
+                        eft_spawn_type10(self, 5, 0x16, &sp8, lbl_8079800C);
                     }
                 } else if ((system_w.field_0x0c & 0x1F) == 0) {
                     if ((u16)(ang + 0x8000) > 0x6E38U) {
-                        fn_8010562C(self, 0x1D, 0x16, &sp8, lbl_80797E9C);
+                        eft_spawn_type10(self, 0x1D, 0x16, &sp8, lbl_80797E9C);
                         return;
                     }
-                    fn_8010562C(self, 0x1C, 0x16, &sp8, lbl_80797E9C);
+                    eft_spawn_type10(self, 0x1C, 0x16, &sp8, lbl_80797E9C);
                 }
             }
         }
@@ -1312,7 +1312,7 @@ void fn_8018D370(_ENEMY_WORK* self) {
 }
 
 /* 0x8018D558 - the effect-spawn router: builds the spawn position from the work (or a joint) and
- * spawns through `eft009_set_pos` (a fixed spawn point) or `fn_801048B4` (a joint spawn).  `arg1`
+ * spawns through `eft009_set_pos` (a fixed spawn point) or `eft009_spawn_at_joint` (a joint spawn).  `arg1`
  * selects the position/height source (0 = the +0x210 height, 1 = a joint, 2 = the +0x20C height),
  * `arg2` the effect kind, `arg3` the joint (0xFF = the work's own position), `arg4` the joint flag
  * and `arg5` the scale. */
@@ -1334,7 +1334,7 @@ void fn_8018D558(_ENEMY_WORK* self, u8 arg1, u8 arg2, u32 arg3, s32 arg4, f32 ar
                     vec.z = self->pos.z;
                     eft009_set_pos(0xE, &vec, (_CP_VECTOR*)&self->field_0x1BC, arg5, self->area_no);
                 } else {
-                    fn_801048B4(self, arg3, 0xE, arg4, arg5);
+                    eft009_spawn_at_joint(self, arg3, 0xE, arg4, arg5);
                 }
                 break;
             case 4:
@@ -1346,7 +1346,7 @@ void fn_8018D558(_ENEMY_WORK* self, u8 arg1, u8 arg2, u32 arg3, s32 arg4, f32 ar
                     vec.z = self->pos.z;
                     eft009_set_pos(0xF, &vec, (_CP_VECTOR*)&self->field_0x1BC, arg5, self->area_no);
                 } else {
-                    fn_801048B4(self, arg3, 0xF, arg4, arg5);
+                    eft009_spawn_at_joint(self, arg3, 0xF, arg4, arg5);
                 }
                 break;
             default:
@@ -1374,7 +1374,7 @@ void fn_8018D558(_ENEMY_WORK* self, u8 arg1, u8 arg2, u32 arg3, s32 arg4, f32 ar
             eft009_set_pos(var, &vec, (_CP_VECTOR*)&self->field_0x1BC, arg5, self->area_no);
             return;
         }
-        fn_801048B4(self, arg3, var, arg4, arg5);
+        eft009_spawn_at_joint(self, arg3, var, arg4, arg5);
         return;
     case 1:
         if ((self->field_0x228 & 6) != 0) {
@@ -1386,7 +1386,7 @@ void fn_8018D558(_ENEMY_WORK* self, u8 arg1, u8 arg2, u32 arg3, s32 arg4, f32 ar
                     eft009_set_pos(0x11, &vec, (_CP_VECTOR*)&self->field_0x1BC, arg5, self->area_no);
                     return;
                 }
-                fn_801048B4(self, arg3, 0x11, arg4, arg5);
+                eft009_spawn_at_joint(self, arg3, 0x11, arg4, arg5);
                 return;
             }
             return;
@@ -1397,7 +1397,7 @@ void fn_8018D558(_ENEMY_WORK* self, u8 arg1, u8 arg2, u32 arg3, s32 arg4, f32 ar
             get_joint_wpos_em(self, arg3, &vec);
         }
         vec.y = self->field_0x20C;
-        fn_8010D2B0(&vec, self->area_no, arg2, arg4, arg5 * get_em_chg_scale(self));
+        eft_spawn_pos_in_area(&vec, self->area_no, arg2, arg4, arg5 * get_em_chg_scale(self));
         return;
     case 2:
         if (arg3 == 0xFF) {
@@ -1409,7 +1409,7 @@ void fn_8018D558(_ENEMY_WORK* self, u8 arg1, u8 arg2, u32 arg3, s32 arg4, f32 ar
         {
             f32 scale = arg5 * get_em_chg_scale(self);
             if (self->pos.y <= lbl_80798174 + self->field_0x20C) {
-                fn_80106694(self, &vec, arg2, scale);
+                eft_spawn_type11(self, &vec, arg2, scale);
             }
         }
         return;
@@ -1500,7 +1500,7 @@ void fn_80191038(_ENEMY_WORK* self) {
         color.b = (u8)self->tev_0x358;
         color.a = 0;
         ((MHchar*)self->char_0x024)->setTevKColor(4, GX_KCOLOR1, &color);
-        if (fn_80135748(self, 1) == 1U) {
+        if (em_flags836_ck(self, 1) == 1U) {
             if (self->tev_0x35E == 1) {
                 color.r = 0xFF;
                 color.g = 0xFF;
@@ -1520,7 +1520,7 @@ void fn_80191038(_ENEMY_WORK* self) {
         ((MHchar*)self->char_0x024)->getTevKColor(3, GX_KCOLOR3, &color);
         if (fn_8012EC3C(self) == 1U) {
             color.a = 0;
-        } else if (fn_8012EC60(self) == 1U) {
+        } else if (em_alt_mode_ck(self) == 1U) {
             color.a = (s32)(lbl_80797EB4 *
                             (lbl_807981BC * (lbl_80797E9C + fn_8005024C((u16)(system_w.field_0x0c * 0x2000))))) +
                       0xE1;
@@ -1597,7 +1597,7 @@ s32 fn_801913FC(_ENEMY_WORK* self, u8 arg1) {
 /* 0x8018D8C8 - the per-(team,motion) frame-window driver.  For the work's team it reads the motion
  * number `em_get_mot_no(self)` and runs that motion's set of `em_after_frame_check` windows; each
  * window that fires calls `fn_8018D558` (the effect-spawn router) with the window's id/kind, or
- * `fn_8011D448`/`fn_8011D4FC`/`fn_8011D690`/`fn_801E2D04`/`fn_80304508` directly.  The `field_0x228 & 6`
+ * `fn_8011D448`/`fn_8011D4FC`/`fn_8011D690`/`eft_em_spawn_joint`/`eft_em_spawn` directly.  The `field_0x228 & 6`
  * bit pair selects the "large/air" variant of each window; the team-0x10 tail runs `fn_80191EF8`
  * and `fn_80192080`. */
 void fn_8018D8C8(_ENEMY_WORK* self) {
@@ -1709,33 +1709,33 @@ void fn_8018D8C8(_ENEMY_WORK* self) {
         case 0x2D:                                  /* switch 2 */
             if (em_after_frame_check(self, 0, lbl_807981A4, lbl_80797E88) == 1U) {
                 setVector3(&sp14, lbl_80797E88, lbl_80797E88, lbl_80797E88);
-                fn_80304508(self, 0x46, 0x15, &sp14, lbl_80797E9C);
+                eft_em_spawn(self, 0x46, 0x15, &sp14, lbl_80797E9C);
             }
             if (em_after_frame_check(self, 0, lbl_807981A8, lbl_80797E88) == 1U) {
                 setVector3(&sp14, lbl_80797E88, lbl_80797E88, lbl_80797ED4);
-                fn_801E2D04(self, 0x16, 0x12, &sp14, 0x3C, lbl_8079804C);
+                eft_em_spawn_joint(self, 0x16, 0x12, &sp14, 0x3C, lbl_8079804C);
             }
             break;
         case 0x33:                                  /* switch 2 */
             if (em_after_frame_check(self, 0, lbl_80797EF8, lbl_80797E88) == 1U) {
-                fn_80129668(self, 0, 9);
+                em_hit_window_set_default(self, 0, 9);
             }
             if (em_after_frame_check(self, 0, lbl_807981AC, lbl_80797E88) == 1U) {
                 setVector3(&sp14, lbl_80797F38, lbl_80797E88, lbl_80797E88);
-                fn_801E2D04(self, 8, 0xF, &sp14, 0x10, lbl_80797EC0);
+                eft_em_spawn_joint(self, 8, 0xF, &sp14, 0x10, lbl_80797EC0);
                 setVector3(&sp14, lbl_807981B0, lbl_80797E88, lbl_80797E88);
-                fn_801E2D04(self, 8, 0x11, &sp14, 0x3C, lbl_80797EB8);
+                eft_em_spawn_joint(self, 8, 0x11, &sp14, 0x3C, lbl_80797EB8);
             }
             break;
         case 0x34:                                  /* switch 2 */
             if (em_after_frame_check(self, 0, lbl_80797EF8, lbl_80797E88) == 1U) {
-                fn_80129668(self, 0, 0xA);
+                em_hit_window_set_default(self, 0, 0xA);
             }
             if (em_after_frame_check(self, 0, lbl_807981AC, lbl_80797E88) == 1U) {
                 setVector3(&sp14, lbl_807981B4, lbl_80797E88, lbl_80797E88);
-                fn_801E2D04(self, 0xD, 0xF, &sp14, 0x10, lbl_80797EC0);
+                eft_em_spawn_joint(self, 0xD, 0xF, &sp14, 0x10, lbl_80797EC0);
                 setVector3(&sp14, lbl_807981B0, lbl_80797E88, lbl_80797E88);
-                fn_801E2D04(self, 0xD, 0x11, &sp14, 0x3C, lbl_80797EB8);
+                eft_em_spawn_joint(self, 0xD, 0x11, &sp14, 0x3C, lbl_80797EB8);
             }
             break;
         case 0x39:                                  /* switch 2 */
@@ -1759,7 +1759,7 @@ void fn_8018D8C8(_ENEMY_WORK* self) {
         case 0x3D:                                  /* switch 2 */
             if (em_after_frame_check(self, 0, lbl_80797FF8, lbl_80797E88) == 1U) {
                 fn_8018D558(self, 1U, 3U, 3U, self->field_0x1C0, lbl_80797E9C);
-                fn_80136B50(self, -1, 7);
+                em_camera_req(self, -1, 7);
             }
             break;
         case 0x3E:                                  /* switch 2 */
@@ -1774,8 +1774,8 @@ void fn_8018D8C8(_ENEMY_WORK* self) {
         case 0x43:                                  /* switch 2 */
             if (em_after_frame_check(self, 0, lbl_80797F84, lbl_80797E88) == 1U) {
                 setVector3(&sp14, lbl_80797E88, lbl_80797E88, lbl_80797ED4);
-                fn_801E2D04(self, 0x16, 0x10, &sp14, 0x1E, lbl_8079800C);
-                fn_801E2D04(self, 0x16, 0x12, &sp14, 0x3C, lbl_8079800C);
+                eft_em_spawn_joint(self, 0x16, 0x10, &sp14, 0x1E, lbl_8079800C);
+                eft_em_spawn_joint(self, 0x16, 0x12, &sp14, 0x3C, lbl_8079800C);
             }
             break;
         case 0x46:                                  /* switch 2 */
@@ -1806,7 +1806,7 @@ void fn_8018D8C8(_ENEMY_WORK* self) {
                     fn_80117E58(self, 1, &sp14, 3, lbl_8079800C * get_em_chg_scale(self));
                     setVector3(&sp14, lbl_80797E88, lbl_80797E88, lbl_80797F58 * get_em_chg_scale(self));
                     rotVecY(&sp14, self->field_0x1C0);
-                    fn_80051378(&sp8, &self->pos, &sp14);
+                    addVec3(&sp8, &self->pos, &sp14);
                     copyVec3(&sp2C, copyVec3(&sp20, &sp8));
                     temp_f1 = lbl_807981CC * get_em_chg_scale(self);
                     sp2C.y -= temp_f1;
@@ -1815,21 +1815,21 @@ void fn_8018D8C8(_ENEMY_WORK* self) {
                 }
             }
             if (em_after_frame_check(self, 0, lbl_8079817C, lbl_80797E88) == 1U) {
-                fn_80136B50(self, 0x28, 7);
+                em_camera_req(self, 0x28, 7);
             }
             break;
         case 0x4E:                                  /* switch 2 */
             if ((em_after_frame_check(self, 0, lbl_80798130, lbl_80797E88) == 1U) || (em_after_frame_check(self, 0, lbl_80797F4C, lbl_80797E88) == 1U)) {
                 setVector3(&sp14, lbl_80797E88, lbl_80797E88, lbl_80797ED4);
-                fn_801E2D04(self, 0x16, 0xF, &sp14, 0x10, lbl_8079800C);
-                fn_801E2D04(self, 0x16, 0x11, &sp14, 0x3C, lbl_8079800C);
+                eft_em_spawn_joint(self, 0x16, 0xF, &sp14, 0x10, lbl_8079800C);
+                eft_em_spawn_joint(self, 0x16, 0x11, &sp14, 0x3C, lbl_8079800C);
             }
             break;
         case 0x4F:                                  /* switch 2 */
             if ((em_after_frame_check(self, 0, lbl_80797F08, lbl_80797E88) == 1U) || (em_after_frame_check(self, 0, lbl_807981D0, lbl_80797E88) == 1U)) {
                 setVector3(&sp14, lbl_80797E88, lbl_80797E88, lbl_80797ED4);
-                fn_801E2D04(self, 0x16, 0xF, &sp14, 0x10, lbl_8079800C);
-                fn_801E2D04(self, 0x16, 0x11, &sp14, 0x3C, lbl_8079800C);
+                eft_em_spawn_joint(self, 0x16, 0xF, &sp14, 0x10, lbl_8079800C);
+                eft_em_spawn_joint(self, 0x16, 0x11, &sp14, 0x3C, lbl_8079800C);
             }
             break;
         case 0x50:                                  /* switch 2 */
@@ -1899,7 +1899,7 @@ void fn_8018D8C8(_ENEMY_WORK* self) {
                 } else {
                     fn_8018D558(self, 1U, 4U, 3U, self->field_0x1C0, lbl_80797EB8);
                 }
-                fn_80136B50(self, -1, 7);
+                em_camera_req(self, -1, 7);
             }
             break;
         case 0x55:                                  /* switch 2 */
@@ -1909,7 +1909,7 @@ void fn_8018D8C8(_ENEMY_WORK* self) {
             }
             if (em_after_frame_check(self, 0, lbl_807981EC, lbl_80797E88) == 1U) {
                 fn_8018D558(self, 0U, 2U, 0xDU, 0, lbl_807981E8);
-                fn_80136B50(self, -1, 7);
+                em_camera_req(self, -1, 7);
             }
             break;
         case 0x57:                                  /* switch 2 */
@@ -1918,7 +1918,7 @@ void fn_8018D8C8(_ENEMY_WORK* self) {
             }
             if (em_after_frame_check(self, 0, lbl_807981A8, lbl_80797E88) == 1U) {
                 fn_8018D558(self, 0U, 2U, 0xDU, 0, lbl_807981E8);
-                fn_80136B50(self, -1, 7);
+                em_camera_req(self, -1, 7);
             }
             break;
         case 0x58:                                  /* switch 2 */
@@ -1928,7 +1928,7 @@ void fn_8018D8C8(_ENEMY_WORK* self) {
                 } else {
                     fn_8018D558(self, 1U, 4U, 0xEU, 0, lbl_8079800C);
                 }
-                fn_80136B50(self, 0xE, 1);
+                em_camera_req(self, 0xE, 1);
             }
             break;
         case 0x59:                                  /* switch 2 */
@@ -1988,7 +1988,7 @@ void fn_8018D8C8(_ENEMY_WORK* self) {
                 } else {
                     fn_8018D558(self, 1U, 4U, 0x11U, self->field_0x1C0, lbl_80797EB8);
                 }
-                fn_80136B50(self, -1, 7);
+                em_camera_req(self, -1, 7);
             }
             if (em_after_frame_check(self, 0, lbl_80797FE0, lbl_80797E88) == 1U) {
                 fn_8018D558(self, 0U, 2U, 0xDU, 0, lbl_80797F0C);
@@ -2007,7 +2007,7 @@ void fn_8018D8C8(_ENEMY_WORK* self) {
                 } else {
                     fn_8018D558(self, 1U, 4U, 3U, self->field_0x1C0, lbl_80797EB8);
                 }
-                fn_80136B50(self, -1, 7);
+                em_camera_req(self, -1, 7);
             }
             if (em_after_frame_check(self, 0, lbl_807981C4, lbl_80797E88) == 1U) {
                 fn_8018D558(self, 0U, 2U, 0x21U, 0, lbl_80797EB8);
@@ -2023,7 +2023,7 @@ void fn_8018D8C8(_ENEMY_WORK* self) {
                 } else {
                     fn_8018D558(self, 1U, 4U, 3U, self->field_0x1C0, lbl_80797EB8);
                 }
-                fn_80136B50(self, -1, 7);
+                em_camera_req(self, -1, 7);
             }
             if (em_after_frame_check(self, 0, lbl_807981C4, lbl_80797E88) == 1U) {
                 fn_8018D558(self, 0U, 2U, 0x25U, 0, lbl_80797EB8);
@@ -2055,25 +2055,25 @@ void fn_8018D8C8(_ENEMY_WORK* self) {
             }
             if (em_after_frame_check(self, 0, lbl_807981EC, lbl_80797E88) == 1U) {
                 fn_8018D558(self, 0U, 2U, 0xDU, 0, lbl_807981E8);
-                fn_80136B50(self, -1, 7);
+                em_camera_req(self, -1, 7);
             }
             break;
         case 0x6F:                                  /* switch 2 */
             if (em_after_frame_check(self, 0, lbl_80798130, lbl_80797E88) == 1U) {
                 setVector3(&sp14, lbl_80797E88, lbl_80797E88, lbl_80797ED4);
-                fn_801E2D04(self, 0x16, 0x12, &sp14, 0x3C, lbl_8079800C);
+                eft_em_spawn_joint(self, 0x16, 0x12, &sp14, 0x3C, lbl_8079800C);
             }
             if (em_after_frame_check(self, 0, lbl_807981F8, lbl_80797E88) == 1U) {
                 setVector3(&sp14, lbl_80797E88, lbl_80797E88, lbl_80797ED4);
-                fn_801E2D04(self, 0x16, 0x11, &sp14, 0x3C, lbl_8079800C);
+                eft_em_spawn_joint(self, 0x16, 0x11, &sp14, 0x3C, lbl_8079800C);
             }
             if (em_after_frame_check(self, 0, lbl_807981FC, lbl_80797E88) == 1U) {
                 setVector3(&sp14, lbl_80797E88, lbl_80797E88, lbl_80797E88);
-                fn_80304508(self, 0x46, 3, &sp14, lbl_80797E9C);
+                eft_em_spawn(self, 0x46, 3, &sp14, lbl_80797E9C);
             }
             if (em_after_frame_check(self, 0, lbl_80798200, lbl_80797E88) == 1U) {
                 setVector3(&sp14, lbl_80797E88, lbl_80797E88, lbl_80797ED4);
-                fn_801E2D04(self, 0x16, 0x11, &sp14, 0x3C, lbl_8079800C);
+                eft_em_spawn_joint(self, 0x16, 0x11, &sp14, 0x3C, lbl_8079800C);
             }
             break;
         case 0x79:                                  /* switch 2 */
@@ -2163,7 +2163,7 @@ void fn_8018D8C8(_ENEMY_WORK* self) {
                 } else {
                     fn_8018D558(self, 1U, 1U, 0xFU, self->field_0x1C0, lbl_80797E9C);
                 }
-                fn_80136B50(self, -1, 7);
+                em_camera_req(self, -1, 7);
             }
             break;
         case 0x84:                                  /* switch 2 */
@@ -2189,7 +2189,7 @@ void fn_8018D8C8(_ENEMY_WORK* self) {
                 } else {
                     fn_8018D558(self, 1U, 2U, 3U, self->field_0x1C0, lbl_80797E9C);
                 }
-                fn_80136B50(self, -1, 7);
+                em_camera_req(self, -1, 7);
             }
             break;
         case 0x89:                                  /* switch 2 */
@@ -2216,7 +2216,7 @@ void fn_8018D8C8(_ENEMY_WORK* self) {
             }
             if ((em_after_frame_check(self, 0, lbl_80798188, lbl_80797E88) == 1U) || (em_after_frame_check(self, 0, lbl_80798210, lbl_80797E88) == 1U)) {
                 fn_8018D558(self, 0U, 2U, 8U, 0, lbl_80797E9C);
-                fn_80136B50(self, 8, 0);
+                em_camera_req(self, 8, 0);
             }
             if ((em_after_frame_check(self, 0, lbl_807981D4, lbl_80797E88) == 1U) || (em_after_frame_check(self, 0, lbl_80798038, lbl_80797E88) == 1U)) {
                 if ((s32) (self->field_0x228 & 6) != 0) {
@@ -2228,7 +2228,7 @@ void fn_8018D8C8(_ENEMY_WORK* self) {
             }
             if ((em_after_frame_check(self, 0, lbl_80798214, lbl_80797E88) == 1U) || (em_after_frame_check(self, 0, lbl_80798218, lbl_80797E88) == 1U)) {
                 fn_8018D558(self, 0U, 2U, 0xDU, 0, lbl_80797E9C);
-                fn_80136B50(self, 0xD, 0);
+                em_camera_req(self, 0xD, 0);
             }
             break;
         case 0xC9:                                  /* switch 2 */
@@ -2249,7 +2249,7 @@ void fn_8018D8C8(_ENEMY_WORK* self) {
                 } else {
                     fn_8018D558(self, 1U, 3U, 3U, self->field_0x1C0, lbl_80797EB8);
                 }
-                fn_80136B50(self, -1, 7);
+                em_camera_req(self, -1, 7);
             }
             break;
         case 0xCB:                                  /* switch 2 */
@@ -2435,7 +2435,7 @@ void fn_8018D8C8(_ENEMY_WORK* self) {
         switch ((s32) temp_r3_3) {                  /* switch 4; irregular */
         case 0x70:                                  /* switch 4 */
             if (em_after_frame_check(self, 0, lbl_80797F40, lbl_80797E88) == 1U) {
-                fn_801048B4(self, 0x13U, 0x67U, 0, lbl_80797EB8 * get_em_scale(self));
+                eft009_spawn_at_joint(self, 0x13U, 0x67U, 0, lbl_80797EB8 * get_em_scale(self));
             }
             fn_80136D14(self);
             break;
@@ -2496,21 +2496,21 @@ void fn_8018D8C8(_ENEMY_WORK* self) {
         case 0xCD:                                  /* switch 4 */
         case 0xC9:                                  /* switch 4 */
             if (em_after_frame_check(self, 0, lbl_80798224, lbl_80797E88) == 1U) {
-                fn_801048B4(self, 0x13U, 0x67U, 0, lbl_807981BC * get_em_scale(self));
+                eft009_spawn_at_joint(self, 0x13U, 0x67U, 0, lbl_807981BC * get_em_scale(self));
             }
             if (em_after_frame_check(self, 0, lbl_80797EB4, lbl_80797E88) == 1U) {
-                fn_801048B4(self, 0x13U, 0x68U, 0, lbl_807981BC * get_em_scale(self));
+                eft009_spawn_at_joint(self, 0x13U, 0x68U, 0, lbl_807981BC * get_em_scale(self));
             }
             if ((em_after_frame_check(self, 3, lbl_80797F08, lbl_80798194) == 1U) && ((s32) (system_w.field_0x0c & 7) == 0)) {
-                fn_801048B4(self, 0x13U, 0x69U, 0, lbl_807981BC * get_em_scale(self));
+                eft009_spawn_at_joint(self, 0x13U, 0x69U, 0, lbl_807981BC * get_em_scale(self));
             }
             break;
         case 0xD0:                                  /* switch 4 */
             if (em_after_frame_check(self, 0, lbl_80797FF8, lbl_80797E88) == 1U) {
-                fn_801048B4(self, 0x13U, 0x66U, 0, get_em_scale(self));
+                eft009_spawn_at_joint(self, 0x13U, 0x66U, 0, get_em_scale(self));
             }
             if (em_after_frame_check(self, 0, lbl_80797F44, lbl_80797E88) == 1U) {
-                fn_801048B4(self, 0x13U, 0x67U, 0, lbl_80797EB8 * get_em_scale(self));
+                eft009_spawn_at_joint(self, 0x13U, 0x67U, 0, lbl_80797EB8 * get_em_scale(self));
             }
             break;
         case 0xD2:                                  /* switch 4 */

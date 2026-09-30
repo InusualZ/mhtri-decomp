@@ -34,11 +34,11 @@
  *   * `em035_handlers_mot1s4` / `em035_handlers_alt` / `em035_handlers_angle` /
  *     `em035_handlers_blend` - the four second-level sub-state dispatchers, each named for the handler
  *     set it selects;
- *   * `em035_motion_done_step` - picks `fn_80127FE4`/`em_action_finish` from the `+0x1E2` mode byte;
- *   * `em035_substate_se_start` - starts the action's sound program (`fn_801251D8` with the
+ *   * `em035_motion_done_step` - picks `em_action_finish_fall`/`em_action_finish` from the `+0x1E2` mode byte;
+ *   * `em035_substate_se_start` - starts the action's sound program (`em_se_tbl_play_alt` with the
  *     `0x805ED8C0`/`0x805ED8F8`/`0x805ED930` tables) from the `+0x1E6` sub-state;
  *   * `em035_blend_seq` / `em035_blend_entry` - the three-stage motion-blend sequences
- *     (`fn_80146008`/`fn_80146058`/`fn_8014610C`);
+ *     (`em_demo_time_ck`/`em_demo_pos_set`/`em_demo_rot_set`);
  *   * `em035_action_dispatch` - the `+0x1E5` action-id dispatch the shared interpreter calls;
  *   * `em035_action11_effect` - action 11's one-shot `eft019_set`/`se_req_pos_ps` trigger;
  *   * `em035_kcolor_set` - the model's `MHchar` K-colour override, once per record;
@@ -119,7 +119,7 @@ extern "C" f32 lbl_8079B730;
 extern "C" f32 lbl_8079B734;
 extern "C" f32 lbl_8079B738;
 
-/* The `.data` tables the action start hands to `fn_801251D8` (declared, never defined - the
+/* The `.data` tables the action start hands to `em_se_tbl_play_alt` (declared, never defined - the
  * unowned 0x805ED8C0 band; see `include/unsplit/enemy.h`). */
 extern "C" u8 lbl_805ED8C0[];
 extern "C" u8 lbl_805ED8F8[];
@@ -220,8 +220,8 @@ extern "C" void em035_arm_mot1s4_angle_wait90(_ENEMY_WORK* work)
     switch (work->state) {
     case 0:
         work->state += 1;
-        fn_80130248(work);
-        fn_801305C4(work);
+        em_fall_height_get(work);
+        em_fall_start(work);
         em_mot_set_ck(work, 1, 4, 0);
         work->timer_0x020 = 90;
         fn_80136DF4(work);
@@ -229,7 +229,7 @@ extern "C" void em035_arm_mot1s4_angle_wait90(_ENEMY_WORK* work)
     case 1:
         fn_80136DF4(work);
         if (--work->timer_0x020 <= 0)
-            fn_80127FE4(work);
+            em_action_finish_fall(work);
         break;
     }
 }
@@ -316,15 +316,15 @@ extern "C" void em035_arm_mot2_angle_exit(_ENEMY_WORK* work)
     switch (work->state) {
     case 0:
         work->state += 1;
-        fn_80130248(work);
-        fn_801305C4(work);
+        em_fall_height_get(work);
+        em_fall_start(work);
         em_mot_set(work, 2, 0, 0);
         fn_80136DF4(work);
         break;
     case 1:
         fn_80136DF4(work);
         if (em_mot_end_ck(work) == 1)
-            fn_80127FE4(work);
+            em_action_finish_fall(work);
         break;
     }
 }
@@ -338,8 +338,8 @@ extern "C" void em035_arm_mot1s0_angle_wait90(_ENEMY_WORK* work)
     switch (work->state) {
     case 0:
         work->state += 1;
-        fn_80130248(work);
-        fn_801305C4(work);
+        em_fall_height_get(work);
+        em_fall_start(work);
         em_mot_set_ck(work, 1, 0, 0);
         work->timer_0x020 = 90;
         fn_80136DF4(work);
@@ -347,7 +347,7 @@ extern "C" void em035_arm_mot1s0_angle_wait90(_ENEMY_WORK* work)
     case 1:
         fn_80136DF4(work);
         if (--work->timer_0x020 <= 0)
-            fn_80127FE4(work);
+            em_action_finish_fall(work);
         break;
     }
 }
@@ -373,7 +373,7 @@ extern "C" void em035_handlers_angle(_ENEMY_WORK* work)
 extern "C" void em035_motion_done_step(_ENEMY_WORK* work)
 {
     if (work->field_0x1E2 == 1)
-        fn_80127FE4(work);
+        em_action_finish_fall(work);
     else
         em_action_finish(work);
 }
@@ -385,19 +385,19 @@ extern "C" void em035_substate_se_start(_ENEMY_WORK* work)
 {
     switch (work->state_sub) {
     case 0:
-        fn_801251D8(work, lbl_805ED8C0, 0, 0);
+        em_se_tbl_play_alt(work, lbl_805ED8C0, 0, 0);
         break;
     case 5:
-        fn_801251D8(work, lbl_805ED8C0, 1, 5);
+        em_se_tbl_play_alt(work, lbl_805ED8C0, 1, 5);
         break;
     case 56:
-        fn_801251D8(work, lbl_805ED8F8, 0, 56);
+        em_se_tbl_play_alt(work, lbl_805ED8F8, 0, 56);
         break;
     case 57:
-        fn_801251D8(work, lbl_805ED930, 1, 57);
+        em_se_tbl_play_alt(work, lbl_805ED930, 1, 57);
         break;
     default:
-        fn_801251D8(work, lbl_805ED8C0, 0, 0);
+        em_se_tbl_play_alt(work, lbl_805ED8C0, 0, 0);
         break;
     }
 }
@@ -412,22 +412,22 @@ extern "C" void em035_blend_seq(_ENEMY_WORK* work)
         work->state += 1;
         em_move_mode_set(work, 0);
         em_mot_set(work, 1, 0, 0);
-        fn_8014616C(work, 0);
+        em_demo_reset(work, 0);
         break;
     case 1:
-        if (fn_80146008(1166) == 1) {
+        if (em_demo_time_ck(1166) == 1) {
             work->state += 1;
-            fn_8014619C(work);
+            em_demo_enable(work);
             em_mot_set(work, 2, 0, 0);
-            fn_80146058(work, lbl_8079B724, lbl_8079B728, lbl_8079B72C);
-            fn_8014610C(work, lbl_8079B728, lbl_8079B730, lbl_8079B728);
+            em_demo_pos_set(work, lbl_8079B724, lbl_8079B728, lbl_8079B72C);
+            em_demo_rot_set(work, lbl_8079B728, lbl_8079B730, lbl_8079B728);
         }
         break;
     case 2:
-        if (fn_80146008(1324) == 1) {
+        if (em_demo_time_ck(1324) == 1) {
             work->state += 1;
             em_mot_set(work, 1, 0, 0);
-            fn_80146058(work, lbl_8079B734, lbl_8079B728, lbl_8079B738);
+            em_demo_pos_set(work, lbl_8079B734, lbl_8079B728, lbl_8079B738);
         }
         break;
     }
@@ -443,8 +443,8 @@ extern "C" void em035_blend_entry(_ENEMY_WORK* work)
         work->state += 1;
         em_move_mode_set(work, 0);
         em_mot_set(work, 1, 0, 0);
-        fn_80146058(work, lbl_8079B734, lbl_8079B728, lbl_8079B738);
-        fn_8014610C(work, lbl_8079B728, lbl_8079B730, lbl_8079B728);
+        em_demo_pos_set(work, lbl_8079B734, lbl_8079B728, lbl_8079B738);
+        em_demo_rot_set(work, lbl_8079B728, lbl_8079B730, lbl_8079B728);
         break;
     case 1:
         if (em_mot_end_ck(work) == 1)

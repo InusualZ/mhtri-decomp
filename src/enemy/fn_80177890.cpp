@@ -12,10 +12,10 @@
  *     are one unit.
  *   * `fn_80177890`, `fn_8017791C`, `fn_8017799C`, `fn_80177A2C`, `fn_80177AA8`, `fn_80177B24`,
  *     `fn_80177CC8` are single-step state machines: `case 0` bumps `state` (+0x5) and arms a motion
- *     through `fn_8012F504`/`em_mot_set`; `case 1` polls a condition (`em_frame_check`, `em_mot_end_ck`,
- *     `fn_80134B0C`) and calls `em_action_finish` (the motion-change commit) when it returns 1.
+ *     through `em_mot_set_blend`/`em_mot_set`; `case 1` polls a condition (`em_frame_check`, `em_mot_end_ck`,
+ *     `em_turn_seq_step`) and calls `em_action_finish` (the motion-change commit) when it returns 1.
  *   * `fn_80177BEC`, `fn_80177F30`, `fn_8017801C` take a second `u8` argument that selects which float
- *     pool constant `fn_80134004` should ease the enemy toward.
+ *     pool constant `em_approach_start` should ease the enemy toward.
  *   * `fn_80177D54` is the compound one: three interleaved sub-steps (`state_0x006`, `state_0x007`)
  *     gated on the per-frame flags at +0xA0D / +0xA69, then the same `em_frame_check`/`em_mot_end_ck` pair.
  *
@@ -69,18 +69,18 @@ extern "C" {
 #endif
 
 void em_move_mode_set(_ENEMY_WORK* self, u32 a);
-void fn_8012F504(_ENEMY_WORK* self, s32 a, s32 b, s32 c, s32 d);
+void em_mot_set_blend(_ENEMY_WORK* self, s32 a, s32 b, s32 c, s32 d);
 void em_mot_set(_ENEMY_WORK* self, s32 a, s32 b, s32 c);
 void fn_8012F810(_ENEMY_WORK* self);
 u32 em_mot_end_ck(_ENEMY_WORK* self);
 void em_action_finish(_ENEMY_WORK* self);
 void em_state_set(_ENEMY_WORK* self, s32 a, s32 b);
-void fn_8012933C(_ENEMY_WORK* self, s32 a, s32 b, s32 c);
-void fn_80133C50(_ENEMY_WORK* self, u32 a);
-void fn_80134004(_ENEMY_WORK* self, f32 a, s32 b);
-u32 fn_80134114(_ENEMY_WORK* self, s32 a, s32 b);
-void fn_80134964(_ENEMY_WORK* self, void* tbl, s32 a, s32 b, s32 c);
-u32 fn_80134B0C(_ENEMY_WORK* self, void* tbl);
+void em_hit_window_set(_ENEMY_WORK* self, s32 a, s32 b, s32 c);
+void em_turn_to_target(_ENEMY_WORK* self, u32 a);
+void em_approach_start(_ENEMY_WORK* self, f32 a, s32 b);
+u32 em_approach_step(_ENEMY_WORK* self, s32 a, s32 b);
+void em_turn_seq_start(_ENEMY_WORK* self, void* tbl, s32 a, s32 b, s32 c);
+u32 em_turn_seq_step(_ENEMY_WORK* self, void* tbl);
 void fn_801823A0(_ENEMY_WORK* self, s32 a);
 
 /* the two neighbouring-TU entries the dispatcher tail-branches into */
@@ -96,7 +96,7 @@ void fn_80177890(_ENEMY_WORK* self) {
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        fn_8012F504(self, 0x14, 0x14, 0, 1);
+        em_mot_set_blend(self, 0x14, 0x14, 0, 1);
         break;
     case 1:
         if (em_frame_check(self, 1, lbl_80797B48, lbl_80797B18) == 1) {
@@ -111,7 +111,7 @@ void fn_8017791C(_ENEMY_WORK* self) {
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        fn_8012F504(self, 7, 0xa, 0, 1);
+        em_mot_set_blend(self, 7, 0xa, 0, 1);
         break;
     case 1:
         if (em_mot_end_ck(self) == 1) {
@@ -176,7 +176,7 @@ void fn_80177B24(_ENEMY_WORK* self) {
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        fn_8012F504(self, 0x1d, 0x14, 0, 1);
+        em_mot_set_blend(self, 0x1d, 0x14, 0, 1);
         break;
     case 1:
         if (em_mot_end_ck(self) == 1) {
@@ -225,18 +225,18 @@ void fn_80177BEC(_ENEMY_WORK* self, s32 arg) {
         self->state++;
         em_move_mode_set(self, 0);
         fn_8012F810(self);
-        fn_8012F504(self, 0x15, 0x28, 0, 1);
+        em_mot_set_blend(self, 0x15, 0x28, 0, 1);
         switch ((u8)arg) {
         default:
-            fn_80134004(self, lbl_80797B18, 0);
+            em_approach_start(self, lbl_80797B18, 0);
             break;
         case 1:
-            fn_80134004(self, lbl_80797B4C, 0);
+            em_approach_start(self, lbl_80797B4C, 0);
             break;
         }
         break;
     case 1:
-        if (fn_80134114(self, 0, 0x80) == 1) {
+        if (em_approach_step(self, 0, 0x80) == 1) {
             em_action_finish(self);
         }
         break;
@@ -248,10 +248,10 @@ void fn_80177CC8(_ENEMY_WORK* self) {
     case 0:
         self->state++;
         em_move_mode_set(self, 0);
-        fn_80134964(self, lbl_8056FDD0, 0, 0, 0);
+        em_turn_seq_start(self, lbl_8056FDD0, 0, 0, 0);
         break;
     case 1:
-        if (fn_80134B0C(self, lbl_8056FDD0) == 1) {
+        if (em_turn_seq_step(self, lbl_8056FDD0) == 1) {
             em_action_finish(self);
         }
         break;
@@ -266,27 +266,27 @@ void fn_80177D54(_ENEMY_WORK* self) {
         self->state_0x007 = 0;
         em_move_mode_set(self, 0);
         em_mot_set(self, 0x1b, 6, 0);
-        fn_8012933C(self, 0, 0x2e, 8);
-        fn_8012933C(self, 1, 0x32, 0x18);
+        em_hit_window_set(self, 0, 0x2e, 8);
+        em_hit_window_set(self, 1, 0x32, 0x18);
         break;
     case 1:
         switch (self->state_0x006) {
         case 0:
             if (self->field_0xA0D == 0) {
                 self->state_0x006++;
-                fn_8012933C(self, 0, 0x2f, 0x18);
+                em_hit_window_set(self, 0, 0x2f, 0x18);
             }
             break;
         case 1:
             if (self->field_0xA0D == 0) {
                 self->state_0x006++;
-                fn_8012933C(self, 0, 0x30, 0x18);
+                em_hit_window_set(self, 0, 0x30, 0x18);
             }
             break;
         case 2:
             if (self->field_0xA0D == 0) {
                 self->state_0x006++;
-                fn_8012933C(self, 0, 0x31, 0x18);
+                em_hit_window_set(self, 0, 0x31, 0x18);
             }
             break;
         }
@@ -295,19 +295,19 @@ void fn_80177D54(_ENEMY_WORK* self) {
         case 0:
             if (self->field_0xA69 == 0) {
                 self->state_0x007++;
-                fn_8012933C(self, 1, 0x33, 0x18);
+                em_hit_window_set(self, 1, 0x33, 0x18);
             }
             break;
         case 1:
             if (self->field_0xA69 == 0) {
                 self->state_0x007++;
-                fn_8012933C(self, 1, 0x34, 0x18);
+                em_hit_window_set(self, 1, 0x34, 0x18);
             }
             break;
         }
 
         if (em_frame_check(self, 1, lbl_80797B50, lbl_80797B54) == 1) {
-            fn_80133C50(self, 0x100);
+            em_turn_to_target(self, 0x100);
         }
         if (em_mot_end_ck(self) == 1) {
             em_action_finish(self);
@@ -324,21 +324,21 @@ void fn_80177F30(_ENEMY_WORK* self, s32 arg) {
         em_mot_set(self, 2, 0xa, 0);
         switch ((u8)arg) {
         default:
-            fn_80134004(self, lbl_80797B18, 0);
+            em_approach_start(self, lbl_80797B18, 0);
             break;
         case 1:
-            fn_80134004(self, lbl_80797B18, 0);
+            em_approach_start(self, lbl_80797B18, 0);
             if (self->value_0x378 > lbl_80797B58) {
                 self->value_0x378 = lbl_80797B58;
             }
             /* falls through to case 2's easing */
         case 2:
-            fn_80134004(self, lbl_80797B5C, 0);
+            em_approach_start(self, lbl_80797B5C, 0);
             break;
         }
         break;
     case 1:
-        if (fn_80134114(self, 0, 0x80) == 1) {
+        if (em_approach_step(self, 0, 0x80) == 1) {
             em_action_finish(self);
         }
         break;
@@ -353,24 +353,24 @@ void fn_8017801C(_ENEMY_WORK* self, s32 arg) {
         em_mot_set(self, 9, 0xa, 0);
         switch ((u8)arg) {
         default:
-            fn_80134004(self, lbl_80797B18, 0);
+            em_approach_start(self, lbl_80797B18, 0);
             break;
         case 1:
-            fn_80134004(self, lbl_80797B4C, 0);
+            em_approach_start(self, lbl_80797B4C, 0);
             break;
         case 2:
-            fn_80134004(self, lbl_80797B18, 0);
+            em_approach_start(self, lbl_80797B18, 0);
             if (self->value_0x378 > lbl_80797B58) {
                 self->value_0x378 = lbl_80797B58;
             }
             break;
         case 3:
-            fn_80134004(self, lbl_80797B5C, 0);
+            em_approach_start(self, lbl_80797B5C, 0);
             break;
         }
         break;
     case 1:
-        if (fn_80134114(self, 0, 0x80) == 1) {
+        if (em_approach_step(self, 0, 0x80) == 1) {
             em_action_finish(self);
         }
         break;

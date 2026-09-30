@@ -67,7 +67,7 @@
  *     is the `HitSphere` this file already defines.
  *   * `fn_80292940` (0x80292940, a 0x3C-byte record copy), `fn_80295544` (a record with a `VEC3` at
  *     +0x08), `fn_8029576C`/`fn_80295578`/`fn_80295290` (0x80295290-0x8029576C) and
- *     `fn_802924C0`/`fn_802929DC`/`fn_80293504`/`fn_80293A88`/`fn_8029403C`/`fn_80294538`/
+ *     `fn_802924C0`/`fn_802929DC`/`fn_80293504`/`fn_80293A88`/`pl_coll_sweep_ck`/`fn_80294538`/
  *     `fn_80294B64`/`fn_80294EFC`/`fn_802950D8` need their record types settled the same way.
  *   * `fn_8028F938`'s two callees whose owners' headers cannot declare them live in
  *     `include/Pl/fn_8028F66C.h` (see that file for the measured `(10197)` reason).
@@ -196,7 +196,7 @@ f32 fn_8028F86C(PlBox* box, const VEC3* point, f32* param) {
     f32 axis_len2;
     f32 t;
 
-    fn_80050CA0(&sep, point, &box->vec_0x00);
+    subVec3(&sep, point, &box->vec_0x00);
     axis_len2 = fn_80050EDC(&box->vec_0x18.x);
     t = 0.0f;
     if (axis_len2 >= 0.001f) {
@@ -226,11 +226,11 @@ f32 fn_8028F938(VEC3* start, VEC3* end, VEC3* point, VEC3* out) {
     param = 0.0f;
     copyVec3(&box.vec_0x00, start);
     copyVec3(&box.vec_0x0C, end);
-    fn_80050CA0(&diff, end, start);
+    subVec3(&diff, end, start);
     copyVec3(&box.vec_0x18, &diff);
     dist = fn_8028F86C(&box, point, &param);
     fn_80051EE0(&scaled, &box.vec_0x18, param);
-    fn_80051378(&pos, &scaled, start);
+    addVec3(&pos, &scaled, start);
     copyVec3(out, &pos);
     return dist;
 }

@@ -24,7 +24,7 @@
  * record (`em_frame_check`, `em_get_mot_no`, `em_die_ck`, `em_after_frame_check`, `get_em_scale`)
  * and calls into the registered enemy units `enemy/enemy_control.cpp`,
  * `enemy/fn_801251D0.cpp` and `enemy/fn_8012EC74.cpp` (em_mot_set x75, em_move_mode_set x62,
- * fn_801251D0 x60, fn_801303EC x51, em_mot_end_ck x44, fn_801280F4 x42).  Lib `enemy` (cflags_main),
+ * em_se_tbl_play x60, fn_801303EC x51, em_mot_end_ck x44, fn_801280F4 x42).  Lib `enemy` (cflags_main),
  * the group its link neighbours use.
  *
  * Naming.  The map has no real name for any of the range's 85 addresses: `dumpmap.py join --kind
@@ -81,7 +81,7 @@
  *     unit must use costs the 3-word copy.
  *   * em_act_hold 87.5, em_act_frame_ck 93.7, em_act_aim 93.9 - register colouring plus one duplicated
  *     branch tail (284-304 B against 312/144/144 B).
- *   * em_act_mot21 96.8 - retail keeps an `lfs f1, lbl_8079AF54` before the `fn_801305C4` call whose
+ *   * em_act_mot21 96.8 - retail keeps an `lfs f1, lbl_8079AF54` before the `em_fall_start` call whose
  *     owner header declares `(self)` only; adding the second parameter there would change that
  *     header's other callers.
  *   * em_act_rec_init 99.3, em_rot_reset 97.6, em_act_entry_start 97.9, em_act_follow 97.3 - one
@@ -213,18 +213,18 @@ void em_act_entry_start(_ENEMY_WORK* self, u8 mode) {
         break;
     }
     self->field_0x835 = 1;
-    if (fn_801391E8(self) == 0) {
+    if (em_res_user_data_ck(self) == 0) {
         void* record = operator new(0xC);
         if (record != NULL) {
             em_act_rec_init(record);
         }
-        fn_801390FC(self, record);
+        em_res_user_data_set(self, record);
     }
 }
 
 /* Initialises the 0xC-byte action record's shared vtable word. */
 void* em_act_rec_init(void* self) {
-    fn_80147E2C(self);
+    em_res_user_data_ctor(self);
     *(void**)self = (void*)&lbl_805DFC00;
     return self;
 }
@@ -332,12 +332,12 @@ void em_act_mot21(_ENEMY_WORK* self) {
     switch (state) {
     case 0:
         self->state = (u8)(state + 1);
-        fn_801305C4(self);
+        em_fall_start(self);
         em_mot_set(self, 0x15, 2, 0);
         return;
     case 1:
         if (em_mot_end_ck(self) == 1U) {
-            fn_80127FE4(self);
+            em_action_finish_fall(self);
         }
         return;
     }

@@ -69,8 +69,8 @@
  *  - `include/enemy/ENEMY_WORK.h`: the EmColorBlock view of +0x328 (the colour scalar + K-colour
  *    bytes), `field_0x48F`, the EmPartState block at +0x740 and `field_0x81A`; every other offset is
  *    unchanged.
- *  - `include/enemy/fn_8012E968.h` (new): the owner declarations of `fn_8012EC3C`/`fn_8012EC60`
- *    (rule 2).  `fn_8012EC60` keeps the `(void)` spelling the landed bands need - a variadic
+ *  - `include/enemy/fn_8012E968.h` (new): the owner declarations of `fn_8012EC3C`/`em_alt_mode_ck`
+ *    (rule 2).  `em_alt_mode_ck` keeps the `(void)` spelling the landed bands need - a variadic
  *    or `(self)` spelling here costs `enemy/fn_801CA004.cpp` 1.1 points and `fn_8019DB9C` 6.25
  *    (measured), because those call sites leave the record in r3.
  *  - `include/unsplit/enemy.h`: re-exports that owner header instead of carrying its own copy
@@ -271,7 +271,7 @@ void fn_80181E24(_ENEMY_WORK* self) {
     ((MHchar*)self->char_0x024)->getTevKColor(5, GX_KCOLOR3, &color);
     if (fn_8012EC3C(self) == 1) {
         color.a = 0;
-    } else if (fn_8012EC60(self) == 1) {
+    } else if (em_alt_mode_ck(self) == 1) {
         color.a = (u8)((s32)(lbl_80797BB0 * (lbl_80797B14 *
                     (lbl_80797B34 + fn_8005024C((u16)(system_w.field_0x0c << 13))))) + 225);
     } else {
@@ -285,7 +285,7 @@ void fn_80181E24(_ENEMY_WORK* self) {
  * fn_80182040 - true for the dead mode (0x1E2 == 2) while the record has not latched its aim state.
  * ------------------------------------------------------------------------------------------------ */
 u32 fn_80182040(_ENEMY_WORK* self) {
-    if (self->field_0x1E2 == 2 && fn_8012EC60(self) == 0) {
+    if (self->field_0x1E2 == 2 && em_alt_mode_ck(self) == 0) {
         return 1;
     }
     return 0;
@@ -449,7 +449,7 @@ u32 fn_80182430(_ENEMY_WORK* self, u32 arg) {
     setVec3(&rel, lbl_80797B18, lbl_80797B18, lbl_80797D08 * get_em_chg_scale(self));
     copyVec3(&b, &rel);
     rotVecY(&b, self->field_0x1C0);
-    fn_80051378(&probe, &self->pos, &b);
+    addVec3(&probe, &self->pos, &b);
     copyVec3(&a, &probe);
     f32 dist = calcDistanceSqXZ(&a, &target->pos);
     f32 range = lbl_80797BE4 * get_em_chg_scale(self);
@@ -708,7 +708,7 @@ void fn_80182C40(_ENEMY_WORK* self, u32 kind, void* out) {
         break;
     }
     rotVecY(&v, (u16)(self->field_0x1C0 + offset));
-    fn_80051378(&rel, &self->pos, &v);
+    addVec3(&rel, &self->pos, &v);
     copyVec3((nw4r::math::VEC3*)out, &rel);
 }
 

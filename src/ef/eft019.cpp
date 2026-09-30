@@ -331,7 +331,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
         copyVec3(&v, &d0);
         fn_80050850(&v, &v);
         fn_800513F0(&v, lbl_807969D8);
-        fn_80073F68(pos, &v);
+        addVec3To(pos, &v);
         eft019_set_core(pos, area, 12, lbl_807969DC, lbl_807969DC);
         return;
     }
@@ -341,7 +341,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
         copyVec3(&v, &d1);
         fn_80050850(&v, &v);
         fn_800513F0(&v, lbl_807969D8);
-        fn_80073F68(pos, &v);
+        addVec3To(pos, &v);
         eft019_set_core(pos, area, 12, lbl_807969E0, lbl_807969E0);
         work = (_EFT019_WORK*)effect->work_0x38;
         work->scale_b_0x48 = lbl_807969DC;
@@ -354,7 +354,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
         copyVec3(&v, &d2);
         fn_80050850(&v, &v);
         fn_800513F0(&v, lbl_807969D8);
-        fn_80073F68(pos, &v);
+        addVec3To(pos, &v);
         eft019_set_core(pos, area, 12, lbl_807969E4, lbl_807969E4);
         work = (_EFT019_WORK*)effect->work_0x38;
         work->scale_b_0x48 = lbl_807969E8;
@@ -366,7 +366,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
         copyVec3(&v, &d3);
         fn_80050850(&v, &v);
         fn_800513F0(&v, lbl_807969D8);
-        fn_80073F68(pos, &v);
+        addVec3To(pos, &v);
         eft019_set_core(pos, area, 13, lbl_807969DC, lbl_807969DC);
         return;
     }
@@ -375,7 +375,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
         copyVec3(&v, &d4);
         fn_80050850(&v, &v);
         fn_800513F0(&v, lbl_807969D8);
-        fn_80073F68(pos, &v);
+        addVec3To(pos, &v);
         eft019_set_core(pos, area, 13, lbl_807969E0, lbl_807969E0);
         return;
     }
@@ -384,7 +384,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
         copyVec3(&v, &d5);
         fn_80050850(&v, &v);
         fn_800513F0(&v, lbl_807969D8);
-        fn_80073F68(pos, &v);
+        addVec3To(pos, &v);
         eft019_set_core(pos, area, 13, lbl_807969EC, lbl_807969EC);
         return;
     }
@@ -402,7 +402,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
         copyVec3(&v, &d6);
         fn_80050850(&v, &v);
         fn_800513F0(&v, lbl_807969D8);
-        fn_80073F68(pos, &v);
+        addVec3To(pos, &v);
         eft019_set_core(pos, area, 12, lbl_807969E8, lbl_807969E8);
         work = (_EFT019_WORK*)effect->work_0x38;
         work->scale_b_0x48 = lbl_807969E8;
@@ -415,7 +415,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
         copyVec3(&v, &d7);
         fn_80050850(&v, &v);
         fn_800513F0(&v, lbl_807969D8);
-        fn_80073F68(pos, &v);
+        addVec3To(pos, &v);
         eft019_set_core(pos, area, 13, lbl_807969E8, lbl_807969E8);
         work = (_EFT019_WORK*)effect->work_0x38;
         work->scale_b_0x48 = lbl_807969E8;
@@ -427,7 +427,7 @@ void eft019_set(nw4r::math::VEC3* pos, u8 area, u8 type)
         copyVec3(&v, &d8);
         fn_80050850(&v, &v);
         fn_800513F0(&v, lbl_807969D8);
-        fn_80073F68(pos, &v);
+        addVec3To(pos, &v);
         eft019_set_core(pos, area, 58, lbl_807969F8, lbl_807969F8);
         break;
     }
@@ -597,7 +597,7 @@ void eft019_set_subtype(u8 type, u8 subtype, nw4r::math::VEC3* pos, u8 area, _CP
             copyVec3(&v, &dir);
             fn_80050850(&v, &v);
             fn_800513F0(&v, lbl_807969D8);
-            fn_80073F68(pos, &v);
+            addVec3To(pos, &v);
             eft019_set_core(pos, area, 12, lbl_807969DC, lbl_807969DC);
             break;
         }
@@ -606,7 +606,7 @@ void eft019_set_subtype(u8 type, u8 subtype, nw4r::math::VEC3* pos, u8 area, _CP
             copyVec3(&v, &dir);
             fn_80050850(&v, &v);
             fn_800513F0(&v, lbl_807969D8);
-            fn_80073F68(pos, &v);
+            addVec3To(pos, &v);
             eft019_set_core(pos, area, 12, lbl_807969E0, lbl_807969E0);
             work->scale_b_0x48 = lbl_807969DC;
             work->scale_a_0x44 = lbl_807969DC;
@@ -617,7 +617,7 @@ void eft019_set_subtype(u8 type, u8 subtype, nw4r::math::VEC3* pos, u8 area, _CP
             copyVec3(&v, &dir);
             fn_80050850(&v, &v);
             fn_800513F0(&v, lbl_807969D8);
-            fn_80073F68(pos, &v);
+            addVec3To(pos, &v);
             eft019_set_core(pos, area, 12, lbl_807969E4, lbl_807969E4);
             work->scale_b_0x48 = lbl_807969E8;
             work->scale_a_0x44 = lbl_807969E8;
@@ -1335,7 +1335,7 @@ void fn_80114B20(_EFT* self, nw4r::math::MTX34* mtx)
     VEC3_ctor(&spin);
     VEC3_ctor(&pos);
     fn_800E0A14(&((_EFT019_PHYSICS*)((_PLW*)self->source_0x30)->physics_0x13C)->chr_0x04, 7, mtx);
-    fn_8010140C(mtx, &pos);
+    mtx34_trans_get(mtx, &pos);
     axis.x = -mtx->m[0][2];
     axis.y = -mtx->m[1][2];
     axis.z = -mtx->m[2][2];
@@ -1345,7 +1345,7 @@ void fn_80114B20(_EFT* self, nw4r::math::MTX34* mtx)
     setVector3(&spin, lbl_80796A14, lbl_80796A14, lbl_80796A18);
     rotVecX(&spin, rot.x);
     rotVecY(&spin, rot.y);
-    fn_80073F68(&pos, &spin);
+    addVec3To(&pos, &spin);
     cpSetRotMatrix(&rot, mtx);
     fn_800FBB90(mtx, &pos);
 }

@@ -305,7 +305,7 @@ void fn_802CE0D8(struct _AINPC_W* self)
 }
 
 /* 0x802CE170 - rebuild `vec_0x1B0` from `vec_0x178` rotated by the angle the two make, then queue
- * the follow-up command.  The stack VEC3 is the rotated offset `fn_80051378` turns into the new
+ * the follow-up command.  The stack VEC3 is the rotated offset `addVec3` turns into the new
  * aim point. */
 void fn_802CE170(struct _AINPC_W* self)
 {
@@ -320,7 +320,7 @@ void fn_802CE170(struct _AINPC_W* self)
 
         setVector3(&tmp, 0.0f, 0.0f, 800.0f);
         rotVecY(&tmp, angle);
-        fn_80051378(&offset, &self->vec_0x178, &tmp);
+        addVec3(&offset, &self->vec_0x178, &tmp);
         copyVec3(&self->vec_0x1B0, &offset);
         self->field_0x389 = 0;
         fn_802D4230(self, 30.0f);
@@ -1140,7 +1140,7 @@ void fn_802CFC94(struct _AINPC_W* self)
 
             setVector3(&tmp, 0.0f, 0.0f, 800.0f);
             rotVecY(&tmp, angle);
-            fn_80051378(&offset, &self->vec_0x178, &tmp);
+            addVec3(&offset, &self->vec_0x178, &tmp);
             copyVec3(&self->vec_0x1B0, &offset);
             self->field_0x389 = 0;
             fn_802D4230(self, 20.0f);
@@ -1180,13 +1180,13 @@ void fn_802CFE20(struct _AINPC_W* self)
             fn_802D4230(self, 1100.0f);
             fn_802D2A00(self, 2, 0xF, 0);
         } else {
-            fn_80050CA0(&delta, &self->vec_0x178, &self->vec_0x1B0);
+            subVec3(&delta, &self->vec_0x178, &self->vec_0x1B0);
             copyVec3(&tmp, &delta);
             calcVecAngXY(&tmp, &x, &z);
             setVector3(&tmp, 0.0f, 0.0f, 800.0f);
             rotVecX(&tmp, x);
             rotVecY(&tmp, (u16)z);
-            fn_80051378(&offset, &self->vec_0x178, &tmp);
+            addVec3(&offset, &self->vec_0x178, &tmp);
             copyVec3(&self->vec_0x1B0, &offset);
             self->field_0x389 = 0;
             fn_802D4230(self, 20.0f);

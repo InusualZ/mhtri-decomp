@@ -501,7 +501,7 @@ void fn_8024A248(_PLW* self, s32 arg1) {
             /* +0x054 is the actor's rotation; other units read its first word as a scalar, so the
              * `_CP_VECTOR` view is taken through the named field rather than a byte offset. */
             rotVecXYZ(&vec, (_CP_VECTOR*)&self->param_0x54);
-            fn_80073F68(&self->field_0x03C, &vec);
+            addVec3To(&self->field_0x03C, &vec);
         }
         break;
     }

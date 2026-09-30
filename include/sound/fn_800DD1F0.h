@@ -15,6 +15,13 @@ class MHchar;
 #ifdef __cplusplus
 extern "C" {
 #endif
+/* 0x800E2F40 - writes the TEV alpha pair of material `mat` on the character model `self` (nothing when the
+ * model has no resource).  `mode` is the stage selector, `a`/`d` the two 8-bit levels; the trailing float
+ * is not read by the body.  Added with `enemy/em024_ai.cpp`.  The name is a GUESS from the body. */
+#ifdef __cplusplus
+void mhchar_mat_tev_set(MHchar* self, s32 mat, s32 mode, u8 a, s32 b, s32 c, u8 d, f32 e);
+#endif
+
 
 /* The stage's effect size class (0x400 / 0x800 / 0x8 - see fn_800F9380).
  *
@@ -33,7 +40,7 @@ u32 fn_800E3B3C(void);
 /* The model's base initialiser: stores the initial joint table's address at +0x00 of `self`
  * (`src/sound/fn_800DD1F0.cpp` defines it as `void fn_800E3B2C(MHchar* self)`; the parameter is
  * `MHchar*` because its own call sites pass the actor's model, and the body only writes +0x00, so the
- * enemy band's 12-byte helper constructor `enemy/fn_80147CE0.cpp`'s `fn_80147E2C` calls it with its
+ * enemy band's 12-byte helper constructor `enemy/fn_80147CE0.cpp`'s `em_res_user_data_ctor` calls it with its
  * own record).  Declared here on landing that consumer (rule 2: the owner's header); the older
  * `unsplit/sound.h` no-argument view stays for the C-side consumer that uses it. */
 void fn_800E3B2C(MHchar* self);

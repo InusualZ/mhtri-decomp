@@ -19,6 +19,11 @@ void camera_position_set(nw4r::g3d::Camera* camera, const nw4r::math::VEC3* pos)
 /* 0x802BDF5C - the camera's yaw (the angle of its view direction), as the 16-bit-wrapped word the HUD rotates by. */
 s32 camera_angle_y_get(void);
 
+/* 0x802BC89C - starts a camera event of `mode` for the enemy work `arg` (only while the camera work
+ * is in the +0x284 == 1 state). */
+void camera_event_set(u8 mode, u32 arg);
+/* 0x802BE77C - starts the third quake slot from the zero vector with the kind's high bits set. */
+void camera_shake_req(u8 kind);
 #ifdef __cplusplus
 }
 #endif

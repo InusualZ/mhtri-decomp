@@ -203,7 +203,7 @@ extern "C" void fn_801B78F8(EmProgWork* self);
  *     `include/mh3_pad.h`'s on the very same C-linkage symbols (MWCC `(10197) illegal function
  *     overloading`), so the header is not includable here.  The map symbol is the plain
  *     `fn_800B0B90`, hence C linkage.
- *   * `lbl_805B2188` is the 0x60-byte `.data` table `fn_80135644` is handed; no registered unit
+ *   * `lbl_805B2188` is the 0x60-byte `.data` table `em_key_curve_eval` is handed; no registered unit
  *     claims that `.data` range, so it has no owner header - the same in-file spelling
  *     `src/Pl/pl_act.cpp` uses for its data labels.  Both are `shared-file` requests in the outbox. */
 extern "C" {
@@ -282,7 +282,7 @@ extern "C" s32 fn_801B7118(u16 id) {
 }
 
 /* Enter / step the motion `mode` (r4): latch the selection record, then either branch on the random
- * kinds (1 and 4) or restart the motion set (`fn_80130248`/`fn_801305C4`). */
+ * kinds (1 and 4) or restart the motion set (`em_fall_height_get`/`em_fall_start`). */
 extern "C" void fn_801B71F4(EmProgWork* self, u8 mode) {
     EmSelRec rec;
     s32 pick;
@@ -303,8 +303,8 @@ extern "C" void fn_801B71F4(EmProgWork* self, u8 mode) {
             self->field_0x00A |= 0x02;
         }
     } else {
-        fn_80130248((struct _ENEMY_WORK*)self);
-        fn_801305C4((struct _ENEMY_WORK*)self);
+        em_fall_height_get((struct _ENEMY_WORK*)self);
+        em_fall_start((struct _ENEMY_WORK*)self);
         if (self->field_0x00A & 1) {
             fn_80128A8C((struct _ENEMY_WORK*)self, 3, 10);
         } else {
@@ -390,19 +390,19 @@ extern "C" void fn_801B7494(EmProgWork* self) {
     }
 }
 
-/* The same two-step shape with the motion set restarted (`fn_80130248`/`fn_801305C4`) and the
- * 1/4/0 window, handing over to `fn_80127FE4`. */
+/* The same two-step shape with the motion set restarted (`em_fall_height_get`/`em_fall_start`) and the
+ * 1/4/0 window, handing over to `em_action_finish_fall`. */
 extern "C" void fn_801B7510(EmProgWork* self) {
     switch (self->state) {
     case 0:
         self->state++;
-        fn_80130248((struct _ENEMY_WORK*)self);
-        fn_801305C4((struct _ENEMY_WORK*)self);
+        em_fall_height_get((struct _ENEMY_WORK*)self);
+        em_fall_start((struct _ENEMY_WORK*)self);
         em_mot_set_ck((struct _ENEMY_WORK*)self, 1, 4, 0);
         break;
     case 1:
         if (em_mot_end_ck((struct _ENEMY_WORK*)self) == 1) {
-            fn_80127FE4((struct _ENEMY_WORK*)self);
+            em_action_finish_fall((struct _ENEMY_WORK*)self);
         }
         break;
     }
@@ -460,23 +460,23 @@ extern "C" void fn_801B7648(EmProgWork* self) {
 }
 
 /* The three-step run-in: step 1 restarts the motion set and arms the 101/2/0 window plus the
- * distance/speed pair, step 2 waits for `fn_80130008`, step 3 ends the motion. */
+ * distance/speed pair, step 2 waits for `em_ground_ck`, step 3 ends the motion. */
 extern "C" void fn_801B76C4(EmProgWork* self) {
     switch (self->state) {
     case 0:
         self->state++;
-        fn_80130248((struct _ENEMY_WORK*)self);
-        fn_801305C4((struct _ENEMY_WORK*)self);
+        em_fall_height_get((struct _ENEMY_WORK*)self);
+        em_fall_start((struct _ENEMY_WORK*)self);
         em_mot_set((struct _ENEMY_WORK*)self, 101, 2, 0);
-        fn_80134E8C((struct _ENEMY_WORK*)self);
-        fn_801353F8((struct _ENEMY_WORK*)self);
+        em_dive_start((struct _ENEMY_WORK*)self);
+        em_move_vec2_clr((struct _ENEMY_WORK*)self);
         self->vec_0x310.y = -5.0f;
         self->value_0x320 = -1.0f;
         break;
     case 1:
         CancelFade((struct _ENEMY_WORK*)self);
-        fn_80130248((struct _ENEMY_WORK*)self);
-        if (fn_80130008((struct _ENEMY_WORK*)self) == 1) {
+        em_fall_height_get((struct _ENEMY_WORK*)self);
+        if (em_ground_ck((struct _ENEMY_WORK*)self) == 1) {
             self->state++;
             em_move_mode_set((struct _ENEMY_WORK*)self, 0);
             em_mot_set((struct _ENEMY_WORK*)self, 102, 2, 0);
@@ -562,35 +562,35 @@ extern "C" void fn_801B78F8(EmProgWork* self) {
     case 1:
         if (em_frame_check((struct _ENEMY_WORK*)self, 1, 6.0f, 3000.0f) == 1) {
             self->state++;
-            fn_80130248((struct _ENEMY_WORK*)self);
-            fn_801305C4((struct _ENEMY_WORK*)self);
-            fn_801353F8((struct _ENEMY_WORK*)self);
-            self->vec_0x310.y = fn_80135644((struct _ENEMY_WORK*)self, lbl_805B2188);
-            fn_80135418((struct _ENEMY_WORK*)self);
+            em_fall_height_get((struct _ENEMY_WORK*)self);
+            em_fall_start((struct _ENEMY_WORK*)self);
+            em_move_vec2_clr((struct _ENEMY_WORK*)self);
+            self->vec_0x310.y = em_key_curve_eval((struct _ENEMY_WORK*)self, lbl_805B2188);
+            em_move_offset_apply((struct _ENEMY_WORK*)self);
         }
         break;
     case 2:
-        fn_801353F8((struct _ENEMY_WORK*)self);
-        self->vec_0x310.y = fn_80135644((struct _ENEMY_WORK*)self, lbl_805B2188);
-        fn_80135418((struct _ENEMY_WORK*)self);
+        em_move_vec2_clr((struct _ENEMY_WORK*)self);
+        self->vec_0x310.y = em_key_curve_eval((struct _ENEMY_WORK*)self, lbl_805B2188);
+        em_move_offset_apply((struct _ENEMY_WORK*)self);
         if (em_frame_check((struct _ENEMY_WORK*)self, 1, 16.0f, 3000.0f) == 1) {
             self->state++;
             em_mot_set((struct _ENEMY_WORK*)self, 1, 10, 0);
             self->timer_0x020 = 10;
-            fn_801353F8((struct _ENEMY_WORK*)self);
+            em_move_vec2_clr((struct _ENEMY_WORK*)self);
         }
         break;
     case 3:
         self->timer_0x020--;
         if (self->timer_0x020 <= 0) {
-            fn_80127FE4((struct _ENEMY_WORK*)self);
+            em_action_finish_fall((struct _ENEMY_WORK*)self);
         }
         break;
     }
 }
 
 /* The charge run-in: the motion set is restarted, the speed comes from the mode-dependent constant
- * (`fn_80134004`, 8 frames), and the vector to the target is normalised and scaled into the run-in
+ * (`em_approach_start`, 8 frames), and the vector to the target is normalised and scaled into the run-in
  * slot. */
 extern "C" void fn_801B7A68(EmProgWork* self, u8 mode) {
     nw4r::math::VEC3 vec;
@@ -600,11 +600,11 @@ extern "C" void fn_801B7A68(EmProgWork* self, u8 mode) {
     switch (self->state) {
     case 0:
         self->state++;
-        fn_80130248((struct _ENEMY_WORK*)self);
-        fn_801305C4((struct _ENEMY_WORK*)self);
+        em_fall_height_get((struct _ENEMY_WORK*)self);
+        em_fall_start((struct _ENEMY_WORK*)self);
         em_mot_set((struct _ENEMY_WORK*)self, 2, 20, 0);
-        fn_80134004((struct _ENEMY_WORK*)self, 8, (s32)(u8)mode == 1 ? -450.0f : -80.0f);
-        fn_801353F8((struct _ENEMY_WORK*)self);
+        em_approach_start((struct _ENEMY_WORK*)self, (s32)(u8)mode == 1 ? -450.0f : -80.0f, 8);
+        em_move_vec2_clr((struct _ENEMY_WORK*)self);
         copyVec3(&vec, &self->target);
         vec.y += 60.0f;
         fn_800B0B90(&vec, &self->pos);
@@ -616,11 +616,11 @@ extern "C" void fn_801B7A68(EmProgWork* self, u8 mode) {
         self->timer_0x020 = 240;
         break;
     case 1:
-        fn_80133C50((struct _ENEMY_WORK*)self, 0x1000);
-        if (fn_80134114((struct _ENEMY_WORK*)self, 0, 0) == 1 || self->timer_0x020 <= 0) {
-            fn_80127FE4((struct _ENEMY_WORK*)self);
+        em_turn_to_target((struct _ENEMY_WORK*)self, 0x1000);
+        if (em_approach_step((struct _ENEMY_WORK*)self, 0, 0) == 1 || self->timer_0x020 <= 0) {
+            em_action_finish_fall((struct _ENEMY_WORK*)self);
         } else {
-            fn_80135418((struct _ENEMY_WORK*)self);
+            em_move_offset_apply((struct _ENEMY_WORK*)self);
             self->timer_0x020--;
         }
         break;
@@ -633,10 +633,10 @@ extern "C" void fn_801B7BDC(EmProgWork* self, u8 mode) {
     switch (self->state) {
     case 0:
         self->state++;
-        fn_80130248((struct _ENEMY_WORK*)self);
-        fn_801305C4((struct _ENEMY_WORK*)self);
+        em_fall_height_get((struct _ENEMY_WORK*)self);
+        em_fall_start((struct _ENEMY_WORK*)self);
         em_mot_set((struct _ENEMY_WORK*)self, 3, 20, 0);
-        fn_801353F8((struct _ENEMY_WORK*)self);
+        em_move_vec2_clr((struct _ENEMY_WORK*)self);
         f32 begin = -5.0f;
         self->vec_0x310.z = begin;
         self->timer_0x020 = 100;
@@ -647,11 +647,11 @@ extern "C" void fn_801B7BDC(EmProgWork* self, u8 mode) {
         rotVecY(&self->vec_0x310, self->field_0x1C0);
         break;
     case 1:
-        fn_80133C50((struct _ENEMY_WORK*)self, 0x1000);
+        em_turn_to_target((struct _ENEMY_WORK*)self, 0x1000);
         if (self->timer_0x020 <= 0) {
-            fn_80127FE4((struct _ENEMY_WORK*)self);
+            em_action_finish_fall((struct _ENEMY_WORK*)self);
         } else {
-            fn_80135418((struct _ENEMY_WORK*)self);
+            em_move_offset_apply((struct _ENEMY_WORK*)self);
             self->timer_0x020--;
         }
         break;
@@ -664,15 +664,15 @@ extern "C" void fn_801B7CD4(EmProgWork* self) {
     switch (self->state) {
     case 0:
         self->state++;
-        fn_80130248((struct _ENEMY_WORK*)self);
-        fn_801305C4((struct _ENEMY_WORK*)self);
+        em_fall_height_get((struct _ENEMY_WORK*)self);
+        em_fall_start((struct _ENEMY_WORK*)self);
         em_mot_set((struct _ENEMY_WORK*)self, 1, 4, 0);
-        fn_80134E8C((struct _ENEMY_WORK*)self);
+        em_dive_start((struct _ENEMY_WORK*)self);
         break;
     case 1:
-        fn_80134F18((struct _ENEMY_WORK*)self);
-        fn_80130248((struct _ENEMY_WORK*)self);
-        if (fn_80130008((struct _ENEMY_WORK*)self) == 1) {
+        em_dive_step((struct _ENEMY_WORK*)self);
+        em_fall_height_get((struct _ENEMY_WORK*)self);
+        if (em_ground_ck((struct _ENEMY_WORK*)self) == 1) {
             self->state++;
             em_move_mode_set((struct _ENEMY_WORK*)self, 0);
             em_mot_set((struct _ENEMY_WORK*)self, 6, 4, 0);
@@ -686,18 +686,18 @@ extern "C" void fn_801B7CD4(EmProgWork* self) {
     }
 }
 
-/* A two-step run-in that ends as soon as `fn_80133C50` reports the end of the motion. */
+/* A two-step run-in that ends as soon as `em_turn_to_target` reports the end of the motion. */
 extern "C" void fn_801B7DB0(EmProgWork* self) {
     switch (self->state) {
     case 0:
         self->state++;
-        fn_80130248((struct _ENEMY_WORK*)self);
-        fn_801305C4((struct _ENEMY_WORK*)self);
+        em_fall_height_get((struct _ENEMY_WORK*)self);
+        em_fall_start((struct _ENEMY_WORK*)self);
         em_mot_set_ck((struct _ENEMY_WORK*)self, 1, 4, 0);
         break;
     case 1:
-        if (fn_80133C50((struct _ENEMY_WORK*)self, 0x400) == 1) {
-            fn_80127FE4((struct _ENEMY_WORK*)self);
+        if (em_turn_to_target((struct _ENEMY_WORK*)self, 0x400) == 1) {
+            em_action_finish_fall((struct _ENEMY_WORK*)self);
         }
         break;
     }
@@ -712,10 +712,10 @@ extern "C" void fn_801B7E34(EmProgWork* self, u8 mode) {
     switch (self->state) {
     case 0:
         self->state++;
-        fn_80130248((struct _ENEMY_WORK*)self);
-        fn_801305C4((struct _ENEMY_WORK*)self);
+        em_fall_height_get((struct _ENEMY_WORK*)self);
+        em_fall_start((struct _ENEMY_WORK*)self);
         em_mot_set((struct _ENEMY_WORK*)self, 2, 20, 0);
-        fn_801353F8((struct _ENEMY_WORK*)self);
+        em_move_vec2_clr((struct _ENEMY_WORK*)self);
         copyVec3(&vec, &self->target);
         vec.y += 60.0f;
         fn_800B0B90(&vec, &self->pos);
@@ -728,12 +728,12 @@ extern "C" void fn_801B7E34(EmProgWork* self, u8 mode) {
         break;
     case 1:
         if (mode == 0) {
-            fn_80133C50((struct _ENEMY_WORK*)self, 0x1000);
+            em_turn_to_target((struct _ENEMY_WORK*)self, 0x1000);
         }
         if (self->timer_0x020 <= 0) {
-            fn_80127FE4((struct _ENEMY_WORK*)self);
+            em_action_finish_fall((struct _ENEMY_WORK*)self);
         } else {
-            fn_80135418((struct _ENEMY_WORK*)self);
+            em_move_offset_apply((struct _ENEMY_WORK*)self);
             self->timer_0x020--;
         }
         break;

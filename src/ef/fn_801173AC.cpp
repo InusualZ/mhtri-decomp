@@ -316,7 +316,7 @@ void fn_80119D10(_EFT* self);
 void fn_80119D9C(_EFT* self);
 /* 0x80041E40 is owned by `src/mh3_pad.cpp`; its header cannot be included here (`include/ef.h`
  * spells `VEC3_ctor`/`setVec3` differently from `include/mh3_pad.h`, MWCC (10197)), so this
- * copy stays - normalised to the owner's body (`void*` return).  `fn_80050850`/`fn_80051378` now
+ * copy stays - normalised to the owner's body (`void*` return).  `fn_80050850`/`addVec3` now
  * come from their owner's header, `include/fn_8004CAD8.h` (included above, rule 2). */
 void fn_800513F0(nw4r::math::VEC3* v, f32 angle);
 void fn_800532DC(nw4r::math::MTX34* out, nw4r::math::MTX34* in);
@@ -326,7 +326,7 @@ s32 fn_800F92F4(_EFT* self, u32 flag);
 void fn_800E0A14(void* mhchar, u32 joint, Mtx34* out);
 u32 event_demo_ck(void);
 u32 fn_80192410(struct _ENEMY_WORK* em);
-void fn_80304508(struct _ENEMY_WORK* em, s32 a, s32 b, nw4r::math::VEC3* v, f32 c);
+void eft_em_spawn(struct _ENEMY_WORK* em, s32 a, s32 b, nw4r::math::VEC3* v, f32 c);
 void fn_8028F558(_EFT28_PARAM* param, void* out);
 void fn_800FA3B8(_EFT28_PARAM* param);
 u32 fn_8007BE2C(nw4r::g3d::ScnMdl::CopiedMatAccess* access, u32 arg);
@@ -445,7 +445,7 @@ extern "C" void fn_801173AC(_EFT* self)
 
     copyVec3(&pos, &work->pos);
     mulVecMat(&pos, &mtx);
-    fn_80073F68(&work->chara[0]->pos_0x04, &pos);
+    addVec3To(&work->chara[0]->pos_0x04, &pos);
     work->chara[0]->field_0x28 = work->rot_x;
     work->chara[0]->field_0x2C = work->rot_y;
     work->chara[0]->field_0x30 = work->rot_z;
@@ -902,13 +902,13 @@ extern "C" void fn_80118214(_EFT* self)
         work->chara[0]->getTevKColor(0, GX_KCOLOR3, (GXColor*)&work->phase[0].color_r);
         work->phase[0].color_a = 0;
         mulVecMat(&vB, &mtx);
-        fn_80073F68(&self->pos_0x18, &vB);
+        addVec3To(&self->pos_0x18, &vB);
         work->field_0x74 = em->height_0x18C;
         if (self->type_0x02 == 1 || self->type_0x02 == 8) {
             nw4r::math::VEC3 camPos = get_camera_pos();
             fn_80119818(work->chara[0], 1);
             copyVec3(&vC, &camPos);
-            fn_80050CA0(&cam, &self->pos_0x18, &vC);
+            subVec3(&cam, &self->pos_0x18, &vC);
             copyVec3(&vA, &cam);
             {
                 f32 dist = fn_80050F24((const f32*)&vA);
@@ -941,12 +941,12 @@ extern "C" void fn_80118214(_EFT* self)
             return;
         }
         get_joint_wmat_em((struct _ENEMY_WORK*)em, work->joint, &mtx);
-        fn_8010140C(&mtx, &self->pos_0x18);
+        mtx34_trans_get(&mtx, &self->pos_0x18);
         work->chara[0]->getTevKColor(0, GX_KCOLOR3, (GXColor*)&work->phase[0].color_r);
         work->phase[0].color_a = 0;
         copyVec3(&vB, &work->offset);
         mulVecMat(&vB, &mtx);
-        fn_80073F68(&self->pos_0x18, &vB);
+        addVec3To(&self->pos_0x18, &vB);
         self->field_0x10 = 10;
         break;
     case 7:
@@ -1076,7 +1076,7 @@ extern "C" void fn_8011870C(_EFT* self)
     rotLocalMatZ(self->rot_0x24.z, &mtx);
     copyVec3(&vA, &work->offset);
     mulVecMat(&vA, &mtx);
-    fn_80073F68(&self->pos_0x18, &vA);
+    addVec3To(&self->pos_0x18, &vA);
     mtx.m[0][3] = self->pos_0x18.x;
     mtx.m[1][3] = self->pos_0x18.y;
     mtx.m[2][3] = self->pos_0x18.z;
@@ -1158,7 +1158,7 @@ extern "C" void fn_80118B2C(_EFT* self)
         }
         fn_80050850(&v3, &v3);
         fn_800513F0(&v3, lbl_80796B04);
-        fn_80051378(&v0, &self->pos_0x18, &v3);
+        addVec3(&v0, &self->pos_0x18, &v3);
         copyVec3(&v2, &v0);
         self->field_0x10++;
         if (self->field_0x10 > 5) {
@@ -1264,7 +1264,7 @@ extern "C" void fn_80118FF0(_EFT* self)
         self->field_0x10--;
         if (self->field_0x10 < 0) {
             setVector3(&v1, lbl_80796AC0, lbl_80796B10, lbl_80796B14);
-            fn_80304508((struct _ENEMY_WORK*)em, 0x1e, 0xf, &v1, lbl_80796AC8);
+            eft_em_spawn((struct _ENEMY_WORK*)em, 0x1e, 0xf, &v1, lbl_80796AC8);
             self->field_0x10 = 3;
         }
     }
@@ -1272,8 +1272,8 @@ extern "C" void fn_80118FF0(_EFT* self)
     get_joint_wmat_em((struct _ENEMY_WORK*)em, work->joint, &mtxA);
     copyVec3(&v1, &work->offset);
     mulVecMat(&v1, &mtxA);
-    fn_80101428(&mtxA, &v1);
-    fn_8010140C(&mtxA, &self->pos_0x18);
+    mtx34_trans_add(&mtxA, &v1);
+    mtx34_trans_get(&mtxA, &self->pos_0x18);
     work->rot_a[0] += (u16)(s32)(lbl_80796AF8 + lbl_80796AFC * lbl_805A04E0[self->type_0x02] / lbl_80796B00);
     work->rot_a[1] -= (u16)(s32)(lbl_80796AF8 + lbl_80796AFC * lbl_805A04E0[self->type_0x02] / lbl_80796B00);
 
@@ -1385,7 +1385,7 @@ extern "C" void fn_80119450(_EFT* self)
     rotLocalMatX(self->rot_0x24.x, &mtx);
     rotLocalMatZ(self->rot_0x24.z, &mtx);
     mulVecMat(&v0, &mtx);
-    fn_80051378(&v2, &self->pos_0x18, &v0);
+    addVec3(&v2, &self->pos_0x18, &v0);
     copyVec3(&v1, &v2);
     mtx.m[0][3] = v1.x;
     mtx.m[1][3] = v1.y;

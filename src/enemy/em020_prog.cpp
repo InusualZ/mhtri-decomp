@@ -9,7 +9,7 @@
  * 0x8036E570, 0x8036E574 and 0x803733BC - exactly the way `em035_prog_tbl` lists the registered
  * `enemy/em035_prog.cpp`'s, and every body drives the shared `_ENEMY_WORK` record through
  * `em_frame_check`/`em_after_frame_check`/`em_get_mot_no`/`em_act_ck`/`em_area_ck`, the motion
- * arming pair `em_move_mode_set`/`fn_8012F504`/`fn_8012F5C4` and the nw4r math helpers
+ * arming pair `em_move_mode_set`/`em_mot_set_blend`/`fn_8012F5C4` and the nw4r math helpers
  * (`setVector3`, `mulVecMat`, `rotVecY`, `calcVecAng2`/`calcVecAngX`), with the joint/effect
  * queries `get_joint_wmat_em`/`get_em_scale`/`get_em_chg_scale`.
  *
@@ -239,7 +239,7 @@ void em020_arm_mot3_wait50(_ENEMY_WORK* self)
     case 0:
         self->state += 1;
         em_move_mode_set(self, 2);
-        fn_8012F504(self, 0x32, 0x28, 0, 3);
+        em_mot_set_blend(self, 0x32, 0x28, 0, 3);
         break;
     case 1:
         if (em_mot_end_ck(self) == 1)
@@ -251,7 +251,7 @@ void em020_arm_mot3_wait50(_ENEMY_WORK* self)
 }
 
 /* The three-step wake-up of the pose whose closing approach depends on the argument: step 0 arms a
- * 0x37/0x14-frame motion and re-aims the model (`fn_80134004`), storing one of the two approach
+ * 0x37/0x14-frame motion and re-aims the model (`em_approach_start`), storing one of the two approach
  * floats at +0x378 for mode 1 and mode 2; step 1 waits for the 0x80-frame window and the motion
  * helper to agree, then arms the closing 0x2f/0x28 pose; step 2 waits and releases the record. */
 void em020_arm_approach_mot1_wait55(_ENEMY_WORK* self, u8 mode)
@@ -260,26 +260,26 @@ void em020_arm_approach_mot1_wait55(_ENEMY_WORK* self, u8 mode)
     case 0:
         self->state += 1;
         em_move_mode_set(self, 2);
-        fn_8012F504(self, 0x37, 0x14, 0, 1);
+        em_mot_set_blend(self, 0x37, 0x14, 0, 1);
 
         switch (mode) {
         default:
-            fn_80134004(self, 0x12, lbl_8079B83C);
+            em_approach_start(self, lbl_8079B83C, 0x12);
             break;
         case 1:
-            fn_80134004(self, 0x12, lbl_8079B83C);
+            em_approach_start(self, lbl_8079B83C, 0x12);
             self->value_0x378 = lbl_8079B858;
             break;
         case 2:
-            fn_80134004(self, 0x12, lbl_8079B83C);
+            em_approach_start(self, lbl_8079B83C, 0x12);
             self->value_0x378 = lbl_8079B85C;
             break;
         }
         break;
     case 1:
-        if (fn_80134114(self, 0, 0x80) == 1 && fn_8012F948(self) == 0) {
+        if (em_approach_step(self, 0, 0x80) == 1 && fn_8012F948(self) == 0) {
             self->state += 1;
-            fn_8012F504(self, 0x2f, 0x28, 0, 1);
+            em_mot_set_blend(self, 0x2f, 0x28, 0, 1);
         }
         break;
     case 2:
@@ -298,7 +298,7 @@ void em020_arm_mot1_wait58(_ENEMY_WORK* self)
     case 0:
         self->state += 1;
         em_move_mode_set(self, 2);
-        fn_8012F504(self, 0x3a, 0xa, 0, 1);
+        em_mot_set_blend(self, 0x3a, 0xa, 0, 1);
         break;
     case 1:
         if (em_mot_end_ck(self) == 1)
@@ -310,7 +310,7 @@ void em020_arm_mot1_wait58(_ENEMY_WORK* self)
 }
 
 /* The 0x4d/0x14-frame pose's wake-up: step 1 keeps the record facing the target
- * (`em_frame_check(self, 1, 0.0.., 0.0)` re-aims it with `fn_80133C50`) and then waits for the
+ * (`em_frame_check(self, 1, 0.0.., 0.0)` re-aims it with `em_turn_to_target`) and then waits for the
  * motion to report done. */
 void em020_arm_mot1_facing_wait77(_ENEMY_WORK* self)
 {
@@ -318,12 +318,12 @@ void em020_arm_mot1_facing_wait77(_ENEMY_WORK* self)
     case 0:
         self->state += 1;
         em_move_mode_set(self, 2);
-        fn_8012F504(self, 0x4d, 0x14, 0, 1);
-        fn_80129668(self, 0, 0xa);
+        em_mot_set_blend(self, 0x4d, 0x14, 0, 1);
+        em_hit_window_set_default(self, 0, 0xa);
         break;
     case 1:
         if (em_frame_check(self, 1, lbl_8079B874, lbl_8079B83C) == 0) {
-            fn_80133C50(self, 0x40);
+            em_turn_to_target(self, 0x40);
         }
         if (em_mot_end_ck(self) == 1)
             fn_80128030(self);
@@ -334,7 +334,7 @@ void em020_arm_mot1_facing_wait77(_ENEMY_WORK* self)
 }
 
 /* The 0x4f/0x0a-frame pose's wake-up: step 1 re-aims the record with `fn_80136D4C` and closes the
- * pose with `fn_80133C50` as soon as either of the two frame windows reports done, then re-arms the
+ * pose with `em_turn_to_target` as soon as either of the two frame windows reports done, then re-arms the
  * 0x10000-step turn. */
 void em020_arm_mot1_turn_wait79(_ENEMY_WORK* self)
 {
@@ -342,18 +342,18 @@ void em020_arm_mot1_turn_wait79(_ENEMY_WORK* self)
     case 0:
         self->state += 1;
         em_move_mode_set(self, 2);
-        fn_8012F504(self, 0x4f, 0xa, 0, 1);
-        fn_80129668(self, 0, 1);
+        em_mot_set_blend(self, 0x4f, 0xa, 0, 1);
+        em_hit_window_set_default(self, 0, 1);
         break;
     case 1: {
         if (em_frame_check(self, 2, lbl_8079B8EC, lbl_8079B83C) == 1 ||
             em_frame_check(self, 3, lbl_8079B8F0, lbl_8079B8C4) == 1) {
             fn_80136D4C(self, lbl_8079B854);
-            fn_80133C50(self, 0x50);
+            em_turn_to_target(self, 0x50);
         }
         f32 lo = lbl_8079B8EC;
         f32 hi = lbl_8079B8F0;
-        fn_80133E3C(self, 0x10000, lo, hi);
+        em_turn_in_window(self, lo, hi, 0x10000);
         if (em_mot_end_ck(self) == 1)
             fn_80128030(self);
         break;
@@ -372,13 +372,13 @@ void em020_arm_mot1_effects_wait78(_ENEMY_WORK* self)
         self->state += 1;
         em_move_mode_set(self, 2);
         em_mot_set(self, 0x4e, 0xa, 0);
-        fn_8012933C(self, 0, 0xb, 8);
-        fn_8012933C(self, 1, 0xc, 0x10);
+        em_hit_window_set(self, 0, 0xb, 8);
+        em_hit_window_set(self, 1, 0xc, 0x10);
         break;
     case 1:
         if (em_frame_check(self, 1, lbl_8079B8A4, lbl_8079B83C) == 0) {
             fn_80136D4C(self, lbl_8079B854);
-            fn_80133C50(self, 0x40);
+            em_turn_to_target(self, 0x40);
         }
         if (em_mot_end_ck(self) == 1)
             fn_80128030(self);
@@ -389,7 +389,7 @@ void em020_arm_mot1_effects_wait78(_ENEMY_WORK* self)
 }
 
 /* The two-directional 0x50/0x51-frame pose's wake-up: the argument picks the motion (0x51 when set,
- * 0x50 otherwise) and the sign of the 0x4000-step turn `fn_80133E3C` re-arms every frame. */
+ * 0x50 otherwise) and the sign of the 0x4000-step turn `em_turn_in_window` re-arms every frame. */
 void em020_arm_mot1_side_wait80(_ENEMY_WORK* self, u8 right)
 {
     Vec3 keys;
@@ -400,13 +400,13 @@ void em020_arm_mot1_side_wait80(_ENEMY_WORK* self, u8 right)
     case 0:
         self->state += 1;
         em_move_mode_set(self, 2);
-        fn_8012F504(self, (u16)(0x51 - (right == 0)), 0x14, 0, 1);
-        fn_80129668(self, 0, 0x11);
+        em_mot_set_blend(self, (u16)(0x51 - (right == 0)), 0x14, 0, 1);
+        em_hit_window_set_default(self, 0, 0x11);
         break;
     case 1: {
         f32 lo = lbl_8079B87C;
         f32 hi = lbl_8079B8C4;
-        fn_80133E3C(self, right == 0 ? 0x4000 : -0x4000, lo, hi);
+        em_turn_in_window(self, lo, hi, right == 0 ? 0x4000 : -0x4000);
         if (em_mot_end_ck(self) == 1)
             fn_80128030(self);
         break;

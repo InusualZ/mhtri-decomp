@@ -25,6 +25,8 @@
 
 #include "types.h"
 
+struct _ENEMY_WORK;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -34,6 +36,16 @@ void eft052_page_count_add(u16 id, s16 delta);
 
 /* The hold block's cursor row table value and its +0x0A word, through optional out pointers. */
 void eft052_hold_row_get(u16* out_row, s32* out_value);
+
+/* Steps the enemy part gauge (`gauge` field of the em024 work view) by `delta` while the monster is in
+ * state 2, clamped to 0..500. */
+void eft052_part_gauge_add(struct _ENEMY_WORK* self, s16 delta);
+
+/* Whether the enemy part's damage flag is set; also a slot of the em024 program table. */
+u8 eft052_part_damage_ck(struct _ENEMY_WORK* self, u32 part);
+
+/* Whether the enemy part's damage level is even; also a slot of the em024 program table. */
+s32 eft052_part_level_even_ck(struct _ENEMY_WORK* self, u32 part);
 
 /* Hands the caller's item-hold entry (its +0x19 byte set to `flag`) to the hold block and re-seeds
  * the block from it. */

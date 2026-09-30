@@ -124,7 +124,7 @@ struct _EFT_WORK {
  * ------------------------------------------------------------------------------------------------- */
 
       /* a `blr` stub in the DOL: the VEC3 ctor */
-extern void* fn_80073F68(VEC3* dst, const VEC3* src);
+extern void* addVec3To(VEC3* dst, const VEC3* src);
 extern void fn_800F93D8(void* self, void* effects, u32 mode, s32 count, u32 arg);
 extern void fn_800F886C(void* self);
 extern void fn_800FD718(struct _EFT* self);
@@ -177,7 +177,7 @@ void fn_800FD718(struct _EFT* self)
         setVector3__FPQ34nw4r4math4VEC3fff(&v, lbl_80796688, lbl_8079668C, lbl_80796688);
         rotVecX__FPQ34nw4r4math4VEC3Ul(&v, source->rot_x_0x24);
         rotVecZ__FPQ34nw4r4math4VEC3Ul(&v, source->rot_z_0x2C);
-        fn_80073F68(&self->pos_0x18, &v);
+        addVec3To(&self->pos_0x18, &v);
         SetRootMtxTrans__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC3(work->effect, &self->pos_0x18);
     }
 

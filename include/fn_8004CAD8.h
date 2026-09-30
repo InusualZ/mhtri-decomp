@@ -132,30 +132,30 @@ void draw_shape_tex_slots_clear(u32 first, u32 last);
  * one the target's call sites require (added when `src/g3d/g3d_gpu.cpp` registered as the consumer). */
 void* fn_80050508(void* pOut);
 /* 0x80050EF4 - the two-pointer distance helper: r3 and r4 are the two `VEC3*` (its body moves r3
- * into r5 and calls `fn_80050CA0(&out, r4, r3)`, then `fn_80050F24(&out)`), so it takes two
+ * into r5 and calls `subVec3(&out, r4, r3)`, then `fn_80050F24(&out)`), so it takes two
  * pointers and returns the float.  Moved here from `enemy/fn_801550FC.cpp` on landing (rule 2):
  * this unit owns the address, and the three-argument form the consumer used was wrong
  * (`enemy/fn_8015941C` sets only r3/r4). */
 f32 fn_80050EF4(void* a, void* b);
 /* 0x80050CA0 / 0x80050F80 - the vector difference and the distance between two positions, both owned here.
- * Signatures are the CALLEES' OWN BODIES, not the callers' guesses: `fn_80050CA0(out, a, b)` is
- * `VEC3_ctor(out); PSVECSubtract(out, a, b)`, and `fn_80050F80(a, b)` calls `fn_80050CA0(&local, b, a)`
+ * Signatures are the CALLEES' OWN BODIES, not the callers' guesses: `subVec3(out, a, b)` is
+ * `VEC3_ctor(out); PSVECSubtract(out, a, b)`, and `calcVecDistXZ(a, b)` calls `subVec3(&local, b, a)`
  * then the length helper `fn_80050F24(&local)`, i.e. `|a - b|`.  Ten consumer files used to declare these
  * locally (four spellings, one of them a `MTX34*` misnomer); they now include this header, so the home is
  * here.  All parameters are pointers - a declaration cannot change a call site's codegen. */
-void fn_80050CA0(void* out, const void* a, const void* b);
-f32 fn_80050F80(const void* a, const void* b);
+void subVec3(void* out, const void* a, const void* b);
+f32 calcVecDistXZ(const void* a, const void* b);
 /* 0x80050EAC - the SQUARED distance between two positions (the callers compare it against a squared
  * radius constant, e.g. `enemy/fn_801B0010.cpp` against `lbl_80798B3C` = 2250000.0f = 1500^2). */
 f32 fn_80050EAC(const void* a, const void* b);
 /* 0x80050F48 - the squared xz distance between two vectors, added with the same consumer.
  * C++ linkage: the map name is the mangling (`calcDistanceSqXZ__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3`). */
 f32 calcDistanceSqXZ(VEC3* a, VEC3* b);
-/* 0x80051378 - the three-pointer vector helper this range owns (unmangled `fn_80051378`, so C
+/* 0x80051378 - the three-pointer vector helper this range owns (unmangled `addVec3`, so C
  * linkage).  Its body saves r3/r4/r5, zeroes the first through `VEC3_ctor`, then tail-forwards all
  * three to `fn_800513CC`, i.e. `void (VEC3*, VEC3*, VEC3*)`; added when `ai/fn_802CC794.cpp`
  * registered as the first consumer (rule 2) - the owner header did not declare it yet. */
-void fn_80051378(VEC3* out, VEC3* a, VEC3* b);
+void addVec3(VEC3* out, VEC3* a, VEC3* b);
 /* 0x80050850 - the in-place normaliser this range owns (unmangled `fn_80050850`, so C
  * linkage).  Its body saves r3/r4 in r29/r30, hands r3 to `PSVECNormalize`'s `src` (r3) and
  * r4 to its `dst` (the target body reads 0(r3)/8(r3) and stores 0(r4)/8(r4)), then restores
@@ -255,7 +255,7 @@ void cpSetRotMatrixZXY(_CP_VECTOR* rot, MTX34* mtx);
 /* 0x80050F80 - the squared distance between two 3-float vectors (`fn_8004CAD8.cpp`'s range).  The
  * same signature `ai/fn_802D0F34.h` carries, so a TU including both sees one declaration.  Added
  * with `ef/eft053.cpp`. */
-f32 fn_80050F80(const void* a, const void* b);
+f32 calcVecDistXZ(const void* a, const void* b);
 
 /* 0x80050E70 - copy the engine's `Vec` into an nw4r `VEC3` (map mangling
  * `vec_to_mh_vec3__FPQ34nw4r4math4VEC3P3Vec`).  Added with `ef/eft053.cpp`, whose state machines

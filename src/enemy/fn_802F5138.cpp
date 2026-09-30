@@ -9,7 +9,7 @@
  * the sub-state dispatchers (`fn_802F5D24`, `fn_802F92E8`, `fn_802F9678`, `fn_802F9BF0`,
  * `fn_802FA964`) on `state_sub` (+0x1E6); the bodies drive the enemy motion API
  * (`em_move_mode_set`, `em_mot_set`, `em_mot_set_ck`, `em_mot_end_ck`, `fn_80128030`), place the effects
- * (`res_eft_UV_model_create_name`, `fn_801251D0`/`fn_801251D8` with the record tables
+ * (`res_eft_UV_model_create_name`, `em_se_tbl_play`/`em_se_tbl_play_alt` with the record tables
  * `lbl_805D6F70`..`lbl_805D7300`) and step the work record's own state bytes.  The band's `.data`
  * holds those record tables and the compiler-emitted switch tables (`jumptable_805D6E50`,
  * `jumptable_805D6E70`, `jumptable_805D89EC`, `jumptable_805D8A48`, `jumptable_805D8AA4`,
@@ -96,7 +96,6 @@ extern u8 lbl_805D7150[]; extern u8 lbl_805D7190[];
 extern u8 lbl_805D71E8[]; extern u8 lbl_805D7240[];
 extern u8 lbl_805D7288[]; extern u8 lbl_805D72D0[];
 extern u8 lbl_805D7300[];
-extern u8 lbl_80570740[]; extern u8 lbl_80570780[];
 extern u8 lbl_805D7328[]; extern u8 lbl_805D75C0[]; extern u8 lbl_805D7AC0[];
 extern u8 lbl_805D7B80[]; extern u8 lbl_805D7DA0[];
 
@@ -268,62 +267,62 @@ extern "C" void fn_802F87B8(_ENEMY_WORK* work) {
     switch (work->state_sub) {
     case 0xA:
         if ((u32)(work->field_0x00A - 3) <= 1) {
-            fn_801251D0(work, lbl_805D6FC0, 2, 0xA);
+            em_se_tbl_play(work, lbl_805D6FC0, 2, 0xA);
         } else if (work->field_0x00A == 1) {
-            fn_801251D0(work, lbl_805D6F98, 2, 0xA);
+            em_se_tbl_play(work, lbl_805D6F98, 2, 0xA);
         } else {
-            fn_801251D0(work, lbl_805D6F70, 2, 0xA);
+            em_se_tbl_play(work, lbl_805D6F70, 2, 0xA);
         }
         break;
     case 0x89:
         if (work->field_0x00A == 1) {
-            fn_801251D0(work, lbl_805D7040, 2, 0x89);
+            em_se_tbl_play(work, lbl_805D7040, 2, 0x89);
         } else {
-            fn_801251D0(work, lbl_805D6FE8, 2, 0x89);
+            em_se_tbl_play(work, lbl_805D6FE8, 2, 0x89);
         }
         break;
     case 0x8A:
-        fn_801251D0(work, lbl_805D70A0, 2, 0x8A);
+        em_se_tbl_play(work, lbl_805D70A0, 2, 0x8A);
         break;
     case 0xA1:
         if (work->field_0x00A == 1) {
-            fn_801251D0(work, lbl_805D7078, 2, 0xA1);
+            em_se_tbl_play(work, lbl_805D7078, 2, 0xA1);
         } else {
-            fn_801251D0(work, lbl_805D7018, 2, 0xA1);
+            em_se_tbl_play(work, lbl_805D7018, 2, 0xA1);
         }
         break;
     case 0xA2:
         if (work->field_0x00A == 1) {
-            fn_801251D0(work, lbl_805D7078, 2, 0xA2);
+            em_se_tbl_play(work, lbl_805D7078, 2, 0xA2);
         } else {
-            fn_801251D0(work, lbl_805D7018, 2, 0xA2);
+            em_se_tbl_play(work, lbl_805D7018, 2, 0xA2);
         }
         break;
     case 0x8B:
         if (work->field_0x00A == 1) {
-            fn_801251D0(work, lbl_805D70F0, 2, 0x8B);
+            em_se_tbl_play(work, lbl_805D70F0, 2, 0x8B);
         } else {
-            fn_801251D0(work, lbl_805D70C8, 2, 0x8B);
+            em_se_tbl_play(work, lbl_805D70C8, 2, 0x8B);
         }
         break;
     case 0x8C:
-        fn_801251D0(work, lbl_805D7150, 2, 0x8C);
+        em_se_tbl_play(work, lbl_805D7150, 2, 0x8C);
         break;
     case 0xAA:
         if (work->field_0x00A == 1) {
-            fn_801251D0(work, lbl_805D7140, 2, 0xAA);
+            em_se_tbl_play(work, lbl_805D7140, 2, 0xAA);
         } else {
-            fn_801251D0(work, lbl_805D7118, 2, 0xAA);
+            em_se_tbl_play(work, lbl_805D7118, 2, 0xAA);
         }
         break;
     case 0xB1:
-        fn_801251D0(work, lbl_805D6F70, 2, 0xB1);
+        em_se_tbl_play(work, lbl_805D6F70, 2, 0xB1);
         break;
     case 0xCB:
         if (work->field_0x00A == 1) {
-            fn_801251D0(work, lbl_805D6F98, 2, 0xCB);
+            em_se_tbl_play(work, lbl_805D6F98, 2, 0xCB);
         } else {
-            fn_801251D0(work, lbl_805D6F70, 2, 0xCB);
+            em_se_tbl_play(work, lbl_805D6F70, 2, 0xCB);
         }
         break;
     default:
@@ -337,35 +336,35 @@ extern "C" void fn_802F89F8(_ENEMY_WORK* work) {
     switch (work->state_sub) {
     case 0x0:
         if (work->field_0x00A == 1) {
-            fn_801251D8(work, lbl_805D71E8, 2, 0);
+            em_se_tbl_play_alt(work, lbl_805D71E8, 2, 0);
         } else {
-            fn_801251D8(work, lbl_805D7190, 2, 0);
+            em_se_tbl_play_alt(work, lbl_805D7190, 2, 0);
         }
         break;
     case 0xA:
         if (work->field_0x00A == 1) {
-            fn_801251D8(work, lbl_805D71E8, 2, 0xA);
+            em_se_tbl_play_alt(work, lbl_805D71E8, 2, 0xA);
         } else {
-            fn_801251D8(work, lbl_805D7190, 2, 0xA);
+            em_se_tbl_play_alt(work, lbl_805D7190, 2, 0xA);
         }
         break;
     case 0x33:
         if ((u32)(work->field_0x00A - 3) <= 1) {
-            fn_801251D8(work, lbl_805D72D0, 2, 0x33);
+            em_se_tbl_play_alt(work, lbl_805D72D0, 2, 0x33);
         } else if (work->field_0x00A == 1) {
-            fn_801251D8(work, lbl_805D7288, 2, 0x33);
+            em_se_tbl_play_alt(work, lbl_805D7288, 2, 0x33);
         } else {
-            fn_801251D8(work, lbl_805D7240, 2, 0x33);
+            em_se_tbl_play_alt(work, lbl_805D7240, 2, 0x33);
         }
         break;
     case 0x38:
-        fn_801251D8(work, lbl_805D7300, 2, 0x38);
+        em_se_tbl_play_alt(work, lbl_805D7300, 2, 0x38);
         break;
     default:
         if (work->field_0x00A == 1) {
-            fn_801251D8(work, lbl_805D71E8, 2, 0xA);
+            em_se_tbl_play_alt(work, lbl_805D71E8, 2, 0xA);
         } else {
-            fn_801251D8(work, lbl_805D7190, 2, 0xA);
+            em_se_tbl_play_alt(work, lbl_805D7190, 2, 0xA);
         }
         break;
     }
@@ -431,15 +430,15 @@ extern "C" void fn_802F930C(_ENEMY_WORK* work) {
         work->state = work->state + 1;
         em_move_mode_set(work, 2);
         em_mot_set(work, 2, 0, 0x46);
-        fn_80146058(work, lbl_8079AB74, lbl_8079AB78, lbl_8079AB7C);
-        fn_8014610C(work, lbl_8079AB80, lbl_8079AB84, lbl_8079AB88);
-        fn_801462A4(work, fn_80145FE4(), lbl_805D7328, lbl_805D75C0, 5, 7);
+        em_demo_pos_set(work, lbl_8079AB74, lbl_8079AB78, lbl_8079AB7C);
+        em_demo_rot_set(work, lbl_8079AB80, lbl_8079AB84, lbl_8079AB88);
+        em_demo_key_apply(work, em_demo_frame_get(), lbl_805D7328, lbl_805D75C0, 5, 7);
         break;
     case 1:
-        if (fn_80146008(0x26C) == 0) {
-            fn_801462A4(work, fn_80145FE4(), lbl_805D7328, lbl_805D75C0, 5, 7);
+        if (em_demo_time_ck(0x26C) == 0) {
+            em_demo_key_apply(work, em_demo_frame_get(), lbl_805D7328, lbl_805D75C0, 5, 7);
         } else {
-            fn_801462A4(work, fn_80145FE4(), lbl_805D7328, lbl_805D7AC0, 5, 5);
+            em_demo_key_apply(work, em_demo_frame_get(), lbl_805D7328, lbl_805D7AC0, 5, 5);
         }
         break;
     }
@@ -453,8 +452,8 @@ extern "C" void fn_802F943C(_ENEMY_WORK* work) {
         work->state = work->state + 1;
         em_move_mode_set(work, 2);
         em_mot_set(work, 1, 0, 0);
-        fn_80146058(work, lbl_8079AB8C, lbl_8079AB78, lbl_8079AB90);
-        fn_8014610C(work, lbl_8079AAB0, lbl_8079AB94, lbl_8079AAB0);
+        em_demo_pos_set(work, lbl_8079AB8C, lbl_8079AB78, lbl_8079AB90);
+        em_demo_rot_set(work, lbl_8079AAB0, lbl_8079AB94, lbl_8079AAB0);
         break;
     case 1:
         if (em_mot_end_ck(work) == 1) {
@@ -472,11 +471,11 @@ extern "C" void fn_802F94EC(_ENEMY_WORK* work) {
         work->state = work->state + 1;
         em_move_mode_set(work, 2);
         em_mot_set(work, 2, 0, 0x14);
-        fn_80146058(work, lbl_8079AB98, lbl_8079AB9C, lbl_8079ABA0);
-        fn_801462A4(work, fn_80145FE4(), lbl_805D7B80, lbl_805D7DA0, 5, 7);
+        em_demo_pos_set(work, lbl_8079AB98, lbl_8079AB9C, lbl_8079ABA0);
+        em_demo_key_apply(work, em_demo_frame_get(), lbl_805D7B80, lbl_805D7DA0, 5, 7);
         break;
     case 1:
-        fn_801462A4(work, fn_80145FE4(), lbl_805D7B80, lbl_805D7DA0, 5, 7);
+        em_demo_key_apply(work, em_demo_frame_get(), lbl_805D7B80, lbl_805D7DA0, 5, 7);
         break;
     }
 }
@@ -489,8 +488,8 @@ extern "C" void fn_802F95C8(_ENEMY_WORK* work) {
         work->state = work->state + 1;
         em_move_mode_set(work, 2);
         em_mot_set(work, 1, 0, 0);
-        fn_80146058(work, lbl_8079ABA4, lbl_8079ABA8, lbl_8079ABAC);
-        fn_8014610C(work, lbl_8079AAB0, lbl_8079AAB0, lbl_8079ABB0);
+        em_demo_pos_set(work, lbl_8079ABA4, lbl_8079ABA8, lbl_8079ABAC);
+        em_demo_rot_set(work, lbl_8079AAB0, lbl_8079AAB0, lbl_8079ABB0);
         break;
     case 1:
         if (em_mot_end_ck(work) == 1) {
@@ -656,10 +655,10 @@ extern "C" void fn_802F621C(_ENEMY_WORK* work) {
     case 0:
         work->state = work->state + 1;
         em_move_mode_set(work, 2);
-        fn_80134964(work, lbl_80570740, 0, 1, 0);
+        em_turn_seq_start(work, lbl_80570740, 0, 1, 0);
         break;
     case 1:
-        if (fn_80134B0C(work, lbl_80570740) == 1) {
+        if (em_turn_seq_step(work, lbl_80570740) == 1) {
             fn_80128030(work);
         }
         break;
@@ -672,10 +671,10 @@ extern "C" void fn_802F62A8(_ENEMY_WORK* work) {
     case 0:
         work->state = work->state + 1;
         em_move_mode_set(work, 2);
-        fn_80134964(work, lbl_80570780, 0, 1, 0);
+        em_turn_seq_start(work, lbl_80570780, 0, 1, 0);
         break;
     case 1:
-        if (fn_80134B0C(work, lbl_80570780) == 1) {
+        if (em_turn_seq_step(work, lbl_80570780) == 1) {
             fn_80128030(work);
         }
         break;

@@ -150,19 +150,19 @@ extern "C" u8 fn_8035E034(_ENEMY_WORK* self, u8 mode)
         return self->field_0x33E;
     case 2:
         fn_8035EE40(self, 0, &a);
-        fn_80050CA0(&c, &a, &self->pos);
+        subVec3(&c, &a, &self->pos);
         copyVec3(&b, &c);
         return fn_80050F24((const f32*)&b) <= lbl_8079B704;
     case 3:
         fn_8035EE40(self, 1, &a);
-        fn_80050CA0(&c, &a, &self->pos);
+        subVec3(&c, &a, &self->pos);
         copyVec3(&b, &c);
         return fn_80050F24((const f32*)&b) <= lbl_8079B708;
     case 4:
         return self->field_0x33F;
     case 5:
         fn_8035EE40(self, 2, &a);
-        fn_80050CA0(&c, &a, &self->pos);
+        subVec3(&c, &a, &self->pos);
         copyVec3(&b, &c);
         return fn_80050F24((const f32*)&b) <= lbl_8079B70C;
     case 6:
@@ -299,11 +299,11 @@ extern "C" u8 fn_8035E580(_ENEMY_WORK* self, u8 a)
             if (type == 5 || type == 1 || type == 0xF) {
                 VEC3* p = fn_803BDFF4(id, self->act_id);
                 if (p != 0) {
-                    u16 ang = fn_80127E78(self);
+                    u16 ang = em_hit_mask_get(self);
                     int ok = 1;
                     if (findInterSection(&self->pos, p, &v1, 1, 0xFFFF, self->act_id, ang, 0) > 0) {
                         VEC3 v3;
-                        fn_80050CA0(&v3, &v1, p);
+                        subVec3(&v3, &v1, p);
                         copyVec3(&v2, &v3);
                         if (fn_80050F24((const f32*)&v2) > em_roster_record_get(id)->field_0x1F0) {
                             ok = 0;
@@ -480,10 +480,10 @@ extern "C" void fn_8035EB80(_ENEMY_WORK* self)
     VEC3_ctor(&v2);
     if (fn_8035E984(self->field_0x33B, self->act_id) == 1) {
         VEC3* p = fn_803BDFF4(self->field_0x33B, self->act_id);
-        u16 ang = fn_80127E78(self);
+        u16 ang = em_hit_mask_get(self);
         int keep = 1;
         if (findInterSection(&self->pos, p, &v1, 1, 0xFFFF, self->act_id, ang, 0) > 0) {
-            fn_80050CA0(&v3, &v1, p);
+            subVec3(&v3, &v1, p);
             copyVec3(&v2, &v3);
             if (fn_80050F24((const f32*)&v2) > em_roster_record_get(self->field_0x33B)->field_0x1F0) {
                 keep = 0;
@@ -625,8 +625,8 @@ extern "C" void fn_8035F060(_ENEMY_WORK* self, u8 a)
     switch (a) {
     case 2:
         if (self->field_0x00A == 2) {
-            fn_80130248(self);
-            fn_801305C4(self);
+            em_fall_height_get(self);
+            em_fall_start(self);
             fn_80128A8C(self, 3, 0);
         } else {
             fn_80128A8C(self, 1, 0);

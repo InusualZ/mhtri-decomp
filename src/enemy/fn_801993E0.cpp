@@ -177,7 +177,7 @@ void fn_801993E0(struct _ENEMY_WORK* self) {
     case 0:
         self->state++;
         em_move_mode_set(self, 2);
-        fn_8012F504(self, 49, 20, 0, 1);
+        em_mot_set_blend(self, 49, 20, 0, 1);
         break;
     case 1:
         if (em_mot_end_ck(self) == 1) {
@@ -194,7 +194,7 @@ void fn_80199468(struct _ENEMY_WORK* self) {
     case 0:
         self->state++;
         em_move_mode_set(self, 2);
-        fn_8012F504(self, 46, 6, 0, 1);
+        em_mot_set_blend(self, 46, 6, 0, 1);
         fn_80130CDC(self, 1000);
         break;
     case 1:
@@ -206,7 +206,7 @@ void fn_80199468(struct _ENEMY_WORK* self) {
 }
 
 /* 0x80199A2C - the motion step of the action `fn_80199ADC` dispatches case 7 to: state 0 arms mode
- * 31 with the band's `fn_80146058`/`fn_8014610C` pair and zeroes the stored height, state 1 waits for
+ * 31 with the band's `em_demo_pos_set`/`em_demo_rot_set` pair and zeroes the stored height, state 1 waits for
  * `em_mot_end_ck` and then runs `fn_80128030`. */
 void fn_80199A2C(struct _ENEMY_WORK* self) {
     switch (self->state) {
@@ -214,8 +214,8 @@ void fn_80199A2C(struct _ENEMY_WORK* self) {
         self->state++;
         em_move_mode_set(self, 2);
         em_mot_set(self, 31, 0, 0);
-        fn_80146058(self, lbl_807983F0, lbl_807983F4, lbl_807983F8);
-        fn_8014610C(self, lbl_80798238, lbl_807983B0, lbl_80798238);
+        em_demo_pos_set(self, lbl_807983F0, lbl_807983F4, lbl_807983F8);
+        em_demo_rot_set(self, lbl_80798238, lbl_807983B0, lbl_80798238);
         fn_801303EC(self, lbl_80798238);
         break;
     case 1:
@@ -258,7 +258,7 @@ void fn_80199ADC(struct _ENEMY_WORK* self) {
 }
 
 /* 0x80199B24 - the per-action `action` (0x1E5) dispatcher of the run above, plus the common tail
- * every action shares: the +0x1E2 gate that runs the pair `em_busy_set`/`fn_80131E74`, then this
+ * every action shares: the +0x1E2 gate that runs the pair `em_busy_set`/`em_busy_timer_reset`, then this
  * unit's own `fn_8019E398`. */
 void fn_80199B24(struct _ENEMY_WORK* self) {
     switch (self->action) {
@@ -295,15 +295,15 @@ void fn_80199B24(struct _ENEMY_WORK* self) {
     }
     if (self->field_0x1E2 == 1) {
         em_busy_set(self);
-        fn_80131E74(self);
+        em_busy_timer_reset(self);
     }
     fn_8019E398(self);
 }
 
 /* 0x8019DB9C - the "action 2 still running" gate: true only in mode 4 of the enemy-control state
- * machine while `fn_8012EC60` reports not-yet-armed. */
+ * machine while `em_alt_mode_ck` reports not-yet-armed. */
 u32 fn_8019DB9C(struct _ENEMY_WORK* self) {
-    if (self->field_0x1E2 == 4 && fn_8012EC60(self) == 0) {
+    if (self->field_0x1E2 == 4 && em_alt_mode_ck(self) == 0) {
         return 1;
     }
     return 0;

@@ -17,7 +17,7 @@
  *
  * Load-bearing source shapes (each measured, not stylistic):
  *   - `#pragma peephole off` for `fn_80101FA4`, `fn_801025FC`, `fn_801027D0`, the whole `eft007` block
- *     and `fn_801039B0`/`fn_80103B60`: retail keeps the unfused `subi`+`cmpwi`, `clrlwi`+`cmpwi`,
+ *     and `eft007_part_spawn`/`fn_80103B60`: retail keeps the unfused `subi`+`cmpwi`, `clrlwi`+`cmpwi`,
  *     `extsb`+`cmpwi` and `rlwinm`+`cmpwi` forms our `-O3` peephole fuses into their record forms
  *     (row 39).  The whole target object has zero fused record forms.
  *   - `#pragma fp_contract off` for `fn_80101FA4`: retail keeps `fmuls` + `fsubs` where the default
@@ -184,14 +184,14 @@ struct EmEffectWork {
 /* --- callees ------------------------------------------------------------------------------------ */
 
 extern "C" f32 fn_80050EDC(const nw4r::math::VEC3* work);
-extern "C" void fn_80050CA0(nw4r::math::VEC3* out, const nw4r::math::VEC3* a, const nw4r::math::VEC3* b);
+extern "C" void subVec3(nw4r::math::VEC3* out, const nw4r::math::VEC3* a, const nw4r::math::VEC3* b);
 extern "C" f32 fn_80050F24(const nw4r::math::VEC3* in);
 extern "C" f32 fn_80052214(const nw4r::math::VEC3* a, const nw4r::math::VEC3* b);
 extern "C" void fn_80050850(nw4r::math::VEC3* v, const nw4r::math::VEC3* in);
 extern "C" void fn_80051EE0(nw4r::math::VEC3* out, const nw4r::math::VEC3* in, f32 scale);
-extern "C" void fn_80051378(nw4r::math::VEC3* out, const nw4r::math::VEC3* a, const nw4r::math::VEC3* b);
+extern "C" void addVec3(nw4r::math::VEC3* out, const nw4r::math::VEC3* a, const nw4r::math::VEC3* b);
 extern "C" void fn_800513F0(nw4r::math::VEC3* v, f32 angle);
-extern "C" void fn_80073F68(nw4r::math::VEC3* out, const nw4r::math::VEC3* in);
+extern "C" void addVec3To(nw4r::math::VEC3* out, const nw4r::math::VEC3* in);
 extern "C" void fn_80075258(s32* model, nw4r::math::VEC3* out, const nw4r::math::VEC3* pos);
 extern "C" void fn_800FA3E8(EmEffectSegment* seg); /* seg = ((0,0,0), (0,0,0)) */
 extern "C" void fn_800FA420(nw4r::math::VEC3* out); /* out = (0, 0, 0) */
@@ -318,7 +318,7 @@ extern "C" void fn_80101FA4(EmEffectWork* work) {
     get_camera_direction__Fv(&vB8);
     copyVec3(&v100, &vB8);
     get_camera_pos__Fv(&vA0);
-    fn_80050CA0(&vAC, &unit->world_pos, &vA0);
+    subVec3(&vAC, &unit->world_pos, &vA0);
     copyVec3(&vF4, &vAC);
     model = fn_80082BCC(pRoot);
     fn_80075258(&model, &v130, &unit->world_pos);
@@ -329,18 +329,18 @@ extern "C" void fn_80101FA4(EmEffectWork* work) {
     copyVec3(&v124, &v94);
     fn_80051EE0(&v88, &vF4, lbl_807966F8);
     copyVec3(&vE8, &v88);
-    fn_80073F68(&v124, &vE8);
+    addVec3To(&v124, &vE8);
     if (!(v130.x <= lbl_807966FC) && !(v130.x >= lbl_80796700) && !(v130.y <= lbl_807966FC)
         && !(v130.y >= lbl_80796704) && !(f29 < lbl_807966F4)) {
         fn_80052214(&vE8, &v100);
         fn_80051EE0(&v64, &v100, lbl_80796708);
         get_camera_pos__Fv(&v70);
-        fn_80051378(&v7C, &v70, &v64);
+        addVec3(&v7C, &v70, &v64);
         copyVec3(&v10C, &v7C);
-        fn_80050CA0(&v58, &v10C, &v124);
+        subVec3(&v58, &v10C, &v124);
         copyVec3(&vE8, &v58);
         fn_800513F0(&vE8, lbl_80796708);
-        fn_80051378(&v4C, &v124, &vE8);
+        addVec3(&v4C, &v124, &vE8);
         copyVec3(&v118, &v4C);
         f31 = (f32)(s32)fn_80050F24(&vE8);
         off_screen = lbl_807966F4;
@@ -368,14 +368,14 @@ extern "C" void fn_80101FA4(EmEffectWork* work) {
                 unit->handles[i]->offset_y = unit->entries[i].offset_y;
                 fn_80051EE0(&v28, &vE8, (f32)(u8)intensity);
                 fn_80051EE0(&v34, &v28, spread);
-                fn_80051378(&v40, &v124, &v34);
+                addVec3(&v40, &v124, &v34);
                 copyVec3(&unit->handles[i]->pos, &v40);
                 if (unit->entries[i].follow != 0) {
                     copyVec3(&unit->handles[i]->pos, &unit->handles[0]->pos);
                 }
                 fn_80051EE0(&v10, &vDC, unit->entries[i].scale);
                 fn_80051EE0(&v1C, &v10, f31 / unit->scale);
-                fn_80073F68(&unit->handles[i]->pos, &v1C);
+                addVec3To(&unit->handles[i]->pos, &v1C);
                 color.r = 0xFF - unit->entries[i].color_r;
                 color.g = 0xFF - unit->entries[i].color_g;
                 color.b = 0xFF - unit->entries[i].color_b;
@@ -658,7 +658,7 @@ struct _EFT007 { /* size: 0x48 */
 extern "C" s32 fn_800F92F4(void* self, u32 arg);
 extern "C" void fn_800F996C(nw4r::ef::Effect* effect, u32 arg);
 extern "C" void fn_800FBB90(nw4r::math::MTX34* mtx, nw4r::math::VEC3* vec);
-extern "C" void fn_8010140C(nw4r::math::MTX34* mtx, nw4r::math::VEC3* vec); /* conflicting arity: reported (rule 2) */
+extern "C" void mtx34_trans_get(nw4r::math::MTX34* mtx, nw4r::math::VEC3* vec); /* conflicting arity: reported (rule 2) */
 extern "C" u8 fn_803311A0(MHchar* model);
 extern "C" u8 fn_80331210(_PLW* self);
 
@@ -893,8 +893,8 @@ extern "C" void fn_80102D48(_EFT007* self)
         copyVec3(&pos, &work->pos_0x14);
         fn_8010383C(self, &mtx);
         mulVecMat(&pos, &mtx);
-        fn_80101428(&mtx, &pos);
-        fn_8010140C(&mtx, &self->pos_0x18);
+        mtx34_trans_add(&mtx, &pos);
+        mtx34_trans_get(&mtx, &self->pos_0x18);
         if (self->rot_flag_0x07 == 1) {
             rotLocalMatY(self->rot_0x24.y, &mtx);
             rotLocalMatX(self->rot_0x24.x, &mtx);
@@ -941,8 +941,8 @@ extern "C" void fn_80102D48(_EFT007* self)
         copyVec3(&pos, &work->pos_0x14);
         fn_8010383C(self, &mtx);
         mulVecMat(&pos, &mtx);
-        fn_80101428(&mtx, &pos);
-        fn_8010140C(&mtx, &self->pos_0x18);
+        mtx34_trans_add(&mtx, &pos);
+        mtx34_trans_get(&mtx, &self->pos_0x18);
         fn_800DD7E0(model, &self->pos_0x18, 0);
         break;
     case 10:
@@ -955,8 +955,8 @@ extern "C" void fn_80102D48(_EFT007* self)
         copyVec3(&pos, &work->pos_0x14);
         fn_8010383C(self, &mtx);
         mulVecMat(&pos, &mtx);
-        fn_80101428(&mtx, &pos);
-        fn_8010140C(&mtx, &self->pos_0x18);
+        mtx34_trans_add(&mtx, &pos);
+        mtx34_trans_get(&mtx, &self->pos_0x18);
         fn_800DD7E0(model, &self->pos_0x18, 0);
         break;
     case 16:
@@ -967,8 +967,8 @@ extern "C" void fn_80102D48(_EFT007* self)
         fn_8010383C(self, &mtx);
         copyVec3(&pos, &work->pos_0x14);
         mulVecMat(&pos, &mtx);
-        fn_80101428(&mtx, &pos);
-        fn_8010140C(&mtx, &self->pos_0x18);
+        mtx34_trans_add(&mtx, &pos);
+        mtx34_trans_get(&mtx, &self->pos_0x18);
         rotLocalMatX(self->rot_0x24.x, &mtx);
         rotLocalMatY(self->rot_0x24.y, &mtx);
         work->effects[0]->SetRootMtx(mtx);
@@ -1067,8 +1067,8 @@ extern "C" void fn_80103130(_EFT007* self)
         copyVec3(&pos, &work->pos_0x14);
         fn_8010383C(self, &mtx);
         mulVecMat(&pos, &mtx);
-        fn_80101428(&mtx, &pos);
-        fn_8010140C(&mtx, &self->pos_0x18);
+        mtx34_trans_add(&mtx, &pos);
+        mtx34_trans_get(&mtx, &self->pos_0x18);
         if (self->rot_flag_0x07 == 1) {
             rotLocalMatY(self->rot_0x24.y, &mtx);
             rotLocalMatX(self->rot_0x24.x, &mtx);
@@ -1148,8 +1148,8 @@ extern "C" void fn_80103518(_EFT007* self)
             copyVec3(&vec, &work->pos_0x14);
             fn_8010383C(self, &mtx);
             mulVecMat(&vec, &mtx);
-            fn_80101428(&mtx, &vec);
-            fn_8010140C(&mtx, &self->pos_0x18);
+            mtx34_trans_add(&mtx, &vec);
+            mtx34_trans_get(&mtx, &self->pos_0x18);
             for (s32 i = 0; i < work->count; i++) {
                 work->effects[i]->SetRootMtx(mtx);
                 fn_800F996C(work->effects[i], 0);
@@ -1262,7 +1262,7 @@ extern "C" void fn_8010383C(_EFT007* self, nw4r::math::MTX34* mtx)
     case 16:
     case 17:
     case 18:
-        fn_8010140C(mtx, &pos);
+        mtx34_trans_get(mtx, &pos);
         cpSetRotMatrix(&model->rot_0x54, mtx);
         fn_800FBB90(mtx, &pos);
         return;
@@ -1278,7 +1278,7 @@ extern "C" void fn_8010383C(_EFT007* self, nw4r::math::MTX34* mtx)
  * and it pre-clears `+0x04..+0x09` and `+0x14..+0x18`).  It is the same record size as
  * `auto/800FCED4`'s `_EFT`, but a different pool id, so its `+0x38` work block is this family's joint
  * record instead of `_EFT_WORK`.  `+0x0C` is the countdown `fn_801041BC` decrements, `+0x18` the joint
- * rotation `fn_8010140C` reads, `+0x24` the joint position copied out of the enemy, `+0x34`/`+0x40`
+ * rotation `mtx34_trans_get` reads, `+0x24` the joint position copied out of the enemy, `+0x34`/`+0x40`
  * the advance/retire hooks `fn_800F886C` calls, and `+0x05` the step `fn_80103CEC` dispatches on.
  * `_EFT_JOINT`'s `+0x0C` matrix and `+0x3C` offset are what `get_joint_wmat_em` / `vec_to_mh_vec3`
  * write, which is what fixes that layout.
@@ -1287,7 +1287,7 @@ extern "C" void fn_8010383C(_EFT007* self, nw4r::math::MTX34* mtx)
  * `#pragma peephole off` around the two setters: retail keeps the unfused `rlwinm` + `cmpwi` form of
  * the `joint_flags & 6` test, which `-O3`'s peephole fuses into `rlwinm.` (playbook 39).  With the
  * peephole off, three load-bearing source shapes remain:
- *   - the two wrappers (`fn_80103960`/`fn_80103968`) take `part` as `u32` while the setter
+ *   - the two wrappers (`eft007_part_set`/`fn_80103968`) take `part` as `u32` while the setter
  *     `fn_80103B60` takes it as `u8`: the `u32 -> u8` narrowing at the call is the `clrlwi r4,r4,24`
  *     retail has before the `b`/`bl`;
  *   - inside the setters `part` is `u8`, so `emitter->type = part` stays a raw `stb` (a wider `part`
@@ -1356,7 +1356,7 @@ struct _EFT_EMITTER {
     /* +0x0C */ s32 timer_0x0C; /* the countdown fn_801041BC decrements */
     /* +0x10 */ s32 unused_0x10; /* zeroed by fn_80103B60, never read by this family */
     /* +0x14 */ u8 unused_0x14[0x18 - 0x14];
-    /* +0x18 */ _CP_VECTOR rot; /* the joint rotation fn_8010140C reads */
+    /* +0x18 */ _CP_VECTOR rot; /* the joint rotation mtx34_trans_get reads */
     /* +0x24 */ _CP_VECTOR pos; /* the joint position, copied out of the enemy */
     /* +0x30 */ _ENEMY_WORK* owner;
     /* +0x34 */ EftEmitterHook advance; /* fn_80103CEC */
@@ -1385,7 +1385,7 @@ extern u8 lbl_8059DE00[];  /* effect count per part */
 extern Vec lbl_8059DE48[]; /* joint offset per part */
 
 /* Builds the emitter for the enemy's part and hands it back. */
-extern "C" void* fn_80103960(_ENEMY_WORK* enemy, u32 part)
+extern "C" void* eft007_part_set(_ENEMY_WORK* enemy, u32 part)
 {
     return fn_80103B60(enemy, part);
 }
@@ -1404,7 +1404,7 @@ extern "C" void fn_80103968(_ENEMY_WORK* enemy, u32 part, nw4r::math::VEC3* offs
 /* Builds the part's emitter for the enemy's own area, positions it from the caller's coordinates and
  * the enemy's joint, and installs the advance/retire hooks. */
 #pragma peephole off
-extern "C" void fn_801039B0(_ENEMY_WORK* enemy, u8 part, s32 pos_x, s32 pos_y)
+extern "C" void eft007_part_spawn(_ENEMY_WORK* enemy, u8 part, s32 pos_x, s32 pos_y)
 {
     if (enemy->area_no == get_now_areano()) {
         _EFT_EMITTER* emitter = (_EFT_EMITTER*)fn_800F8788(0x48);

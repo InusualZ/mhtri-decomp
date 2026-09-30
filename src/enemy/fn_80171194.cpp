@@ -50,7 +50,7 @@
  *     effect queue the header already describes as `_ENEMY_QUEUE_ENTRY`.  The outbox carries the list as a
  *     `shared-file` config_request.
  *   - **Unsplit callees.**  The range calls 10 functions outside it that no shared header declares
- *     (`fn_80170A00`, `fn_80171130`, `fn_80131D84`, `em_busy_set`, `fn_8010562C`, `VEC3_ctor`,
+ *     (`fn_80170A00`, `fn_80171130`, `em_frame_flag_set`, `em_busy_set`, `eft_spawn_type10`, `VEC3_ctor`,
  *     `fn_8011E6EC`, `fn_803B9BA0`, `em_parts_damage_level_get`, `fn_8012EC74`); all but the library ones
  *     are enemy-band and belong in `include/unsplit/enemy.h` (its own docstring says so).  That header is
  *     read-only here, so the declarations sit at the top of this file and the outbox carries them as a

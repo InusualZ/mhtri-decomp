@@ -337,14 +337,14 @@ void fn_800BC070(Vec* v) {
 
 /* --------------------------------------------------------------------------------------------------
  * The indexed four-vertex stripe writers.  They expand a (matrix, two positions) pair into four
- * vertices through `fn_80050CA0`/`fn_80051378` and emit them to the pipe, tagging every other vertex
+ * vertices through `subVec3`/`addVec3` and emit them to the pipe, tagging every other vertex
  * with its index when the draw record asks for it.
  * -------------------------------------------------------------------------------------------------- */
 
 /* GX is an unsplit SDK band (rule 2's named gap): declared here. */
 extern void GXBegin(u8 prim, u8 vtxfmt, u16 nverts);
-extern void fn_80050CA0(Vec* out, void* mtx, Vec* in);
-extern void fn_80051378(Vec* out, void* mtx, Vec* in);
+extern void subVec3(Vec* out, void* mtx, Vec* in);
+extern void addVec3(Vec* out, void* mtx, Vec* in);
 extern void fn_800514FC(Vec* out, void* mtx, Vec* in);
 
 /* The stripe writer (first copy): four vertices from the matrix and two positions. */
@@ -355,22 +355,22 @@ void fn_800BA734(void* unused, void* mtx, Vec* a, Vec* b, u32 flags) {
     Vec v3;
 
     GXBegin(0x80, 0, 4);
-    fn_80050CA0(&v0, mtx, a);
+    subVec3(&v0, mtx, a);
     fn_800BA710(&v0);
     if (fn_800BA6FC(flags) != 0) {
         fn_800BA6EC(0);
     }
-    fn_80050CA0(&v1, mtx, b);
+    subVec3(&v1, mtx, b);
     fn_800BA710(&v1);
     if (fn_800BA6FC(flags) != 0) {
         fn_800BA6EC(1);
     }
-    fn_80051378(&v2, mtx, a);
+    addVec3(&v2, mtx, a);
     fn_800BA710(&v2);
     if (fn_800BA6FC(flags) != 0) {
         fn_800BA6EC(2);
     }
-    fn_80051378(&v3, mtx, b);
+    addVec3(&v3, mtx, b);
     fn_800BA710(&v3);
     if (fn_800BA6FC(flags) != 0) {
         fn_800BA6EC(3);
@@ -386,22 +386,22 @@ void fn_800BC094(void* mtx, Vec* a, Vec* b, u32 flags) {
     Vec v3;
 
     GXBegin(0x80, 0, 4);
-    fn_80050CA0(&v0, mtx, a);
+    subVec3(&v0, mtx, a);
     fn_800BC070(&v0);
     if (fn_800BC05C(flags) != 0) {
         fn_800BC04C(0);
     }
-    fn_80050CA0(&v1, mtx, b);
+    subVec3(&v1, mtx, b);
     fn_800BC070(&v1);
     if (fn_800BC05C(flags) != 0) {
         fn_800BC04C(1);
     }
-    fn_80051378(&v2, mtx, a);
+    addVec3(&v2, mtx, a);
     fn_800BC070(&v2);
     if (fn_800BC05C(flags) != 0) {
         fn_800BC04C(2);
     }
-    fn_80051378(&v3, mtx, b);
+    addVec3(&v3, mtx, b);
     fn_800BC070(&v3);
     if (fn_800BC05C(flags) != 0) {
         fn_800BC04C(3);

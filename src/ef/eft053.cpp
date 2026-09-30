@@ -123,7 +123,7 @@
 #include "unsplit/Pl.h"        /* PlSlotGate lbl_806BB7A0 (the family's timing block) */
 #include "ef/fn_800CDB2C.h"    /* ran_suu (the family's frame randomiser) */
 #include "ef/eft001.h"         /* fn_800FC0D4 (the rotation copy) */
-#include "g3d/g3d_calcworld.h"  /* fn_80073F68 (the vector add) */
+#include "g3d/g3d_calcworld.h"  /* addVec3To (the vector add) */
 
 /* ---------------------------------------------------------------------------------------------------
  * this range's own data (declared, never defined - playbook 29)
@@ -321,7 +321,7 @@ extern "C" void eft053_shell_pos_project(_PLW* plw, VEC3* out)
         scale = lbl_8079B76C;
     }
     rotVecY(out, plw->field_0x058);
-    fn_80073F68(out, &plw->vec_0x03C);
+    addVec3To(out, &plw->vec_0x03C);
     mtx.m[0][3] = out->x;
     mtx.m[1][3] = out->y;
     mtx.m[2][3] = out->z;
@@ -599,7 +599,7 @@ extern "C" s32 eft053_slot_move_step(_EFT* self, s32 index, u8 table_off, s32 ra
             work->counters[index] = start;
             vec_to_mh_vec3(&pos, &lbl_805EDEB0[table_off + work->field_0x35[index]]);
             work->counters[index] =
-                (s32)((f32)work->counters[index] + fn_80050F80(&model->pos_0x04, &pos) / step);
+                (s32)((f32)work->counters[index] + calcVecDistXZ(&model->pos_0x04, &pos) / step);
         }
         break;
     case 2:
@@ -627,7 +627,7 @@ extern "C" s32 eft053_slot_move_step(_EFT* self, s32 index, u8 table_off, s32 ra
             work->counters[index] = start;
             vec_to_mh_vec3(&pos, &lbl_805EDEB0[table_off + work->field_0x35[index]]);
             work->counters[index] =
-                (s32)((f32)work->counters[index] + fn_80050F80(&model->pos_0x04, &pos) / step);
+                (s32)((f32)work->counters[index] + calcVecDistXZ(&model->pos_0x04, &pos) / step);
         }
         break;
     case 5:
@@ -827,9 +827,9 @@ s32 eft053_get_shell_data(_PLW* plw, u8 index, VEC3* a, VEC3* b, VEC3* c)
             fn_80050850(c, c);
             vec_to_mh_vec3(b, &list[i].pos_0x04);
             fn_80051EE0(&tmp_a, c, scale_off);
-            fn_80073F68(b, &tmp_a);
+            addVec3To(b, &tmp_a);
             fn_80051EE0(&tmp_b, c, off_a);
-            fn_80051378(&tmp_c, b, &tmp_b);
+            addVec3(&tmp_c, b, &tmp_b);
             copyVec3(a, &tmp_c);
             fn_800513F0(c, e * lbl_8079B7AC);
             return 1;

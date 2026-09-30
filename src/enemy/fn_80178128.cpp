@@ -7,13 +7,13 @@
  * module is `enemy/`.
  *
  * The three functions are the classic enemy action pattern:
- *   - `fn_80178128` - two-phase action: phase 0 arms the action (`em_move_mode_set`, `fn_80134964`,
- *     `fn_801353F8`) and, for motion ids 0x1F/0x20, aims `v_0x310` at the target (`calcVecAng2` ->
- *     `rotVecY`, re-scaled by `fn_8012F8E4`/`get_em_chg_scale`); phase 1 runs the frame check
- *     (`em_frame_check` -> `CancelFade`) and `em_action_finish` once `fn_80134B0C` reports done.
+ *   - `fn_80178128` - two-phase action: phase 0 arms the action (`em_move_mode_set`, `em_turn_seq_start`,
+ *     `em_move_vec2_clr`) and, for motion ids 0x1F/0x20, aims `v_0x310` at the target (`calcVecAng2` ->
+ *     `rotVecY`, re-scaled by `get_em_base_scale`/`get_em_chg_scale`); phase 1 runs the frame check
+ *     (`em_frame_check` -> `CancelFade`) and `em_action_finish` once `em_turn_seq_step` reports done.
  *   - `fn_8017827C` - dispatcher on `state_sub` (0..0xB) tail-calling the previous range's handler
  *     functions with a sub-index argument (0..3).
- *   - `fn_801782F8` - two-phase action: phase 0 arms `fn_8012F504(self, 0x32, 0x28, 0, 3)`; phase 1
+ *   - `fn_801782F8` - two-phase action: phase 0 arms `em_mot_set_blend(self, 0x32, 0x28, 0, 3)`; phase 1
  *     runs `em_mot_end_ck` and `fn_80128030` on completion.
  *
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every
@@ -59,12 +59,12 @@ u32 em_frame_check(_ENEMY_WORK* self, u16 a, f32 b, f32 c);
 extern "C" {
 /* Owner: the unsplit enemy band (`include/unsplit/enemy.h` already declares most of these). */
 void em_move_mode_set(_ENEMY_WORK* self, u32 a);
-void fn_80134964(_ENEMY_WORK* self, void* tbl, u32 a, u32 b, u32 c);
-void fn_801353F8(_ENEMY_WORK* self);
-u32 fn_80134B0C(_ENEMY_WORK* self, void* tbl);
-f32 fn_8012F8E4(_ENEMY_WORK* self);
+void em_turn_seq_start(_ENEMY_WORK* self, void* tbl, u32 a, u32 b, u32 c);
+void em_move_vec2_clr(_ENEMY_WORK* self);
+u32 em_turn_seq_step(_ENEMY_WORK* self, void* tbl);
+f32 get_em_base_scale(_ENEMY_WORK* self);
 u32 em_mot_end_ck(_ENEMY_WORK* self);
-void fn_8012F504(_ENEMY_WORK* self, s32 a, s32 b, s32 c, s32 d);
+void em_mot_set_blend(_ENEMY_WORK* self, s32 a, s32 b, s32 c, s32 d);
 void em_action_finish(_ENEMY_WORK* self);
 void fn_80128030(_ENEMY_WORK* self);
 void CancelFade(_ENEMY_WORK* self);
@@ -93,21 +93,21 @@ extern "C" void fn_80178128(_ENEMY_WORK* self) {
         u8 state = self->state_0x05;
         self->state_0x05 = state + 1;
         em_move_mode_set(self, 0);
-        fn_80134964(self, lbl_8056FE10, 0, 1, 0);
-        fn_801353F8(self);
+        em_turn_seq_start(self, lbl_8056FE10, 0, 1, 0);
+        em_move_vec2_clr(self);
 
         u16 mot = em_get_mot_no(self);
         if (mot - 0x1f <= 1U) {
             s32 ang = calcVecAng2(&self->pos, &self->target);
             u16 rel = (u16)(ang - self->pos_0x1BC.y);
 
-            self->v_0x310.z = lbl_80797B60 * fn_8012F8E4(self) * get_em_chg_scale(self);
+            self->v_0x310.z = lbl_80797B60 * get_em_base_scale(self) * get_em_chg_scale(self);
             rotVecY(&self->v_0x310, self->pos_0x1BC.y + rel);
         }
         break;
     }
     case 1: {
-        u32 done = fn_80134B0C(self, lbl_8056FE10);
+        u32 done = em_turn_seq_step(self, lbl_8056FE10);
 
         u16 mot = em_get_mot_no(self);
         if (mot - 0x1f <= 1U) {
@@ -179,7 +179,7 @@ extern "C" void fn_801782F8(_ENEMY_WORK* self) {
         u8 state = self->state_0x05;
         self->state_0x05 = state + 1;
         em_move_mode_set(self, 2);
-        fn_8012F504(self, 0x32, 0x28, 0, 3);
+        em_mot_set_blend(self, 0x32, 0x28, 0, 3);
         break;
     }
     case 1:

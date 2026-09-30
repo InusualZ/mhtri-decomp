@@ -81,7 +81,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "enemy/ENEMY_WORK.h"
-#include "enemy/fn_80147CE0.h" /* EmSpawnRec + fn_80147E2C (the owner's header) */
+#include "enemy/fn_80147CE0.h" /* EmSpawnRec + em_res_user_data_ctor (the owner's header) */
 #include "enemy/fn_801502C8.h" /* this unit's own declarations (rule 2) */
 #include "unsplit/unknown.h" /* SystemWork / system_w */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
@@ -100,36 +100,36 @@ extern "C" {
 
 /* enemy/fn_8012EC74.cpp (0x8012EC74..0x80137604) - the action/motion arming helpers. */
 void em_busy_set(struct _ENEMY_WORK* self);
-void fn_8012F504(struct _ENEMY_WORK* self, s32 a, s32 b, s32 c, s32 d);
+void em_mot_set_blend(struct _ENEMY_WORK* self, s32 a, s32 b, s32 c, s32 d);
 void em_mot_set(struct _ENEMY_WORK* self, s32 motion, s32 arg2, s32 arg3);
 u32 em_mot_end_ck(struct _ENEMY_WORK* self);
 void fn_8012FCC4(struct _ENEMY_WORK* self, s32 a, f32 b);
-void fn_80130248(struct _ENEMY_WORK* self);
+void em_fall_height_get(struct _ENEMY_WORK* self);
 void fn_801303FC(f32 a);
-void fn_801305C4(struct _ENEMY_WORK* self);
+void em_fall_start(struct _ENEMY_WORK* self);
 void fn_80130CDC(s32 a);
 struct _ENEMY_WORK* fn_80131034(struct _ENEMY_WORK* self, s32 a, s32 b);
 void fn_801369A0(struct _ENEMY_WORK* self, u8 a, s32 b, void* c, f32 d);
 u32 fn_8012E5A8(struct _ENEMY_WORK* self);
 u32 fn_8012EC3C(struct _ENEMY_WORK* self);
-u32 fn_8012EC60(struct _ENEMY_WORK* self);
+u32 em_alt_mode_ck(struct _ENEMY_WORK* self);
 u32 fn_8012ECF0(struct _ENEMY_WORK* self);
-s16 fn_80145FE4(void);
-u32 fn_80146008(s32 label);
-void fn_80146058(struct _ENEMY_WORK* self, f32 a, f32 b, f32 c);
-void fn_8014610C(struct _ENEMY_WORK* self, f32 a, f32 b, f32 c);
-void fn_8014616C(struct _ENEMY_WORK* self, s32 a);
-void fn_8014619C(struct _ENEMY_WORK* self);
-void fn_801461A8(struct _ENEMY_WORK* self, s16 a, void* b, void* c);
-void fn_801462A4(struct _ENEMY_WORK* self, s16 a, void* b, void* c, s32 d, s32 e);
-void fn_80129668(struct _ENEMY_WORK* self, s32 a, s32 b);
+s16 em_demo_frame_get(void);
+u32 em_demo_time_ck(s32 label);
+void em_demo_pos_set(struct _ENEMY_WORK* self, f32 a, f32 b, f32 c);
+void em_demo_rot_set(struct _ENEMY_WORK* self, f32 a, f32 b, f32 c);
+void em_demo_reset(struct _ENEMY_WORK* self, s32 a);
+void em_demo_enable(struct _ENEMY_WORK* self);
+void em_demo_key3_apply(struct _ENEMY_WORK* self, s16 a, void* b, void* c);
+void em_demo_key_apply(struct _ENEMY_WORK* self, s16 a, void* b, void* c, s32 d, s32 e);
+void em_hit_window_set_default(struct _ENEMY_WORK* self, s32 a, s32 b);
 u32 fn_8012A014(struct _ENEMY_WORK* self, s32 a, s32 b, u16 c, void* d, void* e);
 u32 fn_80129A70(struct _ENEMY_WORK* self, u16 a);u32 fn_80129D3C(struct _ENEMY_WORK* self);
 u8 fn_80129DB8(struct _ENEMY_WORK* self);
 u8 fn_80129E48(struct _ENEMY_WORK* self);
 s32 fn_8012A204(struct _ENEMY_WORK* self);
 u8 stage_map_kind_get(u8 a);
-void fn_80127FE4(struct _ENEMY_WORK* self);
+void em_action_finish_fall(struct _ENEMY_WORK* self);
 
 /* enemy/fn_80147CE0.cpp (0x80147CE0..0x80149D6C) - the band below. */
 void fn_801484D4(struct _ENEMY_WORK* self);
@@ -151,23 +151,23 @@ void fn_8014FE00(struct _ENEMY_WORK* self);
 void fn_8014FF10(struct _ENEMY_WORK* self);
 
 /* the ef/effect helpers the range drives. */
-void fn_801048B4(struct _ENEMY_WORK* self, s32 a, u8 b, s32 c, f32 d);
-void fn_8010562C(struct _ENEMY_WORK* self, u32 a, u32 b, void* pos, f32 c);
+void eft009_spawn_at_joint(struct _ENEMY_WORK* self, s32 a, u8 b, s32 c, f32 d);
+void eft_spawn_type10(struct _ENEMY_WORK* self, u32 a, u32 b, void* pos, f32 c);
 void fn_801057A4(struct _ENEMY_WORK* self, u32 a, void* pos, s32 b, f32 c);
-void fn_80106694(struct _ENEMY_WORK* self, void* pos, u8 a, f32 b);
-void fn_8010D2B0(void* pos, u8 a, u8 b, s32 c, f32 d);
+void eft_spawn_type11(struct _ENEMY_WORK* self, void* pos, u8 a, f32 b);
+void eft_spawn_pos_in_area(void* pos, u8 a, u8 b, s32 c, f32 d);
 
 /* the runtime helpers the range reaches. */
 f32 fn_80050EF4(const void* a, const void* b);
-void fn_80051378(void* out, const void* a, const void* b);
+void addVec3(void* out, const void* a, const void* b);
 void fn_80051490(void* dst, s32 src);
 void fn_800516F0(void* out);
-void fn_80056A54(struct _ENEMY_WORK* self, s32 a, s32 b);
-void fn_800E2F40(void* self, s32 a, s32 b, u8 c, s32 d, s32 e, u8 f, f32 g);
-void fn_801390FC(void* self, s32 helper);
-s32 fn_801391E8(void* self);
+void draw_shape_arm(struct _ENEMY_WORK* self, s32 a, s32 b);
+void mhchar_mat_tev_set(void* self, s32 a, s32 b, u8 c, s32 d, s32 e, u8 f, f32 g);
+void em_res_user_data_set(void* self, s32 helper);
+s32 em_res_user_data_ck(void* self);
 void fn_8013918C(void* self, s32 a);
-void fn_80304508(struct _ENEMY_WORK* self, s32 a, s32 b, void* c, f32 d);
+void eft_em_spawn(struct _ENEMY_WORK* self, s32 a, s32 b, void* c, f32 d);
 void fn_805012E8(void* a, void* b);
 
 #ifdef __cplusplus
@@ -282,93 +282,93 @@ void fn_80154F70(void** self);
 #pragma peephole on
 
 /* 0x801502C8 (0x460) - the 11-state action step (state at +0x05): arm the motion, wait out each
- * effect window through `fn_80146008`/`em_frame_check`, and re-arm the next motion at each
+ * effect window through `em_demo_time_ck`/`em_frame_check`, and re-arm the next motion at each
  * transition. */
 void fn_801502C8(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state = self->state + 1;
-        fn_80130248(self);
-        fn_801305C4(self);
+        em_fall_height_get(self);
+        em_fall_start(self);
         em_mot_set(self, 0x1A, 0, 0);
-        fn_8014616C(self, 0);
+        em_demo_reset(self, 0);
         return;
     case 1:
-        if (fn_80146008(0x1D6) == 1) {
+        if (em_demo_time_ck(0x1D6) == 1) {
             self->state = self->state + 1;
-            fn_80146058(self, lbl_80796FB8, lbl_80796FBC, lbl_80796FC0);
-            fn_8014610C(self, lbl_80796E1C, lbl_80796F88, lbl_80796E1C);
-            fn_8014619C(self);
+            em_demo_pos_set(self, lbl_80796FB8, lbl_80796FBC, lbl_80796FC0);
+            em_demo_rot_set(self, lbl_80796E1C, lbl_80796F88, lbl_80796E1C);
+            em_demo_enable(self);
         }
         return;
     case 2:
-        if (fn_80146008(0x2DA) == 1) {
+        if (em_demo_time_ck(0x2DA) == 1) {
             self->state = self->state + 1;
             em_mot_set(self, 0x3D, 0, 0);
-            fn_801461A8(self, fn_80145FE4(), lbl_805A2BD8, 0);
-            fn_8014610C(self, lbl_80796E1C, lbl_80796F88, lbl_80796E1C);
+            em_demo_key3_apply(self, em_demo_frame_get(), lbl_805A2BD8, 0);
+            em_demo_rot_set(self, lbl_80796E1C, lbl_80796F88, lbl_80796E1C);
         }
         return;
     case 3:
-        fn_801461A8(self, fn_80145FE4(), lbl_805A2BD8, 0);
+        em_demo_key3_apply(self, em_demo_frame_get(), lbl_805A2BD8, 0);
         if (em_after_frame_check(self, 0, lbl_80796F18, lbl_80796E1C) == 1) {
             self->state = self->state + 1;
-            fn_8014616C(self, 0);
+            em_demo_reset(self, 0);
         }
         return;
     case 4:
-        fn_801461A8(self, fn_80145FE4(), lbl_805A2BD8, 0);
-        if (fn_80146008(0x3A2) == 1) {
+        em_demo_key3_apply(self, em_demo_frame_get(), lbl_805A2BD8, 0);
+        if (em_demo_time_ck(0x3A2) == 1) {
             self->state = self->state + 1;
             em_mot_set(self, 0xC8, 0, 0x1E);
-            fn_8014619C(self);
-            fn_801461A8(self, fn_80145FE4(), lbl_805A2D68, 0);
-            fn_8014610C(self, lbl_80796E1C, lbl_80796FC4, lbl_80796E1C);
+            em_demo_enable(self);
+            em_demo_key3_apply(self, em_demo_frame_get(), lbl_805A2D68, 0);
+            em_demo_rot_set(self, lbl_80796E1C, lbl_80796FC4, lbl_80796E1C);
         }
         return;
     case 5:
         if (em_frame_check(self, 0, lbl_80796F44, lbl_80796E1C) == 1) {
-            fn_80129668(self, 0, 0x17);
+            em_hit_window_set_default(self, 0, 0x17);
         }
-        fn_801461A8(self, fn_80145FE4(), lbl_805A2D68, 0);
-        if (fn_80146008(0x41A) == 1) {
+        em_demo_key3_apply(self, em_demo_frame_get(), lbl_805A2D68, 0);
+        if (em_demo_time_ck(0x41A) == 1) {
             self->state = self->state + 1;
             em_mot_set(self, 0x13, 0, 0);
-            fn_80146058(self, lbl_80796FC8, lbl_80796E1C, lbl_80796FCC);
-            fn_8014610C(self, lbl_80796E1C, lbl_80796F18, lbl_80796E1C);
+            em_demo_pos_set(self, lbl_80796FC8, lbl_80796E1C, lbl_80796FCC);
+            em_demo_rot_set(self, lbl_80796E1C, lbl_80796F18, lbl_80796E1C);
         }
         return;
     case 6:
-        if (fn_80146008(0x578) == 1) {
+        if (em_demo_time_ck(0x578) == 1) {
             self->state = self->state + 1;
             em_mot_set(self, 0x12, 0, 0);
-            fn_80146058(self, lbl_80796FC8, lbl_80796E1C, lbl_80796FCC);
-            fn_8014610C(self, lbl_80796E1C, lbl_80796F18, lbl_80796E1C);
+            em_demo_pos_set(self, lbl_80796FC8, lbl_80796E1C, lbl_80796FCC);
+            em_demo_rot_set(self, lbl_80796E1C, lbl_80796F18, lbl_80796E1C);
         }
         return;
     case 7:
-        if (fn_80146008(0x6A4) == 1) {
+        if (em_demo_time_ck(0x6A4) == 1) {
             self->state = self->state + 1;
             em_mot_set(self, 0x29, 0, 0);
-            fn_80146058(self, lbl_80796FC8, lbl_80796E1C, lbl_80796FCC);
+            em_demo_pos_set(self, lbl_80796FC8, lbl_80796E1C, lbl_80796FCC);
         }
         return;
     case 8:
         if (em_frame_check(self, 0, lbl_80796FD0, lbl_80796E1C) == 1) {
             self->state = self->state + 1;
             em_mot_set(self, 0x43, 6, 0);
-            fn_801462A4(self, (s16)(fn_80145FE4() + 1), lbl_805A2F28, 0, 2, 0);
+            em_demo_key_apply(self, (s16)(em_demo_frame_get() + 1), lbl_805A2F28, 0, 2, 0);
         }
         return;
     case 9:
-        fn_801462A4(self, (s16)(fn_80145FE4() + 1), lbl_805A2F28, 0, 2, 0);
+        em_demo_key_apply(self, (s16)(em_demo_frame_get() + 1), lbl_805A2F28, 0, 2, 0);
         if (em_frame_check(self, 0, lbl_80796FD4, lbl_80796E1C) == 1) {
             self->state = self->state + 1;
             em_mot_set(self, 0x1A, 6, 0);
         }
         return;
     case 10:
-        fn_801462A4(self, (s16)(fn_80145FE4() + 1), lbl_805A2F28, 0, 2, 0);
+        em_demo_key_apply(self, (s16)(em_demo_frame_get() + 1), lbl_805A2F28, 0, 2, 0);
         return;
     }
 }
@@ -379,14 +379,14 @@ void fn_80150728(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state = self->state + 1;
-        fn_80130248(self);
-        fn_801305C4(self);
+        em_fall_height_get(self);
+        em_fall_start(self);
         em_mot_set(self, 0x1A, 0, 0);
-        fn_80146058(self, lbl_80796FB8, lbl_80796FBC, lbl_80796FC0);
-        fn_8014610C(self, lbl_80796E1C, lbl_80796F88, lbl_80796E1C);
+        em_demo_pos_set(self, lbl_80796FB8, lbl_80796FBC, lbl_80796FC0);
+        em_demo_rot_set(self, lbl_80796E1C, lbl_80796F88, lbl_80796E1C);
         return;
     case 1:
-        fn_80127FE4(self);
+        em_action_finish_fall(self);
         return;
     }
 }
@@ -399,120 +399,120 @@ void fn_801507CC(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state = self->state + 1;
-        fn_80130248(self);
-        fn_801305C4(self);
+        em_fall_height_get(self);
+        em_fall_start(self);
         em_mot_set(self, 0x1A, 0, 0);
-        fn_8014610C(self, lbl_80796E1C, lbl_80796FD8, lbl_80796E1C);
-        fn_8014616C(self, 0);
+        em_demo_rot_set(self, lbl_80796E1C, lbl_80796FD8, lbl_80796E1C);
+        em_demo_reset(self, 0);
         return;
     case 1:
-        if (fn_80146008(0x15A) == 1) {
+        if (em_demo_time_ck(0x15A) == 1) {
             self->state = self->state + 1;
             em_mot_set(self, 0x1A, 0, 0);
-            fn_80146058(self, lbl_80796FDC, lbl_80796FE0, lbl_80796FE4);
-            fn_801462A4(self, fn_80145FE4(), lbl_805A30DC, 0, 6, 0);
-            fn_8014619C(self);
+            em_demo_pos_set(self, lbl_80796FDC, lbl_80796FE0, lbl_80796FE4);
+            em_demo_key_apply(self, em_demo_frame_get(), lbl_805A30DC, 0, 6, 0);
+            em_demo_enable(self);
         }
         return;
     case 2:
-        fn_801462A4(self, fn_80145FE4(), lbl_805A30DC, 0, 6, 0);
+        em_demo_key_apply(self, em_demo_frame_get(), lbl_805A30DC, 0, 6, 0);
         if (em_mot_end_ck(self) == 1) {
             self->state = self->state + 1;
             em_mot_set(self, 0x1A, 0, 0);
         }
         return;
     case 3:
-        fn_801462A4(self, fn_80145FE4(), lbl_805A30DC, 0, 6, 0);
+        em_demo_key_apply(self, em_demo_frame_get(), lbl_805A30DC, 0, 6, 0);
         if (em_after_frame_check(self, 0, lbl_80796F48, lbl_80796E1C) == 1) {
             self->state = self->state + 1;
-            fn_8012F504(self, 0x3D, 0x1E, 0, 1);
+            em_mot_set_blend(self, 0x3D, 0x1E, 0, 1);
         }
         return;
     case 4:
-        fn_801462A4(self, fn_80145FE4(), lbl_805A30DC, 0, 6, 0);
-        if (fn_80146008(0x280) == 1) {
+        em_demo_key_apply(self, em_demo_frame_get(), lbl_805A30DC, 0, 6, 0);
+        if (em_demo_time_ck(0x280) == 1) {
             self->state = self->state + 1;
             em_mot_set(self, 0x1F, 0, 0x16);
-            fn_801461A8(self, fn_80145FE4(), lbl_805A3280, lbl_805A3860);
+            em_demo_key3_apply(self, em_demo_frame_get(), lbl_805A3280, lbl_805A3860);
         }
         return;
     case 5:
-        fn_801461A8(self, fn_80145FE4(), lbl_805A3280, lbl_805A3860);
+        em_demo_key3_apply(self, em_demo_frame_get(), lbl_805A3280, lbl_805A3860);
         if (em_mot_end_ck(self) == 1) {
             self->state = self->state + 1;
             em_mot_set(self, 0x20, 0, 0);
         }
         return;
     case 6:
-        fn_801461A8(self, fn_80145FE4(), lbl_805A3280, lbl_805A3860);
+        em_demo_key3_apply(self, em_demo_frame_get(), lbl_805A3280, lbl_805A3860);
         if (em_mot_end_ck(self) == 1) {
             self->state = self->state + 1;
             em_mot_set(self, 0x1F, 0, 0);
         }
         return;
     case 7:
-        fn_801461A8(self, fn_80145FE4(), lbl_805A3280, lbl_805A3860);
+        em_demo_key3_apply(self, em_demo_frame_get(), lbl_805A3280, lbl_805A3860);
         if (em_after_frame_check(self, 0, lbl_80796FE8, lbl_80796E1C) == 1) {
             self->state = self->state + 1;
             em_mot_set(self, 0x3D, 0xA, 0);
         }
         return;
     case 8:
-        fn_801461A8(self, fn_80145FE4(), lbl_805A3280, lbl_805A3860);
-        if (fn_80146008(0x3EE) == 1) {
+        em_demo_key3_apply(self, em_demo_frame_get(), lbl_805A3280, lbl_805A3860);
+        if (em_demo_time_ck(0x3EE) == 1) {
             self->state = self->state + 1;
             em_mot_set(self, 0xDB, 0, 0x28);
-            fn_801461A8(self, fn_80145FE4(), lbl_805A3AE0, 0);
-            fn_8014610C(self, lbl_80796E1C, lbl_80796E1C, lbl_80796E1C);
+            em_demo_key3_apply(self, em_demo_frame_get(), lbl_805A3AE0, 0);
+            em_demo_rot_set(self, lbl_80796E1C, lbl_80796E1C, lbl_80796E1C);
         }
         return;
     case 9:
-        fn_801461A8(self, fn_80145FE4(), lbl_805A3AE0, 0);
-        if (fn_80146008(0x434) == 1) {
+        em_demo_key3_apply(self, em_demo_frame_get(), lbl_805A3AE0, 0);
+        if (em_demo_time_ck(0x434) == 1) {
             self->state = self->state + 1;
             em_mot_set(self, 0x1B, 0, 4);
-            fn_801462A4(self, fn_80145FE4(), lbl_805A3C10, lbl_805A3DD0, 7, 2);
+            em_demo_key_apply(self, em_demo_frame_get(), lbl_805A3C10, lbl_805A3DD0, 7, 2);
         }
         return;
     case 10:
-        fn_801462A4(self, fn_80145FE4(), lbl_805A3C10, lbl_805A3DD0, 7, 2);
-        if (fn_80146008(0x468) == 1) {
+        em_demo_key_apply(self, em_demo_frame_get(), lbl_805A3C10, lbl_805A3DD0, 7, 2);
+        if (em_demo_time_ck(0x468) == 1) {
             self->state = self->state + 1;
             em_mot_set(self, 0xCE, 0, 2);
         }
         return;
     case 11:
-        fn_801462A4(self, fn_80145FE4(), lbl_805A3C10, lbl_805A3DD0, 7, 2);
+        em_demo_key_apply(self, em_demo_frame_get(), lbl_805A3C10, lbl_805A3DD0, 7, 2);
         if (em_mot_end_ck(self) == 1) {
             self->state = self->state + 1;
             em_mot_set(self, 0xCF, 0, 2);
         }
         return;
     case 12:
-        fn_801462A4(self, fn_80145FE4(), lbl_805A3C10, lbl_805A3DD0, 7, 2);
-        if (fn_80146008(0x506) == 1) {
+        em_demo_key_apply(self, em_demo_frame_get(), lbl_805A3C10, lbl_805A3DD0, 7, 2);
+        if (em_demo_time_ck(0x506) == 1) {
             self->state = self->state + 1;
-            fn_8012F504(self, 0xCF, 0x14, 0x22, 1);
-            fn_80146058(self, lbl_80796FEC, lbl_80796FF0, lbl_80796FF4);
-            fn_801462A4(self, fn_80145FE4(), lbl_805A3E90, lbl_805A3FC0, 5, 2);
+            em_mot_set_blend(self, 0xCF, 0x14, 0x22, 1);
+            em_demo_pos_set(self, lbl_80796FEC, lbl_80796FF0, lbl_80796FF4);
+            em_demo_key_apply(self, em_demo_frame_get(), lbl_805A3E90, lbl_805A3FC0, 5, 2);
         }
         return;
     case 13:
-        fn_801462A4(self, fn_80145FE4(), lbl_805A3E90, lbl_805A3FC0, 5, 2);
+        em_demo_key_apply(self, em_demo_frame_get(), lbl_805A3E90, lbl_805A3FC0, 5, 2);
         if (em_mot_end_ck(self) == 1) {
             self->state = self->state + 1;
             em_mot_set(self, 0x1B, 0, 0);
         }
         return;
     case 14:
-        fn_801462A4(self, fn_80145FE4(), lbl_805A3E90, lbl_805A3FC0, 5, 2);
+        em_demo_key_apply(self, em_demo_frame_get(), lbl_805A3E90, lbl_805A3FC0, 5, 2);
         if (em_mot_end_ck(self) == 1) {
             self->state = self->state + 1;
             em_mot_set(self, 0x1B, 0, 0);
         }
         return;
     case 15:
-        fn_801462A4(self, fn_80145FE4(), lbl_805A3E90, lbl_805A3FC0, 5, 2);
+        em_demo_key_apply(self, em_demo_frame_get(), lbl_805A3E90, lbl_805A3FC0, 5, 2);
         if (em_mot_end_ck(self) == 1) {
             self->state = self->state + 1;
             em_mot_set(self, 0x1C, 0, 0);
@@ -521,19 +521,19 @@ void fn_801507CC(struct _ENEMY_WORK* self) {
         return;
     case 16:
         if (em_frame_check(self, 0, lbl_80796FF8, lbl_80796E1C) == 1) {
-            fn_80056A54(self, 0x1B, 0xA);
+            draw_shape_arm(self, 0x1B, 0xA);
         }
         setVector3(&pos, lbl_80796E1C, lbl_80796E38, lbl_80796E3C);
         if (em_frame_check(self, 0, lbl_80796FF8, lbl_80796E1C) == 1) {
-            fn_80304508(self, 0, 0x1A, &pos, lbl_80796E20);
+            eft_em_spawn(self, 0, 0x1A, &pos, lbl_80796E20);
         }
         if (em_frame_check(self, 3, lbl_80796FF8, lbl_80796F2C) == 1) {
             if ((self->timer_0x020 & 7) == 0) {
-                fn_80304508(self, 1, 0x1A, &pos, lbl_80796E20);
+                eft_em_spawn(self, 1, 0x1A, &pos, lbl_80796E20);
             }
             self->timer_0x020 = self->timer_0x020 + 1;
         }
-        fn_801462A4(self, fn_80145FE4(), lbl_805A3E90, lbl_805A3FC0, 5, 2);
+        em_demo_key_apply(self, em_demo_frame_get(), lbl_805A3E90, lbl_805A3FC0, 5, 2);
         return;
     }
 }
@@ -543,15 +543,15 @@ void fn_80150FCC(struct _ENEMY_WORK* self) {
     switch (self->state) {
     case 0:
         self->state = self->state + 1;
-        fn_80130248(self);
-        fn_801305C4(self);
+        em_fall_height_get(self);
+        em_fall_start(self);
         em_mot_set(self, 0x1A, 0, 0);
-        fn_80146058(self, lbl_80796FFC, lbl_80797000, lbl_80797004);
-        fn_8014610C(self, lbl_80796E1C, lbl_80796E1C, lbl_80796E1C);
+        em_demo_pos_set(self, lbl_80796FFC, lbl_80797000, lbl_80797004);
+        em_demo_rot_set(self, lbl_80796E1C, lbl_80796E1C, lbl_80796E1C);
         return;
     case 1:
         if (em_mot_end_ck(self) == 1) {
-            fn_80127FE4(self);
+            em_action_finish_fall(self);
         }
         return;
     }
@@ -646,7 +646,7 @@ void fn_8015111C(struct _ENEMY_WORK* self) {
     u32 kind;
 
     VEC3_ctor(&pos);
-    if (fn_8012EC60(self) == 1) {
+    if (em_alt_mode_ck(self) == 1) {
         angle = calcVecAngX(&self->vec_0x76C);
         if ((u16)(angle + 0x8000) > 0x671B) {
             motion = em_get_mot_no(self);
@@ -664,7 +664,7 @@ void fn_8015111C(struct _ENEMY_WORK* self) {
             }
             if (kind != 0xFF && (system_w.field_0x0c % 10) == 0) {
                 setVector3(&pos, lbl_80796E1C, lbl_80796E54, lbl_80796E60);
-                fn_8010562C(self, kind, 0x1A, &pos, lbl_80796E20);
+                eft_spawn_type10(self, kind, 0x1A, &pos, lbl_80796E20);
             }
         }
     }
@@ -693,19 +693,19 @@ void fn_801512E8(struct _ENEMY_WORK* self, u8 arg1, u8 arg2, s32 arg3, s32 arg4,
     VEC3_ctor(&pos);
     switch (arg1) {
     case 0:
-        fn_801048B4(self, arg3, arg2, arg4, farg0);
+        eft009_spawn_at_joint(self, arg3, arg2, arg4, farg0);
         return;
     case 1:
         get_joint_wpos_em(self, arg3, &pos);
         pos.y = self->field_0x20C;
-        fn_8010D2B0(&pos, self->area_no, arg2, self->field_0x1C0 + arg4,
+        eft_spawn_pos_in_area(&pos, self->area_no, arg2, self->field_0x1C0 + arg4,
                     farg0 * get_em_chg_scale(self));
         return;
     case 2:
         pos.x = self->pos.x;
         pos.y = self->field_0x20C;
         pos.z = self->pos.z;
-        fn_80106694(self, &pos, arg2, farg0);
+        eft_spawn_type11(self, &pos, arg2, farg0);
         return;
     }
 }
@@ -741,7 +741,7 @@ void fn_80154184(struct _ENEMY_WORK* self) {
         rgba[1] = 0xFF;
     }
     ratio = self->field_0x1D4;
-    fn_800E2F40(self->char_0x024, 1, 6, (u8)(s32)((f32)rgba[0] * ratio), 0, 3,
+    mhchar_mat_tev_set(self->char_0x024, 1, 6, (u8)(s32)((f32)rgba[0] * ratio), 0, 3,
                 (u8)(s32)((f32)rgba[1] * ratio), ratio);
 
     if (em_parts_damage_level_get(self, 2) < 1) {
@@ -752,7 +752,7 @@ void fn_80154184(struct _ENEMY_WORK* self) {
         rgba[1] = 0xDC;
     }
     ratio = self->field_0x1D4;
-    fn_800E2F40(self->char_0x024, 2, 6, (u8)(s32)((f32)rgba[0] * ratio), 0, 3,
+    mhchar_mat_tev_set(self->char_0x024, 2, 6, (u8)(s32)((f32)rgba[0] * ratio), 0, 3,
                 (u8)(s32)((f32)rgba[1] * ratio), ratio);
 }
 
@@ -870,7 +870,7 @@ s32 fn_80154638(struct _ENEMY_WORK* self, u8 arg1) {
     }
     copyVec3(&b, setVec3(&v, lbl_80796E1C, lbl_80796E1C, lbl_80797074 * get_em_chg_scale(self)));
     rotVecY(&b, self->field_0x1C0);
-    fn_80051378(&w, &self->pos, &b);
+    addVec3(&w, &self->pos, &b);
     copyVec3(&a, &w);
     dist = calcDistanceSqXZ(&a, &target->pos);
     limit = lbl_8079709C * get_em_chg_scale(self);
@@ -946,8 +946,8 @@ void fn_80154928(struct _ENEMY_WORK* self, u8* arg1, u8* arg2) {
     *arg1 = 0xC;
     *arg2 = 0;
     self->pos.y = self->pos.y + lbl_80796E18;
-    fn_80130248(self);
-    fn_801305C4(self);
+    em_fall_height_get(self);
+    em_fall_start(self);
 }
 
 /* 0x8015497C (0xC) - clear the action's case-6 flag. */
@@ -1035,7 +1035,7 @@ void fn_80154B04(struct _ENEMY_WORK* self, nw4r::math::VEC3* out, u16* angleOut,
     if ((u16)(delta + 0xBFFF) > 0x7FFE) {
         setVector3(&b, lbl_80796E1C, lbl_80796E1C, fn_80050EF4(&a, &self->pos) - scale);
         rotVecY(&b, *angleOut);
-        fn_80051378(&v, &self->pos, &b);
+        addVec3(&v, &self->pos, &b);
         copyVec3(out, &v);
         return;
     }
@@ -1046,7 +1046,7 @@ void fn_80154B04(struct _ENEMY_WORK* self, nw4r::math::VEC3* out, u16* angleOut,
     *angleOut = (u16)(base + self->field_0x1C0);
     setVector3(&b, lbl_80796E1C, lbl_80796E1C, -scale);
     rotVecY(&b, *angleOut);
-    fn_80051378(&w, &a, &b);
+    addVec3(&w, &a, &b);
     copyVec3(out, &w);
 }
 
@@ -1123,12 +1123,12 @@ void fn_80154E90(struct _ENEMY_WORK* self, u8 arg1) {
         fn_8012FCC4(self, 0, lbl_807970C0);
         fn_8012FCC4(self, 0xA, lbl_807970C4);
     }
-    if (fn_801391E8(self) == 0) {
+    if (em_res_user_data_ck(self) == 0) {
         helper = (s32)operator new(0xC);
         if (helper != 0) {
             fn_80154F70((void**)helper);
         }
-        fn_801390FC(self, helper);
+        em_res_user_data_set(self, helper);
     }
     if (self->field_0x009 == 0) {
         setVector3(&pos, lbl_807970C0, lbl_807970C8, lbl_807970CC);
@@ -1139,7 +1139,7 @@ void fn_80154E90(struct _ENEMY_WORK* self, u8 arg1) {
 
 /* 0x80154F70 (0x3C) - the 0x0C-byte helper's constructor (installs the `lbl_805A5D18` table). */
 void fn_80154F70(void** self) {
-    fn_80147E2C(self);
+    em_res_user_data_ctor(self);
     *self = (void*)lbl_805A5D18;
 }
 

@@ -1262,6 +1262,7 @@ enemy/em024_ai.cpp:
 	extab       start:0x800171A4 end:0x8001736C
 	extabindex  start:0x800368DC end:0x80036B88
 	.text       start:0x8034F138 end:0x80358624
+	.rodata     start:0x80570880 end:0x805709D0
 	.data       start:0x805EBBE0 end:0x805ED0C0
 	.sdata      start:0x80793330 end:0x80793338
 	.sdata2     start:0x8079B3C8 end:0x8079B640

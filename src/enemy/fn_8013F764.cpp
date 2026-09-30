@@ -11,7 +11,7 @@
  *
  *   * the run driver `fn_8013F764` - it walks the enemy's program table (`prog_0xA00`, 3-byte entries
  *     `EmProgTbl`), latches the entry through `fn_801262BC`, measures the enemy against its target
- *     position `vec_0x36C` (`fn_80050F80`) and dispatches on the two entry bytes through
+ *     position `vec_0x36C` (`calcVecDistXZ`) and dispatches on the two entry bytes through
  *     `fn_8013C36C`; `fn_8013F994` is its "next entry" step.
  *   * the stream readers - the long family `fn_8013F8D8`/`fn_8013F9D8`/`fn_8013FB9C`/`fn_8013FC60`/
  *     `fn_8013FD98`/`fn_8013FF5C`/`fn_8014001C`/`fn_801400BC`/`fn_80140178`/`fn_80140298`/
@@ -254,7 +254,7 @@ void fn_8013C244(_ENEMY_WORK* self, u8* in, u32 id);
 /* the enemy band's other units */
 void* fn_801262BC(_ENEMY_WORK* self, u8 code);        /* the EmActionInfo record */
 void fn_8012B380(_ENEMY_WORK* self, u32 a, u32 b, u8 c);
-void fn_80128BF8(_ENEMY_WORK* self, u32 mode);
+void em_target_pos_set(_ENEMY_WORK* self, u32 mode);
 void fn_8013C36C(_ENEMY_WORK* self, u8 a, u8* in);
 void fn_8013BDE4(u8** in, u8 code, s16* out);
 void fn_8013AA00(_ENEMY_WORK* self);
@@ -283,7 +283,7 @@ void fn_800FA9B8(u8* rec, u8 id);
 void fn_800F0F9C(u8 id);
 
 /* the shared layers the range's helpers call */
-f32 fn_80050F80(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
+f32 calcVecDistXZ(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 u32 fn_803B4EC8(u32 a);
 u32 fn_803B5030(u32 a);
 void* res_file_ctor(void* out, u32 a);
@@ -321,10 +321,10 @@ u8 fn_8013F764(_ENEMY_WORK* self, u8* in) {
             self->field_0x383 = 1;
             self->field_0x384 = info->value_0x04;
             fn_8012B380(self, 5, 8, info->field_0x00);
-            fn_80128BF8(self, 0);
+            em_target_pos_set(self, 0);
             self->field_0x9FE++;
         }
-        if (fn_80050F80(&self->pos, &self->vec_0x36C) < lbl_80796DBC) {
+        if (calcVecDistXZ(&self->pos, &self->vec_0x36C) < lbl_80796DBC) {
             self->field_0x9FE = 2;
         } else {
             self->field_0x9FE = 1;

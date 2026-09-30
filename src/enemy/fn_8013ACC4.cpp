@@ -326,7 +326,7 @@ u32 fn_8013AC00(EmWork* self, u16 index); /* `ran_suu(1)`'s tail: the state's ne
 u8 fn_8013AC08(EmWork* self, u8 index, u8 key);
 void fn_8012A254(EmWork* self, u32 index);
 void fn_8012B380(EmWork* self, u32 a, u32 b, u8 c);
-void fn_80128BF8(EmWork* self, s32 mode);
+void em_target_pos_set(EmWork* self, s32 mode);
 u32 fn_8012EC3C(EmWork* self);
 u8 fn_801408B4(EmWork* self);
 void fn_801409C8(EmWork* self);
@@ -441,7 +441,7 @@ extern "C" u32 fn_8013ACC4(EmWork* self) {
         self->count_0x9A8 = 0;
     }
 
-    fn_80128BF8(self, 0);
+    em_target_pos_set(self, 0);
 
     for (;;) {
         frames++;
@@ -858,7 +858,7 @@ extern "C" u32 fn_8013ACC4(EmWork* self) {
                         } else {
                             v = 0;
                         }
-                        fn_80128BF8(self, 0);
+                        em_target_pos_set(self, 0);
                         fn_8013AB74(self, self->field_0x95C, v);
                     }
                 } else {
@@ -901,7 +901,7 @@ extern "C" u32 fn_8013ACC4(EmWork* self) {
                     self->field_0x383 = save383;
                     self->field_0x384 = save384;
                     self->field_0x424 = save424;
-                    fn_80128BF8(self, (s32)&save);
+                    em_target_pos_set(self, (s32)&save);
                     if (self->field_0x9E4 == 0) {
                         finished = 1;
                     }
@@ -937,7 +937,7 @@ extern "C" u32 fn_8013ACC4(EmWork* self) {
                         if (run != NULL) {
                             fn_8013AB74(self, 0xa, 0);
                             fn_8012B380(self, 7, run->field_0x05, run->field_0x06);
-                            fn_80128BF8(self, 0);
+                            em_target_pos_set(self, 0);
                         } else {
                             fn_801408B4(self);
                         }

@@ -5,7 +5,7 @@
  * What it is.  The enemy-side work block's taken/seated-state bookkeeping: the small accessors that
  * flip the `_ENEMY_WORK` flags around an action change (`fn_801251E0`/`fn_801252C0`), the per-part
  * helpers, and `get_enemy_data`, the accessor that turns an enemy's group + kind into its static data
- * record (`fn_80140C00`).  The large movers (`fn_8012555C`, 2552 B; `fn_80128BF8`, 1860 B;
+ * record (`fn_80140C00`).  The large movers (`fn_8012555C`, 2552 B; `em_target_pos_set`, 1860 B;
  * `fn_8012A9E8`, 2456 B) are the unit's update/state-machine bodies; the rest are the getters and
  * setters that surround them.  The .data pool the unit references (`lbl_805A1ADC`,
  * `lbl_807919D0`, the jump tables) belongs to the data pass and is declared, never defined
@@ -29,7 +29,7 @@
  * (a register-colouring difference: retail keeps the mask in r6 and the shift count in r5, this
  * build swaps the two; every instruction and branch is otherwise right).  The remaining 102 symbols
  * are unwritten and keep their original bytes in the target object; the large bodies
- * (`fn_8012555C`, `fn_80128BF8`, `fn_8012A9E8`, ...) need the unit's full state-machine layout, which
+ * (`fn_8012555C`, `em_target_pos_set`, `fn_8012A9E8`, ...) need the unit's full state-machine layout, which
  * the written accessors only partly pin.
  *
  * Source shape worth keeping: the unit needs `#pragma peephole off`.  With the peephole pass on,
@@ -64,7 +64,7 @@
 extern "C" void fn_80124C5C(u32 a, u32 b, u8 c);
 
 /* The unit's own next symbols, defined in this TU. */
-extern "C" void fn_8012933C(struct _ENEMY_WORK* self, u8 a, u32 b, u32 c);
+extern "C" void em_hit_window_set(struct _ENEMY_WORK* self, u8 a, u32 b, u32 c);
 extern "C" u32 stage_map_kind_get(u32 kind);
 
 /* `fn_8033737C` (0x8033737C) sits in the unclaimed run 0x803250B0..0x8033737C+: its bracketing
@@ -81,12 +81,12 @@ extern "C" u8 lbl_807919D0;
  * The written bodies, in address order.
  * ---------------------------------------------------------------------------------------------- */
 
-extern "C" void fn_801251D0(struct _ENEMY_WORK* self, void* tbl, u32 a, u32 b)
+extern "C" void em_se_tbl_play(struct _ENEMY_WORK* self, void* tbl, u32 a, u32 b)
 {
     fn_80124C5C((u32)self, (u32)tbl, (u8)a);
 }
 
-extern "C" void fn_801251D8(struct _ENEMY_WORK* self, void* tbl, u32 a, u32 b)
+extern "C" void em_se_tbl_play_alt(struct _ENEMY_WORK* self, void* tbl, u32 a, u32 b)
 {
     fn_80124C5C((u32)self, (u32)tbl, (u8)a);
 }
@@ -235,9 +235,9 @@ extern "C" u32 fn_80128204(struct _ENEMY_WORK* self)
     return self->field_0x1F4;
 }
 
-extern "C" void fn_80129668(struct _ENEMY_WORK* self, u32 a, u32 b)
+extern "C" void em_hit_window_set_default(struct _ENEMY_WORK* self, u32 a, u32 b)
 {
-    fn_8012933C(self, (u8)a, b, 0);
+    em_hit_window_set(self, (u8)a, b, 0);
 }
 
 extern "C" void fn_80129864(struct _ENEMY_WORK* self)

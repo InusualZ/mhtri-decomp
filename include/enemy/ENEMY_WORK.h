@@ -202,7 +202,7 @@ struct _ENEMY_WORK {
     /* +0x009 */ u8 field_0x009;        /* `fn_80170610` gates the position seat on it */
     /* +0x00A */ u8 field_0x00A;        /* the area `fn_8012E968` matches the work records'
                                         * `area_no` (+0x1E1) and the area table's entries against */
-    /* +0x00B */ u8 field_0x00B;        /* the byte `fn_8012F504` hands the effect queue as its flag */
+    /* +0x00B */ u8 field_0x00B;        /* the byte `em_mot_set_blend` hands the effect queue as its flag */
     /* +0x00C */ u8 field_0x00C;        /* the mode `fn_80166DF8` gates its case-0/case-3 blocks on
                                         * (3 = the "entry seated" state) */
     /* +0x00D */ u8 field_0x00D;        /* the byte `fn_80137604`/`fn_8013760C` latch */
@@ -311,7 +311,7 @@ struct _ENEMY_WORK {
             /* +0x30C */ u8 unused_0x30C[0x314 - 0x30C];
             /* +0x314 */ f32 field_0x314;  /* the effect scale `fn_80148BD0` writes (added by
                                             * `enemy/fn_80147CE0.cpp`) */
-            /* +0x318 */ f32 field_0x318;  /* the effect radius `fn_801493A8` writes from `fn_80135644` */
+            /* +0x318 */ f32 field_0x318;  /* the effect radius `fn_801493A8` writes from `em_key_curve_eval` */
         };
         /* the offset vector TWO units rotate and hand the position helpers: `enemy/fn_801CA004.cpp`'s
          * `fn_801CC5DC` (added by that unit) and `enemy/fn_801B0010.cpp`'s `fn_801B1F94`, the em030
@@ -520,6 +520,23 @@ struct _ENEMY_WORK {
             /* +0x33B */ u8 kcolor_b_0x33B;
             /* +0x33C */ u8 unused_0x33Ckc[0x354 - 0x33C];
         } em020_kcolor_0x328;
+        /* the em024 monster program's own field view `enemy/em024_ai.cpp` reaches (added by that
+         * unit): the three state bytes, the four `s16` gauge/timer words and the two position
+         * vectors the program latches.  A union member because the views above already own these
+         * bytes. */
+        struct {
+            /* +0x328 */ u8 part_lock_0x328;   /* 1 while the six alternate part records are armed */
+            /* +0x329 */ u8 tev_ramp_0x329;    /* 1 while the TEV colors ramp up, 0 while they fade out */
+            /* +0x32A */ u8 flag_0x32A;    /* the swing-window flag the event handler sets */
+            /* +0x32B */ u8 pad_0x32B;
+            /* +0x32C */ s16 gauge_0x32C;  /* the part gauge (`eft052_part_gauge_add`), 500 at rest */
+            /* +0x32E */ s16 timer_0x32E;  /* the state-1 countdown */
+            /* +0x330 */ s16 timer_0x330;  /* the state-0 countdown */
+            /* +0x332 */ s16 hold_timer_0x332; /* the 150-frame countdown the scatter action arms */
+            /* +0x334 */ nw4r::math::VEC3 tev_color_0x334;   /* RGB written to TEV konst slots 0, 4 and 1 (GUESS: the main glow) */
+            /* +0x340 */ nw4r::math::VEC3 tev_color2_0x340;  /* RGB written to TEV konst slots 2 and 3 (GUESS: the secondary glow) */
+            /* +0x34C */ u8 unused_0x34Cem[0x354 - 0x34C];
+        } em024_0x328;
     };
     /* +0x354 */ union {
         /* the s16 view `fn_801481D8` counts and the byte view `fn_80147F48` flags - the same four
@@ -567,11 +584,11 @@ struct _ENEMY_WORK {
     /* +0x362 */ s16 field_0x362;      /* `enemy/fn_801993E0.cpp`'s `fn_8019D8B8` case 7: `<= 0`
                                         * answers 1 (`lha` + `cmpwi 0` + `bgt`). */
     /* +0x364 */ u8 unused_0x364[0x36C - 0x364];
-    /* +0x36C */ nw4r::math::VEC3 vec_0x36C;  /* the target position `fn_80050F80` measures against
+    /* +0x36C */ nw4r::math::VEC3 vec_0x36C;  /* the target position `calcVecDistXZ` measures against
                                         * `pos` (`fn_8013F764`'s distance test) */
     /* +0x378 */ f32 value_0x378;       /* fn_80177F30/fn_8017801C clamp this against a pool float */
     /* +0x37C */ u32 field_0x37C;       /* the rotation word `fn_801CEF44` latches from `field_0x1C0`
-                                        * and hands `fn_801354F4` (`enemy/fn_801CCBC4.cpp`), and the
+                                        * and hands `em_move_offset_rot_apply` (`enemy/fn_801CCBC4.cpp`), and the
                                         * angle `enemy/fn_801B0010.cpp`'s `fn_801B2298` computes with
                                         * `calcVecAngXY` and steps through `fn_80133DB0` */
     /* +0x380 */ u8 field_0x380;        /* the "special part armed" selector `fn_801D6758` matches
@@ -640,7 +657,7 @@ struct _ENEMY_WORK {
                                         * map (`fn_8019EA04` clears it, `fn_8019EA80` scans its low
                                         * 8 bits for free slot indices), `enemy/fn_801D428C.cpp`'s
                                         * `fn_801D4F78` (bit 0 the "aim target live" flag it mirrors
-                                        * from `fn_8012EC60`/the area test, bit 1 its one-shot latch),
+                                        * from `em_alt_mode_ck`/the area test, bit 1 its one-shot latch),
                                         * and `enemy/fn_801B0010.cpp`'s em030 action bitmap (bit 0x01
                                         * the running flag `fn_801B0A28` arms, 0x10/0x20/0x40/0x80 the
                                         * exclusive motion-state bits). */
@@ -668,7 +685,7 @@ struct _ENEMY_WORK {
     /* +0x7B4 */ u8 unused_0x7B4[0x7BC - 0x7B4];
     /* +0x7BC */ f32 field_0x7BC;       /* the effect radius `fn_8012F474` scales */
     /* +0x7C0 */ f32 field_0x7C0;       /* its second factor */
-    /* +0x7C4 */ f32 field_0x7C4;       /* the value `fn_8012F504` clears to 1.0f */
+    /* +0x7C4 */ f32 field_0x7C4;       /* the value `em_mot_set_blend` clears to 1.0f */
     /* +0x7C8 */ u8 field_0x7C8;        /* the action id `fn_8014278C` picks */
     /* +0x7C9 */ u8 unused_0x7C9[0x812 - 0x7C9];
     /* +0x812 */ u16 field_0x812;       /* the action-end block clears it */
@@ -703,7 +720,7 @@ struct _ENEMY_WORK {
     /* +0x8A4 */ s16 field_0x8A4;       /* the timer `fn_80137720` arms from `fn_80126494` */
     /* +0x8A6 */ s16 field_0x8A6;       /* the timer `fn_801409C8` compares against the enemy data's */
     /* +0x8A8 */ u8 unused_0x8A8[0x8AA - 0x8A8];
-    /* +0x8AA */ u8 mode_0x8AA;         /* `fn_80130A10` latches it (0/1); `fn_8012EC60` tests it
+    /* +0x8AA */ u8 mode_0x8AA;         /* `fn_80130A10` latches it (0/1); `em_alt_mode_ck` tests it
                                         * against 1 */
     /* +0x8AB */ u8 unused_0x8AB[0x8B3 - 0x8AB];
     /* +0x8B3 */ u8 flags_0x8B3;        /* the action bitmap `fn_801376BC`/`DC`/`04` mask */

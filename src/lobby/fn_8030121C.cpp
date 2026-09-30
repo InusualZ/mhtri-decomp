@@ -220,13 +220,13 @@ void* fn_803035F8(u32 id) {
 }
 
 /* 0x80304508 - thunk to fn_80304550 with the argument narrowed to a byte. */
-void* fn_80304508(void* a, u32 b, u32 c, u32 d) {
+void* eft_em_spawn(void* a, u32 b, u32 c, u32 d) {
     return fn_80304550(a, (u8)b, c, d);
 }
 
 /* 0x80304510 - fn_80304550 with the argument narrowed, then stores `value` at the returned effect's
  * work block +0x1C. */
-void fn_80304510(void* a, u32 b, u32 c, u32 d, u32 value) {
+void eft_em_spawn_param(void* a, u32 b, u32 c, u32 d, u32 value) {
     _EFT* rec = (_EFT*)fn_80304550(a, (u8)b, c, d);
     if (rec != NULL) {
         Eft8030Work* w = (Eft8030Work*)rec->work_0x38;

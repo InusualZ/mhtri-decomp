@@ -82,8 +82,8 @@ void* fn_80143174(void* a, void* b, s32 c);
 /* The action band's arming helpers that live inside this unit's range, called by
  * `enemy/fn_80178378.cpp` (docs/plan.md 6.5 rule 2: an extern lives with the TU that owns it).
  * The bodies come with this unit's follow-up queue; the signatures are the call sites'. */
-void fn_80146058(struct _ENEMY_WORK* self, f32 a, f32 b, f32 c);
-void fn_8014610C(struct _ENEMY_WORK* self, f32 a, f32 b, f32 c);
+void em_demo_pos_set(struct _ENEMY_WORK* self, f32 a, f32 b, f32 c);
+void em_demo_rot_set(struct _ENEMY_WORK* self, f32 a, f32 b, f32 c);
 
 
 /* 0x801421E4 - r3 is narrowed with `clrlwi r3,r3,16` (a u16 id, 0xFFFF = the "no record" arm) and r4
@@ -93,20 +93,20 @@ u32 fn_801421E4(u32 id, void* out);
 /* 0x80146008 - r3 the frame count in f1?  It reads the record's motion timer and returns 1 once
  * the elapsed frame count has passed the value in r3 (the call sites pass 0x96/0x12C/...).
  * Declared here with the rest of this unit's record helpers (rule 2). */
-u32 fn_80146008(u32 frames);
-void fn_8014619C(struct _ENEMY_WORK* self);
+u32 em_demo_time_ck(u32 frames);
+void em_demo_enable(struct _ENEMY_WORK* self);
 /* 0x80145FE4 - the joint-effect slot allocator this unit owns (returns the slot index, -1 when the
  * set is full).  Added with `enemy/fn_80387844.cpp`'s action band (rule 2). */
-s16 fn_80145FE4(void);
+s16 em_demo_frame_get(void);
 /* 0x8014616C - r3 (`self`) and r4 (the mode); this unit's own definition, added with
  * `enemy/fn_80387844.cpp` (rule 2). */
-void fn_8014616C(struct _ENEMY_WORK* self, s32 mode);
+void em_demo_reset(struct _ENEMY_WORK* self, s32 mode);
 /* 0x801461A8 - r3 (`self`), r4 (`s16` slot), r5/r6 two pointers (the caller's vectors).  Added with
  * `enemy/fn_80387844.cpp` (rule 2). */
-void fn_801461A8(struct _ENEMY_WORK* self, s16 slot, void* a, void* b);
+void em_demo_key3_apply(struct _ENEMY_WORK* self, s16 slot, void* a, void* b);
 /* 0x801462A4 - r3 (`self`), r4 (`s16` slot), r5/r6 two pointers and r7/r8 two scalars.  Added with
  * `enemy/fn_80387844.cpp` (rule 2). */
-void fn_801462A4(struct _ENEMY_WORK* self, s16 slot, void* a, void* b, s32 c, s32 d);
+void em_demo_key_apply(struct _ENEMY_WORK* self, s16 slot, void* a, void* b, s32 c, s32 d);
 
 /* 0x80143BF8 - no arguments; returns a word the effect band's slot scan compares with 1.  Added with
  * `ef/eft_slot.cpp` (rule 2: this unit owns the address). */

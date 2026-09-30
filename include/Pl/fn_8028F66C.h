@@ -39,6 +39,12 @@ struct LandData {
     /* +0x08 */ nw4r::math::VEC3 vec_0x08;
 };
 
+/* 0x8029403C - sweeps the segment `from`..`to` (with a radius) through the area's collision grid and
+ * answers 1 on the first hit.  `flags` bit 0 tests the floor cells, bit 1 the wall cells; `area` 0xFF
+ * means the current area.  The float sits third, ahead of the integers, because the target's callers
+ * load it first.  Added with `enemy/em024_ai.cpp`. */
+s32 pl_coll_sweep_ck(nw4r::math::VEC3* from, nw4r::math::VEC3* to, f32 radius, u32 flags, u32 arg, u8 area, u16 mask);
+
 /* 0x80041E40 - copies one 0xC-byte float record and returns `dst` (the owner `src/mh3_pad.cpp`'s
  * body); normalised with the declaration fold-in of 2026-09-27. */
 

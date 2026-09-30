@@ -39,8 +39,8 @@ void fn_8013AAC4(struct _ENEMY_WORK* enemy);
 u32 fn_8013AB74(struct _ENEMY_WORK *self, u32 a, u32 b);
 
 /* Declarations moved here from `enemy/fn_80176C58.cpp` (docs/plan.md 6.5 rule 2). */
-s32 fn_801391E8(struct _ENEMY_WORK* self);
-void fn_801390FC(struct _ENEMY_WORK* self, void* arg1);
+s32 em_res_user_data_ck(struct _ENEMY_WORK* self);
+void em_res_user_data_set(struct _ENEMY_WORK* self, void* arg1);
 /* 0x8013A654 - r3 (`self`, the owner spells it `ResUserDataAc*`) and r4, stored at +0x8 of the
  * record at +0x4; moved here from `enemy/fn_801550FC.cpp` on landing (rule 2). */
 void fn_8013A654(struct _ENEMY_WORK* self, u32 a);
