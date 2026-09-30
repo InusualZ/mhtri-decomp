@@ -2407,10 +2407,10 @@ config.libs = [
             # r4,r4,lbl_805F988C@l`, then `lis r4,lbl_805F98C4@ha`), where the default pooling addresses
             # every string of a function through one `@stringBase0` register; toggling it moved one row
             # (`NetworkMultipleUdp_receive` 89.53 % -> 94.06 %) and lowered none.  Measured 2026-09-29: `-pool`
-            # (not `-str`) is the lever - with it on, a function referencing two `@NNN` strings addresses the
+            # (not `-str`) is the lever - with it on, a function referencing three or more distinct `@NNN` strings addresses the
             # second off the first's base (`addi r28,r5,<first>` then `addi r4,r28,<delta>`); it is a no-op
             # on the other seven units of this group TODAY (each object is byte-identical without it), but they are
-            # TUs of the same retail family and the session units still have ~60 unwritten rows, several with two
+            # TUs of the same retail family and the session units still have ~60 unwritten rows, several with three or more
             # log strings in one function, so the flag stays on all eight rather than being re-discovered per row.
             Object(NonMatching, "Network/NetworkPeerBase.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
