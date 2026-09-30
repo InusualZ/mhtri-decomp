@@ -251,7 +251,19 @@ def reserve_id(d):
             fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         except FileExistsError:
             continue
+        except PermissionError:
+            # Windows reports a lock whose owner just deleted it (delete pending) as access denied, not as
+            # "exists": that is contention too - rescan.
+            time.sleep(0.005)
+            continue
         os.close(fd)
+        # The scan above and the create are not one step: a racer can scan (max 2), lose the CPU, and create
+        # `.003.lock` only AFTER the winner wrote `003-x.md` and deleted its own lock - the create then succeeds
+        # and two ideas share id 3 (measured 2026-09-30: 2 of 40 runs of the selftest's 12-thread race). The
+        # winner writes its file while it still holds the lock, so looking again AFTER the create is airtight.
+        if any(name.startswith("%03d-" % n) for name in os.listdir(d)):
+            os.remove(lock)
+            continue
         return n, lock
 
 
@@ -298,7 +310,12 @@ def new_idea(root, title, tags, kind="process", slug=None, applies=(), sync=True
             with open(os.path.join(d, demo_name), "x", encoding="utf-8", newline="") as f:
                 f.write(DEMO_SKELETON.format(n=n, title=title, under=slug.replace("-", "_")))
     finally:
-        os.remove(lock)
+        for attempt in range(20):       # Windows can briefly refuse to delete a just-written, just-scanned file
+            try:
+                os.remove(lock)
+                break
+            except PermissionError:
+                time.sleep(0.02 * (attempt + 1))
     if sync:
         sync_generated(root)
     return n, md

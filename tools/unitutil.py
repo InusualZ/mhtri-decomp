@@ -28,6 +28,73 @@ import tempfile
 import time
 from dataclasses import dataclass
 
+import spawnretry
+
+# a process launch Windows refuses transiently (WinError 5) is retried, for every tool that imports this module
+spawnretry.install()
+
+
+def rmtree_retry(path: str, attempts: int = 8) -> None:
+    """`shutil.rmtree` that survives Windows holding a file for a moment (a scanner, a just-exited git).
+
+    Retries `PermissionError`/`OSError` with a growing backoff, clears the read-only bit git sets on
+    `.git/objects`, and finally gives up silently: a leftover temp directory must never fail a test.
+    """
+    def _onerror(func, p, _exc):
+        try:
+            os.chmod(p, 0o700)
+            func(p)
+        except OSError:
+            pass
+    for attempt in range(attempts):
+        if not os.path.exists(path):
+            return
+        try:
+            if sys.version_info >= (3, 12):
+                shutil.rmtree(path, onexc=_onerror)
+            else:
+                shutil.rmtree(path, onerror=_onerror)
+        except OSError:
+            pass
+        if not os.path.exists(path):
+            return
+        time.sleep(0.1 * (attempt + 1))
+    shutil.rmtree(path, ignore_errors=True)
+
+
+def isolate_live_state() -> str:
+    """Point `CLAUDE_CONFIG_DIR` at an empty temp dir for the rest of this process; returns it.
+
+    `slots.live_runs()` reads `<config dir>/sessions/*.json` - the REAL live lanes - so a selftest that calls
+    a slot guard without a fixture registry sees whichever lanes happen to be running when the gate runs, and
+    passes or fails with them. A selftest calls this first: no live sessions exist for it.
+    """
+    path = tempfile.mkdtemp(prefix="claude-config-")
+    os.environ["CLAUDE_CONFIG_DIR"] = path
+    atexit.register(rmtree_retry, path)
+    return path
+
+
+class temp_dir:
+    """`tempfile.TemporaryDirectory()` with `rmtree_retry` cleanup: `with unitutil.temp_dir() as tmp:`.
+
+    Selftests that build a temp git repo or worktree used `TemporaryDirectory`, whose cleanup raises
+    `PermissionError [WinError 5]` when Windows still holds a file - failing a test that had passed.
+    """
+
+    def __init__(self, prefix: str = "mhtri-"):
+        self.name = tempfile.mkdtemp(prefix=prefix)
+
+    def __enter__(self) -> str:
+        return self.name
+
+    def __exit__(self, *exc) -> None:
+        rmtree_retry(self.name)
+        return None
+
+    def cleanup(self) -> None:
+        rmtree_retry(self.name)
+
 # Options that take a following value token, as used by this project's configure.py. Used only to
 # remove a conflicting earlier occurrence when `--flags-extra` overrides the same option.
 VALUED = {

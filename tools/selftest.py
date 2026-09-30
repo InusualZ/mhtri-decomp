@@ -52,6 +52,15 @@ and a date, so one old red cannot hide every new one: the summary reads "green e
 explicit and greppable, never a silent skip, and a park whose test now **passes** is itself reported as
 `STALE` (and fails the run) so a debt cannot rot unnoticed.
 
+**A failure is re-run once, alone (2026-09-30).** The suite runs `--jobs` tests at once, on a machine that is
+also building (live lanes), and a test that touches git, a temp tree or the clock can lose that race without
+being wrong: four landings were refused by `claims`, `ideas` and `slots` selftests that passed by hand a
+minute later. So every fail/timeout is re-run ONCE, serially, after the pool has drained. Passing the second
+time is a **flake**: it passes the row, prints `flaky: ... passed on isolated re-run` loudly on stderr, lands
+in the JSON summary (`flaky`) and is appended to `.pi/selftest-flakes.jsonl` (tool, time, the first failure's
+last lines) so flakes are counted, not silently eating landings. A test that fails twice fails the row, and
+the refusal carries the last 40 lines of its output (`FAIL_TAIL_LINES`).
+
 Exit status is the answer: 0 only when nothing failed, nothing moved the tree, and no park is stale.
 """
 from __future__ import annotations
@@ -68,6 +77,8 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 PARK_FILE = os.path.join(HERE, "selftests-known-failures.json")
+#: prepended to every selftest's PYTHONPATH: its `sitecustomize.py` installs `tools/spawnretry.py`
+SITE_DIR = os.path.join(HERE, "selftest_site")
 
 # a tool "exposes --selftest" when it registers the flag (not when a docstring merely mentions it)
 SELFTEST_FLAG = re.compile(r"""add_argument\(\s*['"]--selftest['"]""")
@@ -80,6 +91,11 @@ COUNT_PATTERNS = (
     re.compile(r"(\d+)\s+checks?\s+passed", re.I),
     re.compile(r"(\d+)\s+checks?\b", re.I),
 )
+
+#: how much of a failing selftest's output the runner keeps and prints (and the gate's refusal carries)
+FAIL_TAIL_LINES = 40
+#: one JSON line per flake (a selftest that failed, then passed alone), relative to the root
+FLAKE_LOG_REL = os.path.join(".pi", "selftest-flakes.jsonl")
 
 SR_REL = ".claude/skills/mwcc-unit-matching/scripts/sync_reference.py"
 
@@ -279,6 +295,10 @@ def run_one(entry: Entry, timeout: float, root: str = ROOT) -> dict:
     started = time.time()
     kwargs: dict = dict(stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                         encoding="utf-8", errors="replace", cwd=root)
+    # every child Python loads `selftest_site/sitecustomize.py`: a launch refused with WinError 5 is retried
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join(p for p in (SITE_DIR, env.get("PYTHONPATH")) if p)
+    kwargs["env"] = env
     if os.name != "nt":
         kwargs["start_new_session"] = True
     else:
@@ -307,6 +327,53 @@ def run_one(entry: Entry, timeout: float, root: str = ROOT) -> dict:
         "duration_s": round(time.time() - started, 2),
         "output": out or "",
     }
+
+
+def tail_lines(text: str, n: int = FAIL_TAIL_LINES) -> str:
+    """The last `n` lines of `text` (a traceback and a `FAIL` line are at the end, not the head)."""
+    return "\n".join((text or "").splitlines()[-n:])
+
+
+def log_flake(path: str, r: dict, retry: dict) -> None:
+    """Append one flake record; never let a logging problem change the verdict."""
+    rec = {"tool": r["name"], "time": time.strftime("%Y-%m-%dT%H:%M:%S"), "first_status": r["status"],
+           "first_returncode": r["returncode"], "first_duration_s": r["duration_s"],
+           "retry_duration_s": retry["duration_s"], "first_failure_tail": tail_lines(r["output"])}
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(rec) + "\n")
+    except OSError as exc:
+        print("selftest: could not record the flake in %s: %s" % (path, exc), file=sys.stderr)
+
+
+def retry_failed(results: list[dict], entries: list[Entry], timeout: float, root: str = ROOT,
+                 flake_log: str | None = None, runner=None) -> list[dict]:
+    """Re-run every failed/timed-out selftest ONCE, serially (alone: the pool has drained).
+
+    Passing on the re-run marks the result `flaky` (status pass, the first failure kept in `first_failure`);
+    failing again keeps the *second* run's output (the isolated one) and records `attempts: 2`. A parked
+    tool is re-run too - the park is decided later, from the final status - at the cost of one extra run.
+    """
+    runner = runner or run_one
+    by_name = {e.name: e for e in entries}
+    for i, r in enumerate(results):
+        if r["status"] not in ("fail", "timeout"):
+            continue
+        again = runner(by_name[r["name"]], timeout, root)
+        again["attempts"] = 2
+        again["first_failure"] = tail_lines(r["output"])
+        if again["status"] == "pass":
+            again["flaky"] = True
+            again["first_status"] = r["status"]
+            print("flaky: %s passed on isolated re-run (first run: %s, exit %s) - recorded in %s"
+                  % (r["name"], r["status"], r["returncode"], FLAKE_LOG_REL.replace(os.sep, "/")),
+                  file=sys.stderr)
+            for ln in tail_lines(r["output"], 12).splitlines():
+                print("      " + ln, file=sys.stderr)
+            log_flake(flake_log or os.path.join(root, FLAKE_LOG_REL), r, again)
+        results[i] = again
+    return results
 
 
 def git_status(root: str) -> list[str]:
@@ -468,9 +535,11 @@ def selftest() -> int:
     mapping - on fixtures and this tree's inventory.
 
     `tools/selftest.py` exposes `--selftest`, so `discover` finds it and the suite runs these checks as one
-    more entry. They never **run** git and never spawn a test: the discovery fixtures are a temp `tools/`
-    tree, the `--changed` composition replaces `subprocess.run`, and nothing here writes a file.
+    more entry. They never **run** git and never spawn a repository test: the discovery fixtures are a temp
+    `tools/` tree, the `--changed` composition replaces `subprocess.run`, and the only processes started are the
+    two throwaway scripts of the re-run fixture, inside a temp dir.
     """
+    import io
     import tempfile
     fails, checks = [], 0
 
@@ -592,6 +661,47 @@ def selftest() -> int:
     finally:
         subprocess.run = real_run
 
+    # --- the isolated re-run (2026-09-30): a fixture tool that fails once then passes is a FLAKE (row passes,
+    # warning + log line); one that always fails stays red and its last lines are kept. Two tiny scripts
+    # run for real (a subprocess each), in a temp dir, with the flake log pointed there too.
+    with tempfile.TemporaryDirectory() as tmp:
+        marker = os.path.join(tmp, "ran-once")
+        flaky_py = os.path.join(tmp, "flaky_tool.py")
+        with open(flaky_py, "w", encoding="utf-8") as fh:
+            fh.write("import os, sys\nm = %r\nif not os.path.exists(m):\n    open(m, 'w').close()\n"
+                     "    print('first run boom')\n    sys.exit(1)\nprint('ok - 3 checks')\n" % marker)
+        red_py = os.path.join(tmp, "red_tool.py")
+        with open(red_py, "w", encoding="utf-8") as fh:
+            fh.write("import sys\nfor i in range(60):\n    print('line %d' % i)\nprint('FAIL always')\nsys.exit(1)\n")
+        flaky_e = Entry("fixture/flaky", None, None).as_check([sys.executable, flaky_py])
+        red_e = Entry("fixture/red", None, None).as_check([sys.executable, red_py])
+        log = os.path.join(tmp, ".pi", "selftest-flakes.jsonl")
+        first = [run_one(flaky_e, 60, tmp), run_one(red_e, 60, tmp)]
+        check("the fixture flaky tool fails the first time", first[0]["status"], "fail")
+        real_stderr, sys.stderr = sys.stderr, io.StringIO()
+        try:
+            res = retry_failed(first, [flaky_e, red_e], 60, tmp, flake_log=log)
+            warned = sys.stderr.getvalue()
+        finally:
+            sys.stderr = real_stderr
+        check("a fail-once-then-pass tool passes the row", res[0]["status"], "pass")
+        check("... and is marked flaky", res[0].get("flaky"), True)
+        check("... with a loud warning", "flaky: fixture/flaky passed on isolated re-run" in warned, True)
+        check("... that shows the first failure", "first run boom" in warned, True)
+        with open(log, encoding="utf-8") as fh:
+            rows = [json.loads(ln) for ln in fh if ln.strip()]
+        check("... and one flake line is logged with tool, time and the first failure's tail",
+              [(r["tool"], bool(r["time"]), "first run boom" in r["first_failure_tail"]) for r in rows],
+              [("fixture/flaky", True, True)])
+        check("an always-failing tool stays red after the re-run", res[1]["status"], "fail")
+        check("... is not flaky and records two attempts", (res[1].get("flaky"), res[1]["attempts"]), (None, 2))
+        check("... and keeps only the last FAIL_TAIL_LINES lines, ending on the failure",
+              tail_lines(res[1]["output"]).splitlines()[-1], "FAIL always")
+        check("... exactly that many", len(tail_lines(res[1]["output"]).splitlines()), FAIL_TAIL_LINES)
+        check("a passing tool is never re-run", retry_failed([dict(res[0], status="pass", flaky=None)],
+                                                             [flaky_e], 60, tmp, flake_log=log,
+                                                             runner=lambda *a: 1 / 0)[0]["status"], "pass")
+
     for f in fails:
         print("FAIL " + f)
     print("ok - %d checks" % checks)
@@ -659,6 +769,7 @@ def main(argv: list[str] | None = None) -> int:
     started = time.time()
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, a.jobs)) as pool:
         results = list(pool.map(lambda e: run_one(e, a.timeout, root), entries))
+    results = retry_failed(results, entries, a.timeout, root)
     wall = time.time() - started
     dirty_after = git_status(root)
     pool_after = pool_manifest_bytes(root)
@@ -730,7 +841,10 @@ def main(argv: list[str] | None = None) -> int:
             "results": [{k: v for k, v in r.items() if k != "output"} for r in results],
             "dedupe_notes": notes,
             "failures": [{"name": r["name"], "status": r["status"], "returncode": r["returncode"],
-                          "head": "\n".join((r["output"] or "").splitlines()[:25])} for r in failed],
+                          "head": "\n".join((r["output"] or "").splitlines()[:25]),
+                          "tail": tail_lines(r["output"])} for r in failed],
+            "flaky": [{"name": r["name"], "first_status": r.get("first_status"),
+                       "first_failure": r.get("first_failure", "")} for r in results if r.get("flaky")],
         }
         print(json.dumps(payload, indent=2))
         return 0 if green else 1
@@ -739,7 +853,7 @@ def main(argv: list[str] | None = None) -> int:
     print("")
     for r in failed:
         print("FAIL %s (%s, exit %s)" % (r["name"], r["target"], r["returncode"]))
-        for line in (r["output"] or "").splitlines()[:15]:
+        for line in tail_lines(r["output"]).splitlines():
             print("    " + line)
         print("")
     if not tree_ok:
@@ -751,6 +865,9 @@ def main(argv: list[str] | None = None) -> int:
         print("STALE %s" % name)
 
     summary = "%d selftest(s): %d passed, %d failed" % (len(results), passed, len(failed))
+    flaky_n = sum(1 for r in results if r.get("flaky"))
+    if flaky_n:
+        summary += ", %d FLAKY (passed on isolated re-run)" % flaky_n
     if parked_count:
         summary += ", %d parked (known)" % parked_count
     if stale_parks:
