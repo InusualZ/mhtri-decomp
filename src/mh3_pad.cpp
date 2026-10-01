@@ -5,7 +5,7 @@
  * functions the map does name (`Tsk_Change`, `GameModeExec`, `cnvt_eur_fname`, `initKPAD`, ...) use
  * their real C++ signatures.
  *
- * `mh3_pad.cpp` - the game-root pad / mode file.  `.text` 0x800408A8-0x80047398 (145 functions).
+ * `mh3_pad.cpp` - the game-root pad / mode file.  `.text` 0x800408A8-0x80046C80 (125 functions); phase 4 cut the pad-connect tail (0x80046C80-0x80047398) into `pad_connect.cpp`.
  *
  * Name evidence (docs/plan.md 12, evidence class 1): the unit's own `fn_80041AA4` (the WPAD init
  * routine) reaches an OSPanic whose file argument is the bare source name string
@@ -16,22 +16,19 @@
  * `nw_resource.cpp`) in configure.py's `main` lib, so the file is top-level `src/mh3_pad.cpp`.
  *
  * Seam: the left edge 0x800408A8 is settled (`fn_80040598.cpp`'s extab group ends exactly there and
- * this unit's first extab record starts at 0x80006820).  The right edge 0x80047398 is NOT a
- * translation-unit boundary - it is where the pooled proposal was capped (`seam_note: capped at
- * --max-bytes, seam is a guess`); `fn_80047398` (0x5C B, own extab at 0x80006A90) continues the same
- * function stream.  This unit claims only the proposal's 145 functions.
+ * this unit's first extab record starts at 0x80006820).  The right edge 0x80046C80 is where the reconciled
+ * candidate puts `pad_connect.cpp` (the proposal's old edge 0x80047398 was a `--max-bytes` cap, not a TU boundary).
  *
- * Sections: .text 0x800408A8-0x80047398, extab 0x80006820-0x80006A90,
- * extabindex 0x8001E5A0-0x8001E948, and the .ctors word 0x8056F2C4-0x8056F2C8 (dtk assigned it to
+ * Sections: .text 0x800408A8-0x80046C80, and the .ctors word 0x8056F2C4-0x8056F2C8 (dtk assigned it to
  * this unit on the split; the first C++ static constructor of the file).
  *
- * `.bss` 0x806585B8-0x806694E8 is this unit's own (claimed, defined at the foot of the file, every symbol offset and
+ * `.bss` 0x806585B8-0x806694D0 is this unit's own (claimed, defined at the foot of the file, every symbol offset and
  * size equal to the target): `system_w`, `Screen_w`, `option_w`, `lb_param_w`, the `Psw` pad records and their twin, the
  * task table, the WPAD sampling buffers and the pointer/mutex state.  Evidence: the static constructor
  * `fn_80046B94` (`.ctors` word 0x8056F2C4) constructs `Psw` and `Psw_prev` as 4 x 0x350 B arrays, and the window is bounded by
- * `main.cpp`'s `.bss` below and `fn_80047398.cpp`'s above.  The two pad arrays' constructor is not reconstructed (plain
+ * `main.cpp`'s `.bss` below and `pad_connect.cpp`'s `game_mutex` above.  The two pad arrays' constructor is not reconstructed (plain
  * storage here); the names marked GUESS at their definitions (`Psw_prev`, `pad_chan_state`, `pad_btn_table_*`, `kpad_work`,
- * `pointer_*`, `game_mutex`) are derived from the functions that touch them.  `lbl_807419C8` (the RcRecord table) is not
+ * `pointer_*`) are derived from the functions that touch them.  `lbl_807419C8` (the RcRecord table) is not
  * in this window: it sits in the DVD library's `.bss`.
  *
  * This session reconstructed 67 of the 145 functions to the 80 % bar: the RSO sub-overlay loader state
@@ -756,59 +753,6 @@ void setWpadCallback(void)
     } while (chan < 4);
 }
 
-/* ------------------------------------------------------------------ *
- * 0x80046EE4 - 0x800470B4  (system flags)
- * ------------------------------------------------------------------ */
-
-extern "C" void fn_80046EE4(void)
-{
-    system_w.field_0x30 = 1;
-}
-
-extern "C" void fn_80046EF8(void)
-{
-    system_w.field_0x30 = 0;
-}
-
-extern "C" s32 fn_80046F0C(void)
-{
-    return system_w.field_0x30 != 0;
-}
-
-extern "C" s32 screen_split_mode_ck(void)
-{
-    return Screen_w.split_mode != 0;
-}
-
-extern "C" s8 fn_800470B4(void)
-{
-    if (Screen_w.split_mode != 0) {
-        return (s8)Screen_w.split_view_no;
-    }
-    return -1;
-}
-
-extern "C" u8 fn_800472DC(s32 arg0)
-{
-    return (u8)(fn_800470B4() * 2 + arg0);
-}
-
-extern "C" void fn_80046E98(void)
-{
-    if (system_w.field_0x21 != 0) {
-        fn_8007A510();
-    }
-}
-
-/* `setSoftresetFlag__Fb` */
-void setSoftresetFlag(bool flag)
-{
-    if (flag) {
-        system_w.field_0x20 = 0;
-    } else {
-        system_w.field_0x20 = 1;
-    }
-}
 
 /* `GameModeExec__Fv` - pick the task body for the current game mode. */
 void GameModeExec(void)
@@ -881,26 +825,6 @@ extern "C" void fn_80041EA4(u8 chan, s32 on)
 }
 
 /* ------------------------------------------------------------------ *
- * 0x80047234 - 0x8004726C  (32-bit word copy)
- * ------------------------------------------------------------------ */
-
-extern "C" s32 fn_80047234(s32* src)
-{
-    return *src;
-}
-
-extern "C" void word_copy(s32* dst, s32* src)
-{
-    *dst = *src;
-}
-
-extern "C" void* word_copy_return_dst(void* dst, const void* src)
-{
-    word_copy((s32*)dst, (s32*)src);
-    return dst;
-}
-
-/* ------------------------------------------------------------------ *
  * 0x80044180  (acceleration clamp)
  * ------------------------------------------------------------------ */
 
@@ -948,4 +872,3 @@ s16 pointer_hist_x[16];                /* +0x80669478: pointer x history ring, z
 s16 pointer_hist_y[16];                /* +0x80669498: pointer y history ring (GUESS) */
 f32 pointer_center[3];                 /* +0x806694B8: half of `Screen_w.width_f`/`height_f` (GUESS name) */
 f32 pointer_offset[3];                 /* +0x806694C4: zeroed pointer offset (GUESS name) */
-u8 game_mutex[0x18];                   /* +0x806694D0: an OSMutex, initialised by `fn_80046C80` (GUESS name) */

@@ -1,8 +1,8 @@
 /*
  * ef/ef_effectsystem.cpp - the nw4r::ef effect system: its group table, its pools and its walkers.
  *
- * .text 0x800A56B0..0x800A6350, twenty-three functions.  Sections: extab 0x80009C38..0x80009CD4,
- * extabindex 0x80022E30..0x80022EE4, .text 0x800A56B0..0x800A6350, and the `.ctors` word at 0x8056F2D8,
+ * .text 0x800A56B0..0x800A6258, twenty functions (phase 4 moved the emitter-side resource object's constructor, sub-object constructor
+ * and deleting destructor, 0x800A6258..0x800A6350, to `ef_emitter.cpp`).  Sections: .text 0x800A56B0..0x800A6258, and the `.ctors` word at 0x8056F2D8,
  * which points at the file's static initializer fn_800A60C8.
  *
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
@@ -54,9 +54,6 @@
  *   fn_800A61EC/61FC/620C/6248  out-of-line copies of four other units' constructors, emitted here
  *                because this file instantiates their classes (the three borrowed objects and the
  *                `ef_draworder.cpp` list class - `lbl_8059241C` is that class's table).
- *   fn_800A6258/62C0  the emitter-side resource object's constructor and its +0x20 sub-object
- *                (ef/ef_emitter.cpp's bodies own the rest of that layout).
- *   fn_800A630C  that object's deleting destructor.
  *
  * Load-bearing source shapes:
  *   - the pointer guard is the `NW4R_POINTER_ASSERT` RVL address-range chain the ef units share (six
@@ -125,6 +122,9 @@
 #include "ef.h" /* nw4r::ef::EffectSystem / nw4r::ef::Effect (rule 9's owner) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "ef/ef_draworder.h" /* lbl_8059241C (rule 2) */
+#include "ef/ef_emform.h" /* lbl_80594EC4 (rule 2) */
+#include "unsplit/ef_tables.h" /* lbl_80594840: no registered owner yet (rule 2) */
 
 namespace nw4r {
 namespace db {
@@ -132,10 +132,6 @@ void Panic(const char* file, int line, const char* fmt, ...);
 void Warning(const char* file, int line, const char* fmt, ...);
 } // namespace db
 } // namespace nw4r
-
-/* The global `operator delete` (its compiler mangling is `__dl__FPv`; declaring that spelling would be
- * rule 9's violation - the sibling ef units spell it the same way). */
-void operator delete(void* ptr) throw();
 
 /* ===================================================================================================
  * Types.  Every record states its size; the offsets are the ones the bodies load or store.  The `EfSys`
@@ -231,32 +227,6 @@ typedef struct EfSysVtblObj {
     /* +0x00 */ void* vtable;
 } EfSysVtblObj; /* size: 0x04 */
 
-/* The +0x20 sub-object of the emitter-side object `fn_800A62C0` initialises: four transform vectors,
- * cleared in this order.  The offsets are relative to the sub-object. size: 0x94 */
-typedef struct EfSysResourceSub {
-    /* +0x00 */ u8 pad_0x00[0x64];
-    /* +0x64 */ nw4r::math::VEC3 vec_0x84;
-    /* +0x70 */ nw4r::math::VEC3 vec_0x90;
-    /* +0x7C */ nw4r::math::VEC3 vec_0x9C;
-    /* +0x88 */ nw4r::math::VEC3 vec_0xA8;
-} EfSysResourceSub; /* size: 0x94 */
-
-/* The emitter-side object this file's constructor builds.  ef/ef_emitter.cpp owns the rest of the layout
- * (`EfEmitterObj`, the same object) - rule 1 debt, booked in the outbox. size: 0x154 (lower bound:
- * +0x124 is the highest field the constructor touches) */
-typedef struct EfSysResourceObj {
-    /* +0x000 */ u8 pad_0x000[0x01C];
-    /* +0x01C */ void* vtable; /* the root base's table fn_800A4080 sets, then this class's */
-    /* +0x020 */ EfSysResourceSub sub_0x020;
-    /* +0x0B4 */ u8 pad_0x0B4[0x00C];
-    /* +0x0C0 */ EfSysActivityList particles; /* the list ef/ef_emitter.cpp calls `particles` */
-    /* +0x0DC */ u8 pad_0x0DC[0x02C];
-    /* +0x108 */ nw4r::math::VEC3 vec_0x108;
-    /* +0x114 */ nw4r::math::VEC3 vec_0x114;
-    /* +0x120 */ u8 pad_0x120[0x004];
-    /* +0x124 */ nw4r::math::MTX34 mtx_0x124;
-} EfSysResourceObj; /* size: 0x154 (lower bound: ef/ef_emitter.cpp's own view of the object) */
-
 /* The object fn_800A60B8 / fn_800A60C0 are called with: ef/effect.cpp casts fn_800A60C0's result to a
  * MTX34 (the effect's root matrix) and the two returned offsets are the only thing this range
  * establishes, so the +0x30 block is a named byte and the matrix is the mapped one. size: 0x88 */
@@ -317,10 +287,6 @@ extern void* lbl_8059283C[];
 extern void* lbl_80794910; /* the three borrowed engine objects (their constructors are below) */
 extern void* lbl_80794914;
 extern void* lbl_80794918;
-extern void* lbl_8059241C[]; /* ef_draworder.cpp's list class (its key function lives there)       */
-extern void* lbl_80594840[]; /* the strategy table (ef_drawstrategyimpl.cpp's fn_800C5DB8)        */
-extern void* lbl_80594EC4[]; /* the line-strategy table (ef_line.cpp's fn_800CCCF8)               */
-extern void* lbl_80592BA8[]; /* the emitter-side object's table (ef_emitter.cpp's eight virtuals) */
 extern u8 lbl_80688420[];
 extern u8 lbl_806884D0[];
 extern u8 lbl_806884C0[];
@@ -355,14 +321,9 @@ EfSysVtblObj* fn_800A61EC(EfSysVtblObj* self);
 EfSysVtblObj* fn_800A61FC(EfSysVtblObj* self);
 EfSysVtblObj* fn_800A620C(EfSysVtblObj* self);
 EfSysVtblObj* fn_800A6248(EfSysVtblObj* self);
-EfSysResourceObj* fn_800A6258(EfSysResourceObj* self);
-EfSysResourceSub* fn_800A62C0(EfSysResourceSub* self);
-void* fn_800A630C(void* self, s16 flag);
 
 /* the callees */
 void fn_800A4030(void* list, u16 linkOffset);
-void* fn_800A3FFC(void* list, u32 linkOffset);
-void fn_800A4080(void* self);
 void* fn_800A4420(void* p);
 void fn_800A4428(void* list);
 void fn_800A43E8(void* list, void* node);
@@ -707,31 +668,5 @@ extern "C" EfSysVtblObj* fn_800A6248(EfSysVtblObj* self) {
     return self;
 }
 
-/* 0x800A6258 - the emitter-side resource object's constructor (ef/ef_emitter.cpp owns its layout). */
-extern "C" EfSysResourceObj* fn_800A6258(EfSysResourceObj* self) {
-    fn_800A4080(self);
-    self->vtable = lbl_80592BA8;
-    fn_800A62C0(&self->sub_0x020);
-    fn_800A3FFC(&self->particles, 0x14);
-    VEC3_ctor(&self->vec_0x108);
-    VEC3_ctor(&self->vec_0x114);
-    MTX34_ctor(&self->mtx_0x124);
-    return self;
-}
 
-/* 0x800A62C0 - the resource object's +0x20 sub-object: clear its four transform vectors. */
-extern "C" EfSysResourceSub* fn_800A62C0(EfSysResourceSub* self) {
-    VEC3_ctor(&self->vec_0x84);
-    VEC3_ctor(&self->vec_0x90);
-    VEC3_ctor(&self->vec_0x9C);
-    VEC3_ctor(&self->vec_0xA8);
-    return self;
-}
 
-/* 0x800A630C - the resource object's deleting destructor. */
-extern "C" void* fn_800A630C(void* self, s16 flag) {
-    if (self != NULL && flag > 0) {
-        operator delete(self);
-    }
-    return self;
-}

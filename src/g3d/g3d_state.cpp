@@ -1,6 +1,7 @@
 /*
- * nw4r g3d: g3d_state.cpp - the `G3DState` cluster, `.text` 0x8008452C-0x800898B0 (202 functions),
- * plus its `extab` (0x80008ADC-0x80008EB0) and `extabindex` (0x8002148C-0x800219E4) records.
+ * nw4r g3d: g3d_state.cpp - the `G3DState` cluster, `.text` 0x8008452C-0x80088E24 (167 functions),
+ * plus its `extab` (0x80008ADC-0x80008DE0) and `extabindex` (0x8002148C-0x800218AC) records.  Phase 4 cut the
+ * `ResVtx*` accessor tail (0x80088E24-0x800898B0, the second `.data` fragment below) into `g3d_resvtx.cpp`.
  *
  * Registered once, at its final home, from proposal `8008452C` - the 0x8008452C-0x800898B0 maximal
  * unclaimed run.  The evidence:
@@ -16,10 +17,8 @@
  *  - **right seam** 0x800898B0: the registered `g3d/g3d_resanm.c` starts exactly there; `tudiscover
  *    at 0x800894C8` calls it a *strong* cut (`.sdata2` lbl_80795EA0 -> lbl_80795EA8).
  *  - **interior**: a second `.data` fragment opens at 0x8058FCE8 (the `g3d_resvtx_ac.h` /
- *    `ResVtxFurVec` / `ResVtxTexCoord` strings plus the static constructor wrt the `.ctors` word
- *    0x8056F2D4), so the last ~52 functions may belong to a second TU.  Both interior cuts
- *    `tudiscover` offers for the state closure (0x80088AD0, 0x80089330) are *weak* only, so the run
- *    is registered whole and the seam is left to settle as the functions match (brief 8.3).
+ *    `ResVtxFurVec` / `ResVtxTexCoord` strings), so the last ~35 functions are a second TU: the reconciled
+ *    candidate cuts the run at 0x80088E24 and `g3d_resvtx.cpp` takes the tail (phase 4).
  *
  * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (checked with
  * `tools/symbols/dumpmap.py` over the range and the proposal's 202-entry inventory - every name is a

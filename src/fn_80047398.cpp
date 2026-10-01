@@ -1,59 +1,37 @@
 /*
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/dumpmap.py lookup <addr>` - every function in 0x80047398..0x8004C9A0 is a bare
- * `.text` entry; the shared runtime dump has only `zz_<addr>_` placeholders, so there is no better name
- * to take).  The four mangled names the range does carry (`drawSpr2TF__FUcP9fltSpr2TFUc`,
- * `subTransSetPrio__FUcUllPUl`, `subTransSet__FUllPUl`, `subTransSetStackSetup`) are spelled by their
- * real declarations, never as callable identifiers (rule 9).
+ * The character face/skin render unit.  `.text` 0x80047398..0x80048964 (the loader/driver family around `face_work`, the
+ * `drawSpr2TF` GX writers up to the second FIFO family); `.bss` 0x806694E8..0x806699B8 (`face_work`), `.sbss` 0x80794870..78.
+ * Phase 4 cut the old 0x80047398..0x8004C9A0 run at 0x80048964: the part from there is `userdata_item.cpp` (user-data / item-table /
+ * sprite-transform helpers, `.bss` 0x806699B8 on).
  *
- * The character face/skin render unit.  `.text` 0x80047398..0x8004C9A0 (0x5610 B, 117 functions),
- * `extab` 0x80006A90..0x80006CF0, `extabindex` 0x8001E948..0x8001ECD8 (75 framed functions each).
- * The range is one maximal unclaimed run (attribute.py): its seam is unproven, and the two halves of the
- * body work on different data (the loader/driver family around `face_work`, and the sprite/transform
- * family from 0x80048E2C on) - see "Residual" below.
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range - no `__FILE__` string, no assert, no runtime-dump name (class 1/2
+ * fail), so the file keeps the map's `fn_80047398` stem (evidence class 3, the same outcome as `src/fn_80040598.cpp`) in the
+ * game-root `main` lib band (`cflags_main`), next to `mh3_pad.cpp` which ends where this unit begins.  The mangled names the range
+ * carries (`drawSpr2TF__FUcP9fltSpr2TFUc`, `subTransSetPrio__FUcUllPUl`, ...) are in `userdata_item.cpp`'s half and are never
+ * spelled as callable identifiers (rule 9).
  *
- * Naming - which evidence class decided it.
- *   * Class 1 (`__FILE__` string) FAILS: the unit's `.data` pool (0x805813E8, 0x80582D38, 0x80582E58,
- *     0x80582EE0) and its `.sdata2` run (0x80795B70..0x80795BAC) hold resource paths
- *     (`08/skin/m_face000.tpl` .. `08/skin/f_face008.tpl`, `08/skin/facemake.tpl`, `11/efm/com/*.bin`,
- *     `15/scr_me*.breff`) and geometry floats, but NO bare source-file name, and no function in the range
- *     calls `OSPanic`/`Panic` (so no assert string exists).
- *   * Class 2 (runtime-dump name) FAILS: `dumpmap.py lookup 0x80047398` answers `zz_0047398_` only, and
- *     the `join` pass proposes `DBClose`/`GXPosition3f32` style names that are address coincidences from a
- *     different build's dump - not evidence.
- *   * Class 3 decides it: the file keeps the map's stem `fn_80047398` (the same outcome the sibling
- *     `src/fn_80040598.cpp` records) and is registered in the game-root band - the `main` lib at the
- *     `src/` root, with `cflags_main`, exactly where its link neighbours sit (`main.cpp`, `sys_mem.cpp`,
- *     `fn_80040598.cpp`, `mh3_pad.cpp` 0x800408A8..0x80047398 - which ends where this unit begins - and
- *     `nw_resource.cpp`).  Module `main` is a *recorded decision*, not an invention; a future pass that
- *     finds a `__FILE__` string or a subsystem seam can re-home it.
- *
- * What the unit does (from the bodies): it loads the male/female face, skin and `facemake` TPL textures
- * through the 8-byte `{size, name}` tables at 0x80582D38/0x80582E58/0x80582EE0, binds them as GX texture
- * objects into a work block at `face_work` (0x4D0 B, cleared by fn_800474A8, whose three `void*`
- * slots start at 0x04), keeps a per-player face/frame/animation state there (the byte arrays at 0x448,
- * 0x456, 0x4B0, 0x4BA, 0x4C4 and the ten-entry pointer runs at 0x460/0x488) and draws the 2D face with an
+ * What the unit does (from the bodies): it loads the male/female face, skin and `facemake` TPL textures through the 8-byte
+ * `{size, name}` tables at 0x80582D38/0x80582E58/0x80582EE0, binds them as GX texture objects into a work block at `face_work`
+ * (0x4D0 B, cleared by fn_800474A8, whose three `void*` slots start at 0x04), keeps a per-player face/frame/animation state there
+ * (the byte arrays at 0x448, 0x456, 0x4B0, 0x4BA, 0x4C4 and the ten-entry pointer runs at 0x460/0x488) and draws the 2D face with an
  * orthographic GX pipeline (fn_80047D6C builds C_MTXOrtho/GXSetProjection and pushes TPL quads).
  *
- * Status: partial (phase B first pass).  28 of the 117 symbols have bodies, in address order; the rest
- * are unwritten (0 %), biggest first `fn_80047D6C` (0x9F8), `fn_8004991C` (0x8D0), `fn_80048964` (0x33C),
- * `fn_80049F7C` (0x2B0), `fn_8004A5AC` (0x2A8), `fn_800478F0` (0x200), `fn_80047634` (0x170).
+ * Status: partial.  Written, in address order: the accessors and the face animation helpers up to `fn_80047D38` and the GX pipe
+ * writers `fn_80048764..fn_800487C8`; the biggest unwritten are `fn_80047D6C` (0x9F8), `fn_800478F0` (0x200), `fn_80047634` (0x170).
  *
- * Residual: the four functions that read `Screen_w` (fn_80047398, fn_800473F4, fn_800478F0, fn_80047D6C)
- * are NOT written: `ScreenWork` is defined inside `main.cpp`, and reaching its fields from a second unit
- * needs that type moved to `include/` first (rule 1) - a cross-unit refactor, recorded here rather than
- * copied (rule 1 forbids a local copy).  fn_80047634/fn_80047780 are declared and called by fn_80047884/
- * fn_80047CAC but their load_file_req/load_file bodies are unwritten (their signatures come from the map's
- * `load_file_req__FPcUllUllPUl` / `load_file__FPcUll`, which rule 9 forbids spelling as identifiers, so
- * their real declarations have to be recovered from the callee first).
+ * Residual: the four functions that read `Screen_w` (fn_80047398, fn_800473F4, fn_800478F0, fn_80047D6C) are NOT written:
+ * `ScreenWork` is defined inside `main.cpp`, and reaching its fields from a second unit needs that type moved to `include/` first
+ * (rule 1).  fn_80047634/fn_80047780 are declared and called by fn_80047884/fn_80047CAC but their load_file_req/load_file bodies
+ * are unwritten (their real signatures come from the map's `load_file_req__FPcUllUllPUl` / `load_file__FPcUll`, which rule 9
+ * forbids spelling as identifiers).
  *
  * Inventory / addresses / sizes: `python tools/units/ledger.py unit fn_80047398.cpp`.
  */
 
 #include "types.h"
-#include "id_value.h"
 #include "gx.h"
 #include "Runtime.PPCEABI.H/memset.h" /* owned by Runtime.PPCEABI.H/memset.c (rule 2) */
+#include "EXI/GXSetTexCoordGen2.h" /* the SDK function the pipe helpers tail-call (rule 2) */
 
 /* --- the unit's own work block, `face_work` (.bss 0x806694E8, 0x4D0 B) ------------------------ */
 
@@ -85,20 +63,9 @@ typedef struct FaceWork {
 
 extern FaceWork face_work;
 
-/* The unit's own `.data`/`.sdata` pool, declared (never defined) so the object emits only the references
- * (playbook 29).  The two face tables are runs of 8-byte `{size, name}` records. */
-typedef struct FaceLoadEntry {
-    /* +0x00 */ u32 size;
-    /* +0x04 */ const char* name;
-} FaceLoadEntry; /* size: 0x8 */
-
-extern FaceLoadEntry lbl_80582D38[];
-extern FaceLoadEntry lbl_80582E58[];
-extern FaceLoadEntry lbl_80582EE0[];
+/* The unit's own `.sdata` pool word, declared (never defined) so the object emits only the reference (playbook 29).  The face-load tables
+ * (`{size, name}` runs at 0x80582D38/0x80582E58/0x80582EE0, read by the unwritten `fn_80047634`) are `draw_shape.cpp`'s `.data` in the reconciled candidate. */
 extern u16* lbl_80790EE8[];
-
-/* SDK function the pipe helper tail-calls (no map mangling, so the plain declaration is the real one). */
-extern "C" void GXSetTexCoordGen2(u32, u32, u32, u32, u32, u32);
 
 /* --- the unit's own functions, declared so each has one signature --------------------------------- */
 
@@ -342,153 +309,7 @@ extern "C" u32 fn_800487C8(void)
     return 0x4880;
 }
 
-/* Empty stub. */
-extern "C" void fn_80048CA0(void)
-{
-}
-
-/* Two float vertices (second writer family). */
-extern "C" void fn_80048CA4(f32 x, f32 y)
-{
-    GXWGFifo.f32 = x;
-    GXWGFifo.f32 = y;
-}
-
-/* One raw word. */
-extern "C" void fn_80048CB4(u32 value)
-{
-    GXWGFifo.u32 = value;
-}
-
-/* A 2D position pair (second writer family). */
-extern "C" void fn_80048CC0(s32 x, s32 y)
-{
-    GXWGFifo.s16 = x;
-    GXWGFifo.s16 = y;
-}
-
-/* The unit's fixed texture-coordinate generator (second writer family). */
-extern "C" void fn_80048CD8(u32 a, u32 b, u32 c, u32 d)
-{
-    GXSetTexCoordGen2(a, b, c, d, 0, 0x7D);
-}
-
-/* --- the small table helpers ----------------------------------------------------------------------- */
-
-/* The record size for one menu kind. */
-extern "C" u32 fn_8004AF0C(u32 kind)
-{
-    return kind == 1 ? 0x20 : 0x18;
-}
-
-/* The record block for one layout kind. */
-extern "C" u8* fn_8004AF60(u8* base, u32 kind)
-{
-    if (kind == 1) {
-        return base + 0x100;
-    }
-    return base + 0xA0;
-}
-
-/* Whether the given id belongs to the face-record family. */
-extern "C" u32 fn_8004B034(u16 id)
-{
-    if ((u32)(id - 0x1B6) <= 1) {
-        return 1;
-    }
-    if (id == 0) {
-        return 1;
-    }
-    if (id == 0xDF) {
-        return 1;
-    }
-    return 0;
-}
-
-/* Looks up an id in a 4-byte `{id, value}` table; 0 when it is absent. */
-extern "C" s32 item_count_find(u16 id, const IdValue* table, s32 count)
-{
-    s32 value = 0;
-
-    if (id != 0 && count > 0) {
-        do {
-            if (table->id == id) {
-                value = table->value;
-                break;
-            }
-            table++;
-        } while (--count);
-    }
-    return value;
-}
-
-/* The index of an id in a 4-byte `{id, value}` table, or -1. */
-extern "C" s32 item_pair_index_find(u16 id, const IdValue* table, s32 count)
-{
-    s32 index = 0;
-
-    if (count > 0) {
-        do {
-            if (table->id == id) {
-                return index;
-            }
-            table++;
-            index++;
-        } while (--count);
-    }
-    return -1;
-}
-
-/* Clears one record and reports whether it had been in use. */
-extern "C" u32 fn_8004BD30(IdValue* entry)
-{
-    entry->value = 0;
-    if (entry->id != 0) {
-        entry->id = 0;
-        return 1;
-    }
-    return 0;
-}
-
-/* Counts the free entries of a 4-byte `{id, value}` table. */
-extern "C" u32 fn_8004C004(const IdValue* table, s32 count)
-{
-    u32 free = 0;
-
-    if (count > 0) {
-        do {
-            if (table->id == 0) {
-                free++;
-            }
-            table++;
-        } while (--count);
-    }
-    return free;
-}
-
-/* Copies one 4-byte RGBA colour byte by byte. */
-extern "C" void color_rgba_copy(u8* dst, const u8* src)
-{
-    dst[0] = src[0];
-    dst[1] = src[1];
-    dst[2] = src[2];
-    dst[3] = src[3];
-}
-
-/* The hook `bg_tex_disp_func` holds: `fn_80046F28` (mh3_pad.cpp) stores the function, `fn_800492A4` calls it.  The map
- * gives the object 8 bytes; only the first word is referenced (GUESS: the second is the hook's argument). */
-struct BgTexDispHook {
-    /* +0x00 */ void (*func)(void);
-    /* +0x04 */ u32 unused_0x04;
-}; /* size: 0x8 */
-
-/* This unit's own `.bss` (`splits.txt` `.bss 0x806694E8..0x80669F68`) and `.sbss` (`0x80794870..0x80794884`), in
- * address order.  Defined at the foot of the file, after every use.  `lobby_world_block` is the cache
- * `get_userdata()` (0x8004D120) and the user-data init `fn_800497B4`/`fn_800498EC` store the 0x6000-byte
- * user-data block in; the block belongs to the user-data subsystem this band and `fn_8004C9A0`/`fn_8004CAD8` share. */
+/* This unit's own `.bss` (`splits.txt` `.bss 0x806694E8..0x806699B8`) and `.sbss` (`0x80794870..0x80794878`), in
+ * address order.  Defined at the foot of the file, after every use. */
 FaceWork face_work;                    /* +0x806694E8 */
-u8 sub_trans_buf[0x580];               /* +0x806699B8: the sub-transform buffer `subTransSetPrio` fills (GUESS name) */
-u8 sub_trans_state[0x30];              /* +0x80669F38: the sub-transform stack state (GUESS name) */
 u8* face_buf_tbl[2];                   /* +0x80794870: the two 0x4880-byte buffers `fn_800487D0` carves out of the work heap (GUESS name) */
-BgTexDispHook bg_tex_disp_func;        /* +0x80794878 */
-u8* lobby_world_block;                 /* +0x80794880: the cached user-data pointer */

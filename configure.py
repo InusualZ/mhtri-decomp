@@ -1444,12 +1444,12 @@ config.libs = [
         "progress_category": "game",
         "objects": [
                         Object(NonMatching, "sound/fn_800D7F54.cpp"),
-            Object(NonMatching, "sound/fn_800DCFEC.cpp"),
-            # Registered once, at its final home (docs/plan.md 12) from proposal/800DD1F0_fn_800DD1F0.cpp:
-            # the SE (`se_w`) request cluster's tail plus the `MHchar` model class, 125 symbols /
-            # 0x6ACC bytes.  `sound` module (both bracketing units are `sound`, include/unsplit/sound.h
-            # is their band) and C++ (the `* __FP...` / `move__6MHcharFUs` manglings).
-            Object(NonMatching, "sound/fn_800DD1F0.cpp"),
+            # Registered from proposal/800DD1F0_fn_800DD1F0.cpp (125 symbols / 0x6ACC bytes) and recut in phase 4: the head is folded into
+            # sound/fn_800D7F54.cpp, this row is the SE request cluster's middle, then the `MHchar` model class and the job request.
+            # `sound` module (include/unsplit/sound.h is the band) and C++ (the `* __FP...` / `move__6MHcharFUs` manglings).
+            Object(NonMatching, "sound/se_req.cpp"),
+            Object(NonMatching, "sound/mhchar.cpp"),
+            Object(NonMatching, "sound/sound_job.cpp"),
             # Registered from proposal/800E3CBC_fn_800E3CBC.cpp (the 0x800E3CBC run discovery
             # proposed).  Module from the placed link-neighbour sound/fn_800E46E8.cpp; the dump's
             # prim_init_all/set_blendmode/set_zmode name the functions, not the TU (see the file header).
@@ -1545,11 +1545,11 @@ config.libs = [
                         Object(NonMatching, "ef/ef_drawstripestrategy.cpp"),
             Object(NonMatching, "ef/ef_particlemanager.cpp"),
             # Registered once, at its final home (docs/plan.md 12).  The `proposal/800AEE48_fn_800AEE48`
-            # range: 119 functions / 0xABA0 bytes of `nw4r::ef`, three original TUs kept whole
-            # (ef_postfield.cpp, ef_resource.cpp, ef_drawstripestrategy.cpp) because the discovery's
-            # seam was capped at --max-bytes.  C++ from the `.cpp` __FILE__ strings and
-            # Panic__Q24nw4r2dbFPCciPCce.
+            # range, recut in phase 4: this row keeps the first two TUs (ef_postfield.cpp, ef_resource.cpp) of `nw4r::ef`; the
+            # ef_drawstripestrategy.cpp head is `ef/ef_drawstripestrategy.cpp` (its row is above, by file order of the old registration).
+            # C++ from the `.cpp` __FILE__ strings and Panic__Q24nw4r2dbFPCciPCce.
             Object(NonMatching, "ef/fn_800AEE48.cpp"),
+            Object(NonMatching, "ef/ef_drawbillboardstrategy.cpp"),
                         Object(NonMatching, "ef/ef_drawpointstrategy.cpp"),
                         Object(NonMatching, "ef/ef_drawlinestrategy.cpp"),
                         Object(NonMatching, "ef/ef_drawsmoothstripestrategy.cpp"),
@@ -1575,10 +1575,9 @@ config.libs = [
             Object(NonMatching, "ef/ef_point.cpp"),
             # Carved out of the 0x800CDB2C proposal range on 2026-09-30: the `ef_sphere.cpp` TU (one function; see the unit header).
             Object(NonMatching, "ef/ef_sphere.cpp"),
-            # Registered from proposal/800CDB2C_fn_800CDB2C.cpp (a 0x800CDB2C run discovery
-            # proposed at a --max-bytes cap; the seam is a guess and the range is several
-            # original TUs - see the unit's file header).
-            Object(NonMatching, "ef/fn_800CDB2C.cpp"),
+            # Registered from proposal/800CDB2C_fn_800CDB2C.cpp (a 0x800CDB2C run discovery proposed at a --max-bytes cap, recut
+            # 2026-09-30 and renamed in phase 4) - the game-system core; see the unit's file header.
+            Object(NonMatching, "ef/system_core.cpp"),
             Object(NonMatching, "ef/eft001.cpp"),
             # Registered once, at its final home (docs/plan.md 12).  The
             # `proposal/800F6520_fn_800F6520` range (0x800F6520..0x800F95A4, 43 functions): the game's
@@ -1700,7 +1699,7 @@ config.libs = [
         "progress_category": "game",
         "objects": [
                         Object(Matching, "gx/fn_8009AA78.c"),
-                        Object(Matching, "gx/fn_8009ACE4.c"),
+                        Object(NonMatching, "gx/fn_8009ACE4.c"),
         ],
     },
 
@@ -2137,7 +2136,8 @@ config.libs = [
             # constructor fn_80088AD0 at .ctors 0x8056F2D4), so the last ~52 functions may be a second
             # TU; both interior cut candidates (0x80088AD0 / 0x80089330) are tudiscover "weak" only, so
             # the run is registered whole and the seam is left to settle (brief 8.3).
-            Object(NonMatching, "g3d/g3d_state.cpp"),        # 0x8008452C-0x800898B0
+            Object(NonMatching, "g3d/g3d_state.cpp"),        # 0x8008452C-0x80088E24
+            Object(NonMatching, "g3d/g3d_resvtx.cpp"),       # 0x80088E24-0x800898B0
             Object(NonMatching, "g3d/g3d_resanm.c"),         # 0x800898B0-0x80089F94
             Object(NonMatching, "g3d/g3d_resanmamblight.c"), # 0x80089F94-0x8008A220
             Object(NonMatching, "g3d/g3d_resanmcamera.cpp"),   # 0x8008A220-0x8008A664 (merged 2026-09-24 from the 0x8008A220-0x8008A28C `.c` cut: same `__FILE__` fragment and contiguous sections, one TU)
@@ -2308,7 +2308,7 @@ config.libs = [
             # `.text` 0x8009B140..0x8009B374, `extab` 0x80009A28..0x80009A38, `extabindex`
             # 0x80022B18..0x80022B30 (gapless against gx/fn_8009ACE4.c below them).  The right edge
             # 0x8009B374 is the discovery byte cap, not a proven TU end - the file's header records it.
-            Object(Matching, "g3d/g3d_gpu.cpp"),           # 0x8009B140-0x8009B374
+            Object(NonMatching, "g3d/g3d_gpu.cpp"),           # 0x8009B140-0x8009B374
         ],
     },
     {
@@ -2908,6 +2908,7 @@ config.libs = [
             # file name is evidenced by the `__FILE__` string `mh3_pad.cpp` (0x80580EF0) that its own
             # `fn_80041AA4` assert references; same lib and flags as the game-root system files beside it.
             Object(NonMatching, "mh3_pad.cpp"),
+            Object(NonMatching, "pad_connect.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal `80047398` - the character
             # face/skin TPL render unit (117 functions / 0x5610 B, 0x80047398..0x8004C9A0).  Game-root
             # band: the link neighbour `mh3_pad.cpp` ends at 0x80047398 and this unit's link neighbours
@@ -2915,6 +2916,7 @@ config.libs = [
             # `fn_80047398` stem - no `__FILE__` string and no runtime-dump name exists for the range
             # (class 3/4 in the brief; see the file header).
             Object(NonMatching, "fn_80047398.cpp"),
+            Object(NonMatching, "userdata_item.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal `8004CAD8` - the game-root
             # draw/gallery band (drawshape_exec, write/read_wpad_memory, gallery_open, set_mydata2vs, the
             # nw4r-math wrappers).  Same lib and flags as the game-root system files beside it
@@ -2945,6 +2947,7 @@ config.libs = [
             # (cflags_main); the proposal covers only part of the TU - the drawshape_* half lives in the
             # previous proposal - see the file header.
             Object(NonMatching, "draw_shape.cpp"),
+            Object(NonMatching, "draw_shape_arm.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal `80056F24` - the screen
             # fade / filter / glare band (fade_set/fade_reset/get_fade_stat, GlareFilter_on,
             # filter_reset, setFilterPrio, the FIFO writers and the GX setup bodies), 59 symbols /

@@ -1,7 +1,13 @@
 {
  "names": {
   "enemy/fn_80387844.cpp": "enemy/em009_act.cpp",
-  "menu/fn_804513FC.cpp": "menu/menu_sysmsg.cpp"
+  "menu/fn_804513FC.cpp": "menu/menu_sysmsg.cpp",
+  "main/fn_80048964.cpp": "userdata_item.cpp",
+  "g3d/fn_80088E24.cpp": "g3d/g3d_resvtx.cpp",
+  "ef/ef_drawstripestrategy_base.cpp": "ef/ef_drawstripestrategy.cpp",
+  "ef/ef_drawstripestrategy.cpp": "ef/ef_drawbillboardstrategy.cpp",
+  "ef/fn_800CDB2C.cpp": "ef/system_core.cpp",
+  "sound/fn_800DD1F0.cpp": "sound/se_req.cpp"
  },
  "languages": {
   "enemy/em_common": ".cpp",

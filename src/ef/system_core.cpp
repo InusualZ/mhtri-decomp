@@ -1,8 +1,9 @@
 /*
- * ef/fn_800CDB2C.cpp - the game-system core TU: `.text` 0x800CE5A8..0x800D2FEC (the `system_w` interface, the file loader, the
+ * ef/system_core.cpp - the game-system core TU: `.text` 0x800CE5A8..0x800D2FEC (the `system_w` interface, the file loader, the
  * work heap, the texture/hbm block), extab 0x8000A5E4..0x8000A77C, extabindex 0x80023C7C..0x80023EE0, `.ctors` 0x8056F2EC.
- * The file keeps the stem of the proposal it was registered from (`800CDB2C`, a --max-bytes cut); the range was recut on
- * 2026-09-30 - see "Seams" below.
+ * The file was registered under the stem of the proposal it came from (`fn_800CDB2C`, a --max-bytes cut) and the range was recut on
+ * 2026-09-30 - see "Seams" below; phase 4 renamed the unit `system_core` (GUESS: the `system_w` interface, the file loader, the work heap and
+ * the texture/hbm block make the game-system core; no `__FILE__` string names the range).
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every
  * `fn_` name this file uses is a bare `.text` entry in config/RMHE08/symbols.txt; only the 24 named
  * symbols - file_loading_ck, load_file_req, load_file, ran_suu, system_w_clr, all_reset, PlayMode_ck,
@@ -31,9 +32,8 @@
  *   - 0x800D2FEC..0x800D6C00 is `nw_resource.cpp` (one vtable group 0x80595378..0x80595428 whose readers straddle the old
  *     0x800D45AC edge, plus the inline-assert tail 0x80595490..0x80595790), 0x800D6C00..0x800D77B0 is `g3d/g3d_xsi.cpp`.
  *     Evidence for each cut: `.pi/notes/ef-nwres-seam.md`.
- * More than one original file is evidenced, so no single name names the unit: the registration uses
- * the map's `fn_` stem (evidence class 4), exactly as `ef/fn_800AEE48.cpp` did for the same
- * capped-seam situation.  The module is `ef` (the `__FILE__` string and the band below are ef) and
+ * More than one original file was evidenced in the old range; after the recut no `__FILE__` string names this unit, so its name is a
+ * GUESS (see above).  The module is `ef` (the `__FILE__` string and the band below are ef) and
  * the language is C++ (the `.cpp`/`.h` names and the `nw4r::db::Panic` callee).
  *
  * The game-system core - `system_w` and its mode/loading accessors, the file loader and the work
@@ -84,6 +84,7 @@
 #include "Runtime.PPCEABI.H/memset.h" /* memset is owned by Runtime.PPCEABI.H/memset.c (rule 2) */
 #include "unsplit/unknown.h" /* SystemWork / system_w (undecided module, rule 2's unsplit gap) */
 #include "ai/ainpc_w.h" /* `ainpc_w`, owned by ai/fn_802D44F4.cpp (rule 2): fn_800CEF60 clears it */
+#include "fn_80047398.h" /* color_rgba_copy, owned by userdata_item.cpp's range (rule 2) */
 
 /* Claimed data (splits.txt): `.data` 0x80595118-0x80595378, `.bss` 0x80694C68-0x80695610 (five objects, each still
  * `extern`-declared below) and `.sbss` 0x80794958-0x80794970 (the words at 0x80794958/0x80794960/com_data_func).  None of it is
@@ -173,7 +174,6 @@ extern "C" void fn_800CFC64(void);
 
 extern "C" u32 fn_800D02C0(void* data, struct _tex_info* info);
 extern "C" void fn_800417F0(void* fn, u32 count);
-extern "C" void color_rgba_copy(void* record, u32 value);
 extern "C" void* MEMAllocFromAllocator(void* allocator, u32 size);
 extern "C" void MEMFreeToAllocator(void* allocator, void* ptr);
 extern "C" void MEMDestroyExpHeap(void* heap);
@@ -422,7 +422,7 @@ void fn_800CF8EC(void) {
 
 /* 0x800CFBA0 - reset the stream record and stamp its top byte. */
 void fn_800CFBA0(u32 value) {
-    color_rgba_copy(&system_w.field_0x7bc, value);
+    color_rgba_copy((u8*)&system_w.field_0x7bc, (const u8*)value);
     system_w.field_0x7bc.bytes[3] = 0xFF;
 }
 

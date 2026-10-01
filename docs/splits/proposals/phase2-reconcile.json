@@ -1973,6 +1973,36 @@
    "note": "only 0 of 2 symbol(s) are read by the unit (a strong block needs 2, max(3, N/50)): the rest is placed by link order or pointer evidence"
   },
   {
+   "unit": "main/fn_80048964.cpp",
+   "section": ".data",
+   "range": [
+    "0x805813E8",
+    "0x80581544"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 2,
+   "bytes": 348,
+   "signals": {
+    "orchestrator": 2
+   },
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window a units> --root . --base-snapshot <MAIN land-base orphans> --base-ref main",
+     "finding": "the data-closure row refuses lbl_805813E8 and lbl_80581538: referenced by exactly one batch unit's object, no claim covers them"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x805813E8",
+     "finding": "lbl_805813E8 is address-taken by fn_8004991C (userdata_item's text 0x80048964..0x8004C9A0), lbl_80581538 is read the same way; jumptable_80581544 follows (fn_8004C9A0's)"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x805813E8",
+   "text_addr": "0x80048964",
+   "note": "orchestrator override 56: medium: sole-owned (one referencing unit); claimed tight so the batch leaves no data clearly owned behind"
+  },
+  {
    "unit": "fn_8004CAD8.cpp",
    "section": ".data",
    "range": [
@@ -2185,6 +2215,66 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain g3d_anmchr --section .data",
    "text_addr": "0x8005ABD8"
+  },
+  {
+   "unit": "g3d/fn_80063888.cpp",
+   "section": ".data",
+   "range": [
+    "0x8058C118",
+    "0x8058CC3F"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 73,
+   "bytes": 2855,
+   "signals": {
+    "orchestrator": 73
+   },
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window a units> --root . --base-snapshot <MAIN land-base orphans> --base-ref main",
+     "finding": "the data-closure row refuses 16 pairs lbl_8058C30C..lbl_8058C634: referenced by exactly one batch unit's object, no claim covers them"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8058C30C",
+     "finding": "lbl_8058C30C is address-taken by fn_80064CF0 (fn_80063888's text); the run 0x8058C118..0x8058CC40 holds the unit's file strings and assert strings; g3d_anmchr's .data ends at 0x8058C118"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x8058C30C",
+   "text_addr": "0x80063888",
+   "note": "orchestrator override 51: medium: sole-owned run starting at the unit's own `__FILE__` string (lbl_8058C118); the engine's zone ends where g3d/fn_800680CC's `__FILE__` string begins (0x8058CC40)"
+  },
+  {
+   "unit": "g3d/fn_800680CC.cpp",
+   "section": ".data",
+   "range": [
+    "0x8058CC40",
+    "0x8058D6BA"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 58,
+   "bytes": 2682,
+   "signals": {
+    "orchestrator": 58
+   },
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window a units> --root . --base-snapshot <MAIN land-base orphans> --base-ref main",
+     "finding": "the data-closure row refuses 58 pairs lbl_8058CC40..lbl_8058D6A4: referenced by exactly one batch unit's object, no claim covers them"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8058CC40",
+     "finding": "lbl_8058CC40 is the unit's file string and the 58 labels are its assert strings, read only by fn_800680CC's text; g3d_anmvis's .data starts at 0x8058D6C0"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x8058CC40",
+   "text_addr": "0x800680CC",
+   "note": "orchestrator override 52: medium: sole-owned run from the unit's own `__FILE__` string (lbl_8058CC40) to g3d_anmvis's claim at 0x8058D6C0"
   },
   {
    "unit": "g3d/g3d_anmvis.cpp",
@@ -2440,35 +2530,28 @@
     "0x8058ED38",
     "0x8058EDA0"
    ],
-   "grade": "guess",
-   "signal": "file-string",
+   "grade": "medium",
+   "signal": "orchestrator",
    "symbols": 3,
    "bytes": 104,
    "signals": {
-    "vtable-store": 1,
-    "string-reader": 1,
-    "file-string": 1
+    "orchestrator": 3
    },
    "evidence": [
     {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window a units> --root . --base-snapshot <MAIN land-base orphans> --base-ref main",
+     "finding": "the data-closure row refuses lbl_8058ED38, lbl_8058ED64, lbl_8058ED90: referenced by exactly one batch unit's object, no claim covers them (extends the unit's own .data claim)"
+    },
+    {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x8058ED38",
-     "finding": "lbl_8058ED38 (.data 0x8058ED38, 0x2C B) is read at 0x8007B9A0 in g3d/fn_80075DCC.cpp"
-    },
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x8058ED90",
-     "finding": "lbl_8058ED90 (.data 0x8058ED90, 0x10 B) is read at 0x8007B8A8 in g3d/fn_80075DCC.cpp"
-    },
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_80075DCC --section .data",
-     "finding": "3 symbol(s): 3 read by g3d/fn_80075DCC.cpp (first 0x8058ED38, last 0x8058ED90)"
+     "finding": "the three labels are read only by fn_80075DCC's text; g3d_scnmdl's .data starts at 0x8058EDA0"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_80075DCC --section .data",
+   "reproduce": "python tools/units/callers.py 0x8058ED38",
    "text_addr": "0x80075DCC",
-   "note": "not applied: attaching it fails the data-order invariant (strong zigzag seam at 0x8058ED38 inside the unit's .data (a boundary in [0x8058ED38, 0x8058ED38)): at least 2 TUs)"
+   "note": "orchestrator override 53: medium: sole-owned (one referencing unit); the run lies between the unit's own claim (ends 0x8058ED38) and g3d_scnmdl's (starts 0x8058EDA0)"
   },
   {
    "unit": "g3d/g3d_scnmdl.cpp",
@@ -2863,6 +2946,36 @@
    "text_addr": "0x8008F6E8"
   },
   {
+   "unit": "g3d/g3d_resanmscn.cpp",
+   "section": ".data",
+   "range": [
+    "0x805908B0",
+    "0x80590922"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 4,
+   "bytes": 114,
+   "signals": {
+    "orchestrator": 4
+   },
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window a units> --root . --base-snapshot <MAIN land-base orphans> --base-ref main",
+     "finding": "the data-closure row refuses 4 pairs lbl_805908B0..lbl_8059090C: referenced by exactly one batch unit's object, no claim covers them"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x805908B0",
+     "finding": "lbl_8059090C is g3d_resanmscn.cpp's `__FILE__` string and lbl_805908B0/8D8/8F0 its assert strings; g3d_resanmtexsrt's .data starts at 0x80590928"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x805908B0",
+   "text_addr": "0x800908FC",
+   "note": "orchestrator override 54: medium: sole-owned; claimed tight from the first pair to g3d_resanmtexsrt's claim at 0x80590928 (the zone before it holds g3d_resanmlight's strings, which this batch does not own)"
+  },
+  {
    "unit": "g3d/g3d_resanmtexsrt.cpp",
    "section": ".data",
    "range": [
@@ -2898,6 +3011,36 @@
    "reproduce": "python tools/splits/dataattach.py --explain g3d_resanmtexsrt --section .data",
    "text_addr": "0x800916FC",
    "note": "2 symbol(s) are read by another unit than the one link order puts them in (a global read where it is not defined): lbl_80590BA0 read by g3d/g3d_resfile.cpp, lbl_80590BB0 read by g3d/g3d_resfile.cpp"
+  },
+  {
+   "unit": "g3d/g3d_resmat.cpp",
+   "section": ".data",
+   "range": [
+    "0x80590D78",
+    "0x80591280"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 29,
+   "bytes": 1288,
+   "signals": {
+    "orchestrator": 29
+   },
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window a units> --root . --base-snapshot <MAIN land-base orphans> --base-ref main",
+     "finding": "the data-closure row refuses 29 pairs lbl_80590D78..lbl_80591270: referenced by exactly one batch unit's object, no claim covers them"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80590D78",
+     "finding": "the 29 labels are g3d_resmat.cpp's file and assert strings, read only by its text; lbl_80591280 begins g3d_resfile's strings (g3d_resfile.cpp)"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x80590D78",
+   "text_addr": "0x800947A4",
+   "note": "orchestrator override 55: medium: sole-owned; claimed from g3d_resanmtexsrt's end (0x80590D78) to the first g3d_resfile string (0x80591280)"
   },
   {
    "unit": "g3d/g3d_resnode.cpp",
@@ -3538,35 +3681,28 @@
     "0x80593F68",
     "0x805941F8"
    ],
-   "grade": "guess",
-   "signal": "string-reader",
+   "grade": "medium",
+   "signal": "orchestrator",
    "symbols": 14,
    "bytes": 656,
    "signals": {
-    "string-reader": 9,
-    "file-string": 4,
-    "vtable-store": 1
+    "orchestrator": 14
    },
    "evidence": [
     {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window a units> --root . --base-snapshot <MAIN land-base orphans> --base-ref main",
+     "finding": "the data-closure row refuses 14 pairs lbl_80593F68..lbl_805941D8: referenced by exactly one batch unit's object, no claim covers them (extends the unit's own .data claim)"
+    },
+    {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x80593F68",
-     "finding": "lbl_80593F68 (.data 0x80593F68, 0x37 B) is read at 0x800BB5E8 in ef/ef_drawstripestrategy.cpp"
-    },
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x805941D8",
-     "finding": "lbl_805941D8 (.data 0x805941D8, 0x20 B) is read at 0x800BBE08 in ef/ef_drawstripestrategy.cpp"
-    },
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain ef_drawstripestrategy --section .data",
-     "finding": "14 symbol(s): 14 read by ef/ef_drawstripestrategy.cpp (first 0x80593F68, last 0x805941D8)"
+     "finding": "lbl_80593F68 is address-taken only by fn_800BB488 (ef_drawbillboardstrategy's text 0x800B9A44..0x800BE154), the rest of the run is read the same way; the unit's .data claim ends at 0x80593F68 and ef_drawfreestrategy starts at 0x805941F8"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain ef_drawstripestrategy --section .data",
+   "reproduce": "python tools/units/callers.py 0x80593F68",
    "text_addr": "0x800B9A44",
-   "note": "not applied: attaching it fails the data-order invariant (strong V->S seam at 0x80593F68 inside the unit's .data (a boundary in [0x80593F68, 0x805941D8)): at least 2 TUs)"
+   "note": "orchestrator override 49: medium: sole-owned (one referencing unit); the run lies between the billboard/directional unit's own claim (ends 0x80593F68) and ef_drawfreestrategy's (starts 0x805941F8)"
   },
   {
    "unit": "ef/ef_drawfreestrategy.cpp",
@@ -20821,6 +20957,36 @@
    "text_addr": "0x800A56B0"
   },
   {
+   "unit": "ef/ef_effectsystem.cpp",
+   "section": ".sbss",
+   "range": [
+    "0x8079491C",
+    "0x80794920"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 4,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window a units> --root . --base-snapshot <MAIN land-base orphans> --base-ref main",
+     "finding": "ninja's link refuses `undefined: 'lbl_8079491C'` (referenced from fn_800A559C in ef_effect.o): the 4-byte word between ef_effectsystem's .sbss (ends 0x8079491C) and ef_emitter's (starts 0x80794920) is no unit's"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8079491C",
+     "finding": "read at 0x800A55D0 and written at 0x800A55E0, both in fn_800A559C (ef_effect.cpp, the system's constructor); no other reader"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x8079491C",
+   "text_addr": "0x800A56B0",
+   "note": "orchestrator override 57: medium: definer by link order - ef_effect's text (before effectsystem) is the only reader/writer, but .sbss follows .text order and the word lies after effectsystem's three borrowed-object pointers; it was part of ef_effectsystem's .sbss claim before the cut"
+  },
+  {
    "unit": "ef/ef_emitter.cpp",
    "section": ".sbss",
    "range": [
@@ -24512,6 +24678,36 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain g3d_gpu --section .sdata2",
    "text_addr": "0x8009B140"
+  },
+  {
+   "unit": "ef/ef_util.cpp",
+   "section": ".sdata2",
+   "range": [
+    "0x80795F70",
+    "0x80795F78"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 8,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window a units> --root . --base-snapshot <MAIN land-base orphans> --base-ref main",
+     "finding": "the data-closure row refuses lbl_80795F70 (2 sites): referenced by exactly one batch unit's object, no claim covers it (extends the unit's own .sdata2 claim)"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80795F70",
+     "finding": "read only by ef_util's fn_8009C7D4 and fn_8009CA30; g3d_gpu's .sdata2 ends at 0x80795F70 and ef_util's starts at 0x80795F78"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x80795F70",
+   "text_addr": "0x8009B374",
+   "note": "orchestrator override 50: medium: sole-owned (one referencing unit); the 4-byte gap in front of ef_util's own .sdata2 claim is one the splitter refuses to leave"
   },
   {
    "unit": "ef/ef_util.cpp",
@@ -32069,27 +32265,6 @@
   {
    "section": ".data",
    "range": [
-    "0x805813E8",
-    "0x80581544"
-   ],
-   "kind": "ambiguous",
-   "symbols": 2,
-   "bytes": 348,
-   "candidates": [
-    "main/fn_80048964.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_80048964 --section .data",
-     "finding": "2 symbol(s), 2 read (by fn_80048964): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_80048964 --section .data"
-  },
-  {
-   "section": ".data",
-   "range": [
     "0x80581544",
     "0x80581584"
    ],
@@ -32135,68 +32310,12 @@
   {
    "section": ".data",
    "range": [
-    "0x8058C118",
-    "0x8058D6BA"
-   ],
-   "kind": "interleave",
-   "symbols": 131,
-   "bytes": 5538,
-   "candidates": [
-    "g3d/fn_80063888.cpp",
-    "g3d/g3d_anmscn.cpp",
-    "g3d/fn_800680CC.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_80063888 --section .data",
-     "finding": "the data of fn_80063888 / g3d_anmscn / fn_800680CC alternates (10 symbol(s) are read by a unit other than the one their position implies: lbl_8058C740 read by g3d/fn_800680CC.cpp, lbl_8058C778 read by g3d/fn_800680CC.cpp, lbl_8058C7B0 read by g3d/fn_800680CC.cpp): one TU, or one reads the other's data"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_80063888 --section .data",
-   "signals": {
-    "file-string": 26,
-    "string-reader": 95,
-    "readers": 4,
-    "vtable-store": 6
-   }
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x8058ED38",
-    "0x8058EDA0"
-   ],
-   "candidates": [
-    "g3d/fn_80075DCC.cpp"
-   ],
-   "kind": "multi-tu",
-   "symbols": 3,
-   "bytes": 104,
-   "signals": {
-    "vtable-store": 1,
-    "string-reader": 1,
-    "file-string": 1
-   },
-   "evidence": [
-    {
-     "tool": "splitcheck",
-     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only data-order --unit fn_80075DCC",
-     "finding": "strong zigzag seam at 0x8058ED38 inside the unit's .data (a boundary in [0x8058ED38, 0x8058ED38)): at least 2 TUs"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_80075DCC --section .data",
-   "note": "link order and evidence put these symbols in g3d/fn_80075DCC.cpp, but attaching them makes the data-order invariant fail: the unit holds more than one TU, or one of its reads is not its own"
-  },
-  {
-   "section": ".data",
-   "range": [
     "0x80590440",
-    "0x80590922"
+    "0x805908B0"
    ],
    "kind": "interleave",
-   "symbols": 35,
-   "bytes": 1250,
+   "symbols": 31,
+   "bytes": 1136,
    "candidates": [
     "g3d/g3d_resanmlight.cpp",
     "g3d/g3d_resanmscn.cpp"
@@ -32210,20 +32329,20 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain g3d_resanmlight --section .data",
    "signals": {
-    "file-string": 14,
-    "string-reader": 16,
+    "file-string": 12,
+    "string-reader": 14,
     "reader": 5
    }
   },
   {
    "section": ".data",
    "range": [
-    "0x80590D78",
+    "0x80591280",
     "0x805915C0"
    ],
    "kind": "interleave",
-   "symbols": 66,
-   "bytes": 2120,
+   "symbols": 37,
+   "bytes": 832,
    "candidates": [
     "g3d/g3d_resfile.cpp",
     "g3d/g3d_resmat.cpp"
@@ -32237,36 +32356,9 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain g3d_resfile --section .data",
    "signals": {
-    "file-string": 21,
-    "string-reader": 45
+    "string-reader": 22,
+    "file-string": 15
    }
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x80593F68",
-    "0x805941F8"
-   ],
-   "candidates": [
-    "ef/ef_drawstripestrategy.cpp"
-   ],
-   "kind": "multi-tu",
-   "symbols": 14,
-   "bytes": 656,
-   "signals": {
-    "string-reader": 9,
-    "file-string": 4,
-    "vtable-store": 1
-   },
-   "evidence": [
-    {
-     "tool": "splitcheck",
-     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only data-order --unit ef_drawstripestrategy",
-     "finding": "strong V->S seam at 0x80593F68 inside the unit's .data (a boundary in [0x80593F68, 0x805941D8)): at least 2 TUs"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain ef_drawstripestrategy --section .data",
-   "note": "link order and evidence put these symbols in ef/ef_drawstripestrategy.cpp, but attaching them makes the data-order invariant fail: the unit holds more than one TU, or one of its reads is not its own"
   },
   {
    "section": ".data",
@@ -33842,28 +33934,6 @@
   {
    "section": ".sbss",
    "range": [
-    "0x8079491C",
-    "0x80794920"
-   ],
-   "kind": "unread",
-   "symbols": 1,
-   "bytes": 4,
-   "candidates": [
-    "ef/ef_effectsystem.cpp",
-    "ef/ef_emitter.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain ef_effectsystem --section .sbss",
-     "finding": "1 symbol(s), 1 read (by ef_effectsystem, ef_emitter): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain ef_effectsystem --section .sbss"
-  },
-  {
-   "section": ".sbss",
-   "range": [
     "0x80794978",
     "0x80794980"
    ],
@@ -34066,28 +34136,6 @@
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain g3d_cpu --section .sdata2"
-  },
-  {
-   "section": ".sdata2",
-   "range": [
-    "0x80795F70",
-    "0x80795F78"
-   ],
-   "kind": "unread",
-   "symbols": 1,
-   "bytes": 8,
-   "candidates": [
-    "g3d/g3d_gpu.cpp",
-    "ef/ef_util.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain g3d_gpu --section .sdata2",
-     "finding": "1 symbol(s) nothing reads: the boundary between g3d_gpu and ef_util lies somewhere in them (last anchor of the first, first anchor of the second)"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain g3d_gpu --section .sdata2"
   },
   {
    "section": ".sdata2",

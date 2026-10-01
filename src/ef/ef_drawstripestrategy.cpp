@@ -1,200 +1,339 @@
-/* ef/ef_drawstripestrategy.cpp - nw4r::ef draw-strategy family, 0x800B99E8..0x800BE154.
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every
- * fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
+/* ef/ef_drawstripestrategy.cpp - nw4r::ef DrawStripeStrategy and its particle / list helpers, `.text` 0x800B4AC8..0x800B9A44.
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
- * 37 functions / 0x4770 bytes of the NintendoWare-for-Revolution effect library (`nw4r::ef`).  The
- * split region is a **maximal unclaimed run across three original translation units** - the
- * `__FILE__` strings in the object's `.data` are `ef_drawstripestrategy.cpp` (0x805939E8, 0x80593D0C,
- * 0x80593D5C, 0x80593DAC - four copies), `ef_drawbillboardstrategy.cpp` (0x80593E88) and
- * `ef_drawdirectionalstrategy.cpp` (0x80594070).  The run opens on the DrawStripeStrategy deleting
- * destructor (its vtable `lbl_80593CB4` sits beside the `ef_drawstripestrategy.cpp` string), so the
- * dominant, first-owned name is `ef_drawstripestrategy.cpp`: that is this unit's final home.  The
- * seam is unproven (docs/plan.md 8.3) - `ef_drawbillboardstrategy.cpp` owns 0x800B9A44/0x800B9A80/
- * 0x800BBD90 and `ef_drawdirectionalstrategy.cpp` owns 0x800BBDEC/0x800BC1B4/0x800BE0BC, both kept
- * whole by the attribution pass.
+ * Name: the `__FILE__` string `ef_drawstripestrategy.cpp` (`.data` 0x805939E8, with copies at 0x80593D0C/0x80593D5C/0x80593DAC) is cited by the
+ * walkers in this range (`fn_800B4BA4` .. `fn_800B9630`) and its deleting destructor `fn_800B99E8` closes it; `ef_resource.cpp` is the TU before
+ * (`ef/fn_800AEE48.cpp`, which ends at 0x800B4AC8) and `ef_drawbillboardstrategy.cpp` the TU after (`ef/ef_drawbillboardstrategy.cpp`).
+ * Phase 4 made this unit out of the tail of the old `ef/fn_800AEE48.cpp` (0x800B4AC8..0x800B99E8, 36 functions) and the first function of the old
+ * `ef/ef_drawstripestrategy.cpp` (`fn_800B99E8`, now in this file; the rest of that registration is `ef/ef_drawbillboardstrategy.cpp`).
  *
- * The `.cpp` spelling makes the original language C++ (docs/plan.md, "The language comes from the
- * symbol"); the `Panic__Q24nw4r2dbFPCciPCce` callee and the `__dl__FPv` deleting destructors say the
- * same.  This file is registered as `.cpp` and every definition sits inside an `extern "C"` guard so
- * the front-end keeps the map's `fn_XXXXXXXX` spelling (docs/matching.md row 42) instead of mangling
- * it.
+ * Data.  The unit owns no pool section here: its `.data`/`.sdata2` labels are `extern` by their map names and never defined (playbook 29).
+ * `.data` 0x805939E8..0x80593E88 (the strip assert strings), `.sdata2` 0x80796120..0x80796150.
  *
- * Layout in address order (37 symbols):
- *   0x800B99E8  the DrawStripeStrategy deleting destructor
- *   0x800B9A44  the DrawBillboardStrategy constructor
- *   0x800B9A80  the per-particle draw-strategy dispatch (three `nw4r::ef::Emitter*` shape branches)
- *   0x800B9DF8/0x800BA854/0x800BAFBC  the point/stripe/tube particle walkers
- *   0x800BA1E0  the four-vertex stripe writer
- *   0x800BA6E8..0x800BA710  the out-of-line GX FIFO writers (empty/u8/bit/vec3)
- *   0x800BA734  the indexed four-vertex stripe writer
- *   0x800BAC30  the tube writer
- *   0x800BAFB0  the two-f32 accessor
- *   0x800BB488  the four-vertex tube writer
- *   0x800BB748  the stripe GX state setup
- *   0x800BB93C  the DrawBillboardStrategy emitter-shape dispatch
- *   0x800BBBBC/0x800BBCF8  the two ahead-context position resolvers
- *   0x800BBD90  the DrawBillboardStrategy deleting destructor
- *   0x800BBDEC  the DrawDirectionalStrategy constructor
- *   0x800BBE28  the four-vertex matrix writer
- *   0x800BC048..0x800BC070  the out-of-line GX FIFO writers (second copy)
- *   0x800BC094  the indexed four-vertex writer (second copy)
- *   0x800BC1B4  the DrawDirectionalStrategy emitters
- *   0x800BC41C  the particle flag accessor
- *   0x800BC428/0x800BD234  the large per-particle emitters
- *   0x800BCD14/0x800BCE98/0x800BDB60/0x800BDD34  the layer/tube emitters
- *   0x800BE0BC  the DrawDirectionalStrategy deleting destructor
- *   0x800BE118  the next constructor
- *
- * Codegen lever: this unit needs the peephole pass off - the GX FIFO writers keep the unfused
- * `clrlwi`/`extsh`/`extsb` in front of every narrowing store, exactly as the sibling
- * `ef/ef_drawsmoothstripestrategy.cpp` and `gx/fn_8009AA78.c` did.
- *
- * Status (measured against the retired auto_fn_<addr> target objects with the official report metric):
- * 27 of the 37 symbols are written, every one of them at or above 80 % - 18 byte-identical (the
- * constructors/destructors, the GX FIFO writers, the indexed four-vertex writers, the matrix writer
- * and the ahead resolver fn_800BBCF8).  Residual: fn_800BA710/fn_800BC070 (85.6 %) miss only the
- * 4-byte `b` retail materialises between the three vector loads and the FIFO base load;
- * fn_800BB748/fn_800BDB60 (94.9/95.9 %) differ in the GXSetArray sda21 access; fn_800BBBBC (94.9 %)
- * in the setVec3/copyVec3 pairing; fn_800B9A80/fn_800BB93C/fn_800BC1B4/fn_800BDD34 (98-99 %)
- * in the inlined IsValidPointer short-circuit on one guard.  The eleven unwritten emitters
- * (fn_800B9DF8, fn_800BA1E0, fn_800BA854, fn_800BAC30, fn_800BAFBC, fn_800BB488, fn_800BC428,
- * fn_800BCD14, fn_800BCE98, fn_800BD234) are large nw4r paired-single (AltiVec) particle walkers that
- * m2c cannot recover - they are the recorded residual, not a finished translation.
+ * Status.  37 of the unit's 60 symbols are written (measured when they sat in `ef/fn_800AEE48.cpp`: 100 % except `fn_800B6900` 80.5 %,
+ * `fn_800B51F8` 94.4 %, `fn_800B7F58` 99.0 %); the DrawStripeStrategy `Particle`/`ParticleManager` walkers `fn_800B4BA4`.. `fn_800B9630` are not
+ * reconstructed yet.  The layer's own `EfStripeParam` (nine words + a scalar, 0x28) and `EfStripeSample` (three `Vec`s) are distinct even though
+ * `ef_drawsmoothstripestrategy.cpp` spells a 0x28 sampler record `EfVec3x3`, because the target copies the first nine words as words and only +0x24
+ * as a float.  The file-scoped `#pragma peephole off` is the old unit's.
  */
 
-#include "ef.h"
+#include "types.h"
 #include "gx.h"
+#include "ef.h"
+#include "ef/ef_drawstrategyimpl.h"
+#include "ef/fn_800AEE48.h"
+#include "ef/ef_drawstripestrategy.h" /* the ahead-vector builders and EfAheadItem (this unit's own header) */
 #include "sys_mem.h"
+#include "unsplit/ef.h"
+#include "g3d/fn_80063888.h" /* fn_80067E54, owned by g3d/fn_80063888.cpp (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
-/* `nw4r::db::Panic` - the real declaration; the front-end reproduces the map's
- * `Panic__Q24nw4r2dbFPCciPCce` spelling (tools/units/mangle.py confirms it).  Declaring the mangled
- * spelling instead would re-mangle it and break the link (docs/matching.md 50); rule 9. */
 #ifdef __cplusplus
 namespace nw4r {
-namespace db {
-void Panic(const char* file, int line, const char* fmt, ...);
-}  // namespace db
+namespace math {
+f32 FrSqrt(f32 value);
+}  // namespace math
 }  // namespace nw4r
-#endif
-
-#ifdef __cplusplus
 extern "C" {
 #endif
 
 #pragma peephole off
 
-/* --------------------------------------------------------------------------------------------------
- * externs owned by the neighbouring ef translation units (declared here, never defined: rule 2 keeps
- * the definition in the TU that owns the symbol).
- * -------------------------------------------------------------------------------------------------- */
+extern char lbl_80593CB4[];  /* the ef_resource vtable                                     .data 0x80593CB4 */
+extern char lbl_80694C08[];  /* a draw-strategy singleton                                  .bss  0x80694C08 */
+extern char lbl_80694C20[];  /* a draw-strategy singleton                                  .bss  0x80694C20 */
+extern f32 lbl_80796140;    /* a stripe-strategy constant                                 .sdata2 0x80796140 */
+extern f32 lbl_80796124; /* a scale factor  .sdata2 0x80796124 */
+extern f32 lbl_80796130; /* a scale factor  .sdata2 0x80796130 */
 
-void fn_800B4B04(void* self, int mode);
-void fn_800C5F74(void* self);
+/* Helpers owned by other units. */
+extern void  PSVECSubtract(Vec* dst, const Vec* a, const Vec* b);
+extern f32 fn_80052214(void* self, void* other);
+extern void fn_800513F0(void* self);
+extern int fn_800A5248(void* node);
+extern void  GXSetCullMode(u32 mode);
+extern void  GXBegin(u32 primitive, u32 vtxfmt, u32 count);
+extern void* fn_800508A8(void* arg);
+extern void* fn_800508AC(void* arg);
+extern void* fn_80051570(void* arg);
+extern void  PSMTXMultVec(const f32* mtx, const void* src, void* dst);
+extern void  fn_800A7F00(void* arg, Vec* v);
 
-/* The walker family this unit's dispatch selects. */
-void fn_800B9DF8(void* self, void* em, void* args);
-void fn_800BA854(void* self, void* em, void* args);
-void fn_800BAFBC(void* self, void* em, void* args);
+/* Nine words plus a trailing scalar: the sampler's per-step record.  (The target copies the nine words
+ * as words and only +0x24 as a float, so they are not three `Vec`s.) */
+typedef struct EfStripeParam {
+    u32 words_0x00[9]; /* +0x00 */
+    f32 field_0x24;    /* +0x24 */
+} EfStripeParam; /* size: 0x28 */
 
-/* The per-particle draw request and the emitter shape record it points at.  Only the fields this
- * unit reads are named. */
-typedef struct EfDrawArgs {
-    u8 pad_0x00[0x24]; /* +0x00 */
-    void* emitter;     /* +0x24  the emitter/effect record the shape comes from */
-} EfDrawArgs; /* size: 0x28 (lower bound, the record continues past what this unit reads) */
+/* Three positions the sample zeroer walks; `fn_800B6954` zeroes them one `Vec` at a time. */
+typedef struct EfStripeSample {
+    Vec a; /* +0x00 */
+    Vec b; /* +0x0C */
+    Vec c; /* +0x18 */
+} EfStripeSample; /* size: 0x24 */
 
-typedef struct EfEmitterShape {
-    u8 pad_0x00[0xAD]; /* +0x00 */
-    u8 shape_0xAD;     /* +0xAD  0/3 = point, 1 = stripe, 2 = tube */
-    u8 shape_0xAE;     /* +0xAE  the walker selector */
-} EfEmitterShape; /* size: 0xAF (lower bound, the record continues past what this unit reads) */
+/* The per-instance byte offset a node manager carries. */
+typedef struct EfNodeManager {
+    u8 pad_0x00[0x42]; /* +0x00 */
+    u16 field_0x42;    /* +0x42  byte offset from a node base to its link field */
+} EfNodeManager; /* size: 0x44 */
 
-extern EfEmitterShape* fn_800AB388(void* emitter);
+/* The unit's own symbols that are used before their definition. */
+void* fn_800B4B60(void* self, s16 flag);
+void fn_800B4FE0(void);
+void fn_800B5288(f32 x, f32 y);
+int  fn_800B5298(u32 value);
+void fn_800B52AC(Vec* v);
+void fn_800B52BC(f32 x, f32 y, f32 z);
+u32 fn_800B5B40(EfParticleState* self);
+void* fn_800B5B34(void* self, void* node);
+void* fn_800B8DB0(void* self, void* node);
+u32 fn_800B9628(EfParticleState* self);
 
-/* The draw-strategy object header: the draw order and a flag word this unit reads at +0xD0. */
-typedef struct EfDrawStrategyObj {
-    u8 pad_0x00[0xD0]; /* +0x00 */
-    u8 flag_0xD0;      /* +0xD0  non-zero when the draw order is set */
-} EfDrawStrategyObj; /* size: 0xD1 (lower bound, the record continues past what this unit reads) */
+/* Constructs the resource record and installs its vtable. */
+void* fn_800B4AC8(void* self) {
+    fn_800C5F74((EfParticleLayers*)self);
+    *(void**)self = lbl_80593CB4;
+    return self;
+}
 
-/* The ahead-context argument block the walkers read: the particle handle and two cached positions. */
-typedef struct EfAheadArgs {
-    void* particle;    /* +0x00 */
-    u8 pad_0x04[0x94]; /* +0x04 */
-    VEC3 prev_pos;     /* +0x98  the previous resolved position */
-    Vec pos;           /* +0xA4  the fallback position */
-} EfAheadArgs; /* size: 0xB0 (lower bound, the record continues past what this unit reads) */
+/* The two-arg destructor: always detaches, then frees when the signed flag is positive. */
+void* fn_800B4B04(void* self, s16 flag) {
+    if (self != 0) {
+        fn_800B4B60(self, 0);
+        if (flag > 0) {
+            operator delete(self);
+        }
+    }
+    return self;
+}
 
-/* The particle/emitter record each walker advances: its world position sits at +0xAC. */
-typedef struct EfWalkerObj {
-    u8 pad_0x00[0xAC]; /* +0x00 */
-    Vec world_pos;     /* +0xAC */
-} EfWalkerObj; /* size: 0xB8 (lower bound, the record continues past what this unit reads) */
+/* Frees `self` when the signed flag is positive. */
+void* fn_800B4B60(void* self, s16 flag) {
+    if (self != 0 && flag > 0) {
+        operator delete(self);
+    }
+    return self;
+}
 
-/* The particle's packed draw/rotate flag bytes (read by the flag accessor). */
-typedef struct EfParticleFlags {
-    u8 pad_0x00[0xB2]; /* +0x00 */
-    u8 flags_0xB2;     /* +0xB2  draw/rotate flag bits */
-} EfParticleFlags; /* size: 0xB3 (lower bound, the record continues past what this unit reads) */
+/* Nothing to do. */
+void fn_800B4FE0(void) {}
 
-/* The walker family the shape selector returns (defined outside this range). */
-void fn_800B87C8(void);
-void fn_800B87D0(void);
-void fn_800B882C(void);
-void fn_800B8788(void);
-void fn_800BBCF8(Vec* out, EfAheadArgs* args, EfWalkerObj* em);
-void fn_800BBBBC(Vec* out, EfAheadArgs* args, EfWalkerObj* em);
-typedef void (*EfWalkerFn)(void);
+/* Emits two stripe endpoints, each preceded by its scale when the flag's low bit is set. */
+void fn_800B51F8(Vec* a, Vec* b, u32 flags, f32 scale) {
+    fn_800B52AC(a);
+    if (fn_800B5298(flags)) {
+        fn_800B5288(lbl_80796124, scale);
+    }
+    fn_800B52AC(b);
+    if (fn_800B5298(flags)) {
+        fn_800B5288(lbl_80796130, scale);
+    }
+}
 
-/* The large per-particle emitters this unit dispatches to (defined further down). */
-void fn_800BC428(void* self, void* em, EfDrawArgs* args);
-void fn_800BD234(void* self, void* em, EfDrawArgs* args);
-void fn_800BDB60(EfDrawStrategyObj* self, void* em, EfDrawArgs* args);
-u32 fn_800BC41C(void* unused, EfParticleFlags* self);
+/* Writes a pair of f32 to the pipe. */
+void fn_800B5288(f32 x, f32 y) {
+    GXWGFifo.f32 = x;
+    GXWGFifo.f32 = y;
+}
 
-/* SDK GX state setters and the mtx helpers (unsplit / SDK: rule 2's named gap). */
-extern void mtx34_identity(Mtx34* mtx);
-extern void fn_80050508(Mtx34* mtx);
-void fn_800C6064(void* self, EfDrawArgs* args, EfEmitterShape* shape, void* em);
-extern void GXEnableTexOffsets(u32 coord, u32 line_enable, u32 point_enable);
-extern void GXSetArray(u32 attr, const void* base, u8 stride);
-extern void GXClearVtxDesc(void);
-extern void GXSetVtxDesc(u32 attr, u32 type);
-extern void GXSetVtxAttrFmt(u32 fmt, u32 attr, u32 cnt, u32 type, u32 frac);
-extern void GXLoadPosMtxImm(void* mtx, u32 id);
-extern void GXSetCurrentMtx(u32 id);
-extern char lbl_80791300[]; /* the GX position/normal array descriptor (.sdata) */
-extern char lbl_80791320[]; /* the GX texcoord array descriptor (.sdata) */
+/* Tests the low bit of a status word (the booleanised `(value & 1) != 0`). */
+int fn_800B5298(u32 value) {
+    return (value & 1) != 0;
+}
 
-/* The ahead-context walkers: the particle/emitter lookup helpers and the small vector helpers they
- * use (all still `fn_*`/SDK, defined outside this range). */
-extern void PSVECSubtract(Vec* out, Vec* a, Vec* b);
-extern int fn_800B59E4(Vec* v);
-extern EfWalkerObj* fn_800B5ACC(void* particle, EfWalkerObj* em);
-extern EfWalkerObj* fn_800B8D48(void* particle, EfWalkerObj* em);
-extern f32 lbl_80796154; /* the zero/one constant the walkers initialise with (.sdata2) */
+void fn_800B52AC(Vec* v) {
+    fn_800B52BC(v->x, v->y, v->z);
+}
 
-/* This unit's pooled `__FILE__`/assert strings and the vtables the constructors write.  They are
- * declared, never defined here: the data pass claims the ranges once the source emits them
- * (docs/plan.md 8.4), so a definition would move the pool. */
-extern char lbl_80593E88[]; /* "ef_drawbillboardstrategy.cpp"                                 .data 0x80593E88 */
-extern char lbl_80593EA8[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer."           .data 0x80593EA8 */
-extern char lbl_80593EDC[]; /* "NW4R:Pointer Error\npm->mResource(=%p) is not valid..."     .data 0x80593EDC */
-extern char lbl_80593F18[]; /* "NW4R:Pointer Error\n&ed(=%p) is not valid pointer."         .data 0x80593F18 */
-extern char lbl_80593F4C[]; /* the DrawBillboardStrategy vtable                             .data 0x80593F4C */
-extern char lbl_80594070[]; /* "ef_drawdirectionalstrategy.cpp"                             .data 0x80594070 */
-extern char lbl_80594090[]; /* "NW4R:Pointer Error\np(=%p) is not valid pointer."           .data 0x80594090 */
-extern char lbl_805941D8[]; /* the DrawDirectionalStrategy vtable                           .data 0x805941D8 */
-extern char lbl_80594318[]; /* the next strategy vtable                                     .data 0x80594318 */
-extern char lbl_805940C0[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer."           .data 0x805940C0 */
-extern char lbl_805940F4[]; /* "NW4R:Pointer Error\npm->mResource(=%p) is not valid..."     .data 0x805940F4 */
-extern char lbl_80594130[]; /* "NW4R:Pointer Error\n&ed(=%p) is not valid pointer."         .data 0x80594130 */
+/* Writes three f32 to the pipe. */
+void fn_800B52BC(f32 x, f32 y, f32 z) {
+    GXWGFifo.f32 = x;
+    GXWGFifo.f32 = y;
+    GXWGFifo.f32 = z;
+}
 
-/* --------------------------------------------------------------------------------------------------
- * The DrawStripeStrategy constructors and deleting destructors.
- * -------------------------------------------------------------------------------------------------- */
+/* Resolves the stripe length, returning 0 when it is below the unit's threshold. */
+int fn_800B59E4(void* self) {
+    f32 length = fn_80052214(self, self);
+    if (length < fn_800B5A48()) {
+        return 0;
+    }
+    nw4r::math::FrSqrt(length);
+    fn_800513F0(self);
+    return 1;
+}
+
+/* A stripe-strategy constant. */
+f32 fn_800B5A48(void) {
+    return lbl_80796140;
+}
+
+/* Tests one bit of a status word. */
+int fn_800B5A50(u32 value) {
+    return (value & 0x8) != 0;
+}
+
+/* Walks the particle list at +0x3C until the callback reports 1 (or the end). */
+void* fn_800B5A64(EfDrawList* self) {
+    void* node = (void*)fn_800B5B40((EfParticleState*)self);
+    while (node != 0 && fn_800A5248(node) != 1) {
+        node = fn_800B5ACC(self, node);
+    }
+    return node;
+}
+
+/* Walks the auxiliary list through the per-node offset table until the callback reports 1. */
+void* fn_800B5ACC(void* self, void* node) {
+    void* next = fn_800B5B34(self, node);
+    while (next != 0 && fn_800A5248(next) != 1) {
+        next = fn_800B5B34(self, next);
+    }
+    return next;
+}
+
+/* The next list node: the manager's per-instance byte offset into the node.  The offset is a runtime
+ * field, so there is no compile-time field name to reach; the byte add is the only spelling. */
+void* fn_800B5B34(void* self, void* node) {
+    return *(void**)((u8*)node + ((EfNodeManager*)self)->field_0x42);
+}
+
+/* The particle's stored word at +0x3C. */
+u32 fn_800B5B40(EfParticleState* self) {
+    return self->field_0x3C;
+}
+
+/* The particle's packed flags, bits 6-7. */
+u32 fn_800B5B48(void* ctx, EfParticleState* particle) {
+    return particle->field_0xB2 & 0xC0;
+}
+
+/* A draw-strategy singleton. */
+void* fn_800B612C(void) {
+    return lbl_80694C20;
+}
+
+/* A draw-strategy singleton. */
+void* fn_800B6138(void) {
+    return lbl_80694C08;
+}
+
+/* Tests one bit of a status word. */
+int fn_800B6534(u32 value) {
+    return (value & 0x10) != 0;
+}
+
+/* The particle's layer/parameter index byte. */
+u8 fn_800B68F8(void* ctx, EfParticleState* particle) {
+    return particle->field_0xB0;
+}
+
+/* Copies a stripe sample. */
+void fn_800B6900(EfStripeParam* dst, EfStripeParam* src) {
+    *dst = *src;
+}
+
+/* Zeroes the three positions of a stripe sample and returns it. */
+EfStripeSample* fn_800B6954(EfStripeSample* self) {
+    VEC3_ctor((VEC3*)&self->a);
+    VEC3_ctor((VEC3*)&self->b);
+    VEC3_ctor((VEC3*)&self->c);
+    return self;
+}
+
+/* The particle's state bit 0x800. */
+u32 fn_800B6994(void* ctx, EfParticleState* particle) {
+    return particle->flags_0x00 & 0x800;
+}
+
+/* Draws eight stripe steps at one scale when the flag is set. */
+void fn_800B7628(u32 cull_mode, u32 enabled, u32 flags) {
+    GXSetCullMode(cull_mode);
+    if (enabled != 0) {
+        GXBegin(0x98, 0, 8);
+        for (int i = 0; i < 8; i++) {
+            fn_800B52BC(lbl_80796130, lbl_80796130, lbl_80796130);
+            if (fn_800B5298(flags)) {
+                fn_800B5288(lbl_80796130, lbl_80796130);
+            }
+        }
+        fn_800B4FE0();
+    }
+}
+
+/* The particle's packed flags, bits 0-2. */
+u32 fn_800B76B8(void* ctx, EfParticleState* particle) {
+    return particle->field_0xB2 & 0x7;
+}
+
+/* Transforms a vector by the matrix the helper pair builds, and returns `dst`. */
+void* fn_800B7F58(void* dst, void* a, void* b) {
+    void* x = fn_800508A8(dst);
+    void* y = fn_800508AC(b);
+    PSMTXMultVec((const f32*)fn_80051570(a), y, x);
+    return dst;
+}
+
+/* The particle's packed flags, bits 3-5. */
+u32 fn_800B83C0(void* ctx, EfParticleState* particle) {
+    return particle->field_0xB2 & 0x38;
+}
+
+/* Builds the particle's +0xB0 transform into a local and copies it into `dst`. */
+void fn_800B8788(nw4r::math::VEC3* dst, EfParticleState* particle) {
+    u8 tmp[0x10];
+    copyVec3(dst, (const nw4r::math::VEC3*)fn_80067E54(tmp, &particle->field_0xB0));
+}
+
+/* Copies the particle's +0x98 block into `dst`. */
+void fn_800B87C8(nw4r::math::VEC3* dst, EfParticleState* particle) {
+    copyVec3(dst, (const nw4r::math::VEC3*)&particle->field_0x98);
+}
+
+/* Subtracts the two ahead vectors and copies the reference block when the result is degenerate. */
+void fn_800B87D0(Vec* a, EfParticleState* particle, EfAheadItem* item) {
+    PSVECSubtract(a, &item->field_0xAC, &particle->field_0xA4);
+    if (fn_800B59E4(a) == 0) {
+        copyVec3((nw4r::math::VEC3*)a, (const nw4r::math::VEC3*)&particle->field_0x98);
+    }
+}
+
+/* Builds the ahead vector and copies the reference block when the result is degenerate. */
+/* untyped: opaque handle passed through to fn_800A7F00 */
+void fn_800B882C(Vec* a, EfParticleState* particle, void* arg) {
+    fn_800A7F00(arg, a);
+    if (fn_800B59E4(a) == 0) {
+        copyVec3((nw4r::math::VEC3*)a, (const nw4r::math::VEC3*)&particle->field_0x98);
+    }
+}
+
+/* Walks a node chain through fn_800B8DB0 until the callback reports 1 (or the end). */
+void* fn_800B8D48(void* self, void* node) {
+    void* next = fn_800B8DB0(self, node);
+    while (next != 0 && fn_800A5248(next) != 1) {
+        next = fn_800B8DB0(self, next);
+    }
+    return next;
+}
+
+void* fn_800B8DB0(void* self, void* node) {
+    return *(void**)((u8*)node + ((EfNodeManager*)self)->field_0x42 + 4);
+}
+
+/* Walks the +0x38 head through fn_800B8DB0 until the callback reports 1 (or the end). */
+void* fn_800B95C0(EfParticleState* self) {
+    void* next = (void*)fn_800B9628(self);
+    while (next != 0 && fn_800A5248(next) != 1) {
+        next = fn_800B8DB0(self, next);
+    }
+    return next;
+}
+
+/* The particle's stored word at +0x38. */
+u32 fn_800B9628(EfParticleState* self) {
+    return self->field_0x38;
+}
 
 /* Deletes the DrawStripeStrategy and, when the flag is positive, frees the storage. */
 void* fn_800B99E8(void* self, s16 flag) {
@@ -205,414 +344,6 @@ void* fn_800B99E8(void* self, s16 flag) {
         }
     }
     return self;
-}
-
-/* Constructs the DrawBillboardStrategy: runs the base constructor and installs the vtable. */
-void** fn_800B9A44(void** self) {
-    fn_800C5F74(self);
-    self[0] = (void*)lbl_80593F4C;
-    return self;
-}
-
-/* Dispatches one draw request to the point/stripe/tube walker its emitter shape selects. */
-void fn_800B9A80(void* self, void* em, EfDrawArgs* args) {
-    EfEmitterShape* shape;
-
-    if (!IsValidPointer((u32)args)) {
-        nw4r::db::Panic(lbl_80593E88, 502, lbl_80593EA8, args);
-    }
-    if (!IsValidPointer((u32)args->emitter)) {
-        nw4r::db::Panic(lbl_80593E88, 503, lbl_80593EDC, args->emitter);
-    }
-    shape = fn_800AB388(args->emitter);
-    if (!IsValidPointer((u32)shape)) {
-        nw4r::db::Panic(lbl_80593E88, 506, lbl_80593F18, shape);
-    }
-    switch (shape->shape_0xAD) {
-    case 0:
-    case 3:
-        fn_800B9DF8(self, em, args);
-        break;
-    case 1:
-        fn_800BA854(self, em, args);
-        break;
-    case 2:
-        fn_800BAFBC(self, em, args);
-        break;
-    }
-}
-
-/* The base deleting destructor (DrawStrategyImpl). */
-void* fn_800BBD90(void* self, s16 flag) {
-    if (self != 0) {
-        fn_800B4B04(self, 0);
-        if ((s16)flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
-}
-
-/* The base constructor (DrawStrategyImpl). */
-void** fn_800BBDEC(void** self) {
-    fn_800C5F74(self);
-    self[0] = (void*)lbl_805941D8;
-    return self;
-}
-
-/* The second deleting destructor. */
-void* fn_800BE0BC(void* self, s16 flag) {
-    if (self != 0) {
-        fn_800B4B04(self, 0);
-        if ((s16)flag > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
-}
-
-/* The second constructor. */
-void** fn_800BE118(void** self) {
-    fn_800C5F74(self);
-    self[0] = (void*)lbl_80594318;
-    return self;
-}
-
-/* --------------------------------------------------------------------------------------------------
- * The out-of-line GX FIFO writers, in address order (the same family the sibling
- * ef_drawsmoothstripestrategy.cpp carries at 0x800C6F90.. and ef_drawstrategyimpl.cpp at 0x800BC...).
- * -------------------------------------------------------------------------------------------------- */
-
-/* Ends the current FIFO command (the SDK's `GXEnd`, which writes nothing). */
-void fn_800BA6E8(void) {}
-
-/* Writes one u8 to the pipe. */
-void fn_800BA6EC(u8 value) {
-    GXWGFifo.u8 = value;
-}
-
-/* Tests the low bit of a status word. */
-int fn_800BA6FC(u32 value) {
-    return (value & 1) != 0;
-}
-
-/* Writes a vector to the pipe. */
-void fn_800BA710(Vec* v) {
-    f32 x = v->x;
-    f32 y = v->y;
-    f32 z = v->z;
-    GXWGFifo.f32 = x;
-    GXWGFifo.f32 = y;
-    GXWGFifo.f32 = z;
-}
-
-/* Writes a pair of f32 to the pipe. */
-void fn_800BAFB0(f32* dst, f32 x, f32 y) {
-    dst[0] = x;
-    dst[1] = y;
-}
-
-/* Ends the current FIFO command (second copy). */
-void fn_800BC048(void) {}
-
-/* Writes one u8 to the pipe (second copy). */
-void fn_800BC04C(u8 value) {
-    GXWGFifo.u8 = value;
-}
-
-/* Tests the low bit of a status word (second copy). */
-int fn_800BC05C(u32 value) {
-    return (value & 1) != 0;
-}
-
-/* Writes a vector to the pipe (second copy). */
-void fn_800BC070(Vec* v) {
-    f32 x = v->x;
-    f32 y = v->y;
-    f32 z = v->z;
-    GXWGFifo.f32 = x;
-    GXWGFifo.f32 = y;
-    GXWGFifo.f32 = z;
-}
-
-/* --------------------------------------------------------------------------------------------------
- * The indexed four-vertex stripe writers.  They expand a (matrix, two positions) pair into four
- * vertices through `subVec3`/`addVec3` and emit them to the pipe, tagging every other vertex
- * with its index when the draw record asks for it.
- * -------------------------------------------------------------------------------------------------- */
-
-/* GX is an unsplit SDK band (rule 2's named gap): declared here. */
-extern void GXBegin(u8 prim, u8 vtxfmt, u16 nverts);
-extern void subVec3(Vec* out, void* mtx, Vec* in);
-extern void addVec3(Vec* out, void* mtx, Vec* in);
-extern void fn_800514FC(Vec* out, void* mtx, Vec* in);
-
-/* The stripe writer (first copy): four vertices from the matrix and two positions. */
-void fn_800BA734(void* unused, void* mtx, Vec* a, Vec* b, u32 flags) {
-    Vec v0;
-    Vec v1;
-    Vec v2;
-    Vec v3;
-
-    GXBegin(0x80, 0, 4);
-    subVec3(&v0, mtx, a);
-    fn_800BA710(&v0);
-    if (fn_800BA6FC(flags) != 0) {
-        fn_800BA6EC(0);
-    }
-    subVec3(&v1, mtx, b);
-    fn_800BA710(&v1);
-    if (fn_800BA6FC(flags) != 0) {
-        fn_800BA6EC(1);
-    }
-    addVec3(&v2, mtx, a);
-    fn_800BA710(&v2);
-    if (fn_800BA6FC(flags) != 0) {
-        fn_800BA6EC(2);
-    }
-    addVec3(&v3, mtx, b);
-    fn_800BA710(&v3);
-    if (fn_800BA6FC(flags) != 0) {
-        fn_800BA6EC(3);
-    }
-    fn_800BA6E8();
-}
-
-/* The stripe writer (second copy): four vertices from the matrix and two positions. */
-void fn_800BC094(void* mtx, Vec* a, Vec* b, u32 flags) {
-    Vec v0;
-    Vec v1;
-    Vec v2;
-    Vec v3;
-
-    GXBegin(0x80, 0, 4);
-    subVec3(&v0, mtx, a);
-    fn_800BC070(&v0);
-    if (fn_800BC05C(flags) != 0) {
-        fn_800BC04C(0);
-    }
-    subVec3(&v1, mtx, b);
-    fn_800BC070(&v1);
-    if (fn_800BC05C(flags) != 0) {
-        fn_800BC04C(1);
-    }
-    addVec3(&v2, mtx, a);
-    fn_800BC070(&v2);
-    if (fn_800BC05C(flags) != 0) {
-        fn_800BC04C(2);
-    }
-    addVec3(&v3, mtx, b);
-    fn_800BC070(&v3);
-    if (fn_800BC05C(flags) != 0) {
-        fn_800BC04C(3);
-    }
-    fn_800BC048();
-}
-
-/* Selects the ahead-context position resolver for one draw request's emitter shape. */
-EfWalkerFn fn_800BB93C(void* unused, EfDrawArgs* args) {
-    EfEmitterShape* shape;
-
-    if (!IsValidPointer((u32)args->emitter)) {
-        nw4r::db::Panic(lbl_80593E88, 784, lbl_80593EDC, args->emitter);
-    }
-    shape = fn_800AB388(args->emitter);
-    if (!IsValidPointer((u32)shape)) {
-        nw4r::db::Panic(lbl_80593E88, 786, lbl_80593F18, shape);
-    }
-    switch (shape->shape_0xAE) {
-    case 0:
-        return (EfWalkerFn)fn_800B882C;
-    case 1:
-        return (EfWalkerFn)fn_800B87D0;
-    case 2:
-        return (EfWalkerFn)fn_800B87C8;
-    case 3:
-        return (EfWalkerFn)fn_800BBCF8;
-    case 4:
-        return (EfWalkerFn)fn_800BBBBC;
-    default:
-        return (EfWalkerFn)fn_800B882C;
-    }
-}
-
-/* Resolves the ahead-context position of one particle against its emitter and neighbour. */
-void fn_800BBCF8(Vec* out, EfAheadArgs* args, EfWalkerObj* em) {
-    EfWalkerObj* particle = fn_800B5ACC(args->particle, em);
-
-    if (particle != 0) {
-        PSVECSubtract(out, &particle->world_pos, &em->world_pos);
-    } else {
-        PSVECSubtract(out, &em->world_pos, &args->pos);
-    }
-    if (fn_800B59E4(out) == 0) {
-        copyVec3((nw4r::math::VEC3*)out, &args->prev_pos);
-    }
-}
-
-/* Resolves the ahead-context position of one particle from its two neighbour particles. */
-void fn_800BBBBC(Vec* out, EfAheadArgs* args, EfWalkerObj* em) {
-    Vec a;
-    Vec b;
-    Vec c;
-    Vec d;
-    EfWalkerObj* first = fn_800B5ACC(args->particle, em);
-    EfWalkerObj* second = fn_800B8D48(args->particle, em);
-
-    setVec3((nw4r::math::VEC3*)&a, lbl_80796154, lbl_80796154, lbl_80796154);
-    if (first != 0) {
-        PSVECSubtract(&a, &first->world_pos, &em->world_pos);
-        if (fn_800B59E4(&a) == 0) {
-            setVec3((nw4r::math::VEC3*)&c, lbl_80796154, lbl_80796154, lbl_80796154);
-            copyVec3((nw4r::math::VEC3*)&a, (const nw4r::math::VEC3*)&c);
-        }
-    }
-    setVec3((nw4r::math::VEC3*)&b, lbl_80796154, lbl_80796154, lbl_80796154);
-    if (second != 0) {
-        PSVECSubtract(&b, &second->world_pos, &em->world_pos);
-        if (fn_800B59E4(&b) == 0) {
-            setVec3((nw4r::math::VEC3*)&d, lbl_80796154, lbl_80796154, lbl_80796154);
-            copyVec3((nw4r::math::VEC3*)&b, (const nw4r::math::VEC3*)&d);
-        }
-    }
-    PSVECSubtract(out, &a, &b);
-    if (fn_800B59E4(out) == 0) {
-        copyVec3((nw4r::math::VEC3*)out, &args->prev_pos);
-    }
-}
-
-/* Sets the stripe GX state (texcoord array, vertex format and position matrix). */
-void fn_800BB748(EfDrawStrategyObj* self, void* em, EfDrawArgs* args) {
-    Mtx34 mtx;
-
-    if (!IsValidPointer((u32)args)) {
-        nw4r::db::Panic(lbl_80593E88, 746, lbl_80593EA8, args);
-    }
-    fn_800C6064(self, args, fn_800AB388(args->emitter), em);
-    GXEnableTexOffsets(0, 1, 1);
-    GXSetArray(0xD, lbl_80791300, 2);
-    GXClearVtxDesc();
-    GXSetVtxDesc(9, 1);
-    if (self->flag_0xD0 != 0) {
-        GXSetVtxDesc(0xD, 2);
-    }
-    GXSetVtxAttrFmt(0, 9, 1, 4, 0);
-    GXSetVtxAttrFmt(0, 0xD, 1, 0, 0);
-    MTX34_ctor(&mtx);
-    mtx34_identity(&mtx);
-    fn_80050508(&mtx);
-    GXLoadPosMtxImm(&mtx, 0);
-    GXSetCurrentMtx(0);
-}
-
-/* Sets the directional stripe GX state (texcoord array and vertex format). */
-void fn_800BDB60(EfDrawStrategyObj* self, void* em, EfDrawArgs* args) {
-    if (!IsValidPointer((u32)args)) {
-        nw4r::db::Panic(lbl_80594070, 652, lbl_805940C0, args);
-    }
-    fn_800C6064(self, args, fn_800AB388(args->emitter), em);
-    GXEnableTexOffsets(0, 1, 1);
-    GXSetArray(0xD, lbl_80791320, 2);
-    GXClearVtxDesc();
-    GXSetVtxDesc(9, 1);
-    if (self->flag_0xD0 != 0) {
-        GXSetVtxDesc(0xD, 2);
-    }
-    GXSetVtxAttrFmt(0, 9, 1, 4, 0);
-    GXSetVtxAttrFmt(0, 0xD, 1, 0, 0);
-    GXSetCurrentMtx(0);
-}
-
-/* Dispatches the directional emitter to the point/tube path its particle flags select. */
-void fn_800BC1B4(EfDrawStrategyObj* self, void* em, EfDrawArgs* args) {
-    if (!IsValidPointer((u32)args)) {
-        nw4r::db::Panic(lbl_80594070, 342, lbl_805940C0, args);
-    }
-    fn_800BDB60(self, em, args);
-    if (!IsValidPointer((u32)args->emitter)) {
-        nw4r::db::Panic(lbl_80594070, 346, lbl_805940F4, args->emitter);
-    }
-    if (fn_800BC41C(self, (EfParticleFlags*)fn_800AB388(args->emitter)) != 1) {
-        fn_800BC428(self, em, args);
-        return;
-    }
-    fn_800BD234(self, em, args);
-}
-
-/* The four-vertex matrix writer: transforms four positions by a matrix and emits them. */
-void fn_800BBE28(void* mtx, Vec* src, u32 flags) {
-    Vec v0;
-    Vec v1;
-    Vec v2;
-    Vec v3;
-
-    if (!IsValidPointer((u32)src)) {
-        nw4r::db::Panic(lbl_80594070, 92, lbl_80594090, src);
-    }
-    VEC3_ctor((VEC3*)&v0);
-    VEC3_ctor((VEC3*)&v1);
-    VEC3_ctor((VEC3*)&v2);
-    VEC3_ctor((VEC3*)&v3);
-    fn_800514FC(&v0, mtx, &src[0]);
-    fn_800514FC(&v1, mtx, &src[1]);
-    fn_800514FC(&v2, mtx, &src[2]);
-    fn_800514FC(&v3, mtx, &src[3]);
-    GXBegin(0x80, 0, 4);
-    fn_800BC070(&v0);
-    if (fn_800BC05C(flags) != 0) {
-        fn_800BC04C(0);
-    }
-    fn_800BC070(&v1);
-    if (fn_800BC05C(flags) != 0) {
-        fn_800BC04C(1);
-    }
-    fn_800BC070(&v2);
-    if (fn_800BC05C(flags) != 0) {
-        fn_800BC04C(2);
-    }
-    fn_800BC070(&v3);
-    if (fn_800BC05C(flags) != 0) {
-        fn_800BC04C(3);
-    }
-    fn_800BC048();
-}
-
-/* Selects the directional walker for one draw request's emitter shape. */
-EfWalkerFn fn_800BDD34(void* unused, EfDrawArgs* args) {
-    EfEmitterShape* shape;
-
-    if (!IsValidPointer((u32)args)) {
-        nw4r::db::Panic(lbl_80594070, 687, lbl_805940C0, args);
-    }
-    if (!IsValidPointer((u32)args->emitter)) {
-        nw4r::db::Panic(lbl_80594070, 688, lbl_805940F4, args->emitter);
-    }
-    shape = fn_800AB388(args->emitter);
-    if (!IsValidPointer((u32)shape)) {
-        nw4r::db::Panic(lbl_80594070, 691, lbl_80594130, shape);
-    }
-    switch (shape->shape_0xAE) {
-    case 0:
-        return (EfWalkerFn)fn_800B882C;
-    case 1:
-        return (EfWalkerFn)fn_800B87D0;
-    case 2:
-        return (EfWalkerFn)fn_800B87C8;
-    case 3:
-        return (EfWalkerFn)fn_800BBCF8;
-    case 5:
-    case 7:
-        return (EfWalkerFn)fn_800B8788;
-    case 6:
-        return (EfWalkerFn)fn_800BBBBC;
-    default:
-        return (EfWalkerFn)fn_800B882C;
-    }
-}
-
-/* The first two draw/rotate flag bits of a particle. */
-u32 fn_800BC41C(void* unused, EfParticleFlags* self) {
-    return self->flags_0xB2 & 3;
 }
 
 #ifdef __cplusplus
