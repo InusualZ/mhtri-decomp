@@ -45,9 +45,14 @@
        "tool": "callers",
        "command": "python tools/units/callers.py 0x8079A410 ; python tools/units/callers.py 0x8079A448",
        "finding": "value 0x00000000 sits at 0x8079A410 (read by 0x802ABD28, 0x802ABF00, 0x802AC484, 0x802AD9A8) and at 0x8079A448 (read by 0x802AD9CC, 0x802AEC44, 0x802B0100, 0x802B01AC, 0x802B0C10, 0x802B2F60 +4): two pool entries for one value means two TUs, so an edge lies in (0x802AD9A8, 0x802AD9CC]; 0x802AD9C0 is inside that interval and no literal is read on both sides of it"
+      },
+      {
+       "tool": "splitcheck",
+       "command": "python tools/splits/splitcheck.py --baseline --only pool --intervals --unit \"pl_yure|stg_w\"",
+       "finding": "pooldup line: value 0x00000000 held at lbl_8079A410 (last read 0x802AD9B0, pl_yure) and lbl_8079A448 (first read 0x802ADA5C, stage): a TU starts in (0x802AD9A8, 0x802AD9CC], 2 function starts: the cut 0x802AD9C0 is one of them"
       }
      ],
-     "reproduce": "python tools/splits/splitcheck.py --baseline --only ctors --unit pl_yure"
+     "reproduce": "python tools/splits/splitcheck.py --baseline --only pool --intervals --unit \"pl_yure|stg_w\" && python tools/splits/splitcheck.py --baseline --only ctors --unit pl_yure"
     }
    ],
    "removes_cuts": [
@@ -354,6 +359,11 @@
        "tool": "callers",
        "command": "python tools/units/callers.py 0x8079A670",
        "finding": "callers lists the reading functions on both sides of 0x802D0DCC"
+      },
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x802D0DCC",
+       "finding": "second signal: fn_802D0DCC (the registered Matching unit ai/fn_802D0DCC.c, 0x802D0DCC..0x802D0F34) has one caller, fn_802D0F34 at 0x802D1224, in the next registered unit: a private helper of the merged TU"
       }
      ],
      "reproduce": "python tools/splits/splitcheck.py --baseline --only pool --unit fn_802CC794"
@@ -365,7 +375,7 @@
      "evidence": [
       {
        "tool": "splitcheck",
-       "command": "python tools/splits/splitcheck.py --baseline --only pool --unit fn_802D0DCC",
+       "command": "python tools/splits/splitcheck.py --baseline --only pool --unit fn_802D0F34",
        "finding": "pool: 39 literal(s) are read on both sides of 0x802D0F34, e.g. 0x8079A670 read by 0x802D063C (before) and 0x802D1954 (after); 0x8079A674 read by 0x802CA5F4 (before) and 0x802D1954 (after); 0x8079A678 read by 0x802CB5AC (before) and 0x802D287C (after): one pool per TU, so the registered edge is not a TU edge"
       },
       {
@@ -374,7 +384,7 @@
        "finding": "callers lists the reading functions on both sides of 0x802D0F34"
       }
      ],
-     "reproduce": "python tools/splits/splitcheck.py --baseline --only pool --unit fn_802D0DCC"
+     "reproduce": "python tools/splits/splitcheck.py --baseline --only pool --unit fn_802D0F34"
     },
     {
      "addr": "0x802D44F4",
@@ -410,7 +420,7 @@
    ]
   },
   {
-   "derived_name": "hud_notice",
+   "derived_name": "cockpit",
    "module": "hud",
    "ranges": {
     ".text": [
@@ -476,7 +486,8 @@
    ],
    "open_questions": [
     "candidate cut (guess) inside this unit: 5 candidate function starts 0x802E03D4..0x802E0490 (latest 0x802E0490); dup value 3f000000 at 8079A878 and 8079A8C0; the two sides stay merged",
-    "0x802E0490 (get_wide_offset) is the latest of 5 candidate starts of a TU that holds hud/layout.cpp: the two stay merged only as far as the registered edge 0x802E0740; layout.cpp is unchanged"
+    "0x802E0490 (get_wide_offset) is the latest of 5 candidate starts of a TU that holds hud/layout.cpp: the two stay merged only as far as the registered edge 0x802E0740; layout.cpp is unchanged",
+    "name_note: NOT a guess - `cockpit.cpp` is the unit's own `__FILE__` string (lbl_805D55C8, .data 0x805D55C8); its only referrer is fn_802DDC04 at 0x802DDEF0, inside this unit (`callers.py 0x805D55C8`), and the registered neighbours agree: src/hud/layout.cpp:27 places `cockpit.cpp` at 0x802D9EB4..0x802E0740 and src/menu/fn_802E4978.cpp:7 names it as emitted at 0x802DBC48. The earlier name `hud_notice` was a guess"
    ]
   },
   {
@@ -679,7 +690,8 @@
     "enemy/fn_802F5138.cpp"
    ],
    "open_questions": [
-    "placeholder name: derived_name carries the first function address, not a content-derived name"
+    "placeholder name: derived_name carries the first function address, not a content-derived name",
+    "UNIT END IS A GUESS: end edge 0x802FA9A0 has private callees across it. fn_802FA9A0 (0x802FA9A0) and fn_802FAFB4 (0x802FAFB4) are called only from fn_802FA964 (0x802FA98C, 0x802FA994), before the edge (`callers.py 0x802FA9A0`): the registered edge is not a TU edge"
    ]
   },
   {
@@ -731,7 +743,8 @@
    ],
    "open_questions": [
     "candidate cut (guess) inside this unit: 6 candidate function starts 0x8031E568..0x8031E6E0 (latest 0x8031E6E0); dup value 3f800000 at 8079AE74 and 8079AE98 (+1 more dup pairs, one cut separates all); the two sides stay merged",
-    "placeholder name: derived_name carries the first function address, not a content-derived name"
+    "placeholder name: derived_name carries the first function address, not a content-derived name",
+    "UNIT END IS A GUESS: end edge 0x8031EA8C has private callees across it. fn_8031EA8C (0x8031EA8C) is called only from fn_8031E7F4 (0x8031E88C, 0x8031E8C4), before the edge (`callers.py 0x8031EA8C`): the registered edge is not a TU edge"
    ]
   },
   {
@@ -782,12 +795,13 @@
     "enemy/em_act_step.cpp"
    ],
    "open_questions": [
-    "placeholder name: derived_name carries the first function address, not a content-derived name"
+    "placeholder name: derived_name carries the first function address, not a content-derived name",
+    "UNIT END IS A GUESS: end edge 0x8033041C has private callees across it. fn_8033041C (0x8033041C) is called only from the dispatcher fn_803303E0 (0x80330408, before the edge), which tail-branches into em_pl_frame, and fn_80330E00 only from the same dispatcher (0x80330410); the registered edge against the next unit is not a TU edge (`callers.py 0x8033041C`); the tail is not proposed as a separate TU"
    ]
   },
   {
    "derived_name": "fn_80348A48",
-   "module": "ef",
+   "module": "menu",
    "ranges": {
     ".text": [
      [
@@ -833,17 +847,18 @@
     "ef/eft_slot.cpp"
    ],
    "open_questions": [
-    "placeholder name: derived_name carries the first function address, not a content-derived name"
+    "placeholder name: derived_name carries the first function address, not a content-derived name",
+    "UNIT END IS A GUESS: end edge 0x80349DD8 has private callees across it. item_page_scroll_rows (0x80349DD8) is called only from fn_80349080 (0x80349138, 0x80349168) and item_page_update_rows (0x80349F8C) only from fn_80349398 (four sites), both before the edge, so the unit calls into menu_item_page (the registered unit that follows): the edge is not a TU edge (`callers.py 0x80349DD8`). Module `ef` (from the registered eft_slot head) has no support in these functions: renamed `menu`"
    ]
   },
   {
-   "derived_name": "fn_8035BAB4",
-   "module": "ef",
+   "derived_name": "em033_prog",
+   "module": "enemy",
    "ranges": {
     ".text": [
      [
       "0x8035BAB4",
-      "0x8035E034"
+      "0x8035F2B4"
      ]
     ]
    },
@@ -851,7 +866,7 @@
     {
      "addr": "0x8035BAB4",
      "section": ".text",
-     "grade": "medium",
+     "grade": "strong",
      "kind": "pooldup-forced",
      "evidence": [
       {
@@ -863,18 +878,46 @@
        "tool": "callers",
        "command": "python tools/units/callers.py 0x8079B640 ; python tools/units/callers.py 0x8079B668",
        "finding": "the readers of the left pool entries end before 0x8035BAB4 and the readers of the right entries start at or after it; no literal is read on both sides of the chosen start 0x8035BAB4"
+      },
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x8035BAB4 --pointers",
+       "finding": "fn_8035BAB4 is slot 0 of `em033_prog_tbl` (.data 0x805ED370, 0x6C B; `.4byte fn_8035BAB4` at 0x805ED370): the table is the enemy program table of em033, so the function starts that TU; the independent exact signal beside the pool interval (3 candidates 0x8035B97C 0x8035B998 0x8035BAB4)"
       }
      ],
-     "reproduce": "python tools/splits/splitcheck.py --baseline --only pool --unit eft052"
+     "reproduce": "python tools/splits/splitcheck.py --baseline --only pool --unit eft052 && python tools/units/callers.py 0x8035BAB4 --pointers"
     }
    ],
-   "removes_cuts": [],
-   "absorbs": [],
+   "removes_cuts": [
+    {
+     "addr": "0x8035E034",
+     "section": ".text",
+     "grade": "strong",
+     "evidence": [
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x8035E034 --pointers",
+       "finding": "fn_8035E034 is slot of `em033_prog_tbl` (0x805ED370, the same table whose slot 0 is fn_8035BAB4); fn_8035E1E0 and fn_8035E578 are slots of it too (`callers.py 0x8035E1E0 --pointers`, `0x8035E578 --pointers`): the table has slots on both sides of the registered edge 0x8035E034, so the edge is not a TU edge"
+      },
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x8035E81C",
+       "finding": "fn_8035E81C (after the edge) is called only from fn_8035BF64 (0x8035C060, 0x8035C15C), before it; likewise fn_8035EAA0 (0x8035C074, 0x8035C1A0), fn_8035EB80 (fn_8035BC28) and fn_8035ECD8 (0x8035BF78): private callees across 0x8035E034"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x8035E034 --pointers && python tools/units/callers.py 0x8035E1E0 --pointers && python tools/units/callers.py 0x8035E578 --pointers"
+    }
+   ],
+   "absorbs": [
+    "enemy/fn_8035E034.cpp"
+   ],
    "replaces_tail_of": [
     "ef/eft052.cpp"
    ],
    "open_questions": [
-    "placeholder name: derived_name carries the first function address, not a content-derived name"
+    "placeholder name: derived_name carries the first function address, not a content-derived name",
+    "UNIT END IS A GUESS: the rendered end 0x8035F2B4 is the registered end of the absorbed enemy/fn_8035E034.cpp, an upper bound, not a claim. The em033 TU ends in (0x8035E580, 0x8035F060]: fn_8035E578 (0x8 B, ends 0x8035E580) is the last slot of em033_prog_tbl, and fn_8035F060 is slot 0 of `em035_prog_tbl` (0x805ED838, `callers.py 0x8035F060 --pointers`), 0x254 B below the registered em035_prog start 0x8035F2B4, so that registered edge is contradicted as well (phase 2 moves it)",
+    "name `em033_prog` from the map's `em033_prog_tbl` (its slot 0 is the unit's first function); the earlier name `ef/fn_8035BAB4` was a placeholder and module `ef` came from the eft052 head it replaces the tail of"
    ]
   },
   {
@@ -914,7 +957,8 @@
    "replaces_tail_of": [],
    "open_questions": [
     "placeholder name: derived_name carries the first function address, not a content-derived name",
-    "an unowned run with no sinit and no pool entry inside: one TU or several is unknown; it stays one unit"
+    "an unowned run with no sinit and no pool entry inside: one TU or several is unknown; it stays one unit",
+    "END EDGE 0x80365C84 IS A GUESS (private callees across it, dispatcher lb_menu_page_step 0x8036640C): fn_803642B8, fn_803645C4, fn_80364BD8, fn_80364EE8, fn_803653A0 and fn_803659E8 (all before 0x80365C84) are called only from lb_menu_page_step (0x80366590, 0x803664FC, 0x803665C0, 0x803665D8, 0x803665F0, 0x803665A8), the last function of the registered lobby/lb_menu_page.cpp (0x80365C84..0x80366618): they are its static helpers, so the run's tail from the first of them (0x803642B8 or earlier) joins lb_menu_page and 0x80365C84 is not a TU edge (`callers.py 0x803642B8` .. `0x803659E8`); the registered start of lb_menu_page is contradicted, the move is filed for phase 2"
    ]
   },
   {
@@ -1083,6 +1127,11 @@
        "tool": "callers",
        "command": "python tools/units/callers.py 0x8079B830",
        "finding": "callers lists the reading functions on both sides of 0x80375424"
+      },
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x80375424 --pointers",
+       "finding": "second signal: `em020_prog_tbl` (.data 0x805EE098) has slots on both sides of 0x80375424: em020_model_refresh / em020_condition_ck / em020_area_model_set (the registered Matching em020_handlers.cpp, 0x80375084..0x80375424) and em020_hp_ratio_ck (0x80375424, em020_ai.cpp after the edge)"
       }
      ],
      "reproduce": "python tools/splits/splitcheck.py --baseline --only pool --unit em020_handlers"

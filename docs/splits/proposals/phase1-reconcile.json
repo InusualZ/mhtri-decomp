@@ -8,8 +8,8 @@
  "supersedes": [
   {
    "band": "f",
-   "unit": "fn_8053E7D0",
-   "reason": "band g's fn_8053E7D0 starts at the same address, replaces_tail_of band f's, and runs to 0x805425E4 (f stopped at its band edge 0x8054032C inside the function run g measured)"
+   "unit": "fn_8053E808",
+   "reason": "band g's fn_8053E808 starts at the same address, replaces_tail_of band f's, and runs to 0x805425E4 (f stopped at its band edge 0x8054032C inside the function run g measured)"
   },
   {
    "band": "d",

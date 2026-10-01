@@ -8,10 +8,10 @@ registered units and **2,019 unowned functions in 13 runs** (0x803C4BA0..0x803CC
 
 | | |
 | --- | --- |
-| proposal units in the file / after the renderer folds the `guess` ones | 26 / 23 |
-| cuts emitted | 26: **strong 8**, **medium 5**, **guess 13** (3 guess cuts fold a unit away, 10 are registry edges kept as they are) |
+| proposal units in the file / after the renderer folds the `guess` ones | 27 / 24 |
+| cuts emitted | 27: **strong 7**, **medium 6**, **guess 14** (4 guess cuts fold a unit away, 10 are registry edges kept as they are) |
 | of the 13 strong+medium cuts: tails cut off a registered unit | 4 (`0x80383148`, `0x80385EE0`, `0x803B936C`, `0x803C3A5C`) |
-| of them: new cuts inside unowned runs | 6 (`0x803F73C0`, `0x803FCC34`, `0x80432104`, `0x80437270`, `0x8043D524`, `0x80456300`) |
+| of them: new cuts inside unowned runs | 6 (`0x803FCC34`, `0x80432104`, `0x80437270`, `0x8043D524`, `0x804565C0`, `0x804565DC`); `0x803F73C0` (one width-1 zigzag) is a `guess` now |
 | of them: a registered edge the evidence confirms / moves | 2 confirmed (`0x803AB3BC`, `0x80448404`: the sinit closure lands exactly on it) + 1 moved (`arenatask`'s start 0x804459E4 -> `0x804459DC`) |
 | registered cuts removed (`removes_cuts`) | 7: **strong 1** (`0x803DEA30`, a **Matching** unit, see below), **medium 6** |
 | registered units recut (a tail cut off) | 3: `enemy/fn_80382310` (2 tails), `enemy/em_pop`, `menu/get_pop_dat_ptr` |
@@ -49,8 +49,8 @@ one TU. Soft intervals: `pooldup` (one value at two pool addresses), `.data` V->
 | `Network/NetworkSessionManagerPat` | 0x803D70B8..0x803DF5FC | 0x803D70B8 | guess | absorbs the registered Pat unit and the registered **Matching** `initNetworkSessionStable.cpp`; removes 0x803D72F4 (medium), 0x803DEA30 (strong), 0x803DEB38 (medium) |
 | `Network/NetworkLayerPat` | 0x803DF5FC..0x803E44C8 | 0x803DF5FC | guess | Pat / NetworkLayer split in 0x803DF5FC..0x803E0C18, merged into the row above |
 | `Network/NetworkCommunityPat` | 0x803E4888..0x803F73C0 | 0x803E4888 | guess | unowned run, registry edge |
-| `Network/network_packet` | 0x803F73C0..0x803FCC34 | 0x803F73C0 | medium | width-1 zigzag `.data` pin |
-| `Network/PatInterface` | 0x803FCC34..0x803FE8E4 | 0x803FCC34 | strong | ctors closure empty + V->S interval ends at the cut |
+| `Network/network_packet` | 0x803F73C0..0x803FCC34 | 0x803F73C0 | guess | one width-1 zigzag `.data` pin: downgraded from medium (that kind is unmeasured on clean units), merged into the unit it touches |
+| `Network/PatInterface` | 0x803FCC34..0x803FE8E4 | 0x803FCC34 | medium | ctors closure empty + V->S interval ends at the cut; downgraded from strong: its R1 row (no earlier referrer) holds only if the guess 0x803F73C0 is a TU start |
 | `Network/network_layer_io` | 0x804006A8..0x80413C64 | 0x804006A8 | guess | 415 functions, no pool or `.data` constraint at all |
 | `Network/network_opening` | 0x804155D4..0x80418988 | 0x804155D4 | guess | unowned run, registry edge |
 | `Network/constructNetworkLibrary` | 0x804189C8..0x80419EC4 | 0x804189C8 | guess | unowned run, registry edge |
@@ -60,8 +60,9 @@ one TU. Soft intervals: `pooldup` (one value at two pool addresses), `.data` V->
 | `menu/menu_placeinfo` | 0x80437270..0x8043D524 | 0x80437270 | medium | ctors closure; name from the `__FILE__` anchor |
 | `menu/movie` | 0x8043D524..0x804459DC | 0x8043D524 | strong | ctors closure + `__FILE__` anchor `movie.cpp` starts at the cut |
 | `quest/arenatask` | 0x804459DC..0x80448404 | 0x804459DC | strong | extends `quest/arenatask.cpp` by the 8-byte accessor of its own `.sbss` object; moves 0x804459E4 to 0x804459DC |
-| `menu/menu_plsearch` | 0x80448404..0x80456300 | 0x80448404 | strong | closure lands exactly on the registered end of `quest/arenatask.cpp` (confirms that edge) |
-| `main/fn_80456300` | 0x80456300..0x804566A4 | 0x80456300 | medium | ctors closure (4 functions); placeholder name |
+| `menu/menu_plsearch` | 0x80448404..0x804565C0 | 0x80448404 | strong | closure lands exactly on the registered end of `quest/arenatask.cpp` (confirms that edge); ends at 0x804565C0: the closure of `fn_8045622C` reaches 0x80456300 and the slots of the vtables it stores (`lbl_8060E718/E748/E778`) run to 0x804565C0 |
+| `MSL/strlen` | 0x804565C0..0x804565DC | 0x804565C0 | medium | the first function after the own-slot run; exact MSL name |
+| `Runtime.PPCEABI.H/__va_arg` | 0x804565DC..0x804566A4 | 0x804565DC | medium | exact map name, ends at the registered start of `global_destructor_chain.c` |
 | `Runtime.PPCEABI.H/CPlusLibPPC` | 0x80456704..0x80456C88 | 0x80456704 | guess | unowned run, registry edge |
 | `Runtime.PPCEABI.H/runtime` | 0x80456CE0..0x80457420 | 0x80456CE0 | guess | unowned run, registry edge |
 | `MSL_C/alloc` | 0x804578FC..0x8045F9E8 | 0x804578FC | guess | unowned run, registry edge; merged library block (Gecko + >= 8 MSL files) |
@@ -74,8 +75,8 @@ is unclaimed, the three constants are undefined relocations). Caveat: if the lit
 Network constants TU (the `network_shared_data` pattern) the pool half falls and only the slot argument remains.
 
 Names: modules from the neighbours and the data (`menu_placeinfo`, `movie`, `menu_plsearch` from `__FILE__` strings:
-class 1), stems from the dominant class or first named function; `fn_80383148`, `fn_80385EE0`, `fn_80456300` are
-placeholders; `module main` is a guess for a root-level unit.
+class 1), stems from the dominant class or first named function; `fn_80383148`, `fn_80385EE0` are
+placeholders. An earlier revision proposed `main/fn_80456300` (a medium cut at 0x80456300): the sinit TU ends at 0x804565C0, and splitcheck's `ctors` check now fails a cut at 0x80456300 (`cut_at` 0x804565C0).
 
 ## Top open questions (all `guess`; 35 rows in the JSON)
 
@@ -88,23 +89,23 @@ placeholders; `module main` is a guess for a root-level unit.
 5. `lb_quest_ui`, `lb_quest_board`, `multi_result`, `lb_quest_screen` each hold a second TU (55 / 16 / 16 / 12 positions).
 6. `menu/movie` holds >= 3 TUs (movie, `menu_friendlist.cpp` at 0x8043F398, charmake); `menu/menu_plsearch` >= 3
    (`menu_plsearch.cpp`, `menu_message.cpp` at 0x8044E340, the save-data code).
-7. `MSL_C/alloc`: candidate file boundaries from the MSL layout (13 addresses in the JSON), the Gecko | alloc edge near 0x80458BD0.
+7. `MSL_C/alloc`: candidate file boundaries from the MSL layout (13 addresses in the JSON), the Gecko | alloc edge near 0x80458BD0. The unit is misnamed: it starts with ~5 KB of Gecko code and the registered `Gecko_ExceptionPPC` edge at 0x804578FC is not the end of that file (rename or extend Gecko in phase 2).
 8. `Network/fn_8041A87C` holds NetworkReflectService + NetworkTimedHandler (no `.text` interval: the seam's referrers interleave).
+9. The registered edge `0x803D70B8` (left edge of `NetworkSessionManagerPat`) is **contradicted** by the unit's own vtable slots (`__dt__`, `init`, `clear`, `release` at 0x803D6D00..0x803D70B8 lie in the registered NetworkSessionManager.cpp): the Pat TU starts in 0x803D4C18..0x803D68D0; the move is filed for phase 2.
+10. `lobby/lb_server_sel_trans` spans three modules (lobby, Network readers of `networkSessionDefaultDelay`, quest/menu helpers); a split candidate for phase 2.
 
 ## Remaining splitcheck failures (rendered candidate, `--proposal ... --emit-splits`)
 
-Candidate 322 units (baseline 306). `order`, `coverage`, `text-cut`, `extab`, `dtors`, `vtable`, `bss`: 0 FAIL; `data-order` 3
-and `jumptable` 1 unchanged. **New failures outside the proposal units: 0**; lint: none; `ctors` 45 -> 47, `pool` 130 -> 133.
-Proposal units that still FAIL, all explained:
+Candidate 322 units (baseline 306), band alone. `order`, `coverage`, `text-cut`, `extab`, `dtors`, `vtable`, `bss`, `local-static`: 0 FAIL; `data-order` 3
+and `jumptable` 1 unchanged. **New failures outside the proposal units: 0**; lint: none; `ctors` 39 -> 36 (the rest are baseline units this band does not touch),
+`pool` 129 -> 133. Proposal units that still FAIL (8, all `pool`, all explained):
 
-* `ctors` (4: `fn_80383148`, `network_pat_control`, `menu_placeinfo`, `menu_plsearch`): the checker reads the sinit's own
-  end; the closure `L` lands on the unit end in each (the word targets `fn_80385E7C`, `fn_80431CD8`, `fn_8043D48C`,
-  `fn_8045622C`: a sinit followed by its deferred functions). False positives.
-* `pool`: `quest_entry` (the fold continues into em_pop, open question 4), `em_model` (the guess-merged roster + model: two
-  TUs by construction), `lobby/lb_server_sel_trans` (`networkSessionDefaultDelay` of `network_shared_data`, read by the
-  Network tail and by `NetworkSessionStable`), `NetworkSessionManagerPat` and `NetworkCommunityPat` (the NetworkLayer
-  literals above, `networkRequestTimerReset`), `menu_placeinfo` / `menu/movie` (one value at two pool addresses: the merged
-  runs are several TUs, open question 6).
+* `quest_entry` (the fold continues into em_pop, open question 4), `em_model` (the guess-merged roster + model: two TUs by construction),
+  `lobby/lb_server_sel_trans` (`networkSessionDefaultDelay` of `network_shared_data`, read by the Network tail and by `NetworkSessionStable`),
+  `NetworkSessionManagerPat` and `NetworkCommunityPat` (the NetworkLayer literals above, `networkRequestTimerReset`), `menu_placeinfo` / `menu/movie`
+  (one value at two pool addresses: the merged runs are several TUs, open question 6), `MSL_C/alloc` (the guess block of Gecko + MSL files).
+* `ctors` no longer FAILs on any proposal unit: the closure rule (sinit + local callees + the slots of the vtables it stores) lands on each unit end. The earlier
+  `menu/menu_plsearch` cut at 0x80456300 FAILs it (`cut_at` 0x804565C0): that is the finding behind the move above.
 
 ## Measured, not assumed (clean registered units: 150 starts, 4,576 interior positions, base rate 3.2 %)
 
@@ -123,19 +124,16 @@ Proposal units that still FAIL, all explained:
 
 ## Tool gaps hit
 
-* **`splitcheck` `ctors`** reads the sinit's own end (the coordinator's finding); four proposal units FAIL on it falsely.
-  `callers.py` cannot show a `.ctors` word either (no per-word symbol): the evidence rows read the word with
-  `splitcheck.Dol.word`.
-* **`merge_guess`** folded a `guess` unit into the previous proposal unit even when they do not abut. Fixed here
-  (`tools/splits/splitcheck.py`, one selftest added): it folds only an abutting proposal unit, and a `guess` edge next to a
-  registered unit keeps the registry's edge. Band `a`'s workaround (restate the neighbour) still works. Still missing: a
-  way to say "a boundary exists somewhere in [a, b]" without folding (25 such intervals here), and "stay merged with the
-  *registered* neighbour".
-* **`tudiscover` / `datagap` must-link**: `classify()` treats any `.sdata` scalar whose value is copied elsewhere as a
-  pooled literal (178 names, 51 of the 1,648 links, e.g. `networkSessionNotifyValue`, span 9,620 B); only strings are pooled
-  there. Dropping them leaves the contradiction count unchanged (1) and removed the one forced position this band had
-  (0x803CA484).
-* **`splitcheck` `pool`** cannot tell a pooled literal from an `extern const` scalar: the whole Network pool group, the
-  em_pop / quest_entry group and `networkSessionDefaultDelay` are candidates; a `const` flag in the map would settle it.
-* **`tudiscover dataorder --addr`** prints the interval from the last referrer of the earlier vtable run; the first legal
-  cut is the next function (the evidence rows state both).
+* **`splitcheck` `ctors`** used to read the sinit's own end; it now reads the closure of the sinit's callees, address-taken functions and the slots of the
+  vtables it stores, also PAST the unit end (a cut placed too early over a unit's own deferred slots FAILs with `cut_at` = the closure end). `--baseline --only ctors
+  --unit X` (and `--proposal ... --unit X`) print a `detail` line per `.ctors` word with the numbers.
+* **`merge_guess`** folded a `guess` unit into the previous proposal unit even when they do not abut. Fixed in an earlier pass (one selftest): it folds only an abutting proposal
+  unit, and a `guess` edge next to a registered unit keeps the registry's edge. Still missing: a way to say "a boundary exists somewhere in [a, b]" without folding (25 such
+  intervals here), and "stay merged with the *registered* neighbour".
+* **`tudiscover` / `datagap` must-link**: `classify()` treats any `.sdata` scalar whose value is copied elsewhere as a pooled literal (178 names, 51 of the 1,648 links, e.g.
+  `networkSessionNotifyValue`, span 9,620 B); only strings are pooled there. Dropping them leaves the contradiction count unchanged (1) and removed the one forced position this
+  band had (0x803CA484).
+* **`splitcheck` `pool`** cannot tell a pooled literal from an `extern const` scalar: the whole Network pool group, the em_pop / quest_entry group and
+  `networkSessionDefaultDelay` are candidates; a `const` flag in the map would settle it.
+* **`tudiscover dataorder --addr`** prints the interval from the last referrer of the earlier vtable run; the first legal cut is the next function (the evidence rows state both).
+* **`poolseams.py`** from a worktree needs `--root <MAIN>` (the worktree has no asm dump); the rows carry `--root "${MHTRI_MAIN:-.}"`.

@@ -10,7 +10,7 @@ empty here; the 5,407 unowned functions are in other bands), so it is a recut au
 
 | | |
 | --- | --- |
-| proposal units (rendered candidate) | 11 (23 registered units replaced; candidate 296 units, baseline 306) |
+| proposal units (rendered candidate) | 11 (23 registered units replaced; candidate 294 units, baseline 306) |
 | cuts emitted | 5: **strong 4** (`0x8021F020`, `0x80220038`, `0x8028F44C`, `0x80297E34`), **medium 1** (`0x802673A4`), guess 0 |
 | registered cuts removed (`removes_cuts`) | 17, all **strong**: one pooled literal read on both sides of each edge (`callers.py <literal>`) |
 | registered units merged | 4 -> 1 (`lb_npc`), 2 -> 1 (`fn_80220038` = `fn_80224AC4` + the tail of `fn_8021E1EC`), 6 -> 1 (`pl_act_step`), 7 -> 1 (`pl_act`), 2 -> 1 each for `pl_coll` and `menu_item` |
@@ -73,32 +73,31 @@ Data: four units carry the `.data` of the registered unit they absorb (jump tabl
 5. `pl_motion` 0x8028B298..0x8028C168 (9), `pl_coll` 0x8029135C..0x80291664 (4), `menu_item` 0x80299C14..0x80299EF8 (4).
 6. `menu_item`: the registered `menu_item` really starts after the `hit_*` functions (0x8029F61C `get_item_data_ptr`); a further cut
    inside this unit, not placeable from here.
-7. Registered edges with no evidence of their own (kept): `0x802693C4`, `0x8028F66C` (the 0x220 B unit `Pl/fn_8028F44C` may
+7. Registered edges with no evidence of their own (kept): `0x802693C4` (the right edge of `player_control`), `0x8028F66C` (the 0x220 B unit `Pl/fn_8028F44C` may
    belong to the next TU), `0x8021E1EC`, `0x801FBF78`.
+8. `pl_act` holds a pinned zigzag seam `0x805BAB74` (a TU start in 0x80269E8C..0x80269EC8, inside its registered head): contradicted by the pool (`lbl_8079A004` is read at 0x80269CD4 before the interval and at 0x8026A158 / 0x8026A204 after it); the unit stays merged.
 
 ## Remaining splitcheck failures (rendered candidate)
 
-Candidate 296 units (baseline 306). `order`, `coverage`, `text-cut`, `extab`, `dtors`, `vtable`, `bss`: 0 FAIL. `ctors` 45 -> 44,
-`pool` 130 -> 113, `data-order` 3 -> 3, `jumptable` 1 -> 1. **New failures outside the proposal units: 0**; lint: none.
-Proposal units that PASS everything: `fn_80220038`, `pl_act_step`, `player_control`, `fn_8028F44C`. The other seven, and why:
+Candidate 294 units (baseline 306), band alone. `order`, `coverage`, `text-cut`, `extab`, `dtors`, `vtable`, `bss`, `local-static`: 0 FAIL. `ctors` 39 -> 35
+(the rest are baseline units this band does not touch), `pool` 129 -> 112, `data-order` 3 -> 3, `jumptable` 1 -> 1. **New failures outside the proposal units: 0**; lint: none.
+Proposal units that PASS everything: `lb_menu_scratch`, `lb_menu_pos_tbl`, `fn_80220038`, `pl_act_step`, `player_control`, `fn_8028F44C`. The other five, and why:
 
-* `lb_menu_scratch` (sinit `fn_8021EFBC` ends 0x8021EFC8, unit ends 0x8021F020), `lb_menu_pos_tbl` (`fn_8021FF5C`, 0x8021FFFC vs
-  0x80220038) and `pl_coll` (`fn_80297C30`, 0x80297D9C vs 0x80297E34): **`ctors` false positives**; the tail is the sinit's
-  local ctor/dtor chain (`callers.py` of each chain function lists only the sinit). `lb_npc` (`fn_801FF700`) is the same plus an
-  unplaced cut.
-* `lb_npc`, `pl_act`, `pl_motion`, `pl_coll`, `menu_item`: `pool` FAIL = the open `guess` intervals above (the unit holds two TUs,
-  the checker says so; nothing is hidden).
-* Unchanged registered units that still FAIL in the band: `fn_801E0ADC` and `fn_802840DC` (`pool`, the open questions 3-4),
-  `Pl/fn_8023C2D0` (`jumptable`, below).
+* `lb_npc`, `pl_act`, `pl_motion`, `pl_coll`, `menu_item`: `pool` FAIL = the open `guess` intervals above (the unit holds two TUs, the checker says so; nothing is hidden);
+  `lb_npc` also reports `ctors` UNKNOWN (`fn_801FF9E0` is called from `fn_801FD174` before it).
+* Unchanged registered units that still FAIL in the band: `fn_801E0ADC` and `fn_802840DC` (`pool`, the open questions 3-4), `Pl/fn_8023C2D0` (`jumptable`, below).
+
+The earlier `ctors` "false positives" (`lb_menu_scratch`, `lb_menu_pos_tbl`, `pl_coll`) are gone: the checker reads the closure of the sinit's callees, not the sinit's own end
+(`splitcheck.py --baseline --only ctors --unit fn_8021E1EC` prints the `detail` lines with both ends).
 
 ## Tool gaps hit
 
-* `ctors`: the sinit end is not a cut (band `a`'s finding; here 5 of 6 words). The fix is R1's closure in `splitcheck`; until
-  then a proposal cannot reach `ctors` PASS without a wrong cut.
+* `ctors`: the sinit end is not a cut (band `a`'s finding; here 5 of 6 words). Fixed: `splitcheck` reads R1's closure (and, past the unit end, the unit's own
+  vtable slots) and prints it with `--baseline --only ctors --unit X`.
 * **No tool lists pool-separable runs, forced intervals or the baseline cuts they contradict.** `splitcheck --baseline` reports a
   FAIL per unit; `tudiscover at` prints at most six dedupe rows per target (the 3f000000 row for `0x8028F44C` is not among them, it is in
   the `splitcheck --baseline --only pool` JSON). The atom/interval analysis above lives in uncommitted scratch scripts; a
-  `splitcheck --intervals` (or `poolseams.py` per function) is the next tooling request. The positions inside an interval
+  `splitcheck --baseline --only pool --intervals --unit X` now prints each pooled value held at two addresses with the interval a TU starts in. The positions inside an interval
   need one more signal: the call-crossing count inside +-25 functions has a unique minimum for `0x8028B524` and `0x80282BDC`
   (not a reproducible command, so not used).
 * `lint_proposal` demanded a cut for a unit that starts on a registered start; it now takes the baseline starts (changed here,

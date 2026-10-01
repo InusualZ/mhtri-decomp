@@ -98,7 +98,8 @@
    ],
    "open_questions": [
     "name from draw_shape_arm (0x80056A54), which lies in this tail; the registered draw_shape.cpp head [0x80054C64,0x80055EC4) keeps the unit name and its data",
-    "no independent soft signal confines the cut: the pool dedupe row `00000000 lbl_80795BF8 -> lbl_80795C18` ([0x800542C8,0x80055EC4]) also holds the registered start 0x80054C64"
+    "no independent soft signal confines the cut: the pool dedupe row `00000000 lbl_80795BF8 -> lbl_80795C18` ([0x800542C8,0x80055EC4]) also holds the registered start 0x80054C64",
+    "the registered edge 0x80054C64 (end of fn_8004CAD8.cpp, start of draw_shape.cpp) is probably INTERIOR to the draw_shape TU: the registered header calls the cap a proposal cap, the head 0x80054C64..0x80055EC4 (27 functions) reads no `.sdata2` literal (only six `.sdata` strings, lbl_80790F48..lbl_80790FC0), and nothing else in this file asks for a start there; a cut may lie earlier, inside fn_8004CAD8.cpp (open question, no cut proposed)"
    ]
   },
   {
@@ -133,13 +134,18 @@
        "tool": "callers",
        "command": "python tools/units/callers.py 0x80088E24",
        "finding": "only caller is fn_800769F4 (0x80077238, g3d/fn_80075DCC.cpp, an earlier unit): not used by the sinit's TU, so that TU ends at 0x80088E24"
+      },
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x80088E24",
+       "finding": "no referrer inside the unit: none of the 35 functions of the tail 0x80088E24..0x800898B0 is referenced from g3d_state (0x8008452C..0x80088E24) or from its sinit closure (checked with splitcheck's reference index over every tail function start)"
       }
      ],
      "reproduce": "python tools/units/callers.py 0x80088E18 && python tools/units/callers.py 0x80088E24"
     }
    ],
    "open_questions": [
-    "the tail is 0xA8C bytes / 40 functions of vtable-storing constructors (.data 0x8058FCE8..0x8058FDB8): is it one TU, and is it the same TU as the registered g3d/g3d_resanm.c at 0x800898B0 (no signal either way)",
+    "the tail is 0xA8C bytes / 35 functions of vtable-storing constructors (.data 0x8058FCE8..0x8058FDB8): is it one TU, and is it the same TU as the registered g3d/g3d_resanm.c at 0x800898B0 (no signal either way); one soft hint only: no tail function is called from the head, which is what a separate TU looks like, but vtable-storing constructors are emitted for their own class and need no caller (so it is not a proof)",
     "placeholder name (no named function, no mangled class run)"
    ]
   },
@@ -178,25 +184,30 @@
        "tool": "callers",
        "command": "python tools/units/callers.py 0x800A6258",
        "finding": "called from fn_800A7750 (0x800A78B4, ef/ef_emitter.cpp) and its address is passed by nw_resource.cpp fn_800D3D70 (0x800D401C) together with fn_800A630C (0x800D4024); fn_800A62C0 is called only by fn_800A6258: the three tail functions belong with ef_emitter, not with the sinit's TU"
+      },
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x80592BA8",
+       "finding": "fn_800A6258 stores lbl_80592BA8 (0x28 B, address materialised at 0x800A6270): it is the constructor of the ef_emitter vtable, whose slots (0x80592BB0.. = fn_800A6414, 800A6420, 800A6EC4, 800A7378, 800A8A5C ...) are the registered ef_emitter.cpp's functions; a constructor lives in the TU of its class, so fn_800A6258 starts that TU"
       }
      ],
-     "reproduce": "python tools/units/callers.py 0x800A6258"
+     "reproduce": "python tools/units/callers.py 0x800A6258 && python tools/units/callers.py 0x80592BA8"
     }
    ],
    "open_questions": [
     "this moves the registered cut 0x800A6350 (between ef_effectsystem and ef_emitter) back to 0x800A6258; the registered ef/ef_emitter.cpp is absorbed whole",
-    "the tail could instead be its own 0xF8-byte TU; the only evidence for ef_emitter is the caller/address-taken pattern (one soft signal plus the exact closure bound)"
+    "the tail could instead be its own 0xF8-byte TU; the evidence for ef_emitter is the caller/address-taken pattern plus the vtable store (fn_800A6258 is the ctor of lbl_80592BA8, whose slots are in ef_emitter.cpp): an exact signal for the merge, still one TU only if the ctor and the slots are one class"
    ]
   },
   {
-   "derived_name": "fn_800B4AC8",
+   "derived_name": "ef_drawstripestrategy_base",
    "module": "ef",
    "replaces_tail_of": "ef/fn_800AEE48.cpp",
    "ranges": {
     ".text": [
      [
       "0x800B4AC8",
-      "0x800B99E8"
+      "0x800B9A44"
      ]
     ]
    },
@@ -222,17 +233,19 @@
        "finding": "pool dedupe rows `3f800000 lbl_807960EC -> lbl_80796124` (0x800B1C80..0x800B4BA4), `00000000 lbl_807960F0 -> lbl_80796130` (0x800B23A4..0x800B51F8), `34000000 lbl_807960F8 -> lbl_80796140` (0x800B18F0..0x800B5A48): each needs a cut that includes 0x800B4AC8 and none holds another known cut"
       },
       {
-       "tool": "tudiscover",
-       "command": "python tools/splits/tudiscover.py dataorder --addr 0x80593CD0",
-       "finding": "V->S seam 0x80593CD0 pins the new TU's first code to 0x800B4AC8..0x800B9A44, whose lower bound is this cut"
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x80593690 && python tools/units/callers.py 0x805939E8",
+       "finding": "source-file string transition: `ef_resource.cpp` (lbl_80593690)'s last reader is fn_800B4898 (0x800B4980), `ef_drawstripestrategy.cpp` (lbl_805939E8)'s first is fn_800B4BA4 (0x800B4CC0): a TU starts in (0x800B4898, 0x800B4BA4], which holds 0x800B4AC8 (the earlier seam row, V->S 0x80593CD0, is explained by the registered start 0x800B99E8 and is not evidence for this cut)"
       }
      ],
-     "reproduce": "python tools/splits/splitcheck.py --baseline --only ctors --unit '^ef/fn_800AEE48' && python tools/splits/tudiscover.py at 0x800B4AC8 --pool-model on"
+     "reproduce": "python tools/splits/splitcheck.py --baseline --only ctors --unit '^ef/fn_800AEE48' && python tools/splits/tudiscover.py at 0x800B4AC8 --pool-model on && python tools/units/callers.py 0x80593690 && python tools/units/callers.py 0x805939E8"
     }
    ],
    "open_questions": [
-    "name is a placeholder (no named function in the 59-function tail)",
-    "the pool dedupe row `4330000080000000 lbl_80796128 -> lbl_80796160` (0x800B7628..0x800B9DF8) is explained by the registered start 0x800B99E8, but the row is wide, so a third TU inside the tail is not excluded"
+    "the pool dedupe row `4330000080000000 lbl_80796128 -> lbl_80796160` (0x800B7628..0x800B9DF8) is explained by the registered start 0x800B99E8's neighbourhood, but the row is wide, so a third TU inside the tail is not excluded",
+    "END MOVED 0x800B99E8 -> 0x800B9A44: fn_800B99E8 (0x5C B) is the DrawStripeStrategy deleting destructor, slot 0 of vtable lbl_80593CB4 (`callers.py 0x800B99E8 --pointers`), whose ctor fn_800B4AC8 stores it (0x800B4AE0): it belongs to this unit, and the `__FILE__` string of the TU is `ef_drawstripestrategy.cpp` (lbl_805939E8, read at 0x800B4CC0 and from fn_800B9630): name from it, not a placeholder. The registered ef/ef_drawstripestrategy.cpp (0x800B99E8..0x800BE154) therefore keeps only 0x800B9A44..0x800BE154, which holds two more TUs: billboard (ctor fn_800B9A44, dtor fn_800BBD90) and directional (ctor fn_800BBDEC, dtor fn_800BE0BC); the file's `__FILE__` transition lies in 0x800B9630..0x800B9A80",
+    "cuts for phase 2 (guess): 0x800B9A44 (billboard ctor fn_800B9A44, callers.py 0x800B9A44 --pointers: eti and its caller fn_800C5DB8) and 0x800BBDEC (directional ctor fn_800BBDEC, dtor fn_800BE0BC at 0x800BE0BC); the registered unit's remainder is one TU only if those vtable runs are one class family",
+    "NAME: the unit's own `__FILE__` is `ef_drawstripestrategy.cpp`, so its true name is ef/ef_drawstripestrategy; the registered unit of that name survives as the remainder 0x800B9A44..0x800BE154 (billboard + directional), and the renderer refuses two units of one name, so this unit is `ef_drawstripestrategy_base` until phase 4 swaps the names (the remainder takes a billboard/directional name)"
    ]
   },
   {
@@ -290,7 +303,7 @@
       {
        "tool": "callers",
        "command": "python tools/units/callers.py 0x8009CD64",
-       "finding": "15 call sites from ef_util, ef_emitter and ef_drawstripestrategy: an exported ef utility, so it is not a deferred inline of either side"
+       "finding": "15 call sites: 3 in ef_util, 3 in ef_emitter, 9 in ef_drawstripestrategy (`callers.py 0x8009CD64`): called from three TUs, so a shared utility and not a deferred inline of either neighbour; a weak signal (a utility many TUs call is a function of a library TU, not of a class TU) that favours the left fold with ef_util"
       }
      ],
      "reproduce": "python tools/splits/tudiscover.py at 0x8009CD64 --pool-model on"
@@ -351,6 +364,11 @@
        "tool": "splitcheck",
        "command": "python tools/splits/splitcheck.py --baseline --only pool --unit '^sound/fn_800DD1F0'",
        "finding": "fn_800DCFEC (between the two) reads lbl_80796410..18, which sit after the first unit's last entry lbl_80796408, so it extends the same pool"
+      },
+      {
+       "tool": "tudiscover",
+       "command": "python tools/splits/tudiscover.py at 0x800DD1F0 --pool-model on",
+       "finding": "the tool lists 0x800DD1F0 and 0x800DCFEC as `strong x1` left-boundary cuts for `.data: jumptable_80597B50 -> jumptable_80597B7C`: two ADJACENT switch tables, which one TU holding two switches emits back to back; a jump table is not a vtable, so the pair is not a seam and does not contradict the pool evidence (lbl_807963E0 read on both sides, exact)"
       }
      ],
      "reproduce": "python tools/units/callers.py 0x807963E0"
@@ -364,6 +382,11 @@
        "tool": "callers",
        "command": "python tools/units/callers.py 0x807963E0",
        "finding": "same entry lbl_807963E0, read at 0x800DD3D0 after this cut"
+      },
+      {
+       "tool": "tudiscover",
+       "command": "python tools/splits/tudiscover.py at 0x800DD1F0 --pool-model on",
+       "finding": "the tool lists 0x800DD1F0 and 0x800DCFEC as `strong x1` left-boundary cuts for `.data: jumptable_80597B50 -> jumptable_80597B7C`: two ADJACENT switch tables, which one TU holding two switches emits back to back; a jump table is not a vtable, so the pair is not a seam and does not contradict the pool evidence (lbl_807963E0 read on both sides, exact)"
       }
      ],
      "reproduce": "python tools/units/callers.py 0x807963E0"

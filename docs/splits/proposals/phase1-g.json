@@ -2,31 +2,36 @@
  "phase": 1,
  "band": "g",
  "text_range": [
-  "0x8053E7D0",
+  "0x8053E808",
   "0x8056F2B4"
  ],
  "units": [
   {
-   "derived_name": "fn_8053E7D0",
+   "derived_name": "fn_8053E808",
    "module": "homebutton",
    "ranges": {
     ".text": [
      [
-      "0x8053E7D0",
+      "0x8053E808",
       "0x805425E4"
      ]
     ]
    },
    "cuts": [
     {
-     "addr": "0x8053E7D0",
+     "addr": "0x8053E808",
      "section": ".text",
      "grade": "medium",
      "evidence": [
       {
+       "tool": "splitcheck",
+       "command": "python tools/splits/splitcheck.py --proposal docs/splits/proposals/phase1-f.json --unit fn_80533474",
+       "finding": "detail line: .ctors word 0x8056F3F4 = 0x8053E5F8 (fn_8053E5F8, ends 0x8053E7D0): closure ends 0x8053E7D0, with own vtable slots 0x8053E808: fn_8053E7D0..fn_8053E800 are seven 8-byte slots of lbl_8064DC30 (.data 0x8064DC30), whose address fn_805385D0 materialises at 0x805385F8 inside the unit (`callers.py 0x8064DC30`): the TU ends at 0x8053E808, the first non-slot function (0xB0 B)"
+      },
+      {
        "tool": "band f",
        "command": "git show worktree-agent-aea9cca7cc5346a3e:docs/splits/proposals/phase1-f.json",
-       "finding": "band f's last unit fn_8053E7D0 starts at 0x8053E7D0 (ctors word 0x8056F3F4 -> fn_8053E5F8, which ends there); that unit's end 0x8054032C is the band edge, not a cut"
+       "finding": "band f's last unit fn_8053E808 starts at 0x8053E808 (0x8053E7D0 in the earlier revision) (ctors word 0x8056F3F4 -> fn_8053E5F8, which ends at 0x8053E7D0; the seven slots after it close that TU at 0x8053E808); that unit's end 0x8054032C is the band edge, not a cut"
       },
       {
        "tool": "callers",
@@ -34,15 +39,16 @@
        "finding": "lbl_8079D620 (.sdata2, the only literal of its pool run) is read by fn_8053F22C and fn_80540684: one TU holds 0x8053F22C..0x80540684, so 0x8054032C is not a cut and the unit continues into this band"
       }
      ],
-     "reproduce": "python -c \"import sys;sys.path.insert(0,'tools/units');from m2cinput import Dol;d=Dol('orig/RMHE08/sys/main.dol');print(hex(int.from_bytes(d.read(0x8056F3F4,4),'big')))\"",
+     "reproduce": "python tools/splits/splitcheck.py --proposal docs/splits/proposals/phase1-f.json --unit fn_80533474",
      "kind": "inherited"
     }
    ],
    "open_questions": [
-    "supersedes band f's unit fn_8053E7D0 [0x8053E7D0,0x8054032C): drop that unit when both files are rendered together (band f's file carries the older end)",
+    "supersedes band f's unit fn_8053E808 [0x8053E808,0x8054032C): drop that unit when both files are rendered together (band f's file carries the older end)",
     "inside the unit a TU start is possible near 0x8053F65C..0x8053F7BC (dataorder zigzag lbl_8064E51C -> lbl_8064E650) but lbl_8079D620 (readers 0x8053F22C and 0x80540684) links that interval: no cut",
     "tudiscover reports a jump-table seam (jumptable_8064E4E0 -> jumptable_8064E500) at 0x80541B4C/0x80541DA0 as strong; not used: a jump table is not a vtable, and the TU's own vtable lbl_8064E51C holds slots on both sides of 0x80541DA0 (0x80541788 below, 0x80542454 above): same TU",
-    "takes over band f's proposal unit band f: fn_8053E7D0: the supersession is recorded in phase1-reconcile.json (a proposal unit is not a baseline name)"
+    "takes over band f's proposal unit band f: fn_8053E808: the supersession is recorded in phase1-reconcile.json (a proposal unit is not a baseline name)",
+    "start moved 0x8053E7D0 -> 0x8053E808 (the seven slots of lbl_8064DC30 before it are the end of the TU that holds fn_8053E5F8; see band f's fn_80533474)"
    ]
   },
   {
@@ -129,7 +135,7 @@
       {
        "tool": "callers",
        "command": "python tools/units/callers.py 0x8079D630",
-       "finding": "lbl_8079D630 (double 0x4330000000000000, the int-to-float bias) is read at 0x80543110 (fn_80543094) and at 0x80548504 / 0x80548614 (fn_805482CC.cpp): a value held once in the pool is read on both sides of 0x805482CC; lbl_8079D628 (0.0f, 20 readers 0x80542D8C..0x8054E52C), lbl_8079D638 (1.0f) and lbl_8079D63C (0.5f) cross it too"
+       "finding": "lbl_8079D630 (double 0x4330000080000000, the signed int-to-float bias; the bytes at 0x8079D630 are 43 30 00 00 80 00 00 00) is read at 0x80543110 (fn_80543094) and at 0x80548504 / 0x80548614 (fn_805482CC.cpp): a value held once in the pool is read on both sides of 0x805482CC; lbl_8079D628 (0.0f, 20 readers 0x80542D8C..0x8054E52C), lbl_8079D638 (1.0f) and lbl_8079D63C (0.5f) cross it too"
       }
      ],
      "reproduce": "python tools/units/callers.py 0x8079D630 ; python tools/units/callers.py 0x8079D628"
@@ -142,7 +148,7 @@
       {
        "tool": "callers",
        "command": "python tools/units/callers.py 0x8064EF04",
-       "finding": "registered header: a --max-bytes cut, 'unproven'; no signal at 0x8054E894, and the vtable lbl_8064EF04 (0x1AC B) holds slots 0x80543020 and 0x8054F128 on both sides"
+       "finding": "ABSENCE OF EVIDENCE, not a contradiction: the registered edge 0x8054E894 is a discovery cap (a --max-bytes cut, 'unproven' in the registered header) and no signal supports or contradicts it; it is removed from the candidate only because nothing asks for a cut there. The vtable lbl_8064EF04 (0x1AC B) holds slots 0x80543020 and 0x8054F128 on both sides, which argues against a start at the edge but is a weak signal (a base-class vtable is shared across TUs)."
       }
      ],
      "reproduce": "python tools/splits/tudiscover.py at 0x8054E894 --pool-model on"
@@ -270,7 +276,7 @@
       {
        "tool": "tudiscover",
        "command": "python tools/splits/tudiscover.py at 0x80555374 --pool-model on",
-       "finding": "registered header: a --max-bytes cut with no must-link anchor; both neighbouring cuts 0x805546B4 and 0x80555B0C are ctors-derived and no sdata2 literal or pinned seam asks for one at 0x80555374"
+       "finding": "ABSENCE OF EVIDENCE, not a contradiction: the registered edge 0x80555374 is a discovery cap (a --max-bytes cut, 'unproven' in the registered header) and no signal supports or contradicts it; it is removed from the candidate only because nothing asks for a cut there. Both neighbouring cuts 0x805546B4 and 0x80555B0C are ctors-derived; no sdata2 literal or pinned seam asks for a cut at 0x80555374."
       }
      ],
      "reproduce": "python tools/splits/tudiscover.py at 0x80555374 --pool-model on"
@@ -430,7 +436,7 @@
    ],
    "open_questions": [
     "a second TU start is required in 0x8055CB34..0x8055E42C (zigzag lbl_80651950 -> lbl_80651A24, 29 positions); no candidate proposed",
-    "0x8055C894 (registered start of homebutton/keyboard_ui.cpp) lies inside; the sdata2 block 0x8055B710..0x8055C894 ends exactly there and the next block is empty: it is one of the admissible positions for the second TU, no evidence for it"
+    "0x8055C894 (registered start of homebutton/keyboard_ui.cpp) lies inside this unit and BELOW the interval 0x8055CB34..0x8055E42C of the second TU start (zigzag lbl_80651950 -> lbl_80651A24), so it is NOT one of its 29 admissible positions; the sdata2 block 0x8055B710..0x8055C894 ends exactly there and the next block is empty, which is the only thing that points at it; its removal rests on absence of evidence (see removes_cuts)"
    ],
    "removes_cuts": [
     {
@@ -441,7 +447,7 @@
       {
        "tool": "tudiscover",
        "command": "python tools/splits/tudiscover.py at 0x8055C894 --pool-model on",
-       "finding": "registered header: 'stands behind no cut'; the edge is only the left edge of the next registered unit; it is one of 29 admissible positions of the zigzag lbl_80651950 -> lbl_80651A24 and kept there as an open question"
+       "finding": "ABSENCE OF EVIDENCE, not a contradiction: the registered edge 0x8055C894 is a discovery cap (a --max-bytes cut, 'unproven' in the registered header) and no signal supports or contradicts it; it is removed from the candidate only because nothing asks for a cut there. It lies below the interval 0x8055CB34..0x8055E42C of the zigzag lbl_80651950 -> lbl_80651A24, so it is not even an admissible position of that cut."
       }
      ],
      "reproduce": "python tools/splits/tudiscover.py at 0x8055C894 --pool-model on"
@@ -676,7 +682,7 @@
     ".text": [
      [
       "0x80566440",
-      "0x8056A478"
+      "0x80569DAC"
      ]
     ]
    },
@@ -684,17 +690,12 @@
     {
      "addr": "0x80566440",
      "section": ".text",
-     "grade": "strong",
+     "grade": "medium",
      "evidence": [
       {
        "tool": "dol",
        "command": "python -c \"import sys;sys.path.insert(0,'tools/units');from m2cinput import Dol;d=Dol('orig/RMHE08/sys/main.dol');print(hex(int.from_bytes(d.read(0x8056F424,4),'big')))\"",
        "finding": ".ctors word 0x8056F424 = 0x80566340 = fn_80566340 (size 0x100, ends 0x80566440): the static-init function of one TU"
-      },
-      {
-       "tool": "callers",
-       "command": "python tools/units/callers.py 0x80566440 --pointers",
-       "finding": "the sinit calls only functions below it and takes no address after it, and no function after it is a slot of a vtable whose methods lie below it, so nothing is deferred and the unit ends at the sinit end 0x80566440"
       },
       {
        "tool": "callers",
@@ -705,31 +706,28 @@
        "tool": "callers",
        "command": "python tools/units/callers.py 0x8079D738 ; python tools/units/callers.py 0x8079D754",
        "finding": "0.0f is held at 0x8079D738 (last reader fn_80566340) and again at 0x8079D754 (first reader fn_80566618); 3.0f is held at 0x8079D744 and 0x8079D764: the boundary lies in {0x80566440, 0x805664F0, 0x80566618} and 0x80566440 is the one that is also the sinit closure end"
+      },
+      {
+       "tool": "splitcheck",
+       "command": "python tools/splits/splitcheck.py --proposal docs/splits/proposals/phase1-g.json --unit fn_8056083C",
+       "finding": "detail line: fn_80566340 (ends 0x80566440): closure ends 0x80566440, with own vtable slots 0x80566440 (unit text ends 0x80566440). BUT fn_80566440 is itself slot[2] (.data 0x80657F18) of lbl_80657F10, whose address fn_80561148 / fn_805612D0 (keyboard_ui, inside the unit above) materialise at 0x805611FC / 0x80561384: read as an own inline slot the unit would run to 0x80567004 (the extension with the 0x40 B stub cap lifted); the 0xB0 B size and the pool say otherwise"
+      },
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x80657F10",
+       "finding": "lbl_80657F10 (0x2F0 B) is stored by fn_80561148 / fn_805612D0 (keyboard_ui) and fn_80566440 itself: the vtable of a base class shared across TUs, so the slot does not say whose TU emitted fn_80566440"
       }
      ],
-     "reproduce": "python -c \"import sys;sys.path.insert(0,'tools/units');from m2cinput import Dol;d=Dol('orig/RMHE08/sys/main.dol');print(hex(int.from_bytes(d.read(0x8056F424,4),'big')))\" ; python tools/units/callers.py 0x80566440 --pointers",
+     "reproduce": "python -c \"import sys;sys.path.insert(0,'tools/units');from m2cinput import Dol;d=Dol('orig/RMHE08/sys/main.dol');print(hex(int.from_bytes(d.read(0x8056F424,4),'big')))\" ; python tools/units/callers.py 0x80566440 --pointers && python tools/units/callers.py 0x80657F10",
      "kind": "ctors"
     }
    ],
    "open_questions": [
     "a TU start is required in 0x80569554..0x80569E64 (three pooled values, 0.5f / 0x4330000000000000 / 0.0f, each held twice: 46 admissible positions); the registered start 0x80569DAC of homebutton/gui.cpp is one of them, no candidate proposed",
-    "0x80569DAC (registered start of homebutton/gui.cpp) lies inside; its registered header says the left seam is unproven"
+    "DOWNGRADED strong -> medium: the earlier wording (\"no function after the sinit is a slot of a vtable whose methods lie below it\") does not reproduce - fn_80566440 is slot[2] of lbl_80657F10, whose other slots lie below it. Two measurements: R1 closure end 0x80566440 (sinit fn_80566340 ends 0x80566440, closure empty) vs the own-slot reading 0x80567004; the pool allows one of {0x80566440, 0x805664F0, 0x80566618} (0.0f 0x8079D738/0x8079D754, 3.0f 0x8079D744/0x8079D764)",
+    "0x80569DAC (registered start of homebutton/gui.cpp) is KEPT as a registered edge (guess), not removed: 0x80569D3C..0x80569DA4 are fourteen 8-byte slots of lbl_80657F10 that end in `b fn_80566440` (fn_80569DA4, 0x80569DA8): a TU tail, so this unit ends at 0x80569DAC. 0x80569DAC is one of the 46 admissible positions of the required cut in 0x80569554..0x80569E64"
    ],
-   "removes_cuts": [
-    {
-     "addr": "0x80569DAC",
-     "section": ".text",
-     "grade": "medium",
-     "evidence": [
-      {
-       "tool": "callers",
-       "command": "python tools/units/callers.py 0x8079D788",
-       "finding": "0x8056A478 is an exact cut (fn_8056A478 below) and the registered gui range 0x80569DAC..0x8056BBF0 therefore straddles it; 0x80569DAC stays one of the 46 admissible positions of the three pooldup rows in 0x80569554..0x80569E64"
-      }
-     ],
-     "reproduce": "python tools/units/callers.py 0x8079D788 ; python tools/units/callers.py 0x8079D7A0"
-    }
-   ]
+   "removes_cuts": []
   },
   {
    "derived_name": "fn_8056A478",
@@ -878,6 +876,43 @@
    ],
    "open_questions": [
     "the last function of .text is 0x8056F274 (0x40 B, ends 0x8056F2B4); the unit is the TU of the class whose dtor 0x8056F234 three other TUs register"
+   ]
+  },
+  {
+   "derived_name": "gui",
+   "module": "homebutton",
+   "ranges": {
+    ".text": [
+     [
+      "0x80569DAC",
+      "0x8056A478"
+     ]
+    ]
+   },
+   "cuts": [
+    {
+     "addr": "0x80569DAC",
+     "section": ".text",
+     "grade": "guess",
+     "kind": "registered-edge",
+     "keep_registered_edge": true,
+     "evidence": [
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x80566440 --pointers",
+       "finding": "fn_80569DA4 (0x80569DA4, 8 B) ends in `b fn_80566440` (0x80569DA8) and 0x80569D3C..0x80569DA4 are slots of lbl_80657F10 (0x80657F40 holds fn_80569D74): the run is a TU tail; the next function fn_80569DAC (0x48 B) starts the registered gui.cpp"
+      },
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x8079D788",
+       "finding": "0x8056A478 is an exact cut (fn_8056A478 below) and the registered gui range 0x80569DAC..0x8056BBF0 therefore straddles it; 0x80569DAC stays one of the 46 admissible positions of the three pooldup rows in 0x80569554..0x80569E64"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x80566440 --pointers"
+    }
+   ],
+   "open_questions": [
+    "the head of the registered homebutton/gui.cpp up to the exact cut 0x8056A478 (the homebutton::gui namespace start, band g's fn_8056A478): the registered edge is kept as is, the unit is the remnant"
    ]
   }
  ],

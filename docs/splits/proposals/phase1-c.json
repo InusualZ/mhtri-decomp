@@ -97,7 +97,7 @@
     }
    ],
    "open_questions": [
-    "name_note: guess: the global object the TU's __sinit fn_8021EFBC constructs (lb_menu_scratch, 0x806BA8C8); the head of the registered lobby/fn_8021E1EC (its .data/.bss stay as a data-only entry)"
+    "name_note: guess: the global object the TU's __sinit fn_8021EFBC constructs (lb_menu_scratch, 0x806AA8C8); the head of the registered lobby/fn_8021E1EC (its .data/.bss stay as a data-only entry)"
    ],
    "absorbs": []
   },
@@ -120,8 +120,8 @@
      "evidence": [
       {
        "tool": "splitcheck",
-       "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit fn_8021E1EC --json F.json",
-       "finding": ".ctors word -> fn_8021EFBC (0x8021EFBC), a __sinit (read units[...].ctors.items in F.json); the checker takes its own end 0x8021EFC8 as the cut, which is wrong when functions follow it"
+       "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit fn_8021E1EC",
+       "finding": "detail line: .ctors word 0x8056F360 -> 0x8021EFBC (fn_8021EFBC, ends 0x8021EFC8): closure ends 0x8021F020, with own vtable slots 0x8021F020; unit text ends 0x80224AC4"
       },
       {
        "tool": "callers",
@@ -136,14 +136,14 @@
       {
        "tool": "tudiscover",
        "command": "python tools/splits/tudiscover.py at 0x8021F7DC --pool-model on",
-       "finding": "pool dedupe: 4330000000000000 held at lbl_80799C50 and again at lbl_80799C80: the new TU's first code lies in 0x8021E1B4..0x8021F020 (16 fn), and 43480000 lbl_80799C60 -> lbl_80799C90 in 0x8021E300..0x8021F7DC: both intervals hold 0x8021F020 and no other known cut"
+       "finding": "pool dedupe rows: 4330000000000000 held at lbl_80799C50 and again at lbl_80799C80 puts a TU start in [0x8021E1B4, 0x8021F020] (16 fn; this interval also holds the registered start 0x8021E1EC), and 43480000 (lbl_80799C60 -> lbl_80799C90) puts one in [0x8021E300, 0x8021F7DC] (27 fn); the intersection (0x8021E300, 0x8021F020] holds 0x8021F020 and no other known cut, so the cut is placed by the sinit closure and the two rows only agree with it"
       }
      ],
      "reproduce": "python tools/units/callers.py 0x8021EFC8; python tools/units/callers.py 0x8021F020; python tools/splits/tudiscover.py at 0x8021F7DC --pool-model on"
     }
    ],
    "open_questions": [
-    "name_note: guess: the global object the TU's __sinit fn_8021FF5C fills (lb_menu_pos_tbl, 0x806BAB08)"
+    "name_note: guess: the global object the TU's __sinit fn_8021FF5C fills (lb_menu_pos_tbl, 0x806AAB08)"
    ],
    "absorbs": []
   },
@@ -166,8 +166,8 @@
      "evidence": [
       {
        "tool": "splitcheck",
-       "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit fn_8021E1EC --json F.json",
-       "finding": ".ctors word -> fn_8021FF5C (0x8021FF5C), a __sinit (read units[...].ctors.items in F.json); the checker takes its own end 0x8021FFFC as the cut, which is wrong when functions follow it"
+       "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit fn_8021E1EC",
+       "finding": "detail line: .ctors word 0x8056F364 -> 0x8021FF5C (fn_8021FF5C, ends 0x8021FFFC): closure ends 0x80220038, with own vtable slots 0x80220038; unit text ends 0x80224AC4"
       },
       {
        "tool": "callers",
@@ -337,8 +337,8 @@
      "evidence": [
       {
        "tool": "splitcheck",
-       "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit fn_80262940 --json F.json",
-       "finding": ".ctors word -> fn_80267328 (0x80267328), a __sinit (read units[...].ctors.items in F.json); the checker takes its own end 0x802673A4 as the cut, which is wrong when functions follow it"
+       "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit fn_80262940",
+       "finding": "detail line: .ctors word 0x8056F368 -> 0x80267328 (fn_80267328, ends 0x802673A4): closure ends 0x802673A4, with own vtable slots 0x802673A4; unit text ends 0x802693C4"
       },
       {
        "tool": "callers",
@@ -480,7 +480,8 @@
     "Four TUs are held here (0.0f at lbl_8079A000, lbl_8079A084, lbl_8079A120 and lbl_8079A1B4): cuts in 0x802752C8..0x802756F0 (8 positions), 0x8027DC64..0x80280248 (81 positions) and 0x802829B4..0x80282CCC (4 positions). The dense call cluster 0x8027E29C..0x8027FD7C (equipment helpers: GetEquipName, Get_equip_rare, equip_color_*) sits inside the 81-position interval. No sinit, no .data seam and no call closure singles any position out.",
     "name_note: guess: the registered name of the largest absorbed unit",
     "data_note: .data 0x805C5FA0..0x805C6100 = pl_master's jump table 0x805C5FA0..C4, the two unowned objects lbl_805C5FC8/lbl_805C5FE0 between, and fn_80273B14's 0x805C5FEC..0x805C6100 (jumptable_805C5FEC): a TU's .data is contiguous and both ends are this unit's, so the gap is too; dtk takes one range per section",
-    "matching_conflict: Pl/pl_master.cpp is `Matching` and lies inside this unit. The evidence to remove its two edges is strong (lbl_8079A008, the int->double magic, is read by fn_8026A5A4 before it and fn_8026FFBC after it; 0.0f lbl_8079A000 by fn_802693C4 and pl_skill). pl_master's own pool entries (lbl_8079A020..28) sit between those two readers' entries. The phase that applies this must decide what happens to the matched object."
+    "matching_conflict: Pl/pl_master.cpp is `Matching` and lies inside this unit. The evidence to remove its two edges is strong (lbl_8079A008, the int->double magic, is read by fn_8026A5A4 before it and fn_8026FFBC after it; 0.0f lbl_8079A000 by fn_802693C4 and pl_skill). pl_master's own pool entries (lbl_8079A020..28) sit between those two readers' entries. The phase that applies this must decide what happens to the matched object.",
+    "`python tools/splits/tudiscover.py dataorder --all --addr 0x805BAB74` prints a pinned zigzag seam 0x805BAB74 (lbl_805BAB58 -> lbl_805BAB74) with a TU start in .text 0x80269E8C..0x80269EC8, inside this unit's registered head Pl/fn_802693C4.cpp. It is CONTRADICTED by the pool: lbl_8079A004 is read by fn_80269AC4 (0x80269CD4, before the interval) and by Pl_chr_set_attr (0x8026A158) and fn_8026A178 (0x8026A204), after it (`callers.py 0x8079A004`); lbl_8079A008 is read by Pl_chr_set_attr (0x8026A138) onwards, so it does not straddle but is first read after the interval. A zigzag width-1 seam is the least measured kind; the unit stays merged and the seam is not applied"
    ]
   },
   {
@@ -535,8 +536,8 @@
      "evidence": [
       {
        "tool": "splitcheck",
-       "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit fn_80288CEC --json F.json",
-       "finding": ".ctors word -> fn_8028F400 (0x8028F400), a __sinit (read units[...].ctors.items in F.json); the checker takes its own end 0x8028F44C as the cut, which is wrong when functions follow it"
+       "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit fn_80288CEC",
+       "finding": "detail line: .ctors word 0x8056F36C -> 0x8028F400 (fn_8028F400, ends 0x8028F44C): closure ends 0x8028F44C, with own vtable slots 0x8028F44C; unit text ends 0x8028F66C"
       },
       {
        "tool": "callers",
@@ -627,8 +628,8 @@
      "evidence": [
       {
        "tool": "splitcheck",
-       "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit fn_80295EF4 --json F.json",
-       "finding": ".ctors word -> fn_80297C30 (0x80297C30), a __sinit (read units[...].ctors.items in F.json); the checker takes its own end 0x80297D9C as the cut, which is wrong when functions follow it"
+       "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit fn_80295EF4",
+       "finding": "detail line: .ctors word 0x8056F370 -> 0x80297C30 (fn_80297C30, ends 0x80297D9C): closure ends 0x80297E34, with own vtable slots 0x80297E34; unit text ends 0x8029F3C8"
       },
       {
        "tool": "callers",

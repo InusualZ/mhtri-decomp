@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """splitcheck.py - a read-only checker for a `splits.txt`: does every unit and every boundary satisfy what we know?
 
-    python tools/splits/splitcheck.py --baseline [--json F] [--all] [--only INV[,INV]] [--unit REGEX]
+    python tools/splits/splitcheck.py --baseline [--json F] [--all] [--only INV[,INV]] [--unit REGEX] [--intervals]
     python tools/splits/splitcheck.py --proposal F [--proposal G ...] [--emit-splits OUT] [--json F]
     python tools/splits/splitcheck.py --selftest
 
@@ -11,6 +11,12 @@ seams (the seam requests in `.pi/outbox/*.json`, the pool groups of `docs/pool-s
 proposal file (`.pi/splits/phase<N>-<band>.json`, format in `docs/splits-program.md`) into a candidate `splits.txt`
 (strong + medium cuts applied, `guess` cuts merged, never emitted), lints the proposal, checks the candidate and
 prints the delta against the baseline.  Nothing is written except `--json` / `--emit-splits`.
+
+`--baseline --unit REGEX` also prints, for the matching units, one `detail` line per `.ctors`/`.dtors` word (the function, its end, the
+closure end, the end with the unit's own vtable slots, the unit end) and, with `--intervals`, one `pooldup` line per pool value held
+at two addresses (both addresses, the last read of the first, the first read of the second, the interval a TU starts in): the numbers
+a proposal's `reproduce` row quotes.  `--proposal` also reports every proposed cut, a `guess` included, that a `scope:local`
+data object is read across (a static is one TU's) and exits 1 on one.
 
 Invariants (one verdict per unit per invariant; PASS / FAIL / UNKNOWN, `-` = not applicable; evidence = an address):
 
@@ -28,6 +34,8 @@ Invariants (one verdict per unit per invariant; PASS / FAIL / UNKNOWN, `-` = not
   vtable      a vtable sits in the unit whose text holds one of its slots or stores it
   jumptable   a jump table sits in the unit that reads it and branches into
   bss         a local `.bss`/`.sbss` object is read by the unit that holds it
+  local-static a `scope:local` data object (not a pool literal) is read by the text of one unit only: a static is private to its
+              TU, so a local read from both sides of a boundary says the boundary is not a TU edge
 
 The text references (pool first-use, jump table and bss readers) are decoded from the retail `.text`: a `lis` + `addi`/
 `ori`/load pair, or an r13/r2 small-data access.  That is heuristic evidence (a register reused across a branch can
@@ -55,10 +63,10 @@ GAME = "RMHE08"
 PASS, FAIL, UNKNOWN, NA = "PASS", "FAIL", "UNKNOWN", "-"
 RANK = {NA: 0, PASS: 1, UNKNOWN: 2, FAIL: 3}
 INVARIANTS = ("order", "coverage", "text-cut", "extab", "ctors", "dtors", "pool", "data-order", "vtable",
-              "jumptable", "bss")
+              "jumptable", "bss", "local-static")
 #: how bad a defect of this invariant is, for the top-N list (higher first)
 WEIGHT = {"order": 100, "coverage": 95, "extab": 90, "ctors": 85, "dtors": 80, "text-cut": 75, "pool": 60,
-          "vtable": 55, "jumptable": 50, "data-order": 45, "bss": 40}
+          "vtable": 55, "jumptable": 50, "data-order": 45, "bss": 40, "local-static": 58}
 SECTION_ORDER = [".init", "extab", "extabindex", ".text", ".ctors", ".dtors", ".rodata", ".data", ".bss", ".sdata",
                  ".sbss", ".sdata2", ".sbss2"]
 CODE_SECTIONS = (".init", ".text")
@@ -233,6 +241,8 @@ def find_sda_bases(dol, code_words):
 
 #: opcodes that READ memory through `rA + d` (lwz/lbz/lhz/lha/lfs/lfd, their update forms, lmw, psq_l/psq_lu)
 LOAD_OPS = (32, 33, 34, 35, 40, 41, 42, 43, 46, 48, 49, 50, 51, 56, 57)
+#: the update-form accesses (lwzu/lbzu/lhzu/lhau/stwu/stbu/sthu/lfsu/lfdu/stfsu/stfdu): they write rA back
+UPDATE_OPS = (33, 35, 37, 39, 41, 43, 45, 49, 51, 53, 55)
 #: registers a call clobbers (r0, r3..r12): an address formed there does not survive a `bl`
 VOLATILE = frozenset([0] + list(range(3, 13)))
 
@@ -262,6 +272,7 @@ def scan_refs(code, start, sda13, sda2, is_data, fn_starts=(), loads=None):
             if w & 1:                                  # a call clobbers the volatile registers
                 for r in VOLATILE:
                     areg.pop(r, None)
+                    lis.pop(r, None)
             elif op == 18 or (w >> 21) & 31 == 20:     # an unconditional jump or return ends the path
                 areg.clear()
             continue
@@ -307,6 +318,8 @@ def scan_refs(code, start, sda13, sda2, is_data, fn_starts=(), loads=None):
                 ta = (areg[ra][0] + simm) & 0xFFFFFFFF
                 if is_data(ta):
                     loads.setdefault(ta, []).append(site)
+            if op in UPDATE_OPS and ra in lis and t is not None:
+                lis[ra] = (t, i)                         # the update form leaves rA = the effective address
             if op == 14:
                 if rt != ra:
                     areg.pop(rt, None)
@@ -544,10 +557,13 @@ class Ctx:
                         self._slot_words[w].append(ext[0] + i * 4)
         return self._slot_words
 
-    def extend_over_own_vtable_slots(self, limit, lo, end):
+    def extend_over_own_vtable_slots(self, limit, lo, end, unit_end=None):
         """The end of the run of functions at `limit` that are slots of a vtable a function of the unit text `[lo, limit)` stores
         (inline virtual functions a TU emits after its `__sinit`: the table's constructor is in the unit, nothing calls them).
-        Returns `limit` unchanged when the function at `limit` is not such a slot."""
+        Returns `limit` unchanged when the function at `limit` is not such a slot.  Past `unit_end` (the unit's real end, `end` being
+        unbounded) the run must open with a small slot (an inline stub): a large function is a non-inline member another TU defines
+        (a `lis/addi/stw vtable` constructor says nothing about where the member is), while a run that has opened with a stub goes on."""
+        stub = False
         while limit + SINIT_SLACK < end:
             k = bisect.bisect_left(self._fn_starts, limit)
             if k >= len(self.fns):
@@ -558,12 +574,21 @@ class Ctx:
             own = False
             for wa in self.fn_slot_words().get(g["addr"], ()):
                 i, _sym = self.data_sym_at(wa)
-                if i is not None and any(lo <= site < limit for site in self.refs.get(i, ())):
+                if i is None:
+                    continue
+                beyond = unit_end is not None and g["addr"] >= unit_end
+                if beyond and not stub and (g["size"] or 0) > INLINE_SLOT_MAX:
+                    continue
+                if any(lo <= site < limit for site in self.refs.get(i, ())):
                     own = True
+                if own:
                     break
             if not own:
                 break
-            limit = max(limit, self.sinit_closure(g["addr"], end)[1])       # the slot and what it calls after itself
+            stub = stub or (g["addr"] >= (unit_end if unit_end is not None else end))
+            # the slot and what it calls after itself; a slot past the unit end brings only itself (its callees may be anyone's)
+            bound = end if unit_end is None or g["addr"] < unit_end else g["addr"] + 1
+            limit = max(limit, self.sinit_closure(g["addr"], bound)[1])
         return limit
 
 
@@ -809,7 +834,12 @@ def check_ctors(ctx, res):
                                 % (f["name"], hx(end), hx(sinit_end)), {"cut_at": sinit_end})
                         continue
                     _fns, limit = ctx.sinit_closure(f["addr"], end)
-                    limit = ctx.extend_over_own_vtable_slots(limit, tr[0][0] if tr else 0, end)
+                    # the own-slot run is followed past the unit end too: a cut placed over a unit's own deferred slots is early
+                    limit = ctx.extend_over_own_vtable_slots(limit, tr[0][0] if tr else 0, UNBOUNDED, end)
+                    if limit > end + SINIT_SLACK:
+                        res.add(u.name, inv, FAIL, a, "%s's closure (sinit + its local callees + the slots of the vtables it stores) ends %s, past the unit text end %s: "
+                                "the TU boundary is at %s, not %s" % (f["name"], hx(limit), hx(end), hx(limit), hx(end)), {"cut_at": limit})
+                        continue
                     if limit + SINIT_SLACK >= end:
                         res.add(u.name, inv, PASS)
                         continue
@@ -832,6 +862,10 @@ def check_ctors(ctx, res):
 LITERAL_KINDS = ("float", "double")
 #: alignment padding a unit may keep after its last function (a 16-byte-aligned function start)
 SINIT_SLACK = 0xC
+#: an end bound that never binds (the own-slot run is followed past a unit's end)
+UNBOUNDED = 0xFFFFFFFF
+#: the largest slot function past a unit's end that still reads as an inline virtual the unit emitted (a stub, a trivial accessor)
+INLINE_SLOT_MAX = 0x40
 #: crt chain entries a runtime unit registers for another unit's function
 CRT_CHAIN = ("__destroy_global_chain", "__init_cpp_exceptions", "__fini_cpp_exceptions")
 
@@ -1073,6 +1107,109 @@ def check_bss(ctx, res):
                     "" if own else "no object of the range is read by this unit's decoded code (%d read only elsewhere)" % foreign_global)
 
 
+def check_local_static(ctx, res):
+    """A `scope:local` data object is private to one TU: its decoded readers must lie in one unit.  A reader in two units is a
+    FAIL for both (the units are one TU, or one read is a false decode - stated in the finding, like the pool check's)."""
+    for sym in ctx.data_syms:
+        if sym["scope"] != "local" or sym["type"] != "object" or is_literal(sym) or sym["section"] == ".sdata2":
+            continue
+        if sym["name"].startswith("jumptable_"):
+            continue                                       # a switch table: the `jumptable` invariant owns it (its base register is reused across units)
+        units = collections.OrderedDict()
+        for x in ctx.readers(sym):
+            u = ctx.text_owner(x)
+            if u is not None:
+                units.setdefault(u.name, (u, x))
+        if len(units) < 2:
+            for n in units:
+                res.add(n, "local-static", PASS)
+            continue
+        names = list(units)
+        for n in names:
+            others = [o for o in names if o != n]
+            res.add(n, "local-static", FAIL, sym["addr"],
+                    "local %s (%s %s) is read at %s by this unit and at %s by %s (a static is one TU's: the units are one TU, or one read is a false decode)"
+                    % (sym["name"], sym["section"], hx(sym["addr"]), hx(units[n][1]), hx(units[others[0]][1]), ", ".join(others[:3])),
+                    {"symbol": sym["name"], "units": names})
+
+
+def local_static_crossings(ctx, cuts):
+    """`[(cut, grade, unit, symbol, lo_reader, hi_reader)]`: a proposed cut (every grade, a guess included - a guess is merged away
+    and so never reaches the candidate's `local-static` check) that a `scope:local` data object is read across, one decoded reader
+    below the cut and one at or above it: a static is one TU's, so a TU start cannot sit between its readers."""
+    spans = []
+    for sym in ctx.data_syms:
+        if sym["scope"] != "local" or sym["type"] != "object" or is_literal(sym) or sym["section"] == ".sdata2" \
+                or sym["name"].startswith("jumptable_"):
+            continue
+        sites = sorted(ctx.readers(sym))                    # unowned text counts too: a proposal cuts most of it
+        if len(sites) >= 2:
+            spans.append((sites[0], sites[-1], sym, sites))
+    out = []
+    for addr, grade, unit in sorted(cuts):
+        for lo, hi, sym, sites in spans:
+            if lo < addr <= hi:
+                below = max(x for x in sites if x < addr)
+                above = min(x for x in sites if x >= addr)
+                out.append((addr, grade, unit, sym["name"], below, above))
+    return out
+
+
+def ctors_detail(ctx, u, sec=".ctors"):
+    """One line per `.ctors`/`.dtors` word of `u`: the word, the function it names, that function's own end, the closure end the
+    ctors check derives (sinit + local callees + own vtable slots) and the unit's text end - the numbers behind a ctors finding."""
+    out = []
+    tr = u.ranges.get(".text", [])
+    end = tr[-1][1] if tr else 0
+    for s0, e0, _a in u.ranges.get(sec, []):
+        for a in range(s0, e0 - 3, 4):
+            w = ctx.dol.word(a)
+            f = ctx.fn_at(w) if w else None
+            if f is None:
+                out.append("%s word %s = %s: not a function" % (sec, hx(a), hx(w or 0)))
+                continue
+            if sec != ".ctors" or f["name"] in CRT_CHAIN or ctx.text_owner(w) is not u:
+                out.append("%s word %s = %s (%s, ends %s)%s" % (sec, hx(a), hx(w), f["name"], hx(f["addr"] + (f["size"] or 0)),
+                                                                 "" if ctx.text_owner(w) is u else " in %s" % (ctx.text_owner(w).name if ctx.text_owner(w) else "no unit")))
+                continue
+            _fns, limit = ctx.sinit_closure(f["addr"], end)
+            ext = ctx.extend_over_own_vtable_slots(limit, tr[0][0] if tr else 0, UNBOUNDED, end)
+            out.append("%s word %s = %s (%s, ends %s): closure ends %s, with own vtable slots %s; unit text ends %s"
+                       % (sec, hx(a), hx(w), f["name"], hx(f["addr"] + (f["size"] or 0)), hx(limit), hx(ext), hx(end)))
+    return out
+
+
+def pool_intervals(ctx, keep=None):
+    """`[line]`: for each value held at two or more pool addresses and read from one unit, the pair of consecutive copies, the last
+    read of the first and the first read of the second, and the function starts between them (a TU starts in `(fn(last), fn(first)]`).
+    `keep(unit_name)` filters by reader unit."""
+    groups = collections.defaultdict(list)
+    for sym in ctx.data_syms:
+        if sym["kind"] in LITERAL_KINDS and sym["section"] == ".sdata2" and sym["size"] in (4, 8) and sym["type"] == "object":
+            sites = sorted(ctx.literal_readers(sym))
+            if sites:
+                groups[(sym["size"], ctx.dol.read(sym["addr"], sym["size"]))].append((sym, sites))
+    out = []
+    for (size, v), lits in sorted(groups.items(), key=lambda kv: kv[1][0][0]["addr"]):
+        lits.sort(key=lambda t: t[0]["addr"])
+        for (a, sa), (b, sb) in zip(lits, lits[1:]):
+            owners = {ctx.text_owner(x).name for x in sa + sb if ctx.text_owner(x)} or {"unowned"}
+            if keep is not None and not any(keep(n) for n in owners):
+                continue
+            ua = {ctx.text_owner(x) for x in sa if ctx.text_owner(x)}
+            ub = {ctx.text_owner(x) for x in sb if ctx.text_owner(x)}
+            split_note = ""
+            if ua and ub and not (ua & ub):
+                split_note = " [already two units: %s | %s]" % (sorted(x.name for x in ua)[0], sorted(x.name for x in ub)[0])
+            last, first = sa[-1], sb[0]
+            fl, ff = _first_use_fn(ctx, last), _first_use_fn(ctx, first)
+            n = bisect.bisect_right(ctx._fn_starts, ff) - bisect.bisect_right(ctx._fn_starts, fl)
+            out.append("pooldup value 0x%s: %s %s (last read %s) and %s %s (first read %s)%s" % (
+                (v or b"").hex(), a["name"], hx(a["addr"]), hx(last), b["name"], hx(b["addr"]), hx(first),
+                (("; a TU starts in (%s, %s]: %d function starts" % (hx(fl), hx(ff), n)) if fl < ff else "; the reads interleave (no interval)") + split_note))
+    return out
+
+
 def boundaries(ctx, res):
     """One record per adjacent pair of text units: the function start and the pool literals read across it."""
     tu = sorted((u for u in ctx.units if u.ranges.get(".text")), key=lambda u: u.first(".text"))
@@ -1113,6 +1250,8 @@ def run_checks(ctx, rows_for_dataorder=None, only=None):
         check_jumptable(ctx, res)
     if "bss" in want:
         check_bss(ctx, res)
+    if "local-static" in want:
+        check_local_static(ctx, res)
     if only:
         for name in list(res.units):
             for inv in list(res.units[name]):
@@ -1634,6 +1773,8 @@ def render(base, proposals, dol=None, symbols=None, data_by_reader=True):
         for c in u["cuts"]:
             cc["keep_registered_edge" if c.get("keep_registered_edge") else c.get("grade", "?")] += 1
     info["cuts"] = dict(cc)
+    info["proposal_cuts"] = [(c["addr"], "guess" if c.get("keep_registered_edge") is not True and c.get("grade") == "guess" else c.get("grade", "?"), u["name"])
+                             for u in units for c in u["cuts"] if c.get("keep_registered_edge") is not True and c.get("section", ".text") == ".text"]
     units.sort(key=lambda u: (u["ranges"].get(".text") or [(0, 0)])[0][0])
     mg = {"issues": info["issues"], "base_merges": []}
     units = merge_guess(units, base, mg)
@@ -1772,6 +1913,17 @@ def cmd_baseline(args):
         bounds = [b for b in bounds if keep.search(b["left"]) or keep.search(b["right"])]
     outbox = args.outbox or os.path.join(main_root() or tree_root(), ".pi", "outbox")
     seams = seam_requests(ctx, outbox)
+    only_set = set(args.only.split(",")) if args.only else None
+    if args.unit and (only_set is None or only_set & {"ctors", "dtors"}):
+        for u in ctx.units:
+            for sec, inv in ((".ctors", "ctors"), (".dtors", "dtors")):
+                if u.ranges.get(sec) and (only_set is None or inv in only_set):
+                    for line in ctors_detail(ctx, u, sec):
+                        print("detail %s: %s" % (u.name, line))
+    if args.intervals:
+        keep = re.compile(args.unit).search if args.unit else None
+        for line in pool_intervals(ctx, keep):
+            print(line)
     groups = pool_groups(ctx)
     print("baseline: %d units, %d map symbols, r13=%s r2=%s" % (len(ctx.units), len(symbols), hx(ctx.sda13), hx(ctx.sda2)))
     print_table(ctx, res, args.all, args.limit)
@@ -1826,8 +1978,22 @@ def cmd_proposal(args):
             fh.write(render_splits(cand))
     only = args.only.split(",") if args.only else None
     bctx, bres, _bb = analyse(splits, symbols, dol, only, sda=(None, None))
+    crossed = local_static_crossings(bctx, info.get("proposal_cuts", []))
+    print("\ncuts crossed by a local static: %d" % len(crossed))
+    for addr, grade, unit, name, below, above in crossed:
+        print("  [%s] cut %s (%s): local %s is read at %s below it and at %s above it" % (grade, hx(addr), unit, name, hx(below), hx(above)))
     cctx, cres, cb = analyse(cand, symbols, dol, only, sda=(bctx.sda13, bctx.sda2))
     bs, cs = bres.summary(), cres.summary()
+    if args.unit:
+        keep = re.compile(args.unit).search
+        for u in cctx.units:
+            for sec in (".ctors", ".dtors"):
+                if keep(u.name) and u.ranges.get(sec):
+                    for line in ctors_detail(cctx, u, sec):
+                        print("detail %s: %s" % (u.name, line))
+        if args.intervals:
+            for line in pool_intervals(cctx, keep):
+                print(line)
     print("\ncandidate: %d units (baseline %d); proposal units: %s" % (len(cctx.units), len(bctx.units), ", ".join(info["units"][:12])))
     print("%-11s %10s %10s" % ("invariant", "FAIL base", "FAIL cand"))
     for inv in INVARIANTS:
@@ -1851,9 +2017,11 @@ def cmd_proposal(args):
     if args.json:
         with open(args.json, "w", encoding="utf-8") as fh:
             json.dump({"lint": info["issues"], "merged": info["merged"], "candidate": report_json(cctx, cres, cb),
+                       "local_static_crossings": [{"cut": hx(a), "grade": g, "unit": u, "symbol": n, "below": hx(b), "above": hx(c)}
+                                                  for a, g, u, n, b, c in crossed],
                        "baseline_summary": bs, "new_failures": [{"unit": n, "invariant": i, "addr": r["addr"],
                                                                   "finding": r["finding"]} for n, i, r in new]}, fh, indent=1)
-    return 1 if info["issues"] or new or any(r["status"] == FAIL for n in mine for r in cres.units.get(n, {}).values()) else 0
+    return 1 if info["issues"] or new or crossed or any(r["status"] == FAIL for n in mine for r in cres.units.get(n, {}).values()) else 0
 
 
 # ---- selftest -----------------------------------------------------------------------------------------------------------------
@@ -2105,8 +2273,8 @@ u_b.cpp: comment:0
     vt_units = (hdr + "\t.data       type:rodata align:8\n\nu.cpp:\n\t.text       start:0x%X end:0x%X\n\t.ctors      start:0x80200000 end:0x80200004\n"
                 "\t.data       start:0x%X end:0x%X\n" % (T, T + 0x30, DV, DV + 0x10))
 
-    def slot_run(words, cut_to=0x30):
-        c, _s = _mini(T, words, slot_fns, vt_units.replace("end:0x%X\n\t.ctors" % (T + 0x30), "end:0x%X\n\t.ctors" % (T + cut_to)),
+    def slot_run(words, cut_to=0x30, fns=None):
+        c, _s = _mini(T, words, fns or slot_fns, vt_units.replace("end:0x%X\n\t.ctors" % (T + 0x30), "end:0x%X\n\t.ctors" % (T + cut_to)),
                       [ctor_blob, (DV, vt_blob)], vt_sym)
         r = run_checks(c, None, ["ctors"]).units["u.cpp"]["ctors"]
         return r["status"], [i.get("cut_at") for i in r["items"] if i.get("cut_at")]
@@ -2116,6 +2284,18 @@ u_b.cpp: comment:0
     no_store[4], no_store[5] = NOP, NOP
     check("ctors closure: slots of a vtable the unit never stores are not (cut at the first slot)", slot_run(no_store), (FAIL, [T + 0x20]))
     check("ctors closure: a unit that goes on past the slot run is cut after the run's end", slot_run(slots_code + [NOP] * 4, 0x40), (FAIL, [T + 0x30]))
+    # a unit that ENDS inside its own slot run is early: the closure overshoots the unit end (was a PASS)
+    check("ctors closure: a cut placed over the unit's own slots (unit ends at the first slot) is flagged at the run's end",
+          slot_run(slots_code, 0x20), (FAIL, [T + 0x30]))
+    check("ctors closure: an overshoot inside the alignment slack is not flagged (unit ends 0x28, run ends 0x30)", slot_run(slots_code, 0x28), (PASS, []))
+    check("ctors closure: a unit that ends at its sinit, over slots of a vtable it never stores, is not an overshoot", slot_run(no_store, 0x20), (PASS, []))
+    big_fns = [("F0", 0, 0x10), ("sinit", 0x10, 0x10), ("slot1", 0x20, 0x100), ("slot2", 0x120, 8)]
+    check("ctors closure: a large function after the end is another TU's member, not an own inline slot",
+          slot_run(slots_code + [NOP] * 0x40, 0x20, big_fns), (PASS, []))
+    mixed_fns = [("F0", 0, 0x10), ("sinit", 0x10, 0x10), ("slot1", 0x20, 8), ("slot2", 0x28, 0x100)]
+    vt_blob2 = struct.pack(">4I", 0, 0, T + 0x20, T + 0x28)
+    check("ctors closure: a run that opened with a stub goes on over a large slot (the cut is at the run's end)",
+          slot_run(slots_code + [NOP] * 0x40, 0x20, mixed_fns), (FAIL, [T + 0x128]))
 
     # gap 2: a lis/addi that only forms a pool address is not a read of the literal; a load through it is
     S2 = 0x80300000
@@ -2173,6 +2353,54 @@ u_b.cpp: comment:0
         cv2, sv = _mini(T, words, fns_v, vunits, [(0x80200000, struct.pack(">I", T + 0x10)), (D0, vblob)], vsyms)
         rv2 = run_checks(cv2, dataorder_rows(sv), ["data-order"])
         check("data-order: %s" % label, rv2.units["v.cpp"]["data-order"]["status"], want)
+
+    # local-static: a scope:local object is one TU's; read by two units it fails both, and no proposed cut may sit between its readers
+    LS = 0x80700000
+    ls_hdr = "Sections:\n\t.text       type:code align:32\n\t.bss        type:bss align:8\n\n"
+    ls_units = ls_hdr + "u1.cpp:\n\t.text       start:0x%X end:0x%X\n\t.bss        start:0x%X end:0x%X\n\nu2.cpp:\n\t.text       start:0x%X end:0x%X\n" \
+        % (T, T + 0x10, LS, LS + 8, T + 0x10, T + 0x20)
+    rd_fn = [_lis(3, LS >> 16), _w(14, 3, 3, LS & 0xFFFF), BLR, NOP]                               # forms the address of the object
+    ls_syms = ["stat = .bss:0x%X; // type:object size:0x4 scope:local" % LS, "stat2 = .bss:0x%X; // type:object size:0x4 scope:local" % (LS + 4)]
+    cl, _s = _mini(T, rd_fn + rd_fn + rd_fn + rd_fn, [("a", 0, 0x10), ("b", 0x10, 0x10), ("c", 0x20, 0x10), ("d", 0x30, 0x10)], ls_units, (), ls_syms)
+    rl = run_checks(cl, None, ["local-static"])
+    check("local-static: a local object read from two units fails both", (rl.units["u1.cpp"]["local-static"]["status"],
+                                                                           rl.units["u2.cpp"]["local-static"]["status"]), (FAIL, FAIL))
+    cg2, _s = _mini(T, rd_fn + rd_fn + rd_fn + rd_fn, [("a", 0, 0x10), ("b", 0x10, 0x10), ("c", 0x20, 0x10), ("d", 0x30, 0x10)], ls_units, (),
+                    [ls_syms[0].replace("scope:local", "scope:global"), ls_syms[1]])
+    rg2 = run_checks(cg2, None, ["local-static"])
+    check("local-static: a global object read from two units is not a finding", rg2.units.get("u1.cpp", {}).get("local-static", {}).get("status", NA), NA)
+    check("local-static crossing: a cut between two readers of a local object is reported",
+          [(c[0], c[3]) for c in local_static_crossings(cl, [(T + 0x10, "guess", "u2"), (T + 0x04, "guess", "x"), (T + 0x40, "guess", "y")])],
+          [(T + 0x10, "stat")])
+    # the update-form store leaves rA = the effective address: `stwu r0, lo(r3)` then `stw r0, 4(r3)` reads/writes stat2, not a stale lis
+    upd = [_lis(3, LS >> 16), _w(37, 0, 3, 0x10), _w(36, 0, 3, 4), BLR]
+    cu2, _s = _mini(T, upd + [NOP] * 12, [("a", 0, 0x10), ("b", 0x10, 0x30)], ls_units, (),
+                    ls_syms + ["stat3 = .bss:0x%X; // type:object size:0x4 scope:local" % (LS + 0x10),
+                               "stat4 = .bss:0x%X; // type:object size:0x4 scope:local" % (LS + 0x14)])
+    check("decode: an update-form store moves rA, so the next displacement is relative to the updated address (not to the lis value)",
+          [sorted(cu2.readers(cu2.data_sym_at(a)[1])) for a in (LS + 4, LS + 0x10, LS + 0x14)], [[], [T + 4], [T + 8]])
+    cl2, _s = _mini(T, [_lis(3, LS >> 16), _b(T + 4, T + 0x30, True), _w(36, 0, 3, 0), BLR] + [NOP] * 12, [("a", 0, 0x10), ("b", 0x10, 0x30)], ls_units, (), ls_syms)
+    check("decode: a `lis` register does not survive a call", cl2.readers(cl2.data_sym_at(LS)[1]), [])
+
+    # reproduce rows: the per-word closure line and the pool interval line print the numbers a finding quotes
+    cdet, _s = _mini(T, slots_code, slot_fns, vt_units.replace("end:0x%X\n\t.ctors" % (T + 0x30), "end:0x%X\n\t.ctors" % (T + 0x20)),
+                     [ctor_blob, (DV, vt_blob)], vt_sym)
+    check("ctors_detail: names the word, the closure end, the own-slot end and the unit end",
+          ctors_detail(cdet, cdet.by_name["u.cpp"]),
+          [".ctors word 0x80200000 = 0x%X (sinit, ends 0x%X): closure ends 0x%X, with own vtable slots 0x%X; unit text ends 0x%X"
+           % (T + 0x10, T + 0x20, T + 0x20, T + 0x30, T + 0x20)])
+    eq_pool = struct.pack(">ff", 1.5, 1.5)
+    pairs_fn = [_lis(3, hi), _w(48, 1, 3, 0), BLR, NOP, _lis(3, hi), _w(48, 1, 3, 4), BLR, NOP]
+    cpi, _s = _mini(T, pairs_fn, [("f0", 0, 0x10), ("f1", 0x10, 0x10)], pool_txt, [(S2, eq_pool)], s2_syms)
+    check("pool_intervals: one value at two pool addresses prints both reads and the interval a TU starts in",
+          pool_intervals(cpi), ["pooldup value 0x3fc00000: l0 0x%X (last read 0x%X) and l1 0x%X (first read 0x%X); a TU starts in (0x%X, 0x%X]: 1 function starts"
+                                % (S2, T + 4, S2 + 4, T + 0x14, T, T + 0x10)])
+
+    two_txt = hdr + "p1.cpp:\n\t.text       start:0x%X end:0x%X\n\t.sdata2     start:0x%X end:0x%X\n\np2.cpp:\n\t.text       start:0x%X end:0x%X\n" % (T, T + 0x10, S2, S2 + 8, T + 0x10, T + 0x20)
+    c2u, _s = _mini(T, pairs_fn, [("f0", 0, 0x10), ("f1", 0x10, 0x10)], two_txt, [(S2, eq_pool)], s2_syms)
+    check("pool_intervals: a pair read by two units says so, and --unit filters by either reader",
+          ([l.endswith("[already two units: p1.cpp | p2.cpp]") for l in pool_intervals(c2u)], len(pool_intervals(c2u, lambda n: n == "p2.cpp")), len(pool_intervals(c2u, lambda n: n == "zzz"))),
+          ([True], 1, 0))
 
     # gap 4a: a guess cut merges with the unit that TOUCHES it (proposal or registered); none touching is a lint error
     def prop(*units, **more):
@@ -2286,10 +2514,12 @@ def main(argv=None):
     ap.add_argument("--splits"), ap.add_argument("--symbols"), ap.add_argument("--dol")
     ap.add_argument("--outbox", help="lane outbox with seam requests (default: the primary checkout's .pi/outbox)")
     ap.add_argument("--only", help="comma list of invariants")
-    ap.add_argument("--unit", help="regex: report only the units whose name matches (--baseline)")
+    ap.add_argument("--unit", help="regex: report only the units whose name matches (--baseline); with --proposal, the `detail`/`pooldup` lines of the candidate's matching units")
     ap.add_argument("--json", help="write the machine-readable report here")
     ap.add_argument("--all", action="store_true", help="list every unit, not only the failing ones")
     ap.add_argument("--limit", type=int, default=40)
+    ap.add_argument("--intervals", action="store_true",
+                    help="with --baseline: print each pool value held at two addresses (read by --unit's units) with the interval a TU starts in")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args(argv)
     if args.selftest:
