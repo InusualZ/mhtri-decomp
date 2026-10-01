@@ -280,6 +280,15 @@ def align_candidate(cand, symbols, absorb_blocked=False):
                             prev[1] = r[0] = fl
                             write(sec, prev)
                             write(sec, r)
+                        else:
+                            # the range before is too small to give up its tail (Pl/pl_hit_sphere's `.sdata2` is the one word 0x8079A310): the start
+                            # moves UP to the 8-aligned address instead, and the range before takes the word(s) in between
+                            up = (r[0] + 7) & ~7
+                            if up < r[1] and not covered(sec, up, up + 1):
+                                fixes.append((r[2].name, sec, r[0], up))
+                                prev[1] = r[0] = up
+                                write(sec, prev)
+                                write(sec, r)
                     elif (prev is None or fl >= prev[1]) and not covered(sec, fl, r[0]):
                         fixes.append((r[2].name, sec, r[0], fl))
                         r[0] = fl
@@ -1809,6 +1818,12 @@ def selftest():
     check("a range that holds a double and starts 4- but not 8-aligned starts at the 8-aligned address (the abutting range gives up its tail)",
           (got6.by_name()["g.cpp"].rs(".sdata2"), got6.by_name()["h.cpp"].rs(".sdata2"), fixes6),
           ([(0x600, 0x610)], [(0x610, 0x634)], [("h.cpp", ".sdata2", 0x614, 0x610)]))
+    al7 = sc.Splits(header, [U("i.cpp", **{".sdata2": (0x610, 0x614)}), U("j.cpp", **{".sdata2": (0x614, 0x634)})])
+    got7, fixes7, _b7 = align_candidate(clone_splits(al7), [sym("f0", ".sdata2", 0x610, 4), sym("f2", ".sdata2", 0x614, 4), sym("f3", ".sdata2", 0x618, 4),
+                                                           dsym("d0", 0x620), sym("f4", ".sdata2", 0x628, 4)])
+    check("... and when the range before is a single word that cannot give up its tail, the start moves up and the word goes to the range before",
+          (got7.by_name()["i.cpp"].rs(".sdata2"), got7.by_name()["j.cpp"].rs(".sdata2"), fixes7),
+          ([(0x610, 0x618)], [(0x618, 0x634)], [("j.cpp", ".sdata2", 0x614, 0x618)]))
     # dtk's refusals and its config
     m = UNSPLIT_RE.search("Caused by: Unsplit data in .sdata2 from Network/NetworkSessionManagerPat.cpp 11:0x8079C78C to next split 11:0x8079C790")
     check("the `Unsplit data` refusal is parsed", m and (m.group(1), m.group(2), m.group(3), m.group(4)), (".sdata2", "Network/NetworkSessionManagerPat.cpp", "8079C78C", "8079C790"))
