@@ -6,7 +6,7 @@ the data-only unit and the move phase 2 accepted). They replace the six lane fil
 accounts of their own runs (their commands name the lane engines, which are gone).
 
 ```
-python tools/splits/dataattach.py --lane p2 --linker --out docs/splits/proposals/phase2-reconcile.json     # deterministic, ~30 s
+python tools/splits/dataattach.py --lane p2 --linker --overrides docs/splits/proposals/phase2-overrides.json --out docs/splits/proposals/phase2-reconcile.json     # deterministic, ~30 s
 python tools/splits/splitcheck.py --proposal docs/splits/proposals/phase1-{a..g}.json --proposal docs/splits/proposals/phase1-reconcile.json \
     --proposal docs/splits/proposals/phase2-reconcile.json --proposal docs/splits/proposals/phase2-folds.json --emit-splits OUT
 python tools/splits/dataattach.py --explain <unit regex | address> [--section S]    # the `reproduce` of every row
@@ -15,33 +15,36 @@ python tools/splits/dataattach.py --holdout                                     
 
 ## 1. Result
 
-Candidate = phase 1 files + `phase1-reconcile.json` + `phase2-reconcile.json` + `phase2-folds.json`: lint 0, warnings 0, 355 units (360 in phase 1: the folds F1-F4 remove 6 units, the data-only unit F5 adds 1, section 4), 0 new failures outside the proposal units.
+Candidate = phase 1 files + `phase1-reconcile.json` + `phase2-reconcile.json` + `phase2-folds.json`: lint 0, warnings 0, 354 units (360 in phase 1: the folds F1-F4 remove 6 units, the data-only unit F5 adds 1, section 4; the sinit fold of `Pl/bss_pool` into `Pl/pl_coll` removes one), 0 new failures outside the proposal units.
+Regenerated 2026-10-01 after the phase 3 engine and checker fixes (section 7); the numbers below are the regenerated file's.
 
-| invariant | FAIL phase 1 candidate | FAIL + phase 2 |
-| --- | ---: | ---: |
-| order, coverage, text-cut, extab, ctors, dtors, vtable, bss, local-static | 0 | 0 |
-| pool | 63 | 63 |
-| data-order | 0 | 0 |
-| jumptable | 1 | 1 |
+| invariant | FAIL phase 1 candidate | FAIL + phase 2, before the fixes (old checker) | same file, new checker | FAIL + regenerated phase 2, new checker |
+| --- | ---: | ---: | ---: | ---: |
+| coverage, text-cut, extab, ctors, dtors, vtable, bss, local-static | 0 | 0 | 0 | 0 |
+| order | 0 | 0 | 2 (`Pl/pl_frame_data`, `Pl/pl_act_data`) | 0 (the engine moves the two units) |
+| pool | 63 | 63 | 66 | 81 (18 accepted numeric/string inversions, section 7) |
+| data-order | 0 | 0 | 0 | 0 |
+| jumptable | 1 | 1 | 0 | 0 |
 
 (Phase 1 candidate under the current checker: `data-order` is 0 because of the V->S rule of `docs/splits-program.md`; it was 3 under the old one.) One FAIL
 pair moved: `enemy/em_pl_frame.cpp` `pool` became `hud/pl_frame_sync.cpp` `pool` (the fold keeps the unit's open pooldup question).
 
-Rows: 859 ranges attached (strong 732, medium 127), 17 `guess` ranges kept next to their deferral and never applied, 153 `unowned_data` rows, 3 linker-generated.
+Rows: 881 ranges attached (strong 751, medium 130), 28 `guess` ranges kept next to their deferral and never applied, 139 `unowned_data` rows, 3 linker-generated;
+2 `moves` (derived), 32 `open_questions`.
 
 | section | ranges | symbols | bytes | strong | medium |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `.rodata` | 53 | 239 | 39,568 | 45 | 8 |
-| `.data` | 220 | 5,501 | 558,361 | 161 | 59 |
-| `.sdata` | 170 | 1,910 | 12,831 | 126 | 44 |
-| `.sdata2` | 239 | 6,716 | 29,696 | 237 | 2 |
-| `.bss` | 91 | 452 | 1,084,546 | 84 | 7 |
-| `.sbss` | 83 | 893 | 4,232 | 76 | 7 |
-| `.sbss2` | 1 | 1 | 8 | 1 | 0 |
+| `.rodata` | 54 | 265 | 40,676 | 45 | 9 |
+| `.data` | 235 | 5,968 | 581,201 | 178 | 57 |
+| `.sdata` | 169 | 2,068 | 13,716 | 123 | 46 |
+| `.sdata2` | 239 | 6,794 | 30,080 | 237 | 2 |
+| `.bss` | 96 | 461 | 1,106,880 | 88 | 8 |
+| `.sbss` | 84 | 895 | 4,248 | 77 | 7 |
+| `.sbss2` | 2 | 3 | 24 | 1 | 1 |
 | `extab`, `extabindex` | 1 + 1 | 5 + 5 | 100 + 60 | 2 | 0 |
 
-Symbols in no unit, whole map (`splitcheck` coverage gaps), before phase 2 -> after: `.data` 8,454 -> 2,310, `.sdata2` 6,802 -> 86, `.sdata` 2,052 -> 213,
-`.bss` 439 -> 29, `.sbss` 904 -> 37, `.rodata` 277 -> 38, `.sbss2` 3 -> 2; `.init` (2) and `extabindex` `_eti_init_info` (1) are linker tables nobody owns
+Symbols in no unit, whole map (`splitcheck` coverage gaps), before phase 2 -> after: `.data` 8,454 -> 1,843, `.sdata2` 6,802 -> 8, `.sdata` 2,052 -> 55,
+`.bss` 439 -> 34, `.sbss` 904 -> 35, `.rodata` 277 -> 12, `.sbss2` 3 -> 0 (previous regeneration: 2,310 / 86 / 213 / 29 / 37 / 38 / 2); `.init` (2) and `extabindex` `_eti_init_info` (1) are linker tables nobody owns
 (`unowned_data` kind `linker-generated`). The six lane files together attach 17,675 symbols (`.data` 7,391, `.sdata2` 6,753, `.sdata` 1,974, `.bss` 414, `.sbss` 872,
 `.rodata` 259); the reconciled set attaches 15,722 (`.data` 5,501, `.sdata2` 6,716, `.sdata` 1,910, `.bss` 452, `.sbss` 893, `.rodata` 239) and 965 `.data` symbols
 more belong to the data-only unit of section 3.
@@ -124,19 +127,46 @@ derived evidence. F5 is the alternative that passes every check; neither is prov
 
 | class | rows | symbols | bytes | units (symbols) | what decides it |
 | --- | ---: | ---: | ---: | --- | --- |
-| `multi-tu` | 17 | 1,327 | 68,493 | `NetworkCommunityPat` 366, `fn_80047398` 199, `homebutton/fn_80533474` 199, `network_layer_io` 188, `lb_server_sel_trans` 73, `g3d/fn_80075DCC` 57, `homebutton/fn_8056083C` 53, `ef/eft019` 48, `NetworkSessionManagerPat` 43, `fn_8055B710` 27, `fn_80542D8C` 24, `ef_drawstripestrategy` 19, `network_opening` 14, `tiHKBManager` 7 | a text cut the seam/jump table/vtable puts inside the unit (phase 3, bands b/e/f) |
+| `multi-tu` | 28 | 891 | 48,509 | `NetworkCommunityPat` 361, `fn_80047398` 199, `homebutton/fn_80533474` 198, `NetworkSessionManagerPat` 43, `fn_8055B710` 19, `lb_server_sel_trans` 16, `ef_drawstripestrategy` 14, `network_opening` 14 | a text cut the seam/jump table/vtable puts inside the unit (phase 3, bands b/e/f); a seam-cut block keeps the pieces before the seam, the blocked piece takes the later pieces along |
 | `interleave` | 7 | 815 | 46,632 | `quest_snd` + `fn_800EF7D8` 375, `pl_act` + `fn_802840DC` 167, g3d 131 + 76 + 35, `eft001` + `eft002` 31 | merge (F7-F9 class: pool refuses) or an extern-data reading; phase 3 |
-| `unread` | 64 | 332 | 125,374 | `ef/eft050` 87, `ef/eft_slot` 86, `homebutton/fn_8055F728` 76, `fn_8055FB70` 76, `lobby/fn_80220038` 47, `Pl/fn_80229ECC` 44, `.bss` runs nothing reads (0x80673C0A..0x80682E80, 62,070 B in a g3d chain; 0x806A2D34..0x806A4538; 0x80708076..0x8070CDE0, 19,818 B in the ARC/AX chain) | nothing decodes a read: only a link-order neighbour or a pointer table in unowned data |
-| `pool-order` | 24 | 151 | 772 | `Pl/pl_act_step`, `player_control`, `pl_act` 29 each, `EXI/ProbeBarnacle`, `RVLGX/GXTexture_tail`, `OS/FindContainHeap_` 20, `enemy/em_model`, `menu/get_pop_dat_ptr`, `hud/layout`, `hud/cockpit_quest`, `ef/eft035` 17 | inline-function strings at a pool's end vs a TU boundary (needs one compiled fixture) |
-| `ambiguous` | 38 | 93 | 40,625 | `ef/eft050` + `eft_slot` 31 each, g3d 7 + 6 + 5, `fn_80040598` / `mh3_pad` 6, `lobby/lb_menu_scratch` + `lb_menu_pos_tbl` 5 | one symbol between two units' anchors that nothing reads |
+| `unread` | 60 | 207 | 116,094 | `lobby/fn_80220038` + `Pl/fn_80229ECC` 72, `nw_resource` + `g3d_xsi` + `fn_800D77B0` 13, `draw_shape` + `draw_shape_arm` 10, `.bss` runs nothing reads (0x80673C0A..0x80682E80 in a g3d chain; 0x806A2D34..0x806A4538; 0x80708076..0x8070CDE0 in the ARC/AX chain) | nothing decodes a read: only a link-order neighbour or a pointer table in unowned data |
+| `reader-vs-pointer` | 14 | 25 | 6,222 | the 12-element `.bss` array 0x80790C08..0x80790D10 (`homebutton/fn_80556FC4` + `fn_8055FB70`) and its neighbour 0x807907D0, `fn_8055FD58` + `fn_80533474` 8, `fn_8055F728` + `fn_8055EAF0` / `fn_8053E808` | a reader and the pointer tables around it name different units (section 7, rule 5) |
+| `ambiguous` | 27 | 50 | 21,057 | `fn_80063888` + `fn_800680CC` 6, `fn_80040598` + `mh3_pad` 6, `eft007_fx` + `eft009` 5, `lb_npc` + `lb_menu_scratch` + `lb_menu_pos_tbl` 4 | one symbol between two units' anchors that nothing reads |
 | `linker-generated` | 3 | 3 | 196 | `.init` `_rom_copy_info`, `_bss_init_info`; `extabindex` `_eti_init_info` | nobody: mwldeppc emits them |
 
-By section: `.data` 2,310 (multi-tu 1,327, interleave 805, unread 140, ambiguous 39), `.sdata` 213, `.sdata2` 86 (pool-order 78), `.rodata` 38, `.sbss` 37, `.bss` 29, `.sbss2` 2.
+The 24 `pool-order` rows of the previous regeneration (151 symbols) are all decided now: the numeric `.sdata2` ones attach to their reader (the inversion is an open
+question of the unit), the strings by the initialiser order, the rest narrowed to the units that read them (section 7, rule 4).
+
+By section: `.data` 1,844 (multi-tu 891, interleave 805, unread 127, reader-vs-pointer 11, ambiguous 10), `.sdata` 55, `.sdata2` 8, `.rodata` 12, `.sbss` 35, `.bss` 34, `.init` 2, `extabindex` 1.
 
 ## 6. For the tools
 
-* `dataattach.py` decides a symbol from readers and link order only: a global defined in a unit nothing in the unit reads is attached to a reader (hold-out
-  3,045 decided, 3,018 right, 27 wrong, 61 undecided; the 27 are boundaries the readers contradict: `em_pop`|`em_model` 17, `em010`|`em011`/`em008` 6, `DWCi_NatNeg` 4).
-* A symbol decided on derived (pointer) evidence only is `medium`; the 989-symbol `draw_shape` block shows the weakness: a threshold of strong anchors per block is the next rule.
+* `dataattach.py` decides a symbol from the unit's own `__sinit`, its readers and link order: a global defined in a unit nothing in the unit reads is attached to a reader, unless a
+  sinit says otherwise (hold-out 3,040 decided, 3,013 right, 27 wrong, 64 undecided; the 27: `em_pop`|`em_model` 17, `DWCi_NatNeg` 4 and six symbols held by `em010_prog`'s range
+  that `em008`'s and `em011`'s sinits construct - the registered range is the error).
+* A symbol decided on derived (pointer) evidence only is `medium`, and a block with fewer than `max(3, N/50)` symbols read by its unit is medium (section 7, rule 6).
 * The fold test needs the checker's findings, not its counts: F7 passes the count (63 -> 62) and fails on six new findings.
 * The regeneration commit of the six lane files (`3579c953f`) says 218 homebutton symbols where the count is 181 (+ 41 of the fold unit); this file has the numbers.
+
+## 7. Phase 3 engine and checker fixes (2026-10-01)
+
+Six reviewers re-derived the attachments; the fixes below are in `tools/splits/dataattach.py` and `tools/splits/splitcheck.py` (selftests: `splitcheck` 137 checks,
+`dataattach` 63 checks, each rule fails a named check when its code is reverted), and this file is the engine's regeneration, not an edit. Row census against the previous
+`phase2-reconcile.json` (`attach`): 809 rows unchanged, 31 with another range or owner, 9 regraded medium -> strong and 5 strong -> medium, 3 removed, 2 split, 23 new;
+(`unowned_data`): 96 unchanged, 38 decided, 13 changed, 6 split, 5 new. Symbols whose fate changed: 1,461 (regraded medium -> strong 465 and strong -> medium 133, multi-tu -> attached 436,
+unread -> attached 156, pool-order -> attached 151, ambiguous -> attached 43, attached -> unread 40, -> reader-vs-pointer 25, folded in 12).
+
+| rule | what the engine does now | symbols whose fate changes without it (ablation: the rule reverted, the file regenerated) |
+| --- | --- | ---: |
+| 1 `__sinit` evidence | a global a unit's own `__sinit` constructs is that unit's (a store, a ctor's `this`, `__register_global_object`, a tail-called ctor); `.bss` 0x80696D90, 0x806A4548, `emc_work` + 0x806A54E0, `cockpit_work` + `cockpit_state`, 0x80790D64, `.sbss` 0x80795A18 / 0x80795A30, `lb_menu_scratch`, `lobby_w`, `lbl_8066A920` decide; `Pl/bss_pool` is a fold into `Pl/pl_coll` (strong, sinit); groups an owner's range holds although another unit's sinit constructs them become questions (`em010` / `em008` / `em011`) | 102 (hold-out unchanged) |
+| 2 false pointer edges | unaligned `.4byte` sites and holders of at least 64 non-zero words under 1 % of them pointers (the SJIS table `lbl_80574E10`: 12 in 4,278 B) name nothing | 362 (strong -> medium: false neighbours stop a pointer-graph row being strong) |
+| 3 decoder | `lis` live in r14..r31 until written, `mr` copies, any GPR write kills, the `_f_*` operands of a module loader are no readers | 130 (87 strong -> medium, 40 unread -> attached, 3 other) |
+| 4 pool order | initialiser strings first, numeric literals TU-local (inversion = open question, `pool` FAIL accepted), blocks nobody else reads kept whole, candidates narrowed to readers | 160 (151 back to `pool-order` deferrals, 9 medium -> strong) |
+| 5 reader-vs-pointer | a disagreement at a block edge and an array (>= 4 contiguous equal-size elements one table names) split between units are deferred with both listed; an enclosed one stays, medium, noted | 163 (25 deferred -> attached, 138 medium -> strong: the enclosed disagreements); hold-out without it: 3,045 decided / 3,018 right / 27 wrong / 59 undecided |
+| 6 anchors | strong needs `max(3, N/50)` read symbols; V->S seams cut a row; row signals count `pointer-graph` as `explain` does | 546 (388 blocked whole instead of cut at the seam, 157 medium -> strong without the threshold, 1 other) |
+| 7 closure | pointer closure to a fixpoint (<= 16 rounds); pure code-pointer tables and `.data`-owned pointer-graph rows are strong | 579 (464 strong -> medium, 115 undecided without the deeper closure) |
+| 8 labels | `file-string` only for a real file name, else `string-reader`; medium rows say when a foreign unit reads their first symbol | 0 (labels and notes: `string-reader` 1,494 symbols, `file-string` 213 instead of 1,431) |
+| 9 `--explain` | prints a data-only unit; the analysis is cached (`build/tmp/dataattach/`): 14.2 s -> 0.64 s per call after the first | - |
+| 10 `order` | file-position check per section (longest non-decreasing subsequence): finds `Pl/pl_frame_data`, `Pl/pl_act_data`; the engine moves them | 0 (the two `moves`; without the check the candidate's `order` is 0 and the units stay out of order) |
+| 11 `jumptable` | a reader is the `lwzx`/`mtctr`/`bctr` dispatch: `jumptable_8059FE90` has one reader, the candidate's `jumptable` FAIL goes 1 -> 0 | 0 |
+| 13 `--overrides` | `attach` / `defer` / `exclude` rows, blocked when they make an invariant fail | - |

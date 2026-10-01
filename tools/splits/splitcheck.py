@@ -80,6 +80,9 @@ UNIT_RE = re.compile(r"^(\S.*?):(?:\s+(.*))?$")
 GRADES = ("strong", "medium", "guess")
 #: a window (in instructions) a `lis` value stays live for the reference decoder
 LIS_WINDOW = 200
+#: a function that forms this many distinct section starts with `addi @l` is start-up / module-loader code taking `_f_<section>` linker symbols (the
+#: RSO loader forms nine, `__init_data` two: those two stay ordinary references - the first symbol of a section can be read for real)
+LINKER_STARTS = 3
 
 
 # ---- locating the inputs ---------------------------------------------------------------------------------------------
@@ -245,13 +248,37 @@ def find_sda_bases(dol, code_words):
 
 #: opcodes that READ memory through `rA + d` (lwz/lbz/lhz/lha/lfs/lfd, their update forms, lmw, psq_l/psq_lu)
 LOAD_OPS = (32, 33, 34, 35, 40, 41, 42, 43, 46, 48, 49, 50, 51, 56, 57)
+#: opcodes that WRITE memory through `rA + d` (stw/stb/sth, stmw, stfs/stfd, their update forms, psq_st/psq_stu)
+STORE_OPS = (36, 37, 38, 39, 44, 45, 47, 52, 53, 54, 55, 60, 61)
 #: the update-form accesses (lwzu/lbzu/lhzu/lhau/stwu/stbu/sthu/lfsu/lfdu/stfsu/stfdu): they write rA back
 UPDATE_OPS = (33, 35, 37, 39, 41, 43, 45, 49, 51, 53, 55)
 #: registers a call clobbers (r0, r3..r12): an address formed there does not survive a `bl`
 VOLATILE = frozenset([0] + list(range(3, 13)))
+#: opcode 31 forms that write rD (arithmetic with the OE bit masked off, indexed loads, mfcr/mfspr/mftb) and rA (logical, shifts, extends)
+X_ARITH = frozenset([266, 10, 138, 234, 202, 40, 8, 136, 232, 200, 104, 235, 75, 11, 491, 459])
+X_LOADS = frozenset([23, 55, 87, 119, 279, 311, 343, 375, 20, 19, 83, 339, 371, 533])
+X_LOGIC = frozenset([28, 60, 444, 412, 124, 476, 316, 284, 24, 536, 792, 824, 954, 922, 26])
 
 
-def scan_refs(code, start, sda13, sda2, is_data, fn_starts=(), loads=None):
+def written_reg(w):
+    """The general register an instruction word WRITES (`None` when it writes none, or the form is not decoded) - for the opcodes the reference
+    decoder does not handle itself: a `lis` value or a formed address in it is dead after the write."""
+    op = w >> 26
+    rt, ra = (w >> 21) & 31, (w >> 16) & 31
+    if op in (7, 8, 12, 13):
+        return rt
+    if op in (20, 21, 23, 25, 26, 27, 28, 29):
+        return ra
+    if op == 31:
+        xo = (w >> 1) & 0x3FF
+        if (xo & 0x1FF) in X_ARITH or xo in X_LOADS:
+            return rt
+        if xo in X_LOGIC:
+            return ra
+    return None
+
+
+def scan_refs(code, start, sda13, sda2, is_data, fn_starts=(), loads=None, stores=None, passes=None):
     """`{target_address: [site, ...]}` for every absolute/small-data address a function materialises or accesses.
 
     `code` is the big-endian bytes of a code range starting at `start`; `is_data(addr)` says whether a computed
@@ -259,6 +286,10 @@ def scan_refs(code, start, sda13, sda2, is_data, fn_starts=(), loads=None):
     dict, it receives `{address: [site, ...]}` for the accesses that READ the address: a load through r13/r2, a
     `lis` + load, and a load through a register an `addi`/`ori` formed the address into.  The `addi`/`ori` that
     only forms the address of an entry is a reference (it is in the result) and is NOT a read of the literal.
+    `stores` receives the accesses that WRITE it (same forms); `passes` receives `{address: [(site, register, callee)]}` for every
+    `bl` made while a register of r3..r10 holds an address an `addi`/`ori` formed (`callee` is the branch target, `None` for an indirect call).
+    A `lis` value stays live for `LIS_WINDOW` instructions in a volatile register and until the register is written in a callee-saved one
+    (r14..r31 survive calls); `mr rA, rB` copies what rB held.
     """
     refs = collections.defaultdict(list)
     n = len(code) // 4
@@ -266,6 +297,11 @@ def scan_refs(code, start, sda13, sda2, is_data, fn_starts=(), loads=None):
     fs = set(fn_starts)
     lis = {}
     areg = {}                                          # register -> (address formed by addi/ori, index)
+
+    def live_lis(r, i):
+        e = lis.get(r)
+        return e is not None and (r >= 14 or i - e[1] <= LIS_WINDOW)
+
     for i, w in enumerate(words):
         site = start + i * 4
         if site in fs:
@@ -274,10 +310,29 @@ def scan_refs(code, start, sda13, sda2, is_data, fn_starts=(), loads=None):
         op = w >> 26
         if op == 18 or op == 19:                       # b / bl / blr / bctr / bctrl / bclr...: control leaves
             if w & 1:                                  # a call clobbers the volatile registers
+                if passes is not None:
+                    callee = None
+                    if op == 18 and not w & 2:
+                        li = w & 0x03FFFFFC
+                        if li & 0x02000000:
+                            li -= 0x04000000
+                        callee = (site + li) & 0xFFFFFFFF
+                    for r in range(3, 11):
+                        if r in areg:
+                            passes.setdefault(areg[r][0], []).append((site, r, callee))
                 for r in VOLATILE:
                     areg.pop(r, None)
                     lis.pop(r, None)
             elif op == 18 or (w >> 21) & 31 == 20:     # an unconditional jump or return ends the path
+                if passes is not None and op == 18 and not w & 2:      # a tail call (`lis/addi r3; b ctor`) passes what the registers hold too
+                    li = w & 0x03FFFFFC
+                    if li & 0x02000000:
+                        li -= 0x04000000
+                    callee = (site + li) & 0xFFFFFFFF
+                    if callee in fs:
+                        for r in range(3, 11):
+                            if r in areg:
+                                passes.setdefault(areg[r][0], []).append((site, r, callee))
                 areg.clear()
             continue
         if op == 15:                                   # addis rD,rA,SIMM  (lis when rA == 0)
@@ -291,7 +346,7 @@ def scan_refs(code, start, sda13, sda2, is_data, fn_starts=(), loads=None):
         if op == 24:                                   # ori rA,rS,UI : base is rS, result goes to rA
             rs, ra = (w >> 21) & 31, (w >> 16) & 31
             areg.pop(ra, None)
-            if rs in lis and i - lis[rs][1] <= LIS_WINDOW:
+            if live_lis(rs, i):
                 t = lis[rs][0] | (w & 0xFFFF)
                 if is_data(t):
                     refs[t].append(site)
@@ -299,9 +354,9 @@ def scan_refs(code, start, sda13, sda2, is_data, fn_starts=(), loads=None):
             if ra != rs:
                 lis.pop(ra, None)
             continue
-        if op == 14 or 32 <= op <= 57:
+        if op == 14 or 32 <= op <= 57 or op in (60, 61):
             rt, ra = (w >> 21) & 31, (w >> 16) & 31
-            if op in (56, 57):                         # psq_l / psq_lu: 12-bit displacement
+            if op in (56, 57, 60, 61):                 # psq_l / psq_lu / psq_st / psq_stu: 12-bit displacement
                 s = w & 0xFFF
                 simm = s - 0x1000 if s & 0x800 else s
             else:
@@ -312,16 +367,21 @@ def scan_refs(code, start, sda13, sda2, is_data, fn_starts=(), loads=None):
                 t = (sda13 + simm) & 0xFFFFFFFF
             elif ra == 2 and sda2 is not None:
                 t = (sda2 + simm) & 0xFFFFFFFF
-            elif ra != 0 and ra in lis and i - lis[ra][1] <= LIS_WINDOW:
+            elif ra != 0 and live_lis(ra, i):
                 t = (lis[ra][0] + simm) & 0xFFFFFFFF
             if t is not None and is_data(t):
                 refs[t].append(site)
                 if loads is not None and op in LOAD_OPS:
                     loads.setdefault(t, []).append(site)
-            elif op != 14 and ra in areg and loads is not None and op in LOAD_OPS:
+                if stores is not None and op in STORE_OPS:
+                    stores.setdefault(t, []).append(site)
+            elif op != 14 and ra in areg and (loads is not None or stores is not None):
                 ta = (areg[ra][0] + simm) & 0xFFFFFFFF
                 if is_data(ta):
-                    loads.setdefault(ta, []).append(site)
+                    if loads is not None and op in LOAD_OPS:
+                        loads.setdefault(ta, []).append(site)
+                    if stores is not None and op in STORE_OPS:
+                        stores.setdefault(ta, []).append(site)
             if op in UPDATE_OPS and ra in lis and t is not None:
                 lis[ra] = (t, i)                         # the update form leaves rA = the effective address
             if op == 14:
@@ -340,6 +400,21 @@ def scan_refs(code, start, sda13, sda2, is_data, fn_starts=(), loads=None):
                 for r in range(rt, 32):
                     lis.pop(r, None)
                     areg.pop(r, None)
+            continue
+        if op == 31 and (w >> 1) & 0x3FF == 444 and (w >> 21) & 31 == (w >> 11) & 31:    # mr rA,rS (or rA,rS,rS): rA takes what rS held
+            rs, ra = (w >> 21) & 31, (w >> 16) & 31
+            e, a = lis.get(rs), areg.get(rs)
+            lis.pop(ra, None)
+            areg.pop(ra, None)
+            if e is not None:
+                lis[ra] = e
+            if a is not None:
+                areg[ra] = a
+            continue
+        d = written_reg(w)
+        if d is not None:
+            lis.pop(d, None)
+            areg.pop(d, None)
     return refs
 
 
@@ -391,6 +466,8 @@ class Ctx:
         self.sda13, self.sda2 = sda13, sda2
         self.refs = {}                                        # data symbol index -> [sites]
         self.load_refs = {}                                   # data symbol index -> [sites that LOAD through the address]
+        self.store_refs = {}                                  # data symbol index -> [sites that STORE through the address]
+        self.pass_refs = {}                                   # data symbol index -> [(site, register, callee)] of the calls that pass its address
         self.fn_refs = collections.defaultdict(list)          # function start -> [(site, "call" | "addr")]
         self.fn_out = collections.defaultdict(set)            # function start -> {function starts it calls / takes}
         self.scanned = False
@@ -419,6 +496,11 @@ class Ctx:
         f = self.fns[i]
         end = f["addr"] + (f["size"] or 4)
         return f if f["addr"] <= addr < end else None
+
+    def section_of(self, addr):
+        """The map section of the data symbol that holds `addr` (`None` when none does)."""
+        _i, t = self.data_sym_at(addr)
+        return t["section"] if t is not None else None
 
     def data_sym_at(self, addr):
         i = bisect.bisect_right(self._ds_addr, addr) - 1
@@ -464,12 +546,12 @@ class Ctx:
                     ws = [(init["addr"] + i * 4, w) for i, w in enumerate(struct.unpack(">%dI" % (len(b) // 4), b))]
                     self.sda13, self.sda2 = find_sda_bases(self.dol, ws)
         raw = collections.defaultdict(list)
-        rawl = {}
+        rawl, raws, rawp = {}, {}, {}
         fnset = set(self._fn_starts)
         for lo, blob in chunks:
             if not blob:
                 continue
-            for t, sites in scan_refs(blob, lo, self.sda13, self.sda2, is_data, self._fn_starts, rawl).items():
+            for t, sites in scan_refs(blob, lo, self.sda13, self.sda2, is_data, self._fn_starts, rawl, raws, rawp).items():
                 raw[t].extend(sites)
             for site, t in scan_calls(blob, lo, self._fn_starts):
                 self._add_fn_ref(site, t, "call")
@@ -477,15 +559,51 @@ class Ctx:
                 for site in sites:
                     if self.fn_at(site) is not self.fn_at(t):
                         self._add_fn_ref(site, t, "addr")
+        ignore = self.linker_operand_sites(raw)
         for t, sites in raw.items():
             i, _s = self.data_sym_at(t)
             if i is not None:
-                self.refs.setdefault(i, []).extend(sites)
+                self.refs.setdefault(i, []).extend(x for x in sites if x not in ignore)
         for t, sites in rawl.items():
             i, _s = self.data_sym_at(t)
             if i is not None:
-                self.load_refs.setdefault(i, []).extend(sites)
+                self.load_refs.setdefault(i, []).extend(x for x in sites if x not in ignore)
+        for t, sites in raws.items():
+            i, _s = self.data_sym_at(t)
+            if i is not None:
+                self.store_refs.setdefault(i, []).extend(x for x in sites if x not in ignore)
+        for t, sites in rawp.items():
+            i, _s = self.data_sym_at(t)
+            if i is not None:
+                self.pass_refs.setdefault(i, []).extend(x for x in sites if x[0] not in ignore)
         self.scanned = True
+
+    def linker_operand_sites(self, raw):
+        """The sites whose operand is a linker symbol, not a map symbol: `_f_<section>` is the start of a section, so the `lis/addi` that forms one
+        lands on the section's first byte.  Module-loader code (`RSOStaticLocateObject`) takes nine in one function (`_f_sbss2`, `_f_sdata2`, `_f_sbss`,
+        ...): in a function that forms `LINKER_STARTS` or more distinct section starts with `addi`/`ori` every reference to them is a linker operand,
+        not a read of the first symbol of the section (the owner of that symbol is whoever defines it)."""
+        edges = set()                                # the start of every data section: the map's first symbol, the first owned range
+        for sec in SECTION_ORDER:
+            ext = self.section_extent(sec)
+            if ext:
+                edges.add(ext[0])
+        for sec in set(s["section"] for s in self.data_syms):
+            edges.add(min(s["addr"] for s in self.data_syms if s["section"] == sec))
+        per_fn = collections.defaultdict(dict)
+        for t in edges:
+            for site in raw.get(t, ()):
+                if (self.dol.word(site) >> 16) & 31 in (2, 13):      # a small-data access is `sda21`, never a `@l` operand
+                    continue
+                f = self.fn_at(site)
+                per_fn[f["addr"] if f is not None else None].setdefault(t, []).append(site)
+        out = set()
+        for fa, by_t in per_fn.items():
+            formed = [t for t, sites in by_t.items() if any(self.dol.word(x) >> 26 in (14, 24) for x in sites)]         # an `addi`/`ori @l` forms the address
+            if fa is not None and len(formed) >= LINKER_STARTS:
+                for sites in by_t.values():
+                    out.update(sites)
+        return out
 
     def _add_fn_ref(self, site, target, kind):
         self.fn_refs[target].append((site, kind))
@@ -511,6 +629,75 @@ class Ctx:
                 out += self.dol.read(a, n) or b"\0" * n
             a = min(nxt, hi)
         return bytes(out)
+
+    def sinit_definers(self):
+        """`{data symbol index: {unit name: [site, ...]}}` - the globals a unit's OWN `__sinit` constructs, so the unit defines them.
+
+        The `__sinit` is the function a `.ctors` word of the unit points at, inside the unit's own text.  Within it a global counts when it is
+        WRITTEN (a store through its address: `stw r0, off(r13)`, `lis/stw`, a register an `addi` formed), when it is the `this` of a constructor
+        call (r3 of a `bl` made while r3 holds its address), or when it is passed to `__register_global_object` (r3 the object, r5 the registration
+        node) or `__construct_array` (r3).  Taking an address is not enough: a vtable another unit owns is only the VALUE stored into a word.
+        A string literal or a pool constant passed to a call is not constructed (an argument, not an object)."""
+        if getattr(self, "_sinit_definers", None) is not None:
+            return self._sinit_definers
+        out = collections.defaultdict(lambda: collections.defaultdict(list))
+        reg_obj = {f["addr"] for f in self.fns if f["name"] == "__register_global_object"}
+        spans = []
+        for u in self.units:
+            for s, e, _a in u.ranges.get(".ctors", []):
+                for a in range(s, e - 3, 4):
+                    w = self.dol.word(a)
+                    f = self.fn_at(w) if w else None
+                    if f is not None and f["addr"] == w and self.text_owner(w) is u and f["name"] not in CRT_CHAIN:
+                        spans.append((f["addr"], f["addr"] + (f["size"] or 4), u))
+        spans.sort(key=lambda t: t[0])
+        starts = [t[0] for t in spans]
+
+        def span_of(site):
+            k = bisect.bisect_right(starts, site) - 1
+            return spans[k] if k >= 0 and site < spans[k][1] else None
+
+        for i, sites in self.store_refs.items():
+            for x in sites:
+                sp = span_of(x)
+                if sp is not None:
+                    out[i][sp[2].name].append(x)
+        for i, sites in self.pass_refs.items():
+            sym = self.data_syms[i]
+            if is_literal(sym) or sym["kind"] == "string" or sym["section"] in (".rodata", ".sdata2"):
+                continue
+            for x, reg, callee in sites:
+                sp = span_of(x)
+                if sp is None:
+                    continue
+                if reg == 3 or (reg == 5 and callee in reg_obj):
+                    out[i][sp[2].name].append(x)
+        self._sinit_definers = {i: {n: sorted(set(v)) for n, v in d.items()} for i, d in out.items()}
+        return self._sinit_definers
+
+    def string_init_words(self):
+        """`{string address: [word address, ...]}` - the aligned words of `.data`/`.rodata`/`.sdata` that point at a `.sdata` string: the pointer
+        initialisers of a file-scope table (`const char* names[] = {"a", "b"}`).  MWCC emits those strings before the strings the functions use."""
+        if getattr(self, "_str_inits", None) is None:
+            out = collections.defaultdict(list)
+            for s in self.data_syms:
+                if s["section"] not in (".data", ".rodata", ".sdata") or not s["size"]:
+                    continue
+                for i in range(s["size"] // 4):
+                    a = s["addr"] + 4 * i
+                    w = self.dol.word(a)
+                    if a % 4 or not w or w < 0x80500000:
+                        continue
+                    _j, t = self.data_sym_at(w)
+                    if t is not None and t is not s and t["section"] == ".sdata" and is_literal(t):
+                        out[t["addr"]].append(a)
+            self._str_inits = dict(out)
+        return self._str_inits
+
+    def definers(self, sym):
+        """`{unit name: [site, ...]}` of the units whose own `__sinit` constructs this map row (by identity), `{}` when none does."""
+        i, _ = self.data_sym_at(sym["addr"])
+        return self.sinit_definers().get(i, {}) if i is not None and self.data_syms[i] is sym else {}
 
     def readers(self, sym):
         """The sites (text addresses) that read this map row, by identity."""
@@ -670,8 +857,56 @@ def check_order(ctx, res):
             (sec, addr), a, b = min(ev, key=lambda t: t[0][1])
             res.add(name, "order", FAIL, addr, "link-order cycle of %d units (%s before %s at %s %s)"
                     % (len(comp), a, b, sec, hx(addr)), {"cycle": sorted(comp)[:8]})
+    for _sec, name, addr, finding, _before in file_order_offenders(ctx):
+        res.add(name, "order", FAIL, addr, finding)
     for u in ctx.units:
         res.add(u.name, "order", PASS)
+
+
+def longest_nondecreasing(seq):
+    """Indices of one longest non-decreasing subsequence of `seq` (patience sorting; the later of two equal-length candidates wins, deterministic)."""
+    tails, tail_idx, parent = [], [], [None] * len(seq)
+    for i, x in enumerate(seq):
+        k = bisect.bisect_right(tails, x)
+        if k == len(tails):
+            tails.append(x)
+            tail_idx.append(i)
+        else:
+            tails[k], tail_idx[k] = x, i
+        parent[i] = tail_idx[k - 1] if k else None
+    out = []
+    i = tail_idx[-1] if tail_idx else None
+    while i is not None:
+        out.append(i)
+        i = parent[i]
+    return out[::-1]
+
+
+def file_order_offenders(ctx):
+    """`[(section, unit name, address, finding, before)]`: the ranges whose unit is out of link order (`before`: the in-order unit whose range precedes it
+    by address, `None` at the section start).  The linker places the units of one section in FILE order
+    (`dtk` reads `splits.txt` top to bottom; a data-only unit has no text to anchor it, so its file position is the only thing that orders it), so the
+    ranges of every section, taken by address, must have non-decreasing file positions.  A longest-non-decreasing-subsequence picks the ranges that
+    are in order; each range outside it is out of link order (the fewest ranges that have to move).  A `rename:` range is ordered by the linker script."""
+    pos = {u.name: k for k, u in enumerate(ctx.units)}
+    out = []
+    for sec in sorted(ctx.sec_index):
+        seq = []
+        for s, e, u in ctx.sec_index[sec]:
+            if "rename:" in next((a for x, _y, a in u.ranges[sec] if x == s), "") or "common" in next((a for x, _y, a in u.ranges[sec] if x == s), ""):
+                continue
+            seq.append((s, e, u))
+        keep = set(longest_nondecreasing([pos[u.name] for _s, _e, u in seq]))
+        for i, (s, e, u) in enumerate(seq):
+            if i in keep:
+                continue
+            before = next((seq[j] for j in range(i - 1, -1, -1) if j in keep), None)
+            after = next((seq[j] for j in range(i + 1, len(seq)) if j in keep), None)
+            out.append((sec, u.name, s, "%s range %s..%s is out of link order: by address it lies between %s and %s, but %s is at file position %d (%s at %d, %s at %d)"
+                        % (sec, hx(s), hx(e), before[2].name if before else "the section start", after[2].name if after else "the section end", u.name,
+                           pos[u.name], before[2].name if before else "-", pos[before[2].name] if before else -1, after[2].name if after else "-",
+                           pos[after[2].name] if after else -1), before[2].name if before else None))
+    return out
 
 
 def _sccs(edges):
@@ -903,6 +1138,26 @@ def _first_use_fn(ctx, site):
     return f["addr"] if f is not None else site
 
 
+def pool_first_use(ctx, sym, u, own=None, held=None):
+    """`(order key, site)` of the first use of a pool literal by unit `u`, or `None` when `u` does not use it.
+
+    A string a pointer initialiser names (a `.data`/`.rodata`/`.sdata` word of `u`'s own ranges pointing at it: the initialiser of a file-scope
+    table) is emitted BEFORE the strings the functions use, so its first use sorts first (`(0, 0)`: initialisers carry no order among
+    themselves, like the literals of one function); any other use is ordered by the function that makes it (`(1, function start)`).
+    `held(word address)` says whether a table word is `u`'s when the table is not in `u`'s ranges yet (a phase 2 decision)."""
+    if sym["section"] == ".sdata":
+        mine = held if held is not None else (lambda a: ctx.owner(ctx.section_of(a), a) is u)
+        inits = [a for a in ctx.string_init_words().get(sym["addr"], ()) if mine(a)]
+        if inits:
+            return (0, 0), min(inits)
+    if own is None:
+        own = [x for x in ctx.literal_readers(sym) if ctx.text_owner(x) is u]
+    if not own:
+        return None
+    first = min(own)
+    return (1, _first_use_fn(ctx, first)), first
+
+
 def check_pool(ctx, res):
     """Idea 94.  Two halves: what a unit's own pool claim holds, and what its text reads wherever the pool lives."""
     ctx.pool_edges = collections.defaultdict(set)              # (unit, other) -> literal addresses
@@ -943,6 +1198,7 @@ def check_pool(ctx, res):
             seen = {}
             for sym, witness in lits:
                 own = [x for x in ctx.literal_readers(sym) if ctx.text_owner(x) is u]
+                use = pool_first_use(ctx, sym, u, own)
                 if witness:
                     v = ctx.dol.read(sym["addr"], sym["size"])
                     key = (sym["size"], v)
@@ -951,9 +1207,8 @@ def check_pool(ctx, res):
                                 % (v.hex(), hx(seen[key]), hx(sym["addr"])))
                     elif v is not None:
                         seen[key] = sym["addr"]
-                if own:
-                    first = min(own)
-                    own_first.append((sym["addr"], first, sym["name"], _first_use_fn(ctx, first), sym["section"]))
+                if use is not None:
+                    own_first.append((sym["addr"], use[1], sym["name"], use[0], sym["section"]))
             own_first.sort()
             # order is judged per FUNCTION: the scheduler reorders two loads of one function, so literals first used
             # in the same function carry no order; a literal first used in an EARLIER function than the one before it does.
@@ -1028,6 +1283,25 @@ def zigzag_interleaved(ctx, syms, by_addr, seam):
     return bool(own_a and own_b and min(own_a) < max(own_b) and min(own_b) < max(own_a))
 
 
+def seams_inside(ctx, u, s, e, syms, found, by_addr, closure=None):
+    """`(seams, instantiated)`: the strong `.data` seams that cut the range `[s, e)` of unit `u` - the rule `check_data_order` applies, one implementation.
+
+    A V->S row says a boundary lies in `[addr, latest)`: a range that ends inside that gap (`latest >= e`) can have it at its own end, so only one that
+    also holds the later vtable group crosses the seam; a zigzag cuts at `addr`.  Two classes whose member functions alternate in the text are one TU
+    (a zigzag between them is not an edge), and an instantiated vtable - a deferred constructor of this TU stores it (`closure`, the unit's `__sinit`
+    closure) - is no TU edge: the later vtable of a V->S seam, the second of a zigzag pair, or the vtable before either."""
+    import dataorder as do
+    inside = [x for x in found if x["kind"] in do.STRONG_KINDS and s < x["addr"] < e and (x["kind"] != "V->S" or x["latest"] < e)]
+    inside = [x for x in inside if not (x["kind"] == "zigzag" and zigzag_interleaved(ctx, syms, by_addr, x))]
+    kept, inst = [], []
+    for x in inside:
+        if closure and any(_vtable_stored_in(ctx, by_addr.get(a_), closure) for a_ in (x.get("latest") or x["addr"], _vtable_before(syms, x))):
+            inst.append({"unit": u.name, "addr": x["addr"], "vtable": x["before"]})
+        else:
+            kept.append(x)
+    return kept, inst
+
+
 def check_data_order(ctx, res, rows):
     import dataorder as do
     reader = ctx.dol
@@ -1038,22 +1312,8 @@ def check_data_order(ctx, res, rows):
     ctx.seams_instantiated = []
     for u in ctx.units:
         for s, e, _a in u.ranges.get(".data", []):
-            # a V->S row says a boundary lies in [addr, latest): a unit that ends inside that gap (latest >= e) can have it at its own end,
-            # so only a unit that also holds the later vtable group crosses the seam; a zigzag cuts at addr
-            inside = [x for x in found if x["kind"] in do.STRONG_KINDS and s < x["addr"] < e and (x["kind"] != "V->S" or x["latest"] < e)]
-            # two classes whose member functions alternate in the text are one TU: a zigzag between them is not an edge
-            inside = [x for x in inside if not (x["kind"] == "zigzag" and zigzag_interleaved(ctx, syms, by_addr, x))]
-            if inside:
-                closure = unit_sinit_closure(ctx, u)
-                kept = []
-                for x in inside:
-                    # an instantiated vtable (a deferred constructor of this TU stores it) is not a TU edge: the later vtable of a V->S seam,
-                    # the second of a zigzag pair, or the vtable before either
-                    if closure and any(_vtable_stored_in(ctx, by_addr.get(a_), closure) for a_ in (x.get("latest") or x["addr"], _vtable_before(syms, x))):
-                        ctx.seams_instantiated.append({"unit": u.name, "addr": x["addr"], "vtable": x["before"]})
-                    else:
-                        kept.append(x)
-                inside = kept
+            inside, inst = seams_inside(ctx, u, s, e, syms, found, by_addr, unit_sinit_closure(ctx, u))
+            ctx.seams_instantiated += inst
             has_v = any(s <= y.addr < e and y.kind == do.VTABLE for y in syms)
             if inside:
                 x = inside[0]
@@ -1091,6 +1351,42 @@ def check_vtable(ctx, res):
             res.add(u.name, "vtable", UNKNOWN, y.addr, "vtable %s: no slot or constructor store is owned by any unit" % y.name)
 
 
+#: how far past the instruction that forms a jump table's address the dispatch (`lwzx` ... `mtctr` ... `bctr`) may lie
+JUMP_WINDOW = 16
+BCTR = 0x4E800420
+
+
+def jumptable_reader_sites(ctx, sym):
+    """The sites that READ a jump table: the `addi`/`ori` that forms its address followed, within `JUMP_WINDOW` instructions, by the indexed load
+    (`lwzx`/`lwzux` through that register), then `mtctr` and `bctr`.  Any other reference is not a read of the table: a displacement load whose address
+    happens to fall inside the symbol (`lhz r0, 8(r3)` through a base that was formed with `lis`) is a struct-field access, not a dispatch."""
+    out = []
+    for x in ctx.readers(sym):
+        w = ctx.dol.word(x)
+        if w is None:
+            continue
+        op = w >> 26
+        if op == 14:
+            reg = (w >> 21) & 31                              # addi rD, rA, lo
+        elif op == 24:
+            reg = (w >> 16) & 31                              # ori rA, rS, lo
+        else:
+            continue
+        loaded = False
+        for k in range(1, JUMP_WINDOW + 1):
+            v = ctx.dol.word(x + 4 * k)
+            if v is None:
+                break
+            if v >> 26 == 31 and (v >> 1) & 0x3FF in (23, 55) and reg in ((v >> 16) & 31, (v >> 11) & 31):
+                loaded = True
+                continue
+            if loaded and v >> 26 == 31 and (v >> 1) & 0x3FF == 467 and (v >> 11) & 0x3FF == 0x120:       # mtctr
+                if any(ctx.dol.word(x + 4 * (k + j)) == BCTR for j in range(1, 8)):
+                    out.append(x)
+                break
+    return out
+
+
 def check_jumptable(ctx, res):
     for s in ctx.symbols:
         if not s["name"].startswith("jumptable_") or s["section"] not in (".data", ".rodata"):
@@ -1101,7 +1397,7 @@ def check_jumptable(ctx, res):
         targets = [ctx.dol.word(s["addr"] + o) for o in range(0, s["size"] - 3, 4)]
         targets = [t for t in targets if t]
         tu = {ctx.text_owner(t) for t in targets if ctx.fn_at(t)}
-        rsites = ctx.readers(s)
+        rsites = jumptable_reader_sites(ctx, s) if s["name"].startswith("jumptable_") else ctx.readers(s)
         ru = {ctx.text_owner(x) for x in rsites if ctx.text_owner(x)}
         bad = sorted((x for x in ru if x is not u), key=lambda x: x.name)           # a set of units: name order, so the finding is the same on every run
         if bad:
@@ -3095,9 +3391,9 @@ u_b.cpp: comment:0
     JT = 0x80500000
     jt_units = "Sections:\n\t.text       type:code align:32\n\t.data       type:data align:8\n\nown.cpp:\n\t.text       start:0x%X end:0x%X\n\t.data       start:0x%X end:0x%X\n\n" % (T, T + 0x10, JT, JT + 8)
     names8 = ["r%d.cpp" % k for k in (5, 2, 7, 0, 3, 6, 1, 4)]
-    jt_units += "".join("%s:\n\t.text       start:0x%X end:0x%X\n\n" % (n, T + 0x10 * (k + 1), T + 0x10 * (k + 2)) for k, n in enumerate(names8))
-    jt_reader = [_lis(3, JT >> 16), _w(14, 3, 3, JT & 0xFFFF), BLR, NOP]
-    cjt, _s = _mini(T, [NOP] * 4 + jt_reader * 8, [("own", 0, 0x10)] + [("f%d" % k, 0x10 * (k + 1), 0x10) for k in range(8)], jt_units, [(JT, bytes(8))],
+    jt_units += "".join("%s:\n\t.text       start:0x%X end:0x%X\n\n" % (n, T + 0x20 * (k + 1) - 0x10, T + 0x20 * (k + 2) - 0x10) for k, n in enumerate(names8))
+    jt_reader = [_lis(3, JT >> 16), _w(14, 3, 3, JT & 0xFFFF), 0x5480103A, (31 << 26) | (3 << 16) | (23 << 1), 0x7C0903A6, 0x4E800420, NOP, NOP]       # the dispatch
+    cjt, _s = _mini(T, [NOP] * 4 + jt_reader * 8, [("own", 0, 0x10)] + [("f%d" % k, 0x10 + 0x20 * k, 0x20) for k in range(8)], jt_units, [(JT, bytes(8))],
                     ["jumptable_80500000 = .data:0x%X; // type:object size:0x8 scope:local" % JT])
     check("jumptable: the finding names the foreign reader first by name, not first in a set", run_checks(cjt, None, ["jumptable"]).units["own.cpp"]["jumptable"]["finding"],
           "jumptable_80500000 is read by r0.cpp, not by this unit")
@@ -3107,6 +3403,139 @@ u_b.cpp: comment:0
     check("--readers: owner and decoded readers of every symbol in the range (A reads l0, B reads l1)",
           [" ".join(l.split()) for l in readers_report(rctx, ".sdata2:0x%X-0x%X" % (DS, DS + 8))],
           [".sdata2 0x%08X l0 size 0x4 owner big.cpp readers big.cpp x1" % DS, ".sdata2 0x%08X l1 size 0x4 owner big.cpp readers big.cpp x1" % (DS + 4)])
+
+    # ---- phase 3 review fixes: the decoder, the `__sinit` definers, the pool's initialiser order, the file-order check, the jump-table dispatch ----
+    TT = 0x80100000
+    HDR = "Sections:\n\t.text       type:code align:32\n\t.ctors      type:rodata align:4\n\t.data       type:data align:8\n\t.sdata      type:data align:8\n\t.sdata2     type:rodata align:4\n\t.sbss2      type:bss align:4\n\n"
+
+    def ADDI(rt, ra, imm):
+        return _w(14, rt, ra, imm)
+
+    def STW(rs, ra, d):
+        return _w(36, rs, ra, d)
+
+    def LHZ(rt, ra, d):
+        return _w(40, rt, ra, d)
+
+    def X31(rt, ra, rb, xo):
+        return (31 << 26) | (rt << 21) | (ra << 16) | (rb << 11) | (xo << 1)
+
+    def MR(ra, rs):
+        return X31(rs, ra, rs, 444)                              # or rA, rS, rS
+
+    def ADD(rt, ra, rb):
+        return X31(rt, ra, rb, 266)
+
+    def LWZX(rt, ra, rb):
+        return X31(rt, ra, rb, 23)
+
+    MTCTR_R0, BCTR_W, SLWI_R0_R4_2 = 0x7C0903A6, 0x4E800420, 0x5480103A
+
+    def dsym(name, sec, addr, size=4, extra="", scope="global"):
+        return "%s = %s:0x%X; // type:object size:0x%X scope:%s%s" % (name, sec, addr, size, scope, extra)
+
+    def unit_text(*blocks):
+        return HDR + "".join("%s:\n%s\n" % (nm, "".join("\t%-11s start:0x%X end:0x%X\n" % (sec, a, b) for sec, a, b in rr)) for nm, rr in blocks)
+
+    # decoder (rule 3): a `lis` in a callee-saved register outlives the 200-instruction window, until the register is written; `mr` copies it
+    DD = 0x80580000
+    long_fn = [_lis(18, DD >> 16)] + [NOP] * 250 + [ADDI(24, 18, DD & 0xFFFF), BLR]                       # r18 is callee-saved: still live at the addi
+    vol_fn = [_lis(5, DD >> 16)] + [NOP] * 250 + [ADDI(6, 5, DD & 0xFFFF), BLR]                           # r5 is volatile: the window ended
+    mr_fn = [_lis(5, DD >> 16), MR(18, 5), ADDI(24, 18, DD & 0xFFFF), BLR]                                 # mr r18, r5 copies the lis
+    nomr_fn = [_lis(5, DD >> 16), NOP, ADDI(24, 18, DD & 0xFFFF), BLR]                                     # r18 never held it
+    dead_fn = [_lis(18, DD >> 16), ADD(18, 4, 5), ADDI(24, 18, DD & 0xFFFF), BLR]                          # add r18, r4, r5 overwrote the lis
+    long_ori = [_lis(18, DD >> 16)] + [NOP] * 250 + [_w(24, 18, 24, DD & 0xFFFF), BLR]                      # ori r24, r18, lo: the same window rule
+    words, fns, off = [], [], 0
+    for nm, w in (("long", long_fn), ("vol", vol_fn), ("mr", mr_fn), ("nomr", nomr_fn), ("dead", dead_fn), ("long_ori", long_ori)):
+        w = w + [NOP] * (-len(w) % 4)
+        fns.append((nm, off, 4 * len(w)))
+        words += w
+        off += 4 * len(w)
+    cdec, _sd = _mini(TT, words, fns, unit_text(("u.cpp", [(".text", TT, TT + off)])), [(DD, bytes(8))], [dsym("g", ".data", DD, 8)])
+    gi, _gs = cdec.data_sym_at(DD)
+    fn_of = lambda c, x: c.fn_at(x)["name"]
+    check("decode: a lis in a callee-saved register outlives the 200-instruction window; a volatile one does not; mr copies it; an overwrite kills it",
+          [fn_of(cdec, x) for x in sorted(cdec.refs.get(gi, []))], ["long", "mr", "long_ori"])
+
+    # decoder (rule 3): a function that forms two section starts (`_f_sbss2`, `_f_sdata2`: start-up / module-loader code) reads none of the first symbols
+    SB2, SD2, SD1 = 0x80594000, 0x80596000, 0x80592000
+    lk = [_lis(30, SB2 >> 16), _lis(29, SD2 >> 16), _lis(28, SD1 >> 16), ADDI(30, 30, SB2 & 0xFFFF), ADDI(29, 29, SD2 & 0xFFFF), ADDI(28, 28, SD1 & 0xFFFF), BLR, NOP]
+    one = [_lis(3, SB2 >> 16), ADDI(3, 3, SB2 & 0xFFFF), BLR, NOP]                                          # one section start: an ordinary reference
+    two = [_lis(3, SB2 >> 16), _lis(4, SD2 >> 16), ADDI(3, 3, SB2 & 0xFFFF), ADDI(4, 4, SD2 & 0xFFFF)]       # two: below the threshold, both stay
+    clk, _sl = _mini(TT, lk + one + two, [("start", 0, 0x20), ("one", 0x20, 0x10), ("two", 0x30, 0x10)], unit_text(("u.cpp", [(".text", TT, TT + 0x40)])),
+                     [(SB2, bytes(8)), (SD2, bytes(8)), (SD1, bytes(8))],
+                     [dsym("sb2_first", ".sbss2", SB2, 8), dsym("sd2_first", ".sdata2", SD2, 8), dsym("sd_first", ".sdata", SD1, 8)])
+    check("decode: the section starts a module loader forms (three or more: _f_sbss2, _f_sdata2, _f_sdata) are linker operands, not reads; a function with fewer keeps them",
+          sorted((s["name"], sorted(fn_of(clk, x) for x in clk.refs.get(i, []))) for i, s in enumerate(clk.data_syms) if s["name"] in ("sb2_first", "sd2_first", "sd_first")),
+          [("sb2_first", ["one", "two"]), ("sd2_first", ["two"]), ("sd_first", [])])
+
+    # decoder: stores and the calls that pass an address; the `__sinit` definers (rule 1)
+    CT = 0x80200000
+    A1, A2, A3, A4, A5, AW, AV = (0x80580000 + 0x20 * k for k in range(7))
+    sinit = [_lis(4, A1 >> 16), STW(0, 4, A1 & 0xFFFF),                                                    # 0x00 a store into g1 defines it
+             _lis(3, A2 >> 16), ADDI(3, 3, A2 & 0xFFFF), _b(TT + 0x10, TT + 0x80, True),                   # 0x08 ctor(this = &g2)
+             _lis(3, A3 >> 16), ADDI(3, 3, A3 & 0xFFFF), _lis(5, A4 >> 16), ADDI(5, 5, A4 & 0xFFFF),       # 0x14 __register_global_object(&g3, dtor, &g4)
+             _b(TT + 0x24, TT + 0xA0, True),
+             _lis(4, AV >> 16), ADDI(4, 4, AV & 0xFFFF), _lis(5, AW >> 16), STW(4, 5, AW & 0xFFFF),        # 0x28 the vtable is only the VALUE stored into a word
+             _lis(3, A5 >> 16), ADDI(3, 3, A5 & 0xFFFF), _b(TT + 0x40, TT + 0x80)]                          # 0x38 lis/addi r3; b ctor (a tail call)
+    words = sinit + [NOP] * (0x80 // 4 - len(sinit)) + [BLR] + [NOP] * 7 + [BLR] + [NOP] * 3
+    cdf, _s2 = _mini(TT, words, [("sinit_a", 0, 0x80), ("ctor", 0x80, 0x20), ("__register_global_object", 0xA0, 0x10)],
+                     unit_text(("a.cpp", [(".text", TT, TT + 0xB0), (".ctors", CT, CT + 4)])), [(CT, struct.pack(">I", TT)), (0x80580000, bytes(0x100))],
+                     [dsym("g1", ".bss", A1), dsym("g2", ".bss", A2), dsym("g3", ".bss", A3), dsym("g4", ".bss", A4), dsym("g5", ".bss", A5), dsym("word", ".sbss", AW),
+                      dsym("vt", ".data", AV, 0x10)])
+    got = {s["name"]: sorted(cdf.definers(s)) for s in cdf.data_syms if s["name"] in ("g1", "g2", "g3", "g4", "g5", "word", "vt")}
+    check("sinit definers: a store, a ctor's this, __register_global_object's object and node, a tail-called ctor's this define; a vtable stored as a value does not",
+          got, {"g1": ["a.cpp"], "g2": ["a.cpp"], "g3": ["a.cpp"], "g4": ["a.cpp"], "g5": ["a.cpp"], "word": ["a.cpp"], "vt": []})
+    check("decode: the passes record the site, the register and the callee (r3 = &g2 into the ctor at +0x80)",
+          [(hex(x), r, hex(c)) for x, r, c in cdf.pass_refs[cdf.data_sym_at(A2)[0]]], [(hex(TT + 0x10), 3, hex(TT + 0x80))])
+
+    SS = 0x80790100
+    sb = [_lis(3, SS >> 16), ADDI(3, 3, SS & 0xFFFF), _b(TT + 8, TT + 0x10, True), BLR]                      # sinit: bl f(&str) - a string is an argument
+    cstr, _cs = _mini(TT, sb + [BLR, NOP, NOP, NOP], [("sb_sinit", 0, 0x10), ("sb_ctor", 0x10, 0x10)],
+                      unit_text(("s.cpp", [(".text", TT, TT + 0x20), (".ctors", CT, CT + 4)])), [(CT, struct.pack(">I", TT)), (SS, bytes(8))],
+                      [dsym("str", ".sdata", SS, 8, " data:string")])
+    check("sinit definers: a string literal passed to a call in a sinit is an argument, not an object the unit constructs",
+          [(s["name"], sorted(cstr.definers(s))) for s in cstr.data_syms if s["name"] == "str"], [("str", [])])
+
+    # pool order (rule 4): a string a pointer initialiser of the unit's own table names is used first; the same table in another unit's data is not
+    S0, S1, TB = 0x80790000, 0x80790008, 0x80590000
+    pf = [_lis(3, S1 >> 16), ADDI(3, 3, S1 & 0xFFFF), BLR, NOP, _lis(3, S0 >> 16), ADDI(3, 3, S0 & 0xFFFF), BLR, NOP]            # f0 reads s1, f1 reads s0: s0 follows s1
+    for label, tab, want in (("no table: s0 is first used after s1 (an inversion)", None, FAIL),
+                             ("a table of the unit's own data points at s0: s0 is used first", "own", PASS),
+                             ("the table is another unit's data: no help", "other", FAIL)):
+        own_r = [(".text", TT, TT + 0x20), (".sdata", S0, S0 + 0x10)] + ([(".data", TB, TB + 8)] if tab == "own" else [])
+        oth_r = [(".text", TT + 0x20, TT + 0x40)] + ([(".data", TB, TB + 8)] if tab == "other" else [])
+        csp, _sp = _mini(TT, pf + [BLR] + [NOP] * 7 + [BLR] + [NOP] * 7, [("f0", 0, 0x10), ("f1", 0x10, 0x10), ("o", 0x20, 0x20)],
+                         unit_text(("own.cpp", own_r), ("other.cpp", oth_r)), [(S0, bytes(0x10)), (TB, struct.pack(">II", S0, 0))],
+                         [dsym("s0", ".sdata", S0, 8, " data:string"), dsym("s1", ".sdata", S1, 8, " data:string"), dsym("tbl", ".data", TB, 8)])
+        check("pool: %s" % label, run_checks(csp, None, ["pool"]).units["own.cpp"]["pool"]["status"], want)
+
+    # file order (rule 10): the ranges of a section, by address, must have non-decreasing file positions - a data-only unit has only its file position
+    O2 = 0x80300000
+    ou = unit_text(*[("%s.cpp" % nm, [(".sdata2", O2 + 4 * k, O2 + 4 * k + 4)]) for nm, k in (("a", 0), ("c", 1), ("b", 2), ("z", 3))])
+    co1, _o1 = _mini(TT, [BLR], [("f", 0, 4)], ou, [], [])
+    check("order: units in file order are in link order", file_order_offenders(co1), [])
+    ou2 = unit_text(*[("%s.cpp" % nm, [(".sdata2", O2 + 4 * k, O2 + 4 * k + 4)]) for nm, k in (("z", 3), ("a", 0), ("b", 1), ("c", 2))])
+    co2, _o2 = _mini(TT, [BLR], [("f", 0, 4)], ou2, [], [])
+    check("order: a data-only unit placed first in the file but last by address is out of link order (the fewest ranges that must move)",
+          [(o[1], hx(o[2]), o[4]) for o in file_order_offenders(co2)], [("z.cpp", hx(O2 + 12), "c.cpp")])
+    check("order: the offender is an `order` FAIL of its own unit and of nobody else",
+          sorted((n, r["order"]["status"]) for n, r in run_checks(co2, None, ["order"]).units.items() if "order" in r),
+          [("a.cpp", PASS), ("b.cpp", PASS), ("c.cpp", PASS), ("z.cpp", FAIL)])
+
+    # jump tables (rule 11): a reader is the indexed dispatch, not any reference whose address falls inside the symbol
+    JT2 = 0x80580100
+    own_fn = [_lis(3, JT2 >> 16), ADDI(3, 3, JT2 & 0xFFFF), SLWI_R0_R4_2, LWZX(0, 3, 0), MTCTR_R0, BCTR_W, NOP, NOP]            # the dispatch
+    field_fn = [_lis(3, JT2 >> 16), LHZ(0, 3, (JT2 & 0xFFFF) + 8), BLR, NOP]                                                     # lhz r0, 8(r3): a struct field that falls in the symbol
+    for label, foreign, want, find in (("a foreign lhz through lis is a field access, the unit's own dispatch is the reader", field_fn, PASS, None),
+                                       ("a foreign dispatch is a foreign reader", own_fn, FAIL, "jumptable_80580100 is read by foreign.cpp, not by this unit")):
+        cj, _sj = _mini(TT, own_fn + foreign + [NOP] * (0x40 // 4 - len(foreign)), [("own", 0, 0x20), ("f", 0x20, 0x20), ("g", 0x40, 0x20)],
+                        unit_text(("own.cpp", [(".text", TT, TT + 0x20), (".data", JT2, JT2 + 0x20)]), ("foreign.cpp", [(".text", TT + 0x20, TT + 0x60)])),
+                        [(JT2, struct.pack(">8I", *([TT] * 8)))], [dsym("jumptable_80580100", ".data", JT2, 0x20, scope="local")])
+        r = run_checks(cj, None, ["jumptable"]).units["own.cpp"]["jumptable"]
+        check("jumptable: %s" % label, (r["status"], r["finding"] if want == FAIL else None), (want, find))
+    check("jumptable_reader_sites: only the dispatch counts (the addi that forms the address, followed by lwzx, mtctr, bctr)",
+          [hex(x) for x in jumptable_reader_sites(cj, next(s for s in cj.data_syms if s["name"].startswith("jumptable_")))], [hex(TT + 4), hex(TT + 0x24)])
 
     # ranking
     td = top_defects(ctx, res, 50)
