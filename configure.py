@@ -1740,6 +1740,27 @@ config.libs = [
             Object(NonMatching, "Runtime.PPCEABI.H/CPlusLibPPC.cpp"),
             Object(NonMatching, "Runtime.PPCEABI.H/runtime.cpp"),
             Object(NonMatching, "MSL_C/alloc.cpp"),
+            # Phase 4 stubs (docs/splits/phase4, window fg): the MSL libm (fdlibm) units after MSL_C/alloc.
+            Object(NonMatching, "MSL/e_asin.cpp"),
+            Object(NonMatching, "MSL/e_atan2.cpp"),
+            Object(NonMatching, "MSL/e_fmod.cpp"),
+            Object(NonMatching, "MSL/e_log.cpp"),
+            Object(NonMatching, "MSL/e_log10.cpp"),
+            Object(NonMatching, "MSL/e_pow.cpp"),
+            Object(NonMatching, "MSL/e_rem_pio2.cpp"),
+            Object(NonMatching, "MSL/k_cos.cpp"),
+            Object(NonMatching, "MSL/k_rem_pio2.cpp"),
+            Object(NonMatching, "MSL/k_sin.cpp"),
+            Object(NonMatching, "MSL/k_tan.cpp"),
+            Object(NonMatching, "MSL/s_atan.cpp"),
+            Object(NonMatching, "MSL/s_ceil.cpp"),
+            Object(NonMatching, "MSL/s_copysign.cpp"),
+            Object(NonMatching, "MSL/s_cos.cpp"),
+            Object(NonMatching, "MSL/s_floor.cpp"),
+            Object(NonMatching, "MSL/s_frexp.cpp"),
+            Object(NonMatching, "MSL/s_ldexp.cpp"),
+            Object(NonMatching, "MSL/s_modf.cpp"),
+            Object(NonMatching, "MSL/s_sin.cpp"),
             Object(NonMatching, "Runtime.PPCEABI.H/ptmf.c"),
             # Metrowerks' Gecko exception runtime, with the SDK's own extension (.cp, resolved as C++).
             Object(NonMatching, "Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp"),
@@ -2507,7 +2528,9 @@ config.libs = [
             # neighbours (.text 0x80507C40..0x80509DB0, 15 functions / 8560 B).  Right edge is the
             # strong `.sdata` run-jump cut at 0x80509DB0 (`tudiscover.py at 0x80507C40`); the left
             # edge is the named symbol's own start.  Claims .text only.  See the file header.
+            Object(NonMatching, "DWCi/dwc_error.cpp"),
             Object(NonMatching, "DWCi/DWCi_Np_CPUCopyFast.c"),
+            Object(NonMatching, "DWCi/dwc_nasfunc.cpp"),
             Object(NonMatching, "DWCi/fn_805113B0.c"),
             # The DWCi band tail (.text 0x80512490..0x805145B8, 17 functions / 8488 B).  The left
             # edge is the seam the recon resolved: `tudiscover.py at 0x80512490` pins `strong x2`
@@ -2581,7 +2604,7 @@ config.libs = [
         "cflags": cflags_os,
         "host": False,
         "objects": [
-            Object(Matching, "OS/OSAlarm.c"),
+            Object(NonMatching, "NAND/nand.c"),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `804C1760_FindContainHeap_.c` (`.text` 0x804C1760..0x804C6D68, 68 functions / 22024 B).  Module
             # `OS`: the nearest registered unit in splits.txt is OS/OSAlarm.c and the mem half's foreign
@@ -2590,6 +2613,9 @@ config.libs = [
             # inside it); the seam is a byte cap, not a boundary.  Real dump names are used where the map has
             # them; the rest keep their map stem under rule 7's deferral (see the file header).
             Object(NonMatching, "OS/FindContainHeap_.c"),
+            Object(NonMatching, "MTX/mtxvec.c"),
+            Object(NonMatching, "MTX/mtx44.c"),
+            Object(NonMatching, "MTX/vec.c"),
             # Registered once, at its final home (docs/plan.md 12): proposal `80474CB0_AXFXReverbHiInit` -
             # the Revolution SDK AXFX reverb-hi effect pair (16 functions / 0x1174 B,
             # 0x80474CB0..0x80475E24): AXFXReverbHiInit/Shutdown/Callback + AXFXReverbHiExpInit and the
@@ -2605,6 +2631,8 @@ config.libs = [
             # unclaimed run, so it lands as one unit.  Claims .text only; the size/coefficient tables it
             # reads (lbl_80612980 / lbl_80612A40) are an unclaimed auto .data range for the data pass.
             Object(NonMatching, "AX/AXFXReverbHi.c"),
+            Object(NonMatching, "AX/AXFXReverbHiExp.c"),
+            Object(NonMatching, "AX/AXFXReverbStd.cpp"),
             # Registered by the BTE-region survey (`worker/bte-survey-846f`, notes
             # `.pi/notes/bte-survey-846f.md`): `OS/PPCArch.c` (`.text` 0x804770E0..0x804772F0,
             # 22 functions / 528 B, plus its `.data` string at 0x80612CE0).  Module `OS`, lib `OS`:
@@ -2634,6 +2662,21 @@ config.libs = [
             # like the AX band above, and the source restores -O4,p's 16-byte function alignment with
             # `#pragma function_align 16` (every start in the range is 16-aligned).
             Object(NonMatching, "EXI/ProbeBarnacle.c"),
+            # Phase 4 stubs (docs/splits/phase4, window fg): SDK candidate units with no bodies yet.
+            Object(NonMatching, "TRK/TRK_flush_cache.cpp"),
+            Object(NonMatching, "ARC/arc.cpp"),
+            Object(NonMatching, "BTE/gki_buffer.cpp"),
+            Object(NonMatching, "RVLGX/GXTexture_tail.cpp"),
+            Object(NonMatching, "SC/sc.cpp"),
+            Object(NonMatching, "WPAD/wpad.cpp"),
+            Object(NonMatching, "nw4r/math_arithmetic.cpp"),
+            Object(NonMatching, "nw4r/math_triangular.cpp"),
+            Object(NonMatching, "nw4r/fn_805012C4.cpp"),
+            Object(NonMatching, "nw4r/fn_80502828.cpp"),
+            Object(NonMatching, "nw4r/fn_80504A3C.cpp"),
+            Object(NonMatching, "nw4r/fn_8050661C.cpp"),
+            Object(NonMatching, "SSL/ssl.cpp"),
+            Object(NonMatching, "SO/soi.cpp"),
         ],
     },
     {
@@ -2957,11 +3000,6 @@ config.libs = [
             # the runtime dump answers only `FUN_`/`zz_` placeholders (class 3/4 in the brief; see the
             # file header).
             Object(NonMatching, "fn_80056F24.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): proposal `8056BBF0` - the
-            # tiHKBManager.cpp listener/observer manager (its own `__FILE__` string at .data:0x80658408).
-            # Evidence class 1; un-moduled game file at the repository root in the `main` (game) lib,
-            # cflags_main.  Claims .text 0x8056BBF0-0x8056F2B4 + the .ctors word 0x8056F428-0x8056F42C.
-            Object(NonMatching, "tiHKBManager.cpp"),
             # Phase 4 fold: the unit is 0x80423E74-0x80432104 - it absorbed the former `fn_80423E74.cpp`
             # work-record / PatCamellia band (0x80423E74-0x80429B94, 77 functions; same lib and `cflags_main`).
             # Registered once, at its final home (docs/plan.md 12): proposal
@@ -2986,89 +3024,32 @@ config.libs = [
             # cflags_main as its link neighbours (the object carries extab/extabindex for the rest of
             # the band, and C++ virtual dispatch).
             Object(NonMatching, "Network/NetworkSessionManagerPat.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `805482CC_fn_805482CC` - the 0x805482CC-0x8054E894 game-UI band (71 functions /
-            # 26056 B) between the registered `DWCi/fn_805113B0.c` and `homebutton/fn_80555374.cpp`.
-            # No `__FILE__` string covers the range (its data refs are the `.data` UI part-name
-            # vocabulary - "P_txtScrll_UP", "T_As_TextBox_00", "W_TextBox_02" - two `.sdata`
-            # descriptors, the `.sdata2` float pool and the `.bss`/`.sbss` state blocks) and the
-            # runtime-dump map answers only `zz_`/`FUN_` plus a set of clearly misattributed SDK
-            # names at dozens of addresses in this band, so the stem is the map's `fn_805482CC`
-            # with a rule-7 deferral (evidence classes 3/4 in the brief; see the file header).
-            # C++ from the range's own structure (vptr dispatch, adjustor thunks, `__dl__FPv`),
-            # which puts it in the game-root `main` lib with cflags_main like its link neighbours.
-            Object(NonMatching, "fn_805482CC.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): proposal `80569DAC` - the
-            # homebutton::gui component/manager band (`.text` 0x80569DAC-0x8056BBF0, 52 functions /
-            # 7748 B).  Evidence class 2: the shared runtime dump names six functions with the real
-            # `homebutton::gui::` spellings (Manager::~Manager, drawLine_, getComponent,
-            # PaneManager::getPaneComponentByPane, PaneComponent::contain), and the RSO export table
-            # config/RMHE08/hbm_data/symbols.txt carries the same class hierarchy.  Link neighbour
-            # `tiHKBManager.cpp` is in `main`, so the unit takes the `main` lib and cflags_main; the
-            # file is `homebutton/gui.cpp` (the namespace is `gui`).  Claims .text only.
-            # Registered once, at its final home (docs/plan.md 12): proposal `80555374_fn_80555374`
-            # - the 0x80555374-0x8055C894 band (213 functions / 29984 B) below the home-button
-            # software-keyboard slice.  Evidence class 3: no `__FILE__` string covers the range and
-            # the runtime dump answers only `zz_`/`FUN_` placeholders, but the range's `.data`/
-            # `.rodata` vocabulary is the same software-keyboard layout pool the registered
-            # `homebutton/keyboard_ui.cpp` above it documents (`P_SGNkey_01`..`12`,
-            # `B_SGNkey_close`, `T_SGN_pageNumber`, `P_BT_cancel`, `N_UP`/`N_DOWN`), and the band
-            # calls into that neighbour's range (fn_8055C968).  Language C++ from the band's own
-            # structure (adjustor thunks `subi r3, r3, 0x14/0x1C/0x24/0xC4/0xCC`, the deleting
-            # destructors' `__dl__FPv`, the `.ctors` initialisers), so the lib is `main` and the
-            # flags are cflags_main.  The seam is unproven (`--max-bytes` cut, no must-link anchor:
-            # `tudiscover.py at 0x80555374`), the right edge is the registered keyboard_ui.cpp; the
-            # file keeps the map's stem with a rule-7 deferral in the header, and claims .text plus
-            # its three `.ctors` words.
-            # Registered once, at its final home (docs/plan.md 12): proposal `8054E894_fn_8054E894`
-            # - the 0x8054E894-0x80555374 slice of the home-button software-keyboard band (199
-            # functions / 27360 B).  Evidence class 3: no `__FILE__` string covers the range and the
-            # runtime dump answers only `zz_054e894_`, but the range's `.data` vocabulary is the same
-            # software-keyboard layout pool the registered `homebutton/keyboard.cpp` /
-            # `homebutton/keyboard_ui.cpp` / `homebutton/fn_80555374.cpp` beside it document
-            # (fs_VK_*.brlyt, T_2l_TextBox, T_prdc_Text_00..19, B_CPkey_00..11, P_SGNkey_00..19,
-            # P_key_00..49) and its vtables point into the neighbouring bands.  Language C++ from the
-            # object's own structure (adjustor thunks `subi r3, r3, 0x10/0x14`, the deleting
-            # destructors' `__dl__FPv`, vtables), so the lib is `main` and the flags are cflags_main.
-            # The seam is unproven (`--max-bytes` cut at both edges, no must-link anchor) and the
-            # file keeps the map's stem with a rule-7 deferral in the header.  Claims .text only -
-            # the `.ctors` word at 0x8056F3FC (the static initialiser fn_8054F550 inside the range) is
-            # left unclaimed while the reconstruction emits no `.ctors` fragment; see the unit header.
-            Object(NonMatching, "homebutton/fn_8054E894.cpp"),
-            Object(NonMatching, "homebutton/fn_80555374.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `8055C894_fn_8055C894.cpp` - the lower slice of the home-button software-keyboard band
-            # (`.text` 0x8055C894-0x805632BC, 133 functions / 27176 B).  Evidence class 3: the range's
-            # `.data` vocabulary is the same home-button software-keyboard layout pool the registered
-            # `homebutton/keyboard.cpp` (immediately above at 0x805632BC) references (fs_VK_*.brlyt
-            # layouts, T_title_text, T_2l_TextBox, B_abc/T_sign/B_sign, the cellPhone/predictInput/
-            # signWindow/toolbar panes), and the module comes from the two link neighbours
-            # `homebutton/keyboard.cpp` and `homebutton/gui.cpp`.  No `__FILE__` string covers the range
-            # and the runtime dump answers only `zz_` placeholders, so the file name is descriptive
-            # (class 3) and the symbols keep the map's `fn_8055C894` stem with a rule-7 deferral in the
-            # file header.  The left edge is a `--max-bytes` cap (the brief warns; `tudiscover.py at
-            # 0x8055C894` stands behind no cut), the right edge is the registered homebutton/keyboard.cpp.
-            # Link neighbour keyboard.cpp is in `main`, so the unit takes the `main` lib and
-            # cflags_main; the file is `homebutton/keyboard_ui.cpp`.  Claims .text only.
-            Object(NonMatching, "homebutton/keyboard_ui.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `805632BC_fn_805632BC.cpp` - the software-keyboard band of the home-button GUI
-            # (`.text` 0x805632BC-0x80569DAC, 142 functions / 27376 B).  Evidence class 3: the range's
-            # own `.data` pool is the keyboard layout vocabulary of the home-button menu (fs_VK_*.brlyt
-            # layouts, T_hiragana/B_hiragana/T_katakana/P_dakuten/B_Gkey_handaku/T_hankaku/T_zenkaku/
-            # T_Mode_roma_hira, N_Header/N_Footer/T_Nigaoe/B_Nigaoe/T_Letter/T_TouchLetter,
-            # P_txtScrll_UP/DOWN/N_txt_scrl/N_TopBtn_00/N_MemoRoot/G_ArwRoop), and the module comes
-            # from the two link neighbours: `homebutton/gui.cpp` immediately above and
-            # `tiHKBManager.cpp` immediately below (its "HKB" is this keyboard's manager).  No
-            # `__FILE__` string covers the range and the runtime dump answers only `zz_`/`FUN_`
-            # placeholders, so the file name is descriptive (class 3) and the symbols keep the map's
-            # `fn_805632BC` stem with a rule-7 deferral in the file header.  The left edge is a
-            # `--max-bytes` cap (the brief warns; the code before it references the same data pool),
-            # the right edge is the registered homebutton/gui.cpp.  Link neighbour tiHKBManager.cpp is
-            # in `main`, so the unit takes the `main` lib and cflags_main; the file is
-            # `homebutton/keyboard.cpp`.  Claims .text only.
-            Object(NonMatching, "homebutton/keyboard.cpp"),
+            # Phase 4 (docs/splits/phase4, window fg): the HOME-button (HBM) code in link order.  The units from 0x8052A040 to
+            # 0x80542D8C are stubs; the keyboard units absorb the former fn_805482CC / homebutton/fn_8054E894 / fn_80555374 /
+            # keyboard_ui / keyboard / gui / tiHKBManager sources (their evidence is in the unit and header comments).
+            Object(NonMatching, "homebutton/fn_8052A040.cpp"),
+            Object(NonMatching, "homebutton/fn_8052B004.cpp"),
+            Object(NonMatching, "homebutton/fn_8052C880.cpp"),
+            Object(NonMatching, "homebutton/fn_8052E0CC.cpp"),
+            Object(NonMatching, "homebutton/fn_80530680.cpp"),
+            Object(NonMatching, "homebutton/fn_8053072C.cpp"),
+            Object(NonMatching, "homebutton/fn_80533474.cpp"),
+            Object(NonMatching, "homebutton/fn_8053E808.cpp"),
+            Object(NonMatching, "homebutton/hbm_text_panel.cpp"),
+            Object(NonMatching, "homebutton/hbm_kb_widget.cpp"),
+            Object(NonMatching, "homebutton/hbm_kb_list.cpp"),
+            Object(NonMatching, "homebutton/hbm_kb_child.cpp"),
+            Object(NonMatching, "homebutton/hbm_anim_record.cpp"),
+            Object(NonMatching, "homebutton/hbm_value.cpp"),
+            Object(NonMatching, "homebutton/hbm_hermite.cpp"),
+            Object(NonMatching, "homebutton/fn_8055F728.cpp"),
+            Object(NonMatching, "homebutton/fn_8055FB70.cpp"),
+            Object(NonMatching, "homebutton/fn_8055FD58.cpp"),
+            Object(NonMatching, "homebutton/hbm_kb_event.cpp"),
+            Object(NonMatching, "homebutton/hbm_kb_cursor.cpp"),
             Object(NonMatching, "homebutton/gui.cpp"),
+            Object(NonMatching, "homebutton/tiHKBManager.cpp"),
+            Object(NonMatching, "homebutton/fn_8056D814.cpp"),
         ],
     },
 ]

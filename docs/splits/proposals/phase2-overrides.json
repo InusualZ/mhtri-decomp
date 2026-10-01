@@ -211,27 +211,6 @@
    "reproduce": "python tools/units/callers.py 0x806C5488 --pointers"
   },
   {
-   "unit": "homebutton/fn_8052B004.cpp",
-   "section": ".data",
-   "start": "0x8064A5F8",
-   "end": "0x8064A6B0",
-   "action": "defer",
-   "signal": "orchestrator",
-   "candidates": [
-    "homebutton/fn_8052A040.cpp",
-    "homebutton/fn_8052B004.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x8064A638 --pointers",
-     "finding": "lbl_8064A638 (28 slots, stored by fn_8052C330 in fn_8052B004) has 20 slots in homebutton/fn_8052A040's text and 8 in fn_8052B004's, and sits after lbl_8064A5F8 (14 slots, all in fn_8052B004's text 0x8052B5F8..0x8052BF74): data order puts the later TU's vtable first (strong zigzag seam 0x8064A5F8)"
-    }
-   ],
-   "note": "kept deferred: attaching lbl_8064A638 to fn_8052A040 (slot owner 20/28) leaves that unit two .data ranges around fn_8052B004's (an order FAIL), attaching it to fn_8052B004 fails data-order",
-   "reproduce": "python tools/units/callers.py 0x8064A638 --pointers"
-  },
-  {
    "unit": "menu/fn_804513FC.cpp",
    "section": ".data",
    "start": "0x80607E50",
@@ -440,24 +419,6 @@
    "reproduce": "python tools/units/callers.py 0x800CD584 --pointers"
   },
   {
-   "unit": "homebutton/fn_80533474.cpp",
-   "section": ".data",
-   "start": "0x8064DDE0",
-   "end": "0x8064DE88",
-   "action": "attach",
-   "grade": "medium",
-   "signal": "orchestrator",
-   "evidence": [
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x80533474 --pointers",
-     "finding": "lbl_8064DDE0 (0xA8 B, 38 slots): 35 slots in homebutton/fn_80533474's text, 1 in fn_8056083C"
-    }
-   ],
-   "note": "vtable decided by its slots (the slot owner is the key function, playbook 80)",
-   "reproduce": "python tools/units/callers.py 0x80533474 --pointers"
-  },
-  {
    "unit": "homebutton/fn_8053E808.cpp",
    "section": ".data",
    "start": "0x8064E6C0",
@@ -474,24 +435,6 @@
    ],
    "note": "vtable decided by its slots (the slot owner is the key function, playbook 80)",
    "reproduce": "python tools/units/callers.py 0x8053E808 --pointers"
-  },
-  {
-   "unit": "homebutton/fn_80542D8C.cpp",
-   "section": ".data",
-   "start": "0x8064F338",
-   "end": "0x8064F360",
-   "action": "attach",
-   "grade": "medium",
-   "signal": "orchestrator",
-   "evidence": [
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x80542D8C --pointers",
-     "finding": "the vtable at 0x8064F338 (0x28 B): its 5 slots are in homebutton/fn_80542D8C's text"
-    }
-   ],
-   "note": "vtable decided by its slots (the slot owner is the key function, playbook 80)",
-   "reproduce": "python tools/units/callers.py 0x80542D8C --pointers"
   },
   {
    "unit": "homebutton/fn_8054F7BC.cpp",
@@ -1171,6 +1114,314 @@
    ],
    "note": "medium: definer by link order - ef_effect's text (before effectsystem) is the only reader/writer, but .sbss follows .text order and the word lies after effectsystem's three borrowed-object pointers; it was part of ef_effectsystem's .sbss claim before the cut",
    "reproduce": "python tools/units/callers.py 0x8079491C"
+  },
+  {
+   "unit": "nw4r/fn_80502828.cpp",
+   "section": ".data",
+   "start": "0x8062FBE8",
+   "end": "0x8062FC48",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window fg units> --root . --base-snapshot ../mhtri-dtk/.pi/land-base.json --base-ref be0966ec6 --unit-rename <the window fg renames>",
+     "finding": "the data-closure row refuses lbl_8062FBE8: referenced by exactly one batch unit, no claim covers it"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8062FBE8",
+     "finding": "lbl_8062FBE8 (96 B) is address-taken only by nw4r/fn_80502828's text (2 sites, no other reader); the unit's .data claim ends at 0x8062FBE8 and nw4r/fn_8050661C starts at 0x8062FC48"
+    }
+   ],
+   "note": "medium: sole-owned (one referencing unit), claimed tight; force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit",
+   "reproduce": "python tools/units/callers.py 0x8062FBE8",
+   "force": true
+  },
+  {
+   "unit": "homebutton/fn_8052B004.cpp",
+   "section": ".data",
+   "start": "0x8064A5F8",
+   "end": "0x8064A6B0",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window fg units> --root . --base-snapshot ../mhtri-dtk/.pi/land-base.json --base-ref be0966ec6 --unit-rename <the window fg renames>",
+     "finding": "the data-closure row refuses lbl_8064A5F8 and lbl_8064A638 (the engine kept them deferred): referenced by exactly one batch unit, no claim covers them"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8064A638 --pointers",
+     "finding": "both tables are address-taken only by fn_8052B004 (3 sites each, stored by fn_8052C330 in the unit); lbl_8064A638 has 20 of its 28 slots in homebutton/fn_8052A040's text and 8 in fn_8052B004's; fn_8052B004's .data claim ends at 0x8064A5F8 and homebutton/fn_8052C880 starts at 0x8064A6B0"
+    }
+   ],
+   "note": "medium: sole reader and storer (definer); the slot owner of lbl_8064A638 is the other unit but its pair is read through fn_8052B004's vtable store, and attaching it to fn_8052A040 would leave that unit two .data ranges (an order FAIL); force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit",
+   "reproduce": "python tools/units/callers.py 0x8064A638 --pointers",
+   "force": true
+  },
+  {
+   "unit": "homebutton/fn_80533474.cpp",
+   "section": ".data",
+   "start": "0x8064A8F8",
+   "end": "0x8064DE88",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window fg units> --root . --base-snapshot ../mhtri-dtk/.pi/land-base.json --base-ref be0966ec6 --unit-rename <the window fg renames>",
+     "finding": "the data-closure row refuses 33 pairs lbl_8064A8F8..lbl_8064DBD8 and lbl_8064DC30: referenced by batch units, no claim covers them"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8064A8F8",
+     "finding": "every pair from lbl_8064A8F8 to lbl_8064DBD8 (vtables, strings and 14 jump tables) is read only by fn_80533474's text (0x80533474..0x8053E808); lbl_8064DC30 (344 B) is stored by fn_805385D0 inside the unit and also read by fn_8055B710 (a later unit); the unit's .data claim ends at 0x8064A8F8 and homebutton/fn_8053E808 starts at 0x8064DE88 (the row also absorbs the former tail row 0x8064DDE0..0x8064DE88, vtable of 35 slots in this unit)"
+    }
+   ],
+   "note": "medium: sole-owned run (one referencing unit but one shared vtable whose definer is this unit), one contiguous claim; force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit",
+   "reproduce": "python tools/units/callers.py 0x8064A8F8",
+   "force": true
+  },
+  {
+   "unit": "homebutton/fn_80542D8C.cpp",
+   "section": ".data",
+   "start": "0x8064F0BC",
+   "end": "0x8064F360",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window fg units> --root . --base-snapshot ../mhtri-dtk/.pi/land-base.json --base-ref be0966ec6 --unit-rename <the window fg renames>",
+     "finding": "the data-closure row refuses lbl_8064F0BC, lbl_8064F1C0 and lbl_8064F338: referenced by batch units, no claim covers them"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8064F338 --pointers",
+     "finding": "lbl_8064F0BC and lbl_8064F1C0 are read only by homebutton/fn_80542D8C's text; the vtable lbl_8064F338 (0x28 B, 5 slots in this unit) is stored by the unit's constructor and read by fn_8054F7BC and fn_8056083C; the unit's .data claim ends at 0x8064F0BC and homebutton/fn_8054F7BC starts at 0x8064F360 (the row also absorbs the former tail row 0x8064F338..0x8064F360)"
+    }
+   ],
+   "note": "medium: sole-owned run plus a vtable whose definer (constructor and slots) is this unit; force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit",
+   "reproduce": "python tools/units/callers.py 0x8064F338 --pointers",
+   "force": true
+  },
+  {
+   "unit": "homebutton/fn_8055B710.cpp",
+   "section": ".data",
+   "start": "0x80651870",
+   "end": "0x80652340",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window fg units> --root . --base-snapshot ../mhtri-dtk/.pi/land-base.json --base-ref be0966ec6 --unit-rename <the window fg renames>",
+     "finding": "the data-closure row refuses 19 pairs lbl_80651870..lbl_80652300: referenced by batch units, no claim covers them"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80651870",
+     "finding": "the layout strings and vtables lbl_80651870..lbl_806521A8 are read only by fn_8055B710's text (0x80558EB4..0x8055EAF0); lbl_80652300 (\"T_2l_TextBox\", 13 B) is read by it and by fn_8056083C; the unit's .data claim ends at 0x80651870 and homebutton/fn_8055EAF0 starts at 0x80652340"
+    }
+   ],
+   "note": "medium: sole-owned run, link order (the unit is the last owner before the next claim); force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit",
+   "reproduce": "python tools/units/callers.py 0x80651870",
+   "force": true
+  },
+  {
+   "unit": "homebutton/fn_8055F728.cpp",
+   "section": ".data",
+   "start": "0x80652530",
+   "end": "0x806525A4",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window fg units> --root . --base-snapshot ../mhtri-dtk/.pi/land-base.json --base-ref be0966ec6 --unit-rename <the window fg renames>",
+     "finding": "the data-closure row refuses lbl_80652530: referenced by exactly one batch unit, no claim covers it"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80652530",
+     "finding": "lbl_80652530 (116 B) is read only by fn_8055F728 (the sinit-only TU, 1 site); fn_8055EAF0's .data claim ends at 0x80652530 and the unit's own .data starts at 0x806525A4"
+    }
+   ],
+   "note": "medium: sole reader and constructor (the unit is its sinit alone); force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit",
+   "reproduce": "python tools/units/callers.py 0x80652530",
+   "force": true
+  },
+  {
+   "unit": "homebutton/fn_8055FB70.cpp",
+   "section": ".data",
+   "start": "0x80655A98",
+   "end": "0x80655BD8",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window fg units> --root . --base-snapshot ../mhtri-dtk/.pi/land-base.json --base-ref be0966ec6 --unit-rename <the window fg renames>",
+     "finding": "the data-closure row refuses lbl_80655A98: referenced by exactly one batch unit, no claim covers it"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80655A98",
+     "finding": "lbl_80655A98 (320 B, the pointer table that lists the elements of the homebutton arrays) is stored by fn_8055FB70 (the sinit-only TU, 3 sites incl. a write); the unit's .data claim ends at 0x80655A98 and fn_8055FD58 starts at 0x80655BD8"
+    }
+   ],
+   "note": "medium: definer = the unit whose sinit stores it; force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit",
+   "reproduce": "python tools/units/callers.py 0x80655A98",
+   "force": true
+  },
+  {
+   "unit": "homebutton/fn_8056083C.cpp",
+   "section": ".data",
+   "start": "0x80657698",
+   "end": "0x80657BA8",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window fg units> --root . --base-snapshot ../mhtri-dtk/.pi/land-base.json --base-ref be0966ec6 --unit-rename <the window fg renames>",
+     "finding": "the data-closure row refuses 8 pairs lbl_80657698..lbl_80657A20: referenced by batch units, no claim covers them"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80657698",
+     "finding": "the layout strings and tables lbl_80657698..lbl_806579C8 are read only by fn_8056083C's text (0x8056083C..0x80566440); lbl_80657A20 (392 B) is also read by menu/fn_804513FC (window e); the unit's .data claim ends at 0x80657698 and homebutton/fn_80566440 starts at 0x80657BA8"
+    }
+   ],
+   "note": "medium: sole-owned run with one foreign read, link order; force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit",
+   "reproduce": "python tools/units/callers.py 0x80657698",
+   "force": true
+  },
+  {
+   "unit": "homebutton/tiHKBManager.cpp",
+   "section": ".data",
+   "start": "0x80658408",
+   "end": "0x80658458",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window fg units> --root . --base-snapshot ../mhtri-dtk/.pi/land-base.json --base-ref be0966ec6 --unit-rename <the window fg renames>",
+     "finding": "the data-closure row refuses lbl_80658408, lbl_8065841C and lbl_80658440: referenced by exactly one batch unit, no claim covers them"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80658408",
+     "finding": "lbl_80658408 is the __FILE__ string \"tiHKBManager.cpp\", lbl_8065841C its panic message, lbl_80658440 the vtable: all read only by tiHKBManager's text; the unit's .data claim ends at 0x80658408 and homebutton/fn_8056D814 starts at 0x80658458"
+    }
+   ],
+   "note": "medium: sole-owned (one referencing unit); force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit",
+   "reproduce": "python tools/units/callers.py 0x80658408",
+   "force": true
+  },
+  {
+   "unit": "NHTTP/d_nhttp.c",
+   "section": ".rodata",
+   "start": "0x80574CE8",
+   "end": "0x80574E00",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window fg units> --root . --base-snapshot ../mhtri-dtk/.pi/land-base.json --base-ref be0966ec6 --unit-rename <the window fg renames>",
+     "finding": "the data-closure row refuses NHTTPi_postDataRawCode: referenced by two batch units, no claim covers it"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80574CE8",
+     "finding": "NHTTPi_postDataRawCode (21 B string) is address-taken by NHTTP_bgnend (2 sites) and d_nhttp (2 sites); the three .rodata objects behind it (lbl_80574D00 0x28 B, lbl_80574D28 0x74 B, lbl_80574D9C 0x64 B, up to 0x80574E00) are read only by d_nhttp; nw4r/math_triangular's .rodata ends at 0x80574CE8 and nothing is claimed after 0x80574E00"
+    }
+   ],
+   "note": "medium: link order - the string is the head of a 0x118 B .rodata run whose other three objects only d_nhttp reads; NHTTP_bgnend would have to own a 21 B fragment in front of it",
+   "reproduce": "python tools/units/callers.py 0x80574CE8"
+  },
+  {
+   "unit": "homebutton/fn_8052A040.cpp",
+   "section": ".sbss",
+   "start": "0x80795A20",
+   "end": "0x80795A28",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window fg units> --root . --base-snapshot ../mhtri-dtk/.pi/land-base.json --base-ref be0966ec6 --unit-rename <the window fg renames>",
+     "finding": "the data-closure row refuses lbl_80795A20: referenced by seven batch units, no claim covers it"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80795A20",
+     "finding": "lbl_80795A20 (8 B) is written by menu/fn_804513FC (window e) and read by homebutton/fn_8052A040, 8052B004, 8052C880, 8052E0CC, 8053072C, 80533474 and 8056D814; fn_8052A040's .sbss claim ends at 0x80795A20 and fn_8052B004 starts at 0x80795A28 (the engine left it ambiguous between those two)"
+    }
+   ],
+   "note": "medium: no definer is findable (no store in the library, the writer is game code); the first reader in link order is the owner of the adjacent range",
+   "reproduce": "python tools/units/callers.py 0x80795A20"
+  },
+  {
+   "unit": "TRK/TRK_flush_cache.cpp",
+   "section": ".sdata2",
+   "start": "0x8079CF40",
+   "end": "0x8079CF48",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window fg units> --root . --base-snapshot ../mhtri-dtk/.pi/land-base.json --base-ref be0966ec6 --unit-rename <the window fg renames>",
+     "finding": "the data-closure row refuses lbl_8079CF40: referenced by exactly one batch unit, no claim covers it"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8079CF40",
+     "finding": "lbl_8079CF40 (8 B) is read only by TRK/TRK_flush_cache's text (1 site); its .sdata2 claim ends at 0x8079CF40 and ARC/arc starts at 0x8079CF48"
+    }
+   ],
+   "note": "medium: sole-owned (one referencing unit), claimed tight",
+   "reproduce": "python tools/units/callers.py 0x8079CF40"
+  },
+  {
+   "unit": "BTE/gki_buffer.cpp",
+   "section": ".sdata2",
+   "start": "0x8079D080",
+   "end": "0x8079D090",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window fg units> --root . --base-snapshot ../mhtri-dtk/.pi/land-base.json --base-ref be0966ec6 --unit-rename <the window fg renames>",
+     "finding": "the data-closure row refuses lbl_8079D080 and lbl_8079D088: referenced by exactly one batch unit, no claim covers them"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8079D080",
+     "finding": "both 8 B constants are read only by BTE/gki_buffer's text (fn_80479050); its .sdata2 claim starts at 0x8079D090 and AX/fn_80475E30 ends at 0x8079D080"
+    }
+   ],
+   "note": "medium: sole-owned (one referencing unit), claimed tight",
+   "reproduce": "python tools/units/callers.py 0x8079D080"
   }
  ]
 }

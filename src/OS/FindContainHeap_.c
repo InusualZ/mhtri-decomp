@@ -1,8 +1,9 @@
 /*
- * OS/FindContainHeap_.c - the Nintendo SDK low-level runtime band at 0x804C1760..0x804C6D68.
+ * OS/FindContainHeap_.c - the Nintendo SDK low-level runtime band at 0x804C1760..0x804C68A0.
  *
- * `.text` 0x804C1760..0x804C6D68 (68 functions / 22024 B).  Registered from
- * `proposal/804C1760_FindContainHeap_.c` (docs/plan.md 12).
+ * `.text` 0x804C1760..0x804C68A0 (57 functions).  Registered from
+ * `proposal/804C1760_FindContainHeap_.c` (docs/plan.md 12); phase 4 cut the tail from 0x804C68A0 into
+ * MTX/mtxvec.c, MTX/mtx44.c and MTX/vec.c (the vec cluster and the C_MTXOrtho / PSMTXMultVec stubs).
  *
  * Module `OS` is class-3 evidence: the nearest registered unit in splits.txt is `OS/OSAlarm.c`
  * (0x804CBC50, 0x4EE8 above the range end, against `Runtime.PPCEABI.H/__init_cpp_exceptions.cpp`
@@ -44,12 +45,8 @@
 #include "types.h"
 
 #include "OS/mem.h"
-
-
-/* Foreign OS mutex API (unowned in the map; bare prototypes, rule 2 shared-file request in the outbox). */
-void OSLockMutex(void* mutex);
-void OSUnlockMutex(void* mutex);
-void OSInitMutex(void* mutex);
+#include "NAND/nand.h"
+#include "OS/FindContainHeap_.h"
 
 extern u32 lbl_80795298;      /* 'heap list initialised' flag (.sbss) */
 extern MEMList lbl_80748B90;  /* global heap list (.bss) */

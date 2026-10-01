@@ -20,8 +20,8 @@
  * 0x804B1CA0..0x804B32D0) and the GX library's `GXInit.c` / `GXFifo.c` / `GXAttr.c` / ... run
  * (fn_804B32D0..__GetImageTileCount, 0x804B32D0..0x804B8020).  The seam is unproven and unclaimed: the run
  * lands as one unit and the extent settles as its functions match (brief section 2; docs/plan.md 8.3).  The
- * FS half's own `.sdata` state (`__fsFd_80793E38`, `__fsInitialized_807951B0`, `__devfs_807951B4`,
- * `hId_807951C4`, `lbl_807951B8`) and the GX half's (`__GXData`, `__cpReg`, `__peReg`, `__piReg`,
+ * FS half's own `.sdata` state (`__fsFd`, `__fsInitialized`, `__devfs`,
+ * `hId`, `lbl_807951B8`) and the GX half's (`__GXData`, `__cpReg`, `__peReg`, `__piReg`,
  * `__memReg` and the two `.data` jump tables) belong to those SDK libraries, not to this range, so they are
  * declared `extern` here and never defined; the data pass owns the claims.
  *
@@ -70,6 +70,8 @@
 
 #include "types.h"
 #include "gx.h"
+#include "RVLGX/GXTexture_tail.h"
+#include "NAND/nand.h"
 
 /* ---------------------------------------------------------------------------------------------------
  * The SDK entry points the band calls.  They are defined outside the band (the EXI and FS libraries sit
@@ -261,14 +263,9 @@ BOOL EXIWriteReg(EXIChannel chan, u32 dev, u32 cmd, const void* buf, s32 len)
 
 #define FS_DELETE(x)                                                                                   \
     if ((x) != NULL) {                                                                                 \
-        iosFree(hId_807951C4, (x));                                                                    \
+        iosFree(hId, (x));                                                                    \
     }
 
-/* One entry of an `IOS_Ioctlv` vector list. size: 0x8 */
-typedef struct IPCIOVector {
-    void* base; /* +0x0 */
-    u32 length; /* +0x4 */
-} IPCIOVector;
 
 /* The IPC result the FS library hands back; the values are the ones the target's branches load. */
 typedef enum {
@@ -382,42 +379,15 @@ typedef struct FSCommandBlock {
  * at 0x80793E38 / 0x807951B0, an unclaimed auto range), so they are declarations, never definitions -
  * except `lo`/`hi`, which the map spells with MWCC's local-static suffix and which therefore cannot be
  * declared from C (the two 4-byte .sdata words this unit emits). */
-extern s32 __fsFd_80793E38;
-extern u32 __fsInitialized_807951B0;
-extern char* __devfs_807951B4;
-extern s32 hId_807951C4;
+extern s32 __fsFd;
+extern u32 __fsInitialized;
+extern char* __devfs;
+extern s32 hId;
 extern u32 lbl_807951B8;
 
 /* The GX library's GP-FIFO-ready byte flag (.sdata, outside the band). */
 extern u8 lbl_807951F1;
 
-/* The IPC client the FS library drives.  Unclaimed in the map (the IPC library sits below the band), so
- * bare prototypes - the lint's rule 2 named gap.  `IOS_Read` / `IOS_Write` are the map's `fn_804BC3F0` /
- * `fn_804BC600` (the two 0x108-byte bodies between IOS_ReadAsync's and IOS_SeekAsync's neighbours, the
- * only gap in the IOS_* run). */
-s32 IOS_Open(const char* path, u32 mode);
-s32 IOS_OpenAsync(const char* path, u32 mode, void* callback, void* callbackArg);
-s32 IOS_Close(s32 fd);
-s32 IOS_CloseAsync(s32 fd, void* callback, void* callbackArg);
-s32 fn_804BC3F0(s32 fd, void* buf, s32 len);
-s32 fn_804BC600(s32 fd, const void* buf, s32 len);
-s32 IOS_ReadAsync(s32 fd, void* buf, s32 len, void* callback, void* callbackArg);
-s32 IOS_WriteAsync(s32 fd, const void* buf, s32 len, void* callback, void* callbackArg);
-s32 IOS_SeekAsync(s32 fd, s32 offset, s32 mode, void* callback, void* callbackArg);
-s32 IOS_Ioctl(s32 fd, s32 type, void* in, s32 inSize, void* out, s32 outSize);
-s32 IOS_IoctlAsync(s32 fd, s32 type, void* in, s32 inSize, void* out, s32 outSize, void* callback,
-                   void* callbackArg);
-s32 IOS_Ioctlv(s32 fd, s32 type, s32 inCount, s32 outCount, IPCIOVector* vectors);
-s32 IOS_IoctlvAsync(s32 fd, s32 type, s32 inCount, s32 outCount, IPCIOVector* vectors, void* callback,
-                    void* callbackArg);
-s32 iosCreateHeap(void* base, u32 size);
-void* iosAllocAligned(s32 handle, u32 size, u32 align);
-void iosFree(s32 handle, void* ptr);
-void* IPCGetBufferLo(void);
-void* IPCGetBufferHi(void);
-void IPCSetBufferLo(void* lo);
-void OSReport(const char* format, ...);
-u32 strnlen(const char* str, u32 maxlen);
 char* strcpy(char* dst, const char* src);
 
 /* Open the `/dev/fs` device, carve the IPC arena window for it and create the FS heap. */
@@ -429,37 +399,37 @@ s32 ISFS_OpenLib(void)
     s32 ret = IPC_RESULT_OK;
     u8* base;
 
-    if (!__fsInitialized_807951B0) {
+    if (!__fsInitialized) {
         lo = IPCGetBufferLo();
         hi = IPCGetBufferHi();
     }
 
-    __devfs_807951B4 = (char*)ROUND_UP_PTR(lo, 32);
+    __devfs = (char*)ROUND_UP_PTR(lo, 32);
 
-    if (!__fsInitialized_807951B0 && __devfs_807951B4 + FS_MAX_PATH > (char*)hi) {
+    if (!__fsInitialized && __devfs + FS_MAX_PATH > (char*)hi) {
         OSReport("APP ERROR: Not enough IPC arena\n");
         ret = IPC_RESULT_ALLOC_FAILED;
     } else {
-        strcpy(__devfs_807951B4, "/dev/fs");
-        __fsFd_80793E38 = IOS_Open(__devfs_807951B4, 0);
+        strcpy(__devfs, "/dev/fs");
+        __fsFd = IOS_Open(__devfs, 0);
 
-        if (__fsFd_80793E38 < 0) {
-            ret = __fsFd_80793E38;
+        if (__fsFd < 0) {
+            ret = __fsFd;
         } else {
-            base = (u8*)__devfs_807951B4;
+            base = (u8*)__devfs;
 
-            if (!__fsInitialized_807951B0 && base + FS_MAX_PATH + FS_HEAP_SIZE > (u8*)hi) {
+            if (!__fsInitialized && base + FS_MAX_PATH + FS_HEAP_SIZE > (u8*)hi) {
                 OSReport("APP ERROR: Not enough IPC arena\n");
                 ret = IPC_RESULT_ALLOC_FAILED;
             } else {
-                if (!__fsInitialized_807951B0) {
+                if (!__fsInitialized) {
                     IPCSetBufferLo(base + FS_MAX_PATH + FS_HEAP_SIZE);
-                    __fsInitialized_807951B0 = TRUE;
+                    __fsInitialized = TRUE;
                 }
 
-                hId_807951C4 = iosCreateHeap(base, FS_MAX_PATH + FS_HEAP_SIZE);
+                hId = iosCreateHeap(base, FS_MAX_PATH + FS_HEAP_SIZE);
 
-                if (hId_807951C4 < 0) {
+                if (hId < 0) {
                     ret = IPC_RESULT_ALLOC_FAILED;
                 }
             }
@@ -547,11 +517,11 @@ s32 fn_804B1F50(const char* path, u32 attr, u32 ownerPerm, u32 groupPerm, u32 ot
     FSCommandBlock* block;
     u32 len;
 
-    if (path == NULL || __fsFd_80793E38 < 0 || (len = strnlen(path, FS_MAX_PATH)) == FS_MAX_PATH) {
+    if (path == NULL || __fsFd < 0 || (len = strnlen(path, FS_MAX_PATH)) == FS_MAX_PATH) {
         return IPC_RESULT_INVALID;
     }
 
-    block = (FSCommandBlock*)iosAllocAligned(hId_807951C4, sizeof(FSCommandBlock), 32);
+    block = (FSCommandBlock*)iosAllocAligned(hId, sizeof(FSCommandBlock), 32);
     if (block == NULL) {
         return IPC_RESULT_BUSY;
     }
@@ -567,7 +537,7 @@ s32 fn_804B1F50(const char* path, u32 attr, u32 ownerPerm, u32 groupPerm, u32 ot
     block->data.fileIoctl.groupPerm = groupPerm;
     block->data.fileIoctl.otherPerm = otherPerm;
 
-    return IOS_IoctlAsync(__fsFd_80793E38, FS_IOCTL_CREATE_DIR, &block->data.fileIoctl,
+    return IOS_IoctlAsync(__fsFd, FS_IOCTL_CREATE_DIR, &block->data.fileIoctl,
                           sizeof(FSFileIoctl), NULL, 0, _isfsFuncCb, block);
 }
 
@@ -585,11 +555,11 @@ s32 fn_804B2050(const char* path, char* filesOut, u32* fileCountOut)
 
     block = NULL;
 
-    if (path == NULL || fileCountOut == NULL || __fsFd_80793E38 < 0 || (u32)filesOut % 32 != 0 ||
+    if (path == NULL || fileCountOut == NULL || __fsFd < 0 || (u32)filesOut % 32 != 0 ||
         (len = strnlen(path, FS_MAX_PATH)) == FS_MAX_PATH) {
         ret = IPC_RESULT_INVALID;
     } else {
-        block = (FSCommandBlock*)iosAllocAligned(hId_807951C4, sizeof(FSCommandBlock), 32);
+        block = (FSCommandBlock*)iosAllocAligned(hId, sizeof(FSCommandBlock), 32);
 
         if (block == NULL) {
             ret = IPC_RESULT_ALLOC_FAILED;
@@ -620,7 +590,7 @@ s32 fn_804B2050(const char* path, char* filesOut, u32* fileCountOut)
                 outCount = 1;
             }
 
-            ret = IOS_Ioctlv(__fsFd_80793E38, FS_IOCTL_READ_DIR, inCount, outCount, vectors);
+            ret = IOS_Ioctlv(__fsFd, FS_IOCTL_READ_DIR, inCount, outCount, vectors);
 
             if (ret == IPC_RESULT_OK) {
                 *fileCountOut = *countWork;
@@ -647,12 +617,12 @@ s32 fn_804B21B0(const char* path, char* filesOut, u32* fileCountOut, void* callb
     u32 inCount;
     u32 outCount;
 
-    if (path == NULL || fileCountOut == NULL || __fsFd_80793E38 < 0 || (u32)filesOut % 32 != 0 ||
+    if (path == NULL || fileCountOut == NULL || __fsFd < 0 || (u32)filesOut % 32 != 0 ||
         (len = strnlen(path, FS_MAX_PATH)) == FS_MAX_PATH) {
         return IPC_RESULT_INVALID;
     }
 
-    block = (FSCommandBlock*)iosAllocAligned(hId_807951C4, sizeof(FSCommandBlock), 32);
+    block = (FSCommandBlock*)iosAllocAligned(hId, sizeof(FSCommandBlock), 32);
     if (block == NULL) {
         return IPC_RESULT_BUSY;
     }
@@ -689,7 +659,7 @@ s32 fn_804B21B0(const char* path, char* filesOut, u32* fileCountOut, void* callb
         outCount = 1;
     }
 
-    return IOS_IoctlvAsync(__fsFd_80793E38, FS_IOCTL_READ_DIR, inCount, outCount, vectors, _isfsFuncCb,
+    return IOS_IoctlvAsync(__fsFd, FS_IOCTL_READ_DIR, inCount, outCount, vectors, _isfsFuncCb,
                            block);
 }
 
@@ -704,12 +674,12 @@ s32 ISFS_GetAttr(const char* path, u32* ownerIdOut, u16* groupIdOut, u32* attrOu
 
     block = NULL;
 
-    if (path == NULL || __fsFd_80793E38 < 0 || (len = strnlen(path, FS_MAX_PATH)) == FS_MAX_PATH ||
+    if (path == NULL || __fsFd < 0 || (len = strnlen(path, FS_MAX_PATH)) == FS_MAX_PATH ||
         ownerIdOut == NULL || groupIdOut == NULL || attrOut == NULL || ownerPermOut == NULL ||
         groupPermOut == NULL || otherPermOut == NULL) {
         ret = IPC_RESULT_INVALID;
     } else {
-        block = (FSCommandBlock*)iosAllocAligned(hId_807951C4, sizeof(FSCommandBlock), 32);
+        block = (FSCommandBlock*)iosAllocAligned(hId, sizeof(FSCommandBlock), 32);
 
         if (block == NULL) {
             ret = IPC_RESULT_ALLOC_FAILED;
@@ -717,7 +687,7 @@ s32 ISFS_GetAttr(const char* path, u32* ownerIdOut, u16* groupIdOut, u32* attrOu
             memcpy(block->data.ioctlWork, path, len + 1);
             fileIoctl = (FSFileIoctl*)ROUND_UP_PTR(block->data.ioctlWork + FS_MAX_PATH, 32);
 
-            ret = IOS_Ioctl(__fsFd_80793E38, FS_IOCTL_GET_ATTR, block->data.ioctlWork, FS_MAX_PATH,
+            ret = IOS_Ioctl(__fsFd, FS_IOCTL_GET_ATTR, block->data.ioctlWork, FS_MAX_PATH,
                             fileIoctl, sizeof(FSFileIoctl));
 
             if (ret == IPC_RESULT_OK) {
@@ -746,13 +716,13 @@ s32 ISFS_GetAttrAsync(const char* path, u32* ownerIdOut, u16* groupIdOut, u32* a
     u32 len;
     FSCommandBlock* block;
 
-    if (path == NULL || __fsFd_80793E38 < 0 || (len = strnlen(path, FS_MAX_PATH)) == FS_MAX_PATH ||
+    if (path == NULL || __fsFd < 0 || (len = strnlen(path, FS_MAX_PATH)) == FS_MAX_PATH ||
         ownerIdOut == NULL || groupIdOut == NULL || attrOut == NULL || ownerPermOut == NULL ||
         groupPermOut == NULL || otherPermOut == NULL) {
         return IPC_RESULT_INVALID;
     }
 
-    block = (FSCommandBlock*)iosAllocAligned(hId_807951C4, sizeof(FSCommandBlock), 32);
+    block = (FSCommandBlock*)iosAllocAligned(hId, sizeof(FSCommandBlock), 32);
     if (block == NULL) {
         return IPC_RESULT_BUSY;
     }
@@ -770,7 +740,7 @@ s32 ISFS_GetAttrAsync(const char* path, u32* ownerIdOut, u16* groupIdOut, u32* a
 
     memcpy(block->data.ioctlWork, path, len + 1);
 
-    return IOS_IoctlAsync(__fsFd_80793E38, FS_IOCTL_GET_ATTR, block->data.ioctlWork, FS_MAX_PATH,
+    return IOS_IoctlAsync(__fsFd, FS_IOCTL_GET_ATTR, block->data.ioctlWork, FS_MAX_PATH,
                           ROUND_UP_PTR(block->data.ioctlWork + FS_MAX_PATH, 32), sizeof(FSFileIoctl),
                           _isfsFuncCb, block);
 }
@@ -784,17 +754,17 @@ s32 ISFS_Delete(const char* path)
 
     block = NULL;
 
-    if (path == NULL || __fsFd_80793E38 < 0 || (len = strnlen(path, FS_MAX_PATH)) == FS_MAX_PATH) {
+    if (path == NULL || __fsFd < 0 || (len = strnlen(path, FS_MAX_PATH)) == FS_MAX_PATH) {
         ret = IPC_RESULT_INVALID;
     } else {
-        block = (FSCommandBlock*)iosAllocAligned(hId_807951C4, sizeof(FSCommandBlock), 32);
+        block = (FSCommandBlock*)iosAllocAligned(hId, sizeof(FSCommandBlock), 32);
 
         if (block == NULL) {
             ret = IPC_RESULT_ALLOC_FAILED;
         } else {
             memcpy(block->data.ioctlWork, path, len + 1);
 
-            ret = IOS_Ioctl(__fsFd_80793E38, FS_IOCTL_DELETE_PATH, block->data.ioctlWork, FS_MAX_PATH, 0,
+            ret = IOS_Ioctl(__fsFd, FS_IOCTL_DELETE_PATH, block->data.ioctlWork, FS_MAX_PATH, 0,
                             NULL);
         }
     }
@@ -812,11 +782,11 @@ s32 ISFS_DeleteAsync(const char* path, void* callback, void* callbackArg)
     u32 len;
     FSCommandBlock* block;
 
-    if (path == NULL || __fsFd_80793E38 < 0 || (len = strnlen(path, FS_MAX_PATH)) == FS_MAX_PATH) {
+    if (path == NULL || __fsFd < 0 || (len = strnlen(path, FS_MAX_PATH)) == FS_MAX_PATH) {
         return IPC_RESULT_INVALID;
     }
 
-    block = (FSCommandBlock*)iosAllocAligned(hId_807951C4, sizeof(FSCommandBlock), 32);
+    block = (FSCommandBlock*)iosAllocAligned(hId, sizeof(FSCommandBlock), 32);
     if (block == NULL) {
         return IPC_RESULT_BUSY;
     }
@@ -827,7 +797,7 @@ s32 ISFS_DeleteAsync(const char* path, void* callback, void* callbackArg)
     block->callbackArg = callbackArg;
     block->callbackState = CB_STATE_NONE;
 
-    return IOS_IoctlAsync(__fsFd_80793E38, FS_IOCTL_DELETE_PATH, block->data.ioctlWork, FS_MAX_PATH, 0,
+    return IOS_IoctlAsync(__fsFd, FS_IOCTL_DELETE_PATH, block->data.ioctlWork, FS_MAX_PATH, 0,
                           NULL, _isfsFuncCb, block);
 }
 
@@ -841,12 +811,12 @@ s32 ISFS_Rename(const char* from, const char* to)
 
     block = NULL;
 
-    if (from == NULL || to == NULL || __fsFd_80793E38 < 0 ||
+    if (from == NULL || to == NULL || __fsFd < 0 ||
         (lenFrom = strnlen(from, FS_MAX_PATH)) == FS_MAX_PATH ||
         (lenTo = strnlen(to, FS_MAX_PATH)) == FS_MAX_PATH) {
         ret = IPC_RESULT_INVALID;
     } else {
-        block = (FSCommandBlock*)iosAllocAligned(hId_807951C4, sizeof(FSCommandBlock), 32);
+        block = (FSCommandBlock*)iosAllocAligned(hId, sizeof(FSCommandBlock), 32);
 
         if (block == NULL) {
             ret = IPC_RESULT_ALLOC_FAILED;
@@ -854,7 +824,7 @@ s32 ISFS_Rename(const char* from, const char* to)
             memcpy(block->data.renameIoctl.from, from, lenFrom + 1);
             memcpy(block->data.renameIoctl.to, to, lenTo + 1);
 
-            ret = IOS_Ioctl(__fsFd_80793E38, FS_IOCTL_RENAME_PATH, &block->data.renameIoctl,
+            ret = IOS_Ioctl(__fsFd, FS_IOCTL_RENAME_PATH, &block->data.renameIoctl,
                             sizeof(FSRenameIoctl), 0, NULL);
         }
     }
@@ -875,13 +845,13 @@ s32 ISFS_RenameAsync(const char* from, const char* to, void* callback, void* cal
 
     block = NULL;
 
-    if (from == NULL || to == NULL || __fsFd_80793E38 < 0 ||
+    if (from == NULL || to == NULL || __fsFd < 0 ||
         (lenFrom = strnlen(from, FS_MAX_PATH)) == FS_MAX_PATH ||
         (lenTo = strnlen(to, FS_MAX_PATH)) == FS_MAX_PATH) {
         return IPC_RESULT_INVALID;
     }
 
-    block = (FSCommandBlock*)iosAllocAligned(hId_807951C4, sizeof(FSCommandBlock), 32);
+    block = (FSCommandBlock*)iosAllocAligned(hId, sizeof(FSCommandBlock), 32);
     if (block == NULL) {
         return IPC_RESULT_BUSY;
     }
@@ -893,7 +863,7 @@ s32 ISFS_RenameAsync(const char* from, const char* to, void* callback, void* cal
     memcpy(block->data.renameIoctl.from, from, lenFrom + 1);
     memcpy(block->data.renameIoctl.to, to, lenTo + 1);
 
-    return IOS_IoctlAsync(__fsFd_80793E38, FS_IOCTL_RENAME_PATH, &block->data.renameIoctl,
+    return IOS_IoctlAsync(__fsFd, FS_IOCTL_RENAME_PATH, &block->data.renameIoctl,
                           sizeof(FSRenameIoctl), 0, NULL, _isfsFuncCb, block);
 }
 
@@ -910,11 +880,11 @@ s32 ISFS_GetUsage(const char* path, s32* blockCountOut, s32* fileCountOut)
 
     block = NULL;
 
-    if (path == NULL || __fsFd_80793E38 < 0 || blockCountOut == NULL || fileCountOut == NULL ||
+    if (path == NULL || __fsFd < 0 || blockCountOut == NULL || fileCountOut == NULL ||
         (len = strnlen(path, FS_MAX_PATH)) == FS_MAX_PATH) {
         ret = IPC_RESULT_INVALID;
     } else {
-        block = (FSCommandBlock*)iosAllocAligned(hId_807951C4, sizeof(FSCommandBlock), 32);
+        block = (FSCommandBlock*)iosAllocAligned(hId, sizeof(FSCommandBlock), 32);
 
         if (block == NULL) {
             ret = IPC_RESULT_ALLOC_FAILED;
@@ -934,7 +904,7 @@ s32 ISFS_GetUsage(const char* path, s32* blockCountOut, s32* fileCountOut)
             vectors[2].base = fileCountWork;
             vectors[2].length = sizeof(u32);
 
-            ret = IOS_Ioctlv(__fsFd_80793E38, FS_IOCTLV_GET_USAGE, 1, 2, vectors);
+            ret = IOS_Ioctlv(__fsFd, FS_IOCTLV_GET_USAGE, 1, 2, vectors);
 
             if (ret == IPC_RESULT_OK) {
                 *blockCountOut = *blockCountWork;
@@ -962,12 +932,12 @@ s32 fn_804B2AB0(const char* path, s32* blockCountOut, s32* fileCountOut, void* c
     IPCIOVector* vectors;
     u32 len;
 
-    if (path == NULL || __fsFd_80793E38 < 0 || blockCountOut == NULL || fileCountOut == NULL ||
+    if (path == NULL || __fsFd < 0 || blockCountOut == NULL || fileCountOut == NULL ||
         (len = strnlen(path, FS_MAX_PATH)) == FS_MAX_PATH) {
         return IPC_RESULT_INVALID;
     }
 
-    block = (FSCommandBlock*)iosAllocAligned(hId_807951C4, sizeof(FSCommandBlock), 32);
+    block = (FSCommandBlock*)iosAllocAligned(hId, sizeof(FSCommandBlock), 32);
     if (block == NULL) {
         return IPC_RESULT_BUSY;
     }
@@ -994,7 +964,7 @@ s32 fn_804B2AB0(const char* path, s32* blockCountOut, s32* fileCountOut, void* c
     vectors[2].base = fileCountWork;
     vectors[2].length = sizeof(u32);
 
-    return IOS_IoctlvAsync(__fsFd_80793E38, FS_IOCTLV_GET_USAGE, 1, 2, vectors, _isfsFuncCb, block);
+    return IOS_IoctlvAsync(__fsFd, FS_IOCTLV_GET_USAGE, 1, 2, vectors, _isfsFuncCb, block);
 }
 
 /* Create a file with the given owner/group/other permissions and attribute. */
@@ -1006,10 +976,10 @@ s32 ISFS_CreateFile(const char* path, u32 attr, u32 ownerPerm, u32 groupPerm, u3
 
     block = NULL;
 
-    if (path == NULL || __fsFd_80793E38 < 0 || (len = strnlen(path, FS_MAX_PATH)) == FS_MAX_PATH) {
+    if (path == NULL || __fsFd < 0 || (len = strnlen(path, FS_MAX_PATH)) == FS_MAX_PATH) {
         ret = IPC_RESULT_INVALID;
     } else {
-        block = (FSCommandBlock*)iosAllocAligned(hId_807951C4, sizeof(FSCommandBlock), 32);
+        block = (FSCommandBlock*)iosAllocAligned(hId, sizeof(FSCommandBlock), 32);
 
         if (block == NULL) {
             ret = IPC_RESULT_ALLOC_FAILED;
@@ -1021,7 +991,7 @@ s32 ISFS_CreateFile(const char* path, u32 attr, u32 ownerPerm, u32 groupPerm, u3
             block->data.fileIoctl.groupPerm = groupPerm;
             block->data.fileIoctl.otherPerm = otherPerm;
 
-            ret = IOS_Ioctl(__fsFd_80793E38, FS_IOCTL_CREATE_FILE, &block->data.fileIoctl,
+            ret = IOS_Ioctl(__fsFd, FS_IOCTL_CREATE_FILE, &block->data.fileIoctl,
                             sizeof(FSFileIoctl), NULL, 0);
         }
     }
@@ -1041,11 +1011,11 @@ s32 fn_804B2CE0(const char* path, u32 attr, u32 ownerPerm, u32 groupPerm, u32 ot
     FSCommandBlock* block;
     u32 len;
 
-    if (path == NULL || __fsFd_80793E38 < 0 || (len = strnlen(path, FS_MAX_PATH)) == FS_MAX_PATH) {
+    if (path == NULL || __fsFd < 0 || (len = strnlen(path, FS_MAX_PATH)) == FS_MAX_PATH) {
         return IPC_RESULT_INVALID;
     }
 
-    block = (FSCommandBlock*)iosAllocAligned(hId_807951C4, sizeof(FSCommandBlock), 32);
+    block = (FSCommandBlock*)iosAllocAligned(hId, sizeof(FSCommandBlock), 32);
     if (block == NULL) {
         return IPC_RESULT_BUSY;
     }
@@ -1061,7 +1031,7 @@ s32 fn_804B2CE0(const char* path, u32 attr, u32 ownerPerm, u32 groupPerm, u32 ot
     block->data.fileIoctl.groupPerm = groupPerm;
     block->data.fileIoctl.otherPerm = otherPerm;
 
-    return IOS_IoctlAsync(__fsFd_80793E38, FS_IOCTL_CREATE_FILE, &block->data.fileIoctl,
+    return IOS_IoctlAsync(__fsFd, FS_IOCTL_CREATE_FILE, &block->data.fileIoctl,
                           sizeof(FSFileIoctl), NULL, 0, _isfsFuncCb, block);
 }
 
@@ -1077,7 +1047,7 @@ s32 ISFS_Open(const char* path, u32 mode)
     if (path == NULL || (len = strnlen(path, FS_MAX_PATH)) == FS_MAX_PATH) {
         ret = IPC_RESULT_INVALID;
     } else {
-        block = (FSCommandBlock*)iosAllocAligned(hId_807951C4, sizeof(FSCommandBlock), 32);
+        block = (FSCommandBlock*)iosAllocAligned(hId, sizeof(FSCommandBlock), 32);
 
         if (block == NULL) {
             ret = IPC_RESULT_ALLOC_FAILED;
@@ -1105,7 +1075,7 @@ s32 ISFS_OpenAsync(const char* path, u32 mode, void* callback, void* callbackArg
         return IPC_RESULT_INVALID;
     }
 
-    block = (FSCommandBlock*)iosAllocAligned(hId_807951C4, sizeof(FSCommandBlock), 32);
+    block = (FSCommandBlock*)iosAllocAligned(hId, sizeof(FSCommandBlock), 32);
     if (block == NULL) {
         return IPC_RESULT_BUSY;
     }
@@ -1124,7 +1094,7 @@ s32 ISFS_SeekAsync(s32 fd, s32 offset, s32 mode, void* callback, void* callbackA
 {
     FSCommandBlock* block;
 
-    block = (FSCommandBlock*)iosAllocAligned(hId_807951C4, sizeof(FSCommandBlock), 32);
+    block = (FSCommandBlock*)iosAllocAligned(hId, sizeof(FSCommandBlock), 32);
     if (block == NULL) {
         return IPC_RESULT_BUSY;
     }
@@ -1155,7 +1125,7 @@ s32 ISFS_ReadAsync(s32 fd, void* dst, s32 len, void* callback, void* callbackArg
         return IPC_RESULT_INVALID;
     }
 
-    block = (FSCommandBlock*)iosAllocAligned(hId_807951C4, sizeof(FSCommandBlock), 32);
+    block = (FSCommandBlock*)iosAllocAligned(hId, sizeof(FSCommandBlock), 32);
     if (block == NULL) {
         return IPC_RESULT_BUSY;
     }
@@ -1186,7 +1156,7 @@ s32 ISFS_WriteAsync(s32 fd, const void* src, s32 len, void* callback, void* call
         return IPC_RESULT_INVALID;
     }
 
-    block = (FSCommandBlock*)iosAllocAligned(hId_807951C4, sizeof(FSCommandBlock), 32);
+    block = (FSCommandBlock*)iosAllocAligned(hId, sizeof(FSCommandBlock), 32);
     if (block == NULL) {
         return IPC_RESULT_BUSY;
     }
@@ -1209,7 +1179,7 @@ s32 ISFS_CloseAsync(s32 fd, void* callback, void* callbackArg)
 {
     FSCommandBlock* block;
 
-    block = (FSCommandBlock*)iosAllocAligned(hId_807951C4, sizeof(FSCommandBlock), 32);
+    block = (FSCommandBlock*)iosAllocAligned(hId, sizeof(FSCommandBlock), 32);
     if (block == NULL) {
         return IPC_RESULT_BUSY;
     }
@@ -1226,9 +1196,9 @@ s32 ISFS_ShutdownAsync(void* callback, void* callbackArg)
 {
     FSCommandBlock* block;
 
-    block = (FSCommandBlock*)iosAllocAligned(hId_807951C4, sizeof(FSCommandBlock), 32);
+    block = (FSCommandBlock*)iosAllocAligned(hId, sizeof(FSCommandBlock), 32);
 
-    if (__fsFd_80793E38 < 0) {
+    if (__fsFd < 0) {
         return IPC_RESULT_INVALID;
     }
 
@@ -1236,7 +1206,7 @@ s32 ISFS_ShutdownAsync(void* callback, void* callbackArg)
     block->callbackArg = callbackArg;
     block->callbackState = CB_STATE_NONE;
 
-    return IOS_IoctlAsync(__fsFd_80793E38, FS_IOCTL_SHUTDOWN_FS, NULL, 0, NULL, 0, _isfsFuncCb, block);
+    return IOS_IoctlAsync(__fsFd, FS_IOCTL_SHUTDOWN_FS, NULL, 0, NULL, 0, _isfsFuncCb, block);
 }
 
 /* ===================================================================================================
