@@ -1389,23 +1389,29 @@ enemy/fn_80382310.cpp:
 	.bss        start:0x806C23E8 end:0x806C5488
 	.sbss       start:0x80794C00 end:0x80794C08
 
-enemy/fn_80387844.cpp:
+enemy/em009_act.cpp:
 	extab       start:0x8001803C end:0x800181C4
 	extabindex  start:0x80037EC0 end:0x8003810C
 	.text       start:0x803868DC end:0x8038EC44
 	.rodata     start:0x80570B20 end:0x80570BA0
-	.data       start:0x805EFA00 end:0x805F0CB8
+	.data       start:0x805EF990 end:0x805F0CB8
+	.sdata2     start:0x8079BFF8 end:0x8079C298
 
 lobby/lb_quest_ui.cpp:
 	extab       start:0x800181C4 end:0x8001833C
 	extabindex  start:0x8003810C end:0x80038340
 	.text       start:0x8038EC44 end:0x80394038
 	.data       start:0x805F0CB8 end:0x805F13D0
+	.sdata      start:0x807933D8 end:0x80793470
+	.sdata2     start:0x8079C298 end:0x8079C2B0
 
 lobby/lb_quest_board.cpp:
 	extab       start:0x8001833C end:0x8001843C
 	extabindex  start:0x80038340 end:0x800384C0
 	.text       start:0x80394038 end:0x803967F0
+	.data       start:0x805F13D0 end:0x805F1500
+	.sdata      start:0x80793470 end:0x80793488
+	.sdata2     start:0x8079C2B0 end:0x8079C2E8
 
 menu/menu_result.cpp:
 	extab       start:0x8001843C end:0x8001863C
@@ -1413,61 +1419,92 @@ menu/menu_result.cpp:
 	.text       start:0x803967F0 end:0x8039D278
 	.data       start:0x805F1500 end:0x805F1704
 	.bss        start:0x806C5528 end:0x806C5558
+	.sdata      start:0x80793488 end:0x80793520
+	.sdata2     start:0x8079C2E8 end:0x8079C330
 
 menu/multi_result.cpp:
 	extab       start:0x8001863C end:0x8001882C
 	extabindex  start:0x800387C0 end:0x80038AA8
 	.text       start:0x8039D278 end:0x803A3A50
+	.rodata     start:0x80570BA0 end:0x80570C20
+	.data       start:0x805F1708 end:0x805F2038
+	.sdata      start:0x80793520 end:0x80793530
+	.sbss       start:0x80794C08 end:0x80794C18
+	.sdata2     start:0x8079C330 end:0x8079C448
 
 lobby/lb_quest_screen.cpp:
 	extab       start:0x8001882C end:0x80018A6C
 	extabindex  start:0x80038AA8 end:0x80038E08
 	.text       start:0x803A3A50 end:0x803AA4A4
-	.data       start:0x805F2038 end:0x805F2090
+	.data       start:0x805F2038 end:0x805F2940
+	.sdata      start:0x80793530 end:0x807935D0
+	.sdata2     start:0x8079C448 end:0x8079C4C0
 
 quest/quest_item_slot.cpp:
 	extab       start:0x80018A6C end:0x80018B0C
 	extabindex  start:0x80038E08 end:0x80038EF8
 	.text       start:0x803AA4A4 end:0x803AB3BC
 	.ctors      start:0x8056F3B0 end:0x8056F3B4
-	.data       start:0x805F2940 end:0x805F2A38
+	.data       start:0x805F2940 end:0x805F2A98
 	.sdata      start:0x807935D0 end:0x807935D8
 	.sdata2     start:0x8079C4C0 end:0x8079C50C
 
 quest/quest_entry.cpp:
-	extab       start:0x80018B0C end:0x80018C54
-	extabindex  start:0x80038EF8 end:0x800390E4
-	.text       start:0x803AB3BC end:0x803B0F98
-	.data       start:0x805F7AB0 end:0x805F7AF8
-	.bss        start:0x806C5558 end:0x806C5858
-	.sdata      start:0x807935D8 end:0x8079367C
-	.sbss       start:0x80794C1C end:0x80794C3C
+	extab       start:0x80018B0C end:0x80018DC4
+	extabindex  start:0x80038EF8 end:0x8003930C
+	.text       start:0x803AB3BC end:0x803B465C
+	.data       start:0x805F2A98 end:0x805F7C68
+	.bss        start:0x806C5558 end:0x806CC420
+	.sdata      start:0x807935D8 end:0x80793684
+	.sbss       start:0x80794C18 end:0x80794C48
+	.sdata2     start:0x8079C510 end:0x8079C560
 
-menu/arena_result.cpp:
-	extab       start:0x80018C54 end:0x80018DC4
-	extabindex  start:0x800390E4 end:0x8003930C
-	.text       start:0x803B0F98 end:0x803B465C
-	.data       start:0x805F7B78 end:0x805F7C68
-	.sdata      start:0x8079367C end:0x80793684
+enemy/em_pop.cpp:
+	extab       start:0x80018DC4 end:0x80018FEC
+	extabindex  start:0x8003930C end:0x80039648
+	.text       start:0x803B465C end:0x803B936C
+	.ctors      start:0x8056F3B4 end:0x8056F3B8
+	.data       start:0x805F7C68 end:0x805F8220
+	.bss        start:0x806CC420 end:0x806D2A68
+	.sdata      start:0x80793688 end:0x80793690
+	.sbss       start:0x80794C48 end:0x80794C50
+	.sdata2     start:0x8079C560 end:0x8079C5B8
+
+enemy/em_model.cpp:
+	extab       start:0x80018FEC end:0x80019164
+	extabindex  start:0x80039648 end:0x8003987C
+	.text       start:0x803B936C end:0x803BE30C
+	.data       start:0x805F8220 end:0x805F84E0
+	.bss        start:0x806D2A68 end:0x806D2AF8
+	.sdata      start:0x80793690 end:0x807936A8
+	.sbss       start:0x80794C50 end:0x80794C60
+	.sdata2     start:0x8079C5B8 end:0x8079C630
+
+menu/get_pop_dat_ptr.cpp:
+	extab       start:0x80019164 end:0x8001936C
+	extabindex  start:0x8003987C end:0x80039B88
+	.text       start:0x803BE30C end:0x803C3A5C
+	.ctors      start:0x8056F3B8 end:0x8056F3BC
+	.data       start:0x805F84E0 end:0x805F8920
+	.bss        start:0x806D2AF8 end:0x806D2B20
+	.sdata      start:0x807936A8 end:0x80793738
+	.sbss       start:0x80794C60 end:0x80794C90
+	.sdata2     start:0x8079C630 end:0x8079C680
+
+lobby/lb_server_sel_trans.cpp:
+	extab       start:0x8001936C end:0x800198C8
+	extabindex  start:0x80039B88 end:0x8003A0BC
+	.text       start:0x803C3A5C end:0x803CCDF8
+	.rodata     start:0x80570C20 end:0x80570E20
+	.data       start:0x805F8920 end:0x805F94E0
+	.bss        start:0x806D2B20 end:0x806D2C60
+	.sdata      start:0x80793738 end:0x80793900
+	.sbss       start:0x80794C90 end:0x80794C98
+	.sdata2     start:0x8079C680 end:0x8079C690
 
 Network/network_shared_data.cpp:
 	.sdata      start:0x80793900 end:0x80793930
 	.sdata2     start:0x8079C690 end:0x8079C758
-
-enemy/em_pop.cpp:
-	extab       start:0x80018DC4 end:0x80019164
-	extabindex  start:0x8003930C end:0x8003987C
-	.text       start:0x803B465C end:0x803BE30C
-	.ctors      start:0x8056F3B4 end:0x8056F3B8
-	.data       start:0x805F7C68 end:0x805F84E0
-	.bss        start:0x806CC420 end:0x806D2AF8
-	.sbss       start:0x80794C48 end:0x80794C60
-
-menu/get_pop_dat_ptr.cpp:
-	extab       start:0x80019164 end:0x800193D4
-	extabindex  start:0x8003987C end:0x80039C24
-	.text       start:0x803BE30C end:0x803C4BA0
-	.ctors      start:0x8056F3B8 end:0x8056F3BC
 
 Network/NetworkPeerBase.cpp:
 	extab       start:0x800198C8 end:0x800198E0
@@ -1528,26 +1565,53 @@ Network/NetworkSessionManager.cpp:
 	.sbss       start:0x80794CA0 end:0x80794CA8
 
 Network/NetworkSessionManagerPat.cpp:
-	extab       start:0x8001A348 end:0x8001A350
-	extabindex  start:0x8003A8B4 end:0x8003A8C0
-	.text       start:0x803D70B8 end:0x803D72F4
-	.data       start:0x805FB0F0 end:0x805FB2B8
-	.sdata2     start:0x8079C758 end:0x8079C75C
-
-Network/initNetworkSessionStable.cpp:
-	extab       start:0x8001A630 end:0x8001A648
-	extabindex  start:0x8003AB9C end:0x8003ABA8
-	.text       start:0x803DEA30 end:0x803DEB38
+	extab       start:0x8001A348 end:0x8001ACC0
+	extabindex  start:0x8003A8B4 end:0x8003B010
+	.text       start:0x803D70B8 end:0x803E44C8
+	.data       start:0x805FAB48 end:0x805FBC78
+	.sdata      start:0x80793930 end:0x80793940
+	.sdata2     start:0x8079C758 end:0x8079C790
 
 Network/NetworkLayerPatStep.cpp:
 	extab       start:0x8001ACC0 end:0x8001ACC8
 	extabindex  start:0x8003B010 end:0x8003B01C
 	.text       start:0x803E44C8 end:0x803E4888
 
+Network/NetworkCommunityPat.cpp:
+	extab       start:0x8001ACC8 end:0x8001BCAC
+	extabindex  start:0x8003B01C end:0x8003BF40
+	.text       start:0x803E4888 end:0x803FCC34
+	.ctors      start:0x8056F3BC end:0x8056F3C0
+	.data       start:0x805FBC78 end:0x805FC358
+	.data       start:0x805FC358 end:0x80600978
+	.sdata      start:0x80793940 end:0x80793968
+	.sbss       start:0x80794CA8 end:0x80794CB0
+	.sdata2     start:0x8079C790 end:0x8079C7D0
+
+Network/PatInterface.cpp:
+	extab       start:0x8001BCAC end:0x8001BD9C
+	extabindex  start:0x8003BF40 end:0x8003C06C
+	.text       start:0x803FCC34 end:0x803FE8E4
+	.data       start:0x80600978 end:0x80600BA0
+	.sbss       start:0x80794CB0 end:0x80794CB8
+	.sdata2     start:0x8079C7D0 end:0x8079C7D8
+
 Network/network_state.cpp:
 	extab       start:0x8001BD9C end:0x8001BE24
 	extabindex  start:0x8003C06C end:0x8003C138
 	.text       start:0x803FE8E4 end:0x804006A8
+	.sdata      start:0x80793968 end:0x80793970
+	.sdata2     start:0x8079C7D8 end:0x8079C7E8
+
+Network/network_layer_io.cpp:
+	extab       start:0x8001BE24 end:0x8001CA4C
+	extabindex  start:0x8003C138 end:0x8003D2F0
+	.text       start:0x804006A8 end:0x80413C64
+	.rodata     start:0x80570E20 end:0x80570E70
+	.data       start:0x80600BA0 end:0x806024B8
+	.sdata      start:0x80793970 end:0x80793990
+	.sbss       start:0x80794CB8 end:0x80794CC0
+	.sdata2     start:0x8079C7E8 end:0x8079C874
 
 Network/NetworkWiiMediator.cpp:
 	extab       start:0x8001CA4C end:0x8001CBF4
@@ -1555,15 +1619,39 @@ Network/NetworkWiiMediator.cpp:
 	.text       start:0x80413C64 end:0x804155D4
 	.data       start:0x806024B8 end:0x80602824
 
+Network/network_opening.cpp:
+	extab       start:0x8001CBF4 end:0x8001CE34
+	extabindex  start:0x8003D524 end:0x8003D800
+	.text       start:0x804155D4 end:0x80418988
+	.rodata     start:0x80570E70 end:0x80570E98
+	.data       start:0x80602988 end:0x80602AF8
+	.sbss       start:0x80794CC0 end:0x80794CD0
+	.sdata2     start:0x8079C874 end:0x8079C878
+
 Network/constructNetworkWiiMediator.cpp:
 	extab       start:0x8001CE34 end:0x8001CE4C
 	extabindex  start:0x8003D800 end:0x8003D80C
 	.text       start:0x80418988 end:0x804189C8
 
+Network/constructNetworkLibrary.cpp:
+	extab       start:0x8001CE4C end:0x8001CF70
+	extabindex  start:0x8003D80C end:0x8003D92C
+	.text       start:0x804189C8 end:0x80419EC4
+	.data       start:0x80602AF8 end:0x80603118
+	.sbss       start:0x80794CD0 end:0x80794CD8
+	.sdata2     start:0x8079C878 end:0x8079C888
+
 Network/NetworkPat.cpp:
 	extab       start:0x8001CF70 end:0x8001CF88
 	extabindex  start:0x8003D92C end:0x8003D950
 	.text       start:0x80419EC4 end:0x8041A194
+
+Network/NetworkReflectService.cpp:
+	extab       start:0x8001CF88 end:0x8001CFF0
+	extabindex  start:0x8003D950 end:0x8003D9BC
+	.text       start:0x8041A194 end:0x8041A87C
+	.data       start:0x80603118 end:0x80603154
+	.sbss       start:0x80794CD8 end:0x80794CE0
 
 Network/fn_8041A87C.cpp:
 	extab       start:0x8001CFF0 end:0x8001D16C
@@ -1571,6 +1659,7 @@ Network/fn_8041A87C.cpp:
 	.text       start:0x8041A87C end:0x8041DF10
 	.data       start:0x806031A0 end:0x80603714
 	.bss        start:0x806D3650 end:0x806D3670
+	.sdata      start:0x80793990 end:0x807939A0
 	.sbss       start:0x80794CE0 end:0x80794CE8
 
 Camellia/camellia.c:
@@ -1579,29 +1668,51 @@ Camellia/camellia.c:
 	.text       start:0x8041DF10 end:0x80423E74
 	.rodata     start:0x80570E98 end:0x80571E98
 
-fn_80423E74.cpp:
-	extab       start:0x8001D1B4 end:0x8001D368
-	extabindex  start:0x8003DC44 end:0x8003DE54
-	.text       start:0x80423E74 end:0x80429B94
-	.data       start:0x80603750 end:0x806038E8
-
 Network/network_pat_control.cpp:
-	extab       start:0x8001D368 end:0x8001D558
-	extabindex  start:0x8003DE54 end:0x8003E0DC
-	.text       start:0x80429B94 end:0x8043065C
+	extab       start:0x8001D1B4 end:0x8001D824
+	extabindex  start:0x8003DC44 end:0x8003E214
+	.text       start:0x80423E74 end:0x80432104
+	.ctors      start:0x8056F3C0 end:0x8056F3C4
 	.rodata     start:0x80571EA0 end:0x80572240
-	.data       start:0x806038E8 end:0x8060391C
-	.data       start:0x8060391C end:0x80603BF0
-	.data       start:0x80603BF0 end:0x80603C14
-	.data       start:0x80603C14 end:0x80603C40
-	.data       start:0x80603C40 end:0x80603C6C
-	.data       start:0x80603C6C end:0x80603CB8
-	.sbss       start:0x80794CF8 end:0x80794CFC
+	.data       start:0x80603750 end:0x80603D70
+	.bss        start:0x806D3670 end:0x806E1770
+	.sdata      start:0x807939A0 end:0x80793A10
+	.sbss       start:0x80794CE8 end:0x80794D08
+	.sdata2     start:0x8079C888 end:0x8079C8A8
+
+Network/net_session_close.cpp:
+	extab       start:0x8001D824 end:0x8001DA94
+	extabindex  start:0x8003E214 end:0x8003E514
+	.text       start:0x80432104 end:0x80437270
+	.ctors      start:0x8056F3C4 end:0x8056F3C8
+	.data       start:0x80603D70 end:0x80603E90
+	.bss        start:0x806E1770 end:0x806E1B38
+
+menu/menu_placeinfo.cpp:
+	extab       start:0x8001DA94 end:0x8001DBEC
+	extabindex  start:0x8003E514 end:0x8003E718
+	.text       start:0x80437270 end:0x8043D524
+	.ctors      start:0x8056F3C8 end:0x8056F3CC
+	.data       start:0x80603E90 end:0x806047D0
+	.bss        start:0x806E1B38 end:0x806E26E0
+	.sdata      start:0x80793A10 end:0x80793A80
+	.sdata2     start:0x8079C8A8 end:0x8079C8D0
+
+menu/movie.cpp:
+	extab       start:0x8001DBEC end:0x8001DE9C
+	extabindex  start:0x8003E718 end:0x8003EB20
+	.text       start:0x8043D524 end:0x804459DC
+	.ctors      start:0x8056F3CC end:0x8056F3D0
+	.data       start:0x806047D0 end:0x80604D2C
+	.bss        start:0x806E26E0 end:0x806E3E10
+	.sdata      start:0x80793A80 end:0x80793B28
+	.sbss       start:0x80794D08 end:0x80794D18
+	.sdata2     start:0x8079C8D0 end:0x8079C960
 
 quest/arenatask.cpp:
 	extab       start:0x8001DE9C end:0x8001DF24
 	extabindex  start:0x8003EB20 end:0x8003EBEC
-	.text       start:0x804459E4 end:0x80448404
+	.text       start:0x804459DC end:0x80448404
 	.ctors      start:0x8056F3D0 end:0x8056F3D4
 	.data       start:0x80604D30 end:0x806073F0
 	.bss        start:0x806E3E10 end:0x806E40C0
@@ -1609,12 +1720,50 @@ quest/arenatask.cpp:
 	.sbss       start:0x80794D3C end:0x80794D50
 	.sdata2     start:0x8079C960 end:0x8079C998
 
+menu/menu_plsearch.cpp:
+	extab       start:0x8001DF24 end:0x8001E18C
+	extabindex  start:0x8003EBEC end:0x8003EF88
+	.text       start:0x80448404 end:0x804513FC
+	.data       start:0x806073F0 end:0x80607E50
+	.bss        start:0x806E40C0 end:0x806F4658
+	.sdata      start:0x80793B88 end:0x80793C10
+	.sbss       start:0x80794D50 end:0x80794D64
+
+menu/menu_sysmsg.cpp:
+	extab       start:0x8001E18C end:0x8001E3B0
+	extabindex  start:0x8003EF88 end:0x8003F144
+	.text       start:0x804513FC end:0x804565C0
+	.ctors      start:0x8056F3D4 end:0x8056F3D8
+	.rodata     start:0x80572240 end:0x80572418
+	.data       start:0x80607E50 end:0x8060E7FC
+	.bss        start:0x806F4658 end:0x806F4B48
+	.sdata      start:0x80793C80 end:0x80793CB8
+	.sbss       start:0x80794D64 end:0x80794DF8
+	.sdata2     start:0x8079C998 end:0x8079C9A8
+
+MSL/strlen.cpp:
+	.text       start:0x804565C0 end:0x804565DC
+
+Runtime.PPCEABI.H/__va_arg.cpp:
+	.text       start:0x804565DC end:0x804566A4
+
 Runtime.PPCEABI.H/global_destructor_chain.c:
 	.text       start:0x804566A4 end:0x80456704
+	.sbss       start:0x80794DF8 end:0x80794E00
+
+Runtime.PPCEABI.H/CPlusLibPPC.cpp:
+	extab       start:0x8001E3B0 end:0x8001E3F0
+	extabindex  start:0x8003F144 end:0x8003F174
+	.text       start:0x80456704 end:0x80456C88
+	.sdata      start:0x80793CC0 end:0x80793CC8
 
 Runtime.PPCEABI.H/ptmf.c:
 	.text       start:0x80456C88 end:0x80456CE0
 	.rodata     start:0x80572428 end:0x80572438
+
+Runtime.PPCEABI.H/runtime.cpp:
+	.text       start:0x80456CE0 end:0x80457420
+	.rodata     start:0x80572438 end:0x80572450
 
 Runtime.PPCEABI.H/__init_cpp_exceptions.cpp:
 	.text       start:0x80457420 end:0x80457490
@@ -1628,6 +1777,18 @@ Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp:
 	extabindex  start:0x8003F174 end:0x8003F18C
 	.text       start:0x80457490 end:0x804578FC
 	.data       start:0x8060E8A0 end:0x8060E8E4
+	.bss        start:0x806F4B48 end:0x806F4CC8
+
+MSL_C/alloc.cpp:
+	extab       start:0x8001E400 end:0x8001E464
+	extabindex  start:0x8003F18C end:0x8003F1C8
+	.text       start:0x804578FC end:0x804642C8
+	.rodata     start:0x80572450 end:0x80573190
+	.data       start:0x8060E8E4 end:0x8060F538
+	.bss        start:0x806F4CC8 end:0x806F5020
+	.sdata      start:0x80793CD0 end:0x80793D00
+	.sbss       start:0x80794E00 end:0x80794E28
+	.sdata2     start:0x8079C9A8 end:0x8079CAB8
 
 AX/AXFXReverbHi.c:
 	.text       start:0x80474CB0 end:0x80475E24

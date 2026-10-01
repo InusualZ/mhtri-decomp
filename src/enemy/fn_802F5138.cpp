@@ -53,7 +53,7 @@
  *    per function (`fn_802F8B28`, `fn_802F9774`, `fn_802F96B4`, `fn_802F51DC`) - file-wide off costs
  *    `fn_802F5B98` 62.5 -> 20.8 %.
  *  - `include/enemy/fn_801251D0.h` gained the four-argument C++ view of 0x801251D0 and
- *    `enemy/fn_80387844.cpp`'s 28 call sites moved to it (both targets set r6 = the id):
+ *    `enemy/em009_act.cpp`'s 28 call sites moved to it (both targets set r6 = the id):
  *    `fn_8038BD28` 96.729 -> 100.0 %.  The outbox asks the orchestrator to confirm that shared-file
  *    edit on the batch.
  * Per-function measurements: `.pi/notes/802f5138-fn-802f5138-046c.md`.

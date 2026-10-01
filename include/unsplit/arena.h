@@ -9,7 +9,7 @@
  * include once they register.  A declaration of a symbol *another* unit owns is still wrong here: it
  * belongs in that owner's header (`my_player_no` -> `include/ef/fn_800CDB2C.h`, `get_arena_cfg` ->
  * `include/menu/get_pop_dat_ptr.h`, `setVec3` -> `include/mh3_pad.h`, `multi_arena_clr_time` ->
- * this file's sibling `include/unsplit/menu.h`; `quest_record_get` (owner `menu/arena_result.cpp`)
+ * this file's sibling `include/unsplit/menu.h`; `quest_record_get` (owner `quest/quest_entry.cpp`)
  * has no published header yet - that absence is what blocks `dl_acdata_to_ar_eqdata`).
  *
  * Evidence classes: the runtime dump's own local names (`arena_work`, `arena_draw_func`, `que_info`,

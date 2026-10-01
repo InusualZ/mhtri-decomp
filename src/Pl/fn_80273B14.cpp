@@ -44,7 +44,7 @@
  * and the remaining two, `Pl_critical_get__FP4_PLW` and `Pl_decide_mot_get__FPUsPUs`, are the
  * manglings of the two real C++ declarations this file defines).  `dumpmap.py lookup` answers only
  * `zz_0273b14_` placeholders for the whole band and no `__FILE__` string covers it.  `fn_802752C8`
- * is renamed `Pl_item_id_usable_ck` (0x802752C8, 0xCC B, 96.47 %): `menu/arena_result.cpp` calls
+ * is renamed `Pl_item_id_usable_ck` (0x802752C8, 0xCC B, 96.47 %): `quest/quest_entry.cpp` calls
  * it, and a call to a `fn_XXXXXXXX` stem from another unit's new source is a rule-7 finding.  Its
  * second parameter is dead in retail - the body never reads r4 - but every call site passes one
  * (0, 1 and 2), so both the declaration and the definition carry it; re-measuring the whole unit
@@ -71,10 +71,8 @@
 #include "stage/stg_w.h"
 #include "Runtime.PPCEABI.H/memset.h"
 
-/* 0x8045F554 - the runtime string copy `fn_8027552C` uses to arm a hunter name.  Its address band
- * brackets two different modules (`Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp` below, `OS/OSAlarm.c`
- * above), so no band header owns it; `nw_resource.cpp` declares the same shape locally. */
-char* strcpy(char* dst, const char* src);
+/* 0x8045F554 - the runtime string copy `fn_8027552C` uses to arm a hunter name (owner: `MSL_C/alloc.cpp`, rule 2). */
+#include "MSL_C/alloc.h"
 
 /* 0x80335CE8 - the client-side act-message sender `pl_act_enter_raw`'s tail calls (owner:
  * `src/hud/net_char_sync.cpp`, declared by its leaf header `hud/Pl_net_send.h`).  Retail's own build carried

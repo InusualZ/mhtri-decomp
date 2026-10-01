@@ -1,5 +1,8 @@
 {
- "names": {},
+ "names": {
+  "enemy/fn_80387844.cpp": "enemy/em009_act.cpp",
+  "menu/fn_804513FC.cpp": "menu/menu_sysmsg.cpp"
+ },
  "languages": {
   "enemy/em_common": ".cpp",
   "stage/stg_w": ".cpp",

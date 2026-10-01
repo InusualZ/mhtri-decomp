@@ -66,7 +66,7 @@ void quest_zone_tbl_init(void);
 void quest_warp_by_state(struct _PLW* plw);
 /* The quest entry's notify path: a player's entry is announced to the lobby, charged against the quest
  * reward (0x803AB0FC). */
-void quest_entry_notify(u8 player);
+void quest_player_enter_notify(u8 player);
 
 #ifdef __cplusplus
 }  /* extern "C" */

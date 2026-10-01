@@ -7,7 +7,7 @@
  * `sysSE_req`.  The rows live in the record the screen's entry point is handed (a `+0xC4` array of
  * `{u16 id, u8 payload}` rows) and the screen's state is driven by `game_ready_ck` plus the
  * `fn_8021D5BC` lobby state query.  The `em009` action slots that used to head the range
- * (`0x8038E8E8..0x8038EC44`) moved to `enemy/fn_80387844.cpp` - see SEAM below.
+ * (`0x8038E8E8..0x8038EC44`) moved to `enemy/em009_act.cpp` - see SEAM below.
  *
  * MODULE AND NAME (brief section 2, evidence order), evidence class 3.  1. No `__FILE__` string
  * covers the range: every `s_*`/`lbl_*` reference of its 65 split objects is a `.data` table, a
@@ -37,7 +37,7 @@
  * program-table block) whose only `.data` reference is `lbl_805EFAB8`, which sits between the `em009`
  * band's own tables, so they belong to that TU.  `fn_8038EBE8` (0x5C) is the same deleting destructor
  * as `fn_8019E5A8`/`fn_801AA0F8`, each the last function of its TU, so the em009 TU ends at 0x8038EC44
- * (`enemy/fn_80387844.cpp`).  The `.sdata2` pool corroborates the window (the repeated 1.0 at
+ * (`enemy/em009_act.cpp`).  The `.sdata2` pool corroborates the window (the repeated 1.0 at
  * `lbl_8079C2A4` starts a new pool somewhere in 0x8038E8E8..0x8038EFEC).  GUESS: this unit's true first
  * function could be anywhere up to 0x8038EF28 (`fn_8038EF28` is the first reader of the new pool); the
  * dtor closes the em009 TU, so 0x8038EC44 is taken.

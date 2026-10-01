@@ -1,4 +1,4 @@
-/* Declarations the enemy action band `enemy/fn_80387844.cpp` needs that its owner headers cannot
+/* Declarations the enemy action band `enemy/em009_act.cpp` needs that its owner headers cannot
  * carry without breaking the C consumers: the two move-work accessors the band walks by their 0xB20
  * stride.  `ef/fn_800CDB2C.cpp` owns the addresses (0x800CFA90/0x800CFAD0), but its own header cannot
  * hold the C++-scope spelling beside `include/unsplit/ef.h`'s C-scope one (MWCC 10505 illegal

@@ -848,7 +848,7 @@ config.libs = [
             # `.sdata2`/`.bss`/`.sbss` runs are claimed by the pass that writes the bodies emitting
             # them (docs/plan.md 8.4).  Same `cflags_menu` as its menu siblings.
             Object(NonMatching, "menu/get_pop_dat_ptr.cpp"),
-            Object(NonMatching, "menu/arena_result.cpp"),
+            Object(NonMatching, "lobby/lb_server_sel_trans.cpp"),  # phase 4 recut of the line above (its tail), same cflags_menu
             # Registered once, at its final home, from proposal/803AA4A4_fn_803AA4A4.cpp: the quest
             # entry/init band (`.text` 0x803AA4A4..0x803B0F98, 70 functions / 27380 B) with extab
             # 0x80018A6C..0x80018C54 (60 records) and extabindex 0x80038E08..0x800390E4 (60 x 12 B) -
@@ -876,6 +876,7 @@ config.libs = [
             # is recorded in the unit header.  This pass writes 12 of the 139 bodies; the rest keep
             # their original bytes and measure 0 %.
             Object(NonMatching, "enemy/em_pop.cpp"),
+            Object(NonMatching, "enemy/em_model.cpp"),  # phase 4 recut of the line above (its tail), same cflags_menu
             # Registered once, at its final home: the arena task band (`.text`
             # 0x804459E4..0x80448404, 19 functions / 10784 B; extab 0x8001DE9C..0x8001DF24 and
             # extabindex 0x8003EB20..0x8003EBEC, both exactly this run's records - every entry is an
@@ -895,10 +896,15 @@ config.libs = [
             # unit's own shared pool constants (`arena_zero_f`/`arena_50f`, must-link 15578..15585) -
             # measured with `at 0x804459E4 --window 48`, and the phenomenon behind the caveat is real
             # (640 of the 7245 `.sdata2` labels are cited by more than one registered unit).  Same
-            # `cflags_menu` as its link neighbours `quest/quest_entry.cpp` and `menu/arena_result.cpp`.
+            # `cflags_menu` as its link neighbour `quest/quest_entry.cpp`.
             # This pass writes 6 of the 19 bodies (740 B of 10784); the other 13 keep their original
             # bytes and are listed with their blockers in the unit header and the outbox.
             Object(NonMatching, "quest/arenatask.cpp"),
+            # Phase 4 stubs (docs/splits/phase4, window e): candidate units with no bodies yet, `cflags_menu` of the lib.
+            Object(NonMatching, "menu/menu_placeinfo.cpp"),
+            Object(NonMatching, "menu/movie.cpp"),
+            Object(NonMatching, "menu/menu_plsearch.cpp"),
+            Object(NonMatching, "menu/menu_sysmsg.cpp"),
         ],
     },
 
@@ -1327,7 +1333,7 @@ config.libs = [
             # functions measure 100.0, so `flipcheck.py`/`verifyunit.py` say READY and the linker
             # substitutes the object rather than leaving the range's original bytes (playbook 5d).
             Object(Matching, "enemy/em020_handlers.cpp"),
-            # Registered once, at its final home (docs/plan.md 12) from proposal/80387844_fn_80387844.cpp:
+            # Registered once, at its final home (docs/plan.md 12) from proposal/80387844_fn_80387844.cpp, renamed in phase 4 from `enemy/fn_80387844`:
             # the em009 enemy's monster-AI action band, `.text` 0x803868DC..0x8038EC44 (2026-09-30 recut of the
             # range first registered as 0x80387844..0x8038E8E8; see the unit's header).  Module `enemy` from the code (every body drives the shared `_ENEMY_WORK` record
             # through `em_frame_check__FP11_ENEMY_WORKUsff`, `em_after_frame_check`, `get_joint_wpos_em`,
@@ -1335,15 +1341,15 @@ config.libs = [
             # of the bracketing enemy bands; C++ because the range reaches genuinely mangled callees
             # (`setVector3__FPQ34nw4r4math4VEC3fff`, `mulVecMatAddTrans`, `rotVecY`) through their real
             # signatures (rule 9).  No `__FILE__` string is reachable from the range and the runtime dump
-            # answers only `zz_` placeholders, so the file keeps the map's own `fn_80387844` stem.
-            Object(NonMatching, "enemy/fn_80387844.cpp"),
+            # answers only `zz_` placeholders, so the file stem is derived from the map's `em009_act_*` names.
+            Object(NonMatching, "enemy/em009_act.cpp"),
             # Registered once, at its final home (docs/plan.md 12) from proposal/80382310_fn_80382310.cpp:
             # the enemy note-pane/program band's shared support block, `.text` 0x80382310..0x803868DC, extab to
             # 0x8001803C, extabindex to 0x80037EC0 (2026-09-30 recut of the range first registered as
             # 0x80382310..0x80387844).  Module `enemy` from the code (every body drives the shared
             # `_ENEMY_WORK` record through `em_frame_check__FP11_ENEMY_WORKUsff`, `em_act_ck`, `em_magma_check`,
             # `get_joint_wpos_em`, `get_em_chg_scale`) and from the `.data` `em019_prog_tbl`/`em009_prog_tbl`
-            # program tables that bracket the range; the next registered unit is `enemy/fn_80387844.cpp`.
+            # program tables that bracket the range; the next registered unit is `enemy/em009_act.cpp`.
             # C++ because the range defines `qn_get_motion_no__FP7_QNPC_W` and reaches genuinely mangled
             # callees through their real signatures (rule 9).  No `__FILE__` string is referenced by the
             # range and the runtime dump answers only `zz_` placeholders, so the file keeps the map's own
@@ -1728,7 +1734,13 @@ config.libs = [
         "cflags": cflags_ppceabi,
         "progress_category": "sdk",  # str | List[str]
         "objects": [
-            Object(Matching, "Runtime.PPCEABI.H/global_destructor_chain.c"),
+            # Phase 4 stubs (docs/splits/phase4, window e): MSL/runtime candidate units with no bodies yet.
+            Object(NonMatching, "MSL/strlen.cpp"),
+            Object(NonMatching, "Runtime.PPCEABI.H/__va_arg.cpp"),
+            Object(NonMatching, "Runtime.PPCEABI.H/global_destructor_chain.c"),
+            Object(NonMatching, "Runtime.PPCEABI.H/CPlusLibPPC.cpp"),
+            Object(NonMatching, "Runtime.PPCEABI.H/runtime.cpp"),
+            Object(NonMatching, "MSL_C/alloc.cpp"),
             Object(NonMatching, "Runtime.PPCEABI.H/ptmf.c"),
             # Metrowerks' Gecko exception runtime, with the SDK's own extension (.cp, resolved as C++).
             Object(NonMatching, "Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp"),
@@ -2306,10 +2318,10 @@ config.libs = [
         "host": False,
         "objects": [
             # Registered once, at its final home (docs/plan.md 12), the Capcom `Network` reconnaissance
-            # lane (branch worker/net-capcom).  Five units; `constructNetworkWiiMediator` and
-            # `initNetworkSessionStable` have flipped (see their entries below), the other three are
-            # `Object(NonMatching, ...)`.
-            #   Network/initNetworkSessionStable.cpp     .text 0x803DEA30..0x803DEB38 (264 B, 1 fn)
+            # lane (branch worker/net-capcom).  Five units; `constructNetworkWiiMediator` has flipped (see its
+            # entry below), `initNetworkSessionStable` was folded into `Network/NetworkSessionManagerPat.cpp` at
+            # phase 4 (its per-unit -O3 evidence below is kept), the other three are `Object(NonMatching, ...)`.
+            #   Network/initNetworkSessionStable.cpp (folded)  .text 0x803DEA30..0x803DEB38 (264 B, 1 fn)
             #   Network/network_state.cpp              .text 0x803FE8E4..0x804006A8 (8900 B, 21 fn)
             #   Network/NetworkWiiMediator.cpp         .text 0x80413C64..0x804155D4 (6490 B, 79 fn)
             #   Network/constructNetworkWiiMediator.cpp  .text 0x80418988..0x804189C8 (64 B, 1 fn)
@@ -2338,8 +2350,6 @@ config.libs = [
             # `@etb_8001A630` in extabindex).  The extab record and the last `.text` byte are source
             # shapes, not flags - the `new` expression and the file-scope `#pragma peephole off`, both
             # with their measured evidence in the unit header.
-            Object(Matching, "Network/initNetworkSessionStable.cpp",
-                   cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             Object(NonMatching, "Network/network_state.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             # Registered once, at its final home: proposal `803E44C8_fn_803E44C8` (`.text`
@@ -2349,6 +2359,11 @@ config.libs = [
             # `-O4,p` (everything else equal) the unit's one function scores 90.14167 %, against 100.00000 % at `-O3`.
             Object(NonMatching, "Network/NetworkLayerPatStep.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
+            # Phase 4 stubs (docs/splits/phase4, window e): units of the reconciled candidate with no bodies yet.
+            # Each source's header says what the range is and what is unknown; flags are the lib default, unmeasured.
+            Object(NonMatching, "Network/NetworkCommunityPat.cpp"),
+            Object(NonMatching, "Network/PatInterface.cpp"),
+            Object(NonMatching, "Network/network_layer_io.cpp"),
             # Per-object flag deviation (brief section 8.2), instruction-level evidence: measured over
             # the unit's 79 rows, the lib's `-O4,p` leaves getAccountBan/Warning/WaitQueue at 42.86 and
             # getReflectName3C at 51.28 where `-O3` puts all four at 100.00, and `-inline auto` scores
@@ -2357,6 +2372,7 @@ config.libs = [
             # src/Network/NetworkWiiMediator.cpp.
             Object(NonMatching, "Network/NetworkWiiMediator.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
+            Object(NonMatching, "Network/network_opening.cpp"),  # phase 4 stub
             # Per-object flag deviation (brief section 8.2), instruction-level evidence: retail's
             # `constructNetworkWiiMediator` is the plain source order - `li r3,0x1408` lands *after*
             # the two callee-save stores and the `cmpwi r3,0` after `mr r31,r3`; `-O4,p` hoists both
@@ -2369,6 +2385,7 @@ config.libs = [
             # extab record is the one a C++ `new` expression emits - see the unit header.
             Object(Matching, "Network/constructNetworkWiiMediator.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
+            Object(NonMatching, "Network/constructNetworkLibrary.cpp"),  # phase 4 stub
             # Per-object flag deviation (brief section 8.2), instruction-level evidence: the three
             # `deleteNetwork*Pat` helpers get the target's block order and the target's `bl` to the
             # sibling `clearNetwork*Pat` (retail calls it; `-inline auto` folds the 36-byte callee in
@@ -2382,6 +2399,7 @@ config.libs = [
             # 0x8041A170 (+0x24), so the old edge orphaned that function into an `auto_*` unit.
             Object(Matching, "Network/NetworkPat.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
+            Object(NonMatching, "Network/NetworkReflectService.cpp"),  # phase 4 stub
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `803D3CE8_NetworkSessionManager.cpp` (`.text` now 0x803D4904..0x803D70B8: the twelve `NetworkSessionStable`
             # op-code writers that opened the range moved to `Network/NetworkSessionStable.cpp`, whose
@@ -2831,7 +2849,7 @@ config.libs = [
             # (`.text` 0x8038E8E8..0x80394038, 70 functions / 22352 B) plus its extab run
             # 0x8001819C..0x8001833C (52 x 8 B) and extabindex run 0x800380D0..0x80038340
             # (52 x 12 B) - both runs are exactly the gap the bracketing units leave
-            # (`enemy/fn_80387844.cpp` ends at 0x8001819C / 0x800380D0).  Module `lobby`,
+            # (`enemy/em009_act.cpp` ends at 0x8001819C / 0x800380D0).  Module `lobby`,
             # evidence class 3 (see the unit header): the range reads `lobby_w`/`lb_param_w`,
             # calls `LbStr` 28 times and the whole lobby/HUD 2D API, and the lobby menu
             # dispatcher `fn_80211E68` calls two of its functions as screen entry points.  The
@@ -2941,16 +2959,8 @@ config.libs = [
             # Evidence class 1; un-moduled game file at the repository root in the `main` (game) lib,
             # cflags_main.  Claims .text 0x8056BBF0-0x8056F2B4 + the .ctors word 0x8056F428-0x8056F42C.
             Object(NonMatching, "tiHKBManager.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `80423E74_fn_80423E74` - the 0x80423E74-0x80429B94 network work-record band (77
-            # functions, 23840 B) with extab 0x8001D1B4-0x8001D368 and extabindex
-            # 0x8003DC44-0x8003DE54.  Its own `.data` pool is the two dispatch jump tables at
-            # 0x80603750 / 0x806037F4 and the so/dwc alloc-failure strings at 0x80603888; no
-            # `__FILE__` string and no runtime-dump source name cover the range (class 3/4 in the
-            # brief), so the stem is the map's `fn_80423E74` with a rule-7 deferral.  Same game-root
-            # `main` lib and cflags_main as the link neighbour `Network/network_pat_control.cpp`
-            # below it (both dereference `net_ctrl_wk` and call `getPatsObject`/`getNetworkLayerPat`).
-            Object(NonMatching, "fn_80423E74.cpp"),
+            # Phase 4 fold: the unit is 0x80423E74-0x80432104 - it absorbed the former `fn_80423E74.cpp`
+            # work-record / PatCamellia band (0x80423E74-0x80429B94, 77 functions; same lib and `cflags_main`).
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `80429B94_fn_80429B94` - the 0x80429B94-0x8043065C network pat-control band (114
             # functions, 27336 B) with extab 0x8001D368-0x8001D558 and extabindex 0x8003DE54-0x8003E0DC.
@@ -2962,6 +2972,7 @@ config.libs = [
             # It takes the game-root `main` lib and cflags_main (Wii/1.3, -O3, -inline noauto,
             # -Cpp_exceptions on - the target object carries extab/extabindex).
             Object(NonMatching, "Network/network_pat_control.cpp"),
+            Object(NonMatching, "Network/net_session_close.cpp"),  # phase 4 stub (link neighbour's lib and cflags_main)
             # Registered once, at its final home (docs/plan.md 12): the key function of
             # `NetworkSessionManagerPat` - `move` (0x803D70B8, 572 B), the head of the queue's
             # `803D70B8_fn_803D70B8` band.  MWCC emits a class's vtable in the TU that defines its key

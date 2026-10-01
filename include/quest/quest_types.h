@@ -63,7 +63,7 @@ struct Q_ArenaItem {
 };  /* size: 0x6 */
 
 /* The result row `Q_ItemWork::record_0x3C` points at, as this unit reads it: only the word at +0x310,
- * whose bit 0x00800000 marks a live row.  `menu/arena_result.cpp`'s own view of the same record
+ * whose bit 0x00800000 marks a live row.  `quest/quest_entry.cpp`'s own view of the same record
  * (`include/unsplit/menu.h`'s `QuestRecord`) names the rest of it; that header is not this unit's to
  * extend, so the prefix this unit reads stays here - merging the two views is a follow-up. */
 struct Q_ResultRow {

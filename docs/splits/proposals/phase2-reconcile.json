@@ -8544,71 +8544,30 @@
    "section": ".data",
    "range": [
     "0x805F9190",
-    "0x805F91F0"
+    "0x805F94E0"
    ],
-   "grade": "guess",
-   "signal": "vtable-store",
-   "symbols": 2,
-   "bytes": 96,
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 16,
+   "bytes": 848,
    "signals": {
-    "vtable-store": 2
+    "orchestrator": 16
    },
    "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window e units> --root . --base-root ../mhtri-dtk --base-ref main",
+     "finding": "the data-closure row refuses 16 pairs lbl_805F9190..lbl_805F9490: referenced by exactly one batch unit's object, no claim covers it"
+    },
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x805F9190",
-     "finding": "lbl_805F9190 (.data 0x805F9190, 0x50 B) is read at 0x803CA1F0 in lobby/lb_server_sel_trans.cpp"
-    },
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x805F91E0",
-     "finding": "lbl_805F91E0 (.data 0x805F91E0, 0x10 B) is read at 0x803CA394 in lobby/lb_server_sel_trans.cpp"
-    },
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain lb_server_sel_trans --section .data",
-     "finding": "2 symbol(s): 2 read by lobby/lb_server_sel_trans.cpp (first 0x805F9190, last 0x805F91E0)"
+     "finding": "each is read only by lb_server_sel_trans's text (0x803C3A5C..0x803CCDF8), no unsplit reader; the unit's .data claim ends at 0x805F9190 and Network/NetworkPeerBase starts at 0x805F94E0"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain lb_server_sel_trans --section .data",
+   "reproduce": "python tools/units/callers.py 0x805F9190",
    "text_addr": "0x803C3A5C",
-   "note": "not applied: attaching it fails the data-order invariant (strong zigzag seam at 0x805F9190 inside the unit's .data (a boundary in [0x805F9190, 0x805F9190)): at least 3 TUs)"
-  },
-  {
-   "unit": "lobby/lb_server_sel_trans.cpp",
-   "section": ".data",
-   "range": [
-    "0x805F91F0",
-    "0x805F94E0"
-   ],
-   "grade": "guess",
-   "signal": "string-reader",
-   "symbols": 14,
-   "bytes": 752,
-   "signals": {
-    "string-reader": 13,
-    "vtable-store": 1
-   },
-   "evidence": [
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x805F91F0",
-     "finding": "lbl_805F91F0 (.data 0x805F91F0, 0x3A B) is read at 0x803CACB4 in lobby/lb_server_sel_trans.cpp"
-    },
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x805F9490",
-     "finding": "lbl_805F9490 (.data 0x805F9490, 0x50 B) is read at 0x803CA4B8 in lobby/lb_server_sel_trans.cpp"
-    },
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain lb_server_sel_trans --section .data",
-     "finding": "14 symbol(s): 14 read by lobby/lb_server_sel_trans.cpp (first 0x805F91F0, last 0x805F9490)"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain lb_server_sel_trans --section .data",
-   "text_addr": "0x803C3A5C",
-   "note": "not applied: attaching it fails the data-order invariant (follows the blocked piece at 0x805F9190 of the same block: strong zigzag seam at 0x805F9190 inside the unit's .data (a boundary in [0x805F9190, 0x805F9190)): at)"
+   "note": "orchestrator override 44: medium: sole-owned (one referencing unit, no unsplit reader), claimed tight so the batch leaves no data clearly owned behind; a merged guess block owns it until its cut lands; force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit"
   },
   {
    "unit": "Network/NetworkSessionManagerPat.cpp",
@@ -8652,36 +8611,28 @@
     "0x805FB2B8",
     "0x805FBC78"
    ],
-   "grade": "guess",
-   "signal": "reader",
+   "grade": "medium",
+   "signal": "orchestrator",
    "symbols": 43,
    "bytes": 2496,
    "signals": {
-    "string-reader": 14,
-    "reader": 23,
-    "vtable-store": 1,
-    "jumptable": 5
+    "orchestrator": 43
    },
    "evidence": [
     {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window e units> --root . --base-root ../mhtri-dtk --base-ref main",
+     "finding": "the data-closure row refuses 43 pairs lbl_805FB2B8..jumptable_805FBABC (message strings, jump tables, NetworkLayer_VTable 0x805FB5D0): referenced by exactly one batch unit's object, no claim covers it"
+    },
+    {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x805FB2B8",
-     "finding": "lbl_805FB2B8 (.data 0x805FB2B8, 0x38 B) is read at 0x803DF8A8 in Network/NetworkSessionManagerPat.cpp"
-    },
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x805FBABC",
-     "finding": "jumptable_805FBABC (.data 0x805FBABC, 0x1BC B) is read at 0x803E3D2C in Network/NetworkSessionManagerPat.cpp"
-    },
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain NetworkSessionManagerPat --section .data",
-     "finding": "43 symbol(s): 43 read by Network/NetworkSessionManagerPat.cpp (first 0x805FB2B8, last 0x805FBABC)"
+     "finding": "each is read only by the Pat TU's text (0x803D70B8..0x803E44C8), 1-4 sites, no unsplit reader; the unit's own .data claim ends at 0x805FB2B8 (the vtable run) and the next unit (NetworkCommunityPat) starts at 0x805FBC78"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain NetworkSessionManagerPat --section .data",
+   "reproduce": "python tools/units/callers.py 0x805FB2B8",
    "text_addr": "0x803D70B8",
-   "note": "not applied: attaching it fails the data-order invariant (strong V->S seam at 0x805FB2B8 inside the unit's .data (a boundary in [0x805FB2B8, 0x805FB5D0)): at least 2 TUs)"
+   "note": "orchestrator override 39: medium: sole-owned (one referencing unit, no unsplit reader), claimed tight so the batch leaves no data clearly owned behind; a merged guess block owns it until its cut lands; force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit"
   },
   {
    "unit": "Network/NetworkCommunityPat.cpp",
@@ -8724,284 +8675,60 @@
    "section": ".data",
    "range": [
     "0x805FC324",
-    "0x805FC4D0"
+    "0x805FC357"
    ],
-   "grade": "guess",
-   "signal": "reader",
-   "symbols": 14,
-   "bytes": 428,
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 51,
    "signals": {
-    "string-reader": 3,
-    "reader": 10,
-    "vtable-store": 1
+    "orchestrator": 1
    },
    "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window e units> --root . --base-root ../mhtri-dtk --base-ref main",
+     "finding": "the data-closure row refuses lbl_805FC324 (0x34 B): referenced by exactly one batch unit's object, no claim covers it"
+    },
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x805FC324",
-     "finding": "lbl_805FC324 (.data 0x805FC324, 0x33 B) is read at 0x803E9C2C in Network/NetworkCommunityPat.cpp"
-    },
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x805FC440",
-     "finding": "lbl_805FC440 (.data 0x805FC440, 0x90 B) is read at 0x803EF688 in Network/NetworkCommunityPat.cpp"
-    },
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain NetworkCommunityPat --section .data",
-     "finding": "14 symbol(s): 14 read by Network/NetworkCommunityPat.cpp (first 0x805FC324, last 0x805FC440)"
+     "finding": "read only by NetworkCommunityPat's text (2 sites), no unsplit reader; the unit's .data claim ends at 0x805FC324"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain NetworkCommunityPat --section .data",
+   "reproduce": "python tools/units/callers.py 0x805FC324",
    "text_addr": "0x803E4888",
-   "note": "not applied: attaching it fails the data-order invariant (strong V->S seam at 0x805FC324 inside the unit's .data (a boundary in [0x805FC324, 0x805FC440)): at least 9 TUs)"
+   "note": "orchestrator override 40: medium: sole-owned (one referencing unit, no unsplit reader), claimed tight so the batch leaves no data clearly owned behind; a merged guess block owns it until its cut lands"
   },
   {
    "unit": "Network/NetworkCommunityPat.cpp",
    "section": ".data",
    "range": [
-    "0x805FC4D0",
-    "0x805FC7B8"
-   ],
-   "grade": "guess",
-   "signal": "reader",
-   "symbols": 11,
-   "bytes": 744,
-   "signals": {
-    "string-reader": 1,
-    "reader": 8,
-    "jumptable": 1,
-    "vtable-store": 1
-   },
-   "evidence": [
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x805FC4D0",
-     "finding": "lbl_805FC4D0 (.data 0x805FC4D0, 0x38 B) is read at 0x803F0E10 in Network/NetworkCommunityPat.cpp"
-    },
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x805FC728",
-     "finding": "lbl_805FC728 (.data 0x805FC728, 0x90 B) is read at 0x803F02E4 in Network/NetworkCommunityPat.cpp"
-    },
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain NetworkCommunityPat --section .data",
-     "finding": "11 symbol(s): 11 read by Network/NetworkCommunityPat.cpp (first 0x805FC4D0, last 0x805FC728)"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain NetworkCommunityPat --section .data",
-   "text_addr": "0x803E4888",
-   "note": "not applied: attaching it fails the data-order invariant (follows the blocked piece at 0x805FC324 of the same block: strong V->S seam at 0x805FC324 inside the unit's .data (a boundary in [0x805FC324, 0x805FC440)): at l)"
-  },
-  {
-   "unit": "Network/NetworkCommunityPat.cpp",
-   "section": ".data",
-   "range": [
-    "0x805FC7B8",
-    "0x805FC8A8"
-   ],
-   "grade": "guess",
-   "signal": "string-reader",
-   "symbols": 5,
-   "bytes": 240,
-   "signals": {
-    "string-reader": 2,
-    "vtable-store": 2,
-    "jumptable": 1
-   },
-   "evidence": [
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x805FC7B8",
-     "finding": "lbl_805FC7B8 (.data 0x805FC7B8, 0x33 B) is read at 0x803F365C in Network/NetworkCommunityPat.cpp"
-    },
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x805FC880",
-     "finding": "lbl_805FC880 (.data 0x805FC880, 0x28 B) is read at 0x803F6574 in Network/NetworkCommunityPat.cpp"
-    },
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain NetworkCommunityPat --section .data",
-     "finding": "5 symbol(s): 5 read by Network/NetworkCommunityPat.cpp (first 0x805FC7B8, last 0x805FC880)"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain NetworkCommunityPat --section .data",
-   "text_addr": "0x803E4888",
-   "note": "not applied: attaching it fails the data-order invariant (follows the blocked piece at 0x805FC324 of the same block: strong V->S seam at 0x805FC324 inside the unit's .data (a boundary in [0x805FC324, 0x805FC440)): at l)"
-  },
-  {
-   "unit": "Network/NetworkCommunityPat.cpp",
-   "section": ".data",
-   "range": [
-    "0x805FC8A8",
-    "0x805FC8D0"
-   ],
-   "grade": "guess",
-   "signal": "vtable-store",
-   "symbols": 1,
-   "bytes": 40,
-   "signals": {
-    "vtable-store": 1
-   },
-   "evidence": [
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x805FC8A8",
-     "finding": "lbl_805FC8A8 (.data 0x805FC8A8, 0x28 B) is read at 0x803F73DC in Network/NetworkCommunityPat.cpp"
-    },
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain NetworkCommunityPat --section .data",
-     "finding": "1 symbol(s): 1 read by Network/NetworkCommunityPat.cpp (first 0x805FC8A8, last 0x805FC8A8)"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain NetworkCommunityPat --section .data",
-   "text_addr": "0x803E4888",
-   "note": "not applied: attaching it fails the data-order invariant (follows the blocked piece at 0x805FC324 of the same block: strong V->S seam at 0x805FC324 inside the unit's .data (a boundary in [0x805FC324, 0x805FC440)): at l)"
-  },
-  {
-   "unit": "Network/NetworkCommunityPat.cpp",
-   "section": ".data",
-   "range": [
-    "0x805FC8D0",
-    "0x805FC920"
-   ],
-   "grade": "guess",
-   "signal": "vtable-store",
-   "symbols": 1,
-   "bytes": 80,
-   "signals": {
-    "vtable-store": 1
-   },
-   "evidence": [
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x805FC8D0",
-     "finding": "lbl_805FC8D0 (.data 0x805FC8D0, 0x50 B) is read at 0x803F74DC in Network/NetworkCommunityPat.cpp"
-    },
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain NetworkCommunityPat --section .data",
-     "finding": "1 symbol(s): 1 read by Network/NetworkCommunityPat.cpp (first 0x805FC8D0, last 0x805FC8D0)"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain NetworkCommunityPat --section .data",
-   "text_addr": "0x803E4888",
-   "note": "not applied: attaching it fails the data-order invariant (follows the blocked piece at 0x805FC324 of the same block: strong V->S seam at 0x805FC324 inside the unit's .data (a boundary in [0x805FC324, 0x805FC440)): at l)"
-  },
-  {
-   "unit": "Network/NetworkCommunityPat.cpp",
-   "section": ".data",
-   "range": [
-    "0x805FC920",
-    "0x805FC9D0"
-   ],
-   "grade": "guess",
-   "signal": "string-reader",
-   "symbols": 3,
-   "bytes": 176,
-   "signals": {
-    "string-reader": 2,
-    "vtable-store": 1
-   },
-   "evidence": [
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x805FC920",
-     "finding": "lbl_805FC920 (.data 0x805FC920, 0x2D B) is read at 0x803F78E0 in Network/NetworkCommunityPat.cpp"
-    },
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x805FC984",
-     "finding": "lbl_805FC984 (.data 0x805FC984, 0x4C B) is read at 0x803F7564 in Network/NetworkCommunityPat.cpp"
-    },
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain NetworkCommunityPat --section .data",
-     "finding": "3 symbol(s): 3 read by Network/NetworkCommunityPat.cpp (first 0x805FC920, last 0x805FC984)"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain NetworkCommunityPat --section .data",
-   "text_addr": "0x803E4888",
-   "note": "not applied: attaching it fails the data-order invariant (follows the blocked piece at 0x805FC324 of the same block: strong V->S seam at 0x805FC324 inside the unit's .data (a boundary in [0x805FC324, 0x805FC440)): at l)"
-  },
-  {
-   "unit": "Network/NetworkCommunityPat.cpp",
-   "section": ".data",
-   "range": [
-    "0x805FC9D0",
-    "0x805FCC98"
-   ],
-   "grade": "guess",
-   "signal": "string-reader",
-   "symbols": 15,
-   "bytes": 712,
-   "signals": {
-    "string-reader": 14,
-    "vtable-store": 1
-   },
-   "evidence": [
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x805FC9D0",
-     "finding": "lbl_805FC9D0 (.data 0x805FC9D0, 0x27 B) is read at 0x803F84D4 in Network/NetworkCommunityPat.cpp"
-    },
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x805FCC58",
-     "finding": "lbl_805FCC58 (.data 0x805FCC58, 0x40 B) is read at 0x803F87D4 in Network/NetworkCommunityPat.cpp"
-    },
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain NetworkCommunityPat --section .data",
-     "finding": "15 symbol(s): 15 read by Network/NetworkCommunityPat.cpp (first 0x805FC9D0, last 0x805FCC58)"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain NetworkCommunityPat --section .data",
-   "text_addr": "0x803E4888",
-   "note": "not applied: attaching it fails the data-order invariant (follows the blocked piece at 0x805FC324 of the same block: strong V->S seam at 0x805FC324 inside the unit's .data (a boundary in [0x805FC324, 0x805FC440)): at l)"
-  },
-  {
-   "unit": "Network/NetworkCommunityPat.cpp",
-   "section": ".data",
-   "range": [
-    "0x805FCC98",
+    "0x805FC358",
     "0x80600978"
    ],
-   "grade": "guess",
-   "signal": "pointer-graph",
-   "symbols": 311,
-   "bytes": 15584,
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 360,
+   "bytes": 17952,
    "signals": {
-    "string-reader": 16,
-    "vtable-store": 2,
-    "code-pointers": 2,
-    "pointer-graph": 239,
-    "forced": 50,
-    "sinit": 2
+    "orchestrator": 360
    },
    "evidence": [
     {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x805FCC98",
-     "finding": "lbl_805FCC98 (.data 0x805FCC98, 0x2E B) is read at 0x803FA538 in Network/NetworkCommunityPat.cpp"
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window e units> --root . --base-root ../mhtri-dtk --base-ref main",
+     "finding": "the data-closure row refuses the pairs in this range: referenced by batch units, no claim covers them"
     },
     {
      "tool": "callers",
-     "command": "python tools/units/callers.py 0x806006E8",
-     "finding": "lbl_806006E8 (.data 0x806006E8, 0x290 B) is read at 0x803FAEB8 in Network/NetworkCommunityPat.cpp"
-    },
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain NetworkCommunityPat --section .data",
-     "finding": "311 symbol(s): 20 read by Network/NetworkCommunityPat.cpp (first 0x805FCC98, last 0x806006E8), 50 unread one(s) forced to it by the non-decreasing link order between its neighbours' anchors, 241 placed by pointer-derived evidence (code-pointers, pointer-graph)"
+     "command": "python tools/units/callers.py 0x805FE910",
+     "finding": "PacketTable_BaseOffset_ID1 (0x1732 B) is address-taken by NetworkCommunityPat (flushBuffer, fn_803FC5B8) and network_layer_io (fn_804120B8); the whole run 0x805FC358..0x80600978 lies between Community's own .data claim (ends 0x805FC358) and PatInterface's (starts 0x80600978), and Community's text is the first owner in link order that can hold it: the run is Community's by link order, one contiguous claim (a spanning claim also covers lbl_805FC358, read by NetworkSessionManagerPat, and the 66 pairs the engine deferred as span-blocked)"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain NetworkCommunityPat --section .data",
+   "reproduce": "python tools/units/callers.py 0x805FE910",
    "text_addr": "0x803E4888",
-   "note": "not applied: attaching it fails the data-order invariant (follows the blocked piece at 0x805FC324 of the same block: strong V->S seam at 0x805FC324 inside the unit's .data (a boundary in [0x805FC324, 0x805FC440)): at l)"
+   "note": "orchestrator override 45: the run holds at least 8 TUs' data (data-order seam at 0x805FC4D0): kept as the merged block's, owner ruling 2026-10-01"
   },
   {
    "unit": "Network/PatInterface.cpp",
@@ -9080,84 +8807,45 @@
    "section": ".data",
    "range": [
     "0x80602428",
-    "0x806024A0"
-   ],
-   "grade": "guess",
-   "signal": "string-reader",
-   "symbols": 5,
-   "bytes": 120,
-   "signals": {
-    "string-reader": 3,
-    "jumptable": 1,
-    "vtable-store": 1
-   },
-   "evidence": [
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x80602428",
-     "finding": "lbl_80602428 (.data 0x80602428, 0x12 B) is read at 0x80412EE8 in Network/network_layer_io.cpp"
-    },
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x80602490",
-     "finding": "lbl_80602490 (.data 0x80602490, 0x10 B) is read at 0x80412540 in Network/network_layer_io.cpp"
-    },
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain network_layer_io --section .data",
-     "finding": "5 symbol(s): 5 read by Network/network_layer_io.cpp (first 0x80602428, last 0x80602490)"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain network_layer_io --section .data",
-   "text_addr": "0x804006A8",
-   "note": "not applied: attaching it fails the data-order invariant (strong V->S seam at 0x80602428 inside the unit's .data (a boundary in [0x80602428, 0x80602490)): at least 3 TUs)"
-  },
-  {
-   "unit": "Network/network_layer_io.cpp",
-   "section": ".data",
-   "range": [
-    "0x806024A0",
     "0x806024B8"
    ],
-   "grade": "guess",
-   "signal": "vtable-store",
-   "symbols": 1,
-   "bytes": 24,
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 6,
+   "bytes": 144,
    "signals": {
-    "vtable-store": 1
+    "orchestrator": 6
    },
    "evidence": [
     {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x806024A0",
-     "finding": "lbl_806024A0 (.data 0x806024A0, 0x18 B) is read at 0x80413388 in Network/network_layer_io.cpp"
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window e units> --root . --base-root ../mhtri-dtk --base-ref main",
+     "finding": "the data-closure row refuses 6 pairs lbl_80602428, lbl_8060243C, jumptable_80602448, lbl_80602480, lbl_80602490, lbl_806024A0: referenced by exactly one batch unit's object, no claim covers it"
     },
     {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain network_layer_io --section .data",
-     "finding": "1 symbol(s): 1 read by Network/network_layer_io.cpp (first 0x806024A0, last 0x806024A0)"
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80602448",
+     "finding": "each is read only by network_layer_io's text (0x804006A8..0x80413C64), no unsplit reader; the unit's .data claim ends at 0x80602428"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain network_layer_io --section .data",
+   "reproduce": "python tools/units/callers.py 0x80602448",
    "text_addr": "0x804006A8",
-   "note": "not applied: attaching it fails the data-order invariant (follows the blocked piece at 0x80602428 of the same block: strong V->S seam at 0x80602428 inside the unit's .data (a boundary in [0x80602428, 0x80602490)): at l)"
+   "note": "orchestrator override 41: medium: sole-owned (one referencing unit, no unsplit reader), claimed tight so the batch leaves no data clearly owned behind; a merged guess block owns it until its cut lands; force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit"
   },
   {
    "unit": "Network/network_opening.cpp",
    "section": ".data",
    "range": [
     "0x80602824",
-    "0x80602AF8"
+    "0x80602988"
    ],
    "grade": "guess",
    "signal": "string-reader",
-   "symbols": 14,
-   "bytes": 724,
+   "symbols": 7,
+   "bytes": 356,
    "signals": {
-    "string-reader": 10,
-    "forced": 2,
-    "reader": 1,
-    "vtable-store": 1
+    "string-reader": 5,
+    "forced": 2
    },
    "evidence": [
     {
@@ -9167,18 +8855,48 @@
     },
     {
      "tool": "callers",
-     "command": "python tools/units/callers.py 0x80602A60",
-     "finding": "lbl_80602A60 (.data 0x80602A60, 0x98 B) is read at 0x80417BD8 in Network/network_opening.cpp"
+     "command": "python tools/units/callers.py 0x8060291C",
+     "finding": "lbl_8060291C (.data 0x8060291C, 0x49 B) is read at 0x80417978 in Network/network_opening.cpp"
     },
     {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain network_opening --section .data",
-     "finding": "14 symbol(s): 12 read by Network/network_opening.cpp (first 0x80602824, last 0x80602A60), 2 unread one(s) forced to it by the non-decreasing link order between its neighbours' anchors"
+     "finding": "7 symbol(s): 5 read by Network/network_opening.cpp (first 0x80602824, last 0x8060291C), 2 unread one(s) forced to it by the non-decreasing link order between its neighbours' anchors"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain network_opening --section .data",
    "text_addr": "0x804155D4",
    "note": "not applied: attaching it fails the vtable invariant (vtable lbl_80602968 has no slot in this unit; its slots are in Network/network_layer_io.cpp)"
+  },
+  {
+   "unit": "Network/network_opening.cpp",
+   "section": ".data",
+   "range": [
+    "0x80602988",
+    "0x80602AF8"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 7,
+   "bytes": 368,
+   "signals": {
+    "orchestrator": 7
+   },
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window e units> --root . --base-root ../mhtri-dtk --base-ref main",
+     "finding": "the data-closure row refuses 7 pairs lbl_80602988..lbl_80602A60: referenced by exactly one batch unit's object, no claim covers it"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80602988",
+     "finding": "each is read only by network_opening's text (0x804155D4..0x80418988), no unsplit reader; the run lies between network_layer_io's .data and constructNetworkLibrary's (0x80602AF8)"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x80602988",
+   "text_addr": "0x804155D4",
+   "note": "orchestrator override 42: medium: sole-owned (one referencing unit, no unsplit reader), claimed tight so the batch leaves no data clearly owned behind; a merged guess block owns it until its cut lands"
   },
   {
    "unit": "Network/constructNetworkLibrary.cpp",
@@ -22171,6 +21889,36 @@
    "unit": "menu/get_pop_dat_ptr.cpp",
    "section": ".sbss",
    "range": [
+    "0x80794C60",
+    "0x80794C68"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 2,
+   "bytes": 8,
+   "signals": {
+    "orchestrator": 2
+   },
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window e units> --root . --base-root ../mhtri-dtk --base-ref main",
+     "finding": "the data-closure row refuses the pairs in this range: referenced by batch units, no claim covers them"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80794C60",
+     "finding": "lbl_80794C60 and lbl_80794C64 (4 B each) are both written by get_pop_dat_ptr's fn_803BE798 and read by one em_model function each (fn_803BD3C0, fn_803BA1B4); em_model's .sbss ends at 0x80794C60 and get_pop_dat_ptr's starts at 0x80794C68"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x80794C60",
+   "text_addr": "0x803BE30C",
+   "note": "orchestrator override 47: medium: definer = the unit whose code stores to them"
+  },
+  {
+   "unit": "menu/get_pop_dat_ptr.cpp",
+   "section": ".sbss",
+   "range": [
     "0x80794C68",
     "0x80794C90"
    ],
@@ -22232,6 +21980,36 @@
    "text_addr": "0x803C3A5C"
   },
   {
+   "unit": "Network/NetworkCommunityPat.cpp",
+   "section": ".sbss",
+   "range": [
+    "0x80794CA8",
+    "0x80794CB0"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 8,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window e units> --root . --base-root ../mhtri-dtk --base-ref main",
+     "finding": "the data-closure row refuses the pairs in this range: referenced by batch units, no claim covers them"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80794CA8",
+     "finding": "lbl_80794CA8 (8 B) is written by NetworkCommunityPat's fn_803EA77C and only read by NetworkSessionManagerPat (fn_803E2D7C): the writer is the definer; NetworkSessionManager's .sbss ends at 0x80794CA8 and PatInterface's starts at 0x80794CB0"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x80794CA8",
+   "text_addr": "0x803E4888",
+   "note": "orchestrator override 46: medium: definer = the unit whose code stores to it"
+  },
+  {
    "unit": "Network/PatInterface.cpp",
    "section": ".sbss",
    "range": [
@@ -22288,6 +22066,66 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain network_layer_io --section .sbss",
    "text_addr": "0x804006A8"
+  },
+  {
+   "unit": "Network/network_opening.cpp",
+   "section": ".sbss",
+   "range": [
+    "0x80794CC0",
+    "0x80794CC8"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 2,
+   "bytes": 8,
+   "signals": {
+    "orchestrator": 2
+   },
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window e units> --root . --base-root ../mhtri-dtk --base-ref main",
+     "finding": "the data-closure row refuses the pairs in this range: referenced by batch units, no claim covers them"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80794CC0",
+     "finding": "sNetworkWiiMediatorInstance (0x80794CC0) is written by network_opening's dtor_80417C44 (and by constructNetworkWiiMediator at 0x804189B0) and read by fn_80417BC0; mpMediator__15sNetworkLibrary (0x80794CC4) is read/written by constructNetworkLibrary and read by sound/fn_800E46E8. Both lie below network_opening's own .sbss object at 0x80794CC8 and above network_layer_io's range (ends 0x80794CC0), so link order leaves only network_opening"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x80794CC0",
+   "text_addr": "0x804155D4",
+   "note": "orchestrator override 48: medium: link order; mpMediator's class prefix (sNetworkLibrary) points at constructNetworkLibrary, whose text comes after network_opening: judgement call, listed in the lane report"
+  },
+  {
+   "unit": "Network/network_opening.cpp",
+   "section": ".sbss",
+   "range": [
+    "0x80794CC8",
+    "0x80794CD0"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 8,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window e units> --root . --base-root ../mhtri-dtk --base-ref main",
+     "finding": "the data-closure row refuses lbl_80794CC8 (3 sites): referenced by exactly one batch unit's object, no claim covers it"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80794CC8",
+     "finding": "read only by network_opening's text, no unsplit reader; constructNetworkLibrary's .sbss starts at 0x80794CD0"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x80794CC8",
+   "text_addr": "0x804155D4",
+   "note": "orchestrator override 43: medium: sole-owned (one referencing unit, no unsplit reader), claimed tight so the batch leaves no data clearly owned behind; a merged guess block owns it until its cut lands"
   },
   {
    "unit": "Network/constructNetworkLibrary.cpp",
@@ -32657,365 +32495,18 @@
   {
    "section": ".data",
    "range": [
-    "0x805F9190",
-    "0x805F91F0"
-   ],
-   "candidates": [
-    "lobby/lb_server_sel_trans.cpp"
-   ],
-   "kind": "multi-tu",
-   "symbols": 2,
-   "bytes": 96,
-   "signals": {
-    "vtable-store": 2
-   },
-   "evidence": [
-    {
-     "tool": "splitcheck",
-     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only data-order --unit lb_server_sel_trans",
-     "finding": "strong zigzag seam at 0x805F9190 inside the unit's .data (a boundary in [0x805F9190, 0x805F9190)): at least 3 TUs"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain lb_server_sel_trans --section .data",
-   "note": "link order and evidence put these symbols in lobby/lb_server_sel_trans.cpp, but attaching them makes the data-order invariant fail: the unit holds more than one TU, or one of its reads is not its own"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x805F91F0",
-    "0x805F94E0"
-   ],
-   "candidates": [
-    "lobby/lb_server_sel_trans.cpp"
-   ],
-   "kind": "multi-tu",
-   "symbols": 14,
-   "bytes": 752,
-   "signals": {
-    "string-reader": 13,
-    "vtable-store": 1
-   },
-   "evidence": [
-    {
-     "tool": "splitcheck",
-     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only data-order --unit lb_server_sel_trans",
-     "finding": "follows the blocked piece at 0x805F9190 of the same block: strong zigzag seam at 0x805F9190 inside the unit's .data (a boundary in [0x805F9190, 0x805F9190)): at least 3 TUs"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain lb_server_sel_trans --section .data",
-   "note": "link order and evidence put these symbols in lobby/lb_server_sel_trans.cpp, but attaching them makes the data-order invariant fail: the unit holds more than one TU, or one of its reads is not its own"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x805FB2B8",
-    "0x805FBC78"
-   ],
-   "candidates": [
-    "Network/NetworkSessionManagerPat.cpp"
-   ],
-   "kind": "multi-tu",
-   "symbols": 43,
-   "bytes": 2496,
-   "signals": {
-    "string-reader": 14,
-    "reader": 23,
-    "vtable-store": 1,
-    "jumptable": 5
-   },
-   "evidence": [
-    {
-     "tool": "splitcheck",
-     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only data-order --unit NetworkSessionManagerPat",
-     "finding": "strong V->S seam at 0x805FB2B8 inside the unit's .data (a boundary in [0x805FB2B8, 0x805FB5D0)): at least 2 TUs"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain NetworkSessionManagerPat --section .data",
-   "note": "link order and evidence put these symbols in Network/NetworkSessionManagerPat.cpp, but attaching them makes the data-order invariant fail: the unit holds more than one TU, or one of its reads is not its own"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x805FC324",
-    "0x805FC4D0"
-   ],
-   "candidates": [
-    "Network/NetworkCommunityPat.cpp"
-   ],
-   "kind": "multi-tu",
-   "symbols": 14,
-   "bytes": 428,
-   "signals": {
-    "string-reader": 3,
-    "reader": 10,
-    "vtable-store": 1
-   },
-   "evidence": [
-    {
-     "tool": "splitcheck",
-     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only data-order --unit NetworkCommunityPat",
-     "finding": "strong V->S seam at 0x805FC324 inside the unit's .data (a boundary in [0x805FC324, 0x805FC440)): at least 9 TUs"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain NetworkCommunityPat --section .data",
-   "note": "link order and evidence put these symbols in Network/NetworkCommunityPat.cpp, but attaching them makes the data-order invariant fail: the unit holds more than one TU, or one of its reads is not its own"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x805FC4D0",
-    "0x805FC7B8"
-   ],
-   "candidates": [
-    "Network/NetworkCommunityPat.cpp"
-   ],
-   "kind": "multi-tu",
-   "symbols": 11,
-   "bytes": 744,
-   "signals": {
-    "string-reader": 1,
-    "reader": 8,
-    "jumptable": 1,
-    "vtable-store": 1
-   },
-   "evidence": [
-    {
-     "tool": "splitcheck",
-     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only data-order --unit NetworkCommunityPat",
-     "finding": "follows the blocked piece at 0x805FC324 of the same block: strong V->S seam at 0x805FC324 inside the unit's .data (a boundary in [0x805FC324, 0x805FC440)): at least 9 TUs"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain NetworkCommunityPat --section .data",
-   "note": "link order and evidence put these symbols in Network/NetworkCommunityPat.cpp, but attaching them makes the data-order invariant fail: the unit holds more than one TU, or one of its reads is not its own"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x805FC7B8",
-    "0x805FC8A8"
-   ],
-   "candidates": [
-    "Network/NetworkCommunityPat.cpp"
-   ],
-   "kind": "multi-tu",
-   "symbols": 5,
-   "bytes": 240,
-   "signals": {
-    "string-reader": 2,
-    "vtable-store": 2,
-    "jumptable": 1
-   },
-   "evidence": [
-    {
-     "tool": "splitcheck",
-     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only data-order --unit NetworkCommunityPat",
-     "finding": "follows the blocked piece at 0x805FC324 of the same block: strong V->S seam at 0x805FC324 inside the unit's .data (a boundary in [0x805FC324, 0x805FC440)): at least 9 TUs"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain NetworkCommunityPat --section .data",
-   "note": "link order and evidence put these symbols in Network/NetworkCommunityPat.cpp, but attaching them makes the data-order invariant fail: the unit holds more than one TU, or one of its reads is not its own"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x805FC8A8",
-    "0x805FC8D0"
-   ],
-   "candidates": [
-    "Network/NetworkCommunityPat.cpp"
-   ],
-   "kind": "multi-tu",
-   "symbols": 1,
-   "bytes": 40,
-   "signals": {
-    "vtable-store": 1
-   },
-   "evidence": [
-    {
-     "tool": "splitcheck",
-     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only data-order --unit NetworkCommunityPat",
-     "finding": "follows the blocked piece at 0x805FC324 of the same block: strong V->S seam at 0x805FC324 inside the unit's .data (a boundary in [0x805FC324, 0x805FC440)): at least 9 TUs"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain NetworkCommunityPat --section .data",
-   "note": "link order and evidence put these symbols in Network/NetworkCommunityPat.cpp, but attaching them makes the data-order invariant fail: the unit holds more than one TU, or one of its reads is not its own"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x805FC8D0",
-    "0x805FC920"
-   ],
-   "candidates": [
-    "Network/NetworkCommunityPat.cpp"
-   ],
-   "kind": "multi-tu",
-   "symbols": 1,
-   "bytes": 80,
-   "signals": {
-    "vtable-store": 1
-   },
-   "evidence": [
-    {
-     "tool": "splitcheck",
-     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only data-order --unit NetworkCommunityPat",
-     "finding": "follows the blocked piece at 0x805FC324 of the same block: strong V->S seam at 0x805FC324 inside the unit's .data (a boundary in [0x805FC324, 0x805FC440)): at least 9 TUs"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain NetworkCommunityPat --section .data",
-   "note": "link order and evidence put these symbols in Network/NetworkCommunityPat.cpp, but attaching them makes the data-order invariant fail: the unit holds more than one TU, or one of its reads is not its own"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x805FC920",
-    "0x805FC9D0"
-   ],
-   "candidates": [
-    "Network/NetworkCommunityPat.cpp"
-   ],
-   "kind": "multi-tu",
-   "symbols": 3,
-   "bytes": 176,
-   "signals": {
-    "string-reader": 2,
-    "vtable-store": 1
-   },
-   "evidence": [
-    {
-     "tool": "splitcheck",
-     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only data-order --unit NetworkCommunityPat",
-     "finding": "follows the blocked piece at 0x805FC324 of the same block: strong V->S seam at 0x805FC324 inside the unit's .data (a boundary in [0x805FC324, 0x805FC440)): at least 9 TUs"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain NetworkCommunityPat --section .data",
-   "note": "link order and evidence put these symbols in Network/NetworkCommunityPat.cpp, but attaching them makes the data-order invariant fail: the unit holds more than one TU, or one of its reads is not its own"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x805FC9D0",
-    "0x805FCC98"
-   ],
-   "candidates": [
-    "Network/NetworkCommunityPat.cpp"
-   ],
-   "kind": "multi-tu",
-   "symbols": 15,
-   "bytes": 712,
-   "signals": {
-    "string-reader": 14,
-    "vtable-store": 1
-   },
-   "evidence": [
-    {
-     "tool": "splitcheck",
-     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only data-order --unit NetworkCommunityPat",
-     "finding": "follows the blocked piece at 0x805FC324 of the same block: strong V->S seam at 0x805FC324 inside the unit's .data (a boundary in [0x805FC324, 0x805FC440)): at least 9 TUs"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain NetworkCommunityPat --section .data",
-   "note": "link order and evidence put these symbols in Network/NetworkCommunityPat.cpp, but attaching them makes the data-order invariant fail: the unit holds more than one TU, or one of its reads is not its own"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x805FCC98",
-    "0x80600978"
-   ],
-   "candidates": [
-    "Network/NetworkCommunityPat.cpp"
-   ],
-   "kind": "multi-tu",
-   "symbols": 311,
-   "bytes": 15584,
-   "signals": {
-    "string-reader": 16,
-    "vtable-store": 2,
-    "code-pointers": 2,
-    "pointer-graph": 239,
-    "forced": 50,
-    "sinit": 2
-   },
-   "evidence": [
-    {
-     "tool": "splitcheck",
-     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only data-order --unit NetworkCommunityPat",
-     "finding": "follows the blocked piece at 0x805FC324 of the same block: strong V->S seam at 0x805FC324 inside the unit's .data (a boundary in [0x805FC324, 0x805FC440)): at least 9 TUs"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain NetworkCommunityPat --section .data",
-   "note": "link order and evidence put these symbols in Network/NetworkCommunityPat.cpp, but attaching them makes the data-order invariant fail: the unit holds more than one TU, or one of its reads is not its own"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x80602428",
-    "0x806024A0"
-   ],
-   "candidates": [
-    "Network/network_layer_io.cpp"
-   ],
-   "kind": "multi-tu",
-   "symbols": 5,
-   "bytes": 120,
-   "signals": {
-    "string-reader": 3,
-    "jumptable": 1,
-    "vtable-store": 1
-   },
-   "evidence": [
-    {
-     "tool": "splitcheck",
-     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only data-order --unit network_layer_io",
-     "finding": "strong V->S seam at 0x80602428 inside the unit's .data (a boundary in [0x80602428, 0x80602490)): at least 3 TUs"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain network_layer_io --section .data",
-   "note": "link order and evidence put these symbols in Network/network_layer_io.cpp, but attaching them makes the data-order invariant fail: the unit holds more than one TU, or one of its reads is not its own"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x806024A0",
-    "0x806024B8"
-   ],
-   "candidates": [
-    "Network/network_layer_io.cpp"
-   ],
-   "kind": "multi-tu",
-   "symbols": 1,
-   "bytes": 24,
-   "signals": {
-    "vtable-store": 1
-   },
-   "evidence": [
-    {
-     "tool": "splitcheck",
-     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only data-order --unit network_layer_io",
-     "finding": "follows the blocked piece at 0x80602428 of the same block: strong V->S seam at 0x80602428 inside the unit's .data (a boundary in [0x80602428, 0x80602490)): at least 3 TUs"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain network_layer_io --section .data",
-   "note": "link order and evidence put these symbols in Network/network_layer_io.cpp, but attaching them makes the data-order invariant fail: the unit holds more than one TU, or one of its reads is not its own"
-  },
-  {
-   "section": ".data",
-   "range": [
     "0x80602824",
-    "0x80602AF8"
+    "0x80602988"
    ],
    "candidates": [
     "Network/network_opening.cpp"
    ],
    "kind": "multi-tu",
-   "symbols": 14,
-   "bytes": 724,
+   "symbols": 7,
+   "bytes": 356,
    "signals": {
-    "string-reader": 10,
-    "forced": 2,
-    "reader": 1,
-    "vtable-store": 1
+    "string-reader": 5,
+    "forced": 2
    },
    "evidence": [
     {
@@ -34464,94 +33955,6 @@
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain lb_npc --section .sbss"
-  },
-  {
-   "section": ".sbss",
-   "range": [
-    "0x80794C60",
-    "0x80794C68"
-   ],
-   "kind": "ambiguous",
-   "symbols": 2,
-   "bytes": 8,
-   "candidates": [
-    "enemy/em_model.cpp",
-    "menu/get_pop_dat_ptr.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain em_model --section .sbss",
-     "finding": "2 symbol(s), 2 read (by em_model, get_pop_dat_ptr): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain em_model --section .sbss"
-  },
-  {
-   "section": ".sbss",
-   "range": [
-    "0x80794CA8",
-    "0x80794CB0"
-   ],
-   "kind": "ambiguous",
-   "symbols": 1,
-   "bytes": 8,
-   "candidates": [
-    "Network/NetworkSessionManagerPat.cpp",
-    "Network/NetworkCommunityPat.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain NetworkSessionManagerPat --section .sbss",
-     "finding": "1 symbol(s), 1 read (by NetworkSessionManagerPat, NetworkCommunityPat): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain NetworkSessionManagerPat --section .sbss"
-  },
-  {
-   "section": ".sbss",
-   "range": [
-    "0x80794CC0",
-    "0x80794CC4"
-   ],
-   "kind": "ambiguous",
-   "symbols": 1,
-   "bytes": 4,
-   "candidates": [
-    "Network/network_opening.cpp",
-    "Network/constructNetworkWiiMediator.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain network_opening --section .sbss",
-     "finding": "1 symbol(s), 1 read (by network_opening, constructNetworkWiiMediator): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain network_opening --section .sbss"
-  },
-  {
-   "section": ".sbss",
-   "range": [
-    "0x80794CC4",
-    "0x80794CD0"
-   ],
-   "kind": "ambiguous",
-   "symbols": 2,
-   "bytes": 12,
-   "candidates": [
-    "Network/network_opening.cpp",
-    "Network/constructNetworkLibrary.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain network_opening --section .sbss",
-     "finding": "2 symbol(s), 2 read (by network_opening, constructNetworkLibrary): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain network_opening --section .sbss"
   },
   {
    "section": ".sbss",

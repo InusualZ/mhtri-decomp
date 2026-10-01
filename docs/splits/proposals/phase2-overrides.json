@@ -726,6 +726,240 @@
    ],
    "note": "medium: read by both units, placed with the first reader; the pool check records the foreign read like the one of lbl_8079C780",
    "reproduce": "python tools/splits/dataattach.py --explain 0x8079C78C --section .sdata2"
+  },
+  {
+   "unit": "Network/NetworkSessionManagerPat.cpp",
+   "section": ".data",
+   "start": "0x805FB2B8",
+   "end": "0x805FBC78",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window e units> --root . --base-root ../mhtri-dtk --base-ref main",
+     "finding": "the data-closure row refuses 43 pairs lbl_805FB2B8..jumptable_805FBABC (message strings, jump tables, NetworkLayer_VTable 0x805FB5D0): referenced by exactly one batch unit's object, no claim covers it"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x805FB2B8",
+     "finding": "each is read only by the Pat TU's text (0x803D70B8..0x803E44C8), 1-4 sites, no unsplit reader; the unit's own .data claim ends at 0x805FB2B8 (the vtable run) and the next unit (NetworkCommunityPat) starts at 0x805FBC78"
+    }
+   ],
+   "note": "medium: sole-owned (one referencing unit, no unsplit reader), claimed tight so the batch leaves no data clearly owned behind; a merged guess block owns it until its cut lands; force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit",
+   "reproduce": "python tools/units/callers.py 0x805FB2B8",
+   "force": true
+  },
+  {
+   "unit": "Network/NetworkCommunityPat.cpp",
+   "section": ".data",
+   "start": "0x805FC324",
+   "end": "0x805FC358",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window e units> --root . --base-root ../mhtri-dtk --base-ref main",
+     "finding": "the data-closure row refuses lbl_805FC324 (0x34 B): referenced by exactly one batch unit's object, no claim covers it"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x805FC324",
+     "finding": "read only by NetworkCommunityPat's text (2 sites), no unsplit reader; the unit's .data claim ends at 0x805FC324"
+    }
+   ],
+   "note": "medium: sole-owned (one referencing unit, no unsplit reader), claimed tight so the batch leaves no data clearly owned behind; a merged guess block owns it until its cut lands",
+   "reproduce": "python tools/units/callers.py 0x805FC324"
+  },
+  {
+   "unit": "Network/network_layer_io.cpp",
+   "section": ".data",
+   "start": "0x80602428",
+   "end": "0x806024B8",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window e units> --root . --base-root ../mhtri-dtk --base-ref main",
+     "finding": "the data-closure row refuses 6 pairs lbl_80602428, lbl_8060243C, jumptable_80602448, lbl_80602480, lbl_80602490, lbl_806024A0: referenced by exactly one batch unit's object, no claim covers it"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80602448",
+     "finding": "each is read only by network_layer_io's text (0x804006A8..0x80413C64), no unsplit reader; the unit's .data claim ends at 0x80602428"
+    }
+   ],
+   "note": "medium: sole-owned (one referencing unit, no unsplit reader), claimed tight so the batch leaves no data clearly owned behind; a merged guess block owns it until its cut lands; force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit",
+   "reproduce": "python tools/units/callers.py 0x80602448",
+   "force": true
+  },
+  {
+   "unit": "Network/network_opening.cpp",
+   "section": ".data",
+   "start": "0x80602988",
+   "end": "0x80602AF8",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window e units> --root . --base-root ../mhtri-dtk --base-ref main",
+     "finding": "the data-closure row refuses 7 pairs lbl_80602988..lbl_80602A60: referenced by exactly one batch unit's object, no claim covers it"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80602988",
+     "finding": "each is read only by network_opening's text (0x804155D4..0x80418988), no unsplit reader; the run lies between network_layer_io's .data and constructNetworkLibrary's (0x80602AF8)"
+    }
+   ],
+   "note": "medium: sole-owned (one referencing unit, no unsplit reader), claimed tight so the batch leaves no data clearly owned behind; a merged guess block owns it until its cut lands",
+   "reproduce": "python tools/units/callers.py 0x80602988"
+  },
+  {
+   "unit": "Network/network_opening.cpp",
+   "section": ".sbss",
+   "start": "0x80794CC8",
+   "end": "0x80794CD0",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window e units> --root . --base-root ../mhtri-dtk --base-ref main",
+     "finding": "the data-closure row refuses lbl_80794CC8 (3 sites): referenced by exactly one batch unit's object, no claim covers it"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80794CC8",
+     "finding": "read only by network_opening's text, no unsplit reader; constructNetworkLibrary's .sbss starts at 0x80794CD0"
+    }
+   ],
+   "note": "medium: sole-owned (one referencing unit, no unsplit reader), claimed tight so the batch leaves no data clearly owned behind; a merged guess block owns it until its cut lands",
+   "reproduce": "python tools/units/callers.py 0x80794CC8"
+  },
+  {
+   "unit": "lobby/lb_server_sel_trans.cpp",
+   "section": ".data",
+   "start": "0x805F9190",
+   "end": "0x805F94E0",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window e units> --root . --base-root ../mhtri-dtk --base-ref main",
+     "finding": "the data-closure row refuses 16 pairs lbl_805F9190..lbl_805F9490: referenced by exactly one batch unit's object, no claim covers it"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x805F9190",
+     "finding": "each is read only by lb_server_sel_trans's text (0x803C3A5C..0x803CCDF8), no unsplit reader; the unit's .data claim ends at 0x805F9190 and Network/NetworkPeerBase starts at 0x805F94E0"
+    }
+   ],
+   "note": "medium: sole-owned (one referencing unit, no unsplit reader), claimed tight so the batch leaves no data clearly owned behind; a merged guess block owns it until its cut lands; force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit",
+   "reproduce": "python tools/units/callers.py 0x805F9190",
+   "force": true
+  },
+  {
+   "unit": "Network/NetworkCommunityPat.cpp",
+   "section": ".data",
+   "start": "0x805FC358",
+   "end": "0x80600978",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window e units> --root . --base-root ../mhtri-dtk --base-ref main",
+     "finding": "the data-closure row refuses the pairs in this range: referenced by batch units, no claim covers them"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x805FE910",
+     "finding": "PacketTable_BaseOffset_ID1 (0x1732 B) is address-taken by NetworkCommunityPat (flushBuffer, fn_803FC5B8) and network_layer_io (fn_804120B8); the whole run 0x805FC358..0x80600978 lies between Community's own .data claim (ends 0x805FC358) and PatInterface's (starts 0x80600978), and Community's text is the first owner in link order that can hold it: the run is Community's by link order, one contiguous claim (a spanning claim also covers lbl_805FC358, read by NetworkSessionManagerPat, and the 66 pairs the engine deferred as span-blocked)"
+    }
+   ],
+   "note": "the run holds at least 8 TUs' data (data-order seam at 0x805FC4D0): kept as the merged block's, owner ruling 2026-10-01",
+   "reproduce": "python tools/units/callers.py 0x805FE910",
+   "force": true
+  },
+  {
+   "unit": "Network/NetworkCommunityPat.cpp",
+   "section": ".sbss",
+   "start": "0x80794CA8",
+   "end": "0x80794CB0",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window e units> --root . --base-root ../mhtri-dtk --base-ref main",
+     "finding": "the data-closure row refuses the pairs in this range: referenced by batch units, no claim covers them"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80794CA8",
+     "finding": "lbl_80794CA8 (8 B) is written by NetworkCommunityPat's fn_803EA77C and only read by NetworkSessionManagerPat (fn_803E2D7C): the writer is the definer; NetworkSessionManager's .sbss ends at 0x80794CA8 and PatInterface's starts at 0x80794CB0"
+    }
+   ],
+   "note": "medium: definer = the unit whose code stores to it",
+   "reproduce": "python tools/units/callers.py 0x80794CA8"
+  },
+  {
+   "unit": "menu/get_pop_dat_ptr.cpp",
+   "section": ".sbss",
+   "start": "0x80794C60",
+   "end": "0x80794C68",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window e units> --root . --base-root ../mhtri-dtk --base-ref main",
+     "finding": "the data-closure row refuses the pairs in this range: referenced by batch units, no claim covers them"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80794C60",
+     "finding": "lbl_80794C60 and lbl_80794C64 (4 B each) are both written by get_pop_dat_ptr's fn_803BE798 and read by one em_model function each (fn_803BD3C0, fn_803BA1B4); em_model's .sbss ends at 0x80794C60 and get_pop_dat_ptr's starts at 0x80794C68"
+    }
+   ],
+   "note": "medium: definer = the unit whose code stores to them",
+   "reproduce": "python tools/units/callers.py 0x80794C60"
+  },
+  {
+   "unit": "Network/network_opening.cpp",
+   "section": ".sbss",
+   "start": "0x80794CC0",
+   "end": "0x80794CC8",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window e units> --root . --base-root ../mhtri-dtk --base-ref main",
+     "finding": "the data-closure row refuses the pairs in this range: referenced by batch units, no claim covers them"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80794CC0",
+     "finding": "sNetworkWiiMediatorInstance (0x80794CC0) is written by network_opening's dtor_80417C44 (and by constructNetworkWiiMediator at 0x804189B0) and read by fn_80417BC0; mpMediator__15sNetworkLibrary (0x80794CC4) is read/written by constructNetworkLibrary and read by sound/fn_800E46E8. Both lie below network_opening's own .sbss object at 0x80794CC8 and above network_layer_io's range (ends 0x80794CC0), so link order leaves only network_opening"
+    }
+   ],
+   "note": "medium: link order; mpMediator's class prefix (sNetworkLibrary) points at constructNetworkLibrary, whose text comes after network_opening: judgement call, listed in the lane report",
+   "reproduce": "python tools/units/callers.py 0x80794CC0"
   }
  ]
 }
