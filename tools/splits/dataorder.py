@@ -41,7 +41,7 @@ ROOT = uu.ROOT
 GAME = "RMHE08"
 SYMBOLS = os.path.join(ROOT, "config", GAME, "symbols.txt")
 SPLITS = os.path.join(ROOT, "config", GAME, "splits.txt")
-DOL = os.path.join(ROOT, "orig", GAME, "sys", "main.dol")
+DOL = uu.resolve_input(os.path.join("orig", GAME, "sys", "main.dol"), ROOT, os.path.isfile)   # MAIN's copy in a fresh worktree
 
 VTABLE, STRING, DATA = "V", "S", "D"
 PRINTABLE = set(range(32, 127)) | {9, 10, 13}

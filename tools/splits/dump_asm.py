@@ -37,7 +37,7 @@ sys.path.insert(0, str(ROOT / "tools" / "splits"))
 import tudiscover as td  # noqa: E402  (path set above; owns ASM_DIR and the dump stamp)
 
 CONFIG = ROOT / "config" / td.GAME / "config.yml"
-BUILD_DIR = Path(td.ASM_DIR).parent              # build/<game>, the split's `out_dir`
+BUILD_DIR = Path(td.LOCAL_ASM_DIR).parent        # build/<game>, the split's `out_dir` (the tree's own, never MAIN's)
 TMP_CONFIG = BUILD_DIR / "dump_asm.yml"          # a copy: never the repo's own config.yml
 DTK = ROOT / "build" / "tools" / ("dtk.exe" if os.name == "nt" else "dtk")
 
@@ -62,6 +62,7 @@ def main(argv=None):
     ap.add_argument("--dry-run", action="store_true",
                     help="print the split command and the temp config it would write; run nothing")
     args = ap.parse_args(argv)
+    td.use_local_dump()                               # read AND write this tree's dump, never the MAIN fallback
 
     state, msg = td.asm_stamp_status()
     print("asm dump           %s" % msg)

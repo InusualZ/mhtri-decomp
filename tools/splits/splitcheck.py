@@ -19,10 +19,11 @@ Invariants (one verdict per unit per invariant; PASS / FAIL / UNKNOWN, `-` = not
   coverage    every map symbol sits inside exactly one unit's range of its section (no gap under a symbol, no straddle)
   text-cut    a unit's `.text` starts and ends on a function symbol
   extab       every `extabindex` entry is owned by the unit that owns its function and its `extab` record
-  ctors/dtors the `.ctors`/`.dtors` word points at a function of the unit; a `.ctors` word is the unit's LAST function
-              (`__sinit`), and a unit has one
-  pool        idea 94: the `.sdata2` float/double and `.sdata` string pool of a unit is read only by that unit, runs in
-              first-use order, and holds each value once
+  ctors/dtors the `.ctors`/`.dtors` word points at a function of the unit; a unit has one `.ctors` word (`__sinit`), and the
+              TU ends at the end of the closure of the sinit's local callees and address-taken functions (MWCC emits the
+              deferred constructors, registered destructors and `b ctor` thunks after it), not at the sinit's own end
+  pool        idea 94: the `.sdata2` float/double and `.sdata` string pool of a unit is read only (by a load) by that unit,
+              runs in first-use order (per function), and holds each value once
   data-order  docs/data-order-seams.md: no strong V->S / zigzag seam strictly inside the unit's `.data`
   vtable      a vtable sits in the unit whose text holds one of its slots or stores it
   jumptable   a jump table sits in the unit that reads it and branches into
@@ -77,26 +78,15 @@ def tree_root():
 
 
 def main_root(root=None):
-    """The primary checkout (the parent of the git common dir), or None outside git."""
-    root = root or tree_root()
-    try:
-        out = subprocess.run(["git", "rev-parse", "--git-common-dir"], cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace",
-                             timeout=20).stdout.strip()
-    except (OSError, subprocess.SubprocessError):
-        return None
-    if not out:
-        return None
-    out = os.path.normpath(out if os.path.isabs(out) else os.path.join(root, out))
-    return os.path.dirname(out) if os.path.basename(out) == ".git" else None
+    """The primary checkout (`$MHTRI_MAIN`, else the parent of the git common dir), or None outside git."""
+    import unitutil as uu
+    return uu.main_tree(root or tree_root())
 
 
 def find_file(rel, root=None):
     """`rel` under the tree, else under the primary checkout (orig/ and build/ are not in a worktree)."""
-    root = root or tree_root()
-    for base in (root, main_root(root)):
-        if base and os.path.isfile(os.path.join(base, rel)):
-            return os.path.join(base, rel)
-    return os.path.join(root, rel)
+    import unitutil as uu
+    return uu.resolve_input(rel, root or tree_root(), os.path.isfile)
 
 
 # ---- splits.txt ------------------------------------------------------------------------------------------------------
@@ -241,24 +231,43 @@ def find_sda_bases(dol, code_words):
     return out[13], out[2]
 
 
-def scan_refs(code, start, sda13, sda2, is_data, fn_starts=()):
+#: opcodes that READ memory through `rA + d` (lwz/lbz/lhz/lha/lfs/lfd, their update forms, lmw, psq_l/psq_lu)
+LOAD_OPS = (32, 33, 34, 35, 40, 41, 42, 43, 46, 48, 49, 50, 51, 56, 57)
+#: registers a call clobbers (r0, r3..r12): an address formed there does not survive a `bl`
+VOLATILE = frozenset([0] + list(range(3, 13)))
+
+
+def scan_refs(code, start, sda13, sda2, is_data, fn_starts=(), loads=None):
     """`{target_address: [site, ...]}` for every absolute/small-data address a function materialises or accesses.
 
     `code` is the big-endian bytes of a code range starting at `start`; `is_data(addr)` says whether a computed
-    address is worth recording; a `lis` value is forgotten at a function start (`fn_starts`).
+    address is worth recording; a `lis` value is forgotten at a function start (`fn_starts`).  When `loads` is a
+    dict, it receives `{address: [site, ...]}` for the accesses that READ the address: a load through r13/r2, a
+    `lis` + load, and a load through a register an `addi`/`ori` formed the address into.  The `addi`/`ori` that
+    only forms the address of an entry is a reference (it is in the result) and is NOT a read of the literal.
     """
     refs = collections.defaultdict(list)
     n = len(code) // 4
     words = struct.unpack(">%dI" % n, code[:n * 4])
     fs = set(fn_starts)
     lis = {}
+    areg = {}                                          # register -> (address formed by addi/ori, index)
     for i, w in enumerate(words):
         site = start + i * 4
         if site in fs:
             lis.clear()
+            areg.clear()
         op = w >> 26
+        if op == 18 or op == 19:                       # b / bl / blr / bctr / bctrl / bclr...: control leaves
+            if w & 1:                                  # a call clobbers the volatile registers
+                for r in VOLATILE:
+                    areg.pop(r, None)
+            elif op == 18 or (w >> 21) & 31 == 20:     # an unconditional jump or return ends the path
+                areg.clear()
+            continue
         if op == 15:                                   # addis rD,rA,SIMM  (lis when rA == 0)
             rd, ra = (w >> 21) & 31, (w >> 16) & 31
+            areg.pop(rd, None)
             if ra == 0:
                 lis[rd] = ((w & 0xFFFF) << 16, i)
             else:
@@ -266,17 +275,23 @@ def scan_refs(code, start, sda13, sda2, is_data, fn_starts=()):
             continue
         if op == 24:                                   # ori rA,rS,UI : base is rS, result goes to rA
             rs, ra = (w >> 21) & 31, (w >> 16) & 31
+            areg.pop(ra, None)
             if rs in lis and i - lis[rs][1] <= LIS_WINDOW:
                 t = lis[rs][0] | (w & 0xFFFF)
                 if is_data(t):
                     refs[t].append(site)
+                areg[ra] = (t, i)
             if ra != rs:
                 lis.pop(ra, None)
             continue
-        if op == 14 or 32 <= op <= 55:
+        if op == 14 or 32 <= op <= 57:
             rt, ra = (w >> 21) & 31, (w >> 16) & 31
-            s = w & 0xFFFF
-            simm = s - 0x10000 if s & 0x8000 else s
+            if op in (56, 57):                         # psq_l / psq_lu: 12-bit displacement
+                s = w & 0xFFF
+                simm = s - 0x1000 if s & 0x800 else s
+            else:
+                s = w & 0xFFFF
+                simm = s - 0x10000 if s & 0x8000 else s
             t = None
             if ra == 13 and sda13 is not None:
                 t = (sda13 + simm) & 0xFFFFFFFF
@@ -286,13 +301,51 @@ def scan_refs(code, start, sda13, sda2, is_data, fn_starts=()):
                 t = (lis[ra][0] + simm) & 0xFFFFFFFF
             if t is not None and is_data(t):
                 refs[t].append(site)
+                if loads is not None and op in LOAD_OPS:
+                    loads.setdefault(t, []).append(site)
+            elif op != 14 and ra in areg and loads is not None and op in LOAD_OPS:
+                ta = (areg[ra][0] + simm) & 0xFFFFFFFF
+                if is_data(ta):
+                    loads.setdefault(ta, []).append(site)
+            if op == 14:
+                if rt != ra:
+                    areg.pop(rt, None)
+                if t is not None and is_data(t):
+                    areg[rt] = (t, i)
+                else:
+                    areg.pop(rt, None)
+            elif op in LOADS_INT:
+                areg.pop(rt, None)
             writes = op == 14 or op in LOADS_INT
             if writes:
                 lis.pop(rt, None)
             elif op == 46:                               # lmw rD: rD..r31 written
                 for r in range(rt, 32):
                     lis.pop(r, None)
+                    areg.pop(r, None)
     return refs
+
+
+def scan_calls(code, start, fn_starts):
+    """`[(site, target), ...]` for every `b`/`bl` whose target is a function start outside the function holding the site."""
+    out = []
+    n = len(code) // 4
+    words = struct.unpack(">%dI" % n, code[:n * 4])
+    fs = sorted(set(fn_starts))
+    fset = set(fs)
+    for i, w in enumerate(words):
+        if w >> 26 != 18 or w & 2:                     # b/bl with AA = 0
+            continue
+        site = start + i * 4
+        li = w & 0x03FFFFFC
+        if li & 0x02000000:
+            li -= 0x04000000
+        t = (site + li) & 0xFFFFFFFF
+        if t in fset:
+            k = bisect.bisect_right(fs, site) - 1
+            if k < 0 or fs[k] != t:                    # a branch to the function's own start is a loop, not a call
+                out.append((site, t))
+    return out
 
 
 # ---- the context: everything the invariants read --------------------------------------------------------------------------
@@ -320,6 +373,9 @@ class Ctx:
         self._ds_addr = [s["addr"] for s in self.data_syms]
         self.sda13, self.sda2 = sda13, sda2
         self.refs = {}                                        # data symbol index -> [sites]
+        self.load_refs = {}                                   # data symbol index -> [sites that LOAD through the address]
+        self.fn_refs = collections.defaultdict(list)          # function start -> [(site, "call" | "addr")]
+        self.fn_out = collections.defaultdict(set)            # function start -> {function starts it calls / takes}
         self.scanned = False
         if scan:
             self.scan()
@@ -387,16 +443,34 @@ class Ctx:
                     ws = [(init["addr"] + i * 4, w) for i, w in enumerate(struct.unpack(">%dI" % (len(b) // 4), b))]
                     self.sda13, self.sda2 = find_sda_bases(self.dol, ws)
         raw = collections.defaultdict(list)
+        rawl = {}
+        fnset = set(self._fn_starts)
         for lo, blob in chunks:
             if not blob:
                 continue
-            for t, sites in scan_refs(blob, lo, self.sda13, self.sda2, is_data, self._fn_starts).items():
+            for t, sites in scan_refs(blob, lo, self.sda13, self.sda2, is_data, self._fn_starts, rawl).items():
                 raw[t].extend(sites)
+            for site, t in scan_calls(blob, lo, self._fn_starts):
+                self._add_fn_ref(site, t, "call")
+            for t, sites in scan_refs(blob, lo, None, None, fnset.__contains__, self._fn_starts).items():
+                for site in sites:
+                    if self.fn_at(site) is not self.fn_at(t):
+                        self._add_fn_ref(site, t, "addr")
         for t, sites in raw.items():
             i, _s = self.data_sym_at(t)
             if i is not None:
                 self.refs.setdefault(i, []).extend(sites)
+        for t, sites in rawl.items():
+            i, _s = self.data_sym_at(t)
+            if i is not None:
+                self.load_refs.setdefault(i, []).extend(sites)
         self.scanned = True
+
+    def _add_fn_ref(self, site, target, kind):
+        self.fn_refs[target].append((site, kind))
+        f = self.fn_at(site)
+        if f is not None:
+            self.fn_out[f["addr"]].add(target)
 
     def read_span(self, lo, hi):
         """Bytes of `[lo, hi)`, reading across DOL section borders (a hole is zero-filled)."""
@@ -421,6 +495,36 @@ class Ctx:
         """The sites (text addresses) that read this map row, by identity."""
         i, _ = self.data_sym_at(sym["addr"])
         return self.refs.get(i, []) if i is not None and self.data_syms[i] is sym else []
+
+    def literal_readers(self, sym):
+        """The sites that read a pool literal.  A numeric `.sdata2` literal is read only by a LOAD (a `lis`/`addi` that
+        passes or compares its address does not read the value); a `.sdata` string is used by its address, so any reference."""
+        if sym["section"] == ".sdata2" and sym["size"] in (4, 8) and sym["type"] == "object":
+            i, _ = self.data_sym_at(sym["addr"])
+            return self.load_refs.get(i, []) if i is not None and self.data_syms[i] is sym else []
+        return self.readers(sym)
+
+    # the function reference index (callers-style, from the decoder)
+    def refs_to_fn(self, addr, lo=None, hi=None):
+        """`[(site, kind)]` of the code that calls or takes the address of the function at `addr`, within `[lo, hi)` when given."""
+        return [(s, k) for s, k in self.fn_refs.get(addr, []) if (lo is None or s >= lo) and (hi is None or s < hi)]
+
+    def sinit_closure(self, sinit_addr, end):
+        """`(functions, L)`: the closure of the functions the `__sinit` at `sinit_addr` calls or takes the address of, among
+        those after it and before `end` (MWCC emits the deferred constructors, registered destructors and `lis/addi/b ctor`
+        thunks there), and `L`, the end of the last of them (the sinit's own end when it has none)."""
+        f0 = self.fn_at(sinit_addr)
+        if f0 is None:
+            return set(), sinit_addr
+        seen = {f0["addr"]}
+        work = [f0["addr"]]
+        while work:
+            a = work.pop()
+            for t in self.fn_out.get(a, ()):
+                if f0["addr"] < t < end and t not in seen:
+                    seen.add(t)
+                    work.append(t)
+        return seen, max(f["addr"] + (f["size"] or 0) for f in (self.fn_at(a) for a in seen))
 
 
 # ---- the result store ---------------------------------------------------------------------------------------------------
@@ -659,12 +763,27 @@ def check_ctors(ctx, res):
                                                                                      tu.name if tu else "no unit"))
                 elif sec == ".ctors":
                     end = tr[-1][1] if tr else 0
-                    if f["addr"] + (f["size"] or 0) + SINIT_SLACK < end or f["addr"] + (f["size"] or 0) > end:
-                        res.add(u.name, inv, FAIL, a, "%s is not the unit's last function (text ends %s, it ends %s): a TU boundary is at %s"
-                                % (f["name"], hx(end), hx(f["addr"] + f["size"]), hx(f["addr"] + f["size"])),
-                                {"cut_at": f["addr"] + f["size"]})
-                    else:
+                    sinit_end = f["addr"] + (f["size"] or 0)
+                    if sinit_end > end:
+                        res.add(u.name, inv, FAIL, a, "%s runs past the unit's text (text ends %s, it ends %s)"
+                                % (f["name"], hx(end), hx(sinit_end)), {"cut_at": sinit_end})
+                        continue
+                    _fns, limit = ctx.sinit_closure(f["addr"], end)
+                    if limit + SINIT_SLACK >= end:
                         res.add(u.name, inv, PASS)
+                        continue
+                    g = ctx.fn_at(limit)
+                    lo = tr[0][0] if tr else 0
+                    before = ctx.refs_to_fn(limit, lo, limit) if g is not None and g["addr"] == limit else []
+                    if before:
+                        site, kind = before[0]
+                        res.add(u.name, inv, UNKNOWN, a, "%s's closure (sinit + its local callees) ends %s, before the unit end %s, but %s at %s is %s from %s, "
+                                "inside the unit: the boundary at %s is not confirmed" % (f["name"], hx(limit), hx(end), g["name"], hx(limit),
+                                                                                         "called" if kind == "call" else "address-taken", hx(site), hx(limit)),
+                                {"closure_end": limit})
+                    else:
+                        res.add(u.name, inv, FAIL, a, "%s's closure (sinit + its local callees) ends %s, unit text ends %s: a TU boundary is at %s"
+                                % (f["name"], hx(limit), hx(end), hx(limit)), {"cut_at": limit})
                 else:
                     res.add(u.name, inv, PASS)
 
@@ -699,6 +818,12 @@ def is_literal(sym):
             or (sym["section"] == ".sdata" and sym["kind"] == "string"))
 
 
+def _first_use_fn(ctx, site):
+    """The start of the function holding `site` (the site itself when the map has no function there)."""
+    f = ctx.fn_at(site)
+    return f["addr"] if f is not None else site
+
+
 def check_pool(ctx, res):
     """Idea 94.  Two halves: what a unit's own pool claim holds, and what its text reads wherever the pool lives."""
     ctx.pool_edges = collections.defaultdict(set)              # (unit, other) -> literal addresses
@@ -707,7 +832,7 @@ def check_pool(ctx, res):
     for i, sym in enumerate(ctx.data_syms):
         if not is_literal(sym):
             continue
-        sites = ctx.refs.get(i, [])
+        sites = ctx.literal_readers(sym)
         units = collections.OrderedDict()
         for x in sites:
             u = ctx.text_owner(x)
@@ -738,7 +863,7 @@ def check_pool(ctx, res):
             own_first = []
             seen = {}
             for sym, witness in lits:
-                own = [x for x in ctx.readers(sym) if ctx.text_owner(x) is u]
+                own = [x for x in ctx.literal_readers(sym) if ctx.text_owner(x) is u]
                 if witness:
                     v = ctx.dol.read(sym["addr"], sym["size"])
                     key = (sym["size"], v)
@@ -748,19 +873,55 @@ def check_pool(ctx, res):
                     elif v is not None:
                         seen[key] = sym["addr"]
                 if own:
-                    own_first.append((sym["addr"], min(own), sym["name"]))
+                    first = min(own)
+                    own_first.append((sym["addr"], first, sym["name"], _first_use_fn(ctx, first)))
             own_first.sort()
-            bad = next(((a, f, n, pf) for (_pa, pf, _pn), (a, f, n) in zip(own_first, own_first[1:]) if f < pf), None)
+            # order is judged per FUNCTION: the scheduler reorders two loads of one function, so literals first used
+            # in the same function carry no order; a literal first used in an EARLIER function than the one before it does
+            bad = next(((a, f, n, pf) for (_pa, pf, _pn, pfn), (a, f, n, fn) in zip(own_first, own_first[1:]) if fn < pfn), None)
             if bad:
-                res.add(u.name, "pool", FAIL, bad[0], "claimed pool: first use of %s (%s) precedes the literal before it (%s): not text order"
+                res.add(u.name, "pool", FAIL, bad[0], "claimed pool: first use of %s (%s) is in an earlier function than the literal before it (%s): not text order"
                         % (bad[2], hx(bad[1]), hx(bad[3])))
-            foreign_only = [sym for sym, _w in lits if ctx.readers(sym) and not any(ctx.text_owner(x) is u for x in ctx.readers(sym))]
-            if foreign_only and not any(ctx.text_owner(x) is u for sym, _w in lits for x in ctx.readers(sym)):
+            foreign_only = [sym for sym, _w in lits if ctx.literal_readers(sym) and not any(ctx.text_owner(x) is u for x in ctx.literal_readers(sym))]
+            if foreign_only and not any(ctx.text_owner(x) is u for sym, _w in lits for x in ctx.literal_readers(sym)):
                 res.add(u.name, "pool", FAIL, foreign_only[0]["addr"], "claimed pool %s is read by no code of this unit (readers: %s)"
-                        % (foreign_only[0]["name"], sorted({ctx.text_owner(x).name for x in ctx.readers(foreign_only[0]) if ctx.text_owner(x)})[0]))
+                        % (foreign_only[0]["name"], sorted({ctx.text_owner(x).name for x in ctx.literal_readers(foreign_only[0]) if ctx.text_owner(x)})[0]))
         if reads.get(u.name) or lits:
-            res.add(u.name, "pool", PASS if reads.get(u.name) or any(ctx.readers(sym) for sym, _w in lits) else UNKNOWN,
+            res.add(u.name, "pool", PASS if reads.get(u.name) or any(ctx.literal_readers(sym) for sym, _w in lits) else UNKNOWN,
                     None, "no literal is read by decoded code")
+
+
+def unit_sinit_closure(ctx, u):
+    """The function starts of the unit's `__sinit`s and everything they call or take the address of after them (the deferred
+    constructors this TU instantiates); empty when the unit has no `.ctors` word."""
+    out = set()
+    tr = u.ranges.get(".text", [])
+    end = tr[-1][1] if tr else 0
+    for s, e, _a in u.ranges.get(".ctors", []):
+        for a in range(s, e - 3, 4):
+            w = ctx.dol.word(a)
+            f = ctx.fn_at(w) if w else None
+            if f is not None and ctx.text_owner(w) is u:
+                out |= ctx.sinit_closure(f["addr"], end)[0]
+    return out
+
+
+def _vtable_before(syms, seam):
+    """The vtable symbol address of a `V->S` seam's leading group (its `before` name), or None."""
+    for y in syms:
+        if y.name == seam.get("before"):
+            return y.addr
+    return None
+
+
+def _vtable_stored_in(ctx, vt, fns):
+    """Whether a function in `fns` references the `.data` vtable `vt` (a `dataorder.Sym`): its constructor is one of them."""
+    if vt is None:
+        return False
+    i, sym = ctx.data_sym_at(vt.addr)
+    if sym is None or sym["addr"] != vt.addr:
+        return False
+    return any((ctx.fn_at(x) or {}).get("addr") in fns for x in ctx.refs.get(i, []))
 
 
 def check_data_order(ctx, res, rows):
@@ -769,9 +930,21 @@ def check_data_order(ctx, res, rows):
     syms = do.classify_all(rows, reader)
     ctx.data_order = syms
     found = do.seams(syms)
+    by_addr = {y.addr: y for y in syms}
+    ctx.seams_instantiated = []
     for u in ctx.units:
         for s, e, _a in u.ranges.get(".data", []):
             inside = [x for x in found if x["kind"] in do.STRONG_KINDS and s < x["addr"] < e]
+            if inside and any(x["kind"] == "V->S" for x in inside):
+                closure = unit_sinit_closure(ctx, u)
+                kept = []
+                for x in inside:
+                    if x["kind"] == "V->S" and closure and any(_vtable_stored_in(ctx, by_addr.get(a_), closure)
+                                                               for a_ in (x.get("latest"), _vtable_before(syms, x))):
+                        ctx.seams_instantiated.append({"unit": u.name, "addr": x["addr"], "vtable": x["before"]})
+                    else:
+                        kept.append(x)
+                inside = kept
             has_v = any(s <= y.addr < e and y.kind == do.VTABLE for y in syms)
             if inside:
                 x = inside[0]
@@ -997,6 +1170,14 @@ def load_proposal(path):
         return json.load(fh)
 
 
+#: the proposal file's fields: name -> accepted types.  An unknown key is a lint WARNING, a wrong type an ERROR.
+TOP_FIELDS = {"phase": (int, str), "band": (str,), "text_range": (list,), "range": (list,), "units": (list,), "open_questions": (list,)}
+UNIT_FIELDS = {"derived_name": (str,), "module": (str,), "ranges": (dict,), "cuts": (list,), "open_questions": (list,),
+               "removes_cuts": (list,), "absorbs": (list,), "replaces_tail_of": (str, list)}
+CUT_FIELDS = {"addr": (int, str), "section": (str,), "grade": (str,), "evidence": (list,), "reproduce": (str,), "kind": (str,),
+              "keep_registered_edge": (bool,)}
+
+
 def norm_units(proposal):
     """The proposal's units with integer ranges and cuts, in text order."""
     out = []
@@ -1007,25 +1188,71 @@ def norm_units(proposal):
             cuts.append(dict(c, addr=to_int(c["addr"])))
         out.append({"name": "%s/%s.cpp" % (pu["module"], pu["derived_name"]), "derived_name": pu["derived_name"],
                     "module": pu["module"], "ranges": rng, "cuts": cuts, "open_questions": pu.get("open_questions", []),
-                    "merged": []})
+                    "removes_cuts": pu.get("removes_cuts", []), "absorbs": pu.get("absorbs", []),
+                    "replaces_tail_of": pu.get("replaces_tail_of"), "merged": []})
     out.sort(key=lambda u: (u["ranges"].get(".text") or [(min(a for rr in u["ranges"].values() for a, _b in rr), 0)])[0][0]
              if u["ranges"] else 0)
     return out
 
 
-def lint_proposal(proposal):
-    """Structural problems of a proposal file: a list of strings (empty = well-formed)."""
-    issues = []
-    if not isinstance(proposal.get("units"), list) or not proposal["units"]:
-        return ["no units"]
+def _check_fields(obj, spec, who, errors, warnings):
+    """Unknown key -> warning; wrong type -> error."""
+    for k, v in obj.items():
+        if k not in spec:
+            warnings.append("%s: unknown field %r" % (who, k))
+        elif not isinstance(v, spec[k]) or (bool not in spec[k] and isinstance(v, bool)):
+            errors.append("%s: field %r is %s, want %s" % (who, k, type(v).__name__, "|".join(t.__name__ for t in spec[k])))
+
+
+def _lst(v):
+    return v if isinstance(v, list) else []
+
+
+def lint_proposal_full(proposal, base=None):
+    """`(errors, warnings)` of a proposal file.  With `base` (the baseline `Splits`) the fields that name baseline state are
+    checked against it: `keep_registered_edge` must sit on a registered range start (error), `removes_cuts`, `absorbs` and
+    `replaces_tail_of` must name one (warning)."""
+    issues, warns = [], []
+    if not isinstance(proposal, dict) or not isinstance(proposal.get("units"), list) or not proposal["units"]:
+        return ["no units"], warns
+    _check_fields(proposal, TOP_FIELDS, "proposal", issues, warns)
+    for q in _lst(proposal.get("open_questions")):
+        if not isinstance(q, (str, dict)):
+            issues.append("proposal: an open_questions entry is %s, want str|dict" % type(q).__name__)
+    edges = collections.defaultdict(set)
+    names = set()
+    if base is not None:
+        names = {u.name for u in base.units}
+        for u in base.units:
+            for sec, rr in u.ranges.items():
+                for a, _b, _x in rr:
+                    edges[sec].add(a)
     seen = collections.defaultdict(list)
     for pu in proposal["units"]:
+        if not isinstance(pu, dict):
+            issues.append("a unit is %s, want an object" % type(pu).__name__)
+            continue
         who = pu.get("derived_name", "?")
+        _check_fields(pu, UNIT_FIELDS, who, issues, warns)
         for k in ("derived_name", "module", "ranges"):
             if not pu.get(k):
                 issues.append("%s: missing %s" % (who, k))
         if not re.match(r"^[A-Za-z0-9_]+$", str(pu.get("derived_name", ""))):
             issues.append("%s: derived_name must be a plain identifier" % who)
+        for q in _lst(pu.get("open_questions")):
+            if not isinstance(q, (str, dict)):
+                issues.append("%s: an open_questions entry is %s, want str|dict" % (who, type(q).__name__))
+        for nm in _lst(pu.get("absorbs")):
+            if not isinstance(nm, str):
+                issues.append("%s: absorbs entry %r is not a unit name" % (who, nm))
+            elif base is not None and nm.split()[0:1] != [] and nm.split()[0] not in names:
+                warns.append("%s: absorbs %s, which is not a baseline unit" % (who, nm))
+        rt = pu.get("replaces_tail_of")
+        for nm in ([rt] if isinstance(rt, str) else rt if isinstance(rt, list) else []):
+            if not isinstance(nm, str):
+                issues.append("%s: replaces_tail_of entry %r is not a unit name" % (who, nm))
+            elif base is not None and nm.split()[0:1] != [] and nm.split()[0] not in names:
+                warns.append("%s: replaces_tail_of %s is not a baseline unit" % (who, nm))
         try:
             ranges = {sec: [(to_int(a), to_int(b)) for a, b in rr] for sec, rr in (pu.get("ranges") or {}).items()}
         except (TypeError, ValueError):
@@ -1040,21 +1267,43 @@ def lint_proposal(proposal):
                 seen[sec].append((a, b, who))
         starts = {(sec, a) for sec, rr in ranges.items() for a, _b in rr}
         cut_keys = set()
-        for c in pu.get("cuts", []):
-            if c.get("grade") not in GRADES:
+        for rc in _lst(pu.get("removes_cuts")):
+            if not isinstance(rc, dict):
+                issues.append("%s: a removes_cuts entry is %s, want an object" % (who, type(rc).__name__))
+                continue
+            _check_fields(rc, CUT_FIELDS, "%s removes_cuts" % who, issues, warns)
+            try:
+                ra, rsec = to_int(rc["addr"]), rc.get("section", ".text")
+            except (KeyError, TypeError, ValueError):
+                issues.append("%s: a removes_cuts entry has no numeric addr" % who)
+                continue
+            if base is not None and ra not in edges.get(rsec, ()):
+                warns.append("%s: removes_cuts %s %s is not a registered cut" % (who, rsec, hx(ra)))
+        for c in _lst(pu.get("cuts")):
+            if not isinstance(c, dict):
+                issues.append("%s: a cut is %s, want an object" % (who, type(c).__name__))
+                continue
+            _check_fields(c, CUT_FIELDS, "%s cut %s" % (who, c.get("addr")), issues, warns)
+            keep = c.get("keep_registered_edge") is True
+            if keep:
+                if "grade" in c and c["grade"] not in GRADES:
+                    issues.append("%s: cut %s has grade %r (strong|medium|guess)" % (who, c.get("addr"), c.get("grade")))
+            elif c.get("grade") not in GRADES:
                 issues.append("%s: cut %s has grade %r (strong|medium|guess)" % (who, c.get("addr"), c.get("grade")))
             if not c.get("reproduce"):
                 issues.append("%s: cut %s has no reproduce command" % (who, c.get("addr")))
-            if c.get("grade") in ("strong", "medium") and not c.get("evidence"):
+            if not keep and c.get("grade") in ("strong", "medium") and not c.get("evidence"):
                 issues.append("%s: %s cut %s has no evidence" % (who, c.get("grade"), c.get("addr")))
-            for ev in c.get("evidence") or []:
-                if not all(ev.get(k) for k in ("tool", "command", "finding")):
+            for ev in _lst(c.get("evidence")):
+                if not (isinstance(ev, dict) and all(ev.get(k) for k in ("tool", "command", "finding"))):
                     issues.append("%s: cut %s evidence needs tool, command and finding" % (who, c.get("addr")))
             try:
-                cut_keys.add((c.get("section"), to_int(c["addr"])))
+                key = (c.get("section"), to_int(c["addr"]))
+                cut_keys.add(key)
+                if keep and base is not None and key[1] not in edges.get(key[0], ()):
+                    issues.append("%s: cut %s %s has keep_registered_edge but no registered unit starts there" % (who, key[0], hx(key[1])))
             except (KeyError, TypeError, ValueError):
                 issues.append("%s: cut without a numeric addr" % who)
-        text_first = min((a for a, _b in ranges.get(".text", [])), default=None)
         for sec, a in sorted(starts):
             if sec == ".text" and (sec, a) not in cut_keys and pu is not proposal["units"][0]:
                 issues.append("%s: .text starts at %s with no cut recording why" % (who, hx(a)))
@@ -1066,7 +1315,12 @@ def lint_proposal(proposal):
         for (a, b, w), (c, d, x) in zip(v, v[1:]):
             if c < b:
                 issues.append("%s and %s overlap in %s at %s" % (w, x, sec, hx(c)))
-    return issues
+    return issues, warns
+
+
+def lint_proposal(proposal, base=None):
+    """Structural problems of a proposal file: a list of strings (empty = well-formed); warnings are `lint_proposal_full`'s."""
+    return lint_proposal_full(proposal, base)[0]
 
 
 def coalesce(rr):
@@ -1079,24 +1333,45 @@ def coalesce(rr):
     return out
 
 
-def merge_guess(units):
-    """Fold every unit whose left edge carries a `guess` cut into its text neighbour; the merged cut is recorded."""
+def merge_guess(units, base=None, info=None):
+    """Fold every unit whose left edge carries a `guess` cut into the unit that TOUCHES that edge - a proposal unit with a
+    range ending at the cut, else a baseline (registered) unit that does; the merged cut is recorded.  A guess cut with no
+    touching unit is a lint error (the unit stays) - a `keep_registered_edge` cut is never merged.
+
+    `info` (optional) receives `issues` and `base_merges` (`{"unit", "into", "cut"}`: the unit's ranges move to the baseline unit)."""
+    info = info if info is not None else {}
+    info.setdefault("issues", [])
+    info.setdefault("base_merges", [])
     out = []
     for u in units:
-        guess = [c for c in u["cuts"] if c.get("grade") == "guess"]
-        if out and guess:
-            a = out[-1]
+        guess = [c for c in u["cuts"] if c.get("grade") == "guess" and not c.get("keep_registered_edge")]
+        if not guess:
+            out.append(u)
+            continue
+        c0 = guess[0]
+        sec, addr = c0.get("section", ".text"), c0["addr"]
+        at = next((i for i in range(len(out) - 1, -1, -1) if any(e == addr for _s, e in out[i]["ranges"].get(sec, []))), None)
+        rec = [{"candidate_cut": hx(c["addr"]), "section": c.get("section"), "grade": "guess"} for c in guess]
+        if at is not None:
+            a = out[at]
             big, small = (a, u) if sum(e - s for s, e in a["ranges"].get(".text", [])) >= sum(e - s for s, e in u["ranges"].get(".text", [])) else (u, a)
             merged = {"name": big["name"], "derived_name": big["derived_name"], "module": big["module"],
                       "ranges": {}, "cuts": [c for c in a["cuts"] + u["cuts"] if c.get("grade") != "guess"],
                       "open_questions": a["open_questions"] + u["open_questions"],
-                      "merged": a["merged"] + u["merged"] + [{"candidate_cut": hx(c["addr"]), "section": c.get("section"),
-                                                              "absorbed": small["name"], "grade": "guess"} for c in guess]}
-            for sec in set(a["ranges"]) | set(u["ranges"]):
-                merged["ranges"][sec] = coalesce(a["ranges"].get(sec, []) + u["ranges"].get(sec, []))
-            out[-1] = merged
-        else:
-            out.append(u)
+                      "removes_cuts": a.get("removes_cuts", []) + u.get("removes_cuts", []),
+                      "absorbs": a.get("absorbs", []) + u.get("absorbs", []), "replaces_tail_of": big.get("replaces_tail_of"),
+                      "merged": a["merged"] + u["merged"] + [dict(r, absorbed=small["name"]) for r in rec]}
+            for s2 in set(a["ranges"]) | set(u["ranges"]):
+                merged["ranges"][s2] = coalesce(a["ranges"].get(s2, []) + u["ranges"].get(s2, []))
+            out[at] = merged
+            continue
+        bn = next((bu for bu in (base.units if base is not None else []) if any(e == addr for _s, e, _x in bu.ranges.get(sec, []))), None)
+        if bn is not None:
+            info["base_merges"].append({"unit": u, "into": bn.name, "cut": c0, "merged": [dict(r, absorbed=u["name"], into=bn.name) for r in rec]})
+            continue
+        info["issues"].append("%s: guess cut %s %s has no adjacent unit to merge into (no proposal or registered unit ends there)"
+                              % (u["derived_name"], sec, hx(addr)))
+        out.append(u)
     return out
 
 
@@ -1158,28 +1433,162 @@ def derive_attached(units, base, dol, symbols):
     return derived
 
 
-def render(base, proposals, dol=None, symbols=None):
+DATA_SECTIONS = (".rodata", ".data", ".bss", ".sdata", ".sbss", ".sdata2", ".sbss2")
+
+
+def assign_data_by_reader(movers, base, dol, symbols):
+    """PROVISIONAL phase-1 default for the DATA of a recut registered unit (phase 2 replaces it with evidence).
+
+    A baseline unit whose text is split among `movers` (proposal units, plus its own remnant) keeps its data run in one
+    piece, which leaves data-only remnants.  Per data run, per section, the symbols are assigned to the pieces in text order
+    by a monotone DP: a symbol costs one per piece that reads it other than the piece it is put in (readers decoded from
+    the retail text, pool literals by loads only); ties keep a symbol with the earlier piece.  A section one of the
+    movers already lists over that run is left as written.  Each mover's `ranges` gets its share; the remnant keeps the rest.
+    Returns one record per (unit, section) assigned."""
+    ctx = Ctx(base, symbols, dol)
+    text = sorted((a, b, i) for i, u in enumerate(movers) for a, b in u["ranges"].get(".text", []))
+    tstarts = [t[0] for t in text]
+    out = []
+
+    def mover_at(site):
+        k = bisect.bisect_right(tstarts, site) - 1
+        return text[k][2] if k >= 0 and text[k][0] <= site < text[k][1] else None
+
+    for bu in base.units:
+        trs = [(a, b) for a, b, _x in bu.ranges.get(".text", [])]
+        if not trs:
+            continue
+        lo, hi = trs[0][0], trs[-1][1]
+        touching = sorted({i for a, b, i in text if a < hi and b > lo}, key=lambda i: min(a for a, _b, j in text if j == i and a < hi and _b > lo))
+        if not touching:
+            continue
+        claimed_text = coalesce([(max(a, lo), min(b, hi)) for a, b, i in text if a < hi and b > lo])
+        remnant = subtract(trs, claimed_text)
+        pieces = [("m", i, max(lo, min(a for a, _b, j in text if j == i and a < hi and _b > lo))) for i in touching]
+        if remnant:
+            pieces.append(("r", None, remnant[0][0]))
+        pieces.sort(key=lambda t: t[2])
+        pidx = {(kind, i): k for k, (kind, i, _st) in enumerate(pieces)}
+
+        def piece_of(site):
+            if not (lo <= site < hi):
+                return None
+            i = mover_at(site)
+            return pidx.get(("m", i)) if i is not None else pidx.get(("r", None))
+
+        for sec in DATA_SECTIONS:
+            for s0, e0, attr in bu.ranges.get(sec, []):
+                if "rename:" in attr or "common" in attr:
+                    continue
+                if any(s1 < e0 and e1 > s0 for u in movers for s1, e1 in u["ranges"].get(sec, [])):
+                    continue
+                syms = [x for x in ctx.data_syms if x["section"] == sec and s0 <= x["addr"] < e0]
+                if not syms:
+                    continue
+                K = len(pieces)
+                costs = []
+                for sym in syms:
+                    rd = ctx.literal_readers(sym) if is_literal(sym) else ctx.readers(sym)
+                    who = {piece_of(x) for x in rd} - {None}
+                    costs.append([len(who) - (1 if k in who else 0) for k in range(K)])
+                INF = (10 ** 9, 0)
+                dp = [[INF] * K for _ in syms]
+                back = [[0] * K for _ in syms]
+                for i in range(len(syms)):
+                    for k in range(K):
+                        if i == 0:
+                            dp[0][k] = (costs[0][k], k)
+                            continue
+                        best, bk = INF, 0
+                        for k2 in range(k + 1):
+                            if dp[i - 1][k2] < best:
+                                best, bk = dp[i - 1][k2], k2
+                        dp[i][k] = (best[0] + costs[i][k], best[1] + k)
+                        back[i][k] = bk
+                k = min(range(K), key=lambda kk: dp[-1][kk])
+                total = dp[-1][k][0]
+                assign = [0] * len(syms)
+                for i in range(len(syms) - 1, -1, -1):
+                    assign[i] = k
+                    k = back[i][k]
+                runs = []
+                for i, pk in enumerate(assign):
+                    if runs and runs[-1][0] == pk:
+                        runs[-1][2] = i + 1
+                    else:
+                        runs.append([pk, i, i + 1])
+                shares = {}
+                for n, (pk, i0, i1) in enumerate(runs):
+                    a = s0 if n == 0 else syms[i0]["addr"]
+                    b = e0 if n == len(runs) - 1 else syms[runs[n + 1][1]]["addr"]
+                    shares[pk] = (a, b)
+                rec = {"unit": bu.name, "section": sec, "misplaced": total, "pieces": {}}
+                for pk, (a, b) in shares.items():
+                    kind, i, _st = pieces[pk]
+                    if kind == "m":
+                        movers[i]["ranges"][sec] = coalesce(movers[i]["ranges"].get(sec, []) + [(a, b)])
+                        rec["pieces"][movers[i]["name"]] = [hx(a), hx(b)]
+                    else:
+                        rec["pieces"][bu.name + " (remnant)"] = [hx(a), hx(b)]
+                out.append(rec)
+    return out
+
+
+def _extend(nu, sec, a, b):
+    """Add `[a, b)` to a rendered unit's `sec` ranges, growing an abutting plain fragment instead of adding a second range."""
+    frags = nu.ranges.setdefault(sec, [])
+    for k, (s0, e0, at) in enumerate(frags):
+        if "rename:" in at or "common" in at:
+            continue
+        if e0 == a:
+            frags[k] = (s0, b, at)
+            return
+        if s0 == b:
+            frags[k] = (a, e0, at)
+            return
+    frags.append((a, b, ""))
+    frags.sort()
+
+
+def render(base, proposals, dol=None, symbols=None, data_by_reader=True):
     """`(candidate Splits, info)`: the baseline with every proposal's units cut in (guess cuts merged).
 
-    With `dol` and `symbols` the sections a text cut determines (extab, extabindex, ctors, dtors) are derived.
+    With `dol` and `symbols` the sections a text cut determines (extab, extabindex, ctors, dtors) are derived and, unless
+    `data_by_reader` is False, the data of a recut registered unit is assigned by reader (`assign_data_by_reader`).
     """
-    info = {"issues": [], "merged": [], "units": [], "derived": []}
+    info = {"issues": [], "warnings": [], "merged": [], "units": [], "derived": [], "data_by_reader": [], "cuts": {}}
     units = []
     for p in proposals:
-        for issue in lint_proposal(p):
-            info["issues"].append(issue)
+        errs, warns = lint_proposal_full(p, base)
+        info["issues"] += errs
+        info["warnings"] += warns
         units += norm_units(p)
+    cc = collections.Counter()
+    for u in units:
+        for c in u["cuts"]:
+            cc["keep_registered_edge" if c.get("keep_registered_edge") else c.get("grade", "?")] += 1
+    info["cuts"] = dict(cc)
     units.sort(key=lambda u: (u["ranges"].get(".text") or [(0, 0)])[0][0])
-    units = merge_guess(units)
+    mg = {"issues": info["issues"], "base_merges": []}
+    units = merge_guess(units, base, mg)
+    base_merges = mg["base_merges"]
+    movers = units + [bm["unit"] for bm in base_merges]
     if dol is not None and symbols is not None:
-        info["derived"] = derive_attached(units, base, dol, symbols)
+        info["derived"] = derive_attached(movers, base, dol, symbols)
+        if data_by_reader:
+            info["data_by_reader"] = assign_data_by_reader(movers, base, dol, symbols)
     for u in units:
         info["merged"] += u["merged"]
         info["units"].append(u["name"])
+    for bm in base_merges:
+        info["merged"] += bm["merged"]
     claimed = collections.defaultdict(list)
-    for u in units:
+    for u in movers:
         for sec, rr in u["ranges"].items():
             claimed[sec] += rr
+    into = collections.defaultdict(list)
+    for bm in base_merges:
+        into[bm["into"]].append(bm["unit"])
     kept = []                       # [(anchor, Unit)]: a unit's anchor is its original text start (data-only: its predecessor's)
     anchor = 0
     for bu in base.units:
@@ -1199,6 +1608,10 @@ def render(base, proposals, dol=None, symbols=None):
                                       % (bu.name, len(frags), sec, ", ".join("%s..%s" % (hx(a), hx(b)) for a, b, _x in frags)))
             if frags:
                 nu.ranges[sec] = frags
+        for mu in into.get(bu.name, []):
+            for sec, rr in mu["ranges"].items():
+                for a, b in rr:
+                    _extend(nu, sec, a, b)
         if nu.ranges:
             kept.append((anchor, nu))
     for u in units:
@@ -1321,13 +1734,25 @@ def cmd_baseline(args):
 def cmd_proposal(args):
     splits, symbols, dol = load_ctx(args.splits, args.symbols, args.dol)
     proposals = [load_proposal(p) for p in args.proposal]
-    cand, info = render(splits, proposals, dol, symbols)
+    cand, info = render(splits, proposals, dol, symbols, getattr(args, "data_by_reader", True))
     for i in info["issues"]:
         print("lint: " + i)
+    for i in info["warnings"]:
+        print("warn: " + i)
     if info["derived"]:
         print("derived %d attached ranges (extab/extabindex/ctors/dtors) from the text cuts" % len(info["derived"]))
     for m in info["merged"]:
-        print("merged guess cut %s (%s): %s absorbed" % (m["candidate_cut"], m["section"], m["absorbed"]))
+        print("merged guess cut %s (%s): %s absorbed%s" % (m["candidate_cut"], m["section"], m["absorbed"],
+                                                          (" into registered %s" % m["into"]) if m.get("into") else ""))
+    if info["data_by_reader"]:
+        print("data-by-reader (PROVISIONAL phase-1 default, phase 2 replaces it with evidence): %d data runs of recut units assigned"
+              % len(info["data_by_reader"]))
+        for r in info["data_by_reader"]:
+            print("  %-34s %-8s %s%s" % (r["unit"], r["section"], ", ".join("%s %s..%s" % (k, v[0], v[1]) for k, v in r["pieces"].items()),
+                                         ("  (%d read from another piece)" % r["misplaced"]) if r["misplaced"] else ""))
+    if info["cuts"]:
+        print("cuts: " + ", ".join("%s %d" % (k, info["cuts"][k]) for k in ("strong", "medium", "guess", "keep_registered_edge") if k in info["cuts"])
+              + "  (keep_registered_edge is not counted as proven; guess is merged, never emitted)")
     if args.emit_splits:
         with open(args.emit_splits, "w", encoding="utf-8", newline="\n") as fh:
             fh.write(render_splits(cand))
@@ -1371,6 +1796,23 @@ def _w(op, rt, ra, imm):
 
 def _lis(rd, hi):
     return _w(15, rd, 0, hi)
+
+
+def _b(site, target, link=False):
+    """`b` / `bl` from `site` to `target`."""
+    return (18 << 26) | ((target - site) & 0x03FFFFFC) | (1 if link else 0)
+
+
+BLR = 0x4E800020
+NOP = 0x60000000
+
+
+def _mini(T, words, fns, units, extra_blobs=(), extra_syms=()):
+    """A one-text-blob world: `words` at `T`, `fns` = [(name, offset, size)], `units` = splits text; returns `(Ctx, symbols)`."""
+    code = struct.pack(">%dI" % len(words), *words)
+    dol = _make_dol([(T, code)] + list(extra_blobs))
+    syms = parse_symbols(["%s = .text:0x%X; // type:function size:0x%X scope:global" % (n, T + o, z) for n, o, z in fns] + list(extra_syms))
+    return Ctx(parse_splits(units), syms, dol, 0x80500000, 0x80600000), syms
 
 
 def _make_dol(blobs):
@@ -1556,6 +1998,153 @@ u_b.cpp: comment:0
                                        "\t.sdata2     start:0x80300000 end:0x80300004\n\t.data       start:0x80500000 end:0x80500008"))
     r3 = run_checks(Ctx(sp3, syms3, dol3, None, None, scan=False), None, ["jumptable"])
     check("jump table branching into another unit fails", r3.units["u_a.cpp"]["jumptable"]["status"], FAIL)
+    # gap 1: a `.ctors` word is not a cut at the end of its __sinit - the closure of its local callees ends the TU
+    T = 0x80100000
+    hdr = "Sections:\n\t.text       type:code align:32\n\t.ctors      type:rodata align:16\n\t.sdata2     type:rodata align:4\n\n"
+    ctor_blob = (0x80200000, struct.pack(">I", T + 0x10))
+
+    def ctors_of(end, words, fns):
+        c, _s = _mini(T, words, fns, hdr + "u.cpp:\n\t.text       start:0x%X end:0x%X\n\t.ctors      start:0x80200000 end:0x80200004\n" % (T, T + end),
+                      [ctor_blob])
+        r = run_checks(c, None, ["ctors"]).units["u.cpp"]["ctors"]
+        return r["status"], [i.get("cut_at") for i in r["items"] if i.get("cut_at")]
+
+    # F0 0x00..0x10, sinit = `b ctor` 0x10..0x14, ctor 0x14..0x24, g 0x24..0x34
+    thunk = [NOP, NOP, NOP, BLR, _b(T + 0x10, T + 0x14), BLR, NOP, NOP, NOP, NOP, NOP, NOP, NOP, NOP, NOP, BLR]
+    fn_thunk = [("F0", 0, 0x10), ("sinit", 0x10, 4), ("ctor", 0x14, 0x10), ("g", 0x24, 0x10)]
+    thunk += [NOP] * 4
+    check("ctors closure: a `b ctor` sinit whose ctor ends at the unit end passes", ctors_of(0x24, thunk, fn_thunk), (PASS, []))
+    check("ctors closure: a unit that goes on after the ctor is cut at L, the function after the closure", ctors_of(0x34, thunk, fn_thunk), (FAIL, [T + 0x24]))
+    called = list(thunk)
+    called[1] = _b(T + 4, T + 0x24, True)                       # F0 calls g: g belongs to the TU before the sinit
+    check("ctors closure: the function at L called from before L is not confirmed", ctors_of(0x34, called, fn_thunk), (UNKNOWN, []))
+    # sinit 0x10..0x20 takes the address of the dtor at 0x20 (lis/addi), then `after` 0x28..0x38
+    addr = [NOP, NOP, NOP, BLR, _lis(3, T >> 16), _w(14, 3, 3, 0x20), BLR, NOP, BLR, NOP, NOP, BLR, NOP, NOP, NOP, BLR, NOP, NOP, NOP, BLR]
+    fn_addr = [("F0", 0, 0x10), ("sinit", 0x10, 0x10), ("dtor", 0x20, 0x8), ("after", 0x28, 0x10)]
+    check("ctors closure: an address-taken dtor after the sinit is in the closure", ctors_of(0x28, addr, fn_addr), (PASS, []))
+    check("ctors closure: the tail after an address-taken dtor is cut at L", ctors_of(0x38, addr, fn_addr), (FAIL, [T + 0x28]))
+    plain = [NOP, NOP, NOP, BLR, BLR, NOP, NOP, NOP, NOP, NOP, NOP, BLR, NOP, NOP, NOP, NOP]
+    check("ctors closure: a sinit with no local callee cuts at its own end", ctors_of(0x34, plain, [("F0", 0, 0x10), ("sinit", 0x10, 0x8), ("h", 0x18, 0x10)]),
+          (FAIL, [T + 0x18]))
+
+    # gap 2: a lis/addi that only forms a pool address is not a read of the literal; a load through it is
+    S2 = 0x80300000
+    hi, lo = S2 >> 16, S2 & 0xFFFF
+    x_fn = [_lis(3, hi), _w(14, 3, 3, lo), _b(T + 8, T + 0x40, True), BLR]                          # X: passes the address of lit0 to a call
+    y_fn = [_lis(3, hi), _w(48, 1, 3, lo), BLR, NOP]                                                # Y: lis + lfs lit0
+    z_fn = [_lis(3, hi), _w(14, 3, 3, lo), _w(48, 1, 3, 0), BLR]                                    # Z: lis + addi + lfs 0(r3)
+    w_fn = [_lis(3, hi), _w(14, 3, 3, lo), _b(T + 0x38, T + 0x40, True), _w(48, 1, 3, 0)]            # W: address, a call, then lfs 0(r3): r3 is gone
+    u_txt = hdr + "".join("%s.cpp:\n\t.text       start:0x%X end:0x%X\n%s" % (n, T + o, T + o + 0x10, ("\t.sdata2     start:0x%X end:0x%X\n" % (S2, S2 + 4)) if n == "y" else "")
+                          for n, o in (("x", 0), ("y", 0x10), ("z", 0x20), ("w", 0x30)))
+    cg, _s = _mini(T, x_fn + y_fn + z_fn + w_fn, [("x", 0, 0x10), ("y", 0x10, 0x10), ("z", 0x20, 0x10), ("w", 0x30, 0x10)], u_txt,
+                   [(S2, struct.pack(">f", 1.5))], ["lit0 = .sdata2:0x%X; // type:object size:0x4 scope:local data:float" % S2])
+    lit = cg.data_sym_at(S2)[1]
+    check("pool decode: every lis/addi/load stays a reference", sorted(cg.readers(lit)), [T + 4, T + 0x14, T + 0x24, T + 0x34])
+    check("pool decode: only loads read the literal (Y's lis+lfs, Z's addi+lfs; not X's address, not W's stale r3)",
+          sorted(cg.literal_readers(lit)), [T + 0x14, T + 0x28])
+    rg = run_checks(cg, None, ["pool"])
+    check("pool decode: a unit that only forms the address is not a second reader of the literal",
+          rg.units.get("x.cpp", {}).get("pool", {}).get("status", NA), NA)
+
+    # gap 3: pool first-use order is judged per function (scheduling reorders two loads of one function)
+    lits2 = struct.pack(">ff", 1.5, 2.5)
+    s2_syms = ["l0 = .sdata2:0x%X; // type:object size:0x4 scope:local data:float" % S2,
+               "l1 = .sdata2:0x%X; // type:object size:0x4 scope:local data:float" % (S2 + 4)]
+    pool_txt = hdr + "p.cpp:\n\t.text       start:0x%X end:0x%X\n\t.sdata2     start:0x%X end:0x%X\n" % (T, T + 0x20, S2, S2 + 8)
+    one_fn = [_lis(3, hi), _w(48, 2, 3, 4), _w(48, 1, 3, 0), BLR, BLR, NOP, NOP, NOP]              # l1 loaded before l0, in ONE function
+    two_fn = [_lis(3, hi), _w(48, 2, 3, 4), BLR, NOP, _lis(3, hi), _w(48, 1, 3, 0), BLR, NOP]      # f0 uses l1, the later f1 uses l0
+    for label, words, want in (("the same function", one_fn, PASS), ("an earlier function", two_fn, FAIL)):
+        cp, _s = _mini(T, words, [("f0", 0, 0x10), ("f1", 0x10, 0x10)], pool_txt, [(S2, lits2)], s2_syms)
+        rp = run_checks(cp, None, ["pool"]).units["p.cpp"]["pool"]
+        check("pool order: l1 first used before l0 in %s -> %s" % (label, want), rp["status"], want)
+
+    # gap 7: a V->S seam whose vtable's constructor is in the closure of the unit's own sinit is not a seam
+    D0 = 0x80600000
+    dhdr = hdr + "\t.data       type:rodata align:8\n\n"
+    vblob = struct.pack(">3I", 0, 0, T) + b"hello\x00\x00\x00" + struct.pack(">3I", 0, 0, T + 4)
+    vsyms = ["__vt__A = .data:0x%X; // type:object size:0xC scope:global" % D0,
+             "str_h = .data:0x%X; // type:object size:0x8 scope:local data:string" % (D0 + 12),
+             "__vt__B = .data:0x%X; // type:object size:0xC scope:global" % (D0 + 20)]
+    vunits = dhdr + "v.cpp:\n\t.text       start:0x%X end:0x%X\n\t.ctors      start:0x80200000 end:0x80200004\n\t.data       start:0x%X end:0x%X\n" % (T, T + 0x30, D0, D0 + 32)
+    vhi, vlo = (D0 + 20) >> 16, (D0 + 20) & 0xFFFF
+    store = [_lis(3, vhi), _w(14, 3, 3, vlo), BLR, NOP]                                               # a ctor storing the address of __vt__B
+    fns_v = [("F0", 0, 0x10), ("sinit", 0x10, 4), ("ctor", 0x20, 0x10)]
+    for label, sinit_word, want in (("the sinit calls a ctor that stores __vt__B", _b(T + 0x10, T + 0x20), PASS),
+                                    ("the store is in a function the sinit never reaches", BLR, FAIL)):
+        words = [NOP, NOP, NOP, BLR, sinit_word, NOP, NOP, NOP] + store + [NOP] * 4
+        cv2, sv = _mini(T, words, fns_v, vunits, [(0x80200000, struct.pack(">I", T + 0x10)), (D0, vblob)], vsyms)
+        rv2 = run_checks(cv2, dataorder_rows(sv), ["data-order"])
+        check("data-order: %s" % label, rv2.units["v.cpp"]["data-order"]["status"], want)
+
+    # gap 4a: a guess cut merges with the unit that TOUCHES it (proposal or registered); none touching is a lint error
+    def prop(*units, **more):
+        return dict({"phase": 1, "band": "t", "units": list(units)}, **more)
+
+    def pu(name, a, b, *cuts, **more):
+        return dict({"derived_name": name, "module": "m", "ranges": {".text": [["0x%X" % a, "0x%X" % b]]}, "cuts": list(cuts)}, **more)
+
+    def cut(addr, grade, **more):
+        return dict({"addr": "0x%X" % addr, "section": ".text", "grade": grade, "reproduce": "r",
+                     "evidence": [{"tool": "t", "command": "c", "finding": "f"}]}, **more)
+
+    cand4, info4 = render(sp, [prop(pu("first", T, T + 0x10), pu("late", T + 0x10, T + 0x20, cut(T + 0x10, "guess")))])
+    check("guess cut touching the previous proposal unit merges there", (info4["issues"], [m.get("into") for m in info4["merged"]]), ([], [None]))
+    cand4, info4 = render(sp, [prop(pu("first", T, T + 0x10), pu("late", T + 0x28, T + 0x38, cut(T + 0x28, "guess")))])
+    check("a guess cut that touches no proposal unit and no registered unit end is refused",
+          [i for i in info4["issues"] if "no adjacent unit" in i] != [], True)
+    check("... and the unit stays (it is not folded into a non-adjacent neighbour)", "m/late.cpp" in [u.name for u in cand4.units], True)
+    cand4, info4 = render(sp, [prop(pu("tail", T + 0x20, T + 0x38, cut(T + 0x20, "guess")))])
+    text4 = {u.name: u.ranges.get(".text") for u in cand4.units}
+    check("a guess cut on the first unit merges into the registered unit whose range ends there", (info4["issues"], [m.get("into") for m in info4["merged"]],
+                                                                                                 text4.get("u_a.cpp"), "m/tail.cpp" in text4),
+          ([], ["u_a.cpp"], [(T, T + 0x38, "")], False))
+
+    # gap 4b/4c: first-class fields, validated; keep_registered_edge is grade-neutral and never merged
+    full = prop(pu("a1", T, T + 0x20, removes_cuts=[cut(T + 0x20, "strong")], absorbs=["u_b.cpp"], replaces_tail_of="u_a.cpp", kind="x"),
+                open_questions=[{"unit": "u_a.cpp", "question": "q"}, "plain"])
+    full["units"][0]["cuts"] = []
+    e_full, w_full = lint_proposal_full(full, sp)
+    check("lint: a proposal using every documented field is clean except the unknown `kind` on a unit", (e_full, w_full),
+          ([], ["a1: unknown field 'kind'"]))
+    bad = prop(pu("b1", T, T + 0x20, removes_cuts=[{"addr": "0x80100999", "section": ".text"}], absorbs=["nope.cpp"], replaces_tail_of=["nope.cpp"]),
+               open_questions="text")
+    bad["units"][0]["open_questions"] = 5
+    e_bad, w_bad = lint_proposal_full(bad, sp)
+    check("lint: wrong types are errors (open_questions)", sorted(i for i in e_bad if "open_questions" in i), ["b1: field 'open_questions' is int, want list", "proposal: field 'open_questions' is str, want list"])
+    check("lint: names that are not baseline state are warnings", sorted(w_bad), ["b1: absorbs nope.cpp, which is not a baseline unit", "b1: removes_cuts .text 0x80100999 is not a registered cut",
+                                                                                   "b1: replaces_tail_of nope.cpp is not a baseline unit"])
+    keep = cut(T + 0x20, "guess", keep_registered_edge=True, evidence=[])
+    c5, i5 = render(sp, [prop(pu("m1", T + 0x20, T + 0x38, keep))])
+    check("keep_registered_edge: a guess cut is not merged and is counted apart", (i5["issues"], i5["merged"], i5["cuts"], "m/m1.cpp" in [u.name for u in c5.units]),
+          ([], [], {"keep_registered_edge": 1}, True))
+    off = cut(T + 0x28, "guess", keep_registered_edge=True)
+    check("keep_registered_edge at a place no registered unit starts is an error", any("keep_registered_edge" in i for i in render(sp, [prop(pu("m2", T + 0x28, T + 0x38, off))])[1]["issues"]), True)
+    nograde = {"addr": "0x%X" % (T + 0x20), "section": ".text", "keep_registered_edge": True, "reproduce": "r"}
+    check("keep_registered_edge needs no grade and no evidence", lint_proposal(prop(pu("m3", T + 0x20, T + 0x38, nograde)), sp), [])
+    check("a cut without a grade and without the flag is still an error", bool(lint_proposal(prop(pu("m3", T + 0x20, T + 0x38, dict(nograde, keep_registered_edge=False))), sp)), True)
+
+    # gap 5: the data of a recut registered unit goes to the pieces by reader (provisional default), and can be switched off
+    DS = 0x80300000
+    wa = [_lis(3, DS >> 16), _w(48, 1, 3, 0), BLR, NOP, NOP, NOP, NOP, NOP]                       # fn A (0x00..0x20) reads l0
+    wb = [_lis(3, DS >> 16), _w(48, 1, 3, 4), BLR, NOP, NOP, NOP, NOP, NOP]                       # fn B (0x20..0x40) reads l1
+    d_txt = hdr + "big.cpp:\n\t.text       start:0x%X end:0x%X\n\t.sdata2     start:0x%X end:0x%X\n" % (T, T + 0x40, DS, DS + 8)
+    d_ctx, d_syms = _mini(T, wa + wb, [("A", 0, 0x20), ("B", 0x20, 0x20)], d_txt, [(DS, struct.pack(">ff", 1.5, 2.5))],
+                          ["l0 = .sdata2:0x%X; // type:object size:0x4 scope:local data:float" % DS,
+                           "l1 = .sdata2:0x%X; // type:object size:0x4 scope:local data:float" % (DS + 4)])
+    d_dol = _make_dol([(T, struct.pack(">16I", *(wa + wb))), (DS, struct.pack(">ff", 1.5, 2.5))])
+    d_base = parse_splits(d_txt)
+    d_prop = prop(pu("bpiece", T + 0x20, T + 0x40, cut(T + 0x20, "strong")))
+    c_on, i_on = render(d_base, [d_prop], d_dol, d_syms)
+    c_off, i_off = render(d_base, [d_prop], d_dol, d_syms, data_by_reader=False)
+    sd = lambda c: {u.name: [(a, b) for a, b, _x in u.ranges.get(".sdata2", [])] for u in c.units}
+    check("data-by-reader: the literal B reads moves to B's unit, A's stays", sd(c_on), {"big.cpp": [(DS, DS + 4)], "m/bpiece.cpp": [(DS + 4, DS + 8)]})
+    check("data-by-reader: it names the unit and run it assigned", [(r["unit"], r["section"], r["misplaced"]) for r in i_on["data_by_reader"]], [("big.cpp", ".sdata2", 0)])
+    check("data-by-reader off: the old behaviour, the data stays with the recut unit", sd(c_off), {"big.cpp": [(DS, DS + 8)], "m/bpiece.cpp": []})
+    explicit = json.loads(json.dumps(d_prop))
+    explicit["units"][0]["ranges"][".sdata2"] = [["0x%X" % DS, "0x%X" % (DS + 8)]]
+    c_ex, _i = render(d_base, [explicit], d_dol, d_syms)
+    check("data-by-reader leaves a section the proposal lists itself", sd(c_ex)["m/bpiece.cpp"], [(DS, DS + 8)])
+
     # ranking
     td = top_defects(ctx, res, 50)
     check("defects are ranked by score", [d["score"] for d in td] == sorted((d["score"] for d in td), reverse=True) and bool(td), True)
@@ -1568,6 +2157,8 @@ def main(argv=None):
     ap.add_argument("--baseline", action="store_true", help="check the current splits.txt")
     ap.add_argument("--proposal", action="append", help="proposal file (repeatable); render + check the candidate")
     ap.add_argument("--emit-splits", help="with --proposal: write the candidate splits.txt here")
+    ap.add_argument("--data-by-reader", action=argparse.BooleanOptionalAction, default=True,
+                    help="with --proposal: assign the data of a recut registered unit to the pieces by reader (PROVISIONAL phase-1 default; default on)")
     ap.add_argument("--splits"), ap.add_argument("--symbols"), ap.add_argument("--dol")
     ap.add_argument("--outbox", help="lane outbox with seam requests (default: the primary checkout's .pi/outbox)")
     ap.add_argument("--only", help="comma list of invariants")
