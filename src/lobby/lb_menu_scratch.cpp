@@ -1,3 +1,17 @@
+/*
+ * lobby/lb_menu_scratch.cpp - the lobby menu scratch block and its item-list page head.
+ *
+ * `.text` 0x8021E1EC..0x8021F020 (14 functions), `.bss` 0x806AA8C8..0x806AAA88 (`lb_menu_scratch`, 0x1C0 B), `.data` 0x480 B,
+ * `.sdata` 0x10 B, `.sdata2` 0x18 B, `.ctors` 4 B, extab 0x30 B and extabindex 0x48 B.  Phase 4 recut of
+ * `lobby/fn_8021E1EC` (docs/splits/phase4): the registered range 0x8021E1EC..0x80224AC4 is three TUs of the candidate -
+ * this one, `lobby/lb_menu_pos_tbl` and `lobby/lb_equip_page`; each part keeps the former source's text for its own
+ * functions, the shared declarations and its own `.bss` definitions.
+ *
+ * Name: the candidate's (`lb_menu_scratch` is the `.bss` block the unit constructs, `fn_8021EFC8`).
+ * Flags: `cflags_lobby` as the former unit, with its file-scope `#pragma peephole off`.
+ */
+
+/* ==== recut from lobby/fn_8021E1EC.cpp (0x8021E1EC..0x8021F020) ==== */
 /* lobby/fn_8021E1EC.cpp - a lobby screen layer (item/equipment page family).
  *
  * `.text` 0x8021E1EC..0x80224AC4 (108 functions, 26840 B), registered from
@@ -78,6 +92,7 @@
 #include "Runtime.PPCEABI.H/memset.h"
 
 #include "lobby/fn_8021E1EC.h"
+#include "lobby/fn_80208AC0.h" /* fn_80208AC0, owned by lobby/lb_npc.cpp (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* This range's record view of the user-data block; the owner's `lobby_world_block` is a plain `u8*`. */
@@ -102,22 +117,21 @@ extern "C" {
 void* fn_8021EFC8(LbMenuScratch* work);
 u32 fn_8021E1B4(LbMenuActor* self, VEC3* pos);
 f32 fn_80463F04(f32 v);
-void fn_8021FCE0(u8 a, s32 b, u16 c, s32 d);
+
 u32 fn_8021DF50(u32 idx, u32 limit);
 void fn_8021DDA8(LbMenuCandidate* candidate, LbMenuRow* row);
 f32 fn_8021E300(f32 v);
-s32 fn_80208AC0(void);
 s32 game_ready_ck(void);
 u8 fn_8004DD74(void);
-s32 fn_80217934(void);
-u8* fn_80223A18(u8 table, s32 index);
-LbGlobalBlock* fn_80064080(void);
-u8* fn_80223A44(u8 table, s32 index);
-void fn_802FAFC8(s32 id);
-void fn_80221C28(LbMenuItem* item, s32 open);
-s32 fn_802205D8(u16 id);
-void fn_80221E04(LbMenuItem* item);
-void* fn_802235E0(u32* base, s32 offset);
+
+
+
+
+
+
+
+
+
 }
 
 extern "C" {
@@ -318,303 +332,16 @@ void* fn_8021EFC8(LbMenuScratch* work)
     return work;
 }
 
-/* The item-list page's animation clocks. */
-f32 fn_8021F218(void)
-{
-    return lb_item_list_state.step_0x18;
-}
-
-f32 fn_8021F228(void)
-{
-    return lb_item_list_state.depth_0x34;
-}
-
-/* The selected row; also published to the sound unit through `include/unsplit/lobby.h`. */
-s32 fn_8021F238(void)
-{
-    return lb_item_list_state.selected_0x38;
-}
-
-/* Selects a row and remembers whether the selection actually moved. */
-void fn_8021F248(s32 selected)
-{
-    s32 prev = lb_item_list_state.selected_0x38;
-    u8 masked = selected;
-
-    lb_item_list_state.selected_0x38 = masked;
-    if (prev == masked) {
-        lb_item_list_state.changed_0x3C = 0;
-    } else {
-        lb_item_list_state.changed_0x3C = 1;
-    }
-}
-
-/* True on the frame the selection changed. */
-s32 fn_8021F27C(void)
-{
-    return lb_item_list_state.changed_0x3C - 1 == 0;
-}
-
-/* Acknowledges the selection change. */
-void fn_8021F298(void)
-{
-    lb_item_list_state.changed_0x3C = 0;
-}
-
-/* The two-argument row draw the three table variants share. */
-void fn_8021FCD0(u8 a, s32 b, u16 c)
-{
-    fn_8021FCE0(a, b, c, 1);
-}
-
-/* The 8-byte row copy. */
-void fn_802208A8(LbMenuRow8* dst, LbMenuRow8* src)
-{
-    *dst = *src;
-}
-
-/* The row-table accessors: `a` picks the table, `i` the row; -1 means "no row". */
-u8* fn_80223A18(u8 table, s32 index)
-{
-    u8* base = lbl_807922B0[table];
-
-    if (index == -1) {
-        return 0;
-    }
-    return base + index * 8;
-}
-
-u8* fn_80223A44(u8 table, s32 index)
-{
-    u8* base = lbl_807922B8[table];
-
-    if (index == -1) {
-        return 0;
-    }
-    return base + index * 2;
-}
-
-/* The page's row classifier. */
-u32 fn_80221864(u8* row)
-{
-    if (row[0] == 3 && (u32)(row[1] - 1) <= 1) {
-        return 1;
-    }
-    return 0;
-}
-
-/* The offset accessor for the 4-byte base the page keeps at +0. */
-void* fn_802235E0(u32* base, s32 offset)
-{
-    u32 addr = *base;
-
-    if (offset == 0) {
-        return 0;
-    }
-    return (u8*)addr + offset;
-}
-
-/* The no-argument page entry the item page's dispatcher tails into. */
-void fn_80220818(void)
-{
-    fn_80217934();
-}
-
 /* One shared sprite row: the layout entry plus its row table.  (peephole on: see fn_8021E304.) */
 #pragma peephole on
-void fn_802216B4(u16 id)
-{
-    _mh_ivec2_ pos;
-
-    get_lsp_data(id, &pos);
-    draw_sprite_ary(lbl_80791F30, &pos);
-}
 
 #pragma peephole off
-
-/* The item row's icon header strip. */
-void fn_80221BBC(LbMenuItem* item)
-{
-    _mh_ivec2_ pos;
-
-    get_lsp_data(0x131B, &pos);
-    draw_sprite_ary(lbl_805BA820, &pos);
-    fn_802216B4(0x13C9);
-    fn_802216B4(0x13CD);
-    fn_802216B4(0x13CE);
-    draw_sprite_anim_idx(0x132B, item->icon_0x2C, &pos);
-}
-
-/* The equipment slot's frame: open or closed depending on the row's own flag. */
-void fn_80222238(LbMenuItem* item)
-{
-    _mh_ivec2_ pos;
-
-    get_lsp_data(0x138E, &pos);
-    draw_sprite_ary(lbl_805BA968, &pos);
-    if (item->active_0x01 == 0) {
-        draw_sprite_ary(lbl_805BA974, &pos);
-        fn_80221C28(item, 1);
-        return;
-    }
-    draw_sprite_ary(lbl_805BA980, &pos);
-    fn_80221E04(item);
-}
-
-/* The wide-mode backdrop row. */
-void fn_802227BC(void)
-{
-    _mh_ivec2_ pos;
-
-    if (ck_WideMode() != 0) {
-        get_lsp_data(0x129C, &pos);
-        draw_sprite_ary(lbl_805BAA14, &pos);
-    } else {
-        get_lsp_data(0x1297, &pos);
-        draw_sprite_ary(lbl_805BAA08, &pos);
-    }
-    draw_sprite_idx(0x1290, &pos);
-    get_lsp_data(0x1286, &pos);
-    draw_sprite_ary(lbl_805BA9E4, &pos);
-}
-
-/* The identity-ish 3x3 the page starts from. */
-void fn_802230C8(void* unused_0x00, LbMat3x3* m)
-{
-    m->m_0x00 = lbl_80799CD8;
-    m->m_0x04 = lbl_80799CD8;
-    m->m_0x08 = lbl_80799CD8;
-    m->m_0x0C = lbl_80799CDC;
-    m->m_0x10 = lbl_80799CDC;
-    m->m_0x14 = lbl_80799CDC;
-    m->m_0x18 = lbl_80799CDC;
-    m->m_0x1C = lbl_80799CDC;
-    m->m_0x20 = lbl_80799CDC;
-}
-
-/* Whether the item id is one of the first `count` rows of the row table. */
-s32 fn_80220B50(LbMenuItem* item, s32 count, u16 id)
-{
-    s32 i;
-
-    for (i = 0; i < count; i++) {
-        if (item->ids_0x60[i] == id) {
-            return 1;
-        }
-    }
-    return 0;
-}
-
-/* Opens the item page: arms the SE, then raises its own flags. */
-void fn_80220038(void)
-{
-    LbMenuBigBlock* block = lb_menu_block();
-
-    fn_802FAFC8(0x19);
-    block->rows_0x4654[0].open_0x00 = 1;
-    block->rows_0x4654[0].ready_0x01 = 1;
-    block->count_0x4670 = 1;
-}
-
-/* The three countdown bytes the item page runs down. */
-void fn_80220114(void)
-{
-    LbMenuRowSlot* row = &lb_menu_block()->rows_0x4654[1];
-
-    if (row[0].open_0x00) {
-        row[0].open_0x00--;
-    }
-    if (row[1].open_0x00) {
-        row[1].open_0x00--;
-    }
-    if (lb_menu_block()->fade_c_0x466C) {
-        lb_menu_block()->fade_c_0x466C--;
-    }
-}
-
-/* The item row's per-row reset: the four flag bytes rise and fall around the row's state word. */
-void fn_802208D4(LbMenuItem* item)
-{
-    LbMenuBigBlock* block = lb_menu_block();
-
-    item->flag_a_0x24 = 1;
-    item->flag_b_0x25 = 1;
-    item->flag_c_0x26 = 1;
-    item->flag_d_0x27 = 1;
-    memset(&item->base_a_0x4C, 0, 8);
-    item->slot_0x46 = 0;
-    item->value_0x3C = 0;
-    item->kind_0x30 = 0;
-    item->flag_a_0x24 = 0;
-    item->flag_b_0x25 = 0;
-    item->flag_e_0x56 = 0;
-    item->flag_f_0x57 = 0;
-    if (block->rows_0x4654[item->row_0x2E].state_0x04 != 0) {
-        item->icon_0x2C = 1;
-    } else {
-        item->icon_0x2C = 0;
-    }
-}
-
-/* The item row's deactivate: the four state fields first, then the shared reset above. */
-void fn_8022097C(LbMenuItem* item)
-{
-    item->row_0x2E = 0;
-    item->kind_0x30 = 0;
-    item->active_0x01 = 0;
-    item->icon_0x2C = 0;
-    fn_802208D4(item);
-}
-
-/* The row's icon variant from its state byte (`fn_802205D8` maps the item to a byte index). */
-s16 fn_80220AF0(u8* state, u16* id)
-{
-    switch (state[fn_802205D8(*id)]) {
-    case 3:
-        return 0xA;
-    case 2:
-        return 5;
-    default:
-        return 3;
-    }
-}
-
-/* The page's tick: the row count as a float and the per-tick step, then the changed flag. */
-void fn_8021F020(u32 stamp, u32 count, f32 depth)
-{
-    lb_item_list_state.count_0x14 = count;
-    lb_item_list_state.step_0x18 = lbl_80799C78 * count;
-    lb_item_list_state.scroll_0x30 = depth;
-    lb_item_list_state.depth_0x34 = depth;
-    lbl_80794868 = stamp;
-    lb_item_list_state.stamp_0x04 = stamp;
-    if ((f32)depth == lbl_80799C7C) {
-        lb_item_list_state.selected_0x38 = 1;
-    } else {
-        lb_item_list_state.selected_0x38 = 0;
-    }
-    lb_item_list_state.changed_0x3C = 0;
-    lb_item_list_state.events_0x48 = (s8)CalculateEvents();
-    lb_item_list_state.active_0x00 = 0;
-}
-
-/* The base-relative accessor `fn_80064080`'s block wants. */
-void fn_802235A4(u32* base)
-{
-    fn_802235E0(base, fn_80064080()->field_0x08);
-}
 
 /* This unit's own `.bss` (`splits.txt` `.bss 0x806AA8C8..0x806AACC0`), in address order.  Defined at the foot
  * of the file, after every use, so MWCC keeps one `lis`/`addi` pair per symbol like the target.  The two static
  * constructors the `.ctors` claim carries build `lb_menu_scratch` (`fn_8021EFBC`) and the position tables plus
  * `lobby_w` (`fn_8021FF5C`, which `setVec3`s the five vectors and calls `fn_8021FFFC(&lobby_w)`); the
  * constructors are not reconstructed, so the objects are plain storage here. */
-LbMenuScratch lb_menu_scratch;       /* +0x806AA8C8 */
-LbMenuItemState lb_item_list_state;  /* +0x806AAA88 */
-LbPageState lb_page_state_0;         /* +0x806AAAD8: the record `.data` 0x805BA490 points at (GUESS name) */
-LbPageState lb_page_state_1;         /* +0x806AAAF0: the record `.data` 0x805BA530 points at (GUESS name) */
-VEC3 lb_menu_pos_tbl[4];             /* +0x806AAB08: four fixed positions `fn_8021FF5C` sets (GUESS name) */
-VEC3 lb_menu_pos_extra;              /* +0x806AAB38: a fifth fixed position (GUESS name) */
-LbLobbyWork lobby_w;             /* +0x806AAB44 */
+LbMenuScratch lb_menu_scratch;             /* +0x806AAB44 */
 
 }  /* extern "C" */

@@ -64,6 +64,7 @@
 #include "enemy/fn_80138074.h"
 #include "unsplit/enemy.h"
 #include "Network/network_pat_control.h" /* the owner's header (rule 2) */
+#include "Pl/plw.h"
 
 #pragma peephole off
 
@@ -151,20 +152,7 @@ struct _ENEMY_WORK {
  * The player-side work record (`get_move_work_adrs(0)`/`(2)`, 0xB20 apart).
  * ------------------------------------------------------------------------------------------------ */
 
-/* size: 0xB20 */
-struct _PLW {
-    /* +0x000 */ u8 active;
-    /* +0x001 */ u8 unused_0x001[0x008 - 0x001];
-    /* +0x008 */ u8 field_0x008;     /* the slot `fn_8012D1A8` tests against player 0 */
-    /* +0x009 */ u8 unused_0x009;
-    /* +0x00A */ u8 field_0x00A;     /* 8 rejects the record in `fn_8012D0B4` */
-    /* +0x00B */ u8 unused_0x00B[0x016 - 0x00B];
-    /* +0x016 */ u8 field_0x016;     /* matched against the enemy's area in `fn_8012D0B4` */
-    /* +0x017 */ u8 unused_0x017[0x1A4 - 0x017];
-    /* +0x1A4 */ u8 field_0x1A4;     /* the second area byte `fn_8012D188` compares */
-    /* +0x1A5 */ u8 unused_0x1A5[0xB20 - 0x1A5];
-};
-
+/* `_PLW`, the player work record, comes from `Pl/plw.h` - one definition, in the owner's header (rule 1). */
 /* The root object `get_move_work_adrs(0)` returns - the per-player status bytes that
  * `fn_8012D1A8` reads.  It is not the 0xB20 record array; the index is a byte offset into this one
  * object.
@@ -333,7 +321,7 @@ extern "C" void fn_8012BDF4(_ENEMY_WORK* enemy)
     max = get_move_work_max(2);
     work = get_move_work_adrs(2);
     for (i = 0; i < max; i++) {
-        if (work->active != 0 && fn_8012D1A8(work->field_0x008) == 0) {
+        if (work->slot_active != 0 && fn_8012D1A8(work->chunk_ofs) == 0) {
             value = fn_8012BA00(enemy, table, work, 1, i);
             if (value > 0) {
                 if (Pl_Skill_ck(work, 0xC) == 1) {
@@ -396,7 +384,7 @@ extern "C" s32 fn_8012C0EC(_ENEMY_WORK* enemy, u32 index)
         table = lbl_805A0FF8[0];
     }
     work += (u8)index;
-    if (work->active != 0 && fn_8012D1A8(work->field_0x008) == 0 && fn_8012D0B4(enemy, work) == 1) {
+    if (work->slot_active != 0 && fn_8012D1A8(work->chunk_ofs) == 0 && fn_8012D0B4(enemy, work) == 1) {
         entry = table->entry;
         if (entry->condition_0x00C != 0 && Pl_condition_ck(work, entry->condition_0x00C) == 1) {
             value += entry->value_0x010;
@@ -608,7 +596,7 @@ extern "C" u32 fn_8012C6F4(_ENEMY_WORK* enemy, u32 mask, s32 arg2)
         enemy->field_0x798 = 0xFF;
         if ((u8)mask != 0xFF) {
             for (i = 0; i < max; i++, work++) {
-                if (work->active != 0 && fn_8012D1A8(work->field_0x008) == 0 &&
+                if (work->slot_active != 0 && fn_8012D1A8(work->chunk_ofs) == 0 &&
                     ((u8)mask & (1 << i)) != 0 && fn_8012D0B4(enemy, work) != 0) {
                     enemy->field_0x798 = i;
                     break;
@@ -654,7 +642,7 @@ extern "C" u32 fn_8012C870(_ENEMY_WORK* enemy, u32 mask)
         work = get_move_work_adrs(2);
         enemy->field_0x798 = 0xFF;
         for (i = 0; i < max; i++, work++) {
-            if (work->active != 0 && fn_8012D1A8(work->field_0x008) == 0 &&
+            if (work->slot_active != 0 && fn_8012D1A8(work->chunk_ofs) == 0 &&
                 ((u8)mask & (1 << i)) != 0 && fn_8012D0B4(enemy, work) != 0) {
                 enemy->field_0x798 = i;
                 break;
@@ -795,7 +783,7 @@ s32 em_area_ck(_ENEMY_WORK* enemy)
 /* Whether the enemy and the given work record share an area. */
 extern "C" s32 fn_8012D188(_ENEMY_WORK* enemy, _PLW* work)
 {
-    return work->field_0x1A4 == enemy->area_no;
+    return work->effect_key_0x1A4 == enemy->area_no;
 }
 
 /* The enemy's activity byte. */
@@ -835,15 +823,15 @@ extern "C" u32 em_act_ck__FP11_ENEMY_WORKUcUc(_ENEMY_WORK* enemy, u32 state, u32
  * map-specific position gate. */
 extern "C" s32 fn_8012D0B4(_ENEMY_WORK* enemy, _PLW* work)
 {
-    if (fn_8012D1A8(work->field_0x008) == 1) {
+    if (fn_8012D1A8(work->chunk_ofs) == 1) {
         return 0;
     }
     if (work->field_0x00A == 8) {
         return 0;
     }
-    if (enemy->area_no == work->field_0x016) {
+    if (enemy->area_no == work->area_0x16) {
         if (stage_map_kind_get(enemy->field_0x1E0) == 9) {
-            if (Pl_area_flag_get(work->field_0x008) == 0) {
+            if (Pl_area_flag_get(work->chunk_ofs) == 0) {
                 if (fn_802B0688(&enemy->pos) == 1) {
                     return 1;
                 }

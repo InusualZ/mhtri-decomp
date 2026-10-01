@@ -2,6 +2,12 @@
  "names": {
   "enemy/fn_80387844.cpp": "enemy/em009_act.cpp",
   "menu/fn_804513FC.cpp": "menu/menu_sysmsg.cpp",
+  "lobby/fn_801EC9F8_merged.cpp": "lobby/lb_pane_ui.cpp",
+  "lobby/fn_80220038.cpp": "lobby/lb_equip_page.cpp",
+  "Pl/fn_8028F44C.cpp": "Pl/pl_hit_sphere.cpp",
+  "enemy/fn_801CA004.cpp": "enemy/em004_act.cpp",
+  "enemy/fn_801CCBC4.cpp": "enemy/em005_act.cpp",
+  "enemy/fn_801D80EC.cpp": "enemy/em007_act.cpp",
   "main/fn_80048964.cpp": "userdata_item.cpp",
   "g3d/fn_80088E24.cpp": "g3d/g3d_resvtx.cpp",
   "ef/ef_drawstripestrategy_base.cpp": "ef/ef_drawstripestrategy.cpp",

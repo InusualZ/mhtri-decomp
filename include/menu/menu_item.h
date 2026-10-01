@@ -18,31 +18,8 @@
 
 #include "types.h"
 #include "pl.h"
+#include "Pl/hit_w.h"   /* `_HIT_W` / `HitRegistry`, shared with `Pl/pl_coll.cpp` (rule 1) */
 
-/* The attack entry the hit helpers below take.  Only the bytes this unit touches are named; the
- * view stops at +0x05B, the last byte any of these functions reads (the record's real end is not
- * pinned by this unit).  4-aligned, so +0x05B leaves the total at 0x5C.
- * size: 0x5C (approximate: max touched offset + 1) */
-struct _HIT_W {
-    /* +0x000 */ u8 unused_0x000[0x005];
-    /* +0x005 */ u8 result_valid;      /* zero means the entry carries no result yet */
-    /* +0x006 */ u8 unused_0x006[0x00A - 0x006];
-    /* +0x00A */ u16 state;            /* the state bits `fn_8029F5E4`/`fn_8029F5F8` test */
-    /* +0x00C */ u8 unused_0x00C[0x00E - 0x00C];
-    /* +0x00E */ u8 result;            /* the result id `hit_result_check` reports */
-    /* +0x00F */ u8 unused_0x00F[0x018 - 0x00F];
-    /* +0x018 */ u16 field_0x018;      /* the four values `fn_8029F4C4` stores */
-    /* +0x01A */ u16 field_0x01A;
-    /* +0x01C */ u16 field_0x01C;
-    /* +0x01E */ u16 field_0x01E;
-    /* +0x020 */ u32 flags;            /* the hit flag word the setters OR/ANDC into */
-    /* +0x024 */ u8 unused_0x024[0x031 - 0x024];
-    /* +0x031 */ u8 field_0x031;       /* the mask byte `fn_8029F57C` tests */
-    /* +0x032 */ u8 unused_0x032[0x03C - 0x032];
-    /* +0x03C */ f32 field_0x03C;      /* the s16 `hit_knock_set` widens and stores */
-    /* +0x040 */ u8 unused_0x040[0x05B - 0x040];
-    /* +0x05B */ u8 field_0x05B;       /* the mask byte `fn_8029F51C` tests */
-};
 
 /* The record `body_set` copies the hunter's armour/appearance bytes out of; only the four bytes
  * this unit reads are named, and the record is at least 0x1E2 bytes (the highest offset touched).
@@ -110,13 +87,6 @@ struct ItemDataRecord {
                                        * same unit) */
 };
 
-/* The item table head at `.bss:0x806AC8A8` (0x10 B), the block `fn_8029F60C` reads one word of. */
-struct ItemWorkHead {
-    /* +0x000 */ u32 unused_0x000;
-    /* +0x004 */ u32 field_0x004;     /* the item id `fn_8029F60C` hands back */
-    /* +0x008 */ u32 unused_0x008;
-    /* +0x00C */ u32 unused_0x00C;
-};
 
 /* The item table pointers at `.bss:0x806AC8B8` (0x10 B), the block `get_item_data_ptr` returns.
  * `items` is the 747 x 0x14 record array, `names`/`exp` the two 747-entry word tables. */
@@ -289,7 +259,7 @@ struct MenuFrameWork {
 
 /* The three `.bss`/`.data` blocks the accessors read.  They are other units' data (no registered
  * unit emits them), so the accessors take their addresses instead of defining them. */
-extern ItemWorkHead lbl_806AC8A8;
+extern HitRegistry lbl_806AC8A8;
 extern ItemDataHead lbl_806AC8B8;
 extern MenuWork lbl_806AC8C8;
 extern MenuTables lbl_806ACF28;
@@ -404,8 +374,6 @@ void fn_802A47F4(MenuSlot* self);
 void fn_802A4D98(MenuSlot* slot);
 
 /* The callees above this unit. */
-void fn_8027EB18(u8 kind);
-u32 fn_8027E120(_PLW* worker);
 /* `fn_8027D738` is `Pl/fn_8027D684.cpp`'s (its address is inside that unit's range) and it is written
  * there, so its declaration is the owner's header `include/Pl/fn_8027D684.h` (rule 2).  The two
  * unwritten siblings above have no owner header entry yet and keep this unit's call-site shape. */

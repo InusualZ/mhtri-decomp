@@ -1065,7 +1065,7 @@ config.libs = [
             # `calcVecAng2__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3`, `get_em_scale__FP11_ENEMY_WORK`).
             # No `__FILE__` string is reachable from the range and the runtime dump answers only
             # `zz_` placeholders, so the file keeps the map's own stem (see the unit's header).
-            Object(NonMatching, "enemy/fn_801CCBC4.cpp"),
+            Object(NonMatching, "enemy/em005_act.cpp"),
             # Registered from proposal/801B0010_fn_801B0010.cpp (a 0x801B0010 run discovery
             # proposed): the em030 (enemy #30) program unit, 60 functions / 0x4448 bytes plus the
             # extab/extabindex entries its 45 framed functions carry.  Module `enemy` from the link
@@ -1087,7 +1087,7 @@ config.libs = [
             # (`em_frame_check__FP...`, `calcVecAng2__FP...`, `rotVecY__FP...`).  No `__FILE__`
             # string is reachable and the runtime dump answers only `zz_` placeholders, so the file
             # keeps the map's own stem (see the unit header).
-            Object(NonMatching, "enemy/fn_801D80EC.cpp"),
+            Object(NonMatching, "enemy/em007_act.cpp"),
             # Registered once, at its final home (docs/plan.md 12) from
             # proposal/8019ED34_fn_8019ED34.cpp (the 0x8019ED34 gap between this unit and
             # `enemy/fn_801A4504.cpp`; 2026-09-30 recut: left edge 0x8019E670 (the end of the preceding TU's
@@ -1149,7 +1149,7 @@ config.libs = [
             # callees are mangled (`getTevKColor__6MHchar...`, `__nw__FUl`).  No `__FILE__` string
             # is reachable and the dump answers only `zz_` placeholders, so the file keeps the
             # map's own stem (see the unit header).
-            Object(NonMatching, "enemy/fn_801CA004.cpp"),
+            Object(NonMatching, "enemy/em004_act.cpp"),
             # Registered once, at its final home (docs/plan.md 12) from
             # proposal/801A9540_fn_801A9540.cpp: the enemy per-action state-machine band
             # (`.text` 0x801A9540..0x801B0010, 82 functions / 0x6AD0 bytes) plus its
@@ -1721,18 +1721,6 @@ config.libs = [
             # `fn_802373AC` with a rule-7 deferral.  It uses `cflags_pl` (this lib).
             Object(NonMatching, "Pl/fn_802373AC.cpp"),
             Object(Matching, "Pl/fn_80229ECC.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `80224AC4_fn_80224AC4.cpp` - the player actor's per-model SE/motion rig update
-            # (0x80224AC4-0x80229ECC, 44 functions, 0x8408 B) with its own exception tables
-            # (extab 0x80011B34-0x80011C7C, extabindex 0x8002E7B8-0x8002E9A4, 41 records).  Home is
-            # `Pl`: every actor parameter is a `_PLW*` (`Get_motion_no__FP4_PLW`,
-            # `Pl_master_ck__FP4_PLW`, `Pl_act_ck__FP4_PLWUcUs`), the tail helpers
-            # (`fn_80229CB4`/`fn_80229E10`/`fn_80229EA8`) are already homed in `unsplit/Pl.h`, and the
-            # target object's extab/extabindex rules out the `lobby` lib next door
-            # (`-Cpp_exceptions off`).  No `__FILE__` string and no runtime-dump name cover the range,
-            # so the stem is the map's `fn_80224AC4` with a rule-7 deferral.  It uses `cflags_pl`
-            # (this lib).
-            Object(NonMatching, "Pl/fn_80224AC4.cpp"),
             # `8023C2D0_fn_8023C2D0` - the other half of the player motion -> SE frame dispatcher
             # family (0x8023C2D0-0x80241558, 0x50B8 B, TWO functions).  Home is `Pl` and the stem is
             # the map's `fn_8023C2D0` with a rule-7 deferral: both functions dispatch on
@@ -1847,57 +1835,9 @@ config.libs = [
             # report's totals are unchanged except `total_units`, and `ninja build/RMHE08/ok` stays
             # green.  The file name is a guess (see the unit header).
             Object(NonMatching, "Pl/pl_act_data.cpp"),
-            # A **data-only** unit (owner's routing, 2026-09-30): it owns the Pl band's shared
-            # `.bss` collision-work run, 0x806AB848-0x806AC8A8 (0x1060 B, 12 arrays - the per-chunk
-            # move-work table, the hit-box and land tables, the per-slot collision-result arrays),
-            # and its source defines nothing.  The run is read by the Pl ground/hit collision band
-            # alone (`Pl/fn_8028F66C.cpp`, `Pl/fn_80295EF4.cpp`, `Pl/fn_8025F088.cpp`, `Pl/pl_act.cpp`)
-            # while its two edges are reader-disjoint (`Pl/fn_80288CEC.cpp` below it,
-            # `menu/menu_item.cpp` at 0x806AC8A8 above it), so one owner is the right model;
-            # giving it one is what lets those consumers include `Pl/bss_pool.h` instead of
-            # declaring the arrays into their own files (rules 12/2) and what keeps dtk from
-            # generating an anonymous `auto_*_bss` unit over the same bytes.  Measured: the
-            # whole-project report is unchanged row for row and its totals differ only by
-            # `total_units`, and `ninja build/RMHE08/ok` stays green.  The file name is a guess (see
-            # the unit header).
-            Object(NonMatching, "Pl/bss_pool.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `802693C4_fn_802693C4` - the player part/motion cluster (0x802693C4-0x8026BA1C, 63
-            # functions, 9816 B) with its own exception tables (extab 0x80012554-0x8001265C,
-            # extabindex 0x8002F6E8-0x8002F808 - the two runs the link order puts between
-            # `Pl/fn_80262940.cpp` and `Pl/pl_master.cpp`).  Home is `Pl`: every actor parameter is
-            # the `_PLW` the siblings take, the table it walks is `lbl_80794B28` (`_PLGLOBAL`) and
-            # its callees are `Pl_chr_set_attr`/`Pl_chr_setX`/`Pl_frame_check`/`Get_motion_no`.
-            # No `__FILE__` string covers the band and the runtime dump answers only `zz_`
-            # placeholders for 58 of the 63 addresses, so the stem is the map's `fn_802693C4` with
-            # a rule-7 deferral.  It uses `cflags_pl` (this lib).
-            Object(NonMatching, "Pl/fn_802693C4.cpp"),
-            Object(NonMatching, "Pl/pl_skill.cpp", cflags=cflags_pl_skill),
+            Object(NonMatching, "Pl/pl_coll.cpp"),
             Object(NonMatching, "Pl/pl_act.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `80273B14_fn_80273B14.cpp` - the player act-entry/parameter unit
-            # (0x80273B14-0x80276B58, 68 functions, 0x3044 B), the gap between pl_skill and pl_act.
-            # It owns extab 0x8001280C-0x8001294C and extabindex 0x8002FA90-0x8002FC70: each run is
-            # exactly 40 records and every extabindex record's function address (0x80273B14..
-            # 0x80276A3C) is one of this unit's, read out of the DOL.  Home is `Pl`: every function
-            # takes the player work (`_PLW*`) or an equipment slot out of it, and the gates are the
-            # Pl siblings (`Pl_Skill_ck`, `Pl_master_ck`, `Pl_act_ck`, `Pl_cat_skill_ck`,
-            # `Pl_condition_ck`, `Pl_dm_condition_ck`, `Pl_suimen_ck`, `Pl_chr_setX`).  No `__FILE__`
-            # string covers the range and `dumpmap.py` answers only `zz_0273b14_`, so the stem is the
-            # map's `fn_80273B14` with a rule-7 deferral.  It uses `cflags_pl` (this lib).
-            Object(NonMatching, "Pl/fn_80273B14.cpp"),
-            # Cluster C (`Pl_master_ck`, `Pl_act_ck`): pinned by the .sdata2 run jump
-            # `lbl_8079A02C -> lbl_8079A030` at the right edge; the left edge is the closure edge.
-            Object(Matching, "Pl/pl_master.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `8026FFBC_fn_8026FFBC` - the player work's health-ratio gate, ONE function
-            # (0x8026FFBC-0x80270018, 92 B) with extab 0x800126CC-0x800126D4 and extabindex
-            # 0x8002F8B0-0x8002F8BC.  Home is `Pl`: the argument is the `_PLW*` both callers (in
-            # `Pl/pl_skill.cpp`) hand `Pl_Skill_ck(_PLW*, u16)`.  No `__FILE__` string covers the
-            # range (its only data operands are the two `.sdata2` pool words) and `dumpmap.py`
-            # answers `zz_026ffbc_`, so the stem is the map's `fn_8026FFBC` with a rule-7 deferral.
-            # It uses `cflags_pl` (this lib).
-            Object(NonMatching, "Pl/fn_8026FFBC.cpp"),
+            Object(NonMatching, "Pl/pl_act_step_data.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal `802840DC_fn_802840DC`.
             # 54 functions, 0x802840DC-0x80288CEC (0x4C10 B).  Home is `Pl`: the band's callees are
             # all Pl API (`Get_motion_no__FP4_PLW`, `Pl_get_gunner_pos`/`Pl_get_gunner_vec`,
@@ -1909,56 +1849,8 @@ config.libs = [
             # deferral - the sibling class-4 pattern of `Pl/fn_8026FFBC.cpp` / `Pl/fn_80288CEC.cpp`.
             # It uses `cflags_pl` (this lib).
             Object(NonMatching, "Pl/fn_802840DC.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): proposal `8027D684_fn_8027D684` -
-            # the player act/equipment cluster (0x8027D684-0x802840DC, 138 functions, 0x6A58 B) with
-            # extab 0x80012B54-0x80012E7C and extabindex 0x8002FF7C-0x80030438 (101 framed functions,
-            # one 8-byte extab and one 12-byte extabindex record each - the record count is exactly the
-            # framed functions in the range, which is what pins both ranges).  Home is `Pl`: every
-            # function's first argument is the player work `_PLW`, the gates are the Pl siblings
-            # (`Pl_master_ck`/`Pl_frame_check`/`Pl_Skill_ck`), the equipment helpers take the `_EQUIP`
-            # record `include/pl.h` owns, and both bracketing registered units are Pl.  The proposal's
-            # edge is a `--max-bytes` cap rather than a TU boundary (no `__FILE__` evidence anywhere in
-            # the band) and the dump answers `zz_<addr>_` for it, so the stem is the map's
-            # `fn_8027D684` with a rule-7 deferral.  It uses `cflags_pl` (this lib).
-            Object(NonMatching, "Pl/fn_8027D684.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): proposal `80288CEC_fn_80288CEC`.
-            # 78 functions, 0x80288CEC-0x8028F66C (0x697C B), with extab 0x80012FFC-0x8001323C and
-            # extabindex 0x80030678-0x800309D8.  Home is `Pl`: the whole unit operates on the player
-            # work (`Pl_frame_check`/`Pl_zanzo_set`/`Pl_act_ck`/`eft029_set_scale` all take `_PLW*`),
-            # it defines `pl_motion_set`, and its accessors read the record `get_move_work_adrs(0)`
-            # returns.  Extent pinned by the `.sdata2` run 0x8079A270-0x8079A314 (the run boundary is
-            # the left edge).  No `__FILE__` string and no runtime-dump name cover the range, so the
-            # stem is the map's `fn_80288CEC` with a rule-7 deferral (the sibling class-4 pattern of
-            # `Pl/fn_80229ECC.cpp` / `Pl/fn_80241558.cpp`).  It uses `cflags_pl` (this lib).
-            Object(NonMatching, "Pl/fn_80288CEC.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): proposal `8028F66C_fn_8028F66C` -
-            # the ground/hit collision cluster of the Pl band (0x8028F66C-0x80295EF4, 53 functions,
-            # 0x6888 B) with extab 0x8001323C-0x800133CC and extabindex 0x800309D8-0x80030C30 (50
-            # framed functions, one 8-byte extab and one 12-byte extabindex record each).  Home is
-            # `Pl`: the right edge of the preceding Pl unit's `.text` is this range's left edge and
-            # this unit's `.sdata2` pool starts exactly where that unit's ends (0x8079A314), the unit
-            # reads the Pl-band global `lbl_80794B58`, and its exported entry points are the ones the
-            # Pl/ef/enemy units call (`GetGroundHit2` from `Pl/pl_act.cpp`, `GetGroundHit` from
-            # `ef/eft001.cpp`, `findInterSection*` from `enemy/*`).  The proposal's right edge is a
-            # `--max-bytes` cap rather than a TU boundary (no `__FILE__` string covers the band and
-            # the dump answers `zz_<addr>_` for 47 of the 53 addresses), so the stem is the map's
-            # `fn_8028F66C` with a rule-7 deferral.  It uses `cflags_pl` (this lib).
-            Object(NonMatching, "Pl/fn_8028F66C.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): proposal `80295EF4_fn_80295EF4` -
-            # the hit/land query band (0x80295EF4-0x8029F3C8, 99 functions, 0x94D4 B).  Home is `Pl`:
-            # the band hits the Pl family (`get_move_work_adrs`, `_PLW` fields, `Pl_frame_check`) and
-            # its record vocabulary (`_HIT_W`, `LandData`, `get_hit_id`) is the one the map already
-            # names inside the Pl band, whose registered `Pl/fn_80288CEC.cpp` ends at 0x8028F66C
-            # straight before it.  The seam at 0x80295EF4 is a `--max-bytes` cut, not a TU boundary:
-            # the band's `.sdata2` run 0x8079A330-0x8079A3C8 has no break across it, and the static
-            # initializer inside this range (0x80297C30) constructs arrays out of the *previous*
-            # proposal's `fn_80295544`.  No `__FILE__` string covers the band and `dumpmap.py` answers
-            # only `zz_XXXXXXXX_` placeholders, so the stem is the map's `fn_80295EF4` with a rule-7
-            # deferral (the sibling class-4 pattern of `Pl/fn_80229ECC.cpp` / `Pl/fn_80288CEC.cpp`).
-            # `.text` only: the band owns no emitted data, and its `.ctors` word is not claimed
-            # because this source states the static initializer as an explicit function (invariant
-            # 8.4).  It uses `cflags_pl` (this lib).
-            Object(NonMatching, "Pl/fn_80295EF4.cpp"),
+            Object(NonMatching, "Pl/pl_motion.cpp"),
+            Object(NonMatching, "Pl/pl_hit_sphere.cpp"),
             # Re-cut 2026-09-29 out of `enemy/em024_ai.cpp`: the player act-state handlers of
             # `_PLW::field_0x002` class 3 (`Pl/fn_80258FCC.cpp`'s `jumptable_805C5648` entry 3 is
             # this band's dispatcher `fn_8034EE18`), `.text` 0x8034D2B0..0x8034F138 (24 functions /
@@ -2588,71 +2480,8 @@ config.libs = [
             # stem (brief section 2, class 3+4).  Sections: extab 0x800105B4..0x8001079C (61 records),
             # extabindex 0x8002C778..0x8002CA54 (61 x 12 B), .text 0x801E7530..0x801EC9E0.
             Object(NonMatching, "lobby/fn_801E7530.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `801EC9F8_fn_801EC9F8.cpp` (`.text` 0x801EC9F8..0x801F3294, 67 functions / 26780 B).
-            Object(NonMatching, "lobby/fn_801EC9F8.cpp"),
-            # `801F3294_fn_801F3294.cpp` (`.text` 0x801F3294..0x801F9CD4, 48 functions / 27200 B) -
-            # the lobby page/panel group between the menu layer below and the NPC group above.  Module
-            # `lobby` from the code (`LbStr`, `get_lsp_data`, `chk_pointer`, `PutPageArrow`,
-            # `LbPutAnaPageArrow`, `draw_sprite*`, `sysSE_req`) and from both bracketing registered
-            # units; no `__FILE__` string covers the range and the dump answers only `zz_`
-            # placeholders, so the file keeps the map stem (brief section 2, class 3+4).  Both edges
-            # are unproven (the right one is the discovery byte cap; the next proposal 0x801F9CD4
-            # continues the band).  Sections: extab 0x8001094C..0x80010A7C (38 records), extabindex
-            # 0x8002CCDC..0x8002CEA4 (38 x 12 B), .text 0x801F3294..0x801F9CD4.
-            Object(NonMatching, "lobby/fn_801F3294.cpp"),
-            # `801F9CD4_fn_801F9CD4.cpp` (`.text` 0x801F9CD4..0x801FBF78, 14 functions / 8868 B) -
-            # the lobby character-edit (hair/inner colour) screen group.  Module `lobby` from the code
-            # (`lobby_w`/`lb_param_w`/`Screen_w`/`system_w`, `get_lsp_data`, `draw_sprite_ary`,
-            # `GetMenuFontColor`, `LbStr`) and from both bracketing registered units; no `__FILE__`
-            # string covers the range (the only `.cpp` string in the region's data, `enemy_control.cpp`,
-            # is referenced from 0x801411DC, a different band) and the dump answers only `zz_`
-            # placeholders, so the file keeps the map stem (brief section 2, class 3+4).  Sections:
-            # extab 0x80010A7C..0x80010ADC (12 records), extabindex 0x8002CEA4..0x8002CF34 (12 x 12 B),
-            # .text 0x801F9CD4..0x801FBF78.
-            Object(NonMatching, "lobby/fn_801F9CD4.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `801FBF78_fn_801FBF78.cpp` (`.text` 0x801FBF78..0x802029B4, 127 functions / 27196 B) -
-            # the lobby NPC / world-update group.  Module `lobby` from the code (the range owns
-            # `lb_npc`, `npc_data_town`, `npc_data_village`, `npc_lp_tbl`, `npc_model_*`, `npc_sub_data`
-            # and defines `lb_npc_Get_motion_no`/`get_talk_npc_data_ptr`) and from the neighbour
-            # below; no `__FILE__` string covers the range and the dump answers only `zz_`
-            # placeholders, so the file name is the subsystem's own `lb_npc` (brief section 2,
-            # class 3).  Sections: extab 0x80010ADC..0x80010DBC, extabindex 0x8002CF34..0x8002D384
-            # (92 x 12 B), .text 0x801FBF78..0x802029B4, .ctors 0x8056F35C..0x8056F360.
+            Object(NonMatching, "lobby/lb_pane_ui.cpp"),
             Object(NonMatching, "lobby/lb_npc.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `802076D4_fn_802076D4.cpp` (`.text` 0x802076D4..0x8020C588, 82 functions / 20148 B) -
-            # the lobby NPC/character action layer.  Module `lobby` from the code (`LbStr`,
-            # `lb_npc_Get_motion_no`, `fn_801FE0AC`/`fn_801FDE3C` out of `lb_npc.cpp`) and from the
-            # band (both bracketing registered units are `lobby`); no `__FILE__` string covers the
-            # range and the dump answers only `zz_` placeholders, so the file keeps the map stem
-            # (brief section 2, class 4).  C++ from the range's mangled callees.  Sections: extab
-            # 0x80010F7C..0x80011184 and extabindex 0x8002D624..0x8002D930 (65 records, both runs
-            # abutting the bracketing units), .text 0x802076D4..0x8020C588.
-            Object(NonMatching, "lobby/fn_802076D4.cpp"),
-            # `802029B4_fn_802029B4.cpp` (`.text` 0x802029B4..0x802076D4, 68 functions / 19744 B) -
-            # the lobby NPC work band above `lobby/lb_npc.cpp`'s range: the same `_LB_NPC` state
-            # machines and motion-table helpers.  Module `lobby` from the link band (both bracketing
-            # registered units are `lobby`) and from the code (it takes `_LB_NPC`, calls
-            # `lb_npc_Get_motion_no` and reads `lb_npc_move_data`/`lobby_w`); no `__FILE__` string is
-            # reachable from the range and the dump answers only `zz_` placeholders, so the file keeps
-            # the map stem (brief section 2, class 3+4).  Sections: extab 0x80010DBC..0x80010F7C,
-            # extabindex 0x8002D384..0x8002D624 (56 x 8 / 56 x 12 B: the range has 56 framed
-            # functions, and the per-function split objects' extabindex relocations hand
-            # `@etb_80010F7C` to the next proposal's first framed function), .text
-            # 0x802029B4..0x802076D4.
-            Object(NonMatching, "lobby/fn_802029B4.cpp"),
-            # Registered once, at its final home (docs/plan.md 12) from
-            # proposal/8020C588_fn_8020C588.cpp: the lobby player-character control band
-            # (`.text` 0x8020C588..0x80212810, 112 functions / 25224 B, plus its extab run
-            # 0x80011184..0x80011434 and extabindex run 0x8002D930..0x8002DD38 - 86 records).
-            # It sits between this unit and `lobby/fn_80212810.cpp`, so the module is `lobby`
-            # (class 3: the link band); the range **defines** `LbStr__FUcUs`, the lobby string
-            # helper `include/unsplit/lobby.h` declares and `lobby/fn_801E7530.cpp` calls, and
-            # calls the lobby UI API.  No `__FILE__` string survives, so the file keeps the
-            # map's `fn_8020C588` stem (class 4; see the unit's header).
-            Object(NonMatching, "lobby/fn_8020C588.cpp"),
             # `80212810_fn_80212810.cpp` (`.text` 0x80212810..0x80219260, 105 functions / 27216 B) -
             # the lobby item/equipment page layer.  Module `lobby` from the code (`LbStr`,
             # `LbPutAnaPageArrow`, `get_lsp_data`, `draw_sprite_ary`, `GetMenuFontColor`) and from the
@@ -2677,18 +2506,9 @@ config.libs = [
             # only: the `.data` (0x805C0xxx) and `.bss` runs this range reads are shared and leak
             # outside it, so no data range is claimed yet.
             Object(NonMatching, "lobby/fn_80219260.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `8021E1EC_fn_8021E1EC.cpp` (`.text` 0x8021E1EC..0x80224AC4, 108 functions / 26840 B) -
-            # the lobby item/equipment page family.  Module `lobby` from the code (`LbStr`,
-            # `draw_sprite_ary`, `draw_font_idx`, `get_lsp_data`, `ItemName`, `put_menu_cursor`) and
-            # from the band (both bracketing registered units are `lobby`); no `__FILE__` string
-            # survives and the dump answers only `zz_` placeholders, so the file keeps the map stem
-            # (brief section 2, class 4).  C++ from the range's mangled callees.  The extab /
-            # extabindex runs agree with both edges exactly (77 records, `fn_8021E1EC` first,
-            # `fn_80224A28` last), which is why the capped range is registered whole.  `.text` only:
-            # the `.data` run this range partly references leaks outside it, so no data range is
-            # claimed yet.
-            Object(NonMatching, "lobby/fn_8021E1EC.cpp"),
+            Object(NonMatching, "lobby/lb_menu_scratch.cpp"),
+            Object(NonMatching, "lobby/lb_menu_pos_tbl.cpp"),
+            Object(NonMatching, "lobby/lb_equip_page.cpp"),
             # Registered once, at its final home (docs/plan.md 12) from
             # proposal/802FA9A0_fn_802FA9A0.cpp: the lobby event/status band
             # (`.text` 0x802FA9A0..0x8030121C, 120 symbols / 26748 B, plus its extab run

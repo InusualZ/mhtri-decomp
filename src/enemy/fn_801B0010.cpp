@@ -52,7 +52,7 @@
  * emitting a mangled reloc the target does not have).  Everything else that changed here:
  *   * `pl_model_state_set` moved from `include/unsplit/Pl.h` (a fallback band, and a `rule 2` finding once
  *     its owner existed) to the owner's header `include/Pl/fn_80262940.h`; `fn_801E01BC` likewise to
- *     `include/enemy/fn_801D80EC.h`, and this unit's own three band symbols to
+ *     `include/enemy/em007_act.h`, and this unit's own three band symbols to
  *     `include/enemy/fn_801B0010.h` (`fn_801B0010` was parked in `unsplit/enemy.h` with the note
  *     "owned by the still-unregistered proposal/801B0010 range"; `fn_801B4348`/`fn_801B4398` were
  *     declared in `enemy/fn_801B4458.cpp`).
@@ -60,7 +60,7 @@
  *     0x18 bytes where the landed view (`enemy/fn_801B4458.cpp`, whose fields +0x18/+0x1C it reads)
  *     is 0x20, i.e. the scratch buffer `fn_801B4348` hands `fn_80125F54`/`fn_801421E4` was 8 bytes
  *     short of what the same record needs elsewhere.
- *   * this unit's 8-byte lookup entry is `EmCodeListEntry` here: `enemy/fn_801CA004.cpp` has an
+ *   * this unit's 8-byte lookup entry is `EmCodeListEntry` here: `enemy/em004_act.cpp` has an
  *     `EmLookupEntry` of its own for the different 0x805B3CD8 table (rule 1 - two records, two
  *     names).
  *   * `get_move_work_adrs`/`get_move_work_max` stay declared in this file (see the note above their
@@ -106,8 +106,8 @@
 
 #include "enemy/ENEMY_WORK.h"
 #include "enemy/fn_801B0010.h"
-#include "enemy/fn_801CCBC4.h"
-#include "enemy/fn_801D80EC.h"
+#include "enemy/em005_act.h"
+#include "enemy/em007_act.h"
 #include "enemy/fn_8012BDF4.h"
 #include "enemy/fn_801251D0.h" /* EmGroundRec + fn_80125F54 (rule 1/2: their owner) */
 #include "ai/ainpc.h"   /* `_AINPC_W` (rule 1) */
@@ -161,7 +161,7 @@ struct ShellSetBlock {
 };
 
 /* The 8-byte `lbl_805B1B08` lookup entry: a key byte, a value byte and the list pointer (the list
- * holds more records of this same shape, keyed by the kind).  It is NOT `enemy/fn_801CA004.cpp`'s
+ * holds more records of this same shape, keyed by the kind).  It is NOT `enemy/em004_act.cpp`'s
  * same-named entry, which models the different 0x805B3CD8 table (`{key, count, EmLookupSub*}`); the
  * two records are modelled separately and the names must not collide (docs/plan.md 6.5 rule 1), so
  * this unit's view is named after its own table.

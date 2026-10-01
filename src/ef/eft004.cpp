@@ -54,6 +54,7 @@
 #include "ef/eft007.h"
 #include "sound/fn_800D7F54.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
+#include "Pl/plw.h"
 
 /* The retail object keeps the unfused forms of several peephole folds (a `rlwinm` + `cmpwi` where the
  * pass would emit a record-form `rlwinm.`, a function pointer through `r0`); the whole file is compiled
@@ -117,26 +118,7 @@ struct Eft004 {
     /* +0x45 */ u8 unused_0x45[0x48 - 0x45];
 };
 
-/* The player work the public setters and the effect spawners take; only the offsets this unit reads are
- * named. size: 0x668 */
-struct _PLW {
-    /* +0x000 */ u8 unused_0x000[0x16];
-    /* +0x016 */ u8 area_0x16;
-    /* +0x017 */ u8 unused_0x017[0x3C - 0x17];
-    /* +0x03C */ nw4r::math::VEC3 pos_0x3C;
-    /* +0x048 */ u8 unused_0x048[0x54 - 0x48];
-    /* +0x054 */ u32 param_0x54;
-    /* +0x058 */ u32 param_0x58;
-    /* +0x05C */ u32 param_0x5C;
-    /* +0x060 */ u8 unused_0x060[0x1A4 - 0x60];
-    /* +0x1A4 */ u8 effect_key_0x1A4;
-    /* +0x1A5 */ u8 unused_0x1A5[0x5A4 - 0x1A5];
-    /* +0x5A4 */ u16 field_0x5A4;
-    /* +0x5A6 */ u8 unused_0x5A6[0x655 - 0x5A6];
-    /* +0x655 */ u8 field_0x655;
-    /* +0x656 */ u8 unused_0x656[0x668 - 0x656];
-};
-
+/* `_PLW`, the player work record, comes from `Pl/plw.h` - one definition, in the owner's header (rule 1). */
 /* The pool block the `push_eft_effect_heap_num` release helpers walk: a count followed by the effect
  * handles. size: 0x08 - lower bound, an approximation (the pool continues past what this unit reads) */
 struct EftEffectPool {
@@ -493,11 +475,11 @@ void eft004_set_pl(_PLW* self, u8 type, f32 a, f32 b, f32 c, u32 param)
     Eft004* effect;
 
     params[0] = self->param_0x54;
-    params[1] = self->param_0x58 + param;
-    params[2] = self->param_0x5C;
+    params[1] = self->field_0x058 + param;
+    params[2] = self->rot_z_0x5C;
     effect = fn_801007BC(self, type, self->area_0x16, 255, params, a, b, c);
     if (effect != NULL) {
-        copyVec3(&effect->pos_0x18, &self->pos_0x3C);
+        copyVec3(&effect->pos_0x18, &self->vec_0x03C);
         if (type == 17 && (self->field_0x5A4 & 0x6) != 0) {
             eft004_set_pl(self, 2, a, b, c, param);
         }
@@ -513,11 +495,11 @@ void eft004_set_pl2(_PLW* self, u8 type, u32 param, f32 a, f32 b, f32 c, u32 ext
 
     VEC3_ctor(&dir);
     params[0] = self->param_0x54;
-    params[1] = self->param_0x58 + extra;
-    params[2] = self->param_0x5C;
+    params[1] = self->field_0x058 + extra;
+    params[2] = self->rot_z_0x5C;
     effect = fn_801007BC(self, type, self->area_0x16, param, params, a, b, c);
     if (effect != NULL) {
-        copyVec3(&effect->pos_0x18, &self->pos_0x3C);
+        copyVec3(&effect->pos_0x18, &self->vec_0x03C);
         if (type == 17 && (self->field_0x5A4 & 0x6) != 0) {
             eft004_set_pl2(self, 2, param, a, b, c, extra);
         }

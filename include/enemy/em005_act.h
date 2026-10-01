@@ -1,4 +1,4 @@
-/* The enemy unit `enemy/fn_801CCBC4.cpp` (the em005 TU, 0x801CA8DC..0x801D71C4; the header was
+/* The enemy unit `enemy/em005_act.cpp` (the em005 TU, 0x801CA8DC..0x801D71C4; the header was
  * `enemy/fn_801D428C.h` until that unit folded in): the enemy action band's
  * per-motion dispatchers and helpers.
  *
@@ -14,7 +14,7 @@
 
 struct _ENEMY_WORK;
 
-/* The shared tables `enemy/fn_801D80EC.cpp` reads as well; they are declared once here. */
+/* The shared tables `enemy/em007_act.cpp` reads as well; they are declared once here. */
 extern u8 lbl_805B52D8[];
 extern u8 lbl_805B5310[];
 extern u8 lbl_805B531C[];
@@ -117,25 +117,9 @@ extern f32 lbl_807994E4;
 extern f32 lbl_807994E8;
 extern f32 lbl_807994EC;
 extern f32 lbl_807994F0;
-extern f32 lbl_807994F8;
-extern f32 lbl_807994FC;
-extern f32 lbl_80799500;
-extern f32 lbl_80799504;
-extern f32 lbl_80799508;
-extern f32 lbl_8079950C;
-extern f32 lbl_80799510;
-extern f32 lbl_80799514;
-extern f32 lbl_80799518;
-extern f32 lbl_8079951C;
 
-/* The shared `.sdata2` float pool `enemy/fn_801CA004.cpp` and this unit (one TU's code split across the two units)
- * both read.  Declared, never defined: the pool belongs to the data pass. */
-extern f32 lbl_80798FF8;
-extern f32 lbl_8079900C;
-extern f32 lbl_80799014;
-extern f32 lbl_80799214;
-extern f32 lbl_80799218;
-extern f32 lbl_8079921C;
+/* The `.sdata2` float pool this unit and `enemy/em007_act.cpp` (one TU's code split across the units) both read.
+ * Declared, never defined: the pool belongs to the data pass. */
 extern f32 lbl_80799220;
 extern f32 lbl_80799224;
 extern f32 lbl_80799228;
@@ -161,7 +145,7 @@ extern f32 lbl_807992A8;
 extern "C" {
 #endif
 
-/* r3 the work record; the per-motion dispatchers this unit defines (0x801CB308, 0x801CB9DC) and `enemy/fn_801D80EC.cpp`
+/* r3 the work record; the per-motion dispatchers this unit defines (0x801CB308, 0x801CB9DC) and `enemy/em007_act.cpp`
  * tail-calls. */
 void fn_801CB308(struct _ENEMY_WORK* self);
 void fn_801CB9DC(struct _ENEMY_WORK* self);

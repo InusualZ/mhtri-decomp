@@ -60,6 +60,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "ef/cp_vector.h"
 #include "gx.h"
 #include "ef/fn_80104BD0.h"
 #include "sound/fn_800D7F54.h"   /* se_req_pos_ps - owner sound/fn_800D7F54.cpp */
@@ -72,17 +73,8 @@
  * engine types the mangled callees encode
  * ------------------------------------------------------------------------------------------------- */
 
-/* The rotation triple `cpSetRotMatrix` takes (Pl/pl_act.cpp carries the same type). size: 0x0C */
-/* The rotation triple `cpSetRotMatrix` takes.  The SDK type is a float triple, but THIS unit stores
- * the enemy's integer joint angles (`rot_x_0x1BC` / `rot_y_0x1C0`, u32) into it and passes it by
- * pointer; the `f32` spelling emits an int->float conversion the target does not have (99.546 ->
- * 99.184, object 1764 -> 1768 B), so the integer spelling is the one that reproduces this unit.  The
- * canonical `f32` is reported as a disagreement (docs/plan.md 6.5). size: 0x0C */
-struct _CP_VECTOR {
-    /* +0x00 */ u32 x;
-    /* +0x04 */ u32 y;
-    /* +0x08 */ u32 z;
-};
+/* `_CP_VECTOR` (the rotation triple `cpSetRotMatrix` takes; this unit stores the enemy's integer joint
+ * angles into it) comes from `ef/cp_vector.h` - one definition, in the owner's header (rule 1). */
 
 /* The 4-byte colour `change_color_eff` takes by value comes from `gx.h` - one definition, in the
  * owner's header (rule 1). */

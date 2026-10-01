@@ -49,6 +49,7 @@
 #include "unsplit/sound.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "Pl/plw.h"
 
 /* ---------------------------------------------------------------------------------------------------
  * the nw4r math types the mangled callees take
@@ -87,14 +88,13 @@ struct _EFT_WORK {
     /* +0x0C */ u32 param_id;  /* the joint index the query is made with */
 };
 
-/* The player actor the effect was spawned for.  Only the two fields this function reads are named; the
- * full type is `Pl/pl_act.cpp`'s `_PLW`. size: 0x668 */
-struct _PLW {
-    /* +0x000 */ u8 unused_0x000[0x02];
-    /* +0x002 */ u8 weaponClass;      /* the per-class muzzle-offset switch's operand */
-    /* +0x003 */ u8 unused_0x003[0x13C - 0x03];
-    /* +0x13C */ u8* physics_0x13C;   /* the body sub-object; its MHchar sits at +4 */
-    /* +0x140 */ u8 unused_0x140[0x668 - 0x140];
+/* `_PLW`, the player work record, comes from `Pl/plw.h` - one definition, in the owner's header (rule 1). */
+
+/* What `_PLW::physics_0x13C` points at: a 4-byte word, then the actor's `MHchar` block. size: 0x144 - lower bound, an
+ * approximation (only the block's address is taken). */
+struct _EfPlBody {
+    /* +0x000 */ u32 unused_0x000;
+    /* +0x004 */ u8 chr_0x04[0x140];
 };
 
 /* ---------------------------------------------------------------------------------------------------
@@ -160,8 +160,8 @@ void fn_800FD520(struct _EFT* self)
             self->state_0x05 = 3;
             return;
         }
-        fn_800E0A14(source->physics_0x13C + 4, work->param_id, &mtx);
-        switch (source->weaponClass) {
+        fn_800E0A14(((struct _EfPlBody*)source->physics_0x13C)->chr_0x04, work->param_id, &mtx);
+        switch (source->field_0x002) {
         default:
             break;
         case 0:
