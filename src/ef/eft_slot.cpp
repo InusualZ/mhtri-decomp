@@ -1,3 +1,15 @@
+/*
+ * ef/eft_slot.cpp - phase 4 unit, `.text` 0x803432B4..0x80348A48 (76 functions, 22420 bytes).
+ *
+ * PHASE 4 (docs/splits/phase4, window d).  Recut of eft_slot.cpp: its functions whose address lies in this range, in
+ * address order; the rest of the range keeps its original bytes.  34 of 76 functions have a body here.
+ *
+ * FLAGS.  `cflags_main`.  The tail (0x80348A48..) is `menu/menu_effect_slot.cpp`.
+ *
+ * Sections: the unit's block in config/RMHE08/splits.txt (.bss, .ctors, .data, .sdata, .sdata2, .text, extab,
+ * extabindex).
+ */
+/* ---- header inherited from src/ef/eft_slot.cpp (written against its pre-phase-4 range) ---- */
 /* ef/eft_slot.cpp - the `_EFT` family's slot pool at `.text` 0x803432B4..0x80349DD8 (92 functions).
  * The range's still-unwritten entries keep the map's `fn_` stems (`fn_803432B4`, the head, is the one
  * `ef/eft050.cpp`'s state dispatcher calls); every symbol this file DEFINES is named from its own body
@@ -187,8 +199,6 @@
  * where the next pass should start - `fn_80344658` is the shared distance sort they call.
  */
 
-#pragma peephole off
-
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef.h"
@@ -227,24 +237,6 @@ struct EftEntry {
     /* +0x04 */ EftEntry* sub_0x04;
 };
 
-/* One 2-byte {key, value} pair of the innermost table `fn_803457A8` walks. size: 0x02 */
-struct EftPair {
-    /* +0x00 */ u8 key_0x00;
-    /* +0x01 */ u8 value_0x01;
-};
-
-/* The per-model work block `_EFT::work_0x38` points at for this family: the model handle array the
- * spawn entry walks, the single extra model at +0x14 with its created scene handle at +0x18, and the
- * scale the step writes. size: 0x2C */
-struct EftModelWork {
-    /* +0x00 */ u32 count_0x00;
-    /* +0x04 */ MHchar* models_0x04[4];
-    /* +0x14 */ MHchar* model_0x14;
-    /* +0x18 */ void* created_0x18;
-    /* +0x1C */ u8 unused_0x1C[0x28 - 0x1C];
-    /* +0x28 */ f32 scale_0x28;
-};
-
 /* One 0x44-byte record of the 128-entry array `lbl_806A54E0` the live-slot scan walks: the same
  * (team, area, action) key an enemy work record carries, plus the key bytes the slot pool matches
  * against.  size: 0x44 */
@@ -262,6 +254,7 @@ struct EftTargetRecord {
 
 /* The 10-slot pool `eft_slot_pool_clear` clears, `eft_slot_find_free` scans for a free entry and `enemy_data_find`
  * looks a key up in. */
+
 extern "C" {
 EftSlot lbl_806BF0A0[10]; /* .bss 0x806BF0A0, 0x258 B */
 }
@@ -272,6 +265,7 @@ EftSlot lbl_806BF0A0[10]; /* .bss 0x806BF0A0, 0x258 B */
  * 0x805E9168..0x805E91E8 so the object is the target object.  The values and their order are the DOL's
  * words at 0x805E9168..0x805E918C; the eight non-null entries point at the 0x18-byte `EftDef` records
  * the band's `.data` band holds (playbook 58: a unit's sole-referencer data is claimed, not extern'd). */
+
 extern "C" {
 EftDef lbl_806BF2F8;   /* .bss  0x806BF2F8, 0x18 B */
 }
@@ -295,25 +289,7 @@ extern "C" EftDef* lbl_805E9168[9] = {
 };
 /* The 128-entry record array `eft_slot_spawn_targets`/`eft_slot_match_count` walk. */
 extern "C" EftTargetRecord lbl_806A54E0[128];
-
-/* The `.sdata2` pool words the range reads; declared, never defined (playbook 29). */
-extern "C" f32 lbl_8079B320;
-extern "C" f32 lbl_8079B324;
-extern "C" f32 lbl_8079B328;
-extern "C" f32 lbl_8079B32C;
-extern "C" f32 lbl_8079B330;
-extern "C" f32 lbl_8079B334;
-extern "C" f32 lbl_8079B338;
-extern "C" f32 lbl_8079B33C;
 extern "C" f32 lbl_8079B350;
-
-/* The effect manager's control block (`ef/effect.cpp`). */
-extern "C" _EFT* eft_control_0x04;
-extern "C" u8 lbl_806A20F0[];
-
-/* The range's definitions, each named from its own body (see NAMES above; the note after each one is
- * the evidence, so a later pass can re-derive or refine the name without re-reading the whole file). */
-extern "C" void fn_803432B4(_EFT* self);  /* the range's still-unwritten head; `ef/eft050.cpp`'s dispatcher calls it */
 extern "C" void eft_state_advance(_EFT* self);  /* `_EFT::state_0x05++` - the dispatcher's advance arm */
 extern "C" void eft_instance_release(_EFT* self);  /* hands the instance to `fn_800F886C`, the shared release path */
 extern "C" void eft_slot_clear(u8 index);  /* zeroes one pool entry's key byte and stamps its +0x14 byte 255 */
@@ -348,15 +324,7 @@ extern "C" void fn_80345A2C(EftSlot* slot);  /* this range's still-unwritten ent
 extern "C" void eft_slot_mode_set_work(void* slot, _ENEMY_WORK* work, u8 kind, u8 a, u8 b, u8 immediate);  /* the work record rewrites the triple first */
 extern "C" u8* eft_def_model_block(EftSlot* slot, u8 index);  /* the per-motion walk down to the 0x20-byte block */
 
-/* ---------------------------------------------------------------------------------------------------
- * the range's own records and data
- * ------------------------------------------------------------------------------------------------- */
-
-
-
-/* ---------------------------------------------------------------------------------------------------
- * bodies
- * ------------------------------------------------------------------------------------------------- */
+#pragma peephole off
 
 /* Advances the family's step counter. */
 extern "C" void eft_state_advance(_EFT* self) {

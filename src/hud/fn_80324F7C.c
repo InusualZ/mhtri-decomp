@@ -14,11 +14,10 @@
  * 0xB20 - the caller (`move_work_update`, 0x264) passes exactly such a pointer, and that function's own
  * `addi r26,r26,2848` gives the stride.  `_mh_move_work_` below states only the byte this unit reads.
  *
- * The sprite-id runs are the unit's own `.data`/`.sdata` pool (`lbl_805DD9C8` 0x18 B in `.data`, the
- * nine `lbl_80792Cxx` 4/8 B in `.sdata`); they are `extern`-declared here and never defined (playbook 29),
- * so the object emits only the references.  `lbl_805DD9C8` is declared a *sized array* on purpose: that
- * is what makes MWCC address it `lis`/`addi` where the `.sdata` scalars get `…@sda21` - the same split
- * the target object has (pl_act's header records the same finding).
+ * The sprite-id runs are the unit's own `.data`/`.sdata` pool (`move_indicator_base_ids` 0x18 B in `.data`, the
+ * nine others 4/8 B in `.sdata`), defined below from the target's bytes.  The `.data` run is a 12-element
+ * array and the `.sdata` ones are arrays that fit the small-data limit, which is what makes MWCC address them
+ * `lis`/`addi` and `@sda21` respectively - the same split the target object has.
  *
  * The name is derived, not the dump's: the shared runtime dump's name list has no entry at 0x80324F7C
  * (only its `zz_0324f7c_` placeholder), so it is named for what it draws - one record's move indicator.
@@ -44,6 +43,8 @@ typedef struct _mh_ivec2_ {
     /* +0x02 */ s16 y;
 } _mh_ivec2_; /* size: 0x4 */
 
+#include "hud/get_lsp_data__FUsP10_mh_ivec2_.h" /* owned by hud/cockpit.cpp (rule 2) */
+
 /* One player's move-work record: `get_move_work_adrs(player)` indexes an array of these at stride 0xB20
  * (`move_work_update`: `mulli r0,r0,2848` / `addi r26,r26,2848`).  Only the flag byte this unit reads is
  * named; `fn_80321830` sets its bits 0/1 with `ori`.  size: 0xB20 */
@@ -55,22 +56,23 @@ typedef struct _mh_move_work_ {
 
 /* These callees are still unsplit, so their declarations live here (the owning TUs have no source yet);
  * the spellings are the map's mangled names, which is what the target object relocates against. */
-void get_lsp_data__FUsP10_mh_ivec2_(u16 id, _mh_ivec2_* out);
 void uv_pair_copy(_mh_ivec2_* dst, const _mh_ivec2_* src);
 u32 fn_8021B890(void);
 void draw_sprite_ary__FPCUsPC10_mh_ivec2_(const u16* sprite_ids, const _mh_ivec2_* pos);
 u8 get_option_cfg__FUc(u8 id);
 
-extern const u16 lbl_805DD9C8[12]; /* 0x18 B */
-extern const u16 lbl_80792CC8;
-extern const u16 lbl_80792CD0;
-extern const u16 lbl_80792CD8;
-extern const u16 lbl_80792CE0;
-extern const u16 lbl_80792CE8;
-extern const u16 lbl_80792CF0;
-extern const u16 lbl_80792CF8;
-extern const u16 lbl_80792CFC;
-extern const u16 lbl_80792D00;
+/* The move indicator's sprite-id runs, each ended by 0xFFFF; the 8-byte ones keep their zero padding.  The unit
+ * claims them at phase 4 (`.data` 0x805DD9C8, `.sdata` 0x80792CC8..0x80792D08), so it defines them. */
+u16 move_indicator_base_ids[12] = {0x20E3, 0x20E4, 0x20E5, 0x20E6, 0x20E7, 0x20E8, 0x20E9, 0x20EA, 0x20EB, 0xFFFF, 0, 0};
+u16 move_indicator_left_ids[4] = {0x20D4, 0xFFFF, 0, 0};
+u16 move_indicator_right_ids[4] = {0x20D6, 0x20D7, 0x20DE, 0xFFFF};
+u16 move_indicator_left_cfg0_ids[4] = {0x20D8, 0xFFFF, 0, 0};
+u16 move_indicator_right_cfg0_ids[4] = {0x20DC, 0x20DF, 0x20E0, 0xFFFF};
+u16 move_indicator_left_cfg1_ids[4] = {0x20D9, 0xFFFF, 0, 0};
+u16 move_indicator_right_cfg1_ids[4] = {0x20DD, 0x20E1, 0x20E2, 0xFFFF};
+u16 move_indicator_anchor_extra_ids[2] = {0x20D5, 0xFFFF};
+u16 move_indicator_left_extra_cfg0_ids[2] = {0x20DA, 0xFFFF};
+u16 move_indicator_left_extra_cfg1_ids[4] = {0x20DB, 0xFFFF, 0, 0};
 
 /* This unit's single codegen deviation: the original object carries the non-fused `clrlwi` + `cmpwi`
  * for the `get_option_cfg` test (see the file header).  The pragma is file-wide because the file is one
@@ -96,25 +98,25 @@ void move_indicator_draw(_mh_move_work_* self)
         right.y -= 10;
     }
 
-    draw_sprite_ary__FPCUsPC10_mh_ivec2_(lbl_805DD9C8, &anchor);
-    draw_sprite_ary__FPCUsPC10_mh_ivec2_(&lbl_80792CC8, &left);
-    draw_sprite_ary__FPCUsPC10_mh_ivec2_(&lbl_80792CD0, &right);
+    draw_sprite_ary__FPCUsPC10_mh_ivec2_(move_indicator_base_ids, &anchor);
+    draw_sprite_ary__FPCUsPC10_mh_ivec2_(move_indicator_left_ids, &left);
+    draw_sprite_ary__FPCUsPC10_mh_ivec2_(move_indicator_right_ids, &right);
 
     if (expanded == 0) {
-        draw_sprite_ary__FPCUsPC10_mh_ivec2_(&lbl_80792CF8, &anchor);
+        draw_sprite_ary__FPCUsPC10_mh_ivec2_(move_indicator_anchor_extra_ids, &anchor);
     }
 
     if (get_option_cfg__FUc(7) == 0) {
-        draw_sprite_ary__FPCUsPC10_mh_ivec2_(&lbl_80792CD8, &left);
-        draw_sprite_ary__FPCUsPC10_mh_ivec2_(&lbl_80792CE0, &right);
+        draw_sprite_ary__FPCUsPC10_mh_ivec2_(move_indicator_left_cfg0_ids, &left);
+        draw_sprite_ary__FPCUsPC10_mh_ivec2_(move_indicator_right_cfg0_ids, &right);
         if (expanded == 0) {
-            draw_sprite_ary__FPCUsPC10_mh_ivec2_(&lbl_80792CFC, &left);
+            draw_sprite_ary__FPCUsPC10_mh_ivec2_(move_indicator_left_extra_cfg0_ids, &left);
         }
     } else {
-        draw_sprite_ary__FPCUsPC10_mh_ivec2_(&lbl_80792CE8, &left);
-        draw_sprite_ary__FPCUsPC10_mh_ivec2_(&lbl_80792CF0, &right);
+        draw_sprite_ary__FPCUsPC10_mh_ivec2_(move_indicator_left_cfg1_ids, &left);
+        draw_sprite_ary__FPCUsPC10_mh_ivec2_(move_indicator_right_cfg1_ids, &right);
         if (expanded == 0) {
-            draw_sprite_ary__FPCUsPC10_mh_ivec2_(&lbl_80792D00, &left);
+            draw_sprite_ary__FPCUsPC10_mh_ivec2_(move_indicator_left_extra_cfg1_ids, &left);
         }
     }
 }

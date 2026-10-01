@@ -1,4 +1,133 @@
 /*
+ * camera/camera_main.cpp - phase 4 unit, `.text` 0x802B5640..0x802BF278 (157 functions, 39992 bytes).
+ *
+ * PHASE 4 (docs/splits/phase4, window d).  Fold of 3 registered units: fn_802B2AA0.cpp, fn_802B5C58.cpp, light.cpp.
+ * The functions below are the ones those sources define, in address order; every other function of the range keeps its
+ * original bytes.  78 of 157 functions have a body here.
+ *
+ * FLAGS.  `cflags_main`; the pieces come from the stage/camera/light sources, all the same group.
+ *
+ * RESIDUAL (record views).  The absorbed sources were written as separate units and each carries its own header view
+ * of the records they share; where two views disagree on a record layout or a prototype of one extern "C" symbol they
+ * are kept apart in a namespace (extern "C" names stay unmangled, so the symbols are unchanged) instead of being
+ * unified by guess.  Unifying them (one record header, one prototype per symbol) is the open work and removes the
+ * namespace.  Here: `view_fn_802B2AA0` holds the seven camera-range functions of the old stage/fn_802B2AA0.cpp, which
+ * view the 0x4F8-byte camera area through `StageAreaObj` (stage/fn_802B2AA0.h) where the camera functions view it as
+ * `CamWork`.
+ *
+ * The light record types the head of the light module needs moved to `include/light/light_work.h` (shared with
+ * `light/light.cpp`).
+ *
+ * Sections: the unit's block in config/RMHE08/splits.txt (.bss, .ctors, .data, .sdata, .sdata2, .text, extab,
+ * extabindex).
+ */
+/* ---- header inherited from src/stage/fn_802B2AA0.cpp (written against its pre-phase-4 range) ---- */
+/*
+ * stage/fn_802B2AA0.cpp - the stage band's per-area runtime state: the `stage_w` block flags/timers,
+ * the two 0x4F8-byte per-area objects and the area colour/effect drivers that read them.
+ *
+ * `.text` 0x802B2AA0-0x802B5C58 (39 functions, 12728 B), the run right after `stage/fn_802B2978.c`.
+ * Registered once, at its final home (docs/plan.md 12), from `proposal/802B2AA0_fn_802B2AA0.cpp`.
+ *
+ * Name.  Module `stage`: the left neighbour is `stage/fn_802B2978.c`, the lib this file sits in is
+ * `stage`, and the range's own entry points are the stage-work block (`stage_w`, .bss 0x806B87C0,
+ * materialised as `0x806C0000-0x7840` in the prologues) and the two per-area objects at
+ * `lbl_806BB7E0`.  No `__FILE__` string covers the range (the `menu_item.cpp` literal at 0x805CDFC8 is
+ * referenced only by the band *below* 0x802B2AA0) and the runtime dump answers only `zz_XXXXXXXX_`, so
+ * the file keeps the map's own stem (class 4, brief section 2).
+ *
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * `python tools/symbols/symedit.py range 0x802B2AA0 0x802B5C58`: every entry is a bare
+ * `fn_XXXXXXXX = .text:0x802BXXXX;` line, and `python tools/symbols/dumpmap.py lookup <addr>` answers
+ * the `zz_XXXXXXXX_` placeholder for each).
+ *
+ * Language C++.  The map's undefined set carries real manglings (`get_camera_pos__Fv`,
+ * `setVisibility__6MHcharFUlb`, `calcVecAngXY__FPQ34nw4r4math4VEC3PUlPUl`,
+ * `shell_se_req__FP5_se_wPQ34nw4r4math4VEC3UcUl`, `Pl_master_ck__FP4_PLW`, `get_now_mapno__Fv`) and
+ * the retail object carries extab/extabindex, which a no-exceptions C unit could not.
+ *
+ * The band's types, its own entry points and the callee declarations live in
+ * `include/stage/fn_802B2AA0.h` (docs/plan.md 6.5 rules 1-5); this file is the bodies.
+ *
+ * Sections: .text 0x802B2AA0-0x802B5C58; extab 0x80013D34-0x80013E3C (33 8-byte records - the
+ * extabindex table has one entry per function that contains a `bl`); extabindex
+ * 0x80031A4C-0x80031BD8 (33 x 12 B).  The six functions with no record (fn_802B2F3C, fn_802B3250,
+ * fn_802B3260, fn_802B45BC, fn_802B45D4, fn_802B46DC) are exactly the ones with no call at all.
+ *
+ * Data.  `.data` 0x805CF56C-0x805CFBE8 (1660 B) is claimed: the 23-entry switch table MWCC emits for
+ * fn_802B3270's `switch (st->mapno)` (0x805CF728, 92 B, arms read out of `main.elf`) sits inside it, and the
+ * rest is the band's hand-written tables, which our object does not emit yet (the target object carries
+ * 1660 B of `.data`, ours 92 B, so the unit's data row reads 0 % until they are reconstructed).  Every
+ * pooled constant is `extern`-declared and never defined (playbook 29).
+ *
+ * `.sbss` 0x80794B60-0x80794B68 is claimed for `shell_set_func_ptr` (the shell-set job table pointer, typed
+ * in `include/stage/shell_set_func_ptr.h`; 111 functions in 38 units read it, nothing in the DOL stores it, an
+ * RSO does).  Definer: LOW confidence (about one in three) - `.sbss` follows the text order of the defining
+ * TUs, which brackets the word between Pl/fn_8028F66C|fn_80295EF4 (0x80794B58, a `u8`) and light/light.cpp
+ * (0x80794B68), i.e. any of menu_item, menu_message, stage/shell, Pl/pl_yure, stage/stg_w, this unit or
+ * camera/fn_802B5C58; none of them stores it, and stg_w and this unit are the only ones of those that
+ * read it.  This unit is taken as the definer because it is the stage band's shell-effect driver and
+ * already owned the declaration.  The claim is the map's 8-byte row: our object emits the pointer only, so
+ * `.sbss` is 4 B against the target's 8 B (the word at 0x80794B64 is read by nothing).
+ *
+ * Flags.  The whole band is peephole-OFF, measured rather than inferred: with the lib's `-O3` peephole
+ * on, MWCC restores a saved `f32` with `psq_l f31,N(r1)` where retail has the unfused `li r0,N` +
+ * `psq_lx f31,r1,r0,0,0`; the probe is the same four-instruction function with `-opt nopeephole`
+ * added.  `#pragma peephole off` (playbook 39) reproduces retail's prologue/epilogue pair, and the
+ * sibling `stage/fn_802B2978.c` and `stage/stg_w.cpp` already carry the same pragma for the same
+ * reason.  A lib-level flag is the durable home; until that lands the pragma pair carries the
+ * deviation here.
+ *
+ * Shapes.  fn_802B3270's list writes are `field[i] = v; i++;` through the *struct field*, not
+ * `buf[i++] = v` through the array: retail re-loads `local.show`/`local.hide` off the stack before
+ * every store, which only the field spelling produces.  Its dispatches come in both lowerings - the
+ * three on `fn_802FB8EC`'s result are `switch`es (one contiguous compare chain, cases merged into a
+ * `cmplwi/ble` range test where two share a body) while the `LbCheckKujiraEvent`/`fn_802FB9F8` tests
+ * are `if`/`else if` (chain interleaved with the bodies); a rewrite to the other lowering costs
+ * ~7 points.  `fn_802FB9F8` returns `u32`, not `u8` (retail compares `r3` raw, with no `clrlwi`).
+ *
+ * Residuals (measured 2026-09-26, real command line):
+ *   - fn_802B414C 36.50 % (320 B): the two effect-strip loops; ours is 332 B, so the loop shape (the
+ *     `for(;;)` pair the target's `beq`-to-epilogue implies) still differs.
+ *   - fn_802B4E58 43.65 % (1284 B): the colour-cycle blend; ours is 1324 B.  The final
+ *     `fn_80057DE0(0, 6, colour, lbl_8079A4C4)` call and the `psq_lx` prologue/epilogue pair are right,
+ *     so the residual is the inline per-channel blend shape.
+ *   - fn_802B2F60 77.56 % (752 B, ours 812 B): source shape.
+ *   - fn_802B4ABC 78.64 % (416 B, ours 412 B): the condition order still differs.  Retail tests
+ *     `now - base`'s `& 0x40` first and puts both `field_0x2FDC = 0` tails at the *end* of the function
+ *     (0x2188 / 0x2194), while ours emits one of them inline; and retail compares the map number with
+ *     `cmpwi` where MWCC emits `cmplwi` for the same `mapno != 5 && mapno != 0x10 && mapno != 0xA`
+ *     (both the `s32`/`int`/`s8` spelling and a `switch` give `cmplwi`).  Its *semantics* are now
+ *     right: `entry` is `p->offsets` (a sub-table of 8-byte records), which the earlier reconstruction
+ *     read as `entry = p` - the outer table and the sub-table share the record layout.
+ *   - The claimed jump table's two relocations still pair by *value*, not by name: retail's split names
+ *     the table `jumptable_805CF728` where MWCC emits an anonymous `@NNNN` in our object.  The bytes
+ *     and the section size are equal (100.0), so this is cosmetic - but it is why the object is not
+ *     byte-identical to the target yet.
+ *   - Every int->float conversion gets MWCC's own anonymous `.sdata2` slot where the split names
+ *     `lbl_8079A470` (2^52) / `lbl_8079A460` (2^52 + 2^31); that constant cannot be named from source
+ *     (playbook 29) and it is the same residual `fn_802B2978` carries.
+ *   - The unit's `.ctors` word (0x8056F37C, dtk appended the range in the re-split) is not emitted by
+ *     our object; no static object with a constructor exists in the reconstruction yet.
+ *
+ * `fn_802B2F60` and `fn_802B4ABC` keep their pre-existing source shapes.  Three rows that sat below the
+ * bar are 100 % on shape alone, and each one's shape is load-bearing:
+ *   - fn_802B3270: new here; its call site (`fn_802B4C5C`, which must pass all three arguments) moved
+ *     that row 95.69 -> 96.38.
+ *   - fn_802B4824: the outer loop must be a `for` with `index` initialised outside it (`for (; index <
+ *     4U; index++)`), not a `do`/`while` - only a for-counter gets the range analysis that drops the
+ *     `clrlwi` off `index < 4U`; and the per-area body re-reads `st->area_char[index]` (retail loads
+ *     the element address once per iteration and reloads the pointer after `frame_init`).  The
+ *     declarations are ordered `scale, amount, index, joint, st` because the allocator colours them by
+ *     declaration order (98.50 % in the natural order) - a deliberate deviation from the file's style.
+ *   - fn_802B45D4: `(x & 1) != 0`, not `!(x & 1)` - the `!` spelling makes MWCC emit the `cntlzw`/`srwi`
+ *     pair where retail has `neg`/`or`/`srwi`, and the peephole is off in this band already, so the
+ *     asymmetry is source, not flag.
+ *
+ * Inventory and evidence: `python tools/units/ledger.py unit stage/fn_802B2AA0.cpp`.
+ */
+/* ---- header inherited from src/camera/fn_802B5C58.cpp (written against its pre-phase-4 range) ---- */
+/*
  * camera/fn_802B5C58.cpp - the game camera work block and its controller.
  *
  * `.text` 0x802B5C58-0x802BEAAC (132 functions, 36436 B).  Registered from
@@ -53,8 +182,69 @@
  * (`fn_80047398`, owner `src/fn_80047398.cpp`) and `include/g3d/g3d_camera.h` (`fn_800749C8`, owner
  * `src/g3d/g3d_camera.cpp`).
  */
+/* ---- header inherited from src/light/light.cpp (written against its pre-phase-4 range) ---- */
+/*
+ * light/light.cpp - the map light work: its record, its constructors, its per-frame channels and its
+ * accessors.
+ *
+ * `.text` 0x802BEAAC-0x802C474C (103 functions, 23712 B).  Registered from
+ * `proposal/802BEAAC_fn_802BEAAC.cpp`.
+ *
+ * Module `light` and file name `light.cpp` come from evidence class 2 (brief section 2): the range's
+ * own symbols the retail symbol table knows are `light_init__Fv` (0x802BF284), `light_move__Fv`
+ * (0x802C1D30), `set_amblight__FUc8_GXColor` (0x802C1DA8) and
+ * `make_dir_light2__FlPQ34nw4r4math4VEC38_GXColorl` (0x802C1F74) - four real manglings naming one
+ * light subsystem, all confirmed by `tools/symbols/dumpmap.py lookup`; `light_init`/`light_move` are
+ * the module's own entry points, which is what this file holds.  No `__FILE__` string covers the
+ * range (the `menu_item.cpp` string the discovery note mentions sits at 0x805CDFC8 and the dump
+ * attributes its emitter to 0x802A22A4, i.e. the registered `menu_item` proposal, not this band).
+ *
+ * Language C++: four defined manglings (`light_init__Fv`...), `cflags_main` (`Wii/1.3`, `-O3
+ * -inline noauto -Cpp_exceptions on`), the same group as the neighbour `stage/stg_w.cpp`.
+ *
+ * Naming note: the symbol map has only fn_XXXXXXXX for 99 of this range's 103 symbols (checked
+ * with `python tools/symbols/symedit.py range 0x802BEAAC 0x802C474C` and
+ * `python tools/symbols/dumpmap.py lookup` over the inventory: every unnamed entry is a bare
+ * `fn_XXXXXXXX` in config/RMHE08/symbols.txt, and the runtime dump answers either `zz_XXXXXXXX_` or
+ * an unrelated engine symbol for it).
+ *
+ * Seam - unproven.  The range is one maximal unclaimed run (`attribute.py` cut it at its byte cap),
+ * and two observations say a real TU boundary sits at, not inside, its end: the `.ctors` word at
+ * 0x8056F380 points at fn_802BEEE0 and the one at 0x8056F384 at fn_802C2530, and the `.sdata2`
+ * ordering seam `lbl_8079A698 -> lbl_8079A69C` falls between fn_802C4630 and fn_802C474C (the last
+ * function of the range), so the extent stays as proposed until the functions match.
+ *
+ * The light work record.  `LightWork`'s size is 0x4F8 and it is traced, not guessed: lbl_806BB7E0 is
+ * a 0x9F0-byte `.bss` object holding exactly two records (fn_802BECD0 returns one of the two, 0x4F8
+ * apart, and fn_802BEEE0 constructs both with `__construct_array(0x806BB7E0, fn_802BEF00, 0, 0x4F8,
+ * 2)`), and fn_802BEF00's initialization loop runs its `LightChannel` array from +0x4A8 to +0x4E4 in
+ * 0x14 steps.  The sub-records the constructors build carry their own traced extents.
+ *
+ * Flags: the unit is peephole-off - retail keeps the unfused `extsh` + `cmpwi` pair (playbook 39)
+ * where `-O3`'s peephole folds them into one `extsh.`, and the two sibling units of the band
+ * (`stage/stg_w.cpp`, `stage/fn_802B2978.c`) carry the same pragma for the same reason.
+ *
+ * Residuals (31 of the range's 103 functions written, 1960 B of 23712; 28 of the 31 byte-identical):
+ *
+ *  - fn_802BEAAC (86.81 %, 152 B against the target's 144 B).  Retail materialises the zero once at
+ *    the top (`li r0, 0x0`) and keeps the decremented timer in r5; ours rematerialises `li r0, 0x0`
+ *    inside each of the three arms and takes r0 for the timer, so the object is two instructions
+ *    long.  Every other instruction is identical, and `--timer` (the shape landed) beats both the
+ *    `s16 t = timer - 1` local (70.69 %) and the field-assignment form (70.69 %).
+ *  - fn_802BF7E8 (85.45 %, 40 B against 44 B).  Retail materialises the counter's address into r4
+ *    once at the top and stores the wrap with `sth r3, 0x0(r4)`, where ours keeps the `@sda21`
+ *    addressing for both stores, which is one instruction short.
+ *  - fn_802BF0AC (99.00 %, 140 B each).  The first run walk has its pointer/bound register pair the
+ *    other way round (`addi r31, r31, 0xc` / `cmplw r31, r30` against ours on r30/r31); the second
+ *    walk, the four leading vectors and the whole rest of the function are identical.
+ *
+ * Not yet written: the remaining 72 functions of the range, all still `fn_XXXXXXXX` in the map.
+ *
+ * Inventory and evidence: `python tools/units/ledger.py unit proposal/802BEAAC_fn_802BEAAC.cpp`.
+ */
 
 #include "types.h"
+#include "light/light_work.h"
 #include "nw4r/math.h"
 
 #include "fn_80047398.h"
@@ -269,8 +459,6 @@ typedef struct CamLead {
     /* +0x48 */ u8 count_0x48;
 } CamLead; /* size: 0x49 */
 
-#pragma peephole off
-
 extern "C" {
 
 /* Defined later in this file. */
@@ -279,6 +467,284 @@ void fn_802B8B8C(void);
 void fn_802BC4AC(u32 kind, u32 arg);
 void fn_802BB118(CamWork* self);
 void fn_802BBEE0(void);
+}
+
+/* Owner headers (rule 2): every symbol a registered unit defines is declared in that unit's header,
+ * never here.  `include/unsplit/unknown.h` carries the module-ambiguous ones. */
+#include "ef/fn_800CDB2C.h"
+#include "fn_8004CAD8.h"
+#include "g3d/fn_80063888.h"
+#include "lobby/lb_npc.h"
+#include "stage/stg_w.h"
+#include "unsplit/Runtime.PPCEABI.H.h"
+#include "unsplit/unknown.h"
+#include "mh3_pad.h" /* the owner header (rule 2) */
+#include "gx.h"
+#include "sound/mhchar.h"
+#include "sound/fn_800D7F54.h"
+#include "unsplit/ef.h"
+#include "unsplit/g3d.h"
+#include "unsplit/Pl.h"
+#include "ef/fn_800CDB2C.h"
+
+/* ------------------------------------------------------------------------------------------------ */
+/* types                                                                                             */
+/* ------------------------------------------------------------------------------------------------ */
+
+/* ------------------------------------------------------------------------------------------------ */
+/* externs                                                                                           */
+/* ------------------------------------------------------------------------------------------------ */
+
+/* The pooled string and the entry points whose address owns no registered unit, so no header exists
+ * for them: the map already names the data (playbook 29), and these are the module-ambiguous band
+ * (`include/unsplit/unknown.h` carries `get_now_mapno`, the other declarations here are band gaps the
+ * lint counts rather than guesses). */
+extern "C" const char lbl_805D1EB8[];
+extern "C" int sprintf(char* buffer, const char* format, ...);
+
+/* The rest of this unit's own functions, declared before their definitions. */
+extern "C" LightWork* fn_802BECD0(void);
+extern "C" LightWork* fn_802BEF00(LightWork* self);
+extern "C" LightTriple* fn_802BF004(LightTriple* self);
+extern "C" LightOctal* fn_802BF044(LightOctal* self);
+extern "C" LightParams* fn_802BF0AC(LightParams* self);
+extern "C" LightQuad* fn_802BF138(LightQuad* self);
+extern "C" LightQuadMid* fn_802BF180(LightQuadMid* self);
+extern "C" LightRoot* fn_802BF1D8(LightRoot* self);
+extern "C" LightChannel* fn_802BEF84(LightChannel* self);
+extern "C" LightQuadTriple* fn_802BEFB4(LightQuadTriple* self);
+
+/* The two light-work records the module keeps (`.bss` 0x806BB7E0, 0x9F0 B = 2 x 0x4F8).  Declared,
+ * never defined here: the object emits only the references (playbook 29). */
+extern LightWork lbl_806BB7E0[2];
+
+#pragma peephole off
+
+/* The C++-linkage callees the view below calls: declared at global scope so the calls resolve to the map's
+ * manglings (a declaration inside the view namespace would mangle the namespace in). */
+nw4r::math::VEC3 get_camera_pos(void);
+
+namespace view_fn_802B2AA0 {
+
+namespace nw4r = ::nw4r;  /* the view headers below reopen it */
+
+/* data keeps its map name (a view namespace would mangle it): the header is read with C linkage */
+extern "C" {
+#include "stage/fn_802B2AA0.h"
+}
+
+/* Resets one per-area object and runs its six sub-block initialisers. */
+extern "C" void fn_802B5640(StageAreaObj* area, u8 index)
+{
+    area->field_0x498 = (u8)index;
+    area->field_0x49A = 0;
+    area->field_0x499 = 0;
+    ((nw4r::g3d::ScnRoot*)pRoot)->SetCurrentCamera(0);
+    fn_802B700C(area);
+    fn_802B59F8(area);
+    fn_802B95E8(area);
+    fn_802BBEE0(area);
+    fn_802BA25C(area);
+    fn_802BB118(area);
+    area->field_0x494 = NULL;
+    area->field_0x4DC = 0;
+    area->field_0x4C8 = 0;
+    area->field_0x4B4 = 0;
+    area->field_0x4F0 = 0;
+    area->field_0x4E4 = 0;
+    area->field_0x4E8 = 0;
+    area->field_0x4F4 = 0;
+    area->field_0x4F7 = 0;
+}
+
+/* Resets both per-area objects. */
+extern "C" void fn_802B56E0(void)
+{
+    u8 index;
+
+    index = 0;
+    do {
+        fn_802B5640((StageAreaObj*)(lbl_806BB7E0 + index * 0x4F8), index);
+        index++;
+    } while (index < 2U);
+    fn_802BD658();
+}
+
+/* Runs one per-area object's per-frame update and resolves the area's kind. */
+extern "C" void fn_802B5738(StageAreaObj* area)
+{
+    nw4r::math::VEC3 poly;
+    nw4r::math::VEC3 world;
+    nw4r::math::VEC3 pos;
+    u32 move;
+    u8 kind;
+
+    VEC3_ctor(&poly);
+    move = (s32)::get_move_work_adrs(2);
+    area->field_0x494 = (u32)move + my_player_no() * 0xB20;
+    fn_802B7034(area);
+    fn_802B5C58(area);
+    fn_802B9828(area);
+    fn_802B9C04(area);
+    fn_802BC1E4(area);
+    fn_802BA39C(area);
+    fn_802BB7FC(area);
+    area->field_0x49B = 0xFFU;
+    if (area->field_0x284 == 1) {
+        area->field_0x49B = 3U;
+    } else if (area->field_0x188 == 1) {
+        area->field_0x49B = 1U;
+    } else if (area->field_0x230 == 1) {
+        area->field_0x49B = 2U;
+    } else if (area->field_0x43C == 1) {
+        area->field_0x49B = 5U;
+    } else if (area->field_0x388 == 1) {
+        area->field_0x49B = 4U;
+    }
+    kind = area->field_0x49B;
+    if (kind == 0xFF) {
+        kind = area->field_0x499;
+    }
+    fn_800473F4(kind);
+    fn_802B2E2C();
+    fn_802BEAAC(area, kind);
+    fn_802BE1EC(area);
+    fn_802BDDB0(&pos);
+    subVec3(&world, &::get_camera_pos(), &pos);
+    copyVec3(&poly, &world);
+    if (screen_split_mode_ck() != 0) {
+        setVector3(&poly, lbl_8079A4D8, lbl_8079A4DC, lbl_8079A4E0);
+    }
+    fn_802C20A4(&poly);
+    fn_802B5980(area);
+}
+
+/* Runs one per-area object's update and, when the extra gate is open, the second object's too. */
+extern "C" void fn_802B58D4(void)
+{
+    fn_802B5738((StageAreaObj*)lbl_806BB7E0);
+    if (screen_split_mode_ck() != 0) {
+        my_player_no_set(1);
+        fn_802B5738((StageAreaObj*)(lbl_806BB7E0 + 0x4F8));
+        my_player_no_set(0);
+    }
+}
+
+/* Points the g3d scene root's camera at the current view. */
+extern "C" void fn_802B592C(u8 index, s32 camera)
+{
+    nw4r::math::VEC3 pos;
+    s32 handle;
+    s32 root;
+
+    handle = ((nw4r::g3d::ScnRoot*)pRoot)->GetCamera(index);
+    word_copy_return_dst(&pos, &handle);
+    camera_posture_info_ctor(&root);
+    root = camera;
+}
+
+/* Places one per-area object's seat from the camera and the area's effect table. */
+extern "C" void fn_802B5980(StageAreaObj* area)
+{
+    nw4r::math::VEC3 poly;
+    nw4r::math::VEC3 cam;
+    nw4r::math::VEC3 out;
+
+    VEC3_ctor(&poly);
+    copyVec3(&poly, &::get_camera_pos());
+    if (fn_80291BBC(&poly, ::get_now_areano(), (s32)&area->field_0x4F4, &out, 0xFFFF) == 0) {
+        area->field_0x4F4 = 0;
+    }
+}
+
+/* Seeds one per-area object's colour and joint state. */
+extern "C" void fn_802B59F8(StageAreaObj* area)
+{
+    nw4r::math::VEC3 poly;
+    nw4r::math::VEC3 world;
+    u8 mode;
+
+    VEC3_ctor(&poly);
+    setVector3(&area->seat_pos, lbl_8079A4D8, lbl_8079A4D8, lbl_8079A4E4);
+    setVector3(&area->seat_pos2, lbl_8079A4D8, lbl_8079A4D8, lbl_8079A4D8);
+    area->span = lbl_8079A4E8;
+    area->pitch = lbl_8079A4D8;
+    fn_802B592C(0, 2);
+    fn_802BE0F4(0, area, &area->seat_pos2, area->span, area->pitch);
+    subVec3(&world, &area->seat_pos, &area->seat_pos2);
+    copyVec3(&poly, &world);
+    calcVecAngXY(&poly, &area->ang_x, &area->ang_y);
+    area->field_0x06C = area->ang_x;
+    area->field_0x070 = area->ang_y;
+    mode = get_cfg(area->field_0x498, 3);
+    switch (mode) {
+    case 0:
+        area->field_0x07C = 0;
+        break;
+    case 1:
+        area->field_0x07C = 1;
+        break;
+    case 3:
+        area->field_0x07C = 3;
+        break;
+    case 4:
+        area->field_0x07C = 4;
+        break;
+    default:
+        area->field_0x07C = 2;
+        break;
+    }
+    area->field_0x092 = 1;
+    area->field_0x080 = 0;
+    area->field_0x074 = 0;
+    area->field_0x078 = 0;
+    setVector3(&area->field_0x0B8, lbl_8079A4D8, lbl_8079A4D8, lbl_8079A4D8);
+    setVector3(&area->field_0x0C4, lbl_8079A4D8, lbl_8079A4D8, lbl_8079A4D8);
+    setVector3(&area->field_0x0D0, lbl_8079A4D8, lbl_8079A4D8, lbl_8079A4D8);
+    setVector3(&area->field_0x0DC, lbl_8079A4D8, lbl_8079A4D8, lbl_8079A4D8);
+    setVector3(&area->field_0x0E8, lbl_8079A4D8, lbl_8079A4D8, lbl_8079A4D8);
+    setVector3(&area->field_0x0F4, lbl_8079A4D8, lbl_8079A4D8, lbl_8079A4D8);
+    area->field_0x0A0 = 0;
+    area->field_0x0A1 = 0;
+    area->field_0x0A2 = 0;
+    area->field_0x0A3 = 0;
+    area->field_0x0A5 = 0;
+    area->field_0x0A6 = 0;
+    area->field_0x0A4 = 0;
+    area->field_0x0A8 = 0;
+    area->field_0x0AA = 0;
+    area->field_0x0AB = 0;
+    area->field_0x0AD = 0;
+    area->field_0x0AE = 0;
+    area->field_0x0B0 = 0;
+    area->field_0x0B2 = 0;
+    area->field_0x0AC = 0;
+    area->field_0x0B5 = 0;
+    area->field_0x0B4 = 0;
+    area->field_0x100[1] = 0;
+    area->field_0x100[0] = 0;
+    area->field_0x100[3] = 0;
+    area->field_0x100[2] = 0;
+    area->field_0x10D = 0;
+    area->field_0x10C = 0;
+    area->field_0x10F = 0;
+    area->field_0x10E = 0;
+    area->field_0x110 = 0;
+    area->field_0x09E = 0;
+    area->field_0x09F = 0;
+    area->field_0x0B6 = 0;
+    area->field_0x0B7 = 0;
+    area->field_0x084 = 0;
+    area->field_0x114 = 0;
+    area->field_0x118 = 0;
+    area->field_0x11A = 0;
+    area->field_0x11C = 0;
+    area->field_0x144 = 0;
+    area->field_0x145 = 0;
+}
+}  /* namespace view_fn_802B2AA0 */
+
+extern "C" {
 
 /*
  * Clears the five 16-bit records the camera carries over from the previous frame.
@@ -441,6 +907,7 @@ void fn_802BAB54(CamWork* self)
  * adds, so this function builds with the contract pass off (playbook 40).
  */
 #pragma fp_contract off
+
 f32 fn_802BB0D4(f32 a, f32 b, f32 t)
 {
     f32 other = lbl_8079A4EC - t;
@@ -672,7 +1139,6 @@ bool fn_802BE41C(void)
     return self->field_0x388 == 1;
 }
 
-
 /*
  * Copies the target record's +0x1BC word and +0x188 vector out, or raises the camera's invalid flag
  * when there is no live target.
@@ -839,7 +1305,6 @@ void fn_802BC69C(void)
     self->field_0x285 = 8;
 }
 
-
 /*
  * Puts the camera into mode 12 with the caller's argument.
  */
@@ -885,8 +1350,7 @@ void camera_event_set(u8 mode, u32 arg)
         fn_802BC4AC(mode, arg);
     }
 }
-
-} /* extern "C" */
+}
 
 /*
  * The current camera's world position.  The four camera entry points share one shape: build a camera
@@ -921,3 +1385,222 @@ void set_quake_sub(u8 kind, nw4r::math::VEC3* origin)
 {
     fn_802BE44C(&((CamWork*)fn_802BECD0())->quake_0x4A8, origin, kind, 0);
 }
+
+
+/* Ages the three channel timers by one and hands the channel the given index selects to the
+ * per-channel update. */
+extern "C" void fn_802BEAAC(LightWork* self, u8 index)
+{
+    if (--self->channel[0].timer <= 0) {
+        self->channel[0].enable = 0;
+        self->channel[0].timer = 0;
+    }
+
+    if (--self->channel[1].timer <= 0) {
+        self->channel[1].enable = 0;
+        self->channel[1].timer = 0;
+    }
+
+    if (--self->channel[2].timer <= 0) {
+        self->channel[2].enable = 0;
+        self->channel[2].timer = 0;
+    }
+
+    if (index == 3) {
+        fn_802BE7E8(self, &self->channel[2], index);
+    } else if (index == 1) {
+        fn_802BE7E8(self, &self->channel[1], index);
+    } else {
+        fn_802BE7E8(self, &self->channel[0], index);
+    }
+}
+
+/* Formats the per-map light file name into the caller's buffer. */
+extern "C" int fn_802BECB8(char* buffer, u8 mapno)
+{
+    return sprintf(buffer, lbl_805D1EB8, mapno);
+}
+
+/* Returns the light work of the loaded map: the second record while the special-map flag is up, the
+ * first one otherwise. */
+extern "C" LightWork* fn_802BECD0(void)
+{
+    if (screen_split_mode_ck() != 0 && (s8)my_player_no() != 0) {
+        return &lbl_806BB7E0[1];
+    }
+    return &lbl_806BB7E0[0];
+}
+
+/* Runs the map's light-record builder with the level counter's bank switched to the given one and
+ * puts the previous bank back afterwards. */
+extern "C" void* fn_802BEDE8(s8 bank)
+{
+    s32 previous;
+    void* result;
+
+    previous = my_player_no();
+    my_player_no_set(bank);
+    result = (void*)(u32)camera_work_ck();
+    my_player_no_set(previous);
+    return result;
+}
+
+/* Queries the light resource for the given id with the bank reset and then with it raised, letting
+ * each failed query fall through to the id's own record handler. */
+extern "C" void fn_802BEE3C(u8 id, void* arg)
+{
+    s32 previous;
+
+    previous = my_player_no();
+
+    my_player_no_set(0);
+    if (!fn_802B0688(&fn_802BECD0()->resource->entry)) {
+        fn_802BC564(id, arg);
+    }
+
+    my_player_no_set(1);
+    if (!fn_802B0688(&fn_802BECD0()->resource->entry)) {
+        fn_802BC564(id, arg);
+    }
+
+    my_player_no_set(previous);
+}
+
+/* Constructs the two light-work records the module keeps. */
+extern "C" void fn_802BEEE0(void)
+{
+    __construct_array(&lbl_806BB7E0[0], (void*)fn_802BEF00, NULL, 0x4F8, 2);
+}
+
+/* Constructs a light work record: every sub-record in turn, then the three channels. */
+extern "C" LightWork* fn_802BEF00(LightWork* self)
+{
+    LightChannel* end;
+    LightChannel* channel;
+
+    fn_802BF1D8(&self->root);
+    fn_802BF180(&self->anim);
+    fn_802BF138(&self->lights);
+    fn_802BF0AC(&self->params);
+    fn_802BF044(&self->colors);
+    fn_802BEFB4(&self->entry);
+
+    channel = &self->channel[0];
+    end = &self->channel[3];
+    do {
+        fn_802BEF84(channel);
+        channel++;
+    } while (channel < end);
+    return self;
+}
+
+/* Constructs a channel's position vector. */
+extern "C" LightChannel* fn_802BEF84(LightChannel* self)
+{
+    VEC3_ctor(&self->pos);
+    return self;
+}
+
+/* Constructs a record of four vectors and a LightTriple. */
+extern "C" LightQuadTriple* fn_802BEFB4(LightQuadTriple* self)
+{
+    VEC3_ctor(&self->v[0]);
+    VEC3_ctor(&self->v[1]);
+    VEC3_ctor(&self->v[2]);
+    VEC3_ctor(&self->v[3]);
+    fn_802BF004(&self->inner);
+    return self;
+}
+
+/* Constructs a record of three vectors. */
+extern "C" LightTriple* fn_802BF004(LightTriple* self)
+{
+    VEC3_ctor(&self->a);
+    VEC3_ctor(&self->b);
+    VEC3_ctor(&self->c);
+    return self;
+}
+
+/* Constructs a record of eight vectors. */
+extern "C" LightOctal* fn_802BF044(LightOctal* self)
+{
+    VEC3_ctor(&self->v[0]);
+    VEC3_ctor(&self->v[1]);
+    VEC3_ctor(&self->v[2]);
+    VEC3_ctor(&self->v[3]);
+    VEC3_ctor(&self->w[0]);
+    VEC3_ctor(&self->w[1]);
+    VEC3_ctor(&self->w[2]);
+    VEC3_ctor(&self->w[3]);
+    return self;
+}
+
+/* Constructs a record of four vectors. */
+extern "C" LightQuad* fn_802BF138(LightQuad* self)
+{
+    VEC3_ctor(&self->v[0]);
+    VEC3_ctor(&self->v[1]);
+    VEC3_ctor(&self->v[2]);
+    VEC3_ctor(&self->v[3]);
+    return self;
+}
+
+/* Constructs a record of four vectors and two two-element vector runs. */
+extern "C" LightParams* fn_802BF0AC(LightParams* self)
+{
+    nw4r::math::VEC3* vec;
+    nw4r::math::VEC3* end;
+
+    VEC3_ctor(&self->v0);
+    VEC3_ctor(&self->v1);
+    VEC3_ctor(&self->v2);
+    VEC3_ctor(&self->v3);
+
+    vec = &self->runs[0];
+    end = &self->runs[2];
+    do {
+        VEC3_ctor(vec);
+        vec++;
+    } while (vec < end);
+
+    end = &self->runs[4];
+    do {
+        VEC3_ctor(vec);
+        vec++;
+    } while (vec < end);
+    return self;
+}
+
+/* Constructs a record of four vectors, a mid block and a trailing vector. */
+extern "C" LightQuadMid* fn_802BF180(LightQuadMid* self)
+{
+    VEC3_ctor(&self->v[0]);
+    VEC3_ctor(&self->v[1]);
+    VEC3_ctor(&self->v[2]);
+    VEC3_ctor(&self->v[3]);
+    MTX34_ctor(&self->mid);
+    VEC3_ctor(&self->tail);
+    return self;
+}
+
+/* Constructs the scene root record's fifteen vectors. */
+extern "C" LightRoot* fn_802BF1D8(LightRoot* self)
+{
+    VEC3_ctor(&self->v0);
+    VEC3_ctor(&self->v1);
+    VEC3_ctor(&self->v2);
+    VEC3_ctor(&self->v3);
+    VEC3_ctor(&self->v4);
+    VEC3_ctor(&self->v5);
+    VEC3_ctor(&self->v6);
+    VEC3_ctor(&self->v7);
+    VEC3_ctor(&self->v8);
+    VEC3_ctor(&self->v9);
+    VEC3_ctor(&self->v10);
+    VEC3_ctor(&self->v11);
+    VEC3_ctor(&self->v12);
+    VEC3_ctor(&self->v13);
+    VEC3_ctor(&self->v14);
+    return self;
+}
+

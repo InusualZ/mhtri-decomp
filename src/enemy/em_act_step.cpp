@@ -1,4 +1,16 @@
 /*
+ * enemy/em_act_step.cpp - phase 4 unit, `.text` 0x8032C920..0x80330194 (70 functions, 14452 bytes).
+ *
+ * PHASE 4 (docs/splits/phase4, window d).  Recut of em_act_step.cpp: its functions whose address lies in this range,
+ * in address order; the rest of the range keeps its original bytes.  34 of 70 functions have a body here.
+ *
+ * FLAGS.  `cflags_main`.  The tail (0x80330194..) is `enemy/em_act_step_tail.cpp`.
+ *
+ * Sections: the unit's block in config/RMHE08/splits.txt (.bss, .ctors, .data, .sdata, .sdata2, .text, extab,
+ * extabindex).
+ */
+/* ---- header inherited from src/enemy/em_act_step.cpp (written against its pre-phase-4 range) ---- */
+/*
  * enemy/em_act_step.cpp - the enemy work record's action-step band: the step function of each of the
  * record's first four action ids, the motion each of their phases arms, and the record's own class (its
  * constructor, vtable and destructor halves) with the effect-offset and seat-aim helpers.  `.text`
@@ -217,16 +229,8 @@
 #include "Pl/fn_8028F66C.h"
 #include "Pl/pl_master.h"
 
-/* Retail keeps the unfused form of this band's narrowing/bit folds (`and rN, rN, rM` + a separate
- * `cmpwi` where `-O3`'s peephole makes one `and.` record form) - the same finding the sibling bands
- * `enemy/fn_802F5138.cpp`, `ai/fn_802C5D10.cpp` and `light/light.cpp` record (playbook 39). */
-#pragma peephole off
-
-/* Retail keeps `fmuls` + `fadds` where our default `-fp_contract on` fuses them into one `fmadds`
- * (playbook 40: measured on `em_act_arm_mot5`/`em_act_arm_mot7`, whose speed factor is the fused site). */
-#pragma fp_contract off
-
 #ifdef __cplusplus
+
 extern "C" {
 #endif
 
@@ -251,16 +255,11 @@ void fn_80125F54(EmGroundRec* rec);
 }
 #endif
 
-#ifdef __cplusplus
-
 /* The enemy work API this band calls, at C++ scope so the front-end reproduces the map's mangled name
  * (rule 9); each spelling is the callee's own body. */
 u32 get_move_work_max(u8 kind);
 void* get_move_work_adrs(u8 kind);
-s32 em_act_ck(struct _ENEMY_WORK* self, u8 a, u8 b);
 s32 em_die_ck(struct _ENEMY_WORK* self);
-u16 em_get_mot_no(struct _ENEMY_WORK* self);
-u32 em_after_frame_check(struct _ENEMY_WORK* self, u16 a, f32 b, f32 c);
 
 /* The 16-byte per-slot handle block at +0x328: the effect offset `rotVecY` rotates in place and the
  * state's own stage word beside it.  Both are reached through one pointer in the target, so they are
@@ -337,7 +336,8 @@ struct _EM_CHARA_WORK {
     /* +0xB14 */ struct _se_w* se_0xB14;
 };
 
-#endif
+#pragma peephole off
+#pragma fp_contract off
 
 /* Rotates the effect's local offset vector by the work record's own y angle, then hands it to the
  * effect placer. */
@@ -1101,3 +1101,4 @@ extern "C" s32 em_seat_aim_ck(_EM_CHARA_WORK* self)
     }
     return 0;
 }
+

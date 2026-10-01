@@ -1,4 +1,17 @@
 /*
+ * light/light.cpp - phase 4 unit, `.text` 0x802BF278..0x802C2700 (63 functions, 13448 bytes).
+ *
+ * PHASE 4 (docs/splits/phase4, window d).  Recut of light.cpp: its functions whose address lies in this range, in
+ * address order; the rest of the range keeps its original bytes.  15 of 63 functions have a body here.
+ *
+ * FLAGS.  `cflags_main`.  The record types moved to `include/light/light_work.h` (shared with
+ * `camera/camera_main.cpp`, which holds the head of the module).
+ *
+ * Sections: the unit's block in config/RMHE08/splits.txt (.bss, .ctors, .data, .sbss, .sdata, .sdata2, .text, extab,
+ * extabindex).
+ */
+/* ---- header inherited from src/light/light.cpp (written against its pre-phase-4 range) ---- */
+/*
  * light/light.cpp - the map light work: its record, its constructors, its per-frame channels and its
  * accessors.
  *
@@ -59,6 +72,7 @@
  */
 
 #include "types.h"
+#include "light/light_work.h"
 #include "camera/camera.h"
 #include "nw4r/math.h"
 
@@ -74,417 +88,21 @@
 #include "unsplit/Runtime.PPCEABI.H.h"
 #include "unsplit/unknown.h"
 
-#pragma peephole off
-
 /* ------------------------------------------------------------------------------------------------ */
 /* types                                                                                             */
 /* ------------------------------------------------------------------------------------------------ */
 
-/* One light channel: a world position, an enable flag, a control byte (its low five bits index the
- * intensity tables 0x805D1E7C/0x805D1E90, bit 0x80 selects the fade direction and 0x40 the half-way
- * intensity test - all read in fn_802BE7E8), a countdown timer and a table index. */
-typedef struct LightChannel {
-    /* +0x00 */ nw4r::math::VEC3 pos;
-    /* +0x0C */ u8 enable;
-    /* +0x0D */ u8 ctrl;
-    /* +0x0E */ s16 timer;
-    /* +0x10 */ u8 table_index;
-    /* +0x11 */ u8 pad_0x11[3];
-} LightChannel; /* size: 0x14 */
-
-/* The map resource the light work points at.  Only the block fn_802B0688 is handed is traced, so the
- * extent past +0x3C is an approximation. */
-typedef struct LightResource {
-    /* +0x00 */ u8 unused_0x00[0x3C];
-    /* +0x3C */ u8 entry;
-} LightResource; /* size: 0x3D traced (the record is larger; approximation) */
-
-/* Four vectors - the base every light record starts with. */
-typedef struct LightQuad {
-    /* +0x00 */ nw4r::math::VEC3 v[4];
-} LightQuad; /* size: 0x30 */
-
-/* Three vectors with the middle extent untraced (fn_802BF004's record). */
-typedef struct LightTriple {
-    /* +0x00 */ nw4r::math::VEC3 a;
-    /* +0x0C */ nw4r::math::VEC3 b;
-    /* +0x18 */ u8 unused_0x18[0x24];
-    /* +0x3C */ nw4r::math::VEC3 c;
-} LightTriple; /* size: 0x48 */
-
-/* Four vectors, a gap and four more (fn_802BF044's record). */
-typedef struct LightOctal {
-    /* +0x00 */ nw4r::math::VEC3 v[4];
-    /* +0x30 */ u8 unused_0x30[0x54];
-    /* +0x84 */ nw4r::math::VEC3 w[4];
-} LightOctal; /* size: 0xB4 */
-
-/* The sub-record MTX34_ctor constructs; only its extent is traced. */
-typedef struct LightMidBlock {
-    /* +0x00 */ u8 bytes[0x30];
-} LightMidBlock; /* size: 0x30 */
-
-/* Four vectors, that sub-record and a trailing vector (fn_802BF180's record). */
-typedef struct LightQuadMid {
-    /* +0x00 */ nw4r::math::VEC3 v[4];
-    /* +0x30 */ u8 unused_0x30[0x1C];
-    /* +0x4C */ MTX34 mid;
-    /* +0x7C */ nw4r::math::VEC3 tail;
-} LightQuadMid; /* size: 0x88 */
-
-/* Four vectors and a LightTriple (fn_802BEFB4's record). */
-typedef struct LightQuadTriple {
-    /* +0x00 */ nw4r::math::VEC3 v[4];
-    /* +0x30 */ u8 unused_0x30[0x1C];
-    /* +0x4C */ LightTriple inner;
-} LightQuadTriple; /* size: 0x94 */
-
-/* The scene root's own record (fn_802BF1D8's view): fifteen vector members. */
-typedef struct LightRoot {
-    /* +0x000 */ nw4r::math::VEC3 v0;
-    /* +0x00C */ nw4r::math::VEC3 v1;
-    /* +0x018 */ nw4r::math::VEC3 v2;
-    /* +0x024 */ nw4r::math::VEC3 v3;
-    /* +0x030 */ u8 unused_0x030[0x1C];
-    /* +0x04C */ nw4r::math::VEC3 v4;
-    /* +0x058 */ nw4r::math::VEC3 v5;
-    /* +0x064 */ u8 unused_0x064[0x54];
-    /* +0x0B8 */ nw4r::math::VEC3 v6;
-    /* +0x0C4 */ nw4r::math::VEC3 v7;
-    /* +0x0D0 */ nw4r::math::VEC3 v8;
-    /* +0x0DC */ nw4r::math::VEC3 v9;
-    /* +0x0E8 */ nw4r::math::VEC3 v10;
-    /* +0x0F4 */ nw4r::math::VEC3 v11;
-    /* +0x100 */ u8 unused_0x100[0x20];
-    /* +0x120 */ nw4r::math::VEC3 v12;
-    /* +0x12C */ nw4r::math::VEC3 v13;
-    /* +0x138 */ nw4r::math::VEC3 v14;
-    /* +0x144 */ u8 unused_0x144[0x04];
-} LightRoot; /* size: 0x148 (the parent record's next member starts at +0x148) */
-
-/* The parameter record (fn_802BF0AC's view): four vectors, then a four-element vector run whose two
- * halves the constructor walks separately. */
-typedef struct LightParams {
-    /* +0x00 */ nw4r::math::VEC3 v0;
-    /* +0x0C */ nw4r::math::VEC3 v1;
-    /* +0x18 */ nw4r::math::VEC3 v2;
-    /* +0x24 */ nw4r::math::VEC3 v3;
-    /* +0x30 */ u8 unused_0x030[0x1C];
-    /* +0x4C */ nw4r::math::VEC3 runs[4];
-    /* +0x7C */ u8 unused_0x07C[0x88];
-} LightParams; /* size: 0x104 (the parent record's next member starts at +0x104) */
-
-/* A record whose vector member sits at +0x04 (fn_802C26CC's view). */
-typedef struct LightVecAt4 {
-    /* +0x00 */ u32 unused_0x00;
-    /* +0x04 */ nw4r::math::VEC3 vec;
-} LightVecAt4; /* size: 0x10 */
-
-/* fn_802C2664's record: it hands its +0x04 member to fn_802C26CC. */
-typedef struct LightWrap {
-    /* +0x00 */ u32 unused_0x00;
-    /* +0x04 */ LightVecAt4 inner;
-} LightWrap; /* size: 0x14 */
-
-/* fn_802C2698's record: the block at +0x08 is handed to mhchar_construct by address. */
-typedef struct LightWrap2 {
-    /* +0x00 */ u8 unused_0x00[0x08];
-    /* +0x08 */ u32 block;
-} LightWrap2; /* size: 0x0C traced (the block is larger; approximation) */
-
-/* The light work record.  `resource` is the map resource whose +0x3C block fn_802B0688 queries; every
- * other element is a sub-record a constructor builds, an untraced gap, or a channel. */
-typedef struct LightWork {
-    /* +0x000 */ LightRoot root;
-    /* +0x148 */ LightQuadMid anim;
-    /* +0x1D0 */ u8 unused_0x1D0[0x20];
-    /* +0x1F0 */ LightQuad lights;
-    /* +0x220 */ u8 unused_0x220[0x24];
-    /* +0x244 */ LightParams params;
-    /* +0x348 */ LightOctal colors;
-    /* +0x3FC */ LightQuadTriple entry;
-    /* +0x490 */ u8 unused_0x490[0x04];
-    /* +0x494 */ LightResource* resource;
-    /* +0x498 */ u8 unused_0x498[0x10];
-    /* +0x4A8 */ LightChannel channel[3];
-    /* +0x4E4 */ u8 unused_0x4E4[0x14];
-} LightWork; /* size: 0x4F8 */
-
-/* The scene root whose light work sits at +0x2878.  Only that offset is traced. */
-typedef struct SceneRoot {
-    /* +0x0000 */ u8 unused_0x0000[0x2878];
-    /* +0x2878 */ LightWork light;
-} SceneRoot; /* size: 0x2D70 (approximation: only the light block's offset is traced) */
-
-/* The record fn_802C2F08 dispatches on: its state word is at +0x172 and its two arm handlers are
- * fn_802C2DD0 / fn_802C2E6C. */
-typedef struct LightArm {
-    /* +0x000 */ u8 unused_0x000[0x172];
-    /* +0x172 */ u16 state;
-} LightArm; /* size: 0x174 traced (the record is larger; approximation) */
-
-/* ------------------------------------------------------------------------------------------------ */
-/* externs                                                                                           */
-/* ------------------------------------------------------------------------------------------------ */
-
-/* The pooled string and the entry points whose address owns no registered unit, so no header exists
- * for them: the map already names the data (playbook 29), and these are the module-ambiguous band
- * (`include/unsplit/unknown.h` carries `get_now_mapno`, the other declarations here are band gaps the
- * lint counts rather than guesses). */
-extern "C" const char lbl_805D1EB8[];
 extern "C" u16 lbl_80794B68;
-extern "C" int sprintf(char* buffer, const char* format, ...);
-
-/* The rest of this unit's own functions, declared before their definitions. */
-extern "C" LightWork* fn_802BECD0(void);
-extern "C" LightWork* fn_802BEF00(LightWork* self);
-extern "C" LightTriple* fn_802BF004(LightTriple* self);
-extern "C" LightOctal* fn_802BF044(LightOctal* self);
-extern "C" LightParams* fn_802BF0AC(LightParams* self);
 extern "C" void* fn_802C1D68(u8 index);
 extern "C" void fn_802C1E14(void* self, void* arg);
 extern "C" LightWrap* fn_802C2664(LightWrap* self);
 extern "C" LightWrap2* fn_802C2698(LightWrap2* self);
 extern "C" LightVecAt4* fn_802C26CC(LightVecAt4* self);
-extern "C" LightQuad* fn_802BF138(LightQuad* self);
-extern "C" LightQuadMid* fn_802BF180(LightQuadMid* self);
-extern "C" LightRoot* fn_802BF1D8(LightRoot* self);
-extern "C" LightChannel* fn_802BEF84(LightChannel* self);
-extern "C" LightQuadTriple* fn_802BEFB4(LightQuadTriple* self);
 extern "C" u16 fn_802BF7E8(void);
 extern "C" void fn_802BFA00(u16 id, void* vector, void* arg, f32 a, f32 b);
 extern "C" void fn_802C0728(void);
-extern "C" void fn_802C2DD0(LightArm* self);
-extern "C" void fn_802C2E6C(LightArm* self);
 
-/* The two light-work records the module keeps (`.bss` 0x806BB7E0, 0x9F0 B = 2 x 0x4F8).  Declared,
- * never defined here: the object emits only the references (playbook 29). */
-extern LightWork lbl_806BB7E0[2];
-
-/* The level counter fn_802BF7E8 ticks and wraps at 60000. */
-#define LIGHT_TICK_WRAP 60000
-
-/* ------------------------------------------------------------------------------------------------ */
-/* functions                                                                                         */
-/* ------------------------------------------------------------------------------------------------ */
-
-/* Ages the three channel timers by one and hands the channel the given index selects to the
- * per-channel update. */
-extern "C" void fn_802BEAAC(LightWork* self, u8 index)
-{
-    if (--self->channel[0].timer <= 0) {
-        self->channel[0].enable = 0;
-        self->channel[0].timer = 0;
-    }
-
-    if (--self->channel[1].timer <= 0) {
-        self->channel[1].enable = 0;
-        self->channel[1].timer = 0;
-    }
-
-    if (--self->channel[2].timer <= 0) {
-        self->channel[2].enable = 0;
-        self->channel[2].timer = 0;
-    }
-
-    if (index == 3) {
-        fn_802BE7E8(self, &self->channel[2], index);
-    } else if (index == 1) {
-        fn_802BE7E8(self, &self->channel[1], index);
-    } else {
-        fn_802BE7E8(self, &self->channel[0], index);
-    }
-}
-
-/* Formats the per-map light file name into the caller's buffer. */
-extern "C" int fn_802BECB8(char* buffer, u8 mapno)
-{
-    return sprintf(buffer, lbl_805D1EB8, mapno);
-}
-
-/* Returns the light work of the loaded map: the second record while the special-map flag is up, the
- * first one otherwise. */
-extern "C" LightWork* fn_802BECD0(void)
-{
-    if (screen_split_mode_ck() != 0 && (s8)my_player_no() != 0) {
-        return &lbl_806BB7E0[1];
-    }
-    return &lbl_806BB7E0[0];
-}
-
-/* Runs the map's light-record builder with the level counter's bank switched to the given one and
- * puts the previous bank back afterwards. */
-extern "C" void* fn_802BEDE8(s8 bank)
-{
-    s32 previous;
-    void* result;
-
-    previous = my_player_no();
-    my_player_no_set(bank);
-    result = (void*)(u32)camera_work_ck();
-    my_player_no_set(previous);
-    return result;
-}
-
-/* Queries the light resource for the given id with the bank reset and then with it raised, letting
- * each failed query fall through to the id's own record handler. */
-extern "C" void fn_802BEE3C(u8 id, void* arg)
-{
-    s32 previous;
-
-    previous = my_player_no();
-
-    my_player_no_set(0);
-    if (!fn_802B0688(&fn_802BECD0()->resource->entry)) {
-        fn_802BC564(id, arg);
-    }
-
-    my_player_no_set(1);
-    if (!fn_802B0688(&fn_802BECD0()->resource->entry)) {
-        fn_802BC564(id, arg);
-    }
-
-    my_player_no_set(previous);
-}
-
-/* Constructs the two light-work records the module keeps. */
-extern "C" void fn_802BEEE0(void)
-{
-    __construct_array(&lbl_806BB7E0[0], (void*)fn_802BEF00, NULL, 0x4F8, 2);
-}
-
-/* Constructs a light work record: every sub-record in turn, then the three channels. */
-extern "C" LightWork* fn_802BEF00(LightWork* self)
-{
-    LightChannel* end;
-    LightChannel* channel;
-
-    fn_802BF1D8(&self->root);
-    fn_802BF180(&self->anim);
-    fn_802BF138(&self->lights);
-    fn_802BF0AC(&self->params);
-    fn_802BF044(&self->colors);
-    fn_802BEFB4(&self->entry);
-
-    channel = &self->channel[0];
-    end = &self->channel[3];
-    do {
-        fn_802BEF84(channel);
-        channel++;
-    } while (channel < end);
-    return self;
-}
-
-
-/* Constructs a channel's position vector. */
-extern "C" LightChannel* fn_802BEF84(LightChannel* self)
-{
-    VEC3_ctor(&self->pos);
-    return self;
-}
-
-/* Constructs a record of four vectors and a LightTriple. */
-extern "C" LightQuadTriple* fn_802BEFB4(LightQuadTriple* self)
-{
-    VEC3_ctor(&self->v[0]);
-    VEC3_ctor(&self->v[1]);
-    VEC3_ctor(&self->v[2]);
-    VEC3_ctor(&self->v[3]);
-    fn_802BF004(&self->inner);
-    return self;
-}
-
-/* Constructs a record of three vectors. */
-extern "C" LightTriple* fn_802BF004(LightTriple* self)
-{
-    VEC3_ctor(&self->a);
-    VEC3_ctor(&self->b);
-    VEC3_ctor(&self->c);
-    return self;
-}
-
-/* Constructs a record of eight vectors. */
-extern "C" LightOctal* fn_802BF044(LightOctal* self)
-{
-    VEC3_ctor(&self->v[0]);
-    VEC3_ctor(&self->v[1]);
-    VEC3_ctor(&self->v[2]);
-    VEC3_ctor(&self->v[3]);
-    VEC3_ctor(&self->w[0]);
-    VEC3_ctor(&self->w[1]);
-    VEC3_ctor(&self->w[2]);
-    VEC3_ctor(&self->w[3]);
-    return self;
-}
-
-/* Constructs a record of four vectors. */
-extern "C" LightQuad* fn_802BF138(LightQuad* self)
-{
-    VEC3_ctor(&self->v[0]);
-    VEC3_ctor(&self->v[1]);
-    VEC3_ctor(&self->v[2]);
-    VEC3_ctor(&self->v[3]);
-    return self;
-}
-
-/* Constructs a record of four vectors and two two-element vector runs. */
-extern "C" LightParams* fn_802BF0AC(LightParams* self)
-{
-    nw4r::math::VEC3* vec;
-    nw4r::math::VEC3* end;
-
-    VEC3_ctor(&self->v0);
-    VEC3_ctor(&self->v1);
-    VEC3_ctor(&self->v2);
-    VEC3_ctor(&self->v3);
-
-    vec = &self->runs[0];
-    end = &self->runs[2];
-    do {
-        VEC3_ctor(vec);
-        vec++;
-    } while (vec < end);
-
-    end = &self->runs[4];
-    do {
-        VEC3_ctor(vec);
-        vec++;
-    } while (vec < end);
-    return self;
-}
-
-/* Constructs a record of four vectors, a mid block and a trailing vector. */
-extern "C" LightQuadMid* fn_802BF180(LightQuadMid* self)
-{
-    VEC3_ctor(&self->v[0]);
-    VEC3_ctor(&self->v[1]);
-    VEC3_ctor(&self->v[2]);
-    VEC3_ctor(&self->v[3]);
-    MTX34_ctor(&self->mid);
-    VEC3_ctor(&self->tail);
-    return self;
-}
-
-/* Constructs the scene root record's fifteen vectors. */
-extern "C" LightRoot* fn_802BF1D8(LightRoot* self)
-{
-    VEC3_ctor(&self->v0);
-    VEC3_ctor(&self->v1);
-    VEC3_ctor(&self->v2);
-    VEC3_ctor(&self->v3);
-    VEC3_ctor(&self->v4);
-    VEC3_ctor(&self->v5);
-    VEC3_ctor(&self->v6);
-    VEC3_ctor(&self->v7);
-    VEC3_ctor(&self->v8);
-    VEC3_ctor(&self->v9);
-    VEC3_ctor(&self->v10);
-    VEC3_ctor(&self->v11);
-    VEC3_ctor(&self->v12);
-    VEC3_ctor(&self->v13);
-    VEC3_ctor(&self->v14);
-    return self;
-}
+#pragma peephole off
 
 /* Resets the global light level counter. */
 extern "C" void fn_802BF278(void)
@@ -550,19 +168,6 @@ extern "C" void fn_802C1F64(u32* flags)
     *flags &= ~0x10;
 }
 
-/* Moves the record to the arm its state selects. */
-extern "C" void fn_802C2F08(LightArm* self)
-{
-    switch (self->state) {
-    case 0:
-        fn_802C2DD0(self);
-        break;
-    case 1:
-        fn_802C2E6C(self);
-        break;
-    }
-}
-
 /* Clamps a value into the [low, high] range. */
 extern "C" s32 fn_802C2510(s32 value, s32 low, s32 high)
 {
@@ -608,3 +213,4 @@ extern "C" void fn_802C2314(void)
     fn_802AEC00();
     fn_802C0728();
 }
+

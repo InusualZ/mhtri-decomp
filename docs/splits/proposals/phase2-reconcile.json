@@ -7607,7 +7607,7 @@
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x805DD9C8",
-     "finding": "lbl_805DD9C8 (.data 0x805DD9C8, 0x18 B) is read at 0x80324FF4 in hud/fn_80324F7C.c"
+     "finding": "move_indicator_base_ids (.data 0x805DD9C8, 0x18 B) is read at 0x80324FF4 in hud/fn_80324F7C.c"
     },
     {
      "tool": "dataattach",
@@ -13461,6 +13461,36 @@
    "text_addr": "0x8036A828"
   },
   {
+   "unit": "enemy/em020_prog.cpp",
+   "section": ".bss",
+   "range": [
+    "0x806BF530",
+    "0x806C23E8"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 11960,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window d units> --root . --base-snapshot <land-base orphans> --base-ref main",
+     "finding": "the data-closure row refuses lbl_806BF530 (.bss, 0x2EB8 B): referenced by em_prog_support (ex fn_80382310) and menu_item_sub (ex fn_8036A828), both batch units, and no claim covers it"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x806BF530",
+     "finding": "lbl_806BF530 is read by 15 functions of enemy/em020_prog.cpp (em020_quest_active_ck 0x8037583C, em020_quest_active_clear, fn_8037586C, fn_80375B9C, fn_80375D30, ...) and by menu_item_sub (fn_8036A890.., fn_8036C284) and em_prog_support; em020_prog's text lies between menu_item_sub's (previous .bss owner, ends 0x806BF530) and em019_ai's (next, starts 0x806C23E8), so the chain bracketing the run is menu_item_sub..em020_prog; the writer fn_80375B9C is em020_prog's"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x806BF530",
+   "text_addr": "0x8036CF64",
+   "note": "orchestrator override 69: one run, one object (0x2EB8 B); the unit that reads it most and writes it takes it"
+  },
+  {
    "unit": "enemy/em019_ai.cpp",
    "section": ".bss",
    "range": [
@@ -18285,12 +18315,12 @@
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x80792CC8",
-     "finding": "lbl_80792CC8 (.sdata 0x80792CC8, 0x8 B) is read at 0x80325000 in hud/fn_80324F7C.c"
+     "finding": "move_indicator_left_ids (.sdata 0x80792CC8, 0x8 B) is read at 0x80325000 in hud/fn_80324F7C.c"
     },
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x80792D00",
-     "finding": "lbl_80792D00 (.sdata 0x80792D00, 0x8 B) is read at 0x80325090 in hud/fn_80324F7C.c"
+     "finding": "move_indicator_left_extra_cfg1_ids (.sdata 0x80792D00, 0x8 B) is read at 0x80325090 in hud/fn_80324F7C.c"
     },
     {
      "tool": "dataattach",
@@ -28651,33 +28681,35 @@
    "text_addr": "0x8030121C"
   },
   {
-   "unit": "ef/fn_803066F0.c",
+   "unit": "ef/fn_8030681C.cpp",
    "section": ".sdata2",
    "range": [
     "0x8079ADE0",
     "0x8079ADE4"
    ],
-   "grade": "strong",
-   "signal": "pool-order",
+   "grade": "medium",
+   "signal": "orchestrator",
    "symbols": 1,
    "bytes": 4,
    "signals": {
-    "pool-order": 1
+    "orchestrator": 1
    },
    "evidence": [
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x8079ADE0",
-     "finding": "lbl_8079ADE0 (.sdata2 0x8079ADE0, 0x4 B) is read at 0x803067B8 in ef/fn_803066F0.c"
+     "finding": "lbl_8079ADE0 (1.0f, 4 B) is loaded only by fn_803066F0 (0x803067B8); the next unit's range starts at 0x8079ADE4 and holds the 8-byte entries at 0x8079AE08 and 0x8079AE28"
     },
     {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_803066F0 --section .sdata2",
-     "finding": "1 symbol(s): 1 read by ef/fn_803066F0.c (first 0x8079ADE0, last 0x8079ADE0)"
+     "tool": "ninja",
+     "command": "python tools/splits/applysplits.py apply --window d; ninja build/RMHE08/main.elf",
+     "finding": "with the candidate's ef/fn_8030681C .sdata2 starting at 0x8079ADE4 (4 mod 8 over 8-byte entries) mwldeppc dies with `internal linker error: File: 'ELF_gen.c' Line: 2802`; starting it at 0x8079ADE0 links"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_803066F0 --section .sdata2",
-   "text_addr": "0x803066F0"
+   "reproduce": "python tools/units/callers.py 0x8079ADE0",
+   "takes_from": "ef/fn_803066F0.c",
+   "note": "orchestrator override 68: a .sdata2 range that starts 4 mod 8 and holds 8-byte entries cannot link; the abutting 4-byte range of fn_803066F0 gives up its whole claim (its object keeps the load as a relocation to the neighbour's symbol)",
+   "text_addr": "0x8030681C"
   },
   {
    "unit": "ef/fn_8030681C.cpp",
@@ -33086,28 +33118,6 @@
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain enemy_control --section .bss"
-  },
-  {
-   "section": ".bss",
-   "range": [
-    "0x806BF530",
-    "0x806C23E8"
-   ],
-   "kind": "ambiguous",
-   "symbols": 1,
-   "bytes": 11960,
-   "candidates": [
-    "menu/fn_8036A828.cpp",
-    "enemy/em020_prog.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_8036A828 --section .bss",
-     "finding": "1 symbol(s), 1 read (by fn_8036A828, em020_prog): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_8036A828 --section .bss"
   },
   {
    "section": ".bss",

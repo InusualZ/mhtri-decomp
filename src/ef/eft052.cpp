@@ -1,3 +1,15 @@
+/*
+ * ef/eft052.cpp - phase 4 unit, `.text` 0x80358624..0x8035BAB4 (53 functions, 13456 bytes).
+ *
+ * PHASE 4 (docs/splits/phase4, window d).  Recut of eft052.cpp: its functions whose address lies in this range, in
+ * address order; the rest of the range keeps its original bytes.  20 of 53 functions have a body here.
+ *
+ * FLAGS.  `cflags_main`.  The tail (0x8035BAB4..) is `enemy/em033_prog.cpp` (no bodies came from this source).
+ *
+ * Sections: the unit's block in config/RMHE08/splits.txt (.bss, .data, .sbss, .sdata, .sdata2, .text, extab,
+ * extabindex).
+ */
+/* ---- header inherited from src/ef/eft052.cpp (written against its pre-phase-4 range) ---- */
 /* ef/eft052.cpp - the `eft052` effect family (the `_EFT` tag 52) and the cockpit item-page band it
  * draws, `.text` 0x80358624..0x8035E034 (92 functions / 23056 B).
  *
@@ -113,8 +125,6 @@
  *     (`lbl_8079B640`, declared never defined) instead of emitting a literal.
  */
 
-#pragma peephole off
-
 #include "types.h"
 #include "nw4r/math.h"
 #include "enemy/ENEMY_WORK.h"
@@ -173,6 +183,8 @@ extern f32 lbl_8079B640;
 extern u8 lbl_805ED0C0[];
 extern u8 lbl_805ED120[];
 extern u8 lbl_805ED168[];
+
+#pragma peephole off
 
 /* ---------------------------------------------------------------------------------------------- *
  * 0x80358834 - pools this effect family's record, installs its two hooks and seeds both part slots.
@@ -278,6 +290,7 @@ extern "C" void eft052_place(_EFT* self)
     work->field_0x3E = 0xFF;
     fn_80358B40(self);
 }
+
 /* ---------------------------------------------------------------------------------------------- *
  * 0x80358624 - the part-damage report: one flag per queried part index.
  * ---------------------------------------------------------------------------------------------- */
@@ -561,3 +574,4 @@ extern "C" void eft052_hold_entry_copy(CockpitHoldEntry* dst, CockpitHoldEntry* 
 {
     *dst = *src;
 }
+

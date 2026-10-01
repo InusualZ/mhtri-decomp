@@ -1,4 +1,82 @@
 /*
+ * hud/cockpit_quest.cpp - phase 4 unit, `.text` 0x802E4978..0x802F2238 (158 functions, 55488 bytes).
+ *
+ * PHASE 4 (docs/splits/phase4, window d).  Fold of 4 registered units: fn_802E4978.cpp, cockpit_quest.cpp,
+ * fn_802EBED8.cpp, eft035.cpp.  The functions below are the ones those sources define, in address order; every other
+ * function of the range keeps its original bytes.  107 of 158 functions have a body here.
+ *
+ * FLAGS.  `cflags_hud` + `-pool off` (this unit's own row).  The absorbed menu/fn_802E4978.cpp used `cflags_menu`
+ * (equal to `cflags_hud`) and hud/fn_802EBED8.cpp the hud lib's group without `-pool off`; no function of either
+ * scored lower under the merged flags (measured).
+ *
+ * RESIDUAL (record views).  The absorbed sources were written as separate units and each carries its own header view
+ * of the records they share; where two views disagree on a record layout or a prototype of one extern "C" symbol they
+ * are kept apart in a namespace (extern "C" names stay unmangled, so the symbols are unchanged) instead of being
+ * unified by guess.  Unifying them (one record header, one prototype per symbol) is the open work and removes the
+ * namespace.  Here: `view_fn_802E4978` (menu/fn_802E4978.h, unsplit/lobby.h) and `view_fn_802EBED8`
+ * (hud/fn_802EBED8.h) keep the two incompatible views of the cockpit work arrays (`cockpit_work`, `cockpit_state`)
+ * away from the `hud/cockpit_quest.h` view of this file.
+ *
+ * Sections: the unit's block in config/RMHE08/splits.txt (.bss, .ctors, .data, .sdata, .sdata2, .text, extab,
+ * extabindex).
+ */
+/* ---- header inherited from src/menu/fn_802E4978.cpp (written against its pre-phase-4 range) ---- */
+/*
+ * menu/fn_802E4978.cpp - the 0x802E4978-0x802E7408 cockpit/HUD band (29 functions, 10896 B).
+ *
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * tools/symbols/symedit.py find/at + the Dolphin dump map at D:/WiiExperiment/DumpSymbols.zip: every
+ * defined name in the range is a bare `fn_`/`zz_` entry, and the only `__FILE__` strings in the
+ * neighbourhood are `cockpit.cpp` (emitted at 0x802DBC48, below this range) and `cockpit_quest.cpp`
+ * (emitted at 0x802E74E0, above it), neither of which this range references).
+ *
+ * Home and type, from evidence: the band's entry points are the menu/UI library's - it calls
+ * `get_menu_lsp_tbl`, `put_menu_cursor`, `GetMenuFontColor`, `ItemName`, `GetItemData` and the
+ * `draw_sprite`/`draw_font`/`drawshape_*` family - and the registered sibling `menu/menu_message.cpp`
+ * owns `GetMenuFontColor`, so the module is `menu`.  The file keeps the map's stem (brief section 2,
+ * class 4: nothing in the object names the original source file).  Its own data is the two
+ * 0x194-byte per-player cockpit work records at `cockpit_work` (2 entries) and the sub-screen state
+ * at `cockpit_state`.
+ *
+ * Sections: .text 0x802E4978..0x802E7408, extab 0x80014FFC..0x800150C4 and extabindex
+ * 0x80033660..0x8003378C (dtk derived both from the range's own prologues).  The range's `.data`
+ * jump table `jumptable_805D5B48` (0x4C = 19 entries, the `fn_802E4C5C` switch) is declared
+ * `extern` and used, never defined (playbook 29); claiming it as a range is a config_request.
+ *
+ * Flags: `cflags_menu` (the registered sibling's lib flags), -O3 -inline noauto with the peephole
+ * pass off.
+ *
+ * Work: 23 of the 29 functions are at or above the 80 % bar (7 byte-identical).  Residuals, by
+ * function, measured with the report metric (`tools/units/recompile.py menu/fn_802E4978 --measure
+ * <symbol>`, target = the split object of the range):
+ *   * NOT RECONSTRUCTED (empty body, 0 %): `fn_802E4C5C` (the 0x5C4 switch, needs its `.data` jump
+ *     table `jumptable_805D5B48` claimed - playbook 53/56); `fn_802E5764`, `fn_802E5E90`,
+ *     `fn_802E646C`, `fn_802E6AAC` (VMX/paired-single bodies, `m2c` flags them);
+ *     `fn_802E6EB4` is partial (39.8 %) - the `drawshape` colour/rect tail does not reproduce.
+ *   * `fn_802E4AD4` 80.3 %, `fn_802E555C` 81.3 %, `fn_802E5220` 87.2 %, `fn_802E5284` 88.9 %,
+ *     `fn_802E53C4` 89.3 %, `fn_802E4978` 93.3 %, `fn_802E5A14` 95.6 %, `fn_802E5D68` 95.7 %,
+ *     `fn_802E5C3C` 95.8 % - register-allocation/argument-width residuals (first divergence is an
+ *     ARG row, the instruction set is equal; several already sit at the 100 %-minus-a-few-points
+ *     level from the `{lval}` casts the compiler had to insert).
+ *   * a 0-byte-identical tail: none of the residuals is a flag problem - all 23 matched functions
+ *     are compiled with the sibling `menu` lib's own `cflags_menu` command line.
+ *
+ * Rule 2 (an extern lives with the TU that owns it).  `stylelint --diff main` reports 0 sites: the 54
+ * declarations this band used to carry in `include/unsplit/menu.h` are re-homed - 16 to their owners'
+ * headers, which this file now includes (`fn_8004CAD8.h`, `ef/fn_800CDB2C.h`,
+ * `Runtime.PPCEABI.H/memset.h`, `Pl/pl_act.h`, `menu/menu_item.h`, the new `ai/fn_802D44F4.h` and
+ * `enemy/fn_80382310.h`), 14 dropped (nothing in this file referenced them) and 24 left as this
+ * unit's own view in `include/menu/fn_802E4978.h` because the owner's header cannot be included from
+ * here (the clash that blocks each is named there; every one is a `shared-file` config_request).  The
+ * band header now declares only symbols no registered unit owns.
+ *
+ * `.data` request: the range's own jump table is `jumptable_805D5B48` (0x4C = 19 entries, the
+ * `fn_802E4C5C` switch); it is declared `extern` here and never defined (playbook 29), and a `range`
+ * config_request asks for 0x805D5B48..0x805D5B94 so the switch can be read from `main.elf`.
+ * Functions reconstructed in address order.
+ */
+/* ---- header inherited from src/hud/cockpit_quest.cpp (written against its pre-phase-4 range) ---- */
+/*
  * hud/cockpit_quest.cpp - the quest cockpit HUD band: `.text` 0x802E7408..0x802EBED8 (64 functions), extab
  * 0x800150C4..0x8001529C, extabindex 0x8003378C..0x80033A50, and the claimed `.data` 0x805D5C74..0x805D6310.
  *
@@ -53,6 +131,172 @@
  * `quest_gauge_shake_scale`/`quest_view_hold_ids*` (isolated-run, defined here, unclaimed) and `.sdata2` 0x8079A928..0x8079A984
  * (pool-synth: the compiler emits the literals).
  */
+/* ---- header inherited from src/hud/fn_802EBED8.cpp (written against its pre-phase-4 range) ---- */
+/* hud/fn_802EBED8.cpp - the cockpit HUD's quest-window band (`.text` 0x802EBED8..0x802F140C, 54
+ * functions / 21812 B).
+ *
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * `tools/symbols/symedit.py --section .text range 0x802EBED8 0x802F140C`: every row in the range is
+ * a bare `fn_` stem, and `tools/symbols/dumpmap.py lookup 0x802EBED8` answers `zz_02ebed8_`), so
+ * every body below keeps the map's stem.
+ *
+ * Home, name and seam, from evidence (brief section 2):
+ *   - class 4 (nothing supports a name).  No `.data`/`.sdata` string of the range is a source-file
+ *     name: the range's only `.data` references (0x805D6310..0x805D6940) are the mask/table blobs
+ *     `fn_802ED588` and friends walk, and `grep -nE '5d08|805d'` over the range's disassembly finds
+ *     no `__FILE__` load.  The dump answers `zz_` for every address, so there is no class-2 name
+ *     either.  The file therefore keeps its map stem (`hud/fn_802EBED8.cpp`).
+ *   - module `hud`: the band is the cockpit HUD's continuation above `hud/cockpit_quest.cpp` - it
+ *     reads the same `_PLW` act fields (`field_0x3D8`/`field_0x3DC`, `field_0x309`, `slot_id[26]`)
+ *     and the quest-window record (`cockpit_work`, `get_lsp_data`, `draw_sprite_*`), and its
+ *     neighbours `layout.cpp` (0x802E0740..0x802E4978) and `cockpit_quest.cpp`
+ *     (0x802E7408..0x802EBED8) are both registered in the `hud` lib.
+ *   - the seam is unproven.  `tudiscover.py at 0x802EBED8` must-links `quest_marker_draw`/`fn_802EC200`
+ *     and offers strong left cuts at 0x802EBBD0, 0x802EBE2C and 0x802EBED8 (all on the `.sdata2`
+ *     run jump `lbl_8079A980 -> lbl_8079A988`); this unit claims the brief's cut 0x802EBED8, which
+ *     is a clean function boundary (the band below ends at 0x802EBE2C's tail).  The sibling
+ *     `cockpit_quest.cpp` header records the same pool break as a candidate seam it did not take.
+ *
+ * Sections this unit owns: .text 0x802EBED8..0x802F140C, extab 0x8001529C..0x80015424 and
+ * extabindex 0x80033A50..0x80033C9C - both runs are 49 records (8 and 12 bytes), one per framed
+ * function of the range, and both start exactly where `hud/cockpit_quest.cpp`'s runs end.  The five
+ * unframed functions (fn_802ED588, fn_802ED6F4, fn_802EDAF0, fn_802EDB0C, fn_802EF400) carry no
+ * record, which is why the runs tile 49 and not 54.  No `.data`/`.sdata`/`.sdata2` range is claimed
+ * (a partial pool claim is not linkable - `hud/layout.cpp`'s header records the mwld error); the
+ * tables the range reads are declared and never defined (playbook 29).
+ *
+ * Flags: `cflags_hud` (= `cflags_main` + `-opt nopeephole`, the lib flag the band's siblings settled -
+ * see the group's evidence in `configure.py`): this band keeps the unfused `clrlwi` + `cmpwi` pairs
+ * (`fn_802ED588` ... `clrlwi r0,r4,24` + `cmpwi r0,0x0` is the smallest witness), and carries the 49
+ * extab records `-Cpp_exceptions on` emits.
+ *
+ * Score at this commit (the official report metric, one `recompile.py --measure` per symbol against
+ * this worktree's own split of the same range): 5.96 % fuzzy (504 of 21812 `.text` bytes), **6 of the
+ * 54 bodies byte-identical**, 11 of them at or above the 80 % bar:
+ *   100.00  fn_802EDAF0 (28 B), fn_802ED7E4 (80 B), fn_802EECA0 (108 B), fn_802EE330 (124 B),
+ *           fn_802EF400 (36 B), fn_802EF6B0 (128 B)
+ *    98.18  fn_802EF62C (132 B)
+ *    96.67  fn_802ED6F4 (240 B)
+ *    94.03  fn_802EEC24 (124 B)
+ *    91.09  fn_802EF0A0 (92 B)
+ *    90.91  fn_802ED834 (88 B)
+ * The 41 functions without a body score 0 and dominate the unit percentage.  The whole-object build
+ * links: `ninja` ends `build/RMHE08/main.dol: OK`.
+ *
+ * Residuals of the written bodies:
+ *  - `fn_802EC6C4` 72.33 % (60 B target, 60 B ours).  Every instruction is present in the target's
+ *    order except that retail folds `1 | ~v` into one `orc` (`li r3,1; orc r3,r3,r4`) where ours
+ *    emits `not r0,r4; ori r0,r0,1`.  Tried `(1 | ~v)`, `(~v | 1)`, a `u32` vs `u8` local, and
+ *    `#pragma peephole on` around the body: all 72.33.  The fold is an emitter choice this MWCC
+ *    revision does not make under the unit's flags (playbook 22).
+ *  - `fn_802ED588` 73.47 % (152 B target, 152 B ours).  Structurally complete - one `kind == 0`
+ *    test selecting both 4-byte-word mask tables, two bottom-tested loops, the same 38
+ *    instructions - but MWCC puts `result`/`bit`/the second table pointer in different registers
+ *    than retail (`r5`/`r6`/`r8` vs `r6`/`r5`/`r4`); declaring `bit` before `result` lifted it
+ *    72.08 -> 73.47.  Playbook 22 (register allocation, not shape).
+ *  - `fn_802ED834` 90.91 %, `fn_802EF0A0` 91.09 %, `fn_802EEC24` 94.03 %, `fn_802ED6F4` 96.67 %:
+ *    one or two register/instruction choices off (the `fn_802ED6F4` countdown keeps an `extsb`
+ *    retail does not).
+ *
+ * Not written (41, in address order): the rest of the band.  The largest are `fn_802F09C4` (0x8E0),
+ * `fn_802EDCE4` (0x5A4), `fn_802F02EC` (0x4F8), `fn_802ECE28` (0x3E4), `quest_marker_draw` (0x328),
+ * `fn_802EC200` (0x2F0), `fn_802EE3AC` (0x2B0), `fn_802EE97C` (0x2A8), `fn_802ED20C` (0x274); all of
+ * them drive the same `cockpit_work` / `_PLW` records this unit's written bodies view.  Their m2c
+ * shape oracle is kept for the next lane in `build/tmp/m2c/` (throwaway, gitignored).
+ */
+/* ---- header inherited from src/ef/eft035.cpp (written against its pre-phase-4 range) ---- */
+/* ef/eft035.cpp - the `eft035` effect family, `.text` 0x802F140C..0x802F5138 (39 functions).
+ *
+ * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
+ * `python tools/symbols/dumpmap.py lookup <addr>`: the runtime dump resolves only the two
+ * `eft035_*` names - `eft035_set` at 0x802F2238 and `eft035_set2` at 0x802F2394 - and every other
+ * address in the range is the dump's placeholder `zz_XXXXXXXX_`).
+ *
+ * Registration (docs/plan.md 12).  Class 2 evidence named it: the runtime dump's own name at
+ * 0x802F2238 is `eft035_set`, so the module is `ef` and the file is `eft035.cpp` - the scheme of its
+ * neighbours `ef/eft001.cpp` ... `ef/eft029.cpp`.  Language: both dumped names are C++ manglings
+ * (`eft035_set__FP11_ENEMY_WORKUcPQ34nw4r4math4VEC3P10_CP_VECTORUcf`), so the file is `.cpp` and
+ * every definition whose map name is plain (`fn_XXXXXXXX`) is `extern "C"` so its emitted name stays
+ * the map's stem and objdiff can pair it (playbook row 42).  Sections: `extab`
+ * 0x80015424..0x80015514 and `extabindex` 0x80033C9C..0x80033E04 (30 records each - exactly the
+ * bytes the bracketing units leave unclaimed: `hud/fn_802EBED8.cpp` ends at 0x80015424/0x80033C9C
+ * and the next unclaimed run starts at 0x80015514/0x80033E04).  No data section belongs to the unit
+ * (the target object carries none); its `.data`/`.sdata`/`.sdata2` pool is `extern` here and never
+ * defined (playbook 29).  One `.ctors` word belongs to the range, at 0x8056F38C - the address of the
+ * file-scope static initialiser `fn_802F20D8`, read out of the DOL's `.ctors`; it is not claimed,
+ * because dtk's auto split gave the range no `.ctors` unit.
+ *
+ * Seam (unproven).  This is one maximal unclaimed run, registered whole.  Two clusters share it and
+ * there is no call edge between them: 0x802F140C..0x802F2238 (11 functions) drives the cockpit HUD
+ * records (`cockpit_work`/`cockpit_state`, the `draw_sprite`/`drawshape` helpers) and carries the
+ * file-scope static initialiser `fn_802F20D8`, while 0x802F2238..0x802F5138 (28 functions) is the
+ * `eft035` family proper.  A *second* effect family (tag 34; `fn_802F39DC` seeds `field_0x03 = 34`
+ * where `eft035_set` seeds 35) sits in the same half, so the range may hold more than one original
+ * TU.  The extent settles as the functions match; the seam did not have to be cut to register, so it
+ * was not.
+ *
+ * What it is.  `eft035_set`/`eft035_set2` are the spawn entry points of enemy effect 35: each
+ * rejects a foreign area, takes a 64-byte (resp. 56-byte) work block from `fn_800F8788`, stamps
+ * `field_0x03 = 35`, `type_0x02`, the source `_ENEMY_WORK` at +0x30, the position, the two copied
+ * rotation words and the area, then installs the two hooks that travel with the record -
+ * `fn_802F24E0` (`release_0x40`, the pool release) and `fn_802F2640` (`dispatch_0x34`, the
+ * `state_0x05` machine).  The two setters differ in their work block: the type-0/1/3 family pools
+ * 20-byte model records at work+0x08 (`memset` of the 16-byte handle list at work+0x30), the
+ * type-4..7 family pools 4-byte model handles at work+0x08 (`memset` of the 24-byte list at
+ * work+0x20).  Both block sizes are pinned by the allocation (`fn_800F8788(64)` / `fn_800F8788(56)`
+ * against the 0x40 / 0x38 the two layouts need).
+ *
+ * The state machine is `fn_802F2640`: `state_0x05` 0 -> the type switch
+ * (`fn_802F26B4`/`fn_802F288C`/`fn_802F2988`), 1 -> `fn_802F2C78`, 2 -> `fn_802F3940`,
+ * 3 -> `fn_802F3950`.  `fn_802F2C78` is the alive-state body of the same family
+ * (`fn_802F2CB0`/`fn_802F31F0`/`fn_802F3358`), and `fn_802F3B0C` is the machine of the tag-34 family
+ * (`fn_802F3B48`/`fn_802F3D94`/`fn_802F49C8`/`fn_802F49D8`).
+ *
+ * Data.  The `.data` tables, the `.sdata` property tables (`lbl_80792860`, `lbl_80792868`,
+ * `lbl_80792870`, `lbl_80792878`) and the `.sdata2` constants are `extern`-declared by their map
+ * names and never defined (playbook 29).
+ *
+ * Residuals.  17 of the range's 39 functions are reconstructed; 11 of them are byte-identical and
+ * every one but `eft035_set` is at or above the 80 % bar (`python tools/units/recompile.py
+ * ef/eft035.cpp --main . --measure <symbol>`, against this worktree's own split target object):
+ *
+ *   byte-identical  fn_802F288C, fn_802F250C, fn_802F25BC, fn_802F2C78, fn_802F3940, fn_802F3950,
+ *                   fn_802F3954, fn_802F3AD0, fn_802F3B0C, fn_802F49C8, fn_802F49D8
+ *   fn_802F26B4     99.11  ours 468 B against the target's 472 B: retail keeps one more instruction
+ *                          in the type-1 arm (the `em015_denki_eft_se_req` + `fn_802F3954` +
+ *                          `eft019_set_core` argument setup)
+ *   fn_802F39DC     99.18  the register colouring of the two-model seeding loop
+ *   eft035_set2     98.73  ours 328 B against 332 B: we hoist `lbl_80792860[type]` where retail
+ *                          re-reads it with `lbzx` inside the loop
+ *   fn_802F24E0     94.55  the `== 2` arm: retail is `cmpwi` where our `u32` operand makes MWCC emit
+ *                          `cmplwi` (the `<= 1` arm above it needs the unsigned form, so one operand
+ *                          type cannot spell both tests)
+ *   fn_802F2640     92.97  the outer switch: case 0 written first gives retail's chain order
+ *                          (`cmpwi 0,1,2,3`) but its nested block then lands before the three
+ *                          tail-call bodies (71.90); case 0 written last gives the bodies retail's
+ *                          order and the chain 1,2,3,0 (92.97).  Retail has chain 0,1,2,3 *and*
+ *                          bodies 1,2,3,0 - its case-0 body is a `b` to a block emitted after the
+ *                          whole switch, which no source order we tried reproduces.
+ *   eft035_set      73.85  the seeding loop's colouring: retail holds the narrowed type in r25 and
+ *                          the table base in r26 and iterates with r23/r24 (`_savegpr_23`), we
+ *                          hoist `lbl_80792860[type]` into r26 and save one register fewer
+ *                          (`_savegpr_24`); our object is exactly the target's 348 B.  Tried: the
+ *                          bound through a `u8` local (73.85), through a local table pointer (73.22
+ *                          - worse), `memset(..., sizeof(work->works_0x30))` and reloading the work
+ *                          pointer for the final scale store (71.32 -> 73.85).
+ *
+ * The 22 functions still to write, in address order (size): fn_802F140C (0x2B4), fn_802F16C0 (0x284),
+ * fn_802F1944 (0x1D8), fn_802F1B1C (0x1DC), fn_802F1CF8 (0x23C), fn_802F1F34 (0x1A4),
+ * fn_802F20D8 (0x48), fn_802F2120 (0x58), fn_802F2178 (0x30), fn_802F21A8 (0x60), fn_802F2208 (0x30),
+ * fn_802F2988 (0x2F0), fn_802F2CB0 (0x540), fn_802F31F0 (0x168), fn_802F3358 (0x5E8),
+ * fn_802F3B48 (0x24C), fn_802F3D94 (0xC34), fn_802F49DC (0x17C), fn_802F4B58 (0x2F0),
+ * fn_802F4E48 (0x270), fn_802F50B8 (0x44), fn_802F50FC (0x3C).  What they need beyond this pass: the
+ * 11 HUD functions drive `cockpit_work`/`cockpit_state` (their types live in `hud/cockpit_quest.h` and
+ * `hud/fn_802EBED8.h`) plus the `draw_sprite`/`drawshape` helpers, and `fn_802F20D8` needs the
+ * `__construct_array` runtime helper (whose only declaration today sits in `sound/sound_work.h`);
+ * the two tag-34 bodies (`fn_802F3B48`, `fn_802F3D94`) read the `_ENEMY_WORK` motion/sound block and
+ * `fn_802F50FC` reads a `u16` at `_ENEMY_WORK`+0x306 that the shared header does not name yet.
+ */
 
 #include "types.h"
 #include "pl.h"
@@ -87,6 +331,18 @@
 #include "sound/fn_800D7F54.h"
 #include "menu/cockpit_hud_hidden_ck.h"
 #include "hud/cockpit_icon_data.h"
+#include "menu/menu_message.h"
+#include "sound/set_zmode__FbUcb.h"
+#include "Runtime.PPCEABI.H/memset.h"
+#include "enemy/fn_80382310.h"
+#include "unsplit/Pl.h"
+#include "enemy/em_pop.h"
+#include "fn_80047398.h"
+
+extern "C" {
+
+#include "MSL_C/alloc.h" /* sprintf (owner: MSL_C/alloc.cpp, rule 2) */
+}
 
 /* nw4r's debug panic - the map's mangling is `Panic__Q24nw4r2dbFPCciPCce` (rule 9: the owner is
  * `nw4r::db`, so the declaration is the real one and the front-end reproduces the map name). */
@@ -142,6 +398,626 @@ u32 quest_bar_b_blend_dm_c0_to[3] = {
     0x8CD2E5FF, 0x9BD4F5FF, 0xBEE6FAFF,
 };
 
+namespace view_fn_802E4978 {
+
+namespace nw4r = ::nw4r;  /* the view headers below reopen it */
+
+#include "menu/fn_802E4978.h"
+#include "unsplit/lobby.h"
+
+extern "C" {
+/* The two player records and the sub-screen state the band drives.  The map spells them `lbl_*`;
+ * this file defines them (they are this band's own .bss, 0x806BDCC8-0x806BE078). */
+CockpitWork cockpit_work[2];
+}
+extern "C" {
+CockpitState cockpit_state;
+}
+
+extern "C" {
+extern f32 lbl_8079A8FC;
+extern f32 lbl_8079A90C;
+extern f32 lbl_8079A918;
+extern f32 lbl_8079A91C;
+extern f32 lbl_8079A920;
+extern u16 lbl_805D5B98[];
+extern u8 lbl_805D5BD8[];
+extern u8 lbl_805D5C68[];
+u32 fn_800AB658(u8, f32);
+void fn_802E4978(CockpitWork*, CockpitMove*);
+void fn_802E4AD4(void);
+void fn_802E4B8C(void);
+void fn_802E4C24(void);
+void fn_802E5220(CockpitWork*);
+void fn_802E5284(void);
+void fn_802E53C4(void);
+void fn_802E5400(void);
+void fn_802E5414(u8);
+u32 fn_802E54A8(CockpitMove*);
+u32 cockpit_hud_hidden_ck(CockpitMove*, u8);
+void fn_802E555C(void);
+void fn_802E56B4(void);
+void fn_802E5764(void*, u8);
+void fn_802E5A14(void);
+void fn_802E5BB4(void);
+void fn_802E5C3C(_mh_ivec2_*, s8);
+void fn_802E5CFC(s8);
+void fn_802E5D68(s16, u8);
+void fn_802E5E90(void);
+void fn_802E646C(void);
+void fn_802E6AAC(void);
+void fn_802E6EB4(void);
+void fn_802E704C(u16, s32, _mh_ivec2_*);
+void fn_802E70F0(s32, _mh_ivec2_*);
+void fn_802E71C4(void);
+u32 fn_802E73B4(void);
+s32 quest_bar_id_keep(s32, s32);
+void fn_802E4C5C(CockpitMove*, CockpitText*);
+}
+
+void fn_802E4978(CockpitWork* self, CockpitMove* move) {
+    s32 r;
+    s32 i;
+
+    memset(self, 0, 0x194);
+    self->move = move;
+    self->field_0x048 = (MenuWorkView*)fn_802D27E0();
+    self->field_0x0C6 = -1;
+    self->field_0x0C4 = -1;
+    self->field_0x0C2 = -1;
+    self->field_0x0C0 = -1;
+    self->field_0x0BE = -1;
+    self->field_0x0CE = 0;
+    self->field_0x0CF = 0;
+    self->field_0x134 = 0;
+    self->field_0x136 = 0;
+    self->field_0x138 = 0;
+    self->field_0x137 = 0;
+    self->field_0x13A = 0;
+    self->field_0x13C = 0;
+    self->field_0x139 = 0;
+    self->text.field_0x014 = 0;
+    self->text.field_0x00C = 0;
+    fn_802EDAF0(move, &self->field_0x16B, &self->field_0x16F);
+    r = fn_802EC6C4(move);
+    self->field_0x16A = (s8)(((s32)(-r | r) >> 31) & 5);
+    self->field_0x168 = move->field_0x36C;
+    self->field_0x164 = 0xFF;
+    self->field_0x166 = 0;
+    self->field_0x167 = 0;
+    self->field_0x176 = 0;
+    self->field_0x17C = 0;
+    self->field_0x17B = 0;
+    self->field_0x178 = 0;
+    self->field_0x17D = 0;
+    self->field_0x17E = 0;
+    self->field_0x019 = 0xFF;
+    self->field_0x021 = 0xFF;
+    self->field_0x01B = 0xFF;
+    self->field_0x023 = 0xFF;
+    self->field_0x01D = 0xFF;
+    self->field_0x025 = 0xFF;
+    self->field_0x01F = 0xFF;
+    self->field_0x027 = 0xFF;
+    self->field_0x029 = 0xFF;
+    self->field_0x02B = 0xFF;
+    self->byte_0x180 = 0;
+    self->field_0x17F = 0;
+    self->field_0x18C = 0;
+    self->field_0x18E = 0;
+    self->field_0x184 = 0;
+    self->field_0x188 = 0;
+    for (i = 0; i < 10; i++) {
+        fn_802E0468((u8)i, 0);
+    }
+}
+
+void fn_802E4AD4(void) {
+    CockpitMove* move;
+    CockpitState* st;
+    s8 idx;
+
+    st = &cockpit_state;
+    move = (CockpitMove*)::get_move_work_adrs(2);
+    st->field_0x000 = 1;
+    st->field_0x059 = 0;
+    st->field_0x058 = 0;
+    if (move_work_state_ck() != 0) {
+        st->field_0x05C = 0;
+        st->field_0x05A = 0;
+        st->field_0x070 = em_set_work_state_get();
+    } else {
+        st->field_0x05C = 0;
+        st->field_0x05A = 0;
+        st->field_0x070 = fn_803A9690();
+    }
+    st->field_0x074 = 0;
+    idx = (s8)my_player_no();
+    fn_802E4978(&cockpit_work[0], &move[idx]);
+    fn_802DFCD4();
+    ai_slots_clear();
+}
+
+void fn_802E4B8C(void) {
+    CockpitMove* move;
+
+    move = (CockpitMove*)::get_move_work_adrs(2);
+    cockpit_state.field_0x000 = 2;
+    cockpit_state.field_0x059 = 0;
+    cockpit_state.field_0x058 = 0;
+    fn_802E4978(&cockpit_work[0], &move[0]);
+    fn_802E4978(&cockpit_work[1], &move[1]);
+    cockpit_state.field_0x078 = 0;
+    cockpit_state.field_0x002 = 100;
+    cockpit_state.field_0x004 = 0;
+    ai_slots_clear();
+}
+
+void fn_802E4C24(void) {
+    cockpit_state.field_0x078++;
+    cockpit_work[0].field_0x190++;
+    cockpit_work[1].field_0x190++;
+}
+
+void fn_802E5220(CockpitWork* self) {
+    switch (self->field_0x048->field_0x3C4) {
+    case 0:
+        self->field_0x04C = 0;
+        self->field_0x050 = 0;
+        break;
+    case 1:
+        self->field_0x04C = 0x22;
+        self->field_0x050 = 0x00FF00FF;
+        break;
+    case 2:
+        self->field_0x04C = 2;
+        self->field_0x050 = 0xFF0000FF;
+        break;
+    }
+}
+
+void fn_802E53C4(void) {
+    screen_split_mode_ck();
+    fn_802DA344();
+    subTransSetPrio(6, (u32)&fn_802DA3CC, 0, NULL);
+}
+
+void fn_802E5400(void) {
+    cockpit_work[0].field_0x0CF = 1;
+    ai_slots_clear();
+}
+
+void fn_802E5414(u8 arg0) {
+    _mh_ivec2_ pos;
+    u16 lsp;
+    s32 idx;
+
+    switch (arg0) {
+    case 4:
+        lsp = 0xEC8;
+        idx = 0;
+        break;
+    case 6:
+        lsp = 0xEE5;
+        idx = 1;
+        break;
+    case 7:
+        lsp = 0xEED;
+        idx = 2;
+        break;
+    default:
+        return;
+    }
+    ::get_lsp_data(lsp, (::_mh_ivec2_*)&pos);
+    hud_notice_spawn(2, idx, pos.x, pos.y, 1, 1, 0);
+}
+
+u32 fn_802E54A8(CockpitMove* move) {
+    u32 r;
+
+    r = get_cfg((u8)move->field_0x008, 0xD) == 0;
+    if (move->field_0x308 == 1) {
+        r = 1;
+    }
+    return r;
+}
+
+u32 cockpit_hud_hidden_ck(CockpitMove* move, u8 id) {
+    u32 r;
+
+    if (id == 0xFF) {
+        return fn_802E54A8(move);
+    }
+    r = get_arena_cfg(id, 0xD) == 0;
+    if (move->field_0x308 == 1) {
+        r = 1;
+    }
+    return r;
+}
+
+void fn_802E56B4(void) {
+    CockpitMove* move;
+    u16 max;
+    s32 i;
+
+    if (game_ready_ck() != 0) {
+        move = (CockpitMove*)::get_move_work_adrs(2);
+        max = (u16)::get_move_work_max(2);
+        for (i = 0; i < (s32)max; i++) {
+            if (move[i].field_0x000 != 0 && Pl_master_ck((struct _PLW*)&move[i]) == 0) {
+                draw_lsp_element(&move[i], 0xFF, 0xFF, 0xFFFF);
+            }
+        }
+    }
+}
+
+void fn_802E5BB4(void) {
+    CockpitWork* self;
+    CockpitMove* move;
+
+    self = &cockpit_work[0];
+    move = self->move;
+    if (self->field_0x17E == 1) {
+        fn_8027B918((struct _PLW*)move);
+    }
+    if (move->field_0x5BD == 0xFF) {
+        if (menu_item_frame_update((MenuFrameWork*)move) == 0) {
+            self->field_0x17E = 1;
+            return;
+        }
+        self->field_0x17E = 0;
+        return;
+    }
+    self->field_0x17E = 0;
+}
+
+void fn_802E5C3C(_mh_ivec2_* pos, s8 idx) {
+    _mh_ivec2_* src;
+
+    ::get_lsp_data(0xE15, (::_mh_ivec2_*)pos);
+    src = (_mh_ivec2_*)::get_lsp_data(cockpit_slot_row_sprite_ids[idx >> 3], NULL);
+    pos->x += src->x;
+    pos->y = (s16)(pos->y + src->y);
+    src = (_mh_ivec2_*)::get_lsp_data(cockpit_slot_column_sprite_ids[idx & 7], NULL);
+    pos->x += src->x;
+    pos->y = (s16)(pos->y + src->y);
+}
+
+void fn_802E5CFC(s8 idx) {
+    _mh_ivec2_ pos;
+    CockpitWork* self;
+
+    self = &cockpit_work[0];
+    fn_802E5C3C(&pos, idx);
+    HudNotice* notice = hud_notice_spawn(0, 6, pos.x, pos.y, 1, 1, 0);
+    if (notice != 0) {
+        hud_notice_set_flag_ptr(notice, &self->field_0x17A);
+    }
+}
+
+u32 fn_802E54A8(CockpitMove* move);
+
+void fn_802E555C(void) {
+    CockpitMove0* m0;
+    CockpitMove* move;
+
+    m0 = (CockpitMove0*)::get_move_work_adrs(0);
+    move = cockpit_work[0].move;
+    if (::get_now_areano() != 0xFF) {
+        set_zmode(false, 0, false);
+        cockpit_work[0].field_0x0CD = 0;
+        fn_802E56B4();
+        draw_lsp_parts();
+        fn_802EC700();
+        if (fn_802E54A8(move) == 1) {
+            fn_802E71C4();
+            quest_gauge_draw();
+            fn_802ED480();
+        }
+        fn_802EE82C(&cockpit_work[0]);
+        if (m0->field_0x0EF != 0) {
+            fn_802EF0FC(&cockpit_work[0]);
+        }
+        if (menu_item_frame_update((MenuFrameWork*)move) == 0) {
+            if (move->field_0x5BC != 0) {
+            } else if (move->field_0x5BE != 0) {
+            } else if (move->field_0x5BD != 0) {
+                quest_marker_arm();
+                if (fn_802E54A8(move) == 1) {
+                    fn_802EE65C(move, &cockpit_work[0].field_0x16F);
+                    fn_802EDCE4(move, &cockpit_work[0].field_0x16B);
+                }
+            }
+        }
+        quest_marks_flush(&cockpit_work[0]);
+        fn_802E6EB4();
+        note_box_draw();
+        if (move_work_state_ck() != 0) {
+            fn_802EF424();
+        }
+        fn_802EF730();
+    }
+}
+
+void fn_802E5A14(void) {
+    CockpitWork* self;
+    CockpitMove* move;
+    u8 v;
+
+    self = &cockpit_work[0];
+    move = self->move;
+    if (self->field_0x176 != 0) {
+        fn_8027B0BC((struct _PLW*)move);
+    }
+    if (self->field_0x17D == 1) {
+        fn_8027B358((struct _PLW*)move);
+    }
+    if (move->field_0x5BC != 0) {
+        if (menu_item_frame_update((MenuFrameWork*)move) == 0) {
+            self->field_0x176 = 1;
+        } else {
+            self->field_0x176 = 0;
+        }
+        self->field_0x17B++;
+        if (fn_802E0B54(0xE53) < (s32)self->field_0x17B) {
+            self->field_0x17B = 0;
+        }
+        if (self->field_0x17C != 0) {
+            self->field_0x17C++;
+            if (fn_802E0B54(0xE33) < (s32)self->field_0x17C) {
+                self->field_0x17C = 0;
+            }
+        }
+        if (self->field_0x178 != 0) {
+            v = self->field_0x179 - 1;
+            self->field_0x179 = v;
+            if (v == 0) {
+                self->field_0x178 = 0;
+                self->field_0x17C = 1;
+            }
+        }
+        if (menu_item_frame_update((MenuFrameWork*)move) == 0) {
+            self->field_0x17A = 0;
+        } else {
+            self->field_0x17A = 1;
+        }
+    } else {
+        self->field_0x176 = 0;
+        self->field_0x17A = 1;
+        self->field_0x178 = 0;
+        self->field_0x17C = 0;
+    }
+    if (move->field_0x5BE != 0) {
+        if (menu_item_frame_update((MenuFrameWork*)move) == 0) {
+            self->field_0x17D = 1;
+            return;
+        }
+        self->field_0x17D = 0;
+        return;
+    }
+    self->field_0x17D = 0;
+}
+
+u32 fn_802E73B4(void) {
+    return move_work_state_ck();
+}
+
+s32 quest_bar_id_keep(s32 arg0, s32 arg1) {
+    s32 r;
+    s32 mask;
+    u16 v;
+
+    r = Pl_dm_condition_ck((struct _PLW*)arg1, 0x100000);
+    mask = (s32)~((r - 1) | (1 - r)) >> 31;
+    v = (u16)(arg0 + 0x3C0);
+    return mask & v;
+}
+
+void fn_802E5284(void) {
+    CockpitMove0* m0;
+    CockpitMove* move;
+
+    m0 = (CockpitMove0*)::get_move_work_adrs(0);
+    move = cockpit_work[0].move;
+    if (fn_80046F0C(&cockpit_work[0]) != 1) {
+        cockpit_work[0].field_0x0D1 = 0;
+        fn_802E4C24();
+        fn_803839EC();
+        fn_802DFD38();
+        quest_gauge_update(&cockpit_work[0], 0xFF);
+        fn_802E4C5C(move, &cockpit_work[0].text);
+        if (m0->field_0x0EF != 0) {
+            fn_802E5220(&cockpit_work[0]);
+        }
+        fn_802EDB0C(move, &cockpit_work[0].field_0x16B, &cockpit_work[0].field_0x16F);
+        quest_targets_update_b(&cockpit_work[0]);
+        fn_802EC4F0(&cockpit_work[0]);
+        fn_802E5A14();
+        fn_802E5BB4();
+        fn_802ED88C();
+        fn_802A2620(0);
+        if (move_work_state_ck() != 0) {
+            fn_802EF230();
+        }
+        fn_802EF6B0();
+        fn_802DA344();
+    }
+    if (event_demo_ck() != 1) {
+        subTransSet((u32)(void*)fn_802E555C, 0, NULL);
+        if (lb_quest_work_active_ck() == 0) {
+            subTransSetPrio(6, (u32)(void*)&fn_802DA3CC, 0, NULL);
+        }
+        subTransSetPrio(6, (u32)(void*)&menu_slot_panel_draw, 0, NULL);
+    }
+}
+
+struct SprView {
+    /* +0x000 */ u8 unused_0x000[0x010];
+    /* +0x010 */ s16 field_0x010;
+    /* +0x012 */ u8 unused_0x012[0x020 - 0x012];
+}; /* size: 0x20 */
+
+void fn_802E704C(u16 arg0, s32 arg1, _mh_ivec2_* pos) {
+    SprView spr;
+    f32 f;
+
+    spr_data_copy((s16*)&spr, ::get_lsp_data(arg0, NULL));
+    f = (f32)(arg1 / 5);
+    spr.field_0x010 = (s16)(lbl_8079A918 * f);
+    ::draw_sprite(*(const ::_SPR_DATA_*)&spr, (const ::_mh_ivec2_*)pos);
+}
+
+void fn_802E70F0(s32 arg0, _mh_ivec2_* pos) {
+    s32 n;
+    u8 tex;
+
+    n = arg0;
+    if (arg0 > 0x37) {
+        return;
+    }
+    if (n < 0) {
+        n = 0;
+    }
+    tex = lbl_805D5C68[n / 5];
+    drawshape_init(3, (u16)(((0x4A - n) / 15) * 4));
+    drawshape_set_vertex_array((::_mh_ivec2_*)lbl_805D5B98);
+    drawshape_set_flat_color(0xFFFFFFFF);
+    ::drawshape_set_texture_array(0xD, (const ::_mh_tex_uv_*)(lbl_805D5BD8 + tex * 4));
+    drawshape_set_offset_ivec2((s16*)pos);
+    drawshape_exec();
+}
+
+void fn_802E6EB4(void) {
+    CockpitMove* move;
+    _mh_ivec2_ pos;
+    _mh_ivec2_* p;
+
+    move = cockpit_work[0].move;
+    if (move->field_0x00A == 7 && move->field_0x3A4 != 0) {
+        set_blendmode(4, 5, 1);
+        ::get_lsp_data(0xBCE, (::_mh_ivec2_*)&pos);
+        ::draw_sprite_anim_ary(cockpit_flash_anim_ids, cockpit_work[0].half_0x180, (const ::_mh_ivec2_*)&pos);
+        p = (_mh_ivec2_*)::get_lsp_data(0xBD2, NULL);
+        {
+            u8 lo = move->field_0x3A5;
+            u8 hi = move->field_0x3A4;
+            f32 f2 = (f32)p->x * (f32)hi;
+            s32 col = color_lerp(0xC50A83FF, 0xD813BEFF, lo, (f32)hi * (lbl_8079A8FC / (f32)lo), f2);
+            drawshape_init(3, 0xFFFF);
+            drawshape_set_vertex_rect((s16)(p->x + pos.x), (s16)(p->y + pos.y), (s16)(f2 / (f32)lo), p->y);
+            fn_80053960(0xC50A83FF, col, col, 0xC50A83FF);
+            drawshape_exec();
+        }
+    }
+}
+
+/* ---- not yet reconstructed (residual) ---- */
+void fn_802E4C5C(CockpitMove* self, CockpitText* text) {
+}
+
+void fn_802E5764(void* arg0, u8 arg1) {
+}
+
+void fn_802E5D68(s16 arg0, u8 arg1) {
+    CockpitWork* self;
+    _mh_ivec2_ pos;
+    _mh_ivec2_ anchor;
+    _mh_ivec2_* p;
+    s16 dx;
+    s16 dy;
+    s32 sq;
+    s8 v;
+
+    self = &cockpit_work[0];
+    self->field_0x174 = arg0;
+    self->field_0x177 = arg1;
+    fn_802E5C3C(&pos, (s8)arg1);
+    p = (_mh_ivec2_*)::get_lsp_data(0xE56, NULL);
+    pos.x += p->x;
+    pos.y += p->y;
+    ::get_lsp_data(0xE15, (::_mh_ivec2_*)&anchor);
+    p = (_mh_ivec2_*)::get_lsp_data(0xE33, NULL);
+    pos.x -= (s16)(p->x + anchor.x);
+    pos.y -= (s16)(p->y + anchor.y);
+    dx = pos.x;
+    dy = pos.y;
+    sq = dx * dx;
+    v = (s8)(lbl_8079A90C * sqrt_f32(sq, dx, (f32)(sq + dy * dy)));
+    self->field_0x178 = v;
+    if ((u8)v == 0) {
+        self->field_0x178 = 1;
+    }
+    self->field_0x179 = self->field_0x178;
+}
+
+void fn_802E5E90(void) {
+}
+
+void fn_802E646C(void) {
+}
+
+void fn_802E6AAC(void) {
+}
+
+/* `Screen_w` and its `ScreenGeomView` view come from `include/unsplit/menu.h` (rule 1: this unit
+ * was the first user, `quest/quest_entry.cpp` the second). */
+
+struct SprDataView {
+    /* +0x000 */ u8 unused_0x000[0x1C];
+    /* +0x01C */ u32 colour_0x01C;
+}; /* size: 0x20 */
+
+void fn_802E71C4(void) {
+    _mh_ivec2_ pos;
+    SprDataView spr;
+    s32 colour;
+    s32 limit;
+    s32 frame;
+    s32 value;
+    s32 total;
+    s32 bars;
+
+    set_blendmode(4, 5, 1);
+    ::get_lsp_data(0xB90, (::_mh_ivec2_*)&pos);
+    colour = 0x6DAAA3FF;
+    if (fn_802E73B4() != 0) {
+        frame = 0;
+        bars = 0;
+    } else {
+        f32 f;
+        limit = (s32)(lbl_8079A91C * Screen_w.frame_scale);
+        if (quest_sub_state_end_ck(1) == 0) {
+            total = quest_time_elapsed_get();
+        } else {
+            total = fn_803A881C();
+        }
+        if (total <= limit * 5) {
+            if (total > limit) {
+                f = (f32)((cockpit_work[0].field_0x190 & 0x1F) << 0xB);
+            } else {
+                f = (f32)((cockpit_work[0].field_0x190 & 0xF) << 0xC);
+            }
+            colour = color_lerp(0xF50C23FF, 0xFF8C9BFF, (u8)fn_800AB658(0, lbl_8079A920 * f),
+                                 lbl_8079A8FC + 0.0f, 0.0f);
+        }
+        value = quest_time_limit_get();
+        frame = (value - total) / limit;
+        bars = value / limit;
+    }
+    spr_data_copy((s16*)&spr, ::get_lsp_data(0xB91, NULL));
+    spr.colour_0x01C = colour;
+    ::draw_sprite(*(const ::_SPR_DATA_*)&spr, (const ::_mh_ivec2_*)&pos);
+    ::draw_sprite_idx(0xB92, (const ::_mh_ivec2_*)&pos);
+    if (bars != 0) {
+        fn_802E70F0(bars, &pos);
+        fn_802E704C(0xB93, bars, &pos);
+        fn_802E704C(0xB94, frame, &pos);
+        return;
+    }
+    fn_802E70F0(0, &pos);
+    ::draw_sprite_idx(0xB95, (const ::_mh_ivec2_*)&pos);
+}
+}  /* namespace view_fn_802E4978 */
 
 /* 0x802E7408 (0x140).  The first bar's blend parameter: the player's slot 45 state picks a row of
  * the 2x5 `u16` table at 0x805D5C74 and the argument picks the column pair, and a zero result means
@@ -999,6 +1875,7 @@ void quest_screen_project(f32* out, const f32* pos) {
  * view's rotation clock and carried by the two scales of +0xAC/+0xB0, and the two squares are
  * added. */
 #pragma fp_contract off
+
 f32 quest_mark_dist_sq(CockpitWork* work, const f32* pos) {
     f32 rot[2];
     f32 dx = pos[0] - work->marker_ref_x_0x098;
@@ -1080,6 +1957,7 @@ void quest_marker_icon_draw(CockpitWork* work, const f32* pos, u8 index, u16 tex
 /* 0x802E932C.  Projects the world position `pos` and draws the marker icon for it: at the window spot when `clip` is
  * 0, otherwise at the marker ring's position when it lies inside the screen; returns the squared screen distance. */
 #pragma fp_contract off
+
 f32 quest_marker_draw_at(CockpitWork* work, const f32* pos, u8 index, u16 tex_no, u32 color, s32 clip, f32 scale) {
     f32 proj[2];
     f32 dist;
@@ -1265,6 +2143,7 @@ void quest_player_marker_pos(_PLW* plw, VEC3* out) {
 /* 0x802E98A8.  Draws one player's marker: the world position is projected and the marker icon is drawn, and the
  * player's slot is appended to the mark table with its colour (faded by distance when `clip`). */
 #pragma fp_contract off
+
 void quest_player_marker_draw(CockpitWork* work, _PLW* plw, s32 clip) {
     VEC3 pos;
     VEC3 local;
@@ -1552,6 +2431,7 @@ void quest_marks_flush(CockpitWork* work) {
 }
 
 #pragma fp_contract off
+
 /* Draws the AI NPC's marker at `world` and appends its mark-table entry. */
 static inline void quest_npc_marker_draw_at(const VEC3& world, CockpitWork* work, _AINPC_W* npc, s32 clip) {
     f32 proj[2];
@@ -1647,6 +2527,7 @@ u8 quest_target_rank_get(CockpitWork* work, _PLW* plw) {
 u8 quest_target_usable0_ck(CockpitWork* work, _ENEMY_WORK* target) {
     return quest_target_usable_ck(work, target, 0);
 }
+
 /* 0x802EA7DC.  How a quest target may be shown: 0 hidden, 1 not markable, 2 plain, 3 highlighted - from the target's
  * live flag, the cockpit's rank bits (+0xD0) and the target's mark timer. */
 u8 quest_target_usable_ck(CockpitWork* work, _ENEMY_WORK* target, s32 flags) {
@@ -1687,6 +2568,7 @@ u8 quest_target_usable_ck(CockpitWork* work, _ENEMY_WORK* target, s32 flags) {
 /* 0x802EA908.  The target's marker colour: grey for a dead action, per-kind for a live one (blinking towards light grey
  * while the skill 0xBE window is open), plain for an idle one; the alpha byte is full while the target is shown. */
 #pragma fp_contract off
+
 u32 quest_target_color(CockpitWork* work, _ENEMY_WORK* target, u8 kind) {
     _PLW* plw = work->plw;
     u32 color;
@@ -1793,6 +2675,7 @@ s32 quest_target_icon_get(CockpitWork* work, _ENEMY_WORK* target, u8* icon, f32*
 
 /* 0x802EAC38.  Draws one quest target's marker (when it is on screen, for the clipped view). */
 #pragma fp_contract off
+
 void quest_target_marker_draw(CockpitWork* work, _ENEMY_WORK* target, s32 clip) {
     VEC3 pos;
     u8 icon;
@@ -1885,6 +2768,7 @@ void quest_target_icons_anim_draw(void) {
 /* 0x802EB034.  Draws one square icon of sprite `id` at the layout record's position: in the window frame when
  * `clip` is 0, otherwise on the marker ring (rotated by the ring's clock, and dropped when it lies off the ring). */
 #pragma fp_contract off
+
 void quest_icon_rect_draw(CockpitWork* work, u16 id, u16 size, u32 color, s32 clip) {
     _SPR_DATA_* rec = get_lsp_data(id, NULL);
     f32 pos[2];
@@ -2140,6 +3024,7 @@ void quest_map_icon_sprites_draw(CockpitWork* work, u16 size, u8 frame, s32 clip
 /* 0x802EB8E8.  The window position and texture scales of the current area's marker sprite of quest target `idx`;
  * 0 (with everything zeroed) when the map has none. */
 #pragma fp_contract off
+
 s32 quest_marker_screen_pos(CockpitWork* work, _mh_ivec2_* pos, f32* scale, u8 idx) {
     u16* ids = quest_area_sprite_list_by_map[get_now_mapno()];
     _SPR_DATA_* rec;
@@ -2165,6 +3050,7 @@ s32 quest_marker_screen_pos(CockpitWork* work, _mh_ivec2_* pos, f32* scale, u8 i
 
 /* 0x802EBA74.  Draws one pit trap's marker: the clipped view rotates with the marker ring's clock. */
 #pragma fp_contract off
+
 f32 quest_pit_trap_marker_draw(CockpitWork* work, PitTrap* trap, s32 clip) {
     f32 scale;
     u32 color;
@@ -2304,3 +3190,231 @@ s32 quest_mark_allowed_ck(_PLW* plw) {
     }
     return Pl_item_timer_get(plw, 0x2A) != 0;
 }
+
+
+namespace view_fn_802EBED8 {
+
+namespace nw4r = ::nw4r;  /* the view headers below reopen it */
+
+#include "hud/fn_802EBED8.h"
+
+/* 0x802EC6C4 (0x3C).  A one-bit predicate over `fn_803311A0`'s byte: the branch-free
+ * `subfic`/`orc`/`subf` sequence is the target's own shape. */
+u32 fn_802EC6C4(void)
+{
+    u32 v = fn_803311A0();
+    return ((~v | 1) - ((1 - v) >> 1)) >> 31;
+}
+
+/* 0x802EDAF0 (0x1C).  Zero a 4-byte run and the second byte of a following flag record - the
+ * caller (`fn_802E4978`) hands the two pointers into its 0x194 record. */
+void fn_802EDAF0(_PLW* plw, u8* a, u8* b)
+{
+    (void)plw;
+    a[0] = 0;
+    a[1] = 0;
+    a[2] = 0;
+    a[3] = 0;
+    b[1] = 0;
+}
+
+/* 0x802ED588 (0x98).  Fold the two 0x3D8/0x3DC act bitfields through the two 4-byte mask tables
+ * (the `kind` selects the table pair) into one bitmask: bit `n` is raised when the n-th non-zero
+ * mask word is set in the field. */
+s32 fn_802ED588(_PLW* plw, u8 kind)
+{
+    s32 bit = 1;
+    s32 result = 0;
+    const u32* a;
+    const u32* b;
+
+    if (kind == 0) {
+        a = lbl_805D6338;
+        b = lbl_805D6360;
+    } else {
+        a = lbl_805D638C;
+        b = lbl_805D63B0;
+    }
+    while (*a != 0) {
+        if ((plw->field_0x3D8 & *a) != 0) {
+            result |= bit;
+        }
+        bit <<= 1;
+        a++;
+    }
+    while (*b != 0) {
+        if ((plw->field_0x3DC & *b) != 0) {
+            result |= bit;
+        }
+        bit <<= 1;
+        b++;
+    }
+    return result;
+}
+
+/* 0x802ED6F4 (0xF0).  Advance the two-byte cursor over the caller's bit table: while `timer` is
+ * negative, arm on the lowest set bit; while it is non-negative, keep counting down on the same
+ * bit and, once it runs out, arm on the next set bit (wrapping at `count`). */
+void fn_802ED6F4(u32 mask, s32 count, Cursor2* cur)
+{
+    if (mask == 0) {
+        cur->timer = -1;
+        return;
+    }
+    if (cur->timer < 0) {
+        for (s32 i = 0; i < count; i++) {
+            if ((mask & (1u << i)) != 0) {
+                cur->index = i;
+                cur->timer = 20;
+                return;
+            }
+        }
+        return;
+    }
+    if ((mask & (1u << cur->index)) != 0 && cur->timer > 0) {
+        cur->timer -= 1;
+        return;
+    }
+    cur->timer = -1;
+    for (s32 i = 0; i < count; i++) {
+        cur->index = cur->index + 1;
+        if (cur->index >= count) {
+            cur->index = 0;
+        }
+        if ((mask & (1u << cur->index)) != 0) {
+            cur->timer = 20;
+            return;
+        }
+    }
+}
+
+/* 0x802ED7E4 (0x50).  The 18/19-entry cursor's `kind == 0` lumping: mask the act fields, then arm
+ * the cursor with the count the kind selects. */
+void fn_802ED7E4(_PLW* plw, Cursor2* cur, u8 kind)
+{
+    u8 k = kind;
+    s32 count = (k == 0) ? 19 : 18;
+    fn_802ED6F4((u32)fn_802ED588(plw, k), count, cur);
+}
+
+/* 0x802ED834 (0x58).  The second selector's 4/6-entry cursor. */
+void fn_802ED834(_PLW* plw, Cursor2* cur, u8 kind)
+{
+    s32 count = 4;
+    if (kind == 0) {
+        count = 6;
+    }
+    fn_802ED6F4((u32)fn_802ED620(plw, kind), count, cur);
+}
+
+/* 0x802EECA0 (0x6C).  Count the live equipment slots (0..25) `fn_802EEC24` accepts. */
+s16 fn_802EECA0(_PLW* plw)
+{
+    s16 count = 0;
+    u32 i = 0;
+    do {
+        if (fn_802EEC24(plw, i) != 0) {
+            count = count + 1;
+        }
+        i = i + 1;
+    } while (i < 26);
+    return count;
+}
+
+/* 0x802EEC24 (0x7C).  A slot is "live" when its value is positive, it holds an item, the item
+ * passes `item_category_ck`'s flag test and its record's first byte is not 1. */
+s32 fn_802EEC24(_PLW* plw, u16 idx)
+{
+    _SLOTENT* slot = &plw->slot_id[idx];
+    if (slot->value > 0) {
+        if (slot->item_id != 0) {
+            if (item_category_ck(slot->item_id, 8) != 0) {
+                if (GetItemData(slot->item_id)->kind_0x00 != 1) {
+                    return 1;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+/* 0x802EE330 (0x7C).  One cockpit icon: when the act's status byte overlaps the caller's mask,
+ * draw the position record through the 2D library in the fixed 0xFFE300FF colour, else play the
+ * icon's animation. */
+void fn_802EE330(_PLW* plw, u16 id, u8 anim, u8 mask, const _mh_ivec2_* pos)
+{
+    if ((plw->field_0x309 & mask) != 0) {
+        _SPR_DATA_ spr;
+        sprite_frame_apply(&spr, id, anim, 0);
+        spr.color = 0xFFE300FF;
+        ::draw_sprite(*(const ::_SPR_DATA_*)&(spr), (const ::_mh_ivec2_*)pos);
+    } else {
+        draw_sprite_anim_idx(id, anim, pos);
+    }
+}
+
+/* 0x802EF0A0 (0x5C).  Project the caller's position through `eft053_shell_pos_project` and hand the
+ * 12-byte result to the same-file `fn_802EEDE4` (the three word copies are the target's own shape). */
+void fn_802EF0A0(_PLW* plw, void* out)
+{
+    Pos12 scratch;
+    Pos12 pos;
+
+    (void)out;
+    VEC3_ctor((VEC3*)&scratch);
+    eft053_shell_pos_project(plw, &scratch);
+    pos = scratch;
+    fn_802EEDE4(&pos);
+}
+
+/* 0x802EF62C (0x84).  The quest HUD's gate: off while `menu_item_frame_update(0)` or `fn_802BE39C()` hold,
+ * on only in area 1 with the act's state byte at 0 or 0xE. */
+s32 fn_802EF62C(_PLW* plw)
+{
+    if (menu_item_frame_update(0) != 0) {
+        return 0;
+    }
+    if (fn_802BE39C() == 1) {
+        return 0;
+    }
+
+    u8 kind = plw->field_0x3E4;
+    if ((kind == 0 || kind == 0xE) && ::get_now_areano() == 1) {
+        return 1;
+    }
+    return 0;
+}
+
+/* 0x802EF6B0 (0x80).  Arm/decay the blink record after the two quest work records: zero it when
+ * the quest gate `fn_802EF62C` is closed, else reload a 10-frame countdown from `fn_8028E4F0` and
+ * tick it down. */
+void fn_802EF6B0(void)
+{
+    QuestBlink* blink = &cockpit_state;
+
+    if (fn_802EF62C(cockpit_work[0]) == 0) {
+        blink->timer = 0;
+        return;
+    }
+
+    u8 v = fn_8028E4F0();
+    if (v != 0) {
+        blink->timer = 10;
+        blink->flag = v;
+        return;
+    }
+    if (blink->timer != 0) {
+        blink->timer -= 1;
+    }
+}
+
+/* 0x802EF400 (0x24).  Copy one 5-byte selection record field by field (the widths are the target's
+ * `lbz`/`lbz`/`lhz`/`lbz`). */
+void fn_802EF400(QuestSel* dst, const QuestSel* src)
+{
+    dst->field_0x0 = src->field_0x0;
+    dst->field_0x1 = src->field_0x1;
+    dst->field_0x2 = src->field_0x2;
+    dst->field_0x4 = src->field_0x4;
+}
+}  /* namespace view_fn_802EBED8 */

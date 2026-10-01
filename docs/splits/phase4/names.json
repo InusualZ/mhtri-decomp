@@ -33,7 +33,15 @@
   "homebutton/fn_8055B710.cpp": "homebutton/hbm_value.cpp",
   "homebutton/fn_8055EAF0.cpp": "homebutton/hbm_hermite.cpp",
   "homebutton/fn_8056083C.cpp": "homebutton/hbm_kb_event.cpp",
-  "homebutton/fn_80566440.cpp": "homebutton/hbm_kb_cursor.cpp"
+  "homebutton/fn_80566440.cpp": "homebutton/hbm_kb_cursor.cpp",
+  "enemy/fn_802F9994.cpp": "enemy/em_sub_state_prog.cpp",
+  "menu/fn_8031DAA8.cpp": "menu/menu_item_effect.cpp",
+  "enemy/fn_80330194.cpp": "enemy/em_act_step_tail.cpp",
+  "menu/fn_80348A48.cpp": "menu/menu_effect_slot.cpp",
+  "lobby/fn_8035FC18.cpp": "lobby/lb_screen_step.cpp",
+  "menu/fn_8036A828.cpp": "menu/menu_item_sub.cpp",
+  "enemy/fn_80383148.cpp": "enemy/em_prog_support.cpp",
+  "enemy/fn_80385EE0.cpp": "enemy/em_prog_tail.cpp"
  },
  "languages": {
   "enemy/em_common": ".cpp",

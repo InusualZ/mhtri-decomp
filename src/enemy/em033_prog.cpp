@@ -1,3 +1,130 @@
+/*
+ * enemy/em033_prog.cpp - phase 4 unit, `.text` 0x8035BAB4..0x8035F2B4 (55 functions, 14336 bytes).
+ *
+ * PHASE 4 (docs/splits/phase4, window d).  Fold of 2 registered units: eft052.cpp, fn_8035E034.cpp.  The functions
+ * below are the ones those sources define, in address order; every other function of the range keeps its original
+ * bytes.  16 of 55 functions have a body here.
+ *
+ * FLAGS.  `cflags_main`; the bodies come from the old enemy/fn_8035E034.cpp (the same group).
+ *
+ * Sections: the unit's block in config/RMHE08/splits.txt (.data, .rodata, .sdata, .sdata2, .text, extab, extabindex).
+ */
+/* ---- header inherited from src/ef/eft052.cpp (written against its pre-phase-4 range) ---- */
+/* ef/eft052.cpp - the `eft052` effect family (the `_EFT` tag 52) and the cockpit item-page band it
+ * draws, `.text` 0x80358624..0x8035E034 (92 functions / 23056 B).
+ *
+ * WHAT IT IS.  An effect family plus the cockpit hold/item band it draws from, exactly the shape the
+ * registered neighbour `ef/eft050.cpp` documents: `eft052_set` pools the effect record
+ * (`fn_800F8788(76)`, the 76-byte block `ef/eft035.cpp` measured) and installs its
+ * `dispatch_0x34`/`release_0x40` hooks, `eft052_dispatch` is the `state_0x05` machine whose arms are
+ * the model-create pass (`res_eft_model_create_light`), the placement/alive body and the pool release
+ * (`fn_800F886C`), and the rest of the range is the cockpit item layer: the page counters
+ * (`eft052_page_counts_get`, `eft052_page_take`, `eft052_page_put`), the hold block at
+ * `.bss:0x806BF368`, the item/monster strings (`LbStr`, `ItemName`, `GetItemData`) and the sprite
+ * sheet (`draw_sprite_*`, `get_lsp_data`, `PutPageArrow`, `font_*`).  Three bodies read the enemy work
+ * record (`em_parts_damage_level_get`, `fn_80126278`, `calcDistanceSqXZ`), which is what the effect
+ * family reports on.
+ *
+ * MODULE AND NAME (brief section 2, evidence order).  1. No `__FILE__` string is reachable: every
+ * `lbl_` reference in the 92 split objects resolves to the `.sdata2` float pool 0x8079B640..0x8079B704,
+ * to the `.data` run 0x805ED0C0..0x805ED938 or to a call - never to a source-file-name literal.
+ * 2. `dumpmap.py lookup` answers only `zz_` placeholders (two stubs carry Ghidra's library-signature
+ * match, `DBClose` at 0x8035BC24 and `J3DColorBlockLightOff::getColorChanNum` at 0x8035DD40, which is
+ * signature noise on a 4- and an 8-byte stub, not a name).  3. Class 3, the module: `ef` - the range
+ * is the `eft` family shape above (the `+0x34` dispatch / `+0x40` release hook pair, the `state_0x05`
+ * machine, `_EFT::area_0x44`, the pooled-model handle) with the cockpit band's callee profile, and its
+ * callers are the `ef` and `lobby` bands (`ef/ef_emitter.cpp` calls `fn_8035B998`, `ef/eft050.cpp`
+ * calls `fn_8035A7D8`, `lobby/fn_801E7530.cpp`/`lobby/fn_801EC9F8.cpp` call
+ * `eft052_hold_entry_set`/`eft052_item_value_get`, `lobby/fn_801E0ADC.cpp` calls
+ * `eft052_page_count_add`/`eft052_hold_cursor_step`/`eft052_hold_row_get`).  4. The family's own tag
+ * named it: `eft052_set` seeds `_EFT::field_0x03 = 52` (in the target object, byte-identical to ours:
+ * `li r0,52` / `stb r0,3(r30)`), and that tag is the file name of every registered sibling whose name
+ * the dump knows - `ef/eft001.cpp` seeds 1, `eft002` 2, `eft009` 9, `eft019` 19 ("the eft019
+ * family tag"), `eft035` 35 and `eft050` 50 (0x32).  The file name `eft052` is therefore DERIVED from
+ * the unit's own tag and stays a GUESS (no dump name exists for the family - the runtime dump has only
+ * `zz_XXXXXXXX_` for 0x80358624 and no `__FILE__` string is reachable), so a later pass may refine it.
+ *
+ * NAMES.  Every symbol this file DEFINES is named from its own body - the family tag `eft052` plus
+ * what the body does - and each is a guess a later pass may refine (the evidence is the body, not the
+ * map); the 72 entries this file does not reconstruct yet keep the map's `fn_` stems, because they are
+ * absent or referenced, never defined:
+ *   * the family: `eft052_set` (pool the record with `fn_800F8788(76)`, install the two hooks, seed
+ *     both part slots), `eft052_release` (the `+0x40` hook - hand every part slot's handle back),
+ *     `eft052_dispatch` (the `+0x34` hook - one handler per `state_0x05`), `eft052_place` (the
+ *     placement pass - pick the per-area table, create both models, advance), `eft052_state_step`
+ *     (advance the state) and `eft052_pool_release` (`fn_800F886C`);
+ *   * the enemy part report the family draws from: `eft052_part_damage_ck` (one flag per queried part
+ *     index), `eft052_part_level_even_ck` (whether the part's damage level is even) and
+ *     `eft052_part_gauge_add` (step the part gauge and clamp it to 0..500);
+ *   * the item page (`lobby_world_block`): `eft052_item_value_get`/`eft052_item_half_get` (the item
+ *     record's +0x010 value / its +0x00C value halved, floored at 1), `eft052_page_counts_get` (the
+ *     three counts of one id, through optional out pointers), `eft052_page_count_add` (move one id's
+ *     count by `delta`), `eft052_page_take`/`eft052_page_put` (the two moves between the page and the
+ *     caller's hand) and `eft052_page_count_ck` (one of the page's two counts for an id - the cabinet
+ *     or the hand);
+ *   * the hold block (`.bss:0x806BF368`): `eft052_hold_row_set` (re-point the block at a row - the one
+ *     owned symbol whose body is still unwritten, so its declaration below stays a reference),
+ *     `eft052_hold_cursor_step` (re-point at the clamped cursor row and clear the dirty byte),
+ *     `eft052_hold_row_get` (the cursor row's table value and the block's +0x0A word),
+ *     `eft052_hold_entry_set` (hand the caller's entry to the block and re-seed it) and
+ *     `eft052_hold_entry_copy` (copy one entry field by field).
+ *
+ * Naming note: every remaining `fn_XXXXXXXX` in this file is a REFERENCE to a symbol ANOTHER unit
+ * owns (the rule's tolerated half, checked with `python tools/symbols/symedit.py refs` on each of the
+ * file's names): the effect pool/manager (`fn_800F8788`, `fn_800F8914`, `fn_800F886C`, `fn_800F9DF4`,
+ * `fn_800F8A44`), the enemy band (`fn_80126278`, `em_parts_damage_level_get`) and the lobby item API
+ * (`fn_8004Axxx`/`fn_8004Bxxx`).  `symedit.py range` shows the map spells none of those ranges with
+ * anything but their `fn_` stems, so this file cannot name them.  No symbol this unit owns stays
+ * generated.
+ *
+ * SEAM.  The brief's range is one `attribute.py` `--max-bytes` cut of the unclaimed
+ * 0x8034C1D0..0x8035E034 run and no `__FILE__` string exists anywhere in it, so the decisive class-1
+ * test cannot fire.  Both edges are recorded as candidate re-draws, not as settled: the `.sdata2`
+ * pool run continues in referrer order across the lower edge (0x8079B638 -> 0x8079B640) and
+ * `em033_prog_tbl` (0x805ED370) sits in the previous proposal's own `.data` span while listing eight
+ * of this range's functions; at the upper edge the vtable-like table `lbl_805ED808` (inside this
+ * range's `.data` span) mixes this range's functions with `fn_8035F004`/`fn_8035EF50`/`fn_8035EF58`
+ * of the registered `enemy/fn_8035E034.cpp`.  Neither edge can be proven false in-session.
+ *
+ * LANGUAGE AND SECTIONS.  C++ (the map's mangled callees `GetItemData__FUs`, `LbStr__FUcUs`,
+ * `res_eft_model_create_light__FP6MHcharUsUll`, `calcDistanceSqXZ__FP...`, and the class whose
+ * constructor `fn_8035BBE8` installs `lbl_805ED808`).  Every plain `fn_` definition is `extern "C"` so
+ * it keeps the map's name (playbook 42).  dtk appended the unit's `extab` 0x8001736C..0x80017574 and
+ * `extabindex` 0x80036B88..0x80036E94 lines to the splits block itself, from the gaps the bracketing
+ * registrations leave; they are not yet reproduced byte for byte.  The `.data` run
+ * 0x805ED0C0..0x805ED938, the `.sdata2` pool and the tables are declared, never defined (playbook 29).
+ *
+ * FLAGS: the `ef` lib's `cflags_main` (Wii/1.3, `-inline noauto`) plus `#pragma peephole off` for this
+ * file - the file keeps the unfused forms retail has, exactly like the `menu` and `hud` libs
+ * (`cflags_menu`/`cflags_hud` are `cflags_main` + `-opt nopeephole`).  Measured: with the peephole on,
+ * `eft052_part_damage_ck` reads 93.82 % and `eft052_part_level_even_ck` 91.92 % (the fused
+ * `clrlslwi`/`clrlwi.` forms where retail keeps `clrlwi`+`slwi`/`clrlwi`+`cmpwi`); with it off, both
+ * are byte-identical.  A lib-level `-opt nopeephole` needs two agreeing units (policy 8.2) - this is
+ * the first, and it is scoped to the file until a second unit of the band is written.
+ *
+ * STATUS / RESIDUALS (measured 2026-09-27, official report metric; 23056 B total).  The rename to
+ * `eft052` moved no row (all 92 rows, and every other unit's, are identical before and after).
+ *   * 20 of the 92 functions are reconstructed: 2568 `.text` bytes, unit 10.37 % fuzzy, 94.05 % mean
+ *     over the 20 scored rows.  Byte-identical: `eft052_part_damage_ck`, `eft052_part_level_even_ck`,
+ *     `eft052_part_gauge_add`, `eft052_set`, `eft052_dispatch`, `eft052_state_step`,
+ *     `eft052_pool_release`, `eft052_item_value_get`, `eft052_page_count_add`,
+ *     `eft052_hold_entry_set`.
+ *   * 89-99 %: `eft052_item_half_get` 99.29, `eft052_release` 98.60, `eft052_page_counts_get` 95.72,
+ *     `eft052_page_count_ck` 93.33, `eft052_hold_entry_copy` 91.30, `eft052_place` 89.30 (the
+ *     `lbl_805ED0C0`/`lbl_805ED120`/`lbl_805ED168` table selection's colouring), `eft052_page_put`
+ *     88.15.
+ *   * 56-86 %: `eft052_page_take` 85.43, `eft052_hold_cursor_step` 83.77, `eft052_hold_row_get` 56.07
+ *     (the +0x10 table row lookup's stride addressing).
+ *   * the other 72 functions (20488 B) are unwritten, not residual - the two biggest bodies
+ *     (`fn_8035A034` 1684 B, `fn_80358B40` 1144 B) are drafted from `tools/m2c` but not yet
+ *     transcribed, and `eft052_hold_row_set`'s body is unwritten too.
+ *   * DATA: `datagap.py --unit ef/eft052` reports **no ours-extra row** and the expected target-extra
+ *     rows for the unwritten part (`.text` 23056/2568 B, extab 520/104 B, extabindex 780/156 B,
+ *     `.rela.text` 10392/1176 B, `.relaextabindex` 1560/312 B).  The 4-byte `.sdata2` ours-extra this
+ *     unit had at first write was cleared by loading the pooled `0.0f` through its own label
+ *     (`lbl_8079B640`, declared never defined) instead of emitting a literal.
+ */
+/* ---- header inherited from src/enemy/fn_8035E034.cpp (written against its pre-phase-4 range) ---- */
 /* enemy/fn_8035E034.cpp - the em033/em035 enemy-program band, `.text` 0x8035E034..0x8035F2B4
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup`: every address here resolves to a `zz_XXXXXXXX_` dump
@@ -76,14 +203,14 @@
 /* The three vector helpers the game-root draw layer owns; `include/mh3_pad.h` and `include/ef.h`
  * now spell them with the same record type (`nw4r::math::VEC3*`, docs/plan.md 6.5 rule 11), so no
  * local copy of the declaration is needed. */
-void fn_8008E8D0(void* a, void* b);
-void fn_8008DA10(void* a, void* b);
+extern "C" void fn_8008E8D0(void* a, void* b);
+extern "C" void fn_8008DA10(void* a, void* b);
 void fn_800513F0(VEC3* v, f32 s);
 
 /* The enemy action helpers whose owner units are unclaimed; their signatures are the call sites'
  * (this range's bracketing registered units name different bands, the rule 2 named gap). */
 void fn_8012B380(_ENEMY_WORK* self, u32 a, u32 b, u32 c);
-void fn_8012CEB4(_ENEMY_WORK* self, s16 a, u32 b);
+extern "C" void fn_8012CEB4(_ENEMY_WORK* self, s16 a, u32 b);
 
 /* The object the aim writer's first argument points at, and the source block its +0x4 member names
  * (`fn_8035EF58`).  Only the two fields the body touches are named. */
@@ -98,7 +225,7 @@ struct EmAimSource {
     /* +0x348 */ nw4r::math::VEC3 field_0x348;
 }; /* size: 0x354 */
 
-u32 fn_802B0998(u8 index);
+extern "C" u32 fn_802B0998(u8 index);
 
 /* 0x80295924 - the segment/line intersection test the aiming helpers use; its map name is the C++
  * mangling of exactly this signature (rule 9), so it is declared at C++ scope. */
@@ -682,3 +809,4 @@ extern "C" void fn_8035F178(_ENEMY_WORK* self, u8 a, u8 b)
         break;
     }
 }
+
