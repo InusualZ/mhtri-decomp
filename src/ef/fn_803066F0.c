@@ -26,9 +26,10 @@
  * `zz_03066f0_` placeholder while it does name its callee's sibling `eft042_set2` - so the map's
  * `fn_803066F0` stays and the C symbol matches it (a rename needs the map and the source in one edit).
  * `fn_802B050C` indexes `stage_w` for a name buffer, `fn_8030681C`/`fn_80306A94`/`fn_803066B4` are
- * unowned neighbours, and `lbl_80792B70` (".brres") / `lbl_8079ADE0` (1.0f) are the unit's two data runs,
- * referenced externally here because `splits.txt` does not claim them yet.  The two mangled callees are
- * called by their map symbol name so the reloc pairs (`Pl/pl_act.cpp` does the same for `hit_flag_set`).
+ * unowned neighbours.  The unit's two data runs, the ".brres" string (`.sdata` 0x80792B70) and the 1.0f pool
+ * word (`.sdata2` 0x8079ADE0), are claimed with it at phase 4 and emitted by the string and float literals
+ * below.  The two mangled callees are called by their map symbol name so the reloc pairs (`Pl/pl_act.cpp`
+ * does the same for `hit_flag_set`).
  *
  * Result: the object is **byte-identical to the target's `.text`, `extab` and `extabindex`** (300 / 8 / 12
  * bytes) and the function measures 100.00 %.  Two load-bearing source shapes:
@@ -41,6 +42,12 @@
  *     r26/r29 with `name` first): 100.00 % with `i` before `name`, 99.6 % otherwise (playbook 18).
  * The unit's `.comment` is `"CodeWarrior" 0x0f` (Wii/1.3) while the target's is `0x0e` - a different
  * compiler build, not codegen: `.comment` is not allocated, so it does not reach the link.
+ *
+ * PHASE 4 (window d): DEMOTED to `Object(NonMatching)`.  The candidate claims this unit's `.sdata` word (the ".brres" string, 0x80792B70..0x80792B78)
+ * and files the 1.0f `.sdata2` word at 0x8079ADE0 with `ef/fn_8030681C.cpp` (override row 49: that range holds 8-byte entries and cannot start
+ * 4 mod 8).  The source now emits the string and the float as literals: `.sdata` comes out 7 B against the claimed 8 B (the claim carries the
+ * 1-byte alignment pad) and the float is an extra 4 B `.sdata2` the claim no longer holds, so `flipcheck.py` refuses the section and the unit
+ * stays a candidate for a fold with its neighbour (the pool is one TU's: `flipcheck` suggests `ef/fn_803066F0` + `ef/fn_8030681C`).
  *
  * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/803066F0_fn_803066F0.c`.
  * The file name is provisional - `auto/` plus the first symbol's address - because nothing in the object
@@ -112,9 +119,6 @@ extern void* res_eft_UV_model_create_name__FP6MHcharPcUllPP9_g3d_worklUc(MHchar*
 extern void  setVector3__FPQ34nw4r4math4VEC3fff(f32* v, f32 x, f32 y, f32 z);
 extern char* strcat(char* dst, const char* src);
 
-extern char lbl_80792B70[7]; /* ".brres", .sdata 0x80792B70 */
-extern f32  lbl_8079ADE0;    /* 1.0f,    .sdata2 0x8079ADE0 */
-
 /* Creates the effect's models from the stage's ".brres" resource name, resets the model transforms and
  * the step timers, then advances the effect to its next state and runs that state's handler. */
 void fn_803066F0(EftWork* self)
@@ -125,7 +129,7 @@ void fn_803066F0(EftWork* self)
 
     data = self->data;
     name = fn_802B050C(0);
-    strcat(name, lbl_80792B70);
+    strcat(name, ".brres");
 
     for (i = 0; i < data->count; i++) {
         data->models[i].created = res_eft_UV_model_create_name__FP6MHcharPcUllPP9_g3d_worklUc(
@@ -142,8 +146,7 @@ void fn_803066F0(EftWork* self)
     self->timer_b = 0;
 
     for (i = 0; i < data->count; i++) {
-        setVector3__FPQ34nw4r4math4VEC3fff(data->models[i].model->scale, lbl_8079ADE0, lbl_8079ADE0,
-                                           lbl_8079ADE0);
+        setVector3__FPQ34nw4r4math4VEC3fff(data->models[i].model->scale, 1.0f, 1.0f, 1.0f);
         data->models[i].model->rand_accum_a = 0;
         data->models[i].model->rand_accum_b = 0;
         data->models[i].model->rand_accum_a = 0;

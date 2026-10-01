@@ -62,6 +62,12 @@ void stage_start_get(u8 phase, nw4r::math::VEC3* pos, s32* angle);
  * signature is the call site's view: no arguments, no result. */
 void fn_802AEC00(void);
 
+/* 0x802B2E2C - copies the current area's staged colour record out of the stage block and drives it (no arguments). */
+void fn_802B2E2C(void);
+
+/* 0x802B4C5C - re-drives every live area object's own per-frame update (no arguments). */
+void fn_802B4C5C(void);
+
 /* 0x802AFF38 / 0x802AFFF4 - the water tests for a shell's two area bits; each answers 1 while the point is under
  * water (no arguments, the answer in r3).  `stage_water_enabled_ck` is `s32` because `stage/fn_802B2AA0.h` declares it so. */
 s32 stage_water_enabled_ck(void);

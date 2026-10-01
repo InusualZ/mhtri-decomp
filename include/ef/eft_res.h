@@ -19,6 +19,9 @@ extern "C" {
 
 /* Retires one pooled effect's runtime record. */
 void fn_800F886C(void* self);
+/* The name consumers outside `ef/` use for it (the owner's symbol keeps its generated name until the sweep over the
+ * ef units that declare it lands). */
+#define eft_record_retire(self) fn_800F886C(self)
 /* Places `count` pooled models in the `mode` layout and files the result through `arg`. */
 void fn_800F93D8(_EFT* self, void** models, s32 mode, s32 count, void* arg);
 /* Pools the slots `size` bytes' worth of effect records need and returns the first record. */

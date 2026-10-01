@@ -1,3 +1,15 @@
+/*
+ * ef/eft035.cpp - phase 4 unit, `.text` 0x802F2238..0x802F5138 (28 functions, 12032 bytes).
+ *
+ * PHASE 4 (docs/splits/phase4, window d).  Recut of eft035.cpp: its functions whose address lies in this range, in
+ * address order; the rest of the range keeps its original bytes.  17 of 28 functions have a body here.
+ *
+ * FLAGS.  `cflags_main`.  The first 11 functions of the old range moved to `hud/cockpit_quest.cpp` (no source existed
+ * for them).
+ *
+ * Sections: the unit's block in config/RMHE08/splits.txt (.data, .sdata, .sdata2, .text, extab, extabindex).
+ */
+/* ---- header inherited from src/ef/eft035.cpp (written against its pre-phase-4 range) ---- */
 /* ef/eft035.cpp - the `eft035` effect family, `.text` 0x802F140C..0x802F5138 (39 functions).
  *
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
@@ -189,12 +201,6 @@ extern "C" const u8 lbl_80792860[8]; /* per-type pool length, both eft035 famili
 extern "C" const u8 lbl_80792868[8]; /* type -> variant index, both eft035 families */
 extern "C" f32 lbl_8079A9C8;         /* the scale factor eft035_set multiplies its argument by */
 
-/* ---------------------------------------------------------------------------------------------------
- * bodies, in address order
- * ------------------------------------------------------------------------------------------------- */
-
-/* Retail keeps the unfused countdown forms (`subi` + `cmpwi`, not the peephole's `subic.`) in the
- * two release loops - measured: with the pass on `fn_802F250C` is 89.93 and `fn_802F25BC` 87.03. */
 #pragma peephole off
 
 /* Releases the type-0/1/3 family's pooled handles: both model pairs at work+0x30 in descending slot

@@ -34,21 +34,17 @@
  * list row's select/update and draw handlers, called from `fn_8033A160` (0x8033A4D4) and
  * `fn_8033A7DC` (0x8033A808); a scan of every `bl` in the DOL finds no other caller.
  *
- * SECTIONS.  `.data` 0x805E9220..0x805E9248 is this unit's own 10-entry jump table, which MWCC emits
- * from the switch below; it is the only data our object emits.  The two string labels above are
- * declared, never defined (playbook 29: a definition emits a second copy and grows `.data`), so the
- * bytes stay where the DOL has them - inside the `auto_07_805E27B0_data` chunk, whose bracketing
- * registered units (`hud/net_char_sync.cpp` below, `Network/network_pat_control.cpp` above) disagree on a module, so
- * rule 2's home for them is a named gap and the declarations stay here.
+ * SECTIONS (phase 4).  The unit claims `.data` 0x805E91F8..0x805E9248 (0x50 B): the two string labels above (0x805E91F8..0x805E9220), which
+ * this file defines ahead of the table, and the 10-entry jump table at 0x805E9220..0x805E9248 that MWCC emits from the switch below.
  *
  * Flags: the lib's `cflags_menu` (`-O3 -inline noauto -opt nopeephole -Cpp_exceptions on`, mw
  * version Wii/1.3).  No pragma is needed - the body has no fold-shaped pair and no `bl` to a
  * same-file helper.
  *
  * STATUS: `Object(Matching, ...)`.  The object is byte-identical to the target in both sections
- * (`.text` 0x10C, `.data` 0x28; only MWCC's `.comment` version byte differs, `0f` against the
+ * (`.text` 0x10C, `.data` 0x50; only MWCC's `.comment` version byte differs, `0f` against the
  * target's `0e`, as in every other unit of this lib), objdiff's official metric reads 100.0 % fuzzy
- * / 268 of 268 `.text` bytes / 40 of 40 `.data` bytes, and `flipcheck.py` answers READY.  Proved by
+ * / 268 of 268 `.text` bytes / 80 of 80 `.data` bytes, and `flipcheck.py` answers READY.  Proved by
  * the link, not by the score alone: with the unit flipped, a full `ninja` in this branch's worktree
  * ends `build/RMHE08/main.dol: OK` and the built DOL's SHA-1 is the documented
  * `bf4850739478caaedfe675949eb7c28595a7fde9`.  No residual.
@@ -67,10 +63,10 @@ void Panic(const char* file, int line, const char* fmt, ...);
 }  // namespace nw4r
 
 /* The unit's own two literals, in `.data` (the retail build did not use `-str readonly`, so the
- * pool is `.data` and not `.rodata`); the map names them after what they hold.  Both are owned by
- * the unclaimed `.data` chunk this unit sits in, so they are declared here and never defined. */
-extern char s_menu_note_cpp[];      /* "menu_note.cpp"            .data 0x805E91F8 */
-extern char s_nw4r_assert_failed[]; /* "NW4R:Failed assertion 0"  .data 0x805E9208 */
+ * pool is `.data` and not `.rodata`); the map names them after what they hold.  Phase 4 claims
+ * them with this unit (0x805E91F8..0x805E9220), so they are defined here, ahead of the jump table. */
+char s_menu_note_cpp[] = "menu_note.cpp";                /* .data 0x805E91F8 */
+char s_nw4r_assert_failed[] = "NW4R:Failed assertion 0"; /* .data 0x805E9208 */
 
 /* nw4r's assert; the message is the `NW4R_ASSERT(...)` stringification of the condition (which is
  * why the pooled format string reads "NW4R:Failed assertion 0"), and the file is this unit's

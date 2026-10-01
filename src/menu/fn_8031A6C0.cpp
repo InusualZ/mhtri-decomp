@@ -1,4 +1,16 @@
 /*
+ * menu/fn_8031A6C0.cpp - phase 4 unit, `.text` 0x8031A6C0..0x8031DAA8 (45 functions, 13288 bytes).
+ *
+ * PHASE 4 (docs/splits/phase4, window d).  Recut of fn_8031A6C0.cpp: its functions whose address lies in this range,
+ * in address order; the rest of the range keeps its original bytes.  23 of 45 functions have a body here.
+ *
+ * FLAGS.  `cflags_menu`.  The effect tail of the old range (0x8031DAA8..) is `menu/menu_item_effect.cpp`.
+ *
+ * Sections: the unit's block in config/RMHE08/splits.txt (.bss, .ctors, .data, .sdata, .sdata2, .text, extab,
+ * extabindex).
+ */
+/* ---- header inherited from src/menu/fn_8031A6C0.cpp (written against its pre-phase-4 range) ---- */
+/*
  * src/menu/fn_8031A6C0.cpp - the menu selection-screen band, `.text` 0x8031A6C0..0x8031EA8C.
  *
  * WHAT IT IS.  The item/equipment selection screen.  `MenuSel` (this band's view of the 0x330-byte
@@ -38,16 +50,18 @@
  */
 
 #include "types.h"
+#include "ef/eft_res.h"
+#include "menu/menu_effect_slot.h"
 #include "menu/fn_8031A6C0.h"
 #include "menu/menu_item.h"
 #include "menu/menu_message.h"
 #include "sound/fn_800D7F54.h"
 
 /* The band's unowned callees (no registered unit owns these addresses; rule 2's unsplit case). */
+
 extern "C" {
 
 u16* menu_slot_get(MenuSel* self, s16 index);
-void menu_cursor_column_step(u16* value);
 s32  fn_80274570(void* a);
 s32  fn_8033AAFC(u16 a);
 s32  fn_8033AC78(u16 a, u16 b, s32 c);
@@ -55,11 +69,8 @@ s16  fn_8033B380(void* self, u16 a, u16 b, s32 kind, s16 c, s16 d);
 u16  item_count_find(u16 a, s32 b, s32 c);
 s32  fn_8004B3A0(u16 a, s32 b, s32 c);
 void fn_800DCFC0(void);
-void fn_80349184(void* a);
-void fn_800F886C(void* a);
 extern MenuSharedSlots* lobby_world_block;
-
-} /* extern "C" */
+}
 
 /* ============================================================================================== */
 /* 0x8031AC04 - hand the display worker to its update routine                                     */
@@ -156,6 +167,7 @@ extern "C" void fn_8031B5D0(MenuSel* self) {
 /* 0x8031B6D0 - reset this record to its item-screen defaults (kept for the follow-up round that
  * writes the in-band `fn_8031B39C`/`fn_8031B4C4` it calls). */
 #if 0
+
 extern "C" void fn_8031B6D0(MenuSel* self) {
     self->mode_0x014 = 2;
     self->flag_0x1B0 = 0;
@@ -329,25 +341,7 @@ extern "C" void fn_8031CA3C(MenuSelCursor* cur) {
     if (c < 2) cur->counter_0x22 = (u8)(c + 1);
 }
 
-/* ============================================================================================== */
-/* 0x8031E568 / 0x8031EA78 - step counters; 0x8031E578 / 0x8031EA88 / 0x8031DA50 - tail calls    */
-/* ============================================================================================== */
-extern "C" void fn_8031E568(MenuEff* self) {
-    self->step_0x005 = (u8)(self->step_0x005 + 1);
-}
-
-extern "C" void fn_8031EA78(MenuEff* self) {
-    self->step_0x005 = (u8)(self->step_0x005 + 1);
-}
-
-extern "C" void fn_8031E578(MenuEff* self) {
-    fn_800F886C(self);
-}
-
-extern "C" void fn_8031EA88(MenuEff* self) {
-    fn_800F886C(self);
-}
-
 extern "C" void fn_8031DA50(MenuEff* self) {
     fn_800F886C(self);
 }
+

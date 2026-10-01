@@ -1,3 +1,15 @@
+/*
+ * enemy/fn_802F5138.cpp - phase 4 unit, `.text` 0x802F5138..0x802F9994 (61 functions, 18524 bytes).
+ *
+ * PHASE 4 (docs/splits/phase4, window d).  Recut of fn_802F5138.cpp: its functions whose address lies in this range,
+ * in address order; the rest of the range keeps its original bytes.  27 of 61 functions have a body here.
+ *
+ * FLAGS.  `cflags_main`.  The tail of the old range (0x802F9994..) is `enemy/em_sub_state_prog.cpp`.
+ *
+ * Sections: the unit's block in config/RMHE08/splits.txt (.bss, .ctors, .data, .rodata, .sdata, .sdata2, .text, extab,
+ * extabindex).
+ */
+/* ---- header inherited from src/enemy/fn_802F5138.cpp (written against its pre-phase-4 range) ---- */
 /* enemy/fn_802F5138.cpp - an enemy action-program band, `.text` 0x802F5138..0x802FA9A0.
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup <addr>`: every address resolves to a `zz_XXXXXXXX_` dump
@@ -77,33 +89,58 @@
 /* The band's pooled `.sdata2` constants (declared, never defined: the pool belongs to the data pass,
  * playbook 29). */
 extern f32 lbl_8079AA88;
+extern f32 lbl_8079AA98;
+extern f32 lbl_8079AA98; extern f32 lbl_8079AA9C;
+extern f32 lbl_8079AA98; extern f32 lbl_8079AA9C; extern f32 lbl_8079AAA0;
 extern f32 lbl_8079AA98; extern f32 lbl_8079AA9C; extern f32 lbl_8079AAA0; extern f32 lbl_8079AAA4;
+extern f32 lbl_8079AAB0;
+extern f32 lbl_8079AAB0; extern f32 lbl_8079ABA4;
 extern f32 lbl_8079AAB0; extern f32 lbl_8079ABA4; extern f32 lbl_8079ABA8;
+extern f32 lbl_8079AB74;
+extern f32 lbl_8079AB74; extern f32 lbl_8079AB78;
 extern f32 lbl_8079AB74; extern f32 lbl_8079AB78; extern f32 lbl_8079AB7C;
+extern f32 lbl_8079AB80;
+extern f32 lbl_8079AB80; extern f32 lbl_8079AB84;
 extern f32 lbl_8079AB80; extern f32 lbl_8079AB84; extern f32 lbl_8079AB88;
+extern f32 lbl_8079AB8C;
+extern f32 lbl_8079AB8C; extern f32 lbl_8079AB90;
 extern f32 lbl_8079AB8C; extern f32 lbl_8079AB90; extern f32 lbl_8079AB94;
+extern f32 lbl_8079AB98;
+extern f32 lbl_8079AB98; extern f32 lbl_8079AB9C;
 extern f32 lbl_8079AB98; extern f32 lbl_8079AB9C; extern f32 lbl_8079ABA0;
+extern f32 lbl_8079ABAC;
 extern f32 lbl_8079ABAC; extern f32 lbl_8079ABB0;
 
 /* The band's own `.data` record tables (declared, never defined). */
+extern u8 lbl_805D6F70[];
 extern u8 lbl_805D6F70[]; extern u8 lbl_805D6F98[];
+extern u8 lbl_805D6FC0[];
 extern u8 lbl_805D6FC0[]; extern u8 lbl_805D6FE8[];
+extern u8 lbl_805D7018[];
 extern u8 lbl_805D7018[]; extern u8 lbl_805D7040[];
+extern u8 lbl_805D7078[];
 extern u8 lbl_805D7078[]; extern u8 lbl_805D70A0[];
+extern u8 lbl_805D70C8[];
 extern u8 lbl_805D70C8[]; extern u8 lbl_805D70F0[];
+extern u8 lbl_805D7118[];
 extern u8 lbl_805D7118[]; extern u8 lbl_805D7140[];
+extern u8 lbl_805D7150[];
 extern u8 lbl_805D7150[]; extern u8 lbl_805D7190[];
+extern u8 lbl_805D71E8[];
 extern u8 lbl_805D71E8[]; extern u8 lbl_805D7240[];
+extern u8 lbl_805D7288[];
 extern u8 lbl_805D7288[]; extern u8 lbl_805D72D0[];
 extern u8 lbl_805D7300[];
+extern u8 lbl_805D7328[];
+extern u8 lbl_805D7328[]; extern u8 lbl_805D75C0[];
 extern u8 lbl_805D7328[]; extern u8 lbl_805D75C0[]; extern u8 lbl_805D7AC0[];
+extern u8 lbl_805D7B80[];
 extern u8 lbl_805D7B80[]; extern u8 lbl_805D7DA0[];
 
 /* Forward declarations of the band's own functions (the dispatchers below reference later bodies). */
 extern "C" s32 fn_802F5138(_ENEMY_WORK* work);
 extern "C" void fn_802F51C8(_ENEMY_WORK* work);
 extern "C" void fn_802F5464(_ENEMY_WORK* work, u32 action, u32 state_sub);
-extern "C" void fn_802F548C(_ENEMY_WORK* work);
 extern "C" void fn_802F5B98(_ENEMY_WORK* work);
 extern "C" void fn_802F5C58(_ENEMY_WORK* work);
 extern "C" void fn_802F5D24(_ENEMY_WORK* work);
@@ -116,7 +153,6 @@ extern "C" void fn_802F8290(_ENEMY_WORK* work, s32 mode);
 extern "C" void fn_802F8768(_ENEMY_WORK* work);
 extern "C" void fn_802F87B8(_ENEMY_WORK* work);
 extern "C" void fn_802F89F8(_ENEMY_WORK* work);
-extern "C" void fn_802F8B9C(_ENEMY_WORK* work);
 extern "C" void fn_802F8F24(_ENEMY_WORK* work);
 extern "C" void fn_802F929C(_ENEMY_WORK* work);
 extern "C" void fn_802F92E8(_ENEMY_WORK* work);
@@ -128,22 +164,7 @@ extern "C" void fn_802F9678(_ENEMY_WORK* work);
 extern "C" s32 fn_802F9718(_ENEMY_WORK* work);
 extern "C" s32 fn_802F9740(_ENEMY_WORK* work);
 extern "C" s32 fn_802F9774(_ENEMY_WORK* work);
-extern "C" void fn_802F97F0(_ENEMY_WORK* work);
-extern "C" void fn_802F9898(void);
-extern "C" void fn_802F9994(_ENEMY_WORK* work);
-extern "C" void fn_802F9B50(_ENEMY_WORK* work);
 extern "C" void fn_802F96B4(_ENEMY_WORK* work);
-extern "C" void fn_802F9BF0(_ENEMY_WORK* work);
-extern "C" void fn_802F9C2C(_ENEMY_WORK* work);
-extern "C" void fn_802FA33C(_ENEMY_WORK* work);
-extern "C" f32 fn_802FA7EC(s16 a, f32 b);
-extern "C" void fn_802FA7F0(_ENEMY_WORK* work);
-extern "C" void fn_802FA800(_ENEMY_WORK* work);
-extern "C" void fn_802FA804(_ENEMY_WORK* work);
-extern "C" void fn_802FA8D8(_ENEMY_WORK* work);
-extern "C" void fn_802FA964(_ENEMY_WORK* work);
-
-/* --------------------------------------------------------------------------------------------- */
 
 /* Reports whether the record's own counters put it in the ratio state the band entry tests. */
 extern "C" s32 fn_802F5138(_ENEMY_WORK* work) {
@@ -377,6 +398,7 @@ extern "C" u16 fn_802F8B24(_ENEMY_WORK* work) {
 
 /* Reads one of the record's three effect-slot bytes by index. */
 #pragma peephole off
+
 extern "C" u8 fn_802F8B28(_ENEMY_WORK* work, u32 index) {
     u8 slot = index;
 
@@ -542,6 +564,7 @@ extern "C" s32 fn_802F9740(_ENEMY_WORK* work) {
 }
 
 #pragma peephole off
+
 /* Reports whether the record's area lookup and attack timer allow the action. */
 extern "C" s32 fn_802F9774(_ENEMY_WORK* work) {
     switch (stage_map_kind_get(work->field_0x1E0)) {
@@ -587,28 +610,10 @@ extern "C" void fn_802F96B4(_ENEMY_WORK* work) {
         break;
     }
 }
-#pragma peephole on
-
-/* Sub-state dispatcher of the band's model-placement action. */
-extern "C" void fn_802F9BF0(_ENEMY_WORK* work) {
-    switch (work->state) {
-    case 0:
-        fn_802F9C2C(work);
-        break;
-    case 1:
-        fn_802FA33C(work);
-        break;
-    case 2:
-        fn_802FA7F0(work);
-        break;
-    case 3:
-        fn_802FA800(work);
-        break;
-    }
-}
 
 
 #pragma peephole off
+
 /* Adjusts the record's blend weight by the mode's factor, then asks for the model when the record is
  * in one of the two idle modes. */
 extern "C" void fn_802F51DC(_ENEMY_WORK* work, u32 arg) {
@@ -681,35 +686,3 @@ extern "C" void fn_802F62A8(_ENEMY_WORK* work) {
     }
 }
 
-/* Forwards to the shared release helper (a tail call: the parameters pass straight through). */
-extern "C" f32 fn_802FA7EC(s16 a, f32 b) {
-    return fn_80463EE0(a, b);
-}
-
-/* Advances a byte counter in a record above the work record. */
-extern "C" void fn_802FA7F0(_ENEMY_WORK* work) {
-    work->state = work->state + 1;
-}
-
-/* Releases the second shared resource. */
-extern "C" void fn_802FA800(_ENEMY_WORK* work) {
-    fn_800F886C(work);
-}
-
-/* Sub-state dispatcher of the band's last action. */
-extern "C" void fn_802FA964(_ENEMY_WORK* work) {
-    switch (work->state) {
-    case 0:
-        fn_802FA9A0(work);
-        break;
-    case 1:
-        fn_802FAB98(work);
-        break;
-    case 2:
-        fn_802FAFB4(work);
-        break;
-    case 3:
-        fn_802FAFC4(work);
-        break;
-    }
-}

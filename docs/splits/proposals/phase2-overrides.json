@@ -1422,6 +1422,53 @@
    ],
    "note": "medium: sole-owned (one referencing unit), claimed tight",
    "reproduce": "python tools/units/callers.py 0x8079D080"
+  },
+  {
+   "unit": "ef/fn_8030681C.cpp",
+   "section": ".sdata2",
+   "start": "0x8079ADE0",
+   "end": "0x8079ADE4",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "takes_from": "ef/fn_803066F0.c",
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8079ADE0",
+     "finding": "lbl_8079ADE0 (1.0f, 4 B) is loaded only by fn_803066F0 (0x803067B8); the next unit's range starts at 0x8079ADE4 and holds the 8-byte entries at 0x8079AE08 and 0x8079AE28"
+    },
+    {
+     "tool": "ninja",
+     "command": "python tools/splits/applysplits.py apply --window d; ninja build/RMHE08/main.elf",
+     "finding": "with the candidate's ef/fn_8030681C .sdata2 starting at 0x8079ADE4 (4 mod 8 over 8-byte entries) mwldeppc dies with `internal linker error: File: 'ELF_gen.c' Line: 2802`; starting it at 0x8079ADE0 links"
+    }
+   ],
+   "note": "a .sdata2 range that starts 4 mod 8 and holds 8-byte entries cannot link; the abutting 4-byte range of fn_803066F0 gives up its whole claim (its object keeps the load as a relocation to the neighbour's symbol)",
+   "reproduce": "python tools/units/callers.py 0x8079ADE0"
+  },
+  {
+   "unit": "enemy/em020_prog.cpp",
+   "section": ".bss",
+   "start": "0x806BF530",
+   "end": "0x806C23E8",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window d units> --root . --base-snapshot <land-base orphans> --base-ref main",
+     "finding": "the data-closure row refuses lbl_806BF530 (.bss, 0x2EB8 B): referenced by em_prog_support (ex fn_80382310) and menu_item_sub (ex fn_8036A828), both batch units, and no claim covers it"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x806BF530",
+     "finding": "lbl_806BF530 is read by 15 functions of enemy/em020_prog.cpp (em020_quest_active_ck 0x8037583C, em020_quest_active_clear, fn_8037586C, fn_80375B9C, fn_80375D30, ...) and by menu_item_sub (fn_8036A890.., fn_8036C284) and em_prog_support; em020_prog's text lies between menu_item_sub's (previous .bss owner, ends 0x806BF530) and em019_ai's (next, starts 0x806C23E8), so the chain bracketing the run is menu_item_sub..em020_prog; the writer fn_80375B9C is em020_prog's"
+    }
+   ],
+   "note": "one run, one object (0x2EB8 B); the unit that reads it most and writes it takes it",
+   "reproduce": "python tools/units/callers.py 0x806BF530"
   }
  ]
 }
