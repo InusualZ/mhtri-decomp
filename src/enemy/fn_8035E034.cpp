@@ -64,6 +64,7 @@
 #include "enemy/fn_8012EC74.h"
 #include "enemy/fn_80138074.h"
 #include "enemy/em_pop.h" /* the roster records and kind searches (the owner's header, rule 1/2) */
+#include "enemy/em_model.h"
 #include "ef/fn_800CDB2C.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "stage/stg_w.h"

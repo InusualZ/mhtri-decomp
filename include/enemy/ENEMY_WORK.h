@@ -311,7 +311,7 @@ struct _ENEMY_WORK {
     /* +0x210 */ f32 field_0x210;       /* the second effect spawn height `enemy/fn_801D80EC.cpp`'s
                                         * `fn_801DB978` adds to the work record's y (the +0x20C
                                         * sibling is the other branch's) */
-    /* +0x214 */ f32 field_0x214;      /* the effect spawn height `enemy/fn_80387844.cpp`'s
+    /* +0x214 */ f32 field_0x214;      /* the effect spawn height `enemy/em009_act.cpp`'s
                                         * `fn_8038874C`/`fn_8038A7B8` add to the joint position
                                         * before `eft009_set_pos` (added by that unit) */
     /* +0x218 */ u32 field_0x218;       /* nonzero, `fn_80137EE0` has slots to average */
@@ -361,7 +361,7 @@ struct _ENEMY_WORK {
             /* +0x338 */ u8 field_0x338[4]; /* `fn_801A4504`: per-slot data-table index, 0xFF = none */
         };
         /* +0x328 */ s32 handles_0x328[4]; /* `fn_801A4504`: per-slot joint-effect handles, -1 = empty */
-        /* the rotation accumulator `enemy/fn_80387844.cpp`'s action band steps (the same 32-bit word
+        /* the rotation accumulator `enemy/em009_act.cpp`'s action band steps (the same 32-bit word
          * as `handles_0x328[0]`, read/written as one unsigned angle and compared against 0xC000). */
         struct {
             /* +0x328 */ u32 angle_0x328;
@@ -834,7 +834,7 @@ struct _ENEMY_WORK {
     /* +0xA39 */ u8 unused_0xA39[0xA69 - 0xA39];
     /* +0x0A69 */ u8 field_0xA69;       /* fn_80177D54's second gate */
     /* +0x0A6A */ u8 unused_0xA6A[0xAE9 - 0xA6A];
-    /* +0x0AE9 */ u8 field_0xAE9;       /* the one-shot flag `enemy/fn_80387844.cpp`'s
+    /* +0x0AE9 */ u8 field_0xAE9;       /* the one-shot flag `enemy/em009_act.cpp`'s
                                         * `fn_80389C50` tests (== 1) to choose its motion set
                                         * (added by that unit) */
     /* +0x0AEA */ u16 field_0xAEA;      /* the eighteen-bit flag word `enemy/fn_801D80EC.cpp`'s

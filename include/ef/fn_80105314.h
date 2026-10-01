@@ -28,10 +28,10 @@ void fn_80105560(void* self);
 void fn_801057A4(void* self, u32 a, void* v, f32 scale, u32 id);
 void fn_8010A7D4(void* self, u32 a);
 /* 0x8010562C - this unit's joint-effect spawner: r3 (`self`), r4/r5 two scalars, r6 the `VEC3*` and
- * f1 the scale.  Added with `enemy/fn_80387844.cpp` (rule 2: this unit owns the address). */
+ * f1 the scale.  Added with `enemy/em009_act.cpp` (rule 2: this unit owns the address). */
 void eft_spawn_type10(struct _ENEMY_WORK* self, u32 type, u32 a, nw4r::math::VEC3* b, f32 scale);
 /* 0x80106694 - the second spawner of the same band: r3 (`self`), r4 the `VEC3*`, r5 a byte kind and
- * f1 the scale.  Added with `enemy/fn_80387844.cpp` (rule 2). */
+ * f1 the scale.  Added with `enemy/em009_act.cpp` (rule 2). */
 void eft_spawn_type11(struct _ENEMY_WORK* self, nw4r::math::VEC3* pos, u8 kind, f32 scale);
 
 #ifdef __cplusplus

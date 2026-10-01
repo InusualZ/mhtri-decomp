@@ -129,8 +129,8 @@ typedef struct DemoWork {
     /* +0x14 */ DemoEntry entry_0x14;
 } DemoWork; /* size: 0x28 */
 
-extern PopData* pop_dat_ptrs[10]; /* .bss 0x806D2AF8, ten pointers */
-extern DemoWork demo_work;        /* .bss 0x806D2B20 */
+/* `pop_dat_ptrs` (.bss 0x806D2AF8) and `demo_work` (.bss 0x806D2B20) are defined by `menu/get_pop_dat_ptr.cpp` and
+ * `lobby/lb_server_sel_trans.cpp`, which own those addresses since the phase 4 recut. */
 
 /* `get_option_cfg`, `get_arena_cfg`, `get_cfg` and `event_demo_ck` are this band's own - their
  * declarations come from the owner's header (rule 2). */
@@ -138,7 +138,7 @@ extern DemoWork demo_work;        /* .bss 0x806D2B20 */
 
 /* ---- the 0x803A/0x803B arena/quest-result band (proposal `803B0F98`) ----
  *
- * The records and globals `src/menu/arena_result.cpp` reads.  All of them belong to no registered
+ * The records and globals `src/quest/quest_entry.cpp` reads.  All of them belong to no registered
  * unit: `quest_work` is the 0x6AB8-byte block `quest_init` (0x803AD47C) memsets and stores into
  * `quest_work_ptr`, and the band's string tables sit in `.data`/`.sdata` next to it.
  */
@@ -296,9 +296,8 @@ typedef struct QuestWork {
     /* +0x6A9A */ u8 unused_0x6A9A[0x00A];
     /* +0x6AA4 */ u8 field_0x6AA4[0x014];      /* the run `quest_field6AA4_get` hands out */
 } QuestWork;
-extern QuestWork quest_work;              /* .bss 0x806C5858 */
-extern QuestWork* quest_work_ptr;         /* .sbss 0x80794C40, set by `quest_init` */
-extern char quest_text_buffer[0x100];     /* .bss 0x806CC310, the 100-byte text scratch */
+/* `quest_work`, `quest_work_ptr` and `quest_text_buffer` are declared in `quest/quest_entry.h` (the owner's header since the
+ * phase 4 fold of `menu/arena_result` into `quest/quest_entry`), as are the data tables and pooled floats below. */
 /* The band's three `quest_list_*` globals: an item array, its u16 key/value array and the count
  * (`quest_work_word_get` walks them). */
 typedef struct QuestListItem {
@@ -308,19 +307,6 @@ typedef struct QuestListItem {
 extern QuestListItem** quest_list_items;   /* .sbss 0x80794C3C */
 extern s32 quest_list_count;               /* .sbss 0x80794C44 */
 #include "mh3_pad/Screen_w.h" /* `ScreenWork`/`Screen_w`, owned by src/mh3_pad.cpp (rule 1/2) */
-/* The band's own data tables. */
-extern u8 quest_pair_table[];      /* .data 0x805F7898, read [index * 2 + sub] */
-extern u8 quest_byte_table[];      /* .data 0x805F78B4 */
-extern u16* arena_time_table[];    /* .data 0x805F7AF8, 12 pointers to u16 time tables */
-extern char* quest_grade_none_text_table[];   /* .data 0x8060DAD8, indexed by `system_w`'s map index */
-extern u16 multi_arena_clr_time[];     /* .data 0x805F7B28, 10 u16 pairs */
-/* Pooled float constants the target objects address as globals (playbook 29: declare, never
- * define - a definition would make MWCC emit a second copy in `.sdata2`). */
-extern const f32 frames_per_second_60f;   /* .sdata2 0x8079C524 */
-extern const f32 percent_scale_100f;      /* .sdata2 0x8079C558 */
-extern const f32 quest_grade_ratio_10f;   /* .sdata2 0x8079C540 */
-extern const f32 quest_grade_ratio_30f;   /* .sdata2 0x8079C55C */
-extern const f32 quest_grade_ratio_50f;   /* .sdata2 0x8079C520 */
 /* The band's unowned callees (C++ linkage: the declaration reproduces the map's mangling, rule 9). */
 /* The band's unowned callees (C linkage: the map rows are plain names, so a fixed name here has to
  * mangle to the same spelling).  Each is one small accessor of the quest work area `quest_element_*`

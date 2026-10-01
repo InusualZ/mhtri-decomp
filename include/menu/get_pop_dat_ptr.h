@@ -20,8 +20,9 @@
 u8 get_option_cfg(u8 index);
 /* 0x803BEBF0 - one option out of the arena profile of the VS user work. */
 u8 get_arena_cfg(u8 index, u8 value);
-/* 0x803C4814 - non-zero while the demo work is playing the demo the game asks about. */
-u32 event_demo_ck(void);
+/* `event_demo_ck` (0x803C4814) is `lobby/lb_server_sel_trans.cpp`'s since the phase 4 recut; its header is included for the
+ * consumers of this one. */
+#include "lobby/lb_server_sel_trans.h"
 
 #ifdef __cplusplus
 extern "C" {

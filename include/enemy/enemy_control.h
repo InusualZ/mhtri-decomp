@@ -134,16 +134,16 @@ u32 fn_801421E4(u32 id, void* out);
 u32 em_demo_time_ck(u32 frames);
 void em_demo_enable(struct _ENEMY_WORK* self);
 /* 0x80145FE4 - the joint-effect slot allocator this unit owns (returns the slot index, -1 when the
- * set is full).  Added with `enemy/fn_80387844.cpp`'s action band (rule 2). */
+ * set is full).  Added with `enemy/em009_act.cpp`'s action band (rule 2). */
 s16 em_demo_frame_get(void);
 /* 0x8014616C - r3 (`self`) and r4 (the mode); this unit's own definition, added with
- * `enemy/fn_80387844.cpp` (rule 2). */
+ * `enemy/em009_act.cpp` (rule 2). */
 void em_demo_reset(struct _ENEMY_WORK* self, s32 mode);
 /* 0x801461A8 - r3 (`self`), r4 (`s16` slot), r5/r6 two pointers (the caller's vectors).  Added with
- * `enemy/fn_80387844.cpp` (rule 2). */
+ * `enemy/em009_act.cpp` (rule 2). */
 void em_demo_key3_apply(struct _ENEMY_WORK* self, s16 slot, void* a, void* b);
 /* 0x801462A4 - r3 (`self`), r4 (`s16` slot), r5/r6 two pointers and r7/r8 two scalars.  Added with
- * `enemy/fn_80387844.cpp` (rule 2). */
+ * `enemy/em009_act.cpp` (rule 2). */
 void em_demo_key_apply(struct _ENEMY_WORK* self, s16 slot, void* a, void* b, s32 c, s32 d);
 
 /* 0x80141B88 - the enemy spawn request (GUESS name).  The tenth argument is a placement `VEC3*` or null: the

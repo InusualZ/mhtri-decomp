@@ -20,7 +20,9 @@
 #define MHTRI_NETWORK_NETWORK_PAT_CONTROL_H
 
 #include "types.h"
+#include "MSL_C/alloc.h"           /* strcpy (owner: MSL_C/alloc.cpp, rule 2) */
 #include "Network/NetworkPat.h"
+#include "Network/NetworkSessionManagerPat.h"   /* getPatsObject, isNetworkSessionManagerPatReady (owner's header, rule 2) */
 #include "Network/NetworkLayerPat.h"   /* NetId and the layer records the work record embeds */
 
 #ifdef __cplusplus
@@ -501,7 +503,7 @@ typedef struct NetCtrlWk {
     /* +0x7372 */ char name2_0x7372[0xA];
     /* +0x737C */ u8 pad_0x737C[0x10C];
     /* +0x7488 */ union {
-        u8 msgTable_0x7488[0x480];   /* the byte view `fn_80423E74.cpp` indexes */
+        u8 msgTable_0x7488[0x480];   /* the byte view `Network/network_pat_control.cpp` indexes */
         NetPeerRec peers_0x7488[4];
     };
     /* +0x7908 */ u8 pad_0x7908[0x80];
@@ -768,13 +770,8 @@ s8 countOccupiedServerSlots(void);
 s32 isCityMode(void);
 s32 checkOtherInvite(u8 id, s8* result);
 void setErrorCode(s8 code);
-/* The holder `getPatsObject` returns is `NetworkPat` (include/Network/NetworkPat.h).  The accessor
- * itself is at 0x803DA020, inside the unclaimed 0x803D70B8-0x803DDB64 Pat band, so no registered unit
- * owns it yet and its declaration sits here with the one unit that calls it. */
-NetworkPat* getPatsObject(void);
-/* `isNetworkSessionManagerPatReady` (0x803DF1A8) is the session manager's readiness probe: it is handed the object slot
- * +0x00 holds, so its parameter is that object's class. */
-BOOL isNetworkSessionManagerPatReady(NetworkSessionManagerPat* session_manager);
+/* `getPatsObject` (0x803DA020) and `isNetworkSessionManagerPatReady` (0x803DF1A8) are declared in
+ * `Network/NetworkSessionManagerPat.h` (their owner since the phase 4 fold). */
 
 #ifdef __cplusplus
 }
@@ -794,5 +791,92 @@ void setTextSize(s16 size);
 void printTextRuns(s16 x, s16 y, s32 unused, char* text);
 char* getOnlineSupportCode(void);
 char* get_network_sub_error_msg(void);
+
+/* The 0x80423E74..0x80429B94 band's declarations (absorbed from `fn_80423E74.h` at phase 4): the PatCamellia wrapper over the
+ * retail Camellia cipher and the work record's arena vectors, slot table and message pool. */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* Camellia's key schedule (owner: src/Camellia/camellia.c).  Declared here because the vendor header
+ * sits beside its source and is not on the include path; a second consumer should promote it into
+ * `include/` (rule 2).  `PatCamelliaKey` is the vendor's `KEY_TABLE_TYPE`. */
+typedef unsigned int PatCamelliaKey[68];
+
+void Camellia_Ekeygen(int keyBitLength, const unsigned char* rawKey, PatCamelliaKey keyTable);
+void Camellia_EncryptBlock(int keyBitLength, const unsigned char* plaintext,
+                           const PatCamelliaKey keyTable, unsigned char* cipherText);
+void Camellia_DecryptBlock(int keyBitLength, const unsigned char* cipherText,
+                           const PatCamelliaKey keyTable, unsigned char* plaintext);
+
+/* The unit's Camellia key schedule (.bss 0x806D3670, 0x110 B) and the 64 x 0x400 arena base
+ * (.sbss 0x80794CEC); neither has a registered owner. */
+extern PatCamelliaKey lbl_806D3670;
+extern u8* lbl_80794CEC;
+
+/* Unsplit game callees. */
+u8* fn_800404BC(u32 size);
+/* The band's own entry points this neighbour calls (owner: src/Network/network_pat_control.cpp, rule 2). */
+void resetNetSlots(NetCtrlWk* work);
+/* 0x80427284 - queues a network command (1 = accepted): the command id, the caller's result byte, an
+ * unused word, the argument count and the argument words (at most four). */
+s32 queueNetCommand(u32 command, s8* result, s32 unused, s32 arg_count, const s32* args);
+void syncScheduleClock(NetCtrlWk* work);
+s32 fn_804C2380(u32 id);
+
+/* The layer facade both network units drive.  `getNetworkLayerPat` and the holder type it takes are
+ * declared in their owner's header, `Network/NetworkPat.h`, which this header reaches through
+ * `Network/network_pat_control.h` (rule 2) - this unit only calls them. */
+
+/* The slot mode-word source value (.sdata2 0x8079C888). */
+extern f32 lbl_8079C888;
+
+/* MSL primitives. */
+void* memcpy(void* dst, const void* src, u32 size);
+void* memset(void* dst, int value, u32 size);
+
+/* ---- the pat-control band's callees in this range (`Network/network_pat_control.cpp`; GUESS on every
+ * name below: they are derived from the caller's use) ---- */
+struct PatTerms;
+struct SystemWork;
+/* 0x80424198 - points the record's arena vectors at the shared arena (allocating it on first use). */
+void setupArenaVectors(NetCtrlWk* work);
+/* 0x80429A68 - raises the network error (state 0x5A) for the work record. */
+void setErrorHappened(NetCtrlWk* work);
+/* 0x804295A4 - whether the terms object has reached its finished state. */
+u32 isTermsCheckFinished(struct PatTerms* terms);
+/* 0x80429994 - the per-frame timer tick of the control. */
+void tickPatControl(void);
+/* 0x80429A94 - stores `code` and sends the control to its shutdown state. */
+void abortNetworkControl(NetCtrlWk* work, u8 code);
+/* 0x80429AB0 - turns the current state into its failure state. */
+void failNetworkControl(NetCtrlWk* work);
+/* 0x80429990 - a stub (`blr`). */
+void resetFailureState(NetCtrlWk* work);
+/* 0x80429A40 - clears the refresh timeout. */
+void clearRefreshTimeout(void);
+/* 0x80429850 - resets the pat interface singletons. */
+void resetPatInterfaces(void);
+/* 0x804292B4 - allocates and clears the dialog record. */
+void allocateDialogRecord(void);
+/* 0x80425648 - repaints the server-select screen and counts the held-button frames. */
+void refreshServerScreen(NetCtrlWk* work);
+/* 0x80425790 - the message-pool state machine. */
+void updateMessagePool(void);
+/* 0x80426EA0 - resets the message pool. */
+void resetMessagePool(void);
+/* 0x80428CA8 - a stub (`blr`) taking the system record. */
+void resetSystemState(struct SystemWork* system);
+/* 0x8042968C - the reflect (page/event) callback the mediator is handed. */
+/* untyped: caller-owned payload - the two trailing words are the mediator's own event payload words */
+void patReflectCallback(s32 a, s32 b, s32 c, s32 d, void* e, void* f);
+/* 0x80603858 - the per-language (group, group max) word pairs and 0x806038D8 - the server host name,
+ * both in this range's `.data`. */
+extern s32 language_group_table[10];
+extern char pat_server_host[];
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* MHTRI_NETWORK_NETWORK_PAT_CONTROL_H */

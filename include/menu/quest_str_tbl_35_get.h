@@ -1,6 +1,6 @@
 /*
  * Leaf header (docs/plan.md 6.5 rule 2): `quest_str_tbl_35_get` (0x803B33B0), defined by
- * `src/menu/arena_result.cpp`.  `menu/arena_result.h` includes this one, so there is one declaration; it is
+ * `src/quest/quest_entry.cpp`.  `quest/quest_entry.h` includes this one, so there is one declaration; it is
  * separate so `lobby/lb_companion_ui.cpp` can call the string getter without taking `include/unsplit/menu.h`,
  * whose `Screen_w` view clashes with the lobby band's.
  */

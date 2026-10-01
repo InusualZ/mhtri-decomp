@@ -17,12 +17,15 @@
  *   - `__register_global_object`'s parameter order is (object, destructor, chain): r3 goes to the chain's +0x8,
  *     r4 to +0x4 and r5 is the chain node itself.
  *
- * The chain head's byte (`.sbss:0x80794DF8`, 4 B, next to `Debug_BBA`'s case: a `.sbss` split has to be
- * 16-byte aligned and that block is not) stays in the `auto_*` scaffolding for now, so the target object
- * declares it while our source defines it; the relocation pairs by the map's name either way.
+ * The chain head (`__global_destructor_chain`, `.sbss:0x80794DF8`, 4 B) is this unit's own data since phase 4
+ * (window e): the unit's `.sbss` claim is 0x80794DF8..0x80794E00 and the source defines the word.  The claim is 8 B
+ * (the word plus 4 B of padding up to the next unit's 8-aligned start) and the object emits 4 B, so
+ * `flipcheck.py` answers `.sbss: object is 0x4, splits.txt claims 0x8`: the unit is `NonMatching` (demoted at phase 4;
+ * the linked DOL bytes would be unchanged, the object is not the target's).
  *
  * Flags: `Runtime.PPCEABI.H` lib (`cflags_runtime`, Wii/1.3); both functions are byte-identical under it.
- * Residual: none - `__register_global_object` 24/24 B and `__destroy_global_chain` 72/72 B at 100 %.
+ * Residual: `.sbss` 4 B against the target's 8 B (above); `__register_global_object` 24/24 B and
+ * `__destroy_global_chain` 72/72 B at 100 %.
  */
 
 #include "types.h"
@@ -33,7 +36,7 @@ typedef struct DestructorChain {
     void* object;                   /* +0x08 */
 } DestructorChain;
 
-extern DestructorChain* __global_destructor_chain;
+DestructorChain* __global_destructor_chain;
 
 void __register_global_object(void* object, void (*destructor)(void*, int), DestructorChain* chain)
 {

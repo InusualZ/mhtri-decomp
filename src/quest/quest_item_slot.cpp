@@ -41,7 +41,6 @@
 #include "enemy/fn_801251D0.h"  /* `enemy_kind_same_ck` - owned by enemy/fn_801251D0.cpp (rule 2) */
 #include "fn_8004CAD8.h"    /* get_qResult_work, userdata_record_*_add, userdata_quest_stat_set - owned by fn_8004CAD8.cpp (rule 2) */
 #include "lobby/lb_quest_screen.h"  /* quest_rand_seed_set, quest_rand_next - owned by lobby/lb_quest_screen.cpp (rule 2) */
-#include "menu/arena_result.h"  /* quest_record_get - owned by menu/arena_result.cpp (rule 2) */
 #include "pl.h"                 /* _PLW - the player work (rule 1) */
 #include "lobby/lb_entry_notify_send.h" /* lb_entry_notify_send - owned by lobby/lb_companion_ui.cpp (rule 2) */
 #include "unsplit/Runtime.PPCEABI.H.h" /* sprintf, strcat (the MSL band has no registered owner) */
@@ -539,7 +538,7 @@ void quest_warp_by_state(_PLW* plw) {
 
 /* Announces a player's entry: to the quest scene sound while the slot is in its entry state, to the lobby
  * when the server is selecting, else as a faint-penalty charge. */
-void quest_entry_notify(u8 player) {
+void quest_player_enter_notify(u8 player) {
     if (move_work_state_ck() == 1) {
         snd_quest_scene_set();
     } else if (isServerSelectState() == 1) {

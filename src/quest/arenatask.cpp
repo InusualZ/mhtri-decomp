@@ -32,7 +32,7 @@
  *     the 100 % camera/vec functions' relocations anonymous) and `.ctors` 0 of 4 B (`arena_camera_light_vec_init`
  *     is a static initialiser; the flip needs its file-scope object) are not emitted.
  *   - the orphan census lists `stage_w` (0x806B87C0, shared by four units, so not claimable here) and
- *     `multi_arena_clr_time` (shared with `menu/arena_result`); `dataclaim.py --fixpoint` has nothing to claim.
+ *     `multi_arena_clr_time` (shared with `quest/quest_entry`); `dataclaim.py --fixpoint` has nothing to claim.
  *   `flipcheck.py` answers NOT READY: `.text` 11024 of 10784 B, `.sbss`, `.sdata` (one pad byte), `.sdata2`,
  *     `.ctors`, one extab byte and three extabindex bytes (`arena_result_next` saves r24-r31, retail r23-r31).
  *
@@ -75,7 +75,7 @@
  *     point of use; hoisting it to a local of `arena_vs_mode_enter` moves `arena_task` to 79.89 %.
  *
  * FLAGS: `cflags_menu` (`-O3 -inline noauto -opt nopeephole -Cpp_exceptions on`, Wii/1.3), the lib of
- * the link neighbours `quest/quest_entry.cpp` and `menu/arena_result.cpp`.  17 of the 19 functions carry
+ * the link neighbours `quest/quest_entry.cpp` and `quest/quest_entry.cpp`.  17 of the 19 functions carry
  * an extab record (all but the two leaf setters); C++ because `dl_acdata_to_ar_eqdata` is a mangled name.
  *
  * RESIDUALS:
@@ -132,7 +132,6 @@
 #include "nw_resource.h"      /* the resource loader entry points (the owner's header, rule 2) */
 #include "draw_shape.h"       /* `set_arena_idx`, the `ResFile` handle setters (the owner's header, rule 2) */
 #include "g3d/g3d_resanmtexsrt.h" /* `nw4r::g3d::ResFile` (the owner's header, rule 2) */
-#include "menu/arena_result.h"  /* `quest_record_get`, `quest_record_find` (the owner's header, rule 2) */
 #include "quest/quest_entry.h"   /* `get_move_work_adrs`, `get_userdata`, `quest_init` (the owner's header, rule 2) */
 #include "Network/network_pat_control.h" /* the net control accessors (the owner's header, rule 2) */
 #include "unsplit/lobby.h"     /* `lb_param_w`, `Psw` (unowned: band header) */

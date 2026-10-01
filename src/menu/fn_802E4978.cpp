@@ -103,7 +103,7 @@ extern u32* jumptable_805D5B48[];
 extern char lbl_807927C0[];
 extern char lbl_807927C4[];
 
-int sprintf(char*, const char*, ...);
+#include "MSL_C/alloc.h" /* sprintf (owner: MSL_C/alloc.cpp, rule 2) */
 u32 fn_800AB658(u8, f32);
 void fn_802E4978(CockpitWork*, CockpitMove*);
 void fn_802E4AD4(void);
@@ -642,7 +642,7 @@ void fn_802E6AAC(void) {
 }
 
 /* `Screen_w` and its `ScreenGeomView` view come from `include/unsplit/menu.h` (rule 1: this unit
- * was the first user, `menu/arena_result.cpp` the second). */
+ * was the first user, `quest/quest_entry.cpp` the second). */
 
 struct SprDataView {
     /* +0x000 */ u8 unused_0x000[0x1C];

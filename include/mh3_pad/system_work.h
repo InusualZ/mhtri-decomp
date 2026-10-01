@@ -142,7 +142,7 @@ typedef struct SystemWork {
     /* +0x8A0 */ u8 pad_0x8a0[0xE];
     /* +0x8AE */ u8 online_0x8ae;       /* GUESS name: 0 = offline play (`arena_result_next` then arms the solo flag), 1 = online */
     /* +0x8AF */ u8 field_0x8af;   /* non-zero selects the second column of `multi_arena_clr_time`
-                                    * in `menu/arena_result.cpp`'s arena time formatter */
+                                    * in `quest/quest_entry.cpp`'s arena time formatter */
     /* +0x8B0 */ u8 vs_mode_0x8b0;  /* non-zero in VS/arena mode: `get_cfg`/`ck_cfg` then read the VS
                                     * user work's profile instead of `option_w` (0x803BE30C band) */
     /* +0x8B1 */ u8 field_0x8b1;

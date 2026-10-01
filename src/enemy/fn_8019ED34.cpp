@@ -97,6 +97,7 @@
 #include "unsplit/sound.h"
 #include "unsplit/unknown.h"
 #include "enemy/em_pop.h"
+#include "enemy/em_model.h"
 #include "mh3_pad.h"
 #include "stage/stg_w.h"
 #include "enemy/fn_801B0010.h"

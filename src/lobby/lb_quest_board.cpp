@@ -62,7 +62,7 @@
 
 #include "types.h"
 #include "lobby/lb_quest_board.h"
-#include "menu/arena_result.h"   /* `quest_record_find` (the owner's header, rule 2) */
+#include "quest/quest_entry.h"   /* `quest_record_find` (the owner's header, rule 2) */
 #include "Runtime.PPCEABI.H/memset.h"
 
 /* Declarations of this range's own symbols that are still unwritten (`fn_` in the map), so the

@@ -6,6 +6,8 @@
  * bracketing them name different modules, so no `include/unsplit/<module>.h` is sound).  A later pass that
  * registers those bands moves each declaration to its owner's header.
  *
+ * The arena result accessors (`menu/arena_result.cpp`, folded in at phase 4) are declared here too.
+ *
  * Names: every one is derived from the callee's own body and is marked GUESS in the unit header - the
  * runtime dump answers `zz_` for all of them.
  */
@@ -19,6 +21,26 @@
 #include "quest/quest_list_values.h"  /* quest_list_values (this unit defines it) */
 #include "menu/menu_item.h"     /* GetItemData - owned by menu/menu_item.cpp (rule 2) */
 #include "fn_80047398.h"        /* item_pair_copy - owned by fn_80047398.cpp (rule 2) */
+#include "unsplit/menu.h"        /* QuestRecord (the arena result accessors below) */
+#include "menu/menu_sysmsg.h"    /* quest_grade_none_text_table - owned by menu/menu_sysmsg.cpp (rule 2) */
+#include "menu/quest_str_tbl_35_get.h"  /* quest_str_tbl_35_get (leaf header) */
+
+/* The quest work block and the band's data (declared here since the phase 4 fold: `quest/quest_entry.cpp` owns the ranges; the
+ * record types are `unsplit/menu.h`'s). */
+extern QuestWork quest_work;              /* .bss 0x806C5858 */
+extern QuestWork* quest_work_ptr;         /* .sbss 0x80794C40, set by `quest_init` */
+extern char quest_text_buffer[0x100];     /* .bss 0x806CC310, the 100-byte text scratch */
+extern u8 quest_pair_table[];      /* .data 0x805F7898, read [index * 2 + sub] */
+extern u8 quest_byte_table[];      /* .data 0x805F78B4 */
+extern u16* arena_time_table[];    /* .data 0x805F7AF8, 12 pointers to u16 time tables */
+extern u16 multi_arena_clr_time[];     /* .data 0x805F7B28, 10 u16 pairs */
+/* Pooled float constants the target objects address as globals (playbook 29: declare, never
+ * define - a definition would make MWCC emit a second copy in `.sdata2`). */
+extern const f32 frames_per_second_60f;   /* .sdata2 0x8079C524 */
+extern const f32 percent_scale_100f;      /* .sdata2 0x8079C558 */
+extern const f32 quest_grade_ratio_10f;   /* .sdata2 0x8079C540 */
+extern const f32 quest_grade_ratio_30f;   /* .sdata2 0x8079C55C */
+extern const f32 quest_grade_ratio_50f;   /* .sdata2 0x8079C520 */
 
 /* The band's roll-threshold tables (`.data` 0x805F7AB0..0x805F7AF8, claimed and DEFINED by
  * `src/quest/quest_entry.cpp`): each `chance` table is a run of one byte per pick slot, 32 or 22, in
@@ -41,8 +63,9 @@ extern "C" {
 
 /* The item work of the local slot, or NULL when the slot has none. */
 Q_ItemWork* move_work_item_work_get(void);
-/* The low byte of a slot work's +0x36C word; slot 0 means the local one. */
-u8 quest_slot_progress_get(s32 slot);
+/* The low byte of a result record's +0x36C word; a NULL record means the local slot (the two views of this function
+ * - the entry band's `s32 slot` caller and the arena band's record - are one declaration since the phase 4 fold). */
+u8 quest_slot_progress_get(QuestRecord* rec);
 
 /* The two item-pair tables `quest_item_pair_copy_block` indexes by item id: entries below 0x64 and
  * 0x64 and above.  The bytes are the DOL's (declared, never defined - playbook 29). */
@@ -136,6 +159,44 @@ void quest_element_copy(Q_ElementBlock* dst, const Q_ElementBlock* src);
 s32 quest_lot_pick_first(u8* chance, const Q_LotEntry* table, Q_ItemPair* out, s32 count, u16 total);
 s32 quest_lot_pick(u8* chance, const Q_LotEntry* table, Q_ItemPair* out, s32 count, u16 total);
 s32 quest_lot_pick_last(u8* chance, const Q_LotEntry* table, Q_ItemPair* out, s32 count, u16 total);
+
+/* The quest/arena result record accessors and the result screen's text getters (0x803B0F98..0x803B465C,
+ * absorbed from `menu/arena_result.cpp`): `quest_record_get` hands back the record the quest work block's
+ * `record_0x03C` points at and `quest_record_find` looks a record up by quest id.  The record type stays in the
+ * band header `include/unsplit/menu.h`. */
+
+/* The current result row, or NULL when the screen has none. */
+QuestRecord* quest_record_get(void);
+
+/* The result record of quest `quest_id` from the loaded quest list (or the network control's slots), or
+ * NULL when none carries that id. */
+QuestRecord* quest_record_find(u16 quest_id);
+
+/* 0x803B33B0 / 0x803B33E8 - the quest message string tables 35 and 4: the string at `index`
+ * (`quest_str_tbl_35_get` is declared in the leaf header below). */
+char* quest_str_tbl_4_get(u32 index);
+
+/* 0x803B2D50 - how many of item `id` the player `who` holds (the quest band's element accessors
+ * subtract it from an element's target). */
+s16 quest_item_count_sum(u16 id, s32 who);
+
+/* 0x803B3454.. - the result screen's text getters: the `_of` forms take the row, the plain forms read the
+ * current one; each returns `quest_text_buffer` or a string-table entry. */
+char* quest_name_text_get(void);
+char* quest_field198_text_get(void);
+char* quest_field13A_text_get(void);
+char* quest_time_text_get(u8 which);
+char* quest_field348_text_get(void);
+char* quest_field2E8_text_get(void);
+char* quest_clear_time_text_get(void);
+char* quest_elapsed_time_text_get(void);
+char* quest_score_text_get(void);
+char* quest_arena_items_text_get(u8 index);
+char* quest_arena_time_text_get(QuestRecord* rec, s32 which);
+char* quest_grade_text_get(u8 grade);
+char* quest_grade_text_cur_get(void);
+char* quest_monster_text_get(QuestRecord* rec, u8 which);
+
 
 #ifdef __cplusplus
 }  /* extern "C" */

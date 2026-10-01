@@ -60,7 +60,7 @@
 #include "enemy/fn_801251D0.h"
 #include "enemy/fn_80138074.h"
 #include "stage/fn_802B2AA0.h"
-#include "fn_80423E74.h"
+#include "Network/network_pat_control.h"
 #include "sys_mem.h"
 #include "stage/stg_w.h"
 

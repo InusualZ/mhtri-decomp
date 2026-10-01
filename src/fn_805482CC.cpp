@@ -12,7 +12,7 @@
  * `DBClose`, `gdev_cc_shutdown`, `J3DAnonVisibilityFull::~...` - at dozens of addresses across the
  * band, so it is no evidence; and the range's `.data` refs are UI part-name strings only, no
  * `__FILE__` emitter).  The module is likewise un-evidenced, so the file keeps the map's stem at the
- * repository root, like the neighbouring un-moduled game files `fn_80056F24.cpp`/`fn_80423E74.cpp`.
+ * repository root, like the neighbouring un-moduled game files `fn_80056F24.cpp`/`Network/network_pat_control.cpp`.
  *
  * Language C++ and lib, from the range's own structure: vptr dispatch, adjustor thunks
  * (`subi r3, r3, 0x10`), deleting destructors calling `__dl__FPv`, and the target object's flags.

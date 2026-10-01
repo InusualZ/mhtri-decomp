@@ -75,7 +75,7 @@ void font_set_size(s16 x, s16 y);
 void font_flush(void);
 void font_print_ex(s16 x, s16 y, s16 flag, s8* fmt, ...);
 
-/* The font cluster's own text helpers, added with `menu/arena_result.cpp` (rule 2: this range owns
+/* The font cluster's own text helpers, added with `quest/quest_entry.cpp` (rule 2: this range owns
  * the three addresses).  All three keep the owner's own spelling and are declared at C++ scope so a
  * consumer's call mangles to what the target objects' relocations carry (`__FPc`, `__FPcPc`,
  * `__FPcl`): 0x8005B874 `flfntStrLen` (a `b` tail call into the decoding walker, so its length is

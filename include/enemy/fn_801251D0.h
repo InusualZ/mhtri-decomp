@@ -69,7 +69,7 @@ void fn_80128A8C(struct _ENEMY_WORK* self, u8 a, u8 b);
 void fn_80126324(struct _ENEMY_WORK* self, u32 a, u32 b, f32 c);
 void em_hit_window_set(struct _ENEMY_WORK* self, u8 a, u32 b, u32 c);
 /* 0x8012B380 - r3 (`self`) and three scalars; the motion/state setter the action band calls after
- * `em_mot_end_ck` reports done (this unit owns the address).  Added with `enemy/fn_80387844.cpp`
+ * `em_mot_end_ck` reports done (this unit owns the address).  Added with `enemy/em009_act.cpp`
  * (rule 2; the same signature `include/enemy/fn_80165FC8.h` carried). */
 void fn_8012B380(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 /* 0x80127FE4 / 0x801280AC - one `self` argument, no return.  Moved here from
@@ -125,7 +125,7 @@ void em_part_rec_reset(struct _ENEMY_WORK* self, u32 slot);
 /* 0x80127D20 - installs the enemy data's alternate hit-part record `sel` for slot `slot`. */
 void em_part_rec_alt_set(struct _ENEMY_WORK* self, u32 slot, u32 sel);
 
-/* 0x80129744 - r3 (`self`) only; the action band's release hook (`enemy/fn_80387844.cpp`'s
+/* 0x80129744 - r3 (`self`) only; the action band's release hook (`enemy/em009_act.cpp`'s
  * `fn_80389E1C` calls it when its sub-state count reaches 4).  Added with that unit (rule 2: this
  * range owns the address). */
 void fn_80129744(struct _ENEMY_WORK* self);

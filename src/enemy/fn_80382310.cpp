@@ -1,5 +1,5 @@
 /* enemy/fn_80382310.cpp - the enemy `em009`/`em019` program band's shared support block, `.text`
- * 0x80382310..0x803868DC (the tail 0x803868DC..0x80387844 moved to `enemy/fn_80387844.cpp` in the
+ * 0x80382310..0x803868DC (the tail 0x803868DC..0x80387844 moved to `enemy/em009_act.cpp` in the
  * 2026-09-30 recut; the range still holds more than one TU, see SEAM).
  *
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
@@ -13,7 +13,7 @@
  *
  * MODULE AND NAME (brief section 2, evidence order).  1. No `__FILE__` string (above).  2. `dumpmap.py
  * lookup` answers only `zz_XXXXXXXX_` placeholders.  3. The code places the unit in `enemy`: the
- * immediately following registered unit is `enemy/fn_80387844.cpp` (0x80387844, the monster-AI action
+ * immediately following registered unit is `enemy/em009_act.cpp` (0x80387844, the monster-AI action
  * band), the immediately preceding `.data` is the enemy program-table block (`em019_prog_tbl`
  * at 0x805EE518, its table run 0x805EE584..0x805EE5B0 that `fn_80382310` indexes, `em009_prog_tbl` at
  * 0x805EF990, and the `jumptable_805EF4F4`/`jumptable_805EF52C` switch tables of the same band), and
@@ -32,7 +32,7 @@
  * `.sdata2` tables live in other splits and are referenced here as the map's `lbl_`/`jumptable_`
  * symbols, never re-emitted (rule 10 / rule 2).
  *
- * SEAM.  The right edge 0x803868DC starts the `em009` TU (`enemy/fn_80387844.cpp`).  The range is still
+ * SEAM.  The right edge 0x803868DC starts the `em009` TU (`enemy/em009_act.cpp`).  The range is still
  * more than one TU, not split yet: the two `.ctors` words (`fn_8038309C`, `fn_80385E7C`) are two TUs'
  * static initializers (the first TU ends at 0x80383148; `fn_80385E7C` constructs the `lbl_806C4A88`
  * array with `fn_80385E9C`, emitted after it), and the pool repeats 41c00000 at `lbl_8079BFAC` (first
@@ -82,6 +82,8 @@
 #include "enemy/note_work.h" /* NoteWork and the pane/slot/layout types (rule 1) */
 #include "lobby/lb_quest_screen.h" /* note_pane_get_motion (rule 2: the owner's header) */
 #include "ef/pRoot.h"
+#include "lobby/lb_server_sel_trans.h" /* fn_803C7EAC / fn_803C7F88 (owner's header, rule 2) */
+#include "Runtime.PPCEABI.H/CPlusLibPPC.h" /* __construct_array (owner's header, rule 2) */
 
 /* --- the declarations this band's bodies need (the owners are not registered yet; the address of
  * each sits inside 0x80380000.., the band this unit opens) ------------------------------- */
@@ -152,15 +154,12 @@ void fn_803854E4(void);
 void fn_80385598(void);
 void fn_803852B8(void);
 void fn_80385EE0(NoteWork* self);
-void fn_803C7EAC(void);
-void fn_803C7F88(void);
 void fn_800D58B0(s32 handle);
 s32 fn_800D9804(u32 a, void* b, void* c);
 void mhchar_reset(MHchar* self);
 void mhchar_construct(void* self);
 void fn_802DFC6C(void);
 s32 fn_80383F0C(_ENEMY_WORK* self, s16 a);
-void __construct_array(void* array, void* ctor, u32 a, u32 size, u32 count);
 }
 
 extern "C" void fn_80385CA0(_QNPC_W* self);

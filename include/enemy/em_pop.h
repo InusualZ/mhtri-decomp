@@ -85,30 +85,15 @@ typedef struct EmPopWorkSlot {
 extern "C" {
 #endif
 
-extern EmPopWorkSlot em_pop_w;
+/* The roster accessors, the work pointer `em_pop_w` and the model-band helpers (0x803B936C..0x803BE30C) are declared in
+ * `enemy/em_model.h` since the phase 4 recut moved them to `enemy/em_model.cpp`. */
 
-/* The roster accessor (0x803BDECC) - the one this unit's table searches go through. */
-EmPopRec* em_roster_record_get(u32 index);
-/* 0x803B9588 - the per-slot effect/joint binding the range's entry points walk: r3 the work
- * record, r4 the slot index, r5 the slot pointer, r6/r7 two scalars. */
-void em_roster_slot_effect_set(struct _ENEMY_WORK* self, u16 index, s32* slot, s32 a, s32 b);
-s32 em_roster_record_slot_id_get(u32 index);
-u32 em_roster_record_alive_ck(u32 index);
-void em_roster_record_pos_set(s32 index, nw4r::math::VEC3* pos, u8 area);
 /* 0x803B6078 - fills two u16s from the work's per-slot pair when the slot is armed.
  * 0x803B8E1C - the em_set work's own state word.
  * Both moved out of `include/unsplit/menu.h` when this unit registered their addresses
  * (rule 2: the owner's header carries them). */
 u16 em_work_slot_pair_get(u16 index, s16* out);
 s32 em_set_work_state_get(void);
-void em_roster_record_release(u32 index);
-EmPopRec* em_roster_record_clear(EmPopRec* rec);
-u32 em_roster_sub_record_clear(EmPopSubRec* rec);
-EmPopRec* em_roster_free_record_get(void);
-EmPopSubRec* em_roster_sub_free_get(void);
-void em_roster_record_copy(EmPopRec* dst, const EmPopRec* src);
-void em_roster_record_unlink(EmPopRec* rec);
-u32 em_roster_record_result_get(const EmPopRec* rec);
 
 /* The quest/arena accessors that share this unit's registered `.text` range.  `em_pop`'s band
  * 0x803B465C..0x803BE30C is the discovery `--max-bytes` cap over several bands (its header says so);
@@ -116,7 +101,7 @@ u32 em_roster_record_result_get(const EmPopRec* rec);
  * 0x803B4BEC..0x803B68F0 sit inside it and are the quest/arena UI band's own.  Their callers, from
  * the target objects' undefined references (2987 objects scanned), are **20**: enemy/em020_prog,
  * enemy/fn_8011D448, enemy/fn_801251D0, enemy/fn_8012EC74, enemy/fn_8013F764,
- * lobby/lb_quest_screen, menu/fn_8031EA8C, menu/menu_result, menu/arena_result, quest/quest_entry
+ * lobby/lb_quest_screen, menu/fn_8031EA8C, menu/menu_result, quest/quest_entry, quest/quest_entry
  * and nine unclaimed `auto_*` bands - this file defines none of them and is not among them.  The
  * declarations live here because the registered range is this unit's (rule 2); the seam re-draw is
  * filed in both units' residual lists. */
@@ -208,29 +193,19 @@ typedef struct StagingFileHeader {
     /* +0x2C */ u16 version_0x2C;
 } StagingFileHeader;
 
-/* 0x803B88A8 / 0x803B88EC / 0x803BA69C - the local slot's move-work sub-state: read whether it is 4, set it to 4,
- * and test the sub index.  GUESS names. */
+/* 0x803B88A8 / 0x803B88EC - the local slot's move-work sub-state: read whether it is 4 and set it to 4.  GUESS names. */
 s32 quest_move_sub_state_4_get(void);
 void quest_move_sub_state_4_set(u8 flag);
-u32 quest_move_area_sub_ck(u8 sub);
 
 /* One entry of a 0xFFFF-terminated weight table: its `weight` and the `value` a pick returns. size: 0x4 */
 typedef struct EmWeightEntry {
     /* +0x0 */ u16 weight;
     /* +0x2 */ u16 value;
 } EmWeightEntry;
-/* 0x803BAE80 - the weighted random pick over such a table.  GUESS name. */
-u16 em_weight_table_pick(const EmWeightEntry* table);
 /* 0x803B8E40 - settles the carried-item pouch (`Q_ItemPair` x35): returns the credit, `flag` set when a
  * category-2 item was cleared.  GUESS name. */
 struct Q_ItemPair;
 s32 quest_pouch_items_settle(struct Q_ItemPair* pouch, u8* flag);
-
-/* 0x803BDF0C / 0x803BDFF4 / 0x803BE08C - the kind searches over the roster: collect the matching indices, and
- * read one record's aim position or +0x005 byte under the same acceptance test.  GUESS names. */
-u8 em_roster_kind_collect(u8 kind, u8* out, u8 max);
-nw4r::math::VEC3* em_roster_kind_aim_pos_get(u8 index, u8 kind);
-s32 em_roster_kind_field5_get(u8 index, u8 kind);
 
 struct Q_ItemWork;
 /* 0x803B5658 - fills the quest result work's stat block (+0x3E0) from the item work at the end of a hunt of

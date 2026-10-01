@@ -137,7 +137,7 @@ f32 fn_802751B4(struct _EQUIP* equip0, struct _EQUIP* equip1, s8* out);
 
 /* 0x802752C8 / 0x80275394 - the act-id and act-state pair predicates.  `Pl_item_id_usable_ck`'s second
  * argument is never read by its body, but every retail call site passes it (0 in
- * `menu/arena_result.cpp`, 1 in `enemy/em_pop.cpp`, 2 in `ai/fn_802D44F4.cpp`), so the declaration
+ * `quest/quest_entry.cpp`, 1 in `enemy/em_pop.cpp`, 2 in `ai/fn_802D44F4.cpp`), so the declaration
  * carries it - the call sites' `li r4,<mode>` is otherwise unrepresentable.  The parameter's NAME
  * is a GUESS: the sites' 0/1/2 are the only evidence for it, and the body's own masks are 1/2/0x10. */
 s32 Pl_item_id_usable_ck(u16 id, s32 mode);

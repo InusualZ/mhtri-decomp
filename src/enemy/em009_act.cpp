@@ -1,7 +1,7 @@
-/* enemy/fn_80387844.cpp - the enemy monster-AI action band (the `em009` TU), `.text` 0x803868DC..0x8038EC44.
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/dumpmap.py lookup`: every address here resolves to a `zz_XXXXXXXX_` dump
- * name and a bare `.text` entry in config/RMHE08/symbols.txt, so no real function name survives).
+/* enemy/em009_act.cpp - the enemy monster-AI action band (the `em009` TU), `.text` 0x803868DC..0x8038EC44.
+ * Naming note (phase 4): the unit was `enemy/fn_80387844`, a stem that is not its `.text` start; it is
+ * named for the `em009_act_*` slot functions the range holds (`em009_act_noop` 0x8038E8E8, ...) and the
+ * `em009_prog_tbl` table beside it (GUESS: the `_act` suffix is the map's own, the file stem is derived).
  *
  * WHAT IT IS.  The per-action state machines of an enemy monster's AI: every body takes the shared
  * `_ENEMY_WORK` record and drives its `state` (+0x005) through a small machine whose steps call the
@@ -19,8 +19,8 @@
  * `zz_XXXXXXXX_` placeholders.  3. The code places the unit in `enemy`: every body drives
  * `_ENEMY_WORK` and calls `em_frame_check__FP11_ENEMY_WORKUsff`, `em_magma_check`,
  * `get_joint_wpos_em`, and the `.data` switch tables sit in the band the enemy `em0XX_prog_tbl`
- * program tables bracket.  The file therefore keeps the map's `fn_80387844` stem (brief option 4);
- * no name was invented and no module was guessed.
+ * program tables bracket.  The file stem is derived from the map's `em009_act_*`
+ * functions (see the naming note).
  *
  * LANGUAGE AND SECTIONS.  C++: the range reaches genuinely mangled callees (`setVector3`,
  * `mulVecMatAddTrans`, `rotVecY`, `calcVecAng2`, `eft009_set_pos`) through their real signatures
@@ -54,7 +54,7 @@
 #include "ef/eft009.h"
 #include "ef/fn_80105314.h"
 #include "ef/fn_8010D1A8.h"
-#include "enemy/fn_80387844.h"
+#include "enemy/em009_act.h"
 #include "lobby/fn_8030121C.h" /* eft_em_spawn, C linkage (rule 2: the owner's header) */
 #include "mh3_pad.h"
 #include "unsplit/enemy.h"

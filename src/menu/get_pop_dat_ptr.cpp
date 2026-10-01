@@ -1,5 +1,8 @@
 /*
- * The pop-data / option / demo system file, `.text` 0x803BE30C-0x803C4BA0 (110 functions, 26772 B).
+ * The pop-data / option system file, `.text` 0x803BE30C-0x803C3A5C (87 functions).
+ *
+ * Phase 4 recut: the registered range was 0x803BE30C-0x803C4BA0 (110 functions, 26772 B); the demo-work accessors
+ * from 0x803C3A5C moved to `lobby/lb_server_sel_trans.cpp`.  The notes below describe the former range.
  *
  * What it is.  The head of the range loads the per-map/area monster-population files
  * (`m%03d_%06d_c_pop.dat`, `06/..._f_pop.dat`, `06/..._r_pop.dat`) into the move-work buffer
@@ -78,6 +81,10 @@
 #include "Runtime.PPCEABI.H/memset.h" /* memset (owner: the Runtime.PPCEABI.H lib) */
 #include "unsplit/menu.h"    /* option_w, this band's own tables, its unowned callees */
 #include "unsplit/unknown.h" /* SystemWork / system_w */
+#include "lobby/lb_server_sel_trans.h" /* demo_work_process (owner's header, rule 2) */
+
+/* The ten pop-data pointers (.bss 0x806D2AF8) the accessor below hands out; this unit's whole `.bss` claim. */
+PopData* pop_dat_ptrs[10];
 
 /* The pop-data pointer accessor (map name `get_pop_dat_ptr__Fv`). */
 PopData** get_pop_dat_ptr(void)
@@ -126,18 +133,6 @@ u8 get_arena_cfg(u8 index, u8 value)
     return user->cfg_0x00[value];
 }
 
-/* Non-zero while the demo work is playing the demo the game asks about. */
-u32 event_demo_ck(void)
-{
-    return demo_work.state_0x00 == 4;
-}
-
-/* The demo id the demo work is playing, 0xFF when none. */
-u8 get_demo_no(void)
-{
-    return demo_work.demo_no_0x02;
-}
-
 /* This unit's own symbols that keep the map's plain (C-linkage) spelling. */
 extern "C" {
 
@@ -146,8 +141,6 @@ extern "C" {
 u8 ck_arena_cfg(u8 index, u8 value);
 /* Redraws the pop entry list `entry_reset` clears. */
 void entry_list_update(PopEntry* entry);
-/* The demo work's per-frame pass. */
-void demo_work_process(DemoWork* work);
 
 /* Dispatches to the normal or the arena option check, by the system's VS/arena mode byte. */
 u8 ck_cfg(u8 index, u8 value)
@@ -224,49 +217,6 @@ void demo_state_set(DemoWork* work)
     work->field_0x04 = 0;
 }
 
-/* The word the demo work holds at +0x04. */
-u32 get_demo_data(void)
-{
-    return demo_work.field_0x04;
-}
-
-/* Non-zero while any of the demo work's three entry flags is set. */
-u32 demo_flag_ck(void)
-{
-    if (demo_work.field_0x0C != 0) {
-        return 1;
-    }
-    if (demo_work.entry_0x14.flag_0x00 != 0) {
-        return 1;
-    }
-    if (demo_work.entry_0x14.flag_0x08 != 0) {
-        return 1;
-    }
-    return 0;
-}
-
-/* Clears the demo work. */
-void demo_work_clear(void)
-{
-    memset(&demo_work, 0, 36);
-}
-
-/* Marks the demo work as running. */
-void demo_set_running(void)
-{
-    demo_work.field_0x08 = 1;
-}
-
-/* Initialises the demo work for a fresh play-through. */
-void demo_work_init(void)
-{
-    demo_work.field_0x0D = 0;
-    demo_work.field_0x0C = 0;
-    demo_work.state_0x00 = 1;
-    demo_work.field_0x04 = 0;
-    demo_work.demo_no_0x02 = 255;
-}
-
 /* Saves the two demo words into the work block's saved pair. */
 void demo_save_words(void)
 {
@@ -294,12 +244,6 @@ void entry_reset(PopEntry* entry)
 {
     entry->field_0x002 = 0;
     entry_list_update(entry);
-}
-
-/* True for the five map ids 394..398. */
-u32 map_id_ck(u16 map)
-{
-    return (u16)(map - 394) <= 4;
 }
 
 } /* extern "C" */
