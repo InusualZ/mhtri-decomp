@@ -9,7 +9,8 @@ into the larger unit with the candidate cut recorded.
 ## Phases
 
 * **0 - the checker and the grade format** (this file, `tools/splits/splitcheck.py`).
-* **1 - text edges by band.** Proposal files only (`.pi/splits/phase1-<band>.json`); nothing goes into `splits.txt`.
+* **1 - text edges by band.** Proposal files only (`docs/splits/proposals/phase1-<band>.json`, seven bands `a`..`g` plus
+  `phase1-reconcile.json`, which resolves the cross-band conflicts); nothing goes into `splits.txt`.
 * **2 - data attachment per cut**: `.ctors`/`.dtors`, pool, `.data`, `.bss`/`.sbss`, extab; resolve the
   ambiguous-owner / isolated-run / span-blocked classes of `datagap.py`.
 * **3 - independent review** of the bands against what is already known (idea 94, `docs/data-order-seams.md`,
@@ -29,7 +30,7 @@ into the larger unit with the candidate cut recorded.
 
 ## Proposal file format
 
-`.pi/splits/phase<N>-<band>.json` (numbers may be ints or `"0x..."`):
+`docs/splits/proposals/phase<N>-<band>.json` (numbers may be ints or `"0x..."`):
 
 ```json
 {"phase": 1, "band": "ef",
@@ -64,7 +65,8 @@ into the larger unit with the candidate cut recorded.
   `main/<derived_name>.cpp` and phase 4 drops the directory.
 * **`keep_registered_edge: true`** on a cut says "this only restates a registered edge whose position is proven to lie
   inside a wide interval": the cut is grade-neutral (`grade` and `evidence` become optional), is **not counted as a
-  proven cut**, and is never merged away; the cut must sit on a registered range start (an error otherwise). The
+  proven cut**, and is never merged away; the cut must sit on a registered range start **or end** (the end of a registered
+  unit is the start of the unowned run after it; an error otherwise). The
   renderer prints the cut counts apart: `strong N, medium N, guess N, keep_registered_edge N`.
 * **Rendering** (`splitcheck.py --proposal F`): units are taken in text order; a `guess` cut merges the unit into the unit
   that TOUCHES its left edge - a proposal unit with a range ending at the cut, else a registered unit that does (the larger
@@ -72,6 +74,13 @@ into the larger unit with the candidate cut recorded.
   ranges then grow by the absorbed unit's); a guess cut with no touching unit is a `lint:` error and the unit stays; the
   proposal ranges are subtracted from the baseline units they overlap (a proposal that leaves a baseline unit with a hole,
   reuses a baseline name or overlaps another proposal unit is a `lint:` line and a non-zero exit).
+* **Chains**: a unit folded into a registered unit extends it, so the next `guess` cut that touches the folded unit's end folds
+  into the same registered unit (a run of guess units after a registered one is one unit, not a lint error).
+* **`supersedes`** (top-level, normally in a reconciliation file `phase<N>-reconcile.json`): a list of `{"band", "unit",
+  "reason"}`; the named unit (`derived_name`) of the proposal whose `band` matches is dropped before rendering, so a unit
+  two bands both propose (or one band's unit another extends) is replaced by the superseding file's unit. A name that matches
+  nothing is a `warn:` line; the renderer prints `superseded (dropped before rendering): band B unit U`.
+* **`removes_cuts`** may name a registered range **end** as well as a start (the edge of a registered unit against an unowned run).
 * **Data of a recut registered unit** (`--data-by-reader`, default on; `--no-data-by-reader` turns it off): for each data
   run of a baseline unit whose text the proposal splits (or absorbs), the symbols are assigned to the pieces in text order by
   a monotone DP (cost: readers in another piece, decoded from the retail text; ties keep a symbol with the earlier piece).
@@ -99,6 +108,8 @@ the evidence address. Invariants: `order`, `coverage`, `text-cut`, `extab`, `cto
 `--baseline` the suspected seams (the `kind: seam` requests in the primary checkout's `.pi/outbox/*.json`, and the pool
 groups recomputed from the decode, cf. `docs/pool-seams.md`).
 
+* The decoded data extent is the **map's** (owned ranges and unowned symbols alike): a literal of an unowned `.sdata2` pool
+  past the last owned range is read by the text that loads it, as one inside an owned range is.
 * Text references (who reads a pool literal, a jump table, a bss object) are **decoded from the retail `.text`**
   (`lis` + `addi`/`ori`/load, r13/r2 small-data accesses): heuristic, so a pool finding names the literal and the
   reader and a reviewer confirms it with `python tools/units/callers.py <address>` (the same kind of index, built from
@@ -109,7 +120,10 @@ groups recomputed from the decode, cf. `docs/pool-seams.md`).
   (inside the unit; a `bl`/`b` or a `lis`+`addi` of a function start). PASS when `L` is the unit's end (within 0xC of
   padding); FAIL with `cut_at = L` when the unit goes on, **unless** the function at `L` is called or address-taken from
   before `L` inside the unit - then it is UNKNOWN (the boundary is not confirmed). More words than one means several TUs.
-  The crt chain entries (`__destroy_global_chain`, ...) are exempt.
+  The crt chain entries (`__destroy_global_chain`, ...) are exempt. The closure also takes the functions that follow `L`
+  when each is a **slot of a vtable that a function of the unit (before the run) stores** - the inline virtual functions a TU
+  emits after its `__sinit` (found by scanning the map's whole `.data` for words equal to the function start) - together with
+  what they call after themselves.
 * `pool` (idea 94): a literal read by two units means one TU; one value at two addresses read by one unit means two TUs;
   a claimed pool must run in first-use order and be read by its unit. A numeric `.sdata2` literal is **read** only by a
   load (`lfs/lfd/lwz/lhz/lbz/psq_l` through r13/r2, a `lis`, or a register an `addi`/`ori` formed the address into; calls
