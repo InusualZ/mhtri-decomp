@@ -1,0 +1,244 @@
+{
+ "phase": 2,
+ "band": "folds",
+ "lane": "p2",
+ "units": [
+  {
+   "derived_name": "pl_frame_sync",
+   "module": "hud",
+   "ranges": {
+    ".text": [
+     [
+      "0x8033041C",
+      "0x80338808"
+     ]
+    ]
+   },
+   "absorbs": [
+    "enemy/em_pl_frame.cpp",
+    "hud/net_char_sync.cpp"
+   ],
+   "cuts": [
+    {
+     "addr": "0x8033041C",
+     "section": ".text",
+     "kind": "registered-edge",
+     "keep_registered_edge": true,
+     "reproduce": "python tools/splits/splitcheck.py --baseline --only pool --unit em_pl_frame"
+    }
+   ],
+   "removes_cuts": [
+    {
+     "addr": "0x80334568",
+     "section": ".text",
+     "grade": "strong",
+     "kind": "data-interleave",
+     "evidence": [
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x805E0EA0",
+       "finding": "jumptable_805E0EA0 (0x164 B) is the switch table of Pl_act_frame_dispatch (0x80334758, in hud/net_char_sync) and its slots are inside that function, yet it sits at 0x805E0EA0 between lbl_805E0E60 (read at 0x80334050..0x803340B4, in enemy/em_pl_frame) and lbl_805E1004 (read at 0x80331A40..0x80331A90, in enemy/em_pl_frame): the two units' data is interleaved"
+      },
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x805E1ED0",
+       "finding": "lbl_805E1ED0 (0x9C B) is read only by Pl_act_step_table_enter (0x803346B4, hud/net_char_sync) and sits between lbl_805E1E20 (read at 0x8033405C..0x803340C0) and lbl_805E1F6C (read at 0x80334230), both enemy/em_pl_frame text: a second interleave of the same two units"
+      },
+      {
+       "tool": "dataattach",
+       "command": "python tools/splits/dataattach.py --window 0x802A0000 0x80380000 --units docs/splits/proposals/phase2-p2d-folds.json --unit 'pl_frame_sync' --section .data",
+       "finding": "the .data run 0x805E0510..0x805E27D4 is one fragment with readers in both units' text, read in two passes over the same functions (lbl_805E0A70 and lbl_805E1004 are both read by the function at 0x80331A34..0x80331A90): a TU's data is one contiguous fragment, so 0x80334568 is not a TU edge"
+      }
+     ],
+     "reproduce": "python tools/splits/dataattach.py --window 0x802A0000 0x80380000 --units docs/splits/proposals/phase2-p2d-folds.json --unit 'pl_frame_sync' --section .data"
+    }
+   ],
+   "open_questions": [
+    "module hud follows net_char_sync's flag evidence (cflags_hud); the em_pl_frame half has no flag evidence of its own (bodyless unit)",
+    {
+     "unit": "hud/pl_frame_sync.cpp",
+     "question": "the unit still holds two TUs: value 0x41f00000 sits at 0x8079B218 (last read 0x803309AC) and again at 0x8079B258 (first read 0x80331D8C), and the .data run agrees (lbl_805E0510..lbl_805E05E4 are read only up to 0x80330CEC, lbl_805E0728 is first read at 0x8033129C); the second TU starts at one of the 10 function starts between, and the registered 0x80334568 is inside it, not its edge",
+     "candidate_interval": [
+      "0x80330CEC",
+      "0x8033129C"
+     ],
+     "positions": [
+      "0x80330E00",
+      "0x80330E10",
+      "0x80330E14",
+      "0x80330EF8",
+      "0x80331000",
+      "0x80331104",
+      "0x8033112C",
+      "0x803311A0",
+      "0x80331210",
+      "0x80331238"
+     ],
+     "evidence": "pooldup 0x41f00000 (0x8079B218 / 0x8079B258) intersected with the first data object of the second group",
+     "reproduce": "python tools/splits/splitcheck.py --baseline --only pool --unit em_pl_frame --intervals"
+    }
+   ]
+  },
+  {
+   "derived_name": "fn_800FD864_fx",
+   "module": "ef",
+   "ranges": {
+    ".text": [
+     [
+      "0x800FD864",
+      "0x80100448"
+     ]
+    ]
+   },
+   "cuts": [
+    {
+     "addr": "0x800FD864",
+     "section": ".text",
+     "keep_registered_edge": true,
+     "kind": "registered-edge",
+     "reproduce": "python tools/splits/splitcheck.py --baseline --unit ^ef/fn_800FD864\\.cpp$"
+    }
+   ],
+   "absorbs": [
+    "ef/fn_800FD864.cpp",
+    "ef/fn_800FE978.cpp",
+    "ef/eft004.cpp"
+   ],
+   "removes_cuts": [
+    {
+     "addr": "0x800FE978",
+     "section": ".text",
+     "grade": "medium",
+     "evidence": [
+      {
+       "tool": "dataattach_b",
+       "command": "python tools/splits/dataattach_b.py --unit 'fn_800FD864|fn_800FE978|eft004' --section .data",
+       "finding": "fn_800FD864's 11 jump tables (0x8059C19C..0x8059C364, read only by it) lie after eft004's data: jump tables are in function order after the TU's definitions"
+      }
+     ],
+     "reproduce": "python tools/splits/dataattach_b.py --unit 'fn_800FD864|fn_800FE978|eft004' --section .data"
+    },
+    {
+     "addr": "0x800FF8D4",
+     "section": ".text",
+     "grade": "medium",
+     "evidence": [
+      {
+       "tool": "dataattach_b",
+       "command": "python tools/splits/dataattach_b.py --unit 'fn_800FD864|fn_800FE978|eft004' --section .data",
+       "finding": "fn_800FE978's 3 jump tables (0x8059C3C0..0x8059C40C) lie after eft004's data (0x8059BF90..0x8059C190) and before eft004's own table (0x8059C45C)"
+      }
+     ],
+     "reproduce": "python tools/splits/dataattach_b.py --unit 'fn_800FD864|fn_800FE978|eft004' --section .data"
+    }
+   ],
+   "open_questions": [
+    "merge candidate from the phase-2 data interleave (phase2-p2b.md section 4)"
+   ]
+  },
+  {
+   "derived_name": "fn_801EC9F8_merged",
+   "module": "lobby",
+   "ranges": {
+    ".text": [
+     [
+      "0x801EC9F8",
+      "0x801FBF78"
+     ]
+    ]
+   },
+   "absorbs": [
+    "lobby/fn_801EC9F8.cpp",
+    "lobby/fn_801F3294.cpp",
+    "lobby/fn_801F9CD4.cpp"
+   ],
+   "cuts": [
+    {
+     "addr": "0x801EC9F8",
+     "section": ".text",
+     "kind": "registered-edge",
+     "keep_registered_edge": true,
+     "reproduce": "python tools/splits/splitcheck.py --baseline --unit ^lobby/fn_801EC9F8\\.cpp$"
+    }
+   ],
+   "removes_cuts": [
+    {
+     "addr": "0x801F3294",
+     "section": ".text",
+     "grade": "medium",
+     "evidence": [
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x805B8B98",
+       "finding": "jumptable_805B8B98 (0x48 B) is the table of a switch in fn_801F0530 (a function of lobby/fn_801EC9F8) and sits between symbols read only by lobby/fn_801F3294 and lobby/fn_801F9CD4: a jump table lives in the reading unit's TU, so the data of the three units interleaves"
+      }
+     ],
+     "reproduce": "python tools/splits/dataattach.py --explain 0x805B8B98"
+    },
+    {
+     "addr": "0x801F9CD4",
+     "section": ".text",
+     "grade": "medium",
+     "evidence": [
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x805B8674",
+       "finding": "9 symbols of 0x805B8674..0x805B87F4 are read by both lobby/fn_801F3294 and lobby/fn_801F9CD4, and the sole readers of the two units interleave (0x805B89D0..0x805B8B68, 0x805B8BE0, 0x805B8C74): not two TUs in text order"
+      }
+     ],
+     "reproduce": "python tools/splits/dataattach.py --explain 0x805B8B98"
+    }
+   ]
+  },
+  {
+   "derived_name": "stage_res_data",
+   "module": "stage",
+   "after": "fn_80047398.cpp",
+   "ranges": {
+    ".data": [
+     [
+      "0x80582EF8",
+      "0x8058AC50"
+     ]
+    ]
+   },
+   "open_questions": [
+    "a data-only unit like Pl/pl_frame_data: 965 resource-name strings and tables read by stage/stg_w (826), ef/effect (113) and others, none of them by the four units around it"
+   ]
+  }
+ ],
+ "moves": [
+  {
+   "unit": "Network/network_shared_data.cpp",
+   "after": "lobby/lb_server_sel_trans.cpp",
+   "reason": "its .sdata/.sdata2 sit between the data of lb_server_sel_trans and NetworkSessionManagerPat (p2e)"
+  }
+ ],
+ "open_questions": [
+  {
+   "unit": "main/fn_80047398.cpp + fn_8004C9A0.cpp + fn_8004CAD8.cpp",
+   "question": "p2a's fold of the three units (the jump tables of the three lie in 0x80581158..0x80582C60, unit 5's registered .data after them) is NOT proposed: the merged unit reads the double 0x4330000000000000 at 0x80795BA0 (fn_80047398) and again at 0x80795BC8 (fn_8004CAD8) and gets 6 new `pool` findings (one value at two addresses: two TUs); the alternative is a registered range 0x80582C60..0x80582EF8 that belongs to a later unit",
+   "reproduce": "python tools/splits/splitcheck.py --baseline --only pool --unit fn_8004CAD8 --intervals"
+  },
+  {
+   "unit": "sound/quest_snd.cpp + sound/fn_800EF7D8.cpp",
+   "question": "p2b's fold (eight symbols read only by quest_snd lie inside fn_800EF7D8's tables, 0x805980A8..0x8059B16C) is NOT proposed: the merged unit reads the double 0x4330000000000000 at 0x80796580 and at 0x80796598 (2 new `pool` findings); the data stays an `interleave` deferral",
+   "reproduce": "python tools/splits/dataattach.py --explain quest_snd"
+  },
+  {
+   "unit": "ef/eft001.cpp + ef/eft002.cpp",
+   "question": "p2b's fold (eft002's tables lie between eft001's, 0x8059B5F8..0x8059B9A8) is NOT proposed: the merged unit reads the double 0x4330000080000000 at 0x80796638 and at 0x80796650 (2 new `pool` findings); the data stays an `interleave` deferral",
+   "reproduce": "python tools/splits/dataattach.py --explain eft001"
+  },
+  {
+   "unit": "Network/network_opening.cpp",
+   "question": "p2e's vtable conflict is open: lbl_80602968 (slots 0x80413724, 0x804138EC, stored from 0x80413480/0x80413724, all in Network/network_layer_io) sits after NetworkWiiMediator's registered .data (0x806024B8..0x80602824) while its slots precede that unit's text start 0x80413C64; attaching it to network_opening FAILs `vtable`, so the engine blocks it (`multi-tu`, 14 symbols) - either the registered edge 0x80413C64 or that range is wrong",
+   "reproduce": "python tools/splits/dataattach.py --explain 0x80602968"
+  },
+  {
+   "unit": "Pl/pl_act.cpp | Pl/fn_802840DC.cpp",
+   "question": "p2c's edge 0x802840DC is open: jumptable_805C80A8 (read only by fn_802840DC) sits before 30 symbols read by pl_act and pl_act_step; either those are tables of fn_802840DC's TU that earlier units read as externs or the registered edge is misplaced; the readers do not decide (a pl_act majority against an exact invariant)",
+   "reproduce": "python tools/units/callers.py 0x805C80A8"
+  }
+ ]
+}
