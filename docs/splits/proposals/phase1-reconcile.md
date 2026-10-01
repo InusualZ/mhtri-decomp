@@ -16,16 +16,20 @@ reconcile file (and e) it lints clean.
 
 | | baseline | candidate |
 | --- | --- | --- |
-| units | 306 | **362** |
-| cuts emitted (proposal-wide) | - | strong 42, medium 87, guess 190 (folded, never emitted), keep_registered_edge 18 |
+| units | 306 | **360** |
+| cuts emitted (proposal-wide) | - | strong 42, medium 86, guess 190 (folded, never emitted), keep_registered_edge 19 |
 | lint / warnings | - | **0 / 0** |
 | `order` FAIL | 0 | 0 |
 | `coverage` / `text-cut` / `extab` / `dtors` / `vtable` / `bss` FAIL | 0 | 0 |
 | `ctors` FAIL | 39 | **0** |
 | `pool` FAIL | 129 | **63** |
+| `local-static` FAIL (new invariant) | 0 | **0** |
+| proposed cuts crossed by a local static | - | **0** |
 | `data-order` FAIL | 3 | 3 (unchanged) |
 | `jumptable` FAIL | 1 | 1 (unchanged) |
 | new failures outside the proposal units | - | **0** |
+
+Before and after the review pass (same checker, the one with the `ctors` own-slot-past-the-end rule and the `local-static` invariant): the candidate of the first revision gave units 362, `ctors` 2 (`menu/menu_plsearch`, cut 0x80456300 too early over its own vtable slots; `homebutton/fn_80533474`, cut 0x8053E7D0 over seven own slots), `local-static` 2 (`AlarmQueue`, `ConfBuf`: the second was a decode bug, an update-form `stwu` left the old base register alive, fixed) and 8 proposed cuts crossed by a local static (`0x804ABC70`, `0x804ABF00`, `0x804BB750` x3 statics, `0x804CBC60`, `0x804D2CD0`, `0x804E70C0`), `pool` 63; this revision: units 360, `ctors` 0, `local-static` 0, crossings 0, `pool` 63. The own-slot run past a unit end counts only when its first function is an inline-sized slot (<= 0x40 B): the registered `ef_emform` (slots of a vtable whose members are large functions of the next TU) stays PASS.
 
 `.text`: no unowned function is left (every band's backlog is a unit or folded into one). Unowned data after the candidate
 (unchanged from the baseline, phase 2's input): `.data` 61 runs / 8,454 symbols, `.bss` 17 / 439, `.sdata` 13 / 2,052, `.sdata2` 9 / 6,802,
@@ -38,10 +42,10 @@ proposal units still FAIL `pool` (below); that is the open-question list, not an
 ### Proposal units that still FAIL `pool` (28, all documented open questions of the band that proposed them)
 
 * **A unit holds two TUs** (`pooldup`: one value at two pool addresses read by one unit; the band's `open_questions` carry the
-  candidate interval): `eft004_fx`, `eft022_fx`, `eft029_fx`, `lb_npc`, `pl_act`, `pl_motion`, `pl_coll`, `menu_item`, `hud_notice`,
+  candidate interval): `eft004_fx`, `eft022_fx`, `eft029_fx`, `lb_npc`, `pl_act`, `pl_motion`, `pl_coll`, `menu_item`, `cockpit`,
   `eft035`, `fn_8031DAA8`, `em020_prog`, `em_model`, `menu_placeinfo`, `movie` (bands b/c/d/e), and the f/g units the new pool
   decode now sees: `MSL_C/alloc` (the guess block of Gecko + MSL files, `0x0` read at 0x8079C9A8 and 0x8079C9F8), `THP/fn_804DF200`,
-  `WPAD/wpad`, `nw4r/fn_80501CE8`, `SO/soi`, `homebutton/fn_80533474`, `homebutton/fn_8055B710`, `homebutton/fn_80566440`.
+  `WPAD/wpad`, `nw4r/fn_80501CE8`, `SO/soi`, `NAND/nand` (the merged guess block that now holds OSAlarm), `homebutton/fn_80533474`, `homebutton/fn_8055B710` (`homebutton/fn_80566440` left the list: its end moved to 0x80569DAC).
 * **One pool per TU across a kept edge**: `quest_entry` (the fold continues into `em_pop`), `lb_server_sel_trans`
   (`networkSessionDefaultDelay`), `NetworkSessionManagerPat` and `NetworkCommunityPat` (e's open question 2/3: the Network pool group,
   possibly `extern const` scalars), `RVLGX/GXTexture_tail` (`__GXData`, a `.sdata` scalar read as a literal: the tool cannot tell an
@@ -57,9 +61,9 @@ proposal units still FAIL `pool` (below); that is the open-question list, not an
 | b | ..0x801C0000 | 27 | 6 lint, 26 warn | 3 cuts graded `baseline` -> `keep_registered_edge` (`em_common` 0x801251D0, `em_kind` 0x8013BE60, `em008_prog` 0x8015D860; `kind: registered-edge`, a `reproduce` added); `takes_part_of` on 26 units removed (20: the names are already in `absorbs`/`replaces_tail_of`; 6 kept as an `open_questions` line: `em_common`, `em008_prog`, `em010_prog`, `em012_prog`, `em015_prog`, `em016_prog`) |
 | c | ..0x802A0000 | 11 | 5 lint, 29 warn | 5 units that start on a registered start (`lb_menu_scratch`, `pl_act_step`, `pl_act`, `pl_motion`, `pl_coll`) got a `keep_registered_edge` cut; `name_note` (11), `data_note` (4), `matching_conflict` (1) moved into the unit's `open_questions` as `key: text`; 18 `absorbs` and 3 `replaces_tail_of` names completed with the registered unit's extension, 4 prose entries (`the head/tail of X`) rewritten as `X.cpp (head|tail)` |
 | d | ..0x80380000 | 17 | clean | none (its `em019_ai` is superseded below) |
-| e | ..0x80460000 | 26 | 1 lint, 3 warn | 10 `guess` cuts that restate a registered edge (`NetworkSessionManagerPat`, `NetworkCommunityPat`, `network_layer_io`, `network_opening`, `constructNetworkLibrary`, `NetworkReflectService`, `network_pat_control`, `CPlusLibPPC`, `runtime`, `alloc`) -> `keep_registered_edge` (the lane's own renderer kept the registry edge; the landed renderer folds a guess cut into the registered unit it touches: `Camellia`, `Gecko_ExceptionPPC`, ... grew) |
-| f | ..0x80540000 | 229 | 1 lint, 230 warn | `class` -> `kind` on 229 cuts, `text_band` -> `text_range`; the remaining lint is the e/f gap (section 1) |
-| g | 0x80540000..0x8056F2B4 | 20 | 0 lint, 20 warn | `class` -> `kind` on 20 cuts; `replaces_tail_of: "band f: fn_8053E7D0"` (a proposal unit, not a baseline name) moved to an `open_questions` line |
+| e | ..0x80460000 | 27 | 1 lint, 3 warn | 10 `guess` cuts that restate a registered edge (`NetworkSessionManagerPat`, `NetworkCommunityPat`, `network_layer_io`, `network_opening`, `constructNetworkLibrary`, `NetworkReflectService`, `network_pat_control`, `CPlusLibPPC`, `runtime`, `alloc`) -> `keep_registered_edge` (the lane's own renderer kept the registry edge; the landed renderer folds a guess cut into the registered unit it touches: `Camellia`, `Gecko_ExceptionPPC`, ... grew) |
+| f | ..0x80540000 | 227 | 1 lint, 230 warn | `class` -> `kind` on 229 cuts, `text_band` -> `text_range`; the remaining lint is the e/f gap (section 1) |
+| g | 0x80540000..0x8056F2B4 | 21 | 0 lint, 20 warn | `class` -> `kind` on 20 cuts; `replaces_tail_of: "band f: fn_8053E808"` (a proposal unit, not a baseline name) moved to an `open_questions` line |
 
 Tool changes that made the rest clean (not file edits): `merge_guess` chains through a registered unit (e's `NetworkLayerPat`
 behind its folded `NetworkSessionManagerPat`), `keep_registered_edge` and `removes_cuts` accept a registered range **end**,
@@ -68,9 +72,9 @@ PASS now), `Ctx.scan` decodes the unowned `.sdata2` pool (above), `supersedes` e
 
 ## 3. Cross-band decisions (`phase1-reconcile.json`)
 
-1. **`fn_8053E7D0`, f vs g: g supersedes f.** Both propose `homebutton/fn_8053E7D0` from 0x8053E7D0; f ends at 0x8054032C (inside the
+1. **`fn_8053E808` (was `fn_8053E7D0`), f vs g: g supersedes f.** Both propose `homebutton/fn_8053E808` from 0x8053E808 (moved from 0x8053E7D0: the seven 8-byte slots of `lbl_8064DC30` between are the unit's own, `splitcheck` fails the earlier cut with `cut_at` 0x8053E808); f ends at 0x8054032C (inside the
    function run g measured), g at 0x805425E4 with the ctors-closure evidence (the sinit `fn_8054254C` closure ends 0x805425B4 and the 7 slots after it are
-   the unit's own). `supersedes: {band f, unit fn_8053E7D0}`. The renderer prints `superseded (dropped before rendering): band f unit fn_8053E7D0`.
+   the unit's own). `supersedes: {band f, unit fn_8053E808}`. The renderer prints `superseded (dropped before rendering): band f unit fn_8053E808`.
 2. **`menu/menu_item`, c/d at 0x802A6624: no conflict, no resolution needed.** c's unit is 0x80297E34..0x802A6624 (the tail of
    `Pl/fn_80295EF4` + `menu_item`, the cut 0x8029F3C8 removed: `lbl_8079A3B8`); d proposes nothing in that range, so its end stays
    the registered edge against `menu/menu_message` (0x802A6624). Recorded as a reconcile open question only. c's own residual
@@ -92,15 +96,16 @@ Not reconciled (left as the bands' own open questions): the e/f MSL naming; e's 
 
 ## 4. Matching units inside a merge
 
-The set is "a registered `Object(Matching, ...)` whose range the candidate no longer keeps" (all 37 `Matching` objects compared against the emitted candidate). Six:
+The set is "a registered `Object(Matching, ...)` whose range the candidate no longer keeps" (all 37 `Matching` objects compared against the emitted candidate). Seven:
 
 | registered `Matching` unit | folded into | evidence (band, cut, grade) | what the lane that registers the merged unit must do |
 | --- | --- | --- | --- |
-| `ai/fn_802D0DCC.c` 0x802D0DCC..0x802D0F34 | `ai/ai_npc` (0x802C2700..0x802D9EA4) | d, cuts 0x802D0DCC and 0x802D0F34 removed, strong: 39 literals (e.g. 0x8079A670) read on both sides | the merged unit is the one object; demote `fn_802D0DCC` (`Object(NonMatching)` or fold its source into the merged file) and re-match the function inside it |
+| `ai/fn_802D0DCC.c` 0x802D0DCC..0x802D0F34 | `ai/ai_npc` (0x802C2700..0x802D9EA4) | d, cuts 0x802D0DCC and 0x802D0F34 removed, strong: 39 literals (e.g. 0x8079A670) read on both sides; second signal (confirmed on review): `fn_802D0DCC` has one caller, `fn_802D0F34` (0x802D1224), in the next registered unit | the merged unit is the one object; demote `fn_802D0DCC` (`Object(NonMatching)` or fold its source into the merged file) and re-match the function inside it |
 | `enemy/fn_80149D6C.c` 0x80149D6C..0x8014A1BC | `enemy/em001_prog` (0x80147C94..0x80154E40) | b, 0x80149D6C / 0x8014A1BC, strong: 46 literals both sides + `em001_prog_tbl` points at both sides | same |
 | `enemy/fn_80177608.cpp` 0x80177608..0x80177890 | `enemy/em015_prog` (0x80176C30..0x80182C40) | b, 0x80177608 / 0x80177890, strong: 5-12 literals both sides + `em015_prog_tbl` | same |
-| `enemy/em020_handlers.cpp` 0x80375084..0x80375424 | `enemy/em020_prog` (0x8036CF64..0x80378F9C) | d, 0x80375084 / 0x80375424, strong: 6 / 1 literals both sides | same |
+| `enemy/em020_handlers.cpp` 0x80375084..0x80375424 | `enemy/em020_prog` (0x8036CF64..0x80378F9C) | d, 0x80375084 / 0x80375424, strong: 6 / 1 literals both sides; second signal (confirmed on review): `em020_prog_tbl` (0x805EE098) holds slots on both sides of 0x80375424 (`em020_model_refresh`, `em020_condition_ck`, `em020_area_model_set` in the handlers file, `em020_hp_ratio_ck` after it) | same |
 | `Pl/pl_master.cpp` 0x8026BA1C..0x8026FFBC | `Pl/pl_act` (0x802693C4..0x802840DC) | c, 0x8026BA1C / 0x8026FFBC, strong: `lbl_8079A010` read by `fn_8026A3EC` (left) and `fn_802707B4` (right) | same; c's `matching_conflict` says the int->double magic is the strongest evidence |
+| `OS/OSAlarm.c` 0x804CBC50..0x804CBC60 (`cPhs_Set`, 0x10 B) | `OS/OSAlarm` (0x804CB440..0x804CBD10) | f, 0x804CBC50 / 0x804CBC60 removed, strong: `AlarmQueue` (.sbss 0x80795310, scope:local) is accessed 14 times in 6 functions, from `__OSInitAlarm` (0x804CB464) to `__OSCancelInternalAlarms` (0x804CBC80), across the registered unit | same; the lane **re-measures `cPhs_Set` in the merged object** (a function of another library by name inside the OSAlarm TU: it may be a mislabel of a 16-byte OS helper, rule 7 follow-up) |
 | `Network/initNetworkSessionStable.cpp` 0x803DEA30..0x803DEB38 | `Network/NetworkSessionManagerPat` (0x803D70B8..0x803E44C8) | e, 0x803DEA30 strong + 0x803DEB38 medium: `networkSessionPeriodSeconds` read by `networkPatAttachBuffer` and by it; own vtable slots on both sides | same; e's caveat: if the literal is an `extern const` scalar the pool half falls and only the slot argument remains |
 
 A `Matching` flag measures the bytes of the object, not the edge: its pool is typically unclaimed (the constants are undefined relocations), so the object

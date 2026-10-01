@@ -209,11 +209,11 @@
       },
       {
        "tool": "poolseams",
-       "command": "python tools/units/poolseams.py --unit quest/quest_entry.cpp",
+       "command": "python tools/units/poolseams.py --unit quest/quest_entry.cpp --root \"${MHTRI_MAIN:-.}\"",
        "finding": "group 0: quest/quest_entry + menu/arena_result + enemy/em_pop, 6 shared pool literals, text adjacent, first-use order holds, candidate fold (confidence medium; em_pop is coarse)"
       }
      ],
-     "reproduce": "python tools/units/callers.py quest_grade_ratio_50f && python tools/units/poolseams.py --unit quest/quest_entry.cpp"
+     "reproduce": "python tools/units/callers.py quest_grade_ratio_50f && python tools/units/poolseams.py --unit quest/quest_entry.cpp --root \"${MHTRI_MAIN:-.}\""
     }
    ],
    "open_questions": [
@@ -242,7 +242,7 @@
       {
        "tool": "splitcheck",
        "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit '^enemy/em_pop'",
-       "finding": "fn_803B92D4 is not the unit's last function (text ends 0x803BE30C, it ends 0x803B92E0): a TU boundary is at 0x803B92E0"
+       "finding": "fn_803B92D4 is not the unit's last function (text ends 0x803BE30C, it ends 0x803B92E0): the closure of its callees and address-taken functions ends at 0x803B936C, so the TU boundary is at 0x803B936C (the finding line names the sinit's end 0x803B92E0; the closure rows below reach 0x803B936C)"
       },
       {
        "tool": "dol",
@@ -337,7 +337,7 @@
       {
        "tool": "splitcheck",
        "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit '^menu/get_pop_dat_ptr'",
-       "finding": "demo_save_words is not the unit's last function (text ends 0x803C4BA0, it ends 0x803C3A5C): a TU boundary is at 0x803C3A5C"
+       "finding": "demo_save_words (0x803C3A44, ends 0x803C3A5C) is not the unit's last function (text ends 0x803C4BA0); its closure is empty, so the TU boundary is at its end 0x803C3A5C (`--unit '^menu/get_pop_dat_ptr'` prints the `detail` line with both ends)"
       },
       {
        "tool": "dol",
@@ -397,7 +397,8 @@
    "open_questions": [
     "the merged unit [0x803C3A5C,0x803CCDF8) holds at least two TUs: a `.data` V->S seam (0x805F91F0) pins a new TU start in 0x803CA484..0x803CA49C (4 positions, see open_questions)",
     "guess: lobby code (lb_server_sel_trans__FPvUc, get_qnpc_talk_data_ptr__Fv, lobby_world_block, lobby_w) ends and the NetworkStreamSink run starts at 0x803C987C, where a V->S interval ends (0x803B9FC8..0x803C987C, 219 positions) and the vtable first referrer is the new class; one soft signal, never applied",
-    "name from the named function lb_server_sel_trans; module lobby from lobby_w / lobby_world_block (guess)"
+    "name from the named function lb_server_sel_trans; module lobby from lobby_w / lobby_world_block (guess)",
+    "SPANS THREE MODULES: the run 0x803C4BA0..0x803CCDF8 holds lobby (lb_server_sel), Network (networkSessionDefaultDelay readers) and quest/menu helpers; module `lobby` names the first function only, and the unit is a candidate for a split in phase 2"
    ]
   },
   {
@@ -512,7 +513,7 @@
    ],
    "open_questions": [
     "TOUCHES A MATCHING UNIT (Network/initNetworkSessionStable.cpp, 264 B): the evidence is an exact pooled-literal read on both sides plus own vtable slots on both sides; its source has to be folded into the merged unit by the lane that registers it",
-    "the Pat TU starts inside the registered Network/NetworkSessionManager.cpp (see open_questions), so the left edge is a registry edge kept as-is",
+    "CONTRADICTED: the registered edge 0x803D70B8 is NOT the Pat TU's start. `__dt__24NetworkSessionManagerPatFv` (0x803D6D00), `init__` (0x803D6DC4), `clear__` (0x803D6E84) and `release__` (0x803D6F98) are slots of `__vt__24NetworkSessionManagerPatFv` (0x805FB0F0, `callers.py 0x803D6D00 --pointers`) and lie inside the registered NetworkSessionManager.cpp (0x803D6D00..0x803D70B8); the Pat TU starts in 0x803D4C18..0x803D68D0 (the strong V->S seam 0x805FAAD0 and the ctor at 0x803D68D0). 0x803D70B8 is kept only because phase 1 does not move a registered edge; the move is filed for phase 2",
     "the Pat TU ends somewhere in 0x803DF17C..0x803E0C18 (the last own slot is 0x803DF178; a V->S seam puts the NetworkLayer TU start in 0x803DF5FC..0x803E0C18): the next unit is a guess cut at 0x803DF5FC that the renderer folds back into this unit"
    ]
   },
@@ -594,7 +595,7 @@
     {
      "addr": "0x803F73C0",
      "section": ".text",
-     "grade": "medium",
+     "grade": "guess",
      "evidence": [
       {
        "tool": "tudiscover",
@@ -607,7 +608,8 @@
    ],
    "open_questions": [
     "name from the networkPacket_* / networkStreamWriter_* function run; the cut is a width-1 zigzag `.data` pin (0x805FC8A8): one soft signal, zigzag seams are the least measured kind (0 hits, 0 misses at width 1 on the clean registered units)",
-    "the run holds further seams (0x803F7478..0x803F74D8, 0x803F74F4..0x803F7548, 0x803F761C..0x803F87B8, 0x803F8810..0x803FA5F4, see open_questions)"
+    "the run holds further seams (0x803F7478..0x803F74D8, 0x803F74F4..0x803F7548, 0x803F761C..0x803F87B8, 0x803F8810..0x803FA5F4, see open_questions)",
+    "DOWNGRADED medium -> guess: the only evidence is one width-1 zigzag `.data` pin (0x805FC8A8); the width-1 zigzag is unmeasured on clean registered units (0 hits, 0 misses), so it cannot grade a cut by itself. The cut is merged into the touching unit until a second signal exists; PatInterface's cut 0x803FCC34 is tied to it"
    ]
   },
   {
@@ -625,7 +627,7 @@
     {
      "addr": "0x803FCC34",
      "section": ".text",
-     "grade": "strong",
+     "grade": "medium",
      "evidence": [
       {
        "tool": "dol",
@@ -653,7 +655,8 @@
    ],
    "open_questions": [
     "class PatInterface (`__ct__12PatInterfaceFv` first): called from 10 other units, the registered network_state.cpp follows at 0x803FE8E4 (a registry edge)",
-    "the ctors closure is empty (the sinit fn_803FC5B8, 0x67C B, inlines its constructions); the function at L has callers before it (0x803E14F8, 0x803F02C4, 0x803F09B8, 0x803F6554): they lie before the cut 0x803F73C0, so none is inside the TU that ends at L only if that medium cut is right"
+    "the ctors closure is empty (the sinit fn_803FC5B8, 0x67C B, inlines its constructions); the function at L has callers before it (0x803E14F8, 0x803F02C4, 0x803F09B8, 0x803F6554): they lie before the cut 0x803F73C0, so none is inside the TU that ends at L only if that medium cut is right",
+    "DOWNGRADED strong -> medium: the R1 row (\"no earlier referrer in the unit\", callers 0x803E14F8, 0x803F02C4, 0x803F09B8, 0x803F6554) holds only if 0x803F73C0 is a TU start, because the last caller 0x803F6554 lies before it; 0x803F73C0 is itself a guess (one width-1 zigzag), so the two cuts stand or fall together"
    ]
   },
   {
@@ -847,11 +850,11 @@
       },
       {
        "tool": "poolseams",
-       "command": "python tools/units/poolseams.py --unit fn_80423E74.cpp",
+       "command": "python tools/units/poolseams.py --unit fn_80423E74.cpp --root \"${MHTRI_MAIN:-.}\"",
        "finding": "group 0: fn_80423E74 + Network/network_pat_control, 1 shared pool literal, text adjacent, first-use order holds, candidate fold (confidence high)"
       }
      ],
-     "reproduce": "python tools/units/callers.py 0x8079C890 && python tools/units/poolseams.py --unit fn_80423E74.cpp"
+     "reproduce": "python tools/units/callers.py 0x8079C890 && python tools/units/poolseams.py --unit fn_80423E74.cpp --root \"${MHTRI_MAIN:-.}\""
     },
     {
      "addr": "0x8043065C",
@@ -865,16 +868,17 @@
       },
       {
        "tool": "poolseams",
-       "command": "python tools/units/poolseams.py --unit fn_80423E74.cpp",
+       "command": "python tools/units/poolseams.py --unit fn_80423E74.cpp --root \"${MHTRI_MAIN:-.}\"",
        "finding": "group 0: fn_80423E74 + Network/network_pat_control, 1 shared pool literal, text adjacent, first-use order holds, candidate fold (confidence high)"
       }
      ],
-     "reproduce": "python tools/units/callers.py 0x8079C890 && python tools/units/poolseams.py --unit fn_80423E74.cpp"
+     "reproduce": "python tools/units/callers.py 0x8079C890 && python tools/units/poolseams.py --unit fn_80423E74.cpp --root \"${MHTRI_MAIN:-.}\""
     }
    ],
    "open_questions": [
     "the readers of lbl_8079C890 span 0x804292F8..0x80431690 (33 KB); the TU end X lies in 0x8043172C..0x80432104 (the sinit closure end): the whole unowned run 0x8043065C..0x80432104 is merged here (no interval demands a cut inside [0x80423E74,0x80432104), `python tools/splits/tudiscover.py at 0x80431690`), but part of it may be the next TU",
-    "name kept from the larger registered unit; the registered Matching Camellia unit is untouched"
+    "name kept from the larger registered unit; the registered Matching Camellia unit is untouched",
+    "data-order note: jumptable_80603CE4 (read at 0x804306B0 by fn_8043065C) and jumptable_80603D40 are adjacent 0x2C B switch tables; a tudiscover reading takes the pair as a seam (`jumptable_80603CE4 -> D40`), but `python tools/splits/tudiscover.py dataorder --all --weak` prints no row for it in the current build, and two switch tables back to back are what one TU holding two switches emits; the fold rests on the shared 0x4330000000000000 literal (callers.py 0x8079C890), phase 2 re-reads the `.data` order of the run"
    ]
   },
   {
@@ -1143,7 +1147,7 @@
     ".text": [
      [
       "0x80448404",
-      "0x80456300"
+      "0x804565C0"
      ]
     ]
    },
@@ -1178,62 +1182,8 @@
     }
    ],
    "open_questions": [
-    "name from the `__FILE__` string \"menu_plsearch.cpp\" (0x80607678, read at 0x8044BDE8 and 0x8044BF38); the run is 57 KB and also holds the \"menu_message.cpp\" assert (0x8044E340), createSystemFile / readDataFile / GalleryDemo_task_FP4_tcb: at least three TUs, cuts not located (see open_questions)"
-   ]
-  },
-  {
-   "derived_name": "fn_80456300",
-   "module": "main",
-   "ranges": {
-    ".text": [
-     [
-      "0x80456300",
-      "0x804566A4"
-     ]
-    ]
-   },
-   "cuts": [
-    {
-     "addr": "0x80456300",
-     "section": ".text",
-     "grade": "medium",
-     "evidence": [
-      {
-       "tool": "dol",
-       "command": "python -c \"import sys;sys.path.insert(0,'tools/splits');import splitcheck as s;d=s.Dol(open('orig/RMHE08/sys/main.dol','rb').read());print(hex(d.word(0x8056F3D4)))\"",
-       "finding": ".ctors word 0x8056F3D4 -> 0x8045622C (fn_8045622C, 0x30 B): the TU's static-init function"
-      },
-      {
-       "tool": "callers",
-       "command": "python tools/units/callers.py 0x8045625C",
-       "finding": "referenced by fn_8045622C at 0x80456248 (bl target) and located after the sinit: the deferred group ends at 0x80456298"
-      },
-      {
-       "tool": "callers",
-       "command": "python tools/units/callers.py 0x80456298",
-       "finding": "referenced by fn_8045625C at 0x80456270 (bl target) and located after the sinit: the deferred group ends at 0x804562A8"
-      },
-      {
-       "tool": "callers",
-       "command": "python tools/units/callers.py 0x804562A8",
-       "finding": "referenced by fn_8045622C at 0x80456240 (bl target) and located after the sinit: the deferred group ends at 0x804562E4"
-      },
-      {
-       "tool": "callers",
-       "command": "python tools/units/callers.py 0x804562E4",
-       "finding": "referenced by fn_804562A8 at 0x804562BC (bl target) and located after the sinit: the deferred group ends at 0x80456300"
-      },
-      {
-       "tool": "callers",
-       "command": "python tools/units/callers.py 0x80456300",
-       "finding": "fn_80456300: no function before L references it (no caller at all)"
-      }
-     ],
-     "reproduce": "python -c \"import sys;sys.path.insert(0,'tools/splits');import splitcheck as s;d=s.Dol(open('orig/RMHE08/sys/main.dol','rb').read());print(hex(d.word(0x8056F3D4)))\" && python tools/units/callers.py 0x8045625C && python tools/units/callers.py 0x80456298"
-    }
-   ],
-   "open_questions": [
-    "placeholder name: nine `blr` stubs, small r13 flag setters, then `strlen` (0x804565C0) and `__va_arg` (0x804565DC, Runtime.PPCEABI.H/__va_arg.c): the tail 0x804565C0.. is library code (MSL `string.c` / Runtime `__va_arg.c`) and is probably one or two more TUs; module `main` is a guess (root-level unit)"
+    "name from the `__FILE__` string \"menu_plsearch.cpp\" (0x80607678, read at 0x8044BDE8 and 0x8044BF38); the run is 57 KB and also holds the \"menu_message.cpp\" assert (0x8044E340), createSystemFile / readDataFile / GalleryDemo_task_FP4_tcb: at least three TUs, cuts not located (see open_questions)",
+    "the unit ends at 0x804565C0, the end of the .ctors closure of fn_8045622C (word 0x8056F3D4) together with the slots of the vtables it stores: lbl_8060E718/E748/E778 are stored by fn_8045625C/fn_804562A8 (in the closure) and their slots run through fn_804565BC (0x80456300..0x804565C0, nine `blr` stubs and the functions they reach); `splitcheck.py --proposal ... --unit plsearch` prints the numbers (`detail` line: closure ends 0x80456300, with own vtable slots 0x804565C0). An earlier revision cut at 0x80456300 (main/fn_80456300), which splitcheck's ctors check now fails (cut_at 0x804565C0)"
    ]
   },
   {
@@ -1330,7 +1280,83 @@
    ],
    "open_questions": [
     "merged library block: Gecko exception code (0x804578FC..~0x80458BD0), then MSL C alloc / ansi_files / ansi_fp / file_io / FILE_POS / mbstring / mem / math / printf / rand / scanf / string: at least 8 TUs, none located with a tool (function names from the dump only); name from __sys_free / Block_link (alloc.c)",
-    "ends at 0x8045F9E8 (fn_8045F9E8, 0x1324 B) which crosses the band end 0x80460000: that function and the cut at 0x8045F9E8 are handed to band f"
+    "ends at 0x8045F9E8 (fn_8045F9E8, 0x1324 B) which crosses the band end 0x80460000: that function and the cut at 0x8045F9E8 are handed to band f",
+    "NAME: `MSL_C/alloc` is misnamed. The run starts with ~5 KB of Gecko exception code (0x804578FC..) and the registered Gecko_ExceptionPPC edge at 0x804578FC is not the end of that file; the name should follow the larger block or the Gecko edge should be extended in phase 2 (open question, no cut proposed)"
+   ]
+  },
+  {
+   "derived_name": "strlen",
+   "module": "MSL",
+   "ranges": {
+    ".text": [
+     [
+      "0x804565C0",
+      "0x804565DC"
+     ]
+    ]
+   },
+   "cuts": [
+    {
+     "addr": "0x804565C0",
+     "section": ".text",
+     "grade": "medium",
+     "evidence": [
+      {
+       "tool": "splitcheck",
+       "command": "python tools/splits/splitcheck.py --proposal docs/splits/proposals/phase1-e.json --unit plsearch",
+       "finding": "detail line: fn_8045622C's closure ends 0x80456300 and, with the slots of the vtables fn_8045625C/fn_804562A8 store (lbl_8060E718, lbl_8060E748, lbl_8060E778), 0x804565C0, which is the end of the unit that holds the sinit: the TU boundary is at 0x804565C0"
+      },
+      {
+       "tool": "symedit",
+       "command": "python tools/symbols/symedit.py range 0x804565B0 0x804566C0 --section .text",
+       "finding": "fn_804565BC (0x4 B, the last own slot) is followed by `strlen` (0x804565C0, 0x1C B), `__va_arg` (0x804565DC, 0xC8 B) and the registered Runtime global_destructor_chain.c at 0x804566A4: MSL / Runtime library names, not unit code"
+      },
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x804565C0 --limit 400",
+       "finding": "strlen has 197 callers across the DOL (library function: callers inside the 0x80448404..0x804565C0 run are calls from its several TUs, not a reference from the sinit TU's own closure)"
+      }
+     ],
+     "reproduce": "python tools/splits/splitcheck.py --proposal docs/splits/proposals/phase1-e.json --unit plsearch && python tools/symbols/symedit.py range 0x804565B0 0x804566C0 --section .text"
+    }
+   ],
+   "open_questions": [
+    "MSL `string.c` holds more than strlen in the SDK, but the map has only this 0x1C B function between the stubs and `__va_arg`: the unit is the one function; whether the registering lane adds a sibling is open"
+   ]
+  },
+  {
+   "derived_name": "__va_arg",
+   "module": "Runtime.PPCEABI.H",
+   "ranges": {
+    ".text": [
+     [
+      "0x804565DC",
+      "0x804566A4"
+     ]
+    ]
+   },
+   "cuts": [
+    {
+     "addr": "0x804565DC",
+     "section": ".text",
+     "grade": "medium",
+     "evidence": [
+      {
+       "tool": "symedit",
+       "command": "python tools/symbols/symedit.py range 0x804565B0 0x804566C0 --section .text",
+       "finding": "`__va_arg` is 0x804565DC..0x804566A4 (0xC8 B), the exact map name of Runtime.PPCEABI.H/__va_arg.c, and 0x804566A4 is the registered start of Runtime.PPCEABI.H/global_destructor_chain.c"
+      },
+      {
+       "tool": "splitcheck",
+       "command": "python tools/splits/splitcheck.py --baseline --all --only text-cut --unit global_destructor_chain",
+       "finding": "0x804566A4 is a registered unit start on a function symbol (`__register_global_object`): the right edge of `__va_arg` is a registry edge, the left edge follows `strlen`"
+      }
+     ],
+     "reproduce": "python tools/symbols/symedit.py range 0x804565B0 0x804566C0 --section .text"
+    }
+   ],
+   "open_questions": [
+    "the exact map name and the exact registered right edge make the cut at least medium; the left edge (strlen's end) is a function boundary with no cross reference, so the pair strlen | __va_arg is one admissible split of a 0xE8 B run"
    ]
   }
  ],
@@ -1342,7 +1368,7 @@
    "evidence": [
     {
      "tool": "poolseams",
-     "command": "python tools/units/poolseams.py --unit enemy/em_act_mot.cpp",
+     "command": "python tools/units/poolseams.py --unit enemy/em_act_mot.cpp --root \"${MHTRI_MAIN:-.}\"",
      "finding": "group 0: em019_ai + em019_prog + em_act_mot + fn_80382310, 56 shared pool literals, text adjacent, first-use order holds, candidate fold (confidence medium; fn_80382310 is coarse)"
     },
     {
@@ -1351,7 +1377,7 @@
      "finding": "pool dedupe row `00000000 lbl_8079BC88 -> lbl_8079BF68` places the next TU in 0x80383148..0x80385828, i.e. the fold ends at the strong cut 0x80383148"
     }
    ],
-   "reproduce": "python tools/units/poolseams.py --unit enemy/em_act_mot.cpp && python tools/splits/tudiscover.py at 0x80383148 --pool-model on"
+   "reproduce": "python tools/units/poolseams.py --unit enemy/em_act_mot.cpp --root \"${MHTRI_MAIN:-.}\" && python tools/splits/tudiscover.py at 0x80383148 --pool-model on"
   },
   {
    "unit": "Network/NetworkPeerMcs.cpp",
@@ -1360,7 +1386,7 @@
    "evidence": [
     {
      "tool": "poolseams",
-     "command": "python tools/units/poolseams.py --unit Network/NetworkPeerMcs.cpp",
+     "command": "python tools/units/poolseams.py --unit Network/NetworkPeerMcs.cpp --root \"${MHTRI_MAIN:-.}\"",
      "finding": "group 0: NetworkPeerMcs + NetworkSessionStable + NetworkSessionManager + network_shared_data, 28 shared pool literals, text interleaved, 1 first-use inversion, `.data` claims interleave three other units (the pool model and the data model disagree), confidence low"
     },
     {
@@ -1369,7 +1395,7 @@
      "finding": "the rendered candidate reports `lobby/lb_server_sel_trans.cpp FAIL pool@0x8079C690`: literal networkSessionDefaultDelay (0x8079C690, in network_shared_data) is also read by Network/NetworkSessionStable.cpp"
     }
    ],
-   "reproduce": "python tools/units/poolseams.py --unit Network/NetworkPeerMcs.cpp && python tools/splits/splitcheck.py --proposal docs/splits/proposals/phase1-e.json --only pool"
+   "reproduce": "python tools/units/poolseams.py --unit Network/NetworkPeerMcs.cpp --root \"${MHTRI_MAIN:-.}\" && python tools/splits/splitcheck.py --proposal docs/splits/proposals/phase1-e.json --only pool"
   },
   {
    "unit": "Network/NetworkSessionManager.cpp",

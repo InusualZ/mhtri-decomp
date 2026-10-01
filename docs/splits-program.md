@@ -90,7 +90,7 @@ into the larger unit with the candidate cut recorded.
 ## The checker
 
 ```
-python tools/splits/splitcheck.py --baseline [--json F] [--all] [--only INV,INV] [--unit REGEX]
+python tools/splits/splitcheck.py --baseline [--json F] [--all] [--only INV,INV] [--unit REGEX] [--intervals]
 python tools/splits/splitcheck.py --proposal F [--proposal G] [--emit-splits OUT] [--json F]
 python tools/splits/splitcheck.py --selftest
 ```
@@ -103,11 +103,17 @@ the tools serve) or the parent of the git common dir. `dump_asm.py` always write
 status line says `[MAIN's dump ..., read-only]` when it reads MAIN's. A dump whose stamp does not match the tree's
 `symbols.txt`/`splits.txt` is reported `stale`, as before. Per unit and per invariant the verdict is PASS / FAIL / UNKNOWN (`-` = does not apply) with
 the evidence address. Invariants: `order`, `coverage`, `text-cut`, `extab`, `ctors`, `dtors`, `pool`, `data-order`,
-`vtable`, `jumptable`, `bss` (definitions in the tool's docstring). Also emitted: one record per text boundary
+`vtable`, `jumptable`, `bss`, `local-static` (definitions in the tool's docstring). Also emitted: one record per text boundary
 (`fn-start`, `pool-shared`), `coverage_gaps` (unowned symbol runs per section), the ranked `top_defects`, and for
 `--baseline` the suspected seams (the `kind: seam` requests in the primary checkout's `.pi/outbox/*.json`, and the pool
 groups recomputed from the decode, cf. `docs/pool-seams.md`).
 
+* `--baseline --unit REGEX` (and `--proposal ... --unit REGEX`, for the candidate) also prints a `detail` line per `.ctors` word (the function, its end, the closure end, the end with the
+  unit's own vtable slots, the unit end) and, with `--intervals`, one `pooldup` line per pool value held at two addresses (both addresses, the last read of the first, the first read of the second,
+  the interval a TU starts in): the numbers a `reproduce` row quotes. `--proposal` also reports every proposed cut, a `guess` included, that a `scope:local` data object is read across
+  (a static is one TU's; a guess cut is merged away and never reaches the candidate's own `local-static` check) and exits 1 on one.
+* The `ctors` closure follows the unit's own vtable slots past the unit end too, so a cut placed over them FAILs with `cut_at` = the closure end; past the end only an inline-sized
+  first slot (<= 0x40 B) opens the run, a large function is another TU's member.
 * The decoded data extent is the **map's** (owned ranges and unowned symbols alike): a literal of an unowned `.sdata2` pool
   past the last owned range is read by the text that loads it, as one inside an owned range is.
 * Text references (who reads a pool literal, a jump table, a bss object) are **decoded from the retail `.text`**

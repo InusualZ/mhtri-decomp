@@ -10,9 +10,9 @@ C++ extab signal does not exist here.
 
 | | |
 | --- | --- |
-| cuts emitted (one per proposal unit) | 229: **strong 6**, **medium 43**, **guess 180** |
+| cuts emitted (one per proposal unit) | 227: **strong 6**, **medium 42**, **guess 179** |
 | cuts by class | guess: file 131, roster 43, anchor 6; medium: pool 12, ctors 8, inherited 8, file 11, recut 3, anchor 1; strong: file 4, pool 1, anchor 1 |
-| proposal units in the file / rendered (guess cuts merged) | 229 / **50** (candidate 356 units = baseline 306 + 50) |
+| proposal units in the file / rendered (guess cuts merged) | 227 / **48** (candidate 354 units = baseline 306 + 48) |
 | unowned functions covered by a proposal unit | 3,094 of 3,094 (plus 19 functions of two registered units' tails); 226 of the 3,113 sit in rendered units that hold no guess candidate and no unresolved interval |
 | registered units recut / merged | **2 tails cut off / 0 merged**: `AX/AXFXReverbHi.c` -> `AXFXReverbHiExp` 0x80474F30 (medium), `OS/FindContainHeap_.c` -> `mtxvec`, `mtx44`, `vec` (medium, NonMatching units only); 14 `guess` candidates inside registered units stay top-level `open_questions` (`EXI/ProbeBarnacle.c` 10, `OS/FindContainHeap_.c` 4) |
 | registered-unit splitcheck FAILs in the band | 1 (`RSO/runtime.c` pool, a false decode, below); no recut proposed for it |
@@ -37,8 +37,10 @@ and all proposal units PASS, i.e. no guess cut contradicts a shared pool literal
   `0x80465A98`, `0x80465BA8`, `0x80467260`, `0x80467570`, `0x804677A0`, `0x804679E0`, `0x80467BB8`, `0x80467EEC`), `0x80475E30`
   (9 values, right after the registered AXFXReverbHi), `0x805012C4`, `0x80504A3C` (2 values), `0x80533474`.
 * **8 `.ctors` cuts** (`0x80502828`, `0x8050661C`, `0x8052B004`, `0x8052C880`, `0x8052E0CC`, `0x80530680`, `0x8053072C`,
-  `0x8053E7D0`): the sinit is the TU's last function because its closure (callees and address-taken functions after it) is empty
-  for all eight, and the function at L has no referrer inside the unit (band `a`'s closure rule; `callers.py` in each `reproduce`).
+  `0x8053E808`): the sinit is the TU's last function because its closure (callees and address-taken functions after it) is empty
+  for all eight, and the function at L has no referrer inside the unit (band `a`'s closure rule; `callers.py` in each `reproduce`). The last one moved from
+  0x8053E7D0 to 0x8053E808: the seven 8-byte functions between are slots of `lbl_8064DC30`, whose store (`fn_805385D0`) is in the unit
+  (`splitcheck.py --proposal phase1-f.json --unit fn_80533474` prints the `detail` line).
 * **1 exact anchor change**: `0x804E45B0` (THP banner in `fn_804E4510`, then `TPL.c` in `TPLBind`, adjacent functions).
 * **Library identity from `RVL_SDK` banners** (new anchor class, `docs/splits-program.md`): 28 banners anchor AI, AX, DSP, DVD,
   ENC, EXI, GX, KPAD, NAND, OS, PAD, SC, SI, THP, VI, WPAD, DWC, NHTTP, SSL, NCD, NWC24, SO, SOCKET, PMIC, KPR, HID, KBD to the
@@ -62,8 +64,9 @@ The last unit ends at `0x8054032C` (the end of the last function that starts ins
 
 1. **BTE `0x804772F0..0x804AFED0` is one rendered unit of 895 functions**: 72 file/roster candidates (gki_*, bta_*, btm_*, btu_*,
    l2c_*, rfc_*, sdp_*, then DB/DSP/DVD/ENC/ESP), none provable: Broadcom code has no `__FILE__`, few floats, no `.ctors`.
-2. `OS/OSAlarm.c` (registered, **Matching**, 16 B at `0x804CBC50`, symbol `cPhs_Set`) is the tail of a larger TU: `OSAlarm_head`
-   `0x804CB440..0x804CBC50` and `OSAlarm_tail` `0x804CBC60..0x804CBD10` are proposed around it; same TU or not is open.
+2. `OS/OSAlarm.c` (registered, **Matching**, 16 B at `0x804CBC50`, symbol `cPhs_Set`) is folded into ONE unit `OS/OSAlarm` `0x804CB440..0x804CBD10`:
+   `AlarmQueue` (.sbss 0x80795310, scope:local) is accessed 14 times in 6 functions from `__OSInitAlarm` (0x804CB464) to `__OSCancelInternalAlarms` (0x804CBC80),
+   so the earlier head | registered | tail split (a medium cut at 0x804CBC60) was wrong. `cPhs_Set` is re-measured in the merged object (reconcile.md section 4).
 3. `EXI/ProbeBarnacle.c` holds EXICommon, fs (ISFS), GXInit, GXFifo, GXAttr, GXMisc, GXGeometry, GXFrameBuf, GXLight and the head of
    GXTexture (`0x804B7F60`): its own header says so; every candidate is `guess` (the narrowest pooldup interval has 9 positions).
 4. `OS/FindContainHeap_.c`: mem_expHeap, mem_allocator, mix, mtx stay `guess` (39 positions); the three tail cuts are medium but each
@@ -72,16 +75,25 @@ The last unit ends at `0x8054032C` (the end of the last function that starts ins
    named from `AXFXReverbHiExpInit` and the registered unit's own note that a sister build splits there.
 6. `nw4r::db` TU start: one of 7 positions `0x80500710..0x80500900` (`fn_80500900`/`fn_805009AC` share a literal with `Warning`).
 7. Unresolved pooled-value intervals with no candidate: THP decoder `0x804DFBE0..0x804DFC50` (2), `0x804E01E0..0x804E0470` (4), WPAD
-   `0x804F5770..0x804F84E0` (19), HBM `0x80533814..0x80533B04` (4).
+   `0x804F5770..0x804F84E0` (19), HBM `0x80533814..0x80533B04` (4: guess candidates 0x80533814 or 0x80533854 now, one cut settles three rows).
 8. `fn_8051E864` (SO) .. `fn_8051F9D0` (SOCKET banner): the SO/SOCKET file split has 17 positions.
+
+## Moved and removed cuts (a `scope:local` data object read on both sides)
+
+`splitcheck.py --proposal` now reports every proposed cut, a `guess` included, that a local static is read across (guess cuts are merged away, so the candidate's own
+`local-static` check never sees them). Eight crossings in five cuts of this band, all fixed: `0x804BB750` (IPC `ipcclt`: `hid`, `__mailboxAck`, `__responses`) -> `0x804BB340`
+(`0x804BB310`, `strnlen`, is the other admissible start); `0x804ABC70` (`dvderrorcode`: `Callback`) removed, `dvderror` runs to `0x804ABCE0`; `0x804ABF00` (`FatalFunc`) ->
+`0x804ABF40` (`lowCallback`); `0x804D2CD0` (`OSRtc`: `Scb`) -> `0x804D2B90`; `0x804E70C0` (`vi`: `CurrTvMode`) -> `0x804E68B0` (`USB/fn_804E5600` holds a vi function); and the medium `0x804CBC60`
+(`AlarmQueue`, above). `AXFXReverbHiExpShutdown` (0x804760C0) lies in the later TU although its name says AXFXReverbHiExp: an open question on both units (rule 7 follow-up).
 
 ## Rendered candidate (`splitcheck.py --proposal ... --emit-splits`)
 
-Candidate 356 units (baseline 306). `order`, `coverage`, `text-cut`, `extab`, `dtors`, `vtable`, `bss`: 0 FAIL, unchanged;
-`ctors` 45 -> 45, `pool` 130 -> 130, `data-order` 3, `jumptable` 1 (all outside the proposal units, none in this band but
-`RSO/runtime.c` pool). **New failures outside the proposal units: 0**; all 50 proposal units PASS every checked invariant; lint: none.
-`RSO/runtime.c` pool is a false decode: `lbl_80795AA0` is read only by `main`/`fn_8003F9E4` (`callers.py 0x80795AA0`); the
-decoder counts the `lis/addi` that only forms `.sdata2`'s start address in `RSOStaticLocateObject`.
+Candidate 354 units (baseline 306), band alone. `order`, `coverage`, `text-cut`, `extab`, `dtors`, `vtable`, `bss`, `local-static`: 0 FAIL, unchanged;
+`ctors` 39 -> 39, `pool` 129 -> 136, `data-order` 3, `jumptable` 1. **New failures outside the proposal units: 0**; lint: one line (`strtoul` has no adjacent unit when f is rendered
+alone; with band e and the reconcile file it lints clean). Proposal units that FAIL `pool` (8): `MSL/strtoul`, `RVLGX/GXTexture_tail`, `NAND/nand` (the merged guess block that now holds OSAlarm),
+`THP/fn_804DF200`, `WPAD/wpad`, `nw4r/fn_80501CE8`, `SO/soi`, `homebutton/fn_80533474`: merged guess blocks that hold one value at two pool addresses (each carries the pooldup rows in its
+`open_questions`; `splitcheck.py --baseline --only pool --intervals --unit X` prints them). `RSO/runtime.c` pool is a false decode: `lbl_80795AA0` is read only by `main`/`fn_8003F9E4`
+(`callers.py 0x80795AA0`); the decoder counts the `lis/addi` that only forms `.sdata2`'s start address in `RSOStaticLocateObject`.
 
 ## Tool gaps hit
 

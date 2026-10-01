@@ -17,7 +17,7 @@
     {
      "addr": "0x800E0504",
      "section": ".text",
-     "grade": "medium",
+     "grade": "strong",
      "evidence": [
       {
        "tool": "tudiscover",
@@ -41,7 +41,8 @@
    "replaces_tail_of": "sound/fn_800DD1F0.cpp",
    "open_questions": [
     "name: named: the MHchar:: methods and mhchar_reset; starts at the deleting destructor in slot 0 of its vtable",
-    "the start is 0x800E0504 (vtable slot); the sibling position is 0x800E0560 (first named function), 0x5C bytes later"
+    "the start is 0x800E0504 (vtable slot); the sibling position is 0x800E0560 (first named function), 0x5C bytes later",
+    "UPGRADED medium -> strong: both ends are pinned (the left cut by the evidence rows, the right end 0x800E3B3C by the sinit closure of fn_800E3A68 that ends the TU); module `sound` is the nearest registered neighbour: `mhchar` is a model class (module note: it is not a sound unit by name)"
    ]
   },
   {
@@ -64,7 +65,7 @@
       {
        "tool": "splitcheck",
        "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit ^sound/fn_800DD1F0\\.cpp$",
-       "finding": "fn_800E3A68 (the function a .ctors word points at) ends at 0x800E3AE8, before the unit's text end: not its last function"
+       "finding": "fn_800E3A68 (the function a .ctors word points at) ends at 0x800E3AE8, before the unit's text end: not its last function; the command prints a `detail` line per .ctors word of the unit (the function, its end, the closure end, the unit end)"
       },
       {
        "tool": "callers",
@@ -78,7 +79,8 @@
    "replaces_tail_of": "sound/fn_800DD1F0.cpp",
    "open_questions": [
     "name: guess: holds sound_job_request",
-    "the registered start at this unit's right edge (0x800E3CBC) came from an earlier tool (the first reader of the next pool run); R1 puts the end of the neighbouring TU at this unit's start, so the 0x180 bytes between is either a real micro-TU or the tail of the TU that follows (or of the one before) that only a vtable or code before L reaches"
+    "the registered start at this unit's right edge (0x800E3CBC) came from an earlier tool (the first reader of the next pool run); R1 puts the end of the neighbouring TU at this unit's start, so the 0x180 bytes between is either a real micro-TU or the tail of the TU that follows (or of the one before) that only a vtable or code before L reaches",
+    "MICRO UNIT: its right edge 0x800E3CBC is a registered edge only (no cross reference or pool row confirms it); do not register a source for this unit before the edge is pinned (a 0x180-byte unit rests on one signal)"
    ]
   },
   {
@@ -101,7 +103,7 @@
       {
        "tool": "splitcheck",
        "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit ^sound/fn_800E46E8\\.cpp$",
-       "finding": "fn_800E5398 (the function a .ctors word points at) ends at 0x800E53A4, before the unit's text end: not its last function"
+       "finding": "fn_800E5398 (the function a .ctors word points at) ends at 0x800E53A4, before the unit's text end: not its last function; the command prints a `detail` line per .ctors word of the unit (the function, its end, the closure end, the unit end)"
       },
       {
        "tool": "callers",
@@ -142,7 +144,7 @@
       {
        "tool": "splitcheck",
        "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit ^sound/fn_800E46E8\\.cpp$",
-       "finding": "fn_800E7AB0 (the function a .ctors word points at) ends at 0x800E7ABC, before the unit's text end: not its last function"
+       "finding": "fn_800E7AB0 (the function a .ctors word points at) ends at 0x800E7ABC, before the unit's text end: not its last function; the command prints a `detail` line per .ctors word of the unit (the function, its end, the closure end, the unit end)"
       },
       {
        "tool": "callers",
@@ -178,7 +180,7 @@
       {
        "tool": "splitcheck",
        "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit ^sound/fn_800E46E8\\.cpp$",
-       "finding": "fn_800E8DA4 (the function a .ctors word points at) ends at 0x800E8DE0, before the unit's text end: not its last function"
+       "finding": "fn_800E8DA4 (the function a .ctors word points at) ends at 0x800E8DE0, before the unit's text end: not its last function; the command prints a `detail` line per .ctors word of the unit (the function, its end, the closure end, the unit end)"
       },
       {
        "tool": "callers",
@@ -192,7 +194,8 @@
    "replaces_tail_of": "sound/fn_800E46E8.cpp",
    "open_questions": [
     "name: placeholder (one 0x18 function)",
-    "the registered start at this unit's right edge (0x800E8E60) came from an earlier tool (the first reader of the next pool run); R1 puts the end of the neighbouring TU at this unit's start, so the 0x18 bytes between is either a real micro-TU or the tail of the TU that follows (or of the one before) that only a vtable or code before L reaches"
+    "the registered start at this unit's right edge (0x800E8E60) came from an earlier tool (the first reader of the next pool run); R1 puts the end of the neighbouring TU at this unit's start, so the 0x18 bytes between is either a real micro-TU or the tail of the TU that follows (or of the one before) that only a vtable or code before L reaches",
+    "MICRO UNIT: its right edge 0x800E8E60 is a registered edge only; fn_800E8E48 has referrers on both sides; do not register a source for this unit before the edge is pinned (a 0x18-byte unit rests on one signal)"
    ]
   },
   {
@@ -215,7 +218,7 @@
       {
        "tool": "splitcheck",
        "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit ^sound/fn_800E8E60\\.cpp$",
-       "finding": "fn_800E9C10 (the function a .ctors word points at) ends at 0x800E9C1C, before the unit's text end: not its last function"
+       "finding": "fn_800E9C10 (the function a .ctors word points at) ends at 0x800E9C1C, before the unit's text end: not its last function; the command prints a `detail` line per .ctors word of the unit (the function, its end, the closure end, the unit end)"
       },
       {
        "tool": "callers",
@@ -256,7 +259,7 @@
       {
        "tool": "splitcheck",
        "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit ^sound/fn_800E8E60\\.cpp$",
-       "finding": "fn_800ED698 (the function a .ctors word points at) ends at 0x800ED6A4, before the unit's text end: not its last function"
+       "finding": "fn_800ED698 (the function a .ctors word points at) ends at 0x800ED6A4, before the unit's text end: not its last function; the command prints a `detail` line per .ctors word of the unit (the function, its end, the closure end, the unit end)"
       },
       {
        "tool": "callers",
@@ -292,7 +295,7 @@
       {
        "tool": "splitcheck",
        "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit ^sound/fn_800E8E60\\.cpp$",
-       "finding": "fn_800EDF10 (the function a .ctors word points at) ends at 0x800EDF1C, before the unit's text end: not its last function"
+       "finding": "fn_800EDF10 (the function a .ctors word points at) ends at 0x800EDF1C, before the unit's text end: not its last function; the command prints a `detail` line per .ctors word of the unit (the function, its end, the closure end, the unit end)"
       },
       {
        "tool": "callers",
@@ -328,7 +331,7 @@
       {
        "tool": "splitcheck",
        "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit ^ef/effect\\.cpp$",
-       "finding": "fn_800FAC1C (the function a .ctors word points at) ends at 0x800FAC78, before the unit's text end: not its last function"
+       "finding": "fn_800FAC1C (the function a .ctors word points at) ends at 0x800FAC78, before the unit's text end: not its last function; the command prints a `detail` line per .ctors word of the unit (the function, its end, the closure end, the unit end)"
       },
       {
        "tool": "callers",
@@ -342,7 +345,8 @@
    "replaces_tail_of": "ef/effect.cpp",
    "open_questions": [
     "name: placeholder",
-    "the registered start at this unit's right edge (0x800FAE08) came from an earlier tool (the first reader of the next pool run); R1 puts the end of the neighbouring TU at this unit's start, so the 0x15C bytes between is either a real micro-TU or the tail of the TU that follows (or of the one before) that only a vtable or code before L reaches"
+    "the registered start at this unit's right edge (0x800FAE08) came from an earlier tool (the first reader of the next pool run); R1 puts the end of the neighbouring TU at this unit's start, so the 0x15C bytes between is either a real micro-TU or the tail of the TU that follows (or of the one before) that only a vtable or code before L reaches",
+    "MICRO UNIT: its right edge 0x800FAE08 is a registered edge only (no signal at it); do not register a source for this unit before the edge is pinned (a 0x15C-byte unit rests on one signal)"
    ]
   },
   {
@@ -363,9 +367,9 @@
      "grade": "medium",
      "evidence": [
       {
-       "tool": "tudiscover",
-       "command": "python tools/splits/tudiscover.py at 0x80100448 --pool-model on",
-       "finding": "value 0x00000000 held at lbl_807966A8 (last read at 0x800FF8D4) and again at lbl_807966B8 (first read at 0x80100448): one TU holds a value once, so a TU starts in 0x800FFC98..0x80100448 (11 function starts, 11 outside every shared-literal span)"
+       "tool": "splitcheck",
+       "command": "python tools/splits/splitcheck.py --baseline --only pool --intervals --unit '^ef/eft004\\.cpp$'",
+       "finding": "value 0x00000000 held at lbl_807966A8 (last read at 0x800FF8D4) and again at lbl_807966B8 (first read at 0x80100448): one TU holds a value once, so a TU starts in 0x800FFC98..0x80100448 (11 function starts, 11 outside every shared-literal span); `--intervals` prints the pair with its last/first read and the interval (a `pooldup` line)"
       },
       {
        "tool": "symedit",
@@ -373,13 +377,15 @@
        "finding": "eft004_set is the first function of its eftNNN_ name run (the function before it is fn_80100330): the pool interval ends exactly at it"
       }
      ],
-     "reproduce": "python tools/splits/tudiscover.py at 0x80100448 --pool-model on"
+     "reproduce": "python tools/splits/splitcheck.py --baseline --only pool --intervals --unit '^ef/eft004\\.cpp$'"
     }
    ],
    "replaces_tail_of": "ef/eft004.cpp",
    "open_questions": [
     "name: named: eft004_set*",
-    "a TU boundary lies in 0x801011B4..0x801017B0 (value 0x41200000 at lbl_807966D4 and lbl_807966D8; 10 positions once the eft004 pool span is excluded): this unit is 2 TUs until it is pinned"
+    "a TU boundary lies in 0x801011B4..0x801017B0 (value 0x41200000 at lbl_807966D4 and lbl_807966D8; 10 positions once the eft004 pool span is excluded): this unit is 2 TUs until it is pinned",
+    "NAME: the registered unit's name (eftNNN) comes from the effect-setter functions, which the name-run evidence contradicts for the remnant; phase 4 renames the eft*_fx remnants (the proposal keeps the registered names)",
+    "the duplicate pairs' intersection is tighter than the 11 positions of the first row: the value-0 pair lbl_807966A8/lbl_807966B8 gives (0x800FF8D4, 0x80100448] (11 starts) and the 0x40a00000 pair lbl_807966B0/lbl_807966D0 gives (0x80100088, 0x80100AA8]; the intersection (0x80100088, 0x80100448] holds 4 admissible positions (0x80100300, 0x8010030C, 0x80100330, 0x80100448); `splitcheck.py --baseline --only pool --intervals --unit '^ef/eft004\\.cpp$'` prints both rows"
    ]
   },
   {
@@ -400,9 +406,9 @@
      "grade": "medium",
      "evidence": [
       {
-       "tool": "tudiscover",
-       "command": "python tools/splits/tudiscover.py at 0x80102994 --pool-model on",
-       "finding": "value 0x00000000 held at lbl_807966F4 (last read at 0x801027D0) and again at lbl_80796740 (first read at 0x80102994): one TU holds a value once, so a TU starts in 0x8010294C..0x80102994 (2 function starts, 2 outside every shared-literal span)"
+       "tool": "splitcheck",
+       "command": "python tools/splits/splitcheck.py --baseline --only pool --intervals --unit '^ef/eft007\\.cpp$'",
+       "finding": "value 0x00000000 held at lbl_807966F4 (last read at 0x801027D0) and again at lbl_80796740 (first read at 0x80102994): one TU holds a value once, so a TU starts in 0x8010294C..0x80102994 (2 function starts, 2 outside every shared-literal span); `--intervals` prints the pair with its last/first read and the interval (a `pooldup` line)"
       },
       {
        "tool": "symedit",
@@ -410,12 +416,13 @@
        "finding": "eft007_set is the first function of its eftNNN_ name run (the function before it is fn_8010294C): the pool interval ends exactly at it"
       }
      ],
-     "reproduce": "python tools/splits/tudiscover.py at 0x80102994 --pool-model on"
+     "reproduce": "python tools/splits/splitcheck.py --baseline --only pool --intervals --unit '^ef/eft007\\.cpp$'"
     }
    ],
    "replaces_tail_of": "ef/eft007.cpp",
    "open_questions": [
-    "name: named: eft007_*"
+    "name: named: eft007_*",
+    "TWO positions, not one: the cut is 0x80102994 or 0x8010294C (the pool interval (0x801027D0, 0x80102994] holds exactly these two function starts); fn_8010294C is called from both before and after 0x8010294C, which does not separate them; 0x80102994 is the proposal because it is the first reader of lbl_80796740"
    ]
   },
   {
@@ -436,9 +443,9 @@
      "grade": "medium",
      "evidence": [
       {
-       "tool": "tudiscover",
-       "command": "python tools/splits/tudiscover.py at 0x80107250 --pool-model on",
-       "finding": "value 0x3f800000 held at lbl_807967A4 (last read at 0x80106BB4) and again at lbl_807967A8 (first read at 0x80107250): one TU holds a value once, so a TU starts in 0x80106DC8..0x80107250 (8 function starts, 8 outside every shared-literal span)"
+       "tool": "splitcheck",
+       "command": "python tools/splits/splitcheck.py --baseline --only pool --intervals --unit '^ef/fn_80105314\\.cpp$'",
+       "finding": "value 0x3f800000 held at lbl_807967A4 (last read at 0x80106BB4) and again at lbl_807967A8 (first read at 0x80107250): one TU holds a value once, so a TU starts in 0x80106DC8..0x80107250 (8 function starts, 8 outside every shared-literal span); `--intervals` prints the pair with its last/first read and the interval (a `pooldup` line)"
       },
       {
        "tool": "symedit",
@@ -446,13 +453,14 @@
        "finding": "eft013_set is the first function of its eftNNN_ name run (the function before it is fn_8010724C): the pool interval ends exactly at it"
       }
      ],
-     "reproduce": "python tools/splits/tudiscover.py at 0x80107250 --pool-model on"
+     "reproduce": "python tools/splits/splitcheck.py --baseline --only pool --intervals --unit '^ef/fn_80105314\\.cpp$'"
     }
    ],
    "replaces_tail_of": "ef/fn_80105314.cpp",
    "open_questions": [
     "name: named: eft013_set*",
-    "eft014_set_daihouden (0x8010A988) and eft015_set (0x8010BBE0) start new eftNNN_ name runs inside this unit and no pool interval separates them: the unit is 1 to 3 TUs"
+    "eft014_set_daihouden (0x8010A988) and eft015_set (0x8010BBE0) start new eftNNN_ name runs inside this unit and no pool interval separates them: the unit is 1 to 3 TUs",
+    "EIGHT positions: the pool interval (0x80106BB4, 0x80107250] holds eight function starts (0x80106DC8 .. 0x80107250); 0x80107250 is the first reader of the second copy, fn_80106DC8 is the alternative start (the earliest admissible): both are named here, none is proven"
    ]
   },
   {
@@ -475,7 +483,7 @@
       {
        "tool": "splitcheck",
        "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit ^ef/fn_80114E34\\.cpp$",
-       "finding": "fn_801153B8 (the function a .ctors word points at) ends at 0x801153D0, before the unit's text end: not its last function"
+       "finding": "fn_801153B8 (the function a .ctors word points at) ends at 0x801153D0, before the unit's text end: not its last function; the command prints a `detail` line per .ctors word of the unit (the function, its end, the closure end, the unit end)"
       },
       {
        "tool": "callers",
@@ -483,9 +491,9 @@
        "finding": "rule R1 (docs/splits-program.md): the closure of fn_801153B8's local callees and address-taken functions after it is empty (the sinit calls nothing after itself), ending at 0x801153D0; the function at 0x801153D0 is referenced by no code in 0x80114E34..0x801153D0"
       },
       {
-       "tool": "tudiscover",
-       "command": "python tools/splits/tudiscover.py at 0x801153D0 --pool-model on",
-       "finding": "value 0x00000000 held at lbl_80796A28 (last read at 0x801153B8) and again at lbl_80796A34 (first read at 0x80115A80): one TU holds a value once, so a TU starts in 0x801153D0..0x80115A80 (8 function starts, 6 outside every shared-literal span); the interval holds this cut and no other known cut"
+       "tool": "splitcheck",
+       "command": "python tools/splits/splitcheck.py --baseline --only pool --intervals --unit '^ef/fn_80114E34\\.cpp$'",
+       "finding": "value 0x00000000 held at lbl_80796A28 (last read at 0x801153B8) and again at lbl_80796A34 (first read at 0x80115A80): one TU holds a value once, so a TU starts in 0x801153D0..0x80115A80 (8 function starts, 6 outside every shared-literal span); the interval holds this cut and no other known cut; `--intervals` prints the pair with its last/first read and the interval (a `pooldup` line)"
       }
      ],
      "reproduce": "python tools/splits/splitcheck.py --baseline --only ctors --unit ^ef/fn_80114E34\\.cpp$"
@@ -515,9 +523,9 @@
      "grade": "medium",
      "evidence": [
       {
-       "tool": "tudiscover",
-       "command": "python tools/splits/tudiscover.py at 0x80117DA8 --pool-model on",
-       "finding": "value 0x00000000 held at lbl_80796AB4 (last read at 0x80117A1C) and again at lbl_80796AC0 (first read at 0x80117DA8): one TU holds a value once, so a TU starts in 0x80117D94..0x80117DA8 (3 function starts, 3 outside every shared-literal span)"
+       "tool": "splitcheck",
+       "command": "python tools/splits/splitcheck.py --baseline --only pool --intervals --unit '^ef/fn_801173AC\\.cpp$'",
+       "finding": "value 0x00000000 held at lbl_80796AB4 (last read at 0x80117A1C) and again at lbl_80796AC0 (first read at 0x80117DA8): one TU holds a value once, so a TU starts in 0x80117D94..0x80117DA8 (3 function starts, 3 outside every shared-literal span); `--intervals` prints the pair with its last/first read and the interval (a `pooldup` line)"
       },
       {
        "tool": "symedit",
@@ -525,7 +533,7 @@
        "finding": "eft026_set is the first function of its eftNNN_ name run (the function before it is fn_80117DA4): the pool interval ends exactly at it"
       }
      ],
-     "reproduce": "python tools/splits/tudiscover.py at 0x80117DA8 --pool-model on"
+     "reproduce": "python tools/splits/splitcheck.py --baseline --only pool --intervals --unit '^ef/fn_801173AC\\.cpp$'"
     }
    ],
    "replaces_tail_of": "ef/fn_801173AC.cpp",
@@ -554,7 +562,7 @@
       {
        "tool": "splitcheck",
        "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit ^ef/eft029\\.cpp$",
-       "finding": "fn_8011AD04 (the function a .ctors word points at) ends at 0x8011AD58, before the unit's text end: not its last function"
+       "finding": "fn_8011AD04 (the function a .ctors word points at) ends at 0x8011AD58, before the unit's text end: not its last function; the command prints a `detail` line per .ctors word of the unit (the function, its end, the closure end, the unit end)"
       },
       {
        "tool": "callers",
@@ -562,9 +570,9 @@
        "finding": "rule R1 (docs/splits-program.md): the closure of fn_8011AD04's local callees and address-taken functions after it is empty (the sinit calls nothing after itself), ending at 0x8011AD58; the function at 0x8011AD58 is referenced by no code in 0x80119DEC..0x8011AD58"
       },
       {
-       "tool": "tudiscover",
-       "command": "python tools/splits/tudiscover.py at 0x8011AD58 --pool-model on",
-       "finding": "value 0x00000000 held at lbl_80796B30 (last read at 0x8011AB04) and again at lbl_80796B78 (first read at 0x8011B800): one TU holds a value once, so a TU starts in 0x8011ACF0..0x8011B800 (15 function starts, 4 outside every shared-literal span); the interval holds this cut and no other known cut"
+       "tool": "splitcheck",
+       "command": "python tools/splits/splitcheck.py --baseline --only pool --intervals --unit '^ef/eft029\\.cpp$'",
+       "finding": "value 0x00000000 held at lbl_80796B30 (last read at 0x8011AB04) and again at lbl_80796B78 (first read at 0x8011B800): one TU holds a value once, so a TU starts in 0x8011ACF0..0x8011B800 (15 function starts, 4 outside every shared-literal span); the interval holds this cut and no other known cut; `--intervals` prints the pair with its last/first read and the interval (a `pooldup` line)"
       }
      ],
      "reproduce": "python tools/splits/splitcheck.py --baseline --only ctors --unit ^ef/eft029\\.cpp$"
@@ -701,7 +709,7 @@
       {
        "tool": "splitcheck",
        "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit ^enemy/fn_80137604\\.cpp$",
-       "finding": "fn_801378A0 (the function a .ctors word points at) ends at 0x8013791C, before the unit's text end: not its last function"
+       "finding": "fn_801378A0 (the function a .ctors word points at) ends at 0x8013791C, before the unit's text end: not its last function; the command prints a `detail` line per .ctors word of the unit (the function, its end, the closure end, the unit end)"
       },
       {
        "tool": "callers",
@@ -715,7 +723,8 @@
    "replaces_tail_of": "enemy/fn_80137604.cpp",
    "open_questions": [
     "name: placeholder",
-    "the registered start at this unit's right edge (0x80138074) came from an earlier tool (the first reader of the next pool run); R1 puts the end of the neighbouring TU at this unit's start, so the 0x758 bytes (7 functions, the first 0x304 long; fn_80137C9C, fn_80137DD0 and fn_80138024 are called from the TU that starts at 0x80138074) between is either a real micro-TU or the tail of the TU that follows (or of the one before) that only a vtable or code before L reaches"
+    "the registered start at this unit's right edge (0x80138074) came from an earlier tool (the first reader of the next pool run); R1 puts the end of the neighbouring TU at this unit's start, so the 0x758 bytes (7 functions, the first 0x304 long; fn_80137C9C, fn_80137DD0 and fn_80138024 are called from the TU that starts at 0x80138074) between is either a real micro-TU or the tail of the TU that follows (or of the one before) that only a vtable or code before L reaches",
+    "MICRO UNIT: its right edge 0x80138074 is a registered edge only: fn_80137C9C and fn_80137DD0 are called only from the next unit's side, which makes the edge unproven; do not register a source for this unit before the edge is pinned (a 0x758-byte unit rests on one signal)"
    ]
   },
   {
@@ -799,7 +808,7 @@
       {
        "tool": "splitcheck",
        "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit ^enemy/enemy_control\\.cpp$",
-       "finding": "fn_80147ABC (the function a .ctors word points at) ends at 0x80147AC8, before the unit's text end: not its last function"
+       "finding": "fn_80147ABC (the function a .ctors word points at) ends at 0x80147AC8, before the unit's text end: not its last function; the command prints a `detail` line per .ctors word of the unit (the function, its end, the closure end, the unit end)"
       },
       {
        "tool": "callers",
@@ -902,7 +911,8 @@
     }
    ],
    "open_questions": [
-    "name: named from em001_prog_tbl (0x805A1C58), the per-enemy program table whose entries are this TU's functions; em019_prog.cpp is the same scheme"
+    "name: named from em001_prog_tbl (0x805A1C58), the per-enemy program table whose entries are this TU's functions; em019_prog.cpp is the same scheme",
+    "LANGUAGE: the merge mixes registered `.c` and `.cpp` members (the fn_80149D6C.c / fn_80177608.cpp folds): the lane that registers the merged unit decides the extension (`.cpp` if any member carries C++ emission such as extab entries)"
    ]
   },
   {
@@ -934,7 +944,14 @@
      "section": ".text",
      "keep_registered_edge": true,
      "kind": "registered-edge",
-     "reproduce": "python tools/symbols/symedit.py at 0x8015D860 --count 4 --section .text"
+     "reproduce": "python tools/symbols/symedit.py at 0x8015D860 --count 4 --section .text",
+     "evidence": [
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x8015D860 --pointers",
+       "finding": "R1 (L strong row): the registered edge 0x8015D860 is also the closure end of the sinit of the TU before it and its first function has no referrer inside that TU; the unit keeps the registered name (a restatement of the registry edge, not a new cut)"
+      }
+     ]
     }
    ],
    "absorbs": [
@@ -1022,7 +1039,7 @@
       {
        "tool": "splitcheck",
        "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit ^enemy/fn_80165FC8\\.cpp$",
-       "finding": "fn_80166330 (the function a .ctors word points at) ends at 0x801663E4, before the unit's text end: not its last function"
+       "finding": "fn_80166330 (the function a .ctors word points at) ends at 0x801663E4, before the unit's text end: not its last function; the command prints a `detail` line per .ctors word of the unit (the function, its end, the closure end, the unit end)"
       },
       {
        "tool": "callers",
@@ -1090,7 +1107,7 @@
       {
        "tool": "splitcheck",
        "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit ^enemy/fn_801679B0\\.cpp$",
-       "finding": "fn_8016CF18 (the function a .ctors word points at) ends at 0x8016D1C4, before the unit's text end: not its last function"
+       "finding": "fn_8016CF18 (the function a .ctors word points at) ends at 0x8016D1C4, before the unit's text end: not its last function; the command prints a `detail` line per .ctors word of the unit (the function, its end, the closure end, the unit end)"
       },
       {
        "tool": "callers",
@@ -1250,7 +1267,7 @@
       {
        "tool": "splitcheck",
        "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit ^enemy/fn_80171194\\.cpp$",
-       "finding": "fn_80176B7C (the function a .ctors word points at) ends at 0x80176C30, before the unit's text end: not its last function"
+       "finding": "fn_80176B7C (the function a .ctors word points at) ends at 0x80176C30, before the unit's text end: not its last function; the command prints a `detail` line per .ctors word of the unit (the function, its end, the closure end, the unit end)"
       },
       {
        "tool": "callers",
@@ -1391,7 +1408,8 @@
    ],
    "open_questions": [
     "name: named from em015_prog_tbl (0x805A94A0)",
-    "takes part of registered enemy/fn_80181C88.cpp (the retired takes_part_of field; not in absorbs/replaces_tail_of)"
+    "takes part of registered enemy/fn_80181C88.cpp (the retired takes_part_of field; not in absorbs/replaces_tail_of)",
+    "LANGUAGE: the merge mixes registered `.c` and `.cpp` members (the fn_80149D6C.c / fn_80177608.cpp folds): the lane that registers the merged unit decides the extension (`.cpp` if any member carries C++ emission such as extab entries)"
    ]
   },
   {
@@ -1438,7 +1456,7 @@
       {
        "tool": "splitcheck",
        "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit ^enemy/fn_80181C88\\.cpp$",
-       "finding": "fn_80182B94 (the function a .ctors word points at) ends at 0x80182C40, before the unit's text end: not its last function"
+       "finding": "fn_80182B94 (the function a .ctors word points at) ends at 0x80182C40, before the unit's text end: not its last function; the command prints a `detail` line per .ctors word of the unit (the function, its end, the closure end, the unit end)"
       },
       {
        "tool": "callers",
@@ -1553,7 +1571,7 @@
       {
        "tool": "splitcheck",
        "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit ^enemy/fn_80191598\\.cpp$",
-       "finding": "fn_80192204 (the function a .ctors word points at) ends at 0x80192348, before the unit's text end: not its last function"
+       "finding": "fn_80192204 (the function a .ctors word points at) ends at 0x80192348, before the unit's text end: not its last function; the command prints a `detail` line per .ctors word of the unit (the function, its end, the closure end, the unit end)"
       },
       {
        "tool": "callers",
@@ -1594,7 +1612,8 @@
     }
    ],
    "open_questions": [
-    "name: named from em018_prog_tbl (0x805AD370)"
+    "name: named from em018_prog_tbl (0x805AD370)",
+    "a `keep_registered_edge` row can carry the R1 L row as strong evidence (see its evidence); the edge is registered, the grade stays `keep_registered_edge`"
    ]
   },
   {
@@ -1617,7 +1636,7 @@
       {
        "tool": "splitcheck",
        "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit ^enemy/fn_801B0010\\.cpp$",
-       "finding": "fn_801B42DC (the function a .ctors word points at) ends at 0x801B4348, before the unit's text end: not its last function"
+       "finding": "fn_801B42DC (the function a .ctors word points at) ends at 0x801B4348, before the unit's text end: not its last function; the command prints a `detail` line per .ctors word of the unit (the function, its end, the closure end, the unit end)"
       },
       {
        "tool": "callers",
@@ -1631,7 +1650,8 @@
    "replaces_tail_of": "enemy/fn_801B0010.cpp",
    "open_questions": [
     "name: placeholder",
-    "the registered start at this unit's right edge (0x801B4458) came from an earlier tool (the first reader of the next pool run); R1 puts the end of the neighbouring TU at this unit's start, so the 0x110 bytes between is either a real micro-TU or the tail of the TU that follows (or of the one before) that only a vtable or code before L reaches"
+    "the registered start at this unit's right edge (0x801B4458) came from an earlier tool (the first reader of the next pool run); R1 puts the end of the neighbouring TU at this unit's start, so the 0x110 bytes between is either a real micro-TU or the tail of the TU that follows (or of the one before) that only a vtable or code before L reaches",
+    "MICRO UNIT: its right edge 0x801B4458 is a registered edge only; do not register a source for this unit before the edge is pinned (a 0x110-byte unit rests on one signal)"
    ]
   }
  ],
@@ -1729,29 +1749,17 @@
   },
   {
    "unit": "ef/eft029.cpp",
-   "question": "a TU starts in this interval and no known cut holds it (the unit above the interval is 2 TUs until it is pinned)",
+   "question": "ONE interval, not two: a TU starts in 0x8011CB74..0x8011CD78 (the intersection of the 3f800000 row [0x8011C98C, 0x8011CD78] and the 4330000080000000 row [0x8011CB74, 0x8011CEC4]; 7 positions) and no known cut holds it; the unit above the interval is 2 TUs until it is pinned",
    "candidate_interval": [
-    "0x8011C98C",
+    "0x8011CB74",
     "0x8011CD78"
    ],
    "positions": 7,
    "evidence": [
-    "value 0x3f800000 held at lbl_80796B6C (last read at 0x8011C5F4) and again at lbl_80796BC8 (first read at 0x8011CD78): one TU holds a value once, so a TU starts in 0x8011C98C..0x8011CD78 (8 function starts, 7 outside every shared-literal span)"
-   ],
-   "reproduce": "python tools/splits/tudiscover.py at 0x8011CD78 --pool-model on"
-  },
-  {
-   "unit": "ef/eft029.cpp",
-   "question": "a TU starts in this interval and no known cut holds it (the unit above the interval is 2 TUs until it is pinned)",
-   "candidate_interval": [
-    "0x8011CB74",
-    "0x8011CEC4"
-   ],
-   "positions": 7,
-   "evidence": [
+    "value 0x3f800000 held at lbl_80796B6C (last read at 0x8011C5F4) and again at lbl_80796BC8 (first read at 0x8011CD78): one TU holds a value once, so a TU starts in 0x8011C98C..0x8011CD78 (8 function starts, 7 outside every shared-literal span)",
     "value 0x4330000080000000 held at lbl_80796B80 (last read at 0x8011C98C) and again at lbl_80796BF8 (first read at 0x8011CEC4): one TU holds a value once, so a TU starts in 0x8011CB74..0x8011CEC4 (8 function starts, 7 outside every shared-literal span)"
    ],
-   "reproduce": "python tools/splits/tudiscover.py at 0x8011CEC4 --pool-model on"
+   "reproduce": "python tools/splits/splitcheck.py --baseline --only pool --intervals --unit '^ef/eft029\\.cpp$' (prints both pairs; their intersection is the interval)"
   },
   {
    "unit": "enemy/fn_8011D448.cpp",

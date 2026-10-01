@@ -1423,7 +1423,9 @@
      "kind": "file"
     }
    ],
-   "open_questions": [],
+   "open_questions": [
+    "NAME CONFLICT (rule 7 follow-up): the map name `AXFXReverbHiExpShutdown` (0x804760C0) lies in fn_80475E30 (0x80475E30..0x804770E0), but AXFXReverbHiExp ends at the strong cut 0x80475E30 (pool-pinned); either the name is a mislabel (rename the symbol after what the function does) or the end is too early (0x804760C0 sits inside lbl_8079D040's must-link span, which keeps it in the later TU)"
+   ],
    "replaces_tail_of": "AX/AXFXReverbHi.c"
   },
   {
@@ -1463,7 +1465,9 @@
      "kind": "pool"
     }
    ],
-   "open_questions": []
+   "open_questions": [
+    "`AXFXReverbHiExpShutdown` (0x804760C0) in this unit carries the name of the previous TU's roster (AXFXReverbHiExp): see that unit's open question; the strong cut 0x80475E30 stands"
+   ]
   },
   {
    "derived_name": "fn_804772F0",
@@ -3303,7 +3307,7 @@
     ".text": [
      [
       "0x804AB2C0",
-      "0x804ABC70"
+      "0x804ABCE0"
      ]
     ]
    },
@@ -3323,36 +3327,9 @@
      "kind": "file"
     }
    ],
-   "open_questions": []
-  },
-  {
-   "derived_name": "dvderrorcode",
-   "module": "DVD",
-   "ranges": {
-    ".text": [
-     [
-      "0x804ABC70",
-      "0x804ABCE0"
-     ]
-    ]
-   },
-   "cuts": [
-    {
-     "addr": "0x804ABC70",
-     "section": ".text",
-     "grade": "guess",
-     "evidence": [
-      {
-       "tool": "symedit",
-       "command": "python tools/symbols/symedit.py at 0x804ABC70 --count 4 --section .text",
-       "finding": "__DVDStoreErrorCode"
-      }
-     ],
-     "reproduce": "python tools/symbols/symedit.py at 0x804ABC70 --count 4 --section .text",
-     "kind": "file"
-    }
-   ],
-   "open_questions": []
+   "open_questions": [
+    "the roster entry dvderrorcode (__DVDStoreErrorCode, 0x804ABC70..0x804ABCE0) is removed: `Callback` (.sbss 0x80795140, scope:local) is read at 0x804ABC3C (cbForPrepareStatusRegister) and at 0x804ABCB8 (__DVDStoreErrorCode), so the cut 0x804ABC70 cannot be a TU start; dvderror runs 0x804AB2C0..0x804ABCE0 (`callers.py 0x80795140`)"
+   ]
   },
   {
    "derived_name": "dvdidutils",
@@ -3390,7 +3367,7 @@
     ".text": [
      [
       "0x804ABDD0",
-      "0x804ABF00"
+      "0x804ABF40"
      ]
     ]
    },
@@ -3413,33 +3390,40 @@
    "open_questions": []
   },
   {
-   "derived_name": "fn_804ABF00",
+   "derived_name": "lowCallback",
    "module": "DVD",
    "ranges": {
     ".text": [
      [
-      "0x804ABF00",
+      "0x804ABF40",
       "0x804AC3A0"
      ]
     ]
    },
    "cuts": [
     {
-     "addr": "0x804ABF00",
+     "addr": "0x804ABF40",
      "section": ".text",
      "grade": "guess",
      "evidence": [
       {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x80795148",
+       "finding": "local static FatalFunc .sbss (.sbss 0x80795148) is read at FatalFunc is read at 0x804ABEB8/0x804ABEDC (DVDSetAutoFatalMessaging) and at 0x804ABF00 (fn_804ABF00) and 0x804ABF20 (fn_804ABF20): the three functions are one TU, so the next start is lowCallback (0x804ABF40): a static is one TU's, so the cut cannot sit at 0x804ABF00 (inside its reader span); the first reader's function is the earliest admissible start"
+      },
+      {
        "tool": "symedit",
-       "command": "python tools/symbols/symedit.py at 0x804ABF00 --count 4 --section .text",
-       "finding": "fn_804ABF00/fn_804ABF20/lowCallback/__DVDCheckDevice: DVD device glue"
+       "command": "python tools/symbols/symedit.py at 0x804ABF40 --count 4 --section .text",
+       "finding": "function start at 0x804ABF40; the roster position 0x804ABF00 of the earlier revision is replaced by it"
       }
      ],
-     "reproduce": "python tools/symbols/symedit.py at 0x804ABF00 --count 4 --section .text",
+     "reproduce": "python tools/units/callers.py 0x80795148 && python tools/symbols/symedit.py at 0x804ABF40 --count 4 --section .text",
      "kind": "file"
     }
    ],
-   "open_questions": []
+   "open_questions": [
+    "MOVED from 0x804ABF00: local static FatalFunc .sbss is read on both sides (FatalFunc is read at 0x804ABEB8/0x804ABEDC (DVDSetAutoFatalMessaging) and at 0x804ABF00 (fn_804ABF00) and 0x804ABF20 (fn_804ABF20): the three functions are one TU, so the next start is lowCallback (0x804ABF40))"
+   ]
   },
   {
    "derived_name": "dvdlow",
@@ -3776,7 +3760,7 @@
     ".text": [
      [
       "0x804BB220",
-      "0x804BB750"
+      "0x804BB340"
      ]
     ]
    },
@@ -3804,28 +3788,35 @@
    "ranges": {
     ".text": [
      [
-      "0x804BB750",
+      "0x804BB340",
       "0x804BD070"
      ]
     ]
    },
    "cuts": [
     {
-     "addr": "0x804BB750",
+     "addr": "0x804BB340",
      "section": ".text",
      "grade": "guess",
      "evidence": [
       {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x80793EAC",
+       "finding": "local static hid .sdata, __mailboxAck .sdata, __responses .bss (.sdata 0x80793EAC) is read at hid first read 0x804BB53C in fn_804BB340; __mailboxAck 0x804BB4E0; __responses 0x804BB678, all below the old cut 0x804BB750 and read again above it: a static is one TU's, so the cut cannot sit at 0x804BB750 (inside its reader span); the first reader's function is the earliest admissible start"
+      },
+      {
        "tool": "symedit",
-       "command": "python tools/symbols/symedit.py at 0x804BB750 --count 4 --section .text",
-       "finding": "IPCCltInit/__ios_Ipc2/IOS_Open..IOS_IoctlvReboot"
+       "command": "python tools/symbols/symedit.py at 0x804BB340 --count 4 --section .text",
+       "finding": "function start at 0x804BB340; the roster position 0x804BB750 of the earlier revision is replaced by it"
       }
      ],
-     "reproduce": "python tools/symbols/symedit.py at 0x804BB750 --count 4 --section .text",
+     "reproduce": "python tools/units/callers.py 0x80793EAC && python tools/symbols/symedit.py at 0x804BB340 --count 4 --section .text",
      "kind": "file"
     }
    ],
-   "open_questions": []
+   "open_questions": [
+    "MOVED from 0x804BB750: local static hid .sdata, __mailboxAck .sdata, __responses .bss is read on both sides (hid first read 0x804BB53C in fn_804BB340; __mailboxAck 0x804BB4E0; __responses 0x804BB678, all below the old cut 0x804BB750 and read again above it); 0x804BB310 (strnlen, 0x2C B, no static read) is the other admissible start; the earlier roster position 0x804BB750 (IPCCltInit) is excluded"
+   ]
   },
   {
    "derived_name": "memory",
@@ -4194,68 +4185,6 @@
     }
    ],
    "open_questions": []
-  },
-  {
-   "derived_name": "OSAlarm_head",
-   "module": "OS",
-   "ranges": {
-    ".text": [
-     [
-      "0x804CB440",
-      "0x804CBC50"
-     ]
-    ]
-   },
-   "cuts": [
-    {
-     "addr": "0x804CB440",
-     "section": ".text",
-     "grade": "guess",
-     "evidence": [
-      {
-       "tool": "symedit",
-       "command": "python tools/symbols/symedit.py at 0x804CB440 --count 4 --section .text",
-       "finding": "__OSInitAlarm..OSGetAlarmUserData: OSAlarm.c roster (the registered OS/OSAlarm.c is its 16-byte tail)"
-      }
-     ],
-     "reproduce": "python tools/symbols/symedit.py at 0x804CB440 --count 4 --section .text",
-     "kind": "file"
-    }
-   ],
-   "open_questions": [
-    "the registered OS/OSAlarm.c (16 B at 0x804CBC50) and __OSCancelInternalAlarms (0x804CBC60) look like the tail of this TU"
-   ]
-  },
-  {
-   "derived_name": "OSAlarm_tail",
-   "module": "OS",
-   "ranges": {
-    ".text": [
-     [
-      "0x804CBC60",
-      "0x804CBD10"
-     ]
-    ]
-   },
-   "cuts": [
-    {
-     "addr": "0x804CBC60",
-     "section": ".text",
-     "grade": "medium",
-     "evidence": [
-      {
-       "tool": "splitcheck",
-       "command": "python tools/splits/splitcheck.py --baseline --all --unit \"OSAlarm\" --only order,coverage,text-cut",
-       "finding": "0x804CBC60 follows the registered unit OS/OSAlarm.c with no function in between (<= 16 B pad); baseline order/coverage/text-cut PASS"
-      }
-     ],
-     "reproduce": "python tools/splits/splitcheck.py --baseline --all --unit \"OSAlarm\" --only order,coverage,text-cut",
-     "kind": "inherited"
-    }
-   ],
-   "open_questions": [
-    "same TU as OSAlarm_head and the registered OSAlarm.c?"
-   ]
   },
   {
    "derived_name": "OSAlloc",
@@ -4670,7 +4599,7 @@
     ".text": [
      [
       "0x804D21F0",
-      "0x804D2CD0"
+      "0x804D2B90"
      ]
     ]
    },
@@ -4700,28 +4629,35 @@
    "ranges": {
     ".text": [
      [
-      "0x804D2CD0",
+      "0x804D2B90",
       "0x804D3660"
      ]
     ]
    },
    "cuts": [
     {
-     "addr": "0x804D2CD0",
+     "addr": "0x804D2B90",
      "section": ".text",
      "grade": "guess",
      "evidence": [
       {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x8074D640",
+       "finding": "local static Scb .bss (.bss 0x8074D640) is read at Scb is read at 0x804D2BA4 (fn_804D2B90) and from 0x804D2C98 on (__OSInitSram, UnlockSram ...): OSRtc starts at fn_804D2B90 (0x804D2B90) or earlier: a static is one TU's, so the cut cannot sit at 0x804D2CD0 (inside its reader span); the first reader's function is the earliest admissible start"
+      },
+      {
        "tool": "symedit",
-       "command": "python tools/symbols/symedit.py at 0x804D2CD0 --count 4 --section .text",
-       "finding": "__OSInitSram/UnlockSram/__OSGetRTCFlags"
+       "command": "python tools/symbols/symedit.py at 0x804D2B90 --count 4 --section .text",
+       "finding": "function start at 0x804D2B90; the roster position 0x804D2CD0 of the earlier revision is replaced by it"
       }
      ],
-     "reproduce": "python tools/symbols/symedit.py at 0x804D2CD0 --count 4 --section .text",
+     "reproduce": "python tools/units/callers.py 0x8074D640 && python tools/symbols/symedit.py at 0x804D2B90 --count 4 --section .text",
      "kind": "file"
     }
    ],
-   "open_questions": []
+   "open_questions": [
+    "MOVED from 0x804D2CD0: local static Scb .bss is read on both sides (Scb is read at 0x804D2BA4 (fn_804D2B90) and from 0x804D2C98 on (__OSInitSram, UnlockSram ...): OSRtc starts at fn_804D2B90 (0x804D2B90) or earlier)"
+   ]
   },
   {
    "derived_name": "OSSync",
@@ -5391,7 +5327,7 @@
     ".text": [
      [
       "0x804E5600",
-      "0x804E70C0"
+      "0x804E68B0"
      ]
     ]
    },
@@ -5419,29 +5355,35 @@
    "ranges": {
     ".text": [
      [
-      "0x804E70C0",
+      "0x804E68B0",
       "0x804E91C0"
      ]
     ]
    },
    "cuts": [
     {
-     "addr": "0x804E70C0",
+     "addr": "0x804E68B0",
      "section": ".text",
      "grade": "guess",
      "evidence": [
       {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x80795648",
+       "finding": "local static CurrTvMode .sbss (.sbss 0x80795648) is read at CurrTvMode is read at 0x804E6B84 (fn_804E68B0) and at 0x804E6BDC .. 0x804E90A0: vi.c starts at fn_804E68B0 (0x804E68B0) or earlier; the unit USB/fn_804E5600 holds a vi function (its tail 0x804E68B0..0x804E70C0): a static is one TU's, so the cut cannot sit at 0x804E70C0 (inside its reader span); the first reader's function is the earliest admissible start"
+      },
+      {
        "tool": "symedit",
-       "command": "python tools/symbols/symedit.py at 0x804E70C0 --count 4 --section .text",
-       "finding": "fn_804E70C0..VIInit: vi.c (the `vi.c` __FILE__ anchor is in fn_804E7F60)"
+       "command": "python tools/symbols/symedit.py at 0x804E68B0 --count 4 --section .text",
+       "finding": "function start at 0x804E68B0; the roster position 0x804E70C0 of the earlier revision is replaced by it"
       }
      ],
-     "reproduce": "python tools/symbols/symedit.py at 0x804E70C0 --count 4 --section .text",
+     "reproduce": "python tools/units/callers.py 0x80795648 && python tools/symbols/symedit.py at 0x804E68B0 --count 4 --section .text",
      "kind": "anchor"
     }
    ],
    "open_questions": [
-    "where does vi.c start: fn_804E70C0, fn_804E7160 or fn_804E7480?"
+    "MOVED from 0x804E70C0: local static CurrTvMode .sbss is read on both sides (CurrTvMode is read at 0x804E6B84 (fn_804E68B0) and at 0x804E6BDC .. 0x804E90A0: vi.c starts at fn_804E68B0 (0x804E68B0) or earlier; the unit USB/fn_804E5600 holds a vi function (its tail 0x804E68B0..0x804E70C0))",
+    "where does vi.c start: at or below fn_804E68B0 (0x804E68B0): `CurrTvMode` crosses every later position; the `vi.c` __FILE__ anchor is in fn_804E7F60"
    ]
   },
   {
@@ -5875,7 +5817,9 @@
      "kind": "file"
     }
    ],
-   "open_questions": []
+   "open_questions": [
+    "pooldup rows (`python tools/splits/splitcheck.py --proposal docs/splits/proposals/phase1-f.json --only pool --intervals --unit fn_80501CE8`): value 0x00000000 held at lbl_8079D4C8 (last read 0x80501658) and lbl_8079D4E0 (first read 0x80501934): a TU starts in (0x80501658, 0x805018A8], 4 function starts (fn_80501658, fn_8050168C, fn_805016D0, fn_805018A8), all below this unit; and lbl_8079D4E0 (last read 0x80501934) vs lbl_8079D4F0 (first read 0x80503320): a TU starts in (0x805018A8, 0x80503314], which holds this unit's start 0x80501CE8 and nw4r/fn_80502828's 0x80502828: one of them is the cut, the other is not proven. The unit FAILs `pool` at lbl_8079D4E0 until that is decided; guess candidate: 0x80501CE8 (the roster start) satisfies the second row"
+   ]
   },
   {
    "derived_name": "fn_80502828",
@@ -6573,7 +6517,9 @@
      "kind": "roster"
     }
    ],
-   "open_questions": []
+   "open_questions": [
+    "pooldup rows (`... --only pool --intervals --unit soi`): value 0x00000000 held at lbl_8079D514 (last read 0x80506334) and lbl_8079D528 (first read 0x805269B8): a TU starts in (0x80505E5C, 0x80526980]; and lbl_8079D528 (last read 0x805269E0) vs lbl_8079D550 (first read 0x8052A148): a TU starts in (0x80526980, 0x8052A13C], 84 function starts, which holds the roster cuts KPR/kpr 0x80526C90, HID/hid 0x805272B0, KBD/kbd 0x80528CF0 and homebutton/fn_8052A040 0x8052A040. The unit FAILs `pool` at lbl_8079D550; guess candidate: 0x80526C90 (KPR/kpr, the first roster start after the last read 0x805269E0)"
+   ]
   },
   {
    "derived_name": "vf",
@@ -6985,7 +6931,7 @@
     ".text": [
      [
       "0x80533474",
-      "0x8053E7D0"
+      "0x8053E808"
      ]
     ]
    },
@@ -7011,51 +6957,126 @@
     }
    ],
    "open_questions": [
-    "a cut is required in 0x80533814..0x80533854 (2 admissible positions, pooldup: .sdata2 value 3f800000 held at 0x8079D5EC and again at 0x8079D5F8 (copy 1 last read by 0x805337A0, copy 2 first read by 0x8053393C)); no candidate proposed",
-    "a cut is required in 0x80533814..0x80533B04 (4 admissible positions, pooldup: .sdata2 value 00000000 held at 0x8079D5E8 and again at 0x8079D608 (copy 1 last read by 0x805337A0, copy 2 first read by 0x80533B04)); no candidate proposed",
-    "a cut is required in 0x80533814..0x80533B04 (4 admissible positions, dataorder: zigzag seam lbl_8064A8E8 -> lbl_8064A8F8 at 0x8064A8F8); no candidate proposed",
+    "a cut is required in 0x80533814..0x80533854 (2 admissible positions, pooldup: .sdata2 value 3f800000 held at 0x8079D5EC and again at 0x8079D5F8 (copy 1 last read by 0x805337A0, copy 2 first read by 0x8053393C)); guess candidates: 0x80533814 or 0x80533854 (fn_80533814 0x40 B, fn_80533854 0xE8 B): one cut at either satisfies this row, the next row and the zigzag row below (both 4-position intervals contain these two starts)",
+    "a cut is required in 0x80533814..0x80533B04 (4 admissible positions, pooldup: .sdata2 value 00000000 held at 0x8079D5E8 and again at 0x8079D608 (copy 1 last read by 0x805337A0, copy 2 first read by 0x80533B04)); guess candidates: 0x80533814 or 0x80533854 (the same cut as the 2-position row above satisfies it)",
+    "a cut is required in 0x80533814..0x80533B04 (4 admissible positions, dataorder: zigzag seam lbl_8064A8E8 -> lbl_8064A8F8 at 0x8064A8F8); guess candidates: 0x80533814 or 0x80533854 (the same cut as the 2-position row above satisfies it)",
     "a cut is required in 0x80534DB8..0x8053508C (6 admissible positions, dataorder: zigzag seam lbl_8064A920 -> lbl_8064A938 at 0x8064A938); no candidate proposed",
-    "1 more unresolved intervals in this unit (narrowest first, all <= 40 positions)"
+    "1 more unresolved intervals in this unit (narrowest first, all <= 40 positions)",
+    "end moved 0x8053E7D0 -> 0x8053E808: the seven 8-byte functions 0x8053E7D0..0x8053E808 are slots of lbl_8064DC30, whose store (fn_805385D0, 0x805385F8) is in this unit"
    ]
   },
   {
-   "derived_name": "fn_8053E7D0",
+   "derived_name": "fn_8053E808",
    "module": "homebutton",
    "ranges": {
     ".text": [
      [
-      "0x8053E7D0",
+      "0x8053E808",
       "0x8054032C"
      ]
     ]
    },
    "cuts": [
     {
-     "addr": "0x8053E7D0",
+     "addr": "0x8053E808",
      "section": ".text",
      "grade": "medium",
      "evidence": [
       {
+       "tool": "splitcheck",
+       "command": "python tools/splits/splitcheck.py --proposal docs/splits/proposals/phase1-f.json --unit fn_80533474",
+       "finding": "detail line: .ctors word 0x8056F3F4 = 0x8053E5F8 (fn_8053E5F8, ends 0x8053E7D0): closure ends 0x8053E7D0, with own vtable slots 0x8053E808: fn_8053E7D0..fn_8053E800 are seven 8-byte slots of lbl_8064DC30 (.data 0x8064DC30), whose address fn_805385D0 materialises at 0x805385F8 inside the unit (`callers.py 0x8064DC30`): the TU ends at 0x8053E808, the first non-slot function (0xB0 B)"
+      },
+      {
        "tool": "dol",
        "command": "python -c \"import sys;sys.path.insert(0,'tools/units');from m2cinput import Dol;d=Dol('orig/RMHE08/sys/main.dol');print(hex(int.from_bytes(d.read(0x8056F3F4,4),'big')))\"",
-       "finding": ".ctors word 0x8056F3F4 = 0x8053E5F8 = fn_8053E5F8 (ends 0x8053E7D0): the static-init function of a TU; the closure of the sinit's callees and address-taken functions after it is empty, so the TU ends at L = 0x8053E7D0"
+       "finding": ".ctors word 0x8056F3F4 = 0x8053E5F8 = fn_8053E5F8 (ends 0x8053E7D0): the static-init function of a TU; the closure of the sinit's callees and address-taken functions after it is empty, so the closure ends at L = 0x8053E7D0 (the own vtable slots extend the TU to 0x8053E808)"
       },
       {
        "tool": "asm dump",
        "command": "grep -rn -A119 \"^.fn fn_8053E5F8,\" build/RMHE08/asm",
        "finding": "the sinit body calls nothing; every callee lies below the sinit, so nothing it needs is emitted after it"
-      },
-      {
-       "tool": "callers",
-       "command": "python tools/units/callers.py 0x8053E7D0",
-       "finding": "fn_8053E7D0 has 1 referrer(s), none inside the unit that ends at L (unit taken from 0x80533474): 0x8064DC30 pointer"
       }
      ],
-     "reproduce": "python -c \"import sys;sys.path.insert(0,'tools/units');from m2cinput import Dol;d=Dol('orig/RMHE08/sys/main.dol');print(hex(int.from_bytes(d.read(0x8056F3F4,4),'big')))\"",
+     "reproduce": "python tools/splits/splitcheck.py --proposal docs/splits/proposals/phase1-f.json --unit fn_80533474",
      "kind": "ctors"
     }
    ],
    "open_questions": []
+  },
+  {
+   "derived_name": "OSAlarm",
+   "module": "OS",
+   "ranges": {
+    ".text": [
+     [
+      "0x804CB440",
+      "0x804CBD10"
+     ]
+    ]
+   },
+   "cuts": [
+    {
+     "addr": "0x804CB440",
+     "section": ".text",
+     "grade": "guess",
+     "kind": "file",
+     "evidence": [
+      {
+       "tool": "symedit",
+       "command": "python tools/symbols/symedit.py at 0x804CB440 --count 4 --section .text",
+       "finding": "__OSInitAlarm..OSGetAlarmUserData: the OSAlarm.c roster start (the end 0x804CBD10 is the roster end; both edges are roster guesses)"
+      }
+     ],
+     "reproduce": "python tools/symbols/symedit.py at 0x804CB440 --count 4 --section .text"
+    }
+   ],
+   "removes_cuts": [
+    {
+     "addr": "0x804CBC50",
+     "section": ".text",
+     "grade": "strong",
+     "evidence": [
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x80795310",
+       "finding": "`AlarmQueue` (.sbss 0x80795310, scope:local) is accessed 14 times in 6 functions: __OSInitAlarm (0x804CB464, 0x804CB474), InsertAlarm (0x804CB57C, 0x804CB5C8, 0x804CB654, 0x804CB678), OSCancelAlarm (0x804CB848, 0x804CB874), DecrementerExceptionCallback (0x804CB944, 0x804CBA00, 0x804CBA0C, 0x804CBA68), fn_804CBBA0 (0x804CBBBC) and __OSCancelInternalAlarms (0x804CBC80): a static is one TU's, so 0x804CB440..0x804CBD10 is one TU"
+      },
+      {
+       "tool": "symedit",
+       "command": "python tools/symbols/symedit.py range 0x804CBC40 0x804CBC90 --section .text",
+       "finding": "the registered Matching OS/OSAlarm.c (0x804CBC50..0x804CBC60) is the 16-byte `cPhs_Set` between OSGetAlarmUserData (0x804CBC40) and __OSCancelInternalAlarms (0x804CBC60): a function of another library inside the OSAlarm roster, read on both sides by the same static"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x80795310"
+    },
+    {
+     "addr": "0x804CBC60",
+     "section": ".text",
+     "grade": "strong",
+     "evidence": [
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x80795310",
+       "finding": "`AlarmQueue` (.sbss 0x80795310, scope:local) is accessed 14 times in 6 functions: __OSInitAlarm (0x804CB464, 0x804CB474), InsertAlarm (0x804CB57C, 0x804CB5C8, 0x804CB654, 0x804CB678), OSCancelAlarm (0x804CB848, 0x804CB874), DecrementerExceptionCallback (0x804CB944, 0x804CBA00, 0x804CBA0C, 0x804CBA68), fn_804CBBA0 (0x804CBBBC) and __OSCancelInternalAlarms (0x804CBC80): a static is one TU's, so 0x804CB440..0x804CBD10 is one TU"
+      },
+      {
+       "tool": "symedit",
+       "command": "python tools/symbols/symedit.py range 0x804CBC40 0x804CBC90 --section .text",
+       "finding": "the registered Matching OS/OSAlarm.c (0x804CBC50..0x804CBC60) is the 16-byte `cPhs_Set` between OSGetAlarmUserData (0x804CBC40) and __OSCancelInternalAlarms (0x804CBC60): a function of another library inside the OSAlarm roster, read on both sides by the same static"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x80795310"
+    }
+   ],
+   "absorbs": [
+    "OS/OSAlarm.c"
+   ],
+   "replaces_tail_of": [],
+   "open_questions": [
+    "MATCHING UNIT FOLDED: the registered Matching OS/OSAlarm.c (`cPhs_Set`, 0x10 B) lies inside this TU; the lane that registers the merged unit re-measures `cPhs_Set` in the merged object (reconcile.md section 4). An earlier revision split OSAlarm_head | OS/OSAlarm.c | OSAlarm_tail with a medium cut at 0x804CBC60; `AlarmQueue` is read at 0x804CBBBC (before it) and 0x804CBC80 (after it), so the cut was wrong",
+    "`cPhs_Set` (a runtime/f_pc function by name) sitting between two OSAlarm functions is odd; the map name may be a mislabel of a 16-byte OS helper (rule 7 follow-up)"
+   ]
   }
  ],
  "open_questions": [

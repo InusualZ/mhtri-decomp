@@ -89,12 +89,12 @@ These are the 27 single-`.ctors`-word units outside the band whose closure leave
 | unit (derived) | range | cut | grade | note |
 | --- | --- | --- | --- | --- |
 | `main/pad_connect` | 0x80046C80..0x80047398 | 0x80046C80 | strong | tail of `mh3_pad.cpp`; ctors closure + two `pooldup` rows that hold only this cut |
-| `main/draw_shape_arm` | 0x80055EC4..0x80056F24 | 0x80055EC4 | medium | tail of `draw_shape.cpp`; named from `draw_shape_arm` |
-| `g3d/fn_80088E24` | 0x80088E24..0x800898B0 | 0x80088E24 | medium | tail of `g3d_state.cpp`; placeholder name; may join `g3d_resanm.c` |
-| `ef/ef_emitter` | 0x800A6258..0x800A99B4 | 0x800A6258 | medium | `ef_effectsystem`'s tail joins `ef_emitter` (callers and a create/destroy pair in `nw_resource`); absorbs the registered `ef_emitter` |
-| `ef/fn_800B4AC8` | 0x800B4AC8..0x800B99E8 | 0x800B4AC8 | strong | tail of `fn_800AEE48.cpp`; three `pooldup` rows and the `.data` seam 0x80593CD0 agree |
-| `ef/ef_util` (+ `fn_8009CD64`) | 0x8009B374..0x8009CDBC | 0x8009B374 / 0x8009CD64 | medium / guess | the unowned function joins the left neighbour (two positions) |
-| `sound/fn_800D7F54` | 0x800D7F54..0x800DD40C | 0x800D7F54 | medium | swallows the registered cuts 0x800DCFEC and 0x800DD1F0 (strong: `lbl_807963E0`, 0.0f, read on both sides) |
+| `main/draw_shape_arm` | 0x80055EC4..0x80056F24 | 0x80055EC4 | medium | tail of `draw_shape.cpp`; named from `draw_shape_arm`; the registered edge 0x80054C64 (draw_shape.cpp start) is probably interior to its TU (open question) |
+| `g3d/fn_80088E24` | 0x80088E24..0x800898B0 | 0x80088E24 | medium | tail of `g3d_state.cpp`; placeholder name; may join `g3d_resanm.c`; none of its 35 functions is referenced from `g3d_state` or its sinit closure |
+| `ef/ef_emitter` | 0x800A6258..0x800A99B4 | 0x800A6258 | medium | `ef_effectsystem`'s tail joins `ef_emitter` (callers, a create/destroy pair in `nw_resource`, and the vtable store: `fn_800A6258` is the ctor of `lbl_80592BA8`, whose slots are `ef_emitter.cpp`'s); absorbs the registered `ef_emitter` |
+| `ef/ef_drawstripestrategy_base` | 0x800B4AC8..0x800B9A44 | 0x800B4AC8 | strong | tail of `fn_800AEE48.cpp`; three `pooldup` rows and the `__FILE__` transition (`ef_resource.cpp` last 0x800B4898 | `ef_drawstripestrategy.cpp` first 0x800B4BA4) agree; ends past `fn_800B99E8`, the DrawStripeStrategy deleting destructor (slot 0 of `lbl_80593CB4`, stored by this unit's ctor); the registered ef_drawstripestrategy.cpp keeps 0x800B9A44..0x800BE154 (billboard + directional, cuts 0x800B9A44 / 0x800BBDEC open); named `_base` because the renderer refuses two units called ef_drawstripestrategy |
+| `ef/ef_util` (+ `fn_8009CD64`) | 0x8009B374..0x8009CDBC | 0x8009B374 / 0x8009CD64 | medium / guess | the unowned function joins the left neighbour (two positions; its 15 callers are 3 in ef_util, 3 in ef_emitter, 9 in ef_drawstripestrategy: a weak signal for the left fold) |
+| `sound/fn_800D7F54` | 0x800D7F54..0x800DD40C | 0x800D7F54 | medium | swallows the registered cuts 0x800DCFEC and 0x800DD1F0 (strong: `lbl_807963E0`, 0.0f, read on both sides; tudiscover's `strong` rows for these two are two adjacent switch tables `jumptable_80597B50 -> jumptable_80597B7C`, not a seam) |
 
 Naming: root-level units have no module in the format, so `main` is used (a guess); placeholders are `fn_<addr>`.
 
@@ -104,21 +104,20 @@ Naming: root-level units have no module in the format, so `main` is used (a gues
 2. `fn_80056F24.cpp`: four TUs (0.0f held at four pool addresses); three cuts, 4 / 10 / 8 positions.
 3. `g3d_anmchr.cpp`: three TUs; 26 and 58 positions.
 4. `fn_80075DCC.cpp`: one start in 37 positions plus a zigzag seam in 0x8007B2D4..0x8007B99C.
-5. `ef_drawstripestrategy.cpp`: one start in 9 positions after the seam bound, two more `.data` seams inside.
+5. `ef_drawstripestrategy.cpp`: starts at 0x800B9A44 now (billboard) with 0x800BBDEC (directional) as the second cut (guess); two more `.data` seams inside.
 6. The sound merge's end: 0x800DD40C (lower bound) .. 0x800E0560.
 7. `fn_8009CD64` left or right (0x8009CD64 or 0x8009CDBC).
 8. `g3d/fn_80088E24` and the registered `g3d_resanm.c`, and `ef/fn_800B4AC8`'s inner `4330000080000000` row (0x800B7628..0x800B9DF8): one TU or more.
 
 ## Remaining splitcheck failures (rendered candidate, `--proposal ... --emit-splits`)
 
-Candidate 309 units (baseline 306). `order`, `coverage`, `text-cut`, `extab`, `dtors`, `vtable`, `bss`: 0 FAIL, unchanged.
-`ctors` 45 -> 44, `pool` 130 -> 127, `data-order` 3, `jumptable` 1 (both unchanged, outside the band or phase 2).
+Candidate 309 units (baseline 306), band alone. `order`, `coverage`, `text-cut`, `extab`, `dtors`, `vtable`, `bss`, `local-static`: 0 FAIL, unchanged.
+`ctors` 39 -> 34, `pool` 129 -> 126, `data-order` 3, `jumptable` 1 (both unchanged, outside the band or phase 2).
 **New failures outside the proposal units: 0**; all 7 proposal units PASS every checked invariant; lint: none.
 
-Band `ctors` FAILs that remain, all the closure false positive above (the checker reads the sinit end, not `L`):
-`mh3_pad` (L = unit end 0x80046C80), `draw_shape` (0x80055EC4), `g3d_state` (0x80088E24), `ef_effectsystem`
-(0x800A6258), `fn_80056F24`, `ef_emform`, `fn_800CDB2C` (closure end = unit end, no cut proposed), and
-`sound/fn_800DD1F0` (owned by the band that holds 0x800E3B3C).
+The closure "false positive" of the first revision is gone: the checker reads the closure `L` of the sinit's callees (and the unit's own vtable slots), so the band's `ctors` FAILs are
+the baseline units this band does not touch (`splitcheck.py --baseline --only ctors --unit X` prints the `detail` lines with both ends; `ef_emform`, whose sinit registers EmForm
+classes whose vtable slots are another TU's large functions, stays PASS).
 
 Band `pool` FAILs that remain are the `guess` intervals above (units that hold one value at two pool addresses: `mh3_pad`,
 `fn_80047398`, `fn_8004CAD8`, `fn_80056F24`, `g3d_anmchr`, `fn_80075DCC`, `ef_particlemanager`, `ef/fn_800AEE48`'s head,
@@ -126,8 +125,8 @@ Band `pool` FAILs that remain are the `guess` intervals above (units that hold o
 
 ## Tool gaps hit
 
-* **`splitcheck` `ctors`**: use the deferred closure `L` (sinit + local callees and address-taken functions after it),
-  not the sinit's end; `cut_at` would then be exact and four FAILs become PASS. No fixture exists for a `b`-thunk sinit.
+* **`splitcheck` `ctors`** (fixed): the deferred closure `L` (sinit + local callees and address-taken functions after it) replaces the sinit's end, `cut_at` is exact, and the own vtable slots
+  after it count too, also past the unit end; fixtures cover a `b`-thunk sinit, a slot run and a cut over a unit's own slots.
 * **`splitcheck` pool decode**: a `lis/addi` that only forms an address (RSO `RSOStaticLocateObject` taking the start of
   `.sdata2`) is counted as a read of `lbl_80795AA0`; `callers.py` lists the two real readers, both in `main.cpp`.
 * **Format**: no way to say "guess: stay merged with the *baseline* neighbour". `merge_guess` folds into the previous

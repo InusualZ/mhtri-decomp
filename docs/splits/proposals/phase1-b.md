@@ -12,7 +12,7 @@ both directions: units that are several TUs (sound, ef) and units that are one T
 | --- | --- |
 | registered units overlapping the band / with a FAIL | 69 / 47 (`pool` 44, `ctors` 14; a unit can have both) |
 | proposal units | 27 (candidate: 304 units, baseline 306; 67 overlap the band, 20 with a FAIL: `pool` 11 - one is the remainder of `sound/fn_800DD1F0`, band `a`'s - and `ctors` 9) |
-| cuts emitted | 27: **strong 11**, **medium 13**, **baseline 3** (a retained registered edge, no claim) |
+| cuts emitted | 27: **strong 12**, **medium 12**, **baseline 3** (a retained registered edge, no claim; `mhchar`'s 0x800E0504 is strong now: both its ends are pinned) |
 | of which new cuts | 23 (strong 10, medium 13); 4 restate a registered start as a merge's left edge |
 | registered cuts removed (`removes_cuts`) | 25: **strong 23**, **medium 2** (`0x80137604`, `0x80182D5C`: one straddling literal each) |
 | registered units merged into another | 23 whole units into 8 proposal units, plus pieces of 7 more units (heads and tails) |
@@ -106,7 +106,7 @@ from the TU that starts at `0x80138074`). The alternative is one edit: remove th
 ## Top open questions (full list, with intervals, in the JSON; all `guess`)
 
 1. The 5 micro units above: micro-TU, or head of the next TU.
-2. `ef/eft004_fx`: a second TU in `0x801011B4..0x801017B0` (10 positions). `eft022_fx`: one in `0x80116368..0x801168D8` (12 positions
+2. `ef/eft004_fx`: a second TU in `0x801011B4..0x801017B0` (10 positions); the first pair's interval (0x800FF8D4, 0x80100448] tightens to the 4 positions (0x80100088, 0x80100448] when intersected with the 0x40a00000 pair. `eft022_fx`: one in `0x80116368..0x801168D8` (12 positions
    after the code-pointer table `lbl_805A0360` is excluded). `eft029_fx`: one in `0x8011CB74..0x8011CD78` (7).
 3. `ef/eft001` (`0x800FBD68..0x800FBE64`, 2 positions), `fn_80105314` (`0x801063A8..0x80106BB4`, 13), `fn_8010BDE4` (`0x8010C0E0..
    0x8010C554`, 5), `fn_8010D1A8.c` (`0x8010D29C..0x8010E2A8`, 16), `eft019` (`0x80114B20..0x80114C20`, 2): each is 2 TUs.
@@ -117,13 +117,12 @@ from the TU that starts at `0x80138074`). The alternative is one edit: remove th
 
 ## Remaining splitcheck failures (rendered candidate: `--proposal ... --emit-splits`)
 
-Candidate 304 units (baseline 306). `order`, `coverage`, `text-cut`, `extab`, `dtors`, `vtable`, `bss`: 0 FAIL. `ctors` 45 -> 40,
-`pool` 130 -> 97, `jumptable` 1 -> 1, `data-order` 3 -> 3 (both outside the band). **New failures outside the proposal units: 0**; lint: none.
+Candidate 304 units (baseline 306). `order`, `coverage`, `text-cut`, `extab`, `dtors`, `vtable`, `bss`: 0 FAIL. `ctors` 39 -> 25,
+`pool` 129 -> 96, `jumptable` 1 -> 1, `data-order` 3 -> 3 (both outside the band). **New failures outside the proposal units: 0**; lint: none.
 
-* Proposal units that still FAIL: five sound units on `ctors` (`mhchar`, `fn_800E5430`, `fn_800E7D34`, `fn_800E9D00`,
-  `fn_800ED780`) and three ef units on `pool` (`eft004_fx`, `eft022_fx`, `eft029_fx`). The `ctors` ones are the checker's sinit-end
-  reading: in all five the closure `L` is exactly the unit's text end (`0x800E3B3C`, `0x800E7D34`, `0x800E8E48`, `0x800ED780`,
-  `0x800EE014`). The `pool` ones are the three open "2 TUs" questions.
+* Proposal units that still FAIL: three ef units on `pool` (`eft004_fx`, `eft022_fx`, `eft029_fx`), the three open "2 TUs" questions. The five sound units that used to FAIL `ctors`
+  (`mhchar`, `fn_800E5430`, `fn_800E7D34`, `fn_800E9D00`, `fn_800ED780`) PASS: the checker reads the closure `L` now (`0x800E3B3C`, `0x800E7D34`, `0x800E8E48`, `0x800ED780`, `0x800EE014`),
+  which is each unit's text end (`splitcheck.py --baseline --only ctors --unit X` prints the `detail` line per word).
 * Band units outside the proposal that still FAIL: `ctors` on `fn_800E46E8`, `fn_800E8E60`, `effect`, `enemy_control` (each `L` is
   the unit end: a false positive); `pool` on `eft001`, `fn_80105314`, `fn_8010BDE4`, `fn_8010D1A8`, `eft019`, `fn_8011D448` (the open
   intervals) and `em040_ai` (`lbl_80798E20` is the r13 base read by `__start.c`: a false decode, as in band `a`).
@@ -134,8 +133,9 @@ Candidate 304 units (baseline 306). `order`, `coverage`, `text-cut`, `extab`, `d
 
 ## Tool gaps hit
 
-* **`splitcheck` `ctors`** reads the sinit's end, not R1's `L` (see band `a`): 9 of the 9 band `ctors` FAILs left in the candidate
-  have `L` = the unit end. Not changed (brief: fix the proposal, not the checker).
+* **`splitcheck` `ctors`** (fixed since): it reads R1's `L` (see band `a`) and the own vtable slots, also past the unit end, and prints the numbers (`--baseline --only ctors --unit X`).
+  `--baseline --only pool --intervals --unit X` prints each pooled value held at two addresses with its last/first reads and the interval a TU starts in: the `reproduce` of the
+  `eft*_fx` pooldup rows. The five micro units' right edges are registered-only (open questions in their rows; no source before they are pinned).
 * **Format** (changed in this commit, `tools/splits/splitcheck.py`): grade `baseline` (a merge's left edge was otherwise
   forced to claim a grade); `merge_guess` now folds a `guess` unit only into an **adjacent** proposal unit, else drops it and
   prints it as merged into the registered neighbour (band `a` worked around the old behaviour); `--baseline --unit REGEX` now
