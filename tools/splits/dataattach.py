@@ -217,11 +217,46 @@ def reader_names(ctx, s):
     return c
 
 
+#: a holder of at least this many non-zero words of which fewer than `MIN_POINTER_SHARE` point into the map is data (an SJIS/lookup table), not a
+#: pointer table: its few "pointers" are values that happen to fall in the address range (measured: six holders at <= 0.7 %, the next at 4 %)
+MIN_HOLDER_WORDS, MIN_POINTER_SHARE = 64, 0.01
+
+
+def holder_pointers(ctx, s):
+    """`[(word address, word, target data symbol or None, target function or None)]` of the aligned non-zero words of `s` that point into the map
+    (a data symbol other than `s`, or a function), `[]` for a holder that is mostly non-pointer data (`MIN_HOLDER_WORDS`, `MIN_POINTER_SHARE`) -
+    a word at an address that is not 4-aligned (a `.4byte` inside a byte array) is never a pointer."""
+    key = s["addr"]
+    cache = ctx.__dict__.setdefault("_holder_cache", {})
+    if key in cache and cache[key][0] is s:
+        return cache[key][1]
+    out, nonzero = [], 0
+    for i in range((s["size"] or 0) // 4):
+        a = s["addr"] + 4 * i
+        w = ctx.dol.word(a)
+        if not w:
+            continue
+        nonzero += 1
+        if a % 4 or w < 0x80004000:
+            continue
+        t = None
+        if w >= 0x80500000:
+            _j, t = ctx.data_sym_at(w)
+            if t is s:
+                t = None
+        f = ctx.fn_at(w) if w < 0x80580000 else None
+        if t is not None or f is not None:
+            out.append((a, w, t, f))
+    if nonzero >= MIN_HOLDER_WORDS and len(out) < MIN_POINTER_SHARE * nonzero:
+        out = []
+    cache[key] = (s, out)
+    return out
+
+
 def code_target_names(ctx, s):
     c = collections.Counter()
-    for i in range((s["size"] or 0) // 4):
-        w = ctx.dol.word(s["addr"] + 4 * i)
-        if w and 0x80004000 <= w < 0x80580000 and ctx.fn_at(w) is not None:
+    for _a, w, _t, f in holder_pointers(ctx, s):
+        if f is not None and 0x80004000 <= w < 0x80580000:
             u = ctx.text_owner(w)
             if u is not None:
                 c[u.name] += 1
@@ -229,24 +264,29 @@ def code_target_names(ctx, s):
 
 
 def pointer_edges(ctx):
-    """`{symbol address: set of neighbour addresses}` over every data symbol: a word of one that points into another."""
+    """`{symbol address: set of neighbour addresses}` over every data symbol: a word of one that points into another (`holder_pointers`)."""
     edges = collections.defaultdict(set)
     for s in ctx.data_syms:
         if s["section"] not in PTR_SECS or not s["size"]:
             continue
-        for i in range(s["size"] // 4):
-            w = ctx.dol.word(s["addr"] + 4 * i)
-            if not w or w < 0x80500000:
-                continue
-            j, t = ctx.data_sym_at(w)
-            if t is not None and t is not s and t["section"] in DATA_SECS + (".ctors", ".dtors"):
+        for _a, _w, t, _f in holder_pointers(ctx, s):
+            if t is not None and t["section"] in DATA_SECS + (".ctors", ".dtors"):
                 edges[s["addr"]].add(t["addr"])
                 edges[t["addr"]].add(s["addr"])
     return edges
 
 
-def strong_label(s, names, vtable):
-    """The signal a strong row stands on (docs: reader=1, pool-order=3, vtable-store=4, local-static=5, jumptable=6, file-string=7)."""
+def file_name_string(ctx, s):
+    """Whether the string `s` is a real `__FILE__` / file-name string (`g3d_anmvis.cpp`, `g3d_resnode_ac.h`): the one signal `file-string` stands on."""
+    import dataorder as do
+    b = ctx.dol.read(s["addr"], s["size"] or 0)
+    text = b.rstrip(b"\0").decode("latin-1") if b else None
+    return do.is_source_name(text) or do.is_header_name(text)
+
+
+def strong_label(s, names, vtable, ctx=None):
+    """The signal a strong row stands on (docs: reader=1, pool-order=3, vtable-store=4, local-static=5, jumptable=6, file-string=7, string-reader=8,
+    sinit=9).  `file-string` is only for a real `__FILE__` / file-name string; any other string literal one unit reads is a `string-reader`."""
     if s["name"].startswith("jumptable_"):
         return "jumptable"
     if vtable:
@@ -257,13 +297,33 @@ def strong_label(s, names, vtable):
     if sc.is_literal(s) and s["section"] == ".sdata2":
         return "pool-order" if one else "pool-readers"
     if s["section"] in (".data", ".sdata", ".rodata") and s.get("kind") == "string":
-        return "file-string" if one else "readers"
+        if not one:
+            return "readers"
+        return "file-string" if ctx is not None and file_name_string(ctx, s) else "string-reader"
     return "reader" if one else "readers"
+
+
+def names_counter(names):
+    return collections.Counter({x: 1 for x in names})
 
 
 def kind_of(kind, s):
     y = kind.get(s["addr"]) if s["section"] == ".data" else None
     return y.kind if y is not None else ""
+
+
+def nonzero_words(ctx, s):
+    return sum(1 for i in range((s["size"] or 0) // 4) if ctx.dol.word(s["addr"] + 4 * i))
+
+
+#: the pointer closure runs to a fixpoint, at most this many rounds (a chain of N hops needs N rounds)
+MAX_CLOSURE_ROUNDS = 16
+#: a block of N symbols with fewer than `max(ANCHOR_MIN, N * ANCHOR_SHARE)` read by its unit is graded medium (derived/forced evidence is not strong)
+ANCHOR_MIN, ANCHOR_SHARE = 3, 1.0 / 50
+#: contiguous equal-size elements named by one pointer table: at least this many make an array (one object, never split between units)
+MIN_ARRAY = 4
+#: a symbol whose pointer neighbours name more units than this is an index, not an owner signal
+MAX_POINTER_UNITS = 2
 
 
 class Analysis:
@@ -274,10 +334,20 @@ class Analysis:
         self.runs = collect_runs(cand, ctx)
         self.edges = pointer_edges(ctx)
         self.res = []                           # per run: dict
+        self.rvp_groups = []                    # reader-vs-pointer groups: {"kind", "units", "why"}
+        self.ovr = {}                           # (section, address) -> resolved override row (`set_overrides`)
+        self.overrides = []
+        self.do_syms, self.seams, self.do_by_addr = [], [], {}
+        if kind:
+            import dataorder as do
+            self.do_syms = sorted(kind.values(), key=lambda y: y.addr)
+            self.seams = do.seams(self.do_syms)
+            self.do_by_addr = {y.addr: y for y in self.do_syms}
         self._strong_pass()
         self._derived_pass()
         for r in self.res:
             self._weighted(r)
+        self._rvp_pass()
 
     # evidence ----------------------------------------------------------------------------------------------------------------
     def _strong_pass(self):
@@ -287,11 +357,15 @@ class Analysis:
             sets, names, labels, foreign = [], [], [], []
             for s in run.syms:
                 nm = reader_names(ctx, s)
-                ks = {run.pos[x] for x in nm if x in run.pos}
+                dn = {x for x in ctx.definers(s) if x in run.pos}
+                ks = {run.pos[x] for x in (dn or nm) if x in run.pos}
                 label = ""
-                if ks:
+                if dn:                          # a unit's own __sinit constructs it: that unit defines it, whoever else reads it
+                    nm = names_counter(dn)
+                    label = "sinit"
+                elif ks:
                     k = kind_of(self.kind, s)
-                    label = strong_label(s, nm, k == "V")
+                    label = strong_label(s, nm, k == "V", ctx)
                 elif s["name"].startswith("jumptable_"):
                     ct = code_target_names(ctx, s)
                     if len(ct) == 1 and next(iter(ct)) in run.pos:
@@ -304,65 +378,83 @@ class Analysis:
                 foreign.append(sorted(x for x in nm if x not in run.pos))
             opt, adm = dp_admissible(sets, [1] * n, len(run.chain))
             self.res.append({"run": run, "strong": sets, "names": names, "label": labels, "foreign": foreign,
-                             "adm_strong": adm, "opt_strong": opt, "derived": [set() for _ in range(n)], "dlabel": [""] * n})
+                             "adm_strong": adm, "opt_strong": opt, "derived": [set() for _ in range(n)], "dlabel": [""] * n,
+                             "dsrc": [None] * n, "dpure": [False] * n, "ddepth": [0] * n, "rvp": {}})
+
+    def _unit_evidence(self, addr, prev=None):
+        """`(unit names, kind)` the evidence of the data symbol at `addr` names: `base` (the units that read it), `decided` (the strong optimum places
+        it), `derived` (an earlier round of the closure, only with `prev`), `owned` (a registered unit with text holds it), else `("", set())`."""
+        if addr in self._base:
+            return self._base[addr], "base"
+        if addr in self._decided:
+            return self._decided[addr], "decided"
+        if prev is not None and addr in prev:
+            return prev[addr], "derived"
+        if addr not in self._owner_cache:
+            i, t = self.ctx.data_sym_at(addr)
+            u = self.ctx.owner(t["section"], t["addr"]) if t is not None else None
+            self._owner_cache[addr] = ({u.name}, "owned") if (u is not None and u.first(".text") is not None) else (set(), "")
+        return self._owner_cache[addr]
 
     def _derived_pass(self):
         ctx = self.ctx
-        decided = {}
+        self._decided, self._base, self._owner_cache = {}, {}, {}
         for r in self.res:
             for i, s in enumerate(r["run"].syms):
                 lo, hi = r["adm_strong"][i]
                 if lo is not None and lo == hi:
-                    decided[s["addr"]] = {r["run"].chain[lo].name}
-        base = {}                               # address -> unit names, from strong rows
-        for r in self.res:
-            for i, s in enumerate(r["run"].syms):
+                    self._decided[s["addr"]] = {r["run"].chain[lo].name}
                 if r["names"][i]:
-                    base[s["addr"]] = set(r["names"][i])
-        owner_cache = {}
-
-        def ev(addr, prev):
-            if addr in base:
-                return base[addr]
-            if addr in decided:
-                return decided[addr]
-            if addr in prev:
-                return prev[addr]
-            if addr not in owner_cache:
-                i, t = ctx.data_sym_at(addr)
-                u = ctx.owner(t["section"], t["addr"]) if t is not None else None
-                owner_cache[addr] = {u.name} if (u is not None and u.first(".text") is not None) else set()
-            return owner_cache[addr]
-
+                    self._base[s["addr"]] = set(r["names"][i])
         prev = {}
         cands = []
         for r in self.res:
-            for i, s in enumerate(r["run"].syms):
+            run = r["run"]
+            for i, s in enumerate(run.syms):
                 if not r["strong"][i]:
                     ct = code_target_names(ctx, s)
-                    nm = {x for x in ct if x in r["run"].pos}
+                    nm = {x for x in ct if x in run.pos}
                     if nm:
-                        r["derived"][i] = {r["run"].pos[x] for x in nm}
+                        r["derived"][i] = {run.pos[x] for x in nm}
                         r["dlabel"][i] = "code-pointers"
+                        r["dpure"][i] = len(ct) == 1 and sum(ct.values()) == nonzero_words(ctx, s)       # every non-zero word enters the one unit's text
                         prev[s["addr"]] = nm
                     else:
                         cands.append((r, i))
-        for _round in range(2):
+        for rnd in range(1, MAX_CLOSURE_ROUNDS + 1):            # the pointer closure, to a fixpoint (bounded)
             new = {}
             for r, i in cands:
                 s = r["run"].syms[i]
-                acc = set()
+                acc, src = set(), []
                 for a in sorted(self.edges.get(s["addr"], ())):
-                    acc |= ev(a, prev)
+                    names, kd = self._unit_evidence(a, prev)
+                    got = {x for x in names if x in r["run"].pos}
+                    if got:
+                        src.append((a, frozenset(got), kd, ctx.section_of(a)))
+                    acc |= names
                 acc = {x for x in acc if x in r["run"].pos}
                 if acc:
-                    new[(id(r), i)] = (r, i, acc)
-            for (_k, (r, i, acc)) in new.items():
+                    new[(id(r), i)] = (r, i, acc, src)
+            if not new:
+                break
+            for (_k, (r, i, acc, src)) in new.items():
                 s = r["run"].syms[i]
                 r["derived"][i] = {r["run"].pos[x] for x in acc}
                 r["dlabel"][i] = "pointer-graph"
+                r["dsrc"][i] = src
+                r["ddepth"][i] = rnd
                 prev[s["addr"]] = acc
             cands = [(r, i) for r, i in cands if not r["derived"][i]]
+
+    def derived_strong(self, r, i, k):
+        """Whether a symbol placed by derived evidence in unit `k` is as good as a reader: a table of code pointers whose every non-zero word enters
+        that unit's text, or a pointer-graph symbol whose every holder/target is a `.data` symbol the unit's registered ranges already hold."""
+        unit = r["run"].chain[k].name
+        if r["dlabel"][i] == "code-pointers":
+            return r["dpure"][i] and r["derived"][i] == {k}
+        if r["dlabel"][i] == "pointer-graph" and r["dsrc"][i]:
+            return all(kd == "owned" and sec == ".data" and units == {unit} for _a, units, kd, sec in r["dsrc"][i])
+        return False
 
     def _weighted(self, r):
         run = r["run"]
@@ -388,15 +480,100 @@ class Analysis:
                 contra.append(i)
         r["contra"] = contra
 
+    def _rvp_pass(self):
+        """Reader against pointer: a symbol one unit reads (or constructs) while the pointer tables around it name another unit, and an array (contiguous
+        equal-size elements one pointer table names) whose elements the readers split between units, are deferred as `reader-vs-pointer` with both
+        sides listed - a strong reader must not override a disagreeing pointer table silently, and an array is one object."""
+        pos = {}
+        for r in self.res:
+            for i, s in enumerate(r["run"].syms):
+                pos[s["addr"]] = (r, i)
+
+        def add(members, kind, units, why):
+            gid = len(self.rvp_groups)
+            self.rvp_groups.append({"kind": kind, "units": units, "why": why})
+            for r, i in members:
+                r["rvp"].setdefault(i, gid)
+
+        seen = set()                                            # (a) arrays: one object, never split between units (named first: an element is not also a lone disagreement)
+        for h in self.ctx.data_syms:
+            if h["section"] not in PTR_SECS or not h["size"]:
+                continue
+            elems = {}
+            for _a, w, t, _f in holder_pointers(self.ctx, h):
+                if t is not None and t["addr"] == w and t["size"]:
+                    elems[t["addr"]] = t
+            cur = []
+            for t in [elems[a] for a in sorted(elems)] + [None]:
+                if cur and t is not None and t["section"] == cur[-1]["section"] and t["size"] == cur[-1]["size"] and t["addr"] == cur[-1]["addr"] + cur[-1]["size"]:
+                    cur.append(t)
+                    continue
+                if len(cur) >= MIN_ARRAY and (cur[0]["addr"], len(cur)) not in seen:
+                    seen.add((cur[0]["addr"], len(cur)))
+                    members = [pos[e["addr"]] for e in cur if e["addr"] in pos]
+                    units = sorted({r["run"].chain[r["adm"][i][0]].name for r, i in members if r["adm"][i][0] is not None and r["adm"][i][0] == r["adm"][i][1]
+                                    and r["zone_of"][i] is None})
+                    if len(units) >= 2:
+                        add(members, "array", units,
+                            "%d elements of 0x%X B at 0x%08X..0x%08X, named by %s, are one object but their readers split it between %s"
+                            % (len(cur), cur[0]["size"], cur[0]["addr"], sym_end(cur[-1]), h["name"], ", ".join(units)))
+                cur = [t] if t is not None else []
+        for r in self.res:                                      # (b) one object, the reader and the pointer neighbours disagree
+            run = r["run"]
+            for i, s in enumerate(run.syms):
+                st, (lo, hi) = r["strong"][i], r["adm"][i]
+                if not st or lo is None or lo != hi or lo not in st or r["zone_of"][i] is not None:
+                    continue
+                unit = run.chain[lo].name
+                near = set()
+                for a in sorted(self.edges.get(s["addr"], ())):
+                    names, kd = self._unit_evidence(a)
+                    near |= names
+                if near and unit not in near and len(near) <= MAX_POINTER_UNITS:
+                    sig = "constructed by %s's own __sinit" % unit if r["label"][i] == "sinit" else "read by %s" % unit
+                    add([(r, i)], "disagree", [unit] + sorted(near),
+                        "%s is %s, but the pointer tables around it name %s" % (s["name"], sig, ", ".join(sorted(near))))
+        self._rvp_enclosed()
+
+    def _rvp_enclosed(self):
+        """A disagreement the link order encloses is not deferred: a symbol between two symbols of one unit lies in that unit's data (taking it out
+        would leave the unit two ranges in one section - dtk takes one), so it stays attached and the row records both signals instead
+        (`rvp_note`, graded medium).  Only a symbol at the edge of its unit's block, or an array the readers split, is carved out."""
+        for r in self.res:
+            run = r["run"]
+            r["rvp_note"] = {}
+            for i in sorted(r["rvp"]):
+                g = self.rvp_groups[r["rvp"][i]]
+                if g["kind"] != "disagree":
+                    continue
+                lo, hi = r["adm"][i]
+                j = i - 1
+                while j >= 0 and j in r["rvp"]:
+                    j -= 1
+                k = i + 1
+                while k < len(run.syms) and k in r["rvp"]:
+                    k += 1
+                left = r["adm"][j] if j >= 0 else (None, None)
+                right = r["adm"][k] if k < len(run.syms) else (None, None)
+                if left[0] is not None and left[0] == left[1] == lo == right[0] == right[1]:
+                    r["rvp_note"][i] = "reader-vs-pointer: " + g["why"]
+                    del r["rvp"][i]
+
     # segments ----------------------------------------------------------------------------------------------------------------
     def segments(self, r):
-        """Consecutive symbols of a run with the same fate: decided to a unit, in an interleave zone, or ambiguous over an interval."""
+        """Consecutive symbols of a run with the same fate: an orchestrator override, decided to a unit, in an interleave zone, deferred as reader-vs-pointer,
+        or ambiguous over an interval."""
         run = r["run"]
         out = []
         for i, s in enumerate(run.syms):
             lo, hi = r["adm"][i]
-            if r["zone_of"][i] is not None:
+            ov = self.ovr.get((run.sec, s["addr"]))
+            if ov is not None:
+                key = ("ovr", ov["id"])
+            elif r["zone_of"][i] is not None:
                 key = ("zone", r["zone_of"][i])
+            elif i in r["rvp"]:
+                key = ("rvp", r["rvp"][i])
             elif lo is not None and lo == hi:
                 key = ("unit", lo)
             else:
@@ -408,7 +585,7 @@ class Analysis:
         return out
 
     def decisions(self):
-        """`{(section, address): unit name}` of every symbol the analysis decides."""
+        """`{(section, address): unit name}` of every symbol the analysis decides (an override that attaches counts)."""
         out = {}
         for r in self.res:
             run = r["run"]
@@ -416,25 +593,63 @@ class Analysis:
                 if seg["key"][0] == "unit":
                     for i in seg["idx"]:
                         out[(run.sec, run.syms[i]["addr"])] = run.chain[seg["key"][1]].name
+                elif seg["key"][0] == "ovr":
+                    ov = self.overrides[seg["key"][1]]
+                    if ov["action"] == "attach":
+                        for i in seg["idx"]:
+                            out[(run.sec, run.syms[i]["addr"])] = ov["unit"]
         return out
+
+    def cand_unit(self, name):
+        """The unit of the candidate named `name` (`None` when it has none)."""
+        return self.ctx.by_name.get(name)
+
+    def set_overrides(self, rows):
+        """Install the resolved orchestrator overrides (`resolve_overrides`): their symbols leave the solver's segments (`segments`)."""
+        self.overrides = rows
+        self.ovr = {}
+        for r in self.res:
+            for s in r["run"].syms:
+                for ov in rows:
+                    if ov["section"] == r["run"].sec and ov["start"] <= s["addr"] < ov["end"]:
+                        self.ovr[(r["run"].sec, s["addr"])] = ov
+                        break
 
 
 # ---- pool order, from segments to proposal rows -------------------------------------------------------------------------------
 
-def pool_cutback(ctx, run, idx, unit):
-    """A pool is one per TU in first-use order (idea 94): inside one owner's block of `.sdata`/`.sdata2` the first-use function of the literals the
-    owner reads must not go down.  Returns `(keep, given_back)`: the symbol indices of the longest in-order stretch (every index when the block is in
-    order) and the lists of the indices before and after it."""
+def pool_cutback(ctx, run, idx, unit, dec=None):
+    """A pool is one per TU in first-use order (idea 94): inside one owner's block of `.sdata` strings the first use of the strings the owner uses
+    must not go down - a string a pointer initialiser of the owner's table names is used first (`splitcheck.pool_first_use`).  Returns
+    `(keep, given_back, inversions)`: the symbol indices of the longest in-order stretch (every index when the block is in order), the lists of the
+    indices before and after it, and the numeric `.sdata2` literals whose first use goes down.
+
+    A numeric literal is TU-local - the unit that loads it defines it - so an inversion among them cuts nothing back: the block stays the reader's and
+    the inversion is the two-TU signal the caller records as an open question of the unit (`inversions`: `[(literal, previous literal)]`)."""
     if run.sec not in POOL_SECS or len(idx) < 2:
-        return idx, []
-    seq = []                                                   # (position in idx, first-use function of the owner's own reads)
+        return idx, [], []
+    dec = dec or {}
+
+    def held(a):
+        o = ctx.owner(ctx.section_of(a), a)
+        if o is not None:
+            return o is unit
+        _j, t = ctx.data_sym_at(a)
+        return t is not None and dec.get((t["section"], t["addr"])) == unit.name
+
+    seq, inv = [], []                                          # (position in idx, first-use key of the owner's own use)
     for t, i in enumerate(idx):
         sym = run.syms[i]
         if not sc.is_literal(sym):
             continue
-        own = [x for x in ctx.literal_readers(sym) if ctx.text_owner(x) is unit]
-        if own:
-            seq.append((t, sc._first_use_fn(ctx, min(own))))
+        use = sc.pool_first_use(ctx, sym, unit, held=held)
+        if use is None:
+            continue
+        if run.sec == ".sdata2" and seq and use[0] < seq[-1][1]:
+            inv.append((sym["name"], seq[-1][2]))
+        seq.append((t, use[0], sym["name"]))
+    if run.sec == ".sdata2":
+        return idx, [], inv
     stretches, cur = [], []
     for item in seq:
         if cur and item[1] < cur[-1][1]:
@@ -444,11 +659,31 @@ def pool_cutback(ctx, run, idx, unit):
     if cur:
         stretches.append(cur)
     if len(stretches) < 2:
-        return idx, []
+        return idx, [], []
     keep = max(stretches, key=len)                             # the first of equal length
     lo, hi = keep[0][0], keep[-1][0] + 1
     given = [idx[:lo], idx[hi:]]
-    return idx[lo:hi], [g for g in given if g]
+    breaks = [(b[0][2], a[-1][2]) for a, b in zip(stretches, stretches[1:])]
+    return idx[lo:hi], [g for g in given if g], breaks
+
+
+def pool_candidates(an, run, idx, k, block):
+    """The units a block `idx` of pool symbols handed back by the pool order may belong to: the units of the chain that read them (a literal is
+    defined where it is loaded), the owner `k` included; the owner's neighbours when nothing reads them.  A symbol only another unit reads that lies
+    between two symbols the owner reads (`block`: the owner's whole block) is a foreign read the link order forces into the owner's data, not a
+    second owner."""
+    owner = run.chain[k].name
+    mine = [i for i in block if owner in reader_names(an.ctx, run.syms[i])]
+    rd = set()
+    for i in idx:
+        names = {x for x in reader_names(an.ctx, run.syms[i]) if x in run.pos}
+        if names and owner not in names and mine and mine[0] < i < mine[-1]:
+            continue
+        rd |= names
+    if not rd:
+        return [run.chain[x].name for x in (k - 1, k, k + 1) if 0 <= x < len(run.chain)]
+    rd.add(owner)
+    return sorted(rd, key=lambda n: run.pos[n])
 
 
 def stem_of(name):
@@ -484,20 +719,22 @@ def tight_range(an, r, seg, k, idx=None):
     return start, end
 
 
-def signal_counts(r, idx, strong_decided):
+def signal_counts(r, idx):
+    """The signals of a block by symbol: the reader-side label first (`reader`, `sinit`, ...), else the derived one (`pointer-graph`, `code-pointers`),
+    else `forced` (placed only by the non-decreasing link order between anchors)."""
     c = collections.Counter()
     for i in idx:
-        if r["label"][i]:
-            c[r["label"][i]] += 1
-        elif strong_decided[i]:
-            c["forced"] += 1
-        else:
-            c[r["dlabel"][i] or "forced"] += 1
+        c[r["label"][i] or r["dlabel"][i] or "forced"] += 1
     return dict(c)
 
 
 def finding_for(an, r, i, unit_name):
     s = r["run"].syms[i]
+    if r["label"][i] == "sinit":
+        sites = an.ctx.definers(s).get(unit_name, [])
+        f = an.ctx.fn_at(sites[0]) if sites else None
+        return "%s (%s 0x%08X, 0x%X B) is constructed at 0x%08X by %s's own __sinit (%s)" % (
+            s["name"], s["section"], s["addr"], s["size"], sites[0] if sites else 0, unit_name, f["name"] if f else "?")
     sites = (an.ctx.literal_readers(s) if sc.is_literal(s) else an.ctx.readers(s))
     mine = [x for x in sites if (an.ctx.text_owner(x) is not None and an.ctx.text_owner(x).name == unit_name)]
     if mine:
@@ -511,12 +748,64 @@ def explain_cmd(unit, sec):
     return "python tools/splits/dataattach.py --explain %s --section %s" % (stem_of(unit), sec)
 
 
+def seam_pieces(an, run, idx, unit):
+    """`idx` cut at the strong `.data` seams (V->S, zigzag; `splitcheck.seams_inside`, the data-order rule, plus the V->S seams of instantiated vtables) that
+    lie inside the block: each piece is a row of its own, graded by its own anchors - a seam says another TU starts there, so one row must not claim both
+    sides as one TU's strong block."""
+    if run.sec != ".data" or not an.seams or len(idx) < 2:
+        return [idx]
+    lo, hi = run.syms[idx[0]]["addr"], sym_end(run.syms[idx[-1]])
+    kept, inst = sc.seams_inside(an.ctx, unit, lo, hi, an.do_syms, an.seams, an.do_by_addr, sc.unit_sinit_closure(an.ctx, unit))
+    kind_at = {x["addr"]: x["kind"] for x in an.seams}
+    # a V->S seam whose later vtable the unit's own sinit instantiates is no TU edge for the data-order check, but it is still where the strings of the
+    # first vtable group end and the next group starts: the row is cut there so that each side is graded by its own anchors
+    cuts = sorted({x["addr"] for x in kept} | {i["addr"] for i in inst if kind_at.get(i["addr"]) == "V->S"})
+    if not cuts:
+        return [idx]
+    pieces, cur, c = [], [], 0
+    for i in idx:
+        a = run.syms[i]["addr"]
+        if c < len(cuts) and a >= cuts[c]:
+            if cur:
+                pieces.append(cur)
+                cur = []
+            while c < len(cuts) and a >= cuts[c]:
+                c += 1
+        cur.append(i)
+    if cur:
+        pieces.append(cur)
+    return pieces
+
+
+def foreign_first_reader_note(an, r, idx, unit_name):
+    """The uniform note of a medium row: another unit also reads the row's first symbol (an extern, or a read the link order forces into this data)."""
+    first = r["run"].syms[idx[0]]
+    others = sorted(x for x in reader_names(an.ctx, first) if x != unit_name)
+    if not others:
+        return ""
+    return "the first symbol %s is also read by %s (a foreign read: an extern, or one the link order forces into this unit's data)" % (
+        first["name"], ", ".join(others[:3]) + (" ..." if len(others) > 3 else ""))
+
+
+def ov_finding(ov):
+    """What an override says for itself: its note, else its first evidence finding, else that it is the orchestrator's decision."""
+    return ov["note"] or (ov["evidence"][0]["finding"] if ov["evidence"] else "decided by the orchestrator")
+
+
+def row_note(*parts):
+    return "; ".join(p for p in parts if p)
+
+
 def build_records(an, window):
     """The proposal entries of every run as records: `(records, unowned)`.
 
     A record is `{"entry": attach row, "inw": the owner starts in the window, "sec", "start", "end", "run", "idx"}`; `unowned` holds the window's
-    deferrals (`ambiguous` over an interval of units, `interleave` of two units' alternating data, `pool-order` given back, `unread`)."""
+    deferrals (`ambiguous` over an interval of units, `interleave` of two units' alternating data, `reader-vs-pointer` where a reader and the pointer
+    tables disagree, `pool-order` given back, `unread`).  A decided block is cut at the strong `.data` seams inside it (`seam_pieces`) and graded by
+    its anchors: strong needs every symbol decided by readers (or a derived signal as good as one, `Analysis.derived_strong`), no contradiction and at
+    least `max(ANCHOR_MIN, N * ANCHOR_SHARE)` symbols read by the unit."""
     records, unowned = [], []
+    dec = an.decisions()
     for ri, r in enumerate(an.res):
         run = r["run"]
         sec = run.sec
@@ -524,52 +813,97 @@ def build_records(an, window):
         sd_same = [sd[i] and r["adm_strong"][i][0] == r["adm"][i][0] for i in range(len(run.syms))]
         contra = set(r["contra"])
         pending = []                                           # (segment, candidate names, kind, owner) given back by the pool order, or open
+
+        segno = [0]
+
+        def emit(unit, k, idx, inversions, override=None):
+            nsym = len(idx)
+            counts = signal_counts(r, idx)
+            strong_ok = [sd_same[i] or (k is not None and an.derived_strong(r, i, k)) for i in idx]
+            weak = [i for i, ok in zip(idx, strong_ok) if not ok]
+            touched = [i for i in idx if i in contra]
+            anchors = [i for i in idx if r["label"][i]]
+            n_read = len(anchors)
+            need = min(nsym, max(ANCHOR_MIN, nsym * ANCHOR_SHARE))
+            thin = n_read < need
+            rv_notes = [r["rvp_note"][i] for i in idx if i in r["rvp_note"]]          # a reader-vs-pointer disagreement the link order kept in this row
+            grade = "strong" if not weak and not touched and not thin and not rv_notes else "medium"
+            start, end = tight_range(an, r, None, k, idx) if k is not None else (run.syms[idx[0]]["addr"], sym_end(run.syms[idx[-1]]))
+            cmd = explain_cmd(unit.name, sec)
+            evid = []
+            for i in ([anchors[0], anchors[-1]] if len(anchors) > 1 else anchors):
+                evid.append({"tool": "callers", "command": "python tools/units/callers.py 0x%08X" % run.syms[i]["addr"],
+                             "finding": finding_for(an, r, i, unit.name)})
+            n_derived = sum(1 for i in idx if not r["label"][i] and r["dlabel"][i])
+            n_forced = nsym - n_read - n_derived
+            dl = ", ".join(sorted({r["dlabel"][i] for i in idx if r["dlabel"][i] and not r["label"][i]}))
+            if anchors:
+                a0, a1 = run.syms[anchors[0]], run.syms[anchors[-1]]
+                finding = ("%d symbol(s): %d read by %s (first 0x%08X, last 0x%08X)%s%s" % (
+                    nsym, n_read, unit.name, a0["addr"], a1["addr"],
+                    (", %d unread one(s) forced to it by the non-decreasing link order between its neighbours' anchors" % n_forced) if n_forced else "",
+                    (", %d placed by pointer-derived evidence (%s)" % (n_derived, dl)) if n_derived else ""))
+            else:
+                finding = ("%d symbol(s), none read by %s's text: %d forced by link order, %d placed by pointer-derived evidence (%s)"
+                           % (nsym, unit.name, n_forced, n_derived, dl or "none"))
+            evid.append({"tool": "dataattach", "command": cmd, "finding": finding})
+            entry = {"unit": unit.name, "section": sec, "range": [hx(start), hx(end)], "grade": grade,
+                     "signal": max(sorted(counts), key=counts.get) if counts else "forced", "symbols": nsym, "bytes": end - start,
+                     "signals": counts, "evidence": evid, "reproduce": cmd}
+            if unit.first(".text") is not None:
+                entry["text_addr"] = hx(unit.first(".text"))
+            notes = []
+            if inversions:
+                notes.append("the first use of the unit's %s pool goes down at %s (after %s): its literals are TU-local (the reader owns them), so "
+                             "the unit holds two TUs' pool order - an open question of the unit" % (sec, inversions[0][0], inversions[0][1]))
+            if touched:
+                notes.append("%d symbol(s) are read by another unit than the one link order puts them in (a global read where it is not defined): %s"
+                             % (len(touched), ", ".join("%s read by %s" % (run.syms[i]["name"], "/".join(sorted(r["names"][i]))) for i in touched[:4])))
+            if thin:
+                notes.append("only %d of %d symbol(s) are read by the unit (a strong block needs %g, max(%d, N/%d)): the rest is placed by link order or pointer evidence"
+                             % (n_read, nsym, need, ANCHOR_MIN, round(1 / ANCHOR_SHARE)))
+            notes += rv_notes
+            if grade == "medium":
+                notes.append(foreign_first_reader_note(an, r, idx, unit.name))
+            if notes:
+                entry["note"] = row_note(*notes)
+            return {"entry": entry, "inw": in_window(unit, window), "sec": sec, "start": start, "end": end, "run": ri, "idx": idx, "inversions": inversions,
+                    "seg": (ri, segno[0])}
+
         for seg in an.segments(r):
             kk = seg["key"]
+            segno[0] += 1
             if kk[0] == "unit":
                 k = kk[1]
                 unit = run.chain[k]
-                keep, given = pool_cutback(an.ctx, run, seg["idx"], unit)
+                keep, given, inversions = pool_cutback(an.ctx, run, seg["idx"], unit, dec)
+                breaks = inversions if sec != ".sdata2" else []        # a string block's breaks count only when the block is kept whole
+                if sec != ".sdata2":
+                    inversions = []
                 for g in given:
-                    nb = [run.chain[x].name for x in (k - 1, k, k + 1) if 0 <= x < len(run.chain)]
+                    nb = pool_candidates(an, run, g, k, seg["idx"])
+                    if nb == [unit.name]:                       # nobody else uses them: the unit's own, its pool just holds two TUs' order
+                        keep = sorted(keep + g)
+                        inversions = breaks
+                        continue
                     pending.append(({"key": ("amb", k, k), "idx": g}, nb, "pool-order", unit.name))
-                idx = keep
-                nsym = len(idx)
-                counts = signal_counts(r, idx, sd_same)
-                weak = [i for i in idx if not sd_same[i]]
-                touched = [i for i in idx if i in contra]
-                grade = "strong" if not weak and not touched else "medium"
-                start, end = tight_range(an, r, seg, k, idx)
-                anchors = [i for i in idx if r["label"][i]]
-                cmd = explain_cmd(unit.name, sec)
-                evid = []
-                for i in ([anchors[0], anchors[-1]] if len(anchors) > 1 else anchors):
-                    evid.append({"tool": "callers", "command": "python tools/units/callers.py 0x%08X" % run.syms[i]["addr"],
-                                 "finding": finding_for(an, r, i, unit.name)})
-                n_read = len(anchors)
-                n_forced = sum(1 for i in idx if not r["label"][i] and sd_same[i])
-                n_derived = nsym - n_read - n_forced
-                dl = ", ".join(sorted({r["dlabel"][i] for i in idx if r["dlabel"][i]}))
-                if anchors:
-                    a0, a1 = run.syms[anchors[0]], run.syms[anchors[-1]]
-                    finding = ("%d symbol(s): %d read by %s (first 0x%08X, last 0x%08X)%s%s" % (
-                        nsym, n_read, unit.name, a0["addr"], a1["addr"],
-                        (", %d unread one(s) forced to it by the non-decreasing link order between its neighbours' anchors" % n_forced) if n_forced else "",
-                        (", %d placed by pointer-derived evidence (%s)" % (n_derived, dl)) if n_derived else ""))
-                else:
-                    finding = ("%d symbol(s), none read by %s's text: %d forced by link order, %d placed by pointer-derived evidence (%s)"
-                               % (nsym, unit.name, n_forced, n_derived, dl or "none"))
-                evid.append({"tool": "dataattach", "command": cmd, "finding": finding})
-                entry = {"unit": unit.name, "section": sec, "range": [hx(start), hx(end)], "grade": grade,
-                         "signal": max(sorted(counts), key=counts.get) if counts else "forced", "symbols": nsym, "bytes": end - start,
-                         "signals": counts, "evidence": evid, "reproduce": cmd}
-                if unit.first(".text") is not None:
-                    entry["text_addr"] = hx(unit.first(".text"))
-                if touched:
-                    entry["note"] = ("%d symbol(s) are read by another unit than the one link order puts them in (a global read where it is not "
-                                     "defined): %s" % (len(touched), ", ".join("%s read by %s" % (run.syms[i]["name"], "/".join(sorted(r["names"][i])))
-                                                                                for i in touched[:4])))
-                records.append({"entry": entry, "inw": in_window(unit, window), "sec": sec, "start": start, "end": end, "run": ri, "idx": idx})
+                for piece in seam_pieces(an, run, keep, unit):
+                    records.append(emit(unit, k, piece, inversions))
+            elif kk[0] == "ovr":
+                ov = an.overrides[kk[1]]
+                if ov["action"] == "attach" and ov.get("takes_from"):
+                    pass                                       # one direct row over the whole range (`takes_from_records`)
+                elif ov["action"] == "attach":
+                    rec = emit(an.cand_unit(ov["unit"]), None, seg["idx"], [], override=ov)
+                    e = rec["entry"]
+                    e.update(grade=ov["grade"], signal="orchestrator", signals={"orchestrator": len(seg["idx"])}, evidence=ov["evidence"],
+                             reproduce=ov["reproduce"])
+                    e["note"] = row_note("orchestrator override %d: %s" % (ov["id"], ov_finding(ov)))
+                    rec["override"] = ov["id"]
+                    records.append(rec)
+                elif ov["action"] == "defer":
+                    pending.append((seg, ov["candidates"], "override", ov))
+                # exclude: the symbols are neither attached nor deferred
             else:
                 pending.append((seg, None, None, None))
         for seg, cnames, forced_kind, owner in pending:
@@ -579,16 +913,24 @@ def build_records(an, window):
             if forced_kind == "pool-order":
                 cv, kindname = None, "pool-order"
                 cands = cnames
+            elif forced_kind == "override":
+                cv, kindname = None, "orchestrator"
+                cands = cnames
             elif kk[0] == "zone":
                 a, b, _ix = r["zones"][kk[1]]
                 cv, kindname = list(range(a, b + 1)), "interleave"
                 cands = [run.chain[x].name for x in cv]
+            elif kk[0] == "rvp":
+                grp = an.rvp_groups[kk[1]]
+                cv, kindname = None, "reader-vs-pointer"
+                cands = grp["units"]
             else:
                 cv, kindname = list(range(kk[1], kk[2] + 1)), "ambiguous"
                 cands = [run.chain[x].name for x in cv]
             if cv is not None and not any(in_window(run.chain[x], window) for x in cv):
                 continue
-            if cv is None and not any(in_window(u, window) for u in run.chain if u.name in cands):
+            if cv is None and not any(in_window(u, window) for u in run.chain if u.name in cands) and not any(
+                    in_window(an.cand_unit(c), window) for c in cands if an.cand_unit(c) is not None):
                 continue
             if kindname == "ambiguous":
                 # the units that read the segment's symbols and lie in the interval are the plausible owners (a global is defined by one of its readers)
@@ -600,16 +942,21 @@ def build_records(an, window):
                 else:
                     kindname = "unread"          # nothing reads these symbols: no unit has a use of them to be undecided about
             start, end = run.syms[idx[0]]["addr"], sym_end(run.syms[idx[-1]])
-            cmd = explain_cmd(cands[0], sec)
+            cmd = explain_cmd(cands[0], sec) if cands else "python tools/splits/dataattach.py --explain 0x%08X" % start
             ud = {"section": sec, "range": [hx(start), hx(end)], "kind": kindname, "symbols": nsym, "bytes": end - start,
                   "candidates": cands if len(cands) <= 8 else cands[:4] + ["... (%d units)" % len(cands)] + cands[-3:],
-                  "evidence": [{"tool": "dataattach", "command": cmd, "finding": unowned_finding(an, r, idx, kindname, cands)}],
+                  "evidence": [{"tool": "dataattach", "command": cmd, "finding": unowned_finding(an, r, idx, kindname, cands, kk, owner)}],
                   "reproduce": cmd}
             if kindname == "interleave":
-                ud["signals"] = signal_counts(r, idx, sd_same)
+                ud["signals"] = signal_counts(r, idx)
             elif kindname == "pool-order":
                 ud["note"] = ("the pool of %s would go down in first-use order here (a pool is one per TU: two TUs' pools in one block); only its in-order "
                               "stretch is decided, the rest is open between it and its neighbours" % owner)
+            elif kindname == "reader-vs-pointer":
+                ud["note"] = an.rvp_groups[kk[1]]["why"]
+            elif kindname == "orchestrator":
+                ud["note"] = "orchestrator override %d: %s" % (owner["id"], ov_finding(owner))
+                ud["reason"] = "deferred by an orchestrator override"
             else:
                 dn = sorted({(run.chain[k].name, r["dlabel"][i]) for i in idx for k in r["derived"][i] if not kk[1] <= k <= kk[2]})
                 if dn:
@@ -619,7 +966,7 @@ def build_records(an, window):
     return records, unowned
 
 
-def unowned_finding(an, r, idx, kindname, cands):
+def unowned_finding(an, r, idx, kindname, cands, kk=None, owner=None):
     run = r["run"]
     if kindname == "interleave":
         zone = r["zone_of"][idx[0]]
@@ -629,6 +976,10 @@ def unowned_finding(an, r, idx, kindname, cands):
                 "the other's data" % (" / ".join(stem_of(c) for c in cands[:4]), len(cn), sample))
     if kindname == "pool-order":
         return "%d pool symbol(s) first used in an earlier function than the literal before them inside one owner's block: not first-use order" % len(idx)
+    if kindname == "reader-vs-pointer":
+        return "%d symbol(s): %s" % (len(idx), an.rvp_groups[kk[1]]["why"])
+    if kindname == "orchestrator":
+        return ov_finding(owner)
     read = [i for i in idx if r["strong"][i]]
     if read:
         return ("%d symbol(s), %d read (by %s): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
@@ -665,6 +1016,17 @@ def find_folds(an, window):
             lst = by_sec[sec]
             starts = [x["addr"] for x in lst]
             for z0, z1, _a in z.ranges.get(sec, []):
+                sin = collections.defaultdict(list)            # unit -> [(symbol, site)] its own __sinit constructs inside this range
+                for sym in lst:
+                    if z0 <= sym["addr"] < z1:
+                        for un, sites in ctx.definers(sym).items():
+                            sin[un].append((sym, sites[0]))
+                if len(sin) == 1:                              # one unit's own __sinit constructs what this unit holds: the unit is a fragment of that TU
+                    un = next(iter(sin))
+                    u2 = ctx.by_name.get(un)
+                    if u2 is not None and un != z.name and u2.first(".text") is not None and in_window(u2, window):
+                        found.append((sec, z0, z1, un, ("sinit", sin[un]), None, u2))
+                        continue
                 li, ri = bisect.bisect_left(starts, z0) - 1, bisect.bisect_left(starts, z1)
                 if li < 0 or ri >= len(lst):
                     continue
@@ -711,6 +1073,17 @@ def find_folds(an, window):
                              "reproduce": cmd})
                 continue
             cmd = "python tools/splits/dataattach.py --explain %s --section %s" % (stem_of(x), sec)
+            if isinstance(left, tuple):                        # the sinit route: strong
+                (sym0, site0) = left[1][0]
+                fn0 = ctx.fn_at(site0)
+                rows.append({"unit": x, "text_addr": hx(xu.first(".text")), "section": sec, "range": [hx(z0), hx(z1)], "grade": "strong",
+                             "kind": "fold-data-only", "takes_from": z.name, "signal": "sinit",
+                             "symbols": len([t for t in by_sec[sec] if z0 <= t["addr"] < z1]),
+                             "evidence": [{"tool": "callers", "command": "python tools/units/callers.py %s" % hx(sym0["addr"]),
+                                           "finding": "%d symbol(s) of %s's %s range are constructed by %s's own __sinit; first %s at 0x%08X in %s: %s is a fragment of that TU"
+                                                      % (len(left[1]), z.name, sec, x, sym0["name"], site0, fn0["name"] if fn0 else "?", z.name)}],
+                             "reproduce": cmd})
+                continue
             strong = bool(reader_names(ctx, left).get(x)) and bool(reader_names(ctx, right).get(x))
             rows.append({"unit": x, "text_addr": hx(xu.first(".text")), "section": sec, "range": [hx(z0), hx(z1)], "grade": "strong" if strong else "medium",
                          "kind": "fold-data-only", "takes_from": z.name,
@@ -731,6 +1104,33 @@ def find_folds(an, window):
                                           "(its data goes to %s by the rows above; the unit has no text)" % (z.name, ", ".join(xs), ", ".join(secs), ", ".join(xs)),
                               "reproduce": "python tools/splits/dataattach.py --explain %s" % stem_of(xs[0])})
     return rows, questions
+
+
+def sinit_owner_questions(an, folded, window):
+    """The data a unit's range holds although ANOTHER unit's own `__sinit` constructs it (`vec_pair_*` of em010's range, built by em008's and em011's sinits): the
+    solver does not move data a range already owns, so each such group is an open question naming both units and the interval - a recut the orchestrator
+    decides (an `attach` override with `takes_from`).  A unit already folded into the definer (a data-only fragment) is that fold's, not a question."""
+    ctx = an.ctx
+    groups = collections.defaultdict(list)
+    for i, d in sorted(ctx.sinit_definers().items()):
+        sym = ctx.data_syms[i]
+        o = ctx.owner(sym["section"], sym["addr"])
+        if o is None or o.name in d or o.name in folded:
+            continue
+        groups[(o.name, sym["section"], tuple(sorted(d)))].append(sym)
+    out = []
+    for (owner, sec, definers), syms in sorted(groups.items()):
+        if not any(in_window(ctx.by_name[x], window) for x in definers if x in ctx.by_name) and not in_window(ctx.by_name[owner], window):
+            continue
+        s0, s1 = syms[0], syms[-1]
+        fn = ctx.fn_at(ctx.definers(s0)[definers[0]][0])
+        out.append({"unit": owner, "section": sec,
+                    "question": "%d symbol(s) of %s's %s range (%s..%s) are constructed by %s's own __sinit (%s at 0x%08X), not by %s: the range may be %s's - a recut "
+                                "(an `attach` override with `takes_from`)" % (len(syms), owner, sec, s0["name"], s1["name"], ", ".join(definers), fn["name"] if fn else "?",
+                                                                              ctx.definers(s0)[definers[0]][0], owner, definers[0]),
+                    "candidate_interval": [hx(s0["addr"]), hx(sym_end(s1))],
+                    "reproduce": "python tools/units/callers.py %s" % hx(s0["addr"])})
+    return out
 
 
 def finding_for_sym(ctx, s, unit_name):
@@ -786,6 +1186,129 @@ def linker_rows(ctx, symbols):
     return out
 
 
+# ---- orchestrator overrides ----------------------------------------------------------------------------------------------------------
+
+OVERRIDE_ACTIONS = ("attach", "defer", "exclude")
+
+
+def load_overrides(path):
+    """The rows of an overrides file: `{"overrides": [row, ...]}` (or a bare list); each row is one range the engine cannot derive."""
+    with open(path, encoding="utf-8") as fh:
+        d = json.load(fh)
+    rows = d.get("overrides") if isinstance(d, dict) else d
+    if not isinstance(rows, list):
+        raise SystemExit("%s: want {\"overrides\": [...]}" % path)
+    return rows
+
+
+def resolve_overrides(an, rows, path=None):
+    """Validate the override rows against the candidate and give each an `id` (its position): `[{"id", "action", "unit", "section", "start", "end",
+    "grade", "signal", "evidence", "reproduce", "note", "candidates"}]`.
+
+    A row is `{unit | text_addr, section, start, end (or range), action: attach|defer|exclude, grade, signal: "orchestrator", evidence: [{tool, command,
+    finding}], note, reproduce, candidates, takes_from}`: `attach` gives the range to the unit (grade `strong|medium`, evidence required; with
+    `takes_from` it is one row over bytes another unit owns, a recut, and the unit it names gives them up), `defer` lists it in
+    `unowned_data` (`candidates`, else the unit), `exclude` leaves it in neither list.  Two overrides may not overlap in one section."""
+    out = []
+    for n, row in enumerate(rows):
+        who = "override #%d" % n
+        if not isinstance(row, dict):
+            raise SystemExit("%s is %s, want an object" % (who, type(row).__name__))
+        action = row.get("action")
+        if action not in OVERRIDE_ACTIONS:
+            raise SystemExit("%s: action %r (attach|defer|exclude)" % (who, action))
+        sec = row.get("section")
+        if sec not in DATA_SECS:
+            raise SystemExit("%s: section %r is not a data section" % (who, sec))
+        try:
+            a, b = (sc.to_int(row["range"][0]), sc.to_int(row["range"][1])) if "range" in row else (sc.to_int(row["start"]), sc.to_int(row["end"]))
+        except (KeyError, TypeError, ValueError, IndexError):
+            raise SystemExit("%s: start/end (or range) missing or not addresses" % who)
+        if b <= a:
+            raise SystemExit("%s: empty range %s..%s" % (who, hx(a), hx(b)))
+        unit = None
+        if row.get("text_addr") not in (None, ""):
+            ta = sc.to_int(row["text_addr"])
+            unit = next((u for u in an.cand.units if u.first(".text") == ta), None)
+            if unit is None:
+                raise SystemExit("%s: no unit of the candidate holds .text at %s" % (who, hx(ta)))
+        elif row.get("unit"):
+            unit = an.cand_unit(row["unit"])
+            if unit is None:
+                raise SystemExit("%s: the candidate has no unit %r" % (who, row["unit"]))
+        if action == "attach" and unit is None:
+            raise SystemExit("%s: an attach needs a unit or a text_addr" % who)
+        grade = row.get("grade", "medium")
+        if action == "attach" and grade not in ("strong", "medium"):
+            raise SystemExit("%s: grade %r (strong|medium; a guess is never applied)" % (who, grade))
+        if row.get("signal", "orchestrator") != "orchestrator":
+            raise SystemExit("%s: signal must be \"orchestrator\"" % who)
+        ev = row.get("evidence") or []
+        ev = [ev] if isinstance(ev, dict) else list(ev)
+        if action == "attach" and not ev:
+            raise SystemExit("%s: an attach needs evidence (tool, command, finding)" % who)
+        for e in ev:
+            if not (isinstance(e, dict) and all(e.get(x) for x in ("tool", "command", "finding"))):
+                raise SystemExit("%s: evidence needs tool, command and finding" % who)
+        cands = list(row.get("candidates") or ([unit.name] if unit is not None else []))
+        donor = row.get("takes_from") or None
+        if donor and (action != "attach" or an.cand_unit(donor) is None):
+            raise SystemExit("%s: takes_from %r (an attach naming a unit of the candidate whose bytes it takes)" % (who, donor))
+        out.append({"id": n, "action": action, "unit": unit.name if unit is not None else None, "section": sec, "start": a, "end": b, "grade": grade,
+                    "takes_from": donor,
+                    "signal": "orchestrator", "evidence": ev, "note": row.get("note", ""), "candidates": cands,
+                    "reproduce": row.get("reproduce") or "python tools/splits/dataattach.py --overrides %s" % (path or "<overrides file>")})
+    by = collections.defaultdict(list)
+    for o in out:
+        by[o["section"]].append(o)
+    for sec, v in by.items():
+        v.sort(key=lambda o: o["start"])
+        for x, y in zip(v, v[1:]):
+            if y["start"] < x["end"]:
+                raise SystemExit("override #%d and #%d overlap in %s at %s" % (x["id"], y["id"], sec, hx(y["start"])))
+    return out
+
+
+def takes_from_records(an, window):
+    """The direct attach records of the overrides that carry `takes_from`: one row over the whole range (owned bytes included), the donor named."""
+    out = []
+    for o in an.overrides:
+        if o["action"] != "attach" or not o.get("takes_from"):
+            continue
+        unit = an.cand_unit(o["unit"])
+        syms = [x for x in an.ctx.data_syms if x["section"] == o["section"] and o["start"] <= x["addr"] < o["end"] and not (x["type"] == "label" and not x["size"])]
+        entry = {"unit": unit.name, "section": o["section"], "range": [hx(o["start"]), hx(o["end"])], "grade": o["grade"], "signal": "orchestrator",
+                 "symbols": len(syms), "bytes": o["end"] - o["start"], "signals": {"orchestrator": len(syms)}, "evidence": o["evidence"],
+                 "reproduce": o["reproduce"], "takes_from": o["takes_from"],
+                 "note": row_note("orchestrator override %d: %s" % (o["id"], ov_finding(o)))}
+        if unit.first(".text") is not None:
+            entry["text_addr"] = hx(unit.first(".text"))
+        out.append({"entry": entry, "inw": in_window(unit, window), "sec": o["section"], "start": o["start"], "end": o["end"], "run": None, "idx": [],
+                    "inversions": [], "override": o["id"], "seg": ("ovr", o["id"])})
+    return out
+
+
+def override_outcomes(an, records, unowned):
+    """What became of each override: `applied` / `blocked` (an attach whose invariant check failed) / `deferred` / `excluded`, with the symbols it covered."""
+    covered = collections.Counter(o["id"] for o in an.ovr.values())
+    out = []
+    for o in an.overrides:
+        recs = [x for x in records if x.get("override") == o["id"]]
+        blocked = [x for x in recs if x.get("blocked")]
+        if covered[o["id"]] == 0:
+            outcome = "no unowned symbol in the range"
+        elif o["action"] == "attach":
+            outcome = "blocked" if blocked and len(blocked) == len(recs) else "applied" if not blocked else "partly blocked"
+        else:
+            outcome = {"defer": "deferred", "exclude": "excluded"}[o["action"]]
+        row = {"id": o["id"], "action": o["action"], "unit": o["unit"], "section": o["section"], "start": hx(o["start"]), "end": hx(o["end"]),
+               "symbols": covered[o["id"]], "outcome": outcome}
+        if blocked:
+            row["blocked_by"] = ["%s: %s" % (x["blocked"][0], x["blocked"][1][:160]) for x in blocked]
+        out.append(row)
+    return out
+
+
 # ---- settling ---------------------------------------------------------------------------------------------------------------------
 
 def public(entry):
@@ -827,8 +1350,58 @@ def strip_provisional(cand, info):
     return sc.Splits(list(cand.header), units)
 
 
-def load_analysis(paths, extra=()):
-    """`(Analysis, render info)` of the candidate the proposals `paths` (phase 2 rows dropped) and the `extra` proposals (e.g. the folds) render to."""
+def analysis_stamp(paths, extra=()):
+    """The key of a cached analysis: the stat (size, mtime) of the map, `splits.txt`, the DOL, every proposal file and the three tool sources it is
+    built by, and the `extra` proposals' content - anything that changes the result changes the key."""
+    root = sc.tree_root()
+    files = [os.path.join(root, "config", sc.GAME, "splits.txt"), os.path.join(root, "config", sc.GAME, "symbols.txt"),
+             sc.find_file(os.path.join("orig", sc.GAME, "sys", "main.dol"), root)] + list(paths) + [os.path.join(HERE, n) for n in ("dataattach.py", "splitcheck.py", "dataorder.py")]
+    return stamp_of(files, extra), root
+
+
+def stamp_of(files, extra=()):
+    """A short hash of the stat (path, size, mtime) of `files` and the content of the `extra` proposals."""
+    import hashlib
+    h = hashlib.sha1()
+    for f in files:
+        st = os.stat(f)
+        h.update(("%s %d %d\n" % (os.path.abspath(f), st.st_size, st.st_mtime_ns)).encode())
+    h.update(json.dumps(list(extra), sort_keys=True, default=str).encode())
+    return h.hexdigest()[:20]
+
+
+CACHE = [True]
+
+
+def load_analysis(paths, extra=(), cache=None):
+    """`(Analysis, render info)` of the candidate the proposals `paths` (phase 2 rows dropped) and the `extra` proposals (e.g. the folds) render to.
+
+    Building it decodes the whole `.text` (about 12 s); the result is pickled to `build/tmp/dataattach/` (gitignored) under `analysis_stamp`, so a batch of
+    `--explain` calls pays once (0.2 s a call after).  `cache=False` (`--no-cache`) always rebuilds; a cache that does not load is rebuilt."""
+    if cache is None:
+        cache = CACHE[0]
+    if cache:
+        import pickle
+        key, root = analysis_stamp(paths, extra)
+        cdir = os.path.join(root, "build", "tmp", "dataattach")
+        cpath = os.path.join(cdir, "analysis-%s.pkl" % key)
+        try:
+            with open(cpath, "rb") as fh:
+                return pickle.load(fh)
+        except Exception:                                      # missing, stale format, truncated: rebuild
+            pass
+        out = load_analysis(paths, extra, cache=False)
+        try:
+            os.makedirs(cdir, exist_ok=True)
+            for old in sorted(glob.glob(os.path.join(cdir, "analysis-*.pkl")), key=os.path.getmtime)[:-3]:      # keep the newest few (generate builds two)
+                os.remove(old)
+            tmp = cpath + ".tmp%d" % os.getpid()
+            with open(tmp, "wb") as fh:
+                pickle.dump(out, fh, protocol=pickle.HIGHEST_PROTOCOL)
+            os.replace(tmp, cpath)
+        except OSError:
+            pass
+        return out
     splits, symbols, dol = sc.load_ctx()
     props = phase1_inputs(paths) + list(extra)
     cand, info = sc.render(splits, props, dol, symbols)
@@ -844,13 +1417,28 @@ def load_analysis(paths, extra=()):
     return an, info
 
 
-def check_candidate(an, rows, lane):
-    """Render the proposals plus the live rows and run every invariant: `(candidate, info, results)`."""
-    doc = {"phase": 2, "lane": lane, "attach": rows, "unowned_data": []}
+def check_candidate(an, rows, lane, moves=()):
+    """Render the proposals plus the live rows (and the `moves`) and run every invariant: `(candidate, info, results, ctx)`."""
+    doc = {"phase": 2, "lane": lane, "attach": rows, "unowned_data": [], "moves": list(moves)}
     cand, info = sc.render(an.splits, an.props + [doc], an.dol, an.symbols)
     ctx2 = sc.Ctx(cand, an.symbols, an.dol, an.base_ctx.sda13, an.base_ctx.sda2)
     res = sc.run_checks(ctx2, sc.dataorder_rows(an.symbols))
-    return cand, info, res
+    return cand, info, res, ctx2
+
+
+def derive_moves(ctx, moved):
+    """`moves` rows for the data-only units the attachments left out of link order: a unit with no text is ordered by its file position alone, so one
+    whose range lies by address between two units that precede it in the file goes right behind the in-order unit before it (`splitcheck.
+    file_order_offenders`).  Several behind one anchor chain, in address order.  `moved` (names already moved) is extended."""
+    rows, last = [], {}
+    for sec, name, addr, finding, before in sorted(sc.file_order_offenders(ctx), key=lambda o: (sc.SECTION_ORDER.index(o[0]), o[2])):
+        u = ctx.by_name[name]
+        if before is None or name in moved or u.first(".text") is not None or u.first(".init") is not None:
+            continue
+        rows.append({"unit": name, "after": last.get(before, before), "reason": finding})
+        last[before] = name
+        moved.add(name)
+    return rows
 
 
 #: the data sections an invariant reads, for attributing a failure whose address lies outside every attached range
@@ -877,12 +1465,19 @@ def settle(an, extra_rows, records, lane, log=print):
     base_res = sc.run_checks(an.base_ctx, sc.dataorder_rows(an.symbols))
     base_units = {(u, i) for (u, i, _f) in fail_items(base_res)}
     unattributed, blocked = [], []
+    accepted = {}
+    moves, moved = [], set()
     res = None
     for rnd in range(12):
         live = [public(x["entry"]) for x in records if not x.get("blocked")] + extra_rows
-        cand, info, res = check_candidate(an, live, lane)
+        cand, info, res, ctx2 = check_candidate(an, live, lane, moves)
         if info["issues"]:
             raise SystemExit("the attachments do not render clean: " + "; ".join(info["issues"][:3]))
+        fresh = derive_moves(ctx2, moved)
+        if fresh:                                              # the attachments put a data-only unit out of link order: place it, then check again
+            moves += fresh
+            log("settle round %d: %d data-only unit(s) moved to their link position" % (rnd, len(fresh)))
+            continue
         now = fail_items(res)
         # new = a unit that did not fail the invariant in the phase 1 candidate (a unit that already fails it - an open pooldup question -
         # keeps failing, and the claimed pool then also reports the same duplicate in other words)
@@ -895,7 +1490,9 @@ def settle(an, extra_rows, records, lane, log=print):
             if not hit:
                 secs = INV_SECTIONS.get(inv)
                 hit = [x for x in records if not x.get("blocked") and x["entry"]["unit"] == unit and (secs is None or x["sec"] in secs)]
-            if hit:
+            if hit and inv == "pool" and finding.startswith("claimed pool: first use of") and hit[0].get("inversions"):
+                accepted[id(hit[0])] = hit[0]               # the recorded two-TU signal of a TU-local pool: an open question, not a reason to defer
+            elif hit:
                 todo.append((hit[0], inv, finding))
             else:
                 unattributed.append((unit, inv, finding))
@@ -906,7 +1503,11 @@ def settle(an, extra_rows, records, lane, log=print):
             if not rec.get("blocked"):
                 rec["blocked"] = (inv, finding)
                 blocked.append(rec)
-    return blocked, unattributed, res
+            for x in records:                                  # a seam cut the block in pieces: what follows the blocked one goes with it (a hole in the unit's range fails `order`)
+                if x.get("seg") == rec.get("seg") and x["start"] > rec["start"] and not x.get("blocked"):
+                    x["blocked"] = (inv, "follows the blocked piece at 0x%08X of the same block: %s" % (rec["start"], finding))
+                    blocked.append(x)
+    return blocked, unattributed, res, [x for x in accepted.values() if not x.get("blocked")], moves
 
 
 def blocked_to_unowned(rec):
@@ -919,8 +1520,10 @@ def blocked_to_unowned(rec):
             "evidence": [{"tool": "splitcheck", "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only %s --unit %s"
                                                           % (inv, stem_of(e["unit"])), "finding": finding}],
             "reproduce": cmd,
-            "note": "link order and evidence put these symbols in %s, but attaching them makes the %s invariant fail: the unit holds more than one TU, "
-                    "or one of its reads is not its own" % (e["unit"], inv)}
+            "note": ("orchestrator override %d blocked: attaching the range to %s makes the %s invariant fail" % (rec["override"], e["unit"], inv))
+            if rec.get("override") is not None else
+            "link order and evidence put these symbols in %s, but attaching them makes the %s invariant fail: the unit holds more than one TU, "
+            "or one of its reads is not its own" % (e["unit"], inv)}
 
 
 def run_table(an, records, window):
@@ -965,12 +1568,14 @@ def row_key(e):
     return (sc.SECTION_ORDER.index(sec) if sec in sc.SECTION_ORDER else 99, sc.to_int(e["range"][0]), e.get("unit") or "")
 
 
-def proposal_doc(lane, window, attach, unowned, questions=None):
+def proposal_doc(lane, window, attach, unowned, questions=None, moves=None):
     doc = {"phase": 2, "lane": lane, "window": [hx(window[0]), hx(window[1])], "units": [],
            "attach": sorted(attach, key=row_key),
            "unowned_data": sorted(unowned, key=lambda e: (sc.SECTION_ORDER.index(e["section"]) if e["section"] in sc.SECTION_ORDER else 99, sc.to_int(e["range"][0])))}
     if questions:
         doc["open_questions"] = questions
+    if moves:
+        doc["moves"] = moves
     return doc
 
 
@@ -998,6 +1603,7 @@ def explain(an, rx, secs):
         print("%s is in no unowned run (it is in an owned range, or in no data symbol)" % hx(addr))
         return 0
     keep = re.compile(rx)
+    shown = False
     for r in an.res:
         run = r["run"]
         if secs and run.sec not in secs:
@@ -1005,14 +1611,39 @@ def explain(an, rx, secs):
         for seg in an.segments(r):
             kk = seg["key"]
             idx = seg["idx"]
-            names = ([run.chain[kk[1]].name] if kk[0] == "unit" else [run.chain[x].name for x in range(*((r["zones"][kk[1]][0], r["zones"][kk[1]][1] + 1) if kk[0] == "zone" else (kk[1], kk[2] + 1)))])
+            if kk[0] == "unit":
+                names = [run.chain[kk[1]].name]
+            elif kk[0] == "zone":
+                names = [run.chain[x].name for x in range(r["zones"][kk[1]][0], r["zones"][kk[1]][1] + 1)]
+            elif kk[0] == "rvp":
+                names = list(an.rvp_groups[kk[1]]["units"])
+            elif kk[0] == "ovr":
+                names = [an.overrides[kk[1]]["unit"]]
+            else:
+                names = [run.chain[x].name for x in range(kk[1], kk[2] + 1)]
             if not any(keep.search(x) for x in names):
                 continue
             a, b = run.syms[idx[0]], run.syms[idx[-1]]
-            sd = [(lo is not None and lo == hi) for lo, hi in r["adm_strong"]]
+            shown = True
             print("%-7s 0x%08X..0x%08X %4d sym %-9s %s  %s" % (run.sec, a["addr"], sym_end(b), len(idx), kk[0],
                                                                 names[0] if len(names) == 1 else "%s..%s (%d)" % (names[0], names[-1], len(names)),
-                                                                dict(signal_counts(r, idx, [sd[i] and r["adm_strong"][i][0] == r["adm"][i][0] for i in range(len(run.syms))]))))
+                                                                dict(signal_counts(r, idx))))
+    for u in an.cand.units:                                   # a data-only unit is in no chain: its ranges are owned, so list them with who reads each symbol
+        if u.first(".text") is not None or not keep.search(u.name):
+            continue
+        ctx = an.ctx
+        for sec in DATA_SECS:
+            if secs and sec not in secs:
+                continue
+            for z0, z1, _a in u.ranges.get(sec, []):
+                rows = [x for x in ctx.data_syms if x["section"] == sec and z0 <= x["addr"] < z1 and not (x["type"] == "label" and not x["size"])]
+                shown = True
+                print("%-7s 0x%08X..0x%08X %4d sym owned    %s (data-only unit, no text)" % (sec, z0, z1, len(rows), u.name))
+                for x in rows[:200]:
+                    rd = sorted(reader_names(ctx, x))
+                    print("        0x%08X %5x %-30s read by %s" % (x["addr"], x["size"] or 0, x["name"][:30], ",".join(n.split("/")[-1] for n in rd[:4]) or "-"))
+    if not shown:
+        print("no unit matches %r (a unit with no data here, or none of that name)" % rx)
     return 0
 
 
@@ -1120,19 +1751,31 @@ def vtable_order(cand, symbols, dol, ctx):
 
 # ---- the generator --------------------------------------------------------------------------------------------------------------
 
-def generate(paths, window, lane, settle_on=True, linker=False, log=print):
-    """`(doc, stats, blocked, unattributed)`: the window's phase 2 proposal."""
+def generate(paths, window, lane, settle_on=True, linker=False, log=print, overrides=None, overrides_path=None):
+    """`(doc, stats, blocked, unattributed)`: the window's phase 2 proposal.  `overrides` are the orchestrator rows (`resolve_overrides`) that force a
+    decision the engine cannot derive; the settle loop still checks them and blocks one that makes an invariant fail."""
     an, _info = load_analysis(paths)
     all_folds, fquestions = find_folds(an, (0, 0xFFFFFFFF))
     if all_folds:                                              # a folded data-only range is its unit's: the data after it is decided on the folded candidate
         an, _info = load_analysis(paths, [{"phase": 2, "lane": lane, "units": [], "attach": [dict(r) for r in all_folds]}])
+    fquestions += sinit_owner_questions(an, {r["takes_from"] for r in all_folds}, window)
+    if overrides:
+        an.set_overrides(resolve_overrides(an, overrides, overrides_path))
     records, unowned = build_records(an, window)
+    records += takes_from_records(an, window)
     frows = [r for r in all_folds if window[0] <= sc.to_int(r["text_addr"]) < window[1]]
     xrows, _xun = extab_rows(an.cand, an.ctx, an.dol, an.symbols, window)
-    blocked, unattributed, res = [], [], None
+    blocked, unattributed, res, accepted, moves = [], [], None, [], []
     if settle_on:                                              # the fold rows are part of the candidate already (`an.props`); the extab rows are not
-        blocked, unattributed, res = settle(an, [dict(r) for r in xrows], records, lane, log)
+        blocked, unattributed, res, accepted, moves = settle(an, [dict(r) for r in xrows], records, lane, log)
     live = [x for x in records if not x.get("blocked")]
+    for x in live:                                             # the pool inversions of a decided block: the unit holds two TUs' pool order
+        if x["inw"] and x.get("inversions"):
+            lit, prev = x["inversions"][0]
+            fquestions.append({"unit": x["entry"]["unit"], "section": x["sec"],
+                               "question": "the first use of the %s pool of %s goes down at %s (after %s): its literals are TU-local, so the block is the "
+                                           "reader's, and the unit holds two TUs' pool order - where does the cut lie?" % (x["sec"], x["entry"]["unit"], lit, prev),
+                               "reproduce": x["entry"]["reproduce"]})
     attach = [public(x["entry"]) for x in live if x["inw"]] + [dict(r) for r in frows + xrows]
     for rec in blocked:
         if rec["inw"]:
@@ -1144,8 +1787,10 @@ def generate(paths, window, lane, settle_on=True, linker=False, log=print):
     stats = {"totals": totals(records, unowned), "runs": run_table(an, records, window),
              "blocked": [{"unit": x["entry"]["unit"], "section": x["sec"], "start": hx(x["start"]), "end": hx(x["end"]), "symbols": x["entry"]["symbols"],
                           "invariant": x["blocked"][0], "finding": x["blocked"][1]} for x in blocked],
+             "accepted": [{"unit": x["entry"]["unit"], "section": x["sec"], "start": hx(x["start"]), "end": hx(x["end"]), "inversion": x["inversions"][0][0]} for x in accepted],
+             "overrides": override_outcomes(an, records, unowned),
              "unattributed": [list(u) for u in unattributed], "summary": res.summary() if res is not None else None}
-    return proposal_doc(lane, window, attach, unowned, fquestions), stats, blocked, unattributed
+    return proposal_doc(lane, window, attach, unowned, fquestions, moves), stats, blocked, unattributed
 
 
 def main(argv=None):
@@ -1153,6 +1798,8 @@ def main(argv=None):
     ap.add_argument("--proposal", action="append", help="proposal file (repeatable; default: phase 1 a..g + reconcile); a file with `units` (a fold, a data-only unit) joins them")
     ap.add_argument("--window", nargs=2, default=["0x80000000", "0x80700000"], help="rows for the units whose .text STARTS in [LO, HI) (default: all)")
     ap.add_argument("--lane", default="p2")
+    ap.add_argument("--overrides", metavar="FILE", help="orchestrator overrides (docs/splits-program.md): ranges to attach, defer or exclude by decision; "
+                    "the settle loop still checks them")
     ap.add_argument("--out", help="write the window's phase 2 proposal (attach + unowned_data) here")
     ap.add_argument("--stats", help="write the counts (per section, per run, the settle loop) here (json)")
     ap.add_argument("--no-settle", action="store_true", help="skip the invariant loop (keep every decided attachment)")
@@ -1161,8 +1808,10 @@ def main(argv=None):
     ap.add_argument("--section", help="comma list of sections to restrict --explain / --holdout to")
     ap.add_argument("--holdout", action="store_true", help="hide registered data ranges, decide them again, compare with the registered owner")
     ap.add_argument("--vtable-order", action="store_true", help="per unit of the candidate: up/down/tie vtable pairs by first slot")
+    ap.add_argument("--no-cache", action="store_true", help="rebuild the analysis instead of loading build/tmp/dataattach/ (keyed by the inputs' stat)")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args(argv)
+    CACHE[0] = not args.no_cache
     if args.selftest:
         return selftest()
     window = (sc.to_int(args.window[0]), sc.to_int(args.window[1]))
@@ -1183,10 +1832,13 @@ def main(argv=None):
             tot.update(c)
         print("pairs: up %d, down %d, tie %d" % (tot["up"], tot["down"], tot["tie"]))
         return 0
+    ovr_rows = load_overrides(args.overrides) if args.overrides else None
     if args.explain:
         an, _info = load_analysis(paths)
+        if ovr_rows:
+            an.set_overrides(resolve_overrides(an, ovr_rows, args.overrides))
         return explain(an, args.explain, secs)
-    doc, stats, blocked, unattributed = generate(paths, window, args.lane, not args.no_settle, args.linker)
+    doc, stats, blocked, unattributed = generate(paths, window, args.lane, not args.no_settle, args.linker, overrides=ovr_rows, overrides_path=args.overrides)
     if args.out:
         with open(args.out, "w", encoding="utf-8", newline="\n") as fh:
             json.dump(doc, fh, indent=1)
@@ -1304,8 +1956,8 @@ def selftest():
     prec, _pu = build_records(Analysis(pxx.splits, pxx, {}), (T, T + 0x100))
     check("a decided range that abuts the owner's range across alignment padding (0x10 unmapped bytes) takes the padding", [x["entry"]["range"] for x in prec],
           [["0x%08X" % (D0 - 0x10), "0x%08X" % (D0 + 4)]])
-    # pool order: inside one owner's block only the longest first-use-ordered stretch stays decided
-    S2 = 0x80300000
+    # pool order: inside one owner's block of strings only the longest first-use-ordered stretch is decided, the rest is given back; numeric literals are TU-local
+    S2 = 0x80790000
     hi, lo = S2 >> 16, S2 & 0xFFFF
     nl = 6
     use = [[0, 3], [1, 4], [2], [], [], [5]]                         # function f reads the literals use[f]: l3 and l4 are first used BEFORE l2's function
@@ -1318,15 +1970,34 @@ def selftest():
         w += [sc.NOP] * (-len(w) % 8)
         fns.append(("f%d" % f, 4 * len(fn_words), 4 * len(w)))
         fn_words += w
-    ptxt = ("Sections:\n\t.text       type:code align:32\n\t.sdata2     type:rodata align:4\n\n"
-            "p.cpp:\n\t.text       start:0x%X end:0x%X\n" % (T, T + 4 * len(fn_words)))
-    psyms = ["l%d = .sdata2:0x%X; // type:object size:0x4 scope:local data:float" % (k, S2 + 4 * k) for k in range(nl)]
-    cp, _ps = sc._mini(T, fn_words, fns, ptxt, [(S2, struct.pack(">%df" % nl, *[1.5 + k for k in range(nl)]))], psyms)
-    anp = Analysis(cp.splits, cp, {})
-    rp, up = build_records(anp, (T, T + 0x1000))
-    check("pool order: the block that goes down in first-use order is cut back to its longest stretch, the rest is given back",
-          ([(x["entry"]["range"], x["entry"]["symbols"]) for x in rp], [(u["range"], u["kind"]) for u in up]),
-          ([(["0x%08X" % S2, "0x%08X" % (S2 + 12)], 3)], [(["0x%08X" % (S2 + 12), "0x%08X" % (S2 + 24)], "pool-order")]))
+    qk = len(fn_words)
+    fn_words += [sc._lis(3, hi), sc._w(48, 1, 3, lo + 12), sc.BLR, sc.NOP, sc.NOP, sc.NOP, sc.NOP, sc.NOP]               # q reads l3 too
+    fns.append(("fq", 4 * qk, 0x20))
+
+    def pool_world(sec, kind_attr, with_q):
+        ptxt = ("Sections:\n\t.text       type:code align:32\n\t%s     type:rodata align:4\n\n" % sec +
+                "p.cpp:\n\t.text       start:0x%X end:0x%X\n" % (T, T + 4 * qk) + ("\nq.cpp:\n\t.text       start:0x%X end:0x%X\n" % (T + 4 * qk, T + 4 * qk + 0x20) if with_q else ""))
+        psyms = ["l%d = %s:0x%X; // type:object size:0x4 scope:local%s" % (k, sec, S2 + 4 * k, kind_attr) for k in range(nl)]
+        c, _ps = sc._mini(T, fn_words[:qk + (8 if with_q else 0)], fns[:(7 if with_q else 6)], ptxt, [(S2, struct.pack(">%df" % nl, *[1.5 + k for k in range(nl)]))], psyms)
+        return c
+
+    cp = pool_world(".sdata2", " data:float", False)
+    rp, up = build_records(Analysis(cp.splits, cp, {}), (T, T + 0x1000))
+    check("pool order: a numeric literal is TU-local - its first use going down cuts nothing back, the block stays whole and the inversion is recorded",
+          ([(x["entry"]["range"], x["entry"]["symbols"], (x["inversions"][:1] or [("-", "-")])[0][0]) for x in rp], up), ([(["0x%08X" % S2, "0x%08X" % (S2 + 24)], 6, "l3")], []))
+    check("pool order: the recorded inversion is in the row's note (an open question of the unit)", "goes down at l3" in rp[0]["entry"].get("note", ""), True)
+    cs = pool_world(".sdata", " data:string", True)
+    rs, us = build_records(Analysis(cs.splits, cs, {}), (T, T + 0x1000))
+    check("pool order: a block of strings that goes down is cut back to its longest stretch; the rest, read by another unit too, is given back to both readers",
+          ([(x["entry"]["range"], x["entry"]["symbols"]) for x in rs], [(u["range"], u["kind"], u["candidates"]) for u in us]),
+          ([(["0x%08X" % S2, "0x%08X" % (S2 + 12)], 3)], [(["0x%08X" % (S2 + 12), "0x%08X" % (S2 + 24)], "pool-order", ["p.cpp", "q.cpp"])]))
+    recp, blp, accp, _unp, _mvp = _settled(cp, {}, T)
+    check("settle: a numeric block whose first use goes down fails the pool invariant by construction; it is accepted (recorded), not blocked",
+          ([x["entry"]["range"] for x in recp], blp, [(x["inversions"][:1] or [("-", "-")])[0][0] for x in accp]), ([["0x%08X" % S2, "0x%08X" % (S2 + 24)]], [], ["l3"]))
+    cs1 = pool_world(".sdata", " data:string", False)
+    rs1, us1 = build_records(Analysis(cs1.splits, cs1, {}), (T, T + 0x1000))
+    check("pool order: strings nobody else reads stay the unit's (restored), the inversion recorded for its open question",
+          ([(x["entry"]["range"], x["entry"]["symbols"]) for x in rs1], us1, [(x["inversions"][:1] or [("-", "-")])[0][0] for x in rs1]), ([(["0x%08X" % S2, "0x%08X" % (S2 + 24)], 6)], [], ["l3"]))
     # a data-only unit between two anchors of the unit before it is that unit's fragment
     gtxt = ("Sections:\n\t.text       type:code align:32\n\t.data       type:data align:32\n\n"
             "ua.cpp:\n\t.text       start:0x%X end:0x%X\n\t.data       start:0x%X end:0x%X\n\n" % (T, T + 0x20, D0 - 8, D0) +
@@ -1364,8 +2035,320 @@ def selftest():
     han = Analysis(stripped, sc.Ctx(stripped, hx_.symbols, hx_.dol), {})
     check("holdout: every third range is hidden (batch 1 hides b's), and b's symbol is decided back to b between a's and c's",
           (held, han.decisions()), ([("b.cpp", ".data", D0 + 0x10, D0 + 0x20)], {(".data", D0 + 0x10): "b.cpp"}))
+    selftest_phase3(check, T)
     print("\n%d checks, %d failed" % (n[0], len(fails)))
     return 1 if fails else 0
+
+
+def _settled(c, kind_, T):
+    """`settle` over a mini candidate `c`: `(records, blocked, accepted, unattributed, moves)`."""
+    a_ = Analysis(c.splits, c, kind_)
+    a_.splits, a_.symbols, a_.dol, a_.props, a_.base_ctx = c.splits, c.symbols, c.dol, [], c
+    recs, _u = build_records(a_, (T, T + 0x1000))
+    bl, un, _res, acc, mv = settle(a_, [], recs, "t", log=lambda *x: None)
+    return recs, bl, acc, un, mv
+
+
+def selftest_phase3(check, T):
+    """The checks of the phase 3 review fixes (the sinit definers, false pointer edges, the closure depth, labels, reader-vs-pointer, anchor grades and
+    seams, overrides, moves, the analysis cache, explain)."""
+    def hex8(a):
+        return "0x%08X" % a
+
+    hx8 = hex8
+
+    HDRD = "Sections:\n\t.text       type:code align:32\n\t.ctors      type:rodata align:4\n\t.data       type:data align:8\n\t.bss        type:bss align:8\n\t.sdata      type:data align:8\n\n"
+
+    def utext(*blocks):
+        return HDRD + "".join("%s:\n%s\n" % (nm, "".join("\t%-11s start:0x%X end:0x%X\n" % (sec, a, b) for sec, a, b in rr)) for nm, rr in blocks)
+
+    def sy(name, sec, addr, size=4, extra="", scope="global"):
+        return "%s = %s:0x%X; // type:object size:0x%X scope:%s%s" % (name, sec, addr, size, scope, extra)
+
+    def fn_reading(*addrs, pad=0x10):
+        """words of a function that loads each address (`lis` + `lwz`), then `blr`, padded to `pad` bytes."""
+        w = []
+        for a in addrs:
+            w += [sc._lis(3, (a + 0x8000) >> 16), sc._w(32, 0, 3, a & 0xFFFF)]
+        w.append(sc.BLR)
+        return w + [sc.NOP] * (pad // 4 - len(w))
+
+    # rule 1: a global a unit's own __sinit constructs is that unit's, whoever else reads it
+    CT, B0 = 0x80200000, 0x80650000
+    sinit = [sc._lis(3, B0 >> 16), sc._w(14, 3, 3, (B0 + 0x10) & 0xFFFF), sc._b(T + 8, T + 0x10), sc.NOP]               # &g1 in r3; b ctor
+    ctor = fn_reading(B0, pad=0x20)                                                                                      # the ctor reads g0
+    fb = [sc.BLR] + [sc.NOP] * 3
+    fc = fn_reading(B0 + 0x10, B0 + 0x20, pad=0x20)                                                                      # c reads g1 and g2
+    sx, _x = sc._mini(T, sinit + ctor + fb + fc, [("sinit", 0, 0x10), ("ctor", 0x10, 0x20), ("fb", 0x30, 0x10), ("fc", 0x40, 0x20)],
+                      utext(("a.cpp", [(".text", T, T + 0x30), (".ctors", CT, CT + 4)]), ("b.cpp", [(".text", T + 0x30, T + 0x40)]), ("c.cpp", [(".text", T + 0x40, T + 0x60)])),
+                      [(CT, struct.pack(">I", T)), (B0, bytes(0x40))], [sy("g%d" % k, ".bss", B0 + 0x10 * k, 0x10) for k in range(4)])
+    sxan = Analysis(sx.splits, sx, {})
+    check("rule 1: g1 is constructed by a.cpp's own __sinit although only c.cpp reads it -> a.cpp (sinit beats the foreign reader)",
+          (sxan.decisions().get((".bss", B0 + 0x10)), sxan.res[0]["label"][1], sxan.res[0]["label"][2]), ("a.cpp", "sinit", "reader"))
+
+    # rule 2: a word at an address that is not 4-aligned and a holder that is mostly non-pointer data name no neighbour
+    H0 = 0x80600000
+    big = bytearray(0x500)
+    for i in range(0, 0x500, 4):
+        big[i:i + 4] = struct.pack(">I", 0x01020304 + i)
+    big[8:12] = struct.pack(">I", H0 + 0x700)                                       # one value that happens to point at t1: 1 of 320 words
+    small = struct.pack(">IIII", H0 + 0x700, 5, 0, 0)                               # 1 of 2 non-zero words: a real pointer table
+    odd = bytearray(0x10)
+    odd[1:5] = struct.pack(">I", H0 + 0x700)                                        # a `.4byte` inside a byte array: the word at the odd start of the symbol
+    hx_, _h = sc._mini(T, [sc.BLR] * 4, [("f", 0, 0x10)], utext(("a.cpp", [(".text", T, T + 0x10)])),
+                       [(H0, bytes(big)), (H0 + 0x600, small), (H0 + 0x700, bytes(0x10)), (H0 + 0x800, bytes(odd))],
+                       [sy("h_big", ".data", H0, 0x500), sy("h_small", ".data", H0 + 0x600, 0x10), sy("t1", ".data", H0 + 0x700, 0x10), sy("h_odd", ".data", H0 + 0x801, 8)])
+    ed = pointer_edges(hx_)
+    check("rule 2: only the real pointer table names t1; the 4-byte data table (1 pointer in 320 words) and the unaligned word name nothing",
+          sorted(hex(a) for a in ed.get(H0 + 0x700, ())), [hex(H0 + 0x600)])
+
+    # rule 7: the pointer closure runs to a fixpoint (three hops decide s3), code pointers that all enter one unit are as good as a reader
+    P0 = 0x80600000
+    blob = struct.pack(">IIII", P0 + 0x20, 0, 0, 0)          # s0 reads... s1 -> s2 -> s3, s0 -> s1
+    blob = struct.pack(">IIII", P0 + 0x10, 0, 0, 0) + struct.pack(">IIII", P0 + 0x20, 0, 0, 0) + struct.pack(">IIII", P0 + 0x30, 0, 0, 0) + bytes(0x20)
+    cx3, _c3 = sc._mini(T, fn_reading(P0) + fn_reading() + fn_reading(P0 + 0x40, pad=0x20),
+                        [("fa", 0, 0x10), ("fb", 0x10, 0x10), ("fc", 0x20, 0x20)],
+                        utext(("a.cpp", [(".text", T, T + 0x10)]), ("b.cpp", [(".text", T + 0x10, T + 0x20)]), ("c.cpp", [(".text", T + 0x20, T + 0x40)])),
+                        [(P0, blob)], [sy("s%d" % k, ".data", P0 + 0x10 * k, 0x10) for k in range(5)])
+    can3 = Analysis(cx3.splits, cx3, {})
+    check("rule 7: s0 (read by a) points at s1, s1 at s2, s2 at s3 - three hops - and c reads s4: s1, s2 and s3 are decided to a.cpp",
+          [can3.decisions().get((".data", P0 + 0x10 * k)) for k in range(5)], ["a.cpp", "a.cpp", "a.cpp", "a.cpp", "c.cpp"])
+    check("rule 7: the closure depth of each symbol (s1 round 1, s2 round 2, s3 round 3)", can3.res[0]["ddepth"], [0, 1, 2, 3, 0])
+
+    # code-pointer tables
+    tblob = struct.pack(">4I", T, T + 4, T + 8, 0) + struct.pack(">4I", T, T + 4, 5, 0)                      # pure / impure (a number among the pointers)
+    tx, _t = sc._mini(T, fn_reading(P0 + 0x100, pad=0x20), [("fa", 0, 0x20)], utext(("a.cpp", [(".text", T, T + 0x20)])), [(P0 + 0x100, bytes(0x10) + tblob)],
+                      [sy("t_anchor", ".data", P0 + 0x100, 0x10), sy("t_pure", ".data", P0 + 0x110, 0x10), sy("t_mixed", ".data", P0 + 0x120, 0x10)])
+    tan = Analysis(tx.splits, tx, {})
+    check("rule 7: code-pointer tables - every non-zero word enters a.cpp: pure; one number among them: not",
+          [(tan.res[0]["dlabel"][i], tan.res[0]["dpure"][i]) for i in range(3)], [("", False), ("code-pointers", True), ("code-pointers", False)])
+    check("rule 7: derived_strong follows the purity", [tan.derived_strong(tan.res[0], i, 0) for i in range(3)], [False, True, False])
+
+    # rule 8: file-string is a real file-name string; a plain string literal one unit reads is a string-reader
+    fx_, _f = sc._mini(T, fn_reading(P0 + 0x200, P0 + 0x210), [("fa", 0, 0x10)], utext(("a.cpp", [(".text", T, T + 0x10)])),
+                       [(P0 + 0x200, b"foo.cpp\0" + bytes(8) + b"hello\0\0\0" + bytes(8))],
+                       [sy("s_file", ".data", P0 + 0x200, 8, " data:string"), sy("s_plain", ".data", P0 + 0x210, 8, " data:string")])
+    check("rule 8: 'foo.cpp' is a file-string, 'hello' a string-reader", list(Analysis(fx_.splits, fx_, {}).res[0]["label"]), ["file-string", "string-reader"])
+
+    # rule 5: reader against pointer table
+    R0 = 0x80600000
+    h_blob = struct.pack(">IIII", R0 + 0x10, 0, 0, 0)
+
+    def rvp_world(readers, extra_syms=0):
+        """run `.data` u0 (0x10), x (0x10), u2 (0x10) at R0..; c owns a pointer table h at R0+0x100 that points at x; `readers` = [(unit idx, symbol idx)]."""
+        fa = fn_reading(*[R0 + 0x10 * k for u, k in readers if u == 0], pad=0x20)
+        fb = fn_reading(*[R0 + 0x10 * k for u, k in readers if u == 1], pad=0x20)
+        return sc._mini(T, fa + fb + [sc.BLR] + [sc.NOP] * 7, [("fa", 0, 0x20), ("fb", 0x20, 0x20), ("fc", 0x40, 0x20)],
+                        utext(("a.cpp", [(".text", T, T + 0x20), (".ctors", CT, CT + 4)]), ("b.cpp", [(".text", T + 0x20, T + 0x40)]), ("c.cpp", [(".text", T + 0x40, T + 0x60), (".data", R0 + 0x100, R0 + 0x110)])),
+                        [(R0, bytes(0x100) + h_blob)], [sy("u0", ".data", R0, 0x10), sy("x", ".data", R0 + 0x10, 0x10), sy("u2", ".data", R0 + 0x20, 0x10),
+                                                        sy("h", ".data", R0 + 0x100, 0x10)])[0]
+
+    cr = rvp_world([(0, 0), (0, 1), (1, 2)])
+    rr, ur = build_records(Analysis(cr.splits, cr, {}), (T, T + 0x100))
+    check("rule 5: x is read by a.cpp but the pointer table in c.cpp names it, and it sits between a.cpp's and b.cpp's data: deferred reader-vs-pointer, both listed",
+          ([(x["entry"]["unit"], x["entry"]["range"]) for x in rr], [(u["kind"], u["range"], u["candidates"]) for u in ur]),
+          ([("a.cpp", [hex8(R0), hex8(R0 + 0x10)]), ("b.cpp", [hex8(R0 + 0x20), hex8(R0 + 0x30)])], [("reader-vs-pointer", [hex8(R0 + 0x10), hex8(R0 + 0x20)], ["a.cpp", "c.cpp"])]))
+    ce = rvp_world([(0, 0), (0, 1), (0, 2)])
+    re_, ue = build_records(Analysis(ce.splits, ce, {}), (T, T + 0x100))
+    check("rule 5: the same disagreement enclosed by a.cpp's own symbols stays attached (taking it out would split the unit's range), graded medium with both signals",
+          ([(x["entry"]["unit"], x["entry"]["range"], x["entry"]["grade"], "reader-vs-pointer" in x["entry"].get("note", "")) for x in re_], ue),
+          ([("a.cpp", [hex8(R0), hex8(R0 + 0x30)], "medium", True)], []))
+    # an array: four contiguous 8-byte elements one table names, the readers split between a and b
+    E0 = 0x80600200
+    arr_blob = struct.pack(">IIII", E0, E0 + 8, E0 + 16, E0 + 24)
+    fa = fn_reading(E0, E0 + 8, pad=0x20)
+    fb = fn_reading(E0 + 16, E0 + 24, pad=0x20)
+    ca, _ca = sc._mini(T, fa + fb + [sc.BLR] + [sc.NOP] * 7, [("fa", 0, 0x20), ("fb", 0x20, 0x20), ("fc", 0x40, 0x20)],
+                       utext(("a.cpp", [(".text", T, T + 0x20), (".ctors", CT, CT + 4)]), ("b.cpp", [(".text", T + 0x20, T + 0x40)]), ("c.cpp", [(".text", T + 0x40, T + 0x60), (".data", E0 + 0x100, E0 + 0x110)])),
+                       [(E0, bytes(0x20) + bytes(0xE0) + arr_blob)], [sy("e%d" % k, ".data", E0 + 8 * k, 8) for k in range(4)] + [sy("tbl", ".data", E0 + 0x100, 0x10)])
+    ra_, ua = build_records(Analysis(ca.splits, ca, {}), (T, T + 0x100))
+    check("rule 5: an array (4 contiguous equal-size elements one table names) is one object: its readers split it between a and b, so no row takes a half - one deferral lists both",
+          ([x["entry"]["unit"] for x in ra_], [(u["kind"], u["range"], u["symbols"], u["candidates"]) for u in ua]),
+          ([], [("reader-vs-pointer", [hex8(E0), hex8(E0 + 0x20)], 4, ["a.cpp", "b.cpp"])]))
+
+    # rule 6: grade by anchors - a block of N symbols with fewer than max(3, N/50) read by its unit is medium
+    G0, NG = 0x80600000, 60
+
+    def grade_world(read):
+        w = fn_reading(*[G0 + 4 * k for k in read], pad=4 * (len(read) * 2 + 1 + 3) // 4 * 4)
+        c, _g = sc._mini(T, w, [("fa", 0, len(w) * 4)], utext(("a.cpp", [(".text", T, T + 4 * len(w)), (".ctors", CT, CT + 4)])), [(G0, bytes(4 * NG))],
+                         [sy("v%d" % k, ".data", G0 + 4 * k, 4) for k in range(NG)])
+        return build_records(Analysis(c.splits, c, {}), (T, T + 0x1000))[0]
+
+    g2, g3 = grade_world([0, NG - 1]), grade_world([0, NG // 2, NG - 1])
+    check("rule 6: 60 symbols of which the unit reads 2 are medium (note says so), 3 are strong",
+          ([(x["entry"]["symbols"], x["entry"]["grade"]) for x in g2], "only 2 of 60" in g2[0]["entry"].get("note", ""), [(x["entry"]["symbols"], x["entry"]["grade"]) for x in g3]),
+          ([(60, "medium")], True, [(60, "strong")]))
+
+    # rule 6: a strong V->S seam inside a decided block cuts the row at the seam: each piece is graded by its own anchors
+    V0 = 0x80600000
+    vt1 = struct.pack(">4I", 0, 0, T, 0)
+    blob = vt1 + b"abc\0" + b"def\0" + vt1
+    words = fn_reading(V0, V0 + 4, V0 + 8, pad=0x20)
+    cv, _cv = sc._mini(T, words, [("fa", 0, 0x20)], utext(("a.cpp", [(".text", T, T + 0x20), (".ctors", CT, CT + 4)])), [(V0, blob)],
+                       [sy("vt_a", ".data", V0, 0x10), sy("str_x", ".data", V0 + 0x10, 4, " data:string"), sy("str_y", ".data", V0 + 0x14, 4, " data:string"),
+                        sy("vt_b", ".data", V0 + 0x18, 0x10)])
+    import dataorder as do
+    kindv = {y.addr: y for y in do.classify_all(sc.dataorder_rows(cv.symbols), cv.dol)}
+    sv, _su = build_records(Analysis(cv.splits, cv, kindv), (T, T + 0x100))
+    check("rule 6: the V->S seam at the first string cuts a.cpp's block in two rows (before the seam / from it)",
+          [(x["entry"]["range"], x["entry"]["symbols"]) for x in sv], [([hex8(V0), hex8(V0 + 0x10)], 1), ([hex8(V0 + 0x10), hex8(V0 + 0x28)], 3)])
+    sv0, _s0 = build_records(Analysis(cv.splits, cv, {}), (T, T + 0x100))
+    check("rule 6: without the classification (no seams) the block is one row", [(x["entry"]["range"], x["entry"]["symbols"]) for x in sv0], [([hex8(V0), hex8(V0 + 0x28)], 4)])
+    cvi, _cvi = sc._mini(T, words, [("fa", 0, 0x20)], utext(("a.cpp", [(".text", T, T + 0x20), (".ctors", CT, CT + 4)])), [(V0, blob), (CT, struct.pack(">I", T))],
+                         [sy("vt_a", ".data", V0, 0x10), sy("str_x", ".data", V0 + 0x10, 4, " data:string"), sy("str_y", ".data", V0 + 0x14, 4, " data:string"),
+                          sy("vt_b", ".data", V0 + 0x18, 0x10)])
+    kvi = {y.addr: y for y in do.classify_all(sc.dataorder_rows(cvi.symbols), cvi.dol)}
+    svi, _sui = build_records(Analysis(cvi.splits, cvi, kvi), (T, T + 0x100))
+    ua = cvi.by_name["a.cpp"]
+    dsyms = sorted(kvi.values(), key=lambda y: y.addr)
+    kept_i, inst_i = sc.seams_inside(cvi, ua, V0, V0 + 0x28, dsyms, do.seams(dsyms), kvi, sc.unit_sinit_closure(cvi, ua))
+    check("rule 6: a V->S seam the unit's own sinit instantiates is no data-order edge (the checker keeps none) but still cuts the row for grading",
+          ([(x["entry"]["range"], x["entry"]["symbols"]) for x in svi], kept_i, len(inst_i)),
+          ([([hex8(V0), hex8(V0 + 0x10)], 1), ([hex8(V0 + 0x10), hex8(V0 + 0x28)], 3)], [], 1))
+
+    # settle: a block cut by two seams - the first blocked piece takes the pieces after it along (a hole in the unit's range would fail `order`)
+    V1 = 0x80600200
+    blob2 = vt1 + b"abc\0" + vt1 + b"def\0" + vt1
+    cv2, _cv2 = sc._mini(T, fn_reading(V1, pad=0x20), [("fa", 0, 0x20)], utext(("a.cpp", [(".text", T, T + 0x20), (".ctors", CT, CT + 4)])), [(V1, blob2)],
+                         [sy("vt_a", ".data", V1, 0x10), sy("str_x", ".data", V1 + 0x10, 4, " data:string"), sy("vt_b", ".data", V1 + 0x14, 0x10),
+                          sy("str_y", ".data", V1 + 0x24, 4, " data:string"), sy("vt_c", ".data", V1 + 0x28, 0x10)])
+    kv2 = {y.addr: y for y in do.classify_all(sc.dataorder_rows(cv2.symbols), cv2.dol)}
+    recs2, bl2, _acc2, un2, _mv2 = _settled(cv2, kv2, T)
+    check("settle: two V->S seams cut a.cpp's block in three rows; the first seam fails data-order, so that piece and the one after it are blocked, the piece before stays",
+          ([x["entry"]["range"][0] for x in recs2], sorted(x["entry"]["range"][0] for x in bl2), [x["blocked"][0] for x in bl2], un2),
+          ([hex8(V1), hex8(V1 + 0x10), hex8(V1 + 0x24)], [hex8(V1 + 0x10), hex8(V1 + 0x24)], ["data-order", "data-order"], []))
+
+
+    # overrides (rule 13): attach / defer / exclude a range the engine cannot derive; the settle loop still checks them; the output is reproducible
+    O0 = 0x80600000
+    fa = fn_reading(O0, pad=0x20)
+    fb = fn_reading(O0 + 0x30, O0 + 0x40, pad=0x20)
+    fc = fn_reading(O0 + 0x60, pad=0x20)
+    co, _co = sc._mini(T, fa + fb + fc, [("fa", 0, 0x20), ("fb", 0x20, 0x20), ("fc", 0x40, 0x20)],
+                       utext(("a.cpp", [(".text", T, T + 0x20), (".ctors", CT, CT + 4)]), ("b.cpp", [(".text", T + 0x20, T + 0x40)]), ("c.cpp", [(".text", T + 0x40, T + 0x60)])),
+                       [(O0, bytes(0x100))], [sy("d%d" % k, ".data", O0 + 0x10 * k, 0x10) for k in range(8)])
+    ev = [{"tool": "orchestrator", "command": "python tools/splits/dataattach.py --explain 0x%08X" % (O0 + 0x10), "finding": "d1/d2 hold b's tables (reviewer 4)"}]
+    rows = [{"unit": "b.cpp", "section": ".data", "start": hex8(O0 + 0x10), "end": hex8(O0 + 0x30), "action": "attach", "grade": "medium", "signal": "orchestrator", "evidence": ev, "note": "reviewer"},
+            {"unit": "c.cpp", "section": ".data", "start": hex8(O0 + 0x50), "end": hex8(O0 + 0x60), "action": "defer", "candidates": ["b.cpp", "c.cpp"], "note": "keep open"},
+            {"section": ".data", "start": hex8(O0 + 0x70), "end": hex8(O0 + 0x80), "action": "exclude"}]
+    oan = Analysis(co.splits, co, {})
+    base_rec, base_un = build_records(oan, (T, T + 0x100))
+    oan.set_overrides(resolve_overrides(oan, rows))
+    orec, oun = build_records(oan, (T, T + 0x100))
+    check("overrides: the attach row is a record with signal orchestrator, its grade and the note; the defer row an unowned row; the exclude row neither",
+          ([(x["entry"]["unit"], x["entry"]["range"], x["entry"]["grade"], x["entry"]["signal"]) for x in orec if x.get("override") is not None],
+           [(u["kind"], u["range"], u["candidates"]) for u in oun if u["kind"] == "orchestrator"],
+           [u["range"] for u in oun if u["range"][0] == hex8(O0 + 0x70)]),
+          ([("b.cpp", [hex8(O0 + 0x10), hex8(O0 + 0x30)], "medium", "orchestrator")], [("orchestrator", [hex8(O0 + 0x50), hex8(O0 + 0x60)], ["b.cpp", "c.cpp"])], []))
+    check("overrides: without them d1/d2 and d5 are deferred, and d7 is c.cpp's (it ends c.cpp's row, the exclude carves it out)",
+          (sorted(u["range"][0] for u in base_un if u["range"][0] in (hex8(O0 + 0x10), hex8(O0 + 0x50))), [x["entry"]["range"][1] for x in base_rec if x["entry"]["unit"] == "c.cpp"],
+           [x["entry"]["range"][1] for x in orec if x["entry"]["unit"] == "c.cpp"]), ([hex8(O0 + 0x10), hex8(O0 + 0x50)], [hex8(O0 + 0x80)], [hex8(O0 + 0x70)]))
+    check("overrides: the decision is the solver's input for the data after it (decisions() counts an attach)", oan.decisions().get((".data", O0 + 0x10)), "b.cpp")
+
+    def refuses(rows_):
+        try:
+            resolve_overrides(oan, rows_)
+        except SystemExit as e:
+            return str(e)
+        return None
+
+    check("overrides: a row with an unknown unit, an attach without evidence, a guess grade and overlapping rows are refused",
+          [refuses([dict(rows[0], unit="nope.cpp")]) is not None, refuses([dict(rows[0], evidence=[])]) is not None, refuses([dict(rows[0], grade="guess")]) is not None,
+           refuses([rows[0], dict(rows[0], start=hex8(O0 + 0x20), end=hex8(O0 + 0x28))]) is not None, refuses(rows) is None], [True, True, True, True, True])
+    # a blocked override: a jump table read by a.cpp's dispatch, attached to c.cpp, fails the jumptable invariant, so it is blocked and reported
+    J = 0x80600100
+    disp = [sc._lis(3, J >> 16), sc._w(14, 3, 3, J & 0xFFFF), 0x5480103A, (31 << 26) | (3 << 16) | (23 << 1), 0x7C0903A6, 0x4E800420, sc.NOP, sc.NOP]
+    cj, _cj = sc._mini(T, fn_reading(J - 0x20, pad=0x20) + disp + fn_reading(pad=0x20), [("fa", 0, 0x20), ("fb", 0x20, 0x20), ("fc", 0x40, 0x20)],
+                       utext(("a.cpp", [(".text", T, T + 0x20), (".ctors", CT, CT + 4)]), ("b.cpp", [(".text", T + 0x20, T + 0x40)]), ("c.cpp", [(".text", T + 0x40, T + 0x60)])),
+                       [(J - 0x20, bytes(0x20) + struct.pack(">4I", T, T, T, T))], [sy("jumptable_%X" % J, ".data", J, 0x10, scope="local"), sy("dz", ".data", J - 0x20, 0x10)])
+    jan = Analysis(cj.splits, cj, {})
+    jan.splits, jan.symbols, jan.dol, jan.props, jan.base_ctx = cj.splits, cj.symbols, cj.dol, [], cj
+    jrows = [{"unit": "c.cpp", "section": ".data", "start": hex8(J), "end": hex8(J + 0x10), "action": "attach", "grade": "strong", "evidence": ev}]
+    jan.set_overrides(resolve_overrides(jan, jrows))
+    jrec, _ju = build_records(jan, (T, T + 0x100))
+    blocked, unattr, _jr, _acc, _mv = settle(jan, [], jrec, "t", log=lambda *a: None)
+    check("overrides: attaching a jump table to the wrong unit is BLOCKED by the invariant loop and reported (not applied)",
+          ([(b["entry"]["unit"], b["blocked"][0]) for b in blocked], override_outcomes(jan, jrec, [])[0]["outcome"], unattr), ([("c.cpp", "jumptable")], "blocked", []))
+    jan0 = Analysis(cj.splits, cj, {})
+    jrec0, _ju0 = build_records(jan0, (T, T + 0x100))
+    check("overrides: the same table without the override is b.cpp's (the dispatch reads it)", [(x["entry"]["unit"], x["entry"]["signal"]) for x in jrec0], [("a.cpp", "reader"), ("b.cpp", "jumptable")])
+
+    def regen():
+        a_ = Analysis(co.splits, co, {})
+        a_.set_overrides(resolve_overrides(a_, rows))
+        r_, u_ = build_records(a_, (T, T + 0x100))
+        return json.dumps(proposal_doc("t", (T, T + 0x100), [public(x["entry"]) for x in r_], u_), sort_keys=False)
+
+    check("overrides: regeneration with the same overrides is byte-identical", regen(), regen())
+    # takes_from: one row over bytes another unit owns (a recut)
+    rows_tf = [{"unit": "a.cpp", "section": ".data", "start": hex8(O0 + 0x10), "end": hex8(O0 + 0x30), "action": "attach", "grade": "strong", "evidence": ev, "takes_from": "c.cpp"}]
+    tan = Analysis(co.splits, co, {})
+    tan.set_overrides(resolve_overrides(tan, rows_tf))
+    trec, _tu = build_records(tan, (T, T + 0x100))
+    tfr = takes_from_records(tan, (T, T + 0x100))
+    check("overrides: a takes_from attach is one direct row over the whole range, naming the donor (and the solver's segments skip it)",
+          ([(x["entry"]["unit"], x["entry"]["range"], x["entry"]["takes_from"], x["entry"]["signal"]) for x in tfr], [x for x in trec if x.get("override") is not None]),
+          ([("a.cpp", [hex8(O0 + 0x10), hex8(O0 + 0x30)], "c.cpp", "orchestrator")], []))
+
+    # the analysis pickles (the --explain cache) and its key follows the inputs
+    import pickle
+    check("cache: an analysis survives a pickle round trip", pickle.loads(pickle.dumps(oan)).decisions(), oan.decisions())
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        f1 = os.path.join(td, "a.json")
+        with open(f1, "w") as fh:
+            fh.write("{}")
+        k1 = stamp_of([f1])
+        with open(f1, "w") as fh:
+            fh.write("{ }")
+        check("cache: the key changes with a file's size, with the extra proposals, and not otherwise",
+              (k1 != stamp_of([f1]), stamp_of([f1], [{"a": 1}]) != stamp_of([f1]), stamp_of([f1]) == stamp_of([f1])), (True, True, True))
+
+    # moves (phase 3): a data-only unit the attachments left out of link order goes right behind the in-order unit before it, by address
+    M2 = 0x80700000
+    mu = utext(("z.cpp", [(".data", M2 + 0x30, M2 + 0x40)]), ("a.cpp", [(".text", T, T + 0x10), (".data", M2, M2 + 0x10)]), ("b.cpp", [(".text", T + 0x10, T + 0x20), (".data", M2 + 0x10, M2 + 0x20)]),
+               ("c.cpp", [(".text", T + 0x20, T + 0x30), (".data", M2 + 0x20, M2 + 0x30)]))
+    cm, _cm = sc._mini(T, [sc.BLR] * 12, [("fa", 0, 0x10), ("fb", 0x10, 0x10), ("fc", 0x20, 0x10)], mu, [(M2, bytes(0x40))], [])
+    check("moves: z.cpp (data-only, first in the file, last by address) is moved behind c.cpp; the text units stay", [(m["unit"], m["after"]) for m in derive_moves(cm, set())], [("z.cpp", "c.cpp")])
+
+    # fold: a data-only unit whose symbols one unit's own __sinit constructs is a fragment of that unit's TU (the sinit route; the flank route needs readers)
+    ZB = 0x80650000
+    zs = [sc._lis(3, ZB >> 16), sc._w(14, 3, 3, ZB & 0xFFFF), sc._b(T + 8, T + 0x10), sc.NOP, sc.BLR, sc.NOP, sc.NOP, sc.NOP]
+    cz2, _cz2 = sc._mini(T, zs, [("sinit", 0, 0x10), ("ctor", 0x10, 0x10)], utext(("a.cpp", [(".text", T, T + 0x20), (".ctors", CT, CT + 4)]), ("z.cpp", [(".bss", ZB, ZB + 0x10)])),
+                         [(CT, struct.pack(">I", T)), (ZB, bytes(0x10))], [sy("zsym", ".bss", ZB, 0x10)])
+    frows, _fq = find_folds(Analysis(cz2.splits, cz2, {}), (T, T + 0x100))
+    check("fold: z.cpp (data-only) holds zsym, which a.cpp's own __sinit constructs: z is a fragment of a.cpp, strong, takes_from z.cpp",
+          [(r["unit"], r["section"], r["takes_from"], r["grade"], r.get("signal")) for r in frows], [("a.cpp", ".bss", "z.cpp", "strong", "sinit")])
+
+    # a range one unit owns although another unit's own __sinit constructs its symbols: an open question naming both (the solver does not move owned data)
+    OW = 0x80650100
+    ow_words = [sc._lis(3, OW >> 16), sc._w(14, 3, 3, OW & 0xFFFF), sc._b(T + 8, T + 0x10), sc.NOP, sc.BLR, sc.NOP, sc.NOP, sc.NOP] + [sc.BLR] + [sc.NOP] * 7
+    cow, _cow = sc._mini(T, ow_words, [("sinit", 0, 0x10), ("ctor", 0x10, 0x10), ("fb", 0x20, 0x20)],
+                         utext(("a.cpp", [(".text", T, T + 0x20), (".ctors", CT, CT + 4)]), ("b.cpp", [(".text", T + 0x20, T + 0x40), (".bss", OW, OW + 0x10)])),
+                         [(CT, struct.pack(">I", T)), (OW, bytes(0x10))], [sy("ow", ".bss", OW, 0x10)])
+    oq = sinit_owner_questions(Analysis(cow.splits, cow, {}), set(), (T, T + 0x100))
+    check("owner vs sinit: b.cpp's range holds a symbol a.cpp's own __sinit constructs - one open question names both and the interval",
+          [(q["unit"], q["section"], q["candidate_interval"], "a.cpp" in q["question"]) for q in oq], [("b.cpp", ".bss", [hx8(OW), hx8(OW + 0x10)], True)])
+
+    # settle: the data-only unit left out of link order is moved by the loop itself (the moves it returns are the doc's `moves`)
+    mu2 = utext(("z.cpp", [(".data", M2 + 0x30, M2 + 0x40)]), ("a.cpp", [(".text", T, T + 0x20), (".data", M2, M2 + 0x10), (".ctors", CT, CT + 4)]),
+                ("b.cpp", [(".text", T + 0x20, T + 0x40), (".data", M2 + 0x10, M2 + 0x20)]), ("c.cpp", [(".text", T + 0x40, T + 0x60), (".data", M2 + 0x20, M2 + 0x30)]))
+    cm2, _cm2 = sc._mini(T, fn_reading(M2 - 0x10, pad=0x20) + fn_reading(pad=0x20) + fn_reading(pad=0x20), [("fa", 0, 0x20), ("fb", 0x20, 0x20), ("fc", 0x40, 0x20)], mu2,
+                         [(M2 - 0x10, bytes(0x50))], [sy("extra", ".data", M2 - 0x10, 0x10)])
+    recm, blm, _accm, unm, mvm = _settled(cm2, {}, T)
+    check("settle: the data-only unit the file order leaves behind is moved by the loop (not left as an unattributed failure); the attachment stays",
+          ([(m["unit"], m["after"]) for m in mvm], [x["entry"]["unit"] for x in recm], blm, unm), ([("z.cpp", "c.cpp")], ["a.cpp"], [], []))
+
+    # explain: a data-only unit lists its ranges and who reads each symbol
+    import io, contextlib
+    zt = utext(("a.cpp", [(".text", T, T + 0x10), (".ctors", CT, CT + 4)]), ("z.cpp", [(".data", O0, O0 + 0x10)]))
+    cz, _z = sc._mini(T, fn_reading(O0, pad=0x10), [("fa", 0, 0x10)], zt, [(O0, bytes(0x20))], [sy("gz", ".data", O0, 0x10)])
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        explain(Analysis(cz.splits, cz, {}), r"z\.cpp", None)
+    out = buf.getvalue()
+    check("explain: a data-only unit prints its range and the readers of each symbol (it printed nothing)", ("data-only unit" in out, "gz" in out, "read by a.cpp" in out), (True, True, True))
 
 
 if __name__ == "__main__":

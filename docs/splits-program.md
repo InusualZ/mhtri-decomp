@@ -113,6 +113,10 @@ A phase 2 file is an ordinary proposal file whose `units` may be empty (or hold 
 * **`unowned_data` row** - a run nobody could be given: `section`, `range` (or `start`/`end`), `candidates` (names, or objects with a `unit`; empty only
   with a `reason`/`note`: a linker-generated table), a stated cause (`reason`, `why`, `evidence` or `note`), `kind`, `symbols`, `bytes`, `reproduce`.
   A deferred range the candidate gives to a unit is a `lint:` line unless the row says `provisional: true` or the holder is a by-reader piece.
+  The engine's kinds: `ambiguous`, `unread`, `interleave`, `multi-tu` / `invariant` (blocked by the settle loop), `pool-order`, `reader-vs-pointer`, `orchestrator` (an
+  override), `linker-generated`. `attach` signals: `reader`, `sinit`, `jumptable`, `pointer-graph`, `code-pointers`, `forced`, `orchestrator`, ... (`dataattach`'s labels).
+  The engine also writes `open_questions` objects (`unit`, `section`, `question`, `candidate_interval`, `reproduce`): a pool whose first use goes down inside a unit
+  that reads all of it, a data-only unit folded away, a range an owner holds that another unit's own `__sinit` constructs.
 * **`after: <unit>`** on a proposal unit that has no `.text` (a **data-only unit**, like the registered `Pl/pl_frame_data`): the unit sits right behind
   the named unit in file (= link) order; units behind one anchor keep the file order; without `after` the unit is last and a warning says so; an anchor the
   candidate lacks is a `lint:` line.
@@ -126,31 +130,74 @@ A phase 2 file is an ordinary proposal file whose `units` may be empty (or hold 
 ## The data attachment engine (`tools/splits/dataattach.py`)
 
 ```
-python tools/splits/dataattach.py [--window LO HI] [--lane NAME] [--out F] [--stats F] [--proposal F ...] [--linker] [--no-settle]
-python tools/splits/dataattach.py --explain UNIT_REGEX|ADDR [--section S]     # a unit's segments, or the run holding an address, per symbol
+python tools/splits/dataattach.py [--window LO HI] [--lane NAME] [--out F] [--stats F] [--proposal F ...] [--linker] [--no-settle] [--overrides F]
+python tools/splits/dataattach.py --explain UNIT_REGEX|ADDR [--section S]     # a unit's segments (a data-only unit: its ranges and readers), or the run holding an address, per symbol
 python tools/splits/dataattach.py --holdout                                    # the solver on the registered data
 python tools/splits/dataattach.py --vtable-order                               # per unit: up/down/tie vtable pairs (the zigzag premise)
 ```
 
+`--explain` and the generator load the analysis from a pickle (`build/tmp/dataattach/analysis-<key>.pkl`, gitignored, the newest three kept) keyed by the
+stat of the map, `splits.txt`, the DOL, the proposal files and the three tool sources: the first call decodes the whole text (about 12 s), the next ones take
+0.2-0.6 s; `--no-cache` rebuilds. (`callers.py` caches its own index in `build/tmp/callers/graph.json` the same way: the first call of a fresh tree builds it,
+about 8 s, then 1.2 s.)
+
 * **Input**: the candidate `splitcheck.render` makes of phase 1 a..g + `phase1-reconcile.json` + `phase2-folds.json` (when it exists); the provisional by-reader
   data of recut units is stripped (those symbols are decided here). **Runs**: the symbols no range covers between two owned ranges; the **chain** of a run is the
   text units in link order from the owner before it to the owner after it.
-* **Evidence** per symbol: strong (weight 1000) = the units whose decoded text reads it (a literal only by a load), a jump table's branch-target unit;
-  derived (weight 1) = the units a table's code pointers enter, the units of the data symbols it points to or is pointed from (two rounds; owned and decided
-  symbols count by their unit).
+* **Evidence** per symbol: strong (weight 1000) = the unit whose own `__sinit` constructs it (label `sinit`: a write into the object, the `this` of a constructor
+  call, `__register_global_object`'s object and node, a tail-called constructor's `this` - the `.ctors` word's function inside the unit's text; the address merely
+  being stored as a value, a vtable of another unit, is not a definition; a string or pool constant passed to a call is an argument) - which beats the foreign
+  reads of an extern - else the units whose decoded text reads it (a literal only by a load), a jump table's branch-target unit; derived (weight 1) = the units
+  a table's code pointers enter, the units of the data symbols it points to or is pointed from (a closure run to a fixpoint, at most 16 rounds; owned and decided
+  symbols count by their unit).  Not a pointer: a word at an address that is not 4-aligned, and any word of a holder that is mostly non-pointer data (at least 64
+  non-zero words of which under 1 % point into the map: an SJIS table has 12 "pointers" in 4,000 words).  Labels: `reader`, `readers`, `sinit`, `jumptable`,
+  `vtable-store`, `local-static`, `pool-order`, `file-string` (only a real `__FILE__` / file-name string), `string-reader` (any other string literal one unit
+  reads); a row's signal counts follow the same priority (label, then `pointer-graph`/`code-pointers`, then `forced`).
 * **Solver**: a monotone dynamic program over the chain; a symbol is *decided* when every optimal assignment gives it one unit (the readers force it, or it lies
   between two symbols of one unit), else *ambiguous* (an interval of units). A strong row the optimum violates is a **contradiction**; static ones
   (`jumptable_`, `scope:local`) and clusters of three between adjacent units are an **interleave** (the data of two units alternates: not attached, deferred).
-  Inside one owner's pool block only the longest first-use-ordered stretch is decided (**pool-order**). A data-only registered unit whose neighbours' data is
-  one unit's on both sides is that unit's fragment (**`fold-data-only`**, `takes_from`; every range of it follows, and the data after it is decided on the folded
-  candidate). The `extab`/`extabindex` entries past the last range go to the unit holding their function; `--linker` lists the tables mwldeppc emits.
+  **`reader-vs-pointer`**: a symbol one unit reads or constructs while the pointer tables around it (owned or strongly decided neighbours, at most two units)
+  name another unit, and an **array** - at least four contiguous equal-size elements one pointer table names - whose readers split it between units, are
+  deferred with both sides listed (an array is one object: both halves are deferred, none is attached). A disagreement the link order encloses (the symbol lies
+  between two symbols of the unit that reads it) is not carved out - taking it out would leave the unit two ranges in one section - it stays in the row, which is
+  graded medium and carries the disagreement in its note.
+  **Pool order** (idea 94): inside one owner's block of `.sdata` strings only the longest first-use-ordered stretch is decided, a string a pointer initialiser of the
+  owner's own table names counts as used first (MWCC emits those strings before the functions' own), the rest is given back to the units that read it (a symbol
+  only a foreign unit reads between two symbols the owner reads is a foreign read the link order forces, not a second owner); a block nobody else reads is kept
+  whole. Numeric `.sdata2` literals are TU-local - the reader owns them - so an inversion among them cuts nothing back: the row is attached and the inversion goes
+  to the doc's `open_questions` (the unit holds two TUs' pool order), the settle loop accepts the `pool` FAIL it makes (`accepted` in `--stats`).
+  A data-only registered unit whose neighbours' data is one unit's on both sides, or whose symbols one unit's own `__sinit` constructs, is that unit's fragment
+  (**`fold-data-only`**, `takes_from`; every range of it follows, and the data after it is decided on the folded candidate). Data an owner's range already holds
+  that another unit's own `__sinit` constructs (em010's `vec_pair_*`) is not moved by the solver: each such group is an `open_questions` row naming both units and
+  the interval (a recut: an `attach` override with `takes_from`). The `extab`/`extabindex` entries past the last range go to the unit holding their function;
+  `--linker` lists the tables mwldeppc emits.
+  **Grades**: strong needs every symbol decided by readers (or by derived evidence as good as one: a table of code pointers whose every non-zero word enters the
+  unit's text, a pointer-graph symbol whose every holder is a `.data` symbol the unit's registered ranges already hold), no contradiction, no disagreement left
+  in the row, and at least `max(3, N/50)` of its N symbols (at most N) read by the unit (`ANCHOR_MIN`, `ANCHOR_SHARE`); anything else is medium, and a medium
+  row whose first symbol another unit also reads says so in its note. A decided `.data` block is **cut at the strong V->S seams inside it** - including a seam
+  whose later vtable the unit's own `__sinit` instantiates, which is no data-order edge but still where one vtable group's strings end - and every piece is a row of
+  its own, graded by its own anchors.
 * **Settle loop**: the decided rows are rendered and every invariant run; a row that makes a unit FAIL an invariant the phase 1 candidate does not fail it on
   is blocked - an `unowned_data` row `multi-tu` and a `guess` row - until nothing new fails. The finding is evidence: the unit holds more than one TU.
+  Blocking a piece of a block cut at a seam blocks the pieces after it too (a hole would leave the unit two ranges: an `order` FAIL), the pieces before stay.
+  A data-only unit the attachments leave out of link order (`splitcheck`'s `order`: its file position is all that orders it) is moved by the loop itself - the
+  doc's `moves` - behind the in-order unit before it by address.
+* **Overrides** (`--overrides FILE`, `docs/splits/proposals/phase2-overrides.json` is the empty skeleton): `{"overrides": [row, ...]}`, a row forces a decision
+  the engine cannot derive: `{"unit" | "text_addr", "section", "start", "end" (or "range"), "action": "attach" | "defer" | "exclude", "grade": "strong" | "medium",
+  "signal": "orchestrator", "evidence": [{"tool", "command", "finding"}], "note", "reproduce", "candidates", "takes_from"}`. `attach` gives the range to the unit
+  (evidence required, never `guess`; the row is written with signal `orchestrator` and the note; with `takes_from` it is one row over bytes another unit owns -
+  a recut - and that unit gives them up), `defer` lists it in `unowned_data` (kind `orchestrator`, `candidates` or the unit), `exclude` writes it nowhere. An unknown
+  unit, an unusable action, a missing evidence or two overlapping rows is refused before anything runs. The overrides are inputs of the solver (an attach is a
+  decision for the data after it) and still pass the settle loop: one that makes an invariant fail is **blocked** (an `unowned_data` row with the note
+  `orchestrator override N blocked`, a `guess` row, and `overrides` in `--stats` says `blocked` with the failing check). The output with the same overrides is
+  byte-identical.
 * **Output** is deterministic (the same bytes under any `PYTHONHASHSEED`); rows are written for the units whose `.text` starts in `--window`.
 * **Hold-out** (`--holdout`): every third owned data range of a section is hidden per batch (180 ranges in three batches), decided again as an unowned run
-  between its neighbours and compared with the registered owner. Over the whole DOL: 3,127 symbols, **3,045 decided, 3,018 right, 27 wrong, 61 undecided**
-  (99.11 %; `.sdata2` 287/287, `.sdata` 72/72, `.sbss` 99/99, `.bss` 86/94, `.rodata` 72/73, `.data` 2,402/2,420). The 27 wrong are boundaries the readers
-  contradict (`enemy/em_pop`|`em_model` 17, `em010`|`em011`/`em008` 6, `DWCi_NatNeg` 4). The five lane engines it replaced, on the same hold-out:
+  between its neighbours and compared with the registered owner. Over the whole DOL: 3,127 symbols, **3,040 decided, 3,013 right, 27 wrong, 64 undecided**
+  (99.11 %; `.sdata2` 287/287, `.sdata` 72/72, `.sbss` 99/99, `.bss` 86/94, `.rodata` 72/73, `.data` 2,397/2,415). Before the phase 3 fixes: 3,045 decided,
+  3,018 right, 27 wrong, 59 undecided (99.11 %); the five symbols that became undecided are `reader-vs-pointer` deferrals, and no symbol became wrong.
+  The 27 wrong are boundaries the readers contradict (`enemy/em_pop`|`em_model` 17, `DWCi_NatNeg` 4, and 6 symbols held by `enemy/em010_prog`'s range: `em011_prog_tbl`, `lbl_8056FCD0` and four `vec_pair_*` - there the engine decides `em011`/`em008`
+  and the range is wrong: `em011_prog_tbl` is `em011`'s, the pairs are constructed by `em008`'s and `em011`'s own `__sinit`s). The five lane engines it replaced, on the same hold-out:
   p2a 98.31 % (3,074 decided, 52 wrong), p2b 99.11 % (identical), p2c 98.29 % (3,034, 52), p2d 98.26 % (2,987, 52), p2fg 98.32 % (3,088, 52); all the 52 are
   one set of boundaries, p2b alone defers 25 of them (the interleave zone) at the cost of 18 right symbols.
 * **A fold is accepted** when the engine re-run on `phase 1 + the fold` renders with no FAIL **finding** the reference does not have (a count can stay the same
@@ -188,7 +235,11 @@ groups recomputed from the decode, cf. `docs/pool-seams.md`).
 * Text references (who reads a pool literal, a jump table, a bss object) are **decoded from the retail `.text`**
   (`lis` + `addi`/`ori`/load, r13/r2 small-data accesses): heuristic, so a pool finding names the literal and the
   reader and a reviewer confirms it with `python tools/units/callers.py <address>` (the same kind of index, built from
-  the asm dump).
+  the asm dump). A `lis` value stays live for 200 instructions in a volatile register, and in a callee-saved one (r14..r31, they survive calls) until
+  the register is written - by a load, an `addi`/`ori`, or any opcode that writes a GPR (`written_reg`); `mr rA, rB` copies what rB held. A function that forms three
+  or more distinct section starts with `addi` (the module loader's `_f_sbss2`, `_f_sdata2`, ... `RSOStaticLocateObject`) takes linker symbols, not the first symbol of each
+  section: those references are dropped. The decoder also records the stores through an address and the calls (`bl`, or a tail `b` to a function start) made
+  while r3..r10 hold one (`Ctx.store_refs`, `Ctx.pass_refs`), which `Ctx.sinit_definers()` turns into the globals a unit's own `__sinit` constructs.
 * `ctors`: a unit has one `.ctors` word and it points at the unit's `__sinit`, but the `__sinit` is **not** the TU's last
   function: MWCC emits the local constructors, the destructors registered by address and the `lis/addi/b ctor` thunks
   after it. The TU ends at `L`, the end of the closure of the sinit's callees and address-taken functions that lie after it
@@ -207,7 +258,9 @@ groups recomputed from the decode, cf. `docs/pool-seams.md`).
   the same function carry no order (the scheduler reorders loads), a literal first used in an earlier function than the
   one before it fails.  **Per section**: the `.sdata` strings and the `.sdata2` literals of a unit are two pools (the strings sit at lower addresses, so one
   address-sorted list called every late string followed by an early float an inversion), each judged against its own first-use order; the inversion at
-  the lowest address is reported.
+  the lowest address is reported. **Initialisers**: a string a pointer initialiser names (an aligned `.data`/`.rodata`/`.sdata` word of the unit's own ranges pointing at
+  it, `const char* names[] = {...}`) is emitted before the strings the functions use, so its first use sorts first and carries no order among such strings
+  (`pool_first_use`); a table in another unit's data does not count. Measured on the baseline: no count changes (the landed pools have no such table).
 * `data-order`: a strong `V->S` row says a boundary lies in `[addr, latest)` - after the first string, before the next vtable group.
   * **V->S fails a unit only when the unit also holds the later vtable group** (`latest < unit end`): a unit that ends inside the gap, or where the next group
     starts, has its boundary at its own end.
@@ -219,7 +272,16 @@ groups recomputed from the decode, cf. `docs/pool-seams.md`).
 * Effect of each rule on the reconciled candidate (phase 1 + `phase2-reconcile.json` + `phase2-folds.json`; FAIL counts when the rule is reverted):
   per-section pool order `pool` 63 -> 92; V->S rule `data-order` 0 -> 18 (baseline 0 -> 3); zigzag interleave exemption `data-order` 0 -> 10; zigzag
   instantiated exemption `data-order` 0 -> 5. `jumptable` names its foreign reader first by name (a set of units has no order): no count changes.
-* `order`: `rename:` ranges (`.ctors$10`, `.dtors$15`) are ordered by the linker script and left out of the order graph.
+* `order`: `rename:` ranges (`.ctors$10`, `.dtors$15`) are ordered by the linker script and left out of the order graph. Besides overlaps, a unit's gap and the
+  cycles of the address graph, the ranges of every section, taken by address, must have **non-decreasing file positions** (`dtk` reads `splits.txt` top to
+  bottom, and a unit with no text has only its file position to order it): a longest-non-decreasing-subsequence over each section's ranges picks the ones in
+  order, every range outside it is an `order` FAIL naming the units it lies between by address and their file positions (`file_order_offenders`, the fewest ranges
+  that must move). On the reconciled candidate it finds exactly `Pl/pl_frame_data` and `Pl/pl_act_data` (`.sdata2` 0x80799E00..0x80799FDC, between
+  `lobby/fn_80220038` and `Pl/pl_act_step` by address); `dataattach` places them (its `moves`).
+* `jumptable`: a **reader** of a jump table is the dispatch - the `addi`/`ori` that forms the table's address followed, within 16 instructions, by an indexed load
+  (`lwzx`/`lwzux`) through that register, then `mtctr` and `bctr` (`jumptable_reader_sites`) - not any reference whose address falls inside the symbol: an `lhz` struct-field
+  load through a base formed with `lis` is not one. The finding names the first foreign reader by name. Baseline: 63 PASS / 1 FAIL -> 64 PASS / 0 FAIL; the
+  reconciled candidate 1 -> 0 (`jumptable_8059FE90`'s four reader units were stale `lis` values the decoder kept live, the single true reader is the `addi` at 0x801139C4 of `fn_8011392C` in `ef/eft019`; `jumptable_805C390C`'s false readers were `lhz` field loads).
 
 ## How a reviewer re-derives a cut
 
@@ -246,21 +308,28 @@ groups recomputed from the decode, cf. `docs/pool-seams.md`).
 | jumptable | 62 | 1 | 0 |
 | bss | 43 | 0 | 1 |
 
+Phase 3 checker fixes (2026-10-01), baseline on the same tree before -> after: identical except `jumptable` 63 PASS / 1 FAIL -> 64 / 0 (the table above is the
+2026-09-30 state: the tree now gives order 305/0/1, ctors 20/39/2, pool 121/129/0, data-order 21/0/0, bss 44/0/1).
+
 * 149 of 306 units have a FAIL; 294 text cuts, 55 of them cross a shared pool literal; 19 pool groups (20 in
   `docs/pool-seams.md`, which counts from the objects' relocations); 22 seam requests in the outbox (18 land in a unit).
 * Unowned (no unit range): `.text` 5,407 functions in 26 runs, `.data` 8,562 symbols in 62 runs, `.sdata2` 6,802 in 9 -
   the backlog the program covers; `coverage` is PASS because every *claimed* edge is clean.
 
-## Phase 2 result (2026-10-01, phase 1 + `phase2-reconcile.json` + `phase2-folds.json`, 355 units)
+## Phase 2 result (2026-10-01, regenerated after the phase 3 fixes: phase 1 + `phase2-reconcile.json` + `phase2-folds.json`, 354 units)
 
-| invariant | FAIL phase 1 candidate (360 units) | FAIL + phase 2 |
-| --- | ---: | ---: |
-| order, coverage, text-cut, extab, ctors, dtors, vtable, bss, local-static | 0 | 0 |
-| pool | 63 | 63 |
-| data-order | 0 | 0 |
-| jumptable | 1 | 1 |
+| invariant | FAIL phase 1 candidate (360 units) | FAIL + phase 2, before the fixes (355 units) | FAIL + regenerated phase 2 (354 units) |
+| --- | ---: | ---: | ---: |
+| coverage, text-cut, extab, ctors, dtors, vtable, bss, local-static | 0 | 0 | 0 |
+| order | 0 | 0 (2 under the file-order check) | 0 |
+| pool | 63 | 63 (66 under the new decoder) | 81 |
+| data-order | 0 | 0 | 0 |
+| jumptable | 1 | 1 (0 under the dispatch rule) | 0 |
 
-* 859 data ranges attached (strong 732, medium 127), 15,722 symbols; lint 0, warnings 0, 0 new failures; four text folds, one data-only unit and one move
-  applied, three folds held with the failing check (`phase2-reconcile.md` section 4).
-* Symbols in no unit, whole map, before -> after: `.data` 8,454 -> 2,310, `.sdata2` 6,802 -> 86, `.sdata` 2,052 -> 213, `.bss` 439 -> 29, `.sbss` 904 -> 37,
-  `.rodata` 277 -> 38; the rest is deferred by cause (`multi-tu` 1,327 symbols, `interleave` 815, `unread` 332, `pool-order` 151, `ambiguous` 93) for phase 3.
+* 881 data ranges attached (strong 751, medium 130), 16,464 symbols; lint 0, warnings 0, 0 new failures; four text folds, two data-only folds (`Pl/bss_pool` by sinit, `cockpit_icon_data`),
+  one data-only unit, three moves (one hand-written, two derived by the engine) applied, three folds held with the failing check (`phase2-reconcile.md` section 4). The pool count
+  rises by the 18 numeric/string blocks whose first use goes down inside a unit that reads all of them: attached, recorded as open questions (`phase2-reconcile.md` section 7).
+* Symbols in no unit, whole map, before -> after (previous regeneration in brackets): `.data` 8,454 -> 1,843 (2,310), `.sdata2` 6,802 -> 8 (86), `.sdata` 2,052 -> 55 (213),
+  `.bss` 439 -> 34 (29), `.sbss` 904 -> 35 (37), `.rodata` 277 -> 12 (38); the rest is deferred by cause (`multi-tu` 891 symbols, `interleave` 815, `unread` 207,
+  `ambiguous` 50, `reader-vs-pointer` 25) for phase 3.
+* Hold-out: 3,040 decided, 3,013 right, 27 wrong, 64 undecided (99.11 %); before 3,045 / 3,018 / 27 / 59 (99.11 %): the five symbols that became undecided are rule 5 deferrals.
