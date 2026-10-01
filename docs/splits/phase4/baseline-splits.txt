@@ -1,0 +1,1744 @@
+Sections:
+	.init       type:code align:4
+	extab       type:rodata align:32
+	extabindex  type:rodata align:32
+	.text       type:code align:32
+	.ctors      type:rodata align:16
+	.dtors      type:rodata align:32
+	.rodata     type:rodata align:64
+	.data       type:data align:32
+	.bss        type:bss align:32
+	.sdata      type:data align:32
+	.sbss       type:bss align:16
+	.sdata2     type:rodata align:4
+	.sbss2      type:bss align:32
+
+main.cpp:
+	extab       start:0x800066E0 end:0x80006770
+	extabindex  start:0x8001E480 end:0x8001E558
+	.text       start:0x8003F200 end:0x80040478
+	.data       start:0x8057C82C end:0x8057C87C
+	.bss        start:0x80658540 end:0x806585B8
+	.sbss       start:0x80794770 end:0x807947B4
+	.sdata2     start:0x80795AA0 end:0x80795AD8
+
+sys_mem.cpp:
+	extab       start:0x80006770 end:0x80006810
+	extabindex  start:0x8001E558 end:0x8001E588
+	.text       start:0x80040478 end:0x80040598
+
+fn_80040598.cpp:
+	extab       start:0x80006810 end:0x80006820
+	extabindex  start:0x8001E588 end:0x8001E5A0
+	.text       start:0x80040598 end:0x800408A8
+
+mh3_pad.cpp:
+	extab       start:0x80006820 end:0x80006A90
+	extabindex  start:0x8001E5A0 end:0x8001E948
+	.text       start:0x800408A8 end:0x80047398
+	.ctors      start:0x8056F2C4 end:0x8056F2C8
+	.data       start:0x805803EC end:0x80581158
+	.bss        start:0x806585B8 end:0x806694E8
+	.sbss       start:0x807947D0 end:0x80794814
+
+fn_80047398.cpp:
+	extab       start:0x80006A90 end:0x80006CF0
+	extabindex  start:0x8001E948 end:0x8001ECD8
+	.text       start:0x80047398 end:0x8004C9A0
+	.data       start:0x80582C60 end:0x80582EF8
+	.bss        start:0x806694E8 end:0x80669F68
+	.sbss       start:0x80794870 end:0x80794884
+
+fn_8004C9A0.cpp:
+	extab       start:0x80006CF0 end:0x80006CF8
+	extabindex  start:0x8001ECD8 end:0x8001ECE4
+	.text       start:0x8004C9A0 end:0x8004CAD8
+
+fn_8004CAD8.cpp:
+	extab       start:0x80006CF8 end:0x80007170
+	extabindex  start:0x8001ECE4 end:0x8001F398
+	.text       start:0x8004CAD8 end:0x80054C64
+
+draw_shape.cpp:
+	extab       start:0x80007170 end:0x80007218
+	extabindex  start:0x8001F398 end:0x8001F494
+	.text       start:0x80054C64 end:0x80056F24
+	.ctors      start:0x8056F2C8 end:0x8056F2CC
+
+fn_80056F24.cpp:
+	extab       start:0x80007218 end:0x800072D0
+	extabindex  start:0x8001F494 end:0x8001F5A8
+	.text       start:0x80056F24 end:0x80059550
+	.ctors      start:0x8056F2CC end:0x8056F2D0
+
+fn_80059550.cpp:
+	extab       start:0x800072D0 end:0x80007310
+	extabindex  start:0x8001F5A8 end:0x8001F608
+	.text       start:0x80059550 end:0x8005AA28
+
+g3d/fn_8005AA28.cpp:
+	extab       start:0x80007310 end:0x80007328
+	extabindex  start:0x8001F608 end:0x8001F62C
+	.text       start:0x8005AA28 end:0x8005ABD8
+	.ctors      start:0x8056F2D0 end:0x8056F2D4
+
+g3d/g3d_anmchr.cpp:
+	extab       start:0x80007328 end:0x800076C4
+	extabindex  start:0x8001F62C end:0x8001FB00
+	.text       start:0x8005ABD8 end:0x80063888
+
+g3d/fn_80063888.cpp:
+	extab       start:0x800076C4 end:0x80007B14
+	extabindex  start:0x8001FB00 end:0x8001FF5C
+	.text       start:0x80063888 end:0x800680A8
+
+g3d/g3d_anmscn.cpp:
+	extab       start:0x80007B14 end:0x80007B1C
+	extabindex  start:0x8001FF5C end:0x8001FF68
+	.text       start:0x800680A8 end:0x800680CC
+
+g3d/fn_800680CC.cpp:
+	extab       start:0x80007B1C end:0x80007E98
+	extabindex  start:0x8001FF68 end:0x8002040C
+	.text       start:0x800680CC end:0x8006EAC0
+
+g3d/g3d_anmvis.cpp:
+	extab       start:0x80007E98 end:0x80007EC0
+	extabindex  start:0x8002040C end:0x80020448
+	.text       start:0x8006EAC0 end:0x8006EE78
+
+g3d/g3d_calcmaterial.cpp:
+	extab       start:0x80007EC0 end:0x80007F40
+	extabindex  start:0x80020448 end:0x80020508
+	.text       start:0x8006EE78 end:0x8006F738
+
+g3d/g3d_calcview.cpp:
+	extab       start:0x80007F40 end:0x80008008
+	extabindex  start:0x80020508 end:0x80020634
+	.text       start:0x8006F738 end:0x8007270C
+
+g3d/g3d_calcvtx.cpp:
+	extab       start:0x80008008 end:0x800080B8
+	extabindex  start:0x80020634 end:0x8002073C
+	.text       start:0x8007270C end:0x800736F8
+
+g3d/g3d_calcworld.cpp:
+	extab       start:0x800080B8 end:0x80008138
+	extabindex  start:0x8002073C end:0x800207FC
+	.text       start:0x800736F8 end:0x800746DC
+
+g3d/g3d_camera.cpp:
+	extab       start:0x80008138 end:0x800081F8
+	extabindex  start:0x800207FC end:0x8002091C
+	.text       start:0x800746DC end:0x80075DCC
+
+g3d/fn_80075DCC.cpp:
+	extab       start:0x800081F8 end:0x80008588
+	extabindex  start:0x8002091C end:0x80020E74
+	.text       start:0x80075DCC end:0x8007C540
+
+g3d/g3d_scnmdl.cpp:
+	extab       start:0x80008588 end:0x80008674
+	extabindex  start:0x80020E74 end:0x80020FB8
+	.text       start:0x8007C540 end:0x8007F0E4
+
+g3d/g3d_scnmdlsmpl.cpp:
+	extab       start:0x80008674 end:0x800087B8
+	extabindex  start:0x80020FB8 end:0x80021144
+	.text       start:0x8007F0E4 end:0x800813B8
+
+g3d/g3d_scnobj.cpp:
+	extab       start:0x800087B8 end:0x800088F4
+	extabindex  start:0x80021144 end:0x800212C4
+	.text       start:0x800813B8 end:0x800827E4
+
+g3d/g3d_scnroot.cpp:
+	extab       start:0x800088F4 end:0x80008ADC
+	extabindex  start:0x800212C4 end:0x8002148C
+	.text       start:0x800827E4 end:0x8008452C
+
+g3d/g3d_state.cpp:
+	extab       start:0x80008ADC end:0x80008EB0
+	extabindex  start:0x8002148C end:0x800219E4
+	.text       start:0x8008452C end:0x800898B0
+	.ctors      start:0x8056F2D4 end:0x8056F2D8
+
+g3d/g3d_resanm.c:
+	extab       start:0x80008EB0 end:0x80008EE8
+	extabindex  start:0x800219E4 end:0x80021A38
+	.text       start:0x800898B0 end:0x80089F94
+
+g3d/g3d_resanmamblight.c:
+	extab       start:0x80008EE8 end:0x80008F00
+	extabindex  start:0x80021A38 end:0x80021A5C
+	.text       start:0x80089F94 end:0x8008A220
+
+g3d/g3d_resanmcamera.cpp:
+	extab       start:0x80008F00 end:0x80008F10
+	extabindex  start:0x80021A5C end:0x80021A74
+	.text       start:0x8008A220 end:0x8008A664
+
+g3d/g3d_resanmchr.cpp:
+	extab       start:0x80008F10 end:0x80009100
+	extabindex  start:0x80021A74 end:0x80021D5C
+	.text       start:0x8008A664 end:0x8008F6E8
+
+g3d/g3d_resanmfog.cpp:
+	extab       start:0x80009100 end:0x80009108
+	extabindex  start:0x80021D5C end:0x80021D68
+	.text       start:0x8008F6E8 end:0x8008F8E4
+
+g3d/g3d_resanmlight.cpp:
+	extab       start:0x80009108 end:0x800091A0
+	extabindex  start:0x80021D68 end:0x80021E4C
+	.text       start:0x8008F8E4 end:0x800908FC
+
+g3d/g3d_resanmscn.cpp:
+	extab       start:0x800091A0 end:0x80009208
+	extabindex  start:0x80021E4C end:0x80021EE8
+	.text       start:0x800908FC end:0x800916FC
+
+g3d/g3d_resanmtexsrt.cpp:
+	extab       start:0x80009208 end:0x800093A8
+	extabindex  start:0x80021EE8 end:0x80022158
+	.text       start:0x800916FC end:0x80093990
+
+g3d/g3d_resfile.cpp:
+	extab       start:0x800093A8 end:0x800094E0
+	extabindex  start:0x80022158 end:0x8002232C
+	.text       start:0x80093990 end:0x800947A4
+
+g3d/g3d_resmat.cpp:
+	extab       start:0x800094E0 end:0x80009850
+	extabindex  start:0x8002232C end:0x80022854
+	.text       start:0x800947A4 end:0x80098D5C
+
+g3d/g3d_resnode.cpp:
+	extab       start:0x80009850 end:0x80009880
+	extabindex  start:0x80022854 end:0x8002289C
+	.text       start:0x80098D5C end:0x80099400
+
+g3d/g3d_resshp.cpp:
+	extab       start:0x80009880 end:0x800099E0
+	extabindex  start:0x8002289C end:0x80022AAC
+	.text       start:0x80099400 end:0x8009A748
+
+g3d/g3d_cpu.cpp:
+	extab       start:0x800099E0 end:0x800099F0
+	extabindex  start:0x80022AAC end:0x80022AC4
+	.text       start:0x8009A748 end:0x8009AA78
+
+gx/fn_8009AA78.c:
+	extab       start:0x800099F0 end:0x80009A18
+	extabindex  start:0x80022AC4 end:0x80022B00
+	.text       start:0x8009AA78 end:0x8009ACE4
+
+gx/fn_8009ACE4.c:
+	extab       start:0x80009A18 end:0x80009A28
+	extabindex  start:0x80022B00 end:0x80022B18
+	.text       start:0x8009ACE4 end:0x8009B140
+
+g3d/g3d_gpu.cpp:
+	extab       start:0x80009A28 end:0x80009A38
+	extabindex  start:0x80022B18 end:0x80022B30
+	.text       start:0x8009B140 end:0x8009B374
+
+ef/ef_util.cpp:
+	extab       start:0x80009A38 end:0x80009A98
+	extabindex  start:0x80022B30 end:0x80022BC0
+	.text       start:0x8009B374 end:0x8009CD64
+
+ef/ef_animcurve.cpp:
+	extab       start:0x80009A98 end:0x80009B40
+	extabindex  start:0x80022BC0 end:0x80022CBC
+	.text       start:0x8009CDBC end:0x800A3044
+
+ef/ef_creationqueue.cpp:
+	extab       start:0x80009B40 end:0x80009B60
+	extabindex  start:0x80022CBC end:0x80022CEC
+	.text       start:0x800A3044 end:0x800A388C
+
+ef/ef_draworder.cpp:
+	extab       start:0x80009B60 end:0x80009BA0
+	extabindex  start:0x80022CEC end:0x80022D4C
+	.text       start:0x800A388C end:0x800A40F4
+
+ef/ef_effect.cpp:
+	extab       start:0x80009BA0 end:0x80009C38
+	extabindex  start:0x80022D4C end:0x80022E30
+	.text       start:0x800A40F4 end:0x800A56B0
+
+ef/ef_effectsystem.cpp:
+	extab       start:0x80009C38 end:0x80009CD4
+	extabindex  start:0x80022E30 end:0x80022EE4
+	.text       start:0x800A56B0 end:0x800A6350
+	.ctors      start:0x8056F2D8 end:0x8056F2DC
+
+ef/ef_emitter.cpp:
+	extab       start:0x80009CD4 end:0x80009DF4
+	extabindex  start:0x80022EE4 end:0x80023094
+	.text       start:0x800A6350 end:0x800A99B4
+
+ef/ef_emitterform.cpp:
+	extab       start:0x80009DF4 end:0x80009E04
+	extabindex  start:0x80023094 end:0x800230AC
+	.text       start:0x800A99B4 end:0x800AA18C
+
+ef/ef_particle.cpp:
+	extab       start:0x80009E04 end:0x80009E6C
+	extabindex  start:0x800230AC end:0x80023148
+	.text       start:0x800AA18C end:0x800AB658
+
+ef/ef_particlemanager.cpp:
+	extab       start:0x80009E6C end:0x80009F74
+	extabindex  start:0x80023148 end:0x800232D4
+	.text       start:0x800AB658 end:0x800AEE48
+	.ctors      start:0x8056F2DC end:0x8056F2E0
+
+ef/fn_800AEE48.cpp:
+	extab       start:0x80009F74 end:0x8000A234
+	extabindex  start:0x800232D4 end:0x800236F4
+	.text       start:0x800AEE48 end:0x800B99E8
+	.ctors      start:0x8056F2E0 end:0x8056F2E4
+
+ef/ef_drawstripestrategy.cpp:
+	extab       start:0x8000A234 end:0x8000A30C
+	extabindex  start:0x800236F4 end:0x80023838
+	.text       start:0x800B99E8 end:0x800BE154
+
+ef/ef_drawfreestrategy.cpp:
+	extab       start:0x8000A30C end:0x8000A344
+	extabindex  start:0x80023838 end:0x8002388C
+	.text       start:0x800BE154 end:0x800BEF98
+
+ef/ef_drawlinestrategy.cpp:
+	extab       start:0x8000A344 end:0x8000A36C
+	extabindex  start:0x8002388C end:0x800238C8
+	.text       start:0x800BEF98 end:0x800BF818
+
+ef/ef_drawpointstrategy.cpp:
+	extab       start:0x8000A36C end:0x8000A394
+	extabindex  start:0x800238C8 end:0x80023904
+	.text       start:0x800BF818 end:0x800BFFD4
+
+ef/ef_drawsmoothstripestrategy.cpp:
+	extab       start:0x8000A394 end:0x8000A49C
+	extabindex  start:0x80023904 end:0x80023A90
+	.text       start:0x800BFFD4 end:0x800C5DB8
+
+ef/ef_drawstrategyimpl.cpp:
+	extab       start:0x8000A49C end:0x8000A554
+	extabindex  start:0x80023A90 end:0x80023BA4
+	.text       start:0x800C5DB8 end:0x800C9540
+	.ctors      start:0x8056F2E4 end:0x8056F2E8
+
+ef/ef_torus.cpp:
+	extab       start:0x8000A554 end:0x8000A55C
+	extabindex  start:0x80023BA4 end:0x80023BB0
+	.text       start:0x800C9540 end:0x800C9DD0
+
+ef/ef_cube.cpp:
+	extab       start:0x8000A55C end:0x8000A56C
+	extabindex  start:0x80023BB0 end:0x80023BC8
+	.text       start:0x800C9DD0 end:0x800CB948
+
+ef/ef_cylinder.cpp:
+	extab       start:0x8000A56C end:0x8000A57C
+	extabindex  start:0x80023BC8 end:0x80023BE0
+	.text       start:0x800CB948 end:0x800CC5B0
+
+ef/ef_disc.cpp:
+	extab       start:0x8000A57C end:0x8000A584
+	extabindex  start:0x80023BE0 end:0x80023BEC
+	.text       start:0x800CC5B0 end:0x800CCCF8
+
+ef/ef_emform.cpp:
+	extab       start:0x8000A584 end:0x8000A5CC
+	extabindex  start:0x80023BEC end:0x80023C58
+	.text       start:0x800CCCF8 end:0x800CCFB0
+	.ctors      start:0x8056F2E8 end:0x8056F2EC
+
+ef/ef_line.cpp:
+	extab       start:0x8000A5CC end:0x8000A5D4
+	extabindex  start:0x80023C58 end:0x80023C64
+	.text       start:0x800CCFB0 end:0x800CD584
+
+ef/ef_point.cpp:
+	extab       start:0x8000A5D4 end:0x8000A5DC
+	extabindex  start:0x80023C64 end:0x80023C70
+	.text       start:0x800CD584 end:0x800CDB2C
+
+ef/ef_sphere.cpp:
+	extab       start:0x8000A5DC end:0x8000A5E4
+	extabindex  start:0x80023C70 end:0x80023C7C
+	.text       start:0x800CDB2C end:0x800CE5A8
+	.data       start:0x80595058 end:0x80595108
+
+ef/fn_800CDB2C.cpp:
+	extab       start:0x8000A5E4 end:0x8000A77C
+	extabindex  start:0x80023C7C end:0x80023EE0
+	.text       start:0x800CE5A8 end:0x800D2FEC
+	.ctors      start:0x8056F2EC end:0x8056F2F0
+	.data       start:0x80595118 end:0x80595378
+	.bss        start:0x80694C68 end:0x80695610
+	.sbss       start:0x80794958 end:0x80794970
+
+nw_resource.cpp:
+	extab       start:0x8000A77C end:0x8000AC0C
+	extabindex  start:0x80023EE0 end:0x80024258
+	.text       start:0x800D2FEC end:0x800D6C00
+	.data       start:0x80595378 end:0x80595790
+	.sbss       start:0x80794970 end:0x80794978
+
+g3d/g3d_xsi.cpp:
+	extab       start:0x8000AC0C end:0x8000AC54
+	extabindex  start:0x80024258 end:0x800242C4
+	.text       start:0x800D6C00 end:0x800D77B0
+	.rodata     start:0x8056F830 end:0x8056F868
+	.data       start:0x80595790 end:0x80595840
+
+g3d/fn_800D77B0.cpp:
+	extab       start:0x8000AC54 end:0x8000AC5C
+	extabindex  start:0x800242C4 end:0x800242D0
+	.text       start:0x800D77B0 end:0x800D79B4
+
+g3d/g3d_basic.cpp:
+	extab       start:0x8000AC5C end:0x8000AC74
+	extabindex  start:0x800242D0 end:0x800242F4
+	.text       start:0x800D79B4 end:0x800D7F54
+
+sound/fn_800D7F54.cpp:
+	extab       start:0x8000AC74 end:0x8000AF64
+	extabindex  start:0x800242F4 end:0x8002475C
+	.text       start:0x800D7F54 end:0x800DCFEC
+
+sound/fn_800DCFEC.cpp:
+	extab       start:0x8000AF64 end:0x8000AF6C
+	extabindex  start:0x8002475C end:0x80024768
+	.text       start:0x800DCFEC end:0x800DD1F0
+
+sound/fn_800DD1F0.cpp:
+	extab       start:0x8000AF6C end:0x8000B1DC
+	extabindex  start:0x80024768 end:0x80024B10
+	.text       start:0x800DD1F0 end:0x800E3CBC
+	.ctors      start:0x8056F2F0 end:0x8056F2F4
+
+sound/fn_800E3CBC.cpp:
+	extab       start:0x8000B1DC end:0x8000B21C
+	extabindex  start:0x80024B10 end:0x80024B70
+	.text       start:0x800E3CBC end:0x800E46E8
+
+sound/fn_800E46E8.cpp:
+	extab       start:0x8000B21C end:0x8000B554
+	extabindex  start:0x80024B70 end:0x80024FFC
+	.text       start:0x800E46E8 end:0x800E8E60
+	.ctors      start:0x8056F2F4 end:0x8056F300
+
+sound/fn_800E8E60.cpp:
+	extab       start:0x8000B554 end:0x8000B91C
+	extabindex  start:0x80024FFC end:0x80025494
+	.text       start:0x800E8E60 end:0x800EF7D8
+	.ctors      start:0x8056F300 end:0x8056F30C
+
+sound/fn_800EF7D8.cpp:
+	extab       start:0x8000B91C end:0x8000BA6C
+	extabindex  start:0x80025494 end:0x8002568C
+	.text       start:0x800EF7D8 end:0x800F2A94
+
+sound/fn_800F2A94.cpp:
+	extab       start:0x8000BA6C end:0x8000BB6C
+	extabindex  start:0x8002568C end:0x8002580C
+	.text       start:0x800F2A94 end:0x800F6520
+
+ef/eft_res.cpp:
+	extab       start:0x8000BB6C end:0x8000BC5C
+	extabindex  start:0x8002580C end:0x80025974
+	.text       start:0x800F6520 end:0x800F95A4
+
+ef/effect.cpp:
+	extab       start:0x8000BC5C end:0x8000BD6C
+	extabindex  start:0x80025974 end:0x80025B0C
+	.text       start:0x800F95A4 end:0x800FAE08
+	.ctors      start:0x8056F30C end:0x8056F310
+
+ef/eft001.cpp:
+	extab       start:0x8000BD6C end:0x8000BDDC
+	extabindex  start:0x80025B0C end:0x80025BB4
+	.text       start:0x800FAE08 end:0x800FCED4
+
+ef/eft002.cpp:
+	extab       start:0x8000BDDC end:0x8000BDFC
+	extabindex  start:0x80025BB4 end:0x80025BE4
+	.text       start:0x800FCED4 end:0x800FD520
+
+ef/fn_800FD520.c:
+	extab       start:0x8000BDFC end:0x8000BE04
+	extabindex  start:0x80025BE4 end:0x80025BF0
+	.text       start:0x800FD520 end:0x800FD718
+
+ef/fn_800FD718.c:
+	extab       start:0x8000BE04 end:0x8000BE0C
+	extabindex  start:0x80025BF0 end:0x80025BFC
+	.text       start:0x800FD718 end:0x800FD864
+
+ef/fn_800FD864.cpp:
+	extab       start:0x8000BE0C end:0x8000BE1C
+	extabindex  start:0x80025BFC end:0x80025C14
+	.text       start:0x800FD864 end:0x800FE978
+
+ef/fn_800FE978.cpp:
+	extab       start:0x8000BE1C end:0x8000BE34
+	extabindex  start:0x80025C14 end:0x80025C38
+	.text       start:0x800FE978 end:0x800FF8D4
+
+ef/eft004.cpp:
+	extab       start:0x8000BE34 end:0x8000BEF4
+	extabindex  start:0x80025C38 end:0x80025D58
+	.text       start:0x800FF8D4 end:0x80101DF4
+
+ef/fn_80101DF4.cpp:
+	extab       start:0x8000BEF4 end:0x8000BEFC
+	extabindex  start:0x80025D58 end:0x80025D64
+	.text       start:0x80101DF4 end:0x80101FA4
+	.sdata2     start:0x807966E8 end:0x807966F0
+
+Pl/pl_frame_data.cpp:
+	.sdata2     start:0x80799E00 end:0x80799F98
+
+Pl/pl_act_data.cpp:
+	.sdata2     start:0x80799F98 end:0x80799FDC
+
+ef/eft007.cpp:
+	extab       start:0x8000BEFC end:0x8000BF7C
+	extabindex  start:0x80025D64 end:0x80025E24
+	.text       start:0x80101FA4 end:0x80103D28
+
+ef/eft009.cpp:
+	extab       start:0x8000BF7C end:0x8000BFB4
+	extabindex  start:0x80025E24 end:0x80025E78
+	.text       start:0x80103D28 end:0x80104BD0
+
+ef/fn_80104BD0.c:
+	extab       start:0x8000BFB4 end:0x8000BFBC
+	extabindex  start:0x80025E78 end:0x80025E84
+	.text       start:0x80104BD0 end:0x80105314
+
+ef/fn_80105314.cpp:
+	extab       start:0x8000BFBC end:0x8000C1F4
+	extabindex  start:0x80025E84 end:0x800261D8
+	.text       start:0x80105314 end:0x8010BDE4
+
+ef/fn_8010BDE4.cpp:
+	extab       start:0x8000C1F4 end:0x8000C25C
+	extabindex  start:0x800261D8 end:0x80026274
+	.text       start:0x8010BDE4 end:0x8010D1A8
+
+ef/fn_8010D1A8.c:
+	extab       start:0x8000C25C end:0x8000C32C
+	extabindex  start:0x80026274 end:0x800263AC
+	.text       start:0x8010D1A8 end:0x801121DC
+
+ef/eft019.cpp:
+	extab       start:0x8000C32C end:0x8000C3D4
+	extabindex  start:0x800263AC end:0x800264A8
+	.text       start:0x801121DC end:0x80114E34
+
+ef/fn_80114E34.cpp:
+	extab       start:0x8000C3D4 end:0x8000C494
+	extabindex  start:0x800264A8 end:0x800265C8
+	.text       start:0x80114E34 end:0x8011722C
+	.ctors      start:0x8056F310 end:0x8056F314
+
+ef/fn_8011722C.c:
+	extab       start:0x8000C494 end:0x8000C49C
+	extabindex  start:0x800265C8 end:0x800265D4
+	.text       start:0x8011722C end:0x801173AC
+
+ef/fn_801173AC.cpp:
+	extab       start:0x8000C49C end:0x8000C554
+	extabindex  start:0x800265D4 end:0x800266E8
+	.text       start:0x801173AC end:0x80119C44
+
+ef/fn_80119C44.c:
+	extab       start:0x8000C554 end:0x8000C56C
+	extabindex  start:0x800266E8 end:0x8002670C
+	.text       start:0x80119C44 end:0x80119DEC
+
+ef/eft029.cpp:
+	extab       start:0x8000C56C end:0x8000C63C
+	extabindex  start:0x8002670C end:0x80026844
+	.text       start:0x80119DEC end:0x8011D448
+	.ctors      start:0x8056F314 end:0x8056F318
+
+enemy/fn_8011D448.cpp:
+	extab       start:0x8000C63C end:0x8000C8AC
+	extabindex  start:0x80026844 end:0x80026BEC
+	.text       start:0x8011D448 end:0x801251D0
+
+enemy/fn_801251D0.cpp:
+	extab       start:0x8000C8AC end:0x8000CBDC
+	extabindex  start:0x80026BEC end:0x800270B4
+	.text       start:0x801251D0 end:0x8012BA00
+
+enemy/fn_8012BA00.c:
+	extab       start:0x8000CBDC end:0x8000CBE4
+	extabindex  start:0x800270B4 end:0x800270C0
+	.text       start:0x8012BA00 end:0x8012BDF4
+
+enemy/fn_8012BDF4.cpp:
+	extab       start:0x8000CBE4 end:0x8000CD2C
+	extabindex  start:0x800270C0 end:0x800272AC
+	.text       start:0x8012BDF4 end:0x8012E968
+	.data       start:0x805A0FF8 end:0x805A1078
+
+enemy/fn_8012E968.cpp:
+	extab       start:0x8000CD2C end:0x8000CD34
+	extabindex  start:0x800272AC end:0x800272B8
+	.text       start:0x8012E968 end:0x8012EC74
+
+enemy/fn_8012EC74.cpp:
+	extab       start:0x8000CD34 end:0x8000D284
+	extabindex  start:0x800272B8 end:0x80027AB0
+	.text       start:0x8012EC74 end:0x80137604
+
+enemy/fn_80137604.cpp:
+	extab       start:0x8000D284 end:0x8000D2D4
+	extabindex  start:0x80027AB0 end:0x80027B28
+	.text       start:0x80137604 end:0x80138074
+	.ctors      start:0x8056F318 end:0x8056F31C
+
+enemy/fn_80138074.c:
+	extab       start:0x8000D2D4 end:0x8000D414
+	extabindex  start:0x80027B28 end:0x80027D08
+	.text       start:0x80138074 end:0x8013ACC4
+
+enemy/fn_8013ACC4.cpp:
+	extab       start:0x8000D414 end:0x8000D424
+	extabindex  start:0x80027D08 end:0x80027D20
+	.text       start:0x8013ACC4 end:0x8013BE60
+
+enemy/fn_8013BE60.c:
+	extab       start:0x8000D424 end:0x8000D5A4
+	extabindex  start:0x80027D20 end:0x80027F60
+	.text       start:0x8013BE60 end:0x8013F764
+
+enemy/fn_8013F764.cpp:
+	extab       start:0x8000D5A4 end:0x8000D664
+	extabindex  start:0x80027F60 end:0x80028080
+	.text       start:0x8013F764 end:0x801411B8
+
+enemy/enemy_control.cpp:
+	extab       start:0x8000D664 end:0x8000D9DC
+	extabindex  start:0x80028080 end:0x800285B4
+	.text       start:0x801411B8 end:0x80147CE0
+	.ctors      start:0x8056F31C end:0x8056F320
+
+enemy/fn_80147CE0.cpp:
+	extab       start:0x8000D9DC end:0x8000DACC
+	extabindex  start:0x800285B4 end:0x8002871C
+	.text       start:0x80147CE0 end:0x80149D6C
+	.rodata     start:0x8056F8E0 end:0x8056F960
+	.data       start:0x805A20E0 end:0x805A217C
+
+enemy/fn_80149D6C.c:
+	extab       start:0x8000DACC end:0x8000DAD4
+	extabindex  start:0x8002871C end:0x80028728
+	.text       start:0x80149D6C end:0x8014A1BC
+
+enemy/fn_8014A1BC.c:
+	extab       start:0x8000DAD4 end:0x8000DC54
+	extabindex  start:0x80028728 end:0x80028968
+	.text       start:0x8014A1BC end:0x801502C8
+	.rodata     start:0x8056F960 end:0x8056F9E0
+	.data       start:0x805A217C end:0x805A2BD8
+
+enemy/fn_801502C8.cpp:
+	extab       start:0x8000DC54 end:0x8000DCFC
+	extabindex  start:0x80028968 end:0x80028A64
+	.text       start:0x801502C8 end:0x80154E40
+	.ctors      start:0x8056F320 end:0x8056F324
+	.data       start:0x805A2BD8 end:0x805A4478
+	.bss        start:0x806A77D8 end:0x806A7820
+
+enemy/fn_801550FC.cpp:
+	extab       start:0x8000DCFC end:0x8000DFA4
+	extabindex  start:0x80028A64 end:0x80028E60
+	.text       start:0x80154E40 end:0x8015D860
+	.ctors      start:0x8056F324 end:0x8056F328
+	.rodata     start:0x8056FA38 end:0x8056FB50
+	.data       start:0x805A4518 end:0x805A5D48
+	.bss        start:0x806A7820 end:0x806A7868
+
+enemy/fn_8015D860.cpp:
+	extab       start:0x8000DFA4 end:0x8000E04C
+	extabindex  start:0x80028E60 end:0x80028F5C
+	.text       start:0x8015D860 end:0x8015E854
+	.data       start:0x805A5DC0 end:0x805A5DE8
+
+enemy/fn_8015E854.cpp:
+	extab       start:0x8000E04C end:0x8000E1AC
+	extabindex  start:0x80028F5C end:0x8002916C
+	.text       start:0x8015E854 end:0x80165FC8
+	.rodata     start:0x8056FB50 end:0x8056FC10
+	.data       start:0x805A5DE8 end:0x805A6D28
+
+enemy/fn_80165FC8.cpp:
+	extab       start:0x8000E1AC end:0x8000E23C
+	extabindex  start:0x8002916C end:0x80029244
+	.text       start:0x80165FC8 end:0x801679B0
+	.ctors      start:0x8056F328 end:0x8056F32C
+	.data       start:0x805A6DC4 end:0x805A6E14
+	.bss        start:0x806A7868 end:0x806A7898
+
+enemy/fn_801679B0.cpp:
+	extab       start:0x8000E23C end:0x8000E52C
+	extabindex  start:0x80029244 end:0x800296AC
+	.text       start:0x801679B0 end:0x80170600
+	.ctors      start:0x8056F32C end:0x8056F334
+	.rodata     start:0x8056FC10 end:0x8056FD10
+	.data       start:0x805A6E14 end:0x805A8370
+	.bss        start:0x806A7898 end:0x806A79A0
+
+enemy/fn_80170600.cpp:
+	extab       start:0x8000E52C end:0x8000E5AC
+	extabindex  start:0x800296AC end:0x8002976C
+	.text       start:0x80170600 end:0x80170FA8
+
+enemy/fn_80170FA8.cpp:
+	extab       start:0x8000E5AC end:0x8000E5C4
+	extabindex  start:0x8002976C end:0x80029790
+	.text       start:0x80170FA8 end:0x80171194
+
+enemy/fn_80171194.cpp:
+	extab       start:0x8000E5C4 end:0x8000E6D4
+	extabindex  start:0x80029790 end:0x80029928
+	.text       start:0x80171194 end:0x80176C58
+	.ctors      start:0x8056F334 end:0x8056F338
+	.rodata     start:0x8056FD10 end:0x8056FDD0
+	.data       start:0x805A8418 end:0x805A94A0
+	.bss        start:0x806A79A0 end:0x806A79D0
+
+enemy/fn_80176C58.cpp:
+	extab       start:0x8000E6D4 end:0x8000E724
+	extabindex  start:0x80029928 end:0x800299A0
+	.text       start:0x80176C58 end:0x80177608
+
+enemy/fn_80177608.cpp:
+	extab       start:0x8000E724 end:0x8000E734
+	extabindex  start:0x800299A0 end:0x800299B8
+	.text       start:0x80177608 end:0x80177890
+
+enemy/fn_80177890.cpp:
+	extab       start:0x8000E734 end:0x8000E78C
+	extabindex  start:0x800299B8 end:0x80029A3C
+	.text       start:0x80177890 end:0x80178128
+
+enemy/fn_80178128.cpp:
+	extab       start:0x8000E78C end:0x8000E79C
+	extabindex  start:0x80029A3C end:0x80029A54
+	.text       start:0x80178128 end:0x80178378
+
+enemy/fn_80178378.cpp:
+	extab       start:0x8000E79C end:0x8000E96C
+	extabindex  start:0x80029A54 end:0x80029D0C
+	.text       start:0x80178378 end:0x80181C88
+	.rodata     start:0x8056FE50 end:0x8056FF50
+	.data       start:0x805A9574 end:0x805AA8DC
+
+enemy/fn_80181C88.cpp:
+	extab       start:0x8000E96C end:0x8000E9EC
+	extabindex  start:0x80029D0C end:0x80029DCC
+	.text       start:0x80181C88 end:0x80182D5C
+	.ctors      start:0x8056F338 end:0x8056F33C
+	.bss        start:0x806A79D0 end:0x806A7A00
+
+enemy/fn_80182D5C.cpp:
+	extab       start:0x8000E9EC end:0x8000ECC4
+	extabindex  start:0x80029DCC end:0x8002A210
+	.text       start:0x80182D5C end:0x8018B3B8
+	.rodata     start:0x8056FF50 end:0x80570050
+	.data       start:0x805AAA80 end:0x805ABD90
+
+enemy/fn_8018B3B8.cpp:
+	extab       start:0x8000ECC4 end:0x8000ED64
+	extabindex  start:0x8002A210 end:0x8002A300
+	.text       start:0x8018B3B8 end:0x80191598
+	.data       start:0x805ABD90 end:0x805AD310
+
+enemy/fn_80191598.cpp:
+	extab       start:0x8000ED64 end:0x8000EDF4
+	extabindex  start:0x8002A300 end:0x8002A3D8
+	.text       start:0x80191598 end:0x801926EC
+	.ctors      start:0x8056F33C end:0x8056F340
+	.data       start:0x805AD310 end:0x805AD33C
+	.bss        start:0x806A7A00 end:0x806A7A6C
+	.sbss       start:0x80794AA0 end:0x80794AA8
+
+enemy/fn_801926EC.cpp:
+	extab       start:0x8000EDF4 end:0x8000F124
+	extabindex  start:0x8002A3D8 end:0x8002A8A0
+	.text       start:0x801926EC end:0x8019E670
+	.ctors      start:0x8056F340 end:0x8056F344
+	.rodata     start:0x80570050 end:0x80570150
+	.data       start:0x805AD3DC end:0x805AE750
+	.bss        start:0x806A7A70 end:0x806A7A88
+
+enemy/fn_8019ED34.cpp:
+	extab       start:0x8000F124 end:0x8000F374
+	extabindex  start:0x8002A8A0 end:0x8002AC18
+	.text       start:0x8019E670 end:0x801AA154
+	.rodata     start:0x80570150 end:0x805701A0
+	.data       start:0x805AE7C0 end:0x805B06D0
+
+enemy/fn_801A9540.cpp:
+	extab       start:0x8000F374 end:0x8000F54C
+	extabindex  start:0x8002AC18 end:0x8002AEDC
+	.text       start:0x801AA154 end:0x801B0010
+	.rodata     start:0x805701A0 end:0x80570260
+	.data       start:0x805B073C end:0x805B0FCC
+
+enemy/fn_801B0010.cpp:
+	extab       start:0x8000F54C end:0x8000F6B4
+	extabindex  start:0x8002AEDC end:0x8002B0F8
+	.text       start:0x801B0010 end:0x801B4458
+	.ctors      start:0x8056F344 end:0x8056F348
+	.data       start:0x805B103C end:0x805B1B30
+	.bss        start:0x806A7A88 end:0x806A7AA0
+
+enemy/fn_801B4458.cpp:
+	extab       start:0x8000F6B4 end:0x8000F7EC
+	extabindex  start:0x8002B0F8 end:0x8002B2CC
+	.text       start:0x801B4458 end:0x801B7020
+	.ctors      start:0x8056F348 end:0x8056F34C
+	.rodata     start:0x80570260 end:0x805702A0
+	.data       start:0x805B1B30 end:0x805B2118
+	.bss        start:0x806A7AA0 end:0x806A7AB8
+
+enemy/fn_801B7020.cpp:
+	extab       start:0x8000F7EC end:0x8000F904
+	extabindex  start:0x8002B2CC end:0x8002B470
+	.text       start:0x801B7020 end:0x801B98C8
+	.ctors      start:0x8056F34C end:0x8056F350
+	.data       start:0x805B2188 end:0x805B2804
+	.bss        start:0x806A7AB8 end:0x806A7AD0
+
+enemy/em040_ai.cpp:
+	extab       start:0x8000F904 end:0x8000F9A4
+	extabindex  start:0x8002B470 end:0x8002B560
+	.text       start:0x801B98C8 end:0x801BB758
+	.data       start:0x805B2804 end:0x805B28D0
+
+enemy/fn_801BD6C0.cpp:
+	extab       start:0x8000F9A4 end:0x8000FB84
+	extabindex  start:0x8002B560 end:0x8002B830
+	.text       start:0x801BB758 end:0x801C29F8
+	.ctors      start:0x8056F350 end:0x8056F354
+	.rodata     start:0x805702A0 end:0x80570320
+	.data       start:0x805B28D0 end:0x805B3B7C
+	.bss        start:0x806A7AD0 end:0x806A7B18
+
+enemy/fn_801CA004.cpp:
+	extab       start:0x8000FB84 end:0x8000FE4C
+	extabindex  start:0x8002B830 end:0x8002BC5C
+	.text       start:0x801C29F8 end:0x801CA8DC
+	.ctors      start:0x8056F354 end:0x8056F358
+	.rodata     start:0x80570320 end:0x80570410
+	.data       start:0x805B3BF0 end:0x805B4F8C
+	.bss        start:0x806A7B18 end:0x806A7B30
+
+enemy/fn_801CCBC4.cpp:
+	extab       start:0x8000FE4C end:0x80010164
+	extabindex  start:0x8002BC5C end:0x8002C100
+	.text       start:0x801CA8DC end:0x801D71C4
+	.ctors      start:0x8056F358 end:0x8056F35C
+	.rodata     start:0x80570410 end:0x80570500
+	.data       start:0x805B5000 end:0x805B69D8
+	.bss        start:0x806A7B30 end:0x806A7B90
+
+enemy/fn_801D80EC.cpp:
+	extab       start:0x80010164 end:0x800103D4
+	extabindex  start:0x8002C100 end:0x8002C4A8
+	.text       start:0x801D71C4 end:0x801E0ADC
+	.rodata     start:0x80570500 end:0x805706C0
+	.data       start:0x805B6A44 end:0x805B75E8
+
+lobby/fn_801E0ADC.cpp:
+	extab       start:0x800103D4 end:0x800105B4
+	extabindex  start:0x8002C4A8 end:0x8002C778
+	.text       start:0x801E0ADC end:0x801E7530
+
+lobby/fn_801E7530.cpp:
+	extab       start:0x800105B4 end:0x8001079C
+	extabindex  start:0x8002C778 end:0x8002CA54
+	.text       start:0x801E7530 end:0x801EC9E0
+
+lobby/lobby_scene.c:
+	.text       start:0x801EC9E0 end:0x801EC9F8
+
+lobby/fn_801EC9F8.cpp:
+	extab       start:0x8001079C end:0x8001094C
+	extabindex  start:0x8002CA54 end:0x8002CCDC
+	.text       start:0x801EC9F8 end:0x801F3294
+
+lobby/fn_801F3294.cpp:
+	extab       start:0x8001094C end:0x80010A7C
+	extabindex  start:0x8002CCDC end:0x8002CEA4
+	.text       start:0x801F3294 end:0x801F9CD4
+
+lobby/fn_801F9CD4.cpp:
+	extab       start:0x80010A7C end:0x80010ADC
+	extabindex  start:0x8002CEA4 end:0x8002CF34
+	.text       start:0x801F9CD4 end:0x801FBF78
+
+lobby/lb_npc.cpp:
+	extab       start:0x80010ADC end:0x80010DBC
+	extabindex  start:0x8002CF34 end:0x8002D384
+	.text       start:0x801FBF78 end:0x802029B4
+	.ctors      start:0x8056F35C end:0x8056F360
+
+lobby/fn_802029B4.cpp:
+	extab       start:0x80010DBC end:0x80010F7C
+	extabindex  start:0x8002D384 end:0x8002D624
+	.text       start:0x802029B4 end:0x802076D4
+
+lobby/fn_802076D4.cpp:
+	extab       start:0x80010F7C end:0x80011184
+	extabindex  start:0x8002D624 end:0x8002D930
+	.text       start:0x802076D4 end:0x8020C588
+
+lobby/fn_8020C588.cpp:
+	extab       start:0x80011184 end:0x80011434
+	extabindex  start:0x8002D930 end:0x8002DD38
+	.text       start:0x8020C588 end:0x80212810
+	.data       start:0x805B9770 end:0x805B97BC
+
+lobby/fn_80212810.cpp:
+	extab       start:0x80011434 end:0x80011724
+	extabindex  start:0x8002DD38 end:0x8002E1A0
+	.text       start:0x80212810 end:0x80219260
+
+lobby/fn_80219260.cpp:
+	extab       start:0x80011724 end:0x800118CC
+	extabindex  start:0x8002E1A0 end:0x8002E41C
+	.text       start:0x80219260 end:0x8021E1EC
+
+lobby/fn_8021E1EC.cpp:
+	extab       start:0x800118CC end:0x80011B34
+	extabindex  start:0x8002E41C end:0x8002E7B8
+	.text       start:0x8021E1EC end:0x80224AC4
+	.ctors      start:0x8056F360 end:0x8056F368
+	.data       start:0x805BA7E8 end:0x805BAA20
+	.bss        start:0x806AA8C8 end:0x806AACC0
+
+Pl/fn_80224AC4.cpp:
+	extab       start:0x80011B34 end:0x80011C7C
+	extabindex  start:0x8002E7B8 end:0x8002E9A4
+	.text       start:0x80224AC4 end:0x80229ECC
+
+Pl/fn_80229ECC.cpp:
+	extab       start:0x80011C7C end:0x80011C84
+	extabindex  start:0x8002E9A4 end:0x8002E9B0
+	.text       start:0x80229ECC end:0x80230FBC
+	.data       start:0x805C15A8 end:0x805C1F94
+
+Pl/fn_80230FBC.cpp:
+	extab       start:0x80011C84 end:0x80011CA4
+	extabindex  start:0x8002E9B0 end:0x8002E9E0
+	.text       start:0x80230FBC end:0x802373AC
+	.data       start:0x805C1F94 end:0x805C2C60
+
+Pl/fn_802373AC.cpp:
+	extab       start:0x80011CA4 end:0x80011CB4
+	extabindex  start:0x8002E9E0 end:0x8002E9F8
+	.text       start:0x802373AC end:0x8023C2D0
+	.data       start:0x805C2C60 end:0x805C34D4
+
+Pl/fn_8023C2D0.cpp:
+	extab       start:0x80011CB4 end:0x80011CC4
+	extabindex  start:0x8002E9F8 end:0x8002EA10
+	.text       start:0x8023C2D0 end:0x80241558
+	.data       start:0x805C34D4 end:0x805C3D20
+
+Pl/fn_80241558.cpp:
+	extab       start:0x80011CC4 end:0x80011CCC
+	extabindex  start:0x8002EA10 end:0x8002EA1C
+	.text       start:0x80241558 end:0x802430E8
+	.data       start:0x805C3D20 end:0x805C4134
+
+Pl/fn_802430E8.cpp:
+	extab       start:0x80011CCC end:0x80011DB4
+	extabindex  start:0x8002EA1C end:0x8002EB78
+	.text       start:0x802430E8 end:0x802489D4
+	.data       start:0x805C4134 end:0x805C4548
+
+Pl/fn_802489D4.cpp:
+	extab       start:0x80011DB4 end:0x80011EFC
+	extabindex  start:0x8002EB78 end:0x8002ED64
+	.text       start:0x802489D4 end:0x8024F200
+
+Pl/pl_act_step.cpp:
+	extab       start:0x80011EFC end:0x8001219C
+	extabindex  start:0x8002ED64 end:0x8002F154
+	.text       start:0x8024F200 end:0x80258FCC
+
+Pl/fn_80258FCC.cpp:
+	extab       start:0x8001219C end:0x8001239C
+	extabindex  start:0x8002F154 end:0x8002F454
+	.text       start:0x80258FCC end:0x8025F088
+
+Pl/fn_8025F088.cpp:
+	extab       start:0x8001239C end:0x8001241C
+	extabindex  start:0x8002F454 end:0x8002F514
+	.text       start:0x8025F088 end:0x80262940
+
+Pl/fn_80262940.cpp:
+	extab       start:0x8001241C end:0x80012554
+	extabindex  start:0x8002F514 end:0x8002F6E8
+	.text       start:0x80262940 end:0x802693C4
+	.ctors      start:0x8056F368 end:0x8056F36C
+
+Pl/fn_802693C4.cpp:
+	extab       start:0x80012554 end:0x8001265C
+	extabindex  start:0x8002F6E8 end:0x8002F808
+	.text       start:0x802693C4 end:0x8026BA1C
+
+Pl/pl_master.cpp:
+	extab       start:0x8001265C end:0x800126CC
+	extabindex  start:0x8002F808 end:0x8002F8B0
+	.text       start:0x8026BA1C end:0x8026FFBC
+	.data       start:0x805C5FA0 end:0x805C5FC4
+
+Pl/fn_8026FFBC.cpp:
+	extab       start:0x800126CC end:0x800126D4
+	extabindex  start:0x8002F8B0 end:0x8002F8BC
+	.text       start:0x8026FFBC end:0x80270018
+
+Pl/pl_skill.cpp:
+	extab       start:0x800126D4 end:0x8001280C
+	extabindex  start:0x8002F8BC end:0x8002FA90
+	.text       start:0x80270018 end:0x80273B14
+
+Pl/fn_80273B14.cpp:
+	extab       start:0x8001280C end:0x8001294C
+	extabindex  start:0x8002FA90 end:0x8002FC70
+	.text       start:0x80273B14 end:0x80276B58
+	.data       start:0x805C5FEC end:0x805C6100
+
+Pl/pl_act.cpp:
+	extab       start:0x8001294C end:0x80012B54
+	extabindex  start:0x8002FC70 end:0x8002FF7C
+	.text       start:0x80276B58 end:0x8027D684
+
+Pl/fn_8027D684.cpp:
+	extab       start:0x80012B54 end:0x80012E7C
+	extabindex  start:0x8002FF7C end:0x80030438
+	.text       start:0x8027D684 end:0x802840DC
+
+Pl/fn_802840DC.cpp:
+	extab       start:0x80012E7C end:0x80012FFC
+	extabindex  start:0x80030438 end:0x80030678
+	.text       start:0x802840DC end:0x80288CEC
+
+Pl/fn_80288CEC.cpp:
+	extab       start:0x80012FFC end:0x8001323C
+	extabindex  start:0x80030678 end:0x800309D8
+	.text       start:0x80288CEC end:0x8028F66C
+	.ctors      start:0x8056F36C end:0x8056F370
+	.data       start:0x805CBFC0 end:0x805CDC44
+	.bss        start:0x806AB830 end:0x806AB848
+	.sbss       start:0x80794B3C end:0x80794B58
+
+Pl/bss_pool.cpp:
+	.bss        start:0x806AB848 end:0x806AC8A8
+
+Pl/fn_8028F66C.cpp:
+	extab       start:0x8001323C end:0x800133CC
+	extabindex  start:0x800309D8 end:0x80030C30
+	.text       start:0x8028F66C end:0x80295EF4
+
+Pl/fn_80295EF4.cpp:
+	extab       start:0x800133CC end:0x8001360C
+	extabindex  start:0x80030C30 end:0x80030F90
+	.text       start:0x80295EF4 end:0x8029F3C8
+	.ctors      start:0x8056F370 end:0x8056F374
+
+menu/menu_item.cpp:
+	extab       start:0x8001360C end:0x800137D4
+	extabindex  start:0x80030F90 end:0x8003123C
+	.text       start:0x8029F3C8 end:0x802A6624
+
+menu/menu_message.cpp:
+	extab       start:0x800137D4 end:0x80013984
+	extabindex  start:0x8003123C end:0x800314C4
+	.text       start:0x802A6624 end:0x802AA6A8
+	.data       start:0x805CE00C end:0x805CE198
+
+stage/shell.cpp:
+	extab       start:0x80013984 end:0x80013AC4
+	extabindex  start:0x800314C4 end:0x800316A4
+	.text       start:0x802AA6A8 end:0x802ABD28
+	.ctors      start:0x8056F374 end:0x8056F378
+	.bss        start:0x806AD698 end:0x806B8798
+	.sdata2     start:0x8079A400 end:0x8079A410
+
+Pl/pl_yure.cpp:
+	extab       start:0x80013AC4 end:0x80013B0C
+	extabindex  start:0x800316A4 end:0x80031710
+	.text       start:0x802ABD28 end:0x802AD9C0
+	.ctors      start:0x8056F378 end:0x8056F37C
+	.data       start:0x805CE638 end:0x805CED40
+	.bss        start:0x806B8798 end:0x806B87C0
+	.sdata      start:0x807922C0 end:0x807922E0
+	.sdata2     start:0x8079A410 end:0x8079A448
+
+stage/stg_w.cpp:
+	extab       start:0x80013B0C end:0x80013D2C
+	extabindex  start:0x80031710 end:0x80031A40
+	.text       start:0x802AD9C0 end:0x802B2978
+
+stage/fn_802B2978.c:
+	extab       start:0x80013D2C end:0x80013D34
+	extabindex  start:0x80031A40 end:0x80031A4C
+	.text       start:0x802B2978 end:0x802B2AA0
+
+stage/fn_802B2AA0.cpp:
+	extab       start:0x80013D34 end:0x80013E3C
+	extabindex  start:0x80031A4C end:0x80031BD8
+	.text       start:0x802B2AA0 end:0x802B5C58
+	.ctors      start:0x8056F37C end:0x8056F380
+	.data       start:0x805CF56C end:0x805CFBE8
+	.sbss       start:0x80794B60 end:0x80794B68
+
+camera/fn_802B5C58.cpp:
+	extab       start:0x80013E3C end:0x80014194
+	extabindex  start:0x80031BD8 end:0x800320DC
+	.text       start:0x802B5C58 end:0x802BEAAC
+
+light/light.cpp:
+	extab       start:0x80014194 end:0x8001442C
+	extabindex  start:0x800320DC end:0x800324A8
+	.text       start:0x802BEAAC end:0x802C474C
+	.ctors      start:0x8056F380 end:0x8056F388
+
+ai/fn_802C474C.cpp:
+	extab       start:0x8001442C end:0x80014484
+	extabindex  start:0x800324A8 end:0x8003252C
+	.text       start:0x802C474C end:0x802C5D10
+
+ai/fn_802C5D10.cpp:
+	extab       start:0x80014484 end:0x8001467C
+	extabindex  start:0x8003252C end:0x80032820
+	.text       start:0x802C5D10 end:0x802CC794
+
+ai/fn_802CC794.cpp:
+	extab       start:0x8001467C end:0x80014844
+	extabindex  start:0x80032820 end:0x80032ACC
+	.text       start:0x802CC794 end:0x802D0DCC
+	.data       start:0x805D4D38 end:0x805D4E80
+
+ai/fn_802D0DCC.c:
+	.text       start:0x802D0DCC end:0x802D0F34
+
+ai/fn_802D0F34.cpp:
+	extab       start:0x80014844 end:0x8001496C
+	extabindex  start:0x80032ACC end:0x80032C88
+	.text       start:0x802D0F34 end:0x802D44F4
+	.data       start:0x805D4E80 end:0x805D5000
+
+ai/fn_802D44F4.cpp:
+	extab       start:0x8001496C end:0x80014C64
+	extabindex  start:0x80032C88 end:0x800330FC
+	.text       start:0x802D44F4 end:0x802DDC04
+	.ctors      start:0x8056F388 end:0x8056F38C
+	.data       start:0x805D5000 end:0x805D55B8
+	.bss        start:0x806BD360 end:0x806BDA58
+	.sbss       start:0x80794B78 end:0x80794B80
+
+hud/layout.cpp:
+	extab       start:0x80014DAC end:0x80014FFC
+	extabindex  start:0x800332E8 end:0x80033660
+	.text       start:0x802E0740 end:0x802E4978
+
+menu/fn_802E4978.cpp:
+	extab       start:0x80014FFC end:0x800150C4
+	extabindex  start:0x80033660 end:0x8003378C
+	.text       start:0x802E4978 end:0x802E7408
+	.data       start:0x805D5B48 end:0x805D5C74
+
+hud/cockpit_quest.cpp:
+	extab       start:0x800150C4 end:0x8001529C
+	extabindex  start:0x8003378C end:0x80033A50
+	.text       start:0x802E7408 end:0x802EBED8
+	.data       start:0x805D5C74 end:0x805D6310
+
+hud/fn_802EBED8.cpp:
+	extab       start:0x8001529C end:0x80015424
+	extabindex  start:0x80033A50 end:0x80033C9C
+	.text       start:0x802EBED8 end:0x802F140C
+
+ef/eft035.cpp:
+	extab       start:0x80015424 end:0x80015514
+	extabindex  start:0x80033C9C end:0x80033E04
+	.text       start:0x802F140C end:0x802F5138
+	.ctors      start:0x8056F38C end:0x8056F390
+
+enemy/fn_802F5138.cpp:
+	extab       start:0x80015514 end:0x800156B4
+	extabindex  start:0x80033E04 end:0x80034074
+	.text       start:0x802F5138 end:0x802FA9A0
+	.ctors      start:0x8056F390 end:0x8056F394
+
+lobby/fn_802FA9A0.cpp:
+	extab       start:0x800156B4 end:0x80015964
+	extabindex  start:0x80034074 end:0x8003447C
+	.text       start:0x802FA9A0 end:0x8030121C
+	.ctors      start:0x8056F394 end:0x8056F398
+
+lobby/fn_8030121C.cpp:
+	extab       start:0x80015964 end:0x80015AAC
+	extabindex  start:0x8003447C end:0x80034668
+	.text       start:0x8030121C end:0x803066F0
+
+ef/fn_803066F0.c:
+	extab       start:0x80015AAC end:0x80015AB4
+	extabindex  start:0x80034668 end:0x80034674
+	.text       start:0x803066F0 end:0x8030681C
+
+ef/fn_8030681C.cpp:
+	extab       start:0x80015AB4 end:0x80015B54
+	extabindex  start:0x80034674 end:0x80034764
+	.text       start:0x8030681C end:0x80308FB4
+
+menu/menu_infomation.cpp:
+	extab       start:0x80015B54 end:0x80015F3C
+	extabindex  start:0x80034764 end:0x80034D40
+	.text       start:0x80308FB4 end:0x8031A6C0
+
+menu/fn_8031A6C0.cpp:
+	extab       start:0x80015F3C end:0x80016074
+	extabindex  start:0x80034D40 end:0x80034F14
+	.text       start:0x8031A6C0 end:0x8031EA8C
+	.ctors      start:0x8056F398 end:0x8056F39C
+
+menu/fn_8031EA8C.cpp:
+	extab       start:0x80016074 end:0x8001621C
+	extabindex  start:0x80034F14 end:0x80035190
+	.text       start:0x8031EA8C end:0x80324F7C
+
+hud/fn_80324F7C.c:
+	extab       start:0x8001621C end:0x80016224
+	extabindex  start:0x80035190 end:0x8003519C
+	.text       start:0x80324F7C end:0x803250B0
+
+hud/move_work_update.cpp:
+	extab       start:0x80016224 end:0x8001622C
+	extabindex  start:0x8003519C end:0x800351A8
+	.text       start:0x803250B0 end:0x803253BC
+
+enemy/em_action.cpp:
+	extab       start:0x8001622C end:0x80016464
+	extabindex  start:0x800351A8 end:0x800354FC
+	.text       start:0x803253BC end:0x8032C920
+	.ctors      start:0x8056F39C end:0x8056F3A0
+
+enemy/em_act_step.cpp:
+	extab       start:0x80016464 end:0x8001662C
+	extabindex  start:0x800354FC end:0x800357A8
+	.text       start:0x8032C920 end:0x8033041C
+	.ctors      start:0x8056F3A0 end:0x8056F3A4
+	.data       start:0x805DFC9C end:0x805E0510
+	.bss        start:0x806BE328 end:0x806BE340
+
+enemy/em_pl_frame.cpp:
+	extab       start:0x8001662C end:0x8001677C
+	extabindex  start:0x800357A8 end:0x800359A0
+	.text       start:0x8033041C end:0x80334568
+
+hud/net_char_sync.cpp:
+	extab       start:0x8001677C end:0x80016994
+	extabindex  start:0x800359A0 end:0x80035CC4
+	.text       start:0x80334568 end:0x80338808
+	.data       start:0x805E2788 end:0x805E27D4
+
+lobby/lb_companion_ui.cpp:
+	extab       start:0x80016994 end:0x80016CA4
+	extabindex  start:0x80035CC4 end:0x8003615C
+	.text       start:0x80338808 end:0x8033F270
+	.data       start:0x805E27D4 end:0x805E2870
+	.bss        start:0x806BEF20 end:0x806BF0A0
+	.sbss       start:0x80794B90 end:0x80794BE0
+
+hud/cockpit_icon_data.cpp:
+	.data       start:0x805E6A58 end:0x805E70F8
+	.sdata      start:0x80792D80 end:0x80792F8C
+
+ef/eft050.cpp:
+	extab       start:0x80016CA4 end:0x80016DB4
+	extabindex  start:0x8003615C end:0x800362F4
+	.text       start:0x8033F270 end:0x803432B4
+
+ef/eft_slot.cpp:
+	extab       start:0x80016DB4 end:0x80016FE4
+	extabindex  start:0x800362F4 end:0x8003663C
+	.text       start:0x803432B4 end:0x80349DD8
+	.ctors      start:0x8056F3A4 end:0x8056F3A8
+	.data       start:0x805E7FC0 end:0x805E91E8
+	.bss        start:0x806BF0A0 end:0x806BF310
+
+menu/menu_item_page.cpp:
+	extab       start:0x80016FE4 end:0x80017094
+	extabindex  start:0x8003663C end:0x80036744
+	.text       start:0x80349DD8 end:0x8034C0C4
+	.data       start:0x805E91E8 end:0x805E91F8
+	.sdata      start:0x807932F0 end:0x80793308
+
+menu/menu_note.cpp:
+	.text       start:0x8034C0C4 end:0x8034C1D0
+	.data       start:0x805E9220 end:0x805E9248
+
+menu/menu_row.cpp:
+	extab       start:0x80017094 end:0x800170F4
+	extabindex  start:0x80036744 end:0x800367D4
+	.text       start:0x8034C1D0 end:0x8034D2B0
+	.sdata2     start:0x8079B368 end:0x8079B3A8
+
+Pl/pl_act_class3.cpp:
+	extab       start:0x800170F4 end:0x800171A4
+	extabindex  start:0x800367D4 end:0x800368DC
+	.text       start:0x8034D2B0 end:0x8034F138
+	.data       start:0x805E9248 end:0x805EBBE0
+	.sdata      start:0x80793308 end:0x80793330
+	.sdata2     start:0x8079B3A8 end:0x8079B3C8
+
+enemy/em024_ai.cpp:
+	extab       start:0x800171A4 end:0x8001736C
+	extabindex  start:0x800368DC end:0x80036B88
+	.text       start:0x8034F138 end:0x80358624
+	.rodata     start:0x80570880 end:0x805709D0
+	.data       start:0x805EBBE0 end:0x805ED0C0
+	.sdata      start:0x80793330 end:0x80793338
+	.sdata2     start:0x8079B3C8 end:0x8079B640
+
+ef/eft052.cpp:
+	extab       start:0x8001736C end:0x80017574
+	extabindex  start:0x80036B88 end:0x80036E94
+	.text       start:0x80358624 end:0x8035E034
+
+enemy/fn_8035E034.cpp:
+	extab       start:0x80017574 end:0x800175DC
+	extabindex  start:0x80036E94 end:0x80036F30
+	.text       start:0x8035E034 end:0x8035F2B4
+
+enemy/em035_prog.cpp:
+	extab       start:0x800175DC end:0x80017634
+	extabindex  start:0x80036F30 end:0x80036FB4
+	.text       start:0x8035F2B4 end:0x8035FC18
+
+lobby/lb_menu_page.cpp:
+	extab       start:0x800177C4 end:0x800177D4
+	extabindex  start:0x8003720C end:0x80037224
+	.text       start:0x80365C84 end:0x80366618
+	.data       start:0x805EDAB4 end:0x805EDAE0
+
+ef/eft053.cpp:
+	extab       start:0x800177D4 end:0x8001783C
+	extabindex  start:0x80037224 end:0x800372C0
+	.text       start:0x80366618 end:0x8036A690
+	.data       start:0x805EDF40 end:0x805EDFB8
+	.sdata2     start:0x8079B740 end:0x8079B820
+
+enemy/em020_prog.cpp:
+	extab       start:0x800178E4 end:0x80017A5C
+	extabindex  start:0x800373BC end:0x800375F0
+	.text       start:0x8036CF64 end:0x80375084
+	.rodata     start:0x80570A20 end:0x80570AE0
+	.data       start:0x805EE108 end:0x805EE428
+
+enemy/em020_handlers.cpp:
+	extab       start:0x80017A5C end:0x80017A74
+	extabindex  start:0x800375F0 end:0x80037614
+	.text       start:0x80375084 end:0x80375424
+
+enemy/em020_ai.cpp:
+	extab       start:0x80017A74 end:0x80017C44
+	extabindex  start:0x80037614 end:0x800378CC
+	.text       start:0x80375424 end:0x80378F9C
+
+enemy/em019_ai.cpp:
+	extab       start:0x80017C44 end:0x80017DBC
+	extabindex  start:0x800378CC end:0x80037B00
+	.text       start:0x80378F9C end:0x8037EA64
+
+enemy/em019_prog.cpp:
+	extab       start:0x80017DBC end:0x80017E14
+	extabindex  start:0x80037B00 end:0x80037B84
+	.text       start:0x8037EA64 end:0x8037F940
+	.data       start:0x805EF4D0 end:0x805EF52C
+
+enemy/em_act_mot.cpp:
+	extab       start:0x80017E14 end:0x80017E2C
+	extabindex  start:0x80037B84 end:0x80037BA8
+	.text       start:0x8037F940 end:0x80382310
+
+enemy/fn_80382310.cpp:
+	extab       start:0x80017E2C end:0x8001803C
+	extabindex  start:0x80037BA8 end:0x80037EC0
+	.text       start:0x80382310 end:0x803868DC
+	.ctors      start:0x8056F3A8 end:0x8056F3B0
+	.data       start:0x805EF8C0 end:0x805EF990
+	.bss        start:0x806C23E8 end:0x806C5488
+	.sbss       start:0x80794C00 end:0x80794C08
+
+enemy/fn_80387844.cpp:
+	extab       start:0x8001803C end:0x800181C4
+	extabindex  start:0x80037EC0 end:0x8003810C
+	.text       start:0x803868DC end:0x8038EC44
+	.rodata     start:0x80570B20 end:0x80570BA0
+	.data       start:0x805EFA00 end:0x805F0CB8
+
+lobby/lb_quest_ui.cpp:
+	extab       start:0x800181C4 end:0x8001833C
+	extabindex  start:0x8003810C end:0x80038340
+	.text       start:0x8038EC44 end:0x80394038
+	.data       start:0x805F0CB8 end:0x805F13D0
+
+lobby/lb_quest_board.cpp:
+	extab       start:0x8001833C end:0x8001843C
+	extabindex  start:0x80038340 end:0x800384C0
+	.text       start:0x80394038 end:0x803967F0
+
+menu/menu_result.cpp:
+	extab       start:0x8001843C end:0x8001863C
+	extabindex  start:0x800384C0 end:0x800387C0
+	.text       start:0x803967F0 end:0x8039D278
+	.data       start:0x805F1500 end:0x805F1704
+	.bss        start:0x806C5528 end:0x806C5558
+
+menu/multi_result.cpp:
+	extab       start:0x8001863C end:0x8001882C
+	extabindex  start:0x800387C0 end:0x80038AA8
+	.text       start:0x8039D278 end:0x803A3A50
+
+lobby/lb_quest_screen.cpp:
+	extab       start:0x8001882C end:0x80018A6C
+	extabindex  start:0x80038AA8 end:0x80038E08
+	.text       start:0x803A3A50 end:0x803AA4A4
+	.data       start:0x805F2038 end:0x805F2090
+
+quest/quest_item_slot.cpp:
+	extab       start:0x80018A6C end:0x80018B0C
+	extabindex  start:0x80038E08 end:0x80038EF8
+	.text       start:0x803AA4A4 end:0x803AB3BC
+	.ctors      start:0x8056F3B0 end:0x8056F3B4
+	.data       start:0x805F2940 end:0x805F2A38
+	.sdata      start:0x807935D0 end:0x807935D8
+	.sdata2     start:0x8079C4C0 end:0x8079C50C
+
+quest/quest_entry.cpp:
+	extab       start:0x80018B0C end:0x80018C54
+	extabindex  start:0x80038EF8 end:0x800390E4
+	.text       start:0x803AB3BC end:0x803B0F98
+	.data       start:0x805F7AB0 end:0x805F7AF8
+	.bss        start:0x806C5558 end:0x806C5858
+	.sdata      start:0x807935D8 end:0x8079367C
+	.sbss       start:0x80794C1C end:0x80794C3C
+
+menu/arena_result.cpp:
+	extab       start:0x80018C54 end:0x80018DC4
+	extabindex  start:0x800390E4 end:0x8003930C
+	.text       start:0x803B0F98 end:0x803B465C
+	.data       start:0x805F7B78 end:0x805F7C68
+	.sdata      start:0x8079367C end:0x80793684
+
+Network/network_shared_data.cpp:
+	.sdata      start:0x80793900 end:0x80793930
+	.sdata2     start:0x8079C690 end:0x8079C758
+
+enemy/em_pop.cpp:
+	extab       start:0x80018DC4 end:0x80019164
+	extabindex  start:0x8003930C end:0x8003987C
+	.text       start:0x803B465C end:0x803BE30C
+	.ctors      start:0x8056F3B4 end:0x8056F3B8
+	.data       start:0x805F7C68 end:0x805F84E0
+	.bss        start:0x806CC420 end:0x806D2AF8
+	.sbss       start:0x80794C48 end:0x80794C60
+
+menu/get_pop_dat_ptr.cpp:
+	extab       start:0x80019164 end:0x800193D4
+	extabindex  start:0x8003987C end:0x80039C24
+	.text       start:0x803BE30C end:0x803C4BA0
+	.ctors      start:0x8056F3B8 end:0x8056F3BC
+
+Network/NetworkPeerBase.cpp:
+	extab       start:0x800198C8 end:0x800198E0
+	extabindex  start:0x8003A0BC end:0x8003A0E0
+	.text       start:0x803CCDF8 end:0x803CCF30
+	.data       start:0x805F94E0 end:0x805F9510
+
+Network/NetworkPeerBuffer.cpp:
+	extab       start:0x800198E0 end:0x80019940
+	extabindex  start:0x8003A0E0 end:0x8003A134
+	.text       start:0x803CCF30 end:0x803CD248
+	.data       start:0x805F9510 end:0x805F9540
+
+Network/NetworkPeerUdp.cpp:
+	extab       start:0x80019940 end:0x80019968
+	extabindex  start:0x8003A134 end:0x8003A170
+	.text       start:0x803CD248 end:0x803CD764
+	.data       start:0x805F9540 end:0x805F9570
+	.bss        start:0x806D2C60 end:0x806D3240
+
+Network/NetworkPeerMcs.cpp:
+	extab       start:0x80019968 end:0x800199B0
+	extabindex  start:0x8003A170 end:0x8003A1DC
+	.text       start:0x803CD764 end:0x803CE060
+	.data       start:0x805F9570 end:0x805F9610
+	.bss        start:0x806D3240 end:0x806D3650
+	.sbss       start:0x80794C98 end:0x80794CA0
+
+Network/network_socket_streams.cpp:
+	extab       start:0x800199B0 end:0x80019A68
+	extabindex  start:0x8003A1DC end:0x8003A2F0
+	.text       start:0x803CE060 end:0x803CF14C
+	.data       start:0x805F9610 end:0x805F9958
+
+Network/NetworkResolverWii.cpp:
+	extab       start:0x80019A68 end:0x80019AAC
+	extabindex  start:0x8003A2F0 end:0x8003A338
+	.text       start:0x803CF14C end:0x803CF654
+	.data       start:0x805F9958 end:0x805F99A0
+
+Network/NetworkSessionBase.cpp:
+	extab       start:0x80019AAC end:0x80019AB4
+	extabindex  start:0x8003A338 end:0x8003A344
+	.text       start:0x803CF654 end:0x803CF6D8
+	.data       start:0x805F99A0 end:0x805F9A40
+
+Network/NetworkSessionStable.cpp:
+	extab       start:0x80019AB4 end:0x80019F3C
+	extabindex  start:0x8003A344 end:0x8003A5A8
+	.text       start:0x803CF6D8 end:0x803D4904
+	.data       start:0x805F9A40 end:0x805FA788
+
+Network/NetworkSessionManager.cpp:
+	extab       start:0x80019F3C end:0x8001A348
+	extabindex  start:0x8003A5A8 end:0x8003A8B4
+	.text       start:0x803D4904 end:0x803D70B8
+	.data       start:0x805FA788 end:0x805FAB48
+	.sbss       start:0x80794CA0 end:0x80794CA8
+
+Network/NetworkSessionManagerPat.cpp:
+	extab       start:0x8001A348 end:0x8001A350
+	extabindex  start:0x8003A8B4 end:0x8003A8C0
+	.text       start:0x803D70B8 end:0x803D72F4
+	.data       start:0x805FB0F0 end:0x805FB2B8
+	.sdata2     start:0x8079C758 end:0x8079C75C
+
+Network/initNetworkSessionStable.cpp:
+	extab       start:0x8001A630 end:0x8001A648
+	extabindex  start:0x8003AB9C end:0x8003ABA8
+	.text       start:0x803DEA30 end:0x803DEB38
+
+Network/NetworkLayerPatStep.cpp:
+	extab       start:0x8001ACC0 end:0x8001ACC8
+	extabindex  start:0x8003B010 end:0x8003B01C
+	.text       start:0x803E44C8 end:0x803E4888
+
+Network/network_state.cpp:
+	extab       start:0x8001BD9C end:0x8001BE24
+	extabindex  start:0x8003C06C end:0x8003C138
+	.text       start:0x803FE8E4 end:0x804006A8
+
+Network/NetworkWiiMediator.cpp:
+	extab       start:0x8001CA4C end:0x8001CBF4
+	extabindex  start:0x8003D2F0 end:0x8003D524
+	.text       start:0x80413C64 end:0x804155D4
+	.data       start:0x806024B8 end:0x80602824
+
+Network/constructNetworkWiiMediator.cpp:
+	extab       start:0x8001CE34 end:0x8001CE4C
+	extabindex  start:0x8003D800 end:0x8003D80C
+	.text       start:0x80418988 end:0x804189C8
+
+Network/NetworkPat.cpp:
+	extab       start:0x8001CF70 end:0x8001CF88
+	extabindex  start:0x8003D92C end:0x8003D950
+	.text       start:0x80419EC4 end:0x8041A194
+
+Network/fn_8041A87C.cpp:
+	extab       start:0x8001CFF0 end:0x8001D16C
+	extabindex  start:0x8003D9BC end:0x8003DBD8
+	.text       start:0x8041A87C end:0x8041DF10
+	.data       start:0x806031A0 end:0x80603714
+	.bss        start:0x806D3650 end:0x806D3670
+	.sbss       start:0x80794CE0 end:0x80794CE8
+
+Camellia/camellia.c:
+	extab       start:0x8001D16C end:0x8001D1B4
+	extabindex  start:0x8003DBD8 end:0x8003DC44
+	.text       start:0x8041DF10 end:0x80423E74
+	.rodata     start:0x80570E98 end:0x80571E98
+
+fn_80423E74.cpp:
+	extab       start:0x8001D1B4 end:0x8001D368
+	extabindex  start:0x8003DC44 end:0x8003DE54
+	.text       start:0x80423E74 end:0x80429B94
+	.data       start:0x80603750 end:0x806038E8
+
+Network/network_pat_control.cpp:
+	extab       start:0x8001D368 end:0x8001D558
+	extabindex  start:0x8003DE54 end:0x8003E0DC
+	.text       start:0x80429B94 end:0x8043065C
+	.rodata     start:0x80571EA0 end:0x80572240
+	.data       start:0x806038E8 end:0x8060391C
+	.data       start:0x8060391C end:0x80603BF0
+	.data       start:0x80603BF0 end:0x80603C14
+	.data       start:0x80603C14 end:0x80603C40
+	.data       start:0x80603C40 end:0x80603C6C
+	.data       start:0x80603C6C end:0x80603CB8
+	.sbss       start:0x80794CF8 end:0x80794CFC
+
+quest/arenatask.cpp:
+	extab       start:0x8001DE9C end:0x8001DF24
+	extabindex  start:0x8003EB20 end:0x8003EBEC
+	.text       start:0x804459E4 end:0x80448404
+	.ctors      start:0x8056F3D0 end:0x8056F3D4
+	.data       start:0x80604D30 end:0x806073F0
+	.bss        start:0x806E3E10 end:0x806E40C0
+	.sdata      start:0x80793B28 end:0x80793B88
+	.sbss       start:0x80794D3C end:0x80794D50
+	.sdata2     start:0x8079C960 end:0x8079C998
+
+Runtime.PPCEABI.H/global_destructor_chain.c:
+	.text       start:0x804566A4 end:0x80456704
+
+Runtime.PPCEABI.H/ptmf.c:
+	.text       start:0x80456C88 end:0x80456CE0
+	.rodata     start:0x80572428 end:0x80572438
+
+Runtime.PPCEABI.H/__init_cpp_exceptions.cpp:
+	.text       start:0x80457420 end:0x80457490
+	.ctors      start:0x8056F2C0 end:0x8056F2C4 rename:.ctors$10
+	.dtors      start:0x8056F440 end:0x8056F444 rename:.dtors$10
+	.dtors      start:0x8056F444 end:0x8056F448 rename:.dtors$15
+	.sdata      start:0x80793CC8 end:0x80793CCC
+
+Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp:
+	extab       start:0x8001E3F0 end:0x8001E400
+	extabindex  start:0x8003F174 end:0x8003F18C
+	.text       start:0x80457490 end:0x804578FC
+	.data       start:0x8060E8A0 end:0x8060E8E4
+
+AX/AXFXReverbHi.c:
+	.text       start:0x80474CB0 end:0x80475E24
+
+OS/PPCArch.c:
+	.text       start:0x804770E0 end:0x804772F0
+	.data       start:0x80612CE0 end:0x80612D18
+
+EXI/EXIBios.c:
+	.text       start:0x804AFED0 end:0x804B17D0
+	.data       start:0x8061A4F0 end:0x8061A538
+	.bss        start:0x80746B60 end:0x80746C20
+	.sdata      start:0x80793E30 end:0x80793E34
+	.sbss       start:0x80795198 end:0x8079519C
+
+EXI/ProbeBarnacle.c:
+	.text       start:0x804B17D0 end:0x804B8020
+
+OS/FindContainHeap_.c:
+	.text       start:0x804C1760 end:0x804C6D68
+
+OS/OSAlarm.c:
+	.text       start:0x804CBC50 end:0x804CBC60
+
+RSO/runtime.c:
+	.text       start:0x804D9B4C end:0x804DAE40
+	.data       start:0x80629C08 end:0x80629C40
+
+DWCi/DWCi_Np_CPUCopyFast.c:
+	.text       start:0x80507C40 end:0x80509DB0
+	.data       start:0x8062FF90 end:0x806302C8
+	.sdata      start:0x80794200 end:0x80794210
+	.sbss       start:0x807957D0 end:0x807957F8
+
+DWCi/fn_805113B0.c:
+	.text       start:0x805113B0 end:0x80512490
+
+DWCi/DWCi_NatNeg.c:
+	.text       start:0x80512490 end:0x805145B8
+	.data       start:0x806308E8 end:0x80630A08
+	.bss        start:0x807614D8 end:0x80762C20
+	.sdata      start:0x80794368 end:0x807943A0
+	.sbss       start:0x80795828 end:0x80795878
+
+NHTTP/NHTTP_bgnend.c:
+	.text       start:0x805145B8 end:0x80515010
+
+NHTTP/NHTTP_os_RVL.c:
+	.text       start:0x80515010 end:0x80515774
+
+NHTTP/d_nhttp.c:
+	.text       start:0x80515774 end:0x8051B7FC
+	.data       start:0x80630C50 end:0x80630D48
+	.bss        start:0x80762C20 end:0x80762C60
+	.sdata      start:0x80794410 end:0x80794418
+	.sbss       start:0x80795878 end:0x80795888
+
+NWC24/nwc24_msg.c:
+	.text       start:0x8051D710 end:0x8051E068
+	.data       start:0x80631128 end:0x80631178
+	.sdata      start:0x80794438 end:0x80794440
+	.sbss       start:0x807958A0 end:0x807958A8
+
+NWC24/nwc24_io.c:
+	.text       start:0x8051E068 end:0x8051E864
+	.rodata     start:0x80574E00 end:0x80574E10
+	.data       start:0x806311E8 end:0x8063122C
+	.bss        start:0x80766B00 end:0x80766C40
+	.sdata      start:0x80794440 end:0x80794448
+	.sbss       start:0x807958B8 end:0x807958D8
+
+fn_805482CC.cpp:
+	.text       start:0x805482CC end:0x8054E894
+
+homebutton/fn_8054E894.cpp:
+	.text       start:0x8054E894 end:0x80555374
+	.ctors      start:0x8056F3FC end:0x8056F404
+
+homebutton/fn_80555374.cpp:
+	.text       start:0x80555374 end:0x8055C894
+	.ctors      start:0x8056F404 end:0x8056F410
+
+homebutton/keyboard_ui.cpp:
+	.text       start:0x8055C894 end:0x805632BC
+	.ctors      start:0x8056F410 end:0x8056F424
+
+homebutton/keyboard.cpp:
+	.text       start:0x805632BC end:0x80569DAC
+	.ctors      start:0x8056F424 end:0x8056F428
+
+homebutton/gui.cpp:
+	.text       start:0x80569DAC end:0x8056BBF0
+
+tiHKBManager.cpp:
+	.text       start:0x8056BBF0 end:0x8056F2B4
+	.ctors      start:0x8056F428 end:0x8056F42C
+
+Runtime.PPCEABI.H/memcpy.c:
+	.init       start:0x80004000 end:0x80004350
+
+Runtime.PPCEABI.H/memset.c:
+	.init       start:0x80004350 end:0x80004380
+
+Runtime.PPCEABI.H/TRK_interrupt_vectors.c:
+	.init       start:0x80004380 end:0x80004514
+
+Runtime.PPCEABI.H/TRK_interrupt_vector_stubs.c:
+	.init       start:0x80004514 end:0x800062C0
+
+Runtime.PPCEABI.H/__start.c:
+	.init       start:0x800062C0 end:0x800065C0
+
+Runtime.PPCEABI.H/__ppc_eabi_init.cpp:
+	.init       start:0x800065C0 end:0x80006624
