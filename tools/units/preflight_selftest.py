@@ -418,12 +418,9 @@ def derived_rows(repo: dict) -> tuple[list[dict], list[str]]:
         "expected": {"name": "_rom_copy_info", "address": "0x80006624", "kind": 2,
                      "severity": "proceed", "owner": None},
     })
-    rows.append({
-        "label": "fixed kind 2 (memmove, C runtime)", "target": "0x8045b598", "reason": None,
-        "expected": {"name": "memmove", "address": "0x8045B598", "kind": 2, "severity": "proceed",
-                     "owner": None},
-    })
-    notes.append("fixed    _rom_copy_info @ 0x80006624, memmove @ 0x8045B598 (docs/plan.md)")
+    # `memmove` (.text 0x8045B598) used to be the second representative; splits phase 4 gives it an owner
+    # (MSL_C/alloc), the day the header above predicted, so only the linker fragment is pinned now.
+    notes.append("fixed    _rom_copy_info @ 0x80006624 (docs/plan.md)")
     return rows, notes
 
 
