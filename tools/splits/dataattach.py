@@ -1122,6 +1122,9 @@ def sinit_owner_questions(an, folded, window):
     for (owner, sec, definers), syms in sorted(groups.items()):
         if not any(in_window(ctx.by_name[x], window) for x in definers if x in ctx.by_name) and not in_window(ctx.by_name[owner], window):
             continue
+        if all(any(ov["action"] == "attach" and ov.get("takes_from") and ov["section"] == sec and ov["start"] <= s["addr"] and sym_end(s) <= ov["end"]
+                   for ov in an.overrides) for s in syms):
+            continue                                    # an orchestrator recut (`takes_from`) already decided this group
         s0, s1 = syms[0], syms[-1]
         fn = ctx.fn_at(ctx.definers(s0)[definers[0]][0])
         out.append({"unit": owner, "section": sec,
@@ -1295,7 +1298,7 @@ def override_outcomes(an, records, unowned):
     for o in an.overrides:
         recs = [x for x in records if x.get("override") == o["id"]]
         blocked = [x for x in recs if x.get("blocked")]
-        if covered[o["id"]] == 0:
+        if covered[o["id"]] == 0 and not (o["action"] == "attach" and o.get("takes_from") and recs):     # a recut row is one direct record, no solver symbol
             outcome = "no unowned symbol in the range"
         elif o["action"] == "attach":
             outcome = "blocked" if blocked and len(blocked) == len(recs) else "applied" if not blocked else "partly blocked"
@@ -2330,6 +2333,15 @@ def selftest_phase3(check, T):
     oq = sinit_owner_questions(Analysis(cow.splits, cow, {}), set(), (T, T + 0x100))
     check("owner vs sinit: b.cpp's range holds a symbol a.cpp's own __sinit constructs - one open question names both and the interval",
           [(q["unit"], q["section"], q["candidate_interval"], "a.cpp" in q["question"]) for q in oq], [("b.cpp", ".bss", [hx8(OW), hx8(OW + 0x10)], True)])
+    # ... and the recut that decides it (an `attach` override with `takes_from`) removes the question
+    oan_ = Analysis(cow.splits, cow, {})
+    oan_.set_overrides(resolve_overrides(oan_, [{"unit": "a.cpp", "section": ".bss", "start": hex8(OW), "end": hex8(OW + 0x10), "action": "attach", "grade": "strong",
+                                                 "evidence": ev, "takes_from": "b.cpp"}]))
+    check("owner vs sinit: an orchestrator recut (attach with takes_from) over the group removes the question, a recut elsewhere does not",
+          (sinit_owner_questions(oan_, set(), (T, T + 0x100)),
+           len(sinit_owner_questions(Analysis(cow.splits, cow, {}), set(), (T, T + 0x100)))), ([], 1))
+    check("overrides: a takes_from row reports `applied` in the outcomes (it was `no unowned symbol in the range`: a recut row has no solver symbol)",
+          [o["outcome"] for o in override_outcomes(oan_, takes_from_records(oan_, (T, T + 0x100)), [])], ["applied"])
 
     # settle: the data-only unit left out of link order is moved by the loop itself (the moves it returns are the doc's `moves`)
     mu2 = utext(("z.cpp", [(".data", M2 + 0x30, M2 + 0x40)]), ("a.cpp", [(".text", T, T + 0x20), (".data", M2, M2 + 0x10), (".ctors", CT, CT + 4)]),

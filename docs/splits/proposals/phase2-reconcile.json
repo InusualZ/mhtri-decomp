@@ -52,14 +52,14 @@
    "section": ".rodata",
    "range": [
     "0x8056F4A0",
-    "0x8056F500"
+    "0x8056F4C0"
    ],
    "grade": "strong",
    "signal": "reader",
-   "symbols": 2,
-   "bytes": 96,
+   "symbols": 1,
+   "bytes": 32,
    "signals": {
-    "reader": 2
+    "reader": 1
    },
    "evidence": [
     {
@@ -68,18 +68,42 @@
      "finding": "lbl_8056F4A0 (.rodata 0x8056F4A0, 0x20 B) is read at 0x8004F6CC in fn_8004CAD8.cpp"
     },
     {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x8056F4C0",
-     "finding": "lbl_8056F4C0 (.rodata 0x8056F4C0, 0x40 B) is read at 0x8005300C in fn_8004CAD8.cpp"
-    },
-    {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain fn_8004CAD8 --section .rodata",
-     "finding": "2 symbol(s): 2 read by fn_8004CAD8.cpp (first 0x8056F4A0, last 0x8056F4C0)"
+     "finding": "1 symbol(s): 1 read by fn_8004CAD8.cpp (first 0x8056F4A0, last 0x8056F4A0)"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain fn_8004CAD8 --section .rodata",
    "text_addr": "0x8004CAD8"
+  },
+  {
+   "unit": "main/draw_shape.cpp",
+   "section": ".rodata",
+   "range": [
+    "0x8056F4C0",
+    "0x8056F500"
+   ],
+   "grade": "strong",
+   "signal": "reader",
+   "symbols": 1,
+   "bytes": 64,
+   "signals": {
+    "reader": 1
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8056F4C0",
+     "finding": "lbl_8056F4C0 (.rodata 0x8056F4C0, 0x40 B) is read at 0x8005300C in main/draw_shape.cpp"
+    },
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain draw_shape --section .rodata",
+     "finding": "1 symbol(s): 1 read by main/draw_shape.cpp (first 0x8056F4C0, last 0x8056F4C0)"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain draw_shape --section .rodata",
+   "text_addr": "0x8005270C"
   },
   {
    "unit": "g3d/fn_80063888.cpp",
@@ -530,6 +554,32 @@
    "text_addr": "0x80147C94"
   },
   {
+   "unit": "enemy/em011_prog.cpp",
+   "section": ".rodata",
+   "range": [
+    "0x8056FCD0",
+    "0x8056FD10"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 64,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8056FCD0",
+     "finding": "lbl_8056FCD0 (0x40 B) is read only at 0x8016DE9C, 0x8016DEC8 (fn_8016DE40) and 0x8016EFC0, 0x8016EFDC (fn_8016EEE8), all inside em011's text"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x8056FCD0",
+   "takes_from": "enemy/em010_prog.cpp",
+   "note": "orchestrator override 3: boundary 0x8056FCD0 (medium: one reader unit, no second observation)",
+   "text_addr": "0x8016D1C4"
+  },
+  {
    "unit": "enemy/em015_prog.cpp",
    "section": ".rodata",
    "range": [
@@ -562,6 +612,35 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain em015_prog --section .rodata",
    "text_addr": "0x80176C30"
+  },
+  {
+   "unit": "enemy/fn_801B4348.cpp",
+   "section": ".rodata",
+   "range": [
+    "0x80570260",
+    "0x805702A0"
+   ],
+   "grade": "strong",
+   "signal": "reader",
+   "symbols": 1,
+   "bytes": 64,
+   "signals": {
+    "reader": 1
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80570260",
+     "finding": "lbl_80570260 (.rodata 0x80570260, 0x40 B) is read at 0x801B5BA4 in enemy/fn_801B4348.cpp"
+    },
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain fn_801B4348 --section .rodata",
+     "finding": "1 symbol(s): 1 read by enemy/fn_801B4348.cpp (first 0x80570260, last 0x80570260)"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain fn_801B4348 --section .rodata",
+   "text_addr": "0x801B4348"
   },
   {
    "unit": "Pl/pl_act.cpp",
@@ -908,7 +987,7 @@
    "text_addr": "0x804155D4"
   },
   {
-   "unit": "menu/menu_plsearch.cpp",
+   "unit": "menu/fn_804513FC.cpp",
    "section": ".rodata",
    "range": [
     "0x80572240",
@@ -925,21 +1004,21 @@
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x80572240",
-     "finding": "lbl_80572240 (.rodata 0x80572240, 0x198 B) is read at 0x80452734 in menu/menu_plsearch.cpp"
+     "finding": "lbl_80572240 (.rodata 0x80572240, 0x198 B) is read at 0x80452734 in menu/fn_804513FC.cpp"
     },
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x805723D8",
-     "finding": "lbl_805723D8 (.rodata 0x805723D8, 0x40 B) is read at 0x80452B20 in menu/menu_plsearch.cpp"
+     "finding": "lbl_805723D8 (.rodata 0x805723D8, 0x40 B) is read at 0x80452B20 in menu/fn_804513FC.cpp"
     },
     {
      "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain menu_plsearch --section .rodata",
-     "finding": "2 symbol(s): 2 read by menu/menu_plsearch.cpp (first 0x80572240, last 0x805723D8)"
+     "command": "python tools/splits/dataattach.py --explain fn_804513FC --section .rodata",
+     "finding": "2 symbol(s): 2 read by menu/fn_804513FC.cpp (first 0x80572240, last 0x805723D8)"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain menu_plsearch --section .rodata",
-   "text_addr": "0x80448404"
+   "reproduce": "python tools/splits/dataattach.py --explain fn_804513FC --section .rodata",
+   "text_addr": "0x804513FC"
   },
   {
    "unit": "Runtime.PPCEABI.H/runtime.cpp",
@@ -1366,6 +1445,31 @@
    "text_addr": "0x804E45B0"
   },
   {
+   "unit": "nw4r/math_triangular.cpp",
+   "section": ".rodata",
+   "range": [
+    "0x80573CD8",
+    "0x80574CE8"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 4112,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80573CD8",
+     "finding": "lbl_80573CD8 (0x1010 B = 257 x 16, the sin/cos table) is read by SinFIdx, CosFIdx and math_sincos_idx (0x80500E60..0x80500F00, nw4r/math_triangular's text) and by externs in ef (0x8009C6F8..)"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x80573CD8",
+   "text_addr": "0x80500E34",
+   "note": "orchestrator override 30: medium: the readers inside the nw4r math unit are its own sin/cos index functions; the ef reads are externs"
+  },
+  {
    "unit": "NHTTP/d_nhttp.c",
    "section": ".rodata",
    "range": [
@@ -1790,7 +1894,7 @@
     "pointer-graph": 26,
     "reader": 18,
     "string-reader": 2,
-    "forced": 1,
+    "readers": 1,
     "file-string": 1
    },
    "evidence": [
@@ -1807,12 +1911,12 @@
     {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain mh3_pad --section .data",
-     "finding": "48 symbol(s): 21 read by mh3_pad.cpp (first 0x8057C9D8, last 0x80581040), 1 unread one(s) forced to it by the non-decreasing link order between its neighbours' anchors, 26 placed by pointer-derived evidence (pointer-graph)"
+     "finding": "48 symbol(s): 22 read by mh3_pad.cpp (first 0x8057C9D8, last 0x80581040), 26 placed by pointer-derived evidence (pointer-graph)"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain mh3_pad --section .data",
    "text_addr": "0x800408A8",
-   "note": "reader-vs-pointer: lbl_8057CA50 is read by mh3_pad.cpp, but the pointer tables around it name BTE/gki_buffer.cpp, lobby/lb_companion_ui.cpp"
+   "note": "1 symbol(s) are read by another unit than the one link order puts them in (a global read where it is not defined): lbl_80580058 read by g3d/g3d_anmchr.cpp/menu/fn_804513FC.cpp; reader-vs-pointer: lbl_8057CA50 is read by mh3_pad.cpp, but the pointer tables around it name BTE/gki_buffer.cpp, lobby/lb_companion_ui.cpp"
   },
   {
    "unit": "main/pad_connect.cpp",
@@ -1848,73 +1952,101 @@
    "section": ".data",
    "range": [
     "0x80581158",
-    "0x80582C60"
+    "0x80581180"
    ],
-   "grade": "guess",
+   "grade": "medium",
    "signal": "pointer-graph",
-   "symbols": 199,
-   "bytes": 6920,
+   "symbols": 2,
+   "bytes": 40,
    "signals": {
-    "pointer-graph": 171,
-    "forced": 26,
-    "reader": 2
+    "pointer-graph": 2
    },
    "evidence": [
     {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x805813E8",
-     "finding": "lbl_805813E8 (.data 0x805813E8, 0x150 B) is read at 0x80049B70 in fn_80047398.cpp"
-    },
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x80581538",
-     "finding": "lbl_80581538 (.data 0x80581538, 0xC B) is read at 0x80049C90 in fn_80047398.cpp"
-    },
-    {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain fn_80047398 --section .data",
-     "finding": "199 symbol(s): 2 read by fn_80047398.cpp (first 0x805813E8, last 0x80581538), 26 unread one(s) forced to it by the non-decreasing link order between its neighbours' anchors, 171 placed by pointer-derived evidence (pointer-graph)"
+     "finding": "2 symbol(s), none read by fn_80047398.cpp's text: 0 forced by link order, 2 placed by pointer-derived evidence (pointer-graph)"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain fn_80047398 --section .data",
    "text_addr": "0x80047398",
-   "note": "not applied: attaching it fails the jumptable invariant (jumptable_80581544 is read by fn_8004C9A0.cpp, not by this unit)"
+   "note": "only 0 of 2 symbol(s) are read by the unit (a strong block needs 2, max(3, N/50)): the rest is placed by link order or pointer evidence"
   },
   {
-   "unit": "draw_shape.cpp",
+   "unit": "fn_8004CAD8.cpp",
    "section": ".data",
    "range": [
-    "0x8058AC50",
-    "0x8058AF41"
+    "0x80581584",
+    "0x80581770"
    ],
-   "grade": "medium",
-   "signal": "pointer-graph",
-   "symbols": 31,
-   "bytes": 753,
+   "grade": "strong",
+   "signal": "jumptable",
+   "symbols": 6,
+   "bytes": 492,
    "signals": {
-    "pointer-graph": 27,
-    "reader": 4
+    "jumptable": 2,
+    "reader": 2,
+    "string-reader": 1,
+    "file-string": 1
    },
    "evidence": [
     {
      "tool": "callers",
-     "command": "python tools/units/callers.py 0x8058ACA0",
-     "finding": "lbl_8058ACA0 (.data 0x8058ACA0, 0x10 B) is read at 0x800553E0 in draw_shape.cpp"
+     "command": "python tools/units/callers.py 0x80581584",
+     "finding": "jumptable_80581584 (.data 0x80581584, 0x40 B) is read at 0x8004CAE8 in fn_8004CAD8.cpp"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8058175C",
+     "finding": "lbl_8058175C (.data 0x8058175C, 0xD B) is read at 0x80050BEC in fn_8004CAD8.cpp"
+    },
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain fn_8004CAD8 --section .data",
+     "finding": "6 symbol(s): 6 read by fn_8004CAD8.cpp (first 0x80581584, last 0x8058175C)"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain fn_8004CAD8 --section .data",
+   "text_addr": "0x8004CAD8"
+  },
+  {
+   "unit": "main/draw_shape.cpp",
+   "section": ".data",
+   "range": [
+    "0x80581770",
+    "0x8058AF41"
+   ],
+   "grade": "medium",
+   "signal": "pointer-graph",
+   "symbols": 1206,
+   "bytes": 38865,
+   "signals": {
+    "reader": 15,
+    "string-reader": 8,
+    "file-string": 7,
+    "pointer-graph": 1172,
+    "forced": 4
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80581770",
+     "finding": "lbl_80581770 (.data 0x80581770, 0x10 B) is read at 0x80054EE8 in main/draw_shape.cpp"
     },
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x8058AF08",
-     "finding": "lbl_8058AF08 (.data 0x8058AF08, 0x18 B) is read at 0x800557D8 in draw_shape.cpp"
+     "finding": "lbl_8058AF08 (.data 0x8058AF08, 0x18 B) is read at 0x800557D8 in main/draw_shape.cpp"
     },
     {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain draw_shape --section .data",
-     "finding": "31 symbol(s): 4 read by draw_shape.cpp (first 0x8058ACA0, last 0x8058AF08), 27 placed by pointer-derived evidence (pointer-graph)"
+     "finding": "1206 symbol(s): 30 read by main/draw_shape.cpp (first 0x80581770, last 0x8058AF08), 4 unread one(s) forced to it by the non-decreasing link order between its neighbours' anchors, 1172 placed by pointer-derived evidence (pointer-graph)"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain draw_shape --section .data",
-   "text_addr": "0x80054C64",
-   "note": ""
+   "text_addr": "0x8005270C",
+   "note": "3 symbol(s) are read by another unit than the one link order puts them in (a global read where it is not defined): lbl_80582D38 read by fn_80047398.cpp, lbl_80582E58 read by fn_80047398.cpp, lbl_80582EE0 read by fn_80047398.cpp"
   },
   {
    "unit": "fn_80056F24.cpp",
@@ -3049,6 +3181,32 @@
    "text_addr": "0x800A388C"
   },
   {
+   "unit": "ef/ef_draworder.cpp",
+   "section": ".data",
+   "range": [
+    "0x80592419",
+    "0x80592430"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 23,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x800A3B20 --pointers",
+     "finding": "vtable 0x8059241C: all 3 slots (0x800A3B20, 0x800A3D7C, 0x800A39A4) are in ef_draworder's text; the slot owner is the unit's key function (playbook 80), and the vtable is the next object after the unit's own .data ending at 0x80592419"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x800A3B20 --pointers",
+   "takes_from": "ef/ef_draworder.cpp",
+   "note": "orchestrator override 14: vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
+   "text_addr": "0x800A388C"
+  },
+  {
    "unit": "ef/ef_effect.cpp",
    "section": ".data",
    "range": [
@@ -3446,6 +3604,32 @@
    "text_addr": "0x800BE154"
   },
   {
+   "unit": "ef/ef_drawfreestrategy.cpp",
+   "section": ".data",
+   "range": [
+    "0x80594315",
+    "0x80594330"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 27,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x800BEF00 --pointers",
+     "finding": "vtable 0x80594318: slots 0x800BEF00 and 0x800BE3C0 are in ef_drawfreestrategy's text (the other two, 0x800C8A48/0x800C8A64, are the base class's in ef_drawstrategyimpl); the slot owner is the unit's key function (playbook 80), and the vtable is the next object after the unit's own .data ending at 0x80594315"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x800BEF00 --pointers",
+   "takes_from": "ef/ef_drawfreestrategy.cpp",
+   "note": "orchestrator override 15: vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
+   "text_addr": "0x800BE154"
+  },
+  {
    "unit": "ef/ef_drawlinestrategy.cpp",
    "section": ".data",
    "range": [
@@ -3481,6 +3665,32 @@
    "text_addr": "0x800BEF98"
   },
   {
+   "unit": "ef/ef_drawlinestrategy.cpp",
+   "section": ".data",
+   "range": [
+    "0x805943EA",
+    "0x80594408"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 30,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x800BF780 --pointers",
+     "finding": "vtable 0x805943F0: slots 0x800BF780 and 0x800BEF98 are in ef_drawlinestrategy's text (the other two are the base class's in ef_drawstrategyimpl); the slot owner is the unit's key function (playbook 80), and the vtable is the next object after the unit's own .data ending at 0x805943EA"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x800BF780 --pointers",
+   "takes_from": "ef/ef_drawlinestrategy.cpp",
+   "note": "orchestrator override 16: vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
+   "text_addr": "0x800BEF98"
+  },
+  {
    "unit": "ef/ef_drawpointstrategy.cpp",
    "section": ".data",
    "range": [
@@ -3513,6 +3723,32 @@
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain ef_drawpointstrategy --section .data",
+   "text_addr": "0x800BF818"
+  },
+  {
+   "unit": "ef/ef_drawpointstrategy.cpp",
+   "section": ".data",
+   "range": [
+    "0x805944C6",
+    "0x805944E0"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 26,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x800BFF3C --pointers",
+     "finding": "vtable 0x805944C8: slots 0x800BFF3C and 0x800BF818 are in ef_drawpointstrategy's text (the other two are the base class's in ef_drawstrategyimpl); the slot owner is the unit's key function (playbook 80), and the vtable is the next object after the unit's own .data ending at 0x805944C6"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x800BFF3C --pointers",
+   "takes_from": "ef/ef_drawpointstrategy.cpp",
+   "note": "orchestrator override 17: vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
    "text_addr": "0x800BF818"
   },
   {
@@ -3624,6 +3860,32 @@
    "text_addr": "0x800C9540"
   },
   {
+   "unit": "ef/ef_torus.cpp",
+   "section": ".data",
+   "range": [
+    "0x80594C55",
+    "0x80594C68"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 19,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x800C9540 --pointers",
+     "finding": "vtable 0x80594C58: its one slot 0x800C9540 is in ef_torus's text; the slot owner is the unit's key function (playbook 80), and the vtable is the next object after the unit's own .data ending at 0x80594C55"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x800C9540 --pointers",
+   "takes_from": "ef/ef_torus.cpp",
+   "note": "orchestrator override 18: vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
+   "text_addr": "0x800C9540"
+  },
+  {
    "unit": "ef/ef_cube.cpp",
    "section": ".data",
    "range": [
@@ -3659,6 +3921,32 @@
    "text_addr": "0x800C9DD0"
   },
   {
+   "unit": "ef/ef_cube.cpp",
+   "section": ".data",
+   "range": [
+    "0x80594D11",
+    "0x80594D20"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 15,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x800CA200 --pointers",
+     "finding": "vtable 0x80594D14: its one slot 0x800CA200 is in ef_cube's text; the slot owner is the unit's key function (playbook 80), and the vtable is the next object after the unit's own .data ending at 0x80594D11"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x800CA200 --pointers",
+   "takes_from": "ef/ef_cube.cpp",
+   "note": "orchestrator override 19: vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
+   "text_addr": "0x800C9DD0"
+  },
+  {
    "unit": "ef/ef_cylinder.cpp",
    "section": ".data",
    "range": [
@@ -3691,6 +3979,32 @@
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain ef_cylinder --section .data",
+   "text_addr": "0x800CB948"
+  },
+  {
+   "unit": "ef/ef_cylinder.cpp",
+   "section": ".data",
+   "range": [
+    "0x80594DCD",
+    "0x80594DE0"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 19,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x800CBFB0 --pointers",
+     "finding": "vtable 0x80594DD0: its one slot 0x800CBFB0 is in ef_cylinder's text; the slot owner is the unit's key function (playbook 80), and the vtable is the next object after the unit's own .data ending at 0x80594DCD"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x800CBFB0 --pointers",
+   "takes_from": "ef/ef_cylinder.cpp",
+   "note": "orchestrator override 20: vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
    "text_addr": "0x800CB948"
   },
   {
@@ -3831,6 +4145,32 @@
    "text_addr": "0x800CCFB0"
   },
   {
+   "unit": "ef/ef_line.cpp",
+   "section": ".data",
+   "range": [
+    "0x80594F89",
+    "0x80594F98"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 15,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x800CCFB0 --pointers",
+     "finding": "vtable 0x80594F8C: its one slot 0x800CCFB0 is in ef_line's text; the slot owner is the unit's key function (playbook 80), and the vtable is the next object after the unit's own .data ending at 0x80594F89"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x800CCFB0 --pointers",
+   "takes_from": "ef/ef_line.cpp",
+   "note": "orchestrator override 21: vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
+   "text_addr": "0x800CCFB0"
+  },
+  {
    "unit": "ef/ef_point.cpp",
    "section": ".data",
    "range": [
@@ -3863,6 +4203,32 @@
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain ef_point --section .data",
+   "text_addr": "0x800CD584"
+  },
+  {
+   "unit": "ef/ef_point.cpp",
+   "section": ".data",
+   "range": [
+    "0x80595045",
+    "0x80595058"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 19,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x800CD584 --pointers",
+     "finding": "vtable 0x80595048: its one slot 0x800CD584 is in ef_point's text; the slot owner is the unit's key function (playbook 80), and the vtable is the next object after the unit's own .data ending at 0x80595045"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x800CD584 --pointers",
+   "takes_from": "ef/ef_point.cpp",
+   "note": "orchestrator override 22: vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
    "text_addr": "0x800CD584"
   },
   {
@@ -3962,7 +4328,7 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain fn_800D7F54 --section .data",
    "text_addr": "0x800D7F54",
-   "note": "5 symbol(s) are read by another unit than the one link order puts them in (a global read where it is not defined): lbl_80597238 read by sound/fn_800DD1F0.cpp, lbl_80597554 read by sound/fn_800EF7D8.cpp, lbl_805977FC read by sound/fn_800EF7D8.cpp, lbl_805978E8 read by sound/fn_800EF7D8.cpp"
+   "note": "5 symbol(s) are read by another unit than the one link order puts them in (a global read where it is not defined): lbl_80597238 read by sound/fn_800DD1F0.cpp, lbl_80597554 read by sound/fn_800EEAE0.cpp, lbl_805977FC read by sound/fn_800EEAE0.cpp, lbl_805978E8 read by sound/fn_800EEAE0.cpp"
   },
   {
    "unit": "sound/fn_800DD1F0.cpp",
@@ -4266,6 +4632,42 @@
    "text_addr": "0x800ED780"
   },
   {
+   "unit": "sound/fn_800EEAE0.cpp",
+   "section": ".data",
+   "range": [
+    "0x805980A8",
+    "0x8059B170"
+   ],
+   "grade": "strong",
+   "signal": "pointer-graph",
+   "symbols": 375,
+   "bytes": 12488,
+   "signals": {
+    "reader": 27,
+    "pointer-graph": 314,
+    "string-reader": 34
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x805980A8",
+     "finding": "lbl_805980A8 (.data 0x805980A8, 0xA4 B) is read at 0x800F0FF0 in sound/fn_800EEAE0.cpp"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8059B150",
+     "finding": "lbl_8059B150 (.data 0x8059B150, 0x1C B) is read at 0x800F22F4 in sound/fn_800EEAE0.cpp"
+    },
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain fn_800EEAE0 --section .data",
+     "finding": "375 symbol(s): 61 read by sound/fn_800EEAE0.cpp (first 0x805980A8, last 0x8059B150), 314 placed by pointer-derived evidence (pointer-graph)"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain fn_800EEAE0 --section .data",
+   "text_addr": "0x800EEAE0"
+  },
+  {
    "unit": "sound/fn_800F2A94.cpp",
    "section": ".data",
    "range": [
@@ -4370,6 +4772,76 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain effect --section .data",
    "text_addr": "0x800F95A4"
+  },
+  {
+   "unit": "ef/eft001.cpp",
+   "section": ".data",
+   "range": [
+    "0x8059B5F8",
+    "0x8059B638"
+   ],
+   "grade": "strong",
+   "signal": "reader",
+   "symbols": 3,
+   "bytes": 64,
+   "signals": {
+    "reader": 3
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8059B5F8",
+     "finding": "lbl_8059B5F8 (.data 0x8059B5F8, 0x18 B) is read at 0x800FB5CC in ef/eft001.cpp"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8059B628",
+     "finding": "lbl_8059B628 (.data 0x8059B628, 0x10 B) is read at 0x800FB5D4 in ef/eft001.cpp"
+    },
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain eft001 --section .data",
+     "finding": "3 symbol(s): 3 read by ef/eft001.cpp (first 0x8059B5F8, last 0x8059B628)"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain eft001 --section .data",
+   "text_addr": "0x800FAE08"
+  },
+  {
+   "unit": "ef/fn_800FBE64.cpp",
+   "section": ".data",
+   "range": [
+    "0x8059B638",
+    "0x8059B9A8"
+   ],
+   "grade": "strong",
+   "signal": "reader",
+   "symbols": 28,
+   "bytes": 880,
+   "signals": {
+    "reader": 17,
+    "pointer-graph": 6,
+    "jumptable": 5
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8059B638",
+     "finding": "lbl_8059B638 (.data 0x8059B638, 0x38 B) is read at 0x800FC4D8 in ef/fn_800FBE64.cpp"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8059B930",
+     "finding": "jumptable_8059B930 (.data 0x8059B930, 0x78 B) is read at 0x800FD2D0 in ef/fn_800FBE64.cpp"
+    },
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain fn_800FBE64 --section .data",
+     "finding": "28 symbol(s): 22 read by ef/fn_800FBE64.cpp (first 0x8059B638, last 0x8059B930), 6 placed by pointer-derived evidence (pointer-graph)"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain fn_800FBE64 --section .data",
+   "text_addr": "0x800FBE64"
   },
   {
    "unit": "ef/fn_800FD864_fx.cpp",
@@ -5380,6 +5852,32 @@
    "note": "only 0 of 1 symbol(s) are read by the unit (a strong block needs 1, max(3, N/50)): the rest is placed by link order or pointer evidence"
   },
   {
+   "unit": "enemy/em011_prog.cpp",
+   "section": ".data",
+   "range": [
+    "0x805A7CE8",
+    "0x805A7D54"
+   ],
+   "grade": "strong",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 108,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8016D1C4 --pointers",
+     "finding": "em011_prog_tbl (0x805A7CE8, 0x6C B) is a table of 11 code pointers, every one into em011's text (0x8016D1C4..0x80170600; slot 1 is em011's first function 0x8016D1C4): the registered em010 .data edge 0x805A7D54 lies inside em011"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x8016D1C4 --pointers",
+   "takes_from": "enemy/em010_prog.cpp",
+   "note": "orchestrator override 2: boundary 0x805A7CE8 (em010 end, em011 start): the table is em011's",
+   "text_addr": "0x8016D1C4"
+  },
+  {
    "unit": "enemy/em012_prog.cpp",
    "section": ".data",
    "range": [
@@ -5657,16 +6155,18 @@
    "unit": "enemy/fn_801B4348.cpp",
    "section": ".data",
    "range": [
-    "0x805B1818",
-    "0x805B1B30"
+    "0x805B17A8",
+    "0x805B2118"
    ],
    "grade": "medium",
    "signal": "pointer-graph",
-   "symbols": 15,
-   "bytes": 792,
+   "symbols": 72,
+   "bytes": 2416,
    "signals": {
-    "pointer-graph": 14,
-    "reader": 1
+    "code-pointers": 1,
+    "pointer-graph": 52,
+    "reader": 17,
+    "jumptable": 2
    },
    "evidence": [
     {
@@ -5675,14 +6175,19 @@
      "finding": "lbl_805B1B08 (.data 0x805B1B08, 0x28 B) is read at 0x801B43C0 in enemy/fn_801B4348.cpp"
     },
     {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x805B20E8",
+     "finding": "lbl_805B20E8 (.data 0x805B20E8, 0x30 B) is read at 0x801B63C4 in enemy/fn_801B4348.cpp"
+    },
+    {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain fn_801B4348 --section .data",
-     "finding": "15 symbol(s): 1 read by enemy/fn_801B4348.cpp (first 0x805B1B08, last 0x805B1B08), 14 placed by pointer-derived evidence (pointer-graph)"
+     "finding": "72 symbol(s): 19 read by enemy/fn_801B4348.cpp (first 0x805B1B08, last 0x805B20E8), 53 placed by pointer-derived evidence (code-pointers, pointer-graph)"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain fn_801B4348 --section .data",
    "text_addr": "0x801B4348",
-   "note": "only 1 of 15 symbol(s) are read by the unit (a strong block needs 3, max(3, N/50)): the rest is placed by link order or pointer evidence"
+   "note": ""
   },
   {
    "unit": "enemy/fn_801B7020.cpp",
@@ -6216,6 +6721,56 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain pl_act --section .data",
    "text_addr": "0x802693C4"
+  },
+  {
+   "unit": "Pl/pl_act.cpp",
+   "section": ".data",
+   "range": [
+    "0x805C6100",
+    "0x805C80A8"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 55,
+   "bytes": 8104,
+   "signals": {
+    "orchestrator": 55
+   },
+   "evidence": [
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain 0x805C6100 --section .data",
+     "finding": "the first 8,100 B of the 167-symbol interleave zone (0x805C6100..0x805C80A8) are read only by pl_act (reader/pointer-graph rows) and no fn_802840DC read sits inside; jumptable_805C80A8 (read by fn_802840DC) is the first object after it"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain 0x805C6100 --section .data",
+   "text_addr": "0x802693C4",
+   "note": "orchestrator override 4: narrowing of the Pl/pl_act | Pl/fn_802840DC interleave: the head belongs to pl_act; the registered edge 0x802840DC is suspect (0x805C80A8..0x805C9568 stays deferred)"
+  },
+  {
+   "unit": "Pl/fn_802840DC.cpp",
+   "section": ".data",
+   "range": [
+    "0x805C9568",
+    "0x805CBFC0"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 83,
+   "bytes": 10840,
+   "signals": {
+    "orchestrator": 83
+   },
+   "evidence": [
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain 0x805C9568 --section .data",
+     "finding": "the last 10,840 B of the interleave zone (0x805C9568..0x805CBFC0) are read only by fn_802840DC (reader/pointer-graph rows, no pl_act read)"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain 0x805C9568 --section .data",
+   "text_addr": "0x802840DC",
+   "note": "orchestrator override 5: narrowing of the Pl/pl_act | Pl/fn_802840DC interleave: the tail belongs to fn_802840DC"
   },
   {
    "unit": "Pl/pl_coll.cpp",
@@ -7336,6 +7891,31 @@
    "unit": "enemy/em035_prog.cpp",
    "section": ".data",
    "range": [
+    "0x805ED838",
+    "0x805ED8A8"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 112,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8035F060 --pointers",
+     "finding": "em035_prog_tbl (0x70 B): its 9 code pointers (0x8035F060..0x8035FB60) are 6 in enemy/em035_prog's text and 3 in em033_prog's"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x8035F060 --pointers",
+   "text_addr": "0x8035F2B4",
+   "note": "orchestrator override 28: table of the unit's own code pointers: the key function is em035_prog's"
+  },
+  {
+   "unit": "enemy/em035_prog.cpp",
+   "section": ".data",
+   "range": [
     "0x805ED8A8",
     "0x805ED950"
    ],
@@ -7635,6 +8215,32 @@
    "text_addr": "0x80378F9C"
   },
   {
+   "unit": "enemy/fn_80383148.cpp",
+   "section": ".data",
+   "range": [
+    "0x805EF8C0",
+    "0x805EF94C"
+   ],
+   "grade": "strong",
+   "signal": "orchestrator",
+   "symbols": 4,
+   "bytes": 140,
+   "signals": {
+    "orchestrator": 4
+   },
+   "evidence": [
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain fn_80382310",
+     "finding": "the registered data-only unit enemy/fn_80382310.cpp (0x805EF8C0..0x805EF94C, 4 symbols) is read only by fn_80383148 (lbl_805EF8C0, lbl_805EF8D8, lbl_805EF940); nothing else reads or constructs it"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain fn_80382310",
+   "takes_from": "enemy/fn_80382310.cpp",
+   "note": "orchestrator override 9: fold of the data-only residue into its only reader; phase 4 removes the unit fn_80382310",
+   "text_addr": "0x80383148"
+  },
+  {
    "unit": "enemy/fn_80387844.cpp",
    "section": ".data",
    "range": [
@@ -7831,6 +8437,32 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain quest_entry --section .data",
    "text_addr": "0x803AB3BC"
+  },
+  {
+   "unit": "enemy/em_model.cpp",
+   "section": ".data",
+   "range": [
+    "0x805F8220",
+    "0x805F84C0"
+   ],
+   "grade": "strong",
+   "signal": "orchestrator",
+   "symbols": 17,
+   "bytes": 672,
+   "signals": {
+    "orchestrator": 17
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py --range 0x805F8200 0x805F8230 --each",
+     "finding": "the 17 labels 0x805F8220..0x805F84B0 are read only at 0x803BB824..0x803BD8FC, inside em_model's text (0x803B936C..), while lbl_805F81F4 and the labels before it are read at 0x803B7BCC / 0x803B8AAC (em_pop): the registered .data edge 0x805F84C0 is 0x2A0 B late, the edge lies in (0x805F81F4, 0x805F8220]"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py --range 0x805F8200 0x805F8230 --each",
+   "takes_from": "enemy/em_pop.cpp",
+   "note": "orchestrator override 13: recut of the registered range: em_model's .data starts at 0x805F8220 (hold-out: the 17 wrong symbols of enemy/em_pop | em_model)",
+   "text_addr": "0x803B936C"
   },
   {
    "unit": "menu/get_pop_dat_ptr.cpp",
@@ -8853,19 +9485,43 @@
    "text_addr": "0x80448404"
   },
   {
-   "unit": "menu/menu_plsearch.cpp",
+   "unit": "menu/fn_804513FC.cpp",
    "section": ".data",
    "range": [
     "0x80607E50",
+    "0x8060E0B8"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 381,
+   "bytes": 25192,
+   "signals": {
+    "orchestrator": 381
+   },
+   "evidence": [
+    {
+     "tool": "dataorder",
+     "command": "python tools/splits/dataorder.py at 0x80607E50",
+     "finding": "strong V->S seam 0x80607E50: every symbol after it is the next TU's, and the 38 symbols that follow (0x8060E0B8..0x8060E7FC, read and vtable-stored by fn_804513FC's text) are that TU's end of the same run"
+    }
+   ],
+   "reproduce": "python tools/splits/dataorder.py at 0x80607E50",
+   "text_addr": "0x804513FC",
+   "note": "orchestrator override 12: the 381 unread pointer-graph symbols between the seam and the first symbol the new TU reads: no read of their own, the seam alone places them"
+  },
+  {
+   "unit": "menu/fn_804513FC.cpp",
+   "section": ".data",
+   "range": [
+    "0x8060E0B8",
     "0x8060E7FC"
    ],
-   "grade": "strong",
+   "grade": "medium",
    "signal": "pointer-graph",
-   "symbols": 419,
-   "bytes": 27052,
+   "symbols": 38,
+   "bytes": 1860,
    "signals": {
-    "pointer-graph": 403,
-    "forced": 3,
+    "pointer-graph": 25,
     "reader": 4,
     "string-reader": 4,
     "vtable-store": 4,
@@ -8875,21 +9531,22 @@
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x8060E508",
-     "finding": "lbl_8060E508 (.data 0x8060E508, 0x30 B) is read at 0x804525E0 in menu/menu_plsearch.cpp"
+     "finding": "lbl_8060E508 (.data 0x8060E508, 0x30 B) is read at 0x804525E0 in menu/fn_804513FC.cpp"
     },
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x8060E790",
-     "finding": "jumptable_8060E790 (.data 0x8060E790, 0x6C B) is read at 0x80456368 in menu/menu_plsearch.cpp"
+     "finding": "jumptable_8060E790 (.data 0x8060E790, 0x6C B) is read at 0x80456368 in menu/fn_804513FC.cpp"
     },
     {
      "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain menu_plsearch --section .data",
-     "finding": "419 symbol(s): 13 read by menu/menu_plsearch.cpp (first 0x8060E508, last 0x8060E790), 3 unread one(s) forced to it by the non-decreasing link order between its neighbours' anchors, 403 placed by pointer-derived evidence (pointer-graph)"
+     "command": "python tools/splits/dataattach.py --explain fn_804513FC --section .data",
+     "finding": "38 symbol(s): 13 read by menu/fn_804513FC.cpp (first 0x8060E508, last 0x8060E790), 25 placed by pointer-derived evidence (pointer-graph)"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain menu_plsearch --section .data",
-   "text_addr": "0x80448404"
+   "reproduce": "python tools/splits/dataattach.py --explain fn_804513FC --section .data",
+   "text_addr": "0x804513FC",
+   "note": ""
   },
   {
    "unit": "MSL_C/alloc.cpp",
@@ -9529,17 +10186,16 @@
    "section": ".data",
    "range": [
     "0x8062FC48",
-    "0x8062FF90"
+    "0x8062FD00"
    ],
-   "grade": "strong",
-   "signal": "reader",
-   "symbols": 6,
-   "bytes": 840,
+   "grade": "medium",
+   "signal": "pointer-graph",
+   "symbols": 3,
+   "bytes": 184,
    "signals": {
-    "reader": 3,
+    "reader": 1,
     "vtable-store": 1,
-    "pointer-graph": 1,
-    "jumptable": 1
+    "pointer-graph": 1
    },
    "evidence": [
     {
@@ -9549,17 +10205,53 @@
     },
     {
      "tool": "callers",
-     "command": "python tools/units/callers.py 0x8062FE10",
-     "finding": "lbl_8062FE10 (.data 0x8062FE10, 0x180 B) is read at 0x80507934 in nw4r/fn_8050661C.cpp"
+     "command": "python tools/units/callers.py 0x8062FC58",
+     "finding": "lbl_8062FC58 (.data 0x8062FC58, 0x60 B) is read at 0x80506630 in nw4r/fn_8050661C.cpp"
     },
     {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain fn_8050661C --section .data",
-     "finding": "6 symbol(s): 5 read by nw4r/fn_8050661C.cpp (first 0x8062FC48, last 0x8062FE10), 1 placed by pointer-derived evidence (pointer-graph)"
+     "finding": "3 symbol(s): 2 read by nw4r/fn_8050661C.cpp (first 0x8062FC48, last 0x8062FC58), 1 placed by pointer-derived evidence (pointer-graph)"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain fn_8050661C --section .data",
-   "text_addr": "0x8050661C"
+   "text_addr": "0x8050661C",
+   "note": "only 2 of 3 symbol(s) are read by the unit (a strong block needs 3, max(3, N/50)): the rest is placed by link order or pointer evidence"
+  },
+  {
+   "unit": "DWCi/dwc_error.cpp",
+   "section": ".data",
+   "range": [
+    "0x8062FD00",
+    "0x8062FF90"
+   ],
+   "grade": "strong",
+   "signal": "reader",
+   "symbols": 3,
+   "bytes": 656,
+   "signals": {
+    "jumptable": 1,
+    "reader": 2
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8062FD00",
+     "finding": "jumptable_8062FD00 (.data 0x8062FD00, 0x64 B) is read at 0x805073EC in DWCi/dwc_error.cpp"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8062FE10",
+     "finding": "lbl_8062FE10 (.data 0x8062FE10, 0x180 B) is read at 0x80507934 in DWCi/dwc_error.cpp"
+    },
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain dwc_error --section .data",
+     "finding": "3 symbol(s): 3 read by DWCi/dwc_error.cpp (first 0x8062FD00, last 0x8062FE10)"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain dwc_error --section .data",
+   "text_addr": "0x805073C0"
   },
   {
    "unit": "DWCi/fn_80509DB0.cpp",
@@ -9839,20 +10531,19 @@
    "section": ".data",
    "range": [
     "0x80631230",
-    "0x8064A5E8"
+    "0x806498C8"
    ],
    "grade": "medium",
    "signal": "string-reader",
-   "symbols": 27,
-   "bytes": 103352,
+   "symbols": 25,
+   "bytes": 99992,
    "signals": {
     "pointer-graph": 6,
     "string-reader": 7,
     "jumptable": 5,
-    "reader": 6,
+    "reader": 5,
     "forced": 1,
-    "file-string": 1,
-    "vtable-store": 1
+    "file-string": 1
    },
    "evidence": [
     {
@@ -9862,18 +10553,53 @@
     },
     {
      "tool": "callers",
-     "command": "python tools/units/callers.py 0x8064A570",
-     "finding": "lbl_8064A570 (.data 0x8064A570, 0x78 B) is read at 0x8052A164 in SO/soi.cpp"
+     "command": "python tools/units/callers.py 0x80649840",
+     "finding": "jumptable_80649840 (.data 0x80649840, 0x88 B) is read at 0x80528FE4 in SO/soi.cpp"
     },
     {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain soi --section .data",
-     "finding": "27 symbol(s): 20 read by SO/soi.cpp (first 0x80631278, last 0x8064A570), 1 unread one(s) forced to it by the non-decreasing link order between its neighbours' anchors, 6 placed by pointer-derived evidence (pointer-graph)"
+     "finding": "25 symbol(s): 18 read by SO/soi.cpp (first 0x80631278, last 0x80649840), 1 unread one(s) forced to it by the non-decreasing link order between its neighbours' anchors, 6 placed by pointer-derived evidence (pointer-graph)"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain soi --section .data",
    "text_addr": "0x8051E864",
    "note": ""
+  },
+  {
+   "unit": "homebutton/fn_8052A040.cpp",
+   "section": ".data",
+   "range": [
+    "0x806498C8",
+    "0x8064A5E8"
+   ],
+   "grade": "strong",
+   "signal": "reader",
+   "symbols": 2,
+   "bytes": 3360,
+   "signals": {
+    "reader": 1,
+    "vtable-store": 1
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x806498C8",
+     "finding": "lbl_806498C8 (.data 0x806498C8, 0xCA8 B) is read at 0x8052A05C in homebutton/fn_8052A040.cpp"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8064A570",
+     "finding": "lbl_8064A570 (.data 0x8064A570, 0x78 B) is read at 0x8052A164 in homebutton/fn_8052A040.cpp"
+    },
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain fn_8052A040 --section .data",
+     "finding": "2 symbol(s): 2 read by homebutton/fn_8052A040.cpp (first 0x806498C8, last 0x8064A570)"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain fn_8052A040 --section .data",
+   "text_addr": "0x8052A040"
   },
   {
    "unit": "homebutton/fn_8052B004.cpp",
@@ -9903,41 +10629,6 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain fn_8052B004 --section .data",
    "text_addr": "0x8052B004"
-  },
-  {
-   "unit": "homebutton/fn_8052B004.cpp",
-   "section": ".data",
-   "range": [
-    "0x8064A5F8",
-    "0x8064A6B0"
-   ],
-   "grade": "guess",
-   "signal": "vtable-store",
-   "symbols": 2,
-   "bytes": 184,
-   "signals": {
-    "vtable-store": 2
-   },
-   "evidence": [
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x8064A5F8",
-     "finding": "lbl_8064A5F8 (.data 0x8064A5F8, 0x40 B) is read at 0x8052B5D0 in homebutton/fn_8052B004.cpp"
-    },
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x8064A638",
-     "finding": "lbl_8064A638 (.data 0x8064A638, 0x78 B) is read at 0x8052C364 in homebutton/fn_8052B004.cpp"
-    },
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_8052B004 --section .data",
-     "finding": "2 symbol(s): 2 read by homebutton/fn_8052B004.cpp (first 0x8064A5F8, last 0x8064A638)"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_8052B004 --section .data",
-   "text_addr": "0x8052B004",
-   "note": "not applied: attaching it fails the data-order invariant (strong zigzag seam at 0x8064A5F8 inside the unit's .data (a boundary in [0x8064A5F8, 0x8064A5F8)): at least 2 TUs)"
   },
   {
    "unit": "homebutton/fn_8052C880.cpp",
@@ -10198,6 +10889,31 @@
    "note": "not applied: attaching it fails the data-order invariant (follows the blocked piece at 0x8064A8F8 of the same block: strong zigzag seam at 0x8064A8F8 inside the unit's .data (a boundary in [0x8064A8F8, 0x8064A8F8)): at)"
   },
   {
+   "unit": "homebutton/fn_80533474.cpp",
+   "section": ".data",
+   "range": [
+    "0x8064DDE0",
+    "0x8064DE88"
+   ],
+   "grade": "guess",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 168,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80533474 --pointers",
+     "finding": "lbl_8064DDE0 (0xA8 B, 38 slots): 35 slots in homebutton/fn_80533474's text, 1 in fn_8056083C"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x80533474 --pointers",
+   "text_addr": "0x80533474",
+   "note": "not applied: attaching it fails the order invariant (.data has 2 ranges with a gap at 0x8064A8F8 (dtk takes one))"
+  },
+  {
    "unit": "homebutton/fn_8053E808.cpp",
    "section": ".data",
    "range": [
@@ -10236,6 +10952,31 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain fn_8053E808 --section .data",
    "text_addr": "0x8053E808"
+  },
+  {
+   "unit": "homebutton/fn_8053E808.cpp",
+   "section": ".data",
+   "range": [
+    "0x8064E6C0",
+    "0x8064E760"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 160,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8053E808 --pointers",
+     "finding": "lbl_8064E6C0 (0xA0 B, 32 slots): 28 slots in homebutton/fn_8053E808's text, 3 in fn_80533474 (base), 1 in fn_8056083C"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x8053E808 --pointers",
+   "text_addr": "0x8053E808",
+   "note": "orchestrator override 24: vtable decided by its slots (the slot owner is the key function, playbook 80)"
   },
   {
    "unit": "homebutton/fn_80542D8C.cpp",
@@ -10313,6 +11054,31 @@
    "note": "not applied: attaching it fails the data-order invariant (strong zigzag seam at 0x8064F0BC inside the unit's .data (a boundary in [0x8064F0BC, 0x8064F0BC)): at least 2 TUs)"
   },
   {
+   "unit": "homebutton/fn_80542D8C.cpp",
+   "section": ".data",
+   "range": [
+    "0x8064F338",
+    "0x8064F360"
+   ],
+   "grade": "guess",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 40,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80542D8C --pointers",
+     "finding": "the vtable at 0x8064F338 (0x28 B): its 5 slots are in homebutton/fn_80542D8C's text"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x80542D8C --pointers",
+   "text_addr": "0x805425E4",
+   "note": "not applied: attaching it fails the order invariant (.data has 2 ranges with a gap at 0x8064F0BC (dtk takes one))"
+  },
+  {
    "unit": "homebutton/fn_8054F7BC.cpp",
    "section": ".data",
    "range": [
@@ -10352,6 +11118,31 @@
    "text_addr": "0x8054F7BC"
   },
   {
+   "unit": "homebutton/fn_8054F7BC.cpp",
+   "section": ".data",
+   "range": [
+    "0x80650080",
+    "0x80650160"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 2,
+   "bytes": 224,
+   "signals": {
+    "orchestrator": 2
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8054F7BC --pointers",
+     "finding": "lbl_80650080 and lbl_806500A0 (0x20 + 0xC0 B): 16 slots in homebutton/fn_8054F7BC's text"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x8054F7BC --pointers",
+   "text_addr": "0x8054F7BC",
+   "note": "orchestrator override 26: vtable decided by its slots (the slot owner is the key function, playbook 80)"
+  },
+  {
    "unit": "homebutton/fn_805546B4.cpp",
    "section": ".data",
    "range": [
@@ -10389,6 +11180,31 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain fn_805546B4 --section .data",
    "text_addr": "0x805546B4"
+  },
+  {
+   "unit": "homebutton/fn_805546B4.cpp",
+   "section": ".data",
+   "range": [
+    "0x806504C8",
+    "0x80650500"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 56,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x805546B4 --pointers",
+     "finding": "lbl_806504C8 (0x38 B): its 5 slots are in homebutton/fn_805546B4's text"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x805546B4 --pointers",
+   "text_addr": "0x805546B4",
+   "note": "orchestrator override 27: vtable decided by its slots (the slot owner is the key function, playbook 80)"
   },
   {
    "unit": "homebutton/fn_80555B0C.cpp",
@@ -10899,14 +11715,14 @@
     "0x806585B8",
     "0x806694D0"
    ],
-   "grade": "strong",
+   "grade": "medium",
    "signal": "reader",
    "symbols": 22,
    "bytes": 69400,
    "signals": {
     "reader": 15,
-    "readers": 3,
-    "forced": 2,
+    "readers": 4,
+    "forced": 1,
     "sinit": 2
    },
    "evidence": [
@@ -10923,11 +11739,12 @@
     {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain mh3_pad --section .bss",
-     "finding": "22 symbol(s): 20 read by mh3_pad.cpp (first 0x806585B8, last 0x806694C4), 2 unread one(s) forced to it by the non-decreasing link order between its neighbours' anchors"
+     "finding": "22 symbol(s): 21 read by mh3_pad.cpp (first 0x806585B8, last 0x806694C4), 1 unread one(s) forced to it by the non-decreasing link order between its neighbours' anchors"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain mh3_pad --section .bss",
-   "text_addr": "0x800408A8"
+   "text_addr": "0x800408A8",
+   "note": "1 symbol(s) are read by another unit than the one link order puts them in (a global read where it is not defined): option_w read by ef/fn_800CDB2C.cpp/fn_8004CAD8.cpp/fn_80059550.cpp/menu/get_pop_dat_ptr.cpp/menu/menu_plsearch.cpp/menu/multi_result.cpp"
   },
   {
    "unit": "main/pad_connect.cpp",
@@ -10957,6 +11774,69 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain pad_connect --section .bss",
    "text_addr": "0x80046C80"
+  },
+  {
+   "unit": "fn_80047398.cpp",
+   "section": ".bss",
+   "range": [
+    "0x806694E8",
+    "0x806699B8"
+   ],
+   "grade": "strong",
+   "signal": "reader",
+   "symbols": 1,
+   "bytes": 1232,
+   "signals": {
+    "reader": 1
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x806694E8",
+     "finding": "face_work (.bss 0x806694E8, 0x4D0 B) is read at 0x80047474 in fn_80047398.cpp"
+    },
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain fn_80047398 --section .bss",
+     "finding": "1 symbol(s): 1 read by fn_80047398.cpp (first 0x806694E8, last 0x806694E8)"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain fn_80047398 --section .bss",
+   "text_addr": "0x80047398"
+  },
+  {
+   "unit": "main/fn_80048964.cpp",
+   "section": ".bss",
+   "range": [
+    "0x806699B8",
+    "0x80669F68"
+   ],
+   "grade": "strong",
+   "signal": "reader",
+   "symbols": 2,
+   "bytes": 1456,
+   "signals": {
+    "reader": 2
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x806699B8",
+     "finding": "sub_trans_buf (.bss 0x806699B8, 0x580 B) is read at 0x80048F9C in main/fn_80048964.cpp"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80669F38",
+     "finding": "sub_trans_state (.bss 0x80669F38, 0x30 B) is read at 0x80049038 in main/fn_80048964.cpp"
+    },
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain fn_80048964 --section .bss",
+     "finding": "2 symbol(s): 2 read by main/fn_80048964.cpp (first 0x806699B8, last 0x80669F38)"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain fn_80048964 --section .bss",
+   "text_addr": "0x80048964"
   },
   {
    "unit": "fn_8004CAD8.cpp",
@@ -10993,7 +11873,7 @@
    "text_addr": "0x8004CAD8"
   },
   {
-   "unit": "draw_shape.cpp",
+   "unit": "main/draw_shape.cpp",
    "section": ".bss",
    "range": [
     "0x8066A920",
@@ -11010,16 +11890,16 @@
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x8066A920",
-     "finding": "lbl_8066A920 (.bss 0x8066A920, 0x368 B) is constructed at 0x80055E60 by draw_shape.cpp's own __sinit (fn_80055E58)"
+     "finding": "lbl_8066A920 (.bss 0x8066A920, 0x368 B) is constructed at 0x80055E60 by main/draw_shape.cpp's own __sinit (fn_80055E58)"
     },
     {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain draw_shape --section .bss",
-     "finding": "1 symbol(s): 1 read by draw_shape.cpp (first 0x8066A920, last 0x8066A920)"
+     "finding": "1 symbol(s): 1 read by main/draw_shape.cpp (first 0x8066A920, last 0x8066A920)"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain draw_shape --section .bss",
-   "text_addr": "0x80054C64"
+   "text_addr": "0x8005270C"
   },
   {
    "unit": "fn_80056F24.cpp",
@@ -11566,72 +12446,38 @@
    "text_addr": "0x800ED780"
   },
   {
-   "unit": "sound/quest_snd.cpp",
+   "unit": "sound/fn_800EEAE0.cpp",
    "section": ".bss",
    "range": [
-    "0x806A1110",
-    "0x806A1138"
-   ],
-   "grade": "strong",
-   "signal": "reader",
-   "symbols": 2,
-   "bytes": 40,
-   "signals": {
-    "reader": 2
-   },
-   "evidence": [
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x806A1110",
-     "finding": "lbl_806A1110 (.bss 0x806A1110, 0x10 B) is read at 0x800EEA0C in sound/quest_snd.cpp"
-    },
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x806A1120",
-     "finding": "lbl_806A1120 (.bss 0x806A1120, 0x18 B) is read at 0x800EEB34 in sound/quest_snd.cpp"
-    },
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain quest_snd --section .bss",
-     "finding": "2 symbol(s): 2 read by sound/quest_snd.cpp (first 0x806A1110, last 0x806A1120)"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain quest_snd --section .bss",
-   "text_addr": "0x800EE014"
-  },
-  {
-   "unit": "sound/fn_800EF7D8.cpp",
-   "section": ".bss",
-   "range": [
-    "0x806A1138",
+    "0x806A1120",
     "0x806A11B8"
    ],
    "grade": "strong",
    "signal": "reader",
-   "symbols": 2,
-   "bytes": 128,
+   "symbols": 3,
+   "bytes": 152,
    "signals": {
-    "reader": 2
+    "reader": 3
    },
    "evidence": [
     {
      "tool": "callers",
-     "command": "python tools/units/callers.py 0x806A1138",
-     "finding": "lbl_806A1138 (.bss 0x806A1138, 0x40 B) is read at 0x800F1D0C in sound/fn_800EF7D8.cpp"
+     "command": "python tools/units/callers.py 0x806A1120",
+     "finding": "lbl_806A1120 (.bss 0x806A1120, 0x18 B) is read at 0x800EEB34 in sound/fn_800EEAE0.cpp"
     },
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x806A1178",
-     "finding": "lbl_806A1178 (.bss 0x806A1178, 0x40 B) is read at 0x800F1B68 in sound/fn_800EF7D8.cpp"
+     "finding": "lbl_806A1178 (.bss 0x806A1178, 0x40 B) is read at 0x800F1B68 in sound/fn_800EEAE0.cpp"
     },
     {
      "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_800EF7D8 --section .bss",
-     "finding": "2 symbol(s): 2 read by sound/fn_800EF7D8.cpp (first 0x806A1138, last 0x806A1178)"
+     "command": "python tools/splits/dataattach.py --explain fn_800EEAE0 --section .bss",
+     "finding": "3 symbol(s): 3 read by sound/fn_800EEAE0.cpp (first 0x806A1120, last 0x806A1178)"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_800EF7D8 --section .bss",
-   "text_addr": "0x800EF7D8"
+   "reproduce": "python tools/splits/dataattach.py --explain fn_800EEAE0 --section .bss",
+   "text_addr": "0x800EEAE0"
   },
   {
    "unit": "sound/fn_800F2A94.cpp",
@@ -11816,6 +12662,58 @@
    "text_addr": "0x801411B8"
   },
   {
+   "unit": "enemy/em008_prog.cpp",
+   "section": ".bss",
+   "range": [
+    "0x806A7868",
+    "0x806A7898"
+   ],
+   "grade": "strong",
+   "signal": "orchestrator",
+   "symbols": 2,
+   "bytes": 48,
+   "signals": {
+    "orchestrator": 2
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x806A7868",
+     "finding": "vec_pair_80165FC8_0..1 are materialised only by fn_80166330 (sinit at 0x80166360), em008_prog's own __sinit: the registered range sits in the .bss of the next unit"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x806A7868",
+   "takes_from": "enemy/em010_prog.cpp",
+   "note": "orchestrator override 0: recut: em008's own __sinit constructs the two pairs",
+   "text_addr": "0x8015D860"
+  },
+  {
+   "unit": "enemy/em011_prog.cpp",
+   "section": ".bss",
+   "range": [
+    "0x806A7970",
+    "0x806A79A0"
+   ],
+   "grade": "strong",
+   "signal": "orchestrator",
+   "symbols": 2,
+   "bytes": 48,
+   "signals": {
+    "orchestrator": 2
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x806A7970",
+     "finding": "vec_pair_801679B0_9..10 are materialised only by fn_8017054C (sinit at 0x8017057C), em011_prog's own __sinit"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x806A7970",
+   "takes_from": "enemy/em010_prog.cpp",
+   "note": "orchestrator override 1: recut: em011's own __sinit constructs the two pairs",
+   "text_addr": "0x8016D1C4"
+  },
+  {
    "unit": "enemy/fn_801B0010.cpp",
    "section": ".bss",
    "range": [
@@ -11843,6 +12741,35 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain fn_801B0010 --section .bss",
    "text_addr": "0x801B0010"
+  },
+  {
+   "unit": "enemy/fn_801B4348.cpp",
+   "section": ".bss",
+   "range": [
+    "0x806A7AA0",
+    "0x806A7AB8"
+   ],
+   "grade": "strong",
+   "signal": "sinit",
+   "symbols": 1,
+   "bytes": 24,
+   "signals": {
+    "sinit": 1
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x806A7AA0",
+     "finding": "vec_pair_801B4458_0 (.bss 0x806A7AA0, 0x18 B) is constructed at 0x801B6FE0 by enemy/fn_801B4348.cpp's own __sinit (fn_801B6FB0)"
+    },
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain fn_801B4348 --section .bss",
+     "finding": "1 symbol(s): 1 read by enemy/fn_801B4348.cpp (first 0x806A7AA0, last 0x806A7AA0)"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain fn_801B4348 --section .bss",
+   "text_addr": "0x801B4348"
   },
   {
    "unit": "lobby/lb_npc.cpp",
@@ -12783,6 +13710,31 @@
    "text_addr": "0x80383148"
   },
   {
+   "unit": "enemy/fn_80383148.cpp",
+   "section": ".bss",
+   "range": [
+    "0x806C5488",
+    "0x806C5528"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 2,
+   "bytes": 160,
+   "signals": {
+    "orchestrator": 2
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x806C5488 --pointers",
+     "finding": "lbl_806C5488 (0x50 B) is pointed from lbl_805EF940, a .data object read by fn_80383148; lbl_806C54D8 follows it; nothing reads either directly (unread, pointer evidence only)"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x806C5488 --pointers",
+   "text_addr": "0x80383148",
+   "note": "orchestrator override 10: medium: the .bss run follows fn_80383148's own .bss end 0x806C5488 and is named only by its .data pointer"
+  },
+  {
    "unit": "quest/quest_entry.cpp",
    "section": ".bss",
    "range": [
@@ -13083,17 +14035,15 @@
    "section": ".bss",
    "range": [
     "0x806E40C0",
-    "0x806F4B48"
+    "0x806F4658"
    ],
    "grade": "medium",
    "signal": "reader",
-   "symbols": 19,
-   "bytes": 68232,
+   "symbols": 7,
+   "bytes": 66968,
    "signals": {
-    "reader": 16,
-    "readers": 1,
-    "forced": 1,
-    "sinit": 1
+    "reader": 6,
+    "readers": 1
    },
    "evidence": [
     {
@@ -13103,18 +14053,54 @@
     },
     {
      "tool": "callers",
-     "command": "python tools/units/callers.py 0x806F4B38",
-     "finding": "lbl_806F4B38 (.bss 0x806F4B38, 0x10 B) is read at 0x80451F88 in menu/menu_plsearch.cpp"
+     "command": "python tools/units/callers.py 0x806F4644",
+     "finding": "lbl_806F4644 (.bss 0x806F4644, 0x14 B) is read at 0x8044EB34 in menu/menu_plsearch.cpp"
     },
     {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain menu_plsearch --section .bss",
-     "finding": "19 symbol(s): 18 read by menu/menu_plsearch.cpp (first 0x806E40C0, last 0x806F4B38), 1 unread one(s) forced to it by the non-decreasing link order between its neighbours' anchors"
+     "finding": "7 symbol(s): 7 read by menu/menu_plsearch.cpp (first 0x806E40C0, last 0x806F4644)"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain menu_plsearch --section .bss",
    "text_addr": "0x80448404",
    "note": "1 symbol(s) are read by another unit than the one link order puts them in (a global read where it is not defined): lbl_806E70C4 read by TRK/TRK_flush_cache.cpp"
+  },
+  {
+   "unit": "menu/fn_804513FC.cpp",
+   "section": ".bss",
+   "range": [
+    "0x806F4658",
+    "0x806F4B48"
+   ],
+   "grade": "strong",
+   "signal": "reader",
+   "symbols": 12,
+   "bytes": 1264,
+   "signals": {
+    "reader": 10,
+    "forced": 1,
+    "sinit": 1
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x806F4658",
+     "finding": "lbl_806F4658 (.bss 0x806F4658, 0x10 B) is read at 0x80452760 in menu/fn_804513FC.cpp"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x806F4B38",
+     "finding": "lbl_806F4B38 (.bss 0x806F4B38, 0x10 B) is read at 0x80451F88 in menu/fn_804513FC.cpp"
+    },
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain fn_804513FC --section .bss",
+     "finding": "12 symbol(s): 11 read by menu/fn_804513FC.cpp (first 0x806F4658, last 0x806F4B38), 1 unread one(s) forced to it by the non-decreasing link order between its neighbours' anchors"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain fn_804513FC --section .bss",
+   "text_addr": "0x804513FC"
   },
   {
    "unit": "Runtime.PPCEABI.H/Gecko_ExceptionPPC.cp",
@@ -14146,15 +15132,14 @@
    "section": ".sdata",
    "range": [
     "0x80790EF0",
-    "0x80790F0C"
+    "0x80790EF8"
    ],
    "grade": "strong",
    "signal": "string-reader",
-   "symbols": 6,
-   "bytes": 28,
+   "symbols": 2,
+   "bytes": 8,
    "signals": {
-    "string-reader": 5,
-    "reader": 1
+    "string-reader": 2
    },
    "evidence": [
     {
@@ -14164,55 +15149,54 @@
     },
     {
      "tool": "callers",
-     "command": "python tools/units/callers.py 0x80790F04",
-     "finding": "lbl_80790F04 (.sdata 0x80790F04, 0x8 B) is read at 0x80053830 in fn_8004CAD8.cpp"
+     "command": "python tools/units/callers.py 0x80790EF4",
+     "finding": "lbl_80790EF4 (.sdata 0x80790EF4, 0x3 B) is read at 0x8004FF30 in fn_8004CAD8.cpp"
     },
     {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain fn_8004CAD8 --section .sdata",
-     "finding": "6 symbol(s): 6 read by fn_8004CAD8.cpp (first 0x80790EF0, last 0x80790F04)"
+     "finding": "2 symbol(s): 2 read by fn_8004CAD8.cpp (first 0x80790EF0, last 0x80790EF4)"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain fn_8004CAD8 --section .sdata",
    "text_addr": "0x8004CAD8"
   },
   {
-   "unit": "draw_shape.cpp",
+   "unit": "main/draw_shape.cpp",
    "section": ".sdata",
    "range": [
-    "0x80790F48",
+    "0x80790EF8",
     "0x807910F8"
    ],
-   "grade": "medium",
-   "signal": "forced",
-   "symbols": 54,
-   "bytes": 432,
+   "grade": "strong",
+   "signal": "pointer-graph",
+   "symbols": 65,
+   "bytes": 512,
    "signals": {
-    "string-reader": 8,
-    "pointer-graph": 10,
-    "forced": 30,
-    "reader": 6
+    "string-reader": 11,
+    "reader": 7,
+    "pointer-graph": 47
    },
    "evidence": [
     {
      "tool": "callers",
-     "command": "python tools/units/callers.py 0x80790F48",
-     "finding": "lbl_80790F48 (.sdata 0x80790F48, 0x8 B) is read at 0x80055080 in draw_shape.cpp"
+     "command": "python tools/units/callers.py 0x80790EF8",
+     "finding": "lbl_80790EF8 (.sdata 0x80790EF8, 0x4 B) is read at 0x8005294C in main/draw_shape.cpp"
     },
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x807910F0",
-     "finding": "lbl_807910F0 (.sdata 0x807910F0, 0x8 B) is read at 0x80055950 in draw_shape.cpp"
+     "finding": "lbl_807910F0 (.sdata 0x807910F0, 0x8 B) is read at 0x80055950 in main/draw_shape.cpp"
     },
     {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain draw_shape --section .sdata",
-     "finding": "54 symbol(s): 14 read by draw_shape.cpp (first 0x80790F48, last 0x807910F0), 30 unread one(s) forced to it by the non-decreasing link order between its neighbours' anchors, 10 placed by pointer-derived evidence (pointer-graph)"
+     "finding": "65 symbol(s): 18 read by main/draw_shape.cpp (first 0x80790EF8, last 0x807910F0), 47 placed by pointer-derived evidence (pointer-graph)"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain draw_shape --section .sdata",
-   "text_addr": "0x80054C64",
-   "note": "2 symbol(s) are read by another unit than the one link order puts them in (a global read where it is not defined): lbl_80790FC8 read by fn_8004CAD8.cpp, lbl_80790FD0 read by fn_8004CAD8.cpp"
+   "text_addr": "0x8005270C",
+   "note": "the first use of the unit's .sdata pool goes down at lbl_80790F0C (after lbl_80790F00): its literals are TU-local (the reader owns them), so the unit holds two TUs' pool order - an open question of the unit"
   },
   {
    "unit": "main/draw_shape_arm.cpp",
@@ -15262,7 +16246,7 @@
    "text_addr": "0x800E9D00"
   },
   {
-   "unit": "sound/fn_800EF7D8.cpp",
+   "unit": "sound/fn_800EEAE0.cpp",
    "section": ".sdata",
    "range": [
     "0x80791470",
@@ -15282,22 +16266,22 @@
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x80791590",
-     "finding": "lbl_80791590 (.sdata 0x80791590, 0x4 B) is read at 0x800F0628 in sound/fn_800EF7D8.cpp"
+     "finding": "lbl_80791590 (.sdata 0x80791590, 0x4 B) is read at 0x800F0628 in sound/fn_800EEAE0.cpp"
     },
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x80791648",
-     "finding": "lbl_80791648 (.sdata 0x80791648, 0x7 B) is read at 0x800F1B88 in sound/fn_800EF7D8.cpp"
+     "finding": "lbl_80791648 (.sdata 0x80791648, 0x7 B) is read at 0x800F1B88 in sound/fn_800EEAE0.cpp"
     },
     {
      "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_800EF7D8 --section .sdata",
-     "finding": "67 symbol(s): 9 read by sound/fn_800EF7D8.cpp (first 0x80791590, last 0x80791648), 58 placed by pointer-derived evidence (pointer-graph)"
+     "command": "python tools/splits/dataattach.py --explain fn_800EEAE0 --section .sdata",
+     "finding": "67 symbol(s): 9 read by sound/fn_800EEAE0.cpp (first 0x80791590, last 0x80791648), 58 placed by pointer-derived evidence (pointer-graph)"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_800EF7D8 --section .sdata",
-   "text_addr": "0x800EF7D8",
-   "note": "2 symbol(s) are read by another unit than the one link order puts them in (a global read where it is not defined): lbl_80791618 read by sound/quest_snd.cpp, lbl_80791620 read by sound/quest_snd.cpp"
+   "reproduce": "python tools/splits/dataattach.py --explain fn_800EEAE0 --section .sdata",
+   "text_addr": "0x800EEAE0",
+   "note": ""
   },
   {
    "unit": "sound/fn_800F2A94.cpp",
@@ -15335,15 +16319,14 @@
    "section": ".sdata",
    "range": [
     "0x80791698",
-    "0x807916D0"
+    "0x807916C8"
    ],
-   "grade": "medium",
+   "grade": "strong",
    "signal": "reader",
-   "symbols": 8,
-   "bytes": 56,
+   "symbols": 7,
+   "bytes": 48,
    "signals": {
-    "reader": 7,
-    "pointer-graph": 1
+    "reader": 7
    },
    "evidence": [
     {
@@ -15359,46 +16342,47 @@
     {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain eft001 --section .sdata",
-     "finding": "8 symbol(s): 7 read by ef/eft001.cpp (first 0x80791698, last 0x807916C0), 1 placed by pointer-derived evidence (pointer-graph)"
+     "finding": "7 symbol(s): 7 read by ef/eft001.cpp (first 0x80791698, last 0x807916C0)"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain eft001 --section .sdata",
-   "text_addr": "0x800FAE08",
-   "note": ""
+   "text_addr": "0x800FAE08"
   },
   {
-   "unit": "ef/eft002.cpp",
+   "unit": "ef/fn_800FBE64.cpp",
    "section": ".sdata",
    "range": [
-    "0x807916D0",
+    "0x807916C8",
     "0x807916E0"
    ],
-   "grade": "strong",
+   "grade": "medium",
    "signal": "reader",
-   "symbols": 2,
-   "bytes": 16,
+   "symbols": 3,
+   "bytes": 24,
    "signals": {
+    "pointer-graph": 1,
     "reader": 2
    },
    "evidence": [
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x807916D0",
-     "finding": "lbl_807916D0 (.sdata 0x807916D0, 0x8 B) is read at 0x800FD158 in ef/eft002.cpp"
+     "finding": "lbl_807916D0 (.sdata 0x807916D0, 0x8 B) is read at 0x800FD158 in ef/fn_800FBE64.cpp"
     },
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x807916D8",
-     "finding": "lbl_807916D8 (.sdata 0x807916D8, 0x8 B) is read at 0x800FD15C in ef/eft002.cpp"
+     "finding": "lbl_807916D8 (.sdata 0x807916D8, 0x8 B) is read at 0x800FD15C in ef/fn_800FBE64.cpp"
     },
     {
      "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain eft002 --section .sdata",
-     "finding": "2 symbol(s): 2 read by ef/eft002.cpp (first 0x807916D0, last 0x807916D8)"
+     "command": "python tools/splits/dataattach.py --explain fn_800FBE64 --section .sdata",
+     "finding": "3 symbol(s): 2 read by ef/fn_800FBE64.cpp (first 0x807916D0, last 0x807916D8), 1 placed by pointer-derived evidence (pointer-graph)"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain eft002 --section .sdata",
-   "text_addr": "0x800FCED4"
+   "reproduce": "python tools/splits/dataattach.py --explain fn_800FBE64 --section .sdata",
+   "text_addr": "0x800FBE64",
+   "note": "only 2 of 3 symbol(s) are read by the unit (a strong block needs 3, max(3, N/50)): the rest is placed by link order or pointer evidence"
   },
   {
    "unit": "ef/fn_800FD520.c",
@@ -16098,7 +17082,7 @@
    "note": "only 0 of 1 symbol(s) are read by the unit (a strong block needs 1, max(3, N/50)): the rest is placed by link order or pointer evidence"
   },
   {
-   "unit": "enemy/fn_801B4458.cpp",
+   "unit": "enemy/fn_801B4348.cpp",
    "section": ".sdata",
    "range": [
     "0x80791A90",
@@ -16114,12 +17098,12 @@
    "evidence": [
     {
      "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_801B4458 --section .sdata",
-     "finding": "4 symbol(s), none read by enemy/fn_801B4458.cpp's text: 0 forced by link order, 4 placed by pointer-derived evidence (pointer-graph)"
+     "command": "python tools/splits/dataattach.py --explain fn_801B4348 --section .sdata",
+     "finding": "4 symbol(s), none read by enemy/fn_801B4348.cpp's text: 0 forced by link order, 4 placed by pointer-derived evidence (pointer-graph)"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_801B4458 --section .sdata",
-   "text_addr": "0x801B4458",
+   "reproduce": "python tools/splits/dataattach.py --explain fn_801B4348 --section .sdata",
+   "text_addr": "0x801B4348",
    "note": "only 0 of 4 symbol(s) are read by the unit (a strong block needs 3, max(3, N/50)): the rest is placed by link order or pointer evidence"
   },
   {
@@ -18473,16 +19457,15 @@
    "section": ".sdata",
    "range": [
     "0x80793B88",
-    "0x80793CB8"
+    "0x80793C0B"
    ],
    "grade": "medium",
-   "signal": "pointer-graph",
-   "symbols": 50,
-   "bytes": 304,
+   "signal": "string-reader",
+   "symbols": 17,
+   "bytes": 131,
    "signals": {
-    "pointer-graph": 27,
-    "string-reader": 12,
-    "reader": 11
+    "pointer-graph": 6,
+    "string-reader": 11
    },
    "evidence": [
     {
@@ -18492,18 +19475,54 @@
     },
     {
      "tool": "callers",
-     "command": "python tools/units/callers.py 0x80793CB0",
-     "finding": "lbl_80793CB0 (.sdata 0x80793CB0, 0x8 B) is read at 0x804527A4 in menu/menu_plsearch.cpp"
+     "command": "python tools/units/callers.py 0x80793C08",
+     "finding": "lbl_80793C08 (.sdata 0x80793C08, 0x3 B) is read at 0x8044EAE0 in menu/menu_plsearch.cpp"
     },
     {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain menu_plsearch --section .sdata",
-     "finding": "50 symbol(s): 23 read by menu/menu_plsearch.cpp (first 0x80793BB8, last 0x80793CB0), 27 placed by pointer-derived evidence (pointer-graph)"
+     "finding": "17 symbol(s): 11 read by menu/menu_plsearch.cpp (first 0x80793BB8, last 0x80793C08), 6 placed by pointer-derived evidence (pointer-graph)"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain menu_plsearch --section .sdata",
    "text_addr": "0x80448404",
-   "note": "the first use of the unit's .sdata pool goes down at lbl_80793C10 (after lbl_80793C08): its literals are TU-local (the reader owns them), so the unit holds two TUs' pool order - an open question of the unit"
+   "note": ""
+  },
+  {
+   "unit": "menu/fn_804513FC.cpp",
+   "section": ".sdata",
+   "range": [
+    "0x80793C80",
+    "0x80793CB8"
+   ],
+   "grade": "strong",
+   "signal": "reader",
+   "symbols": 14,
+   "bytes": 56,
+   "signals": {
+    "reader": 11,
+    "pointer-graph": 2,
+    "string-reader": 1
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80793C80",
+     "finding": "lbl_80793C80 (.sdata 0x80793C80, 0x1 B) is read at 0x80452534 in menu/fn_804513FC.cpp"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80793CB0",
+     "finding": "lbl_80793CB0 (.sdata 0x80793CB0, 0x8 B) is read at 0x804527A4 in menu/fn_804513FC.cpp"
+    },
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain fn_804513FC --section .sdata",
+     "finding": "14 symbol(s): 12 read by menu/fn_804513FC.cpp (first 0x80793C80, last 0x80793CB0), 2 placed by pointer-derived evidence (pointer-graph)"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain fn_804513FC --section .sdata",
+   "text_addr": "0x804513FC"
   },
   {
    "unit": "Runtime.PPCEABI.H/CPlusLibPPC.cpp",
@@ -18640,6 +19659,31 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain arc --section .sdata",
    "text_addr": "0x8046D9F0"
+  },
+  {
+   "unit": "AX/fn_80475E30.cpp",
+   "section": ".sdata",
+   "range": [
+    "0x80793D20",
+    "0x80793D28"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 2,
+   "bytes": 8,
+   "signals": {
+    "orchestrator": 2
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80793D20",
+     "finding": "lbl_80793D20 and lbl_80793D24 (4 B each) are read 5 + 5 times by AX/AXFXReverbHiExp (0x80475760..0x80475A88) and 5 + 5 times by fn_80475E30 (0x80476710..0x80476A64), the unit that holds the Shutdown function the map names AXFXReverbHiExp: one TU spans the two"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x80793D20",
+   "text_addr": "0x80475E30",
+   "note": "orchestrator override 29: medium: read by both units, placed with the later one (the name conflict AXFXReverbHiExpShutdown at 0x804760C0 says the two are one TU, phase 1 f keeps the strong cut 0x80475E30)"
   },
   {
    "unit": "BTE/gki_buffer.cpp",
@@ -18896,15 +19940,14 @@
    "section": ".sdata",
    "range": [
     "0x807941E8",
-    "0x807941FE"
+    "0x807941F8"
    ],
    "grade": "strong",
    "signal": "reader",
-   "symbols": 3,
-   "bytes": 22,
+   "symbols": 2,
+   "bytes": 16,
    "signals": {
-    "reader": 2,
-    "string-reader": 1
+    "reader": 2
    },
    "evidence": [
     {
@@ -18914,17 +19957,46 @@
     },
     {
      "tool": "callers",
-     "command": "python tools/units/callers.py 0x807941F8",
-     "finding": "lbl_807941F8 (.sdata 0x807941F8, 0x6 B) is read at 0x805075E0 in nw4r/fn_8050661C.cpp"
+     "command": "python tools/units/callers.py 0x807941F0",
+     "finding": "lbl_807941F0 (.sdata 0x807941F0, 0x8 B) is read at 0x8050712C in nw4r/fn_8050661C.cpp"
     },
     {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain fn_8050661C --section .sdata",
-     "finding": "3 symbol(s): 3 read by nw4r/fn_8050661C.cpp (first 0x807941E8, last 0x807941F8)"
+     "finding": "2 symbol(s): 2 read by nw4r/fn_8050661C.cpp (first 0x807941E8, last 0x807941F0)"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain fn_8050661C --section .sdata",
    "text_addr": "0x8050661C"
+  },
+  {
+   "unit": "DWCi/dwc_error.cpp",
+   "section": ".sdata",
+   "range": [
+    "0x807941F8",
+    "0x807941FE"
+   ],
+   "grade": "strong",
+   "signal": "string-reader",
+   "symbols": 1,
+   "bytes": 6,
+   "signals": {
+    "string-reader": 1
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x807941F8",
+     "finding": "lbl_807941F8 (.sdata 0x807941F8, 0x6 B) is read at 0x805075E0 in DWCi/dwc_error.cpp"
+    },
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain dwc_error --section .sdata",
+     "finding": "1 symbol(s): 1 read by DWCi/dwc_error.cpp (first 0x807941F8, last 0x807941F8)"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain dwc_error --section .sdata",
+   "text_addr": "0x805073C0"
   },
   {
    "unit": "DWCi/DWCi_Np_CPUCopyFast.c",
@@ -19666,6 +20738,35 @@
    "text_addr": "0x800408A8"
   },
   {
+   "unit": "main/fn_80048964.cpp",
+   "section": ".sbss",
+   "range": [
+    "0x80794878",
+    "0x80794880"
+   ],
+   "grade": "strong",
+   "signal": "readers",
+   "symbols": 1,
+   "bytes": 8,
+   "signals": {
+    "readers": 1
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80794878",
+     "finding": "bg_tex_disp_func (.sbss 0x80794878, 0x8 B) is read at 0x8004933C in main/fn_80048964.cpp"
+    },
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain fn_80048964 --section .sbss",
+     "finding": "1 symbol(s): 1 read by main/fn_80048964.cpp (first 0x80794878, last 0x80794878)"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain fn_80048964 --section .sbss",
+   "text_addr": "0x80048964"
+  },
+  {
    "unit": "fn_8004CAD8.cpp",
    "section": ".sbss",
    "range": [
@@ -19700,38 +20801,40 @@
    "text_addr": "0x8004CAD8"
   },
   {
-   "unit": "draw_shape.cpp",
+   "unit": "main/draw_shape.cpp",
    "section": ".sbss",
    "range": [
     "0x807948A0",
-    "0x807948A8"
+    "0x807948C0"
    ],
-   "grade": "strong",
-   "signal": "reader",
-   "symbols": 2,
-   "bytes": 8,
+   "grade": "medium",
+   "signal": "pointer-graph",
+   "symbols": 5,
+   "bytes": 32,
    "signals": {
-    "reader": 2
+    "reader": 2,
+    "pointer-graph": 3
    },
    "evidence": [
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x807948A0",
-     "finding": "lbl_807948A0 (.sbss 0x807948A0, 0x1 B) is read at 0x80055E30 in draw_shape.cpp"
+     "finding": "lbl_807948A0 (.sbss 0x807948A0, 0x1 B) is read at 0x80055E30 in main/draw_shape.cpp"
     },
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x807948A1",
-     "finding": "lbl_807948A1 (.sbss 0x807948A1, 0x7 B) is read at 0x80055E38 in draw_shape.cpp"
+     "finding": "lbl_807948A1 (.sbss 0x807948A1, 0x7 B) is read at 0x80055E38 in main/draw_shape.cpp"
     },
     {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain draw_shape --section .sbss",
-     "finding": "2 symbol(s): 2 read by draw_shape.cpp (first 0x807948A0, last 0x807948A1)"
+     "finding": "5 symbol(s): 2 read by main/draw_shape.cpp (first 0x807948A0, last 0x807948A1), 3 placed by pointer-derived evidence (pointer-graph)"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain draw_shape --section .sbss",
-   "text_addr": "0x80054C64"
+   "text_addr": "0x8005270C",
+   "note": "only 2 of 5 symbol(s) are read by the unit (a strong block needs 3, max(3, N/50)): the rest is placed by link order or pointer evidence"
   },
   {
    "unit": "main/draw_shape_arm.cpp",
@@ -20204,73 +21307,39 @@
    "text_addr": "0x800E9D00"
   },
   {
-   "unit": "sound/quest_snd.cpp",
+   "unit": "sound/fn_800EEAE0.cpp",
    "section": ".sbss",
    "range": [
-    "0x80794A20",
-    "0x80794A2C"
-   ],
-   "grade": "strong",
-   "signal": "reader",
-   "symbols": 3,
-   "bytes": 12,
-   "signals": {
-    "readers": 1,
-    "reader": 2
-   },
-   "evidence": [
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x80794A20",
-     "finding": "lbl_80794A20 (.sbss 0x80794A20, 0x4 B) is read at 0x800EEA38 in sound/quest_snd.cpp"
-    },
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x80794A28",
-     "finding": "lbl_80794A28 (.sbss 0x80794A28, 0x4 B) is read at 0x800EEB5C in sound/quest_snd.cpp"
-    },
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain quest_snd --section .sbss",
-     "finding": "3 symbol(s): 3 read by sound/quest_snd.cpp (first 0x80794A20, last 0x80794A28)"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain quest_snd --section .sbss",
-   "text_addr": "0x800EE014"
-  },
-  {
-   "unit": "sound/fn_800EF7D8.cpp",
-   "section": ".sbss",
-   "range": [
-    "0x80794A30",
+    "0x80794A24",
     "0x80794A40"
    ],
    "grade": "strong",
    "signal": "reader",
-   "symbols": 3,
-   "bytes": 16,
+   "symbols": 6,
+   "bytes": 28,
    "signals": {
-    "reader": 3
+    "reader": 5,
+    "readers": 1
    },
    "evidence": [
     {
      "tool": "callers",
-     "command": "python tools/units/callers.py 0x80794A30",
-     "finding": "lbl_80794A30 (.sbss 0x80794A30, 0x4 B) is read at 0x800F1BE0 in sound/fn_800EF7D8.cpp"
+     "command": "python tools/units/callers.py 0x80794A24",
+     "finding": "lbl_80794A24 (.sbss 0x80794A24, 0x4 B) is read at 0x800EEB58 in sound/fn_800EEAE0.cpp"
     },
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x80794A38",
-     "finding": "lbl_80794A38 (.sbss 0x80794A38, 0x8 B) is read at 0x800F1B04 in sound/fn_800EF7D8.cpp"
+     "finding": "lbl_80794A38 (.sbss 0x80794A38, 0x8 B) is read at 0x800F1B04 in sound/fn_800EEAE0.cpp"
     },
     {
      "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_800EF7D8 --section .sbss",
-     "finding": "3 symbol(s): 3 read by sound/fn_800EF7D8.cpp (first 0x80794A30, last 0x80794A38)"
+     "command": "python tools/splits/dataattach.py --explain fn_800EEAE0 --section .sbss",
+     "finding": "6 symbol(s): 6 read by sound/fn_800EEAE0.cpp (first 0x80794A24, last 0x80794A38)"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_800EF7D8 --section .sbss",
-   "text_addr": "0x800EF7D8"
+   "reproduce": "python tools/splits/dataattach.py --explain fn_800EEAE0 --section .sbss",
+   "text_addr": "0x800EEAE0"
   },
   {
    "unit": "ef/eft_res.cpp",
@@ -21285,17 +22354,15 @@
    "section": ".sbss",
    "range": [
     "0x80794D50",
-    "0x80794DF8"
+    "0x80794D60"
    ],
    "grade": "strong",
    "signal": "reader",
-   "symbols": 53,
-   "bytes": 168,
+   "symbols": 2,
+   "bytes": 16,
    "signals": {
-    "reader": 49,
-    "readers": 1,
-    "forced": 2,
-    "sinit": 1
+    "reader": 1,
+    "readers": 1
    },
    "evidence": [
     {
@@ -21305,17 +22372,53 @@
     },
     {
      "tool": "callers",
-     "command": "python tools/units/callers.py 0x80794DF4",
-     "finding": "lbl_80794DF4 (.sbss 0x80794DF4, 0x4 B) is read at 0x804532F8 in menu/menu_plsearch.cpp"
+     "command": "python tools/units/callers.py 0x80794D58",
+     "finding": "lbl_80794D58 (.sbss 0x80794D58, 0x8 B) is read at 0x80450514 in menu/menu_plsearch.cpp"
     },
     {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain menu_plsearch --section .sbss",
-     "finding": "53 symbol(s): 51 read by menu/menu_plsearch.cpp (first 0x80794D50, last 0x80794DF4), 2 unread one(s) forced to it by the non-decreasing link order between its neighbours' anchors"
+     "finding": "2 symbol(s): 2 read by menu/menu_plsearch.cpp (first 0x80794D50, last 0x80794D58)"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain menu_plsearch --section .sbss",
    "text_addr": "0x80448404"
+  },
+  {
+   "unit": "menu/fn_804513FC.cpp",
+   "section": ".sbss",
+   "range": [
+    "0x80794D65",
+    "0x80794DF8"
+   ],
+   "grade": "strong",
+   "signal": "reader",
+   "symbols": 49,
+   "bytes": 147,
+   "signals": {
+    "reader": 45,
+    "readers": 3,
+    "sinit": 1
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80794D65",
+     "finding": "lbl_80794D65 (.sbss 0x80794D65, 0x1 B) is read at 0x80451780 in menu/fn_804513FC.cpp"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80794DF4",
+     "finding": "lbl_80794DF4 (.sbss 0x80794DF4, 0x4 B) is read at 0x804532F8 in menu/fn_804513FC.cpp"
+    },
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain fn_804513FC --section .sbss",
+     "finding": "49 symbol(s): 49 read by menu/fn_804513FC.cpp (first 0x80794D65, last 0x80794DF4)"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain fn_804513FC --section .sbss",
+   "text_addr": "0x804513FC"
   },
   {
    "unit": "Runtime.PPCEABI.H/global_destructor_chain.c",
@@ -21831,14 +22934,14 @@
    "section": ".sbss",
    "range": [
     "0x80795780",
-    "0x807957D0"
+    "0x807957B0"
    ],
    "grade": "strong",
    "signal": "reader",
-   "symbols": 19,
-   "bytes": 80,
+   "symbols": 12,
+   "bytes": 48,
    "signals": {
-    "reader": 19
+    "reader": 12
    },
    "evidence": [
     {
@@ -21848,17 +22951,51 @@
     },
     {
      "tool": "callers",
-     "command": "python tools/units/callers.py 0x807957C8",
-     "finding": "lbl_807957C8 (.sbss 0x807957C8, 0x8 B) is read at 0x80507928 in nw4r/fn_8050661C.cpp"
+     "command": "python tools/units/callers.py 0x807957AC",
+     "finding": "lbl_807957AC (.sbss 0x807957AC, 0x4 B) is read at 0x80506760 in nw4r/fn_8050661C.cpp"
     },
     {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain fn_8050661C --section .sbss",
-     "finding": "19 symbol(s): 19 read by nw4r/fn_8050661C.cpp (first 0x80795780, last 0x807957C8)"
+     "finding": "12 symbol(s): 12 read by nw4r/fn_8050661C.cpp (first 0x80795780, last 0x807957AC)"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain fn_8050661C --section .sbss",
    "text_addr": "0x8050661C"
+  },
+  {
+   "unit": "DWCi/dwc_error.cpp",
+   "section": ".sbss",
+   "range": [
+    "0x807957B0",
+    "0x807957D0"
+   ],
+   "grade": "strong",
+   "signal": "reader",
+   "symbols": 7,
+   "bytes": 32,
+   "signals": {
+    "reader": 7
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x807957B0",
+     "finding": "lbl_807957B0 (.sbss 0x807957B0, 0x4 B) is read at 0x805073D8 in DWCi/dwc_error.cpp"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x807957C8",
+     "finding": "lbl_807957C8 (.sbss 0x807957C8, 0x8 B) is read at 0x80507928 in DWCi/dwc_error.cpp"
+    },
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain dwc_error --section .sbss",
+     "finding": "7 symbol(s): 7 read by DWCi/dwc_error.cpp (first 0x807957B0, last 0x807957C8)"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain dwc_error --section .sbss",
+   "text_addr": "0x805073C0"
   },
   {
    "unit": "DWCi/fn_80509DB0.cpp",
@@ -22026,15 +23163,14 @@
    "section": ".sbss",
    "range": [
     "0x807958D8",
-    "0x80795A20"
+    "0x80795A18"
    ],
    "grade": "strong",
    "signal": "reader",
-   "symbols": 67,
-   "bytes": 328,
+   "symbols": 66,
+   "bytes": 320,
    "signals": {
-    "reader": 66,
-    "sinit": 1
+    "reader": 66
    },
    "evidence": [
     {
@@ -22044,17 +23180,46 @@
     },
     {
      "tool": "callers",
-     "command": "python tools/units/callers.py 0x80795A18",
-     "finding": "lbl_80795A18 (.sbss 0x80795A18, 0x8 B) is constructed at 0x8052AFFC by SO/soi.cpp's own __sinit (fn_8052AFF8)"
+     "command": "python tools/units/callers.py 0x80795A10",
+     "finding": "lbl_80795A10 (.sbss 0x80795A10, 0x8 B) is read at 0x80529E88 in SO/soi.cpp"
     },
     {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain soi --section .sbss",
-     "finding": "67 symbol(s): 67 read by SO/soi.cpp (first 0x807958D8, last 0x80795A18)"
+     "finding": "66 symbol(s): 66 read by SO/soi.cpp (first 0x807958D8, last 0x80795A10)"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain soi --section .sbss",
    "text_addr": "0x8051E864"
+  },
+  {
+   "unit": "homebutton/fn_8052A040.cpp",
+   "section": ".sbss",
+   "range": [
+    "0x80795A18",
+    "0x80795A20"
+   ],
+   "grade": "strong",
+   "signal": "sinit",
+   "symbols": 1,
+   "bytes": 8,
+   "signals": {
+    "sinit": 1
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80795A18",
+     "finding": "lbl_80795A18 (.sbss 0x80795A18, 0x8 B) is constructed at 0x8052AFFC by homebutton/fn_8052A040.cpp's own __sinit (fn_8052AFF8)"
+    },
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain fn_8052A040 --section .sbss",
+     "finding": "1 symbol(s): 1 read by homebutton/fn_8052A040.cpp (first 0x80795A18, last 0x80795A18)"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain fn_8052A040 --section .sbss",
+   "text_addr": "0x8052A040"
   },
   {
    "unit": "homebutton/fn_8052B004.cpp",
@@ -22408,14 +23573,14 @@
    "section": ".sdata2",
    "range": [
     "0x80795B70",
-    "0x80795BC0"
+    "0x80795BA8"
    ],
    "grade": "strong",
    "signal": "pool-order",
-   "symbols": 15,
-   "bytes": 80,
+   "symbols": 11,
+   "bytes": 56,
    "signals": {
-    "pool-order": 15
+    "pool-order": 11
    },
    "evidence": [
     {
@@ -22425,31 +23590,65 @@
     },
     {
      "tool": "callers",
-     "command": "python tools/units/callers.py 0x80795BB8",
-     "finding": "lbl_80795BB8 (.sdata2 0x80795BB8, 0x8 B) is read at 0x80048E78 in fn_80047398.cpp"
+     "command": "python tools/units/callers.py 0x80795BA0",
+     "finding": "lbl_80795BA0 (.sdata2 0x80795BA0, 0x8 B) is read at 0x80047E1C in fn_80047398.cpp"
     },
     {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain fn_80047398 --section .sdata2",
-     "finding": "15 symbol(s): 15 read by fn_80047398.cpp (first 0x80795B70, last 0x80795BB8)"
+     "finding": "11 symbol(s): 11 read by fn_80047398.cpp (first 0x80795B70, last 0x80795BA0)"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain fn_80047398 --section .sdata2",
    "text_addr": "0x80047398"
   },
   {
+   "unit": "main/fn_80048964.cpp",
+   "section": ".sdata2",
+   "range": [
+    "0x80795BA8",
+    "0x80795BC0"
+   ],
+   "grade": "strong",
+   "signal": "pool-order",
+   "symbols": 4,
+   "bytes": 24,
+   "signals": {
+    "pool-order": 4
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80795BA8",
+     "finding": "lbl_80795BA8 (.sdata2 0x80795BA8, 0x4 B) is read at 0x80048A44 in main/fn_80048964.cpp"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80795BB8",
+     "finding": "lbl_80795BB8 (.sdata2 0x80795BB8, 0x8 B) is read at 0x80048E78 in main/fn_80048964.cpp"
+    },
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain fn_80048964 --section .sdata2",
+     "finding": "4 symbol(s): 4 read by main/fn_80048964.cpp (first 0x80795BA8, last 0x80795BB8)"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain fn_80048964 --section .sdata2",
+   "text_addr": "0x80048964"
+  },
+  {
    "unit": "fn_8004CAD8.cpp",
    "section": ".sdata2",
    "range": [
     "0x80795BC0",
-    "0x80795C18"
+    "0x80795BF8"
    ],
    "grade": "strong",
    "signal": "pool-order",
-   "symbols": 18,
-   "bytes": 88,
+   "symbols": 12,
+   "bytes": 56,
    "signals": {
-    "pool-order": 18
+    "pool-order": 12
    },
    "evidence": [
     {
@@ -22459,17 +23658,51 @@
     },
     {
      "tool": "callers",
-     "command": "python tools/units/callers.py 0x80795C10",
-     "finding": "lbl_80795C10 (.sdata2 0x80795C10, 0x8 B) is read at 0x80053644 in fn_8004CAD8.cpp"
+     "command": "python tools/units/callers.py 0x80795BF0",
+     "finding": "lbl_80795BF0 (.sdata2 0x80795BF0, 0x8 B) is read at 0x800522B8 in fn_8004CAD8.cpp"
     },
     {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain fn_8004CAD8 --section .sdata2",
-     "finding": "18 symbol(s): 18 read by fn_8004CAD8.cpp (first 0x80795BC0, last 0x80795C10)"
+     "finding": "12 symbol(s): 12 read by fn_8004CAD8.cpp (first 0x80795BC0, last 0x80795BF0)"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain fn_8004CAD8 --section .sdata2",
    "text_addr": "0x8004CAD8"
+  },
+  {
+   "unit": "main/draw_shape.cpp",
+   "section": ".sdata2",
+   "range": [
+    "0x80795BF8",
+    "0x80795C18"
+   ],
+   "grade": "strong",
+   "signal": "pool-order",
+   "symbols": 6,
+   "bytes": 32,
+   "signals": {
+    "pool-order": 6
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80795BF8",
+     "finding": "lbl_80795BF8 (.sdata2 0x80795BF8, 0x4 B) is read at 0x80052720 in main/draw_shape.cpp"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80795C10",
+     "finding": "lbl_80795C10 (.sdata2 0x80795C10, 0x8 B) is read at 0x80053644 in main/draw_shape.cpp"
+    },
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain draw_shape --section .sdata2",
+     "finding": "6 symbol(s): 6 read by main/draw_shape.cpp (first 0x80795BF8, last 0x80795C10)"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain draw_shape --section .sdata2",
+   "text_addr": "0x8005270C"
   },
   {
    "unit": "main/draw_shape_arm.cpp",
@@ -24537,7 +25770,7 @@
    "text_addr": "0x800EE014"
   },
   {
-   "unit": "sound/fn_800EF7D8.cpp",
+   "unit": "sound/fn_800EEAE0.cpp",
    "section": ".sdata2",
    "range": [
     "0x80796588",
@@ -24554,21 +25787,21 @@
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x80796588",
-     "finding": "lbl_80796588 (.sdata2 0x80796588, 0x4 B) is read at 0x800F2A44 in sound/fn_800EF7D8.cpp"
+     "finding": "lbl_80796588 (.sdata2 0x80796588, 0x4 B) is read at 0x800F2A44 in sound/fn_800EEAE0.cpp"
     },
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x80796598",
-     "finding": "lbl_80796598 (.sdata2 0x80796598, 0x8 B) is read at 0x800F2A2C in sound/fn_800EF7D8.cpp"
+     "finding": "lbl_80796598 (.sdata2 0x80796598, 0x8 B) is read at 0x800F2A2C in sound/fn_800EEAE0.cpp"
     },
     {
      "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_800EF7D8 --section .sdata2",
-     "finding": "4 symbol(s): 4 read by sound/fn_800EF7D8.cpp (first 0x80796588, last 0x80796598)"
+     "command": "python tools/splits/dataattach.py --explain fn_800EEAE0 --section .sdata2",
+     "finding": "4 symbol(s): 4 read by sound/fn_800EEAE0.cpp (first 0x80796588, last 0x80796598)"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_800EF7D8 --section .sdata2",
-   "text_addr": "0x800EF7D8"
+   "reproduce": "python tools/splits/dataattach.py --explain fn_800EEAE0 --section .sdata2",
+   "text_addr": "0x800EEAE0"
   },
   {
    "unit": "sound/fn_800F2A94.cpp",
@@ -24677,14 +25910,14 @@
    "section": ".sdata2",
    "range": [
     "0x80796608",
-    "0x80796650"
+    "0x80796640"
    ],
    "grade": "strong",
    "signal": "pool-order",
-   "symbols": 15,
-   "bytes": 72,
+   "symbols": 12,
+   "bytes": 56,
    "signals": {
-    "pool-order": 15
+    "pool-order": 12
    },
    "evidence": [
     {
@@ -24694,46 +25927,51 @@
     },
     {
      "tool": "callers",
-     "command": "python tools/units/callers.py 0x80796648",
-     "finding": "lbl_80796648 (.sdata2 0x80796648, 0x4 B) is read at 0x800FCC20 in ef/eft001.cpp"
+     "command": "python tools/units/callers.py 0x80796638",
+     "finding": "lbl_80796638 (.sdata2 0x80796638, 0x8 B) is read at 0x800FB6AC in ef/eft001.cpp"
     },
     {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain eft001 --section .sdata2",
-     "finding": "15 symbol(s): 15 read by ef/eft001.cpp (first 0x80796608, last 0x80796648)"
+     "finding": "12 symbol(s): 12 read by ef/eft001.cpp (first 0x80796608, last 0x80796638)"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain eft001 --section .sdata2",
    "text_addr": "0x800FAE08"
   },
   {
-   "unit": "ef/eft002.cpp",
+   "unit": "ef/fn_800FBE64.cpp",
    "section": ".sdata2",
    "range": [
-    "0x80796650",
+    "0x80796640",
     "0x80796658"
    ],
    "grade": "strong",
    "signal": "pool-order",
-   "symbols": 1,
-   "bytes": 8,
+   "symbols": 4,
+   "bytes": 24,
    "signals": {
-    "pool-order": 1
+    "pool-order": 4
    },
    "evidence": [
     {
      "tool": "callers",
+     "command": "python tools/units/callers.py 0x80796640",
+     "finding": "lbl_80796640 (.sdata2 0x80796640, 0x4 B) is read at 0x800FBF54 in ef/fn_800FBE64.cpp"
+    },
+    {
+     "tool": "callers",
      "command": "python tools/units/callers.py 0x80796650",
-     "finding": "lbl_80796650 (.sdata2 0x80796650, 0x8 B) is read at 0x800FD058 in ef/eft002.cpp"
+     "finding": "lbl_80796650 (.sdata2 0x80796650, 0x8 B) is read at 0x800FD058 in ef/fn_800FBE64.cpp"
     },
     {
      "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain eft002 --section .sdata2",
-     "finding": "1 symbol(s): 1 read by ef/eft002.cpp (first 0x80796650, last 0x80796650)"
+     "command": "python tools/splits/dataattach.py --explain fn_800FBE64 --section .sdata2",
+     "finding": "4 symbol(s): 4 read by ef/fn_800FBE64.cpp (first 0x80796640, last 0x80796650)"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain eft002 --section .sdata2",
-   "text_addr": "0x800FCED4"
+   "reproduce": "python tools/splits/dataattach.py --explain fn_800FBE64 --section .sdata2",
+   "text_addr": "0x800FBE64"
   },
   {
    "unit": "ef/fn_800FD520.c",
@@ -26025,7 +27263,7 @@
    "text_addr": "0x801B0010"
   },
   {
-   "unit": "enemy/fn_801B4458.cpp",
+   "unit": "enemy/fn_801B4348.cpp",
    "section": ".sdata2",
    "range": [
     "0x80798C68",
@@ -26042,21 +27280,21 @@
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x80798C68",
-     "finding": "lbl_80798C68 (.sdata2 0x80798C68, 0x4 B) is read at 0x801B4490 in enemy/fn_801B4458.cpp"
+     "finding": "lbl_80798C68 (.sdata2 0x80798C68, 0x4 B) is read at 0x801B4490 in enemy/fn_801B4348.cpp"
     },
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x80798CF4",
-     "finding": "lbl_80798CF4 (.sdata2 0x80798CF4, 0x4 B) is read at 0x801B6FF0 in enemy/fn_801B4458.cpp"
+     "finding": "lbl_80798CF4 (.sdata2 0x80798CF4, 0x4 B) is read at 0x801B6FF0 in enemy/fn_801B4348.cpp"
     },
     {
      "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_801B4458 --section .sdata2",
-     "finding": "36 symbol(s): 36 read by enemy/fn_801B4458.cpp (first 0x80798C68, last 0x80798CF4)"
+     "command": "python tools/splits/dataattach.py --explain fn_801B4348 --section .sdata2",
+     "finding": "36 symbol(s): 36 read by enemy/fn_801B4348.cpp (first 0x80798C68, last 0x80798CF4)"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_801B4458 --section .sdata2",
-   "text_addr": "0x801B4458",
+   "reproduce": "python tools/splits/dataattach.py --explain fn_801B4348 --section .sdata2",
+   "text_addr": "0x801B4348",
    "note": "the first use of the unit's .sdata2 pool goes down at lbl_80798C74 (after lbl_80798C70): its literals are TU-local (the reader owns them), so the unit holds two TUs' pool order - an open question of the unit"
   },
   {
@@ -26535,6 +27773,58 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain fn_80220038 --section .sdata2",
    "text_addr": "0x80220038"
+  },
+  {
+   "unit": "Pl/pl_act_step.cpp",
+   "section": ".sdata2",
+   "range": [
+    "0x80799E00",
+    "0x80799F98"
+   ],
+   "grade": "strong",
+   "signal": "orchestrator",
+   "symbols": 101,
+   "bytes": 408,
+   "signals": {
+    "orchestrator": 101
+   },
+   "evidence": [
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain Pl/pl_frame_data",
+     "finding": "all 101 literals of Pl/pl_frame_data are read by pl_act_step and by no other unit"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain Pl/pl_frame_data",
+   "takes_from": "Pl/pl_frame_data.cpp",
+   "note": "orchestrator override 7: fold of the data-only unit into the reader; phase 4 removes src/Pl/pl_frame_data.*",
+   "text_addr": "0x802430E8"
+  },
+  {
+   "unit": "Pl/pl_act_step.cpp",
+   "section": ".sdata2",
+   "range": [
+    "0x80799F98",
+    "0x80799FDC"
+   ],
+   "grade": "strong",
+   "signal": "orchestrator",
+   "symbols": 17,
+   "bytes": 68,
+   "signals": {
+    "orchestrator": 17
+   },
+   "evidence": [
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain Pl/pl_act_data",
+     "finding": "all 17 literals of Pl/pl_act_data are read by pl_act_step and by no other unit"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain Pl/pl_act_data",
+   "takes_from": "Pl/pl_act_data.cpp",
+   "note": "orchestrator override 8: fold of the data-only unit into the reader; phase 4 removes src/Pl/pl_act_data.*",
+   "text_addr": "0x802430E8"
   },
   {
    "unit": "Pl/pl_act_step.cpp",
@@ -28566,7 +29856,7 @@
    "text_addr": "0x8043D524"
   },
   {
-   "unit": "menu/menu_plsearch.cpp",
+   "unit": "menu/fn_804513FC.cpp",
    "section": ".sdata2",
    "range": [
     "0x8079C998",
@@ -28583,21 +29873,21 @@
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x8079C998",
-     "finding": "lbl_8079C998 (.sdata2 0x8079C998, 0x8 B) is read at 0x804524E8 in menu/menu_plsearch.cpp"
+     "finding": "lbl_8079C998 (.sdata2 0x8079C998, 0x8 B) is read at 0x804524E8 in menu/fn_804513FC.cpp"
     },
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x8079C9A4",
-     "finding": "lbl_8079C9A4 (.sdata2 0x8079C9A4, 0x4 B) is read at 0x80454EC0 in menu/menu_plsearch.cpp"
+     "finding": "lbl_8079C9A4 (.sdata2 0x8079C9A4, 0x4 B) is read at 0x80454EC0 in menu/fn_804513FC.cpp"
     },
     {
      "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain menu_plsearch --section .sdata2",
-     "finding": "3 symbol(s): 3 read by menu/menu_plsearch.cpp (first 0x8079C998, last 0x8079C9A4)"
+     "command": "python tools/splits/dataattach.py --explain fn_804513FC --section .sdata2",
+     "finding": "3 symbol(s): 3 read by menu/fn_804513FC.cpp (first 0x8079C998, last 0x8079C9A4)"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain menu_plsearch --section .sdata2",
-   "text_addr": "0x80448404"
+   "reproduce": "python tools/splits/dataattach.py --explain fn_804513FC --section .sdata2",
+   "text_addr": "0x804513FC"
   },
   {
    "unit": "MSL_C/alloc.cpp",
@@ -29865,14 +31155,14 @@
    "section": ".sdata2",
    "range": [
     "0x8079D528",
-    "0x8079D570"
+    "0x8079D550"
    ],
    "grade": "strong",
    "signal": "pool-order",
-   "symbols": 15,
-   "bytes": 72,
+   "symbols": 9,
+   "bytes": 40,
    "signals": {
-    "pool-order": 15
+    "pool-order": 9
    },
    "evidence": [
     {
@@ -29882,17 +31172,51 @@
     },
     {
      "tool": "callers",
-     "command": "python tools/units/callers.py 0x8079D568",
-     "finding": "lbl_8079D568 (.sdata2 0x8079D568, 0x8 B) is read at 0x8052AF2C in SO/soi.cpp"
+     "command": "python tools/units/callers.py 0x8079D548",
+     "finding": "lbl_8079D548 (.sdata2 0x8079D548, 0x8 B) is read at 0x805269E8 in SO/soi.cpp"
     },
     {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain soi --section .sdata2",
-     "finding": "15 symbol(s): 15 read by SO/soi.cpp (first 0x8079D528, last 0x8079D568)"
+     "finding": "9 symbol(s): 9 read by SO/soi.cpp (first 0x8079D528, last 0x8079D548)"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain soi --section .sdata2",
    "text_addr": "0x8051E864"
+  },
+  {
+   "unit": "homebutton/fn_8052A040.cpp",
+   "section": ".sdata2",
+   "range": [
+    "0x8079D550",
+    "0x8079D570"
+   ],
+   "grade": "strong",
+   "signal": "pool-order",
+   "symbols": 6,
+   "bytes": 32,
+   "signals": {
+    "pool-order": 6
+   },
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8079D550",
+     "finding": "lbl_8079D550 (.sdata2 0x8079D550, 0x4 B) is read at 0x8052A148 in homebutton/fn_8052A040.cpp"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8079D568",
+     "finding": "lbl_8079D568 (.sdata2 0x8079D568, 0x8 B) is read at 0x8052AF2C in homebutton/fn_8052A040.cpp"
+    },
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain fn_8052A040 --section .sdata2",
+     "finding": "6 symbol(s): 6 read by homebutton/fn_8052A040.cpp (first 0x8079D550, last 0x8079D568)"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain fn_8052A040 --section .sdata2",
+   "text_addr": "0x8052A040"
   },
   {
    "unit": "homebutton/fn_8052B004.cpp",
@@ -30646,7 +31970,7 @@
    "symbols": 1,
    "bytes": 15,
    "candidates": [
-    "menu/menu_plsearch.cpp",
+    "menu/fn_804513FC.cpp",
     "MSL/strlen.cpp",
     "Runtime.PPCEABI.H/__va_arg.cpp",
     "Runtime.PPCEABI.H/global_destructor_chain.c",
@@ -30656,33 +31980,11 @@
    "evidence": [
     {
      "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain menu_plsearch --section .rodata",
-     "finding": "1 symbol(s) nothing reads: the boundary between menu_plsearch and ptmf lies somewhere in them (last anchor of the first, first anchor of the second)"
+     "command": "python tools/splits/dataattach.py --explain fn_804513FC --section .rodata",
+     "finding": "1 symbol(s) nothing reads: the boundary between fn_804513FC and ptmf lies somewhere in them (last anchor of the first, first anchor of the second)"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain menu_plsearch --section .rodata"
-  },
-  {
-   "section": ".rodata",
-   "range": [
-    "0x80573CD8",
-    "0x80574CE8"
-   ],
-   "kind": "ambiguous",
-   "symbols": 1,
-   "bytes": 4112,
-   "candidates": [
-    "nw4r/math_triangular.cpp",
-    "nw4r/fn_80501CE8.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain math_triangular --section .rodata",
-     "finding": "1 symbol(s), 1 read (by math_triangular, fn_80501CE8): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain math_triangular --section .rodata"
+   "reproduce": "python tools/splits/dataattach.py --explain fn_804513FC --section .rodata"
   },
   {
    "section": ".rodata",
@@ -30733,29 +32035,65 @@
   {
    "section": ".data",
    "range": [
-    "0x80581158",
-    "0x80582C60"
+    "0x80581180",
+    "0x805813E8"
    ],
+   "kind": "ambiguous",
+   "symbols": 3,
+   "bytes": 616,
    "candidates": [
-    "fn_80047398.cpp"
+    "fn_8004CAD8.cpp"
    ],
-   "kind": "multi-tu",
-   "symbols": 199,
-   "bytes": 6920,
-   "signals": {
-    "pointer-graph": 171,
-    "forced": 26,
-    "reader": 2
-   },
    "evidence": [
     {
-     "tool": "splitcheck",
-     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only jumptable --unit fn_80047398",
-     "finding": "jumptable_80581544 is read by fn_8004C9A0.cpp, not by this unit"
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain fn_8004CAD8 --section .data",
+     "finding": "3 symbol(s), 3 read (by fn_8004CAD8): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_80047398 --section .data",
-   "note": "link order and evidence put these symbols in fn_80047398.cpp, but attaching them makes the jumptable invariant fail: the unit holds more than one TU, or one of its reads is not its own"
+   "reproduce": "python tools/splits/dataattach.py --explain fn_8004CAD8 --section .data"
+  },
+  {
+   "section": ".data",
+   "range": [
+    "0x805813E8",
+    "0x80581544"
+   ],
+   "kind": "ambiguous",
+   "symbols": 2,
+   "bytes": 348,
+   "candidates": [
+    "main/fn_80048964.cpp"
+   ],
+   "evidence": [
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain fn_80048964 --section .data",
+     "finding": "2 symbol(s), 2 read (by fn_80048964): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain fn_80048964 --section .data"
+  },
+  {
+   "section": ".data",
+   "range": [
+    "0x80581544",
+    "0x80581584"
+   ],
+   "kind": "ambiguous",
+   "symbols": 1,
+   "bytes": 64,
+   "candidates": [
+    "fn_8004C9A0.cpp"
+   ],
+   "evidence": [
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain fn_8004C9A0 --section .data",
+     "finding": "1 symbol(s), 1 read (by fn_8004C9A0): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain fn_8004C9A0 --section .data"
   },
   {
    "section": ".data",
@@ -30767,7 +32105,7 @@
    "symbols": 10,
    "bytes": 564,
    "candidates": [
-    "draw_shape.cpp",
+    "main/draw_shape.cpp",
     "main/draw_shape_arm.cpp",
     "fn_80056F24.cpp"
    ],
@@ -30778,7 +32116,8 @@
      "finding": "10 symbol(s) nothing reads: the boundary between draw_shape and fn_80056F24 lies somewhere in them (last anchor of the first, first anchor of the second)"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain draw_shape --section .data"
+   "reproduce": "python tools/splits/dataattach.py --explain draw_shape --section .data",
+   "note": "derived evidence names mh3_pad.cpp (pointer-graph), outside the interval: the monotone link order puts the symbol before data that a unit inside the interval reads (that unit may be the head of the named one's TU)"
   },
   {
    "section": ".data",
@@ -30892,28 +32231,6 @@
   {
    "section": ".data",
    "range": [
-    "0x8059241C",
-    "0x80592430"
-   ],
-   "kind": "unread",
-   "symbols": 1,
-   "bytes": 20,
-   "candidates": [
-    "ef/ef_draworder.cpp",
-    "ef/ef_effect.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain ef_draworder --section .data",
-     "finding": "1 symbol(s), 1 read (by ef_draworder, ef_effect): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain ef_draworder --section .data"
-  },
-  {
-   "section": ".data",
-   "range": [
     "0x80593F68",
     "0x805941F8"
    ],
@@ -30941,72 +32258,6 @@
   {
    "section": ".data",
    "range": [
-    "0x80594318",
-    "0x80594330"
-   ],
-   "kind": "unread",
-   "symbols": 1,
-   "bytes": 24,
-   "candidates": [
-    "ef/ef_drawfreestrategy.cpp",
-    "ef/ef_drawlinestrategy.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain ef_drawfreestrategy --section .data",
-     "finding": "1 symbol(s), 1 read (by ef_drawfreestrategy, ef_drawlinestrategy): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain ef_drawfreestrategy --section .data"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x805943F0",
-    "0x80594408"
-   ],
-   "kind": "unread",
-   "symbols": 1,
-   "bytes": 24,
-   "candidates": [
-    "ef/ef_drawlinestrategy.cpp",
-    "ef/ef_drawpointstrategy.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain ef_drawlinestrategy --section .data",
-     "finding": "1 symbol(s), 1 read (by ef_drawlinestrategy, ef_drawpointstrategy): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain ef_drawlinestrategy --section .data"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x805944C8",
-    "0x805944E0"
-   ],
-   "kind": "unread",
-   "symbols": 1,
-   "bytes": 24,
-   "candidates": [
-    "ef/ef_drawpointstrategy.cpp",
-    "ef/ef_drawsmoothstripestrategy.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain ef_drawpointstrategy --section .data",
-     "finding": "1 symbol(s), 1 read (by ef_drawpointstrategy, ef_drawsmoothstripestrategy): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain ef_drawpointstrategy --section .data"
-  },
-  {
-   "section": ".data",
-   "range": [
     "0x80594840",
     "0x80594850"
    ],
@@ -31025,171 +32276,6 @@
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain ef_drawsmoothstripestrategy --section .data"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x80594C58",
-    "0x80594C68"
-   ],
-   "kind": "unread",
-   "symbols": 1,
-   "bytes": 16,
-   "candidates": [
-    "ef/ef_torus.cpp",
-    "ef/ef_cube.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain ef_torus --section .data",
-     "finding": "1 symbol(s), 1 read (by ef_torus, ef_cube): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain ef_torus --section .data"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x80594D14",
-    "0x80594D20"
-   ],
-   "kind": "unread",
-   "symbols": 1,
-   "bytes": 12,
-   "candidates": [
-    "ef/ef_cube.cpp",
-    "ef/ef_cylinder.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain ef_cube --section .data",
-     "finding": "1 symbol(s), 1 read (by ef_cube, ef_cylinder): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain ef_cube --section .data"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x80594DD0",
-    "0x80594DE0"
-   ],
-   "kind": "unread",
-   "symbols": 1,
-   "bytes": 16,
-   "candidates": [
-    "ef/ef_cylinder.cpp",
-    "ef/ef_disc.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain ef_cylinder --section .data",
-     "finding": "1 symbol(s), 1 read (by ef_cylinder, ef_disc): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain ef_cylinder --section .data"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x80594F8C",
-    "0x80594F98"
-   ],
-   "kind": "unread",
-   "symbols": 1,
-   "bytes": 12,
-   "candidates": [
-    "ef/ef_line.cpp",
-    "ef/ef_point.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain ef_line --section .data",
-     "finding": "1 symbol(s), 1 read (by ef_line, ef_point): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain ef_line --section .data"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x80595048",
-    "0x80595058"
-   ],
-   "kind": "unread",
-   "symbols": 1,
-   "bytes": 16,
-   "candidates": [
-    "ef/ef_point.cpp",
-    "ef/ef_sphere.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain ef_point --section .data",
-     "finding": "1 symbol(s), 1 read (by ef_point, ef_sphere): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain ef_point --section .data"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x805980A8",
-    "0x8059B16C"
-   ],
-   "kind": "interleave",
-   "symbols": 375,
-   "bytes": 12484,
-   "candidates": [
-    "sound/quest_snd.cpp",
-    "sound/fn_800EF7D8.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain quest_snd --section .data",
-     "finding": "the data of quest_snd / fn_800EF7D8 alternates (8 symbol(s) are read by a unit other than the one their position implies: lbl_80598B38 read by sound/quest_snd.cpp, lbl_80598B70 read by sound/quest_snd.cpp, lbl_80598FAC read by sound/quest_snd.cpp): one TU, or one reads the other's data"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain quest_snd --section .data",
-   "signals": {
-    "reader": 26,
-    "pointer-graph": 314,
-    "readers": 4,
-    "string-reader": 31
-   }
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x8059B5F8",
-    "0x8059B9A8"
-   ],
-   "kind": "interleave",
-   "symbols": 31,
-   "bytes": 944,
-   "candidates": [
-    "ef/eft001.cpp",
-    "ef/eft002.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain eft001 --section .data",
-     "finding": "the data of eft001 / eft002 alternates (7 symbol(s) are read by a unit other than the one their position implies: lbl_8059B7C8 read by ef/eft001.cpp, lbl_8059B7D8 read by ef/eft001.cpp, lbl_8059B7EC read by ef/eft001.cpp): one TU, or one reads the other's data"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain eft001 --section .data",
-   "signals": {
-    "reader": 20,
-    "pointer-graph": 6,
-    "jumptable": 5
-   }
   },
   {
    "section": ".data",
@@ -31238,29 +32324,6 @@
   {
    "section": ".data",
    "range": [
-    "0x805B17A8",
-    "0x805B1818"
-   ],
-   "kind": "unread",
-   "symbols": 1,
-   "bytes": 112,
-   "candidates": [
-    "enemy/fn_801B0010.cpp",
-    "enemy/fn_801B4348.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_801B0010 --section .data",
-     "finding": "1 symbol(s) nothing reads: the boundary between fn_801B0010 and fn_801B4348 lies somewhere in them (last anchor of the first, first anchor of the second)"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_801B0010 --section .data",
-   "note": "derived evidence names enemy/fn_801B4458.cpp (code-pointers), outside the interval: the monotone link order puts the symbol before data that a unit inside the interval reads (that unit may be the head of the named one's TU)"
-  },
-  {
-   "section": ".data",
-   "range": [
     "0x805BA540",
     "0x805BA650"
    ],
@@ -31305,34 +32368,12 @@
   {
    "section": ".data",
    "range": [
-    "0x805BDC48",
-    "0x805C15A8"
+    "0x805C80A8",
+    "0x805C9568"
    ],
-   "kind": "unread",
-   "symbols": 72,
-   "bytes": 14688,
-   "candidates": [
-    "lobby/fn_80220038.cpp",
-    "Pl/fn_80229ECC.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_80220038 --section .data",
-     "finding": "72 symbol(s), 2 read (by fn_80220038, fn_80229ECC): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_80220038 --section .data"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x805C6100",
-    "0x805CBFC0"
-   ],
-   "kind": "interleave",
-   "symbols": 167,
-   "bytes": 24256,
+   "kind": "orchestrator",
+   "symbols": 29,
+   "bytes": 5312,
    "candidates": [
     "Pl/pl_act.cpp",
     "Pl/fn_802840DC.cpp"
@@ -31341,16 +32382,12 @@
     {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain pl_act --section .data",
-     "finding": "the data of pl_act / fn_802840DC alternates (1 symbol(s) are read by a unit other than the one their position implies: jumptable_805C80A8 read by Pl/fn_802840DC.cpp): one TU, or one reads the other's data"
+     "finding": "interleave kept deferred: either the tables are fn_802840DC's TU (read as externs by pl_act) or the registered edge is misplaced"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain pl_act --section .data",
-   "signals": {
-    "reader": 118,
-    "jumptable": 7,
-    "pointer-graph": 26,
-    "forced": 16
-   }
+   "note": "orchestrator override 6: interleave kept deferred: either the tables are fn_802840DC's TU (read as externs by pl_act) or the registered edge is misplaced",
+   "reason": "deferred by an orchestrator override"
   },
   {
    "section": ".data",
@@ -31441,28 +32478,6 @@
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain eft050 --section .data"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x805ED838",
-    "0x805ED8A8"
-   ],
-   "kind": "unread",
-   "symbols": 1,
-   "bytes": 112,
-   "candidates": [
-    "enemy/em033_prog.cpp",
-    "enemy/em035_prog.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain em033_prog --section .data",
-     "finding": "1 symbol(s) nothing reads: the boundary between em033_prog and em035_prog lies somewhere in them (last anchor of the first, first anchor of the second)"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain em033_prog --section .data"
   },
   {
    "section": ".data",
@@ -31919,7 +32934,7 @@
    "symbols": 6,
    "bytes": 160,
    "candidates": [
-    "menu/menu_plsearch.cpp",
+    "menu/fn_804513FC.cpp",
     "MSL/strlen.cpp",
     "Runtime.PPCEABI.H/__va_arg.cpp",
     "Runtime.PPCEABI.H/global_destructor_chain.c",
@@ -31931,11 +32946,11 @@
    "evidence": [
     {
      "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain menu_plsearch --section .data",
-     "finding": "6 symbol(s) nothing reads: the boundary between menu_plsearch and Gecko_ExceptionPPC lies somewhere in them (last anchor of the first, first anchor of the second)"
+     "command": "python tools/splits/dataattach.py --explain fn_804513FC --section .data",
+     "finding": "6 symbol(s) nothing reads: the boundary between fn_804513FC and Gecko_ExceptionPPC lies somewhere in them (last anchor of the first, first anchor of the second)"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain menu_plsearch --section .data"
+   "reproduce": "python tools/splits/dataattach.py --explain fn_804513FC --section .data"
   },
   {
    "section": ".data",
@@ -32013,24 +33028,23 @@
     "0x8064A5F8",
     "0x8064A6B0"
    ],
-   "candidates": [
-    "homebutton/fn_8052B004.cpp"
-   ],
-   "kind": "multi-tu",
+   "kind": "orchestrator",
    "symbols": 2,
    "bytes": 184,
-   "signals": {
-    "vtable-store": 2
-   },
+   "candidates": [
+    "homebutton/fn_8052A040.cpp",
+    "homebutton/fn_8052B004.cpp"
+   ],
    "evidence": [
     {
-     "tool": "splitcheck",
-     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only data-order --unit fn_8052B004",
-     "finding": "strong zigzag seam at 0x8064A5F8 inside the unit's .data (a boundary in [0x8064A5F8, 0x8064A5F8)): at least 2 TUs"
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain fn_8052A040 --section .data",
+     "finding": "kept deferred: attaching lbl_8064A638 to fn_8052A040 (slot owner 20/28) leaves that unit two .data ranges around fn_8052B004's (an order FAIL), attaching it to fn_8052B004 fails data-order"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_8052B004 --section .data",
-   "note": "link order and evidence put these symbols in homebutton/fn_8052B004.cpp, but attaching them makes the data-order invariant fail: the unit holds more than one TU, or one of its reads is not its own"
+   "reproduce": "python tools/splits/dataattach.py --explain fn_8052A040 --section .data",
+   "note": "orchestrator override 11: kept deferred: attaching lbl_8064A638 to fn_8052A040 (slot owner 20/28) leaves that unit two .data ranges around fn_8052B004's (an order FAIL), attaching it to fn_8052B004 fails data-order",
+   "reason": "deferred by an orchestrator override"
   },
   {
    "section": ".data",
@@ -32119,43 +33133,24 @@
     "0x8064DDE0",
     "0x8064DE88"
    ],
-   "kind": "unread",
+   "candidates": [
+    "homebutton/fn_80533474.cpp"
+   ],
+   "kind": "invariant",
    "symbols": 1,
    "bytes": 168,
-   "candidates": [
-    "homebutton/fn_80533474.cpp",
-    "homebutton/fn_8053E808.cpp"
-   ],
+   "signals": {
+    "orchestrator": 1
+   },
    "evidence": [
     {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_80533474 --section .data",
-     "finding": "1 symbol(s), 1 read (by fn_80533474, fn_8053E808): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
+     "tool": "splitcheck",
+     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only order --unit fn_80533474",
+     "finding": ".data has 2 ranges with a gap at 0x8064A8F8 (dtk takes one)"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_80533474 --section .data"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x8064E6C0",
-    "0x8064E760"
-   ],
-   "kind": "unread",
-   "symbols": 1,
-   "bytes": 160,
-   "candidates": [
-    "homebutton/fn_8053E808.cpp",
-    "homebutton/fn_80542D8C.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_8053E808 --section .data",
-     "finding": "1 symbol(s), 1 read (by fn_8053E808, fn_80542D8C): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_8053E808 --section .data"
+   "reproduce": "python tools/units/callers.py 0x80533474 --pointers",
+   "note": "orchestrator override 23 blocked: attaching the range to homebutton/fn_80533474.cpp makes the order invariant fail"
   },
   {
    "section": ".data",
@@ -32188,65 +33183,24 @@
     "0x8064F338",
     "0x8064F360"
    ],
-   "kind": "ambiguous",
+   "candidates": [
+    "homebutton/fn_80542D8C.cpp"
+   ],
+   "kind": "invariant",
    "symbols": 1,
    "bytes": 40,
-   "candidates": [
-    "homebutton/fn_80542D8C.cpp",
-    "homebutton/fn_8054F7BC.cpp"
-   ],
+   "signals": {
+    "orchestrator": 1
+   },
    "evidence": [
     {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_80542D8C --section .data",
-     "finding": "1 symbol(s), 1 read (by fn_80542D8C, fn_8054F7BC): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
+     "tool": "splitcheck",
+     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only order --unit fn_80542D8C",
+     "finding": ".data has 2 ranges with a gap at 0x8064F0BC (dtk takes one)"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_80542D8C --section .data"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x80650080",
-    "0x80650160"
-   ],
-   "kind": "unread",
-   "symbols": 2,
-   "bytes": 224,
-   "candidates": [
-    "homebutton/fn_8054F7BC.cpp",
-    "homebutton/fn_805546B4.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_8054F7BC --section .data",
-     "finding": "2 symbol(s), 2 read (by fn_8054F7BC, fn_805546B4): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_8054F7BC --section .data"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x806504C8",
-    "0x80650500"
-   ],
-   "kind": "unread",
-   "symbols": 1,
-   "bytes": 56,
-   "candidates": [
-    "homebutton/fn_805546B4.cpp",
-    "homebutton/fn_80555B0C.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_805546B4 --section .data",
-     "finding": "1 symbol(s), 1 read (by fn_805546B4, fn_80555B0C): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_805546B4 --section .data"
+   "reproduce": "python tools/units/callers.py 0x80542D8C --pointers",
+   "note": "orchestrator override 25 blocked: attaching the range to homebutton/fn_80542D8C.cpp makes the order invariant fail"
   },
   {
    "section": ".data",
@@ -32659,6 +33613,28 @@
   {
    "section": ".bss",
    "range": [
+    "0x806A1110",
+    "0x806A1120"
+   ],
+   "kind": "ambiguous",
+   "symbols": 1,
+   "bytes": 16,
+   "candidates": [
+    "sound/quest_snd.cpp",
+    "sound/fn_800EEAE0.cpp"
+   ],
+   "evidence": [
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain quest_snd --section .bss",
+     "finding": "1 symbol(s), 1 read (by quest_snd, fn_800EEAE0): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain quest_snd --section .bss"
+  },
+  {
+   "section": ".bss",
+   "range": [
     "0x806A20F0",
     "0x806A2D34"
    ],
@@ -32693,7 +33669,7 @@
     "ef/effect.cpp",
     "ef/fn_800FACAC.cpp",
     "ef/eft001.cpp",
-    "ef/eft002.cpp",
+    "ef/fn_800FBE64.cpp",
     "... (19 units)",
     "ef/fn_8010D1A8.c",
     "ef/eft019.cpp",
@@ -32703,7 +33679,7 @@
     {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain effect --section .bss",
-     "finding": "1 symbol(s), 1 read (by effect, fn_800FACAC, eft001, eft002, fn_800FD520): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
+     "finding": "1 symbol(s), 1 read (by effect, fn_800FACAC, eft001, fn_800FBE64, fn_800FD520): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain effect --section .bss"
@@ -32733,34 +33709,6 @@
   {
    "section": ".bss",
    "range": [
-    "0x806AACC0",
-    "0x806AB3E0"
-   ],
-   "kind": "unread",
-   "symbols": 10,
-   "bytes": 1824,
-   "candidates": [
-    "lobby/lb_menu_pos_tbl.cpp",
-    "lobby/fn_80220038.cpp",
-    "Pl/fn_80229ECC.cpp",
-    "Pl/fn_80230FBC.cpp",
-    "Pl/fn_802373AC.cpp",
-    "Pl/fn_8023C2D0.cpp",
-    "Pl/fn_80241558.cpp",
-    "Pl/pl_act_step.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain lb_menu_pos_tbl --section .bss",
-     "finding": "10 symbol(s) nothing reads: the boundary between lb_menu_pos_tbl and pl_act_step lies somewhere in them (last anchor of the first, first anchor of the second)"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain lb_menu_pos_tbl --section .bss"
-  },
-  {
-   "section": ".bss",
-   "range": [
     "0x806BF530",
     "0x806C23E8"
    ],
@@ -32779,32 +33727,6 @@
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain fn_8036A828 --section .bss"
-  },
-  {
-   "section": ".bss",
-   "range": [
-    "0x806C5488",
-    "0x806C5528"
-   ],
-   "kind": "unread",
-   "symbols": 2,
-   "bytes": 160,
-   "candidates": [
-    "enemy/fn_80383148.cpp",
-    "enemy/fn_80385EE0.cpp",
-    "enemy/fn_80387844.cpp",
-    "lobby/lb_quest_ui.cpp",
-    "lobby/lb_quest_board.cpp",
-    "menu/menu_result.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_80383148 --section .bss",
-     "finding": "2 symbol(s) nothing reads: the boundary between fn_80383148 and menu_result lies somewhere in them (last anchor of the first, first anchor of the second)"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_80383148 --section .bss"
   },
   {
    "section": ".bss",
@@ -32928,29 +33850,6 @@
   {
    "section": ".sdata",
    "range": [
-    "0x80790F0C",
-    "0x80790F43"
-   ],
-   "kind": "unread",
-   "symbols": 7,
-   "bytes": 55,
-   "candidates": [
-    "fn_8004CAD8.cpp",
-    "draw_shape.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_8004CAD8 --section .sdata",
-     "finding": "7 symbol(s) nothing reads: the boundary between fn_8004CAD8 and draw_shape lies somewhere in them (last anchor of the first, first anchor of the second)"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_8004CAD8 --section .sdata",
-   "note": "derived evidence names fn_80047398.cpp (pointer-graph), outside the interval: the monotone link order puts the symbol before data that a unit inside the interval reads (that unit may be the head of the named one's TU)"
-  },
-  {
-   "section": ".sdata",
-   "range": [
     "0x807910F8",
     "0x80791100"
    ],
@@ -32958,7 +33857,7 @@
    "symbols": 1,
    "bytes": 8,
    "candidates": [
-    "draw_shape.cpp",
+    "main/draw_shape.cpp",
     "main/draw_shape_arm.cpp"
    ],
    "evidence": [
@@ -33189,6 +34088,28 @@
   {
    "section": ".sdata",
    "range": [
+    "0x80793C10",
+    "0x80793C7F"
+   ],
+   "kind": "unread",
+   "symbols": 19,
+   "bytes": 111,
+   "candidates": [
+    "menu/menu_plsearch.cpp",
+    "menu/fn_804513FC.cpp"
+   ],
+   "evidence": [
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain menu_plsearch --section .sdata",
+     "finding": "19 symbol(s) nothing reads: the boundary between menu_plsearch and fn_804513FC lies somewhere in them (last anchor of the first, first anchor of the second)"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain menu_plsearch --section .sdata"
+  },
+  {
+   "section": ".sdata",
+   "range": [
     "0x80793CB8",
     "0x80793CC0"
    ],
@@ -33196,7 +34117,7 @@
    "symbols": 1,
    "bytes": 8,
    "candidates": [
-    "menu/menu_plsearch.cpp",
+    "menu/fn_804513FC.cpp",
     "MSL/strlen.cpp",
     "Runtime.PPCEABI.H/__va_arg.cpp",
     "Runtime.PPCEABI.H/global_destructor_chain.c",
@@ -33205,33 +34126,11 @@
    "evidence": [
     {
      "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain menu_plsearch --section .sdata",
-     "finding": "1 symbol(s) nothing reads: the boundary between menu_plsearch and CPlusLibPPC lies somewhere in them (last anchor of the first, first anchor of the second)"
+     "command": "python tools/splits/dataattach.py --explain fn_804513FC --section .sdata",
+     "finding": "1 symbol(s) nothing reads: the boundary between fn_804513FC and CPlusLibPPC lies somewhere in them (last anchor of the first, first anchor of the second)"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain menu_plsearch --section .sdata"
-  },
-  {
-   "section": ".sdata",
-   "range": [
-    "0x80793D20",
-    "0x80793D28"
-   ],
-   "kind": "ambiguous",
-   "symbols": 2,
-   "bytes": 8,
-   "candidates": [
-    "AX/AXFXReverbHiExp.cpp",
-    "AX/fn_80475E30.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain AXFXReverbHiExp --section .sdata",
-     "finding": "2 symbol(s), 2 read (by AXFXReverbHiExp, fn_80475E30): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain AXFXReverbHiExp --section .sdata"
+   "reproduce": "python tools/splits/dataattach.py --explain fn_804513FC --section .sdata"
   },
   {
    "section": ".sdata",
@@ -33314,13 +34213,14 @@
    "candidates": [
     "mh3_pad.cpp",
     "main/pad_connect.cpp",
-    "fn_80047398.cpp"
+    "fn_80047398.cpp",
+    "main/fn_80048964.cpp"
    ],
    "evidence": [
     {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain mh3_pad --section .sbss",
-     "finding": "1 symbol(s), 1 read (by mh3_pad, pad_connect, fn_80047398): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
+     "finding": "1 symbol(s), 1 read (by mh3_pad, pad_connect, fn_80047398, fn_80048964): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain mh3_pad --section .sbss"
@@ -33328,24 +34228,46 @@
   {
    "section": ".sbss",
    "range": [
-    "0x807948A8",
-    "0x807948C0"
+    "0x80794870",
+    "0x80794878"
    ],
-   "kind": "unread",
-   "symbols": 3,
-   "bytes": 24,
+   "kind": "ambiguous",
+   "symbols": 1,
+   "bytes": 8,
    "candidates": [
-    "draw_shape.cpp",
-    "main/draw_shape_arm.cpp"
+    "fn_80047398.cpp",
+    "main/fn_80048964.cpp"
    ],
    "evidence": [
     {
      "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain draw_shape --section .sbss",
-     "finding": "3 symbol(s) nothing reads: the boundary between draw_shape and draw_shape_arm lies somewhere in them (last anchor of the first, first anchor of the second)"
+     "command": "python tools/splits/dataattach.py --explain fn_80047398 --section .sbss",
+     "finding": "1 symbol(s), 1 read (by fn_80047398, fn_80048964): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain draw_shape --section .sbss"
+   "reproduce": "python tools/splits/dataattach.py --explain fn_80047398 --section .sbss"
+  },
+  {
+   "section": ".sbss",
+   "range": [
+    "0x80794880",
+    "0x80794884"
+   ],
+   "kind": "ambiguous",
+   "symbols": 1,
+   "bytes": 4,
+   "candidates": [
+    "main/fn_80048964.cpp",
+    "fn_8004CAD8.cpp"
+   ],
+   "evidence": [
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain fn_80048964 --section .sbss",
+     "finding": "1 symbol(s), 1 read (by fn_80048964, fn_8004CAD8): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain fn_80048964 --section .sbss"
   },
   {
    "section": ".sbss",
@@ -33416,21 +34338,21 @@
   {
    "section": ".sbss",
    "range": [
-    "0x80794A2C",
-    "0x80794A30"
+    "0x80794A20",
+    "0x80794A24"
    ],
    "kind": "ambiguous",
    "symbols": 1,
    "bytes": 4,
    "candidates": [
     "sound/quest_snd.cpp",
-    "sound/fn_800EF7D8.cpp"
+    "sound/fn_800EEAE0.cpp"
    ],
    "evidence": [
     {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain quest_snd --section .sbss",
-     "finding": "1 symbol(s), 1 read (by quest_snd, fn_800EF7D8): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
+     "finding": "1 symbol(s), 1 read (by quest_snd, fn_800EEAE0): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain quest_snd --section .sbss"
@@ -33599,6 +34521,28 @@
   {
    "section": ".sbss",
    "range": [
+    "0x80794D60",
+    "0x80794D65"
+   ],
+   "kind": "unread",
+   "symbols": 2,
+   "bytes": 5,
+   "candidates": [
+    "menu/menu_plsearch.cpp",
+    "menu/fn_804513FC.cpp"
+   ],
+   "evidence": [
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain menu_plsearch --section .sbss",
+     "finding": "2 symbol(s) nothing reads: the boundary between menu_plsearch and fn_804513FC lies somewhere in them (last anchor of the first, first anchor of the second)"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain menu_plsearch --section .sbss"
+  },
+  {
+   "section": ".sbss",
+   "range": [
     "0x80795A20",
     "0x80795A28"
    ],
@@ -33606,17 +34550,17 @@
    "symbols": 1,
    "bytes": 8,
    "candidates": [
-    "SO/soi.cpp",
+    "homebutton/fn_8052A040.cpp",
     "homebutton/fn_8052B004.cpp"
    ],
    "evidence": [
     {
      "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain soi --section .sbss",
-     "finding": "1 symbol(s), 1 read (by soi, fn_8052B004): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
+     "command": "python tools/splits/dataattach.py --explain fn_8052A040 --section .sbss",
+     "finding": "1 symbol(s), 1 read (by fn_8052A040, fn_8052B004): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain soi --section .sbss"
+   "reproduce": "python tools/splits/dataattach.py --explain fn_8052A040 --section .sbss"
   },
   {
    "section": ".sdata2",
@@ -33815,6 +34759,12 @@
    "reproduce": "python tools/splits/dataattach.py --explain mh3_pad --section .sdata"
   },
   {
+   "unit": "main/draw_shape.cpp",
+   "section": ".sdata",
+   "question": "the first use of the .sdata pool of main/draw_shape.cpp goes down at lbl_80790F0C (after lbl_80790F00): its literals are TU-local, so the block is the reader's, and the unit holds two TUs' pool order - where does the cut lie?",
+   "reproduce": "python tools/splits/dataattach.py --explain draw_shape --section .sdata"
+  },
+  {
    "unit": "g3d/g3d_anmchr.cpp",
    "section": ".sdata",
    "question": "the first use of the .sdata pool of g3d/g3d_anmchr.cpp goes down at lbl_8079113C (after lbl_80791138): its literals are TU-local, so the block is the reader's, and the unit holds two TUs' pool order - where does the cut lie?",
@@ -33899,12 +34849,6 @@
    "reproduce": "python tools/splits/dataattach.py --explain network_pat_control --section .sdata"
   },
   {
-   "unit": "menu/menu_plsearch.cpp",
-   "section": ".sdata",
-   "question": "the first use of the .sdata pool of menu/menu_plsearch.cpp goes down at lbl_80793C10 (after lbl_80793C08): its literals are TU-local, so the block is the reader's, and the unit holds two TUs' pool order - where does the cut lie?",
-   "reproduce": "python tools/splits/dataattach.py --explain menu_plsearch --section .sdata"
-  },
-  {
    "unit": "NAND/nand.cpp",
    "section": ".sdata",
    "question": "the first use of the .sdata pool of NAND/nand.cpp goes down at lbl_80793F38 (after lbl_80793F28): its literals are TU-local, so the block is the reader's, and the unit holds two TUs' pool order - where does the cut lie?",
@@ -33935,10 +34879,10 @@
    "reproduce": "python tools/splits/dataattach.py --explain ef_util --section .sdata2"
   },
   {
-   "unit": "enemy/fn_801B4458.cpp",
+   "unit": "enemy/fn_801B4348.cpp",
    "section": ".sdata2",
-   "question": "the first use of the .sdata2 pool of enemy/fn_801B4458.cpp goes down at lbl_80798C74 (after lbl_80798C70): its literals are TU-local, so the block is the reader's, and the unit holds two TUs' pool order - where does the cut lie?",
-   "reproduce": "python tools/splits/dataattach.py --explain fn_801B4458 --section .sdata2"
+   "question": "the first use of the .sdata2 pool of enemy/fn_801B4348.cpp goes down at lbl_80798C74 (after lbl_80798C70): its literals are TU-local, so the block is the reader's, and the unit holds two TUs' pool order - where does the cut lie?",
+   "reproduce": "python tools/splits/dataattach.py --explain fn_801B4348 --section .sdata2"
   },
   {
    "unit": "stage/stg_w.cpp",
@@ -33975,18 +34919,6 @@
    "section": ".sdata2",
    "question": "the first use of the .sdata2 pool of homebutton/fn_8054F7BC.cpp goes down at lbl_8079D6AC (after lbl_8079D6A8): its literals are TU-local, so the block is the reader's, and the unit holds two TUs' pool order - where does the cut lie?",
    "reproduce": "python tools/splits/dataattach.py --explain fn_8054F7BC --section .sdata2"
-  }
- ],
- "moves": [
-  {
-   "unit": "Pl/pl_frame_data.cpp",
-   "after": "lobby/fn_80220038.cpp",
-   "reason": ".sdata2 range 0x80799E00..0x80799F98 is out of link order: by address it lies between lobby/fn_80220038.cpp and Pl/pl_act_step.cpp, but Pl/pl_frame_data.cpp is at file position 103 (lobby/fn_80220038.cpp at 158, Pl/pl_act_step.cpp at 164)"
-  },
-  {
-   "unit": "Pl/pl_act_data.cpp",
-   "after": "Pl/pl_frame_data.cpp",
-   "reason": ".sdata2 range 0x80799F98..0x80799FDC is out of link order: by address it lies between lobby/fn_80220038.cpp and Pl/pl_act_step.cpp, but Pl/pl_act_data.cpp is at file position 104 (lobby/fn_80220038.cpp at 158, Pl/pl_act_step.cpp at 164)"
   }
  ]
 }

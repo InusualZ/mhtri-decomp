@@ -1147,7 +1147,7 @@
     ".text": [
      [
       "0x80448404",
-      "0x804565C0"
+      "0x804513FC"
      ]
     ]
    },
@@ -1357,6 +1357,48 @@
    ],
    "open_questions": [
     "the exact map name and the exact registered right edge make the cut at least medium; the left edge (strlen's end) is a function boundary with no cross reference, so the pair strlen | __va_arg is one admissible split of a 0xE8 B run"
+   ]
+  },
+  {
+   "derived_name": "fn_804513FC",
+   "module": "menu",
+   "ranges": {
+    ".text": [
+     [
+      "0x804513FC",
+      "0x804565C0"
+     ]
+    ]
+   },
+   "cuts": [
+    {
+     "addr": "0x804513FC",
+     "section": ".text",
+     "grade": "medium",
+     "kind": "data-seam",
+     "evidence": [
+      {
+       "tool": "dataorder",
+       "command": "python tools/splits/dataorder.py at 0x80607E50",
+       "finding": "strong V->S seam 0x80607E50 (vtable lbl_80607E40 then strings lbl_80607E50..): the strings after it belong to the next TU"
+      },
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x80607E18",
+       "finding": "lbl_80607E18, the last string of the group before the seam, is read at 0x80451364 (fn_804512E8, ends 0x804513A8): the new TU starts after that function"
+      },
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x8060E688",
+       "finding": "lbl_8060E688, the first symbol of the group after the seam that any text reads, is first read at 0x80451600 (fn_804513FC, starts 0x804513FC): the new TU starts no later than that function; 5 function starts in [0x804513A8, 0x804513FC]"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x80607E18 && python tools/units/callers.py 0x8060E688"
+    }
+   ],
+   "open_questions": [
+    "the cut lies in [0x804513A8, 0x804513FC] (5 function starts: 0x804513A8, 0x804513B0, 0x804513F4, 0x804513F8, 0x804513FC): placed at the function that first reads the second group, the position inside the interval is not decided by any signal",
+    "name: placeholder; holds the .ctors word 0x8056F3D4 (fn_8045622C) and the vtables 0x8060E718/E748/E778"
    ]
   }
  ],
@@ -1978,7 +2020,7 @@
   },
   {
    "unit": "menu/menu_plsearch.cpp",
-   "question": "a TU boundary lies in [0x80450534, 0x804562A8]: 1 constraint(s) (dataorder), 52 legal position(s) of 82",
+   "question": "a TU boundary lies in [0x80450534, 0x804562A8]: 1 constraint(s) (dataorder), 52 legal position(s) of 82 [narrowed to [0x804513A8, 0x804513FC] by the readers on both sides of the seam, applied as unit fn_804513FC (phase 3)]",
    "candidate_interval": [
     "0x80450534",
     "0x804562A8"

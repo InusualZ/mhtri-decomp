@@ -1,5 +1,587 @@
 {
  "phase": 2,
  "lane": "p2-overrides",
- "overrides": []
+ "overrides": [
+  {
+   "unit": "enemy/em008_prog.cpp",
+   "section": ".bss",
+   "start": "0x806A7868",
+   "end": "0x806A7898",
+   "action": "attach",
+   "grade": "strong",
+   "signal": "orchestrator",
+   "takes_from": "enemy/em010_prog.cpp",
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x806A7868",
+     "finding": "vec_pair_80165FC8_0..1 are materialised only by fn_80166330 (sinit at 0x80166360), em008_prog's own __sinit: the registered range sits in the .bss of the next unit"
+    }
+   ],
+   "note": "recut: em008's own __sinit constructs the two pairs",
+   "reproduce": "python tools/units/callers.py 0x806A7868"
+  },
+  {
+   "unit": "enemy/em011_prog.cpp",
+   "section": ".bss",
+   "start": "0x806A7970",
+   "end": "0x806A79A0",
+   "action": "attach",
+   "grade": "strong",
+   "signal": "orchestrator",
+   "takes_from": "enemy/em010_prog.cpp",
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x806A7970",
+     "finding": "vec_pair_801679B0_9..10 are materialised only by fn_8017054C (sinit at 0x8017057C), em011_prog's own __sinit"
+    }
+   ],
+   "note": "recut: em011's own __sinit constructs the two pairs",
+   "reproduce": "python tools/units/callers.py 0x806A7970"
+  },
+  {
+   "unit": "enemy/em011_prog.cpp",
+   "section": ".data",
+   "start": "0x805A7CE8",
+   "end": "0x805A7D54",
+   "action": "attach",
+   "grade": "strong",
+   "signal": "orchestrator",
+   "takes_from": "enemy/em010_prog.cpp",
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8016D1C4 --pointers",
+     "finding": "em011_prog_tbl (0x805A7CE8, 0x6C B) is a table of 11 code pointers, every one into em011's text (0x8016D1C4..0x80170600; slot 1 is em011's first function 0x8016D1C4): the registered em010 .data edge 0x805A7D54 lies inside em011"
+    }
+   ],
+   "note": "boundary 0x805A7CE8 (em010 end, em011 start): the table is em011's",
+   "reproduce": "python tools/units/callers.py 0x8016D1C4 --pointers"
+  },
+  {
+   "unit": "enemy/em011_prog.cpp",
+   "section": ".rodata",
+   "start": "0x8056FCD0",
+   "end": "0x8056FD10",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "takes_from": "enemy/em010_prog.cpp",
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8056FCD0",
+     "finding": "lbl_8056FCD0 (0x40 B) is read only at 0x8016DE9C, 0x8016DEC8 (fn_8016DE40) and 0x8016EFC0, 0x8016EFDC (fn_8016EEE8), all inside em011's text"
+    }
+   ],
+   "note": "boundary 0x8056FCD0 (medium: one reader unit, no second observation)",
+   "reproduce": "python tools/units/callers.py 0x8056FCD0"
+  },
+  {
+   "unit": "Pl/pl_act.cpp",
+   "section": ".data",
+   "start": "0x805C6100",
+   "end": "0x805C80A8",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain 0x805C6100 --section .data",
+     "finding": "the first 8,100 B of the 167-symbol interleave zone (0x805C6100..0x805C80A8) are read only by pl_act (reader/pointer-graph rows) and no fn_802840DC read sits inside; jumptable_805C80A8 (read by fn_802840DC) is the first object after it"
+    }
+   ],
+   "note": "narrowing of the Pl/pl_act | Pl/fn_802840DC interleave: the head belongs to pl_act; the registered edge 0x802840DC is suspect (0x805C80A8..0x805C9568 stays deferred)",
+   "reproduce": "python tools/splits/dataattach.py --explain 0x805C6100 --section .data"
+  },
+  {
+   "unit": "Pl/fn_802840DC.cpp",
+   "section": ".data",
+   "start": "0x805C9568",
+   "end": "0x805CBFC0",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain 0x805C9568 --section .data",
+     "finding": "the last 10,840 B of the interleave zone (0x805C9568..0x805CBFC0) are read only by fn_802840DC (reader/pointer-graph rows, no pl_act read)"
+    }
+   ],
+   "note": "narrowing of the Pl/pl_act | Pl/fn_802840DC interleave: the tail belongs to fn_802840DC",
+   "reproduce": "python tools/splits/dataattach.py --explain 0x805C9568 --section .data"
+  },
+  {
+   "unit": "Pl/pl_act.cpp",
+   "section": ".data",
+   "start": "0x805C80A8",
+   "end": "0x805C9568",
+   "action": "defer",
+   "signal": "orchestrator",
+   "candidates": [
+    "Pl/pl_act.cpp",
+    "Pl/fn_802840DC.cpp"
+   ],
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x805C80A8",
+     "finding": "jumptable_805C80A8 (read only by fn_802840DC) sits before pl_act-only tables (0x805C8134..0x805C90E8): 29 symbols of two units interleave, so the registered edge 0x802840DC and these tables cannot both hold"
+    }
+   ],
+   "note": "interleave kept deferred: either the tables are fn_802840DC's TU (read as externs by pl_act) or the registered edge is misplaced",
+   "reproduce": "python tools/units/callers.py 0x805C80A8"
+  },
+  {
+   "unit": "Pl/pl_act_step.cpp",
+   "section": ".sdata2",
+   "start": "0x80799E00",
+   "end": "0x80799F98",
+   "action": "attach",
+   "grade": "strong",
+   "signal": "orchestrator",
+   "takes_from": "Pl/pl_frame_data.cpp",
+   "evidence": [
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain Pl/pl_frame_data",
+     "finding": "all 101 literals of Pl/pl_frame_data are read by pl_act_step and by no other unit"
+    }
+   ],
+   "note": "fold of the data-only unit into the reader; phase 4 removes src/Pl/pl_frame_data.*",
+   "reproduce": "python tools/splits/dataattach.py --explain Pl/pl_frame_data"
+  },
+  {
+   "unit": "Pl/pl_act_step.cpp",
+   "section": ".sdata2",
+   "start": "0x80799F98",
+   "end": "0x80799FDC",
+   "action": "attach",
+   "grade": "strong",
+   "signal": "orchestrator",
+   "takes_from": "Pl/pl_act_data.cpp",
+   "evidence": [
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain Pl/pl_act_data",
+     "finding": "all 17 literals of Pl/pl_act_data are read by pl_act_step and by no other unit"
+    }
+   ],
+   "note": "fold of the data-only unit into the reader; phase 4 removes src/Pl/pl_act_data.*",
+   "reproduce": "python tools/splits/dataattach.py --explain Pl/pl_act_data"
+  },
+  {
+   "unit": "enemy/fn_80383148.cpp",
+   "section": ".data",
+   "start": "0x805EF8C0",
+   "end": "0x805EF94C",
+   "action": "attach",
+   "grade": "strong",
+   "signal": "orchestrator",
+   "takes_from": "enemy/fn_80382310.cpp",
+   "evidence": [
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain fn_80382310",
+     "finding": "the registered data-only unit enemy/fn_80382310.cpp (0x805EF8C0..0x805EF94C, 4 symbols) is read only by fn_80383148 (lbl_805EF8C0, lbl_805EF8D8, lbl_805EF940); nothing else reads or constructs it"
+    }
+   ],
+   "note": "fold of the data-only residue into its only reader; phase 4 removes the unit fn_80382310",
+   "reproduce": "python tools/splits/dataattach.py --explain fn_80382310"
+  },
+  {
+   "unit": "enemy/fn_80383148.cpp",
+   "section": ".bss",
+   "start": "0x806C5488",
+   "end": "0x806C5528",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x806C5488 --pointers",
+     "finding": "lbl_806C5488 (0x50 B) is pointed from lbl_805EF940, a .data object read by fn_80383148; lbl_806C54D8 follows it; nothing reads either directly (unread, pointer evidence only)"
+    }
+   ],
+   "note": "medium: the .bss run follows fn_80383148's own .bss end 0x806C5488 and is named only by its .data pointer",
+   "reproduce": "python tools/units/callers.py 0x806C5488 --pointers"
+  },
+  {
+   "unit": "homebutton/fn_8052B004.cpp",
+   "section": ".data",
+   "start": "0x8064A5F8",
+   "end": "0x8064A6B0",
+   "action": "defer",
+   "signal": "orchestrator",
+   "candidates": [
+    "homebutton/fn_8052A040.cpp",
+    "homebutton/fn_8052B004.cpp"
+   ],
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8064A638 --pointers",
+     "finding": "lbl_8064A638 (28 slots, stored by fn_8052C330 in fn_8052B004) has 20 slots in homebutton/fn_8052A040's text and 8 in fn_8052B004's, and sits after lbl_8064A5F8 (14 slots, all in fn_8052B004's text 0x8052B5F8..0x8052BF74): data order puts the later TU's vtable first (strong zigzag seam 0x8064A5F8)"
+    }
+   ],
+   "note": "kept deferred: attaching lbl_8064A638 to fn_8052A040 (slot owner 20/28) leaves that unit two .data ranges around fn_8052B004's (an order FAIL), attaching it to fn_8052B004 fails data-order",
+   "reproduce": "python tools/units/callers.py 0x8064A638 --pointers"
+  },
+  {
+   "unit": "menu/fn_804513FC.cpp",
+   "section": ".data",
+   "start": "0x80607E50",
+   "end": "0x8060E0B8",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "dataorder",
+     "command": "python tools/splits/dataorder.py at 0x80607E50",
+     "finding": "strong V->S seam 0x80607E50: every symbol after it is the next TU's, and the 38 symbols that follow (0x8060E0B8..0x8060E7FC, read and vtable-stored by fn_804513FC's text) are that TU's end of the same run"
+    }
+   ],
+   "note": "the 381 unread pointer-graph symbols between the seam and the first symbol the new TU reads: no read of their own, the seam alone places them",
+   "reproduce": "python tools/splits/dataorder.py at 0x80607E50"
+  },
+  {
+   "unit": "enemy/em_model.cpp",
+   "section": ".data",
+   "start": "0x805F8220",
+   "end": "0x805F84C0",
+   "action": "attach",
+   "grade": "strong",
+   "signal": "orchestrator",
+   "takes_from": "enemy/em_pop.cpp",
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py --range 0x805F8200 0x805F8230 --each",
+     "finding": "the 17 labels 0x805F8220..0x805F84B0 are read only at 0x803BB824..0x803BD8FC, inside em_model's text (0x803B936C..), while lbl_805F81F4 and the labels before it are read at 0x803B7BCC / 0x803B8AAC (em_pop): the registered .data edge 0x805F84C0 is 0x2A0 B late, the edge lies in (0x805F81F4, 0x805F8220]"
+    }
+   ],
+   "note": "recut of the registered range: em_model's .data starts at 0x805F8220 (hold-out: the 17 wrong symbols of enemy/em_pop | em_model)",
+   "reproduce": "python tools/units/callers.py --range 0x805F8200 0x805F8230 --each"
+  },
+  {
+   "unit": "ef/ef_draworder.cpp",
+   "takes_from": "ef/ef_draworder.cpp",
+   "section": ".data",
+   "start": "0x80592419",
+   "end": "0x80592430",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x800A3B20 --pointers",
+     "finding": "vtable 0x8059241C: all 3 slots (0x800A3B20, 0x800A3D7C, 0x800A39A4) are in ef_draworder's text; the slot owner is the unit's key function (playbook 80), and the vtable is the next object after the unit's own .data ending at 0x80592419"
+    }
+   ],
+   "note": "vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
+   "reproduce": "python tools/units/callers.py 0x800A3B20 --pointers"
+  },
+  {
+   "unit": "ef/ef_drawfreestrategy.cpp",
+   "takes_from": "ef/ef_drawfreestrategy.cpp",
+   "section": ".data",
+   "start": "0x80594315",
+   "end": "0x80594330",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x800BEF00 --pointers",
+     "finding": "vtable 0x80594318: slots 0x800BEF00 and 0x800BE3C0 are in ef_drawfreestrategy's text (the other two, 0x800C8A48/0x800C8A64, are the base class's in ef_drawstrategyimpl); the slot owner is the unit's key function (playbook 80), and the vtable is the next object after the unit's own .data ending at 0x80594315"
+    }
+   ],
+   "note": "vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
+   "reproduce": "python tools/units/callers.py 0x800BEF00 --pointers"
+  },
+  {
+   "unit": "ef/ef_drawlinestrategy.cpp",
+   "takes_from": "ef/ef_drawlinestrategy.cpp",
+   "section": ".data",
+   "start": "0x805943EA",
+   "end": "0x80594408",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x800BF780 --pointers",
+     "finding": "vtable 0x805943F0: slots 0x800BF780 and 0x800BEF98 are in ef_drawlinestrategy's text (the other two are the base class's in ef_drawstrategyimpl); the slot owner is the unit's key function (playbook 80), and the vtable is the next object after the unit's own .data ending at 0x805943EA"
+    }
+   ],
+   "note": "vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
+   "reproduce": "python tools/units/callers.py 0x800BF780 --pointers"
+  },
+  {
+   "unit": "ef/ef_drawpointstrategy.cpp",
+   "takes_from": "ef/ef_drawpointstrategy.cpp",
+   "section": ".data",
+   "start": "0x805944C6",
+   "end": "0x805944E0",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x800BFF3C --pointers",
+     "finding": "vtable 0x805944C8: slots 0x800BFF3C and 0x800BF818 are in ef_drawpointstrategy's text (the other two are the base class's in ef_drawstrategyimpl); the slot owner is the unit's key function (playbook 80), and the vtable is the next object after the unit's own .data ending at 0x805944C6"
+    }
+   ],
+   "note": "vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
+   "reproduce": "python tools/units/callers.py 0x800BFF3C --pointers"
+  },
+  {
+   "unit": "ef/ef_torus.cpp",
+   "takes_from": "ef/ef_torus.cpp",
+   "section": ".data",
+   "start": "0x80594C55",
+   "end": "0x80594C68",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x800C9540 --pointers",
+     "finding": "vtable 0x80594C58: its one slot 0x800C9540 is in ef_torus's text; the slot owner is the unit's key function (playbook 80), and the vtable is the next object after the unit's own .data ending at 0x80594C55"
+    }
+   ],
+   "note": "vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
+   "reproduce": "python tools/units/callers.py 0x800C9540 --pointers"
+  },
+  {
+   "unit": "ef/ef_cube.cpp",
+   "takes_from": "ef/ef_cube.cpp",
+   "section": ".data",
+   "start": "0x80594D11",
+   "end": "0x80594D20",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x800CA200 --pointers",
+     "finding": "vtable 0x80594D14: its one slot 0x800CA200 is in ef_cube's text; the slot owner is the unit's key function (playbook 80), and the vtable is the next object after the unit's own .data ending at 0x80594D11"
+    }
+   ],
+   "note": "vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
+   "reproduce": "python tools/units/callers.py 0x800CA200 --pointers"
+  },
+  {
+   "unit": "ef/ef_cylinder.cpp",
+   "takes_from": "ef/ef_cylinder.cpp",
+   "section": ".data",
+   "start": "0x80594DCD",
+   "end": "0x80594DE0",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x800CBFB0 --pointers",
+     "finding": "vtable 0x80594DD0: its one slot 0x800CBFB0 is in ef_cylinder's text; the slot owner is the unit's key function (playbook 80), and the vtable is the next object after the unit's own .data ending at 0x80594DCD"
+    }
+   ],
+   "note": "vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
+   "reproduce": "python tools/units/callers.py 0x800CBFB0 --pointers"
+  },
+  {
+   "unit": "ef/ef_line.cpp",
+   "takes_from": "ef/ef_line.cpp",
+   "section": ".data",
+   "start": "0x80594F89",
+   "end": "0x80594F98",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x800CCFB0 --pointers",
+     "finding": "vtable 0x80594F8C: its one slot 0x800CCFB0 is in ef_line's text; the slot owner is the unit's key function (playbook 80), and the vtable is the next object after the unit's own .data ending at 0x80594F89"
+    }
+   ],
+   "note": "vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
+   "reproduce": "python tools/units/callers.py 0x800CCFB0 --pointers"
+  },
+  {
+   "unit": "ef/ef_point.cpp",
+   "takes_from": "ef/ef_point.cpp",
+   "section": ".data",
+   "start": "0x80595045",
+   "end": "0x80595058",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x800CD584 --pointers",
+     "finding": "vtable 0x80595048: its one slot 0x800CD584 is in ef_point's text; the slot owner is the unit's key function (playbook 80), and the vtable is the next object after the unit's own .data ending at 0x80595045"
+    }
+   ],
+   "note": "vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
+   "reproduce": "python tools/units/callers.py 0x800CD584 --pointers"
+  },
+  {
+   "unit": "homebutton/fn_80533474.cpp",
+   "section": ".data",
+   "start": "0x8064DDE0",
+   "end": "0x8064DE88",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80533474 --pointers",
+     "finding": "lbl_8064DDE0 (0xA8 B, 38 slots): 35 slots in homebutton/fn_80533474's text, 1 in fn_8056083C"
+    }
+   ],
+   "note": "vtable decided by its slots (the slot owner is the key function, playbook 80)",
+   "reproduce": "python tools/units/callers.py 0x80533474 --pointers"
+  },
+  {
+   "unit": "homebutton/fn_8053E808.cpp",
+   "section": ".data",
+   "start": "0x8064E6C0",
+   "end": "0x8064E760",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8053E808 --pointers",
+     "finding": "lbl_8064E6C0 (0xA0 B, 32 slots): 28 slots in homebutton/fn_8053E808's text, 3 in fn_80533474 (base), 1 in fn_8056083C"
+    }
+   ],
+   "note": "vtable decided by its slots (the slot owner is the key function, playbook 80)",
+   "reproduce": "python tools/units/callers.py 0x8053E808 --pointers"
+  },
+  {
+   "unit": "homebutton/fn_80542D8C.cpp",
+   "section": ".data",
+   "start": "0x8064F338",
+   "end": "0x8064F360",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80542D8C --pointers",
+     "finding": "the vtable at 0x8064F338 (0x28 B): its 5 slots are in homebutton/fn_80542D8C's text"
+    }
+   ],
+   "note": "vtable decided by its slots (the slot owner is the key function, playbook 80)",
+   "reproduce": "python tools/units/callers.py 0x80542D8C --pointers"
+  },
+  {
+   "unit": "homebutton/fn_8054F7BC.cpp",
+   "section": ".data",
+   "start": "0x80650080",
+   "end": "0x80650160",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8054F7BC --pointers",
+     "finding": "lbl_80650080 and lbl_806500A0 (0x20 + 0xC0 B): 16 slots in homebutton/fn_8054F7BC's text"
+    }
+   ],
+   "note": "vtable decided by its slots (the slot owner is the key function, playbook 80)",
+   "reproduce": "python tools/units/callers.py 0x8054F7BC --pointers"
+  },
+  {
+   "unit": "homebutton/fn_805546B4.cpp",
+   "section": ".data",
+   "start": "0x806504C8",
+   "end": "0x80650500",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x805546B4 --pointers",
+     "finding": "lbl_806504C8 (0x38 B): its 5 slots are in homebutton/fn_805546B4's text"
+    }
+   ],
+   "note": "vtable decided by its slots (the slot owner is the key function, playbook 80)",
+   "reproduce": "python tools/units/callers.py 0x805546B4 --pointers"
+  },
+  {
+   "unit": "enemy/em035_prog.cpp",
+   "section": ".data",
+   "start": "0x805ED838",
+   "end": "0x805ED8A8",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8035F060 --pointers",
+     "finding": "em035_prog_tbl (0x70 B): its 9 code pointers (0x8035F060..0x8035FB60) are 6 in enemy/em035_prog's text and 3 in em033_prog's"
+    }
+   ],
+   "note": "table of the unit's own code pointers: the key function is em035_prog's",
+   "reproduce": "python tools/units/callers.py 0x8035F060 --pointers"
+  },
+  {
+   "unit": "AX/fn_80475E30.cpp",
+   "section": ".sdata",
+   "start": "0x80793D20",
+   "end": "0x80793D28",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80793D20",
+     "finding": "lbl_80793D20 and lbl_80793D24 (4 B each) are read 5 + 5 times by AX/AXFXReverbHiExp (0x80475760..0x80475A88) and 5 + 5 times by fn_80475E30 (0x80476710..0x80476A64), the unit that holds the Shutdown function the map names AXFXReverbHiExp: one TU spans the two"
+    }
+   ],
+   "note": "medium: read by both units, placed with the later one (the name conflict AXFXReverbHiExpShutdown at 0x804760C0 says the two are one TU, phase 1 f keeps the strong cut 0x80475E30)",
+   "reproduce": "python tools/units/callers.py 0x80793D20"
+  },
+  {
+   "unit": "nw4r/math_triangular.cpp",
+   "section": ".rodata",
+   "start": "0x80573CD8",
+   "end": "0x80574CE8",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80573CD8",
+     "finding": "lbl_80573CD8 (0x1010 B = 257 x 16, the sin/cos table) is read by SinFIdx, CosFIdx and math_sincos_idx (0x80500E60..0x80500F00, nw4r/math_triangular's text) and by externs in ef (0x8009C6F8..)"
+    }
+   ],
+   "note": "medium: the readers inside the nw4r math unit are its own sin/cos index functions; the ef reads are externs",
+   "reproduce": "python tools/units/callers.py 0x80573CD8"
+  }
+ ]
 }
