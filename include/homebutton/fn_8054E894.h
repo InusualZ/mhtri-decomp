@@ -11,9 +11,8 @@
  * (`.data` 0x8064E780 and its group), so it is a struct of typed slots here and never a definition we
  * emit (rule 10).
  *
- * The callees whose owners are registered are declared in the *owner's* header and included from the
- * source: `homebutton/fn_80555374.h` (fn_8055C494, fn_8055C638, fn_8055C1D4, fn_8055C2CC) and
- * `homebutton/keyboard_ui.h` (fn_8056083C).  A callee whose band holds no registered unit (the
+ * The callees whose owners are registered are declared in the *owner's* header (`include/homebutton/<unit>.h`) and
+ * included from the source.  A callee whose band holds no registered unit (the
  * 0x805124F4-0x8054E894 and 0x805425B4-0x8054F550 bands - the address band interleaves the `DWCi` and
  * `homebutton` modules, so there is no sound `include/unsplit/<module>.h`) is declared here with the
  * signature its call site shows.
@@ -301,54 +300,5 @@ struct HkbLayoutRecord {
 /* `offsetof` for this band's types (MWCC's `stddef.h` is off the include path).  The adjustor thunks
  * convert a base-subobject pointer back to the complete object with it. */
 #define HKB_OFFSET_OF(type, field) ((u32)(&((type*)0)->field))
-
-/* --------------------------------------------------------------------------------------------- */
-/* Callees whose band holds no registered unit                                                    */
-/* --------------------------------------------------------------------------------------------- */
-
-extern "C" void fn_80501A64(void* self);
-extern "C" u32 fn_80526F00(void* list, u32 arg1, u32 arg2);
-extern "C" void fn_80545C44(void* self);
-extern "C" void fn_80545DAC(void* self);
-extern "C" void fn_80545DCC(void* self);
-extern "C" void fn_80546658(void* self);
-extern "C" void fn_80546BCC(void* self);
-extern "C" void fn_80547114(void* self);
-extern "C" void fn_805472C4(void* self);
-extern "C" void fn_8054734C(void* self);
-extern "C" void fn_80547BE8(void* self);
-extern "C" void fn_8054CDCC(void* self);
-extern "C" void fn_8054CF38(void* self);
-extern "C" void fn_8054D634(void* self);
-extern "C" void fn_8054D818(void* self);
-extern "C" void fn_8054D9F0(void* self);
-extern "C" void fn_8054DDD8(void* self);
-extern "C" void fn_8054E05C(void* self);
-extern "C" void fn_8054E180(void* self);
-extern "C" void fn_8054E81C(void* self);
-extern "C" void fn_8054CDCC(void* self);
-extern "C" void fn_8054E858(void* self);
-
-/* Callees inside the unit, declared ahead of their bodies (address order). */
-extern "C" void fn_8054F128(void* self);
-extern "C" void fn_8054F12C(void* self);
-extern "C" void fn_8054F130(void* self);
-extern "C" void fn_8054F90C(HkbWidget* self);
-extern "C" void fn_805504EC(HkbWidget* self);
-extern "C" void fn_80550770(HkbWidget* self);
-extern "C" void fn_80550804(HkbWidget* self);
-extern "C" void fn_805516E4(HkbWidget* self);
-extern "C" void fn_805536FC(HkbWidget* self);
-extern "C" void fn_805542BC(HkbWidget* self);
-extern "C" void fn_80551EB0(HkbWidget* self);
-extern "C" void fn_80551F08(HkbWidget* self);
-extern "C" void fn_80553074(void* self, s32 value);
-extern "C" void fn_80550804(HkbWidget* self);
-extern "C" void fn_805504EC(HkbWidget* self);
-extern "C" void fn_80550770(HkbWidget* self);
-extern "C" void fn_805516E4(HkbWidget* self);
-extern "C" void fn_805536FC(HkbWidget* self);
-extern "C" void fn_805542BC(HkbWidget* self);
-
 
 #endif

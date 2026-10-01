@@ -2023,12 +2023,136 @@ MSL_C/alloc.cpp:
 	.sbss       start:0x80794E00 end:0x80794E28
 	.sdata2     start:0x8079C9A8 end:0x8079CAB8
 
+MSL/e_asin.cpp:
+	.text       start:0x804642C8 end:0x80464560
+	.sdata2     start:0x8079CAB8 end:0x8079CB40
+
+MSL/e_atan2.cpp:
+	.text       start:0x80464560 end:0x804647B8
+	.sdata2     start:0x8079CB40 end:0x8079CB98
+
+MSL/e_fmod.cpp:
+	.text       start:0x804647B8 end:0x80464B38
+	.rodata     start:0x80573190 end:0x805731A0
+
+MSL/e_log.cpp:
+	.text       start:0x80464B38 end:0x80464DEC
+	.sbss       start:0x80794E28 end:0x80794E30
+	.sdata2     start:0x8079CB98 end:0x8079CC18
+
+MSL/e_log10.cpp:
+	.text       start:0x80464DEC end:0x80464F00
+	.sbss       start:0x80794E30 end:0x80794E38
+	.sdata2     start:0x8079CC18 end:0x8079CC48
+
+MSL/e_pow.cpp:
+	.text       start:0x80464F00 end:0x80465714
+	.rodata     start:0x805731A0 end:0x805731D0
+	.sdata2     start:0x8079CC48 end:0x8079CD58
+
+MSL/e_rem_pio2.cpp:
+	.text       start:0x80465714 end:0x80465A98
+	.rodata     start:0x805731D0 end:0x80573358
+	.sdata2     start:0x8079CD58 end:0x8079CDB0
+
+MSL/k_cos.cpp:
+	.text       start:0x80465A98 end:0x80465BA8
+	.sdata2     start:0x8079CDB0 end:0x8079CDF8
+
+MSL/k_rem_pio2.cpp:
+	.text       start:0x80465BA8 end:0x80467260
+	.rodata     start:0x80573358 end:0x805733A8
+	.sdata2     start:0x8079CDF8 end:0x8079CE38
+
+MSL/k_sin.cpp:
+	.text       start:0x80467260 end:0x80467320
+	.sdata2     start:0x8079CE38 end:0x8079CE70
+
+MSL/k_tan.cpp:
+	.text       start:0x80467320 end:0x80467570
+	.rodata     start:0x805733A8 end:0x80573410
+	.sdata2     start:0x8079CE70 end:0x8079CEA8
+
+MSL/s_atan.cpp:
+	.text       start:0x80467570 end:0x804677A0
+	.rodata     start:0x80573410 end:0x805734A8
+	.sdata2     start:0x8079CEA8 end:0x8079CED0
+
+MSL/s_ceil.cpp:
+	.text       start:0x804677A0 end:0x804678EC
+	.sdata2     start:0x8079CED0 end:0x8079CEE0
+
+MSL/s_copysign.cpp:
+	.text       start:0x804678EC end:0x80467918
+
+MSL/s_cos.cpp:
+	.text       start:0x80467918 end:0x804679E0
+	.sdata2     start:0x8079CEE0 end:0x8079CEE8
+
+MSL/s_floor.cpp:
+	.text       start:0x804679E0 end:0x80467B30
+	.sdata2     start:0x8079CEE8 end:0x8079CEF8
+
+MSL/s_frexp.cpp:
+	.text       start:0x80467B30 end:0x80467BB8
+	.sdata2     start:0x8079CEF8 end:0x8079CF00
+
+MSL/s_ldexp.cpp:
+	.text       start:0x80467BB8 end:0x80467D24
+	.sdata2     start:0x8079CF00 end:0x8079CF28
+
+MSL/s_modf.cpp:
+	.text       start:0x80467D24 end:0x80467E20
+
+MSL/s_sin.cpp:
+	.text       start:0x80467E20 end:0x80467EEC
+	.sdata2     start:0x8079CF28 end:0x8079CF30
+
+TRK/TRK_flush_cache.cpp:
+	.text       start:0x80467EEC end:0x8046D9F0
+	.rodata     start:0x805734A8 end:0x80573530
+	.data       start:0x8060F538 end:0x8060F868
+	.bss        start:0x806F5020 end:0x806F74E0
+	.sdata      start:0x80793D00 end:0x80793D08
+	.sbss       start:0x80794E38 end:0x80794EC8
+	.sdata2     start:0x8079CF30 end:0x8079CF48
+
+ARC/arc.cpp:
+	.text       start:0x8046D9F0 end:0x80474CB0
+	.data       start:0x8060F868 end:0x80612980
+	.bss        start:0x806F74E0 end:0x8070C414
+	.sdata      start:0x80793D08 end:0x80793D20
+	.sbss       start:0x80794EC8 end:0x80795008
+	.sdata2     start:0x8079CF48 end:0x8079CFF0
+
 AX/AXFXReverbHi.c:
-	.text       start:0x80474CB0 end:0x80475E24
+	.text       start:0x80474CB0 end:0x80474F30
+	.sdata2     start:0x8079CFF0 end:0x8079D000
+
+AX/AXFXReverbHiExp.c:
+	.text       start:0x80474F30 end:0x80475E30
+	.data       start:0x80612980 end:0x80612B20
+	.sdata2     start:0x8079D000 end:0x8079D040
+
+AX/AXFXReverbStd.cpp:
+	.text       start:0x80475E30 end:0x804770E0
+	.data       start:0x80612B20 end:0x80612CE0
+	.sdata      start:0x80793D20 end:0x80793D28
+	.sdata2     start:0x8079D040 end:0x8079D080
 
 OS/PPCArch.c:
 	.text       start:0x804770E0 end:0x804772F0
 	.data       start:0x80612CE0 end:0x80612D18
+
+BTE/gki_buffer.cpp:
+	.text       start:0x804772F0 end:0x804AFED0
+	.rodata     start:0x80573530 end:0x80573A00
+	.data       start:0x80612D18 end:0x8061A4F0
+	.bss        start:0x8070CDE0 end:0x80746B60
+	.sdata      start:0x80793D28 end:0x80793E30
+	.sbss       start:0x80795008 end:0x80795198
+	.sdata2     start:0x8079D080 end:0x8079D0F0
+	.sbss2      start:0x8079D7E0 end:0x8079D7F0
 
 EXI/EXIBios.c:
 	.text       start:0x804AFED0 end:0x804B17D0
@@ -2039,25 +2163,132 @@ EXI/EXIBios.c:
 
 EXI/ProbeBarnacle.c:
 	.text       start:0x804B17D0 end:0x804B8020
+	.data       start:0x8061A538 end:0x8061ABE4
+	.bss        start:0x80746C20 end:0x80747300
+	.sdata      start:0x80793E38 end:0x80793E60
+	.sbss       start:0x807951A0 end:0x80795228
+	.sdata2     start:0x8079D0F0 end:0x8079D160
+
+RVLGX/GXTexture_tail.cpp:
+	.text       start:0x804B8020 end:0x804C1760
+	.data       start:0x8061ABE4 end:0x8061AE00
+	.bss        start:0x80747300 end:0x80748B90
+	.sdata      start:0x80793E60 end:0x80793F00
+	.sbss       start:0x80795228 end:0x80795298
+	.sdata2     start:0x8079D160 end:0x8079D270
 
 OS/FindContainHeap_.c:
-	.text       start:0x804C1760 end:0x804C6D68
+	.text       start:0x804C1760 end:0x804C68A0
+	.data       start:0x8061AE00 end:0x8061B9A0
+	.bss        start:0x80748B90 end:0x8074CF40
+	.sdata      start:0x80793F00 end:0x80793F08
+	.sbss       start:0x80795298 end:0x807952B8
+	.sdata2     start:0x8079D270 end:0x8079D298
 
-OS/OSAlarm.c:
-	.text       start:0x804CBC50 end:0x804CBC60
+MTX/mtxvec.c:
+	.text       start:0x804C68A0 end:0x804C6900
+
+MTX/mtx44.c:
+	.text       start:0x804C6900 end:0x804C6B60
+	.sdata2     start:0x8079D298 end:0x8079D2B0
+
+MTX/vec.c:
+	.text       start:0x804C6B60 end:0x804C6D70
+	.sdata2     start:0x8079D2B0 end:0x8079D2C0
+
+NAND/nand.c:
+	.text       start:0x804C6D70 end:0x804D9B4C
+	.rodata     start:0x80573A00 end:0x80573B58
+	.data       start:0x8061B9A0 end:0x80629B90
+	.bss        start:0x8074CF40 end:0x8074E460
+	.sdata      start:0x80793F08 end:0x80794000
+	.sbss       start:0x807952B8 end:0x80795440
+	.sdata2     start:0x8079D2C0 end:0x8079D330
 
 RSO/runtime.c:
 	.text       start:0x804D9B4C end:0x804DAE40
-	.data       start:0x80629C08 end:0x80629C40
+	.data       start:0x80629B90 end:0x80629CA8
+
+SC/sc.cpp:
+	.text       start:0x804DAE40 end:0x804E45B0
+	.rodata     start:0x80573B58 end:0x80573C40
+	.data       start:0x80629CA8 end:0x8062AB68
+	.bss        start:0x8074E460 end:0x8075B110
+	.sdata      start:0x80794000 end:0x80794148
+	.sbss       start:0x80795440 end:0x807955C8
+	.sdata2     start:0x8079D330 end:0x8079D3C0
+
+WPAD/wpad.cpp:
+	.text       start:0x804E45B0 end:0x80500E10
+	.rodata     start:0x80573C40 end:0x80573CD8
+	.data       start:0x8062AB68 end:0x8062F9C0
+	.bss        start:0x8075B110 end:0x80760C78
+	.sdata      start:0x80794148 end:0x807941E8
+	.sbss       start:0x807955C8 end:0x80795768
+	.sdata2     start:0x8079D3C0 end:0x8079D494
+
+nw4r/math_arithmetic.cpp:
+	.text       start:0x80500E10 end:0x80500E34
+	.sdata2     start:0x8079D494 end:0x8079D4A0
+
+nw4r/math_triangular.cpp:
+	.text       start:0x80500E34 end:0x805012C4
+	.rodata     start:0x80573CD8 end:0x80574CE8
+	.data       start:0x8062F9C0 end:0x8062FAC8
+	.sdata2     start:0x8079D4A0 end:0x8079D4C8
+
+nw4r/fn_805012C4.cpp:
+	.text       start:0x805012C4 end:0x80502828
+	.ctors      start:0x8056F3D8 end:0x8056F3DC
+	.data       start:0x8062FAC8 end:0x8062FAF0
+	.bss        start:0x80760C78 end:0x80760C98
+	.sdata2     start:0x8079D4C8 end:0x8079D4F0
+
+nw4r/fn_80502828.cpp:
+	.text       start:0x80502828 end:0x80504A3C
+	.data       start:0x8062FAF0 end:0x8062FC48
+	.bss        start:0x80760C98 end:0x80760CB8
+	.sbss       start:0x80795768 end:0x80795770
+	.sdata2     start:0x8079D4F0 end:0x8079D510
+
+nw4r/fn_80504A3C.cpp:
+	.text       start:0x80504A3C end:0x8050661C
+	.ctors      start:0x8056F3DC end:0x8056F3E0
+	.bss        start:0x80760CB8 end:0x80760CD0
+	.sbss       start:0x80795770 end:0x80795780
+	.sdata2     start:0x8079D510 end:0x8079D528
+
+nw4r/fn_8050661C.cpp:
+	.text       start:0x8050661C end:0x805073C0
+	.data       start:0x8062FC48 end:0x8062FD00
+	.bss        start:0x80760CD0 end:0x80760F00
+	.sdata      start:0x807941E8 end:0x807941F8
+	.sbss       start:0x80795780 end:0x807957B0
+
+DWCi/dwc_error.cpp:
+	.text       start:0x805073C0 end:0x80507C40
+	.data       start:0x8062FD00 end:0x8062FF90
+	.sdata      start:0x807941F8 end:0x80794200
+	.sbss       start:0x807957B0 end:0x807957D0
 
 DWCi/DWCi_Np_CPUCopyFast.c:
 	.text       start:0x80507C40 end:0x80509DB0
 	.data       start:0x8062FF90 end:0x806302C8
-	.sdata      start:0x80794200 end:0x80794210
+	.bss        start:0x80760F00 end:0x807613B8
+	.sdata      start:0x80794200 end:0x807942FC
 	.sbss       start:0x807957D0 end:0x807957F8
+
+DWCi/dwc_nasfunc.cpp:
+	.text       start:0x80509DB0 end:0x805113B0
+	.data       start:0x806307F0 end:0x806308A8
+	.bss        start:0x807613B8 end:0x807614D8
+	.sdata      start:0x807942FC end:0x80794358
+	.sbss       start:0x807957F8 end:0x80795820
 
 DWCi/fn_805113B0.c:
 	.text       start:0x805113B0 end:0x80512490
+	.sdata      start:0x80794358 end:0x80794368
+	.sbss       start:0x80795820 end:0x80795828
 
 DWCi/DWCi_NatNeg.c:
 	.text       start:0x80512490 end:0x805145B8
@@ -2068,56 +2299,217 @@ DWCi/DWCi_NatNeg.c:
 
 NHTTP/NHTTP_bgnend.c:
 	.text       start:0x805145B8 end:0x80515010
+	.data       start:0x80630A08 end:0x80630AE8
 
 NHTTP/NHTTP_os_RVL.c:
 	.text       start:0x80515010 end:0x80515774
+	.data       start:0x80630AE8 end:0x80630B28
+	.sdata      start:0x807943A0 end:0x807943A8
 
 NHTTP/d_nhttp.c:
 	.text       start:0x80515774 end:0x8051B7FC
-	.data       start:0x80630C50 end:0x80630D48
-	.bss        start:0x80762C20 end:0x80762C60
-	.sdata      start:0x80794410 end:0x80794418
+	.rodata     start:0x80574CE8 end:0x80574E00
+	.data       start:0x80630B28 end:0x80630F88
+	.bss        start:0x80762C20 end:0x80763900
+	.sdata      start:0x807943A8 end:0x80794420
 	.sbss       start:0x80795878 end:0x80795888
+
+SSL/ssl.cpp:
+	.text       start:0x8051B7FC end:0x8051D710
+	.data       start:0x80630F88 end:0x80631128
+	.bss        start:0x80763900 end:0x80766980
+	.sdata      start:0x80794420 end:0x80794438
+	.sbss       start:0x80795888 end:0x80795898
 
 NWC24/nwc24_msg.c:
 	.text       start:0x8051D710 end:0x8051E068
-	.data       start:0x80631128 end:0x80631178
+	.data       start:0x80631128 end:0x806311C0
+	.bss        start:0x80766980 end:0x80766B00
 	.sdata      start:0x80794438 end:0x80794440
-	.sbss       start:0x807958A0 end:0x807958A8
+	.sbss       start:0x80795898 end:0x807958B8
 
 NWC24/nwc24_io.c:
 	.text       start:0x8051E068 end:0x8051E864
 	.rodata     start:0x80574E00 end:0x80574E10
-	.data       start:0x806311E8 end:0x8063122C
+	.data       start:0x806311C0 end:0x80631230
 	.bss        start:0x80766B00 end:0x80766C40
 	.sdata      start:0x80794440 end:0x80794448
 	.sbss       start:0x807958B8 end:0x807958D8
 
-fn_805482CC.cpp:
-	.text       start:0x805482CC end:0x8054E894
+SO/soi.cpp:
+	.text       start:0x8051E864 end:0x8052A040
+	.rodata     start:0x80574E10 end:0x80579450
+	.data       start:0x80631230 end:0x806498C8
+	.bss        start:0x80766C40 end:0x807901C0
+	.sdata      start:0x80794448 end:0x807944B0
+	.sbss       start:0x807958D8 end:0x80795A18
+	.sdata2     start:0x8079D528 end:0x8079D550
 
-homebutton/fn_8054E894.cpp:
-	.text       start:0x8054E894 end:0x80555374
-	.ctors      start:0x8056F3FC end:0x8056F404
+homebutton/fn_8052A040.cpp:
+	.text       start:0x8052A040 end:0x8052B004
+	.ctors      start:0x8056F3E0 end:0x8056F3E4
+	.data       start:0x806498C8 end:0x8064A5E8
+	.sbss       start:0x80795A18 end:0x80795A28
+	.sdata2     start:0x8079D550 end:0x8079D570
 
-homebutton/fn_80555374.cpp:
-	.text       start:0x80555374 end:0x8055C894
-	.ctors      start:0x8056F404 end:0x8056F410
+homebutton/fn_8052B004.cpp:
+	.text       start:0x8052B004 end:0x8052C880
+	.ctors      start:0x8056F3E4 end:0x8056F3E8
+	.data       start:0x8064A5E8 end:0x8064A6B0
+	.sbss       start:0x80795A28 end:0x80795A30
+	.sdata2     start:0x8079D570 end:0x8079D580
 
-homebutton/keyboard_ui.cpp:
-	.text       start:0x8055C894 end:0x805632BC
-	.ctors      start:0x8056F410 end:0x8056F424
+homebutton/fn_8052C880.cpp:
+	.text       start:0x8052C880 end:0x8052E0CC
+	.ctors      start:0x8056F3E8 end:0x8056F3EC
+	.data       start:0x8064A6B0 end:0x8064A738
+	.sdata      start:0x807944B0 end:0x807944B8
+	.sbss       start:0x80795A30 end:0x80795A38
+	.sdata2     start:0x8079D580 end:0x8079D598
 
-homebutton/keyboard.cpp:
-	.text       start:0x805632BC end:0x80569DAC
+homebutton/fn_8052E0CC.cpp:
+	.text       start:0x8052E0CC end:0x80530680
+	.ctors      start:0x8056F3EC end:0x8056F3F0
+	.data       start:0x8064A738 end:0x8064A800
+	.sbss       start:0x80795A38 end:0x80795A40
+	.sdata2     start:0x8079D598 end:0x8079D5B0
+
+homebutton/fn_80530680.cpp:
+	.text       start:0x80530680 end:0x8053072C
+	.ctors      start:0x8056F3F0 end:0x8056F3F4
+	.data       start:0x8064A800 end:0x8064A878
+	.sbss       start:0x80795A40 end:0x80795A48
+
+homebutton/fn_8053072C.cpp:
+	.text       start:0x8053072C end:0x80533474
+	.data       start:0x8064A878 end:0x8064A8E8
+	.sdata2     start:0x8079D5B0 end:0x8079D5D0
+	.sbss2      start:0x8079D7F0 end:0x8079D7F8
+
+homebutton/fn_80533474.cpp:
+	.text       start:0x80533474 end:0x8053E808
+	.ctors      start:0x8056F3F4 end:0x8056F3F8
+	.rodata     start:0x80579450 end:0x8057AB98
+	.data       start:0x8064A8E8 end:0x8064DE88
+	.bss        start:0x807901C0 end:0x807901F0
+	.sdata      start:0x807944B8 end:0x80794568
+	.sbss       start:0x80795A48 end:0x80795A50
+	.sdata2     start:0x8079D5D0 end:0x8079D620
+
+homebutton/fn_8053E808.cpp:
+	.text       start:0x8053E808 end:0x805425E4
+	.ctors      start:0x8056F3F8 end:0x8056F3FC
+	.rodata     start:0x8057AB98 end:0x8057B098
+	.data       start:0x8064DE88 end:0x8064E760
+	.sdata      start:0x80794568 end:0x807945C8
+	.sdata2     start:0x8079D620 end:0x8079D628
+
+homebutton/hbm_text_panel.cpp:
+	.text       start:0x805425E4 end:0x8054F7BC
+	.ctors      start:0x8056F3FC end:0x8056F400
+	.rodata     start:0x8057B098 end:0x8057B2F0
+	.data       start:0x8064E760 end:0x8064F360
+	.bss        start:0x807901F0 end:0x80790250
+	.sdata      start:0x807945C8 end:0x807945E8
+	.sbss       start:0x80795A50 end:0x80795A70
+	.sdata2     start:0x8079D628 end:0x8079D6A0
+
+homebutton/hbm_kb_widget.cpp:
+	.text       start:0x8054F7BC end:0x805546B4
+	.ctors      start:0x8056F400 end:0x8056F404
+	.rodata     start:0x8057B2F0 end:0x8057B668
+	.data       start:0x8064F360 end:0x80650160
+	.sdata      start:0x807945E8 end:0x80794608
+	.sdata2     start:0x8079D6A0 end:0x8079D6D0
+
+homebutton/hbm_kb_list.cpp:
+	.text       start:0x805546B4 end:0x80555B0C
+	.ctors      start:0x8056F404 end:0x8056F408
+	.rodata     start:0x8057B668 end:0x8057B848
+	.data       start:0x80650160 end:0x80650500
+	.sdata      start:0x80794608 end:0x80794620
+
+homebutton/hbm_kb_child.cpp:
+	.text       start:0x80555B0C end:0x80556FC4
+	.ctors      start:0x8056F408 end:0x8056F40C
+	.rodata     start:0x8057B848 end:0x8057BAB0
+	.data       start:0x80650500 end:0x80650B40
+	.sdata      start:0x80794620 end:0x80794628
+
+homebutton/hbm_anim_record.cpp:
+	.text       start:0x80556FC4 end:0x80558EB4
+	.ctors      start:0x8056F40C end:0x8056F410
+	.rodata     start:0x8057BAB0 end:0x8057BDB0
+	.data       start:0x80650B40 end:0x80651568
+	.bss        start:0x807907D0 end:0x80790D10
+	.sdata      start:0x80794628 end:0x80794638
+
+homebutton/hbm_value.cpp:
+	.text       start:0x80558EB4 end:0x8055EAF0
+	.ctors      start:0x8056F410 end:0x8056F414
+	.data       start:0x80651568 end:0x80652340
+	.sbss       start:0x80795A70 end:0x80795A78
+	.sdata2     start:0x8079D6D0 end:0x8079D718
+
+homebutton/hbm_hermite.cpp:
+	.text       start:0x8055EAF0 end:0x8055F728
+	.ctors      start:0x8056F414 end:0x8056F418
+	.data       start:0x80652340 end:0x80652530
+	.sbss       start:0x80795A78 end:0x80795A90
+	.sdata2     start:0x8079D718 end:0x8079D738
+
+homebutton/fn_8055F728.cpp:
+	.text       start:0x8055F728 end:0x8055FB70
+	.ctors      start:0x8056F418 end:0x8056F41C
+	.rodata     start:0x8057BDB0 end:0x8057C1FC
+	.data       start:0x80652530 end:0x806553C0
+
+homebutton/fn_8055FB70.cpp:
+	.text       start:0x8055FB70 end:0x8055FD58
+	.ctors      start:0x8056F41C end:0x8056F420
+	.data       start:0x80655630 end:0x80655BD8
+	.sdata      start:0x80794660 end:0x80794668
+
+homebutton/fn_8055FD58.cpp:
+	.text       start:0x8055FD58 end:0x8056083C
+	.ctors      start:0x8056F420 end:0x8056F424
+	.data       start:0x80655BD8 end:0x80655F50
+
+homebutton/hbm_kb_event.cpp:
+	.text       start:0x8056083C end:0x80566440
 	.ctors      start:0x8056F424 end:0x8056F428
+	.rodata     start:0x8057C228 end:0x8057C258
+	.data       start:0x80657210 end:0x80657BA8
+	.bss        start:0x80790D10 end:0x80790D58
+	.sdata      start:0x80794668 end:0x80794708
+	.sbss       start:0x80795A90 end:0x80795AA0
+	.sdata2     start:0x8079D738 end:0x8079D750
+
+homebutton/hbm_kb_cursor.cpp:
+	.text       start:0x80566440 end:0x80569DAC
+	.rodata     start:0x8057C258 end:0x8057C760
+	.data       start:0x80657BA8 end:0x80658200
+	.sdata      start:0x80794708 end:0x80794750
+	.sdata2     start:0x8079D750 end:0x8079D788
 
 homebutton/gui.cpp:
-	.text       start:0x80569DAC end:0x8056BBF0
+	.text       start:0x80569DAC end:0x8056A478
+	.sdata2     start:0x8079D788 end:0x8079D7A0
 
-tiHKBManager.cpp:
-	.text       start:0x8056BBF0 end:0x8056F2B4
+homebutton/tiHKBManager.cpp:
+	.text       start:0x8056A478 end:0x8056D814
 	.ctors      start:0x8056F428 end:0x8056F42C
+	.data       start:0x80658290 end:0x80658458
+	.bss        start:0x80790D58 end:0x80790DF8
+	.sdata2     start:0x8079D7A0 end:0x8079D7B0
+
+homebutton/fn_8056D814.cpp:
+	.text       start:0x8056D814 end:0x8056F2B4
+	.rodata     start:0x8057C760 end:0x8057C808
+	.data       start:0x80658458 end:0x806584E4
+	.bss        start:0x80790DF8 end:0x80790E04
+	.sdata      start:0x80794750 end:0x80794754
+	.sdata2     start:0x8079D7B0 end:0x8079D7C8
 
 Runtime.PPCEABI.H/memcpy.c:
 	.init       start:0x80004000 end:0x80004350

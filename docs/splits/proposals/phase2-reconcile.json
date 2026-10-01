@@ -1467,41 +1467,37 @@
    ],
    "reproduce": "python tools/units/callers.py 0x80573CD8",
    "text_addr": "0x80500E34",
-   "note": "orchestrator override 30: medium: the readers inside the nw4r math unit are its own sin/cos index functions; the ef reads are externs"
+   "note": "orchestrator override 27: medium: the readers inside the nw4r math unit are its own sin/cos index functions; the ef reads are externs"
   },
   {
    "unit": "NHTTP/d_nhttp.c",
    "section": ".rodata",
    "range": [
-    "0x80574D00",
+    "0x80574CE8",
     "0x80574E00"
    ],
-   "grade": "strong",
-   "signal": "reader",
-   "symbols": 3,
-   "bytes": 256,
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 4,
+   "bytes": 280,
    "signals": {
-    "reader": 3
+    "orchestrator": 4
    },
    "evidence": [
     {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x80574D00",
-     "finding": "lbl_80574D00 (.rodata 0x80574D00, 0x28 B) is read at 0x805170E4 in NHTTP/d_nhttp.c"
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window fg units> --root . --base-snapshot ../mhtri-dtk/.pi/land-base.json --base-ref be0966ec6 --unit-rename <the window fg renames>",
+     "finding": "the data-closure row refuses NHTTPi_postDataRawCode: referenced by two batch units, no claim covers it"
     },
     {
      "tool": "callers",
-     "command": "python tools/units/callers.py 0x80574D9C",
-     "finding": "lbl_80574D9C (.rodata 0x80574D9C, 0x64 B) is read at 0x805187B0 in NHTTP/d_nhttp.c"
-    },
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain d_nhttp --section .rodata",
-     "finding": "3 symbol(s): 3 read by NHTTP/d_nhttp.c (first 0x80574D00, last 0x80574D9C)"
+     "command": "python tools/units/callers.py 0x80574CE8",
+     "finding": "NHTTPi_postDataRawCode (21 B string) is address-taken by NHTTP_bgnend (2 sites) and d_nhttp (2 sites); the three .rodata objects behind it (lbl_80574D00 0x28 B, lbl_80574D28 0x74 B, lbl_80574D9C 0x64 B, up to 0x80574E00) are read only by d_nhttp; nw4r/math_triangular's .rodata ends at 0x80574CE8 and nothing is claimed after 0x80574E00"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain d_nhttp --section .rodata",
-   "text_addr": "0x80515774"
+   "reproduce": "python tools/units/callers.py 0x80574CE8",
+   "text_addr": "0x80515774",
+   "note": "orchestrator override 64: medium: link order - the string is the head of a 0x118 B .rodata run whose other three objects only d_nhttp reads; NHTTP_bgnend would have to own a 21 B fragment in front of it"
   },
   {
    "unit": "SO/soi.cpp",
@@ -2000,7 +1996,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x805813E8",
    "text_addr": "0x80048964",
-   "note": "orchestrator override 56: medium: sole-owned (one referencing unit); claimed tight so the batch leaves no data clearly owned behind"
+   "note": "orchestrator override 53: medium: sole-owned (one referencing unit); claimed tight so the batch leaves no data clearly owned behind"
   },
   {
    "unit": "fn_8004CAD8.cpp",
@@ -2244,7 +2240,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x8058C30C",
    "text_addr": "0x80063888",
-   "note": "orchestrator override 51: medium: sole-owned run starting at the unit's own `__FILE__` string (lbl_8058C118); the engine's zone ends where g3d/fn_800680CC's `__FILE__` string begins (0x8058CC40)"
+   "note": "orchestrator override 48: medium: sole-owned run starting at the unit's own `__FILE__` string (lbl_8058C118); the engine's zone ends where g3d/fn_800680CC's `__FILE__` string begins (0x8058CC40)"
   },
   {
    "unit": "g3d/fn_800680CC.cpp",
@@ -2274,7 +2270,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x8058CC40",
    "text_addr": "0x800680CC",
-   "note": "orchestrator override 52: medium: sole-owned run from the unit's own `__FILE__` string (lbl_8058CC40) to g3d_anmvis's claim at 0x8058D6C0"
+   "note": "orchestrator override 49: medium: sole-owned run from the unit's own `__FILE__` string (lbl_8058CC40) to g3d_anmvis's claim at 0x8058D6C0"
   },
   {
    "unit": "g3d/g3d_anmvis.cpp",
@@ -2551,7 +2547,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x8058ED38",
    "text_addr": "0x80075DCC",
-   "note": "orchestrator override 53: medium: sole-owned (one referencing unit); the run lies between the unit's own claim (ends 0x8058ED38) and g3d_scnmdl's (starts 0x8058EDA0)"
+   "note": "orchestrator override 50: medium: sole-owned (one referencing unit); the run lies between the unit's own claim (ends 0x8058ED38) and g3d_scnmdl's (starts 0x8058EDA0)"
   },
   {
    "unit": "g3d/g3d_scnmdl.cpp",
@@ -2973,7 +2969,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x805908B0",
    "text_addr": "0x800908FC",
-   "note": "orchestrator override 54: medium: sole-owned; claimed tight from the first pair to g3d_resanmtexsrt's claim at 0x80590928 (the zone before it holds g3d_resanmlight's strings, which this batch does not own)"
+   "note": "orchestrator override 51: medium: sole-owned; claimed tight from the first pair to g3d_resanmtexsrt's claim at 0x80590928 (the zone before it holds g3d_resanmlight's strings, which this batch does not own)"
   },
   {
    "unit": "g3d/g3d_resanmtexsrt.cpp",
@@ -3040,7 +3036,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x80590D78",
    "text_addr": "0x800947A4",
-   "note": "orchestrator override 55: medium: sole-owned; claimed from g3d_resanmtexsrt's end (0x80590D78) to the first g3d_resfile string (0x80591280)"
+   "note": "orchestrator override 52: medium: sole-owned; claimed from g3d_resanmtexsrt's end (0x80590D78) to the first g3d_resfile string (0x80591280)"
   },
   {
    "unit": "g3d/g3d_resnode.cpp",
@@ -3346,7 +3342,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x800A3B20 --pointers",
    "takes_from": "ef/ef_draworder.cpp",
-   "note": "orchestrator override 14: vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
+   "note": "orchestrator override 13: vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
    "text_addr": "0x800A388C"
   },
   {
@@ -3702,7 +3698,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x80593F68",
    "text_addr": "0x800B9A44",
-   "note": "orchestrator override 49: medium: sole-owned (one referencing unit); the run lies between the billboard/directional unit's own claim (ends 0x80593F68) and ef_drawfreestrategy's (starts 0x805941F8)"
+   "note": "orchestrator override 46: medium: sole-owned (one referencing unit); the run lies between the billboard/directional unit's own claim (ends 0x80593F68) and ef_drawfreestrategy's (starts 0x805941F8)"
   },
   {
    "unit": "ef/ef_drawfreestrategy.cpp",
@@ -3762,7 +3758,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x800BEF00 --pointers",
    "takes_from": "ef/ef_drawfreestrategy.cpp",
-   "note": "orchestrator override 15: vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
+   "note": "orchestrator override 14: vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
    "text_addr": "0x800BE154"
   },
   {
@@ -3823,7 +3819,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x800BF780 --pointers",
    "takes_from": "ef/ef_drawlinestrategy.cpp",
-   "note": "orchestrator override 16: vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
+   "note": "orchestrator override 15: vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
    "text_addr": "0x800BEF98"
   },
   {
@@ -3884,7 +3880,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x800BFF3C --pointers",
    "takes_from": "ef/ef_drawpointstrategy.cpp",
-   "note": "orchestrator override 17: vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
+   "note": "orchestrator override 16: vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
    "text_addr": "0x800BF818"
   },
   {
@@ -4018,7 +4014,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x800C9540 --pointers",
    "takes_from": "ef/ef_torus.cpp",
-   "note": "orchestrator override 18: vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
+   "note": "orchestrator override 17: vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
    "text_addr": "0x800C9540"
   },
   {
@@ -4079,7 +4075,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x800CA200 --pointers",
    "takes_from": "ef/ef_cube.cpp",
-   "note": "orchestrator override 19: vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
+   "note": "orchestrator override 18: vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
    "text_addr": "0x800C9DD0"
   },
   {
@@ -4140,7 +4136,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x800CBFB0 --pointers",
    "takes_from": "ef/ef_cylinder.cpp",
-   "note": "orchestrator override 20: vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
+   "note": "orchestrator override 19: vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
    "text_addr": "0x800CB948"
   },
   {
@@ -4303,7 +4299,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x800CCFB0 --pointers",
    "takes_from": "ef/ef_line.cpp",
-   "note": "orchestrator override 21: vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
+   "note": "orchestrator override 20: vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
    "text_addr": "0x800CCFB0"
   },
   {
@@ -4364,7 +4360,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x800CD584 --pointers",
    "takes_from": "ef/ef_point.cpp",
-   "note": "orchestrator override 22: vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
+   "note": "orchestrator override 21: vtable of the unit's own class, decided by its slots (the range starts at the unit's .data end so the unit keeps one run)",
    "text_addr": "0x800CD584"
   },
   {
@@ -8046,7 +8042,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x8035F060 --pointers",
    "text_addr": "0x8035F2B4",
-   "note": "orchestrator override 28: table of the unit's own code pointers: the key function is em035_prog's"
+   "note": "orchestrator override 25: table of the unit's own code pointers: the key function is em035_prog's"
   },
   {
    "unit": "enemy/em035_prog.cpp",
@@ -8597,7 +8593,7 @@
    ],
    "reproduce": "python tools/units/callers.py --range 0x805F8200 0x805F8230 --each",
    "takes_from": "enemy/em_pop.cpp",
-   "note": "orchestrator override 13: recut of the registered range: em_model's .data starts at 0x805F8220 (hold-out: the 17 wrong symbols of enemy/em_pop | em_model)",
+   "note": "orchestrator override 12: recut of the registered range: em_model's .data starts at 0x805F8220 (hold-out: the 17 wrong symbols of enemy/em_pop | em_model)",
    "text_addr": "0x803B936C"
   },
   {
@@ -8703,7 +8699,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x805F9190",
    "text_addr": "0x803C3A5C",
-   "note": "orchestrator override 44: medium: sole-owned (one referencing unit, no unsplit reader), claimed tight so the batch leaves no data clearly owned behind; a merged guess block owns it until its cut lands; force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit"
+   "note": "orchestrator override 41: medium: sole-owned (one referencing unit, no unsplit reader), claimed tight so the batch leaves no data clearly owned behind; a merged guess block owns it until its cut lands; force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit"
   },
   {
    "unit": "Network/NetworkSessionManagerPat.cpp",
@@ -8768,7 +8764,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x805FB2B8",
    "text_addr": "0x803D70B8",
-   "note": "orchestrator override 39: medium: sole-owned (one referencing unit, no unsplit reader), claimed tight so the batch leaves no data clearly owned behind; a merged guess block owns it until its cut lands; force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit"
+   "note": "orchestrator override 36: medium: sole-owned (one referencing unit, no unsplit reader), claimed tight so the batch leaves no data clearly owned behind; a merged guess block owns it until its cut lands; force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit"
   },
   {
    "unit": "Network/NetworkCommunityPat.cpp",
@@ -8834,7 +8830,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x805FC324",
    "text_addr": "0x803E4888",
-   "note": "orchestrator override 40: medium: sole-owned (one referencing unit, no unsplit reader), claimed tight so the batch leaves no data clearly owned behind; a merged guess block owns it until its cut lands"
+   "note": "orchestrator override 37: medium: sole-owned (one referencing unit, no unsplit reader), claimed tight so the batch leaves no data clearly owned behind; a merged guess block owns it until its cut lands"
   },
   {
    "unit": "Network/NetworkCommunityPat.cpp",
@@ -8864,7 +8860,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x805FE910",
    "text_addr": "0x803E4888",
-   "note": "orchestrator override 45: the run holds at least 8 TUs' data (data-order seam at 0x805FC4D0): kept as the merged block's, owner ruling 2026-10-01"
+   "note": "orchestrator override 42: the run holds at least 8 TUs' data (data-order seam at 0x805FC4D0): kept as the merged block's, owner ruling 2026-10-01"
   },
   {
    "unit": "Network/PatInterface.cpp",
@@ -8966,7 +8962,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x80602448",
    "text_addr": "0x804006A8",
-   "note": "orchestrator override 41: medium: sole-owned (one referencing unit, no unsplit reader), claimed tight so the batch leaves no data clearly owned behind; a merged guess block owns it until its cut lands; force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit"
+   "note": "orchestrator override 38: medium: sole-owned (one referencing unit, no unsplit reader), claimed tight so the batch leaves no data clearly owned behind; a merged guess block owns it until its cut lands; force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit"
   },
   {
    "unit": "Network/network_opening.cpp",
@@ -9032,7 +9028,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x80602988",
    "text_addr": "0x804155D4",
-   "note": "orchestrator override 42: medium: sole-owned (one referencing unit, no unsplit reader), claimed tight so the batch leaves no data clearly owned behind; a merged guess block owns it until its cut lands"
+   "note": "orchestrator override 39: medium: sole-owned (one referencing unit, no unsplit reader), claimed tight so the batch leaves no data clearly owned behind; a merged guess block owns it until its cut lands"
   },
   {
    "unit": "Network/constructNetworkLibrary.cpp",
@@ -9361,7 +9357,7 @@
    ],
    "reproduce": "python tools/splits/dataorder.py at 0x80607E50",
    "text_addr": "0x804513FC",
-   "note": "orchestrator override 12: the 381 unread pointer-graph symbols between the seam and the first symbol the new TU reads: no read of their own, the seam alone places them"
+   "note": "orchestrator override 11: the 381 unread pointer-graph symbols between the seam and the first symbol the new TU reads: no read of their own, the seam alone places them"
   },
   {
    "unit": "menu/fn_804513FC.cpp",
@@ -10012,28 +10008,28 @@
     "0x8062FBE8",
     "0x8062FC48"
    ],
-   "grade": "guess",
-   "signal": "vtable-store",
+   "grade": "medium",
+   "signal": "orchestrator",
    "symbols": 1,
    "bytes": 96,
    "signals": {
-    "vtable-store": 1
+    "orchestrator": 1
    },
    "evidence": [
     {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x8062FBE8",
-     "finding": "lbl_8062FBE8 (.data 0x8062FBE8, 0x60 B) is read at 0x80503030 in nw4r/fn_80502828.cpp"
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window fg units> --root . --base-snapshot ../mhtri-dtk/.pi/land-base.json --base-ref be0966ec6 --unit-rename <the window fg renames>",
+     "finding": "the data-closure row refuses lbl_8062FBE8: referenced by exactly one batch unit, no claim covers it"
     },
     {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_80502828 --section .data",
-     "finding": "1 symbol(s): 1 read by nw4r/fn_80502828.cpp (first 0x8062FBE8, last 0x8062FBE8)"
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8062FBE8",
+     "finding": "lbl_8062FBE8 (96 B) is address-taken only by nw4r/fn_80502828's text (2 sites, no other reader); the unit's .data claim ends at 0x8062FBE8 and nw4r/fn_8050661C starts at 0x8062FC48"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_80502828 --section .data",
+   "reproduce": "python tools/units/callers.py 0x8062FBE8",
    "text_addr": "0x80502828",
-   "note": "not applied: attaching it fails the data-order invariant (strong zigzag seam at 0x8062FBE8 inside the unit's .data (a boundary in [0x8062FBE8, 0x8062FBE8)): at least 2 TUs)"
+   "note": "orchestrator override 55: medium: sole-owned (one referencing unit), claimed tight; force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit"
   },
   {
    "unit": "nw4r/fn_8050661C.cpp",
@@ -10485,6 +10481,36 @@
    "text_addr": "0x8052B004"
   },
   {
+   "unit": "homebutton/fn_8052B004.cpp",
+   "section": ".data",
+   "range": [
+    "0x8064A5F8",
+    "0x8064A6B0"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 2,
+   "bytes": 184,
+   "signals": {
+    "orchestrator": 2
+   },
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window fg units> --root . --base-snapshot ../mhtri-dtk/.pi/land-base.json --base-ref be0966ec6 --unit-rename <the window fg renames>",
+     "finding": "the data-closure row refuses lbl_8064A5F8 and lbl_8064A638 (the engine kept them deferred): referenced by exactly one batch unit, no claim covers them"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8064A638 --pointers",
+     "finding": "both tables are address-taken only by fn_8052B004 (3 sites each, stored by fn_8052C330 in the unit); lbl_8064A638 has 20 of its 28 slots in homebutton/fn_8052A040's text and 8 in fn_8052B004's; fn_8052B004's .data claim ends at 0x8064A5F8 and homebutton/fn_8052C880 starts at 0x8064A6B0"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x8064A638 --pointers",
+   "text_addr": "0x8052B004",
+   "note": "orchestrator override 56: medium: sole reader and storer (definer); the slot owner of lbl_8064A638 is the other unit but its pair is read through fn_8052B004's vtable store, and attaching it to fn_8052A040 would leave that unit two .data ranges (an order FAIL); force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit"
+  },
+  {
    "unit": "homebutton/fn_8052C880.cpp",
    "section": ".data",
    "range": [
@@ -10646,126 +10672,30 @@
    "section": ".data",
    "range": [
     "0x8064A8F8",
-    "0x8064A920"
+    "0x8064DE88"
    ],
-   "grade": "guess",
-   "signal": "vtable-store",
-   "symbols": 1,
-   "bytes": 40,
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 199,
+   "bytes": 13712,
    "signals": {
-    "vtable-store": 1
+    "orchestrator": 199
    },
    "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window fg units> --root . --base-snapshot ../mhtri-dtk/.pi/land-base.json --base-ref be0966ec6 --unit-rename <the window fg renames>",
+     "finding": "the data-closure row refuses 33 pairs lbl_8064A8F8..lbl_8064DBD8 and lbl_8064DC30: referenced by batch units, no claim covers them"
+    },
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x8064A8F8",
-     "finding": "lbl_8064A8F8 (.data 0x8064A8F8, 0x28 B) is read at 0x80533B10 in homebutton/fn_80533474.cpp"
-    },
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_80533474 --section .data",
-     "finding": "1 symbol(s): 1 read by homebutton/fn_80533474.cpp (first 0x8064A8F8, last 0x8064A8F8)"
+     "finding": "every pair from lbl_8064A8F8 to lbl_8064DBD8 (vtables, strings and 14 jump tables) is read only by fn_80533474's text (0x80533474..0x8053E808); lbl_8064DC30 (344 B) is stored by fn_805385D0 inside the unit and also read by fn_8055B710 (a later unit); the unit's .data claim ends at 0x8064A8F8 and homebutton/fn_8053E808 starts at 0x8064DE88 (the row also absorbs the former tail row 0x8064DDE0..0x8064DE88, vtable of 35 slots in this unit)"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_80533474 --section .data",
+   "reproduce": "python tools/units/callers.py 0x8064A8F8",
    "text_addr": "0x80533474",
-   "note": "not applied: attaching it fails the data-order invariant (strong zigzag seam at 0x8064A8F8 inside the unit's .data (a boundary in [0x8064A8F8, 0x8064A8F8)): at least 4 TUs)"
-  },
-  {
-   "unit": "homebutton/fn_80533474.cpp",
-   "section": ".data",
-   "range": [
-    "0x8064A920",
-    "0x8064A938"
-   ],
-   "grade": "guess",
-   "signal": "vtable-store",
-   "symbols": 1,
-   "bytes": 24,
-   "signals": {
-    "vtable-store": 1
-   },
-   "evidence": [
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x8064A920",
-     "finding": "lbl_8064A920 (.data 0x8064A920, 0x18 B) is read at 0x80534DAC in homebutton/fn_80533474.cpp"
-    },
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_80533474 --section .data",
-     "finding": "1 symbol(s): 1 read by homebutton/fn_80533474.cpp (first 0x8064A920, last 0x8064A920)"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_80533474 --section .data",
-   "text_addr": "0x80533474",
-   "note": "not applied: attaching it fails the data-order invariant (follows the blocked piece at 0x8064A8F8 of the same block: strong zigzag seam at 0x8064A8F8 inside the unit's .data (a boundary in [0x8064A8F8, 0x8064A8F8)): at)"
-  },
-  {
-   "unit": "homebutton/fn_80533474.cpp",
-   "section": ".data",
-   "range": [
-    "0x8064A938",
-    "0x8064DDE0"
-   ],
-   "grade": "guess",
-   "signal": "pointer-graph",
-   "symbols": 196,
-   "bytes": 13480,
-   "signals": {
-    "vtable-store": 8,
-    "reader": 5,
-    "pointer-graph": 160,
-    "sinit": 1,
-    "jumptable": 14,
-    "forced": 3,
-    "string-reader": 5
-   },
-   "evidence": [
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x8064A938",
-     "finding": "lbl_8064A938 (.data 0x8064A938, 0x18 B) is read at 0x805350B4 in homebutton/fn_80533474.cpp"
-    },
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x8064DDC0",
-     "finding": "lbl_8064DDC0 (.data 0x8064DDC0, 0x20 B) is read at 0x80538840 in homebutton/fn_80533474.cpp"
-    },
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_80533474 --section .data",
-     "finding": "196 symbol(s): 33 read by homebutton/fn_80533474.cpp (first 0x8064A938, last 0x8064DDC0), 3 unread one(s) forced to it by the non-decreasing link order between its neighbours' anchors, 160 placed by pointer-derived evidence (pointer-graph)"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_80533474 --section .data",
-   "text_addr": "0x80533474",
-   "note": "not applied: attaching it fails the data-order invariant (follows the blocked piece at 0x8064A8F8 of the same block: strong zigzag seam at 0x8064A8F8 inside the unit's .data (a boundary in [0x8064A8F8, 0x8064A8F8)): at)"
-  },
-  {
-   "unit": "homebutton/fn_80533474.cpp",
-   "section": ".data",
-   "range": [
-    "0x8064DDE0",
-    "0x8064DE88"
-   ],
-   "grade": "guess",
-   "signal": "orchestrator",
-   "symbols": 1,
-   "bytes": 168,
-   "signals": {
-    "orchestrator": 1
-   },
-   "evidence": [
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x80533474 --pointers",
-     "finding": "lbl_8064DDE0 (0xA8 B, 38 slots): 35 slots in homebutton/fn_80533474's text, 1 in fn_8056083C"
-    }
-   ],
-   "reproduce": "python tools/units/callers.py 0x80533474 --pointers",
-   "text_addr": "0x80533474",
-   "note": "not applied: attaching it fails the order invariant (.data has 2 ranges with a gap at 0x8064A8F8 (dtk takes one))"
+   "note": "orchestrator override 57: medium: sole-owned run (one referencing unit but one shared vtable whose definer is this unit), one contiguous claim; force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit"
   },
   {
    "unit": "homebutton/fn_8053E808.cpp",
@@ -10830,7 +10760,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x8053E808 --pointers",
    "text_addr": "0x8053E808",
-   "note": "orchestrator override 24: vtable decided by its slots (the slot owner is the key function, playbook 80)"
+   "note": "orchestrator override 22: vtable decided by its slots (the slot owner is the key function, playbook 80)"
   },
   {
    "unit": "homebutton/fn_80542D8C.cpp",
@@ -10877,60 +10807,30 @@
    "section": ".data",
    "range": [
     "0x8064F0BC",
-    "0x8064F338"
-   ],
-   "grade": "guess",
-   "signal": "vtable-store",
-   "symbols": 2,
-   "bytes": 636,
-   "signals": {
-    "vtable-store": 2
-   },
-   "evidence": [
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x8064F0BC",
-     "finding": "lbl_8064F0BC (.data 0x8064F0BC, 0x104 B) is read at 0x80542974 in homebutton/fn_80542D8C.cpp"
-    },
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x8064F1C0",
-     "finding": "lbl_8064F1C0 (.data 0x8064F1C0, 0x178 B) is read at 0x805428EC in homebutton/fn_80542D8C.cpp"
-    },
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_80542D8C --section .data",
-     "finding": "2 symbol(s): 2 read by homebutton/fn_80542D8C.cpp (first 0x8064F0BC, last 0x8064F1C0)"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_80542D8C --section .data",
-   "text_addr": "0x805425E4",
-   "note": "not applied: attaching it fails the data-order invariant (strong zigzag seam at 0x8064F0BC inside the unit's .data (a boundary in [0x8064F0BC, 0x8064F0BC)): at least 2 TUs)"
-  },
-  {
-   "unit": "homebutton/fn_80542D8C.cpp",
-   "section": ".data",
-   "range": [
-    "0x8064F338",
     "0x8064F360"
    ],
-   "grade": "guess",
+   "grade": "medium",
    "signal": "orchestrator",
-   "symbols": 1,
-   "bytes": 40,
+   "symbols": 3,
+   "bytes": 676,
    "signals": {
-    "orchestrator": 1
+    "orchestrator": 3
    },
    "evidence": [
     {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window fg units> --root . --base-snapshot ../mhtri-dtk/.pi/land-base.json --base-ref be0966ec6 --unit-rename <the window fg renames>",
+     "finding": "the data-closure row refuses lbl_8064F0BC, lbl_8064F1C0 and lbl_8064F338: referenced by batch units, no claim covers them"
+    },
+    {
      "tool": "callers",
-     "command": "python tools/units/callers.py 0x80542D8C --pointers",
-     "finding": "the vtable at 0x8064F338 (0x28 B): its 5 slots are in homebutton/fn_80542D8C's text"
+     "command": "python tools/units/callers.py 0x8064F338 --pointers",
+     "finding": "lbl_8064F0BC and lbl_8064F1C0 are read only by homebutton/fn_80542D8C's text; the vtable lbl_8064F338 (0x28 B, 5 slots in this unit) is stored by the unit's constructor and read by fn_8054F7BC and fn_8056083C; the unit's .data claim ends at 0x8064F0BC and homebutton/fn_8054F7BC starts at 0x8064F360 (the row also absorbs the former tail row 0x8064F338..0x8064F360)"
     }
    ],
-   "reproduce": "python tools/units/callers.py 0x80542D8C --pointers",
+   "reproduce": "python tools/units/callers.py 0x8064F338 --pointers",
    "text_addr": "0x805425E4",
-   "note": "not applied: attaching it fails the order invariant (.data has 2 ranges with a gap at 0x8064F0BC (dtk takes one))"
+   "note": "orchestrator override 58: medium: sole-owned run plus a vtable whose definer (constructor and slots) is this unit; force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit"
   },
   {
    "unit": "homebutton/fn_8054F7BC.cpp",
@@ -10994,7 +10894,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x8054F7BC --pointers",
    "text_addr": "0x8054F7BC",
-   "note": "orchestrator override 26: vtable decided by its slots (the slot owner is the key function, playbook 80)"
+   "note": "orchestrator override 23: vtable decided by its slots (the slot owner is the key function, playbook 80)"
   },
   {
    "unit": "homebutton/fn_805546B4.cpp",
@@ -11058,7 +10958,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x805546B4 --pointers",
    "text_addr": "0x805546B4",
-   "note": "orchestrator override 27: vtable decided by its slots (the slot owner is the key function, playbook 80)"
+   "note": "orchestrator override 24: vtable decided by its slots (the slot owner is the key function, playbook 80)"
   },
   {
    "unit": "homebutton/fn_80555B0C.cpp",
@@ -11177,37 +11077,30 @@
    "section": ".data",
    "range": [
     "0x80651870",
-    "0x8065230D"
+    "0x8065233E"
    ],
-   "grade": "guess",
-   "signal": "string-reader",
-   "symbols": 19,
-   "bytes": 2717,
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 21,
+   "bytes": 2766,
    "signals": {
-    "string-reader": 9,
-    "vtable-store": 9,
-    "readers": 1
+    "orchestrator": 21
    },
    "evidence": [
     {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window fg units> --root . --base-snapshot ../mhtri-dtk/.pi/land-base.json --base-ref be0966ec6 --unit-rename <the window fg renames>",
+     "finding": "the data-closure row refuses 19 pairs lbl_80651870..lbl_80652300: referenced by batch units, no claim covers them"
+    },
+    {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x80651870",
-     "finding": "lbl_80651870 (.data 0x80651870, 0xD B) is read at 0x8055DD20 in homebutton/fn_8055B710.cpp"
-    },
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x80652300",
-     "finding": "lbl_80652300 (.data 0x80652300, 0xD B) is read at 0x8055E21C in homebutton/fn_8055B710.cpp"
-    },
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_8055B710 --section .data",
-     "finding": "19 symbol(s): 19 read by homebutton/fn_8055B710.cpp (first 0x80651870, last 0x80652300)"
+     "finding": "the layout strings and vtables lbl_80651870..lbl_806521A8 are read only by fn_8055B710's text (0x80558EB4..0x8055EAF0); lbl_80652300 (\"T_2l_TextBox\", 13 B) is read by it and by fn_8056083C; the unit's .data claim ends at 0x80651870 and homebutton/fn_8055EAF0 starts at 0x80652340"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_8055B710 --section .data",
+   "reproduce": "python tools/units/callers.py 0x80651870",
    "text_addr": "0x80558EB4",
-   "note": "not applied: attaching it fails the data-order invariant (strong V->S seam at 0x80651870 inside the unit's .data (a boundary in [0x80651870, 0x80651950)): at least 2 TUs)"
+   "note": "orchestrator override 59: medium: sole-owned run, link order (the unit is the last owner before the next claim); force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit"
   },
   {
    "unit": "homebutton/fn_8055EAF0.cpp",
@@ -11239,6 +11132,36 @@
    "reproduce": "python tools/splits/dataattach.py --explain fn_8055EAF0 --section .data",
    "text_addr": "0x8055EAF0",
    "note": "only 1 of 5 symbol(s) are read by the unit (a strong block needs 3, max(3, N/50)): the rest is placed by link order or pointer evidence"
+  },
+  {
+   "unit": "homebutton/fn_8055F728.cpp",
+   "section": ".data",
+   "range": [
+    "0x80652530",
+    "0x806525A4"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 116,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window fg units> --root . --base-snapshot ../mhtri-dtk/.pi/land-base.json --base-ref be0966ec6 --unit-rename <the window fg renames>",
+     "finding": "the data-closure row refuses lbl_80652530: referenced by exactly one batch unit, no claim covers it"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80652530",
+     "finding": "lbl_80652530 (116 B) is read only by fn_8055F728 (the sinit-only TU, 1 site); fn_8055EAF0's .data claim ends at 0x80652530 and the unit's own .data starts at 0x806525A4"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x80652530",
+   "text_addr": "0x8055F728",
+   "note": "orchestrator override 60: medium: sole reader and constructor (the unit is its sinit alone); force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit"
   },
   {
    "unit": "homebutton/fn_8055F728.cpp",
@@ -11310,6 +11233,36 @@
    "reproduce": "python tools/splits/dataattach.py --explain fn_8055FB70 --section .data",
    "text_addr": "0x8055FB70",
    "note": "2 symbol(s) are read by another unit than the one link order puts them in (a global read where it is not defined): lbl_80655978 read by homebutton/fn_80556FC4.cpp, lbl_80655A68 read by homebutton/fn_80556FC4.cpp"
+  },
+  {
+   "unit": "homebutton/fn_8055FB70.cpp",
+   "section": ".data",
+   "range": [
+    "0x80655A98",
+    "0x80655BD8"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 320,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window fg units> --root . --base-snapshot ../mhtri-dtk/.pi/land-base.json --base-ref be0966ec6 --unit-rename <the window fg renames>",
+     "finding": "the data-closure row refuses lbl_80655A98: referenced by exactly one batch unit, no claim covers it"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80655A98",
+     "finding": "lbl_80655A98 (320 B, the pointer table that lists the elements of the homebutton arrays) is stored by fn_8055FB70 (the sinit-only TU, 3 sites incl. a write); the unit's .data claim ends at 0x80655A98 and fn_8055FD58 starts at 0x80655BD8"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x80655A98",
+   "text_addr": "0x8055FB70",
+   "note": "orchestrator override 61: medium: definer = the unit whose sinit stores it; force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit"
   },
   {
    "unit": "homebutton/fn_8055FD58.cpp",
@@ -11386,36 +11339,28 @@
     "0x80657698",
     "0x80657BA8"
    ],
-   "grade": "guess",
-   "signal": "string-reader",
+   "grade": "medium",
+   "signal": "orchestrator",
    "symbols": 8,
    "bytes": 1296,
    "signals": {
-    "string-reader": 4,
-    "reader": 1,
-    "vtable-store": 2,
-    "readers": 1
+    "orchestrator": 8
    },
    "evidence": [
     {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window fg units> --root . --base-snapshot ../mhtri-dtk/.pi/land-base.json --base-ref be0966ec6 --unit-rename <the window fg renames>",
+     "finding": "the data-closure row refuses 8 pairs lbl_80657698..lbl_80657A20: referenced by batch units, no claim covers them"
+    },
+    {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x80657698",
-     "finding": "lbl_80657698 (.data 0x80657698, 0x19 B) is read at 0x8056118C in homebutton/fn_8056083C.cpp"
-    },
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x80657A20",
-     "finding": "lbl_80657A20 (.data 0x80657A20, 0x188 B) is read at 0x80560924 in homebutton/fn_8056083C.cpp"
-    },
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_8056083C --section .data",
-     "finding": "8 symbol(s): 8 read by homebutton/fn_8056083C.cpp (first 0x80657698, last 0x80657A20)"
+     "finding": "the layout strings and tables lbl_80657698..lbl_806579C8 are read only by fn_8056083C's text (0x8056083C..0x80566440); lbl_80657A20 (392 B) is also read by menu/fn_804513FC (window e); the unit's .data claim ends at 0x80657698 and homebutton/fn_80566440 starts at 0x80657BA8"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_8056083C --section .data",
+   "reproduce": "python tools/units/callers.py 0x80657698",
    "text_addr": "0x8056083C",
-   "note": "not applied: attaching it fails the data-order invariant (strong V->S seam at 0x80657698 inside the unit's .data (a boundary in [0x80657698, 0x80657858)): at least 2 TUs)"
+   "note": "orchestrator override 62: medium: sole-owned run with one foreign read, link order; force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit"
   },
   {
    "unit": "homebutton/fn_80566440.cpp",
@@ -11497,35 +11442,28 @@
     "0x80658408",
     "0x80658458"
    ],
-   "grade": "guess",
-   "signal": "file-string",
+   "grade": "medium",
+   "signal": "orchestrator",
    "symbols": 3,
    "bytes": 80,
    "signals": {
-    "file-string": 1,
-    "string-reader": 1,
-    "vtable-store": 1
+    "orchestrator": 3
    },
    "evidence": [
     {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window fg units> --root . --base-snapshot ../mhtri-dtk/.pi/land-base.json --base-ref be0966ec6 --unit-rename <the window fg renames>",
+     "finding": "the data-closure row refuses lbl_80658408, lbl_8065841C and lbl_80658440: referenced by exactly one batch unit, no claim covers them"
+    },
+    {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x80658408",
-     "finding": "lbl_80658408 (.data 0x80658408, 0x11 B) is read at 0x8056BC44 in homebutton/tiHKBManager.cpp"
-    },
-    {
-     "tool": "callers",
-     "command": "python tools/units/callers.py 0x80658440",
-     "finding": "lbl_80658440 (.data 0x80658440, 0x18 B) is read at 0x8056C098 in homebutton/tiHKBManager.cpp"
-    },
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain tiHKBManager --section .data",
-     "finding": "3 symbol(s): 3 read by homebutton/tiHKBManager.cpp (first 0x80658408, last 0x80658440)"
+     "finding": "lbl_80658408 is the __FILE__ string \"tiHKBManager.cpp\", lbl_8065841C its panic message, lbl_80658440 the vtable: all read only by tiHKBManager's text; the unit's .data claim ends at 0x80658408 and homebutton/fn_8056D814 starts at 0x80658458"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain tiHKBManager --section .data",
+   "reproduce": "python tools/units/callers.py 0x80658408",
    "text_addr": "0x8056A478",
-   "note": "not applied: attaching it fails the data-order invariant (strong V->S seam at 0x80658408 inside the unit's .data (a boundary in [0x80658408, 0x80658440)): at least 2 TUs)"
+   "note": "orchestrator override 63: medium: sole-owned (one referencing unit); force: the range sits after a data-order seam of the merged block (the engine would block it), kept because the gate refuses data clearly owned by one unit"
   },
   {
    "unit": "homebutton/fn_8056D814.cpp",
@@ -11881,7 +11819,7 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain 0x80673C0A --section .bss",
    "text_addr": "0x8005ABD8",
-   "note": "orchestrator override 31: medium: no reader; the unaligned follower of the preceding unit's last object, so the dtk-refused split `auto_08_80673C0A_bss` disappears"
+   "note": "orchestrator override 28: medium: no reader; the unaligned follower of the preceding unit's last object, so the dtk-refused split `auto_08_80673C0A_bss` disappears"
   },
   {
    "unit": "g3d/g3d_state.cpp",
@@ -14138,7 +14076,7 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain 0x80708076 --section .bss",
    "text_addr": "0x8046D9F0",
-   "note": "orchestrator override 32: medium: no reader; the unaligned follower of arc's last read object, so `auto_08_80708076_bss` disappears"
+   "note": "orchestrator override 29: medium: no reader; the unaligned follower of arc's last read object, so `auto_08_80708076_bss` disappears"
   },
   {
    "unit": "BTE/gki_buffer.cpp",
@@ -14639,7 +14577,7 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain 0x8076317A --section .bss",
    "text_addr": "0x80515774",
-   "note": "orchestrator override 33: medium: no reader; the unaligned follower of d_nhttp's last object"
+   "note": "orchestrator override 30: medium: no reader; the unaligned follower of d_nhttp's last object"
   },
   {
    "unit": "SSL/ssl.cpp",
@@ -14825,7 +14763,7 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain 0x807907D0 --section .bss",
    "text_addr": "0x80556FC4",
-   "note": "orchestrator override 34: medium: the whole arrays go to the unit whose text reads the bases; the pointer table of fn_8055FB70 reaches them as externs. Residual: lbl_80790250 (0x580 B, read by the fn_8055B710 candidate) lies before the first array in link order and stays deferred (contradicts the order), as before"
+   "note": "orchestrator override 31: medium: the whole arrays go to the unit whose text reads the bases; the pointer table of fn_8055FB70 reaches them as externs. Residual: lbl_80790250 (0x580 B, read by the fn_8055B710 candidate) lies before the first array in link order and stays deferred (contradicts the order), as before"
   },
   {
    "unit": "homebutton/fn_8056083C.cpp",
@@ -18563,7 +18501,7 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain 0x8079308A --section .sdata",
    "text_addr": "0x80338808",
-   "note": "orchestrator override 35: medium: no reader; the unaligned follower of lb_companion_ui's last object"
+   "note": "orchestrator override 32: medium: no reader; the unaligned follower of lb_companion_ui's last object"
   },
   {
    "unit": "ef/eft050.cpp",
@@ -19637,7 +19575,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x80793D20",
    "text_addr": "0x80475E30",
-   "note": "orchestrator override 29: medium: read by both units, placed with the later one (the name conflict AXFXReverbHiExpShutdown at 0x804760C0 says the two are one TU, phase 1 f keeps the strong cut 0x80475E30)"
+   "note": "orchestrator override 26: medium: read by both units, placed with the later one (the name conflict AXFXReverbHiExpShutdown at 0x804760C0 says the two are one TU, phase 1 f keeps the strong cut 0x80475E30)"
   },
   {
    "unit": "BTE/gki_buffer.cpp",
@@ -20984,7 +20922,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x8079491C",
    "text_addr": "0x800A56B0",
-   "note": "orchestrator override 57: medium: definer by link order - ef_effect's text (before effectsystem) is the only reader/writer, but .sbss follows .text order and the word lies after effectsystem's three borrowed-object pointers; it was part of ef_effectsystem's .sbss claim before the cut"
+   "note": "orchestrator override 54: medium: definer by link order - ef_effect's text (before effectsystem) is the only reader/writer, but .sbss follows .text order and the word lies after effectsystem's three borrowed-object pointers; it was part of ef_effectsystem's .sbss claim before the cut"
   },
   {
    "unit": "ef/ef_emitter.cpp",
@@ -22079,7 +22017,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x80794C60",
    "text_addr": "0x803BE30C",
-   "note": "orchestrator override 47: medium: definer = the unit whose code stores to them"
+   "note": "orchestrator override 44: medium: definer = the unit whose code stores to them"
   },
   {
    "unit": "menu/get_pop_dat_ptr.cpp",
@@ -22173,7 +22111,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x80794CA8",
    "text_addr": "0x803E4888",
-   "note": "orchestrator override 46: medium: definer = the unit whose code stores to it"
+   "note": "orchestrator override 43: medium: definer = the unit whose code stores to it"
   },
   {
    "unit": "Network/PatInterface.cpp",
@@ -22261,7 +22199,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x80794CC0",
    "text_addr": "0x804155D4",
-   "note": "orchestrator override 48: medium: link order; mpMediator's class prefix (sNetworkLibrary) points at constructNetworkLibrary, whose text comes after network_opening: judgement call, listed in the lane report"
+   "note": "orchestrator override 45: medium: link order; mpMediator's class prefix (sNetworkLibrary) points at constructNetworkLibrary, whose text comes after network_opening: judgement call, listed in the lane report"
   },
   {
    "unit": "Network/network_opening.cpp",
@@ -22291,7 +22229,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x80794CC8",
    "text_addr": "0x804155D4",
-   "note": "orchestrator override 43: medium: sole-owned (one referencing unit, no unsplit reader), claimed tight so the batch leaves no data clearly owned behind; a merged guess block owns it until its cut lands"
+   "note": "orchestrator override 40: medium: sole-owned (one referencing unit, no unsplit reader), claimed tight so the batch leaves no data clearly owned behind; a merged guess block owns it until its cut lands"
   },
   {
    "unit": "Network/constructNetworkLibrary.cpp",
@@ -22511,7 +22449,7 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain 0x80794D60 --section .sbss",
    "text_addr": "0x80448404",
-   "note": "orchestrator override 36: medium: only foreign (homebutton) readers; link order and the padding place it"
+   "note": "orchestrator override 33: medium: only foreign (homebutton) readers; link order and the padding place it"
   },
   {
    "unit": "menu/fn_804513FC.cpp",
@@ -22536,7 +22474,7 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain 0x80794D64 --section .sbss",
    "text_addr": "0x804513FC",
-   "note": "orchestrator override 37: strong: the alignment of the unit's `.sbss` forces the start to 0x80794D64"
+   "note": "orchestrator override 34: strong: the alignment of the unit's `.sbss` forces the start to 0x80794D64"
   },
   {
    "unit": "menu/fn_804513FC.cpp",
@@ -23376,6 +23314,36 @@
    "text_addr": "0x8052A040"
   },
   {
+   "unit": "homebutton/fn_8052A040.cpp",
+   "section": ".sbss",
+   "range": [
+    "0x80795A20",
+    "0x80795A28"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 8,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window fg units> --root . --base-snapshot ../mhtri-dtk/.pi/land-base.json --base-ref be0966ec6 --unit-rename <the window fg renames>",
+     "finding": "the data-closure row refuses lbl_80795A20: referenced by seven batch units, no claim covers it"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80795A20",
+     "finding": "lbl_80795A20 (8 B) is written by menu/fn_804513FC (window e) and read by homebutton/fn_8052A040, 8052B004, 8052C880, 8052E0CC, 8053072C, 80533474 and 8056D814; fn_8052A040's .sbss claim ends at 0x80795A20 and fn_8052B004 starts at 0x80795A28 (the engine left it ambiguous between those two)"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x80795A20",
+   "text_addr": "0x8052A040",
+   "note": "orchestrator override 65: medium: no definer is findable (no store in the library, the writer is game code); the first reader in link order is the owner of the adjacent range"
+  },
+  {
    "unit": "homebutton/fn_8052B004.cpp",
    "section": ".sbss",
    "range": [
@@ -23876,12 +23844,12 @@
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x80795C18",
-     "finding": "lbl_80795C18 (.sdata2 0x80795C18, 0x4 B) is read at 0x80055F34 in main/draw_shape_arm.cpp"
+     "finding": "draw_shape_f32_zero (.sdata2 0x80795C18, 0x4 B) is read at 0x80055F34 in main/draw_shape_arm.cpp"
     },
     {
      "tool": "callers",
      "command": "python tools/units/callers.py 0x80795C44",
-     "finding": "lbl_80795C44 (.sdata2 0x80795C44, 0x4 B) is read at 0x80056ED8 in main/draw_shape_arm.cpp"
+     "finding": "draw_shape_sprite_scale_y (.sdata2 0x80795C44, 0x4 B) is read at 0x80056ED8 in main/draw_shape_arm.cpp"
     },
     {
      "tool": "dataattach",
@@ -24707,7 +24675,7 @@
    ],
    "reproduce": "python tools/units/callers.py 0x80795F70",
    "text_addr": "0x8009B374",
-   "note": "orchestrator override 50: medium: sole-owned (one referencing unit); the 4-byte gap in front of ef_util's own .sdata2 claim is one the splitter refuses to leave"
+   "note": "orchestrator override 47: medium: sole-owned (one referencing unit); the 4-byte gap in front of ef_util's own .sdata2 claim is one the splitter refuses to leave"
   },
   {
    "unit": "ef/ef_util.cpp",
@@ -29758,7 +29726,7 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain 0x8079C78C --section .sdata2",
    "text_addr": "0x803D70B8",
-   "note": "orchestrator override 38: medium: read by both units, placed with the first reader; the pool check records the foreign read like the one of lbl_8079C780"
+   "note": "orchestrator override 35: medium: read by both units, placed with the first reader; the pool check records the foreign read like the one of lbl_8079C780"
   },
   {
    "unit": "Network/NetworkCommunityPat.cpp",
@@ -30732,6 +30700,36 @@
    "text_addr": "0x80467EEC"
   },
   {
+   "unit": "TRK/TRK_flush_cache.cpp",
+   "section": ".sdata2",
+   "range": [
+    "0x8079CF40",
+    "0x8079CF48"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 8,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window fg units> --root . --base-snapshot ../mhtri-dtk/.pi/land-base.json --base-ref be0966ec6 --unit-rename <the window fg renames>",
+     "finding": "the data-closure row refuses lbl_8079CF40: referenced by exactly one batch unit, no claim covers it"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8079CF40",
+     "finding": "lbl_8079CF40 (8 B) is read only by TRK/TRK_flush_cache's text (1 site); its .sdata2 claim ends at 0x8079CF40 and ARC/arc starts at 0x8079CF48"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x8079CF40",
+   "text_addr": "0x80467EEC",
+   "note": "orchestrator override 66: medium: sole-owned (one referencing unit), claimed tight"
+  },
+  {
    "unit": "ARC/arc.cpp",
    "section": ".sdata2",
    "range": [
@@ -30866,6 +30864,36 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain fn_80475E30 --section .sdata2",
    "text_addr": "0x80475E30"
+  },
+  {
+   "unit": "BTE/gki_buffer.cpp",
+   "section": ".sdata2",
+   "range": [
+    "0x8079D080",
+    "0x8079D090"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 2,
+   "bytes": 16,
+   "signals": {
+    "orchestrator": 2
+   },
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window fg units> --root . --base-snapshot ../mhtri-dtk/.pi/land-base.json --base-ref be0966ec6 --unit-rename <the window fg renames>",
+     "finding": "the data-closure row refuses lbl_8079D080 and lbl_8079D088: referenced by exactly one batch unit, no claim covers them"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x8079D080",
+     "finding": "both 8 B constants are read only by BTE/gki_buffer's text (fn_80479050); its .sdata2 claim starts at 0x8079D090 and AX/fn_80475E30 ends at 0x8079D080"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x8079D080",
+   "text_addr": "0x804772F0",
+   "note": "orchestrator override 67: medium: sole-owned (one referencing unit), claimed tight"
   },
   {
    "unit": "BTE/gki_buffer.cpp",
@@ -32198,28 +32226,6 @@
   {
    "section": ".rodata",
    "range": [
-    "0x80574CE8",
-    "0x80574CFD"
-   ],
-   "kind": "ambiguous",
-   "symbols": 1,
-   "bytes": 21,
-   "candidates": [
-    "NHTTP/NHTTP_bgnend.c",
-    "NHTTP/d_nhttp.c"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain NHTTP_bgnend --section .rodata",
-     "finding": "1 symbol(s), 1 read (by NHTTP_bgnend, d_nhttp): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain NHTTP_bgnend --section .rodata"
-  },
-  {
-   "section": ".rodata",
-   "range": [
     "0x8057C1FC",
     "0x8057C228"
    ],
@@ -32713,31 +32719,6 @@
   {
    "section": ".data",
    "range": [
-    "0x8062FBE8",
-    "0x8062FC48"
-   ],
-   "candidates": [
-    "nw4r/fn_80502828.cpp"
-   ],
-   "kind": "multi-tu",
-   "symbols": 1,
-   "bytes": 96,
-   "signals": {
-    "vtable-store": 1
-   },
-   "evidence": [
-    {
-     "tool": "splitcheck",
-     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only data-order --unit fn_80502828",
-     "finding": "strong zigzag seam at 0x8062FBE8 inside the unit's .data (a boundary in [0x8062FBE8, 0x8062FBE8)): at least 2 TUs"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_80502828 --section .data",
-   "note": "link order and evidence put these symbols in nw4r/fn_80502828.cpp, but attaching them makes the data-order invariant fail: the unit holds more than one TU, or one of its reads is not its own"
-  },
-  {
-   "section": ".data",
-   "range": [
     "0x806302C8",
     "0x806307F0"
    ],
@@ -32783,258 +32764,6 @@
   {
    "section": ".data",
    "range": [
-    "0x8064A5F8",
-    "0x8064A6B0"
-   ],
-   "kind": "orchestrator",
-   "symbols": 2,
-   "bytes": 184,
-   "candidates": [
-    "homebutton/fn_8052A040.cpp",
-    "homebutton/fn_8052B004.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_8052A040 --section .data",
-     "finding": "kept deferred: attaching lbl_8064A638 to fn_8052A040 (slot owner 20/28) leaves that unit two .data ranges around fn_8052B004's (an order FAIL), attaching it to fn_8052B004 fails data-order"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_8052A040 --section .data",
-   "note": "orchestrator override 11: kept deferred: attaching lbl_8064A638 to fn_8052A040 (slot owner 20/28) leaves that unit two .data ranges around fn_8052B004's (an order FAIL), attaching it to fn_8052B004 fails data-order",
-   "reason": "deferred by an orchestrator override"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x8064A8F8",
-    "0x8064A920"
-   ],
-   "candidates": [
-    "homebutton/fn_80533474.cpp"
-   ],
-   "kind": "multi-tu",
-   "symbols": 1,
-   "bytes": 40,
-   "signals": {
-    "vtable-store": 1
-   },
-   "evidence": [
-    {
-     "tool": "splitcheck",
-     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only data-order --unit fn_80533474",
-     "finding": "strong zigzag seam at 0x8064A8F8 inside the unit's .data (a boundary in [0x8064A8F8, 0x8064A8F8)): at least 4 TUs"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_80533474 --section .data",
-   "note": "link order and evidence put these symbols in homebutton/fn_80533474.cpp, but attaching them makes the data-order invariant fail: the unit holds more than one TU, or one of its reads is not its own"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x8064A920",
-    "0x8064A938"
-   ],
-   "candidates": [
-    "homebutton/fn_80533474.cpp"
-   ],
-   "kind": "multi-tu",
-   "symbols": 1,
-   "bytes": 24,
-   "signals": {
-    "vtable-store": 1
-   },
-   "evidence": [
-    {
-     "tool": "splitcheck",
-     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only data-order --unit fn_80533474",
-     "finding": "follows the blocked piece at 0x8064A8F8 of the same block: strong zigzag seam at 0x8064A8F8 inside the unit's .data (a boundary in [0x8064A8F8, 0x8064A8F8)): at least 4 TUs"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_80533474 --section .data",
-   "note": "link order and evidence put these symbols in homebutton/fn_80533474.cpp, but attaching them makes the data-order invariant fail: the unit holds more than one TU, or one of its reads is not its own"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x8064A938",
-    "0x8064DDE0"
-   ],
-   "candidates": [
-    "homebutton/fn_80533474.cpp"
-   ],
-   "kind": "multi-tu",
-   "symbols": 196,
-   "bytes": 13480,
-   "signals": {
-    "vtable-store": 8,
-    "reader": 5,
-    "pointer-graph": 160,
-    "sinit": 1,
-    "jumptable": 14,
-    "forced": 3,
-    "string-reader": 5
-   },
-   "evidence": [
-    {
-     "tool": "splitcheck",
-     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only data-order --unit fn_80533474",
-     "finding": "follows the blocked piece at 0x8064A8F8 of the same block: strong zigzag seam at 0x8064A8F8 inside the unit's .data (a boundary in [0x8064A8F8, 0x8064A8F8)): at least 4 TUs"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_80533474 --section .data",
-   "note": "link order and evidence put these symbols in homebutton/fn_80533474.cpp, but attaching them makes the data-order invariant fail: the unit holds more than one TU, or one of its reads is not its own"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x8064DDE0",
-    "0x8064DE88"
-   ],
-   "candidates": [
-    "homebutton/fn_80533474.cpp"
-   ],
-   "kind": "invariant",
-   "symbols": 1,
-   "bytes": 168,
-   "signals": {
-    "orchestrator": 1
-   },
-   "evidence": [
-    {
-     "tool": "splitcheck",
-     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only order --unit fn_80533474",
-     "finding": ".data has 2 ranges with a gap at 0x8064A8F8 (dtk takes one)"
-    }
-   ],
-   "reproduce": "python tools/units/callers.py 0x80533474 --pointers",
-   "note": "orchestrator override 23 blocked: attaching the range to homebutton/fn_80533474.cpp makes the order invariant fail"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x8064F0BC",
-    "0x8064F338"
-   ],
-   "candidates": [
-    "homebutton/fn_80542D8C.cpp"
-   ],
-   "kind": "multi-tu",
-   "symbols": 2,
-   "bytes": 636,
-   "signals": {
-    "vtable-store": 2
-   },
-   "evidence": [
-    {
-     "tool": "splitcheck",
-     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only data-order --unit fn_80542D8C",
-     "finding": "strong zigzag seam at 0x8064F0BC inside the unit's .data (a boundary in [0x8064F0BC, 0x8064F0BC)): at least 2 TUs"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_80542D8C --section .data",
-   "note": "link order and evidence put these symbols in homebutton/fn_80542D8C.cpp, but attaching them makes the data-order invariant fail: the unit holds more than one TU, or one of its reads is not its own"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x8064F338",
-    "0x8064F360"
-   ],
-   "candidates": [
-    "homebutton/fn_80542D8C.cpp"
-   ],
-   "kind": "invariant",
-   "symbols": 1,
-   "bytes": 40,
-   "signals": {
-    "orchestrator": 1
-   },
-   "evidence": [
-    {
-     "tool": "splitcheck",
-     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only order --unit fn_80542D8C",
-     "finding": ".data has 2 ranges with a gap at 0x8064F0BC (dtk takes one)"
-    }
-   ],
-   "reproduce": "python tools/units/callers.py 0x80542D8C --pointers",
-   "note": "orchestrator override 25 blocked: attaching the range to homebutton/fn_80542D8C.cpp makes the order invariant fail"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x80651870",
-    "0x8065230D"
-   ],
-   "candidates": [
-    "homebutton/fn_8055B710.cpp"
-   ],
-   "kind": "multi-tu",
-   "symbols": 19,
-   "bytes": 2717,
-   "signals": {
-    "string-reader": 9,
-    "vtable-store": 9,
-    "readers": 1
-   },
-   "evidence": [
-    {
-     "tool": "splitcheck",
-     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only data-order --unit fn_8055B710",
-     "finding": "strong V->S seam at 0x80651870 inside the unit's .data (a boundary in [0x80651870, 0x80651950)): at least 2 TUs"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_8055B710 --section .data",
-   "note": "link order and evidence put these symbols in homebutton/fn_8055B710.cpp, but attaching them makes the data-order invariant fail: the unit holds more than one TU, or one of its reads is not its own"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x80652310",
-    "0x8065233E"
-   ],
-   "kind": "unread",
-   "symbols": 2,
-   "bytes": 46,
-   "candidates": [
-    "homebutton/fn_8055B710.cpp",
-    "homebutton/fn_8055EAF0.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_8055B710 --section .data",
-     "finding": "2 symbol(s) nothing reads: the boundary between fn_8055B710 and fn_8055EAF0 lies somewhere in them (last anchor of the first, first anchor of the second)"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_8055B710 --section .data"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x80652530",
-    "0x806525A4"
-   ],
-   "kind": "reader-vs-pointer",
-   "symbols": 1,
-   "bytes": 116,
-   "candidates": [
-    "homebutton/fn_8055F728.cpp",
-    "homebutton/fn_8055EAF0.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_8055F728 --section .data",
-     "finding": "1 symbol(s): lbl_80652530 is constructed by homebutton/fn_8055F728.cpp's own __sinit, but the pointer tables around it name homebutton/fn_8055EAF0.cpp"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_8055F728 --section .data",
-   "note": "lbl_80652530 is constructed by homebutton/fn_8055F728.cpp's own __sinit, but the pointer tables around it name homebutton/fn_8055EAF0.cpp"
-  },
-  {
-   "section": ".data",
-   "range": [
     "0x806553C0",
     "0x80655630"
    ],
@@ -33054,29 +32783,6 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain fn_8055F728 --section .data",
    "note": "lbl_806553C0 is constructed by homebutton/fn_8055F728.cpp's own __sinit, but the pointer tables around it name homebutton/fn_8053E808.cpp"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x80655A98",
-    "0x80655BD8"
-   ],
-   "kind": "reader-vs-pointer",
-   "symbols": 1,
-   "bytes": 320,
-   "candidates": [
-    "homebutton/fn_8055FB70.cpp",
-    "homebutton/fn_80556FC4.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_8055FB70 --section .data",
-     "finding": "1 symbol(s): lbl_80655A98 is constructed by homebutton/fn_8055FB70.cpp's own __sinit, but the pointer tables around it name homebutton/fn_80556FC4.cpp"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_8055FB70 --section .data",
-   "note": "lbl_80655A98 is constructed by homebutton/fn_8055FB70.cpp's own __sinit, but the pointer tables around it name homebutton/fn_80556FC4.cpp"
   },
   {
    "section": ".data",
@@ -33265,34 +32971,6 @@
   {
    "section": ".data",
    "range": [
-    "0x80657698",
-    "0x80657BA8"
-   ],
-   "candidates": [
-    "homebutton/fn_8056083C.cpp"
-   ],
-   "kind": "multi-tu",
-   "symbols": 8,
-   "bytes": 1296,
-   "signals": {
-    "string-reader": 4,
-    "reader": 1,
-    "vtable-store": 2,
-    "readers": 1
-   },
-   "evidence": [
-    {
-     "tool": "splitcheck",
-     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only data-order --unit fn_8056083C",
-     "finding": "strong V->S seam at 0x80657698 inside the unit's .data (a boundary in [0x80657698, 0x80657858)): at least 2 TUs"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_8056083C --section .data",
-   "note": "link order and evidence put these symbols in homebutton/fn_8056083C.cpp, but attaching them makes the data-order invariant fail: the unit holds more than one TU, or one of its reads is not its own"
-  },
-  {
-   "section": ".data",
-   "range": [
     "0x80658200",
     "0x80658290"
    ],
@@ -33312,33 +32990,6 @@
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain fn_80566440 --section .data"
-  },
-  {
-   "section": ".data",
-   "range": [
-    "0x80658408",
-    "0x80658458"
-   ],
-   "candidates": [
-    "homebutton/tiHKBManager.cpp"
-   ],
-   "kind": "multi-tu",
-   "symbols": 3,
-   "bytes": 80,
-   "signals": {
-    "file-string": 1,
-    "string-reader": 1,
-    "vtable-store": 1
-   },
-   "evidence": [
-    {
-     "tool": "splitcheck",
-     "command": "python tools/splits/splitcheck.py --proposal <phase 1 files> --proposal <this file with the attachment> --only data-order --unit tiHKBManager",
-     "finding": "strong V->S seam at 0x80658408 inside the unit's .data (a boundary in [0x80658408, 0x80658440)): at least 2 TUs"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain tiHKBManager --section .data",
-   "note": "link order and evidence put these symbols in homebutton/tiHKBManager.cpp, but attaching them makes the data-order invariant fail: the unit holds more than one TU, or one of its reads is not its own"
   },
   {
    "section": ".bss",
@@ -34049,28 +33700,6 @@
    "reproduce": "python tools/splits/dataattach.py --explain movie --section .sbss"
   },
   {
-   "section": ".sbss",
-   "range": [
-    "0x80795A20",
-    "0x80795A28"
-   ],
-   "kind": "ambiguous",
-   "symbols": 1,
-   "bytes": 8,
-   "candidates": [
-    "homebutton/fn_8052A040.cpp",
-    "homebutton/fn_8052B004.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_8052A040 --section .sbss",
-     "finding": "1 symbol(s), 1 read (by fn_8052A040, fn_8052B004): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_8052A040 --section .sbss"
-  },
-  {
    "section": ".sdata2",
    "range": [
     "0x80795DB0",
@@ -34136,51 +33765,6 @@
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain g3d_cpu --section .sdata2"
-  },
-  {
-   "section": ".sdata2",
-   "range": [
-    "0x8079CF40",
-    "0x8079CF48"
-   ],
-   "kind": "unread",
-   "symbols": 1,
-   "bytes": 8,
-   "candidates": [
-    "TRK/TRK_flush_cache.cpp",
-    "ARC/arc.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain TRK_flush_cache --section .sdata2",
-     "finding": "1 symbol(s) nothing reads: the boundary between TRK_flush_cache and arc lies somewhere in them (last anchor of the first, first anchor of the second)"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain TRK_flush_cache --section .sdata2"
-  },
-  {
-   "section": ".sdata2",
-   "range": [
-    "0x8079D080",
-    "0x8079D090"
-   ],
-   "kind": "unread",
-   "symbols": 2,
-   "bytes": 16,
-   "candidates": [
-    "AX/fn_80475E30.cpp",
-    "OS/PPCArch.c",
-    "BTE/gki_buffer.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_80475E30 --section .sdata2",
-     "finding": "2 symbol(s) nothing reads: the boundary between fn_80475E30 and gki_buffer lies somewhere in them (last anchor of the first, first anchor of the second)"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_80475E30 --section .sdata2"
   }
  ],
  "open_questions": [
