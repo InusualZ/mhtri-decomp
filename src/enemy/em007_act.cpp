@@ -1,4 +1,4 @@
-/* enemy/fn_801D80EC.cpp - the em007 enemy's action band, `.text` 0x801D71C4..0x801E0ADC.
+/* enemy/em007_act.cpp - the em007 enemy's action band, `.text` 0x801D71C4..0x801E0ADC.
  *
  * Recut 2026-09-30.  The 0x801B7020..0x801E0ADC band was registered as seven ranges that cut through its
  * translation units.  The real TUs (each one's `.data` chunk opens with its `emNNN_prog_tbl`, each ends with its
@@ -25,7 +25,9 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "enemy/ENEMY_WORK.h"
-#include "enemy/fn_801CCBC4.h"
+#include "enemy/em005_act.h"
+#include "enemy/em007_act.h"
+#include "Pl/pl_hit_sphere.h"
 #include "unsplit/unknown.h" /* SystemWork / system_w */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
@@ -1798,18 +1800,6 @@ extern "C" void fn_801DB7D8(struct _ENEMY_WORK* self) {
  * the pool the range reads (owned elsewhere; declared, never defined - playbook 29)
  * -------------------------------------------------------------------------------------------------- */
 
-extern f32 lbl_80799220;
-extern f32 lbl_80799224;
-extern f32 lbl_80799230;
-extern f32 lbl_80799238;
-extern f32 lbl_8079923C;
-extern f32 lbl_80799240;
-extern f32 lbl_80799244;
-extern f32 lbl_80799248;
-extern f32 lbl_8079924C;
-extern f32 lbl_80799254;
-extern f32 lbl_8079925C;
-extern f32 lbl_80799260;
 
 /* the range's own `.data` tables (no `.data` range is registered for this unit yet, so they stay the
  * shared pool's bytes; only the ones the code loads explicitly are declared). */
@@ -1961,7 +1951,6 @@ void eft_em_spawn_joint(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3
 
 /* the same gap in the other modules: 0x802Bxxxx sits between `Pl/pl_act.cpp` and
  * `stage/fn_802B2978.c`, 0x8030xxxx between `ai/fn_802D0DCC.c` and `ef/fn_803066F0.c`. */
-s32 fn_8028F558(void* a, void* b);
 s32 fn_802907BC(s32 a, void* b);
 void fn_802B43A8(void* pos, u8 a, u16 b);
 

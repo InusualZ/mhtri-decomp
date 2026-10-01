@@ -735,12 +735,6 @@ ef/fn_80101DF4.cpp:
 	.text       start:0x80101DF4 end:0x80101FA4
 	.sdata2     start:0x807966E8 end:0x807966F0
 
-Pl/pl_frame_data.cpp:
-	.sdata2     start:0x80799E00 end:0x80799F98
-
-Pl/pl_act_data.cpp:
-	.sdata2     start:0x80799F98 end:0x80799FDC
-
 ef/eft007.cpp:
 	extab       start:0x8000BEFC end:0x8000BF7C
 	extabindex  start:0x80025D64 end:0x80025E24
@@ -1070,103 +1064,127 @@ enemy/fn_801BD6C0.cpp:
 	.data       start:0x805B28D0 end:0x805B3B7C
 	.bss        start:0x806A7AD0 end:0x806A7B18
 
-enemy/fn_801CA004.cpp:
+enemy/em004_act.cpp:
 	extab       start:0x8000FB84 end:0x8000FE4C
 	extabindex  start:0x8002B830 end:0x8002BC5C
 	.text       start:0x801C29F8 end:0x801CA8DC
 	.ctors      start:0x8056F354 end:0x8056F358
 	.rodata     start:0x80570320 end:0x80570410
-	.data       start:0x805B3BF0 end:0x805B4F8C
+	.data       start:0x805B3B80 end:0x805B4F8C
 	.bss        start:0x806A7B18 end:0x806A7B30
+	.sdata      start:0x80791AD8 end:0x80791B20
+	.sdata2     start:0x80798FE8 end:0x80799220
 
-enemy/fn_801CCBC4.cpp:
+enemy/em005_act.cpp:
 	extab       start:0x8000FE4C end:0x80010164
 	extabindex  start:0x8002BC5C end:0x8002C100
 	.text       start:0x801CA8DC end:0x801D71C4
 	.ctors      start:0x8056F358 end:0x8056F35C
 	.rodata     start:0x80570410 end:0x80570500
-	.data       start:0x805B5000 end:0x805B69D8
+	.data       start:0x805B4F90 end:0x805B69D8
 	.bss        start:0x806A7B30 end:0x806A7B90
+	.sdata      start:0x80791B20 end:0x80791B38
+	.sdata2     start:0x80799220 end:0x807994F8
 
-enemy/fn_801D80EC.cpp:
+enemy/em007_act.cpp:
 	extab       start:0x80010164 end:0x800103D4
 	extabindex  start:0x8002C100 end:0x8002C4A8
 	.text       start:0x801D71C4 end:0x801E0ADC
 	.rodata     start:0x80570500 end:0x805706C0
-	.data       start:0x805B6A44 end:0x805B75E8
+	.data       start:0x805B69D8 end:0x805B75E8
+	.sdata2     start:0x807994F8 end:0x80799788
 
 lobby/fn_801E0ADC.cpp:
 	extab       start:0x800103D4 end:0x800105B4
 	extabindex  start:0x8002C4A8 end:0x8002C778
 	.text       start:0x801E0ADC end:0x801E7530
+	.data       start:0x805B75E8 end:0x805B7CB0
+	.sdata      start:0x80791B38 end:0x80791B70
+	.sbss       start:0x80794AA8 end:0x80794AB0
+	.sdata2     start:0x80799788 end:0x80799870
 
 lobby/fn_801E7530.cpp:
 	extab       start:0x800105B4 end:0x8001079C
 	extabindex  start:0x8002C778 end:0x8002CA54
 	.text       start:0x801E7530 end:0x801EC9E0
+	.data       start:0x805B7CB0 end:0x805B85D8
+	.sdata      start:0x80791B70 end:0x80791C58
 
 lobby/lobby_scene.c:
 	.text       start:0x801EC9E0 end:0x801EC9F8
 
-lobby/fn_801EC9F8.cpp:
-	extab       start:0x8001079C end:0x8001094C
-	extabindex  start:0x8002CA54 end:0x8002CCDC
-	.text       start:0x801EC9F8 end:0x801F3294
-
-lobby/fn_801F3294.cpp:
-	extab       start:0x8001094C end:0x80010A7C
-	extabindex  start:0x8002CCDC end:0x8002CEA4
-	.text       start:0x801F3294 end:0x801F9CD4
-
-lobby/fn_801F9CD4.cpp:
-	extab       start:0x80010A7C end:0x80010ADC
-	extabindex  start:0x8002CEA4 end:0x8002CF34
-	.text       start:0x801F9CD4 end:0x801FBF78
+lobby/lb_pane_ui.cpp:
+	extab       start:0x8001079C end:0x80010ADC
+	extabindex  start:0x8002CA54 end:0x8002CF34
+	.text       start:0x801EC9F8 end:0x801FBF78
+	.data       start:0x805B85D8 end:0x805B8D44
+	.sdata      start:0x80791C58 end:0x80791D50
+	.sdata2     start:0x80799870 end:0x80799880
 
 lobby/lb_npc.cpp:
-	extab       start:0x80010ADC end:0x80010DBC
-	extabindex  start:0x8002CF34 end:0x8002D384
-	.text       start:0x801FBF78 end:0x802029B4
+	extab       start:0x80010ADC end:0x80011434
+	extabindex  start:0x8002CF34 end:0x8002DD38
+	.text       start:0x801FBF78 end:0x80212810
 	.ctors      start:0x8056F35C end:0x8056F360
-
-lobby/fn_802029B4.cpp:
-	extab       start:0x80010DBC end:0x80010F7C
-	extabindex  start:0x8002D384 end:0x8002D624
-	.text       start:0x802029B4 end:0x802076D4
-
-lobby/fn_802076D4.cpp:
-	extab       start:0x80010F7C end:0x80011184
-	extabindex  start:0x8002D624 end:0x8002D930
-	.text       start:0x802076D4 end:0x8020C588
-
-lobby/fn_8020C588.cpp:
-	extab       start:0x80011184 end:0x80011434
-	extabindex  start:0x8002D930 end:0x8002DD38
-	.text       start:0x8020C588 end:0x80212810
-	.data       start:0x805B9770 end:0x805B97BC
+	.data       start:0x805B8D44 end:0x805B97BC
+	.bss        start:0x806A7B90 end:0x806AA790
+	.sdata      start:0x80791D50 end:0x80791DC0
+	.sbss       start:0x80794AB0 end:0x80794B08
+	.sdata2     start:0x80799880 end:0x80799C18
 
 lobby/fn_80212810.cpp:
 	extab       start:0x80011434 end:0x80011724
 	extabindex  start:0x8002DD38 end:0x8002E1A0
 	.text       start:0x80212810 end:0x80219260
+	.data       start:0x805B97BC end:0x805B9DDC
+	.sdata      start:0x80791DC0 end:0x80791EB0
+	.sdata2     start:0x80799C18 end:0x80799C40
 
 lobby/fn_80219260.cpp:
 	extab       start:0x80011724 end:0x800118CC
 	extabindex  start:0x8002E1A0 end:0x8002E41C
 	.text       start:0x80219260 end:0x8021E1EC
+	.data       start:0x805B9DDC end:0x805BA0C0
+	.bss        start:0x806AA790 end:0x806AA8C8
+	.sdata      start:0x80791EB0 end:0x80791EE0
+	.sdata2     start:0x80799C40 end:0x80799C60
 
-lobby/fn_8021E1EC.cpp:
-	extab       start:0x800118CC end:0x80011B34
-	extabindex  start:0x8002E41C end:0x8002E7B8
-	.text       start:0x8021E1EC end:0x80224AC4
-	.ctors      start:0x8056F360 end:0x8056F368
-	.data       start:0x805BA7E8 end:0x805BAA20
-	.bss        start:0x806AA8C8 end:0x806AACC0
+lobby/lb_menu_scratch.cpp:
+	extab       start:0x800118CC end:0x800118FC
+	extabindex  start:0x8002E41C end:0x8002E464
+	.text       start:0x8021E1EC end:0x8021F020
+	.ctors      start:0x8056F360 end:0x8056F364
+	.data       start:0x805BA0C0 end:0x805BA540
+	.bss        start:0x806AA8C8 end:0x806AAA88
+	.sdata      start:0x80791EE0 end:0x80791EF0
+	.sdata2     start:0x80799C60 end:0x80799C78
 
-Pl/fn_80224AC4.cpp:
-	extab       start:0x80011B34 end:0x80011C7C
-	extabindex  start:0x8002E7B8 end:0x8002E9A4
-	.text       start:0x80224AC4 end:0x80229ECC
+lobby/lb_menu_pos_tbl.cpp:
+	extab       start:0x800118FC end:0x8001195C
+	extabindex  start:0x8002E464 end:0x8002E4F4
+	.text       start:0x8021F020 end:0x80220038
+	.ctors      start:0x8056F364 end:0x8056F368
+	.data       start:0x805BA650 end:0x805BA660
+	.bss        start:0x806AAA88 end:0x806AACC0
+	.sdata2     start:0x80799C78 end:0x80799CD8
+
+lobby/lb_equip_page.cpp:
+	extab       start:0x8001195C end:0x80011C7C
+	extabindex  start:0x8002E4F4 end:0x8002E9A4
+	.text       start:0x80220038 end:0x80229ECC
+	.data       start:0x805BA750 end:0x805BDC48
+	.sdata      start:0x80791EF0 end:0x80792030
+	.sdata2     start:0x80799CD8 end:0x80799E00
+
+Pl/pl_frame_data.cpp:
+	.sdata2     start:0x80799E00 end:0x80799F98
+
+Pl/pl_act_data.cpp:
+	.sdata2     start:0x80799F98 end:0x80799FDC
+
+Pl/pl_act_step_data.cpp:
+	.data       start:0x805BDC48 end:0x805C15A8
+	.bss        start:0x806AACC0 end:0x806AB3E0
 
 Pl/fn_80229ECC.cpp:
 	extab       start:0x80011C7C end:0x80011C84
@@ -1230,75 +1248,61 @@ Pl/fn_80262940.cpp:
 	.text       start:0x80262940 end:0x802693C4
 	.ctors      start:0x8056F368 end:0x8056F36C
 
-Pl/fn_802693C4.cpp:
-	extab       start:0x80012554 end:0x8001265C
-	extabindex  start:0x8002F6E8 end:0x8002F808
-	.text       start:0x802693C4 end:0x8026BA1C
-
-Pl/pl_master.cpp:
-	extab       start:0x8001265C end:0x800126CC
-	extabindex  start:0x8002F808 end:0x8002F8B0
-	.text       start:0x8026BA1C end:0x8026FFBC
-	.data       start:0x805C5FA0 end:0x805C5FC4
-
-Pl/fn_8026FFBC.cpp:
-	extab       start:0x800126CC end:0x800126D4
-	extabindex  start:0x8002F8B0 end:0x8002F8BC
-	.text       start:0x8026FFBC end:0x80270018
-
-Pl/pl_skill.cpp:
-	extab       start:0x800126D4 end:0x8001280C
-	extabindex  start:0x8002F8BC end:0x8002FA90
-	.text       start:0x80270018 end:0x80273B14
-
-Pl/fn_80273B14.cpp:
-	extab       start:0x8001280C end:0x8001294C
-	extabindex  start:0x8002FA90 end:0x8002FC70
-	.text       start:0x80273B14 end:0x80276B58
-	.data       start:0x805C5FEC end:0x805C6100
-
 Pl/pl_act.cpp:
-	extab       start:0x8001294C end:0x80012B54
-	extabindex  start:0x8002FC70 end:0x8002FF7C
-	.text       start:0x80276B58 end:0x8027D684
-
-Pl/fn_8027D684.cpp:
-	extab       start:0x80012B54 end:0x80012E7C
-	extabindex  start:0x8002FF7C end:0x80030438
-	.text       start:0x8027D684 end:0x802840DC
+	extab       start:0x80012554 end:0x80012E7C
+	extabindex  start:0x8002F6E8 end:0x80030438
+	.text       start:0x802693C4 end:0x802840DC
+	.rodata     start:0x805706C0 end:0x80570700
+	.data       start:0x805C5F30 end:0x805C80A8
+	.bss        start:0x806AB810 end:0x806AB830
+	.sdata      start:0x80792140 end:0x80792188
+	.sbss       start:0x80794B30 end:0x80794B38
+	.sdata2     start:0x8079A000 end:0x8079A1D8
 
 Pl/fn_802840DC.cpp:
 	extab       start:0x80012E7C end:0x80012FFC
 	extabindex  start:0x80030438 end:0x80030678
 	.text       start:0x802840DC end:0x80288CEC
+	.data       start:0x805C9568 end:0x805CBFC0
+	.sdata      start:0x80792188 end:0x807921B0
+	.sdata2     start:0x8079A1D8 end:0x8079A270
 
-Pl/fn_80288CEC.cpp:
-	extab       start:0x80012FFC end:0x8001323C
-	extabindex  start:0x80030678 end:0x800309D8
-	.text       start:0x80288CEC end:0x8028F66C
+Pl/pl_motion.cpp:
+	extab       start:0x80012FFC end:0x80013224
+	extabindex  start:0x80030678 end:0x800309B4
+	.text       start:0x80288CEC end:0x8028F44C
 	.ctors      start:0x8056F36C end:0x8056F370
 	.data       start:0x805CBFC0 end:0x805CDC44
 	.bss        start:0x806AB830 end:0x806AB848
-	.sbss       start:0x80794B3C end:0x80794B58
+	.sdata      start:0x807921B0 end:0x80792270
+	.sbss       start:0x80794B38 end:0x80794B58
+	.sdata2     start:0x8079A270 end:0x8079A310
 
-Pl/bss_pool.cpp:
-	.bss        start:0x806AB848 end:0x806AC8A8
+Pl/pl_hit_sphere.cpp:
+	extab       start:0x80013224 end:0x8001323C
+	extabindex  start:0x800309B4 end:0x800309D8
+	.text       start:0x8028F44C end:0x8028F66C
+	.sdata2     start:0x8079A310 end:0x8079A318
 
-Pl/fn_8028F66C.cpp:
-	extab       start:0x8001323C end:0x800133CC
-	extabindex  start:0x800309D8 end:0x80030C30
-	.text       start:0x8028F66C end:0x80295EF4
-
-Pl/fn_80295EF4.cpp:
-	extab       start:0x800133CC end:0x8001360C
-	extabindex  start:0x80030C30 end:0x80030F90
-	.text       start:0x80295EF4 end:0x8029F3C8
+Pl/pl_coll.cpp:
+	extab       start:0x8001323C end:0x80013454
+	extabindex  start:0x800309D8 end:0x80030CFC
+	.text       start:0x8028F66C end:0x80297E34
 	.ctors      start:0x8056F370 end:0x8056F374
+	.data       start:0x805CDC48 end:0x805CDC88
+	.bss        start:0x806AB848 end:0x806AC8A8
+	.sdata      start:0x80792270 end:0x80792278
+	.sbss       start:0x80794B58 end:0x80794B60
+	.sdata2     start:0x8079A318 end:0x8079A380
 
 menu/menu_item.cpp:
-	extab       start:0x8001360C end:0x800137D4
-	extabindex  start:0x80030F90 end:0x8003123C
-	.text       start:0x8029F3C8 end:0x802A6624
+	extab       start:0x80013454 end:0x800137D4
+	extabindex  start:0x80030CFC end:0x8003123C
+	.text       start:0x80297E34 end:0x802A6624
+	.data       start:0x805CDC88 end:0x805CE00C
+	.bss        start:0x806AC8A8 end:0x806AD698
+	.sdata      start:0x80792278 end:0x807922A0
+	.sdata2     start:0x8079A380 end:0x8079A3F8
 
 menu/menu_message.cpp:
 	extab       start:0x800137D4 end:0x80013984

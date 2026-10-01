@@ -1,4 +1,4 @@
-/* enemy/fn_801CCBC4.cpp - the em005 enemy's action band, `.text` 0x801CA8DC..0x801D71C4.
+/* enemy/em005_act.cpp - the em005 enemy's action band, `.text` 0x801CA8DC..0x801D71C4.
  *
  * Recut 2026-09-30.  The 0x801B7020..0x801E0ADC band was registered as seven ranges that cut through its
  * translation units.  The real TUs (each one's `.data` chunk opens with its `emNNN_prog_tbl`, each ends with its
@@ -27,7 +27,10 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "enemy/ENEMY_WORK.h"
-#include "enemy/fn_801CCBC4.h"
+#include "enemy/em005_act.h"
+#include "enemy/em004_act.h"
+#include "enemy/em007_act.h"
+#include "Pl/pl_hit_sphere.h"
 #include "enemy/fn_801251D0.h" /* fn_80128AAC, em_target_pos_set, em_hit_window_set (rule 2: the owner's header) */
 #include "enemy/fn_8012EC74.h" /* fn_80133BB4 (rule 2: the owner's header) */
 #include "ef/eft009.h"       /* eft009_set_pos (rule 2: the owner's header) */
@@ -2614,7 +2617,6 @@ void eft_em_spawn_joint(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3
 
 /* the same gap in the other modules: 0x802Bxxxx sits between `Pl/pl_act.cpp` and
  * `stage/fn_802B2978.c`, 0x8030xxxx between `ai/fn_802D0DCC.c` and `ef/fn_803066F0.c`. */
-s32 fn_8028F558(void* a, void* b);
 s32 fn_802907BC(s32 a, void* b);
 void fn_802B43A8(void* pos, u8 a, u16 b);
 void eft_em_spawn(struct _ENEMY_WORK* self, u32 a, u32 b, nw4r::math::VEC3* pos, f32 c);

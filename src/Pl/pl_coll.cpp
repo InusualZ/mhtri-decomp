@@ -1,4 +1,17 @@
 /*
+ * Pl/pl_coll.cpp - the player actor's ground/hit collision band: the ground and hit queries, the land table and the hit-id list.
+ *
+ * `.text` 0x8028F66C..0x80297E34 (about 80 functions), `.bss` 0x1060 B (the `Pl/bss_pool.h` arrays), `.ctors` 4 B, `.data` 0x40 B,
+ * `.sbss` 8 B, `.sdata` 8 B, `.sdata2` 0x6C B, extab 0x218 B and extabindex 0x324 B.  Phase 4 fold/recut (docs/splits/phase4):
+ * `Pl/fn_8028F66C` (whole), the head of `Pl/fn_80295EF4` (0x80295EF4..0x80297E34) and the data-only unit `Pl/bss_pool` (the
+ * `.bss` arrays the band's static initialiser constructs) are one TU of the candidate; the tail of `Pl/fn_80295EF4` goes to
+ * `menu/menu_item`.
+ *
+ * Flags: `cflags_pl` as the former units.
+ */
+
+/* ==== absorbed from Pl/fn_8028F66C.cpp (0x8028F66C..0x80295998) ==== */
+/*
  * Pl/fn_8028F66C.cpp - the ground/hit collision TU of the `Pl` band.  `.text`
  * 0x8028F66C-0x80295EF4 (53 functions, 0x6888 B), extab 0x8001323C-0x800133CC (50 records) and
  * extabindex 0x800309D8-0x80030C30 (50 records); all three ranges are registered in splits.txt.
@@ -324,4 +337,219 @@ s32 findInterSection(nw4r::math::VEC3* from, nw4r::math::VEC3* to, nw4r::math::V
 s32 findInterSection2(nw4r::math::VEC3* from, nw4r::math::VEC3* to, nw4r::math::VEC3* out, u8 group,
                       u32 ground, u8 area_no, u16 angle, u8* out_flags, LandData* land) {
     return findInterSection3(from, to, out, group, ground, area_no, angle, out_flags, land, 1);
+}
+
+/* ==== recut from Pl/fn_80295EF4.cpp (0x80295EF4..0x80297E34) ==== */
+/*
+ * Naming note: the symbol map spells 97 of this range's 99 functions as bare `fn_XXXXXXXX` and
+ * names the other two with a mangling (`get_hit_id__Fv`) or a plain name; the map is the only
+ * evidence for a name here - no `__FILE__` string covers the band (the DOL's string pool jumps from
+ * `enemy_control.cpp` at 0x805A1BB8 straight to `menu_item.cpp` at 0x805CDFC8) and
+ * `tools/symbols/dumpmap.py lookup` answers a `zz_XXXXXXXX_` placeholder for every in-range address
+ * (checked for 0x80295EF4, 0x8029B918, 0x8029F204 and the range's other endpoints).
+ *
+ * Pl/fn_80295EF4.cpp - the hit/land query band of the `Pl` module.  `.text` 0x80295EF4-0x8029F3C8
+ * (99 functions, 0x94D4 B).  Nothing else is claimed: the band's `.data` tables and both pools
+ * (`.sdata2` 0x8079A330-0x8079A3C8, `.sdata` 0x80794B58) stay with the `auto_*` objects, and so does
+ * the `.ctors` word for the static initializer `fn_80297C30` (invariant 8.4 - never claim a range the
+ * object does not emit).
+ *
+ * The seam is unproven, and it is a `--max-bytes` cut, not a TU boundary (the brief says so and the
+ * evidence agrees): the band's `.sdata2` run 0x8079A330-0x8079A3C8 is referenced from 0x80291664
+ * through 0x8029F204 without a single run break, and the static initializer at 0x80297C30 (inside
+ * this range) constructs arrays whose element constructors are the *previous* proposal's functions
+ * (`fn_80295544` at 0x80295544) - i.e. 0x8028F66C-0x8029F3C8 and their neighbours are very likely one
+ * original object.  Both halves are registered separately only because discovery cut the run; the
+ * merge is requested in the outbox (`shared-file`).
+ *
+ * Module `Pl` - class 3 of the brief's evidence order.  Class 1 (a `__FILE__` string) and class 2 (a
+ * real runtime-dump name) both fail (above).  Class 3 is conclusive: the band's callees are the Pl
+ * family (`get_move_work_adrs`, `_PLW` fields, `Pl_frame_check`) and its record vocabulary is the one
+ * the map already names inside the Pl band (`_HIT_W`, `PlLandCell`, `hit_ground_comon`, `get_hit_id`,
+ * `body_set`), with the registered sibling `Pl/fn_80288CEC.cpp` ending at 0x8028F66C straight before
+ * it.  File name - class 4: nothing names a file, so the stem stays the map's `fn_80295EF4`, the
+ * sibling class-4 pattern of `Pl/fn_80229ECC.cpp` / `Pl/fn_8024158.cpp` / `Pl/fn_80288CEC.cpp`.
+ *
+ * Language: C++ (mangled `get_hit_id__Fv` is defined here, and the range reaches mangled callees).
+ * Flags: `cflags_pl` (the lib's, settled by `Pl/pl_act.cpp`/`pl_master.cpp`/`pl_skill.cpp`).
+ *
+ * RESIDUAL (this pass).  24 of the range's 99 functions are written and measured; the row is at
+ * ~4 % of the range's bytes, with 16 functions byte-identical and the rest of this pass's set between
+ * 92 and 99 %.  Per-symbol numbers are in `build/RMHE08/report.json` and the outbox; what is
+ * deliberately NOT written, and why:
+ *   * `hit_data_apply` (452 B, the hit-record initializer) reads the owner's area byte for all four
+ *     owner kinds; kinds 1 and 2 land on offsets `pl.h` does not name (+0x1E1 inside an `_EQUIP`
+ *     sub-record, +0x08 inside a run another lane owns), and this pass did not invent names for them.
+ *   * The owner work records (`_HIT_W`'s owner, written at +0x470/+0x574/+0x8B4 by the
+ *     `fn_802996B4`..`fn_802997E4` family) are not pinned: `pl.h`'s `+0x470` is an `s16` while those
+ *     functions store a float triple there, so the field's owner is unresolved (the same blocker the
+ *     sibling band records from the other side).
+ *   * The band's switches (`fn_80299EF8`, `fn_8029A358`, `fn_8029B918`, `fn_8029E35C`, ...) are the
+ *     ceiling the sibling band already recorded: every jump table in the range is zero-filled in the
+ *     original DOL, so a sparse switch's case-to-body mapping is not recoverable from the image.
+ *   * `.text` only is claimed.  The split does hand the unit's target object the `.ctors` word
+ *     (4 B), `extab` (0x240 B) and `extabindex` (0x360 B) that bracket the range, and our object does
+ *     emit the extab of the functions it defines - but the ranges are not registered here because the
+ *     `.text` cut is not a TU boundary (see above) and this source states the static initializer
+ *     `fn_80297C30` as an explicit function rather than a file-scope object (invariant 8.4).
+ *
+ * Measured residuals in the written set (best variant landed for each):
+ *   * `fn_802961F8` / `fn_80296228` (95.0 / 95.71): retail's loop guard is `cmplwi r5,0` + `ble`
+ *     where MWCC emits `cmpwi` + `beq` from every shape tried (`while`, `for`, `for (;;)`+break,
+ *     `u32` and `s32` counts, an explicit pre-loop guard - the last one costs 12 bytes).
+ *   * `fn_8029F084` (92.41): retail carries an unused accumulator (`li r5,0` then `+9` per outer
+ *     iteration) that MWCC's dead-code pass removes from every source spelling tried; ours is 4 B
+ *     short.  The loop shape itself (two unrolled ten-entry rows) is the one that reproduces.
+ *   * `fn_802963B0` / `fn_802963FC` / `fn_802969A8` / `fn_802969D0` (98.32 / 98.32 / 99.0 / 99.0):
+ *     instruction-for-instruction equal but for the operand order of one `add` in the index
+ *     arithmetic, and the branch form of the range checks (`||`-chain vs `&&`-chain inversion).
+ *   * `fn_80296368` (98.78), `fn_8029A140` (68.61): the same class - only the branch sense of one
+ *     `fcmpo` differs.  `fn_8029A140`'s tail block is laid out in the other order (4 B).
+ */
+
+#include "types.h"
+#include "nw4r/math.h"
+#include "pl.h"
+#include "Runtime.PPCEABI.H/memset.h"
+#include "ef/fn_800CDB2C.h"   /* PlayMode_ck (rule 2: the owner is `ef/fn_800CDB2C.cpp`) */
+#include "menu/hit_attack_list_push.h"
+#include "Pl/pl_coll.h"   /* the owner of the `.bss` arrays `pl_land_data` / `pl_hit_id_list` (rule 2) */
+
+/* The pool constants this pass needs: 0.0f (`lbl_8079A330`), 1.0f (`lbl_8079A338`) and the pair
+ * `lbl_8079A380` = 0.0f / `lbl_8079A3A4` = 1.0f.  They are declared, never defined (invariant 8.4). */
+
+/* ------------------------------------------------------------------------------------------------ *
+ * List scans: the registry's own id lists and the two helpers that walk a caller's array.
+ * ------------------------------------------------------------------------------------------------ */
+
+/* Whether `key` occurs in the first `count` words of `list`. */
+extern "C" u32 fn_802961F8(u32 key, u32* list, s32 count)
+{
+    while (count > 0) {
+        if (key == *list) {
+            return 1;
+        }
+        list++;
+        count--;
+    }
+    return 0;
+}
+
+/* The same scan over the global id array. */
+extern "C" u32 fn_80296228(u32 key, s32 count)
+{
+    u32* list = pl_hit_id_list;
+
+    while (count > 0) {
+        if (key == *list) {
+            return 1;
+        }
+        list++;
+        count--;
+    }
+    return 0;
+}
+
+/* ------------------------------------------------------------------------------------------------ *
+ * The land table (`.bss` `pl_land_data`, 15 x 0x88).
+ * ------------------------------------------------------------------------------------------------ */
+
+/* Zeroes the four vectors of one land record. */
+extern "C" PlLandCell* fn_80297D9C(PlLandCell* self)
+{
+    VEC3_ctor(&self->vec_0x0C);
+    VEC3_ctor(&self->vec_0x18);
+    VEC3_ctor(&self->box_min_0x48);
+    VEC3_ctor(&self->box_max_0x54);
+    return self;
+}
+
+/* Clears the whole table. */
+extern "C" void fn_8029708C(void)
+{
+    memset(pl_land_data, 0, 0x7F8);
+}
+
+/* ------------------------------------------------------------------------------------------------ *
+ * The 0x14-byte position record.
+ * ------------------------------------------------------------------------------------------------ */
+
+/* Clears the header fields and points the record's vector up by one. */
+extern "C" void fn_802977E4(LandData* self)
+{
+    self->field_0x00 = 0;
+    self->field_0x02 = 0;
+    self->field_0x03 = 0;
+    self->field_0x04 = 0;
+    self->field_0x06 = 0;
+    self->field_0x07 = 0;
+    setVector3(&self->vec_0x08, 0.0f, 1.0f, 0.0f);
+}
+
+/* Copies one position record. */
+extern "C" void fn_80297BE4(LandData* dst, LandData* src)
+{
+    *dst = *src;
+}
+
+/* ------------------------------------------------------------------------------------------------ *
+ * The land record's two 3-D grids and its AABB.
+ * ------------------------------------------------------------------------------------------------ */
+
+/* Whether `pos` lies strictly inside the record's horizontal box. */
+extern "C" u32 fn_80296368(nw4r::math::VEC3* pos, PlLandCell* land)
+{
+    if (!(pos->x < land->box_max_0x54.x && pos->x > land->box_min_0x48.x &&
+          pos->z < land->box_max_0x54.z && pos->z > land->box_min_0x48.z)) {
+        return 0;
+    }
+    return 1;
+}
+
+/* Whether a grid-B coordinate triple is inside the record's second grid. */
+extern "C" u32 fn_802963B0(s32 x, s32 y, s32 z, PlLandCell* land)
+{
+    if ((u32)x >= (u32)land->dim_x_0x74 || x < 0 || (u32)y >= (u32)land->dim_y_0x70 || y < 0 ||
+        (u32)z >= (u32)land->dim_z_0x6C || z < 0) {
+        return 0;
+    }
+    return 1;
+}
+
+/* The same range check for the record's first grid. */
+extern "C" u32 fn_802963FC(s32 x, s32 y, s32 z, PlLandCell* land)
+{
+    if ((u32)x >= (u32)land->dim_x_0x38 || x < 0 || (u32)y >= (u32)land->dim_y_0x34 || y < 0 ||
+        (u32)z >= (u32)land->dim_z_0x30 || z < 0) {
+        return 0;
+    }
+    return 1;
+}
+
+/* One cell of the record's second grid, indexed [x][y][z]. */
+extern "C" u32 fn_802969A8(s32 x, s32 y, s32 z, PlLandCell* land)
+{
+    return land->cells_0x78[(x * land->dim_y_0x70 + y) * land->dim_z_0x6C + z];
+}
+
+/* One cell of the record's first grid, indexed [x][y][z]. */
+extern "C" u32 fn_802969D0(s32 x, s32 y, s32 z, PlLandCell* land)
+{
+    return land->cells_0x3C[(x * land->dim_y_0x34 + y) * land->dim_z_0x30 + z];
+}
+
+/* ------------------------------------------------------------------------------------------------ *
+ * The 0x3C-byte box record (`.bss` `pl_hit_box`, 10 records).
+ * ------------------------------------------------------------------------------------------------ */
+
+/* Zeroes the four vectors of one box record. */
+extern "C" void* fn_80297DE8(void* self)
+{
+    PlHitBox* box = (PlHitBox*)self;
+
+    VEC3_ctor(&box->vec_0x08);
+    VEC3_ctor(&box->vec_0x14);
+    VEC3_ctor(&box->vec_0x20);
+    VEC3_ctor(&box->vec_0x2C);
+    return self;
 }

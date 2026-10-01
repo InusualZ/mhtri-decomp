@@ -1,4 +1,4 @@
-/* enemy/fn_801CA004.cpp - the em004 enemy's action band, `.text` 0x801C29F8..0x801CA8DC.
+/* enemy/em004_act.cpp - the em004 enemy's action band, `.text` 0x801C29F8..0x801CA8DC.
  *
  * Recut 2026-09-30.  The 0x801B7020..0x801E0ADC band was registered as seven ranges that cut through its
  * translation units.  The real TUs (each one's `.data` chunk opens with its `emNNN_prog_tbl`, each ends with its
@@ -29,7 +29,8 @@
 #include "g3d/g3d_calcworld.h"
 #include "draw_shape.h"
 #include "enemy/ENEMY_WORK.h"
-#include "enemy/fn_801CCBC4.h"
+#include "enemy/em005_act.h"
+#include "enemy/em004_act.h"
 #include "enemy/fn_801251D0.h"
 #include "enemy/fn_8012BDF4.h"
 #include "enemy/fn_8012EC74.h"

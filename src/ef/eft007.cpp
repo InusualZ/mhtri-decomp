@@ -49,6 +49,8 @@
 #include "types.h"
 
 #include "nw4r/math.h"
+#include "Pl/plw.h"
+#include "Pl/pl_hit_sphere.h"
 #include "gx.h"
 #include "ef/eft004.h"
 #include "ef/eft009.h"
@@ -196,7 +198,6 @@ extern "C" void addVec3To(nw4r::math::VEC3* out, const nw4r::math::VEC3* in);
 extern "C" void fn_80075258(s32* model, nw4r::math::VEC3* out, const nw4r::math::VEC3* pos);
 extern "C" void fn_800FA3E8(EmEffectSegment* seg); /* seg = ((0,0,0), (0,0,0)) */
 extern "C" void fn_800FA420(nw4r::math::VEC3* out); /* out = (0, 0, 0) */
-extern "C" u8 fn_8028F4B4(const EmEffectSegment* seg, const EmEffectQuad* quad);
 extern "C" u8 fn_80290598(const EmEffectQuad* quad, const nw4r::math::VEC3* pos, s32 a, s32 b);
 extern "C" s32 stage_water_enabled_ck(void);
 extern "C" u32 fn_802B45D4(void);
@@ -564,52 +565,28 @@ struct Effect { /* size: 0x04 - lower bound, an approximation (opaque here) */
 }  // namespace ef
 }  // namespace nw4r
 
-/* The engine's three-word rotation vector the setters copy in; `eft_rot_vec_copy` fills it and
- * `rotLocalMatX/Y` take its x/y as the joint ids.  The SDK type is a float triple, but THIS unit reads
- * x/y as the joint ids `rotLocalMatX/Y` take (unsigned long) and passes the triple by pointer, so the
- * `f32` spelling changes the codegen (546 instructions in the object) even though the single-symbol
- * score happens to hold; the integer spelling is the one that reproduces this unit.  The canonical
- * `f32` is reported as a disagreement (docs/plan.md 6.5). size: 0x0C - Pl/pl_act.cpp's extent. */
-struct _CP_VECTOR {
-    /* +0x00 */ u32 x;
-    /* +0x04 */ u32 y;
-    /* +0x08 */ u32 z;
-};
+/* `_CP_VECTOR` (the three-word rotation vector the setters copy in; x/y are the joint ids `rotLocalMatX/Y`
+ * take) comes from `ef/cp_vector.h` - one definition, in the owner's header (rule 1). */
 
 struct _MHcharJoints;
 
-/* The character/model an effect hangs off (`MHchar` in the map's mangling). Only the offsets this block
- * reads are named. */
-struct MHchar { /* size: 0x140 - lower bound, an approximation (Pl/pl_act.cpp's extent) */
-    /* +0x000 */ u8 unused_0x000[0x0A];
-    /* +0x00A */ u8 kind_0x0A;     /* == 4 gates the joint frame checks */
-    /* +0x00B */ u8 unused_0x00B;
-    /* +0x00C */ u16 motion_0x0C;  /* the animation id `fn_801036C0` switches on */
-    /* +0x00E */ u8 unused_0x00E[0x16 - 0x0E];
-    /* +0x016 */ u8 area_0x16;     /* the stage area the effect belongs to */
-    /* +0x017 */ u8 unused_0x017[0x54 - 0x17];
-    /* +0x054 */ _CP_VECTOR rot_0x54;
-    /* +0x060 */ u8 unused_0x060[0x64 - 0x60];
-    /* +0x064 */ f32 field_0x64;
-    /* +0x068 */ u8 unused_0x068[0x13C - 0x68];
-    /* +0x13C */ _MHcharJoints* joints_0x13C;
+/* The character/model an effect hangs off (`MHchar` in the map's mangling); this block only calls its
+ * joint-position member.  size: 0x140 - lower bound, an approximation (Pl/pl_act.cpp's extent) */
+struct MHchar {
+    /* +0x000 */ u8 unused_0x000[0x140];
 
     void get_joint_wpos(unsigned long joint, nw4r::math::VEC3* out);
 };
 
-/* What `MHchar::joints_0x13C` points at: a 4-byte word and then the joint-bearing character the joint
+/* What `_PLW::physics_0x13C` points at: a 4-byte word and then the joint-bearing character the joint
  * calls are made on. Only ever used through the pointer. size: 0x144 - lower bound, an approximation. */
 struct _MHcharJoints {
     /* +0x000 */ u32 unused_0x000;
     /* +0x004 */ MHchar joint_0x004;
 };
 
-/* The player work the two setters take (`_PLW` in the map's mangling) - the character plus the
- * player-only tail; only the inherited `area_0x16` is read here. size: 0x668 */
-struct _PLW : MHchar {
-    /* +0x140 */ u8 unused_0x140[0x668 - 0x140];
-};
-
+/* `_PLW`, the player work the two setters take, comes from `Pl/plw.h` - one definition, in the owner's header
+ * (rule 1). */
 /* The effect object `fn_800F8788(44)` returns and the two setters fill: the pool block at +0x38, the two
  * handlers at +0x34/+0x40 and the source character at +0x30. */
 struct _EFT007;
@@ -932,7 +909,7 @@ extern "C" void fn_80102D48(_EFT007* self)
             return;
         }
         work->count++;
-        if (fn_803311A0(model) >= 2) {
+        if (fn_803311A0((MHchar*)model) >= 2) {
             self->timer_0x0C = 3;
             work->paramscale *= lbl_80796744;
         } else {
@@ -943,10 +920,10 @@ extern "C" void fn_80102D48(_EFT007* self)
         mulVecMat(&pos, &mtx);
         mtx34_trans_add(&mtx, &pos);
         mtx34_trans_get(&mtx, &self->pos_0x18);
-        fn_800DD7E0(model, &self->pos_0x18, 0);
+        fn_800DD7E0((MHchar*)model, &self->pos_0x18, 0);
         break;
     case 10:
-        if (fn_803311A0(model) >= 2) {
+        if (fn_803311A0((MHchar*)model) >= 2) {
             self->timer_0x0C = 3;
             work->paramscale *= lbl_80796744;
         } else {
@@ -957,7 +934,7 @@ extern "C" void fn_80102D48(_EFT007* self)
         mulVecMat(&pos, &mtx);
         mtx34_trans_add(&mtx, &pos);
         mtx34_trans_get(&mtx, &self->pos_0x18);
-        fn_800DD7E0(model, &self->pos_0x18, 0);
+        fn_800DD7E0((MHchar*)model, &self->pos_0x18, 0);
         break;
     case 16:
     case 17:
@@ -980,7 +957,7 @@ extern "C" void fn_80102D48(_EFT007* self)
         change_paramscale_eff(work->effects[0], work->paramscale);
         break;
     }
-    model->joints_0x13C->joint_0x004.get_joint_wpos(work->param_id, &work->joint_pos_0x20);
+    ((_MHcharJoints*)model->physics_0x13C)->joint_0x004.get_joint_wpos(work->param_id, &work->joint_pos_0x20);
     fn_80103130(self);
 }
 
@@ -1013,7 +990,7 @@ extern "C" void fn_80103130(_EFT007* self)
     }
     if (((u32)(self->type_0x02 - 3) <= 2 || (u32)(self->type_0x02 - 9) <= 1 ||
          (u32)(self->type_0x02 - 16) <= 1) &&
-        model->kind_0x0A != 4) {
+        model->field_0x00A != 4) {
         self->flag_0x01 = 0;
         self->state_0x05++;
         self->step_0x06 = 2;
@@ -1114,7 +1091,7 @@ extern "C" void fn_80103130(_EFT007* self)
     }
     if ((u32)(self->type_0x02 - 13) <= 2) {
         get_camera_pos__Fv(&cam);
-        if (cam.y < model->field_0x64) {
+        if (cam.y < model->field_0x064) {
             fn_800F93D8(self, work->effects, 1, work->count, 0);
         }
     } else {
@@ -1183,8 +1160,8 @@ extern "C" s32 fn_801036C0(_EFT007* self)
 {
     _PLW* model = self->model_0x30;
 
-    if (model->kind_0x0A == 4) {
-        switch (model->motion_0x0C) {
+    if (model->field_0x00A == 4) {
+        switch (model->act_no) {
         case 9:
         case 22:
         case 53:
@@ -1198,7 +1175,7 @@ extern "C" s32 fn_801036C0(_EFT007* self)
         case 55:
             if (self->step_0x06 == 0) {
                 self->step_0x06++;
-                fn_800DD7E0(model, &self->pos_0x18, 1);
+                fn_800DD7E0((MHchar*)model, &self->pos_0x18, 1);
             }
             return 1;
         case 10:
@@ -1208,14 +1185,14 @@ extern "C" s32 fn_801036C0(_EFT007* self)
             }
             if (self->step_0x06 == 1) {
                 self->step_0x06 = 2;
-                fn_800DD7E0(model, &self->pos_0x18, -1);
+                fn_800DD7E0((MHchar*)model, &self->pos_0x18, -1);
             }
             return 0;
         }
     }
     if (self->step_0x06 == 1) {
         self->step_0x06 = 2;
-        fn_800DD7E0(model, &self->pos_0x18, -1);
+        fn_800DD7E0((MHchar*)model, &self->pos_0x18, -1);
     }
     return 0;
 }
@@ -1231,7 +1208,7 @@ extern "C" void fn_8010383C(_EFT007* self, nw4r::math::MTX34* mtx)
 
     VEC3_ctor(&pos);
     VEC3_ctor(&origin);
-    fn_800E0A14(&model->joints_0x13C->joint_0x004, work->param_id, mtx);
+    fn_800E0A14(&((_MHcharJoints*)model->physics_0x13C)->joint_0x004, work->param_id, mtx);
     switch (self->type_0x02) {
     case 0:
     case 1:

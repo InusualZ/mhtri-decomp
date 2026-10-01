@@ -180,36 +180,6 @@ typedef struct _LB_NPC {
  * (`src/lobby/fn_802076D4.cpp`).  docs/plan.md 6.5 rule 2: an extern lives with the TU that owns the
  * symbol.  The names are unmangled in the map, so the declarations are `extern "C"` (rule 9).
  */
-/* The `.bss` lobby work block (`lobby_w`, 0x17C B).  Its view here is this unit's own (see the note
- * above): `include/unsplit/lobby.h` carries the menu-layer unit's partial view, whose `lobby_world_block`
- * is declared as an array rather than the pointer the target loads, so the two views cannot be one. */
-typedef struct LbNpcLobbyWork {
-    /* +0x000 */ u8 field_0x000;
-    /* +0x001 */ u8 field_0x001;
-    /* +0x002 */ s8 field_0x002;
-    /* +0x003 */ u8 field_0x003;
-    /* +0x004 */ u8 pad_0x004[0x23];
-    /* +0x027 */ u8 field_0x027;
-    /* +0x028 */ u8 pad_0x028[0x0E];
-    /* +0x036 */ s16 field_0x036[13];
-    /* +0x050 */ u8 pad_0x050[0x29];
-    /* +0x079 */ s8 field_0x079;
-    /* +0x07A */ u8 pad_0x07A[6];
-    /* +0x080 */ u8 field_0x080;
-    /* +0x081 */ u8 pad_0x081[0x3F];
-    /* +0x0C0 */ u8 talk_0x0C0[0x6C];
-    /* +0x12C */ u8 field_0x12C;
-    /* +0x12D */ u8 pad_0x12D[0x2];
-    /* +0x12F */ u8 field_0x12F;
-    /* +0x130 */ u8 pad_0x130[0x33];
-    /* +0x163 */ u8 field_0x163;
-    /* +0x164 */ u8 pad_0x164[0x0B];
-    /* +0x16F */ s8 field_0x16F;
-    /* +0x170 */ u8 pad_0x170[2];
-    /* +0x172 */ s16 field_0x172;
-    /* +0x174 */ u8 pad_0x174[8];
-} LbNpcLobbyWork; /* size: 0x17C */
-
 /* One of the 0x12 NPC work records in the `lb_npc` array (stride 0x268). */
 typedef struct LbNpcWork {
     /* +0x000 */ u8 alive_0x000;

@@ -1,4 +1,18 @@
 /*
+ * Pl/pl_motion.cpp - the player actor's motion layer: the per-frame motion step, the root-mode accessors and the area/root entry
+ * lookups.
+ *
+ * `.text` 0x80288CEC..0x8028F44C (74 functions), `.bss` 0x18 B, `.ctors` 4 B, `.data` 0x1C84 B, `.sbss` 0x20 B, `.sdata` 0xC0 B, `.sdata2` 0xA0 B,
+ * extab 0x228 B and extabindex 0x33C B.  Phase 4 recut of `Pl/fn_80288CEC` (docs/splits/phase4): the registered range
+ * 0x80288CEC..0x8028F66C is two TUs of the candidate - this one and `Pl/pl_hit_sphere`.
+ *
+ * Name: GUESS, from the motion-step entry points the range holds (`fn_80288CEC` steps the player's motion); no `__FILE__`
+ * string covers the range.
+ * Flags: `cflags_pl` as the former unit.
+ */
+
+/* ==== recut from Pl/fn_80288CEC.cpp (0x80288CEC..0x8028F44C) ==== */
+/*
  * Naming note: the symbol map spells 75 of this range's 78 functions as bare `fn_XXXXXXXX`
  * (checked with tools/symbols/dumpmap.py - every address of the range answers `zz_XXXXXXXX_` or
  * `FUN_XXXXXXXX`, never a real runtime name - and the range's `config/RMHE08/symbols.txt` entries
@@ -85,7 +99,7 @@
 #include "nw4r/math.h"
 #include "pl.h"
 #include "Pl/pl_act.h"
-#include "Pl/pl_master.h"
+#include "Pl/Pl_master_ck.h"
 #include "Pl/fn_802693C4.h"
 #include "Pl/fn_80288CEC.h" /* `PlBox`, shared with `Pl/fn_8028F66C.cpp` (rule 1) */
 #include "ef/fn_800CDB2C.h"
@@ -120,7 +134,7 @@ struct PlHandleSet {
 void* get_move_work_adrs(u8 index);
 
 /* Pl/pl_act.cpp owns `Pl_zanzo_set`; Pl/pl_master.cpp owns `Pl_act_ck` (`include/Pl/pl_master.h`). */
-u32 Pl_zanzo_set(_PLW* plw, long frame, u8 param);
+
 
 /* No registered unit covers these addresses; declared with the view this unit's call sites take. */
 u32 Pl_frame_check(_PLW* plw, u32 frame, f32 a, f32 b);
@@ -128,21 +142,20 @@ void player_init_data_load(void);
 
 extern "C" {
 /* `arena_userdata_apply` (0x8004A240) is `fn_80047398.cpp`'s and now comes from its owner header. */
-f32 subVec3(void* dst, void* a, void* b);
-f32 fn_80050EF4(void* a, void* b);
-void addVec3(void* dst, void* a, void* b);
-void fn_80051EE0(void* dst, void* a, f32 scale);
+
+
+
+
 void fn_800553B4(u8 idx);
 void fn_800D8E44(void* handle);
 void fn_800F6710(void);
-void fn_802673B8(void);
-void pl_act_enter(void* self, u32 a, u32 b, u32 c);
+
 u32 fn_8027CB1C(void* self);
 u32 stage_map_kind_get(u8 idx);
 void fn_802BE568(void* self, u32 sub);
 u32 fn_803A7E1C(void);
 void fn_803BA814(u8 idx);
-void PSVECSubtract(void* dst, void* a, void* b);
+
 }
 
 /* The two small-data seeds `fn_8028F400` fills, and the 256-byte-stride table `fn_8028F1E8` indexes.
@@ -495,16 +508,6 @@ void fn_8028F400(void) {
     setVec3((nw4r::math::VEC3*)lbl_806AB83C, 1413.0f, -571.0f, 1740.0f);
 }
 
-/* 0x8028F44C - build the first 0x24 bytes of a box from two vectors and their cross product. */
-void fn_8028F44C(PlBox* a, PlBox* b) {
-    f32 cross[3];
-
-    copyVec3(&b->vec_0x00, &a->vec_0x00);
-    copyVec3(&b->vec_0x0C, &a->vec_0x0C);
-    subVec3(cross, &a->vec_0x0C, &a->vec_0x00);
-    copyVec3(&b->vec_0x18, (const nw4r::math::VEC3*)cross);
-}
-
 } /* extern "C" */
 
 /* 0x8028F2C0 - the stage's day/night byte (`get_move_work_adrs(0)` + 0x22D8), 0 when absent. */
@@ -514,13 +517,4 @@ u8 get_gm_daynight(void) {
         return 0;
     }
     return root->field_0x22D8;
-}
-
-
-/* 0x8028F61C - `hit_point_sphr(point, center, radius)`: 1 when the point is inside the sphere. */
-u32 hit_point_sphr(nw4r::math::VEC3* point, nw4r::math::VEC3* center, f32 radius) {
-    f32 dx = center->x - point->x;
-    f32 dy = center->y - point->y;
-    f32 dz = center->z - point->z;
-    return dx * dx + dy * dy + dz * dz <= radius * radius;
 }

@@ -57,6 +57,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "ef/cp_vector.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
@@ -67,12 +68,8 @@
 /* `VEC3` / `MTX34` come from `nw4r/math.h` - one definition, in the owner's header (rule 1).  The
  * header is C-visible, so a `-lang=c` unit can include it. */
 
-/* The rotation source `cpSetRotMatrix` converts into a matrix.  size: 0x0C */
-typedef struct _CP_VECTOR {
-    /* +0x00 */ f32 x;
-    /* +0x04 */ f32 y;
-    /* +0x08 */ f32 z;
-} _CP_VECTOR;
+/* `_CP_VECTOR`, the rotation source `cpSetRotMatrix` converts into a matrix, comes from `ef/cp_vector.h` - one
+ * definition, in the owner's header (rule 1). */
 
 /* The enemy work object.  Only the bytes this unit reads are named; the full 0x300-byte record is the
  * enemy units' (`D:/WiiExperiment/MH3Disassembly/_ENEMY_WORK.h` gives the size, from the memset at

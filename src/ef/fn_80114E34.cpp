@@ -69,6 +69,7 @@
 #include "sound/fn_800D7F54.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "Pl/plw.h"
 
 /* The engine's own 3-float vector.  It is NOT `nw4r::math::VEC3`: `vec_to_mh_vec3` exists to convert
  * between the two (`nw4r::math::VEC3* dst, Vec* src`), so they are distinct types that happen to share
@@ -175,30 +176,7 @@ struct _EFT {
     /* +0x45 */ u8 unused_0x45[0x48 - 0x45];
 };
 
-/* The player actor an effect was spawned for.  Only the offsets this unit reads are named.
- * size: at least 0x668 */
-struct _PLW {
-    /* +0x000 */ u8 unused_0x000;
-    /* +0x001 */ u8 field_0x01;
-    /* +0x002 */ u8 unused_0x002[0x16 - 0x02];
-    /* +0x016 */ u8 area_0x16;
-    /* +0x017 */ u8 unused_0x017[0x54 - 0x17];
-    /* +0x054 */ s32 pos_x_0x54;
-    /* +0x058 */ s32 pos_y_0x58;
-    /* +0x05C */ s32 pos_z_0x5C;
-    /* +0x060 */ u8 unused_0x060[0x13C - 0x60];
-    /* +0x13C */ _PLW_PHYSICS* physics_0x13C;
-    /* +0x140 */ u8 unused_0x140[0x384 - 0x140];
-    /* +0x384 */ s16 field_0x384;
-    /* +0x386 */ u8 unused_0x386[0x65E - 0x386];
-    /* +0x65E */ u8 field_0x65E;
-    /* +0x65F */ u8 unused_0x65F[0x662 - 0x65F];
-    /* +0x662 */ s16 field_0x662;
-    /* +0x664 */ u16 field_0x664;
-    /* +0x666 */ u16 field_0x666;
-};
-/* size: 0x668 (lower bound) */
-
+/* `_PLW`, the player work record, comes from `Pl/plw.h` - one definition, in the owner's header (rule 1). */
 /* The effect character `fn_800F8914` hands out (the pointer it returns is slot+4).  Only the fields
  * these functions touch are named. */
 struct MHchar {
@@ -1249,9 +1227,9 @@ extern "C" void fn_801156A0(_EFT* self)
         setVisibility__6MHcharFUlb(work->models[0], 1, 1);
         setVisibility__6MHcharFUlb(work->models[0], 2, 0);
         fn_800E0A14(&plw->physics_0x13C->chr_0x04, 7, &work->mtx[0][0]);
-        self->field_0x24 = plw->pos_x_0x54;
-        self->field_0x28 = plw->pos_y_0x58;
-        self->field_0x2C = plw->pos_z_0x5C;
+        self->field_0x24 = (s32)plw->param_0x54;
+        self->field_0x28 = (s32)plw->field_0x058;
+        self->field_0x2C = (s32)plw->rot_z_0x5C;
         break;
     case 1:
     case 3:
@@ -1260,9 +1238,9 @@ extern "C" void fn_801156A0(_EFT* self)
         setVisibility__6MHcharFUlb(work->models[0], 1, 0);
         setVisibility__6MHcharFUlb(work->models[0], 2, 1);
         fn_800E0A14(&plw->physics_0x13C->chr_0x04, 7, &work->mtx[0][0]);
-        self->field_0x24 = plw->pos_x_0x54;
-        self->field_0x28 = plw->pos_y_0x58;
-        self->field_0x2C = plw->pos_z_0x5C;
+        self->field_0x24 = (s32)plw->param_0x54;
+        self->field_0x28 = (s32)plw->field_0x058;
+        self->field_0x2C = (s32)plw->rot_z_0x5C;
         break;
     default:
         fn_80115FB0(self);
@@ -1472,10 +1450,10 @@ extern "C" void fn_80115A80(_EFT* self)
             fn_800532DC(&work->mtx[i][j], &work->mtx[i][j - 1]);
         }
         fn_800E0A14(&plw->physics_0x13C->chr_0x04, 7, &work->mtx[i][0]);
-        self->flag_0x01 = plw->field_0x01;
-        self->field_0x24 = plw->pos_x_0x54;
-        self->field_0x28 = plw->pos_y_0x58;
-        self->field_0x2C = plw->pos_z_0x5C;
+        self->flag_0x01 = plw->field_0x001;
+        self->field_0x24 = (s32)plw->param_0x54;
+        self->field_0x28 = (s32)plw->field_0x058;
+        self->field_0x2C = (s32)plw->rot_z_0x5C;
         vec_to_mh_vec3(&v, (Vec*)&lbl_805A0208[self->type_0x02]);
         if (i == 1) {
             v.x *= f25;

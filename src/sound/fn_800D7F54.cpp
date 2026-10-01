@@ -56,6 +56,10 @@
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "draw_shape/fn_800532DC.h" /* fn_800532DC, owned by draw_shape.cpp's range (rule 2) */
 #include "sound/se_req.h" /* fn_800DFDCC / fn_800E0428, owned by se_req.cpp's range (rule 2) */
+#include "Pl/plw.h"
+#include "Pl/fn_802693C4.h"
+#include "lobby/lobby_w.h"
+#include "lobby/lb_npc_func.h"
 /* One of the 32 sound-slot records the SE work object carries at +0x3C. `fn_800D8E58` walks them
  * looking for a clear `in_use` byte and `fn_800DA72C` fills one in; the offsets below are read off that
  * pair and off `se_req_pos_ps`. Fields whose meaning is not established yet keep their offset as a name.
@@ -109,26 +113,7 @@ struct _se_w {
 };
 
 
-/* The actor/motion object the SE work points at; each part reads a different offset of it, so this is
- * the union of those views (the offsets do not overlap).
- * size: 0xB00 (at least) */
-struct _PLW {
-    /* +0x000 */ u8 pad_0x000[3];
-    /* +0x003 */ u8 field_0x003;
-    /* +0x004 */ u8 pad_0x004[4];
-    /* +0x008 */ u8 field_0x008;
-    /* +0x009 */ u8 pad_0x009[1];
-    /* +0x00A */ u8 field_0x00A;
-    /* +0x00B */ u8 pad_0x00B[0x0F];
-    /* +0x01A */ u16 field_0x01A;
-    /* +0x01C */ u8 pad_0x01C[0x1AC];
-    /* +0x1C8 */ u32 field_0x1C8;
-    /* +0x1CC */ u8 pad_0x1CC[0x2D8];
-    /* +0x4A4 */ u32 field_0x4A4;
-    /* +0x4A8 */ u8 pad_0x4A8[0x654];
-    /* +0xAFC */ _se_w* field_0xAFC;
-};
-
+/* `_PLW`, the player work record, comes from `Pl/plw.h` - one definition, in the owner's header (rule 1). */
 /* The per-kind container `get_move_work_adrs` returns: a status byte at +0x112 and a pointer array at
  * +0x138 indexed by the kind argument, each entry an `_se_w`. The array bound is an approximation (the
  * kind values in this unit stay well below it).
@@ -492,17 +477,7 @@ extern "C" void fn_800DCA98(_se_w* self, nw4r::math::VEC3* pos, u8 id) {
  * Residuals and shared-type notes are collected at the bottom of the file.
  */
 
-/* The lobby's SE work globals: `fn_800DBE94`/`fn_800DBFAC` take their work object from the two pointers
- * at +0xB8 and +0xBC.
- * size: 0x17C */
-struct LobbyWork {
-    /* +0x000 */ u8 pad_0x000[0xB8];
-    /* +0x0B8 */ _se_w* field_0x0B8;
-    /* +0x0BC */ _se_w* field_0x0BC;
-    /* +0x0C0 */ u8 pad_0x0C0[0xBC];
-};
 
-extern LobbyWork lobby_w;
 
 /* `_PLW`'s +0x4A4 counter as `se_req_frame_set` touches it (a byte increment and reload); the prelude's
  * `_PLW` types the field as a word. Same object, same layout.
@@ -573,11 +548,9 @@ extern "C" void* memset(void* dst, s32 c, u32 n);
 extern "C" u32 stage_water_area_ck(void);
 extern "C" u32 fn_800D843C(void);
 extern "C" void fn_800D8EA8(_se_w* work, SeSlot* slot);
-extern "C" u32 Get_motion_no__FP4_PLW(_PLW* plw);
 extern "C" s32 fn_800F0C14(s32 owner);
 extern "C" s32 fn_800F2890(s32 bank, s32 id);
 extern "C" u8 fn_800F0C74(s32 owner);
-extern "C" u32 fn_8026A328(_PLW* plw, s32 zero, f32 a, f32 b);
 extern "C" u32 fn_802D29A0(_PLW* plw, s32 zero, f32 a, f32 b);
 extern "C" u32 fn_801FE1DC(_LB_NPC* npc, s32 zero, f32 a, f32 b);
 extern "C" u32 fn_80385C80(_PLW* plw, s32 zero, f32 a, f32 b);
@@ -657,7 +630,7 @@ extern "C" void fn_800D9B6C(_se_w* work, SeSlot* slot) {
         plw = w->field_0x004;
         p = &lbl_80791438;
         {
-            u32 motion = (u16)Get_motion_no__FP4_PLW(plw);
+            u32 motion = Get_motion_no(plw) & 0xFFFF;
             while (*p != 0xFFFF) {
                 if (*p == motion) {
                     found = 1;
@@ -667,7 +640,7 @@ extern "C" void fn_800D9B6C(_se_w* work, SeSlot* slot) {
             }
         }
         if (found == 0) {
-            sl->field_0x25 = plw->field_0x008;
+            sl->field_0x25 = plw->chunk_ofs;
         } else {
             sl->field_0x25 = 0;
         }
@@ -1043,7 +1016,7 @@ void se_req_frame_set_sp(_se_w* work, s32 a, s32 param, s32 d, s32 e, s32 f) {
  * own, so no kind lookup. The id's top bit is the "loud" flag, stripped off and recorded as no owner.
  */
 extern "C" SeSlot* fn_800DBE94(s32 kind, s32 id, nw4r::math::VEC3* pos) {
-    LobbyWork* lw = &lobby_w;
+    LbLobbyWork* lw = &lobby_w;
     if (fn_800D843C() == 1) {
         return NULL;
     }
@@ -1081,7 +1054,7 @@ extern "C" SeSlot* fn_800DBE94(s32 kind, s32 id, nw4r::math::VEC3* pos) {
  * always takes the work object's owner.
  */
 extern "C" SeSlot* fn_800DBFAC(s32 kind, s32 id, nw4r::math::VEC3* pos) {
-    LobbyWork* lw = &lobby_w;
+    LbLobbyWork* lw = &lobby_w;
     if (fn_800D843C() == 1) {
         return NULL;
     }
@@ -1888,15 +1861,6 @@ struct _ENEMY_WORK;
 /* A 3x4 float matrix is `Mtx34` from `nw4r/math.h` (the SDK's `Mtx`): the camera helpers copy one into
  * each of the pool's two view matrices. */
 
-/* The NPC sound-hook object: the word at +0x04 is the callback the per-frame driver fires when the SE
- * system reports mode 2.
- * size: 0x10 */
-struct LbNpcFunc {
-    /* +0x00 */ u8 pad_0x00[4];
-    /* +0x04 */ void (*field_0x04)(void);
-    /* +0x08 */ u8 pad_0x08[8];
-};
-
 /* The `_ENEMY_WORK` bytes this part reads (the enemy units own the rest of the object): the byte at
  * +0x03 picks the enemy's SE bank and the byte at +0x08 is its own sound code.
  * size: 0x09 (partial view) */
@@ -1982,7 +1946,6 @@ struct SeMoveWork {
 /* --- declarations ------------------------------------------------------------------------------ */
 
 extern "C" _se_w* lbl_80794978;
-extern "C" LbNpcFunc lb_npc_func;
 
 extern "C" u8 fn_800CF208(void);
 /* Owned by `ef/system_core.cpp` (rule 2).  The declaration stays here, in the block form, because this

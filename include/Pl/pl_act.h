@@ -22,6 +22,17 @@ s32 fn_8027AC18(void* arg);
 void pl_pos_blend_start(struct _PLW* self, s32 frames); /* 0x8027AE28 - starts the blend of the actor's position to `target_pos_0x090` over `frames` */
 u32 Pl_motion_input_ck(s32 arg);
 
+/* The skill-slot and equipment helpers the lobby page, menu and cockpit units drive (0x802738B8-0x8027EB18). */
+u8 fn_802738B8(u8 idx);
+void fn_802738E8(struct _PLW* plw, u8* rec);
+void fn_80273998(struct _PLW* plw, u8 idx, s32 val);
+void fn_802754B4(struct _PLW* plw);
+void fn_8027EB18(u8 kind);
+u32 fn_8027E120(struct _PLW* worker);
+/* untyped: the equipment-slot record the caller casts to its own view */
+void* fn_8027E354(u8 kind, u16 index);
+void pl_act_enter(struct _PLW* plw, s32 a, u16 b, u16 c);
+
 /* Declarations added with `Pl/fn_80262940.cpp` (the player main/control cluster 0x80262940-0x802693C4),
  * which calls them; all four are in this unit's `.text` range (0x80276B58-0x8027D684). */
 void fn_80276B58(struct _PLW* self, s32 value);

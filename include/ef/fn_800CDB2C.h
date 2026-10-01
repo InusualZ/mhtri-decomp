@@ -69,7 +69,10 @@ void game_reset_to_title(void);
  * inside, and it returns the narrowed u16 it has just stored (`clrlwi r3,r0,16`) - which is also how
  * the owner defines it (`src/ef/fn_800CDB2C.cpp:559`, `u16 ran_suu(long index)`).  Added with
  * `enemy/fn_801B7020.cpp`, which calls it as `ran_suu(0)`. */
+#ifndef EF_FN_800CDB2C_NO_RAN_SUU
+/* A TU that holds a section with its own width of `ran_suu`'s result (`lobby/lb_npc.cpp`) defines the macro and declares it itself. */
 u16 ran_suu(s32 index);
+#endif
 
 /* 0x800CEC64 - reads the file `path` into `dest` (`size` bytes) through the loader; non-zero when the
  * read succeeded.  A C++ free function, the map's `load_file__FPcUll`.  Added with `quest/arenatask.cpp`
