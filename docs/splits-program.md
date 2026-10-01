@@ -17,7 +17,9 @@ into the larger unit with the candidate cut recorded.
   `phase2-reconcile.md` (section "Phase 2 files" and "The data attachment engine" below).
 * **3 - independent review** of the bands against what is already known (idea 94, `docs/data-order-seams.md`,
   `docs/pool-seams.md`, tudiscover / dataorder / poolseams evidence).
-* **4 - apply phase by phase** to `splits.txt` through `dtk split` and the gate (a phase is applied as a whole).
+* **4 - apply phase by phase** to `splits.txt` through `dtk split` and the gate (a phase is applied as a whole). Owner decision (2026-10-01): the source files of every folded or recut
+  registered unit are merged too, re-registered `NonMatching` (a folded `Matching` unit is demoted). Six address windows, one lane and one landing each:
+  `tools/splits/applysplits.py` (`plan`, `apply`, `manifest`, `verify`), the manifests and the lane brief are in `docs/splits/phase4/`.
 * **5 - re-audit the landed units** with `splitcheck.py --baseline` (its defect list is the audit list).
 
 ## Grades
