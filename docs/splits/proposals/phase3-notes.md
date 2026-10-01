@@ -86,3 +86,7 @@ g3d_resanmtexsrt data edge; g3d_scnobj / fn_80075DCC cut [0x8007B340, 0x8007B878
 * **Unit moves / removals**: `Network/network_shared_data` dissolves (data by reader); `Pl/pl_frame_data`, `Pl/pl_act_data`, `Pl/bss_pool`, `hud/cockpit_icon_data`, `enemy/fn_80382310` fold away (src files removed); `Pl/pl_act_step_data` is a new data-only unit.
 * **Renames**: `ef/fn_800CDB2C.cpp` -> `fn_800CE5A8`; the placeholder names of the new units (`main/fn_80048964`, `main/draw_shape` as a root unit, `ef/fn_800FBE64`, `sound/fn_800EEAE0`, `menu/fn_804513FC`, `Pl/pl_act_step_data`, `DWCi/dwc_error`, `homebutton/fn_8052A040`); `AXFXReverbHiExpShutdown` (rule 7).
 * **Matching demotions or data definitions**: the 11 units of section H and the 7 swallowed ones.
+
+## J. The seven dtk boundaries (phase 4 tool, 2026-10-01)
+
+Overrides 31-38 of `phase2-overrides.json` give the six unaligned symbols and the 4-byte `.sdata2` gap an owner (item 4 decided as the two arrays, item 6 as two rows); the decisions, evidence and the dtk result per window are in `docs/splits/phase4/README.md`. `phase2-reconcile.json` regenerated: 935 attach rows (928), `unowned_data` 116 (123), pool 75 (75), lint 0; overrides 39 rows (35 applied, 2 deferred, 2 blocked by `order`).

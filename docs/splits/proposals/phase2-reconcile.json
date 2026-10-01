@@ -12005,6 +12005,31 @@
    "text_addr": "0x8005ABD8"
   },
   {
+   "unit": "g3d/g3d_anmchr.cpp",
+   "section": ".bss",
+   "range": [
+    "0x80673C0A",
+    "0x80682E80"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 62070,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain 0x80673C0A --section .bss",
+     "finding": "lbl_80673C0A (0xF276 B) starts 2 bytes off a word, exactly where lbl_8066AE80 (0x8D8A B, g3d_anmchr's last object) ends, and nothing reads it (free): a TU's `.bss` start is aligned to its largest object, so a symbol packed behind an object of the previous TU's range belongs to that TU; the next unit g3d_state starts aligned at 0x80682E80"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain 0x80673C0A --section .bss",
+   "text_addr": "0x8005ABD8",
+   "note": "orchestrator override 31: medium: no reader; the unaligned follower of the preceding unit's last object, so the dtk-refused split `auto_08_80673C0A_bss` disappears"
+  },
+  {
    "unit": "g3d/g3d_state.cpp",
    "section": ".bss",
    "range": [
@@ -14237,6 +14262,31 @@
    "text_addr": "0x8046D9F0"
   },
   {
+   "unit": "ARC/arc.cpp",
+   "section": ".bss",
+   "range": [
+    "0x80708076",
+    "0x8070C414"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 17310,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain 0x80708076 --section .bss",
+     "finding": "lbl_80708076 (0x439E B) is packed straight behind lbl_807046E0 (0x3996 B, read by arc) and ends on a word (0x8070C414); the unit's other `.bss` objects (lbl_8070197B 0x1565 B) are unaligned the same way and nothing reads it (free): it belongs to arc's range. lbl_8070C414 (0x9CC B) stays deferred (aligned both sides)"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain 0x80708076 --section .bss",
+   "text_addr": "0x8046D9F0",
+   "note": "orchestrator override 32: medium: no reader; the unaligned follower of arc's last read object, so `auto_08_80708076_bss` disappears"
+  },
+  {
    "unit": "BTE/gki_buffer.cpp",
    "section": ".bss",
    "range": [
@@ -14713,6 +14763,31 @@
    "text_addr": "0x80515774"
   },
   {
+   "unit": "NHTTP/d_nhttp.c",
+   "section": ".bss",
+   "range": [
+    "0x8076317A",
+    "0x80763900"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 1926,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain 0x8076317A --section .bss",
+     "finding": "lbl_8076317A (0x786 B) is packed behind NHTTPi_systemInfo (0x80762C60 + 0x51A = 0x8076317A, read by d_nhttp) and nothing reads it (free); the next unit ssl starts aligned at 0x80763900"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain 0x8076317A --section .bss",
+   "text_addr": "0x80515774",
+   "note": "orchestrator override 33: medium: no reader; the unaligned follower of d_nhttp's last object"
+  },
+  {
    "unit": "SSL/ssl.cpp",
    "section": ".bss",
    "range": [
@@ -14877,26 +14952,26 @@
    "unit": "homebutton/fn_80556FC4.cpp",
    "section": ".bss",
    "range": [
-    "0x8079082A",
-    "0x80790C08"
+    "0x807907D0",
+    "0x80790D10"
    ],
    "grade": "medium",
-   "signal": "pointer-graph",
-   "symbols": 11,
-   "bytes": 990,
+   "signal": "orchestrator",
+   "symbols": 24,
+   "bytes": 1344,
    "signals": {
-    "pointer-graph": 11
+    "orchestrator": 24
    },
    "evidence": [
     {
      "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_80556FC4 --section .bss",
-     "finding": "11 symbol(s), none read by homebutton/fn_80556FC4.cpp's text: 0 forced by link order, 11 placed by pointer-derived evidence (pointer-graph)"
+     "command": "python tools/splits/dataattach.py --explain 0x807907D0 --section .bss",
+     "finding": "the two arrays (12 x 0x5A B at 0x807907D0, 12 x 0x16 B at 0x80790C08) are one object each: the engine deferred both (`reader-vs-pointer`) and attached elements 1..11 of the first to fn_80556FC4, leaving an unaligned start at 0x8079082A. Their only code readers are fn_80557744 (both bases), fn_80558670 (0x807907D0) and fn_805586D4 (0x80790C08), all inside fn_80556FC4's text; the only other evidence is the pointer table lbl_80655A98 (fn_8055FB70's .data, weight 1) that lists the elements. A reader is the stronger anchor, and one function taking both bases says one TU holds both"
     }
    ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_80556FC4 --section .bss",
+   "reproduce": "python tools/splits/dataattach.py --explain 0x807907D0 --section .bss",
    "text_addr": "0x80556FC4",
-   "note": "only 0 of 11 symbol(s) are read by the unit (a strong block needs 3, max(3, N/50)): the rest is placed by link order or pointer evidence"
+   "note": "orchestrator override 34: medium: the whole arrays go to the unit whose text reads the bases; the pointer table of fn_8055FB70 reaches them as externs. Residual: lbl_80790250 (0x580 B, read by the fn_8055B710 candidate) lies before the first array in link order and stays deferred (contradicts the order), as before"
   },
   {
    "unit": "homebutton/fn_8056083C.cpp",
@@ -18610,6 +18685,31 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain lb_companion_ui --section .sdata",
    "text_addr": "0x80338808"
+  },
+  {
+   "unit": "lobby/lb_companion_ui.cpp",
+   "section": ".sdata",
+   "range": [
+    "0x8079308A",
+    "0x8079308C"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 2,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain 0x8079308A --section .sdata",
+     "finding": "lbl_8079308A (2 B) is packed behind lbl_80793088 (2 B, read by lb_companion_ui) and nothing reads it (free); eft050's first object starts aligned at 0x8079308C"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain 0x8079308A --section .sdata",
+   "text_addr": "0x80338808",
+   "note": "orchestrator override 35: medium: no reader; the unaligned follower of lb_companion_ui's last object"
   },
   {
    "unit": "ef/eft050.cpp",
@@ -22383,6 +22483,56 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain menu_plsearch --section .sbss",
    "text_addr": "0x80448404"
+  },
+  {
+   "unit": "menu/menu_plsearch.cpp",
+   "section": ".sbss",
+   "range": [
+    "0x80794D60",
+    "0x80794D61"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 1,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain 0x80794D60 --section .sbss",
+     "finding": "lbl_80794D60 (1 B) and lbl_80794D64 (1 B) leave 3 bytes between them: one TU packs 1-byte objects without padding, so they are two TUs' objects and the word padding D61..D63 is the tail of the unit before. menu_plsearch's last object lbl_80794D58 (8 B) ends at 0x80794D60, so it takes D60 and its padding; both objects are read only as externs of the homebutton units (callers.py)"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain 0x80794D60 --section .sbss",
+   "text_addr": "0x80448404",
+   "note": "orchestrator override 36: medium: only foreign (homebutton) readers; link order and the padding place it"
+  },
+  {
+   "unit": "menu/fn_804513FC.cpp",
+   "section": ".sbss",
+   "range": [
+    "0x80794D64",
+    "0x80794D65"
+   ],
+   "grade": "strong",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 1,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain 0x80794D64 --section .sbss",
+     "finding": "fn_804513FC's range held 4-byte objects from lbl_80794D6C on, so its `.sbss` starts on a word: the range cannot start at 0x80794D65 (dtk: Invalid alignment for split) and the byte at 0x80794D64, which abuts the unit's first byte object and has the word padding D61..D63 before it, is its first object"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain 0x80794D64 --section .sbss",
+   "text_addr": "0x804513FC",
+   "note": "orchestrator override 37: strong: the alignment of the unit's `.sbss` forces the start to 0x80794D64"
   },
   {
    "unit": "menu/fn_804513FC.cpp",
@@ -29552,6 +29702,31 @@
    "text_addr": "0x803D70B8"
   },
   {
+   "unit": "Network/NetworkSessionManagerPat.cpp",
+   "section": ".sdata2",
+   "range": [
+    "0x8079C78C",
+    "0x8079C790"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 4,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "dataattach",
+     "command": "python tools/splits/dataattach.py --explain 0x8079C78C --section .sdata2",
+     "finding": "lbl_8079C78C (4 B) is read by fn_803E1B2C (0x803E1B74, inside NetworkSessionManagerPat's text 0x803D70B8..0x803E44C8) and fn_803EAF14 (0x803EAFF0, NetworkCommunityPat's text 0x803E4888..): a shared scalar (its neighbour lbl_8079C780 is read the same way and already sits in the Session block); the first use in text order is Session's, and a 4-byte gap between two units is what dtk refuses (`Unsplit data in .sdata2`)"
+    }
+   ],
+   "reproduce": "python tools/splits/dataattach.py --explain 0x8079C78C --section .sdata2",
+   "text_addr": "0x803D70B8",
+   "note": "orchestrator override 38: medium: read by both units, placed with the first reader; the pool check records the foreign read like the one of lbl_8079C780"
+  },
+  {
    "unit": "Network/NetworkCommunityPat.cpp",
    "section": ".sdata2",
    "range": [
@@ -33585,34 +33760,6 @@
   {
    "section": ".bss",
    "range": [
-    "0x80673C0A",
-    "0x80682E80"
-   ],
-   "kind": "unread",
-   "symbols": 1,
-   "bytes": 62070,
-   "candidates": [
-    "g3d/g3d_anmchr.cpp",
-    "g3d/fn_80063888.cpp",
-    "g3d/g3d_anmscn.cpp",
-    "g3d/fn_800680CC.cpp",
-    "... (16 units)",
-    "g3d/g3d_scnobj.cpp",
-    "g3d/g3d_scnroot.cpp",
-    "g3d/g3d_state.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain g3d_anmchr --section .bss",
-     "finding": "1 symbol(s) nothing reads: the boundary between g3d_anmchr and g3d_state lies somewhere in them (last anchor of the first, first anchor of the second)"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain g3d_anmchr --section .bss"
-  },
-  {
-   "section": ".bss",
-   "range": [
     "0x806A1110",
     "0x806A1120"
    ],
@@ -33731,12 +33878,12 @@
   {
    "section": ".bss",
    "range": [
-    "0x80708076",
+    "0x8070C414",
     "0x8070CDE0"
    ],
    "kind": "unread",
-   "symbols": 2,
-   "bytes": 19818,
+   "symbols": 1,
+   "bytes": 2508,
    "candidates": [
     "ARC/arc.cpp",
     "AX/AXFXReverbHi.c",
@@ -33749,32 +33896,10 @@
     {
      "tool": "dataattach",
      "command": "python tools/splits/dataattach.py --explain arc --section .bss",
-     "finding": "2 symbol(s) nothing reads: the boundary between arc and gki_buffer lies somewhere in them (last anchor of the first, first anchor of the second)"
+     "finding": "1 symbol(s) nothing reads: the boundary between arc and gki_buffer lies somewhere in them (last anchor of the first, first anchor of the second)"
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain arc --section .bss"
-  },
-  {
-   "section": ".bss",
-   "range": [
-    "0x8076317A",
-    "0x80763900"
-   ],
-   "kind": "unread",
-   "symbols": 1,
-   "bytes": 1926,
-   "candidates": [
-    "NHTTP/d_nhttp.c",
-    "SSL/ssl.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain d_nhttp --section .bss",
-     "finding": "1 symbol(s) nothing reads: the boundary between d_nhttp and ssl lies somewhere in them (last anchor of the first, first anchor of the second)"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain d_nhttp --section .bss"
   },
   {
    "section": ".bss",
@@ -33800,52 +33925,6 @@
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain fn_80542D8C --section .bss"
-  },
-  {
-   "section": ".bss",
-   "range": [
-    "0x807907D0",
-    "0x8079082A"
-   ],
-   "kind": "reader-vs-pointer",
-   "symbols": 1,
-   "bytes": 90,
-   "candidates": [
-    "homebutton/fn_80556FC4.cpp",
-    "homebutton/fn_8055FB70.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_80556FC4 --section .bss",
-     "finding": "1 symbol(s): lbl_807907D0 is read by homebutton/fn_80556FC4.cpp, but the pointer tables around it name homebutton/fn_8055FB70.cpp"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_80556FC4 --section .bss",
-   "note": "lbl_807907D0 is read by homebutton/fn_80556FC4.cpp, but the pointer tables around it name homebutton/fn_8055FB70.cpp"
-  },
-  {
-   "section": ".bss",
-   "range": [
-    "0x80790C08",
-    "0x80790D10"
-   ],
-   "kind": "reader-vs-pointer",
-   "symbols": 12,
-   "bytes": 264,
-   "candidates": [
-    "homebutton/fn_80556FC4.cpp",
-    "homebutton/fn_8055FB70.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain fn_80556FC4 --section .bss",
-     "finding": "12 symbol(s): 12 elements of 0x16 B at 0x80790C08..0x80790D10, named by lbl_80655A98, are one object but their readers split it between homebutton/fn_80556FC4.cpp, homebutton/fn_8055FB70.cpp"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain fn_80556FC4 --section .bss",
-   "note": "12 elements of 0x16 B at 0x80790C08..0x80790D10, named by lbl_80655A98, are one object but their readers split it between homebutton/fn_80556FC4.cpp, homebutton/fn_8055FB70.cpp"
   },
   {
    "section": ".sdata",
@@ -34062,28 +34141,6 @@
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain menu_message --section .sdata"
-  },
-  {
-   "section": ".sdata",
-   "range": [
-    "0x8079308A",
-    "0x8079308C"
-   ],
-   "kind": "unread",
-   "symbols": 1,
-   "bytes": 2,
-   "candidates": [
-    "lobby/lb_companion_ui.cpp",
-    "ef/eft050.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain lb_companion_ui --section .sdata",
-     "finding": "1 symbol(s) nothing reads: the boundary between lb_companion_ui and eft050 lies somewhere in them (last anchor of the first, first anchor of the second)"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain lb_companion_ui --section .sdata"
   },
   {
    "section": ".sdata",
@@ -34521,28 +34578,6 @@
   {
    "section": ".sbss",
    "range": [
-    "0x80794D60",
-    "0x80794D65"
-   ],
-   "kind": "unread",
-   "symbols": 2,
-   "bytes": 5,
-   "candidates": [
-    "menu/menu_plsearch.cpp",
-    "menu/fn_804513FC.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain menu_plsearch --section .sbss",
-     "finding": "2 symbol(s) nothing reads: the boundary between menu_plsearch and fn_804513FC lies somewhere in them (last anchor of the first, first anchor of the second)"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain menu_plsearch --section .sbss"
-  },
-  {
-   "section": ".sbss",
-   "range": [
     "0x80795A20",
     "0x80795A28"
    ],
@@ -34650,28 +34685,6 @@
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain g3d_gpu --section .sdata2"
-  },
-  {
-   "section": ".sdata2",
-   "range": [
-    "0x8079C78C",
-    "0x8079C790"
-   ],
-   "kind": "ambiguous",
-   "symbols": 1,
-   "bytes": 4,
-   "candidates": [
-    "Network/NetworkSessionManagerPat.cpp",
-    "Network/NetworkCommunityPat.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain NetworkSessionManagerPat --section .sdata2",
-     "finding": "1 symbol(s), 1 read (by NetworkSessionManagerPat, NetworkCommunityPat): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain NetworkSessionManagerPat --section .sdata2"
   },
   {
    "section": ".sdata2",
