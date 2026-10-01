@@ -1,4 +1,16 @@
 {
  "names": {},
- "note": "candidate unit name -> the name a window lane gave it (placeholder fn_<addr> stems, name-run remnants). tools/splits/applysplits.py plan/apply/manifest/verify read it so splits.txt, the plan and the verify row stay equal. A rename of a unit that is registered today is a --unit-rename at landing, not an entry here."
+ "languages": {
+  "enemy/em_common": ".cpp",
+  "stage/stg_w": ".cpp",
+  "ai/ai_npc": ".cpp",
+  "enemy/em_kind": ".c",
+  "enemy/em001_prog": ".c",
+  "AX/AXFXReverbHiExp": ".c",
+  "MTX/mtxvec": ".c",
+  "MTX/mtx44": ".c",
+  "MTX/vec": ".c",
+  "NAND/nand": ".c"
+ },
+ "note": "names: candidate unit name -> the name a window lane gave it (placeholder fn_<addr> stems, name-run remnants). languages: final unit stem -> the extension decided from the symbols (docs/splits/phase4/README.md, 'Language decisions'); map_candidate applies it to the extension. tools/splits/applysplits.py plan/apply/manifest/verify read both so splits.txt, the plan and the verify row stay equal. A rename of a unit that is registered today is a --unit-rename at landing, not an entry here."
 }

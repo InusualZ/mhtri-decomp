@@ -170,14 +170,19 @@ def stem_of(name):
     return name[:-len(e)] if e else name
 
 
-def map_candidate(cand, names=None):
-    """The candidate with the names a lane chose applied, and `main/<name>` units made root units."""
+def map_candidate(cand, names=None, languages=None):
+    """The candidate with the names a lane chose applied, `main/<name>` units made root units, and the language decisions
+    (`names.json` "languages": final stem -> extension) applied to the extension."""
     names = names or {}
+    languages = languages or {}
     units = []
     for u in cand.units:
         n = names.get(u.name, u.name)
         if n.startswith("main/"):
             n = n[len("main/"):]
+        want = languages.get(stem_of(n))
+        if want and ext_of(n) != want:
+            n = stem_of(n) + want
         units.append(copy_unit(u, n))
     return sc.Splits(list(cand.header), units)
 
@@ -554,8 +559,9 @@ def find_definition(text, name):
 # ---- the inputs ---------------------------------------------------------------------------------------------------------------------
 
 class Inputs:
-    def __init__(self, old, new, symbols, configure_text, tree, names=None, windows=WINDOWS, cand_issues=(), fixes=(), blocked=(), new_raw=None):
+    def __init__(self, old, new, symbols, configure_text, tree, names=None, windows=WINDOWS, cand_issues=(), fixes=(), blocked=(), new_raw=None, languages=None):
         self.old, self.new = old, new
+        self.languages = languages or {}
         self.new_raw = new_raw if new_raw is not None else new       # the candidate before the alignment normalisation
         self.fixes, self.blocked = list(fixes), list(blocked)
         self.symbols = symbols
@@ -571,7 +577,7 @@ class Inputs:
     def diag(self):
         """The same inputs with the candidate's dtk blockers given an owner (`align_candidate(absorb_blocked=True)`): a DIAGNOSTIC to see what dtk says past them."""
         new, fixes, blocked = align_candidate(clone_splits(self.new_raw), self.symbols, True)
-        return Inputs(self.old, new, self.symbols, self.configure_text, self.tree, self.names, self.windows, self.cand_issues, fixes, blocked, self.new_raw)
+        return Inputs(self.old, new, self.symbols, self.configure_text, self.tree, self.names, self.windows, self.cand_issues, fixes, blocked, self.new_raw, self.languages)
 
     def functions(self):
         """Function symbols in code sections, address-sorted: `[(addr, size, name)]` and the parallel address list."""
@@ -611,9 +617,10 @@ def load_inputs(root=None, splits_text=None, configure_text=None, proposals=None
     if configure_text is None:
         with open(os.path.join(root, "configure.py"), encoding="utf-8", errors="replace") as fh:
             configure_text = fh.read()
-    raw = map_candidate(cand, names)
+    languages = load_languages(root)
+    raw = map_candidate(cand, names, languages)
     new, fixes, blocked = align_candidate(clone_splits(raw), symbols, absorb_blocked)
-    return Inputs(old, new, symbols, configure_text, tree or Tree(root), names, windows, info["issues"], fixes, blocked, raw), dol
+    return Inputs(old, new, symbols, configure_text, tree or Tree(root), names, windows, info["issues"], fixes, blocked, raw, languages), dol
 
 
 def resolve_window(inp, spec):
@@ -628,6 +635,15 @@ def load_names(root):
         return {}
     with open(p, encoding="utf-8") as fh:
         return dict(json.load(fh).get("names", {}))
+
+
+def load_languages(root):
+    """The language decisions of `names.json`: `{"languages": {"<final stem>": ".c" | ".cpp"}}`, a decision the symbols alone cannot make."""
+    p = os.path.join(root, NAMES_FILE)
+    if not os.path.isfile(p):
+        return {}
+    with open(p, encoding="utf-8") as fh:
+        return dict(json.load(fh).get("languages", {}))
 
 
 # ---- plan ---------------------------------------------------------------------------------------------------------------------------
@@ -826,14 +842,17 @@ def language_evidence(inp, cand_unit, absorbed_old):
     funcs = inp.functions_in(code_ranges(cand_unit))
     mangled = [f[2] for f in funcs if MANGLED_RE.search(f[2])]
     exts = sorted({ext_of(o) for o in absorbed_old if ext_of(o)})
-    if mangled or ".cpp" in exts or ".cp" in exts:
+    decided = inp.languages.get(stem_of(cand_unit.name))
+    if decided:
+        rec = decided
+    elif mangled or ".cpp" in exts or ".cp" in exts:
         rec = ".cpp"
     elif exts == [".c"]:
         rec = ".c"
     else:
         rec = ext_of(cand_unit.name) or ".cpp"
-    mixed = len(exts) > 1
-    return {"extensions_absorbed": exts, "mangled_functions": len(mangled), "mangled_examples": mangled[:3], "functions": len(funcs),
+    mixed = len(exts) > 1 and not decided
+    return {"decided": bool(decided), "extensions_absorbed": exts, "mangled_functions": len(mangled), "mangled_examples": mangled[:3], "functions": len(funcs),
             "recommended": rec, "name_extension": ext_of(cand_unit.name), "mixed_c_cpp": mixed,
             "differs": bool(exts) and rec.replace(".cpp", ".cp") != ext_of(cand_unit.name).replace(".cpp", ".cp")}
 
@@ -1083,8 +1102,8 @@ def md_manifest(man):
     if chk:
         L.append("## Checks on the edited splits.txt")
         L.append("")
-        L.append("`alone` = this window applied to the current file, nothing else; `cumulative` = windows a..%s applied in order (the landing order); `probe` = the diagnostic run "
-                 "with the candidate's dtk blockers given an owner (see README)." % w)
+        L.append("`alone` = this window applied to the current file, nothing else; `cumulative` = windows a..%s applied in order (the landing order); `probe` = the diagnostic run, "
+                 "present only when plain dtk refused, with the candidate's dtk blockers given an owner (see README)." % w)
         L.append("")
         for key in ("alone", "cumulative"):
             c = chk.get(key)
@@ -1482,12 +1501,16 @@ def cmd_all(args):
         if args.dtk:
             ok, dt, tail = dtk_split(root, sc.render_splits(edited), name)
             checks["alone"]["dtk"] = {"ok": ok, "seconds": dt, "tail": tail}
-            _c, dedited = plan_for(diag, widx)
-            acc, patches, ptail = dtk_probe(root, dedited, name + "-probe")
-            checks["probe"] = {"accepted": acc, "patches": patches, "tail": ptail}
+            cok, cdt, ctail = dtk_split(root, sc.render_splits(cum), name + "-cum")
+            checks["cumulative"]["dtk"] = {"ok": cok, "seconds": cdt, "tail": ctail}
             dcum = apply_components(dcum, diag.new, [c for c in diff_units(dcum, diag.new, diag.windows)[2] if c.window == widx])
-            acc2, patches2, ptail2 = dtk_probe(root, dcum, name + "-cum")
-            checks["cumulative"]["dtk_probe"] = {"accepted": acc2, "patches": patches2, "tail": ptail2}
+            if not (ok and cok):
+                # DIAGNOSTIC, only when the plain candidate is refused: what dtk says past the blockers
+                _c, dedited = plan_for(diag, widx)
+                acc, patches, ptail = dtk_probe(root, dedited, name + "-probe")
+                checks["probe"] = {"accepted": acc, "patches": patches, "tail": ptail}
+                acc2, patches2, ptail2 = dtk_probe(root, dcum, name + "-cum")
+                checks["cumulative"]["dtk_probe"] = {"accepted": acc2, "patches": patches2, "tail": ptail2}
         man = build_manifest(inp, widx, checks)
         with open(os.path.join(out_dir, "manifest-%s.json" % name), "w", encoding="utf-8", newline=NL) as fh:
             json.dump(man, fh, separators=(",", ":"))
@@ -1495,11 +1518,13 @@ def cmd_all(args):
             fh.write(md_manifest(man))
         s = man["summary"]
         al = checks["alone"].get("dtk")
-        print("window %-3s components %3d  old %3d -> new %3d  kinds %s  sources %3d  demotions %2d  renames %2d  size %s  problems %2d  new-failures alone %d cumulative %d  dtk alone %s probe %s cumulative-probe %s" % (
+        cu = checks["cumulative"].get("dtk")
+        print("window %-3s components %3d  old %3d -> new %3d  kinds %s  sources %3d  demotions %2d  renames %2d  size %s  problems %2d  new-failures alone %d cumulative %d  dtk alone %s cumulative %s%s" % (
             name, s["components"], s["units_replaced"], s["units_in_candidate"], s["kinds"], s["registered_sources_touched"], s["matching_demotions"], s["unit_renames"],
             s["size"]["label"], s["problems"], len(new), len(cnew), "-" if al is None else ("ok" if al["ok"] else "REFUSED"),
-            "-" if "probe" not in checks else ("ok" if checks["probe"]["accepted"] else "REFUSED"),
-            "-" if "probe" not in checks else ("ok" if checks["cumulative"]["dtk_probe"]["accepted"] else "REFUSED")))
+            "-" if cu is None else ("ok" if cu["ok"] else "REFUSED"),
+            "" if "probe" not in checks else "  probe %s cumulative-probe %s" % (
+                "ok" if checks["probe"]["accepted"] else "REFUSED", "ok" if checks["cumulative"]["dtk_probe"]["accepted"] else "REFUSED")))
     full = sc.render_splits(cum) == sc.render_splits(inp.new)
     print("all six windows applied in turn == the candidate: %s" % full)
     import matchinggain as mg
@@ -1614,6 +1639,9 @@ def selftest():
     # candidate names: `main/` units are root units, a lane's chosen names win
     m = map_candidate(sc.Splits(header, [U("main/draw.cpp", **{".text": (0x1000, 0x1100)}), U("ef/fn_1.cpp", **{".text": (0x1100, 0x1200)})]), {"ef/fn_1.cpp": "ef/real.cpp"})
     check("main/ is dropped, chosen names applied", [u.name for u in m.units], ["draw.cpp", "ef/real.cpp"])
+    m = map_candidate(sc.Splits(header, [U("main/draw.cpp", **{".text": (0x1000, 0x1100)}), U("ef/fn_1.cpp", **{".text": (0x1100, 0x1200)})]), {"ef/fn_1.cpp": "ef/real.cpp"},
+                      {"draw": ".c", "ef/real": ".cpp"})
+    check("a language decision rewrites the extension of the final stem", [u.name for u in m.units], ["draw.c", "ef/real.cpp"])
     # splits.txt text round trip
     txt = sc.render_splits(old)
     check("render/parse round trip", sc.render_splits(sc.parse_splits(txt)), txt)
@@ -1640,6 +1668,10 @@ def selftest():
     check("mangled function -> .cpp", language_evidence(inp, new.by_name()["a23.cpp"], ["a2.cpp"])["recommended"], ".cpp")
     check("only .c absorbed and nothing mangled -> .c, flagged when the name says .cpp", (language_evidence(inp, new.by_name()["b1.cpp"], ["x.c"])["recommended"],
                                                                                            language_evidence(inp, new.by_name()["b1.cpp"], ["x.c"])["differs"]), (".c", True))
+    inp.languages = {"b1": ".c"}
+    ev = language_evidence(inp, new.by_name()["b1.cpp"], ["x.c", "y.cpp"])
+    check("a decided language wins over the absorbed sources and silences the mixed flag", (ev["recommended"], ev["decided"], ev["mixed_c_cpp"]), (".c", True, False))
+    inp.languages = {}
     # the manifest of a fixture tree: kinds, renames, demotions, data gain
     tmp = tempfile.mkdtemp(prefix="applysplits-")
     try:
