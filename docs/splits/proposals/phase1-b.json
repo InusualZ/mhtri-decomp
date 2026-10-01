@@ -282,7 +282,7 @@
     ".text": [
      [
       "0x800EE014",
-      "0x800EF7D8"
+      "0x800EEAE0"
      ]
     ]
    },
@@ -309,6 +309,62 @@
    "replaces_tail_of": "sound/fn_800E8E60.cpp",
    "open_questions": [
     "name: guess: quest_snd_wk_init and the chacha bank getters"
+   ]
+  },
+  {
+   "derived_name": "fn_800EEAE0",
+   "module": "sound",
+   "absorbs": [
+    "sound/fn_800EF7D8.cpp"
+   ],
+   "ranges": {
+    ".text": [
+     [
+      "0x800EEAE0",
+      "0x800F2A94"
+     ]
+    ]
+   },
+   "cuts": [
+    {
+     "addr": "0x800EEAE0",
+     "section": ".text",
+     "grade": "medium",
+     "kind": "data-interleave",
+     "evidence": [
+      {
+       "tool": "splitcheck",
+       "command": "python tools/splits/splitcheck.py --baseline --only pool --unit '^sound/fn_800EF7D8' --intervals",
+       "finding": "pooldup 0x4330000000000000 lbl_80796580 (last read 0x800EE7D4, in fn_800EE780) / lbl_80796598 (first read 0x800F2A2C): a TU starts in [0x800EE868, 0x800F2A1C]; the quest_snd symbols inside fn_800EF7D8's tables (0x805980A8..0x8059B16C) end it at the first reader of the second group"
+      },
+      {
+       "tool": "dataattach",
+       "command": "python tools/splits/dataattach.py --explain quest_snd",
+       "finding": "the 375 .data symbols 0x805980A8..0x8059B16C and 67 .sdata symbols are read by the two units in alternation (eight symbols read only by quest_snd lie inside fn_800EF7D8's tables): one TU holds them, its text starts inside quest_snd's tail"
+      }
+     ],
+     "reproduce": "python tools/splits/dataattach.py --explain quest_snd"
+    }
+   ],
+   "removes_cuts": [
+    {
+     "addr": "0x800EF7D8",
+     "section": ".text",
+     "grade": "medium",
+     "kind": "registered-edge",
+     "evidence": [
+      {
+       "tool": "dataattach",
+       "command": "python tools/splits/dataattach.py --explain quest_snd",
+       "finding": "the 375 .data symbols 0x805980A8..0x8059B16C and 67 .sdata symbols are read by the two units in alternation (eight symbols read only by quest_snd lie inside fn_800EF7D8's tables): one TU holds them, its text starts inside quest_snd's tail"
+      }
+     ],
+     "reproduce": "python tools/splits/dataattach.py --explain quest_snd"
+    }
+   ],
+   "open_questions": [
+    "the cut lies in [0x800EE868, 0x800EEAE0] (8 function starts: 0x800EE868, 0x800EE8B4, 0x800EE900, 0x800EE978, 0x800EE9EC, 0x800EEA2C, 0x800EEA44, 0x800EEAE0): placed at the end of the interval, the first reader of the TU's data",
+    "name: placeholder"
    ]
   },
   {
@@ -1623,7 +1679,7 @@
     ".text": [
      [
       "0x801B4348",
-      "0x801B4458"
+      "0x801B7020"
      ]
     ]
    },
@@ -1650,25 +1706,87 @@
    "replaces_tail_of": "enemy/fn_801B0010.cpp",
    "open_questions": [
     "name: placeholder",
-    "the registered start at this unit's right edge (0x801B4458) came from an earlier tool (the first reader of the next pool run); R1 puts the end of the neighbouring TU at this unit's start, so the 0x110 bytes between is either a real micro-TU or the tail of the TU that follows (or of the one before) that only a vtable or code before L reaches",
-    "MICRO UNIT: its right edge 0x801B4458 is a registered edge only; do not register a source for this unit before the edge is pinned (a 0x110-byte unit rests on one signal)"
+    "folded into the registered enemy/fn_801B4458.cpp (text 0x801B4348..0x801B7020, .data 0x805B17A8..0x805B2118); the R1 cut at 0x801B4348 stays: the TU of fn_801B0010 ends there"
+   ],
+   "absorbs": [
+    "enemy/fn_801B4458.cpp"
+   ],
+   "removes_cuts": [
+    {
+     "addr": "0x801B4458",
+     "section": ".text",
+     "grade": "medium",
+     "kind": "data-pointer-chain",
+     "evidence": [
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x805B1B08",
+       "finding": "lbl_805B1B08 (0x805B1B08, the end of the pointer chain that starts at em034_prog_tbl 0x805B17A8) is read only by fn_801B4398 (0x801B43BC, 0x801B43D8), inside the micro unit 0x801B4348..0x801B4458"
+      },
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x805B17A8 --pointers",
+       "finding": "em034_prog_tbl (0x70 B) is a table of ten code pointers into fn_801B4458's text (0x801B4458..0x801B7020) and the 0x805B1818..0x805B1B30 objects it leads to are read from the micro unit: the 0x110-byte unit and fn_801B4458 are one TU"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x805B1B08"
+    }
+   ]
+  },
+  {
+   "derived_name": "fn_800FBE64",
+   "module": "ef",
+   "replaces_tail_of": "ef/eft001.cpp",
+   "absorbs": [
+    "ef/eft002.cpp"
+   ],
+   "ranges": {
+    ".text": [
+     [
+      "0x800FBE64",
+      "0x800FD520"
+     ]
+    ]
+   },
+   "cuts": [
+    {
+     "addr": "0x800FBE64",
+     "section": ".text",
+     "grade": "medium",
+     "kind": "pooldup-interval",
+     "evidence": [
+      {
+       "tool": "splitcheck",
+       "command": "python tools/splits/splitcheck.py --baseline --only pool --unit '^ef/eft001' --intervals",
+       "finding": "pooldup 0x3f800000 lbl_80796608 (last read 0x800FBD10) / lbl_80796644 (first read 0x800FBF88) and 0x3f000000 lbl_80796618 / lbl_80796640 (first read 0x800FBF54): a TU starts in [0x800FBD68, 0x800FBE64] (2 function starts)"
+      }
+     ],
+     "reproduce": "python tools/splits/splitcheck.py --baseline --only pool --unit '^ef/eft001' --intervals"
+    }
+   ],
+   "removes_cuts": [
+    {
+     "addr": "0x800FCED4",
+     "section": ".text",
+     "grade": "medium",
+     "kind": "data-interleave",
+     "evidence": [
+      {
+       "tool": "dataattach",
+       "command": "python tools/splits/dataattach.py --explain 0x8059B5F8 --section .data",
+       "finding": "the 31 symbols 0x8059B5F8..0x8059B9A8 interleave eft001's and eft002's readers (eft002 reads 0x8059B6F8..0x8059B778 between eft001's tables, and eft001 reads the jump tables 0x8059B800..0x8059B8F4 after them): a TU's data is one run, so eft002's text belongs to the TU that holds eft001's tail"
+      }
+     ],
+     "reproduce": "python tools/splits/dataattach.py --explain 0x8059B5F8 --section .data"
+    }
+   ],
+   "open_questions": [
+    "the cut lies in [0x800FBD68, 0x800FBE64] (2 function starts): 0x800FBE64 is placed at the first reader of the second 1.0 literal, 0x800FBD68 is the other candidate",
+    "name: placeholder"
    ]
   }
  ],
  "open_questions": [
-  {
-   "unit": "ef/eft001.cpp",
-   "question": "a TU starts in this interval and no known cut holds it (the unit above the interval is 2 TUs until it is pinned)",
-   "candidate_interval": [
-    "0x800FBD68",
-    "0x800FBE64"
-   ],
-   "positions": 2,
-   "evidence": [
-    "value 0x3f800000 held at lbl_80796608 (last read at 0x800FBBC0) and again at lbl_80796644 (first read at 0x800FBE64): one TU holds a value once, so a TU starts in 0x800FBD68..0x800FBE64 (2 function starts, 2 outside every shared-literal span)"
-   ],
-   "reproduce": "python tools/splits/tudiscover.py at 0x800FBE64 --pool-model on"
-  },
   {
    "unit": "ef/eft004.cpp",
    "question": "a TU starts in this interval and no known cut holds it (the unit above the interval is 2 TUs until it is pinned)",

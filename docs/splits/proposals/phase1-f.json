@@ -5950,19 +5950,36 @@
     {
      "addr": "0x805073C0",
      "section": ".text",
-     "grade": "guess",
+     "grade": "medium",
      "evidence": [
       {
        "tool": "symedit",
        "command": "python tools/symbols/symedit.py at 0x805073C0 --count 4 --section .text",
        "finding": "DWC_GetLastErrorEx/DWC_ClearError: DWC roster begins"
+      },
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x8062FD00",
+       "finding": ".data 0x8062FC48..0x8062FF90: lbl_8062FC48 / lbl_8062FC58 are read at 0x80506620..0x8050663C (nw4r/fn_8050661C), jumptable_8062FD00 / lbl_8062FD68 / lbl_8062FE10 at 0x805073E4, 0x805074C4, 0x8050792C (the DWC roster): low, low, high, high, high"
+      },
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x807957B4",
+       "finding": ".sbss 0x80795780..0x807957D0: the first 12 symbols are read at 0x805066F8..0x80506EDC, the other 7 from 0x805073C8 (lbl_807957B4), 0x805073D8 (lbl_807957B0) on"
+      },
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x807941F8",
+       "finding": ".sdata 0x807941E8..0x807941FE: lbl_807941E8 / lbl_807941F0 are read up to 0x8050719C, lbl_807941F8 only at 0x805075E0: the three sections put one seam in (0x8050719C, 0x805073C8], which holds 0x805073C0"
       }
      ],
-     "reproduce": "python tools/symbols/symedit.py at 0x805073C0 --count 4 --section .text",
-     "kind": "roster"
+     "reproduce": "python tools/units/callers.py 0x807957B4",
+     "kind": "data-seam"
     }
    ],
-   "open_questions": []
+   "open_questions": [
+    "the right edge 0x80507C40 (registered, start of DWCi_Np_CPUCopyFast) is kept: the three DWC roster guesses (dwc_error, dwc_memfunc, dwc_report) stay merged into this unit; merging them forward into DWCi_Np_CPUCopyFast is the alternative (no signal at 0x80507C40 either way)"
+   ]
   },
   {
    "derived_name": "dwc_memfunc",
@@ -6712,16 +6729,26 @@
     {
      "addr": "0x8052A040",
      "section": ".text",
-     "grade": "guess",
+     "grade": "medium",
      "evidence": [
       {
        "tool": "symedit",
        "command": "python tools/symbols/symedit.py at 0x8052A040 --count 4 --section .text",
        "finding": "unnamed C++ run after kbd_init_keyboard"
+      },
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x8064A638 --pointers",
+       "finding": "lbl_8064A638 (0x78 B, 28 slots) is stored by fn_8052C330 (0x8052C35C) and 20 of its 28 slots point into 0x8052A040..0x8052B004 (0x8052A498..0x8052AFD0); the other 8 into 0x8052C47C..0x8052C86C (homebutton/fn_8052B004)"
+      },
+      {
+       "tool": "splitcheck",
+       "command": "python tools/splits/splitcheck.py --baseline --only pool --unit '^SO/soi' --intervals",
+       "finding": "pooldup lbl_8079D528 (last read 0x805269E0) / lbl_8079D550 (first read 0x8052A148): a TU starts in (0x80526980, 0x8052A13C], which holds 0x8052A040"
       }
      ],
-     "reproduce": "python tools/symbols/symedit.py at 0x8052A040 --count 4 --section .text",
-     "kind": "file"
+     "reproduce": "python tools/units/callers.py 0x8064A638 --pointers",
+     "kind": "vtable-owner"
     }
    ],
    "open_questions": []

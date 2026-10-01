@@ -60,6 +60,101 @@
    ]
   },
   {
+   "derived_name": "fn_80048964",
+   "module": "main",
+   "replaces_tail_of": "fn_80047398.cpp",
+   "ranges": {
+    ".text": [
+     [
+      "0x80048964",
+      "0x8004C9A0"
+     ]
+    ]
+   },
+   "cuts": [
+    {
+     "addr": "0x80048964",
+     "section": ".text",
+     "grade": "medium",
+     "kind": "pooldup-interval",
+     "evidence": [
+      {
+       "tool": "splitcheck",
+       "command": "python tools/splits/splitcheck.py --baseline --only pool --unit '^fn_80047398' --intervals",
+       "finding": "pooldup 0x00000000 lbl_80795B70 (last read 0x80048678, fn_80047D6C) / lbl_80795BA8 (first read 0x80048A44, fn_80048964) and 0x3f800000 lbl_80795B74 / lbl_80795BAC (first read 0x80048A60): a TU starts in [0x80048764, 0x80048964] (10 function starts)"
+      },
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x80795BA8",
+       "finding": "lbl_80795BA8 is read only at 0x80048A44 in fn_80048964, the first reader of the second pool group"
+      }
+     ],
+     "reproduce": "python tools/splits/splitcheck.py --baseline --only pool --unit '^fn_80047398' --intervals"
+    }
+   ],
+   "open_questions": [
+    "the cut lies in [0x80048764, 0x80048964] (10 function starts): placed at the first reader of the second pool group, the position inside the interval is not decided by any signal",
+    "a third cut is forced in (0x80048E2C, 0x80050BC0] (0.0 at lbl_80795BA8 and again at lbl_80795BDC, 1.0 at lbl_80795BAC / lbl_80795BE0, 0x4330000080000000 at lbl_80795BB8 / lbl_80795C10): the registered edges 0x8004C9A0 and 0x8004CAD8 both lie in it and are kept"
+   ]
+  },
+  {
+   "derived_name": "draw_shape",
+   "module": "main",
+   "replaces_tail_of": "fn_8004CAD8.cpp",
+   "absorbs": [
+    "draw_shape.cpp"
+   ],
+   "ranges": {
+    ".text": [
+     [
+      "0x8005270C",
+      "0x80055EC4"
+     ]
+    ]
+   },
+   "cuts": [
+    {
+     "addr": "0x8005270C",
+     "section": ".text",
+     "grade": "medium",
+     "kind": "pooldup-interval",
+     "evidence": [
+      {
+       "tool": "splitcheck",
+       "command": "python tools/splits/splitcheck.py --baseline --only pool --unit '^fn_8004CAD8' --intervals",
+       "finding": "pooldup 0x00000000 lbl_80795BDC (last read 0x80052564) / lbl_80795BF8 (first read 0x80052720, fn_8005270C) and 0x3f800000 lbl_80795BE0 (last read 0x80052590) / lbl_80795C04: a TU starts in [0x800525E4, 0x8005270C] (6 function starts)"
+      },
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x80795BF8",
+       "finding": "lbl_80795BF8 is first read at 0x80052720 in fn_8005270C, then in drawshape_set_scale (0x80053DE4): the third pool group starts with that function"
+      }
+     ],
+     "reproduce": "python tools/splits/splitcheck.py --baseline --only pool --unit '^fn_8004CAD8' --intervals"
+    }
+   ],
+   "removes_cuts": [
+    {
+     "addr": "0x80054C64",
+     "section": ".text",
+     "grade": "medium",
+     "kind": "registered-edge",
+     "evidence": [
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x80795BF8",
+       "finding": "lbl_80795BF8 (first read 0x80052720) is read up to 0x800542EC, left of the registered edge 0x80054C64, and the draw_shape head reads no literal of its own: the edge is interior to one TU"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x80795BF8"
+    }
+   ],
+   "open_questions": [
+    "the cut lies in [0x800525E4, 0x8005270C] (6 function starts): placed at the first reader of the third pool group, the position inside the interval is not decided by any signal",
+    "owns the registered draw_shape's .data/.sdata (the resource block 0x80582EF8..0x8058AC50) and the 'ResPltt'/'ResTex' strings read at 0x80052E28/0x8005297C"
+   ]
+  },
+  {
    "derived_name": "draw_shape_arm",
    "module": "main",
    "replaces_tail_of": "draw_shape.cpp",

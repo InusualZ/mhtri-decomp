@@ -190,7 +190,8 @@ about 8 s, then 1.2 s.)
   unit, an unusable action, a missing evidence or two overlapping rows is refused before anything runs. The overrides are inputs of the solver (an attach is a
   decision for the data after it) and still pass the settle loop: one that makes an invariant fail is **blocked** (an `unowned_data` row with the note
   `orchestrator override N blocked`, a `guess` row, and `overrides` in `--stats` says `blocked` with the failing check). The output with the same overrides is
-  byte-identical.
+  byte-identical. A `takes_from` row is one direct record (it holds owned bytes, so the solver sees no symbol in it): its outcome is `applied`, and it removes the
+  `sinit_owner_questions` row for the group it decides.
 * **Output** is deterministic (the same bytes under any `PYTHONHASHSEED`); rows are written for the units whose `.text` starts in `--window`.
 * **Hold-out** (`--holdout`): every third owned data range of a section is hidden per batch (180 ranges in three batches), decided again as an unowned run
   between its neighbours and compared with the registered owner. Over the whole DOL: 3,127 symbols, **3,040 decided, 3,013 right, 27 wrong, 64 undecided**
@@ -283,6 +284,9 @@ groups recomputed from the decode, cf. `docs/pool-seams.md`).
   load through a base formed with `lis` is not one. The finding names the first foreign reader by name. Baseline: 63 PASS / 1 FAIL -> 64 PASS / 0 FAIL; the
   reconciled candidate 1 -> 0 (`jumptable_8059FE90`'s four reader units were stale `lis` values the decoder kept live, the single true reader is the `addi` at 0x801139C4 of `fn_8011392C` in `ef/eft019`; `jumptable_805C390C`'s false readers were `lhz` field loads).
 
+* `python tools/splits/matchinggain.py` lists the `Object(Matching, ...)` units of `configure.py` whose data sections the candidate changes (the gain, per section, registered -> candidate)
+  and the Matching units the candidate no longer has under their name (with the unit that swallowed them): the phase 4 list of data to define or units to demote.
+
 ## How a reviewer re-derives a cut
 
 1. Run the cut's `reproduce` command; its output must show the `finding` text.
@@ -316,7 +320,7 @@ Phase 3 checker fixes (2026-10-01), baseline on the same tree before -> after: i
 * Unowned (no unit range): `.text` 5,407 functions in 26 runs, `.data` 8,562 symbols in 62 runs, `.sdata2` 6,802 in 9 -
   the backlog the program covers; `coverage` is PASS because every *claimed* edge is clean.
 
-## Phase 2 result (2026-10-01, regenerated after the phase 3 fixes: phase 1 + `phase2-reconcile.json` + `phase2-folds.json`, 354 units)
+## Phase 2 result (2026-10-01, regenerated after the phase 3 fixes: phase 1 + `phase2-reconcile.json` + `phase2-folds.json`, 354 units; lane B's numbers: `docs/splits/proposals/phase3-notes.md` - pool 75, `.data` 1,020 unowned)
 
 | invariant | FAIL phase 1 candidate (360 units) | FAIL + phase 2, before the fixes (355 units) | FAIL + regenerated phase 2 (354 units) |
 | --- | ---: | ---: | ---: |
