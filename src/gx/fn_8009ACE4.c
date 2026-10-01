@@ -1,5 +1,8 @@
 /* gx/fn_8009ACE4.c - the 2 functions at .text 0x8009ACE4..0x8009B140.
  *
+ * Phase 4: the reconciled candidate gives this unit a further `.sdata2` 0x10 (the pool the two bodies read) that the source neither
+ * defines nor claims, so the row is demoted from `Matching` to `NonMatching` until the data is emitted (flipcheck refuses a differing section).
+ *
  * Registration (brief section 2).  Module, evidence class 3 (what the code does plus the naming scheme
  * of its neighbours): the range is the immediate continuation of `gx/fn_8009AA78.c`, reads the same
  * `.sdata2` prompt constants and emits through the same write-gather-pipe writers (`fn_8009AC98`/

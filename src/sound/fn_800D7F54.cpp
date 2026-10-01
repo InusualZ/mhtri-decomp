@@ -1,4 +1,11 @@
-/* auto/800D7F54_fn_800D7F54.cpp - the SE (`se_w`) request cluster, .text 0x800D7F54..0x800DCFEC.
+/* sound/fn_800D7F54.cpp - the SE (`se_w`) request cluster, .text 0x800D7F54..0x800DD40C.
+ *
+ * Phase 4 fold: the old `sound/fn_800D7F54.cpp` (0x800D7F54..0x800DCFEC), `sound/fn_800DCFEC.cpp` (the map-dependent SE request, one function)
+ * and the head of the old `sound/fn_800DD1F0.cpp` (0x800DD1F0..0x800DD40C: `fn_800DD38C`, `st_ice_se_req`, `st_ice_break_se_req`,
+ * `fn_800DD3B8`) are one TU in the reconciled candidate.  The folded functions sit at the end of the file under
+ * `#pragma optimization_level reset`: the old units that held them were measured with the project's default level and `peephole off`
+ * only (the `optimization_level 4` pragma below is the old `fn_800D7F54.cpp`'s, which the cflags of the three absorbed rows share).
+ *
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * 141 functions. This is the game's sound-effect request layer: a request names a sound id plus a world
@@ -47,7 +54,8 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-
+#include "draw_shape/fn_800532DC.h" /* fn_800532DC, owned by draw_shape.cpp's range (rule 2) */
+#include "sound/se_req.h" /* fn_800DFDCC / fn_800E0428, owned by se_req.cpp's range (rule 2) */
 /* One of the 32 sound-slot records the SE work object carries at +0x3C. `fn_800D8E58` walks them
  * looking for a clear `in_use` byte and `fn_800DA72C` fills one in; the offsets below are read off that
  * pair and off `se_req_pos_ps`. Fields whose meaning is not established yet keep their offset as a name.
@@ -131,7 +139,6 @@ struct SeWork {
     /* +0x113 */ u8 pad_0x113[0x25];
     /* +0x138 */ _se_w* se[64];
 };
-
 extern "C" SeSlot* fn_800DA72C(s32 kind, s32 id, nw4r::math::VEC3* pos);
 extern "C" SeSlot* fn_800DBE94(s32 kind, s32 id, nw4r::math::VEC3* pos);
 extern "C" SeSlot* fn_800DBFAC(s32 kind, s32 id, nw4r::math::VEC3* pos);
@@ -1978,7 +1985,7 @@ extern "C" _se_w* lbl_80794978;
 extern "C" LbNpcFunc lb_npc_func;
 
 extern "C" u8 fn_800CF208(void);
-/* Owned by `ef/fn_800CDB2C.cpp` (rule 2).  The declaration stays here, in the block form, because this
+/* Owned by `ef/system_core.cpp` (rule 2).  The declaration stays here, in the block form, because this
  * unit's view is `s32` where the owner's is `u32` and the return type is load-bearing (the two call
  * sites here narrow it with `(s8)`/`(u8)` before indexing the move-work record). */
 extern "C" {
@@ -1986,7 +1993,6 @@ s32 my_player_no(void);
 }
 extern "C" void my_player_no_set(s32 value);
 extern "C" u8 fn_802EED0C(SeMoveWork* work);
-extern "C" void fn_800532DC(Mtx34* dst, Mtx34* src);
 extern "C" void fn_800E8498(Mtx34* mtx, s32 index);
 /* The target object references this callee by its C++ mangling
  * (em_act_ck__FP11_ENEMY_WORKUcUc), so it is C++ - the extern "C" here was the
@@ -1999,7 +2005,6 @@ extern "C" void fn_800D85B0(_se_w* work, s32 mode);
 extern "C" void fn_800D92E4(_se_w* work, SeSlot* slot);
 extern "C" void fn_800D8404(SeSlot* slot);
 extern "C" s32 fn_8028F204(void);
-extern "C" void fn_800DFDCC(SePool* self, s32 arg);
 extern "C" u8* fn_800D8DDC(u8* base);
 extern "C" s32 fn_800F1398(_ENEMY_WORK* enemy, s32 index);
 extern "C" s32 em_area_ck__FP11_ENEMY_WORK(_ENEMY_WORK* enemy);
@@ -2591,7 +2596,6 @@ extern "C" u32 stage_water_area_ck(void);
 extern "C" u8 fn_800CF208(void);
 extern "C" u32 fn_800F26B8(s32 handle, u32 id, s32 which);
 extern "C" u32 fn_802BE088(void);
-extern "C" u32 fn_800E0428(_se_w* work, nw4r::math::VEC3* pos);
 extern "C" void fn_800F2714(s32 handle, u32 id, s32 which, u32 value);
 extern "C" u8 fn_800F2680(s32 id, s32 kind);
 extern "C" void fn_800F2540(s32 handle, u32 id, u16* out);
@@ -3463,4 +3467,148 @@ extern "C" void fn_800D8AB0(SeSlot* slot) {
     default:
         break;
     }
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * 0x800DCFEC - the map-dependent SE request (folded in from the old `sound/fn_800DCFEC.cpp` in phase 4).
+ * That unit was measured with the project's default optimisation level and `peephole off`; this file's
+ * `optimization_level 4` pragma is reset around it so the codegen stays the measured one.
+ * ------------------------------------------------------------------------------------------------ */
+#pragma optimization_level reset
+
+/* The 3-float engine vector: the shared `nw4r::math::VEC3` layout, reached through the header that
+ * owns it (rule 1).  It was a second local definition until the type-fix pass. */
+typedef nw4r::math::VEC3 VEC3; /* size: 0xC */
+
+/* The two getters are C++-mangled in the target (`get_now_mapno__Fv`/`get_now_areano__Fv`); they are
+ * still unsplit, so the declarations live here as ordinary C++ functions.  The `fn_*` callees are
+ * plain (C linkage) in the target, so their declarations are wrapped in `extern "C"`. */
+u8 get_now_mapno(void);
+u8 get_now_areano(void);
+extern "C" {
+u32 stage_map_kind_get(u8 mapno);
+}
+
+/* This unit's private .sdata2 position pool (0x80796410..0x8079641C), referenced but not defined here. */
+extern const f32 lbl_80796410;
+extern const f32 lbl_80796414;
+extern const f32 lbl_80796418;
+
+/* Requests SE work 46 at the caller's position, with the SE code the current map region and area number
+ * select. */
+extern "C" void fn_800DCFEC(u32 arg0, VEC3* pos)
+{
+    u32 m = stage_map_kind_get((u8)get_now_mapno());
+    u8 areano = get_now_areano();
+    u32 se_code;
+
+    switch ((s32)(u8)m) {
+    case 1:
+        se_code = (u8)arg0 % 3;
+        break;
+    case 2:
+        if (areano == 6) {
+            se_code = (u8)arg0 % 2 + 3;
+        } else {
+            se_code = 10;
+        }
+        break;
+    case 3:
+        switch (areano) {
+        case 5:
+            se_code = 4;
+            break;
+        case 9:
+            se_code = 5;
+            break;
+        case 6:
+        case 10:
+            se_code = (u8)arg0 + 3;
+            break;
+        default:
+            return;
+        }
+        break;
+    case 4:
+        if (areano != 1) {
+            return;
+        }
+        se_code = 3;
+        break;
+    case 5:
+        switch (areano) {
+        case 2:
+        case 4:
+            se_code = (u8)arg0 + 3;
+            break;
+        default:
+            return;
+        }
+        break;
+    case 7:
+        switch (areano) {
+        case 0:
+            se_code = (u8)arg0 + 3;
+            break;
+        case 1:
+            se_code = 5;
+            break;
+        case 2:
+            if ((u8)arg0 == 0) {
+                VEC3 fixed_pos;
+
+                setVec3(&fixed_pos, lbl_80796410, lbl_80796414, lbl_80796418);
+                fn_800DA72C(46, 8, &fixed_pos);
+                return;
+            }
+            se_code = (u8)arg0 + 5;
+            break;
+        default:
+            return;
+        }
+        break;
+    case 8:
+        if (areano != 1) {
+            return;
+        }
+        se_code = 3;
+        break;
+    case 9:
+        if (areano != 0) {
+            return;
+        }
+        se_code = 3;
+        break;
+    case 10:
+        if (areano != 1) {
+            return;
+        }
+        se_code = (u8)arg0 + 3;
+    }
+    fn_800DA72C(46, se_code, pos);
+}
+
+/* Non-positional SE: bank 46, id 15. */
+extern "C" s32 fn_800DD38C(void)
+{
+    return fn_800DBB78(46, 15);
+}
+
+SeSlot* st_ice_se_req(nw4r::math::VEC3* pos)
+{
+    return fn_800DA72C(46, 18, pos);
+}
+
+SeSlot* st_ice_break_se_req(nw4r::math::VEC3* pos)
+{
+    return fn_800DA72C(46, 19, pos);
+}
+
+/* Positional SE: bank 46, id `30 + (arg & 3)`, at the caller's position broadcast over all three axes. */
+extern "C" SeSlot* fn_800DD3B8(u32 arg)
+{
+    nw4r::math::VEC3 v;
+    f32 c = lbl_807963E0;
+    setVec3(&v, c, c, c);
+    return fn_800DA72C(46, ((u8)arg & 3) + 30, &v);
 }

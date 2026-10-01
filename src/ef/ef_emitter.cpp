@@ -1,6 +1,7 @@
 /*
  * ef/ef_emitter.cpp - the nw4r::ef emitter / particle-manager object layer, `.text`
- * 0x800A6350..0x800A99B4.
+ * 0x800A6258..0x800A99B4 (phase 4: the emitter-side resource object's constructor, its sub-object constructor and its deleting
+ * destructor, 0x800A6258..0x800A6350, came over from the old `ef_effectsystem.cpp`, which ends at 0x800A6258).
  *
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup <addr>` for every one of the proposal's 49 symbols - each
@@ -71,6 +72,8 @@
 #include "ef/ef_particlemanager.h" /* fn_800AB9F4 / fn_800AE360 are that unit's (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "ef/ef_util.h" /* fn_8009CD64, owned by ef_util.cpp's range (rule 2) */
+#include "draw_shape/fn_800532DC.h" /* fn_800532DC, owned by draw_shape.cpp's range (rule 2) */
 
 namespace nw4r {
 namespace db {
@@ -146,7 +149,6 @@ void fn_800A3800(void* p);
 void fn_800A5114(void* manager, s32 flag);
 void fn_800A5900(void* random, u32 seed);
 void* fn_800A5484(void* p);
-void fn_800A6258(void* self);
 void* fn_800A60C0(void* manager);
 void fn_800A52E4(void* manager, void* cb, void* arg, s32 flag, void* self);
 void fn_800AEE0C(void* dst, const void* src);
@@ -160,7 +162,6 @@ void fn_8009B650(void* vec, void* mtx);
 void fn_8009BCB4(void* mtx, void* vec);
 void fn_8009CC20(void* out, void* mtx, void* in);
 void fn_8009CCAC(void* out, void* mtx, void* in);
-f32 fn_8009CD64(void* vec, s32 index);
 f32 sqrt_f32(f32 x);
 void subVec3(void* dst, void* a, void* b);
 void* fn_800508AC(void* vec);
@@ -177,7 +178,6 @@ void fn_8009CBA0(void* dst, void* mtx, void* vec);
 void fn_80501390(void* dst, void* mtx, void* vec);
 f32 fn_80463E2C(f32 x);
 s32 fn_8009C484(void* a, void* b);
-void fn_800532DC(void* dst, void* mtx);
 }
 
 /* -------------------------------------------------------------------------------------------------
@@ -417,6 +417,45 @@ static inline EfEmitterWork* EfGetWork(void* p) {
 #define NW4R_EF_MAX_PARTICLEMANAGER 0x400
 #define NW4R_EF_MAX_EMITTER 0x200
 
+/* The global `operator delete` (its compiler mangling is `__dl__FPv`; declaring that spelling would be
+ * rule 9's violation - the sibling ef units spell it the same way). */
+void operator delete(void* ptr) throw();
+
+/* The +0x20 sub-object of the emitter-side object `fn_800A62C0` initialises: four transform vectors,
+ * cleared in this order.  The offsets are relative to the sub-object. size: 0x94 */
+typedef struct EfSysResourceSub {
+    /* +0x00 */ u8 pad_0x00[0x64];
+    /* +0x64 */ nw4r::math::VEC3 vec_0x84;
+    /* +0x70 */ nw4r::math::VEC3 vec_0x90;
+    /* +0x7C */ nw4r::math::VEC3 vec_0x9C;
+    /* +0x88 */ nw4r::math::VEC3 vec_0xA8;
+} EfSysResourceSub; /* size: 0x94 */
+
+/* The emitter-side object `fn_800A6258` builds: the constructor's view of `EfEmitterObj` (the same object; the table sits at +0x1C
+ * here).  Moved with the constructor from the old `ef_effectsystem.cpp` in phase 4. size: 0x154 (lower bound: +0x124 is the highest
+ * field the constructor touches) */
+typedef struct EfSysResourceObj {
+    /* +0x000 */ u8 pad_0x000[0x01C];
+    /* +0x01C */ void* vtable; /* the root base's table fn_800A4080 sets, then this class's */
+    /* +0x020 */ EfSysResourceSub sub_0x020;
+    /* +0x0B4 */ u8 pad_0x0B4[0x00C];
+    /* +0x0C0 */ u8 particles[0x1C]; /* the activity-list record `fn_800A3FFC` initialises (EfEmitterObj's `particles`) */
+    /* +0x0DC */ u8 pad_0x0DC[0x02C];
+    /* +0x108 */ nw4r::math::VEC3 vec_0x108;
+    /* +0x114 */ nw4r::math::VEC3 vec_0x114;
+    /* +0x120 */ u8 pad_0x120[0x004];
+    /* +0x124 */ nw4r::math::MTX34 mtx_0x124;
+} EfSysResourceObj; /* size: 0x154 */
+
+extern void* lbl_80592BA8[]; /* the emitter-side object's table (this unit's eight virtuals) */
+
+extern "C" {
+EfSysResourceObj* fn_800A6258(EfSysResourceObj* self);
+EfSysResourceSub* fn_800A62C0(EfSysResourceSub* self);
+void* fn_800A630C(void* self, s16 flag);
+void* fn_800A3FFC(void* list, u32 linkOffset);
+void fn_800A4080(void* self);
+}
 /* This unit's own symbols, in address order (the file defines them in that order). */
 extern "C" {
 u32 fn_800A6350(EfEmitterObj* self);
@@ -507,6 +546,39 @@ s32 fn_800A98D4(EfEmitterObj* self, void* cb, void* arg, s32 flag, s32 recurse);
 /* -------------------------------------------------------------------------------------------------
  * 0x800A6350 - retire every particle of every manager on this object's list.
  * ------------------------------------------------------------------------------------------------- */
+
+#pragma peephole off
+
+/* 0x800A6258 - the emitter-side resource object's constructor (this unit owns its layout). */
+extern "C" EfSysResourceObj* fn_800A6258(EfSysResourceObj* self) {
+    fn_800A4080(self);
+    self->vtable = lbl_80592BA8;
+    fn_800A62C0(&self->sub_0x020);
+    fn_800A3FFC(&self->particles, 0x14);
+    VEC3_ctor(&self->vec_0x108);
+    VEC3_ctor(&self->vec_0x114);
+    MTX34_ctor(&self->mtx_0x124);
+    return self;
+}
+
+/* 0x800A62C0 - the resource object's +0x20 sub-object: clear its four transform vectors. */
+extern "C" EfSysResourceSub* fn_800A62C0(EfSysResourceSub* self) {
+    VEC3_ctor(&self->vec_0x84);
+    VEC3_ctor(&self->vec_0x90);
+    VEC3_ctor(&self->vec_0x9C);
+    VEC3_ctor(&self->vec_0xA8);
+    return self;
+}
+
+/* 0x800A630C - the resource object's deleting destructor. */
+extern "C" void* fn_800A630C(void* self, s16 flag) {
+    if (self != NULL && flag > 0) {
+        operator delete(self);
+    }
+    return self;
+}
+
+#pragma peephole on
 
 extern "C" u32 fn_800A6350(EfEmitterObj* self) {
     u32 total = 0;
@@ -873,7 +945,7 @@ extern "C" s32 fn_800A7750(EfEmitterObj* self, void* eh, const EfEmitterParam* p
         EfVec v;
         nw4r::math::MTX34 m1, m2;
 
-        fn_800A6258(&e);
+        fn_800A6258((EfSysResourceObj*)&e);
         fn_800A4864(eh);
         fn_800A6A04(&e, eh, self->managerEF);
         e.field_0x0E8 += (u16)life_bonus;
@@ -1443,13 +1515,13 @@ extern "C" void fn_800A8F18(EfEmitterObj* self) {
         MTX34_ctor(&m2);
         fn_800710BC(&m2, &self->managerEF->effect->ref_mtx, &m1);
         fn_800A89A0(&m3, &m2);
-        m3.m[0][0] = fn_8009CD64(&m3, 0);
+        m3.m[0][0] = fn_8009CD64((const f32*)&m3, 0);
         m3.m[2][0] = lbl_80796004;
         m3.m[1][0] = lbl_80796004;
-        m3.m[1][1] = fn_8009CD64(&m3, 1);
+        m3.m[1][1] = fn_8009CD64((const f32*)&m3, 1);
         m3.m[2][1] = lbl_80796004;
         m3.m[0][1] = lbl_80796004;
-        m3.m[2][2] = fn_8009CD64(&m3, 2);
+        m3.m[2][2] = fn_8009CD64((const f32*)&m3, 2);
         m3.m[1][2] = lbl_80796004;
         m3.m[0][2] = lbl_80796004;
         if ((self->flags2 & 0x10000) != 0) {
@@ -1479,7 +1551,7 @@ extern "C" void* fn_800A90AC(void* dst, void* orig, u32 a, u32 b, s8 c, u32 d) {
         nw4r::db::Panic(lbl_80592850, 0x466, lbl_80592B14);
     }
     if (a != 0 && b != 0 && c == 100) {
-        fn_800532DC(dst, orig);
+        fn_800532DC((Mtx34*)dst, (Mtx34*)orig);
         return dst;
     }
     if (a == 0 && b == 0 && c == 0) {
@@ -1548,7 +1620,7 @@ extern "C" void* fn_800A94A4(EfEmitterObj* self, void* out) {
         self->transform_dirty = 0;
     }
     if (out != NULL) {
-        fn_800532DC(out, &self->matrix);
+        fn_800532DC((Mtx34*)out, &self->matrix);
         return out;
     }
     return &self->matrix;

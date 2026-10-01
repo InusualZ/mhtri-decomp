@@ -1,6 +1,9 @@
 /* g3d_gpu.cpp - the 2 functions at `.text` 0x8009B140..0x8009B374 (564 B) of the discovery proposal
  * `8009B140_fn_8009B140`.
  *
+ * Phase 4: the reconciled candidate gives this unit `.data` 0x48 (the assert strings) and `.sdata2` 0x4 that the source neither defines nor
+ * claims, so the row is demoted from `Matching` to `NonMatching` until the data is emitted (flipcheck refuses a differing section).
+ *
  * Naming - which evidence class decided it.  Class 1 decides: the range's own `.data` pool holds the
  * bare source-file name `g3d_gpu.cpp` (lbl_80591900 at 0x80591900), the `pFile` argument of the
  * `nw4r::db::Panic` assert fn_8009B140 reaches; the `.cpp` suffix and the

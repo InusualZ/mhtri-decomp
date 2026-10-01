@@ -5,8 +5,8 @@
  * (`drawshape_exec__Fv`, `set_mydata2vs__FUcUc`, `write_wpad_memory__FUcUc`, `rotMatrixX__FUlP...`,
  * `atan2ang__Fff`, ...) are spelled by their real declarations, never as callable identifiers (rule 9).
  *
- * The game-root draw/gallery band.  `.text` 0x8004CAD8..0x80054C64 (0x81A8 B, 277 functions),
- * `extab` 0x80006CF8..0x80007170, `extabindex` 0x8001ECE4..0x8001F398 (143 framed functions).
+ * The game-root draw/gallery band.  `.text` 0x8004CAD8..0x8005270C (phase 4 cut: the old range ran to 0x80054C64, 277 functions).
+ * The `draw_shape` 2D pipeline's `drawshape_*` half from 0x8005270C on is `draw_shape.cpp`'s now.
  * One maximal unclaimed run (attribute.py `proposal/8004CAD8_fn_8004CAD8.cpp`): its seam is unproven
  * (`capped at --max-bytes, seam is a guess`) and the body work is plainly several families - the
  * work-block accessors and quest/VS result buffers (0x8004CAD8..0x8004D4xx), the gallery / Wii-message /
@@ -35,7 +35,7 @@
  * `get_vsUser_work` over the two 0x100 B VS slots, `score_add_clamped`'s 0..9999999 counter clamp) and two of
  * the nw4r math helpers the rest of the range is built on (`setVector3`, `copyMat33`).
  *
- * Status: partial (phase B first pass).  9 of the 277 symbols have bodies, measured against the retired
+ * Status: partial (phase B first pass).  9 of the unit's 201 symbols have bodies, measured against the retired
  * per-range targets (the auto_*_text.o objects under build/RMHE08/obj/): 8 at 100 % (`score_add_clamped`,
  * `fn_8004D134`, `get_qResult_work`, `clear_FqResult_work`, `clear_qResult_work`, `fn_8004D1A4`,
  * `setVector3`, `copyMat33`) and `get_vsUser_work` at 81.67 %.  The remaining ~268 symbols are unwritten
