@@ -12,6 +12,10 @@ proposal file (`.pi/splits/phase<N>-<band>.json`, format in `docs/splits-program
 (strong + medium cuts applied, `guess` cuts merged, never emitted), lints the proposal, checks the candidate and
 prints the delta against the baseline.  Nothing is written except `--json` / `--emit-splits`.
 
+A phase 2 proposal (`docs/splits-program.md`, "Phase 2 files") may have no `units` and carries `attach` rows (data ranges given to a unit of the candidate; the
+legacy names `data_attach` and `attachments` load as aliases with a warning), `unowned_data` rows (the deferrals), `moves`, and units without `.text` placed by
+`after`.  `--readers SECTION:START-END` prints each map symbol of a data range with its owner in the candidate and the units whose decoded text reads it.
+
 `--baseline --unit REGEX` also prints, for the matching units, one `detail` line per `.ctors`/`.dtors` word (the function, its end, the
 closure end, the end with the unit's own vtable slots, the unit end) and, with `--intervals`, one `pooldup` line per pool value held
 at two addresses (both addresses, the last read of the first, the first read of the second, the interval a TU starts in): the numbers
@@ -949,11 +953,18 @@ def check_pool(ctx, res):
                         seen[key] = sym["addr"]
                 if own:
                     first = min(own)
-                    own_first.append((sym["addr"], first, sym["name"], _first_use_fn(ctx, first)))
+                    own_first.append((sym["addr"], first, sym["name"], _first_use_fn(ctx, first), sym["section"]))
             own_first.sort()
             # order is judged per FUNCTION: the scheduler reorders two loads of one function, so literals first used
-            # in the same function carry no order; a literal first used in an EARLIER function than the one before it does
-            bad = next(((a, f, n, pf) for (_pa, pf, _pn, pfn), (a, f, n, fn) in zip(own_first, own_first[1:]) if fn < pfn), None)
+            # in the same function carry no order; a literal first used in an EARLIER function than the one before it does.
+            # Per SECTION: the `.sdata` strings and the `.sdata2` literals are two pools (the strings sit at lower addresses, so one
+            # address-sorted list would call every late string followed by an early float an inversion); the lowest-addressed inversion is reported
+            bad = None
+            for psec in sorted({t[4] for t in own_first}):
+                run = [t for t in own_first if t[4] == psec]
+                hit = next(((a, f, n, pf) for (_pa, pf, _pn, pfn, _ps), (a, f, n, fn, _qs) in zip(run, run[1:]) if fn < pfn), None)
+                if hit is not None and (bad is None or hit[0] < bad[0]):
+                    bad = hit
             if bad:
                 res.add(u.name, "pool", FAIL, bad[0], "claimed pool: first use of %s (%s) is in an earlier function than the literal before it (%s): not text order"
                         % (bad[2], hx(bad[1]), hx(bad[3])))
@@ -999,6 +1010,24 @@ def _vtable_stored_in(ctx, vt, fns):
     return any((ctx.fn_at(x) or {}).get("addr") in fns for x in ctx.refs.get(i, []))
 
 
+def zigzag_interleaved(ctx, syms, by_addr, seam):
+    """Whether the two vtables of a zigzag pair have member functions that alternate in the text (each class's own slots - the ones the
+    other table does not share - span past the other's).  A TU is one contiguous text range, so no cut separates two classes whose
+    members interleave: the pair is one TU, and the `owner goes up` reading of the first slots is not an edge."""
+    a = by_addr.get(_vtable_before(syms, seam))
+    b = by_addr.get(seam["addr"])
+    if a is None or b is None:
+        return False
+    fs = set(ctx._fn_starts)
+
+    def slots(y):
+        return {w for w in (ctx.dol.word(y.addr + o) for o in range(8, y.size - 3, 4)) if w in fs}
+
+    sa, sb = slots(a), slots(b)
+    own_a, own_b = sa - sb, sb - sa
+    return bool(own_a and own_b and min(own_a) < max(own_b) and min(own_b) < max(own_a))
+
+
 def check_data_order(ctx, res, rows):
     import dataorder as do
     reader = ctx.dol
@@ -1009,13 +1038,18 @@ def check_data_order(ctx, res, rows):
     ctx.seams_instantiated = []
     for u in ctx.units:
         for s, e, _a in u.ranges.get(".data", []):
-            inside = [x for x in found if x["kind"] in do.STRONG_KINDS and s < x["addr"] < e]
-            if inside and any(x["kind"] == "V->S" for x in inside):
+            # a V->S row says a boundary lies in [addr, latest): a unit that ends inside that gap (latest >= e) can have it at its own end,
+            # so only a unit that also holds the later vtable group crosses the seam; a zigzag cuts at addr
+            inside = [x for x in found if x["kind"] in do.STRONG_KINDS and s < x["addr"] < e and (x["kind"] != "V->S" or x["latest"] < e)]
+            # two classes whose member functions alternate in the text are one TU: a zigzag between them is not an edge
+            inside = [x for x in inside if not (x["kind"] == "zigzag" and zigzag_interleaved(ctx, syms, by_addr, x))]
+            if inside:
                 closure = unit_sinit_closure(ctx, u)
                 kept = []
                 for x in inside:
-                    if x["kind"] == "V->S" and closure and any(_vtable_stored_in(ctx, by_addr.get(a_), closure)
-                                                               for a_ in (x.get("latest"), _vtable_before(syms, x))):
+                    # an instantiated vtable (a deferred constructor of this TU stores it) is not a TU edge: the later vtable of a V->S seam,
+                    # the second of a zigzag pair, or the vtable before either
+                    if closure and any(_vtable_stored_in(ctx, by_addr.get(a_), closure) for a_ in (x.get("latest") or x["addr"], _vtable_before(syms, x))):
                         ctx.seams_instantiated.append({"unit": u.name, "addr": x["addr"], "vtable": x["before"]})
                     else:
                         kept.append(x)
@@ -1069,7 +1103,7 @@ def check_jumptable(ctx, res):
         tu = {ctx.text_owner(t) for t in targets if ctx.fn_at(t)}
         rsites = ctx.readers(s)
         ru = {ctx.text_owner(x) for x in rsites if ctx.text_owner(x)}
-        bad = [x for x in ru if x is not u]
+        bad = sorted((x for x in ru if x is not u), key=lambda x: x.name)           # a set of units: name order, so the finding is the same on every run
         if bad:
             res.add(u.name, "jumptable", FAIL, s["addr"], "%s is read by %s, not by this unit" % (s["name"], bad[0].name))
         elif tu and tu != {u}:
@@ -1347,16 +1381,51 @@ def to_int(v):
 
 def load_proposal(path):
     with open(path, encoding="utf-8") as fh:
-        return json.load(fh)
+        p = json.load(fh)
+    if isinstance(p, dict):
+        p["_file"] = os.path.basename(path)          # only for messages: a `_`-prefixed key is not a field
+    return p
 
 
 #: the proposal file's fields: name -> accepted types.  An unknown key is a lint WARNING, a wrong type an ERROR.
 TOP_FIELDS = {"phase": (int, str), "band": (str,), "text_range": (list,), "range": (list,), "units": (list,), "open_questions": (list,),
-              "supersedes": (list,)}
+              "supersedes": (list,), "attach": (list,), "unowned_data": (list,), "moves": (list,), "lane": (str,), "window": (list,)}
+#: phase 2: the canonical name of a list is `attach`; the names the first six lanes used are accepted on load (a lint warning names the file)
+ATTACH_ALIASES = {"data_attach": "attach", "attachments": "attach"}
 UNIT_FIELDS = {"derived_name": (str,), "module": (str,), "ranges": (dict,), "cuts": (list,), "open_questions": (list,),
-               "removes_cuts": (list,), "absorbs": (list,), "replaces_tail_of": (str, list)}
+               "removes_cuts": (list,), "absorbs": (list,), "replaces_tail_of": (str, list), "after": (str,)}
 CUT_FIELDS = {"addr": (int, str), "section": (str,), "grade": (str,), "evidence": (list,), "reproduce": (str,), "kind": (str,),
               "keep_registered_edge": (bool,)}
+#: phase 2 `attach` row: ONE data range (or a few, of one section) given to a unit of the candidate.  The unit is named (`unit`: a
+#: candidate unit name, a proposal unit's `derived_name`, or a name a guess merge / `absorbs` folded away) or addressed by the `.text`
+#: address it holds (`text_addr`: survives renames, which a merged unit does).  The range is `section` + `range` [start, end] or
+#: `ranges` ([[start, end], ...] with `section`, or `{section: [[start, end], ...]}`) or `section` + `start` + `end`.
+ATTACH_FIELDS = {"unit": (str,), "text_addr": (int, str), "section": (str,), "range": (list,), "ranges": (list, dict), "start": (int, str),
+                 "end": (int, str), "grade": (str,), "evidence": (list,), "reproduce": (str,), "kind": (str,), "signal": (str, int),
+                 "signals": (list, dict), "symbols": (int,), "bytes": (int,), "note": (str,), "takes_from": (str,), "provisional": (bool,),
+                 "edges": (dict,)}
+#: phase 2 `unowned_data` row: a run nobody could be given (a deferral): the candidate owners and why, never applied
+UNOWNED_FIELDS = {"section": (str,), "range": (list,), "start": (int, str), "end": (int, str), "symbols": (int,), "bytes": (int,),
+                  "candidates": (list,), "kind": (str,), "reason": (str,), "why": (dict, str), "class": (str,), "candidate_count": (int,),
+                  "evidence": (list, str), "reproduce": (str,), "note": (str,), "signals": (dict,), "clusters": (list,), "readers": (dict, list),
+                  "provisional": (bool,), "bounds": (dict,), "evidence_units": (list,), "cut_interval": (list,)}
+MOVE_FIELDS = {"unit": (str,), "after": (str,), "reason": (str,), "evidence": (list, str), "reproduce": (str,)}
+
+
+def canonical_proposal(p):
+    """The proposal with its phase 2 list under the canonical `attach` (a legacy name is moved, not copied); `p` itself is left alone.
+    Returns `(proposal, errors, warnings)`: both names in one file is an error, a legacy name a warning that names the file."""
+    errs, warns = [], []
+    if not isinstance(p, dict):
+        return p, errs, warns
+    for old, new in ATTACH_ALIASES.items():
+        if old in p:
+            if new in p:
+                errs.append("proposal %s: has both `%s` and `%s`" % (p.get("_file", "?"), old, new))
+                continue
+            p = {(new if k == old else k): v for k, v in p.items()}
+            warns.append("proposal %s: field `%s` is the legacy name of `%s`" % (p.get("_file", "?"), old, new))
+    return p, errs, warns
 
 
 def norm_units(proposal):
@@ -1370,7 +1439,7 @@ def norm_units(proposal):
         out.append({"name": "%s/%s.cpp" % (pu["module"], pu["derived_name"]), "derived_name": pu["derived_name"],
                     "module": pu["module"], "ranges": rng, "cuts": cuts, "open_questions": pu.get("open_questions", []),
                     "removes_cuts": pu.get("removes_cuts", []), "absorbs": pu.get("absorbs", []),
-                    "replaces_tail_of": pu.get("replaces_tail_of"), "merged": []})
+                    "replaces_tail_of": pu.get("replaces_tail_of"), "after": pu.get("after"), "merged": []})
     out.sort(key=lambda u: (u["ranges"].get(".text") or [(min(a for rr in u["ranges"].values() for a, _b in rr), 0)])[0][0]
              if u["ranges"] else 0)
     return out
@@ -1379,6 +1448,8 @@ def norm_units(proposal):
 def _check_fields(obj, spec, who, errors, warnings):
     """Unknown key -> warning; wrong type -> error."""
     for k, v in obj.items():
+        if k.startswith("_"):
+            continue
         if k not in spec:
             warnings.append("%s: unknown field %r" % (who, k))
         elif not isinstance(v, spec[k]) or (bool not in spec[k] and isinstance(v, bool)):
@@ -1389,14 +1460,148 @@ def _lst(v):
     return v if isinstance(v, list) else []
 
 
+def _rng(a, b):
+    return (to_int(a), to_int(b))
+
+
+def _row_spans(row):
+    """`{section: [(start, end), ...]}` of an `attach` row in any of its accepted shapes (`ranges` as a dict or a list, `range`,
+    `start`/`end`); raises KeyError/TypeError/ValueError when the row has none or a malformed one."""
+    if isinstance(row.get("ranges"), dict):
+        return {sec: [_rng(a, b) for a, b in rr] for sec, rr in row["ranges"].items()}
+    if isinstance(row.get("ranges"), list):
+        return {row["section"]: [_rng(a, b) for a, b in row["ranges"]]}
+    if "range" in row:
+        a, b = row["range"]
+        return {row["section"]: [_rng(a, b)]}
+    return {row["section"]: [_rng(row["start"], row["end"])]}
+
+
+def attach_entries(p):
+    """The well-formed `attach` rows of a canonical proposal, one per (row, section):
+    `{"row", "unit", "text_addr", "section", "ranges": [(a, b)], "grade", "takes_from"}`.  A malformed row is skipped (the linter names it)."""
+    out = []
+    for row in _lst(p.get("attach")):
+        if not isinstance(row, dict):
+            continue
+        try:
+            spans = _row_spans(row)
+            ta = to_int(row["text_addr"]) if row.get("text_addr") not in (None, "") else None
+        except (KeyError, TypeError, ValueError):
+            continue
+        for sec, rr in spans.items():
+            out.append({"row": row, "unit": row.get("unit"), "text_addr": ta, "section": sec, "ranges": rr, "grade": row.get("grade"),
+                        "takes_from": row.get("takes_from")})
+    return out
+
+
+def unowned_entries(p):
+    """The well-formed `unowned_data` rows: `{"row", "section", "a", "b", "candidates": [names], "provisional"}` (`range` or `start`/`end`;
+    a candidate is a name or an object with a `unit`)."""
+    out = []
+    for row in _lst(p.get("unowned_data")):
+        if not isinstance(row, dict):
+            continue
+        try:
+            a, b = _rng(*row["range"]) if "range" in row else _rng(row["start"], row["end"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        cands = [c["unit"] if isinstance(c, dict) and "unit" in c else c for c in _lst(row.get("candidates"))]
+        out.append({"row": row, "section": row.get("section"), "a": a, "b": b, "candidates": [c for c in cands if isinstance(c, str)],
+                    "provisional": row.get("provisional") is True})
+    return out
+
+
+def _lint_phase2(p, issues, warns):
+    """Shape of the phase 2 lists: `attach` (a unit or `text_addr`, a data section, a non-empty range, a grade, a reproduce command, evidence for
+    strong/medium; two non-guess rows may not overlap), `unowned_data` (section, range, candidates, a stated reason) and `moves`."""
+    seen = collections.defaultdict(list)
+    for k, row in enumerate(_lst(p.get("attach"))):
+        if not isinstance(row, dict):
+            issues.append("attach[%d] is %s, want an object" % (k, type(row).__name__))
+            continue
+        who = "attach %s" % (row.get("unit") or row.get("text_addr") or "#%d" % k)
+        _check_fields(row, ATTACH_FIELDS, who, issues, warns)
+        if not (row.get("unit") or row.get("text_addr")):
+            issues.append("%s: missing unit or text_addr" % who)
+        if row.get("grade") not in GRADES:
+            issues.append("%s: grade %r (strong|medium|guess)" % (who, row.get("grade")))
+        if not row.get("reproduce"):
+            issues.append("%s: no reproduce command" % who)
+        if row.get("grade") in ("strong", "medium") and not row.get("evidence"):
+            issues.append("%s: %s attach has no evidence" % (who, row.get("grade")))
+        for ev in _lst(row.get("evidence")):
+            if not (isinstance(ev, dict) and all(ev.get(x) for x in ("tool", "command", "finding"))):
+                issues.append("%s: evidence needs tool, command and finding" % who)
+        if row.get("text_addr") not in (None, ""):
+            try:
+                to_int(row["text_addr"])
+            except (TypeError, ValueError):
+                issues.append("%s: text_addr is not an address" % who)
+        try:
+            spans = _row_spans(row)
+        except (KeyError, TypeError, ValueError):
+            issues.append("%s: the range is missing or not [start, end]" % who)
+            continue
+        if not spans:
+            issues.append("%s: missing ranges" % who)
+        for sec, rr in spans.items():
+            if sec not in SECTION_ORDER or sec in CODE_SECTIONS:
+                issues.append("%s: %s is not a data section" % (who, sec))
+                continue
+            for a, b in rr:
+                if b <= a:
+                    issues.append("%s: %s range %s..%s is empty" % (who, sec, hx(a), hx(b)))
+                elif row.get("grade") != "guess":
+                    seen[sec].append((a, b, who))
+    for sec, v in seen.items():
+        v.sort()
+        for (a, b, w), (c, d, x) in zip(v, v[1:]):
+            if c < b:
+                issues.append("%s and %s overlap in %s at %s" % (w, x, sec, hx(c)))
+    for k, row in enumerate(_lst(p.get("unowned_data"))):
+        who = "unowned_data[%d]" % k
+        if not isinstance(row, dict):
+            issues.append("%s is %s, want an object" % (who, type(row).__name__))
+            continue
+        _check_fields(row, UNOWNED_FIELDS, who, issues, warns)
+        if row.get("section") not in SECTION_ORDER:
+            issues.append("%s: section %r" % (who, row.get("section")))
+        try:
+            a, b = _rng(*row["range"]) if "range" in row else _rng(row["start"], row["end"])
+            if b <= a:
+                issues.append("%s: range %s..%s is empty" % (who, hx(a), hx(b)))
+        except (KeyError, TypeError, ValueError):
+            issues.append("%s: the range is missing or not [start, end]" % who)
+        if not isinstance(row.get("candidates"), list):
+            issues.append("%s: candidates must list the units that could own it" % who)
+        elif not row["candidates"] and not (row.get("note") or row.get("why") or row.get("reason")):
+            issues.append("%s: no candidate owners and no reason saying why (a linker-generated range)" % who)
+        if not any(row.get(x) for x in ("reason", "why", "evidence", "note")):
+            issues.append("%s: needs a reason (reason, why, evidence or note)" % who)
+    for k, mv in enumerate(_lst(p.get("moves"))):
+        if not (isinstance(mv, dict) and isinstance(mv.get("unit"), str) and isinstance(mv.get("after"), str)):
+            issues.append("moves[%d] needs a unit and an after (strings)" % k)
+            continue
+        _check_fields(mv, MOVE_FIELDS, "moves[%d]" % k, issues, warns)
+
+
 def lint_proposal_full(proposal, base=None):
     """`(errors, warnings)` of a proposal file.  With `base` (the baseline `Splits`) the fields that name baseline state are
     checked against it: `keep_registered_edge` must sit on a registered range start or end (error), `removes_cuts`, `absorbs` and
     `replaces_tail_of` must name one (warning)."""
     issues, warns = [], []
-    if not isinstance(proposal, dict) or not isinstance(proposal.get("units"), list) or not proposal["units"]:
+    proposal, aerr, awarn = canonical_proposal(proposal)
+    issues += aerr
+    warns += awarn
+    if not isinstance(proposal, dict):
         return ["no units"], warns
+    phase2 = any(proposal.get(k) for k in ("attach", "unowned_data", "moves"))
+    if not isinstance(proposal.get("units", [] if phase2 else None), list) or not (proposal.get("units") or phase2):
+        return ["no units"], warns
+    proposal = dict(proposal, units=proposal.get("units") or [])
     _check_fields(proposal, TOP_FIELDS, "proposal", issues, warns)
+    _lint_phase2(proposal, issues, warns)
     for q in _lst(proposal.get("open_questions")):
         if not isinstance(q, (str, dict)):
             issues.append("proposal: an open_questions entry is %s, want str|dict" % type(q).__name__)
@@ -1547,7 +1752,7 @@ def merge_guess(units, base=None, info=None):
                       "open_questions": a["open_questions"] + u["open_questions"],
                       "removes_cuts": a.get("removes_cuts", []) + u.get("removes_cuts", []),
                       "absorbs": a.get("absorbs", []) + u.get("absorbs", []), "replaces_tail_of": big.get("replaces_tail_of"),
-                      "merged": a["merged"] + u["merged"] + [dict(r, absorbed=small["name"]) for r in rec]}
+                      "after": big.get("after"), "merged": a["merged"] + u["merged"] + [dict(r, absorbed=small["name"]) for r in rec]}
             for s2 in set(a["ranges"]) | set(u["ranges"]):
                 merged["ranges"][s2] = coalesce(a["ranges"].get(s2, []) + u["ranges"].get(s2, []))
             out[at] = merged
@@ -1742,20 +1947,174 @@ def _extend(nu, sec, a, b):
     frags.sort()
 
 
+def _cut_range(unit, sec, a, b):
+    """Remove `[a, b)` from `unit`'s `sec` fragments (a fragment is split or trimmed; its attributes are kept)."""
+    out = []
+    for s, e, at in unit.ranges.get(sec, []):
+        if e <= a or s >= b:
+            out.append((s, e, at))
+            continue
+        if s < a:
+            out.append((s, a, at))
+        if e > b:
+            out.append((b, e, at))
+    if out:
+        unit.ranges[sec] = out
+    else:
+        unit.ranges.pop(sec, None)
+
+
+def name_resolver(final, pre_merge, units, base_merges):
+    """`resolve(name)`: the name of the candidate unit a phase 2 row means by `name` - the name itself when the candidate has it, else a
+    proposal unit's `derived_name`, the unit a `guess` cut folded it into, or the proposal unit that `absorbs` it."""
+    alias = {}
+    for u in pre_merge:
+        alias.setdefault(u["derived_name"], u["name"])
+    for u in units:
+        for r in u["merged"]:
+            if r.get("absorbed") and r["absorbed"] != u["name"]:
+                alias[r["absorbed"]] = u["name"]
+    for bm in base_merges:
+        alias[bm["unit"]["name"]] = bm["into"]
+    for u in units:
+        for nm in _lst(u.get("absorbs")):
+            if isinstance(nm, str) and nm.split() and nm.split()[0] != u["name"]:
+                alias.setdefault(nm.split()[0], u["name"])           # a trailing comment after the name is fine
+
+    def resolve(name):
+        present = {x.name for x in final}
+        seen = set()
+        while name not in present and name in alias and name not in seen:
+            seen.add(name)
+            name = alias[name]
+        return name
+
+    return resolve
+
+
+def apply_attach(final, proposals, info, resolve):
+    """Phase 2: give every non-`guess` `attach` range to its unit.  The rule, one implementation of what the six lanes each had:
+
+    * the target is the unit `unit` names (`resolve`: a name, a `derived_name`, a name a guess fold or an `absorbs` replaced) or the unit whose
+      `.text`/`.init` holds `text_addr` (a mismatch with `unit` is a warning); a unit the candidate lacks is a lint line;
+    * a range may take unowned bytes, bytes the target holds already (a restatement), bytes of a PROVISIONAL by-reader piece (the evidence
+      replaces the default) and bytes of the unit its row names in `takes_from` (a fold: that unit, left with no range, leaves the
+      candidate); a byte any other unit keeps - a registered unit nothing recut, a proposal unit's own listed range - is a lint line and
+      the range is not applied;
+    * two applied rows never share a byte (the second is a lint line); `guess` rows are counted, never applied;
+    * `unowned_data` rows are checked against the result: a deferred range a unit owns is a lint line unless the row says `provisional`."""
+    by_name = {u.name: u for u in final}
+    prov = collections.defaultdict(list)
+    for r in info.get("data_by_reader", []):
+        for label, v in r["pieces"].items():
+            nm = label[:-len(" (remnant)")] if label.endswith(" (remnant)") else label
+            prov[(nm, r["section"])].append((to_int(v[0]), to_int(v[1])))
+    entries = []
+    for p in proposals:
+        for e in attach_entries(p):
+            if e["grade"] == "guess":
+                info["attach_skipped"].append({"unit": e["unit"], "section": e["section"], "ranges": e["ranges"], "grade": "guess"})
+            else:
+                entries.append(e)
+        info["unowned_data"] += [x for x in _lst(p.get("unowned_data")) if isinstance(x, dict)]
+    entries.sort(key=lambda e: (SECTION_ORDER.index(e["section"]) if e["section"] in SECTION_ORDER else 99, min(a for a, _b in e["ranges"]),
+                                e["unit"] or ""))
+    seen = collections.defaultdict(list)
+    touched, emptied = set(), set()
+    text_starts = sorted((a, b, u) for u in final for sec in CODE_SECTIONS for a, b, _x in u.ranges.get(sec, []))
+    for e in entries:
+        sec, who = e["section"], e["unit"] or hx(e["text_addr"] or 0)
+        tgt = None
+        if e["text_addr"] is not None:
+            tgt = next((u for a, b, u in text_starts if a <= e["text_addr"] < b), None)
+            if tgt is None:
+                info["issues"].append("attach %s %s: text_addr %s is in no unit of the candidate" % (who, sec, hx(e["text_addr"])))
+                continue
+            if e["unit"] and resolve(e["unit"]) != tgt.name:
+                info["warnings"].append("attach %s %s: text_addr %s is in %s" % (e["unit"], sec, hx(e["text_addr"]), tgt.name))
+        else:
+            tgt = by_name.get(resolve(e["unit"] or ""))
+            if tgt is None or tgt not in final:
+                info["issues"].append("attach: unit %s is not in the candidate (%s %s..%s)" % (who, sec, hx(e["ranges"][0][0]), hx(e["ranges"][0][1])))
+                continue
+        donor = resolve(e["takes_from"]) if e["takes_from"] else None
+        for a, b in e["ranges"]:
+            lab = "attach %s %s %s..%s" % (tgt.name, sec, hx(a), hx(b))
+            clash = [x for x in seen[sec] if x[0] < b and x[1] > a]
+            if clash:
+                info["issues"].append("%s overlaps another attach row (%s)" % (lab, clash[0][2]))
+                continue
+            bad = None
+            for u in final:
+                for s, en, _at in u.ranges.get(sec, []):
+                    lo, hi = max(s, a), min(en, b)
+                    if lo >= hi or u is tgt or u.name == donor:
+                        continue
+                    if not any(ps <= lo and hi <= pe for ps, pe in prov.get((u.name, sec), [])):
+                        bad = (u.name, lo, hi)
+            if bad:
+                info["issues"].append("%s takes %s..%s from %s, whose range no cut recut (only an unowned run, a provisional by-reader range or a "
+                                      "`takes_from` unit may be taken)" % (lab, hx(bad[1]), hx(bad[2]), bad[0]))
+                continue
+            seen[sec].append((a, b, lab))
+            for u in final:
+                if u is not tgt and any(s < b and en > a for s, en, _x in u.ranges.get(sec, [])):
+                    _cut_range(u, sec, a, b)
+                    emptied.add(u.name)
+            had = sum(max(0, min(en, b) - max(s, a)) for s, en, _x in tgt.ranges.get(sec, []))
+            if had < b - a:
+                _cut_range(tgt, sec, a, b)
+                _extend(tgt, sec, a, b)
+            touched.add((tgt.name, sec))
+            info["attach"].append({"unit": tgt.name, "section": sec, "start": a, "end": b, "grade": e["grade"]})
+            if tgt.name not in info["attach_units"]:
+                info["attach_units"].append(tgt.name)
+    for u in final:                                          # abutting plain fragments of a unit that took a range are one range
+        for sec in list(u.ranges):
+            if (u.name, sec) not in touched:
+                continue
+            merged = []
+            for s, e, at in sorted(u.ranges[sec]):
+                if merged and merged[-1][1] == s and not at and not merged[-1][2]:
+                    merged[-1] = (merged[-1][0], e, at)
+                else:
+                    merged.append((s, e, at))
+            u.ranges[sec] = merged
+    for u in list(final):                                    # a unit whose every range was taken is gone
+        if u.name in emptied and not u.ranges:
+            final.remove(u)
+            info["dropped"].append(u.name)
+    info["attach_units"] = [n for n in info["attach_units"] if any(u.name == n for u in final)]
+    for p in proposals:
+        for ud in unowned_entries(p):
+            if ud["provisional"]:
+                continue
+            for u in final:
+                for s, e, _at in u.ranges.get(ud["section"], []):
+                    lo, hi = max(s, ud["a"]), min(e, ud["b"])
+                    if lo < hi and not any(ps <= lo and hi <= pe for ps, pe in prov.get((u.name, ud["section"]), [])):
+                        info["issues"].append("unowned_data %s %s..%s is listed as deferred but %s owns %s..%s"
+                                              % (ud["section"], hx(ud["a"]), hx(ud["b"]), u.name, hx(max(s, ud["a"])), hx(min(e, ud["b"]))))
+                        break
+
+
 def render(base, proposals, dol=None, symbols=None, data_by_reader=True):
     """`(candidate Splits, info)`: the baseline with every proposal's units cut in (guess cuts merged).
 
     With `dol` and `symbols` the sections a text cut determines (extab, extabindex, ctors, dtors) are derived and, unless
     `data_by_reader` is False, the data of a recut registered unit is assigned by reader (`assign_data_by_reader`).
     """
-    info = {"issues": [], "warnings": [], "merged": [], "units": [], "derived": [], "data_by_reader": [], "cuts": {}, "superseded": []}
+    info = {"issues": [], "warnings": [], "merged": [], "units": [], "derived": [], "data_by_reader": [], "cuts": {}, "superseded": [],
+            "attach": [], "attach_skipped": [], "attach_units": [], "unowned_data": [], "dropped": [], "moved": []}
     units = []
     drop = {}                       # (band, derived_name) -> the superseding entry; filled from every proposal's `supersedes`
+    raw = proposals
+    proposals = [canonical_proposal(p)[0] for p in proposals]
     for p in proposals:
         for s in _lst(p.get("supersedes")):
             if isinstance(s, dict) and s.get("band") and s.get("unit"):
                 drop[(s["band"], s["unit"])] = s
-    for p in proposals:
+    for p in raw:
         errs, warns = lint_proposal_full(p, base)
         info["issues"] += errs
         info["warnings"] += warns
@@ -1777,6 +2136,7 @@ def render(base, proposals, dol=None, symbols=None, data_by_reader=True):
                              for u in units for c in u["cuts"] if c.get("keep_registered_edge") is not True and c.get("section", ".text") == ".text"]
     units.sort(key=lambda u: (u["ranges"].get(".text") or [(0, 0)])[0][0])
     mg = {"issues": info["issues"], "base_merges": []}
+    pre_merge = list(units)
     units = merge_guess(units, base, mg)
     base_merges = mg["base_merges"]
     movers = units + [bm["unit"] for bm in base_merges]
@@ -1821,21 +2181,54 @@ def render(base, proposals, dol=None, symbols=None, data_by_reader=True):
                     _extend(nu, sec, a, b)
         if nu.ranges:
             kept.append((anchor, nu))
+    late = []                       # data-only proposal units with an `after` anchor: placed once every unit is in
     for u in units:
         nu = Unit(u["name"], "", {sec: [(a, b, "") for a, b in rr] for sec, rr in u["ranges"].items()})
         at = nu.first(".text")
+        if at is None:
+            if not u.get("after"):
+                info["warnings"].append("%s: a unit without .text has no `after` anchor: it is placed at the end of the candidate" % u["name"])
+            late.append((u, nu))
+            continue
         pos = len(kept)
-        if at is not None:
-            for i, (anc, _k) in enumerate(kept):
-                if anc >= at:
-                    pos = i
-                    break
-        kept.insert(pos, (at if at is not None else (kept[pos - 1][0] if pos else 0), nu))
+        for i, (anc, _k) in enumerate(kept):
+            if anc >= at:
+                pos = i
+                break
+        kept.insert(pos, (at, nu))
     names = collections.Counter(k.name for _a, k in kept)
     for n, c in names.items():
         if c > 1:
             info["issues"].append("unit name %s is used %d times in the candidate (a proposal unit reuses a baseline unit's name)" % (n, c))
-    return Splits(list(base.header), [k for _a, k in kept]), info
+    final = [k for _a, k in kept]
+    resolve = name_resolver(final, pre_merge, units, base_merges)
+    placed = collections.Counter()
+    for u, nu in late:              # units after one anchor keep the file order; one without an anchor goes last
+        if not u.get("after"):
+            final.append(nu)
+            continue
+        anchor_name = resolve(u["after"])
+        k = next((i for i, x in enumerate(final) if x.name == anchor_name), None)
+        if k is None:
+            info["issues"].append("%s: after %s, which is not a unit of the candidate" % (u["name"], u["after"]))
+            final.append(nu)
+            continue
+        final.insert(k + 1 + placed[anchor_name], nu)
+        placed[anchor_name] += 1
+    for p in proposals:
+        for mv in _lst(p.get("moves")):
+            if not (isinstance(mv, dict) and isinstance(mv.get("unit"), str) and isinstance(mv.get("after"), str)):
+                continue
+            who, anc = resolve(mv["unit"]), resolve(mv["after"])
+            mu = next((x for x in final if x.name == who), None)
+            if mu is None or not any(x.name == anc for x in final):
+                info["issues"].append("moves: %s after %s names a unit the candidate does not have" % (mv["unit"], mv["after"]))
+                continue
+            final.remove(mu)
+            final.insert(next(i for i, x in enumerate(final) if x.name == anc) + 1, mu)
+            info["moved"].append("%s after %s" % (mu.name, anc))
+    apply_attach(final, proposals, info, resolve)
+    return Splits(list(base.header), final), info
 
 
 # ---- output -----------------------------------------------------------------------------------------------------------------
@@ -1949,6 +2342,31 @@ def cmd_baseline(args):
     return 0
 
 
+def parse_readers_spec(spec):
+    """`SECTION:START-END` (hex addresses) -> `(section, start, end)`."""
+    m = re.match(r"^(\.?\w+):(0x[0-9A-Fa-f]+)-(0x[0-9A-Fa-f]+)$", spec or "")
+    if not m:
+        raise ValueError("--readers wants SECTION:0xSTART-0xEND, got %r" % (spec,))
+    return m.group(1), int(m.group(2), 16), int(m.group(3), 16)
+
+
+def readers_report(ctx, spec):
+    """One line per map symbol of `spec`'s section range: the owner unit of the candidate, then the units whose decoded text reads it
+    (`literal_readers` for a pool literal) with the site counts.  The evidence an `attach` row quotes."""
+    sec, lo, hi = parse_readers_spec(spec)
+    lines = []
+    for sym in ctx.data_syms:
+        if sym["section"] != sec or not (lo <= sym["addr"] < hi):
+            continue
+        sites = ctx.literal_readers(sym) if is_literal(sym) else ctx.readers(sym)
+        by = collections.Counter((ctx.text_owner(x).name if ctx.text_owner(x) else "?") for x in sites)
+        own = ctx.owner(sec, sym["addr"])
+        lines.append("%s %s %-26s size 0x%X owner %-34s readers %s" % (
+            sec, hx(sym["addr"]), sym["name"], sym["size"] or 0, own.name if own else "(unowned)",
+            ", ".join("%s x%d" % (u, n) for u, n in sorted(by.items())) or "none"))
+    return lines
+
+
 def cmd_proposal(args):
     splits, symbols, dol = load_ctx(args.splits, args.symbols, args.dol)
     proposals = [load_proposal(p) for p in args.proposal]
@@ -1973,6 +2391,18 @@ def cmd_proposal(args):
     if info["cuts"]:
         print("cuts: " + ", ".join("%s %d" % (k, info["cuts"][k]) for k in ("strong", "medium", "guess", "keep_registered_edge") if k in info["cuts"])
               + "  (keep_registered_edge is not counted as proven; guess is merged, never emitted)")
+    if info["attach"] or info["attach_skipped"] or info["unowned_data"]:
+        gc = collections.Counter(r["grade"] for r in info["attach"])
+        by_sec = collections.Counter()
+        for r in info["attach"]:
+            by_sec[r["section"]] += r["end"] - r["start"]
+        print("attach (phase 2): %d ranges applied (strong %d, medium %d; %s), %d guess ranges not applied; unowned_data: %d rows; %d units dropped, %d moved"
+              % (len(info["attach"]), gc["strong"], gc["medium"], ", ".join("%s 0x%X B" % kv for kv in sorted(by_sec.items())) or "-",
+                 len(info["attach_skipped"]), len(info["unowned_data"]), len(info["dropped"]), len(info["moved"])))
+    for x in info["dropped"]:
+        print("dropped (every range taken by an attach): " + x)
+    for x in info["moved"]:
+        print("moved: " + x)
     if args.emit_splits:
         with open(args.emit_splits, "w", encoding="utf-8", newline="\n") as fh:
             fh.write(render_splits(cand))
@@ -1998,9 +2428,14 @@ def cmd_proposal(args):
     print("%-11s %10s %10s" % ("invariant", "FAIL base", "FAIL cand"))
     for inv in INVARIANTS:
         print("%-11s %10d %10d" % (inv, bs[inv][FAIL], cs[inv][FAIL]))
-    mine = set(info["units"])
-    print("\nproposal units:")
-    for n in info["units"]:
+    if getattr(args, "readers", None):
+        for spec in args.readers:
+            for line in readers_report(cctx, spec):
+                print(line)
+    attached = [n for n in info["attach_units"] if n not in info["units"] and n in cres.units]
+    mine = set(info["units"]) | set(attached)         # a unit an `attach` gives data to is the proposal's: its FAILs are listed, not "new"
+    print("\nproposal units (and units an `attach` gives data to):")
+    for n in info["units"] + attached:
         recs = cres.units.get(n, {})
         bad = {k: r for k, r in recs.items() if r["status"] == FAIL}
         unk = [k for k, r in recs.items() if r["status"] == UNKNOWN]
@@ -2497,6 +2932,182 @@ u_b.cpp: comment:0
     c_ex, _i = render(d_base, [explicit], d_dol, d_syms)
     check("data-by-reader leaves a section the proposal lists itself", sd(c_ex)["m/bpiece.cpp"], [(DS, DS + 8)])
 
+    # phase 2 format: the canonical `attach` list (the legacy names load as aliases), rendered by one rule set
+    def arow(unit, a, b, grade="strong", sec=".sdata2", **more):
+        return dict({"unit": unit, "section": sec, "range": ["0x%X" % a, "0x%X" % b], "grade": grade, "reproduce": "r",
+                     "evidence": [{"tool": "t", "command": "c", "finding": "f"}]}, **more)
+
+    def p2(*rows, **more):
+        return dict({"phase": 2, "lane": "t", "units": [], "attach": list(rows)}, **more)
+
+    UN = DS + 0x100                                           # unowned `.sdata2` bytes of the d_base fixture
+    shapes = p2(arow("big.cpp", UN, UN + 4),
+                {"unit": "big.cpp", "ranges": {".sdata2": [["0x%X" % (UN + 4), "0x%X" % (UN + 8)]]}, "grade": "strong", "reproduce": "r",
+                 "evidence": [{"tool": "t", "command": "c", "finding": "f"}]},
+                {"unit": "big.cpp", "section": ".sdata2", "ranges": [["0x%X" % (UN + 8), "0x%X" % (UN + 12)]], "grade": "strong", "reproduce": "r",
+                 "evidence": [{"tool": "t", "command": "c", "finding": "f"}]},
+                {"unit": "big.cpp", "section": ".sdata2", "start": "0x%X" % (UN + 12), "end": "0x%X" % (UN + 16), "grade": "strong", "reproduce": "r",
+                 "evidence": [{"tool": "t", "command": "c", "finding": "f"}]})
+    c_sh, i_sh = render(d_base, [shapes], d_dol, d_syms)
+    check("attach: a row may carry `range`, `ranges` as a dict or as a list, or `start`/`end`; four abutting rows are one range",
+          (i_sh["issues"], i_sh["warnings"], sd(c_sh)["big.cpp"], len(i_sh["attach"])), ([], [], [(DS, DS + 8), (UN, UN + 16)], 4))
+    legacy = {k: v for k, v in p2(arow("big.cpp", UN, UN + 4)).items() if k != "attach"}
+    legacy["data_attach"] = [arow("big.cpp", UN, UN + 4)]
+    legacy["_file"] = "phase2-x.json"
+    legacy2 = dict(legacy)
+    del legacy2["data_attach"]
+    legacy2["attachments"] = [arow("big.cpp", UN, UN + 4)]
+    c_lg, i_lg = render(d_base, [legacy], d_dol, d_syms)
+    c_l2, i_l2 = render(d_base, [legacy2], d_dol, d_syms)
+    c_cn, i_cn = render(d_base, [p2(arow("big.cpp", UN, UN + 4))], d_dol, d_syms)
+    check("attach: `data_attach` and `attachments` load as aliases of `attach` (the same candidate) and a warning names the file",
+          (sd(c_lg) == sd(c_l2) == sd(c_cn), sd(c_cn)["big.cpp"], i_lg["warnings"], i_l2["warnings"]),
+          (True, [(DS, DS + 8), (UN, UN + 4)], ["proposal phase2-x.json: field `data_attach` is the legacy name of `attach`"],
+           ["proposal phase2-x.json: field `attachments` is the legacy name of `attach`"]))
+    check("attach: the canonical name carries no alias warning", i_cn["warnings"], [])
+    both = dict(legacy, attach=[arow("big.cpp", UN + 4, UN + 8)])
+    check("attach: a file with both the legacy and the canonical name is a lint error",
+          [i for i in render(d_base, [both], d_dol, d_syms)[1]["issues"] if "has both" in i], ["proposal phase2-x.json: has both `data_attach` and `attach`"])
+    c_gs, i_gs = render(d_base, [p2(arow("big.cpp", UN, UN + 4, "guess"))], d_dol, d_syms)
+    check("attach: a guess row is counted and never applied", (sd(c_gs)["big.cpp"], len(i_gs["attach_skipped"]), i_gs["attach"], i_gs["issues"]), ([(DS, DS + 8)], 1, [], []))
+    c_ta, i_ta = render(d_base, [d_prop, p2(dict(arow("big.cpp", UN, UN + 4), text_addr="0x%X" % (T + 0x30)))], d_dol, d_syms)
+    check("attach: `text_addr` addresses the unit holding that `.text` (the name is only checked: a mismatch warns)",
+          (sd(c_ta)["m/bpiece.cpp"], i_ta["warnings"]), ([(DS + 4, DS + 8), (UN, UN + 4)], ["attach big.cpp .sdata2: text_addr 0x%X is in m/bpiece.cpp" % (T + 0x30)]))
+    c_tn, i_tn = render(d_base, [p2(dict(arow("big.cpp", UN, UN + 4), text_addr="0x80999999"))], d_dol, d_syms)
+    check("attach: a `text_addr` inside no unit is a lint line", [i for i in i_tn["issues"] if "is in no unit" in i] != [], True)
+    c_nu, i_nu = render(d_base, [p2(arow("nope.cpp", UN, UN + 4))], d_dol, d_syms)
+    check("attach: a unit the candidate lacks is a lint line", [i for i in i_nu["issues"] if "unit nope.cpp is not in the candidate" in i] != [], True)
+    # what a range may take: unowned bytes, its own bytes, a provisional by-reader piece, a `takes_from` unit's bytes - nothing else
+    c_pv, i_pv = render(d_base, [d_prop, p2(arow("big.cpp", DS, DS + 8))], d_dol, d_syms)
+    check("attach: a row takes back a PROVISIONAL by-reader piece (the evidence replaces the default)", (i_pv["issues"], sd(c_pv)),
+          ([], {"big.cpp": [(DS, DS + 8)], "m/bpiece.cpp": []}))
+    c_np, i_np = render(d_base, [d_prop, p2(arow("m/bpiece.cpp", DS, DS + 4))], d_dol, d_syms, data_by_reader=False)
+    check("attach: a registered unit's own range that no cut recut is not taken (lint line naming the donor); nothing changes",
+          ([i for i in i_np["issues"] if "from big.cpp" in i] != [], sd(c_np)), (True, {"big.cpp": [(DS, DS + 8)], "m/bpiece.cpp": []}))
+    c_tk, i_tk = render(d_base, [d_prop, p2(arow("m/bpiece.cpp", DS, DS + 4, takes_from="big.cpp"))], d_dol, d_syms, data_by_reader=False)
+    check("attach: `takes_from` names the unit the row may take from", (i_tk["issues"], sd(c_tk)), ([], {"big.cpp": [(DS + 4, DS + 8)], "m/bpiece.cpp": [(DS, DS + 4)]}))
+    c_rs, i_rs = render(d_base, [p2(arow("big.cpp", DS, DS + 8))], d_dol, d_syms)
+    check("attach: a row restating the target's own range changes nothing and is no lint line", (i_rs["issues"], sd(c_rs)["big.cpp"]), ([], [(DS, DS + 8)]))
+    c_ov, i_ov = render(d_base, [p2(arow("big.cpp", UN, UN + 8), arow("big.cpp", UN + 4, UN + 12))], d_dol, d_syms)
+    check("attach: two rows over the same bytes are a lint line (one applied)",
+          (any("overlap in .sdata2" in i or "overlaps another attach row" in i for i in i_ov["issues"]), sd(c_ov)["big.cpp"]), (True, [(DS, DS + 8), (UN, UN + 8)]))
+    f_txt = hdr + ("u.cpp:\n\t.text       start:0x%X end:0x%X\n\t.sdata2     start:0x%X end:0x%X\n\nz.cpp:\n\t.sdata2     start:0x%X end:0x%X\n"
+                   % (T, T + 0x40, DS, DS + 8, DS + 0x10, DS + 0x18))
+    f_base = parse_splits(f_txt)
+    c_fd, i_fd = render(f_base, [p2(arow("u.cpp", DS + 0x10, DS + 0x18, takes_from="z.cpp"))], d_dol, d_syms)
+    check("attach: a fold takes a data-only unit's whole range and the unit leaves the candidate",
+          (i_fd["issues"], i_fd["dropped"], [u.name for u in c_fd.units], sd(c_fd)["u.cpp"]), ([], ["z.cpp"], ["u.cpp"], [(DS, DS + 8), (DS + 0x10, DS + 0x18)]))
+    c_nf, i_nf = render(f_base, [p2(arow("u.cpp", DS + 0x10, DS + 0x18))], d_dol, d_syms)
+    check("attach: ... and without `takes_from` the same row is refused", ([i for i in i_nf["issues"] if "from z.cpp" in i] != [], i_nf["dropped"]), (True, []))
+    # a name a proposal unit absorbs, a unit a guess merge folded away, and a derived name all resolve to the surviving unit
+    c_ab, i_ab = render(d_base, [prop(pu("big2", T, T + 0x40, cut(T, "strong"), absorbs=["big.cpp # trailing comment"])), p2(arow("big.cpp", UN, UN + 4))], d_dol, d_syms)
+    check("attach: a row for a baseline unit a proposal unit `absorbs` lands on the absorber",
+          (i_ab["issues"], [(u.name, [(a, b) for a, b, _x in u.ranges.get(".sdata2", [])]) for u in c_ab.units if u.ranges.get(".sdata2")]),
+          ([], [("m/big2.cpp", [(DS, DS + 8), (UN, UN + 4)])]))
+    fold = prop(pu("first", T, T + 0x10), pu("late", T + 0x10, T + 0x20, cut(T + 0x10, "guess")))
+    c_gf, i_gf = render(sp, [fold, p2(arow("m/late.cpp", S2 + 0x100, S2 + 0x108), arow("late", S2 + 0x108, S2 + 0x10C))])
+    check("attach: a row for a unit a guess cut folded away (by name or derived_name) lands on the unit that absorbed it",
+          (i_gf["issues"], [(a, b) for u in c_gf.units if u.name == "m/first.cpp" for a, b, _x in u.ranges.get(".sdata2", [])]), ([], [(S2 + 0x100, S2 + 0x10C)]))
+    # unowned_data: checked against the candidate
+    un = {"section": ".sdata2", "range": ["0x%X" % UN, "0x%X" % (UN + 4)], "candidates": ["big.cpp"], "reason": "r"}
+    check("unowned_data: a deferral a unit owns is a lint line, unless the row says `provisional`",
+          ([i for i in render(d_base, [p2(arow("big.cpp", UN, UN + 4), unowned_data=[un])], d_dol, d_syms)[1]["issues"] if "listed as deferred" in i] != [],
+           [i for i in render(d_base, [p2(arow("big.cpp", UN, UN + 4), unowned_data=[dict(un, provisional=True)])], d_dol, d_syms)[1]["issues"]]), (True, []))
+    prov_row = {"section": ".sdata2", "range": ["0x%X" % (DS + 4), "0x%X" % (DS + 8)], "candidates": ["m/bpiece.cpp", "big.cpp"], "reason": "r"}
+    check("unowned_data: a range the by-reader default holds is not 'owned' (the deferral says the default stays)",
+          [i for i in render(d_base, [d_prop, p2(unowned_data=[prov_row])], d_dol, d_syms)[1]["issues"]], [])
+    check("unowned_data: `candidates` may be empty only with a reason; the range may be `start`/`end`",
+          (lint_proposal(p2(unowned_data=[{"section": ".init", "start": "0x10", "end": "0x20", "candidates": []}]), d_base),
+           lint_proposal(p2(unowned_data=[{"section": ".init", "start": "0x10", "end": "0x20", "candidates": [], "reason": "linker table"}]), d_base)),
+          (["unowned_data[0]: no candidate owners and no reason saying why (a linker-generated range)", "unowned_data[0]: needs a reason (reason, why, evidence or note)"], []))
+    # lint of the rows
+    bad_rows = p2(dict(arow("big.cpp", UN, UN + 4), reproduce=""), arow("big.cpp", UN, UN + 4, sec=".text"), arow("big.cpp", UN + 8, UN + 8),
+                  arow("big.cpp", UN + 8, UN + 12, "medium", evidence=[]), arow("big.cpp", UN + 8, UN + 12, "maybe"), "x", {"section": ".sdata2", "range": ["0x1", "0x2"], "grade": "strong"},
+                  {"unit": "big.cpp", "section": ".sdata2", "grade": "strong", "reproduce": "r"})
+    e_bad = lint_proposal(bad_rows, d_base)
+    check("lint: no reproduce, a code section, an empty range, a medium row without evidence, a bad grade, a non-object, no unit and no range are each an error",
+          [any(k in i for i in e_bad) for k in ("no reproduce command", ".text is not a data section", "is empty", "medium attach has no evidence", "grade 'maybe'",
+                                                "want an object", "missing unit or text_addr", "range is missing")], [True] * 8)
+    check("lint: `extab`/`extabindex` rows are attachments too (a unit's exception tables past the registered range)",
+          lint_proposal(p2(arow("big.cpp", 0x8003F18C, 0x8003F198, sec="extabindex")), d_base), [])
+    check("lint: a file with units, attach, unowned_data or moves is a proposal; one with none of them is 'no units'",
+          (lint_proposal({"phase": 2}, d_base), lint_proposal(p2(), d_base), lint_proposal(p2(arow("big.cpp", UN, UN + 4)), d_base)), (["no units"], ["no units"], []))
+    c_au, i_au = render(d_base, [d_prop, p2(arow("big.cpp", UN, UN + 4), arow("m/bpiece.cpp", UN + 8, UN + 12))], d_dol, d_syms)
+    check("attach: the units given data are recorded (cmd_proposal lists them with the proposal units, not as new failures)", i_au["attach_units"], ["big.cpp", "m/bpiece.cpp"])
+    # a unit without `.text` has a place: `after` anchors it, else it is the last unit (and warns)
+    dunit = lambda **more: pu("dtab", 0, 0, **more)
+    dunit_ = lambda **more: dict(dunit(**more), ranges={".sdata2": [["0x%X" % UN, "0x%X" % (UN + 8)]]})
+    order = lambda c: [u.name for u in c.units]
+    c_da, i_da = render(d_base, [prop(pu("bpiece", T + 0x20, T + 0x40, cut(T + 0x20, "strong")), dunit_(after="big.cpp"))], d_dol, d_syms)
+    c_dn, i_dn = render(d_base, [prop(pu("bpiece", T + 0x20, T + 0x40, cut(T + 0x20, "strong")), dunit_())], d_dol, d_syms)
+    check("data-only unit: `after` puts it right behind the named unit; without it the unit is last and a warning says so",
+          (order(c_da), i_da["issues"], i_da["warnings"], order(c_dn), [w for w in i_dn["warnings"] if "no `after` anchor" in w] != []),
+          (["big.cpp", "m/dtab.cpp", "m/bpiece.cpp"], [], [], ["big.cpp", "m/bpiece.cpp", "m/dtab.cpp"], True))
+    c_db, i_db = render(d_base, [prop(dunit_(after="m/nope.cpp"))], d_dol, d_syms)
+    check("data-only unit: an `after` naming no unit is a lint line", [i for i in i_db["issues"] if "which is not a unit of the candidate" in i] != [], True)
+    c_d2, _i = render(d_base, [prop(dunit_(after="big.cpp"), dict(dunit_(after="big.cpp"), derived_name="dtab2", ranges={".sdata2": [["0x%X" % (UN + 8), "0x%X" % (UN + 12)]]}))], d_dol, d_syms)
+    check("data-only unit: several units behind one anchor keep the file order", order(c_d2), ["big.cpp", "m/dtab.cpp", "m/dtab2.cpp"])
+    c_mv, i_mv = render(d_base, [d_prop, p2(moves=[{"unit": "big.cpp", "after": "m/bpiece.cpp"}])], d_dol, d_syms)
+    check("moves: a registered unit is placed behind another (the candidate order is the link order)", (order(c_mv), i_mv["moved"], i_mv["issues"]),
+          (["m/bpiece.cpp", "big.cpp"], ["big.cpp after m/bpiece.cpp"], []))
+    check("moves: a name the candidate lacks is a lint line", [i for i in render(d_base, [p2(moves=[{"unit": "big.cpp", "after": "nope.cpp"}])], d_dol, d_syms)[1]["issues"]
+                                                                if "moves:" in i] != [], True)
+
+    # checker rules the phase 2 attachments exposed
+    # pool: a unit claiming `.sdata` strings and `.sdata2` literals has two pools; first-use order is judged inside each, never across
+    SD = 0x80200100
+    two_pools = hdr + "p.cpp:\n\t.text       start:0x%X end:0x%X\n\t.sdata      start:0x%X end:0x%X\n\t.sdata2     start:0x%X end:0x%X\n" % (T, T + 0x20, SD, SD + 8, S2, S2 + 4)
+    words_sd = [_lis(3, hi), _w(48, 1, 3, 0), BLR, NOP, _lis(3, SD >> 16), _w(14, 3, 3, SD & 0xFFFF), BLR, NOP]      # f0 loads the literal, the later f1 takes the string's address
+    cps, _s = _mini(T, words_sd, [("f0", 0, 0x10), ("f1", 0x10, 0x10)], two_pools, [(SD, b"hello\0\0\0"), (S2, struct.pack(">f", 1.5))],
+                    ["str0 = .sdata:0x%X; // type:object size:0x8 scope:local data:string" % SD, s2_syms[0]])
+    check("pool order: a string of `.sdata` first used after a `.sdata2` literal that sits above it is two pools, not one inverted pool",
+          run_checks(cps, None, ["pool"]).units["p.cpp"]["pool"]["status"], PASS)
+    both_inv = two_pools.replace("end:0x%X\n" % (S2 + 4), "end:0x%X\n" % (S2 + 8))
+    words_inv = [_lis(3, hi), _w(48, 2, 3, 4), BLR, NOP, _lis(3, hi), _w(48, 1, 3, 0), BLR, NOP]                         # `.sdata2`: l1 first used before l0
+    cpi, _s = _mini(T, words_inv, [("f0", 0, 0x10), ("f1", 0x10, 0x10)], both_inv, [(SD, b"hello\0\0\0"), (S2, lits2)],
+                    ["str0 = .sdata:0x%X; // type:object size:0x8 scope:local data:string" % SD] + s2_syms)
+    check("pool order: an inversion inside one section is still a FAIL, reported at the literal that breaks the order", (lambda r: (r["status"], "first use of l1" in r["finding"]))(
+          run_checks(cpi, None, ["pool"]).units["p.cpp"]["pool"]), (FAIL, True))
+    # data-order: a strong V->S row asserts a boundary in [first string, next vtable): a unit ending inside the gap can end at it
+    for label, dend, want in (("the unit ends where the second vtable group starts", D0 + 20, PASS), ("the unit ends inside the string gap", D0 + 16, PASS),
+                              ("the unit holds the second vtable group too", D0 + 32, FAIL)):
+        vu3 = dhdr + "v.cpp:\n\t.text       start:0x%X end:0x%X\n\t.data       start:0x%X end:0x%X\n" % (T, T + 0x30, D0, dend)
+        cv3, sv3 = _mini(T, [NOP] * 12, fns_v, vu3, [(D0, vblob)], vsyms)
+        check("data-order V->S: %s -> %s" % (label, want), run_checks(cv3, dataorder_rows(sv3), ["data-order"]).units["v.cpp"]["data-order"]["status"], want)
+    # data-order: a zigzag pair (adjacent vtables whose first slots go up) whose vtable the unit's own sinit closure stores is instantiated, not a seam
+    zblob = struct.pack(">3I", 0, 0, T) + struct.pack(">3I", 0, 0, T + 4)
+    zsyms = ["__vt__A = .data:0x%X; // type:object size:0xC scope:global" % D0, "__vt__B = .data:0x%X; // type:object size:0xC scope:global" % (D0 + 12)]
+    zunits = dhdr + "v.cpp:\n\t.text       start:0x%X end:0x%X\n\t.ctors      start:0x80200000 end:0x80200004\n\t.data       start:0x%X end:0x%X\n" % (T, T + 0x30, D0, D0 + 24)
+    zstore = [_lis(3, (D0 + 12) >> 16), _w(14, 3, 3, (D0 + 12) & 0xFFFF), BLR, NOP]                    # a ctor storing the address of __vt__B
+    for label, sinit_word, want in (("the sinit calls a ctor that stores __vt__B", _b(T + 0x10, T + 0x20), PASS),
+                                    ("the store is in a function the sinit never reaches", BLR, FAIL)):
+        czz, szz = _mini(T, [NOP, NOP, NOP, BLR, sinit_word, NOP, NOP, NOP] + zstore + [NOP] * 4, fns_v, zunits, [(0x80200000, struct.pack(">I", T + 0x10)), (D0, zblob)], zsyms)
+        check("data-order zigzag: %s -> %s" % (label, want), run_checks(czz, dataorder_rows(szz), ["data-order"]).units["v.cpp"]["data-order"]["status"], want)
+    # data-order: a zigzag pair whose classes' member functions alternate in the text is one TU (no text cut separates them); an ordered pair is a seam
+    ffns = [("g%d" % i, 0x10 * i, 0x10) for i in range(6)]
+    funits = dhdr + "v.cpp:\n\t.text       start:0x%X end:0x%X\n\t.data       start:0x%X end:0x%X\n" % (T, T + 0x60, D0, D0 + 32)
+    fsyms = ["__vt__A = .data:0x%X; // type:object size:0x10 scope:global" % D0, "__vt__B = .data:0x%X; // type:object size:0x10 scope:global" % (D0 + 16)]
+    for label, aslots, bslots, want in (("alternating members", (T + 0x10, T + 0x30), (T + 0x20, T + 0x40), PASS),
+                                        ("A's members all before B's", (T + 0x00, T + 0x10), (T + 0x20, T + 0x30), FAIL)):
+        cfz, sfz = _mini(T, [NOP] * 24, ffns, funits, [(D0, struct.pack(">4I", 0, 0, *aslots) + struct.pack(">4I", 0, 0, *bslots))], fsyms)
+        check("data-order zigzag: %s -> %s" % (label, want), run_checks(cfz, dataorder_rows(sfz), ["data-order"]).units["v.cpp"]["data-order"]["status"], want)
+    # jumptable: the foreign reader a finding names is the first by name (a set of units has no order of its own)
+    JT = 0x80500000
+    jt_units = "Sections:\n\t.text       type:code align:32\n\t.data       type:data align:8\n\nown.cpp:\n\t.text       start:0x%X end:0x%X\n\t.data       start:0x%X end:0x%X\n\n" % (T, T + 0x10, JT, JT + 8)
+    names8 = ["r%d.cpp" % k for k in (5, 2, 7, 0, 3, 6, 1, 4)]
+    jt_units += "".join("%s:\n\t.text       start:0x%X end:0x%X\n\n" % (n, T + 0x10 * (k + 1), T + 0x10 * (k + 2)) for k, n in enumerate(names8))
+    jt_reader = [_lis(3, JT >> 16), _w(14, 3, 3, JT & 0xFFFF), BLR, NOP]
+    cjt, _s = _mini(T, [NOP] * 4 + jt_reader * 8, [("own", 0, 0x10)] + [("f%d" % k, 0x10 * (k + 1), 0x10) for k in range(8)], jt_units, [(JT, bytes(8))],
+                    ["jumptable_80500000 = .data:0x%X; // type:object size:0x8 scope:local" % JT])
+    check("jumptable: the finding names the foreign reader first by name, not first in a set", run_checks(cjt, None, ["jumptable"]).units["own.cpp"]["jumptable"]["finding"],
+          "jumptable_80500000 is read by r0.cpp, not by this unit")
+
+    # --readers: one line per map symbol of a range with its candidate owner and the units that read it
+    rctx = Ctx(c_sh, d_syms, d_dol, 0x80500000, 0x80600000)
+    check("--readers: owner and decoded readers of every symbol in the range (A reads l0, B reads l1)",
+          [" ".join(l.split()) for l in readers_report(rctx, ".sdata2:0x%X-0x%X" % (DS, DS + 8))],
+          [".sdata2 0x%08X l0 size 0x4 owner big.cpp readers big.cpp x1" % DS, ".sdata2 0x%08X l1 size 0x4 owner big.cpp readers big.cpp x1" % (DS + 4)])
+
     # ranking
     td = top_defects(ctx, res, 50)
     check("defects are ranked by score", [d["score"] for d in td] == sorted((d["score"] for d in td), reverse=True) and bool(td), True)
@@ -2513,6 +3124,8 @@ def main(argv=None):
                     help="with --proposal: assign the data of a recut registered unit to the pieces by reader (PROVISIONAL phase-1 default; default on)")
     ap.add_argument("--splits"), ap.add_argument("--symbols"), ap.add_argument("--dol")
     ap.add_argument("--outbox", help="lane outbox with seam requests (default: the primary checkout's .pi/outbox)")
+    ap.add_argument("--readers", action="append", metavar="SEC:START-END",
+                    help="with --proposal: print each map symbol of that data range with its candidate owner and the units that read it (repeatable)")
     ap.add_argument("--only", help="comma list of invariants")
     ap.add_argument("--unit", help="regex: report only the units whose name matches (--baseline); with --proposal, the `detail`/`pooldup` lines of the candidate's matching units")
     ap.add_argument("--json", help="write the machine-readable report here")
