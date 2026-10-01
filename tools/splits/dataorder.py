@@ -516,7 +516,10 @@ def selftest() -> int:
         found_nt = [a for a in (0x805F9570, 0x805F9610, 0x805F9958, 0x805F9A40) if a in inside]
         check("real DOL: the four network_transport V->S seams are inside a unit or at a unit start",
               found_nt, [0x805F9570, 0x805F9610, 0x805F9958, 0x805F9A40])
-        check("real DOL: unclaimed .data holds candidate seams", out["in_unclaimed_data"] > 30, True)
+        # the seams stay in the DOL whoever owns the data: once the splits program claimed the unowned runs the
+        # "unclaimed" bucket empties, so count every bucket
+        check("real DOL: .data holds candidate seams",
+              out["in_unclaimed_data"] + len(out["inside_registered_unit"]) + len(out["at_registered_unit_start"]) > 30, True)
         rows_vs = [s for s in out["inside_registered_unit"] + out["unclaimed"] + out["at_registered_unit_start"]
                    if s["kind"] == "V->S"]
         check("real DOL: the g3d/ef inline tails are found (16 V->S rows measured 2026-09-29)",
