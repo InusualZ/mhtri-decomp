@@ -60,6 +60,7 @@ GAME = "RMHE08"
 WINDOWS = (("a", 0x80000000, 0x800E0000), ("b", 0x800E0000, 0x801C0000), ("c", 0x801C0000, 0x802A0000),
            ("d", 0x802A0000, 0x80380000), ("e", 0x80380000, 0x80460000), ("fg", 0x80460000, None))
 CODE = (".init", ".text")
+DOUBLE_SECTIONS = (".sdata2", ".sdata", ".rodata")   # sections where a unit that holds a `double` must start 8-aligned (align_candidate)
 DATA = (".rodata", ".data", ".sdata", ".sdata2", ".bss", ".sbss", ".sbss2")
 PHASE4_DIR = os.path.join("docs", "splits", "phase4")
 NAMES_FILE = os.path.join(PHASE4_DIR, "names.json")
@@ -195,6 +196,8 @@ def align_candidate(cand, symbols, absorb_blocked=False):
     has no such boundary (180 gaps, all aligned) and the candidate has 23 gaps and 4 more starts: its ranges end where the last symbol ends and begin where the
     first one begins.  An END before a gap moves up over the padding; a START moves down over the padding of the gap before it, or (abutting) takes the padding
     from the range before it.  Neither moves over a map symbol; what cannot move is `blocked` (an unowned or foreign unaligned symbol begins right there).
+    An aligned END that lies strictly inside a symbol-free gap also moves to the next symbol's start: dtk's `gap_NN_ADDR_<section>` symbol runs to that
+    symbol, past the unit's end, and `objdiff report` then refuses the object (`size out of section bounds`).
     `fixes` and `blocked` are `(unit, section, old boundary, new boundary or the blocking address)`."""
     sym_start = collections.defaultdict(list)
     sym_cover = collections.defaultdict(list)
@@ -258,6 +261,42 @@ def align_candidate(cand, symbols, absorb_blocked=False):
                         changed = True
             if not changed:
                 break
+        lst.sort(key=lambda r: (r[0], r[1]))
+        if sec in DOUBLE_SECTIONS:
+            # A START that is 4- but not 8-aligned over a range that holds a `double`: dtk gives the object a section alignment of 4 and
+            # mwld then drops the padding in front of the 8-byte object (lb_quest_board's `.sdata2` 0x8079C2B4..: `lbl_8079C2C8` links at
+            # 0x8079C2C4 and every later symbol of the section moves).  The start moves down to the 8-aligned address, the abutting
+            # range before it gives up its tail (the symbols between move with the boundary).
+            dbl = sorted(s["addr"] for s in symbols if s["section"] == sec and s["kind"] == "double" and s["addr"] % 8 == 0)
+            for k, r in enumerate(lst):
+                prev = lst[k - 1] if k else None
+                if r[0] % 8 and r[0] % 4 == 0 and any(r[0] <= x < r[1] for x in dbl):
+                    fl = r[0] & ~7
+                    if prev is not None and prev[1] > r[0]:
+                        continue
+                    if prev is not None and prev[1] == r[0]:
+                        if prev[0] < fl and not covered(sec, fl, r[0]):
+                            fixes.append((r[2].name, sec, r[0], fl))
+                            prev[1] = r[0] = fl
+                            write(sec, prev)
+                            write(sec, r)
+                    elif (prev is None or fl >= prev[1]) and not covered(sec, fl, r[0]):
+                        fixes.append((r[2].name, sec, r[0], fl))
+                        r[0] = fl
+                        write(sec, r)
+        lst.sort(key=lambda r: (r[0], r[1]))
+        for k, r in enumerate(lst):
+            # An END strictly inside a symbol-free gap (the last symbol ends below it, the next one starts above it): dtk's gap symbol
+            # (`gap_09_807935C9_sdata`) runs to the next symbol, past the unit's end, and `objdiff report` refuses the object
+            # (`size out of section bounds`).  The end moves up to the next symbol's start when no other range starts before it.
+            nxt = lst[k + 1] if k + 1 < len(lst) else None
+            if r[1] % 4 == 0 and (nxt is None or nxt[0] > r[1]):
+                prev_end = max([y for x, y in sym_cover[sec] if x < r[1]] or [0])
+                nstart = starts_in(sec, r[1], 1 << 32)
+                if prev_end < r[1] and nstart is not None and nstart > r[1] and (nxt is None or nstart <= nxt[0]):
+                    fixes.append((r[2].name, sec, r[1], nstart))
+                    r[1] = nstart
+                    write(sec, r)
         lst.sort(key=lambda r: (r[0], r[1]))
         for k, r in enumerate(lst):
             nxt = lst[k + 1] if k + 1 < len(lst) else None
@@ -1754,6 +1793,22 @@ def selftest():
           ([("b.cpp", ".data", 0x122)], [(0x122, 0x130)]))
     got3, _f3, blocked3 = align_candidate(clone_splits(al2), [sym("x", ".data", 0x110, 0x10), sym("z", ".data", 0x122, 8)])
     check("... and without that symbol the start moves down to the aligned address", (got3.by_name()["b.cpp"].rs(".data"), blocked3), ([(0x120, 0x130)], []))
+    al4 = sc.Splits(header, [U("e.cpp", **{".data": (0x500, 0x508)}), U("f.cpp", **{".data": (0x510, 0x514)})])
+    got4, fixes4, _b4 = align_candidate(clone_splits(al4), [sym("a", ".data", 0x500, 5), sym("b", ".data", 0x510, 4)])
+    check("an aligned end strictly inside a symbol-free gap moves to the next symbol (dtk's gap symbol would overflow the unit)",
+          (got4.by_name()["e.cpp"].rs(".data"), fixes4), ([(0x500, 0x510)], [("e.cpp", ".data", 0x508, 0x510)]))
+    got5, fixes5, _b5 = align_candidate(clone_splits(al4), [sym("a", ".data", 0x500, 8), sym("b", ".data", 0x510, 4)])
+    check("... an end at a symbol's end is left alone", (got5.by_name()["e.cpp"].rs(".data"), fixes5), ([(0x500, 0x508)], []))
+    def dsym(name, addr):
+        s = sym(name, ".sdata2", addr, 8)
+        s["kind"] = "double"
+        return s
+    al6 = sc.Splits(header, [U("g.cpp", **{".sdata2": (0x600, 0x614)}), U("h.cpp", **{".sdata2": (0x614, 0x634)})])
+    got6, fixes6, _b6 = align_candidate(clone_splits(al6), [sym("f0", ".sdata2", 0x600, 4), sym("f1", ".sdata2", 0x610, 4), sym("f2", ".sdata2", 0x614, 4),
+                                                           sym("f3", ".sdata2", 0x618, 4), dsym("d0", 0x620), sym("f4", ".sdata2", 0x628, 4)])
+    check("a range that holds a double and starts 4- but not 8-aligned starts at the 8-aligned address (the abutting range gives up its tail)",
+          (got6.by_name()["g.cpp"].rs(".sdata2"), got6.by_name()["h.cpp"].rs(".sdata2"), fixes6),
+          ([(0x600, 0x610)], [(0x610, 0x634)], [("h.cpp", ".sdata2", 0x614, 0x610)]))
     # dtk's refusals and its config
     m = UNSPLIT_RE.search("Caused by: Unsplit data in .sdata2 from Network/NetworkSessionManagerPat.cpp 11:0x8079C78C to next split 11:0x8079C790")
     check("the `Unsplit data` refusal is parsed", m and (m.group(1), m.group(2), m.group(3), m.group(4)), (".sdata2", "Network/NetworkSessionManagerPat.cpp", "8079C78C", "8079C790"))
