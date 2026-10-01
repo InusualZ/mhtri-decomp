@@ -1210,7 +1210,8 @@ def resolve_overrides(an, rows, path=None):
 
     A row is `{unit | text_addr, section, start, end (or range), action: attach|defer|exclude, grade, signal: "orchestrator", evidence: [{tool, command,
     finding}], note, reproduce, candidates, takes_from}`: `attach` gives the range to the unit (grade `strong|medium`, evidence required; with
-    `takes_from` it is one row over bytes another unit owns, a recut, and the unit it names gives them up), `defer` lists it in
+    `takes_from` it is one row over bytes another unit owns, a recut, and the unit it names gives them up; `"force": true` keeps the row applied when the
+    invariant loop would block it - the owner's ruling for data the land gate refuses to leave behind), `defer` lists it in
     `unowned_data` (`candidates`, else the unit), `exclude` leaves it in neither list.  Two overrides may not overlap in one section."""
     out = []
     for n, row in enumerate(rows):
@@ -1258,7 +1259,7 @@ def resolve_overrides(an, rows, path=None):
         if donor and (action != "attach" or an.cand_unit(donor) is None):
             raise SystemExit("%s: takes_from %r (an attach naming a unit of the candidate whose bytes it takes)" % (who, donor))
         out.append({"id": n, "action": action, "unit": unit.name if unit is not None else None, "section": sec, "start": a, "end": b, "grade": grade,
-                    "takes_from": donor,
+                    "takes_from": donor, "force": bool(row.get("force")),
                     "signal": "orchestrator", "evidence": ev, "note": row.get("note", ""), "candidates": cands,
                     "reproduce": row.get("reproduce") or "python tools/splits/dataattach.py --overrides %s" % (path or "<overrides file>")})
     by = collections.defaultdict(list)
@@ -1495,6 +1496,8 @@ def settle(an, extra_rows, records, lane, log=print):
                 hit = [x for x in records if not x.get("blocked") and x["entry"]["unit"] == unit and (secs is None or x["sec"] in secs)]
             if hit and inv == "pool" and finding.startswith("claimed pool: first use of") and hit[0].get("inversions"):
                 accepted[id(hit[0])] = hit[0]               # the recorded two-TU signal of a TU-local pool: an open question, not a reason to defer
+            elif hit and hit[0].get("override") is not None and an.overrides[hit[0]["override"]].get("force"):
+                pass                                        # a forced override (`"force": true`): the failure is recorded in the checker's output, the row stays applied
             elif hit:
                 todo.append((hit[0], inv, finding))
             else:
@@ -2273,6 +2276,13 @@ def selftest_phase3(check, T):
     blocked, unattr, _jr, _acc, _mv = settle(jan, [], jrec, "t", log=lambda *a: None)
     check("overrides: attaching a jump table to the wrong unit is BLOCKED by the invariant loop and reported (not applied)",
           ([(b["entry"]["unit"], b["blocked"][0]) for b in blocked], override_outcomes(jan, jrec, [])[0]["outcome"], unattr), ([("c.cpp", "jumptable")], "blocked", []))
+    jan_f = Analysis(cj.splits, cj, {})
+    jan_f.splits, jan_f.symbols, jan_f.dol, jan_f.props, jan_f.base_ctx = cj.splits, cj.symbols, cj.dol, [], cj
+    jan_f.set_overrides(resolve_overrides(jan_f, [dict(jrows[0], force=True)]))
+    jrec_f, _juf = build_records(jan_f, (T, T + 0x100))
+    blocked_f, _ua, _jrf, _accf, _mvf = settle(jan_f, [], jrec_f, "t", log=lambda *a: None)
+    check("overrides: the same row with force stays applied (not blocked) although the jumptable invariant fails",
+          (blocked_f, override_outcomes(jan_f, jrec_f, [])[0]["outcome"]), ([], "applied"))
     jan0 = Analysis(cj.splits, cj, {})
     jrec0, _ju0 = build_records(jan0, (T, T + 0x100))
     check("overrides: the same table without the override is b.cpp's (the dispatch reads it)", [(x["entry"]["unit"], x["entry"]["signal"]) for x in jrec0], [("a.cpp", "reader"), ("b.cpp", "jumptable")])
