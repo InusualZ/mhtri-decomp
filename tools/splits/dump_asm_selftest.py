@@ -81,6 +81,8 @@ def test_stamp_states(tmp):
 
     td.write_asm_stamp()
     check("stamped dump is fresh", state(), "fresh")
+    check("a dump read from outside the tree says it is MAIN's, read-only", "[MAIN's dump" in td.asm_stamp_status()[1], True)
+    check("... and is reported as a fallback", td.dump_is_main_fallback(), True)
     check("stamp counts .s only", json.loads(open(td.ASM_STAMP, encoding="utf-8").read())["files"], 1)
     check("no temp stamp left behind", os.path.exists(td.ASM_STAMP + ".tmp"), False)
 
@@ -111,11 +113,22 @@ def test_stamp_states(tmp):
     check("absent directory is missing", state(), "missing")
 
 
+def test_local_dump(tmp):
+    """The tool that WRITES the dump never follows the MAIN fallback."""
+    td.ASM_DIR = str(tmp / "main-dump")
+    check("a dump outside the tree is a fallback", td.dump_is_main_fallback(), True)
+    td.use_local_dump()
+    check("use_local_dump points at the tree's own dump", (td.ASM_DIR, td.dump_is_main_fallback()), (td.LOCAL_ASM_DIR, False))
+    check("... and its stamp", td.ASM_STAMP, os.path.join(td.LOCAL_ASM_DIR, ".stamp.json"))
+    check("dump_asm's out_dir is the tree's own build dir, never MAIN's", da.BUILD_DIR, Path(td.LOCAL_ASM_DIR).parent)
+
+
 def main():
     with tempfile.TemporaryDirectory(prefix="dump_asm_selftest-") as tmp:
         tmp = Path(tmp)
         test_temp_config(tmp)
         test_stamp_states(tmp / "state")
+        test_local_dump(tmp)
     for line in FAIL:
         print("FAIL " + line)
     print("%d check(s) failed" % len(FAIL) if FAIL else "all checks passed")

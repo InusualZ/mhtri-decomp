@@ -50,10 +50,33 @@ into the larger unit with the candidate cut recorded.
 * `ranges` is the unit's **final** ranges per section (phase 1: `.text` only). The renderer derives the sections a
   text cut already determines: `extabindex`/`extab` by the function of each entry, `.ctors`/`.dtors` by the function each
   word points at; a section the unit lists itself is kept as written.
-* **Rendering** (`splitcheck.py --proposal F`): units are taken in text order; a `guess` cut merges the unit into its
-  left neighbour (the larger `.text` keeps its name; the absorbed unit and the candidate cut are printed); the proposal
-  ranges are subtracted from the baseline units they overlap (a proposal that leaves a baseline unit with a hole, reuses a
-  baseline name or overlaps another proposal unit is a `lint:` line and a non-zero exit).
+* **Fields** (validated by the linter: an unknown key is a `warn:` line, a wrong type a `lint:` error):
+  * file: `phase`, `band`, `text_range` (or `range`), `units`, `open_questions` (a list of strings or objects: the
+    candidate cuts kept out of the candidate, e.g. `{"unit", "question", "candidate_interval", "positions", "evidence",
+    "reproduce"}`);
+  * unit: `derived_name`, `module`, `ranges`, `cuts`, `open_questions`, and the bookkeeping `removes_cuts` (the
+    registered cuts the unit makes disappear: full cut objects, each should be a registered range start - a warning when
+    not), `absorbs` (baseline unit names it swallows whole; a trailing comment after the name is fine) and
+    `replaces_tail_of` (a baseline unit name, or a list of them, it cuts a tail from);
+  * cut: `addr`, `section`, `grade`, `evidence`, `reproduce`, `kind` (a label such as `sinit-closure`,
+    `registered-edge`, `pooldup-forced`, `callers`; free text) and `keep_registered_edge`.
+* **`module: "main"`** is the module of a root-level unit (`src/<name>.cpp`, no directory); the candidate names it
+  `main/<derived_name>.cpp` and phase 4 drops the directory.
+* **`keep_registered_edge: true`** on a cut says "this only restates a registered edge whose position is proven to lie
+  inside a wide interval": the cut is grade-neutral (`grade` and `evidence` become optional), is **not counted as a
+  proven cut**, and is never merged away; the cut must sit on a registered range start (an error otherwise). The
+  renderer prints the cut counts apart: `strong N, medium N, guess N, keep_registered_edge N`.
+* **Rendering** (`splitcheck.py --proposal F`): units are taken in text order; a `guess` cut merges the unit into the unit
+  that TOUCHES its left edge - a proposal unit with a range ending at the cut, else a registered unit that does (the larger
+  `.text` keeps its name; the absorbed unit and the candidate cut are printed, `into registered X` for the latter, whose
+  ranges then grow by the absorbed unit's); a guess cut with no touching unit is a `lint:` error and the unit stays; the
+  proposal ranges are subtracted from the baseline units they overlap (a proposal that leaves a baseline unit with a hole,
+  reuses a baseline name or overlaps another proposal unit is a `lint:` line and a non-zero exit).
+* **Data of a recut registered unit** (`--data-by-reader`, default on; `--no-data-by-reader` turns it off): for each data
+  run of a baseline unit whose text the proposal splits (or absorbs), the symbols are assigned to the pieces in text order by
+  a monotone DP (cost: readers in another piece, decoded from the retail text; ties keep a symbol with the earlier piece).
+  A section a proposal unit already lists over that run is left as written. It is a **PROVISIONAL phase-1 default** - not
+  evidence; phase 2 replaces it - and the renderer prints every (unit, section) it assigned.
 
 ## The checker
 
@@ -64,7 +87,12 @@ python tools/splits/splitcheck.py --selftest
 ```
 
 It is read-only. The DOL is found in the tree, else in the primary checkout (`orig/` is not in a worktree); it never
-needs a build directory. Per unit and per invariant the verdict is PASS / FAIL / UNKNOWN (`-` = does not apply) with
+needs a build directory. **The same fallback serves the other readers** (`unitutil.resolve_input`, one implementation):
+`tudiscover` (DOL and the asm dump), `callers` (the asm dump, else the split objects' relocations) and `dataorder` read
+the tree's own `orig/` / `build/` when it has them, else MAIN's by path, read-only. MAIN is `$MHTRI_MAIN` (for the tree
+the tools serve) or the parent of the git common dir. `dump_asm.py` always writes the tree's own dump; `tudiscover`'s
+status line says `[MAIN's dump ..., read-only]` when it reads MAIN's. A dump whose stamp does not match the tree's
+`symbols.txt`/`splits.txt` is reported `stale`, as before. Per unit and per invariant the verdict is PASS / FAIL / UNKNOWN (`-` = does not apply) with
 the evidence address. Invariants: `order`, `coverage`, `text-cut`, `extab`, `ctors`, `dtors`, `pool`, `data-order`,
 `vtable`, `jumptable`, `bss` (definitions in the tool's docstring). Also emitted: one record per text boundary
 (`fn-start`, `pool-shared`), `coverage_gaps` (unowned symbol runs per section), the ranked `top_defects`, and for
@@ -75,11 +103,22 @@ groups recomputed from the decode, cf. `docs/pool-seams.md`).
   (`lis` + `addi`/`ori`/load, r13/r2 small-data accesses): heuristic, so a pool finding names the literal and the
   reader and a reviewer confirms it with `python tools/units/callers.py <address>` (the same kind of index, built from
   the asm dump).
-* `ctors`: a unit has one `.ctors` word and it points at the unit's **last** function (`__sinit`); more words, or a
-  word pointing earlier, means the unit spans several TUs and names the cut (`cut_at`). The crt chain entries
-  (`__destroy_global_chain`, ...) are exempt.
+* `ctors`: a unit has one `.ctors` word and it points at the unit's `__sinit`, but the `__sinit` is **not** the TU's last
+  function: MWCC emits the local constructors, the destructors registered by address and the `lis/addi/b ctor` thunks
+  after it. The TU ends at `L`, the end of the closure of the sinit's callees and address-taken functions that lie after it
+  (inside the unit; a `bl`/`b` or a `lis`+`addi` of a function start). PASS when `L` is the unit's end (within 0xC of
+  padding); FAIL with `cut_at = L` when the unit goes on, **unless** the function at `L` is called or address-taken from
+  before `L` inside the unit - then it is UNKNOWN (the boundary is not confirmed). More words than one means several TUs.
+  The crt chain entries (`__destroy_global_chain`, ...) are exempt.
 * `pool` (idea 94): a literal read by two units means one TU; one value at two addresses read by one unit means two TUs;
-  a claimed pool must run in first-use order and be read by its unit.
+  a claimed pool must run in first-use order and be read by its unit. A numeric `.sdata2` literal is **read** only by a
+  load (`lfs/lfd/lwz/lhz/lbz/psq_l` through r13/r2, a `lis`, or a register an `addi`/`ori` formed the address into; calls
+  and jumps end the register's life): a `lis/addi` that only passes or stores the address is not a read. Strings (`.sdata`)
+  are used by their address, so any reference counts. First-use order is judged **per function**: literals first used in
+  the same function carry no order (the scheduler reorders loads), a literal first used in an earlier function than the
+  one before it fails.
+* `data-order`: a strong `V->S` seam is not a seam when the vtable on either side of it is stored by a function in the
+  closure of the same unit's `__sinit` (a deferred constructor instantiated in this TU for a class defined elsewhere).
 * `order`: `rename:` ranges (`.ctors$10`, `.dtors$15`) are ordered by the linker script and left out of the order graph.
 
 ## How a reviewer re-derives a cut

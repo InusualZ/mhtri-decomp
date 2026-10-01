@@ -92,8 +92,20 @@ ROOT = uu.ROOT
 GAME = "RMHE08"
 SYMBOLS = os.path.join(ROOT, "config", GAME, "symbols.txt")
 SPLITS = os.path.join(ROOT, "config", GAME, "splits.txt")
-ASM_DIR = os.path.join(ROOT, "build", GAME, "asm")
-DOL = os.path.join(ROOT, "orig", GAME, "sys", "main.dol")
+LOCAL_ASM_DIR = os.path.join(ROOT, "build", GAME, "asm")      # the tree's own dump: the only place a tool WRITES
+
+
+def has_dump(d):
+    """Whether a directory holds at least one `.s` file."""
+    for _dp, _dirs, names in os.walk(d):
+        if any(n.endswith(".s") for n in names):
+            return True
+    return False
+
+
+#: where the dump is READ from: the tree's own, else MAIN's by path (a fresh worktree has no `build/`); same for the DOL
+ASM_DIR = uu.resolve_input(os.path.join("build", GAME, "asm"), ROOT, has_dump)
+DOL = uu.resolve_input(os.path.join("orig", GAME, "sys", "main.dol"), ROOT, os.path.isfile)
 CACHE = os.path.join(ROOT, "build", "tmp", "tudiscover", "graph.json")
 SCHEMA = 10     # bump on any change to what `build_graph()` stores (the stamp also hashes the code)
 
@@ -303,6 +315,19 @@ def map_fn_hits(path, fns):
 ASM_STAMP = os.path.join(ASM_DIR, ".stamp.json")
 
 
+def use_local_dump():
+    """Point the dump at the tree's OWN `build/<game>/asm` - what the tool that WRITES the dump (`dump_asm.py`) calls first,
+    so a fallback to MAIN's dump can never make it write into MAIN."""
+    global ASM_DIR, ASM_STAMP
+    ASM_DIR = LOCAL_ASM_DIR
+    ASM_STAMP = os.path.join(ASM_DIR, ".stamp.json")
+
+
+def dump_is_main_fallback():
+    """True when the dump is read from another tree's `build/` (MAIN's) because this tree has none."""
+    return os.path.normcase(os.path.abspath(ASM_DIR)) != os.path.normcase(os.path.abspath(LOCAL_ASM_DIR))
+
+
 def repo_rel(path):
     """`path` relative to the repo root, or as-is when that is not expressible (Windows drives)."""
     try:
@@ -368,15 +393,16 @@ def asm_stamp_status():
     except (ValueError, OSError, AssertionError) as exc:
         return "unstamped", "%d file(s), unreadable stamp (%s) - run tools/splits/dump_asm.py" \
             % (cur["files"], exc)
+    note = " [MAIN's dump at %s, read-only]" % repo_rel(ASM_DIR) if dump_is_main_fallback() else ""
     changed = [k for k in ("symbols", "splits", "dol") if old.get(k) != cur[k]]
     if changed:
-        return "stale", "%s changed since the dump (%s) - run tools/splits/dump_asm.py" \
-            % ("/".join(changed), old.get("utc", "unknown time"))
+        return "stale", "%s changed since the dump (%s) - run tools/splits/dump_asm.py%s" \
+            % ("/".join(changed), old.get("utc", "unknown time"), note)
     if cur["files"] < old.get("files", 0):
         return "truncated", "%d of %d file(s) are gone - run tools/splits/dump_asm.py" \
             % (old["files"] - cur["files"], old["files"])
-    return "fresh", "%d file(s), matches symbols.txt/splits.txt/main.dol (dumped %s)" \
-        % (cur["files"], old.get("utc", "unknown time"))
+    return "fresh", "%d file(s), matches symbols.txt/splits.txt/main.dol (dumped %s)%s" \
+        % (cur["files"], old.get("utc", "unknown time"), note)
 
 
 def asm_files(fns=None):

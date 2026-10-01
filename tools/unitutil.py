@@ -166,6 +166,43 @@ def repo_root(start=None):
 ROOT = repo_root()
 
 
+def main_tree(root=None):
+    """MAIN, the primary checkout a worktree was cut from: `$MHTRI_MAIN` when it names a directory, else the parent of
+    `git rev-parse --git-common-dir`.  None when neither answers (a fixture, a non-git copy)."""
+    root = root or ROOT
+    env = os.environ.get("MHTRI_MAIN")
+    if env and os.path.isdir(env) and os.path.normcase(os.path.abspath(root)) == os.path.normcase(ROOT):
+        return os.path.abspath(env)                   # an explicit override, for the tree the tools serve (never a fixture root)
+    try:
+        out = subprocess.run(["git", "rev-parse", "--git-common-dir"], cwd=root, capture_output=True, text=True,
+                             encoding="utf-8", errors="replace", timeout=20).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if not out:
+        return None
+    out = os.path.normpath(out if os.path.isabs(out) else os.path.join(root, out))
+    return os.path.dirname(out) if os.path.basename(out) == ".git" else None
+
+
+def resolve_input(rel, root=None, probe=os.path.exists):
+    """The path of a build/orig input: `rel` under the tree, else (read-only) under MAIN when the tree has none.
+
+    `orig/` and `build/` are not in a fresh worktree; a reader of the asm dump, the split objects or the original DOL
+    uses this instead of `ROOT/rel` so it reads MAIN's copy by path.  `probe(path)` says whether a candidate is usable
+    (default: exists).  When neither has it the tree's own path is returned, so the error names the tree's path.
+    Never use it for a path a tool WRITES."""
+    root = os.path.abspath(root or ROOT)
+    local = os.path.join(root, rel)
+    if probe(local):
+        return local
+    main = main_tree(root)
+    if main and os.path.normcase(os.path.abspath(main)) != os.path.normcase(root):
+        cand = os.path.join(main, rel)
+        if probe(cand):
+            return cand
+    return local
+
+
 def warn_if_foreign_worktree() -> None:
     """Say so when the caller sits in a worktree other than ROOT - a silent wrong-source measurement.
 

@@ -144,6 +144,69 @@ def selftest() -> int:
                            encoding="utf-8", errors="replace")
         failures = _ok("a cwd that is not a tree still falls back to this tree",
                        os.path.normcase(p.stdout.strip()), os.path.normcase(real), failures)
+
+        failures = _input_fallback(tmp, failures)
+    return failures
+
+
+def _input_fallback(tmp: str, failures: int) -> int:
+    """`resolve_input`: a build/orig input is read from the tree, else from MAIN by path (never the reverse, never written)."""
+    def norm(p):
+        return os.path.normcase(os.path.abspath(p))
+
+    def put(root, rel, data=b"x"):
+        path = os.path.join(root, rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as fh:
+            fh.write(data)
+        return path
+
+    def git(cwd, *args):
+        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"] + list(args), cwd=cwd,
+                       capture_output=True, check=True)
+
+    main = os.path.join(tmp, "main")
+    wt = os.path.join(tmp, "wt")
+    os.makedirs(main)
+    put(main, "configure.py", b"config.libs = []\n")
+    git(main, "init", "-q")
+    git(main, "add", "configure.py")
+    git(main, "commit", "-q", "-m", "init")
+    git(main, "worktree", "add", "-q", wt)
+    failures = _ok("main_tree(worktree) is the primary checkout (the git common dir's parent)", norm(uu.main_tree(wt) or ""), norm(main), failures)
+    failures = _ok("main_tree(a tree that is not in git) is None", uu.main_tree(os.path.join(tmp, "not-a-tree")), None, failures)
+    rel = os.path.join("orig", "RMHE08", "sys", "main.dol")
+    failures = _ok("nothing anywhere -> the tree's own path (the error names it)", norm(uu.resolve_input(rel, wt)), norm(os.path.join(wt, rel)), failures)
+    in_main = put(main, rel)
+    failures = _ok("only MAIN has it -> MAIN's path", norm(uu.resolve_input(rel, wt)), norm(in_main), failures)
+    in_wt = put(wt, rel)
+    failures = _ok("both have it -> the tree's own", norm(uu.resolve_input(rel, wt)), norm(in_wt), failures)
+    failures = _ok("MAIN itself resolves to itself (no self-fallback loop)", norm(uu.resolve_input(rel, main)), norm(in_main), failures)
+    os.remove(in_wt)
+    # a directory input with a probe: an empty tree dir does not hide MAIN's dump
+    put(main, os.path.join("build", "RMHE08", "asm", "a", "u.s"))
+    os.makedirs(os.path.join(wt, "build", "RMHE08", "asm"))
+
+    def has_s(d):
+        return any(n.endswith(".s") for _dp, _dirs, names in os.walk(d) for n in names)
+    failures = _ok("an empty local dir fails the probe -> MAIN's dump", norm(uu.resolve_input(os.path.join("build", "RMHE08", "asm"), wt, has_s)),
+                   norm(os.path.join(main, "build", "RMHE08", "asm")), failures)
+    failures = _ok("the same dir with the default probe (exists) stays local", norm(uu.resolve_input(os.path.join("build", "RMHE08", "asm"), wt)),
+                   norm(os.path.join(wt, "build", "RMHE08", "asm")), failures)
+    # $MHTRI_MAIN names MAIN for the tree the tools serve (ROOT); a fixture root never takes it
+    alt = os.path.join(tmp, "alt")
+    alt_file = put(alt, "only/in/alt.bin")
+    old = os.environ.get("MHTRI_MAIN")
+    os.environ["MHTRI_MAIN"] = alt
+    try:
+        failures = _ok("MHTRI_MAIN is MAIN for the tools' own tree", norm(uu.main_tree(uu.ROOT) or ""), norm(alt), failures)
+        failures = _ok("... and resolve_input reads it", norm(uu.resolve_input(os.path.join("only", "in", "alt.bin"), uu.ROOT)), norm(alt_file), failures)
+        failures = _ok("... but a fixture root ignores it", norm(uu.main_tree(wt) or ""), norm(main), failures)
+    finally:
+        if old is None:
+            del os.environ["MHTRI_MAIN"]
+        else:
+            os.environ["MHTRI_MAIN"] = old
     return failures
 
 

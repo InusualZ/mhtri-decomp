@@ -89,6 +89,7 @@ for _path in (TOOLS, HERE, os.path.join(TOOLS, "symbols"), os.path.join(TOOLS, "
         sys.path.insert(0, _path)
 
 import tudiscover as td  # noqa: E402  (GAME, ASM_DIR, and the dump's own stamp: one definition of stale)
+import unitutil as uu  # noqa: E402  (resolve_input: MAIN's build/ by path when the tree has none)
 from units import stylelint as sl  # noqa: E402  (the Ownership index the rule-2 lint uses)
 from units import callees as cl  # noqa: E402  (decode_rw: the tree's one register read/write decode)
 from units import dossier as dossier_mod  # noqa: E402  (parse_elf: the tree's one relocation scan)
@@ -135,7 +136,8 @@ MOD_RE = re.compile(r'(?:"([^"]+)"|([A-Za-z_$][\w$.]*))@(ha|h|l|sda21|sda2)\b')
 
 
 def asm_dir_of(root=ROOT):
-    return os.path.join(root, "build", GAME, "asm")
+    """The dump to READ: the tree's own `build/<game>/asm`, else MAIN's by path when the tree has none (a fresh worktree)."""
+    return uu.resolve_input(os.path.join("build", GAME, "asm"), root, td.has_dump)
 
 
 def cache_of(root=ROOT):
@@ -521,8 +523,13 @@ def load_index(root=ROOT, rebuild=False, asm_dir=None, cache=None):
 # exactly what the question needs: a `bl` is an `R_PPC_REL24` to the callee, a data access is an
 # `R_PPC_ADDR16_*`/`@sda21` relocation to the data symbol. This builds the same address-keyed graph
 # from them, so `query`/`print_report` are unchanged.
+def _has_objects(d):
+    return any(n.endswith(".o") for _dp, _dirs, names in os.walk(d) for n in names)
+
+
 def obj_dir_of(root=ROOT):
-    return os.path.join(root, "build", GAME, "obj")
+    """The split objects to READ: the tree's own `build/<game>/obj`, else MAIN's by path when the tree has none."""
+    return uu.resolve_input(os.path.join("build", GAME, "obj"), root, _has_objects)
 
 
 def all_object_files(root=ROOT):
