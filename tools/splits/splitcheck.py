@@ -425,6 +425,10 @@ class Ctx:
             if ext:
                 data_lo = ext[0] if data_lo is None else min(data_lo, ext[0])
         hi = max((e for sec in self.sec_index for _s, e, _u in self.sec_index[sec]), default=0)
+        # the map's own data extent counts too: an unowned `.sdata2` pool past the last owned range is still read by text
+        hi = max([hi] + [s["addr"] + (s["size"] or 4) for s in self.data_syms])
+        if data_lo is None and self.data_syms:
+            data_lo = min(s["addr"] for s in self.data_syms)
 
         def is_data(t):
             return data_lo is not None and data_lo <= t < hi
@@ -525,6 +529,42 @@ class Ctx:
                     seen.add(t)
                     work.append(t)
         return seen, max(f["addr"] + (f["size"] or 0) for f in (self.fn_at(a) for a in seen))
+
+    def fn_slot_words(self):
+        """`{function start: [.data word addresses holding it]}` - the virtual-table slots (read lazily, once)."""
+        if getattr(self, "_slot_words", None) is None:
+            self._slot_words = collections.defaultdict(list)
+            rows = [s for s in self.data_syms if s["section"] == ".data"]          # the map's extent: unowned `.data` counts too
+            ext = (min(s["addr"] for s in rows), max(s["addr"] + (s["size"] or 4) for s in rows)) if rows else None
+            if ext:
+                blob = self.read_span(ext[0], ext[1])
+                fs = set(self._fn_starts)
+                for i, w in enumerate(struct.unpack(">%dI" % (len(blob) // 4), blob[:len(blob) // 4 * 4])):
+                    if w in fs:
+                        self._slot_words[w].append(ext[0] + i * 4)
+        return self._slot_words
+
+    def extend_over_own_vtable_slots(self, limit, lo, end):
+        """The end of the run of functions at `limit` that are slots of a vtable a function of the unit text `[lo, limit)` stores
+        (inline virtual functions a TU emits after its `__sinit`: the table's constructor is in the unit, nothing calls them).
+        Returns `limit` unchanged when the function at `limit` is not such a slot."""
+        while limit + SINIT_SLACK < end:
+            k = bisect.bisect_left(self._fn_starts, limit)
+            if k >= len(self.fns):
+                break
+            g = self.fns[k]
+            if g["addr"] - limit > SINIT_SLACK or g["addr"] >= end:
+                break
+            own = False
+            for wa in self.fn_slot_words().get(g["addr"], ()):
+                i, _sym = self.data_sym_at(wa)
+                if i is not None and any(lo <= site < limit for site in self.refs.get(i, ())):
+                    own = True
+                    break
+            if not own:
+                break
+            limit = max(limit, self.sinit_closure(g["addr"], end)[1])       # the slot and what it calls after itself
+        return limit
 
 
 # ---- the result store ---------------------------------------------------------------------------------------------------
@@ -769,6 +809,7 @@ def check_ctors(ctx, res):
                                 % (f["name"], hx(end), hx(sinit_end)), {"cut_at": sinit_end})
                         continue
                     _fns, limit = ctx.sinit_closure(f["addr"], end)
+                    limit = ctx.extend_over_own_vtable_slots(limit, tr[0][0] if tr else 0, end)
                     if limit + SINIT_SLACK >= end:
                         res.add(u.name, inv, PASS)
                         continue
@@ -1171,7 +1212,8 @@ def load_proposal(path):
 
 
 #: the proposal file's fields: name -> accepted types.  An unknown key is a lint WARNING, a wrong type an ERROR.
-TOP_FIELDS = {"phase": (int, str), "band": (str,), "text_range": (list,), "range": (list,), "units": (list,), "open_questions": (list,)}
+TOP_FIELDS = {"phase": (int, str), "band": (str,), "text_range": (list,), "range": (list,), "units": (list,), "open_questions": (list,),
+              "supersedes": (list,)}
 UNIT_FIELDS = {"derived_name": (str,), "module": (str,), "ranges": (dict,), "cuts": (list,), "open_questions": (list,),
                "removes_cuts": (list,), "absorbs": (list,), "replaces_tail_of": (str, list)}
 CUT_FIELDS = {"addr": (int, str), "section": (str,), "grade": (str,), "evidence": (list,), "reproduce": (str,), "kind": (str,),
@@ -1210,7 +1252,7 @@ def _lst(v):
 
 def lint_proposal_full(proposal, base=None):
     """`(errors, warnings)` of a proposal file.  With `base` (the baseline `Splits`) the fields that name baseline state are
-    checked against it: `keep_registered_edge` must sit on a registered range start (error), `removes_cuts`, `absorbs` and
+    checked against it: `keep_registered_edge` must sit on a registered range start or end (error), `removes_cuts`, `absorbs` and
     `replaces_tail_of` must name one (warning)."""
     issues, warns = [], []
     if not isinstance(proposal, dict) or not isinstance(proposal.get("units"), list) or not proposal["units"]:
@@ -1219,14 +1261,19 @@ def lint_proposal_full(proposal, base=None):
     for q in _lst(proposal.get("open_questions")):
         if not isinstance(q, (str, dict)):
             issues.append("proposal: an open_questions entry is %s, want str|dict" % type(q).__name__)
+    for s in _lst(proposal.get("supersedes")):
+        if not (isinstance(s, dict) and all(isinstance(s.get(k), str) and s.get(k) for k in ("band", "unit", "reason"))):
+            issues.append("proposal: a supersedes entry needs band, unit and reason (strings): %r" % (s,))
     edges = collections.defaultdict(set)
+    ends = collections.defaultdict(set)      # registered range ends: the edge of a registered range against an unowned run
     names = set()
     if base is not None:
         names = {u.name for u in base.units}
         for u in base.units:
             for sec, rr in u.ranges.items():
-                for a, _b, _x in rr:
+                for a, b, _x in rr:
                     edges[sec].add(a)
+                    ends[sec].add(b)
     seen = collections.defaultdict(list)
     for pu in proposal["units"]:
         if not isinstance(pu, dict):
@@ -1277,7 +1324,7 @@ def lint_proposal_full(proposal, base=None):
             except (KeyError, TypeError, ValueError):
                 issues.append("%s: a removes_cuts entry has no numeric addr" % who)
                 continue
-            if base is not None and ra not in edges.get(rsec, ()):
+            if base is not None and ra not in edges.get(rsec, ()) and ra not in ends.get(rsec, ()):
                 warns.append("%s: removes_cuts %s %s is not a registered cut" % (who, rsec, hx(ra)))
         for c in _lst(pu.get("cuts")):
             if not isinstance(c, dict):
@@ -1300,8 +1347,8 @@ def lint_proposal_full(proposal, base=None):
             try:
                 key = (c.get("section"), to_int(c["addr"]))
                 cut_keys.add(key)
-                if keep and base is not None and key[1] not in edges.get(key[0], ()):
-                    issues.append("%s: cut %s %s has keep_registered_edge but no registered unit starts there" % (who, key[0], hx(key[1])))
+                if keep and base is not None and key[1] not in edges.get(key[0], ()) and key[1] not in ends.get(key[0], ()):
+                    issues.append("%s: cut %s %s has keep_registered_edge but no registered unit starts or ends there" % (who, key[0], hx(key[1])))
             except (KeyError, TypeError, ValueError):
                 issues.append("%s: cut without a numeric addr" % who)
         for sec, a in sorted(starts):
@@ -1343,6 +1390,7 @@ def merge_guess(units, base=None, info=None):
     info.setdefault("issues", [])
     info.setdefault("base_merges", [])
     out = []
+    bm_end = {}                      # (section, end) of a unit folded into a registered unit -> that registered unit's name
     for u in units:
         guess = [c for c in u["cuts"] if c.get("grade") == "guess" and not c.get("keep_registered_edge")]
         if not guess:
@@ -1366,8 +1414,13 @@ def merge_guess(units, base=None, info=None):
             out[at] = merged
             continue
         bn = next((bu for bu in (base.units if base is not None else []) if any(e == addr for _s, e, _x in bu.ranges.get(sec, []))), None)
-        if bn is not None:
-            info["base_merges"].append({"unit": u, "into": bn.name, "cut": c0, "merged": [dict(r, absorbed=u["name"], into=bn.name) for r in rec]})
+        into = bn.name if bn is not None else bm_end.get((sec, addr))
+        if into is not None:
+            # a unit folded into a registered unit extends it: the next guess cut touching ITS end folds there too
+            for s2, rr2 in u["ranges"].items():
+                for _a2, e2 in rr2:
+                    bm_end[(s2, e2)] = into
+            info["base_merges"].append({"unit": u, "into": into, "cut": c0, "merged": [dict(r, absorbed=u["name"], into=into) for r in rec]})
             continue
         info["issues"].append("%s: guess cut %s %s has no adjacent unit to merge into (no proposal or registered unit ends there)"
                               % (u["derived_name"], sec, hx(addr)))
@@ -1556,13 +1609,26 @@ def render(base, proposals, dol=None, symbols=None, data_by_reader=True):
     With `dol` and `symbols` the sections a text cut determines (extab, extabindex, ctors, dtors) are derived and, unless
     `data_by_reader` is False, the data of a recut registered unit is assigned by reader (`assign_data_by_reader`).
     """
-    info = {"issues": [], "warnings": [], "merged": [], "units": [], "derived": [], "data_by_reader": [], "cuts": {}}
+    info = {"issues": [], "warnings": [], "merged": [], "units": [], "derived": [], "data_by_reader": [], "cuts": {}, "superseded": []}
     units = []
+    drop = {}                       # (band, derived_name) -> the superseding entry; filled from every proposal's `supersedes`
+    for p in proposals:
+        for s in _lst(p.get("supersedes")):
+            if isinstance(s, dict) and s.get("band") and s.get("unit"):
+                drop[(s["band"], s["unit"])] = s
     for p in proposals:
         errs, warns = lint_proposal_full(p, base)
         info["issues"] += errs
         info["warnings"] += warns
-        units += norm_units(p)
+        kept_units = [pu for pu in p.get("units", []) if not (isinstance(pu, dict) and (p.get("band"), pu.get("derived_name")) in drop)]
+        for pu in p.get("units", []):
+            if isinstance(pu, dict) and (p.get("band"), pu.get("derived_name")) in drop:
+                info["superseded"].append("band %s unit %s" % (p.get("band"), pu.get("derived_name")))
+                drop[(p.get("band"), pu.get("derived_name"))]["_used"] = True
+        units += norm_units(dict(p, units=kept_units))
+    for (band, name), s in drop.items():
+        if not s.get("_used"):
+            info["warnings"].append("supersedes: band %s has no unit %s" % (band, name))
     cc = collections.Counter()
     for u in units:
         for c in u["cuts"]:
@@ -1739,6 +1805,8 @@ def cmd_proposal(args):
         print("lint: " + i)
     for i in info["warnings"]:
         print("warn: " + i)
+    for s in info["superseded"]:
+        print("superseded (dropped before rendering): " + s)
     if info["derived"]:
         print("derived %d attached ranges (extab/extabindex/ctors/dtors) from the text cuts" % len(info["derived"]))
     for m in info["merged"]:
@@ -2027,6 +2095,28 @@ u_b.cpp: comment:0
     check("ctors closure: a sinit with no local callee cuts at its own end", ctors_of(0x34, plain, [("F0", 0, 0x10), ("sinit", 0x10, 0x8), ("h", 0x18, 0x10)]),
           (FAIL, [T + 0x18]))
 
+    # gap 1b: inline virtual functions emitted after the sinit are the unit's own: slots of a vtable the unit stores
+    DV = 0x80600000
+    vt_hi, vt_lo = DV >> 16, DV & 0xFFFF
+    slots_code = [NOP, NOP, NOP, BLR, _lis(3, vt_hi), _w(14, 3, 3, vt_lo), BLR, NOP, BLR, NOP, BLR, NOP]   # F0, sinit (stores __vt__V), slot1, slot2
+    slot_fns = [("F0", 0, 0x10), ("sinit", 0x10, 0x10), ("slot1", 0x20, 8), ("slot2", 0x28, 8)]
+    vt_blob = struct.pack(">4I", 0, 0, T + 0x20, T + 0x28)
+    vt_sym = ["__vt__V = .data:0x%X; // type:object size:0x10 scope:global" % DV]
+    vt_units = (hdr + "\t.data       type:rodata align:8\n\nu.cpp:\n\t.text       start:0x%X end:0x%X\n\t.ctors      start:0x80200000 end:0x80200004\n"
+                "\t.data       start:0x%X end:0x%X\n" % (T, T + 0x30, DV, DV + 0x10))
+
+    def slot_run(words, cut_to=0x30):
+        c, _s = _mini(T, words, slot_fns, vt_units.replace("end:0x%X\n\t.ctors" % (T + 0x30), "end:0x%X\n\t.ctors" % (T + cut_to)),
+                      [ctor_blob, (DV, vt_blob)], vt_sym)
+        r = run_checks(c, None, ["ctors"]).units["u.cpp"]["ctors"]
+        return r["status"], [i.get("cut_at") for i in r["items"] if i.get("cut_at")]
+
+    check("ctors closure: the slots of a vtable the unit stores, after the sinit, are the unit's own", slot_run(slots_code), (PASS, []))
+    no_store = list(slots_code)
+    no_store[4], no_store[5] = NOP, NOP
+    check("ctors closure: slots of a vtable the unit never stores are not (cut at the first slot)", slot_run(no_store), (FAIL, [T + 0x20]))
+    check("ctors closure: a unit that goes on past the slot run is cut after the run's end", slot_run(slots_code + [NOP] * 4, 0x40), (FAIL, [T + 0x30]))
+
     # gap 2: a lis/addi that only forms a pool address is not a read of the literal; a load through it is
     S2 = 0x80300000
     hi, lo = S2 >> 16, S2 & 0xFFFF
@@ -2045,6 +2135,14 @@ u_b.cpp: comment:0
     rg = run_checks(cg, None, ["pool"])
     check("pool decode: a unit that only forms the address is not a second reader of the literal",
           rg.units.get("x.cpp", {}).get("pool", {}).get("status", NA), NA)
+
+    # gap 2b: a literal in an UNOWNED `.sdata2` pool past the last owned range is still decoded (the map's data extent counts)
+    un_txt = hdr + "y.cpp:\n\t.text       start:0x%X end:0x%X\n" % (T, T + 0x10)
+    cu, _s = _mini(T, y_fn + [NOP] * 4, [("y", 0, 0x10)], un_txt, [(S2, struct.pack(">f", 1.5))],
+                   ["lit0 = .sdata2:0x%X; // type:object size:0x4 scope:local data:float" % S2])
+    lit_u = cu.data_sym_at(S2)[1]
+    check("pool decode: a literal of an unowned pool beyond every owned range is read by the text that loads it",
+          (cu.owner(".sdata2", S2), sorted(cu.literal_readers(lit_u))), (None, [T + 4]))
 
     # gap 3: pool first-use order is judged per function (scheduling reorders two loads of one function)
     lits2 = struct.pack(">ff", 1.5, 2.5)
@@ -2099,6 +2197,25 @@ u_b.cpp: comment:0
                                                                                                  text4.get("u_a.cpp"), "m/tail.cpp" in text4),
           ([], ["u_a.cpp"], [(T, T + 0x38, "")], False))
 
+    # reconcile 1: a guess cut that touches the end of a unit already folded into a registered unit folds into that registered unit
+    chain = prop(pu("tail", T + 0x20, T + 0x30, cut(T + 0x20, "guess")), pu("tail2", T + 0x30, T + 0x38, cut(T + 0x30, "guess")))
+    c_ch, i_ch = render(sp, [chain])
+    text_ch = {u.name: u.ranges.get(".text") for u in c_ch.units}
+    check("a guess chain through a registered unit folds every link into it (was: 'no adjacent unit' for the second)",
+          (i_ch["issues"], [m.get("into") for m in i_ch["merged"]], text_ch.get("u_a.cpp"), [n for n in text_ch if n.startswith("m/")]),
+          ([], ["u_a.cpp", "u_a.cpp"], [(T, T + 0x38, "")], []))
+    # reconcile 2: `supersedes` drops the named band's unit before rendering (and warns when no such unit exists)
+    band_f = dict(prop(pu("dup", T, T + 0x20)), band="f")
+    band_g = dict(prop(pu("dup", T, T + 0x28)), band="g", supersedes=[{"band": "f", "unit": "dup", "reason": "g owns the longer unit"}])
+    c_sup, i_sup = render(sp, [band_f, band_g])
+    check("supersedes: only the superseding band's unit survives, no name clash", ([i for i in i_sup["issues"]], i_sup["superseded"],
+                                                                                  [(u.name, u.ranges[".text"][0][:2]) for u in c_sup.units if u.name.startswith("m/")]),
+          ([], ["band f unit dup"], [("m/dup.cpp", (T, T + 0x28))]))
+    band_g["supersedes"] = [{"band": "f", "unit": "nope", "reason": "r"}, {"band": "f", "unit": "dup"}]
+    check("supersedes: a missing unit warns, an entry without a reason is an error",
+          ([w for w in render(sp, [band_f, band_g])[1]["warnings"] if w.startswith("supersedes")],
+           any("supersedes entry needs" in i for i in lint_proposal(band_g, sp))),
+          (["supersedes: band f has no unit nope"], True))
     # gap 4b/4c: first-class fields, validated; keep_registered_edge is grade-neutral and never merged
     full = prop(pu("a1", T, T + 0x20, removes_cuts=[cut(T + 0x20, "strong")], absorbs=["u_b.cpp"], replaces_tail_of="u_a.cpp", kind="x"),
                 open_questions=[{"unit": "u_a.cpp", "question": "q"}, "plain"])
@@ -2113,12 +2230,19 @@ u_b.cpp: comment:0
     check("lint: wrong types are errors (open_questions)", sorted(i for i in e_bad if "open_questions" in i), ["b1: field 'open_questions' is int, want list", "proposal: field 'open_questions' is str, want list"])
     check("lint: names that are not baseline state are warnings", sorted(w_bad), ["b1: absorbs nope.cpp, which is not a baseline unit", "b1: removes_cuts .text 0x80100999 is not a registered cut",
                                                                                    "b1: replaces_tail_of nope.cpp is not a baseline unit"])
+    edge_end = prop(pu("e1", T, T + 0x20, removes_cuts=[{"addr": "0x%X" % (T + 0x38), "section": ".text"}]))
+    check("lint: a removes_cuts at the END of a registered range (against an unowned run) is a registered edge, no warning",
+          [w for w in lint_proposal_full(edge_end, sp)[1] if "removes_cuts" in w], [])
     keep = cut(T + 0x20, "guess", keep_registered_edge=True, evidence=[])
     c5, i5 = render(sp, [prop(pu("m1", T + 0x20, T + 0x38, keep))])
     check("keep_registered_edge: a guess cut is not merged and is counted apart", (i5["issues"], i5["merged"], i5["cuts"], "m/m1.cpp" in [u.name for u in c5.units]),
           ([], [], {"keep_registered_edge": 1}, True))
     off = cut(T + 0x28, "guess", keep_registered_edge=True)
     check("keep_registered_edge at a place no registered unit starts is an error", any("keep_registered_edge" in i for i in render(sp, [prop(pu("m2", T + 0x28, T + 0x38, off))])[1]["issues"]), True)
+    keep_end = cut(T + 0x38, "guess", keep_registered_edge=True, evidence=[])
+    c6, i6 = render(sp, [prop(pu("m4", T + 0x38, T + 0x48, keep_end))])
+    check("keep_registered_edge at the END of a registered unit (an unowned run's start) is allowed and the unit is not folded into it",
+          (i6["issues"], i6["merged"], "m/m4.cpp" in [u.name for u in c6.units]), ([], [], True))
     nograde = {"addr": "0x%X" % (T + 0x20), "section": ".text", "keep_registered_edge": True, "reproduce": "r"}
     check("keep_registered_edge needs no grade and no evidence", lint_proposal(prop(pu("m3", T + 0x20, T + 0x38, nograde)), sp), [])
     check("a cut without a grade and without the flag is still an error", bool(lint_proposal(prop(pu("m3", T + 0x20, T + 0x38, dict(nograde, keep_registered_edge=False))), sp)), True)

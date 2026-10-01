@@ -1,0 +1,719 @@
+{
+ "phase": 1,
+ "band": "c",
+ "text_range": [
+  "0x801C0000",
+  "0x802A0000"
+ ],
+ "units": [
+  {
+   "derived_name": "lb_npc",
+   "module": "lobby",
+   "ranges": {
+    ".text": [
+     [
+      "0x801FBF78",
+      "0x80212810"
+     ]
+    ],
+    ".data": [
+     [
+      "0x805B9770",
+      "0x805B97BC"
+     ]
+    ]
+   },
+   "cuts": [],
+   "removes_cuts": [
+    {
+     "addr": "0x802029B4",
+     "section": ".text",
+     "grade": "strong",
+     "evidence": [
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x8079999C --limit 0",
+       "finding": "lbl_8079999C (0x8079999C) is read by fn_80201464 (0x80201464, left of the edge) and by fn_802047C8 (0x802047C8, right of it): one TU pool, so lobby/lb_npc and lobby/fn_802029B4 are one TU"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x8079999C --limit 0"
+    },
+    {
+     "addr": "0x802076D4",
+     "section": ".text",
+     "grade": "strong",
+     "evidence": [
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x807999A0 --limit 0",
+       "finding": "lbl_807999A0 (0x807999A0) is read by fn_80206DE8 (0x80206DE8, left of the edge) and by fn_80207DC4 (0x80207DC4, right of it): one TU pool, so lobby/fn_802029B4 and lobby/fn_802076D4 are one TU"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x807999A0 --limit 0"
+    },
+    {
+     "addr": "0x8020C588",
+     "section": ".text",
+     "grade": "strong",
+     "evidence": [
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x80799BA8 --limit 0",
+       "finding": "lbl_80799BA8 (0x80799BA8) is read by fn_802097E8 (0x802097E8, left of the edge) and by fn_8020E824 (0x8020E824, right of it): one TU pool, so lobby/fn_802076D4 and lobby/fn_8020C588 are one TU"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x80799BA8 --limit 0"
+    }
+   ],
+   "absorbs": [
+    "lobby/fn_802029B4.cpp",
+    "lobby/fn_802076D4.cpp",
+    "lobby/fn_8020C588.cpp"
+   ],
+   "open_questions": [
+    "At least three TUs (0.0f, 2.0f, 8.0f, 40.0f, 42.0f and 92.0f are each held at two pool addresses, 0.0f at lbl_80799880, lbl_807999A0 and lbl_80799B50): a cut in 0x801FF9E0..0x801FFE44 and one in 0x80207E9C..0x80208B94. The first interval is the __sinit fn_801FF700 closure end (0x801FF9E0) up to the first reader of the second pool (fn_801FFE44: 8.0f at lbl_80799994 against lbl_80799980): 6 positions. fn_801FF9E0 is called from fn_801FD174 before it, so the R1 condition fails and no cut is emitted. The second interval is 25 positions (pooldup 0.0f lbl_807999A0 -> lbl_80799B50, 3f19999a, 2.0f) with nothing narrowing it.",
+    "name_note: guess: the registered name of the unit whose start is kept",
+    "data_note: .data 0x805B9770..0x805B97BC is the registered fn_8020C588's whole .data (jumptable_805B9770, read and branched into by this unit's text); attached so the jump table does not become a new `jumptable` failure"
+   ]
+  },
+  {
+   "derived_name": "lb_menu_scratch",
+   "module": "lobby",
+   "ranges": {
+    ".text": [
+     [
+      "0x8021E1EC",
+      "0x8021F020"
+     ]
+    ]
+   },
+   "cuts": [
+    {
+     "addr": "0x8021E1EC",
+     "section": ".text",
+     "keep_registered_edge": true,
+     "kind": "registered-edge",
+     "reproduce": "python tools/symbols/symedit.py at 0x8021E1EC --count 4 --section .text"
+    }
+   ],
+   "open_questions": [
+    "name_note: guess: the global object the TU's __sinit fn_8021EFBC constructs (lb_menu_scratch, 0x806BA8C8); the head of the registered lobby/fn_8021E1EC (its .data/.bss stay as a data-only entry)"
+   ],
+   "absorbs": []
+  },
+  {
+   "derived_name": "lb_menu_pos_tbl",
+   "module": "lobby",
+   "ranges": {
+    ".text": [
+     [
+      "0x8021F020",
+      "0x80220038"
+     ]
+    ]
+   },
+   "cuts": [
+    {
+     "addr": "0x8021F020",
+     "section": ".text",
+     "grade": "strong",
+     "evidence": [
+      {
+       "tool": "splitcheck",
+       "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit fn_8021E1EC --json F.json",
+       "finding": ".ctors word -> fn_8021EFBC (0x8021EFBC), a __sinit (read units[...].ctors.items in F.json); the checker takes its own end 0x8021EFC8 as the cut, which is wrong when functions follow it"
+      },
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x8021EFC8",
+       "finding": "fn_8021EFC8 (0x8021EFC8) is referenced only by the sinit chain (fn_8021EFBC): local function emitted after the __sinit"
+      },
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x8021F020",
+       "finding": "the closure ends at 0x8021F020; fn_8021F020 is referenced only by syncScheduleClock (0x80429944, fn_80423E74.cpp): nothing before it in the unit (the other pointer callers.py lists is its extabindex entry)"
+      },
+      {
+       "tool": "tudiscover",
+       "command": "python tools/splits/tudiscover.py at 0x8021F7DC --pool-model on",
+       "finding": "pool dedupe: 4330000000000000 held at lbl_80799C50 and again at lbl_80799C80: the new TU's first code lies in 0x8021E1B4..0x8021F020 (16 fn), and 43480000 lbl_80799C60 -> lbl_80799C90 in 0x8021E300..0x8021F7DC: both intervals hold 0x8021F020 and no other known cut"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x8021EFC8; python tools/units/callers.py 0x8021F020; python tools/splits/tudiscover.py at 0x8021F7DC --pool-model on"
+    }
+   ],
+   "open_questions": [
+    "name_note: guess: the global object the TU's __sinit fn_8021FF5C fills (lb_menu_pos_tbl, 0x806BAB08)"
+   ],
+   "absorbs": []
+  },
+  {
+   "derived_name": "fn_80220038",
+   "module": "lobby",
+   "ranges": {
+    ".text": [
+     [
+      "0x80220038",
+      "0x80229ECC"
+     ]
+    ]
+   },
+   "cuts": [
+    {
+     "addr": "0x80220038",
+     "section": ".text",
+     "grade": "strong",
+     "evidence": [
+      {
+       "tool": "splitcheck",
+       "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit fn_8021E1EC --json F.json",
+       "finding": ".ctors word -> fn_8021FF5C (0x8021FF5C), a __sinit (read units[...].ctors.items in F.json); the checker takes its own end 0x8021FFFC as the cut, which is wrong when functions follow it"
+      },
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x8021FFFC",
+       "finding": "fn_8021FFFC (0x8021FFFC) is referenced only by the sinit chain (fn_8021FF5C): local function emitted after the __sinit"
+      },
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x80220038",
+       "finding": "the closure ends at 0x80220038; fn_80220038 is referenced only by fn_802FAFC8 (0x802FAFC8, lobby/fn_802FA9A0.cpp): nothing before it in the unit (the other pointer callers.py lists is its extabindex entry)"
+      },
+      {
+       "tool": "tudiscover",
+       "command": "python tools/splits/tudiscover.py at 0x802230C8 --pool-model on",
+       "finding": "pool dedupe: 0.0f held at lbl_80799CC0 and again at lbl_80799CDC: the new TU's first code lies in 0x8021FFFC..0x802230C8 (43 fn); the interval holds 0x80220038 and no other known cut (the registered 0x80224AC4 is removed below)"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x8021FFFC; python tools/units/callers.py 0x80220038; python tools/splits/tudiscover.py at 0x802230C8 --pool-model on"
+    }
+   ],
+   "removes_cuts": [
+    {
+     "addr": "0x80224AC4",
+     "section": ".text",
+     "grade": "strong",
+     "evidence": [
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x80799CD8 --limit 0",
+       "finding": "lbl_80799CD8 (0x80799CD8) is read by fn_802230C8 (0x802230C8, left of the edge) and by fn_80224AC4 (0x80224AC4, right of it): one TU pool, so lobby/fn_8021E1EC (tail) and Pl/fn_80224AC4 are one TU"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x80799CD8 --limit 0"
+    }
+   ],
+   "absorbs": [
+    "Pl/fn_80224AC4.cpp",
+    "lobby/fn_8021E1EC.cpp (tail)"
+   ],
+   "open_questions": [
+    "name_note: placeholder: fn_<addr>; the module is a guess (the registered halves are lobby/ and Pl/; the code is lobby menu code)"
+   ]
+  },
+  {
+   "derived_name": "pl_act_step",
+   "module": "Pl",
+   "ranges": {
+    ".text": [
+     [
+      "0x802430E8",
+      "0x802673A4"
+     ]
+    ],
+    ".data": [
+     [
+      "0x805C4134",
+      "0x805C4548"
+     ]
+    ]
+   },
+   "cuts": [
+    {
+     "addr": "0x802430E8",
+     "section": ".text",
+     "keep_registered_edge": true,
+     "kind": "registered-edge",
+     "reproduce": "python tools/symbols/symedit.py at 0x802430E8 --count 4 --section .text"
+    }
+   ],
+   "removes_cuts": [
+    {
+     "addr": "0x802489D4",
+     "section": ".text",
+     "grade": "strong",
+     "evidence": [
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x80799E14 --limit 0",
+       "finding": "lbl_80799E14 (0x80799E14) is read by fn_802476A0 (0x802476A0, left of the edge) and by fn_80262940 (0x80262940, right of it): one TU pool, so Pl/fn_802430E8 and Pl/fn_802489D4 are one TU"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x80799E14 --limit 0"
+    },
+    {
+     "addr": "0x8024F200",
+     "section": ".text",
+     "grade": "strong",
+     "evidence": [
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x80799E68 --limit 0",
+       "finding": "pl_float_neg20 (0x80799E68) is read by fn_80249A84 (0x80249A84, left of the edge) and by fn_802549C4 (0x802549C4, right of it): one TU pool, so Pl/fn_802489D4 and Pl/pl_act_step are one TU"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x80799E68 --limit 0"
+    },
+    {
+     "addr": "0x80258FCC",
+     "section": ".text",
+     "grade": "strong",
+     "evidence": [
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x80799EB0 --limit 0",
+       "finding": "pl_float_1_7 (0x80799EB0) is read by fn_8024CA50 (0x8024CA50, left of the edge) and by fn_8025948C (0x8025948C, right of it): one TU pool, so Pl/pl_act_step and Pl/fn_80258FCC are one TU"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x80799EB0 --limit 0"
+    },
+    {
+     "addr": "0x8025F088",
+     "section": ".text",
+     "grade": "strong",
+     "evidence": [
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x80799F98 --limit 0",
+       "finding": "pl_float_neg250 (0x80799F98) is read by fn_80259C38 (0x80259C38, left of the edge) and by fn_8025FA00 (0x8025FA00, right of it): one TU pool, so Pl/fn_80258FCC and Pl/fn_8025F088 are one TU"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x80799F98 --limit 0"
+    },
+    {
+     "addr": "0x80262940",
+     "section": ".text",
+     "grade": "strong",
+     "evidence": [
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x80799E90 --limit 0",
+       "finding": "lbl_80799E90 (0x80799E90) is read by fn_8024BDE4 (0x8024BDE4, left of the edge) and by fn_802657F8 (0x802657F8, right of it): one TU pool, so Pl/fn_8025F088 and Pl/fn_80262940 are one TU"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x80799E90 --limit 0"
+    }
+   ],
+   "absorbs": [
+    "Pl/fn_802430E8.cpp (its .data range stays as a data-only entry)",
+    "Pl/fn_802489D4.cpp",
+    "Pl/pl_act_step.cpp",
+    "Pl/fn_80258FCC.cpp",
+    "Pl/fn_8025F088.cpp",
+    "Pl/fn_80262940.cpp (head)"
+   ],
+   "open_questions": [
+    "The left edge 0x802430E8 is the registered start (not proposed here). The dup interval from the previous pool (0.0f, 0.3 and 0.75 held at both pools) is 0x80229BFC..0x80246158 (24 positions) and holds the registered cuts 0x80229ECC..0x802430E8 (six units, four `Matching`); none of them is contradicted.",
+    "name_note: guess: the registered name of the largest absorbed unit that has a source file",
+    "data_note: .data 0x805C4134..0x805C4548 is the registered fn_802430E8's whole .data (jumptable_805C4134, read by this unit's text)"
+   ]
+  },
+  {
+   "derived_name": "player_control",
+   "module": "Pl",
+   "ranges": {
+    ".text": [
+     [
+      "0x802673A4",
+      "0x802693C4"
+     ]
+    ]
+   },
+   "cuts": [
+    {
+     "addr": "0x802673A4",
+     "section": ".text",
+     "grade": "medium",
+     "evidence": [
+      {
+       "tool": "splitcheck",
+       "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit fn_80262940 --json F.json",
+       "finding": ".ctors word -> fn_80267328 (0x80267328), a __sinit (read units[...].ctors.items in F.json); the checker takes its own end 0x802673A4 as the cut, which is wrong when functions follow it"
+      },
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x802673A4",
+       "finding": "the closure ends at 0x802673A4; set_max_player__Fl is referenced only by fn_8028B524 (0x8028B524, Pl/fn_80288CEC.cpp), fn_8028BAA8 (0x8028BAA8, Pl/fn_80288CEC.cpp), charmake_init__Fv (0x80443E50, unowned), arena_task (0x804463C4, quest/arenatask.cpp): nothing before it in the unit (the other pointer callers.py lists is its extabindex entry)"
+      },
+      {
+       "tool": "tudiscover",
+       "command": "python tools/splits/tudiscover.py at 0x80269AC4 --pool-model on",
+       "finding": "pool dedupe: 0.0f pl_float_zero -> lbl_8079A000, 1.0f and the u32 magic likewise: the new TU's first code lies in 0x802673A4..0x80269AC4 (37 fn); the interval also holds the registered 0x802693C4 (so it does not single this cut out: medium, not strong)"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x802673A4; python tools/splits/tudiscover.py at 0x80269AC4 --pool-model on"
+    }
+   ],
+   "replaces_tail_of": "Pl/fn_80262940.cpp",
+   "open_questions": [
+    "The right edge 0x802693C4 is the registered cut; the only evidence for it is that it lies in the dup interval 0x802673A4..0x80269AC4 (tudiscover at 0x802693C4 gives weak signals only). The range is a .sdata-string TU at best (fn_802684EC, fn_80268604, fn_802688B0 read strings).",
+    "name_note: guess: player_control_move / player_control_release / init_player_work are the named functions of the range"
+   ],
+   "absorbs": []
+  },
+  {
+   "derived_name": "pl_act",
+   "module": "Pl",
+   "ranges": {
+    ".text": [
+     [
+      "0x802693C4",
+      "0x802840DC"
+     ]
+    ],
+    ".data": [
+     [
+      "0x805C5FA0",
+      "0x805C6100"
+     ]
+    ]
+   },
+   "cuts": [
+    {
+     "addr": "0x802693C4",
+     "section": ".text",
+     "keep_registered_edge": true,
+     "kind": "registered-edge",
+     "reproduce": "python tools/symbols/symedit.py at 0x802693C4 --count 4 --section .text"
+    }
+   ],
+   "removes_cuts": [
+    {
+     "addr": "0x8026BA1C",
+     "section": ".text",
+     "grade": "strong",
+     "evidence": [
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x8079A010 --limit 0",
+       "finding": "lbl_8079A010 (0x8079A010) is read by fn_8026A3EC (0x8026A3EC, left of the edge) and by fn_802707B4 (0x802707B4, right of it): one TU pool, so Pl/fn_802693C4 and Pl/pl_master are one TU"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x8079A010 --limit 0"
+    },
+    {
+     "addr": "0x8026FFBC",
+     "section": ".text",
+     "grade": "strong",
+     "evidence": [
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x8079A010 --limit 0",
+       "finding": "lbl_8079A010 (0x8079A010) is read by fn_8026A3EC (0x8026A3EC, left of the edge) and by fn_802707B4 (0x802707B4, right of it): one TU pool, so Pl/pl_master and Pl/fn_8026FFBC are one TU"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x8079A010 --limit 0"
+    },
+    {
+     "addr": "0x80270018",
+     "section": ".text",
+     "grade": "strong",
+     "evidence": [
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x8079A010 --limit 0",
+       "finding": "lbl_8079A010 (0x8079A010) is read by fn_8026A3EC (0x8026A3EC, left of the edge) and by fn_802707B4 (0x802707B4, right of it): one TU pool, so Pl/fn_8026FFBC and Pl/pl_skill are one TU"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x8079A010 --limit 0"
+    },
+    {
+     "addr": "0x80273B14",
+     "section": ".text",
+     "grade": "strong",
+     "evidence": [
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x8079A044 --limit 0",
+       "finding": "lbl_8079A044 (0x8079A044) is read by fn_8027035C (0x8027035C, left of the edge) and by fn_802751B4 (0x802751B4, right of it): one TU pool, so Pl/pl_skill and Pl/fn_80273B14 are one TU"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x8079A044 --limit 0"
+    },
+    {
+     "addr": "0x80276B58",
+     "section": ".text",
+     "grade": "strong",
+     "evidence": [
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x8079A080 --limit 0",
+       "finding": "lbl_8079A080 (0x8079A080) is read by fn_8027633C (0x8027633C, left of the edge) and by fn_80279EBC (0x80279EBC, right of it): one TU pool, so Pl/fn_80273B14 and Pl/pl_act are one TU"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x8079A080 --limit 0"
+    },
+    {
+     "addr": "0x8027D684",
+     "section": ".text",
+     "grade": "strong",
+     "evidence": [
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x8079A088 --limit 0",
+       "finding": "lbl_8079A088 (0x8079A088) is read by Pl_get_gunner_vec__FP4_PLWP10_CP_VECTOR (0x8027CDF0, left of the edge) and by fn_8027D968 (0x8027D968, right of it): one TU pool, so Pl/pl_act and Pl/fn_8027D684 are one TU"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x8079A088 --limit 0"
+    }
+   ],
+   "absorbs": [
+    "Pl/fn_802693C4.cpp",
+    "Pl/pl_master.cpp (registered `Matching`: see matching_conflict)",
+    "Pl/fn_8026FFBC.cpp",
+    "Pl/pl_skill.cpp",
+    "Pl/fn_80273B14.cpp (.data range stays)",
+    "Pl/pl_act.cpp",
+    "Pl/fn_8027D684.cpp"
+   ],
+   "open_questions": [
+    "Four TUs are held here (0.0f at lbl_8079A000, lbl_8079A084, lbl_8079A120 and lbl_8079A1B4): cuts in 0x802752C8..0x802756F0 (8 positions), 0x8027DC64..0x80280248 (81 positions) and 0x802829B4..0x80282CCC (4 positions). The dense call cluster 0x8027E29C..0x8027FD7C (equipment helpers: GetEquipName, Get_equip_rare, equip_color_*) sits inside the 81-position interval. No sinit, no .data seam and no call closure singles any position out.",
+    "name_note: guess: the registered name of the largest absorbed unit",
+    "data_note: .data 0x805C5FA0..0x805C6100 = pl_master's jump table 0x805C5FA0..C4, the two unowned objects lbl_805C5FC8/lbl_805C5FE0 between, and fn_80273B14's 0x805C5FEC..0x805C6100 (jumptable_805C5FEC): a TU's .data is contiguous and both ends are this unit's, so the gap is too; dtk takes one range per section",
+    "matching_conflict: Pl/pl_master.cpp is `Matching` and lies inside this unit. The evidence to remove its two edges is strong (lbl_8079A008, the int->double magic, is read by fn_8026A5A4 before it and fn_8026FFBC after it; 0.0f lbl_8079A000 by fn_802693C4 and pl_skill). pl_master's own pool entries (lbl_8079A020..28) sit between those two readers' entries. The phase that applies this must decide what happens to the matched object."
+   ]
+  },
+  {
+   "derived_name": "pl_motion",
+   "module": "Pl",
+   "ranges": {
+    ".text": [
+     [
+      "0x80288CEC",
+      "0x8028F44C"
+     ]
+    ],
+    ".data": [
+     [
+      "0x805CBFC0",
+      "0x805CDC44"
+     ]
+    ]
+   },
+   "cuts": [
+    {
+     "addr": "0x80288CEC",
+     "section": ".text",
+     "keep_registered_edge": true,
+     "kind": "registered-edge",
+     "reproduce": "python tools/symbols/symedit.py at 0x80288CEC --count 4 --section .text"
+    }
+   ],
+   "open_questions": [
+    "Two TUs (0.0f at lbl_8079A270 and again at lbl_8079A2D8): a cut in 0x8028B298..0x8028C168 (9 positions; the unique call-crossing minimum is 0x8028B524, not a tool-reproducible signal).",
+    "name_note: guess: pl_motion_set / pl_warp_start are the named functions; the head of the registered Pl/fn_80288CEC (its .bss/.sbss stay as a data-only entry)",
+    "data_note: .data 0x805CBFC0..0x805CDC44 is the registered fn_80288CEC's whole .data, attached whole because jumptable_805CBFC0 is read by this unit; the tail unit Pl/fn_8028F44C (3 functions) may own part of it (phase 2)"
+   ],
+   "absorbs": []
+  },
+  {
+   "derived_name": "fn_8028F44C",
+   "module": "Pl",
+   "ranges": {
+    ".text": [
+     [
+      "0x8028F44C",
+      "0x8028F66C"
+     ]
+    ]
+   },
+   "cuts": [
+    {
+     "addr": "0x8028F44C",
+     "section": ".text",
+     "grade": "strong",
+     "evidence": [
+      {
+       "tool": "splitcheck",
+       "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit fn_80288CEC --json F.json",
+       "finding": ".ctors word -> fn_8028F400 (0x8028F400), a __sinit (read units[...].ctors.items in F.json); the checker takes its own end 0x8028F44C as the cut, which is wrong when functions follow it"
+      },
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x8028F44C",
+       "finding": "the closure ends at 0x8028F44C; fn_8028F44C is referenced only by fn_8012A810 (0x8012A810, enemy/fn_801251D0.cpp): nothing before it in the unit (the other pointer callers.py lists is its extabindex entry)"
+      },
+      {
+       "tool": "tudiscover",
+       "command": "python tools/splits/tudiscover.py at 0x8028F4B4 --pool-model on",
+       "finding": "pool dedupe: 0.0f lbl_8079A2D8 -> lbl_8079A318 puts a new TU in 0x8028E3EC..0x8028F758 (24 fn); that interval holds 0x8028F44C and also the registered 0x8028F66C"
+      },
+      {
+       "tool": "splitcheck",
+       "command": "python tools/splits/splitcheck.py --baseline --only pool --unit fn_80288CEC --json F.json",
+       "finding": "one value at two pool addresses inside one registered unit: 3f000000 at lbl_8079A2DC (read before 0x8028E3EC) and at lbl_8079A310 (first read by fn_8028F4B4): the new TU starts in 0x8028E3EC..0x8028F4B4, which holds 0x8028F44C and no other known cut"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x8028F44C; python tools/splits/tudiscover.py at 0x8028F4B4 --pool-model on"
+    }
+   ],
+   "replaces_tail_of": "Pl/fn_80288CEC.cpp",
+   "open_questions": [
+    "Both edges: the left one is the closure end of the sinit fn_8028F400 (no callee after it); the right one, 0x8028F66C, is the registered start of Pl/fn_8028F66C and has no evidence (no dup value between this range and the next): the range is 3 small functions, 0x220 B, and may belong to the TU that follows.",
+    "name_note: placeholder: fn_<addr>"
+   ],
+   "absorbs": []
+  },
+  {
+   "derived_name": "pl_coll",
+   "module": "Pl",
+   "ranges": {
+    ".text": [
+     [
+      "0x8028F66C",
+      "0x80297E34"
+     ]
+    ]
+   },
+   "cuts": [
+    {
+     "addr": "0x8028F66C",
+     "section": ".text",
+     "keep_registered_edge": true,
+     "kind": "registered-edge",
+     "reproduce": "python tools/symbols/symedit.py at 0x8028F66C --count 4 --section .text"
+    }
+   ],
+   "removes_cuts": [
+    {
+     "addr": "0x80295EF4",
+     "section": ".text",
+     "grade": "strong",
+     "evidence": [
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x8079A334 --limit 0",
+       "finding": "lbl_8079A334 (0x8079A334) is read by fn_802950D8 (0x802950D8, left of the edge) and by fn_80297814 (0x80297814, right of it): one TU pool, so Pl/fn_8028F66C and Pl/fn_80295EF4 (head) are one TU"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x8079A334 --limit 0"
+    }
+   ],
+   "absorbs": [
+    "Pl/fn_8028F66C.cpp",
+    "Pl/fn_80295EF4.cpp (head)"
+   ],
+   "open_questions": [
+    "Two TUs (0.0f at lbl_8079A318 and lbl_8079A330; 3a83126f at lbl_8079A314 and lbl_8079A344): a cut in 0x8029135C..0x80291664 (4 positions: fn_8029135C, fn_802914CC, GetGroundHit, GetGroundHit2; no signal singles one out).",
+    "name_note: guess: GetGroundHit*, hit_ground_comon, pl_coll_sweep_ck, findInterSection* are the named functions"
+   ]
+  },
+  {
+   "derived_name": "menu_item",
+   "module": "menu",
+   "ranges": {
+    ".text": [
+     [
+      "0x80297E34",
+      "0x802A6624"
+     ]
+    ]
+   },
+   "cuts": [
+    {
+     "addr": "0x80297E34",
+     "section": ".text",
+     "grade": "strong",
+     "evidence": [
+      {
+       "tool": "splitcheck",
+       "command": "python tools/splits/splitcheck.py --baseline --only ctors --unit fn_80295EF4 --json F.json",
+       "finding": ".ctors word -> fn_80297C30 (0x80297C30), a __sinit (read units[...].ctors.items in F.json); the checker takes its own end 0x80297D9C as the cut, which is wrong when functions follow it"
+      },
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x80297D9C",
+       "finding": "fn_80297D9C (0x80297D9C) is referenced only by the sinit chain (fn_80297C30): local function emitted after the __sinit"
+      },
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x80297DE8",
+       "finding": "fn_80297DE8 (0x80297DE8) is referenced only by the sinit chain (fn_80297C30): local function emitted after the __sinit"
+      },
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x80297E34",
+       "finding": "the closure ends at 0x80297E34; fn_80297E34 is referenced only by fn_8028CC7C (0x8028CC7C, Pl/fn_80288CEC.cpp), fn_80450428 (0x80450428, unowned): nothing before it in the unit (the other pointer callers.py lists is its extabindex entry)"
+      },
+      {
+       "tool": "tudiscover",
+       "command": "python tools/splits/tudiscover.py at 0x80297E88 --pool-model on",
+       "finding": "pool dedupe: 0.0f lbl_8079A330 -> lbl_8079A380: the new TU's first code lies in 0x80297D9C..0x80297E88 (6 fn); the interval holds 0x80297E34 and no other known cut"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x80297D9C; python tools/units/callers.py 0x80297DE8; python tools/units/callers.py 0x80297E34; python tools/splits/tudiscover.py at 0x80297E88 --pool-model on"
+    }
+   ],
+   "removes_cuts": [
+    {
+     "addr": "0x8029F3C8",
+     "section": ".text",
+     "grade": "strong",
+     "evidence": [
+      {
+       "tool": "callers",
+       "command": "python tools/units/callers.py 0x8079A3B8 --limit 0",
+       "finding": "lbl_8079A3B8 (0x8079A3B8) is read by fn_8029C8AC (0x8029C8AC, left of the edge) and by hit_knock_set (0x8029F5B4, right of it): one TU pool, so Pl/fn_80295EF4 (tail) and menu/menu_item are one TU"
+      }
+     ],
+     "reproduce": "python tools/units/callers.py 0x8079A3B8 --limit 0"
+    }
+   ],
+   "absorbs": [
+    "Pl/fn_80295EF4.cpp (tail)",
+    "menu/menu_item.cpp"
+   ],
+   "replaces_tail_of": "Pl/fn_80295EF4.cpp",
+   "open_questions": [
+    "Two TUs at least (0.0f at lbl_8079A380 and lbl_8079A39C; 3f000000 at lbl_8079A388 and lbl_8079A3E0): a cut in 0x80299C14..0x80299EF8 (4 positions). The end 0x802A6624 is the registered end of menu/menu_item and belongs to band `d`: the real menu_item TU probably starts after the hit_* functions (0x8029F61C get_item_data_ptr ... 0x8029F7A0 get_menu_tbl_ptr), which would be a further cut in this unit that this band cannot place.",
+    "name_note: guess: the registered name of the absorbed unit that has a source file; the first half is hit_* code (hit_knock_set, hit_data_apply), the registered menu_item starts inside it (body_set at 0x8029F3C8)"
+   ]
+  }
+ ],
+ "open_questions": [
+  {
+   "unit": "lobby/fn_801E0ADC.cpp",
+   "question": "two TUs (0.0f, 1.0f, 0.5f and 65536.0f held at lbl_8079978C/807997A0/807997AC/807997D0 and again at lbl_8079981C/80799818/8079982C/80799830); the registered unit 0x801E0ADC..0x801E7530 holds both and the cut is unplaced",
+   "candidate_interval": [
+    "0x801E2864",
+    "0x801E2A9C"
+   ],
+   "positions": 3,
+   "evidence": [
+    {
+     "tool": "tudiscover",
+     "command": "python tools/splits/tudiscover.py at 0x801E2A9C --pool-model on",
+     "finding": "pool dedupe: 0.0f and 1.0f held at two pool addresses in this unit; the new TU's first code lies in 0x801E2864..0x801E2A9C (3 fn); `tudiscover dataorder --weak` adds a V->D seam 0x805B76D0 in 0x801E1B68..0x801E2A9C that agrees but does not narrow it"
+    }
+   ],
+   "reproduce": "python tools/splits/tudiscover.py at 0x801E2A9C --pool-model on"
+  },
+  {
+   "unit": "Pl/fn_802840DC.cpp",
+   "question": "two TUs (0.0f at lbl_8079A1E4 and lbl_8079A238, 40c90fdb, 42b40000 ...); the registered unit 0x802840DC..0x80288CEC holds both",
+   "candidate_interval": [
+    "0x80286DF8",
+    "0x802874E0"
+   ],
+   "positions": 7,
+   "evidence": [
+    {
+     "tool": "tudiscover",
+     "command": "python tools/splits/tudiscover.py at 0x802874E0 --pool-model on",
+     "finding": "pool dedupe: 0.0f lbl_8079A1E4 -> lbl_8079A238 and 40c90fdb, 43b40000, 41d00000 likewise: the new TU's first code lies inside 0x80286970..0x802879CC and the narrowest row is 0x80286BF0..0x802879CC (13 fn); the interval used here is the atom gap 0x80286DF8..0x802874E0 (7 positions)"
+    }
+   ],
+   "reproduce": "python tools/splits/tudiscover.py at 0x802874E0 --pool-model on"
+  }
+ ]
+}
