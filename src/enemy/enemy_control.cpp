@@ -1,3 +1,11 @@
+/* enemy/enemy_control.cpp - the enemy control unit head
+ *
+ * `.text` 0x801411B8..0x80147C94, 28 functions written (the rest of the range is not decompiled yet).
+ * Phase 4 (docs/splits/phase4): recut registered unit; the functions of the neighbouring units were cut out of this file.
+ * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
+ */
+
+/* Retired header of `enemy/enemy_control.cpp` (kept for its notes and residuals): */
 /* enemy/enemy_control.cpp - the enemy control translation unit, `.text` 0x801411B8..0x80147CE0
  * (155 functions).  This file is the lower half of the maximal unclaimed run
  * 0x801411B8..0x80149D6C; the upper half 0x80147CE0..0x80149D6C is already registered as
@@ -95,20 +103,12 @@
 #include "enemy/fn_80138074.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
-/* retail keeps the unfused clrlwi/rlwinm + cmpwi pairs this band's -O3 peephole folds, so the whole
- * unit is built with the peephole off (the same finding as `enemy/fn_80147CE0.cpp`,
- * `enemy/fn_8013F764.cpp` and `enemy/fn_8012BDF4.cpp`). */
-#pragma peephole off
+namespace nw4r {
 
-/* ----------------------------------------------------------------------------------------------- *
- * the callees and the data pools
- * ----------------------------------------------------------------------------------------------- */
-
-/* `nw4r::db::Panic(const char*, int, const char*, ...)` - declared at its owner's real spelling so the
- * C++ front-end reproduces the map's `Panic__Q24nw4r2dbFPCciPCce` (rule 9). */
-#ifdef __cplusplus
-namespace nw4r { namespace db { void Panic(const char* file, int line, const char* fmt, ...); } }
-#endif
+namespace db {
+void Panic(const char* file, int line, const char* fmt, ...);
+}
+}
 
 /* the `__FILE__` / assert-message / resource-name pool this range's first function reads (the
  * `enemy_control.cpp` name at 0x805A1BB8 is the TU's own source name, the evidence of section 2). */
@@ -118,7 +118,6 @@ extern char lbl_805A1BF0[];  /* "shadow_tex.brres" */
 extern char lbl_805A1C08[];  /* "NW4R:Failed assertion bAllBound" */
 
 extern "C" {
-
 /* the enemy-control work blob (0x806A4590, 0xF50 bytes). */
 extern EmcWork emc_work;
 
@@ -165,7 +164,11 @@ struct EmResHeader {
     /* +0x00 */ u8 unused_0x00[0x44];
     /* +0x44 */ u32 field_0x44;
 };
+}
 
+#pragma peephole off
+
+extern "C" {
 /* the enemy's em001 per-activation constructor: asserts the NW4R revision, sets up the record and
  * installs the em001 handler set.  `lbl_805A1BB8` is the TU's `__FILE__` string. */
 void fn_801411B8(u8* self) {
@@ -538,8 +541,7 @@ u32 fn_80144FB4(u8 index) {
 void fn_80144240(void* self) {
     fn_80143A40(self);
 }
-
-}  /* extern "C" */
+}
 
 /* `senko_set(VEC3*, f32, u8, s16)` - the map's `senko_set__FPQ34nw4r4math4VEC3fUcs`; defined at
  * C++ scope so the front-end reproduces the mangling (rule 9). */
@@ -564,4 +566,3 @@ void kemuri_set(nw4r::math::VEC3* pos, f32 value, u8 arg2) {
         rec->countdown = 570;
     }
 }
-

@@ -5,16 +5,16 @@
  * What it is.  `fn_803066B4` (0x803066B4, the last function of the previous unit) is a four-state update
  * dispatcher: it tail-calls `fn_803066F0` (state 0), `fn_8030681C` (state 1), `fn_80306A84` (state 2) and
  * `fn_80306A94` (state 3) on `self->state` (`+0x05`).  `fn_80306524` installs it as the `+0x34` update
- * hook of the effect record it creates with `fn_800F8788(32)` and stamps `+0x03 = 41`; `fn_80306BFC`
+ * hook of the effect record it creates with `eft_res_slot_get(32)` and stamps `+0x03 = 41`; `fn_80306BFC`
  * (reached from the named `eft042_set2`) installs `fn_80306FF0` and stamps `+0x03 = 42`.  This function is
  * therefore the state-0 handler of the effect-41 machine.  It builds the stage's effect-resource name
  * (`fn_802B050C(0)` plus the ".brres" suffix), creates each model through
  * `res_eft_UV_model_create_name` with that name, and on the first failure destroys the effect
- * (`fn_80306A94` = `fn_800F886C`).  On success it advances the state to 1, arms the two step timers, sets
+ * (`fn_80306A94` = `eft_res_slot_release`).  On success it advances the state to 1, arms the two step timers, sets
  * each model's scale to 1 and resets its random accumulators, then runs the state-1 handler `fn_8030681C`
  * directly.
  *
- * Types.  The effect record is the 0x48-byte pool slot `fn_800F8788` hands out (its record stride is
+ * Types.  The effect record is the 0x48-byte pool slot `eft_res_slot_get` hands out (its record stride is
  * `addi r31,r31,72` in that function, and it pre-clears `+0x04..+0x08` and `+0x14..+0x17`); the fields
  * this unit and the neighbours that share the type touch are named in `EftWork`.  `self->+0x38` is the
  * per-effect work area `fn_800F8B44` returns: a count, one 8-byte model record at `+0x04`, four
@@ -60,7 +60,7 @@
  * by this unit; the three accumulators are the ones `fn_8030627C` adds a masked `ran_suu()` delta to every
  * frame; `ready` is set to 1 by the model creator (`res_eft_UV_model_create_name`, `stb r0,53(r25)`) and
  * again here. */
-typedef struct MHchar {
+typedef struct UvModelTail {
     u8   pad_0x00[0x1C];  /* +0x00 */
     f32  scale[3];        /* +0x1C */
     u32  rand_accum_a;    /* +0x28 */
@@ -68,11 +68,11 @@ typedef struct MHchar {
     u32  rand_accum_c;    /* +0x30 */
     u8   pad_0x34;        /* +0x34 */
     u8   ready;           /* +0x35 */
-} MHchar;                 /* size: 0x36 (the model object continues past +0x36) */
+} UvModelTail;                 /* size: 0x36 (the model object continues past +0x36) */
 
 /* One model record of the effect's work area: the resource handle and the created model. */
 typedef struct EftModel {
-    MHchar* model;          /* +0x00 */
+    UvModelTail* model;          /* +0x00 */
     void* volatile created; /* +0x04 */
 } EftModel;                 /* size: 0x08 */
 
@@ -87,7 +87,7 @@ typedef struct EftWorkData {
 
 typedef struct EftWork EftWork;
 
-/* The 0x48-byte effect record `fn_800F8788` allocates and the engine drives.  Only the fields this unit
+/* The 0x48-byte effect record `eft_res_slot_get` allocates and the engine drives.  Only the fields this unit
  * and the neighbours that share the type touch are named. */
 struct EftWork {
     u8   in_use;               /* +0x00 */
@@ -113,7 +113,7 @@ struct EftWork {
 extern void* fn_802B050C(u8 index); /* a `stage_w` name buffer for the stage's effect resource */
 extern void  fn_8030681C(EftWork* self);
 extern void  fn_80306A94(EftWork* self);
-extern void* res_eft_UV_model_create_name__FP6MHcharPcUllPP9_g3d_worklUc(MHchar* model, char* name,
+extern void* res_eft_UV_model_create_name__FP6MHcharPcUllPP9_g3d_worklUc(UvModelTail* model, char* name,
                                                                         u32 a, u32 b, void** works,
                                                                         s32 n, u8 c);
 extern void  setVector3__FPQ34nw4r4math4VEC3fff(f32* v, f32 x, f32 y, f32 z);

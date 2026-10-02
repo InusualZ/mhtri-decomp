@@ -15,10 +15,10 @@
  *
  * WHAT IT IS.  An effect family plus the cockpit hold/item band it draws from, exactly the shape the
  * registered neighbour `ef/eft050.cpp` documents: `eft052_set` pools the effect record
- * (`fn_800F8788(76)`, the 76-byte block `ef/eft035.cpp` measured) and installs its
+ * (`eft_res_slot_get(76)`, the 76-byte block `ef/eft035.cpp` measured) and installs its
  * `dispatch_0x34`/`release_0x40` hooks, `eft052_dispatch` is the `state_0x05` machine whose arms are
  * the model-create pass (`res_eft_model_create_light`), the placement/alive body and the pool release
- * (`fn_800F886C`), and the rest of the range is the cockpit item layer: the page counters
+ * (`eft_res_slot_release`), and the rest of the range is the cockpit item layer: the page counters
  * (`eft052_page_counts_get`, `eft052_page_take`, `eft052_page_put`), the hold block at
  * `.bss:0x806BF368`, the item/monster strings (`LbStr`, `ItemName`, `GetItemData`) and the sprite
  * sheet (`draw_sprite_*`, `get_lsp_data`, `PutPageArrow`, `font_*`).  Three bodies read the enemy work
@@ -48,11 +48,11 @@
  * what the body does - and each is a guess a later pass may refine (the evidence is the body, not the
  * map); the 72 entries this file does not reconstruct yet keep the map's `fn_` stems, because they are
  * absent or referenced, never defined:
- *   * the family: `eft052_set` (pool the record with `fn_800F8788(76)`, install the two hooks, seed
+ *   * the family: `eft052_set` (pool the record with `eft_res_slot_get(76)`, install the two hooks, seed
  *     both part slots), `eft052_release` (the `+0x40` hook - hand every part slot's handle back),
  *     `eft052_dispatch` (the `+0x34` hook - one handler per `state_0x05`), `eft052_place` (the
  *     placement pass - pick the per-area table, create both models, advance), `eft052_state_step`
- *     (advance the state) and `eft052_pool_release` (`fn_800F886C`);
+ *     (advance the state) and `eft052_pool_release` (`eft_res_slot_release`);
  *   * the enemy part report the family draws from: `eft052_part_damage_ck` (one flag per queried part
  *     index), `eft052_part_level_even_ck` (whether the part's damage level is even) and
  *     `eft052_part_gauge_add` (step the part gauge and clamp it to 0..500);
@@ -71,7 +71,7 @@
  *
  * Naming note: every remaining `fn_XXXXXXXX` in this file is a REFERENCE to a symbol ANOTHER unit
  * owns (the rule's tolerated half, checked with `python tools/symbols/symedit.py refs` on each of the
- * file's names): the effect pool/manager (`fn_800F8788`, `fn_800F8914`, `fn_800F886C`, `fn_800F9DF4`,
+ * file's names): the effect pool/manager (`eft_res_slot_get`, `eft_res_model_get`, `eft_res_slot_release`, `eft_state_flags_set`,
  * `fn_800F8A44`), the enemy band (`fn_80126278`, `em_parts_damage_level_get`) and the lobby item API
  * (`fn_8004Axxx`/`fn_8004Bxxx`).  `symedit.py range` shows the map spells none of those ranges with
  * anything but their `fn_` stems, so this file cannot name them.  No symbol this unit owns stays
@@ -140,15 +140,15 @@
 #include "enemy/fn_801251D0.h"
 #include "fn_8004CAD8.h"
 
-/* One 0x1C-byte part slot of the work block below: the pooled model handle `fn_800F8914` hands back
+/* One 0x1C-byte part slot of the work block below: the pooled model handle `eft_res_model_get` hands back
  * and the byte that says whether the slot has been placed. */
 struct EftPartSlot {
-    /* +0x00 */ EftModel* model_0x00;   /* `fn_800F8914`'s pooled model record */
+    /* +0x00 */ EftModel* model_0x00;   /* `eft_res_model_get`'s pooled model record */
     /* +0x04 */ u8 field_0x04;          /* cleared once the slot is placed */
     /* +0x05 */ u8 pad_0x05[0x17];
 }; /* size: 0x1C */
 
-/* This family's work block, the `_EFT::work_0x38` record `fn_800F8788` pools with the effect.  The
+/* This family's work block, the `_EFT::work_0x38` record `eft_res_slot_get` pools with the effect.  The
  * two part slots are walked as a run from the count word (`eft052_set`/`eft052_place` address them
  * with the count word as base), and the tail fields hold the area table the placement pass looks the
  * per-area byte up in. */
@@ -191,7 +191,7 @@ extern u8 lbl_805ED168[];
  * ---------------------------------------------------------------------------------------------- */
 extern "C" void eft052_set()
 {
-    _EFT* eft = (_EFT*)fn_800F8788(76);
+    _EFT* eft = (_EFT*)eft_res_slot_get(76);
     if (eft == NULL)
         return;
 
@@ -200,15 +200,15 @@ extern "C" void eft052_set()
     EftPartWork* work = (EftPartWork*)eft->work_0x38;
     work->count_0x00 = 2;
     for (s32 i = 0; i < work->count_0x00; i++) {
-        work->slots_0x04[i].model_0x00 = (EftModel*)fn_800F8914();
+        work->slots_0x04[i].model_0x00 = (EftModel*)eft_res_model_get();
         if (work->slots_0x04[i].model_0x00 == NULL) {
-            fn_800F886C(eft);
+            eft_res_slot_release(eft);
             return;
         }
     }
     eft->source_0x30 = NULL;
     eft->field_0x03 = 52;
-    fn_800F9DF4(eft, 8, 0);
+    eft_state_flags_set(eft, 8, 0);
 }
 
 /* ---------------------------------------------------------------------------------------------- *
@@ -380,7 +380,7 @@ extern "C" void eft052_state_step(_EFT* self)
  * ---------------------------------------------------------------------------------------------- */
 extern "C" void eft052_pool_release(_EFT* self)
 {
-    fn_800F886C(self);
+    eft_res_slot_release(self);
 }
 
 /* ---------------------------------------------------------------------------------------------- *

@@ -1,3 +1,11 @@
+/* ef/eft001.cpp - effect 001 setup
+ *
+ * `.text` 0x800FAE08..0x800FBE64, 7 functions written (the rest of the range is not decompiled yet).
+ * Phase 4 (docs/splits/phase4): recut registered unit; the functions of the neighbouring units were cut out of this file.
+ * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
+ */
+
+/* Retired header of `ef/eft001.cpp` (kept for its notes and residuals): */
 /* ef/eft001.cpp - the `eft001` effect cluster, 0x800FAE08..0x800FCED4 (23 functions).
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every
  * fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt; the one non-fn_ name,
@@ -21,6 +29,9 @@
  * was measured are in the unit report and the `.pi/notes/800fae08-fn-800fae08-d3c2.md` note.
  */
 
+#include "ef/fn_800FAD90.h" /* fn_800FAD90 (rule 2: the owner's header) */
+#include "ef/fn_800FADCC.h" /* fn_800FADCC (rule 2: the owner's header) */
+#include "enemy/fn_80135998.h" /* fn_80135998 (rule 2: the owner's header) */
 #include "types.h"
 #include "nw4r/math.h"
 #include "gx.h"
@@ -31,6 +42,9 @@
 #include "ef/eft002.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+/* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
+#define fn_800FAD90_c1 ((void (*)(_EFT*))fn_800FAD90)
+#define fn_800FADCC_c1 ((void (*)(_EFT*))fn_800FADCC)
 
 /* ---------------------------------------------------------------------------------------------------
  * the +0x38 pool block, in its two per-family views (ef.h's `_EFT_WORK` is the generic 0x10 prefix)
@@ -47,35 +61,6 @@ struct _EFT001_MODEL_WORK {
     /* +0x18 */ s8 timer_0x18;      /* the per-frame countdown the frame handler runs down */
     /* +0x19 */ u8 color_0x19[4];   /* the K-colour passed to setTevKColor */
     /* +0x1D */ u8 unused_0x1D[0x17];
-};
-
-/* The `fn_800FBE64` / `fn_800FC484` family block: two pooled effects and the model they share. */
-struct _EFT001_EFFECT_WORK {
-    /* +0x00 */ s32 count;
-    /* +0x04 */ nw4r::ef::Effect* effect_0x04;  /* the primary pooled effect */
-    /* +0x08 */ nw4r::ef::Effect* effect_0x08;  /* the secondary effect / the joint model (cast per family) */
-    /* +0x0C */ f32 scale_0x0C;
-    /* +0x10 */ u8 unused_0x10[4];
-    /* +0x14 */ u8 color_0x14[4];
-    /* +0x18 */ union { f32 value_0x18; s8 timer_0x18; };
-    /* +0x1C */ u8 unused_0x1C[0x0C];
-    /* +0x28 */ u8 flag_0x28;
-    /* +0x29 */ u8 flag_0x29;
-    /* +0x2A */ u8 unused_0x2A[2];
-    /* +0x2C */ s32 value_0x2C;
-    /* +0x30 */ s32 value_0x30;
-};
-/* size: 0x34 - lower bound, an approximation. */
-
-/* The opaque source record the `fn_800FBE64` / `fn_800FC1DC` builders read: the area byte at +0x0F
- * and the joint/parameter word at +0x36.  Only the offsets this unit reads are named.
- * size: 0x3C - lower bound, an approximation. */
-struct _EFT001_SRC {
-    /* +0x00 */ u8 unused_0x00[0x0F];
-    /* +0x0F */ u8 area_0x0F;      /* the area the builder is gated on */
-    /* +0x10 */ u8 unused_0x10[0x26];
-    /* +0x36 */ u16 param_0x36;     /* the joint/parameter passed to the model builder */
-    /* +0x38 */ u8 unused_0x38[0x04];
 };
 
 /* The joint holder `_PLW::physics_0x13C` points at: the `MHchar` the effect is placed on sits at
@@ -98,13 +83,6 @@ struct _EFT001_PLW_VIEW {
     /* +0x13C */ void* physics_0x13C; /* the joint holder the effect is placed on */
 };
 
-/* One particle-manager entry `fn_800FCEC8` walks: the manager sits after an 88-byte header.
- * size: 0x59 - lower bound. */
-struct _EFT001_PM_ENTRY {
-    /* +0x00 */ u8 unused_0x00[0x58];
-    /* +0x58 */ u8 field_0x58;
-};
-
 /* The enemy work record `fn_800FAE08` drives: only the offsets the state machine reads are named
  * (`_ENEMY_WORK`'s canonical view names fewer of them).  A unit-local view of the same record, cast
  * from `_EFT::source_0x30` where the effect is attached to an enemy.  size: 0x22C - lower bound. */
@@ -122,101 +100,38 @@ struct _EFT001_ENEMY {
     /* +0x228 */ u16 flags_0x228;
 };
 
-/* ---------------------------------------------------------------------------------------------------
- * the mangled callees (real C++ declarations - rule 9: the member call, never the mangled spelling)
- * ------------------------------------------------------------------------------------------------- */
-
-u32 get_now_areano();
 s32 ran_suu(s32 range);
 void* res_eft_model_create(MHchar* model, u16 id, u32 arg);
-nw4r::ef::Effect* res_eft_create(u16 id, u16 param, u32 idx);
-void SetRootMtxTrans(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos);
-void change_color_eff(nw4r::ef::Effect* effect, nw4r::math::VEC3* pos, _GXColor color);
-void change_paramscale_eff(nw4r::ef::Effect* effect, f32 scale);
-void change_paramscale_eff_vec3(nw4r::ef::Effect* effect, nw4r::math::VEC3* vec);
-u32 effect_move(nw4r::ef::Effect* effect);
-void push_eft_effect_heap_num(nw4r::ef::Effect** effects, long count);
-void eftGetKeyRGB(u8* keys, long frame, u8* r, u8* g, u8* b);
-u8 eftGetKeyAlpha(u8* key, long frame);
+
 void setVector3(nw4r::math::VEC3* v, f32 x, f32 y, f32 z);
-void cpSetRotMatrix(_CP_VECTOR* rot, nw4r::math::MTX34* mtx);
-void mulVecMat(nw4r::math::VEC3* v, nw4r::math::MTX34* m);
-u32 calcVecAng3(nw4r::math::VEC3* v);
-void rotLocalMatX(u32 angle, nw4r::math::MTX34* m);
-void rotLocalMatY(u32 angle, nw4r::math::MTX34* m);
-void rotVecY(nw4r::math::VEC3* v, u32 angle);
+
 void get_joint_wpos_em(_ENEMY_WORK* enemy, u32 joint, nw4r::math::VEC3* out);
-extern "C" f32 fn_80135998(void* enemy); /* target references the plain name (relocaudit) */
 f32 GetGroundHit(nw4r::math::VEC3* pos, u32 ground, u8 flag);
 
-/* The unmangled `fn_XXXXXXXX` callees (unsplit, or owned by a registered unit whose header is
- * included above).  A linkage block keeps them out of the per-declaration checker; the owned ones
- * come from their owner's header. */
 extern "C" {
-void mtx34_identity(nw4r::math::MTX34* m);
-void fn_80050850(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
-void subVec3(nw4r::math::VEC3* out, nw4r::math::MTX34* m, nw4r::math::VEC3* v);
-void addVec3(nw4r::math::VEC3* out, nw4r::math::VEC3* a, nw4r::math::VEC3* b);
-void fn_800513F0(nw4r::math::VEC3* v, f32 s);
-void fn_80051EE0(nw4r::math::VEC3* out, nw4r::math::VEC3* in, f32 s);
-void fn_800834F0(void* p);
-void fn_800B0B90(nw4r::math::VEC3* dst, nw4r::math::VEC3* src);
 u8 fn_800CF208(void* model);
-void fn_800DB6CC(nw4r::math::VEC3* pos);
-void fn_800DB714(nw4r::math::VEC3* pos);
-void fn_800DB75C(void* enemy, nw4r::math::VEC3* pos);
-void fn_801B701C(_ENEMY_WORK* enemy);
-void fn_80224884(_PLW* plw);
-void fn_8027D7EC(_PLW* plw, u8 flag);
-u32 fn_8029F564(void* self, u32 flag);
-void fn_802B00AC(nw4r::math::VEC3* out, u8 area);
-void fn_802BE038(void* self);
-void fn_802D2B78(_ENEMY_WORK* enemy);
-void fn_80331210(void* model);
-void get_option_21(void);
-void* fn_800F8788(u32 pool);
-void fn_800F886C(void* self);
-void* fn_800F8914();
-void fn_800F8A44(void* p, s32 mode);
-u32 fn_800F92F4(void* self, u32 flag);
-u32 fn_800F9380(_PLW* plw);
-void fn_800F93D8(void* self, nw4r::ef::Effect** effects, s32 count, s32 mode, void* arg);
-u8 fn_800F9D80(void* self);
-void fn_800F9DF4(void* self, u8 a, u8 b);
-void fn_800FAD90(_EFT* self);
-void fn_800FADCC(_EFT* self);
-void fn_800AA75C(void* dst);
+
+void* eft_res_slot_get(u32 pool);
+void eft_res_slot_release(void* self);
+void* eft_res_model_get();
+
+/* untyped: an opaque handle passed through (the callee only hands the pointer on) */
+void eft_state_flags_set(void* self, u8 a, u8 b);
 
 /* The unit's own `.sdata`/`.data` pool, referenced by name (never emitted here). */
 extern u8 lbl_807916C0[8];
 extern u32 lbl_807916A0[];
-extern u16 lbl_8059B638[];
-extern u16 lbl_8059B670[];
+
 extern f32 lbl_80796608;
 extern f32 lbl_8079660C;
 extern f32 lbl_80796610;
 extern f32 lbl_80796614;
-extern f32 lbl_80796644;
-extern f32 lbl_80796640;
-extern f32 lbl_80796648;
-extern u8 lbl_8059B6A8[];
-extern u8 lbl_8059B6B4[];
-extern u8 lbl_8059B6CC[];
-extern u8 lbl_8059B6E4[];
-extern u8 lbl_8059B7C8[];
 }
 
 /* ---------------------------------------------------------------------------------------------------
  * bodies
  * ------------------------------------------------------------------------------------------------- */
-
 extern "C" void fn_800FB160(_EFT* self);
-extern "C" void fn_800FC3A4(_EFT* self);
-extern "C" void fn_800FC3E0(_EFT* self);
-extern "C" void fn_800FC484(_EFT* self);
-extern "C" void fn_800FC7EC(_EFT* self);
-extern "C" void fn_800FCA34(_EFT* self);
-extern "C" void fn_800FCA54(_EFT* self);
 
 /* Writes a VEC3 into an MTX34's translation column: `m[0][3]`, `m[1][3]`, `m[2][3]`. */
 extern "C" void fn_800FBB90(nw4r::math::MTX34* m, nw4r::math::VEC3* v)
@@ -235,82 +150,14 @@ extern "C" void fn_800FBBAC(_EFT* self)
 /* Retires the effect object: hands it back to the pool through the shared destructor. */
 extern "C" void fn_800FBBBC(_EFT* self)
 {
-    fn_800F886C(self);
-}
-
-/* Copies a 12-byte rotation triple. */
-extern "C" void eft_rot_vec_copy(_CP_VECTOR* dst, _CP_VECTOR* src)
-{
-    *dst = *src;
-}
-
-/* Dispatches to the two per-frame model handlers by the effect type. */
-extern "C" void fn_800FC384(_EFT* self)
-{
-    if ((u32)(self->type_0x02 - 18) <= 1 || (s8)self->type_0x02 == 14) {
-        fn_800FC3E0(self);
-    } else {
-        fn_800FC3A4(self);
-    }
-}
-
-/* Retires the pooled effect of the work block and clears its count. */
-extern "C" void fn_800FC3A4(_EFT* self)
-{
-    _EFT001_EFFECT_WORK* work = (_EFT001_EFFECT_WORK*)self->work_0x38;
-
-    push_eft_effect_heap_num((nw4r::ef::Effect**)&work->effect_0x04, work->count);
-    work->count = 0;
-}
-
-/* Releases the secondary effect's pool entry, retires the primary and clears the count. */
-extern "C" void fn_800FC3E0(_EFT* self)
-{
-    _EFT001_EFFECT_WORK* work = (_EFT001_EFFECT_WORK*)self->work_0x38;
-
-    fn_800F8A44(&work->effect_0x08, 1);
-    push_eft_effect_heap_num((nw4r::ef::Effect**)&work->effect_0x04, work->count);
-    work->count = 0;
-}
-
-/* The per-frame dispatcher: advance the state handler the effect's `byte_5` selects. */
-extern "C" void fn_800FC428(_EFT* self)
-{
-    switch (self->state_0x05) {
-    case 1:
-        fn_800FCA34(self);
-        break;
-    case 2:
-        fn_800FD29C(self);
-        break;
-    case 3:
-        fn_800FD2AC(self);
-        break;
-    case 0:
-        if ((u32)(self->type_0x02 - 18) <= 1 || (s8)self->type_0x02 == 14) {
-            fn_800FC7EC(self);
-        } else {
-            fn_800FC484(self);
-        }
-        break;
-    }
-}
-
-/* Dispatches to the two per-frame model handlers of the second half of the unit. */
-extern "C" void fn_800FCA34(_EFT* self)
-{
-    if ((u32)(self->type_0x02 - 18) <= 1 || (s8)self->type_0x02 == 14) {
-        fn_800FCED4(self);
-    } else {
-        fn_800FCA54(self);
-    }
+    eft_res_slot_release(self);
 }
 
 /* Builds a new effect of `type`: allocates it from the 32-entry pool, installs the dispatcher and the
  * pool-release handler, fills the model list from the type's descriptor table and clears the pose. */
 extern "C" _EFT* fn_800FBD68(u32 type)
 {
-    _EFT* effect = (_EFT*)fn_800F8788(32);
+    _EFT* effect = (_EFT*)eft_res_slot_get(32);
     _EFT001_MODEL_WORK* work;
     u8* table = lbl_807916C0;
     s32 i;
@@ -321,16 +168,16 @@ extern "C" _EFT* fn_800FBD68(u32 type)
     }
 
     effect->type_0x02 = (u8)type;
-    effect->dispatch_0x34 = fn_800FADCC;
-    effect->release_0x40 = fn_800FAD90;
+    effect->dispatch_0x34 = fn_800FADCC_c1;
+    effect->release_0x40 = fn_800FAD90_c1;
 
     work = (_EFT001_MODEL_WORK*)effect->work_0x38;
     work->count = table[type];
 
     for (i = 0, slot = work->models; i < work->count; i++, slot++) {
-        *slot = (MHchar*)fn_800F8914();
+        *slot = (MHchar*)eft_res_model_get();
         if (*slot == NULL) {
-            fn_800F886C(effect);
+            eft_res_slot_release(effect);
             return NULL;
         }
     }
@@ -340,183 +187,8 @@ extern "C" _EFT* fn_800FBD68(u32 type)
     effect->rot_0x24.z = 0;
     effect->field_0x10 = 0;
     effect->timer_0x0C = 0;
-    fn_800F9DF4(effect, 1, 0);
+    eft_state_flags_set(effect, 1, 0);
     return effect;
-}
-
-/* Builds a model effect at `pos`: gated on the current area, allocates a 16-entry pool effect,
- * installs the two per-frame handlers, seeds the model list and the parameter scale. */
-extern "C" _EFT* fn_800FC27C(nw4r::math::VEC3* pos, u32 type, u32 param, u32 area, f32 scale)
-{
-    if ((u8)area != (u8)get_now_areano()) {
-        return NULL;
-    }
-
-    _EFT* effect = (_EFT*)fn_800F8788(16);
-    if (effect == NULL) {
-        return NULL;
-    }
-
-    effect->type_0x02 = (u8)type;
-    effect->release_0x40 = fn_800FC384;
-    effect->dispatch_0x34 = fn_800FC428;
-
-    _EFT001_EFFECT_WORK* work = (_EFT001_EFFECT_WORK*)effect->work_0x38;
-    work->count = 1;
-    work->effect_0x08 = (nw4r::ef::Effect*)fn_800F8914();
-    if (work->effect_0x08 == NULL) {
-        fn_800F886C(effect);
-        return NULL;
-    }
-
-    work->scale_0x0C = scale;
-    effect->field_0x03 = 1;
-    effect->timer_0x0C = 0;
-    copyVec3(&effect->pos_0x18, pos);
-    effect->rot_0x24.y = param;
-    effect->area_0x44 = (u8)area;
-    fn_800F9DF4(effect, 0, 4);
-    return effect;
-}
-
-/* Wrapper around `fn_800FC27C` for a `_CP_VECTOR` rotation triple: its second word is the parameter
- * stored on the effect. */
-void eft001_set_pos(nw4r::math::VEC3* pos, u32 a, _CP_VECTOR* v, u8 b, f32 c)
-{
-    if (fn_800FC27C(pos, a, v->y, b, c) == NULL) {
-        return;
-    }
-}
-
-/* Builds a model effect from a joint source: its +0x36 word and +0x0F area seed `fn_800FC27C`, and the
- * effect's `field_0x07` records whether the source owns the 0x800 flag. */
-extern "C" void fn_800FC1DC(nw4r::math::VEC3* pos, u32 type, _EFT001_SRC* src)
-{
-    _EFT* effect = fn_800FC27C(pos, type, src->param_0x36, src->area_0x0F, lbl_80796644);
-
-    if (effect != NULL) {
-        effect->field_0x07 = (fn_8029F564(src, 2048) == 1) ? 1 : 0;
-    }
-}
-
-/* Builds a model effect with a full parameter set: the area gate, the model builder, the effect's
- * `field_0x08`/`field_0x06` seed bytes, the rotation triple and the parameter scale. */
-extern "C" void fn_800FC0F0(nw4r::math::VEC3* pos, u32 type, u32 field_08, u32 area, _CP_VECTOR* rot, f32 scale)
-{
-    if ((u8)area != (u8)get_now_areano()) {
-        return;
-    }
-
-    _EFT* effect = (_EFT*)fn_800F8788(44);
-    if (effect == NULL) {
-        return;
-    }
-
-    _EFT001_EFFECT_WORK* work = (_EFT001_EFFECT_WORK*)effect->work_0x38;
-    work->count = 1;
-    effect->type_0x02 = (u8)type;
-    effect->demo_flag_0x08 = (u8)field_08;
-    effect->field_0x03 = 1;
-    effect->timer_0x0C = 0;
-    copyVec3(&effect->pos_0x18, pos);
-    eft_rot_vec_copy(&effect->rot_0x24, rot);
-    effect->area_0x44 = (u8)area;
-    work->value_0x18 = scale;
-    effect->field_0x07 = 4;
-    effect->field_0x06 = 0;
-    fn_800F9DF4(effect, 0, 4);
-    effect->release_0x40 = fn_800FC384;
-    effect->dispatch_0x34 = fn_800FC428;
-}
-
-/* The particle-manager walk callback: forwards the entry (offset by its 88-byte header) to the shared
- * particle release. */
-extern "C" void fn_800FCEC8(void* entry, u32 index)
-{
-    (void)index;
-    fn_800AA75C(&((_EFT001_PM_ENTRY*)entry)->field_0x58);
-}
-
-/* Walks the effect's particle-manager pool through `ForeachParticleManager`. */
-extern "C" void fn_800FCEB0(nw4r::ef::Effect* self, u32 arg, bool flag)
-{
-    self->ForeachParticleManager(fn_800FCEC8, arg, flag);
-}
-
-/* Builds the pooled effect + model pair for a per-frame effect: allocates both from the type's id
- * tables, poses the model at the effect's position, offsets its animation clock by a random amount,
- * and seeds the two K-colours the effect family uses. */
-extern "C" void fn_800FC7EC(_EFT* self)
-{
-    _EFT001_EFFECT_WORK* work = (_EFT001_EFFECT_WORK*)self->work_0x38;
-    MHchar* model;
-    _GXColor color;
-
-    self->state_0x05++;
-
-    work->effect_0x04 = res_eft_create(lbl_8059B638[self->type_0x02], lbl_8059B670[self->type_0x02], 0);
-    if (work->effect_0x04 == NULL) {
-        fn_800FD2AC(self);
-        return;
-    }
-
-    if (res_eft_model_create((MHchar*)work->effect_0x08, 82, 340) == NULL) {
-        fn_800FD2AC(self);
-        return;
-    }
-
-    model = (MHchar*)work->effect_0x08;
-    SetRootMtxTrans(work->effect_0x04, &self->pos_0x18);
-    copyVec3(&model->pos_0x04, &self->pos_0x18);
-    eft_rot_vec_copy(&model->rot_0x54, &self->rot_0x24);
-
-    model->field_0x2C -= 3641;
-    model->field_0x2C += ran_suu(0) & 0x1FFF;
-    model->field_0x30 = 0xF1C7;
-    model->field_0x30 += ran_suu(0) & 0x1FFF;
-
-    model->setVisibility(1, false);
-    setVector3(&model->scale_0x1C, work->scale_0x0C, work->scale_0x0C, work->scale_0x0C);
-
-    self->timer_0x0C = 5;
-    self->flag_0x01 = 1;
-
-    switch (self->type_0x02) {
-    case 14:
-        color.r = 0x66;
-        color.g = 0xEE;
-        color.b = 0xFF;
-        color.a = 0xFF;
-        break;
-    case 18:
-        color.r = 0xFF;
-        color.g = 0;
-        color.b = 0;
-        color.a = 0xFF;
-        {
-            s32 i;
-            for (i = 0; i < 2; i++) {
-                model->setMatAlphaBlendMode(i, GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_CLEAR);
-            }
-        }
-        break;
-    case 19:
-        color.r = 0xFF;
-        color.g = 0xFF;
-        color.b = 0xC8;
-        color.a = 0xFF;
-        break;
-    }
-
-    {
-        s32 i;
-        for (i = 0; i < 2; i++) {
-            model->setTevKColor(i, GX_KCOLOR3, &color);
-        }
-    }
-
-    self->field_0x06 = 0;
-    fn_800FCA34(self);
 }
 
 /* Places the `index`-th model of a model effect on a joint whose ground height the player's state
@@ -661,164 +333,7 @@ extern "C" void fn_800FAE08(_EFT* self)
     fn_800FB160(self);
 }
 
-/* The per-frame body of the non-model (type 11..26) effect: advances the two-stage machine, moves
- * the pooled effects, and recolours them per type from the key tables. */
-extern "C" void fn_800FCA54(_EFT* self)
-{
-    u8 buf[8];
-    nw4r::math::VEC3 vec;
-    _GXColor color;
-    s32 live = 0;
-    s32 i;
-    _EFT001_EFFECT_WORK* work;
-
-    fn_800834F0(buf);
-    VEC3_ctor(&vec);
-    work = (_EFT001_EFFECT_WORK*)self->work_0x38;
-
-    if (self->field_0x06 == 0) {
-        if (--self->timer_0x0C > 0) {
-            return;
-        }
-
-        self->field_0x06++;
-
-        switch (self->type_0x02) {
-        case 7:
-        case 8:
-            fn_800DB608(2, &self->pos_0x18, work->flag_0x29);
-            break;
-        case 15:
-            fn_800DB608(3, &self->pos_0x18, work->flag_0x29);
-            break;
-        case 17:
-            fn_800DB608(4, &self->pos_0x18, work->flag_0x29);
-            break;
-        case 16:
-            fn_800DB608(5, &self->pos_0x18, work->flag_0x29);
-            break;
-        case 20:
-            fn_800DB608(6, &self->pos_0x18, work->flag_0x29);
-            break;
-        case 21:
-            fn_800DB608(7, &self->pos_0x18, work->flag_0x29);
-            break;
-        case 11:
-            switch (self->demo_flag_0x08) {
-            case 0:
-            case 2:
-                fn_800DB6CC(&self->pos_0x18);
-                break;
-            case 1:
-                fn_800DB714(&self->pos_0x18);
-                break;
-            }
-            break;
-        case 12:
-            if (fn_800F92F4(self, 0) == 1) {
-                fn_800DB75C(self->source_0x30, &self->pos_0x18);
-            }
-            break;
-        }
-        return;
-    }
-
-    if (self->type_0x02 == 7) {
-        ((nw4r::math::VEC3*)buf)->x = lbl_80796640;
-        ((nw4r::math::VEC3*)buf)->y = lbl_80796640;
-        fn_800FCEB0(work->effect_0x04, (u32)buf, true);
-    }
-
-    if (self->type_0x02 <= 5 || (u8)(self->type_0x02 - 9) <= 1 ||
-        self->type_0x02 == 22 || self->type_0x02 == 26) {
-        change_paramscale_eff(work->effect_0x04, work->scale_0x0C);
-    } else if (self->type_0x02 == 25) {
-        setVector3(&vec, work->scale_0x0C, work->scale_0x0C, lbl_80796648 * work->scale_0x0C);
-        change_paramscale_eff_vec3(work->effect_0x04, &vec);
-    }
-
-    for (i = 0; i < work->count; i++) {
-        if (effect_move(((nw4r::ef::Effect**)&work->effect_0x04)[i]) == 0) {
-            live = (u8)(live + 1);
-        }
-    }
-
-    if (live >= work->count) {
-        self->flag_0x01 = 0;
-        self->state_0x05++;
-        return;
-    }
-
-    self->field_0x10++;
-
-    switch (self->type_0x02) {
-    case 0:
-    case 1:
-    case 2:
-    case 24:
-        color = *(_GXColor*)work->color_0x14;
-        change_color_eff(work->effect_0x04, &self->pos_0x18, color);
-        break;
-    case 7:
-    case 8:
-        if (fn_800F9D80(self) == 1) {
-            work->color_0x14[0] = 100;
-            work->color_0x14[1] = 191;
-            work->color_0x14[2] = 255;
-            work->color_0x14[3] = 255;
-            color = *(_GXColor*)work->color_0x14;
-            change_color_eff(work->effect_0x04, &self->pos_0x18, color);
-        }
-        break;
-    case 11:
-        if (work->flag_0x28 == 0) {
-            eftGetKeyRGB(lbl_8059B6E4 + self->demo_flag_0x08 * 4, self->field_0x10, &work->color_0x14[0],
-                         &work->color_0x14[1], &work->color_0x14[2]);
-        } else {
-            eftGetKeyRGB(lbl_8059B6B4, self->field_0x10, &work->color_0x14[0], &work->color_0x14[1],
-                         &work->color_0x14[2]);
-        }
-        color = *(_GXColor*)work->color_0x14;
-        change_color_eff(work->effect_0x04, &self->pos_0x18, color);
-        break;
-    case 20:
-        if (work->flag_0x28 == 0) {
-            eftGetKeyRGB(lbl_8059B6A8, self->field_0x10, &work->color_0x14[0], &work->color_0x14[1],
-                         &work->color_0x14[2]);
-        } else {
-            color.r = 255;
-            color.g = 175;
-            color.b = 175;
-            color.a = 255;
-            change_color_eff(work->effect_0x04, &self->pos_0x18, color);
-            eftGetKeyRGB(lbl_8059B6B4, self->field_0x10, &work->color_0x14[0], &work->color_0x14[1],
-                         &work->color_0x14[2]);
-        }
-        color = *(_GXColor*)work->color_0x14;
-        change_color_eff(work->effect_0x08, &self->pos_0x18, color);
-        break;
-    case 21:
-        eftGetKeyRGB(lbl_8059B6CC, self->field_0x10, &work->color_0x14[0], &work->color_0x14[1],
-                     &work->color_0x14[2]);
-        color = *(_GXColor*)work->color_0x14;
-        change_color_eff(work->effect_0x08, &self->pos_0x18, color);
-        break;
-    case 25:
-    case 26:
-        eftGetKeyRGB(lbl_8059B7C8 + self->demo_flag_0x08 * 4, self->field_0x10, &work->color_0x14[0],
-                     &work->color_0x14[1], &work->color_0x14[2]);
-        color = *(_GXColor*)work->color_0x14;
-        change_color_eff(work->effect_0x04, &self->pos_0x18, color);
-        break;
-    }
-
-    fn_800F93D8(self, (nw4r::ef::Effect**)&work->effect_0x04, 1, work->count, NULL);
-}
-
 /* ---------------------------------------------------------------------------------------------------
  * still stubbed - the residual (see the unit report)
  * ------------------------------------------------------------------------------------------------- */
-
 extern "C" void fn_800FB160(_EFT* self) {}
-extern "C" void fn_800FC484(_EFT* self) {}
-extern "C" void fn_800FBE64(void) {}

@@ -5,8 +5,8 @@
  * What it is.  Two clusters that share one translation unit:
  *   * 0x80138074..0x801391E8 - the `ENEMY_WORK` per-frame driver: `fn_8013823C` (the per-tick update)
  *     and `fn_80138B60` (the sleep/death half) walk the work block's move table, user-data list and
- *     MHchar base, and the small helpers around them (`fn_80138E64` pushes the work's scale/rotation into
- *     the MHchar, `fn_80138EC8` advances one of the two 0x5C-byte effect slots, `fn_80138F3C` fills the
+ *     EmCharBase base, and the small helpers around them (`fn_80138E64` pushes the work's scale/rotation into
+ *     the EmCharBase, `fn_80138EC8` advances one of the two 0x5C-byte effect slots, `fn_80138F3C` fills the
  *     per-move `-1` markers, `fn_80139024` is the action-state step, `em_res_user_data_set` installs a callback).
  *   * 0x801394B8..0x8013AC08 - the `g3d_resuser_ac.h` accessor: `ResUserDataAc` (vtable at +0, the
  *     `ENEMY_WORK*` at +4, a 32-bit flag word at +8) reads `ResUserData` values out of the work's
@@ -47,6 +47,26 @@
  * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/80138074_fn_80138074.c`.
  */
 
+struct _ENEMY_WORK; /* file scope, so the leaf headers' `struct _ENEMY_WORK*` parameters name this type (C scopes a struct first named in a prototype) */
+#include "enemy/em_motion_param_set.h" /* em_motion_param_set (rule 2: the owner's header) */
+#include "enemy/get_enemy_data__FP11_ENEMY_WORK.h" /* get_enemy_data__FP11_ENEMY_WORK (rule 2: the owner's header) */
+#include "enemy/fn_801252DC.h" /* fn_801252DC (rule 2: the owner's header) */
+#include "enemy/fn_80126098.h" /* fn_80126098 (rule 2: the owner's header) */
+#include "enemy/fn_80126278.h" /* fn_80126278 (rule 2: the owner's header) */
+#include "enemy/fn_801264BC.h" /* fn_801264BC (rule 2: the owner's header) */
+#include "enemy/em_hit_mask_get.h" /* em_hit_mask_get (rule 2: the owner's header) */
+#include "enemy/fn_801281EC.h" /* fn_801281EC (rule 2: the owner's header) */
+#include "enemy/fn_801281F8.h" /* fn_801281F8 (rule 2: the owner's header) */
+#include "enemy/fn_80128204.h" /* fn_80128204 (rule 2: the owner's header) */
+#include "enemy/fn_80128308.h" /* fn_80128308 (rule 2: the owner's header) */
+#include "enemy/em_target_pos_set.h" /* em_target_pos_set (rule 2: the owner's header) */
+#include "enemy/fn_8012987C.h" /* fn_8012987C (rule 2: the owner's header) */
+#include "enemy/fn_8012A3B4.h" /* fn_8012A3B4 (rule 2: the owner's header) */
+#include "enemy/fn_8012A414.h" /* fn_8012A414 (rule 2: the owner's header) */
+#include "enemy/em_area_change.h" /* em_area_change (rule 2: the owner's header) */
+#include "enemy/fn_8012B64C.h" /* fn_8012B64C (rule 2: the owner's header) */
+#include "enemy/em_busy_set.h" /* em_busy_set (rule 2: the owner's header) */
+#include "enemy/fn_80133BCC.h" /* fn_80133BCC (rule 2: the owner's header) */
 #include "types.h"
 #include "nw4r/math.h"
 #include "enemy/fn_8012BDF4.h"
@@ -61,6 +81,12 @@
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 #include "unsplit/enemy_pool.h" /* the band's unowned .data pools (rule 2) */
+/* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
+#define fn_80126098_c1 ((s32 (*)(void))fn_80126098)
+#define fn_801281EC_c1 ((void (*)(EnemyWork*))fn_801281EC)
+#define fn_801281F8_c1 ((void (*)(EnemyWork*))fn_801281F8)
+#define fn_80128204_c1 ((u32 (*)(EnemyWork*))fn_80128204)
+#define em_busy_set_c1 ((void (*)(EnemyWork*))em_busy_set)
 
 /* --------------------------------------------------------------------------------------------- */
 /* shared pool symbols (another unit owns the bytes)                                              */
@@ -126,6 +152,9 @@ typedef struct ResUserDataItemData ResUserDataItemData;
 typedef struct UserDataCursor UserDataCursor;
 typedef struct MtxHolder MtxHolder;
 typedef struct MHchar MHchar;
+typedef struct EmCharBase EmCharBase;
+#define fn_80126278_c1 ((void (*)(u16, Vec3*))fn_80126278)
+#define EM_CHAR(self) ((MHchar*)&(self)->char_0x024)
 typedef struct WorkSlot WorkSlot;
 typedef struct EffectArea EffectArea;
 typedef struct MoveSlot MoveSlot;
@@ -241,7 +270,6 @@ extern void setVector3__FPQ34nw4r4math4VEC3fff(Vec3* v, f32 x, f32 y, f32 z);
 extern s32 calcVecAng2__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3(const Vec3* a, const Vec3* b);
 extern void rotVecY__FPQ34nw4r4math4VEC3Ul(Vec3* v, u32 angle);
 extern void get_worldworld_pos__FPQ34nw4r4math4VEC3Uc(Vec3* out, const Vec3* v, u8 area);
-extern EnemyData* get_enemy_data__FP11_ENEMY_WORK(EnemyWork* work);
 extern void* get_move_work_adrs__FUc(u8 area);
 extern u16 get_move_work_max__FUc(u8 area);
 extern u8 get_now_areano__Fv(void);
@@ -250,23 +278,6 @@ extern s32 ran_suu__Fl(s32 n);
 
 extern void fn_8011F5C0(EnemyWork* work);
 extern u32 fn_8011F654(EnemyWork* work);
-extern void fn_801252DC(EnemyWork* work);
-extern s32 fn_80126098(void);
-extern void fn_80126278(u16 id, Vec3* out);
-extern void (*fn_801264BC(EnemyWork* work, s32 index))(EnemyWork*);
-extern u16 em_hit_mask_get(EnemyWork* work);
-extern void fn_801281EC(EnemyWork* work);
-extern void fn_801281F8(EnemyWork* work);
-extern u32 fn_80128204(EnemyWork* work);
-extern void fn_80128308(EnemyWork* work);
-extern void em_target_pos_set(EnemyWork* work, s32 arg1);
-extern void fn_8012987C(EnemyWork* work);
-extern void fn_8012A3B4(EnemyWork* work);
-extern void fn_8012A414(EnemyWork* work);
-extern void em_area_change(EnemyWork* work, s32 arg1);
-extern void fn_8012B64C(EnemyWork* work);
-extern void em_busy_set(EnemyWork* work);
-extern u32 fn_80133BCC(EnemyWork* work);
 extern void fn_80295578(EnemyWork* work, u8 arg1, u16 arg2);
 extern void hit_attack_list_push(void* arg0);
 extern void hit_knock_set(void* arg0, s32 arg1);
@@ -282,8 +293,9 @@ extern void fn_805012E8(Mtx34* out, const Mtx34* src);
 /* reconstructed types                                                                            */
 /* --------------------------------------------------------------------------------------------- */
 
-/* The MHchar base the work block embeds at +0x24. */
-struct MHchar { /* size: 0x40 */
+/* The lower-bound view of the `MHchar` base the work block embeds at +0x24 (0x40 bytes of the actor's character object);
+ * calls reach it as `MHchar*`, whose definition is `pl.h`'s. */
+struct EmCharBase { /* size: 0x40 */
     /* +0x00 */ u32 field_0x00;
     /* +0x04 */ Vec3 field_0x04;
     /* +0x10 */ u8 pad_0x10[0x18];
@@ -443,7 +455,7 @@ struct _ENEMY_WORK { /* size: 0xB00 */
     /* +0x017 */ u8 field_0x017;
     /* +0x018 */ s16 field_0x018;
     /* +0x01A */ u8 pad_0x01A[0x0A];
-    /* +0x024 */ MHchar char_0x024;
+    /* +0x024 */ EmCharBase char_0x024; /* the `MHchar` base, passed on through `EM_CHAR` */
     /* +0x064 */ u32 field_0x064;
     /* +0x068 */ u8 pad_0x068[0xA8];
     /* +0x110 */ u32 field_0x110;
@@ -583,7 +595,7 @@ struct _ENEMY_WORK { /* size: 0xB00 */
 /* 0x80138074..0x801391E8 - the ENEMY_WORK per-frame driver                                       */
 /* --------------------------------------------------------------------------------------------- */
 
-/* Applies the work's current rotation to the MHchar base and pushes the animation frame. */
+/* Applies the work's current rotation to the EmCharBase base and pushes the animation frame. */
 void fn_80138074(EnemyWork* self, u8 arg1) {
     Vec3 saved;
     Vec3 offset;
@@ -609,14 +621,14 @@ void fn_80138074(EnemyWork* self, u8 arg1) {
     }
 }
 
-/* Loads the current motion's first frame into the MHchar base. */
+/* Loads the current motion's first frame into the EmCharBase base. */
 void fn_8013817C(EnemyWork* self) {
     EnemyData* data = self->field_0x9A4;
 
     if (data->field_0x00 == 0xFE || data->field_0x00 == 0xFC) {
         self->field_0x1F9 = 0;
     } else {
-        fn_80126278(data->field_0x08, &self->field_0x188);
+        fn_80126278_c1(data->field_0x08, &self->field_0x188);
         self->field_0x1C0 = data->field_0x0A;
         em_area_change(self, 0);
     }
@@ -806,10 +818,10 @@ void fn_8013823C(EnemyWork* self) {
         if (cb != NULL) {
             if (fn_80137C9C(self, cb) != 0) {
                 if (fn_80133BCC(self) == 1 && self->field_0x46A == 0 && fn_8013ACC4(self) == 1) {
-                    fn_801281EC(self);
+                    fn_801281EC_c1(self);
                 }
-                if (fn_80128204(self) == 1) {
-                    fn_801281F8(self);
+                if (fn_80128204_c1(self) == 1) {
+                    fn_801281F8_c1(self);
                     if (fn_80137C9C(self, cb) == 0) {
                         return;
                     }
@@ -820,7 +832,7 @@ void fn_8013823C(EnemyWork* self) {
         }
         if (self->field_0x784 != 0) {
             em_busy_timer_reset(self);
-            em_busy_set(self);
+            em_busy_set_c1(self);
             fn_80131D9C(self);
         }
         fn_80138E64(self);
@@ -843,7 +855,7 @@ void fn_8013823C(EnemyWork* self) {
         {
             f32 step = self->field_0x1AC * get_em_chg_scale__FP11_ENEMY_WORK(self);
             self->field_0x1A0.y = self->field_0x1A0.y + step;
-            fn_800E09D0(&self->char_0x024, &self->field_0x1A0, step);
+            fn_800E09D0(EM_CHAR(self), &self->field_0x1A0, step);
         }
         if (em_act_ck__FP11_ENEMY_WORKUcUc(self, 0xC, 0xFF) == 0 &&
             ((em_area_ck__FP11_ENEMY_WORK(self) == 1 && self->field_0x001 != 0) ||
@@ -868,7 +880,7 @@ void fn_8013823C(EnemyWork* self) {
             } else {
                 move_arg = 0;
             }
-            move__6MHcharFUs(&self->char_0x024, move_arg);
+            move__6MHcharFUs(EM_CHAR(self), move_arg);
         }
         copyVec3(&self->field_0x188, &self->char_0x024.field_0x04);
         switch (self->field_0x1E2) {
@@ -892,7 +904,7 @@ void fn_8013823C(EnemyWork* self) {
         fn_8012FF38(self);
         fn_80137DD0(self);
         fn_80138E64(self);
-        fn_800E0914(&self->char_0x024);
+        fn_800E0914(EM_CHAR(self));
         {
             u8 slot;
             for (slot = 0; slot < 2; slot++) {
@@ -922,7 +934,7 @@ void fn_80138B60(EnemyWork* self) {
         }
         if (self->field_0x8C0 != 0 || found != -1) {
             fn_80138E64(self);
-            fn_800E0914(&self->char_0x024);
+            fn_800E0914(EM_CHAR(self));
         }
         fn_8012A414(self);
         if (self->field_0x766 == 0) {
@@ -964,13 +976,13 @@ void fn_80138B60(EnemyWork* self) {
         } else if ((self->flags_0x1C8 & 0x40000) != 0) {
             if (em_die_ck__FP11_ENEMY_WORK(self) == 1) {
                 u32 i;
-                for (i = 0; i < fn_800E28E4(&self->char_0x024); i++) {
-                    fn_800E30DC(&self->char_0x024, i, 0x10);
+                for (i = 0; i < fn_800E28E4(EM_CHAR(self)); i++) {
+                    fn_800E30DC(EM_CHAR(self), i, 0x10);
                 }
             } else {
                 u32 i;
-                for (i = 0; i < fn_800E28E4(&self->char_0x024); i++) {
-                    fn_800E2EBC(&self->char_0x024, i, 2);
+                for (i = 0; i < fn_800E28E4(EM_CHAR(self)); i++) {
+                    fn_800E2EBC(EM_CHAR(self), i, 2);
                 }
             }
         }
@@ -1000,11 +1012,11 @@ void fn_80138E28(EnemyWork* self) {
     self->field_0x008 = owner;
 }
 
-/* Copies the work's scale and rotation into its MHchar base. */
+/* Copies the work's scale and rotation into its EmCharBase base. */
 void fn_80138E64(EnemyWork* self) {
-    MHchar* ch = &self->char_0x024;
+    EmCharBase* ch = &self->char_0x024;
 
-    setScaleAll__6MHcharFf(ch, get_em_scale__FP11_ENEMY_WORK(self));
+    setScaleAll__6MHcharFf((MHchar*)ch, get_em_scale__FP11_ENEMY_WORK(self));
     ch->field_0x28 = self->field_0x1BC;
     ch->field_0x2C = self->field_0x1C0;
     ch->field_0x30 = self->field_0x1C4;
@@ -1056,7 +1068,7 @@ void fn_80139024(EnemyWork* self) {
     switch (state) {
     case 0:
         self->field_0x005 = (u8)(state + 1);
-        fn_8012FCC4(self, 0, lbl_80796D40);
+        em_motion_param_set(self, 0, lbl_80796D40);
         em_mot_set(self, 1, 0, 0);
         self->field_0x001 = 0;
         return;
@@ -1230,7 +1242,7 @@ void fn_801394D4(ResUserDataAc* self, s32 arg1, s32* arg2, UserDataCursor* arg3)
     }
 }
 
-/* Builds the effect transform for one user-data item and applies it to the MHchar. */
+/* Builds the effect transform for one user-data item and applies it to the EmCharBase. */
 void fn_80139620(ResUserDataAc* self, void* arg1, void* arg2, s32 arg3, s32 arg4, UserDataItem* arg5) {
     Vec3 angles;
     Mtx34 mtx;
@@ -1694,7 +1706,7 @@ void fn_8013A954(EnemyWork* work, u8 arg1) {
 
 /* Installs the work's user-data state table and re-enters the default state. */
 void fn_8013A978(EnemyWork* work) {
-    work->field_0x954 = (u32**)fn_80126098();
+    work->field_0x954 = (u32**)fn_80126098_c1();
     if (fn_8013A884(work, 0) == 1) {
         fn_8013AB74(work, 0, 0);
     } else {

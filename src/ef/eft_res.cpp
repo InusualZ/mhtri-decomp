@@ -44,12 +44,12 @@
  *
  *   >= 80 %: fn_800F6520 94.0, fn_800F65B4 89.1, fn_800F6688 94.5, fn_800F69A0 96.7, fn_800F69B8 94.1,
  *   fn_800F6A24 92.4, fn_800F6A78 80.0, fn_800F7AA4 81.6, fn_800F7BF0 88.5, fn_800F7C74 83.1,
- *   fn_800F7D44 87.1, fn_800F8634 85.7, fn_800F8788 82.7, fn_800F886C 96.4, fn_800F8914 96.4,
+ *   fn_800F7D44 87.1, fn_800F8634 85.7, eft_res_slot_get 82.7, eft_res_slot_release 96.4, eft_res_model_get 96.4,
  *   fn_800F89A4 98.2, fn_800F8A44 92.8, push_eft_effect_heap_num 86.6, fn_800F8C78 80.2,
  *   fn_800F8D80 87.2, fn_800F8DA4 90.8, fn_800F91C4 98.6, fn_800F9278 98.7, fn_800F92D4 100,
- *   fn_800F92E0 100, fn_800F9380 100, fn_800F93D8 86.7.
+ *   fn_800F92E0 100, fn_800F9380 100, eft_res_models_spawn 86.7.
  *   below the bar (residuals, each with what still differs in the unit note): fn_800F6984 77.1,
- *   fn_800F92F4 78.9, get_eft_res_name 68.0, res_eft_model_create 66.7, fn_800F6AC8 59.9,
+ *   eft_res_spawn_gate_ck 78.9, get_eft_res_name 68.0, res_eft_model_create 66.7, fn_800F6AC8 59.9,
  *   res_eft_create 50.0, fn_800F8B44 39.0.
  *   not reconstructed (9): fn_800F6710, fn_800F6B6C, fn_800F6DB4, fn_800F7778, fn_800F7F18,
  *   fn_800F8358, res_eft_model_create_light, res_eft_UV_model_create,
@@ -59,8 +59,8 @@
  *
  * Load-bearing shapes (each measured):
  *   * `eft_control`'s address is materialised into one callee-saved register at the top of almost every
- *     function that touches it (`EftResControl* ctrl = &eft_control;` as the first statement): the
- *     unhoisted form measured 74.7 on fn_800F886C and 76.6 on fn_800F89A4, hoisting them is 96.4 / 98.3.
+ *     function that touches it (`EftControl* ctrl = &eft_control;` as the first statement): the
+ *     unhoisted form measured 74.7 on eft_res_slot_release and 76.6 on fn_800F89A4, hoisting them is 96.4 / 98.3.
  *   * The 256-record table is addressed two ways and both are needed verbatim: `lbl_806A2D34 + i*0x18`
  *     with the record's fields at +0x04.. (fn_800F6A78, whose `EftProHdrSlot` carries the 4-byte header
  *     as a pad) and `(lbl_806A2D34 + 4) + i*0x18` with the fields at +0x00.. (the searchers
@@ -111,40 +111,14 @@ typedef struct EftResSlot {
     /* +0x34 */ void (*update_0x34)(void*);   /* the per-frame hook fn_800F8DA4 runs */
     /* +0x38 */ void* blocks_0x38;            /* the 0x40-byte block run this slot owns */
     /* +0x3C */ u32 block_count_0x3C;         /* how many of them */
-    /* +0x40 */ void (*release_0x40)(void*);  /* the release hook fn_800F886C runs first */
+    /* +0x40 */ void (*release_0x40)(void*);  /* the release hook eft_res_slot_release runs first */
     /* +0x44 */ u32 field_0x44;
 } EftResSlot; /* size: 0x48 */
 
-/* The manager's control block (`eft_control`, 0xC44 B of `.bss`).  `ef/effect.cpp` carries a second
- * view of the same record (its `EftManager`, which names +0x00/+0x04); this is the owner's view. */
-typedef struct EftResControl {
-    /* +0x000 */ u8 initialised_0x00;
-    /* +0x001 */ u8 pad_0x01[0x3];
-    /* +0x004 */ void* system_0x04;        /* the nw4r::ef::EffectSystem fn_800D3C0C builds */
-    /* +0x008 */ void* resource_0x08;      /* the resource walker fn_800B2878 builds */
-    /* +0x00C */ u32 slot_count_0x0C;      /* get_move_work_max(4) */
-    /* +0x010 */ EftResSlot* slots_0x10;   /* get_move_work_adrs(4) */
-    /* +0x014 */ u32 slot_used_0x14;
-    /* +0x018 */ u32 model_count_0x18;     /* get_move_work_max(5) */
-    /* +0x01C */ u8* models_0x1C;          /* get_move_work_adrs(5), 0x168 B each */
-    /* +0x020 */ u32 model_used_0x20;
-    /* +0x024 */ u32 heap_count_0x24;      /* get_move_work_max(6) */
-    /* +0x028 */ u8* heap_0x28;            /* get_move_work_adrs(6): count*0x40 B of data */
-    /* +0x02C */ u8* heap_flags_0x2C;      /* heap_0x28 + heap_count*0x40: one byte per block */
-    /* +0x030 */ u32 loaded_a_0x30;
-    /* +0x034 */ u32 loaded_b_0x34;
-    /* +0x038 */ u32 loaded_c_0x38;
-    /* +0x03C */ s32 id_a_0x3C[0x100];
-    /* +0x43C */ s32 id_b_0x43C[0x100];
-    /* +0x83C */ s32 id_c_0x83C[0x100];
-    /* +0xC3C */ u32 bytes_0xC3C;
-    /* +0xC40 */ u8 frame_ready_0xC40;     /* fn_800F8DA4 clears it before it walks the slots */
-    /* +0xC41 */ u8 pad_0xC41[0x3];
-} EftResControl; /* size: 0xC44 */
+/* The manager's control block `eft_control` (`EftControl`, 0xC44 B of `.bss`) is the band's one record (`unsplit/ef_control.h`); this unit is its main reader. */
+#include "unsplit/ef_control.h"
 
-extern "C" EftResControl eft_control;
-
-/* The record fn_800F92F4 gates a spawn on: a pointer at +0x30 whose byte 0 must be clear when one is
+/* The record eft_res_spawn_gate_ck gates a spawn on: a pointer at +0x30 whose byte 0 must be clear when one is
  * pending.  Only that pointer is touched by this unit. */
 typedef struct EftSpawnRecord {
     /* +0x00 */ u8 pad_0x00[0x30];
@@ -154,7 +128,7 @@ typedef struct EftSpawnRecord {
 /* The 256-entry slot table that follows `eft_control` in `.bss`: a 4-byte header, then 0x18-byte records
  * whose proID byte `fn_800F6AC8` looks up (`fn_800F6A78` builds one, `fn_800F7778` releases it).
  * Every function reaches it through the map's own absolute label, never as an offset of `eft_control`. */
-extern "C" u8 lbl_806A2D34[];
+#include "unsplit/ef_tables.h" /* lbl_806A2D34 (rule 2: the band) */
 
 typedef struct EftProSlot {
     /* +0x00 */ u8 kind_0x00;    /* fn_800F6AC8's key; 2 = a registered effect (fn_800F7778) */
@@ -176,7 +150,7 @@ typedef struct EftResFile {
     /* +0x04 */ char* name_0x04;
 } EftResFile; /* size: 0x08 */
 
-/* The pool record the 0x168-byte model arrays hold: a used byte, then the EftModel `fn_800F8914`
+/* The pool record the 0x168-byte model arrays hold: a used byte, then the EftModel `eft_res_model_get`
  * hands out (the copy `res_eft_model_create_light` fills). */
 typedef struct EftResModelSlot {
     /* +0x000 */ u8 used_0x00;
@@ -249,9 +223,9 @@ void fn_800F7D44(u8*, void*, EftLoadCtx*, EftLoadCtx*);
 void fn_800F7F18(void*, u32, u32, void*);
 void fn_800F8358(void*, void*, void*, void*);
 void fn_800F8634(EftResFile*, u32, void*, u8*, u32, u32);
-EftResSlot* fn_800F8788(u32);
-void fn_800F886C(void*);
-u8* fn_800F8914(void);
+EftResSlot* eft_res_slot_get(u32);
+void eft_res_slot_release(void*);
+u8* eft_res_model_get(void);
 void fn_800F89A4(void*);
 void fn_800F8A44(void*, s32);
 void* fn_800F8B44(u32);
@@ -262,9 +236,9 @@ void* fn_800F91C4(u16, u16, u32, u32);
 void* fn_800F9278(void*, void*, u32, u32);
 void* fn_800F92D4(void*, void*);
 u32 fn_800F92E0(void*);
-u32 fn_800F92F4(void*, u32);
+u32 eft_res_spawn_gate_ck(void*, u32);
 u32 fn_800F9380(void);
-void fn_800F93D8(_EFT*, void**, s32, s32, void*);
+void eft_res_models_spawn(_EFT*, void**, s32, s32, void*);
 void fn_800F95A4(void*);
 u32 fn_800F97F0(u16, void*, void*);
 void fn_800FA450(void*);
@@ -360,7 +334,7 @@ extern "C" void fn_800F6688(void) {
     }
     for (u32 i = 0; i < eft_control.slot_count_0x0C; i++) {
         if (slot[i].active_0x00 != 0 && (slot[i].field_0x04 & 1) == 0) {
-            fn_800F886C(&slot[i]);
+            eft_res_slot_release(&slot[i]);
         }
     }
 }
@@ -461,7 +435,7 @@ extern "C" void fn_800F7BF0(EftProSlot* slot) {
 
 /* 0x800F7C74 - rebuild the resource walker and (in mode 0) hand every armed slot to fn_800F7BF0. */
 extern "C" void fn_800F7C74(u32 mode) {
-    EftResControl* ctrl = &eft_control;
+    EftControl* ctrl = &eft_control;
 
     if ((u8)mode == 0) {
         EftProSlot* slot = eft_pro_slots();
@@ -486,7 +460,7 @@ extern "C" void fn_800F7C74(u32 mode) {
 /* 0x800F7D44 - the resource-loader callback: file the loaded handle into the mode's id array and update
  * the record's ordinal/flag bytes, then re-arm the resource walker. */
 extern "C" void fn_800F7D44(u8* name, void* data, EftLoadCtx* unused, EftLoadCtx* ctx) {
-    EftResControl* ctrl = &eft_control;
+    EftControl* ctrl = &eft_control;
     u8* table = lbl_806A2D34;
     void* work = fn_800B2878();
     EftProSlot* slot = ctx->slot;
@@ -540,7 +514,7 @@ extern "C" void fn_800F7D44(u8* name, void* data, EftLoadCtx* unused, EftLoadCtx
 /* 0x800F8634 - the resource-file request: pull the file into memory and start the async load whose
  * callback is fn_800F8358. */
 extern "C" void fn_800F8634(EftResFile* desc, u32 mode, void* unused, u8* name, u32 a7, u32 a8) {
-    EftResControl* ctrl = &eft_control;
+    EftControl* ctrl = &eft_control;
     u32 ctx[6];
 
     if (mode == 3) {
@@ -584,7 +558,7 @@ extern "C" void fn_800F8634(EftResFile* desc, u32 mode, void* unused, u8* name, 
 }
 
 /* 0x800F8788 - hand out one of the 0x48-byte effect slots plus its block run. */
-extern "C" EftResSlot* fn_800F8788(u32 size) {
+extern "C" EftResSlot* eft_res_slot_get(u32 size) {
     EftResSlot* found;
 
     if (eft_control.slot_used_0x14 >= eft_control.slot_count_0x0C) {
@@ -623,9 +597,9 @@ extern "C" EftResSlot* fn_800F8788(u32 size) {
 }
 
 /* 0x800F886C - release one effect slot: run its hooks, retire the effect system's emitter and clear it. */
-extern "C" void fn_800F886C(void* self_) {
+extern "C" void eft_res_slot_release(void* self_) {
     EftResSlot* self = (EftResSlot*)self_;
-    EftResControl* ctrl = &eft_control;
+    EftControl* ctrl = &eft_control;
 
     if (self->blocks_0x38 != NULL) {
         if (self->release_0x40 != NULL) {
@@ -645,8 +619,8 @@ extern "C" void fn_800F886C(void* self_) {
 }
 
 /* 0x800F8914 - hand out one of the 0x168-byte model records. */
-extern "C" u8* fn_800F8914(void) {
-    EftResControl* ctrl = &eft_control;
+extern "C" u8* eft_res_model_get(void) {
+    EftControl* ctrl = &eft_control;
 
     if (ctrl->model_used_0x20 >= ctrl->model_count_0x18) {
         return NULL;
@@ -667,7 +641,7 @@ extern "C" u8* fn_800F8914(void) {
 /* 0x800F89A4 - release one model record and the g3d work slot it carries. */
 extern "C" void fn_800F89A4(void* self_) {
     EftModel* self = (EftModel*)self_;
-    EftResControl* ctrl = &eft_control;
+    EftControl* ctrl = &eft_control;
 
     if (self->field_0x10C != NULL) {
         push_g3d_wk((struct _g3d_work*)self->field_0x10C);
@@ -847,7 +821,7 @@ extern "C" u32 fn_800F92E0(void* self) {
 }
 
 /* 0x800F92F4 - the spawn gate: the effect's pending record must be clear before a spawn. */
-extern "C" u32 fn_800F92F4(void* self_, u32 mode) {
+extern "C" u32 eft_res_spawn_gate_ck(void* self_, u32 mode) {
     EftSpawnRecord* self = (EftSpawnRecord*)self_;
 
     switch (mode) {
@@ -892,7 +866,7 @@ extern "C" u32 fn_800F9380(void) {
 }
 
 /* 0x800F93D8 - spawn or release the effect's models for the current area and mode bits. */
-extern "C" void fn_800F93D8(_EFT* self, void** models, s32 mode, s32 count, void* arg) {
+extern "C" void eft_res_models_spawn(_EFT* self, void** models, s32 mode, s32 count, void* arg) {
     VEC3 pos;
     u16 flags = 0;
 

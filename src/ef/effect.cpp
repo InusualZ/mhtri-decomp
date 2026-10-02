@@ -1,3 +1,11 @@
+/* ef/effect.cpp - the effect handle helpers (root matrix, colour and scale changes, key lookups)
+ *
+ * `.text` 0x800F95A4..0x800FACAC, 36 functions written (the rest of the range is not decompiled yet).
+ * Phase 4 (docs/splits/phase4): recut registered unit; the functions of the neighbouring units were cut out of this file.
+ * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
+ */
+
+/* Retired header of `ef/effect.cpp` (kept for its notes and residuals): */
 /* effect.cpp - the game's effect manager, `.text` 0x800F95A4..0x800FAE08 (41 functions).
  *
  * Naming note: the symbol map spells 34 of this range's 41 functions as bare `fn_XXXXXXXX`
@@ -28,8 +36,8 @@
  * emit them (docs/plan.md 8.4).
  */
 
+#include "ef/eft_scnbox_data_ptr.h" /* eft_scnbox_data_ptr (rule 2: the owner's header) */
 #include "types.h"
-
 #include "nw4r/math.h"
 #include "nw4r/g3d/scnmdl.h"
 #include "gx.h"
@@ -38,28 +46,11 @@
 #include "g3d/fn_80063888.h" /* fn_80064820, owned by g3d/fn_80063888.cpp (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
-
-/* The retail object keeps the unfused forms (a `rlwinm` + `cmpwi` where the pass would emit a
- * record-form `rlwinm.`); the whole file is compiled with the peephole pass off (playbook 39). */
-#pragma peephole off
-
-/* The key-sampling arithmetic keeps the unfused `fmuls` + `fadds` chain (the default contracts it
- * into `fmadds`, playbook 40). */
-#pragma fp_contract off
+#include "ef/effect_types.h"
 
 /* ---------------------------------------------------------------------------------------------------
  * the range's records
  * ------------------------------------------------------------------------------------------------- */
-
-/* The effect manager's control block (`eft_control`, 0xC44 B in `.bss`).  Only the "initialised" byte
- * and the active effect handle are read here.  `ef/eft004.cpp` carries a second view of the same record
- * (its `EftControl`); the two move to one header in wave 2, so this one keeps a distinct local name. */
-typedef struct EftManager {
-    /* +0x000 */ u8 initialised_0x00;
-    /* +0x001 */ u8 pad_0x01[0x3];
-    /* +0x004 */ void* effect_0x04;
-    /* +0x008 */ u8 pad_0x08[0xC44 - 0x008];
-} EftManager; /* size: 0xC44 */
 
 /* One pooled effect instance (`fn_800A51D8` returns it).  It carries a vtable at +0x1C (the emitter
  * retire call in `fn_800F996C` is vtable slot 6) and its root position at +0x9C. */
@@ -128,36 +119,6 @@ typedef struct EftParticleArgs {
     /* +0x10 */ nw4r::math::VEC3 pos_0x10;
 } EftParticleArgs; /* size: 0x1C */
 
-/* The effect state `fn_800F9D80`/`fn_800F9DF4` read and write. */
-typedef struct EftFrameState {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ u8 flags_0x04;
-    /* +0x05 */ u8 mode_0x05;
-    /* +0x06 */ u8 pad_0x06[0x16];
-    /* +0x1C */ f32 value_0x1C;
-} EftFrameState; /* size: 0x20 */
-
-/* One pool slot `fn_800FBD68` returns. */
-typedef struct EftPoolSlot {
-    /* +0x00 */ u8 pad_0x00[0x03];
-    /* +0x03 */ u8 state_0x03;
-    /* +0x04 */ u8 pad_0x04[0x2C];
-    /* +0x30 */ void* owner_0x30;
-    /* +0x34 */ void* handler_0x34;
-} EftPoolSlot; /* size: 0x38 */
-
-/* The model record `fn_800FAD90` releases. */
-typedef struct EftJointModel {
-    /* +0x00 */ void* field_0x00;
-    /* +0x04 */ void* field_0x04;
-} EftJointModel; /* size: 0x08 */
-
-/* The owner whose model pointer sits at +0x38. */
-typedef struct EftModelOwner {
-    /* +0x00 */ u8 pad_0x00[0x38];
-    /* +0x38 */ EftJointModel* model_0x38;
-} EftModelOwner; /* size: 0x3C */
-
 /* The colour-parameter block `fn_800F9E04` reads at +0x30 (four `u8` multipliers). */
 typedef struct EftColorParams {
     /* +0x00 */ u8 pad_0x00[0x30];
@@ -210,7 +171,7 @@ u32 get_stg_eft_col(u8 area, u8 index);
 u32 hit_point_sphr(nw4r::math::VEC3* a, nw4r::math::VEC3* b, f32 r);
 
 /* the unit's own owned symbols other units call (declared in the owners' headers in wave 2) */
-extern "C" void fn_800F9DF4(EftFrameState* self, u8 a, u8 b);
+extern "C" void eft_state_flags_set(EftFrameState* self, u8 a, u8 b);
 extern "C" EftVectors* fn_800FA3E8(EftVectors* self);
 extern "C" nw4r::math::VEC3* fn_800FA420(nw4r::math::VEC3* self);
 
@@ -223,7 +184,6 @@ extern "C" EftVectors* fn_800FA3B8(EftVectors* self);
 extern "C" void fn_800F9E04(EftSpawnOwner* owner, void* target, u8 mode, EftColorParams* params, u8 flag);
 
 extern "C" {
-
 /* the engine vector/matrix helpers */
 void color_rgba_copy(void* dst, void* src);
 void fn_800532DC(nw4r::math::MTX34* dst, const nw4r::math::MTX34* src);
@@ -255,11 +215,7 @@ void fn_800B483C(void);
 void fn_800B4A14(s32 handle);
 s32 fn_800E28E4(void* chr);
 s32 fn_800E2994(void* access);
-void fn_800E2AF4(void* chr, u32 idx, u32 id, _GXColor* out);
-void fn_800E2CD4(void* chr, u32 idx, u32 id, _GXColor* out);
-void fn_800E2D60(void* chr, u32 idx, u32 id, _GXColor* out);
-void fn_800E28EC(void* chr, u32 idx, u32 id, _GXColor* color, u32 keep);
-void fn_800F8A44(void* a, void* b);
+
 void* fn_8007BE2C(void* access, u32 idx);
 void* fn_8007BC2C(void* access, u32 idx);
 void fn_8006F0E8(void* out, void* handle);
@@ -269,7 +225,7 @@ s32 fn_80076750(void* out);
 /* the emitter data helpers */
 s32 fn_800F6984(u32 a, u32 b, void* table, void* names);
 s32 fn_800F6B6C(u32 a, u32 b, u8 idx, u32 c, u8 d);
-void* fn_800FBD68(s32 a);
+
 void* fn_802B0420(void);
 u32 stage_water_area_ck(void);
 u32 stage_water_enabled_ck(void);
@@ -283,12 +239,6 @@ void __construct_array(void* base, void* ctor, u32 a, u32 elemsize, u32 count);
 /* the compiler-generated array constructors the unit hands to `__construct_array` */
 EftNameArrayElem* fn_800FAC78(EftNameArrayElem* self);
 
-/* the next proposal's dispatcher entries `fn_800FADCC` tail-calls */
-void fn_800FAE08(void* self);
-void fn_800FB160(void* self);
-void fn_800FBBAC(void* self);
-void fn_800FBBBC(void* self);
-
 /* the shared SDK entry points */
 void* memset(void* dst, int v, u32 n);
 void* memcpy(void* dst, const void* src, u32 n);
@@ -299,9 +249,7 @@ EftParticleArgs* fn_800F9A8C(EftParticleArgs* self);
 void fn_800F9B68(EftHandle* handle, nw4r::math::VEC3* v);
 void fn_800F996C(EftHandle* handle, u32 flag);
 void fn_800F99D4(void* effect, u8 mode, _GXColor* color, _GXColor* color2, nw4r::math::VEC3* pos, u8 flag, f32 scale);
-void fn_800FADCC(EftFrameState* self);
-
-}  // extern "C"
+}
 
 /* C++ callees: the target object references their manglings (`ran_suu__Fl`,
  * `work_mem_alloc__FUl`, `work_mem_free__FPv`, `load_file__FPcUll`,
@@ -311,13 +259,18 @@ s32 ran_suu(s32 max);
 void* work_mem_alloc(u32 size);
 void work_mem_free(void* p);
 void load_file(char* name, u32 dst, s32 size);
-namespace nw4r { namespace db { void Panic(const char* file, int line, const char* msg, ...); } }
+
+namespace nw4r {
+
+namespace db {
+void Panic(const char* file, int line, const char* msg, ...);
+}
+}
 
 /* the effect manager's control block and the two name tables live in the shared data run */
-extern "C" EftManager eft_control;
+#include "unsplit/ef_control.h" /* eft_control (rule 2: the band) */
 extern "C" void* lbl_8058A880[];
 extern "C" void* lbl_8058A924[];
-extern "C" void** eft_scnbox_data_ptr;
 extern "C" u8 lbl_8059B5D0[];
 extern "C" u8 lbl_8059B5E0[];
 extern "C" u8 lbl_806A1400[];
@@ -328,6 +281,9 @@ extern f32 lbl_807965E0;
 extern f32 lbl_807965F0;
 extern f32 lbl_807965F4;
 extern f32 lbl_807965F8;
+
+#pragma fp_contract off
+#pragma peephole off
 
 /* ---------------------------------------------------------------------------------------------------
  * the functions, in address order
@@ -565,7 +521,7 @@ extern "C" s32 fn_800F9D80(EftFrameState* self) {
 }
 
 /* 0x800F9DF4 - merge two flag bytes into the effect's state byte. */
-extern "C" void fn_800F9DF4(EftFrameState* self, u8 a, u8 b) {
+extern "C" void eft_state_flags_set(EftFrameState* self, u8 a, u8 b) {
     self->flags_0x04 = (u8)(a | b);
 }
 
@@ -924,60 +880,4 @@ extern "C" void fn_800FAC1C(void) {
 extern "C" EftNameArrayElem* fn_800FAC78(EftNameArrayElem* self) {
     fn_800FA3B8(&self->vectors_0x04);
     return self;
-}
-
-/* 0x800FACAC - register the area owner on pool slot 0. */
-extern "C" void fn_800FACAC(void* owner) {
-    EftPoolSlot* slot = (EftPoolSlot*)fn_800FBD68(0);
-    if (slot != NULL) {
-        slot->state_0x03 = 0;
-        slot->owner_0x30 = owner;
-    }
-}
-
-/* 0x800FACF0 - register the area owner and the slot-1 handler. */
-extern "C" void fn_800FACF0(void* owner) {
-    EftPoolSlot* slot = (EftPoolSlot*)fn_800FBD68(1);
-    if (slot != NULL) {
-        slot->state_0x03 = 0;
-        slot->owner_0x30 = owner;
-        slot->handler_0x34 = (void*)fn_800FADCC;
-    }
-}
-
-/* 0x800FAD40 - register the area owner and the slot-2 handler. */
-extern "C" void fn_800FAD40(void* owner) {
-    EftPoolSlot* slot = (EftPoolSlot*)fn_800FBD68(2);
-    if (slot != NULL) {
-        slot->state_0x03 = 0;
-        slot->owner_0x30 = owner;
-        slot->handler_0x34 = (void*)fn_800FADCC;
-    }
-}
-
-/* 0x800FAD90 - release the model held by the owner. */
-extern "C" void fn_800FAD90(EftModelOwner* self) {
-    EftJointModel* model = self->model_0x38;
-    fn_800F8A44(&model->field_0x04, model->field_0x00);
-    model->field_0x00 = NULL;
-}
-
-/* 0x800FADCC - dispatch on the effect type byte. */
-extern "C" void fn_800FADCC(EftFrameState* self) {
-    switch (self->mode_0x05) {
-    case 0:
-        fn_800FAE08(self);
-        break;
-    case 1:
-        fn_800FB160(self);
-        break;
-    case 2:
-        fn_800FBBAC(self);
-        break;
-    case 3:
-        fn_800FBBBC(self);
-        break;
-    default:
-        break;
-    }
 }

@@ -51,15 +51,41 @@
  */
 #pragma optimization_level 4
 #pragma peephole off
+#include "sound/fn_800E80DC.h" /* fn_800E80DC (rule 2: the owner's header) */
+#include "enemy/em_after_frame_check__FP11_ENEMY_WORKUsff.h" /* em_after_frame_check__FP11_ENEMY_WORKUsff (rule 2: the owner's header) */
+#include "sound/fn_800E802C.h" /* fn_800E802C (rule 2: the owner's header) */
+#include "sound/fn_800E8228.h" /* fn_800E8228 (rule 2: the owner's header) */
+#include "sound/fn_800E8354.h" /* fn_800E8354 (rule 2: the owner's header) */
+#include "sound/fn_800EF56C.h" /* fn_800EF56C (rule 2: the owner's header) */
+#include "sound/fn_800E8498.h" /* fn_800E8498 (rule 2: the owner's header) */
+#include "enemy/em_area_ck__FP11_ENEMY_WORK.h" /* em_area_ck__FP11_ENEMY_WORK (rule 2: the owner's header) */
+#include "sound/fn_800E8294.h" /* fn_800E8294 (rule 2: the owner's header) */
+#include "sound/fn_800E81BC.h" /* fn_800E81BC (rule 2: the owner's header) */
+#include "sound/fn_800E8444.h" /* fn_800E8444 (rule 2: the owner's header) */
+#include "sound/fn_800E83CC.h" /* fn_800E83CC (rule 2: the owner's header) */
+#include "sound/fn_800E8080.h" /* fn_800E8080 (rule 2: the owner's header) */
+#include "sound/fn_800E8150.h" /* fn_800E8150 (rule 2: the owner's header) */
 #include "types.h"
 #include "nw4r/math.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "draw_shape/fn_800532DC.h" /* fn_800532DC, owned by draw_shape.cpp's range (rule 2) */
 #include "sound/se_req.h" /* fn_800DFDCC / fn_800E0428, owned by se_req.cpp's range (rule 2) */
 #include "Pl/plw.h"
+#include "pl.h"
 #include "Pl/fn_802693C4.h"
 #include "lobby/lobby_w.h"
 #include "lobby/lb_npc_func.h"
+/* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
+#define fn_800E80DC_c1 ((s32 (*)(s32, s32, s32))fn_800E80DC)
+#define fn_800E802C_c1 ((s32 (*)(s32))fn_800E802C)
+#define fn_800E8228_c1 ((void (*)(s32))fn_800E8228)
+#define fn_800E8354_c1 ((void (*)(s32, s16))fn_800E8354)
+#define fn_800E8498_c1 ((void (*)(Mtx34*, s32))fn_800E8498)
+#define fn_800E81BC_c1 ((s32 (*)(s32, s32, nw4r::math::VEC3*, s32))fn_800E81BC)
+#define fn_800E8444_c1 ((s32 (*)(void))fn_800E8444)
+#define fn_800E83CC_c1 ((void (*)(s32, s16))fn_800E83CC)
+#define fn_800E8080_c1 ((void (*)(s32, s32))fn_800E8080)
+#define fn_800E8150_c1 ((s32 (*)(s32, s32, nw4r::math::VEC3*, s32))fn_800E8150)
 /* One of the 32 sound-slot records the SE work object carries at +0x3C. `fn_800D8E58` walks them
  * looking for a clear `in_use` byte and `fn_800DA72C` fills one in; the offsets below are read off that
  * pair and off `se_req_pos_ps`. Fields whose meaning is not established yet keep their offset as a name.
@@ -337,7 +363,6 @@ extern "C" void fn_800DCFE4(void) { sysSE_req(12); }
 
 extern "C" s32 fn_800F0C14(s32 bank);
 extern "C" s32 fn_800F04FC(s32 id);
-extern "C" s32 fn_800E80DC(s32 handle, s32 id, s32 param);
 extern "C" u8 fn_803C482C(void);
 extern "C" u32 fn_800D843C(void);
 extern "C" u8 system_w[];
@@ -355,7 +380,7 @@ extern "C" s32 fn_800DBB78(s32 bank, s32 id) {
             return 0;
         }
     }
-    return fn_800E80DC(handle, id, 0);
+    return fn_800E80DC_c1(handle, id, 0);
 }
 
 /* The `sysSE_req` family: bank 0, gated on the `fn_803C482C` predicate and the id being playable. */
@@ -554,7 +579,6 @@ extern "C" u8 fn_800F0C74(s32 owner);
 extern "C" u32 fn_802D29A0(_PLW* plw, s32 zero, f32 a, f32 b);
 extern "C" u32 fn_801FE1DC(_LB_NPC* npc, s32 zero, f32 a, f32 b);
 extern "C" u32 fn_80385C80(_PLW* plw, s32 zero, f32 a, f32 b);
-extern "C" u32 em_after_frame_check__FP11_ENEMY_WORKUsff(_PLW* plw, u16 zero, f32 a, f32 b);
 extern "C" u32 ai_get_motion_no__FP8_AINPC_W(_PLW* plw);
 extern "C" _UserData* get_userdata__Fv(void);
 extern "C" f32 lbl_807963E0;
@@ -1288,10 +1312,6 @@ extern "C" u32 fn_800D843C(void);
 extern "C" void fn_800D9DB4(_se_w* se, s32 a, u32 b, s32 c, s32 d);
 extern "C" u32 fn_800DAE48(void);
 extern "C" void fn_800DB2DC(void);
-extern "C" s32 fn_800E802C(s32 voice);
-extern "C" void fn_800E8228(s32 handle);
-extern "C" s32 fn_800E80DC(s32 a, s32 b, s32 c);
-extern "C" void fn_800E8354(s32 handle, s16 value);
 extern "C" s32 fn_800F0C14(s32 owner);
 extern "C" u8 fn_800F2680(s32 id, s32 kind);
 void se_req_pos_ps(_se_w* se, s32 id, s32 kind, nw4r::math::VEC3* pos);
@@ -1307,12 +1327,12 @@ extern "C" f64 lbl_80796400;
 extern "C" void fn_800DB2DC(void) {
     SeSysWork* self = (SeSysWork*)lbl_80794978;
 
-    if (self->field_0x295F0 != NULL && fn_800E802C((s32)self->field_0x295F0) != 0) {
-        fn_800E8228((s32)self->field_0x295F0);
+    if (self->field_0x295F0 != NULL && fn_800E802C_c1((s32)self->field_0x295F0) != 0) {
+        fn_800E8228_c1((s32)self->field_0x295F0);
     }
     if (self->field_0x295E4[self->field_0x295EF] != NULL &&
-        fn_800E802C((s32)self->field_0x295E4[self->field_0x295EF]) != 0) {
-        fn_800E8228((s32)self->field_0x295E4[self->field_0x295EF]);
+        fn_800E802C_c1((s32)self->field_0x295E4[self->field_0x295EF]) != 0) {
+        fn_800E8228_c1((s32)self->field_0x295E4[self->field_0x295EF]);
     }
 }
 
@@ -1360,12 +1380,12 @@ extern "C" void fn_800DB36C(u8 kind, u32 unused, u8 sub) {
         return;
     }
 
-    void* obj = (void*)fn_800E80DC(handle, slot, 0);
+    void* obj = (void*)fn_800E80DC_c1(handle, slot, 0);
     if (obj == NULL) {
         return;
     }
     u8 volume = fn_800F2680(handle, slot);
-    fn_800E8354((s32)obj, (s16)(lbl_807963E4 * (f32)(u8)volume));
+    fn_800E8354_c1((s32)obj, (s16)(lbl_807963E4 * (f32)(u8)volume));
 }
 
 /* --- 0x800DB608 -------------------------------------------------------------------------------- */
@@ -1426,12 +1446,12 @@ extern "C" void fn_800DB86C(_PLW* plw) {
     if (motion == -1) {
         return;
     }
-    void* obj = (void*)fn_800E80DC(motion, 21, 0);
+    void* obj = (void*)fn_800E80DC_c1(motion, 21, 0);
     if (obj == NULL) {
         return;
     }
     u8 volume = fn_800F2680(motion, 1);
-    fn_800E8354((s32)obj, (s16)(lbl_807963E4 * (f32)(u8)volume));
+    fn_800E8354_c1((s32)obj, (s16)(lbl_807963E4 * (f32)(u8)volume));
 }
 
 /* --- 0x800DBACC -------------------------------------------------------------------------------- */
@@ -1621,10 +1641,7 @@ extern "C" void fn_800DCB74(_se_w* se, s32 kind, nw4r::math::VEC3* pos) {
  */
 
 extern "C" u32 fn_800D843C(void);
-extern "C" s32 fn_800E80DC(s32 a, s32 b, s32 c);
 extern "C" u8 fn_800F2680(s32 id, s32 kind);
-extern "C" void fn_800E8354(s32 handle, s16 value);
-extern "C" s32 fn_800EF56C(u8 a, u8 b);
 extern "C" void fn_800D9CC8(_se_w* work, s32 id, u32 param, s32 value);
 
 void se_req_pos_ps(_se_w* work, s32 id, s32 arg, nw4r::math::VEC3* pos);
@@ -1685,9 +1702,9 @@ extern "C" void fn_800DAE9C(void) {
     mgr->field_0x295F0 = 0;
     u8 id = fn_800DAE48();
     if (id != 0) {
-        s32 handle = fn_800E80DC(id, 15, 0);
+        s32 handle = fn_800E80DC_c1(id, 15, 0);
         u8 value = fn_800F2680(id, 15);
-        fn_800E8354(handle, (s16)(lbl_807963E4 * (f32)value));
+        fn_800E8354_c1(handle, (s16)(lbl_807963E4 * (f32)value));
         mgr->field_0x295F0 = handle;
     }
 }
@@ -1704,9 +1721,9 @@ extern "C" void fn_800DAF70(void) {
     mgr->field_0x295F0 = 0;
     u8 id = fn_800DAE48();
     if (id != 0) {
-        s32 handle = fn_800E80DC(id, 10, 0);
+        s32 handle = fn_800E80DC_c1(id, 10, 0);
         u8 value = fn_800F2680(id, 10);
-        fn_800E8354(handle, (s16)(lbl_807963E4 * (f32)value));
+        fn_800E8354_c1(handle, (s16)(lbl_807963E4 * (f32)value));
         mgr->field_0x295F0 = handle;
     }
 }
@@ -1956,7 +1973,6 @@ s32 my_player_no(void);
 }
 extern "C" void my_player_no_set(s32 value);
 extern "C" u8 fn_802EED0C(SeMoveWork* work);
-extern "C" void fn_800E8498(Mtx34* mtx, s32 index);
 /* The target object references this callee by its C++ mangling
  * (em_act_ck__FP11_ENEMY_WORKUcUc), so it is C++ - the extern "C" here was the
  * defect (relocaudit). */
@@ -1970,7 +1986,6 @@ extern "C" void fn_800D8404(SeSlot* slot);
 extern "C" s32 fn_8028F204(void);
 extern "C" u8* fn_800D8DDC(u8* base);
 extern "C" s32 fn_800F1398(_ENEMY_WORK* enemy, s32 index);
-extern "C" s32 em_area_ck__FP11_ENEMY_WORK(_ENEMY_WORK* enemy);
 extern "C" u32 fn_80331104(PlWorkView* plw);
 extern "C" u8* lbl_80597668[];
 extern "C" u8* lbl_805975D8[];
@@ -2016,13 +2031,13 @@ extern "C" void fn_800D80B8(void) {
             copyVec3(&self->field_0x004, &get_camera_pos());
             copyVec3(&self->field_0x010, &get_camera_direction());
             fn_800532DC(&self->field_0x29280, &get_current_view_mtx());
-            fn_800E8498(&self->field_0x29280, 0);
+            fn_800E8498_c1(&self->field_0x29280, 0);
 
             my_player_no_set(1);
             copyVec3(&self->field_0x01C, &get_camera_pos());
             copyVec3(&self->field_0x028, &get_camera_direction());
             fn_800532DC(&self->field_0x292B0, &get_current_view_mtx());
-            fn_800E8498(&self->field_0x292B0, 1);
+            fn_800E8498_c1(&self->field_0x292B0, 1);
 
             my_player_no_set((s8)idx);
         } else {
@@ -2031,8 +2046,8 @@ extern "C" void fn_800D80B8(void) {
             copyVec3(&self->field_0x01C, &self->field_0x004);
             copyVec3(&self->field_0x028, &self->field_0x010);
             fn_800532DC(&self->field_0x29280, &get_current_view_mtx());
-            fn_800E8498(&self->field_0x29280, 0);
-            fn_800E8498(NULL, 1);
+            fn_800E8498_c1(&self->field_0x29280, 0);
+            fn_800E8498_c1(NULL, 1);
             if (work != NULL) {
                 copyVec3(&self->field_0x01C, &work->pos);
             }
@@ -2484,13 +2499,7 @@ struct SeWorkHead {
     /* +0x30 */ nw4r::math::VEC3 field_0x030;
 };
 
-/* The MH character object the enemy's joint count comes from; only the call is modelled. */
-/* size: 0x18 */
-struct MHchar {
-    /* +0x00 */ u8 pad_0x00[0x18];
-    /* the joint count `get_joint_wpos_em`'s index is bounded by */
-    u32 get_joint_num(void);
-};
+/* `MHchar` (the actor's character object, the joint count comes from it) is `pl.h`'s: the view below holds it as raw bytes. */
 
 /* The player/enemy actor's joint block: the `MHchar` at +0x24, the fallback vector at +0x3C and the
  * enemy's fallback vector at +0x188. Same object as the prelude's `_PLW`.
@@ -2500,7 +2509,7 @@ struct PlView {
     /* +0x001 */ u8 pad_0x001[2];
     /* +0x003 */ u8 field_0x003;
     /* +0x004 */ u8 pad_0x004[0x20];
-    /* +0x024 */ MHchar field_0x024;
+    /* +0x024 */ u8 field_0x024[0x18]; /* the `MHchar` base, called through `pl.h`'s view */
     /* +0x03C */ nw4r::math::VEC3 field_0x03C;
     /* +0x048 */ u8 pad_0x048[0x140];
     /* +0x188 */ nw4r::math::VEC3 field_0x188;
@@ -2642,7 +2651,7 @@ extern "C" void fn_800D8EA8(_se_w* work, SeSlot* slot) {
                         copyVec3(&s.pos, &((PlView*)plw)->field_0x188);
                     }
                 } else {
-                    s32 joints = ((PlView*)plw)->field_0x024.get_joint_num();
+                    s32 joints = ((MHchar*)((PlView*)plw)->field_0x024)->get_joint_num();
                     if ((u32)s.field_0x34 < (u32)joints) {
                         get_joint_wpos_em((_ENEMY_WORK*)plw, s.field_0x34, &s.pos);
                     } else {
@@ -2666,7 +2675,7 @@ extern "C" void fn_800D8EA8(_se_w* work, SeSlot* slot) {
                         copyVec3(&s.pos, &w.field_0x030);
                     }
                 } else {
-                    s32 joints = ((PlView*)plw)->field_0x024.get_joint_num();
+                    s32 joints = ((MHchar*)((PlView*)plw)->field_0x024)->get_joint_num();
                     if ((u32)s.field_0x34 < (u32)joints) {
                         get_joint_wpos_em((_ENEMY_WORK*)plw, s.field_0x34, &s.pos);
                     } else {
@@ -2917,7 +2926,6 @@ extern "C" void fn_800D92E4(_se_w* work, SeSlot* slot) {
 
 extern "C" u8 system_w[];
 
-extern "C" void fn_800E8294(void);
 extern "C" void fn_800D87B8(SeSlot* slot);
 extern "C" void fn_800D8AB0(SeSlot* slot);
 extern "C" u8 fn_800CF208(void);
@@ -3094,8 +3102,6 @@ s32 SE_Code_Make(s32 low_code, s16 low, s32 mid_code, s16 span) {
 extern "C" f32 lbl_807963E4;
 extern "C" s32 fn_800F0C14(s32 owner);
 extern "C" u8 fn_800F2680(s32 id, s32 kind);
-extern "C" void fn_800E8354(s32 handle, s16 value);
-extern "C" s32 fn_800E80DC(s32 a, s32 b, s32 c);
 
 /* Looks the per-frame bank up, opens a handle and scales its rate by the `lbl_807963E4` factor. */
 extern "C" void fn_800DABF0(void) {
@@ -3108,11 +3114,11 @@ extern "C" void fn_800DABF0(void) {
     if (handle == -1) {
         return;
     }
-    s32 voice = fn_800E80DC(handle, 0, 0);
+    s32 voice = fn_800E80DC_c1(handle, 0, 0);
     if (voice == 0) {
         return;
     }
-    fn_800E8354(voice, (s16)(s32)(lbl_807963E4 * (f32)fn_800F2680(handle, 1)));
+    fn_800E8354_c1(voice, (s16)(s32)(lbl_807963E4 * (f32)fn_800F2680(handle, 1)));
 }
 
 /* The same, but the voice is opened with the alternate argument. */
@@ -3126,11 +3132,11 @@ extern "C" void snd_item_fail_play(void) {
     if (handle == -1) {
         return;
     }
-    s32 voice = fn_800E80DC(handle, 1, 0);
+    s32 voice = fn_800E80DC_c1(handle, 1, 0);
     if (voice == 0) {
         return;
     }
-    fn_800E8354(voice, (s16)(s32)(lbl_807963E4 * (f32)fn_800F2680(handle, 1)));
+    fn_800E8354_c1(voice, (s16)(s32)(lbl_807963E4 * (f32)fn_800F2680(handle, 1)));
 }
 
 /* --- the SE work-area initialiser ------------------------------------------------------------------ */
@@ -3200,17 +3206,16 @@ extern "C" void fn_800DAADC(u16 code) {
     if (handle == -1) {
         return;
     }
-    s32 voice = fn_800E80DC(handle, 0, 0);
+    s32 voice = fn_800E80DC_c1(handle, 0, 0);
     if (voice == 0) {
         return;
     }
-    fn_800E8354(voice, (s16)(s32)(lbl_807963E4 * (f32)fn_800F2680(handle, 0)));
+    fn_800E8354_c1(voice, (s16)(s32)(lbl_807963E4 * (f32)fn_800F2680(handle, 0)));
 }
 
 /* --- the two-voice crossfade helper ---------------------------------------------------------------- */
 
 extern "C" u32 fn_800DAE48(void);
-extern "C" s32 fn_800E802C(s32 voice);
 
 /* Opens a per-frame voice for the caller's mode, files it in one of the two rotating voice slots and
  * starts the other one (or retunes it) so the two crossfade. */
@@ -3225,33 +3230,33 @@ extern "C" void fn_800DB044(s32 unused, u32 mode) {
     }
     id = (u8)mode + ((work->voice_slot & 1) ? 111 : 11);
     if ((u8)mode == 0) {
-        s32 voice = fn_800E80DC(handle, id, 0);
+        s32 voice = fn_800E80DC_c1(handle, id, 0);
         work->voices[work->voice_slot] = voice;
         if (work->voice_slot != work->field_0x295EF) {
-            fn_800E8354(work->voices[work->voice_slot], 0);
+            fn_800E8354_c1(work->voices[work->voice_slot], 0);
         } else {
-            fn_800E8354(work->voices[work->field_0x295EF],
+            fn_800E8354_c1(work->voices[work->field_0x295EF],
                         (s16)(s32)(lbl_807963E4 * (f32)fn_800F2680(handle, id)));
         }
         work->voice_slot ^= 1;
         return;
     }
-    work->field_0x295F0 = fn_800E80DC(handle, id, 0);
+    work->field_0x295F0 = fn_800E80DC_c1(handle, id, 0);
     work->voices[work->field_0x295EF] = 0;
     work->field_0x295EF ^= 1;
     s32 v = work->voices[work->field_0x295EF];
     if (v != 0) {
-        if (fn_800E802C(v) == 0) {
+        if (fn_800E802C_c1(v) == 0) {
             return;
         }
-        fn_800E8354(work->voices[work->field_0x295EF],
+        fn_800E8354_c1(work->voices[work->field_0x295EF],
                     (s16)(s32)(lbl_807963E4 * (f32)fn_800F2680(handle, id)));
     } else {
         if (work->voices[work->field_0x295EF] != 0) {
-            fn_800E8354(work->voices[work->field_0x295EF],
+            fn_800E8354_c1(work->voices[work->field_0x295EF],
                         (s16)(s32)(lbl_807963E4 * (f32)fn_800F2680(handle, id)));
         } else {
-            fn_800E8354(work->field_0x295F0,
+            fn_800E8354_c1(work->field_0x295F0,
                         (s16)(s32)(lbl_807963E4 * (f32)fn_800F2680(handle, id)));
         }
     }
@@ -3260,13 +3265,7 @@ extern "C" void fn_800DB044(s32 unused, u32 mode) {
 /* --- the slot state machines ----------------------------------------------------------------------- */
 
 extern "C" void fn_800F27C4(s32 handle, s32 id, u8 param);
-extern "C" s32 fn_800E81BC(s32 handle, s32 id, nw4r::math::VEC3* pos, s32 flag);
-extern "C" s32 fn_800E8444(void);
-extern "C" void fn_800E83CC(s32 handle, s16 pitch);
-extern "C" void fn_800E8080(s32 handle, s32 param);
-extern "C" s32 fn_800E8150(s32 handle, s32 id, nw4r::math::VEC3* pos, s32 flag);
 extern "C" void fn_800F284C(s32 handle, s32 id);
-extern "C" void fn_800E8228(s32 handle);
 extern "C" f32 lbl_807963E0;
 
 /* Advances one slot by its state: 3 opens the two voices, 4 keeps them running, 6 stops them. */
@@ -3293,30 +3292,30 @@ extern "C" void fn_800D87B8(SeSlot* slot) {
             return;
         }
         fn_800F27C4(handle, slot->id, slot->field_0x25);
-        slot->field_0x3C = fn_800E81BC(handle, slot->id, &slot->field_0x10, 1);
+        slot->field_0x3C = fn_800E81BC_c1(handle, slot->id, &slot->field_0x10, 1);
         if (slot->field_0x3C == 0) {
             slot->state = 7;
         } else {
             if (slot->field_0x4A != 0) {
-                fn_800E83CC(slot->field_0x3C, (s16)(fn_800E8444() + slot->field_0x4C));
+                fn_800E83CC_c1(slot->field_0x3C, (s16)(fn_800E8444_c1() + slot->field_0x4C));
             }
-            fn_800E8354(slot->field_0x3C, (s16)(s32)(lbl_807963E4 * slot->field_0x1C));
+            fn_800E8354_c1(slot->field_0x3C, (s16)(s32)(lbl_807963E4 * slot->field_0x1C));
             slot->state = 4;
             if (slot->field_0x4F == 129) {
                 fn_800F284C(slot->owner, slot->id);
-                fn_800E8080(slot->field_0x3C, 1300);
+                fn_800E8080_c1(slot->field_0x3C, 1300);
             }
         }
         if (slot->field_0x24 != 0 && slot->field_0x30 != -1) {
-            slot->field_0x40 = fn_800E8150(handle, slot->field_0x30, &slot->field_0x10, 1);
+            slot->field_0x40 = fn_800E8150_c1(handle, slot->field_0x30, &slot->field_0x10, 1);
             if (slot->field_0x40 != 0) {
                 if (slot->field_0x4A != 0) {
-                    fn_800E83CC(slot->field_0x40, (s16)(fn_800E8444() + slot->field_0x4C));
+                    fn_800E83CC_c1(slot->field_0x40, (s16)(fn_800E8444_c1() + slot->field_0x4C));
                 }
-                fn_800E8354(slot->field_0x40, (s16)(s32)(lbl_807963E4 * slot->field_0x20));
+                fn_800E8354_c1(slot->field_0x40, (s16)(s32)(lbl_807963E4 * slot->field_0x20));
                 if (slot->field_0x4F == 129) {
                     fn_800F284C(slot->owner, slot->field_0x30);
-                    fn_800E8080(slot->field_0x40, 1300);
+                    fn_800E8080_c1(slot->field_0x40, 1300);
                 }
             }
         }
@@ -3325,30 +3324,30 @@ extern "C" void fn_800D87B8(SeSlot* slot) {
     }
     case 4: {
         u32 stop = 0;
-        if (fn_800E802C(slot->field_0x3C) == 0) {
+        if (fn_800E802C_c1(slot->field_0x3C) == 0) {
             slot->in_use = 0;
         } else if (slot->field_0x4F != 193 && fn_800F0C14(slot->owner) != -1) {
-            fn_800E8354(slot->field_0x3C, (s16)(s32)(lbl_807963E4 * slot->field_0x1C));
+            fn_800E8354_c1(slot->field_0x3C, (s16)(s32)(lbl_807963E4 * slot->field_0x1C));
         } else {
             stop = 1;
         }
         if (stop) {
-            fn_800E8228(slot->field_0x3C);
+            fn_800E8228_c1(slot->field_0x3C);
             if (slot->field_0x24 != 0) {
-                fn_800E8228(slot->field_0x40);
+                fn_800E8228_c1(slot->field_0x40);
             }
             slot->state = 7;
             break;
         }
-        if (slot->field_0x24 != 0 && fn_800E802C(slot->field_0x40) != 0) {
-            fn_800E8354(slot->field_0x40, (s16)(s32)(lbl_807963E4 * slot->field_0x20));
+        if (slot->field_0x24 != 0 && fn_800E802C_c1(slot->field_0x40) != 0) {
+            fn_800E8354_c1(slot->field_0x40, (s16)(s32)(lbl_807963E4 * slot->field_0x20));
         }
         break;
     }
     case 6:
-        fn_800E8228(slot->field_0x3C);
+        fn_800E8228_c1(slot->field_0x3C);
         if (slot->field_0x24 != 0) {
-            fn_800E8228(slot->field_0x40);
+            fn_800E8228_c1(slot->field_0x40);
         }
         slot->state = 7;
         break;
@@ -3377,30 +3376,30 @@ extern "C" void fn_800D8AB0(SeSlot* slot) {
             return;
         }
         fn_800F27C4(handle, slot->id, slot->field_0x25);
-        slot->field_0x3C = fn_800E81BC(handle, slot->id, &slot->field_0x10, 1);
+        slot->field_0x3C = fn_800E81BC_c1(handle, slot->id, &slot->field_0x10, 1);
         if (slot->field_0x3C == 0) {
             slot->state = 7;
         } else {
             if (slot->field_0x4A != 0) {
-                fn_800E83CC(slot->field_0x3C, (s16)(fn_800E8444() + slot->field_0x4C));
+                fn_800E83CC_c1(slot->field_0x3C, (s16)(fn_800E8444_c1() + slot->field_0x4C));
             }
-            fn_800E8354(slot->field_0x3C, (s16)(s32)(lbl_807963E4 * slot->field_0x1C));
+            fn_800E8354_c1(slot->field_0x3C, (s16)(s32)(lbl_807963E4 * slot->field_0x1C));
             if (slot->field_0x4F == 129) {
                 fn_800F284C(slot->owner, slot->id);
-                fn_800E8080(slot->field_0x3C, 1300);
+                fn_800E8080_c1(slot->field_0x3C, 1300);
             }
             slot->state = 4;
         }
         if (slot->field_0x24 != 0 && slot->field_0x30 != -1) {
-            slot->field_0x40 = fn_800E8150(handle, slot->field_0x30, &slot->field_0x10, 1);
+            slot->field_0x40 = fn_800E8150_c1(handle, slot->field_0x30, &slot->field_0x10, 1);
             if (slot->field_0x40 != 0) {
                 if (slot->field_0x4A != 0) {
-                    fn_800E83CC(slot->field_0x40, (s16)(fn_800E8444() + slot->field_0x4C));
+                    fn_800E83CC_c1(slot->field_0x40, (s16)(fn_800E8444_c1() + slot->field_0x4C));
                 }
-                fn_800E8354(slot->field_0x40, (s16)(s32)(lbl_807963E4 * slot->field_0x20));
+                fn_800E8354_c1(slot->field_0x40, (s16)(s32)(lbl_807963E4 * slot->field_0x20));
                 if (slot->field_0x4F == 129) {
                     fn_800F284C(slot->owner, slot->field_0x30);
-                    fn_800E8080(slot->field_0x40, 1300);
+                    fn_800E8080_c1(slot->field_0x40, 1300);
                 }
             }
         }
@@ -3408,23 +3407,23 @@ extern "C" void fn_800D8AB0(SeSlot* slot) {
         break;
     }
     case 4:
-        if (fn_800E802C(slot->field_0x3C) == 0) {
+        if (fn_800E802C_c1(slot->field_0x3C) == 0) {
             slot->state = 7;
             slot->in_use = 0;
         } else {
             if (fn_800F0C14(slot->owner) == -1) {
-                fn_800E8228(slot->field_0x3C);
+                fn_800E8228_c1(slot->field_0x3C);
                 if (slot->field_0x24 != 0) {
-                    fn_800E8228(slot->field_0x40);
+                    fn_800E8228_c1(slot->field_0x40);
                 }
                 slot->state = 7;
                 slot->in_use = 0;
                 return;
             }
-            fn_800E8354(slot->field_0x3C, (s16)(s32)(lbl_807963E4 * slot->field_0x1C));
+            fn_800E8354_c1(slot->field_0x3C, (s16)(s32)(lbl_807963E4 * slot->field_0x1C));
         }
-        if (slot->field_0x24 != 0 && fn_800E802C(slot->field_0x40) != 0) {
-            fn_800E8354(slot->field_0x40, (s16)(s32)(lbl_807963E4 * slot->field_0x20));
+        if (slot->field_0x24 != 0 && fn_800E802C_c1(slot->field_0x40) != 0) {
+            fn_800E8354_c1(slot->field_0x40, (s16)(s32)(lbl_807963E4 * slot->field_0x20));
         }
         break;
     default:

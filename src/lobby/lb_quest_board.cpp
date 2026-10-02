@@ -94,7 +94,7 @@ extern "C" void lb_quest_board_state_next(LbQuestBoardWork* work) {
 /* Retires one pooled effect runtime record.  GUESS: a forwarding thunk to the effect resource
  * helper of the same name, mirroring the band's other one-line forwards. */
 extern "C" void lb_quest_board_effect_retire(void* work) {
-    fn_800F886C(work);
+    eft_res_slot_release(work);
 }
 
 /* Opens the board screen: clears the whole screen block, files the payload it was opened with and

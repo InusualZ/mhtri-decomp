@@ -12263,6 +12263,36 @@
    "text_addr": "0x800ED780"
   },
   {
+   "unit": "sound/quest_snd.cpp",
+   "section": ".bss",
+   "range": [
+    "0x806A1110",
+    "0x806A1120"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 16,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window b units> --root . --base-snapshot <MAIN land-base orphans> --unit-rename <the manifest's pairs>",
+     "finding": "the data-closure row refuses lbl_806A1110 (referenced by quest_snd and snd_bank_loader): no claim covers the 0x10 bytes between snd_voice_pool's .bss (ends 0x806A1110) and snd_bank_loader's (starts 0x806A1120)"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x806A1110",
+     "finding": "address-taken at 0x800EEA08 (fn_800EE9EC, sound/quest_snd.cpp) and at 0x800EEB3C (fn_800EEAE0, sound/snd_bank_loader.cpp); no other reader"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x806A1110",
+   "text_addr": "0x800EE014",
+   "note": "orchestrator override 58: medium: by link order - quest_snd's text (0x800EE014) sits between snd_voice_pool's and snd_bank_loader's, quest_snd is the first reader in text order, and the 0x10 bytes lie exactly between the two neighbouring .bss claims"
+  },
+  {
    "unit": "sound/fn_800EEAE0.cpp",
    "section": ".bss",
    "range": [
@@ -21257,6 +21287,36 @@
    ],
    "reproduce": "python tools/splits/dataattach.py --explain fn_800E9D00 --section .sbss",
    "text_addr": "0x800E9D00"
+  },
+  {
+   "unit": "sound/quest_snd.cpp",
+   "section": ".sbss",
+   "range": [
+    "0x80794A20",
+    "0x80794A24"
+   ],
+   "grade": "medium",
+   "signal": "orchestrator",
+   "symbols": 1,
+   "bytes": 4,
+   "signals": {
+    "orchestrator": 1
+   },
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window b units> --root . --base-snapshot <MAIN land-base orphans> --unit-rename <the manifest's pairs>",
+     "finding": "the data-closure row refuses lbl_80794A20 (referenced by quest_snd and snd_bank_loader): no claim covers the 4 bytes between snd_stream_mgr's .sbss (ends 0x80794A20) and snd_bank_loader's (starts 0x80794A24)"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80794A20",
+     "finding": "read at 0x800EEA38 (fn_800EEA2C, sound/quest_snd.cpp), read and stored by fn_800EEAE0 (sound/snd_bank_loader.cpp), stored once at 0x8003F710 (main.cpp's fn_8003F620)"
+    }
+   ],
+   "reproduce": "python tools/units/callers.py 0x80794A20",
+   "text_addr": "0x800EE014",
+   "note": "orchestrator override 59: medium: by link order - the word lies exactly between the .sbss claims of the units before and after quest_snd's text; main.cpp stores it as an extern"
   },
   {
    "unit": "sound/fn_800EEAE0.cpp",
@@ -33026,28 +33086,6 @@
   {
    "section": ".bss",
    "range": [
-    "0x806A1110",
-    "0x806A1120"
-   ],
-   "kind": "ambiguous",
-   "symbols": 1,
-   "bytes": 16,
-   "candidates": [
-    "sound/quest_snd.cpp",
-    "sound/fn_800EEAE0.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain quest_snd --section .bss",
-     "finding": "1 symbol(s), 1 read (by quest_snd, fn_800EEAE0): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain quest_snd --section .bss"
-  },
-  {
-   "section": ".bss",
-   "range": [
     "0x806A20F0",
     "0x806A2D34"
    ],
@@ -33613,28 +33651,6 @@
     }
    ],
    "reproduce": "python tools/splits/dataattach.py --explain fn_800D7F54 --section .sbss"
-  },
-  {
-   "section": ".sbss",
-   "range": [
-    "0x80794A20",
-    "0x80794A24"
-   ],
-   "kind": "ambiguous",
-   "symbols": 1,
-   "bytes": 4,
-   "candidates": [
-    "sound/quest_snd.cpp",
-    "sound/fn_800EEAE0.cpp"
-   ],
-   "evidence": [
-    {
-     "tool": "dataattach",
-     "command": "python tools/splits/dataattach.py --explain quest_snd --section .sbss",
-     "finding": "1 symbol(s), 1 read (by quest_snd, fn_800EEAE0): the monotone link order leaves the owner open among those units - a global is defined in one of its readers"
-    }
-   ],
-   "reproduce": "python tools/splits/dataattach.py --explain quest_snd --section .sbss"
   },
   {
    "section": ".sbss",

@@ -342,6 +342,6 @@ extern "C" void fn_8031CA3C(MenuSelCursor* cur) {
 }
 
 extern "C" void fn_8031DA50(MenuEff* self) {
-    fn_800F886C(self);
+    eft_res_slot_release(self);
 }
 

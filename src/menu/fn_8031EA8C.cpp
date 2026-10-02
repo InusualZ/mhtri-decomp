@@ -33,22 +33,24 @@
  * next round's work.
  */
 
+#include "ef/eft_state_flags_set.h" /* eft_state_flags_set (rule 2: the owner's header) */
+#include "ef/eft_rot_vec_copy.h" /* eft_rot_vec_copy (rule 2: the owner's header) */
 #include "types.h"
 #include "menu/fn_8031EA8C.h"
 #include "unsplit/lobby.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "ai/fn_802D44F4.h" /* ai_slots_clear (rule 2: its owner) */
+/* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
+#define eft_state_flags_set_c1 ((void (*)(_EFT*, u32, u32))eft_state_flags_set)
 
 /* The band's unowned callees (no registered unit owns these addresses). */
 extern "C" {
 
-void* fn_800F8788(s32 size);
-void* fn_800F8914(void);
-void  fn_800F886C(_EFT* self);
+void* eft_res_slot_get(s32 size);
+void* eft_res_model_get(void);
+void  eft_res_slot_release(_EFT* self);
 void  fn_800F8A44(MHchar** models, s32 count);
-void  fn_800F9DF4(_EFT* self, u32 a, u32 b);
 f32   fn_800513F0(VEC3* v, f32 s);
-void  eft_rot_vec_copy(_CP_VECTOR* dst, _CP_VECTOR* src);
 u32   fn_8004D70C(u32 value);
 s32   fn_800CEF18(u32 value);
 s32   fn_80217934(void);
@@ -176,12 +178,12 @@ extern "C" void fn_8031F2F0(_EFT* self) {
 
 /* 0x8031F300 - retire the first family's effect. */
 extern "C" void fn_8031F300(_EFT* self) {
-    fn_800F886C(self);
+    eft_res_slot_release(self);
 }
 
 /* 0x8031F304 - spawn the second effect family over `arg`. */
 extern "C" void fn_8031F304(void* arg) {
-    _EFT* self = (_EFT*)fn_800F8788(0xC);
+    _EFT* self = (_EFT*)eft_res_slot_get(0xC);
     MenuFxWork* work;
     s32 i;
 
@@ -197,9 +199,9 @@ extern "C" void fn_8031F304(void* arg) {
     self->dispatch_0x34 = fn_8031F420;
 
     for (i = 0; i < work->count; i++) {
-        work->models[i] = (MHchar*)fn_800F8914();
+        work->models[i] = (MHchar*)eft_res_model_get();
         if (work->models[i] == NULL) {
-            fn_800F886C(self);
+            eft_res_slot_release(self);
             return;
         }
     }
@@ -207,7 +209,7 @@ extern "C" void fn_8031F304(void* arg) {
     self->rot_0x24.x = 0;
     self->rot_0x24.y = 0;
     self->rot_0x24.z = 0;
-    fn_800F9DF4(self, 1, 0);
+    eft_state_flags_set_c1(self, 1, 0);
     self->field_0x03 = 0x2E;
     self->source_0x30 = arg;
 }
@@ -263,7 +265,7 @@ extern "C" void fn_8031F768(_EFT* self) {
 
 /* 0x8031F778 - retire the second family's effect. */
 extern "C" void fn_8031F778(_EFT* self) {
-    fn_800F886C(self);
+    eft_res_slot_release(self);
 }
 
 /* 0x8031F77C - count the non-zero `u16` entries of a string table whose value `fn_8004D70C`

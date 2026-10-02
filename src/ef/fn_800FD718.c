@@ -3,7 +3,7 @@
  * `.text` 0x800FD718..0x800FD864 (3 functions: fn_800FD718, fn_800FD850, fn_800FD860).
  *
  * What it is.  `fn_800FD4E4` is the four-state update hook the `eft002` setters install on the 0x48-byte
- * effect record (`_EFT::dispatch_0x34`); it dispatches on `state_0x05` to `fn_800FD520` (0),
+ * effect record (`_EFT_S8::dispatch_0x34`); it dispatches on `state_0x05` to `fn_800FD520` (0),
  * `fn_800FD718` (1), `fn_800FD850` (2) and `fn_800FD860` (3).  This unit owns the last three.
  *
  * `fn_800FD718` is the shell family's per-frame body (`type_0x02 == 1`): it counts the frame budget down,
@@ -11,8 +11,8 @@
  * the area the effect was spawned for, it re-seats the effect on the shell's position - the shell's own
  * position, offset 20 units up, rotated by the shell's X and Z angles and added back - and then asks the
  * nw4r effect whether it is still alive, either dropping the effect or handing the pool block to
- * `fn_800F93D8`.  `fn_800FD850` is the state-2 "advance one state" step and `fn_800FD860` the state-3
- * release, a one-line forward to `fn_800F886C`.
+ * `eft_res_models_spawn`.  `fn_800FD850` is the state-2 "advance one state" step and `fn_800FD860` the state-3
+ * release, a one-line forward to `eft_res_slot_release`.
  *
  * Language.  `langcheck` reads the object as *suggested* C++ - the only evidence is six mangled callees -
  * and a mangled callee does not decide the caller's language, so the unit stays `.c` and the callees are
@@ -45,7 +45,7 @@
  * defined (playbook 29); the target object carries no such section either.  The `extab`/`extabindex`
  * fragments travel with the code and are already claimed in `splits.txt`.
  *
- * Types.  `_EFT`, `_EFT_WORK` and `_SHELL_W` are reconstructed minimally (only the offsets this unit
+ * Types.  `_EFT_S8`, `_EFT_WORK` and `_SHELL_W` are reconstructed minimally (only the offsets this unit
  * reads) and are copies of `auto/800FCED4_fn_800FCED4.cpp`'s definitions, which the same `_SHELL_W`
  * extension belongs to; all three belong in one shared header, which does not exist yet (the request is
  * in that unit's outbox).  `VEC3` is `include/nw4r/math.h`'s type, which is C++ and so cannot be
@@ -58,6 +58,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "ef.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
 /* ---------------------------------------------------------------------------------------------------
@@ -78,7 +79,7 @@ struct _SHELL_W {
     /* +0x001 */ u8 unused_0x001[0x03 - 0x01];
     /* +0x003 */ u8 type_0x03;    /* the shell type, 0..29 (fn_800FD2B0's switch operand) */
     /* +0x004 */ u8 unused_0x004[0x08 - 0x04];
-    /* +0x008 */ u8 area_0x08;    /* the area the shell is in, copied into _EFT::area_0x44 */
+    /* +0x008 */ u8 area_0x08;    /* the area the shell is in, copied into _EFT_S8::area_0x44 */
     /* +0x009 */ u8 unused_0x009[0x18 - 0x09];
     /* +0x018 */ VEC3 pos_0x18;   /* world position; the effect is re-seated on it */
     /* +0x024 */ u32 rot_x_0x24;  /* X rotation, rotVecX's operand */
@@ -87,12 +88,12 @@ struct _SHELL_W {
     /* +0x030 */ u8 unused_0x030[0x10C - 0x30];
 }; /* size: 0x10C */
 
-/* The effect record `fn_800F8788` hands out and `fn_800FD4E4` dispatches on. */
-struct _EFT {
+/* The effect record `eft_res_slot_get` hands out and `fn_800FD4E4` dispatches on. */
+struct _EFT_S8 {
     /* +0x00 */ u8 unused_0x00;
     /* +0x01 */ u8 flag_0x01;      /* 1 while the effect is live, 0 once it has been dropped */
     /* +0x02 */ s8 type_0x02;      /* the effect type; 0 is the player family, 1 the shell family; s8 is
-                                    * this unit's codegen (u8: 100.0 -> 99.23), reported vs `_EFT`'s u8 */
+                                    * this unit's codegen (u8: 100.0 -> 99.23), reported vs `_EFT_S8`'s u8 */
     /* +0x03 */ u8 field_0x03;
     /* +0x04 */ u8 field_0x04;
     /* +0x05 */ u8 state_0x05;     /* the `fn_800FD4E4` state index the handlers advance */
@@ -102,22 +103,15 @@ struct _EFT {
     /* +0x18 */ VEC3 pos_0x18;     /* the position handed to SetRootMtxTrans */
     /* +0x24 */ u8 unused_0x24[0x30 - 0x24];
     /* +0x30 */ void* source_0x30; /* the actor the effect was spawned for (_PLW or _SHELL_W) */
-    /* +0x34 */ void (*dispatch_0x34)(struct _EFT*); /* the state dispatcher (fn_800FD4E4) */
+    /* +0x34 */ void (*dispatch_0x34)(struct _EFT_S8*); /* the state dispatcher (fn_800FD4E4) */
     /* +0x38 */ struct _EFT_WORK* work_0x38;
     /* +0x3C */ u8 unused_0x3C[0x40 - 0x3C];
-    /* +0x40 */ void (*release_0x40)(struct _EFT*); /* the pool release handler (fn_800FD4A8) */
+    /* +0x40 */ void (*release_0x40)(struct _EFT_S8*); /* the pool release handler (fn_800FD4A8) */
     /* +0x44 */ u8 area_0x44;      /* the area the effect is legal in */
     /* +0x45 */ u8 unused_0x45[0x48 - 0x45];
 }; /* size: 0x48 */
 
-/* The pool block at `_EFT::work_0x38`: a count and the effect-pointer array it counts.  Size 0x10 is a
- * lower bound - the block is only ever reached through its first two words. */
-struct _EFT_WORK {
-    /* +0x00 */ s32 count;
-    /* +0x04 */ void* effect;
-    /* +0x08 */ f32 scale;
-    /* +0x0C */ u32 param_id;
-}; /* size: 0x10 */
+/* `_EFT_WORK`, the pool block at `_EFT_S8::work_0x38`, comes from `ef.h` (rule 1: one definition). */
 
 /* ---------------------------------------------------------------------------------------------------
  * externs - the plain-named callees and the shared pool
@@ -125,11 +119,11 @@ struct _EFT_WORK {
 
       /* a `blr` stub in the DOL: the VEC3 ctor */
 extern void* addVec3To(VEC3* dst, const VEC3* src);
-extern void fn_800F93D8(void* self, void* effects, u32 mode, s32 count, u32 arg);
-extern void fn_800F886C(void* self);
-extern void fn_800FD718(struct _EFT* self);
-extern void fn_800FD850(struct _EFT* self);
-extern void fn_800FD860(struct _EFT* self);
+extern void eft_res_models_spawn(void* self, void* effects, u32 mode, s32 count, u32 arg);
+extern void eft_res_slot_release(void* self);
+extern void fn_800FD718(struct _EFT_S8* self);
+extern void fn_800FD850(struct _EFT_S8* self);
+extern void fn_800FD860(struct _EFT_S8* self);
 
 /* The mangled callees, declared with the map's spelling (docs/plan.md, "The language comes from the
  * symbol"): `setVector3(nw4r::math::VEC3*, f32, f32, f32)`, `rotVecX/rotVecZ(..., u32)`,
@@ -152,7 +146,7 @@ extern f32 lbl_8079668C; /* 20.0f */
 
 /* Per-frame body of the shell family's effect: counts the frame budget down, drops the effect once the
  * shell is gone, and re-seats it on the shell's position while the shell is in the effect's area. */
-void fn_800FD718(struct _EFT* self)
+void fn_800FD718(struct _EFT_S8* self)
 {
     struct _EFT_WORK* work;
     struct _SHELL_W* source;
@@ -186,17 +180,17 @@ void fn_800FD718(struct _EFT* self)
         self->state_0x05++;
         return;
     }
-    fn_800F93D8(self, &work->effect, 1, work->count, 0);
+    eft_res_models_spawn(self, &work->effect, 1, work->count, 0);
 }
 
 /* Advances the effect one state: the state-2 "nothing left to do" step. */
-void fn_800FD850(struct _EFT* self)
+void fn_800FD850(struct _EFT_S8* self)
 {
     self->state_0x05++;
 }
 
-/* Releases the effect: the state-3 step, the release `fn_800F886C` performs. */
-void fn_800FD860(struct _EFT* self)
+/* Releases the effect: the state-3 step, the release `eft_res_slot_release` performs. */
+void fn_800FD860(struct _EFT_S8* self)
 {
-    fn_800F886C(self);
+    eft_res_slot_release(self);
 }

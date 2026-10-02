@@ -172,11 +172,8 @@ void addVec3(VEC3* out, VEC3* a, VEC3* b);
  * (`ef`, `g3d` and `enemy` callers mix `VEC3*` and `void*` pointers) - the body moves
  * pointers and cannot distinguish them. */
 void* fn_80050850(void* dst, const void* src);
-/* 0x80052300 / 0x80052408 / 0x80052370 - the animation key-frame readers this unit owns (the
- * manglings `getKeyData__FPff` / `getKeyData3__FPffPfPfPf` say the real C++ signatures, which is how
- * the consumers call them; rule 9).  Added with `Pl/fn_80224AC4.cpp`. */
-f32 getKeyData(f32* keys, f32 frame);
-void getKeyData3(f32* keys, f32 frame, f32* out0, f32* out1, f32* out2);
+/* 0x80052370 - the animation key-frame reader the C++ pair below sits beside (plain `fn_` map name,
+ * so it stays at C linkage).  Added with `Pl/fn_80224AC4.cpp`. */
 f32 fn_80052370(f32* a, f32* b, f32* c, f32 frame);
 /* 0x800513CC / 0x80050028 / 0x80051EE0 / 0x800513F0 - the four vector helpers the `Pl` hit tests and
  * the `ef`/`enemy` effect code call (rule 2: this range owns the addresses).  `fn_800513CC(out, a, b)`
@@ -279,6 +276,12 @@ f32 calcVecDistXZ(const void* a, const void* b);
  * convert the family's placement-table entries. */
 struct Vec;
 void vec_to_mh_vec3(VEC3* dst, struct Vec* src);
+
+/* 0x80052300 / 0x80052408 - the animation key-frame readers (map manglings `getKeyData__FPff` /
+ * `getKeyData3__FPffPfPfPf`), so C++ linkage at global scope, outside the `extern "C"` block.
+ * Added with `Pl/fn_80224AC4.cpp`. */
+f32 getKeyData(f32* keys, f32 frame);
+void getKeyData3(f32* keys, f32 frame, f32* out0, f32* out1, f32* out2);
 #endif
 
 #ifdef __cplusplus

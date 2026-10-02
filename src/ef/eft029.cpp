@@ -1,3 +1,11 @@
+/* ef/eft029.cpp - effect 029 setup
+ *
+ * `.text` 0x80119DEC..0x8011AD58, 2 functions written (the rest of the range is not decompiled yet).
+ * Phase 4 (docs/splits/phase4): recut registered unit; the functions of the neighbouring units were cut out of this file.
+ * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
+ */
+
+/* Retired header of `ef/eft029.cpp` (kept for its notes and residuals): */
 /* ef/eft029.cpp - the `eft029` effect family, `.text` 0x80119DEC..0x8011D448 (37 functions).
  *
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
@@ -61,15 +69,6 @@
 #include "unsplit/unknown.h"
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 
-/* The unit's own pooled tables (never emitted here). */
-extern "C" {
-u16 lbl_805A06F0[]; /* effect id per `type_0x02`, .data 0x805A06F0 */
-u16 lbl_805A0710[]; /* its parameter pair,      .data 0x805A0710 */
-}
-
-/* The unmangled `fn_XXXXXXXX` callees: the range's own placeholder names, and the unsplit
- * `fn_800DD1F0` / `fn_8021F238` (neither address has a registered owner that publishes a header, so
- * both stay declared here - rule 2's named gap). */
 extern "C" {
 void fn_800DD1F0(u32 id, nw4r::math::VEC3* pos);
 u32 fn_8021F238();
@@ -88,13 +87,11 @@ struct _EFT029_WORK {
     /* +0x04 */ nw4r::ef::Effect* effects[1];     /* the pool `res_eft_create` fills */
 };
 
-/* ---------------------------------------------------------------------------------------------------
- * bodies
- * ------------------------------------------------------------------------------------------------- */
+extern "C" {
+u16 lbl_805A06F0[]; /* effect id per `type_0x02`, .data 0x805A06F0 */
+u16 lbl_805A0710[]; /* its parameter pair,      .data 0x805A0710 */
+}
 
-/* Retail keeps the unfused forms the `-O3` peephole pass folds: `addi`+`cmpwi` for the timer test and
-the `clrlwi` narrowing of the effect id.  The peephole pass off matches the target object (the same
-per-unit lever eft009 and sound/fn_800DD1F0 use, playbook row 39). */
 #pragma peephole off
 
 /* 0x80119DEC - the family's per-frame handler.  Runs `timer_0x0C` down; only the frame it goes
@@ -354,5 +351,3 @@ extern "C" void fn_8011A2A0(_EFT* self)
     self->flag_0x01 = 1;
     fn_8011A34C(self);
 }
-
-#pragma peephole reset

@@ -44,7 +44,7 @@
  * unit only) - without it `datagap.py` reports an `ours-extra .data 36B` row.
  *
  * Naming note: references only to other units' unrenamed fn_XXXXXXXX symbols (each checked
- * against the map's owner: `fn_800F886C` -> `ef/eft_res.cpp`, `fn_800DBDD4` ->
+ * against the map's owner: `eft_res_slot_release` -> `ef/eft_res.cpp`, `fn_800DBDD4` ->
  * `sound/fn_800D7F54.cpp`, `item_pair_copy` -> `fn_80047398.cpp`, and `fn_803B5030`, `fn_802DF6E4`,
  * `fn_803B4C64`/`fn_803B4CE8` -> unregistered bands).  No `fn_` name
  * this unit *defines* is left unrenamed: every body above carries the name `symbols.txt` now has.
@@ -80,7 +80,7 @@ void q_result_anim_counter_inc(QResultScreen* self)
 /* Hands the screen's character record to the effect system's release (0x800F886C). */
 void q_result_release_effect(QResultScreen* self)
 {
-    fn_800F886C(self);
+    eft_res_slot_release(self);
 }
 
 /* The language-selected message table for one message id: `q_result_msg_adrs[id][language]`. */

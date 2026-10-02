@@ -15,10 +15,10 @@
  *
  * WHAT IT IS.  An effect family plus the cockpit hold/item band it draws from, exactly the shape the
  * registered neighbour `ef/eft050.cpp` documents: `eft052_set` pools the effect record
- * (`fn_800F8788(76)`, the 76-byte block `ef/eft035.cpp` measured) and installs its
+ * (`eft_res_slot_get(76)`, the 76-byte block `ef/eft035.cpp` measured) and installs its
  * `dispatch_0x34`/`release_0x40` hooks, `eft052_dispatch` is the `state_0x05` machine whose arms are
  * the model-create pass (`res_eft_model_create_light`), the placement/alive body and the pool release
- * (`fn_800F886C`), and the rest of the range is the cockpit item layer: the page counters
+ * (`eft_res_slot_release`), and the rest of the range is the cockpit item layer: the page counters
  * (`eft052_page_counts_get`, `eft052_page_take`, `eft052_page_put`), the hold block at
  * `.bss:0x806BF368`, the item/monster strings (`LbStr`, `ItemName`, `GetItemData`) and the sprite
  * sheet (`draw_sprite_*`, `get_lsp_data`, `PutPageArrow`, `font_*`).  Three bodies read the enemy work
@@ -48,11 +48,11 @@
  * what the body does - and each is a guess a later pass may refine (the evidence is the body, not the
  * map); the 72 entries this file does not reconstruct yet keep the map's `fn_` stems, because they are
  * absent or referenced, never defined:
- *   * the family: `eft052_set` (pool the record with `fn_800F8788(76)`, install the two hooks, seed
+ *   * the family: `eft052_set` (pool the record with `eft_res_slot_get(76)`, install the two hooks, seed
  *     both part slots), `eft052_release` (the `+0x40` hook - hand every part slot's handle back),
  *     `eft052_dispatch` (the `+0x34` hook - one handler per `state_0x05`), `eft052_place` (the
  *     placement pass - pick the per-area table, create both models, advance), `eft052_state_step`
- *     (advance the state) and `eft052_pool_release` (`fn_800F886C`);
+ *     (advance the state) and `eft052_pool_release` (`eft_res_slot_release`);
  *   * the enemy part report the family draws from: `eft052_part_damage_ck` (one flag per queried part
  *     index), `eft052_part_level_even_ck` (whether the part's damage level is even) and
  *     `eft052_part_gauge_add` (step the part gauge and clamp it to 0..500);
@@ -71,7 +71,7 @@
  *
  * Naming note: every remaining `fn_XXXXXXXX` in this file is a REFERENCE to a symbol ANOTHER unit
  * owns (the rule's tolerated half, checked with `python tools/symbols/symedit.py refs` on each of the
- * file's names): the effect pool/manager (`fn_800F8788`, `fn_800F8914`, `fn_800F886C`, `fn_800F9DF4`,
+ * file's names): the effect pool/manager (`eft_res_slot_get`, `eft_res_model_get`, `eft_res_slot_release`, `eft_state_flags_set`,
  * `fn_800F8A44`), the enemy band (`fn_80126278`, `em_parts_damage_level_get`) and the lobby item API
  * (`fn_8004Axxx`/`fn_8004Bxxx`).  `symedit.py range` shows the map spells none of those ranges with
  * anything but their `fn_` stems, so this file cannot name them.  No symbol this unit owns stays
@@ -180,6 +180,8 @@
  *     straight-line region as a replace.
  */
 
+#include "enemy/fn_8012B380.h" /* fn_8012B380 (rule 2: the owner's header) */
+#include "enemy/fn_8012CEB4.h" /* fn_8012CEB4 (rule 2: the owner's header) */
 #include "types.h"
 #include "nw4r/math.h"
 #include "enemy.h"
@@ -195,6 +197,8 @@
 #include "ef/fn_800CDB2C.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "stage/stg_w.h"
+/* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
+#define fn_8012CEB4_c1 ((void (*)(_ENEMY_WORK*, s16, u32))fn_8012CEB4)
 
 /* ---------------------------------------------------------------------------------------------- *
  * Callees outside this unit.
@@ -209,8 +213,6 @@ void fn_800513F0(VEC3* v, f32 s);
 
 /* The enemy action helpers whose owner units are unclaimed; their signatures are the call sites'
  * (this range's bracketing registered units name different bands, the rule 2 named gap). */
-void fn_8012B380(_ENEMY_WORK* self, u32 a, u32 b, u32 c);
-extern "C" void fn_8012CEB4(_ENEMY_WORK* self, s16 a, u32 b);
 
 /* The object the aim writer's first argument points at, and the source block its +0x4 member names
  * (`fn_8035EF58`).  Only the two fields the body touches are named. */
@@ -577,7 +579,7 @@ extern "C" void fn_8035EAA0(_ENEMY_WORK* self, u8 a)
     } else {
         self->field_0x33B = 0xFF;
         if (a == 1) {
-            fn_8012CEB4(self, (s16)(ran_suu(0) & 0xF), 0);
+            fn_8012CEB4_c1(self, (s16)(ran_suu(0) & 0xF), 0);
             fn_8013072C(self, 0, 0);
         } else {
             fn_8013072C(self, 5, 0);
@@ -614,7 +616,7 @@ extern "C" void fn_8035EB80(_ENEMY_WORK* self)
         }
     } else {
         self->field_0x33B = 0xFF;
-        fn_8012CEB4(self, (s16)(ran_suu(0) & 0xF), 0);
+        fn_8012CEB4_c1(self, (s16)(ran_suu(0) & 0xF), 0);
         self->field_0x33F = 0;
         fn_8013072C(self, 0, 0);
     }
