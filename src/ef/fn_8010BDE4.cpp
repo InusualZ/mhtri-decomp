@@ -11,7 +11,7 @@
  *   3. module = `ef`, class 3: the range sits in the `ef` link band directly below
  *      `ef/fn_8010D1A8.c` (0x8010D1A8..0x801121DC) and above the `ef/fn_80104BD0.c` /
  *      `ef/eft009.cpp` cluster, and it drives the same `_EFT` pool records those units own
- *      (`fn_800F8788`/`fn_800F8914`/`fn_800F8A44`/`fn_800F886C`, `fn_800F9D80`/`fn_800F9DF4`,
+ *      (`eft_res_slot_get`/`eft_res_model_get`/`fn_800F8A44`/`eft_res_slot_release`, `fn_800F9D80`/`eft_state_flags_set`,
  *      `res_eft_model_create`, the `MHchar` members) - so it goes in the `ef` lib block of
  *      configure.py, next to its neighbours;
  *   4. name = the map's own stem `fn_8010BDE4` (class 4): no evidence supports a better one and the
@@ -44,6 +44,12 @@
  * Inventory, addresses and sizes: `python tools/units/ledger.py unit ef/fn_8010BDE4.cpp`.
  */
 
+#include "ef/eft_state_flags_set.h" /* eft_state_flags_set (rule 2: the owner's header) */
+#include "enemy/fn_8012E2D4.h" /* fn_8012E2D4 (rule 2: the owner's header) */
+#include "enemy/em_status_ck.h" /* em_status_ck (rule 2: the owner's header) */
+#include "enemy/fn_80137614.h" /* fn_80137614 (rule 2: the owner's header) */
+#include "enemy/fn_80137648.h" /* fn_80137648 (rule 2: the owner's header) */
+#include "ef/lbl_8059F574.h" /* lbl_8059F574 (rule 2: the owner's header) */
 #include "types.h"
 #include "nw4r/math.h"
 #include "gx.h"
@@ -53,12 +59,14 @@
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 #include "ef/pRoot.h"
+/* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
+#define eft_state_flags_set_c1 ((void (*)(void*, u8, u8))eft_state_flags_set)
 
 /* ---------------------------------------------------------------------------------------------------
  * the two per-family `_EFT::work_0x38` blocks
  * ------------------------------------------------------------------------------------------------- */
 
-/* The light family's block, allocated by `fn_800F8788(0x50)`: the pooled light handles the state
+/* The light family's block, allocated by `eft_res_slot_get(0x50)`: the pooled light handles the state
  * machine walks, the effect id the matrix/scale getters are keyed on, the offset vector and the mode
  * byte that selects the source family. size: 0x50 */
 struct _EFT_LIGHT_WORK {
@@ -182,18 +190,13 @@ void fn_800DAA4C(nw4r::math::VEC3* pos);
 s32 fn_800E0A8C(MHchar* model);
 void fn_800E0BE8(MHchar* model, s32 value);
 void* sound_job_request(s32 a, u8 b, s32 c, s32 d, s32 e, void (*cb)(void*));
-void* fn_800F8788(u32 pool);
-void fn_800F886C(void* self);
-void* fn_800F8914();
+void* eft_res_slot_get(u32 pool);
+void eft_res_slot_release(void* self);
+void* eft_res_model_get();
 void fn_800F8A44(void* p, s32 mode);
-u32 fn_800F93D8(void* self, void* list, s32 a, s32 b, void* c);
+u32 eft_res_models_spawn(void* self, void* list, s32 a, s32 b, void* c);
 u32 fn_800F9D80(void* self);
-void fn_800F9DF4(void* self, u8 a, u8 b);
 void fn_800FBB90(nw4r::math::MTX34* m, nw4r::math::VEC3* v);
-s32 fn_8012E2D4(u32 state, u32 action);
-u32 em_status_ck(_ENEMY_WORK* enemy, s32 value);
-u32 fn_80137614(_ENEMY_WORK* enemy);
-u32 fn_80137648(_ENEMY_WORK* enemy);
 void fn_8026A394(_PLW* plw, s32 id, nw4r::math::MTX34* mtx);
 u32 fn_802D2B38(_ENEMY_WORK* enemy, u8 a, u16 b);
 void fn_802D2B68(_ENEMY_WORK* enemy, u32 id, nw4r::math::MTX34* mtx);
@@ -225,7 +228,6 @@ void fn_8010D12C(nw4r::math::MTX34* a, nw4r::math::MTX34* b);
 /* The shared pools the range references by name (never emitted here; playbook 29). */
 extern u8 lbl_80791820[];
 extern f32 lbl_8059F518[];
-extern f32 lbl_8059F574[];
 extern f32 lbl_807967E8;
 extern f32 lbl_807967EC;
 extern f32 lbl_807967F0;
@@ -264,7 +266,7 @@ extern "C" void fn_8010C710(_EFT* self)
 /* Allocates a light effect with `count` pooled handles, installs its two hooks and clears its pose. */
 extern "C" _EFT* fn_8010C468(u32 count)
 {
-    _EFT* eft = (_EFT*)fn_800F8788(0x50);
+    _EFT* eft = (_EFT*)eft_res_slot_get(0x50);
     _EFT_LIGHT_WORK* work;
     s32 i;
 
@@ -278,9 +280,9 @@ extern "C" _EFT* fn_8010C468(u32 count)
     eft->release_0x40 = fn_8010C710;
 
     for (i = 0; i < work->count_0x18; i++) {
-        work->models_0x1c[i] = (MHchar*)fn_800F8914();
+        work->models_0x1c[i] = (MHchar*)eft_res_model_get();
         if (work->models_0x1c[i] == NULL) {
-            fn_800F886C(eft);
+            eft_res_slot_release(eft);
             return NULL;
         }
     }
@@ -315,7 +317,7 @@ extern "C" void fn_8010C554(_PLW* source)
     work->scale_0x44 = lbl_80796814;
     eft->area_0x44 = source->area_0x16;
     work->count2_0x30 = 5;
-    fn_800F9DF4(eft, 1, 0);
+    eft_state_flags_set_c1(eft, 1, 0);
 }
 
 /* The parameterised one-light player effect. */
@@ -337,7 +339,7 @@ extern "C" void fn_8010C5DC(void* source, u32 id, nw4r::math::VEC3* vec, f32 sca
     work->scale_0x44 = scale;
     eft->area_0x44 = ((_EFT_ENEMY_VIEW*)source)->field_0x1e1;
     work->count2_0x30 = 5;
-    fn_800F9DF4(eft, 1, 0);
+    eft_state_flags_set_c1(eft, 1, 0);
 }
 
 /* The five-light player effect with a raised offset. */
@@ -361,7 +363,7 @@ extern "C" void fn_8010C680(void* source)
     work->scale_0x44 = lbl_80796814;
     eft->area_0x44 = ((_EFT_ENEMY_VIEW*)source)->field_0x1a4;
     work->count2_0x30 = 5;
-    fn_800F9DF4(eft, 1, 0);
+    eft_state_flags_set_c1(eft, 1, 0);
 }
 
 /* The state dispatcher: the first two states are this unit's, the last two the next unit's. */
@@ -548,7 +550,7 @@ extern "C" void fn_8010C8F8(_EFT* self)
         }
     }
 
-    fn_800F93D8(self, &work->models_0x1c[0], 2, work->count2_0x30, NULL);
+    eft_res_models_spawn(self, &work->models_0x1c[0], 2, work->count2_0x30, NULL);
     self->timer_0x0C++;
     if (self->timer_0x0C >= 0x20) {
         self->timer_0x0C = 0;
@@ -790,12 +792,12 @@ extern "C" void fn_8010C0E0(_EFT* self)
                 addVec3To(&work->entries[i].vecC_0x20, &work->entries[i].vecB_0x14);
                 fn_800FBB90(&mtx, &work->entries[i].vecC_0x20);
                 work->entries[i].model_0x04->move2(&mtx, 0);
-                fn_800F93D8(self, &work->entries[i].model_0x04, 2, 1, NULL);
+                eft_res_models_spawn(self, &work->entries[i].model_0x04, 2, 1, NULL);
             } else {
                 fn_800FBB90(&mtx, &work->entries[i].vecC_0x20);
                 work->entries[i].model_0x04->move2(&mtx, 0);
                 addVec3To(&work->entries[i].vecC_0x20, &work->entries[i].vecA_0x08);
-                fn_800F93D8(self, &work->entries[i].model_0x04, 2, 1, NULL);
+                eft_res_models_spawn(self, &work->entries[i].model_0x04, 2, 1, NULL);
             }
             break;
         case 1:
@@ -812,7 +814,7 @@ extern "C" void fn_8010C0E0(_EFT* self)
                 addVec3To(&work->entries[i].vecC_0x20, &work->entries[i].vecB_0x14);
                 addVec3To(&work->entries[i].vecC_0x20, &work->entries[i].vecA_0x08);
                 work->entries[i].angle_0x30 = work->entries[i].angle_0x30 + work->entries[i].step_0x3c;
-                fn_800F93D8(self, &work->entries[i].model_0x04, 2, 1, NULL);
+                eft_res_models_spawn(self, &work->entries[i].model_0x04, 2, 1, NULL);
             }
             break;
         case 2:
@@ -831,7 +833,7 @@ extern "C" void fn_8010C0E0(_EFT* self)
                 addVec3To(&work->entries[i].vecC_0x20, &work->entries[i].vecA_0x08);
                 work->entries[i].angle_0x30 = work->entries[i].angle_0x30 + work->entries[i].step_0x3c;
                 work->entries[i].angle_0x2c = work->entries[i].angle_0x2c + work->entries[i].step_0x38;
-                fn_800F93D8(self, &work->entries[i].model_0x04, 2, 1, NULL);
+                eft_res_models_spawn(self, &work->entries[i].model_0x04, 2, 1, NULL);
             }
             break;
         }
@@ -847,5 +849,5 @@ extern "C" void fn_8010C454(_EFT* self)
 /* The delete thunk the light family installs as a pool destructor. */
 extern "C" void fn_8010C464(_EFT* self)
 {
-    fn_800F886C(self);
+    eft_res_slot_release(self);
 }

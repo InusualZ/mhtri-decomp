@@ -87,7 +87,7 @@ extern LbQuestBoardLobby lobby_w;   /* .bss 0x806AAB44 */
  * whose `fn_` names the map still carries). */
 void fn_8004DF10(void* work, u32* out_a, u32* out_b);
 void sysSE_stop(u32 id);
-void fn_800F886C(void* work);
+void eft_res_slot_release(void* work);
 void fn_800F8A44(void* list, s32 count);
 void fn_80214EF0(u32 panel, u32 value);
 void fn_80215170(u32 panel, u32 value);

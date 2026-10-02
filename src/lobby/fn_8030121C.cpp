@@ -266,7 +266,7 @@ void fn_80305910(u8* self) {
 
 /* 0x80305920 - state-3 step: retire the effect. */
 void fn_80305920(void* self) {
-    fn_800F886C(self);
+    eft_res_slot_release(self);
 }
 
 /* 0x80306510 - state step: advance the state byte. */
@@ -276,7 +276,7 @@ void fn_80306510(u8* self) {
 
 /* 0x80306520 - retire the effect. */
 void fn_80306520(void* self) {
-    fn_800F886C(self);
+    eft_res_slot_release(self);
 }
 
 /* 0x80301A20 - draws the page header row (`0x231B`/`0x2316` by wide mode) and, while the +0x00
@@ -311,7 +311,7 @@ void fn_80306524(void) {
     if (res == NULL) {
         return;
     }
-    rec = (_EFT*)fn_800F8788(0x20);
+    rec = (_EFT*)eft_res_slot_get(0x20);
     if (rec == NULL) {
         return;
     }
@@ -322,15 +322,15 @@ void fn_80306524(void) {
     w->count = 1;
     slots = w->slots_0x004;
     for (i = 0; i < w->count; i++) {
-        slots[i].effect = (nw4r::ef::Effect*)fn_800F8914();
+        slots[i].effect = (nw4r::ef::Effect*)eft_res_model_get();
         if (slots[i].effect == NULL) {
-            fn_800F886C(rec);
+            eft_res_slot_release(rec);
             return;
         }
     }
     memset(w->models_0x00C, 0, 0x10);
     rec->field_0x03 = 0x29;
-    fn_800F9DF4(rec, 8, 0);
+    eft_state_flags_set(rec, 8, 0);
     rec->area_0x44 = area;
 }
 

@@ -53,7 +53,7 @@
  * Residuals (this pass).
  *   * 83 of the 110 functions are unwritten and measure 0 %.  The ones that need a heavily shared
  *     `lbl_` global (`lbl_806BF530` - 26 referrers outside the range - `lobby_world_block` - 90 - and the
- *     `stage_map_kind_get` / `fn_80217934` / `fn_800F886C` / `fn_800F8A44` callee set, each declared across
+ *     `stage_map_kind_get` / `fn_80217934` / `eft_res_slot_release` / `fn_800F8A44` callee set, each declared across
  *     30+ files) are deliberately left out: rule 7 makes naming them this batch's job, and that is a
  *     cross-unit rename batch, not this unit's registration.  They are the first follow-up.
  *   * `set_option_mode` / `set_option_cfg` / `set_def_option` / `set_option_from` (488 B) are not

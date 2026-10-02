@@ -2,9 +2,9 @@
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  * `.text` 0x80119C44..0x80119DEC (5 functions, in address order).
  *
- * What it is.  `fn_80119C44` is the constructor of a 0x48-byte effect record (`_EFT`, the same object
+ * What it is.  `fn_80119C44` is the constructor of a 0x48-byte effect record (`_EFT_HEAP`, the same object
  * `auto/800FCED4_fn_800FCED4.cpp` and `auto/800FD520_fn_800FD520.c` drive): it gates on the current
- * area, takes a record from the `fn_800F8788` pool with a 0x18-byte work block attached, seeds the work
+ * area, takes a record from the `eft_res_slot_get` pool with a 0x18-byte work block attached, seeds the work
  * block's effect count and scale, stamps the type/area, and installs the two handlers that travel with
  * the record - `fn_80119D10` as the pool-release hook at +0x40 and `fn_80119D9C` as the per-frame
  * dispatch at +0x34.  `fn_80119D10` picks between the two identical pool-release bodies
@@ -27,7 +27,7 @@
  *     identical.  It is not a source shape: the same two assignments in `eft002_set` (C++,
  *     `auto/800FCED4_fn_800FCED4.cpp`) *do* compile to `addi r0` with this flag set, and no spelling of
  *     the assignment here moves it (tried: a typed local, an explicit cast, `void*` fields, a comma
- *     expression, the two stores swapped, the stores moved before the `fn_800F9DF4` call, a nested
+ *     expression, the two stores swapped, the stores moved before the `eft_state_flags_set` call, a nested
  *     block-scoped declaration, `#pragma peephole off`) - so it is the allocator's preference for this
  *     function's IR and belongs to the residual, not to the source.
  *   * `fn_80119D9C` (89.00 %).  The instructions are the target's, in the target's order, and the
@@ -51,14 +51,17 @@
  * `.sdata2` pool, so it is `extern`-declared by its map name and never defined (playbook 29).  The
  * `extab`/`extabindex` fragments travel with the code and are claimed in `splits.txt` with its `.text`.
  *
- * Types.  `_EFT` and `_EFT_HEAP_WORK` are reconstructed minimally (only the offsets this unit touches)
- * and are copies of the neighbours' definitions (`auto/800FCED4_fn_800FCED4.cpp`'s `_EFT`/`_EFT_WORK`);
+ * Types.  `_EFT_HEAP` and `_EFT_HEAP_WORK` are reconstructed minimally (only the offsets this unit touches)
+ * and are copies of the neighbours' definitions (`auto/800FCED4_fn_800FCED4.cpp`'s `_EFT_HEAP`/`_EFT_WORK`);
  * all of them belong in one shared header, which does not exist yet.
  *
  * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/80119C44_fn_80119C44.c`.
  */
 
+#include "ef/eft_state_flags_set.h" /* eft_state_flags_set (rule 2: the owner's header) */
 #include "types.h"
+/* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
+#define eft_state_flags_set_c1 ((void (*)(struct _EFT_HEAP*, u8, u8))eft_state_flags_set)
 
 /* ---------------------------------------------------------------------------------------------------
  * the 0x48-byte effect record and its pool block
@@ -66,8 +69,8 @@
 
 struct _EFT_HEAP_WORK;
 
-/* The effect object `fn_800F8788` hands out and the two installed handlers drive. size: 0x48 */
-struct _EFT {
+/* The effect object `eft_res_slot_get` hands out and the two installed handlers drive. size: 0x48 */
+struct _EFT_HEAP {
     /* +0x00 */ u8 unused_0x00;
     /* +0x01 */ u8 flag_0x01;
     /* +0x02 */ u8 type_0x02;   /* the effect type the pool tables are indexed by */
@@ -75,16 +78,16 @@ struct _EFT {
     /* +0x04 */ u8 unused_0x04;
     /* +0x05 */ u8 state_0x05;  /* the `fn_80119D9C` state index */
     /* +0x06 */ u8 unused_0x06[0x34 - 0x06];
-    /* +0x34 */ void (*dispatch_0x34)(struct _EFT*); /* the per-frame state machine */
+    /* +0x34 */ void (*dispatch_0x34)(struct _EFT_HEAP*); /* the per-frame state machine */
     /* +0x38 */ struct _EFT_HEAP_WORK* work_0x38;
     /* +0x3C */ u8 unused_0x3C[0x40 - 0x3C];
-    /* +0x40 */ void (*release_0x40)(struct _EFT*);  /* the pool-release hook */
+    /* +0x40 */ void (*release_0x40)(struct _EFT_HEAP*);  /* the pool-release hook */
     /* +0x44 */ u8 area_0x44;   /* the area the record was spawned in */
     /* +0x45 */ u8 unused_0x45[0x48 - 0x45];
 };
 /* size: 0x48 */
 
-/* The pool block `fn_800F8788(sizeof(struct _EFT_HEAP_WORK))` attaches: the effects it owns and their
+/* The pool block `eft_res_slot_get(sizeof(struct _EFT_HEAP_WORK))` attaches: the effects it owns and their
  * scale.  The scale sits at +0x10, so at most three effect pointers fit in front of it.
  * size: 0x18 */
 struct _EFT_HEAP_WORK {
@@ -99,13 +102,12 @@ struct _EFT_HEAP_WORK {
  * ------------------------------------------------------------------------------------------------- */
 
 extern u32 get_now_areano__Fv(void);
-extern struct _EFT* fn_800F8788(u32 block_size);
-extern void fn_800F9DF4(struct _EFT* self, u8 a, u8 b);
-extern void fn_80119DEC(struct _EFT* self);
-extern void fn_8011A2A0(struct _EFT* self);
-extern void fn_8011A34C(struct _EFT* self);
-extern void fn_8011ACF0(struct _EFT* self);
-extern void fn_8011AD00(struct _EFT* self);
+extern struct _EFT_HEAP* eft_res_slot_get(u32 block_size);
+extern void fn_80119DEC(struct _EFT_HEAP* self);
+extern void fn_8011A2A0(struct _EFT_HEAP* self);
+extern void fn_8011A34C(struct _EFT_HEAP* self);
+extern void fn_8011ACF0(struct _EFT_HEAP* self);
+extern void fn_8011AD00(struct _EFT_HEAP* self);
 
 extern void push_eft_effect_heap_num__FPPQ34nw4r2ef6Effectl(void** effects, long count);
 
@@ -115,21 +117,21 @@ extern f32 lbl_80796B2C; /* 1.0f */
  * body
  * ------------------------------------------------------------------------------------------------- */
 
-void fn_80119D10(struct _EFT* self);
-void fn_80119D24(struct _EFT* self);
-void fn_80119D60(struct _EFT* self);
-void fn_80119D9C(struct _EFT* self);
+void fn_80119D10(struct _EFT_HEAP* self);
+void fn_80119D24(struct _EFT_HEAP* self);
+void fn_80119D60(struct _EFT_HEAP* self);
+void fn_80119D9C(struct _EFT_HEAP* self);
 
 /* Creates the area's effect record and installs its two handlers. */
-struct _EFT* fn_80119C44(u32 type, u32 area, u32 count)
+struct _EFT_HEAP* fn_80119C44(u32 type, u32 area, u32 count)
 {
-    struct _EFT* effect;
+    struct _EFT_HEAP* effect;
     struct _EFT_HEAP_WORK* work;
 
     if ((u8)area != (u8)get_now_areano__Fv()) {
         return 0;
     }
-    effect = fn_800F8788(sizeof(struct _EFT_HEAP_WORK));
+    effect = eft_res_slot_get(sizeof(struct _EFT_HEAP_WORK));
     if (effect == 0) {
         return 0;
     }
@@ -139,14 +141,14 @@ struct _EFT* fn_80119C44(u32 type, u32 area, u32 count)
     effect->field_0x03 = 0x1C;
     effect->type_0x02 = type;
     effect->area_0x44 = area;
-    fn_800F9DF4(effect, 0, 0);
+    eft_state_flags_set_c1(effect, 0, 0);
     effect->release_0x40 = fn_80119D10;
     effect->dispatch_0x34 = fn_80119D9C;
     return effect;
 }
 
 /* Runs the release body the record's type asks for. */
-void fn_80119D10(struct _EFT* self)
+void fn_80119D10(struct _EFT_HEAP* self)
 {
     switch (self->type_0x02) {
     default:
@@ -159,7 +161,7 @@ void fn_80119D10(struct _EFT* self)
 }
 
 /* Hands the record's pooled effects back and clears its count. */
-void fn_80119D24(struct _EFT* self)
+void fn_80119D24(struct _EFT_HEAP* self)
 {
     struct _EFT_HEAP_WORK* work = self->work_0x38;
 
@@ -168,7 +170,7 @@ void fn_80119D24(struct _EFT* self)
 }
 
 /* Hands the record's pooled effects back and clears its count. */
-void fn_80119D60(struct _EFT* self)
+void fn_80119D60(struct _EFT_HEAP* self)
 {
     struct _EFT_HEAP_WORK* work = self->work_0x38;
 
@@ -177,7 +179,7 @@ void fn_80119D60(struct _EFT* self)
 }
 
 /* Runs the state handler the record's `state_0x05` selects. */
-void fn_80119D9C(struct _EFT* self)
+void fn_80119D9C(struct _EFT_HEAP* self)
 {
     switch (self->state_0x05) {
     case 0:

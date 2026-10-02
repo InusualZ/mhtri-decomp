@@ -41,14 +41,14 @@
  * was not.
  *
  * What it is.  `eft035_set`/`eft035_set2` are the spawn entry points of enemy effect 35: each
- * rejects a foreign area, takes a 64-byte (resp. 56-byte) work block from `fn_800F8788`, stamps
+ * rejects a foreign area, takes a 64-byte (resp. 56-byte) work block from `eft_res_slot_get`, stamps
  * `field_0x03 = 35`, `type_0x02`, the source `_ENEMY_WORK` at +0x30, the position, the two copied
  * rotation words and the area, then installs the two hooks that travel with the record -
  * `fn_802F24E0` (`release_0x40`, the pool release) and `fn_802F2640` (`dispatch_0x34`, the
  * `state_0x05` machine).  The two setters differ in their work block: the type-0/1/3 family pools
  * 20-byte model records at work+0x08 (`memset` of the 16-byte handle list at work+0x30), the
  * type-4..7 family pools 4-byte model handles at work+0x08 (`memset` of the 24-byte list at
- * work+0x20).  Both block sizes are pinned by the allocation (`fn_800F8788(64)` / `fn_800F8788(56)`
+ * work+0x20).  Both block sizes are pinned by the allocation (`eft_res_slot_get(64)` / `eft_res_slot_get(56)`
  * against the 0x40 / 0x38 the two layouts need).
  *
  * The state machine is `fn_802F2640`: `state_0x05` 0 -> the type switch
@@ -150,7 +150,7 @@ extern "C" void fn_802F49D8(_EFT* self);
  * ------------------------------------------------------------------------------------------------- */
 
 /* One pooled model record of the type-0/1/3 family: the colour step the update walks (`state_0x00`
- * selects the colour), the model handle `fn_800F8914` pools and `fn_800F8A44` releases, and the
+ * selects the colour), the model handle `eft_res_model_get` pools and `fn_800F8A44` releases, and the
  * model record `res_eft_UV_model_create` returned.  The release and the create both index this array
  * with a stride of 0x14 off work+0x08. size: 0x14 */
 struct Eft035Slot {
@@ -165,7 +165,7 @@ struct Eft035Slot {
  * pool's used length, `scale_0x04` the effect's start scale, `slots_0x08` the two 20-byte model
  * records and `works_0x30` the 2x2 `_g3d_work` handle list `res_eft_UV_model_create` fills (one
  * 8-byte pair per model, indexed by the same count as `slots_0x08`).
- * size: 0x40 (the size `fn_800F8788(64)` pools) */
+ * size: 0x40 (the size `eft_res_slot_get(64)` pools) */
 struct Eft035Work {
     /* +0x00 */ s32 count_0x00;
     /* +0x04 */ f32 scale_0x04;
@@ -175,7 +175,7 @@ struct Eft035Work {
 
 /* Work block of the type-4..7 family (the 56-byte block `eft035_set2` pools): a 4-byte-stride model
  * handle array at +0x08 whose length is `count_0x00`, the create's returns at +0x14 and the handle
- * list at +0x20 (one 8-byte pair per model). size: 0x38 (the size `fn_800F8788(56)` pools) */
+ * list at +0x20 (one 8-byte pair per model). size: 0x38 (the size `eft_res_slot_get(56)` pools) */
 struct Eft035Work2 {
     /* +0x00 */ s32 count_0x00;
     /* +0x04 */ f32 scale_0x04;
@@ -184,7 +184,7 @@ struct Eft035Work2 {
     /* +0x20 */ struct _g3d_work* works_0x20[3][2];
 };
 
-/* Work block of the tag-34 family `fn_802F39DC` seeds (the 76-byte block `fn_800F8788(76)` pools):
+/* Work block of the tag-34 family `fn_802F39DC` seeds (the 76-byte block `eft_res_slot_get(76)` pools):
  * the pooled model handles at +0x04, `field_0x00` their used length (always 2) and the rest the
  * family's own body reads. size: 0x4C */
 struct Eft034Work {
@@ -399,7 +399,7 @@ extern "C" void fn_802F288C(_EFT* self)
  * clock, then installs the two hooks that travel with the record. */
 extern "C" void fn_802F39DC(_ENEMY_WORK* self, u8 type)
 {
-    _EFT* eft = (_EFT*)fn_800F8788(76);
+    _EFT* eft = (_EFT*)eft_res_slot_get(76);
     if (eft == 0) {
         return;
     }
@@ -408,9 +408,9 @@ extern "C" void fn_802F39DC(_ENEMY_WORK* self, u8 type)
     eft->type_0x02 = type;
     work->count_0x00 = 2;
     for (int i = 0; i < work->count_0x00; i++) {
-        work->models_0x04[i] = (MHchar*)fn_800F8914();
+        work->models_0x04[i] = (MHchar*)eft_res_model_get();
         if (work->models_0x04[i] == 0) {
-            fn_800F886C(eft);
+            eft_res_slot_release(eft);
             return;
         }
     }
@@ -419,7 +419,7 @@ extern "C" void fn_802F39DC(_ENEMY_WORK* self, u8 type)
     eft->rot_0x24.z = 0;
     eft->timer_0x0C = 0;
     eft->field_0x10 = 0;
-    fn_800F9DF4(eft, 1, 0);
+    eft_state_flags_set(eft, 1, 0);
     eft->field_0x03 = 34;
     eft->area_0x44 = self->field_0x016;
     eft->flag_0x01 = 1;
@@ -436,7 +436,7 @@ extern "C" void fn_802F3940(_EFT* self)
 /* Retires the record once the effect is over. */
 extern "C" void fn_802F3950(_EFT* self)
 {
-    fn_800F886C(self);
+    eft_res_slot_release(self);
 }
 
 /* Makes exactly one model of a joint range visible: `visible` is the joint the effect currently
@@ -490,7 +490,7 @@ extern "C" void fn_802F49C8(_EFT* self)
 /* Retires the tag-34 record once the effect is over. */
 extern "C" void fn_802F49D8(_EFT* self)
 {
-    fn_800F886C(self);
+    eft_res_slot_release(self);
 }
 
 /* Spawns the eft035 effect for a type-0/1/3 variant: builds the record, seeds the pool length from
@@ -501,7 +501,7 @@ void eft035_set(_ENEMY_WORK* self, u8 type, nw4r::math::VEC3* pos, _CP_VECTOR* r
     if (area != (u8)get_now_areano()) {
         return;
     }
-    _EFT* eft = (_EFT*)fn_800F8788(64);
+    _EFT* eft = (_EFT*)eft_res_slot_get(64);
     if (eft == 0) {
         return;
     }
@@ -512,9 +512,9 @@ void eft035_set(_ENEMY_WORK* self, u8 type, nw4r::math::VEC3* pos, _CP_VECTOR* r
     work->count_0x00 = 1;
     memset(&work->works_0x30[0][0], 0, sizeof(work->works_0x30));
     for (int i = 0; i < lbl_80792860[type]; i++) {
-        work->slots_0x08[i].model_0x0C = (MHchar*)fn_800F8914();
+        work->slots_0x08[i].model_0x0C = (MHchar*)eft_res_model_get();
         if (work->slots_0x08[i].model_0x0C == 0) {
-            fn_800F886C(eft);
+            eft_res_slot_release(eft);
             return;
         }
     }
@@ -527,7 +527,7 @@ void eft035_set(_ENEMY_WORK* self, u8 type, nw4r::math::VEC3* pos, _CP_VECTOR* r
     eft->rot_0x24.x = rot->x;
     eft->rot_0x24.y = rot->y;
     eft->area_0x44 = area;
-    fn_800F9DF4(eft, 0, 0);
+    eft_state_flags_set(eft, 0, 0);
     ((Eft035Work*)eft->work_0x38)->scale_0x04 = lbl_8079A9C8 * scale;
 }
 
@@ -539,7 +539,7 @@ void eft035_set2(_ENEMY_WORK* self, u8 type, nw4r::math::VEC3* pos, _CP_VECTOR* 
     if (area != (u8)get_now_areano()) {
         return;
     }
-    _EFT* eft = (_EFT*)fn_800F8788(56);
+    _EFT* eft = (_EFT*)eft_res_slot_get(56);
     if (eft == 0) {
         return;
     }
@@ -550,9 +550,9 @@ void eft035_set2(_ENEMY_WORK* self, u8 type, nw4r::math::VEC3* pos, _CP_VECTOR* 
     work->count_0x00 = lbl_80792860[type];
     memset(&work->works_0x20[0][0], 0, 24);
     for (int i = 0; i < work->count_0x00; i++) {
-        work->models_0x08[i] = (MHchar*)fn_800F8914();
+        work->models_0x08[i] = (MHchar*)eft_res_model_get();
         if (work->models_0x08[i] == 0) {
-            fn_800F886C(eft);
+            eft_res_slot_release(eft);
             return;
         }
     }
@@ -565,7 +565,7 @@ void eft035_set2(_ENEMY_WORK* self, u8 type, nw4r::math::VEC3* pos, _CP_VECTOR* 
     eft->rot_0x24.x = rot->x;
     eft->rot_0x24.y = rot->y;
     eft->area_0x44 = area;
-    fn_800F9DF4(eft, 0, 0);
+    eft_state_flags_set(eft, 0, 0);
     work->scale_0x04 = scale;
 }
 

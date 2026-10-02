@@ -7,7 +7,7 @@
  * `fn_80117018`/`fn_80117050`/`fn_80117074`/`fn_80117084`; inside state 0 and state 1 a second byte,
  * `job->kind_0x02`, selects a variant (`fn_80117088`/`fn_8011722C` for kind 0/1 in state 0,
  * `fn_80117120`/`fn_801173AC` for kind 0/1 in state 1).  This function is the kind-1 state-0 entry: it
- * takes one effect character out of the shared `eft_control` pool (`fn_800F8914`), creates the model
+ * takes one effect character out of the shared `eft_control` pool (`eft_res_model_get`), creates the model
  * for it, drops it at one of three fixed offsets picked at random (`lbl_805A0460`), zeroes its scale
  * and its position, randomises the three rotation angles and clears the three spin deltas.  The
  * kind-1 state-1 handler `fn_801173AC` is the one that then integrates those spin deltas into the
@@ -23,7 +23,7 @@
  *
  * Load-bearing source shapes (each measured; the wrong form costs real points):
  *   * `#pragma peephole off` is required for the pool-handle loop.  With the pass on MWCC forwards
- *     `work->chara[i] = fn_800F8914()` into the test, dropping the target's `lwz r0, 4(r30)` - 4 B
+ *     `work->chara[i] = eft_res_model_get()` into the test, dropping the target's `lwz r0, 4(r30)` - 4 B
  *     short, 96.41 %; the pragma keeps the reload (100 %).
  *   * the model id has to be the **ternary** `get_now_mapno() == 12 ? 24 : 23`, not the equivalent
  *     `(get_now_mapno() == 12) + 23`: both emit the same `cntlzw`/`srwi`/`addi`, but the addition
@@ -33,7 +33,7 @@
  * Types.  `EftJob` and `EftCharaWork` are reconstructed minimally (only the offsets this function
  * reads) and are this unit's own copies: the sibling kind-0 functions (`fn_80116EEC`, `fn_80117120`,
  * `fn_80117088`) view the very same `job->work_0x38` block as 32 `MHchar*` slots plus two `s16`
- * counters, so the block is really one allocation with two views.  `MHchar` is `fn_800F8914`'s
+ * counters, so the block is really one allocation with two views.  `MHchar` is `eft_res_model_get`'s
  * 0x168-byte `eft_control` slot (the pointer it returns is slot+4), and only the three fields this
  * function touches are named.  The 3-float vector is `Vec` from the shared `include/ef.h`, not a
  * fourth local `Vec3`.
@@ -44,26 +44,17 @@
  * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/8011722C_fn_8011722C.c`.
  */
 
+#include "ef/fn_80116FCC.h" /* fn_80116FCC (rule 2: the owner's header) */
+#include "ef/fn_80117074.h" /* fn_80117074 (rule 2: the owner's header) */
 #include "types.h"
 #include "ef.h"
+#include "pl.h"
 
 /* ---------------------------------------------------------------------------------------------------
  * the job record and its kind-1 work block
  * ------------------------------------------------------------------------------------------------- */
 
-/* The effect character `fn_800F8914` hands out: one 0x168-byte slot of the shared `eft_control` pool
- * (the pointer it returns is slot+4, so this is the object res_eft_model_create* fills in).
- * size: 0x110 - a lower bound, from the two fields res_eft_model_create_light writes (+0x35 and
- * +0x10C); everything past +0x35 is untouched here. */
-typedef struct MHchar {
-    /* +0x000 */ u8 unused_0x000[0x04];
-    /* +0x004 */ Vec pos_0x004;   /* the world position vec_to_mh_vec3 writes */
-    /* +0x010 */ u8 unused_0x010[0x1C - 0x10];
-    /* +0x01C */ Vec scale_0x01C; /* the scale setVector3 writes */
-    /* +0x028 */ u8 unused_0x028[0x35 - 0x28];
-    /* +0x035 */ u8 ready_0x035;   /* set by res_eft_model_create_light, cleared again here */
-    /* +0x036 */ u8 unused_0x036[0x110 - 0x36];
-} MHchar;
+/* `MHchar`, the effect character `eft_res_model_get` hands out (one 0x168-byte slot of the shared `eft_control` pool, the pointer is slot+4), comes from `pl.h` (rule 1: one definition). */
 
 /* The kind-1 view of the 0x84-byte work block `job->work_0x38` points at.  The kind-0 siblings
  * (fn_80116EEC/fn_80117120/fn_80117088) see the same block as 32 `MHchar*` slots at +0x00 followed
@@ -96,18 +87,16 @@ typedef struct EftJob {
     /* +0x3C */ u8 unused_0x3C[0x40 - 0x3C];
     /* +0x40 */ void (*callback_0x40)(struct EftJob* self);
 } EftJob;
+#define fn_80116FCC_c1 ((void (*)(EftJob*))fn_80116FCC)
+#define fn_80117074_c1 ((void (*)(EftJob*))fn_80117074)
 
 /* ---------------------------------------------------------------------------------------------------
  * externs - the callees and the shared pool
  * ------------------------------------------------------------------------------------------------- */
 
-extern MHchar* fn_800F8914(void);                 /* takes a free eft_control slot, returns its chara */
-/* fn_80116FCC / fn_80117074 are declared here rather than through `include/ef/fn_80114E34.h`: the
- * consumer stores them in a typed callback field (`void (*)(EftJob*)`), while the owner types the
- * parameter `_EFT*`, so a shared `void*` declaration breaks the function-pointer assignment.  Reported
- * as a rule-2 conflict (docs/plan.md 6.5). */
-extern void fn_80116FCC(EftJob* self);            /* the job's per-frame callback for the kind-1 work */
-extern void fn_80117074(EftJob* self);            /* advances the job's dispatch state */
+extern MHchar* eft_res_model_get(void);                 /* takes a free eft_control slot, returns its chara */
+/* fn_80116FCC / fn_80117074 come from their owner's leaf headers (`_EFT*` parameter); the consumer stores them in a typed
+ * callback field (`void (*)(EftJob*)`), so it reaches them through the `_c1` cast macros above. */
 extern BOOL res_eft_model_create__FP6MHcharUsUl(MHchar* chara, u16 model, u32 light);
 extern u16 ran_suu__Fl(long index);               /* pseudo-random u16 out of system_w[index] */
 extern u8 get_now_mapno__Fv(void);
@@ -135,24 +124,24 @@ void fn_8011722C(EftJob* self)
     s16 i;
 
     work = self->work_0x38;
-    self->callback_0x40 = fn_80116FCC;
+    self->callback_0x40 = fn_80116FCC_c1;
     work->count = 1;
     for (i = 0; i < work->count; i++) {
-        work->chara[i] = fn_800F8914();
+        work->chara[i] = eft_res_model_get();
         if (work->chara[i] == 0) {
-            fn_80117074(self);
+            fn_80117074_c1(self);
             return;
         }
     }
     if (!res_eft_model_create__FP6MHcharUsUl(work->chara[0],
                                              get_now_mapno__Fv() == 12 ? 24 : 23, 0)) {
-        fn_80117074(self);
+        fn_80117074_c1(self);
         return;
     }
-    work->chara[0]->ready_0x035 = 0;
-    vec_to_mh_vec3__FPQ34nw4r4math4VEC3P3Vec(&work->chara[0]->pos_0x004,
+    work->chara[0]->ready = 0;
+    vec_to_mh_vec3__FPQ34nw4r4math4VEC3P3Vec((Vec*)&work->chara[0]->pos_0x04,
                                             (Vec*)&lbl_805A0460[ran_suu__Fl(1) % 3]);
-    setVector3__FPQ34nw4r4math4VEC3fff(&work->chara[0]->scale_0x01C, lbl_80796A80, lbl_80796A80,
+    setVector3__FPQ34nw4r4math4VEC3fff((Vec*)&work->chara[0]->scale_0x1C, lbl_80796A80, lbl_80796A80,
                                        lbl_80796A80);
     work->pos.x = lbl_80796A84;
     work->pos.y = lbl_80796A84;

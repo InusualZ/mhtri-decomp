@@ -5,13 +5,13 @@
  * `state_0x05` the per-variant handler advances and a `type_0x02` selecting the variant body, and its
  * `EftWork` block holds the nw4r effect handle (`effect`), its colour and scale, the per-variant light
  * handles and the joint matrix.  The entry points are the spawn helpers (`eft_spawn_pos_in_area`, `fn_8010D608`,
- * `fn_8010D678`, `fn_8010D688`), which build the record through `fn_800F8788`/`fn_8010D70C` and install
+ * `fn_8010D678`, `fn_8010D688`), which build the record through `eft_res_slot_get`/`fn_8010D70C` and install
  * `fn_8010D3C4`/`fn_8010D8B0` as the update hook; the variants then create effects, lights and colours
  * through `res_eft_create`/`res_eft_model_create_light` and the `change_*_eff` helpers.  The day-cycle
  * interpolation in `fn_8010D1A8` scales the effect over the keyframe table `lbl_8059F530`.
  *
  * Source shapes worth keeping (each measured against the target):
- *   * `fn_8010D400` and the `fn_800F8788` handle store need `#pragma peephole off` (playbook 39) - the
+ *   * `fn_8010D400` and the `eft_res_slot_get` handle store need `#pragma peephole off` (playbook 39) - the
  *     pool-block store has to keep the target's reload; the pragma is scoped to that one function.
  *   * the colour split in `fn_8010D400` is written with explicit `(color & mask) >> shift` terms; the
  *     `(color >> shift) & 0xFF` form folds into one `rlwinm` and loses the target's three-instruction
@@ -47,6 +47,7 @@
  * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/8010D1A8_fn_8010D1A8.c`.
  */
 
+#include "ef/eft_state_flags_set.h" /* eft_state_flags_set (rule 2: the owner's header) */
 #include "types.h"
 #include "nw4r/math.h"
 #include "unsplit/g3d.h"
@@ -55,6 +56,8 @@
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
 #include "ef/pRoot.h"
+/* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
+#define eft_state_flags_set_c1 ((void (*)(Eft*, s32, s32))eft_state_flags_set)
 
 /* ---- math types ---- */
 /* `Vec3` (and the `VEC3`/`MTX34`/`Mtx34` spellings) come from `nw4r/math.h` - one definition, in the
@@ -224,9 +227,8 @@ typedef struct Plw {
 /* ---- externs ---- */
 extern u8 get_now_areano__Fv(void);
 extern u32 event_demo_ck__Fv(void);
-extern void* fn_800F8788(u32 size);
-extern void fn_800F886C(Eft* eft);
-extern void fn_800F9DF4(Eft* eft, s32 a, s32 b);
+extern void* eft_res_slot_get(u32 size);
+extern void eft_res_slot_release(Eft* eft);
 extern void push_eft_effect_heap_num__FPPQ34nw4r2ef6Effectl(void** effect, s32 n);
 extern void cpSetRotMatrix__FP10_CP_VECTORPQ34nw4r4math5MTX34(CPMtxVec* rot, Mtx34* mtx);
 extern void SetRootMtx__Q34nw4r2ef6EffectFRCQ34nw4r4math5MTX34(void* effect, Mtx34* mtx);
@@ -235,7 +237,7 @@ extern u32 get_stg_eft_col__FUcUc(u8 areano, u8 idx);
 extern void change_paramscale_eff__FPQ34nw4r2ef6Effectf(void* effect, f32 scale);
 extern s32 effect_move__FPQ34nw4r2ef6Effect(void* effect);
 extern void change_color_eff__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC38_GXColor(void* effect, Vec3* pos, u32* color);
-extern void fn_800F93D8(Eft* self, void* effect, s32 a, s32 b, s32 c);
+extern void eft_res_models_spawn(Eft* self, void* effect, s32 a, s32 b, s32 c);
 
 extern u16 lbl_8059F588[10];
 extern u16 lbl_8059F59C[10];
@@ -244,7 +246,7 @@ extern EftDayKey lbl_8059F530[];
 extern f32 lbl_80796838; /* -1.0f, the day-key terminator */
 extern f64 lbl_80796840; /* the int-to-double magic */
 
-extern EftLight* fn_800F8914(void);
+extern EftLight* eft_res_model_get(void);
 extern void fn_800F8A44(void* p, s32 n);
 extern u8 fn_800CF208(void);
 extern Eft* fn_8010D70C(Plw* source, s32 arg1, s32 arg2, s32 arg3);
@@ -324,7 +326,7 @@ f32 fn_8010D1A8(Eft* self, s32 arg1, f32 farg0)
 
 void fn_8010D2AC(Eft* self)
 {
-    fn_800F886C(self);
+    eft_res_slot_release(self);
 }
 
 void eft_spawn_pos_in_area(void* arg0, s8 arg1, s8 arg2, u32 arg3, f32 farg0)
@@ -333,7 +335,7 @@ void eft_spawn_pos_in_area(void* arg0, s8 arg1, s8 arg2, u32 arg3, f32 farg0)
     EftWork* work;
 
     if ((u8)arg1 == get_now_areano__Fv()) {
-        eft = fn_800F8788(0x10);
+        eft = eft_res_slot_get(0x10);
         if (eft != NULL) {
             work = eft->work_0x38;
             work->count = 1;
@@ -345,7 +347,7 @@ void eft_spawn_pos_in_area(void* arg0, s8 arg1, s8 arg2, u32 arg3, f32 farg0)
             eft->areano_0x44 = arg1;
             eft->cb_0x40 = fn_8010D388;
             eft->cb_0x34 = fn_8010D3C4;
-            fn_800F9DF4(eft, 0, 0);
+            eft_state_flags_set_c1(eft, 0, 0);
             if (event_demo_ck__Fv() == 1) {
                 eft->demo_flag_0x08 = 1;
             }
@@ -387,7 +389,7 @@ void fn_8010D5F4(Eft* self)
 
 void fn_8010D604(Eft* self)
 {
-    fn_800F886C(self);
+    eft_res_slot_release(self);
 }
 
 /* Creates the effect this state runs and orients it by the record's rotation and position. */
@@ -445,7 +447,7 @@ void fn_8010D50C(Eft* self)
     }
     color = work->color_0x08.rgba;
     change_color_eff__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC38_GXColor(work->effect, &self->pos_0x18, &color);
-    fn_800F93D8(self, &work->effect, 1, work->count, 0);
+    eft_res_models_spawn(self, &work->effect, 1, work->count, 0);
 }
 
 /* Spawns the sub-effect whose variant depends on the current game mode. */
@@ -478,7 +480,7 @@ void fn_8010D688(Plw* self)
         work->field_0x68 = self->field_0x60;
         work->field_0x6C = self->field_0x7C;
         fn_800E0A14(self->physics_0x13C + 4, 7, &work->body_0x34.matrix_0x34);
-        fn_800F9DF4(eft, 1, 4);
+        eft_state_flags_set_c1(eft, 1, 4);
     }
 }
 
@@ -540,7 +542,7 @@ Eft* fn_8010D70C(Plw* source, s32 arg1, s32 arg2, s32 arg3)
     EftWork* work;
     s32 i;
 
-    eft = fn_800F8788(0x70);
+    eft = eft_res_slot_get(0x70);
     if (eft == NULL) {
         return NULL;
     }
@@ -549,9 +551,9 @@ Eft* fn_8010D70C(Plw* source, s32 arg1, s32 arg2, s32 arg3)
     work = eft->work_0x38;
     work->count = (u8)arg3;
     for (i = 0; i < work->count; i++) {
-        work->slots_0x10.items.items_0x10[i] = fn_800F8914();
+        work->slots_0x10.items.items_0x10[i] = eft_res_model_get();
         if (work->slots_0x10.items.items_0x10[i] == 0) {
-            fn_800F886C(eft);
+            eft_res_slot_release(eft);
             return NULL;
         }
     }
@@ -559,7 +561,7 @@ Eft* fn_8010D70C(Plw* source, s32 arg1, s32 arg2, s32 arg3)
     eft->flag_0x01 = 1;
     eft->kind_0x03 = 0x12;
     eft->field_0x0C = 0;
-    fn_800F9DF4(eft, 1, 0);
+    eft_state_flags_set_c1(eft, 1, 0);
     switch ((u8)arg2) {
     case 0:
         eft->source_0x30 = source;
@@ -598,7 +600,7 @@ void fn_80111624(Eft* self)
 /* Drops the sub-effect record. */
 void fn_80111634(Eft* self)
 {
-    fn_800F886C(self);
+    eft_res_slot_release(self);
 }
 
 /* Shows only the numbered light of the first item. */
@@ -862,6 +864,6 @@ void fn_80111BC0(Eft* self, EftModel* model, u16 arg2)
             g3d_root_model_bind(pRoot, model->field_0x118);
         }
     } else {
-        fn_800F93D8(self, &work->slots_0x10.items.items_0x10[0], 2, 1, 0);
+        eft_res_models_spawn(self, &work->slots_0x10.items.items_0x10[0], 2, 1, 0);
     }
 }

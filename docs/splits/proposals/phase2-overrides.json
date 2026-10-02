@@ -1469,6 +1469,52 @@
    ],
    "note": "one run, one object (0x2EB8 B); the unit that reads it most and writes it takes it",
    "reproduce": "python tools/units/callers.py 0x806BF530"
+  },
+  {
+   "unit": "sound/quest_snd.cpp",
+   "section": ".bss",
+   "start": "0x806A1110",
+   "end": "0x806A1120",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window b units> --root . --base-snapshot <MAIN land-base orphans> --unit-rename <the manifest's pairs>",
+     "finding": "the data-closure row refuses lbl_806A1110 (referenced by quest_snd and snd_bank_loader): no claim covers the 0x10 bytes between snd_voice_pool's .bss (ends 0x806A1110) and snd_bank_loader's (starts 0x806A1120)"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x806A1110",
+     "finding": "address-taken at 0x800EEA08 (fn_800EE9EC, sound/quest_snd.cpp) and at 0x800EEB3C (fn_800EEAE0, sound/snd_bank_loader.cpp); no other reader"
+    }
+   ],
+   "note": "medium: by link order - quest_snd's text (0x800EE014) sits between snd_voice_pool's and snd_bank_loader's, quest_snd is the first reader in text order, and the 0x10 bytes lie exactly between the two neighbouring .bss claims",
+   "reproduce": "python tools/units/callers.py 0x806A1110"
+  },
+  {
+   "unit": "sound/quest_snd.cpp",
+   "section": ".sbss",
+   "start": "0x80794A20",
+   "end": "0x80794A24",
+   "action": "attach",
+   "grade": "medium",
+   "signal": "orchestrator",
+   "evidence": [
+    {
+     "tool": "datagap",
+     "command": "python tools/units/datagap.py --row <window b units> --root . --base-snapshot <MAIN land-base orphans> --unit-rename <the manifest's pairs>",
+     "finding": "the data-closure row refuses lbl_80794A20 (referenced by quest_snd and snd_bank_loader): no claim covers the 4 bytes between snd_stream_mgr's .sbss (ends 0x80794A20) and snd_bank_loader's (starts 0x80794A24)"
+    },
+    {
+     "tool": "callers",
+     "command": "python tools/units/callers.py 0x80794A20",
+     "finding": "read at 0x800EEA38 (fn_800EEA2C, sound/quest_snd.cpp), read and stored by fn_800EEAE0 (sound/snd_bank_loader.cpp), stored once at 0x8003F710 (main.cpp's fn_8003F620)"
+    }
+   ],
+   "note": "medium: by link order - the word lies exactly between the .sbss claims of the units before and after quest_snd's text; main.cpp stores it as an extern",
+   "reproduce": "python tools/units/callers.py 0x80794A20"
   }
  ]
 }

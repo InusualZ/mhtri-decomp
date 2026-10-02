@@ -15,7 +15,7 @@
  * unclaimed; no `.ctors` word belongs to the range (no auto-split object of it carries one).
  *
  * What it is.  `fn_80114A1C` is the family allocator: it rejects a foreign area, runs
- * `fn_800F8788(0x58)` for the 0x48-byte `_EFT` record plus its 0x58-byte work block at +0x38, stamps
+ * `eft_res_slot_get(0x58)` for the 0x48-byte `_EFT` record plus its 0x58-byte work block at +0x38, stamps
  * `field_0x03 = 19` (the eft019 family tag) and `type_0x02` with the caller's id, seeds the work
  * pool's capacity from the per-id count table `lbl_8059F670`, and installs the two hooks that travel
  * with the record - `fn_80112D1C` (the per-frame dispatcher, `dispatch_0x34`) and `fn_80112CE0` (the
@@ -25,7 +25,7 @@
  *
  * The state machine is `fn_80112D1C`: `state_0x05` 0 -> `fn_80112D58` (create the pooled effect
  * objects and place them), 1 -> `fn_8011392C` (the per-frame update), 2 -> `fn_8011484C` (advance the
- * state), 3 -> `fn_8011485C` (destroy the record through `fn_800F886C`).
+ * state), 3 -> `fn_8011485C` (destroy the record through `eft_res_slot_release`).
  *
  * Work block.  The effects go through one `res_eft_create(u16 id, u16 param, u32 mode)` pool whose
  * capacity is the id's `lbl_8059F670` entry (maximum 7) and whose used length is `live_0x3C` while
@@ -118,8 +118,8 @@ void fn_80050850(nw4r::math::VEC3* v, const nw4r::math::VEC3* in);
 void fn_800513F0(nw4r::math::VEC3* v, f32 angle);
 void fn_8005696C(s32 id, s32 kind, s32 mode, s32* color, s32 timer, f32 x, f32 y);
 void fn_80056A20(f32 a, f32 b);
-_EFT* fn_800F8788(u32 pool);
-void fn_800F886C(_EFT* self);
+_EFT* eft_res_slot_get(u32 pool);
+void eft_res_slot_release(_EFT* self);
 void fn_80306D6C(void* self, s32 a, void* b, void* c, u8 d, f32 e);
 u8 fn_80331210(void* self);
 void fn_800E0A14(void* chr, u32 joint, nw4r::math::MTX34* out);
@@ -166,16 +166,8 @@ struct _EFT019_SND_VTABLE {
     /* +0x0C */ void (*slot_0x0C)(_EFT019_SND_OBJ* self);
 }; /* size: 0x10 */
 
-/* The effect manager's control block `eft_control` (`.bss` 0x8062C000, 0xC44 B in `ef/effect.cpp`).
- * Only the +0x04 word this unit hands to `fn_800A4420` is named, but the type carries the record's
- * full size: MWCC picks sda21 addressing for a small extern it cannot see defined, and the record is
- * 0xC44 bytes (retail's `lis`/`addi` pair). size: 0xC44 */
-struct _EFT019_CTRL {
-    /* +0x00 */ u32 field_0x00;
-    /* +0x04 */ s32 field_0x04;
-    /* +0x08 */ u8 pad_0x08[0xC44 - 0x08];
-};
-extern _EFT019_CTRL eft_control;
+/* The effect manager's control block `eft_control` is the band's one record (`unsplit/ef_control.h`); this unit only hands its +0x04 word to `fn_800A4420`. */
+#include "unsplit/ef_control.h"
 
 /* `calcVecAngXY(VEC3*, u32*, u32*)` and `rotVecY(VEC3*, u32)` are map-mangled free functions with no
  * registered owner; declaring them at global scope reproduces their map spellings exactly. */
@@ -198,7 +190,7 @@ void* get_enemy_data(struct _ENEMY_WORK* enemy);
  * engine records
  * ------------------------------------------------------------------------------------------------- */
 
-/* The effect pool the eft019 record carries at `_EFT::work_0x38`.  The size is `fn_800F8788`'s
+/* The effect pool the eft019 record carries at `_EFT::work_0x38`.  The size is `eft_res_slot_get`'s
  * argument, 0x58.  `count` is how many effects the id asks for (`lbl_8059F670[type]`, whose maximum
  * entry is 7), `live_0x3C` how many the creation path has built so far - `fn_80112D58` copies it into
  * `count` when it runs out, `fn_8011392C` reaps over it.  The per-variant state the setters leave
@@ -1228,7 +1220,7 @@ void fn_8011484C(_EFT* self)
 
 void fn_8011485C(_EFT* self)
 {
-    fn_800F886C(self);
+    eft_res_slot_release(self);
 }
 
 /* ===================================================================================================
@@ -1239,7 +1231,7 @@ void fn_80114860(nw4r::math::VEC3* pos, u8 area)
 {
     _EFT* effect;
 
-    effect = fn_800F8788(0);
+    effect = eft_res_slot_get(0);
     if (effect != 0) {
         effect->field_0x03 = 19;
         effect->type_0x02 = 6;
@@ -1296,7 +1288,7 @@ _EFT* fn_80114A1C(nw4r::math::VEC3* pos, u8 area, u8 type)
     if (area != get_now_areano()) {
         return 0;
     }
-    effect = fn_800F8788(0x58);
+    effect = eft_res_slot_get(0x58);
     if (effect == 0) {
         return 0;
     }
@@ -1310,7 +1302,7 @@ _EFT* fn_80114A1C(nw4r::math::VEC3* pos, u8 area, u8 type)
     effect->type_0x02 = type;
     copyVec3(&effect->pos_0x18, pos);
     effect->area_0x44 = area;
-    fn_800F9DF4(effect, 0, 0);
+    eft_state_flags_set(effect, 0, 0);
     effect->release_0x40 = fn_80112CE0;
     effect->dispatch_0x34 = fn_80112D1C;
     effect->source_0x30 = 0;

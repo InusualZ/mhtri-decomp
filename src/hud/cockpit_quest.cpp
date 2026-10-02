@@ -236,14 +236,14 @@
  * was not.
  *
  * What it is.  `eft035_set`/`eft035_set2` are the spawn entry points of enemy effect 35: each
- * rejects a foreign area, takes a 64-byte (resp. 56-byte) work block from `fn_800F8788`, stamps
+ * rejects a foreign area, takes a 64-byte (resp. 56-byte) work block from `eft_res_slot_get`, stamps
  * `field_0x03 = 35`, `type_0x02`, the source `_ENEMY_WORK` at +0x30, the position, the two copied
  * rotation words and the area, then installs the two hooks that travel with the record -
  * `fn_802F24E0` (`release_0x40`, the pool release) and `fn_802F2640` (`dispatch_0x34`, the
  * `state_0x05` machine).  The two setters differ in their work block: the type-0/1/3 family pools
  * 20-byte model records at work+0x08 (`memset` of the 16-byte handle list at work+0x30), the
  * type-4..7 family pools 4-byte model handles at work+0x08 (`memset` of the 24-byte list at
- * work+0x20).  Both block sizes are pinned by the allocation (`fn_800F8788(64)` / `fn_800F8788(56)`
+ * work+0x20).  Both block sizes are pinned by the allocation (`eft_res_slot_get(64)` / `eft_res_slot_get(56)`
  * against the 0x40 / 0x38 the two layouts need).
  *
  * The state machine is `fn_802F2640`: `state_0x05` 0 -> the type switch

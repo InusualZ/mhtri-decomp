@@ -127,7 +127,7 @@ extern "C" void fn_802FA7F0(_ENEMY_WORK* work) {
 
 /* Releases the second shared resource. */
 extern "C" void fn_802FA800(_ENEMY_WORK* work) {
-    fn_800F886C(work);
+    eft_res_slot_release(work);
 }
 
 /* Sub-state dispatcher of the band's last action. */

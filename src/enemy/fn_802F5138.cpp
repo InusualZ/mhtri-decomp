@@ -71,6 +71,7 @@
  * Per-function measurements: `.pi/notes/802f5138-fn-802f5138-046c.md`.
  */
 
+#include "enemy/em_mot_finished_ck.h" /* em_mot_finished_ck (rule 2: the owner's header) */
 #include "types.h"
 #include "nw4r/math.h"
 #include "enemy/ENEMY_WORK.h"
@@ -85,6 +86,8 @@
 #include "unsplit/unknown.h"
 #include "lobby/fn_802FA9A0.h"
 #include "stage/stg_w.h"
+/* the call sites use the argument-less view: a cast call is the same direct call. */
+#define em_mot_finished_ck_c1 ((u32 (*)(void))em_mot_finished_ck)
 
 /* The band's pooled `.sdata2` constants (declared, never defined: the pool belongs to the data pass,
  * playbook 29). */
@@ -176,7 +179,7 @@ extern "C" s32 fn_802F5138(_ENEMY_WORK* work) {
         }
         return 0;
     default:
-        return fn_8012ECF0();
+        return em_mot_finished_ck_c1();
     }
 }
 

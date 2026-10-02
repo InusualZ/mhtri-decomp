@@ -15,7 +15,7 @@
  *   2. The dump's only real in-range name is `em_parts_damage_level_get`, i.e. a FUNCTION name, and
  *      the map already carries it - it names nothing about the file.
  *   3. What the code does: the whole range is the enemy module's effect-spawner band.  The head
- *      (0x8011D448..0x8011E530) allocates pooled `_EFT` records through `fn_800F8788` and installs
+ *      (0x8011D448..0x8011E530) allocates pooled `_EFT` records through `eft_res_slot_get` and installs
  *      `fn_8011D8C0`/`fn_8011D9B8`-style `.release`/`.dispatch` callbacks exactly like
  *      `ef/eft001.cpp`; `_ENEMY_WORK` is the spawning owner everywhere (`self->act_id`,
  *      `self->pos_0x1BC`, `get_em_scale`, `em_get_mot_no`), and the tail
@@ -66,7 +66,7 @@
  *   0x8011DE2C fn_8011DE2C 0x30 100.0   second family's release dispatcher
  *   0x8011E378 fn_8011E378 0x30 100.0   third family's per-frame dispatcher
  *   0x8011E51C fn_8011E51C 0x10 100.0   `state_0x05++` tail
- *   0x8011E52C fn_8011E52C 0x04 100.0   release tail -> fn_800F886C
+ *   0x8011E52C fn_8011E52C 0x04 100.0   release tail -> eft_res_slot_release
  *   0x8011E530 fn_8011E530 0xBC 100.0   place one pooled effect at the enemy's joint transform
  *   0x8011E5EC fn_8011E5EC 0x34 100.0   seed `bits_0x824` from the data record
  *   0x8011E620 fn_8011E620 0x10 100.0   set status bits
@@ -110,7 +110,7 @@
  *   - `event_demo_ck` and `get_em_scale` are declared at C++ scope (their objects reference
  *     `event_demo_ck__Fv` / `get_em_scale__FP11_ENEMY_WORK`); a declaration inside the `extern "C"`
  *     block below would emit the unmangled name and miss the relocation.
- *   - the family skeleton every creator shares: `get_now_areano() == act_id` guard, `fn_800F8788(size)`,
+ *   - the family skeleton every creator shares: `get_now_areano() == act_id` guard, `eft_res_slot_get(size)`,
  *     `field_0x03 = 0x1f`, `type_0x02 = type`, `release_0x40`, `dispatch_0x34`,
  *     `event_demo_ck() == 1 -> field_0x07 = 1` - the `ef/eft001.cpp` family shape.  A creator whose
  *     first argument is a bare type (`fn_8011D7B0`) is NOT an `_ENEMY_WORK` owner: it stores
@@ -314,7 +314,7 @@ extern "C" _EFT* fn_8011D558(_ENEMY_WORK* self, u32 type, u32 id0, u32 id1, f32 
         return NULL;
     }
 
-    effect = (_EFT*)fn_800F8788(0xA8);
+    effect = (_EFT*)eft_res_slot_get(0xA8);
     if (effect == NULL) {
         return NULL;
     }
@@ -331,7 +331,7 @@ extern "C" _EFT* fn_8011D558(_ENEMY_WORK* self, u32 type, u32 id0, u32 id1, f32 
     effect->source_0x30 = self;
     effect->area_0x44 = self->act_id;
     effect->rot_0x24 = self->pos_0x1BC;
-    fn_800F9DF4(effect, 0, 0);
+    eft_state_flags_set(effect, 0, 0);
     effect->demo_flag_0x08 = self->team;
     effect->release_0x40 = fn_8011D8C0;
     effect->dispatch_0x34 = fn_8011D9B8;
@@ -352,7 +352,7 @@ extern "C" void fn_8011D690(_ENEMY_WORK* self, u32 type, u32 id, f32 scale)
         return;
     }
 
-    effect = (_EFT*)fn_800F8788(0x20);
+    effect = (_EFT*)eft_res_slot_get(0x20);
     if (effect == NULL) {
         return;
     }
@@ -369,7 +369,7 @@ extern "C" void fn_8011D690(_ENEMY_WORK* self, u32 type, u32 id, f32 scale)
     effect->source_0x30 = self;
     effect->area_0x44 = self->act_id;
     effect->rot_0x24 = self->pos_0x1BC;
-    fn_800F9DF4(effect, 0, 0);
+    eft_state_flags_set(effect, 0, 0);
     effect->demo_flag_0x08 = self->team;
     if (event_demo_ck() == 1) {
         effect->field_0x07 = 1;
@@ -391,7 +391,7 @@ extern "C" void fn_8011D7B0(u32 type, const nw4r::math::VEC3* pos, const _CP_VEC
         return;
     }
 
-    effect = (_EFT*)fn_800F8788(0x20);
+    effect = (_EFT*)eft_res_slot_get(0x20);
     if (effect == NULL) {
         return;
     }
@@ -407,7 +407,7 @@ extern "C" void fn_8011D7B0(u32 type, const nw4r::math::VEC3* pos, const _CP_VEC
     effect->rot_0x24 = *rot;
     copyVec3(&effect->pos_0x18, pos);
     effect->timer_0x0C = 0;
-    fn_800F9DF4(effect, 0, 0);
+    eft_state_flags_set(effect, 0, 0);
     effect->demo_flag_0x08 = demo;
     if (event_demo_ck() == 1) {
         effect->field_0x07 = 1;
@@ -517,7 +517,7 @@ extern "C" void fn_8011E51C(_EFT* self)
 /* 0x8011E52C - the terminal release: hand the whole pooled record back. */
 extern "C" void fn_8011E52C(_EFT* self)
 {
-    fn_800F886C(self);
+    eft_res_slot_release(self);
 }
 
 /* 0x8011E530 - place `effect` at the enemy's `part` joint: build the rotation matrix from the

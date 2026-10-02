@@ -25,7 +25,7 @@ extern "C" {
 #endif
 
 /* ORs the two flag bytes into the effect state's `flags_0x04` (the pool's per-effect state updater). */
-void fn_800F9DF4(struct _EFT* self, u8 a, u8 b);
+void eft_state_flags_set(struct _EFT* self, u8 a, u8 b);
 
 /* Calls vtable slot 6 of the pooled effect with `flag != 0` (its retire/flag hook). */
 void fn_800F996C(nw4r::ef::Effect* effect, u32 arg);

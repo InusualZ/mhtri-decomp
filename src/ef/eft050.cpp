@@ -32,9 +32,9 @@
  * `Pl_master_ck`.  The rest is the `eft050` family: `eft050_set` pools the effect record, installs its
  * `release_0x40`/`dispatch_0x34` hooks (`fn_8034305C`, `fn_803430F4`) and its 100-byte work block, and
  * `fn_8033FDA8` is the second spawn entry the hold band calls.  Each spawner stamps `_EFT::type_0x02`,
- * the hooks and `_EFT::area_0x44`, seeds the pooled model handle (`fn_800F8914`) and installs the
+ * the hooks and `_EFT::area_0x44`, seeds the pooled model handle (`eft_res_model_get`) and installs the
  * `state_0x05` machine, whose arms are the model-create pass (`res_eft_model_create`), the alive body,
- * the state advance and the pool release (`fn_800F886C`).
+ * the state advance and the pool release (`eft_res_slot_release`).
  *
  * Seam (unproven, as the brief says).  This is one maximal unclaimed run.  `python
  * tools/splits/tudiscover.py at 0x8033F270` must-links only `fn_8033F270` and offers weak left
@@ -199,7 +199,7 @@ typedef struct Eft051Work {
 } Eft051Work;
 
 /* The block `eft050_set` pools for the family `fn_803430F4` drives: a word count at +0x00, the four
- * pooled handles at +0x04, the extra record the fourth `fn_800F8914` hands back at +0x14 and the
+ * pooled handles at +0x04, the extra record the fourth `eft_res_model_get` hands back at +0x14 and the
  * eight-byte run the spawner zeroes at +0x1C. size: 0x24 (the bytes this spawner writes) */
 typedef struct Eft050SetWork {
     /* +0x00 */ s32 count_0x00;
@@ -522,13 +522,13 @@ extern "C" void fn_8033FEE8(_EFT* self)
 
 /* Spawns the family's effect for one area: rejects a foreign area, pools the record and its work
  * block, seeds the model handle, stamps the type/area and the two hooks, then installs the state
- * machine through `fn_800F9DF4`. */
+ * machine through `eft_state_flags_set`. */
 extern "C" void fn_8033FDA8(u8 type, VEC3* pos, f32 scale, f32 scale2, u32 param, u8 area)
 {
     if ((u8)get_now_areano() != (u8)area) {
         return;
     }
-    _EFT* eft = (_EFT*)fn_800F8788(0x64);
+    _EFT* eft = (_EFT*)eft_res_slot_get(0x64);
     if (eft == NULL) {
         return;
     }
@@ -540,9 +540,9 @@ extern "C" void fn_8033FDA8(u8 type, VEC3* pos, f32 scale, f32 scale2, u32 param
     s32 i = 0;
     MHchar** p = work->models_0x00;
     while (i < work->count_0x04) {
-        *p = (MHchar*)fn_800F8914();
+        *p = (MHchar*)eft_res_model_get();
         if (*p == NULL) {
-            fn_800F886C(eft);
+            eft_res_slot_release(eft);
             return;
         }
         p++;
@@ -559,7 +559,7 @@ extern "C" void fn_8033FDA8(u8 type, VEC3* pos, f32 scale, f32 scale2, u32 param
     eft->field_0x03 = 0x30;
     eft->area_0x44 = area;
     eft->flag_0x01 = 1;
-    fn_800F9DF4(eft, 0, 0);
+    eft_state_flags_set(eft, 0, 0);
 }
 
 /* The state machine of the effect `fn_8033FDA8` spawns: 0 the model-create pass, 1 the alive body, 2
@@ -604,7 +604,7 @@ extern "C" void fn_803401B8(_EFT* self)
 /* State 3 of the family's state machine: releases the pooled effect record. */
 extern "C" void fn_803401C8(_EFT* self)
 {
-    fn_800F886C(self);
+    eft_res_slot_release(self);
 }
 
 /* Addresses one 0x14-byte slot of the table by its signed index. */
@@ -719,7 +719,7 @@ extern "C" void fn_80342E80(_EFT* self)
     }
     for (s32 i = 0; i < work->count_0x00; i++) {
         work->models_0x04[i]->move(0);
-        fn_800F93D8(self, (void**)&work->models_0x04[i], 2, 1, NULL);
+        eft_res_models_spawn(self, (void**)&work->models_0x04[i], 2, 1, NULL);
     }
 }
 
@@ -732,7 +732,7 @@ extern "C" void fn_80342F20(_EFT* self)
 /* State 3 of the second family's state machine: releases the pooled effect record. */
 extern "C" void fn_80342F30(_EFT* self)
 {
-    fn_800F886C(self);
+    eft_res_slot_release(self);
 }
 
 /* Releases the `eft050` family's pools: every model handle one at a time, the two `_g3d_work`
@@ -755,7 +755,7 @@ extern "C" void fn_8034305C(_EFT* self)
  * the fourth pool call hands back, and the position/source/area seeds. */
 void eft050_set(_PLW* plw, nw4r::math::VEC3* pos, u8 flag)
 {
-    _EFT* eft = (_EFT*)fn_800F8788(0x2C);
+    _EFT* eft = (_EFT*)eft_res_slot_get(0x2C);
     if (eft == NULL) {
         return;
     }
@@ -767,22 +767,22 @@ void eft050_set(_PLW* plw, nw4r::math::VEC3* pos, u8 flag)
     s32 i = 0;
     MHchar** p = work->models_0x04;
     while (i < work->count_0x00) {
-        *p = (MHchar*)fn_800F8914();
+        *p = (MHchar*)eft_res_model_get();
         if (*p == NULL) {
-            fn_800F886C(eft);
+            eft_res_slot_release(eft);
             return;
         }
         p++;
         i++;
     }
-    work->extra_0x14 = fn_800F8914();
+    work->extra_0x14 = eft_res_model_get();
     if (work->extra_0x14 == NULL) {
-        fn_800F886C(eft);
+        eft_res_slot_release(eft);
         return;
     }
     memset(work->works_0x1C, 0, 8);
     eft->field_0x03 = 0x32;
-    fn_800F9DF4(eft, 1, 0);
+    eft_state_flags_set(eft, 1, 0);
     copyVec3(&eft->pos_0x18, pos);
     eft->area_0x44 = flag;
     eft->source_0x30 = plw;

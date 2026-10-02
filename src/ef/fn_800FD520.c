@@ -45,6 +45,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "ef.h"
 #include "ef/fn_800FD718.h"
 #include "unsplit/sound.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
@@ -61,32 +62,7 @@
  * the 0x48-byte effect record and its pool block
  * ------------------------------------------------------------------------------------------------- */
 
-struct _EFT_WORK;
-
-/* The effect object `fn_800F8788(16)` hands out and `fn_800FD4E4` dispatches. size: 0x48 */
-struct _EFT {
-    /* +0x00 */ u8 unused_0x00;
-    /* +0x01 */ u8 flag_0x01;   /* 1 while the effect is live, 0 when it has been dropped */
-    /* +0x02 */ u8 type_0x02;   /* the effect type the pool tables are indexed by */
-    /* +0x03 */ u8 unused_0x03;
-    /* +0x04 */ u8 unused_0x04;
-    /* +0x05 */ u8 state_0x05;  /* the `fn_800FD4E4` state index this handler advances */
-    /* +0x06 */ u8 unused_0x06[0x18 - 0x06];
-    /* +0x18 */ VEC3 pos_0x18;  /* the world position handed to SetRootMtxTrans */
-    /* +0x24 */ u8 unused_0x24[0x30 - 0x24];
-    /* +0x30 */ void* source_0x30; /* the actor the effect was spawned for (a `_PLW*` for type 0) */
-    /* +0x34 */ u8 unused_0x34[0x38 - 0x34];
-    /* +0x38 */ struct _EFT_WORK* work_0x38;
-};
-
-/* The pool block `fn_800F8788` attaches: the effect handle, its scale and its parameter id.
- * size: 0x10 - lower bound, an approximation (the pool block the handlers walk). */
-struct _EFT_WORK {
-    /* +0x00 */ s32 count;
-    /* +0x04 */ void* effect;
-    /* +0x08 */ f32 scale;
-    /* +0x0C */ u32 param_id;  /* the joint index the query is made with */
-};
+/* `_EFT` (the effect object `eft_res_slot_get(16)` hands out and `fn_800FD4E4` dispatches) and `_EFT_WORK` (the pool block it attaches) come from `ef.h` (rule 1: one definition). */
 
 /* `_PLW`, the player work record, comes from `Pl/plw.h` - one definition, in the owner's header (rule 1). */
 
@@ -103,7 +79,7 @@ struct _EfPlBody {
 
       /* a `blr` stub in the DOL: a no-op, but the call is in the bytes */
      /* likewise */
-extern u32 fn_800F92F4(struct _EFT* self, u32 mode);
+extern u32 eft_res_spawn_gate_ck(struct _EFT* self, u32 mode);
 /* fn_800FD718 / fn_800FD860 come from their owner's header (rule 2). */
 
 extern void* res_eft_create__FUsUsUl(u16 id, u16 param, u32 idx);
@@ -155,7 +131,7 @@ void fn_800FD520(struct _EFT* self)
     }
     if (self->type_0x02 == 0) {
         source = self->source_0x30;
-        if (fn_800F92F4(self, 0) == 0) {
+        if (eft_res_spawn_gate_ck(self, 0) == 0) {
             self->flag_0x01 = 0;
             self->state_0x05 = 3;
             return;

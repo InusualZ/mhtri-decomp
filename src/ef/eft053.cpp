@@ -36,7 +36,7 @@
  *     record is in one of the four act states this family reacts to (`_ck` is `eft052`'s predicate
  *     suffix - `eft052_part_damage_ck`, `eft052_page_count_ck`).
  *   * `eft053_set` (0x80366FE4) - the family's creation entry, the shape `ef/eft050.cpp`'s
- *     `eft050_set` documents: pool the 0x7C record with `fn_800F8788(0x7C)`, install the `+0x40`
+ *     `eft050_set` documents: pool the 0x7C record with `eft_res_slot_get(0x7C)`, install the `+0x40`
  *     hook, take the model list, allocate one handle per slot, install the `+0x34` hook, record the
  *     area and seed the family tag.  No arguments, so it is the bank's plain entry rather than
  *     `eft050_set`'s placed one.
@@ -99,7 +99,7 @@
  * declaration of one of this range's five still-unwritten bodies (0x80367124, 0x80367760, 0x80368374,
  * 0x8036928C, 0x80369D50; `python tools/symbols/dumpmap.py lookup <addr>` answers the dump's
  * `zz_XXXXXXXX_` placeholder for each, so no name is derivable yet) or a call to a callee ANOTHER unit
- * owns (`fn_800F8788`, `VEC3_ctor`, ...).  Every symbol this file DEFINES is named above; the two
+ * owns (`eft_res_slot_get`, `VEC3_ctor`, ...).  Every symbol this file DEFINES is named above; the two
  * runtime-dump spellings (`eft053_get_shell_data`, `eft053_get_model_ang`) are the dump's own.
  */
 #include "types.h"
@@ -114,8 +114,8 @@
 #include "ef/eft053.h"         /* this unit's header (the helpers whose owner header cannot carry them) */
 #include "unsplit/unknown.h"
 #include "enemy/em_pop.h"   /* the band's unnamed callees */
-#include "ef/eft_res.h"        /* fn_800F8788/fn_800F8914/fn_800F8A44 (the effect pool) */
-#include "ef/effect.h"         /* fn_800F9DF4 (the effect's two state bytes) */
+#include "ef/eft_res.h"        /* eft_res_slot_get/eft_res_model_get/fn_800F8A44 (the effect pool) */
+#include "ef/effect.h"         /* eft_state_flags_set (the effect's two state bytes) */
 #include "ef/eft019.h"         /* eft019_set_core (the family's shared placement entry) */
 #include "draw_shape.h"        /* fn_80056A84 (the shape request the state machine fires) */
 #include "sound/fn_800DD1F0.h" /* map_se_req (the map SE the same state fires) */
@@ -438,7 +438,7 @@ extern "C" void eft053_set(void)
     Eft053Work* work;
     s32 i;
 
-    eft = (_EFT*)fn_800F8788(0x7C);
+    eft = (_EFT*)eft_res_slot_get(0x7C);
     if (eft == 0) {
         return;
     }
@@ -449,9 +449,9 @@ extern "C" void eft053_set(void)
         return;
     }
     for (i = 0; i < work->count; i++) {
-        work->models[i] = (MHchar*)fn_800F8914();
+        work->models[i] = (MHchar*)eft_res_model_get();
         if (work->models[i] == 0) {
-            fn_800F886C(eft);
+            eft_res_slot_release(eft);
             return;
         }
     }
@@ -459,7 +459,7 @@ extern "C" void eft053_set(void)
     eft->dispatch_0x34 = eft053_dispatch;
     eft->area_0x44 = get_now_areano();
     eft->field_0x03 = 53;
-    fn_800F9DF4(eft, 8, 0);
+    eft_state_flags_set(eft, 8, 0);
 }
 
 /* Step one slot of the family's state machine: the area picks the position the step works at, the

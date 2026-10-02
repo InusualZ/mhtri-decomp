@@ -39,7 +39,7 @@
  * first `extabindex` record of the next unit, so 20 records stay here and 20 is exactly the count
  * this range's framed functions need.
  *
- * Types.  `_EFT` (include/ef.h) is the 0x48-byte record `fn_800F8788` pools; its `work_0x38` is the
+ * Types.  `_EFT` (include/ef.h) is the 0x48-byte record `eft_res_slot_get` pools; its `work_0x38` is the
  * 64-byte per-effect work area `fn_800F8B44` hands out.  The work area's head is the same everywhere
  * (a model count, the pooled `MHchar` handle, the `res_eft_*_model_create` result), but its tail is
  * per family: effect 41 (and effect 42's kind-0 bodies) read four `_g3d_work` handles at +0x0C, effect
@@ -145,7 +145,7 @@
  * (rule 5: each member names the site that uses it, and both keep the +0x04 offset).
  * size: 0x08 */
 typedef struct Eft042Model {
-    MHchar* model;      /* +0x00  `fn_800F8914`'s pooled model handle */
+    MHchar* model;      /* +0x00  `eft_res_model_get`'s pooled model handle */
     union {
         void* created;  /* +0x04  the `res_eft_UV_model_create*` result (effect 41, kind 0) */
         f32   scale;    /* +0x04  the model's uniform scale (kind-2 bodies) */
@@ -278,7 +278,7 @@ extern "C" void rotLocalMatY(u32 angle, nw4r::math::MTX34* mtx);
 extern "C" void rotLocalMatX(u32 angle, nw4r::math::MTX34* mtx);
 extern "C" void sysSE_req(s32 id);
 
-/* `fn_800F8788`'s working area (64 bytes per record) and the model pool are the resource manager's;
+/* `eft_res_slot_get`'s working area (64 bytes per record) and the model pool are the resource manager's;
  * the two entry points here are the ones this unit pools from. */
 
 /* ---------------------------------------------------------------------------------------------------
@@ -342,7 +342,7 @@ extern "C" void fn_8030681C(_EFT* self)
             } else {
                 model->model->move(0);
                 ((EftUvModel*)model->v_0x04.created)->vtbl->retire_0x24(model->v_0x04.created);
-                fn_800F93D8(self, (void**)&work->models[i], 2, 1, NULL);
+                eft_res_models_spawn(self, (void**)&work->models[i], 2, 1, NULL);
             }
             break;
         }
@@ -372,7 +372,7 @@ extern "C" void fn_80306A84(_EFT* self)
 /* The machine's state-3 step (and every failure path): retire the effect. */
 extern "C" void fn_80306A94(_EFT* self)
 {
-    fn_800F886C(self);
+    eft_res_slot_release(self);
 }
 
 /* ---------------------------------------------------------------------------------------------------
@@ -438,7 +438,7 @@ extern "C" _EFT* fn_80306BFC(u8 type, u8 area)
     if (area != get_now_areano()) {
         return NULL;
     }
-    eft = (_EFT*)fn_800F8788(28);
+    eft = (_EFT*)eft_res_slot_get(28);
     if (eft == NULL) {
         return NULL;
     }
@@ -453,9 +453,9 @@ extern "C" _EFT* fn_80306BFC(u8 type, u8 area)
 
     handles = &work->models[0].model;
     for (i = 0; i < work->count; i++) {
-        handles[i] = (MHchar*)fn_800F8914();
+        handles[i] = (MHchar*)eft_res_model_get();
         if (handles[i] == NULL) {
-            fn_800F886C(eft);
+            eft_res_slot_release(eft);
             return NULL;
         }
     }
@@ -464,7 +464,7 @@ extern "C" _EFT* fn_80306BFC(u8 type, u8 area)
     eft->area_0x44 = area;
     eft->flag_0x01 = 1;
     eft->field_0x10 = 0;
-    fn_800F9DF4(eft, 0, 0);
+    eft_state_flags_set(eft, 0, 0);
 
     return eft;
 }
@@ -498,7 +498,7 @@ extern "C" void fn_80306D6C(void* source, u8 type, nw4r::math::VEC3* pos, _CP_VE
 }
 
 /* The second effect-42 creator: the same pooling as `fn_80306BFC`, but the record is stamped with the
- * type it was asked for (not the work area's), its `field_0x04` word is the `fn_800F9DF4` mask 4, and
+ * type it was asked for (not the work area's), its `field_0x04` word is the `eft_state_flags_set` mask 4, and
  * the two hooks are installed after that call. */
 extern "C" _EFT* fn_80306E04(u8 type, u8 area)
 {
@@ -510,7 +510,7 @@ extern "C" _EFT* fn_80306E04(u8 type, u8 area)
     if (area != get_now_areano()) {
         return NULL;
     }
-    eft = (_EFT*)fn_800F8788(28);
+    eft = (_EFT*)eft_res_slot_get(28);
     if (eft == NULL) {
         return NULL;
     }
@@ -520,9 +520,9 @@ extern "C" _EFT* fn_80306E04(u8 type, u8 area)
 
     handles = &work->models[0].model;
     for (i = 0; i < work->count; i++) {
-        handles[i] = (MHchar*)fn_800F8914();
+        handles[i] = (MHchar*)eft_res_model_get();
         if (handles[i] == NULL) {
-            fn_800F886C(eft);
+            eft_res_slot_release(eft);
             return NULL;
         }
     }
@@ -533,7 +533,7 @@ extern "C" _EFT* fn_80306E04(u8 type, u8 area)
     eft->area_0x44 = area;
     eft->flag_0x01 = 1;
     eft->timer_0x0C = 0;
-    fn_800F9DF4(eft, 0, 4);
+    eft_state_flags_set(eft, 0, 4);
 
     eft->release_0x40 = fn_80306F10;
     eft->dispatch_0x34 = fn_80306FF0;
@@ -642,7 +642,7 @@ extern "C" void fn_80307E08(_EFT* self)
 /* The state-3 arm: retire the effect record. */
 extern "C" void fn_80308E34(_EFT* self)
 {
-    fn_800F886C(self);
+    eft_res_slot_release(self);
 }
 
 /* Makes exactly one joint of the work area's model visible and hides every joint in `[from, to]` -
@@ -707,7 +707,7 @@ extern "C" void fn_80307AE8(_EFT* self)
         fn_80308E34(self);
         return;
     }
-    if (fn_800F92F4(self, 0) == 0) {
+    if (eft_res_spawn_gate_ck(self, 0) == 0) {
         self->flag_0x01 = 0;
         self->state_0x05 = 3;
         return;
@@ -799,7 +799,7 @@ extern "C" void fn_803088FC(_EFT* self)
     VEC3_ctor(&pos);
     MTX34_ctor(&mtx);
 
-    if (fn_800F92F4(self, 0) == 0) {
+    if (eft_res_spawn_gate_ck(self, 0) == 0) {
         self->flag_0x01 = 0;
         self->state_0x05++;
     } else if (self->pos_0x18.z < work->field_0x60 || --self->timer_0x0C < 0) {
@@ -814,7 +814,7 @@ extern "C" void fn_803088FC(_EFT* self)
         rotLocalMatX(self->rot_0x24.x, &mtx);
         fn_800FBB90(&mtx, &self->pos_0x18);
         work->model->move2(&mtx, 0);
-        fn_800F93D8(self, (void**)&work->model, 2, work->count, NULL);
+        eft_res_models_spawn(self, (void**)&work->model, 2, work->count, NULL);
     }
 }
 
@@ -841,7 +841,7 @@ extern "C" void fn_80308D00(_EFT* self)
         eft_rot_vec_copy(&work->model->rot_0x54, (_CP_VECTOR*)&source->field_0x1BC);
         work->model->setMatColor(0, GX_COLOR0A0, work->v_0x0C.color, false);
         work->model->move(0);
-        fn_800F93D8(self, (void**)&work->model, 2, work->count, NULL);
+        eft_res_models_spawn(self, (void**)&work->model, 2, work->count, NULL);
     } else {
         self->state_0x05++;
     }

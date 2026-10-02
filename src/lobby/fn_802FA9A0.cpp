@@ -225,7 +225,7 @@ u8 fn_802FBA60(void) {
 
 /* Forwards to the effect-model release helper. */
 void fn_802FBE40(void* self) {
-    fn_800F886C(self);
+    eft_res_slot_release(self);
 }
 
 /* Clears the five event-state bytes at +0x328 of the whale-event work. */

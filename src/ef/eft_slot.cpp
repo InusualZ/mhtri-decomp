@@ -73,7 +73,7 @@
  *
  * Naming note: the 34 symbols this file defines are named above, so the escape covers only the
  * names it REFERENCES - this range's own still-unwritten entries (`fn_803432B4`, `fn_80345A2C`) and
- * eight callees other units own (`fn_800F886C`, `fn_80125FF0`, `fn_8012A9E8`, `fn_8012D1A8`,
+ * eight callees other units own (`eft_res_slot_release`, `fn_80125FF0`, `fn_8012A9E8`, `fn_8012D1A8`,
  * `fn_80143BF8`, `eft_net_send`, `isServerSelectState`, `isReadyCountOne`).
  *
  * SEAM (UNPROVEN - not settled; the merger round re-checked it from the DOL and left it that way).  The
@@ -199,6 +199,7 @@
  * where the next pass should start - `fn_80344658` is the shared distance sort they call.
  */
 
+#include "enemy/lbl_806A54E0.h" /* lbl_806A54E0 (rule 2: the owner's header) */
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef.h"
@@ -288,10 +289,9 @@ extern "C" EftDef* lbl_805E9168[9] = {
     &lbl_805E7FD8,
 };
 /* The 128-entry record array `eft_slot_spawn_targets`/`eft_slot_match_count` walk. */
-extern "C" EftTargetRecord lbl_806A54E0[128];
 extern "C" f32 lbl_8079B350;
 extern "C" void eft_state_advance(_EFT* self);  /* `_EFT::state_0x05++` - the dispatcher's advance arm */
-extern "C" void eft_instance_release(_EFT* self);  /* hands the instance to `fn_800F886C`, the shared release path */
+extern "C" void eft_instance_release(_EFT* self);  /* hands the instance to `eft_res_slot_release`, the shared release path */
 extern "C" void eft_slot_clear(u8 index);  /* zeroes one pool entry's key byte and stamps its +0x14 byte 255 */
 extern "C" void eft_slot_pool_clear(void);  /* the 10-iteration loop over `eft_slot_clear` */
 extern "C" u8 eft_slot_find_free(void);  /* first entry whose `key_0x00` is zero, 255 when the pool is full */
@@ -333,7 +333,7 @@ extern "C" void eft_state_advance(_EFT* self) {
 
 /* Hands the instance to the shared effect release path. */
 extern "C" void eft_instance_release(_EFT* self) {
-    fn_800F886C(self);
+    eft_res_slot_release(self);
 }
 
 /* Resets one slot of the 0x3C-byte slot pool: cleared, with its +0x14 byte stamped 255. */
@@ -511,7 +511,7 @@ extern "C" EftSlot* eft_slot_spawn(u8 key1, u8 key0, u8 index) {
 /* Spawns the live slots of every enemy work record, then of the 128-entry record array. */
 extern "C" void eft_slot_spawn_targets(void) {
     _ENEMY_WORK* work = (_ENEMY_WORK*)get_move_work_adrs(3);
-    EftTargetRecord* record = lbl_806A54E0;
+    EftTargetRecord* record = (EftTargetRecord*)lbl_806A54E0;
     u16 count = get_move_work_max(3);
     s32 i;
 
@@ -677,7 +677,7 @@ extern "C" u32 eft_target_match_ck(EftSlot* slot, EftTargetRecord* record) {
 extern "C" void eft_slot_match_count(EftSlot* slot) {
     _ENEMY_WORK* work = (_ENEMY_WORK*)get_move_work_adrs(3);
     u16 count = get_move_work_max(3);
-    EftTargetRecord* record = lbl_806A54E0;
+    EftTargetRecord* record = (EftTargetRecord*)lbl_806A54E0;
     u8 i;
 
     slot->field_0x0D = 0;
@@ -772,7 +772,7 @@ extern "C" u32 eft_slot_area_ck(EftSlot* slot) {
         }
     }
     {
-        EftTargetRecord* record = lbl_806A54E0;
+        EftTargetRecord* record = (EftTargetRecord*)lbl_806A54E0;
         s32 j;
 
         for (j = 0; j < 128; j++, record++) {

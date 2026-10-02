@@ -13,7 +13,7 @@
  *   fn_80103D28 (0x494)  per-frame handler, shared joint matrix, type switch on `type_0x02`
  *   fn_801041BC (0x6E4)  per-frame handler, joint matrix/pos, colour switch, `effect_move` liveness
  *   fn_801048A0 (0x10)   `state_0x05++`
- *   fn_801048B0 (0x04)   destroys the effect object (`fn_800F886C`)
+ *   fn_801048B0 (0x04)   destroys the effect object (`eft_res_slot_release`)
  *   eft009_spawn_at_joint (0x98)   setter: single effect, re-scaled by `get_em_chg_scale`
  *   eft009_set_pos (0x84) setter: position + rotation vector, no scale
  *   fn_801049D0 (0x98)   setter: as eft009_spawn_at_joint plus `copyVec3`
@@ -58,6 +58,7 @@
  * `MTX34` comes from `include/nw4r/math.h` (landed with the `auto/800FF8D4` batch).
  */
 
+#include "ef/eft_state_flags_set.h" /* eft_state_flags_set (rule 2: the owner's header) */
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef/cp_vector.h"
@@ -68,6 +69,8 @@
 #include "unsplit/ef.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+/* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
+#define eft_state_flags_set_c1 ((void (*)(_EFT*, u8, u8))eft_state_flags_set)
 
 /* ---------------------------------------------------------------------------------------------------
  * engine types the mangled callees encode
@@ -85,7 +88,7 @@ struct _se_w;
 namespace nw4r {
 namespace ef {
 
-/* The pooled effect object `fn_800F8788` hands out. Only ever reached through a pointer here. */
+/* The pooled effect object `eft_res_slot_get` hands out. Only ever reached through a pointer here. */
 /* size: 0x04 - lower bound, an approximation (opaque here; only reached through a pointer) */
 struct Effect {
     void SetRootMtx(const nw4r::math::MTX34& mtx);
@@ -142,7 +145,7 @@ union _EFTWork {
     /* +0x00 */ _EFT_SCALE_WORK* scale;
 };
 
-/* The pooled effect object `fn_800F8788` hands out and `fn_800F886C` destroys. size: 0x48 */
+/* The pooled effect object `eft_res_slot_get` hands out and `eft_res_slot_release` destroys. size: 0x48 */
 struct _EFT {
     /* +0x00 */ u8 unused_0x00;
     /* +0x01 */ u8 flag_0x01;    /* alive flag; the handlers clear it on death */
@@ -171,10 +174,9 @@ struct _EFT {
  * ------------------------------------------------------------------------------------------------- */
 
 extern "C" void addVec3To(nw4r::math::VEC3* out, nw4r::math::VEC3* in);
-extern "C" void fn_800F886C(void* self);
-extern "C" void fn_800F93D8(void* self, void* list, u32 mode, s32 count, u32 arg);
-extern "C" void fn_800F9DF4(_EFT* self, u8 a, u8 b);
-extern "C" _EFT* fn_800F8788(u32 pool_id);
+extern "C" void eft_res_slot_release(void* self);
+extern "C" void eft_res_models_spawn(void* self, void* list, u32 mode, s32 count, u32 arg);
+extern "C" _EFT* eft_res_slot_get(u32 pool_id);
 extern "C" void fn_800FBB90(nw4r::math::MTX34* mtx, nw4r::math::VEC3* pos);
 extern "C" void mtx34_trans_get(nw4r::math::MTX34* mtx, void* vec);
 /* fn_80104BD0 comes from its owner's header (rule 2). */
@@ -209,8 +211,7 @@ extern "C" void fn_801049D0(_ENEMY_WORK* self, u32 id, u32 type, s32 joint_delta
 extern "C" _EFT* fn_80104A68(u32 id, u8 type, f32 scale, u8 area);
 
 /* The unit's shared pool, referenced but not emitted (see the header). */
-extern "C" u16 lbl_8059DBF0[]; /* effect id per type */
-extern "C" u16 lbl_8059DC74[]; /* resource id per type */
+#include "unsplit/ef_tables.h" /* lbl_8059DBF0 / lbl_8059DC74 (rule 2: the band) */
 extern "C" u32 lbl_8059DCF8[]; /* joint id per type */
 extern "C" f32 lbl_80796750;
 extern "C" f32 lbl_80796754;
@@ -625,7 +626,7 @@ extern "C" void fn_801041BC(_EFT* self)
         change_color_eff(work->items_0x04[0], &self->pos_0x18, color);
         break;
     }
-    fn_800F93D8(self, &work->items_0x04[0], 1, work->count, 0);
+    eft_res_models_spawn(self, &work->items_0x04[0], 1, work->count, 0);
 }
 
 /* Bumps the effect's state index. */
@@ -637,7 +638,7 @@ extern "C" void fn_801048A0(_EFT* self)
 /* Destroys an effect object. */
 extern "C" void fn_801048B0(_EFT* self)
 {
-    fn_800F886C(self);
+    eft_res_slot_release(self);
 }
 
 /* Spawns one effect of the given type on the enemy, seeded with the enemy's rotation and a joint delta. */
@@ -693,7 +694,7 @@ extern "C" _EFT* fn_80104A68(u32 id, u8 type, f32 scale, u8 area)
     if (area != get_now_areano()) {
         return NULL;
     }
-    _EFT* effect = fn_800F8788(0x18);
+    _EFT* effect = eft_res_slot_get(0x18);
     if (effect == NULL) {
         return NULL;
     }
@@ -704,7 +705,7 @@ extern "C" _EFT* fn_80104A68(u32 id, u8 type, f32 scale, u8 area)
     effect->field_0x03 = 9;
     effect->type_0x02 = type;
     effect->area_0x44 = area;
-    fn_800F9DF4(effect, 0, 0);
+    eft_state_flags_set_c1(effect, 0, 0);
     effect->release_0x40 = fn_80104B54;
     effect->dispatch_0x34 = fn_80104B94;
     if (event_demo_ck() == 1) {

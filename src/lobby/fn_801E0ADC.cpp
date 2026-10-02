@@ -49,7 +49,7 @@ s32 fn_8027E354(u8, u16);
 s32 fn_802FB4BC(u16);
 u32 fn_803768F8(void);
 u32 chk_pointer(void);
-void fn_800F886C(void* obj);
+void eft_res_slot_release(void* obj);
 void fn_8021AA78(void*, u32, void*, void*, void*);
 s32 fn_80217934(void);
 }
@@ -196,7 +196,7 @@ s32 fn_8027E354(u8, u16);
 s32 fn_802FB4BC(u16);
 u32 fn_803768F8(void);
 u32 chk_pointer(void);
-void fn_800F886C(void* obj);
+void eft_res_slot_release(void* obj);
 void fn_8021AA78(void*, u32, void*, void*, void*);
 s32 fn_80217934(void);
 }
@@ -219,7 +219,7 @@ void fn_801E1A2C(u8* rec)
 /* Forwards to the effect release helper (a one-instruction tail call). */
 void fn_801E1A3C(void* obj)
 {
-    fn_800F886C(obj);
+    eft_res_slot_release(obj);
 }
 
 /* Scatters the entry-0 colour of both tables over the first output pair and the indexed colour over the
@@ -271,7 +271,7 @@ void fn_801E1A40(u8 kind, u8 idx, u8* out0, u8* out1, u8* out2, u8* out3)
 /* Forwards to the effect release helper (a one-instruction tail call). */
 void fn_801E3EDC(void* obj)
 {
-    fn_800F886C(obj);
+    eft_res_slot_release(obj);
 }
 
 /* Forwards one record plus its three sub-records to the page handler. */

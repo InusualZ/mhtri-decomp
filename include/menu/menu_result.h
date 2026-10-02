@@ -10,7 +10,7 @@
  * this unit touches are named (a *view*, folded by the next pass that owns the record - rule 1).
  * The owners of the symbols this unit only *references* are: `fn_8004CAD8.cpp` (`get_qResult_work`,
  * `get_userdata`), `sound/fn_800D7F54.cpp` (`sysSE_req`, `fn_800DBDD4`), `ef/fn_800CDB2C.cpp`
- * (`my_player_no`, `get_move_work_adrs`, `file_loading_ck`), `ef/eft_res.h` (`fn_800F886C`),
+ * (`my_player_no`, `get_move_work_adrs`, `file_loading_ck`), `ef/eft_res.h` (`eft_res_slot_release`),
  * `menu/menu_item.cpp` (`GetItemData`, `ItemName`, `get_menu_lsp_tbl`, `put_menu_cursor`),
  * `menu/menu_message.cpp`, `hud/layout.cpp`, `fn_80047398.cpp` - all included, never re-declared
  * (rule 2). `system_w`, `q_result_msg_adrs`, `Psw` and the `sprintf`/`strcpy`/`strcat` family sit in

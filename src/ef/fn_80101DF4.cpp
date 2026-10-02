@@ -12,7 +12,7 @@
  * the main character's effect (fixed id 14) and one effect per record of the run (id through the
  * shared table `lbl_8059CFB0`, scale copied into the model's +0x1C/+0x20).  A failed
  * `res_eft_model_create` bails out through `fn_801025F8` (a tail call to the library's error path
- * `fn_800F886C`).
+ * `eft_res_slot_release`).
  *
  * Flags: retail keeps the peephole's `clrlwi r0,r3,24` + `slwi r0,r0,2` pair unfused at the
  * `get_now_mapno()` index, so the file needs `#pragma peephole off` (playbook 39); with the peephole
@@ -44,6 +44,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "pl.h"
 #include "ef/eft007.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
@@ -53,16 +54,7 @@
 /* types                                                                                             */
 /* ------------------------------------------------------------------------------------------------ */
 
-/* The effect owner the library's `res_eft_model_create` works on.  This unit only sets its two scale
- * floats; the class is larger than this lower bound (the create path also writes +0x35 and +0x10C), so
- * the tail is opaque.
- * size: 0x110 (lower bound - `res_eft_model_create_light` writes +0x10C) */
-struct MHchar {
-    /* +0x000 */ u8 pad_0x000[0x1C];
-    /* +0x01C */ f32 scale_x; /* set from the effect record once the model exists */
-    /* +0x020 */ f32 scale_y;
-    /* +0x024 */ u8 pad_0x024[0xEC];
-};
+/* `MHchar`, the effect owner the library's `res_eft_model_create` works on, comes from `pl.h` (rule 1: one definition). */
 
 /* One entry of the 0xFF-terminated run `EftModelSet::records` points at, 0x14 B.  Only the id and the
  * scale are read here; the rest of the entry is the create path's (the DOL's own records carry 1..15 in
@@ -77,7 +69,7 @@ struct EftModelRecord {
 }; /* size: 0x14 */
 
 /* The per-state model set `fn_800F8B44` allocates; `fn_80101C74` passes 0x60 as its size to
- * `fn_800F8788`.  `fn_80101D70` releases `chars[0..char_count-1]` and then `main_char`. */
+ * `eft_res_slot_get`.  `fn_80101D70` releases `chars[0..char_count-1]` and then `main_char`. */
 struct EftModelSet {
     /* +0x00 */ u32 char_count;  /* 12, the size of `chars` */
     /* +0x04 */ u32 model_count; /* how many effect models this state created */
@@ -95,9 +87,9 @@ struct EftModelSet {
     /* +0x5C */ u32 field_5C; /* per-map, per-area value */
 }; /* size: 0x60 */
 
-/* The effect-state record `fn_800F8788` hands out of its pool (record stride 0x48).  `fn_80101DB8` is
+/* The effect-state record `eft_res_slot_get` hands out of its pool (record stride 0x48).  `fn_80101DB8` is
  * installed at +0x34 as the state dispatcher and `fn_80101D70` at +0x40 as the update handler;
- * `fn_80101C74` is the constructor and `fn_800F886C` the release path. */
+ * `fn_80101C74` is the constructor and `eft_res_slot_release` the release path. */
 struct EftState {
     /* +0x00 */ u8 in_use;   /* the pool allocator's busy flag */
     /* +0x01 */ u8 field_01; /* set once the state has been set up */
@@ -129,7 +121,7 @@ extern "C" void* fn_800B2878(void);
 /* Bounds-checks `index` against `obj`'s +0x08 count, then forwards to `fn_80501C9C`. */
 extern "C" void fn_800B4A70(void* obj, u16 index);
 /* The `nw4r::math::VEC3` copy the map still spells `copyVec3`. */
-/* The library's error path (`fn_800F886C`). */
+/* The library's error path (`eft_res_slot_release`). */
 /* fn_801025F8 comes from its owner's header (rule 2). */
 /* Builds the current area's effect vector from the per-map table at 0x806C87C0. */
 extern "C" void fn_802B00AC(nw4r::math::VEC3* out, u8 area);
@@ -168,8 +160,8 @@ extern "C" void fn_80101DF4(EftState* self) {
         fn_801025F8(self);
         return;
     }
-    set->main_char->scale_x = 7.2f;
-    set->main_char->scale_y = 7.2f;
+    set->main_char->scale_0x1C.x = 7.2f;
+    set->main_char->scale_0x1C.y = 7.2f;
 
     i = 0;
     while (set->records[i].effect_id != 0xFF) {
@@ -180,8 +172,8 @@ extern "C" void fn_80101DF4(EftState* self) {
             fn_801025F8(self);
             return;
         }
-        set->chars[i]->scale_x = set->records[i].scale;
-        set->chars[i]->scale_y = set->records[i].scale;
+        set->chars[i]->scale_0x1C.x = set->records[i].scale;
+        set->chars[i]->scale_0x1C.y = set->records[i].scale;
         i++;
     }
 
