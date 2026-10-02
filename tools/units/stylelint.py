@@ -3368,8 +3368,11 @@ def selftest() -> int:
         r = real.resolve("em_act_ck__FP11_ENEMY_WORKUcUc") if real else None
         check("rule2: the real map resolves a named symbol to its owner unit",
               (r or {}).get("kind"), "owned")
-        check("rule2: the real map names the enemy unit that owns it",
-              (r or {}).get("unit"), "enemy/fn_8012BDF4.cpp")
+        # the owner moves whenever the splits program folds or renames the unit (it was enemy/fn_8012BDF4.cpp
+        # before the em_common fold), so pin only the module directory and the language
+        own = str((r or {}).get("unit") or "")
+        check("rule2: the real map names an enemy unit that owns it",
+              own.startswith("enemy/") and own.endswith(".cpp"), True)
 
     # --- budget aggregation -----------------------------------------------------------------------
     text = ("/* size: 0x8 */\nstruct A {\n    u32 unk00;\n};\n"
