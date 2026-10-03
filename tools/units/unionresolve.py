@@ -36,11 +36,11 @@ touches the tree.
     python tools/units/unionresolve.py --selftest
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import collections
 import os
-import re
 import sys
 import tempfile
 
@@ -54,6 +54,7 @@ for _path in (TOOLS, HERE):
         sys.path.insert(0, _path)
 
 from units import unionprose as up  # noqa: E402
+from tools.lib import project as _project  # noqa: E402  (the splits / configure readers)
 
 # The only two paths a registration append-conflict may touch.  A conflicted header or a `src/**` file is
 # a *different* class (a real content conflict) and is never unioned here: a plain union of a HEADER
@@ -63,14 +64,6 @@ UNION_SCOPE = ("configure.py", "config/RMHE08/splits.txt")
 # The sections the merged map must never overlap in.  splits.txt also carries `.data`/`.rodata`/... rows;
 # the task names these three because they are where adjacent bands meet and where a bad union shows first.
 OVERLAP_SECTIONS = (".text", "extab", "extabindex")
-
-# A unit header is an unindented line ending in `:` (`Sections:` is the file's own legend, not a unit), and
-# every range is an indented `section start:0x.. end:0x..` line - the shape `land._split_rows` and
-# `stylelint._parse_splits` parse.
-_UNIT_RE = re.compile(r"^(\S.*):\s*$")
-_RANGE_RE = re.compile(r"^\s+(\S+)\s+start:(0x[0-9A-Fa-f]+)\s+end:(0x[0-9A-Fa-f]+)")
-# `Object(<kind>, "<unit>")` on one line, optional comma/whitespace - `recompile.OBJECT_RE`'s shape.
-_OBJECT_RE = re.compile(r"Object\(\s*([A-Za-z_]\w*)\s*,\s*\"([^\"]+)\"\s*\)")
 
 
 def union_text_full(text: str, path: str = "") -> tuple[str, int, list[dict]]:
@@ -127,41 +120,22 @@ def union_file(path: str) -> int:
 
 def split_units(text: str) -> list[str]:
     """The unit keys of a `splits.txt` text, in file order (the order is the address order)."""
-    out: list[str] = []
-    for line in text.splitlines():
-        if line.startswith("Sections:"):
-            continue
-        m = _UNIT_RE.match(line)
-        if m:
-            out.append(m.group(1).strip())
-    return out
+    return _project.Splits.parse(text).units
 
 
 def split_ranges(text: str) -> list[tuple[str, str, int, int]]:
     """`(unit, section, start, end)` for every range in a `splits.txt` text."""
-    rows: list[tuple[str, str, int, int]] = []
-    cur: str | None = None
-    for line in text.splitlines():
-        if line.startswith("Sections:"):
-            continue
-        m = _UNIT_RE.match(line)
-        if m:
-            cur = m.group(1).strip()
-            continue
-        r = _RANGE_RE.match(line)
-        if r and cur:
-            rows.append((cur, r.group(1), int(r.group(2), 16), int(r.group(3), 16)))
-    return rows
+    return [(r.unit, r.section, r.start, r.end) for r in _project.Splits.parse(text).ranges]
 
 
 def configure_objects(text: str) -> list[str]:
-    """Every `Object(kind, "unit")` as a normalised string, in file order."""
-    return ["Object(%s, \"%s\")" % (m.group(1), m.group(2)) for m in _OBJECT_RE.finditer(text)]
+    """Every one-line `Object(kind, "unit")` (no options) as a normalised string, in file order."""
+    return [c.normalised() for c in _project.object_calls(text) if c.closed]
 
 
 def object_names(text: str) -> list[str]:
-    """Every unit name a `configure.py` text registers via `Object(...)`, in file order."""
-    return [m.group(2) for m in _OBJECT_RE.finditer(text)]
+    """Every unit name a `configure.py` text registers via a one-line `Object(kind, "unit")`, in file order."""
+    return [c.path for c in _project.object_calls(text) if c.closed]
 
 
 def duplicate_unit_keys(units: list[str]) -> list[str]:

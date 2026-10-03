@@ -53,11 +53,10 @@ import sys
 import zipfile
 from tools.lib import names as libnames
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-if HERE not in sys.path:
-    sys.path.insert(0, HERE)
+from tools.lib.project import SymbolMap  # the one symbols.txt parser
+from tools.lib.project.ownership import SYMBOLS_REL
 
-import symedit  # noqa: E402  - shares the symbols.txt line parser, prints nothing on import
+HERE = os.path.dirname(os.path.abspath(__file__))
 
 DEFAULT_DUMP = os.environ.get("MHTRI_DUMP_SYMBOLS", "D:/WiiExperiment/DumpSymbols.zip")
 
@@ -158,8 +157,8 @@ def load_dump(path: str = DEFAULT_DUMP, member: str | None = None) -> tuple[dict
 
 
 def map_rows(path: str) -> list[dict]:
-    """The symbols.txt side, via symedit's parser (never read the 4.5 MB file directly)."""
-    rows = list(symedit.entries(path))
+    """The symbols.txt side, via the one map parser (never read the 4.5 MB file directly)."""
+    rows = [e.to_dict() for e in SymbolMap(path).rows()]
     rows.sort(key=lambda r: (r["address"], r["section"], r["name"]))
     return rows
 
@@ -575,7 +574,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("command", nargs="?", choices=("lookup", "join"))
     ap.add_argument("query", nargs="?", help="lookup: an address or a name")
-    ap.add_argument("--file", default=symedit.DEFAULT_FILE, help="the symbol map (symbols.txt)")
+    ap.add_argument("--file", default=SYMBOLS_REL, help="the symbol map (symbols.txt)")
     ap.add_argument("--dump", default=DEFAULT_DUMP, help="DumpSymbols.zip (or $MHTRI_DUMP_SYMBOLS)")
     ap.add_argument("--member", default=None, help="zip member (default: the first *.map)")
     ap.add_argument("--section", default=None, help="only this section (.text, .data, ...)")

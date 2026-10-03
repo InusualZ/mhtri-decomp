@@ -141,11 +141,13 @@ import collections
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
 from tools.lib.git import Git
+
+from tools.lib import project as _project
+from tools.lib.project import ownership as _ownership
 
 SRC = "src"
 # The unsplit band (`include/unsplit/<module>.h`) is the legitimate home for a symbol with no registered
@@ -466,182 +468,51 @@ def rule1_findings(sources: list[Source]) -> list[dict]:
 # --------------------------------------------------------------------------------------------------
 # rule 2: an extern lives with the TU that owns it (symbols.txt + splits.txt)
 # --------------------------------------------------------------------------------------------------
-def module_name(unit: str) -> str:
-    """The module of a registered unit: its directory, or its stem for a root-level file."""
-    unit = unit.replace("\\", "/")
-    d = unit.rsplit("/", 1)[0] if "/" in unit else ""
-    return d or os.path.splitext(unit)[0]
+module_name = _ownership.module_name
+#: the ownership cache (`lib.project.ownership`), exposed so a selftest can clear it between scenarios
+_OWNERSHIP_CACHE = _ownership._CACHE
 
 
-class Ownership:
-    """`symbol -> owning registered unit`, from `symbols.txt` + `splits.txt`.
+class Ownership(_project.Ownership):
+    """The rule-2 index: `lib.project.Ownership` plus the counters a lint run accumulates.
 
-    Both files are parsed programmatically and never printed (`symbols.txt` is 4.5 MB); the result is
-    cached per mtime by `load_ownership`, as `brief.py` caches the map. `gaps`, `unsplit_modules` and
-    `foreign_units` accumulate what the lookup can and cannot judge, so the report states the classes it
-    leaves alone instead of guessing them.
-
-    Two views of the same rows.  `resolve(name)` answers "what does this *name* mean"; `resolution_at`
-    answers "what did this *address* mean, whatever the row was called" - the view a rename needs, because
-    a rename keeps the address and changes the name (`owed_rename_completion`).
+    `gaps`, `unsplit_modules` and `foreign_units` record what the lookup can and cannot judge, so the report
+    states the classes it leaves alone instead of guessing them.
     """
 
-    def __init__(self, symbols: dict, ranges: dict):
-        self.symbols = symbols
-        self.ranges = {s: sorted(v) for s, v in ranges.items()}
+    def __init__(self, symbols: dict, ranges: dict, **kw):
+        super().__init__(symbols, ranges, **kw)
         self.gaps: "collections.Counter" = collections.Counter()
         self.unsplit_modules: "collections.Counter" = collections.Counter()
         self.unsplit_symbols: dict[str, set] = {}
         self.foreign_units: "collections.Counter" = collections.Counter()
-        self._at_address: "dict | None" = None
-
-    def name_at(self, section: str, address: int) -> "str | None":
-        """The map's row name for an address, or None when the map has no row there at all.
-
-        Built lazily as one inverted index over the rows (no range scan per query); a name with duplicate
-        rows is skipped, exactly as `resolve` refuses to guess it.
-        """
-        if self._at_address is None:
-            index: dict = {}
-            for name, entries in self.symbols.items():
-                if len(entries) == 1:
-                    index.setdefault((entries[0][0], entries[0][1]), name)
-            self._at_address = index
-        return self._at_address.get((section, address))
-
-    def resolution_at(self, section: str, address: int) -> "dict | None":
-        """`resolve` of whatever row sits at `(section, address)`, or `None` when the map has none.
-
-        The **address** view: a rename changes the name a file spells, not the address it lands on, so this
-        is what tells "the batch renamed a referrer to a row the base already had" from "the batch made a
-        declaration foreign" (an address with no row at base, or one owned by somebody else).
-        """
-        name = self.name_at(section, address)
-        return self.resolve(name) if name else None
-
-    def resolve(self, name: str) -> "dict | None":
-        """`None` when the name is not in the map; else a dict with `kind` owned/unsplit/dup."""
-        entries = self.symbols.get(name)
-        if not entries:
-            return None
-        if len(entries) != 1:
-            return {"kind": "dup"}
-        section, address, type_ = entries[0]
-        for start, end, unit in self.ranges.get(section, []):
-            if start <= address < end:
-                return {"kind": "owned", "unit": unit, "section": section,
-                        "address": address, "type": type_}
-        return {"kind": "unsplit", "section": section, "address": address, "type": type_,
-                "module": self.module(section, address)}
-
-    def module(self, section: str, address: int) -> "str | None":
-        """The module of the registered units bracketing `address` in `section`, or None.
-
-        The registered bands interleave across modules - a `sound` unit sits inside the `ef` band - so
-        when the nearest unit below and the nearest above disagree there is no sound answer and this
-        returns None. The caller leaves those sites a documented gap rather than name a wrong module.
-        """
-        rows = self.ranges.get(section)
-        if not rows:
-            return None
-        lo = hi = None
-        for start, _end, unit in rows:
-            if start <= address:
-                lo = unit
-            elif hi is None:
-                hi = unit
-        if lo is None or hi is None:
-            return None
-        a, b = module_name(lo), module_name(hi)
-        return a if a == b else None
 
 
 def _parse_symbols(path: str) -> dict:
-    pattern = re.compile(r"^(\S+)\s*=\s*([.\w]+):(0x[0-9A-Fa-f]+);\s*//\s*type:(\w+)")
-    symbols: dict = {}
-    with open(path, encoding="utf-8", errors="replace") as fh:
-        for line in fh:
-            m = pattern.match(line)
-            if m:
-                symbols.setdefault(m.group(1), []).append(
-                    (m.group(2), int(m.group(3), 16), m.group(4)))
-    return symbols
+    """`name -> [(section, address, type)]` from a map file (`lib.project.ownership.symbol_index`)."""
+    return _ownership.symbol_index(_project.SymbolMap(path).rows())
 
 
 def _parse_splits(path: str) -> dict:
-    ranges: dict = {}
-    current = None
-    with open(path, encoding="utf-8", errors="replace") as fh:
-        for line in fh:
-            if line.startswith("Sections:"):
-                continue
-            m = re.match(r"^([^\s:][^:]*):\s*$", line)
-            if m and not line.startswith(("\t", " ")):
-                current = m.group(1)
-                continue
-            m = re.match(r"^\s+(\S+)\s+start:(0x[0-9A-Fa-f]+)\s+end:(0x[0-9A-Fa-f]+)", line)
-            if m and current:
-                ranges.setdefault(m.group(1), []).append(
-                    (int(m.group(2), 16), int(m.group(3), 16), current))
-    return ranges
-
-
-_OWNERSHIP_CACHE: dict = {}
-
-
-_OWNERSHIP_REF_CACHE: dict = {}
+    """`section -> [(start, end, unit)]` from a splits file (`lib.project.Splits.by_section`)."""
+    return _project.Splits.read(path).by_section()
 
 
 def load_ownership_at_ref(root: str, ref: str) -> "Ownership | None":
-    """The rule-2 index **as of `ref`** - each side of a `--diff` is judged by the map it was written against.
-
-    Judging the base side by the *working* map makes a rename read as a regression: the base copy of a file
-    still says `fn_80043EA8`, this batch renamed that row to `VEC3_ctor`, so the base side's local declarations
-    stop resolving to an owner, their rule-2 findings vanish from the `before` count, and `diff_deltas` reports
-    them as **additions** - a real batch measured "+62 added rule-2 violations" for a pure rename, and spent
-    ~30 minutes proving it was an artefact.
-
-    Judging each side by its own map keeps them comparable and still charges a batch for the ownership *it*
-    creates: a newly registered unit's ranges exist only in the working map, so the declarations it newly
-    orphans are additions there and absent from the base.
-    """
-    if not ref:
-        return load_ownership(root)
-    if (root, ref) in _OWNERSHIP_REF_CACHE:
-        return _OWNERSHIP_REF_CACHE[(root, ref)]
-    tmp = tempfile.mkdtemp(prefix="stylelint-ref-")
-    try:
-        paths = {}
-        for rel in ("config/RMHE08/symbols.txt", "config/RMHE08/splits.txt"):
-            try:
-                text = git_bytes(root, "show", "%s:%s" % (ref, rel)).decode("utf-8", "replace")
-            except RuntimeError:
-                return None
-            paths[rel] = os.path.join(tmp, os.path.basename(rel))
-            with open(paths[rel], "w", encoding="utf-8", newline="") as fh:
-                fh.write(text)
-        own = Ownership(_parse_symbols(paths["config/RMHE08/symbols.txt"]),
-                        _parse_splits(paths["config/RMHE08/splits.txt"]))
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
-    _OWNERSHIP_REF_CACHE[(root, ref)] = own
-    return own
+    """The rule-2 index **as of `ref`**: each side of a `--diff` is judged by the map it was written against
+    (judging the base by the working map made a pure rename read as +62 added rule-2 findings). The ref's files
+    are read through this module's `git_bytes`, the one seam its selftest stubs."""
+    def show(at: str, rel: str):
+        try:
+            return git_bytes(root, "show", "%s:%s" % (at, rel))
+        except RuntimeError:
+            return None
+    return Ownership.at_ref(root, ref, show)
 
 
 def load_ownership(root: str) -> "Ownership | None":
-    """Parse `symbols.txt` + `splits.txt` once per mtime; None when either is absent.
-
-    A scratch lint with no map simply has rule 2 unchecked rather than dying. The cache is keyed on both
-    MTimes, so a rename or a re-split invalidates it within one process (a pool brief, a batch check).
-    """
-    sym = os.path.join(root, "config", "RMHE08", "symbols.txt")
-    spl = os.path.join(root, "config", "RMHE08", "splits.txt")
-    if not os.path.exists(sym) or not os.path.exists(spl):
-        return None
-    key = (sym, spl, os.path.getmtime(sym), os.path.getmtime(spl))
-    if key not in _OWNERSHIP_CACHE:
-        _OWNERSHIP_CACHE[key] = Ownership(_parse_symbols(sym), _parse_splits(spl))
-    return _OWNERSHIP_CACHE[key]
+    """The tree's rule-2 index, parsed once per mtime; None when either file is absent (rule 2 unchecked)."""
+    return Ownership.load(root)
 
 
 def is_unsplit_header(rel: str) -> bool:
@@ -2242,10 +2113,8 @@ def _covering_range(own: "Ownership", section: str, address: int) -> "tuple | No
     renames a unit file (`menu/fn_802A6624.cpp` -> `menu/menu_message.cpp`) keeps every boundary, so an
     address's ownership is unchanged even though the unit the map spells changed.
     """
-    for start, end, _unit in own.ranges.get(section, ()):
-        if start <= address < end:
-            return (start, end)
-    return None
+    hit = own.covering(section, address)
+    return (hit[0], hit[1]) if hit else None
 
 
 def rename_map(base: "Ownership | None", after: "Ownership | None",

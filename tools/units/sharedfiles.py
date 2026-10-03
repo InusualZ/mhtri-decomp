@@ -29,15 +29,13 @@ import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file_
 
 import argparse
 import os
-import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from tools.lib.project import splits as _splits
 from tools.lib.text import (TMP_SUFFIX, AnchorError, Transaction, append_blocks,  # noqa: F401
                             insert_after_anchor, line_ending, missing_anchors, read_text, with_ending)
-
-SPLIT_RANGE = re.compile(r"^\s+(\S+)\s+start:(0x[0-9A-Fa-f]+)\s+end:(0x[0-9A-Fa-f]+)")
 
 
 class OverlapError(Exception):
@@ -55,15 +53,7 @@ class Layout:
 
 def parse_ranges(text: str) -> list[tuple[str, str, int, int]]:
     """Every `start:`/`end:` range in a `splits.txt` text, as (unit, section, start, end)."""
-    out, cur = [], None
-    for line in text.splitlines():
-        if line[:1] not in (" ", "\t") and line.rstrip().endswith(":"):
-            cur = line.strip()[:-1]
-            continue
-        m = SPLIT_RANGE.match(line)
-        if m and cur is not None:
-            out.append((cur, m.group(1), int(m.group(2), 16), int(m.group(3), 16)))
-    return out
+    return [(r.unit, r.section, r.start, r.end) for r in _splits.Splits.parse(text).ranges]
 
 
 def overlaps(a: tuple[int, int], b: tuple[int, int]) -> bool:
@@ -79,14 +69,8 @@ def find_overlap(claimed, start: int, end: int, section: str | None = None,
     section. This is the collision `symbolpreflight` reports and the one a range must pass before it
     lands.
     """
-    for u, sec, s, e in claimed:
-        if section is not None and sec != section:
-            continue
-        if unit is not None and u == unit and sec == ".text" and (s, e) == (start, end):
-            continue
-        if s < end and start < e:
-            return (u, sec, s, e)
-    return None
+    hit = _splits.first_overlap(claimed, start, end, section, unit)
+    return (hit.unit, hit.section, hit.start, hit.end) if hit else None
 
 
 def check_no_overlap(claimed, start: int, end: int, section: str | None = None,

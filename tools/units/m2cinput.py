@@ -3,8 +3,8 @@
 Spec: docs/tools/spec/m2cinput.md. CLI: m2cinput.py build/RMHE08/obj/<unit>.o [-f name]... [-o out.s] [--list]."""
 
 from __future__ import annotations
-
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
+
 import argparse
 import os
 import re
@@ -277,19 +277,16 @@ def load_dol(path: str) -> Dol | None:
 
 
 def load_symbols(path: str) -> dict[str, dict]:
-    """name -> symbol-map entry, through that map's own parser (`tools/symbols/symedit.py`).
+    """name -> symbol-map entry, through the map's one parser (`tools/lib/project/symbols.py`).
 
     Only used to place a jump table and to find the address an object is linked at, so a missing map costs
     the tables, not the decompilation.
     """
     if not os.path.exists(path):
         return {}
-    symbols_dir = os.path.join(ROOT, "tools", "symbols")
-    if symbols_dir not in sys.path:
-        sys.path.insert(0, symbols_dir)
-    import symedit  # noqa: PLC0415  (only needed when a jump table is in play)
+    from tools.lib.project import SymbolMap  # noqa: PLC0415  (only needed when a jump table is in play)
 
-    return {entry["name"]: entry for entry in symedit.entries(path)}
+    return {e.name: e.to_dict() for e in SymbolMap(path).rows()}
 
 
 def symbol_address(name: str, symbols: dict[str, dict]) -> int | None:

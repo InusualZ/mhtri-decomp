@@ -44,11 +44,11 @@ freshness guard refused, 2 a usage or input error (no report, an unreadable repo
 it) - a traceback is never the answer.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import json
 import os
-import re
 import sys
 import time
 from dataclasses import dataclass, field
@@ -62,12 +62,11 @@ for _path in (TOOLS, os.path.join(TOOLS, "units"), HERE):
 import unitutil as uu                                             # noqa: E402
 import symdiff                                                    # noqa: E402
 from units import verifyunit as vu                                # noqa: E402
+from tools.lib import project as _project                         # noqa: E402
 from freshguard import (mtime, stamp, stamp_json, freshness, source_closure,  # noqa: E402
                         newest, rel_path as _rel)
 
 REPORT_REL = os.path.join("build", "RMHE08", "report.json")
-# `\t.text       start:0x804459E4 end:0x80448404` - the splits.txt claim shape (land.py/flipcheck.py's).
-SPLIT_ROW_RE = re.compile(r"^\s+(\S+)\s+start:(0x[0-9A-Fa-f]+)\s+end:(0x[0-9A-Fa-f]+)")
 
 
 # --------------------------------------------------------------------------------------------------
@@ -165,21 +164,15 @@ def split_claims(tree: str, unit: str) -> dict[str, tuple[int, int]]:
     """`{section: (start, end)}` from `splits.txt` for one unit stem - the unit's registered ranges."""
     path = os.path.join(tree, "config", "RMHE08", "splits.txt")
     try:
-        text = open(path, encoding="utf-8", errors="replace").read()
+        splits = _project.Splits.read(path)
     except OSError:
         return {}
     out: dict[str, tuple[int, int]] = {}
     want = vu.unit_stem(unit)
-    current: str | None = None
-    for line in text.splitlines():
-        if line[:1] not in (" ", "\t") and line.rstrip().endswith(":"):
-            current = vu.unit_stem(line.strip()[:-1])
-            continue
-        if current != want:
-            continue
-        m = SPLIT_ROW_RE.match(line)
-        if m:
-            out[m.group(1)] = (int(m.group(2), 16), int(m.group(3), 16))
+    for block in splits.blocks:
+        if vu.unit_stem(block.unit) == want:
+            for r in block.ranges:
+                out[r.section] = (r.start, r.end)
     return out
 
 

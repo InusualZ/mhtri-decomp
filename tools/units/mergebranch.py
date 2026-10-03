@@ -90,6 +90,7 @@ for _path in (REPO_TOOLS, HERE):
         sys.path.insert(0, _path)
 from stylelint import strip  # noqa: E402
 from units import unionprose as up  # noqa: E402
+from tools.lib import project as _project  # noqa: E402  (the splits / map readers)
 # The names this module's `resolve`, `addadd_choice` and selftest use stay here, but the implementations
 # live once in `unionprose`.
 prose_line = up.prose_line
@@ -104,12 +105,8 @@ MARKERS = ("<<<<<<<", "|||||||", ">>>>>>>")
 RENAME = re.compile(r"\b(fn|lbl|loc)_([0-9A-Fa-f]{8})\b")
 # A generated name followed by a file extension is a file name, not a symbol: `fn_805113B0.c` / `.o`.
 PATH_EXT = re.compile(r"\.(?:c|cpp|cc|cp|h|hpp|hh|o|obj|d|s|asm|txt|json|map|md)\b")
-# A `symbols.txt` row: the name, its section (`.text`, `@`-prefixed extab, ...) and its address.
-MAP_ROW = re.compile(r"^\s*([^\s=]+)\s*=\s*([^:\s]+):(0x[0-9A-Fa-f]+)", re.M)
 ADDR_COMMENT = re.compile(r"/\*\s*0x([0-9A-Fa-f]{8})")
 DECL_HEAD = re.compile(r"^\s*(?:extern\s+\"C\"\s+)?(?:const\s+)?[A-Za-z_][\w:<> \*&]*?\b\w+\s*\(")
-SPLITS_UNIT = re.compile(r"^(\S+):\s*$")
-SPLITS_TEXT = re.compile(r"^\s*\.text\s+start:(0x[0-9A-Fa-f]+)\s+end:(0x[0-9A-Fa-f]+)")
 
 
 # ---------------------------------------------------------------------------------------------------
@@ -284,16 +281,7 @@ def markers_in(lines: list[str]) -> list[tuple[int, str]]:
 
 def text_ranges(splits: str) -> list[tuple[int, int, str]]:
     """`(start, end, unit)` for every `.text` range in a `splits.txt`."""
-    ranges, cur = [], None
-    for line in splits.splitlines():
-        m = SPLITS_UNIT.match(line)
-        if m:
-            cur = m.group(1)
-            continue
-        m = SPLITS_TEXT.match(line)
-        if m and cur:
-            ranges.append((int(m.group(1), 16), int(m.group(2), 16), cur))
-    return ranges
+    return [(r.start, r.end, r.unit) for r in _project.Splits.parse(splits).text_ranges()]
 
 
 def sweep_band_header(lines: list[str], ranges: list[tuple[int, int, str]]) -> tuple[list[str], list[tuple[str, str]]]:
@@ -378,9 +366,11 @@ def map_symbols(map_text: str) -> tuple[set[str], dict[int, str]]:
     """`(every row's name, address -> name)` for a `symbols.txt`: the map a generated name must resolve through."""
     live: set[str] = set()
     addresses: dict[int, str] = {}
-    for m in MAP_ROW.finditer(map_text):
-        live.add(m.group(1))
-        addresses[int(m.group(3), 16)] = m.group(1)
+    for line in map_text.splitlines():
+        e = _project.parse_line(line)
+        if e is not None:
+            live.add(e.name)
+            addresses[e.address] = e.name
     return live, addresses
 
 

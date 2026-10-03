@@ -3,14 +3,15 @@
 Spec: docs/tools/spec/objalign.md. CLI: objalign.py <object> [--splits PATH] [--unit KEY] [-v] [--dry-run] | --selftest."""
 
 from __future__ import annotations
-
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
+
 import argparse
 import os
-import re
 import struct
 
 from tools.lib.binary.elf import Elf, ElfEditor, ElfError
+
+from tools.lib.project import Splits
 
 DEFAULT_SPLITS = os.path.join("config", "RMHE08", "splits.txt")
 
@@ -22,9 +23,6 @@ SKIP_SECTIONS = {"extab", "extabindex"}
 # real ceiling - we only ever lower it.
 MAX_ALIGN = 1 << 30
 
-_SECTION_RE = re.compile(
-    r"^\s+(?P<name>[.\w$]+)\s+start:0x(?P<start>[0-9A-Fa-f]+)\s+end:0x(?P<end>[0-9A-Fa-f]+)\s*$"
-)
 
 
 def allowed_align(address: int) -> int:
@@ -41,21 +39,12 @@ def allowed_align(address: int) -> int:
 
 
 def parse_splits(path: str) -> dict[str, dict[str, int]]:
-    """{unit key: {section name (no dot): start address}} from splits.txt."""
-    units: dict[str, dict[str, int]] = {}
-    current: str | None = None
-    with open(path, encoding="utf-8") as handle:
-        for line in handle:
-            if line[:1] not in ("", " ", "\t") and line.rstrip().endswith(":"):
-                current = line.strip()[:-1]
-                units[current] = {}
-            elif current:
-                match = _SECTION_RE.match(line)
-                if match:
-                    units[current][match.group("name").lstrip(".")] = int(
-                        match.group("start"), 16
-                    )
-    return units
+    """{unit key: {section name (no dot): start address}} from splits.txt.
+
+    A range carrying attributes (`rename:.ctors$10`) is left out: its object section is not the split's.
+    """
+    return {block.unit: {r.section.lstrip("."): r.start for r in block.ranges if not r.attrs}
+            for block in Splits.read(path).blocks}
 
 
 def unit_key(obj_path: str, units: dict[str, dict[str, int]]) -> str | None:

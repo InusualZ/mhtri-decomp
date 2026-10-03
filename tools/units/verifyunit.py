@@ -71,6 +71,7 @@ batch), and the write-up (§6).
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import hashlib
@@ -89,10 +90,9 @@ if os.path.dirname(HERE) not in sys.path:
 
 import measure as ms  # noqa: E402
 import unitutil  # noqa: E402
+from tools.lib import project as _project  # noqa: E402  (the configure / splits readers)
 
 SRC_EXT = (".c", ".cpp", ".cp", ".cxx", ".cc", ".c++", ".C")
-# `Object(<kind>, "<unit>")` - the same shape `recompile.OBJECT_RE` and `unionresolve._OBJECT_RE` use.
-_OBJECT_RE = re.compile(r"Object\(\s*\w+\s*,\s*\"([^\"]+)\"")
 # one or more ninja outputs before the `:`, e.g. `build build\RMHE08\src\hud\fn_80334568.o: mwcc_sjis`
 _NINJA_BUILD_RE = re.compile(r"^build\s+(.+?):", re.M)
 # objdiff declines to pair a symbol whose one side is more than 50 % smaller than the other.
@@ -147,24 +147,16 @@ def _join(main: str, rel: str) -> str:
 
 def configure_object_names(text: str) -> list[str]:
     """Every unit name a `configure.py` text registers through `Object(...)`, in file order."""
-    return [m.group(1) for m in _OBJECT_RE.finditer(text or "")]
+    return [c.path for c in _project.object_calls(text or "")]
 
 
 def splits_unit_names(text: str) -> set[str]:
     """The unit keys a `splits.txt` text defines - an unindented `name:` line, `Sections:` excluded.
 
-    The same parse `unionresolve.split_units` and `land._split_rows` use. Returned as stems so the
-    comparison against `configure.py` names is extension-insensitive.
+    Read by `lib.project.Splits`. Returned as stems so the comparison against `configure.py` names is
+    extension-insensitive.
     """
-    out: set[str] = set()
-    for line in (text or "").splitlines():
-        if line.startswith("Sections:"):
-            continue
-        if line[:1] not in (" ", "\t") and line.rstrip().endswith(":"):
-            name = line.strip()[:-1].strip()
-            if name:
-                out.add(unit_stem(name))
-    return out
+    return {unit_stem(u) for u in _project.Splits.parse(text or "").units if u.strip()}
 
 
 def build_ninja_targets(text: str) -> set[str]:

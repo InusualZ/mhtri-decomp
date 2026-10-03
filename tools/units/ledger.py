@@ -37,6 +37,7 @@ if os.path.join(ROOT, "tools", "units") not in sys.path:
     sys.path.insert(0, os.path.join(ROOT, "tools", "units"))
 
 import symbolpreflight as preflight  # noqa: E402  (shares its symbols.txt / splits.txt / configure.py parsers)
+from tools.lib.project.ownership import AUTO_OBJECT_RE, AutoObjects  # noqa: E402  (dtk's auto_* objects)
 
 BAR = 80.0
 SCORE_KEY = "fuzzy_match_percent"
@@ -48,7 +49,7 @@ SOURCES = (
     os.path.join(ROOT, "configure.py"),
 )
 # dtk names a split object after the section and the address it starts at: auto_03_802AE0C4_text.o
-OBJECT_RE = re.compile(r"^auto_\d+_([0-9a-fA-F]{8})_(\w+)$")
+OBJECT_RE = AUTO_OBJECT_RE
 GENERATED_RE = libnames.GENERATED["ledger"]
 
 
@@ -90,38 +91,20 @@ class Objects:
     """
 
     def __init__(self, path: str = CONFIG_PATH) -> None:
-        self.ranges: dict[str, list[tuple[int, int | None, str]]] = {}
         config = read_json(path)
-        if config:
-            named = [(unit.get("name", ""), unit.get("code_size", 0) + unit.get("data_size", 0)) for unit in config["units"]]
-        else:
-            named = [(os.path.splitext(os.path.basename(p))[0], 0) for p in _object_paths()]
-        entries = []
-        for name, size in named:
-            match = OBJECT_RE.match(name)
-            if match:
-                entries.append(
-                    (
-                        "." + match.group(2),
-                        int(match.group(1), 16),
-                        size,
-                        os.path.join(ROOT, "build", GAME, "obj", name + ".o"),
-                    )
-                )
-        for section, address, size, obj in sorted(entries):
-            self.ranges.setdefault(section, []).append([address, address + size if size else None, obj])
-        for section, ranges in self.ranges.items():
-            # An object without a recorded size runs until the next one in its section starts.
-            for index in range(len(ranges) - 1):
-                if ranges[index][1] is None:
-                    ranges[index][1] = ranges[index + 1][0]
-            self.ranges[section] = [tuple(rng) for rng in ranges]
+        names = [] if config else [os.path.splitext(os.path.basename(p))[0] for p in _object_paths()]
+        self._auto = AutoObjects.from_config(config, names)
+        self.ranges: dict[str, list[tuple[int, int | None, str]]] = {
+            section: [(start, end, self._path(name)) for start, end, name in rows]
+            for section, rows in self._auto.ranges.items()}
+
+    @staticmethod
+    def _path(name: str) -> str:
+        return os.path.join(ROOT, "build", GAME, "obj", name + ".o")
 
     def covering(self, section: str, address: int) -> str | None:
-        for start, end, obj in self.ranges.get(section, ()):
-            if start <= address and (end is None or address < end):
-                return obj
-        return None
+        hit = self._auto.covering(section, address)
+        return self._path(hit[2]) if hit else None
 
 
 def _object_paths() -> list[str]:

@@ -23,6 +23,7 @@ fragments.  It reads only the DOL and `config/RMHE08/symbols.txt`.  Nothing is w
   dataorder.py --selftest
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import collections
@@ -36,6 +37,7 @@ sys.path.insert(0, os.path.dirname(HERE))
 sys.path.insert(0, HERE)
 
 import unitutil as uu  # noqa: E402  (repo root + build layout)
+from tools.lib import project as _project  # noqa: E402  (the map / splits readers)
 
 ROOT = uu.ROOT
 GAME = "RMHE08"
@@ -48,8 +50,6 @@ PRINTABLE = set(range(32, 127)) | {9, 10, 13}
 #: A `D` symbol this small between a vtable and the next symbol is alignment padding, not a new object.
 PAD_MAX = 8
 STRONG_KINDS = ("V->S", "zigzag")
-SYMBOL_RE = re.compile(r"^(\S+) = (\S+):0x([0-9A-Fa-f]+);(.*)$")
-SIZE_RE = re.compile(r"size:0x([0-9A-Fa-f]+)")
 
 
 class Sym:
@@ -111,15 +111,7 @@ def inline_tail(gap: list["Sym"]) -> int:
 
 def load_symbols(path: str = SYMBOLS) -> list[tuple[str, int, int | None, str]]:
     """`(section, address, size-or-None, name)` for every map row."""
-    out = []
-    with open(path, encoding="utf-8", errors="replace") as fh:
-        for ln in fh:
-            m = SYMBOL_RE.match(ln.rstrip("\n"))
-            if not m:
-                continue
-            sz = SIZE_RE.search(m.group(4))
-            out.append((m.group(2), int(m.group(3), 16), int(sz.group(1), 16) if sz else None, m.group(1)))
-    return out
+    return [(e.section, e.address, e.size if e.sized else None, e.name) for e in _project.SymbolMap(path).rows()]
 
 
 def text_range(rows) -> tuple[int, int]:
@@ -275,16 +267,7 @@ def fragments(syms: list[Sym], weak: bool = False) -> list[list[Sym]]:
 
 def unit_data_ranges(path: str = SPLITS) -> dict[int, tuple[str, int]]:
     """`start -> (unit, end)` for every registered unit `.data` range."""
-    out, cur = {}, None
-    with open(path, encoding="utf-8", errors="replace") as fh:
-        for ln in fh:
-            if ln and not ln[0].isspace() and ln.rstrip().endswith(":"):
-                cur = ln.strip()[:-1]
-                continue
-            m = re.match(r"\s+\.data\s+start:0x([0-9A-Fa-f]+) end:0x([0-9A-Fa-f]+)", ln)
-            if m and cur:
-                out[int(m.group(1), 16)] = (cur, int(m.group(2), 16))
-    return out
+    return {r.start: (r.unit, r.end) for r in _project.Splits.read(path).ranges if r.section == ".data"}
 
 
 def unit_of(ranges: dict, addr: int):

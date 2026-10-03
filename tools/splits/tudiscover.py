@@ -6,7 +6,6 @@ import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file_
 import argparse
 import collections
 import hashlib
-import importlib.util
 import json
 import os
 import re
@@ -19,6 +18,7 @@ from tools.lib.binary.dol import Dol as LibDol
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # tools/
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))                   # tools/splits/ (dataorder)
 import unitutil as uu  # noqa: E402  (repo root + build layout)
+from tools.lib import project as _project  # noqa: E402  (the map / splits readers)
 
 ROOT = uu.ROOT
 GAME = "RMHE08"
@@ -102,12 +102,6 @@ INTERVAL_CAP = 4
 NO_REF_SECTIONS = ("extab", "extabindex", ".init")
 
 
-def load_symedit():
-    path = os.path.join(ROOT, "tools", "symbols", "symedit.py")
-    spec = importlib.util.spec_from_file_location("symedit", path)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
 
 
 class Dol(LibDol):
@@ -124,22 +118,14 @@ class Dol(LibDol):
 
 def load_map():
     """(functions, labels): names -> records, straight from the symbol map (never printed)."""
-    se = load_symedit()
     fns, labels = {}, {}
-    for e in se.entries(SYMBOLS):
-        if e["section"] == ".text" and e["type"] == "function":
-            fns[e["name"]] = {"addr": e["address"], "size": e["size"],
-                              "scope": "local" if "scope:local" in e["line"] else ""}
-        elif e["section"] != ".text":
-            # `(?<![\w.])` matters: `.sdata:`, `.rodata:` and `.data:` all contain the substring
-            # `data:`, and only the third is preceded by a non-word char.  With a bare `(?<!\w)`
-            # the `.data` *address* (`0x8058F750;`) became the kind, so `source_file_label` silently
-            # skipped every `.data`-resident `__FILE__` string - 53 of them are referenced from more
-            # than one function, including the widest anchor in the binary.
-            kind = re.search(r"(?<![\w.])data:(\S+)", e["line"])
-            labels[e["name"]] = {"section": e["section"], "addr": e["address"],
-                                 "size": e["size"], "kind": kind.group(1) if kind else "",
-                                 "local": "scope:local" in e["line"]}
+    for e in _project.SymbolMap(SYMBOLS).rows():
+        if e.section == ".text" and e.type == "function":
+            fns[e.name] = {"addr": e.address, "size": e.size, "scope": "local" if e.scope == "local" else ""}
+        elif e.section != ".text":
+            # `kind` is the `data:` attribute (`Symbol.kind`), never the `.data:` of the address.
+            labels[e.name] = {"section": e.section, "addr": e.address, "size": e.size, "kind": e.kind,
+                              "local": e.scope == "local"}
     return fns, labels
 
 
@@ -1356,15 +1342,7 @@ def print_human(res, ordered, fns, sug_lo, sug_hi):
 
 def claimed_units():
     """`splits.txt` as ground truth: {unit: {section: (start, end)}} for every claimed range."""
-    out, cur = {}, None
-    for line in open(SPLITS, encoding="utf-8", errors="replace"):
-        if line[:1] not in (" ", "\t") and line.rstrip().endswith(":"):
-            cur = line.strip()[:-1]
-            out[cur] = {}
-            continue
-        m = re.match(r"\s+(\S+)\s+start:(0x[0-9A-Fa-f]+)\s+end:(0x[0-9A-Fa-f]+)", line)
-        if m and cur:
-            out[cur][m.group(1)] = (int(m.group(2), 16), int(m.group(3), 16))
+    out = {b.unit: {r.section: (r.start, r.end) for r in b.ranges} for b in _project.Splits.read(SPLITS).blocks}
     return {u: s for u, s in out.items() if ".text" in s}
 
 

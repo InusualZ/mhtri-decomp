@@ -45,6 +45,7 @@ constructor/destructor-shaped name (`construct`, `ctor`, `dtor`, `destruct`, `in
 mangling is `__ct__`/`__dt__`, not the method form, so no rename is proposed for it.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import json
@@ -60,11 +61,11 @@ sys.path.insert(0, os.path.dirname(HERE))
 
 import mangle as mg  # noqa: E402
 import stylelint as sl  # noqa: E402
+from tools.lib import project as _project  # noqa: E402  (the map line parser)
 
 SYMBOLS = os.path.join("config", "RMHE08", "symbols.txt")
 CTOR_LIKE_RE = re.compile(r"^(?:construct|ctor|dtor|destruct|destroy|delete)(?:$|[A-Z_0-9])", re.I)
 CONFIRMED = ("exact", "verified")
-MAP_ROW_RE = re.compile(r"^(\S+)\s*=\s*([.\w]+):(0x[0-9A-Fa-f]+);?\s*(.*)$")
 
 
 def repo_root() -> str:
@@ -118,9 +119,10 @@ def map_rows(root: str, names: set) -> dict:
         for line in fh:
             head = line.split(" ", 1)[0]
             if head in names:
-                m = MAP_ROW_RE.match(line.strip())
-                if m and m.group(1) == head:
-                    rows[head] = {"section": m.group(2), "address": m.group(3), "attrs": m.group(4)}
+                e = _project.parse_line(line.strip())
+                if e is not None and e.name == head:
+                    rows[head] = {"section": e.section, "address": "0x%08X" % e.address,
+                                  "attrs": e.line.partition(";")[2].strip()}
     return rows
 
 
