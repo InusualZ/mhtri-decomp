@@ -22,14 +22,15 @@ they live in a small importable module with no side effects on import, which bot
 `guard_selftest.py` can call.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import os
-import subprocess
 
+from tools.lib.git import Git
 
 def _git(root, *args, input=None):
-    return subprocess.run(["git", "-C", root, *args], capture_output=True, input=input)
+    return Git(root).run_bytes(*args, input=input)
 
 
 def _git_text(root, *args) -> str:

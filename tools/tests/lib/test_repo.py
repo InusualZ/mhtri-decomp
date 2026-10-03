@@ -1,0 +1,163 @@
+"""lib.repo: the tree rule, MAIN, the input fallback, scratch/state/ground truth, and the live-tree choke point."""
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
+import contextlib
+import hashlib
+import os
+import subprocess
+import tempfile
+from pathlib import Path
+
+from tools.lib import repo, testing
+from tools.lib.testing import LiveTreeError
+
+TIER = "fixture"
+
+
+def same(a, b) -> bool:
+    return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
+
+
+@contextlib.contextmanager
+def tier(name: str):
+    """Run a block under another tier (the fallback rule is only reachable outside the fixture tier)."""
+    before = testing.current_tier()
+    testing.set_tier(name)
+    try:
+        yield
+    finally:
+        testing.set_tier(before)
+
+
+@contextlib.contextmanager
+def cwd(path):
+    here = os.getcwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(here)
+
+
+def test_tree_rule(c):
+    with testing.FixtureTree() as tree, tempfile.TemporaryDirectory() as tmp:
+        sub = tree.root / "src" / "deep"
+        sub.mkdir(parents=True)
+        c.check("start= walks up to the fixture's configure.py", same(repo.repo_root(sub), tree.root), True)
+        c.raises("no tree above start= exits", SystemExit, repo.repo_root, tmp)
+        with testing.refusals_expected() as seen:
+            c.raises("without start= the fixture tier refuses", LiveTreeError, repo.repo_root)
+        c.check("... and the refusal was recorded", len(seen.refused), 1)
+        packaged = repo.PACKAGED_ROOT
+        repo.PACKAGED_ROOT = tree.root
+        try:
+            with cwd(tmp), testing.refusals_expected():
+                c.raises("... even when the fallback would land on a fixture", LiveTreeError, repo.repo_root)
+            with tier("smoke"), cwd(tmp):
+                c.check("a cwd that is no tree falls back to the packaged copy", same(repo.repo_root(), tree.root), True)
+            with testing.FixtureTree() as other, tier("smoke"), cwd(other.root):
+                c.check("a cwd that is a tree (not git) wins", same(repo.repo_root(), other.root), True)
+        finally:
+            repo.PACKAGED_ROOT = packaged
+
+
+def test_live_tree_choke_point(c):
+    live = testing.LIVE_ROOT
+    with testing.refusals_expected() as seen:
+        c.raises("repo_root(start=<live>) is refused under the fixture tier", LiveTreeError, repo.repo_root, live)
+        c.raises("resolve_input on the live tree is refused (an os.stat probe the audit hook cannot see)",
+                 LiveTreeError, repo.resolve_input, "build/RMHE08/asm", live)
+        c.raises("a Tree over the live root is refused", LiveTreeError, repo.Tree, live)
+        c.raises("main_tree of the live root is refused", LiveTreeError, repo.main_tree, live)
+        c.raises("scratch/state under the live root are refused", LiveTreeError, repo.scratch, "x", live)
+        c.raises("a process given a live path is refused (a Windows command line is one string)", LiveTreeError,
+                 subprocess.run, [sys.executable, "-c", "pass", str(live / "config")])
+    c.check("every refusal was recorded", len(seen.refused), 6)
+
+
+def test_import_time_roots(c):
+    from tools import unitutil                      # imports under the fixture tier: no root is resolved at import
+    c.expect("unitutil imports under the fixture tier", "ROOT" not in vars(unitutil))
+    with testing.refusals_expected() as seen:
+        c.raises("... and refuses the live root when ROOT is first used", LiveTreeError, getattr, unitutil, "ROOT")
+        c.raises("... as does OBJDIFF, derived from it", LiveTreeError, getattr, unitutil, "OBJDIFF")
+    c.check("both refusals recorded", len(seen.refused), 2)
+    with testing.FixtureTree() as tree:
+        unitutil.ROOT = str(tree.root)              # the older selftests' way of pointing a tool at a fixture
+        try:
+            c.check("an assigned ROOT pins it", (unitutil.ROOT, unitutil.main_tree()), (str(tree.root), None))
+            c.check("... and OBJDIFF follows it", unitutil.OBJDIFF,
+                    os.path.join(str(tree.root), "build", "tools", "objdiff-cli.exe"))
+        finally:
+            del unitutil.ROOT
+
+
+def test_main_and_inputs(c):
+    with testing.GitFixture() as fx, tempfile.TemporaryDirectory() as tmp:
+        fx.init()
+        fx.commit({"configure.py": "", "build/RMHE08/obj/a.o": b"\x7fELF"}, "main")
+        wt = fx.worktree(Path(tmp) / "wt", "lane")
+        c.check("main_tree of a worktree is MAIN", same(repo.main_tree(wt), fx.root), True)
+        c.check("main_tree of MAIN is MAIN", same(repo.main_tree(fx.root), fx.root), True)
+        (fx.root / "only-main.bin").write_bytes(b"m")
+        got = repo.resolve_input("only-main.bin", wt)
+        c.check("resolve_input falls back to MAIN by path", same(got, fx.root / "only-main.bin"), True)
+        c.check("... the worktree's own copy wins", same(repo.resolve_input("configure.py", wt), wt / "configure.py"), True)
+        c.check("... and a path neither has names the worktree's",
+                same(repo.resolve_input("nope.bin", wt), wt / "nope.bin"), True)
+        alt = Path(tmp) / "alt"
+        alt.mkdir()
+        os.environ["MHTRI_MAIN"] = str(alt)
+        try:
+            c.check("$MHTRI_MAIN applies only when honoured", (same(repo.main_tree(wt, honour_env=True), alt),
+                                                              same(repo.main_tree(wt), fx.root)), (True, True))
+        finally:
+            del os.environ["MHTRI_MAIN"]
+        t = repo.Tree(wt)
+        c.check("Tree: a linked worktree, not a slot", (t.is_worktree, t.is_slot, same(t.main, fx.root)),
+                (True, False, True))
+        c.check("Tree locations", [p.relative_to(t.root).as_posix() for p in
+                                   (t.obj_dir, t.src_obj_dir, t.asm_dir, t.report_json, t.orig_dol, t.config_yml,
+                                    t.objdiff_json)],
+                ["build/RMHE08/obj", "build/RMHE08/src", "build/RMHE08/asm", "build/RMHE08/report.json",
+                 "orig/RMHE08/sys/main.dol", "config/RMHE08/config.yml", "objdiff.json"])
+        c.check("Tree.input uses the fallback", same(t.input("only-main.bin"), fx.root / "only-main.bin"), True)
+    with testing.FixtureTree() as tree:
+        c.check("main_tree outside git is None", repo.main_tree(tree.root), None)
+        c.check("a fixture Tree is its own MAIN", same(repo.Tree(tree.root).main, tree.root), True)
+
+
+def test_scratch_state_session(c):
+    with testing.FixtureTree() as tree:
+        p = repo.scratch("mytool", tree.root)
+        c.check("scratch is build/tmp/<tool>, created", (p.relative_to(tree.root).as_posix(), p.is_dir()),
+                ("build/tmp/mytool", True))
+        c.check("state names the .pi file", repo.state("claims.json", tree.root).relative_to(tree.root).as_posix(),
+                ".pi/claims.json")
+        c.raises("state refuses a name off the one list", ValueError, repo.state, "random.json", tree.root)
+    d = repo.session_tmpdir()
+    c.check("session_tmpdir is one directory per process", (repo.session_tmpdir() == d, os.path.isdir(d)), (True, True))
+    env = dict(os.environ, PYTHONPATH=str(Path(repo.__file__).parents[2]))
+    child = subprocess.run([sys.executable, "-c", "from tools.lib import repo; print(repo.session_tmpdir())"],
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", env=env)
+    c.check("... and another process gets another", child.stdout.strip() not in ("", d), True)
+
+
+def test_ground_truth(c):
+    with testing.FixtureTree() as tree:
+        dol = b"not really a dol"
+        tree.write("orig/RMHE08/sys/main.dol", dol)
+        tree.write(tree.config_dir / "config.yml", "object: orig/RMHE08/sys/main.dol\nhash: %s\n"
+                   "selfile_hash: %s\n" % (hashlib.sha1(dol).hexdigest().upper(), "0" * 40))
+        gt = repo.ground_truth(tree.root)
+        c.check("ground_truth reads both pins, lowercased",
+                gt, {"orig/RMHE08/sys/main.dol": hashlib.sha1(dol).hexdigest(), "orig/RMHE08/files/mh3.sel": "0" * 40})
+        c.check("verify_ground_truth: the DOL matches, the missing selfile is reported",
+                repo.verify_ground_truth(tree.root), [("orig/RMHE08/files/mh3.sel", "0" * 40, "MISSING")])
+        tree.write("orig/RMHE08/sys/main.dol", b"changed")
+        c.check("... a changed DOL is reported with its hash",
+                [r[0] for r in repo.verify_ground_truth(tree.root)],
+                ["orig/RMHE08/files/mh3.sel", "orig/RMHE08/sys/main.dol"])
+
+
+if __name__ == "__main__":
+    raise SystemExit(testing.run(globals()))

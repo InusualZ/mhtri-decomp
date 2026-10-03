@@ -20,13 +20,16 @@ the *needle* to LF only. This helper never guesses:
   (`git ls-files --eol`); `--fix` normalises them.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import difflib
 import os
-import re
-import subprocess
 import sys
+
+from tools.lib import text
+from tools.lib.git import Git
+from tools.lib.text import dominant, to_ending, to_lf  # noqa: F401 - the names this CLI has always exported
 
 
 def _read(path: str) -> bytes:
@@ -35,72 +38,28 @@ def _read(path: str) -> bytes:
 
 
 def _write(path: str, data: bytes) -> None:
-    tmp = path + ".edit.tmp"
-    with open(tmp, "wb") as fh:
-        fh.write(data)
-    os.replace(tmp, path)
-
-
-def to_lf(data: bytes) -> bytes:
-    return data.replace(b"\r\n", b"\n")
-
-
-def to_ending(data: bytes, ending: bytes) -> bytes:
-    data = to_lf(data)
-    return data if ending == b"\n" else data.replace(b"\n", ending)
+    text.atomic_write(path, data)
 
 
 def classify(data: bytes) -> str:
     """'lf', 'crlf', 'mixed' or 'none' (no line break) by counting `\\r\\n` against bare `\\n`."""
-    crlf = data.count(b"\r\n")
-    lf = data.count(b"\n") - crlf
-    if crlf and lf:
-        return "mixed"
-    if crlf:
-        return "crlf"
-    return "lf" if lf else "none"
-
-
-def dominant(data: bytes) -> bytes:
-    crlf = data.count(b"\r\n")
-    return b"\r\n" if crlf > data.count(b"\n") - crlf else b"\n"
-
-
-def _pattern(old_lf: bytes) -> "re.Pattern[bytes]":
-    lines = old_lf.split(b"\n")
-    return re.compile(b"\r?\n".join(re.escape(x) for x in lines))
+    return text.endings(data, lone_cr=False)
 
 
 def find_matches(data: bytes, old: bytes) -> list[tuple[int, int, int]]:
-    """[(start, end, 1-based line)] of the non-overlapping matches of `old` in `data`, either ending."""
     if not old:
         raise SystemExit("edit: the old text is empty")
-    pat = _pattern(to_lf(old))
-    return [(m.start(), m.end(), data.count(b"\n", 0, m.start()) + 1) for m in pat.finditer(data)]
+    return text.find_matches(data, old)
 
 
 def replace_bytes(data: bytes, old: bytes, new: bytes, count: int = 1) -> tuple[bytes, list[int]]:
     """(new file bytes, match line numbers). Raises SystemExit, changing nothing, when the count is wrong."""
-    hits = find_matches(data, old)
-    lines = [h[2] for h in hits]
-    if len(hits) != count:
-        raise SystemExit("edit: expected %d match(es), found %d%s" % (
-            count, len(hits), " at line(s) " + ", ".join(map(str, lines)) if hits else ""))
-    fallback = dominant(data)
-    out, pos = [], 0
-    for start, end, _line in hits:
-        span = data[start:end]
-        if b"\r\n" in span:
-            ending = b"\r\n"
-        elif b"\n" in span:
-            ending = b"\n"
-        else:
-            ending = fallback
-        out.append(data[pos:start])
-        out.append(to_ending(new, ending))
-        pos = end
-    out.append(data[pos:])
-    return b"".join(out), lines
+    if not old:
+        raise SystemExit("edit: the old text is empty")
+    try:
+        return text.replace_bytes(data, old, new, count)
+    except text.MatchCountError as exc:
+        raise SystemExit("edit: %s" % exc) from None
 
 
 def _diff(path: str, before: bytes, after: bytes) -> str:
@@ -149,21 +108,14 @@ def cmd_normalise(args) -> int:
     return 0
 
 
-EOL_RE = re.compile(r"^i/(\S+)\s+w/(\S+)\s+attr/(.*?)\t(.*)$")
-
-
 def drifted(root: str) -> list[tuple[str, str, str]]:
     """[(path, index class, working-tree class)] for tracked files whose endings differ from the index."""
-    p = subprocess.run(["git", "ls-files", "--eol"], cwd=root, capture_output=True, text=True,
-                       encoding="utf-8", errors="replace")
-    if p.returncode != 0:
-        raise SystemExit("edit: git ls-files --eol failed: " + (p.stderr or "").strip())
+    try:
+        rows = Git(root).ls_files(eol=True)
+    except Exception as exc:  # noqa: BLE001 - GitError: name git's own message
+        raise SystemExit("edit: git ls-files --eol failed: " + str(getattr(exc, "stderr", exc)).strip())
     out = []
-    for line in p.stdout.splitlines():
-        m = EOL_RE.match(line)
-        if not m:
-            continue
-        idx, wt, _attr, path = m.groups()
+    for idx, wt, _attr, path in rows:
         if wt in ("-text", "none") or idx == wt:
             continue
         if idx in ("-text", "none"):
@@ -173,11 +125,9 @@ def drifted(root: str) -> list[tuple[str, str, str]]:
 
 
 def cmd_check(args) -> int:
-    top = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True,
-                         encoding="utf-8", errors="replace")
-    if top.returncode != 0:
+    root = Git().toplevel()
+    if not root:
         raise SystemExit("edit: not in a git worktree")
-    root = top.stdout.strip()
     rows = drifted(root)
     for path, idx, wt in rows:
         print("index %-6s working tree %-6s %s" % (idx, wt, path))

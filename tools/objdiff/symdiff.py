@@ -33,6 +33,7 @@ Every run writes its project, report and diff JSON under a **unique** temp direc
 another process twice and raised `PermissionError [WinError 5]`, costing a measurement round (2026-09-28);
 a unique directory (with a transient-lock retry) removes the collision.
 """
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import atexit
 import json
 import os
@@ -40,6 +41,7 @@ import shutil
 import sys
 import tempfile
 import time
+from tools.lib import repo as librepo
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # tools/
 _HERE = os.path.dirname(os.path.abspath(__file__))                 # tools/objdiff (freshguard lives here)
@@ -49,23 +51,8 @@ import unitutil as uu
 import freshguard
 
 
-_TMPDIR = None
-
-
 def session_tmpdir() -> str:
-    """A **unique** scratch directory for this invocation, removed at exit.
-
-    The shared `build/tmp/unitutil/unitutil_report.json` cost a measurement round twice: a review lane
-    hit `PermissionError [WinError 5]` removing/creating it while another process held it, and fell back
-    to `build/RMHE08/report.json` (2026-09-28).  Each invocation now owns its project/report/diff files
-    (`build/tmp/` is shared scratch), so two concurrent `symdiff.py` runs cannot collide, and the
-    directory is cleaned up on exit.
-    """
-    global _TMPDIR
-    if _TMPDIR is None:
-        _TMPDIR = tempfile.mkdtemp(prefix="symdiff-")
-        atexit.register(shutil.rmtree, _TMPDIR, ignore_errors=True)
-    return _TMPDIR
+    return librepo.session_tmpdir()
 
 
 def stale_reasons(unit, root: str | None = None) -> list[str]:

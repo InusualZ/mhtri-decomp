@@ -2,27 +2,58 @@
 
 ## Purpose
 
-Bytes, line endings, byte-exact replace, atomic writes, anchors and transactions on shared files.
+Edits text without ever guessing a line ending: classifies endings, replaces bytes across `\n` or `\r\n`, writes atomically,
+and rewrites the shared files (`splits.txt`, `configure.py`) all-or-nothing with their anchors asserted first.
 
 ## Users
 
-The tools listed under this concept in `docs/tools/README.md`.
+`agents/edit.py` (replace/normalise/check), `units/escape.py --write`, `units/sharedfiles.py` (and through it `symedit`,
+`dataqueue`, `recordmerge`), `dataclaim`, `backlog`, `agents/sync_profiles.py`, `lib.cache`.
 
 ## Public API
 
-* `endings(data) -> {lf, crlf, mixed, cr}`, `dominant(data)`, `to_lf`, `with_ending(text, nl)`, `line_ending(text)`
-* `replace_bytes(data, old, new, count=1)`: the needle matches across `\n` or `\r\n`; the replacement takes the ending of the span; 0 or more than `count` matches refuses with line numbers
-* `atomic_write(path, data, append=False)`; `Transaction(paths)` temp + `os.replace`, exact restore on failure
-* `insert_after_anchor(text, anchor, insertion, present=None)`, `append_blocks(text, blocks)` (idempotent), `missing_anchors(text, anchors)`
+* `endings(data, lone_cr=True) -> lf | crlf | cr | mixed | none`; `dominant(data)`; `to_lf`; `to_ending(data, ending)`;
+  `line_ending(text)`; `with_ending(text, nl)`; `read_text(path)` (`newline=""`).
+* `find_matches(data, old)`, `replace_bytes(data, old, new, count=1) -> (bytes, lines)`; `MatchCountError(expected, lines)`.
+* `atomic_write(path, data, append=False)`.
+* `Transaction(rename=None)`: `write(path, text|bytes)`, `rollback()`, `cleanup()`; `TMP_SUFFIX`.
+* `insert_after_anchor(text, anchor, insertion, present=None)`, `append_blocks(text, blocks)`, `missing_anchors(text, anchors)`;
+  `AnchorError`.
+
+## Invariants and rules
+
+* **The needle matches either ending; the replacement takes the span's.** Working copies mixed CRLF and LF while the index
+  is LF, so a scripted `str.replace` with `\n` silently matched nothing on a CRLF file. A span with no line break takes the
+  file's dominant ending, so a mixed file keeps each region's own.
+* **Assert the match count**: 0 or more than `count` matches raise `MatchCountError` with the match lines; nothing is replaced.
+* `endings(lone_cr=False)` is `edit.py`'s reading (a bare CR is not a break), kept so its report does not change.
+* **`atomic_write`** is byte-exact (a `str` is UTF-8, never newline-translated), uses a unique temp file beside the target
+  (two writers never share one), keeps the target's permission bits, and never leaves the temp file behind.
+* **Shared files** (docs/plan.md 7.12): a CRLF file written back with LF silently voided two edits (the anchor stopped
+  matching), so the file's own ending is kept, every anchor is asserted before a byte is written, a block already present is
+  not appended twice, and a `Transaction` restores the previous bytes exactly (deleting what it created, newest first) on any
+  failure; recovery never goes through the injectable `rename`.
 
 ## Absorbs (today's implementations)
 
-`edit.replace_bytes/classify/dominant`, `sharedfiles.Transaction/line_ending/insert_after_anchor/append_blocks`, `escape.atomic_write`, `symedit._write_text`, `dataqueue.write_queue`, `backlog/dataclaim.write_atomic`, `sync_profiles.nl_of/to_lf`, `mergebranch.newline_of`
+`edit.replace_bytes/find_matches/classify/dominant/to_lf/to_ending/_write`, `sharedfiles.Transaction/read_text/line_ending/
+with_ending/insert_after_anchor/append_blocks/missing_anchors/AnchorError/TMP_SUFFIX`, `escape.atomic_write`,
+`dataclaim.write_atomic`, `backlog.write_atomic`, `sync_profiles.write`.
+
+## Lib dependencies
+
+None (stdlib).
 
 ## Test contract
 
-Tier: fixture (a lib test never reads the live tree). LF, CRLF and mixed files round-trip; a failed transaction restores the previous bytes exactly; anchors are asserted before any write
+Tier: fixture (`tools/tests/lib/test_text.py`). LF, CRLF, mixed and lone-CR data classify; an LF needle matches a CRLF file
+and the replacement takes CRLF; a mixed file keeps each region's ending; 0/too many matches refuse with line numbers;
+`atomic_write` leaves no temp file; a failed transaction restores the previous bytes exactly and removes what it created;
+a missing anchor raises before any write; `append_blocks`/`present=` are idempotent.
 
 ## Known gaps
 
-None until implemented; `migration.md` names the package.
+* `symedit._write_text`, `dataqueue.write_queue`, `sync_playbook_index.write`, `mergebranch.newline_of/restore` and
+  `sync_profiles.nl_of/to_lf` (a lone CR counts there) still carry their own copy: they move with the symbols (3d), merge
+  (3f) and agents packages.
+* `escape.py --edit` matches bytes exactly (CRLF-sensitive) and is not `replace_bytes`; WP3f folds it into `edit.py replace`.

@@ -119,6 +119,7 @@ occurrence number is preserved on the item as `count`, and each such item also c
 one place the meaning changed, so a reader that treated `weight` as occurrences should read `count` instead.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import datetime as _dt
@@ -130,6 +131,7 @@ import re
 import sys
 import tempfile
 from dataclasses import dataclass, field
+from tools.lib import text as libtext
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOOLS = os.path.dirname(HERE)
@@ -1056,15 +1058,7 @@ def canonical(p: dict) -> str:
 
 
 def write_atomic(path: str, text: str) -> None:
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".backlog-", suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as fh:
-            fh.write(text)
-        os.replace(tmp, path)
-    finally:
-        if os.path.exists(tmp):
-            os.remove(tmp)
+    libtext.atomic_write(path, text)
 
 
 # -----------------------------------------------------------------------------------------------------------

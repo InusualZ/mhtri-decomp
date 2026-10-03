@@ -73,6 +73,7 @@ Usage (addresses in hex, or a symbol name):
 
 Nothing is written outside `build/tmp/`: the `splits.txt` block is printed, never applied.
 """
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import collections
 import hashlib
@@ -83,6 +84,7 @@ import re
 import struct
 import sys
 import time
+from tools.lib import cache as libcache
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # tools/
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))                   # tools/splits/ (dataorder)
@@ -351,9 +353,9 @@ def dump_stamp():
     files = dump_files()
     return {
         "game": GAME,
-        "symbols": hashlib.sha1(open(SYMBOLS, "rb").read()).hexdigest(),
-        "splits": hashlib.sha1(open(SPLITS, "rb").read()).hexdigest(),
-        "dol": hashlib.sha1(open(DOL, "rb").read()).hexdigest(),
+        "symbols": libcache.content_hash(SYMBOLS),
+        "splits": libcache.content_hash(SPLITS),
+        "dol": libcache.content_hash(DOL),
         "files": len(files),
         "bytes": sum(os.path.getsize(f) for f in files),
         "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),

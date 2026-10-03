@@ -75,8 +75,12 @@ becomes it (`duplication.md` has the line numbers).
 * `Tree` value: `root`, `main` (the MAIN tree of a worktree or slot, via `git worktree list --porcelain`), `is_worktree`,
   `is_slot`, `build(version)`, `obj_dir`, `src_obj_dir`, `asm_dir`, `orig_dol`, `config_yml`, `report_json`, `objdiff_json`.
 * `repo_root(start=None)`: the `cwd`-is-a-tree rule from `unitutil.repo_root` (the invocation's tree wins; a fixture is a tree).
-* `main_tree(tree)`, `resolve_input(rel, tree)` (worktree first, MAIN fallback - `unitutil.resolve_input`,
-  `recompile.main_root`, `splitcheck.main_root`).
+* `main_tree(root, honour_env=False)` (the parent of `git rev-parse --git-common-dir`, not the first `git worktree list` row,
+  which is registration order), `resolve_input(rel, root, probe, honour_env=False)` (worktree first, MAIN fallback -
+  `unitutil.resolve_input`, `recompile.main_root`, `splitcheck.main_root`).
+* `guard(path, what)`: the fixture tier's choke point for what the audit hook cannot see (`os.stat` probes, roots bound at
+  import time): every root `lib.repo` resolves or is handed is refused under `TIER="fixture"` when it is the live tree. A module
+  never resolves the live tree at import time (`unitutil.ROOT` is resolved on first use) - WP0 gaps 1-2, closed in WP1a.
 * `scratch(tool) -> build/tmp/<tool>/`, `session_tmpdir()` (unique, removed at exit), `state(name) -> .pi/<name>`
   (one place names `claims.json`, `backlog.json`, `land-base.json`, `data-requests.json`, `slots/`, `lanes/`, `outbox/`, `notes/`).
 * `ground_truth(tree)`: the DOL path and the pinned hashes from `config.yml` (`wtsafe.ground_truth`, `prepcommit.ground_truth_error`).
@@ -85,13 +89,16 @@ becomes it (`duplication.md` has the line numbers).
 ### `lib/proc.py` - subprocess
 
 * `run(args, cwd=None, check=False, input=None, timeout=None) -> Completed` with `encoding="utf-8", errors="replace"` always
-  (F34); `run_bytes` for binary output; `kill_tree(proc)`; `spawnretry.install()` on import on Windows.
+  (F34); `run_bytes` for binary output; `kill_tree(proc)`; `install_spawn_retry()` - explicit, not on import (importing a lib
+  module must not patch `subprocess`); `unitutil` and `selftest_site/sitecustomize.py` call it, as they did `spawnretry.install`.
 * `trap_sites(root)` (the AST scan) becomes a test in `tests/lib/test_proc.py`.
 * From: `subproc`, `spawnretry`, `selftest._kill_tree`, `land.run`.
 
 ### `lib/git.py` - git
 
-* `Git(cwd)` with the calls the tools make, typed: `rev_parse`, `head`, `branch`, `merge_base`, `is_ancestor`, `fork_point`,
+* `Git(cwd)` with the calls the tools make, typed: the primitives `run`/`run_bytes`/`out`/`ok` (each wrapper keeps its own
+  failure policy and message, only the process call is shared), `rev_parse`, `head`, `current_branch`, `toplevel`,
+  `common_dir`, `merge_base`, `is_ancestor`, `fork_point`, `merge_tree`,
   `show(ref, path) -> bytes`, `cat_index(path)`, `ls_files(eol=False)`, `status_porcelain`, `diff_names(a, b)`,
   `renames(a, b)`, `worktree_list`, `worktree_add/remove`, `branch_exists/create/delete`, `refs(prefix)`, `update_ref`,
   `stage(paths)`, `unstage`, `commit(message_file, pathspec)`, `merge_file_diff3`, `unmerged_stages`.
@@ -115,8 +122,9 @@ becomes it (`duplication.md` has the line numbers).
 
 ### `lib/names.py` - names
 
-* `is_generated(name)` (`fn_`/`lbl_`/`loc_`/`@etb_`/`@eti_`/`jumptable_`/`@NNN`), `address_of_generated`, `is_mangled`,
-  `linkage_stem`, `estimate_member_mangling`, `estimate_static_mangling`, `mangle_tokens` (the `<digits><chars>` peel).
+* `is_generated(name, scheme)` - the tools ask four different questions (`default`, `rule7`, `map`, `ledger`), so each is a
+  named scheme written once rather than one predicate that would change three tools' answers; `address_of`, `is_mangled`,
+  `linkage_stem`, `estimate_member_mangling`, `estimate_static_mangling`, `peel_tokens` (the `<digits><chars>` peel).
 * From: `callees.is_generated`, `dumpmap.is_generated`, `relocaudit.linkage_stem`, `undefrefs.linkage_stem`, `langcheck.mangled`,
   `mangle.estimate_*`, `typeregistry.tokens_of_name`, `stylelint` rule 7/9 regexes.
 

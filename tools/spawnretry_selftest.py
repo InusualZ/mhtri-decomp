@@ -2,12 +2,11 @@
 """Selftest for `spawnretry`: WinError 5 at launch is retried, anything else is raised at once."""
 from __future__ import annotations
 
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import os
 import subprocess
-import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import spawnretry  # noqa: E402
+from tools import spawnretry
 
 
 def _winerr(code):

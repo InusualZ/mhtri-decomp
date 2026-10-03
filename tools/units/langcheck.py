@@ -66,6 +66,7 @@ Read-only: nothing here writes a file, and nothing here re-splits, builds or lin
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import json
@@ -73,6 +74,7 @@ import os
 import re
 import struct
 import sys
+from tools.lib import names as libnames
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -97,10 +99,6 @@ SRCFILE_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_./\\-]*\.(?:c|cpp|cc|cxx|cp|c\
 # sections themselves.
 EXTAB_SECTIONS = ("extab", "extabindex")
 
-# MWCC's C++ mangling appends the argument list after `__` (`fn__Fv`, `Pl_Skill_ck__FP4_PLWUs`), and
-# the `__F`/`__Q` form is what every mangled name in this image uses. `__start`, `__init_data`,
-# `_savegpr_21` and `lbl_80594DE0` are C/EABI spellings and deliberately do not match.
-MANGLE_RE = re.compile(r"__(F|Q)")
 
 # `configure.py` tokens this tool needs: the lib a block belongs to, its cflags variable, and one
 # Object registration (with an optional inline `cflags=` override).
@@ -124,8 +122,7 @@ _CFLAGS_TOKEN_RE = re.compile(
 # the pure rule
 # --------------------------------------------------------------------------------------------------
 def mangled(name: str) -> bool:
-    """MWCC's C++ mangling puts the argument list after `__` (`fn__Fv`, `Pl_Skill_ck__FP4_PLWUs`)."""
-    return "__" in name and MANGLE_RE.search(name) is not None
+    return libnames.is_mangled(name)
 
 
 def ext_lang(ext: str) -> str | None:

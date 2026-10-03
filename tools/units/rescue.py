@@ -41,6 +41,7 @@ last copy of work, not to reclaim disk.
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import json
@@ -48,6 +49,7 @@ import os
 import re
 import subprocess
 import sys
+from tools.lib.git import Git
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
@@ -79,7 +81,7 @@ _SRC_EXTS = (".c", ".cpp", ".cp", ".cxx", ".cc", ".c++", ".C")
 # --------------------------------------------------------------------------------------------------
 
 def _run(repo: str, args: list[str]) -> subprocess.CompletedProcess:
-    return subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    return Git(repo).run(*args)
 
 
 def git(repo: str, args: list[str], check: bool = True) -> str:
@@ -122,9 +124,7 @@ def list_rescue_refs(repo: str, prefix: str) -> list[dict]:
 
 def merge_base(repo: str, main_ref: str, ref: str) -> str | None:
     """The merge-base of `main_ref` and `ref`, or None when the histories are unrelated."""
-    p = _run(repo, ["merge-base", main_ref, ref])
-    base = p.stdout.strip()
-    return base if p.returncode == 0 and base else None
+    return Git(repo).merge_base(main_ref, ref)
 
 
 def added_registrations(repo: str, base: str, ref: str) -> tuple[list[str], list[str]]:

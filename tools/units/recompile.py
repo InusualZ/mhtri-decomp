@@ -88,6 +88,7 @@ read with its kind, so a measurement is unambiguous about the map as well as the
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import json
@@ -96,6 +97,7 @@ import re
 import subprocess
 import sys
 import time
+from tools.lib.git import Git
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
@@ -106,7 +108,7 @@ SRC_EXT = (".c", ".cpp", ".cp", ".cxx", ".cc")
 
 
 def git(args: list[str], cwd: str, check: bool = True) -> str:
-    out = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    out = Git(cwd).run(*args)
     if check and out.returncode != 0:
         raise SystemExit("git %s failed in %s: %s" % (" ".join(args), cwd, out.stderr.strip()))
     return out.stdout

@@ -21,12 +21,15 @@ Both come out of the same repository state the other tools read, so a fresh sess
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import json
 import os
 import re
 import sys
+
+from tools.lib import names as libnames
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 GAME = "RMHE08"
@@ -46,8 +49,7 @@ SOURCES = (
 )
 # dtk names a split object after the section and the address it starts at: auto_03_802AE0C4_text.o
 OBJECT_RE = re.compile(r"^auto_\d+_([0-9a-fA-F]{8})_(\w+)$")
-# `fn_804DA7E4`, `lbl_805CED58`, `jumptable_805CEF78`: names that carry no information (yet).
-GENERATED_RE = re.compile(r"^(?:fn|lbl|unk|sub|loc|jump|jtbl|jumptable|gap)_?[0-9a-fA-F]*$")
+GENERATED_RE = libnames.GENERATED["ledger"]
 
 
 def read_json(path: str) -> dict | None:

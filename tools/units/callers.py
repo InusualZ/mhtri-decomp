@@ -70,6 +70,7 @@ with the remedy, `exit 2`, and `"error": "no asm dump"` under `--json`.
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import bisect
@@ -80,6 +81,7 @@ import os
 import re
 import sys
 import time
+from tools.lib import cache as libcache
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOOLS = os.path.dirname(HERE)
@@ -156,18 +158,7 @@ def all_asm_files(asm_dir):
 
 
 def dump_signature(asm_dir, files):
-    """What the index is a function of: every file's name, size and mtime in the dump.
-
-    A `symbols.txt` edit is deliberately *not* part of it: the graph is address-keyed and stores no name
-    from the map, so a rename must not cost a 10 s rebuild. `dump_asm.py` rewrites the dump when it runs,
-    so any dump change moves this signature.
-    """
-    h = hashlib.sha1()
-    for path in files:
-        st = os.stat(path)
-        name = os.path.relpath(path, asm_dir).replace("\\", "/")
-        h.update(("%s\0%d\0%d\n" % (name, st.st_size, st.st_mtime_ns)).encode("utf-8"))
-    return h.hexdigest()
+    return libcache.stat_digest(files, asm_dir)
 
 
 def is_scaffolding(path, asm_dir):

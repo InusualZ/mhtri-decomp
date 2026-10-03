@@ -51,6 +51,7 @@ lives in), which is how a worktree can audit MAIN's already-built objects withou
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import json
@@ -59,6 +60,7 @@ import re
 import struct
 import sys
 import time
+from tools.lib import names as libnames
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)                      # so `import langcheck` works from any cwd
@@ -70,9 +72,6 @@ STB_LOCAL, STB_GLOBAL, STB_WEAK = 0, 1, 2
 STT_FILE = 4
 SHN_UNDEF = 0
 
-# MWCC writes a C++ argument list after `__` (`drawSpr2TF__FUc...`, `Panic__Q24nw4r2dbFPCciPCce`).
-# `__start`, `_savegpr_20` and `lbl_8058B290` are C/EABI spellings and deliberately do not match.
-MANGLE_RE = re.compile(r"__(F|Q)")
 
 # EABI register-save/restore helpers. They are compiler-generated references that encode register
 # allocation (a different prologue saves a different `_savegpr_N`), not linkage, so they are reported
@@ -93,13 +92,7 @@ DECL_CAP = 4
 # the pure rule
 # --------------------------------------------------------------------------------------------------
 def linkage_stem(name: str) -> str:
-    """The identifier a mangled name is built from: everything before MWCC's `__<args>` suffix.
-
-    `drawSpr2TF__FUcP9fltSpr2TFUc` -> `drawSpr2TF`; `fn_80059550` -> `fn_80059550`. Two symbols with
-    the same stem are "the same symbol under two linkages", which is exactly what this tool reports.
-    """
-    m = MANGLE_RE.search(name)
-    return name[:m.start()] if m else name
+    return libnames.linkage_stem(name)
 
 
 def audit_sets(our_defined, our_undefined, tgt_defined, tgt_undefined) -> dict:

@@ -25,12 +25,14 @@ instead. Lone CR (`\\r` with no `\\n`) is reported because a tool that splits on
 Exit status is the answer: 0 nothing differs, 1 at least one path differs, 2 a usage error.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import os
 import re
 import subprocess
 import sys
+from tools.lib.git import Git
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -38,7 +40,7 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 
 def git(repo: str, *args: str) -> tuple[int, bytes, str]:
     """Run `git -C repo <args>`; `(returncode, stdout bytes, stderr text)`, never raising."""
-    p = subprocess.run(["git", "-C", repo, *args], capture_output=True)
+    p = Git(repo).run_bytes(*args)
     return p.returncode, p.stdout, (p.stderr or b"").decode("utf-8", "replace")
 
 

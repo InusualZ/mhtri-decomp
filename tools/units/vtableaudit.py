@@ -94,6 +94,7 @@ offset/address/size fields by hand - this mode parses them once, in `dol_segment
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import json
@@ -103,6 +104,7 @@ import struct
 import subprocess
 import sys
 import time
+from tools.lib.git import Git
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -765,8 +767,7 @@ def _symbol_address(name: str, symbols_by_name: dict):
 def _git(root: str, *args: str) -> str:
     """`git <args>` stdout, or `""` - a missing ref or a file absent at it is a fact, not a crash."""
     try:
-        p = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, encoding="utf-8",
-                           errors="replace")
+        p = Git(root).run(*args)
     except OSError:
         return ""
     return p.stdout if p.returncode == 0 else ""

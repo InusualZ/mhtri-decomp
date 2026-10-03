@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -71,6 +72,29 @@ def live_root() -> Path:
     return LIVE_ROOT
 
 
+def assert_path_allowed(path: Any, what: str) -> None:
+    """Raise `LiveTreeError` when the running test is fixture-tier and `path` lies in the live repository.
+
+    The seam for what the audit hook cannot see (`os.stat`/`os.path.exists`, a root bound at import time
+    and used later): `lib.repo` calls it on every root it resolves or is handed.
+    """
+    if current_tier() == "fixture" and _live_parts(path) is not None:
+        _refuse(what)
+
+
+class refusals_expected:
+    """`with testing.refusals_expected():` - for a test OF a refusal: the refusals raised inside the block are
+    the point of the test, so they are not counted against the run. Greppable on purpose."""
+
+    def __enter__(self) -> "refusals_expected":
+        self._mark = len(_STATE["violations"])
+        return self
+
+    def __exit__(self, *exc: Any) -> None:
+        self.refused = _STATE["violations"][self._mark:]
+        del _STATE["violations"][self._mark:]
+
+
 # --- the live-tree guard (an audit hook) ------------------------------------------------------------------
 
 def _norm(path: Any) -> str | None:
@@ -107,6 +131,18 @@ def _is_listable(parts: tuple[str, ...]) -> bool:
     return parts == () or (parts[0] == "tools" and not parts[-1].endswith((".json", ".txt", ".md")))
 
 
+def _argv_items(argv: Any) -> list:
+    """The arguments of a process start. On Windows the audit event carries the command line as ONE string
+    (`list2cmdline` has run), so it is split back into its (unquoted) tokens; a list is taken as it is."""
+    if isinstance(argv, (str, bytes)):
+        try:
+            return [t[1:-1] if len(t) > 1 and t[0] == t[-1] == '"' else t
+                    for t in shlex.split(os.fsdecode(argv), posix=False)]
+        except ValueError:
+            return [os.fsdecode(argv)]
+    return list(argv or ())
+
+
 def _hook(event: str, args: tuple) -> None:
     if not _STATE["guard"] or _STATE["in_hook"]:
         return
@@ -130,8 +166,7 @@ def _hook(event: str, args: tuple) -> None:
             parts = _live_parts(cwd if cwd is not None else os.getcwd())
             if parts is not None:
                 _refuse("a process started in %s" % ("/".join(parts) or "the repository root"))
-            items = [argv] if isinstance(argv, (str, bytes)) else list(argv or ())
-            for item in items:
+            for item in _argv_items(argv):
                 if isinstance(item, (str, bytes, os.PathLike)) and os.path.isabs(os.fsdecode(item)):
                     parts = _live_parts(item)
                     if parts is not None and not _is_code(parts):

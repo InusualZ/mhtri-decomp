@@ -58,6 +58,7 @@ selftest pins it as a negative fixture). And a unit whose *only* wrong reference
     python tools/units/undefrefs.py --selftest
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import hashlib
@@ -69,6 +70,8 @@ import struct
 import subprocess
 import sys
 import tempfile
+from tools.lib import cache as libcache
+from tools.lib import names as libnames
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 if os.path.dirname(HERE) not in sys.path:
@@ -84,8 +87,6 @@ BOOKKEEPING = ("extab", "extabindex")
 LINKER_SYMBOLS = ("_SDA_BASE_", "_SDA2_BASE_", "__start")
 # The linker script's own assignments (`_stack_addr = ...;`): the link supplies these, no object does.
 LINKER_ASSIGN_RE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_.]*)\s*=")
-# MWCC's mangling: `__F...` (free function), `__Q<digits>...` (method), `__ct`/`__dt`.
-MANGLE_RE = re.compile(r"__(?:F[A-Za-z0-9]|Q\d|ct|dt)")
 GLOBAL_BINDING, WEAK_BINDING = 1, 2
 SCHEMA = 1
 # `build/` is untracked and gitignored, so this never shows in the gate's tree-dirty guard.
@@ -185,13 +186,7 @@ def linker_symbols(main: str) -> set[str]:
 
 
 def linkage_stem(name: str) -> str:
-    """The identifier a mangled name is built from: everything before MWCC's `__<args>` suffix.
-
-    `get_move_work_adrs__FUc` -> `get_move_work_adrs`; `dl_acdata_to_ar_eqdata__FP11ArenaEqDataUc` ->
-    `dl_acdata_to_ar_eqdata`. Two names with the same stem are one symbol under two linkages - the fix.
-    """
-    m = MANGLE_RE.search(name)
-    return name[:m.start()] if m else name
+    return libnames.linkage_stem(name)
 
 
 # ---------------------------------------------------------------------------------------------------------
@@ -199,11 +194,7 @@ def linkage_stem(name: str) -> str:
 # ---------------------------------------------------------------------------------------------------------
 
 def _sig(path: str):
-    try:
-        st = os.stat(path)
-    except OSError:
-        return None
-    return [st.st_mtime_ns, st.st_size]
+    return libcache.stat_key(path)
 
 
 def link_symbol_index(main: str, cache_path: str | None = None, rebuild: bool = False) -> dict:
