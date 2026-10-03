@@ -9,7 +9,7 @@ mis-numbered the rule table (see T2 below).
 | T0 | freshness | `python tools/agents/sync_profiles.py --check` | exits 0: every profile's generated section 6.5 block matches `docs/plan.md` section 6.5. A rule change that forgot the profiles fails here (`install.sh` and `profileprobe.py` both run it first) |
 | T1 | discovery | `subagent({ action: "list" })`, run from **MAIN** *and* from a fresh worktree | the name shows as a **project** agent with its aliases. Project agents are read from the **cwd's** `.claude/agents/`, so a lane in a worktree cut *before* a profile edit sees the old prompt - and the user-scope copy (`~/.claude/agents/`, consulted for every cwd) is what closes that gap. **Run `tools/agents/install.sh` after every profile edit.** T1's original "there is no install step" was proven only from MAIN and is wrong for worktrees |
 | T2 | recall | `python tools/agents/profileprobe.py <agent>...` then launch the printed call | the reader child, running nothing, states its job, its write limits **and the tell for being launched in MAIN**, the numbered rules **with the right numbers**, the pre-report verification **and that the `FAILED` count is the primary signal**, its report sections, and its role-specific rules - and names anything missing rather than inventing it |
-| T3 | behaviour | give it a **real** task of that shape and judge the result against the gate | lands through `landbranch.sh` first try; MAIN untouched; the role-specific proof present (see below); no row lower than before |
+| T3 | behaviour | give it a **real** task of that shape and judge the result against the gate | lands through `land.py land --branch` first try; MAIN untouched; the role-specific proof present (see below); no row lower than before |
 
 T2 is the cheap test that has already paid: it caught the first `decompiler` draft mis-numbering section 6.5
 (rule 1 described as the vtable rule, which is rule 10; rule 4 as "no duplicated records"; the field-offset rule
@@ -19,11 +19,11 @@ before trusting a profile with lanes.
 ## Role-specific T3 acceptance
 
 * **decompiler** - a real unit: registration + bodies in one commit, `Object(NonMatching, ...)`, the unit lands
-  through `landbranch.sh` **without a gate refusal**, MAIN's tree still clean, the budget converged (no
+  through `land.py land --branch` **without a gate refusal**, MAIN's tree still clean, the budget converged (no
   single-row spelunking), and the report carries its `Verification` section.
 * **merger** - a real refused-apply branch: the merged branch lands; the report carries the **zero-rows-moved**
   table (landed consumers of the merged header measured before/after); `git merge-base --is-ancestor main HEAD`
-  is true (so `main` moving mid-task was re-merged); and the header was merged **by hand** - no `union.py` on a
+  is true (so `main` moving mid-task was re-merged); and the header was merged **by hand** - no mechanical union of a
   header.
 * **fixer** - a real refused branch: exactly the refused items cleared, the diff no larger than the refusal, no
   row lower than before, improvements kept (matching policy rule 1), and the branch lands.

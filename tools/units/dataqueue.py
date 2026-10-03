@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Write `tools/units/data-queue.json`: the campaign's unowned data as a queue, not as comments.
 
-docs/plan.md 7.17. `attribute.py`'s data pass currently writes the runs it saw into `splits.txt` as
+docs/plan.md 7.17. The retired tiler's data pass wrote the runs it saw into `splits.txt` as
 `# ... claim in the measured data pass` comments, and nothing reads them back. This tool is the writer
 for the queue `brief.py` already reads: one entry per **unowned data run**, in the shape the plan
 specifies,
@@ -156,7 +156,7 @@ def split_by_owner(runs: list[dict], refs: dict[str, set[str]], fn_unit: dict[st
 
     A `.sdata2` pool is contiguous but several units share it, so raw contiguity merges unrelated
     units' data into one run and hides the attribution. Splitting where the set of referencing units
-    changes recovers the per-unit runs `attribute.py` would propose (`Pl/pl_act`'s `.sdata2` run is one
+    changes recovers the per-unit runs a tiler would propose (`Pl/pl_act`'s `.sdata2` run is one
     such case), while an unreferenced stretch stays a single run.
     """
     out: list[dict] = []

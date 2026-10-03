@@ -8,7 +8,7 @@ Compile one unit **without ninja**, from any worktree, and prove the object is f
 
 ## Users
 
-the landing gate (5); the selftest runner (1); `.pi/bin` scripts (1); profiles (`.claude/agents`) (8); skills (1); docs (133); imported by `brief`, `claims`, `dossier`, `handoff`, `land`, `measure`, `queue`, `slots`, `undefrefs`
+the landing gate (5); the selftest runner (1); profiles (`.claude/agents`) (8); skills (1); docs (133); imported by `brief`, `claims`, `dossier`, `handoff`, `land`, `measure`, `queue`, `slots`, `undefrefs`
 
 ## CLI
 

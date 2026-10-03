@@ -13,7 +13,7 @@ For every proposed run it answers, with evidence, without compiling and without 
 
 1. **the range next to what is claimed today.** The run's section/start/end is compared against every range
    in `config/RMHE08/splits.txt`; an intersection is a **refusal** (`overlap`), not a warning - the queue is
-   a snapshot and `attribute.py apply` can have moved since it was written.
+   a snapshot and a splits edit can have moved since it was written.
 2. **the target's bytes.** Read from the split object that currently covers the address
    (`build/RMHE08/obj/**/*.o`; the object's base address comes from `build/RMHE08/config.json`) and
    cross-checked against `orig/RMHE08/sys/main.dol`. The DOL is the fallback when no object covers the

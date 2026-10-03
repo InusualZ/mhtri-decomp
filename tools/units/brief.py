@@ -335,7 +335,7 @@ def symbols_in_range(main: str, start: int, end: int) -> list[dict]:
     """The unit's symbols from the map, parsed in-process.
 
     `symbols.txt` must never reach an agent's context, but a tool reading it programmatically is exactly what
-    `attribute.py` and `tudiscover` do. Parsing it here instead of shelling out to `symedit.py --json` also
+    `tudiscover` does. Parsing it here instead of shelling out to `symedit.py --json` also
     avoids that command's multi-document output, which is not a single JSON value.
 
     A failure is reported, never swallowed: an empty inventory would let a worker believe a unit is finished.
@@ -1042,7 +1042,7 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
 #
 # The `src/auto/` scaffolding bucket is retired: a translation unit is registered ONCE, at its final
 # `src/<module>/<name>.<ext>` home, by the worker that works it. Discovery therefore produces *proposals*
-# (`attribute.py queue`), and the pool is built from the queue rather than from registered no-body units.
+# (the queue file `tools/units/attribution-queue.json`, no longer produced), and the pool is built from the queue rather than from registered no-body units.
 # The worker's first act is the registration - it has to be, because a unit that is not in the build graph
 # cannot be measured - and that registration lands on `main` with the worker's own commit.
 # --------------------------------------------------------------------------------------------------
@@ -1122,9 +1122,9 @@ def proposal_conflicts(main: str, p: dict) -> list[str]:
     regenerated on every landing, so a proposal's range can be registered by another worker before its
     brief is written. Measured 2026-09-25: the `proposal/8008F8E4` entry capped `0x8008F8E4-0x80097D40` -
     five translation units, four of them already claimed and live. A brief written for it would set a
-    second worker on four live ranges, so none is written: the range is finished work and `attribute.py
-    queue` re-cuts the region. A range overlapping a *sibling* proposal is the queue's own invariant
-    broken (`attribute.overlap_report`), and is refused the same way rather than handed out twice.
+    second worker on four live ranges, so none is written: the range is finished work and the queue file
+    must be regenerated over the region. A range overlapping a *sibling* proposal is the queue's own invariant
+    broken, and is refused the same way rather than handed out twice.
     """
     text = p.get("text") or []
     label = p.get("label", "?")
@@ -1150,7 +1150,7 @@ def handable_proposals(main: str) -> tuple[list[dict], list[dict]]:
     """`(handable, blocked)` - the queue's entries a worker may be given, and the rest with reasons.
 
     `blocked` carries `why` per entry because a queue entry nobody can take is a *data* defect to fix
-    (`attribute.py queue`), never work to drop silently - `pool` reports every one of them.
+    (the queue file), never work to drop silently - `pool` reports every one of them.
     """
     handable, blocked = [], []
     for p in proposals(main):
@@ -1465,12 +1465,12 @@ def _tu_row(p: dict) -> str:
 
 
 def _tu_warning(p: dict) -> str | None:
-    """A plain warning when the range's own evidence does not make it one TU (`attribute.tu_probe`).
+    """A plain warning when the range's own evidence does not make it one TU (the queue entry's `tu` tag).
 
     The queue tiles the unclaimed `.text` by evidence first and size only where no evidence reaches, so a
     proposal can be a *partial* TU, a union of several, one file whose internal boundary is a guess, or -
     in a range no `__FILE__` name reaches - a pure `--max-bytes` slice. Each of those has cost a worker or
-    a landing cycle. `attribute.tu_probe` reads `tudiscover`'s anchors and `segments`' notes, and this is
+    a landing cycle. The tag was set from `tudiscover`'s anchors and `segments`' notes, and this is
     where the verdict reaches the worker, at the top of the brief, before the claim. `None` when the range
     is one anchored TU (or has no TU evidence at all, which the seam row already states).
     """
@@ -1504,7 +1504,7 @@ def _tu_warning(p: dict) -> str | None:
 
 
 def _data_seam_note(p: dict) -> str | None:
-    """The `.data` emission-order evidence for a proposal (`attribute.data_seams_for`), or None.
+    """The `.data` emission-order evidence for a proposal (the entry's `data_seams`), or None.
 
     MWCC emits one TU's `.data` as globals, strings, vtables in reverse class order, then the strings of inline
     functions, so strings between two vtable groups (or two vtables whose owners go up) mean a TU boundary
@@ -1553,7 +1553,7 @@ def _data_seam_note(p: dict) -> str | None:
 
 
 def _pool_seam_note(p: dict) -> str | None:
-    """The literal-pool evidence for a proposal (`attribute.pool_seams_of`), or None.
+    """The literal-pool evidence for a proposal (the entry's pool-seam tag), or None.
 
     MWCC emits one literal pool per translation unit and `mwld` does not merge pools, so a pooled literal this
     range reads that a REGISTERED unit already reads or claims means the two are one original TU: this range is
@@ -1602,7 +1602,7 @@ def pool(main: str, force: bool = False, prune: bool = True,
          prune_promoted_litter: bool = False) -> dict:
     """Write a brief for every piece of work the pool can hand out, into `tools/units/briefs/pool/`.
 
-    Under option A (owner, 2026-09-24) the work is the **proposal queue** written by `attribute.py queue`,
+    Under option A (owner, 2026-09-24) the work is the **proposal queue** read from `attribution-queue.json`,
     and each pooled brief is a proposal brief. The pre-option-A source - registered units with no bodies -
     is the fallback when there is no queue, so an existing pool is not orphaned and the tool still works on
     a tree whose discovery has not been re-run.
@@ -1689,7 +1689,7 @@ def brief_text_range(path: str) -> list[int] | None:
 def promoted_litter(main: str) -> list[dict]:
     """Promoted briefs in `tools/units/briefs/` whose current queue entry no longer matches.
 
-    A promoted brief is a claim's copy; it outlives the claim, and `attribute.py queue` can be regenerated
+    A promoted brief is a claim's copy; it outlives the claim, and the queue file can be regenerated
     under it, so the brief can end up describing a range the queue no longer hands out. Two were found this
     way on 2026-09-25 - `801502C8` stated `0x801502C8..0x80154B04` while the queue says `..0x801550FC`, and
     `801FBF78` stated a `.ctors` word where the queue says `0x801FBF78..0x802029B4` (127 functions) - and a
@@ -1963,7 +1963,7 @@ def selftest() -> int:
 
         # the TU probe: the queue tags each entry with what `tudiscover`'s anchors and `segments`' notes
         # say, and a range that is not one TU gets a plain warning at the top of the brief
-        # (attribute.tu_probe). `capped` is the tag for a range no `__FILE__` name reaches: its edge is
+        # (the entry's tag). `capped` is the tag for a range no `__FILE__` name reaches: its edge is
         # the `--max-bytes` cap, which is a size decision and not a TU boundary.
         for verdict, want in (("multi-tu", "union of translation units"),
                               ("partial", "cuts source file"),
@@ -1983,7 +1983,7 @@ def selftest() -> int:
                                                                assume_claim=True), None), True)
         check("an untagged entry gets no TU warning", _tu_warning({}), None)
 
-        # data-order evidence (attribute.data_seams_for): interior seams give a lower bound and candidate cuts
+        # data-order evidence (the entry's `data_seams`): interior seams give a lower bound and candidate cuts
         seamed = dict(entry, data_seams={"min_tus": 3, "weak": 1, "seams": [
             {"addr": 0x805F9570, "kind": "V->S", "before": "vt_a", "after": "str_b", "interior": True,
              "cut": {"after": 0x80161700}},
@@ -2449,7 +2449,7 @@ def main() -> int:
         for w in why:
             print("  - %s" % w)
         print("  A proposal is work to hand out, and this range is no longer unclaimed (or the queue's own")
-        print("  tiling overlaps itself). Re-run `python tools/units/attribute.py queue <start> <end>` over")
+        print("  tiling overlaps itself). Regenerate the queue entry over")
         print("  the region - `python tools/units/brief.py --pool` follows it - then take a live proposal.")
         return 1
 

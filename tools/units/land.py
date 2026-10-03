@@ -86,7 +86,7 @@ inside MAIN is what left MAIN conflicted on 2026-09-26).  The union is gated in 
 `unionresolve` invariants (no duplicate unit key, no duplicate `Object()` line, no overlapping
 `.text`/`extab`/`extabindex` range, and no registration `main` already had is dropped); the union is
 computed in memory and the invariants asserted *before* anything is written.  Staging is explicit
-(`git add -- <the two paths>`), never the untracked `.pi/bin/applybranch.sh`'s `git add -A`.  The helper
+(`git add -- <the two paths>`), never `git add -A`.  The helper
 branch that parks the union (`land/resolve-<slug>-<pid>`, in the scratch worktree) is deleted by the landing
 that lands the branch - visibly, and only when the helper's tip is provably contained by the branch or by
 `main`; one carrying a hand fix the branch never took is refused loudly and left alone, because it may be the
@@ -197,8 +197,7 @@ from units import stylelint as sl  # noqa: E402
 # `land.run` was the site that broke it - see the F34 fixture in the selftest and `subproc.py`'s docstring.
 from units import subproc as sp  # noqa: E402
 # unionguard decides whether a conflicted registration is the safe append class; unionresolve is the
-# resolver + invariant assertions moved in from the untracked `.pi/bin/union.py`. `land` calls both
-# directly, so the land path no longer depends on a script a fresh clone cannot see.
+# resolver + invariant assertions. `land` calls both directly, so the land path depends only on tracked code.
 from units import unionguard as ug  # noqa: E402
 from units import unionresolve as ur  # noqa: E402
 # `verifyunit` is the independent half of the gate: registration completeness, a per-symbol re-measure
@@ -233,7 +232,7 @@ BASE_FILE = os.path.join(".pi", "land-base.json")
 # `objdiff-cli diff` run from the repo root - typically a caller that names its dump after the symbol it is
 # looking at (`d910.json`, the `diff` of fn_8009A910, plus a byte-identical `t910.json`) - leaves these in the
 # repo root. `65492794` put them in `.gitignore`, but a **staged** file bypasses `.gitignore`, and a stage
-# happened anyway: the landing flow's own `git add -A` (`.pi/bin/applybranch.sh`) swept `d910.json` into the
+# happened anyway: a landing flow's own `git add -A` swept `d910.json` into the
 # index, land.py then refused the batch over it ("paths outside the batch appeared during the build"), and the
 # batch could not be committed at all. A path the gate refuses must never have reached the index, so this
 # gate now de-indexes what it tolerates instead of refusing it - and names it, every time.
@@ -622,8 +621,8 @@ def branch_error(main: str) -> str | None:
     The incident (2026-09-24): a worker told to "branch and commit there" ran
     `git checkout -b tools/stylelint-rule2-unsplit` in MAIN's checkout, so MAIN's HEAD left `main` and the
     next **14 landings** went onto that branch while the `main` ref sat at `e3ade082`. Nothing failed -
-    `.pi/bin/applybranch.sh` and `land.py` both key off `main` - but a stale `main` silently changes what
-    they *mean*: the merge-base slides backwards and the branch's diff starts describing already-landed
+    the landing path keys off `main` - but a stale `main` silently changes what
+    it *means*: the merge-base slides backwards and the branch's diff starts describing already-landed
     units, re-applying them or listing them as deletions (it nearly deleted landed units the same day). The
     gate names the branch it found and refuses before any check runs.
     """
@@ -876,8 +875,7 @@ def stage_batch(main: str, stageable: list[str]) -> None:
 # lives in `_union_conflicts` with the MAIN guard in `resolve_conflicts` around it.
 #
 # Staging is explicit (`git add -- <the two scoped paths>`), never `git add -A`: that sweep - the tail of
-# the untracked `.pi/bin/applybranch.sh` this replaces - staged `d910.json` and has bitten the campaign
-# twice.
+# an earlier landing script's tail - staged `d910.json` and has bitten the campaign twice.
 # --------------------------------------------------------------------------------------------------
 
 UNION_SCOPE = ur.UNION_SCOPE
@@ -975,7 +973,7 @@ def _union_conflicts(tree: str, branch: str, base: str | None = None, paths: lis
         work = os.path.join(tree, *path.replace("/", os.sep).split(os.sep))
         with open(work, "w", encoding="utf-8", newline="\n") as fh:
             fh.write(merged)
-    # the two scoped paths, explicitly - never `git add -A`, the untracked applybranch.sh's sweep.
+    # the two scoped paths, explicitly - never `git add -A`.
     git(["add", "--", *conflicted], tree)
     committed = None
     if commit:
@@ -1216,8 +1214,7 @@ def apply_branch(main: str, branch: str, base: str | None = None
 
     -> (ok, reason, base).  `git diff --binary <merge-base> <branch>` is exactly the branch's own work (a
     merged-in `main` cancels out), which is why it is used instead of a cherry-pick: cherry-picking a
-    branch that merged `main` silently drops the work the merge carried (the untracked
-    `.pi/bin/applybranch.sh`'s own note).  A clean apply is done; a conflict is sent to the scoped union,
+    branch that merged `main` silently drops the work the merge carried.  A clean apply is done; a conflict is sent to the scoped union,
     and a refusal undoes the apply so the tree is exactly as it was found.
     """
     base = base or git(["merge-base", "main", branch], main).strip()
@@ -4462,8 +4459,8 @@ def selftest() -> int:
     # the branch guard: `land` runs on `main`, never on a worker's branch. The incident (2026-09-24): a worker
     # told to "branch and commit there" ran `git checkout -b tools/stylelint-rule2-unsplit` in MAIN's checkout,
     # so MAIN's HEAD left `main` and the next 14 landings went onto that branch while the `main` ref sat at
-    # `e3ade082`. `applybranch.sh` and `land.py` both key off `main`, so a stale `main` does not fail - it
-    # silently changes what their diff means. The gate must refuse before any check runs.
+    # `e3ade082`. the landing path keys off `main`, so a stale `main` does not fail - it
+    # silently changes what its diff means. The gate must refuse before any check runs.
     with unitutil.temp_dir() as tmp:
         repo_git(tmp, "init", "-q")
         repo_git(tmp, "checkout", "-q", "-b", "main")

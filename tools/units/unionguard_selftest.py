@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Self-test for tools/units/unionguard.py - the guard `.pi/bin/applybranch.sh` runs before it unions.
+"""Self-test for tools/units/unionguard.py - the guard `land.py` runs before it unions.
 
     python tools/units/unionguard_selftest.py
     python tools/units/unionguard.py --selftest
@@ -9,7 +9,7 @@ delete, a rename, or both sides editing the same region it silently writes a tre
 (measured 2026-09-25: `configure.py` registered both halves of a rename; ten shared g3d headers unioned into
 "illegal function overloading").  The cases below are the contract: every unsafe case must be refused, and
 the disjoint union must still pass through and union.  A refusal must also undo the `git apply -3` that
-`applybranch.sh` has already run - clean tree, no UU/AA, nothing staged - while `--no-cleanup` keeps the
+`land.py` has already run - clean tree, no UU/AA, nothing staged - while `--no-cleanup` keeps the
 conflicted index for inspection.  Every case builds a real git repo and a real unmerged index - no
 repository state, no build, no mocks.
 """

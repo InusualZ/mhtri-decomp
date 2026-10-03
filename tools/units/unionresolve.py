@@ -17,11 +17,9 @@ but `union_text`/`union_file` are public and a hand `union_file <header>` was a 
 now a prose hunk with no superset is `blocked` and `land._union_conflicts` refuses it rather than writing
 the placeholder.
 
-The union itself used to live in an **untracked** `.pi/bin/union.py`, driven by an untracked
-`.pi/bin/applybranch.sh` that ended in `git add -A` - "the land path depends on a script no reviewer or a
-fresh clone can see", and the `-A` sweep has bitten this campaign twice.  This module is that resolver,
-brought into the repo and called by `land.py` directly, and it contains **no staging at all**: the caller
-stages the two scoped paths explicitly (`git add -- <paths>`), never the whole index.
+This module is the land path's resolver, called by `land.py` directly, and it contains **no staging at
+all**: the caller stages the two scoped paths explicitly (`git add -- <paths>`), never the whole index
+(a `git add -A` sweep has bitten this campaign twice).
 
 It also carries the assertions a wrong union breaks *silently* - the reason the union is not trusted:
 
@@ -58,8 +56,8 @@ for _path in (TOOLS, HERE):
 from units import unionprose as up  # noqa: E402
 
 # The only two paths a registration append-conflict may touch.  A conflicted header or a `src/**` file is
-# a *different* class (a real content conflict) and is never unioned here - `.pi/bin/mergeline`'s rule:
-# "DO NOT run union.py on a HEADER.  It stacks two `#ifdef __cplusplus }` closings and drops an `#endif`."
+# a *different* class (a real content conflict) and is never unioned here: a plain union of a HEADER
+# stacks two `#ifdef __cplusplus }` closings and drops an `#endif`.
 UNION_SCOPE = ("configure.py", "config/RMHE08/splits.txt")
 
 # The sections the merged map must never overlap in.  splits.txt also carries `.data`/`.rodata`/... rows;

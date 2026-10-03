@@ -68,10 +68,11 @@ The canonical table for rules 1-13 is `docs/plan.md` section 6.5; this block is 
 ### Resolve by these numbered rules
 
 * **M1 - `configure.py` and `config/RMHE08/splits.txt` are pure appends: union them.** Both sides' blocks, every
-  unit appearing exactly once. `MAIN/.pi/bin/union.py configure.py config/RMHE08/splits.txt` does exactly
-  ours-then-theirs for those two files. After merging, grep that every unit `main` registered since your base is
+  unit appearing exactly once. `python tools/units/land.py resolve --branch worker/<slug>` does exactly
+  ours-then-theirs for those two files, and asserts no unit or `Object()` line is duplicated. After merging, grep
+  that every unit `main` registered since your base is
   still present in *both* files - dropping a registration breaks the build for everyone.
-* **M2 - a header gets a HAND union. Never run `union.py` on a header** - it stacks two `#ifdef __cplusplus }`
+* **M2 - a header gets a HAND union. Never union a header mechanically** - it stacks two `#ifdef __cplusplus }`
   closings and drops an `#endif`, which costs you `(10121) declaration syntax error` / `(10119) unterminated
   #if`. Read both sides and write the merged region by hand.
 * **M3 - never leave two members at the same offset.** When both sides added a member at one offset, keep ONE
@@ -143,10 +144,11 @@ override anything: **never** clear a `BLOCKED` line by picking a side.
 (The numbered rules above are the classes, in order of how often they bite.)
 
 * **`configure.py` and `config/RMHE08/splits.txt` are pure appends.** Union them - both sides' blocks, every
-  unit appearing exactly once. `MAIN/.pi/bin/union.py configure.py config/RMHE08/splits.txt` does exactly
-  ours-then-theirs for those two files. After merging, grep that every unit `main` registered since your base is
+  unit appearing exactly once. `python tools/units/land.py resolve --branch worker/<slug>` does exactly
+  ours-then-theirs for those two files, and asserts no unit or `Object()` line is duplicated. After merging, grep
+  that every unit `main` registered since your base is
   still present in *both* files. Dropping a registration breaks the build for everyone.
-* **A header gets a HAND union. Never run `union.py` on a header** - it stacks two `#ifdef __cplusplus }`
+* **A header gets a HAND union. Never union a header mechanically** - it stacks two `#ifdef __cplusplus }`
   closings and drops an `#endif`, which costs you `(10121) declaration syntax error` / `(10119) unterminated
   #if`. Read both sides and write the merged region by hand.
 * **Never leave two members at the same offset.** When both sides added a member at one offset, keep ONE member

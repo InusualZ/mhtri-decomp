@@ -17,7 +17,7 @@ The tools listed under this concept in `docs/tools/README.md`.
 
 ## Absorbs (today's implementations)
 
-`unitutil.report_functions/report_measure/measure_project`, `freshguard`, 16 report readers, `reportdiff`, `land.report_snapshot/report_regressions`, `applysplits.regression_rows`, `measure.moved_summary`
+`unitutil.report_functions/report_measure/measure_project`, `freshguard`, 16 report readers, `reportdiff`, `land.report_snapshot/report_regressions`, `measure.moved_summary`
 
 ## Test contract
 

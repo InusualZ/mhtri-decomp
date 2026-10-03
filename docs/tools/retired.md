@@ -5,6 +5,14 @@ Code stays in git history (the retiring commit is named in the migration batch);
 
 ## The splits-program proposal pipeline
 
+**DONE 2026-10-03** (owner: "Retire now"), removed by the commits whose subjects are:
+`tools/splits: retire applysplits, dataattach, matchinggain and the splitcheck proposal half` (the three tools, the
+proposal half of `splitcheck`, its spec rewritten), `tools/attribute: retire the tiler, its queue file and promote,
+promote_batch` (`attribute.py`, `attribution-queue.json`, `promote.py`, `promote_batch.py` and their selftests),
+`docs/splits-program: rewrite as the program record, delete the proposals and window manifests` (the record is
+`docs/splits-program.md`; `docs/splits/phase4/homebutton-carried-notes.md` stays because 15 `src/`/`include/` headers cite it).
+The entries below are the evidence and history that were kept; `tools/splits/gen_trk_vectors.py` is still to retire.
+
 * **`tools/splits/applysplits.py`** (1 899 lines, last 2026-10-01). Phase 4 of the program: plan/apply/manifest/verify per window.
   Evidence: the six windows are applied (`docs/splits/phase4/land-*.txt`, `manifest-*.md`); referenced only by `docs/splits/**` (20
   lines) and nothing in `tools/`, `.claude/` or `CLAUDE.md`. Replacement: none needed; a future re-cut uses `unwindcut.py` and
@@ -27,7 +35,7 @@ Code stays in git history (the retiring commit is named in the migration batch);
   `--emit-splits`, `--readers`, `--data-by-reader`, ~900 lines). Evidence: proposal files are history (`docs/splits/proposals/`).
   The `--baseline` audit (11 invariants) is kept and becomes `Row`s (`design.md` section 5). History: the proposal format
   (`docs/splits-program.md`) and the grades strong/medium/guess stay documented there.
-* **`tools/units/attribute.py`** (1 361 lines) + `attribution-queue.json` + `attribute_selftest.py` - **pending question 1**.
+* **`tools/units/attribute.py`** (1 361 lines) + `attribution-queue.json` + `attribute_selftest.py` - retired (question 1 ruled).
   Evidence: the program put every TU edge into `splits.txt` as a split-proven unit; `queue.py next` already prefers the pool of
   registered body-less units; the tiler's own docstring (lines 1963-1975) describes the queue as a snapshot that goes stale on every
   landing and once destroyed itself. Replacement: `splits.txt` is the queue; `tudiscover at` answers the one-address question.
@@ -36,7 +44,7 @@ Code stays in git history (the retiring commit is named in the migration batch);
 
 ## Superseded by the register-once rule
 
-* **`tools/units/promote.py`** (1 223) and **`tools/units/promote_batch.py`** (514) with their selftests (880). Evidence: the
+* **`tools/units/promote.py`** (1 223) and **`tools/units/promote_batch.py`** (514) with their selftests (880) - retired with the tiler. Evidence: the
   `src/auto/` scaffolding bucket is retired (`docs/plan.md` section 12; `CLAUDE.md`, layout); nothing imports `promote` but
   `promote_batch`; no profile, skill or `CLAUDE.md` line names either. Replacement: a unit is registered once at its final home;
   a rename is `symedit rename` + `git mv` + the registration edit through `lib.project` (the three edits `promote` did are each a lib
@@ -69,7 +77,7 @@ Code stays in git history (the retiring commit is named in the migration batch);
   `pane_probe`, the `--pane` flag; 50 references). Evidence: the pi harness and its pane tool were replaced by Claude Code on
   2026-09-29; live lanes are read from `~/.claude/sessions` (`slots.live_runs`). History: "a pane whose content moves is a worker
   that is alive, whatever its ack file says" becomes "a session whose pid is alive" in `lib.lanes.registry.live_runs`.
-* **`MAIN/.pi/bin/applybranch.sh`, `landbranch.sh`, `mergelane.py`, `union.py`** (untracked) - **pending question 2**. Evidence:
+* **`MAIN/.pi/bin/applybranch.sh`, `landbranch.sh`, `mergelane.py`, `union.py`** (untracked) - deleted by the orchestrator (question 2 ruled); the tracked mentions went with `agents/policy: name land.py land --branch as the one landing path and retire the tiler lines`, `agents/merger: point the registration union at land.py resolve`, `docs/pipeline: name land.py land --branch in the plan, pipeline and profile-test docs` and `tools/units: drop the .pi/bin script mentions from the land, unionguard and unionresolve prose`. Evidence:
   `land.py land --branch` + `resolve` + `unionresolve` are the tracked implementation (its docstring says so); the scripts still end
   in `git add -A` (the sweep that bit twice) and reference `AGENTS.md`. Replacement: `land.py`; `CLAUDE.md` step 3 rewritten.
 

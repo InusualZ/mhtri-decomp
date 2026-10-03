@@ -3,12 +3,12 @@
 Only decisions the design cannot make alone. Each has a recommendation; the design and migration assume the recommendation
 unless ruled otherwise.
 
-1. **Retire `tools/units/attribute.py` and `attribution-queue.json`?** The splits program put every TU edge into `splits.txt`;
+1. **RULED 2026-10-03: retired (done).** **Retire `tools/units/attribute.py` and `attribution-queue.json`?** The splits program put every TU edge into `splits.txt`;
    `queue.py next` already hands out registered body-less units from `brief --pool`. The tiler's queue is a snapshot that goes
    stale on every landing (its own docstring, lines 1963-1975). *Recommendation:* retire both once `ledger.py` reports no
    unclaimed `.text` (if any remains, keep `attribute.py plan` read-only until it is zero, then retire). The `tu-boundary-discovery`
    skill and `CLAUDE.md` (one line each) are updated in the same batch.
-2. **Make `land.py land --branch` the only landing path and delete `MAIN/.pi/bin/*`?** Two procedures are documented today
+2. **RULED 2026-10-03: yes (done).** **Make `land.py land --branch` the only landing path and delete `MAIN/.pi/bin/*`?** Two procedures are documented today
    (`CLAUDE.md` step 3 names `applybranch.sh`; `land.py`'s docstring says the resolver was brought into the repo). The scripts end
    in `git add -A` and reference `AGENTS.md`. *Recommendation:* yes; WP4 rewrites `CLAUDE.md` step 3 and `docs/pipeline.md` section 5,
    and the four scripts are deleted from `.pi/bin` by the orchestrator (they are untracked; no commit removes them).

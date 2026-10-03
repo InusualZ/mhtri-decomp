@@ -8,7 +8,7 @@ Decide a translation unit's *language* (C or C++) from evidence, not from our co
 
 ## Users
 
-the landing gate (14); skills (3); docs (4); imported by `attribute`, `brief`, `promote_batch`, `relocaudit`, `vtableaudit`
+the landing gate (14); skills (3); docs (4); imported by `brief`, `relocaudit`, `vtableaudit`
 
 ## CLI
 

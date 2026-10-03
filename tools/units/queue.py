@@ -146,7 +146,7 @@ def state(main: str, entry: dict, branches: set[str] | None = None) -> str:
 
     A **proposal** (option A) is the simpler case and takes a different route: it has no source and no
     registration to check, so while it is in the queue it is work to hand out, and once the queue drops it -
-    which happens when `attribute.py queue` is re-run after its range was registered - it is stale.  Until
+    which happens when the queue file is regenerated after its range was registered - it is stale.  Until
     the queue is re-run, a proposal whose range is *already* registered under another name is `covered`.
     """
     unit = entry.get("unit")
@@ -374,7 +374,7 @@ def promote(main: str, unit: str, claim_slug: str, wt: str | None = None) -> str
     """Render the brief for `unit` at the claim's slug path, **from the current entry**.
 
     The pool is a scheduling device, not the source of truth: `brief.py --pool` used to skip a brief that
-    already existed, so `attribute.py queue` re-cutting a range left every pre-existing pooled brief
+    already existed, so a regenerated queue file re-cutting a range left every pre-existing pooled brief
     describing the OLD scope, and copying that file handed the worker the wrong work - `proposal/80119DEC`
     got `.text 0x80119DEC..0x8011A34C` (two functions) while the queue had `..0x8011D448` (thirty-seven).
     The brief is therefore re-rendered here against the current queue entry (or `splits.txt` range) and the
@@ -945,7 +945,7 @@ def selftest() -> int:
               os.path.join(tmp, "ws"))
 
     # option A: a proposal is ready while it is in the queue, and stale once the queue drops it (which is
-    # what happens when its range is registered and `attribute.py queue` is re-run)
+    # what happens when its range is registered and the queue file is regenerated)
     with claims.unitutil.temp_dir() as tmp:
         os.makedirs(os.path.join(tmp, "src"))
         os.makedirs(os.path.join(tmp, "tools", "units", "briefs", "pool"))
@@ -1120,7 +1120,7 @@ def selftest() -> int:
             check("... the selector refuses it too, so no caller can pass it through", "at least 1" in str(exc), True)
 
     # The pool is NOT the source of truth at claim time. `brief.py --pool` used to skip a brief that already
-    # existed, so `attribute.py queue` re-cutting a range left every pre-existing pooled brief describing the
+    # existed, so a regenerated queue file re-cutting a range left every pre-existing pooled brief describing the
     # OLD scope - and `queue.py next` copied it. `proposal/80119DEC` was handed `.text 0x80119DEC..0x8011A34C`
     # (two functions) while the queue said `..0x8011D448` (thirty-seven). The claim path must render the
     # current entry, and the stale pooled range must never appear in what the worker reads.
