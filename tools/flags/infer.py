@@ -83,121 +83,51 @@ class Elf:
         return out
 
 
-# --- instruction decoding ----------------------------------------------------------------------
+# --- instruction decoding (lib.ppc: one decoder) ------------------------------------------------------------------
 
-def op(w):  return w >> 26
-def rt(w):  return (w >> 21) & 31
-def ra(w):  return (w >> 16) & 31
-def rb(w):  return (w >> 11) & 31
-def frt(w): return (w >> 21) & 31
-def fra(w): return (w >> 16) & 31
-def frb(w): return (w >> 11) & 31
-def frc(w): return (w >> 6) & 31
-def xo5(w): return (w >> 1) & 31
-def xo10(w): return (w >> 1) & 0x3FF
-def si(w):  return struct.unpack(">h", struct.pack(">H", w & 0xFFFF))[0]
-def sh(w):  return (w >> 11) & 31
-def mb(w):  return (w >> 6) & 31
-def me(w):  return (w >> 1) & 31
+from tools.lib.ppc import (op, rt, ra, rb, frc, xo5, xo10, si, sh, mb, me, rlwinm_alias,  # noqa: E402,F401
+                           NARROW_STORE_OPS, RECORD_OPCODES, FMA_XO, FMUL_XO, FADD_XO, FSUB_XO, PSQ_INDEXED_XO)
+from tools.lib import ppc as _ppc  # noqa: E402
+
+frt, fra, frb = rt, ra, rb
+
+#: `writes_gpr`'s opcode-31 XO list: infer's own best-effort set (the scanner's precise one is `ppc.written_reg`)
+_WRITES_XO = (266, 40, 444, 12, 124, 136, 792, 824, 536, 316, 8, 104, 235, 75, 83, 87, 467, 459, 491, 202, 210, 234)
+_GPR_OPS = (14, 15, 24, 25, 26, 27, 28, 29, 32, 33, 34, 35, 36, 37, 38, 40, 42, 43)
 
 
-def rlwinm_alias(w):
-    """The objdump spelling of an `rlwinm` (opcode 21) form, or 'rlwinm'.
-
-    `clrlwi`/`clrrwi`/`srwi`/`slwi`/`extrwi` are aliases of single `rlwinm` instructions; the
-    peephole's byte-extraction fold is `srwi`+`clrlwi` -> one `extrwi`, so telling the aliases apart
-    is what makes the fold visible without objdump (which prints the aliases too).
-    """
-    if op(w) != 21:
-        return "rlwinm"
-    s, m, e = sh(w), mb(w), me(w)
-    if s == 0 and e == 31 and m > 0:
-        return "clrlwi"
-    if s == 0 and m == 0 and e < 31:
-        return "clrrwi"
-    if e == 31 and m == 32 - s and s > 0:
-        return "srwi"
-    if m == 0 and s + e == 31 and s > 0:
-        return "slwi"
-    return "rlwinm"
-
-
-# Narrowing stores: `clrlwi`/`clrrwi` directly before one of these is what the peephole folds away.
-NARROW_STORE_OPS = {38, 39, 44, 45}   # stb, stbu, sth, sthu
-
-# Primary opcodes whose bit 0 is the Rc (record) bit for every instruction in the family.
-RECORD_OPCODES = {12, 13, 20, 21, 23, 31, 59, 63}
-# Fused multiply-add XO values for the A-form float opcodes (59 single, 63 double).
-FMA_XO = {28, 29, 30, 31}
-FMUL_XO = {25}
-FADD_XO = {21}
-FSUB_XO = {20}
-# Gekko paired-single indexed forms share primary opcode 4 with (later) VMX; the FPR epilogue's
-# `li r0,N; psq_lx/psq_stx` uses XO 6.
-PSQ_INDEXED_XO = 6
-
-
-class Insn:
-    __slots__ = ("addr", "word", "op", "reloc_sym", "reloc_type")
+class Insn(_ppc.Insn):
+    """`lib.ppc.Insn` plus the relocation the instruction carries (`reloc_sym`, `reloc_type`) and infer's GPR
+    def/use heuristics."""
+    __slots__ = ("reloc_sym", "reloc_type")
 
     def __init__(self, addr, word, reloc_sym="", reloc_type=-1):
-        self.addr = addr
-        self.word = word
-        self.op = op(word)
-        self.reloc_sym = reloc_sym
-        self.reloc_type = reloc_type
+        object.__setattr__(self, "address", addr)
+        object.__setattr__(self, "word", word)
+        object.__setattr__(self, "op", word >> 26)
+        object.__setattr__(self, "reloc_sym", reloc_sym)
+        object.__setattr__(self, "reloc_type", reloc_type)
 
-    def is_record(self) -> bool:
-        return self.op in RECORD_OPCODES and (self.word & 1) == 1
-
-    def is_fma(self) -> bool:
-        return self.op in (59, 63) and xo5(self.word) in FMA_XO
-
-    def is_fmul(self) -> bool:
-        return self.op in (59, 63) and xo5(self.word) in FMUL_XO
-
-    def is_faddsub(self) -> bool:
-        return self.op in (59, 63) and xo5(self.word) in (FADD_XO | FSUB_XO)
-
-    def is_psq_indexed(self) -> bool:
-        return self.op == 4 and xo5(self.word) == PSQ_INDEXED_XO
-
-    def is_clr_mask(self) -> bool:
-        return rlwinm_alias(self.word) in ("clrlwi", "clrrwi")
-
-    def is_shift(self) -> bool:
-        return rlwinm_alias(self.word) in ("srwi", "slwi")
-
-    def is_narrow_store(self) -> bool:
-        return self.op in NARROW_STORE_OPS
-
-    def is_branch_link(self) -> bool:
-        return self.op == 18 and (self.word & 1) == 1
-
-    def is_lis(self) -> bool:
-        return self.op == 15 and ra(self.word) == 0
+    @property
+    def addr(self):
+        return self.address
 
     def writes_gpr(self):
         """The GPR this instruction defines, or None (best effort; only the forms we decode)."""
         o = self.op
-        if o in (14, 15, 24, 25, 26, 27, 28, 29, 32, 33, 34, 35, 36, 37, 38, 40, 42, 43):
+        if o in _GPR_OPS:
             return rt(self.word)
-        if o == 31:
-            if xo10(self.word) in (266, 40, 444, 12, 124, 136, 792, 824, 536, 316, 8, 104, 235, 75, 83, 87, 467, 459, 491, 202, 210, 234, 266, 491):
-                return rt(self.word)
+        if o == 31 and xo10(self.word) in _WRITES_XO:
+            return rt(self.word)
         return None
 
     def reads_gpr(self):
         o = self.op
-        if o in (14, 15, 24, 25, 26, 27, 28, 29, 32, 33, 34, 35, 36, 37, 38, 40, 42, 43):
+        if o in _GPR_OPS:
             return ra(self.word)
-        if o in (18, 16):
-            return None
         if o == 31:
             return ra(self.word) if ra(self.word) else None
         return None
-
-
 # --- per-object fingerprints -------------------------------------------------------------------
 
 class Fingerprint:
@@ -240,7 +170,7 @@ class Fingerprint:
         return out
 
     def insns_in(self, start, end):
-        return [i for i in self.insns if start <= i.addr < end]
+        return [i for i in self.insns if start <= i.address < end]
 
     def _bl_targets(self):
         """Multi-set of relocation symbols called by a `bl` in this object."""

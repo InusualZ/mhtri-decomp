@@ -40,7 +40,7 @@ Inputs -> outputs: build/RMHE08/asm or obj/ -> build/tmp/callers/graph.json -> r
 * `addr` - the symbol's address is materialised (`lis r3, X@ha` + `addi r3, r3, X@l`). For a function this is the "who installs this as a task, who puts it in a table" answer, which a call-only grep misses: the quest field task `fn_8028BF1C` has no direct caller at all - it is only ever *taken* and handed to `Tsk_Change`.
 * `read` / `write` - a load from / store to the symbol's address (the `.sdata` accesses that carry most game state). Classified from the mnemonic (`l*` loads, `st*` stores); `li`/`lis` and every other form that names the symbol is `addr`.
 * `pointer` - a `.4byte X` entry inside a data object (run `--pointers` to list): a function-pointer table, a vtable, an `@eti_` exception-table index. The *site* is the containing object's address, not the exact word: the dump prints no address on a bare `.4byte`, and guessing one from the object's directive stream would be a second parser for a number nobody needs.
-* `arg` - what the caller materialises in `r3` before a `bl`, inferred from the instructions immediately before the call (through `callees.decode_rw`, the tree's one register read/write decode): `0x0`, `&some_label`, `0 (r3 live-in)` when the preceding call's return flows in, `0?` when a branch or a truncated window separates them, and `? (opcode)` when it cannot be judged. It is an inference, and it says which way it is unsure instead of guessing.
+* `arg` - what the caller materialises in `r3` before a `bl`, inferred from the instructions immediately before the call (through `lib.ppc.decode_rw`, the tree's one register read/write decode): `0x0`, `&some_label`, `0 (r3 live-in)` when the preceding call's return flows in, `0?` when a branch or a truncated window separates them, and `? (opcode)` when it cannot be judged. It is an inference, and it says which way it is unsure instead of guessing.
 * **Limits, stated so no count is over-read.** An indirect call (`bctrl`, or through a table) has no static target and is invisible *as a call*: it shows up as an `addr`/`pointer` reference to the callee when the address is materialised, and as nothing when it is loaded from memory. A data reference is coalesced at its `lis`+`addi` pair into one site. The dump's state is always printed; when it is stale the *texts* of the instructions are too (never the addresses), and `python tools/splits/dump_asm.py` refreshes it.
 * **No dump is not "0 callers"** (the defect `tudiscover` was fixed for): a missing dump is its own message with the remedy, `exit 2`, and `"error": "no asm dump"` under `--json`.
 * **It is a reader.** No `src/` edits, no renames, no writes outside `build/tmp/callers/`.
@@ -57,7 +57,7 @@ Target: `tools/tests/units/test_callers.py` on `lib.testing` (`FixtureTree`/`Git
 
 ## Known gaps
 
-two censuses (dump, objects) of unequal detail; `accessextent` re-decodes to repair
+two censuses (dump, objects) of unequal detail; `accessextent` re-decodes to repair. The parser, both index builds and the cache are `lib.refs` (WP2a); this tool keeps the input locations, the owner labels (`query`) and the rendering.
 
 ## History (the incidents behind the rules - keep the rule, drop the narrative when the rule is stable)
 

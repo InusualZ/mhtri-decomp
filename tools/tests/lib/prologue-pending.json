@@ -52,7 +52,6 @@
   "tools/splits/gen_trk_vectors.py",
   "tools/splits/splitcheck.py",
   "tools/splits/tudiscover.py",
-  "tools/symbols/phantom.py",
   "tools/symbols/symedit.py",
   "tools/units/accessextent.py",
   "tools/units/accessextent_selftest.py",

@@ -1,55 +1,10 @@
 #!/usr/bin/env python3
-"""Find phantom `fn_XXXXXXXX` symbols - map entries that are not function entries at all.
-
-A phantom is an unnamed `fn_XXXXXXXX` in `config/RMHE08/symbols.txt` that the map treats as a function
-while the bytes at its address are really part of the *previous* function's body: the dead epilogue MWCC
-emits after a `mtctr`/`bctr` tail-call dispatcher, a jump-table island, or padding.  `docs/plan.md` 7.9
-records the incident: five 4-byte `fn_*` in `auto/80040598_fn_80040598` were not functions (dead
-epilogues) and cost four dispatchers their last 11 points (`docs/matching.md` 25).
-
-Every candidate is reported with its evidence, never a bare verdict:
-
-1. its address and size, and the symbol immediately before it in the same section (name, size, end
-   address) - `inside` when the candidate starts inside that symbol's extent, `adjacent` when it starts
-   exactly at its end, `gap` otherwise;
-2. whether anything reaches it.  The linked DOL is scanned for `bl` callers, `b`/`bc` branch targets,
-   `lis`+`addi`/`ori` address materialisations in code, and 32-bit address words in the data sections
-   (a vtable slot or a jump-table entry).  Nothing reaches it -> merge candidate; something calls it ->
-   real, reported `keep`.  This is the relocation evidence the plan asks for, read out of the linked
-   image: every relocation the split objects carried is already applied there, so it subsumes both
-   `tools/symbols/symedit.py refs` and the `.rela` records, and it sees intra-unit calls too.
-3. whether the bytes at its address look like a function prologue at all (`stwu r1,-N(r1)`, `mflr`,
-   `stmw`) - the plan's phantom set fails this;
-4. one verdict: `merge-into <previous>`, `keep`, or `unclear` with the reason.  A merge needs a dead
-   epilogue (the symbol's bytes are exactly one `blr`) that nothing reaches and that the 2021 runtime
-   symbol dump does not name (`DumpSymbols.zip` -> `Dump_Loading85.raw.map`, `docs/memory-dump.md`).
-   The dump carries `zz_<address>_` placeholders for genuinely unnamed functions and *no line* at a
-   non-function, which is how the five phantoms were confirmed; its silence is only used where it
-   covers the address (a populated neighbourhood).
-
-**This tool only reports - it never edits the symbol map.**  A merge is a symbol-map edit (grow the
-previous symbol's `size:` comment, delete the phantom's line) and that edit is a human's, through the
-symbol-map proxy `tools/symbols/symedit.py` (`rename`/`rename-batch`); the proxy cannot resize or delete
-a symbol today, so the merge lines are printed as a two-line edit plan and applied by hand.  Nothing in
-this file writes `symbols.txt`, `splits.txt` or any other file, and `symbols.txt` is only ever read
-through `symedit`'s line parser.
-
-Usage:
-
-    python tools/symbols/phantom.py                        # counts + the merge/unclear list
-    python tools/symbols/phantom.py --all --limit 40       # also list the `keep` records
-    python tools/symbols/phantom.py --json                 # every record, machine-readable
-    python tools/symbols/phantom.py explain fn_8005236C    # all four evidence items for one symbol
-    python tools/symbols/phantom.py --selftest
-
-    --max-size 8        unnamed `fn_*` at most this many bytes are candidates (default 8)
-    --section .text     restrict the scan to one section
-    --file PATH         symbol map (default config/RMHE08/symbols.txt)
-    --dol PATH          original DOL, read-only (default orig/RMHE08/sys/main.dol)
-    --dump PATH|auto    runtime symbol map, a `.zip` member or a plain `.map`; `auto` finds the 2021 dump
-"""
+"""Find phantom `fn_XXXXXXXX` rows (dead epilogues) with reachability evidence from the linked DOL.
+Spec: docs/tools/spec/phantom.md. CLI: phantom.py [scan|explain <name|0xADDR>] [--all] [--json]
+[--max-size N] [--section S] [--file F] [--dol F] [--dump F|auto] | --selftest."""
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import bisect
@@ -64,11 +19,10 @@ import zipfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOOLS = os.path.dirname(HERE)
 ROOT = os.path.dirname(TOOLS)
-if TOOLS not in sys.path:
-    sys.path.insert(0, TOOLS)
 
-from symbols import symedit  # noqa: E402  the map parser - never read symbols.txt directly
-from units.m2cinput import Dol  # noqa: E402  the read-only DOL image (address -> bytes)
+from tools.lib import ppc as _ppc  # noqa: E402  the one instruction decoder
+from tools.symbols import symedit  # noqa: E402  the map parser - never read symbols.txt directly
+from tools.units.m2cinput import Dol  # noqa: E402  the read-only DOL image (address -> bytes)
 
 DEFAULT_FILE = os.path.join(ROOT, "config", "RMHE08", "symbols.txt")
 DEFAULT_DOL = os.path.join(ROOT, "orig", "RMHE08", "sys", "main.dol")
@@ -107,12 +61,9 @@ class Refs:
         return sum(self.get(ch, address) for ch in CHANNELS)
 
 
-def _signed(value: int, bits: int) -> int:
-    return value - (1 << bits) if value & (1 << (bits - 1)) else value
-
-
 def index_refs(image) -> Refs:
-    """Every static reference to a code address in the linked image, per channel (see `Refs`)."""
+    """Every static reference to a code address in the linked image, per channel (see `Refs`); the decode is
+    `lib.ppc` (`branch_target`, `materialisations`)."""
     refs = Refs()
     text = [s for s in image.sections[:7] if s[2]]
     ranges = [(a, a + size) for _o, a, size in text]
@@ -121,29 +72,14 @@ def index_refs(image) -> Refs:
         return any(lo <= value < hi for lo, hi in ranges)
 
     for offset, start, size in text:
-        lis: dict[int, tuple[int, int]] = {}  # dest register -> (instruction address, 16-bit immediate)
-        for i in range(0, size - 3, 4):
-            insn = struct.unpack_from(">I", image.data, offset + i)[0]
-            address = start + i
-            op = insn >> 26
-            if op == 18:  # b / bl
-                target = address + _signed(insn & 0x03FFFFFC, 26)
+        code = image.data[offset:offset + size]
+        for i, insn in enumerate(_ppc.words(code)):
+            target = _ppc.branch_target(start + i * 4, insn)
+            if target is not None:
                 refs.add("callers" if insn & 1 else "branches", target)
-            elif op == 16 and not (insn >> 1) & 1:  # bc (AA=0), relative
-                refs.add("callers" if insn & 1 else "branches", address + _signed(insn & 0xFFFC, 16))
-            elif op == 15:  # lis rD,imm
-                lis[(insn >> 21) & 0x1F] = (address, insn & 0xFFFF)
-            elif op in (14, 24):  # addi / ori, only in the lis rD,hi ; addi|ori rD,rD,lo idiom
-                rd = (insn >> 21) & 0x1F
-                ra = (insn >> 16) & 0x1F
-                hit = lis.get(rd)
-                if hit and ra == rd and address - hit[0] <= 16:
-                    value = hit[1] << 16
-                    value = value + (insn & 0xFFFF) if op == 14 else value | (insn & 0xFFFF)
-                    if is_code(value):
-                        refs.add("addrloads", value)
-            if lis:  # the register is reloaded often; drop stale entries so the table stays small
-                lis = {r: v for r, v in lis.items() if address - v[0] <= 16}
+        for _site, value in _ppc.materialisations(code, start, 16):
+            if is_code(value):
+                refs.add("addrloads", value)
     for offset, start, size in image.sections[7:]:
         for i in range(0, size - 3, 4):
             word = struct.unpack_from(">I", image.data, offset + i)[0]
@@ -228,21 +164,13 @@ def first_instruction(image, address: int) -> int | None:
 
 
 def looks_like_prologue(image, address: int) -> bool:
-    """`stwu r1,-N(r1)` / `mflr` / `stmw` - the shapes a real function entry starts with."""
-    insn = first_instruction(image, address)
-    if insn is None:
-        return False
-    if insn & 0xFFFF0000 == 0x94210000:  # stwu r1, d(r1)
-        return True
-    if insn >> 26 == 31 and (insn >> 16) & 0x1F == 8 and insn & 0x7FF == 0x2A6:  # mflr rD
-        return True
-    return insn >> 26 == 47  # stmw
+    """`stwu r1,-N(r1)` / `mflr` / `stmw` - the shapes a real function entry starts with (`lib.ppc`)."""
+    return _ppc.looks_like_prologue(first_instruction(image, address))
 
 
 def is_dead_epilogue(image, symbol: dict) -> bool:
-    """The phantom's own shape: the symbol's bytes are exactly one `blr`."""
-    raw = image.read(symbol["address"], symbol["size"])
-    return bool(raw) and len(raw) == 4 and struct.unpack(">I", raw)[0] == BLR
+    """The phantom's own shape: the symbol's bytes are exactly one `blr` (`lib.ppc`)."""
+    return _ppc.is_dead_epilogue(image.read(symbol["address"], symbol["size"]))
 
 
 def bytes_at(image, address: int, size: int) -> str:

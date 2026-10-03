@@ -1,73 +1,7 @@
 #!/usr/bin/env python3
-"""Who calls this function / who reads this data: the whole-DOL caller index, keyed on addresses.
-
-    python tools/units/callers.py <address|name> [--json] [--code|--data] [--kind K[,...]]
-                                  [--pointers] [--limit N] [--rebuild]
-    python tools/units/callers.py --range 0x80799F98 0x80799FDC [--step 4] [--each] [--json]
-                                  # the per-address referrer runs over a range (the .sdata2 seam)
-    python tools/units/callers.py --stats          # what the index is, and how old the answer is
-    python tools/units/callers.py --selftest       # this file + callers_selftest.py (fixtures only)
-
-**The question nothing else answered.** `tools/units/callees.py` answers "what does this unit call"; the
-inverse - "who calls this function, who reads this data" - had no tool at all, so it was answered with a
-hand-written grep over the dump (2800 `.s` files / 89 MB in this tree, one per split unit), and the quest
-recon lane wrote the 30-line version of *this*, calling it the most useful thing it built. This is that
-tool, supported, cached and self-tested.
-
-**The trap this tool exists to survive: the dump is stale, and its labels are printed stale.**
-`build/RMHE08/asm/` is dtk's disassembly of the symbol map *as of the split* (see
-`tools/splits/dump_asm.py`); a `bl` whose callee was renamed afterwards still prints the OLD label, so
-grepping the dump for the new name finds nothing. The dump in this tree carries the proof: at 0x803A146C
-the canonical `menu/multi_result.s` prints `bl game_mode_sub_state_set1`, while the stale top-level copy
-`auto_fn_803A13B4_text.s` still prints `bl fn_803A1680` - one instruction, two labels, and only one of
-them is in `symbols.txt`. Therefore:
-
-* **the graph is built on addresses.** A `bl`/`b` target is decoded from the instruction's own
-  displacement (`NIA = CIA + EXTS(LI||0b00)`), so it is exact and needs no map at all; a data reference
-  (`X@ha`/`@l`/`@sda21`/...) resolves its name through *the dump's own label table* (the `# <section>:0xOFF
-  | 0xADDR | size:` headers), which is stale in exactly the same way the reference is, so an old name still
-  lands on the right address;
-* **names are resolved per run** through the current map, via `symedit`-style streaming access (never
-  printing `symbols.txt` - non-negotiable 7), so a caller renamed since the dump is named correctly and a
-  query on a *new* name is answered by address;
-* **the index is cached** (`build/tmp/callers/graph.json`) and rebuilt only when the dump changes - a
-  signature over every `.s` file's path, size and mtime. A `symbols.txt` edit does **not** rebuild it: the
-  graph holds no name from the map. In this tree the build is 245 258 references over 54 256 target
-  addresses and takes 8-10 s; a cached query answers in ~1.3 s.
-
-**What it reports, and what each column is evidence for.**
-
-* `call` - a `bl`/`bla` whose target address the encoding decodes. This is the "who calls this" answer.
-* `branch` - `b`/`ba` to a *symbol* (a tail call, or a jump into another function). The `.L_ADDR` branches
-  inside one function are not callers and are not indexed.
-* `addr` - the symbol's address is materialised (`lis r3, X@ha` + `addi r3, r3, X@l`). For a function this
-  is the "who installs this as a task, who puts it in a table" answer, which a call-only grep misses: the
-  quest field task `fn_8028BF1C` has no direct caller at all - it is only ever *taken* and handed to
-  `Tsk_Change`.
-* `read` / `write` - a load from / store to the symbol's address (the `.sdata` accesses that carry most
-  game state). Classified from the mnemonic (`l*` loads, `st*` stores); `li`/`lis` and every other form
-  that names the symbol is `addr`.
-* `pointer` - a `.4byte X` entry inside a data object (run `--pointers` to list): a function-pointer table,
-  a vtable, an `@eti_` exception-table index. The *site* is the containing object's address, not the exact
-  word: the dump prints no address on a bare `.4byte`, and guessing one from the object's directive stream
-  would be a second parser for a number nobody needs.
-* `arg` - what the caller materialises in `r3` before a `bl`, inferred from the instructions immediately
-  before the call (through `callees.decode_rw`, the tree's one register read/write decode): `0x0`,
-  `&some_label`, `0 (r3 live-in)` when the preceding call's return flows in, `0?` when a branch or a
-  truncated window separates them, and `? (opcode)` when it cannot be judged. It is an inference, and it
-  says which way it is unsure instead of guessing.
-
-**Limits, stated so no count is over-read.** An indirect call (`bctrl`, or through a table) has no static
-target and is invisible *as a call*: it shows up as an `addr`/`pointer` reference to the callee when the
-address is materialised, and as nothing when it is loaded from memory. A data reference is coalesced at its
-`lis`+`addi` pair into one site. The dump's state is always printed; when it is stale the *texts* of the
-instructions are too (never the addresses), and `python tools/splits/dump_asm.py` refreshes it.
-
-**No dump is not "0 callers"** (the defect `tudiscover` was fixed for): a missing dump is its own message
-with the remedy, `exit 2`, and `"error": "no asm dump"` under `--json`.
-
-**It is a reader.** No `src/` edits, no renames, no writes outside `build/tmp/callers/`.
-"""
+"""Who calls this function / who reads this data: the whole-DOL reference index, keyed on addresses.
+Spec: docs/tools/spec/callers.md. CLI: callers.py <address|name> [--json] [--code|--data] [--kind K]
+[--pointers] [--limit N] [--rebuild] | --range LO HI [--step N] [--each] | --stats | --selftest."""
 
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
@@ -75,12 +9,10 @@ import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file_
 import argparse
 import bisect
 import collections
-import hashlib
 import json
 import os
 import re
 import sys
-import time
 from tools.lib import cache as libcache
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -92,49 +24,38 @@ for _path in (TOOLS, HERE, os.path.join(TOOLS, "symbols"), os.path.join(TOOLS, "
 
 import tudiscover as td  # noqa: E402  (GAME, ASM_DIR, and the dump's own stamp: one definition of stale)
 import unitutil as uu  # noqa: E402  (resolve_input: MAIN's build/ by path when the tree has none)
+from tools.lib import refs as _refs  # noqa: E402  (the one reference index: dump parser, object fallback, cache)
 from tools.lib.project import Ownership  # noqa: E402  (the one ownership index; the rule-2 lint's too)
-from units import callees as cl  # noqa: E402  (decode_rw: the tree's one register read/write decode)
-from units import dossier as dossier_mod  # noqa: E402  (parse_elf: the tree's one relocation scan)
+from units import callees as cl  # noqa: E402  (classify_owner: the owner vocabulary callees reports in)
 
-SCHEMA = 1                      # bump on any change to what the graph stores
+SCHEMA = _refs.SCHEMA
 GAME = td.GAME
 DUMP_TOOL = "python tools/splits/dump_asm.py"
-CODE_SECTIONS = (".text", ".init")
-KINDS = ("call", "branch", "addr", "read", "write", "pointer")
-CODE_KINDS = ("call", "branch")                     # a control transfer: a caller
-DATA_KINDS = ("addr", "read", "write", "pointer")   # the address is used, not entered
-ARG_WINDOW = 12                                     # instructions scanned back for the r3 argument
+CODE_SECTIONS = _refs.CODE_SECTIONS
+KINDS = _refs.KINDS
+CODE_KINDS = _refs.CODE_KINDS                       # a control transfer: a caller
+DATA_KINDS = _refs.DATA_KINDS                       # the address is used, not entered
+ARG_WINDOW = _refs.ARG_WINDOW                       # instructions scanned back for the r3 argument
 
 # --------------------------------------------------------------------------------------------------
-# the dump: one `.s` per unit (~2800 files / 92 MB), the address of every line in its own comment
+# the dump and the object fallback: the parser, the index and its cache are `lib.refs` (one reference
+# index); this tool keeps where the inputs live and how the answer is printed
 # --------------------------------------------------------------------------------------------------
-LOAD_MNEMONICS = frozenset((
-    "li lis lwz lwzu lbz lbzu lhz lhzu lha lhau lmw lfs lfsu lfd lfdu lwzx lwzux lbzx lbzux lhzx lhax "
-    "lhaux lfsx lfdx lwarx psq_l psq_lx").split())
-
-
-def _scan_re():
-    """One regex for a whole `.s` file: header comments, `.fn`/`.obj` blocks, instructions, `.4byte`.
-
-    Named groups (not positions) keep the dispatch readable; `re.M` makes every alternative's `^` a line
-    start. The instruction form is dtk's `/* ADDR OFFSET BYTES */\ttext`.
-    """
-    return re.compile(
-        r"(?m)^#\s*(?P<sec>[.\w]+):(?:0x)?[0-9A-Fa-f]+\s*\|\s*(?P<haddr>0x[0-9A-Fa-f]+)"
-        r"\s*\|\s*size:\s*(?P<hsize>0x[0-9A-Fa-f]+)\s*$"
-        r"|^\.fn\s+(?P<fn>[^\s,]+)"
-        r'|^\.obj\s+"?(?P<obj>[^\s,"]+)"?'
-        r"|^/\*\s+(?P<iaddr>[0-9A-Fa-f]{8})\s+(?:[0-9A-Fa-f]+)\s+(?P<ibytes>[0-9A-Fa-f ]+?)"
-        r"\s*\*/\s*(?P<itext>.+?)\s*$"
-        r"|^[ \t]*\.(?:4byte|long)\s+(?P<ptr>\S+)\s*$")
-
-
-SCAN_RE = _scan_re()
-# A symbol as an operand: a name, an optional `"`-quoted name - never a register, an immediate, a local
-# `.L_ADDR` label or a section name.
-SYM_RE = re.compile(r'^(?:"([^"]+)"|([A-Za-z_$][\w$.]*))')
-# The `@` modifier that turns an operand into a reference to a symbol's address.
-MOD_RE = re.compile(r'(?:"([^"]+)"|([A-Za-z_$][\w$.]*))@(ha|h|l|sda21|sda2)\b')
+LOAD_MNEMONICS = _refs.LOAD_MNEMONICS
+SCAN_RE = _refs.SCAN_RE
+SYM_RE = _refs.SYM_RE
+MOD_RE = _refs.MOD_RE
+is_scaffolding = _refs.is_scaffolding
+file_rank = _refs.file_rank
+branch_target = _refs.dump_branch_target
+symbol_operand = _refs.symbol_operand
+mem_kind = _refs.mem_kind
+arg_hint = _refs.arg_hint
+parse_dump_file = _refs.parse_dump_file
+key_of = _refs.key_of
+attach_derived = _refs.attach_derived
+object_signature = _refs.object_signature
+coalesce = _refs.coalesce
 
 
 def asm_dir_of(root=ROOT):
@@ -148,286 +69,16 @@ def cache_of(root=ROOT):
 
 def all_asm_files(asm_dir):
     """Every `.s` of the dump (`.stamp.json` is not a unit). Sorted, so a build is deterministic."""
-    out = []
-    for dirpath, _dirs, names in os.walk(asm_dir):
-        for n in names:
-            if n.endswith(".s"):
-                out.append(os.path.join(dirpath, n))
-    out.sort()
-    return out
+    return _refs.dump_files(asm_dir)
 
 
 def dump_signature(asm_dir, files):
     return libcache.stat_digest(files, asm_dir)
 
 
-def is_scaffolding(path, asm_dir):
-    """Whether a dump file is a top-level `auto_*` scaffolding copy rather than a unit's own file."""
-    return os.path.dirname(os.path.abspath(path)) == os.path.abspath(asm_dir)
-
-
-def file_rank(path, asm_dir):
-    """How much a duplicate copy of one unit's asm is trusted; low wins.
-
-    The dump can hold the same instruction twice: a top-level `auto_*` scaffolding file from an older run
-    beside the unit's own file. Their *addresses* agree (which is why the graph survives either way), but
-    their labels do not - `auto_fn_803A13B4_text.s` prints `bl fn_803A1680` where `menu/multi_result.s`
-    prints `bl game_mode_sub_state_set1` - so the copy that is not the top-level scaffolding wins, and
-    among equals the newest mtime does. The same rule `tudiscover.asm_files()` uses, so the two tools
-    cannot disagree about which copy is the live one.
-    """
-    return (1 if is_scaffolding(path, asm_dir) else 0, -os.stat(path).st_mtime_ns)
-
-
-def branch_target(addr, byte_text):
-    """The address a relative `b`/`bl` branches to, or None: `NIA = CIA + EXTS(LI||0b00)`.
-
-    This is why the graph needs no symbol map at all - the operand's label may be stale, the displacement
-    is not. None for an absolute (`AA=1`) branch or an encoding that is not a branch, so the caller falls
-    back to the dump's own label table.
-    """
-    try:
-        word = int(byte_text.replace(" ", ""), 16)
-    except ValueError:
-        return None
-    if (word >> 26) not in (16, 18) or (word & 2):
-        return None
-    disp = word & 0x03FFFFFC
-    if disp & 0x02000000:
-        disp -= 0x04000000
-    return addr + disp
-
-
-def symbol_operand(operands):
-    """The symbol an operand names, or None for a register/immediate/local `.L_` label."""
-    tok = operands.split(",")[0].strip() if operands else ""
-    m = SYM_RE.match(tok)
-    if not m:
-        return None
-    name = m.group(1) or m.group(2)
-    if name.startswith(".") or re.fullmatch(r"(?:r|f|cr|vs|vr)\d+", name):
-        return None
-    return name
-
-
-def mem_kind(mnemonic):
-    """`read` / `write` / `addr` for an instruction that names a symbol's address.
-
-    From the mnemonic's shape: `l*` loads read the address, `st*` stores write it, and everything else
-    (`li`, `lis`, `addi`, `or`, ...) only materialises it.
-    """
-    if mnemonic in LOAD_MNEMONICS:
-        return "addr" if mnemonic in ("li", "lis") else "read"
-    if mnemonic.startswith("st") or mnemonic in ("psq_st", "psq_stx"):
-        return "write"
-    return "addr"
-
-
-def arg_hint(window, truncated):
-    """What `r3` holds at a call, from the instructions before it, in `callees.call_shape`'s vocabulary.
-
-    `window` is `[(mnemonic, operands)]` in order with the call excluded; `truncated` says the window lost
-    its oldest instruction (the function start), where a missing writer can no longer be called "0".
-    """
-    for mnemonic, operands in reversed(window):
-        toks = [t.strip() for t in operands.split(",")] if operands else []
-        _reads, writes, is_branch, is_call, decoded = cl.decode_rw(mnemonic, operands)
-        if not decoded:
-            return "?"
-        if is_call:
-            return "0 (r3 live-in)"
-        if is_branch:
-            return "0?"
-        if 3 in writes:
-            if mnemonic == "li" and toks and toks[0] == "r3" and len(toks) > 1:
-                return toks[1]
-            m = MOD_RE.search(operands) if operands else None
-            if mnemonic in ("lis", "addi", "addis", "ori", "oris") and toks and toks[0] == "r3" and m:
-                return "&" + (m.group(1) or m.group(2))
-            return "? (%s)" % mnemonic
-    return "0?" if truncated else "0"
-
-
-def parse_dump_file(path):
-    """-> (labels, funcs, refs) for one `.s` file of the dump.
-
-    `labels` is `name -> (address, size, section)` from the `# <section>:0xOFF | 0xADDR | size:` headers;
-    `funcs` is `function address -> .fn label`; `refs` are unresolved sites
-    `(site, kind, name, encoded_target_or_None, func_addr, text, arg)`.
-
-    The file is read as one string and scanned once, so the order of the `.fn`/`.obj` blocks and of the
-    instructions inside them is preserved without a second pass. `pending` is the header comment that
-    names the address of the block which follows it - the dump's own label table, and the reason a stale
-    name still resolves to the right address.
-    """
-    with open(path, "r", encoding="utf-8", errors="replace") as fh:
-        text = fh.read()
-    labels, funcs, refs = {}, {}, []
-    pending = None                       # (section, address, size) of the last header comment
-    cur = None                           # the `.fn`/`.obj` block in force: (label, is_fn, addr, size, sec)
-    window, truncated = [], False
-    for m in SCAN_RE.finditer(text):
-        if m.group("sec"):
-            pending = (m.group("sec"), int(m.group("haddr"), 16), int(m.group("hsize"), 16))
-            continue
-        if m.group("fn") or m.group("obj"):
-            is_fn = bool(m.group("fn"))
-            label = m.group("fn") or m.group("obj")
-            cur = [label, is_fn, pending[1] if pending else None,
-                   pending[2] if pending else 0, pending[0] if pending else None]
-            pending = None
-            window, truncated = [], False
-            if cur[2] is not None:
-                labels[label] = (cur[2], cur[3], cur[4])
-                if is_fn:
-                    funcs[cur[2]] = label
-            continue
-        if m.group("ptr"):
-            # A pointer entry: its own address is the containing object's, not the word's.
-            tok = m.group("ptr")
-            if tok.startswith(("0x", "-")) or tok[0].isdigit() or tok.startswith("."):
-                continue
-            nm = SYM_RE.match(tok)
-            if not nm or (nm.group(1) or nm.group(2)).startswith("."):
-                continue
-            if cur is not None and cur[2] is not None:
-                funcs.setdefault(cur[2], cur[0])
-                refs.append((cur[2], "pointer", nm.group(1) or nm.group(2), None, cur[2],
-                             ".4byte %s" % tok, ""))
-            continue
-        # an instruction line: it gives its own address, and it may be a block's first body line
-        addr = int(m.group("iaddr"), 16)
-        if cur is not None and cur[2] is None:
-            cur[2] = addr
-            labels[cur[0]] = (addr, cur[3], cur[4])
-            if cur[1]:
-                funcs[addr] = cur[0]
-        func = cur[2] if cur is not None else None
-        asm = m.group("itext")
-        parts = asm.split(None, 1)
-        if not parts:
-            continue
-        mnemonic, operands = parts[0].rstrip("."), (parts[1].strip() if len(parts) > 1 else "")
-        name = symbol_operand(operands)
-        if mnemonic in ("bl", "bla", "b", "ba", "bcl", "bcla") and name:
-            kind = "call" if mnemonic in ("bl", "bla", "bcl", "bcla") else "branch"
-            arg = arg_hint(window, truncated) if kind == "call" else ""
-            refs.append((addr, kind, name, branch_target(addr, m.group("ibytes")), func, asm, arg))
-        elif "@" in operands:
-            for mod in MOD_RE.finditer(operands):
-                refs.append((addr, mem_kind(mnemonic), mod.group(1) or mod.group(2), None, func, asm, ""))
-        window.append((mnemonic, operands))
-        if len(window) > ARG_WINDOW:
-            del window[0]
-            truncated = True
-    return labels, funcs, refs
-
-
-# --------------------------------------------------------------------------------------------------
-# the index: parse every `.s` once, keep addresses, cache it
-# --------------------------------------------------------------------------------------------------
-def key_of(ref):
-    """The identity of a reference site: one instruction per address, one entry per named table slot.
-
-    Keying an *instruction* reference on `(site, kind)` and not on its printed symbol is what makes the
-    stale copies harmless: 0x803A146C is one site, whether the copy that printed it called the callee
-    `fn_803A1680` or `game_mode_sub_state_set1`. A `.4byte` entry is keyed on its name too, because one
-    object legitimately holds several pointers to several symbols.
-    """
-    site, kind, name = ref[0], ref[1], ref[2]
-    return (site, kind, name) if kind == "pointer" else (site, kind)
-
-
 def build_index(asm_dir, files):
-    """-> (index dict, stats dict). Every `.s` is parsed; each site keeps its preferred copy.
-
-    Two independent kinds of duplicate are handled here: the *same instruction* in a stale copy of a unit
-    (`key_of` dedupes the site, `file_rank` decides which text is kept) and the *same name* at two
-    addresses (kept, counted, and reported by `--stats` rather than silently dropped).
-    """
-    t0 = time.time()
-    labels, funcs, best = {}, {}, {}
-    by_target = collections.defaultdict(list)
-    conflicts, dropped, mismatch = [], 0, 0
-    for path in files:
-        try:
-            labels_f, funcs_f, refs_f = parse_dump_file(path)
-        except OSError:
-            continue
-        rank = file_rank(path, asm_dir)
-        for name, (addr, size, section) in labels_f.items():
-            old = labels.get(name)
-            if old is None:
-                labels[name] = (addr, size, section)
-            elif old[0] == addr:
-                if section in CODE_SECTIONS and old[2] not in CODE_SECTIONS:
-                    labels[name] = (addr, size, section)   # a `.text` block beats its `@eti_` stub
-            elif old[2] in CODE_SECTIONS and section not in CODE_SECTIONS:
-                pass                                        # the code block's address wins
-            elif len(conflicts) < 8:
-                conflicts.append((name, "0x%08X" % old[0], "0x%08X" % addr,
-                                  os.path.relpath(path, asm_dir)))
-        funcs.update(funcs_f)
-        for ref in refs_f:
-            key = key_of(ref)
-            prev = best.get(key)
-            if prev is None:
-                best[key] = (rank, ref)
-            else:
-                dropped += 1
-                if rank < prev[0]:
-                    best[key] = (rank, ref)
-    for _key, (_rank, ref) in best.items():
-        site, kind, name, encoded, func, asm, arg = ref
-        lab = labels.get(name)
-        target = encoded if encoded is not None else (lab[0] if lab else None)
-        if encoded is not None and lab is not None and lab[0] != encoded:
-            mismatch += 1      # the printed label is not the address the displacement points at
-        row = [site, kind, func, asm, arg]
-        if target is None:
-            by_target[name].append(row)      # kept under its name: retried through the map per query
-            continue
-        by_target[("0x%08X" % target)].append(row)
-    index = {
-        "schema": SCHEMA,
-        "game": GAME,
-        "built_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "seconds": round(time.time() - t0, 1),
-        "files": len(files),
-        "bytes": sum(os.path.getsize(p) for p in files),
-        "labels": {n: list(v) for n, v in labels.items()},
-        "funcs": {str(a): n for a, n in sorted(funcs.items())},
-        "refs": {k: sorted(v, key=lambda r: (r[0], r[1])) for k, v in by_target.items()},
-    }
-    stats = {
-        "refs": sum(len(v) for v in by_target.values()),
-        "targets": sum(1 for k in by_target if k.startswith("0x")),
-        "labels": len(labels),
-        "unresolved": sum(1 for k in by_target if not k.startswith("0x")),
-        "duplicates": dropped,
-        "label_conflicts": conflicts,
-        "label_mismatch": mismatch,
-        "biggest": sorted(((len(v), k) for k, v in by_target.items() if k.startswith("0x")),
-                          reverse=True)[:3],
-    }
-    return index, stats
-
-
-def attach_derived(index):
-    """Add the in-memory lookups a query needs (never serialised with the cache).
-
-    `_label_at` is `address -> [names the dump prints there]`, which is what a stale label is read
-    through; `_funcs` is the same table with integer addresses.
-    """
-    by_addr = {}
-    for name, row in index["labels"].items():
-        by_addr.setdefault(row[0], []).append(name)
-    for names in by_addr.values():
-        names.sort()
-    index["_label_at"] = by_addr
-    index["_funcs"] = {int(k): v for k, v in index["funcs"].items()}
-    index["refs"] = {k: [tuple(r) for r in v] for k, v in index["refs"].items()}
-    return index
+    """-> (index dict, stats dict) over every `.s` (`lib.refs.build_dump_index`)."""
+    return _refs.build_dump_index(asm_dir, files, GAME)
 
 
 def dump_state(asm_dir, files, root=ROOT):
@@ -452,68 +103,22 @@ def dump_state(asm_dir, files, root=ROOT):
 
 
 def load_index(root=ROOT, rebuild=False, asm_dir=None, cache=None):
-    """-> (index, info) - from the cache when it is the same dump, else built.
-
-    `info` records whether the cache was used and why not, so `--stats` and `--json` can say how old the
-    answer is instead of implying it is fresh. A cache with a different schema, or one built from another
-    dump signature, is rebuilt rather than trusted.
-    """
+    """-> (index, info) - from the cache when it is the same dump, else built (`lib.refs.load_index`)."""
     asm_dir = asm_dir or asm_dir_of(root)
     cache = cache or cache_of(root)
     files = all_asm_files(asm_dir)
-    info = {"asm_dir": asm_dir, "cache": cache, "files": len(files), "cached": False,
-            "rebuilt": False, "reason": "no cache", "stats": {}}
     if not files:
-        info["reason"] = "no dump"
-        return None, info
-    signature = dump_signature(asm_dir, files)
-    info["signature"] = signature
-    if not rebuild and os.path.exists(cache):
-        try:
-            with open(cache, "r", encoding="utf-8") as fh:
-                index = json.load(fh)
-        except (ValueError, OSError) as exc:
-            info["reason"] = "unreadable cache (%s)" % exc
-            index = None
-        else:
-            if index.get("schema") != SCHEMA:
-                info["reason"] = "cache schema %s, this tool writes %s" % (index.get("schema"), SCHEMA)
-                index = None
-            elif index.get("signature") != signature or index.get("files") != len(files):
-                info["reason"] = "the dump changed since the index was built"
-                index = None
-            else:
-                info.update(cached=True, reason="cache hit", index=index,
-                            stats=index.get("stats", {}))
-                info["cache_bytes"] = os.path.getsize(cache)
-                return attach_derived(index), info
-    elif rebuild:
-        info["reason"] = "forced rebuild"
-    index, stats = build_index(asm_dir, files)
-    index["signature"] = signature
-    index["stats"] = stats
-    info.update(rebuilt=True, index=index, stats=stats)
-    try:
-        os.makedirs(os.path.dirname(cache), exist_ok=True)
-        tmp = cache + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as fh:
-            json.dump(index, fh, separators=(",", ":"), sort_keys=True)
-        os.replace(tmp, cache)
-        info["cache_bytes"] = os.path.getsize(cache)
-    except OSError as exc:
-        info["cache_error"] = str(exc)
-    return attach_derived(index), info
+        return None, {"asm_dir": asm_dir, "cache": cache, "files": 0, "cached": False, "rebuilt": False,
+                      "reason": "no dump", "stats": {}}
+    index, info = _refs.load_index(cache, dump_signature(asm_dir, files), len(files),
+                                   lambda: build_index(asm_dir, files), rebuild,
+                                   "the dump changed since the index was built")
+    info["asm_dir"] = asm_dir
+    return index, info
 
 
-# --------------------------------------------------------------------------------------------------
-# the fallback: no asm dump -> the split objects' own relocations
-# --------------------------------------------------------------------------------------------------
-# `build/<game>/asm` is written only on demand (a `dol split`, ~3 min), so a tree that has built the
-# project but not dumped it has no dump and `callers.py` used to exit 2 with "no asm dump". The
-# objects it *does* have are the split pieces under `build/<game>/obj`, and their relocations are
-# exactly what the question needs: a `bl` is an `R_PPC_REL24` to the callee, a data access is an
-# `R_PPC_ADDR16_*`/`@sda21` relocation to the data symbol. This builds the same address-keyed graph
-# from them, so `query`/`print_report` are unchanged.
+# No dump (it is written only on demand): the split objects under `build/<game>/obj` answer from their
+# relocations instead - the same address-keyed graph, coarser kinds, `source: elf`.
 def _has_objects(d):
     return any(n.endswith(".o") for _dp, _dirs, names in os.walk(d) for n in names)
 
@@ -525,180 +130,28 @@ def obj_dir_of(root=ROOT):
 
 def all_object_files(root=ROOT):
     """Every split object under `build/<game>/obj` (the target pieces dtk wrote), sorted."""
-    base = obj_dir_of(root)
-    out = []
-    for dirpath, _dirs, names in os.walk(base):
-        for n in names:
-            if n.endswith(".o"):
-                out.append(os.path.join(dirpath, n))
-    out.sort()
-    return out
-
-
-def object_signature(obj_dir, files):
-    """The fallback cache's key: every object's path, size and mtime."""
-    h = hashlib.sha1()
-    for path in files:
-        st = os.stat(path)
-        h.update(("%s\0%d\0%d\n" % (os.path.relpath(path, obj_dir).replace("\\", "/"),
-                                      st.st_size, st.st_mtime_ns)).encode("utf-8"))
-    return h.hexdigest()
+    return _refs.object_files(obj_dir_of(root))
 
 
 def build_elf_index(obj_dir, files, cmap):
-    """The address-keyed graph from the split objects' relocations - the no-dump fallback.
-
-    A split object is relocatable: its sections sit at 0 and every symbol value is an *offset*. Two
-    things recover absolute addresses without the dump: one anchor per section (a defined symbol the
-    map knows, whose `map_address - object_offset` is that section's base) and `dossier.parse_elf`'s
-    relocation scan. A reference's *kind* is coarser than the dump's - there is no instruction text to
-    tell a read from a write - so every non-call is `addr`; the caller, the site and the target are
-    exact, and the index says `source: elf` so a count is never read as the dump's.
-    """
-    t0 = time.time()
-    labels, funcs = {}, {}
-    # key -> {(site, kind, func, text): row}. The same site is dumped by two objects when a registered
-    # unit's piece and the retired `auto_*` piece cover the same bytes; the tuple is identical, so the
-    # dict keys the site once (the asm path's `key_of` dedupe, without the dump's `file_rank`).
-    by_target = collections.defaultdict(dict)
-    scanned, dropped = 0, 0
-    for path in files:
-        try:
-            with open(path, "rb") as fh:
-                _sections, symbols, relocs = dossier_mod.parse_elf(fh.read())
-        except (OSError, ValueError):
-            continue
-        scanned += 1
-        by_sec = collections.defaultdict(list)
-        for s in symbols:
-            if s["shndx"] and s["name"]:
-                by_sec[s["section"]].append(s)
-        base = {}
-        for sec, lst in by_sec.items():
-            for s in sorted(lst, key=lambda x: x["value"]):
-                row = cmap.symbols.get(s["name"])
-                if row:
-                    base[sec] = row[0][1] - s["value"]
-                    break
-            if sec in base:
-                for s in sorted(lst, key=lambda x: x["value"]):
-                    labels.setdefault(s["name"], (base[sec] + s["value"], s["size"] or 0, sec))
-                    if sec in CODE_SECTIONS and s["type"] == 2:
-                        funcs.setdefault(base[sec] + s["value"], s["name"])
-        ordered = {sec: sorted(lst, key=lambda x: x["value"]) for sec, lst in by_sec.items()}
-
-        def holder(sec, off):
-            best = None
-            for s in ordered.get(sec, ()):
-                if s["value"] <= off and (s["size"] == 0 or off < s["value"] + s["size"]):
-                    best = s
-                elif s["value"] > off:
-                    break
-            return best
-
-        for r in relocs:
-            name, site_sec = r.get("symbol"), r.get("target")
-            if not name or not site_sec or site_sec not in base or name.startswith("."):
-                continue
-            h = holder(site_sec, r["offset"])
-            site = base[site_sec] + r["offset"]
-            func_addr = base[site_sec] + h["value"] if h is not None else None
-            if func_addr is not None:
-                funcs.setdefault(func_addr, h["name"])
-            if site_sec in CODE_SECTIONS:
-                kind = "call" if r["type"] in cl.CALL_TYPES else "addr"
-                text = ("bl %s" % name) if kind == "call" else "%s %s" % (r["type_name"], name)
-            else:
-                kind = "pointer"
-                text = "%s %s" % (r["type_name"], name)
-            row_map = cmap.symbols.get(name)
-            key = ("0x%08X" % (row_map[0][1] + (r.get("addend") or 0))) if row_map else name
-            slot = (site, kind, func_addr, text)
-            if slot in by_target[key]:
-                dropped += 1
-            by_target[key][slot] = [site, kind, func_addr, text, ""]
-    index = {
-        "schema": SCHEMA,
-        "game": GAME,
-        "source": "elf",
-        "built_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "seconds": round(time.time() - t0, 1),
-        "files": scanned,
-        "bytes": sum(os.path.getsize(p) for p in files),
-        "labels": {n: list(v) for n, v in labels.items()},
-        "funcs": {str(a): n for a, n in sorted(funcs.items())},
-        "refs": {k: sorted(v.values(), key=lambda r: (r[0], r[1])) for k, v in by_target.items()},
-    }
-    stats = {
-        "refs": sum(len(v) for v in by_target.values()),
-        "targets": sum(1 for k in by_target if k.startswith("0x")),
-        "labels": len(labels),
-        "unresolved": sum(1 for k in by_target if not k.startswith("0x")),
-        "duplicates": dropped,
-        "label_conflicts": [],
-        "label_mismatch": 0,
-        "biggest": sorted(((len(v), k) for k, v in by_target.items() if k.startswith("0x")),
-                          reverse=True)[:3],
-    }
-    return index, stats
+    """The address-keyed graph from the split objects' relocations (`lib.refs.build_object_index`)."""
+    return _refs.build_object_index(obj_dir, files, cmap.symbols, GAME)
 
 
 def load_elf_index(root=ROOT, rebuild=False, cmap=None, cache=None):
-    """`load_index`'s fallback: the same index shape, built from the split objects, cached the same way.
-
-    `info["source"] == "elf"` and `info["reason"]`/`stats` carry exactly what `load_index` does, so
-    `--stats` and `--json` report which graph answered without a second code path.
-    """
+    """`load_index`'s fallback: the same index shape, built from the split objects, cached the same way."""
     obj_dir = obj_dir_of(root)
     cache = cache or os.path.join(root, "build", "tmp", "callers", "elf-graph.json")
     files = all_object_files(root)
-    info = {"asm_dir": obj_dir, "cache": cache, "files": len(files), "cached": False,
-            "rebuilt": False, "reason": "no cache", "stats": {}, "source": "elf"}
     if not files:
-        info["reason"] = "no objects"
-        return None, info
+        return None, {"asm_dir": obj_dir, "cache": cache, "files": 0, "cached": False, "rebuilt": False,
+                      "reason": "no objects", "stats": {}, "source": "elf"}
     cmap = cmap if cmap is not None else load_map(root)
-    signature = object_signature(obj_dir, files)
-    info["signature"] = signature
-    if not rebuild and os.path.exists(cache):
-        try:
-            with open(cache, "r", encoding="utf-8") as fh:
-                index = json.load(fh)
-        except (ValueError, OSError) as exc:
-            info["reason"] = "unreadable cache (%s)" % exc
-            index = None
-        else:
-            if index.get("schema") != SCHEMA:
-                info["reason"] = "cache schema %s, this tool writes %s" % (index.get("schema"),
-                                                                           SCHEMA)
-                index = None
-            elif index.get("signature") != signature or index.get("files") != len(files):
-                info["reason"] = "the objects changed since the index was built"
-                index = None
-            else:
-                info.update(cached=True, reason="cache hit", index=index,
-                            stats=index.get("stats", {}))
-                info["cache_bytes"] = os.path.getsize(cache)
-                return attach_derived(index), info
-    elif rebuild:
-        info["reason"] = "forced rebuild"
-    index, stats = build_elf_index(obj_dir, files, cmap)
-    index["signature"] = signature
-    index["stats"] = stats
-    info.update(rebuilt=True, index=index, stats=stats)
-    try:
-        os.makedirs(os.path.dirname(cache), exist_ok=True)
-        tmp = cache + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as fh:
-            json.dump(index, fh, separators=(",", ":"), sort_keys=True)
-        os.replace(tmp, cache)
-        info["cache_bytes"] = os.path.getsize(cache)
-    except OSError as exc:
-        info["cache_error"] = str(exc)
-    return attach_derived(index), info
-
-
-# --------------------------------------------------------------------------------------------------
+    index, info = _refs.load_index(cache, object_signature(obj_dir, files), len(files),
+                                   lambda: build_elf_index(obj_dir, files, cmap), rebuild,
+                                   "the objects changed since the index was built")
+    info.update(asm_dir=obj_dir, source="elf")
+    return index, info
 # the current symbol map, through symedit-style access (never printed - non-negotiable 7)
 # --------------------------------------------------------------------------------------------------
 class Map:
@@ -804,24 +257,6 @@ def find_target(query, index, cmap):
 # --------------------------------------------------------------------------------------------------
 # the query
 # --------------------------------------------------------------------------------------------------
-def coalesce(rows):
-    """Merge a `lis X@ha` + `addi X@l` pair into one site; every other site stays as it is.
-
-    The compiler materialises a data address as two instructions, and reporting them as two references
-    doubles every count; they are one site - the same arithmetic that makes the quest dossier read "two
-    referrers" for a table whose two pointers each take two instructions.
-    """
-    out = []
-    for row in sorted(rows, key=lambda r: r[0]):
-        if out and row[0] == out[-1][0] + 4 and "@ha" in out[-1][3] and "@l" in row[3] \
-                and out[-1][2] == row[2] and out[-1][1] == row[1]:
-            prev = out[-1]
-            out[-1] = (prev[0], prev[1], prev[2], prev[3] + " + " + row[3], prev[4])
-            continue
-        out.append(tuple(row))
-    return out
-
-
 def fmt_addr(addr):
     return "0x%08X" % addr if addr is not None else "-"
 
@@ -877,16 +312,10 @@ def query(query, index, cmap, kinds=None, limit=40, pointers=False):
         rep["notes"].append("the queried name is the dump's (stale) label: the current map calls %s %s"
                             % (fmt_addr(addr), map_hit[0]))
 
-    rows = [tuple(r) for r in index["refs"].get(fmt_addr(addr), [])]
     # a reference the dump could not resolve by name was left keyed on that name: the current map may
     # name the address now (the rename-since-the-dump case, in both directions), so retry it here
-    retried = set()
-    for nm in {name, query, asm_label} - {None, ""}:
-        for row in index["refs"].get(nm, []):
-            if row not in rows:
-                rows.append(row)
-                retried.add(nm)
-    for nm in sorted(retried):
+    rows, retried = _refs.rows_at(index, addr, (name, query, asm_label))
+    for nm in retried:
         rep["notes"].append("a reference printed as %r (in neither the dump's label table nor the map) "
                             "was resolved through the current map" % nm)
 
@@ -1085,27 +514,7 @@ def range_report(index, cmap, lo, hi, step=4):
     collapse into one run, and the first address of every run but the first is a **seam** - the
     boundary a lane otherwise measures one `callers.py` invocation at a time.
     """
-    census = readers_of(index, cmap)
-    addresses = []
-    address = lo
-    while address <= hi:
-        readers = census(address)
-        addresses.append({"address": address, "readers": sorted(readers),
-                          "sites": sum(readers.values())})
-        address += step
-    runs, seams = [], []
-    for row in addresses:
-        if runs and runs[-1]["readers"] == row["readers"]:
-            runs[-1]["end"] = row["address"]
-            runs[-1]["count"] += 1
-            runs[-1]["sites"] += row["sites"]
-        else:
-            if runs:
-                seams.append(row["address"])
-            runs.append({"start": row["address"], "end": row["address"], "count": 1,
-                         "readers": row["readers"], "sites": row["sites"]})
-    return {"range": {"lo": lo, "hi": hi, "step": step, "addresses": len(addresses)},
-            "addresses": addresses, "runs": runs, "seams": seams}
+    return _refs.runs_over(readers_of(index, cmap), lo, hi, step)
 
 
 def print_range(payload, root=ROOT, asm_dir=None, state=None, each=False):

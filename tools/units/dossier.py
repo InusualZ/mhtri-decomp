@@ -16,6 +16,7 @@ import zipfile
 from tools.lib.binary.elf import Elf as LibElf, ElfError
 
 from tools.lib.binary.dol import Dol as LibDol
+from tools.lib import ppc as _ppc
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -95,14 +96,7 @@ def language_of(name: str | None) -> str:
     return "C++" if is_mangled(name) else "C"
 
 
-def decode_li(word: int) -> tuple[int, int] | None:
-    """`(register, immediate)` when the word is `addi rD, 0, imm` (MWCC's `li`), else None."""
-    if word >> 26 != 14 or ((word >> 16) & 0x1F) != 0:
-        return None
-    imm = word & 0xFFFF
-    if imm >= 0x8000:
-        imm -= 0x10000
-    return (word >> 21) & 0x1F, imm
+decode_li = _ppc.decode_li   # `(register, immediate)` of MWCC's `li` (`addi rD, 0, imm`), else None
 
 
 def panic_calls(text: bytes, base: int, relocs: list[dict], funcs: list[dict],
