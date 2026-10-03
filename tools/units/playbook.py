@@ -36,6 +36,7 @@ The registry (`LEVERS`) is the one place the curated framing lives; extending it
 a row. It is deliberately data, so the next round's workers can be pointed at it.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import glob
@@ -45,8 +46,8 @@ import re
 import sys
 from dataclasses import dataclass, field
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "agents"))
-import sync_playbook_index  # noqa: E402  (derive_tags: the idea-tag keyword heuristic)
+from tools.agents import sync_playbook_index  # derive_tags: the idea-tag keyword heuristic
+from tools.lib import outbox as _outbox
 
 MAIN = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUTBOX = os.path.join(MAIN, ".pi", "outbox")
@@ -625,13 +626,7 @@ def render_readme(ready, already, notdraft, undraftable, base) -> str:
 # Run
 # -----------------------------------------------------------------------------------------------------------
 def load_outboxes(outbox_dir: str) -> list[tuple[str, dict]]:
-    out = []
-    for path in sorted(glob.glob(os.path.join(outbox_dir, "*.json"))):
-        try:
-            out.append((path, json.loads(_read(path))))
-        except (OSError, json.JSONDecodeError) as exc:
-            print("warn: skipping %s (%s)" % (os.path.basename(path), exc), file=sys.stderr)
-    return out
+    return [(e.path, e.data) for e in _outbox.load_outboxes(outbox_dir, warn=sys.stderr)]
 
 
 def run(outbox_dir: str, notes_dir: str, drafts_dir: str, matching: str, agents: str,

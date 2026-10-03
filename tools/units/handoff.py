@@ -19,7 +19,7 @@ What `--check` enforces (each is something the orchestrator would otherwise have
 * `unit_percent` and each `percent` are in 0-100;
 * `measured_with` names the command, so a number can be reproduced and a hand-written compile spotted;
 * `config_requests` entries carry the evidence the plan's §8 requires. The accepted kinds and their required
-  fields are `CONFIG_REQUEST_SCHEMA` below - the one definition, which `brief.py` renders into the worker's
+  fields are `lib.outbox.CONFIG_REQUEST_SCHEMA` - the one definition, which `brief.py` renders into the worker's
   brief (part 6). A kind outside the table (`tooling`, `naming`, ...) or a known kind whose structured fields
   are absent is still accepted when it carries its content under a free-text field (`FREE_TEXT_FIELDS`), so a
   real filing is never refused for spelling its field the way its lane does. `flags_probed` is a list of
@@ -28,11 +28,11 @@ What `--check` enforces (each is something the orchestrator would otherwise have
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import json
 import os
-import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -41,96 +41,21 @@ sys.path.insert(0, os.path.dirname(HERE))
 from units import brief as brief_mod  # noqa: E402
 from units import claims  # noqa: E402
 from units import recompile as rc  # noqa: E402
+from tools.lib import outbox as _outbox  # noqa: E402  (the schema and the validator: one definition)
 
-REQUIRED = ("unit", "worker", "finished_at", "unit_percent", "symbols", "residual", "measured_with")
-
-# The `config_requests` schema: the kind, the fields this validator *requires* and the fields the
-# orchestrator reads when they are present. `brief.py` renders this table verbatim (part 6), so the brief
-# asks for exactly what the validator accepts - the two cannot drift, because there is one definition.
-#
-# Why this direction (the brief copies the schema, not the reverse): the kind name carries the required
-# fields. `range` means section/start/end, `rename` means old/new/evidence, and a synonym such as `data` or
-# `tool` would have to be mapped back to a canonical kind before those checks run - two vocabularies and two
-# chances for a typo to skip a required-field check. The brief is machine-generated, so it can carry the
-# exact vocabulary at no cost. The 2026-09-23 `RSO/runtime` round produced an 18-error outbox precisely
-# because the brief named no schema and the worker invented `data`/`flags`/`tool` and a non-dict
-# `flags_probed`; a brief that states the schema is the fix, not a validator that guesses.
-CONFIG_REQUEST_SCHEMA = (
-    {"kind": "range", "needs": ("section", "start", "end"), "also": ("evidence",),
-     "means": "a data range this unit owns (a splits.txt range plus its configure.py entry)"},
-    {"kind": "seam", "needs": ("section", "start", "end", "evidence"), "also": ("why",),
-     "means": "a seam finding: this code span's boundary is in the wrong place and the unit split should be "
-              "re-drawn - distinct from `range`, which claims a data run this unit already owns"},
-    {"kind": "rename", "needs": ("old", "new", "evidence"), "also": (),
-     "means": "a map-symbol rename, with the evidence for the new name"},
-    {"kind": "flag", "needs": ("evidence",), "also": ("lib", "change"),
-     "means": "a compiler flag for a lib, with the probe numbers that justify it"},
-    {"kind": "shared-file", "needs": ("why",), "also": ("file",),
-     "means": "an edit to a file a worker may not touch (a tool, configure.py, splits.txt)"},
-)
-CONFIG_KINDS = tuple(row["kind"] for row in CONFIG_REQUEST_SCHEMA)
-CONFIG_NEEDS = {row["kind"]: row["needs"] for row in CONFIG_REQUEST_SCHEMA}
-FLAG_PROBE_FIELDS = ("flags", "effect", "verdict")
-FLAG_PROBE_VERDICTS = ("reject", "adopt", "inconclusive", "kept")
-
-# The free-text fields a lane files its content under when it does not use - or the schema does not name -
-# the kind's structured fields. The schema and `backlog.py`'s intake have to agree about what a filing *is*:
-# a request with its content in `why`/`request`/`what`/`subject`/`note`/`evidence` is a real filing, and
-# neither the validator nor `_add_request` may drop it for spelling its field differently. This is the one
-# list both sides read (backlog imports it), so the two cannot drift.
-FREE_TEXT_FIELDS = ("evidence", "why", "request", "what", "subject", "note")
-
-
-def config_schema_rows() -> list[dict]:
-    """The schema table `brief.py` renders - the one definition both tools read."""
-    return [dict(row) for row in CONFIG_REQUEST_SCHEMA]
-
-
-def request_content(req: dict) -> str:
-    """A request's free-text content: the first non-empty `FREE_TEXT_FIELDS` value (`""` when none)."""
-    for field in FREE_TEXT_FIELDS:
-        value = req.get(field)
-        if isinstance(value, str) and value.strip():
-            return value
-    return ""
-
-
-def symbol_like(name: str) -> bool:
-    """Whether `name` is one symbol and not a summary row (`"80 more symbols"`, `"a / b / c"`).
-
-    The ownership check can only speak about a name the map could hold; a prose line in `symbols` is a human
-    summary, and flagging it "not owned" is a false positive that would refuse a real batch.
-    """
-    s = (name or "").strip()
-    return bool(s) and " " not in s and "/" not in s
-
-
-def units_declared(entry: dict) -> list[str]:
-    """The unit spelling(s) an outbox declares: `unit`, plus a batch's `units`/`also_changed_units`/`per_unit`.
-
-    A batch that registers or touches several units writes one outbox (the branch's) and names them here. The
-    ownership check has to read all of them, or every symbol of the second unit is "not owned by this unit"
-    and the batch can never satisfy the gate - which is how an outbox check gets skipped with `--no-outbox`
-    and a filed request goes missing. Only the explicit list structure is read: the `unit` field is sometimes
-    a prose summary (`"A + B (2 units; ...)"`) whose `+`-tokens are not reliably the batch's units, and
-    splitting it would turn a previously-skipped ownership check on for records whose "symbols" are prose.
-    """
-    out: list[str] = []
-
-    def add(value) -> None:
-        if isinstance(value, str) and value.strip():
-            out.append(value.strip())
-
-    add(entry.get("unit"))
-    for key in ("units", "also_changed_units", "changed_units"):
-        value = entry.get(key)
-        if isinstance(value, list):
-            for item in value:
-                add((item.get("unit") or item.get("name")) if isinstance(item, dict) else item)
-    for item in (entry.get("per_unit") or []):
-        if isinstance(item, dict):
-            add(item.get("unit") or item.get("name"))
-    return list(dict.fromkeys(out))
+# The schema, the free-text fields and the validator are `lib.outbox` (docs/tools/spec/lib-outbox.md): `brief.py`
+# renders the same table, `backlog.py` reads the same free-text list, `land.py` refuses on the same errors.
+REQUIRED = _outbox.REQUIRED
+CONFIG_REQUEST_SCHEMA = _outbox.CONFIG_REQUEST_SCHEMA
+CONFIG_KINDS = _outbox.CONFIG_KINDS
+CONFIG_NEEDS = _outbox.CONFIG_NEEDS
+FLAG_PROBE_FIELDS = _outbox.FLAG_PROBE_FIELDS
+FLAG_PROBE_VERDICTS = _outbox.FLAG_PROBE_VERDICTS
+FREE_TEXT_FIELDS = _outbox.FREE_TEXT_FIELDS
+config_schema_rows = _outbox.config_schema_rows
+request_content = _outbox.request_content
+symbol_like = _outbox.symbol_like
+units_declared = _outbox.units_declared
 
 
 def owned_symbols(main: str, units: list[str]) -> set[str]:
@@ -168,82 +93,8 @@ def template(unit: str, worker: str = "worker-a") -> dict:
 
 
 def validate(entry: dict, owned: set[str]) -> tuple[list[str], list[str]]:
-    """-> (errors, warnings). An error means the batch may not land."""
-    errors, warnings = [], []
-    for key in REQUIRED:
-        if key not in entry:
-            errors.append("missing field `%s`" % key)
-    pct = entry.get("unit_percent")
-    if not isinstance(pct, (int, float)):
-        errors.append("unit_percent must be a number")
-    elif not 0 <= pct <= 100:
-        errors.append("unit_percent out of range: %r" % pct)
-    syms = entry.get("symbols")
-    if not isinstance(syms, list) or not syms:
-        errors.append("symbols must be a non-empty list")
-    else:
-        for i, s in enumerate(syms):
-            if not isinstance(s, dict) or not s.get("name"):
-                errors.append("symbols[%d] has no name" % i)
-                continue
-            value = s.get("percent")
-            if not isinstance(value, (int, float)):
-                errors.append("symbols[%d] (%s) has no numeric percent" % (i, s["name"]))
-            elif not 0 <= value <= 100:
-                errors.append("symbols[%d] (%s) percent out of range: %r" % (i, s["name"], value))
-            if owned and symbol_like(s["name"]) and s["name"] not in owned:
-                errors.append("symbols[%d] `%s` is not owned by this unit" % (i, s["name"]))
-    if not isinstance(entry.get("residual"), str) or not entry.get("residual", "").strip():
-        errors.append("residual must be a non-empty string ('none' is a valid answer)")
-    if "measured_with" in entry and (not isinstance(entry.get("measured_with"), str)
-                                     or not entry.get("measured_with", "").strip()):
-        errors.append("measured_with must name the command the numbers came from")
-    for i, req in enumerate(entry.get("config_requests") or []):
-        if not isinstance(req, dict):
-            errors.append("config_requests[%d] is not an object" % i)
-            continue
-        kind = req.get("kind")
-        content = request_content(req)
-        if kind not in CONFIG_NEEDS:
-            # An out-of-schema kind (`tooling`, `naming`, `done-in-this-fold`) is a real filing the schema has
-            # not caught up with: accept it when it carries free-text content and refuse it only when empty,
-            # so a lane's own kind name cannot cost it a landing (or its request).
-            if not content:
-                errors.append("config_requests[%d] has kind %r (not one of %s) and no free-text content (%s)"
-                              % (i, kind, list(CONFIG_KINDS), ", ".join(FREE_TEXT_FIELDS)))
-            continue
-        missing = [f for f in CONFIG_NEEDS[kind] if f not in req or req.get(f) in (None, "")]
-        if missing and not content:
-            errors.append("config_requests[%d] (%s) needs %s (or content under one of %s)"
-                          % (i, kind, ", ".join(missing), ", ".join(FREE_TEXT_FIELDS)))
-    for i, probe in enumerate(entry.get("flags_probed") or []):
-        if isinstance(probe, str):
-            if not probe.strip():
-                errors.append("flags_probed[%d] is an empty string" % i)
-            continue
-        if not isinstance(probe, dict):
-            errors.append("flags_probed[%d] is not an object or a string (it needs flags, effect, verdict)" % i)
-            continue
-        flags = str(probe.get("flags") or probe.get("flag") or "").strip()
-        effect = str(probe.get("effect") or probe.get("result") or probe.get("evidence") or "").strip()
-        verdict = str(probe.get("verdict") or "").strip()
-        if not (flags or effect or verdict):
-            errors.append("flags_probed[%d] carries no flags/effect/verdict content" % i)
-            continue
-        missing = [name for name, value in (("flags", flags), ("effect", effect), ("verdict", verdict))
-                   if not value]
-        if missing:
-            # A probe filed under a lane's own keys (`flag`/`result`) or without a verdict is still content;
-            # the gate refuses a *bad verdict*, never a probe that spells its fields differently.
-            warnings.append("flags_probed[%d] does not name %s" % (i, ", ".join(missing)))
-        elif not any(verdict.lower().startswith(v) for v in FLAG_PROBE_VERDICTS):
-            errors.append("flags_probed[%d] verdict %r is not one of %s"
-                          % (i, probe.get("verdict"), "/".join(FLAG_PROBE_VERDICTS)))
-    if entry.get("claim_state") not in (None, "released", "open"):
-        warnings.append("claim_state %r is not open or released" % entry["claim_state"])
-    if not (entry.get("blockers") or []):
-        warnings.append("no blockers listed ('[]' is a valid answer)")
-    return errors, warnings
+    """-> (errors, warnings). An error means the batch may not land (`lib.outbox.validate`)."""
+    return _outbox.errors_and_warnings(_outbox.validate(entry, owned))
 
 
 def digest(unit: str, rows: list[dict]) -> str:

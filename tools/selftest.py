@@ -73,6 +73,7 @@ the refusal carries the last 40 lines of its output (`FAIL_TAIL_LINES`).
 Exit status is the answer: 0 only when nothing failed, nothing moved the tree, and no park is stale.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import concurrent.futures
@@ -89,8 +90,9 @@ PARK_FILE = os.path.join(HERE, "selftests-known-failures.json")
 #: prepended to every selftest's PYTHONPATH: its `sitecustomize.py` installs `tools/spawnretry.py`
 SITE_DIR = os.path.join(HERE, "selftest_site")
 
-# a tool "exposes --selftest" when it registers the flag (not when a docstring merely mentions it)
-SELFTEST_FLAG = re.compile(r"""add_argument\(\s*['"]--selftest['"]""")
+# a tool "exposes --selftest" when it registers the flag or is a `lib.cli.Tool` with `tests=` (not when a
+# docstring merely mentions it)
+from tools.lib.cli import SELFTEST_FLAG  # noqa: E402
 # the count shapes the tools print: `ok - 12 checks`, `9/9 checks passed`, `all 6 checks passed`,
 # `12 checks` - anything else is reported as `-` and the exit status is still the verdict.
 COUNT_PATTERNS = (

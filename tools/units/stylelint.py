@@ -146,6 +146,8 @@ import sys
 import tempfile
 from tools.lib.git import Git
 
+from tools.lib import cscan
+from tools.lib import findings as _findings
 from tools.lib import project as _project
 from tools.lib.project import ownership as _ownership
 
@@ -217,97 +219,23 @@ UNCHECKED: list[tuple[int, str]] = []
 # stripping: comments and literals blanked out, positions and newlines preserved
 # --------------------------------------------------------------------------------------------------
 def strip(text: str) -> tuple[str, str]:
-    """Return `(code, comments)`, each the same length as `text` with newlines in place.
-
-    `code` has every comment and string/char literal replaced by spaces; `comments` has the comment
-    bodies preserved and everything else blanked. Both keep one character per input character, so an
-    offset into either maps to the original line/column exactly.
-    """
-    n = len(text)
-    code = list(text)
-    comments = list(text)
-    i = 0
-    while i < n:
-        c = text[i]
-        if c == "/" and i + 1 < n and text[i + 1] == "*":
-            comments[i] = "/"
-            comments[i + 1] = "*"
-            code[i] = code[i + 1] = " "
-            i += 2
-            while i < n:
-                comments[i] = text[i]
-                if text[i] != "\n":
-                    code[i] = " "
-                if text[i] == "*" and i + 1 < n and text[i + 1] == "/":
-                    comments[i + 1] = "/"
-                    code[i + 1] = " "
-                    i += 2
-                    break
-                i += 1
-            continue
-        if c == "/" and i + 1 < n and text[i + 1] == "/":
-            while i < n and text[i] != "\n":
-                comments[i] = text[i]
-                code[i] = " "
-                i += 1
-            continue
-        if c in "\"'":
-            quote = c
-            code[i] = comments[i] = " "
-            i += 1
-            while i < n:
-                if text[i] == "\\" and i + 1 < n:
-                    code[i] = code[i + 1] = comments[i] = comments[i + 1] = " "
-                    i += 2
-                    continue
-                if text[i] == "\n":
-                    break  # unterminated literal / line continuation: do not swallow the newline
-                code[i] = comments[i] = " "
-                if text[i] == quote:
-                    i += 1
-                    break
-                i += 1
-            continue
-        i += 1
-    return "".join(code), "".join(comments)
+    """`(code, comments)` - `lib.cscan.strip`: comments and literals blanked, positions and newlines preserved."""
+    return cscan.strip(text)
 
 
-class Source:
-    """One file's text plus its two stripped views and a line index."""
+class Source(cscan.Text):
+    """One file's text plus its two stripped views and a line index (`lib.cscan.Text`), and its paths."""
 
     def __init__(self, path: str, rel: str, text: str):
         self.path = path
         self.rel = rel
-        self.text = text
-        self.code, self.comments = strip(text)
-        self._starts = [0]
-        for i, ch in enumerate(text):
-            if ch == "\n":
-                self._starts.append(i + 1)
-
-    def line_of(self, pos: int) -> int:
-        lo, hi = 0, len(self._starts) - 1
-        while lo < hi:
-            mid = (lo + hi + 1) // 2
-            if self._starts[mid] <= pos:
-                lo = mid
-            else:
-                hi = mid - 1
-        return lo + 1
-
-    def line_text(self, line: int) -> str:
-        start = self._starts[line - 1]
-        end = self.text.find("\n", start)
-        return self.text[start:] if end < 0 else self.text[start:end]
-
-    def span_lines(self, start: int, end: int) -> tuple[int, int]:
-        return self.line_of(start), self.line_of(max(start, end - 1))
+        super().__init__(text)
 
 
 # --------------------------------------------------------------------------------------------------
 # struct/class definitions and their fields
 # --------------------------------------------------------------------------------------------------
-STRUCT_RE = re.compile(r"\b(?:struct|class)\s*([A-Za-z_]\w*)?\s*\{")
+STRUCT_RE = cscan.STRUCT_RE
 SIZE_RE = re.compile(r"size\s*:\s*0x[0-9A-Fa-f]+")
 OFFSET_RE = re.compile(r"/\*\s*\+?0x[0-9A-Fa-f]+")
 UNK_FIELD_RE = re.compile(r"^unk\w*$")
@@ -315,55 +243,17 @@ UNK_FIELD_RE = re.compile(r"^unk\w*$")
 
 def match_brace(code: str, open_pos: int) -> int:
     """Index of the `}` matching the `{` at `open_pos`, or -1."""
-    depth = 0
-    for i in range(open_pos, len(code)):
-        if code[i] == "{":
-            depth += 1
-        elif code[i] == "}":
-            depth -= 1
-            if depth == 0:
-                return i
-    return -1
+    return cscan.match_brace(code, open_pos)
 
 
 def struct_defs(src: Source) -> list[dict]:
     """Every `struct`/`class` definition in the file, with its name, line range and body range."""
-    out = []
-    for m in STRUCT_RE.finditer(src.code):
-        open_pos = m.end() - 1
-        close_pos = match_brace(src.code, open_pos)
-        if close_pos < 0:
-            continue
-        name = m.group(1)
-        if not name:  # `typedef struct { ... } Name;`
-            tail = re.match(r"\s*([A-Za-z_]\w*)", src.code[close_pos + 1:])
-            name = tail.group(1) if tail else "<anonymous>"
-        out.append({
-            "name": name,
-            "start": m.start(),
-            "open": open_pos,
-            "close": close_pos,
-            "line": src.line_of(m.start()),
-            "end_line": src.line_of(close_pos),
-        })
-    return out
+    return [d.to_dict() for d in cscan.struct_defs(src)]
 
 
 def iter_fields(code: str, open_pos: int, close_pos: int) -> list[tuple[int, int]]:
     """`(start, end)` of every field declaration chunk at the body's top level."""
-    out = []
-    depth = 0
-    start = open_pos + 1
-    for i in range(open_pos + 1, close_pos):
-        c = code[i]
-        if c == "{":
-            depth += 1
-        elif c == "}":
-            depth -= 1
-        elif c == ";" and depth == 0:
-            out.append((start, i))
-            start = i + 1
-    return out
+    return cscan.fields(code, open_pos, close_pos)
 
 
 def field_name(chunk: str) -> str | None:
@@ -531,27 +421,8 @@ EXTERN_RE = re.compile(r"\bextern\b")
 
 
 def _declared_name(segment: str) -> "str | None":
-    """The identifier an `extern` declaration introduces (function, function pointer, or variable).
-
-    The first `(` is always at depth 0, so what follows it decides the shape: `(*name)` is a function
-    pointer variable, `(*name(` is a function returning a function pointer, anything else is a function
-    whose name is the last identifier before the `(`. A function-pointer *parameter* is nested, so it is
-    never reached from the first `(`.
-    """
-    i = segment.find("(")
-    if i >= 0:
-        tail = segment[i:]
-        m = re.match(r"\(\s*\*\s*([A-Za-z_]\w*)\s*\)", tail)
-        if m:
-            return m.group(1)
-        m = re.match(r"\(\s*\*\s*([A-Za-z_]\w*)\s*\(", tail)
-        if m:
-            return m.group(1)
-        ids = re.findall(r"[A-Za-z_]\w*", segment[:i])
-        return ids[-1] if ids else None
-    segment = re.sub(r"\[[^\]]*\]", " ", segment.split("=")[0])
-    ids = re.findall(r"[A-Za-z_]\w*", segment)
-    return ids[-1] if ids else None
+    """The identifier an `extern` declaration introduces (`lib.cscan.declared_name`)."""
+    return cscan.declared_name(segment)
 
 
 def extern_declarations(src: Source) -> list[tuple[str, int, int]]:
@@ -599,7 +470,7 @@ def _owns(rel: str, unit: str) -> bool:
             and any(rel.endswith("/" + stem + ext) for ext in HEADER_SUFFIXES))
 
 
-_LINKAGE_OPEN_RE = re.compile(r"\bextern\s*$")
+_LINKAGE_OPEN_RE = cscan.LINKAGE_OPEN_RE
 _TYPE_ONLY_RE = re.compile(r"^\s*(?:typedef\s+)?(?:struct|class|union|enum)\b")
 
 
@@ -1038,8 +909,7 @@ _DECL_HEAD_RE = re.compile(
     r"|[A-Za-z_]\w*(?:\s*::\s*[A-Za-z_]\w*)*)"
     r"\s*[\*&]*\s*$"
 )
-_DECL_KEYWORDS = {"return", "if", "while", "for", "switch", "case", "else", "do",
-                  "sizeof", "break", "continue", "goto"}
+_DECL_KEYWORDS = cscan.STATEMENT_KEYWORDS
 
 
 def _statement_head(code: str, pos: int) -> str:
@@ -1091,16 +961,11 @@ def enclosing_call(code: str, pos: int) -> str | None:
 
 
 def _finding(src: Source, rule: int, line: int, detail: str, token: str | None = None) -> dict:
-    """One finding.  `token` is the identifier at fault - the `fn_XXXXXXXX`/`unkNN` a rule-7 rename
-    closes, the declared symbol rule 2/12 wants moved or claimed, the type/field a rule 3/5 wants named.
-
-    The detail string carries the same identifier in prose, but `--list-added` (and the `--diff --json`
-    payload) names it as data so a lane can read *which* occurrences a `+N rule R` summary stands for
-    without re-deriving them from the diff.  It is `None` for the rules whose finding has no single
-    named token (rule 8's `goto`).
+    """One finding (`lib.findings.Finding` as a dict). `token` is the identifier at fault - the
+    `fn_XXXXXXXX`/`unkNN` a rule-7 rename closes, the declared symbol rule 2/12 wants moved or claimed, the
+    type/field a rule 3/5 wants named; None for a rule whose finding names no single token (rule 8's `goto`).
     """
-    return {"rule": rule, "file": src.rel, "line": line, "token": token,
-            "text": src.line_text(line).strip()[:160], "detail": detail}
+    return _findings.Finding(rule, src.rel, line, token, detail, text=src.line_text(line).strip()[:160]).to_dict()
 
 
 def _rule2_finding(src: Source, line: int, name: str, detail: str) -> dict:
@@ -1135,153 +1000,22 @@ RULE11_MARKER_RE = re.compile(r"untyped\s*:\s*([^\n]*)")
 # A statement head that opens a `{` but is not a declaration: a control-flow block, or a macro/keyword that
 # is an expression at file scope (`static_assert(sizeof(void*) == 4)`). The rule must not read such a
 # parenthesised expression as a parameter list.
-RULE11_NON_DECL_HEADS = _DECL_KEYWORDS | {
-    "catch", "alignof", "__alignof", "static_assert", "_Static_assert", "assert", "asm", "__asm",
-}
+RULE11_NON_DECL_HEADS = cscan.NON_DECL_HEADS
 
 
 def match_paren(code: str, open_pos: int) -> int:
     """Index of the `)` matching the `(` at `open_pos`, or -1."""
-    depth = 0
-    for i in range(open_pos, len(code)):
-        if code[i] == "(":
-            depth += 1
-        elif code[i] == ")":
-            depth -= 1
-            if depth == 0:
-                return i
-    return -1
+    return cscan.match_paren(code, open_pos)
 
 
-def _mask_preproc(code: str) -> str:
-    """Blank every preprocessor line (and its continuations), positions and newlines preserved.
-
-    A macro body is not a declaration and its braces need not be balanced, so leaving one in place could
-    corrupt the scope walk. Blanking keeps a reported line number exact.
-    """
-    out = []
-    cont = False
-    for line in code.split("\n"):
-        directive = cont or line.lstrip().startswith("#")
-        cont = directive and line.rstrip().endswith("\\")
-        out.append(" " * len(line) if directive else line)
-    return "\n".join(out)
-
-
-def _declared_name_pos(segment: str) -> tuple[str | None, int]:
-    """`(name, position)` for the declaration `segment`, using rule 2's `_declared_name` for the name.
-
-    The position is recovered with the same discrimination `_declared_name` uses: a function pointer
-    (`(*name)` or `(*name(`) names the identifier inside the parens, anything else names the last
-    identifier before the first `(`. Reusing the parser keeps rule 11 from disagreeing with rule 2 about
-    what a declaration's name is.
-    """
-    name = _declared_name(segment)
-    if name is None:
-        return None, -1
-    i = segment.find("(")
-    if i >= 0:
-        tail = segment[i:]
-        for rx in (r"\(\s*\*\s*([A-Za-z_]\w*)\s*\)", r"\(\s*\*\s*([A-Za-z_]\w*)\s*\("):
-            m = re.match(rx, tail)
-            if m and m.group(1) == name:
-                return name, i + m.start(1)
-        k = i
-        while k > 0 and (segment[k - 1].isascii() and (segment[k - 1].isalnum() or segment[k - 1] == "_")):
-            k -= 1
-        return name, k
-    m = re.search(r"\b%s\b" % re.escape(name), segment)
-    return (name, m.start()) if m else (None, -1)
-
-
-def _declarator_parens(segment: str, name_pos: int, name_len: int) -> tuple[int, int] | None:
-    """`(open, close)` of a function declarator's parameter list, or None when this is not a function.
-
-    A direct declarator has `(` right after the name; a function-pointer declarator has `)` (closing
-    `(*name)`) before its own `(`. The text after `)` must be empty, a qualifier, a constructor-init `:`,
-    or a trailing `{`/`;` (the delimiters are outside `segment`), which is what rejects a variable
-    initializer (`void (*cb)(void *) = 0;`) and an expression (`static_assert`) rather than reading its
-    parenthesised operand as a parameter list.
-    """
-    j = name_pos + name_len
-    while j < len(segment) and segment[j].isspace():
-        j += 1
-    if j < len(segment) and segment[j] == "(":
-        open_pos = j
-    elif j < len(segment) and segment[j] == ")":
-        k = j + 1
-        while k < len(segment) and segment[k].isspace():
-            k += 1
-        if k >= len(segment) or segment[k] != "(":
-            return None
-        open_pos = k
-    else:
-        return None
-    close = match_paren(segment, open_pos)
-    if close < 0:
-        return None
-    tail = segment[close + 1:].lstrip()
-    if tail and not tail.startswith(("const", "volatile", "noexcept", "override", "final",
-                                     "__attribute__", ":", "&", "throw", ")")):
-        return None
-    return open_pos, close
-
-
-def _declaration_from(src: Source, start: int, end: int, code: str) -> dict | None:
-    """The function declaration `code[start:end]` describes, or None when the segment is not one."""
-    seg = code[start:end]
-    name, name_pos = _declared_name_pos(seg)
-    if name is None or name in RULE11_NON_DECL_HEADS:
-        return None
-    parens = _declarator_parens(seg, name_pos, len(name))
-    if parens is None:
-        return None
-    open_pos, close_pos = parens
-    first = start + (len(seg) - len(seg.lstrip()))
-    return {"name": name, "pos": start + name_pos, "line": src.line_of(start + name_pos),
-            "start_line": src.line_of(first),
-            "end_line": src.line_of(start + close_pos),
-            "params": seg[open_pos + 1:close_pos], "params_pos": start + open_pos + 1,
-            "ret": seg[:name_pos], "ret_pos": start}
+_mask_preproc = cscan.mask_preproc
 
 
 def function_declarations(src: Source) -> list[dict]:
-    """Every function declaration/definition header in the file, with its parameter and return text.
-
-    The walk is rule 2's `header_declarations` shape (brace depth decides scope, a linkage block is
-    transparent), with the scope stack extended so a declaration inside a `namespace`/`class` is seen too
-    while a statement inside a function **body** is not: that is what keeps a cast out of the rule. A `{`
-    ends a statement wherever it is (an inline method body sits at class scope), and the declarator check
-    separates a function header from a type body, an initializer and a control block.
-    """
-    code = _mask_preproc(src.code)
-    out: list[dict] = []
-    scopes: list[str] = []          # "function" for a body, "other" for a type/namespace/block, "linkage"
-    stmt_start = 0
-    for i, c in enumerate(code):
-        if c == "{":
-            if _LINKAGE_OPEN_RE.search(code[stmt_start:i]):
-                scopes.append("linkage")
-            else:
-                decl = _declaration_from(src, stmt_start, i, code)
-                if decl is not None:
-                    decl["body"] = (i, match_brace(code, i))
-                    scopes.append("function")
-                    out.append(decl)
-                else:
-                    scopes.append("other")
-            stmt_start = i + 1
-        elif c == "}":
-            if scopes:
-                scopes.pop()
-            stmt_start = i + 1
-        elif c == ";":
-            if "function" not in scopes:
-                decl = _declaration_from(src, stmt_start, i, code)
-                if decl is not None:
-                    out.append(decl)
-            stmt_start = i + 1
-    return out
+    """Every function declaration/definition header in the file, with its parameter and return text
+    (`lib.cscan.function_declarations`; a definition carries `body`). A statement inside a function body is
+    never one, which is what keeps a cast out of rule 11."""
+    return [d.to_dict() for d in cscan.function_declarations(src)]
 
 
 def _untyped_marker(src: Source, start_line: int, end_line: int,
@@ -1403,7 +1137,6 @@ RULE13_FIRST_PARAM_RE = re.compile(
 # not a static member of `Type`: measured 2026-09-29, these two are the only such shapes in the tree.
 RULE13_CTOR_HELPER_RE = re.compile(r"^(?:ctor|dtor|construct|destruct)$")
 RULE13_CPP_SUFFIXES = (".cpp", ".cp", ".cc")
-_INCLUDE_RE = re.compile(r'^[ \t]*#[ \t]*include[ \t]*["<]([^">]+)[">]', re.M)
 
 
 class Rule13Context:
@@ -1425,11 +1158,8 @@ _RULE13_CACHE: dict = {}
 
 def _resolve_include(root: str, includer_rel: str, inc: str) -> str | None:
     """The repo-relative path an `#include` names, or None (an SDK/system header this tree lacks)."""
-    for base in (HEADERS, os.path.dirname(includer_rel), SRC):
-        rel = os.path.normpath(os.path.join(base, inc)).replace(os.sep, "/")
-        if os.path.isfile(os.path.join(root, rel)):
-            return rel
-    return None
+    hit = cscan.resolve_include(inc, [os.path.join(root, b) for b in (HEADERS, os.path.dirname(includer_rel), SRC)])
+    return os.path.relpath(hit, root).replace(os.sep, "/") if hit else None
 
 
 def build_rule13_context(root: str) -> Rule13Context:
@@ -1459,8 +1189,8 @@ def build_rule13_context(root: str) -> Rule13Context:
     seen = set(todo)
     while todo:
         rel = todo.pop()
-        for m in _INCLUDE_RE.finditer(text_of(rel)):
-            inc = _resolve_include(root, rel, m.group(1))
+        for name in cscan.includes(text_of(rel)):
+            inc = _resolve_include(root, rel, name)
             if inc is not None and inc in files and inc not in seen:
                 seen.add(inc)
                 reach.add(inc)
@@ -2094,16 +1824,9 @@ def diff_deltas(before: dict[tuple[int, str], int], after: dict[tuple[int, str],
 
 
 def finding_identity(f: dict) -> tuple:
-    """A line-independent identity for a finding: rule, file, at-fault token and detail text.
-
-    The identity is the **token and the detail** a lane acts on - never the line, which moves with every
-    edit above it.  `added_identities` compares the two sides' identity *sets* per (rule, file), so
-    writing 30 more occurrences of a name the file already spells adds no identity (and is not an
-    addition), while a token new to the file is one, however many times it is spelled.  Keeping `detail`
-    in the tuple is what stops two different complaints about one token (rule 7's `auto-generated name`
-    and its `bare` identifier, say) from collapsing into one.
-    """
-    return (f["rule"], f["file"], f.get("token"), f["detail"])
+    """A line-independent identity for a finding: rule, file, at-fault token and detail text
+    (`lib.findings.identity`; the credit model is `lib.findings.added`)."""
+    return _findings.identity(f)
 
 
 def _covering_range(own: "Ownership", section: str, address: int) -> "tuple | None":
@@ -2184,69 +1907,19 @@ def renamed_finding(f: dict, symbols: dict, files: "dict | None" = None) -> dict
 
 def added_identities(before_findings: list[dict], after_findings: list[dict],
                      symbols: "dict | None" = None, files: "dict | None" = None) -> dict:
-    """`{(rule, file): [finding, ...]}` - one entry per after-side identity **new to that file**.
-
-    This is the whole judgement `--diff` makes, as a **set difference per (rule, file)** rather than a
-    count delta: an occurrence is an *addition* only when its identity (`finding_identity`) was not
-    already firing in that file at the base.  A file that spells an already-flagged `fn_XXXXXXXX`/`unkNN`
-    /unowned-data extern 30 more times adds no identity and no row; a token new to the file is one, and is
-    refused, however many times the batch spells it.  The entry chosen for an identity is the first
-    occurrence by line, so a brand-new callee called five times is named once.
-
-    Each base identity is admitted **under every spelling a rename gives it** (`renamed_finding`, driven by
-    the symbol map and the file map): the old name (a referrer that kept the old spelling) and the new one
-    (the rename completed) - so a rename is never one removal plus one addition, the artefact class the
-    base side's own map is already judged by - while a name the maps never carried stays a new token.
-    """
-    before: dict = {}
-    for f in before_findings:
-        known = before.setdefault((f["rule"], f["file"]), set())
-        known.add(finding_identity(f))
-        moved = renamed_finding(f, symbols or {}, files)
-        if moved is not f:
-            known.add(finding_identity(moved))
-    after: dict = {}
-    for f in after_findings:
-        after.setdefault((f["rule"], f["file"]), []).append(f)
-    out: dict = {}
-    for key, finds in after.items():
-        known = before.get(key, ())
-        seen: dict = {}
-        for f in sorted(finds, key=lambda f: f["line"]):
-            ident = finding_identity(f)
-            if ident in known or ident in seen:
-                continue
-            seen[ident] = f
-        if seen:
-            out[key] = list(seen.values())
-    return out
+    """`{(rule, file): [finding, ...]}` - one entry per after-side identity **new to that file**
+    (`lib.findings.added`), each base identity admitted under every spelling a rename gives it
+    (`renamed_finding`, driven by the symbol map and the file map)."""
+    return _findings.added(before_findings, after_findings,
+                           lambda f: (renamed_finding(f, symbols or {}, files),))
 
 
 def removed_identities(before_findings: list[dict], after_findings: list[dict],
                        symbols: "dict | None" = None, files: "dict | None" = None) -> dict:
-    """`{(rule, token, detail): [file, ...]}` - one entry per base identity a file **stopped** carrying.
-
-    The mirror of `added_identities`: an identity is removed from a file when the after side of that file
-    no longer spells it under any spelling a rename gives it (`renamed_finding`).  One entry per identity
-    per file, so thirty occurrences of one name leaving a file are one removal - the same unit
-    `added_identities` counts an addition in.
-    """
-    after: dict = {}
-    for f in after_findings:
-        after.setdefault((f["rule"], f["file"]), set()).add(finding_identity(f))
-    out: dict = {}
-    seen: set = set()
-    for f in before_findings:
-        ident = finding_identity(f)
-        if ident in seen:
-            continue
-        seen.add(ident)
-        moved = renamed_finding(f, symbols or {}, files)
-        here = after.get((f["rule"], f["file"]), set())
-        if ident in here or finding_identity(moved) in here:
-            continue
-        out.setdefault((f["rule"], f.get("token"), f["detail"]), []).append(f["file"])
-    return out
+    """`{(rule, token, detail): [file, ...]}` - one entry per base identity a file **stopped** carrying under any
+    spelling a rename gives it (`lib.findings.removed`); the mirror of `added_identities`."""
+    return _findings.removed(before_findings, after_findings,
+                             lambda f: (renamed_finding(f, symbols or {}, files),))
 
 
 def _unit_stem(path: str) -> "str | None":

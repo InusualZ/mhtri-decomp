@@ -189,6 +189,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(HERE), "agents"))
 import unitutil  # noqa: E402
 import prepcommit as pc  # noqa: E402
 from tools.lib import project as _project  # noqa: E402  (the splits / configure readers)
+from tools.lib import findings as _findings  # noqa: E402  (the check row, its KIND and its renderers)
 from tools.lib import report as _report  # noqa: E402  (the report snapshot and the one regression rule)
 from units import brief as brief_mod  # noqa: E402
 from units import claims  # noqa: E402
@@ -252,9 +253,9 @@ SCRATCH_JSON = re.compile(r"^[dt][0-9]+\.json$")
 # bookkeeping refusal (a released branch) read as a substantive gate failure - the reader reached for the
 # manual-landing fallback and nearly overrode a real gate failure on another batch. The KIND and the remedy
 # are now part of every refusal, and a bookkeeping-only refusal never says "the gate failed".
-KIND_GATE = "gate"
-KIND_BOOKKEEPING = "bookkeeping"
-KIND_TAG = {KIND_GATE: "GATE", KIND_BOOKKEEPING: "BOOKKEEPING"}
+KIND_GATE = _findings.KIND_GATE
+KIND_BOOKKEEPING = _findings.KIND_BOOKKEEPING
+KIND_TAG = _findings.KIND_TAG
 KIND_REMEDY = {
     KIND_GATE: "the batch itself is bad - fix the batch; do not override the gate",
     KIND_BOOKKEEPING: ("the batch itself is fine - repair the landing's own state (the remedy above), "
@@ -265,17 +266,18 @@ KIND_REMEDY = {
 def check_kind(row: tuple) -> str:
     """The KIND of a check row. A 4-tuple (an older caller, a test fixture) reads as GATE - a refusal whose
     kind is unknown must never be soft-pedalled as mere bookkeeping."""
-    return row[4] if len(row) > 4 and row[4] in KIND_TAG else KIND_GATE
+    return _findings.Row.from_tuple(row).kind
 
 
 def check_remedy(row: tuple) -> str:
     """The remedy a row carries, falling back to the generic remedy of its kind."""
-    return (row[5] if len(row) > 5 and row[5] else "") or KIND_REMEDY[check_kind(row)]
+    r = _findings.Row.from_tuple(row)
+    return r.remedy or KIND_REMEDY[r.kind]
 
 
 def failed_kinds(checks: list) -> set[str]:
     """The set of KINDs among the failed rows of `checks`."""
-    return {check_kind(row) for row in checks if not row[1]}
+    return _findings.Verdict.of(checks).failed_kinds
 
 
 def kinds_from_failures(failed: list[str]) -> set[str]:
@@ -480,14 +482,13 @@ def failing_checks(checks: list) -> list[str]:
     as GATE through `check_kind`, the conservative default.
     """
     out = []
-    for row in checks:
-        name, good, detail, info = row[:4]
-        if good:
+    for row in _findings.rows_of(checks):
+        if not row.failed:
             continue
-        kind = check_kind(row)
-        note = " ".join((detail or info or "no detail").split())
+        note = " ".join((row.detail or row.evidence or "no detail").split())
         out.append("%s [%s]: %s (remedy: %s)"
-                   % (name, KIND_TAG[kind], note[:240] or "no detail", check_remedy(row)))
+                   % (row.name, KIND_TAG[row.kind], note[:240] or "no detail",
+                      row.remedy or KIND_REMEDY[row.kind]))
     return out
 
 
@@ -2557,10 +2558,8 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     elf_file = os.path.join(main, "build", "RMHE08", "main.elf")
 
     if dry_run:
-        for row in checks:
-            name, good, detail, info = row[:4]
-            note = (detail if not good else "") or info
-            print("%s %s%s" % ("PASS" if good else "FAIL", name, (" - " + note) if note else ""))
+        if checks:
+            print(_findings.render_lines(checks))
         print("\nwould then: delete build/RMHE08/ok%s, run configure.py -> registration gate (configure.py "
               "+ splits.txt + build graph) -> compile gate (ninja -k 0, scoped to the batch's own "
               "objects) -> ninja -> report.json -> target-object drift + independent per-symbol "
@@ -2572,10 +2571,8 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
 
     failures = [row[0] for row in checks if not row[1]]
     if failures:
-        for row in checks:
-            name, good, detail, info = row[:4]
-            note = (detail if not good else "") or info
-            print("%s %s%s" % ("PASS" if good else "FAIL", name, (" - " + note) if note else ""))
+        if checks:
+            print(_findings.render_lines(checks))
         if problems is not None:
             problems.extend(failing_checks(checks))
         print("\n" + failure_summary(checks))
@@ -2857,11 +2854,7 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     elif units and not release_claims:
         check("claim release skipped", True, info="--no-release")
 
-    print("%-58s %s" % ("check", "result"))
-    for row in checks:
-        name, good, detail, info = row[:4]
-        note = (detail if not good else "") or info
-        print("%-58s %s%s" % (name[:58], "PASS" if good else "FAIL", ("  " + note[:80]) if note else ""))
+    print(_findings.render_table(checks))
 
     body = [subject,
             "",

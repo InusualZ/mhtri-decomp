@@ -52,6 +52,7 @@ import os
 import posixpath
 import re
 import sys
+from tools.lib import cscan
 from tools.lib import names as libnames
 
 from tools.lib import project as _project
@@ -73,19 +74,6 @@ EXCEPTIONS = {
     "src/Camellia/camellia.c": "vendor file mirrors upstream and keeps its own typedefs (include/types.h)",
 }
 
-# Words that show up in a declarator but are never the declared name.
-NOT_NAMES = {
-    "const", "volatile", "struct", "union", "enum", "class", "signed", "unsigned", "int", "char",
-    "short", "long", "float", "double", "void", "typedef", "restrict", "register", "static", "extern",
-    "inline", "typename", "__attribute__", "attribute", "packed", "aligned", "__declspec", "constexpr",
-}
-
-TYPE_KEYWORD = re.compile(r"\b(typedef\s+)?(struct|union|enum|class)\b")
-SIMPLE_TYPEDEF = re.compile(r"(?m)^[ \t]*typedef[ \t]+(?!struct\b|union\b|enum\b|class\b)([^;{}]+);")
-USING = re.compile(r"(?m)^[ \t]*using[ \t]+([A-Za-z_]\w*)[ \t]*=")
-MACRO = re.compile(r"(?m)^[ \t]*#[ \t]*define[ \t]+([A-Za-z_]\w*)")
-INLINE = re.compile(r"\b(inline|__inline)\b[^;{}()]*?\b([A-Za-z_]\w*)[ \t]*\(([^;{}]*)\)[ \t]*\{")
-EXTERN = re.compile(r"(?m)^[ \t]*extern[ \t]+([^;{}]+);")
 IDENT = re.compile(r"[A-Za-z_]\w*")
 
 
@@ -94,50 +82,9 @@ IDENT = re.compile(r"[A-Za-z_]\w*")
 # ------------------------------------------------------------------------------------------------------------------
 
 def strip_comments(text: str) -> str:
-    """Blank comments and string/char literal bodies, preserving length and every newline.
-
-    A line number derived from the result is the original line (the same contract `stylelint.py` keeps),
-    which is what makes a finding openable. Strings are blanked too: a string never contains a declarator,
-    and leaving its contents in would only add junk tokens to the usage scan.
-    """
-    out = list(text)
-    i, n = 0, len(text)
-    while i < n:
-        c = text[i]
-        if c in ('"', "'"):
-            quote = c
-            i += 1
-            while i < n and text[i] != quote:
-                if text[i] == "\\":
-                    out[i] = " "
-                    i += 1
-                if i < n and text[i] != "\n":
-                    out[i] = " "
-                i += 1
-            if i < n:
-                i += 1
-            continue
-        if c == "/" and i + 1 < n and text[i + 1] in ("/", "*"):
-            if text[i + 1] == "/":
-                while i < n and text[i] != "\n":
-                    out[i] = " "
-                    i += 1
-                continue
-            out[i] = out[i + 1] = " "
-            i += 2
-            while i < n and not (text[i] == "*" and i + 1 < n and text[i + 1] == "/"):
-                if text[i] != "\n":
-                    out[i] = " "
-                i += 1
-            if i < n:
-                out[i] = " "
-                i += 1
-            if i < n:
-                out[i] = " "
-                i += 1
-            continue
-        i += 1
-    return "".join(out)
+    """Blank comments and string/char literals, preserving length and every newline (`lib.cscan.strip_comments`):
+    a line number derived from the result is the original line."""
+    return cscan.strip_comments(text)
 
 
 def identifiers(text: str) -> set:
@@ -149,144 +96,15 @@ def tokens_of_name(name: str) -> set:
     return identifiers(name) | libnames.peel_tokens(name)
 
 
-def _match_brace(text: str, open_index: int) -> int:
-    depth = 0
-    for j in range(open_index, len(text)):
-        if text[j] == "{":
-            depth += 1
-        elif text[j] == "}":
-            depth -= 1
-            if depth == 0:
-                return j
-    return len(text) - 1
-
-
-def _split_semicolons(body: str) -> list:
-    """Split an aggregate body on the `;`s that sit at bracket depth 0."""
-    parts, stack, start = [], [], 0
-    pairs = {")": "(", "]": "[", "}": "{"}
-    for i, c in enumerate(body):
-        if c in "([{":
-            stack.append(c)
-        elif c in ")]}":
-            if stack and stack[-1] == pairs[c]:
-                stack.pop()
-        elif c == ";" and not stack:
-            parts.append(body[start:i])
-            start = i + 1
-    parts.append(body[start:])
-    return parts
-
-
-def shape_of(body: str) -> str:
-    """A field-type fingerprint of an aggregate body, insensitive to field names.
-
-    `Vec { f32 x; f32 y; f32 z; }` and `VEC3 { f32 x; f32 y; f32 z; }` share `f32 f32 f32`, which is how
-    the report shows one 3-float vector recomputed under three names. Padding arrays keep their type
-    (`u8[]`), a function pointer becomes `fnptr`, and a nested aggregate `agg`.
-    """
-    parts = []
-    for stmt in _split_semicolons(body):
-        stmt = stmt.strip()
-        if not stmt:
-            continue
-        if "{" in stmt:
-            parts.append("agg")
-            continue
-        if re.search(r"\(\s*\*", stmt):
-            parts.append("fnptr")
-            continue
-        dims = re.findall(r"\[[^\]]*\]", stmt)
-        core = re.sub(r"\[[^\]]*\]", "", stmt)
-        ids = [x for x in IDENT.findall(core) if x not in NOT_NAMES]
-        if not ids:
-            continue
-        parts.append((" ".join(ids[:-1]) or "?") + "[]" * len(dims))
-    return " ".join(parts)
-
-
-def declarator_name(region: str) -> str | None:
-    """The name a `typedef`/`extern` declarator introduces.
-
-    Handles the three shapes the tree actually carries: `unsigned int u32` (last identifier), a function
-    pointer `void (*EfPmSpawn)(...)` (the identifier inside `(*...)`), and an array
-    `KEY_TABLE_TYPE[CAMELLIA_TABLE_WORD_LEN]` (the identifier before `[`).
-    """
-    region = re.sub(r"\[[^\]]*\]", " ", region)
-    m = re.search(r"\(\s*\*\s*([A-Za-z_]\w*)\s*\)", region)
-    if m:
-        return m.group(1)
-    region = re.sub(r"\([^()]*\)", " ", region)
-    ids = [x for x in IDENT.findall(region) if x not in NOT_NAMES]
-    return ids[-1] if ids else None
-
-
-def alias_names(tail: str) -> list:
-    """The alias name(s) after a `}` closing an aggregate definition, in order."""
-    return [x for x in IDENT.findall(tail) if x not in NOT_NAMES]
-
-
 # ------------------------------------------------------------------------------------------------------------------
 # declaration scanning
 # ------------------------------------------------------------------------------------------------------------------
 
 def extract_decls(clean: str, rel: str, shared: bool) -> list:
-    """Every declaration in one already-cleaned file, as `Decl` dicts.
-
-    One entry per name per file: a `typedef struct Foo { ... } Foo;` records `Foo` once (as `struct`).
-    A name may still appear in several files - that is exactly what the duplication report measures.
-    """
-    decls, seen = [], set()
-
-    def add(name, kind, pos, shape=""):
-        if not name or name in NOT_NAMES or name in seen:
-            return
-        seen.add(name)
-        decls.append({"name": name, "kind": kind, "file": rel,
-                      "line": clean.count("\n", 0, pos) + 1, "shape": shape, "shared": shared})
-
-    for m in TYPE_KEYWORD.finditer(clean):
-        is_typedef, keyword = bool(m.group(1)), m.group(2)
-        j = m.end()
-        tm = re.match(r"[ \t\r\n]*([A-Za-z_]\w*)", clean[j:])
-        tag = tm.group(1) if tm else None
-        after = j + (tm.end() if tm else 0)
-        k = after
-        while k < len(clean) and clean[k] in " \t\r\n":
-            k += 1
-        if k < len(clean) and clean[k] == "{":
-            end = _match_brace(clean, k)
-            semi = clean.find(";", end)
-            tail = clean[end + 1:semi if semi >= 0 else len(clean)]
-            shape = shape_of(clean[k + 1:end])
-            if tag:
-                add(tag, keyword, m.start(), shape)
-            for nm in alias_names(tail):
-                add(nm, "typedef", m.start(), shape)
-        elif is_typedef:
-            semi = clean.find(";", after)
-            region = clean[after:semi if semi >= 0 else len(clean)]
-            if tag:
-                add(tag, keyword, m.start())
-            nm = declarator_name(region)
-            if nm:
-                add(nm, "typedef", m.start())
-
-    for m in SIMPLE_TYPEDEF.finditer(clean):
-        nm = declarator_name(m.group(1))
-        if nm:
-            add(nm, "typedef", m.start())
-    for m in USING.finditer(clean):
-        add(m.group(1), "using", m.start())
-    for m in MACRO.finditer(clean):
-        add(m.group(1), "macro", m.start())
-    for m in INLINE.finditer(clean):
-        add(m.group(2), "inline", m.start(), shape_of(m.group(3)))
-    for m in EXTERN.finditer(clean):
-        nm = declarator_name(m.group(1))
-        if nm:
-            add(nm, "extern", m.start())
-    return decls
+    """Every declaration in one already-cleaned file, as `Decl` dicts (`lib.cscan.declared_names`): one entry per
+    name per file. A name may still appear in several files - that is what the duplication report measures."""
+    return [{"name": d.name, "kind": d.kind, "file": rel, "line": d.line, "shape": d.shape, "shared": shared}
+            for d in cscan.declared_names(clean)]
 
 
 def _rel(root: str, path: str) -> str:
@@ -336,7 +154,7 @@ def clear_cache() -> None:
 # ------------------------------------------------------------------------------------------------------------------
 
 def _includes(text: str) -> set:
-    return set(re.findall(r'#[ \t]*include[ \t]+"([^"]+)"', text))
+    return set(cscan.includes(text, angle=False))
 
 
 def reference_sets(reg: dict, root: str, symbols_by_unit: dict | None = None) -> dict:
