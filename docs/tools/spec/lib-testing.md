@@ -25,4 +25,9 @@ Tier: fixture (a lib test never reads the live tree). the harness tests itself: 
 
 ## Known gaps
 
-None until implemented; `migration.md` names the package.
+Implemented in WP0 (`docs/tools/wp0-report.md`). Open:
+
+* `FixtureTree.add_object` takes raw bytes until `lib.binary.build.ElfBuilder` exists (WP1b).
+* `lib.repo.repo_root()` does not exist yet; WP1a makes it call `testing.assert_live_allowed(...)` when `start` is None.
+* The audit-hook guard cannot see `os.stat`/`os.path.exists` or anything a module does at import time (before `run()`).
+* `GitFixture.conflict(path, a, b, base, names)` takes the file and both texts, not two branches.
