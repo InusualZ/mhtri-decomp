@@ -28,6 +28,10 @@ BOOL isNetworkSessionManagerPatReady(NetworkSessionManagerPat* session_manager);
 /* Declarations moved here from `include/unsplit/Network.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 class NetworkSessionManagerPat;    /* include/Network/NetworkSessionManager.h */
 typedef struct NetLayerRequest NetLayerRequest; /* include/Network/NetworkLayerPat.h */
+typedef struct NetworkRequest NetworkRequest;   /* include/Network/NetworkSessionManager.h */
+typedef struct NetworkRequestError NetworkRequestError;   /* include/unsplit/Network.h */
+typedef struct NetworkNameList NetworkNameList;           /* include/Network/NetworkSessionManager.h */
+class NetworkBuffer;                                      /* include/Network/network_writer_types.h */
 struct PatTerms;
 
 #ifdef __cplusplus
@@ -42,6 +46,31 @@ void initNetLayerRequest(NetLayerRequest* request);
 
 /* 0x803E247C - the terms object; 0x80416A18 - whether it reached its update-finished state. */
 struct PatTerms* getPatTerms(void);
+
+/* The Pat band's helpers (moved here from `Network/NetworkSessionManager.h`, which defines the records
+ * they take).  `buildCircleInfoName` was the map's `fn_803DE524` until the Pat pass renamed it from what
+ * its body does (GUESS); the others are the map's own names. */
+void buildCircleInfoName(NetworkSessionManagerPat* self, char* dst, NetworkNameList* src);
+s32 circleAvailable(NetworkSessionManagerPat* self);
+void networkPatResetCircleInfo(NetworkSessionManagerPat* self, s32 index);
+void networkPatAttachBuffer(NetworkBuffer* buffer);
+void networkPatReleaseBuffer(NetworkSessionManagerPat* self);
+
+/* the two reflection adapters the session manager installs as callbacks */
+/* untyped: caller-owned payload - the six arguments are forwarded unchanged */
+void networkSessionReflect0(void* a0, void* a1, s8 a2, void* a3, void* a4, void* a5);
+/* untyped: caller-owned payload - the six arguments are forwarded unchanged */
+void networkSessionReflect1(void* a0, void* a1, void* a2, void* a3, void* a4, void* a5);
+
+/* 0x803E3598 - copies the request's error record out under its mutex; false while none is set. */
+s32 NetworkRequest_getError(NetworkRequest* request, NetworkRequestError* out);
+
+/* 0x80793930 / 0x80793934 - the two `.sdata` floats `initNetworkSessionStable` copies into a new
+ * session through the vtable's +0x54/+0x58 slots; 0x8079C764 the `.sdata2` float it publishes
+ * through +0x60. */
+extern f32 networkSessionTimeoutSeconds;
+extern f32 networkSessionIntervalSeconds;
+extern f32 networkSessionPeriodSeconds;
 
 #ifdef __cplusplus
 }

@@ -108,7 +108,9 @@
 #include "Runtime.PPCEABI.H/memset.h"
 #include "types.h"
 #include "sys_mem.h"
-#include "unsplit/NetworkData.h"   /* the band's unowned constants (rule 2) */
+#include "Network/NetworkSessionManagerPat.h"   /* the unit's own header: its free functions and constants (rule 2) */
+#include "Network/network_layer_io.h"            /* sendReqCircleInfoSet - owner Network/network_layer_io.cpp */
+#include "Network/session_mediator_views.h"     /* GameSpyInterfaceThread / NetworkErrorInfo (the Pat side's views) */
 
 /* The callback word the base stores at +0x04 and `move` runs: six arguments, the error record it was
  * handed as the fifth and the base's second word as the sixth.  The typedef exists only because the

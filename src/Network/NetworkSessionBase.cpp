@@ -28,8 +28,6 @@
 #include "types.h"
 #include "Network/network_transport.h"
 #include "Network/NetworkSessionManager.h"
-#include "unsplit/NetworkData.h"
-#include "unsplit/NetworkStream.h"
 /* `unsplit/Network.h` is the Network band's code half (`getNetworkLogger` and the socket-pool helpers).  It
    cannot be included beside `unsplit/OS.h`: the two band headers declare `OSCreateThread`/`OSResumeThread` with
    different signatures and a TU that sees both fails with `(10197) illegal function overloading`. */

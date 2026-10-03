@@ -16,8 +16,7 @@
 #define NETWORK_WII_MEDIATOR_H
 
 #include "types.h"
-
-typedef void (*NetworkWiiMediatorReflectFn)(s32, s32, s32, s32, void*, void*);
+#include "Network/NetworkReflectService.h"   /* NetworkWiiMediatorReflectFn - the reflect service's callback type */
 
 /* The mediator's field layout, traced from the disassembly: every offset below is one an instruction
  * in this unit addresses.  `buffer_A`/`buffer_B` are the two 0x106-byte blocks the accessors copy,
@@ -118,6 +117,9 @@ void setReflectName5C(NetworkWiiMediatorFields* self, char* name);
 s32 dispatchReflectEvent();
 s32 getWarningUInt(NetworkWiiMediatorFields* self);
 char* getAccountName(NetworkWiiMediatorFields* self, char* out, u32 size);
+/* the mediator state byte at +0x68A (the session state machine sets and reads it) */
+void setMediatorState68A(NetworkWiiMediatorFields* self, u8 value);
+void getMediatorState68A(NetworkWiiMediatorFields* self, u8* out);
 
 #ifdef __cplusplus
 }

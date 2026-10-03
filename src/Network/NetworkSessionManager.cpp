@@ -104,12 +104,14 @@
 
 #include "types.h"
 #include "Network/NetworkSessionManager.h"
+#include "Network/NetworkSessionManagerPat.h"   /* the Pat buffer helpers and the reflection adapters */
+#include "Network/NetworkCommunityPat.h"        /* networkSmallObject_construct */
+#include "Network/session_mediator_views.h"     /* the Pat side's PatInterface / GameSpyInterfaceThread views */
 
 /* `NetworkVaState` and the two variadic intrinsics live in this unit's header (rule 2 keeps the
    declaration with the TU that needs it). */
 #define net_va_start(ap) __va_start(&(ap))
 #define net_va_arg(ap, type) (*(type*)__va_arg(&(ap), 1))
-#include "unsplit/NetworkData.h"
 
 /* Rule 2: the symbols this unit calls but does not own come from their owner's headers, never from a
    declaration here - `getInstance_` (0x803768F0) is inside `enemy/em020_ai.cpp`'s registered range,

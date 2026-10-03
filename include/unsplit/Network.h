@@ -269,26 +269,14 @@ extern "C" {
 /* debug manager */
 NetworkLogger* getNetworkLogger(void);
 
-/* The socket pool the transport peers register their socket with (0x804187F0 / 0x80418864 - no
- * registered range covers either address).  Both bodies walk a four-entry table at the manager's
- * +0x04 and take the socket from the manager's own +0x8C slot, so the argument is the manager the
- * transport band reaches through `getNetworkLogger` (GUESS on both names: they carry the acquire /
- * release roles the two call sites give them, nothing in the range spells them). */
-NetworkSocketHandle* networkSocketPool_acquire(NetworkLogger* pool);
-s32 networkSocketPool_release(NetworkLogger* pool, NetworkSocketHandle* socket);
+/* The socket pool (`networkSocketPool_acquire`/`_release`, owner `Network/network_opening.cpp`) is
+ * declared in `Network/network_opening.h`, included at the top of this band. */
 
 /* network singleton and its callbacks.  `getInstance_` (0x803768F0) is owned by
  * `enemy/em020_ai.cpp` now that its range is registered - rule 2: the declaration moved to the
-owner's header and is included here. */
+owner's header and is included here.  The singleton's callback/reference/error accessors are owned by
+`Network/PatInterface.cpp` and declared in `Network/PatInterface.h`. */
 #include "enemy/em020_ai.h"
-s32 isCallback(NetworkInstance* self, s32 index);
-void resetCallback(NetworkInstance* self, s32 index);
-
-void decrement60d4(NetworkInstance* self);
-s32 hasMultipleRefs60d4(NetworkInstance* self);
-/* untyped: caller-owned payload - the 0x208-byte error record copied in when non-null */
-s32 errorRecordCode613c(NetworkInstance* self, const void* record);
-void getErrorInfo654c(NetworkInstance* self, u32* info);
 
 /* GameSpy GT2 transport (the SDK's `gt2*` API): a socket and a connection are opaque handles, and
  * `gt2Accept` / `gt2Connect` take the four-callback set `GameSpyInterfaceThread` installs on a
@@ -328,10 +316,6 @@ void gt2SetUnrecognizedMessageCallback(GT2Socket socket, NetworkCallback callbac
 /* OS / runtime helpers.  `SOHtoNs` is an SO-library symbol whose one home is the SO band header,
  * which is C-linkage-safe and so reachable from the DWCi `.c` units as well. */
 #include "unsplit/SO.h"
-void getGameInfo2d1c(class NetworkWiiMediator* self, u32* out);
-void sendReqChannelInfo(NetworkInstance* self, u32 handle);
-void sendReqChannelData(NetworkInstance* self, u32 handle, u32 offset, u32 size);
-void sendReqConnect(NetworkInstance* self);
 void dtor_803CA338(void* self, s32 flags);
 void OSLockMutex(void* mutex);
 void OSUnlockMutex(void* mutex);
@@ -365,10 +349,6 @@ extern u32 lbl_80603740[];
    that class's vtable 0x80603190, which unsplit code reads), so no claim of this band's unit can cover it */
 extern const char lbl_80603154[];
 
-/* The Network band's constants live in the data-only sibling header (see its comment for why a
- * unit that also includes `Network/NetworkSessionManager.h` cannot take them from here). */
-#include "unsplit/NetworkData.h"
-
 /* ---- the layer request state machine's callees (0x803DECF0..0x803EF4C8, 0x8040144C..0x80401B68) ---- */
 
 /* The request record `NetworkRequest_getError` copies out: the three words `NetworkRequest_setError`
@@ -383,35 +363,14 @@ class NetworkLayerPat;             /* include/Network/NetworkLayerPat.h */
 class NetworkSessionManagerPat;    /* include/Network/NetworkSessionManager.h */
 typedef struct NetworkRequest NetworkRequest;   /* include/Network/NetworkSessionManager.h */
 
-/* 0x803E3598 - copies the request's error record out under its mutex; false while none is set. */
-s32 NetworkRequest_getError(NetworkRequest* request, NetworkRequestError* out);
-/* GUESS: 0x803EBAF0 hands one layer event (kind 3 = error, kind 4 = done) to the callback object the
- * layer holds, after posting `info` to the network singleton. */
-void notifyLayerEvent(NetworkLayerPat* self, u32 kind, s32 code, u32 has_info, NetworkRequestError* info,
-                      u32 context);
-/* The layer requests: each writes its op-code and returns the request id (the callee narrows it to 16
- * bits, but its caller stores the full register, so the declared type is the wide one - playbook 66). */
-u32 sendReqLayerUp(NetworkInstance* self);
-u32 sendReqLayerChildInfo(NetworkInstance* self, s16 layer_id, u32 unused_arg);
-u32 sendReqLayerUserList(NetworkInstance* self);
-
-/* ---- the network control band's callees (`Network/network_pat_control.cpp`) ---------------------- */
-/* 0x803768F8-band clock: the network singleton's game time (GUESS: the caller passes the singleton). */
-u32 getGameTime(NetworkInstance* self);
-/* ---- the pat control's update callees (GUESS on every name: they come from the caller's use) ---- */
+/* The request/layer state machine's owned callees live in their owners' headers (rule 2):
+ * `NetworkRequest_getError` in `Network/NetworkSessionManagerPat.h`, `notifyLayerEvent` in
+ * `Network/NetworkCommunityPat.h`, the layer requests and `isMaintenanceMode` in
+ * `Network/network_layer_io.h`, the Pat setters and `getGameTime` in `Network/PatInterface.h`, and the
+ * terms entry points in `Network/network_opening.h`. */
 struct PatTerms;
 struct NetRosterSync;
 struct NetworkPat;
-/* 0x80413AEC - whether the server is in maintenance (the status word reads 1). */
-s32 isMaintenanceMode(class NetworkWiiMediator* self);
-/* 0x80416890 / 0x8041690C - start the terms check / the terms update on the mediator singleton. */
-void startTermsCheck(class NetworkWiiMediator* self);
-void startTermsUpdate(class NetworkWiiMediator* self);
-/* 0x803FE854 / 0x803FE860 / 0x803FE404 / 0x803FE73C - the network singleton's Pat setters. */
-void setPatField854(NetworkInstance* self, s32 value);
-void setPatField860(NetworkInstance* self, const char* name);
-void setPatByteD400(NetworkInstance* self, u8 value);
-void setPatByte6138On(NetworkInstance* self);
 }
 
 /* MH3GetErrorString2 (`MH3GetErrorString2__Fl`, C++ linkage) - the localized message for a network error code. */

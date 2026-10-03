@@ -13,7 +13,10 @@
 #define MHTRI_NETWORK_NETWORKCOMMUNITYPAT_H
 
 #include "types.h"
-#include "Network/NetworkLayerPat.h"   /* NetId */
+
+/* The network id the friend requests take (defined in `Network/NetworkLayerPat.h`; only its address
+ * crosses the calls below, so the name is enough and this header stays free of the session types). */
+typedef struct NetId NetId;
 
 /* The roster block `NetCtrlWk::roster_sync_0x61CC` holds (defined by the work record header). */
 struct NetRosterSync;
@@ -56,10 +59,61 @@ struct NetworkStreamWriterDefault;
 struct NetworkStreamWriter;
 struct NetworkSmallObject;
 class NetworkStreamQueue;
+typedef struct NetworkRequestError NetworkRequestError;   /* include/unsplit/Network.h */
+typedef struct NetworkStateMachine NetworkStateMachine;   /* include/Network/network_state.h */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* ---- the bit-stream writer API (moved here from `Network/NetworkSessionManager.h`).  The two writer
+   classes are reconstructions from the frame each constructor is given: `NetworkStreamWriter` is the
+   0x20-byte local every op-code sender reserves, `NetworkStreamWriterDefault` the one
+   `NetworkSessionStable::move` reserves. */
+u32 writeByte(NetworkStreamWriter* self, u32 value);
+u32 writeUInt(NetworkStreamWriter* self, u32 value);
+u16 writeSize(NetworkStreamWriter* self, u16 size);
+/* untyped: byte range - the bytes appended to the stream */
+s32 writeBytes(NetworkStreamWriter* self, const void* data, u32 len);
+
+/* the writer's remaining entry points the session tail drives (the second writer class) */
+/* untyped: byte range - the bytes appended to the stream */
+void networkStreamWriter_putBytes(NetworkStreamWriterDefault* self, const void* data, u32 size);
+void networkStreamWriter_flush(NetworkStreamWriterDefault* self);
+void networkStreamWriter_setMode(NetworkStreamWriterDefault* self, u32 mode);
+void networkStreamWriter_putU16(NetworkStreamWriterDefault* self, u16 value);
+void networkStreamWriter_putU16b(NetworkStreamWriterDefault* self, u16 value);
+void networkStreamWriter_putU32(NetworkStreamWriterDefault* self, u32 value);
+void networkStreamWriter_putU32b(NetworkStreamWriterDefault* self, u32 value);
+void networkStreamWriter_enable1(NetworkStreamWriterDefault* self, u32 value);
+void networkStreamWriter_enable2(NetworkStreamWriterDefault* self, u32 value);
+void networkStreamWriter_enable3(NetworkStreamWriterDefault* self, u32 value);
+void networkStreamWriter_commit(NetworkStreamWriterDefault* self);
+void networkStreamWriter_bytes(NetworkStreamWriterDefault* self);
+u32 networkStreamWriter_size(const void* sub);
+
+/* untyped: opaque handle passed through - only the writer band owns the layout */
+void networkSmallObject_construct(void* self);
+
+/* ---- the session band's request writers (moved here from `Network/network_state.h`; the state machine
+   passes its own view of the session object) */
+u32  flushBuffer(NetworkStateMachine* self, u32 opcode, u32 flags);
+void encryptBuffer(NetworkStateMachine* self);
+u32  writeUInt8(NetworkStateMachine* self, u8 value);
+void writeUInt16(NetworkStateMachine* self, u16 value);
+void writeUInt32(NetworkStateMachine* self, u32 value);
+void writeUInt32Shared(NetworkStateMachine* self, u32 value);
+void writeUInt8Array(NetworkStateMachine* self, const u8* data, u16 count);
+void writeBool(NetworkStateMachine* self, s8 value);
+
+/* The socket reader `network_socket_streams.cpp` polls (moved here from `Network/network_transport_types.h`). */
+/* untyped: opaque handle passed through - the socket object belongs to another band */
+s32 getBytesAvailableToRead(void* handle);
+
+/* GUESS: 0x803EBAF0 hands one layer event (kind 3 = error, kind 4 = done) to the callback object the
+ * layer holds, after posting `info` to the network singleton. */
+void notifyLayerEvent(NetworkLayerPat* self, u32 kind, s32 code, u32 has_info, NetworkRequestError* info,
+                      u32 context);
 
 /* GUESS on both names: 0x803EF3C0 and 0x803EF4C8 are the siblings of `setCollectionLog` for the two
  * fixed codes the state machine's flag tests report (0x80060033 and 0x80060012); the names follow the
@@ -96,6 +150,10 @@ s32 networkStreamReader_consumePacket(NetworkStreamWriterDefault* self);
 
 /* 0x803FA0E8 - the length field of the leading packet (its payload size plus the 22-byte header). */
 u16 read_size_from_buffer(NetworkStreamWriterDefault* self);
+
+/* 0x803F89D0 - binds the packet to `size` bytes at `buffer`. */
+/* untyped: byte range (the block the packet reads or writes) */
+void networkPacket_attach(NetworkStreamWriter* self, const void* buffer, u32 size);
 
 /* 0x803F8A14 - starts a message in `mode`. */
 void networkPacket_begin(NetworkStreamWriter* self, s32 mode);

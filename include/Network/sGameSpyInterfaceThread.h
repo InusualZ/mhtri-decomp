@@ -7,7 +7,7 @@
 #ifndef MHTRI_NETWORK_SGAMESPYINTERFACETHREAD_H
 #define MHTRI_NETWORK_SGAMESPYINTERFACETHREAD_H
 
-class GameSpyInterfaceThread;
-extern "C" GameSpyInterfaceThread* sGameSpyInterfaceThread;   /* 0x80794CE4 (.sbss) - the live GameSpyInterfaceThread */
+/* the class is named through the elaborated specifier so the header declares exactly the one symbol */
+extern "C" class GameSpyInterfaceThread* sGameSpyInterfaceThread;   /* 0x80794CE4 (.sbss) - the live GameSpyInterfaceThread */
 
 #endif /* MHTRI_NETWORK_SGAMESPYINTERFACETHREAD_H */

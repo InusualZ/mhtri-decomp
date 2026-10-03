@@ -53,8 +53,6 @@
 #include "types.h"
 #include "Network/network_transport.h"
 #include "Network/NetworkSessionManager.h"
-#include "unsplit/NetworkData.h"
-#include "unsplit/NetworkStream.h"
 #include "lobby/lb_server_sel_trans.h"
 #include "Network/NetworkCommunityPat.h"
 #include "MSL_C/alloc.h"

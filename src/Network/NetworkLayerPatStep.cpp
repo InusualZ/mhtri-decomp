@@ -28,6 +28,8 @@
 #include "unsplit/Network.h"
 #include "Network/NetworkSessionManagerPat.h"
 #include "Network/NetworkCommunityPat.h"
+#include "Network/network_layer_io.h"   /* sendReqLayerUp / sendReqLayerChildInfo / sendReqLayerUserList */
+#include "Network/session_mediator_views.h"   /* GameSpyInterfaceThread (the Pat side's view) */
 
 /* The log codes the request reports (0x8006xxxx = the layer's own error range). */
 enum {

@@ -18,3 +18,5 @@
  * The unit's `.data`/`.sdata`/`.sbss` claims are the candidate's (config/RMHE08/splits.txt); the symbols they hold are
  * in the map (`ledger.py unit Network/network_layer_io.cpp`), and the pass that writes the bodies defines them.
  */
+
+#include "Network/network_layer_io.h"

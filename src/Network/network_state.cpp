@@ -184,6 +184,10 @@
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
 #include "Network/network_state.h"
+#include "Network/PatInterface.h"          /* the state predicates, the call-stack helpers, isCallback */
+#include "Network/network_layer_io.h"      /* the request emitters, the item writers, the hand-off dispatch */
+#include "Network/NetworkCommunityPat.h"   /* the request writers */
+#include "Network/NetworkWiiMediator.h"    /* setMediatorState68A / getMediatorState68A */
 
 /* The target object carries `extab` 0x88 / `extabindex` 0xCC (the splits block claims both ranges), so
  * the original TU was built with C++ exceptions on; the lib sets them off.  The pragma adds exactly
@@ -214,29 +218,7 @@ s32 sendReqOpcode1F(NetworkInstance* self);
 s32 sendServerTimeout(NetworkInstance* self, const u32* values);
 s32 sendReqUnknownCheck(NetworkInstance* self, const u8* tags, const u8* data, u32 size);
 
-/* the band's request emitters this range does not own */
-void sendReqAuthenticationToken(NetworkInstance* self, u32 token);
-void sendReqMaintenance(NetworkInstance* self);
-void sendReqTermsVersion(NetworkInstance* self);
-void sendReqTerms(NetworkInstance* self, u32 a, u32 b, u32 len);
-void sendReqAnnounce(NetworkInstance* self);
-void sendReqNoCharge(NetworkInstance* self);
-void sendReqVulgarityInfoLow(NetworkInstance* self, s32 mode);
-void sendReqVulgarityLow(NetworkInstance* self, s32 mode, u32 slice, u32 len);
-void sendReqLmpConnect(NetworkInstance* self);
-void sendReqMediaVersionInfo(NetworkInstance* self);
-void sendReqRfpConnect(NetworkInstance* self);
-void sendReqFmpListVersion(NetworkInstance* self);
-void sendReqFmpListHead(NetworkInstance* self, s32 a, s32 b);
-void sendReqFmpListData(NetworkInstance* self, u32 start, u32 count);
-void sendReqFmpListFoot(NetworkInstance* self);
-void sendReqFmpInfo(NetworkInstance* self, u32 value, s32 flag);
-void sendReqBinaryHead(NetworkInstance* self, s32 a, s32 b);
-void sendReqBinaryData(NetworkInstance* self, s32 a, u32 size, s32 flag);
-void sendReqBinaryFoot(NetworkInstance* self, s32 a);
-void sendReqCircleInfoNoticeSet(NetworkInstance* self);
-void reqUserSearchInfoMine(NetworkInstance* self, s32 mode);
-
+/* the band's request emitters this range does not own are declared in `Network/network_layer_io.h` */
 
 } /* extern "C" */
 
@@ -296,7 +278,7 @@ s32 handleNetworkState1(NetworkInstance* self)
         st->sessionState_6132 += 5;
         break;
     case 10:
-        if (isSubState_8254_3(st) != 0) {
+        if (isSubState_8254_3((PatInterface*)st) != 0) {
             st->sessionState_6132 = 200;
             break;
         }
@@ -304,7 +286,7 @@ s32 handleNetworkState1(NetworkInstance* self)
         sendReqAuthenticationToken(self, getNASToken((NetworkInstance*)getInstance()));
         break;
     case 20:
-        if (isOpeningMaintenanceServer() == 0) {
+        if (isOpeningMaintenanceServer((PatInterface*)st) == 0) {
             if (st->announcePending_8270 != 0) {
                 *st->announceBufferPtr_8290 = 0;
             }
@@ -315,7 +297,7 @@ s32 handleNetworkState1(NetworkInstance* self)
         sendReqMaintenance(self);
         break;
     case 30:
-        if (isOpeningMaintenanceTerms() != 0) {
+        if (isOpeningMaintenanceTerms((PatInterface*)st) != 0) {
             if (st->termsSize_826C != 0) {
                 *st->termsBufferPtr_828C = 0;
             }
@@ -359,7 +341,7 @@ s32 handleNetworkState1(NetworkInstance* self)
         }
         break;
     case 60:
-        if (isOpeningMaintenanceServer() != 0) {
+        if (isOpeningMaintenanceServer((PatInterface*)st) != 0) {
             if (st->serverInfoPending_8274 != 0) {
                 *st->serverInfoPtr_8294 = 0;
             }
@@ -474,7 +456,7 @@ s32 handleNetworkState1(NetworkInstance* self)
         }
         st->sessionState_6132 += 5;
         flag = 0;
-        if (isOpeningMaintenanceServer() != 0 || isSubState_8254_3(st) != 0) {
+        if (isOpeningMaintenanceServer((PatInterface*)st) != 0 || isSubState_8254_3((PatInterface*)st) != 0) {
             flag = 1;
         }
         mode = 2;
@@ -486,7 +468,7 @@ s32 handleNetworkState1(NetworkInstance* self)
     case 255:
         resetNetworkState3(self);
         chooseServerAddress(st, 0, 0);
-        updatePatInterface(st, 0, 0, 0);
+        updatePatInterface((PatInterface*)st, 0, 0, 0);
         return 1;
     default:
         break;
@@ -537,7 +519,7 @@ s32 handleNetworkState2(NetworkInstance* self)
             st->requestState_6135 = st->requestState_6135 + 10;
             break;
         }
-        if (isSubState_894F_5(st) != 0 || isSubState_894F_3(st) != 0) {
+        if (isSubState_894F_5((PatInterface*)st) != 0 || isSubState_894F_3((PatInterface*)st) != 0) {
             u32 size = st->replySize_8BC4;
 
             if (size != 0) {
@@ -552,7 +534,7 @@ s32 handleNetworkState2(NetworkInstance* self)
             st->requestState_6135 = 250;
             break;
         }
-        if (isSubState_894F_2(st) != 0 || isSubState_894F_4or6(st) != 0) {
+        if (isSubState_894F_2((PatInterface*)st) != 0 || isSubState_894F_4or6((PatInterface*)st) != 0) {
             st->requestState_6135 = 225;
             break;
         }
@@ -562,7 +544,7 @@ s32 handleNetworkState2(NetworkInstance* self)
         sendReqTicket(self);
         break;
     case 40:
-        if (isSubState_894F_6(st) != 0) {
+        if (isSubState_894F_6((PatInterface*)st) != 0) {
             st->requestState_6135 = 250;
             break;
         }
@@ -623,20 +605,20 @@ s32 handleNetworkState2(NetworkInstance* self)
     case 110:
         setConnectionPaths((NetworkInstance*)getInstance(), st->userIdText_82D5,
                            st->userPasswordText_8301);
-        setMediatorState68A((NetworkInstance*)getInstance(), 0);
+        setMediatorState68A((NetworkWiiMediatorFields*)getInstance(), 0);
         st->requestState_6135 = 10;
         break;
     case 120:
         st->loginInfoSent_82B4 = 3;
-        setMediatorState68A((NetworkInstance*)getInstance(), 0);
+        setMediatorState68A((NetworkWiiMediatorFields*)getInstance(), 0);
         st->requestState_6135 = 10;
         break;
     case 230:
-        if (isSubState_894F_2(st) != 0) {
+        if (isSubState_894F_2((PatInterface*)st) != 0) {
             st->requestState_6135 = 30;
             break;
         }
-        if (isSubState_894F_6(st) != 0) {
+        if (isSubState_894F_6((PatInterface*)st) != 0) {
             st->requestState_6135 += 5;
             sendReqRfpConnect(self);
             break;
@@ -644,7 +626,7 @@ s32 handleNetworkState2(NetworkInstance* self)
         st->requestState_6135 += 20;
         break;
     case 240:
-        if (isSubState_894F_6(st) != 0) {
+        if (isSubState_894F_6((PatInterface*)st) != 0) {
             st->requestState_6135 = 30;
             break;
         }
@@ -671,7 +653,7 @@ s32 handleNetworkState2Fmp(NetworkInstance* self)
             } else {
                 u8 mediatorState;
 
-                getMediatorState68A((NetworkInstance*)getInstance(), &mediatorState);
+                getMediatorState68A((NetworkWiiMediatorFields*)getInstance(), &mediatorState);
                 if (mediatorState == 1) {
                     st->requestState_6135 = 100;
                     break;
