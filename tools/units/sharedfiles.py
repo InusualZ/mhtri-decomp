@@ -16,7 +16,7 @@ failed the *next* `ninja`, not the edit. So every write goes through here:
 * the edit is a temp-file + `os.replace` transaction - `Transaction` restores the previous bytes exactly
   on any failure and removes the temp files on both paths.
 
-`attribute.py` is the first consumer. The next writers that should move here: `tools/symbols/symedit.py`
+The next writers that should move here: `tools/symbols/symedit.py`
 (writes `symbols.txt` with its own `.tmp` + `os.replace` and no anchor/overlap gate) and
 `tools/units/dataqueue.py` (`write_queue` is a second temp+rename implementation). See
 `.pi/notes/sharedfiles.md`.

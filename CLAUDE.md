@@ -122,7 +122,7 @@ supersedes "keep the queue full": the aim is **steady** throughput, not maximum 
   already gives, and do not defeat it by re-sorting the ready set (by score or otherwise).
 * **Land one unit per commit, one unit at a time, from `main`.** Check `git rev-parse --abbrev-ref HEAD` prints
   `main` before landing - `land.py` now refuses otherwise, because a batch landed off `main` puts its commits
-  on the wrong ref and slides the merge-base that `applybranch.sh` and the gate both resolve against.
+  on the wrong ref and slides the merge-base that `land.py land --branch` and the gate both resolve against.
 * Keep `ninja build/RMHE08/ok` green and `orig/RMHE08/**` untouched as the invariant of every step (see
   Non-negotiables).
 * **A lane is launched with the profile that matches its job - not with the generic `worker` (owner's
@@ -159,11 +159,14 @@ The steady loop, per unit:
 
 1. `queue.py next` claims one proposal - one worktree, one branch, one brief - and prints the paste-ready spawn.
 2. The worker registers its range at its final home and commits the bodies on its branch, measured.
-3. Apply that branch with `.pi/bin/applybranch.sh` (the merge-base diff, not a tip-only cherry-pick and not a
-   plain two-way diff, which lose work), and resolve the shared-file conflicts: `python
-   tools/units/mergebranch.py resolve` resolves the classes it can (a comment that names a unit **file** is not
-   a stale symbol; a comment-only `src/**` difference takes main's comment and the branch's code) and refuses
-   the rest. Then `land.py record-base` -> `land.py land --units <claim>` -> `claims.py release`.
+3. Land that branch with the one landing path, `python tools/units/land.py land --branch worker/<slug> [--units <claim>]
+   [--message SUBJECT]`: it refuses a dirty tree, records the base, applies the branch's merge-base diff three-way (not a
+   tip-only cherry-pick and not a plain two-way diff, which lose work), resolves a `configure.py` / `splits.txt`
+   registration conflict with its own scoped union (`land.py resolve`, guarded by `unionguard`/`unionresolve`), runs the
+   gate, commits with a pathspec and releases the claim; a refusal leaves the tree as it was. A conflict it refuses (a
+   shared header, a `src/**` file) is resolved first: `python tools/units/mergebranch.py resolve` resolves the classes it
+   can (a comment that names a unit **file** is not a stale symbol; a comment-only `src/**` difference takes main's
+   comment and the branch's code) and refuses the rest.
 4. `ninja build/RMHE08/ok` green, then refill exactly that one slot.
 
 **The loop closes with a review: `decomp -> review -> decomp`.** A committed branch is reviewed **before** it
@@ -178,11 +181,9 @@ pass (a `fixer` lane, or the decompiler lane that wrote it). Only then does the 
 that finds nothing says so explicitly - for a well-measured unit that is the common answer, and it is what
 makes the loop worth its cost.
 
-Two tool behaviours the loop leans on, both fixed this session: `queue.py` never offers a proposal whose range
-a registered unit already covers, so re-attributing a region cannot re-hand landed work; and
-`attribute.py queue <start> <end>` **rewrites** the queue file with only that region's proposals rather than
-appending - run it over the whole unclaimed region (the file records this as `cap: 0`), or the rest of the
-backlog disappears.
+`queue.py` never offers a proposal whose range a registered unit already covers, so a landed range cannot be
+re-handed. The bulk tiler (`attribute.py`) and its `attribution-queue.json` are retired (`docs/tools/retired.md`):
+`splits.txt` is the queue, and the pool is the registered body-less units (`brief.py --pool`).
 
 ## Matching playbook
 
@@ -306,8 +307,8 @@ docs/                     Where all documentation lives — ours and dtk-templat
                           splitter blocker.
                           data-order-seams.md explains why a vtable followed by data in retail `.data` is a
                           TU seam (MWCC emits globals, strings, then vtables in reverse), the measured
-                          result, and the plan that feeds it into tudiscover, dataclaim, flipcheck and
-                          attribute (playbook row 80).
+                          result, and the plan that feeds it into tudiscover, dataclaim and flipcheck
+                          (playbook row 80).
 ```
 
 ### External oracles

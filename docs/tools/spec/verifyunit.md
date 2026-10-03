@@ -8,7 +8,7 @@ Independent verification for a landed batch: registration completeness, a per-sy
 
 ## Users
 
-the landing gate (2); profiles (`.claude/agents`) (2); skills (1); docs (3); imported by `applysplits`, `land`, `rescue`, `unitscore`
+the landing gate (2); profiles (`.claude/agents`) (2); skills (1); docs (3); imported by `land`, `rescue`, `unitscore`
 
 ## CLI
 

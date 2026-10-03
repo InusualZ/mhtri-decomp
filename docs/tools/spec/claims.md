@@ -8,7 +8,7 @@ Claim a unit for a worker: one git worktree, one branch, and the branch *is* the
 
 ## Users
 
-the landing gate (4); configure.py / the build (1); `.pi/bin` scripts (3); profiles (`.claude/agents`) (6); CLAUDE.md (3); docs (40); imported by `brief`, `flipcheck`, `handoff`, `land`, `promote`, `queue`, `recompile`, `slots`, `vtslot`
+the landing gate (4); configure.py / the build (1); profiles (`.claude/agents`) (6); CLAUDE.md (3); docs (40); imported by `brief`, `flipcheck`, `handoff`, `land`, `queue`, `recompile`, `slots`, `vtslot`
 
 ## CLI
 

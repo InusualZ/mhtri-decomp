@@ -399,7 +399,7 @@ them are **project** profiles, tracked in `.claude/agents/`; the rest are the gl
 | profile | job | launched when |
 | **`decompiler`** | unit work: register a proposal range at its final `src/<module>/<name>.<ext>` home, reconstruct its bodies, measure, commit on its branch | **the default lane** - a proposal or a body-completion lane. `queue.py next` emits `agent: "decompiler"` |
 | **`fixer`** | a *refused gate*: a measured regression, a lint failure, a claim or branch that must be repaired | a `land.py verify` refusal, a `ninja changes` regression, a stale claim |
-| **`merger`** | a *refused apply*: two lanes' divergent views of one record/type/header, a fold | `applybranch.sh` / `git apply` refusing a branch, the `recordmerge.py` class |
+| **`merger`** | a *refused apply*: two lanes' divergent views of one record/type/header, a fold | `land.py land --branch` refusing a branch (its `git apply -3` or the resolver), the `recordmerge.py` class |
 | **`codereviewer`** | a *style/convention review* of decompiled code: the match claim's honesty, naming (rule 7), placement (rule 2), types (rules 3-6/9/11), comments, codegen-adjacent hygiene. Read-only by construction - its tool list has no `write`/`edit` - and it reports ranked, evidence-backed findings instead of diffs | after a module's pass, before a flip campaign, or when a band's debt needs a scope statement |
 | `worker` | the generic lane: anything that is none of the above | the fallback, and the only profile the older rounds used |
 | `scout`, `planner`, `reviewer` | read-only recon, planning, independent review | before a batch, or when a plan/review is the deliverable |

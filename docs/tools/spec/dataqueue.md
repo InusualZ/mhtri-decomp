@@ -30,7 +30,7 @@ Inputs -> outputs: map, splits, config.json, tudiscover cache, seams -> data-que
 
 ## Invariants and rules
 
-* docs/plan.md 7.17. `attribute.py`'s data pass currently writes the runs it saw into `splits.txt` as `# ... claim in the measured data pass` comments, and nothing reads them back. This tool is the writer for the queue `brief.py` already reads: one entry per **unowned data run**, in the shape the plan specifies,
+* docs/plan.md 7.17. the retired tiler's data pass wrote the runs it saw into `splits.txt` as `# ... claim in the measured data pass` comments, and nothing reads them back. This tool is the writer for the queue `brief.py` already reads: one entry per **unowned data run**, in the shape the plan specifies,
 ```
 {unit, section, start, end, labels, leak, density, verdict}
 ```

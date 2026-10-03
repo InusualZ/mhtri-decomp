@@ -15,7 +15,7 @@ The tools listed under this concept in `docs/tools/README.md`.
 
 ## Absorbs (today's implementations)
 
-`callers.dump_signature/load_index`, `tudiscover.dump_stamp/asm_stamp_status`, `undefrefs._sig/link_symbol_index`, `dataattach.stamp_of`, `verifyunit.target_object_snapshot`
+`callers.dump_signature/load_index`, `tudiscover.dump_stamp/asm_stamp_status`, `undefrefs._sig/link_symbol_index`, `verifyunit.target_object_snapshot`
 
 ## Test contract
 

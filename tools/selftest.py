@@ -20,7 +20,7 @@ the one command that runs them all, so a stale tool cannot hide behind a green g
 * a tool exposing `--selftest`, run as `python <tool.py> --selftest`.
 
 They are one *entry* per tested tool (keyed by the module path with `_selftest` stripped), because many are
-wrappers of each other: `attribute.py --selftest` imports and runs `attribute_selftest.py`, and
+wrappers of each other: a tool's `--selftest` can import and run its `<tool>_selftest.py`, and
 `dossier_selftest.py` calls `dossier.selftest()`. Running both would run the same checks twice and waste the
 gate's time, so a delegating pair is collapsed to its **tool** entry (the documented contract); a genuine
 pair that does *not* delegate - `ledger.py --selftest` covers the per-0x10000 view, `ledger_selftest.py` the
@@ -144,7 +144,7 @@ class Entry:
 
     def __init__(self, key: str, tool: str | None, standalone: str | None,
                  dedupe_note: str = ""):
-        self.key = key                      # e.g. "tools/units/attribute"
+        self.key = key                      # e.g. "tools/units/queue"
         self.tool = tool                    # relative path of the tool exposing --selftest
         self.standalone = standalone        # relative path of the standalone selftest
         self.dedupe_note = dedupe_note
@@ -188,7 +188,7 @@ def _rel(path: str, root: str = ROOT) -> str:
 
 
 def _key_for(path: str, root: str = ROOT) -> str:
-    """`tools/units/attribute_selftest.py` and `tools/units/attribute.py` -> `tools/units/attribute`."""
+    """`tools/units/queue_selftest.py` and `tools/units/queue.py` -> `tools/units/queue`."""
     rel = _rel(path, root)
     base = os.path.basename(rel)[:-3]  # strip .py
     if base.endswith("_selftest"):

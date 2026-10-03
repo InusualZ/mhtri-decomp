@@ -970,9 +970,9 @@ audited on the spot: `redundant` is pruned, drift is reported, `unlanded`/`unkno
 * **A slot goes to a problem before a new unit; a refused slot is refilled with a `fixer`, not a claim** (the
   queue refuses while a branch holds unlanded work). `queue.py next --count N` strides the address order, so no
   two wave lanes hold adjacent proposals (adjacency is the vector for shared-TU and rule-2 boundary clashes).
-* **`attribute.py queue <start> <end>` REWRITES the queue file.** Run it over the whole unclaimed region (`cap:
-  0`), or add briefs with `brief.py`; a partial run deletes the rest of the pool. Claimed proposals were once
-  re-offered by `queue.py next`: check `claims.py list` first if it refuses at random.
+* **`attribute.py` and the proposal queue are retired** (`docs/tools/retired.md`); the pool is the registered
+  body-less units. Claimed proposals were once re-offered by `queue.py next`: check `claims.py list` first if it
+  refuses at random.
 * **`tools/splits/tudiscover.py` needs the asm dump** (`python tools/splits/dump_asm.py`; `write_asm: false` by
   default; `dol split` is then 200-400 s instead of ~18 s).
 * **A `Matching` flip is one unit per commit, byte-identical, with a green `ok`** (§8); a lane on an exhausted

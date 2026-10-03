@@ -12,7 +12,7 @@ the plan to get there is `migration.md`; what is dropped is `retired.md`; what t
 | trees, paths, scratch, state, ground truth | `lib/repo.py` | `spec/lib-repo.md` | every tool |
 | subprocess with the codec rule | `lib/proc.py` | `spec/lib-proc.md` | every tool that shells out |
 | git calls | `lib/git.py` | `spec/lib-git.md` | land, claims, slots, lane, rescue, mergebranch, stylelint, guard, prepcommit, commitlint, edit |
-| bytes, line endings, atomic writes, anchors | `lib/text.py` | `spec/lib-text.md` | edit, escape, symedit, dataqueue, backlog, sync_profiles, mergebranch, promote (retired) |
+| bytes, line endings, atomic writes, anchors | `lib/text.py` | `spec/lib-text.md` | edit, escape, symedit, dataqueue, backlog, sync_profiles, mergebranch |
 | stamped caches | `lib/cache.py` | `spec/lib-cache.md` | callers, tudiscover, undefrefs, verifyunit |
 | generated names and manglings | `lib/names.py` | `spec/lib-names.md` | callees, dumpmap, undefrefs, langcheck, mangle, methodize, stylelint, typeregistry |
 | `symbols.txt`, `splits.txt`, `configure.py`, ownership | `lib/project/` | `spec/lib-project.md` | symedit, stylelint, symbolpreflight, ledger, datagap, dataclaim, dataqueue, flipcheck, vtableaudit, unwindcut, land, brief, queue, ... |

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Refuse to union-resolve a conflicted branch-apply when the conflict is not a disjoint addition.
 
-`.pi/bin/applybranch.sh` lands a worker branch as `git apply -3 <merge-base diff>` and then resolves every
-conflicted path with a plain **union** (`.pi/bin/union.py`: ours block, then theirs block).  That union is
+`land.py land --branch` lands a worker branch as `git apply -3 <merge-base diff>` and then resolves the
+conflicted registration paths with a plain **union** (`unionresolve`: ours block, then theirs block).  That union is
 only correct when the two sides touched *disjoint* things - two units each appending a registration at the
 same anchor.  When the two sides changed the *same* existing content it silently writes a tree that cannot
 build, and the damage is only found later by `ninja`:
@@ -27,10 +27,10 @@ not depend on the working tree's conflict-marker style):
   resurrected).
 
 For every conflicted path the tool prints what each side did (deleted / renamed / modified) and exits
-**non-zero** with the offending paths named, so `applybranch.sh` can stop *before* it stages a tree that
+**non-zero** with the offending paths named, so the landing can stop *before* it stages a tree that
 cannot build.  A tree whose conflicts are all disjoint additions still unions exactly as before.
 
-**A refusal also undoes the apply.**  `applybranch.sh` runs this guard *after* `git apply -3`, which has
+**A refusal also undoes the apply.**  `land.py` runs this guard *after* `git apply -3`, which has
 already merged into the index: UU/AA entries for the conflicts and cleanly-applied hunks staged.  Refusing
 and then only printing "resolve these by hand" left `main` mid-conflict - staged files, conflict stages,
 and a `ninja` that cannot regenerate `build.ninja` - until somebody cleaned it up by hand.  So on refusal
@@ -42,7 +42,7 @@ restored and anything still dirty.  `--no-cleanup` keeps the old behaviour for a
     python tools/units/unionguard.py --branch worker/<slug> --no-cleanup [--base <ref>] [path ...]
     python tools/units/unionguard.py --selftest
 
-`applybranch.sh` passes the branch and the conflicted paths; with no paths it inspects `git ls-files -u`.
+`land.py` passes the branch and the conflicted paths; with no paths it inspects `git ls-files -u`.
 """
 from __future__ import annotations
 
@@ -322,7 +322,7 @@ def _read(cwd: str, name: str) -> str:
 
 
 def _union_file(path: str) -> None:
-    """Local mirror of `.pi/bin/union.py`: ours block, then theirs, for the pass-through test."""
+    """Local mirror of `unionresolve`'s union: ours block, then theirs, for the pass-through test."""
     with open(path, encoding="utf-8", newline="") as fh:
         lines = fh.read().replace("\r\n", "\n").split("\n")
     out, i = [], 0
@@ -541,7 +541,7 @@ def selftest() -> int:
         check("disjoint-union: apply landed the conflict",
               _apply_conflict(tmp7, base7, "branch") in (0, 1), True)
         check("disjoint-union: guard passes it through", report(tmp7, base7, "branch", []), 0)
-        check("disjoint-union: conflict still present for union.py",
+        check("disjoint-union: conflict still present for the union",
               _conflict_paths(tmp7), ["reg.txt"])
         _union_file(os.path.join(tmp7, "reg.txt"))
         text = _read(tmp7, "reg.txt")

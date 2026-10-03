@@ -8,7 +8,7 @@ dataorder.py - translation-unit seams read from the *order* of retail `.data`.
 
 ## Users
 
-profiles (`.claude/agents`) (2); skills (6); CLAUDE.md (1); docs (13); imported by `attribute`, `dataattach`, `dataseams`, `splitcheck`, `tudiscover`
+profiles (`.claude/agents`) (2); skills (6); CLAUDE.md (1); docs (13); imported by `dataseams`, `splitcheck`, `tudiscover`
 
 ## CLI
 

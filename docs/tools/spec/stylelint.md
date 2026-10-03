@@ -8,7 +8,7 @@ Lint `src/` against the type and naming discipline of docs/plan.md section 6.5 (
 
 ## Users
 
-the landing gate (4); `.pi/bin` scripts (2); profiles (`.claude/agents`) (18); skills (2); CLAUDE.md (3); docs (24); imported by `backlog`, `callees`, `callers`, `dataclaim`, `land`, `mergebranch`, `methodize`, `promote`
+the landing gate (4); profiles (`.claude/agents`) (18); skills (2); CLAUDE.md (3); docs (24); imported by `backlog`, `callees`, `callers`, `dataclaim`, `land`, `mergebranch`, `methodize`
 
 ## CLI
 

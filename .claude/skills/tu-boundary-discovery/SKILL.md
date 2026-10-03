@@ -54,17 +54,12 @@ anchors, closures, cuts - is only as current as that dump, and stale asm is sile
 | scorecard for iterating on this tool | `python tools/splits/tudiscover.py bench [--seeds 400] [--compare <baseline.json>]` (tier 4 = strong pins vs `splits.txt`, precision/recall per kind) |
 | the `.data` emission-order seams as `.text` intervals, with contradictions | `python tools/splits/tudiscover.py dataorder [--weak] [--all] [--addr HEX]`; selftest `python tools/splits/tudiscover.py --selftest` |
 | which registered units are ONE original TU (a shared pooled literal = one pool per TU) | `python tools/units/poolseams.py [--unit <unit>] [--json f]` (same as `datagap.py --pool-seams`); `tudiscover.py at <addr>` prints the `pool model` and `pool dedupe` blocks; `--pool-model off|on|strong` |
-| **bulk attribution** over an unclaimed region | `python tools/units/attribute.py plan 0x80040598 0x800408A8` |
 
-`attribute.py` is the bulk driver on top of this tool: it walks the *unclaimed* runs of a region, cuts them
-only at seams a narrow strong observation pins (`--min-bytes`/`--max-bytes` repair the pieces that are not
-TU-shaped), and emits one **proposal** per unit - `.text` ranges, seams and evidence, never a registered unit.
-A worker that takes a proposal registers the unit **once, at its final `src/<module>/<name>.<ext>` home** inside
-its own worktree (docs/plan.md §12); the `auto/` bucket and its stub sources are retired. The data runs the run
-saw are printed for a measured second pass (playbook idea 23). A run with no evidence stays **one** unit and its
-header records that the seam is unproven: one function per file is certainly wrong, one file per region is only
-unproven. It is idempotent, and the registration write asserts rather than silently skipping (configure.py is
-CRLF, splits.txt is LF).
+Bulk attribution (`attribute.py`) is **retired**: the splits program put every TU edge into `splits.txt`
+(`docs/splits-program.md`), so `splits.txt` is the queue of units and `tudiscover at <addr>` answers the
+one-address question. A new unit is registered **once, at its final `src/<module>/<name>.<ext>` home** inside
+its worker's worktree (docs/plan.md section 12); a re-cut of a registered range uses `unwindcut.py`, and
+`splitcheck.py --baseline` audits the result.
 
 The graph (per-function data references, calls, codegen fingerprint, unwind entries, `.rel` ownership) is
 built from `build/<version>/asm/` once (~12 s / 13 751 files) and cached in

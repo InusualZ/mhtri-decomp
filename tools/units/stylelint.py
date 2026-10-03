@@ -2190,8 +2190,8 @@ def unique_names(findings: list[dict]) -> dict:
 
 def rule_enforced(rule: int, rel: str, src: "Source | None" = None) -> bool:
     """Whether `rule` is enforced for `rel`. It always is: the rule-7 exemptions and per-file keys are
-    gone (owner's ruling, 2026-09-27) and no other rule ever had one. Kept as an API because the brief
-    and `promote.py` ask before they count."""
+    gone (owner's ruling, 2026-09-27) and no other rule ever had one. Kept as an API because callers
+    ask before they count."""
     return True
 
 
