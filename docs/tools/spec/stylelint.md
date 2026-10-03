@@ -1,0 +1,78 @@
+# `stylelint` - Lint `src/`+`include/` against section 6.5 rules 1-13 with `file:line`; `--diff REF` is the gate's add-only comparison with rename/move credits; `--ref` judges a branch; owns the `Ownership` index
+
+<!-- generated from the module docstring of `tools/units/stylelint.py` at ec2609b46 by the tools-design lane; tightened by hand where marked -->
+
+## Purpose
+
+Lint `src/` against the type and naming discipline of docs/plan.md section 6.5 (roadmap 7.21).
+
+## Users
+
+the landing gate (4); `.pi/bin` scripts (2); profiles (`.claude/agents`) (18); skills (2); CLAUDE.md (3); docs (24); imported by `backlog`, `callees`, `callers`, `dataclaim`, `land`, `mergebranch`, `methodize`, `promote`
+
+## CLI
+
+```
+python tools/units/stylelint.py --budget          # the per-unit backlog over src/
+python tools/units/stylelint.py --budget --headers  # ... plus the include/unsplit band's rule-2 rows
+python tools/units/stylelint.py --diff <ref>      # exit 0 = the working tree adds no violation
+python tools/units/stylelint.py --diff <ref> --list-added  # ... and name each added finding
+python tools/units/stylelint.py --ref <branch>    # read-only: judge a held branch's committed tree
+python tools/units/stylelint.py --json            # machine-readable findings + budget
+python tools/units/stylelint.py --selftest
+```
+Flags: `--budget`, `--diff`, `--headers`, `--json`, `--list-added`, `--ref`, `--selftest`.
+Exit codes: It is a **report**: the exit status and the flag-absent summary lines are byte-identical, because the landing gate reads them.
+`--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
+
+## Inputs and outputs
+
+Inputs -> outputs: src, include, map, splits -> findings, budget.
+
+## Invariants and rules
+
+* A rule enforced by remembering is not a rule: the conformance rules were agreed with the owner and the only thing keeping them is the reviewer's attention. This tool turns the mechanically checkable ones into `file:line` findings, and `land.py verify` calls it with `--diff <base>` so a batch that **adds** a violation is refused before it is committed.
+* Rules checked (each finding is `file:line`):
+| # | rule | how it is decided |
+| --- | --- | --- |
+| 1 | a shared type lives in one header | the same `struct`/`class`/`union` name defined with a body in more than one `src/` file: one finding per (type, extra file), naming both files |
+| 2 | an extern lives with the TU that owns it | a declaration (the `extern` keyword or a plain function prototype) of a symbol whose registered owner (symbols.txt address + splits.txt range) is another unit, or of a symbol with **no registered owner** at all (an unsplit address), which belongs in a band header under `include/unsplit/`; an ordinary `include/<module>/*.h` header is judged too (a foreign declaration there is a finding); and, in `include/unsplit/*.h` itself, any declaration of a symbol a registered unit owns (that header is a fallback, not the owner) |
+| 3 | a reconstructed `struct`/`class` states its size | a `size: 0xNN` comment within four lines of the definition (or two lines after its closing brace) |
+| 4 | every field carries its offset | an offset comment on the field's own line(s); `/* +0x1C */` is the canonical form and the `/* 0x1C */` variant the existing units use is accepted |
+| 5 | no field is left named `unk*` | a field name matching `unk`, `unkNN`; `pad_0xNN` / `unused_0xNN` are the exception |
+| 6 | no pointer arithmetic reaches a field | a `(T*)base + 0xNN` / `(T*)(base + 0xNN)` cast-plus-literal-offset expression, except an offset passed straight to `memset`/`memcpy`/`memmove` (the rule's own byte-range exception) |
+| 7 | no auto-generated name survives | `fn_XXXXXXXX` anywhere, `lbl_XXXXXXXX`/`loc_XXXXXXXX` anywhere, and `unk*` used for anything that is not a struct field (a field is rule 5's) - **whoever owns the symbol**; no exemption, no deferral |
+| 8 | `goto` is forbidden | the `goto` keyword |
+| 9 | a mangled symbol is called/declared through its owner | a callee identifier that carries a compiler mangling (`Name__FP...`, `Name__Q34nw4r...`, a class member `name__<len>ClassF...`) used as a call **or** as a declaration; an `fn_XXXXXXXX` stem has no `__` and stays legal |
+| 10 | a codegen pragma lives in the TU that needs it | a `#pragma` whose name is codegen-affecting (`peephole`, `optimization_level`, `fp_contract`, ...) in a file under `include/` (a `.c`/`.cpp` is never reported). A pragma leaks into every TU that includes the header |
+| 11 | no `void *` parameter or return type | a `void` `*` in a function declaration's parameter list or return type (a declaration, never a cast). Erasing the type hides what a heterogeneous call site is actually passing; the only exemption is a per-declaration `/* untyped: <reason> */` marker whose reason names which genuinely-untyped case it is - a byte range, an opaque handle passed through, or a caller-owned payload |
+| 12 | data a unit uses that no registered range claims is the unit's to claim | an `extern` declaration (the `extern` keyword) of a symbol whose `symbols.txt` type is an **object** and whose address falls in **no** registered `splits.txt` range. The declaration is the defect: the unit that reads or writes the bytes claims the range in its own section and matches it, so the finding names the address the claim covers |
+| 13 | a method is a member | a free function named `<Type>_<name>` whose first parameter is `<Type>*`/`const <Type>*`/`<Type>&` (a member) or with no such parameter (a static member), for a type the project defines, in `.cpp` sources and the headers they include; exempt only with a standing `/* free: <reason> */` marker; `<Type>_ctor`/`_dtor`/`_construct`/`_destruct` whose first parameter is a *different* type is a C-style helper (hand-added: the code's table stops at 12 while `rule13_findings` is implemented; `docs/plan.md` section 6.5 is canonical) |
+* Rule 2 is checked from `config/RMHE08/symbols.txt` (a symbol's section and address) + `config/RMHE08/splits.txt` (each registered unit's ranges) and reads **both** declaration shapes a file can make: the `extern` keyword and a plain function prototype (`void foo(void);` - the `extern`-only scanner could not see the latter, so `src/Network/fn_8041A87C.cpp`'s local `memset`/`memcpy` and `src/DWCi/fn_805113B0.c`'s `DWCi_GetStringLength` were invisible while four real sites existed in the Network scope). A declaration a file makes for a symbol another registered unit owns is a finding - move it to that unit's header and `#include` it. A symbol with **no registered owner** (the map resolves it to an unsplit address) is a finding too: the local declaration is the defect and it belongs in a band header under `include/unsplit/`. When the registered bands interleave across modules (a `sound` unit sits inside the `ef` band) so no module is sound, the finding names the band directory only rather than guess a `<module>.h`, and the local declaration is still wrong in the `src/` file. A symbol missing from the map, a duplicate map row, and an address the map gives no section stay counted gaps (`Ownership.gaps`) - the map cannot judge them, so they are not guessed. The owning unit's own public header is not a finding: `_owns` recognises `include/<module>/<stem>.h` as the owner's header (before that fix the own header read as foreign, so extending rule 2 to headers would have reported ~30 owners' own headers in the Network scope alone). An ordinary `include/<module>/*.h` header is judged by this rule (a foreign declaration there is a finding; an unowned symbol stays, because the module header carries public names the splits map has not registered and the band is the detector for those). The band is checked as well - `include/unsplit/*.h` is a file a batch may change, and a declaration there of a symbol a registered unit owns is a finding, because the owner's typed definition collides with it (`(10197) illegal function overloading`); an unowned symbol stays, which is the band's purpose. A definition in the band is not a declaration and is left alone.
+* The backlog is a burn-down, not a gate: `--diff` fails only when a (rule, file) count rises, so touching a unit with 300 `unk*` fields is allowed as long as the touch adds none. A **new** file starts from zero, so its violations are all additions - new work is held to the rules from its first commit.
+* **Rule 7 has no exemption and no deferral.** Every `fn_XXXXXXXX`, `lbl_XXXXXXXX`, `loc_XXXXXXXX` and bare `unk*` identifier in `src/` is a finding, whoever owns the symbol: this unit's, another unit's, an unowned one, or a name the map does not know. A data label is not "the owner's to name" any more - leaving a generated spelling on either side of an ownership line is the defect. The rule applies to a file with no bodies too, and **no comment exempts anything**: a `rule 7 deferred` line is now just inert text, not a key.
+* The **only** grandfather is the gate's own `--diff`: touching a file that already carries findings is allowed (an existing finding never blocks a landing), while a finding whose token is *new to that file* is refused - the judgement is the **token set difference per (rule, file)**, not a count delta, so a file may go on spelling the names it already flagged (30 more occurrences add no identity and no row) while a brand-new `fn_XXXXXXXX`/unowned-data extern still refuses. That is the owner's "do not revoke committed progress" - the mounted debt is worked slowly through the backlog register (`tools/units/backlog.py`), never through a per-file escape hatch. **Rules 1-6, 8, 9, 10 and 11 apply as before.**
+* **A move is credited, a copy is not.** A token new to one file is credited when another file of the same batch stopped carrying the same (rule, token, detail): one credit per removal, reported as `moved rule R <token>: <old> -> <new>` (and the `--json` `moved` key). A copy, a removal of another rule, or net growth still refuses. A file the batch **deletes** counts as a source: its base findings are read from the base blob (`deleted_src_files`, `findings_of_deleted`) and every identity it carried is a removal; a git-detected rename keeps its identities.
+* `--ref <branch>` is the **read-only** sibling of `--diff`: it judges a *held branch's committed tree* against the merge base `--diff` would resolve (the branch's tip for the `after` side, exactly as if the branch were checked out), so a lane can prove a `splits.txt` claim cleared a held branch's rows without checking it out and without writing anything. The comparison itself is `--diff`'s - each side judged by the map it was written against - and `--diff`'s behaviour and its "REF is not an ancestor" warning are untouched.
+* **Rule 11 has no per-file key either.** A `void *` parameter or return type is a finding by default, and the exemption is a **per-declaration** marker comment - `/* untyped: <reason> */` on the declaration or the line above it (a marker on the line above must stand alone, so a trailing marker on one declaration never exempts the next) - whose reason says which genuinely-untyped case it is (a byte range, an opaque handle passed through, or a caller-owned payload). A file cannot exempt itself, exactly as rule 7's per-file keys were removed; `grep -rn "untyped:" src include` is the complete, reviewable list of exemptions, and a marker with an empty or vague reason is still a finding. The scan reads **declarations** (the same `_declared_name` parser rule 2 uses), so a `(void*)p` cast inside a body is never a finding; a `void *` **local variable** is out of the rule's scope and is only counted (the report prints the number) so the owner can decide later. The rule is ticked in the register as its own `untyped` kind.
+
+## Lib dependencies
+
+cscan, project.Ownership, findings, git, names.
+
+## Test contract
+
+Tier: fixture; smoke: the real map resolves a named symbol to *a* registered owner (never a named module).
+Today's selftest: in-file `selftest()` (`--selftest`).
+Target: `tools/tests/units/test_stylelint.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
+
+## Known gaps
+
+the docstring's rule table stops at rule 12 while rule 13 is implemented; `--budget --headers` and the band report are rule-2-only views
+
+## History (the incidents behind the rules - keep the rule, drop the narrative when the rule is stable)
+
+* Comments and string/char literals are stripped before matching, and the two are stripped separately: the size/offset annotations of rules 3-4 live *in comments*, while every other rule must not fire on text inside one. The stripped strings keep the file's exact length and newlines, so a reported line is the original line. `Pl/pl_act.cpp`'s header comment naming the banned `goto` dispatch is the incident this exists for.
+* **`--diff` says how many; `--list-added` says which.** A `+N rule R <file>` row names no occurrence, so a lane that reads `+76 rule 7` cannot tell which of its renames are load-bearing: one dropped three whole bodies to find out, then re-added them (2026-09-30). The flag names every added finding as `rule R <file>:<line> <token>` - the `fn_XXXXXXXX`/`unkNN` a rename closes, the symbol a rule 2/12 wants moved or claimed, the declaration/type/field a rule 3/5/9/11 names - grouped by rule then file, with the per-file count so the biggest offender leads (`backlog.py`'s weight convention). The same rows are the `detail` key of the `--diff`/`--ref` `--json` payload. It is a **report**: the exit status and the flag-absent summary lines are byte-identical, because the landing gate reads them.
+* **A `--ref` that measures nothing exits non-zero, never "clean".** `--ref <branch>` is safe to run from the branch's own worktree (a review lane is launched exactly there), but there `_resolve_diff_ref` returns the branch itself - it *is* HEAD, an ancestor of itself - so a naive comparison judges a branch against itself and prints `adds no section 6.5 violation over 0 changed file(s)` with exit 0. That was a **false green for every review's lint row** (2026-09-28). When the resolved base equals the branch, the comparison uses the fork point against `main` instead; and if it still finds no changed file, `--ref` refuses with exit 2 and a message naming the reason (`--ref <branch> judged 0 changed file(s) - <branch> is HEAD here; run it from MAIN or use --diff <merge-base>`).
+* **Rule 12 (owner, 2026-09-28).** An `extern` declaration of a **data** symbol - `symbols.txt` says `type:object` - whose address no registered `splits.txt` range covers is a finding: the unit that reads or writes those bytes **claims the range in its own `splits.txt`** and matches it as part of its own object. The old "no registered owner; declared, never defined" header comment was the finding naming itself, so a band header under `include/unsplit/` is judged by this rule too - rule 2's band is the fallback for a symbol no unit can claim, not the answer for data a unit demonstrably uses. The same `Ownership` index as rule 2 decides it, so the map-absent / duplicate-row / not-in-the-map cases stay counted gaps here as well; `rule 2` and `rule 12` may both name one `extern` line and that is intended - rule 2 says whose header the declaration belongs in, rule 12 says the bytes must be claimed. The declare-never-define carve-out is unchanged and is *not* checked here: when the address is already inside the file's own registered range, `resolve` returns `owned` and rule 12 does not fire (playbook 29). A **function** declaration is rule 2's, never rule 12's.
