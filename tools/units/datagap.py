@@ -1,54 +1,17 @@
 #!/usr/bin/env python3
-"""Per-unit data-section gap between a unit's target object and ours.
-
-A registered unit whose code matches can still differ in *data*: our source defines a constant, a table or a
-string pool the original translation unit did not have (MWCC pools its own copy of a floating-point constant,
-a string literal lands in `.data`, an array is emitted where retail referenced a map symbol). objdiff's unit
-score hides this - the extra section is simply not counted - so a unit can read 100 % fuzzy and still not be
-the target object.
-
-This tool compares the two objects' section sizes directly:
-
-    build/RMHE08/obj/<path>.o   the target, split out of the DOL
-    build/RMHE08/src/<path>.o   ours, compiled from src/
-
-and reports, per unit:
-
-    ours-extra    ours has bytes in a section the target does not have at all (the usual case: our source
-                  defines pooled data the original referenced from elsewhere)
-    target-extra  the target has bytes ours does not (a range we failed to claim, or data we dropped)
-
-Usage:
-    python tools/units/datagap.py --flip-blockers    # the actionable list: matched code, data-only gap
-    python tools/units/datagap.py                    # every unit with data we did not mean to emit
-    python tools/units/datagap.py --mode both        # both directions
-    python tools/units/datagap.py --unit Pl/fn_8026FFBC
-    python tools/units/datagap.py --json out.json    # machine-readable
-    python tools/units/datagap.py --pool-seams       # literal pools as TU evidence: which units are ONE original TU
-    python tools/units/datagap.py --selftest
-
-`--flip-blockers` is the list to work: units whose **code already matches** (`fuzzy_match_percent` at or above
-`--min-fuzzy`, default 99) and whose only remaining defect is `ours-extra` bytes in a data section. A raw
-`ours-extra` listing is noisier than it looks - a unit with unwritten bodies reports `.text` ours-extra too,
-which is progress, not a defect. `--mode` selects the direction to report (default `ours-extra`, the direction
-that blocks a flip) and `--flip-blockers` narrows it to the data sections. Sections
-that only carry metadata (`.comment`, the string/symbol tables, `.note.split`) are ignored unless
-`--all-sections` is given; everything else - `.text`, `.data`, `.sdata`, `.sdata2`, `.bss`, `.sbss`,
-`.rodata`, `extab`, `extabindex`, `.ctors`, `.dtors` and the `.rela*` sections - is compared.
-
-The finding this tool exists for (2026-09-26): the data gap on the ten units that read `.text` 100 % was
-**ours-extra**, not target-extra - e.g. `Pl/fn_8026FFBC` emits an 8-byte `.sdata2` double the target does not
-have, and `ef/eft002` / `ef/fn_800FD864` emit 120 / 548 bytes of `.data`. The fix is therefore playbook 29's
-rule - reference the map's symbol (`extern`), never define it - not a `splits.txt` claim (there is no range to
-claim: the target object has no such section).
-"""
+"""Per-unit data-section gap target vs ours, the data-closure census and the gate's strict/span/fold verdicts.
+Spec: docs/tools/spec/datagap.md. CLI: datagap.py [--flip-blockers] [--unit U] [--census] [--mode M] [--json F]
+[--pool-seams] [--touched-by REF] | --selftest."""
 
 from __future__ import annotations
 
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import json
 import os
 import sys
+
+from tools.lib.binary.elf import Elf as LibElf
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # `tools/`: `from units import`
@@ -67,11 +30,7 @@ DATA_SECTIONS = {".data", ".sdata", ".sdata2", ".rodata", ".bss", ".sbss", ".cto
 
 def section_sizes(path: str) -> dict[str, int]:
     """Section name -> byte size for one ELF object (empty sections are omitted)."""
-    from elftools.elf.elffile import ELFFile
-
-    with open(path, "rb") as fh:
-        elf = ELFFile(fh)
-        return {s.name: s.data_size for s in elf.iter_sections() if s.data_size}
+    return {s.name: s.size for s in LibElf.read(path).sections if s.size}
 
 
 def compare_sections(target: dict[str, int], ours: dict[str, int], all_sections: bool = False):

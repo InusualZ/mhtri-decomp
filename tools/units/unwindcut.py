@@ -1,66 +1,18 @@
 #!/usr/bin/env python3
-"""Re-cut one unit at a function boundary: print the exact `splits.txt` lines for both halves.
-
-    python tools/units/unwindcut.py <unit> <cut-addr>
-    python tools/units/unwindcut.py menu/menu_message 0x802AA764
-    python tools/units/unwindcut.py --selftest
-
-**The job this replaces.** A seam re-cut (`menu-seam-recut-4622`, `.pi/notes/menu-seam-recut-4622.md`)
-took a lane ~15 mechanical minutes: read the unit's claimed ranges out of `splits.txt`, objdump
-`extabindex`, find the record whose `fn_addr` is the cut, do the three section partitions by hand, and
-discover - only when `dtk dol split` refused - that un-claiming a `.text` range also obliges dropping the
-`.ctors` word pointing into it. All of that is arithmetic over two files, so it is one command.
-
-**What it reads.**
-
-* the unit's claimed ranges from `config/RMHE08/splits.txt` (the claimed half is the *prefix* of the full
-  range - the tool never writes the file);
-* the unwind records from the **retail image** (`orig/RMHE08/sys/main.dol`), as 12-byte
-  `{fn_addr, fn_size, etab_addr}` entries in `extabindex`, starting at the unit's claimed `extabindex`
-  start. The DOL is the source because that section is the *whole* original run: the split object
-  (`build/RMHE08/obj/<unit>.o`) only covers what `splits.txt` already claims, so it cannot name the
-  released tail a re-cut has to describe. When the split object is present its section sizes are used as
-  a cross-check on the claimed half (a mismatch is a warning, not a guess).
-
-**The three safety properties.**
-
-1. **A cut must be a function boundary.** The cut has to be some record's `fn_addr` *and*, when
-   `symbols.txt` carries `.text` function rows, a function has to start there with the previous function
-   ending exactly there. A cut in the middle of a function - or one that matches no record - is refused,
-   and the refusal names the function it would have cut through. An un-claiming that splits a function
-   corrupts the split; the refusal is the tool's whole point.
-2. **The record invariant must hold.** Verified for every record in the unit's full range:
-   `etab_addr == extab_start + 8*i` (1:1 with `extab` at 8 B each) and `fn_addr` strictly increasing
-   (function-address order). The lane proved this for all 103 `menu/menu_message` records; when it does
-   *not* hold the tool refuses and says which record broke it, rather than emitting a guess.
-3. **The halves must sum to the original.** `.text`, `extab` and `extabindex` bytes, the record count and
-   the `.text` function-row count are all checked: `kept + tail == original`, and the claimed prefix's
-   `extab`/`extabindex` ends must be exactly `start + 8*k` / `start + 12*k`. An asymmetry is reported.
-
-**The `.ctors`/`.dtors` rule (undocumented before this tool).** Un-claiming a `.text` range obliges
-dropping any `.ctors`/`.dtors` word **whose target function leaves with the cut**: dtk derives the
-`.ctors` claim from the unit that owns the constructor's target, so a surviving word would make it refuse
-`Mismatched splits for .ctors 4:0x8056F374 (menu/menu_message.cpp) and function 3:0x802ABC4C
-(auto_fn_802ABC4C_text)` (the real first attempt). The tool scans the `.ctors`/`.dtors` claims for words
-targeting the unit's range and names the ones to drop; dropping the line lets dtk re-derive it. The rule
-is recorded in `docs/pipeline.md` §9.4.1.
-
-**The full range.** A unit's claim may already be the *kept* half of an earlier cut: `splits.txt` then
-ends at `0x802AA764` while the released tail is the unclaimed gap up to the next claim
-(`stage/stg_w.cpp` at `0x802AD9C0`). The tool re-absorbs that immediately-following gap in `.text`,
-`extab` and `extabindex` - and only when all three agree on the same record count, which is what makes
-the re-cut reproducible rather than a guess. Nothing is written.
-
-**Read-only.** Like `dataclaim.py`, it prints and never edits `splits.txt`.
-"""
+"""Re-cut one unit at a function boundary: print the exact splits.txt lines for both halves, or refuse.
+Spec: docs/tools/spec/unwindcut.md. CLI: unwindcut.py <unit> <cut-addr> | --selftest."""
 from __future__ import annotations
 
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import json
 import os
 import re
 import struct
 import sys
+
+from tools.lib.binary.dol import Dol as LibDol, DolError
+from tools.lib.binary.elf import Elf as LibElf
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOOLS = os.path.dirname(HERE)
@@ -102,38 +54,21 @@ class Refusal(Exception):
 # inputs
 
 
-class Dol:
-    """Address -> bytes for the retail image, through its section table (same shape as tudiscover's)."""
+class Dol(LibDol):
+    """Address -> bytes for the retail image, through its section table (`lib.binary.dol`)."""
 
     def __init__(self, path: str):
-        self.path = path
         with open(path, "rb") as handle:
-            self.data = handle.read()
-        h = self.data
-        if len(h) < 0x100:
-            raise Refusal("%s is too short to be a DOL" % path)
-        toff = struct.unpack(">7I", h[0x00:0x1C])
-        doff = struct.unpack(">11I", h[0x1C:0x48])
-        taddr = struct.unpack(">7I", h[0x48:0x64])
-        daddr = struct.unpack(">11I", h[0x64:0x90])
-        tsize = struct.unpack(">7I", h[0x90:0xAC])
-        dsize = struct.unpack(">11I", h[0xAC:0xD8])
-        self.secs = [(a, s, o) for a, s, o in zip(taddr, tsize, toff) if s]
-        self.secs += [(a, s, o) for a, s, o in zip(daddr, dsize, doff) if s]
+            data = handle.read()
+        try:
+            super().__init__(data, path)
+        except DolError:
+            raise Refusal("%s is too short to be a DOL" % path) from None
+        self.secs = [(s.address, s.size, s.offset) for s in self.segments]
 
     def read(self, addr: int, n: int) -> bytes | None:
         """The n bytes at `addr`, or None when they do not lie wholly inside one section."""
-        if n < 0:
-            return None
-        for a, s, o in self.secs:
-            if a <= addr and addr + n <= a + s:
-                off = o + (addr - a)
-                return self.data[off:off + n]
-        return None
-
-    def word(self, addr: int) -> int | None:
-        raw = self.read(addr, 4)
-        return None if raw is None else struct.unpack(">I", raw)[0]
+        return self.bytes_at(addr, n)
 
 
 def read_splits(path: str) -> "dict[str, dict]":
@@ -501,13 +436,9 @@ def object_sizes(path: str) -> dict:
     if not path or not os.path.exists(path):
         return {}
     try:
-        if os.path.join(TOOLS, "elf") not in sys.path:
-            sys.path.insert(0, os.path.join(TOOLS, "elf"))
-        import elfsect  # noqa: E402
-        _data, headers = elfsect.sections(path)
+        return {s.name: s.size for s in LibElf.read(path).sections}
     except Exception:  # an unreadable object is a missing object, never a refusal
         return {}
-    return {h["name"]: h["size"] for h in headers}
 
 
 def object_cross_check(object_path: str, text_bytes: int, kept_records: int) -> dict:

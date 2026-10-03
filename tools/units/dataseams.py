@@ -1,28 +1,13 @@
 #!/usr/bin/env python3
-"""dataseams.py - the `.data` emission-order seams (tools/splits/dataorder.py) as a guard for data-claim tools.
-
-`dataorder.py` classifies every retail `.data` symbol and finds the TU seams (docs/data-order-seams.md): strings
-between two vtable groups (`V->S`) or two adjacent vtables whose owners go up (`zigzag`).  Those two are
-**strong**; `V->tail` (a vtable, strings, no later vtable: possibly an inline tail) and `V->D` are weak and are
-never used to cut, warn or refuse.
-
-A `V->S` row is a **gap** `[addr, latest)`, not a cut at its first string: a TU's inline-function strings follow
-its vtables, so the boundary lies somewhere in the gap, after the leading `tail` strings.  This layer therefore
-gives each row a `cut` (the address of the first symbol after the tail) and only *cuts* a gap that is narrow
-(`width <= NARROW`, where the position is known to a few symbols); a wide gap only *warns* that "a TU boundary
-lies in [addr, latest)".  A `zigzag` seam has no gap and cuts at its own address.
-
-This module is the thin consumer layer the claim tools share - `dataqueue.py` (cut a proposed run), `dataclaim.py`
-(warn on a run or a rule-12 claim), `flipcheck.py` and `datagap.py` (name an order-only mismatch).  It classifies
-nothing itself: every kind comes from `dataorder`.
-
-    python tools/units/dataseams.py [START END]     # the strong seams (optionally inside one range)
-    python tools/units/dataseams.py --selftest
-"""
+"""The .data emission-order seams (dataorder) as cut points, warnings and order-only notes for the claim tools.
+Spec: docs/tools/spec/dataseams.md. CLI: dataseams.py [START END] | --selftest."""
 from __future__ import annotations
 
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import os
 import sys
+
+from tools.lib.binary.elf import Elf as LibElf
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOOLS = os.path.dirname(HERE)
@@ -146,19 +131,18 @@ def section_chunks(path: str, section: str) -> list[bytes] | None:
     object or the section is missing or unreadable.
     """
     try:
-        from elftools.elf.elffile import ELFFile
-        with open(path, "rb") as fh:
-            elf = ELFFile(fh)
-            sec = elf.get_section_by_name(section)
-            symtab = elf.get_section_by_name(".symtab")
-            if sec is None or symtab is None:
-                return None
-            data = sec.data()
-            index = next(i for i, s in enumerate(elf.iter_sections()) if s.name == section)
-            by_off: dict[int, int] = {}
-            for sym in symtab.iter_symbols():
-                if sym["st_shndx"] == index and sym["st_size"]:
-                    by_off[sym["st_value"]] = max(by_off.get(sym["st_value"], 0), sym["st_size"])
+        elf = LibElf.read(path)
+        named = [s for s in elf.sections if s.name == section]
+        if not named or elf.section(".symtab") is None:
+            return None
+        # a repeated section name (dtk can write two `.data` pieces): the bytes of the last, the symbols of
+        # the first - exactly what the pyelftools reader this replaced returned (its name map keeps the last)
+        sec = named[-1]
+        data = b"\0" * sec.size if sec.is_nobits else sec.raw
+        by_off: dict[int, int] = {}
+        for sym in elf.symbols:
+            if sym.shndx == named[0].index and sym.size:
+                by_off[sym.value] = max(by_off.get(sym.value, 0), sym.size)
     except Exception:  # noqa: BLE001 - an unreadable object is "no evidence", never a crash
         return None
     return [data[off:off + size] for off, size in sorted(by_off.items())]

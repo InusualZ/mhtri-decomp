@@ -1,59 +1,11 @@
 #!/usr/bin/env python3
-"""Name the callees of a unit's range: every generated symbol its bodies reference, who owns it, the call
-shape, and whether a repo-wide rename is needed.
-
-    python tools/units/callees.py <unit> [--json] [--limit N] [--no-shape] [--no-scan]
-    python tools/units/callees.py --selftest      # this file + callees_selftest.py
-
-**Why this exists.** Conventions rule 7 (a batch may not *add* a reference to a generated symbol) is a gate
-before any body is written: the body's callees must be renamed first, map row and source together. A lane
-spent ~20 minutes hand-surveying 21 such symbols for one unit - which unit owns each, the call shape, and
-whether a cross-reference lived in another unit's source or header (one did, and only a repo-wide scan
-found it). That survey is mechanical, so it is mechanised here.
-
-**What it reads, and why from the *target* object.** The split target object
-(`build/<ver>/obj/<Lib>/<file>.o`) is retail's compiled unit: its `.text` relocations name, in the map's
-own spelling, every symbol the original bodies called. That is the authority for "what the body will
-reference", and it exists before a line of source is written - which is exactly when the gate applies. Our
-object is read too when it exists, and a reference that is in *ours* but not in the target is the rule-7
-defect the batch would otherwise be adding, so it is marked `ours` and called out.
-
-**What each column is evidence for.**
-
-* `owner` / `state` - `symbols.txt` (address + section) and `splits.txt` (ranges), through the *same*
-  `Ownership` index the lint uses (`tools/units/stylelint.py`), so this tool and the lint can never
-  disagree about who owns an address. `state=reconstructed` means the owner unit has source in `src/`
-  (rename its source too); `state=registered` means a split range but no source yet (the map row is the
-  only half); `state=unsplit` means no registered owner at all (a band header under `include/unsplit/`).
-* `shape` - the instructions at the reference site, read out of the target's own disassembly
-  (`dtk elf disasm`, the same build tool directory as objdiff-cli): which argument registers the caller
-  materialises (`r3..rN`) and whether it reads the return. This is a *heuristic inference* - the object
-  carries no prototype - but it is the evidence a name is derived from, and it is exact for the common
-  shapes. The tool says which way it is unsure instead of guessing: `0 (r3 live-in)` (the preceding call's
-  return flows into r3), `0?` (nothing materialised but a branch separates r3's def from the call), and
-  `?`/`N undecoded` when an instruction in the window is outside the decoder's subset.
-* `files` / `XF` - every in-repo `code` mention of the name. The scan is `symedit.find_refs`'s
-  classification (`src/` + `include/`, so the `path` bucket that protects `#include`s applies here too)
-  done in one pass instead of one pass per name. `XF` (cross-file) is set when the code references live in
-  **more than one file**: those need the repo-wide `symedit.py rename`, not a local edit.
-
-**Layout.** This lives in `tools/units/` beside `dossier.py` and `symbolpreflight.py` rather than in
-`tools/objdiff/`: `tools/objdiff/` is the objdiff-cli wrapper directory (`symdiff.py`, `slotmap.py`),
-while this tool never calls objdiff - it reads the object, the ownership map and the source tree, which is
-the `tools/units/` layer. It reuses `dossier.parse_elf` (the project's ELF reader) rather than growing a
-second one.
-
-**It is a reader.** No `src/` edits, no renames, no writes to any shared file.
-
-**When a unit has nothing to rename it says so plainly** - that is the good answer, and this tool exists to
-make it a one-command answer rather than a reassurance:
-
-    == Network/network_state: no generated references - every symbol its bodies reference has a real name
-"""
+"""Name a unit's generated callees from the target object's relocations: owner, state and call shape.
+Spec: docs/tools/spec/callees.md. CLI: callees.py <unit> [--json] [--limit N] [--no-shape] [--no-scan] | --selftest."""
 
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import json
 import os
@@ -63,6 +15,8 @@ import subprocess
 import sys
 import tempfile
 from tools.lib import names as libnames
+
+from tools.lib.binary import objdump as lib_objdump
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOOLS = os.path.dirname(HERE)
@@ -79,8 +33,6 @@ import symedit  # noqa: E402  (the bounded, classified in-repo reference scan)
 CODE_SECTIONS = (".text", ".init")
 CALL_TYPES = (10,)          # R_PPC_REL24 - the `bl` form (what a C call compiles to)
 # Which symbol the *target* object's relocation names; MWCC also emits 109 (EABI SDA21) for pool loads.
-DISASM_HEADER_RE = re.compile(r"^#\s+([.\w]+):0x([0-9A-Fa-f]+)\s+\|\s+0x([0-9A-Fa-f]+)\s+\|")
-DISASM_INSN_RE = re.compile(r"^/\*\s+([0-9A-Fa-f]{8})\s+([0-9A-Fa-f ]+?)\s*\*/\s*(.+?)\s*$")
 
 
 def is_generated(name):
@@ -164,7 +116,7 @@ FN_RE = re.compile(r"^\.fn\s+([^,\s]+)")
 
 
 def parse_disasm(text):
-    """-> (insns, base) from `dtk elf disasm` output.
+    """-> (insns, base) from `dtk elf disasm` output (lines read by `lib.binary.objdump.tokenize`).
 
     `insns` is a list of dicts (`offset`, `va`, `mnemonic`, `operands`, `func`, `raw`) in file order, and
     `base` is the object's `.text` base address (the first function header's `va - offset`), so a
@@ -173,27 +125,19 @@ def parse_disasm(text):
     """
     insns, base, func = [], None, None
     for line in text.splitlines():
-        m = FN_RE.match(line)
-        if m:
-            func = m.group(1)
+        tok = lib_objdump.tokenize(line)
+        if tok is None:
             continue
-        if line.startswith(".endfn"):
+        if tok.kind == "fn":
+            func = tok.name
+        elif tok.kind == "endfn":
             func = None
-            continue
-        m = DISASM_HEADER_RE.match(line)
-        if m and m.group(1) in CODE_SECTIONS:
-            if base is None:
-                base = int(m.group(3), 16) - int(m.group(2), 16)
-            continue
-        m = DISASM_INSN_RE.match(line)
-        if not m or base is None:
-            continue
-        asm = m.group(3)
-        parts = asm.split(None, 1)
-        mnemonic = parts[0].rstrip(".")
-        operands = parts[1].strip() if len(parts) > 1 else ""
-        insns.append(dict(offset=int(m.group(1), 16) - base, va=int(m.group(1), 16),
-                          mnemonic=mnemonic, operands=operands, func=func, raw=asm))
+        elif tok.kind == "header":
+            if tok.name in CODE_SECTIONS and base is None:
+                base = tok.address - tok.offset
+        elif tok.kind == "insn" and base is not None and line.startswith("/*"):
+            insns.append(dict(offset=tok.address - base, va=tok.address, mnemonic=tok.mnemonic.rstrip("."),
+                              operands=tok.operands, func=func, raw=tok.text))
     return insns, base
 
 
@@ -412,19 +356,10 @@ def disassemble(obj, tool=None):
     tool = tool or os.path.join(ROOT, "build", "tools", "dtk.exe")
     if not os.path.exists(tool):
         return None, "dtk not found at %s (call shape unavailable)" % os.path.relpath(tool, ROOT)
-    fd, tmp = tempfile.mkstemp(prefix="callees-", suffix=".s")
-    os.close(fd)
-    os.remove(tmp)
     try:
-        p = subprocess.run([tool, "elf", "disasm", obj, tmp], cwd=ROOT,
-                           capture_output=True, text=True, encoding="utf-8", errors="replace")
-        if p.returncode != 0 or not os.path.exists(tmp):
-            return None, "dtk elf disasm failed: " + ((p.stdout or "") + (p.stderr or "")).strip()[:200]
-        with open(tmp, "r", encoding="utf-8", errors="replace") as fh:
-            return fh.read(), None
-    finally:
-        if os.path.exists(tmp):
-            os.remove(tmp)
+        return lib_objdump.dtk_disasm(obj, tool, cwd=ROOT), None
+    except RuntimeError as exc:
+        return None, str(exc)
 
 
 def scan_refs(names, roots=("src", "include"), limit=40, root=None):

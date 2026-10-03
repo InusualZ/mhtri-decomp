@@ -1,60 +1,17 @@
 #!/usr/bin/env python3
-"""Infer the compiler flags a target object was built with, from the object's own bytes.
-
-    python tools/flags/infer.py <unit|object>          # one unit
-    python tools/flags/infer.py --all                  # every registered unit
-    python tools/flags/infer.py --accuracy             # + the known-case accuracy table
-    python tools/flags/infer.py <unit> --json          # machine-readable
-
-A *unit* is spelled as in `configure.py` (`Camellia/camellia.c`, `auto/80073398_fn_80073398.cpp`)
-or as a path to a split target object (`build/RMHE08/obj/...o`).  The object is the *target* object
-under `build/RMHE08/obj/` (the original split out of the DOL), never our `build/RMHE08/src/` build.
-
-Why this exists
----------------
-The matching playbook (`docs/matching.md`, rows 39-46) records eight levers that are derivable from
-the target bytes alone - `-opt nopeephole`, `-fp_contract off`, `-pool off`, `-str ...` (not
-`readonly`), `-use_lmw_stmw off`, `-func_align 4`, `-inline noauto`, the C++ front-end - and every one
-of them was rediscovered independently by a worker who had to notice the same byte pattern.  This tool
-applies those rules automatically and reports, per flag, the evidence and a confidence.  It is a
-*pre-flight*, not an oracle: it reads one side of the diff (the target), so a flag whose effect is
-source-dependent (the peephole pass, the optimizer level) can only be inferred one way, and the tool
-says so instead of guessing.
-
-Fingerprints implemented
-------------------------
-* record forms (`rlwinm.`/`clrlwi.`/`and.`/`add.`/`extsb.`/...) - only the peephole pass emits them,
-  so their presence proves `-opt peephole` on; their absence proves nothing.
-* fused multiply-adds (`fmadds`/`fmsubs`/...) vs an unfused `fmuls`+`fadds` chain - the contraction.
-* pooled literal addressing: a single `lis` base register reused across several data symbols (pool on)
-  vs one `lis`+`addi` pair per symbol (pool off).
-* the string pool's section (`.rodata` = `-str ...,readonly`, `.data` = not readonly).
-* the FPR/`GPR` save/restore shape: `stmw`/`lmw` (`-use_lmw_stmw on`) vs the EABI `_savegpr_*`/
-  `_restgpr_*` helpers (off).
-* function start alignment and inter-function `gap_*` padding: a start off a 16-byte boundary proves
-  `-func_align 4`; every start 16-byte aligned *with* `gap_*` padding is only consistent with 16
-  (`-O4,p` implies it, and a `#pragma function_align 16` restores it), because a `-func_align 4`
-  unit can land all-16-aligned too, so that direction is a hint.
-* a kept `bl` to a tiny function defined in the same object - consistent with `-inline noauto`, but a
-  hint only: `-inline auto` is a heuristic, a source `#pragma dont_inline` also keeps the call, and in
-  a multi-TU split object the callee may be a different original translation unit.
-* `extab`/`extabindex` presence, `.ctors`/`.dtors` fragments, and the `.comment` byte (reported as
-  evidence; the split objects' `.comment` is synthesized from `config.yml` and is uniform here).
-
-Instruction decoding is done on the raw big-endian words, not through `objdump`: GNU objdump in the
-pinned binutils mis-decodes the Gekko paired-single instructions (primary opcode 4) as VMX, which
-would hide the indexed `psq_lx`/`psq_stx` epilogue that row 39 is about.
-
-Nothing here compiles, links, re-splits or writes to the repository.
-"""
+"""Infer the compiler flags a target object was built with, from its own bytes, with evidence and confidence.
+Spec: docs/tools/spec/infer.md. CLI: infer.py <unit|object> [--json] | --all | --accuracy | --selftest."""
 from __future__ import annotations
 
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import json
 import os
 import re
 import struct
 import sys
+
+from tools.lib.binary.elf import Elf as LibElf, ElfError
 
 # --- ELF ---------------------------------------------------------------------------------------
 
@@ -70,39 +27,24 @@ DATA_SECTIONS = (".data", ".rodata", ".sdata", ".sdata2", ".bss", ".sbss")
 
 
 class Elf:
-    """A minimal big-endian ELF32 reader: sections, symbols and RELA relocations."""
+    """A big-endian ELF32 object as dicts: sections, symbols and RELA relocations (a view over `lib.binary.elf`)."""
 
     def __init__(self, path: str):
         self.path = path
-        self.data = open(path, "rb").read()
-        d = self.data
-        if d[:4] != b"\x7fELF":
-            raise ValueError("%s: not an ELF file" % path)
-        if d[4] != 1 or d[5] != 2:
+        try:
+            elf = LibElf.read(path)
+        except ElfError as exc:
+            raise ValueError("%s: %s" % (path, exc)) from None
+        if elf.ei_class != 1 or elf.ei_data != 2:
             raise ValueError("%s: expected 32-bit big-endian ELF" % path)
+        self._elf = elf
+        self.data = elf.raw
         self.is64 = False
-        e_shoff, = struct.unpack_from(">I", d, 0x20)
-        e_shentsize, = struct.unpack_from(">H", d, 0x2E)
-        e_shnum, = struct.unpack_from(">H", d, 0x30)
-        e_shstrndx, = struct.unpack_from(">H", d, 0x32)
-        self.sections = []
-        for i in range(e_shnum):
-            off = e_shoff + i * e_shentsize
-            name, typ, flags, addr, offset, size, link, info, align, entsize = struct.unpack_from(
-                ">IIIIIIIIII", d, off)
-            self.sections.append(dict(
-                name_off=name, typ=typ, flags=flags, addr=addr, offset=offset, size=size,
-                link=link, info=info, align=align, entsize=entsize))
-        shstr = self.sections[e_shstrndx]
-
-        def name_of(o: int) -> str:
-            end = d.index(b"\0", shstr["offset"] + o)
-            return d[shstr["offset"] + o:end].decode("latin1")
-
-        for h in self.sections:
-            h["name"] = name_of(h["name_off"])
-            h["bytes"] = d[h["offset"]:h["offset"] + h["size"]]
-        self.symbols = self._symbols()
+        self.sections = [dict(name_off=s.name_offset, typ=s.type, flags=s.flags, addr=s.addr, offset=s.offset,
+                              size=s.size, link=s.link, info=s.info, align=s.align, entsize=s.entsize, name=s.name,
+                              bytes=s.raw) for s in elf.sections]
+        self.symbols = [dict(name=s.name, val=s.value, size=s.size, info=s.info, bind=s.bind, type=s.type,
+                             shndx=s.shndx) for s in elf.symbols]
 
     def section(self, name: str):
         for h in self.sections:
@@ -117,48 +59,11 @@ class Elf:
                 out += h["bytes"]
         return out
 
-    def _symbols(self):
-        for h in self.sections:
-            if h["typ"] != 2:  # SHT_SYMTAB
-                continue
-            strtab = self.sections[h["link"]]
-
-            def name_of(o: int) -> str:
-                end = self.data.index(b"\0", strtab["offset"] + o)
-                return self.data[strtab["offset"] + o:end].decode("latin1")
-
-            out = []
-            for i in range(h["size"] // 16):
-                name, val, size, info, other, shndx = struct.unpack_from(
-                    ">IIIBBH", self.data, h["offset"] + i * 16)
-                out.append(dict(name=name_of(name), val=val, size=size, info=info,
-                                bind=info >> 4, type=info & 0xF, shndx=shndx))
-            return out
-        return []
-
     def relocations(self):
         """{section_name: [(offset, symbol_name, type, addend), ...]} for every SHT_RELA."""
         out = {}
-        for h in self.sections:
-            if h["typ"] != 4:  # SHT_RELA
-                continue
-            target = self.sections[h["info"]]["name"]
-            symtab = self.sections[h["link"]]
-            strtab = self.sections[symtab["link"]]
-
-            def sym_name(idx: int) -> str:
-                if idx == 0:
-                    return ""
-                off = symtab["offset"] + idx * 16
-                name_off, = struct.unpack_from(">I", self.data, off)
-                end = self.data.index(b"\0", strtab["offset"] + name_off)
-                return self.data[strtab["offset"] + name_off:end].decode("latin1")
-
-            ents = []
-            for i in range(h["size"] // 12):
-                off, info, add = struct.unpack_from(">IIi", self.data, h["offset"] + i * 12)
-                ents.append((off, sym_name(info >> 8), info & 0xFF, add))
-            out.setdefault(target, []).extend(ents)
+        for r in self._elf.relocs():
+            out.setdefault(r.section, []).append((r.offset, r.symbol_name, r.type, r.addend))
         return out
 
     def functions(self):

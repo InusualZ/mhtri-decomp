@@ -1,41 +1,16 @@
 #!/usr/bin/env python3
-"""Clamp a compiled object's section alignment to what its link address allows.
-
-MWCC emits every section with ``sh_addralign = 8``.  That is fine for a section
-whose claimed start is 8-aligned, but a unit whose claimed start is only
-4-mod-8 cannot be linked at that address: mwld rounds the section up to the next
-8-byte boundary and every later section shifts with it, which breaks the DOL
-hash while the object itself stays byte-identical.
-
-Retail really does have such units, and dtk's own ``dol split`` writes the value the
-address can honour into the target objects it synthesises: the target's
-``sh_addralign`` is ``lowbit(section start)``, bounded only by what MWCC emitted
-(never more than 8 for a data section).  ``Pl/fn_8023C2D0.os`` ``.data`` is the worked
-example: our object has size 0x84C alignment 8, the target has the same size with
-alignment 4, and setting that one field to 4 makes the flip link to the original DOL
-byte for byte.
-
-This tool applies the same rule to the object MWCC produced, chained after
-``dtk extab clean`` in the compile rule (``tools/project.py``).  It is a **strict
-lowering** - a section whose start is 8-aligned keeps alignment 8 - so it is a
-no-op for every unit that links today, and it cannot move the DOL on its own.
-
-Evidence and the reproduction recipe: ``docs/matching.md``, "An odd-start
-``.data`` claim cannot be linked with MWCC's alignment".
-
-Usage:
-    python tools/elf/objalign.py <object> [--splits config/RMHE08/splits.txt]
-                                           [--unit <splits key>] [-v] [--dry-run]
-    python tools/elf/objalign.py --selftest
-"""
+"""Post-compile ninja step: lower each section's sh_addralign to what its claimed start allows (lowbit).
+Spec: docs/tools/spec/objalign.md. CLI: objalign.py <object> [--splits PATH] [--unit KEY] [-v] [--dry-run] | --selftest."""
 
 from __future__ import annotations
 
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import os
 import re
 import struct
-import sys
+
+from tools.lib.binary.elf import Elf, ElfEditor, ElfError
 
 DEFAULT_SPLITS = os.path.join("config", "RMHE08", "splits.txt")
 
@@ -98,61 +73,29 @@ def unit_key(obj_path: str, units: dict[str, dict[str, int]]) -> str | None:
     return None
 
 
-def read_sections(data: bytes) -> tuple[list[dict], int, int]:
-    """Parse the ELF32 big-endian section headers into dicts."""
-    if data[:4] != b"\x7fELF":
-        raise SystemExit("objalign: not an ELF file")
-    if data[4] != 1 or data[5] != 2:
-        raise SystemExit("objalign: expected a 32-bit big-endian ELF")
-    shoff = struct.unpack_from(">I", data, 0x20)[0]
-    shentsize, shnum, shstrndx = struct.unpack_from(">HHH", data, 0x2E)
-    if shentsize < 40:
-        raise SystemExit("objalign: unexpected section header size")
-    shstr_off = struct.unpack_from(">I", data, shoff + shstrndx * shentsize + 0x10)[0]
-    sections = []
-    for index in range(shnum):
-        base = shoff + index * shentsize
-        name_off = struct.unpack_from(">I", data, base)[0]
-        end = data.index(b"\0", shstr_off + name_off)
-        sections.append(
-            {
-                "index": index,
-                "name": data[shstr_off + name_off : end].decode(),
-                "header_offset": base,
-            }
-        )
-    return sections, shoff, shentsize
-
-
-def align_offset(base: int) -> int:
-    """Byte offset of `sh_addralign` within a 40-byte ELF32 section header."""
-    return base + 32
-
-
 def align_object(path: str, starts: dict[str, int], verbose: bool, dry_run: bool) -> int:
     """Lower every placed section's alignment to what its start address allows."""
-    with open(path, "rb") as handle:
-        data = bytearray(handle.read())
-    sections, shentsize, _ = read_sections(data)
+    try:
+        elf = Elf.read(path).require_be32()
+    except ElfError as exc:
+        raise SystemExit(f"objalign: {exc}")
+    editor = ElfEditor(elf)
     changes = []
-    for section in sections:
-        name = section["name"].lstrip(".")
+    for section in elf.sections:
+        name = section.name.lstrip(".")
         if not name or name in SKIP_SECTIONS or name not in starts:
             continue
-        offset = align_offset(section["header_offset"])
-        current = struct.unpack_from(">I", data, offset)[0]
+        current = section.align
         wanted = allowed_align(starts[name])
         if verbose:
-            print(f"  {section['name']:10s} start=0x{starts[name]:08X} "
+            print(f"  {section.name:10s} start=0x{starts[name]:08X} "
                   f"align={current} allowed={wanted}")
         if current > wanted:
-            if not dry_run:
-                struct.pack_into(">I", data, offset, wanted)
-            changes.append((section["name"], current, wanted))
+            editor.set_section_align(section.index, wanted)
+            changes.append((section.name, current, wanted))
 
     if changes and not dry_run:
-        with open(path, "r+b") as handle:
-            handle.write(data)
+        editor.write(path)
     for name, before, after in changes:
         verb = "would be" if dry_run else "->"
         print(f"objalign: {path}: {name} align {before} {verb} {after}")

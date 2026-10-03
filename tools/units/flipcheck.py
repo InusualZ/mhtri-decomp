@@ -1,42 +1,8 @@
-"""Check whether a unit can be flipped to Object(Matching, ...): can our object fill the region?
-
-A flip replaces the original bytes with our compiled object, so the object has to provide every section the
-unit's `splits.txt` entry claims - same size, same alignment. Comparing against the *target object* is not
-enough: dtk's split object is itself incomplete (a unit can claim extab/extabindex/data ranges that no single
-object in the build emits), which is how a byte-identical object still scrambles main.dol.
-
-**What a refusal says, and what the three classes are.** The `   - ` lines are the reasons a flip would
-break the DOL, and they are *add-only*: lanes and the profiles parse them, so no wording here is ever
-rewritten. Three of them carry a class a lane has to tell apart:
-
-* `no compiled object (build/RMHE08/src/<unit>.o) - compile it first` means the object is absent. When the
-  object **is** there but emits none of the sections this check compares (a bodyless unit whose object is
-  `.comment` and nothing else - `NHTTP/NHTTP_os_RVL`), the line says exactly that and names what `splits.txt`
-  claims instead, because the old wording sent lanes into a rebuild loop (`ninja -n` answers "no work to
-  do").
-* A section byte difference prints the **first** differing byte on its own line (unchanged), then the
-  **differing-byte count**, then - when the two sections are the same size and every symbol's bytes match at
-  its *own* address - names the section a **permutation**: the object's layout is the source's definition
-  order, not the address order. That class (`Network/NetworkPat`: 577 of 720 `.text` bytes mislaid, every
-  per-symbol score at 100 %) is invisible to the first-byte line, which reads the same as a three-instruction
-  residual. The same defect got measured with a moved symbol carrying a word of its own too (`NetworkPat`'s
-  three `delete*` functions score 99.7 %, not 100 %), which no lane can act on either, so a fourth line names
-  the weaker case as `the section's layout is a permutation` when the sizes agree, every shared symbol has the
-  same size on both sides, at least one sits at a different address and the mislaid layout accounts for more
-  of the differing bytes than the symbols' own content does.
-* Referenced symbol(s) our object relocates that a flip would leave **undefined**: not defined by our object,
-  no row in `symbols.txt`, no link input other than the target object providing them, and the target object
-  not defining them either (`Network/NetworkWiiMediator`: four constructor names, `undefined: '<name>'` on a
-  flip). This is the general relocation half of a flip check, not just the `@etb_`/`@eti_` fragment class.
-
-Usage:
-    python tools/units/flipcheck.py                 # every registered unit
-    python tools/units/flipcheck.py <unit> [...]    # named units
-    python tools/units/flipcheck.py --selftest      # the link/byte/claim checks, against fixtures only
-Exit status is non-zero when any unit is not flip-ready.
-"""
+"""Can our object fill every section the unit's splits.txt claims? Sizes, bytes, permutation, undefined refs.
+Spec: docs/tools/spec/flipcheck.md. CLI: flipcheck.py [<unit> ...] | --selftest."""
 from __future__ import annotations
 
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import os
 import re
@@ -44,6 +10,8 @@ import struct
 import subprocess
 import sys
 import tempfile
+
+from tools.lib.binary.elf import Elf as LibElf, ElfError
 
 MAIN = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OBJDUMP = os.path.join(MAIN, "build", "binutils", "powerpc-eabi-objdump.exe")
@@ -374,36 +342,29 @@ EABI_LINKER_SYMBOLS = ("_SDA_BASE_", "_SDA2_BASE_")
 ENTRY_SYMBOLS = ("__start",)
 
 
+def _elf(path: str):
+    """The ELF32 big-endian object at `path` with a section table, or None (missing, unreadable, other)."""
+    if not os.path.exists(path):
+        return None
+    try:
+        elf = LibElf.read(path)
+    except (OSError, ElfError):
+        return None
+    if elf.ei_class != 1 or elf.ei_data != 2 or not elf.sections or elf.shstrndx >= elf.shnum:
+        return None
+    return elf
+
+
 def elf_sections(path: str) -> tuple[list[str], dict[str, bytes]]:
     """([section names in shndx order], {name: raw bytes}) read straight from the ELF.
 
     `raw_section` above goes through objcopy, whose `-O binary` drops non-allocatable sections - `.comment`
     is one of them - so the flag table has to be read from the file itself.
     """
-    if not os.path.exists(path):
+    elf = _elf(path)
+    if elf is None:
         return [], {}
-    data = open(path, "rb").read()
-    if data[:4] != b"\x7fELF" or data[4] != 1 or data[5] != 2:      # ELF32, big-endian
-        return [], {}
-    shoff, = struct.unpack_from(">I", data, 0x20)
-    shentsize, = struct.unpack_from(">H", data, 0x2E)
-    shnum, = struct.unpack_from(">H", data, 0x30)
-    shstrndx, = struct.unpack_from(">H", data, 0x32)
-    if not shoff or not shnum or shstrndx >= shnum:
-        return [], {}
-    raw = []
-    for i in range(shnum):
-        name, _typ, _flags, _addr, offset, size, _link, _info, _align, _entsize = struct.unpack_from(
-            ">IIIIIIIIII", data, shoff + i * shentsize)
-        raw.append((name, offset, size))
-    stroff = raw[shstrndx][1]
-
-    def name_at(o: int) -> str:
-        end = data.find(b"\0", stroff + o)
-        return data[stroff + o:end].decode("latin1")
-
-    order = [name_at(n) for n, _, _ in raw]
-    return order, {order[i]: data[raw[i][1]:raw[i][1] + raw[i][2]] for i in range(shnum)}
+    return [s.name for s in elf.sections], {s.name: s.raw for s in elf.sections}
 
 
 def comment_symbols(path: str) -> list[dict] | None:
@@ -412,25 +373,20 @@ def comment_symbols(path: str) -> list[dict] | None:
     One 8-byte entry per ELF symbol, starting at 0x2C: `[align:4][visibility:1][active_flags:1][pad:2]`
     (docs/comment_section.md). The table follows ELF symbol-table order, so callers pair entries by name.
     """
-    order, secs = elf_sections(path)
-    com = secs.get(".comment")
-    symtab = secs.get(".symtab")
-    strtab = secs.get(".strtab")
+    elf = _elf(path)
+    com = elf.section(".comment") if elf is not None else None
     if com is None:
         return None
-    if symtab is None or strtab is None or len(com) < COMMENT_HEADER:
+    if elf.section(".symtab") is None or elf.section(".strtab") is None or len(com.raw) < COMMENT_HEADER:
         return []
+    syms = elf.symbols
     out = []
-    for i in range((len(com) - COMMENT_HEADER) // 8):
-        entry = com[COMMENT_HEADER + 8 * i:COMMENT_HEADER + 8 * i + 8]
-        name = size = shndx = 0
-        if (i + 1) * 16 <= len(symtab):
-            name, _value, size, _info, _other, shndx = struct.unpack_from(">IIIBBH", symtab, i * 16)
-        end = strtab.find(b"\0", name) if name < len(strtab) else -1
-        out.append({"name": strtab[name:end].decode("latin1") if end != -1 else "",
-                    "size": size,
-                    "section": order[shndx] if shndx < len(order) else "",
-                    "active_flags": entry[5]})
+    for i in range((len(com.raw) - COMMENT_HEADER) // 8):
+        sym = syms[i] if i < len(syms) else None
+        out.append({"name": sym.name if sym else "",
+                    "size": sym.size if sym else 0,
+                    "section": elf.section_name(sym.shndx) if sym else "",
+                    "active_flags": com.raw[COMMENT_HEADER + 8 * i + 5]})
     return out
 
 
@@ -440,27 +396,14 @@ def object_symbols(path: str) -> tuple[set[str], dict[str, tuple[str, int]]]:
     One read of the ELF serves both the row-36 reference set and the link-symbol check; the link has thousands
     of inputs, so reading each twice is worth avoiding.
     """
-    order, secs = elf_sections(path)
-    symtab = secs.get(".symtab")
-    strtab = secs.get(".strtab")
-    if symtab is None or strtab is None:
+    elf = _elf(path)
+    if elf is None or elf.section(".symtab") is None or elf.section(".strtab") is None:
         return set(), {}
-    syms: list[tuple[str, int, int]] = []
-    for i in range(len(symtab) // 16):
-        name, _value, _size, info, _other, shndx = struct.unpack_from(">IIIBBH", symtab, i * 16)
-        end = strtab.find(b"\0", name) if name < len(strtab) else -1
-        syms.append((strtab[name:end].decode("latin1") if end != -1 else "", info, shndx))
-    defined = {name: (order[shndx] if shndx < len(order) else "", info)
-               for name, info, shndx in syms if name and shndx}
-    refs = set()
-    for sec, data in secs.items():
-        if not sec.startswith(".rela") or sec[5:].startswith(BOOKKEEPING_SECTIONS):
-            continue
-        for i in range(len(data) // 12):
-            _off, info, _add = struct.unpack_from(">IIi", data, i * 12)
-            index = info >> 8
-            if index < len(syms) and syms[index][0]:
-                refs.add(syms[index][0])
+    defined = {s.name: (elf.section_name(s.shndx), s.info) for s in elf.symbols if s.name and s.shndx}
+    # one relocation section per name (a repeated name: the last one, as the name-keyed reader always read)
+    last = {s.name: s.index for s in elf.sections if s.name.startswith(".rela")}
+    refs = {r.symbol_name for r in elf.relocs()
+            if r.symbol_name and last.get(r.rela) == r.rela_index and not r.rela[5:].startswith(BOOKKEEPING_SECTIONS)}
     return refs, defined
 
 

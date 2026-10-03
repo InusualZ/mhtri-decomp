@@ -427,10 +427,13 @@ class FixtureTree:
         self.splits[unit] = rows + [(section, start, end)]
 
     # build artefacts
-    def add_object(self, rel: str, data: bytes, side: str = "obj") -> Path:
-        """Place an object under `build/RMHE08/obj` (the target) or `build/RMHE08/src` (ours)."""
+    def add_object(self, rel: str, data: Any, side: str = "obj") -> Path:
+        """Place an object under `build/RMHE08/obj` (the target) or `build/RMHE08/src` (ours); `data` is the
+        object's bytes or a builder with `build()` (`lib.binary.build.ElfBuilder`)."""
         if side not in ("obj", "src"):
             raise ValueError("side is 'obj' (target) or 'src' (ours), not %r" % side)
+        if hasattr(data, "build"):
+            data = data.build()
         return self.write(self.build_dir / side / rel, data)
 
     def set_report(self, units: dict[str, dict]) -> Path:

@@ -1,41 +1,10 @@
 #!/usr/bin/env python3
-"""Extract everything a split object already knows about a unit - one page, before any source is written.
-
-docs/plan.md, "The binary is the ground truth, and compilation is lossy" (2026-09-23). This is a
-*matching* decompilation, so the binary is the only authority - and compilation is lossy, so what
-survives in the split object is *evidence about the source*: the original file name, the language, the
-source line of every assert, the order of the literals, the switch structure, the unit's extent. The
-method is to extract the maximum from the object first and fill only the blanks it cannot answer.
-
-Six workers independently rediscovered the same peephole lever, one spent a round working out that its
-unit's `__FILE__` string was `ef_cube.cpp`, another propagated "`Panic` is variadic" through 13 call
-sites by hand. Every one of those traces was already in the object. This tool is the one page that
-carries them, and `brief.py` embeds it so a worker's brief *is* the dossier plus the task.
-
-What it reports, and what each trace is evidence for (the plan's table, mechanised):
-
-| section | the trace | what it tells us |
-| --- | --- | --- |
-| source file & asserts | `__FILE__` strings in `.data`, read from the DOL | the original source name (`ef_line.cpp`), hence the module and language |
-| symbols | mangled names in the object's symbol table | the language (C++ vs C) and the signature |
-| panic line map | the `li r4, line` before each `Panic` call | the source line of each assert, in order |
-| literals | the `.sdata2`/`.data` pool, in section order | the order the literals appear in the source |
-| external references | relocations in `.text` | which named symbol each load/call refers to |
-| jump tables | dense 4-byte `.data`/`.rodata` relocations | the switch structure, including the case count |
-| section layout | the object's section headers | the exception/constructor structure and the unit's extent |
-| blanks | what is *not* there | a name with no dump entry, a signature with no callers, a type with no size evidence |
-
-The other oracle (`D:/WiiExperiment/DumpSymbols.zip`, `docs/memory-dump.md`) is consulted for names
-only - never for codegen. A name it does not have is reported in the blanks section, not guessed.
-
-    python tools/units/dossier.py <unit> [--json] [--out FILE] [--no-dump]
-    python tools/units/dossier.py --selftest
-
-Read-only: no `ninja`, no compile, no link, no write to any shared file.
-"""
+"""One page of what the split target object already knows about a unit, before any source is written.
+Spec: docs/tools/spec/dossier.md. CLI: dossier.py <unit> [--json] [--out FILE] [--no-dump] | --selftest."""
 
 from __future__ import annotations
 
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import json
 import os
@@ -43,6 +12,10 @@ import re
 import struct
 import sys
 import zipfile
+
+from tools.lib.binary.elf import Elf as LibElf, ElfError
+
+from tools.lib.binary.dol import Dol as LibDol
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -79,54 +52,29 @@ LBL_HEX_RE = re.compile(r"_([0-9A-Fa-f]{6,8})$")
 # ------------------------------------------------------------------------------------------------------------------
 
 def parse_elf(blob: bytes) -> tuple[list[dict], list[dict], list[dict]]:
-    """(sections, symbols, relocations) of an ELF32 big-endian object - enough for MWCC objects.
+    """(sections, symbols, relocations) of an ELF32 big-endian object, as dicts (a view over `lib.binary.elf`).
 
-    Relocations are SHT_RELA (type 4); `sh_info` is the section they apply to and `sh_link` the symbol
-    table. Symbol rows keep their binding/type and the section index they live in, because "is this
-    symbol defined here, and in which section" is what separates the unit's own symbols from its
-    external references.
+    Relocations are SHT_RELA (type 4); `target` is the section `sh_info` names. Symbol rows keep their
+    binding/type and the section index they live in, because "is this symbol defined here, and in which
+    section" is what separates the unit's own symbols from its external references.
     """
-    if blob[:4] != b"\x7fELF":
-        raise ValueError("not an ELF object")
-    (shoff,) = struct.unpack_from(">I", blob, 0x20)
-    shentsize, shnum, shstrndx = struct.unpack_from(">HHH", blob, 0x2E)
-    sections = []
-    for i in range(shnum):
-        o = shoff + i * shentsize
-        name, typ, flags, addr, off, size, link, info, align, entsize = struct.unpack_from(
-            ">IIIIIIIIII", blob, o)
-        sections.append(dict(name_off=name, typ=typ, flags=flags, addr=addr, off=off, size=size,
-                             link=link, info=info, align=align, entsize=entsize,
-                             data=blob[off:off + size]))
-    shstr = sections[shstrndx]["data"]
-    for s in sections:
-        end = shstr.find(b"\0", s["name_off"])
-        s["name"] = shstr[s["name_off"]:end].decode("latin-1")
-
-    symbols = []
-    symtab = next((s for s in sections if s["typ"] == 2), None)
-    if symtab is not None:
-        strtab = sections[symtab["link"]]["data"]
-        for o in range(0, symtab["size"], symtab["entsize"] or 16):
-            nm, val, size, info, _other, shndx = struct.unpack_from(">IIIBBH", symtab["data"], o)
-            end = strtab.find(b"\0", nm)
-            name = strtab[nm:end].decode("latin-1") if nm else ""
-            symbols.append(dict(name=name, value=val, size=size, info=info, bind=info >> 4,
-                                type=info & 0xF, shndx=shndx,
-                                section=sections[shndx]["name"] if 0 < shndx < len(sections) else None))
-
-    relocs = []
-    for s in sections:
-        if s["typ"] != 4:
-            continue
-        target = sections[s["info"]]["name"] if 0 <= s["info"] < len(sections) else None
-        for o in range(0, s["size"], s["entsize"] or 12):
-            roff, rinfo, radd = struct.unpack_from(">IIi", s["data"], o)
-            si, rt = rinfo >> 8, rinfo & 0xFF
-            relocs.append(dict(section=s["name"], target=target, offset=roff, type=rt,
-                               type_name=RELOC_TYPES.get(rt, "type-%d" % rt),
-                               symbol=symbols[si]["name"] if si < len(symbols) else None,
-                               addend=radd))
+    try:
+        elf = LibElf.read(blob)
+    except ElfError:
+        raise ValueError("not an ELF object") from None
+    nsec = len(elf.sections)
+    sections = [dict(name_off=s.name_offset, typ=s.type, flags=s.flags, addr=s.addr, off=s.offset, size=s.size,
+                     link=s.link, info=s.info, align=s.align, entsize=s.entsize, data=s.raw, name=s.name)
+                for s in elf.sections]
+    symbols = [dict(name=s.name, value=s.value, size=s.size, info=s.info, bind=s.bind, type=s.type, shndx=s.shndx,
+                    section=elf.sections[s.shndx].name if 0 < s.shndx < nsec else None)
+               for s in elf.symbols]
+    targets = {s.name: (elf.sections[s.info].name if 0 <= s.info < nsec else None)
+               for s, _t in elf.rela_sections()}
+    relocs = [dict(section=r.rela, target=targets[r.rela], offset=r.offset, type=r.type,
+                   type_name=RELOC_TYPES.get(r.type, "type-%d" % r.type),
+                   symbol=r.symbol_name if r.symbol < len(symbols) else None, addend=r.addend)
+              for r in elf.relocs()]
     return sections, symbols, relocs
 
 
@@ -240,18 +188,10 @@ def pool_entries(section: dict, symbols: list[dict], relocs: list[dict]) -> list
 
 
 def dol_sections(blob: bytes) -> list[tuple[int, int, int]]:
-    """`(address, size, file_offset)` for every DOL section with file bytes."""
+    """`(address, size, file_offset)` for every DOL section with file bytes. (`lib.binary.dol`)."""
     if len(blob) < 0x100:
         return []
-    text_off = struct.unpack_from(">7I", blob, 0x00)
-    data_off = struct.unpack_from(">11I", blob, 0x1C)
-    text_addr = struct.unpack_from(">7I", blob, 0x48)
-    data_addr = struct.unpack_from(">11I", blob, 0x64)
-    text_size = struct.unpack_from(">7I", blob, 0x90)
-    data_size = struct.unpack_from(">11I", blob, 0xAC)
-    out = [(text_addr[i], text_size[i], text_off[i]) for i in range(7) if text_size[i]]
-    out += [(data_addr[i], data_size[i], data_off[i]) for i in range(11) if data_size[i]]
-    return out
+    return [(s.address, s.size, s.offset) for s in LibDol.read(blob).segments]
 
 
 def dol_bytes(blob: bytes, sections: list[tuple[int, int, int]], address: int, length: int):

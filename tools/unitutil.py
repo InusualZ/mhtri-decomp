@@ -32,6 +32,7 @@ from dataclasses import dataclass
 
 from tools.lib import proc as _proc
 from tools.lib import repo as _repo
+from tools.lib.binary.elf import Elf
 
 # a process launch Windows refuses transiently (WinError 5) is retried, for every tool that imports this module
 _proc.install_spawn_retry()
@@ -404,31 +405,15 @@ def quiet(out):
 # --- minimal ELF32 big-endian reader (enough for MWCC objects) --------------------------------
 
 def read_elf(path):
-    """(sections, symbols) of an ELF32 big-endian object; symbols are (name, value, size, type)."""
-    data = open(path, "rb").read()
-    assert data[:4] == b"\x7fELF", "%s is not an ELF file" % path
-    (shoff,) = struct.unpack_from(">I", data, 0x20)
-    (shentsize, shnum, shstrndx) = struct.unpack_from(">HHH", data, 0x2E)
-    secs = []
-    for i in range(shnum):
-        o = shoff + i * shentsize
-        name, typ, flags, addr, off, size, link, info, align, entsize = struct.unpack_from(
-            ">IIIIIIIIII", data, o)
-        secs.append(dict(name=name, typ=typ, off=off, size=size, link=link, entsize=entsize,
-                         data=data[off:off + size]))
-    shstr = secs[shstrndx]["data"]
-    for s in secs:
-        e = shstr.find(b"\0", s["name"])
-        s["sname"] = shstr[s["name"]:e].decode()
-    symtab = next(s for s in secs if s["typ"] == 2)
-    strtab = secs[symtab["link"]]["data"]
-    syms = []
-    for o in range(0, symtab["size"], symtab["entsize"] or 16):
-        nm, val, size, info, other, shndx = struct.unpack_from(">IIIBBH", symtab["data"], o)
-        if nm == 0 or shndx == 0:
-            continue
-        e = strtab.find(b"\0", nm)
-        syms.append((strtab[nm:e].decode(), val, size, info & 0xF, shndx))
+    """(sections, symbols) of an ELF32 big-endian object; symbols are (name, value, size, type, shndx).
+
+    A view over `lib.binary.elf.Elf`: section dicts keep `name` (the string offset), `sname`, `typ`, `off`,
+    `size`, `link`, `entsize`, `data`; symbols skip the unnamed and the undefined rows."""
+    elf = Elf.read(path)
+    secs = [dict(name=s.name_offset, typ=s.type, off=s.offset, size=s.size, link=s.link, entsize=s.entsize,
+                 data=s.raw, sname=s.name) for s in elf.sections]
+    syms = [(s.name, s.value, s.size, s.type, s.shndx) for s in elf.symbols
+            if s.name and s.shndx]
     return secs, syms
 
 

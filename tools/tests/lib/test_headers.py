@@ -16,7 +16,12 @@ SPEC_RE = re.compile(r"Spec:\s*(docs/tools/spec/[\w.-]+\.md)")
 
 
 def expected_spec(rel: str) -> str:
-    stem = rel.rsplit("/", 1)[-1][:-3]
+    """`docs/tools/spec/<stem>.md`; `lib-<stem>.md` for a lib module, `lib-<package>.md` for a module of a lib
+    package (`tools/lib/binary/elf.py` -> `lib-binary.md`: one spec per package, design.md section 3)."""
+    parts = rel.split("/")
+    if rel.startswith("tools/lib/") and len(parts) > 3:
+        return "docs/tools/spec/lib-%s.md" % parts[2]
+    stem = parts[-1][:-3]
     return "docs/tools/spec/%s%s.md" % ("lib-" if rel.startswith("tools/lib/") else "", stem)
 
 
@@ -64,6 +69,11 @@ def test_rule_on_fixtures(c):
             ["names docs/tools/spec/flipcheck.md, expected docs/tools/spec/datagap.md"])
     c.check("a lib module names lib-<name>.md",
             header_problems("tools/lib/testing.py", '"""H. Spec: docs/tools/spec/lib-testing.md. CLI: none."""\n'), [])
+    c.check("a lib package's module names the package's spec",
+            header_problems("tools/lib/binary/elf.py", '"""H. Spec: docs/tools/spec/lib-binary.md. CLI: none."""\n'), [])
+    c.check("... not its own stem",
+            header_problems("tools/lib/binary/elf.py", '"""H. Spec: docs/tools/spec/lib-elf.md. CLI: none."""\n'),
+            ["names docs/tools/spec/lib-elf.md, expected docs/tools/spec/lib-binary.md"])
     c.check("a spec that does not exist is refused",
             header_problems("tools/units/flipcheck.py", good, spec_exists=lambda p: False),
             ["docs/tools/spec/flipcheck.md does not exist"])
