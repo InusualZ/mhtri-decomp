@@ -10,10 +10,12 @@
  * WHY IT SITS HERE. phase 1 grade medium: the `.ctors` closure is empty and a `.data` vtable-then-string seam ends exactly at 0x803FCC34, where
  *   `__ct__12PatInterfaceFv` starts; the right edge is the registered `Network/network_state.cpp`.
  *
- * UNKNOWN. every body; `include/Network/` has no `PatInterface` header yet.
+ * UNKNOWN. every body; the C-linkage surface the callers use is declared in `include/Network/PatInterface.h`.
  *
  * FLAGS. the `Network` lib's `cflags_network` (unmeasured).
  *
  * The unit's `.data`/`.sdata`/`.sbss` claims are the candidate's (config/RMHE08/splits.txt); the symbols they hold are
  * in the map (`ledger.py unit Network/PatInterface.cpp`), and the pass that writes the bodies defines them.
  */
+
+#include "Network/PatInterface.h"

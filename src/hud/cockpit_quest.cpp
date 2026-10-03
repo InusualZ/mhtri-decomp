@@ -326,7 +326,6 @@
 #include "Pl/fn_8027D684.h"
 #include "Pl/fn_80273B14.h"
 #include "ai/ainpc.h"
-#include "unsplit/NetworkStream.h"
 #include "unsplit/menu.h"
 #include "hud/cockpit.h"
 #include "sound/fn_800D7F54.h"

@@ -150,49 +150,12 @@ extern "C" {
 s32  sendReqShut(NetworkInstance* self, s32 mode);
 s32  resetNetworkState3(NetworkInstance* self);
 
-/* ---- the session band's request writers (no registered owner yet: rule 2's unsplit gap) -------- */
-
-u32  flushBuffer(NetworkStateMachine* self, u32 opcode, u32 flags);
-void encryptBuffer(NetworkStateMachine* self);
-u32  writeUInt8(NetworkStateMachine* self, u8 value);
-void writeUInt16(NetworkStateMachine* self, u16 value);
-void writeUInt32(NetworkStateMachine* self, u32 value);
-void writeUInt32Shared(NetworkStateMachine* self, u32 value);
-void writeUInt8Array(NetworkStateMachine* self, const u8* data, u16 count);
-void writeUInt8Array2(NetworkStateMachine* self, u8 count, const u8* data);
-void writeBool(NetworkStateMachine* self, s8 value);
-void putItemAny(NetworkStateMachine* self, const u8* values, u32 count, const u8* tags);
-void putItemTaggedLongs(NetworkStateMachine* self, const u32* values, u8 count, const u8* tags);
-void putItemTaggedBytes(NetworkStateMachine* self, const u8* values, u8 count, const u8* tags);
-void putUserSlotObjects(NetworkStateMachine* self, const u8* row, u8 count, const u8* tags);
-
-/* ---- the state predicates and getters the dispatchers gate on (no registered owner) ------------ */
-
-s32 isSubState_8254_3(NetworkStateMachine* self);   /* +0x8254 == 3 */
-s32 isSubState_894F_2(NetworkStateMachine* self);   /* +0x894F == 2 */
-s32 isSubState_894F_3(NetworkStateMachine* self);   /* +0x894F == 3 */
-s32 isSubState_894F_4or6(NetworkStateMachine* self);/* +0x894F == 4 || == 6 */
-s32 isSubState_894F_5(NetworkStateMachine* self);   /* +0x894F == 5 */
-s32 isSubState_894F_6(NetworkStateMachine* self);   /* +0x894F == 6 */
-u32 getSomething3(NetworkStateMachine* self);       /* +0x655C */
-u32 getSomething6(NetworkStateMachine* self);       /* +0x6560 */
-u32 getSomething9(NetworkStateMachine* self);       /* +0x6564 */
-u32 getFmpSlotIndex(NetworkStateMachine* self, u32 value);
-s32 isOpeningMaintenanceServer(void);
-s32 isOpeningMaintenanceTerms(void);
-u32 getNASToken(NetworkInstance* instance);
-void sendReqAuthenticationToken(NetworkInstance* self, u32 token);
-
-/* ---- the session hand-off layer and the mediator band ----------------------------------------- */
-
-u8*  createStack(NetworkStateMachine* self, u32 size, u32* outSize);
-void growStackSize(NetworkStateMachine* self, u32 size);
-void chooseServerAddress(NetworkStateMachine* self, u32 a, u32 b);
-void dispatchSessionHandlers(NetworkStateMachine* self, u32 code, s32 a, s32 b, u32 count, const u8* data);
-void setConnectionPaths(NetworkInstance* connection, const char* userId, const char* password);
-void setMediatorState68A(NetworkInstance* mediator, s32 state);
-void getMediatorState68A(NetworkInstance* mediator, u8* out);
-void updatePatInterface(NetworkStateMachine* self, u32 a, u32 b, u32 c);
+/* The callees this unit drives are declared in their owners' headers, which `network_state.cpp`
+ * includes (rule 2): the request writers in `Network/NetworkCommunityPat.h`, the item writers, the
+ * hand-off dispatch and the request emitters in `Network/network_layer_io.h`, the state predicates, the
+ * maintenance queries and the call-stack helpers in `Network/PatInterface.h`, the NAS token and the
+ * connection paths in `Network/network_opening.h`, and the mediator state accessors in
+ * `Network/NetworkWiiMediator.h`. */
 
 /* `getInstance` (0x800E89D8) is owned by `src/sound/fn_800E46E8.cpp`; its header declares it. */
 #include "sound/fn_800E46E8.h"

@@ -446,16 +446,8 @@ public:
     SOAddrInfo* addrInfo_1560;         /* +0x1560 - the SDK's result list, freed when consumed */
 };   /* size: 0x1564 */
 
-/* ---------------- symbols no registered unit owns ---------------------------------------------- */
-
-extern "C" {
-
-/* The unsplit socket reader: a symbol no registered unit owns, declared in the header the band's
-   consumers already include. */
-/* untyped: opaque handle passed through - the socket object belongs to another band */
-s32 getBytesAvailableToRead(void* handle);
-
-}
+/* The socket reader `getBytesAvailableToRead` is owned by `Network/NetworkCommunityPat.cpp` and declared
+   in `Network/NetworkCommunityPat.h` (rule 2). */
 
 /* `__dl__FPv`'s real spelling - every deleting destructor calls it.  It is a C++ operator, so it is declared
    outside the `extern "C"` block. */

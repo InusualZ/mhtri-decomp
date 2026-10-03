@@ -19,7 +19,6 @@
 #include "Network/network_transport.h"
 #include "Network/network_shared_data.h"
 #include "Network/network_writer_types.h"
-#include "Network/sGameSpyInterfaceThread.h"   /* sGameSpyInterfaceThread - owner Network/fn_8041A87C.cpp */
 #include "Runtime.PPCEABI.H/ptmf.h"
 
 /* The 0x60-byte record block `NetworkRequest_copyRecord` moves.  Only its size (24 words) is
@@ -286,21 +285,11 @@ typedef struct PatCircleInfo {
 } PatCircleInfo;   /* size: 0x37C */
 
 /* The Pat band's helpers: the members the manager pumps (`NetworkSingleTcp::move`, `NetworkMultipleUdp::move`)
- * are declared with their classes in `Network/network_transport_types.h`.  The rest have
- * no registered owner, and this header - not `include/unsplit/Network.h` - is where this band's
- * unowned helpers already live (`networkPatAttachBuffer`, `networkPatResetCircleInfo`, `PatInterface_*`),
- * so they are declared beside the records they take.  The first of the three was the map's
- * `fn_803DE524` until the Pat pass renamed it from what its body
- * does (**GUESS**, recorded where it is declared); the other two are the map's own names. */
-/* the manager itself is declared below - the band's helpers take it, so name it first, and
- * `NetworkInstance` is the session singleton's class (`include/unsplit/Network.h` defines it; a
- * forward declaration is enough here because only a pointer crosses the call) */
+ * are declared with their classes in `Network/network_transport_types.h`.  The free helpers that take
+ * the records above are owned by registered units and declared in their owners' headers (rule 2):
+ * `buildCircleInfoName`, `circleAvailable` and the `networkPat*` buffer helpers in
+ * `Network/NetworkSessionManagerPat.h`, `sendReqCircleInfoSet` in `Network/network_layer_io.h`. */
 class NetworkSessionManagerPat;
-class NetworkInstance;
-extern "C" void buildCircleInfoName(NetworkSessionManagerPat* self, char* dst, NetworkNameList* src);
-extern "C" s32 circleAvailable(NetworkSessionManagerPat* self);
-extern "C" void sendReqCircleInfoSet(NetworkInstance* instance, u32 request_id, PatCircleInfo* info,
-                                      const char* name);
 
 /* -------------------------------- NetworkSessionManagerPat ---------------------------------- */
 
@@ -432,57 +421,9 @@ public:
     u8 field_6E75;                             /* +0x6E75 */
 };   /* size: 0x6E76 */
 
-/* the Pat interface singletons the Pat methods build on demand (another band) */
-class PatInterface {
-public:
-    virtual void destroy(u32 flags);   /* +0x08 - the key function, defined in the Pat band */
-    PatInterface();
-    static PatInterface* getInstance();
-};
-/* The error record `GameSpyInterfaceThread::getErrorStruct` fills and `NetworkInstance::postError`
- * (declared in `include/unsplit/Network.h`, which only forward-declares this type) takes back.  It is
- * declared here beside that handshake, from the Pat band's `move`: it reads +0x04 as the error
- * **code** (it forwards the record only when it is 0x4B) and copies the three words
- * +0x00/+0x04/+0x08 into its own copy, so only those three are named; the tail is untouched anywhere
- * and is padding.  size: 0x10 (approximate - only +0x00..+0x0B is evidenced). */
-struct NetworkErrorInfo {
-    /* +0x00 */ u32 value_00;
-    /* +0x04 */ u32 code_04;
-    /* +0x08 */ u32 extra_08;
-    /* +0x0C */ u32 pad_0C;
-};
-
-class GameSpyInterfaceThread {
-public:
-    virtual void destroy(u32 flags);   /* +0x08 - the key function, defined in the Pat band */
-    GameSpyInterfaceThread();
-    /* the live worker thread (`.sbss` 0x80794CE4); defined in `Network/NetworkSessionManager.cpp` */
-    static GameSpyInterfaceThread* getInstance();
-    void canClose();
-    s32 initialize();
-    void armCancel();
-    bool requestClose();
-    /* The error handshake `move` runs (all three are plain members - the target calls them by their
-     * own mangling, not through the table): the result the thread finished with (negative = error),
-     * the error record it filled in, and the acknowledgement that clears it. */
-    s32 getResult();
-    void getErrorStruct(NetworkErrorInfo* info);
-    void clearError();
-};
-
-/* the Pat accessors keep their plain (unmangled) map names.
-
-   The singleton accessor at 0x803768F0 and `memset` are deliberately **not** declared here: both are
-   owned by another registered unit (`getInstance_` sits inside `enemy/em020_ai.cpp`'s range,
-   `memset` is `Runtime.PPCEABI.H/memset.c`), and rule 2 puts the declaration in the owner's header -
-   which the consumer includes (`enemy/em020_ai.h`, `Runtime.PPCEABI.H/memset.h`). */
-extern "C" void PatInterface_clear(void);
-extern "C" int PatInterface_isReady(void);
-/* untyped: opaque handle passed through - the context's layout belongs to the Pat band */
-extern "C" void networkLog_destroyContext(NetworkSessionManagerLogger* log, void* context);
-extern "C" void networkPatResetCircleInfo(NetworkSessionManagerPat* self, s32 index);
-extern "C" void networkPatAttachBuffer(NetworkBuffer* buffer);
-extern "C" void networkPatReleaseBuffer(NetworkSessionManagerPat* self);
+/* The Pat session units' views of the mediator records (`PatInterface`, `GameSpyInterfaceThread`,
+ * `NetworkErrorInfo`) and the no-argument `PatInterface_*` spellings live in
+ * `Network/session_mediator_views.h`, included only by the units that use them. */
 
 /* ---------------- externs ----------------------------------------------------------------- */
 
@@ -516,27 +457,12 @@ extern NetworkRequestDesc networkRequestDesc428;
 void networkStreamWriter_dtor(NetworkStreamWriter* self, s32 flags);
 void networkStreamWriter_constructDefault(NetworkStreamWriterDefault* self);
 void networkStreamWriterDefault_dtor(NetworkStreamWriterDefault* self, s32 flags);
-u32 writeByte(NetworkStreamWriter* self, u32 value);
-u32 writeUInt(NetworkStreamWriter* self, u32 value);
-u16 writeSize(NetworkStreamWriter* self, u16 size);
-s32 writeBytes(NetworkStreamWriter* self, const void* data, u32 len);
 
-/* the writer's remaining entry points the tail of the range drives (the second writer class) */
+/* the writer's remaining entry points the tail of the range drives (the second writer class); the
+   writer methods `Network/NetworkCommunityPat.cpp` owns (`writeByte`..`writeBytes`,
+   `networkStreamWriter_putBytes`..`_size`) are declared in `Network/NetworkCommunityPat.h` */
 void networkStreamWriter_attach(NetworkConnectionStable* connection, NetworkStreamWriterDefault* stream);
 void networkStreamWriter_reserve(NetworkConnectionStable* connection, const u8* bytes, u32 length, s8 kind);
-void networkStreamWriter_putBytes(NetworkStreamWriterDefault* self, const void* data, u32 size);
-void networkStreamWriter_flush(NetworkStreamWriterDefault* self);
-void networkStreamWriter_setMode(NetworkStreamWriterDefault* self, u32 mode);
-void networkStreamWriter_putU16(NetworkStreamWriterDefault* self, u16 value);
-void networkStreamWriter_putU16b(NetworkStreamWriterDefault* self, u16 value);
-void networkStreamWriter_putU32(NetworkStreamWriterDefault* self, u32 value);
-void networkStreamWriter_putU32b(NetworkStreamWriterDefault* self, u32 value);
-void networkStreamWriter_enable1(NetworkStreamWriterDefault* self, u32 value);
-void networkStreamWriter_enable2(NetworkStreamWriterDefault* self, u32 value);
-void networkStreamWriter_enable3(NetworkStreamWriterDefault* self, u32 value);
-void networkStreamWriter_commit(NetworkStreamWriterDefault* self);
-void networkStreamWriter_bytes(NetworkStreamWriterDefault* self);
-u32 networkStreamWriter_size(const void* sub);
 
 /* The manager logger accessor `getNetworkLogger` is *not* declared here: no registered unit owns it,
    so rule 2 puts it in the band header `include/unsplit/Network.h` (which types it as the class
@@ -551,14 +477,9 @@ u32 networkStreamWriter_size(const void* sub);
 extern u32 NetworkRequest_idCounter;
 
 /* neighbouring helpers.  Each `untyped:` marker below is the honest case for that declaration: a
-   callback adapter whose arguments are forwarded unchanged, or a record whose layout this range
-   never reads. */
-/* untyped: caller-owned payload - the six arguments are forwarded unchanged */
-void networkSessionReflect0(void* a0, void* a1, s8 a2, void* a3, void* a4, void* a5);
-/* untyped: caller-owned payload - the six arguments are forwarded unchanged */
-void networkSessionReflect1(void* a0, void* a1, void* a2, void* a3, void* a4, void* a5);
-/* untyped: opaque handle passed through - only the writer band owns the layout */
-void networkSmallObject_construct(void* self);
+   record whose layout this range never reads.  The reflection adapters `networkSessionReflect0`/`1`
+   are declared in `Network/NetworkSessionManagerPat.h` and `networkSmallObject_construct` in
+   `Network/NetworkCommunityPat.h` (their owners' headers). */
 
 /* untyped: opaque handle passed through - only the writer band owns the layout */
 void fn_803CA338(void* self);

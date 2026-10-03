@@ -105,6 +105,8 @@
 #include "ai/fn_802D44F4.h"
 #include "unsplit/Network.h"
 #include "Network/NetworkSessionManagerPat.h"
+#include "Network/PatInterface.h"       /* getGameTime / the Pat setters - owner Network/PatInterface.cpp */
+#include "Network/network_layer_io.h"   /* isMaintenanceMode - owner Network/network_layer_io.cpp */
 #include "unsplit/lobby.h"
 #include "lobby/lb_entry_flags_clear.h"          /* lb_entry_flags_clear, owner lobby/lb_companion_ui.cpp (rule 2) */
 #include "lobby/lb_quest_board_reset.h"          /* lb_quest_board_reset, owner lobby/lb_quest_board.cpp (rule 2) */
@@ -1161,8 +1163,8 @@ void updateNetworkPatControl(void)
 
                             work->status_0x6248 = 0;
                             work->status_0x174 = 0;
-                            setPatField854(getInstance_(), row->id_0x00);
-                            setPatField860(getInstance_(), user->name_0x03);
+                            setPatField854((PatInterface*)getInstance_(), row->id_0x00);
+                            setPatField860((PatInterface*)getInstance_(), user->name_0x03);
                             setPatByteD400(getInstance_(), (u8)(work->group_0xC494 * 15 + 5));
                             setPatByte6138On(getInstance_());
                             work->name_0x7368[0] = 0;

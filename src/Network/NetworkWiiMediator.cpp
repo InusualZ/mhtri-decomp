@@ -132,51 +132,24 @@
  */
 #include "types.h"
 #include "Network/NetworkWiiMediator.h"
+#include "Network/PatInterface.h"            /* the singleton's Pat accessors */
+#include "Network/NetworkReflectService.h"   /* the reflect service's entry points */
+#include "Network/network_layer_io.h"        /* getReflectService / getNetworkWiiMediator / getLanguage / getReflectEventId */
+#include "Network/GameSpyInterfaceThread.h"  /* the worker thread `initializeNetworkMediator` spawns */
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
 #include "unsplit/Runtime.PPCEABI.H.h"
 
-/* The reflect sub-service the mediator starts, stops and agrees through.  This band only dispatches
- * into its `+0x08` slot (retail's `lwz r12, 0(r3)` / `lwz r12, 8(r12)`), so the class is declared with
- * the real virtual and never defined here - MWCC emits the table only for a class this TU defines,
- * and this one's vtable lives in the unit that owns the service.  Its constructor is the unit-level
- * builder at 0x8041A1C4 (out of line, so `new NetworkReflectService` lowers to that call and keeps
- * the allocation alive across it - the `mr r31,r3` of `reflectInit`); the 0x816C body is the size
- * `reflectInit` allocates. */
-class NetworkReflectService {
-public:
-    NetworkReflectService();
-    /* +0x00 */ virtual void finalize(s32 flags);
-    /* +0x04 */ u8 pad_004[0x8168];
-    /* only the vtable word and the one slot this band dispatches through are evidenced */
-};   /* size: 0x816C (the allocation `reflectInit` makes) */
+/* The reflect sub-service the mediator starts, stops and agrees through is `NetworkReflectService`
+ * (`Network/NetworkReflectService.h`): this band dispatches into its `+0x08` slot and allocates it with
+ * `new` - its out-of-line constructor keeps the allocation alive across the call (the `mr r31,r3` of
+ * `reflectInit`). */
 
-/* The network singleton's Pat accessor the two buffer loaders forward to.  Its five buffer setters are
- * the mangled member symbols this band calls (`setTermsBuffer__12PatInterfaceFPScUl`); the class is
- * only used here, never constructed, so no vtable and no table bytes enter our object. */
-class PatInterface {
-public:
-    PatInterface();
-    /* +0x00 */ virtual void finalize(s32 flags);
-    /* +0x04 */ u8 pad_004[0xD63C];
-    void setTermsBuffer(s8* buffer, u32 size);
-    void setMaintenanceBuffer(s8* buffer, u32 size);
-    void setAnnounceBuffer(s8* buffer, u32 size);
-    void setNoChargeBuffer(s8* buffer, u32 size);
-    void setPatchMessageBuffer(s8* buffer, u32 size);
-    /* only the vtable word is evidenced: the band reaches the record through `getInstance_` */
-};   /* size: 0xD640 (the allocation `initializeNetworkMediator` makes) */
+/* The network singleton the two buffer loaders forward to is `PatInterface` (`Network/PatInterface.h`):
+ * this band allocates it and calls its five buffer setters by their mangled member names. */
 
-/* The GameSpy worker thread `initializeNetworkMediator` spawns.  Its full layout and the rest of its
- * methods live in `include/Network/fn_8041A87C.h`, which this band does not include (that header also
- * declares `updatePatInterface` with a different first parameter, and playbook 60: a declaration set
- * is a codegen input), so only the entry point this band calls is named here. */
-class GameSpyInterfaceThread {
-public:
-    GameSpyInterfaceThread();
-    static GameSpyInterfaceThread* getInstance();
-    /* +0x0000 */ u8 pad_000[0x44A0];
-};   /* size: 0x44A0 (the allocation `initializeNetworkMediator` makes) */
+/* The GameSpy worker thread `initializeNetworkMediator` spawns is `GameSpyInterfaceThread`
+ * (`Network/GameSpyInterfaceThread.h`, the class alone - the GameSpy band's full header is not needed). */
 
 /* `operator new` is what the band's allocation lowers to (`__nw__FUl`). */
 void* operator new(unsigned long size);   /* untyped: allocation returns a raw byte range */
@@ -200,7 +173,6 @@ u32   getMediatorField24(NetworkWiiMediatorFields* self);
 u8    getMediatorFlag6B(NetworkWiiMediatorFields* self);
 u8    getMediatorFlag60D1(NetworkWiiMediatorFields* self);
 void  setMediatorTimestamp(NetworkWiiMediatorFields* self, u64 value);
-void  getMediatorState68A(NetworkWiiMediatorFields* self, u8* out);
 u64   getMediatorTimestamp(NetworkWiiMediatorFields* self);
 s32   getAccountQuery1(NetworkWiiMediatorFields* self);
 s32   getAccountQuery2(NetworkWiiMediatorFields* self);
@@ -215,7 +187,6 @@ void  getReflectField38(NetworkWiiMediatorFields* self, u32* out);
 s32  getReflectModeFromLanguage();
 u64  updateServerTime(NetworkWiiMediatorFields* self);
 u64  setServerTimeResult(NetworkWiiMediatorFields* self);
-void setMediatorState68A(NetworkWiiMediatorFields* self, u8 value);
 s32  queryOpeningFlag208(NetworkWiiMediatorFields* self);
 s32  queryOpeningFlag250(NetworkWiiMediatorFields* self);
 s32  queryOpeningFlag290(NetworkWiiMediatorFields* self);
@@ -234,56 +205,12 @@ s32  parseReflectPacket(NetworkWiiMediatorFields* self, char* out, const char* i
 s32  validateReflectName(NetworkWiiMediatorFields* self, const char* name);
 s32  buildReflectPacket(NetworkWiiMediatorFields* self, const char* text, s32* skipCount, s32* flags);
 
-/* the network singleton and the reflect service the band forwards to (0x803D5xxx / 0x8041Axxx bands,
- * owned by no registered unit) */
+/* the network singleton the band forwards to (owned by `enemy/em020_ai.cpp`; this band holds it as the
+ * `PatInterface` it is, where the owner's header spells it `NetworkInstance`) */
 PatInterface*  getInstance_(void);
-NetworkReflectService* getReflectService(void);
-NetworkWiiMediatorFields* getNetworkWiiMediator(void);
 
-/* the singleton's Pat accessor surface, reached through `getInstance_` */
-void  setTermVersion(PatInterface* self, u32 value);
-s32   getTermsVersion(PatInterface* self);
-u32   getWarningUInt2(PatInterface* self);
-s32   isOpeningMaintenanceTerms(PatInterface* self);
-s32   isOpeningMaintenanceServer(PatInterface* self);
-s32   isOpeningAnnounce(PatInterface* self);
-void  updatePatInterface(PatInterface* self, u32 a, u32 b, u32 c);
-void  PatInterface_clear(PatInterface* self);
-s32   PatInterface_isReady(PatInterface* self);
-void  setPatBuffer(PatInterface* self, u32 index, char* buffer, u32 size);
-void  setPatRange(PatInterface* self, u32 index, u32 address, u32 size);
-u32   getPatServerTime(PatInterface* self);
-s32   isSubState_8254_3(PatInterface* self);
-s32   isSubState_894F_4or6(PatInterface* self);
-s32   isSubState_894F_6(PatInterface* self);
-s32   isSubState_894F_5(PatInterface* self);
-s32   isSubState_894F_2(PatInterface* self);
-s32   isSubState_894F_3(PatInterface* self);
-char* getPatAccountName(PatInterface* self);
-void  setPatReflectPageRange(PatInterface* self, u32 address, u32 size);
-void  setPatReflectField30(PatInterface* self, u32 value);
-void  setPatReflectField34(PatInterface* self, u32 value);
-void  setPatReflectField38(PatInterface* self, u32 value);
-void  setPatReflectName3C(PatInterface* self, char* name);
-void  setPatReflectName5C(PatInterface* self, char* name);
-void  setPatField854(PatInterface* self, u32 value);
-void  setPatField860(PatInterface* self, u32 value);
-
-/* the reflect service's own entry points */
-void initReflectService(NetworkReflectService* service, NetworkWiiMediatorReflectFn callback,
-                        void* arg);   /* untyped: the callback's user payload, caller-owned */
-void finalizeReflectService(NetworkReflectService* service);
-void setReflectServicePage(NetworkReflectService* service, u32 page);
-
-/* the singleton's remaining query the band forwards */
-char* getMediaVersion(PatInterface* self);
-char* getStr1(PatInterface* self);
-u32   getServerTime(PatInterface* self);
-s32   getLanguage(void);
-s32   getReflectEventId(void);
-void  reflectServiceStart(NetworkReflectService* service);
-void  reflectServiceStop(NetworkReflectService* service);
-void  reflectServiceAgree(NetworkReflectService* service);
+/* The singleton's Pat surface is declared in `Network/PatInterface.h`, the reflect service's in
+ * `Network/NetworkReflectService.h` and the layer queries in `Network/network_layer_io.h`. */
 
 } /* extern "C" */
 
@@ -932,7 +859,7 @@ void updatePatField860(NetworkWiiMediatorFields* self, u32 value)
 {
     (void)self;
     if (getInstance_() != NULL) {
-        setPatField860(getInstance_(), value);
+        setPatField860(getInstance_(), (const char*)value);
     }
 }
 s32 isShiftJisLeadByte(NetworkWiiMediatorFields* self, u8 value)
