@@ -8,6 +8,15 @@
     python tools/selftest.py --list          # the inventory, without running anything
     python tools/selftest.py --no-dedupe     # run both halves of every wrapper pair
     python tools/selftest.py --selftest      # this runner's own checks (it is discovered like any other)
+    python tools/selftest.py --tier fixture  # only the fixture tier of tools/tests/ (plus every legacy entry)
+
+**The third shape: `tools/tests/**/test_*.py` (WP0, docs/tools/design.md section 7).** A `lib.testing` module
+declares `TIER = "fixture"` (the default) or `TIER = "smoke"`; it is run as `python <file>` with the tier in
+`TOOLS_TEST_TIER`, and a fixture-tier module runs with its cwd in a fresh temp dir. Its key is the tool it tests
+(`tools/tests/units/test_land.py` -> `tools/units/land`; `tests/smoke/` keeps its own path, `tests/top/` maps to
+`tools/<name>`), so a re-homed test replaces the tool's old entry (dedupe; `--no-dedupe` runs both) and a park on
+the old target still matches. `--tier fixture|smoke` filters these entries only; the older entries (tier
+`legacy`) and the synthetic `--check` entries (tier `check`) run in every tier until they are re-homed.
 
 **The incident this closes.** `tools/units/measure_selftest.py` was red for weeks while 31 lanes filed
 "`recompile.py` is broken": the tool's own test said so and nothing ran it. A selftest nobody runs is
@@ -139,6 +148,12 @@ def _source_lookup(table: dict, src: str):
     return out
 
 
+#: where the `lib.testing` modules live, relative to the root, and the tiers they declare
+TESTS_REL = "tools/tests"
+TEST_TIERS = ("fixture", "smoke")
+TIER_ENV = "TOOLS_TEST_TIER"
+
+
 class Entry:
     """One tested tool. `key` is stable across whichever half of a wrapper pair is run."""
 
@@ -152,6 +167,18 @@ class Entry:
         self.target = tool or standalone
         self.kind = "tool" if tool else "standalone"
         self.check_argv: list[str] | None = None   # set for a synthetic `--check` entry (F37)
+        self.tier = "legacy"                # `fixture`/`smoke` for a tools/tests module, `check` for F37
+        self.test: str | None = None        # relative path of the tools/tests module, for a `test` entry
+        self.data_files: list[str] = []     # files beside a test module that it names (its allow-lists)
+        self.replaced: "Entry | None" = None  # the legacy entry a test module deduped away
+
+    @classmethod
+    def for_test(cls, key: str, test: str, tier: str, data_files: list[str] | None = None) -> "Entry":
+        """A `tools/tests/**/test_*.py` module, run as `python <file>` in its declared tier."""
+        e = cls(key, None, None)
+        e.kind, e.target, e.test, e.tier = "test", test, test, tier
+        e.data_files = list(data_files or [])
+        return e
 
     def as_check(self, argv: list[str]) -> "Entry":
         """Turn this entry into a `--check` run of a tool outside `tools/` (F37).
@@ -162,6 +189,7 @@ class Entry:
         silent skip.
         """
         self.kind = "check"
+        self.tier = "check"
         self.check_argv = list(argv)
         if len(argv) > 1:
             self.target = argv[1]
@@ -180,7 +208,8 @@ class Entry:
         return [sys.executable, self.target]
 
     def both_paths(self) -> list[str]:
-        return [p for p in (self.tool, self.standalone) if p]
+        own = [p for p in (self.tool, self.standalone, self.test) if p]
+        return own + (self.replaced.both_paths() if self.replaced else [])
 
 
 def _rel(path: str, root: str = ROOT) -> str:
@@ -220,13 +249,117 @@ def _standalone_delegates_to_tool(st_text: str, key: str) -> bool:
     return bool(re.search(r"\b%s\.selftest\s*\(" % re.escape(base), st_text))
 
 
+def test_key(rel: str) -> str:
+    """`tools/tests/units/test_land.py` -> `tools/units/land`: the tool a test module tests.
+
+    `tests/smoke/` holds checks of the live tree rather than of one tool, so it keeps its own path; `tests/top/`
+    is the area of the top-level `tools/*.py` (`tests/top/test_selftest.py` -> `tools/selftest`).
+    """
+    rel = rel.replace("\\", "/")
+    sub = rel[len(TESTS_REL) + 1:] if rel.startswith(TESTS_REL + "/") else rel
+    parts = sub.split("/")
+    name = parts[-1][:-3]
+    if name.startswith("test_"):
+        name = name[len("test_"):]
+    area = parts[:-1]
+    if area[:1] == ["smoke"]:
+        return "/".join([TESTS_REL, *area, name])
+    if area[:1] == ["top"]:
+        area = area[1:]
+    return "/".join(["tools", *area, name])
+
+
+def read_tier(text: str) -> str:
+    """The module-level `TIER = "..."` of a test module (`fixture` when it declares none)."""
+    import ast
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return "fixture"
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name) \
+                and node.targets[0].id == "TIER" and isinstance(node.value, ast.Constant) \
+                and isinstance(node.value.value, str):
+            return node.value.value
+    return "fixture"
+
+
+def discover_tests(root: str = ROOT) -> list[Entry]:
+    """Every `tools/tests/**/test_*.py`, with its tier and the sibling data files it names."""
+    out: list[Entry] = []
+    base = os.path.join(root, *TESTS_REL.split("/"))
+    for dirpath, dirnames, filenames in os.walk(base):
+        dirnames[:] = sorted(d for d in dirnames if d != "__pycache__")
+        for fn in sorted(filenames):
+            if not (fn.startswith("test_") and fn.endswith(".py")):
+                continue
+            full = os.path.join(dirpath, fn)
+            text = _read(full)
+            data = [_rel(os.path.join(dirpath, f), root) for f in sorted(filenames)
+                    if not f.endswith(".py") and f in text]
+            out.append(Entry.for_test(test_key(_rel(full, root)), _rel(full, root), read_tier(text), data))
+    return out
+
+
 def discover(root: str = ROOT) -> tuple[list[Entry], list[str]]:
-    """Every tested tool, deduped, plus the notes describing each collapsed pair."""
+    """Every tested tool, deduped, plus the notes describing each collapsed pair.
+
+    The older shapes (a tool's `--selftest`, a `*_selftest.py`) and the `tools/tests/**` modules are both
+    discovered; a test module whose key a legacy entry also has replaces it (`Entry.replaced` keeps the old
+    entry for `--no-dedupe` and the park list).
+    """
+    entries, notes = discover_legacy(root)
+    tests = discover_tests(root)
+    by_key = {e.key: e for e in entries}
+    for t in tests:
+        old = by_key.get(t.key)
+        if old is not None:
+            t.replaced = old
+            t.dedupe_note = "%s replaces %s (the re-homed test; --no-dedupe runs both)" % (t.test, old.target)
+            notes.append(t.dedupe_note)
+            entries = [e for e in entries if e is not old]
+        entries.append(t)
+    entries.sort(key=lambda e: e.name)
+    return entries, notes
+
+
+def expand_no_dedupe(entries: list[Entry]) -> list[Entry]:
+    """`--no-dedupe`: every tool entry plus its standalone sibling, and every legacy entry a test replaced."""
+    expanded: list[Entry] = []
+    seen: set[str] = set()
+    for e in entries:
+        if e.key not in seen:
+            expanded.append(e)
+            seen.add(e.key)
+        if e.standalone and e.kind == "tool" and e.standalone not in seen:
+            expanded.append(Entry(e.standalone[:-3].replace("\\", "/"), None, e.standalone,
+                                  "explicit --no-dedupe half of " + e.key))
+            seen.add(e.standalone)
+        if e.replaced is not None:
+            old = e.replaced
+            twin = Entry(old.key + " (legacy)", old.tool, old.standalone, "explicit --no-dedupe legacy half of " + e.key)
+            if twin.key not in seen:
+                expanded.append(twin)
+                seen.add(twin.key)
+    return sorted(expanded, key=lambda e: e.name)
+
+
+def filter_tier(entries: list[Entry], tier: str) -> list[Entry]:
+    """`--tier`: keep the test modules of that tier; legacy and `--check` entries run in every tier."""
+    if tier == "all":
+        return list(entries)
+    return [e for e in entries if e.kind != "test" or e.tier == tier]
+
+
+def discover_legacy(root: str = ROOT) -> tuple[list[Entry], list[str]]:
+    """The older shapes only: a tool's `--selftest` and a `*_selftest.py`, deduped by delegation."""
     notes: list[str] = []
     tools: dict[str, str] = {}       # key -> tool path
     standalones: dict[str, str] = {}  # key -> selftest path
+    tests_dir = os.path.normcase(os.path.join(root, *TESTS_REL.split("/")))
     for dirpath, dirnames, filenames in os.walk(os.path.join(root, "tools")):
-        dirnames[:] = [d for d in dirnames if d != "__pycache__"]
+        dirnames[:] = [d for d in dirnames if d != "__pycache__"
+                       and os.path.normcase(os.path.join(dirpath, d)) != tests_dir]
         for fn in filenames:
             if not fn.endswith(".py"):
                 continue
@@ -298,12 +431,25 @@ def run_one(entry: Entry, timeout: float, root: str = ROOT) -> dict:
     # every child Python loads `selftest_site/sitecustomize.py`: a launch refused with WinError 5 is retried
     env = dict(os.environ)
     env["PYTHONPATH"] = os.pathsep.join(p for p in (SITE_DIR, env.get("PYTHONPATH")) if p)
+    env.pop(TIER_ENV, None)
+    scratch = None
+    if entry.kind == "test":
+        # the tier rides into the module and every process it starts; a fixture-tier module gets a cwd
+        # that is not a tree, so a cwd-relative read of the live repository has nothing to find
+        env[TIER_ENV] = entry.tier
+        if entry.tier == "fixture":
+            import tempfile
+            scratch = tempfile.mkdtemp(prefix="selftest-fixture-")
+            kwargs["cwd"] = scratch
     kwargs["env"] = env
     if os.name != "nt":
         kwargs["start_new_session"] = True
     else:
         kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
-    proc = subprocess.Popen(entry.argv, **kwargs)
+    argv = entry.argv
+    if entry.kind == "test":
+        argv = [sys.executable, os.path.join(root, entry.target)]
+    proc = subprocess.Popen(argv, **kwargs)
     timed_out = False
     try:
         out, _ = proc.communicate(timeout=timeout)
@@ -316,10 +462,14 @@ def run_one(entry: Entry, timeout: float, root: str = ROOT) -> dict:
         except subprocess.TimeoutExpired:
             out = ""
         rc = -1
+    if scratch is not None:
+        import shutil
+        shutil.rmtree(scratch, ignore_errors=True)
     return {
         "name": entry.name,
         "target": entry.target,
         "kind": entry.kind,
+        "tier": entry.tier,
         "argv": " ".join(entry.argv[1:]),
         "returncode": rc,
         "status": "timeout" if timed_out else ("pass" if rc == 0 else "fail"),
@@ -461,6 +611,29 @@ def mapped_checks(changed: list[str], ref: str = "HEAD") -> list[tuple[str, list
     return out
 
 
+def dotted_name(rel: str) -> str:
+    """`tools/lib/testing.py` -> `tools.lib.testing`; a package's `__init__.py` is the package."""
+    mod = rel.replace("\\", "/")[:-3].replace("/", ".")
+    return mod[: -len(".__init__")] if mod.endswith(".__init__") else mod
+
+
+def dotted_imports(text: str) -> set[str]:
+    """Every dotted module a source imports: `import a.b` -> a.b; `from a.b import c` -> a.b and a.b.c."""
+    import ast
+    out: set[str] = set()
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return out
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            out.update(a.name for a in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
+            out.add(node.module)
+            out.update("%s.%s" % (node.module, a.name) for a in node.names)
+    return out
+
+
 def changed_entries(entries: list[Entry], ref: str | None, root: str) -> tuple[list[Entry], list[str]]:
     """The selftests of the tools a diff touches, plus the checks a non-`tools/` source owns (F37); also
     the paths no selftest claims."""
@@ -481,23 +654,37 @@ def changed_entries(entries: list[Entry], ref: str | None, root: str) -> tuple[l
     changed = sorted(set(changed))
     changed_set = set(changed)
     changed_mods = {os.path.basename(c)[:-3] for c in changed if c.endswith(".py")}
+    changed_dotted = {dotted_name(c) for c in changed if c.startswith("tools/") and c.endswith(".py")}
 
     picked: list[Entry] = []
     claimed: set[str] = set()
     for entry in entries:
         files = entry.both_paths() or [entry.target]
+        if entry.kind == "test":
+            # a test module also owns the allow-lists it names and the tool its key names
+            files = files + entry.data_files
+            if os.path.isfile(os.path.join(root, entry.key + ".py")):
+                files.append(entry.key + ".py")
+        # a changed module this entry names by its package path is covered by it (claimed, not "unclaimed")
+        dotted = set()
+        if changed_dotted:
+            for f in files:
+                if f.endswith(".py"):
+                    dotted |= dotted_imports(_read(os.path.join(root, f)))
+        via_dotted = {c for c in changed if c.endswith(".py") and dotted_name(c) in dotted}
         # 1. the diff touches the tool's or the standalone's own file
         if changed_set & set(files):
             picked.append(entry)
-            claimed |= set(files)
+            claimed |= set(files) | via_dotted
             continue
         # 2. the diff touches a module one of the entry's files imports
         if changed_mods:
             text = "".join(_read(os.path.join(root, f)) for f in files)
             imports = set(re.findall(r"(?:^|\n)\s*(?:import|from)\s+([A-Za-z_][\w]*)", text))
-            if imports & changed_mods:
+            # 2b. ... or names it by its package path (`from tools.lib import testing`)
+            if imports & changed_mods or via_dotted:
                 picked.append(entry)
-                claimed |= set(files)
+                claimed |= set(files) | via_dotted
 
     # 3. a diff outside `tools/` whose generated copies this runner would otherwise never check (F37):
     #    `docs/plan.md` selects the tool whose selftest validates the generated block against it, and a
@@ -517,6 +704,17 @@ def changed_entries(entries: list[Entry], ref: str | None, root: str) -> tuple[l
     picked.sort(key=lambda e: e.name)
     unclaimed = [c for c in changed if c not in claimed and c.endswith(".py")]
     return picked, unclaimed
+
+
+def tier_counts(results: list[dict]) -> dict[str, dict[str, int]]:
+    """Entries and checks per tier, in a fixed order (fixture, smoke, legacy, check)."""
+    out: dict[str, dict[str, int]] = {}
+    order = ("fixture", "smoke", "legacy", "check")
+    for r in sorted(results, key=lambda r: (order.index(r.get("tier")) if r.get("tier") in order else 9)):
+        row = out.setdefault(r.get("tier") or "legacy", {"entries": 0, "checks": 0})
+        row["entries"] += 1
+        row["checks"] += r.get("checks") or 0
+    return out
 
 
 def format_table(results: list[dict]) -> str:
@@ -661,6 +859,79 @@ def selftest() -> int:
     finally:
         subprocess.run = real_run
 
+    # --- WP0: tools/tests/** beside the legacy shapes - the key, the tier, the dedupe, the selection ------
+    check("a tool's test maps to the tool", test_key("tools/tests/units/test_land.py"), "tools/units/land")
+    check("a lib test maps to the lib module", test_key("tools/tests/lib/test_testing.py"), "tools/lib/testing")
+    check("a smoke check keeps its own path", test_key("tools/tests/smoke/test_cli_compat.py"),
+          "tools/tests/smoke/cli_compat")
+    check("tests/top/ is the area of the top-level tools", test_key("tools/tests/top/test_selftest.py"), "tools/selftest")
+    check("no TIER is the fixture tier", read_tier("import os\n"), "fixture")
+    check("a module-level TIER is read", read_tier('"""doc"""\nTIER = "smoke"\n'), "smoke")
+    check("a TIER inside a function is not the module's", read_tier("def f():\n    TIER = 'smoke'\n"), "fixture")
+
+    def write_under(tmp, rel, text=""):
+        p = os.path.join(tmp, rel)
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "w", encoding="utf-8") as fh:
+            fh.write(text)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        write_under(tmp, "tools/units/alpha.py", 'ap.add_argument("--selftest")\n')
+        write_under(tmp, "tools/units/beta.py", 'ap.add_argument("--selftest")\n')
+        write_under(tmp, "tools/lib/testing.py", "")
+        write_under(tmp, "tools/tests/units/test_alpha.py",
+                    "from tools.lib import testing\nTIER = 'fixture'\nALLOW = 'allow.json'\n")
+        write_under(tmp, "tools/tests/units/allow.json", "{}")
+        write_under(tmp, "tools/tests/units/other.json", "{}")
+        write_under(tmp, "tools/tests/units/helper.py", "")
+        write_under(tmp, "tools/tests/smoke/test_live.py", "TIER = 'smoke'\n")
+        entries, notes = discover(tmp)
+        by = {e.name: e for e in entries}
+        check("both shapes are discovered and a re-homed test replaces the legacy entry of its key",
+              sorted((e.name, e.kind, e.tier) for e in entries),
+              [("tools/tests/smoke/live", "test", "smoke"), ("tools/units/alpha", "test", "fixture"),
+               ("tools/units/beta", "tool", "legacy")])
+        alpha = by["tools/units/alpha"]
+        check("... keeping the replaced entry and saying so", (alpha.replaced.target, len(notes)),
+              ("tools/units/alpha.py", 1))
+        check("a park on the old target still matches the re-homed test",
+              _park_matches({"target": "tools/units/alpha.py"}, alpha), True)
+        check("a test owns the sibling data files it names", alpha.data_files, ["tools/tests/units/allow.json"])
+        check("--no-dedupe runs the legacy half too", sorted(e.name for e in expand_no_dedupe(entries)),
+              ["tools/tests/smoke/live", "tools/units/alpha", "tools/units/alpha (legacy)", "tools/units/beta"])
+        check("--tier fixture: the fixture tests plus every legacy entry",
+              sorted(e.name for e in filter_tier(entries, "fixture")), ["tools/units/alpha", "tools/units/beta"])
+        check("--tier smoke: the smoke tests plus every legacy entry",
+              sorted(e.name for e in filter_tier(entries, "smoke")), ["tools/tests/smoke/live", "tools/units/beta"])
+        check("--tier all keeps everything", len(filter_tier(entries, "all")), 3)
+        check("the dotted name of a module and of a package", (dotted_name("tools/lib/testing.py"),
+                                                               dotted_name("tools/lib/__init__.py")),
+              ("tools.lib.testing", "tools.lib"))
+        try:
+            for source, want in (("tools/lib/testing.py", ["tools/units/alpha"]),
+                                 ("tools/tests/units/allow.json", ["tools/units/alpha"]),
+                                 ("tools/tests/units/other.json", []),
+                                 ("tools/units/alpha.py", ["tools/units/alpha"])):
+                subprocess.run = fake_git(source)
+                picked, unclaimed = changed_entries(entries, "HEAD", tmp)
+                check("--changed %s selects %s" % (source, want), [e.name for e in picked], want)
+                if source.endswith(".py"):
+                    check("... and counts it as covered", unclaimed, [])
+        finally:
+            subprocess.run = real_run
+
+    # a test module runs with its tier in the environment; a fixture-tier one with a cwd that is not the root
+    with tempfile.TemporaryDirectory() as tmp:
+        write_under(tmp, "probe.py", "import os\nprint(os.environ.get(%r), os.path.realpath(os.getcwd()))\n"
+                    "print('ok - 1 checks')\n" % TIER_ENV)
+        for tier in ("fixture", "smoke"):
+            r = run_one(Entry.for_test("fixture/probe", "probe.py", tier), 60, tmp)
+            env_tier, cwd = r["output"].splitlines()[0].split(" ", 1)
+            check("a %s-tier module gets TOOLS_TEST_TIER=%s" % (tier, tier), (r["status"], env_tier), ("pass", tier))
+            check("... and %s" % ("a temp cwd, not the root" if tier == "fixture" else "the root as cwd"),
+                  os.path.normcase(cwd) == os.path.normcase(os.path.realpath(tmp)), tier == "smoke")
+            check("... and the tier is recorded on the result", r["tier"], tier)
+
     # --- the isolated re-run (2026-09-30): a fixture tool that fails once then passes is a FLAKE (row passes,
     # warning + log line); one that always fails stays red and its last lines are kept. Two tiny scripts
     # run for real (a subprocess each), in a temp dir, with the flake log pointed there too.
@@ -726,6 +997,9 @@ def main(argv: list[str] | None = None) -> int:
                     help="parallel workers (default min(8, cpus))")
     ap.add_argument("--root", default=ROOT, help="repository root (default: this file's parent)")
     ap.add_argument("--park-file", default=PARK_FILE, help="known-failures list")
+    ap.add_argument("--tier", choices=("fixture", "smoke", "all"), default="all",
+                    help="run only that tier of the tools/tests/ modules (legacy and --check entries run in "
+                         "every tier; default all)")
     a = ap.parse_args(argv)
 
     if a.selftest:
@@ -735,27 +1009,19 @@ def main(argv: list[str] | None = None) -> int:
     entries, notes = discover(root)
     if a.no_dedupe:
         # re-expand: keep every tool entry and add the standalone sibling back on its own key
-        expanded: list[Entry] = []
-        seen: set[str] = set()
-        for e in entries:
-            if e.key not in seen:
-                expanded.append(e)
-                seen.add(e.key)
-            if e.standalone and e.kind == "tool" and e.standalone not in seen:
-                expanded.append(Entry(e.standalone[:-3].replace("\\", "/"), None, e.standalone,
-                                      "explicit --no-dedupe half of " + e.key))
-                seen.add(e.standalone)
-        entries = sorted(expanded, key=lambda e: e.name)
+        entries = expand_no_dedupe(entries)
 
     if a.changed is not None:
         entries, unclaimed = changed_entries(entries, a.changed, root)
         for path in unclaimed:
             print("note: %s changed but no selftest targets it" % path, file=sys.stderr)
+    entries = filter_tier(entries, a.tier)
 
     if a.list:
         for e in entries:
             note = ("  (%s)" % e.dedupe_note) if e.dedupe_note else ""
-            print("%-58s %-10s %s%s" % (e.name, e.kind, e.target, note))
+            kind = "%s:%s" % (e.kind, e.tier) if e.kind == "test" else e.kind
+            print("%-58s %-10s %s%s" % (e.name, kind, e.target, note))
         print("%d selftest(s)" % len(entries))
         return 0
 
@@ -802,7 +1068,7 @@ def main(argv: list[str] | None = None) -> int:
     unmatched_parks = [p for i, p in enumerate(parks) if i not in matched_parks]
     # a park for a test a `--changed` subset did not run is not stale - only the full run can say a tool's
     # test has vanished. A park whose test ran and PASSED is always stale, subset or not.
-    if a.changed is None:
+    if a.changed is None and a.tier == "all":
         for p in unmatched_parks:
             stale_parks.append("park entry %s (%s) matches no discovered selftest"
                                % (p.get("target") or p.get("name"), p.get("date", "?")))
@@ -821,10 +1087,13 @@ def main(argv: list[str] | None = None) -> int:
     passed = sum(1 for r in results if r["status"] == "pass")
     total_checks = sum(r["checks"] or 0 for r in results)
     green = not failed and tree_ok and not stale_parks
+    tiers = tier_counts(results)
 
     if a.json:
         payload = {
             "root": root,
+            "tier": a.tier,
+            "tiers": tiers,
             "total": len(results),
             "passed": passed,
             "failed": len(failed),
@@ -864,7 +1133,9 @@ def main(argv: list[str] | None = None) -> int:
     for name in stale_parks:
         print("STALE %s" % name)
 
-    summary = "%d selftest(s): %d passed, %d failed" % (len(results), passed, len(failed))
+    print("tiers (--tier %s): %s" % (a.tier, ", ".join(
+        "%s %d entries / %d checks" % (t, v["entries"], v["checks"]) for t, v in tiers.items())))
+    summary ="%d selftest(s): %d passed, %d failed" % (len(results), passed, len(failed))
     flaky_n = sum(1 for r in results if r.get("flaky"))
     if flaky_n:
         summary += ", %d FLAKY (passed on isolated re-run)" % flaky_n

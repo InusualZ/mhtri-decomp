@@ -21,7 +21,8 @@ python tools/selftest.py --list          # the inventory, without running anythi
 python tools/selftest.py --no-dedupe     # run both halves of every wrapper pair
 python tools/selftest.py --selftest      # this runner's own checks (it is discovered like any other)
 ```
-Flags: `--changed`, `--jobs`, `--json`, `--list`, `--no-dedupe`, `--park-file`, `--root`, `--selftest`, `--timeout`.
+Flags: `--changed`, `--jobs`, `--json`, `--list`, `--no-dedupe`, `--park-file`, `--root`, `--selftest`, `--tier`, `--timeout`.
+`--tier fixture|smoke|all` (default all) filters the `tools/tests/**` modules by their `TIER`; legacy and `--check` entries run in every tier.
 Exit codes: Exit status is the answer: 0 only when nothing failed, nothing moved the tree, and no park is stale.
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
 
