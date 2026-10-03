@@ -95,7 +95,7 @@ A literal address read by two registered units is not always one TU. Measured ca
   unchanged).
 * `flipcheck.py` / `sectiongap.py`: a differing `.sdata2`/`.sdata` of a unit in a group reads "our object's pool is a
   partial pool of a TU that spans several registered units (candidate fold: ...)".
-* `attribute.py queue` / `brief.py`: a proposal that reads a literal a registered unit already touches carries
+* `brief.py`: a pool unit that reads a literal a registered unit already touches carries
   `pool_seams` and the brief opens with a **Pool evidence** note naming the units.
 
 ## 5. Status and open items

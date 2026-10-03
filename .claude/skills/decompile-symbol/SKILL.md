@@ -166,8 +166,7 @@ the disassembly of the function you are writing (`mt.py diff -u <unit> <symbol>`
 
 Include the small fragments a runtime unit owns (`.ctors`/`.dtors` with their `rename:.ctors$10` forms).
 Ranges are **proposed by hand** from `splits.txt` and the section order, then measured before and after; a
-range that lowers a match is reverted. (The discovery tool `tools/splits/tudiscover.py` is not in this
-branch; when it lands, per the collision policy it is the *proposal* step, never the justification.)
+range that lowers a match is reverted. (The discovery tool `tools/splits/tudiscover.py` gives the *proposal*; per the collision policy it is never the justification.)
 
 ## 5. Measure, and prove nothing regressed
 

@@ -1,5 +1,9 @@
 # The `.data` emission order as translation-unit seam evidence
 
+> **Historical note (2026-10-03).** The tiler this plan feeds (`attribute.py`, proposals, `attribution-queue.json`) is retired
+> (`docs/tools/retired.md`); `tudiscover.py`, `dataorder.py` and `splitcheck.py --baseline` carry the evidence now
+> (`docs/splits-program.md`). Mentions of `attribute.py` below are the record of how the rule was first wired.
+
 Status: discovery measured 2026-09-29 and **corrected the same day** (section 3): the first version of the rule
 was wrong because the measurement left out inline functions. The corrected rule and the tools built on it are
 below; what is still unproven is listed in section 3.

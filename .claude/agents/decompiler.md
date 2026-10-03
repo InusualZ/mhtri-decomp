@@ -319,7 +319,7 @@ Decide the module and file name from evidence, in this order, and write the clas
 1. a `__FILE__`/assert string in the range's data;
 2. the shared runtime dump's real name;
 3. the behaviour plus the sibling units' naming scheme - a descriptive name that fits the siblings' scheme, and
-   if several proposals are plainly one subsystem, say so: they belong in one module directory;
+   if several registered units are plainly one subsystem, say so: they belong in one module directory;
 4. **the evidence gives no name - derive the best guess and mark it.** With no `__FILE__` string, no real
    runtime-dump name and no neighbour scheme reaching the range, derive the most descriptive module and name the
    context supports (what the range actually does), write it in the unit header as an explicit **GUESS** with the

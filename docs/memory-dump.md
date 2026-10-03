@@ -44,7 +44,7 @@ questions the Ghidra project answers only one function at a time:
 * **a real name**, e.g. `fn_800406AC` -> `CntSdRsoTerminate` (batch 6; the rename went map + source as usual);
 * **whether an address is a function at all** - a `fn_*` in our map with no line in this one, where the
 dump does carry `zz_` placeholders for genuinely unnamed functions, is usually not a function. Five
-4-byte `fn_80040794`-style symbols in `src/auto/80040598_fn_80040598.cpp` turned out to be the dead
+4-byte `fn_80040794`-style symbols in the `fn_80040598` unit turned out to be the dead
 epilogue MWCC emits after a `mtctr`/`bctr` tail-call dispatcher: merging each into the dispatcher before it
 (map sizes +4, symbols deleted) closed four of them outright;
 * **a signature**, since the argument list is demangled (`kbd_init(unsigned`, `set_kbd_param(char`).

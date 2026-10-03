@@ -53,8 +53,7 @@ override — but a dump does outlive the map it was made from, which is what the
 ## Knob 2 — one re-split per batch, renames included
 
 The split's cost is per **run**, not per symbol, so the batch should be as large as is safe:
-registrations already work that way (`tools/units/attribute.py` — "one re-split and one ledger check per
-batch"), and renames/phantom merges belong in the same batch. Collect them with
+registrations already work that way ("one re-split and one ledger check per batch", `land.py`), and renames/phantom merges belong in the same batch. Collect them with
 `tools/symbols/symedit.py rename-batch <file>` and re-split once; verify every renamed symbol after that
 split, before the commit. The trade is explicit: per-symbol objdiff verification moves to the batch
 boundary.

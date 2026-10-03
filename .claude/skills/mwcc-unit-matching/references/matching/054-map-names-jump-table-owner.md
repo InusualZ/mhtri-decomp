@@ -49,7 +49,7 @@ two TUs emit), never the reverse.
 the dump's local symbol for that address is `_802a22a4s_menu_item.cpp_805cdfc8`, so the **file name** is naming
 evidence without reading a single assert - the prefix 0x802A22A4 is *not* the emitter (it lies inside
 `fn_802A1714` at +0xB90). Two lanes then derived the **same** file name independently from that one string, which
-is how a real defect was caught: `attribute.py`'s `--max-bytes` cap had split one translation unit into two
+is how a real defect was caught: the retired tiler's `--max-bytes` cap had split one translation unit into two
 registered proposals, and only the agreeing `__FILE__` evidence made it visible. The same pattern settled a
 boundary question the other way: `_8029e4e0switchdataD_805cdea8` (owner 0x8029E4E0, inside the *previous* run)
 sitting in a file's own `.data` run proves that TU starts at or before 0x8029E4E0 - a bound, not a measured edge.
