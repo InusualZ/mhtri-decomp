@@ -94,6 +94,7 @@
 #include "ef/fn_800FD520.h"
 #include "ef/fn_800FD718.h"
 #include "unsplit/g3d.h"
+#include "g3d/g3d_state.h"
 #include "unsplit/sound.h"
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
 #define eft_state_flags_set_c1 ((void (*)(void*, u8, u8))eft_state_flags_set)

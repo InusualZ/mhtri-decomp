@@ -31,7 +31,7 @@
  * This unit owns this run only.  The `.bss` collision-work run that follows the two `.sdata2` runs
  * (the move-work table, the hit-box and land tables, the per-slot collision results) is a different
  * pool shared by the `Pl` ground/hit collision band, and it has its own data-only owner,
- * `Pl/bss_pool.cpp` (`Pl/bss_pool.h`), so it is not this unit's.
+ * `Pl/pl_coll.cpp` (`Pl/pl_coll.h`), so it is not this unit's.
  */
 #ifndef MHTRI_PL_ACT_DATA_H
 #define MHTRI_PL_ACT_DATA_H

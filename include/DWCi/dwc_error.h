@@ -1,0 +1,36 @@
+/* Declarations owned by `src/DWCi/dwc_error.*` (docs/plan.md 6.5 rule 2): a consumer includes this header instead of declaring the symbols itself. */
+#ifndef MHTRI_DWCI_DWC_ERROR_H
+#define MHTRI_DWCI_DWC_ERROR_H
+
+#include "types.h"
+#include "DWCi/DWCi_NatNeg.h"            /* the NATNEG half's own data (rule 2: the owner declares it) */
+#include "DWCi/DWCi_Np_CPUCopyFast.h"    /* the Np unit's own data (rule 2) */
+
+/* Declarations moved here from `include/unsplit/DWCi.h, Network.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* 0x80507690 - the tagged-block allocator `DWCi_freeNode` releases: one callback allocates
+ * `size + 0x20` bytes (the DWCi allocator the runtime's initialiser registers), the block is stamped
+ * with the 0x4457434D tag and its size and the payload is handed back (`NULL` when the callback
+ * fails).  Name and shape are GUESSes from the body: `src/DWCi/DWCi_Np_CPUCopyFast.c`'s friend-code
+ * getter calls it twice as `(3, 0x4000/0x8000, 0x20)`, and the `u8*` return is the payload, not a
+ * typed object. */
+u8* DWCi_allocNode(u32 kind, u32 size, u32 align);
+
+/* 0x805078F0 - the DWCi report: a `printf`-style, category-filtered logger (the category argument
+ * masks 0x1000000/0x8000000 against this band's own enable word at 0x807957C8 and selects the
+ * prefix out of the 0x8062FE10 table before calling `OSReport`). */
+void DWCi_report(u32 category, const char* format, ...);
+
+/* NHTTP / network utility layer */
+s32 DWC_GetLastErrorEx(s32* code, s32* type);
+
+void DWC_ClearError(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* MHTRI_DWCI_DWC_ERROR_H */

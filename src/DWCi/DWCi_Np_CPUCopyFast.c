@@ -166,6 +166,7 @@
 #include "unsplit/NCD.h"                 /* NCDGetCurrentIfConfig: the NCD band's header (rule 2) */
 #include "unsplit/Runtime.PPCEABI.H.h"   /* strncpy / wcsncpy */
 #include "unsplit/VF.h"                  /* VFipf2*: the file-system band's own header (rule 2) */
+#include "SO/soi.h"
 
 /* The two host callbacks `DWCi_initRuntime` stores in the runtime block: the allocator it is handed
  * the block by, and the command/free callback it publishes results through. */

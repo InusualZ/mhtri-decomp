@@ -86,4 +86,21 @@ u32 quest_element_pick_ck(struct QuestWork* work, u8 index, s32 use_alt);
 }
 #endif
 
+/* Declarations moved here from `include/unsplit/lobby.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* The four 6-entry sprite/index tables `fn_803A4F7C`/`fn_803A5070` search, and the flat u16 run
+ * their search continues into (both terminated by a 0 entry).  The addresses are in the unclaimed
+ * `.data` run 0x805F2038..0x805F2A38 / `.sdata` run 0x80793530.., which no registered unit owns
+ * (rule 2: the band header carries them). */
+extern const u16* note_slot_table[4];
+
+extern const u16 note_slot_flat_table[];
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_LOBBY_LB_QUEST_SCREEN_H */

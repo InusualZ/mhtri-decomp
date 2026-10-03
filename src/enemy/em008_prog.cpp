@@ -244,6 +244,8 @@
 #include "fn_8004CAD8.h"
 #include "fn_8004CAD8/mtx.h" /* the owner header (rule 2) */
 #include "mh3_pad.h" /* the owner header (rule 2) */
+/* `enemy/fn_80165FC8.h` spells these callees with signatures that clash with this file's own views, so each is hidden
+ * for the include. */
 #define assignVec3 assignVec3_hidden_fn_80165FC8_h
 #define em_act_ck em_act_ck_hidden_fn_80165FC8_h
 #define em_fall_height_get em_fall_height_get_hidden_fn_80165FC8_h
@@ -254,9 +256,7 @@
 #define fn_8015D934 fn_8015D934_hidden_fn_80165FC8_h
 #define rotMatrixX rotMatrixX_hidden_fn_80165FC8_h
 #define rotMatrixZ rotMatrixZ_hidden_fn_80165FC8_h
-#include "enemy/stale_motion_decls_hide.h"
 #include "enemy/fn_80165FC8.h"
-#include "enemy/stale_motion_decls_hide.h"
 #undef rotMatrixZ
 #undef rotMatrixX
 #undef fn_8015D934

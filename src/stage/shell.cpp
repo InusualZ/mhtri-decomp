@@ -46,7 +46,7 @@
 
 #include "Runtime.PPCEABI.H/memset.h"
 #include "Network/network_pat_control.h"
-#include "Pl/fn_80295EF4.h"
+#include "menu/hit_attack_list_push.h"
 #include "ef/effect.h"
 #include "ef/eft_res.h"
 #include "ef/fn_800CDB2C.h"

@@ -25,6 +25,7 @@
 #include "camera/camera.h"
 #include "ef/eft052.h"
 #include "menu/menu_message.h"
+#include "lobby/fn_801E7530.h"
 
 /* The 2D integer vector the lobby/HUD helpers exchange (`_mh_ivec2_` in the map's mangling).
  * size: 0x4 */
@@ -198,8 +199,6 @@ extern "C" {
 #include "mh3_pad/lb_param_w.h" /* `LbParamWork`/`lb_param_w`, owned by src/mh3_pad.cpp (rule 1/2) */
 #include "mh3_pad/Psw.h"        /* `PlayerPad`/`Psw[4]`, owned by src/mh3_pad.cpp (rule 1/2) */
 
-extern u8 jumptable_805B7CD8[36];
-extern u8 lb_item_get_data[];
 extern u8 lbex_main_str[];
 extern u8 lbex_zaco_str[];
 extern u8 lbl_805B7A88[64];
@@ -300,8 +299,6 @@ extern const u16 lbl_80791CA4[4];
 extern const u16 lbl_80791D18[4];
 extern const u16 lbl_80791D20[4];
 extern const f64 lbl_80799878;
-extern u8 jumptable_805B8C74[104];
-extern u8 jumptable_805B8CF0[84];
 
 extern u16 lbl_805BA660[58];
 extern u16 lbl_805BA6D4[34];
@@ -336,12 +333,6 @@ extern u8 lbl_80791C38[8];
 extern u8 lbl_80791C40[2];
 extern u8 lbl_80791C44[5];
 extern u8 lbl_80791C50[8];
-/* The four 6-entry sprite/index tables `fn_803A4F7C`/`fn_803A5070` search, and the flat u16 run
- * their search continues into (both terminated by a 0 entry).  The addresses are in the unclaimed
- * `.data` run 0x805F2038..0x805F2A38 / `.sdata` run 0x80793530.., which no registered unit owns
- * (rule 2: the band header carries them). */
-extern const u16* note_slot_table[4];
-extern const u16 note_slot_flat_table[];
 /* The `.data` pair/lookup tables the lobby list band reads: `lbl_805F0EC8[kind]` is a pointer to a
  * table of 6-byte-stride records whose first u16 is the key, terminated by an entry whose u16 is
  * 0xFFFF (`lb_ui_pair_lookup`, `lb_ui_pair_offset`).  The `.data` range 0x805F0EC8 is unclaimed, so
@@ -427,7 +418,6 @@ extern LbNpcMoveSpot lbl_805B8F70[3];
 /* The unsplit plain-C callees. */
 void* fn_801E6F10(u16 id);
 void* fn_801E6F48(u16 id);
-s8* str_tbl_33_get(u8 id);
 s32 spr_data_copy(s16 *, void *);
 s32 fn_801E6DCC(void);
 u16 fn_801E6EA8(u16, s32);
@@ -535,4 +525,3 @@ void* get_lsp_data(u16, _mh_ivec2_*);
 #endif /* __cplusplus */
 
 #endif /* MHTRI_UNSPLIT_LOBBY_H */
-

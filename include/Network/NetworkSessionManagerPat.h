@@ -25,4 +25,26 @@ BOOL isNetworkSessionManagerPatReady(NetworkSessionManagerPat* session_manager);
 }
 #endif
 
+/* Declarations moved here from `include/unsplit/Network.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+class NetworkSessionManagerPat;    /* include/Network/NetworkSessionManager.h */
+typedef struct NetLayerRequest NetLayerRequest; /* include/Network/NetworkLayerPat.h */
+struct PatTerms;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* GUESS: 0x803DECF0 clears the session manager's busy byte and releases its buffers. */
+void closeNetworkSessionManagerPat(NetworkSessionManagerPat* self);
+
+/* 0x803DFC34 - initialises a layer request record. */
+void initNetLayerRequest(NetLayerRequest* request);
+
+/* 0x803E247C - the terms object; 0x80416A18 - whether it reached its update-finished state. */
+struct PatTerms* getPatTerms(void);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_NETWORK_NETWORKSESSIONMANAGERPAT_H */

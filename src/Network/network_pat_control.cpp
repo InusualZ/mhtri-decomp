@@ -104,6 +104,7 @@
 #include "menu/get_pop_dat_ptr.h"
 #include "ai/fn_802D44F4.h"
 #include "unsplit/Network.h"
+#include "Network/NetworkSessionManagerPat.h"
 #include "unsplit/lobby.h"
 #include "lobby/lb_entry_flags_clear.h"          /* lb_entry_flags_clear, owner lobby/lb_companion_ui.cpp (rule 2) */
 #include "lobby/lb_quest_board_reset.h"          /* lb_quest_board_reset, owner lobby/lb_quest_board.cpp (rule 2) */

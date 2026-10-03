@@ -67,7 +67,7 @@
 #include "sound/se.h"
 #include "sound/fn_800D7F54.h"
 #include "unsplit/Pl.h"
-#include "Pl/pl_master.h"
+#include "Pl/Pl_master_ck.h"
 #include "Pl/fn_802693C4.h"
 
 /* Arms the frame-timed sound requests for every motion the player can be in above 0x3EA, with the

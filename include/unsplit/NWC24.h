@@ -32,21 +32,10 @@ typedef struct NWC24RequestWork {
 /* 0x80766980 - the work block. */
 extern NWC24RequestWork sNwc24Work;
 
-/* 0x807958A8 - the work block's one-time-initialisation flag (bit 0). */
-extern u32 sNwc24WorkInit;
-
-/* 0x807958AC / 0x807958B0 - the scheduler pair's two counters: the depth `NWC24SuspendScheduler`
- * raises and `NWC24ResumeScheduler` lowers, and the limit both compare against. */
-extern s32 sNwc24SuspendCount;
-extern s32 sNwc24ResumeLimit;
-
 /* The device layer's own work block (`.bss` 0x80766B00, 0xE0 B) and its one-time-initialisation flag
  * (`.sbss` 0x807958B8) are NOT declared here: `NWC24/nwc24_io.c` is their only referencer (checked
  * with `tools/units/callers.py`), so it claims `.bss` 0x80766B00-0x80766C40 and `.sbss`
  * 0x807958B8-0x807958D8 and defines them itself (rule 12). */
-
-/* 0x80795898 - the library's work pointer; +0x08 is the cached user id (two words). */
-extern u32* sNwc24UserWork;
 
 /* 0x800031C0 - the RTC shadow the game keeps at the top of main memory: the cached user id that
  * `NWC24iGetUserId` falls back to and refreshes through `DCStoreRange`.  It has no reloc in the
@@ -60,10 +49,6 @@ extern u32* sNwc24UserWork;
  * (0x80631200) and `Nwc24RequestShutdownName` (0x80631214) are NOT declared here: `NWC24/nwc24_io.c`
  * claims `.data` 0x806311E8-0x8063122A and defines them itself (rule 12). */
 extern const char Nwc24RequestPath[];      /* 0x80631178 "/dev/net/kd/request" */
-extern const char Nwc24SetScriptModeName[]; /* 0x8063118C "NWC24iSetScriptMode" */
-extern const char Nwc24GenerateUserIdName[]; /* 0x806311A0 "NWC24iRequestGenerateUserId" */
-extern const char Nwc24TimePath[];         /* 0x806311C0 "/dev/net/kd/time" */
-extern const char Nwc24SetRtcName[];       /* 0x806311D4 "NWC24iSetRtcCounter" */
 
 #ifdef __cplusplus
 }

@@ -4,7 +4,7 @@
  *
  * Rule 2 note (the practice `include/menu/fn_802E4978.h` documents): the callees below are declared here
  * or come from `include/unsplit/<band>.h`, because the owner headers collide in one translation unit -
- * `include/hud/layout.h` and `include/lobby/fn_801F3294.h` define `_mh_ivec2_`/`_SPR_DATA_` differently
+ * `include/hud/layout.h` and `include/lobby/lb_pane_ui.h` define `_mh_ivec2_`/`_SPR_DATA_` differently
  * from `include/unsplit/lobby.h` (`get_lsp_data` is `void*` there and `_SPR_DATA_*` in the owner's), and
  * `include/menu/menu_item.h` already pulls `pl.h`.
  */

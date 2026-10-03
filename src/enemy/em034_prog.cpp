@@ -138,7 +138,7 @@
 #include "pl.h"
 #undef assignVec3
 #include "Pl/pl_act.h"
-#include "Pl/pl_master.h"
+#include "Pl/Pl_master_ck.h"
 #include "Pl/pl_skill.h"
 #define em_turn_seq_start em_turn_seq_start_hidden_enemy_h
 #include "unsplit/enemy.h"

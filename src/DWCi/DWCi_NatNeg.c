@@ -96,6 +96,7 @@
 #include "types.h"
 #include "DWCi/DWCi_NatNeg.h"            /* the owner's own header: the entry points and the data */
 #include "unsplit/DWCi.h"                /* the band's unowned data and helpers (rule 2) */
+#include "SO/soi.h"
 #include "unsplit/SO.h"                  /* SOAddressToString / SOAddressToHostPort / SOHtoNs */
 #include "unsplit/Runtime.PPCEABI.H.h"   /* sprintf / memcmp / memcpy / strlen */
 

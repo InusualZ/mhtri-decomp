@@ -54,8 +54,6 @@ u32 fn_8027E220(struct _PLW* self, s32 v);
  * declaration (`s32 (_PLW*)`) and a second, differently-typed copy here is the `illegal
  * function overloading` class (rule 2).  Consumers include the owner's header. */
 
-
-
 /* The 0x80229xxx motion/SE helper family `Pl/fn_80229ECC.cpp` dispatches into (all unregistered and
  * unmangled; the actor itself is the `_PLW` at their r3). */
 void fn_80229CB4(struct _PLW* self);
@@ -77,8 +75,6 @@ void fn_80244E88(void* p, u32 a, u32 b, u32 c);
 /* The second argument is `u16`: retail keeps the `clrlwi r4,r4,16` that narrows the `lis`/`subi`
  * constant at the `0x8001`/`0x8003` call sites, which MWCC only emits for a narrower parameter.
  * `Pl/pl_act_step.cpp`'s calls pass 0/3, so the width is immaterial there. */
-void Pl_act_set_motion(struct _PLW* self, u16 a, u32 b, u32 c);
-void Pl_act_set_motion_slot(struct _PLW* self, u32 a, u32 b, u32 c);
 void fn_80276868(struct _PLW* self, s16 value);
 u32 fn_80276800(struct _PLW* self, s32 v);
 
@@ -195,19 +191,6 @@ void fn_802430E8(struct _PLW* self, u8 part);
  * band's unclaimed run 0x80273B14-0x80276B58, so the band header is its rule-2 home; where the two
  * lanes spelled one argument differently the MAIN spelling is kept (M7). */
 
-/* The act tail's predicates and setters, called by `Pl/fn_80258FCC.cpp` (`.text`
- * 0x80258FCC-0x8025F088).  `pl_act_clear_wait` sits in the unclaimed run 0x802430E8-0x80258FCC, so the band
- * header is its rule-2 home; `pl_act_set_cam_ang` sits inside `Pl/fn_802693C4.cpp`'s range and is declared
- * in `Pl/fn_802693C4.h`. */
-/* The return was `u32`; the owner's own body ends without ever setting r3 (the value callers would
- * read is `Pl_master_ck`'s), and `Pl/fn_80258FCC.cpp` drops it at all three call sites, so the
- * declaration is `void` (docs/plan.md 6.5 rule 2: the owner owns the spelling). */
-void pl_act_clear_wait(struct _PLW* self, u8 a);
-
-/* The act band's remaining Pl helpers, added with the rest of `Pl/fn_80258FCC.cpp`.  Each signature
- * is the callee's own body (its prologue's argument saves and the width it narrows them to), not a
- * guess from the call site. */
-void pl_act_reenter(struct _PLW* self, s32 a, s32 b, s32 c);
 u32 fn_8027D8A0(struct _PLW* self, s32 a);
 
 /* Pl-band callees and tables with no registered owner, added with `Pl/fn_80273B14.cpp`
@@ -232,15 +215,6 @@ extern u8 lbl_805C5F70[];
 extern const f32 lbl_8079A044;
 extern const f32 lbl_8079A080;
 extern const f32 lbl_8079A084;
-
-/* The 0x80273B14-0x80276B58 run's act/motion request entry point, declared for
- * `Pl/fn_8027D684.cpp`'s `fn_8027D6DC`.  The symbol is owned by `Pl/fn_80273B14.cpp`, so the
- * signature here is that owner's (`include/Pl/fn_80273B14.h`) and not a second, differently-typed
- * spelling of it: two C-linkage declarations of one name with different parameter types are the
- * `illegal function overloading` class (rule 2).  The owner's `u16` third parameter is what
- * retail's own callers narrow to (`pl_act_enter`/`fn_80275ADC` emit `clrlwi r6,r6,16`) and what
- * reproduces the callee's own `clrlwi` on the mask. */
-void pl_act_enter_raw(struct _PLW* self, u8 kind, u16 no, u16 mask);
 
 /* The per-slot gate table at 0x806BB7A0 (`.bss`, 0x18 B = three 8-byte entries, the map's size).
  * size: 0x8 */

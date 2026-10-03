@@ -41,4 +41,15 @@ u8* fn_80089844(void* pSelf, u32 index);
 }
 #endif
 
+/* Declarations moved here from `include/unsplit/g3d.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void mtx34_inverse(Mtx34* out, const Mtx34* src);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_G3D_G3D_STATE_H */

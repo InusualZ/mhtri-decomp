@@ -32,4 +32,27 @@ u16* wcsncpy(u16* dst, const u16* src, u32 n);
 }
 #endif
 
+/* Declarations moved here from `include/unsplit/DWCi.h, NetworkStream.h, unknown.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+struct DWCiCType;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* 0x8060EDB0 - the character-class record `DWCi_parseAddress` validates port digits against (a header
+ * whose +0x38 pointer reaches the per-character u16 flags, bit 3 marking a decimal digit). */
+extern struct DWCiCType DWCi_digitClassTable;
+
+/* 0x8045DFA0 - the C library's `rand` (the 0x41C64E6D linear congruential step, top 15 bits). */
+s32 rand(void);
+
+/* 0x80463E08 - the arctangent of `y / x` in radians (the libm `atan2` entry); `Pl/pl_yure.cpp` turns it into
+ * a 16-bit angle word.  0x805015C8 - `out = mtx * v` (the paired-single matrix/vector multiply); the two
+ * vectors may alias.  Added with that unit. */
+f32 atan2f(f32 y, f32 x);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_MSL_C_ALLOC_H */

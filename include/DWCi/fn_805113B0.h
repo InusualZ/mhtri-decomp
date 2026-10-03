@@ -22,4 +22,24 @@ char* DWCi_formatAddress(u32 addr, u16 port, char* buf);
 }
 #endif
 
+/* Declarations moved here from `include/unsplit/DWCi.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+extern char DWCi_addressFormat[6];
+
+extern char DWCi_addressFormatHost[3];
+
+extern char DWCi_addressFormatPort[4];
+
+/* 0x80795820 - the index of the two-buffer address-string ring `DWCi_formatAddress` writes into the
+ * 0x807625C0 buffers (`DWCi_addressRing`, declared by the NATNEG unit's header - the word falls
+ * inside its `.bss` run). */
+extern u32 DWCi_addressRingIndex;
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_DWCI_FN_805113B0_H */

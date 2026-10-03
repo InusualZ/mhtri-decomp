@@ -314,7 +314,7 @@
  * lib's setting, and `-Cpp_exceptions on` is what emits the target's extab.
  *
  * Rule-1 debt: `_HIT_W` is defined here (through `include/ai/ai_npc.h`) as well as in
- * `include/menu/menu_item.h` and `include/Pl/fn_80295EF4.h`, which carry their own partial views of
+ * `include/menu/menu_item.h` and `include/menu/hit_attack_list_push.h`, which carry their own partial views of
  * the same record; none of them names the offsets this band reads.  `_AINPC_W` likewise also lives in
  * `include/ai/ainpc.h` (the `fn_802CC794.cpp`/`fn_802C474C.cpp` view) - `include/ai/ai_npc.h` carries
  * the note and the two must be folded by the next `ai` worker.

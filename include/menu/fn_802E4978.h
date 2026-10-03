@@ -203,7 +203,7 @@ u32 get_move_work_max(u8 kind);
  * case - the owner's header is unusable in this translation unit, and the declaration cannot sit in
  * `include/unsplit/menu.h` at all):
  *
- *   * `include/hud/fn_802EBED8.h` (0x802EC4F0-0x802EF730), `include/hud/cockpit_quest.h`
+ *   * `include/hud/cockpit_quest_marker.h` (0x802EC4F0-0x802EF730), `include/hud/cockpit_quest.h`
  *     (0x802E796C-0x802EA33C) and `include/hud/layout.h` (0x802E0B54/0x802E270C): all three clash with
  *     `include/unsplit/lobby.h`, which this unit needs for `drawshape_*`/`draw_sprite_*`, on
  *     `_mh_ivec2_`, `spr_data_copy`, `fn_802E0DA8`, `draw_sprite_anim_ary`, `get_move_work_adrs` and

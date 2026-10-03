@@ -129,4 +129,33 @@ u32 Pl_condition_ck__FP4_PLWUl(struct _PLW* work, u32 condition);
 u32 Pl_dm_condition_ck__FP4_PLWUl(struct _PLW* work, u32 condition);
 #endif
 
+/* Declarations moved here from `include/unsplit/Pl.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+struct _PLW;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void Pl_act_set_motion(struct _PLW* self, u16 a, u32 b, u32 c);
+
+void Pl_act_set_motion_slot(struct _PLW* self, u32 a, u32 b, u32 c);
+
+/* The act band's remaining Pl helpers, added with the rest of `Pl/fn_80258FCC.cpp`.  Each signature
+ * is the callee's own body (its prologue's argument saves and the width it narrows them to), not a
+ * guess from the call site. */
+void pl_act_reenter(struct _PLW* self, s32 a, s32 b, s32 c);
+
+/* The 0x80273B14-0x80276B58 run's act/motion request entry point, declared for
+ * `Pl/fn_8027D684.cpp`'s `fn_8027D6DC`.  The symbol is owned by `Pl/fn_80273B14.cpp`, so the
+ * signature here is that owner's (`include/Pl/fn_80273B14.h`) and not a second, differently-typed
+ * spelling of it: two C-linkage declarations of one name with different parameter types are the
+ * `illegal function overloading` class (rule 2).  The owner's `u16` third parameter is what
+ * retail's own callers narrow to (`pl_act_enter`/`fn_80275ADC` emit `clrlwi r6,r6,16`) and what
+ * reproduces the callee's own `clrlwi` on the mask. */
+void pl_act_enter_raw(struct _PLW* self, u8 kind, u16 no, u16 mask);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_PL_PL_ACT_H */

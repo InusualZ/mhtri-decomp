@@ -125,7 +125,7 @@
 /* ef/fn_800CDB2C.cpp owns the pool accessors (`PlayMode_ck` is declared in that unit's header). */
 
 
-/* Pl/pl_act.cpp owns `Pl_zanzo_set`; Pl/pl_master.cpp owns `Pl_act_ck` (`include/Pl/pl_master.h`). */
+/* Pl/pl_act.cpp owns `Pl_zanzo_set`; Pl/pl_master.cpp owns `Pl_act_ck` (`include/Pl/Pl_master_ck.h`). */
 
 
 /* No registered unit covers these addresses; declared with the view this unit's call sites take. */

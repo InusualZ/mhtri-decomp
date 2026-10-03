@@ -449,7 +449,7 @@
 #undef fn_8012EC3C
 #undef em_alt_mode_ck
 #include "unsplit/enemy_pool.h" /* the band's unowned .data pools (rule 2) */
-#include "Pl/pl_master.h"
+#include "Pl/Pl_master_ck.h"
 #define em_act_ck__FP11_ENEMY_WORKUcUc em_act_ck__FP11_ENEMY_WORKUcUc_hidden_fn_8012BDF4_h
 #define em_area_ck em_area_ck_hidden_fn_8012BDF4_h
 #define fn_8012D0B4 fn_8012D0B4_hidden_fn_8012BDF4_h

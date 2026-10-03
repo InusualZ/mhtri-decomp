@@ -1,6 +1,7 @@
-/* The declarations `src/hud/fn_802EBED8.cpp` owns (docs/plan.md 6.5, rules 1-5).
+/* The declarations of the quest-window band (0x802EBED8..) of `src/hud/cockpit_quest.cpp` (docs/plan.md 6.5,
+ * rules 1-5), included mid-file after the unit's own views.
  *
- * This unit is the continuation of the cockpit HUD band above `hud/cockpit_quest.cpp`: the same
+ * The band is the continuation of the cockpit HUD band above it: the same
  * quest-window / item-slot / act-flag work the sibling bands drive, but no `__FILE__` string of its
  * own survives (checked below), so the file keeps the map's `fn_802EBED8` stem while the symbol
  * itself is named `quest_marker_draw` (brief section 2, class 4), and the module is `hud` (the
@@ -14,8 +15,8 @@
  * placeholders (rule 7 deferral in the source) and have no registered owner, so they live here until
  * their band is cut.
  */
-#ifndef MHTRI_HUD_FN_802EBED8_H
-#define MHTRI_HUD_FN_802EBED8_H
+#ifndef MHTRI_HUD_COCKPIT_QUEST_MARKER_H
+#define MHTRI_HUD_COCKPIT_QUEST_MARKER_H
 
 #include "types.h"
 #include "pl.h"
@@ -105,4 +106,4 @@ extern const u32 lbl_805D63B0[];
 }
 #endif
 
-#endif /* MHTRI_HUD_FN_802EBED8_H */
+#endif /* MHTRI_HUD_COCKPIT_QUEST_MARKER_H */

@@ -14,7 +14,7 @@
  * are kept apart in a namespace (extern "C" names stay unmangled, so the symbols are unchanged) instead of being
  * unified by guess.  Unifying them (one record header, one prototype per symbol) is the open work and removes the
  * namespace.  Here: `view_fn_802E4978` (menu/fn_802E4978.h, unsplit/lobby.h) and `view_fn_802EBED8`
- * (hud/fn_802EBED8.h) keep the two incompatible views of the cockpit work arrays (`cockpit_work`, `cockpit_state`)
+ * (hud/cockpit_quest_marker.h) keep the two incompatible views of the cockpit work arrays (`cockpit_work`, `cockpit_state`)
  * away from the `hud/cockpit_quest.h` view of this file.
  *
  * Sections: the unit's block in config/RMHE08/splits.txt (.bss, .ctors, .data, .sdata, .sdata2, .text, extab,
@@ -292,7 +292,7 @@
  * fn_802F3B48 (0x24C), fn_802F3D94 (0xC34), fn_802F49DC (0x17C), fn_802F4B58 (0x2F0),
  * fn_802F4E48 (0x270), fn_802F50B8 (0x44), fn_802F50FC (0x3C).  What they need beyond this pass: the
  * 11 HUD functions drive `cockpit_work`/`cockpit_state` (their types live in `hud/cockpit_quest.h` and
- * `hud/fn_802EBED8.h`) plus the `draw_sprite`/`drawshape` helpers, and `fn_802F20D8` needs the
+ * `hud/cockpit_quest_marker.h`) plus the `draw_sprite`/`drawshape` helpers, and `fn_802F20D8` needs the
  * `__construct_array` runtime helper (whose only declaration today sits in `sound/sound_work.h`);
  * the two tag-34 bodies (`fn_802F3B48`, `fn_802F3D94`) read the `_ENEMY_WORK` motion/sound block and
  * `fn_802F50FC` reads a `u16` at `_ENEMY_WORK`+0x306 that the shared header does not name yet.
@@ -303,7 +303,7 @@
 #include "nw4r/math.h"
 #include "Pl/pl_skill.h"
 #include "Pl/pl_act.h"
-#include "Pl/pl_master.h"
+#include "Pl/Pl_master_ck.h"
 #include "hud/layout.h"
 #include "hud/cockpit_quest.h"
 #include "main.h"
@@ -328,6 +328,7 @@
 #include "ai/ainpc.h"
 #include "unsplit/NetworkStream.h"
 #include "unsplit/menu.h"
+#include "hud/cockpit.h"
 #include "sound/fn_800D7F54.h"
 #include "menu/cockpit_hud_hidden_ck.h"
 #include "hud/cockpit_icon_data.h"
@@ -3196,7 +3197,7 @@ namespace view_fn_802EBED8 {
 
 namespace nw4r = ::nw4r;  /* the view headers below reopen it */
 
-#include "hud/fn_802EBED8.h"
+#include "hud/cockpit_quest_marker.h"
 
 /* 0x802EC6C4 (0x3C).  A one-bit predicate over `fn_803311A0`'s byte: the branch-free
  * `subfic`/`orc`/`subf` sequence is the target's own shape. */

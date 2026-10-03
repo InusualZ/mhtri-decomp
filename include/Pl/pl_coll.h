@@ -1,5 +1,5 @@
 /*
- * Declarations owned by `Pl/bss_pool.cpp` (docs/plan.md 6.5 rule 2).  A consumer includes this
+ * Declarations owned by `Pl/pl_coll.cpp` (docs/plan.md 6.5 rule 2).  A consumer includes this
  * header instead of declaring one of the run's arrays itself.
  *
  * The unit is **data-only**: it owns the Pl band's shared `.bss` collision-work run,
@@ -25,8 +25,7 @@
  * - and a flat `[44]` indexed `chunk_ofs * 11 + i` makes MWCC emit a different multiply sequence.
  *
  * The unit name is a **GUESS**: no `__FILE__` string and no runtime-dump name covers the range, so the
- * file keeps the name `tools/units/dataclaim.py` derives for the pool (`Pl/bss_pool.cpp`); a context
- * name would fit the collision band equally well and a later pass may rename it.
+ * file was named for the pool by `tools/units/dataclaim.py` and is now folded into `Pl/pl_coll.cpp`.
  *
  * GUESSES: the arrays no written body spells yet - `pl_coll_slot_free`, `pl_coll_closest_0/1/2`,
  * `pl_coll_slot_dist`, `pl_coll_slot_hit`, `pl_coll_slot_kind`, `pl_coll_slot_used`, `pl_hit_id_list` -

@@ -14,6 +14,7 @@
 #define MHTRI_UNSPLIT_NCD_H
 
 #include "types.h"
+#include "SSL/ssl.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -23,13 +24,6 @@ extern "C" {
  * the caller's payload (NHTTP passes its own system-info block), so it stays untyped here. */
 /* untyped: caller-owned payload */
 s32 NCDGetCurrentIpConfig(void* config);
-
-/* 0x8051C554 - fill the caller's interface-configuration block; non-zero on failure (the DWCi
- * runtime initialiser prints its own " NCDGetCurrentIfConfig failed.[%d]\n" with the answer and
- * hands it the `+0x4000` region of its runtime block).  The name is read off that call site's own
- * message: this band is unregistered, so this header is the symbol's home until `ncdsystem.c`
- * registers, and that unit's own header will be the real one then. */
-s32 NCDGetCurrentIfConfig(u8* config);
 
 #ifdef __cplusplus
 }

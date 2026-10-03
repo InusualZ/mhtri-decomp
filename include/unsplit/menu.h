@@ -27,7 +27,6 @@ extern "C" {
 
 /* ---- the cockpit band's own callees (unregistered `.text`) ---- */
 void fn_802DFCD4(void);                 /* 0x802DFCD4 */
-void draw_lsp_parts(void);                 /* 0x802DFEBC */
 void fn_802DFD38(void);                 /* 0x802DFD38 */
 void draw_lsp_element(void*, u8, u8, u16);   /* 0x802E00A4 */
 void fn_802E03D4(void*, s32, void*);    /* 0x802E03D4 */

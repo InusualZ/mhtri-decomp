@@ -14,7 +14,7 @@
  * and `_PLW` come from `include/pl.h`, their owner.
  *
  * `_HIT_W` is this band's view of the attack record - `include/menu/menu_item.h` and
- * `include/Pl/fn_80295EF4.h` carry their own views of the same type (both record it as rule-1
+ * `include/menu/hit_attack_list_push.h` carry their own views of the same type (both record it as rule-1
  * debt), and none of the three names the offsets this band reads (+0x08, +0x18..+0x1E, +0x31,
  * +0x32, +0x40..+0x4E).  Folding the views into one union-aware definition is the rule-1
  * follow-up this header records for the unit.

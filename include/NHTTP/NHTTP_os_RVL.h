@@ -86,4 +86,22 @@ void* NHTTPi_commThreadMain(void* arg);
 }
 #endif
 
+/* Declarations moved here from `include/unsplit/NHTTP.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* 0x80630AE8 (0x30+ B, `.data`) - the `NHTTP_os_RVL.c` assert group: +0x00 the function name
+ * "NHTTPi_CheckCurrentThread", +0x1C "%s:illegal thread
+", +0x30 "NHTTP_os_RVL.c". */
+extern const char NHTTPi_threadCheckMessages[];
+
+/* 0x807943A0 (`.sdata`) - the message that assert panics with ("halt
+"). */
+extern const char NHTTPi_haltMessage[];
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_NHTTP_NHTTP_OS_RVL_H */

@@ -128,8 +128,8 @@ extern "C" {
  * the run that follows (0x80799F98-0x80799FDC) by `Pl/pl_act_data.h`, both included by
  * `Pl/fn_8025F088.cpp`.  Nothing from either run is declared here any more. */
 
-/* The player's per-chunk move-work table (`.bss` 0x806AB848) is owned by `Pl/bss_pool.cpp`, whose
- * header `Pl/bss_pool.h` declares it; nothing from that run is declared here any more (rule 2). */
+/* The player's per-chunk move-work table (`.bss` 0x806AB848) is owned by `Pl/pl_coll.cpp`, whose
+ * header `Pl/pl_coll.h` declares it; nothing from that run is declared here any more (rule 2). */
 
 #ifdef __cplusplus
 }

@@ -97,7 +97,7 @@
  * fn_802F3B48 (0x24C), fn_802F3D94 (0xC34), fn_802F49DC (0x17C), fn_802F4B58 (0x2F0),
  * fn_802F4E48 (0x270), fn_802F50B8 (0x44), fn_802F50FC (0x3C).  What they need beyond this pass: the
  * 11 HUD functions drive `cockpit_work`/`cockpit_state` (their types live in `hud/cockpit_quest.h` and
- * `hud/fn_802EBED8.h`) plus the `draw_sprite`/`drawshape` helpers, and `fn_802F20D8` needs the
+ * `hud/cockpit_quest_marker.h`) plus the `draw_sprite`/`drawshape` helpers, and `fn_802F20D8` needs the
  * `__construct_array` runtime helper (whose only declaration today sits in `sound/sound_work.h`);
  * the two tag-34 bodies (`fn_802F3B48`, `fn_802F3D94`) read the `_ENEMY_WORK` motion/sound block and
  * `fn_802F50FC` reads a `u16` at `_ENEMY_WORK`+0x306 that the shared header does not name yet.

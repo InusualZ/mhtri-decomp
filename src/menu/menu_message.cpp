@@ -55,7 +55,7 @@
  *   * rule-2 debt: `menu/menu_item.cpp`, `menu/fn_8031A6C0.cpp` and `lobby/fn_801EC9F8.cpp` still declare the
  *     record-typed entry points (`menu_slot_*`, `menu_item_slot_accepts`, `menu_list_*`, `menu_cursor_column_step`)
  *     locally because they view the record as `MENU_ITEM_W` / `MenuSel`, not `MenuListWork`; folding the views is a
- *     separate change.  `include/unsplit/lobby.h` and `include/lobby/fn_801F3294.h` declare `menu_cursor_step` as
+ *     separate change.  `include/unsplit/lobby.h` and `include/lobby/lb_pane_ui.h` declare `menu_cursor_step` as
  *     a C++ five-argument function while this range owns 0x802A8EFC and the target spells it bare.
  *
  * Declaration linkage: every callee the written bodies call is declared the way the map spells it -

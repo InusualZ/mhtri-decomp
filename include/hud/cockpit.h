@@ -13,4 +13,17 @@ void fn_802DFC6C(void);
 
 }
 
+/* Declarations moved here from `include/unsplit/lobby.h, menu.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+s8* str_tbl_33_get(u8 id);
+
+void draw_lsp_parts(void);                 /* 0x802DFEBC */
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_HUD_COCKPIT_H */

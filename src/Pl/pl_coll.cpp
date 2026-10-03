@@ -1,7 +1,7 @@
 /*
  * Pl/pl_coll.cpp - the player actor's ground/hit collision band: the ground and hit queries, the land table and the hit-id list.
  *
- * `.text` 0x8028F66C..0x80297E34 (about 80 functions), `.bss` 0x1060 B (the `Pl/bss_pool.h` arrays), `.ctors` 4 B, `.data` 0x40 B,
+ * `.text` 0x8028F66C..0x80297E34 (about 80 functions), `.bss` 0x1060 B (the `Pl/pl_coll.h` arrays), `.ctors` 4 B, `.data` 0x40 B,
  * `.sbss` 8 B, `.sdata` 8 B, `.sdata2` 0x6C B, extab 0x218 B and extabindex 0x324 B.  Phase 4 fold/recut (docs/splits/phase4):
  * `Pl/fn_8028F66C` (whole), the head of `Pl/fn_80295EF4` (0x80295EF4..0x80297E34) and the data-only unit `Pl/bss_pool` (the
  * `.bss` arrays the band's static initialiser constructs) are one TU of the candidate; the tail of `Pl/fn_80295EF4` goes to
@@ -17,8 +17,8 @@
  * extabindex 0x800309D8-0x80030C30 (50 records); all three ranges are registered in splits.txt.
  * Nothing is claimed out of `.data`/`.sdata`/`.sdata2` (invariant 8.4): the unit's `.sdata2` pool is
  * still emitted by the `auto_*` objects, and the `.bss` collision-work tables the query half walks
- * (`pl_move_work`, `pl_hit_box`, `pl_land_data`, `pl_hit_id_list`, ...) are owned by the data-only
- * unit `Pl/bss_pool.cpp` (its header `Pl/bss_pool.h` declares them), not by this unit.
+ * (`pl_move_work`, `pl_hit_box`, `pl_land_data`, `pl_hit_id_list`, ...) are owned by this unit
+ * (its header `Pl/pl_coll.h` declares them).
  *
  * Extent.  The LEFT edge is a real TU boundary, pinned by the `.sdata2` run: the preceding unit
  * (`Pl/fn_80288CEC.cpp`) owns 0x8079A270-0x8079A314 and this unit's pool starts exactly at
