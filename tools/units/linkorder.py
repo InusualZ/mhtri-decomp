@@ -1,45 +1,9 @@
 #!/usr/bin/env python3
-"""Link-order audit for flips (roadmap 7.19): does the linked ELF still reproduce the original DOL?
-
-    python tools/units/linkorder.py                  # whole link: order, addresses, bytes, first divergence
-    python tools/units/linkorder.py --unit <unit>    # one unit's claimed region (works before a flip too)
-    python tools/units/linkorder.py --json           # the same report as data, for a batch gate
-
-Why this exists
----------------
-A flip substitutes our object for dtk's split object, so the only proof that the *link* is still the
-original is `ninja build/RMHE08/ok`. When it goes red, `dtk dol diff` names a symbol and a count of
-differing bytes - not the unit or the object responsible - and `build/RMHE08/main.MAP` cannot help: it is
-a stale 2024 artefact, because dtk's link does not write one. So this tool reconstructs the DOL image
-from the linked `build/RMHE08/main.elf` alone - section headers, PT_LOAD contents, entry point and the
-NOBITS span - and compares it to `orig/RMHE08/sys/main.dol`. No relink, no `ninja`, nothing written.
-
-What it checks
---------------
-order     the ELF's code/data sections in address order against the DOL's text0..text6 / data0..data10
-          slots: same count, same addresses, same sizes. A DOL slot is the section's size rounded up to
-          0x20, the original's file-offset alignment (measured on the green link: 10/10 slots).
-bytes     every slot, from the ELF's file bytes, against the DOL's - the whole `dtk dol diff`, bucketed
-          per section, with the first differing byte and the count per section.
-header    the reconstructed DOL header against the original's, field by field.
-For the first divergence it prints both words, the original symbol (from `symbols.txt`) and the linked
-symbol (from the ELF symtab), then the unit from `splits.txt` and the object `configure.py` links for it.
-
-`--unit` scopes the same audit to the ranges one unit's `splits.txt` entry claims. That is the pre-flip
-check: before a flip the region holds dtk's target object and matches, afterwards it holds ours. It also
-reports whether a claimed range is a *fragment* of a shared `.ctors`/`.dtors` slot - the link-order case
-roadmap 7.19 is about, which `flipcheck.py` cannot see - and it names the object the link actually used
-(`src/` for a `Matching` unit, the target `obj/` for a `NonMatching` one). `extab`/`extabindex` fragments
-are not flagged: `g3d/g3d_resanmamblight.c` is green with one. The content half of the proof (object vs
-target object) stays `flipcheck.py`'s job; this tool owns the link shape.
-
-`land.py` does not call this yet (it was built under a no-edit-other-tools constraint); the natural hook
-is a `linkorder.py --json` step after `ok`, reading `ok` and the per-unit verdicts.
-
-Read-only by construction: it opens the ELF, the DOL, `symbols.txt`, `splits.txt` and `configure.py`.
-"""
+"""Reconstruct the DOL image from main.elf and compare it to the original slot by slot (order, bytes, header).
+Spec: docs/tools/spec/linkorder.md. CLI: linkorder.py [--unit U] [--json]."""
 from __future__ import annotations
 
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import bisect
 import json
@@ -47,6 +11,10 @@ import os
 import re
 import struct
 import sys
+
+from tools.lib.binary.elf import Elf as LibElf, ElfError
+
+from tools.lib.binary.dol import Dol as LibDol, DolError
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 GAME = "RMHE08"
@@ -84,90 +52,50 @@ AUTO_RE = re.compile(r"^auto_\d+_([0-9A-Fa-f]{8})_(\w+)$")
 
 
 # ---------------------------------------------------------------------------------------------------
-# little readers: one ELF32 big-endian parser and one DOL header parser, both self-contained
+# little readers: views over lib.binary's ELF and DOL readers
 # ---------------------------------------------------------------------------------------------------
-
-def _u16(data: bytes, off: int) -> int:
-    return struct.unpack_from(">H", data, off)[0]
-
-
-def _u32(data: bytes, off: int) -> int:
-    return struct.unpack_from(">I", data, off)[0]
-
-
-def _cstr(data: bytes, off: int) -> str:
-    if off < 0 or off >= len(data):
-        return ""
-    end = data.find(b"\0", off)
-    return data[off:end if end >= 0 else len(data)].decode("latin1")
-
 
 def align_up(value: int, align: int) -> int:
     return (value + align - 1) // align * align
 
 
 def parse_elf(data: bytes) -> dict:
-    """ELF32 big-endian: sections, PT_LOAD segments, the symtab and e_entry. Works for objects too."""
-    if len(data) < 0x34 or data[:4] != b"\x7fELF":
-        raise ValueError("not an ELF file")
+    """ELF32 big-endian: sections, PT_LOAD segments, the symtab and e_entry (a view over `lib.binary.elf`)."""
+    try:
+        elf = LibElf.read(data)
+    except ElfError:
+        raise ValueError("not an ELF file") from None
     if data[4] != 1 or data[5] != 2:
         raise ValueError("expected a 32-bit big-endian ELF (class %d, data %d)" % (data[4], data[5]))
-    entry = _u32(data, 0x18)
-    phoff, shoff = _u32(data, 0x1C), _u32(data, 0x20)
-    phentsize, phnum = _u16(data, 0x2A), _u16(data, 0x2C)
-    shentsize, shnum, shstrndx = _u16(data, 0x2E), _u16(data, 0x30), _u16(data, 0x32)
-
-    sections = []
-    for i in range(shnum):
-        off = shoff + i * shentsize
-        name_off, typ, flags, addr, offset, size, link, info, align, entsize = struct.unpack_from(">10I", data, off)
-        sections.append({"index": i, "name_off": name_off, "typ": typ, "flags": flags, "addr": addr,
-                         "offset": offset, "size": size, "link": link, "info": info, "align": align,
-                         "entsize": entsize, "name": ""})
-    if 0 <= shstrndx < len(sections):
-        base = sections[shstrndx]["offset"]
-        for section in sections:
-            section["name"] = _cstr(data, base + section["name_off"])
-
-    segments = []
-    for i in range(phnum):
-        off = phoff + i * phentsize
-        typ, offset, vaddr, _paddr, filesz, memsz, flags, align = struct.unpack_from(">8I", data, off)
-        segments.append({"typ": typ, "offset": offset, "vaddr": vaddr, "filesz": filesz,
-                         "memsz": memsz, "flags": flags, "align": align})
-
-    symbols = []
-    for section in sections:
-        if section["typ"] != SHT_SYMTAB or section["link"] >= len(sections):
-            continue
-        strtab = sections[section["link"]]
-        base, entsize = strtab["offset"], section["entsize"] or 16
-        for j in range(section["size"] // entsize):
-            name_off, value, size, info, _other, shndx = struct.unpack_from(">IIIBBH", data, section["offset"] + j * entsize)
-            stype = info & 0xF
-            name = _cstr(data, base + name_off)
-            if not name or stype == STT_SECTION:
-                continue
-            symbols.append({"name": name, "value": value, "size": size, "type": stype,
-                            "bind": info >> 4, "shndx": shndx})
+    sections = [{"index": s.index, "name_off": s.name_offset, "typ": s.type, "flags": s.flags, "addr": s.addr,
+                 "offset": s.offset, "size": s.size, "link": s.link, "info": s.info, "align": s.align,
+                 "entsize": s.entsize, "name": s.name} for s in elf.sections]
+    segments = [{"typ": p.type, "offset": p.offset, "vaddr": p.vaddr, "filesz": p.filesz, "memsz": p.memsz,
+                 "flags": p.flags, "align": p.align} for p in elf.program_headers]
+    symbols = [{"name": s.name, "value": s.value, "size": s.size, "type": s.type, "bind": s.bind, "shndx": s.shndx}
+               for s in elf.symbols if s.name and s.type != STT_SECTION]
     symbols.sort(key=lambda s: (s["value"], s["size"]))
-    return {"data": data, "entry": entry, "sections": sections, "segments": segments, "symbols": symbols,
+    return {"data": data, "entry": elf.entry, "sections": sections, "segments": segments, "symbols": symbols,
             "sym_values": [s["value"] for s in symbols]}
 
 
 def parse_dol(data: bytes) -> dict:
-    if len(data) < DOL_HEADER:
-        raise ValueError("not a DOL (shorter than its 0x100 header)")
+    try:
+        dol = LibDol.read(data)
+    except DolError as exc:
+        raise ValueError(str(exc)) from None
+    text = [s for s in dol.slots if s.kind == "text"]
+    datas = [s for s in dol.slots if s.kind == "data"]
     return {
-        "text_offsets": list(struct.unpack_from(">7I", data, 0x00)),
-        "data_offsets": list(struct.unpack_from(">11I", data, 0x1C)),
-        "text_addrs": list(struct.unpack_from(">7I", data, 0x48)),
-        "data_addrs": list(struct.unpack_from(">11I", data, 0x64)),
-        "text_sizes": list(struct.unpack_from(">7I", data, 0x90)),
-        "data_sizes": list(struct.unpack_from(">11I", data, 0xAC)),
-        "bss_addr": _u32(data, 0xD8),
-        "bss_size": _u32(data, 0xDC),
-        "entry": _u32(data, 0xE0),
+        "text_offsets": [s.offset for s in text],
+        "data_offsets": [s.offset for s in datas],
+        "text_addrs": [s.address for s in text],
+        "data_addrs": [s.address for s in datas],
+        "text_sizes": [s.size for s in text],
+        "data_sizes": [s.size for s in datas],
+        "bss_addr": dol.bss_address,
+        "bss_size": dol.bss_size,
+        "entry": dol.entry,
     }
 
 

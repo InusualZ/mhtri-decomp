@@ -701,6 +701,8 @@ def generate_build_ninja(
     # every unit whose section starts are already 8-aligned.
     # Evidence: tools/elf/objalign.py (selftest) and docs/matching.md.
     objalign = Path("tools") / "elf" / "objalign.py"
+    # objalign and objextab read and write the object through lib.binary.elf: it is an input of the step too
+    objelf = Path("tools") / "lib" / "binary" / "elf.py"
     objalign_cmd = f" && $python {objalign} $out"
     # The two base rules have no chain of their own, so they need CHAIN (a `cmd /c` on
     # Windows) to make the `&&` meaningful; the extab rules already start with it.
@@ -715,6 +717,7 @@ def generate_build_ninja(
         mwcc_sjis_extab_implicit,
     ):
         mwcc_implicit_list.append(objalign)
+        mwcc_implicit_list.append(objelf)
 
     # Exception-table name normalisation, appended to every MWCC rule after the alignment step.
     # `dtk dol split` names the extab/extabindex entries it synthesises after the map address they

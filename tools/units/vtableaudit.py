@@ -1,101 +1,12 @@
 #!/usr/bin/env python3
-"""Sweep registered units for a **vtable they own but do not emit** - the rule-10 defect made mechanical.
-
-Why this tool exists (owner's backlog #0, 2026-09-26). `docs/plan.md` §6.5 rule 10 (playbook row 52) says a
-table of code pointers inside a unit's own registered ranges is **compiler output**: declare the class with its
-`virtual` methods and let MWCC emit the table. A hand-modelled table - or a table the unit simply never emits -
-is **not evidence of inheritance**, and for a `NonMatching` unit nothing fails: the bytes come from the DOL, the
-unit scores 100 %, and the defect only surfaces at the flip, when a `Matching` object replaces the original and
-the DOL hash moves. The audit that found this was done **by hand once** (0 instances, 2026-09-26); this is that
-audit as a tool so it stays true.
-
-Three forms of the same defect, and what the tool reports for each:
-
-**(a) code-pointer runs inside the unit's own data ranges.** For every unit, walk the data sections it owns in
-`config/RMHE08/splits.txt` (`.data`, `.rodata`, `.sdata`, `.sdata2`, `.ctors`, `.dtors`, `extab`,
-`extabindex`) and find maximal runs of consecutive words whose value is an address inside `.text`. A word's
-value is read from the unit's own target object (`build/RMHE08/obj/<Unit>.o`): a word carrying a relocation is
-resolved through that relocation (`section base + symbol + addend`; the object's bytes hold the unlinked addend
-there, the *same* reason `dataclaim` masks reloc sites), a word without one is a plain linked value. A run needs
-**at least two entries** - a single code pointer in a data section is an ordinary pointer, not a table.
-
-**(b) whether OUR side is legitimate.** A run our object **emits** (the section covers it and every word is a
-code pointer) or **references** (a relocation anywhere in our object resolves to an address inside the run) is
-fine. A run we own and **neither emit nor reference** is the violation - the table is absent from our object
-entirely. The legal rule-10 Case 2 shape is the mirror image and is explicitly **not** flagged, only recorded:
-`self->vtbl = lbl_XXXXXXXX;` where the address is outside every registered range is another TU's table, and
-storing its address is the correct way to reproduce the call without dragging a class into this TU. The source
-scan for that shape reports every hit with its classification: `external` (no registered range owns it -
-legal), `foreign` (another unit owns it - legal), `own` (this unit's range - the shape rule 10 forbids,
-reported).
-
-**The scan keys on the assignment and on OWNERSHIP, never on the table symbol's spelling** (fixed
-2026-09-27). It used to match `vtable = lbl_XXXXXXXX` and nothing else, so
-`self->vtable = &NetworkSessionManagerVTable;` in `Network/fn_803D3CE8.cpp` - a table at 0x805FA908, inside
-that unit's own band - was invisible to it and survived a landing review; the owner found it by reading the
-file. A rule about *ownership* cannot be enforced by a scan keyed on a *name*. The symbol on the right is now
-resolved through `symbols.txt` (any spelling) and classified against the unit's own registered ranges, and
-the member it is assigned to is matched either by the legacy `vtable`/`vtbl` name or by **the definition
-index**: any struct/class member at `+0x00` whose type is a pointer to a struct whose members are function
-pointers (the owner's heuristic - a function-pointer-table pointer at `+0x00` IS a class with inheritance).
-That is `fn_table_fields`, and it is what makes the `_VTable`-named blind spot impossible to repeat.
-
-**(c) section completeness.** The same defect seen from the other side: a `NonMatching` unit hides a missing
-`.data`/`.rodata` section entirely, because the target's bytes are scored against nothing of ours. Every
-non-`.text` section whose size differs between our object and the target object is reported, marked `missing`
-(ours is 0), `extra` (the target has none), `short` or `long`.
-
-**(d) emission order (warn-level, `docs/data-order-seams.md`, playbook row 80).** MWCC emits one TU's `.data`
-as globals, strings (`@NNN`), then vtables in the **reverse** of class definition order. In our built object
-every `__vt__*` symbol must therefore come after every non-string `.data` symbol (`vtable-before-data`), and the
-vtables must descend in class order (`vtable-order`; the order comes from the class definitions in the unit's
-source and the project headers it includes, a vtable whose class cannot be resolved is skipped and counted).
-`@NNN` / `@STRING@<inline function>` string literals **after** a vtable are not a finding: they are the "inline tail" (the strings of inline
-functions - in-class bodies, free `inline` functions - are emitted after the vtables, unmerged), so only a
-non-string, non-vtable symbol (an initialised global) after a vtable is flagged.
-A finding means the source order or a hand-modelled table is wrong. These findings are **reported, never
-part of the `--diff` violation set** - the gate row refuses only the rule-10 kinds above.
-
-What the tool **cannot** decide, said plainly: whether an emitted table came from a `virtual` class or from a
-hand-written array of the same bytes. Both compile to the same object; the difference is in the source (`virtual`
-methods plus the constructor that stores the table vs. an array initializer). The tool's job is the part that is
-decidable - a table that is *absent* from our object - and it names the emitted ones so a reviewer can check the
-source. `docs/plan.md` §6.5 rule 10's "a table we wrote is not evidence of inheritance" therefore still lands on
-the reviewer; the tool removes the invisible case.
-
-Read-only by construction: no `ninja`, no compile, no link, no write anywhere. Section parsing is
-`tools/elf/elfsect.py`; the registered-unit list is `langcheck.registered_units` (the one place that reads
-`config.libs`); the DOL header supplies the `.text` ranges.
-
-    python tools/units/vtableaudit.py                    # every registered unit, runs + refs + section diffs
-    python tools/units/vtableaudit.py --runs             # only the owned code-pointer runs
-    python tools/units/vtableaudit.py --sections         # only the section-size differences
-    python tools/units/vtableaudit.py --order            # only the .data emission-order findings
-    python tools/units/vtableaudit.py --fields           # only the fn-table-pointer fields at +0x00
-    python tools/units/vtableaudit.py --unit Pl/pl_master
-    python tools/units/vtableaudit.py --diff <ref>       # exit 0 = the batch adds no rule-10 violation
-    python tools/units/vtableaudit.py --at 0x80050F28   # one vtable, its slots and each target's owner
-    python tools/units/vtableaudit.py --json
-    python tools/units/vtableaudit.py --selftest
-
-`--main` points the sweep at a tree holding `configure.py` and `build/` (default: the tree this file lives in),
-which is how a worktree audits `MAIN`'s built objects without a build of its own. `--diff <ref>` is the
-`land.py` gate row's core: the violation set is computed twice - once with the batched tree and once with
-`<ref>`'s text (`configure.py`, `symbols.txt`, `splits.txt` and the `src/**` that carries an assignment, read
-with `git show`) - and only a set that *grew* is a refusal. The run half is judged with the working tree's
-objects on both sides, so the ownership change a batch makes (a new `.data` claim) is what the diff sees;
-a batch that only *removed* an emission is not refused by that half - it is named in the report instead.
-
-`--at <addr>` is the census mode: it reads the vtable at `<addr>` straight out of the DOL and prints every
-slot with the registered unit that **owns** its target (by address, never by name) and the symbol the map
-names there, plus the reference object's relocation symbol for that slot (`dossier.parse_elf`). One lane
-hand-built that list twice and got 62 of 114 slots wrong, each time by parsing the DOL header's grouped
-offset/address/size fields by hand - this mode parses them once, in `dol_segments`/`dol_read`.
-"""
+"""Rule 10 audit: owned code-pointer runs, +0x00 table stores in source, section completeness; --diff is the gate's row.
+Spec: docs/tools/spec/vtableaudit.md. CLI: vtableaudit.py [--unit U] [--runs|--sections|--order|--fields]
+[--diff REF] [--at ADDR] [--json] | --selftest."""
 
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import json
 import os
@@ -106,13 +17,15 @@ import sys
 import time
 from tools.lib.git import Git
 
+from tools.lib.binary.dol import Dol as LibDol
+from tools.lib.binary.elf import Elf as LibElf, ElfError
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
-for _p in (HERE, os.path.join(ROOT, "tools", "elf")):
+for _p in (HERE,):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-import elfsect  # noqa: E402  (the project's ELF section reader)
 import langcheck  # noqa: E402  (registered_units - the same list every other unit tool uses)
 import dossier  # noqa: E402  (parse_elf - the one ELF object reader, for the `--at` reference side)
 
@@ -223,40 +136,24 @@ def parse_symbols(text: str) -> dict:
 
 
 def dol_segments(blob: bytes) -> list:
-    """`[(start, size, file_offset)]` for every section the DOL header declares - the raw byte reader."""
+    """`[(start, size, file_offset)]` for every section the DOL header declares (`lib.binary.dol`)."""
     if len(blob) < 0x100:
         return []
-    text_off = struct.unpack_from(">7I", blob, 0x00)
-    data_off = struct.unpack_from(">11I", blob, 0x1C)
-    text_addr = struct.unpack_from(">7I", blob, 0x48)
-    data_addr = struct.unpack_from(">11I", blob, 0x64)
-    text_size = struct.unpack_from(">7I", blob, 0x90)
-    data_size = struct.unpack_from(">11I", blob, 0xAC)
-    out = []
-    for i in range(7):
-        if text_size[i]:
-            out.append((text_addr[i], text_size[i], text_off[i]))
-    for i in range(11):
-        if data_size[i]:
-            out.append((data_addr[i], data_size[i], data_off[i]))
-    return out
+    return [(s.address, s.size, s.offset) for s in LibDol.read(blob).segments]
 
 
 def dol_read(blob: bytes, address: int, length: int) -> bytes:
     """The DOL's own bytes at `address`, or None when the address is in no section."""
-    for start, size, offset in dol_segments(blob):
-        if start <= address < start + size:
-            return blob[offset + address - start:offset + address - start + length]
-    return None
+    if len(blob) < 0x100:
+        return None
+    return LibDol.read(blob).bytes_from(address, length)
 
 
 def dol_text_ranges(blob: bytes) -> list:
     """`[(start, end)]` for every text section the DOL header declares - the authoritative `.text`."""
     if len(blob) < 0x100:
         return []
-    addr = struct.unpack_from(">7I", blob, 0x48)
-    size = struct.unpack_from(">7I", blob, 0x90)
-    return [(addr[i], addr[i] + size[i]) for i in range(7) if size[i]]
+    return LibDol.read(blob).text_ranges
 
 
 def merge_ranges(ranges) -> list:
@@ -440,43 +337,30 @@ def object_paths(main: str, source_path: str):
 def read_object(path: str):
     """`{sections, order, symbols, relocs}` for an ELF32 object, or `None` when it is not one.
 
-    Section headers come from `tools/elf/elfsect.py`. The `.symtab` rows are kept **with their indices**,
-    because a relocation names its symbol by index and the reader must not drop a row (the undefined rows
-    are exactly the ones an object-only reader has no address for). Relocations are grouped by the section
-    they apply to, so a lookup is `relocs[section][offset]`.
+    The `.symtab` rows are kept **with their indices** (`lib.binary.elf`), because a relocation names its
+    symbol by index and the reader must not drop a row (the undefined rows are exactly the ones an
+    object-only reader has no address for). Relocations are grouped by the section they apply to, so a
+    lookup is `relocs[section][offset]`.
     """
     try:
-        _, headers = elfsect.sections(path)
-    except (OSError, AssertionError, struct.error, ValueError):
+        elf = LibElf.read(path)
+    except (OSError, ElfError):
         return None
     sections, order = {}, []
-    for h in headers:
-        name = h["name"]
-        order.append(name)
-        sections[name] = {"name": name, "typ": h["typ"], "size": h["size"], "link": h["link"],
-                          "entsize": h["entsize"], "data": b"" if h["typ"] == 8 else h["data"]}
+    for s in elf.sections:
+        order.append(s.name)
+        sections[s.name] = {"name": s.name, "typ": s.type, "size": s.size, "link": s.link,
+                            "entsize": s.entsize, "data": s.data}
     obj = {"sections": sections, "order": order, "symbols": [], "relocs": {}}
-    st = sections.get(".symtab")
-    if st and st["data"]:
-        link = st["link"]
-        strtab = order[link] if link < len(order) else None
-        sdata = sections[strtab]["data"] if strtab in sections else b""
-        step = st["entsize"] or 16
-        for off in range(0, len(st["data"]) - step + 1, step):
-            nm, value, size, info, _other, shndx = struct.unpack_from(">IIIBBH", st["data"], off)
-            end = sdata.find(b"\0", nm)
-            name = sdata[nm:end].decode("latin-1") if nm and end >= 0 else ""
-            obj["symbols"].append({"name": name, "value": value, "size": size,
-                                   "bind": (info >> 4) & 0xF, "type": info & 0xF, "shndx": shndx})
-    for name, sec in sections.items():
-        if not name.startswith(".rela") or not sec["data"]:
-            continue
-        rows = {}
-        step = sec["entsize"] or 12
-        for off in range(0, len(sec["data"]) - step + 1, step):
-            r_off, r_info, r_add = struct.unpack_from(">IIi", sec["data"], off)
-            rows[r_off] = (r_info & 0xFF, r_info >> 8, r_add)
-        obj["relocs"][name[5:]] = rows
+    if elf.symtab is not None and elf.symtab.data:
+        obj["symbols"] = [{"name": s.name, "value": s.value, "size": s.size, "bind": s.bind, "type": s.type,
+                           "shndx": s.shndx} for s in elf.symbols]
+    by_rela: dict[int, dict] = {}
+    for r in elf.relocs():
+        by_rela.setdefault(r.rela_index, {})[r.offset] = (r.type, r.symbol, r.addend)
+    for rela, _target in elf.rela_sections():  # a repeated section name: the last one wins, as before
+        if rela.data:
+            obj["relocs"][rela.name[5:]] = by_rela.get(rela.index, {})
     return obj
 
 

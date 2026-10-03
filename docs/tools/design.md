@@ -149,10 +149,12 @@ becomes it (`duplication.md` has the line numbers).
 
 * `elf.py`: `Elf.read(path|bytes)`: `sections` (name, type, addr, offset, size, data, align), `symbols` (name, section, value,
   size, bind, type), `relocs(section)` (offset, symbol, type, addend, type name), `comment` (the CodeWarrior bytes and flags),
-  `section_bytes(name)`, `defined/undefined/global sets`, `write()` for the two ninja steps (`objalign`, `objextab`).
+  `section_bytes(name)`, `defined/undefined/global sets`; the writer for the two ninja steps (`objalign`, `objextab`) is
+  `ElfEditor(elf)` (`set_section_align`, `set_symbol_info`, `rename_symbols`, `write`): a parsed `Elf` stays an immutable
+  view, and the edit is the splice those steps already proved byte-neutral.
 * `dol.py`: `Dol.read(path)`: `segments` (text0..6, data0..10, bss), `bytes_at(address, n)`, `section_of(address)`, `text_ranges`,
   `data_ranges`, `words(address, n)`.
-* `objdump.py`: `locate_binutils(tree)`, `disassemble(objdump, obj|elf, sections)`, `dtk_disasm(obj)`, and one tokenizer for the
+* `objdump.py`: `locate(root)`, `disassemble(objdump, obj|elf, sections)`, `dtk_disasm(obj, dtk)`, and one tokenizer for the
   objdump / dtk / asm-dump line shapes (`mnemonic`, `operands`, `address`, `relocation`), so `accessextent`, `m2cinput`, `callees`,
   `callers` and `verify_pcode` parse one way.
 * `dwarf.py`: `dwarfmap`'s core (uleb/sleb, `.debug_info` with `.rela.debug_info` applied).

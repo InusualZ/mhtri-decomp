@@ -30,7 +30,7 @@ Tier: fixture (a lib test never reads the live tree). the harness tests itself: 
 
 Implemented in WP0 (`docs/tools/wp0-report.md`). Open:
 
-* `FixtureTree.add_object` takes raw bytes until `lib.binary.build.ElfBuilder` exists (WP1b).
+* `FixtureTree.add_object` takes raw bytes or a `lib.binary.build.ElfBuilder` (WP1b).
 * The audit-hook guard cannot see `os.stat`/`os.path.exists` or anything a module does at import time (before `run()`).
   WP1a closed the part of this that matters: `lib.repo` is the choke point (every root it resolves or is handed goes
   through `assert_path_allowed`, and `repo_root()` without `start=` raises), and `unitutil.ROOT` resolves on first use, so

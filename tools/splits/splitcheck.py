@@ -41,6 +41,7 @@ fool it) and is stated as such in every finding that depends on it.
 """
 from __future__ import annotations
 
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import bisect
 import collections
@@ -50,6 +51,8 @@ import re
 import struct
 import subprocess
 import sys
+
+from tools.lib.binary.dol import Dol as LibDol
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOOLS = os.path.dirname(HERE)
@@ -178,29 +181,15 @@ def parse_symbols(lines):
     return out
 
 
-class Dol:
-    """Address -> bytes of the retail image through the DOL section table."""
+class Dol(LibDol):
+    """Address -> bytes of the retail image through the DOL section table (`lib.binary.dol`)."""
 
     def __init__(self, data):
-        self.data = data
-        h = data
-        toff = struct.unpack(">7I", h[0x00:0x1C])
-        doff = struct.unpack(">11I", h[0x1C:0x48])
-        taddr = struct.unpack(">7I", h[0x48:0x64])
-        daddr = struct.unpack(">11I", h[0x64:0x90])
-        tsize = struct.unpack(">7I", h[0x90:0xAC])
-        dsize = struct.unpack(">11I", h[0xAC:0xD8])
-        self.secs = [(a, s, o) for a, s, o in zip(taddr + daddr, tsize + dsize, toff + doff) if s]
+        super().__init__(data)
+        self.secs = [(s.address, s.size, s.offset) for s in self.segments]
 
     def read(self, addr, n):
-        for a, s, o in self.secs:
-            if a <= addr and addr + n <= a + s:
-                return self.data[o + (addr - a):o + (addr - a) + n]
-        return None
-
-    def word(self, addr):
-        b = self.read(addr, 4)
-        return struct.unpack(">I", b)[0] if b else None
+        return self.bytes_at(addr, n)
 
 
 # ---- instruction decoding: who reads which data address -----------------------------------------------------------------

@@ -10,8 +10,6 @@
   "tools/agents/sync_playbook_index_selftest.py",
   "tools/agents/sync_profiles_selftest.py",
   "tools/elf/elfsect.py",
-  "tools/elf/objalign.py",
-  "tools/elf/objextab.py",
   "tools/flags/frame.py",
   "tools/flags/infer.py",
   "tools/flags/infer_selftest.py",

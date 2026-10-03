@@ -55,6 +55,7 @@ that acts on these verdicts.
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import json
 import os
@@ -63,13 +64,15 @@ import sys
 import tempfile
 from tools.lib import text as libtext
 
+from tools.lib.binary.dol import Dol as LibDol
+from tools.lib.binary.elf import Elf as LibElf, ElfError
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
-for _path in (os.path.join(ROOT, "tools", "elf"), os.path.dirname(HERE), HERE):
+for _path in (os.path.dirname(HERE), HERE):
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
-import elfsect  # noqa: E402  (the project's object section reader)
 import symbolpreflight as preflight  # noqa: E402
 import ledger as ledger_mod  # noqa: E402  (Objects/covering + the report's numbers)
 import dataqueue as dq  # noqa: E402  (the queue's own section order is this tool's sort key)
@@ -167,18 +170,10 @@ def hex_prefix(data: bytes | None, n: int = HEX_PREFIX) -> str | None:
 
 
 def dol_sections(blob: bytes) -> list[tuple[int, int, int]]:
-    """`(address, size, file_offset)` for every DOL section with file bytes - the DOL's own header layout."""
+    """`(address, size, file_offset)` for every DOL section with file bytes - the DOL's own header layout. (`lib.binary.dol`)."""
     if len(blob) < 0x100:
         return []
-    text_off = struct.unpack_from(">7I", blob, 0x00)
-    data_off = struct.unpack_from(">11I", blob, 0x1C)
-    text_addr = struct.unpack_from(">7I", blob, 0x48)
-    data_addr = struct.unpack_from(">11I", blob, 0x64)
-    text_size = struct.unpack_from(">7I", blob, 0x90)
-    data_size = struct.unpack_from(">11I", blob, 0xAC)
-    out = [(text_addr[i], text_size[i], text_off[i]) for i in range(7) if text_size[i]]
-    out += [(data_addr[i], data_size[i], data_off[i]) for i in range(11) if data_size[i]]
-    return out
+    return [(s.address, s.size, s.offset) for s in LibDol.read(blob).segments]
 
 
 def dol_bytes(blob: bytes, sections: list[tuple[int, int, int]], address: int, length: int) -> bytes | None:
@@ -425,17 +420,10 @@ def summary(entries: list[dict], queue_path: str) -> str:
 def read_object_sections(path: str) -> dict | None:
     """`{section: {type, size, data}}` for one object; a NOBITS section carries no file bytes."""
     try:
-        _, headers = elfsect.sections(path)
-    except (OSError, AssertionError, struct.error, ValueError):
+        elf = LibElf.read(path)
+    except (OSError, ElfError):
         return None
-    out = {}
-    for header in headers:
-        name = header["name"]
-        if not name:
-            continue
-        data = b"" if header["typ"] == 8 else header["data"]
-        out[name] = {"type": header["typ"], "size": header["size"], "data": data}
-    return out
+    return {s.name: {"type": s.type, "size": s.size, "data": s.data} for s in elf.sections if s.name}
 
 
 def covering_object(objects, section: str, address: int) -> tuple[str | None, int | None]:

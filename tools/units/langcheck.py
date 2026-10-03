@@ -1,73 +1,10 @@
-"""Decide a translation unit's *language* (C or C++) from evidence, not from our convenience.
-
-`docs/plan.md`, "The language comes from the symbol, not from our convenience" (owner's rule,
-2026-09-23). A unit is **C++** only on **conclusive** evidence:
-
-* **its own symbol is mangled** - a *definition* carrying MWCC's `__F`/`__Q` argument-list mangling
-  (`SetPosition__Q34nw4r3g3d6CameraFRCQ34nw4r4math4VEC3`, `fn_800CD584__FP9ResHandle`);
-* **its panic/log string names a `.cpp`** - the `__FILE__` assert strings are original source names
-  (`ef_line.cpp`, `g3d_resanm.cpp`, `menu_message.cpp`). A unit whose *object* references one is a C++
-  file even when its `.text` reads like C, and a unit whose object references a `.c` name is C.
-
-A mangled name on the *referenced* side (`get_now_areano__Fv`, `Panic__Q24nw4r2dbFPCciPCce`) is
-**suggestive, not conclusive**: it is still reported, with its reason, but it must not raise
-confidence to `high` nor drive an extension change by itself. A C translation unit can call a mangled
-function - it declares it with the map's spelling - and `auto/800FD520_fn_800FD520` does exactly that:
-it calls mangled `SetRootMtxTrans__FPQ34nw4r2ef6EffectPQ34nw4r4math4VEC3` and was reconstructed as
-`.c`, matching at 100.00 % with all 26 relocations identical (`auto/803066F0_fn_803066F0.c` is the
-same shape).
-
-A third signal is **suggestive, not conclusive** too, and it is cheap and mechanical: an object that
-carries the `extab`/`extabindex` sections was compiled as C++ - **C has no exceptions**, so a C
-translation unit has no `__eh` records to emit. The confound is a lib whose `cflags` set
-`-Cpp_exceptions on` (`cflags_pl`, `cflags_main`, `cflags_g3d`, `cflags_camellia`): that makes a **C**
-unit emit `extab` as well, so the signal is only usable when the lib leaves the flag off, which
-`cflags_exceptions` resolves from the unit's cflags variable. Even then it is **one-directional** - a
-C++ file with no `try`/`catch`/`throw` emits no `extab`, so an object *without* the section evidences
-nothing (`Runtime.PPCEABI.H/__init_cpp_exceptions.cpp` is C++ and has none). It therefore joins the
-mangled-callee signal as `suggested`: reported with its reason, keeps the extension, and never
-renames on its own. On today's tree its decisive hit count is **0** - the `.c` units that carry
-`extab` all sit in libs that enable exceptions (`auto`/`main`), where the hint is silent - but it is
-decisive for the no-exceptions libs and catches a wrong extension the moment a new unit is registered
-there.
-
-That decides three things and none of them is stylistic: the **file extension**, the **`-lang`** the
-front-end is run with, and the **name objdiff pairs by** (a C++ definition is mangled unless it is
-`extern "C"` - playbook row 42 seen from the other side).
-
-**Why this is a tool and not a judgement call.** The attribution batches picked `.c`/`.cpp` per unit
-from a guess, so registered units are the wrong language today: `auto/800CCFB0_fn_800CCFB0` is
-`ef_line.cpp` and is registered as `.c`.  `auto/800CCFB0` closed at 99.96 % with its last rows
-attributed to "C-vs-C++ front-end, not source shape" - that residual is not source-reachable. The fix
-belongs in the promotion pass (rename + extension + one re-split), which is what the sweep report here
-feeds.
-
-The extension is not just a hint: `dtk` derives the front-end flag from it and passes `-lang=c` for a
-`.c` object, `-lang=c++` for a `.cpp` one (visible in the real compile command). So a wrong extension is
-a wrong compiler invocation, and a lib-level `-lang` in `cflags` would be the only way to disagree with
-it - which is why `unit_verdict` resolves the cflags variable's text and reports that separately.
-
-**The trap this tool exists to avoid.** Every target object carries a `STT_FILE` symbol whose name is
-the *configured* source path (`800CCFB0_fn_800CCFB0.c`, `pl_master.cpp`). dtk's split synthesises it
-from `configure.py`, so it is circular: it echoes the extension we chose and is evidence of nothing.
-`elf_symbols` returns it, and every consumer here filters `type == 4`/`SHN_ABS` out. (The other
-near-miss is `-lang`: it lives in a cflags list, so `unit_verdict` resolves the cflags variable's text
-and reports a flag/verdict disagreement separately from an extension one.)
-
-Usage:
-
-    python tools/units/langcheck.py                 # every registered unit, verdict + evidence
-    python tools/units/langcheck.py --disagree      # the sweep report: units that disagree
-    python tools/units/langcheck.py --unit auto/800CCFB0_fn_800CCFB0
-    python tools/units/langcheck.py --json
-    python tools/units/langcheck.py --selftest
-
-Read-only: nothing here writes a file, and nothing here re-splits, builds or links.
-"""
+"""Decide a unit's language (C or C++) from evidence: mangled definitions, __FILE__ strings, extab presence.
+Spec: docs/tools/spec/langcheck.md. CLI: langcheck.py [--unit U] [--disagree] [--json] | --selftest."""
 
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import json
 import os
@@ -75,6 +12,8 @@ import re
 import struct
 import sys
 from tools.lib import names as libnames
+
+from tools.lib.binary.elf import Elf as LibElf, ElfError
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -213,53 +152,32 @@ def classify(mangled_defined, mangled_undefined, sources, extab=False, exception
 # the object oracle
 # --------------------------------------------------------------------------------------------------
 def _elf_sections(path: str) -> list[dict]:
-    """Every section header of an ELF32 big-endian object, with `sname` resolved.
+    """Every section header of an ELF32 big-endian object, with `sname` resolved (a view over `lib.binary.elf`).
 
-    Shared by `elf_symbols` (it needs `.symtab`/`.strtab`) and `object_has_extab` (it needs the section
-    names). Values are section-relative; `data` is the raw section content.
+    Shared by `elf_symbols` and `object_has_extab` (it needs the section names). `data` is the raw content.
     """
-    data = open(path, "rb").read()
-    if data[:4] != b"\x7fELF":
-        raise ValueError("%s is not an ELF object" % path)
-    (shoff,) = struct.unpack_from(">I", data, 0x20)
-    (shentsize, shnum, shstrndx) = struct.unpack_from(">HHH", data, 0x2E)
-    secs = []
-    for i in range(shnum):
-        o = shoff + i * shentsize
-        name, typ, flags, addr, off, size, link, info, align, entsize = struct.unpack_from(
-            ">IIIIIIIIII", data, o)
-        secs.append(dict(name=name, typ=typ, off=off, size=size, link=link, entsize=entsize,
-                         data=data[off:off + size]))
-    shstr = secs[shstrndx]["data"]
-    for s in secs:
-        e = shstr.find(b"\0", s["name"])
-        s["sname"] = shstr[s["name"]:e].decode("latin-1")
-    return secs
+    try:
+        elf = LibElf.read(path)
+    except ElfError:
+        raise ValueError("%s is not an ELF object" % path) from None
+    return [dict(name=s.name_offset, typ=s.type, off=s.offset, size=s.size, link=s.link, entsize=s.entsize,
+                 data=s.raw, sname=s.name) for s in elf.sections]
 
 
 def elf_symbols(path: str) -> list[dict]:
-    """Every symbol in an ELF32 big-endian object, **including undefined and `STT_FILE`**.
+    """Every named symbol in an ELF32 big-endian object, **including undefined and `STT_FILE`**.
 
     `unitutil.read_elf` drops `shndx == 0` (undefined) and keeps but does not label `STT_FILE`; both
     matter here - the undefined names *are* the relocation targets (the strongest callee evidence),
     and the FILE symbol is the circular one this tool must not read. Values are section-relative.
     """
-    secs = _elf_sections(path)
-    symtab = next((s for s in secs if s["typ"] == 2), None)
-    if symtab is None:
-        return []
-    strtab = secs[symtab["link"]]["data"]
-    out = []
-    for o in range(0, symtab["size"], symtab["entsize"] or 16):
-        nm, val, size, info, other, shndx = struct.unpack_from(">IIIBBH", symtab["data"], o)
-        if nm == 0:
-            continue
-        e = strtab.find(b"\0", nm)
-        out.append({"name": strtab[nm:e].decode("latin-1"), "value": val, "size": size,
-                    "type": info & 0xF, "shndx": shndx,
-                    # SHN_ABS is where MWCC files the source-file (STT_FILE) symbol
-                    "file": (info & 0xF) == 4})
-    return out
+    try:
+        elf = LibElf.read(path)
+    except ElfError:
+        raise ValueError("%s is not an ELF object" % path) from None
+    # SHN_ABS is where MWCC files the source-file (STT_FILE) symbol
+    return [{"name": s.name, "value": s.value, "size": s.size, "type": s.type, "shndx": s.shndx,
+             "file": s.type == 4} for s in elf.symbols if s.name]
 
 
 def object_has_extab(path: str) -> bool:

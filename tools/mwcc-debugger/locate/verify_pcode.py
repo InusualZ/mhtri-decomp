@@ -1,46 +1,17 @@
 #!/usr/bin/env python3
-"""Classify a PCode dump, then either verify it against the object or measure its delta.
-
-The debugger writes one dump per optimizer pass (`backend-NN-<pass>.txt`), so the
-question "does this dump reproduce the object?" only has an answer for the *last*
-one - the state just before assembly.  An earlier dump is not claiming to be the
-final code; what it is worth is the difference between it and the final code,
-which is exactly what names the pass responsible for a residual.
-
-So this tool classifies the dump first:
-
-* **the final dump** (its pass name is the last dump point of the build's codegen
-  driver, see `final_pass_name`) is compared against `powerpc-eabi-objdump -d` of
-  the object the same command line produces, and reports MATCH or FAIL with the
-  first divergence;
-* **any earlier dump** reports a PASS-DELTA: the instruction-count delta and the
-  concrete instruction changes from that pass forward, with the pass that first
-  reaches the object's stream named when the sibling dumps are still on disk;
-* a dump whose pass cannot be identified from its file name reports its delta too
-  (never a bare FAIL: it does not claim to be final), and `--final` forces the
-  strict comparison when the caller knows better.
-
-    python locate/verify_pcode.py <backend-NN-....txt> <file.o> [--json]
-
-Mnemonics are compared after folding the spelling differences between MWCC's
-PCode and the disassembler (`clrlwi` is an `rlwinm`, `cmplwi` is a `cmpli`,
-`bgt` is a `bt` on a condition bit, ...), and registers are compared as sets
-per instruction, because the dump prints a memory operand as `rX,rY,disp`
-where the disassembler prints `disp(rY)`.  The delta uses the same comparison,
-so a pure operand reordering is not reported as a change.
-
-Exit status: 0 for MATCH and for PASS-DELTA, 1 for a FAIL, 2 for an error
-(a missing file, no objdump, an unknown build).  `--strict` makes a PASS-DELTA
-exit 1 as well, for a caller that requires the final code.
-"""
+"""Classify a PCode dump (final vs earlier pass) and compare it to the object: MATCH / FAIL / PASS-DELTA.
+Spec: docs/tools/spec/verify_pcode.md. CLI: verify_pcode.py <backend-NN-....txt> <file.o> [--json]."""
 from __future__ import annotations
 
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import json
 import re
 import subprocess
 import sys
 from pathlib import Path
+
+from tools.lib.binary import objdump as lib_objdump
 
 OBJDUMP = (
     Path(__file__).resolve().parents[3] / "build/binutils/powerpc-eabi-objdump.exe"
@@ -103,7 +74,7 @@ NO_IMM_COMPARE = {
 }
 
 DUMP_LINE = re.compile(r"^\s*\d+\s+([a-z0-9_.]+)\s*(.*)$")
-OBJDUMP_LINE = re.compile(r"^\s*[0-9a-f]+:\s+([a-z0-9_.]+)\s*(.*)$")
+MNEMONIC = re.compile(r"[a-z0-9_.]+")
 DUMP_NAME = re.compile(r"^backend-(\d+)-(.+)\.txt$")
 REG = re.compile(r"\b([rf])(\d+)\b")
 IMM = re.compile(r"(?<![\w])(-?0x[0-9a-f]+|-?\d+)\b")
@@ -130,17 +101,12 @@ def read_dump(path):
 
 
 def read_objdump(obj_path, objdump=OBJDUMP):
-    out = subprocess.run(
-        [str(objdump), "-d", "--no-show-raw-insn", str(obj_path)],
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout
+    out = lib_objdump.run_objdump(objdump, ["-d", "--no-show-raw-insn"], obj_path, check=True).stdout
     insns = []
     for line in out.splitlines():
-        m = OBJDUMP_LINE.match(line)
-        if m:
-            insns.append((m.group(1), m.group(2)))
+        tok = lib_objdump.tokenize(line)
+        if tok is not None and tok.kind == "insn" and MNEMONIC.fullmatch(tok.mnemonic):
+            insns.append((tok.mnemonic, tok.operands))
     return insns
 
 

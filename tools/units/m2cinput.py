@@ -1,79 +1,10 @@
 #!/usr/bin/env python3
-"""Turn a target object's disassembly into the assembly `m2c` reads.
-
-    python tools/units/m2cinput.py build/RMHE08/obj/<unit>.o [-f name]... [-o out.s] [--list]
-
-`m2c` (the `tools/m2c` submodule) recovers C from GNU-as style assembly, which makes it a second shape
-oracle next to the Ghidra decompiler - and the only one that works offline. Our target objects are
-`build/RMHE08/obj/<unit>.o`, and `powerpc-eabi-objdump -dr` prints them in a shape m2c rejects (a
-`00000000 <LocateObject>:` header per symbol, and an address in front of every instruction), so this
-translates one into the other:
-
-    glabel fn_804DA7E4
-    lwz r6, 12(r3)
-    bl RSORelocate
-    beq loc_2c8
-    ...
-
-    python tools/units/m2cinput.py build/RMHE08/obj/RSO/runtime.o -f fn_804DA7E4 -o build/tmp/x.s
-    python tools/m2c/m2c.py -t ppc-mwcc-c --no-cache -f fn_804DA7E4 build/tmp/x.s
-
-What it rewrites, and why each one has to happen:
-
-* Relocations become the spelling m2c expects: `R_PPC_REL24` the target symbol, `R_PPC_ADDR16_HA`/`_HI`/
-  `_LO` `sym@ha`/`sym@h`/`sym@l`, `R_PPC_EMB_SDA21` `sym@sda21(r13)`. m2c asserts on any other spelling
-  (`@hi` crashes it), and an unapplied relocation left as a raw immediate would decompile silently wrong.
-  An sda21 access is encoded with RA=0 and that *is* the sda base register, so it is printed as `(r13) -
-  the same object form mwcc itself emits (checked against `mwcceppc` on a small-data access).
-* A branch to an address that is a symbol in this object keeps that name; any other target inside the
-  function becomes a `loc_<address>` label - the `loc_` prefix is what stops m2c treating it as the start
-  of a new function.
-* A tail call in the middle of a function (`b <function>`) becomes `bl <function>` + `blr`. m2c only
-  accepts that shape when the branch is the function's *last* instruction (`TailCallPattern` in
-  `m2c/arch_ppc.py`) and otherwise fails the function with "Cannot find branch target". It is m2c's own
-  rewrite, applied early, so the C is the shape it would have produced for a trailing one.
-* A symbol m2c cannot spell gets a readable alias: dtk names pooled constants `@1841_80629B90`, and `@` is
-  m2c's relocation separator, so it becomes `_1841_80629B90` - definitions and references alike.
-* A symbol whose body is only data (`.long`, `...`, the `gap_*` blobs) is dropped: m2c aborts the whole run
-  with "Function ... contains no instructions" if one of those reaches it.
-* The section is always emitted as `.text`. m2c only accepts a label as a function inside `.text`, so a
-  `.init` function (memset, boot code) has to be handed over under that name; `--section` picks what to
-  read out of the object.
-* A `bctr` switch is handed its jump table: the table is the nearest symbol loaded before the `bctr`, its
-  bytes are read out of the original DOL (`orig/RMHE08/sys/main.dol`, read-only - the table lives in a
-  different section than the code, often a different split object) and emitted as `.data` with
-  `.long loc_<address>` entries. A table m2c could not recognize by name (an anonymous local like `@1845`,
-  or an SDK name) is written as `jumptable_<address>` so m2c looks at it at all. A table whose entries are
-  not this function's case labels - a relative table, a wrong size, a function pointer read - is refused
-  with a warning instead of guessed at, and then m2c reports it itself. The table's address comes from
-  `config/RMHE08/symbols.txt` (through its own parser), which is also what tells this script where a unit
-  object is linked (`--base` overrides both).
-* The Gekko/Broadway paired-single save/restore is put into the shape m2c has a table entry for. The
-  pinned binutils defaults to a later PowerPC core and decodes those opcodes as the VSX/VMX instructions
-  that reused them - `psq_lx`/`psq_stx` as `vmrghb`/`vpku*`, `psq_l`/`psq_st` as `xscmpgedp`/`xxsel`/
-  `xsmsubasp` - so objdump is asked for the `gekko` core (`DISASM_CPU`) and the indexed frame save/restore
-  MWCC emits with its peephole off is folded to the displacement form m2c handles: `li rX,N` + `psq_lx
-  fD,base,rX,W,I` (or `addi rX,base,N` + `psq_stx fD,r0,rX,W,I`) becomes `psq_l/psq_st fD,N(base),W,I`.
-  Without both, the frame and float saves come out as `M2C_ERROR(unknown instruction: ...)` woven into
-  every return path - the part that decides a match.
-
-Not every instruction survives the trip: m2c has no `mfcr` or `cmpwi cr1, ...` and prints `M2C_ERROR(...)`
-inline where it meets one, which is visible in its output. The file written is throwaway - `build/tmp/` is
-gitignored. Nothing here is codegen evidence: the disassembly is the arbiter (playbook 4).
-
-    --list       the object's functions with size and instruction count, data-only ones marked `data` and
-                 the ones that switch through a jump table marked `switch`
-    --no-tables  do not pull jump tables in (no DOL, no symbol map)
-    --dol PATH   original DOL to read them out of (default `orig/RMHE08/sys/main.dol`)
-    --base       address used for `loc_` labels and `--addresses` comments (default: the address in an
-                 `auto_<nn>_<address>_<section>.o` name, else 0, i.e. object-relative)
-    --section    section to read (default `.text`; repeatable, or `all`)
-    --addresses  comment each instruction with its address
-    -f           keep only these functions (repeatable)
-"""
+"""Turn a target object's objdump into the GNU-as shape tools/m2c accepts, one function or all.
+Spec: docs/tools/spec/m2cinput.md. CLI: m2cinput.py build/RMHE08/obj/<unit>.o [-f name]... [-o out.s] [--list]."""
 
 from __future__ import annotations
 
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import os
 import re
@@ -81,6 +12,10 @@ import shutil
 import struct
 import subprocess
 import sys
+
+from tools.lib.binary import objdump as lib_objdump
+
+from tools.lib.binary.dol import Dol as LibDol
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 EXE = ".exe" if os.name == "nt" else ""
@@ -200,21 +135,11 @@ def find_objdump(explicit: str | None) -> str:
 
 
 def disassemble(objdump: str, obj: str) -> str:
-    out = subprocess.run(
-        [objdump, "-M", DISASM_CPU, "-dr", "--no-show-raw-insn", obj],
-        capture_output=True,
-        text=True, encoding="utf-8",
-        errors="replace",
-    )
+    out = lib_objdump.run_objdump(objdump, ["-M", DISASM_CPU, "-dr", "--no-show-raw-insn"], obj)
     if out.returncode != 0:
         # A system objdump too old for `-M gekko` rejects the option outright; fall back to its default
         # decode rather than fail the run (paired-single is then wrong, which the note in the header says).
-        out = subprocess.run(
-            [objdump, "-dr", "--no-show-raw-insn", obj],
-            capture_output=True,
-            text=True, encoding="utf-8",
-            errors="replace",
-        )
+        out = lib_objdump.run_objdump(objdump, ["-dr", "--no-show-raw-insn"], obj)
         if out.returncode != 0:
             sys.exit(f"{objdump} failed on {obj}:\n{out.stderr.strip()[:500]}")
         print(
@@ -276,7 +201,7 @@ def parse(text: str, sections: tuple[str, ...]) -> tuple[dict[str, dict[int, str
     """(symbol starts per section, the functions found in the wanted sections).
 
     Every section's symbols are collected - a branch into another section still has a name to use - but
-    instructions are only kept for the wanted sections.
+    instructions are only kept for the wanted sections. Lines are read by `lib.binary.objdump.tokenize`.
     """
     symbols: dict[str, dict[int, str]] = {}
     functions: list[Function] = []
@@ -284,66 +209,48 @@ def parse(text: str, sections: tuple[str, ...]) -> tuple[dict[str, dict[int, str
     current: Function | None = None
 
     for line in text.splitlines():
-        match = SECTION_RE.match(line)
-        if match:
-            section, current = match.group("name"), None
+        tok = lib_objdump.tokenize(line)
+        if tok is None:
             continue
-
-        match = LABEL_RE.match(line)
-        if match:
-            addr, name = int(match.group("addr"), 16), match.group("name")
+        if tok.kind == "section":
+            section, current = tok.name, None
+        elif tok.kind == "label":
+            addr, name = tok.address, tok.name
             symbols.setdefault(section, {})[addr] = name
             current = None
             if section in sections and not name.startswith("."):
                 current = Function(name, addr, section)
                 functions.append(current)
-            continue
-
-        match = RELOC_RE.match(line)
-        if match and current is not None and current.instrs:
-            # objdump prints the relocation under its instruction, at the address of the relocated
-            # field - for @ha/@l that is instruction+2, so find the instruction it belongs to.
-            addr = int(match.group("addr"), 16)
-            for instr in reversed(current.instrs):
-                if instr.addr <= addr < instr.addr + 4:
-                    instr.relocs.append((match.group("type"), match.group("symbol")))
-                    break
-            continue
-
-        match = INSTR_RE.match(line)
-        if match and current is not None:
-            addr = int(match.group("addr"), 16)
-            current.instrs.append(Instr(addr, match.group("text")))
-            current.end = max(current.end, addr + 4)
+        elif tok.kind == "reloc":
+            if current is not None and current.instrs:
+                # objdump prints the relocation under its instruction, at the address of the relocated
+                # field - for @ha/@l that is instruction+2, so find the instruction it belongs to.
+                for instr in reversed(current.instrs):
+                    if instr.addr <= tok.address < instr.addr + 4:
+                        instr.relocs.append((tok.reloc, tok.name))
+                        break
+        elif tok.kind == "insn" and tok.indented and current is not None:
+            current.instrs.append(Instr(tok.address, tok.body))
+            current.end = max(current.end, tok.address + 4)
 
     return symbols, functions
 
 
-class Dol:
-    """The original DOL as an addressable image: `read(vaddr, size)`, or None when it is not mapped.
-
-    Its header is 7 text and 11 data section descriptors, each an offset/address/size triple, which is
-    all that is needed to turn a data address into a file offset. Nothing here writes to it.
-    """
+class Dol(LibDol):
+    """The original DOL as an addressable image: `read(vaddr, size)`, or None when it is not mapped
+    (`lib.binary.dol`). Nothing here writes to it."""
 
     def __init__(self, path: str) -> None:
         with open(path, "rb") as fh:
-            self.data = fh.read()
-        self.sections: list[tuple[int, int, int]] = []
-        for count, bases in ((7, (0x00, 0x48, 0x90)), (11, (0x1C, 0x64, 0xAC))):
-            offsets, addresses, sizes = (
-                [self.word(base + 4 * i) for i in range(count)] for base in bases
-            )
-            self.sections += list(zip(offsets, addresses, sizes))
+            super().__init__(fh.read(), path)
+        self.sections: list[tuple[int, int, int]] = [(s.offset, s.address, s.size) for s in self.slots]
 
     def word(self, at: int) -> int:
+        """The u32 at file offset `at`."""
         return struct.unpack_from(">I", self.data, at)[0]
 
     def read(self, address: int, size: int) -> bytes | None:
-        for offset, start, length in self.sections:
-            if start <= address and address + size <= start + length:
-                return self.data[offset + address - start : offset + address - start + size]
-        return None
+        return self.bytes_at(address, size)
 
 
 class JumpTable:

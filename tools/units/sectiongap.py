@@ -1,72 +1,20 @@
 #!/usr/bin/env python3
-"""Per-section gap between a unit's target object and ours: size, bytes, and relocations.
-
-A unit can read 100 % in objdiff and still not be the target object. `datagap.py` compares section
-*sizes* and looks at the data sections only, so the two compiler-generated exception sections it skips -
-`extab` and `extabindex` - are exactly where a flip can die; and a record can be the **right size** with
-its relocations at the **wrong offsets**, which no size check can see.
-
-This tool compares a unit's two objects section by section:
-
-    build/RMHE08/obj/<path>.o   the target, split out of the DOL
-    build/RMHE08/src/<path>.o   ours, compiled from src/
-
-and prints, per differing section, the three things a lane acts on - the two sizes, the first differing
-byte and the differing-byte count, and the **relocation list** (type, offset, symbol name) - in the
-`unit  section  ours  target  why` voice `datagap.py` and `vtableaudit.py` use. A clean unit says so.
-
-Usage:
-    python tools/units/sectiongap.py --unit Network/NetworkWiiMediator
-    python tools/units/sectiongap.py --unit Network/fn_803D3CE8
-    python tools/units/sectiongap.py --unit <u> --all-sections   # add .comment/.symtab/.strtab churn
-    python tools/units/sectiongap.py --selftest
-
-Two filings asked for this tool:
-
-* **F39** (`datagap.py` ignores `extab`/`extabindex`) - filed first by the `constructNetworkWiiMediator`
-  lane and voted again in `.pi/notes/initnetworksessionstable-d599.md` ("Tooling and environment"): on
-  the pre-fix object `datagap.py` printed `0 unit(s) listed, 0 of them with a real ours-extra gap` for a
-  unit whose object was 16 bytes short in `extab`, because `extab`/`extabindex` are not in its
-  `DATA_SECTIONS` set; and `flipcheck.py` reports the sizes and byte counts but not the relocated symbol
-  names *inside* the record. The lane's words - "a `sectiongap.py --unit <u>` printing each differing
-  section with its reloc names would have named this defect in one command" - are this tool's shape.
-* **F41** (`.pi/notes/production-trial.md`, "PIPELINE 1, PHASE 1"): a record can have the **right size**
-  with its relocations at the **wrong offsets** - `Network/NetworkWiiMediator` carries the correct `extab`
-  0x1a8 with its three `__dl__FPv` relocations at +0x14/+0xac/+0xb4 against the target's
-  +0x2c/+0x34/+0x54 - and `Network/fn_803D3CE8` is missing two-thirds of its record (0x2e4 against
-  0x4ec). A size check alone cannot see either.
-
-**Why a sibling tool and not a `datagap.py` patch.** Teaching `datagap.py` the two exception sections
-would only add a *size* row; `Network/NetworkWiiMediator`'s `extab` is 0x1a8 on **both** sides, so no size
-comparison - extended or not - can name F41. Naming it needs each section's bytes and relocation list, a
-different question from `datagap.py`'s data-gap scan (and F39's own wording asks for `sectiongap.py`).
-
-Known answers on this tree (both objects present):
-    Network/NetworkWiiMediator      -> `extab` same size, `__dl__FPv` relocations at both offset sets
-    Network/fn_803D3CE8             -> `extab` 0x2e4 against the target's 0x4ec
-    Network/initNetworkSessionStable -> clean (the negative control: `.text`, `extab`, `extabindex` and
-        every relocation are identical).
-
-What it does **not** compare, deliberately - the honest limit: section *order* (dtk's synthesised object
-lays sections out differently from MWCC's), alignment, the `.comment` active-flags table, and anything
-beyond the single object pair. Whether a relocation's name resolves in the link, and what `splits.txt`
-claims for a range, are `flipcheck.py`'s questions, not this tool's. A section present on one side only is
-reported by name and size; a section whose bytes are shorter is compared over the bytes that exist, and
-the size line carries the rest.
-"""
+"""Per-section gap of a unit's two objects: sizes, first differing byte, count and the relocation list.
+Spec: docs/tools/spec/sectiongap.md. CLI: sectiongap.py --unit U [--all-sections] | --selftest."""
 from __future__ import annotations
 
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import os
 import struct
 import sys
 
+from tools.lib.binary.elf import Elf as LibElf
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOOLS = os.path.dirname(HERE)
 MAIN = os.path.dirname(TOOLS)
-sys.path.insert(0, os.path.join(TOOLS, "elf"))
 sys.path.insert(0, TOOLS)
-import elfsect  # noqa: E402  (the project's object section reader)
 import unitutil  # noqa: E402  (unit spec -> build/RMHE08/{src,obj} paths)
 sys.path.insert(0, HERE)
 import poolseams  # noqa: E402  (literal pools as TU evidence: which differing pools are a partial pool)
@@ -98,42 +46,31 @@ def _type_name(typ: int) -> str:
 
 
 def read_object(path: str, all_sections: bool = False) -> dict:
-    """`{sections, order, relocs}` for one ELF32 big-endian object.
+    """`{sections, order, relocs}` for one ELF32 big-endian object (a view over `lib.binary.elf`).
 
     `sections` maps a content section name to `{size, data}` (`.rela*` sections are folded into
     `relocs[target]`, a list of `(offset, type, symbol name)`); `order` is the section-header order,
     so the report reads in the object's own layout. Metadata sections are omitted unless
     `all_sections`, and `.bss`/`.sbss` (SHT_NOBITS) keep their size with no bytes.
     """
-    _, headers = elfsect.sections(path)
-    symtab = next((h for h in headers if h["name"] == ".symtab"), None)
-    symbols: list[str] = []
-    if symtab and symtab["data"]:
-        strtab = headers[symtab["link"]]["data"] if symtab["link"] < len(headers) else b""
-        step = symtab["entsize"] or 16
-        for off in range(0, len(symtab["data"]) - step + 1, step):
-            nm, _val, _size, _info, _other, _shndx = struct.unpack_from(">IIIBBH", symtab["data"], off)
-            end = strtab.find(b"\0", nm)
-            symbols.append(strtab[nm:end].decode("latin1") if nm and end >= 0 else "")
+    elf = LibElf.read(path)
+    nsym = len(elf.symbols)
     order: list[str] = []
     sections: dict[str, dict] = {}
     relocs: dict[str, list] = {}
-    for h in headers:
-        name = h["name"]
-        if name.startswith(RELOC_PREFIX):
-            rows = []
-            step = h["entsize"] or 12
-            for off in range(0, len(h["data"]) - step + 1, step):
-                r_offset, r_info, _addend = struct.unpack_from(">IIi", h["data"], off)
-                index = r_info >> 8
-                rows.append((r_offset, r_info & 0xFF,
-                             symbols[index] if index < len(symbols) else "?%d" % index))
-            relocs[name[len(RELOC_PREFIX):]] = rows
+    by_rela: dict[int, list] = {}
+    for r in elf.relocs():
+        by_rela.setdefault(r.rela_index, []).append(
+            (r.offset, r.type, r.symbol_name if r.symbol < nsym else "?%d" % r.symbol))
+    for rela, _target in elf.rela_sections():  # a repeated section name: the last one wins, as before
+        relocs[rela.name[len(RELOC_PREFIX):]] = by_rela.get(rela.index, [])
+    for s in elf.sections:
+        if s.name.startswith(RELOC_PREFIX):
             continue
-        if h["typ"] == 0 or (not all_sections and name in META_SECTIONS):
+        if s.type == 0 or (not all_sections and s.name in META_SECTIONS):
             continue
-        order.append(name)
-        sections[name] = {"size": h["size"], "data": b"" if h["typ"] == SHT_NOBITS else h["data"]}
+        order.append(s.name)
+        sections[s.name] = {"size": s.size, "data": s.data}
     return {"sections": sections, "order": order, "relocs": relocs}
 
 

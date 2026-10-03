@@ -53,6 +53,7 @@ lives in), which is how a worktree can audit MAIN's already-built objects withou
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import json
 import os
@@ -62,12 +63,13 @@ import sys
 import time
 from tools.lib import names as libnames
 
+from tools.lib.binary.elf import Elf as LibElf, ElfError
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)                      # so `import langcheck` works from any cwd
 ROOT = os.path.dirname(os.path.dirname(HERE))
 
 # ELF bits we need. An object this project links is ELF32, big-endian, and carries a real `.symtab`.
-ELF_MAGIC = b"\x7fELF"
 STB_LOCAL, STB_GLOBAL, STB_WEAK = 0, 1, 2
 STT_FILE = 4
 SHN_UNDEF = 0
@@ -125,48 +127,22 @@ def audit_sets(our_defined, our_undefined, tgt_defined, tgt_undefined) -> dict:
 # the object reader (pure Python; no binutils dependency)
 # --------------------------------------------------------------------------------------------------
 def read_symbols(path: str):
-    """`[{name, bind, type, shndx}]` for an ELF32 big-endian object, or `None` if it is not one.
+    """`[{name, value, size, bind, type, shndx}]` for an ELF32 big-endian object, or `None` if it is not one.
 
     `None` (not `[]`) distinguishes "unreadable/not an object" from "an object with no symbols", so a
     missing build artefact is reported as unbuilt rather than as an empty, falsely-clean unit.
     """
     try:
-        with open(path, "rb") as fh:
-            data = fh.read()
-    except OSError:
+        elf = LibElf.read(path)
+    except (OSError, ElfError):
         return None
-    if data[:4] != ELF_MAGIC or len(data) < 0x34 or data[4] != 1 or data[5] != 2:
+    if elf.ei_class != 1 or elf.ei_data != 2:
         return None
-    try:
-        return _read_symtab(data)
-    except (struct.error, IndexError):        # a truncated object is unreadable, not a crash
-        return None
+    return [{"name": s.name, "value": s.value, "size": s.size, "bind": s.bind, "type": s.type, "shndx": s.shndx}
+            for s in elf.symbols if s.name]
 
 
-def _read_symtab(data: bytes):
-    (shoff,) = struct.unpack_from(">I", data, 0x20)
-    (shentsize, shnum, _shstrndx) = struct.unpack_from(">HHH", data, 0x2E)
-    sections = []
-    for i in range(shnum):
-        o = shoff + i * shentsize
-        name, typ, flags, addr, off, size, link, info, align, entsize = struct.unpack_from(
-            ">IIIIIIIIII", data, o)
-        sections.append({"typ": typ, "off": off, "size": size, "link": link, "entsize": entsize})
-    symtab = next((s for s in sections if s["typ"] == 2), None)     # SHT_SYMTAB
-    if symtab is None:
-        return []
-    strtab = sections[symtab["link"]]
-    stroff, strsize = strtab["off"], strtab["size"]
-    sb = data[stroff:stroff + strsize]
-    out = []
-    for o in range(symtab["off"], symtab["off"] + symtab["size"], symtab["entsize"] or 16):
-        nm, value, size, info, other, shndx = struct.unpack_from(">IIIBBH", data, o)
-        if nm == 0:
-            continue
-        end = sb.find(b"\0", nm)
-        out.append({"name": sb[nm:end].decode("latin-1"), "value": value, "size": size,
-                    "bind": (info >> 4) & 0xF, "type": info & 0xF, "shndx": shndx})
-    return out
+
 
 
 def object_sets(path: str):
