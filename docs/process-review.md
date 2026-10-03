@@ -1,5 +1,8 @@
 # Process review: the matching campaign, after seven batches
 
+> **Historical note (2026-10-03).** A point-in-time review. `attribute.py` and the proposal flow it describes are retired
+> (`docs/tools/retired.md`); the process is `docs/pipeline.md`.
+
 A point-in-time review of how the work is actually running - what it costs, what went wrong, and what I would
 change. Written 2026-09-22 from the session that took the project from 60 to **217 matched functions**
 (65,128 of 5,437,392 `.text` bytes, 295 symbols attributed of 20,519, `main.dol` still `OK`).

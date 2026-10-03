@@ -13,7 +13,13 @@ guard, the verify-then-commit order, the submodule trap and the honest size of t
 remaining contradictions (the `.ninja_log` proof, the completion test, section 12, the cross-references).
 
 **Version 2.4 (2026-09-24).** The `src/auto/` scaffolding bucket is retired: a unit is registered **once**, at
-its final home, by the worker that works it, and attribution produces **proposals**, not registered units (§12).
+its final home, by the worker that works it (§12).
+
+> **Status 2026-10-03.** The splits program is finished (`docs/splits-program.md`): `splits.txt` cuts the whole DOL into
+> registered units (354) with no unclaimed `.text`, and the bulk tiler (`attribute.py`), its proposal queue and the
+> `.pi/bin/*` landing scripts are retired (`docs/tools/retired.md`). Passages below that name `attribute.py`, a
+> "proposal" or the "attribute" step are the history of how units were first registered; today the pool is the registered
+> body-less units (`brief.py --pool`) and the only landing path is `land.py land --branch`.
 
 ---
 
@@ -52,7 +58,7 @@ The campaign is not one loop; it is four phases with different economics, and co
 
 | phase | what it does | cost per unit of progress | measured so far |
 | --- | --- | --- | --- |
-| **A. attribute** | propose ranges, seams and evidence (`attribute.py plan`); registration happens when a worker takes a proposal (§12) | ~1 min per proposal, no source work | 19 units, 295 functions |
+| **A. attribute** | (retired 2026-10-03: done by the splits program) propose ranges, seams and evidence; registration happened when a worker took a proposal (§12) | ~1 min per proposal, no source work | 19 units, 295 functions |
 | **B. decompile** | write bodies to >= 80 % | a worker round (10-40 functions) per 12 workers | 60 functions from a 7-worker round, before the 4-worker cap existed |
 | **C. second pass** | push the 80-99.9 % band to 100 % | the playbook's idea list, per unit | 67 symbols sit in that band today, ~26 % of each batch's output |
 | **D. flip** | prove byte-identity per object, link it, keep `ok` green | minutes per object, but the DOL hash starts depending on us | 0 objects flipped |
@@ -69,7 +75,7 @@ The campaign is not one loop; it is four phases with different economics, and co
 | unclaimed (proposal backlog, §1) | **20 224 functions** |
 | per module | `Runtime.PPCEABI.H` 19 of 20 symbols at 100 % (`__register_fragment` 93.68 %); `Pl` 3 units, 150+ of 189 closed (`pl_master` 99.99 %, `pl_skill` 96.07 %, `pl_act` 93.75 %); `main.cpp` 47 functions, 37 at 100 %; `sys_mem.cpp` complete; the `auto/` unit `80040598_fn_80040598` 97.19 % (its home is now `src/fn_80040598.cpp`, §12); `Camellia` 99.97 % and `RSO` 99.71 % (both with named residuals), `g3d`, `OS`, `Network` at 100 % |
 | flags landed | `cflags_main` (`-O3 -inline noauto`), `cflags_pl` (`-O3 -inline noauto -opt nopeephole -Cpp_exceptions on`), `cflags_ppceabi` (`cflags_runtime` + `-func_align 4`) — each with its instruction-level evidence in `configure.py`. **The flag *set* is under audit (2026-09-28) and this plan asserts no default set**: see §8.2 and `.pi/notes/flags-audit-645d.md` |
-| tooling that exists | `ledger.py`, `attribute.py` (+ selftest), `symbolpreflight.py`, `tudiscover.py`, `dump_asm.py`, `m2cinput.py` (+ selftest), `symedit.py`, `symdiff.py`, `mt.py`, `prepcommit.py`, `tools/m2c` (submodule) - plus the **analysis tier** a residual leads to: `tools/mwcc-debugger/` (the compiler's own IR - the PCode after each optimizer pass, gated by `locate/verify_pcode.py`), `tools/mwlink_debugger.py` (the linker's own run: `trace`/`diagnose`/`verify`/`align`/`order`, the link step is **Wii/1.0**), `tools/units/callers.py` (who calls this / who reads this, whole-DOL and address-keyed) and `tools/units/flipcheck.py` (is this object flip-ready) |
+| tooling that exists | `ledger.py`, `symbolpreflight.py`, `tudiscover.py`, `dump_asm.py`, `m2cinput.py` (+ selftest), `symedit.py`, `symdiff.py`, `mt.py`, `prepcommit.py`, `tools/m2c` (submodule) - plus the **analysis tier** a residual leads to: `tools/mwcc-debugger/` (the compiler's own IR - the PCode after each optimizer pass, gated by `locate/verify_pcode.py`), `tools/mwlink_debugger.py` (the linker's own run: `trace`/`diagnose`/`verify`/`align`/`order`, the link step is **Wii/1.0**), `tools/units/callers.py` (who calls this / who reads this, whole-DOL and address-keyed) and `tools/units/flipcheck.py` (is this object flip-ready) |
 
 Everything above is *derived*, never remembered: `python tools/units/ledger.py` reads `symbols.txt` (through
 `symedit.py`), `splits.txt`, `configure.py` and `build/RMHE08/report.json`. A stale `report.json` lies — the
@@ -102,8 +108,8 @@ second stream; these are the measured per-edge costs, and `docs/build-performanc
 1. **One split and one link per land batch.** A batch boundary costs ~1.5–2.5 min of machine time; a rename-only
    batch that changes no object is ~20 s.
 2. **Cap a registration batch at 0.5 MB of `.text`** (owner's call) — it binds the *attribution* pass, where one
-   command can claim a whole region. Until `attribute.py` grows `--max-total-bytes` (§7.14) the cap is enforced
-   with `--limit N`, using the byte total `attribute.py plan` prints.
+   command can claim a whole region. The tiler that this cap bound is retired (2026-10-03); a window of `splits.txt` edits is
+   now capped by the lane that makes it.
 3. **A round is the pool's six slots wide** (the 2026-09-23 decision raised the *coordination* cap from four
    to twelve; the cap that binds today is the environment, and the environment is a slot). A lane's tree is a
    reusable slot (§5.1), the pool has **six**, and `queue.py next` refuses while all six are taken - naming the
@@ -131,12 +137,12 @@ have exactly one writer: the orchestrator.**
 
 | responsibility | orchestrator (me) | worker (external `pi` agent) | owner | tooling |
 | --- | --- | --- | --- | --- |
-| pick the batch (§12), order, size cap | **owns** | — | — | `ledger.py next`, `attribute.py plan` |
-| register a unit: range, module/name, `configure.py` entry | **applies it on `main`** (one writer for the shared files) | **writes the registration in its own worktree**, for the unit it works | — | `symbolpreflight.py`, `tudiscover.py`, `attribute.py plan` |
+| pick the batch (§12), order, size cap | **owns** | — | — | `ledger.py next` |
+| register a unit: range, module/name, `configure.py` entry | **applies it on `main`** (one writer for the shared files) | **writes the registration in its own worktree**, for the unit it works | — | `symbolpreflight.py`, `tudiscover.py` |
 | write a unit's source | reviews, integrates | **owns one unit, one file, one worktree** | — | `m2cinput.py`+`m2c`, Ghidra dump, `DumpSymbols.map` |
 | measure a symbol | **re-measures every claim** | measures its own unit | — | `recompile.py`, `mt.py diff/info`, `symdiff.py` |
 | land a compiler flag | **owns** — decides, and the decision needs §8.2's evidence | probes, reports numbers; may put a **one-unit** deviation in the source as a pragma (it owns that file) | — | the `configure.py` comment is the evidence; the pragma is the exception |
-| claim a data range | **owns**, measured before/after | proposes with numbers | — | `attribute.py` data pass, playbook 23 |
+| claim a data range | **owns**, measured before/after | proposes with numbers | — | `dataclaim.py`, playbook 23 |
 | run `ninja` / the split / the link / `ok` | **sole runner** | **never** (uses `recompile.py`) | — | `land.py verify` |
 | git: branches, merges, conflicts | **owns** (cherry-pick to `main`) | commits only on its branch | — | `git worktree`, `git cherry-pick` |
 | commit on `main` | **owns** | never | grants standing approval | `prepcommit.py` |
@@ -441,7 +447,7 @@ asked again.
 
 | # | step | tool | gate before moving on | left behind |
 | --- | --- | --- | --- | --- |
-| 1 | **attribute** | `symbolpreflight.py`, `tudiscover.py`, `attribute.py` | the verdict is `proceed`, or `approve` with a written proposal the owner accepted (§10) | a **proposal**: ranges, seams and evidence - not a registered unit (§12) |
+| 1 | **attribute** | `symbolpreflight.py`, `tudiscover.py` | the verdict is `proceed`, or `approve` with a written proposal the owner accepted (§10) | the unit's range, seams and evidence (now already in `splits.txt`, §12) |
 | 2 | **decompile** | the Ghidra dump (`docs/memory-dump.md`), `DumpSymbols.map`, `m2cinput.py` → `tools/m2c` | it compiles, and the disassembly agrees with every instruction-level decision | `src/<Dir>/<file>.c` (+ header beside it) |
 | 3 | **match** | `recompile.py`, `mt.py diff/info`, `ninja changes`, `report.json` | the symbol's own score ≥ 80, nothing else regressed, `ok` green | the residual in the unit's file header |
 | 4 | **commit** | `land.py verify` + `prepcommit.py` | the batch's knowledge delta is written and `sync_reference.py --check` is clean | one commit per unit, the ledger moves |
@@ -451,22 +457,18 @@ asked again.
 ```sh
 python tools/units/symbolpreflight.py <address|name>   # owner, collision verdict, registration drafts
 python tools/splits/tudiscover.py at <address|name>    # TU boundary proposal for an unowned address
-python tools/units/attribute.py plan <start> <end>     # bulk: one PROPOSAL per maximal unclaimed run
-#   `plan` proposes `.text` ranges, seams and evidence and registers nothing; a worker that takes a
-#   proposal registers the unit at its final home (§12). The data runs it saw are a measured second
-#   pass (playbook 23).
+#   the bulk tiler (`attribute.py plan`) is retired: every range is registered in `splits.txt`; a re-cut of one
+#   region uses `tools/splits/unwindcut.py` and `splitcheck.py --baseline` audits the result (docs/splits-program.md).
 ```
 
-* **A proposal is not a unit.** `attribute.py plan` proposes; registration is the worker's act (§12). The worker
-  registers the unit **once, at its final `src/<module>/<name>.<ext>` home**, inside its own worktree so it can
-  measure, and the orchestrator applies that registration on `main` with the batch's one re-split.
+* **A unit is registered once, at its final `src/<module>/<name>.<ext>` home** (§12), inside the worker's own worktree so
+  it can measure, and the orchestrator applies that registration on `main` with the batch's one re-split.
 * **A registered unit has a source file; its bodies follow.** The file is created with the registration and its
   header says what it is, its range, why it sits there, what is unknown, and where its inventory lives
   (`ledger.py unit <path>`), never a copied function list. A registered unit whose source does not exist is a
   bug (the build warns `Missing source file`); a unit that still carries only a header at the end is a note, not
   a unit (§1 clause 2b).
-* **Evidence-first partition.** `attribute.py` cuts only at seams a narrow (≤ 4 cuts) *strong* observation pins;
-  a piece under `--min-bytes` joins its neighbour, one over `--max-bytes` is split and flagged as a guess. A
+* **Evidence-first partition.** A cut is made only at a seam a narrow (≤ 4 cuts) *strong* observation pins; one over the old size cap was flagged as a guess (the tiler that cut by size is retired). A
   region with no evidence stays **one** unit whose header says the seam is unproven — one function per file is
   certainly wrong, one file per region is only unproven.
 * **Confidence is recorded, not hidden**, and a seam may only be claimed from `tudiscover`'s evidence kinds; a
@@ -1035,9 +1037,9 @@ and when a slot frees, prefer a new unit, a new symbol or the next attribution b
 The 11 units that *are* flipped: `Runtime.PPCEABI.H/{__start,__ppc_eabi_init,global_destructor_chain,__init_cpp_exceptions,memcpy,memset}`,
 `g3d/g3d_resanmamblight`, `Network/NetworkWiiMediator`, `OS/OSAlarm`, `lobby/lobby_scene`, `Pl/pl_master`.
 
-**The breadth queue is now the proposal backlog** (§12, "Register once, at the final home"): the ranges and
-symbols `attribute.py plan` offers that no worker has taken. They are not units and have no score, so they are
-not parked rows - a proposal joins this table only once a worker has registered and measured it.
+**The breadth queue is the pool** (§12, "Register once, at the final home"): the registered body-less units
+(`brief.py --pool`) that no worker has taken. They have no score, so they are not parked rows - a unit joins this
+table only once a worker has measured it.
 
 ### The breadth blocker: rule 7 versus a unit with no bodies yet (owner, 2026-09-24)
 
@@ -1048,7 +1050,7 @@ cannot be satisfied yet. `stylelint --diff` counted that as a new violation, so 
 registered the unit.
 
 **Decided: rule 7 is not enforced for a unit with no bodies yet.** The exemption is keyed on the unit's own
-source, not on its path - the old `src/auto/` prefix retired with the bucket it named. Once a unit carries
+source, not on its path (the old `src/auto/` bucket no longer exists). Once a unit carries
 reconstructed bodies, rule 7 applies to it: the bodies' names come from the evidence the worker has (§12), so
 the exemption is a starting gate, not a standing one.
 
@@ -1202,9 +1204,8 @@ re-split.
 ### Register once, at the final home (owner, 2026-09-24)
 
 The `src/auto/` bucket is **retired**. A translation unit is registered **once**, at its final
-`src/<module>/<name>.<ext>` home, by the worker that works it. `attribute.py plan` produces **proposals** -
-ranges, seams, evidence - never registered units; the old two-step (`attribute` -> `src/auto/<addr>_fn_<addr>`
-stub -> later promotion to a real name and location) touched every unit twice and is gone.
+`src/<module>/<name>.<ext>` home, by the worker that works it. The old two-step (`attribute` -> `src/auto/<addr>_fn_<addr>`
+stub -> later promotion to a real name and location) touched every unit twice and is gone, as is the tiler that proposed units.
 
 * **The worker names the unit from the evidence it has.** In order: the `__FILE__` string in the pool (the
   original source name, hence the module and the language), then a real name from the shared dump
@@ -1346,7 +1347,7 @@ brief is then a *file it writes for itself* too, so a later worker can pick the 
    auto-renamed). **The batched rename pass itself is the next step.** `dataclaim.py` (7.8, 737a5ce) and
    `phantom.py` (7.9, 4629ae1) are done too - the latter finds 16 `fn_*` that are really a previous function's
    dead epilogue, and reproduces the earlier hand-made merge byte-for-byte.
-**The attribution pass is ready and has a first target.** `attribute.py plan 0x80280000 0x80410000` proposes a
+**(History: the attribution pass, retired 2026-10-03.)** `attribute.py plan 0x80280000 0x80410000` proposed a
 batch inside the largest untouched run the ledger reports (25 blocks, 0x80280000-0x80410000) - 52 functions /
 17 312 B in the first unit, then 31 / 10 760, and so on, each with its `.data`/`.sdata`/`.sdata2`/`extabindex`
 proposals and a flag: `pinned` for a jump-table seam, `no evidence - one run` or `capped at --max-bytes` for the
@@ -1356,8 +1357,8 @@ guesses. Those flagged units are exactly what `dataclaim.py` (7.8) classifies be
 `symbols.txt` with its own temp+replace and no anchor/overlap/idempotency gate, the highest-risk shared file -
 and `tools/units/dataqueue.py::write_queue`, which duplicates the same primitive.
 
-5. **The attribution pass, scaled** - `attribute.py plan` over the next regions in ascending address order; each
-   proposal is registered at its final home by the worker that takes it (registration batches capped at 0.5 MB),
+5. **The attribution pass, scaled** (retired 2026-10-03; the splits program did it) - each
+   range was registered at its final home by the worker that takes it (registration batches capped at 0.5 MB),
    and its seam is re-checked the moment its functions match.
 6. **Phase C, the residual sweep** - the 80-99.9 % band is on the critical path for the DOL (a unit with any
    residual cannot flip): `pl_act`'s near-misses, `pl_skill`'s two allocator-shaped residuals, `pl_master`'s
