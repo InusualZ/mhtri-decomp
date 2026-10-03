@@ -16,11 +16,8 @@ object, no repository state. What is pinned:
 * `norm_code` collapses comment/whitespace-only differences, which is what makes the driver's cheap
   pre-compile dedupe safe.
 """
-import os
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import shapes as sh  # noqa: E402
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
+from tools.flags import shapes as sh
 
 FAILS = []
 

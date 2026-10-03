@@ -22,6 +22,8 @@ generator name.
 import re
 from dataclasses import dataclass
 
+from tools.lib import cscan
+
 # --------------------------------------------------------------------------------------------------
 # lexical helpers: strings, chars, comments, brace matching, statement splitting
 # --------------------------------------------------------------------------------------------------
@@ -60,20 +62,7 @@ def _skip_comment(src, i):
 
 def strip_comments(text):
     """Remove comments, preserving everything else (used for normalised source dedupe)."""
-    out = []
-    i = 0
-    while i < len(text):
-        c = text[i]
-        if c in "\"'":
-            j = _skip_quote(text, i)
-            out.append(text[i:j])
-            i = j
-        elif text.startswith("/*", i) or text.startswith("//", i):
-            i = _skip_comment(text, i)
-        else:
-            out.append(c)
-            i += 1
-    return "".join(out)
+    return cscan.remove_comments(text)
 
 
 def norm_code(text):

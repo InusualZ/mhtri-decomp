@@ -25,8 +25,8 @@ Exit status is 0 for a report and 1 only with `--fail-on-different` when a `DIFF
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
-import argparse
 import collections
 import io
 import json
@@ -34,9 +34,9 @@ import os
 import re
 import sys
 
-INCLUDE_ROOTS = ("include", os.path.join("build", "RMHE08", "include"))
+from tools.lib import cli, cscan
 
-INCLUDE_RE = re.compile(r'^\s*#\s*include\s+"([^"]+)"', re.M)
+INCLUDE_ROOTS = ("include", os.path.join("build", "RMHE08", "include"))
 
 # A one-line function declaration: type(s), name, parameter list, `;` and an optional trailing comment.
 # Definitions (a `{` on the line) and multi-line prototypes are deliberately not matched.
@@ -77,35 +77,12 @@ def read_text(path):
 
 def resolve(header, roots):
     """The file an `#include "..."` names, searched in the source tree then in the generated tree."""
-    for root in roots:
-        candidate = os.path.join(root, header)
-        if os.path.isfile(candidate):
-            return candidate
-    return None
+    return cscan.resolve_include(header, roots)
 
 
 def closure(start, roots):
     """Every file reachable from `start` through `#include "..."`, `start` first, each file once."""
-    seen = set()
-    order = []
-
-    def visit(path):
-        key = os.path.normcase(os.path.abspath(path))
-        if key in seen:
-            return
-        seen.add(key)
-        order.append(path)
-        try:
-            text = read_text(path)
-        except OSError:
-            return
-        for match in INCLUDE_RE.finditer(text):
-            found = resolve(match.group(1), roots)
-            if found:
-                visit(found)
-
-    visit(start)
-    return order
+    return cscan.include_closure(start, lambda name, _includer: resolve(name, roots), read=read_text)
 
 
 def shape(text):
@@ -176,12 +153,18 @@ def report(paths, roots, only_different=False):
     return findings
 
 
+def _selftest():
+    import declclash_selftest
+
+    return declclash_selftest.selftest()
+
+
+TOOL = cli.Tool("declclash", "docs/tools/spec/declclash.md", tests=_selftest, common=("root", "json"))
+
+
 def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = TOOL.parser(description=__doc__.splitlines()[0])
     parser.add_argument("paths", nargs="*", help="source or header files to scan")
-    parser.add_argument("--selftest", action="store_true")
-    parser.add_argument("--root", default=".", help="project root (default: the working directory)")
-    parser.add_argument("--json", action="store_true", help="machine-readable output")
     parser.add_argument(
         "--only-different",
         action="store_true",
@@ -192,12 +175,10 @@ def main(argv=None):
         action="store_true",
         help="exit 1 when a DIFFERENT name was found (for a gate)",
     )
-    args = parser.parse_args(argv)
+    return TOOL.run(lambda args: _main(parser, args), argv, parser)
 
-    if args.selftest:
-        import declclash_selftest
 
-        return declclash_selftest.selftest()
+def _main(parser, args):
     if not args.paths:
         parser.error("at least one path is required (or --selftest)")
 

@@ -141,7 +141,7 @@ if TOOLS not in sys.path:
 from units import lanecmd  # noqa: E402
 from tools.lib import project as _project  # noqa: E402  (the configure / splits readers)
 from units import tooling as tg  # noqa: E402  (the second source: its register is read, not rebuilt)
-from units import handoff as handoff_mod  # noqa: E402 (the outbox schema: FREE_TEXT_FIELDS is one definition)
+from tools.lib import outbox as _outbox  # noqa: E402 (the outbox schema: FREE_TEXT_FIELDS is one definition)
 
 STATUSES = ("open", "done", "parked")
 NEW_KINDS = ("shared-file", "range", "seam", "flag", "tooling", "naming", "band-header", "untyped",
@@ -194,11 +194,7 @@ def read(path: str) -> str:
 
 def asstr(x) -> str:
     """A config_requests field as text (some are lists - e.g. a flag `change` of `["-opt","nopeephole"]`)."""
-    if isinstance(x, str):
-        return x
-    if x is None:
-        return ""
-    return json.dumps(x, ensure_ascii=False)
+    return _outbox.asstr(x)
 
 
 def one_line(s: str, limit: int = 200) -> str:
@@ -214,11 +210,11 @@ def one_line(s: str, limit: int = 200) -> str:
 
 def free_text(r: dict, preferred: tuple = ()) -> str:
     """A request's free-text content: the first non-empty field, `preferred` spellings first then the shared
-    `handoff.FREE_TEXT_FIELDS` list. `handoff.py` owns the schema and this intake reads the same list, so a
+    `lib.outbox.FREE_TEXT_FIELDS` list. `lib/outbox.py` owns the schema and this intake reads the same list, so a
     filing that puts its content under its lane's own spelling (`why`, `request`, `what`, `subject`, `note`)
     is read here rather than registering content-free and being swallowed by a neighbour.
     """
-    for field in tuple(preferred) + handoff_mod.FREE_TEXT_FIELDS:
+    for field in tuple(preferred) + _outbox.FREE_TEXT_FIELDS:
         value = asstr(r.get(field))
         if value.strip():
             return value

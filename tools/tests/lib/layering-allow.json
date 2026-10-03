@@ -77,7 +77,6 @@
   "tools/units/accessextent_selftest.py -> tools/units/accessextent.py",
   "tools/units/backlog.py -> tools/units/backlog_selftest.py",
   "tools/units/backlog.py -> tools/units/datagap.py",
-  "tools/units/backlog.py -> tools/units/handoff.py",
   "tools/units/backlog.py -> tools/units/lanecmd.py",
   "tools/units/backlog.py -> tools/units/stylelint.py",
   "tools/units/backlog.py -> tools/units/tooling.py",

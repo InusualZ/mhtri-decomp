@@ -227,6 +227,11 @@ becomes it (`duplication.md` has the line numbers).
 * `strip_comments` (length-preserving), `match_brace`, `match_paren`, `statements`, `declarations(text)` (function prototypes,
   `extern`, with declarator parsing), `type_definitions(text)` (struct/class/union/enum, fields with offsets, size comment),
   `includes(text)`, `include_closure(path, roots)`, `pragmas`, `calls(text, name)`.
+  As built (WP2c): one lexer (`spans`) behind `strip`/`strip_comments`/`remove_comments`; `declarations` is two
+  functions, `function_declarations(Text)` (stylelint's scope walk) and `declared_names(clean)` (typeregistry's names),
+  because their callers ask different questions; `include_closure` takes a `resolve(name, includer)` callable rather
+  than roots, since declclash and stylelint search different bases. `statements`, `type_definitions`, `pragmas` and
+  `calls` wait for 3b/3d (the spec's Known gaps).
 * From: `stylelint` (`strip`, `match_brace`, `struct_defs`, `iter_fields`, `function_declarations`, `_resolve_include`),
   `typeregistry` (`strip_comments`, `extract_decls`, `_match_brace`), `vtableaudit.type_definitions/_members`, `declclash.closure/shape`,
   `recordmerge.parse`, `methodize._call_sites`, `shapes.strip_comments/match_brace/split_statements`, `freshguard.source_closure`.
@@ -237,6 +242,8 @@ becomes it (`duplication.md` has the line numbers).
   `Row(name, status in {PASS, FAIL, UNKNOWN, SKIP}, detail, evidence, remedy, kind)`, `Verdict(rows) -> ok, failed_kinds, summary`,
   `added(before, after, credits)` (the `stylelint.added_identities` + rename/move credit model), `render_table`, `render_json`
   (one schema: `{"tool", "rows": [...], "ok", "summary"}`), `exit_code(verdict)` with the one convention: 0 ok, 1 findings, 2 could not run.
+  As built (WP2c): `Finding` also carries `text` (the source line - stylelint's JSON always had it), and `credits` is one
+  `credit(f) -> other spellings` callable, so the rename map and the file map stay with the tool that owns them.
 * From: `land.check`, `stylelint._finding/diff_deltas`, `vtableaudit.violation_rows`, `undefrefs.check_object`,
   `datagap.strict_verdict`, `splitcheck.Results`, `flipcheck.check`, `verifyunit.*_problems`, `symbolpreflight.severity_for`,
   `dataclaim.classify`, `handoff.validate`, `unionresolve.check_union`.
