@@ -93,7 +93,6 @@ import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file_
 import argparse
 import json
 import os
-import re
 import subprocess
 import sys
 import time
@@ -103,9 +102,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 
 import unitutil  # noqa: E402
-from tools.lib import project as _project  # noqa: E402  (the configure / map readers)
+from tools.lib import report as _report  # noqa: E402  (the metric and the diagnostic rows)
+from tools.lib import units as _units  # noqa: E402  (spellings, the compile command, the compile, the target)
 
-SRC_EXT = (".c", ".cpp", ".cp", ".cxx", ".cc")
+SRC_EXT = _units.SOURCE_EXT
 
 
 def git(args: list[str], cwd: str, check: bool = True) -> str:
@@ -162,361 +162,41 @@ def main_worktree_list(current: str) -> list[dict]:
     return entries
 
 
-def unit_source(unit: str) -> str:
-    return unit if unit.endswith(SRC_EXT) else unit + ".cpp"
-
-
-def normalize_unit(unit: str) -> str:
-    """Strip the prefixes a lane pastes (`src/`, `./`, `build/RMHE08/src/`) from a unit argument.
-
-    Passing the real path (`src/NHTTP/NHTTP_bgnend`) used to produce a doubled `src/src/...` in the
-    rewritten command; the unit argument is a path *from `src/`*, so the prefixes only ever hide it.
-    """
-    u = unit.replace("\\", "/").strip()
-    while u.startswith("./"):
-        u = u[2:]
-    changed = True
-    while changed:
-        changed = False
-        for pre in ("build/RMHE08/src/", "build/RMHE08/obj/", "src/"):
-            if u.startswith(pre):
-                u = u[len(pre):]
-                changed = True
-    return u.strip("/")
+unit_source = _units.with_ext
+normalize_unit = _units.normalize
 
 
 def resolve_unit_source(unit: str, wt: str = None, main: str = None, source: str = None) -> str:
-    """The unit's source spelling **with its real extension** - the fix for the `.c` unit.
-
-    `unit_source` appends `.cpp` when no extension is given, which is right for the `.cpp` units that
-    make up most of the tree and wrong for every `.c` unit (`NHTTP/NHTTP_bgnend`, `RSP/runtime`, ...):
-    `recompile.py` then told MWCC to compile `src/NHTTP/NHTTP_bgnend.cpp`, which does not exist, and
-    four lanes fell back to `ninja build/RMHE08/src/<unit>.o` + `symdiff.py`. Resolution order:
-
-    1. a source the caller named with `--source` (the deliberate override);
-    2. `configure.py`'s own registration (`lib_block`) - the one authority for the spelling;
-    3. the file that actually exists under `src/` (`.cpp` first, so the old default is byte-for-byte);
-    4. `.cpp`, the pre-fix behaviour.
-
-    The result is a unit spelling (`Pl/pl_act.cpp`), not a path, so every downstream `unit_source` call
-    is the identity and the object directory / ninja target derivation is unchanged.
-    """
-    if source:
-        s = source.replace("\\", "/").strip()
-        for root in (wt, main):
-            if not root:
-                continue
-            base = os.path.join(os.path.abspath(root), "src").replace("\\", "/") + "/"
-            if os.path.normcase(s).startswith(os.path.normcase(base)):
-                s = s[len(base):]
-                break
-        for pre in ("build/RMHE08/src/", "src/", "./"):
-            if s.startswith(pre):
-                s = s[len(pre):]
-        return s.strip("/")
-    unit = normalize_unit(unit)
-    if unit.endswith(SRC_EXT):
-        return unit
-    stem = _unit_stem(unit)
-    for root in (wt, main):
-        if not root:
-            continue
-        try:
-            _lib, names = lib_block(root, unit)
-        except Exception:
-            names = []
-        for name in names:
-            if _unit_stem(name) == stem:
-                return normalize_unit(name)
-    for root in (wt, main):
-        if not root:
-            continue
-        base = os.path.join(root, "src", *unit.split("/"))
-        for ext in (".cpp", ".c", ".cp", ".cxx", ".cc"):
-            if os.path.isfile(base + ext):
-                return unit + ext
-    return unit + ".cpp"
+    """The unit's source spelling with its real extension (`lib.units.source_spelling`)."""
+    return _units.source_spelling(unit, (wt, main), source)
 
 
 def _ninja_compile_lines(main: str, unit: str, runner=subprocess.run):
-    """(target, mwcceppc lines, completed process) for a unit, without raising.
-
-    Empty lines is the normal case for a *proposal* unit in MAIN: the source is registered in the
-    worker's worktree, so MAIN's build.ninja has no edge for `build/RMHE08/src/<unit>.o` yet.
-    """
-    target = "build/RMHE08/src/" + os.path.splitext(unit_source(unit))[0] + ".o"
-    p = runner(["ninja", "-t", "commands", target], cwd=main, capture_output=True, text=True, encoding="utf-8",
-               errors="replace")
-    return target, [l for l in (p.stdout or "").splitlines() if "mwcceppc" in l], p
+    """(target, mwcceppc lines, completed process) of MAIN's ninja for a unit, without raising."""
+    target = _units.ninja_target(unit)
+    lines, p = _units.ninja_lines(main, target, runner)
+    return target, lines, p
 
 
-def ninja_command(main: str, unit: str, runner=subprocess.run) -> list[str]:
-    """The exact compile command MAIN's ninja would run, as tokens."""
-    target, lines, p = _ninja_compile_lines(main, unit, runner)
-    if not lines:
-        raise SystemExit("could not get the compile command for %s from ninja in %s:\n%s%s"
-                         % (target, main, p.stdout, p.stderr))
-    return unitutil.unquote(lines[-1].split())
-
-
-def _unit_stem(name: str) -> str:
-    """`ef/effect.cpp` / `src/ef/effect.c` / `ef/effect` -> `ef/effect` - registration names and unit
-    spellings differ by prefix and extension, so compare on this."""
-    n = name.replace("\\", "/").strip().lstrip("./")
-    if n.startswith("src/"):
-        n = n[len("src/"):]
-    return os.path.splitext(n)[0]
-
-
-def retarget(tokens: list[str], unit: str) -> list[str]:
-    """Point a borrowed command line at *this* unit's object directory and language.
-
-    MWCC's `-o` is a directory and `project.py` sets it to the source's own directory, and it inserts the
-    `-lang` token from the extension; those are the only two things a same-lib sibling's line gets wrong.
-    Nothing else is touched - the flags stay exactly what ninja printed for the lib.
-    """
-    obj_dir = os.path.join("build", "RMHE08", "src", *unit_source(unit).split("/")[:-1])
-    lang = "-lang=c" if unit_source(unit).lower().endswith(".c") else "-lang=c++"
-    out, i = [], 0
-    while i < len(tokens):
-        tok = tokens[i]
-        if tok == "-o" and i + 1 < len(tokens):
-            out += [tok, obj_dir]
-            i += 2
-            continue
-        if tok.startswith("-lang="):
-            out.append(lang)
-            i += 1
-            continue
-        out.append(tok)
-        i += 1
-    return out
-
-
-
-def lib_block(wt: str, unit: str):
-    """(lib name, [object source names]) for the `config.libs` block that registers `unit`.
-
-    Read from the **worktree's** `configure.py` - the registration is the worker's, and it is exactly what
-    MAIN does not have yet. (None, []) when the unit is not registered there.
-    """
-    path = os.path.join(wt, "configure.py")
-    if not os.path.exists(path):
-        return None, []
-    try:
-        libs = _project.Configure.load(path).libs()
-    except SyntaxError:
-        return None, []
-    want = _unit_stem(unit)
-    for lib in libs:
-        names = [o.path for o in lib.objects]
-        if any(_unit_stem(n) == want for n in names):
-            return lib.name, names
-    return None, []
-
-
-def sibling_for(main: str, wt: str, unit: str, runner=subprocess.run):
-    """(sibling, tokens) - a registered unit in the worktree's lib for `unit`, and its command line.
-
-    Every object in one `config.libs` block shares the `mw_version` and `cflags` `project.py` builds the
-    command from, so a sibling's line IS this unit's flags. Preference is the same module directory and
-    the same extension, so the borrow usually needs no correction at all. Raises with the registration
-    step to run when the unit is not in `configure.py`, or when its lib has no unit MAIN can build.
-    """
-    lib, names = lib_block(wt, unit)
-    want = _unit_stem(unit)
-    if not lib:
-        raise SystemExit(
-            "%s is not registered in %s/configure.py, and MAIN has no compile command for it - a proposal "
-            "unit is measurable only once its own `Object(...)` line and `splits.txt` block are there "
-            "(docs/plan.md: registration comes before the bodies)" % (unit, wt))
-    want_dir, want_ext = os.path.dirname(want), os.path.splitext(unit_source(unit))[1].lower()
-
-    def rank(name: str):
-        stem = _unit_stem(name)
-        return (0 if os.path.dirname(stem) == want_dir else 1,
-                0 if os.path.splitext(name)[1].lower() == want_ext else 1, stem)
-
-    for name in sorted(names, key=rank):
-        stem = _unit_stem(name)
-        if stem == want:
-            continue
-        _target, lines, _p = _ninja_compile_lines(main, stem, runner)
-        if lines:
-            return stem, unitutil.unquote(lines[-1].split())
-    raise SystemExit(
-        "no unit in lib %r (the one %s/configure.py registers %s in) has a compile command in MAIN's "
-        "ninja - a brand-new lib cannot be measured until its registration lands on MAIN"
-        % (lib, wt, unit))
-
-
-def unit_tokens(main: str, wt: str, unit: str, runner=subprocess.run):
-    """(tokens, source) - the real compile command for `unit`, and where it came from.
-
-    In order: MAIN's ninja (the registered unit, unchanged), the worktree's own ninja (a worker who
-    regenerated `build.ninja` after registering), then a registered sibling in the same lib (the proposal
-    path). Only the sibling's line is rewritten, and only its `-c`/`-o`/`-lang` - the flags are the ones
-    ninja printed.
-    """
-    _target, lines, _p = _ninja_compile_lines(main, unit, runner)
-    if lines:
-        return unitutil.unquote(lines[-1].split()), "main"
-    _target, lines, _p = _ninja_compile_lines(wt, unit, runner)
-    if lines:
-        return unitutil.unquote(lines[-1].split()), "worktree"
-    sibling, tokens = sibling_for(main, wt, unit, runner)
-    return retarget(tokens, unit), "sibling %s (same lib)" % sibling
-
-
-# The post-compile helpers project.py chains after MWCC; each takes the just-written object as its
-# positional argument. Kept as data so a new helper is one entry, not another special case.
-OBJECT_HELPERS = ("objalign.py", "objextab.py")
-
-
-def retarget_object_helpers(tokens: list[str], obj_path: str) -> list[str]:
-    """Point every chained `<helper>.py <object>` argument at the worktree's object.
-
-    Every `.o` rule ends `... && python tools\\elf\\objalign.py build\\RMHE08\\src\\<unit>.o && python
-    tools\\elf\\objextab.py build\\RMHE08\\src\\<unit>.o`, and those arguments are neither `-o` nor `-c`,
-    so `rewrite` used to leave them **relative** while `compile_unit` runs the whole line with `cwd=MAIN`.
-    The helper then resolved MAIN's copy of the object - absent for a unit MAIN has not registered -
-    raised `FileNotFoundError`, and the tool reported `FAILED` even though MWCC had compiled the worktree
-    object fine (the exact measurement `docs/plan.md`'s landing recipe names; its `--dry-run` showed the
-    good command and hid the mismatch). `objextab` was the same latent failure `objalign` already had:
-    with a worktree object and an unregistered unit it silently rewrote MAIN's object instead of this
-    tree's. A borrowed sibling's line is worse still: its helper carries the *sibling's* object name, so
-    the fix replaces the token after the helper rather than matching on the object's name.
-    """
-    out = list(tokens)
-    changed = False
-    for i, tok in enumerate(out):
-        if any(tok.replace("\\", "/").endswith(helper) for helper in OBJECT_HELPERS) \
-                and i + 1 < len(out):
-            out[i + 1] = os.path.abspath(obj_path)
-            changed = True
-    return out if changed else tokens
+ninja_command = _units.ninja_command
+_unit_stem = _units.stem
+retarget = _units.retarget
+lib_block = _units.lib_block
+sibling_for = _units.sibling_for
+unit_tokens = _units.unit_tokens
+OBJECT_HELPERS = _units.OBJECT_HELPERS
+retarget_object_helpers = _units.retarget_object_helpers
 
 
 # kept for callers outside this module (the name the fix first shipped under)
 retarget_objalign = retarget_object_helpers
 
 
-def rewrite(tokens: list[str], unit: str, main: str, wt: str) -> tuple[list[str], str]:
-    """Point the command at the worktree's source and object, and at its own headers first.
-
-    Returns (tokens, object_path). The three rewrites are the source path, the `-o` directory (MWCC's `-o`
-    is a directory - the object's *name* comes from the source) and the include search path
-    (`order_includes`).
-    """
-    rel_src = os.path.join("src", *unit_source(unit).split("/"))
-    wt_src = os.path.join(wt, rel_src)
-    out: list[str] = []
-    obj_dir = None
-    i = 0
-    while i < len(tokens):
-        tok = tokens[i]
-        if tok in ("-o",):
-            out.append(tok)
-            i += 1
-            if i < len(tokens):
-                obj_dir = os.path.join(wt, tokens[i].lstrip("./\\"))
-                out.append(obj_dir)
-        elif tok == "-c":
-            out.append(tok)
-            i += 1
-            if i < len(tokens):
-                out.append(wt_src)
-        else:
-            out.append(tok)
-        i += 1
-    if obj_dir is None:
-        raise SystemExit("no -o in the command line - refusing to guess where the object goes")
-    out = order_includes(out, main, wt)
-    obj_path = os.path.join(obj_dir, os.path.splitext(os.path.basename(wt_src))[0] + ".o")
-    # the chained objalign/objextab arguments are not `-o`/`-c` values, so they were left relative to
-    # MAIN; absolutise them here, after the object path is known, so each helper touches the object MWCC
-    # just wrote rather than MAIN's.
-    out = retarget_object_helpers(out, obj_path)
-    return out, obj_path
-
-
-# The flag configure.py's cflags use for a search directory; the include *values* are relative to MAIN
-# (`-i include`, `-i build/RMHE08/include`), which is exactly why the order matters here.
-INCLUDE_FLAG = "-i"
-
-
-def include_pairs(tokens: list[str]) -> list[tuple[int, str]]:
-    """[(index of the flag, its directory)] for every `-i <dir>` in a command line."""
-    pairs: list[tuple[int, str]] = []
-    i = 0
-    while i < len(tokens):
-        if tokens[i] == INCLUDE_FLAG and i + 1 < len(tokens):
-            pairs.append((i, tokens[i + 1]))
-            i += 2
-        else:
-            i += 1
-    return pairs
-
-
-def order_includes(tokens: list[str], main: str, wt: str) -> list[str]:
-    """Rebuild the command line's `-i` list so the worktree's headers always win.
-
-    MWCC searches `-i` directories **in the order given**, and the command line ninja hands over carries
-    MAIN's directories as relative paths (`-i include -i build/RMHE08/include`) which the compile resolves
-    against its cwd - MAIN. Appending the worktree's `include/` (what this used to do) therefore left MAIN's
-    copy of every shared header first: a worker's edit to an *existing* header (`include/nw4r/math.h`,
-    `include/ef.h`) was shadowed, the compile succeeded, and the measurement was silently of MAIN's source -
-    a lower score that reads as a matching problem.
-
-    Two changes: the worktree's own include directories go **first**, and every one of MAIN's directories is
-    pointed at the worktree's copy of it when the worktree has one, so the worktree is self-sufficient
-    (`docs/plan.md` §5.1) and no MAIN path can shadow a worktree file. A directory only MAIN has (the
-    generated `build/RMHE08/include`, the toolchain) keeps MAIN's absolute path.
-
-    Pure in the sense that matters for testing: it only reads the two trees' directory listings, never the
-    compiler, so the ordering can be asserted without a build.
-    """
-    pairs = include_pairs(tokens)
-    dirs: list[str] = []
-    seen: set[str] = set()
-
-    def add(path: str) -> None:
-        key = os.path.normcase(os.path.abspath(path))
-        if key not in seen:
-            seen.add(key)
-            dirs.append(path)
-
-    # 1. the worktree's own headers, before anything MAIN carries - the whole point
-    for rel in ("include", os.path.join("build", "RMHE08", "include")):
-        cand = os.path.join(wt, rel)
-        if os.path.isdir(cand):
-            add(cand)
-    # 2. MAIN's own list, each entry redirected to the worktree's copy when it has one
-    for _idx, value in pairs:
-        rel = os.path.normpath(value)
-        wt_copy = os.path.join(wt, rel)
-        if os.path.isdir(wt_copy):
-            add(wt_copy)
-            continue
-        main_copy = os.path.join(main, rel)
-        add(main_copy if os.path.isdir(main_copy) else value)
-
-    block = [t for d in dirs for t in (INCLUDE_FLAG, d)]
-    if pairs:
-        at = pairs[0][0]
-        skip = {i for idx, _v in pairs for i in (idx, idx + 1)}
-    else:
-        # no `-i` at all: put the worktree's own directories at the head of the flag list
-        at = next((k for k, t in enumerate(tokens) if t.startswith("-")), len(tokens))
-        skip = set()
-    kept = [t for k, t in enumerate(tokens) if k not in skip]
-    pos = at - sum(1 for k in skip if k < at)
-    return kept[:pos] + block + kept[pos:]
-
-
-def source_path(wt: str, unit: str) -> str:
-    """The source a unit's object must be newer than, resolved the way `rewrite` resolves it."""
-    return os.path.join(wt, "src", *unit_source(unit).split("/"))
+rewrite = _units.rewrite
+INCLUDE_FLAG = _units.INCLUDE_FLAG
+include_pairs = _units.include_pairs
+order_includes = _units.order_includes
+source_path = _units.source_path
 
 
 def _stamp(seconds: float) -> str:
@@ -582,40 +262,8 @@ def provenance_lines(prov: dict) -> list[str]:
     return lines
 
 
-def object_is_fresh(object_path: str, source: str) -> tuple[bool, str]:
-    """(fresh, reason) - the stale-object guard every measurement path must pass before reading an object.
-
-    The failure this refuses: a compile fails (or is a no-op) and leaves the **previous** object on disk,
-    and the scorer reads it and reports the old score as this run's number. That is worse than no scorer,
-    because the number looks like progress. Two layers protect against it - `compile_unit` deletes the
-    object before it compiles and requires it to reappear, and this last check refuses any object whose
-    mtime predates the source it claims to be built from, so a scorer handed an object path directly
-    cannot be fooled either.
-
-    An object with no source to compare against is not rejected *here* (`compile_unit` already failed the
-    compile if the source is missing); this is about the ordering, not existence.
-    """
-    if not os.path.exists(object_path):
-        return False, ("STALE OBJECT: no object at %s - the compile wrote nothing, so there is no score to "
-                       "read" % object_path)
-    if not os.path.exists(source):
-        return True, ""
-    obj_m, src_m = os.stat(object_path).st_mtime_ns, os.stat(source).st_mtime_ns
-    if obj_m < src_m:
-        return False, (
-            "STALE OBJECT: %s is older than its source %s (object %s, source %s) - the compile did not "
-            "rewrite it; refusing to measure, because a score read from here would be last build's number "
-            "dressed as this one's"
-            % (object_path, source, _stamp(obj_m / 1e9), _stamp(src_m / 1e9)))
-    return True, ""
-
-
-def section_sizes(obj: str) -> dict:
-    try:
-        secs, _syms = unitutil.read_elf(obj)
-    except Exception:
-        return {}
-    return {s["sname"]: s["size"] for s in secs if s.get("sname") and s.get("size")}
+object_is_fresh = _units.object_is_fresh
+section_sizes = _units.section_sizes
 
 
 MIN_PROJECT_VERSION = unitutil.MIN_PROJECT_VERSION
@@ -623,30 +271,14 @@ MIN_PROJECT_VERSION = unitutil.MIN_PROJECT_VERSION
 
 def measure(target: str, base: str, symbol: str, objdiff: str, tmpdir: str,
             unit: str = None, runner=subprocess.run) -> dict:
-    """The official score for one symbol, plus the instruction-level rows behind it.
-
-    The score comes from `unitutil.report_measure`, i.e. `report generate` over a one-unit project - the
-    SAME primitive `measure.py` scores a whole unit with (`unitutil.report_functions`) and the number
-    `build/RMHE08/report.json`, `ledger.py` and `land.py` carry. There used to be a second copy of that
-    project/report code here; deleting it is what makes `--measure` a single way to measure rather than a
-    parallel implementation that can drift (the drift that once printed ~0.36 pt low on `RSO/runtime`).
-
-    `match_percent` is deliberately the **report** metric (`fuzzy_match_percent`), so any existing consumer
-    that reads `measure().match_percent` gets the number that closes a symbol. The positional objdiff value
-    is kept as `diff_match_percent`; it is diagnostic only.
-    """
-    previous = unitutil.OBJDIFF
-    unitutil.OBJDIFF = objdiff
-    try:
-        result = unitutil.report_measure(target, base, symbol, unit_name=unit, tmpdir=tmpdir,
-                                         runner=runner)
-    finally:
-        unitutil.OBJDIFF = previous
+    """The official score of one symbol (`lib.report.symbol_score`) plus the diagnostic rows behind it;
+    the positional diff value is kept as `diff_match_percent` and is never the score."""
+    result = _report.symbol_score(target, base, symbol, unit, tmpdir, objdiff=objdiff, cwd=unitutil.ROOT,
+                                  runner=runner)
     if "error" in result:
         return result
     rows = diff_rows(target, base, symbol, objdiff, tmpdir, runner=runner)
     if "error" in rows:
-        # the score stands on its own; only the row detail is unavailable
         result["rows_error"] = rows["error"]
         return result
     result["diff_match_percent"] = rows.get("diff_match_percent")
@@ -658,92 +290,10 @@ def measure(target: str, base: str, symbol: str, objdiff: str, tmpdir: str,
     return result
 
 
-def diff_rows(target: str, base: str, symbol: str, objdiff: str, tmpdir: str,
-              runner=subprocess.run) -> dict:
-    """Instruction-level diff for the row detail the report does not carry.
-
-    `-c functionRelocDiffs=none` is passed explicitly because `report generate`'s default is `none` while
-    `diff`'s is `data_value`: without it the rows disagree with the official classification (relocation-only
-    differences show up as `DIFF_ARG_MISMATCH`). The metric in this JSON (`match_percent`) is *not* the
-    report's - it is exposed as `diff_match_percent` and must never be quoted as the score.
-    """
-    out = os.path.join(tmpdir, "recompile_%s.json" % re.sub(r"\W", "_", symbol))
-    os.makedirs(tmpdir, exist_ok=True)
-    p = runner([objdiff, "diff", "-1", target, "-2", base, symbol,
-                "-c", "functionRelocDiffs=none", "--format", "json", "-o", out],
-               capture_output=True, text=True, encoding="utf-8", errors="replace")
-    if p.returncode != 0 or not os.path.exists(out):
-        return {"symbol": symbol, "error": (p.stdout or "") + (p.stderr or "")}
-    data = json.loads(open(out, encoding="utf-8").read())
-    if isinstance(data, dict) and "left" in data:
-        sides = (data.get("left") or {}, data.get("right") or {})
-    elif isinstance(data, dict) and "symbols" in data:
-        sides = (data, data)
-    else:
-        return {"symbol": symbol, "error": "unrecognised objdiff output"}
-
-    def entry(side):
-        for sym in side.get("symbols") or []:
-            if sym.get("name") == symbol:
-                return sym
-        return None
-
-    tgt, cand = entry(sides[0]), entry(sides[1])
-    if tgt is None and cand is None:
-        return {"symbol": symbol, "error": "symbol is in neither object (renamed? unpaired?)"}
-    return {
-        "symbol": symbol,
-        "diff_match_percent": (cand or tgt or {}).get("match_percent"),
-        "target_size": (tgt or {}).get("size"),
-        "candidate_size": (cand or {}).get("size"),
-        "paired": tgt is not None and cand is not None,
-        "json": out,
-    }
-
-
-# Tokens that are switches, not paths. `cmd /c` is the one that bit: `os.path.join(main, "/c")` is
-# `C:/c` - a leading separator resets to the drive root - and on a host where `C:\c` exists (this one
-# does) the switch was rewritten to that path, so the child became an *interactive* `cmd`, printed its
-# banner, and never wrote an object. A `-` or `/` prefix is always a switch in these command lines
-# (`-o`, `-i`, `-c`, `-lang=`, `cmd /c`), never a MAIN-relative file.
-SWITCH_PREFIXES = ("-", "/")
-
-
-def is_switch(tok: str) -> bool:
-    """Whether a command token is a flag/switch, never a MAIN-relative path.
-
-    The one predicate that decides `absolutize`'s classification; kept separate so the `cmd /c` contract
-    can be asserted without depending on whether this host happens to have a `C:/c` artifact.
-    """
-    return tok.startswith(SWITCH_PREFIXES)
-
-
-def absolutize(tokens: list[str], main: str) -> list[str]:
-    """Resolve any token that names a file *in MAIN* to an absolute path, without touching switches.
-
-    Windows resolves a relative executable path against the parent process's directory, not against the
-    `cwd=` handed to the child, so `build/tools/sjiswrap.exe` fails with WinError 2 even when the child's cwd
-    is MAIN. Absolutizing the driver (and the compiler sjiswrap is told to run) is what makes the command
-    work from any worktree.
-
-    The guard that matters is the switch prefix: a token beginning with `-` or `/` is a flag, and
-    `os.path.join` would resolve a rooted one (`/c`) against the *drive root* rather than MAIN. With
-    `C:/c` present that turned `cmd /c ...` into `cmd C:\\c ...` - an interactive shell, no compile, no
-    object. A rooted token that is a real path (`C:\\...`) is still absolutised by `os.path.join`
-    discarding `main`, so absolute paths keep working.
-    """
-    out = []
-    for tok in tokens:
-        if is_switch(tok):
-            out.append(tok)
-            continue
-        if "\\" in tok or "/" in tok:
-            candidate = os.path.join(main, tok.replace("\\", os.sep))
-            if os.path.exists(candidate):
-                out.append(os.path.abspath(candidate))
-                continue
-        out.append(tok)
-    return out
+diff_rows = _report.diff_rows
+SWITCH_PREFIXES = _units.SWITCH_PREFIXES
+is_switch = _units.is_switch
+absolutize = _units.absolutize
 
 
 # ---------------------------------------------------------------------------------------------------
@@ -754,134 +304,16 @@ def absolutize(tokens: list[str], main: str) -> list[str]:
 # split objects its previous split produced, with the same original bytes. That is the honest fallback, and
 # it is what each stuck worker re-derived by hand.
 
-SYMBOLS_REL = os.path.join("config", "RMHE08", "symbols.txt")
-SPLITS_REL = os.path.join("config", "RMHE08", "splits.txt")
-AUTO_RUN_RE = re.compile(r"^auto_\d+_([0-9A-Fa-f]{8})_text$")
-
-
-def same_tree(a: str, b: str) -> bool:
-    """Whether two paths name the same tree (normcase/abspath, so Windows case and slashes agree)."""
-    return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
-
-
-def resolve_map(wt: str, main: str, rel: str = SYMBOLS_REL):
-    """(absolute path, kind) of a config map resolved from **this invocation's** tree outward.
-
-    `kind` is `worktree-map`, `main-map` or `missing`. This is `resolve_target`'s discipline applied to the
-    *map* (F43): a branch that renamed its own symbols has edited *its* `config/RMHE08/symbols.txt`, and a
-    lookup pinned to MAIN's copy cannot see a name MAIN never carried - the filed refusal "a symbol this
-    branch renamed has no entry there". The invocation tree comes first, MAIN is the fallback (a fresh
-    worktree may have no `config/` of its own yet), and never MAIN-only. The caller prints the result:
-    which map was read is part of what makes a measurement unambiguous.
-
-    `rel` is a parameter so the *same* order serves `splits.txt` (`SPLITS_REL`): nothing here is
-    symbols-specific.
-    """
-    p_wt, p_main = os.path.join(wt, rel), os.path.join(main, rel)
-    if not same_tree(wt, main) and os.path.exists(p_wt):
-        return os.path.abspath(p_wt), "worktree-map"
-    if os.path.exists(p_main):
-        return os.path.abspath(p_main), "main-map"
-    if os.path.exists(p_wt):
-        return os.path.abspath(p_wt), "worktree-map"
-    return os.path.abspath(p_main), "missing"
-
-
-def text_symbol_addresses(map_path: str) -> dict:
-    """{name: address} for every `.text` symbol in a symbols.txt - the only section `report generate`
-    scores. `map_path` is the resolved map itself (`resolve_map`), not a tree root."""
-    if not os.path.exists(map_path):
-        return {}
-    return {e.name: e.address for e in _project.SymbolMap(map_path).rows() if e.section == ".text"}
-
-
-def auto_text_runs(main: str) -> list:
-    """[(start, size, object)] for MAIN's retired *run* split objects, ascending by start address.
-
-    dtk names a run `auto_<nn>_<address>_text` (its start in the name) and records its `code_size` in MAIN's
-    `build/RMHE08/config.json`; a run can hold several functions (`fn_80041304` and `fn_8004132C` share
-    `auto_03_80041304_text.o`). A single symbol gets `auto_<symbol[:20]>_text` instead, found by name.
-    """
-    path = os.path.join(main, "build", "RMHE08", "config.json")
-    if not os.path.exists(path):
-        return []
-    try:
-        units = json.load(open(path, encoding="utf-8")).get("units") or []
-    except (ValueError, OSError):
-        return []
-    out = []
-    for u in units:
-        m = AUTO_RUN_RE.match(u.get("name") or "")
-        if m:
-            out.append((int(m.group(1), 16), u.get("code_size") or 0, u.get("object") or ""))
-    out.sort()
-    return out
-
-
-def symbol_addresses(wt: str, main: str):
-    """({name: address}, map path, map kind) merged from this invocation's map first, MAIN's second.
-
-    Merging both is what makes a **rename** measurable (F43): the branch's map carries the new name at the
-    address while MAIN's still carries the old one - and MAIN's retired `auto_<name>_text.o` is named after
-    the *old* spelling, so the by-name step needs both maps. The invocation's map wins whenever the same
-    name appears in both, because it is the tree being edited.
-    """
-    path, kind = resolve_map(wt, main)
-    out: dict = {}
-    main_map = os.path.abspath(os.path.join(main, SYMBOLS_REL))
-    if not same_tree(wt, main) and os.path.exists(main_map) \
-            and os.path.normcase(main_map) != os.path.normcase(path):
-        out.update(text_symbol_addresses(main_map))     # the older spelling first ...
-    out.update(text_symbol_addresses(path))             # ... the invocation's name wins
-    return out, path, kind
-
-
-def retired_object_dirs(wt: str, main: str) -> list[str]:
-    """The `obj/` directories a retired `auto_*_text.o` can live in: MAIN's first, then this tree's."""
-    dirs = [os.path.join(main, "build", "RMHE08", "obj")]
-    if not same_tree(wt, main):
-        dirs.append(os.path.join(wt, "build", "RMHE08", "obj"))
-    return dirs
-
-
-def proposal_target(wt: str, main: str, symbol: str):
-    """(target object path, note) for `symbol` in a proposal unit, or (None, why not).
-
-    Resolution is by **address**, and the address comes from the map this invocation resolves
-    (`symbol_addresses` - the branch's own map first, MAIN's second), so a branch that renamed the symbol
-    still finds the object: its map knows the new name, MAIN knows the old one. Two shapes of retired
-    object:
-
-    * the single-symbol object dtk named after the symbol - `auto_<name[:20]>_text.o`. The truncation is
-      dtk's; the existence test plus the name at the address is the test, not a spelling guess - and every
-      name either map places at that address is tried, so a rename does not lose the object;
-    * the run that covers the address - `auto_<nn>_<start>_text.o`, `start <= addr < start + code_size`.
-    """
-    addresses, map_path, map_kind = symbol_addresses(wt, main)
-    addr = addresses.get(symbol)
-    if addr is None:
-        return None, ("%s is not a `.text` symbol in the map this tree resolves (%s [%s]) or in MAIN's "
-                      "copy, and the fallback locates the retired split object by address"
-                      % (symbol, map_path, map_kind))
-    names = [symbol] + sorted(n for n, a in addresses.items() if a == addr and n != symbol)
-    # 1. a single-symbol object named (by dtk, truncated to 20 chars) after a name at this address
-    for objdir in retired_object_dirs(wt, main):
-        for name in names:
-            cand = os.path.join(objdir, "auto_%s_text.o" % name[:20])
-            if os.path.exists(cand):
-                return cand, ("retired single-symbol split object %s (%s at 0x%X)"
-                              % (os.path.basename(cand), name, addr))
-    # 2. the run whose range covers the address
-    for tree in ([main] if same_tree(wt, main) else [main, wt]):
-        for start, size, rel in auto_text_runs(tree):
-            if start <= addr < start + size:
-                path = os.path.join(tree, *rel.replace("\\", "/").split("/"))
-                if os.path.exists(path):
-                    return path, ("retired split object %s covers 0x%X-0x%X - the run that owns %s"
-                                  % (os.path.basename(rel), start, start + size, symbol))
-    return None, ("0x%X (%s) is not inside any retired `auto_*_text` object in this tree or MAIN - it "
-                  "belongs to an already-registered unit or a gap, so there is no original object for it"
-                  % (addr, symbol))
+SYMBOLS_REL = _units.SYMBOLS_REL
+SPLITS_REL = _units.SPLITS_REL
+AUTO_RUN_RE = _units.AUTO_RUN_RE
+same_tree = _units.same_tree
+resolve_map = _units.resolve_map
+text_symbol_addresses = _units.text_symbol_addresses
+auto_text_runs = _units.auto_text_runs
+symbol_addresses = _units.symbol_addresses
+retired_object_dirs = _units.retired_object_dirs
+proposal_target = _units.proposal_target
 
 
 def object_has_symbol(obj: str, symbol: str) -> bool:
@@ -894,13 +326,7 @@ def object_has_symbol(obj: str, symbol: str) -> bool:
     return any(s[0] == symbol for s in syms)
 
 
-def target_rel(unit: str) -> str:
-    """The registered split object's path relative to a tree root, from the unit spelling.
-
-    This is the worktree *and* MAIN layout: `<root>/build/RMHE08/obj/<unit>.o`.
-    """
-    head = os.path.join("build", "RMHE08", "obj", *unit_source(unit).split("/"))
-    return os.path.splitext(head)[0] + ".o"
+target_rel = _units.target_rel
 
 
 # ---------------------------------------------------------------------------------------------------
@@ -1016,51 +442,7 @@ def target_tree(path: str, wt: str, main: str) -> str:
     return os.path.dirname(os.path.abspath(path))
 
 
-def resolve_target(wt: str, main: str, unit: str, symbol: str):
-    """(target object, kind, note) for `--measure`, resolved from THIS invocation's tree outward.
-
-    `kind` is `worktree-split`, `registered`, `auto-fallback` or `missing`. The order is the one
-    `measure.py` uses, and it is the fix for the filed trap of reading MAIN's object inside a worktree
-    that has its own copy:
-
-    1. the **worktree's** split object, when this tree is not MAIN and the object exists (a proposal the
-       worker has already split here - the *real* new bytes, which MAIN cannot have first);
-    2. MAIN's registered split object (`registered` - the path a registered unit has always measured
-       against, unchanged);
-    3. the retired `auto_*_text` object that owns the symbol's address, looked up through the map this
-       invocation resolves (the branch's own `symbols.txt` first, MAIN's second) and found in MAIN's
-       `obj/` or this tree's - the proposal path before its registration lands on MAIN;
-    4. `missing`, so the caller refuses to invent a number.
-
-    The returned path is absolute, and the CLI prints it, so a measurement is never ambiguous about which
-    tree it came from; `resolve_map` and the printed map line do the same for the map the address came
-    from.  When the object is MAIN's while the invocation is a worktree - step 2 - the `note` says so and
-    names the path this tree would need, because `registered` alone does not say *which* tree registered it.
-    """
-    rel = target_rel(unit)
-    same = same_tree(wt, main)
-    p_wt, p_main = os.path.join(wt, rel), os.path.join(main, rel)
-    if not same and os.path.exists(p_wt):
-        return p_wt, "worktree-split", ""
-    if os.path.exists(p_main):
-        # Run from a worktree that has no object for this unit: the score is MAIN's, and the caller must
-        # be able to see that without reading the path.  `resolve_target` uses MAIN's split object where
-        # MAIN is the registered tree - a plain `registered` label hides which of the two trees that is,
-        # which is exactly how the filed double-take read a MAIN number as this lane's.
-        note = ""
-        if not same:
-            note = ("this tree has no split object for %s at %s - the score is MAIN's split object; "
-                    "re-split this tree (ninja build/RMHE08/config.json, or a plain ninja) to score your own"
-                    % (unit, rel))
-        return p_main, "registered", note
-    found, note = proposal_target(wt, main, symbol)
-    if found:
-        return found, "auto-fallback", note
-    map_path, map_kind = resolve_map(wt, main)
-    return p_main, "missing", (
-        "no original object for %s: no split object at %s in this tree or MAIN, and no retired "
-        "`auto_*_text` object covers the address of %s (map: %s [%s])"
-        % (unit, rel, symbol, map_path, map_kind))
+resolve_target = _units.resolve_target
 
 
 # the name this shipped under before item B (`resolve_target` follows the invocation; this searched MAIN
@@ -1069,36 +451,7 @@ def measure_target(main: str, unit: str, symbol: str):
     return resolve_target(main, main, unit, symbol)
 
 
-def compile_unit(unit: str, main: str, wt: str, dry_run: bool = False, runner=subprocess.run,
-                 tokens: list[str] = None) -> dict:
-    if tokens is None:
-        tokens = ninja_command(main, unit, runner=runner)
-    cmd, obj = rewrite(tokens, unit, main, wt)
-    cmd = absolutize(cmd, main)
-    os.makedirs(os.path.dirname(obj), exist_ok=True)
-    existed = os.path.exists(obj)
-    before = os.stat(obj).st_mtime_ns if existed else None
-    if dry_run:
-        return {"command": cmd, "object": obj, "dry_run": True}
-    if existed:
-        os.remove(obj)
-    started = time.time_ns()
-    p = runner(cmd, cwd=main, capture_output=True, text=True, encoding="utf-8", errors="replace")
-    log = (p.stdout or "") + (p.stderr or "")
-    if p.returncode != 0:
-        return {"object": obj, "compiled": False, "error": log}
-    if not os.path.exists(obj):
-        return {"object": obj, "compiled": False,
-                "error": "the compiler returned 0 but wrote no object - MWCC's -o is a DIRECTORY; "
-                         "digest:\n" + log}
-    after = os.stat(obj).st_mtime_ns
-    fresh = after >= started and after != before
-    ok, why = object_is_fresh(obj, source_path(wt, unit))
-    if not ok:
-        # the compile returned 0 and wrote *an* object, but it is not this source's - refuse it
-        return {"object": obj, "compiled": False, "error": why}
-    return {"object": obj, "compiled": True, "fresh": fresh, "bytes": os.path.getsize(obj),
-            "sections": section_sizes(obj), "log": log}
+compile_unit = _units.compile
 
 
 def main() -> int:
@@ -1148,7 +501,7 @@ def main() -> int:
         if target_kind == "missing":
             result["measure"] = {"symbol": args.measure, "error": target_note}
         else:
-            result["measure"] = measure(target, result["object"], args.measure, unitutil.OBJDIFF,
+            result["measure"] = measure(target, result["object"], args.measure, _report.objdiff_cli(wt, main_wt),
                                         unitutil.session_tmpdir(), unit=unit)
             m = result["measure"]
             if target_kind == "auto-fallback" and "error" not in m and m.get("match_percent") is None:

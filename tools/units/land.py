@@ -189,6 +189,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(HERE), "agents"))
 import unitutil  # noqa: E402
 import prepcommit as pc  # noqa: E402
 from tools.lib import project as _project  # noqa: E402  (the splits / configure readers)
+from tools.lib import report as _report  # noqa: E402  (the report snapshot and the one regression rule)
 from units import brief as brief_mod  # noqa: E402
 from units import claims  # noqa: E402
 from units import handoff as handoff_mod  # noqa: E402
@@ -2043,89 +2044,22 @@ def regression_rows(changes_json: str) -> list[tuple[str, str, float, float]]:
 
 
 def report_snapshot(main: str) -> dict:
-    """Per-unit measures and the sub-100 % symbols - the evidence a batch's delta is judged against.
-
-    `build/RMHE08/report_changes.json` only carries DOL-level totals, and `ninja baseline` (which this tool runs
-    at the end of a batch) rewrites the very baseline the comparison would need: two consecutive verifies of the
-    same tree therefore both report "no regression" while the ledger says matched 231 -> 228. So the snapshot is
-    taken at `record-base` and kept in `.pi/`, where nothing overwrites it.
-    """
+    """Per-unit measures and the sub-100 % symbols (`lib.report.snapshot`) - the evidence a batch's delta is
+    judged against, taken at `record-base` and kept in `.pi/` because `ninja baseline` rewrites the baseline
+    a later comparison would need."""
     path = os.path.join(main, "build", "RMHE08", "report.json")
     if not os.path.exists(path):
         return {}
-    data = json.loads(open(path, encoding="utf-8").read())
-    out = {}
-    for unit in data.get("units", []):
-        name = unit.get("name") or ""
-        measures = unit.get("measures") or {}
-        symbols = {}
-        for fn in unit.get("functions") or []:
-            pct = fn.get("fuzzy_match_percent", fn.get("match_percent"))
-            if fn.get("name") and isinstance(pct, (int, float)) and pct < 100.0:
-                symbols[fn["name"]] = round(float(pct), 4)
-        if measures or symbols:
-            out[name] = {
-                "fuzzy": measures.get("fuzzy_match_percent"),
-                "matched_code": measures.get("matched_code"),
-                "symbols": symbols,
-            }
-    return out
+    return _report.snapshot(_report.read(path))
 
 
-def unit_grew(prior: dict, after: dict) -> bool:
-    """True when a unit only **gained** bodies/symbols - an extension, not a loss.
-
-    A widened splits range (or a head joined to its tail) adds functions to an already-registered unit; the
-    unit's average `fuzzy` then falls because the weaker new bodies joined it, which is exactly what an
-    extension does and is not a regression. Two signals say "grew" and either is enough: the unit's sub-100 %
-    symbol set gained a name the previous report did not hold, or its matched-byte count rose. Both are read
-    from the `record-base` snapshot, so a unit re-measured identically is not "grown" and the unit-average
-    comparison still sees it (`report_regressions`).
-    """
-    prior_syms = prior.get("symbols") or {}
-    after_syms = after.get("symbols") or {}
-    if len(after_syms) > len(prior_syms) or any(s not in prior_syms for s in after_syms):
-        return True
-    bm, am = prior.get("matched_code"), after.get("matched_code")
-    return isinstance(bm, (int, float)) and isinstance(am, (int, float)) and am > bm + 1e-9
+unit_grew = _report.unit_grew
 
 
 def report_regressions(before: dict, after: dict, allow: list[str]) -> tuple[list[tuple], list[tuple]]:
-    """-> (unauthorised, authorised) regressions as (unit, what, before, after).
-
-    A regression is measured **per symbol**: a symbol the previous report held whose own score dropped is a
-    regression, and the row names the symbol and both numbers. A symbol the previous report did not hold is
-    NEW - a body this batch added - and is never a regression, however weak; that is what extending an
-    already-registered unit does, and refusing it blocks every legitimate extension (the gate did exactly
-    that to the g3d_resshp head-plus-tail join and to the 800997e0 extension before 2026-09-25).
-
-    The unit's own `fuzzy` is an average over its symbols, so it can fall while every symbol holds or improves
-    - the weaker new symbols joined. `unit_grew` catches that case and the unit-average row is skipped; it
-    fires only for a unit that did **not** grow, where something really dropped and no per-symbol row would
-    name it, and it names the unit and both numbers. `allow` names units whose measured regression an explicit
-    rule authorised (rule 8 of §6.5 costs score, and that cost is measured, not hidden).
-    """
-    unauthorised, authorised = [], []
-    for unit, after_vals in after.items():
-        prior = before.get(unit)
-        if not prior or "auto_" in unit and "/auto/" not in unit:
-            continue          # the auto_* scaffold losing symbols to a real unit is bookkeeping, not a regression
-        hit_allowed = any(a in unit for a in allow)
-        rows = []
-        for sym, bpct in (prior.get("symbols") or {}).items():
-            apct = (after_vals.get("symbols") or {}).get(sym)
-            if apct is None:
-                continue          # reached 100 %: not a regression
-            if isinstance(apct, (int, float)) and apct < bpct - 1e-9:
-                rows.append((unit, sym, bpct, apct))
-        # the average only speaks when no symbol does, and never for a unit that merely grew: `unit_grew`
-        # already said the fall is the weaker new bodies joining, which is not a regression to name.
-        if not rows and not unit_grew(prior, after_vals):
-            af, bf = prior.get("fuzzy"), after_vals.get("fuzzy")
-            if isinstance(af, (int, float)) and isinstance(bf, (int, float)) and bf < af - 1e-9:
-                rows.append((unit, "unit fuzzy", af, bf))
-        (authorised if hit_allowed else unauthorised).extend(rows)
-    return unauthorised, authorised
+    """-> (unauthorised, authorised) regressions as (unit, what, before, after): the one rule,
+    `lib.report.regression` (per symbol; the unit average only for a unit that did not grow)."""
+    return _report.regression(before, after, allow)
 
 
 def ledger_numbers(main: str) -> dict:

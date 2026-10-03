@@ -195,8 +195,10 @@ becomes it (`duplication.md` has the line numbers).
 * `score(target, base, unit_name, tmpdir) -> Report` = `objdiff report generate` on a one-unit project (`unitutil.report_functions`,
   the one metric); `diff_rows(target, base, symbol)` for instruction rows (never a score); `objdiff_cli(tree)`.
 * `Freshness` (`freshguard`): `unit_reasons(src, obj, tree)`, `report_reasons`.
-* `regression(before, after, allow, eps) -> (moved, dropped)` - **one** regression rule replacing `land.report_regressions`,
-  `applysplits.regression_rows`, `reportdiff.diff_*`, `measure.moved_summary`.
+* `regression(before, after, allow, eps) -> (unauthorised, authorised)` over two `snapshot`s - **one** regression rule
+  replacing `land.report_regressions` (WP2b: the gate's `allow` split is the return shape the gate already consumes);
+  `reportdiff.diff_*` became `diff_units/diff_symbols/diff_denominators` here, and folding `reportdiff`'s verdict and
+  `measure.moved_summary` onto `regression` is WP3b (it changes their output; `applysplits` retired).
 * From: 16 readers, `unitutil.report_*`, `freshguard`, `reportdiff`.
 
 ### `lib/units.py` - the unit
