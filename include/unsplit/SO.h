@@ -24,18 +24,8 @@
 extern "C" {
 #endif
 
-/* 0x80520604 - format the network-order address word at *addr as "a.b.c.d". */
-char* SOAddressToString(u32* addr);
-
-/* 0x8052065C - the port conversion `DWCi_sendControlFrame`/`DWCi_sendTo` store into a connection. */
-u16 SOAddressToHostPort(u16 port);
-
 /* 0x80520668 - host-to-network 16-bit byte swap. */
 u16 SOHtoNs(u16 port);
-
-/* 0x8051FAC0 - close the socket whose descriptor is inside the SO band's connection record; the
- * NHTTP library's async cleanup closes the one `NHTTPi_Startup` opened (`-1` when there is none). */
-s32 SOClose(s32 fd);
 
 /* The IPv4 socket address `SOConnect` takes: the length byte (8), the family (2, AF_INET), the port in
  * network order and the address word. size: 0x8 */
@@ -59,21 +49,8 @@ typedef struct SOAddrInfo {
     /* +0x1C */ struct SOAddrInfo* next;
 } SOAddrInfo;
 
-/* 0x8051F8FC - open a socket (domain 2 = AF_INET, type 1 = stream); the descriptor, or a negative error. */
-s32 __SOCreateSocket(s32 domain, s32 type, s32 protocol);
-
-/* 0x80521054 - set one socket option; `value` is the option's own bytes. */
-s32 SOSetSockOpt(s32 fd, s32 level, s32 option, u32* value, s32 length);
-
 /* 0x8051FE40 - connect the socket to the address. */
 s32 SOConnect(s32 fd, SOSockAddrIn* addr);
-
-/* 0x805202E8 - shut the socket down (how 2 = both directions). */
-s32 SOShutdown(s32 fd, s32 how);
-
-/* 0x80520148 / 0x80520194 - receive into / send from a byte range; the byte count, or a negative error. */
-s32 SORecv(s32 fd, void* buf, s32 length, s32 flags); /* untyped: byte range */
-s32 SOSend(s32 fd, void* buf, s32 length, s32 flags); /* untyped: byte range */
 
 /* 0x80520D0C / 0x80520FF0 - resolve a host name (getaddrinfo) and release the result. */
 s32 SOGetAddrInfo(const char* node, const char* service, const SOAddrInfo* hints, SOAddrInfo** result);

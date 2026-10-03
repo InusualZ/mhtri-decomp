@@ -18,6 +18,12 @@
    through this include - a band header that still declared them would collide with the owner's
    definitions (docs/plan.md 6.5 rule 2). */
 #include "Network/network_transport.h"
+#include "Network/constructNetworkLibrary.h"
+#include "DWCi/dwc_nasfunc.h"
+#include "DWCi/dwc_error.h"
+#include "Network/net_session_close.h"
+#include "Network/network_opening.h"
+#include "menu/menu_plsearch.h"
 
 typedef struct NetworkErrorInfo NetworkErrorInfo;
 typedef struct NetId NetId;                 /* include/Network/NetworkLayerPat.h */
@@ -278,8 +284,6 @@ owner's header and is included here. */
 s32 isCallback(NetworkInstance* self, s32 index);
 void resetCallback(NetworkInstance* self, s32 index);
 
-/* DWC/GameSpy session layer */
-void constructNetworkLibrary(void);   /* 0x804189C8, the sNetworkLibrary constructor body the opener calls */
 void decrement60d4(NetworkInstance* self);
 s32 hasMultipleRefs60d4(NetworkInstance* self);
 /* untyped: caller-owned payload - the 0x208-byte error record copied in when non-null */
@@ -299,15 +303,6 @@ typedef struct GT2ConnectionCallbacks {
     /* +0x0C */ void (*ping_0C)(void);
 } GT2ConnectionCallbacks;   /* size: 0x10 */
 
-/* GameSpy socket layer (DWC / GameSpyInterface) */
-s32 DWC_NASLoginAsync(void);
-s32 DWC_NASLoginProcess(void);
-s32 DWC_SVLBegin(void);
-void DWC_SVLEnd(void);
-s32 DWC_SVLGetTokenAsync(const char* svl, s32 handle);
-s32 DWC_SVLProcess(void);
-void DWCi_natProbeStart(const char* gameName);
-s32 DWCi_natProbePoll(void);
 s32 gt2CreateSocket(GT2Socket* socket, const char* localAddress, u32 outgoingBufferSize, u32 incomingBufferSize,
                     NetworkCallback socketErrorCallback);
 void gt2CloseSocket(GT2Socket socket);
@@ -324,10 +319,6 @@ s32 gt2Send(GT2Connection connection, const void* message, u32 length, s32 relia
 void gt2CloseConnection(GT2Connection connection);
 s32 gt2GetSocketSOCKET(GT2Socket socket);
 void gt2SetUnrecognizedMessageCallback(GT2Socket socket, NetworkCallback callback);
-
-/* NHTTP / network utility layer */
-s32 DWC_GetLastErrorEx(s32* code, s32* type);
-void DWC_ClearError(void);
 
 /* The DWCi NATNEG / transport-tail unit (`.text` 0x80512490..0x805145B8) is registered as
  * `src/DWCi/DWCi_NatNeg.c`, so its five entry points now live in its owner header; including
@@ -354,11 +345,6 @@ void OSSleepTicks(u64 ticks);
 /* another TU's vtables (rule 10: reference, never rebuild) */
 extern u32 lbl_80603740[];
 
-/* the GT2 reject message, the empty service-locator string and the listen-address format (shared
-   `.sdata` pool entries no registered unit claims) */
-extern const char sRejectMessageNG[3];
-extern const char sEmptyString[4];
-extern const char sPortFormat[4];
 /* 0x80794380 `natNegMessageMagic` - the NATNEG message signature this unit compares the head of a
  * received datagram against - is deliberately *not* declared here: the bytes belong to the NATNEG
  * unit, so rule 2 puts the declaration in `include/DWCi/DWCi_NatNeg.h` (included above), and that
@@ -399,107 +385,33 @@ typedef struct NetworkRequest NetworkRequest;   /* include/Network/NetworkSessio
 
 /* 0x803E3598 - copies the request's error record out under its mutex; false while none is set. */
 s32 NetworkRequest_getError(NetworkRequest* request, NetworkRequestError* out);
-/* GUESS on both names: 0x803EF3C0 and 0x803EF4C8 are the siblings of `setCollectionLog` for the two
- * fixed codes the state machine's flag tests report (0x80060033 and 0x80060012); the names follow the
- * flag bits that select them (bit 0 = the session dropped, bit 1 = the request was cancelled). */
-void setCollectionLogSessionLost(NetworkLayerPat* self, NetworkRequest* request);
-void setCollectionLogAborted(NetworkLayerPat* self, NetworkRequest* request);
-/* 0x803EF568 - records `code` (+ two arguments) as the request's error and reports it to the server. */
-void setCollectionLog(NetworkLayerPat* self, NetworkRequest* request, u32 code, u32 arg_a, u32 arg_b);
 /* GUESS: 0x803EBAF0 hands one layer event (kind 3 = error, kind 4 = done) to the callback object the
  * layer holds, after posting `info` to the network singleton. */
 void notifyLayerEvent(NetworkLayerPat* self, u32 kind, s32 code, u32 has_info, NetworkRequestError* info,
                       u32 context);
-/* GUESS: 0x803EB9D4 walks the layer's 100 child slots and releases each finished one. */
-void pollLayerSlots(NetworkLayerPat* self);
-/* GUESS: 0x803EBA5C reports the layer's slot counts as one kind-0x14 event. */
-void notifyLayerSlotSummary(NetworkLayerPat* self);
-/* GUESS: 0x803DECF0 clears the session manager's busy byte and releases its buffers. */
-void closeNetworkSessionManagerPat(NetworkSessionManagerPat* self);
 /* The layer requests: each writes its op-code and returns the request id (the callee narrows it to 16
  * bits, but its caller stores the full register, so the declared type is the wide one - playbook 66). */
 u32 sendReqLayerUp(NetworkInstance* self);
 u32 sendReqLayerChildInfo(NetworkInstance* self, s16 layer_id, u32 unused_arg);
 u32 sendReqLayerUserList(NetworkInstance* self);
 
-/* 0x804343C4 - starts the network session's close-down sequence (0 when there is no session manager or one
- * is already closing, 1 once started); 0x80434668 - its progress: -1 on error, 1 when done or when there is
- * no manager, else 0.  No registered unit owns the addresses, so the band is their home (rule 2).  Added
- * with `quest/arenatask.cpp`; the names are GUESSES from the bodies. */
-s32 net_session_close_start(void);
-s32 net_session_close_state_get(void);
-
 /* ---- the network control band's callees (`Network/network_pat_control.cpp`) ---------------------- */
 /* 0x803768F8-band clock: the network singleton's game time (GUESS: the caller passes the singleton). */
 u32 getGameTime(NetworkInstance* self);
-/* 0x80431324 / 0x804312B8 - the message for the network error / sub-error `-1` (a generic failure). */
-char* getDefaultErrorMessage(void);
-char* getDefaultSubErrorMessage(void);
-/* 0x80437040 - renders a network id as text into `out` (a `%` in the id prints as `*`). */
-void formatNetId(char* out, const NetId* id);
-/* 0x804370BC - imports a network id from `src` into `dst`. */
-void importNetId(NetId* dst, const NetId* src);
-/* 0x803DFC34 - initialises a layer request record. */
-void initNetLayerRequest(NetLayerRequest* request);
-/* 0x8043172C - switches the transfer mode (1 on / 0 off). */
-void setTransferMode(s32 mode);
 /* ---- the pat control's update callees (GUESS on every name: they come from the caller's use) ---- */
 struct PatTerms;
 struct NetRosterSync;
 struct NetworkPat;
-/* 0x803E247C - the terms object; 0x80416A18 - whether it reached its update-finished state. */
-struct PatTerms* getPatTerms(void);
-u32 isTermsUpdateFinished(struct PatTerms* terms);
-/* 0x804344DC.. - the handlers of the actions queued in the work record's action byte (1, 4, 5, 6, 7, 8). */
-void runPendingAction1(void);
-void runPendingAction5(void);
-void runPendingAction6(void);
-void runPendingAction7(void);
-void runPendingAction8(void);
-/* 0x804353A4 / 0x804356D0 / 0x80435BAC / 0x80435D1C - the friend roster sync helpers. */
-void buildRosterSync(struct NetRosterSync* sync);
-void flushRosterSync(void);
-void refreshRosterCache(void);
-void startRosterFetch(s32 mode);
-/* 0x80449968 / 0x8044996C / 0x80449918 / 0x8044991C - the boot and account loading steps. */
-void startBootLoad(void);
-s32 pollBootLoad(void);
-void startAccountLoad(void);
-s32 pollAccountLoad(s16 frame);
 /* 0x80413AEC - whether the server is in maintenance (the status word reads 1). */
 s32 isMaintenanceMode(class NetworkWiiMediator* self);
 /* 0x80416890 / 0x8041690C - start the terms check / the terms update on the mediator singleton. */
 void startTermsCheck(class NetworkWiiMediator* self);
 void startTermsUpdate(class NetworkWiiMediator* self);
-/* 0x80433384 / 0x8043339C / 0x80434FB4 / 0x80433B0C - the shutdown phase slots and the friend slot lookup. */
-void clearPhaseSlot(s32 slot);
-u32 isPhaseSlotDone(s32 slot);
-s8 lookupFriendSlot(const u8* id);
-void startShutdownTimer(void);
-/* 0x80431A9C / 0x804317E8 - the transfer queue and mode updates the control runs each frame. */
-void updateTransferQueue(void);
-void updateTransferMode(void);
-/* 0x80419C2C / 0x80419E1C - the Pat holder reset and the session-manager slot delete. */
-void clearNetworkPat(struct NetworkPat* holder);
-void deleteNetworkSessionManagerPat(struct NetworkPat* holder, s32 index);
 /* 0x803FE854 / 0x803FE860 / 0x803FE404 / 0x803FE73C - the network singleton's Pat setters. */
 void setPatField854(NetworkInstance* self, s32 value);
 void setPatField860(NetworkInstance* self, const char* name);
 void setPatByteD400(NetworkInstance* self, u8 value);
 void setPatByte6138On(NetworkInstance* self);
-/* 0x80433870 - reads the link state; 1 = the network link is up. */
-u32 getLinkStatus(void);
-/* 0x804344A0 - whether the session-start request has completed (`net_ctrl_wk` +0xC153, set by the start
- * request's completion callback and cleared by `net_session_close_start`).  GUESS name from those writers. */
-u32 isSessionStartDone(void);
-/* 0x80434800 - drops the session after a link loss: clears `net_ctrl_wk` +0x98 and raises pending action 8
- * (`runPendingAction8`); returns 0 when there is no work record.  GUESS name from its callers, which are the
- * link-loss exits of the arena and the lobby. */
-s32 net_session_abort_start(void);
-/* 0x804333B0 - resets the link state the reconnect path relies on. */
-void resetLinkState(void);
-/* 0x804370CC - whether two network ids are equal (1). */
-u32 isSameNetId(const NetId* left, const NetId* right);
 }
 
 /* MH3GetErrorString2 (`MH3GetErrorString2__Fl`, C++ linkage) - the localized message for a network error code. */

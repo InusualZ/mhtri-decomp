@@ -248,6 +248,7 @@
 #include "ef/fn_800CDB2C.h"    /* `move_work_state_ck` - owned by ef/fn_800CDB2C.cpp (rule 2) */
 #include "unsplit/menu.h"       /* `quest_work_ptr` - the band data no registered unit claims */
 #include "unsplit/lobby.h"      /* `lb_param_w` - the option block no registered unit claims */
+#include "hud/cockpit.h"
 #include "unsplit/unknown.h"    /* `system_w` - the system block no registered unit claims */
 #include "Network/network_pat_control.h"   /* isServerSelectState (owner header, rule 2) */
 #include "enemy/em_pop.h"       /* `quest_flag_*_ck` - owned by enemy/em_pop.cpp (rule 2) */
@@ -269,7 +270,7 @@
 #include "mh3_pad.h"          /* setVec3 (rule 2) */
 #include "stage/stg_w.h"        /* stage_map_area_count_get - owned by stage/stg_w.cpp (rule 2) */
 #include "sound/fn_800D7F54.h"  /* snd_item_fail_play - owned by sound/fn_800D7F54.cpp (rule 2) */
-#include "Pl/pl_master.h"    /* Pl_master_ck - owned by Pl/pl_master.cpp (rule 2) */
+#include "Pl/Pl_master_ck.h"    /* Pl_master_ck - owned by Pl/pl_master.cpp (rule 2) */
 #include "Pl/pl_skill.h"    /* Pl_Skill_ck, Pl_cat_skill_ck - owned by Pl/pl_skill.cpp (rule 2) */
 #include "Runtime.PPCEABI.H/memset.h"  /* memset (owner: the Runtime.PPCEABI.H lib) */
 #include "Runtime.PPCEABI.H/memcpy.h"  /* memcpy (owner: the Runtime.PPCEABI.H lib) */

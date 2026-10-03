@@ -101,8 +101,10 @@
 #include "NHTTP/NHTTP_os_RVL.h"   /* NHTTPi_InitRequestInfo, NHTTPi_CheckCurrentThread (rule 2) */
 #include "unsplit/OS.h"           /* the OS thread/message set + OSReport/OSPanic (rule 2 band) */
 #include "unsplit/SO.h"           /* SOClose (rule 2 band) */
+#include "SO/soi.h"
 #include "unsplit/NCD.h"          /* NCDGetCurrentIpConfig (rule 2 band) */
 #include "unsplit/NHTTP.h"        /* the four literal groups + the code table (rule 2 band) */
+#include "NHTTP/d_nhttp.h"
 #include "unsplit/Runtime.PPCEABI.H.h" /* printf (rule 2 band) */
 
 

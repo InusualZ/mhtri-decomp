@@ -69,9 +69,7 @@
 #define em_fall_height_get em_fall_height_get_hidden_enemy_h
 #define em_frame_flag_set em_frame_flag_set_hidden_enemy_h
 #define em_mot_set em_mot_set_hidden_enemy_h
-#include "enemy/stale_motion_decls_hide.h"
 #include "unsplit/enemy.h"
-#include "enemy/stale_motion_decls_hide.h"
 #undef em_mot_set
 #undef em_frame_flag_set
 #undef em_fall_height_get

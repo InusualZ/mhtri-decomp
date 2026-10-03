@@ -250,7 +250,7 @@
 #include "fn_80047398.h"
 #include "g3d/g3d_camera.h"
 #include "mh3_pad.h"
-#include "Pl/pl_master.h"
+#include "Pl/Pl_master_ck.h"
 #include "camera/camera.h"
 #include "unsplit/camera.h"
 

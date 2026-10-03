@@ -25,8 +25,6 @@ typedef struct StageMapView {
     /* +0x0BC7 */ u8 pad_0x0BC7[0x2419];
 } StageMapView; /* size: 0x2FE0 */
 
-extern u8 stage_w[]; /* the block itself, viewed as `StageMapView` by a cast (the band's own idiom) */
-
 #ifdef __cplusplus
 }
 #endif

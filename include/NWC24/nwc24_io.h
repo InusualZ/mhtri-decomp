@@ -46,4 +46,17 @@ BOOL NWC24iRequestShutdown(BOOL final, u32 event);
 }
 #endif
 
+/* Declarations moved here from `include/unsplit/NWC24.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+extern const char Nwc24TimePath[];         /* 0x806311C0 "/dev/net/kd/time" */
+
+extern const char Nwc24SetRtcName[];       /* 0x806311D4 "NWC24iSetRtcCounter" */
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_NWC24_NWC24_IO_H */

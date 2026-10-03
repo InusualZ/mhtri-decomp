@@ -150,6 +150,7 @@
 #include "Pl/pl_yure.h"         /* `yure_move` (the owner's header, rule 2) */
 #include "Pl/fn_80288CEC.h"     /* `pl_motion_set` (the owner's header, rule 2) */
 #include "unsplit/stage.h"      /* `stage_w` (unowned: band header) */
+#include "stage/stg_w.h"
 #include "mh3_pad/Psw.h"        /* `Psw` (the owner's header, rule 2) */
 
 

@@ -109,7 +109,7 @@
  * `lobby_world_block` in `include/lobby/*.h` stop short of the offsets below, so each is this unit's
  * view with its own name.  `LbIconRec`/`LbWorldBlock`/`lobby_world_block`/`fn_8004A20C` come from the
  * owner's header (rule 2). */
-#include "lobby/fn_801F3294.h"
+#include "lobby/lb_pane_ui.h"
 
 /* The target objects carry one 8-byte extab record and one 12-byte extabindex entry per function
  * (both runs are claimed in splits.txt); `cflags_lobby`'s `-Cpp_exceptions off` would emit none. */

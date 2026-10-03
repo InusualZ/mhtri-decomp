@@ -77,6 +77,7 @@ struct _ENEMY_WORK; /* file scope, so the leaf headers' `struct _ENEMY_WORK*` pa
 #include "unsplit/ef.h"
 #include "unsplit/enemy.h"
 #include "unsplit/g3d.h"
+#include "g3d/g3d_state.h"
 #include "unsplit/sound.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */

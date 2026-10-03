@@ -14,6 +14,7 @@
 #define MHTRI_UNSPLIT_SC_H
 
 #include "types.h"
+#include "SC/sc.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,21 +31,8 @@ typedef struct SCIdleModeInfo {
     /* +0x04 */ u8 pad_0x04[0x05];
 } SCIdleModeInfo; /* size: 0x09 */
 
-/* 0x804DB0F0 - the SC state machine: 0 = idle, 1 = busy, 2 = the configuration file was reloaded.
- * The band's compares are unsigned (`cmplwi r3,2` / `cmplwi r3,1`), so the status is `u32`. */
-u32 SCCheckStatus(void);
-
 /* 0x804DCAC0 - copy the idle-mode record out of the SC configuration. */
 BOOL SCGetIdleMode(SCIdleModeInfo* info);
-
-/* 0x804DC280 / 0x804DBEB0 - read one typed item out of the SC configuration; FALSE when it is absent. */
-BOOL SCFindU32Item(u32* value, u32 item);
-BOOL SCFindByteArrayItem(void* value, u32 item, u32 size); /* untyped: byte range */
-
-/* 0x804DCC60 - the SC's counter bias (the U32 item 0, or 0x0B49D800 when the configuration has none);
- * the value `NWC24iSynchronizeRtcCounter` rebases the device's RTC counter against.  NAME (a GUESS,
- * see `src/NWC24/nwc24_io.c`'s header): the dump answers `zz_` for it and it has no other caller. */
-u32 SCGetCounterBias(void);
 
 /* 0x804D5BB0 - hand one idle-mode byte to the SC device (ioctl command 0x6002, 32-byte in/out
  * blocks); -6 when the SC was never initialised.  NAME (a GUESS, same reason as above): its only

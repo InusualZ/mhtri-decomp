@@ -124,6 +124,7 @@
 #include "Runtime.PPCEABI.H/memset.h"
 #include "unsplit/Runtime.PPCEABI.H.h"
 #include "unsplit/SO.h"
+#include "SO/soi.h"
 #include "unsplit/SSL.h"
 
 /* Retail inlines only the one-line list wrappers into this file's bodies and keeps a `bl` to every

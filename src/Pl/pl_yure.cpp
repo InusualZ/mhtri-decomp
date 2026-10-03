@@ -40,6 +40,8 @@
 #include "g3d/mtx34_inverse.h"
 #include "mh3_pad/vec3.h"
 #include "unsplit/unknown.h"
+#include "nw4r/fn_805012C4.h"
+#include "MSL_C/alloc.h"
 
 /* One row of a span table: how many sway records a type owns and the first one's row in the source table.
  * size: 0x2 */

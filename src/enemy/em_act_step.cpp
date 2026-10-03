@@ -227,7 +227,7 @@
 #include "pl.h"
 #include "Pl/fn_802693C4.h"
 #include "Pl/fn_8028F66C.h"
-#include "Pl/pl_master.h"
+#include "Pl/Pl_master_ck.h"
 
 #ifdef __cplusplus
 

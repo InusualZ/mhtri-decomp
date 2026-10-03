@@ -41,23 +41,6 @@ extern struct NHTTPInfo NHTTPi_systemInfo;
  *   NHTTPi_allocFailMessage  0x80630A90 (0x1B B) - "failed to allocate memory\n".
  *   NHTTPi_postDataRawMessage 0x80630AAC (0x39 B) - "already called NHTTPAddPostDataRaw ...".
  */
-extern const char NHTTPi_startupMessages[];
-extern const char NHTTPi_connRestWarning[];
-extern const char NHTTPi_allocFailMessage[];
-extern const char NHTTPi_postDataRawMessage[];
-
-/* 0x80630AE8 (0x30+ B, `.data`) - the `NHTTP_os_RVL.c` assert group: +0x00 the function name
- * "NHTTPi_CheckCurrentThread", +0x1C "%s:illegal thread
-", +0x30 "NHTTP_os_RVL.c". */
-extern const char NHTTPi_threadCheckMessages[];
-
-/* 0x807943A0 (`.sdata`) - the message that assert panics with ("halt
-"). */
-extern const char NHTTPi_haltMessage[];
-
-/* 0x80574CE8 (0x15 B, `.rodata`) - the 19-character code `NHTTPAddPostDataRaw` walks its request's
- * 18-byte code field up to, one character at a time, re-submitting after each step. */
-extern const char NHTTPi_postDataRawCode[];
 
 #ifdef __cplusplus
 }

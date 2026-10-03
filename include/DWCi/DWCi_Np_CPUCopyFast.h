@@ -108,4 +108,19 @@ extern char DWCi_reportLoginTimeout[];
 }
 #endif
 
+/* Declarations moved here from `include/unsplit/DWCi.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* 0x80760F00 - the DWCi state block (0x1D0 B, first word a status) and 0x807610D0 the 0x190-byte
+ * work buffer. */
+extern u32 DWCi_stateBlock[];
+
+extern u8 DWCi_workBuffer[];
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_DWCI_DWCI_NP_CPUCOPYFAST_H */

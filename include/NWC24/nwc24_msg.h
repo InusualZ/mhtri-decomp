@@ -44,4 +44,29 @@ int NWC24iUnlockSocket(void);
 }
 #endif
 
+/* Declarations moved here from `include/unsplit/NWC24.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* 0x807958A8 - the work block's one-time-initialisation flag (bit 0). */
+extern u32 sNwc24WorkInit;
+
+/* 0x807958AC / 0x807958B0 - the scheduler pair's two counters: the depth `NWC24SuspendScheduler`
+ * raises and `NWC24ResumeScheduler` lowers, and the limit both compare against. */
+extern s32 sNwc24SuspendCount;
+
+extern s32 sNwc24ResumeLimit;
+
+/* 0x80795898 - the library's work pointer; +0x08 is the cached user id (two words). */
+extern u32* sNwc24UserWork;
+
+extern const char Nwc24SetScriptModeName[]; /* 0x8063118C "NWC24iSetScriptMode" */
+
+extern const char Nwc24GenerateUserIdName[]; /* 0x806311A0 "NWC24iRequestGenerateUserId" */
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_NWC24_NWC24_MSG_H */

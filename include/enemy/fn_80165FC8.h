@@ -77,14 +77,12 @@ u32 fn_8012A014(struct _ENEMY_WORK* self, u32 a, u32 b, u16 c, void* d, void* e)
 u32 fn_8012A204(struct _ENEMY_WORK* self);
 void fn_8012B380(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 void fn_8012CEB4(struct _ENEMY_WORK* self, s16 timer, u8 index);
-u32 fn_8012ECF0(struct _ENEMY_WORK* self);
 u8 fn_8015D934(struct _ENEMY_WORK* self);
 void fn_8012E664(struct _ENEMY_WORK* self);
 void fn_8012E694(struct _ENEMY_WORK* self);
 void em_mot_set(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 void em_mot_set_ck(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 u32 em_mot_end_ck(struct _ENEMY_WORK* self);
-void fn_8012FCC4(struct _ENEMY_WORK* self, u32 a, f32 b);
 void em_fall_height_get(struct _ENEMY_WORK* self);
 void em_move_mode_set(struct _ENEMY_WORK* self, u32 a);
 void em_fall_start(struct _ENEMY_WORK* self);

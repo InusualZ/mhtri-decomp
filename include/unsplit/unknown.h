@@ -19,6 +19,7 @@
 /* Owner headers (rule 2): `camera/fn_802B5C58.cpp` owns 0x802B5C58-0x802BEAAC, which covers the
  * 0x802B8DF8/0x802BE638 sites declared here until that range registered. */
 #include "camera/camera.h"
+#include "ef/fn_8030681C.h"
 
 struct MHchar;
 struct _CP_VECTOR;
@@ -40,7 +41,6 @@ extern "C" {
  * (0x8021E1EC-0x80224AC4) over it, so its declaration moved to that owner's header (rule 2). */
 s32 fn_8035B700(s32 a, s32 b, u16 c); /* 0x8035B700 - bracket: hud below, Network above */
 
-
 #include "mh3_pad/system_w.h" /* `SystemWork`/`system_w`, owned by src/mh3_pad.cpp (rule 1/2) */
 
 /* The unowned C helpers `enemy/fn_8019ED34.cpp` calls: addresses whose bracketing registered units
@@ -50,7 +50,6 @@ s32 fn_8035B700(s32 a, s32 b, u16 c); /* 0x8035B700 - bracket: hud below, Networ
 /* `fn_802BE638` (0x802BE638) is in `camera/fn_802B5C58.cpp`'s range 0x802B5C58-0x802BEAAC, so the
  * owner's header declares it and this one includes it (rule 2). */
 void eft_em_spawn_param(struct _ENEMY_WORK* self, u32 a, u32 b, void* v, f32 s, s32 d);
-void eft_spawn_type_at_area(struct _ENEMY_WORK* self, u32 a);
 /* `enemy_data_find`/`enemy_data_grp` (0x803438E4 / 0x803439D4) are declared in their owner's
  * header, `include/ef/eft_slot.h`, since `ef/eft_slot.cpp` registered the band that defines them -
  * a declaration here of a symbol a registered unit owns is rule 2's finding.  Their consumers
@@ -83,11 +82,6 @@ void fn_8033A920(u32 arg);
  * signature its own call sites set (`f32 fn_80463EE0(s16, f32)`), which is the one declared
  * here; the action band tail-calls it with its own parameters. */
 f32 fn_80463EE0(s16 a, f32 b);
-/* 0x80463E08 - the arctangent of `y / x` in radians (the libm `atan2` entry); `Pl/pl_yure.cpp` turns it into
- * a 16-bit angle word.  0x805015C8 - `out = mtx * v` (the paired-single matrix/vector multiply); the two
- * vectors may alias.  Added with that unit. */
-f32 atan2f(f32 y, f32 x);
-void mtx34_rotate_vec3(nw4r::math::VEC3* out, const nw4r::math::MTX34* mtx, const nw4r::math::VEC3* v);
 /* The `.sdata2` / `.data` pool entries the 0x805482CC-0x8054E894 game-UI band loads.  The band's
  * target object carries no data section at all, so every constant it uses is another translation
  * unit's pool entry and is declared here `extern` and used as a load operand - never defined
@@ -111,8 +105,6 @@ void fn_80553670(void* record);
 void fn_80526D00(void* record);
 /* 0x8055A3E0 / 0x8055BEF0 / 0x8055C1D4 / 0x8055C2CC are inside the registered band
  * `homebutton/fn_80555374.cpp`, so `include/homebutton/fn_80555374.h` declares them (rule 2). */
-
-
 
 /* Merged 2026-09-24: a second lane formalized into this shared header.  Declarations it
  * needed that the first did not; a symbol both named keeps the first (verified) signature. */

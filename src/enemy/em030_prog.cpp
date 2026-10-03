@@ -120,7 +120,7 @@
 #include "fn_8004CAD8.h"
 #include "pl.h"
 #include "Pl/pl_act.h"
-#include "Pl/pl_master.h"
+#include "Pl/Pl_master_ck.h"
 #include "Pl/pl_skill.h"
 #include "unsplit/enemy.h"
 #include "Pl/fn_80262940.h" /* pl_model_state_set (rule 2: its owner's header) */

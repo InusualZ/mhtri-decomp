@@ -26,6 +26,8 @@
 #include "Network/network_pat_control.h"
 #include "enemy/em020_ai.h"
 #include "unsplit/Network.h"
+#include "Network/NetworkSessionManagerPat.h"
+#include "Network/NetworkCommunityPat.h"
 
 /* The log codes the request reports (0x8006xxxx = the layer's own error range). */
 enum {

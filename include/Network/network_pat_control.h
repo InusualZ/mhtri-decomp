@@ -879,4 +879,26 @@ extern char pat_server_host[];
 }
 #endif
 
+/* Declarations moved here from `include/unsplit/Network.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* 0x80431324 / 0x804312B8 - the message for the network error / sub-error `-1` (a generic failure). */
+char* getDefaultErrorMessage(void);
+
+char* getDefaultSubErrorMessage(void);
+
+/* 0x8043172C - switches the transfer mode (1 on / 0 off). */
+void setTransferMode(s32 mode);
+
+/* 0x80431A9C / 0x804317E8 - the transfer queue and mode updates the control runs each frame. */
+void updateTransferQueue(void);
+
+void updateTransferMode(void);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_NETWORK_NETWORK_PAT_CONTROL_H */

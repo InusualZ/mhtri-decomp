@@ -181,7 +181,7 @@
 #include "Pl/fn_80273B14.h" /* the owner header of the act-motion setters (rule 2) */
 #include "hud/net_char_sync.h"
 #include "Network/network_pat_control.h" /* the owner's header (rule 2) */
-#include "Pl/pl_master.h"
+#include "Pl/Pl_master_ck.h"
 #include "Pl/fn_80288CEC.h"
 #include "ef/get_move_work_adrs.h"
 #include "Pl/pl_skill.h"

@@ -98,7 +98,9 @@
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
 #include "unsplit/DWCi.h"                /* the band's unowned data and helpers (rule 2) */
+#include "MSL_C/alloc.h"
 #include "unsplit/SO.h"                  /* SOAddressToString / SOAddressToHostPort / SOHtoNs */
+#include "SO/soi.h"
 #include "unsplit/Runtime.PPCEABI.H.h"   /* sprintf / strchr / strlen / atoi */
 
 /* --------------------------------------------------------------------------------------------- */

@@ -131,4 +131,21 @@ void NHTTPi_free(void* block); /* untyped: byte range */
 }
 #endif
 
+/* Declarations moved here from `include/unsplit/NHTTP.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+extern const char NHTTPi_startupMessages[];
+
+extern const char NHTTPi_connRestWarning[];
+
+extern const char NHTTPi_allocFailMessage[];
+
+extern const char NHTTPi_postDataRawMessage[];
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_NHTTP_NHTTP_BGNEND_H */

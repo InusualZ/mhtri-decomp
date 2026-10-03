@@ -199,4 +199,15 @@ void mhchar_construct(void* block);
 }
 #endif
 
+/* Declarations moved here from `include/unsplit/lobby.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+extern u8 lb_item_get_data[];
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_LOBBY_LB_NPC_H */

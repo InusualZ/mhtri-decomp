@@ -405,7 +405,7 @@
 #undef get_move_work_adrs
 #include "Pl/fn_802693C4.h"
 #include "Pl/pl_act.h"
-#include "Pl/pl_master.h"
+#include "Pl/Pl_master_ck.h"
 #include "Pl/pl_skill.h"
 #include "Pl/pl_frame_data.h" /* the owner of the Pl band's shared .sdata2 frame-window pool (rule 2) */
 #include "nw4r/math.h"
@@ -431,7 +431,7 @@
                           * copy is gone now that the owner's registration declares it (rule 2) */
 #include "Pl/pl_frame_data.h" /* the owner of the Pl band's shared .sdata2 pool 0x80799E00-0x80799F98 (rule 2) */
 #include "Pl/pl_act_data.h" /* the owner of the pool's second run, 0x80799F98-0x80799FDC (rule 2) */
-#include "Pl/bss_pool.h" /* the owner of the `.bss` move-work table `pl_move_work` (rule 2) */
+#include "Pl/pl_coll.h" /* the owner of the `.bss` move-work table `pl_move_work` (rule 2) */
 #include "Network/network_pat_control.h" /* the owner's header (rule 2) */
 #include "ef/eft052.h" /* hud_item_msg_push (the owner's header, rule 2) */
 #include "lobby/fn_8021E1EC.h"

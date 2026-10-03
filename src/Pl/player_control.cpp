@@ -10,7 +10,7 @@
 #include "nw4r/math.h"
 #include "Pl/pl_skill.h"
 #include "Pl/pl_act.h"
-#include "Pl/pl_master.h"
+#include "Pl/Pl_master_ck.h"
 #include "Pl/fn_802693C4.h"
 #include "unsplit/Pl.h"
 #include "unsplit/unknown.h"

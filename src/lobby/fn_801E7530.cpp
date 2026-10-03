@@ -23,6 +23,8 @@
 #include "Runtime.PPCEABI.H/memset.h"
 
 #include "unsplit/lobby.h"
+#include "hud/cockpit.h"
+#include "lobby/lb_npc.h"
 #include "menu/menu_item.h"   /* `put_menu_cursor` (owner: `menu/menu_item.cpp`, rule 2) */
 
 /* `sprintf` is a libc intrinsic; `-nosyspath` means it has to be declared here (the owner unit has no

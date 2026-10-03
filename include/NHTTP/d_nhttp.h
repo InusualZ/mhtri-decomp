@@ -429,4 +429,17 @@ s32 NHTTPi_RegisterCallbacks(void (*commandCallback)(u32), void (*commandCallbac
 }
 #endif
 
+/* Declarations moved here from `include/unsplit/NHTTP.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* 0x80574CE8 (0x15 B, `.rodata`) - the 19-character code `NHTTPAddPostDataRaw` walks its request's
+ * 18-byte code field up to, one character at a time, re-submitting after each step. */
+extern const char NHTTPi_postDataRawCode[];
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_NHTTP_D_NHTTP_H */

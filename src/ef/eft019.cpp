@@ -79,7 +79,7 @@
 #include "g3d/g3d_calcworld.h"
 #include "g3d/g3d_camera.h"
 #include "main.h"
-#include "Pl/pl_master.h"
+#include "Pl/Pl_master_ck.h"
 #include "unsplit/unknown.h"
 #include "unsplit/g3d.h"
 #include "sound/fn_800D7F54.h"

@@ -45,7 +45,7 @@
 #include "Pl/fn_802693C4.h"
 #include "Pl/fn_802840DC.h"
 #include "Pl/pl_act.h"
-#include "Pl/pl_master.h"
+#include "Pl/Pl_master_ck.h"
 #include "Pl/pl_skill.h"
 #include "unsplit/Pl.h"
 

@@ -192,4 +192,17 @@ void draw_itemicon_item_id(const _SPR_DATA_& spr, u16 id, const _mh_ivec2_* pos)
 
 #endif /* __cplusplus && !LOBBY_VIEW_IN_NAMESPACE */
 
+/* Declarations moved here from `include/unsplit/lobby.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+extern u8 jumptable_805B8C74[104];
+
+extern u8 jumptable_805B8CF0[84];
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_LOBBY_LB_PANE_UI_H */
