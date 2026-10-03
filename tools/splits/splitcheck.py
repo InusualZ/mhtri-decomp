@@ -40,8 +40,8 @@ The text references (pool first-use, jump table and bss readers) are decoded fro
 fool it) and is stated as such in every finding that depends on it.
 """
 from __future__ import annotations
-
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
+
 import argparse
 import bisect
 import collections
@@ -60,6 +60,8 @@ for _p in (TOOLS, HERE):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+from tools.lib import project as _project  # noqa: E402  (the one splits / map parser)
+
 GAME = "RMHE08"
 PASS, FAIL, UNKNOWN, NA = "PASS", "FAIL", "UNKNOWN", "-"
 RANK = {NA: 0, PASS: 1, UNKNOWN: 2, FAIL: 3}
@@ -71,9 +73,6 @@ WEIGHT = {"order": 100, "coverage": 95, "extab": 90, "ctors": 85, "dtors": 80, "
 SECTION_ORDER = [".init", "extab", "extabindex", ".text", ".ctors", ".dtors", ".rodata", ".data", ".bss", ".sdata",
                  ".sbss", ".sdata2", ".sbss2"]
 CODE_SECTIONS = (".init", ".text")
-SYMBOL_RE = re.compile(r"^(\S+) = (\S+):0x([0-9A-Fa-f]+);(.*)$")
-RANGE_RE = re.compile(r"^\s+(\S+)\s+start:0x([0-9A-Fa-f]+)\s+end:0x([0-9A-Fa-f]+)(.*)$")
-UNIT_RE = re.compile(r"^(\S.*?):(?:\s+(.*))?$")
 #: a window (in instructions) a `lis` value stays live for the reference decoder
 LIS_WINDOW = 200
 #: a function that forms this many distinct section starts with `addi @l` is start-up / module-loader code taking `_f_<section>` linker symbols (the
@@ -139,26 +138,15 @@ class Splits:
 
 
 def parse_splits(text):
-    header, units, cur = [], [], None
-    in_header = True
-    for ln in text.splitlines():
-        if in_header:
-            if ln.startswith("Sections:") or (header and ln[:1].isspace() and ln.strip()):
-                header.append(ln)
-                continue
-            in_header = False
-        if not ln.strip():
-            continue
-        m = RANGE_RE.match(ln)
-        if m and cur is not None:
-            cur.ranges.setdefault(m.group(1), []).append((int(m.group(2), 16), int(m.group(3), 16),
-                                                          m.group(4).rstrip()))
-            continue
-        m = UNIT_RE.match(ln)
-        if m and not ln[0].isspace():
-            cur = Unit(m.group(1), m.group(2) or "")
-            units.append(cur)
-    return Splits(header, units)
+    """This tool's `Splits`/`Unit` view of `lib.project.Splits.parse(text)` (a range's attrs keep their space)."""
+    parsed = _project.Splits.parse(text)
+    units = []
+    for block in parsed.blocks:
+        unit = Unit(block.unit, block.attrs)
+        for r in block.ranges:
+            unit.ranges.setdefault(r.section, []).append((r.start, r.end, (" " + r.attrs) if r.attrs else ""))
+        units.append(unit)
+    return Splits(list(parsed.header), units)
 
 
 # ---- symbols.txt and the DOL ------------------------------------------------------------------------------------------
@@ -167,17 +155,10 @@ def parse_symbols(lines):
     """Map rows as dicts (`name section addr size type scope kind`); the map is streamed, never printed."""
     out = []
     for ln in lines:
-        m = SYMBOL_RE.match(ln.rstrip("\n"))
-        if not m:
-            continue
-        rest = m.group(4)
-        sz = re.search(r"size:0x([0-9A-Fa-f]+)", rest)
-        ty = re.search(r"type:(\w+)", rest)
-        sc = re.search(r"scope:(\w+)", rest)
-        kd = re.search(r"(?<![\w.])data:(\S+)", rest)
-        out.append({"name": m.group(1), "section": m.group(2), "addr": int(m.group(3), 16),
-                    "size": int(sz.group(1), 16) if sz else 0, "type": ty.group(1) if ty else "",
-                    "scope": sc.group(1) if sc else "", "kind": kd.group(1) if kd else ""})
+        e = _project.parse_line(ln.rstrip("\n"))
+        if e is not None:
+            out.append({"name": e.name, "section": e.section, "addr": e.address, "size": e.size, "type": e.type,
+                        "scope": e.scope, "kind": e.kind})
     return out
 
 

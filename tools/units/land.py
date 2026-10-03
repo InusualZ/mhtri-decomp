@@ -188,6 +188,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(HERE), "agents"))
 
 import unitutil  # noqa: E402
 import prepcommit as pc  # noqa: E402
+from tools.lib import project as _project  # noqa: E402  (the splits / configure readers)
 from units import brief as brief_mod  # noqa: E402
 from units import claims  # noqa: E402
 from units import handoff as handoff_mod  # noqa: E402
@@ -1451,24 +1452,8 @@ RULE2_CALLSITE_CAVEAT = ("after checking every call site: moving a declaration c
 
 
 def _split_rows(text: str) -> list[tuple[str, str, int, int]]:
-    """`(unit, section, start, end)` rows of a `splits.txt` text.
-
-    The same parse `sharedfiles.parse_ranges`/`stylelint._parse_splits` use: a unit header is an
-    unindented `name:` line, every range is an indented `start:0x.. end:0x..` line. Kept local so the
-    check can parse the *base* text `git show` returns without a temp file.
-    """
-    rows: list[tuple[str, str, int, int]] = []
-    cur = None
-    for line in text.splitlines():
-        if line.startswith("Sections:"):
-            continue
-        if line[:1] not in (" ", "\t") and line.rstrip().endswith(":"):
-            cur = line.strip()[:-1]
-            continue
-        m = re.match(r"^\s+(\S+)\s+start:(0x[0-9A-Fa-f]+)\s+end:(0x[0-9A-Fa-f]+)", line)
-        if m and cur:
-            rows.append((cur, m.group(1), int(m.group(2), 16), int(m.group(3), 16)))
-    return rows
+    """`(unit, section, start, end)` rows of a `splits.txt` text (`lib.project.Splits`)."""
+    return [(r.unit, r.section, r.start, r.end) for r in _project.Splits.parse(text).ranges]
 
 
 def _merge_intervals(spans: list[tuple[int, int]]) -> list[tuple[int, int]]:
@@ -1523,14 +1508,6 @@ def added_split_ranges(old_rows: list[tuple[str, str, int, int]],
     for unit, section, s, e in new_rows:
         for cs, ce in _subtract_intervals((s, e), old_cov.get(section, [])):
             out.append((unit, section, cs, ce))
-    return out
-
-
-def _ranges_by_section(rows: list[tuple[str, str, int, int]]) -> dict:
-    """`Stylelint.Ownership`'s ranges shape: {section: [(start, end, unit)]}."""
-    out: dict = {}
-    for unit, section, s, e in rows:
-        out.setdefault(section, []).append((s, e, unit))
     return out
 
 
@@ -1923,7 +1900,7 @@ def band_ownership_warnings(main: str, base: str | None) -> list[str]:
         return []
 
     symbols = sl._parse_symbols(sym_path)  # the 4.5 MB map, parsed here and never printed
-    old_own = sl.Ownership(symbols, _ranges_by_section(_split_rows(old.stdout)))
+    old_own = sl.Ownership(symbols, _project.Splits.parse(old.stdout).by_section())
 
     # 1. symbols the batch's new ranges now cover (via their address), grouped by the owner the range names.
     newly: dict[str, str] = {}
@@ -2001,18 +1978,22 @@ def band_ownership_warnings(main: str, base: str | None) -> list[str]:
     return sorted(dict.fromkeys(warnings))
 
 
+def _added_object_calls(diff: str) -> list:
+    """The `Object(...)` calls a diff's added lines spell (`lib.project.object_calls`, comments ignored)."""
+    return [c for line in (diff or "").splitlines() if line.startswith("+") and not line.startswith("+++")
+            for c in _project.object_calls(line[1:])]
+
+
 def flips_objects(main: str) -> bool:
     """True when configure.py gains `Object(Matching, ...)` relative to HEAD - the batch flips something."""
     p = run(["git", "diff", "HEAD", "--", "configure.py"], main)
-    return bool(re.search(r"^\+.*Object\(\s*Matching", p.stdout or "", re.M))
+    return any(c.flag == "Matching" for c in _added_object_calls(p.stdout))
 
 
 def flipped_units(main: str) -> list[str]:
     """Units whose `Object(...)` line gains `Matching` in configure.py relative to HEAD (a flip, or a new Matching unit)."""
     p = run(["git", "diff", "HEAD", "-U0", "--", "configure.py"], main)
-    out = []
-    for m in re.finditer(r'^\+.*Object\(\s*Matching\s*,\s*"([^"]+)"', p.stdout or "", re.M):
-        out.append(claims.norm_unit(m.group(1)))
+    out = [claims.norm_unit(c.path) for c in _added_object_calls(p.stdout) if c.flag == "Matching"]
     return sorted(dict.fromkeys(out))
 
 

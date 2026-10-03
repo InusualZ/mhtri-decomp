@@ -18,6 +18,7 @@ Usage:
     python tools/rso/symbols.py --all [--out config/RMHE08] [--report build/tmp/rso-symbols/summary.md]
     python tools/rso/symbols.py --rso <file.rso> --print
 """
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import os
 import re
@@ -27,6 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import inventory
 import unitutil as uu
+from tools.lib.project import SymbolMap
 
 # Fallback order for sections the evidence cannot name: small export-less sections first (extab /
 # extabindex are small and never carry exports), then the data sections.
@@ -117,13 +119,9 @@ def emit(mod, out_dir):
 def dol_symbols():
     """{name: line} for the DOL's symbols.txt - read with a stream, never loaded into a prompt."""
     path = os.path.join(uu.ROOT, "config", "RMHE08", "symbols.txt")
-    out = {}
     if not os.path.exists(path):
-        return out
-    for line in open(path, encoding="utf-8", errors="replace"):
-        if " = " in line:
-            out[line.split(" = ", 1)[0].strip()] = line.strip()
-    return out
+        return {}
+    return {e.name: e.line.strip() for e in SymbolMap(path).rows()}
 
 
 def main():

@@ -139,6 +139,7 @@ if TOOLS not in sys.path:
     sys.path.insert(0, TOOLS)
 
 from units import lanecmd  # noqa: E402
+from tools.lib import project as _project  # noqa: E402  (the configure / splits readers)
 from units import tooling as tg  # noqa: E402  (the second source: its register is read, not rebuilt)
 from units import handoff as handoff_mod  # noqa: E402 (the outbox schema: FREE_TEXT_FIELDS is one definition)
 
@@ -1297,75 +1298,15 @@ def _norm_section(s: str) -> str:
     return re.sub(r"^[.\s]+", "", (s or "").strip()).lower()
 
 
-def _bracket_rhs(text: str, name: str) -> str | None:
-    """The text inside `name = [ ... ]`, honouring nesting, or None when the assignment is absent."""
-    m = re.search(r"^%s\s*=\s*\[" % re.escape(name), text, re.M)
-    if not m:
-        return None
-    i = text.index("[", m.start())
-    depth = 0
-    for j in range(i, len(text)):
-        if text[j] == "[":
-            depth += 1
-        elif text[j] == "]":
-            depth -= 1
-            if depth == 0:
-                return text[i + 1:j]
-    return None
-
-
-def _cflags_groups(main: str) -> tuple[str, dict]:
-    """`configure.py`'s text and every `cflags_* = [...]` RHS, for the flag checks."""
-    text = read(os.path.join(main, "configure.py"))
-    raw = {}
-    for m in re.finditer(r"^(cflags_\w+)\s*=\s*\[", text, re.M):
-        rhs = _bracket_rhs(text, m.group(1))
-        if rhs is not None:
-            raw[m.group(1)] = rhs
-    return text, raw
-
-
-def _resolve_group(text: str, raw: dict, name: str, seen=None) -> list[str]:
-    """A cflags group as an ordered token list, resolving `*cflags_*` spreads and the `[f for f in ...]`
-    filters the file uses. The tokens are the quoted list elements, so a flag written as `"-opt nopeephole"`
-    is one token while `"-func_align", "4"` is two - membership is tested on the joined string."""
-    seen = set(seen or ())
-    if name in seen:
-        return []
-    seen.add(name)
-    rhs = raw.get(name)
-    if rhs is None:
-        return []
-    rhs = re.sub(r"#.*", "", rhs)
-    out: list[str] = []
-    pat = re.compile(r"\*?\[f for f in (cflags_\w+) if f (?:not in \(([^)]*)\)|!=\s*(\"[^\"]*\"))\]"
-                     r"|\*(cflags_\w+)|\"([^\"]*)\"")
-    for m in pat.finditer(rhs):
-        if m.group(1):
-            base = _resolve_group(text, raw, m.group(1), seen)
-            if m.group(2) is not None:
-                excl = set(re.findall(r'"([^"]*)"', m.group(2)))
-                out.extend(t for t in base if t not in excl)
-            else:
-                out.extend(t for t in base if t != m.group(3))
-        elif m.group(4):
-            out.extend(_resolve_group(text, raw, m.group(4), seen))
-        elif m.group(5) is not None:
-            out.append(m.group(5))
-    return out
-
-
-def _lib_groups(text: str) -> dict:
-    """lib name -> its cflags group name, from both the dict entries and the `DolphinLib`/`Rel` helpers."""
-    libs: dict = {}
-    for m in re.finditer(r'"lib"\s*:\s*"([^"]+)"', text):
-        seg = text[m.end():m.end() + 4000]
-        cg = re.search(r'"cflags"\s*:\s*(cflags_\w+)', seg)
-        libs[m.group(1)] = cg.group(1) if cg else None
-    for helper, grp in (("DolphinLib", "cflags_base"), ("Rel", "cflags_rel")):
-        for m in re.finditer(re.escape(helper) + r'\("([^"]+)"', text):
-            libs[m.group(1)] = grp
-    return libs
+def _flag_context(main: str) -> dict:
+    """The flag checks' view of `configure.py`: every resolved `cflags_*` group (an ordered token list - a flag
+    written as `"-opt nopeephole"` is one token, `"-func_align", "4"` two) and each lib's group name."""
+    try:
+        conf = _project.Configure.load(os.path.join(main, "configure.py"))
+    except (OSError, SyntaxError):
+        return {"groups": set(), "resolved": {}, "libs": {}}
+    groups = {name: list(flags) for name, flags in conf.groups().items()}
+    return {"groups": set(groups), "resolved": groups, "libs": {lib.name: lib.cflags_name for lib in conf.libs()}}
 
 
 _FLAG_PART_RE = re.compile(r"-[A-Za-z_]\w*(?:\s+[A-Za-z0-9,_=\.]+)?$")
@@ -1416,17 +1357,8 @@ def _splits_ranges(main: str) -> dict:
     out: dict = {}
     if not os.path.exists(path):
         return out
-    unit = ""
-    for line in read(path).replace("\r\n", "\n").split("\n"):
-        if not line.strip():
-            continue
-        if not line[0].isspace():
-            unit = line.rstrip().rstrip(":") if line.rstrip().endswith(":") else unit
-            continue
-        m = re.match(r"\s+(\S+)\s+start:0x([0-9A-Fa-f]+)\s+end:0x([0-9A-Fa-f]+)", line)
-        if m and unit:
-            out.setdefault(_norm_section(m.group(1)), []).append(
-                (int(m.group(2), 16), int(m.group(3), 16), unit))
+    for r in _project.Splits.read(path).ranges:
+        out.setdefault(_norm_section(r.section), []).append((r.start, r.end, r.unit))
     return out
 
 
@@ -1592,9 +1524,7 @@ def _check_flag(main: str, item: Item, ctx: dict):
     group = ctx["libs"].get(lib) or (lib if lib in ctx["groups"] else None)
     if not group:
         return ("open", "no check: no cflags group resolves for lib %r in configure.py" % lib)
-    if group not in ctx["resolved"]:
-        ctx["resolved"][group] = _resolve_group(ctx["text"], ctx["raw"], group)
-    toks = ctx["resolved"][group]
+    toks = ctx["resolved"].get(group, [])
     missing = [s for s in specs if not _flag_present(toks, s)]
     if missing:
         return ("open", "%s still lacks %s in configure.py (%s)"
@@ -1777,9 +1707,7 @@ def triage_item(main: str, item: Item, ctx: dict):
 def triage(main: str, **kw) -> tuple[list, dict]:
     """Classify every OPEN item; returns `([(item, decision, evidence)], meta)`."""
     items, meta = build(main, **kw)
-    text, raw = _cflags_groups(main)
-    ctx = {"text": text, "raw": raw, "groups": set(raw), "resolved": {},
-           "libs": _lib_groups(text), "splits": _splits_ranges(main)}
+    ctx = dict(_flag_context(main), splits=_splits_ranges(main))
     out = []
     for it in items:
         if it.status != "open":

@@ -46,6 +46,7 @@ workers, and neither is offered.
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import json
@@ -65,6 +66,7 @@ except Exception:
 sys.path.insert(0, os.path.dirname(HERE))
 
 import unitutil  # noqa: E402
+from tools.lib import project as _project  # noqa: E402  (the configure / splits / map readers)
 from units import recompile as rc  # noqa: E402
 from units import claims  # noqa: E402
 from units import langcheck as lc  # noqa: E402
@@ -181,7 +183,7 @@ def registered_units(main: str) -> list[str]:
     whose object has never been built still counts as registered.
     """
     text = open(os.path.join(main, "configure.py"), encoding="utf-8", errors="replace").read()
-    return re.findall(r'Object\([^,]+,\s*"([^"]+)"', text)
+    return [c.path for c in _project.object_calls(text)]
 
 
 def pool_units(main: str) -> list[str]:
@@ -289,17 +291,13 @@ def splits_range(main: str, unit: str) -> dict:
     """
     path = os.path.join(main, "config", "RMHE08", "splits.txt")
     want = os.path.splitext(source_name(unit, main))[0]
-    out, current = {}, None
+    out = {}
     if not os.path.exists(path):
         return out
-    for line in open(path, encoding="utf-8", errors="replace"):
-        if line[:1] not in (" ", "\t") and line.rstrip().endswith(":") and not line.startswith("#"):
-            current = line.strip()[:-1]
-            continue
-        m = re.match(r"\s+(\S+)\s+start:(0x[0-9A-Fa-f]+)\s+end:(0x[0-9A-Fa-f]+)", line)
-        if m and current and os.path.splitext(current.lstrip("/"))[0] == want:
-            start, end = int(m.group(2), 16), int(m.group(3), 16)
-            out[m.group(1)] = (start, end, end - start)
+    for block in _project.Splits.cached(path).blocks:
+        if os.path.splitext(block.unit.lstrip("/"))[0] == want:
+            for r in block.ranges:
+                out[r.section] = (r.start, r.end, r.size)
     return out
 
 
@@ -317,15 +315,8 @@ def map_rows(main: str) -> list[dict] | None:
         return None
     key = (path, os.path.getmtime(path))
     if key not in _MAP_CACHE:
-        pattern = re.compile(r"^(\S+) = (\S+):(0x[0-9A-Fa-f]+); // type:(\w+)( size:(0x[0-9A-Fa-f]+))?")
-        rows = []
-        with open(path, encoding="utf-8", errors="replace") as fh:
-            for line in fh:
-                m = pattern.match(line)
-                if not m:
-                    continue
-                rows.append({"name": m.group(1), "section": m.group(2), "address": int(m.group(3), 16),
-                             "size": int(m.group(6), 16) if m.group(6) else 0, "type": m.group(4)})
+        rows = [{"name": e.name, "section": e.section, "address": e.address, "size": e.size, "type": e.type}
+                for e in _project.SymbolMap(path).rows() if e.type]
         _MAP_CACHE.clear()
         _MAP_CACHE[key] = rows
     return _MAP_CACHE[key]

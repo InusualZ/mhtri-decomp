@@ -6,7 +6,6 @@ Spec: docs/tools/spec/vtableaudit.md. CLI: vtableaudit.py [--unit U] [--runs|--s
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
-import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import json
 import os
@@ -26,7 +25,7 @@ for _p in (HERE,):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-import langcheck  # noqa: E402  (registered_units - the same list every other unit tool uses)
+from tools.lib import project as _project  # noqa: E402  (registered units, splits and map: the one parser)
 import dossier  # noqa: E402  (parse_elf - the one ELF object reader, for the `--at` reference side)
 
 GAME = "RMHE08"
@@ -83,10 +82,6 @@ CLASS_OPEN_RE = re.compile(r"\b(?:typedef\s+)?(class|struct)\b\s*([A-Za-z_]\w*)?
 
 SOURCE_EXT = (".c", ".cc", ".cpp", ".cxx", ".cp", ".c++")
 
-UNIT_RE = re.compile(r"^(\S+):\s*$")
-RANGE_RE = re.compile(r"^\s+(\S+)\s+start:(0x[0-9A-Fa-f]+)\s+end:(0x[0-9A-Fa-f]+)"
-                     r"(?:\s+rename:(\S+))?\s*$")
-SYMBOL_RE = re.compile(r"^(\S+)\s*=\s*([.\w]+):(0x[0-9A-Fa-f]+);")
 HEX_SUFFIX_RE = re.compile(r"_([0-9A-Fa-f]{8})$")
 
 
@@ -102,20 +97,9 @@ def parse_splits(text: str) -> dict:
     split's name instead would miss every renamed section - `Runtime.PPCEABI.H/__init_cpp_exceptions.cpp`
     owns three of them.
     """
-    units, cur = {}, None
-    for line in text.splitlines():
-        if not line.strip() or line.startswith("Sections:"):
-            continue
-        m = UNIT_RE.match(line)
-        if m:
-            cur = m.group(1)
-            units[cur] = []
-            continue
-        m = RANGE_RE.match(line)
-        if m and cur is not None:
-            units[cur].append({"section": m.group(1), "start": int(m.group(2), 16),
-                               "end": int(m.group(3), 16), "object": m.group(4) or m.group(1)})
-    return units
+    return {block.unit: [{"section": r.section, "start": r.start, "end": r.end, "object": r.object_section}
+                         for r in block.ranges]
+            for block in _project.Splits.parse(text).blocks}
 
 
 def parse_symbols(text: str) -> dict:
@@ -127,11 +111,9 @@ def parse_symbols(text: str) -> dict:
     """
     out = {}
     for line in text.splitlines():
-        m = SYMBOL_RE.match(line)
-        if m:
-            size = re.search(r"size:(0x[0-9A-Fa-f]+)", line)
-            out[m.group(1)] = (m.group(2), int(m.group(3), 16),
-                               int(size.group(1), 16) if size else 0)
+        e = _project.parse_line(line)
+        if e is not None:
+            out[e.name] = (e.section, e.address, e.size)
     return out
 
 
@@ -405,7 +387,8 @@ def unit_list(main: str, tree: dict, ref: str | None = None) -> list:
     """
     if ref:
         return [{"path": p, "flag": ""} for p in sorted(tree["splits"])]
-    return langcheck.registered_units(main)
+    return [{"path": o.path, "flag": o.flag}
+            for o in _project.Configure.load(os.path.join(main, "configure.py")).objects()]
 
 
 # --------------------------------------------------------------------------------------------------

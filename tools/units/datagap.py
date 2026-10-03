@@ -4,8 +4,8 @@ Spec: docs/tools/spec/datagap.md. CLI: datagap.py [--flip-blockers] [--unit U] [
 [--pool-seams] [--touched-by REF] | --selftest."""
 
 from __future__ import annotations
-
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
+
 import argparse
 import json
 import os
@@ -15,6 +15,7 @@ from tools.lib.binary.elf import Elf as LibElf
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # `tools/`: `from units import`
+from tools.lib import project as _project  # noqa: E402  (the one splits / map parser)
 import dataseams  # noqa: E402  (`.data` emission-order seams: order-only / multi-TU diagnosis)
 import poolseams  # noqa: E402  (literal pools as TU evidence: a deferral a pool-sharing group explains)
 
@@ -163,21 +164,8 @@ GAME_DIR = "RMHE08"
 
 def parse_splits_text(text: str) -> dict[str, list[tuple[int, int, str]]]:
     """`{section: [(start, end, unit)]}` (sorted) from the text of a `splits.txt`; the unit has no extension."""
-    import re
-
-    out: dict[str, list[tuple[int, int, str]]] = {}
-    unit = None
-    for line in text.splitlines():
-        if line.startswith("Sections:"):
-            continue
-        m = re.match(r"^([^\s:][^:]*):\s*$", line)
-        if m:
-            unit = os.path.splitext(m.group(1))[0]
-            continue
-        m = re.match(r"^\s+(\S+)\s+start:(0x[0-9A-Fa-f]+)\s+end:(0x[0-9A-Fa-f]+)", line)
-        if m and unit:
-            out.setdefault(m.group(1), []).append((int(m.group(2), 16), int(m.group(3), 16), unit))
-    return {k: sorted(v) for k, v in out.items()}
+    return {section: sorted((s, e, os.path.splitext(u)[0]) for s, e, u in rows)
+            for section, rows in _project.Splits.parse(text).by_section().items()}
 
 
 def merged(ranges) -> list[tuple[int, int]]:
@@ -1180,12 +1168,9 @@ def claims_at_ref(root: str, ref: str) -> dict:
 
 def load_data_symbols(root: str) -> dict[str, dict]:
     """`{name: {section, address, size, type}}` from `symbols.txt` (a duplicated name is dropped: ambiguous)."""
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "symbols"))
-    import symedit  # noqa: PLC0415 - the map proxy; never prints the file
-
     out: dict[str, dict] = {}
     dup = set()
-    for e in symedit.entries(os.path.join(root, "config", GAME_DIR, "symbols.txt")):
+    for e in (r.to_dict() for r in _project.SymbolMap(os.path.join(root, "config", GAME_DIR, "symbols.txt")).rows()):
         if e["name"] in out:
             dup.add(e["name"])
         out[e["name"]] = e

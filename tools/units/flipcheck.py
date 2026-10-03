@@ -1,8 +1,8 @@
 """Can our object fill every section the unit's splits.txt claims? Sizes, bytes, permutation, undefined refs.
 Spec: docs/tools/spec/flipcheck.md. CLI: flipcheck.py [<unit> ...] | --selftest."""
 from __future__ import annotations
-
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
+
 import argparse
 import os
 import re
@@ -34,13 +34,13 @@ SYMBOLS = os.path.join(MAIN, "config", "RMHE08", "symbols.txt")
 # `flipcheck.py runtime` name the same unit and the same object (aliased: `claims` is a local function here)
 sys.path.insert(0, os.path.join(MAIN, "tools"))
 from units import claims as claims_mod  # noqa: E402
+from tools.lib import project as _project  # noqa: E402  (the splits / map readers)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import dataseams  # noqa: E402  (`.data` emission-order seams: order-only / multi-TU diagnosis)
 import poolseams  # noqa: E402  (literal pools as TU evidence: a pool difference a fold explains)
 
 # section names may or may not start with a dot: extab/extabindex do not.
 SEC_RE = re.compile(r"^\s*\d+\s+(\S+)\s+([0-9a-f]+)\s+[0-9a-f]+\s+[0-9a-f]+\s+[0-9a-f]+\s+2\*\*(\d+)")
-CLAIM_RE = re.compile(r"^\s+(\S+)\s+start:(0x[0-9A-Fa-f]+)\s+end:(0x[0-9A-Fa-f]+)(?:\s+rename:(\S+))?")
 IGNORE = (".comment", ".note.split", ".symtab", ".strtab", ".shstrtab", ".rela")
 # Fragments the *compiler* generates as a side effect of the unit's code: the exception tables and the
 # constructor/destructor reference words. A matched unit produces them, so they are part of its match and are
@@ -94,19 +94,10 @@ def missing_or_empty_object(unit: str, src_path: str, claim: dict[str, tuple[int
 def claims() -> dict[str, dict[str, tuple[int, int]]]:
     """{unit: {section name as the object spells it: (claimed size, align exponent)}} from splits.txt."""
     units: dict[str, dict[str, tuple[int, int]]] = {}
-    unit = None
-    for line in open(SPLITS, encoding="utf-8"):
-        if not line.strip() or line.lstrip().startswith("#"):
-            continue
-        if not line[0].isspace():
-            unit = re.sub(r"\.(c|cpp|cp|cc)$", "", line.split(":")[0].strip())
-            units.setdefault(unit, {})
-            continue
-        m = CLAIM_RE.match(line)
-        if m and unit:
-            name = m.group(4) or m.group(1)          # rename:.ctors$10 -> .ctors$10
-            size = int(m.group(3), 16) - int(m.group(2), 16)
-            units[unit][name] = (size, 2)            # splits.txt states ranges, not alignment
+    for block in _project.Splits.read(SPLITS).blocks:
+        claimed = units.setdefault(re.sub(r"\.(c|cpp|cp|cc)$", "", block.unit), {})
+        for r in block.ranges:
+            claimed[r.object_section] = (r.size, 2)    # rename:.ctors$10 -> .ctors$10; ranges, not alignment
     return units
 
 
@@ -494,15 +485,7 @@ def map_symbols(path: str | None = None) -> set[str]:
     path = SYMBOLS if path is None else path
     if not os.path.exists(path):
         return set()
-    out: set[str] = set()
-    for line in open(path, encoding="utf-8", errors="replace"):
-        text = line.strip()
-        if not text or text.startswith(("#", "//")):
-            continue
-        name = text.split("=", 1)[0].strip()
-        if name:
-            out.add(name)
-    return out
+    return _project.SymbolMap(path).names()
 
 
 def link_reference_context() -> dict | None:

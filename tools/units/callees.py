@@ -5,7 +5,6 @@ Spec: docs/tools/spec/callees.md. CLI: callees.py <unit> [--json] [--limit N] [-
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
-import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import json
 import os
@@ -27,7 +26,7 @@ for _path in (TOOLS, HERE, os.path.join(TOOLS, "symbols")):
 
 import unitutil as uu  # noqa: E402
 import dossier  # noqa: E402  (the project's ELF32-BE reader; do not grow a second one)
-from units import stylelint as sl  # noqa: E402  (the Ownership index the lint uses)
+from tools.lib.project import Ownership, Splits  # noqa: E402  (the one ownership index; the lint's too)
 import symedit  # noqa: E402  (the bounded, classified in-repo reference scan)
 
 CODE_SECTIONS = (".text", ".init")
@@ -435,7 +434,7 @@ def report(unit, args, root=ROOT):
             ours_refs = {}
     rows = merge_sides(target_refs, ours_refs)
 
-    ownership = sl.load_ownership(root)
+    ownership = Ownership.load(root)
     exists = make_source_exists(root)
     refs = scan_refs([r["name"] for r in rows], root=root) if not args.no_scan else {}
 
@@ -485,21 +484,10 @@ def text_range(unit, root):
     if not os.path.exists(path):
         return None
     want = os.path.relpath(unit.src, os.path.join(root, "src")).replace(os.sep, "/")
-    with open(path, "r", encoding="utf-8", errors="replace") as fh:
-        text = fh.read()
-    m = re.search(r"^%s:\s*$" % re.escape(want), text, re.M)
-    if not m:
-        return None
-    block = text[m.end():]
-    nxt = re.search(r"^[^\s:][^:]*:\s*$", block, re.M)
-    if nxt:
-        block = block[:nxt.start()]
-    for sm in re.finditer(r"^\s*\.text\s+start:(0x[0-9A-Fa-f]+)\s+end:(0x[0-9A-Fa-f]+)(.*)$",
-                          block, re.M):
-        start, end = int(sm.group(1), 16), int(sm.group(2), 16)
-        rename = re.search(r"rename:(\S+)", sm.group(3))
-        return dict(start=start, end=end, size=end - start,
-                    rename=rename.group(1) if rename else None)
+    block = next((b for b in Splits.read(path).blocks if b.unit == want), None)
+    for r in (block.ranges if block else ()):
+        if r.section == ".text":
+            return dict(start=r.start, end=r.end, size=r.size, rename=r.rename)
     return None
 
 

@@ -4,7 +4,6 @@ Spec: docs/tools/spec/langcheck.md. CLI: langcheck.py [--unit U] [--disagree] [-
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
-import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import json
 import os
@@ -14,6 +13,7 @@ import sys
 from tools.lib import names as libnames
 
 from tools.lib.binary.elf import Elf as LibElf, ElfError
+from tools.lib.project import Configure, Splits
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -39,22 +39,15 @@ SRCFILE_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_./\\-]*\.(?:c|cpp|cc|cxx|cp|c\
 EXTAB_SECTIONS = ("extab", "extabindex")
 
 
-# `configure.py` tokens this tool needs: the lib a block belongs to, its cflags variable, and one
-# Object registration (with an optional inline `cflags=` override).
-CONF_TOKEN_RE = re.compile(
-    r'"lib":\s*"(?P<lib>[^"]+)"'
-    r'|"cflags":\s*(?P<cflags>[A-Za-z_]\w*)'
-    r'|Object\(\s*(?P<flag>[A-Za-z_]\w*)\s*,\s*"(?P<path>[^"]+)"(?P<rest>[^)]*)\)')
-INLINE_CFLAGS_RE = re.compile(r"cflags\s*=\s*([A-Za-z_]\w*)")
+_CONFIGURE_CACHE: dict = {}
 
-# One cflags-list body is read as an ordered stream of literal tokens and spreads, because both `-lang`
-# and `-Cpp_exceptions` mean "last one wins". A spread can be `*cflags_x` or a filtered comprehension
-# `*[f for f in cflags_x if ...]`; the tokens a filter removes are re-added explicitly by the same list
-# where that matters (`cflags_pl` filters `-Cpp_exceptions off` from `cflags_base` and then sets `on`).
-_CFLAGS_TOKEN_RE = re.compile(
-    r'"([^"]*)"'
-    r'|\*\s*([A-Za-z_]\w*)'
-    r'|\*\[[^\]]*?\bfor\s+\w+\s+in\s+([A-Za-z_]\w*)')
+
+def _configure(text: str) -> "Configure":
+    """`configure.py` evaluated once per text (`lib.project.Configure`)."""
+    if text not in _CONFIGURE_CACHE:
+        _CONFIGURE_CACHE.clear()
+        _CONFIGURE_CACHE[text] = Configure.parse(text)
+    return _CONFIGURE_CACHE[text]
 
 
 # --------------------------------------------------------------------------------------------------
@@ -293,42 +286,14 @@ def registered_units(main: str | None = None) -> list[dict]:
     """
     path = os.path.join(_root(main), "configure.py")
     text = open(path, encoding="utf-8", errors="replace").read()
-    out, lib, cflags = [], None, None
-    for m in CONF_TOKEN_RE.finditer(text):
-        if m.group("lib"):
-            lib, cflags = m.group("lib"), None
-        elif m.group("cflags"):
-            cflags = m.group("cflags")
-        else:
-            inline = INLINE_CFLAGS_RE.search(m.group("rest") or "")
-            out.append({"path": m.group("path"), "flag": m.group("flag"), "lib": lib,
-                        "cflags": inline.group(1) if inline else cflags})
-    return out
+    return [{"path": o.path, "flag": o.flag, "lib": o.lib, "cflags": o.cflags_name or o.lib_cflags}
+            for o in _configure(text).objects()]
 
 
-def cflags_tokens(text: str, name: str, seen=None) -> list[str]:
-    """The literal `"-x y"` tokens reachable from a cflags variable, **in source order**.
-
-    Follows `*cflags_x` spreads and filtered `*[f for f in cflags_x if ...]` spreads, because both
-    `-lang` and `-Cpp_exceptions` are "last one wins" and the order decides the answer. Not a full
-    Python evaluator: a filter's own quoted literals are collected too, which is harmless here (the one
-    filter this tool cares about, `-Cpp_exceptions off`, is followed by an explicit `on` wherever it is
-    filtered). Recursion is bounded so a cycle cannot hang the tool.
-    """
-    seen = set(seen or ())
-    if not name or name in seen:
-        return []
-    seen.add(name)
-    m = re.search(r"(?m)^%s\s*=\s*\[(.*?)\n\]" % re.escape(name), text, re.S)
-    if not m:
-        return []
-    tokens = []
-    for mt in _CFLAGS_TOKEN_RE.finditer(m.group(1)):
-        if mt.group(1) is not None:
-            tokens.append(mt.group(1))
-        else:
-            tokens.extend(cflags_tokens(text, mt.group(2) or mt.group(3), seen))
-    return tokens
+def cflags_tokens(text: str, name: str) -> list[str]:
+    """A cflags variable's tokens **in order** (spreads and filters resolved by `lib.project.Configure`),
+    because both `-lang` and `-Cpp_exceptions` are "last one wins"."""
+    return list(_configure(text).cflags(name) or ()) if name else []
 
 
 def cflags_lang(main: str | None = None, cflags_name: str | None = None, text: str | None = None) -> str | None:
@@ -915,19 +880,8 @@ def selftest() -> int:
 
         def unit_at(addr: int) -> str | None:
             """The registered unit whose `.text` range contains `addr`, from `splits.txt`."""
-            cur, rng = None, None
-            for line in open(os.path.join(ROOT, "config", "RMHE08", "splits.txt"),
-                             encoding="utf-8", errors="replace"):
-                m = re.match(r"^(\S+):\s*$", line)
-                if m:
-                    cur = m.group(1)
-                    continue
-                t = re.match(r"\s*\.text\s+start:(0x[0-9A-Fa-f]+)\s+end:(0x[0-9A-Fa-f]+)", line)
-                if t and cur:
-                    a, b = int(t.group(1), 16), int(t.group(2), 16)
-                    if a <= addr < b:
-                        rng = cur
-            return rng
+            hit = Splits.read(os.path.join(ROOT, "config", "RMHE08", "splits.txt")).covering(".text", addr)
+            return hit.unit if hit else None
 
         def obj_of(unit: str) -> str:
             return os.path.splitext(os.path.join(ROOT, "build", "RMHE08", "obj",

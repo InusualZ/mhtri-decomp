@@ -2,8 +2,8 @@
 """Re-cut one unit at a function boundary: print the exact splits.txt lines for both halves, or refuse.
 Spec: docs/tools/spec/unwindcut.md. CLI: unwindcut.py <unit> <cut-addr> | --selftest."""
 from __future__ import annotations
-
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
+
 import argparse
 import json
 import os
@@ -11,6 +11,7 @@ import re
 import struct
 import sys
 
+from tools.lib import project as _project
 from tools.lib.binary.dol import Dol as LibDol, DolError
 from tools.lib.binary.elf import Elf as LibElf
 
@@ -31,12 +32,6 @@ EXTABINDEX_ENTRY = 12
 # A cap so a corrupt/misaligned read cannot walk the whole data section. The widest real unit is tens of
 # thousands of frames, not millions.
 MAX_RECORDS = 1 << 16
-
-SPLIT_BLOCK_RE = re.compile(r"^(?P<unit>\S+):\s*$")
-SPLIT_LINE_RE = re.compile(
-    r"^\s*(?P<section>[.\w]+)\s+start:(?P<start>0x[0-9a-fA-F]+)\s+end:(?P<end>0x[0-9a-fA-F]+)"
-    r"(?:\s+rename:(?P<rename>\S+))?\s*$"
-)
 
 # The fragment sections a re-cut has to move 1:1 with the `.text` range.
 FRAGMENTS = ("extab", "extabindex")
@@ -72,40 +67,16 @@ class Dol(LibDol):
 
 
 def read_splits(path: str) -> "dict[str, dict]":
-    """{unit key: {section: (start, end)}} in file order - the parser `symbolpreflight.py` uses."""
-    blocks: dict[str, dict] = {}
-    current: str | None = None
-    with open(path, "r", encoding="utf-8", errors="replace") as handle:
-        for line in handle:
-            if line[:1] not in ("", " ", "\t") and line.rstrip().endswith(":"):
-                key = line.strip()[:-1]
-                if key != "Sections":
-                    current = key
-                    blocks.setdefault(current, {})
-                else:
-                    current = None
-                continue
-            match = SPLIT_LINE_RE.match(line)
-            if match and current:
-                name = match.group("section")
-                blocks[current][name] = (int(match.group("start"), 16), int(match.group("end"), 16))
-    return blocks
+    """{unit key: {section: (start, end)}} in file order (`lib.project.Splits.by_unit`)."""
+    return _project.Splits.read(path).by_unit()
 
 
 def read_functions(path: str):
     """The `.text` function rows of `symbols.txt`, address-sorted: [(addr, size, name)]."""
-    try:
-        if os.path.join(TOOLS, "symbols") not in sys.path:
-            sys.path.insert(0, os.path.join(TOOLS, "symbols"))
-        import symedit  # noqa: E402  (same shim as symbolpreflight.py)
-    except ImportError:
-        return []
     if not os.path.exists(path):
         return []
-    rows = []
-    for entry in symedit.entries(path):
-        if entry.get("section") == ".text" and entry.get("type") == "function":
-            rows.append((entry["address"], entry.get("size") or 0, entry["name"]))
+    rows = [(e.address, e.size, e.name) for e in _project.SymbolMap(path).rows()
+            if e.section == ".text" and e.type == "function"]
     rows.sort()
     return rows
 

@@ -89,6 +89,7 @@ cc0 / fork provenance of ``tools/mwcc-debugger/`` does not reach this file:
 this is original work in this repository.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import json
@@ -98,6 +99,8 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+from tools.lib.project import Splits
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
@@ -2441,21 +2444,11 @@ def _splits_starts(path):
     in column 0 and ends with ``:``; its sections are indented
     ``.name start:0x.... end:0x....`` lines.
     """
-    units, cur = {}, None
-    rx = re.compile(r"^\s+(\.?[\w$.]+)\s+start:0x([0-9A-Fa-f]+)")
     try:
-        text = Path(path).read_text(encoding="utf-8", errors="replace")
+        splits = Splits.read(path)
     except OSError:
-        return units
-    for line in text.splitlines():
-        if line[:1] not in ("", " ", "\t") and line.rstrip().endswith(":"):
-            cur = line.strip()[:-1]
-            units[cur] = {}
-        elif cur:
-            m = rx.match(line)
-            if m:
-                units[cur][m.group(1)] = int(m.group(2), 16)
-    return units
+        return {}
+    return {block.unit: {r.section: r.start for r in block.ranges} for block in splits.blocks}
 
 
 def derive_alignment(pe):

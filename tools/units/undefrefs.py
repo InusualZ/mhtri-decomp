@@ -77,6 +77,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 if os.path.dirname(HERE) not in sys.path:
     sys.path.insert(0, os.path.dirname(HERE))          # `tools/`, so `from units import dossier` works
 from units import dossier as dossier_mod  # noqa: E402
+from tools.lib import project as _project  # noqa: E402  (the map reader)
 
 # The relocation-type reader (`dossier.parse_elf`) is the one ELF scan. Relocations into extab/extabindex
 # are compiler bookkeeping, not names our code calls, so they are not this row's business (flipcheck treats
@@ -162,15 +163,7 @@ def map_rows(main: str) -> set[str]:
     path = os.path.join(main, SYMBOLS_REL)
     if not os.path.exists(path):
         return set()
-    out = set()
-    for line in open(path, encoding="utf-8", errors="replace"):
-        text = line.strip()
-        if not text or text.startswith(("#", "//")):
-            continue
-        name = text.split("=", 1)[0].strip()
-        if name:
-            out.add(name)
-    return out
+    return _project.SymbolMap(path).names()
 
 
 def linker_symbols(main: str) -> set[str]:

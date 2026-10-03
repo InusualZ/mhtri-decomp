@@ -103,6 +103,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 
 import unitutil  # noqa: E402
+from tools.lib import project as _project  # noqa: E402  (the configure / map readers)
 
 SRC_EXT = (".c", ".cpp", ".cp", ".cxx", ".cc")
 
@@ -292,14 +293,6 @@ def retarget(tokens: list[str], unit: str) -> list[str]:
     return out
 
 
-# One `config.libs` block: its name up to the object list, then the list. The brace-free runs on either
-# side let the block's own comments through - the real `configure.py` puts a long comment between the `{`
-# and the `"lib"` line, and requiring only whitespace there (what `brief.lib_for` does) silently matches
-# just the handful of blocks that have no comment, so those lookups report the lib as `(unknown)`.
-LIB_BLOCK_RE = re.compile(r"\{[^{}]*?\"lib\": \"([^\"]+)\"[^{}]*?\"objects\": \[(.*?)\]\s*,\s*\n\s*\}",
-                          re.S)
-OBJECT_RE = re.compile(r"Object\(\s*\w+\s*,\s*\"([^\"]+)\"")
-
 
 def lib_block(wt: str, unit: str):
     """(lib name, [object source names]) for the `config.libs` block that registers `unit`.
@@ -310,12 +303,15 @@ def lib_block(wt: str, unit: str):
     path = os.path.join(wt, "configure.py")
     if not os.path.exists(path):
         return None, []
-    text = open(path, encoding="utf-8", errors="replace").read()
+    try:
+        libs = _project.Configure.load(path).libs()
+    except SyntaxError:
+        return None, []
     want = _unit_stem(unit)
-    for m in LIB_BLOCK_RE.finditer(text):
-        names = OBJECT_RE.findall(m.group(2))
+    for lib in libs:
+        names = [o.path for o in lib.objects]
         if any(_unit_stem(n) == want for n in names):
-            return m.group(1), names
+            return lib.name, names
     return None, []
 
 
@@ -760,8 +756,6 @@ def absolutize(tokens: list[str], main: str) -> list[str]:
 
 SYMBOLS_REL = os.path.join("config", "RMHE08", "symbols.txt")
 SPLITS_REL = os.path.join("config", "RMHE08", "splits.txt")
-SYMBOL_LINE_RE = re.compile(r"^(\S+)\s*=\s*(.*)$")
-SYMBOL_TEXT_RE = re.compile(r"^\.text:(0x[0-9A-Fa-f]+)$")
 AUTO_RUN_RE = re.compile(r"^auto_\d+_([0-9A-Fa-f]{8})_text$")
 
 
@@ -796,19 +790,9 @@ def resolve_map(wt: str, main: str, rel: str = SYMBOLS_REL):
 def text_symbol_addresses(map_path: str) -> dict:
     """{name: address} for every `.text` symbol in a symbols.txt - the only section `report generate`
     scores. `map_path` is the resolved map itself (`resolve_map`), not a tree root."""
-    out: dict = {}
     if not os.path.exists(map_path):
-        return out
-    for line in open(map_path, encoding="utf-8", errors="replace"):
-        m = SYMBOL_LINE_RE.match(line.rstrip("\n"))
-        if not m:
-            continue
-        for part in m.group(2).split(";"):
-            a = SYMBOL_TEXT_RE.match(part.strip())
-            if a:
-                out[m.group(1)] = int(a.group(1), 16)
-                break
-    return out
+        return {}
+    return {e.name: e.address for e in _project.SymbolMap(map_path).rows() if e.section == ".text"}
 
 
 def auto_text_runs(main: str) -> list:

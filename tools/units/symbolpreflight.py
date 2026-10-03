@@ -24,6 +24,7 @@ Nothing here decides anything: it reports the mechanical facts and names the ana
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import json
@@ -34,94 +35,47 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 GAME = "RMHE08"
 
-if os.path.join(ROOT, "tools", "symbols") not in sys.path:
-    sys.path.insert(0, os.path.join(ROOT, "tools", "symbols"))
-
-import symedit  # noqa: E402  (same directory shim as the other tools)
+from tools.lib import project  # noqa: E402  (the one map / splits / configure parser)
 
 DATA_SECTIONS = (".rodata", ".data", ".bss", ".sdata", ".sbss", ".sdata2", ".sbss2")
 FRAGMENT_SECTIONS = ("extab", "extabindex", ".ctors", ".dtors")
-SPLIT_BLOCK_RE = re.compile(r"^(?P<unit>\S+):\s*$")
-SPLIT_LINE_RE = re.compile(
-    r"^\s*(?P<section>[.\w]+)\s+start:(?P<start>0x[0-9a-fA-F]+)\s+end:(?P<end>0x[0-9a-fA-F]+)"
-    r"(?:\s+rename:(?P<rename>\S+))?\s*$"
-)
-TOKEN_RE = re.compile(
-    r'"lib":\s*"(?P<lib>[^"]+)"|\s"mw_version":\s*"(?P<mw>[^"]+)"'
-    r'|"cflags":\s*(?P<flags>[A-Za-z_]\w*)'
-    r'|Object\(\s*(?P<flag>Matching|NonMatching|Equivalent)\s*,\s*"(?P<path>[^"]+)"'
-)
-
-
-def read(path: str) -> str:
-    with open(path, "r", encoding="utf-8", errors="replace") as fh:
-        return fh.read()
 
 
 def load_symbols() -> tuple[dict, dict, dict]:
-    """Return (by_name, by_section_sorted, by_address)."""
+    """Return (by_name, by_section_sorted, by_address) of entry dicts (`lib.project.Symbol.to_dict`)."""
     path = os.path.join(ROOT, "config", GAME, "symbols.txt")
     by_name, by_section, by_address = {}, {}, {}
-    for entry in symedit.entries(path):
+    for entry in (e.to_dict() for e in project.SymbolMap(path).rows()):
         by_name[entry["name"]] = entry
         by_section.setdefault(entry["section"], []).append(entry)
-        for name in [entry["name"]]:
-            by_address.setdefault(entry["address"], []).append(name)
+        by_address.setdefault(entry["address"], []).append(entry["name"])
     for section in by_section:
         by_section[section].sort(key=lambda e: e["address"])
     return by_name, by_section, by_address
 
 
 def load_splits() -> list[dict]:
+    """`[{unit, ranges: [{section, start, end, rename}]}]` in file order (`lib.project.Splits`)."""
     path = os.path.join(ROOT, "config", GAME, "splits.txt")
-    blocks, current = [], None
-    for line in read(path).splitlines():
-        if not line.strip() or line.startswith("Sections:"):
-            continue
-        m = SPLIT_BLOCK_RE.match(line)
-        if m and not line.startswith(("\t", " ")):
-            current = {"unit": m.group("unit"), "ranges": []}
-            blocks.append(current)
-            continue
-        m = SPLIT_LINE_RE.match(line)
-        if m and current is not None:
-            current["ranges"].append(
-                {
-                    "section": m.group("section"),
-                    "start": int(m.group("start"), 16),
-                    "end": int(m.group("end"), 16),
-                    "rename": m.group("rename"),
-                }
-            )
-    return blocks
+    return [{"unit": b.unit,
+             "ranges": [{"section": r.section, "start": r.start, "end": r.end, "rename": r.rename}
+                        for r in b.ranges]}
+            for b in project.Splits.read(path).blocks]
 
 
 def load_configure() -> tuple[dict, list[dict]]:
-    """Return (object_path -> {flag, lib, mw_version, cflags}, libs)."""
-    path = os.path.join(ROOT, "configure.py")
-    text = read(path)
-    # Walk the file once: a `"lib":` starts a library block, the Objects that follow belong to it.
-    objects, libs, current, pending = {}, [], None, {}
-    for token in TOKEN_RE.finditer(text):
-        if token.group("lib"):
-            current = {"lib": token.group("lib"), "objects": []}
-            pending = {}
-            libs.append(current)
-        elif token.group("mw"):
-            pending["mw_version"] = token.group("mw")
-        elif token.group("flags"):
-            pending["cflags"] = token.group("flags")
-        elif token.group("path"):
-            info = {
-                "flag": token.group("flag"),
-                "path": token.group("path"),
-                "lib": current["lib"] if current else None,
-                "mw_version": pending.get("mw_version"),
-                "cflags": pending.get("cflags"),
-            }
-            objects[info["path"]] = info
-            if current is not None:
-                current["objects"].append(info)
+    """Return (object_path -> {flag, path, lib, mw_version, cflags (the lib's group name)}, libs)."""
+    objects, libs = {}, []
+    for lib in project.Configure.load(os.path.join(ROOT, "configure.py")).libs():
+        current = {"lib": lib.name, "objects": []}
+        libs.append(current)
+        for o in lib.objects:
+            if o.flag not in project.configure.FLAGS:
+                continue
+            info = {"flag": o.flag, "path": o.path, "lib": lib.name, "mw_version": o.mw_version,
+                    "cflags": o.lib_cflags}
+            objects[o.path] = info
+            current["objects"].append(info)
     return objects, libs
 
 

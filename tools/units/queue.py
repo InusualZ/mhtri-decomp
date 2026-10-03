@@ -48,6 +48,7 @@ candidates in address order.
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import datetime as _dt
@@ -61,6 +62,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 
 from units import brief  # noqa: E402
+from tools.lib import project as _project  # noqa: E402  (the splits reader)
 
 from units import claims  # noqa: E402
 from units import lanecmd  # noqa: E402
@@ -219,17 +221,8 @@ def system_hints(main: str) -> list[tuple[int, int, str]]:
     cached = _SYSTEM_HINTS.get(main)
     if cached and cached[0] == key:
         return cached[1]
-    rows: list[tuple[int, int, str]] = []
-    text = open(path, encoding="utf-8").read()
-    unit = None
-    for line in text.replace('\r\n', '\n').split('\n'):
-        if line and not line[0].isspace() and line.rstrip().endswith(':'):
-            unit = line.rstrip()[:-1]
-        m = re.match(r"\s+\.text\s+start:0x([0-9A-Fa-f]+) end:0x([0-9A-Fa-f]+)", line)
-        if m and unit:
-            rows.append((int(m.group(1), 16), int(m.group(2), 16),
-                         unit.split('/')[0] if '/' in unit else unit))
-    rows.sort()
+    rows = sorted((r.start, r.end, r.unit.split("/")[0] if "/" in r.unit else r.unit)
+                  for r in _project.Splits.read(path).text_ranges())
     _SYSTEM_HINTS[main] = (key, rows)
     return rows
 

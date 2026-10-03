@@ -54,6 +54,8 @@ import re
 import sys
 from tools.lib import names as libnames
 
+from tools.lib import project as _project
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(os.path.dirname(HERE))
 
@@ -542,14 +544,7 @@ def _map_rows(root: str) -> list:
         return []
     key = (path, os.path.getmtime(path))
     if key not in _MAP_CACHE:
-        rows = []
-        pattern = re.compile(r"^(\S+) = (\S+):(0x[0-9A-Fa-f]+);")
-        with open(path, encoding="utf-8", errors="replace") as fh:
-            for line in fh:
-                m = pattern.match(line)
-                if m:
-                    rows.append((int(m.group(3), 16), m.group(1)))
-        rows.sort()
+        rows = sorted((e.address, e.name) for e in _project.SymbolMap(path).rows())
         _MAP_CACHE.clear()
         _MAP_CACHE[key] = rows
     return _MAP_CACHE[key]
@@ -564,14 +559,8 @@ def symbols_by_unit(root: str) -> dict:
     if not rows:
         return {}
     addrs = [a for a, _ in rows]
-    out, current, ranges = {}, None, {}
-    for line in open(splits_path, encoding="utf-8", errors="replace"):
-        if line[:1] not in (" ", "\t") and line.rstrip().endswith(":") and not line.startswith("#"):
-            current = line.strip()[:-1]
-            continue
-        m = re.match(r"\s+\.text\s+start:(0x[0-9A-Fa-f]+)\s+end:(0x[0-9A-Fa-f]+)", line)
-        if m and current:
-            ranges[current] = (int(m.group(1), 16), int(m.group(2), 16))
+    out = {}
+    ranges = {r.unit: (r.start, r.end) for r in _project.Splits.read(splits_path).text_ranges()}
     for unit, (start, end) in ranges.items():
         lo, hi = bisect.bisect_left(addrs, start), bisect.bisect_left(addrs, end)
         out[unit] = [rows[i][1] for i in range(lo, hi)]

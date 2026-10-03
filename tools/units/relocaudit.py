@@ -53,7 +53,6 @@ lives in), which is how a worktree can audit MAIN's already-built objects withou
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
-import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import json
 import os
@@ -64,9 +63,9 @@ import time
 from tools.lib import names as libnames
 
 from tools.lib.binary.elf import Elf as LibElf, ElfError
+from tools.lib.project import Configure  # noqa: E402  (the registered units)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, HERE)                      # so `import langcheck` works from any cwd
 ROOT = os.path.dirname(os.path.dirname(HERE))
 
 # ELF bits we need. An object this project links is ELF32, big-endian, and carries a real `.symtab`.
@@ -173,13 +172,9 @@ def object_sets(path: str):
 # the units and their objects
 # --------------------------------------------------------------------------------------------------
 def registered_units(main: str) -> list[dict]:
-    """Every registered unit from `configure.py` (via `langcheck.registered_units`).
-
-    Reused rather than re-parsed: the two tools must agree on what "a registered unit" is, and
-    `langcheck` is the one place that reads `config.libs` with its inline `cflags=` overrides.
-    """
-    import langcheck
-    return langcheck.registered_units(main)
+    """Every registered unit from `configure.py` (`lib.project.Configure`, the one reader of `config.libs`)."""
+    return [{"path": o.path, "flag": o.flag}
+            for o in Configure.load(os.path.join(main, "configure.py")).objects()]
 
 
 def object_paths(main: str, source_path: str) -> tuple[str, str]:

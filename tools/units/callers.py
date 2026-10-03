@@ -92,7 +92,7 @@ for _path in (TOOLS, HERE, os.path.join(TOOLS, "symbols"), os.path.join(TOOLS, "
 
 import tudiscover as td  # noqa: E402  (GAME, ASM_DIR, and the dump's own stamp: one definition of stale)
 import unitutil as uu  # noqa: E402  (resolve_input: MAIN's build/ by path when the tree has none)
-from units import stylelint as sl  # noqa: E402  (the Ownership index the rule-2 lint uses)
+from tools.lib.project import Ownership  # noqa: E402  (the one ownership index; the rule-2 lint's too)
 from units import callees as cl  # noqa: E402  (decode_rw: the tree's one register read/write decode)
 from units import dossier as dossier_mod  # noqa: E402  (parse_elf: the tree's one relocation scan)
 
@@ -770,7 +770,7 @@ class Map:
 
 def load_map(root=ROOT):
     """The map, or an empty one when the tree has no `symbols.txt` (a scratch fixture)."""
-    return Map(sl.load_ownership(root), root)
+    return Map(Ownership.load(root), root)
 
 
 def plain_name(name):

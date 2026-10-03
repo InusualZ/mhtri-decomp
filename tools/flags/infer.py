@@ -2,8 +2,8 @@
 """Infer the compiler flags a target object was built with, from its own bytes, with evidence and confidence.
 Spec: docs/tools/spec/infer.md. CLI: infer.py <unit|object> [--json] | --all | --accuracy | --selftest."""
 from __future__ import annotations
-
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
+
 import argparse
 import json
 import os
@@ -614,24 +614,11 @@ def obj_path_for(unit_name: str, root: str) -> str:
 
 
 def registered_units(root: str):
-    """(lib, unit_name, obj_path, cflags) for every Object() in configure.py, without running it."""
-    src = open(os.path.join(root, "configure.py")).read()
-    src = src.split("if args.mode ==")[0]
-    ns = {"__name__": "configure_prefix"}
-    if root not in sys.path:
-        sys.path.insert(0, root)
-    sys.argv = ["configure.py"]
-    exec(compile(src, "configure.py", "exec"), ns)  # read-only: the build-generating tail is cut
-    out = []
-    for lib in ns["config"].libs:
-        for o in lib["objects"]:
-            # Object() keeps its options in `.options`; a per-object `cflags=` override (Pl/pl_skill,
-            # Network/fn_803D3CE8, Network/fn_8041A87C) must beat the library group.
-            opts = getattr(o, "options", {}) or {}
-            override = opts.get("cflags")
-            cflags = list(override or lib["cflags"])
-            out.append((lib["lib"], o.name, obj_path_for(o.name, root), cflags))
-    return out
+    """(lib, unit_name, obj_path, cflags) for every Object() in configure.py, without running it: the
+    per-object `cflags=` override beats the library group (`lib.project.Configure` resolves both)."""
+    from tools.lib.project import Configure  # noqa: PLC0415
+    return [(o.lib, o.path, obj_path_for(o.path, root), list(o.cflags))
+            for o in Configure.load(os.path.join(root, "configure.py")).objects()]
 
 
 def resolve_object(spec: str, root: str) -> str:

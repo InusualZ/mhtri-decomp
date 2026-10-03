@@ -131,18 +131,26 @@ becomes it (`duplication.md` has the line numbers).
 ### `lib/project/` - the three project files and ownership
 
 * `symbols.py`: `SymbolMap(path)` streaming over `config/RMHE08/symbols.txt` (never whole into a string a caller can print):
-  `rows()`, `by_name`, `by_address(section)`, `at(address, count)`, `in_range(section, lo, hi)`, `find(regex)`,
-  `plan_rename(pairs, force)`, `apply`, `plan_merge(rows)`, `check()` (duplicates, aliases, unparsed). Line parser is
-  `symedit.parse_line`; the write is `lib.text.Transaction`. Non-negotiable 7 becomes structural: no API returns the file text.
-* `splits.py`: `Splits.parse(text)` / `render()` round-trip (`splitcheck.parse_splits`/`render_splits`), `units`, `ranges`,
-  `covering(section, address) -> (unit, start, end) | None`, `claims(unit)`, `overlap(section, lo, hi)`, `add_block`,
-  `rename_unit`, `text_ranges()`; one return shape (`Range(unit, section, start, end)`).
-* `configure.py`: `Configure.load(path)` by importing `configure.py` as a module where possible and by `ast` otherwise:
-  `objects()` (`Object(flag, path, **kw)` rows with their lib), `libs()`, `cflags(lib)` with group inheritance resolved
-  (one rule; today `langcheck`, `backlog` and `promote` have three), `matching_units()`, `object_line_text`.
-* `ownership.py`: `Ownership(tree, ref=None)` = map + splits + dtk `config.json`: `owner_of(section, address) -> Owner(unit,
-  range, state in {reconstructed, registered, unsplit, auto})`, `unit_of_symbol(name)`, `symbols_of_unit(unit, section)`,
-  `band_of(address)`; `at_ref(ref)` reads the three files from git (`stylelint.load_ownership_at_ref`).
+  `rows()`, `by_name`, `by_section()`, `at(address, count, section)`, `in_range(lo, hi, section)`, `find(regex, section, type)`,
+  `plan_rename(pairs, force)`, `apply(plan, write=None)`, `plan_merge(rows, scan_refs)`, `check()` (duplicates, aliases,
+  unparsed). Line parser is `parse_line` (was `symedit.parse_line`); the write is `write_text` over `lib.text.Transaction`.
+  Non-negotiable 7 becomes structural: no API returns the file text.
+* `splits.py`: `Splits.parse(text)` / `render()` round-trip, byte for byte for every unedited block (`render_splits` was
+  already retired with the splits program, so there was no second renderer to absorb), `units`, `ranges`, `covering(section,
+  address) -> Range | None`, `claims(unit)`, `overlap(section, lo, hi)`, `add_block`, `rename_unit`, `remove_block`,
+  `text_ranges()`, `by_section()`, `by_unit()`; one return shape (`Range(unit, section, start, end, attrs)`).
+* `configure.py`: `Configure.load(path)` by **evaluating** `configure.py`'s AST, never importing it (WP1c: importing runs
+  argparse on the caller's argv and the build generator; the evaluator models the statements the file uses and is pinned
+  to the executed file by a smoke test): `objects()` (`Object(flag, path, **kw)` rows with their lib), `libs()`,
+  `cflags(group or lib)` with spreads, filters and appends resolved (one rule; `langcheck`, `backlog` and `infer` had three),
+  `matching_units()`, `object_line_text`; plus `object_calls(text)` for fragments (a diff line, a conflict side).
+* `ownership.py`: `Ownership(symbols, ranges, auto=None, root=None)` built by `load(root)` (map + splits, + dtk `config.json`
+  when `auto=True`) or `at_ref(root, ref, show=None)` (the two files at a ref, read through `lib.git`, or through the
+  caller's `show` - stylelint keeps its stubbed seam): `owner_of(section, address) -> Owner(state in {reconstructed,
+  registered, auto, unsplit}, unit, section, range, band)`, `resolve(name)`, `unit_of_symbol(name)`,
+  `symbols_of_unit(unit, section)`, `band_of(section, address)`. WP1c: the index is a value built from data rather than
+  `Ownership(tree, ref)`, because `stylelint` (and `land`'s base-side check) build it from texts they already hold;
+  `reconstructed` means "the unit's source exists", the vocabulary `callers`/`callees` used.
 * From: 24 + 18 + 14 parsers, `stylelint.Ownership`, `symbolpreflight`, `ledger.Objects`, `sharedfiles.parse_ranges`.
 
 ### `lib/binary/` - the bytes

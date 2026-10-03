@@ -37,6 +37,7 @@ scopes agree, and the phantom has no in-repo reference.  An already-merged row i
 plan's previous name is stale (a rename landed after `phantom.py` ran), the refusal names the symbol
 that actually ends at the phantom's address instead of guessing.
 """
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import os
 import re
@@ -54,6 +55,7 @@ for _p in (_UNITS, _TOOLS):
 
 import sharedfiles as sf  # noqa: E402  the one writer for shared files - docs/plan.md 7.12
 import unitutil as _uu  # noqa: E402  the invocation-tree resolver (`repo_root`)
+from tools.lib.project import symbols as _sym  # noqa: E402  the one map parser and the rename/merge planner
 
 # The tree a relative `--file` resolves against. `symedit` **writes** the map (rename/rename-batch), so a
 # MAIN-hardcoded root means a lane that invoked MAIN's copy from its own worktree renamed symbols *in MAIN*
@@ -61,37 +63,19 @@ import unitutil as _uu  # noqa: E402  the invocation-tree resolver (`repo_root`)
 # invocation-first resolver the other tools use (`git rev-parse --show-toplevel`, falling back to this
 # file's tree outside a worktree), so the map is the caller's tree's map.
 REPO = _uu.repo_root()
-LINE_RE = re.compile(r"^(?P<name>[^\s=]+)\s*=\s*(?P<loc>[^;]+);\s*(?://\s*(?P<comment>.*))?$")
-ADDR_RE = re.compile(r"^(?P<section>[.\w]+):(?:0x)?(?P<addr>[0-9a-fA-F]+)$")
+LINE_RE = _sym.LINE_RE
 
 
 def parse_line(line):
-    m = LINE_RE.match(line.rstrip("\n"))
-    if not m:
-        return None
-    loc = ADDR_RE.match(m.group("loc").strip())
-    if not loc:
-        return None
-    comment = m.group("comment") or ""
-    kind = re.search(r"type:(\S+)", comment)
-    size = re.search(r"size:(0x[0-9a-fA-F]+)", comment)
-    return {
-        "name": m.group("name"),
-        "section": loc.group("section"),
-        "address": int(loc.group("addr"), 16),
-        "type": kind.group(1) if kind else "",
-        "size": int(size.group(1), 16) if size else 0,
-        "line": line.rstrip("\n"),
-    }
+    """`lib.project.symbols.parse_line` as the dict this tool's importers read."""
+    e = _sym.parse_line(line)
+    return e.to_dict() if e else None
 
 
 def entries(path):
-    with open(path, "r", encoding="utf-8", errors="replace", newline="") as fh:
-        for i, line in enumerate(fh, 1):
-            e = parse_line(line)
-            if e:
-                e["lineno"] = i
-                yield e
+    """Every map row as a dict (with `lineno`), streamed."""
+    for e in _sym.SymbolMap(path).rows():
+        yield e.to_dict()
 
 
 def emit(items, as_json=False, limit=None):
@@ -108,16 +92,12 @@ def emit(items, as_json=False, limit=None):
 
 
 def cmd_find(a):
-    rx = re.compile(a.pattern)
-    hits = [e for e in entries(a.file)
-            if rx.search(e["name"]) and (not a.section or e["section"] == a.section)
-            and (not a.type or e["type"] == a.type)]
-    emit(hits, a.json, a.limit)
+    emit([e.to_dict() for e in _sym.SymbolMap(a.file).find(a.pattern, a.section, a.type)], a.json, a.limit)
 
 
 def cmd_show(a):
     want = set(a.names)
-    hits = [e for e in entries(a.file) if e["name"] in want]
+    hits = [e.to_dict() for e in _sym.SymbolMap(a.file).rows() if e.name in want]
     emit(hits, a.json)
     missing = want - {e["name"] for e in hits}
     if missing:
@@ -127,55 +107,19 @@ def cmd_show(a):
 
 
 def infer_section(rows, want, section=None):
-    """The section an `at` address belongs to, when `--section` does not name one.
-
-    `at <data address>` used to default to `.text`: a data address above the whole `.text` range landed
-    at the *end* of `.text` and the tracer got the last text rows, not the data rows the address is in
-    (the filed bug). The section is inferred from the map's own extents - the section whose [min, max]
-    contains the address, else the one with the symbol nearest to it - and an explicit `--section` is
-    never second-guessed.
-    """
-    if section or not rows:
-        return section or ".text"
-    extents: dict = {}
-    for e in rows:
-        r = extents.get(e["section"])
-        if r is None:
-            extents[e["section"]] = [e["address"], e["address"]]
-        else:
-            r[0] = min(r[0], e["address"])
-            r[1] = max(r[1], e["address"])
-    containing = [s for s, (lo, hi) in extents.items() if lo <= want <= hi]
-    if containing:
-        # a section that contains the address wins; the narrowest on the odd chance two overlap
-        return min(containing, key=lambda s: extents[s][1] - extents[s][0])
-
-    def distance(s):
-        lo, hi = extents[s]
-        return min(abs(want - lo), abs(want - hi))
-
-    return min(extents, key=distance)
+    """The section an `at` address belongs to when `--section` does not name one (`rows` are entry dicts)."""
+    return _sym.infer_section(((e["section"], e["address"]) for e in rows), want, section)
 
 
 def cmd_at(a):
     want = int(a.address, 0) if not re.fullmatch(r"[0-9a-fA-F]+", a.address) else int(a.address, 16)
-    rows = list(entries(a.file))
-    sec = infer_section(rows, want, a.section)
-    all_e = sorted((e for e in rows if e["section"] == sec), key=lambda e: e["address"])
-    idx = [i for i, e in enumerate(all_e) if e["address"] <= want]
-    centre = idx[-1] if idx else 0
-    lo = max(0, centre - a.count)
-    emit(all_e[lo:centre + a.count + 1], a.json)
+    emit([e.to_dict() for e in _sym.SymbolMap(a.file).at(want, a.count, a.section)], a.json)
     return 0
 
 
 def cmd_range(a):
-    lo = int(a.start, 0)
-    hi = int(a.end, 0)
-    hits = [e for e in entries(a.file)
-            if lo <= e["address"] < hi and (not a.section or e["section"] == a.section)]
-    hits.sort(key=lambda e: e["address"])
-    emit(hits, a.json, a.limit)
+    hits = _sym.SymbolMap(a.file).in_range(int(a.start, 0), int(a.end, 0), a.section)
+    emit([e.to_dict() for e in hits], a.json, a.limit)
     return 0
 
 
@@ -296,279 +240,68 @@ def cmd_refs(a):
 
 
 def cmd_check(a):
-    seen_name, seen_addr, bad, aliases = {}, {}, [], 0
-    for e in entries(a.file):
-        seen_name.setdefault(e["name"], []).append(e)
-        seen_addr.setdefault((e["section"], e["address"]), []).append(e)
-    for name, es in seen_name.items():
-        if len(es) > 1:
-            bad.append("duplicate name %s at lines %s" % (name, [e["lineno"] for e in es]))
-    for (sec, addr), es in seen_addr.items():
-        if len(es) > 1:
-            # several names at one address is normal in a dtk map (label aliases)
-            aliases += 1
-    with open(a.file, "r", encoding="utf-8", errors="replace", newline="") as fh:
-        for i, line in enumerate(fh, 1):
-            if line.strip() and not line.startswith(("#", "//")) and not parse_line(line):
-                bad.append("unparsed line %d: %s" % (i, line.strip()[:100]))
+    res = _sym.SymbolMap(a.file).check()
+    bad = ["duplicate name %s at lines %s" % (name, list(lines)) for name, lines in res.duplicates]
+    bad += ["unparsed line %d: %s" % (i, text) for i, text in res.unparsed]
     if bad:
         print("\n".join(bad[:a.limit]))
-        print("%d problem(s), %d address alias group(s)" % (len(bad), aliases))
+        print("%d problem(s), %d address alias group(s)" % (len(bad), res.aliases))
         return 1
     print("%s: %d symbols, no duplicate names, all lines parse (%d address alias group(s))"
-          % (a.file, len(seen_name), aliases))
+          % (a.file, res.symbols, res.aliases))
     return 0
 
 
+def _lib_call(fn, *args, **kwargs):
+    """Run a `lib.project.symbols` planner with this tool's exit: a refusal is `SystemExit(message)` (a shape
+    failure stays `ShapeError`, which is a `lib.text.AnchorError`)."""
+    try:
+        return fn(*args, **kwargs)
+    except _sym.Refused as exc:
+        raise SystemExit(str(exc))
+
+
 def _rewrite_line(line, old, new):
-    """The name token of one definition line, replaced - or `sf.AnchorError` if it is not that shape.
-
-    This is the shape gate: the line must parse as a map line naming `old`, and the rewrite must yield
-a line that parses back as `new`.  Anything else raises before a byte is written, so a rename can
-never silently change nothing.
-    """
-    if not LINE_RE.match(line) or not parse_line(line):
-        raise sf.AnchorError("line %r is not a map line" % line[:80])
-    out = re.sub(r"^%s(\s*=)" % re.escape(old), lambda m: new + m.group(1), line, count=1)
-    if out == line:
-        raise sf.AnchorError("line %r does not start with the name %r" % (line[:80], old))
-    if (parse_line(out) or {}).get("name") != new:
-        raise sf.AnchorError("rewriting %r did not name %r" % (line[:80], new))
-    return out
-
-
-def _definitions(lines):
-    """name -> the indices of the lines that define it, by parsed shape (never by substring)."""
-    out = {}
-    for i, line in enumerate(lines):
-        e = parse_line(line)
-        if e:
-            out.setdefault(e["name"], []).append(i)
-    return out
-
-
-def _names_at_two_addresses(lines, names):
-    """The `names` that appear at more than one (section, address) - the duplicate the map forbids."""
-    seen = {}
-    for line in lines:
-        e = parse_line(line)
-        if e and e["name"] in names:
-            seen.setdefault(e["name"], set()).add((e["section"], e["address"]))
-    return {n: sorted(a) for n, a in seen.items() if len(a) > 1}
+    """The name token of one definition line, replaced - or `sf.AnchorError` if it is not that shape."""
+    return _lib_call(_sym.rewrite_name, line, old, new)
 
 
 def plan_rename(path, pairs, force=False):
-    """Read the map and plan a batch of renames - no write, every gate runs here.
-
-    Returns `(text, nl, lines, changed, applied)`: `changed` is `(old, new, index, new_line)` for the
-    edits to make and `applied` the pairs whose rename is already in the file (the idempotent no-op).
-    A pair whose `old` is absent *and* whose `new` is absent is a typo, not a re-apply, and is refused;
-    so is a rename that would put one name at two addresses.
-    """
-    text = sf.read_text(path)
-    nl = sf.line_ending(text)
-    lines = text.split(nl)
-    defined = _definitions(lines)
-    changed, applied, used = [], [], set()
-    for old, new in pairs:
-        if old == new:
-            applied.append((old, new))
-            continue
-        hits = defined.get(old, [])
-        if not hits:
-            if new in defined:
-                applied.append((old, new))          # the rename is already in the file
-                continue
-            raise SystemExit("refusing: %s is not defined in %s" % (old, path))
-        if new in defined and not force:
-            raise SystemExit("refusing: %s is already defined in %s (use --force)" % (new, path))
-        if not re.fullmatch(r"[A-Za-z_][\w.$]*", new):
-            raise SystemExit("refusing: %s is not a valid symbol name" % new)
-        if len(hits) != 1:
-            raise SystemExit("refusing: %s is defined %d times" % (old, len(hits)))
-        i = hits[0]
-        if i in used:
-            raise SystemExit("refusing: %s appears twice in the batch" % old)
-        if sf.missing_anchors(text, [lines[i]]):
-            raise sf.AnchorError("refusing: the %s definition line is not in %s" % (old, path))
-        changed.append((old, new, i, _rewrite_line(lines[i], old, new)))
-        used.add(i)
-    if changed:
-        planned = list(lines)
-        for _old, _new, i, new_line in changed:
-            planned[i] = new_line
-        dupes = _names_at_two_addresses(planned, {new for _old, new, _i, _l in changed})
-        if dupes:
-            name = sorted(dupes)[0]
-            (s1, a1), (s2, a2) = dupes[name][0], dupes[name][1]
-            raise SystemExit("refusing: %s would be defined at two addresses (%s:0x%08X, %s:0x%08X)"
-                             % (name, s1, a1, s2, a2))
-    return text, nl, lines, changed, applied
+    """Plan a batch of renames (no write): `(text, nl, lines, changed, applied)`, `changed` being
+    `(old, new, index, new_line)` - `lib.project.symbols.SymbolMap.plan_rename` with this tool's exits."""
+    plan = _lib_call(_sym.SymbolMap(path).plan_rename, pairs, force)
+    return plan.text, plan.newline, list(plan.lines), list(plan.changed), list(plan.applied)
 
 
 def _write_text(path, text, rename=None):
-    """Write through the shared-file transaction; a failure restores the previous bytes exactly."""
-    path = Path(path)
-    tx = sf.Transaction(rename=rename)
-    try:
-        tx.write(path, text)
-        if sf.read_text(path) != text:              # the bytes on disk are the ones we planned
-            raise IOError("verification failed: %s does not hold what was written" % path)
-    except BaseException:
-        tx.rollback()
-        raise
-    finally:
-        tx.cleanup()
+    """Write through the verified transaction (`lib.project.symbols.write_text`); a failure restores the bytes."""
+    _sym.write_text(path, text, rename)
 
 
 def apply_rename(path, nl, lines, changed):
     """Apply the planned edits and write once, in the file's own line ending."""
-    if not changed:
-        return
-    for _old, _new, i, new_line in changed:
-        lines[i] = new_line
-    _write_text(path, nl.join(lines))
-
-
-def _scope(line):
-    """The `scope:` token of a map line, or `""` - a merge must not change a symbol's scope."""
-    m = re.search(r"scope:(\S+)", line)
-    return m.group(1) if m else ""
+    plan = _sym.RenamePlan(str(path), "", nl, tuple(lines), tuple(changed), ())
+    if plan.changed:
+        _write_text(path, plan.render())
 
 
 def _resize_line(line, name, new_size):
-    """The `size:` field of one definition line, set to `new_size` - or `sf.AnchorError`.
-
-    The merge's shape gate: the line must parse as a map line naming `name` and carry a positive
-    `size:` field, and the rewrite must parse back with the new size.  Anything else raises before a
-    byte is written, so a merge can never silently grow the wrong line.  The digits are written the
-    way the map writes them (upper case, as dtk does).
-    """
-    e = parse_line(line)
-    if not e or e["name"] != name:
-        raise sf.AnchorError("line %r is not the definition of %r" % (line[:80], name))
-    if e["size"] <= 0:
-        raise sf.AnchorError("line %r has no size: field to grow" % line[:80])
-    out = re.sub(r"size:0x[0-9a-fA-F]+", "size:0x%X" % new_size, line, count=1)
-    if out == line:
-        raise sf.AnchorError("line %r has no size: field to grow" % line[:80])
-    e2 = parse_line(out)
-    if not e2 or e2["name"] != name or e2["size"] != new_size:
-        raise sf.AnchorError("rewriting %r did not set size:0x%X" % (line[:80], new_size))
-    return out
-
-
-def _ending_at(lines, address):
-    """`name (size:0xN)` for every symbol whose declared end is exactly `address`.
-
-    The stale-plan hint: when the batch names a previous symbol the map no longer has, the symbol that
-    actually ends at the phantom's address is what a rename pass turned it into.
-    """
-    out = []
-    for line in lines:
-        e = parse_line(line)
-        if e and e["size"] and e["address"] + e["size"] == address:
-            out.append("%s (size:0x%X)" % (e["name"], e["size"]))
-    return out
+    """The `size:` field of one definition line, set to `new_size` - or `sf.AnchorError`."""
+    return _lib_call(_sym.resize, line, name, new_size)
 
 
 def plan_merge(path, rows, scan_refs=None):
-    """Read the map and plan a batch of phantom merges - no write, every gate runs here.
-
-    `rows` is `(phantom, previous, new_size)` in ascending address order.  A merge grows `previous` to
-    `new_size` and deletes `phantom`'s line, so the plan refuses - before any write - unless the two
-    are defined exactly once each, in the same section, with the previous symbol ending exactly at the
-    phantom's address, no other name at that address, the stated size being exactly the previous size
-    plus the phantom's, matching scope, and no reference to the phantom in `scan_refs`' result.
-
-    Returns `(text, nl, lines, grown, deleted, applied)`: `grown` is `index -> new line`, `deleted`
-    the indices to drop, and `applied` the rows already merged (the idempotent no-op).  A row whose
-    phantom is absent *and* whose previous already carries `new_size` is the re-apply; a row whose
-    phantom is absent but whose previous still has the old size is a half-applied plan and is refused.
-    """
-    text = sf.read_text(path)
-    nl = sf.line_ending(text)
-    lines = text.split(nl)
-    defined = _definitions(lines)
-    by_addr = {}
-    for line in lines:
-        e = parse_line(line)
-        if e:
-            by_addr.setdefault((e["section"], e["address"]), []).append(e["name"])
-    refs = scan_refs([r[0] for r in rows]) if scan_refs else {}
-    grown, deleted, applied = {}, [], []
-    used = set()
-    for phantom, previous, new_size in rows:
-        if phantom == previous:
-            raise SystemExit("refusing: %s is its own previous symbol" % phantom)
-        for name in (phantom, previous):
-            if name in used:
-                raise SystemExit("refusing: %s appears twice in the batch" % name)
-            used.add(name)
-        ph_hits, pv_hits = defined.get(phantom, []), defined.get(previous, [])
-        if not ph_hits:
-            if not pv_hits:
-                raise SystemExit("refusing: neither %s nor %s is defined in %s"
-                                 % (phantom, previous, path))
-            if len(pv_hits) != 1:
-                raise SystemExit("refusing: %s is defined %d times" % (previous, len(pv_hits)))
-            e = parse_line(lines[pv_hits[0]])
-            if e["size"] == new_size:
-                applied.append((phantom, previous, new_size))
-                continue
-            raise SystemExit("refusing: %s is absent but %s has size:0x%X, not the planned 0x%X"
-                             % (phantom, previous, e["size"], new_size))
-        if len(ph_hits) != 1:
-            raise SystemExit("refusing: %s is defined %d times" % (phantom, len(ph_hits)))
-        ph = parse_line(lines[ph_hits[0]])
-        if not pv_hits:
-            cands = _ending_at(lines, ph["address"])
-            hint = ("; the symbol ending at 0x%08X is %s - the plan may be stale after a rename"
-                    % (ph["address"], ", ".join(cands[:3]))) if cands else ""
-            raise SystemExit("refusing: %s is not defined in %s%s" % (previous, path, hint))
-        if len(pv_hits) != 1:
-            raise SystemExit("refusing: %s is defined %d times" % (previous, len(pv_hits)))
-        pv = parse_line(lines[pv_hits[0]])
-        if ph["section"] != pv["section"]:
-            raise SystemExit("refusing: %s is in %s but %s is in %s"
-                             % (phantom, ph["section"], previous, pv["section"]))
-        if pv["address"] + pv["size"] != ph["address"]:
-            raise SystemExit("refusing: %s ends at 0x%08X, not at %s's 0x%08X"
-                             % (previous, pv["address"] + pv["size"], phantom, ph["address"]))
-        if pv["size"] + ph["size"] != new_size:
-            raise SystemExit("refusing: 0x%X (the plan) is not 0x%X + 0x%X (%s + %s)"
-                             % (new_size, pv["size"], ph["size"], previous, phantom))
-        if ph["size"] <= 0:
-            raise SystemExit("refusing: %s has no size to merge" % phantom)
-        if ph["type"] != "function" or pv["type"] != "function":
-            raise SystemExit("refusing: %s and %s are not both type:function" % (previous, phantom))
-        if _scope(lines[ph_hits[0]]) != _scope(lines[pv_hits[0]]):
-            raise SystemExit("refusing: %s and %s disagree on scope" % (previous, phantom))
-        aliases = [n for n in by_addr.get((ph["section"], ph["address"]), []) if n != phantom]
-        if aliases:
-            raise SystemExit("refusing: %s shares its address with %s"
-                             % (phantom, ", ".join(sorted(aliases)[:3])))
-        hits = refs.get(phantom) or []
-        if hits:
-            rel, lineno, txt = hits[0]
-            raise SystemExit("refusing: %s is referenced at %s:%d (%s)"
-                             % (phantom, rel, lineno, txt))
-        if ph_hits[0] in grown:
-            raise SystemExit("refusing: %s is another row's grown symbol" % phantom)
-        grown[pv_hits[0]] = _resize_line(lines[pv_hits[0]], previous, new_size)
-        deleted.append(ph_hits[0])
-    if set(deleted) & set(grown):
-        raise SystemExit("refusing: a line is both grown and deleted")
-    return text, nl, lines, grown, deleted, applied
+    """Plan a batch of phantom merges (no write): `(text, nl, lines, grown, deleted, applied)`, `grown` being
+    `index -> new line` - `lib.project.symbols.SymbolMap.plan_merge` with this tool's exits."""
+    plan = _lib_call(_sym.SymbolMap(path).plan_merge, rows, scan_refs)
+    return plan.text, plan.newline, list(plan.lines), dict(plan.grown), list(plan.deleted), list(plan.applied)
 
 
 def apply_merge(path, nl, lines, grown, deleted):
     """Apply the planned growths and deletions and write once, in the file's own line ending."""
-    if not grown and not deleted:
-        return
-    drop = set(deleted)
-    out = [grown.get(i, line) for i, line in enumerate(lines) if i not in drop]
-    _write_text(path, nl.join(out))
+    plan = _sym.MergePlan(str(path), "", nl, tuple(lines), dict(grown), tuple(deleted))
+    if plan.changed:
+        _write_text(path, plan.render())
 
 
 def merge(a, rows):
