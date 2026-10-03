@@ -26,6 +26,7 @@ they select the compiler version and `-lang=c++`; they are not a claim about the
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import json
@@ -34,6 +35,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from tools.lib import names as libnames
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
@@ -98,86 +100,11 @@ def mangle(snippet: str, unit_spec: str | None = None, verbose: bool = False,
 # class/struct/enum name (`<len><Name>`), and a shape it cannot spell (a function pointer, an array, a
 # repeated class type that the compiler folds into a `T`/`N` back-reference) returns None instead of a guess.
 # `mangle()` above is the exact answer (it compiles); call it to confirm before a map row is renamed.
-_PRIMITIVE_CODES = {
-    "u8": "Uc", "s8": "Sc", "u16": "Us", "s16": "s", "u32": "Ul", "s32": "l", "u64": "Ux", "s64": "x",
-    "f32": "f", "f64": "d", "BOOL": "i", "int": "i", "char": "c", "short": "s", "long": "l",
-    "float": "f", "double": "d", "bool": "b", "void": "v",
-    "unsigned char": "Uc", "signed char": "Sc", "unsigned short": "Us", "unsigned int": "Ui",
-    "unsigned": "Ui", "unsigned long": "Ul", "long long": "x", "unsigned long long": "Ux",
-    "short int": "s", "long int": "l", "unsigned short int": "Us", "unsigned long int": "Ul",
-}
-_QUALIFIERS = {"const", "volatile", "register", "struct", "class", "enum"}
-
-
-def _param_code(text: str) -> str | None:
-    """The mangling of one parameter declaration (`const u8* data`), or None when it cannot be spelled."""
-    t = text.split("=")[0].strip()
-    if not t or "(" in t or "[" in t or "::" in t or "<" in t or "..." in t:
-        return None
-    toks = re.findall(r"[A-Za-z_]\w*|\*|&", t)
-    # split the declaration into the base words and the declarator levels (`*`/`&`, each with its own const)
-    base: list[str] = []
-    base_const = False
-    levels: list[list] = []          # [char, const]
-    seen_decl = False
-    for tok in toks:
-        if tok in ("*", "&"):
-            levels.append([tok, False])
-            seen_decl = True
-        elif tok in ("const", "volatile"):
-            if levels:
-                levels[-1][1] = levels[-1][1] or tok == "const"
-            elif tok == "const":
-                base_const = True
-        elif tok in _QUALIFIERS:
-            continue
-        elif not seen_decl:
-            base.append(tok)
-        # an identifier after the declarators is the parameter's name
-    words = base[:]
-    prim = _PRIMITIVE_CODES.get(" ".join(words))
-    if prim is None and len(words) >= 2:
-        # the last word may be the parameter's own name (`s32 size`, `unsigned char c`)
-        prim = _PRIMITIVE_CODES.get(" ".join(words[:-1]))
-        if prim is not None or not levels:
-            words = words[:-1]
-    if prim is None:
-        if len(words) != 1:
-            return None
-        prim = "%d%s" % (len(words[0]), words[0])
-    code = ("C" if base_const else "") + prim
-    for ch, const in levels:
-        code = ("C" if const else "") + ("P" if ch == "*" else "R") + code
-    return code
-
-
-def estimate_member_mangling(type_name: str, method: str, rest_params: list[str],
-                             const_self: bool = False) -> str | None:
-    """`method__<len>Type[C]F<params>` for `Type::method(rest_params...)`, or None when it cannot be spelled.
-
-    `rest_params` is the parameter list **without** the `self`. An empty list (or a lone `void`) is `Fv`.
-    A class-typed parameter that repeats an earlier one is refused (the compiler back-references it).
-    """
-    params = [p.strip() for p in rest_params if p.strip() and p.strip() != "void"]
-    codes: list[str] = []
-    for p in params:
-        c = _param_code(p)
-        if c is None:
-            return None
-        if any(ch.isdigit() for ch in c) and c in codes:
-            return None              # a repeated class type is folded by the compiler: do not guess
-        codes.append(c)
-    return "%s__%d%s%sF%s" % (method, len(type_name), type_name, "C" if const_self else "",
-                              "".join(codes) if codes else "v")
-
-
-def estimate_static_mangling(type_name: str, method: str, params: list[str]) -> str | None:
-    """`method__<len>TypeF<params>` for `static Type::method(params...)`.
-
-    A static member has no `this` and no cv-qualifier on the class, so the mangling is the non-const member
-    one over the full parameter list (`getInstance__20GameSpyInterfaceThreadFv`).
-    """
-    return estimate_member_mangling(type_name, method, params, const_self=False)
+_PRIMITIVE_CODES = libnames.PRIMITIVE_CODES
+_QUALIFIERS = libnames.QUALIFIERS
+_param_code = libnames.param_code
+estimate_member_mangling = libnames.estimate_member_mangling
+estimate_static_mangling = libnames.estimate_static_mangling
 
 
 def rename_command(old: str, new: str) -> str:

@@ -163,6 +163,7 @@ The ordering to prefer is still `record-base` on a clean tree *before* applying 
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import contextlib
@@ -174,6 +175,8 @@ import subprocess
 import sys
 import tempfile
 import time
+from tools.lib.git import Git
+from tools.lib import proc
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 #: The repository the tools layer lives in.  `land` always works on MAIN (`rc.main_root`, walked from
@@ -302,11 +305,11 @@ def failure_summary(checks: list, prefix: str = "REFUSING to build or stage anyt
 
 
 def run(args: list[str], cwd: str) -> subprocess.CompletedProcess:
-    return subprocess.run(args, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    return proc.run(args, cwd=cwd)
 
 
 def git(args: list[str], cwd: str, check: bool = True) -> str:
-    p = run(["git", *args], cwd)
+    p = Git(cwd).run(*args)
     if check and p.returncode != 0:
         raise SystemExit("git %s failed in %s: %s" % (" ".join(args), cwd, p.stderr.strip()))
     return p.stdout

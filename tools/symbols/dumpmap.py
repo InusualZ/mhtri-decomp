@@ -42,6 +42,7 @@ truth and a rename is two edits (symbols.txt + the source) through `tools/symbol
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import collections
@@ -50,6 +51,7 @@ import os
 import re
 import sys
 import zipfile
+from tools.lib import names as libnames
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
@@ -67,16 +69,12 @@ FUN_RE = re.compile(r"^FUN_[0-9a-fA-F]{6,8}$")
 # `s_<text>_<addr>` and `u_MonsterHunter3_8056f4a0` carry more than the address.
 GHIDRA_RE = re.compile(r"^(?:word|byte|dword|qword|u|s|FLOAT|DOUBLE|BOOL|BYTE|switchdataD|switchdata"
                        r"|DAT|PTR|LAB|UNK|off|field|zz|FUN)_[0-9a-fA-F]{6,8}_?$")
-# A name dtk/the map generated from the address, not one a human chose.
-GENERATED_RE = re.compile(r"^(?:fn_|lbl_|dtor_|FUN_|sub_|loc_|@etb_|@eti_)[0-9A-Fa-f]{6,8}$"
-                          r"|^(?:unk|unk_)[0-9A-Fa-f]+$")
 # The character set symbols.txt actually uses (plus a leading `$`, which MWCC emits).
 USABLE_RE = re.compile(r"^[A-Za-z_$][A-Za-z0-9_$]*$")
 
 
 def is_generated(name: str) -> bool:
-    """True for a name the tooling made out of the address (`fn_8004054C`, `lbl_8057C82C`)."""
-    return bool(GENERATED_RE.match(name))
+    return libnames.is_generated(name, "map")
 
 
 def base_name(name: str) -> str:

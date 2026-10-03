@@ -52,6 +52,7 @@ make it a one-command answer rather than a reassurance:
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import json
@@ -61,6 +62,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+from tools.lib import names as libnames
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOOLS = os.path.dirname(HERE)
@@ -75,9 +77,6 @@ from units import stylelint as sl  # noqa: E402  (the Ownership index the lint u
 import symedit  # noqa: E402  (the bounded, classified in-repo reference scan)
 
 CODE_SECTIONS = (".text", ".init")
-# The spellings rule 7 fires on: dtk's stems for an unrenamed function/data label. `loc_` is absent from
-# this map today but is dtk's third stem (other modules carry it), so it is matched, not omitted.
-GENERATED_RE = re.compile(r"^(?:fn|lbl|loc)_[0-9A-Fa-f]+$")
 CALL_TYPES = (10,)          # R_PPC_REL24 - the `bl` form (what a C call compiles to)
 # Which symbol the *target* object's relocation names; MWCC also emits 109 (EABI SDA21) for pool loads.
 DISASM_HEADER_RE = re.compile(r"^#\s+([.\w]+):0x([0-9A-Fa-f]+)\s+\|\s+0x([0-9A-Fa-f]+)\s+\|")
@@ -85,8 +84,7 @@ DISASM_INSN_RE = re.compile(r"^/\*\s+([0-9A-Fa-f]{8})\s+([0-9A-Fa-f ]+?)\s*\*/\s
 
 
 def is_generated(name):
-    """Whether `name` is one of rule 7's generated spellings (`fn_XXXXXXXX` / `lbl_...` / `loc_...`)."""
-    return bool(name) and bool(GENERATED_RE.match(name))
+    return libnames.is_generated(name, "rule7")
 
 
 # --------------------------------------------------------------------------------------------------

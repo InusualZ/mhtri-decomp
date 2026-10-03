@@ -106,6 +106,7 @@ costing a full `rm -rf build/RMHE08` rebuild):
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import io
@@ -118,6 +119,7 @@ import sys
 import tarfile
 import tempfile
 import time
+from tools.lib.git import Git
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
@@ -394,7 +396,7 @@ def run_label(run: dict) -> str:
 
 
 def git(args: list[str], cwd: str, check: bool = True) -> str:
-    p = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    p = Git(cwd).run(*args)
     if check and p.returncode != 0:
         raise SystemExit("git %s failed in %s: %s" % (" ".join(args), cwd, p.stderr.strip()))
     return (p.stdout or "").strip()
@@ -1264,8 +1266,7 @@ def merge_tree_of(main: str, ref: str) -> str | None:
     The free test the held-branch audit uses (CLAUDE.md): it touches no worktree and no index, so it is safe
     to run on a slot that is still checked out.  A conflict (nonzero exit) or anything unparseable is None.
     """
-    p = subprocess.run(["git", "merge-tree", "--write-tree", "main", ref], cwd=main, capture_output=True,
-                       text=True, encoding="utf-8", errors="replace")
+    p = Git(main).merge_tree("main", ref)
     return _merge_tree_oid(p.returncode, p.stdout)
 
 

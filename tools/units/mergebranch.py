@@ -64,6 +64,7 @@ registration) plus the affected units' compile, which is the only check that see
 object.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import contextlib
@@ -74,6 +75,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from tools.lib.git import Git
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO_TOOLS = os.path.dirname(HERE)                       # tools/
@@ -114,8 +116,7 @@ SPLITS_TEXT = re.compile(r"^\s*\.text\s+start:(0x[0-9A-Fa-f]+)\s+end:(0x[0-9A-Fa
 # git plumbing (bytes in / bytes out: a merge must never re-encode a file)
 # ---------------------------------------------------------------------------------------------------
 def git(root: str, *args: str, check: bool = False) -> str:
-    p = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True,
-                       encoding="utf-8", errors="replace")
+    p = Git(root).run(*args)
     if check and p.returncode != 0:
         raise SystemExit("git %s failed: %s" % (" ".join(args), (p.stderr or p.stdout).strip()[:300]))
     return p.stdout if p.returncode == 0 else ""
@@ -123,8 +124,7 @@ def git(root: str, *args: str, check: bool = False) -> str:
 
 def blob(root: str, ref: str, path: str) -> bytes | None:
     """A path's exact bytes at a ref, or None when the ref does not carry it (added/deleted)."""
-    p = subprocess.run(["git", "show", "%s:%s" % (ref, path)], cwd=root, capture_output=True)
-    return p.stdout if p.returncode == 0 else None
+    return Git(root).show(ref, path)
 
 
 def merge_head_path(root: str) -> str:

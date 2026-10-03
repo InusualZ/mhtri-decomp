@@ -14,6 +14,9 @@ The tools listed under this concept in `docs/tools/README.md`.
 * `FixtureTree(tmp)`: `configure.py`, `config/RMHE08/{symbols,splits}.txt`, `src/`, `include/`, `build/RMHE08/{obj,src}/` objects from `ElfBuilder`, `report.json`, optional asm dump; `add_unit`, `add_symbol`, `claim`; created outside the repository
 * `GitFixture(tmp)`: `init`, `commit`, `branch`, `worktree`, `conflict`
 * `TIER = 'fixture' | 'smoke'`; under `fixture`, `lib.repo.repo_root()` without `start=` raises
+* `assert_live_allowed(what)`, `assert_path_allowed(path, what)` (raises only for a path inside the live tree): the seams
+  `lib.repo` calls; `refusals_expected()` - a `with` block whose refusals are the point of a test OF the guard, so they do
+  not fail the run
 
 ## Absorbs (today's implementations)
 
@@ -28,6 +31,11 @@ Tier: fixture (a lib test never reads the live tree). the harness tests itself: 
 Implemented in WP0 (`docs/tools/wp0-report.md`). Open:
 
 * `FixtureTree.add_object` takes raw bytes until `lib.binary.build.ElfBuilder` exists (WP1b).
-* `lib.repo.repo_root()` does not exist yet; WP1a makes it call `testing.assert_live_allowed(...)` when `start` is None.
 * The audit-hook guard cannot see `os.stat`/`os.path.exists` or anything a module does at import time (before `run()`).
+  WP1a closed the part of this that matters: `lib.repo` is the choke point (every root it resolves or is handed goes
+  through `assert_path_allowed`, and `repo_root()` without `start=` raises), and `unitutil.ROOT` resolves on first use, so
+  importing a tool never resolves the live tree. A tool with its own module-level `ROOT = dirname(...)` constant is still
+  invisible until its package removes the constant (`lib-repo.md`, Known gaps).
+* On Windows the `subprocess.Popen` audit event carries the command line as one string; WP0's argv check treated it as one
+  path and so never refused a live path given to a child. The hook now splits it back into tokens (WP1a).
 * `GitFixture.conflict(path, a, b, base, names)` takes the file and both texts, not two branches.

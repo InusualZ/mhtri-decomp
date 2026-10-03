@@ -41,6 +41,7 @@ the pane pins the worktree as its cwd on Windows (docs/plan.md 5.1).
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import hashlib
@@ -52,6 +53,7 @@ import struct
 import subprocess
 import sys
 import time
+from tools.lib.git import Git
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
@@ -82,7 +84,7 @@ PANE_READ_LINES = 40
 
 
 def git(args: list[str], cwd: str, check: bool = True) -> str:
-    out = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    out = Git(cwd).run(*args)
     if check and out.returncode != 0:
         raise SystemExit("git %s failed in %s: %s" % (" ".join(args), cwd, out.stderr.strip()))
     return out.stdout
@@ -998,7 +1000,7 @@ def load_ack(main: str, unit: str) -> dict:
 
 def _git_quiet(args: list[str], cwd: str) -> str | None:
     """`git <args>`'s stripped stdout, or `None` when git fails (a temp dir in the selftests, no repo)."""
-    p = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    p = Git(cwd).run(*args)
     return p.stdout.strip() if p.returncode == 0 else None
 
 

@@ -61,7 +61,6 @@
   "tools/rso/inventory.py -> tools/unitutil.py",
   "tools/rso/symbols.py -> tools/rso/inventory.py",
   "tools/rso/symbols.py -> tools/unitutil.py",
-  "tools/selftest_site/sitecustomize.py -> tools/spawnretry.py",
   "tools/spawnretry_selftest.py -> tools/spawnretry.py",
   "tools/splits/dataorder.py -> tools/splits/tudiscover.py",
   "tools/splits/dataorder.py -> tools/units/dataseams.py",
@@ -257,7 +256,6 @@
   "tools/units/vtslot_selftest.py -> tools/units/vtableaudit.py",
   "tools/units/vtslot_selftest.py -> tools/units/vtslot.py",
   "tools/units/worktreehook.py -> tools/units/slots.py",
-  "tools/unitutil.py -> tools/spawnretry.py",
   "tools/unitutil_selftest.py -> tools/unitutil.py"
  ]
 }

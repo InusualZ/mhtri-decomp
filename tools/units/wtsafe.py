@@ -22,6 +22,7 @@ junction's target, while Python's `shutil.rmtree` unlinks reparse points and lea
     python tools/units/wtsafe.py --selftest
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import hashlib
@@ -31,6 +32,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from tools.lib.git import Git
+from tools.lib import repo as librepo
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CONFIG = os.path.join("config", "RMHE08", "config.yml")
@@ -121,22 +124,7 @@ def sha1(path: str) -> str:
 
 
 def ground_truth(repo: str | None = None) -> dict[str, str]:
-    """The pinned original-file hashes, taken from `config.yml` so there is one source of truth.
-
-    `hash` pins the DOL and `selfile_hash` the RSO selfile; both are dtk's own verification fields, so a
-    file that fails them was never the one this project builds from.  `repo` defaults to the main worktree,
-    which is the tree the pins describe and the one a bad worktree removal damages.
-    """
-    repo = repo or main_worktree()
-    cfg = os.path.join(repo, CONFIG)
-    text = open(cfg, encoding="utf-8", errors="replace").read()
-    out = {}
-    for key, rel in (("hash", "orig/RMHE08/sys/main.dol"),
-                     ("selfile_hash", "orig/RMHE08/files/mh3.sel")):
-        m = re.search(r"^%s:\s*([0-9A-Fa-f]{40})\s*$" % key, text, re.M)
-        if m:
-            out[rel] = m.group(1).lower()
-    return out
+    return librepo.ground_truth(repo or main_worktree())
 
 
 def verify_orig(repo: str | None = None, want: dict[str, str] | None = None) -> list[tuple[str, str, str]]:
@@ -174,7 +162,7 @@ def _make_junction(link: str, target: str) -> bool:
 
 
 def _git(args: list[str], cwd: str) -> None:
-    subprocess.run(["git"] + args, cwd=cwd, check=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    Git(cwd).run(*args)
 
 
 def _junction_roundtrip(tmp: str) -> tuple[bool, bool] | None:

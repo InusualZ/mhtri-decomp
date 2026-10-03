@@ -49,11 +49,13 @@ Run it from MAIN (`docs/plan.md` is the authority there); the selftest runs the 
 and on the real tree.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import os
 import re
 import sys
+from tools.lib import text as libtext
 
 # the block carries the plan's text verbatim (em dashes, `<=`, `>=`), and a Windows console is cp1252: without
 # this `--print` dies on the first such character while the file write (UTF-8) is fine
@@ -285,10 +287,7 @@ def to_lf(text):
 
 def write(path, lf_text, nl):
     """Write `lf_text` back with the file's dominant ending - never a half-CRLF file."""
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8", newline="") as fh:
-        fh.write(lf_text.replace("\n", nl) if nl != "\n" else lf_text)
-    os.replace(tmp, path)
+    libtext.atomic_write(path, libtext.with_ending(lf_text, nl))
 
 
 def check_profile(root, rel, block):

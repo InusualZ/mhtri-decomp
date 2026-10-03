@@ -45,18 +45,20 @@ restored and anything still dirty.  `--no-cleanup` keeps the old behaviour for a
 `land.py` passes the branch and the conflicted paths; with no paths it inspects `git ls-files -u`.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import os
 import subprocess
 import sys
 import tempfile
+from tools.lib.git import Git
 
 BASE = "main"
 
 
 def _git(cwd: str, *args: str) -> bytes:
-    p = subprocess.run(["git", *args], cwd=cwd, capture_output=True)
+    p = Git(cwd).run_bytes(*args)
     if p.returncode != 0:
         raise RuntimeError("git %s failed: %s" % (" ".join(args),
                                                   p.stderr.decode("utf-8", "replace").strip()))

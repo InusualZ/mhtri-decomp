@@ -43,6 +43,7 @@ exception (EXCEPTIONS below).
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import bisect
@@ -51,6 +52,7 @@ import os
 import posixpath
 import re
 import sys
+from tools.lib import names as libnames
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -142,26 +144,7 @@ def identifiers(text: str) -> set:
 
 
 def tokens_of_name(name: str) -> set:
-    """The identifier tokens a (possibly mangled) symbol name encodes.
-
-    MWCC's mangling length-prefixes each component (`Q34nw4r4math4VEC3`), so a plain identifier split
-    never sees `VEC3`. This peels every `<digits><exactly that many chars>` component, which is what makes
-    a map symbol like `Pl_get_gunner_pos__FP4_PLWQ34nw4r4math4VEC3l` count as a use of `VEC3`.
-    """
-    out = identifiers(name)
-    i, n = 0, len(name)
-    while i < n:
-        m = re.match(r"\d+", name[i:])
-        if m:
-            count = int(m.group(0))
-            j = i + len(m.group(0))
-            token = name[j:j + count]
-            if len(token) == count and re.match(r"[A-Za-z_]", token or " "):
-                out.add(token)
-                i = j + count
-                continue
-        i += 1
-    return out
+    return identifiers(name) | libnames.peel_tokens(name)
 
 
 def _match_brace(text: str, open_index: int) -> int:

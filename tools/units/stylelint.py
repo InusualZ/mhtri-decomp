@@ -134,6 +134,7 @@ never rule 12's.
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import collections
@@ -144,6 +145,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from tools.lib.git import Git
 
 SRC = "src"
 # The unsplit band (`include/unsplit/<module>.h`) is the legitimate home for a symbol with no registered
@@ -2569,14 +2571,14 @@ def added_detail_lines(detail: list[dict]) -> list[str]:
 
 
 def git(root: str, *args: str) -> str:
-    p = subprocess.run(["git", *args], cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    p = Git(root).run(*args)
     if p.returncode != 0:
         raise RuntimeError("git %s failed: %s" % (" ".join(args), (p.stderr or "").strip()))
     return p.stdout
 
 
 def git_bytes(root: str, *args: str) -> bytes:
-    p = subprocess.run(["git", *args], cwd=root, capture_output=True)
+    p = Git(root).run_bytes(*args)
     if p.returncode != 0:
         raise RuntimeError("git %s failed: %s" % (" ".join(args), p.stderr.decode("utf-8", "replace").strip()))
     return p.stdout
@@ -4595,11 +4597,7 @@ def _fork_point(root: str, branch: str) -> str | None:
     ancestor of HEAD by construction (it *is* HEAD), so `_resolve_diff_ref` returns the branch and the
     comparison would judge it against itself.
     """
-    p = subprocess.run(["git", "merge-base", "main", branch], cwd=root, capture_output=True, text=True,
-                       encoding="utf-8", errors="replace")
-    if p.returncode != 0:
-        return None
-    return (p.stdout or "").strip() or None
+    return Git(root).fork_point(branch)
 
 
 def _resolve_diff_ref(root: str, ref: str) -> str:

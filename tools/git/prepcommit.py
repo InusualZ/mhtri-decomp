@@ -19,12 +19,14 @@ commit for you and is only for when the user has explicitly asked for one.
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import json
 import os
 import subprocess
 import sys
+from tools.lib.git import Git
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -41,7 +43,7 @@ ORIGINAL_DOL = "orig/RMHE08/sys/main.dol"
 
 
 def git(*args: str, check: bool = True) -> str:
-    out = subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    out = Git(ROOT).run(*args)
     if check and out.returncode != 0:
         sys.exit(f"git {' '.join(args)} failed: {out.stderr.strip()}")
     return out.stdout

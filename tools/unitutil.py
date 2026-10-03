@@ -18,6 +18,7 @@ A *unit spec* is any of these spellings:
 The compile command is taken from ninja (`ninja -t commands <obj>`), i.e. it is the *exact* command
 line the build would run, including whatever `configure.py` put in that unit's `cflags`.
 """
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import atexit
 import json
 import os
@@ -25,15 +26,15 @@ import re
 import shutil
 import struct
 import subprocess
-import sys
 import tempfile
 import time
 from dataclasses import dataclass
 
-import spawnretry
+from tools.lib import proc as _proc
+from tools.lib import repo as _repo
 
 # a process launch Windows refuses transiently (WinError 5) is retried, for every tool that imports this module
-spawnretry.install()
+_proc.install_spawn_retry()
 
 
 def rmtree_retry(path: str, attempts: int = 8) -> None:
@@ -110,97 +111,46 @@ SOURCE_EXT = (".c", ".cc", ".cp", ".cpp", ".cxx", ".c++")
 
 
 def caller_worktree(start=None):
-    """The git worktree the *caller* is in, or None when git cannot say."""
-    try:
-        p = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=start or os.getcwd(),
-                           capture_output=True, text=True, encoding="utf-8", errors="replace")
-    except OSError:
-        return None
-    return (p.stdout or "").strip() or None if p.returncode == 0 else None
+    return _repo.caller_worktree(start)
 
 
 def _cwd_tree() -> str | None:
-    """`cwd` when it is itself a tree (has `configure.py`), else None - the non-git invocation case."""
-    try:
-        cwd = os.getcwd()
-    except OSError:
-        return None
-    return cwd if os.path.exists(os.path.join(cwd, "configure.py")) else None
+    return _repo.cwd_tree()
 
 
 def repo_root(start=None):
-    """The tree the tools should read: the **caller's** tree, else the tree this file lives in.
-
-    This used to be only the file's location, which silently read MAIN from inside a lane's worktree: a
-    tool invoked as `python <MAIN>/tools/objdiff/symdiff.py -u <unit>` with cwd in a worktree scored
-    MAIN's objects and printed MAIN's numbers - 0.91743 for a symbol the worktree's own build had at
-    100.0, which read as "the merge destroyed 67 functions". The invocation's tree is what the caller
-    means (`git rev-parse --show-toplevel`), and it is the same tree `recompile.py`/`measure.py` already
-    take their source, `-o` and `-i` order from. When there is no git worktree (a temp dir, a packaged
-    copy) the walk up to `configure.py` is unchanged, and an explicit `start` still roots the walk (the
-    lane/teardown helpers pass one) so a caller can name a tree unambiguously.
-
-    **A tree that is not a git worktree is named with `start`, or with `cwd`.**  A *fixture* (a fake
-    repository under the system temp, the shape every `*_selftest.py` here uses) is not a git worktree,
-    so `git rev-parse` answers nothing; before this, the walk then began at *this file's* directory and
-    silently resolved the real repository - the fixture was scored against the real build, which is why
-    `unitscore_selftest` had to `git init` its tree. Without `start`, the invocation's own tree is tried
-    first (its git worktree, else `cwd` **when `cwd` is a tree at all**), and only a cwd that is not a
-    tree falls back to this file's directory, so the packaged-copy case is unchanged. With `start`, the
-    walk begins there and never reaches this file's directory.
-    """
-    if start is not None:
-        d = os.path.abspath(start)
-    else:
-        top = caller_worktree() or _cwd_tree()
-        d = top or os.path.dirname(os.path.abspath(__file__))
-    while True:
-        if os.path.exists(os.path.join(d, "configure.py")):
-            return d
-        parent = os.path.dirname(d)
-        if parent == d:
-            raise SystemExit("repo root (configure.py) not found above %s" % (start or d))
-        d = parent
+    return _repo.repo_root(start)
 
 
-ROOT = repo_root()
+def _root():
+    """`ROOT`, resolved on first use (an assignment to `unitutil.ROOT` pins it) - spec lib-repo, gap 1."""
+    root = globals().get("ROOT")
+    if root is None:
+        root = globals()["ROOT"] = repo_root()
+    return root
+
+
+def __getattr__(name):
+    if name == "ROOT":
+        return _root()
+    if name == "OBJDIFF":
+        return _objdiff()
+    raise AttributeError("module %r has no attribute %r" % (__name__, name))
+
+
+def _serves(root) -> bool:
+    """Whether `root` is the tree the tools serve (`$MHTRI_MAIN` applies to it, never to a fixture)."""
+    return os.path.normcase(os.path.abspath(root)) == os.path.normcase(_root())
 
 
 def main_tree(root=None):
-    """MAIN, the primary checkout a worktree was cut from: `$MHTRI_MAIN` when it names a directory, else the parent of
-    `git rev-parse --git-common-dir`.  None when neither answers (a fixture, a non-git copy)."""
-    root = root or ROOT
-    env = os.environ.get("MHTRI_MAIN")
-    if env and os.path.isdir(env) and os.path.normcase(os.path.abspath(root)) == os.path.normcase(ROOT):
-        return os.path.abspath(env)                   # an explicit override, for the tree the tools serve (never a fixture root)
-    try:
-        out = subprocess.run(["git", "rev-parse", "--git-common-dir"], cwd=root, capture_output=True, text=True,
-                             encoding="utf-8", errors="replace", timeout=20).stdout.strip()
-    except (OSError, subprocess.SubprocessError):
-        return None
-    if not out:
-        return None
-    out = os.path.normpath(out if os.path.isabs(out) else os.path.join(root, out))
-    return os.path.dirname(out) if os.path.basename(out) == ".git" else None
+    root = root or _root()
+    return _repo.main_tree(root, honour_env=_serves(root))
 
 
 def resolve_input(rel, root=None, probe=os.path.exists):
-    """The path of a build/orig input: `rel` under the tree, else (read-only) under MAIN when the tree has none.
-
-    `orig/` and `build/` are not in a fresh worktree; a reader of the asm dump, the split objects or the original DOL
-    uses this instead of `ROOT/rel` so it reads MAIN's copy by path.  `probe(path)` says whether a candidate is usable
-    (default: exists).  When neither has it the tree's own path is returned, so the error names the tree's path.
-    Never use it for a path a tool WRITES."""
-    root = os.path.abspath(root or ROOT)
-    local = os.path.join(root, rel)
-    if probe(local):
-        return local
-    main = main_tree(root)
-    if main and os.path.normcase(os.path.abspath(main)) != os.path.normcase(root):
-        cand = os.path.join(main, rel)
-        if probe(cand):
-            return cand
-    return local
+    root = root or _root()
+    return _repo.resolve_input(rel, root, probe, honour_env=_serves(root))
 
 
 def warn_if_foreign_worktree() -> None:
@@ -214,9 +164,9 @@ def warn_if_foreign_worktree() -> None:
     path - it rewrites the source, the `-o` directory and the `-i` order to the caller's tree.
     """
     top = caller_worktree()
-    if top and os.path.normcase(os.path.abspath(top)) != os.path.normcase(os.path.abspath(ROOT)):
+    if top and os.path.normcase(os.path.abspath(top)) != os.path.normcase(os.path.abspath(_root())):
         print("note: this tool compiles %s - you are in %s, whose edits it cannot see. "
-              "Use tools/units/recompile.py to measure your own tree." % (ROOT, top), file=sys.stderr)
+              "Use tools/units/recompile.py to measure your own tree." % (_root(), top), file=sys.stderr)
 
 
 @dataclass
@@ -232,14 +182,14 @@ class Unit:
 
 
 def _versions(root=None):
-    build = os.path.join(root or ROOT, "build")
+    build = os.path.join(root or _root(), "build")
     return sorted(d for d in os.listdir(build)
                   if os.path.isdir(os.path.join(build, d, "obj"))) if os.path.isdir(build) else []
 
 
 def _find_src(lib, file, root=None):
     for ext in SOURCE_EXT:
-        p = os.path.join(root or ROOT, "src", lib, file + ext)
+        p = os.path.join(root or _root(), "src", lib, file + ext)
         if os.path.exists(p):
             return p
     return None
@@ -247,7 +197,7 @@ def _find_src(lib, file, root=None):
 
 def _make(lib, file, version, root=None):
     """A `Unit`; `lib` is "" for a top-level unit (`src/<file>.cpp`, objdiff name `main/<file>`)."""
-    root = root or ROOT
+    root = root or _root()
     src = _find_src(lib, file, root)
     if src is None:
         raise SystemExit("no source for unit %s under src/" % ("%s/%s" % (lib, file) if lib else file))
@@ -264,7 +214,7 @@ def list_units(root=None):
     A unit is `src/<lib>/<file>.<ext>` or a top-level `src/<file>.<ext>` (`lib` is "" - `main`,
     `mh3_pad`, `fn_80047398`, ...); the objdiff name is `main/<lib>/<file>` / `main/<file>`.
     """
-    root = root or ROOT
+    root = root or _root()
     out = []
     for version in _versions(root):
         for entry in sorted(os.listdir(os.path.join(root, "src"))):
@@ -328,15 +278,15 @@ def resolve_unit(spec=None, root=None):
             return u
     versions = _versions(root)
     if not versions:
-        raise SystemExit("no build/<version>/obj tree under %s - build first" % (root or ROOT))
+        raise SystemExit("no build/<version>/obj tree under %s - build first" % (root or _root()))
     return _make(lib, file, units[0].version if units else versions[0], root)
 
 
 def compile_command(unit):
     """The exact command line ninja would run for this unit, as a token list."""
     warn_if_foreign_worktree()
-    target = os.path.relpath(unit.obj, ROOT)
-    p = subprocess.run(["ninja", "-t", "commands", target], cwd=ROOT,
+    target = os.path.relpath(unit.obj, _root())
+    p = subprocess.run(["ninja", "-t", "commands", target], cwd=_root(),
                        capture_output=True, text=True, encoding="utf-8", errors="replace")
     lines = [l for l in (p.stdout or "").splitlines() if "mwcceppc" in l]
     if not lines:
@@ -435,7 +385,7 @@ def run_compile(tokens, expect=None, scratch_dir=None, src=None, verbose=False):
     # The filesystem reports whole-second mtimes and objdiff caches on (mtime, size): make sure this
     # compile lands in a later second than the previous one.
     time.sleep(1.05)
-    p = subprocess.run(tokens, cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    p = subprocess.run(tokens, cwd=_root(), capture_output=True, text=True, encoding="utf-8", errors="replace")
     out = (p.stdout or "") + (p.stderr or "")
     if verbose:
         print("$ " + " ".join(tokens))
@@ -508,7 +458,9 @@ def function_names(obj):
 
 # --- objdiff -----------------------------------------------------------------------------------
 
-OBJDIFF = os.path.join(ROOT, "build", "tools", "objdiff-cli.exe")
+def _objdiff():
+    """`OBJDIFF`: the tree's objdiff-cli, resolved on first use (an assignment to `unitutil.OBJDIFF` pins it)."""
+    return globals().get("OBJDIFF") or os.path.join(_root(), "build", "tools", "objdiff-cli.exe")
 
 
 def objdiff(unit, symbol, out=None, runner=subprocess.run):
@@ -532,9 +484,9 @@ def objdiff(unit, symbol, out=None, runner=subprocess.run):
     """
     out = out or os.path.join(session_tmpdir(), "%s_%s_diff.json" % (unit.lib, unit.file))
     os.makedirs(os.path.dirname(out), exist_ok=True)
-    p = runner([OBJDIFF, "diff", "-p", ".", "-u", unit.name, symbol,
+    p = runner([_objdiff(), "diff", "-p", ".", "-u", unit.name, symbol,
                 "-c", "functionRelocDiffs=none", "--format", "json", "-o", out],
-               cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
+               cwd=_root(), capture_output=True, text=True, encoding="utf-8", errors="replace")
     return (out if p.returncode == 0 else None), (p.stdout or "") + (p.stderr or "")
 
 
@@ -554,30 +506,8 @@ def objdiff(unit, symbol, out=None, runner=subprocess.run):
 MIN_PROJECT_VERSION = "2.0.0-beta.5"
 
 
-_TMPDIR = None
-
-
 def session_tmpdir() -> str:
-    """A **unique** scratch directory for this process, removed at exit.
-
-    The default used to be the shared `build/tmp/unitutil`, and every tool that did not pass `tmpdir`
-    (`tryvar.py`, `slotmap.py`, `recompile.py`'s single-symbol path, `report_measure` called with no
-    tmpdir) wrote its project/report there. Two concurrent invocations raced on
-    `unitutil_report.json`, and the loser saw a report the *other* run had just written (or a
-    `PermissionError [WinError 5]` while the file was held) - the same collision that cost `symdiff.py` a
-    measurement round (see `tools/objdiff/symdiff.py`) and was fixed there with a per-invocation directory.
-    `objdiff()`'s per-file `build/tmp/<lib>_<file>_diff.json` was the same shape of race and now routes
-    through this helper too.
-
-    One directory per process (not per call) keeps `report_measure`'s returned `report_json` path equal to
-    the file `report_functions` just wrote, while two processes never share one. It lives in the system
-    temp, not under the repo, so a measurement cannot dirty the tree the selftest's dirty-guard watches.
-    """
-    global _TMPDIR
-    if _TMPDIR is None:
-        _TMPDIR = tempfile.mkdtemp(prefix="unitutil-")
-        atexit.register(shutil.rmtree, _TMPDIR, ignore_errors=True)
-    return _TMPDIR
+    return _repo.session_tmpdir()
 
 
 def measure_project(target, base, unit_name, tmpdir):
@@ -611,8 +541,8 @@ def report_functions(target, base, unit_name=None, tmpdir=None, runner=subproces
     out = os.path.join(tmpdir, "unitutil_report.json")
     if os.path.exists(out):
         os.remove(out)
-    p = runner([OBJDIFF, "report", "generate", "-p", proj, "-o", out],
-               cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    p = runner([_objdiff(), "report", "generate", "-p", proj, "-o", out],
+               cwd=_root(), capture_output=True, text=True, encoding="utf-8", errors="replace")
     if p.returncode != 0 or not os.path.exists(out):
         return {"_error": "objdiff report generate failed: " + (p.stdout or "") + (p.stderr or "")}
     data = json.load(open(out, encoding="utf-8"))
@@ -721,14 +651,14 @@ def main():
     if spec is None:
         print("%d unit(s) with source in this repo:" % len(units))
         for u in units:
-            print("  %-32s %s" % (u.name, os.path.relpath(u.src, ROOT)))
+            print("  %-32s %s" % (u.name, os.path.relpath(u.src, _root())))
         return
     u = resolve_unit(spec)
     head, flags, tail = split_flags(compile_command(u))
     print("unit    ", u.name)
-    print("src     ", os.path.relpath(u.src, ROOT))
-    print("obj     ", os.path.relpath(u.obj, ROOT))
-    print("target  ", os.path.relpath(u.target, ROOT))
+    print("src     ", os.path.relpath(u.src, _root()))
+    print("obj     ", os.path.relpath(u.obj, _root()))
+    print("target  ", os.path.relpath(u.target, _root()))
     print("compiler", " ".join(head))
     print("flags   ", " ".join(flags))
     print("tail    ", " ".join(tail))

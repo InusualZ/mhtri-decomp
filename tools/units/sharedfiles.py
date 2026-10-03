@@ -25,6 +25,7 @@ The next writers that should move here: `tools/symbols/symedit.py`
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import os
@@ -33,15 +34,10 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-# Every write stages to `<name>.sharedfiles-tmp` beside its target and is renamed in. The suffix lives
-# here so a selftest can sweep for leftovers.
-TMP_SUFFIX = ".sharedfiles-tmp"
+from tools.lib.text import (TMP_SUFFIX, AnchorError, Transaction, append_blocks,  # noqa: F401
+                            insert_after_anchor, line_ending, missing_anchors, read_text, with_ending)
 
 SPLIT_RANGE = re.compile(r"^\s+(\S+)\s+start:(0x[0-9A-Fa-f]+)\s+end:(0x[0-9A-Fa-f]+)")
-
-
-class AnchorError(Exception):
-    """An anchor a write depends on is not in the file - refuse before touching a byte."""
 
 
 class OverlapError(Exception):
@@ -55,58 +51,6 @@ class Layout:
     splits: Path
     configure: Path
     src: Path
-
-
-def read_text(path: Path) -> str:
-    """The file's text with its line endings intact - what goes back in on a rollback."""
-    return open(path, encoding="utf-8", newline="").read()
-
-
-def line_ending(text: str) -> str:
-    """The ending the file already uses: CRLF if any line has one, else LF."""
-    return "\r\n" if "\r\n" in text else "\n"
-
-
-def with_ending(text: str, nl: str) -> str:
-    """`text` with every line ending normalised to `nl` (LF text in, `nl` text out)."""
-    return text.replace("\r\n", "\n").replace("\n", nl)
-
-
-def missing_anchors(text: str, anchors) -> list[str]:
-    """The anchors not present in `text` - for a validator that reports instead of raising."""
-    return [a for a in anchors if a not in text]
-
-
-def insert_after_anchor(text: str, anchor: str, insertion: str, present: str | None = None):
-    """Insert `insertion` after the line `anchor`, once, in the file's own line ending.
-
-    Returns `(new_text, inserted)`. Raises `AnchorError` when the anchor line is absent - a silently
-    skipped edit is a unit that exists in `splits.txt` and nowhere else. `present` is a marker that
-    makes the insert idempotent: when it is already in `text`, nothing changes.
-    """
-    nl = line_ending(text)
-    marker = anchor + nl
-    if marker not in text:
-        raise AnchorError("%r not found (line ending %r?)" % (anchor, nl))
-    if present is not None and present in text:
-        return text, False
-    return text.replace(marker, marker + nl + with_ending(insertion, nl), 1), True
-
-
-def append_blocks(text: str, blocks):
-    """Append the `(key, block)` pairs whose key is not already in `text`, once, in order.
-
-    Returns `(new_text, appended)`. `new_text` is the input when nothing is appended, so re-applying a
-    batch is a no-op. The file's line ending is preserved and every block is normalised to it.
-    """
-    fresh = [(k, b) for k, b in blocks if k not in text]
-    if not fresh:
-        return text, 0
-    nl = line_ending(text)
-    if not text.endswith(nl):
-        text += nl
-    body = "".join(with_ending(b, nl) for _, b in fresh)
-    return text + nl + body, len(fresh)
 
 
 def parse_ranges(text: str) -> list[tuple[str, str, int, int]]:
@@ -152,75 +96,6 @@ def check_no_overlap(claimed, start: int, end: int, section: str | None = None,
     if hit is not None:
         raise OverlapError("0x%08X..0x%08X overlaps %s's %s range 0x%08X..0x%08X"
                            % (start, end, hit[0], hit[1], hit[2], hit[3]))
-
-
-class Transaction:
-    """All-or-nothing writes over a fixed set of paths.
-
-    Every target is staged to `<name>.sharedfiles-tmp` beside it and renamed in with `os.replace`, so a
-    reader never sees a half-written file. If a write fails, `rollback()` puts every already-renamed
-    target back to the bytes it had before - and deletes the ones that did not exist - newest first;
-    `cleanup()` removes the temp files on both paths. `rename` is the injection point the selftest uses
-    to fail a write on purpose; recovery deliberately does not go through it, because recovery must not
-    be breakable by the fault it is recovering from.
-    """
-
-    def __init__(self, rename=None):
-        self._rename = rename or os.replace
-        self.prev: dict[Path, bytes | None] = {}
-        self.order: list[Path] = []
-        self.dirs: list[Path] = []
-        self.temps: list[Path] = []
-
-    def write(self, path: Path, text: str) -> None:
-        if not path.parent.exists():
-            made, d = [], path.parent
-            while not d.exists() and d != d.parent:
-                made.append(d)
-                d = d.parent
-            path.parent.mkdir(parents=True, exist_ok=True)
-            self.dirs.extend(made)          # deepest first: rollback removes children before parents
-        if path not in self.prev:
-            self.prev[path] = path.read_bytes() if path.exists() else None
-        tmp = path.with_name(path.name + TMP_SUFFIX)
-        self.temps.append(tmp)
-        tmp.write_bytes(text.encode("utf-8"))
-        self._rename(tmp, path)
-        self.order.append(path)
-
-    def cleanup(self) -> None:
-        for tmp in self.temps:
-            try:
-                tmp.unlink()
-            except FileNotFoundError:
-                pass
-
-    def rollback(self) -> None:
-        """Undo every rename already made, newest first, back to the exact previous bytes.
-
-        The temp files go first: the write that failed left one in the directory this is about to
-        remove, and a directory with a file in it cannot be removed. The restore then re-creates a temp
-        per file, so a second `cleanup()` follows. Recovery uses `os.replace` directly - an injected
-        fault must not be able to break the recovery from itself.
-        """
-        self.cleanup()
-        for path in reversed(self.order):
-            prev = self.prev[path]
-            try:
-                if prev is None:
-                    path.unlink(missing_ok=True)
-                else:
-                    tmp = path.with_name(path.name + TMP_SUFFIX)
-                    tmp.write_bytes(prev)
-                    os.replace(tmp, path)
-            except OSError:
-                pass
-        self.cleanup()
-        for d in self.dirs:                     # deepest first, so a child is gone before its parent
-            try:
-                d.rmdir()                       # only if empty: never destroy a pre-existing tree
-            except OSError:
-                pass
 
 
 # --------------------------------------------------------------------------------------------------

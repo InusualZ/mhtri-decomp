@@ -33,6 +33,7 @@ tool now avoids.
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import hashlib
@@ -40,6 +41,7 @@ import os
 import re
 import subprocess
 import sys
+from tools.lib.git import Git
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
@@ -53,8 +55,7 @@ BASE = "main"
 
 
 def git(args: list[str], cwd: str | None = None, check: bool = True) -> str:
-    p = subprocess.run(["git"] + args, cwd=cwd or unitutil.repo_root(),
-                       capture_output=True, text=True, encoding="utf-8", errors="replace")
+    p = Git(cwd or unitutil.repo_root()).run(*args)
     if check and p.returncode != 0:
         raise SystemExit("git %s failed:\n%s%s" % (" ".join(args), p.stdout, p.stderr))
     return (p.stdout or "").strip()

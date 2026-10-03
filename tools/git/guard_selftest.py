@@ -96,7 +96,8 @@ check("improved_since_base returns a bool", isinstance(pc.improved_since_base(),
 def temp_repo() -> str:
     """A throwaway repo with its own copy of the hooks and tools, so the hook runs there and not here."""
     tmp = tempfile.mkdtemp(prefix="guard-selftest-")
-    for rel in ("tools/git/guard.py", "tools/git/hooks/pre-commit"):
+    for rel in ("tools/git/guard.py", "tools/git/hooks/pre-commit", "tools/__init__.py", "tools/lib/__init__.py",
+                "tools/lib/git.py", "tools/lib/proc.py"):
         dst = os.path.join(tmp, rel)
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         shutil.copy(os.path.join(ROOT, rel), dst)

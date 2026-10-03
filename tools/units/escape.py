@@ -25,10 +25,13 @@ The bytes are only ever Python `bytes`; nothing goes through a shell.
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import os
 import sys
+
+from tools.lib import text as libtext
 
 # The two characters that always need escaping inside a C string literal, plus the control characters
 # with a short spelling. Everything else non-printable becomes `\xHH`.
@@ -94,18 +97,7 @@ def decode(text: str) -> bytes:
 
 
 def atomic_write(path: str, data: bytes, append: bool = False) -> None:
-    """Write `data` to `path` (byte-exact); a temp file + `os.replace` so a crash leaves one or the other."""
-    parent = os.path.dirname(os.path.abspath(path))
-    if parent:
-        os.makedirs(parent, exist_ok=True)
-    if append and os.path.exists(path):
-        with open(path, "ab") as fh:
-            fh.write(data)
-        return
-    tmp = path + ".tmp"
-    with open(tmp, "wb") as fh:
-        fh.write(data)
-    os.replace(tmp, path)
+    libtext.atomic_write(path, data, append=append)
 
 
 def edit(path: str, old: bytes, new: bytes, count: int = 1) -> int:

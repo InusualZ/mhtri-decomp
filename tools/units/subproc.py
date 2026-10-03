@@ -1,133 +1,19 @@
 #!/usr/bin/env python3
-"""The one rule for reading a subprocess' text: say the codec, never inherit the locale's.
-
-**The incident this closes (F34).** `land.run` did `subprocess.run(..., text=True, errors="replace")`
-with no `encoding=`.  `text=True` without an explicit codec decodes with `locale.getpreferredencoding(False)`
-- `cp1252` on this host - while the file it was compared against is read as UTF-8.  `CLAUDE.md`'s prose
-carries an em dash, so `git show HEAD:CLAUDE.md` decoded as cp1252 spelled `â€"` where the file said `—`,
-the clean-tree comparison never matched, and the landing gate refused every landing with "main's tree is
-not clean: M CLAUDE.md".  The refusal was *false*: the file was byte-equal to HEAD.  One non-ASCII byte in
-the compared text was the whole difference.
-
-The trap is silent and host-dependent: the same code is correct on a UTF-8 locale (Linux CI) and wrong on
-this one, and it only bites when the compared text is non-ASCII.  A fixture whose CLAUDE.md is pure ASCII
-passes either way, which is how `require_clean_tree`'s existing test missed it.
-
-So the rule is mechanical and this module is where it is written down:
-
-* **every** text-mode subprocess call (`text=True` / `universal_newlines=True`) passes `encoding="utf-8"`
-  explicitly (and `errors="replace"`, so a stray byte in a tool's output cannot raise
-  `UnicodeDecodeError` halfway through a gate);
-* `TEXT_KWARGS` is that pair, for callers that want to spell it once;
-* `trap_sites(root)` finds the call sites that break the rule, for the selftest that refuses to let one
-  come back.
-
-`trap_sites` is an AST scan, not a grep: a call spans several lines, and the keyword may sit on any of them
-(`subprocess.run([...], cwd=..., capture_output=True,\n text=True)` is the shape almost all of these have).
-"""
+"""Shim: the subprocess codec rule (F34) and its trap scan live in tools.lib.proc (removed in WP6).
+Spec: docs/tools/spec/lib-proc.md. CLI: subproc.py [--selftest] (prints every trap site under tools/)."""
 from __future__ import annotations
 
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import ast
 import os
 import subprocess
-import sys
 
-#: The pair every text-mode subprocess call in this repo passes.  `errors="replace"` as well as the
-#: codec: a tool that prints one byte outside UTF-8 must not abort a gate with a decode error.
-TEXT_KWARGS = {"encoding": "utf-8", "errors": "replace"}
-
-#: The keyword names that turn a subprocess call into text mode.
-TEXT_KEYWORDS = ("text", "universal_newlines")
+from tools.lib.proc import TEXT_KEYWORDS, TEXT_KWARGS, call_traps, module_traps, trap_sites  # noqa: F401
+from tools.lib.proc import run as _run
 
 
 def run(args, cwd=None, **kwargs):
-    """`subprocess.run` with the codec decided here rather than by the host's locale.
-
-    A thin convenience for callers that do not need to spell `TEXT_KWARGS`; it adds nothing else, so a
-    caller that wants `capture_output`/`timeout`/`runner` still passes them through.
-    """
-    kwargs.setdefault("capture_output", True)
-    for key, value in TEXT_KWARGS.items():
-        kwargs.setdefault(key, value)
-    return subprocess.run(args, cwd=cwd, **kwargs)
-
-
-def _is_text_on(node: ast.AST) -> bool:
-    """Whether a keyword argument's value is the literal `True` that turns text mode on.
-
-    The **literal** is required, on purpose.  `text` is a common field name (`dict(text=...)`, a dataclass
-    with a `text=` field, `write_elf(text=b"...")`), and this scan is an AST walk that cannot tell a
-    constructor from a subprocess call; the nine `Proposal(text=...)`-shaped calls in `tools/units/` were
-    false findings when the rule accepted any non-`False` value.  Every real text-mode call in this tree
-    spells `text=True` literally, so requiring it costs no coverage and buys a scan that never asks a
-    dataclass to pin a codec.  A `text=<expression>` is not claimed, the same way a `**` splat is not.
-    """
-    return isinstance(node, ast.Constant) and node.value is True
-
-
-def call_traps(node: ast.AST) -> str | None:
-    """Why `node` (an `ast.Call`) breaks the rule, or None when it does not.
-
-    A `**kwargs` splat suppresses the finding: the keywords are not visible here, so this scan cannot
-    claim either way, and a false FAIL would be worse than a missed one (there is exactly one such call
-    in the tree, `selftest.py`'s runner, and it passes the codec through its own literal dict).
-    """
-    if not isinstance(node, ast.Call):
-        return None
-    keywords = {kw.arg: kw.value for kw in node.keywords if kw.arg}
-    if any(kw.arg is None for kw in node.keywords):
-        return None                      # a `**` splat: the keywords are not visible to this scan
-    if "kwargs" in keywords:             # the same thing spelled through a dict
-        return None
-    text_kw = [name for name in TEXT_KEYWORDS if name in keywords and _is_text_on(keywords[name])]
-    if not text_kw:
-        return None
-    if "encoding" in keywords:
-        return None
-    return "text mode (%s=True) without an explicit encoding=" % "/".join(text_kw)
-
-
-def module_traps(tree: ast.AST) -> list[tuple[int, str]]:
-    """`[(line, reason)]` for every text-mode subprocess call in one parsed module."""
-    found = []
-    for node in ast.walk(tree):
-        reason = call_traps(node)
-        if reason:
-            found.append((getattr(node, "lineno", 0), reason))
-    return sorted(found)
-
-
-def trap_sites(root: str, subdir: str = "tools", skip_selftests: bool = False) -> list[str]:
-    """`["<relpath>:<line>: <reason>"]` for every breaking call site under `root/<subdir>`.
-
-    Two kinds of file are not scanned, both because they are not this repo's code to fix: the `m2c`
-    submodule and the vendored `mwcc-debugger` (which carries a `PROVENANCE.md`).  `skip_selftests` is
-    available for a scan that should ignore test scaffolding; the default scans everything, because a
-    selftest compares text too (the trap cost a session in one).
-    """
-    out: list[str] = []
-    vendored = ("tools/m2c/", "tools/mwcc-debugger/")
-    base = os.path.join(root, subdir)
-    for dirpath, dirnames, filenames in os.walk(base):
-        dirnames[:] = [d for d in dirnames if d != "__pycache__"]
-        for name in sorted(filenames):
-            if not name.endswith(".py"):
-                continue
-            if skip_selftests and name.endswith("_selftest.py"):
-                continue
-            path = os.path.join(dirpath, name)
-            rel = path.replace("\\", "/")
-            if any("/%s" % v in rel or rel.endswith("/" + v.rstrip("/")) for v in vendored):
-                continue
-            try:
-                with open(path, encoding="utf-8", errors="replace") as fh:
-                    tree = ast.parse(fh.read(), filename=path)
-            except (OSError, SyntaxError) as exc:       # a broken file is not this scan's finding
-                out.append("%s: unreadable by the scanner: %s" % (rel, exc))
-                continue
-            for line, reason in module_traps(tree):
-                out.append("%s:%d: %s" % (rel, line, reason))
-    return out
+    return _run(args, cwd=cwd, **kwargs)
 
 
 def selftest() -> int:
@@ -228,7 +114,6 @@ def selftest() -> int:
 
 
 if __name__ == "__main__":
-    import sys
     if "--selftest" in sys.argv:
         raise SystemExit(selftest())
     for site in trap_sites(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))):

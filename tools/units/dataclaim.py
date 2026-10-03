@@ -53,6 +53,7 @@ that acts on these verdicts.
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import json
@@ -60,6 +61,7 @@ import os
 import struct
 import sys
 import tempfile
+from tools.lib import text as libtext
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -383,11 +385,7 @@ def render(entries: list[dict]) -> str:
 
 
 def write_atomic(path: str, text: str) -> None:
-    os.makedirs(os.path.dirname(os.path.abspath(path)) or ".", exist_ok=True)
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8", newline="\n") as fh:
-        fh.write(text)
-    os.replace(tmp, path)
+    libtext.atomic_write(path, text)
 
 
 def summary(entries: list[dict], queue_path: str) -> str:
