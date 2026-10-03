@@ -187,6 +187,9 @@ becomes it (`duplication.md` has the line numbers).
 * Names are resolved per query through `lib.project.SymbolMap` (the dump's labels are never trusted - `callers`' rule).
 * From: `callers.build_index/build_elf_index/query`, `datagap.census`, `splitcheck.Ctx` readers, `tudiscover.build_graph`,
   `accessextent.object_sites/repair_sites`.
+* As built (WP2a): the index stays the cache's JSON dict with functions over it (`build_dump_index`, `build_object_index`,
+  `load_index`, `rows_at`, `runs_over`), because four tools read the dict's keys and a typed `RefIndex` would change the
+  cache format; the class arrives with 3c, which rewrites those readers. `spec/lib-refs.md` "Known gaps" lists the rest.
 
 ### `lib/report.py` - scores
 

@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))                   # tools/splits/ (dataorder)
 import unitutil as uu  # noqa: E402  (repo root + build layout)
 from tools.lib import project as _project  # noqa: E402  (the map / splits readers)
+from tools.lib import refs as _refs  # noqa: E402  (the dump's per-function graph)
 
 ROOT = uu.ROOT
 GAME = "RMHE08"
@@ -45,27 +46,27 @@ SCHEMA = 10     # bump on any change to what `build_graph()` stores (the stamp a
 SECTION_ORDER = [".init", "extab", "extabindex", ".text", ".ctors", ".dtors", ".rodata", ".data",
                  ".bss", ".sdata", ".sbss", ".sdata2", ".sbss2"]
 
-TOKEN_RE = re.compile(r"[A-Za-z_@][A-Za-z0-9_@$.]*")
-CALL_RE = re.compile(r"\bbl (\S+)")
-SAVE_RE = re.compile(r"\b(?:_savegpr_|_restgpr_|stmw|lmw)\S*")
-REC_RE = re.compile(r"\b(?:rlwinm|and|or|add|subf|subfc|neg|cntlzw|slw|srw|andc|xor|extsb|extsh)\.")
+TOKEN_RE = _refs.TOKEN_RE
+CALL_RE = _refs.CALL_RE
+SAVE_RE = _refs.SAVE_RE
+REC_RE = _refs.REC_RE
 SRCFILE_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_./\\-]*\.(?:c|cpp|cc|cxx|cp)$")
-ETI_RE = re.compile(r'\.obj "@eti_([0-9A-Fa-f]{8})".*?\.endobj', re.S)
-FOURBYTE_RE = re.compile(r"\.4byte\s+(\S+)")
+ETI_RE = _refs.ETI_RE
+FOURBYTE_RE = _refs.FOURBYTE_RE
 # The whole-unit extent dtk prints in the header comment of every `.s`, in either spelling the tree
 # uses: `# 0xSTART..0xEND | size: 0xN` (current dtk) and the pre-2025 `# 0xSTART - 0xEND`.
 HEADER_RANGE_RE = re.compile(r"^#\s+(0x[0-9A-Fa-f]+)\s*(?:\.\.|-)\s*(0x[0-9A-Fa-f]+)\s*(?:\|.*)?$",
                              re.M)
 # A function is exactly its `.fn <name>, ...` .. matching `.endfn <name>` span (nothing else).
-FN_BLOCK_RE = re.compile(r"(?ms)^\.fn\s+([^\s,]+)[^\n]*\n(.*?)^\.endfn\s+\1[ \t]*$")
+FN_BLOCK_RE = _refs.FN_BLOCK_RE
 # Just the names, for the cheap "does the symbol map know this file" test (`FN_BLOCK_RE.findall`
 # returns (name, block) tuples and would compare tuples against the map).
-FN_NAME_RE = re.compile(r"(?m)^\.fn\s+([^\s,]+)")
+FN_NAME_RE = _refs.FN_NAME_RE
 # The address dtk prints in the leading comment of every instruction (`/* ADDR RELOC  bytes */`).
-FIRST_INS_RE = re.compile(r"/\* ([0-9A-Fa-f]{8}) ")
+FIRST_INS_RE = _refs.FIRST_INS_RE
 # `.obj <label>` blocks that declare where the addresses in their relocations live.
-REL_OBJ_RE = re.compile(r"(?ms)^\.obj\s+\"?([^\s,\"]+)\"?[^\n]*\n(.*?)^\.endobj\s")
-REL_OWNER_RE = re.compile(r"^\s*\.rel\s+([^\s,]+)", re.M)
+REL_OBJ_RE = _refs.REL_OBJ_RE
+REL_OWNER_RE = _refs.REL_OWNER_RE
 # Observation kinds by authority: `pool`/`source` pin a real boundary, the other two are weak.
 STRONG = ("pool", "source")
 #: `--data-order` modes: which `.data` emission-order seams (tools/splits/dataorder.py) become observations.
@@ -99,7 +100,7 @@ INTERVAL_CAP = 4
 # Sections whose labels must never be read as TU-shared data: `extab`/`extabindex` are per-function
 # unwind table fragments whose `@eti_`/`@etb_` symbols are aliases covering arbitrary addresses in the
 # section (real code loads `"@eti_8001FFF8"+0xA`), and `.init` is boot code owned by no game TU.
-NO_REF_SECTIONS = ("extab", "extabindex", ".init")
+NO_REF_SECTIONS = _refs.NO_REF_SECTIONS
 
 
 
@@ -354,55 +355,13 @@ def asm_files(fns=None):
     return dedupe_ranges(keep, fns)
 
 
-def rel_owners(txt, fns, labels):
-    """`data label -> function names it relocates against`, from the objects' `.rel` lines.
-
-    dtk prints a relocation as `.rel <symbol containing the target address>, <target label>`, so a
-    data object that is a table of code addresses (a jump table, a handler table) names the function
-    those addresses live in.  It is *ownership* of the object, not a reference to it: a table whose
-    entries point into two functions must not merge them.
-    """
-    if ".rel " not in txt:
-        return {}
-    out = {}
-    for m in REL_OBJ_RE.finditer(txt):
-        if m.group(1) not in labels:
-            continue
-        got = out.setdefault(m.group(1), set())
-        for rel in REL_OWNER_RE.finditer(m.group(2)):
-            if rel.group(1) in fns:
-                got.add(rel.group(1))
-    return out
+rel_owners = _refs.rel_owners   # `data label -> function names it relocates against` (`.rel` lines)
 
 
-AT_SPELLED_RE = re.compile(r"^(@[^_]+)_([0-9A-Fa-f]{8})$")
+AT_SPELLED_RE = _refs.AT_SPELLED_RE
 
 
-def resolve_name(tok, names, labels=None):
-    """Resolve an asm operand token to a symbol-map name, or None.
-
-    Two spellings need care:
-
-    * `lbl_807947A5@sda21` / `camellia_sp3033@ha` - the `@modifier` is a relocation modifier, so the
-      name is everything before it.  Splitting on `@` only works when the token does not *start* with
-      `@`: for a `@`-pool object the leading `@` is part of the name, and `tok.split("@")[0]` is the
-      empty string, so every such reference used to be dropped unless the map spelled it exactly.
-    * `"@1841_80629B90"` - dtk spells a `@`-pool object with its address appended, while the map holds
-      `@1841`.  About 34 labels are affected here, and one of them is the `RSO/runtime` string pool -
-      the only label that ties two functions of that unit together - so dropping them loses real
-      anchors.  The appended address must match the map entry, so a suffix cannot resolve to a
-      different copy of the same generated name.
-    """
-    if tok in names:
-        return tok
-    if tok.startswith("@"):
-        m = AT_SPELLED_RE.match(tok)
-        if m and m.group(1) in names and (labels is None
-                                          or labels[m.group(1)]["addr"] == int(m.group(2), 16)):
-            return m.group(1)
-        return None
-    base = tok.split("@", 1)[0]
-    return base if base in names else None
+resolve_name = _refs.resolve_name   # an asm operand token -> a symbol-map name, or None
 
 
 def parse_fingerprint():
@@ -418,7 +377,7 @@ def parse_fingerprint():
              REC_RE.pattern, FOURBYTE_RE.pattern, HEADER_RANGE_RE.pattern, AT_SPELLED_RE.pattern]
     try:
         import inspect
-        for fn in (asm_files, dedupe_ranges, load_map, rel_owners, build_graph, resolve_name):
+        for fn in (asm_files, dedupe_ranges, load_map, rel_owners, build_graph, resolve_name, _refs.function_graph):
             parts.append(inspect.getsource(fn))
     except (OSError, TypeError, IOError):
         parts.append("source unavailable")
@@ -550,67 +509,16 @@ def build_graph(fns, labels, force=False):
         except (ValueError, OSError):
             pass
     t0 = time.time()
-    datanames = {n for n, l in labels.items() if l["section"] not in NO_REF_SECTIONS}
-    graph = {}
-    extab = {}
-    owners = collections.defaultdict(set)
-    # `.fn` parse self-check: every parsed span must start at its symbol-map address, and the number
-    # of `.fn` lines must match the number of spans, so a format change cannot quietly drop
-    # functions while the tool still prints a confident MATCH SET.
-    check = {"matched": 0, "mismatched_count": 0, "nocode_count": 0, "outside_map": 0,
-             "unparsed_fn_lines": 0, "mismatched": [], "nocode": [], "parse_misses": []}
-    for path in files:
-        txt = open(path, "r", encoding="utf-8", errors="replace").read()
-        blocks = list(FN_BLOCK_RE.finditer(txt))
-        loose = len(re.findall(r"(?m)^[ \t]*\.fn[ \t]", txt))
-        if loose != len(blocks):
-            check["unparsed_fn_lines"] += loose - len(blocks)
-            if len(check["parse_misses"]) < 20:
-                check["parse_misses"].append([os.path.relpath(path, ASM_DIR), loose, len(blocks)])
-        for m in ETI_RE.finditer(txt):
-            ops = FOURBYTE_RE.findall(m.group(0))
-            if ops and ops[0] in fns:
-                etb = int(ops[1], 16) if len(ops) > 1 and ops[1].startswith("0x") else None
-                extab[ops[0]] = [int(m.group(1), 16), etb]
-        for m in blocks:
-            name, block = m.group(1), m.group(2)
-            if name not in fns:
-                check["outside_map"] += 1
-                continue
-            first = FIRST_INS_RE.search(block)
-            got = int(first.group(1), 16) if first else None
-            if got == fns[name]["addr"]:
-                check["matched"] += 1
-            elif got is None:
-                check["nocode_count"] += 1
-                if len(check["nocode"]) < 20:
-                    check["nocode"].append(name)
-            else:
-                check["mismatched_count"] += 1
-                if len(check["mismatched"]) < 20:
-                    check["mismatched"].append([name, got, fns[name]["addr"]])
-            refs, calls = set(), set()
-            for tok in TOKEN_RE.findall(block):
-                ref = resolve_name(tok, datanames, labels)
-                if ref:
-                    refs.add(ref)
-            for callee in CALL_RE.findall(block):
-                ref = resolve_name(callee, fns)
-                if ref:
-                    calls.add(ref)
-            rec = len(REC_RE.findall(block))
-            graph[name] = {"refs": sorted(refs), "calls": sorted(calls),
-                           "fp": [1 if SAVE_RE.search(block) else 0, rec]}
-        for name, own in rel_owners(txt, fns, labels).items():
-            owners[name] |= own
+    parsed = _refs.function_graph(files, fns, labels, ASM_DIR)
+    graph, extab = parsed["funcs"], parsed["extab"]
     out = {"stamp": stamp, "files": len(files), "funcs": graph, "extab": extab,
-           "owners": {k: sorted(v) for k, v in owners.items()},
+           "owners": parsed["owners"],
            "collisions": [{k: [os.path.relpath(p, ASM_DIR) for p in v] if k in ("kept", "dropped")
                            else v for k, v in c.items()} for c in ASM_COLLISIONS],
            "range_dups": list(ASM_RANGE_DUPS),
            "subrange": list(ASM_SUBRANGE),
            "no_range": list(ASM_NO_RANGE),
-           "fn_check": check}
+           "fn_check": parsed["fn_check"]}
     os.makedirs(os.path.dirname(CACHE), exist_ok=True)
     json.dump(out, open(CACHE, "w", encoding="utf-8"))
     print("# graph: %d functions (%d with extab) from %d files in %.1fs -> build/tmp/tudiscover/graph.json"

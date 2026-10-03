@@ -16,6 +16,7 @@ from tools.lib.binary.elf import Elf as LibElf
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # `tools/`: `from units import`
 from tools.lib import project as _project  # noqa: E402  (the one splits / map parser)
+from tools.lib import refs as _refs  # noqa: E402  (the census over target objects)
 import dataseams  # noqa: E402  (`.data` emission-order seams: order-only / multi-TU diagnosis)
 import poolseams  # noqa: E402  (literal pools as TU evidence: a deferral a pool-sharing group explains)
 
@@ -153,12 +154,12 @@ def summary_lines(listed: int, data_rows: int, scanned: int, mode: str,
 #   other   the object references it and ANOTHER unit's claim covers its address (a legitimate cross-unit read)
 #   orphan  the object references it and NO claim covers its address (named with its neighbours and section)
 #
-# The readers are the project's existing ones: `undefrefs.load_object` (the one relocation reader),
+# The readers are the project's existing ones: `lib.refs` (the census and its relocation read),
 # `symedit.entries` (the map rows, with sizes), `splits.txt` (the claims) and `callers.py`'s index (who else
 # reads an orphan). A claim is a `splits.txt` range, so "covered" is exactly "some registered block's range
 # contains the row's start address".
 
-CENSUS_SECTIONS = (".rodata", ".data", ".bss", ".sdata", ".sbss", ".sdata2", ".sbss2")
+CENSUS_SECTIONS = _refs.CENSUS_SECTIONS
 GAME_DIR = "RMHE08"
 
 
@@ -207,42 +208,10 @@ def shrunk_claims(base: dict, now: dict) -> list[tuple[str, int, int]]:
     return out
 
 
-def classify_address(section: str, address: int, ranges: dict, unit: str) -> dict:
-    """`{status, owner, prev, next}` for one data address against the claims.
-
-    `status` is `own` (a range of `unit` contains it), `other` (another unit's does; `owner` names it) or
-    `orphan` (none does; `prev`/`next` are the registered neighbours bracketing it in the section, each
-    `(unit, start, end)` or None). Pure.
-    """
-    prev = nxt = None
-    for start, end, owner in ranges.get(section, []):
-        if start <= address < end:
-            return {"status": "own" if owner == unit else "other", "owner": owner, "prev": None, "next": None}
-        if end <= address:
-            prev = (owner, start, end)
-        elif start > address and nxt is None:
-            nxt = (owner, start, end)
-    return {"status": "orphan", "owner": None, "prev": prev, "next": nxt}
+classify_address = _refs.classify_address   # `{status, owner, prev, next}` of one data address
 
 
-def object_data_refs(path: str) -> dict[str, int]:
-    """`{name: relocation sites}` for the symbols the object references and does not define.
-
-    Extab bookkeeping is skipped; the site count is the number of relocations that name the symbol.
-    """
-    from units import undefrefs as uref  # noqa: PLC0415 - the one relocation reader
-
-    loaded = uref.load_object(path)
-    if loaded is None:
-        return {}
-    defined = loaded.get("defined") or {}
-    out: dict[str, int] = {}
-    for r in loaded["relocs"]:
-        name = r["symbol"]
-        if not name or (r["target"] or "").startswith(uref.BOOKKEEPING) or name in defined:
-            continue
-        out[name] = out.get(name, 0) + 1
-    return out
+object_data_refs = _refs.object_refs   # `{name: relocation sites}` an object references and does not define
 
 
 CODE_SOURCES = (".text", "extab")
@@ -277,31 +246,7 @@ def exposing_sections(sources) -> list[str]:
     return sorted(srcs)
 
 
-def census_records(unit_refs: dict, symbols: dict, ranges: dict) -> tuple[list[dict], dict]:
-    """`(records, stats)` - one record per (unit, referenced data symbol). Pure.
-
-    `unit_refs` is `{unit: {name: sites}}`, `symbols` is `{name: {section, address, size, type}}` (the map)
-    and `ranges` the claims. A reference to a name the map does not carry, to a code symbol or to a
-    non-data section is not data and is counted in `stats` only.
-    """
-    records, stats = [], {"unmapped": 0, "code": 0, "other_section": 0}
-    for unit in sorted(unit_refs):
-        for name, sites in sorted(unit_refs[unit].items()):
-            entry = symbols.get(name)
-            if entry is None:
-                stats["unmapped"] += 1
-                continue
-            if entry.get("type") == "function":
-                stats["code"] += 1
-                continue
-            if entry["section"] not in CENSUS_SECTIONS:
-                stats["other_section"] += 1
-                continue
-            verdict = classify_address(entry["section"], entry["address"], ranges, unit)
-            records.append({"unit": unit, "name": name, "section": entry["section"],
-                            "address": entry["address"], "size": int(entry.get("size") or 0),
-                            "sites": sites, **verdict})
-    return records, stats
+census_records = _refs.census_records   # one record per (unit, referenced data symbol)
 
 
 def orphan_key(unit: str, section: str, address: int) -> str:
@@ -1179,26 +1124,33 @@ def load_data_symbols(root: str) -> dict[str, dict]:
     return out
 
 
-def census_inputs(root: str, units: list[str] | None = None, ranges: dict | None = None) -> tuple[dict, int]:
-    """`({unit: {name: sites}}, registered)`: what each registered unit's TARGET object in `root` references."""
-    ranges = ranges if ranges is not None else load_claims(root)
+def _registered(ranges: dict, units: list[str] | None) -> list[str]:
+    """The registered units of the claims, narrowed to `units` (extensions dropped) when given."""
     registered = sorted({u for rows in ranges.values() for _s, _e, u in rows})
     if units is not None:
         want = {os.path.splitext(u)[0] for u in units}
         registered = [u for u in registered if u in want]
-    unit_refs = {}
-    for unit in registered:
-        path = os.path.join(root, "build", GAME_DIR, "obj", unit + ".o")
-        if os.path.exists(path):
-            unit_refs[unit] = object_data_refs(path)
+    return registered
+
+
+def census_inputs(root: str, units: list[str] | None = None, ranges: dict | None = None) -> tuple[dict, int]:
+    """`({unit: {name: sites}}, registered)`: what each registered unit's TARGET object in `root` references."""
+    ranges = ranges if ranges is not None else load_claims(root)
+    registered = _registered(ranges, units)
+    obj_dir = os.path.join(root, "build", GAME_DIR, "obj")
+    unit_refs = {u: object_data_refs(os.path.join(obj_dir, u + ".o")) for u in registered
+                 if os.path.exists(os.path.join(obj_dir, u + ".o"))}
     return unit_refs, len(registered)
 
 
 def census(root: str, units: list[str] | None = None, ranges: dict | None = None):
-    """`(records, stats), registered, read` for the registered units' TARGET objects as they stand in `root`."""
+    """`(records, stats), registered, read` for the registered units' TARGET objects as they stand in `root`
+    (`lib.refs.census`)."""
     ranges = ranges if ranges is not None else load_claims(root)
-    unit_refs, registered = census_inputs(root, units, ranges)
-    return census_records(unit_refs, load_data_symbols(root), ranges), registered, len(unit_refs)
+    registered = _registered(ranges, units)
+    found, read = _refs.census(os.path.join(root, "build", GAME_DIR, "obj"), registered, load_data_symbols(root),
+                               ranges)
+    return found, len(registered), read
 
 
 # -- which batch units the STRICT row judges: "touched" means a REAL change (owner, 2026-09-29: "Only real changes") --

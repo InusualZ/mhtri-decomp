@@ -80,7 +80,7 @@ The boundary summary line counts each `.text` cut with a failing `fn-start` or `
 
 ## Lib dependencies
 
-ppc, refs, binary, project, findings (target; today the tool carries its own copies, to be folded in the migration).
+ppc (the scanner and opcode tables, WP2a), refs (`text_refs`: the `Ctx` scan loop, WP2a), binary, project; findings is the target for the verdict rows.
 
 ## Test contract
 

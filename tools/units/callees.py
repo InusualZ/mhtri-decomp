@@ -16,6 +16,7 @@ import tempfile
 from tools.lib import names as libnames
 
 from tools.lib.binary import objdump as lib_objdump
+from tools.lib import ppc as _ppc
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOOLS = os.path.dirname(HERE)
@@ -140,120 +141,9 @@ def parse_disasm(text):
     return insns, base
 
 
-def _gpr(token):
-    m = re.match(r"^r(\d+)$", token.strip())
-    return int(m.group(1)) if m else None
-
-
-def _gpr_in(token):
-    m = re.search(r"r(\d+)\s*\)", token)
-    return int(m.group(1)) if m else None
-
-
-# Mnemonic groups for the register read/write decode. The list is the subset MWCC emits around a call
-# site; an instruction outside it is reported as undecoded rather than silently treated as inert.
-_DEST_FIRST = frozenset((
-    "add addc adde addme addze subf subfc subfe subfme subfze mullw mulhw mulhwu divw divwu neg "
-    "slw srw sraw srawi and or xor nor nand eqv orc andc extsb extsh extsw cntlzw popcntb "
-    "li lis addi addis subi subis mulli subfic addic "
-    "rlwinm rlwimi rlwnm slwi srwi clrlwi clrrwi extlwi extrwi rotlwi rotrwi "
-    "mr ori oris xori xoris andi andis "
-    "mflr mfctr mfcr mfspr mfmsr mftb"
-).split())
-_LOADS = frozenset("lbz lbzu lhz lhzu lha lhau lwz lwzu lwa lwarx lfs lfsu lfd lfdu lmw".split())
-_STORES = frozenset(
-    "stb stbu sth sthu stw stwu stfs stfsu stfd stfdu stmw stwcx stwx stwux stbx sthx".split())
-# Indexed (X-form) loads/stores spell their operands `rD, rA, rB`, so the base is the second register
-# rather than one inside parentheses - the D-form reader above would miss it.
-_XLOADS = frozenset("lwzx lwzux lbzx lbzux lhzx lhax lhaux lfsx lfdx".split())
-_XSTORES = frozenset("stwx stwux stbx sthx stfsx stfdx".split())
-_CMP = frozenset("cmpwi cmpdi cmplwi cmpldi cmpw cmpd cmplw cmpld".split())
-_MT = frozenset("mtlr mtctr mtcrf mtspr mtmsr".split())
-_BRANCH = frozenset((
-    "b ba bl bla bc bca bcl bcla beq bne blt bgt ble bge bso bns bdnz bdz blr blrl bctr bctrl "
-    "bcctr bclr beqlr bnelr bltlr bgtlr blelr bgelr bsolr bnsr bdnzlr bdzlr blrl"
-).split())
-_CALL = frozenset("bl bla bcl bcla bctrl".split())
-
-
-def decode_rw(mnemonic, operands):
-    """-> (reads, writes, is_branch, is_call, decoded) for one instruction.
-
-    Reads/writes are GPR numbers. `decoded` is False for an instruction outside the curated subset, so a
-    caller can report `?` instead of inventing an answer from a hole in the decode.
-    """
-    toks = [t.strip() for t in operands.split(",")] if operands else []
-    reads, writes = set(), set()
-    is_branch = mnemonic in _BRANCH
-    is_call = mnemonic in _CALL
-    if is_branch:
-        return reads, writes, True, is_call, True
-    if mnemonic in ("li", "lis"):
-        d = _gpr(toks[0]) if toks else None
-        if d is not None:
-            writes.add(d)
-        return reads, writes, False, False, True
-    if mnemonic in _DEST_FIRST:
-        for t in toks:
-            g = _gpr(t)
-            if g is not None:
-                if not writes:
-                    writes.add(g)
-                else:
-                    reads.add(g)
-        return reads, writes, False, False, True
-    if mnemonic in _LOADS or mnemonic in _STORES:
-        if toks:
-            g = _gpr(toks[0])
-            if g is not None:
-                (writes if mnemonic in _LOADS else reads).add(g)
-            base = _gpr_in(toks[1]) if len(toks) > 1 else None
-            if base is not None and base != 0:
-                reads.add(base)
-            if mnemonic == "lmw" and g is not None:
-                writes.update(range(g, 32))
-            if mnemonic == "stmw":
-                reads.update(range(g, 32))
-        return reads, writes, False, False, True
-    if mnemonic in _XLOADS or mnemonic in _XSTORES:
-        if toks:
-            g = _gpr(toks[0])
-            if g is not None:
-                (writes if mnemonic in _XLOADS else reads).add(g)
-            for t in toks[1:]:
-                g = _gpr(t)
-                if g is not None and g != 0:
-                    reads.add(g)
-        return reads, writes, False, False, True
-    if mnemonic in _CMP:
-        for t in toks:
-            g = _gpr(t)
-            if g is not None:
-                reads.add(g)
-        return reads, writes, False, False, True
-    if mnemonic in _MT:
-        for t in toks:
-            g = _gpr(t)
-            if g is not None:
-                reads.add(g)
-        return reads, writes, False, False, True
-    if mnemonic.startswith("f"):
-        # Every float form (fadds/fmr/fcmpo/fctiwz/fsel/...) touches FPRs or CR only - no GPR read or
-        # write, so it is decoded as inert for this analysis rather than reported as a hole.
-        return reads, writes, False, False, True
-    if mnemonic.startswith(("ps_", "psq_")):
-        # Paired-single: the dest is an FPR, and any GPR operand is an address (D-form `disp(rA)` or an
-        # indexed `rA, rB`), which is a real read as far as "did this call's return flow anywhere" goes.
-        for t in toks:
-            for g in (_gpr(t), _gpr_in(t)):
-                if g is not None and g != 0:
-                    reads.add(g)
-        return reads, writes, False, False, True
-    if mnemonic in ("nop", "sc", "sync", "isync", "eieio", "dcbf", "dcbst", "dcbt", "dccci", "icbi",
-                    "twi", "tw", "crxor", "cror", "crand", "crnand", "crnor", "creqv", "crandc",
-                    "crorc", "mcrf", "crset", "crclr", "crmove", "crnot"):
-        return reads, writes, False, False, True
-    return reads, writes, False, False, False
+# The register read/write decode of a disassembled instruction is `lib.ppc.decode_rw` (one decoder).
+_CALL = _ppc.CALL_MNEMONICS
+decode_rw = _ppc.decode_rw
 
 
 def call_shape(insns, index, window=24):

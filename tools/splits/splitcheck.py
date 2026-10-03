@@ -1,44 +1,7 @@
 #!/usr/bin/env python3
-"""splitcheck.py - a read-only checker for a `splits.txt`: does every unit and every boundary satisfy what we know?
-
-    python tools/splits/splitcheck.py --baseline [--json F] [--all] [--only INV[,INV]] [--unit REGEX] [--intervals]
-    python tools/splits/splitcheck.py --readers SECTION:START-END [--readers ...]
-    python tools/splits/splitcheck.py --selftest
-
-`--baseline` checks the repository's current `config/RMHE08/splits.txt` against the retail DOL and `symbols.txt` and prints
-the audit list: per invariant PASS/FAIL/UNKNOWN counts, the top defects, the suspected seams (the seam requests in
-`.pi/outbox/*.json`, the pool groups of `docs/pool-seams.md`).  `--readers` prints each map symbol of a data range with its
-owner and the units whose decoded text reads it.  Nothing is written except `--json`.  The invariants' spec is
-`docs/tools/spec/splitcheck.md`; the program that produced the current `splits.txt` is `docs/splits-program.md`.
-
-`--baseline --unit REGEX` also prints, for the matching units, one `detail` line per `.ctors`/`.dtors` word (the function, its end, the
-closure end, the end with the unit's own vtable slots, the unit end) and, with `--intervals`, one `pooldup` line per pool value held
-at two addresses (both addresses, the last read of the first, the first read of the second, the interval a TU starts in): the numbers
-a finding quotes.
-
-Invariants (one verdict per unit per invariant; PASS / FAIL / UNKNOWN, `-` = not applicable; evidence = an address):
-
-  order       link order: no overlapping ranges, one range per section, no cycle between the units' section orders
-              (`.bss`/`.sbss`/data sequences against the text sequence are the same graph)
-  coverage    every map symbol sits inside exactly one unit's range of its section (no gap under a symbol, no straddle)
-  text-cut    a unit's `.text` starts and ends on a function symbol
-  extab       every `extabindex` entry is owned by the unit that owns its function and its `extab` record
-  ctors/dtors the `.ctors`/`.dtors` word points at a function of the unit; a unit has one `.ctors` word (`__sinit`), and the
-              TU ends at the end of the closure of the sinit's local callees and address-taken functions (MWCC emits the
-              deferred constructors, registered destructors and `b ctor` thunks after it), not at the sinit's own end
-  pool        idea 94: the `.sdata2` float/double and `.sdata` string pool of a unit is read only (by a load) by that unit,
-              runs in first-use order (per function), and holds each value once
-  data-order  docs/data-order-seams.md: no strong V->S / zigzag seam strictly inside the unit's `.data`
-  vtable      a vtable sits in the unit whose text holds one of its slots or stores it
-  jumptable   a jump table sits in the unit that reads it and branches into
-  bss         a local `.bss`/`.sbss` object is read by the unit that holds it
-  local-static a `scope:local` data object (not a pool literal) is read by the text of one unit only: a static is private to its
-              TU, so a local read from both sides of a boundary says the boundary is not a TU edge
-
-The text references (pool first-use, jump table and bss readers) are decoded from the retail `.text`: a `lis` + `addi`/
-`ori`/load pair, or an r13/r2 small-data access.  That is heuristic evidence (a register reused across a branch can
-fool it) and is stated as such in every finding that depends on it.
-"""
+"""Read-only audit of `splits.txt`: twelve invariants per unit against the retail DOL and the map.
+Spec: docs/tools/spec/splitcheck.md. CLI: splitcheck.py --baseline [--json F] [--all] [--only INV]
+[--unit REGEX] [--intervals] | --readers SEC:START-END | --selftest."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
@@ -73,8 +36,6 @@ WEIGHT = {"order": 100, "coverage": 95, "extab": 90, "ctors": 85, "dtors": 80, "
 SECTION_ORDER = [".init", "extab", "extabindex", ".text", ".ctors", ".dtors", ".rodata", ".data", ".bss", ".sdata",
                  ".sbss", ".sdata2", ".sbss2"]
 CODE_SECTIONS = (".init", ".text")
-#: a window (in instructions) a `lis` value stays live for the reference decoder
-LIS_WINDOW = 200
 #: a function that forms this many distinct section starts with `addi @l` is start-up / module-loader code taking `_f_<section>` linker symbols (the
 #: RSO loader forms nine, `__init_data` two: those two stay ordinary references - the first symbol of a section can be read for real)
 LINKER_STARTS = 3
@@ -173,224 +134,17 @@ class Dol(LibDol):
         return self.bytes_at(addr, n)
 
 
-# ---- instruction decoding: who reads which data address -----------------------------------------------------------------
+# ---- instruction decoding: who reads which data address (lib.ppc: the one decoder and reference scanner) -------------
 
-LOADS_INT = (32, 33, 34, 35, 40, 41, 42, 43)          # write rD
-STORES = (36, 37, 38, 39, 44, 45, 47)
-FP_MEM = (48, 49, 50, 51, 52, 53, 54, 55)
+from tools.lib.ppc import (LOADS_INT, STORES, FP_MEM, LOAD_OPS, STORE_OPS, UPDATE_OPS, VOLATILE,  # noqa: E402,F401
+                           X_ARITH, X_LOADS, X_LOGIC, LIS_WINDOW, written_reg, scan_refs, scan_calls)
+from tools.lib import ppc as _ppc  # noqa: E402
+from tools.lib import refs as _refs  # noqa: E402
 
 
 def find_sda_bases(dol, code_words):
-    """`(r13, r2)` values: the `lis rN / ori|addi rN` pair in the start-up code (`__init_registers`)."""
-    out = {13: None, 2: None}
-    lis = {}
-    for addr, w in code_words:
-        op = w >> 26
-        rd, ra = (w >> 21) & 31, (w >> 16) & 31
-        if op == 15 and ra == 0 and rd in out:
-            lis[rd] = (w & 0xFFFF) << 16
-        elif op == 24 and rd in lis and ra == rd and out[rd] is None:         # ori rA,rS,UI
-            out[rd] = lis[rd] | (w & 0xFFFF)
-        elif op == 14 and ra in lis and rd == ra and out[rd] is None:         # addi rD,rA,SIMM
-            s = w & 0xFFFF
-            out[rd] = (lis[rd] + (s - 0x10000 if s & 0x8000 else s)) & 0xFFFFFFFF
-    return out[13], out[2]
-
-
-#: opcodes that READ memory through `rA + d` (lwz/lbz/lhz/lha/lfs/lfd, their update forms, lmw, psq_l/psq_lu)
-LOAD_OPS = (32, 33, 34, 35, 40, 41, 42, 43, 46, 48, 49, 50, 51, 56, 57)
-#: opcodes that WRITE memory through `rA + d` (stw/stb/sth, stmw, stfs/stfd, their update forms, psq_st/psq_stu)
-STORE_OPS = (36, 37, 38, 39, 44, 45, 47, 52, 53, 54, 55, 60, 61)
-#: the update-form accesses (lwzu/lbzu/lhzu/lhau/stwu/stbu/sthu/lfsu/lfdu/stfsu/stfdu): they write rA back
-UPDATE_OPS = (33, 35, 37, 39, 41, 43, 45, 49, 51, 53, 55)
-#: registers a call clobbers (r0, r3..r12): an address formed there does not survive a `bl`
-VOLATILE = frozenset([0] + list(range(3, 13)))
-#: opcode 31 forms that write rD (arithmetic with the OE bit masked off, indexed loads, mfcr/mfspr/mftb) and rA (logical, shifts, extends)
-X_ARITH = frozenset([266, 10, 138, 234, 202, 40, 8, 136, 232, 200, 104, 235, 75, 11, 491, 459])
-X_LOADS = frozenset([23, 55, 87, 119, 279, 311, 343, 375, 20, 19, 83, 339, 371, 533])
-X_LOGIC = frozenset([28, 60, 444, 412, 124, 476, 316, 284, 24, 536, 792, 824, 954, 922, 26])
-
-
-def written_reg(w):
-    """The general register an instruction word WRITES (`None` when it writes none, or the form is not decoded) - for the opcodes the reference
-    decoder does not handle itself: a `lis` value or a formed address in it is dead after the write."""
-    op = w >> 26
-    rt, ra = (w >> 21) & 31, (w >> 16) & 31
-    if op in (7, 8, 12, 13):
-        return rt
-    if op in (20, 21, 23, 25, 26, 27, 28, 29):
-        return ra
-    if op == 31:
-        xo = (w >> 1) & 0x3FF
-        if (xo & 0x1FF) in X_ARITH or xo in X_LOADS:
-            return rt
-        if xo in X_LOGIC:
-            return ra
-    return None
-
-
-def scan_refs(code, start, sda13, sda2, is_data, fn_starts=(), loads=None, stores=None, passes=None):
-    """`{target_address: [site, ...]}` for every absolute/small-data address a function materialises or accesses.
-
-    `code` is the big-endian bytes of a code range starting at `start`; `is_data(addr)` says whether a computed
-    address is worth recording; a `lis` value is forgotten at a function start (`fn_starts`).  When `loads` is a
-    dict, it receives `{address: [site, ...]}` for the accesses that READ the address: a load through r13/r2, a
-    `lis` + load, and a load through a register an `addi`/`ori` formed the address into.  The `addi`/`ori` that
-    only forms the address of an entry is a reference (it is in the result) and is NOT a read of the literal.
-    `stores` receives the accesses that WRITE it (same forms); `passes` receives `{address: [(site, register, callee)]}` for every
-    `bl` made while a register of r3..r10 holds an address an `addi`/`ori` formed (`callee` is the branch target, `None` for an indirect call).
-    A `lis` value stays live for `LIS_WINDOW` instructions in a volatile register and until the register is written in a callee-saved one
-    (r14..r31 survive calls); `mr rA, rB` copies what rB held.
-    """
-    refs = collections.defaultdict(list)
-    n = len(code) // 4
-    words = struct.unpack(">%dI" % n, code[:n * 4])
-    fs = set(fn_starts)
-    lis = {}
-    areg = {}                                          # register -> (address formed by addi/ori, index)
-
-    def live_lis(r, i):
-        e = lis.get(r)
-        return e is not None and (r >= 14 or i - e[1] <= LIS_WINDOW)
-
-    for i, w in enumerate(words):
-        site = start + i * 4
-        if site in fs:
-            lis.clear()
-            areg.clear()
-        op = w >> 26
-        if op == 18 or op == 19:                       # b / bl / blr / bctr / bctrl / bclr...: control leaves
-            if w & 1:                                  # a call clobbers the volatile registers
-                if passes is not None:
-                    callee = None
-                    if op == 18 and not w & 2:
-                        li = w & 0x03FFFFFC
-                        if li & 0x02000000:
-                            li -= 0x04000000
-                        callee = (site + li) & 0xFFFFFFFF
-                    for r in range(3, 11):
-                        if r in areg:
-                            passes.setdefault(areg[r][0], []).append((site, r, callee))
-                for r in VOLATILE:
-                    areg.pop(r, None)
-                    lis.pop(r, None)
-            elif op == 18 or (w >> 21) & 31 == 20:     # an unconditional jump or return ends the path
-                if passes is not None and op == 18 and not w & 2:      # a tail call (`lis/addi r3; b ctor`) passes what the registers hold too
-                    li = w & 0x03FFFFFC
-                    if li & 0x02000000:
-                        li -= 0x04000000
-                    callee = (site + li) & 0xFFFFFFFF
-                    if callee in fs:
-                        for r in range(3, 11):
-                            if r in areg:
-                                passes.setdefault(areg[r][0], []).append((site, r, callee))
-                areg.clear()
-            continue
-        if op == 15:                                   # addis rD,rA,SIMM  (lis when rA == 0)
-            rd, ra = (w >> 21) & 31, (w >> 16) & 31
-            areg.pop(rd, None)
-            if ra == 0:
-                lis[rd] = ((w & 0xFFFF) << 16, i)
-            else:
-                lis.pop(rd, None)
-            continue
-        if op == 24:                                   # ori rA,rS,UI : base is rS, result goes to rA
-            rs, ra = (w >> 21) & 31, (w >> 16) & 31
-            areg.pop(ra, None)
-            if live_lis(rs, i):
-                t = lis[rs][0] | (w & 0xFFFF)
-                if is_data(t):
-                    refs[t].append(site)
-                areg[ra] = (t, i)
-            if ra != rs:
-                lis.pop(ra, None)
-            continue
-        if op == 14 or 32 <= op <= 57 or op in (60, 61):
-            rt, ra = (w >> 21) & 31, (w >> 16) & 31
-            if op in (56, 57, 60, 61):                 # psq_l / psq_lu / psq_st / psq_stu: 12-bit displacement
-                s = w & 0xFFF
-                simm = s - 0x1000 if s & 0x800 else s
-            else:
-                s = w & 0xFFFF
-                simm = s - 0x10000 if s & 0x8000 else s
-            t = None
-            if ra == 13 and sda13 is not None:
-                t = (sda13 + simm) & 0xFFFFFFFF
-            elif ra == 2 and sda2 is not None:
-                t = (sda2 + simm) & 0xFFFFFFFF
-            elif ra != 0 and live_lis(ra, i):
-                t = (lis[ra][0] + simm) & 0xFFFFFFFF
-            if t is not None and is_data(t):
-                refs[t].append(site)
-                if loads is not None and op in LOAD_OPS:
-                    loads.setdefault(t, []).append(site)
-                if stores is not None and op in STORE_OPS:
-                    stores.setdefault(t, []).append(site)
-            elif op != 14 and ra in areg and (loads is not None or stores is not None):
-                ta = (areg[ra][0] + simm) & 0xFFFFFFFF
-                if is_data(ta):
-                    if loads is not None and op in LOAD_OPS:
-                        loads.setdefault(ta, []).append(site)
-                    if stores is not None and op in STORE_OPS:
-                        stores.setdefault(ta, []).append(site)
-            if op in UPDATE_OPS and ra in lis and t is not None:
-                lis[ra] = (t, i)                         # the update form leaves rA = the effective address
-            if op == 14:
-                if rt != ra:
-                    areg.pop(rt, None)
-                if t is not None and is_data(t):
-                    areg[rt] = (t, i)
-                else:
-                    areg.pop(rt, None)
-            elif op in LOADS_INT:
-                areg.pop(rt, None)
-            writes = op == 14 or op in LOADS_INT
-            if writes:
-                lis.pop(rt, None)
-            elif op == 46:                               # lmw rD: rD..r31 written
-                for r in range(rt, 32):
-                    lis.pop(r, None)
-                    areg.pop(r, None)
-            continue
-        if op == 31 and (w >> 1) & 0x3FF == 444 and (w >> 21) & 31 == (w >> 11) & 31:    # mr rA,rS (or rA,rS,rS): rA takes what rS held
-            rs, ra = (w >> 21) & 31, (w >> 16) & 31
-            e, a = lis.get(rs), areg.get(rs)
-            lis.pop(ra, None)
-            areg.pop(ra, None)
-            if e is not None:
-                lis[ra] = e
-            if a is not None:
-                areg[ra] = a
-            continue
-        d = written_reg(w)
-        if d is not None:
-            lis.pop(d, None)
-            areg.pop(d, None)
-    return refs
-
-
-def scan_calls(code, start, fn_starts):
-    """`[(site, target), ...]` for every `b`/`bl` whose target is a function start outside the function holding the site."""
-    out = []
-    n = len(code) // 4
-    words = struct.unpack(">%dI" % n, code[:n * 4])
-    fs = sorted(set(fn_starts))
-    fset = set(fs)
-    for i, w in enumerate(words):
-        if w >> 26 != 18 or w & 2:                     # b/bl with AA = 0
-            continue
-        site = start + i * 4
-        li = w & 0x03FFFFFC
-        if li & 0x02000000:
-            li -= 0x04000000
-        t = (site + li) & 0xFFFFFFFF
-        if t in fset:
-            k = bisect.bisect_right(fs, site) - 1
-            if k < 0 or fs[k] != t:                    # a branch to the function's own start is a loop, not a call
-                out.append((site, t))
-    return out
-
-
+    """`(r13, r2)` from the start-up code's `lis`/`ori|addi` pairs (`lib.ppc.find_sda_bases`; `dol` is unused)."""
+    return _ppc.find_sda_bases(code_words)
 # ---- the context: everything the invariants read --------------------------------------------------------------------------
 
 class Ctx:
@@ -496,20 +250,11 @@ class Ctx:
                 if b:
                     ws = [(init["addr"] + i * 4, w) for i, w in enumerate(struct.unpack(">%dI" % (len(b) // 4), b))]
                     self.sda13, self.sda2 = find_sda_bases(self.dol, ws)
-        raw = collections.defaultdict(list)
-        rawl, raws, rawp = {}, {}, {}
-        fnset = set(self._fn_starts)
-        for lo, blob in chunks:
-            if not blob:
-                continue
-            for t, sites in scan_refs(blob, lo, self.sda13, self.sda2, is_data, self._fn_starts, rawl, raws, rawp).items():
-                raw[t].extend(sites)
-            for site, t in scan_calls(blob, lo, self._fn_starts):
-                self._add_fn_ref(site, t, "call")
-            for t, sites in scan_refs(blob, lo, None, None, fnset.__contains__, self._fn_starts).items():
-                for site in sites:
-                    if self.fn_at(site) is not self.fn_at(t):
-                        self._add_fn_ref(site, t, "addr")
+        found = _refs.text_refs(chunks, self.sda13, self.sda2, is_data, self._fn_starts,
+                                lambda site, t: self.fn_at(site) is self.fn_at(t))
+        raw, rawl, raws, rawp = found.refs, found.loads, found.stores, found.passes
+        for site, t, kind in found.fn_edges:
+            self._add_fn_ref(site, t, kind)
         ignore = self.linker_operand_sites(raw)
         for t, sites in raw.items():
             i, _s = self.data_sym_at(t)
