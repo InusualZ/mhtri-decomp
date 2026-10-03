@@ -38,179 +38,46 @@ swapping the arguments swaps every delta and the verdict. Both files are ordinar
 MAIN's own report all work unchanged.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import json
 import os
-import sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(os.path.dirname(HERE))
+from tools.lib import report as _report
 
-#: The report `measures` keys, in the order a reader wants them: the score, then code, data, functions,
-#: the "complete" family, and the unit counts last.
-MEASURE_ORDER = (
-    "fuzzy_match_percent",
-    "matched_code", "matched_code_percent",
-    "total_code",
-    "matched_data", "matched_data_percent",
-    "total_data",
-    "matched_functions", "matched_functions_percent",
-    "total_functions",
-    "complete_code", "complete_code_percent",
-    "complete_data", "complete_data_percent",
-    "complete_units",
-    "total_units",
-)
+MEASURE_ORDER = _report.MEASURE_ORDER
 #: The task's short names (`fuzzy 23.229952`) where they differ from the report's own key.
 METRIC_LABEL = {"fuzzy_match_percent": "fuzzy"}
-#: A *fall* in one of these is a regression **at project scope**; a `total_*` rising or falling is a
-#: re-tiling, not a loss, and a `category` denominator moves with the bucketing rather than with a byte,
-#: so category rows are reported (and marked) but never set the exit status on their own.
-REGRESSION_KEYS = frozenset((
-    "fuzzy_match_percent", "matched_code", "matched_code_percent",
-    "matched_data", "matched_data_percent",
-    "matched_functions", "matched_functions_percent",
-    "complete_code", "complete_code_percent",
-    "complete_data", "complete_data_percent",
-    "complete_units",
-))
-DEFAULT_EPS = 1e-9
-
-
-class ReportError(Exception):
-    """A path that cannot serve as one side of the diff (missing, unreadable, or not a report)."""
-
-
-def num(value):
-    """A measure as a number, or None. The report stores counts as strings and percents as floats."""
-    if isinstance(value, bool) or value is None:
-        return None
-    if isinstance(value, int):
-        return value
-    if isinstance(value, float):
-        return value
-    if isinstance(value, str):
-        text = value.strip()
-        if not text:
-            return None
-        try:
-            return int(text)
-        except ValueError:
-            try:
-                return float(text)
-            except ValueError:
-                return None
-    return None
+REGRESSION_KEYS = _report.REGRESSION_KEYS
+DEFAULT_EPS = _report.DEFAULT_EPS
+ReportError = _report.ReportError
+num = _report.num
 
 
 def load_report(path: str) -> dict:
-    """Read one report, refusing anything that is not a report so `nothing comparable` is honest."""
-    if not os.path.exists(path):
-        raise ReportError("%s does not exist" % path)
-    try:
-        with open(path, "r", encoding="utf-8") as fh:
-            data = json.load(fh)
-    except (OSError, ValueError) as exc:
-        raise ReportError("%s is not readable JSON (%s)" % (path, exc))
-    if not isinstance(data, dict) or ("units" not in data and "measures" not in data):
-        raise ReportError("%s is not a report (no `units` and no `measures`)" % path)
-    return data
+    """Read one report (`lib.report.Report.load`), refusing anything that is not a report."""
+    return _report.Report.load(path).data
 
 
 def unit_measures(report: dict) -> dict[str, dict]:
     """`{unit name: measures}` - the unit-level score rows."""
-    out: dict[str, dict] = {}
-    for unit in report.get("units") or []:
-        name = unit.get("name")
-        if name:
-            out[name] = unit.get("measures") or {}
-    return out
+    return _report.Report.coerce(report).unit_measures()
 
 
-def symbol_measures(report: dict) -> dict[tuple, float | None]:
-    """`{(unit name, symbol name): fuzzy_match_percent}` - the symbol-level score rows."""
-    out: dict[tuple, float | None] = {}
-    for unit in report.get("units") or []:
-        name = unit.get("name")
-        if not name:
-            continue
-        for fn in unit.get("functions") or []:
-            symbol = fn.get("name")
-            if symbol:
-                out[(name, symbol)] = num(fn.get("fuzzy_match_percent"))
-    return out
+def symbol_measures(report: dict) -> dict[tuple, float]:
+    """`{(unit name, symbol name): score}` - the symbol-level rows, with the 0 % rule."""
+    return _report.Report.coerce(report).symbol_measures()
 
 
 def denominators(report: dict) -> dict[str, dict]:
-    """`{scope: {measure key: number}}` for the project total and every category - the denominator rows."""
-    out: dict[str, dict] = {"project": {k: num(v) for k, v in (report.get("measures") or {}).items()}}
-    for category in report.get("categories") or []:
-        scope = category.get("id") or category.get("name")
-        if scope:
-            out[str(scope)] = {k: num(v) for k, v in (category.get("measures") or {}).items()}
-    return out
+    """`{scope: {measure key: number}}` for the project total and every category."""
+    return _report.Report.coerce(report).denominators()
 
 
-def _moved_rows(before: dict, after: dict, eps: float) -> list[dict]:
-    """`(key, before, after)` for every key both sides carry whose value moved past `eps`."""
-    rows = []
-    for key in sorted(set(before) & set(after)):
-        a, b = before[key], after[key]
-        if a is None or b is None:
-            continue
-        delta = b - a
-        if abs(delta) > eps:
-            rows.append({"key": key, "before": a, "after": b, "delta": delta})
-    return rows
-
-
-def diff_units(before: dict, after: dict, eps: float = DEFAULT_EPS) -> dict:
-    """Unit-level rows: moved (worst first), added, removed."""
-    ub, ua = unit_measures(before), unit_measures(after)
-    moved = []
-    for row in _moved_rows({k: num(v.get("fuzzy_match_percent")) for k, v in ub.items()},
-                           {k: num(v.get("fuzzy_match_percent")) for k, v in ua.items()}, eps):
-        moved.append({"unit": row["key"], "before": row["before"], "after": row["after"],
-                      "delta": row["delta"]})
-    moved.sort(key=lambda r: (r["delta"], r["unit"]))
-    return {"moved": moved,
-            "added": sorted(set(ua) - set(ub)),
-            "removed": sorted(set(ub) - set(ua))}
-
-
-def diff_symbols(before: dict, after: dict, eps: float = DEFAULT_EPS) -> dict:
-    """Symbol-level rows: moved (worst first), plus how many symbols appeared and vanished."""
-    sb, sa = symbol_measures(before), symbol_measures(after)
-    moved = []
-    for row in _moved_rows(sb, sa, eps):
-        unit, symbol = row["key"]
-        moved.append({"unit": unit, "symbol": symbol, "before": row["before"],
-                      "after": row["after"], "delta": row["delta"]})
-    moved.sort(key=lambda r: (r["delta"], r["unit"], r["symbol"]))
-    return {"moved": moved,
-            "added": sorted(set(sa) - set(sb)),
-            "removed": sorted(set(sb) - set(sa))}
-
-
-def diff_denominators(before: dict, after: dict, eps: float = DEFAULT_EPS) -> list[dict]:
-    """The project total and every category, measure by measure, with the delta and a regression flag."""
-    db, da = denominators(before), denominators(after)
-    scopes = ["project"] + sorted((set(db) | set(da)) - {"project"})
-    rows = []
-    for scope in scopes:
-        mb, ma = db.get(scope, {}), da.get(scope, {})
-        keys = [k for k in MEASURE_ORDER if k in mb or k in ma]
-        keys += sorted((set(mb) | set(ma)) - set(MEASURE_ORDER))
-        for key in keys:
-            a, b = mb.get(key), ma.get(key)
-            delta = None if (a is None or b is None) else b - a
-            fell = delta is not None and delta < -eps
-            rows.append({"scope": scope, "metric": key, "before": a, "after": b, "delta": delta,
-                         "moved": delta is not None and abs(delta) > eps,
-                         "fell": fell,
-                         "regressed": bool(fell and scope == "project" and key in REGRESSION_KEYS)})
-    return rows
+diff_units = _report.diff_units
+diff_symbols = _report.diff_symbols
+diff_denominators = _report.diff_denominators
 
 
 def build(before: dict, after: dict, eps: float = DEFAULT_EPS,

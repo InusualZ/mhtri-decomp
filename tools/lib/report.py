@@ -1,0 +1,603 @@
+"""Scores: the objdiff report, the one metric, freshness, and one regression rule.
+Spec: docs/tools/spec/lib-report.md. CLI: none (library)."""
+from __future__ import annotations
+
+import json
+import os
+import re
+import subprocess
+import time
+from dataclasses import dataclass, field
+from typing import Any, Callable
+
+#: The per-function score key of report version 2; a function entry **without** it scores 0 %, not 100 %.
+SCORE_KEY = "fuzzy_match_percent"
+#: The oldest objdiff that reads the one-unit project this module writes.
+MIN_PROJECT_VERSION = "2.0.0-beta.5"
+#: The one-unit project directory and its report, inside the caller's scratch directory (callers read the
+#: report back by this name).
+PROJECT_DIR = "unitutil_project"
+REPORT_FILE = "unitutil_report.json"
+#: objdiff-cli under a tree.
+OBJDIFF_REL = os.path.join("build", "tools", "objdiff-cli.exe")
+#: The smallest score movement that counts as a move.
+DEFAULT_EPS = 1e-9
+#: The tolerance of `arithmetic_check`: a float unit percent reproduces up to its report rounding.
+ARITH_TOL = 0.01
+
+#: The report `measures` keys in reading order: the score, code, data, functions, "complete", unit counts.
+MEASURE_ORDER = (
+    "fuzzy_match_percent",
+    "matched_code", "matched_code_percent", "total_code",
+    "matched_data", "matched_data_percent", "total_data",
+    "matched_functions", "matched_functions_percent", "total_functions",
+    "complete_code", "complete_code_percent",
+    "complete_data", "complete_data_percent",
+    "complete_units", "total_units",
+)
+#: The measures whose fall is a regression at project scope (a `total_*` moving is a re-tiling).
+REGRESSION_KEYS = frozenset((
+    "fuzzy_match_percent", "matched_code", "matched_code_percent",
+    "matched_data", "matched_data_percent",
+    "matched_functions", "matched_functions_percent",
+    "complete_code", "complete_code_percent",
+    "complete_data", "complete_data_percent",
+    "complete_units",
+))
+
+
+class ReportError(Exception):
+    """A path or a run that cannot serve as a report (missing, unreadable, not a report, objdiff failed)."""
+
+
+# --------------------------------------------------------------------------------------------------
+# numbers and the 0 % rule
+# --------------------------------------------------------------------------------------------------
+
+def num(value: Any) -> int | float | None:
+    """A measure as a number, or None: the report stores counts as strings and percents as floats."""
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return value
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        try:
+            return int(text)
+        except ValueError:
+            try:
+                return float(text)
+            except ValueError:
+                return None
+    return None
+
+
+def is_scored(entry: dict | None) -> bool:
+    """Whether a function entry carries a numeric score at all."""
+    return bool(entry) and isinstance(entry.get(SCORE_KEY), (int, float)) and not isinstance(entry.get(SCORE_KEY), bool)
+
+
+def score_of(entry: dict | None) -> float:
+    """A function entry's score with the campaign's rule: no numeric `fuzzy_match_percent` is 0.0, never 100."""
+    return float(entry[SCORE_KEY]) if is_scored(entry) else 0.0
+
+
+def entry_score(entry: dict | None) -> float | None:
+    """The score when the entry carries one, else None ("unscored" kept distinct from 0 for display)."""
+    return float(entry[SCORE_KEY]) if is_scored(entry) else None
+
+
+def arithmetic_check(measures: dict, entries: dict[str, dict] | list[dict],
+                     tol: float = ARITH_TOL) -> tuple[bool, str]:
+    """`sum(size * score / 100) / total_code == fuzzy_match_percent` with the 0 % rule.
+
+    With an absent key read as 0 the identity holds; read as 100 it does not, so a mismatch means one of
+    the two readings is wrong. A unit without `total_code` or a numeric percent passes with the reason.
+    """
+    try:
+        total = int(measures.get("total_code"))
+    except (TypeError, ValueError, AttributeError):
+        return True, "no total_code to check"
+    reported = measures.get(SCORE_KEY)
+    if not isinstance(reported, (int, float)):
+        return True, "no unit fuzzy_match_percent to check"
+    matched = 0.0
+    for fn in (entries.values() if isinstance(entries, dict) else entries):
+        try:
+            size = int(fn.get("size"))
+        except (TypeError, ValueError):
+            continue
+        matched += size * score_of(fn) / 100.0
+    computed = (100.0 * matched / total) if total else 0.0
+    if abs(computed - reported) <= tol:
+        return True, "sum(check) %.5f == report %.5f" % (computed, reported)
+    return False, ("per-symbol sum gives %.5f but the unit reports %.5f - a function with no "
+                   "fuzzy_match_percent key reads as 0%%, not 100%%" % (computed, reported))
+
+
+# --------------------------------------------------------------------------------------------------
+# the report
+# --------------------------------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class Report:
+    """A parsed objdiff report (`report generate`'s JSON); `path` is where it was read from, if anywhere."""
+    data: dict = field(default_factory=dict)
+    path: str | None = None
+
+    @classmethod
+    def load(cls, path: str | os.PathLike) -> "Report":
+        """Read one report; `ReportError` for a missing, unreadable or non-report file."""
+        path = os.fspath(path)
+        if not os.path.exists(path):
+            raise ReportError("%s does not exist" % path)
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                data = json.load(fh)
+        except (OSError, ValueError) as exc:
+            raise ReportError("%s is not readable JSON (%s)" % (path, exc))
+        if not isinstance(data, dict) or ("units" not in data and "measures" not in data):
+            raise ReportError("%s is not a report (no `units` and no `measures`)" % path)
+        return cls(data, path)
+
+    @classmethod
+    def coerce(cls, report: "Report | dict | None") -> "Report":
+        """A `Report` from a `Report`, a raw report dict, or None (the empty report)."""
+        if isinstance(report, Report):
+            return report
+        return cls(report or {})
+
+    def units(self) -> list[dict]:
+        """The unit rows that carry a name."""
+        return [u for u in (self.data.get("units") or []) if u.get("name")]
+
+    def unit(self, name: str) -> dict | None:
+        """The unit row named `name` exactly, or None."""
+        return next((u for u in self.units() if u.get("name") == name), None)
+
+    def entries(self, name: str) -> dict[str, dict]:
+        """`{function name: entry}` of a unit (empty for an unknown unit)."""
+        return {f["name"]: f for f in ((self.unit(name) or {}).get("functions") or []) if f.get("name")}
+
+    def functions(self, name: str) -> dict[str, float]:
+        """`{function name: score}` of a unit, with the 0 % rule."""
+        return {n: score_of(e) for n, e in self.entries(name).items()}
+
+    def scores(self) -> dict[str, dict[str, float]]:
+        """`{unit: {function: score}}` for every unit, with the 0 % rule."""
+        return {u["name"]: {f["name"]: score_of(f) for f in (u.get("functions") or ()) if f.get("name")}
+                for u in self.units()}
+
+    def measures(self, name: str | None = None) -> dict:
+        """A unit's `measures` (the project's own with no name)."""
+        if name is None:
+            return self.data.get("measures") or {}
+        return (self.unit(name) or {}).get("measures") or {}
+
+    def unit_measures(self) -> dict[str, dict]:
+        """`{unit name: measures}` - the unit-level score rows."""
+        return {u["name"]: u.get("measures") or {} for u in self.units()}
+
+    def symbol_measures(self) -> dict[tuple[str, str], float]:
+        """`{(unit, symbol): score}` - the symbol-level score rows, with the 0 % rule."""
+        out: dict[tuple[str, str], float] = {}
+        for u in self.units():
+            for f in u.get("functions") or []:
+                if f.get("name"):
+                    out[(u["name"], f["name"])] = score_of(f)
+        return out
+
+    def denominators(self) -> dict[str, dict]:
+        """`{scope: {measure: number}}` for the project total and every category."""
+        out: dict[str, dict] = {"project": {k: num(v) for k, v in (self.data.get("measures") or {}).items()}}
+        for category in self.data.get("categories") or []:
+            scope = category.get("id") or category.get("name")
+            if scope:
+                out[str(scope)] = {k: num(v) for k, v in (category.get("measures") or {}).items()}
+        return out
+
+    def arithmetic_check(self, name: str, tol: float = ARITH_TOL) -> tuple[bool, str]:
+        """`arithmetic_check` over one unit's measures and functions."""
+        return arithmetic_check(self.measures(name), self.entries(name), tol)
+
+
+def read(path: str | os.PathLike, default: dict | None = None) -> Report:
+    """A report from `path`, or `Report(default)` when the file does not exist (a bad file still raises)."""
+    path = os.fspath(path)
+    if not os.path.exists(path):
+        return Report(default if default is not None else {"units": [], "measures": {}}, None)
+    with open(path, "r", encoding="utf-8") as fh:
+        return Report(json.load(fh), path)
+
+
+# --------------------------------------------------------------------------------------------------
+# comparisons: moved rows, and the one regression rule
+# --------------------------------------------------------------------------------------------------
+
+def _moved(before: dict, after: dict, eps: float) -> list[dict]:
+    rows = []
+    for key in sorted(set(before) & set(after)):
+        a, b = before[key], after[key]
+        if a is None or b is None:
+            continue
+        delta = b - a
+        if abs(delta) > eps:
+            rows.append({"key": key, "before": a, "after": b, "delta": delta})
+    return rows
+
+
+def diff_units(before: "Report | dict", after: "Report | dict", eps: float = DEFAULT_EPS) -> dict:
+    """Unit rows whose `fuzzy_match_percent` moved (worst first), plus the units added and removed."""
+    ub, ua = Report.coerce(before).unit_measures(), Report.coerce(after).unit_measures()
+    moved = [{"unit": r["key"], "before": r["before"], "after": r["after"], "delta": r["delta"]}
+             for r in _moved({k: num(v.get(SCORE_KEY)) for k, v in ub.items()},
+                             {k: num(v.get(SCORE_KEY)) for k, v in ua.items()}, eps)]
+    moved.sort(key=lambda r: (r["delta"], r["unit"]))
+    return {"moved": moved, "added": sorted(set(ua) - set(ub)), "removed": sorted(set(ub) - set(ua))}
+
+
+def diff_symbols(before: "Report | dict", after: "Report | dict", eps: float = DEFAULT_EPS) -> dict:
+    """Symbol rows whose score moved (worst first, the 0 % rule), plus the symbols added and removed."""
+    sb, sa = Report.coerce(before).symbol_measures(), Report.coerce(after).symbol_measures()
+    moved = []
+    for r in _moved(sb, sa, eps):
+        unit, symbol = r["key"]
+        moved.append({"unit": unit, "symbol": symbol, "before": r["before"], "after": r["after"],
+                      "delta": r["delta"]})
+    moved.sort(key=lambda r: (r["delta"], r["unit"], r["symbol"]))
+    return {"moved": moved, "added": sorted(set(sa) - set(sb)), "removed": sorted(set(sb) - set(sa))}
+
+
+def diff_denominators(before: "Report | dict", after: "Report | dict", eps: float = DEFAULT_EPS) -> list[dict]:
+    """The project total and every category, measure by measure, with the delta and a regression flag."""
+    db, da = Report.coerce(before).denominators(), Report.coerce(after).denominators()
+    rows = []
+    for scope in ["project"] + sorted((set(db) | set(da)) - {"project"}):
+        mb, ma = db.get(scope, {}), da.get(scope, {})
+        keys = [k for k in MEASURE_ORDER if k in mb or k in ma]
+        keys += sorted((set(mb) | set(ma)) - set(MEASURE_ORDER))
+        for key in keys:
+            a, b = mb.get(key), ma.get(key)
+            delta = None if (a is None or b is None) else b - a
+            fell = delta is not None and delta < -eps
+            rows.append({"scope": scope, "metric": key, "before": a, "after": b, "delta": delta,
+                         "moved": delta is not None and abs(delta) > eps, "fell": fell,
+                         "regressed": bool(fell and scope == "project" and key in REGRESSION_KEYS)})
+    return rows
+
+
+def snapshot(report: "Report | dict | None") -> dict:
+    """`{unit: {"fuzzy", "matched_code", "symbols": {name: score < 100}}}` - what a batch is judged against.
+
+    A symbol is listed when it is below 100 % under the 0 % rule (an unscored function is listed at 0.0);
+    an older report's `match_percent` is read when `fuzzy_match_percent` is absent.
+    """
+    out = {}
+    for unit in Report.coerce(report).units():
+        measures = unit.get("measures") or {}
+        symbols = {}
+        for fn in unit.get("functions") or []:
+            pct = fn.get(SCORE_KEY, fn.get("match_percent"))
+            pct = float(pct) if isinstance(pct, (int, float)) and not isinstance(pct, bool) else 0.0
+            if fn.get("name") and pct < 100.0:
+                symbols[fn["name"]] = round(pct, 4)
+        if measures or symbols:
+            out[unit["name"]] = {"fuzzy": measures.get(SCORE_KEY), "matched_code": measures.get("matched_code"),
+                                 "symbols": symbols}
+    return out
+
+
+def unit_grew(prior: dict, after: dict, eps: float = DEFAULT_EPS) -> bool:
+    """A snapshot row only gained: a sub-100 % symbol it did not hold, or more matched bytes."""
+    prior_syms = prior.get("symbols") or {}
+    after_syms = after.get("symbols") or {}
+    if len(after_syms) > len(prior_syms) or any(s not in prior_syms for s in after_syms):
+        return True
+    bm, am = prior.get("matched_code"), after.get("matched_code")
+    return isinstance(bm, (int, float)) and isinstance(am, (int, float)) and am > bm + eps
+
+
+def regression(before: dict, after: dict, allow: list[str] | tuple = (),
+               eps: float = DEFAULT_EPS) -> tuple[list[tuple], list[tuple]]:
+    """The one regression rule over two `snapshot`s -> (unauthorised, authorised) as (unit, what, before, after).
+
+    A symbol the previous snapshot held whose score fell is a drop, whatever the aggregate did; a symbol it
+    did not hold is new, never a drop; a symbol gone from `after` reached 100 %. The unit average speaks only
+    when no symbol does and the unit did not grow (`unit_grew`). `auto_*` scaffold units (outside `/auto/`)
+    are bookkeeping. `allow` names units whose drops an explicit rule authorised (substring match).
+    """
+    unauthorised, authorised = [], []
+    for unit, after_vals in after.items():
+        prior = before.get(unit)
+        if not prior or "auto_" in unit and "/auto/" not in unit:
+            continue
+        rows = []
+        for sym, bpct in (prior.get("symbols") or {}).items():
+            apct = (after_vals.get("symbols") or {}).get(sym)
+            if apct is None:
+                continue
+            if isinstance(apct, (int, float)) and apct < bpct - eps:
+                rows.append((unit, sym, bpct, apct))
+        if not rows and not unit_grew(prior, after_vals, eps):
+            bf, af = prior.get("fuzzy"), after_vals.get("fuzzy")
+            if isinstance(bf, (int, float)) and isinstance(af, (int, float)) and af < bf - eps:
+                rows.append((unit, "unit fuzzy", bf, af))
+        (authorised if any(a in unit for a in allow) else unauthorised).extend(rows)
+    return unauthorised, authorised
+
+
+# --------------------------------------------------------------------------------------------------
+# scoring: `objdiff report generate` on a one-unit project, and the diagnostic diff rows
+# --------------------------------------------------------------------------------------------------
+
+def objdiff_cli(root: str | os.PathLike, main: str | os.PathLike | None = None) -> str:
+    """objdiff-cli of `root`, else of `main`; `root`'s path when neither has it (so the error names it)."""
+    for tree in (root, main):
+        if tree:
+            cand = os.path.join(os.fspath(tree), OBJDIFF_REL)
+            if os.path.exists(cand):
+                return cand
+    return os.path.join(os.fspath(root), OBJDIFF_REL)
+
+
+def write_project(target: str, base: str, unit_name: str | None, tmpdir: str) -> str:
+    """Write a one-unit objdiff project for (`target`, `base`) under `tmpdir`; return its directory.
+
+    Both paths are absolutised: objdiff joins a relative path to the project directory, and on Windows only
+    a backslash-rooted path counts as absolute.
+    """
+    proj = os.path.join(tmpdir, PROJECT_DIR)
+    os.makedirs(proj, exist_ok=True)
+    with open(os.path.join(proj, "objdiff.json"), "w", encoding="utf-8") as fh:
+        json.dump({"min_version": MIN_PROJECT_VERSION,
+                   "units": [{"name": unit_name or "measure", "target_path": os.path.abspath(target),
+                              "base_path": os.path.abspath(base)}]}, fh, indent=2)
+    return proj
+
+
+def score(target: str, base: str, unit_name: str | None = None, tmpdir: str | None = None, *,
+          objdiff: str, cwd: str | None = None, runner: Callable = subprocess.run) -> Report:
+    """The official metric for one object pair: `objdiff report generate` on a one-unit project.
+
+    The report is left at `<tmpdir>/unitutil_report.json` (`Report.path`); `tmpdir` defaults to this
+    process's `lib.repo.session_tmpdir()`. A failed run raises `ReportError` with objdiff's output.
+    """
+    if tmpdir is None:
+        from tools.lib.repo import session_tmpdir
+        tmpdir = session_tmpdir()
+    os.makedirs(tmpdir, exist_ok=True)
+    proj = write_project(target, base, unit_name, tmpdir)
+    out = os.path.join(tmpdir, REPORT_FILE)
+    if os.path.exists(out):
+        os.remove(out)
+    p = runner([objdiff, "report", "generate", "-p", proj, "-o", out],
+               cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if p.returncode != 0 or not os.path.exists(out):
+        raise ReportError("objdiff report generate failed: " + (p.stdout or "") + (p.stderr or ""))
+    with open(out, encoding="utf-8") as fh:
+        return Report(json.load(fh), out)
+
+
+def first_unit(report: Report) -> dict:
+    """The one unit of a one-unit report (an empty dict when it has none)."""
+    units = report.data.get("units") or []
+    return units[0] if units else {}
+
+
+def score_entries(target: str, base: str, unit_name: str | None = None, tmpdir: str | None = None, *,
+                  objdiff: str, cwd: str | None = None, runner: Callable = subprocess.run) -> dict:
+    """`{function: report entry}` of `score`, or `{"_error": text}` (never a 0.0 score)."""
+    try:
+        rep = score(target, base, unit_name, tmpdir, objdiff=objdiff, cwd=cwd, runner=runner)
+    except ReportError as exc:
+        return {"_error": str(exc)}
+    return {f.get("name"): f for f in (first_unit(rep).get("functions") or [])}
+
+
+def symbol_score(target: str, base: str, symbol: str, unit_name: str | None = None, tmpdir: str | None = None,
+                 *, objdiff: str, cwd: str | None = None, runner: Callable = subprocess.run) -> dict:
+    """The official score of one symbol: `{symbol, match_percent, target_size, report_json}` or `{symbol, error}`.
+
+    `match_percent` is the report's `fuzzy_match_percent` as it stands (None when objdiff left it unscored),
+    so a consumer can tell "unscored" from 0 % and the positional diff value is never exposed here.
+    """
+    if tmpdir is None:
+        from tools.lib.repo import session_tmpdir
+        tmpdir = session_tmpdir()
+    entries = score_entries(target, base, unit_name, tmpdir, objdiff=objdiff, cwd=cwd, runner=runner)
+    if "_error" in entries:
+        return {"symbol": symbol, "error": entries["_error"]}
+    fn = entries.get(symbol)
+    if fn is None:
+        return {"symbol": symbol, "error": "symbol is not in the target object (renamed? not in this unit?)"}
+    return {"symbol": symbol, "match_percent": fn.get(SCORE_KEY), "target_size": fn.get("size"),
+            "report_json": os.path.join(tmpdir, REPORT_FILE)}
+
+
+def diff_rows(target: str, base: str, symbol: str, objdiff: str, tmpdir: str,
+              runner: Callable = subprocess.run) -> dict:
+    """Instruction-level diff rows for one symbol (`objdiff diff -1 -2`), **never** a score.
+
+    `-c functionRelocDiffs=none` matches `report generate`'s classification; the JSON's `match_percent` is
+    exposed as `diff_match_percent`, a different normalisation that must not be quoted as the score.
+    """
+    out = os.path.join(tmpdir, "recompile_%s.json" % re.sub(r"\W", "_", symbol))
+    os.makedirs(tmpdir, exist_ok=True)
+    p = runner([objdiff, "diff", "-1", target, "-2", base, symbol,
+                "-c", "functionRelocDiffs=none", "--format", "json", "-o", out],
+               capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if p.returncode != 0 or not os.path.exists(out):
+        return {"symbol": symbol, "error": (p.stdout or "") + (p.stderr or "")}
+    with open(out, encoding="utf-8") as fh:
+        data = json.load(fh)
+    if isinstance(data, dict) and "left" in data:
+        sides = (data.get("left") or {}, data.get("right") or {})
+    elif isinstance(data, dict) and "symbols" in data:
+        sides = (data, data)
+    else:
+        return {"symbol": symbol, "error": "unrecognised objdiff output"}
+
+    def entry(side):
+        return next((s for s in side.get("symbols") or [] if s.get("name") == symbol), None)
+
+    tgt, cand = entry(sides[0]), entry(sides[1])
+    if tgt is None and cand is None:
+        return {"symbol": symbol, "error": "symbol is in neither object (renamed? unpaired?)"}
+    return {"symbol": symbol, "diff_match_percent": (cand or tgt or {}).get("match_percent"),
+            "target_size": (tgt or {}).get("size"), "candidate_size": (cand or {}).get("size"),
+            "paired": tgt is not None and cand is not None, "json": out}
+
+
+# --------------------------------------------------------------------------------------------------
+# freshness: is a prebuilt object (or the report) older than the sources it describes?
+# --------------------------------------------------------------------------------------------------
+
+#: A one-line `#include`; comments are stripped first so a commented-out one is not a dependency.
+INCLUDE_RE = re.compile(r'^\s*#\s*include\s*[<"]([^>"]+)[>"]', re.M)
+MAX_INCLUDE_DEPTH = 12
+
+
+def mtime(path: str) -> float | None:
+    """The file's mtime, or None when it does not exist."""
+    try:
+        return os.path.getmtime(path)
+    except OSError:
+        return None
+
+
+def stamp(t: float | None) -> str:
+    """A local timestamp for a printed report, `-` for a missing file."""
+    return "-" if t is None else time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(t))
+
+
+def stamp_json(t: float | None):
+    """The same instant machine-readably: seconds since the epoch, or None."""
+    return None if t is None else round(t, 3)
+
+
+def freshness(use_report: bool, report_mtime: float | None, object_mtime: float | None,
+              newest_source: tuple[str, float] | None, report_path: str, object_path: str,
+              rel=lambda p: p) -> list[str]:
+    """The reasons the numbers would be stale, worst first - `[]` means current.
+
+    Strict `<`: an equal stamp is current. In report mode the report is checked against the object and the
+    newest source; otherwise the object is checked against the newest source. `rel` shortens printed paths.
+    """
+    reasons: list[str] = []
+    if object_mtime is None:
+        reasons.append("the unit's object does not exist (%s): nothing was built for it in this tree, so "
+                       "the report's rows cannot be this tree's" % rel(object_path))
+    if use_report:
+        if report_mtime is None:
+            reasons.append("the report does not exist (%s)" % rel(report_path))
+        else:
+            if object_mtime is not None and report_mtime < object_mtime:
+                reasons.append(
+                    "the report (%s, %s) predates the unit's object (%s, %s) - it was written before the "
+                    "last build of this unit" % (rel(report_path), stamp(report_mtime), rel(object_path),
+                                                 stamp(object_mtime)))
+            if newest_source is not None and report_mtime < newest_source[1]:
+                reasons.append(
+                    "the report (%s, %s) predates the newest source under the unit (%s, %s) - it holds "
+                    "the PREVIOUS build's scores (report.json is an order-only target of all_source)"
+                    % (rel(report_path), stamp(report_mtime), rel(newest_source[0]),
+                       stamp(newest_source[1])))
+    else:
+        if object_mtime is not None and newest_source is not None and object_mtime < newest_source[1]:
+            reasons.append(
+                "the object (%s, %s) predates the newest source under the unit (%s, %s) - it was not "
+                "rebuilt after the edit" % (rel(object_path), stamp(object_mtime), rel(newest_source[0]),
+                                            stamp(newest_source[1])))
+    return reasons
+
+
+def includes_of(path: str) -> list[str]:
+    """The `#include` targets named in a source file, comments removed."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            text = fh.read()
+    except OSError:
+        return []
+    text = re.sub(r"/\*.*?\*/", " ", text, flags=re.S)
+    text = re.sub(r"//[^\n]*", " ", text)
+    return INCLUDE_RE.findall(text)
+
+
+def rel_path(path: str, tree: str) -> str:
+    """A path as printed: relative to the tree, forward slashes."""
+    try:
+        out = os.path.relpath(path, tree)
+    except ValueError:
+        out = path
+    return out.replace("\\", "/")
+
+
+def _inside(path: str, root: str) -> bool:
+    try:
+        r = os.path.normcase(os.path.abspath(root))
+        return os.path.commonpath([os.path.normcase(os.path.abspath(path)), r]) == r
+    except ValueError:
+        return False
+
+
+def resolve_include(name: str, from_dir: str, root: str) -> str | None:
+    """Where MWCC finds `name` from `from_dir`: beside the includer, then `include/`, then `src/`; in-tree only."""
+    name = name.replace("\\", "/")
+    for base in (from_dir, os.path.join(root, "include"), os.path.join(root, "src")):
+        cand = os.path.normpath(os.path.join(base, *name.split("/")))
+        if os.path.isfile(cand) and _inside(cand, root):
+            return cand
+    return None
+
+
+def source_closure(src: str, root: str) -> list[str]:
+    """The unit's source file and every in-tree header it reaches, transitively (deduplicated)."""
+    out: list[str] = []
+    seen: set[str] = set()
+    todo: list[tuple[str, int]] = [(os.path.abspath(src), 0)]
+    while todo:
+        path, depth = todo.pop(0)
+        key = os.path.normcase(os.path.abspath(path))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(path)
+        if depth >= MAX_INCLUDE_DEPTH:
+            continue
+        for name in includes_of(path):
+            hit = resolve_include(name, os.path.dirname(path), root)
+            if hit and os.path.normcase(os.path.abspath(hit)) not in seen:
+                todo.append((hit, depth + 1))
+    return out
+
+
+def newest(paths: list[str]) -> tuple[str, float] | None:
+    """The `(path, mtime)` of the most recently modified existing path, or None."""
+    best: tuple[str, float] | None = None
+    for p in paths:
+        t = mtime(p)
+        if t is not None and (best is None or t > best[1]):
+            best = (p, t)
+    return best
+
+
+def unit_reasons(src: str, obj: str, root: str, rel=lambda p: p) -> tuple[list[str], tuple[str, float] | None]:
+    """The stale reasons for a unit's prebuilt object against its include closure, and the newest source."""
+    newest_source = newest(source_closure(src, root))
+    return freshness(False, None, mtime(obj), newest_source, "", obj, rel=rel), newest_source
+
+
+def report_reasons(report: str, obj: str, src: str, root: str,
+                   rel=lambda p: p) -> tuple[list[str], tuple[str, float] | None]:
+    """The stale reasons for a report's rows of one unit (report vs object vs include closure)."""
+    newest_source = newest(source_closure(src, root))
+    return freshness(True, mtime(report), mtime(obj), newest_source, report, obj, rel=rel), newest_source
+
+
+class Freshness:
+    """The staleness rule as one namespace: `Freshness.unit_reasons(...)`, `Freshness.report_reasons(...)`."""
+    unit_reasons = staticmethod(unit_reasons)
+    report_reasons = staticmethod(report_reasons)
+    source_closure = staticmethod(source_closure)

@@ -91,50 +91,30 @@ if os.path.dirname(HERE) not in sys.path:
 import measure as ms  # noqa: E402
 import unitutil  # noqa: E402
 from tools.lib import project as _project  # noqa: E402  (the configure / splits readers)
+from tools.lib import report as _report  # noqa: E402  (the 0 % rule, the arithmetic identity)
+from tools.lib import units as _units  # noqa: E402  (the unit spellings)
 
-SRC_EXT = (".c", ".cpp", ".cp", ".cxx", ".cc", ".c++", ".C")
 # one or more ninja outputs before the `:`, e.g. `build build\RMHE08\src\hud\fn_80334568.o: mwcc_sjis`
 _NINJA_BUILD_RE = re.compile(r"^build\s+(.+?):", re.M)
 # objdiff declines to pair a symbol whose one side is more than 50 % smaller than the other.
 OBJDIFF_SIZE_GAP = 1.5
-# a float `fuzzy_match_percent` reproduces from `size * score / 100` up to its report rounding.
-ARITH_TOL = 0.01
+ARITH_TOL = _report.ARITH_TOL
 
 
 # --------------------------------------------------------------------------------------------------
 # names and paths
 # --------------------------------------------------------------------------------------------------
 
-def unit_stem(unit: str) -> str:
-    """`src/hud/fn_80334568.cpp` / `main/hud/fn_80334568` / `build/RMHE08/src/...o` -> `hud/fn_80334568`.
-
-    The key every check is quoted under. The gate spells a unit the way `claims.norm_unit` does
-    (extension stripped, `src/` or `main/` prefix removed), and the report names it `main/<stem>`, so
-    normalising here keeps the three spellings one key.
-    """
-    u = (unit or "").replace("\\", "/").strip().strip("/")
-    for pre in ("build/RMHE08/src/", "build/RMHE08/obj/", "src/", "main/"):
-        if u.startswith(pre):
-            u = u[len(pre):]
-    for ext in SRC_EXT + (".o",):
-        if u.endswith(ext):
-            return u[: -len(ext)]
-    return u
+unit_stem = _units.stem          # every spelling -> `hud/fn_80334568`, the key checks are quoted under
 
 
 def src_object_rel(unit: str) -> str:
     """`hud/fn_80334568` -> `build/RMHE08/src/hud/fn_80334568.o` (the candidate object target)."""
-    return os.path.join("build", "RMHE08", "src", *(unit_stem(unit).split("/"))) + ".o"
+    return _units.obj_rel(unit, "src")
 
 
-def target_object_rel(unit: str) -> str:
-    """`hud/fn_80334568` -> `build/RMHE08/obj/hud/fn_80334568.o` (the split target object)."""
-    return os.path.join("build", "RMHE08", "obj", *(unit_stem(unit).split("/"))) + ".o"
-
-
-def report_unit_name(unit: str) -> str:
-    """The name the objdiff report uses for a unit: `main/<stem>`."""
-    return "main/" + unit_stem(unit)
+target_object_rel = _units.target_rel
+report_unit_name = _units.report_name
 
 
 def _join(main: str, rel: str) -> str:
@@ -419,11 +399,7 @@ def raw_symbol_rows(target_obj: str, candidate_obj: str) -> dict[str, dict]:
 
 def report_unit(report_data: dict, unit: str) -> dict | None:
     """The report.json entry for a unit (`main/<stem>`), or None."""
-    want = report_unit_name(unit)
-    for entry in (report_data or {}).get("units") or []:
-        if entry.get("name") == want:
-            return entry
-    return None
+    return _report.Report.coerce(report_data).unit(_units.report_name(unit))
 
 
 def report_functions(entry: dict | None) -> dict[str, dict]:
@@ -436,49 +412,10 @@ def report_functions(entry: dict | None) -> dict[str, dict]:
     return out
 
 
-def _score(entry: dict | None):
-    """The report's score, or None when the entry is absent.
-
-    **A function with no `fuzzy_match_percent` key is 0 %, not 100 %** (SKILL §5.2): the unit's fuzzy
-    equals the sum over the *listed* partials, so an unscored function contributes nothing. Callers
-    that need a number read `_score(entry) or 0.0`; callers that need "is this scored at all" read the
-    None.
-    """
-    if not entry:
-        return None
-    value = entry.get("fuzzy_match_percent")
-    return float(value) if isinstance(value, (int, float)) else None
+_score = _report.entry_score          # None when unscored; callers read `or 0.0` for the 0 % rule
 
 
-def arithmetic_crosscheck(measures: dict, functions: dict[str, dict],
-                          tol: float = ARITH_TOL) -> tuple[bool, str]:
-    """`sum(size * score / 100) / total_code == fuzzy_match_percent`, absent key = 0.
-
-    The SKILL §5.3 identity. It is what proves the `fuzzy_match_percent`-absent trap was read
-    correctly: with an absent key read as 0 the identity holds (measured on
-    `main/hud/fn_80334568`: 15.664868 computed vs 15.664868 reported), and with it read as 100 the
-    same unit reads 99.999 - so a mismatch here means one of the two readings is wrong and the
-    measurement cannot be trusted.
-    """
-    try:
-        total = int(measures.get("total_code"))
-    except (TypeError, ValueError, AttributeError):
-        return True, "no total_code to check"
-    reported = measures.get("fuzzy_match_percent")
-    if not isinstance(reported, (int, float)):
-        return True, "no unit fuzzy_match_percent to check"
-    matched = 0.0
-    for fn in functions.values():
-        try:
-            size = int(fn.get("size"))
-        except (TypeError, ValueError):
-            continue
-        matched += size * (_score(fn) or 0.0) / 100.0
-    computed = (100.0 * matched / total) if total else 0.0
-    if abs(computed - reported) <= tol:
-        return True, "sum(check) %.5f == report %.5f" % (computed, reported)
-    return False, ("per-symbol sum gives %.5f but the unit reports %.5f - a function with no "
-                   "fuzzy_match_percent key reads as 0%%, not 100%%" % (computed, reported))
+arithmetic_crosscheck = _report.arithmetic_check
 
 
 def size_gap_problems(rep_funcs: dict[str, dict], raw: dict[str, dict]) -> list[str]:

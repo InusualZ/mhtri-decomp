@@ -38,12 +38,12 @@ one scored 100.00000 % by `unitscore.py`.
 
 The unit's two object paths and their mtimes are named in the header (so a stale read is visible), and a
 prebuilt object older than a source in the unit's include closure is flagged with `stale` (the same rule
-`tools/objdiff/freshguard.py` enforces for the scorers).
+`lib.report` (freshness) enforces for the scorers).
 
 **Reuse, not re-implementation.** The object is read by `tools/units/dossier.py`'s `parse_elf` - the
 project's ELF reader, already used by `callees.py` - which carries the RELA addend; the relocation type
 names come from the same module; the unit and its paths come from `tools/unitutil.py`; the staleness
-arithmetic is `tools/objdiff/freshguard.py`. This tool is the section-relocation *view*; `sectiongap.py`
+arithmetic is `lib.report` (freshness). This tool is the section-relocation *view*; `sectiongap.py`
 stays the section size/byte view and pairs relocations by name, while this one pairs by offset and
 carries addends. It deliberately does not decode an instruction's field, resolve a symbol in the link,
 or judge what `splits.txt` claims.
@@ -63,7 +63,7 @@ for _path in (TOOLS, os.path.join(TOOLS, "units"), os.path.join(TOOLS, "elf"), H
         sys.path.insert(0, _path)
 
 import unitutil as uu                                             # noqa: E402
-import freshguard                                                 # noqa: E402
+from tools.lib import report as _report                         # noqa: E402  (root on the path via unitutil)
 from units import dossier                                         # noqa: E402
 
 
@@ -149,8 +149,8 @@ def unit_record(spec: str, sections: list[str] | None = None) -> dict:
                         "(`python configure.py && ninja`)" % unit.target)
         return rec
     src = unit.src if os.path.isabs(unit.src) else os.path.join(uu.ROOT, unit.src)
-    rec["stale"] = freshguard.unit_reasons(src, unit.obj, uu.ROOT,
-                                           rel=lambda p: freshguard.rel_path(p, uu.ROOT))[0]
+    rec["stale"] = _report.unit_reasons(src, unit.obj, uu.ROOT,
+                                           rel=lambda p: _report.rel_path(p, uu.ROOT))[0]
     ours, err = read_relocs(unit.obj)
     if err:
         rec["error"] = err
@@ -332,11 +332,11 @@ def _diff_lines(d: dict, indent: str = "  ") -> list[str]:
 
 def render(rec: dict, rows: int | None = 60) -> None:
     """The human report: the unit's paths and mtimes, then each section's relocations and its diff."""
-    rel = lambda p: freshguard.rel_path(p, uu.ROOT)               # noqa: E731
+    rel = lambda p: _report.rel_path(p, uu.ROOT)               # noqa: E731
     print("== %s" % rec["unit"])
-    print("   ours    %-54s %s" % (rel(rec["ours"]), freshguard.stamp(freshguard.mtime(rec["ours"]))))
+    print("   ours    %-54s %s" % (rel(rec["ours"]), _report.stamp(_report.mtime(rec["ours"]))))
     print("   target  %-54s %s" % (rel(rec["target"]),
-                                   freshguard.stamp(freshguard.mtime(rec["target"]))))
+                                   _report.stamp(_report.mtime(rec["target"]))))
     for reason in rec["stale"]:
         print("   stale   " + reason)
     if rec["error"]:

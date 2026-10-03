@@ -20,7 +20,6 @@ line the build would run, including whatever `configure.py` put in that unit's `
 """
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import atexit
-import json
 import os
 import re
 import shutil
@@ -32,6 +31,8 @@ from dataclasses import dataclass
 
 from tools.lib import proc as _proc
 from tools.lib import repo as _repo
+from tools.lib import report as _report
+from tools.lib import units as _units
 from tools.lib.binary.elf import Elf
 
 # a process launch Windows refuses transiently (WinError 5) is retried, for every tool that imports this module
@@ -108,7 +109,7 @@ VALUED = {
     "-sdata": 1, "-sdata2": 1, "-model": 1, "-abi": 1, "-encoding": 1, "-D": 0, "-U": 0,
     "-gccinc": 0, "-nodefaults": 0, "-nosyspath": 0, "-multibyte": 0, "-gcc": 0, "-rostr": 0,
 }
-SOURCE_EXT = (".c", ".cc", ".cp", ".cpp", ".cxx", ".c++")
+SOURCE_EXT = _units.SOURCE_EXT
 
 
 def caller_worktree(start=None):
@@ -183,134 +184,42 @@ class Unit:
 
 
 def _versions(root=None):
-    build = os.path.join(root or _root(), "build")
-    return sorted(d for d in os.listdir(build)
-                  if os.path.isdir(os.path.join(build, d, "obj"))) if os.path.isdir(build) else []
+    return _units.versions(root or _root())
 
 
-def _find_src(lib, file, root=None):
-    for ext in SOURCE_EXT:
-        p = os.path.join(root or _root(), "src", lib, file + ext)
-        if os.path.exists(p):
-            return p
-    return None
+def _as_unit(u: "_units.Unit") -> Unit:
+    """The old mutable `Unit` shape of a `lib.units.Unit`."""
+    return Unit(name=u.report_name, lib=u.module, file=u.file, version=u.version, src=u.source,
+                obj_dir=u.obj_dir, obj=u.obj_ours, target=u.obj_target)
 
 
 def _make(lib, file, version, root=None):
     """A `Unit`; `lib` is "" for a top-level unit (`src/<file>.cpp`, objdiff name `main/<file>`)."""
-    root = root or _root()
-    src = _find_src(lib, file, root)
-    if src is None:
-        raise SystemExit("no source for unit %s under src/" % ("%s/%s" % (lib, file) if lib else file))
-    sub = [lib] if lib else []
-    return Unit(name="/".join(["main"] + sub + [file]), lib=lib, file=file, version=version, src=src,
-                obj_dir=os.path.join(root, "build", version, "src", *sub),
-                obj=os.path.join(root, "build", version, "src", *sub, file + ".o"),
-                target=os.path.join(root, "build", version, "obj", *sub, file + ".o"))
+    return _as_unit(_units.Unit.make(lib + "/" + file if lib else file, root or _root(), version))
 
 
 def list_units(root=None):
-    """Every configured unit that has source in `root`'s `src/` (`root` defaults to `ROOT`).
-
-    A unit is `src/<lib>/<file>.<ext>` or a top-level `src/<file>.<ext>` (`lib` is "" - `main`,
-    `mh3_pad`, `fn_80047398`, ...); the objdiff name is `main/<lib>/<file>` / `main/<file>`.
-    """
-    root = root or _root()
-    out = []
-    for version in _versions(root):
-        for entry in sorted(os.listdir(os.path.join(root, "src"))):
-            d = os.path.join(root, "src", entry)
-            if os.path.isdir(d):
-                for sub in sorted(os.listdir(d)):
-                    if sub.endswith(SOURCE_EXT):
-                        out.append(_make(entry, os.path.splitext(sub)[0], version, root))
-            elif entry.endswith(SOURCE_EXT):
-                out.append(_make("", os.path.splitext(entry)[0], version, root))
-    return out
+    """Every configured unit that has source in `root`'s `src/` (`root` defaults to `ROOT`)."""
+    return [_as_unit(u) for u in _units.Unit.list(root or _root())]
 
 
 def resolve_unit(spec=None, root=None):
-    """Resolve a unit spec (see the module docstring). With no spec, use the only unit there is.
-
-    `root` names the tree to resolve against and defaults to `ROOT` (the invocation's tree).  Passing it
-    is the same rule `repo_root(start=)` documents - the caller names the tree it means - and it is the
-    only way to resolve a unit in a tree that is **not a git worktree**, i.e. a fixture: without it the
-    fixture silently reads this module's own `ROOT` and refuses (or, worse, resolves the real unit).  The
-    returned `Unit`'s `src`/`obj`/`target` are therefore absolute paths *under that root*.
-
-    A bare file name (`camellia`, `main`, `main.cpp`) names a unit by its stem; when two units share the
-    stem the spec is refused with the candidates, never guessed. A top-level unit is spelled exactly like
-    a nested one without the directory (`main`, `main/main`, `src/main.cpp`, `build/RMHE08/src/main.o`).
-    """
-    units = list_units(root)
-    if spec is None:
-        if len(units) == 1:
-            return units[0]
-        raise SystemExit("--unit is required; candidates:\n  " +
-                         "\n  ".join(u.name for u in units))
-    s = spec.replace("\\", "/").strip()
-    qualified = False          # a `src/`, `main/` or `build/...` prefix says "this is a path, not a bare stem"
-    for pre in ("build/", "src/"):
-        if s.startswith(pre):
-            s = s[len(pre):]
-            qualified = True
-    parts = [p for p in s.split("/") if p not in ("", ".")]
-    if len(parts) > 1 and parts[0] == "main":          # the objdiff prefix; a lone `main` is the unit
-        parts = parts[1:]
-        qualified = True
-    if len(parts) >= 3 and parts[0] in _versions(root):      # build/<ver>/{src,obj}/[<lib>/]<file>.o
-        parts = parts[2:]
-        qualified = True
-    if not parts:
-        raise SystemExit("cannot parse unit spec %r" % spec)
-    file = os.path.splitext(parts[-1])[0]
-    if len(parts) == 1:
-        # a qualified single part is a top-level unit; a bare stem may be a nested unit's file name
-        hits = [u for u in units if u.file == file and (u.lib == "" or not qualified)]
-        if len(hits) == 1:
-            return hits[0]
-        if hits:
-            raise SystemExit("unit spec %r is ambiguous; name the directory:\n  %s"
-                             % (spec, "\n  ".join(u.name for u in hits)))
-        raise SystemExit("no unit with file name %r" % file)
-    lib = parts[-2]
-    for u in units:
-        if u.lib == lib and u.file == file:
-            return u
-    versions = _versions(root)
-    if not versions:
-        raise SystemExit("no build/<version>/obj tree under %s - build first" % (root or _root()))
-    return _make(lib, file, units[0].version if units else versions[0], root)
+    """Resolve a unit spec (the module docstring; `lib.units.Unit.resolve`) in `root` (default `ROOT`)."""
+    return _as_unit(_units.Unit.resolve(spec, root or _root()))
 
 
 def compile_command(unit):
     """The exact command line ninja would run for this unit, as a token list."""
     warn_if_foreign_worktree()
     target = os.path.relpath(unit.obj, _root())
-    p = subprocess.run(["ninja", "-t", "commands", target], cwd=_root(),
-                       capture_output=True, text=True, encoding="utf-8", errors="replace")
-    lines = [l for l in (p.stdout or "").splitlines() if "mwcceppc" in l]
+    lines, p = _units.ninja_lines(_root(), target)
     if not lines:
         raise SystemExit("could not get the compile command for %s from ninja:\n%s%s"
                          % (target, p.stdout, p.stderr))
     return unquote(lines[-1].split())
 
 
-def unquote(tokens):
-    """Merge `"cats off"` (split into two tokens by .split()) back into one token, without quotes."""
-    out, i = [], 0
-    while i < len(tokens):
-        t = tokens[i]
-        if t.startswith('"') and not t.endswith('"'):
-            j = i
-            while j < len(tokens) and not tokens[j].endswith('"'):
-                j += 1
-            out.append(" ".join(tokens[i:j + 1]).strip('"'))
-            i = j + 1
-        else:
-            out.append(t.strip('"'))
-            i += 1
-    return out
+unquote = _units.unquote
 
 
 def split_flags(tokens):
@@ -359,42 +268,9 @@ def override_flags(flags, extra):
 
 
 def run_compile(tokens, expect=None, scratch_dir=None, src=None, verbose=False):
-    """Run a compile command. Returns (rc, output, object path).
-
-    * `expect`  - object path that must exist afterwards (staleness check).
-    * `scratch_dir` - redirect MWCC's `-o` there, so the unit's real object is not clobbered.
-    * `src`     - replace the `-c` source argument (used for source-rewrite experiments).
-    """
-    tokens = list(tokens)
+    """Run a compile command in `ROOT` -> (rc, output, object path) (`lib.units.run_tokens`)."""
     warn_if_foreign_worktree()
-    obj = expect
-    if src is not None:
-        i = tokens.index("-c")
-        tokens[i + 1] = src
-        obj = os.path.join(scratch_dir, os.path.splitext(os.path.basename(src))[0] + ".o") \
-            if scratch_dir else obj
-    if scratch_dir is not None:
-        i = tokens.index("-o")
-        tokens[i + 1] = scratch_dir
-        os.makedirs(scratch_dir, exist_ok=True)
-        if src is None:
-            j = tokens.index("-c")
-            obj = os.path.join(scratch_dir,
-                               os.path.splitext(os.path.basename(tokens[j + 1]))[0] + ".o")
-    if obj and os.path.exists(obj):
-        os.remove(obj)
-    # The filesystem reports whole-second mtimes and objdiff caches on (mtime, size): make sure this
-    # compile lands in a later second than the previous one.
-    time.sleep(1.05)
-    p = subprocess.run(tokens, cwd=_root(), capture_output=True, text=True, encoding="utf-8", errors="replace")
-    out = (p.stdout or "") + (p.stderr or "")
-    if verbose:
-        print("$ " + " ".join(tokens))
-        print(out)
-    if obj and not os.path.exists(obj):
-        out += "\n!! object was NOT regenerated (%s) -- check the -o argument" % obj
-        return 2, out, obj
-    return p.returncode, out, obj
+    return _units.run_tokens(tokens, _root(), expect=expect, scratch_dir=scratch_dir, src=src, verbose=verbose)
 
 
 def quiet(out):
@@ -475,20 +351,9 @@ def objdiff(unit, symbol, out=None, runner=subprocess.run):
     return (out if p.returncode == 0 else None), (p.stdout or "") + (p.stderr or "")
 
 
-# --- official scoring: `report generate`, not `diff` --------------------------------------------
-#
-# objdiff-cli's `diff` mode is not the metric that closes a symbol, and two differences compound:
-#   * `diff` defaults `functionRelocDiffs` to `data_value` while `report generate` defaults to `none`,
-#     so relocation-only differences are counted as mismatches by the former (measured on this repo:
-#     `pl_skill` fn_80270018 reads 99.88 % in diff mode and **100.0 %** in the report);
-#   * even at the same setting, the diff JSON's `match_percent` is a different normalisation from the
-#     report's `fuzzy_match_percent` (`RSOStaticLocateObject` 99.38461 vs 99.64103; the gap reaches
-#     1.25 pt on `main`'s fn_8003F730).
-# `report generate` over a one-unit project is the report code path by construction - the number
-# `build/RMHE08/report.json`, `ledger.py`, `brief.py` and `land.py` read - and it costs ~0.04 s.
-# `tools/units/recompile.py` carries the same primitive for the no-ninja worker path; keep them in sync.
+# --- official scoring: `report generate`, not `diff` (lib.report.score) -------------------------
 
-MIN_PROJECT_VERSION = "2.0.0-beta.5"
+MIN_PROJECT_VERSION = _report.MIN_PROJECT_VERSION
 
 
 def session_tmpdir() -> str:
@@ -496,64 +361,21 @@ def session_tmpdir() -> str:
 
 
 def measure_project(target, base, unit_name, tmpdir):
-    """Write a one-unit objdiff project for (`target`, `base`); return its directory.
-
-    `report generate` resolves `target_path`/`base_path` against the project directory, and on Windows
-    only a backslash-rooted path counts as absolute (`C:/...` is joined and mangled into `C:...`), so
-    both are absolutised with `os.path.abspath` - that shape on Windows, a plain absolute path elsewhere.
-    """
-    proj = os.path.join(tmpdir, "unitutil_project")
-    os.makedirs(proj, exist_ok=True)
-    with open(os.path.join(proj, "objdiff.json"), "w", encoding="utf-8") as fh:
-        json.dump({"min_version": MIN_PROJECT_VERSION,
-                   "units": [{"name": unit_name or "measure",
-                              "target_path": os.path.abspath(target),
-                              "base_path": os.path.abspath(base)}]}, fh, indent=2)
-    return proj
+    """Write a one-unit objdiff project for (`target`, `base`); return its directory."""
+    return _report.write_project(target, base, unit_name, tmpdir)
 
 
 def report_functions(target, base, unit_name=None, tmpdir=None, runner=subprocess.run):
-    """{function: report entry} for one object pair, scored by `report generate` - the official metric.
-
-    Each entry carries `fuzzy_match_percent` and `size` exactly as `build/RMHE08/report.json` does, so
-    a consumer that wants the official score reads `[name]["fuzzy_match_percent"]`. An error is returned
-    as `{"_error": <text>}` (never as a 0.0 score); the one-unit project's report is left in `tmpdir`,
-    which defaults to this process's unique `session_tmpdir()` so concurrent tools cannot collide.
-    """
-    tmpdir = tmpdir or session_tmpdir()
-    os.makedirs(tmpdir, exist_ok=True)
-    proj = measure_project(target, base, unit_name, tmpdir)
-    out = os.path.join(tmpdir, "unitutil_report.json")
-    if os.path.exists(out):
-        os.remove(out)
-    p = runner([_objdiff(), "report", "generate", "-p", proj, "-o", out],
-               cwd=_root(), capture_output=True, text=True, encoding="utf-8", errors="replace")
-    if p.returncode != 0 or not os.path.exists(out):
-        return {"_error": "objdiff report generate failed: " + (p.stdout or "") + (p.stderr or "")}
-    data = json.load(open(out, encoding="utf-8"))
-    units = data.get("units") or []
-    return {f.get("name"): f for f in ((units[0].get("functions") if units else []) or [])}
+    """{function: report entry} for one object pair, scored by `report generate` - the official metric
+    (`lib.report.score_entries`); an error is `{"_error": <text>}`, never a 0.0 score."""
+    return _report.score_entries(target, base, unit_name, tmpdir or session_tmpdir(), objdiff=_objdiff(),
+                                 cwd=_root(), runner=runner)
 
 
 def report_measure(target, base, symbol, unit_name=None, tmpdir=None, runner=subprocess.run):
-    """The official (`fuzzy_match_percent`) score for one symbol of an object pair.
-
-    Returns `{"symbol", "match_percent", "target_size", "report_json"}` or `{"error": ...}`.
-    `match_percent` is deliberately the **report** metric so that any consumer reading it gets the
-    number that closes a symbol; the positional objdiff value is not exposed here (use `objdiff()` if
-    row detail is what is wanted). `tmpdir` defaults to this process's unique `session_tmpdir()`.
-    """
-    tmpdir = tmpdir or session_tmpdir()
-    entries = report_functions(target, base, unit_name=unit_name, tmpdir=tmpdir, runner=runner)
-    if "_error" in entries:
-        return {"symbol": symbol, "error": entries["_error"]}
-    fn = entries.get(symbol)
-    if fn is None:
-        return {"symbol": symbol,
-                "error": "symbol is not in the target object (renamed? not in this unit?)"}
-    report_json = os.path.join(tmpdir, "unitutil_report.json")
-    return {"symbol": symbol, "match_percent": fn.get("fuzzy_match_percent"),
-            "target_size": fn.get("size"), "report_json": report_json}
+    """The official score of one symbol (`lib.report.symbol_score`)."""
+    return _report.symbol_score(target, base, symbol, unit_name, tmpdir or session_tmpdir(), objdiff=_objdiff(),
+                                cwd=_root(), runner=runner)
 
 
 def any_function(obj):

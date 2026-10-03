@@ -61,10 +61,11 @@ for _path in (TOOLS, os.path.join(TOOLS, "units"), HERE):
 
 import unitutil as uu                                             # noqa: E402
 import symdiff                                                    # noqa: E402
-from units import verifyunit as vu                                # noqa: E402
 from tools.lib import project as _project                         # noqa: E402
-from freshguard import (mtime, stamp, stamp_json, freshness, source_closure,  # noqa: E402
-                        newest, rel_path as _rel)
+from tools.lib import report as _report                           # noqa: E402
+from tools.lib import units as _units                             # noqa: E402
+from tools.lib.report import (mtime, stamp, stamp_json, freshness, source_closure,  # noqa: E402
+                              newest, rel_path as _rel)
 
 REPORT_REL = os.path.join("build", "RMHE08", "report.json")
 
@@ -106,7 +107,7 @@ def spec_of(unit_spec: str, report: str | None = None, tree: str | None = None) 
     root = tree or uu.ROOT
     unit = uu.resolve_unit(unit_spec, root=root)
     src = unit.src if os.path.isabs(unit.src) else os.path.join(root, unit.src)
-    return Spec(unit=vu.unit_stem(unit.name), unit_name=unit.name, obj=unit.obj, target=unit.target,
+    return Spec(unit=_units.stem(unit.name), unit_name=unit.name, obj=unit.obj, target=unit.target,
                 src=src, tree=root, report=os.path.abspath(report) if report else os.path.join(root, REPORT_REL),
                 sources=source_closure(src, root))
 
@@ -115,7 +116,7 @@ def rows_of(entry: dict) -> list[Row]:
     """Every symbol the report entry carries, worst first (ties by name) - the one ordering this tool has.
 
     The percent is the report's own `fuzzy_match_percent`; a row the report left unscored (the key is
-    absent) is **0 %, not 100 %** - `verifyunit._score`'s reading, reused here.
+    absent) is **0 %, not 100 %** - `lib.report.score_of`.
     """
     rows: list[Row] = []
     for fn in (entry.get("functions") or []):
@@ -131,10 +132,8 @@ def rows_of(entry: dict) -> list[Row]:
             address = int(addr) if addr is not None else None
         except (TypeError, ValueError):
             address = None
-        pct = fn.get("fuzzy_match_percent")
-        rows.append(Row(name=name, size=size, address=address,
-                        percent=float(pct) if isinstance(pct, (int, float)) else 0.0,
-                        scored=isinstance(pct, (int, float))))
+        rows.append(Row(name=name, size=size, address=address, percent=_report.score_of(fn),
+                        scored=_report.is_scored(fn)))
     rows.sort(key=lambda r: (r.percent, r.name))
     return rows
 
@@ -168,9 +167,9 @@ def split_claims(tree: str, unit: str) -> dict[str, tuple[int, int]]:
     except OSError:
         return {}
     out: dict[str, tuple[int, int]] = {}
-    want = vu.unit_stem(unit)
+    want = _units.stem(unit)
     for block in splits.blocks:
-        if vu.unit_stem(block.unit) == want:
+        if _units.stem(block.unit) == want:
             for r in block.ranges:
                 out[r.section] = (r.start, r.end)
     return out
@@ -217,7 +216,7 @@ def measure_report(spec: Spec, report_path: str) -> tuple[dict | None, str | Non
         data = json.load(open(report_path, encoding="utf-8"))
     except (OSError, ValueError) as exc:
         return None, "cannot read %s: %s" % (report_path, exc)
-    entry = vu.report_unit(data, spec.unit)
+    entry = _report.Report.coerce(data).unit(_units.report_name(spec.unit))
     if entry is None:
         for name in (spec.unit_name, spec.unit):
             for u in (data.get("units") or []):

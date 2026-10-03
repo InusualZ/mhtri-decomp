@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Selftest for `tools/objdiff/freshguard.py` - the shared "is this artefact older than its unit?" rule.
+"""Selftest for the freshness half of `tools/lib/report.py` (was `tools/objdiff/freshguard.py`) - the shared "is this artefact older than its unit?" rule.
 
     python tools/objdiff/freshguard_selftest.py
 
@@ -16,16 +16,12 @@ repository state). It pins the pieces both scorers stand on:
   dates the object just as a `.cpp` edit does.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import os
-import sys
 import tempfile
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-if HERE not in sys.path:
-    sys.path.insert(0, HERE)
-
-import freshguard as fg  # noqa: E402
+from tools.lib import report as fg  # the rule moved to lib.report; tools/objdiff/freshguard.py re-exports it
 
 CHECKS = 0
 FAILURES: list[str] = []

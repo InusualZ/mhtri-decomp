@@ -58,6 +58,8 @@ sys.path.insert(0, HERE)
 
 import unitutil  # noqa: E402
 import recompile as rc  # noqa: E402
+from tools.lib import report as _report  # noqa: E402  (importable once unitutil has put the root on the path)
+from tools.lib import units as _units  # noqa: E402
 
 STATE_DIR = os.path.join("build", "tmp", "measure")
 
@@ -67,40 +69,14 @@ def _san(name: str) -> str:
 
 
 def normalize_unit(unit: str, wt: str) -> str:
-    """`src/Camellia/camellia` / `main/Camellia/camellia` / `Camellia/camellia` -> `Camellia/camellia.c`.
-
-    `recompile.unit_source` appends `.cpp` when no extension is given, which fails for every `.c` unit in
-    the tree (`Camellia/camellia`, the `Runtime.PPCEABI.H` library, ...). Infer the extension from the
-    worktree's `src/` instead, and strip the prefixes a worker is likely to paste (`src/`, `main/`,
-    `build/RMHE08/src/`).
-    """
-    u = unit.replace("\\", "/").strip()
-    while u.startswith("./"):
-        u = u[2:]
-    while True:
-        for pre in ("build/RMHE08/src/", "build/RMHE08/obj/", "build/", "src/"):
-            if u.startswith(pre):
-                u = u[len(pre):]
-                break
-        else:
-            break
-    if u.startswith("main/"):
-        u = u[len("main/"):]
-    u = u.lstrip("/")
-    if not u.endswith(rc.SRC_EXT):
-        for ext in (".cpp", ".c", ".cp", ".cxx", ".cc"):
-            if os.path.isfile(os.path.join(wt, "src", *u.split("/")) + ext):
-                return u + ext
-    return u
+    """A pasted unit (`src/`, `main/`, `build/RMHE08/src/` prefixes) as its spelling with the real extension,
+    resolved in this tree (`lib.units.source_spelling`)."""
+    return _units.source_spelling(unit, (wt,))
 
 
 def objdiff_path(wt: str, main: str) -> str:
-    """objdiff-cli from this tree if it has one, else MAIN's - a fresh worktree may have neither."""
-    for root in (wt, main):
-        cand = os.path.join(root, "build", "tools", "objdiff-cli.exe")
-        if os.path.exists(cand):
-            return cand
-    return unitutil.OBJDIFF
+    """objdiff-cli from this tree if it has one, else MAIN's (`lib.report.objdiff_cli`)."""
+    return _report.objdiff_cli(wt, main)
 
 
 # Resolution lives in `recompile` so `recompile.py --measure` and this tool cannot disagree about which
@@ -120,30 +96,14 @@ def candidate_functions(obj: str):
 
 def score_report(target: str, base: str, unit_name: str, tmpdir: str, objdiff: str,
                  runner=subprocess.run):
-    """One `report generate` over the pair -> ({name: entry}, unit measures, error-or-report-path).
-
-    `unitutil.report_functions` is the shared primitive: one project, one report, every symbol. It reads
-    its binary from the module global, so point that at the tree-resolved objdiff for the call.
-    """
-    previous = unitutil.OBJDIFF
-    unitutil.OBJDIFF = objdiff
+    """One `report generate` over the pair (`lib.report.score`) -> ({name: entry}, unit measures,
+    error-or-report-path)."""
     try:
-        entries = unitutil.report_functions(target, base, unit_name=unit_name, tmpdir=tmpdir,
-                                            runner=runner)
-    finally:
-        unitutil.OBJDIFF = previous
-    if "_error" in entries:
-        return None, {}, entries["_error"]
-    measures = {}
-    report_path = os.path.join(tmpdir, "unitutil_report.json")
-    try:
-        data = json.load(open(report_path, encoding="utf-8"))
-        units = data.get("units") or []
-        if units:
-            measures = units[0].get("measures") or {}
-    except (OSError, ValueError):
-        pass
-    return entries, measures, report_path
+        rep = _report.score(target, base, unit_name, tmpdir, objdiff=objdiff, cwd=unitutil.ROOT, runner=runner)
+    except _report.ReportError as exc:
+        return None, {}, str(exc)
+    unit = _report.first_unit(rep)
+    return {f.get("name"): f for f in unit.get("functions") or []}, unit.get("measures") or {}, rep.path
 
 
 def aggregates(entries: dict, measures: dict) -> dict:

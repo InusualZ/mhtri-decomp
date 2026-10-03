@@ -10,7 +10,7 @@ Usage:
 `-u <unit>` scores the unit's **prebuilt** object (`build/RMHE08/src/<unit>.o`), so it refuses to print
 numbers when a source or header under the unit is newer than that object (exit 1, naming the newer
 file): a lane that measured a stale object reported two "improvements" that were never built. The rule
-and its arithmetic live in `tools/objdiff/freshguard.py`, shared with `unitscore.py`; `--force-stale`
+and its arithmetic live in `lib.report` (freshness), shared with `unitscore.py`; `--force-stale`
 scores it anyway and says so on stderr.
 
 A bare `-u <unit>` is the **first measurement of a unit in one command**: it lists every symbol the
@@ -44,11 +44,11 @@ import time
 from tools.lib import repo as librepo
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # tools/
-_HERE = os.path.dirname(os.path.abspath(__file__))                 # tools/objdiff (freshguard lives here)
+_HERE = os.path.dirname(os.path.abspath(__file__))                 # tools/objdiff
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 import unitutil as uu
-import freshguard
+from tools.lib import report as _report
 
 
 def session_tmpdir() -> str:
@@ -62,14 +62,14 @@ def stale_reasons(unit, root: str | None = None) -> list[str]:
     `report generate` (the listing) or one `report measure` (the per-symbol score). If a source or
     header under the unit is newer than that object, the score describes a build that no longer exists:
     a lane measured exactly that, twice, and reported two "improvements" that were never compiled. This
-    is the same rule `unitscore.py` enforces (`tools/objdiff/freshguard.py` holds the arithmetic), applied
+    is the same rule `unitscore.py` enforces (`lib.report` (freshness) holds the arithmetic), applied
     to the tool that scores without one. `root` is the tree the include closure is resolved in (default
     `unitutil.ROOT`); the selftest passes a fixture tree.
     """
     root = root or uu.ROOT
     src = unit.src if os.path.isabs(unit.src) else os.path.join(root, unit.src)
-    reasons, _newest = freshguard.unit_reasons(src, unit.obj, root,
-                                              rel=lambda p: freshguard.rel_path(p, root))
+    reasons, _newest = _report.unit_reasons(src, unit.obj, root,
+                                              rel=lambda p: _report.rel_path(p, root))
     return reasons
 
 

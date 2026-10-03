@@ -30,6 +30,8 @@ import re
 import sys
 
 from tools.lib import names as libnames
+from tools.lib import report as _report
+from tools.lib import units as _units
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 GAME = "RMHE08"
@@ -60,14 +62,8 @@ def read_json(path: str) -> dict | None:
         return json.load(fh)
 
 
-def report_name(unit: str) -> str:
-    """`Camellia/camellia.c` (splits.txt, configure.py) -> `main/Camellia/camellia` (report.json)."""
-    return "main/" + os.path.splitext(unit)[0]
-
-
-def bare(unit: str) -> str:
-    """Either spelling of a unit, without its extension and the report's `main/` prefix."""
-    return os.path.splitext(unit)[0].removeprefix("main/")
+report_name = _units.report_name      # `Camellia/camellia.c` -> `main/Camellia/camellia`
+bare = _units.stem                     # either spelling, without its extension and `main/`
 
 
 def stale(report_path: str, sources: tuple[str, ...] = SOURCES) -> bool:
@@ -137,12 +133,7 @@ class Ledger:
         self.objects = Objects(config_path)
         # The report is a *build* output, so it can describe a repository one registration out of date.
         self.stale = report is None and stale(report_path)
-        self.scores: dict[str, dict[str, float]] = {
-            unit["name"]: {
-                function["name"]: function.get(SCORE_KEY, 0.0) for function in unit.get("functions", ())
-            }
-            for unit in self.report["units"]
-        }
+        self.scores: dict[str, dict[str, float]] = _report.Report(self.report).scores()
 
     # -- reading the map -------------------------------------------------------------------------
 
