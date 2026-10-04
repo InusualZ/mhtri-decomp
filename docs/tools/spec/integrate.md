@@ -17,14 +17,14 @@ it; a lane under the trial rule runs `--dry-run` to prove names-only drift.
 ```
 python tools/units/integrate.py [--requests FILE..] [--lane SLUG..] [--outbox DIR] [--only ID..] [--names FILE]
     [--lane-units UNIT..] [--base BRANCH] [--branch NAME] [--dry-run] [--no-build] [--no-gate] [--no-claims]
-    [--no-comments] [--no-mangle-check] [--retries N] [--commit] [--write-status] [--json]
+    [--no-comments] [--no-mangle-check] [--retries N] [--no-commit] [--write-status] [--json]
 python tools/units/land.py integrate ARGS...        # the same, forwarded unchanged
 ```
 
 * default input: every `*-requests.json` in `MAIN/.pi/outbox`; `--lane` names slugs; `--names` supplies the decisions
   (`old new`, `old` a spelling or `0xADDR`) a GUESS or an unnamed target needs.
 * `--dry-run` classifies, resolves and plans; writes nothing (no branch, no file, no sidecar).
-* `--commit`: two commits - `config/symbols: name the N symbols ...` (the map and its sweep only) and
+* default: two commits (`--no-commit` leaves the result in the working tree; `--dry-run` never commits; `--commit` is accepted and ignored): two commits - `config/symbols: name the N symbols ...` (the map and its sweep only) and
   `game/<module>: declare the integrated callees in their owners' headers` (everything else); both subjects pass
   `commitlint.py`.
 * `--write-status` records each request's verdict (`applied` / `judgement` / `deferred`) in its sidecar.
