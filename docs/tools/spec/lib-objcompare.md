@@ -60,8 +60,11 @@ object for drift and for "touched". Every function takes a path, the bytes of an
   changed inputs are re-read and the file is written only when an input appeared, vanished or moved.
 * **Two fingerprints, two questions**: `fingerprint` is rename-insensitive (string tables skipped, symbol names dropped) so a
   rename sweep is not drift; `touch_fingerprint` hashes everything but external targets and resolves those by address through
-  the map, so a rename sweep is not a touch. Both are byte-compatible with the values stored before this module existed
-  (`.pi/land-base.json` keeps them across a landing).
+  the map, so a rename sweep is not a touch. Both hash a section's *contents* (`Section.data`), so a `SHT_NOBITS` section
+  contributes only its name and size: dtk writes a `.bss`/`.sbss` header offset of 0, and its file slice is the ELF header,
+  whose section-table offset moves with `.strtab`'s length - hashing that slice made a rename read as a re-range (2026-10-04,
+  6 units in the L4/L2 landings). `fingerprint` values of an object with a NOBITS section changed with that fix; nothing
+  compares across versions, because `.pi/land-base.json` is recorded fresh by every landing's `record-base`.
 * The `symbols` size-gap threshold is strict (`>`), and gates only the size-gap class; an absent symbol is always 100 % apart.
 
 ## Absorbs (today's implementations)
@@ -82,11 +85,12 @@ link_symbol_index/external_candidates/spelling_hint/unresolved_names`, `relocaud
 
 ## Test contract
 
-Tier: fixture (`tools/tests/lib/test_objcompare.py`, 75 checks, every object built with `ElfBuilder`): F41 (moved relocations,
+Tier: fixture (`tools/tests/lib/test_objcompare.py`, 79 checks, every object built with `ElfBuilder`): F41 (moved relocations,
 both offset sets) and F39 (a short record), the objdump/objcopy views (repeated names, NOBITS), both permutation classes, the
 three symbol classes and the strict threshold, the address-resolved `pad_` row, the four relocation classes and the owner
 view, both same-named relocation sections read, every `undefined` exemption and both hints, the link index and its cache, the
-linkage classifier in both directions, and both fingerprints. Mutation-checked: seven seeded defects (last-rela-only, no
+linkage classifier in both directions, and both fingerprints (a dtk-shaped `.bss` at header offset 0 plus a longer
+`.strtab` is not drift, a `.data` byte is). Mutation-checked: seven seeded defects (last-rela-only, no
 relocation reasons, target not excluded, string tables hashed, first-of-repeated, inclusive threshold, target definitions
 ignored) each fail at least one check.
 

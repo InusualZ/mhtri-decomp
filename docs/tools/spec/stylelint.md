@@ -19,11 +19,21 @@ python tools/units/stylelint.py --diff <ref>      # exit 0 = the working tree ad
 python tools/units/stylelint.py --diff <ref> --list-added  # ... and name each added finding
 python tools/units/stylelint.py --ref <branch>    # read-only: judge a held branch's committed tree
 python tools/units/stylelint.py --json            # machine-readable findings + budget
+python tools/units/stylelint.py --findings [--path GLOB]... [--rule N]... [--json]   # each finding of the budget set
+python tools/units/stylelint.py --findings --diff <ref> [--path GLOB] [--rule N]   # each ADDED finding
 python tools/units/stylelint.py --selftest
 ```
-Flags: `--budget`, `--diff`, `--headers`, `--json`, `--list-added`, `--ref`, `--selftest`.
+Flags: `--budget`, `--diff`, `--findings`, `--headers`, `--json`, `--list-added`, `--path`, `--ref`, `--rule`, `--selftest`.
 Exit codes: It is a **report**: the exit status and the flag-absent summary lines are byte-identical, because the landing gate reads them.
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
+
+`--findings` lists one finding per line, `<file>:<line>  rule <N>  <token>`, then a count per rule; with `--json` it is the
+`lib.findings` schema with each row a `Finding.to_dict()` (`rule, file, line, token, text, detail`) plus `scope`, `filters`
+and `by_rule`. The set is `--diff`'s added findings (the `--list-added` rows; exit 1 when the batch adds any, exactly as
+`--diff`) or the whole-tree `--budget` set (exit 0; `--headers` adds the band's rule-2 rows). `--path` is an `fnmatch` glob
+(no wildcard: a directory or file prefix) and `--rule` a rule number, both repeatable unions, and both refuse without
+`--findings`. Measured 2026-10-04 at 042956de2: the budget set is 50 084 findings and its per-rule counts equal the
+`--json` budget totals rule for rule.
 
 ## Inputs and outputs
 

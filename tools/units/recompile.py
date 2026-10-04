@@ -370,9 +370,13 @@ def main() -> int:
         refuse_if_split_stale(wt, main_wt, allow_stale=args.allow_stale_split)
     map_path, map_kind = resolve_map(wt, main_wt)
     tokens, cmd_source = unit_tokens(main_wt, wt, unit)
+    # the graph's flags are only as new as its last `python configure.py`; this tree's configure.py decides
+    tokens, flag_notes = _units.reconcile_flags(tokens, wt, unit)
     result = dict(compile_unit(unit, main_wt, wt, dry_run=args.dry_run, tokens=tokens))
     result.update({"unit": unit, "worktree": wt, "main": main_wt,
                    "symbol_map": map_path, "symbol_map_kind": map_kind})
+    if flag_notes:
+        result["flags_reread"] = flag_notes
     if cmd_source != "main":
         # the registered path must read exactly as it did before; a proposal says where its flags came from
         result["command_source"] = cmd_source
@@ -416,6 +420,8 @@ def main() -> int:
     if args.dry_run:
         print("would run (cwd %s):\n  %s" % (main_wt, " ".join('"%s"' % t if " " in t else t for t in result["command"])))
         print("object  -> %s" % result["object"])
+        for note in result.get("flags_reread") or ():
+            print("[flags] %s" % note)
         return 0
     if not result.get("compiled"):
         print("FAILED: %s\n%s" % (result["unit"], result.get("error", "")))
@@ -446,6 +452,8 @@ def main() -> int:
         print("  [no target] %s" % result["target_note"])
     if result.get("command_source"):
         print("  command  %s" % result["command_source"])
+    for note in result.get("flags_reread") or ():
+        print("  [flags] %s" % note)
     for name, size in sorted((result.get("sections") or {}).items()):
         print("  %-12s 0x%X" % (name, size))
     if "measure" in result:

@@ -1193,8 +1193,52 @@ def cli_rows() -> int:
     return failures
 
 
+def flags_reread_rows() -> int:
+    """A configure.py row switched after the last `python configure.py`: the graph's stale flags are replaced by
+    the ones the tree's configure.py evaluates to (the network pilot measured `-O4,p` after a row went `-O3`)."""
+    failures = 0
+    stale_line = ('cmd /c build\\tools\\sjiswrap.exe build\\compilers\\Wii\\1.3\\mwcceppc.exe -nodefaults '
+                  '-pragma "cats off" -O4,p -inline auto -lang=c++ -MMD -c src\\prop\\unit.cpp -o build\\RMHE08\\src\\prop')
+    tokens = lib_units.unquote(stale_line.split())
+    with tempfile.TemporaryDirectory() as tmp:
+        conf = os.path.join(tmp, "configure.py")
+
+        def write(row_flags, version="Wii/1.3"):
+            open(conf, "w", encoding="utf-8").write(
+                'cflags_main = ["-nodefaults", \'-pragma "cats off"\', "-O4,p", "-inline auto"]\n'
+                'config.libs = [\n    {\n        "lib": "prop",\n        "mw_version": "%s",\n'
+                '        "cflags": cflags_main,\n        "objects": [\n'
+                '            Object(NonMatching, "prop/unit.cpp"%s),\n        ],\n    },\n]\n' % (version, row_flags))
+
+        write("")
+        out, notes = lib_units.reconcile_flags(tokens, tmp, "prop/unit.cpp")
+        failures = _ok("flags: a graph that agrees with configure.py is left as it is", (out, notes), (tokens, []),
+                       failures)
+        write(', cflags=[f for f in cflags_main if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]')
+        out, notes = lib_units.reconcile_flags(tokens, tmp, "prop/unit.cpp")
+        head, flags, tail = lib_units.split_flags(out)
+        failures = _ok("flags: a row switched to -O3 after the graph was written compiles at -O3",
+                       flags, ["-nodefaults", "-pragma", "cats off", "-O3", "-inline", "noauto", "-lang=c++"], failures)
+        failures = _ok("flags: the head and the tail are the graph's", (head, tail),
+                       (lib_units.split_flags(tokens)[0], lib_units.split_flags(tokens)[2]), failures)
+        failures = _ok("flags: the re-read is reported", len(notes) == 1 and "-O3" in notes[0], True, failures)
+        write("", version="Wii/1.0")
+        out, notes = lib_units.reconcile_flags(tokens, tmp, "prop/unit.cpp")
+        failures = _ok("flags: a changed mw_version re-points the compiler",
+                       (lib_units.compiler_version(lib_units.split_flags(out)[0]), len(notes)), ("Wii/1.0", 1),
+                       failures)
+        out, notes = lib_units.reconcile_flags(tokens, tmp, "prop/other.cpp")
+        failures = _ok("flags: a unit configure.py does not register is left as it is", (out, notes), (tokens, []),
+                       failures)
+        os.remove(conf)
+        failures = _ok("flags: no configure.py is left as it is",
+                       lib_units.reconcile_flags(tokens, tmp, "prop/unit.cpp"), (tokens, []), failures)
+    return failures
+
+
 def main() -> int:
     failures = cli_rows()
+    failures += flags_reread_rows()
     failures += wire_rows()
     failures += include_order_rows()
     failures += chained_objalign_rows()

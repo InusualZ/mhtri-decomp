@@ -279,5 +279,32 @@ def test_fingerprints(c):
         c.check("touch: unreadable is None", oc.touch_fingerprint(p["raw"]), None)
 
 
+def _dtk_bss(sym="s", data=b"\x01\x02\x03\x04"):
+    """An object with a `.bss` whose header offset is 0, as dtk writes it: its file slice is the ELF header, so
+    a longer symbol name (a longer `.strtab`) moves the section-table offset inside that slice."""
+    from tools.lib.binary.elf import Elf
+    blob = bytearray(ElfBuilder().section(".data", data).nobits(".bss", 0x40)
+                     .symbol(sym, ".data", 0, 4, type="object").symbol("b_" + sym, ".bss", 0, 4, type="object")
+                     .build())
+    bss = next(s for s in Elf.read(bytes(blob)).sections if s.name == ".bss")
+    blob[bss.header + 16:bss.header + 20] = b"\0\0\0\0"              # sh_offset = 0
+    return bytes(blob)
+
+
+def test_fingerprint_nobits(c):
+    with testing.FixtureTree() as tree:
+        a = str(tree.write("a.o", _dtk_bss()))
+        renamed = str(tree.write("r.o", _dtk_bss(sym="a_much_longer_symbol_name_that_grows_strtab")))
+        edited = str(tree.write("d.o", _dtk_bss(data=b"\x09\x02\x03\x04")))
+        c.check("fixture: the rename really moved the bytes a header-offset-0 .bss slices",
+                open(a, "rb").read()[:0x40] != open(renamed, "rb").read()[:0x40], True)
+        c.check("fingerprint: a .bss at offset 0 plus a .strtab length change is not drift",
+                oc.fingerprint(a) == oc.fingerprint(renamed), True)
+        c.check("fingerprint: a real .data change in the same object is drift",
+                oc.fingerprint(a) == oc.fingerprint(edited), False)
+        c.check("touch: the same rename keeps the touch body",
+                oc.touch_fingerprint(a)["body"] == oc.touch_fingerprint(renamed)["body"], True)
+
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))

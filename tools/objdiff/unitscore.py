@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Every symbol of one unit from one report read, refusing a stale report. Spec: docs/tools/spec/unitscore.md.
-CLI: python tools/objdiff/unitscore.py <unit> [--measure] [--threshold P] [--report R] [--json] [--force-stale] | --selftest."""
+CLI: python tools/objdiff/unitscore.py <unit> [--measure] [--refresh] [--threshold P] [--report R] [--json] [--force-stale] | --selftest."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
@@ -8,8 +8,10 @@ import argparse
 import json
 import os
 import sys
+import time
 from dataclasses import dataclass, field
 
+from tools.lib import proc as _proc
 from tools.lib import project as _project
 from tools.lib import repo as _repo
 from tools.lib import report as _report
@@ -245,17 +247,41 @@ def summary_line(spec: Spec, measures: dict, rows: list[Row], shown: int,
     return "summary: " + "; ".join(parts)
 
 
+def refresh_target(spec: Spec, measure: bool = False) -> str:
+    """The ninja target `--refresh` builds: the unit's object for `--measure` (it reads nothing else), else the
+    tree's project report - which depends on `all_source`, so every stale object of the tree is compiled first."""
+    path = os.path.relpath(spec.obj, spec.tree) if measure else REPORT_REL
+    return path.replace("\\", "/")
+
+
+def refresh(spec: Spec, measure: bool = False, runner=None) -> dict:
+    """Run `ninja <refresh_target>` in the unit's tree: `{target, seconds, ok, error}` (the error carries the
+    tail of ninja's output). It costs a build - the whole tree's stale objects for the report."""
+    target = refresh_target(spec, measure)
+    started = time.time()
+    p = (runner or _proc.run)(["ninja", target], cwd=spec.tree)
+    out = {"target": target, "seconds": round(time.time() - started, 1), "ok": p.returncode == 0, "error": None}
+    if p.returncode != 0:
+        tail = ((p.stdout or "") + (p.stderr or "")).strip().splitlines()[-6:]
+        out["error"] = "ninja %s failed (exit %d): %s" % (target, p.returncode, " | ".join(tail))
+    return out
+
+
 def run(spec: Spec, *, report: str | None = None, threshold: float | None = None, force: bool = False,
-        measure: bool = False, tmpdir: str | None = None) -> dict:
-    """Score the unit and build the record. `refused` is the freshness guard's verdict, not an error."""
+        measure: bool = False, tmpdir: str | None = None, refresh_build: bool = False, runner=None) -> dict:
+    """Score the unit and build the record. `refused` is the freshness guard's verdict, not an error.
+    `refresh_build` first rebuilds what the score reads (`refresh`); a failed build is the record's error."""
     report_path = os.path.abspath(report) if report else spec.report
+    refreshed = refresh(spec, measure, runner) if refresh_build else None
     obj_mtime = mtime(spec.obj)
     newest_source = newest(spec.sources)
     mtimes = {"report": mtime(report_path), "object": obj_mtime, "source": newest_source}
 
     entry: dict | None = None
     error: str | None = None
-    if measure:
+    if refreshed is not None and not refreshed["ok"]:
+        error = refreshed["error"]
+    elif measure:
         entry, error = score_by_measure(spec, tmpdir=tmpdir)
     else:
         entry, error = measure_report(spec, report_path)
@@ -283,6 +309,7 @@ def run(spec: Spec, *, report: str | None = None, threshold: float | None = None
         "refused": False,
         "error": error,
         "forced": bool(force),
+        "refreshed": refreshed,
     }
     # the guard is only meaningful when there is something to print: a missing report is an error, and an
     # error is exit 2 whatever the mtimes say.
@@ -322,6 +349,9 @@ def render(record: dict) -> None:
         print("%-10s %-46s %s%s" % (label, rel(path) if path else "-", when, extra))
 
     print("== %s  (report unit %s, mode %s)" % (record["unit"], record["unit_name"], record["mode"]))
+    if record.get("refreshed"):
+        r = record["refreshed"]
+        print("%-10s ninja %s  (%s, %.1f s)" % ("refresh", r["target"], "ok" if r["ok"] else "FAILED", r["seconds"]))
     if record["report"]["used"]:
         row("report", record["report"]["path"], record["report"]["mtime_iso"])
     else:
@@ -377,6 +407,9 @@ def cli(argv: list[str] | None = None) -> int:
     ap.add_argument("--measure", action="store_true",
                     help="score the objects on disk with one `objdiff report generate` instead of "
                          "reading the project report")
+    ap.add_argument("--refresh", action="store_true",
+                    help="rebuild first: `ninja build/RMHE08/report.json` (compiles every stale object of the "
+                         "tree - it costs a build), or with --measure only the unit's object")
     ap.add_argument("--force-stale", action="store_true",
                     help="print the numbers even when the report (or object) is older than the unit's "
                          "sources - the STALE verdict stays in the output")
@@ -388,6 +421,8 @@ def cli(argv: list[str] | None = None) -> int:
         return unitscore_selftest.selftest()
     if not args.unit:
         ap.error("a unit is required (or --selftest)")
+    if args.refresh and args.report and not args.measure:
+        ap.error("--refresh rebuilds the tree's own build/RMHE08/report.json; it cannot rebuild --report")
 
     try:
         spec = spec_of(args.unit, report=args.report)
@@ -395,7 +430,7 @@ def cli(argv: list[str] | None = None) -> int:
         print(str(exc), file=sys.stderr)
         return 2
     record = run(spec, report=args.report, threshold=args.threshold, force=args.force_stale,
-                 measure=args.measure)
+                 measure=args.measure, refresh_build=args.refresh)
     if args.json:
         print(json.dumps(record, indent=2))
     else:

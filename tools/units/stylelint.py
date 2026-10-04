@@ -12,6 +12,8 @@ violation is refused before it is committed.
     python tools/units/stylelint.py --diff <ref> --list-added  # ... and name each added finding
     python tools/units/stylelint.py --ref <branch>    # read-only: judge a held branch's committed tree
     python tools/units/stylelint.py --json            # machine-readable findings + budget
+    python tools/units/stylelint.py --findings [--diff <ref>] [--path GLOB] [--rule N] [--json]
+                                                      # each finding of the budget (or added) set
     python tools/units/stylelint.py --selftest
 
 Rules checked (each finding is `file:line`):
@@ -2406,6 +2408,45 @@ def source_files_of(findings: list[dict]) -> set[str]:
     return {f["file"] for f in findings}
 
 
+def select_findings(findings: list[dict], paths: "list[str] | None" = None,
+                    rules: "list[int] | None" = None) -> list[dict]:
+    """The `--findings` filter: a finding whose file matches any `--path` glob (`fnmatch`, `/` separators; a
+    glob with no wildcard is a directory or file prefix) and whose rule is any `--rule`; no filter keeps all.
+    Sorted by (file, line, rule) so a listing reads top-down per file."""
+    import fnmatch
+
+    def path_ok(rel: str) -> bool:
+        if not paths:
+            return True
+        for glob in paths:
+            glob = glob.replace("\\", "/")
+            if any(c in glob for c in "*?["):
+                if fnmatch.fnmatchcase(rel, glob):
+                    return True
+            elif rel == glob or rel.startswith(glob.rstrip("/") + "/"):
+                return True
+        return False
+
+    out = [f for f in findings if path_ok(f["file"]) and (not rules or f["rule"] in rules)]
+    return sorted(out, key=lambda f: (f["file"], f["line"], f["rule"]))
+
+
+def print_findings_listing(rows: list[dict], scope: str, as_json: bool, paths=None, rules=None) -> None:
+    """`--findings`: one `file:line  rule N  token` line per finding, or the `lib.findings` JSON schema
+    (`{tool, rows, ok, summary}` + `scope`/`filters`/`by_rule`), each row a `Finding.to_dict()`."""
+    by_rule = dict(sorted(collections.Counter(f["rule"] for f in rows).items()))
+    if as_json:
+        verdict = _findings.Verdict.of(_findings.Finding.from_dict(f) for f in rows)
+        print(_findings.render_json("stylelint", verdict, scope=scope,
+                                    filters={"path": list(paths or []), "rule": list(rules or [])},
+                                    by_rule={str(k): v for k, v in by_rule.items()}))
+        return
+    for f in rows:
+        print("%s:%d  rule %d  %s" % (f["file"], f["line"], f["rule"], f.get("token") or "-"))
+    print("stylelint: %d finding(s) in the %s set%s" % (
+        len(rows), scope, (" (" + ", ".join("rule %d: %d" % kv for kv in by_rule.items()) + ")") if rows else ""))
+
+
 def print_findings(findings: list[dict]) -> None:
     for f in findings:
         print("%s:%d: rule %d: %s [%s]" % (f["file"], f["line"], f["rule"], f["detail"], f["text"]))
@@ -4112,6 +4153,34 @@ def selftest() -> int:
           file_absorbers({"A/g1": ["A/f", "A/zz"], "A/g2": ["A/f"], "A/g3": ["A/zz"]}, [F], [G1, G2, G3]),
           {F: [G1, G2]})
 
+    # --- --findings: the listing of the --diff / --budget set, filtered ----------------------------------
+    listed = [_af(7, "src/Network/b.cpp", 9, "fn_00000009"), _af(2, "src/Network/a.cpp", 4, "lbl_1"),
+              _af(7, "src/Network/a.cpp", 2, "fn_00000002"), _af(7, "src/Pl/p.cpp", 1, "fn_00000001"),
+              _af(2, "include/Network/n.h", 3, "x")]
+    check("--findings: no filter keeps every finding, sorted by file then line",
+          [(f["file"], f["line"]) for f in select_findings(listed)],
+          [("include/Network/n.h", 3), ("src/Network/a.cpp", 2), ("src/Network/a.cpp", 4),
+           ("src/Network/b.cpp", 9), ("src/Pl/p.cpp", 1)])
+    check("--findings --path GLOB --rule N keeps the intersection",
+          [f["token"] for f in select_findings(listed, ["src/Network/*"], [7])], ["fn_00000002", "fn_00000009"])
+    check("--findings --path with no wildcard is a directory prefix, not a substring",
+          [f["file"] for f in select_findings(listed, ["src/Net"])], [])
+    check("--findings: repeated --path and --rule are unions",
+          len(select_findings(listed, ["src/Pl", "include/*"], [2, 7])), 2)
+    _buf = io.StringIO()
+    with contextlib.redirect_stdout(_buf):
+        print_findings_listing(select_findings(listed, rules=[2]), "budget", True, None, [2])
+    _js = json.loads(_buf.getvalue())
+    check("--findings --json is the lib.findings schema with each row a Finding",
+          (_js["tool"], _js["ok"], [r["token"] for r in _js["rows"]], _js["by_rule"], _js["filters"]["rule"]),
+          ("stylelint", False, ["x", "lbl_1"], {"2": 2}, [2]))
+    _buf = io.StringIO()
+    with contextlib.redirect_stdout(_buf):
+        print_findings_listing(select_findings(listed, ["src/Pl"]), "budget", False)
+    check("--findings text: one `file:line  rule N  token` line, then the count",
+          _buf.getvalue().splitlines(),
+          ["src/Pl/p.cpp:1  rule 7  fn_00000001", "stylelint: 1 finding(s) in the budget set (rule 7: 1)"])
+
     if fails:
         print("FAIL (%d)" % len(fails))
         for f in fails:
@@ -4310,6 +4379,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--list-added", action="store_true",
                     help="with --diff/--ref: also name each added finding (rule, file, line and the "
                          "identifier/token), grouped by rule then file, biggest file first")
+    ap.add_argument("--findings", action="store_true",
+                    help="list each finding (file:line, rule, token) of the --diff set (the added ones) or, "
+                         "without --diff, the whole-tree --budget set; --json gives the lib.findings schema")
+    ap.add_argument("--path", action="append", metavar="GLOB",
+                    help="with --findings: keep a file matching GLOB (fnmatch; no wildcard = a prefix); repeatable")
+    ap.add_argument("--rule", action="append", type=int, metavar="N",
+                    help="with --findings: keep rule N; repeatable")
     ap.add_argument("--json", action="store_true", help="machine-readable output")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args(argv)
@@ -4319,6 +4395,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.ref is not None and args.diff is not None:
         ap.error("--ref and --diff are two different comparisons; pass one")
+    if (args.path or args.rule) and not args.findings:
+        ap.error("--path and --rule filter the --findings listing; pass --findings")
+    if args.findings and args.ref is not None:
+        ap.error("--findings lists the --diff or the --budget set; --ref has --list-added")
 
     root = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True, encoding="utf-8", errors="replace")
     root = root.stdout.strip() if root.returncode == 0 else os.getcwd()
@@ -4399,6 +4479,10 @@ def main(argv: list[str] | None = None) -> int:
             {p: len(names) for p, names in freed_gaps.items()})
         credit_lines = rename_credit_lines(credits, freed_gaps) + move_credit_lines(moves)
         detail = added_finding_detail(added, after_findings, before_findings, symbol_rename, rename, fresh)
+        if args.findings:
+            print_findings_listing(select_findings(detail, args.path, args.rule), "added (--diff %s)" % args.diff,
+                                   args.json, args.path, args.rule)
+            return 1 if added else 0
         if args.json:
             print(json.dumps({"ref": args.diff, "added": added, "detail": detail, "moved": moves,
                               "changed": rels,
@@ -4435,14 +4519,19 @@ def main(argv: list[str] | None = None) -> int:
                 print(line)
         return 1 if added else 0
 
-    if args.headers and not args.budget:
-        ap.error("--headers describes the --budget table; pass --budget")
+    if args.headers and not (args.budget or args.findings):
+        ap.error("--headers describes the --budget table; pass --budget (or --findings)")
     findings = lint_all(root, ownership)
     if args.headers:
         # the band's rule-2 column, which `lint_all` cannot see (see `band_rule2_findings`). Only the
         # rule-2 reading is added: the band's rule 12 is already in `lint_all` via `header_rule12_findings`.
         findings = findings + header_rule2_band_findings(root, ownership)
         findings.sort(key=lambda f: (f["rule"], f["file"], f["line"]))
+    if args.findings:
+        print_findings_listing(select_findings(findings, args.path, args.rule),
+                               "budget" + (" + band headers" if args.headers else ""), args.json, args.path,
+                               args.rule)
+        return 0
     if args.json:
         print(json.dumps({"budget": budget(findings),
                           "rule11_locals": rule11_local_total(root),

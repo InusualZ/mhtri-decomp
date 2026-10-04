@@ -136,7 +136,9 @@ removes a stale one when it refuses; committing it stays a deliberate step for t
 
 `--no-outbox` and `--no-release` are **separate** opt-outs: skipping the outbox/branch checks does not skip the
 claim teardown (the old `--no-worker-units` did both, and a round that passed it left 18 worktrees and 3 dead
-claims behind). `--no-worker-units` remains as an alias for `--no-outbox`.
+claims behind). `--no-worker-units` remains as an alias for `--no-outbox`. `land --branch` with a branch that is
+not `worker/<slug>` (a pilot or plain worktree branch) skips the outbox row with a printed note - no claim, no
+outbox - while a `worker/*` branch is held to it (`outbox_skip_note`).
 
 Every check is classified by **KIND**, and a refusal says which kind failed, because the two need opposite
 responses. A **GATE** check refuses because the *batch* is bad - the style lint, the regression scan, the
@@ -2139,6 +2141,19 @@ def branch_commits(main: str, unit: str) -> int:
     return int(p.stdout.strip()) if p.returncode == 0 and p.stdout.strip().isdigit() else 0
 
 
+def outbox_skip_note(branch: str | None) -> str | None:
+    """Why the outbox row is skipped for `land --branch <branch>`, or None when it is checked.
+
+    Only a `worker/<slug>` branch is a claim, and only a claim's lane writes `.pi/outbox/<slug>.json`; a pilot or
+    plain worktree branch never has one, so demanding it made every such landing pass `--no-outbox`, which also
+    silences the row for a real claim named beside it. A `worker/*` branch stays strict, and so does a landing
+    with no `--branch` (`--units` names claims)."""
+    if not branch or branch.startswith(claims.BRANCH_PREFIX):
+        return None
+    return ("outbox row skipped: %s is not a %s<slug> claim branch, so no per-unit outbox is expected"
+            % (branch, claims.BRANCH_PREFIX))
+
+
 def outbox_units(main: str, units: list[str], branch: str | None = None) -> tuple[list[str], list[str]]:
     """-> (units whose outbox validates, problems).
 
@@ -2430,11 +2445,16 @@ def verify(main: str, units: list[str], base: str | None, dry_run: bool, no_buil
     if unit_units and check_outbox:
         # NOTE: a fresh name for the outbox problems. Reusing the `problems` out-parameter here rebound it
         # locally and the failed-check list never reached the caller's `land` refusal (2026-09-26).
-        ok_units, outbox_problems = outbox_units(main, unit_units, branch=branch)
-        check("every unit's outbox validates", not outbox_problems, "; ".join(outbox_problems[:4]),
-              kind=KIND_BOOKKEEPING,
-              remedy="the source is fine - have the worker re-run brief.py to rewrite its outbox, or re-run "
-                     "with --no-outbox for an orchestrator-only batch")
+        skip_note = outbox_skip_note(branch)
+        if skip_note:
+            print("NOTE: " + skip_note, file=sys.stderr)
+            check("every unit's outbox validates", True, info=skip_note)
+        else:
+            ok_units, outbox_problems = outbox_units(main, unit_units, branch=branch)
+            check("every unit's outbox validates", not outbox_problems, "; ".join(outbox_problems[:4]),
+                  kind=KIND_BOOKKEEPING,
+                  remedy="the source is fine - have the worker re-run brief.py to rewrite its outbox, or re-run "
+                         "with --no-outbox for an orchestrator-only batch")
         # a `--force` release leaves the work at refs/rescue/<slug>. `branch_problems` already accepts that
         # ref as the branch's work, and the landing path (never `--dry-run`, which touches nothing) restores
         # the real branch from it so the teardown still has a branch to release (2026-09-26 case (a)).
@@ -4097,6 +4117,25 @@ def selftest() -> int:
               any("[BOOKKEEPING]" in p for p in problems), True)
         check("... naming the branch check",
               any(p.startswith("every unit's branch carries its work as commits") for p in problems), True)
+        # the outbox row and `land --branch`: a pilot/worktree branch has no per-unit outbox and is not asked
+        # for one; a `worker/*` claim branch with no outbox is still refused (2026-10-04)
+        os.remove(claims.outbox_path(tmp, unit))
+        outbox_rows = {}
+        for name in ("pilot/net-l3", "worker/pl-act-zz99"):
+            repo_git(tmp, "checkout", "-q", "-b", name)
+            with open(os.path.join(tmp, "src", "Pl", "pl_act.c"), "a", encoding="utf-8") as fh:
+                fh.write(name + "\n")
+            repo_git(tmp, "commit", "-q", "-am", name)
+            repo_git(tmp, "checkout", "-q", "main")
+            seen = []
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                verify(tmp, [unit], repo_git(tmp, "rev-parse", "HEAD"), dry_run=True, no_build=True,
+                       problems=seen, branch=name)
+            outbox_rows[name] = any(p.startswith("every unit's outbox validates") for p in seen)
+        check("outbox: a non-claim branch with no outbox passes the row", outbox_rows["pilot/net-l3"], False)
+        check("outbox: a worker/* branch with no outbox is still refused", outbox_rows["worker/pl-act-zz99"], True)
+        check("outbox: the skip note names the branch", "pilot/x" in (outbox_skip_note("pilot/x") or ""), True)
+        check("outbox: no --branch is strict", outbox_skip_note(None), None)
 
     # case (b) end to end: the batch was applied to the working tree *before* `record-base` ran, so the base's
     # dirty snapshot recorded the batch's own edits as foreign and `land_stageable` had nothing to stage. The

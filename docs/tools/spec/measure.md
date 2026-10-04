@@ -26,6 +26,9 @@ Inputs -> outputs: unit source -> table/JSON, build/tmp/measure.
 ## Invariants and rules
 
 * What it does, in order, and the only place it differs from `recompile.py`:
+* The compile command's flags are re-read from this tree's `configure.py` when the graph predates it
+  (`lib.units.reconcile_flags`, the same call `recompile.py` makes); the report prints a `flags` line and `--json` carries
+  `flags_reread`.
 * One compile, one report, N symbols: the cost of the search loop is the compiler, not N x the measurer. `recompile.py --measure` remains the tool for a single-symbol proof; this one is for the round.
 * The unit is the path from the repository root (`Pl/pl_act`, `Camellia/camellia`, `auto/8005AA28_fn_8005AA28`); the extension may be omitted and is inferred from the worktree's `src/`. Run it from the worktree you are editing, or from MAIN with `--main` left to `git worktree list`; the source, `-o` directory and `-i` order are always this tree's (that half is `recompile.py`'s, not this file's).
 
@@ -40,6 +43,10 @@ Today's selftest (`tools/units/measure_selftest.py`): The contract this pins is 
 Target: `tools/tests/units/test_measure.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
 
 ## Known gaps
+
+* No `--refresh` (2026-10-04): the tool compiles its unit itself on every run, and the only report it reads is a baseline -
+  `--against-main` is MAIN's `report.json`, which a lane must not rebuild from its slot. `unitscore --refresh` is the
+  report-reading tool's refresh.
 
 * A baseline report row without a `fuzzy_match_percent` reads as **0 %** (the campaign rule, `lib.report.score_of`)
   since WP3b; it used to read as "no baseline" and printed no delta. On MAIN's report at 0375f98c4 that is 11 966 of

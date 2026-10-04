@@ -212,6 +212,7 @@ def collect(unit: str, wt: str, main: str, symbol: str = None, runner=subprocess
             return {"unit": unit, "worktree": wt, "main": main, "compiled": False,
                     "error": note}
     tokens, command_source = _units.unit_tokens(main, wt, unit, runner=runner)
+    tokens, flag_notes = _units.reconcile_flags(tokens, wt, unit)   # the graph may predate configure.py
     compiled = _units.compile(unit, main, wt, tokens=tokens, runner=runner)
     if not compiled.get("compiled"):
         return {"unit": unit, "worktree": wt, "main": main, "compiled": False,
@@ -238,6 +239,8 @@ def collect(unit: str, wt: str, main: str, symbol: str = None, runner=subprocess
         "symbol_map": map_path, "symbol_map_kind": map_kind,
         "candidate": candidates,
     }
+    if flag_notes:
+        result["flags_reread"] = flag_notes
     if kind == "missing":
         return result
 
@@ -320,6 +323,8 @@ def format_report(r: dict, sort: str = "score", limit: int = None, quiet: bool =
     out.append("unit      %s" % unit)
     if r.get("command_source"):
         out.append("command   %s" % r["command_source"])
+    for note in r.get("flags_reread") or ():
+        out.append("flags     %s" % note)
     out.append("target    %s%s" % (r["target"],
                                   "  [%s]" % r["target_kind"] if r.get("target_kind") else ""))
     if r.get("baseline"):
