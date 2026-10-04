@@ -1,6 +1,6 @@
 /*
  * include/Network/network_layer_io.h - the declarations `src/Network/network_layer_io.cpp` owns
- * (`.text` 0x804006A8..0x80413C64, the network layer's `sendReq*` request builders and their handlers).
+ * (`.text` 0x804006A8..0x80413450, the network layer's `sendReq*` request builders and their handlers).
  *
  * The unit has no bodies yet, so every parameter list is the one its callers' calls demonstrate.  Moved
  * here from the band header `include/unsplit/Network.h` (docs/plan.md 6.5 rule 2: the owner declares).
@@ -47,7 +47,7 @@ public:
 
     /* 0x804128C4 - resets the state and starts the EC (shop) sequence (GUESS name). */
     void start();
-    /* 0x8041793C (`Network/network_opening.cpp`) - whether the EC sequence is running (+0x44). */
+    /* 0x8041793C (`Network/NetworkWiiMediator.cpp`) - whether the EC sequence is running (+0x44). */
     BOOL isECStarted();
 
     /* +0x0004 */ u8  pad_0004[0x40];
@@ -73,9 +73,6 @@ void sendReqConnect(NetworkInstance* self);
 u32 sendReqLayerUp(NetworkInstance* self);
 u32 sendReqLayerChildInfo(NetworkInstance* self, s16 layer_id, u32 unused_arg);
 u32 sendReqLayerUserList(NetworkInstance* self);
-
-/* 0x80413AEC - whether the server is in maintenance (the status word reads 1). */
-s32 isMaintenanceMode(NetworkWiiMediator* self);
 
 /* The request emitters the session state machine (`Network/network_state.cpp`) drives. */
 void sendReqAuthenticationToken(NetworkInstance* self, const char* token);
@@ -108,15 +105,8 @@ void putItemTaggedBytes(NetworkStateMachine* self, const u8* values, u8 count, c
 void putUserSlotObjects(NetworkStateMachine* self, const u8* row, u8 count, const u8* tags);
 void dispatchSessionHandlers(NetworkStateMachine* self, u32 code, s32 a, s32 b, u32 count, const u8* data);
 
-/* The singletons the mediator band forwards to and the language/event queries it reads. */
-NetworkReflectService* getReflectService(void);
+/* The pool singleton the mediator band forwards to. */
 NetworkPool* getNetworkPool(void);
-/* 0x80413450 - the Pat interface callback the mediator installs (slot 1): forwards the event to the
- * mediator passed as the callback argument (GUESS name). */
-void mediatorEventCallback(u32 code, s32 a, s32 b, s32 c, const union GameSpyEventMsg* msg,
-                           NetworkWiiMediator* mediator);
-s32 getLanguage(void);
-s32 getReflectEventId(void);
 
 /* The circle (lobby room) requests the Pat session manager sends: each writes its op-code and returns the
  * request id (stored whole by the caller - playbook 66); the `sendNtc*` notices return nothing.  Names

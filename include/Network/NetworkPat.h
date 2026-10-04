@@ -40,7 +40,7 @@ class NetworkCommunityPat;
  * `NetworkLayer::NetworkLayer` (the root, which stores 0x805FB5D0) first. */
 class NetworkLayerPat;
 
-/* `sNetworkLibrary::init`'s parameter block (`Network/network_opening.h`). */
+/* `sNetworkLibrary::init`'s parameter block (`Network/sNetworkLibrary.h`). */
 struct sNetworkLibraryInitParam;
 
 typedef struct NetworkPat {

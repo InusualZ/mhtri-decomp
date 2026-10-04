@@ -159,7 +159,7 @@ s32  handleNetworkState1(NetworkInstance* self);
  * includes (rule 2): the request writers in `Network/NetworkCommunityPat.h`, the item writers, the
  * hand-off dispatch and the request emitters in `Network/network_layer_io.h`, the state predicates, the
  * maintenance queries and the call-stack helpers in `Network/PatInterface.h`, the NAS token and the
- * connection paths in `Network/network_opening.h`, and the mediator state accessors in
+ * connection paths in `Network/NetworkWiiMediator.h`, and the mediator state accessors in
  * `Network/NetworkWiiMediator.h`. */
 
 /* `getInstance` (0x800E89D8) is owned by `src/sound/fn_800E46E8.cpp`; its header declares it. */

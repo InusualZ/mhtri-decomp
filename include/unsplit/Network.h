@@ -22,7 +22,7 @@
 #include "DWCi/dwc_nasfunc.h"
 #include "DWCi/dwc_error.h"
 #include "Network/net_session_close.h"
-#include "Network/network_opening.h"
+#include "Network/sNetworkLibrary.h"
 #include "menu/menu_plsearch.h"
 
 typedef struct NetworkErrorInfo NetworkErrorInfo;
@@ -276,8 +276,8 @@ extern "C" {
 /* debug manager */
 NetworkLogger* getNetworkLogger(void);
 
-/* The socket pool (`networkSocketPool_acquire`/`_release`, owner `Network/network_opening.cpp`) is
- * declared in `Network/network_opening.h`, included at the top of this band. */
+/* The socket pool (`networkSocketPool_acquire`/`_release`, owner `Network/sNetworkLibrary.cpp`) is
+ * declared in `Network/sNetworkLibrary.h`, included at the top of this band. */
 
 /* network singleton and its callbacks.  `getInstance_` (0x803768F0) is owned by
  * `enemy/em020_ai.cpp` now that its range is registered - rule 2: the declaration moved to the
@@ -370,7 +370,7 @@ typedef struct NetworkRequest NetworkRequest;   /* include/Network/NetworkSessio
  * `NetworkRequest_getError` in `Network/NetworkSessionManagerPat.h`, `notifyLayerEvent` in
  * `Network/NetworkCommunityPat.h`, the layer requests and `isMaintenanceMode` in
  * `Network/network_layer_io.h`, the Pat setters and `getGameTime` in `Network/PatInterface.h`, and the
- * terms entry points in `Network/network_opening.h`. */
+ * terms entry points in `Network/NetworkWiiMediator.h`. */
 struct PatTerms;
 struct NetRosterSync;
 struct NetworkPat;

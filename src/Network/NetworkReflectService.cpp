@@ -29,7 +29,7 @@
 #include "Network/network_state.h"
 #include "Network/network_layer_io.h"  /* sendReqChannelInfo / sendReqChannelData / sendReqConnect */
 #include "Runtime.PPCEABI.H/memcpy.h"
-#include "Network/network_opening.h"    /* sNetworkLibrary, sNetworkLibraryError */
+#include "Network/sNetworkLibrary.h"    /* sNetworkLibrary, sNetworkLibraryError */
 #include "unsplit/Network.h"            /* getNetworkLogger */
 #include "enemy/em020_ai.h"             /* getInstance_ */
 #include "Runtime.PPCEABI.H/memset.h"

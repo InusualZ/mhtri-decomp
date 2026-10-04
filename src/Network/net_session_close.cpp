@@ -55,10 +55,11 @@
 #include "fn_80047398/lobby_world_block.h"    /* lobby_world_block - owner fn_80047398.cpp */
 #include "sound/fn_800E46E8.h"                /* getInstance - owner sound/fn_800E46E8.cpp */
 
-#include "Network/network_opening.h"            /* postMediatorRecord - owner Network/network_opening.cpp */
+#include "Network/NetworkWiiMediator.h"         /* postMediatorRecord - owner Network/NetworkWiiMediator.cpp */
 #include "menu/get_pop_dat_ptr.h"               /* ck_option_cfg - owner menu/get_pop_dat_ptr.cpp */
 #include "userdata_item.h"                      /* buildNetUserProfile - owner userdata_item.cpp */
 #include "Network/NetworkCommunityPat.h"        /* NetworkCommunityPat - the community layer's reflect slot */
+#include "Network/NetworkUniqueId.h"            /* the address-object helpers - owner Network/NetworkUniqueId.cpp */
 #include "MSL/strlen.h"                        /* strlen - owner MSL/strlen.cpp */
 #include "enemy/em020_ai.h"                     /* getInstance_ - owner enemy/em020_ai.cpp */
 #include "Network/NetworkPeerBase.h"            /* NetworkSmallObjectSink::destroy - owner Network/NetworkPeerBase.cpp */

@@ -113,7 +113,7 @@
 #include "types.h"
 #include "Network/NetworkSessionManager.h"
 #include "Network/NetworkSessionManagerPat.h"   /* the Pat buffer helpers and the reflection adapters */
-#include "Network/NetworkCommunityPat.h"        /* networkSmallObject_construct */
+#include "Network/NetworkUniqueId.h"            /* networkSmallObject_construct */
 #include "Network/gamespy_interface_types.h"    /* GameSpyInterfaceThread / NetworkErrorInfo - owner Network/GameSpyInterfaceThread.cpp */
 #include "Network/sGameSpyInterfaceThread.h"    /* sGameSpyInterfaceThread - owner Network/GameSpyInterfaceThread.cpp */
 #include "Network/PatInterface.h"              /* PatInterface - owner Network/PatInterface.cpp */

@@ -79,7 +79,8 @@
 #include "Network/network_transport.h"
 #include "Network/NetworkSessionManager.h"
 #include "lobby/lb_server_sel_trans.h"
-#include "Network/NetworkCommunityPat.h"
+#include "Network/NetworkUnitPacket.h"
+#include "Network/NetworkUniqueId.h"
 #include "MSL_C/alloc.h"
 /* `unsplit/Network.h` is the Network band's code half (`getNetworkLogger` and the socket-pool helpers).  It
    cannot be included beside `unsplit/OS.h`: the two band headers declare `OSCreateThread`/`OSResumeThread` with

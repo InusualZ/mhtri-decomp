@@ -186,7 +186,7 @@
 #include "Network/network_state.h"
 #include "Network/PatInterface.h"          /* the state predicates, the call-stack helpers, isCallback */
 #include "Network/network_layer_io.h"      /* the request emitters, the item writers, the hand-off dispatch */
-#include "Network/NetworkCommunityPat.h"   /* the request writers */
+#include "Network/PatConnection.h"   /* the request writers */
 #include "Network/NetworkWiiMediator.h"    /* setMediatorState68A / getMediatorState68A */
 
 /* The target object carries `extab` 0x88 / `extabindex` 0xCC (the splits block claims both ranges), so
