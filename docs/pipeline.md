@@ -223,7 +223,7 @@ skill: run `python tools/agents/sync_profiles.py --check` and never hand-edit be
 
 * **The profile is not cosmetic.** Reconstruction/recon work runs as `decompiler`, never `worker`: three
   networking recon lanes launched as `worker` never saw the §6.5 naming/type policy and all three were
-  refused for ~130 names. `slots.py spawn --kind KIND` decides the profile (`unit`->`decompiler`,
+  refused for ~130 names. `slots.py spawn --kind KIND` decides the profile (`unit`->`surveyor`,
   `fix`->`fixer`, `merge`->`merger`, `tooling`/`docs`->`worker`, `review`->`codereviewer`); an unknown kind is
   refused.
 * **Policy never lives only in hand-written duplication.** The profiles once taught the retired `rule 7
@@ -1054,7 +1054,7 @@ Grouped by cause; each cost a lane ~30 min the first time.
 * **Land the orchestrator-side tools/docs batch first** with `land.py land --already-applied`: an uncommitted `CLAUDE.md` +
   `docs/plan.md` pair rode the `OS/FindContainHeap_.c` unit commit (`4fad00522`, 2026-09-26), because the commit-sweep guard
   protects a path only when the base's `dirty_at_base` snapshot recorded it and the batch does not name it.
-* **Profiles are not cosmetic** (2026-09-26): `slots.py spawn --kind` maps `unit`->`decompiler`, `fix`->`fixer`,
+* **Profiles are not cosmetic** (2026-09-26): `slots.py spawn --kind` maps `unit`->`surveyor` (was `decompiler` until the four-leg loop), `fix`->`fixer`,
   `merge`->`merger`, `tooling`/`docs`->`worker`, `review`->`codereviewer`, `scout`/`plan` to the read-only globals; an unknown
   kind is refused. A tooling lane launched as `decompiler` gets unit policy it cannot satisfy.
 * **Known bug (2026-09-24, status unverified):** `queue.py next` re-offered an already-claimed proposal and refused each time

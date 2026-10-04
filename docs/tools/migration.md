@@ -16,10 +16,40 @@ step, and the gate lands every package.
    `.claude/`, `docs/`, `CLAUDE.md` returns only `docs/tools/retired.md`.
 7. The in-code headers of every touched tool follow the template; `tests/lib/test_headers.py` passes.
 8. Measured in the batch's commit body: lines removed, lines added, number of implementations collapsed (from `duplication.md`).
+   The landed commits carry only the gate's ledger/gates lines, so for WP0-WP6 these numbers are the table below instead.
+
+## Status: every package landed
+
+Lines are the landing commit's `--shortstat`: all files, then `tools/**` without `tools/tests/`, then `tools/tests/`.
+"Collapsed onto" is what the batch added as the one implementation; the per-concept before-counts are `duplication.md`'s.
+
+| package | commit | all files +/- | tools (no tests) +/- | tests +/- | collapsed onto |
+| --- | --- | ---: | ---: | ---: | --- |
+| WP0 skeleton | `37ff9164e` | +2228 / -23 | +896 / -21 | +1238 / -0 | `lib/testing.py`, the runner's discovery, four lints |
+| WP1a leaf lib | `e14f25060` | +2301 / -826 | +1389 / -755 | +655 / -14 | `lib/{repo,proc,git,text,cache,names}.py` |
+| WP1b binary | `878616028` | +2109 / -2097 | +1785 / -2077 | +260 / -7 | `lib/binary/{elf,dol,dwarf,objdump,build}.py` |
+| WP1c project | `9b59d1907` | +2708 / -1270 | +1966 / -1232 | +623 / -15 | `lib/project/{symbols,splits,configure,ownership}.py` |
+| WP2a ppc/refs | `1700dbffd` | +1956 / -1435 | +1386 / -1411 | +433 / -3 | `lib/{ppc,refs}.py` |
+| WP2b report/units | `1c274aca1` | +2082 / -1517 | +1536 / -1492 | +393 / -7 | `lib/{report,units}.py` |
+| WP2c findings/cli | `7958fa08a` | +1824 / -858 | +1236 / -827 | +361 / -5 | `lib/{findings,cli,outbox,cscan}.py` |
+| WP3a objcompare | `7eec9e2cc` | +4241 / -4435 | +3558 / -4300 | +508 / -112 | `lib/objcompare.py` |
+| WP3b scoring | `86a6195c4` | +919 / -1088 | +711 / -1014 | +120 / -36 | the WP2b lib (no new module) |
+| WP3c seams | `af8b41844` | +3850 / -3160 | +2641 / -3030 | +873 / -32 | `splits/seams/evidence.py`, `splits/invariants/` (13 modules) |
+| WP3d symbols/stylelint | `ec8223e66` | +5750 / -5605 | +5172 / -5541 | +385 / -24 | `units/stylelint_rules/` (one module per rule) |
+| WP3e lanes | `0553ebfe5` | +6104 / -8891 | +5110 / -8742 | +690 / -34 | `lib/lanes/` (9 modules), `units/briefing/`; herdr deleted |
+| WP3f merge/git | `5839bb1eb` | +3166 / -3860 | +1492 / -3958 | +1759 / -21 | `units/merge/` (one union rule), `edit.py` |
+| WP5 debuggers | `a8cf330b7` | +4214 / -3976 | +3340 / -3943 | +780 / -11 | `mwlink/` (8 modules), `lib/binary/pe.py` |
+| WP4 landing gate | `d2ecb8560` | +6671 / -5241 | +3759 / -5171 | +2771 / -43 | `units/landing/` (21 modules) |
+| WP6 sweep | `fb1e8051d` | +1898 / -4567 | +517 / -3228 | +657 / -421 | 18 files deleted (shims, delegates, dated outputs) |
+| integrate (not a WP) | `1c0e5252b` | +3128 / -4 | +2468 / -3 | +437 / -0 | new tool: `lib/requests.py`, `units/integrate.py` |
+
+Totals WP0-WP6: all files +52021 / -48849; tools without tests +36494 / -46742 (net -10248).
 
 ## The packages
 
 ### WP0 - the skeleton (M, blocking)
+
+**Done** (`37ff9164e`).
 
 * `tools/lib/__init__.py`; the one-line prologue and its lint (`tests/lib/test_prologue.py`: every `tools/**/*.py` entry point has
   exactly the canonical line, no other `sys.path.insert`); `tests/lib/test_layering.py` (lib never imports tools; tool->tool only
@@ -31,6 +61,8 @@ step, and the gate lands every package.
 * No tool changes. Acceptance: items 1, 3, 5 (the compat test is created here from the list below).
 
 ### WP1 - the leaf lib (three lanes in parallel, each M)
+
+**Done** (`e14f25060` 1a, `878616028` 1b, `9b59d1907` 1c).
 
 * **1a** `lib/repo.py`, `lib/proc.py`, `lib/git.py`, `lib/text.py`, `lib/cache.py`, `lib/names.py`. Delegates: `unitutil.repo_root/
   main_tree/resolve_input/session_tmpdir`, `subproc.run`, `spawnretry`, the 16 `git()` wrappers, `edit.replace_bytes`,
@@ -46,6 +78,8 @@ step, and the gate lands every package.
 
 ### WP2 - the middle lib (three lanes in parallel)
 
+**Done** (`1700dbffd` 2a, `1c274aca1` 2b, `7958fa08a` 2c).
+
 * **2a** (L) `lib/ppc.py`, `lib/refs.py`. Delegates: `splitcheck.scan_refs/scan_calls/find_sda_bases/Ctx`, `phantom.index_refs`,
   `infer.Insn` + field helpers, `callers.build_index/build_elf_index/query/load_index`, `datagap.census`, `tudiscover.build_graph`.
   Measured acceptance: `callers.py --stats` and `datagap.py --census` report the same counts before and after on this tree;
@@ -58,6 +92,8 @@ step, and the gate lands every package.
   struct_defs/function_declarations`, `typeregistry.strip_comments/extract_decls`, `declclash.closure`, `shapes.strip_comments`.
 
 ### WP3 - the tool families (parallel lanes; each family is one batch)
+
+**Done** (`7eec9e2cc` 3a, `86a6195c4` 3b, `af8b41844` 3c, `ec8223e66` 3d, `0553ebfe5` 3e, `5839bb1eb` 3f, `a8cf330b7` WP5).
 
 * **3a** (L) object comparison: `lib/objcompare.py`; thin `datagap` + new `dataclosure.py`, `sectiongap`, `pairgap`, `relocdiff`,
   `flipcheck`, `undefrefs` (absorbing `relocaudit` as `--census`), `verifyunit`. Measured: `datagap --flip-blockers`, `flipcheck`
@@ -84,6 +120,8 @@ step, and the gate lands every package.
 
 ### WP4 - the landing gate (L, after 3a, 3b, 3d, 3e, 3f)
 
+**Done** (`d2ecb8560`).
+
 * `tools/units/landing/` as in `design.md` section 5; `land.py` becomes the CLI; rows call the lib; `.pi/bin/*` scripts retired
   (question 2) with `CLAUDE.md` step 3 rewritten to `land.py land --branch`.
 * Measured: on a recorded no-op batch and on a real unit batch, the row names and statuses are identical to the old gate's
@@ -91,9 +129,10 @@ step, and the gate lands every package.
 
 ### WP6 - the sweep (M, after WP4)
 
-**Done 2026-10-04** (status and numbers: `retired.md`, "Folded into another tool"; the commits are the branch's
-`tools/units: ...` series). Kept, with the reason in `retired.md`: `escape.py --edit` (the profiles name it), the
-`mergebranch.py`/`land.py`/`stylelint.py`/`brief.py`/`mwlink_debugger.py` shims (the compatibility list).
+**Done 2026-10-04** (`fb1e8051d`; what went: `retired.md`, "Folded into another tool"). Kept, because the compatibility list
+spells their paths: the shims `mergebranch.py`, `land.py`, `stylelint.py`, `brief.py` and `mwlink_debugger.py`, and the entry
+points `claims.py`, `slots.py` and `queue.py` (thin over `lib.lanes`). `escape.py --edit` was deleted afterwards, once the
+profiles named `edit.py replace` instead.
 
 
 * Delete the delegates and shims (`unitutil.py` -> re-export only what `mt.py` needs, then move `mt.py`'s forwarders to `lib.cli`;
@@ -115,7 +154,7 @@ From the path-qualified scan (`inventory.md`, "callers"); counts are lines.
 | `reportdiff.py` | 0 | 0 | 0 | 0 | 0 |
 | `relocaudit.py` -> `undefrefs --census` | 0 | 0 | 0 | 0 | 5 |
 | `checklf.py` -> `edit.py check` | 0 | 0 | 0 | 0 | 3 |
-| `escape.py --edit` -> `edit.py replace` | 12 (`decompiler.md` et al.) | 3 | 0 | 11 | 1 |
+| `escape.py --edit` -> `edit.py replace` (deleted after WP6) | 12 (`decompiler.md` et al.) | 3 | 0 | 11 | 1 |
 | `promote.py`, `promote_batch.py` | 0 | 1 | 0 | 2 | 13 |
 | `applysplits.py` | 0 | 0 | 0 | 20 (`docs/splits/**`) | 0 |
 | `dataattach.py` | 0 | 0 | 0 | 45 (`docs/splits-program.md`, `docs/splits/**`) | 2 |
@@ -148,7 +187,7 @@ tools/agents/sync_profiles.py [--check]
 tools/agents/edit.py replace|normalise|check
 tools/units/slots.py spawn --kind <X> | init | collect --path <X> --release
 tools/units/mangle.py <X>
-tools/units/escape.py --write|--escape|--edit
+tools/units/escape.py --write|--escape
 tools/units/claims.py ack|claim|release
 tools/selftest.py [--changed [main]] [--json]
 tools/objdiff/unitscore.py <X> [--report|--measure]

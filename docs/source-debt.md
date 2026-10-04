@@ -70,9 +70,10 @@ enemy band declarations; the retype disappears once the callee has a single name
 
 ## Band headers (`include/unsplit/*.h`)
 
-After the declaration move of this batch the band headers still declare 943 symbols a registered unit owns:
-808 carry a generated `fn_XXXXXXXX`/`lbl_XXXXXXXX` name (moving them adds rule 7 findings to the owner's
-header: the symbol has to be named first), 51 take an unmarked `void *` (rule 11), 53 use a type the band
-header defines itself (the type moves first), 18 clashed with another declaration at compile time, 7 sit in
-an owner header the tool could not extend safely, 6 are manglings (rule 9). Largest remaining: `enemy.h` (264),
-`lobby.h` (232), `Pl.h` (154), `ai.h` (61), `Network.h` (45), `g3d.h` (43).
+Re-measured 2026-10-04 (`stylelint.py --budget --headers`, the r2 column summed over `include/unsplit/*.h`): the band
+headers still carry **913** declarations of a symbol a registered unit owns (943 after this batch's move). Largest:
+`enemy.h` (264), `lobby.h` (232), `Pl.h` (154), `ai.h` (61), `g3d.h` (43), `enemy_pool.h` (33), `DWCi.h` (25), `OS.h` (21),
+`Network.h` (20, was 45). Why the 943 stayed when written: 808 carried a generated `fn_XXXXXXXX`/`lbl_XXXXXXXX` name
+(moving them adds rule 7 findings to the owner's header: the symbol has to be named first), 51 an unmarked `void *`
+(rule 11), 53 a type the band header defines itself (the type moves first), 18 clashed with another declaration at
+compile time, 7 sat in an owner header the tool could not extend safely, 6 were manglings (rule 9).

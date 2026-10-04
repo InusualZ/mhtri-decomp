@@ -3,9 +3,10 @@
 Entry page for the tooling design and specs, which live one directory down (the same shape as
 `docs/matching.md` -> `docs/matching/`):
 
-* `docs/tools/README.md` - the map: concept -> lib module -> tools, the spec index, how to add a tool, the
+* `docs/tools/README.md` - **the live map**: concept -> lib module -> tools, the spec index, how to add a tool, the
   in-code header template.
-* `docs/tools/inventory.md` - every tracked file under `tools/`, measured, with a verdict.
+* `docs/tools/inventory.md` - a **frozen snapshot** (2026-10-03, `ec2609b46`, before WP0-WP6): every tracked file under
+  `tools/` then, measured, with a verdict. Paths in it may no longer exist; use the README for the current tree.
 * `docs/tools/duplication.md` - the repeated concepts and code, quantified and ranked.
 * `docs/tools/prose-audit.md` - the documentation embedded in code and where each block belongs.
 * `docs/tools/design.md` - the target architecture (the `tools/lib/` package and the thin tools on it).

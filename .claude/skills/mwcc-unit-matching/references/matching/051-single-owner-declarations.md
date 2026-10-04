@@ -54,8 +54,8 @@ nw4r::db::Panic(file, line, fmt);    // not Panic__Q24nw4r2dbFPCciPCce(file, lin
 ```
 
 A rename has a **third place** to sweep beyond the map and the source: `symedit.py refs` roots at `src/` and
-`include/` only; `docs/` and `tools/` are searched only when named in `--roots`. Regenerable caches such as
-`tools/units/attribution-queue.json` keep their own name strings (keyed by `symbols_sha1`), so the map plus
+`include/` only; `docs/` and `tools/` are searched only when named in `--roots`. Regenerable caches (the retired
+`tools/units/attribution-queue.json` was one; `docs/tools/retired.md`) keep their own name strings (keyed by `symbols_sha1`), so the map plus
 `--roots` is the authority, not the rows in the cache (the symbol-map-editing skill, rule 2, states this).
 
 **Result (measured when written).** Rules 1, 2 and 9 were made checks (they were prose in 6.5). At that time: rule
@@ -97,6 +97,6 @@ sites (the first use of a symbol fixes its addressing for the whole TU, idea 12)
 one; this is the declaration half.
 
 *A rename's third place (same session).* The DWCi band's renames left 44 stale names in
-`tools/units/attribution-queue.json` plus one stale example in `tools/splits/tudiscover.py`; re-checked
+`tools/units/attribution-queue.json` (retired 2026-10-03) plus one stale example in `tools/splits/tudiscover.py`; re-checked
 2026-09-29, `git grep fn_805087A0 -- tools` finds nothing (the cache has been regenerated). `rename` is not one of
 `backlog.py`'s kinds, so a rename filed in an outbox is picked up by nothing.
