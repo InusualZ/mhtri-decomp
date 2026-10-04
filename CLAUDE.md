@@ -18,7 +18,7 @@ assets in the repo), and the final `main.dol` is verified against `config/RMHE08
 * Current state: the splits program is finished - `config/RMHE08/splits.txt` cuts the whole DOL into registered
   translation units with no unclaimed `.text` (`docs/splits-program.md`). A unit is registered **once**, at its final home
   `src/<module>/<name>.<ext>` (no `src/auto/` bucket); most are `NonMatching` shells being reconstructed. The work queue is
-  `splits.txt` itself: the pool is the registered body-less units (`python tools/units/brief.py --pool`). The measured
+  `splits.txt` itself: the pool is the registered units that are not `Matching` (`python tools/units/queue.py list`). The measured
   totals and the live in-flight state are not kept here: `docs/plan.md` section 2, `python tools/units/ledger.py`, and
   `.pi/state.md`.
 
@@ -79,7 +79,7 @@ The full policy, with its dated reasons, is `docs/pipeline.md` 13.1 and the ruli
 * **Six lanes at most**, unit workers and tool fixes together; **refill one slot per completion**, not in waves.
 * **A slot is not filled while finished work sits unlanded** (`queue.py next` refuses; `--allow-unlanded <branch>` parks one),
   and **a slot goes to a problem before a new unit** (a gate refusal, a blocked lane, a tool that cannot express the work).
-* **Claim a wave with `queue.py next --count N`**, never N adjacent proposals (the stride keeps two lanes off one TU).
+* **Claim a wave with `queue.py next --cluster MODULE|HEADER`** (one lane per module or owner-header closure) or `--count N` (lanes that share no owner header or module): two concurrent lanes never share a hot header.
 * **Land one unit per commit, one at a time, from `main`** (`git rev-parse --abbrev-ref HEAD` prints `main`; `land.py` refuses
   otherwise). Land the orchestrator-side tools/docs batch first (`land.py land --already-applied`), then the lanes.
 * **A lane gets the profile that matches its job** - `.claude/agents/` (tracked): `decompiler` (unit work), `fixer` (a refused
@@ -94,7 +94,7 @@ The full policy, with its dated reasons, is `docs/pipeline.md` 13.1 and the ruli
 
 The steady loop, per unit:
 
-1. `queue.py next` claims one registered body-less unit - one worktree, one branch, one brief - and prints the paste-ready spawn.
+1. `queue.py next` claims one registered `NonMatching` unit (or a cluster) - one worktree, one branch, one brief - and prints the paste-ready spawn.
 2. The worker reconstructs the bodies and commits them on its branch, measured.
 3. **Review before landing**: a read-only `codereviewer` lane judges the branch's own diff (`git diff main...<branch>`,
    `python tools/units/stylelint.py --ref <branch>`, per-function objdiff) for honesty of the match claim, naming, placement,
