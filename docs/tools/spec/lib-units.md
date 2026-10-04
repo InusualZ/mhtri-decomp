@@ -23,7 +23,8 @@ fresh-object proof, and finds the original object to score against.
 * The command: `unquote(tokens)`, `ninja_target(spec)`, `ninja_lines(tree, target, runner)`, `ninja_command(tree, spec)`,
   `lib_block(tree, spec)`, `sibling_for(main, wt, spec)`, `retarget(tokens, spec)`, `unit_tokens(main, wt, spec) ->
   (tokens, source)`, `rewrite(tokens, spec, main, wt) -> (tokens, object)`, `order_includes`, `include_pairs`,
-  `retarget_object_helpers`, `absolutize`, `is_switch`.
+  `retarget_object_helpers`, `absolutize`, `is_switch`, `configured_flags(tree, spec) -> (tokens, mw_version) | None`,
+  `compiler_version(head)`, `reconcile_flags(tokens, tree, spec) -> (tokens, notes)`.
 * The compile: `compile(spec, main, wt, dry_run, runner, tokens) -> CompileResult` - a frozen value that also reads as
   the old mapping (`{object, compiled, fresh, bytes, sections, log}` | `{object, compiled: False, error}` |
   `{command, object, dry_run}`; unset fields absent, so `dict(result)` is the old shape and `.get` keeps working);
@@ -51,6 +52,12 @@ fresh-object proof, and finds the original object to score against.
   is refused; a unit without source is refused. A fixture names its tree (`root`); nothing reads a module-global root.
 * **The command is the build's.** MAIN's `ninja -t commands`, else the worktree's, else a registered sibling in the same
   `config.libs` block (same `mw_version` and `cflags`) with only `-o` and `-lang` retargeted - never hand-rolled flags.
+* **The flags are the tree's configure.py's.** `build.ninja` is only as new as its last `python configure.py`, and a worktree
+  compiles with MAIN's graph: `reconcile_flags` evaluates the invoking tree's `configure.py` (`lib.project.Configure`) and,
+  when the row's cflags or `mw_version` differ from the command's, replaces the flag slice (ninja's own `-lang=` kept) and the
+  compiler directory, with a note naming the tokens removed and added. A row the evaluator cannot resolve, a missing file or an
+  unregistered unit leaves the command as it is. Measured 2026-10-04: 354 of 354 registered units agree with MAIN's current
+  graph (no false re-read); the network pilot measured `-O4,p` after its row had gone `-O3`.
 * **The worktree's headers win.** MWCC searches `-i` in order and MAIN's list is relative to MAIN: the worktree's own
   `include/` and `build/RMHE08/include` go first, and each of MAIN's directories is pointed at the worktree's copy when it has
   one (appending them once measured MAIN's copy of an edited header - the `eft004` round).

@@ -37,7 +37,7 @@ Inputs -> outputs: main tree, branch, .pi/land-base.json -> rows, commit.
 1. ground truth: `build.sha1` equals the DOL's hash (GATE).
 2. `main` has not moved since the batch base; the base was recorded (`record-base`) (BOOKKEEPING).
 3. every changed path belongs to the batch (tool scratch `d<digits>.json`/`t<digits>.json` is tolerated and named); no batch file carries a conflict marker (GATE).
-4. every unit's outbox validates (`handoff.validate`); every unit's branch carries its work as commits; batch units named (or `--no-outbox` for an orchestrator-only batch) (BOOKKEEPING).
+4. every unit's outbox validates (`handoff.validate`; skipped with a printed note for `--branch` naming a branch that is not `worker/<slug>` - only a claim's lane writes an outbox, while a `worker/*` branch and a `--units` landing stay strict); every unit's branch carries its work as commits; batch units named (or `--no-outbox` for an orchestrator-only batch) (BOOKKEEPING).
 5. style lint (section 6.5) adds no violation (`stylelint --diff <base>`, add-only, with rename/move credits) (GATE).
 6. all tool selftests pass except the parked list (`tools/selftest.py`, ~30 s); `--no-selftests` skips (GATE).
 7. rule 2 registration boundary (a batch registers a range a band header still declares) - a warning row.

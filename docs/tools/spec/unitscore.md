@@ -18,9 +18,11 @@ python tools/objdiff/unitscore.py <unit> --measure          # score the objects 
 python tools/objdiff/unitscore.py <unit> --threshold 99.9   # only the rows below the threshold
 python tools/objdiff/unitscore.py <unit> --json             # the whole record, mtimes included
 python tools/objdiff/unitscore.py <unit> --force-stale      # score anyway, STALE stays in the output
+python tools/objdiff/unitscore.py <unit> --refresh          # ninja build/RMHE08/report.json first (costs a build)
+python tools/objdiff/unitscore.py <unit> --measure --refresh   # ninja the unit's object first, then one call
 python tools/objdiff/unitscore.py --selftest
 ```
-Flags: `--force-stale`, `--json`, `--measure`, `--report`, `--selftest`, `--threshold`.
+Flags: `--force-stale`, `--json`, `--measure`, `--refresh`, `--report`, `--selftest`, `--threshold`.
 Exit codes: **Exit status is the answer**: 0 the numbers are printable (current, or explicitly forced), 1 the freshness guard refused, 2 a usage or input error (no report, an unreadable report, the unit missing from it) - a traceback is never the answer.
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
 
@@ -33,10 +35,11 @@ Inputs -> outputs: report.json or objects -> table/JSON.
 * `<unit>` is the path from the repository root (`quest/arenatask`, `Pl/pl_act`); the extension may be omitted, and `src/`/`main/`/`build/RMHE08/...` prefixes are accepted.
 * **Reuse, not re-implementation.** The unit and its paths come from `lib.units.Unit.resolve` in the invocation's tree (`lib.repo.repo_root`); the report entry's identity and scoring conventions come from `tools/units/verifyunit.py` (`report_unit`, `unit_stem`, and its "a function with no `fuzzy_match_percent` key is 0 %, not 100 %" reading); the one-report score comes from `unitutil.report_functions` through `tools/objdiff/symdiff.py`'s scratch/retry helpers. There is one implementation of each, and this file holds none of them. The staleness arithmetic itself (the three mtimes, the include closure, the verdict) is `tools/objdiff/freshguard.py`, shared with `symdiff.py`, so "which file is newer" has one answer.
 * **Exit status is the answer**: 0 the numbers are printable (current, or explicitly forced), 1 the freshness guard refused, 2 a usage or input error (no report, an unreadable report, the unit missing from it) - a traceback is never the answer.
+* **`--refresh` costs a build, and says so.** It runs `ninja build/RMHE08/report.json` in the unit's tree before the read: the report depends on `all_source`, so every stale object of the tree is compiled first (and a changed map or `splits.txt` re-splits). With `--measure` it builds only the unit's object, the one thing that mode reads. The record carries `refreshed: {target, seconds, ok, error}`; a failed build is exit 2 with ninja's tail, and the freshness guard still runs on the rebuilt files. `--refresh --report R` is a usage error: an arbitrary report is not a ninja target.
 
 ## Lib dependencies
 
-report, units, repo.
+report, units, repo, proc.
 
 ## Test contract
 

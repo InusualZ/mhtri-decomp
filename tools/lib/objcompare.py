@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 from tools.lib import cache as _cache
 from tools.lib import names as _names
-from tools.lib.binary.elf import (SHN_UNDEF, SHT_NOBITS, SHT_NULL, SHT_RELA, SHT_STRTAB, SHT_SYMTAB, STB_GLOBAL,
+from tools.lib.binary.elf import (SHN_UNDEF, SHT_NULL, SHT_RELA, SHT_STRTAB, SHT_SYMTAB, STB_GLOBAL,
                                   STB_WEAK, STT_FILE, Elf, ElfError, reloc_name)
 
 #: Bookkeeping tables, not a unit's code or data: they move with the symbol table and the compiler version.
@@ -877,9 +877,11 @@ def _sha256_file(path: str) -> str:
 def fingerprint(path: str) -> str:
     """A rename-insensitive content fingerprint of a split target object (the drift check).
 
-    Every section but the two string tables (name, size, file bytes), plus the defined symbols' geometry
+    Every section but the two string tables (name, size, contents), plus the defined symbols' geometry
     `(value, size, type, section index)` with the names dropped: a `splits.txt` re-range moves bytes or addresses,
-    a rename moves neither. A file that is not an ELF object falls back to `raw:<sha256>`."""
+    a rename moves neither. A `SHT_NOBITS` section (`.bss`/`.sbss`) contributes no contents: dtk writes its
+    header offset as 0, so its file slice is the ELF header, whose section-table offset moves with `.strtab`'s
+    length. A file that is not an ELF object falls back to `raw:<sha256>`."""
     try:
         elf = Elf.read(path)
     except Exception:                                            # noqa: BLE001 - not an ELF (or truncated)
@@ -889,7 +891,7 @@ def fingerprint(path: str) -> str:
         if sec.name in RENAME_FREE_SECTIONS:
             continue
         h.update(("%s\0%08x\0" % (sec.name, sec.size)).encode())
-        h.update(sec.raw)
+        h.update(sec.data)
     for geom in sorted((s.value, s.size, s.type, s.shndx) for s in elf.symbols if s.name and s.shndx):
         h.update(("|%08x/%08x/%d/%d" % geom).encode())
     return h.hexdigest()
@@ -913,7 +915,7 @@ def touch_fingerprint(path: str, symbols: dict | None = None) -> dict | None:
         if sec.name in UNSTABLE_SECTIONS or sec.type == SHT_RELA or not sec.name:
             continue
         h.update(("S|%s|%d|%d|%d|%d|" % (sec.name, sec.type, sec.flags, sec.align, sec.size)).encode())
-        h.update(sec.raw if sec.type != SHT_NOBITS else b"")
+        h.update(sec.data)
 
     def section_of(s):
         return elf.sections[s.shndx].name if 0 < s.shndx < nsec else None

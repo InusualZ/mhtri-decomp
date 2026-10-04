@@ -360,6 +360,33 @@ def selftest() -> int:
         fails = check("... and a system header is not a dependency", "string.h" in closure, False, fails)
         fails = check("a range that does not tile is a warning, not a refusal",
                       us.range_block({".text": (0x80001000, 0x80000800)}, rows)["ok"], False, fails)
+
+        # 13b. --refresh: rebuild the report through ninja, then score it
+        calls = []
+
+        def rebuilds(argv, cwd=None, **_kw):
+            calls.append((argv, cwd))
+            stamp = time.time()
+            os.utime(fx.report, (stamp, stamp))
+            return subprocess.CompletedProcess(argv, 0, "", "")
+
+        fx.set_times(report=-DAY, obj=-2 * DAY, source=0)
+        fails = check("refresh: without it the stale report is refused",
+                      us.run(fx.spec(us))["refused"], True, fails)
+        rec = us.run(fx.spec(us), refresh_build=True, runner=rebuilds)
+        fails = check("refresh: ninja builds the tree's report in the tree",
+                      calls, [(["ninja", "build/RMHE08/report.json"], fx.dir)], fails)
+        fails = check("refresh: ... and the rebuilt report is scored", (rec["refused"], rec["row_count"]),
+                      (False, 4), fails)
+        fails = check("refresh: --measure rebuilds only the unit's object",
+                      us.refresh_target(fx.spec(us), measure=True), "build/RMHE08/src/demo/unit.o", fails)
+        failed = us.run(fx.spec(us), refresh_build=True,
+                        runner=lambda argv, **_kw: subprocess.CompletedProcess(argv, 1, "FAILED: x.o\n", ""))
+        fails = check("refresh: a failed build is the record's error, with no rows",
+                      (failed["error"] is not None and "FAILED: x.o" in failed["error"], failed["rows"]),
+                      (True, None), fails)
+        p = fx.run("demo/unit", "--refresh", "--report", fx.report)
+        fails = check("refresh: --report cannot be rebuilt (usage error)", p.returncode, 2, fails)
     finally:
         fx.cleanup()
 
@@ -375,7 +402,7 @@ def selftest() -> int:
     if fails:
         print("FAIL (%d)" % fails)
         return 1
-    print("ok - 74 checks")
+    print("ok - 80 checks")
     return 0
 
 
