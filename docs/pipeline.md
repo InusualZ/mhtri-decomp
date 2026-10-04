@@ -915,6 +915,29 @@ open request is a stylelint finding).
   `u32` in the owner); a lane's stale spelling of a name another lane already renamed (`fn_80419CF0`) is the common
   case and is a source rewrite, not a map edit; MWCC reports one error per object per run, so narrowing a failed build
   takes one incremental round per wrong declaration; a header read by C cannot be handed a forward-declared game type.
+* **Round 2 (2026-10-04).** Four lanes (transport, session core, game control, library/mediator) under the stopgap
+  marker and the lane exception; the integrator ran per lane after the lane's report. Landings: L1 `35fe065d8`, L4
+  `f0c9d0f4a`, L2 `a3fee4ac9`, L3 `a92bd52b9`, then the last batch `de74ae758` (reflect-service seam, destructor,
+  terms wrappers). Ledger across round 2: closed 8359 -> 8472, matched 6145 -> 6255, bytes 758,416 -> 787,208. No two
+  lanes conflicted on a header. Integrator cost per lane 22-37 min (`integrate.py` itself 1-2 min). The land log
+  (`.pi/land-log.jsonl`, `python tools/units/landlog.py`) counted 14 attempts: 10 landed; the 4 refusals were
+  bookkeeping (a `config.yml` change in a unit batch, a missing outbox, nothing to stage), none a gate failure.
+* **Gate refusals worth remembering.** `flipcheck` refuses a Matching flip when a section is 4 B short of its claim
+  (the alignment tail) even when the DOL hash holds: keep such units NonMatching. A unit average that drops only
+  because functions moved to a neighbour takes `--allow-regression <unit>`. A batch that carries
+  `config/RMHE08/config.yml` is refused at pre-flight even when named: land the unit batch, then commit the
+  `block_relocations` patch alone (the guard accepts relocation-analysis keys only). A stale MAIN `report.json` makes
+  the regression row compare against a stale base: `record-base` now rebuilds it.
+* **Open tool requests from the pilot** (not built): `integrate.py` commits a tree that does not build and cannot green
+  a base that does not compile, writes no owner declaration for some renames, re-proposes applied requests, prints an
+  empty `--units` on a source change, stops at 5 retry rounds; `claims.py list` shows live lanes as `(unregistered)`;
+  `handoff.py --check` needs `--map <tree>`; a stopgap form for a missing field/slot on another lane's class (it
+  blocked about 9 KB of bodies); `vtableaudit --diff` reads a rename as 2 added; `queue.py next --cluster <header>`
+  pulls in units of other modules; the gate should accept `block_relocations` in a batch.
+* **Owner rulings pending after round 2.** The three-way split of `NetworkSessionManagerPat` (wait for a
+  `NetworkCommunityPat` recut: pool FAIL would rise 76 -> 77 otherwise); folding `network_layer_io`'s tail with
+  `NetworkWiiMediator` and `network_opening` (their `.data` reads as one TU); the `0x80794868` `.sbss` claim (playbook 53);
+  unifying `NetworkSmallObject` with its class (the faithful fix for the Stable extab residual).
 
 ---
 
