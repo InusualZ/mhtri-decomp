@@ -268,7 +268,7 @@ lines with a stray `L`. Use the helper instead:
 
 `replace` matches across `\n` or `\r\n`, keeps the file's own endings, and **refuses, writing nothing, when the
 match count is not the N you asserted** - that is the difference between a rewrite and a corruption. Assert the count
-every time (`escape.py --edit` is the same rule, kept until the WP6 sweep).
+every time (`edit.py replace --old/--new` is that rule; `escape.py` keeps only `--write` and `--escape`).
 
 **Line endings.** A slot's working copy mixes CRLF and LF files while the index is LF, so a scripted `str.replace`
 with `\n` silently matches nothing on a CRLF file, and a careless write puts CRLF into an LF file. Edit through
