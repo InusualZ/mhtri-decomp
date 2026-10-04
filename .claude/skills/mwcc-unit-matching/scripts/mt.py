@@ -29,8 +29,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.dirname(HERE)
 
 TOOLS = {
-    "units":    "tools/unitutil.py",
-    "info":     "tools/unitutil.py",
+    "units":    "tools/units/unitinfo.py",
+    "info":     "tools/units/unitinfo.py",
     "frames":   "tools/flags/frame.py",
     "matrix":   "tools/flags/mwcc_matrix.py",
     "sweep":    "tools/flags/optsweep.py",

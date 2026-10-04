@@ -15,9 +15,8 @@ docs (7); the classifier is `lib.lanes.rescue` (`claims.release` reads a ref's v
 ```
 python tools/units/rescue.py audit [--prune] [--json] [--full-diff] [--ref REF]...
 [--repo PATH] [--main REF]
-python tools/units/rescue.py --selftest
 ```
-Flags: `--full-diff`, `--json`, `--main`, `--prefix`, `--prune`, `--ref`, `--repo`, `--selftest`.
+Flags: `--full-diff`, `--json`, `--main`, `--prefix`, `--prune`, `--ref`, `--repo`.
 Exit codes: 0 ok, 1 findings or refusal, 2 could not run (the `lib.findings` convention; today's tool documents none, so `migration.md` records the current behaviour before changing it).
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
 
@@ -47,7 +46,7 @@ lanes.rescue, git, project.configure.
 ## Test contract
 
 Tier: fixture (GitFixture).
-`tools/tests/units/test_rescue.py` (GitFixture; `--selftest` forwards to it): all four verdicts, both derivations, the read-only audit, `--prune` deleting only `redundant`, `--ref`, the CLI's `--json`. The registration readers are `lib.project.object_calls`/`Splits` and `lib.units.stem` (the `unionresolve`/`verifyunit` imports are gone).
+`tools/tests/units/test_rescue.py` (GitFixture): all four verdicts, both derivations, the read-only audit, `--prune` deleting only `redundant`, `--ref`, the CLI's `--json`. The registration readers are `lib.project.object_calls`/`Splits` and `lib.units.stem` (the `unionresolve`/`verifyunit` imports are gone).
 
 ## Known gaps
 

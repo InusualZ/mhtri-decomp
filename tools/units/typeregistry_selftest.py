@@ -14,15 +14,14 @@ report text names the header and the copying unit.
 `typeregistry.selftest()` holds the checks so `typeregistry.py --selftest` and this entry point cannot drift.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import os
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if os.path.join(ROOT, "tools") not in sys.path:
-    sys.path.insert(0, os.path.join(ROOT, "tools"))
 
-from units import typeregistry  # noqa: E402
+from tools.units import typeregistry
 
 
 def main() -> int:

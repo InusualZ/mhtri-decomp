@@ -169,7 +169,7 @@ It is the *librarian* of the compounding asset (§9), not the fastest decompiler
 > * the **gate and the landing**, the **merge procedure**, the **feedback loop**, the **measurement discipline**
 >   and the **flip discipline** — `docs/pipeline.md` §4–§8;
 > * the **agent profiles** and when each is used — `docs/pipeline.md` §2.4;
-> * the **tool roster** — `docs/pipeline.md` §9.
+> * the **tool roster** — `docs/tools/README.md` ("Use it when: the roster").
 >
 > Two things this section described are **superseded outright**: the manual merge procedure (now
 > `tools/units/mergebranch.py resolve`) and per-claim worktree construction (now the slot pool, with
@@ -1356,7 +1356,7 @@ batch inside the largest untouched run the ledger reports (25 blocks, 0x80280000
 proposals and a flag: `pinned` for a jump-table seam, `no evidence - one run` or `capped at --max-bytes` for the
 guesses. Those flagged units are exactly what `dataclaim.py` (7.8) classifies before anyone edits `splits.txt`.
 
-**Follow-ups the tool work named:** migrate `tools/symbols/symedit.py::rewrite` to `sharedfiles.py` - it writes
+**Follow-ups the tool work named:** migrate `tools/symbols/symedit.py::rewrite` to `lib.text` (`Transaction`; `sharedfiles.py` was retired in WP6) - it writes
 `symbols.txt` with its own temp+replace and no anchor/overlap/idempotency gate, the highest-risk shared file -
 and `tools/units/dataqueue.py::write_queue`, which duplicates the same primitive.
 

@@ -17,9 +17,8 @@ python tools/git/commitlint.py <message-file>         # the `commit-msg` hook sh
 python tools/git/commitlint.py --message "<subject>"  # a one-liner
 python tools/git/commitlint.py --last 20              # score the recent history
 python tools/git/commitlint.py --install-hook [--force]
-python tools/git/commitlint.py --selftest
 ```
-Flags: `--force`, `--install-hook`, `--last`, `--message`, `--root`, `--selftest`.
+Flags: `--force`, `--install-hook`, `--last`, `--message`, `--root`.
 Exit codes: Exit status follows the house convention (`--diff`'s 0/1/2): **0** clean (a warning alone does not fail - an unknown family is legitimate), **1** one or more violations, **2** nothing was checked (no mode given, `--last 0`, or a history with no commits), so the tool can be wired into a gate later.
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
 
@@ -56,7 +55,7 @@ git, repo.
 
 Tier: fixture (fixture tree + fixture history).
 Today's selftest (`tools/git/commitlint_selftest.py`): Every check runs against a **fixture tree** and a **fixture git history** built in a temp directory, never against this repository's working tree or HEAD, so the result cannot move when the tree does. The two mechanisms that decide the lint - the derived member sets and the message checks - are exercised both as pure functions and through the CLI, so the exit codes (0/1/2) are pinned too.
-Now: `tools/tests/git/test_commitlint.py` (83 checks, re-homed; `--selftest` forwards; `commitlint_selftest.py` is deleted). The tool's git calls go through `lib.git` (`toplevel`, `log`, `rev-parse`, `config`).
+Now: `tools/tests/git/test_commitlint.py` (83 checks, re-homed). The tool's git calls go through `lib.git` (`toplevel`, `log`, `rev-parse`, `config`).
 
 ## Known gaps
 

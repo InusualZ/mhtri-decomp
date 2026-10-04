@@ -1,8 +1,10 @@
 """The layering rule: tools/lib never imports a tool, and a tool imports another tool only on the allow-list.
 
 layering-allow.json (beside this file) is the tool->tool import graph as it stood when the rule arrived; it only
-shrinks: a new edge fails, and a listed edge whose two files exist but no longer import fails as stale. Tests under
-tools/tests/ may import anything. `--prune` drops stale and deleted edges; nothing ever adds one.
+shrinks: a new edge fails, and a listed edge whose two files exist but no longer import fails as stale; since WP6
+every listed edge states its reason. Test code may import anything: the modules under tools/tests/, a legacy
+`*_selftest.py`, and a tool importing its own `<stem>_selftest.py` (one tested unit, selftest.py's one entry).
+`--prune` drops stale and deleted edges; nothing ever adds one.
 """
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import ast
@@ -90,7 +92,7 @@ def edges(root: Path) -> tuple[set[tuple[str, str]], list[tuple[str, str]]]:
     file_set = set(files)
     tool_edges, lib_bad = set(), []
     for f in files:
-        if f.startswith("tools/tests/"):
+        if f.startswith("tools/tests/") or f.endswith("_selftest.py"):
             continue
         try:
             tree = ast.parse((root / f).read_text(encoding="utf-8", errors="replace"))
@@ -104,7 +106,7 @@ def edges(root: Path) -> tuple[set[tuple[str, str]], list[tuple[str, str]]]:
                 if not target.startswith("tools/lib/"):
                     lib_bad.append((f, target))
                 continue
-            if target.startswith("tools/lib/"):
+            if target.startswith("tools/lib/") or target == f[:-3] + "_selftest.py":
                 continue
             pkg = package_of(f, file_set)
             if pkg is not None and pkg == package_of(target, file_set):
@@ -117,8 +119,22 @@ def key(edge: tuple[str, str]) -> str:
     return "%s -> %s" % edge
 
 
-def load_allow(path: Path = ALLOW_FILE) -> list[str]:
+def load_entries(path: Path = ALLOW_FILE) -> list:
+    """The allowed edges as written: since WP6 each is `{"edge": "a -> b", "reason": ...}`."""
     return list(json.loads(path.read_text(encoding="utf-8"))["edges"])
+
+
+def entry_key(entry) -> str:
+    return entry["edge"] if isinstance(entry, dict) else entry
+
+
+def unjustified(entries: list) -> list[str]:
+    """The allowed edges that do not state a reason (a bare string, or an empty `reason`)."""
+    return [entry_key(e) for e in entries if not (isinstance(e, dict) and str(e.get("reason", "")).strip())]
+
+
+def load_allow(path: Path = ALLOW_FILE) -> list[str]:
+    return [entry_key(e) for e in load_entries(path)]
 
 
 def verdict(found: set[tuple[str, str]], allow: list[str], root: Path) -> tuple[list[str], list[str], list[str]]:
@@ -151,8 +167,12 @@ def test_rule_on_fixtures(c):
         w("tools/objdiff/symdiff.py", "import queue\nimport json\nimport elfsect\n")
         w("tools/elf/elfsect.py", "import struct\n")
         w("tools/tests/units/test_claims.py", "from tools.units import claims\n")
+        w("tools/units/slots_selftest.py", "import claims\nimport queue\n")
+        w("tools/units/zeta.py", "import zeta_selftest\n")
+        w("tools/units/zeta_selftest.py", "import zeta\n")
         found, lib_bad = edges(tree.root)
-        c.check("lib->lib, stdlib and test imports are not edges; a bare name resolves like the sys.path inserts",
+        c.check("lib->lib, stdlib and test imports (tools/tests, *_selftest.py, a tool's own selftest) are not edges; "
+                "a bare name resolves like the sys.path inserts",
                 sorted(key(e) for e in found),
                 ["tools/objdiff/symdiff.py -> tools/elf/elfsect.py",
                  "tools/units/claims.py -> tools/units/queue.py",
@@ -183,6 +203,9 @@ def test_rule_on_fixtures(c):
                 sorted(k for k in found if k.startswith("tools/pkg/") and "/pkg/" in k.split(" -> ")[1]), [])
         c.contains("... while the package importing another tool is", found, "tools/pkg/c.py -> tools/units/queue.py")
         c.contains("... and so is a shim importing the package", found, "tools/pkgshim.py -> tools/pkg/a.py")
+        c.check("an allowed edge without a reason is unjustified; one with a reason is not",
+                unjustified(["a -> b", {"edge": "c -> d", "reason": ""}, {"edge": "e -> f", "reason": "the shim"}]),
+                ["a -> b", "c -> d"])
         w("tools/units/nopkg.py", "import queue\n")
         c.contains("a directory without __init__.py is not a package: its imports stay edges",
                    {key(e) for e in edges(tree.root)[0]}, "tools/units/nopkg.py -> tools/units/queue.py")
@@ -209,13 +232,15 @@ def test_live_tree(c):
         print("note: allowed edge %s names a deleted file - `--prune` drops it" % k)
     print("layering: %d tool->tool edge(s) allowed pending migration" % (len(allow) - len(gone) - len(stale)))
     c.check("the allow-list is sorted and has no duplicates", allow, sorted(set(allow)))
+    c.check("every allowed edge states its reason (WP6)", unjustified(load_entries()), [])
 
 
 def prune() -> int:
     root = testing.live_root()
     have = {key(e) for e in edges(root)[0]}
-    allow = load_allow()
-    keep = [k for k in allow if k in have]
+    entries = load_entries()
+    allow = [entry_key(e) for e in entries]
+    keep = [e for e in entries if entry_key(e) in have]
     data = json.loads(ALLOW_FILE.read_text(encoding="utf-8"))
     data["edges"] = keep
     testing.rewrite_json(ALLOW_FILE, data)   # the file's own indent: a prune is a minimal diff

@@ -69,5 +69,5 @@ The fold-shaped sequences are not guesses: every object **we** build with the pe
 targets that need `#pragma peephole off` have them. The `src` side of the diff is the proof; the
 target-only inference is the pre-flight.
 
-`infer-run.md` is the committed output of `--markdown` (a per-unit row for all 155 registered units,
-the aggregate, and the accuracy table).
+`python tools/flags/infer.py --markdown` prints a per-unit row for every registered unit, the aggregate,
+and the accuracy table (a committed snapshot of it, `infer-run.md`, was retired in WP6: regenerate it).

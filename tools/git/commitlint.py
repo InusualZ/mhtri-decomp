@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Lint commit messages against CLAUDE.md's `<category>: <message>` convention (the mechanical part); exit 0/1/2.
-Spec: docs/tools/spec/commitlint.md. CLI: commitlint.py MESSAGE_FILE | --message M | --last N | --install-hook [--force] | --selftest [--root D]."""
+Spec: docs/tools/spec/commitlint.md. CLI: commitlint.py MESSAGE_FILE | --message M | --last N | --install-hook [--force] [--root D]."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
@@ -9,7 +9,6 @@ import os
 import re
 import sys
 import difflib
-import tempfile
 
 from tools.lib.git import Git
 
@@ -335,12 +334,6 @@ def install_hook(root: str, force: bool, out=sys.stdout) -> int:
     return 0
 
 
-def selftest() -> int:
-    """Run `tools/tests/git/test_commitlint.py` (the fixture tree and history) in a temp working directory."""
-    from tools.lib import cli
-    return cli.Tool("commitlint", tests="tools/tests/git/test_commitlint.py").selftest(cwd=tempfile.gettempdir())
-
-
 def main(argv: list | None = None) -> int:
     ap = argparse.ArgumentParser(description="Lint commit messages against CLAUDE.md's convention.")
     ap.add_argument("message_file", nargs="?",
@@ -353,11 +346,7 @@ def main(argv: list | None = None) -> int:
                     help="with --install-hook: replace an existing hook that is not this tool's")
     ap.add_argument("--root", metavar="DIR",
                     help="read the tree and history from DIR (default: this repository's toplevel)")
-    ap.add_argument("--selftest", action="store_true", help="run the selftest and exit")
     args = ap.parse_args(argv)
-
-    if args.selftest:
-        return selftest()
 
     root = find_root(args.root)
 
@@ -368,7 +357,7 @@ def main(argv: list | None = None) -> int:
     if sum(chosen) != 1:
         # ap.error exits 2 - "nothing was checked", the house meaning of 2
         ap.error("pass exactly one of: a message file, --message, --last N "
-                 "(or --install-hook / --selftest)")
+                 "(or --install-hook)")
 
     members = derive_members(root)
 

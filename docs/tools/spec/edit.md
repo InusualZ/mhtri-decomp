@@ -43,11 +43,11 @@ text, git.
 ## Test contract
 
 Tier: fixture (temp files).
-`tools/tests/agents/test_edit.py` (the old `edit_selftest.py` plus `--old/--new` and `check --blob`, every case through the CLI); `checklf`'s own cases are `tools/tests/units/test_checklf.py`.
+`tools/tests/agents/test_edit.py` (the old `edit_selftest.py` plus `--old/--new` and `check --blob`, every case through the CLI); the per-path `check_path` cases (`test_check_path_cases`) came from the deleted `checklf` test.
 
 ## Known gaps
 
-* `tools/units/checklf.py` stays as a shim (same CLI and exit codes) until the WP6 sweep deletes it.
+* `tools/units/checklf.py` (the shim) was deleted in WP6.
 
 ## History (the incidents behind the rules - keep the rule, drop the narrative when the rule is stable)
 

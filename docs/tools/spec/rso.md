@@ -59,3 +59,24 @@ Target: `tools/tests/rso/test_rso.py` on `lib.testing` (`FixtureTree`/`GitFixtur
 ## Known gaps
 
 dormant: the RSO splitter blocker
+
+## Moved from the module docstring (WP6)
+
+From `tools/rso/symbols.py`:
+
+The export table is the only symbol information a retail RSO carries: name, section index, section
+offset and a name hash - no sizes and no local symbols. So the generated `symbols.txt` is a *seed*:
+it pins the names and addresses the original link exported, and the analyzer fills in the rest once a
+module can be split (see docs/rso-modules.md for the splitter blocker).
+
+Section names are derived from evidence, and the derivation is recorded per section:
+
+    proven    .init   the section holding the module's prolog entry point
+              .ctors  the section holding the `_ctors` label
+              .dtors  the section holding the `_dtors` label
+              .bss    the section with no file bytes whose size equals the header's bss size
+    inferred  everything else, by index order from the conventional REL section pool
+
+Usage:
+    python tools/rso/symbols.py --all [--out config/RMHE08] [--report build/tmp/rso-symbols/summary.md]
+    python tools/rso/symbols.py --rso <file.rso> --print

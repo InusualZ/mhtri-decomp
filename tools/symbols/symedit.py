@@ -907,7 +907,7 @@ def selftest() -> int:
     # --- the map resolves against the TREE the command was run in ------------------------------------
     # `symedit` *writes* the map, so a MAIN-hardcoded root meant a lane that invoked MAIN's copy from its
     # own worktree renamed symbols in MAIN (and, reading, refused to find a name the branch had just
-    # introduced). The default `--file` now resolves through `unitutil.repo_root` - the caller's git
+    # introduced). The default `--file` now resolves through `lib.repo.repo_root` - the caller's git
     # worktree. This runs the real CLI from a throwaway git tree whose map is the only one that knows the
     # marker, so a file-location root cannot pass it.
     import subprocess

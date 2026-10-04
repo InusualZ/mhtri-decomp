@@ -17,6 +17,7 @@ neither bullet may be agglomerated with the other, the identical bullet from a s
 *vote*, and a bullet that was skipped (too short, or already owned by a curated topic) is reported.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import json
 import os
@@ -24,10 +25,8 @@ import sys
 import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if os.path.join(ROOT, "tools", "units") not in sys.path:
-    sys.path.insert(0, os.path.join(ROOT, "tools", "units"))
 
-import tooling as tg  # noqa: E402
+from tools.units import tooling as tg
 
 
 def outbox(unit, worker, **kw):

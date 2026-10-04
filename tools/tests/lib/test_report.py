@@ -286,5 +286,32 @@ def test_freshness(c):
         c.check("rel_path is tree-relative with forward slashes", report.rel_path(str(root / "a" / "b"), str(root)), "a/b")
 
 
+def test_freshness_modes(c):
+    """`freshness` in both modes and `newest`/`mtime`, on stamps alone (no files needed but one)."""
+    base = 1_000_000.0
+    src = ("u.cpp", base + 20)
+    c.check("mtime of a missing file is None", report.mtime(os.path.join(tempfile.gettempdir(), "nope-xyz-wp6")), None)
+    c.check("newest of nothing is None", report.newest([]), None)
+    with tempfile.TemporaryDirectory() as tmp:
+        a, b = Path(tmp) / "a.h", Path(tmp) / "b.h"
+        _touch(a, base)
+        _touch(b, base + 10)
+        c.check("newest finds the most recent input and its stamp",
+                (os.path.basename(report.newest([str(a), str(b)])[0]), report.newest([str(a), str(b)])[1]),
+                ("b.h", base + 10))
+    c.check("report mode: a report newer than the object and every source is current",
+            report.freshness(True, base + 100, base + 5, src, "r.json", "o.o"), [])
+    c.check("report mode: older than the newest source is stale",
+            len(report.freshness(True, base + 15, base + 5, src, "r.json", "o.o")), 1)
+    c.check("report mode: older than the object is stale", len(report.freshness(True, base + 3, base + 5, None, "r", "o")), 1)
+    c.check("report mode: a missing report is stale", len(report.freshness(True, None, base + 5, None, "r", "o")), 1)
+    c.check("object mode: an object newer than every source is current",
+            report.freshness(False, None, base + 50, src, "r", "o"), [])
+    c.check("object mode: a source newer than the object is stale",
+            len(report.freshness(False, None, base + 10, src, "r", "o")), 1)
+    c.check("object mode: an equal whole-second stamp is current", report.freshness(False, None, base + 20, src, "r", "o"),
+            [])
+
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))

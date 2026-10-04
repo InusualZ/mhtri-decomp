@@ -49,7 +49,7 @@ Inputs -> outputs: build/RMHE08/asm or obj/ -> build/tmp/callers/graph.json -> r
 ## Lib dependencies
 
 `lib.refs` (the index, the cache, `RefMap`, `query`, `readers_of`, `range_report`, `DumpStamp`), `lib.cache`
-(`stat_digest`), `lib.report` (`rel_path`), `lib.repo` (`VERSION`); `unitutil.resolve_input` for the input locations.
+(`stat_digest`), `lib.report` (`rel_path`), `lib.repo` (`VERSION`); `lib.repo.resolve_input` for the input locations.
 
 ## Test contract
 

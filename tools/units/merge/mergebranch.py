@@ -1,5 +1,5 @@
 """Bring `main` into a held lane branch, resolve the conflicts by class, prove the result, commit it.
-Spec: docs/tools/spec/mergebranch.md. CLI: none (module; `tools/units/mergebranch.py` is the entry point)."""
+Spec: docs/tools/spec/merge.md. CLI: none (module; `tools/units/mergebranch.py` is the entry point, spec/mergebranch.md)."""
 from __future__ import annotations
 
 import argparse
@@ -583,7 +583,7 @@ def status(root: str) -> int:
     return 0
 
 
-def main(argv: list[str] | None = None, selftest=None, description: str = "") -> int:
+def main(argv: list[str] | None = None, description: str = "") -> int:
     ap = argparse.ArgumentParser(description=description)
     ap.add_argument("--root", default=None, help="the lane's tree (default: the cwd's toplevel)")
     sub = ap.add_subparsers(dest="cmd")
@@ -593,10 +593,7 @@ def main(argv: list[str] | None = None, selftest=None, description: str = "") ->
     r.add_argument("--json", action="store_true")
     s = sub.add_parser("status", help="what this tool has recorded for the tree")
     s.set_defaults(func=None)
-    ap.add_argument("--selftest", action="store_true", help="run tools/tests/units/test_mergebranch.py")
     a = ap.parse_args(argv)
-    if a.selftest:
-        return selftest() if selftest else 2
     root = a.root or (git(os.getcwd(), "rev-parse", "--show-toplevel").strip() or os.getcwd())
     if not a.cmd:
         ap.print_help()

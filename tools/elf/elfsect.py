@@ -23,11 +23,9 @@ if __name__ == '__main__':
     args = sys.argv[1:]
     # `-u <unit>` prints the split target object next to ours, which is the usual comparison
     if args[:1] in (['-u'], ['--unit']):
-        import os
-        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # tools/ (unitutil's own imports)
-        import unitutil as uu
-        unit = uu.resolve_unit(args[1] if len(args) > 1 else None)
-        args = [unit.target, unit.obj]
+        from tools.lib import repo, units
+        unit = units.Unit.resolve(args[1] if len(args) > 1 else None, repo.repo_root())
+        args = [unit.obj_target, unit.obj_ours]
     if not args:
         raise SystemExit("usage: elfsect.py [-u <unit>] [<obj> ...]")
     for p in args:

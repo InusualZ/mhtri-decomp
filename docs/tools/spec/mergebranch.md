@@ -18,7 +18,7 @@ python tools/units/mergebranch.py status
 python tools/units/mergebranch.py selftest
 ```
 Subcommands: `resolve`, `status`.
-Flags: `--branch`, `--dry-run`, `--json`, `--root`, `--selftest`.
+Flags: `--branch`, `--dry-run`, `--json`, `--root`.
 Exit codes: 0 ok, 1 findings or refusal, 2 could not run (the `lib.findings` convention; today's tool documents none, so `migration.md` records the current behaviour before changing it).
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
 
@@ -45,7 +45,7 @@ git (`Git.merge_bytes`, `renames`, `show`), text (`line_ending`, `atomic_write`)
 ## Test contract
 
 Tier: fixture (GitFixture).
-`tools/tests/units/test_mergebranch.py` (120 checks, the old in-file selftest re-homed; `--selftest` forwards to it). The two real prose conflicts and the pre-fix union live once in `tools/tests/units/merge_fixtures.py`.
+`tools/tests/units/test_mergebranch.py` (120 checks, the old in-file selftest re-homed). The two real prose conflicts and the pre-fix union live once in `tools/tests/units/merge_fixtures.py`.
 
 ## Known gaps
 

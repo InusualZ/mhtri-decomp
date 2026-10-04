@@ -1,167 +1,325 @@
 {
- "$comment": "The tool->tool import graph as it stood when the layering rule arrived (WP0, 2026-10-03, tree 923349423), resolved the way tools/tests/lib/test_layering.py resolves imports. It only shrinks: a new edge fails the test, and so does a listed edge whose files exist but no longer import; `python tools/tests/lib/test_layering.py --prune` drops stale and deleted edges and never adds one. A file split carries the moved code's edges and nothing else (WP3a: `datagap -> dataclosure`, and `dataclosure -> callers/poolseams` in place of datagap's own; that batch's net is -4). WP5 split mwlink_debugger.py into the package tools/mwlink/ (imports inside one package are not edges, test_layering.package_of) and left the shim's one edge `mwlink_debugger.py -> mwlink/cli.py`, retired with the shim in WP6; the PE reader moved to lib.binary.pe, dropping `pass_points -> dissect`: that batch's net is 0. WP3c put the seam rules in tools/splits/seams/evidence.py (five entry points import it), split splitcheck into the package tools/splits/invariants/ (one edge, `splitcheck.py -> invariants/audit.py`) and moved the callers query into lib.refs (accessextent, dataclaim, dataclosure stop importing callers): that batch's net is -12. WP3e moved the lane model into lib.lanes (claims, slots, lane, rescue, wtsafe, queue, lanecmd, worktreehook delegate to it) and split brief.py into tools/units/briefing/ (sources is the one module that reads other tools): the split carries brief.py's dossier/handoff/langcheck/typeregistry edges to briefing/sources.py and adds brief.py -> briefing/__init__.py; that batch drops 24 edges and adds 5, net -19. WP3d split stylelint.py into the package tools/units/stylelint_rules/ and swapped its two edges (`stylelint.py -> datagap.py` became `stylelint_rules/diff.py -> dataclosure.py`, where the fold map lives; `stylelint.py -> mangle.py` became lib.names) for the shim's one edge `stylelint.py -> stylelint_rules/api.py`; with the symbols/source-scanner delegations that batch's net is -13. WP4 split land.py into the package tools/units/landing/: land.py's 14 edges become the package's 11 (each foreign tool imported by one module) plus the shim's `land.py -> landing/api.py`; the subproc/unitutil/recompile edges went to lib (net -2).",
+ "$comment": "The tool->tool import graph as it stood when the layering rule arrived (WP0, 2026-10-03, tree 923349423), resolved the way tools/tests/lib/test_layering.py resolves imports. It only shrinks: a new edge fails the test, and so does a listed edge whose files exist but no longer import; `python tools/tests/lib/test_layering.py --prune` drops stale and deleted edges and never adds one. A file split carries the moved code's edges and nothing else (WP3a: `datagap -> dataclosure`, and `dataclosure -> callers/poolseams` in place of datagap's own; that batch's net is -4). WP5 split mwlink_debugger.py into the package tools/mwlink/ (imports inside one package are not edges, test_layering.package_of) and left the shim's one edge `mwlink_debugger.py -> mwlink/cli.py`, retired with the shim in WP6; the PE reader moved to lib.binary.pe, dropping `pass_points -> dissect`: that batch's net is 0. WP3c put the seam rules in tools/splits/seams/evidence.py (five entry points import it), split splitcheck into the package tools/splits/invariants/ (one edge, `splitcheck.py -> invariants/audit.py`) and moved the callers query into lib.refs (accessextent, dataclaim, dataclosure stop importing callers): that batch's net is -12. WP3e moved the lane model into lib.lanes (claims, slots, lane, rescue, wtsafe, queue, lanecmd, worktreehook delegate to it) and split brief.py into tools/units/briefing/ (sources is the one module that reads other tools): the split carries brief.py's dossier/handoff/langcheck/typeregistry edges to briefing/sources.py and adds brief.py -> briefing/__init__.py; that batch drops 24 edges and adds 5, net -19. WP3d split stylelint.py into the package tools/units/stylelint_rules/ and swapped its two edges (`stylelint.py -> datagap.py` became `stylelint_rules/diff.py -> dataclosure.py`, where the fold map lives; `stylelint.py -> mangle.py` became lib.names) for the shim's one edge `stylelint.py -> stylelint_rules/api.py`; with the symbols/source-scanner delegations that batch's net is -13. WP4 split land.py into the package tools/units/landing/: land.py's 14 edges become the package's 11 (each foreign tool imported by one module) plus the shim's `land.py -> landing/api.py`; the subproc/unitutil/recompile edges went to lib (net -2). WP6 deleted the shims unitutil, unionguard, unionresolve, unionprose, checklf, relocaudit, sharedfiles, subproc, spawnretry, freshguard, reportdiff: their edges went with them, and landing/branch.py's two edges to the deleted union shims now name the package modules they forwarded to (tools/units/merge/unionguard.py, unionresolve.py). WP6: test code is not an importer (a legacy *_selftest.py, as tools/tests/ already was) and a tool's own <stem>_selftest.py is not an edge (one tested unit): 58 edges; flipcheck and vtslot take norm_unit from lib.lanes.naming and dataclaim/dataqueue the section order from lib.project.splits: 3 more; 141 -> 80 edges, and every edge now states its reason.",
  "edges": [
-  "tools/agents/ideas.py -> tools/agents/ideas_demo.py",
-  "tools/agents/ideas.py -> tools/agents/sync_playbook_index.py",
-  "tools/agents/ideas_demo.py -> tools/unitutil.py",
-  "tools/agents/ideas_selftest.py -> tools/agents/ideas.py",
-  "tools/agents/ideas_selftest.py -> tools/agents/ideas_demo.py",
-  "tools/agents/ideas_selftest.py -> tools/agents/sync_playbook_index.py",
-  "tools/agents/sync_playbook_index_selftest.py -> tools/agents/sync_playbook_index.py",
-  "tools/agents/sync_profiles_selftest.py -> tools/agents/sync_profiles.py",
-  "tools/agents/sync_profiles_selftest.py -> tools/units/brief.py",
-  "tools/elf/elfsect.py -> tools/unitutil.py",
-  "tools/elf/objextab.py -> tools/elf/objalign.py",
-  "tools/flags/infer.py -> tools/flags/infer_selftest.py",
-  "tools/flags/infer_selftest.py -> tools/flags/infer.py",
-  "tools/flags/shapes_selftest.py -> tools/flags/shapes.py",
-  "tools/flags/shapesearch.py -> tools/flags/shapes.py",
-  "tools/flags/shapesearch.py -> tools/flags/shapesearch_selftest.py",
-  "tools/flags/shapesearch_selftest.py -> tools/flags/shapesearch.py",
-  "tools/git/guard_selftest.py -> tools/git/guard.py",
-  "tools/git/guard_selftest.py -> tools/git/prepcommit.py",
-  "tools/git/prepcommit.py -> tools/units/land.py",
-  "tools/mwcc-debugger/locate/verify_pcode.py -> tools/mwcc-debugger/versions.py",
-  "tools/mwcc-debugger/locate/verify_pcode_selftest.py -> tools/mwcc-debugger/locate/verify_pcode.py",
-  "tools/mwcc-debugger/mwcc_debugger.py -> tools/mwcc-debugger/versions.py",
-  "tools/mwlink_debugger.py -> tools/mwlink/cli.py",
-  "tools/objdiff/metric_selftest.py -> tools/flags/mwcc_matrix.py",
-  "tools/objdiff/metric_selftest.py -> tools/flags/tryvar.py",
-  "tools/objdiff/metric_selftest.py -> tools/unitutil.py",
-  "tools/objdiff/pairgap.py -> tools/unitutil.py",
-  "tools/objdiff/pairgap_selftest.py -> tools/objdiff/pairgap.py",
-  "tools/objdiff/relocdiff.py -> tools/objdiff/relocdiff_selftest.py",
-  "tools/objdiff/relocdiff.py -> tools/unitutil.py",
-  "tools/objdiff/relocdiff_selftest.py -> tools/objdiff/relocdiff.py",
-  "tools/objdiff/relocdiff_selftest.py -> tools/units/sectiongap_selftest.py",
-  "tools/objdiff/relocdiff_selftest.py -> tools/units/undefrefs_selftest.py",
-  "tools/objdiff/unitscore.py -> tools/objdiff/unitscore_selftest.py",
-  "tools/rso/inventory.py -> tools/unitutil.py",
-  "tools/rso/symbols.py -> tools/rso/inventory.py",
-  "tools/rso/symbols.py -> tools/unitutil.py",
-  "tools/spawnretry_selftest.py -> tools/spawnretry.py",
-  "tools/splits/dataorder.py -> tools/splits/seams/evidence.py",
-  "tools/splits/dump_asm.py -> tools/splits/tudiscover.py",
-  "tools/splits/dump_asm_selftest.py -> tools/splits/dump_asm.py",
-  "tools/splits/dump_asm_selftest.py -> tools/splits/tudiscover.py",
-  "tools/splits/invariants/context.py -> tools/splits/seams/evidence.py",
-  "tools/splits/invariants/data_order.py -> tools/splits/seams/evidence.py",
-  "tools/splits/invariants/pool.py -> tools/splits/seams/evidence.py",
-  "tools/splits/splitcheck.py -> tools/splits/invariants/audit.py",
-  "tools/splits/tudiscover.py -> tools/splits/seams/evidence.py",
-  "tools/splits/tudiscover.py -> tools/units/poolseams.py",
-  "tools/units/accessextent_selftest.py -> tools/units/accessextent.py",
-  "tools/units/backlog.py -> tools/units/backlog_selftest.py",
-  "tools/units/backlog.py -> tools/units/datagap.py",
-  "tools/units/backlog.py -> tools/units/stylelint.py",
-  "tools/units/backlog.py -> tools/units/tooling.py",
-  "tools/units/backlog.py -> tools/units/undefrefs.py",
-  "tools/units/backlog_selftest.py -> tools/units/backlog.py",
-  "tools/units/backlog_selftest.py -> tools/units/datagap.py",
-  "tools/units/backlog_selftest.py -> tools/units/undefrefs_selftest.py",
-  "tools/units/brief.py -> tools/units/briefing/__init__.py",
-  "tools/units/briefing/sources.py -> tools/units/dossier.py",
-  "tools/units/briefing/sources.py -> tools/units/handoff.py",
-  "tools/units/briefing/sources.py -> tools/units/langcheck.py",
-  "tools/units/briefing/sources.py -> tools/units/typeregistry.py",
-  "tools/units/callees.py -> tools/symbols/symedit.py",
-  "tools/units/callees.py -> tools/unitutil.py",
-  "tools/units/callees_selftest.py -> tools/units/callees.py",
-  "tools/units/callers.py -> tools/unitutil.py",
-  "tools/units/callers_selftest.py -> tools/units/callers.py",
-  "tools/units/checklf.py -> tools/agents/edit.py",
-  "tools/units/claims.py -> tools/units/queue.py",
-  "tools/units/claims.py -> tools/unitutil.py",
-  "tools/units/dataclaim.py -> tools/units/datagap.py",
-  "tools/units/dataclaim.py -> tools/units/dataqueue.py",
-  "tools/units/dataclaim.py -> tools/units/dataseams.py",
-  "tools/units/dataclaim.py -> tools/units/ledger.py",
-  "tools/units/dataclaim.py -> tools/units/stylelint.py",
-  "tools/units/dataclaim.py -> tools/units/symbolpreflight.py",
-  "tools/units/dataclaim.py -> tools/units/undefrefs.py",
-  "tools/units/dataclosure.py -> tools/units/poolseams.py",
-  "tools/units/datagap.py -> tools/units/dataclosure.py",
-  "tools/units/datagap.py -> tools/units/dataseams.py",
-  "tools/units/datagap.py -> tools/units/poolseams.py",
-  "tools/units/dataqueue.py -> tools/units/brief.py",
-  "tools/units/dataqueue.py -> tools/units/dataseams.py",
-  "tools/units/dataqueue.py -> tools/units/ledger.py",
-  "tools/units/dataqueue.py -> tools/units/sharedfiles.py",
-  "tools/units/dataqueue.py -> tools/units/symbolpreflight.py",
-  "tools/units/dataseams.py -> tools/splits/seams/evidence.py",
-  "tools/units/dossier_selftest.py -> tools/units/dossier.py",
-  "tools/units/flipcheck.py -> tools/units/claims.py",
-  "tools/units/flipcheck.py -> tools/units/dataseams.py",
-  "tools/units/flipcheck.py -> tools/units/flipcheck_selftest.py",
-  "tools/units/flipcheck.py -> tools/units/poolseams.py",
-  "tools/units/flipcheck_selftest.py -> tools/units/flipcheck.py",
-  "tools/units/handoff.py -> tools/units/brief.py",
-  "tools/units/handoff.py -> tools/units/claims.py",
-  "tools/units/handoff.py -> tools/units/recompile.py",
-  "tools/units/land.py -> tools/units/landing/api.py",
-  "tools/units/landing/branch.py -> tools/units/unionguard.py",
-  "tools/units/landing/branch.py -> tools/units/unionresolve.py",
-  "tools/units/landing/release.py -> tools/units/claims.py",
-  "tools/units/landing/rows/batch.py -> tools/units/handoff.py",
-  "tools/units/landing/rows/data.py -> tools/units/dataclosure.py",
-  "tools/units/landing/rows/objects.py -> tools/units/undefrefs.py",
-  "tools/units/landing/rows/objects.py -> tools/units/verifyunit.py",
-  "tools/units/landing/rows/rules.py -> tools/units/briefing/sources.py",
-  "tools/units/landing/rows/rules.py -> tools/units/stylelint_rules/api.py",
-  "tools/units/landing/rows/rules.py -> tools/units/vtableaudit.py",
-  "tools/units/landing/rows/tree.py -> tools/git/prepcommit.py",
-  "tools/units/langcheck.py -> tools/splits/seams/evidence.py",
-  "tools/units/ledger.py -> tools/units/symbolpreflight.py",
-  "tools/units/ledger_selftest.py -> tools/units/ledger.py",
-  "tools/units/linkorder.py -> tools/units/symbolpreflight.py",
-  "tools/units/linkorder_selftest.py -> tools/units/linkorder.py",
-  "tools/units/m2cinput_selftest.py -> tools/units/m2cinput.py",
-  "tools/units/measure_selftest.py -> tools/units/measure.py",
-  "tools/units/merge/mergebranch.py -> tools/units/land.py",
-  "tools/units/mergebranch.py -> tools/units/merge/mergebranch.py",
-  "tools/units/methodize.py -> tools/units/mangle.py",
-  "tools/units/methodize.py -> tools/units/stylelint.py",
-  "tools/units/playbook.py -> tools/agents/sync_playbook_index.py",
-  "tools/units/playbook.py -> tools/units/playbook_selftest.py",
-  "tools/units/playbook_selftest.py -> tools/units/playbook.py",
-  "tools/units/poolseams.py -> tools/splits/seams/evidence.py",
-  "tools/units/preflight_selftest.py -> tools/units/symbolpreflight.py",
-  "tools/units/queue.py -> tools/units/backlog.py",
-  "tools/units/queue.py -> tools/units/brief.py",
-  "tools/units/queue.py -> tools/units/claims.py",
-  "tools/units/recompile.py -> tools/units/recompile_selftest.py",
-  "tools/units/recompile_selftest.py -> tools/units/recompile.py",
-  "tools/units/sectiongap.py -> tools/units/poolseams.py",
-  "tools/units/sectiongap.py -> tools/units/sectiongap_selftest.py",
-  "tools/units/sectiongap.py -> tools/unitutil.py",
-  "tools/units/sectiongap_selftest.py -> tools/units/sectiongap.py",
-  "tools/units/slots.py -> tools/units/claims.py",
-  "tools/units/slots.py -> tools/units/dataqueue.py",
-  "tools/units/slots.py -> tools/unitutil.py",
-  "tools/units/stylelint.py -> tools/units/stylelint_rules/api.py",
-  "tools/units/stylelint_rules/diff.py -> tools/units/dataclosure.py",
-  "tools/units/subproc_selftest.py -> tools/units/subproc.py",
-  "tools/units/tooling.py -> tools/units/tooling_selftest.py",
-  "tools/units/tooling_selftest.py -> tools/units/tooling.py",
-  "tools/units/typeregistry_selftest.py -> tools/units/typeregistry.py",
-  "tools/units/undefrefs.py -> tools/units/recompile.py",
-  "tools/units/undefrefs.py -> tools/units/undefrefs_selftest.py",
-  "tools/units/undefrefs_selftest.py -> tools/units/undefrefs.py",
-  "tools/units/unionguard.py -> tools/units/merge/unionguard.py",
-  "tools/units/unionprose.py -> tools/units/merge/unionprose.py",
-  "tools/units/unionresolve.py -> tools/units/merge/unionresolve.py",
-  "tools/units/unwindcut.py -> tools/units/unwindcut_selftest.py",
-  "tools/units/unwindcut_selftest.py -> tools/units/unwindcut.py",
-  "tools/units/verifyunit.py -> tools/units/measure.py",
-  "tools/units/verifyunit.py -> tools/unitutil.py",
-  "tools/units/verifyunit_selftest.py -> tools/units/verifyunit.py",
-  "tools/units/vtableaudit.py -> tools/units/vtableaudit_selftest.py",
-  "tools/units/vtableaudit_selftest.py -> tools/units/vtableaudit.py",
-  "tools/units/vtslot.py -> tools/units/claims.py",
-  "tools/units/vtslot.py -> tools/units/vtableaudit.py",
-  "tools/units/vtslot.py -> tools/units/vtslot_selftest.py",
-  "tools/units/vtslot_selftest.py -> tools/units/vtableaudit.py",
-  "tools/units/vtslot_selftest.py -> tools/units/vtslot.py",
-  "tools/unitutil_selftest.py -> tools/unitutil.py"
+  {
+   "edge": "tools/agents/ideas.py -> tools/agents/ideas_demo.py",
+   "reason": "ideas_demo is ideas' own demo library (demo-check), split out of one tool; not a package because tools/agents holds several tools"
+  },
+  {
+   "edge": "tools/agents/ideas.py -> tools/agents/sync_playbook_index.py",
+   "reason": "the playbook index parser and writer are sync_playbook_index's; ideas reads and rewrites the same index (one parser)"
+  },
+  {
+   "edge": "tools/elf/objextab.py -> tools/elf/objalign.py",
+   "reason": "one splits grammar and one object->unit rule (parse_splits, unit_key), owned by objalign; both are object post-processors chained by the build"
+  },
+  {
+   "edge": "tools/flags/shapesearch.py -> tools/flags/shapes.py",
+   "reason": "shapes is shapesearch's own generator library (spec/shapes.md), split out of one tool"
+  },
+  {
+   "edge": "tools/git/prepcommit.py -> tools/units/land.py",
+   "reason": "prepcommit previews the gate's ledger numbers and base record (land.ledger_numbers, read_base) - the gate's own API, not a second copy"
+  },
+  {
+   "edge": "tools/mwcc-debugger/locate/verify_pcode.py -> tools/mwcc-debugger/versions.py",
+   "reason": "versions.py is the mwcc-debugger tool's build data (one tool directory, not importable as a package: the hyphen)"
+  },
+  {
+   "edge": "tools/mwcc-debugger/mwcc_debugger.py -> tools/mwcc-debugger/versions.py",
+   "reason": "versions.py is the mwcc-debugger tool's build data (one tool directory, not importable as a package: the hyphen)"
+  },
+  {
+   "edge": "tools/mwlink_debugger.py -> tools/mwlink/cli.py",
+   "reason": "a CLI shim the compatibility list keeps by path, forwarding to its own package: one tool, two directories"
+  },
+  {
+   "edge": "tools/rso/symbols.py -> tools/rso/inventory.py",
+   "reason": "inventory.parse is the one RSO reader; both entry points are the rso tool (spec/rso.md)"
+  },
+  {
+   "edge": "tools/splits/dataorder.py -> tools/splits/seams/evidence.py",
+   "reason": "reads the seam evidence (data order, pools, source names) from its one home, tools/splits/seams/evidence.py; moving it to lib is open (it is a tool-level model, not a shared primitive)"
+  },
+  {
+   "edge": "tools/splits/dump_asm.py -> tools/splits/tudiscover.py",
+   "reason": "the dump's location and stamp are tudiscover's (its only reader): dump_asm writes what tudiscover checks"
+  },
+  {
+   "edge": "tools/splits/invariants/context.py -> tools/splits/seams/evidence.py",
+   "reason": "reads the seam evidence (data order, pools, source names) from its one home, tools/splits/seams/evidence.py; moving it to lib is open (it is a tool-level model, not a shared primitive)"
+  },
+  {
+   "edge": "tools/splits/invariants/data_order.py -> tools/splits/seams/evidence.py",
+   "reason": "reads the seam evidence (data order, pools, source names) from its one home, tools/splits/seams/evidence.py; moving it to lib is open (it is a tool-level model, not a shared primitive)"
+  },
+  {
+   "edge": "tools/splits/invariants/pool.py -> tools/splits/seams/evidence.py",
+   "reason": "reads the seam evidence (data order, pools, source names) from its one home, tools/splits/seams/evidence.py; moving it to lib is open (it is a tool-level model, not a shared primitive)"
+  },
+  {
+   "edge": "tools/splits/splitcheck.py -> tools/splits/invariants/audit.py",
+   "reason": "a CLI shim the compatibility list keeps by path, forwarding to its own package: one tool, two directories"
+  },
+  {
+   "edge": "tools/splits/tudiscover.py -> tools/splits/seams/evidence.py",
+   "reason": "reads the seam evidence (data order, pools, source names) from its one home, tools/splits/seams/evidence.py; moving it to lib is open (it is a tool-level model, not a shared primitive)"
+  },
+  {
+   "edge": "tools/splits/tudiscover.py -> tools/units/poolseams.py",
+   "reason": "the pool census is poolseams' (one census); tudiscover reports it as TU evidence"
+  },
+  {
+   "edge": "tools/units/backlog.py -> tools/units/datagap.py",
+   "reason": "the register counts datagap's strict pairs with datagap's own rule, never a second copy"
+  },
+  {
+   "edge": "tools/units/backlog.py -> tools/units/stylelint.py",
+   "reason": "the register counts the lint's findings with the lint itself (lint_source, finding_identity)"
+  },
+  {
+   "edge": "tools/units/backlog.py -> tools/units/tooling.py",
+   "reason": "the tooling register is a second source the backlog reads, not rebuilds"
+  },
+  {
+   "edge": "tools/units/backlog.py -> tools/units/undefrefs.py",
+   "reason": "the register counts unresolved references with undefrefs.census, the one rule"
+  },
+  {
+   "edge": "tools/units/brief.py -> tools/units/briefing/__init__.py",
+   "reason": "a CLI shim the compatibility list keeps by path, forwarding to its own package: one tool, two directories"
+  },
+  {
+   "edge": "tools/units/briefing/sources.py -> tools/units/dossier.py",
+   "reason": "the brief quotes the dossier (one unit's evidence); sources is the one briefing module that reads other tools"
+  },
+  {
+   "edge": "tools/units/briefing/sources.py -> tools/units/handoff.py",
+   "reason": "the brief embeds the handoff skeleton the worker returns (one report schema)"
+  },
+  {
+   "edge": "tools/units/briefing/sources.py -> tools/units/langcheck.py",
+   "reason": "the brief states the unit's language from langcheck's verdict"
+  },
+  {
+   "edge": "tools/units/briefing/sources.py -> tools/units/typeregistry.py",
+   "reason": "the brief lists the headers typeregistry says the unit needs"
+  },
+  {
+   "edge": "tools/units/callees.py -> tools/symbols/symedit.py",
+   "reason": "the bounded, classified in-repo reference scan is symedit's public API (find_refs), shared with the rename"
+  },
+  {
+   "edge": "tools/units/claims.py -> tools/units/queue.py",
+   "reason": "claim promotes the queue's pick and prints queue's spawn line (one launch block)"
+  },
+  {
+   "edge": "tools/units/dataclaim.py -> tools/units/datagap.py",
+   "reason": "the strict row reads datagap's own fixture object builder for the same verdict"
+  },
+  {
+   "edge": "tools/units/dataclaim.py -> tools/units/dataseams.py",
+   "reason": "a run spanning several TUs is cut by dataseams' strong seams (one seam reader)"
+  },
+  {
+   "edge": "tools/units/dataclaim.py -> tools/units/ledger.py",
+   "reason": "Objects/covering and the report numbers are the ledger's (one coverage model)"
+  },
+  {
+   "edge": "tools/units/dataclaim.py -> tools/units/stylelint.py",
+   "reason": "the declaration reader and the ownership index are the lint's (rule 12's own reading)"
+  },
+  {
+   "edge": "tools/units/dataclaim.py -> tools/units/symbolpreflight.py",
+   "reason": "symbols/splits as symbolpreflight's dict shape (load_symbols/load_splits); lib.project returns objects, the move is open"
+  },
+  {
+   "edge": "tools/units/dataclaim.py -> tools/units/undefrefs.py",
+   "reason": "one ELF relocation reader (undefrefs.load_object)"
+  },
+  {
+   "edge": "tools/units/dataclosure.py -> tools/units/poolseams.py",
+   "reason": "a deferral a pool-sharing group explains: poolseams' groups (one census)"
+  },
+  {
+   "edge": "tools/units/datagap.py -> tools/units/dataclosure.py",
+   "reason": "datagap's CLI over the data closure it was split from (WP3a)"
+  },
+  {
+   "edge": "tools/units/datagap.py -> tools/units/dataseams.py",
+   "reason": "order-only / multi-TU diagnosis from dataseams (one seam reader)"
+  },
+  {
+   "edge": "tools/units/datagap.py -> tools/units/poolseams.py",
+   "reason": "--pool-seams renders poolseams' census (one census)"
+  },
+  {
+   "edge": "tools/units/dataqueue.py -> tools/units/brief.py",
+   "reason": "the queue entries a brief prints are brief's (data_queue_entries), one rendering"
+  },
+  {
+   "edge": "tools/units/dataqueue.py -> tools/units/dataseams.py",
+   "reason": "a run spanning several TUs is cut at dataseams' strong seams (one seam reader)"
+  },
+  {
+   "edge": "tools/units/dataqueue.py -> tools/units/ledger.py",
+   "reason": "the queue reads the ledger's state (Ledger), the same the other tools read"
+  },
+  {
+   "edge": "tools/units/dataqueue.py -> tools/units/symbolpreflight.py",
+   "reason": "FRAGMENT_SECTIONS is symbolpreflight's (the four per-function fragments); moving it to lib.project is open"
+  },
+  {
+   "edge": "tools/units/dataseams.py -> tools/splits/seams/evidence.py",
+   "reason": "reads the seam evidence (data order, pools, source names) from its one home, tools/splits/seams/evidence.py; moving it to lib is open (it is a tool-level model, not a shared primitive)"
+  },
+  {
+   "edge": "tools/units/flipcheck.py -> tools/units/dataseams.py",
+   "reason": "order-only / multi-TU diagnosis from dataseams (one seam reader)"
+  },
+  {
+   "edge": "tools/units/flipcheck.py -> tools/units/poolseams.py",
+   "reason": "a pool difference a fold explains: poolseams' note (one census)"
+  },
+  {
+   "edge": "tools/units/handoff.py -> tools/units/brief.py",
+   "reason": "the skeleton quotes the brief's scores and range (one rendering)"
+  },
+  {
+   "edge": "tools/units/handoff.py -> tools/units/claims.py",
+   "reason": "the outbox and notes paths and the branch name are the claim registry's"
+  },
+  {
+   "edge": "tools/units/handoff.py -> tools/units/recompile.py",
+   "reason": "the worktree/main roots as recompile resolves them for a lane (main_root, worktree_root)"
+  },
+  {
+   "edge": "tools/units/land.py -> tools/units/landing/api.py",
+   "reason": "a CLI shim the compatibility list keeps by path, forwarding to its own package: one tool, two directories"
+  },
+  {
+   "edge": "tools/units/landing/branch.py -> tools/units/merge/unionguard.py",
+   "reason": "the gate's branch apply refuses through the merge package's guard (one union rule, spec/merge.md)"
+  },
+  {
+   "edge": "tools/units/landing/branch.py -> tools/units/merge/unionresolve.py",
+   "reason": "the gate's branch apply unions registration conflicts with the merge package (one union rule, spec/merge.md)"
+  },
+  {
+   "edge": "tools/units/landing/release.py -> tools/units/claims.py",
+   "reason": "a landed claim is released by claims.release (one teardown)"
+  },
+  {
+   "edge": "tools/units/landing/rows/batch.py -> tools/units/handoff.py",
+   "reason": "the outbox row validates with handoff's schema (one schema)"
+  },
+  {
+   "edge": "tools/units/landing/rows/data.py -> tools/units/dataclosure.py",
+   "reason": "the data rows are the data closure's verdicts (one closure)"
+  },
+  {
+   "edge": "tools/units/landing/rows/objects.py -> tools/units/undefrefs.py",
+   "reason": "the undefined-reference row is undefrefs' check (the tool the gate runs)"
+  },
+  {
+   "edge": "tools/units/landing/rows/objects.py -> tools/units/verifyunit.py",
+   "reason": "the re-measure row is verifyunit.verify_units"
+  },
+  {
+   "edge": "tools/units/landing/rows/rules.py -> tools/units/briefing/sources.py",
+   "reason": "a file with no bodies is detected by the brief's own text_has_bodies"
+  },
+  {
+   "edge": "tools/units/landing/rows/rules.py -> tools/units/stylelint_rules/api.py",
+   "reason": "the section 6.5 rows are the lint's (the gate runs the lint, not a copy)"
+  },
+  {
+   "edge": "tools/units/landing/rows/rules.py -> tools/units/vtableaudit.py",
+   "reason": "the rule 10 row is vtableaudit's sweep"
+  },
+  {
+   "edge": "tools/units/landing/rows/tree.py -> tools/git/prepcommit.py",
+   "reason": "the ground-truth check (orig/ hashes) is prepcommit's, shared with the commit hook"
+  },
+  {
+   "edge": "tools/units/langcheck.py -> tools/splits/seams/evidence.py",
+   "reason": "reads the seam evidence (data order, pools, source names) from its one home, tools/splits/seams/evidence.py; moving it to lib is open (it is a tool-level model, not a shared primitive)"
+  },
+  {
+   "edge": "tools/units/ledger.py -> tools/units/symbolpreflight.py",
+   "reason": "symbols/splits/configure as symbolpreflight's dict shapes; lib.project returns objects, the move is open"
+  },
+  {
+   "edge": "tools/units/linkorder.py -> tools/units/symbolpreflight.py",
+   "reason": "symbols/splits/configure as symbolpreflight's dict shapes; lib.project returns objects, the move is open"
+  },
+  {
+   "edge": "tools/units/merge/mergebranch.py -> tools/units/land.py",
+   "reason": "the lane merge derives the batch's units with the gate's own rule (land.units_from_branch)"
+  },
+  {
+   "edge": "tools/units/mergebranch.py -> tools/units/merge/mergebranch.py",
+   "reason": "a CLI shim the compatibility list keeps by path, forwarding to its own package: one tool, two directories"
+  },
+  {
+   "edge": "tools/units/methodize.py -> tools/units/mangle.py",
+   "reason": "the compiler's exact mangling is mangle's (--exact)"
+  },
+  {
+   "edge": "tools/units/methodize.py -> tools/units/stylelint.py",
+   "reason": "the findings methodize plans are rule 13's own (the lint)"
+  },
+  {
+   "edge": "tools/units/playbook.py -> tools/agents/sync_playbook_index.py",
+   "reason": "the idea-tag heuristic is the index's (derive_tags), one copy"
+  },
+  {
+   "edge": "tools/units/poolseams.py -> tools/splits/seams/evidence.py",
+   "reason": "reads the seam evidence (data order, pools, source names) from its one home, tools/splits/seams/evidence.py; moving it to lib is open (it is a tool-level model, not a shared primitive)"
+  },
+  {
+   "edge": "tools/units/queue.py -> tools/units/backlog.py",
+   "reason": "the credit ratio and the debt items are the backlog's (one register)"
+  },
+  {
+   "edge": "tools/units/queue.py -> tools/units/brief.py",
+   "reason": "the claimed lane's brief is written by brief (one brief)"
+  },
+  {
+   "edge": "tools/units/queue.py -> tools/units/claims.py",
+   "reason": "a queue pick is claimed through claims.claim (one registry)"
+  },
+  {
+   "edge": "tools/units/sectiongap.py -> tools/units/poolseams.py",
+   "reason": "which differing pools are a partial pool: poolseams' note (one census)"
+  },
+  {
+   "edge": "tools/units/slots.py -> tools/units/claims.py",
+   "reason": "the slot pool claims, releases and expires through the claim registry (one registry)"
+  },
+  {
+   "edge": "tools/units/slots.py -> tools/units/dataqueue.py",
+   "reason": "collect merges a lane's data requests with dataqueue's own reader and writer"
+  },
+  {
+   "edge": "tools/units/stylelint.py -> tools/units/stylelint_rules/api.py",
+   "reason": "a CLI shim the compatibility list keeps by path, forwarding to its own package: one tool, two directories"
+  },
+  {
+   "edge": "tools/units/stylelint_rules/diff.py -> tools/units/dataclosure.py",
+   "reason": "the fold map is the data closure's (rule 12's grandfathering of a folded claim)"
+  },
+  {
+   "edge": "tools/units/undefrefs.py -> tools/units/recompile.py",
+   "reason": "the base worktree's object is compiled with recompile's command (one compile path)"
+  },
+  {
+   "edge": "tools/units/verifyunit.py -> tools/units/measure.py",
+   "reason": "the fresh report generate is measure.score_report (one scorer)"
+  },
+  {
+   "edge": "tools/units/vtslot.py -> tools/units/vtableaudit.py",
+   "reason": "the DOL segments, the code-pointer runs and vtable_slots are vtableaudit's (vtslot is its reverse lookup)"
+  }
  ]
 }

@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """Audit the `refs/rescue/*` safety net and prune only what is provably redundant (`lib.lanes.rescue`).
 Spec: docs/tools/spec/rescue.md. CLI: python tools/units/rescue.py audit [--prune] [--json] [--full-diff]
-[--ref REF]... [--repo PATH] [--main REF] [--prefix P] | --selftest; tests: tools/tests/units/test_rescue.py."""
+[--ref REF]... [--repo PATH] [--main REF] [--prefix P]."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import json
-import tempfile
 
 from tools.lib import cli
 from tools.lib.lanes import rescue as _rescue
@@ -14,8 +13,7 @@ from tools.lib.lanes.rescue import (CONFIGURE, DEFAULT_PREFIX, DERIVATION_NONE, 
                                     DERIVATION_TOUCHED, SPLITS, VERDICT_DRIFT, VERDICT_REDUNDANT,
                                     VERDICT_UNKNOWN, VERDICT_UNLANDED, VERDICTS, audit, default_repo)
 
-TOOL = cli.Tool("rescue", "docs/tools/spec/rescue.md", tests="tools/tests/units/test_rescue.py",
-                description=(__doc__ or "").splitlines()[0], common=())
+TOOL = cli.Tool("rescue", "docs/tools/spec/rescue.md", description=(__doc__ or "").splitlines()[0], common=())
 classify_ref = _rescue.classify
 
 
@@ -56,8 +54,6 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--main", default="main", help="the branch that represents landed state (default: main)")
     ap.add_argument("--prefix", default=DEFAULT_PREFIX, help="the rescue ref prefix")
     args = ap.parse_args(argv)
-    if args.selftest:
-        return TOOL.selftest(cwd=tempfile.gettempdir())
     report = audit(args.repo or default_repo(), args.main, args.prefix, refs=args.ref or None, prune=args.prune,
                    full_diff=args.full_diff)
     print(json.dumps(report, indent=2) if args.json else render(report))

@@ -10,7 +10,8 @@ import json
 import os
 import sys
 
-from tools import unitutil as uu
+from tools.lib import repo as _repo
+from tools.lib import units as _units
 from tools.lib import objcompare
 from tools.lib import report as _report
 
@@ -39,24 +40,24 @@ def compare_by_owner(ours, target) -> tuple[int, int, list[str]]:
 
 def unit_record(spec: str, sections: list[str] | None = None) -> dict:
     """Resolve the unit, read both objects' relocations, and diff every section they relocate."""
-    unit = uu.resolve_unit(spec)
-    rec = {"unit": unit.name, "stem": spec, "ours": unit.obj, "target": unit.target,
+    unit = _units.Unit.resolve(spec, _repo.repo_root())
+    rec = {"unit": unit.report_name, "stem": spec, "ours": unit.obj_ours, "target": unit.obj_target,
            "sections": [], "error": None, "stale": []}
-    if not os.path.exists(unit.obj):
-        rec["error"] = "our object does not exist (%s) - build it (`ninja %s`)" % (unit.obj, spec)
+    if not os.path.exists(unit.obj_ours):
+        rec["error"] = "our object does not exist (%s) - build it (`ninja %s`)" % (unit.obj_ours, spec)
         return rec
-    if not os.path.exists(unit.target):
+    if not os.path.exists(unit.obj_target):
         rec["error"] = ("the split target object does not exist (%s) - split the unit first "
-                        "(`python configure.py && ninja`)" % unit.target)
+                        "(`python configure.py && ninja`)" % unit.obj_target)
         return rec
-    src = unit.src if os.path.isabs(unit.src) else os.path.join(uu.ROOT, unit.src)
-    rec["stale"] = _report.unit_reasons(src, unit.obj, uu.ROOT,
-                                           rel=lambda p: _report.rel_path(p, uu.ROOT))[0]
-    ours, err = read_relocs(unit.obj)
+    src = unit.source
+    rec["stale"] = _report.unit_reasons(src, unit.obj_ours, _repo.repo_root(),
+                                           rel=lambda p: _report.rel_path(p, _repo.repo_root()))[0]
+    ours, err = read_relocs(unit.obj_ours)
     if err:
         rec["error"] = err
         return rec
-    target, err = read_relocs(unit.target)
+    target, err = read_relocs(unit.obj_target)
     if err:
         rec["error"] = err
         return rec
@@ -75,14 +76,14 @@ def run_by_owner(units: list[str]) -> int:
     """`--by-owner`: differences only, then one `N/N relocations match` line per unit. 0 clean, 1 differs, 2 error."""
     status = 0
     for spec in units:
-        unit = uu.resolve_unit(spec)
-        missing = [p for p in (unit.obj, unit.target) if not os.path.exists(p)]
+        unit = _units.Unit.resolve(spec, _repo.repo_root())
+        missing = [p for p in (unit.obj_ours, unit.obj_target) if not os.path.exists(p)]
         if missing:
             print("%s: object missing (%s) - build/split it first" % (spec, missing[0]))
             status = max(status, 2)
             continue
         try:
-            with open(unit.obj, "rb") as fo, open(unit.target, "rb") as ft:
+            with open(unit.obj_ours, "rb") as fo, open(unit.obj_target, "rb") as ft:
                 matched, total, lines = compare_by_owner(fo.read(), ft.read())
         except (ValueError, OSError) as exc:
             print("%s: unreadable object (%s)" % (spec, exc))
@@ -154,7 +155,7 @@ def _diff_lines(d: dict, indent: str = "  ") -> list[str]:
 
 def render(rec: dict, rows: int | None = 60) -> None:
     """The human report: the unit's paths and mtimes, then each section's relocations and its diff."""
-    rel = lambda p: _report.rel_path(p, uu.ROOT)               # noqa: E731
+    rel = lambda p: _report.rel_path(p, _repo.repo_root())               # noqa: E731
     print("== %s" % rec["unit"])
     print("   ours    %-54s %s" % (rel(rec["ours"]), _report.stamp(_report.mtime(rec["ours"]))))
     print("   target  %-54s %s" % (rel(rec["target"]),

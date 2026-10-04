@@ -12,7 +12,7 @@ import os
 import sys
 from dataclasses import dataclass, field
 
-from tools import unitutil as uu
+from tools.lib import repo as _repo
 from tools.lib import objcompare
 
 # objdiff's report metric omits the key when nothing matched; the project reads that as 0 %, never 100 %.
@@ -129,7 +129,7 @@ def _stem_of(spec: str) -> str:
 def resolve_specs(specs, known, root) -> tuple[list[UnitRef], list[str]]:
     """Unit specs -> UnitRefs, plus the specs that matched nothing.
 
-    A spec is accepted in every spelling `unitutil.resolve_unit` accepts, and is matched against the
+    A spec is accepted in every spelling `lib.units.Unit.resolve` accepts, and is matched against the
     report's unit list *first* (so `-u g3d/fn_80075DCC`, `main/g3d/fn_80075DCC` and `src/g3d/...` all
     land on one unit).  A spec the report does not know is still resolved from its path, which is how a
     brand-new registration is inspected before the report is regenerated.
@@ -352,7 +352,7 @@ def main(argv=None) -> int:
     if args.selftest:
         return selftest()
 
-    root = os.path.abspath(args.root) if args.root else uu.repo_root()
+    root = os.path.abspath(args.root) if args.root else _repo.repo_root()
     threshold = parse_threshold(args.threshold)
     specs = list(args.units) + list(args.unit_flags)
 
@@ -473,7 +473,7 @@ def _json_payload(scanres: Scan, with_report: bool, threshold: float) -> dict:
 def _elf32(sections, symbols) -> bytes:
     """A minimal ELF32 big-endian relocatable object holding `sections` and `symbols`.
 
-    Enough for `unitutil.read_elf`: one section-header table, a `SHT_SYMTAB`, its `.strtab` and a
+    Enough for `lib.binary.elf.Elf`: one section-header table, a `SHT_SYMTAB`, its `.strtab` and a
     `.shstrtab`.  `sections` is `[(name, bytes)]`; `symbols` is `[(name, value, size, st_info, section
     name)]`.  It emits no code - only the symbol/layout records this tool compares - which is the point:
     the comparison is a function of the *symbol tables*, so the fixture is the smallest object that
@@ -644,7 +644,7 @@ def selftest() -> int:
         t, o = _fixture(d)
         ts = read_symbols(t, wanted_kinds("code"))
         os_ = read_symbols(o, wanted_kinds("code"))
-        ok("the fixture reads back through unitutil.read_elf",
+        ok("the fixture reads back through the ELF reader",
            sorted(ts), ["fn_big", "fn_edge", "fn_gap2", "fn_gone", "fn_same"])
         ok("the fixture's sizes read back", [ts["fn_big"].size, os_["fn_big"].size], [100, 40])
         ok("the fixture's section reads back", ts["fn_big"].section, ".text")

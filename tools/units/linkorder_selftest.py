@@ -11,16 +11,15 @@ instead of being re-derived from whatever `build/RMHE08/main.elf` happens to con
 The real-data counterpart is the tool itself run against the green link, which reports MATCH.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import os
 import struct
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if os.path.join(ROOT, "tools", "units") not in sys.path:
-    sys.path.insert(0, os.path.join(ROOT, "tools", "units"))
 
-import linkorder as lo  # noqa: E402  (imported through the sys.path shim above)
+from tools.units import linkorder as lo
 
 ALIGN = 0x20
 TEXT_ADDR = 0x80004000

@@ -44,7 +44,7 @@ build/RMHE08/src/<path>.o   ours, compiled from src/
 
 ## Lib dependencies
 
-objcompare (`object_sections`, `sections`); `unitutil.resolve_unit`, `poolseams.note_for_unit`.
+objcompare (`object_sections`, `sections`); `lib.units.Unit.resolve`, `poolseams.note_for_unit`.
 
 ## Test contract
 

@@ -1,19 +1,6 @@
 #!/usr/bin/env python3
-"""Derive the Wii/1.3 PCode breakpoint table from the pass *call sites*.
-
-Every backend pass is a named function (the CodeView symbol blob names them)
-called from one of two drivers:
-
-  * `_globallyoptimizepcode` (the -O2/-O3/-O4 peephole + propagation pipeline)
-  * `_CodeGen_Generator`      (the shared passes: initial code, regalloc,
-                               prologue/epilogue, scheduling, peephole, ...)
-
-A breakpoint at the *return address* of a `call <pass>` is exactly upstream's
-"just after that flag is checked" point: the pass has finished and the global
-`pcbasicblocks` block list is current, so `print_pcode` reads the right state.
-
-Usage: python pass_points.py <exe> [rva:rva ...]
-"""
+"""Derive the Wii/1.3 PCode breakpoint table from the backend pass call sites.
+Spec: docs/tools/spec/mwcc-debugger.md. CLI: pass_points.py <exe> [rva:rva ...]."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 

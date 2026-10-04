@@ -42,9 +42,10 @@ def package_of(rel: str, files: set[str] | frozenset[str]) -> str | None:
 
 
 def is_entry_point(rel: str, tree: ast.Module) -> bool:
-    """A file run as a program: a module-level `if __name__ == "__main__":`, or a test module."""
+    """A file run as a program: a module-level `if __name__ == "__main__":`, a test module, or a `*_selftest.py`
+    (the runner starts every one as `python <file>`, guard or not)."""
     name = rel.rsplit("/", 1)[-1]
-    if rel.startswith("tools/tests/") and name.startswith("test_"):
+    if (rel.startswith("tools/tests/") and name.startswith("test_")) or name.endswith("_selftest.py"):
         return True
     for node in tree.body:
         if isinstance(node, ast.If) and isinstance(node.test, ast.Compare) \

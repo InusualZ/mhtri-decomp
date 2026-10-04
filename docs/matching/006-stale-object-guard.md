@@ -28,7 +28,7 @@ granularity); (b) the compile wrote somewhere else. MWCC's `-o` takes an output 
 **How to work it.** Delete the object before each compile, wait long enough that the mtimes differ, and fail
 loudly when the object was not regenerated. Always redirect `-o` when compiling anything that is not the unit
 build, and restore with `rm -f <obj> && ninja <obj>` afterwards. Use the shared guard rather than a private one:
-`tools/objdiff/freshguard.py` (report or object older than any source in the unit's include closure) is what
+`lib.report`'s freshness rule (report or object older than any source in the unit's include closure) is what
 `unitscore.py` and `symdiff.py -u` apply. Any number produced before the guard is worthless.
 
 **When NOT to apply.** A flat matrix is not always a stale object: a unit compiled without the flag that differs

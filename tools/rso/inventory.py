@@ -1,40 +1,14 @@
 #!/usr/bin/env python3
-"""Inventory RSO modules: header, sections, and the export/import symbol tables.
-
-RSO layout (from decomp-toolkit `src/util/rso.rs`, verified against the retail files):
-
-    0x00 u32 next          (always 0, filled in at runtime)
-    0x04 u32 prev          (always 0, filled in at runtime)
-    0x08 u32 num_sections
-    0x0C u32 section_info_offset      (always 0x58)
-    0x10 u32 name_offset              (original *build* path, e.g. D:\\MH3_EUR\\...\\map00.plf)
-    0x14 u32 name_size
-    0x18 u32 version                  (always 1)
-    0x1C u32 bss_size
-    0x20 u8  prolog_section / 0x21 epilog_section / 0x22 unresolved_section / 0x23 bss_section
-    0x24 u32 prolog_offset / 0x28 epilog_offset / 0x2C unresolved_offset
-    0x30 u32 internal_rel_offset / 0x34 internal_rel_size
-    0x38 u32 external_rel_offset / 0x3C external_rel_size
-    0x40 u32 export_table_offset / 0x44 export_table_size / 0x48 export_table_name_offset
-    0x4C u32 import_table_offset / 0x50 import_table_size / 0x54 import_table_name_offset
-
-Section info: num_sections x (u32 offset_and_flags, u32 size); offset = value & ~1, bit 0 = executable.
-Export symbol:   (u32 name_offset, u32 offset, u32 section_index, u32 name_hash)     16 bytes
-Import symbol:   (u32 name_offset, u32 offset, u32 reloc_link)                        12 bytes
-
-Usage:
-    python tools/rso/inventory.py                                  # every *.rso under orig/<game>/files
-    python tools/rso/inventory.py --rso <file> --sections --symbols
-    python tools/rso/inventory.py --json build/tmp/rso_inventory.json
-"""
+"""Inventory RSO modules: header, sections, and the export/import symbol tables. Spec: docs/tools/spec/rso.md.
+CLI: inventory.py [--dir DIR] [--rso FILE] [--sections] [--symbols] [--json OUT]."""
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import json
 import os
 import struct
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # tools/
-import unitutil as uu
+from tools.lib import repo
 
 
 def cstr(data, off):
@@ -100,7 +74,7 @@ def label(name):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--dir", default=os.path.join(uu.ROOT, "orig", "RMHE08", "files"))
+    ap.add_argument("--dir", default=os.path.join(repo.repo_root(), "orig", "RMHE08", "files"))
     ap.add_argument("--rso", action="append", default=[])
     ap.add_argument("--json")
     ap.add_argument("--sections", action="store_true", help="print each module's section table")
@@ -147,7 +121,7 @@ def main():
     if args.json:
         os.makedirs(os.path.dirname(args.json), exist_ok=True)
         json.dump(mods, open(args.json, "w", encoding="utf-8"), indent=1)
-        print("wrote", os.path.relpath(args.json, uu.ROOT))
+        print("wrote", os.path.relpath(args.json, repo.repo_root()))
 
 
 if __name__ == "__main__":

@@ -18,12 +18,8 @@ from tools.lib.binary.dol import Dol as LibDol, DolError
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 GAME = "RMHE08"
-if os.path.join(ROOT, "tools", "units") not in sys.path:
-    sys.path.insert(0, os.path.join(ROOT, "tools", "units"))
-if os.path.join(ROOT, "tools", "symbols") not in sys.path:
-    sys.path.insert(0, os.path.join(ROOT, "tools", "symbols"))
 
-import symbolpreflight as preflight  # noqa: E402  (shares the symbols.txt / splits.txt / configure.py parsers)
+from tools.units import symbolpreflight as preflight  # shares the symbols.txt / splits.txt / configure.py parsers
 
 ELF_PATH = os.path.join(ROOT, "build", GAME, "main.elf")
 DOL_PATH = os.path.join(ROOT, "orig", GAME, "sys", "main.dol")

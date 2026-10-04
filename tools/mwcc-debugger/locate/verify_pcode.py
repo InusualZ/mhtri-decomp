@@ -16,7 +16,6 @@ from tools.lib.binary import objdump as lib_objdump
 OBJDUMP = (
     Path(__file__).resolve().parents[3] / "build/binutils/powerpc-eabi-objdump.exe"
 )
-VERSIONS_DIR = Path(__file__).resolve().parents[1]
 
 # MWCC PCode mnemonic -> the disassembler's spelling for the same encoding.
 ALIASES = {
@@ -255,11 +254,10 @@ def render_change(change) -> str:
 
 def version_rows():
     """The build-data module, loaded without a compiler binary to detect."""
-    if str(VERSIONS_DIR) not in sys.path:
-        sys.path.insert(0, str(VERSIONS_DIR))
-    import versions
+    import importlib
 
-    return versions
+    # `tools/mwcc-debugger/` is not an identifier, but it is a namespace package of `tools`: import it by name
+    return importlib.import_module("tools.mwcc-debugger.versions")
 
 
 def final_pass_name(row):

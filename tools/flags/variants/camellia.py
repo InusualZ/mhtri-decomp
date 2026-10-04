@@ -1,17 +1,6 @@
 #!/usr/bin/env python3
-"""Source-rewrite experiments for the `Camellia` unit - data for `tools/flags/tryvar.py`.
-
-The harness (`tryvar.py`) is generic; this file is unit-specific *data*: the rewrites that were tried
-against the one remaining difference in `camellia_setup256` (an extra 4-byte stack slot) and the small
-regex helpers they use.
-
-Each entry is `(name, repls)` where `repls` is either a list of `(old, new)` string pairs or a callable
-`src -> src` (returning `None` means "the pattern did not match here").
-
-Status: **every variant in this file is a rejected candidate** - all of them either reproduce the
-baseline byte-for-byte (the front end is insensitive to statement shape) or make the code worse. The
-surviving hypothesis and the full analysis are in `.pi/notes/camellia-match-process.md` (finding #14).
-"""
+"""Source-rewrite experiments for the `Camellia` unit: data for `tools/flags/tryvar.py`, every one a rejected candidate.
+Spec: docs/tools/spec/variants.md. CLI: none (data; `tryvar.py --variants tools/flags/variants/camellia.py`)."""
 import re
 
 

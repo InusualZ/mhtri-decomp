@@ -10,8 +10,8 @@ import tempfile
 
 from tools.lib.lanes import naming
 from tools.lib.lanes import teardown
-import tools.units.unionguard as ug
-import tools.units.unionresolve as ur
+import tools.units.merge.unionguard as ug
+import tools.units.merge.unionresolve as ur
 from tools.units.landing.common import git, run
 
 

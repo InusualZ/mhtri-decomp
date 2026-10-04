@@ -15,7 +15,8 @@ import subprocess
 import tarfile
 import time
 
-import tools.unitutil as unitutil
+from tools.lib import proc as _proc
+from tools.lib import testing
 from tools.lib.lanes import launch, naming, pool, seed, sessions
 from tools.lib.lanes.registry import main_of as lane_registry_main_of
 from tools.lib.lanes.launch import KIND_PROFILE, PROFILES, profile_for_kind, tree_block as _tree_block  # noqa: F401
@@ -31,6 +32,8 @@ from tools.lib.lanes.pool import (DEFAULT_COUNT, LOCK_SUBDIR, SLOT_KEEP, SLOT_MA
                                   slot_head, slot_of_path, slot_state, unlanded_reason, verify, write_lock)
 from tools.lib.lanes.sessions import (SESSIONS_DIRNAME, config_dir, live_runs, pid_alive,  # noqa: F401
                                       run_label, run_registries)
+
+_proc.install_spawn_retry()  # a launch Windows refuses transiently (WinError 5) is retried
 
 _merge_tree_oid = pool.merge_tree_oid
 _resolve_slot = pool.resolve_slot
@@ -332,7 +335,7 @@ def status(main: str, registry: str | None = None) -> list[dict]:
 # --- selftest -----------------------------------------------------------------------------------
 
 def selftest() -> int:
-    unitutil.isolate_live_state()   # no real ~/.claude/sessions: a live lane must not change the verdict
+    testing.isolate_live_state()   # no real ~/.claude/sessions: a live lane must not change the verdict
     fails, checks = [], 0
 
     def check(name, got, want):
@@ -480,7 +483,7 @@ def selftest() -> int:
     check("slot path is stable", slot_dir("/tmp/mhtri-dtk", 3), slot_dir("/tmp/mhtri-dtk", 3))
     check("a tree with no pool is not enabled", enabled("/tmp/nonexistent-mhtri-dtk"), False)
 
-    with unitutil.temp_dir() as tmp:
+    with testing.temp_dir() as tmp:
         repo = fixture(tmp, count=2)
         out = init(repo, count=2)
         check("init creates the requested slots", out["created"], [1, 2])

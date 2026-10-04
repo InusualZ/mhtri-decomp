@@ -98,7 +98,7 @@ becomes it (`duplication.md` has the line numbers).
 
 * `run(args, cwd=None, check=False, input=None, timeout=None) -> Completed` with `encoding="utf-8", errors="replace"` always
   (F34); `run_bytes` for binary output; `kill_tree(proc)`; `install_spawn_retry()` - explicit, not on import (importing a lib
-  module must not patch `subprocess`); `unitutil` and `selftest_site/sitecustomize.py` call it, as they did `spawnretry.install`.
+  module must not patch `subprocess`); the tools that start processes and `selftest_site/sitecustomize.py` call it (WP6: `unitutil`, which called it on import, is gone).
 * `trap_sites(root)` (the AST scan) becomes a test in `tests/lib/test_proc.py`.
 * From: `subproc`, `spawnretry`, `selftest._kill_tree`, `land.run`.
 
@@ -491,8 +491,8 @@ Every invocation found in `.claude/agents/*.md`, `.claude/skills/**`, `CLAUDE.md
 (the list in `migration.md`, section "CLI compatibility") keeps its path, subcommand, flags, exit code and - where a lane parses
 it - its text (`flipcheck`'s `   - ` lines, `land.py verify`'s table, `claims.py` step lines, `queue.py next`'s spawn block,
 `symedit rename`'s one-line diff). Additions are allowed; removals wait for `migration.md` WP6's reference sweep and happen in
-one commit with the docs. `--selftest` keeps working as a forwarding shim until that sweep. `unitutil` keeps its names as a
-shim because `mt.py` (the skill) and 40 files import it.
+one commit with the docs. WP6 did that sweep: the forwarding `--selftest` flags and the `unitutil` shim are gone (`mt.py units|info`
+forwards to `tools/units/unitinfo.py`), and `escape.py --edit` stays until the profiles stop naming it.
 
 ## 9. Naming and style
 

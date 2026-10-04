@@ -74,23 +74,6 @@ def test_live_tree_choke_point(c):
     c.check("every refusal was recorded", len(seen.refused), 6)
 
 
-def test_import_time_roots(c):
-    from tools import unitutil                      # imports under the fixture tier: no root is resolved at import
-    c.expect("unitutil imports under the fixture tier", "ROOT" not in vars(unitutil))
-    with testing.refusals_expected() as seen:
-        c.raises("... and refuses the live root when ROOT is first used", LiveTreeError, getattr, unitutil, "ROOT")
-        c.raises("... as does OBJDIFF, derived from it", LiveTreeError, getattr, unitutil, "OBJDIFF")
-    c.check("both refusals recorded", len(seen.refused), 2)
-    with testing.FixtureTree() as tree:
-        unitutil.ROOT = str(tree.root)              # the older selftests' way of pointing a tool at a fixture
-        try:
-            c.check("an assigned ROOT pins it", (unitutil.ROOT, unitutil.main_tree()), (str(tree.root), None))
-            c.check("... and OBJDIFF follows it", unitutil.OBJDIFF,
-                    os.path.join(str(tree.root), "build", "tools", "objdiff-cli.exe"))
-        finally:
-            del unitutil.ROOT
-
-
 def test_is_served(c):
     with testing.refusals_expected() as seen:
         c.check("no tree is the served one under the fixture tier, and asking resolves nothing live",

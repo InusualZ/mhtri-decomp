@@ -16,10 +16,9 @@ no caller in the tracked tree
 python tools/units/lane.py list                      # every lane, its unlanded commits, its rescue ref
 python tools/units/lane.py teardown <branch>          # rescue, then remove the worktree and the branch
 python tools/units/lane.py teardown <branch> --dry-run
-python tools/units/lane.py --selftest
 ```
 Subcommands: `list`, `teardown`.
-Flags: `--base`, `--dry-run`, `--force`, `--selftest`.
+Flags: `--base`, `--dry-run`, `--force`.
 Exit codes: 0 ok, 1 findings or refusal, 2 could not run (the `lib.findings` convention; today's tool documents none, so `migration.md` records the current behaviour before changing it).
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
 
@@ -43,7 +42,7 @@ lanes.rescue, lanes.teardown, git.
 ## Test contract
 
 Tier: fixture (GitFixture).
-`tools/tests/units/test_lane.py` (GitFixture; `--selftest` forwards to it). Every function takes `repo=`, so the test passes its fixture instead of patching `unitutil.repo_root`, and `teardown(remove=...)` is the seam for the damaged-`orig/` case.
+`tools/tests/units/test_lane.py` (GitFixture). Every function takes `repo=`, so the test passes its fixture instead of patching a module root, and `teardown(remove=...)` is the seam for the damaged-`orig/` case.
 
 ## Known gaps
 

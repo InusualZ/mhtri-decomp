@@ -1,26 +1,6 @@
 #!/usr/bin/env python3
-"""ideas_demo.py - compile a playbook demo with the real MWCC and test its EXPECT lines.
-
-Library for `ideas.py demo-check` (the header parser `ideas.demo_header` is the single parser; this module owns
-the EXPECT grammar, the compile and the object model).
-
-EXPECT vocabulary (one assertion per line; `<sym>` matches a symbol exactly or as the C++ mangling prefix
-`<sym>__...`, so `f` finds `f__Fi`):
-
-    contains <x>                       <x> is an instruction mnemonic, a symbol, or a relocation target
-    absent <x>                         the opposite
-    size <sym> <bytes>                 the symbol's st_size
-    section <name> <bytes>             the section's size (`.text`, `.data`, `.sdata`, ...)
-    order <section> <symA> < <symB>    symA is at a lower address than symB inside the section
-    reloc <sym>                        some relocation names <sym>
-    seq <m1> <m2> ... [in <func>]      the mnemonics occur in this order (a subsequence), in <func> if given
-    count <mnemonic> <n> [in <func>]   the mnemonic occurs exactly n times
-    insn <mnemonic> <operands> [in <func>]   an instruction with exactly these operands (`insn rlwinm r3,r0,0,24,24`)
-    bytes <section> <hex>              the section's contents contain this byte string (hex digits, spaces ignored)
-    nobytes <section> <hex>            ... do not contain it
-
-`section <name> 0` also holds when the object has no such section.
-"""
+"""Compile a playbook demo with the real MWCC and test its EXPECT lines (the library of `ideas.py demo-check`).
+Spec: docs/tools/spec/ideas_demo.md. CLI: none (library)."""
 import ast
 import os
 import re
@@ -85,18 +65,9 @@ def base_flags(root):
 
 def demo_command(root, info, src, outdir):
     """The compile argv for a demo: base cflags with the demo's FLAGS replacing same-family flags."""
-    sys_path_added = False
-    import sys
-    tools = os.path.join(root, "tools")
-    if tools not in sys.path:
-        sys.path.insert(0, tools)
-        sys_path_added = True
-    try:
-        import unitutil
-    finally:
-        if sys_path_added:
-            sys.path.remove(tools)
-    flags = unitutil.override_flags(base_flags(root), info.get("FLAGS", ""))
+    from tools.lib import proc, units
+    proc.install_spawn_retry()  # a launch Windows refuses transiently (WinError 5) is retried
+    flags = units.override_flags(base_flags(root), info.get("FLAGS", ""))
     mw = info.get("MWCC", DEFAULT_MWCC)
     comp = os.path.join(root, "build", "compilers", *mw.split("/"), "mwcceppc.exe")
     wrap = os.path.join(root, "build", "tools", "sjiswrap.exe")

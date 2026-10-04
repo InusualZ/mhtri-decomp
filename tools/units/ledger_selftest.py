@@ -12,6 +12,7 @@ happens to contain today.
 The real-data counterpart is `symbolpreflight`'s self-test, which pins the parsers these views stand on.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import json
 import os
@@ -21,10 +22,8 @@ import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-if os.path.join(ROOT, "tools", "units") not in sys.path:
-    sys.path.insert(0, os.path.join(ROOT, "tools", "units"))
 
-import ledger as led  # noqa: E402  (imported through the sys.path shim above)
+from tools.units import ledger as led
 
 
 def entry(name: str, section: str, address: int, kind: str, size: int) -> dict:

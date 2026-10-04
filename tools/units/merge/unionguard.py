@@ -1,5 +1,5 @@
 """Refuse a union of a conflicted apply unless every conflict is a disjoint addition; undo the apply on refusal.
-Spec: docs/tools/spec/unionguard.md. CLI: none (module; `tools/units/unionguard.py` is the entry point)."""
+Spec: docs/tools/spec/merge.md. CLI: none (module of the landing gate)."""
 from __future__ import annotations
 
 import argparse
@@ -186,14 +186,11 @@ def parser(description: str) -> argparse.ArgumentParser:
     ap.add_argument("--branch", default=None, help="the branch being landed")
     ap.add_argument("--no-cleanup", action="store_true",
                     help="on refusal, leave the conflicted index in place for inspection")
-    ap.add_argument("--selftest", action="store_true", help="run tools/tests/units/test_unionguard.py")
     return ap
 
 
-def main(argv: list[str] | None = None, selftest=None, description: str = "") -> int:
+def main(argv: list[str] | None = None, description: str = "") -> int:
     args = parser(description).parse_args(argv)
-    if args.selftest:
-        return selftest() if selftest else 2
     base = args.base
     if base is None:
         base = (_git(args.cwd, "merge-base", BASE, args.branch).decode("utf-8", "replace").strip()

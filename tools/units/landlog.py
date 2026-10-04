@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
 """Read and summarise the landing log, `MAIN/.pi/land-log.jsonl` (`lib.lanes.landlog`). Spec: docs/tools/spec/landlog.md.
-CLI: python tools/units/landlog.py [summary] [--last N] [--json] | list [--last N] [--json] | --selftest;
+CLI: python tools/units/landlog.py [summary] [--last N] [--json] | list [--last N] [--json];
 tests: tools/tests/units/test_landlog.py."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import json
-import tempfile
 
 from tools.lib import cli
 from tools.lib.lanes import landlog, registry
 
-TOOL = cli.Tool("landlog", "docs/tools/spec/landlog.md", tests="tools/tests/units/test_landlog.py",
-                description=(__doc__ or "").splitlines()[0], common=())
+TOOL = cli.Tool("landlog", "docs/tools/spec/landlog.md", description=(__doc__ or "").splitlines()[0], common=())
 
 
 def render_summary(s: dict, bad: list[int], path: str) -> str:
@@ -50,8 +48,6 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--main", default=None, help="MAIN's path (default: resolved from the current tree)")
     args = ap.parse_args(argv)
-    if args.selftest:
-        return TOOL.selftest(cwd=tempfile.gettempdir())
     main_wt = args.main or registry.main_of()
     rows, bad = landlog.read(main_wt)
     if args.last:

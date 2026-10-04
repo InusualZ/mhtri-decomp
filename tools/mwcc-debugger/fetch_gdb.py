@@ -1,24 +1,8 @@
 #!/usr/bin/env python3
-"""Fetch a native mingw-w64 gdb (plus its runtime DLLs) without MSYS2/pacman.
-
-Why this exists: on Windows the mwcc-debugger port needs a *native* mingw-w64
-gdb (it debugs the 32-bit mwcceppc.exe directly).  If you already have MSYS2,
-`pacman -S mingw-w64-x86_64-gdb` is the short answer.  If you do not - or you
-do not want to install one - this script does what pacman would do: it reads
-the MSYS2 package database, walks the dependency graph and unpacks the packages
-into a self-contained prefix.
-
-    python fetch_gdb.py --dest ~/.local/tools/mwcc-dbg/prefix
-    ~/.local/tools/mwcc-dbg/prefix/mingw64/bin/gdb.exe --version
-
-Then point the debugger at it:
-
-    python tools/mwcc-debugger/mwcc_debugger.py --gdb <dest>/mingw64/bin/gdb.exe ...
-
-Requires `pip install zstandard` (used to unpack the .pkg.tar.zst files; a
-system zstd is not assumed).
-"""
+"""Fetch a native mingw-w64 gdb (plus its runtime DLLs) without MSYS2/pacman, for the mwcc-debugger port.
+Spec: docs/tools/spec/mwcc-debugger.md. CLI: fetch_gdb.py --dest DIR."""
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import os

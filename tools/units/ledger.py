@@ -1,24 +1,6 @@
 #!/usr/bin/env python3
 """Derive the campaign's progress from the repository: what is covered, what is registered, what is next.
-
-    python tools/units/ledger.py [--json]           # totals, per-module table, units at >= 80 %
-    python tools/units/ledger.py next [N]           # the next N unclaimed symbols, in address order
-    python tools/units/ledger.py unit <unit>        # one unit: ranges, symbols, per-symbol score
-
-Nothing here writes and nothing is stored: the loop's state *is* the repository. `splits.txt` says which
-addresses a unit owns, `configure.py` says which units are registered and how they are built,
-`build/RMHE08/config.json` says which split object holds a given address, and `build/RMHE08/report.json` says
-what each unit scores. A ledger file would be a fourth copy of all that, and it would be the wrong one the
-first time a subagent edited the repo without updating it.
-
-Metric: report version 2, where a *function* entry carries `fuzzy_match_percent` and an entry **without**
-that key is 0 %, not 100 % (`complete_code_percent` is not a score). The bar is 80 on that per-symbol number,
-which is what step 3 of `docs/plan.md` closes a symbol against; playbook 15 pins it to the objdiff version in
-`configure.py`, so a tool bump means re-baselining.
-
-`next` is what step 1 of the campaign consumes - an address, and the split object step 2 has to disassemble.
-Both come out of the same repository state the other tools read, so a fresh session resumes with no history.
-"""
+Spec: docs/tools/spec/ledger.md. CLI: ledger.py [--json] | next [N] | unit <unit> | --selftest."""
 
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
@@ -35,11 +17,9 @@ from tools.lib import units as _units
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 GAME = "RMHE08"
-if os.path.join(ROOT, "tools", "units") not in sys.path:
-    sys.path.insert(0, os.path.join(ROOT, "tools", "units"))
 
-import symbolpreflight as preflight  # noqa: E402  (shares its symbols.txt / splits.txt / configure.py parsers)
-from tools.lib.project.ownership import AUTO_OBJECT_RE, AutoObjects  # noqa: E402  (dtk's auto_* objects)
+from tools.units import symbolpreflight as preflight  # shares its symbols.txt / splits.txt / configure.py parsers
+from tools.lib.project.ownership import AUTO_OBJECT_RE, AutoObjects  # dtk's auto_* objects
 
 BAR = 80.0
 SCORE_KEY = "fuzzy_match_percent"

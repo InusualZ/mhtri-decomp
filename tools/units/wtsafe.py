@@ -1,19 +1,17 @@
 """Remove a worktree without letting a junction reach outside it, and prove `orig/` survived (`lib.lanes.teardown`).
-Spec: docs/tools/spec/wtsafe.md. CLI: python tools/units/wtsafe.py [--check] [--unlink DIR] [--selftest];
+Spec: docs/tools/spec/wtsafe.md. CLI: python tools/units/wtsafe.py [--check] [--unlink DIR];
 tests: tools/tests/units/test_wtsafe.py."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import os
-import tempfile
 
 from tools.lib import cli
 from tools.lib import repo as librepo
 from tools.lib.lanes import teardown
 from tools.lib.lanes.teardown import is_reparse_point, sha1, unlink_reparse_points  # noqa: F401  (the old names)
 
-TOOL = cli.Tool("wtsafe", "docs/tools/spec/wtsafe.md", tests="tools/tests/units/test_wtsafe.py",
-                description=(__doc__ or "").splitlines()[0], common=())
+TOOL = cli.Tool("wtsafe", "docs/tools/spec/wtsafe.md", description=(__doc__ or "").splitlines()[0], common=())
 REPO = str(librepo.PACKAGED_ROOT)
 CONFIG = os.path.join("config", "RMHE08", "config.yml")
 _make_junction = teardown.make_junction
@@ -45,8 +43,6 @@ def main() -> int:
     ap.add_argument("--check", action="store_true", help="verify orig/ against its pinned hashes")
     ap.add_argument("--unlink", metavar="DIR", help="unlink the reparse points under DIR")
     a = ap.parse_args()
-    if a.selftest:
-        return TOOL.selftest(cwd=tempfile.gettempdir())
     if a.unlink:
         for p in unlink_reparse_points(a.unlink):
             print("unlinked %s" % p)

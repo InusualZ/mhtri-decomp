@@ -14,9 +14,8 @@ the landing gate (2); the implementation is `lib.lanes.teardown` (`claims` and `
 
 ```
 python tools/units/wtsafe.py --check      # verify orig/ against its pinned hashes
-python tools/units/wtsafe.py --selftest
 ```
-Flags: `--check`, `--selftest`, `--unlink`.
+Flags: `--check`, `--unlink`.
 Exit codes: 0 ok, 1 findings or refusal, 2 could not run (the `lib.findings` convention; today's tool documents none, so `migration.md` records the current behaviour before changing it).
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
 
@@ -36,7 +35,7 @@ lanes.teardown, repo (ground truth).
 
 ## Test contract
 
-Tier: smoke. `tools/tests/units/test_wtsafe.py` (`--selftest` forwards to it): the junction round trip in temp dirs, the measured git hazard (Windows), and MAIN's `orig/` against `config.yml`'s pins (skipped when absent).
+Tier: smoke. `tools/tests/units/test_wtsafe.py`: the junction round trip in temp dirs, the measured git hazard (Windows), and MAIN's `orig/` against `config.yml`'s pins (skipped when absent).
 
 ## Known gaps
 

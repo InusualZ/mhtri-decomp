@@ -25,6 +25,7 @@ is hashed before and after the sweep, which is how "the tool only reads" is chec
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import hashlib
 import os
@@ -34,9 +35,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import vtableaudit as va  # noqa: E402
+from tools.units import vtableaudit as va
 
 # info byte = (bind << 4) | type
 GLOBAL_FUNC = (1 << 4) | 2                        # STB_GLOBAL, STT_FUNC

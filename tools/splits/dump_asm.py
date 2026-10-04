@@ -1,27 +1,9 @@
 #!/usr/bin/env python3
-"""Regenerate the split disassembly dump that `tudiscover` reads.
-
-`build/RMHE08/asm/` is dtk's disassembly of every split unit - one `.s` per unit, ~92 MB across
-13 500 files. Nothing in the build reads it (`config.asm_dir = None`, and no ninja edge names it);
-`tools/splits/tudiscover.py` does, so `config/RMHE08/config.yml` sets `write_asm: false` and this
-tool produces the dump when a session needs it. That turns a cost the split paid on *every* run -
-`symbols.txt` is one of its dirty-check inputs, so a rename re-dumps all of it, ~200 s of a ~380 s
-`ninja` - into one full split per attribution session.
-
-    python tools/splits/dump_asm.py              # dump, then stamp it
-    python tools/splits/dump_asm.py --check      # report the dump's age only, no split (exit 1 if not fresh)
-    python tools/splits/dump_asm.py --dry-run    # print the command it would run
-
-`--no-update` keeps the hand-edited `symbols.txt`/`splits.txt` out of the run (dtk's own
-"for build systems" mode), and the dump is stamped with the hashes of the three files it is a
-function of, so `tudiscover stats` can say when it has outlived a symbol edit. That matters because
-stale asm is silent: `asm_files()`'s docstring records a stale copy printing `bl fn_80456DD4` where
-the canonical one prints `bl _savegpr_14`, which zeroes a codegen fingerprint.
-
-Nothing here is written outside `build/<game>/` (`dump_asm.yml`, the dump itself, the stamp).
-"""
+"""Regenerate the split disassembly dump that `tudiscover` reads, and stamp it. Spec: docs/tools/spec/dump_asm.md.
+CLI: dump_asm.py [--check | --dry-run]."""
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import os
@@ -32,9 +14,8 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "tools" / "splits"))
 
-import tudiscover as td  # noqa: E402  (path set above; owns ASM_DIR and the dump stamp)
+from tools.splits import tudiscover as td  # path set above; owns ASM_DIR and the dump stamp
 
 CONFIG = ROOT / "config" / td.GAME / "config.yml"
 BUILD_DIR = Path(td.LOCAL_ASM_DIR).parent        # build/<game>, the split's `out_dir` (the tree's own, never MAIN's)

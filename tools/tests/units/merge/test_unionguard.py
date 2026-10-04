@@ -5,7 +5,6 @@ import io
 
 from tools.lib import testing
 from tools.tests.units import merge_fixtures as mf
-from tools.units import unionguard as shim
 from tools.units.merge import unionguard as ug
 from tools.units.merge import unionresolve as ur
 
@@ -170,7 +169,7 @@ def test_no_cleanup_keeps_the_conflict(c):
     with testing.GitFixture() as fx:
         base = diverged(fx, {"cfg.txt": "value = 0\n"}, {"cfg.txt": "value = 1\n"}, {"cfg.txt": "value = 2\n"})
         apply3(fx, base)
-        rc = quiet(shim.main, ["--cwd", str(fx.root), "--base", base, "--branch", "branch", "--no-cleanup"])
+        rc = quiet(ug.main, ["--cwd", str(fx.root), "--base", base, "--branch", "branch", "--no-cleanup"])
         c.check("no-cleanup: the exit stays non-zero, the conflict stays UU",
                 (rc, sorted(ug.unmerged(str(fx.root))), fx.git("status", "--short").startswith("UU ")),
                 (1, ["cfg.txt"], True))

@@ -64,3 +64,15 @@ discovery by `--selftest` flag scan and delegation regexes is replaced by `tools
 
 * **The incident this closes.** `tools/units/measure_selftest.py` was red for weeks while 31 lanes filed "`recompile.py` is broken": the tool's own test said so and nothing ran it. A selftest nobody runs is decoration, and the land gate only ran `land.py --selftest` - the gate's own tests, never the suite. This is the one command that runs them all, so a stale tool cannot hide behind a green gate.
 * **A failure is re-run once, alone (2026-09-30).** The suite runs `--jobs` tests at once, on a machine that is also building (live lanes), and a test that touches git, a temp tree or the clock can lose that race without being wrong: four landings were refused by `claims`, `ideas` and `slots` selftests that passed by hand a minute later. So every fail/timeout is re-run ONCE, serially, after the pool has drained. Passing the second time is a **flake**: it passes the row, prints `flaky: ... passed on isolated re-run` loudly on stderr, lands in the JSON summary (`flaky`) and is appended to `.pi/selftest-flakes.jsonl` (tool, time, the first failure's last lines) so flakes are counted, not silently eating landings. A test that fails twice fails the row, and the refusal carries the last 40 lines of its output (`FAIL_TAIL_LINES`).
+
+## Moved from the module docstring (WP6)
+
+From `tools/selftest.py`:
+
+**The third shape: `tools/tests/**/test_*.py` (WP0, docs/tools/design.md section 7).** A `lib.testing` module
+declares `TIER = "fixture"` (the default) or `TIER = "smoke"`; it is run as `python <file>` with the tier in
+`TOOLS_TEST_TIER`, and a fixture-tier module runs with its cwd in a fresh temp dir. Its key is the tool it tests
+(`tools/tests/units/test_land.py` -> `tools/units/land`; `tests/smoke/` keeps its own path, `tests/top/` maps to
+`tools/<name>`), so a re-homed test replaces the tool's old entry (dedupe; `--no-dedupe` runs both) and a park on
+the old target still matches. `--tier fixture|smoke` filters these entries only; the older entries (tier
+`legacy`) and the synthetic `--check` entries (tier `check`) run in every tier until they are re-homed.

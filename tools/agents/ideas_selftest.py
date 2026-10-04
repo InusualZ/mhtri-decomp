@@ -7,6 +7,7 @@ Covers: `find` ranking and filters on fixtures, `new` scaffolding a valid idea (
 
     python tools/agents/ideas_selftest.py
 """
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import contextlib
 import io
@@ -15,9 +16,8 @@ import sys
 import tempfile
 import threading
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import ideas  # noqa: E402
-import sync_playbook_index as spi  # noqa: E402
+from tools.agents import ideas
+from tools.agents import sync_playbook_index as spi
 
 RESULTS = []
 
@@ -210,7 +210,7 @@ check("find: score is word-substring (reloc finds relocations)",
 check("tags: derive_tags suggests from a title", "pragma" in spi.derive_tags("A pragma leaks", ""), True)
 
 # ---- demo-check: the EXPECT grammar, the object model, the runner ---------------------------------------------------
-import ideas_demo  # noqa: E402
+from tools.agents import ideas_demo  # noqa: E402
 
 DUMP = "\n".join([
     "", "x.o:     file format elf32-powerpc", "", "Sections:", "Idx Name          Size      VMA       LMA       File off  Algn",

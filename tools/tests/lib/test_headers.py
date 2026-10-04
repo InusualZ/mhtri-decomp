@@ -1,6 +1,6 @@
 """The in-code header template (design.md section 9): a tool's module docstring is at most three lines and names
-its spec, docs/tools/spec/<name>.md (lib-<name>.md for tools/lib). ADVISORY until WP6: the live count is printed and
-never fails; the rule itself is checked on fixtures and does fail.
+its spec, docs/tools/spec/<name>.md (lib-<name>.md for tools/lib). Refusing since WP6: every tool module on the live
+tree must follow it, and the rule itself is checked on fixtures.
 """
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import ast
@@ -15,10 +15,12 @@ MAX_LINES = 3
 SPEC_RE = re.compile(r"Spec:\s*(docs/tools/spec/[\w.-]+\.md)")
 
 
-def expected_spec(rel: str, packages: frozenset = frozenset()) -> str:
+def expected_spec(rel: str, packages: frozenset = frozenset(), spec_exists=lambda path: False) -> str:
     """`docs/tools/spec/<stem>.md`; `lib-<stem>.md` for a lib module, `lib-<package>.md` for a module of a lib
     package (`tools/lib/binary/elf.py` -> `lib-binary.md`: one spec per package, design.md section 3), and
-    `<package>.md` for a module of a tool package in `packages` (`tools/mwlink/trace.py` -> `mwlink.md`)."""
+    `<package>.md` for a module of a tool package in `packages` (`tools/mwlink/trace.py` -> `mwlink.md`). A module
+    with no spec of its own in a directory that is one tool but cannot be a package (`tools/mwcc-debugger/`, a hyphen)
+    or holds one tool's data (`tools/flags/variants/`) names the nearest directory spec that `spec_exists`."""
     parts = rel.split("/")
     if rel.startswith("tools/lib/") and len(parts) > 3:
         return "docs/tools/spec/lib-%s.md" % parts[2]
@@ -27,7 +29,14 @@ def expected_spec(rel: str, packages: frozenset = frozenset()) -> str:
         if "/".join(parts[:depth]) in packages:
             return "docs/tools/spec/%s.md" % parts[depth - 1]
     stem = parts[-1][:-3]
-    return "docs/tools/spec/%s%s.md" % ("lib-" if rel.startswith("tools/lib/") else "", stem)
+    own = "docs/tools/spec/%s%s.md" % ("lib-" if rel.startswith("tools/lib/") else "", stem)
+    if rel.startswith("tools/lib/") or spec_exists(own):
+        return own
+    for depth in range(len(parts) - 1, 1, -1):
+        directory = "docs/tools/spec/%s.md" % parts[depth - 1]
+        if spec_exists(directory):
+            return directory
+    return own
 
 
 def in_scope(rel: str) -> bool:
@@ -51,7 +60,7 @@ def header_problems(rel: str, text: str, spec_exists=lambda path: True,
     if len(lines) > MAX_LINES:
         out.append("module docstring is %d lines (at most %d)" % (len(lines), MAX_LINES))
     m = SPEC_RE.search(doc)
-    want = expected_spec(rel, packages)
+    want = expected_spec(rel, packages, spec_exists)
     if not m:
         out.append("no `Spec: %s`" % want)
     elif m.group(1) != want:
@@ -87,9 +96,20 @@ def test_rule_on_fixtures(c):
     pkg = '"""H. Spec: docs/tools/spec/mwlink.md. CLI: none."""\n'
     c.check("a module of a tool package names the package's spec",
             header_problems("tools/mwlink/trace.py", pkg, packages=frozenset({"tools/mwlink"})), [])
-    c.check("... and its own stem when the directory is not a package",
-            header_problems("tools/mwlink/trace.py", pkg),
+    c.check("... and its own stem when the directory is not a package (and has no spec)",
+            header_problems("tools/mwlink/trace.py", pkg, spec_exists=lambda p: p.endswith("trace.md")),
             ["names docs/tools/spec/mwlink.md, expected docs/tools/spec/trace.md"])
+    tool_dir = lambda p: p in ("docs/tools/spec/mwcc-debugger.md", "docs/tools/spec/verify_pcode.md")  # noqa: E731
+    c.check("a module with no spec of its own in a tool directory names the directory's spec",
+            header_problems("tools/mwcc-debugger/locate/dissect.py",
+                            '"""H. Spec: docs/tools/spec/mwcc-debugger.md. CLI: x."""\n', spec_exists=tool_dir), [])
+    c.check("... but a module that has its own spec names it",
+            header_problems("tools/mwcc-debugger/locate/verify_pcode.py",
+                            '"""H. Spec: docs/tools/spec/mwcc-debugger.md. CLI: x."""\n', spec_exists=tool_dir),
+            ["names docs/tools/spec/mwcc-debugger.md, expected docs/tools/spec/verify_pcode.md"])
+    c.check("... and with neither, its own stem is what is missing",
+            header_problems("tools/units/zz.py", '"""H. Spec: docs/tools/spec/units.md."""\n', spec_exists=lambda p: False),
+            ["names docs/tools/spec/units.md, expected docs/tools/spec/zz.md"])
     nested = frozenset({"tools/units/landing", "tools/units/landing/rows"})
     c.check("a module of a NESTED package names the topmost package's spec",
             header_problems("tools/units/landing/rows/tree.py", '"""H. Spec: docs/tools/spec/landing.md."""\n',
@@ -99,7 +119,7 @@ def test_rule_on_fixtures(c):
                                    "tools/units/x.py")], [False, False, False, True])
 
 
-def test_live_tree_advisory(c):
+def test_live_tree(c):
     root = testing.live_root()
     files = tool_files(root)
     packages = frozenset(f.rsplit("/", 1)[0] for f in files if f.endswith("/__init__.py")
@@ -108,14 +128,9 @@ def test_live_tree_advisory(c):
                                   lambda p: (root / p).is_file(), packages))
             for rel in files if in_scope(rel)]
     bad = [(rel, p) for rel, p in rows if p]
-    print("advisory: %d of %d tool modules follow the header template (refusing from WP6)"
-          % (len(rows) - len(bad), len(rows)))
-    if "--verbose" in sys.argv[1:]:
-        for rel, p in bad:
-            print("  %s: %s" % (rel, "; ".join(p)))
-    for rel in ("tools/lib/testing.py",):
-        if (root / rel).is_file():
-            c.check("the WP0 module %s follows the template" % rel, dict(rows).get(rel), [])
+    print("headers: %d of %d tool modules follow the template" % (len(rows) - len(bad), len(rows)))
+    for rel, p in bad:
+        c.fail("header: %s" % rel, "; ".join(p))
 
 
 if __name__ == "__main__":
