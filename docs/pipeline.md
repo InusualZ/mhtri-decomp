@@ -928,12 +928,18 @@ open request is a stylelint finding).
   `config/RMHE08/config.yml` is refused at pre-flight even when named: land the unit batch, then commit the
   `block_relocations` patch alone (the guard accepts relocation-analysis keys only). A stale MAIN `report.json` makes
   the regression row compare against a stale base: `record-base` now rebuilds it.
-* **Open tool requests from the pilot** (not built): `integrate.py` commits a tree that does not build and cannot green
-  a base that does not compile, writes no owner declaration for some renames, re-proposes applied requests, prints an
-  empty `--units` on a source change, stops at 5 retry rounds; `claims.py list` shows live lanes as `(unregistered)`;
-  `handoff.py --check` needs `--map <tree>`; a stopgap form for a missing field/slot on another lane's class (it
-  blocked about 9 KB of bodies); `vtableaudit --diff` reads a rename as 2 added; `queue.py next --cluster <header>`
-  pulls in units of other modules; the gate should accept `block_relocations` in a batch.
+* **Pilot tool requests: built 2026-10-04** (landed `ef5c59b19`, `0e93ca858`). The gate admits a `config.yml` change that
+  touches only `block_relocations`/`add_relocations` in a `land --branch` batch (the same decision the commit hook
+  uses); `integrate.py` refuses to commit a tree that never built, stops when the base does not compile, narrows errors
+  per object (`-maxerrors 0`, 12 rounds), writes owner declarations for renamed callers, falls back to a leaf header on a
+  redefinition, skips already-applied requests and prints a non-empty `--units`; `claims.py list --json` shows a spawned
+  lane's `units`; `handoff.py --check --map <tree>`; `queue.py next --cluster <header>` stays inside the header's
+  module (`--cross-module` opts out); `vtableaudit --diff` keys are rename-stable and the removed set is printed;
+  `unitscore --baseline`, `fnasm.py`, `tryvar` variants and `doclinks.py` exist. Still open: a stopgap form for a missing
+  field or slot on another lane's class (design in `docs/tools/spec/stopgap-views.md`, build only if a round hits it
+  again); the gate still decides rule 10 by set difference (adopt `vtableaudit.diff_rows`'s SHIFTED pairing); a
+  cascading compiler error can exclude a declaration that was fine; the lane brief should require a build check after
+  `git merge main` (L3's merged base did not compile until the integrator fixed `exportTo`).
 * **Owner rulings pending after round 2.** The three-way split of `NetworkSessionManagerPat` (wait for a
   `NetworkCommunityPat` recut: pool FAIL would rise 76 -> 77 otherwise); folding `network_layer_io`'s tail with
   `NetworkWiiMediator` and `network_opening` (their `.data` reads as one TU); the `0x80794868` `.sbss` claim (playbook 53);
