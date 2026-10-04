@@ -131,6 +131,17 @@ def test_main_and_inputs(c):
                  "orig/RMHE08/sys/main.dol", "config/RMHE08/config.yml", "objdiff.json"])
         c.check("Tree.input uses the fallback", same(t.input("only-main.bin"), fx.root / "only-main.bin"), True)
         c.check("main_checkout of a worktree is MAIN", same(repo.main_checkout(wt), fx.root), True)
+        (wt / "sub").mkdir()
+        c.check("worktree_root from inside a worktree's subdirectory is the worktree, not MAIN",
+                same(repo.worktree_root(wt / "sub"), wt), True)
+        c.check("worktree_root of MAIN is MAIN", same(repo.worktree_root(fx.root), fx.root), True)
+        try:
+            repo.worktree_root(tmp)
+            refused = None
+        except SystemExit as exc:
+            refused = str(exc)
+        c.check("worktree_root outside git refuses and names the directory",
+                bool(refused and "not a git worktree" in refused and os.path.basename(tmp) in refused), True)
     with testing.FixtureTree() as tree:
         c.check("main_tree outside git is None", repo.main_tree(tree.root), None)
         c.check("main_checkout of a non-repository copy is the copy itself",

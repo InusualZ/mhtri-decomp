@@ -42,7 +42,7 @@ def land_decision(gate_ok: bool, stageable: list[str],
 
 
 def land_stageable(units: list[str], rows: list[tuple[str, str]],
-                   base_dirty: set[str] | None = None) -> list[str]:
+                   base_dirty: set[str] | None = None, main: str | None = None) -> list[str]:
     """The paths `land` stages: the batch's own files, never another stream's in-flight work.
 
     A *tracked* change inside the allowed set is part of the batch (the cherry-pick, the shared-file edits) -
@@ -59,12 +59,13 @@ def land_stageable(units: list[str], rows: list[tuple[str, str]],
     unit the batch is genuinely working on keeps its existing behaviour.
 
     Tool scratch (`is_scratch`) is never staged - the batch did not receive it (the `d910.json` refusal).
+    With `main`, a relocation-keys-only `config.yml` change is batch material (`outside_batch`'s content door).
     """
     owned = unit_owned_paths(units)
     foreign = base_dirty or set()
     stageable = []
     for code, path in rows:
-        if outside_batch([path]):
+        if outside_batch([path], main=main):
             continue
         if is_scratch(path):
             continue          # an objdiff dump the batch never received, staged or not (the crossing point)
@@ -78,7 +79,7 @@ def land_stageable(units: list[str], rows: list[tuple[str, str]],
     return stageable
 
 
-def looks_already_applied(rows: list[tuple[str, str]], base_dirty: set[str] | None) -> bool:
+def looks_already_applied(rows: list[tuple[str, str]], base_dirty: set[str] | None, main: str | None = None) -> bool:
     """True when the batch was applied to the tree *before* `record-base` ran.
 
     The signature: every changed path the batch guard allows is in the base's `dirty_at_base` snapshot, so
@@ -92,7 +93,7 @@ def looks_already_applied(rows: list[tuple[str, str]], base_dirty: set[str] | No
     "nothing to commit" refusal is the right one. Neither is a batch that adds a path the base did not
     already hold - only a *wholly* pre-existing dirty set has the signature.
     """
-    allowed = [p for _code, p in rows if not outside_batch([p]) and not is_scratch(p)]
+    allowed = [p for _code, p in rows if not outside_batch([p], main=main) and not is_scratch(p)]
     if not allowed:
         return False
     return set(allowed) <= (base_dirty or set())

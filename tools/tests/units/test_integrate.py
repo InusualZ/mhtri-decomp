@@ -58,6 +58,19 @@ def test_plan(c):
     c.check("an applied request (sidecar) is done", items[0].state, "done")
 
 
+def test_live_units(c):
+    rows = [{"unit": "Network/A", "merged": False},                                     # an old row: no `units`
+            {"unit": "(unregistered)", "merged": False},
+            {"unit": "lane/net2-l2", "registered": False, "units": ["Network/B", "Network/C"], "merged": False},
+            {"unit": "cluster/net", "units": ["Network/D"], "merged": True}]
+    c.check("live units: a row's unit and every unit a lane's unit set holds; merged rows and the placeholder "
+            "are not", ig.units_of_rows(rows), {"Network/A", "lane/net2-l2", "Network/B", "Network/C"})
+    own = Ownership.from_texts(SYMBOLS, SPLITS)
+    items = ig.plan([req("rename", "fn_8051E864", "SOInit", n=1)], own, {}, ig.units_of_rows(
+        [{"unit": "lane/x", "registered": False, "units": ["SO/soi"], "merged": False}]), set(), {})
+    c.check("... and a spawned lane's unit set defers its requests", items[0].state, "deferred")
+
+
 def write(root, rel, text):
     p = os.path.join(root, rel)
     os.makedirs(os.path.dirname(p), exist_ok=True)
@@ -203,6 +216,232 @@ def test_build_log_and_blame(c):
     c.check("dedupe keeps a decl request's op over a rename's implicit one",
             [o.implicit for o in ig.dedupe_ops([ig.DeclOp("r#1", "x", "x", 1, ".text", "u", "h", cpp=False, implicit=True),
                                                 ig.DeclOp("r#2", "x", "x", 1, ".text", "u", "h", cpp=False)])], [False])
+
+
+# --- the 2026-10-04 pilot gaps ------------------------------------------------------------------------------------
+
+def test_stopgap_keeps_types(c):
+    text = ("/* STOPGAP-BEGIN(a#4) */\ntypedef u32 (*CircleInfoSetSender)(NetworkInstance* i, u32 id);\n"
+            "/* STOPGAP-END(a#4) */\n/* STOPGAP-BEGIN(a#5) */\nextern \"C\" u32 sendReqCircleListLayer(void* s);\n"
+            "extern u8 lbl_flag;\n/* STOPGAP-END(a#5) */\nvoid f(void);\n")
+    new, done, _points = ig.remove_stopgap_blocks(text, {"a#4", "a#5"})
+    c.check("a STOPGAP block's declarations go, a typedef the code casts through stays (the L2 CircleInfoSetSender "
+            "break)", (new, sorted(done)),
+            ("typedef u32 (*CircleInfoSetSender)(NetworkInstance* i, u32 id);\nvoid f(void);\n", ["a#4", "a#5"]))
+
+
+def test_rename_declaration_from_its_stopgap(c):
+    """The L2 batch's 9 renames: the lane declared each renamed callee in a STOPGAP block; step 0 removed the block, so
+    the rename's declaration found no lane site, was skipped, and every caller failed to compile."""
+    with tempfile.TemporaryDirectory() as tmp:
+        write(tmp, "include/types.h", "typedef unsigned int u32;\n")
+        write(tmp, "include/Net/io.h", "#ifndef IO_H\n#define IO_H\n#include \"types.h\"\n#endif\n")
+        write(tmp, "src/Net/io.cpp", '#include "Net/io.h"\n')                    # the owner: no body to read
+        write(tmp, "src/Lane/pat.cpp", '#include "types.h"\n\n/* STOPGAP-BEGIN(a#3) */\n'
+                                      'u32 sendReqCircleKick(u32 self, const char* user);\n/* STOPGAP-END(a#3) */\n\n'
+                                      "u32 f(void) { return sendReqCircleKick(0, 0); }\n")
+        files = ig.Files(tmp)
+        op = ig.DeclOp("a#3", "sendReqCircleKick", "sendReqCircleKick", 0x80402BCC, ".text", "Net/io.cpp",
+                       "include/Net/io.h", cpp=True, implicit=True)
+        c.check("before: a caller would see no declaration once the block goes", ig.needs_declaration(
+            ig.Files(tmp), op), False)
+        fails = ig.apply_decls(files, [op], {"src/Lane/pat.cpp"}, {"a#3"})
+        files.flush()
+        io_h, pat = read(tmp, "include/Net/io.h"), read(tmp, "src/Lane/pat.cpp")
+        c.check("the rename's declaration is written to the owner header", (fails, op.result.get("skipped"),
+                "u32 sendReqCircleKick(u32 self, const char* user);" in io_h), ({}, None, True))
+        c.check("... from the lane's STOPGAP spelling, named as such", op.result.get("source"),
+                "the lane's declaration (src/Lane/pat.cpp, its STOPGAP block)")
+        c.check("... and the caller includes the owner header", '#include "Net/io.h"' in pat, True)
+        again = ig.DeclOp("a#3", "sendReqCircleKick", "sendReqCircleKick", 0x80402BCC, ".text", "Net/io.cpp",
+                          "include/Net/io.h", cpp=True, implicit=True)
+        f2 = ig.Files(tmp)
+        ig.apply_decls(f2, [again], {"src/Lane/pat.cpp"}, set())
+        c.check("a rename whose callers all see a declaration is still skipped", again.result.get("skipped", "")
+                .startswith("no declaration in the lane's scope"), True)
+
+
+def test_decided_name_rewrites_the_prototype(c):
+    own = Ownership.from_texts(SYMBOLS + "fn_803FDC80 = .text:0x803FDC80; // type:function size:0x10\n",
+                               SPLITS + "Network/pat.cpp:\n\t.text       start:0x803FD000 end:0x803FE000\n")
+    r = R.from_entry({"id": "a#18", "kind": "rename", "symbol": "fn_803FDC80", "proposed_name": "isCircleListBusy",
+                      "prototype": "s32 isCircleListBusy(NetworkInstance* self);", "evidence": "x",
+                      "confidence": "guess"})
+    items = ig.plan([r], own, {"fn_803FDC80": "testAndSet611b"}, set(), set(), {})
+    c.check("a --names decision renames the request's prototype too, not only the fn_ spelling",
+            (items[0].renames, items[0].decls[0].hint),
+            ([("fn_803FDC80", "testAndSet611b")], "s32 testAndSet611b(NetworkInstance* self);"))
+
+
+def test_already_applied(c):
+    with tempfile.TemporaryDirectory() as tmp:
+        write(tmp, "config/RMHE08/symbols.txt", SYMBOLS)
+        write(tmp, "config/RMHE08/splits.txt", SPLITS)
+        write(tmp, "include/types.h", "typedef unsigned int u32;\n")
+        write(tmp, "include/SO/soi.h", SOI_H.replace("s32 SOSend(s32 fd);", "s32 SOSend(s32 fd);\nu32 SOGetHostID(void);"))
+        write(tmp, "src/SO/soi.cpp", '#include "SO/soi.h"\nextern "C" u32 SOGetHostID(void) { return 0; }\n')
+        write(tmp, "src/Lane/lane.cpp", '#include "SO/soi.h"\nvoid f(void) { SOGetHostID(); }\n')
+        own = Ownership.from_texts(SYMBOLS, SPLITS)
+        reqs = [req("decl", "SOGetHostID", "u32 SOGetHostID(void);", n=4),
+                req("rename", "fn_80070000", "laneHelper", n=5)]
+        items = ig.plan(reqs, own, {}, set(), {"Lane/lane"}, {})
+        c.check("before: both plan to apply", [i.state for i in items], ["apply", "apply"])
+        c.check("a declaration already in the owner header is marked already applied (the tree)",
+                (ig.mark_applied(tmp, items, {"src/Lane/lane.cpp"}), items[0].state, items[0].why),
+                (1, "done", "already applied (the tree): SOGetHostID in include/SO/soi.h"))
+        c.check("... a rename still to do is not", items[1].state, "apply")
+        write(tmp, "src/Lane/lane.cpp", '#include "SO/soi.h"\n/* STOPGAP-BEGIN(lane-a#4) */\nu32 SOGetHostID(void);\n'
+                                        '/* STOPGAP-END(lane-a#4) */\nvoid f(void) { SOGetHostID(); }\n')
+        items = ig.plan(reqs[:1], own, {}, set(), {"Lane/lane"}, {})
+        c.check("... while its STOPGAP block is still in the tree, it is not applied", (ig.mark_applied(
+            tmp, items, {"src/Lane/lane.cpp"}), items[0].state), (0, "apply"))
+        write(tmp, "src/Lane/lane.cpp", '#include "SO/SOGetHostID.h"\nvoid f(void) { SOGetHostID(); }\n')
+        write(tmp, "include/SO/soi.h", SOI_H)
+        write(tmp, "include/SO/SOGetHostID.h", "#include \"types.h\"\nu32 SOGetHostID(void);\n")
+        items = ig.plan(reqs[:1], own, {}, set(), {"Lane/lane"}, {})
+        c.check("... and one its leaf header already declares is applied too",
+                (ig.mark_applied(tmp, items, set()), items[0].why),
+                (1, "already applied (the tree): SOGetHostID in include/SO/SOGetHostID.h"))
+
+
+def test_narrow(c):
+    def items_with(*ops):
+        out = []
+        for i, op in enumerate(ops):
+            it = ig.Item(req("decl", op.name, n=i + 1), "mechanical", "x", state="apply")
+            it.decls = [op]
+            out.append(it)
+        return out
+    skipped = ig.DeclOp("lane-a#1", "copyFmpSlot", "copyFmpSlot", 1, ".text", "N/p.cpp", "include/N/p.h", cpp=False,
+                        implicit=True)
+    skipped.result = {"skipped": "no declaration in the lane's scope to move"}
+    wrong = ig.DeclOp("lane-a#2", "getErr", "getErr", 2, ".text", "N/p.cpp", "include/N/p.h", cpp=False)
+    wrong.result = {"prototype": "s32 getErr(u32* x);"}
+    items = items_with(skipped, wrong)
+    errs = [{"file": "src/L/l.cpp", "line": 5, "text": "copyFmpSlot(a);", "message": "undefined identifier 'copyFmpSlot'"},
+            {"file": "src/L/l.cpp", "line": 9, "text": "getErr(0, 1);",
+             "message": "function call 'getErr(int, int)' does not match"}]
+    v = ig.narrow(items, errs, ["build/RMHE08/src/L/l.o"])
+    c.check("one round handles every error: the needed declaration is forced, the wrong one excluded",
+            (v["forced"], v["excluded"], skipped.force, items[1].state), (["copyFmpSlot"], ["getErr"], True, "judgement"))
+    v = ig.narrow(items, errs[:1], ["build/RMHE08/src/L/l.o"])
+    c.check("... a forced declaration still undefined reverts its request", (v["reverted"], items[0].state),
+            (["lane-a#1"], "reverted"))
+    clash = ig.DeclOp("lane-a#3", "em_net_recv", "em_net_recv", 3, ".text", "enemy/em.cpp", "include/enemy/em.h",
+                      cpp=False)
+    clash.result = {"prototype": "void em_net_recv(void);", "already_declared": False,
+                    "includes_added": ["src/L/l.cpp"]}
+    items = items_with(clash)
+    v = ig.narrow(items, [{"file": "include\\enemy\\em.h", "line": 12, "text": "struct EnemyWork {",
+                           "message": "struct/union/enum/class tag 'EnemyWork' redefined", "object": "x"}], ["x"])
+    c.check("a redefinition in the owner header moves the declaration to its leaf header",
+            (v["leaf"], clash.header, clash.full_header, clash.leaf, items[0].state),
+            (["em_net_recv"], "include/enemy/em_net_recv.h", "include/enemy/em.h", True, "apply"))
+
+
+def test_error_command(c):
+    toks = ["cmd", "/c", "mwcceppc.exe", "-O4", "-maxerrors", "1", "-MMD", "-c", "src/a.cpp", "-o", "build/RMHE08/src",
+            "&&", "python", "objalign.py"]
+    c.check("the diagnostic compile reports every error and writes to scratch, the build untouched",
+            ig.error_command(toks, "T"),
+            ["cmd", "/c", "mwcceppc.exe", "-O4", "-maxerrors", "0", "-MMD", "-c", "src/a.cpp", "-o", "T"])
+    c.check("... a command without -maxerrors gets one", ig.error_command(["cc", "-c", "a", "-o", "b"], "T"),
+            ["cc", "-c", "a", "-maxerrors", "0", "-o", "T"])
+
+
+def test_config_edit(c):
+    old = "object: x\nblock_relocations:\n- target: a\n  end: b\n# a comment of the next key\nfill_gaps: true\n"
+    it = ig.Item(R.from_entry({"id": "a#42", "kind": "config", "symbol": "updateSession", "evidence": "x",
+                               "proposed": "block_relocations: 0x803D7564 and 0x803D7568 (the constant 0x80060034)"}),
+                 "mechanical", "x", state="apply")
+    it.config = it.req.proposed
+    new, added, key, refusal = ig.config_edit(old, it)
+    c.check("a prose block lands at the end of its key's block, through the guard's rule",
+            (new, added, key, refusal),
+            ("object: x\nblock_relocations:\n- target: a\n  end: b\n- source: .text:0x803D7564\n  end: .text:0x803D756C\n"
+             "# a comment of the next key\nfill_gaps: true\n", 1, "block_relocations", None))
+    c.check("... and a second pass adds nothing", ig.config_edit(new, it)[1], 0)
+
+
+# --- run(): the refusals and the commit, on a fixture repository with the build faked -------------------------------
+
+RUN_FILES = {
+    "configure.py": "", ".gitignore": "build/\n",
+    "config/RMHE08/symbols.txt": "SOGetHostID = .text:0x8051F000; // type:function size:0x8\n",
+    "config/RMHE08/splits.txt": ("SO/soi.cpp:\n\t.text       start:0x8051E000 end:0x80520000\n"
+                                 "Lane/lane.cpp:\n\t.text       start:0x80070000 end:0x80071000\n"),
+    "include/types.h": "typedef unsigned int u32;\ntypedef int s32;\n",
+    "include/SO/soi.h": SOI_H,
+    "src/SO/soi.cpp": '#include "SO/soi.h"\nextern "C" u32 SOGetHostID(void) { return 0; }\n',
+    "src/Lane/lane.cpp": ('#include "types.h"\n\n/* STOPGAP-BEGIN(lane-a#1) */\nextern "C" u32 SOGetHostID(void);\n'
+                          '/* STOPGAP-END(lane-a#1) */\n\nvoid f(void) { SOGetHostID(); }\n'),
+}
+
+
+def _run(fx, tmp, builds, errors=None):
+    """`integrate.main` on the fresh fixture repo `fx` (the request file in `tmp`): `builds` are the verdicts the
+    faked `run_build` returns in turn."""
+    import contextlib
+    import io
+    import subprocess
+    import unittest.mock as mock
+    fx.init()
+    fx.commit(RUN_FILES, "base")
+    base = fx.git("rev-parse", "HEAD").strip()
+    rq = os.path.join(tmp, "lane-a-requests.json")
+    with open(rq, "w", encoding="utf-8") as fh:
+        fh.write('{"id": "lane-a#1", "kind": "decl", "symbol": "SOGetHostID", "evidence": "x"}\n')
+    verdicts = list(builds)
+
+    def fake_build(root, log):
+        ok = verdicts.pop(0) if verdicts else True
+        return ok, "" if ok else "FAILED: build/RMHE08/src/Other/x.o\n", 0.0
+
+    real_tool = ig.run_tool
+
+    def fake_tool(script, *args, **kw):
+        if script.endswith("commitlint.py"):
+            return subprocess.CompletedProcess([script], 0, "commitlint: ok", "")
+        return real_tool(script, *args, **kw)
+    out = io.StringIO()
+    env = {"GIT_AUTHOR_NAME": "fx", "GIT_AUTHOR_EMAIL": "fx@example.invalid", "GIT_COMMITTER_NAME": "fx",
+           "GIT_COMMITTER_EMAIL": "fx@example.invalid"}
+    with mock.patch.object(ig, "run_build", fake_build), mock.patch.object(ig, "run_tool", fake_tool), \
+            mock.patch.object(ig, "object_errors", lambda root, failed: (list(errors or []), [])), \
+            mock.patch.dict(os.environ, env), contextlib.redirect_stdout(out):
+        code = ig.main(["--requests", rq, "--no-claims", "--no-gate", "--no-mangle-check", "--branch", "integrate/fx"],
+                       root=str(fx.root))
+    return base, code, out.getvalue()
+
+
+def test_run_refusals_and_commit(c):
+    unattributable = [{"file": "src/Other/x.cpp", "line": 3, "text": "y = ;", "message": "expression syntax error",
+                       "object": "build/RMHE08/src/Other/x.o"}]
+    with testing.GitFixture() as fx, tempfile.TemporaryDirectory() as tmp:
+        base, code, out = _run(fx, tmp, [True, False], unattributable)
+        status = fx.git("status", "--porcelain").splitlines()
+        c.check("(a) a build that never goes green is REFUSED with a non-zero exit",
+                (code, "NOTHING was committed" in out), (1, True))
+        c.check("... no commit was made on the integrate branch", fx.git("rev-parse", "HEAD").strip(), base)
+        c.check("... and the last attempt is left in the working tree for the operator",
+                sorted(line[3:] for line in status), ["include/SO/soi.h", "src/Lane/lane.cpp"])
+    with testing.GitFixture() as fx, tempfile.TemporaryDirectory() as tmp:
+        base, code, out = _run(fx, tmp, [False], unattributable)
+        c.check("(b) a base that does not compile is refused before anything is applied",
+                (code, "the base" in out and "does not compile" in out, fx.git("status", "--porcelain")),
+                (1, True, ""))
+        c.check("... the integrate branch it cut is removed again",
+                (fx.git("branch", "--list", "integrate/fx").strip(), fx.git("rev-parse", "--abbrev-ref", "HEAD").strip()),
+                ("", "main"))
+    with testing.GitFixture() as fx, tempfile.TemporaryDirectory() as tmp:
+        base, code, out = _run(fx, tmp, [True, True])
+        log = fx.git("log", "--format=%s", "%s..HEAD" % base).splitlines()
+        c.check("a green build is committed (one commit: no renames)", (code, log),
+                (0, ["game/lane: declare the integrated callees in their owners' headers"]))
+        c.check("... the committed tree is the tree that built, and the tree is clean",
+                ("commits_verified: true" in out, fx.git("status", "--porcelain")), (True, ""))
+        c.check("(f) ... and the land line names the changed unit",
+                "land.py land --branch integrate/fx --units Lane/lane" in out, True)
 
 
 if __name__ == "__main__":

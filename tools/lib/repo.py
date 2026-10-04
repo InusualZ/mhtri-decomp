@@ -61,6 +61,17 @@ def caller_worktree(start: str | os.PathLike | None = None) -> str | None:
         return None
 
 
+def worktree_root(start: str | os.PathLike | None = None) -> str:
+    """The git worktree the caller (or `start`) is in - `git rev-parse --show-toplevel` from the cwd, never from a
+    tool file's location, so `MAIN/tools/...` run inside a worktree reads the worktree. `SystemExit` when git
+    cannot say (the one resolver `landing.common` and `recompile` share)."""
+    where = os.fspath(start) if start else os.getcwd()
+    top = caller_worktree(where)
+    if not top:
+        raise SystemExit("git rev-parse --show-toplevel failed in %s: not a git worktree" % where)
+    return top
+
+
 def cwd_tree() -> str | None:
     """`cwd` when it is itself a tree (holds `configure.py`), else None - the non-git invocation case."""
     try:

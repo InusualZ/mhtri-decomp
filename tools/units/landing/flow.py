@@ -199,7 +199,7 @@ def _land(main: str, units: list[str], rec: dict, base: str | None, no_build: bo
                               release_claims=False, problems=gate_failures, branch=branch,
                               no_selftests=no_selftests) == 0
     rows = changed_status(main)
-    outside = outside_batch([path for _code, path in rows])
+    outside = outside_batch([path for _code, path in rows], main=main)
     scratch = scratch_paths(outside)
     foreign = [p for p in outside if p not in scratch]
     if scratch:
@@ -212,8 +212,8 @@ def _land(main: str, units: list[str], rec: dict, base: str | None, no_build: bo
         return _refused(rec, "REFUSED %s | paths outside the batch appeared during the build: %s"
                              % (",".join(norm_units), ", ".join(foreign)), "paths outside the batch (after the build)")
     base_dirty = base_dirty_paths(main)
-    stageable = land_stageable(norm_units, rows, base_dirty)
-    if gate_ok and looks_already_applied(rows, base_dirty):
+    stageable = land_stageable(norm_units, rows, base_dirty, main=main)
+    if gate_ok and looks_already_applied(rows, base_dirty, main=main):
         # the batch was applied to the tree *before* `record-base` ran, so the base's dirty snapshot recorded
         # its own edits as foreign and `land_stageable` excluded them (all of them, or just the shared files).
         # This is the 2026-09-26 case (b): the gate printed "READY: every check passed" and `land` then
@@ -223,7 +223,7 @@ def _land(main: str, units: list[str], rec: dict, base: str | None, no_build: bo
             print("NOTE: --already-applied: the batch was applied before `record-base`, so the base's dirty "
                   "snapshot recorded its own edits as foreign - staging the batch's paths anyway.",
                   file=sys.stderr)
-            stageable = land_stageable(norm_units, rows, set())
+            stageable = land_stageable(norm_units, rows, set(), main=main)
         else:
             clear_land_message(main)
             return _refused(rec, "REFUSED %s | the batch is already applied: every changed path was dirty when "

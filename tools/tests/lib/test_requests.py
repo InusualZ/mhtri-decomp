@@ -193,5 +193,29 @@ def test_status_and_stopgap(c):
     c.check("an unpaired BEGIN is reported", [u[0] for u in R.unpaired_stopgaps(text)], ["x#2"])
 
 
+def test_config_items(c):
+    l2 = {"kind": "config", "symbol": "updateSession", "address": "0x803D7764", "id": "net2-l2-101a#42",
+          "proposed": "block_relocations: 0x803D7764 and 0x803D7768 (lis/addi of the constant 0x80060034)",
+          "evidence": "x"}
+    req = R.from_entry(l2)
+    c.check("the L2 round-2 #42 prose is mechanical now (it read as judgement: `symbol` was glued to `proposed`)",
+            R.classify(req)[0], "mechanical")
+    c.check("... and becomes one block covering both instructions, the aside's constant ignored",
+            R.config_items(l2["proposed"]), ("block_relocations",
+                                             ["- source: .text:0x803D7764\n  end: .text:0x803D776C"],
+                                             "instruction addresses"))
+    c.check("the range form", R.config_items("block_relocations source .text:0x803D7564..0x803D756C")[1],
+            ["- source: .text:0x803D7564\n  end: .text:0x803D756C"])
+    c.check("the YAML form is taken as written", R.config_items(LEGACY[10]["proposed"])[1],
+            ["- target: extabindex:0x80020000\n  end: extabindex:0x80020010"])
+    c.check("the add_relocations form",
+            R.config_items("add_relocations source .text:0x80001000 type R_PPC_ADDR16_HA target lbl_80500000")[1],
+            ["- source: .text:0x80001000\n  type: R_PPC_ADDR16_HA\n  target: lbl_80500000"])
+    c.check("an add_relocations without its type stays judgement",
+            R.classify(R.from_entry(dict(l2, proposed="add_relocations source 0x80001000")))[0], "judgement")
+    c.check("a proposal with no relocation key is judgement",
+            R.classify(R.from_entry(dict(l2, proposed="fill_gaps: false")))[0], "judgement")
+
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))

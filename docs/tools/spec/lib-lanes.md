@@ -33,7 +33,8 @@ lane->wtsafe and slots->lanecmd are gone). Import the module you need; `lanes/__
   names the owner, a legacy body names nobody), `slot_state`/`all_slots` (`free`, `no worktree`, `LIVE`, `claimed`,
   `branch`, `debris`), `capacity_error`, `verify`/`claim_currency` (the build tree proven current, pending ninja
   steps run at handover; `NINJA_RUNNER` is the test seam), `release_blockers` (a live session, a dirty tree, commits
-  no branch reaches), `acquire`/`preview`/`release`/`reclaim_verdict`/`reclaim_slot` (a slot on a branch whose tree
+  no branch reaches), `lock_for_path(main, path)` (the lock of the slot a path is - a spawned lane's claim and unit
+  set), `acquire`/`preview`/`release`/`reclaim_verdict`/`reclaim_slot` (a slot on a branch whose tree
   `merge-tree` proves applied is reclaimed, rescue ref first), `unlanded_reason`.
 * `seed`: `seed_worktree_build` (toolchain and build tree by copy, `orig/` by copy below 64 MB else junctioned, the
   `tools/m2c` submodule, ninja state with `.ninja_deps` re-pointed via `ninja_deps_rewrite`, inputs aged behind the
@@ -48,7 +49,9 @@ lane->wtsafe and slots->lanecmd are gone). Import the module you need; `lanes/__
   the `orig/` guard - `main_worktree`, `verify_orig`, `snapshot`.
 * `launch`: `KIND_PROFILE`, `PROFILES`, `profile_for_kind` (an unknown kind is refused with the list), `lane_call`
   (`claude --agent ... -p`, cwd first, task single-quoted or staged under `.pi/lanes/` past `INLINE_LIMIT`),
-  `resume_call`, `your_tree_lines`/`teardown_lines`/`tree_block` (the block every lane gets, one copy for the brief and
+  `resume_call`, `task_units(task)` (the names a task's first `Units:` line lists, asides dropped) and
+  `resolve_units(names, registered) -> (units, unresolved)` (a path as given, a bare stem only when one registered unit
+  has it - `slots.py spawn`'s unit set), `your_tree_lines`/`teardown_lines`/`tree_block` (the block every lane gets, one copy for the brief and
   `slots.py spawn`).
 * `landlog`: `Attempt` (branch, outcome in `landed`/`refused`/`conflict`/`error`, seconds, refused row, conflicted
   paths, units, commit), `append(main, attempt)` (one line to `.pi/land-log.jsonl`), `read` (records plus the numbers

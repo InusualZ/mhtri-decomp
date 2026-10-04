@@ -15,7 +15,7 @@ profiles (`.claude/agents`) (4); CLAUDE.md (4); docs (16); imports `lib.lanes.po
 ```
 python tools/units/slots.py init [--count 6] [--force]
 python tools/units/slots.py acquire <unit> [--slot N] [--worker NAME] [--force] [--dry-run]
-python tools/units/slots.py spawn --kind KIND [--slot N] [--unit U] [--task-file PATH] [--json]
+python tools/units/slots.py spawn --kind KIND [--slot N] [--unit U] [--task-file PATH] [--units A,B] [--json]
 python tools/units/slots.py release [--slot N | --unit U | --branch B] [--keep-branch] [--force] [--dry-run]
 python tools/units/slots.py reclaim [--slot N | --unit U | --branch B] [--json]
 python tools/units/slots.py status [--json]
@@ -24,7 +24,7 @@ python tools/units/slots.py shadow <slot> <dir> [--seed-build] [--force]
 python tools/units/slots.py --selftest
 ```
 Subcommands: `init`, `acquire`, `release`, `reclaim`, `spawn`, `collect`, `status`, `verify`, `shadow`.
-Flags: `--branch`, `--count`, `--dry-run`, `--force`, `--json`, `--keep-branch`, `--kind`, `--main`, `--path`, `--release`, `--seed-build`, `--selftest`, `--slot`, `--task-file`, `--unit`, `--worker`.
+Flags: `--branch`, `--count`, `--dry-run`, `--force`, `--json`, `--keep-branch`, `--kind`, `--main`, `--path`, `--release`, `--seed-build`, `--selftest`, `--slot`, `--task-file`, `--unit`, `--units`, `--worker`.
 Exit codes: 0 ok, 1 findings or refusal, 2 could not run (the `lib.findings` convention; today's tool documents none, so `migration.md` records the current behaviour before changing it).
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
 
@@ -49,6 +49,11 @@ git submodule update --init tools/m2c
 * **one `.used` marker per slot** in the worktree root, created by `acquire` (atomically, `O_EXCL`) and removed by `release`; `status` reports `used`/`free` from it. The marker is the primary occupancy signal - it only works because the launch pattern is now structural (acquire first, launch with the slot as `cwd`), so a lane always enters its slot. A JSON lock record at `MAIN/.pi/slots/<n>.json` still names the claim, worker and time, and a stale one is reclaimed instead of wedging forever.
 * **`status` reads the worktree too, and keeps the two readings distinct.** A slot whose worktree still has a branch checked out is **in use**, whatever the marker or the JSON record say - the lock is a convenience, the worktree is the truth. The two disagreed in the wild (slot 2 was reported `free` while it held `worker/rule10-fix-14f8`), and that disagreement *was* the bug, so both readings are kept.
 * **`acquire` falls through.** An occupied slot is skipped, not failed on: the search takes the next genuinely free slot and marks it atomically, so two racing acquires cannot both take one. An explicitly targeted `--slot N` still refuses when it holds an unlanded branch (never reuse a branch).
+* **A spawned lane's unit set rides its lock.** `spawn --units A,B` (else the task's first `Units:` line, via
+  `lib.lanes.launch.task_units`) is resolved against `splits.txt` (`launch.resolve_units`: a path as given, a bare stem
+  only when exactly one registered unit has it - the rest are printed as NOT recorded) and written to the lock as
+  `units`; `claims.py list --json` reads it back, so `integrate.py` defers a request whose owner a live lane holds. The
+  slot's `release` clears it with the lock.
 * **reset** = `checkout -f --detach <main-tip>`, a selective `git clean` that keeps `build/`, `orig/`, the toolchain and `tools/m2c` but discards scratch, stale source edits and stray files, then `checkout -B worker/<slug> <main-tip>`.
 * **validate** the kept build tree against MAIN's current map/DOL with the same staleness guard `seed_worktree_build` already uses (`claims._build_is_current` - `config.json` vs `symbols.txt`/`splits.txt`/`main.dol`), a byte comparison of `build/RMHE08/report.json`, AND the **compile-output set** the official scorer opens (`objdiff.json`'s `target_path`/`base_path`, existence - `compile_outputs`). A slot can pass the first two while its `obj/`/`src/` objects are gone; that tree cannot run `objdiff report generate`, so it is refused too. **If it cannot be proven current, re-seed; never proceed on a doubt.**
 * **claim-time currency**: a freshly seeded slot is *always* a few `ninja` steps behind by construction (the seed copies MAIN's `build/` with MAIN's mtimes while `git worktree add` stamps the slot's own sources at checkout time), so "no work to do" is the wrong test for a handover. `acquire` runs `ninja -n`, **finishes the pending steps in the slot** (`claim_currency`, bounded - measured 3: one MWCC unit, REPORT, PROGRESS), re-counts, and prints the proof the lane can see: `report.json` byte-identical, the compile-output set, the pending count. A ninja that cannot run is reported as *unknown*, never silently as 0.

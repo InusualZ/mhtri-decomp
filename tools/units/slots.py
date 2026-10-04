@@ -279,12 +279,25 @@ def tree_block(main: str, path: str) -> str:
     return _tree_block(main, path)
 
 
+def spawn_units(main: str, task: str | None, units: list[str] | None) -> tuple[list[str], list[str]]:
+    """The unit set a spawned lane holds: `units` when given, else the task's `Units:` line, each resolved to a
+    registered unit (`launch.resolve_units` over `splits.txt`) -> `(units, unresolved names)`."""
+    from tools.lib.project import Splits
+    names = list(units) if units else launch.task_units(task or "")
+    if not names:
+        return [], []
+    splits = os.path.join(main, "config", "RMHE08", "splits.txt")
+    registered = Splits.read(splits).units if os.path.exists(splits) else []
+    return launch.resolve_units(names, registered)
+
+
 def spawn(main: str, kind: str, slot: int | None = None, unit: str | None = None,
           task: str | None = None, task_file: str | None = None, worker: str | None = None,
-          force: bool = False) -> dict:
+          force: bool = False, units: list[str] | None = None) -> dict:
     """Take a slot (by number, or the first free one - named) for a lane of `kind` and return the paste-ready
     launch: the headless `claude --agent <profile>` line run in the slot, then the "your tree" block and the
-    claim-time currency proof. The kind and profile are recorded on the slot's lock."""
+    claim-time currency proof. The kind, profile and the lane's unit set (`units`, else the task's `Units:`
+    line - `claims.py list --json` reads it back as `units`) are recorded on the slot's lock."""
     profile = profile_for_kind(kind)
     if task is None and task_file:
         try:
@@ -292,6 +305,7 @@ def spawn(main: str, kind: str, slot: int | None = None, unit: str | None = None
                 task = fh.read().strip()
         except OSError as exc:
             raise SystemExit("REFUSED spawn: cannot read --task-file %s: %s" % (task_file, exc))
+    held, unresolved = spawn_units(main, task, units)
     unit = unit or "lane/%s-%s" % (kind, time.strftime("%Y%m%d-%H%M%S"))
     info = acquire(main, unit, worker=worker or os.environ.get("USERNAME") or os.environ.get("USER") or "unknown",
                    slot=slot, force=force)
@@ -300,6 +314,8 @@ def spawn(main: str, kind: str, slot: int | None = None, unit: str | None = None
     if lock:
         lock["kind"] = kind
         lock["agent"] = profile
+        if held:
+            lock["units"] = held
         write_lock(main, info["slot"], lock)
     tail = ("End your turn with your report: your final message is the result the orchestrator receives. "
             "If you need a ruling, end the turn with the request - the orchestrator resumes this session.")
@@ -315,8 +331,8 @@ def spawn(main: str, kind: str, slot: int | None = None, unit: str | None = None
         write_lock(main, info["slot"], lock)
     block = "\n\n".join([tree_block(main, path)] + currency_lines(info["currency"]))
     return {"slot": info["slot"], "path": path, "agent": profile, "kind": kind,
-            "branch": info["branch"], "unit": unit, "sessionId": call["session_id"],
-            "spawnLine": "%s\n\n%s" % (call["call"], block)}
+            "branch": info["branch"], "unit": unit, "units": held, "unresolved_units": unresolved,
+            "sessionId": call["session_id"], "spawnLine": "%s\n\n%s" % (call["call"], block)}
 
 
 # --- status -----------------------------------------------------------------------------------------------------
@@ -1069,7 +1085,33 @@ def selftest() -> int:
             check("spawn BY NUMBER refuses a slot holding an unlanded branch",
                   "never a branch" in str(exc), True)
         check("... and the held branch is untouched", slot_attached_branch(slot_dir(repo, 1)), sp["branch"])
+        plain_row = next(r for r in claims.claims_view(repo) if r["branch"] == sp["branch"])
+        check("a spawned lane with no unit set lists under its lock's name, with no `units` key",
+              (plain_row["unit"], plain_row.get("registered"), "units" in plain_row),
+              ("lane/spawn-tooling", False, False))
         release(repo, slot=1, unit="lane/spawn-tooling", rescue=False)
+
+        # (a2) the lane's UNIT SET: the task's `Units:` line is recorded on the lock and `claims.py list` reads
+        # it back (the network pilot: a spawned lane listed as `(unregistered)`, so integrate saw no owner)
+        sp_u = spawn(repo, "fix", slot=1, unit="lane/spawn-units",
+                     task="Lane L9.\nUnits: Net/alpha (Matching), Net/beta, Net/alpha.\nOwned headers: x.h")
+        check("spawn records the task's Units: line on the lock", read_lock(repo, 1).get("units"),
+              ["Net/alpha", "Net/beta"])
+        check("... and returns it", (sp_u["units"], sp_u["unresolved_units"]), (["Net/alpha", "Net/beta"], []))
+        lane_row = next(r for r in claims.claims_view(repo) if r["branch"] == sp_u["branch"])
+        check("claims list shows the lane by name with its units, not as (unregistered)",
+              (lane_row["unit"], lane_row.get("registered"), lane_row.get("units"), lane_row.get("kind")),
+              ("lane/spawn-units", False, ["Net/alpha", "Net/beta"], "fix"))
+        check("... and the registry teardown sweep skips it (no registry row to release)",
+              [s["why"] for s in claims.release_merged(repo, dry_run=True)["skipped"]
+               if s["branch"] == sp_u["branch"]], ["no registry entry"])
+        release(repo, slot=1, unit="lane/spawn-units", rescue=False)
+        sp_x = spawn(repo, "fix", slot=1, unit="lane/spawn-explicit", task="Units: Net/ignored",
+                     units=["Net/gamma"])
+        check("an explicit --units wins over the task's line", read_lock(repo, 1).get("units"), ["Net/gamma"])
+        release(repo, slot=1, unit="lane/spawn-explicit", rescue=False)
+        check("... and the release clears the unit set with the lock", read_lock(repo, 1), {})
+        del sp_x
 
         # (c) an unknown kind is refused before any slot is touched
         try:
@@ -1510,6 +1552,9 @@ def main() -> int:
     sp.add_argument("--unit", default=None,
                     help="the claim/branch name (default: lane/<kind>-<timestamp>)")
     sp.add_argument("--task-file", default=None, help="read the lane's task text from this file")
+    sp.add_argument("--units", default=None,
+                    help="the units the lane holds, comma-separated (default: the task's `Units:` line); "
+                         "recorded on the slot lock, read back by `claims.py list --json` as `units`")
     sp.add_argument("--worker", default=None)
     sp.add_argument("--force", action="store_true",
                     help="take a slot whose `.used` sentinel names a claim whose owner is gone")
@@ -1614,16 +1659,21 @@ def main() -> int:
         return 0
     if args.cmd == "spawn":
         out = spawn(main_wt, args.kind, slot=args.slot, unit=args.unit, task_file=args.task_file,
-                    worker=args.worker, force=args.force)
+                    worker=args.worker, force=args.force,
+                    units=[u.strip() for u in (args.units or "").split(",") if u.strip()] or None)
         if args.json:
             # exactly the fields a caller needs; `spawnLine` is the whole paste-ready text (line + block)
-            print(json.dumps({k: out[k] for k in ("slot", "path", "agent", "kind", "spawnLine")},
+            print(json.dumps({k: out[k] for k in ("slot", "path", "agent", "kind", "units", "spawnLine")},
                              indent=2))
             return 0
+        if out["unresolved_units"]:
+            print("spawn: NOT recorded (no single registered unit): %s" % ", ".join(out["unresolved_units"]),
+                  file=sys.stderr)
         # stdout is exactly the paste-ready artifact (the claude launch line + the block); the header names the
         # slot that was taken on stderr, so a caller can capture stdout verbatim.
-        print("spawn slot %d (%s) for kind %s -> agent %s\n  path: %s"
-              % (out["slot"], out["branch"], out["kind"], out["agent"], out["path"]),
+        print("spawn slot %d (%s) for kind %s -> agent %s\n  path: %s\n  holds: %s"
+              % (out["slot"], out["branch"], out["kind"], out["agent"], out["path"],
+                 ", ".join(out["units"]) or "no unit set (pass --units or a task `Units:` line)"),
               file=sys.stderr)
         print(out["spawnLine"])
         return 0
