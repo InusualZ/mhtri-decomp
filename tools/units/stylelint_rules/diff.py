@@ -326,7 +326,9 @@ def apply_move_credits(fresh: dict, before_findings: list[dict], after_findings:
     in the new file although the old file lost the same findings.  Here every identity new to a file
     (`fresh`, `added_identities`' shape) is matched against the identities other files lost
     (`removed_identities`), keyed `(rule, token, detail)` - the same rule and the same at-fault token, never
-    a look-alike of another rule.  **One credit per removal** (a multiset match): a copy that leaves the
+    a look-alike of another rule.  A removal is keyed by its **renamed** spelling (`lib.findings.removed` through
+    `renamed_finding`), so a finding that moved file while the batch renamed its map row is still a move.
+    **One credit per removal** (a multiset match): a copy that leaves the
     original intact removes nothing and earns nothing, and a name that grew across the batch (two files
     gained it, one lost it) still leaves the surplus refused.  Returns `(fresh_left, moves)`, each move
     `{rule, token, detail, from, to}`; a batch without a move returns `fresh` unchanged and `[]`.

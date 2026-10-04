@@ -53,6 +53,29 @@ def test_removed(c):
     credit = lambda f: [dict(f, token="new", detail="`new` has no registered owner")] if f["token"] == "lbl_1" else []
     c.check("a credited spelling still present is no removal",
             fd.removed(before, [_f(2, "src/f.c", "new"), _f(2, "src/f.c", "lbl_2")], credit), {})
+    c.check("without a credit a removal is keyed by the base spelling",
+            fd.removed(before, [_f(2, "src/f.c", "lbl_2")], lambda f: [f]),
+            {(2, "lbl_1", "`lbl_1` has no registered owner"): ["src/f.c"]})
+
+
+def test_removed_after_spelling(c):
+    # a move that also renamed (lbl_1 -> new, src/f.c -> src/g.c): the removal must be keyed the way the addition is
+    credit = lambda f: [dict(f, token="new", detail="`new` has no registered owner")] if f["token"] == "lbl_1" else [f]
+    before = [_f(12, "src/f.c", "lbl_1")]
+    after = [_f(12, "src/g.c", "new")]
+    gone = fd.removed(before, after, credit)
+    c.check("a renamed removal is keyed by the after-side spelling", gone,
+            {(12, "new", "`new` has no registered owner"): ["src/f.c"]})
+    new = fd.added(before, after, credit)
+    c.check("... so it meets the addition it moved to: same (rule, token, detail)",
+            [(k[0], f["token"], f["detail"]) for k, v in new.items() for f in v], [tuple(next(iter(gone)))])
+    c.check("renamed in place is neither removed nor added",
+            (fd.removed(before, [_f(12, "src/f.c", "new")], credit), fd.added(before, [_f(12, "src/f.c", "new")], credit)),
+            ({}, {}))
+    c.check("another rule's addition does not share the removal's key",
+            (12, "new", "`new` has no registered owner") in
+            {(k[0], f["token"], f["detail"]) for k, v in fd.added(before, [_f(2, "src/g.c", "new")], credit).items()
+             for f in v}, False)
 
 
 def test_rows_and_rendering(c):
