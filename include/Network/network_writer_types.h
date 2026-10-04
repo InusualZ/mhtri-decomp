@@ -11,21 +11,37 @@
 #define NETWORK_NETWORK_WRITER_TYPES_H
 
 #include "types.h"
+#include "Network/network_transport_types.h"   /* NetworkStreamSink */
 
 /* ---------------- the bit-stream writer's frame objects (the writer band's classes) ------------- */
 
-/* Only the sizes are evidenced: `NetworkStreamWriter` is the 0x18-byte packet every op-code sender in
-   this range reserves (a stream sink's four words, the message pointer at +0x10 and the cursor at +0x14;
-   `NetworkSessionStable::send` places it at +0x08 and the 0x1C-byte writer at +0x20), and
-   `NetworkStreamWriterDefault` the one `moveOutOfBand` reserves.  Their members belong to the writer's
-   own band. */
-typedef struct NetworkStreamWriter {
-    u8 bytes_00[0x18];   /* +0x00..+0x17 */
-} NetworkStreamWriter;   /* size: 0x18 */
+/* Two stream-sink classes of the writer band (`lobby/lb_server_sel_trans.cpp` defines their constructors and
+   destructors).  Each constructor chains `NetworkStreamSink`'s and stores its own table - 0x805FCE10 for
+   `NetworkStreamWriter` (0x803CB9B4), 0x805FCDD4 for `NetworkStreamWriterDefault` (0x803CB9F0) - and each
+   table's +0x08 slot is the matching destructor (0x803CB958, 0x803CB8FC); both destructors chain
+   `~NetworkStreamSink` directly, which is also what an inlined `~NetworkStreamWriter` reduces to, so the bodies
+   allow either hierarchy - `NetworkStreamWriterDefault : NetworkStreamWriter` is the one the call sites need (the
+   writer band's `networkPacket_*` readers take a `NetworkStreamWriter*` and are handed the default writer).
+   Only the sizes are evidenced beyond that:
+   `NetworkStreamWriter` is the 0x18-byte packet every op-code sender in this range reserves
+   (`NetworkSessionStable::send` places it at +0x08 and the 0x1C-byte writer at +0x20), and
+   `NetworkStreamWriterDefault` the one `moveOutOfBand` reserves.  Their remaining members belong to the
+   writer's own band; only the constructor and destructor are declared, so no table is emitted here. */
+class NetworkStreamWriter : public NetworkStreamSink {
+public:
+    NetworkStreamWriter();
+    virtual ~NetworkStreamWriter();
 
-typedef struct NetworkStreamWriterDefault : public NetworkStreamWriter {
-    u8 bytes_18[0x04];   /* +0x18..+0x1B */
-} NetworkStreamWriterDefault;   /* size: 0x1C (a packet's 0x18 bytes and one word more) */
+    u8 unused_10[0x08];   /* +0x10..+0x17 */
+};   /* size: 0x18 */
+
+class NetworkStreamWriterDefault : public NetworkStreamWriter {
+public:
+    NetworkStreamWriterDefault();
+    virtual ~NetworkStreamWriterDefault();
+
+    u8 unused_18[0x04];   /* +0x18..+0x1B */
+};   /* size: 0x1C */
 
 /* ---------------- bit-stream writer (owned by the network-serialization band) -------------- */
 

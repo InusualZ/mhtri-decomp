@@ -24,7 +24,7 @@
    `Network/NetworkSessionManager.h`, so it cannot include it back.  A forward declaration of the class name is
    all a pointer parameter needs. */
 class NetworkSessionStable;
-struct NetworkStreamWriter;
+class NetworkStreamWriter;
 struct NetworkPeerInfo;
 
 /* ---------------- the peer's error record --------------------------------------------------- */
@@ -403,8 +403,9 @@ typedef struct NetworkPeerLock {
 
 /* ---------------- the name resolver ------------------------------------------------------------ */
 
-/* The abstract resolver (table 0x805F9938, 0x20 B: the deleting destructor and five pure slots - the
-   sixth entry of the derived table stays pure too): the name it resolves (at most 0x1FF bytes), the
+/* The abstract resolver (table 0x805F9938: the deleting destructor and four pure slots; the 0x20 B the map
+   gives each resolver table is 0x1C of table and the 8-byte `.data` alignment, since `NetworkResolverWii` is
+   concrete - `sNetworkLibraryWii::createResolver` news it): the name it resolves (at most 0x1FF bytes), the
    four-word address table and how many of them are live.  The destructor is the key function that makes
    MWCC emit the table. */
 class NetworkResolverBase {
@@ -415,7 +416,6 @@ public:
     /* +0x10 (GUESS) */ virtual void resetCode() = 0;
     /* +0x14 (GUESS: the state machine `check()` in the log strings) */ virtual s32 check() = 0;
     /* +0x18 (GUESS) */ virtual void recordGet(s32 index, u32* out) = 0;
-    /* +0x1C */ virtual void slot_1C() = 0;
 
     char  name_04[0x200];   /* +0x04..+0x203 */
     u32   records_204[4];   /* +0x204..+0x213 - the resolved addresses */
@@ -423,7 +423,7 @@ public:
 };   /* size: 0x218 (evidence: the derived constructor stores its first own field, `code_218`, at +0x218
         and the base constructor's last store is the word at +0x214) */
 
-/* `NetworkResolverWii` (table 0x805F9980): the base record plus the state of the lookup - the one-byte
+/* `NetworkResolverWii` (table 0x805F9980; 0x1568 B, the size `createResolver` allocates): the base record plus the state of the lookup - the one-byte
    state at +0x218 (idle until the first failure, then 0xFF; 0x0A while the lookup thread runs, 0x0F when it
    ended, 0x14 once the addresses are copied, 0x5A on failure), the thread the lookup runs on with its
    stack, the lookup's result and inputs and the SDK's result list. */
@@ -438,13 +438,13 @@ public:
 
     u8    code_218;                    /* +0x218 - the lookup's state */
     u8    pad_219[0x07];               /* +0x219..+0x21F */
-    u8    thread_220[0x318];           /* +0x220..+0x537 - the OS thread the lookup runs on */
+    u8    thread_220[0x318] __attribute__((aligned(8))); /* +0x220..+0x537 - the OS thread the lookup runs on (8-aligned: the OS thread record holds doubles) */
     u8    stack_538[0x1000];           /* +0x538..+0x1537 - its stack */
     s32   result_1538;                 /* +0x1538 - what the lookup returned */
     const char* lookupName_153C;       /* +0x153C - the name the thread resolves */
     SOAddrInfo hints_1540;             /* +0x1540..+0x155F - the lookup hints: only the family is set */
     SOAddrInfo* addrInfo_1560;         /* +0x1560 - the SDK's result list, freed when consumed */
-};   /* size: 0x1564 */
+};   /* size: 0x1568 */
 
 /* The socket reader `getBytesAvailableToRead` is owned by `Network/NetworkCommunityPat.cpp` and declared
    in `Network/NetworkCommunityPat.h` (rule 2). */

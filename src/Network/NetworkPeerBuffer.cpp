@@ -15,9 +15,12 @@
  * FLAGS.  C++ under `cflags_network` (`-Cpp_exceptions on` gives the `extab`), per-unit `-O3`/`-pool off` (`configure.py`);
  * file-scope `#pragma peephole off` (playbook 39); each `dont_inline` region keeps a retail `bl` that `-inline auto` folds.
  *
+ * SHAPES.  `receive`'s stream is a real `NetworkStreamWriterDefault` local: its implicit destructor at every
+ * return is what gives the `extab` its cleanup record (the claimed 0x60 B, byte-identical).
+ *
  * RESIDUALS.  `send` 99.73 % (the `NETWORK_ERROR_*` constant is an immediate the target relocates against an
- * `@eti_` extabindex row, playbook 58's class); the object's `extab` is 0x38 of the claimed 0x60 B and `.text`
- * differs from the target by 3 B (relocations).
+ * `@eti_` extabindex row, playbook 58's class); `.text` differs from the target by 3 B (relocations).  As
+ * `Matching` the DOL hash holds (measured 2026-10-04).
  */
 #include "types.h"
 #include "Network/network_transport.h"
@@ -76,28 +79,23 @@ s32 NetworkPeerBuffer::receive(u8* out, s32* size, u8* out2, s32* size2, u8* kin
     s32 capacity;
     s32 length;
 
-    networkStreamWriter_constructDefault(&stream);
     capacity = *size;
     *size = 0;
     *size2 = 0;
     *kind = 0;
     networkStreamReader_attach(&stream, this->payload_10, this->used_2010);
     if (make_sure_enough_space(&stream) == 0) {
-        networkStreamWriterDefault_dtor(&stream, -1);
         return 0;
     }
     if (capacity < read_size_from_buffer(&stream)) {
-        networkStreamWriterDefault_dtor(&stream, -1);
         return 0;
     }
     length = copy_from_buffer(&stream, out, capacity);
     if (length < 0) {
-        networkStreamWriterDefault_dtor(&stream, -1);
         return 0;
     }
     this->used_2010 -= networkStreamReader_consumePacket(&stream);
     *size = length;
-    networkStreamWriterDefault_dtor(&stream, -1);
     return length;
 }
 

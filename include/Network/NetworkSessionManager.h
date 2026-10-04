@@ -557,13 +557,6 @@ extern NetworkRequestDesc networkRequestDesc396;
 extern NetworkRequestDesc networkRequestDesc400;
 extern NetworkRequestDesc networkRequestDesc428;
 
-/* bit-stream writer API (another band).  The two writer classes are reconstructions from the frame
-   each constructor is given: `NetworkStreamWriter` is the 0x20-byte local every op-code sender
-   reserves, `NetworkStreamWriterDefault` the one `NetworkSessionStable::move` reserves. */
-void networkStreamWriter_dtor(NetworkStreamWriter* self, s32 flags);
-void networkStreamWriter_constructDefault(NetworkStreamWriterDefault* self);
-void networkStreamWriterDefault_dtor(NetworkStreamWriterDefault* self, s32 flags);
-
 /* the writer's remaining entry points the tail of the range drives (the second writer class); the
    writer methods `Network/NetworkCommunityPat.cpp` owns (`writeByte`..`writeBytes`,
    `networkStreamWriter_putBytes`..`_size`) are declared in `Network/NetworkCommunityPat.h` */

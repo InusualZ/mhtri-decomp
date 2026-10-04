@@ -17,7 +17,8 @@
  *
  * RESIDUALS.  `send`/`receive`/`put`/`move` 99.7-99.8 % (the same `NETWORK_ERROR_*` immediates, playbook 58's
  * class); `.text` differs from the target by 36 B, all relocations; `.sbss` holds the 4-byte `networkMcsRetryTime`
- * against the claimed 8 B.
+ * against the claimed 8 B (the map's size is the gap to the next 8-aligned `.sbss` object; the section's 8-byte
+ * alignment pads it).  As `Matching` the DOL hash holds (measured 2026-10-04).
  */
 #include "types.h"
 #include "Network/network_transport.h"
