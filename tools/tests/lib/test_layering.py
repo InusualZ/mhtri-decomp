@@ -79,10 +79,23 @@ class Resolver:
         return cands[0] if cands else None
 
 
+def package_of(rel: str, files: set[str]) -> str | None:
+    """The tool package `rel` belongs to: its topmost directory below `tools/` that has an `__init__.py`
+    (`tools/mwlink/trace.py` -> `tools/mwlink`), never `tools/lib` (lib imports are not edges anyway) or
+    `tools/tests`. A package is one tool split into modules, so an import inside it is not a tool->tool edge."""
+    parts = rel.split("/")
+    for depth in range(2, len(parts)):
+        d = "/".join(parts[:depth])
+        if d not in ("tools/lib", "tools/tests") and d + "/__init__.py" in files:
+            return d
+    return None
+
+
 def edges(root: Path) -> tuple[set[tuple[str, str]], list[tuple[str, str]]]:
     """(tool->tool edges, lib->non-lib edges) of the tree under `root`."""
     files = tool_files(root)
     res = Resolver(files)
+    file_set = set(files)
     tool_edges, lib_bad = set(), []
     for f in files:
         if f.startswith("tools/tests/"):
@@ -100,6 +113,9 @@ def edges(root: Path) -> tuple[set[tuple[str, str]], list[tuple[str, str]]]:
                     lib_bad.append((f, target))
                 continue
             if target.startswith("tools/lib/"):
+                continue
+            pkg = package_of(f, file_set)
+            if pkg is not None and pkg == package_of(target, file_set):
                 continue
             tool_edges.add((f, target))
     return tool_edges, sorted(set(lib_bad))
@@ -165,6 +181,19 @@ def test_rule_on_fixtures(c):
         w("tools/lib/bad.py", "import unitutil\nfrom tools.units import claims\n")
         c.check("a lib->tools import is always a finding", edges(tree.root)[1],
                 [("tools/lib/bad.py", "tools/units/claims.py"), ("tools/lib/bad.py", "tools/unitutil.py")])
+        w("tools/pkg/__init__.py", "")
+        w("tools/pkg/a.py", "from tools.pkg import b\nfrom . import c\n")
+        w("tools/pkg/b.py", "import os\n")
+        w("tools/pkg/c.py", "from tools.units import queue\n")
+        w("tools/pkgshim.py", "from tools.pkg import a\n")
+        found = {key(e) for e in edges(tree.root)[0]}
+        c.check("an import inside one tool package (a directory with __init__.py) is not an edge",
+                sorted(k for k in found if k.startswith("tools/pkg/") and "/pkg/" in k.split(" -> ")[1]), [])
+        c.contains("... while the package importing another tool is", found, "tools/pkg/c.py -> tools/units/queue.py")
+        c.contains("... and so is a shim importing the package", found, "tools/pkgshim.py -> tools/pkg/a.py")
+        w("tools/units/nopkg.py", "import queue\n")
+        c.contains("a directory without __init__.py is not a package: its imports stay edges",
+                   {key(e) for e in edges(tree.root)[0]}, "tools/units/nopkg.py -> tools/units/queue.py")
 
 
 # --- the live tree ------------------------------------------------------------------------------------------

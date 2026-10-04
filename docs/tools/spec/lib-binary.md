@@ -36,8 +36,15 @@ The tools listed under this concept in `docs/tools/README.md`. Delegating today 
   path, check)`, `disassemble(objdump, path, sections, relocs, raw, cpu)`, `dtk_disasm(obj, dtk, cwd)`.
 * `dwarf`: `uleb`, `sleb`, `debug_info(elf)` (relocations applied), `abbrevs`, `read_form`,
   `compile_unit(elf, on_die)`, `loclist`, `decode_expr`, `local_slots(obj, function) -> [LocalSlot]`; `DwarfError`.
+* `pe.Pe(path)` (WP5): the one PE32 reader of the Metrowerks host tools (`mwldeppc.exe`, `mwcceppc.exe`): `machine`,
+  `image_base`, `entry`, `size_image`, `dll_characteristics`, `sections` (`Section`: name, va, vsize, raw_off, raw_size,
+  flags, 1-based index), `section(name)`, `rva2off`, `read(rva, n)` (None when not file-backed), `read_rva(rva, n)`
+  (ValueError there), `cstring`, `data_dir(i)`, `debug_entries()`, `debug_blob()`, `codeview_symbols()` (the `NB11`
+  blob: `[(rva, name, section)]`, cached), `symbol_map()`, `imports()`, `iat_slots()` (`{name: slot VA}`),
+  `resources()`, `string_blocks()` (RT_STRING). Refuses (ValueError) no `MZ`, no `PE\0\0`, a non-PE32 header.
 * `build.ElfBuilder` (`section`, `nobits`, `symbol`, `file_symbol`, `reloc`, `comment(version)`, `build`, `write`;
-  locals first unless `keep_order`) and `build.DolBuilder` (`text`, `data`, `bss`, `pad`, `entry`, `build`, `write`).
+  locals first unless `keep_order`), `build.PeBuilder` (`section(name, data, vsize, va)`, `imports`, `strings`,
+  `codeview`, `rva`, `build`, `write`) and `build.DolBuilder` (`text`, `data`, `bss`, `pad`, `entry`, `build`, `write`).
   `lib.testing.FixtureTree.add_object` accepts a builder.
 
 ## Absorbs (today's implementations)
@@ -66,10 +73,18 @@ for every field; `.rela<sec>` pairs with `<sec>`; locals are below `sh_info`; a 
 byte-neutral outside `.symtab`/`.strtab`; DOL reads at and across segment ends; DWARF LEB128, expressions and a
 synthetic compile unit with a relocated loclist; the tokenizer on each line shape. The real split objects are parsed
 by the old-vs-new equivalence run recorded in the WP1b batch, not by a pinned smoke count.
+`pe` (WP5): `tools/tests/lib/test_binary_pe.py` on `PeBuilder` images - sections and the file-backed boundary, the
+import directory and its IAT slots (each slot read back to its hint/name), RT_STRING resources, the CodeView blob, the
+machine/image base read (not assumed), and the three refusals. The real linkers and compilers were compared old-vs-new
+in the WP5 batch (`mwlink_debugger.py info/messages/anchors/phases/records/align`, `versions.detect` over the 30
+`build/compilers/*/*/mwcceppc.exe`, `dissect.py`, `pass_points.py`: identical output).
 
 ## Known gaps
 
-* Not delegated in WP1b (left for their family lane): `mwlink_debugger.Elf`/`MwObject` (WP5), `promote.Elf` (retired
+* WP5 delegated `mwlink_debugger.Elf`/`MwObject`/`_object_header_bits` here (as dict-shaped adapters, so the trace's
+  output is unchanged) and the three PE readers (`mwlink_debugger.Pe`, `mwcc-debugger/versions.Pe`,
+  `locate/dissect.Pe`) to `pe`.
+* Not delegated in WP1b (left for their family lane): `promote.Elf` (retired
   in WP6), `callers.build_elf_index` and `callers.parse_dump_file`'s combined scan regex (WP3c - the scan is one regex
   over the whole dump for speed), `flipcheck.sections`/`raw_section` (binutils `objdump -h`/`objcopy -O binary`
   semantics: a separate equivalence run), `relocdiff`/`sectiongap` type-name fallbacks (`R_PPC_%d` vs `type-%d`).

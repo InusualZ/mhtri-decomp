@@ -346,8 +346,8 @@ The CLI names, subcommands and flags the profiles/skills/docs use stay (section 
 | `units/sharedfiles.py` | ABSORB into `lib.text` + `lib.project.splits` | - | - |
 | `unitutil.py` | ABSORB into `lib.repo` + `lib.units` + `lib.report` | - | kept as a shim re-exporting the old names while `mt.py` and 40 importers migrate |
 | `selftest.py` | KEEP (rewritten discovery) | proc, repo, testing | discovers `tools/tests/**`, keeps `--changed`, `--json`, `--list`, the park list |
-| `mwlink_debugger.py` | SPLIT into `tools/mwlink/` | binary, proc, project | a package: `pe.py`, `catalogue.py`, `anchors.py`, `trace.py`, `link.py`, `cli.py`; `mwlink_debugger.py` stays as a shim |
-| `mwcc-debugger/*` | KEEP | proc, binary | `versions.py` is already the data/mechanism split; `make_port.py` stays for provenance |
+| `mwlink_debugger.py` | SPLIT into `tools/mwlink/` | binary (elf, pe), proc, project, units | a package: `catalogue.py`, `mapfile.py`, `anchors.py`, `trace.py`, `link.py`, `align.py`, `records.py`, `cli.py`; `mwlink_debugger.py` stays as a shim |
+| `mwcc-debugger/*` | KEEP | proc, binary (pe) | `versions.py` is already the data/mechanism split; `make_port.py` stays for provenance (and regenerates the port byte for byte - a test) |
 | `rso/*` | KEEP (dormant) | binary, project | spec marks it dormant |
 | `project.py` and the template scripts | UNTOUCHED | - | dtk-template; only the `objalign`/`objextab` chain is ours |
 | `units/promote.py`, `units/promote_batch.py`, `splits/gen_trk_vectors.py`, `flags/infer-run.md`, `units/relocaudit-findings.md`, `units/relocaudit.py`, `units/checklf.py` | RETIRE | - | `retired.md` |
@@ -394,10 +394,15 @@ plan sections - all through the lib), `render.py` (the six parts), `proposal.py`
 stamps, prune, promoted litter), `cli.py`. `dossier` stops importing `brief` (the cycle) by rendering through `render.py`'s
 public function.
 
-**`mwlink_debugger.py` (3 743) -> `tools/mwlink/`**: `pe.py` (the PE reader shared with `mwcc-debugger/versions.Pe` - one copy),
-`catalogue.py` (RT_STRING messages, phases), `anchors.py` (derive/prove), `trace.py` (`MwObject`, `build_trace`, `render_trace`),
-`link.py` (rsp derivation, `run_link`, `report_link_failure`), `align.py`, `records.py`, `cli.py`; ELF reading via `lib.binary.elf`;
-the 336-line selftest becomes fixture tests.
+**`mwlink_debugger.py` (3 743) -> `tools/mwlink/`**: the PE reader shared with `mwcc-debugger` is `lib.binary.pe`, not a
+module of the package (WP5: `versions.py` importing `tools/mwlink/pe.py` would be a new tool->tool edge, and the
+`mwcc-debugger` spec already named `binary (pe)`); `catalogue.py` (RT_STRING messages, phases), `mapfile.py` (the map
+parser, `verify`, the order check - shared by `trace` and `verify`, so not inside either), `anchors.py` (derive/prove,
+the phase table), `trace.py` (`MwObject`, `build_trace`, `render_trace`), `link.py` (rsp derivation, `run_link`,
+`report_link_failure`), `align.py`, `records.py`, `cli.py`; ELF reading via `lib.binary.elf`; the 336-line selftest
+becomes fixture tests in `tools/tests/mwlink/` plus the real-linker checks in `tools/tests/smoke/test_mwlink_live.py`.
+An import inside one tool package is not a tool->tool edge (`test_layering.package_of`), and a package module's header
+names the package's spec (`test_headers`).
 
 Also split: **`splits/splitcheck.py` (3 578)** -> `lib.ppc.scan_refs` + `lib.refs` (its `Ctx`), `tools/splits/invariants/*.py`
 (order, coverage, text-cut, extab, ctors, pool, data-order, vtable, jumptable, bss, local-static - each a `Row` producer), the
@@ -464,7 +469,7 @@ shim because `mt.py` (the skill) and 40 files import it.
 | a lib behaviour differs from one of its N sources | each absorption lists its sources' selftests and keeps them green on the lib before the source is deleted (extract-and-delegate: the old function becomes `return lib.x(...)` first) |
 | Windows: paths, `cp1252`, junctions, `WinError 5` | `lib.proc`/`lib.text`/`lanes.teardown` carry those rules once with fixture tests on Windows; the suite runs on this host |
 | a shim is forgotten and a doc breaks | the compatibility list is a test (`tests/smoke/test_cli_compat.py` runs every documented invocation with `--help` or `--dry-run`) |
-| import cycles reappear | `tests/lib/test_layering.py` fails on `lib -> tools` or `tool -> tool` imports outside the allowed list |
+| import cycles reappear | `tests/lib/test_layering.py` fails on `lib -> tools` or `tool -> tool` imports outside the allowed list (imports inside one tool package - a `tools/<pkg>/` with `__init__.py`, such as `tools/mwlink/` - are that tool's own structure, not edges) |
 | performance regressions (the gate budget is ~30 s for selftests) | the runner prints per-test durations; a package's acceptance records the suite time before/after |
 | the splits-program tools are needed again | retired code stays in git history; `retired.md` names the commit and the replacement |
 | rollback | each work package is one landed batch with its own commit; reverting it restores the shims because the old entry points are only deleted in WP6 |

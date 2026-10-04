@@ -15,12 +15,15 @@ MAX_LINES = 3
 SPEC_RE = re.compile(r"Spec:\s*(docs/tools/spec/[\w.-]+\.md)")
 
 
-def expected_spec(rel: str) -> str:
+def expected_spec(rel: str, packages: frozenset = frozenset()) -> str:
     """`docs/tools/spec/<stem>.md`; `lib-<stem>.md` for a lib module, `lib-<package>.md` for a module of a lib
-    package (`tools/lib/binary/elf.py` -> `lib-binary.md`: one spec per package, design.md section 3)."""
+    package (`tools/lib/binary/elf.py` -> `lib-binary.md`: one spec per package, design.md section 3), and
+    `<package>.md` for a module of a tool package in `packages` (`tools/mwlink/trace.py` -> `mwlink.md`)."""
     parts = rel.split("/")
     if rel.startswith("tools/lib/") and len(parts) > 3:
         return "docs/tools/spec/lib-%s.md" % parts[2]
+    if rel.rsplit("/", 1)[0] in packages:
+        return "docs/tools/spec/%s.md" % parts[-2]
     stem = parts[-1][:-3]
     return "docs/tools/spec/%s%s.md" % ("lib-" if rel.startswith("tools/lib/") else "", stem)
 
@@ -32,7 +35,8 @@ def in_scope(rel: str) -> bool:
                 or rel.startswith("tools/selftest_site/"))
 
 
-def header_problems(rel: str, text: str, spec_exists=lambda path: True) -> list[str]:
+def header_problems(rel: str, text: str, spec_exists=lambda path: True,
+                    packages: frozenset = frozenset()) -> list[str]:
     """Why `rel`'s module docstring does not follow the template (empty when it does)."""
     try:
         doc = ast.get_docstring(ast.parse(text), clean=False)
@@ -45,7 +49,7 @@ def header_problems(rel: str, text: str, spec_exists=lambda path: True) -> list[
     if len(lines) > MAX_LINES:
         out.append("module docstring is %d lines (at most %d)" % (len(lines), MAX_LINES))
     m = SPEC_RE.search(doc)
-    want = expected_spec(rel)
+    want = expected_spec(rel, packages)
     if not m:
         out.append("no `Spec: %s`" % want)
     elif m.group(1) != want:
@@ -78,6 +82,12 @@ def test_rule_on_fixtures(c):
             header_problems("tools/units/flipcheck.py", good, spec_exists=lambda p: False),
             ["docs/tools/spec/flipcheck.md does not exist"])
     c.check("no docstring is refused", header_problems("tools/units/x.py", "import os\n"), ["no module docstring"])
+    pkg = '"""H. Spec: docs/tools/spec/mwlink.md. CLI: none."""\n'
+    c.check("a module of a tool package names the package's spec",
+            header_problems("tools/mwlink/trace.py", pkg, packages=frozenset({"tools/mwlink"})), [])
+    c.check("... and its own stem when the directory is not a package",
+            header_problems("tools/mwlink/trace.py", pkg),
+            ["names docs/tools/spec/mwlink.md, expected docs/tools/spec/trace.md"])
     c.check("tests, selftests, package markers are out of scope",
             [in_scope(p) for p in ("tools/tests/lib/test_x.py", "tools/units/x_selftest.py", "tools/lib/__init__.py",
                                    "tools/units/x.py")], [False, False, False, True])
@@ -85,9 +95,12 @@ def test_rule_on_fixtures(c):
 
 def test_live_tree_advisory(c):
     root = testing.live_root()
+    files = tool_files(root)
+    packages = frozenset(f.rsplit("/", 1)[0] for f in files if f.endswith("/__init__.py")
+                         and not f.startswith(("tools/lib/", "tools/tests/")) and f != "tools/__init__.py")
     rows = [(rel, header_problems(rel, (root / rel).read_text(encoding="utf-8", errors="replace"),
-                                  lambda p: (root / p).is_file()))
-            for rel in tool_files(root) if in_scope(rel)]
+                                  lambda p: (root / p).is_file(), packages))
+            for rel in files if in_scope(rel)]
     bad = [(rel, p) for rel, p in rows if p]
     print("advisory: %d of %d tool modules follow the header template (refusing from WP6)"
           % (len(rows) - len(bad), len(rows)))

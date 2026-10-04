@@ -1,4 +1,4 @@
-"""Fixture builders: ElfBuilder (an ELF32 big-endian relocatable object) and DolBuilder (a DOL image).
+"""Fixture builders: ElfBuilder (an ELF32 big-endian relocatable object), PeBuilder (a PE32 host tool), DolBuilder.
 Spec: docs/tools/spec/lib-binary.md. CLI: none (library)."""
 from __future__ import annotations
 
@@ -180,6 +180,157 @@ class ElfBuilder:
         for i, ((_n, typ, flags, _d, size, link, info, align, entsize, addr), off) in enumerate(zip(blocks, offsets)):
             struct.pack_into(">IIIIIIIIII", out, shoff + (i + 1) * 40, name_offs[i], typ, flags, addr, off, size,
                              link, info, align, entsize)
+        return bytes(out)
+
+    def write(self, path: str | os.PathLike) -> str:
+        with open(path, "wb") as handle:
+            handle.write(self.build())
+        return os.fspath(path)
+
+
+@dataclass
+class PeBuilder:
+    """Build a PE32 image shaped like the Metrowerks host tools for a fixture (nothing in it runs).
+
+    `section(name, data, vsize, va)` adds a section at `va` (default: the next free 0x1000 page, call order);
+    `rva(name, offset)` is where an offset of it lands. `imports({dll: [names]})` adds `.idata`,
+    `strings({block_id: [text, ...]})` an `.rsrc` with RT_STRING blocks, `codeview([(section, offset, name)])` a
+    debug directory with an `NB11` blob; those generated sections follow the caller's.
+    """
+    image_base: int = 0x400000
+    machine: int = 0x014C
+    entry: int = 0
+    _sections: list[tuple[str, bytes, int, int]] = field(default_factory=list)
+    _imports: dict[str, list[str]] = field(default_factory=dict)
+    _strings: dict[int, list[str]] = field(default_factory=dict)
+    _codeview: list[tuple[str, int, str]] = field(default_factory=list)
+
+    @staticmethod
+    def _page(n: int) -> int:
+        return (n + 0xFFF) // 0x1000 * 0x1000
+
+    def _next_va(self) -> int:
+        end = 0x1000
+        for _name, data, vsize, va in self._sections:
+            end = max(end, self._page(va + max(vsize, len(data), 1)))
+        return end
+
+    def section(self, name: str, data: bytes = b"", vsize: int | None = None, va: int | None = None) -> "PeBuilder":
+        self._sections.append((name, bytes(data), len(data) if vsize is None else vsize,
+                               self._next_va() if va is None else va))
+        return self
+
+    def imports(self, table: dict[str, list[str]]) -> "PeBuilder":
+        self._imports = {dll: list(names) for dll, names in table.items()}
+        return self
+
+    def strings(self, blocks: dict[int, list[str]]) -> "PeBuilder":
+        self._strings = {bid: list(texts) for bid, texts in blocks.items()}
+        return self
+
+    def codeview(self, symbols: list[tuple[str, int, str]]) -> "PeBuilder":
+        self._codeview = list(symbols)
+        return self
+
+    def rva(self, name: str, offset: int = 0) -> int:
+        """The RVA of `offset` inside the caller's section `name`."""
+        for sec, _data, _vsize, va in self._sections:
+            if sec == name:
+                return va + offset
+        raise KeyError(name)
+
+    def _idata(self, va: int) -> bytes:
+        """Descriptors, then per DLL its thunk array (used as both lookup and address table), names, hint/names."""
+        dlls = list(self._imports.items())
+        blob = bytearray(20 * (len(dlls) + 1))
+        for i, (dll, names) in enumerate(dlls):
+            thunks_at = len(blob)
+            blob += bytes(4 * (len(names) + 1))
+            dll_at = len(blob)
+            blob += dll.encode("latin-1") + b"\0"
+            for j, name in enumerate(names):
+                if len(blob) % 2:
+                    blob += b"\0"
+                struct.pack_into("<I", blob, thunks_at + 4 * j, va + len(blob))
+                blob += struct.pack("<H", 0) + name.encode("latin-1") + b"\0"
+            struct.pack_into("<IIIII", blob, 20 * i, 0, 0, 0, va + dll_at, va + thunks_at)
+        return bytes(blob)
+
+    def _rsrc(self, va: int) -> bytes:
+        """type RT_STRING -> one name entry per block -> one language entry -> the data entry and the block."""
+        blocks = sorted(self._strings.items())
+        n = len(blocks)
+        type_dir = 16 + 8
+        name_dirs = type_dir + 16 + 8 * n
+        data_entries = name_dirs + n * (16 + 8)
+        blob = bytearray(data_entries + 16 * n)
+        struct.pack_into("<IIHHHH", blob, 0, 0, 0, 0, 0, 0, 1)
+        struct.pack_into("<II", blob, 16, 6, 0x80000000 | type_dir)
+        struct.pack_into("<IIHHHH", blob, type_dir, 0, 0, 0, 0, 0, n)
+        for k, (bid, texts) in enumerate(blocks):
+            lang_dir = name_dirs + k * 24
+            struct.pack_into("<II", blob, type_dir + 16 + 8 * k, bid, 0x80000000 | lang_dir)
+            struct.pack_into("<IIHHHH", blob, lang_dir, 0, 0, 0, 0, 0, 1)
+            struct.pack_into("<II", blob, lang_dir + 16, 0x409, data_entries + 16 * k)
+            body = b"".join(struct.pack("<H", len(t)) + t.encode("utf-16le") for t in (texts + [""] * 16)[:16])
+            struct.pack_into("<IIII", blob, data_entries + 16 * k, va + len(blob), len(body), 0, 0)
+            blob += body
+        return bytes(blob)
+
+    def _nb11(self, laid: list[list]) -> bytes:
+        blob = bytearray(b"NB11")
+        for sec, off, sym in self._codeview:
+            sec_index = next(j for j, s in enumerate(laid) if s[0] == sec) + 1
+            raw = sym.encode("latin-1")
+            rec = struct.pack("<HIIH", 0x1009, 0, off, sec_index) + bytes([len(raw)]) + raw
+            blob += struct.pack("<H", len(rec)) + rec
+        return bytes(blob)
+
+    def build(self) -> bytes:
+        laid = [[name, data, vsize, va] for name, data, vsize, va in self._sections]
+        va = self._next_va()
+        dirs: dict[int, tuple[int, int]] = {}
+        for name, index, make in ((".idata", 1, self._idata if self._imports else None),
+                                  (".rsrc", 2, self._rsrc if self._strings else None),
+                                  (".debug", 6, (lambda _va: b"") if self._codeview else None)):
+            if make is None:
+                continue
+            data = make(va)
+            laid.append([name, data, len(data), va])
+            dirs[index] = (va, len(data))
+            va += 0x1000
+        nsec = len(laid)
+        raw_cursor = (0x40 + 4 + 20 + 0xE0 + 40 * nsec + 0x1FF) // 0x200 * 0x200
+        raws = []
+        for entry in laid:
+            if entry[0] == ".debug" and self._codeview:
+                # the directory entry, then the NB11 blob it points at (by file offset, as the linker writes it)
+                blob = self._nb11(laid)
+                entry[1] = struct.pack("<IIHHIIII", 0, 0, 0, 0, 2, len(blob), 0, raw_cursor + 28) + blob
+                entry[2] = len(entry[1])
+                dirs[6] = (entry[3], 28)
+            raws.append((raw_cursor, len(entry[1])))
+            raw_cursor += (len(entry[1]) + 0x1FF) // 0x200 * 0x200
+        out = bytearray(raw_cursor)
+        out[0:2] = b"MZ"
+        struct.pack_into("<I", out, 0x3C, 0x40)
+        out[0x40:0x44] = b"PE\0\0"
+        struct.pack_into("<HHIIIHH", out, 0x44, self.machine, nsec, 0, 0, 0, 0xE0, 0x0102)
+        opt = 0x58
+        struct.pack_into("<H", out, opt, 0x10B)
+        struct.pack_into("<I", out, opt + 16, self.entry)
+        struct.pack_into("<I", out, opt + 28, self.image_base)
+        struct.pack_into("<II", out, opt + 32, 0x1000, 0x200)
+        struct.pack_into("<I", out, opt + 56, va)
+        struct.pack_into("<I", out, opt + 92, 16)
+        for index, (dva, size) in dirs.items():
+            struct.pack_into("<II", out, opt + 96 + 8 * index, dva, size)
+        so = opt + 0xE0
+        for i, ((name, data, vsize, sva), (raw_off, raw_size)) in enumerate(zip(laid, raws)):
+            hdr = name.encode("latin-1")[:8].ljust(8, b"\0")
+            struct.pack_into("<8sIIIIIIHHI", out, so + 40 * i, hdr, vsize, sva, raw_size, raw_off, 0, 0, 0, 0,
+                             0x40000040)
+            out[raw_off:raw_off + len(data)] = data
         return bytes(out)
 
     def write(self, path: str | os.PathLike) -> str:

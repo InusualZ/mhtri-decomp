@@ -31,14 +31,23 @@ Inputs -> outputs: source + flags -> build/mwcc-debug dumps.
 
 ## Lib dependencies
 
-proc, binary (pe).
+proc (the gdb session, `lib_proc.run`), binary (`pe`: `versions.detect`/`build`/`_verify_symbols`, `locate/dissect.py`,
+`locate/pass_points.py`, `locate/extract_upstream_tables.py`). The launcher carries the repository prologue (emitted by
+`make_port.py`), so `versions.py` imports `tools.lib` in the launcher and inside gdb's embedded Python.
 
 ## Test contract
 
-Tier: fixture: `verify_pcode` dumps + an assembled object.
-No selftest today.
-Target: `tools/tests/mwcc-debugger/test_mwcc-debugger.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
+Tier: fixture - `tools/tests/mwcc-debugger/test_mwcc_debugger.py`: `make_port.py upstream/mwcc_debugger.py` regenerates
+the committed port byte for byte (so a hand edit of `mwcc_debugger.py` fails; edit `make_port.py`), and
+`versions.detect` identifies a `PeBuilder` image carrying the Wii/1.3 probe, takes the row without a CodeView blob,
+refuses (SystemExit, naming the symbol) a blob that puts a row symbol elsewhere, and answers None for an unknown build,
+a non-i386 image and a missing file. `locate/verify_pcode_selftest.py` stays as it is. Measured in WP5 on the live
+tree: `versions.detect` over the 30 `build/compilers/*/*/mwcceppc.exe`, `dissect.py syms|dis`, `pass_points.py` and
+`extract_upstream_tables.py` print the same as before, and a real gdb session (Wii/1.3, `-O4,p`) writes 41 dump files
+identical to the old port's.
 
 ## Known gaps
 
-needs a native gdb (`fetch_gdb.py`)
+needs a native gdb (`fetch_gdb.py`); `mwcc_debugger.py` and `verify_pcode*.py` still carry their own `sys.path`
+insert beside the prologue (the hyphenated directory is not importable as a package), so they stay on the prologue
+pending list.

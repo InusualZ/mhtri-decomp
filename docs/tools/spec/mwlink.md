@@ -34,18 +34,50 @@ Inputs -> outputs: main.elf, link rsp, mwld PE -> report.
 * **The internal records.** ``records`` documents the linker's own input-file record (stride, array, and each field) derived from the ``.comment`` parser's instructions, and ``records --prove`` reads that array out of a running link and cross-checks every field against the object it names. ``align`` derives where the linker aligns a fragment's address and what it compares - the answer to the ``tools/elf/objalign.py`` question. Fields that could not be derived are rows that say so; nothing is invented.
 * **Health check.** ``verify`` clasps the link map against the ELF ``elf2dol`` will be run on: section addresses and sizes in ``main.MAP`` must *be* the section headers of ``main.elf``. It classifies first and stays loud: a ``FAIL`` names the first section that disagrees, and it is never a formality.
 * **Ground truth check for a run**: ``anchors --prove`` and ``phases --prove`` stop the linker at the derived anchors and report what it was doing there; ``trace --link`` reports whether the artifact it traced is byte-identical to the one ``ninja`` built.
-* Provenance: no code is copied from ``tools/mwcc-debugger/``. The PE header / section / data-directory / resource parsing here is our own, stdlib-only (that tree's ``locate/dissect.py`` is a different, symbol-blob-shaped helper). The *method* - dump the tool's own state, then prove the dump describes the artifact before believing it - is borrowed from ``locate/verify_pcode.py``; the anchor derivation borrows its shape from ``locate/pass_points.py``. The cc0 / fork provenance of ``tools/mwcc-debugger/`` does not reach this file: this is original work in this repository.
+* Provenance: no code is copied from ``tools/mwcc-debugger/``. The PE parsing is ``tools/lib/binary/pe.py`` since WP5 - this tool's own reader, with the CodeView walk ``versions.py``/``locate/dissect.py`` each carried, all our own work in this repository - and ``mwcc-debugger`` now reads PEs through it too. The *method* - dump the tool's own state, then prove the dump describes the artifact before believing it - is borrowed from ``locate/verify_pcode.py``; the anchor derivation borrows its shape from ``locate/pass_points.py``. The cc0 / fork provenance of ``tools/mwcc-debugger/`` does not reach this package: this is original work in this repository.
+
+## Layout (WP5)
+
+`tools/mwlink_debugger.py` is the shim (the prologue and `cli.main`); the package is `tools/mwlink/`:
+
+* `catalogue.py` - RT_STRING decoding, the message ids, the phase timeline, the diagnostic classifier.
+* `mapfile.py` - the map parser, the generated-symbol listing, the row classifier, `verify_map`, the ctor/dtor order
+  check, and `OutputElf` (the linked ELF as section dicts and `{name: [value]}`, read through `lib.binary.elf`).
+* `link.py` - `ROOT`, the build's linker, the link line and response file from `build.ninja`, unit-name resolution,
+  scratch links (`lib.proc`), the failure report.
+* `anchors.py` - the ctor/dtor order table, string anchors, the message loader and phase table, the gdb proofs; the
+  linker's `.text` is disassembled once per `Pe` (`_text_insns`, cached) and every derivation walks that list.
+* `trace.py` - `MwObject` (an input object as dicts, read through `lib.binary.elf`), `reloc_field`, `build_trace`,
+  `render_trace`.
+* `align.py`, `records.py` - the alignment and input-file-record derivations (`records` reads an object's header
+  through `lib.binary.elf`).
+* `cli.py` - one `cmd_*` per subcommand, the parser, `main`, and `--selftest` (forwards to the test modules).
 
 ## Lib dependencies
 
-binary, proc, project.
+binary (`elf`, `pe`), proc, project (`Splits`), units (`stem`).
 
 ## Test contract
 
-Tier: fixture (ELF/object fixtures); smoke: a real link.
-Today's selftest: in-file `selftest()` (`--selftest`).
-Target: `tools/tests/top/test_mwlink.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
+Tier: fixture - `tools/tests/mwlink/test_{catalogue,mapfile,trace,link,cli}.py` on `ElfBuilder` objects and in-memory
+maps (the 76 checks of the old in-file selftest, plus the symbol-inside-fragment extent, REL24's field mask, the
+`(entry of ...)` row, the response-file "not an input" case and the CLI parser); smoke -
+`tools/tests/smoke/test_mwlink_live.py` reads the build's real linker (the record and alignment derivations), skipped
+when capstone or the linker is absent. `--selftest` runs both.
+
+## Behaviour changes (WP5)
+
+* Relocation names come from `lib.binary.elf.RELOC_NAMES` (prefix `R_PPC_` dropped): `type 109` now prints
+  `EMB_SDA21` (every SDA-relative relocation in a trace: 24 rows of `trace DWCi/dwc_error`), and types 18-22, which the
+  old private table mislabelled `SECTOFF*`/`ADDR30` (those are 33-37), now carry their standard names. Every other
+  line of `trace`, `verify`, `info`, `messages`, `order`, `anchors`, `phases`, `records`, `align` and `--help` is
+  byte-identical on the live tree (49 of 51 captured outputs; the two that differ are those reloc names).
 
 ## Known gaps
 
-becomes the package `tools/mwlink/` (design 5)
+* The shim's header names `mwlink.md` while the header lint expects `mwlink_debugger.md` (advisory until WP6, when the
+  shim question is settled).
+* `find_gdb` here and `mwcc_debugger.find_gdb` search different places; the compiler port's is generated by
+  `make_port.py` from upstream, so folding the two is a change to the port, not done in WP5.
+* `trace` on the live tree is ~0.15 s slower (1.12 s vs 0.95 s median of 5): `lib.binary.elf` builds every symbol of
+  `main.elf` as a value object where the old reader filled a dict.
