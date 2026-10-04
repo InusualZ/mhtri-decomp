@@ -32,7 +32,7 @@ Inputs -> outputs: hook JSON -> slot path.
 
 ## Lib dependencies
 
-lanes.
+lanes (`pool` - imported under the name `slots`, which the selftest swaps for a fake pool; `registry.main_of`).
 
 ## Test contract
 

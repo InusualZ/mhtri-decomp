@@ -969,11 +969,10 @@ audited on the spot: `redundant` is pruned, drift is reported, `unlanded`/`unkno
 * **A lane that needs a ruling ends its turn with the request** and is resumed by `claude --resume <session-id>
   -p "<ruling>"`.
 * **A slot goes to a problem before a new unit; a refused slot is refilled with a `fixer`, not a claim** (the
-  queue refuses while a branch holds unlanded work). `queue.py next --count N` strides the address order, so no
-  two wave lanes hold adjacent proposals (adjacency is the vector for shared-TU and rule-2 boundary clashes).
-* **`attribute.py` and the proposal queue are retired** (`docs/tools/retired.md`); the pool is the registered
-  body-less units. Claimed proposals were once re-offered by `queue.py next`: check `claims.py list` first if it
-  refuses at random.
+  queue refuses while a branch holds unlanded work). `queue.py next --count N` claims lanes that share no owner
+  header or module, and `queue.py next --cluster <module|header>` gives header-sharing units one lane (WP3e).
+* **`attribute.py` and the proposal queue are retired** (`docs/tools/retired.md`); the queue is the registered
+  units that are not `Matching` (2026-10-04; it was the body-less units only).
 * **`tools/splits/tudiscover.py` needs the asm dump** (`python tools/splits/dump_asm.py`; `write_asm: false` by
   default; `dol split` is then 200-400 s instead of ~18 s).
 * **A `Matching` flip is one unit per commit, byte-identical, with a green `ok`** (§8); a lane on an exhausted
@@ -1131,8 +1130,9 @@ Grouped by cause; each cost a lane ~30 min the first time.
   delta is stale `git worktree remove <wt> && git branch -D <branch>`; `--allow-unlanded <branch>` parks one on purpose.
 * **A slot goes to a problem before a new unit** (gate refusal, blocked lane, tool that cannot express the work, MAIN's HEAD on
   the wrong branch, a hole in the queue).
-* **Waves are claimed with `queue.py next --count N`** (stride `i, i+N, ...` over the address order), never N adjacent
-  proposals: adjacency put two workers on one TU (`g3d_calcvtx.cpp`) and produced rule-2 boundary artefacts.
+* **Waves are claimed with `queue.py next --count N`** (no two lanes share an owner header or a module) or one lane per
+  header/module with `--cluster`: header-sharing neighbours in concurrent lanes put two workers on one TU
+  (`g3d_calcvtx.cpp`) and produced rule-2 boundary artefacts (the old address stride did not prevent it).
 * **Land one unit per commit, one at a time, from `main`** (`land.py` refuses off `main`: a batch landed elsewhere slides the
   merge-base the gate resolves against).
 * **Land the orchestrator-side tools/docs batch first** with `land.py land --already-applied`: an uncommitted `CLAUDE.md` +

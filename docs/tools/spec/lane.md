@@ -43,8 +43,7 @@ lanes.rescue, lanes.teardown, git.
 ## Test contract
 
 Tier: fixture (GitFixture).
-Today's selftest: in-file `selftest()` (`--selftest`).
-Target: `tools/tests/units/test_lane.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
+`tools/tests/units/test_lane.py` (GitFixture; `--selftest` forwards to it). Every function takes `repo=`, so the test passes its fixture instead of patching `unitutil.repo_root`, and `teardown(remove=...)` is the seam for the damaged-`orig/` case.
 
 ## Known gaps
 

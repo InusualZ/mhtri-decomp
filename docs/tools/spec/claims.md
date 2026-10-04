@@ -1,56 +1,72 @@
-# `claims` - Claim a unit for a worker (branch = lock, worktree, registry), ack/status/timeout, the one-shot idempotent `release` teardown with rescue ref, `expire`; also the worktree build seeder
+# `claims` - Claim a unit for a worker (branch = lock, slot or worktree, registry), ack/status/timeout, the one-shot idempotent `release` teardown with rescue ref, `expire`
 
-<!-- generated from the module docstring of `tools/units/claims.py` at ec2609b46 by the tools-design lane; tightened by hand where marked -->
+<!-- rewritten by WP3e (2026-10-04): the lane model is lib.lanes; the herdr pane layer is deleted -->
 
 ## Purpose
 
-Claim a unit for a worker: one git worktree, one branch, and the branch *is* the lock.
+Claim a unit for a worker: one branch (the lock), one slot or worktree, one registry row.
 
 ## Users
 
-the landing gate (4); configure.py / the build (1); profiles (`.claude/agents`) (6); CLAUDE.md (3); docs (40); imported by `brief`, `flipcheck`, `handoff`, `land`, `queue`, `recompile`, `slots`, `vtslot`
+the landing gate (4); profiles (`.claude/agents`) (6); CLAUDE.md (3); docs (40); imported by `flipcheck`,
+`handoff`, `land`, `vtslot` (the names they import are re-exported from `lib.lanes`); `integrate` reads
+`claims.py list --json` (the live-claim query - its shape is kept).
 
 ## CLI
 
 ```
-python tools/units/claims.py claim <unit> [--worker NAME] [--dry-run] [--json]
+python tools/units/claims.py claim <unit> [--worker W] [--kind K] [--slot N] [--no-slots] [--dry-run] [--json]
 python tools/units/claims.py list [--json]
-python tools/units/claims.py release <unit> [--force] [--dry-run]
-python tools/units/claims.py release --all-merged [--dry-run]
+python tools/units/claims.py release <unit> | --branch B | --all-merged [--force] [--dry-run] [--json]
+python tools/units/claims.py ack <unit> [--agent A] [--progress P] [--json]
+python tools/units/claims.py status [--ack-seconds S] [--stall-minutes M] [--json]
+python tools/units/claims.py timeout [<unit>] [--apply]
 python tools/units/claims.py expire [--minutes N] [--apply]
 python tools/units/claims.py --selftest
 ```
-Subcommands: `claim`, `list`, `release`, `ack`, `status`, `timeout`, `expire`.
-Flags: `--ack-seconds`, `--agent`, `--all-merged`, `--apply`, `--branch`, `--dry-run`, `--force`, `--json`, `--kind`, `--minutes`, `--no-slots`, `--pane`, `--progress`, `--selftest`, `--slot`, `--stall-minutes`, `--worker`.
-Exit codes: The exit status says whether the teardown is complete.
-`--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
+`release`'s step list (`done`/`skip`/`would`/`FAILED` lines) and its final `complete` are parsed by lanes and the gate
+and stay as they were. `list --json` rows: `unit, branch, worktree, worker, claimed_at, base, merged, outbox, acked,
+exists` (unchanged).
 
 ## Inputs and outputs
 
-Inputs -> outputs: git, .pi/claims.json, slots -> worktree/branch.
+Inputs -> outputs: git (branches, worktrees), `.pi/claims.json`, `.pi/ack/`, `.pi/outbox/`, the slot pool, the
+session registry -> branch + slot/worktree + registry row; teardown steps.
 
 ## Invariants and rules
 
-* docs/plan.md 7.2. With up to twelve externally spawned worker agents, "who owns this unit" cannot live in anyone's memory, and a lock file has to be trusted. Git already has an atomic one: creating a branch either succeeds or fails, and two worktrees cannot share a branch name. So a claim is
-```
-git worktree add -b worker/<slug> <sibling>.ws-<slug> <main's HEAD>
-```
-* and the unit-to-worker mapping, the batch base sha and the timestamps live in `MAIN/.pi/claims.json` - a convenience registry on top of git, never the source of truth (git is: `list` reconstructs from it when the registry is missing).
-* `<unit>` is the path from the repository root (`Pl/pl_act`, `auto/80040598_fn_80040598`).
-* `release` is the **one-shot, idempotent** teardown (docs/plan.md, "Teardown is part of landing"): rescue ref -> pane close -> `git worktree remove --force` -> `branch -D` -> `prune` -> registry entry (+ the ack file). Every step reports what it did or why it was skipped, so releasing an already-released claim (or one whose worktree was already removed by hand) is a clean no-op instead of an abort. The one refusal that stays is a **live pane**, because Windows will not delete a directory a process is sitting in (5.1); it is named in the message. The exit status says whether the teardown is complete. `release --all-merged` sweeps every claim whose branch is already merged into main, releasing what it can and naming what it skipped.
-* The rescue ref is also **classified at the moment it is created** (`rescue_verdict`, reusing `rescue.py`'s audit - never a second implementation of "is this on main"): the verdict is reported in the teardown's own step list, a `redundant` ref (the unit is on `main` and every touched path matches) is pruned, `landed-with-drift` is reported and kept, and `unlanded`/`unknown` are surfaced loudly with the ref, its unit(s) and its date and kept. It is **never a gate**: a verdict cannot fail a teardown, and nothing is pruned without proof of containment.
-* A claim is only ever declared `stalled` from the ack *and* the worker's own pane: `herdr pane list` is matched to the claim by its worktree name, and `herdr pane read` is sampled twice - a pane whose content moves is a worker that is alive, whatever its ack file says. A live pane is therefore never reclaimed on a stale ack, and `timeout --apply` closes the pane *before* it touches the worktree, because the pane pins the worktree as its cwd on Windows (docs/plan.md 5.1).
+* A claim is `git worktree add -b worker/<slug> <sibling>.ws-<slug> <main's HEAD>` - or, with a slot pool,
+  `lib.lanes.pool.acquire` (a fresh branch in a reset, verified slot). Git is the source of truth: `list`
+  reconstructs from the worktrees when the registry is missing, and the registry is a convenience on top.
+* A claim may hold several units (`units` in its row: a `queue.py next --cluster` claim); every listed unit reads as
+  claimed, and its brief names the cluster's outbox (`lib.lanes.registry.record_holding`).
+* `release` is the **one-shot, idempotent** teardown: rescue ref (+ its verdict) -> slot return, or worktree remove
+  -> prune -> branch delete -> registry entry -> ack file. Every step reports what it did or why it was skipped
+  (`lib.lanes.teardown`), so releasing an already-released claim is a clean no-op. Refusals: an unmerged claim with
+  no outbox (unless `--force`, which costs the branch - its commits live on at the rescue ref, and the cost line names
+  the restore command), and a **live session** in a worktree claim's tree (a slot claim is refused by the slot
+  return's own blockers). The exit status says whether the teardown is complete.
+* The rescue ref is classified the moment it is created (`lib.lanes.rescue.verdict`): `redundant` is pruned and
+  said so, `landed-with-drift` reported and kept, `unlanded`/`unknown` surfaced loudly and kept. Never a gate.
+* `status`: `done` (outbox), `unacked` (no ack past `--ack-seconds`), `stalled` (no progress for `--stall-minutes`),
+  else `working`; a live session in the claim's tree (`lib.lanes.sessions`: a session record whose pid is alive and
+  whose cwd is inside the tree) keeps an unacked/stalled claim `working`. `timeout` reclaims the rest through
+  `release --force` (commits rescued first); a live session is never reclaimed, named or not.
+* `ack` proves the place (the claim's worktree, on its branch) before it writes the heartbeat.
 
 ## Lib dependencies
 
-lanes, git, repo, text.
+lanes (naming, registry, pool, seed, rescue, sessions, teardown, launch), git.
 
 ## Test contract
 
-Tier: fixture (GitFixture).
-Today's selftest: in-file `selftest()` (`--selftest`).
-Target: `tools/tests/units/test_claims.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
+Tier: fixture (temp repositories). Today's selftest: in-file `selftest()` (`--selftest`; 94 checks: the registry's
+spellings, ack and its place check, the session probe on a real registry (live pid, dead pid, another tree),
+status/timeout over a stale ack, claim with seeding and kinds and a cluster row, release (idempotent, gone worktree,
+leftover directory, live session, `--force` and its cost, the rescue verdicts), the merged sweep, the branch
+selector). Target: `tools/tests/units/test_claims.py`.
 
 ## Known gaps
 
-the herdr pane probing is a dead path (retired.md); `seed_worktree_build` duplicates `slots` seeding
+The seeder and the slot path are `lib.lanes.seed`/`pool` now; `claims.py claim`'s CLI still imports `queue` to render
+the brief and the spawn line (the `claims -> queue` edge).

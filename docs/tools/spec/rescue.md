@@ -8,7 +8,7 @@ Audit the `refs/rescue/*` safety net and prune only what is provably redundant.
 
 ## Users
 
-docs (7); imported by `claims`
+docs (7); the classifier is `lib.lanes.rescue` (`claims.release` reads a ref's verdict from the lib; this tool is the audit CLI)
 
 ## CLI
 
@@ -47,8 +47,7 @@ lanes.rescue, git, project.configure.
 ## Test contract
 
 Tier: fixture (GitFixture).
-Today's selftest: in-file `selftest()` (`--selftest`).
-Target: `tools/tests/units/test_rescue.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
+`tools/tests/units/test_rescue.py` (GitFixture; `--selftest` forwards to it): all four verdicts, both derivations, the read-only audit, `--prune` deleting only `redundant`, `--ref`, the CLI's `--json`. The registration readers are `lib.project.object_calls`/`Splits` and `lib.units.stem` (the `unionresolve`/`verifyunit` imports are gone).
 
 ## Known gaps
 

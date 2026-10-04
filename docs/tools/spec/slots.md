@@ -8,7 +8,7 @@ A fixed pool of reusable lane directories ("slots") - the branch is still the cl
 
 ## Users
 
-profiles (`.claude/agents`) (4); CLAUDE.md (4); docs (16); imported by `claims`, `worktreehook`
+profiles (`.claude/agents`) (4); CLAUDE.md (4); docs (16); imports `lib.lanes.pool` (acquire, release, reclaim, verify, the sentinel and slot state live there since WP3e; `claims` and `worktreehook` call the lib, not this tool)
 
 ## CLI
 
@@ -64,7 +64,7 @@ lanes, git, repo, text, proc.
 
 Tier: fixture (GitFixture).
 Today's selftest: in-file `selftest()` (`--selftest`).
-Target: `tools/tests/units/test_slots.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
+Target: `tools/tests/units/test_slots.py` on `lib.testing`; the pool's unit checks are in `tools/tests/lib/test_lanes.py`. The in-file selftest drives the lib through this module's re-exported names (357 checks; the ninja seam is `lib.lanes.pool.NINJA_RUNNER`).
 
 ## Known gaps
 

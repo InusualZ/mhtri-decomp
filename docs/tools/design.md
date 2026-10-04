@@ -312,6 +312,13 @@ becomes it (`duplication.md` has the line numbers).
 * `teardown.py`: **one** teardown sequence (rescue -> unlink reparse points -> worktree remove -> branch delete -> prune ->
   registry) with step reporting, used by `claims release`, `lane teardown`, `slots release/reclaim`.
 * `launch.py`: `lane_call`, `resume_call`, `profile_for_kind` (`lanecmd`, `slots.profile_for_kind`, `queue._profile_for_kind`).
+* As built (WP3e): the registry is three modules - `registry.py` (`.pi/claims.json`, acks, handoff paths, the git
+  lock, `main_of`), `sessions.py` (the live-run signal) and `pool.py` (the slot manifest, locks, sentinel, state, and
+  `acquire`/`release`/`reclaim`/`verify`, which `claims`, `slots` and `worktreehook` all need, so the pool's
+  operations live in the lib rather than in `slots.py`); `seed.py` holds the seeder (`claims._seed_*`/`_ninja_deps_*`)
+  and `build_is_current`; `launch.py` also holds the "your tree" block (`brief` and `slots spawn` render one copy);
+  `landlog.py` is the landing log (`.pi/land-log.jsonl`, CLI `tools/units/landlog.py`). `claims.timeout`/`expire`
+  are `release --force`, so the teardown is one sequence.
 
 ## 4. The thin tools (what each becomes)
 
@@ -343,7 +350,7 @@ The CLI names, subcommands and flags the profiles/skills/docs use stay (section 
 | `units/unwindcut.py`, `units/vtslot.py`, `units/linkorder.py`, `units/m2cinput.py` | KEEP (thin) | binary, project | - |
 | `units/typeregistry.py`, `units/declclash.py`, `units/recordmerge.py` | KEEP (thin) | cscan | - |
 | `units/claims.py`, `units/slots.py`, `units/lane.py`, `units/rescue.py`, `units/wtsafe.py`, `units/queue.py`, `units/lanecmd.py`, `units/worktreehook.py` | SPLIT into `lib/lanes` + thin CLIs | lanes, git, repo, text | `herdr` pane code deleted; one teardown; `worktreehook` stays a prototype (question 4) |
-| `units/brief.py` | SPLIT | project, report, outbox, units, lanes | `brief/render.py`, `brief/proposal.py`, `brief/pool.py` |
+| `units/brief.py` | SPLIT | project, report, outbox, units, lanes | As built (WP3e): `tools/units/briefing/` (`sources.py`, `render.py`, `pool.py`); `brief.py` stays the CLI and re-exports every name; the proposal brief is deleted with the proposals |
 | `units/backlog.py`, `units/tooling.py`, `units/playbook.py`, `units/handoff.py` | KEEP (thin) | outbox, findings, text | - |
 | `units/mergebranch.py`, `units/unionresolve.py`, `units/unionguard.py`, `units/unionprose.py` | MERGE into `tools/units/merge/` | git, text, project | one union rule, one check_union, three entry points. As built (WP3f): one module per tool spec (`merge/unionprose.py` the rule, the diff3 hunk reader and the superset `cover`; `merge/unionresolve.py`; `merge/unionguard.py`; `merge/mergebranch.py`), so each module's header names an existing spec; the four old files are entry-point shims forwarding every name; the package is imported as `import tools.units.merge.<m> as x` (no edge to `merge/__init__.py`) |
 | `git/commitlint.py`, `git/guard.py`, `git/prepcommit.py`, `git/hooks/pre-commit` | KEEP (thin) | git, text, report | - |
@@ -401,7 +408,9 @@ rule-13 include context), `diff.py` (`--diff REF`: added/removed identities, ren
 (the span/fold/strict verdicts), `snapshot_orphans`/`batch_orphans`/`touch_verdicts`/`fold_snapshot` (the gate's rows) become
 `dataclosure.py` with `Row` outputs; `poolseams.py` stays a sibling on the same census.
 
-**`units/brief.py` (2 479) -> `tools/units/brief/`**: `sources.py` (map rows, scores, header comment, flags, shared headers,
+**`units/brief.py` (2 479) -> `tools/units/briefing/`** (as built, WP3e: a package named `brief/` would shadow `brief.py`
+for every `from units import brief`, so the package is `briefing/`, `brief.py` the CLI over it, and the proposal
+brief went with the proposals - `sources`, `render`, `pool`; `sources` is the one module that imports other tools): `sources.py` (map rows, scores, header comment, flags, shared headers,
 plan sections - all through the lib), `render.py` (the six parts), `proposal.py` (the proposal brief), `pool.py` (`--pool`,
 stamps, prune, promoted litter), `cli.py`. `dossier` stops importing `brief` (the cycle) by rendering through `render.py`'s
 public function.
