@@ -41,8 +41,39 @@ typedef struct NetStatusRecord {
     /* +0x04 */ NetStatusPair pairs_0x04[4];
 } NetStatusRecord; /* size: 0x24 */
 
+/* The community layer's state block (`.bss` 0x806E18A0, 0x26C B): community command 17 delivers it whole.  This
+ * player's community profile sits at +0x28, a 0x44-byte block at +0x128 and four 0x40-byte member records at
+ * +0x16C.  The static initialiser builds it with the NetworkCommunityPat band's constructor (0x803F0730).
+ * size: 0x26C */
+typedef struct NetCommunityState {
+    /* +0x000 */ u8 pad_0x000[0x28];
+    /* +0x028 */ NetUserProfile profile_0x028;
+    /* +0x128 */ u8 block_0x128[0x44];
+    /* +0x16C */ u8 members_0x16C[4][0x40];
+} NetCommunityState; /* size: 0x26C */
+
 extern NetUserProfile net_user_profile;
 extern NetStatusRecord net_presence_record;
+extern NetCommunityState net_community_state;
+
+/* 0x80435F38 / 0x804360B0 / 0x804360C0 - the community state's profile, its +0x128 block and member record
+ * `index`. */
+NetUserProfile* getCommunityUserProfile(void);
+u8* getCommunityStateBlock(void);
+u8* getCommunityMemberRecord(u8 index);
+
+/* 0x804360DC / 0x8043614C / 0x804361B0 - community requests (news, block list, friend-roster sync): clear the
+ * command's result word, issue it and hand the caller's result byte to the community callback. */
+void requestCommunityNews(s8* result);
+void requestCommunityBlockList(s8* result);
+void requestFriendSync(s8* result);
+
+/* 0x804362E0..0x8043656C - the friend roster and the recent-player list: membership, append and remove. */
+s32 isRosterMember(const struct NetworkSmallObject* address);
+void appendRosterEntry(const struct NetRosterRec* src);
+void removeRosterEntry(const struct NetworkSmallObject* address);
+void appendRecentEntry(const struct NetworkSmallObject* address);
+void removeRecentEntry(const struct NetworkSmallObject* address);
 
 /* 0x80436658 - the community layer's reflect callback. */
 /* untyped: caller-owned payload - the community layer's reflect payload */
@@ -101,6 +132,11 @@ void requestReadyOnAlias(void);
 void requestReadyOnAlias2(void);
 void requestReadyOffAlias(void);
 
+/* 0x804344BC / 0x804346CC - the completions of pending action 1 (command 0x18) and of the leave (command 0x1E),
+ * which the session callback also runs for commands 25 and 31. */
+void onAction1Done(s32 status, s32* values);
+void onLeaveDone(s32 status, s32* values);
+
 /* 0x804346F8 / 0x804347CC - the leave request (command 0x1E) and the leave-or-abort choice. */
 s32 requestLeave(void);
 void requestLeaveOrAbort(void);
@@ -141,6 +177,28 @@ u32 isPhaseSlotDone(s32 slot);
 
 s8 lookupFriendSlot(const u8* id);
 
+/* 0x80434D34 / 0x80434E48 / 0x80434EA0 - whether an address object (or six raw id bytes) belongs to a session
+ * member, and the member's slot (-1 when none). */
+s32 isSessionMember(const struct NetworkSmallObject* address);
+s32 isSessionMemberId(const NetId* id);
+s8 findSessionMemberSlot(const struct NetworkSmallObject* address);
+
+/* 0x804338AC - hands the mediator a quest-board record (the quest board's only network call). */
+void postQuestBoardRecord(u8* record);
+
+/* The join parameters the quest board hands `requestSessionJoin`: the quest (published as name entry 1), the
+ * party size (name entry 0, and the join request's argument), the session name and the circle comment.
+ * size: 0x99 (approximate: the comment is the session manager's 0x91-byte field) */
+typedef struct NetJoinParams {
+    /* +0x00 */ u16 quest_0x00;
+    /* +0x02 */ s8 party_size_0x02;
+    /* +0x03 */ char session_name_0x03[0x5];
+    /* +0x08 */ char comment_0x08[0x91];
+} NetJoinParams; /* size: 0x99 (approximate) */
+
+/* 0x8043361C - requests the session join (command 4); 0 when there is no session manager or a request is busy. */
+s32 requestSessionJoin(const NetJoinParams* params);
+
 
 
 /* 0x80433870 - reads the link state; 1 = the network link is up. */
@@ -158,17 +216,23 @@ s32 net_session_abort_start(void);
 /* 0x804333B0 - resets the link state the reconnect path relies on. */
 void resetLinkState(void);
 
+/* 0x80432104 - stores `state` as member `member`'s link state in the kind-0 move work (GUESS name: the
+ * session callback writes 4 when a member drops). */
+void setMoveWorkMemberState(u8 member, u8 state);
+
 /* 0x80433254 / 0x80435570 - install the session manager's and the community layer's reflect callbacks
  * (`sessionReflectCallback` 0x80432154, `communityReflectCallback` 0x80436658) after clearing their result
  * words. */
 void installSessionCallback(void);
 /* 0x80432154 - the session manager's reflect callback: records command `command`'s result and runs its
- * completion. */
-void sessionReflectCallback(s32 command, s32 value, s32 result, s32 count, s32* data);
+ * completion (always 0). */
+/* untyped: caller-owned payload - each session command delivers its own record */
+s32 sessionReflectCallback(s32 command, s8 member, s32 result, s32 count, void* data);
 void installCommunityCallback(void);
 
-/* 0x804371A8 - sends the pat interface's check request carrying `code` (GUESS name: the callee is
- * `sendReqUnknownCheck`). */
+/* 0x8043713C / 0x804371A8 - send the pat interface's check request carrying `code`: for item-box page `page`
+ * (tag 1) and for the equipment set (tag 2) (GUESS names: the callee is `sendReqUnknownCheck`). */
+void sendBoxPageCheckRequest(u8 code, s32 page);
 void sendCheckRequest(u8 code);
 
 /* 0x804370CC - whether two network ids are equal (1). */
@@ -177,5 +241,9 @@ u32 isSameNetId(const NetId* left, const NetId* right);
 #ifdef __cplusplus
 }
 #endif
+
+/* 0x8043500C - the message id of the session layer's last error (C++ linkage in the map,
+ * `MH3GetSessionErrorCode__Fv`; the session twin of `getNetErrorMessageId`). */
+s32 MH3GetSessionErrorCode(void);
 
 #endif /* MHTRI_NETWORK_NET_SESSION_CLOSE_H */

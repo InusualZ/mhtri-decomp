@@ -387,7 +387,7 @@ extern "C" u32 item_page_item_price(MenuSlot* slot, u16 id)
     s32 worker = (s32)slot->worker;
     s32 base;
 
-    if (fn_800CF208() == 2) {
+    if (GameMode_ck() == 2) {
         return fn_8004B0A4(id, (void*)lobby_world_block);
     }
     base = Pl_item_timer_get(worker, id);

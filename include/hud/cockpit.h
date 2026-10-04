@@ -22,6 +22,9 @@ s8* str_tbl_33_get(u8 id);
 
 void draw_lsp_parts(void);                 /* 0x802DFEBC */
 
+/* 0x802DFB70 - shows the new-mail notice: the cockpit icon and sound 0x27 (GUESS name). */
+void cockpitShowNewMail(void);
+
 #ifdef __cplusplus
 }
 #endif

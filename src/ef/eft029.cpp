@@ -71,7 +71,7 @@
 
 extern "C" {
 void fn_800DD1F0(u32 id, nw4r::math::VEC3* pos);
-u32 fn_8021F238();
+u32 getItemListSelection();
 void fn_8011AD00(_EFT* self);
 void fn_8011A34C(_EFT* self);
 }
@@ -286,7 +286,7 @@ extern "C" void fn_80119DEC(_EFT* self)
         map_se_req(10, &self->pos_0x18);
         break;
     case 12:
-        if (fn_8021F238() == 0) {
+        if (getItemListSelection() == 0) {
             id = lbl_805A06F0[self->type_0x02];
             param = lbl_805A0710[self->type_0x02];
         } else {

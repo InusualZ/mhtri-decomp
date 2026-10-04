@@ -3592,7 +3592,7 @@ extern "C" void fn_80212584(void* self) {
 extern "C" void fn_802125C8(void) {
     if (game_ready_ck() == 0) {
         lobby_world_block[0x3E00] ^= 1;
-        if (fn_8021F238() == 1) {
+        if (getItemListSelection() == 1) {
             fn_801E9888();
         }
         fn_801E9C58();
@@ -3606,7 +3606,7 @@ extern "C" void fn_8021261C(void) {
     if (lobby_w.countdown_0x028 != 0) {
         lobby_w.countdown_0x028--;
     }
-    if (fn_8021F238() == 0) {
+    if (getItemListSelection() == 0) {
         if (lobby_w.slide_0x034 < 0) {
             lobby_w.slide_0x034 = 0;
         }

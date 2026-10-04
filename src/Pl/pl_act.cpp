@@ -563,7 +563,7 @@ u32 fn_8026BA04(_PLW* self);
 u32 fn_803BECC8(u8 value, u32 low, u32 high);
 void fn_8026AF08(_PLW* self, u32 value);
 void fn_800E09D0(void* dst, void* src);
-u8 fn_800CF208(void);
+u8 GameMode_ck(void);
 s8 my_player_no(void);
 u32 fn_80212060(void);
 u16 fn_802BE038(void);
@@ -2269,11 +2269,11 @@ extern "C" u32 fn_8026FD94(_PLW* self)
 /* 0x8026FDD4: master gate - true while the actor's Pl_master is the one in charge. */
 u32 Pl_master_ck(_PLW* self)
 {
-    using s_8026BA1C::fn_800CF208; using s_8026BA1C::my_player_no;
+    using s_8026BA1C::GameMode_ck; using s_8026BA1C::my_player_no;
     if (PlayMode_ck() == 2) {
         return 1;
     }
-    if (fn_800CF208() == 3) {
+    if (GameMode_ck() == 3) {
         return 1;
     }
     return my_player_no() == self->chunk_ofs;
@@ -2580,7 +2580,7 @@ void fn_8027885C(_PLW*, int, int);
 void fn_802789EC(_PLW*, int);
 extern u32 lbl_805C5FC8[];
 extern u32 lbl_805C5FE0[];
-u8 fn_800CF208(void);
+u8 GameMode_ck(void);
 u32 fn_80363A2C(void);
 int fn_80274AB8(int);
 u32 fn_8027E29C(u8);
@@ -3002,11 +3002,11 @@ extern "C" void fn_80270F50(_PLW* plw, _EQUIP* equip, u8* out) {
 
 /* Whether the player's active skill set contains `skill`. */
 u32 Pl_Skill_ck(_PLW* plw, u16 skill) {
-    using s_80270018::fn_800CF208; using s_80270018::fn_80363A2C; 
+    using s_80270018::GameMode_ck; using s_80270018::fn_80363A2C; 
     bool ok = false;
     int i;
 
-    if (fn_800CF208() == 2) {
+    if (GameMode_ck() == 2) {
         if (lobby_w.state_0x000 == 6) {
             ok = true;
         } else if (lobby_w.state_0x000 == 15 && fn_80363A2C() == 1) {
@@ -3047,7 +3047,7 @@ extern "C" u32 fn_802714F0(_PLW* plw, u16 skill) {
 extern "C" u32 Pl_Skill_slot_item_get(_PLW* plw, u32 slot) {
     int i;
 
-    if (fn_800CF208() == 2 && lobby_w.state_0x000 == 6) {
+    if (GameMode_ck() == 2 && lobby_w.state_0x000 == 6) {
         for (int i = 0; i < 8; i++) {
             if ((u8)slot == plw->unk62A[i]) {
                 return (u8)plw->unk61A[i];

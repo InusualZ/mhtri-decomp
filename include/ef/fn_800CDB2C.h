@@ -3,8 +3,8 @@
 
 #include "types.h"
 
-/* Declarations for the symbols `src/ef/fn_800CDB2C.cpp` owns (docs/plan.md 6.5 rule 2).  `fn_800CF208`
- * is the one the owner defines (`u8 fn_800CF208(void)`); the other two are called by
+/* Declarations for the symbols `src/ef/fn_800CDB2C.cpp` owns (docs/plan.md 6.5 rule 2).  `GameMode_ck`
+ * is the one the owner defines (`u8 GameMode_ck(void)`); the other two are called by
  * `sound/fn_800EF7D8.cpp` before the owner's body exists, so they carry that call site's view.  The
  * caller had declared all three itself, which only became a rule-2 violation when the owner registered
  * in the same landing wave.
@@ -26,9 +26,9 @@ u32 my_player_no(void);
  * the range owns the address).  The map's name carries no mangling, so the consumer-side declaration
  * is C linkage; the owner's own definition (`src/ef/fn_800CDB2C.cpp:247`) is still C++ linkage. */
 void my_player_no_set(s8 value);
-u8  fn_800CF208(void);
+u8  GameMode_ck(void);
 u32 move_work_state_ck(void);
-/* 0x800CF2C4 - the play-mode/move-state dispatcher: it reads `fn_800CF208()`, switches on
+/* 0x800CF2C4 - the play-mode/move-state dispatcher: it reads `GameMode_ck()`, switches on
  * `PlayMode_ck()` and hands the caller's mode byte on (`Pl/pl_act_step.cpp`'s act-175 arm is a
  * consumer, so the declaration belongs here - rule 2). */
 void ef_move_state_dispatch(u8 mode);

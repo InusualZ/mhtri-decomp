@@ -456,7 +456,7 @@ extern "C" void snd_bank_layout(u8 mode)
         rec++;
     }
     lbl_80794A2C->total_size = cur;
-    if (mode != 1 && (system_w[0x7D3] == 1 || fn_800CF208() == 3)) {
+    if (mode != 1 && (system_w[0x7D3] == 1 || GameMode_ck() == 3)) {
         rec = lbl_80598F68[5];
         while (rec->chunk != -1) {
             if (rec->chunk != 0) {
@@ -611,7 +611,7 @@ extern "C" void scene_se_bank_load(u8 a, u8 b)
 
     fn_800F051C(a, 0);
     fn_800F08E8(a);
-    if (fn_800CF208() != 3) {
+    if (GameMode_ck() != 3) {
         fn_800F2328(a, b);
     }
     lbl_80794A2C->stream_dma = 0x92D1E000;
@@ -656,7 +656,7 @@ extern "C" void fn_800EFAC0(u8 arg0)
             }
             p++;
         }
-        if (fn_800CF208() == 0 || fn_800CF208() == 3) {
+        if (GameMode_ck() == 0 || GameMode_ck() == 3) {
             p = work;
             for (i = 0; i < max; i++) {
                 fn_800EFDD8(p);

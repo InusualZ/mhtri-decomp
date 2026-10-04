@@ -311,7 +311,7 @@ void fn_8031A638(MenuSlot*);
 /* Callees other units own.  Most are declared in their owner's header and included above
  * (`fn_8027FF88`, `fn_8027F11C`, `fn_8027ECAC`, `fn_8027FFFC` in `Pl/fn_8027D684.h`; `Pl_Skill_slot_item_get`
  * and `pl_item_add` in `Pl/pl_skill.h`; `fn_8029FFFC` and `get_menu_lsp_tbl` in `menu/menu_item.h`;
- * `fn_800CF208` in `ef/fn_800CDB2C.h`; `put_lsp_anchor_offset` and `get_str_tbl` in `include/unsplit/menu.h`).
+ * `GameMode_ck` in `ef/fn_800CDB2C.h`; `put_lsp_anchor_offset` and `get_str_tbl` in `include/unsplit/menu.h`).
  * The two below cannot: `fn_8031AE38`/`fn_8031BFEC` are owned by `menu/fn_8031A6C0.cpp`, whose header
  * declares neither and `include/unsplit/menu.h` (their old home) may not.  Declared here as this unit's
  * view, the way `lobby/fn_801EC9F8.cpp` declares its own. */
@@ -1128,7 +1128,7 @@ void fn_8031A638(MenuSlot* self) {
     s8 st = self->field_0x014;
     if ((u32)(st - 1) <= 1) {
         if (self->field_0x001 == 3) {
-            if (fn_800CF208() != 2) {
+            if (GameMode_ck() != 2) {
                 if (self->field_0x1F0 != 0) {
                     pl_item_add(self->worker, self->field_0x1F0, 1);
                 }

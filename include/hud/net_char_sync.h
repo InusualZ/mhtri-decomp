@@ -470,7 +470,7 @@ void em_net_recv_bind(_ENEMY_WORK* work, NetEmBindMsg* msg);
 void em_net_send_release(_ENEMY_WORK* work, u8 from, s32 to, u8 kind, u8 param);
 void em_net_recv_release(_ENEMY_WORK* work, NetEmReleaseMsg* msg);
 void em_net_send(_ENEMY_WORK* work, u8 kind, u16 param);
-void em_net_recv(_ENEMY_WORK* unused_work, const NetEmStateMsg* msg);
+void em_net_recv(u8 slot, const NetEmStateMsg* msg);
 void emc_net_send_status(EmcWork* emc, u8 from, s32 to, u8 kind);
 void emc_net_recv_status(NetEmcStatusMsg* msg);
 void emc_net_send_marker(EmcWork* emc, u8 from, s32 to, u8 kind, u16 index);

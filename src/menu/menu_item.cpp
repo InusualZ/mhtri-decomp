@@ -327,7 +327,7 @@ extern "C" u32 fn_8029A140(_HIT_W* self)
  * values (3 byte-identical).  Two whole-project notes from the same comparison: the folded unit's
  * own `menu` lib flag `-opt nopeephole` reproduces every folded row with the `#pragma peephole off`
  * removed (measured: the probe re-adds it and the unit's 99 rows are bit-identical), and
- * `menu_item_frame_update` 98.50 is unchanged by the `fn_800CF208` declaration this fold aligned with its
+ * `menu_item_frame_update` 98.50 is unchanged by the `GameMode_ck` declaration this fold aligned with its
  * owner (`u8`, the owner's own spelling - the `u32` call-site view main carried is the
  * `(10505) illegal overloading` that `Pl/fn_80273B14.cpp` trips once it includes this header).
  *
@@ -379,8 +379,8 @@ extern "C" u32 fn_8029A140(_HIT_W* self)
  *   * `fn_8029FB00` 99.61 - the same r0-vs-argument-register shape on the trailing `fn_802A0040`
  *     call; passing the field through an `s8` local (which fixes nothing else here) is what closed
  *     the rest of that function.
- *   * `menu_item_frame_update` 98.50 - the `fn_800CF208` arm.  Its declaration in this unit's header is the
- *     owner's own `u8 fn_800CF208(void)` (the landed registration's `u32` call-site view is the
+ *   * `menu_item_frame_update` 98.50 - the `GameMode_ck` arm.  Its declaration in this unit's header is the
+ *     owner's own `u8 GameMode_ck(void)` (the landed registration's `u32` call-site view is the
  *     `(10505) illegal overloading` this fold's rule-2 move tripped in `Pl/fn_80273B14.cpp`, which
  *     now includes this header), and the residual rows are that widening, not an instruction count.
  *   * the folded half (its four own residuals, retained): `get_move_work_adrs`/`get_move_work_max`
@@ -1558,7 +1558,7 @@ extern "C" u32 menu_item_frame_update(MenuFrameWork* self)
     u32 idx = 0;
 
     if (self != 0) {
-        switch ((u8)fn_800CF208()) {
+        switch ((u8)GameMode_ck()) {
         default:
             return 0;
         case 1:

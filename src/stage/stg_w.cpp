@@ -807,8 +807,8 @@ extern "C" void fn_802B2E2C(void)
     fn_802AE250(&rec, &handle);
     fn_8007A1B8(&rec, 0, &rec.flags, &rec.b, 0, 0, &rec.a);
 
-    if (fn_800CF208() == 2) {
-        if (fn_8021F238() == 0) {
+    if (GameMode_ck() == 2) {
+        if (getItemListSelection() == 0) {
             fn_802B2F3C(&rec, &st->area[st->areano].colour_a);
         } else {
             fn_802B2F3C(&rec, &st->area[st->areano].colour_b);
@@ -1035,7 +1035,7 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
                 src++;
                 show_i++;
             }
-            if (fn_8021F238() == 0) {
+            if (getItemListSelection() == 0) {
                 local.show[show_i] = 1;
                 show_i++;
             }
@@ -1044,7 +1044,7 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
             local.show[show_i] = 0xFF;
         } else if (area == 1) {
             lists = &lbl_80792470;
-            if (fn_8021F238() == 1) {
+            if (getItemListSelection() == 1) {
                 flag = 1;
             }
         } else if (area == 2) {
@@ -1135,7 +1135,7 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
                 local.show[show_i] = 0x10;
                 show_i++;
             }
-            if (fn_8021F238() == 0) {
+            if (getItemListSelection() == 0) {
                 local.show[show_i] = 7;
                 show_i++;
             }
@@ -1153,7 +1153,7 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
             lists = &local;
             local.hide = hide_buf;
             local.show = show_buf;
-            if (fn_8021F238() == 1) {
+            if (getItemListSelection() == 1) {
                 const u8* src;
 
                 src = lbl_805CF6D4;
@@ -1204,7 +1204,7 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
             lists = &local;
             local.hide = hide_buf;
             local.show = show_buf;
-            if (fn_8021F238() == 1) {
+            if (getItemListSelection() == 1) {
                 const u8* src;
 
                 src = lbl_805CF6E8;
@@ -1255,7 +1255,7 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
             lists = &local;
             local.hide = hide_buf;
             local.show = show_buf;
-            if (fn_8021F238() == 1) {
+            if (getItemListSelection() == 1) {
                 const u8* src;
 
                 src = lbl_805CF6F4;
@@ -1316,7 +1316,7 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
             lists = &local;
             local.hide = hide_buf;
             local.show = show_buf;
-            if (fn_8021F238() == 1) {
+            if (getItemListSelection() == 1) {
                 const u8* src;
 
                 src = lbl_80792428;
@@ -1371,13 +1371,13 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
             break;
         case 5:
             lists = &lbl_80792440;
-            if (fn_8021F238() == 1) {
+            if (getItemListSelection() == 1) {
                 flag = 1;
             }
             break;
         case 6:
             lists = &lbl_80792450;
-            if (fn_8021F238() == 1) {
+            if (getItemListSelection() == 1) {
                 flag = 1;
             }
             break;
@@ -1385,7 +1385,7 @@ extern "C" void fn_802B3270(StageRuntime* st, MHchar* chr, u8 mode)
             lists = &local;
             local.hide = hide_buf;
             local.show = show_buf;
-            if (fn_8021F238() == 1) {
+            if (getItemListSelection() == 1) {
                 const u8* src;
 
                 src = lbl_805CF700;
@@ -1778,7 +1778,7 @@ extern "C" void fn_802B493C(StageRuntime* st)
     target = 0;
     switch (st->mapno) {
     case 21:
-        if (fn_8021F238() == 0) {
+        if (getItemListSelection() == 0) {
             switch (st->areano) {
             case 0:
                 list = lbl_80792498;
@@ -1887,7 +1887,7 @@ extern "C" void fn_802B4C5C(void)
     StageRuntime* st = (StageRuntime*)stage_w;
     u8 index;
 
-    if (fn_800CF208() == 1) {
+    if (GameMode_ck() == 1) {
         return;
     }
     index = 0;

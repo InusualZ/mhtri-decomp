@@ -244,7 +244,7 @@ void fn_800CEF60(void) {
 }
 
 /* 0x800CF208 - the current game mode. */
-u8 fn_800CF208(void) {
+u8 GameMode_ck(void) {
     return system_w.game_mode;
 }
 

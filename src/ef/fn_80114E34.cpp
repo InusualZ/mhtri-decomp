@@ -123,7 +123,7 @@ extern "C" u32 eft_res_spawn_gate_ck(_EFT* self, u32 mode);
 extern "C" u32 fn_800F9380(_PLW* plw);
 extern "C" void eft_res_models_spawn(void* self, void* list, u32 mode, s32 count, u32 arg);
 
-extern "C" u8 fn_800CF208(void);
+extern "C" u8 GameMode_ck(void);
 
 extern "C" void addVec3To(nw4r::math::VEC3* a, nw4r::math::VEC3* b);
 
@@ -217,7 +217,7 @@ extern "C" void fn_80114FAC(_EFT* self)
     work = (_EFT_WORK_A*)self->work_0x38;
     self->state_0x05++;
     if (self->type_0x02 == 0) {
-        if ((u8)fn_800CF208() == 2) {
+        if ((u8)GameMode_ck() == 2) {
             id = 0x9FB;
             n = 3;
         } else {
@@ -242,7 +242,7 @@ extern "C" void fn_80114FAC(_EFT* self)
     fn_80115100(self);
     switch (self->field_0x07) {
     case 0:
-        if ((u8)fn_800CF208() == 2) {
+        if ((u8)GameMode_ck() == 2) {
             fn_800DA93C(&self->pos_0x18);
             return;
         }

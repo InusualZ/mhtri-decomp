@@ -206,6 +206,9 @@ extern "C" {
 
 extern u8 lb_item_get_data[];
 
+/* 0x802087D4 - resets the lobby party state when the party is dissolved (GUESS name, from the body). */
+void lb_party_state_reset(void);
+
 #ifdef __cplusplus
 }
 #endif

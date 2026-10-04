@@ -452,7 +452,7 @@ s32 fn_80216678(u16, s32, s16 *, s32, s32, s32, s32);
 s32 fn_80217934(void);
 s32 fn_8021CBB0(s32);
 s32 fn_8021D5BC(void);
-s32 fn_8021F238(void);
+s32 getItemListSelection(void);
 s32 fn_80222848(s32, s16 *);
 s32 fn_80222BC4(void*, s32, u8);
 /* `menu_hold_row_draw_by_lsp`/`menu_cursor_step_fixed_tail`/`menu_cursor_step_open_last`/`menu_cursor_step`/`toggle_word_step` (0x802A7C04-0x802A8F50) were

@@ -38,12 +38,25 @@
  * the count is stays unknown) and `resetFailureState` (a `blr` stub).
  *
  * Residuals (re-measure: `python tools/units/recompile.py Network/network_pat_control --measure <symbol>`):
- *  - 2026-10-03: 143 of 225 rows at 100 % (report metric 65.6 %).  Not written yet (no body): the state machines
- *    `updateMessagePool` (5504 B) and `layerReflectCallback` (3704 B), `drawTextRuns`, the message-pool helpers
- *    0x80427868..0x80428628 (they call NetworkLayerPat/NetworkCommunityPat slots their owners still declare as
- *    `pad_NN()`), the transfer queue/mode updates, the NetworkInstance error accessors (0x804312B8..0x80431368)
- *    and the static-init/ctor/dtor group 0x80431CD8..0x80432104 (it needs `NetCtrlWk`'s member classes and the
- *    small network object as C++ classes, which `Network/network_writer_types.h` rules out for now).
+ *  - 2026-10-04: 144 of 225 rows at 100 % (report metric 73.2 %).  Not written yet (no body): the state machine
+ *    `updateMessagePool` (5504 B), `drawTextRuns`, the message-pool helpers 0x80427868..0x80428628 (they call
+ *    NetworkLayerPat/NetworkCommunityPat slots - the owners' headers now declare +0x4C/+0x50/+0x60 and +0xA0,
+ *    requests net2-l3-2c54#23/#24 - not yet the bodies), the transfer queue/mode updates, the NetworkInstance error accessors
+ *    (0x804312B8..0x80431368: their +0x613C/+0x6344 records sit in the band header's NetworkInstance) and the
+ *    static-init/ctor/dtor group 0x80431CD8..0x80432104 (it needs `NetCtrlWk`'s member classes and the small
+ *    network object as C++ classes, which `Network/network_writer_types.h` rules out for now).
+ *  - `layerReflectCallback` 94.8 %: retail saves r24..r31 and keeps the joining peer's id/name/profile addresses
+ *    in their own saved registers (ours CSEs them), the chat-record text address is CSE'd across
+ *    `getInstance()` as in net_session_close (request #22), and the invite pointer is formed with a `subi`
+ *    where ours re-derives the `addis` base.
+ *  - `queueNetCommand` 98.8 % (one store scheduled before the loop's pointer bump), `resetMessagePool` 95.7 % (the
+ *    address objects' +0x28 copy goes through the struct-of-function-pointers view; retail dispatches a real
+ *    virtual, request net2-l3-2c54#21).
+ *  - GUESS names added 2026-10-04: `allocPoolEntry`/`freePoolEntry`, `allocArenaBlock`/`setArenaBlockValue`/`resetSlotTable`/`findSlotByOwner`/
+ *    `resetPeerTable`/`findFreePeerEvent`/`refreshFriendList`/`updatePeerCardBlock` (from their bodies),
+ *    `net_peer_join_stamp` (the frame stamp layer command 5 takes), `net_arena_base` (the arena pointer), the
+ *    idle-check fields `idle_hold_0xC360`/`idle_press_0xC362`/`idle_frames_0xC364` (refreshServerScreen raises
+ *    error 23 after 36000 unchanged frames) and the layer stack `layer_stack_0x6220`/`layer_depth_0x6240`.
  *  - Partial: `updateNetworkPatControl` 88.6 % (retail saves r24..r31 in a 0x50 frame, ours r26.. in 0x30: a
  *    whole-function allocation shift), `layoutTextRuns` 95.5 % (retail keeps the `tag != 4/8/9` loop test on a
  *    constant 0; the glyph copy needs a `(s32)` cast to keep retail's `extsb`), `parseTextTags` 91.2 % (our
@@ -140,7 +153,13 @@
 #include "lobby/lb_menu_pos_tbl.h"     /* syncItemListClock - owner lobby/lb_menu_pos_tbl.cpp */
 #include "g3d/fn_80075DCC.h"            /* the placement operator new - owner g3d/fn_80075DCC.cpp */
 #include "g3d/fn_80063888.h"            /* the placement operator delete - owner g3d/fn_80063888.cpp */
+#include "ef/fn_800CDB2C.h"               /* GameMode_ck - declared by its former owner's header */
+#include "enemy/em020_ai.h"                /* getInstance_ - owner enemy/em020_ai.cpp */
 #include "enemy/lobby_state_block.h"   /* lobby_state_block - owner enemy/em020_prog.cpp (its leaf header) */
+#include "enemy/postChatLogLine.h"   /* postChatLogLine - owner enemy/em_prog_support.cpp (its leaf header) */
+#include "userdata_item.h"   /* applyNetUserProfile */
+#include "enemy/em020_prog.h"   /* net_layer_error_message */
+#include "sound/snd_stream_reloc.h"   /* pushReverbSamples, advanceReverbClock */
 
 
 #ifdef __cplusplus
@@ -158,6 +177,80 @@ typedef struct PatCryptBuf {
  * Wrapper over Camellia_DecryptBlock's key schedule: build the 256-bit PatCamellia key schedule from
  * `rawKey`.  A tail call, so the retail body is a bare `b Camellia_Ekeygen`.
  */
+
+/* The peer record layer command 6 delivers when a player joins: the address object, the name and the
+ * peer's 0x100-byte profile.  size: 0x13C */
+typedef struct NetLayerPeerJoin {
+    /* +0x00 */ NetId id_0x00;
+    /* +0x0A */ u8 pad_0x0A[0x16];
+    /* +0x20 */ char name_0x20[0x1C];
+    /* +0x3C */ u8 profile_0x3C[0x100];
+} NetLayerPeerJoin; /* size: 0x13C */
+
+/* The peer position layer command 14 delivers: the peer's id, its position, the message kind, a halfword and
+ * four packed bytes.  size: 0x38 */
+typedef struct NetLayerPeerPosition {
+    /* +0x00 */ NetId id_0x00;
+    /* +0x0A */ u8 pad_0x0A[0x16];
+    /* +0x20 */ f32 pos_0x20[3];
+    /* +0x2C */ s32 kind_0x2C;
+    /* +0x30 */ u32 value_0x30;
+    /* +0x34 */ u32 packed_0x34;
+} NetLayerPeerPosition; /* size: 0x38 */
+
+/* The 0x38-byte position message layer command 14 builds in an arena block.  size: 0x38 */
+typedef struct NetPositionMessage {
+    /* +0x00 */ u8 kind_0x00;
+    /* +0x01 */ u8 valid_0x01;
+    /* +0x02 */ u8 pad_0x02[0x2];
+    /* +0x04 */ char id_text_0x04[0x20];
+    /* +0x24 */ f32 pos_0x24[3];
+    /* +0x30 */ u16 value_0x30;
+    /* +0x32 */ u8 bytes_0x32[4];
+    /* +0x36 */ u8 pad_0x36[0x2];
+} NetPositionMessage; /* size: 0x38 */
+
+/* The raw block layer command 17 delivers: a type word (1), a kind byte (9), the source and its size.
+ * size: 0x36 (approximate) */
+typedef struct NetLayerBlockUpdate {
+    /* +0x00 */ NetId id_0x00;
+    /* +0x0A */ u8 pad_0x0A[0x16];
+    /* +0x20 */ u32 type_0x20;
+    /* +0x24 */ u8 pad_0x24[0x4];
+    /* +0x28 */ u8 kind_0x28;
+    /* +0x29 */ u8 pad_0x29[0x7];
+    /* +0x30 */ const u8* data_0x30;
+    /* +0x34 */ u16 size_0x34;
+} NetLayerBlockUpdate; /* size: 0x36 (approximate) */
+
+/* The stream record layer command 39 delivers (handed to the sound side whole) and the word at +0x2F4.
+ * size: 0x2F8 (approximate) */
+typedef struct NetLayerStreamRecord {
+    /* +0x000 */ u8 bytes_0x000[0x2F4];
+    /* +0x2F4 */ u32 value_0x2F4;
+} NetLayerStreamRecord; /* size: 0x2F8 (approximate) */
+
+/* A pool record seen as a queued network command (`queueNetCommand`): the command byte, the caller's result
+ * byte, an unused word, the argument count and up to four argument words.  size: 0x20 */
+typedef struct NetCommandEntry {
+    /* +0x00 */ u8 pad_0x00;
+    /* +0x01 */ u8 command_0x01;
+    /* +0x02 */ u8 pad_0x02[0x2];
+    /* +0x04 */ s8* result_0x04;
+    /* +0x08 */ s32 unused_0x08;
+    /* +0x0C */ s32 arg_count_0x0C;
+    /* +0x10 */ s32 args_0x10[4];
+} NetCommandEntry; /* size: 0x20 */
+
+/* One peer event word (`NetCtrlWk::slots_0x7996`): event kind 1, the action (1 = joined, 2 = left), the peer's
+ * slot and the peer count after it.  size: 0x4 */
+typedef struct NetPeerEvent {
+    /* +0x0 */ u8 kind_0x0;
+    /* +0x1 */ u8 action_0x1;
+    /* +0x2 */ u8 slot_0x2;
+    /* +0x3 */ u8 total_0x3;
+} NetPeerEvent; /* size: 0x4 */
+
 #pragma peephole off
 void fn_80423E74(const u8* rawKey)
 {
@@ -265,10 +358,10 @@ void setupArenaVectors(NetCtrlWk* work)
     u8* base;
     u32 k;
 
-    if (lbl_80794CEC == 0) {
-        lbl_80794CEC = fn_800404BC(0x10000);
+    if (net_arena_base == 0) {
+        net_arena_base = fn_800404BC(0x10000);
     }
-    base = lbl_80794CEC;
+    base = net_arena_base;
     for (k = 0; k < 64; k++) {
         work->arrA_0x7A98[k] = (u32*)(base + k * 0x400);
         work->arrB_0x7B98[k] = 0;
@@ -282,7 +375,7 @@ void setupArenaVectors(NetCtrlWk* work)
  */
 void fn_80424308(NetCtrlWk* work)
 {
-    u8* base = lbl_80794CEC;
+    u8* base = net_arena_base;
     u32 k;
 
     if (base != 0) {
@@ -298,7 +391,7 @@ void fn_80424308(NetCtrlWk* work)
  * Hand out the first free arena block: mark its arrC slot used and return the block pointer (arrA),
  * or NULL when all 64 are taken.
  */
-u32* fn_80424444(void)
+u32* allocArenaBlock(void)
 {
     NetCtrlWk* work = net_ctrl_wk;
     u32 i;
@@ -332,7 +425,7 @@ void fn_8042448C(u32 block)
 /*
  * Store `value` in the arrB side of the entry that owns `block`.
  */
-void fn_804244D8(u32 block, u32 value)
+void setArenaBlockValue(u32 block, u32 value)
 {
     NetCtrlWk* work = net_ctrl_wk;
     u32 i;
@@ -362,7 +455,7 @@ void resetNetSlots(NetCtrlWk* work)
  * Reset the 100-record slot table: every slot's state byte goes to 0, then slot 0 is made live and the
  * record's slot list is pointed at it, with the two float members and the mode word seeded.
  */
-void fn_804245C8(void)
+void resetSlotTable(void)
 {
     NetCtrlWk* work = net_ctrl_wk;
     u32 i;
@@ -381,7 +474,7 @@ void fn_804245C8(void)
 /*
  * Find the live slot whose owner pointer is `owner`, or NULL when none is.
  */
-NetSlot* fn_804246F8(void* owner)
+NetSlot* findSlotByOwner(void* owner)
 {
     NetCtrlWk* work = net_ctrl_wk;
     NetSlot* slot = work->slots_0x3ED4;
@@ -397,10 +490,505 @@ NetSlot* fn_804246F8(void* owner)
 }
 
 /*
+ * The layer's reflect callback: records command `command`'s result word (and a failure's error triple), then
+ * follows the layer's state - the layer stack, the peers joining and leaving, positions, chat, the server list,
+ * the invites - and reports the outcome through the caller's result byte where a request waits on it.
+ */
+/* untyped: caller-owned payload - each layer command delivers its own record */
+s32 layerReflectCallback(u32 command, s32 result, s32 count, void* data)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+    s32 i;
+
+    if (result < 0 && data != NULL) {
+        work->net_error_0x134 = *(NetErrorTriple*)data;
+    }
+    switch (command) {
+    case 1:
+        if (result < 0) {
+            work->layer_results_0x6244[command] = result;
+            work->error_0x058 = result;
+            setErrorCode(4);
+        } else {
+            work->layer_stack_0x6220[0] = 1;
+            work->layer_depth_0x6240 = 1;
+            work->layer_results_0x6244[command] = 1;
+        }
+        resetSlotTable();
+        work->peer_count_0x62E8 = 1;
+        break;
+    case 2:
+        if (result < 0) {
+            work->layer_results_0x6244[command] = result;
+        } else {
+            work->layer_results_0x6244[command] = 1;
+        }
+        break;
+    case 40:
+        if (result < 0) {
+            work->layer_results_0x6244[command] = result;
+            net_layer_error_message = getNetErrorMessageId();
+        } else {
+            work->layer_results_0x6244[command] = 1;
+        }
+        work->field_0xC498 = 1;
+        break;
+    case 3:
+        work->error_0x058 = result;
+        if (work->net_error_0x134.code_0x0 == 0x80000004) {
+            setErrorCode(-1);
+        } else {
+            setErrorCode(4);
+        }
+        break;
+    case 4:
+        if (result < 0) {
+            work->layer_results_0x6244[command] = result;
+            work->sub_error_0xC259 = -1;
+        } else {
+            work->layer_depth_0x6240--;
+            work->layer_stack_0x6220[work->layer_depth_0x6240] = 0;
+            work->layer_results_0x6244[command] = 1;
+            work->layer_state_0x064--;
+            resetSlotTable();
+            resetPeerTable();
+            work->peer_count_0x62E8 = 1;
+            work->flag_0x068 = 0;
+            work->flag_0x069 = 0;
+            work->flag_0x82C4 = 0;
+            work->flag_0x82C5 = 0;
+            work->flag_0x82C7 = 0;
+        }
+        break;
+    case 5:
+        if (result < 0) {
+            work->layer_results_0x6244[command] = result;
+            work->sub_error_0xC259 = -1;
+            if (data != NULL && *(s32*)data != 0) {
+                work->flag_0x069 = 0;
+            }
+            net_layer_error_message = getNetErrorMessageId();
+        } else {
+            work->layer_stack_0x6220[work->layer_depth_0x6240] = *(s32*)data;
+            work->layer_depth_0x6240++;
+            work->layer_results_0x6244[command] = 1;
+            work->layer_state_0x064++;
+            resetSlotTable();
+            work->peer_count_0x62E8 = 1;
+            work->flag_0x068 = 0;
+            work->flag_0x069 = 0;
+            work->flag_0x82C4 = 0;
+            work->flag_0x82C5 = 0;
+            work->flag_0x82C7 = 0;
+            net_peer_join_stamp = frame_counter;
+        }
+        break;
+    case 6:
+        if (result >= 0 && work->layer_state_0x064 == 2) {
+            s32 slot;
+
+            work->peer_count_0x62E8++;
+            slot = findFreePeerSlot((const NetworkSmallObject*)data);
+            if (slot > 0) {
+                NetPeerEvent* event;
+                char line[0x80];
+
+                formatNetId(work->peers_0x7488[slot].id_0x00.text_0x00, (const NetId*)data);
+                strcpy(work->peers_0x7488[slot].name_0x0A.text_0x00, ((NetLayerPeerJoin*)data)->name_0x20);
+                importNetId((NetId*)&work->peer_addresses_0x7908[slot], &work->peers_0x7488[slot].id_0x00);
+                memcpy(&work->peers_0x7488[slot].blob_0x20, ((NetLayerPeerJoin*)data)->profile_0x3C, 0x100);
+                applyNetUserProfile((const u8*)&work->peers_0x7488[slot].blob_0x20);
+                postMediatorRecord(getInstance(), work->peers_0x7488[slot].blob_0x20.record_0x9C);
+                work->used_0x7988[slot] = 1;
+                work->peer_total_0x7994 = work->peer_count_0x62E8;
+                event = (NetPeerEvent*)findFreePeerEvent();
+                if (event != NULL) {
+                    event->kind_0x0 = 1;
+                    event->action_0x1 = 1;
+                    event->slot_0x2 = slot;
+                    event->total_0x3 = work->peer_total_0x7994;
+                }
+                if (net_peer_join_stamp != frame_counter && (GameMode_ck() != 1 || get_option_cfg(26) != 1) &&
+                    strcmp(work->peers_0x7488[slot].id_0x00.text_0x00, work->name_0x7368) != 0) {
+                    if (get_option_cfg(12) == 0) {
+                        sprintf(line, MH3GetErrorString2(37), work->peers_0x7488[slot].name_0x0A.text_0x00);
+                    } else {
+                        sprintf(line, MH3GetErrorString2(37), work->peers_0x7488[slot].id_0x00.text_0x00);
+                    }
+                    postChatLogLine(1, 0, 0xFFFFF0, line, work->peers_0x7488[slot].id_0x00.text_0x00,
+                                work->peers_0x7488[slot].name_0x0A.text_0x00);
+                }
+            }
+        }
+        break;
+    case 7:
+        if (result >= 0 && work->layer_state_0x064 == 2) {
+            s32 slot;
+
+            work->peer_count_0x62E8--;
+            slot = findPeerSlot((const NetworkSmallObject*)data);
+            if (slot > 0) {
+                NetPeerEvent* event;
+
+                if (GameMode_ck() != 1 || get_option_cfg(26) != 1) {
+                    if (strcmp(work->peers_0x7488[slot].id_0x00.text_0x00, work->name_0x7368) != 0) {
+                        char line[0x80];
+
+                        if (get_option_cfg(12) == 0) {
+                            sprintf(line, MH3GetErrorString2(38), work->peers_0x7488[slot].name_0x0A.text_0x00);
+                        } else {
+                            sprintf(line, MH3GetErrorString2(38), work->peers_0x7488[slot].id_0x00.text_0x00);
+                        }
+                        postChatLogLine(1, 0, 0xFFFFF0, line, work->peers_0x7488[slot].id_0x00.text_0x00,
+                                    work->peers_0x7488[slot].name_0x0A.text_0x00);
+                    }
+                }
+                work->peers_0x7488[slot].id_0x00.text_0x00[0] = 0;
+                work->peers_0x7488[slot].name_0x0A.text_0x00[0] = 0;
+                work->used_0x7988[slot] = 0;
+                work->peer_total_0x7994 = work->peer_count_0x62E8;
+                event = (NetPeerEvent*)findFreePeerEvent();
+                if (event != NULL) {
+                    event->kind_0x0 = 1;
+                    event->action_0x1 = 2;
+                    event->slot_0x2 = slot;
+                    event->total_0x3 = work->peer_total_0x7994;
+                }
+            }
+        }
+        break;
+    case 8:
+        if (result < 0) {
+            work->layer_results_0x6244[command] = result;
+        } else {
+            work->layer_results_0x6244[command] = 1;
+            memcpy(work->layer_block_0x1A68, data, sizeof(work->layer_block_0x1A68));
+        }
+        break;
+    case 9:
+        if (result < 0) {
+            work->layer_results_0x6244[command] = result;
+        } else {
+            work->layer_results_0x6244[command] = 1;
+            work->flag_0x068 = 1;
+        }
+        break;
+    case 10:
+        if (result < 0) {
+            work->layer_results_0x6244[command] = result;
+        } else {
+            work->layer_results_0x6244[command] = 1;
+            work->flag_0x069 = 1;
+        }
+        break;
+    case 11:
+        if (result < 0) {
+            work->layer_results_0x6244[command] = result;
+        } else {
+            work->layer_results_0x6244[command] = 1;
+            work->layer_value_0x1ADC = *(s32*)data;
+        }
+        break;
+    case 13:
+        if (result >= 0) {
+            NetSlot* slot = findSlotByOwner(data);
+
+            if (slot != NULL) {
+                memcpy(&slot->mode_0x54, &((NetLayerPeerPosition*)data)->pos_0x20[0], 4);
+            }
+        }
+        break;
+    case 14:
+        if (result >= 0 && findPeerIndex((const NetId*)data) > 0) {
+            NetPositionMessage* message = (NetPositionMessage*)allocArenaBlock();
+
+            if (message != NULL) {
+                NetLayerPeerPosition* position = (NetLayerPeerPosition*)data;
+
+                memset(message, 0, sizeof(NetPositionMessage));
+                message->kind_0x00 = position->kind_0x2C;
+                message->valid_0x01 = 1;
+                formatNetId(message->id_text_0x04, &position->id_0x00);
+                message->pos_0x24[0] = position->pos_0x20[0];
+                message->pos_0x24[1] = position->pos_0x20[1];
+                message->pos_0x24[2] = position->pos_0x20[2];
+                message->value_0x30 = position->value_0x30;
+                message->bytes_0x32[0] = (position->packed_0x34 >> 8) & 0xFF;
+                message->bytes_0x32[1] = position->packed_0x34;
+                message->bytes_0x32[2] = position->packed_0x34 >> 24;
+                message->bytes_0x32[3] = (position->packed_0x34 >> 16) & 0xFF;
+            }
+        }
+        break;
+    case 15:
+        if (result >= 0) {
+            s32 member = findPeerIndex((const NetId*)data);
+
+            if (member == 0) {
+                char id_text[0x14];
+
+                formatNetId(id_text, &((NetSessionChatRecord*)data)->sender_0x000);
+                postMediatorRecord(getInstance(), ((NetSessionChatRecord*)data)->text_0x035);
+                postChatLogLine(1, member, ((NetSessionChatRecord*)data)->color_0x238,
+                            (const char*)((NetSessionChatRecord*)data)->text_0x035, id_text,
+                            ((NetSessionChatRecord*)data)->name_0x020);
+            } else if (work->layer_state_0x064 == 1) {
+                char id_text[0x14];
+
+                formatNetId(id_text, &((NetSessionChatRecord*)data)->sender_0x000);
+                postMediatorRecord(getInstance(), ((NetSessionChatRecord*)data)->text_0x035);
+                postChatLogLine(1, member, ((NetSessionChatRecord*)data)->color_0x238,
+                            (const char*)((NetSessionChatRecord*)data)->text_0x035, id_text,
+                            ((NetSessionChatRecord*)data)->name_0x020);
+            }
+        }
+        {
+            NetCtrlEntry* entry = work->entries_0x7CD8;
+
+            for (i = 0; i < 16; i++, entry++) {
+                if (entry->in_use_0x00 == 2) {
+                    entry->in_use_0x00 = 0;
+                    break;
+                }
+            }
+        }
+        break;
+    case 16:
+        if (work->flag_0xC48A != 1 && result >= 0 &&
+            (get_option_cfg(26) != 1 || work->sub_state_0x017 != 0x21 ||
+             ((NetSessionChatRecord*)data)->color_0x238 == 0xFFFF50FF)) {
+            s32 member = findPeerIndex((const NetId*)data);
+
+            if (member > 0 || (((NetSessionChatRecord*)data)->color_0x238 & 0xF) == 0) {
+                char id_text[0x14];
+                s32 color;
+
+                formatNetId(id_text, &((NetSessionChatRecord*)data)->sender_0x000);
+                postMediatorRecord(getInstance(), ((NetSessionChatRecord*)data)->text_0x035);
+                color = ((NetSessionChatRecord*)data)->color_0x238;
+                if (isServerSelectState() == 1 && ((NetSessionChatRecord*)data)->color_0x238 == 0xF0EFF0FF) {
+                    color = 0x56FF56FF;
+                }
+                postChatLogLine(1, member, color, (const char*)((NetSessionChatRecord*)data)->text_0x035, id_text,
+                            ((NetSessionChatRecord*)data)->name_0x020);
+            } else if (work->layer_state_0x064 == 1) {
+                char id_text[0x14];
+
+                formatNetId(id_text, &((NetSessionChatRecord*)data)->sender_0x000);
+                postMediatorRecord(getInstance(), ((NetSessionChatRecord*)data)->text_0x035);
+                postChatLogLine(1, member, ((NetSessionChatRecord*)data)->color_0x238,
+                            (const char*)((NetSessionChatRecord*)data)->text_0x035, id_text,
+                            ((NetSessionChatRecord*)data)->name_0x020);
+            }
+        }
+        break;
+    case 17:
+        if (result >= 0 && findPeerIndex((const NetId*)data) > 0 && ((NetLayerBlockUpdate*)data)->type_0x20 == 1 &&
+            ((NetLayerBlockUpdate*)data)->kind_0x28 == 9) {
+            u32* block = allocArenaBlock();
+
+            if (block != NULL) {
+                memcpy(block, ((NetLayerBlockUpdate*)data)->data_0x30, ((NetLayerBlockUpdate*)data)->size_0x34);
+                setArenaBlockValue((u32)block, ((NetLayerBlockUpdate*)data)->size_0x34);
+            }
+        }
+        break;
+    case 18:
+        if (result < 0) {
+            work->layer_results_0x6244[command] = result;
+        } else {
+            work->layer_results_0x6244[command] = 1;
+            memcpy(&work->server_count_0x660, data, 0x1408);
+        }
+        break;
+    case 19:
+        if (result < 0) {
+            work->layer_results_0x6244[command] = result;
+            if (work->net_error_0x134.code_0x0 == 0x80060036) {
+                work->sub_error_0xC259 = 8;
+            } else {
+                work->sub_error_0xC259 = 6;
+            }
+        } else {
+            work->layer_results_0x6244[command] = 1;
+            work->layer_depth_0x6240 = 1;
+        }
+        resetSlotTable();
+        work->peer_count_0x62E8 = 1;
+        break;
+    case 25:
+        if (result < 0) {
+            work->layer_results_0x6244[command] = result;
+            if (work->result_0xC290 != NULL) {
+                *work->result_0xC290 = -1;
+            }
+        } else {
+            work->layer_results_0x6244[command] = 1;
+            if (work->result_0xC290 != NULL) {
+                *work->result_0xC290 = 1;
+            }
+        }
+        break;
+    case 26:
+        if (result < 0) {
+            work->layer_results_0x6244[command] = result;
+            if (work->result_0xC290 != NULL) {
+                *work->result_0xC290 = -1;
+            }
+        } else {
+            work->layer_results_0x6244[command] = 1;
+            if (work->result_0xC290 != NULL) {
+                *work->result_0xC290 = 1;
+            }
+            if (work->flag_0xC480 == 1) {
+                refreshFriendList();
+                work->flag_0xC480 = 0;
+            }
+        }
+        break;
+    case 27:
+        if (result < 0) {
+            work->layer_results_0x6244[command] = result;
+            work->sub_error_0xC259 = -1;
+            net_layer_error_message = getNetErrorMessageId();
+        } else {
+            work->layer_results_0x6244[command] = 1;
+            work->layer_depth_0x6240 = 1;
+            resetSlotTable();
+            work->peer_count_0x62E8 = 1;
+        }
+        break;
+    case 28:
+        if (result < 0) {
+            work->layer_results_0x6244[command] = result;
+            work->sub_error_0xC259 = -1;
+        } else {
+            work->layer_results_0x6244[command] = 1;
+        }
+        break;
+    case 36:
+        if (result < 0) {
+            work->layer_results_0x6244[command] = result;
+            work->sub_error_0xC259 = -1;
+        } else {
+            work->layer_results_0x6244[command] = 1;
+        }
+        break;
+    case 37:
+        if (result < 0) {
+            work->layer_results_0x6244[command] = result;
+        } else {
+            if (*(s32*)data == work->link_id_0xC0C0) {
+                work->flag_0xC0BD = 0;
+            }
+            work->layer_results_0x6244[command] = 1;
+        }
+        break;
+    case 31:
+    case 32:
+        if (result < 0) {
+            work->layer_results_0x6244[command] = result;
+        } else {
+            u8 index = ((NetInviteEntry*)data)->index_0x20;
+
+            if (index != 0) {
+                NetInviteRec* invite = &work->invites_0xBF3C[index - 1];
+
+                formatNetId(invite->id_text_0x00, &((NetInviteEntry*)data)->id_0x00);
+                invite->index_0x0A = ((NetInviteEntry*)data)->index_0x20;
+                invite->valid_0x0B = ((NetInviteEntry*)data)->valid_0x21;
+            }
+            work->layer_results_0x6244[command] = 1;
+        }
+        break;
+    case 33:
+    case 34:
+        if (result < 0) {
+            work->layer_results_0x6244[command] = result;
+        } else {
+            u8 index = ((NetInviteEntry*)data)->index_0x20;
+
+            if (index != 0) {
+                NetInviteRec* invite = &work->invites_0xBF3C[index - 1];
+
+                invite->id_text_0x00[0] = 0;
+                invite->index_0x0A = ((NetInviteEntry*)data)->index_0x20;
+                invite->valid_0x0B = 0;
+            }
+            work->layer_results_0x6244[command] = 1;
+        }
+        break;
+    case 35:
+        work->link_state_0xC0BC = 1;
+        if (result < 0) {
+            work->layer_results_0x6244[command] = result;
+            work->invite_count_0xBF38 = 0;
+            for (i = 0; i < 32; i++) {
+                work->invites_0xBF3C[i].id_text_0x00[0] = 0;
+                work->invites_0xBF3C[i].index_0x0A = i + 1;
+                work->invites_0xBF3C[i].valid_0x0B = 0;
+            }
+        } else {
+            NetInviteEntry* entry;
+
+            work->layer_results_0x6244[command] = 1;
+            for (i = 0; i < 32; i++) {
+                work->invites_0xBF3C[i].id_text_0x00[0] = 0;
+                work->invites_0xBF3C[i].index_0x0A = i + 1;
+                work->invites_0xBF3C[i].valid_0x0B = 0;
+            }
+            work->invite_count_0xBF38 = ((NetInviteList*)data)->count_0x000;
+            entry = ((NetInviteList*)data)->entries_0x004;
+            for (i = 0; i < work->invite_count_0xBF38; i++, entry++) {
+                if (entry->index_0x20 != 0) {
+                    NetInviteRec* invite = &work->invites_0xBF3C[entry->index_0x20 - 1];
+
+                    formatNetId(invite->id_text_0x00, &entry->id_0x00);
+                    invite->index_0x0A = entry->index_0x20;
+                    invite->valid_0x0B = entry->valid_0x21;
+                }
+            }
+        }
+        break;
+    case 39:
+        if (result < 0) {
+            work->layer_results_0x6244[command] = result;
+        } else {
+            work->layer_results_0x6244[command] = 1;
+            if (system_w.transfer_level_0xa52 != 0) {
+                pushReverbSamples((s16*)data, ((NetLayerStreamRecord*)data)->value_0x2F4);
+                advanceReverbClock();
+            }
+        }
+        break;
+    }
+    return 0;
+}
+
+/*
+ * Counts the frames pad 0's hold and press words stay unchanged; after 36000 (ten minutes) it raises network
+ * error 23 (the idle disconnect).
+ */
+void refreshServerScreen(NetCtrlWk* work)
+{
+    if (work->idle_hold_0xC360 == Psw[0].button_0x2C0.hold_0x00 &&
+        work->idle_press_0xC362 == Psw[0].button_0x2C0.press_0x08) {
+        work->idle_frames_0xC364++;
+    } else {
+        work->idle_frames_0xC364 = 0;
+    }
+    if (work->idle_frames_0xC364 >= 36000) {
+        setErrorCode(23);
+    }
+    work->idle_hold_0xC360 = Psw[0].button_0x2C0.hold_0x00;
+    work->idle_press_0xC362 = Psw[0].button_0x2C0.press_0x08;
+}
+
+/*
  * Hand out the first free record of the 128-entry pool at `pool_0x6320`: mark it in use, bump the pool's
  * live count and return a pointer to the record's payload (record + 8).
  */
-NetPoolEntry* fn_804256F4(void)
+NetPoolEntry* allocPoolEntry(void)
 {
     NetCtrlWk* work = net_ctrl_wk;
     NetPoolEntry* pool = work->pool_0x6320;
@@ -419,7 +1007,7 @@ NetPoolEntry* fn_804256F4(void)
 /*
  * Release one record back to the pool and drop the pool's live count.
  */
-void fn_80425750(NetPoolEntry* entry)
+void freePoolEntry(NetPoolEntry* entry)
 {
     NetCtrlWk* work = net_ctrl_wk;
 
@@ -432,7 +1020,7 @@ void fn_80425750(NetPoolEntry* entry)
  */
 void fn_80426D10(void)
 {
-    net_ctrl_wk->counter_0xC364 = 0;
+    net_ctrl_wk->idle_frames_0xC364 = 0;
 }
 
 /*
@@ -480,10 +1068,58 @@ s32 findFriendIndex(const NetId* id)
 }
 
 /*
+ * Rebuilds the peer table from the layer's peer list: this player in slot 0, every other listed peer (newest
+ * first) in the next slot with its id text, name and address object; then clears the 64 peer-event words.
+ */
+void resetMessagePool(void)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+    char id_text[8];
+    s32 slot;
+    s32 n;
+    s32 i;
+
+    if (getNetworkLayerPat(getPatsObject(), 0) != NULL) {
+        memset(work->msgTable_0x7488, 0, 0x480);
+        work->used_0x7988[0] = 0;
+        work->used_0x7988[1] = 0;
+        work->used_0x7988[2] = 0;
+        work->used_0x7988[3] = 0;
+        strcpy(work->peers_0x7488[0].id_0x00.text_0x00, work->name_0x7368);
+        strcpy(work->peers_0x7488[0].name_0x0A.text_0x00, work->name2_0x7372);
+        work->used_0x7988[0] = 1;
+        if (work->layer_state_0x064 > 1) {
+            n = work->peer_count_0x62E8;
+            work->peer_total_0x7994 = n;
+            slot = 1;
+            for (; n > 0; n--) {
+                NetRecentRec* listed = &work->layer_peers_0x1AE0[n - 1];
+
+                exportTo(&listed->address_0x00, (u8*)id_text, 8);
+                if (strcmp(id_text, work->name_0x7368) == 0) {
+                    work->peer_addresses_0x7908[0].object_0x00.vtable->slot_28(&work->peer_addresses_0x7908[0].object_0x00,
+                                                                             (const u8*)&listed->address_0x00);
+                } else {
+                    strcpy(work->peers_0x7488[slot].id_0x00.text_0x00, id_text);
+                    strcpy(work->peers_0x7488[slot].name_0x0A.text_0x00, listed->name_0x20);
+                    work->used_0x7988[slot] = 1;
+                    work->peer_addresses_0x7908[slot].object_0x00.vtable->slot_28(
+                        &work->peer_addresses_0x7908[slot].object_0x00, (const u8*)&listed->address_0x00);
+                    slot++;
+                }
+            }
+            for (i = 0; i < 0x40; i++) {
+                memset(&work->slots_0x7996[i], 0, 4);
+            }
+        }
+    }
+}
+
+/*
  * Clear the four-entry message table back to the record's own name, free its 64 flags and mark entry 0
  * live.  Guarded on the network layer being up.
  */
-void fn_80427024(void)
+void resetPeerTable(void)
 {
     NetCtrlWk* work = net_ctrl_wk;
     u32 i;
@@ -551,7 +1187,7 @@ s32 findPeerSlot(const NetworkSmallObject* address)
  * Hand out the first free 4-byte record of the 64-record flag array at +0x7996, or NULL when none is
  * free.
  */
-u32* fn_80427240(void)
+u32* findFreePeerEvent(void)
 {
     NetCtrlWk* work = net_ctrl_wk;
     u32 i;
@@ -562,6 +1198,37 @@ u32* fn_80427240(void)
         }
     }
     return 0;
+}
+
+/*
+ * Queues network command `command` in a free pool record: the caller's result byte, an unused word and up to four
+ * argument words; 0 when the pool is full.
+ */
+s32 queueNetCommand(u32 command, s8* result, s32 unused, s32 arg_count, const s32* args)
+{
+    NetCommandEntry* entry = (NetCommandEntry*)allocPoolEntry();
+    s32 i;
+
+    if (entry == NULL) {
+        return 0;
+    }
+    entry->command_0x01 = command;
+    entry->result_0x04 = result;
+    entry->unused_0x08 = unused;
+    entry->arg_count_0x0C = arg_count;
+    entry->args_0x10[0] = 0;
+    entry->args_0x10[1] = 0;
+    entry->args_0x10[2] = 0;
+    entry->args_0x10[3] = 0;
+    if (arg_count != 0 && args != NULL) {
+        if (arg_count > 4) {
+            arg_count = 4;
+        }
+        for (i = 0; i < arg_count; i++) {
+            entry->args_0x10[i] = *args++;
+        }
+    }
+    return 1;
 }
 
 /*
@@ -939,7 +1606,7 @@ void initWorkRecord(void)
     for (i = 0; i < 44; i++) {
         work->results_0x078[i] = 0;
     }
-    memset(work->cleared_0x128, 0, 0x3C);
+    memset(&work->community_error_0x128, 0, 0x3C);
     work->status_0x174 = 0;
     work->row_count_0x178 = 0;
     work->page_count_0x45C = 0;
@@ -976,7 +1643,7 @@ void initWorkRecord(void)
     work->action_0xC152 = 0;
     work->error_code_0xC258 = 0;
     work->sub_error_0xC259 = 0;
-    work->counter_0xC364 = 0;
+    work->idle_frames_0xC364 = 0;
     work->settings_0x6210[0] = -1;
     work->settings_0x6210[1] = -1;
     work->settings_0x6210[2] = -1;
@@ -985,9 +1652,9 @@ void initWorkRecord(void)
     work->account_name_0xC0C4[0] = 0;
     work->nickname_0xC104[0] = 0;
     work->flag_0xC368 = 0;
-    work->counter_0xC360 = 0;
-    work->counter_0xC362 = 0;
-    work->counter_0xC364 = 0;
+    work->idle_hold_0xC360 = 0;
+    work->idle_press_0xC362 = 0;
+    work->idle_frames_0xC364 = 0;
     work->timeout_0xC36C = 0;
     work->field_0xC370 = 0;
     work->field_0xC374 = 0;
@@ -1026,7 +1693,7 @@ void initWorkRecord(void)
     work->fetch_sums_0xA0E4[2] = 0;
     work->fetch_sums_0xA0E4[3] = 0;
     memset(work->community_results_0xA144, 0, 0x6C);
-    work->roster_count_0xA1B8 = 0;
+    work->roster_0xA1B8.count_0x000 = 0;
     work->field_0xC154 = 0;
     memset(&work->screen_0xC158, 0, 4);
     memset(work->flags_0xC1C0, 0, sizeof(work->flags_0xC1C0));
@@ -1470,6 +2137,10 @@ void acknowledgeTermsCheck(void)
  * the 0x80423E74 band above reaches the same row through the header's `extern`. */
 NetCtrlWk* net_ctrl_wk;
 
+/* The arena base (`.sbss` 0x80794CEC) and the frame stamp of the last layer re-entry (`.sbss` 0x80794CE8). */
+u8* net_arena_base;
+u32 net_peer_join_stamp;
+
 /* The work record itself (`.bss` 0x806D3790, 0xC4A8 B; `initNetworkPatControl` points `net_ctrl_wk` at it)
  * and the network heap handle (`.sbss` 0x80794CF4). */
 NetCtrlWk net_ctrl_work;
@@ -1589,7 +2260,7 @@ void updateNetworkPatControl(void)
         break;
     case 3:
         if (work->error_0x05C == 0) {
-            work->community_results_0xA144[3].words_0x00[0] = 0;
+            work->community_results_0xA144[18] = 0;
             buildRosterSync(&work->roster_sync_0x61CC);
             getNetworkCommunityPat(getPatsObject(), 0)->syncFriends(&work->roster_sync_0x61CC);
         }
@@ -1610,7 +2281,7 @@ void updateNetworkPatControl(void)
         runPendingAction8();
         break;
     case 2:
-        getNetworkSessionManagerPat(getPatsObject(), 0)->setCircleRecords(work->record_0xC3F4, 0x88);
+        getNetworkSessionManagerPat(getPatsObject(), 0)->setCircleRecords((const u8*)&work->circle_records_0xC3F4, 0x88);
         break;
     }
     work->action_0xC152 = 0;
@@ -2549,7 +3220,7 @@ void updateNetworkPatControl(void)
                 setErrorHappened(work);
                 return;
             }
-            work->community_results_0xA144[1].words_0x00[0] = 0;
+            work->community_results_0xA144[6] = 0;
             getNetworkCommunityPat(getPatsObject(), 0)->requestNews_38();
             work->sub_state_0x017 = 0x13;
             dialog->timer_0x128 = 0;
@@ -2565,13 +3236,13 @@ void updateNetworkPatControl(void)
 
         dialog->timer_0x128 = counter + 1;
         ai_npc_reaction_forward();
-        if (work->community_results_0xA144[1].words_0x00[0] != 0) {
-            if (work->community_results_0xA144[1].words_0x00[0] < 0) {
+        if (work->community_results_0xA144[6] != 0) {
+            if (work->community_results_0xA144[6] < 0) {
                 setErrorCode(5);
                 setErrorHappened(work);
                 return;
             }
-            work->community_tail_0xA1A4[0] = 0;
+            work->community_results_0xA144[24] = 0;
             getNetworkCommunityPat(getPatsObject(), 0)->requestBlockList();
             work->sub_state_0x017 = 0x14;
             dialog->timer_0x128 = 0;
@@ -2587,15 +3258,15 @@ void updateNetworkPatControl(void)
 
         dialog->timer_0x128 = counter + 1;
         ai_npc_reaction_forward();
-        if (work->community_tail_0xA1A4[0] != 0) {
-            if (work->community_tail_0xA1A4[0] < 0) {
+        if (work->community_results_0xA144[24] != 0) {
+            if (work->community_results_0xA144[24] < 0) {
                 setErrorCode(5);
                 setErrorHappened(work);
                 return;
             }
             work->layer_state_0x064 = 0;
             if (isOnlineFlagClear() == 0) {
-                work->community_results_0xA144[3].words_0x00[0] = 0;
+                work->community_results_0xA144[18] = 0;
                 buildRosterSync(&work->roster_sync_0x61CC);
                 getNetworkCommunityPat(getPatsObject(), 0)->syncFriends(&work->roster_sync_0x61CC);
             }
@@ -2613,10 +3284,10 @@ void updateNetworkPatControl(void)
         dialog->timer_0x128 = counter + 1;
         ai_npc_reaction_forward();
         if (isOnlineFlagClear() == 0) {
-            if (work->community_results_0xA144[3].words_0x00[0] == 0) {
+            if (work->community_results_0xA144[18] == 0) {
                 break;
             }
-            if (work->community_results_0xA144[3].words_0x00[0] < 0) {
+            if (work->community_results_0xA144[18] < 0) {
                 setErrorCode(5);
                 setErrorHappened(work);
                 return;
@@ -2752,29 +3423,29 @@ void updateNetworkPatControl(void)
             resetMessagePool();
             work->sub_state_0x017 = 0x19;
             work->mode_0x010 = 3;
-            work->counter_0xC360 = 0;
-            work->counter_0xC362 = 0;
-            work->counter_0xC364 = 0;
+            work->idle_hold_0xC360 = 0;
+            work->idle_press_0xC362 = 0;
+            work->idle_frames_0xC364 = 0;
             return;
         }
         break;
     case 0x1F:
         switch (work->step_0x018) {
         case 0:
-            if (work->community_results_0xA144[3].words_0x00[0] != 0) {
-                if (work->community_results_0xA144[3].words_0x00[0] < 0) {
+            if (work->community_results_0xA144[18] != 0) {
+                if (work->community_results_0xA144[18] < 0) {
                     setErrorCode(5);
                     setErrorHappened(work);
                 } else {
-                    work->community_results_0xA144[2].words_0x00[0] = 0;
+                    work->community_results_0xA144[12] = 0;
                     startRosterFetch(0);
                     work->step_0x018 = 1;
                 }
             }
             break;
         case 1:
-            if (work->community_results_0xA144[2].words_0x00[0] != 0) {
-                if (work->community_results_0xA144[2].words_0x00[0] < 0) {
+            if (work->community_results_0xA144[12] != 0) {
+                if (work->community_results_0xA144[12] < 0) {
                     setErrorCode(5);
                     setErrorHappened(work);
                 } else {
@@ -2879,9 +3550,9 @@ void updateNetworkPatControl(void)
         break;
     case 0x20:
         if (work->flag_0x04C == 1) {
-            work->counter_0xC360 = 0;
-            work->counter_0xC362 = 0;
-            work->counter_0xC364 = 0;
+            work->idle_hold_0xC360 = 0;
+            work->idle_press_0xC362 = 0;
+            work->idle_frames_0xC364 = 0;
             work->sub_state_0x017 = 0x19;
             work->mode_0x010 = 3;
             work->flag_0x82C4 = 0;
@@ -3036,13 +3707,13 @@ void updateNetworkPatControl(void)
             break;
         case 4:
             if (getNetworkCommunityPat(getPatsObject(), 0) != NULL) {
-                work->community_results_0xA144[0].words_0x00[2] = 0;
+                work->community_results_0xA144[2] = 0;
                 getNetworkCommunityPat(getPatsObject(), 0)->shutdown_20();
             }
             work->step_0x018++;
             return;
         case 5:
-            if (getNetworkCommunityPat(getPatsObject(), 0) == NULL || work->community_results_0xA144[0].words_0x00[2] != 0) {
+            if (getNetworkCommunityPat(getPatsObject(), 0) == NULL || work->community_results_0xA144[2] != 0) {
                 if (getNetworkSessionManagerPat(getPatsObject(), 0) != NULL) {
                     clearPhaseSlot(2);
                     getNetworkSessionManagerPat(getPatsObject(), 0)->request368();
@@ -3523,9 +4194,9 @@ BOOL NetCtrlWk::restartSession(void)
     }
     work->sub_state_0x017 = 0x19;
     work->mode_0x010 = 3;
-    work->counter_0xC362 = 0;
-    work->counter_0xC360 = 0;
-    work->counter_0xC364 = 0;
+    work->idle_press_0xC362 = 0;
+    work->idle_hold_0xC360 = 0;
+    work->idle_frames_0xC364 = 0;
     work->flag_0x82C4 = 0;
     work->flag_0x82C5 = 0;
     work->flag_0x82C7 = 0;
@@ -4491,7 +5162,7 @@ s32 NetCtrlWk::checkOwnInvite(u8 id, s8* result)
     }
     invite = &work->invites_0xBF3C[id - 1];
     if (invite->valid_0x0B == 1) {
-        if (strcmp(work->name_0x7368, invite->name_0x00) == 0) {
+        if (strcmp(work->name_0x7368, invite->id_text_0x00) == 0) {
             *result = 1;
             return 1;
         }
@@ -4525,7 +5196,7 @@ s32 checkOtherInvite(u8 id, s8* result)
         *result = 1;
         return 1;
     }
-    if (strcmp(work->name_0x7368, invite->name_0x00) != 0) {
+    if (strcmp(work->name_0x7368, invite->id_text_0x00) != 0) {
         *result = 1;
         return 1;
     }
@@ -4878,15 +5549,15 @@ void NetCtrlWk::copyRosterLists(NetRosterListView* roster, NetRecentListView* re
     }
     memset(roster, 0, sizeof(*roster));
     memset(recent, 0, sizeof(*recent));
-    roster->count_0x000 = work->roster_count_0xA1B8;
+    roster->count_0x000 = work->roster_0xA1B8.count_0x000;
     for (i = 0; i < roster->count_0x000; i++) {
-        memcpy(roster->rows_0x004[i].name_0x00, work->roster_0xA1BC[i].name_0x20, 0x14);
-        formatNetId(roster->rows_0x004[i].id_text_0x14, &work->roster_0xA1BC[i].id_0x00);
+        memcpy(roster->rows_0x004[i].name_0x00, work->roster_0xA1B8.entries_0x004[i].name_0x20, 0x14);
+        formatNetId(roster->rows_0x004[i].id_text_0x14, &work->roster_0xA1B8.entries_0x004[i].id_0x00);
     }
-    recent->count_0x000 = work->recent_count_0xBB84;
+    recent->count_0x000 = work->recent_0xBB84.count_0x000;
     for (i = 0; i < recent->count_0x000; i++) {
-        memcpy(recent->rows_0x004[i].name_0x00, work->recent_0xBB88[i].name_0x20, 0x14);
-        formatNetId(recent->rows_0x004[i].id_text_0x14, &work->recent_0xBB88[i].id_0x00);
+        memcpy(recent->rows_0x004[i].name_0x00, work->recent_0xBB84.entries_0x004[i].name_0x20, 0x14);
+        formatNetId(recent->rows_0x004[i].id_text_0x14, &work->recent_0xBB84.entries_0x004[i].id_0x00);
     }
 }
 

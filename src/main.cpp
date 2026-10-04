@@ -252,7 +252,6 @@ extern u8 lbl_807947A4;
 extern void* lbl_807947AC;
 extern u32 lbl_807947B0;
 extern void* lbl_8079483C;
-extern u32 lbl_80794868;
 extern void* lbl_80794A20;
 extern u8 lbl_80790E20;
 extern char lbl_8057C82C[];
@@ -932,7 +931,7 @@ extern "C" void fn_80040144(void)
         u32 ticks = (OS_BUS_CLOCK >> 2) / 1000;
         OSSleepTicks(0, ticks);
     }
-    lbl_80794868++;
+    frame_counter++;
     lbl_807947A0 = 0;
 }
 

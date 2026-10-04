@@ -40,6 +40,7 @@
 #include "unsplit/lobby.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 #include "ai/fn_802D44F4.h" /* ai_slots_clear (rule 2: its owner) */
+#include "lobby/lb_npc.h" /* lb_party_state_reset (rule 2: its owner) */
 /* signatures the calls below use, when they differ from the owner header's: a cast call is the same direct call. */
 #define eft_state_flags_set_c1 ((void (*)(_EFT*, u32, u32))eft_state_flags_set)
 
@@ -58,7 +59,6 @@ void  fn_803B4C64(void);
 void  fn_802E0468(u8 index, s32 value);
 void  fn_802DFCD4(void);
 void* memset(void* dst, int value, u32 size);
-s32   fn_802087D4(void);
 void  sysSE_stop(s32 value);
 char* quest_result_field_text_get(MenuQuestWork* self, s32 index);
 s32   fn_803223B0(MenuQuestWork* self, u8 value);
@@ -356,7 +356,7 @@ extern "C" void fn_8032194C(void) {
     if (lb_param_w.field_0x04 != 0) {
         sysSE_req(9);
     }
-    fn_802087D4();
+    lb_party_state_reset();
     sysSE_stop(1);
 }
 

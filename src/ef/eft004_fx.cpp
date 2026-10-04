@@ -52,7 +52,7 @@ extern "C" Eft004* eft_res_slot_get(u32 pool_id);
 extern "C" Eft004* fn_801007BC(void* owner, u32 arg1, u32 arg2, u32 arg3, s32* arg4,
                                f32 farg0, f32 farg1, f32 farg2);
 
-extern "C" u8 fn_800CF208(Eft004* self);
+extern "C" u8 GameMode_ck(Eft004* self);
 extern "C" f32 lbl_807966B8; /* 0.0f  .sdata2 */
 
 extern "C" void fn_80100AA8(Eft004* self);
@@ -303,7 +303,7 @@ extern "C" void fn_80101594(_PLW* self)
         effect->field_0x10 = 20;
         effect->owner_0x30 = self;
         effect->area_0x44 = self->area_0x16;
-        if (fn_800CF208(effect) == 1) {
+        if (GameMode_ck(effect) == 1) {
             key = self->field_0x655;
             if ((key & 0x80) != 0) {
                 effect->byte_0x08 = 0;

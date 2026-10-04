@@ -153,7 +153,7 @@ f32 fn_8021F228(void)
 }
 
 /* The selected row; also published to the sound unit through `include/unsplit/lobby.h`. */
-s32 fn_8021F238(void)
+s32 getItemListSelection(void)
 {
     return lb_item_list_state.selected_0x38;
 }
@@ -202,7 +202,7 @@ void syncItemListClock(u32 stamp, u32 count, f32 depth)
     lb_item_list_state.step_0x18 = lbl_80799C78 * count;
     lb_item_list_state.scroll_0x30 = depth;
     lb_item_list_state.depth_0x34 = depth;
-    lbl_80794868 = stamp;
+    frame_counter = stamp;
     lb_item_list_state.stamp_0x04 = stamp;
     if ((f32)depth == lbl_80799C7C) {
         lb_item_list_state.selected_0x38 = 1;

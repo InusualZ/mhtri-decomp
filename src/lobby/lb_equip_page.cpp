@@ -487,7 +487,7 @@ extern "C" void fn_80224AC4(PlSeRig* rig)
     u32 i;
     u32 v;
 
-    if ((u8)fn_800CF208() == 1) {
+    if ((u8)GameMode_ck() == 1) {
         if (fn_8026FD94(rig->plw) == 0) {
             flag = 0;
         }
@@ -501,7 +501,7 @@ extern "C" void fn_80224AC4(PlSeRig* rig)
         flag = 0;
     }
     if (Pl_master_ck(rig->plw) == 0) {
-        if ((u8)fn_800CF208() == 2 && game_ready_ck() == 1 && rig->plw->field_0xB04 == 0) {
+        if ((u8)GameMode_ck() == 2 && game_ready_ck() == 1 && rig->plw->field_0xB04 == 0) {
             flag = 0;
         }
     }

@@ -17,6 +17,12 @@ s32 fn_800E885C(void);
 void setStreamTransferMode(u32 mode);
 /* 0x800E8D40 - resets the reverb work area (its 0x8000-byte buffer at 0x90003F60 and the cursor words). */
 void clearReverbWorkArea(void);
+/* 0x800E8CC8 - copies `count` halfwords into the ring the reverb time counter walks (GUESS name: the network layer
+ * callback hands it the record layer command 39 delivers). */
+void pushReverbSamples(s16* src, s32 count);
+/* 0x800E8D74 - advances the reverb time counter by 0xB with interrupts off (GUESS name). */
+void advanceReverbClock(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -95,6 +95,11 @@ extern f32 lbl_8079D638; /* 1.0f */
 extern f32 lbl_8079D63C; /* 0.5f */
 extern f32 lbl_8079D698; /* 15.0f */
 
+/* `.sbss` 0x80794868 - the frame counter: `main.cpp`'s frame end increments it after the retrace wait, the lobby item
+ * list and the stream player copy it as a tick stamp, and the network layer callback stamps peer joins with it.  No
+ * registered range covers it (the bracketing `.sbss` claims are `main.cpp` below and `fn_80047398.cpp` above). */
+extern u32 frame_counter;
+
 /* The helpers the 0x805482CC-0x8054E894 band tail-calls into its unregistered neighbours (the bands
  * below at 0x8054F788 / 0x805526xx and above at 0x80553xxx / 0x8055Bxxx, none of which is registered
  * yet, so rule 2's owner has no header to name).  Signatures are the call sites': r3 is the address

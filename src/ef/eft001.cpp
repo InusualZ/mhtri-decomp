@@ -109,7 +109,7 @@ void get_joint_wpos_em(_ENEMY_WORK* enemy, u32 joint, nw4r::math::VEC3* out);
 f32 GetGroundHit(nw4r::math::VEC3* pos, u32 ground, u8 flag);
 
 extern "C" {
-u8 fn_800CF208(void* model);
+u8 GameMode_ck(void* model);
 
 void* eft_res_slot_get(u32 pool);
 void eft_res_slot_release(void* self);
@@ -211,7 +211,7 @@ extern "C" void fn_800FBBC0(_EFT* self, u32 index, u32 flags)
     model = &((_EFT001_PHYSICS*)plw->physics_0x13C)->joint_0x004;
     model->get_joint_wpos(flags, &pos);
 
-    switch (fn_800CF208(model)) {
+    switch (GameMode_ck(model)) {
     case 2:
         pos.y = lbl_80796610 + plw->field_0x060;
         break;

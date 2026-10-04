@@ -117,7 +117,7 @@ void fn_80268E48(_PLW* self, u32 unused, s32 mode, u8** stream) {
 /* 0x80267C84 - the player-type index the current game mode uses. */
 u8 fn_80267C84(_PLW* self) {
     u8 type = 0;
-    u8 mode = fn_800CF208();
+    u8 mode = GameMode_ck();
 
     if (mode == 2) {
         if (PlayMode_ck() == 5) {
