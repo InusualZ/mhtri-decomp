@@ -45,6 +45,7 @@ now false is a fact about the repo *or* about the tool, and the two are told apa
 rows still pass.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import os
 import re
@@ -53,10 +54,8 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CONFIG = os.path.join(ROOT, "config", "RMHE08")
 
-if os.path.join(ROOT, "tools", "units") not in sys.path:
-    sys.path.insert(0, os.path.join(ROOT, "tools", "units"))
 
-import symbolpreflight as sp  # noqa: E402  (imported through the sys.path shim above)
+from tools.units import symbolpreflight as sp
 
 # Section classes, spelled out here rather than imported from symbolpreflight: a change to that tuple has
 # to be a deliberate change here too, or the derived rows would follow the tool into a wrong verdict.

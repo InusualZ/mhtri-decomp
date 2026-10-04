@@ -13,7 +13,8 @@ import shutil
 import subprocess
 import time
 
-import tools.unitutil as unitutil
+from tools.lib import proc as _proc
+from tools.lib import testing
 from tools.lib.git import Git
 from tools.lib.lanes import launch, naming, pool, registry, rescue as lane_rescue, seed, sessions, teardown
 from tools.lib.lanes.naming import (BRANCH_PREFIX, SLUG_MAX, branch_for, norm_unit, slug,  # noqa: F401
@@ -23,6 +24,8 @@ from tools.lib.lanes.registry import (ack_path, branch_exists, claim_branch, cla
                                       outbox_path, registry_path, worker_branches)
 from tools.lib.lanes.seed import (ORIG_JUNCTION_MIN_BYTES, ORIG_REL, RMHE08_REL, SEED_COPY_DIRS,  # noqa: F401
                                   seed_worktree_build)
+
+_proc.install_spawn_retry()  # a launch Windows refuses transiently (WinError 5) is retried
 
 load_registry = registry.load
 save_registry = registry.save
@@ -497,7 +500,7 @@ def expire(main: str, minutes: int, apply: bool) -> list[dict]:
 # --- selftest -----------------------------------------------------------------------------------------------
 
 def selftest() -> int:
-    unitutil.isolate_live_state()   # no real ~/.claude/sessions: a live lane must not change the verdict
+    testing.isolate_live_state()   # no real ~/.claude/sessions: a live lane must not change the verdict
     fails = []
     checks = 0
 
@@ -527,7 +530,7 @@ def selftest() -> int:
     check("outbox path is in MAIN", os.path.dirname(os.path.dirname(outbox_path("/tmp/mhtri-dtk", "Pl/pl_act"))),
           os.path.join("/tmp/mhtri-dtk", ".pi"))
 
-    with unitutil.temp_dir() as tmp:
+    with testing.temp_dir() as tmp:
         main = os.path.join(tmp, "mhtri-dtk")
         os.makedirs(main)
         check("registry starts empty", load_registry(main), {})
@@ -547,7 +550,7 @@ def selftest() -> int:
         check("the outbox is the stored branch's slug", os.path.basename(outbox_path(main, "Camellia/camellia")),
               "camellia-67ed.json")
 
-    with unitutil.temp_dir() as tmp:
+    with testing.temp_dir() as tmp:
         os.makedirs(os.path.join(tmp, ".pi"), exist_ok=True)
         save_registry(tmp, {"Pl/x": {"branch": "worker/x", "claimed_at": "2026-01-01T00:00:00"}})
         check("an unacked claim has no ack file", load_ack(tmp, "Pl/x"), {})
@@ -611,7 +614,7 @@ def selftest() -> int:
     live_session = lambda _row: {"session": "sid-1 (worker: x)", "known": True, "alive": True}
 
     # the live-lane signal is the session registry: a record whose pid is alive and whose cwd is the claim's tree
-    with unitutil.temp_dir() as tmp:
+    with testing.temp_dir() as tmp:
         reg_root = os.path.join(tmp, "claude", sessions.SESSIONS_DIRNAME)
         os.makedirs(reg_root)
         wt = os.path.join(tmp, "ws-live")
@@ -634,7 +637,7 @@ def selftest() -> int:
         check("no registry is no signal (known=False)", session_probe({"worktree": wt})["known"], False)
 
     # status and timeout: a stale ack is not enough to reclaim a worker whose session is alive
-    with unitutil.temp_dir() as tmp:
+    with testing.temp_dir() as tmp:
         main = new_repo(tmp)
         branch, wt = claimed(main, "Pl/live", outbox=False)
         stamp = time.strftime(registry.STAMP, time.localtime(time.time() - 3600))
@@ -661,7 +664,7 @@ def selftest() -> int:
               (branch_exists(main, branch), os.path.isdir(wt), load_registry(main), os.path.exists(ack_path(main, "Pl/live"))),
               (False, False, {}, False))
 
-    with unitutil.temp_dir() as tmp:
+    with testing.temp_dir() as tmp:
         os.makedirs(os.path.join(tmp, ".pi"), exist_ok=True)
         save_registry(tmp, {"Pl/pl_act": {"branch": branch_for("Pl/pl_act")},
                             "Pl/pl_skill": {"branch": branch_for("Pl/pl_skill") + "-dd6e"}})
@@ -676,7 +679,7 @@ def selftest() -> int:
               slug("Pl/pl_skill") + ".json")
 
     # claim() end to end: the worktree it cuts is seeded, the kind maps to its profile, and it releases clean
-    with unitutil.temp_dir() as tmp:
+    with testing.temp_dir() as tmp:
         seed_main = new_repo(tmp)
         os.makedirs(os.path.join(seed_main, "build", "tools"))
         open(os.path.join(seed_main, "build", "tools", "dtk.exe"), "wb").write(b"dtk")
@@ -712,7 +715,7 @@ def selftest() -> int:
               open(os.path.join(seed_main, "orig", "RMHE08", "sys", "main.dol"), "rb").read(), b"dol")
 
     unit = "Pl/pl_act"
-    with unitutil.temp_dir() as tmp:
+    with testing.temp_dir() as tmp:
         main = new_repo(tmp)
         branch, wt = claimed(main, unit)
         check("ack_place_error accepts the claim's worktree and branch", ack_place_error(main, unit, wt), None)
@@ -726,7 +729,7 @@ def selftest() -> int:
         check("ack() refuses from the wrong place", _raises(lambda: ack(unit, main, agent="w-a")), True)
         check("... and writes no heartbeat agent", load_ack(main, unit).get("agent"), None)
 
-    with unitutil.temp_dir() as tmp:
+    with testing.temp_dir() as tmp:
         main = new_repo(tmp)
         _worker_branch, worker_wt = claimed(main, "Pl/pl_act")
         check("a claim from MAIN on main passes the guard", claim_place_error(main, main), None)
@@ -739,7 +742,7 @@ def selftest() -> int:
                "Pl/pl_skill" in load_registry(main), branch_exists(main, branch_for("Pl/pl_skill"))),
               (True, False, False))
 
-    with unitutil.temp_dir() as tmp:
+    with testing.temp_dir() as tmp:
         main = new_repo(tmp)
         branch, wt = claimed(main, unit)
         tip = repo_git(main, "rev-parse", branch)
@@ -755,7 +758,7 @@ def selftest() -> int:
         check("release twice: the worktree and branch steps are skips",
               (step_of(second, "worktree remove")["status"], step_of(second, "branch -D")["status"]), ("skipped", "skipped"))
 
-    with unitutil.temp_dir() as tmp:
+    with testing.temp_dir() as tmp:
         main = new_repo(tmp)
         branch, wt = claimed(main, unit)
         shutil.rmtree(wt)
@@ -764,7 +767,7 @@ def selftest() -> int:
         check("... the skip says so, and the branch still goes",
               ("already gone" in step_of(out, "worktree remove")["why"], branch_exists(main, branch)), (True, False))
 
-    with unitutil.temp_dir() as tmp:
+    with testing.temp_dir() as tmp:
         main = new_repo(tmp)
         branch, wt = claimed(main, unit, worktree=False)
         repo_git(main, "branch", "-D", branch)
@@ -774,7 +777,7 @@ def selftest() -> int:
         check("a branch already deleted is a clean release", out["complete"], True)
         check("... a leftover directory git no longer tracks is removed", os.path.isdir(wt), False)
 
-    with unitutil.temp_dir() as tmp:
+    with testing.temp_dir() as tmp:
         main = new_repo(tmp)
         branch, wt = claimed(main, unit)
         out = release(unit, main, force=False, dry_run=False, probe=live_session)
@@ -795,7 +798,7 @@ def selftest() -> int:
         check("... and once it is gone the release completes",
               release(unit, main, force=False, dry_run=False)["complete"], True)
 
-    with unitutil.temp_dir() as tmp:
+    with testing.temp_dir() as tmp:
         main = new_repo(tmp)
         branch, wt = claimed(main, unit)
         out = release(unit, main, force=False, dry_run=True, probe=no_session)
@@ -849,7 +852,7 @@ def selftest() -> int:
         save_registry(m, reg)
         return b, w
 
-    with unitutil.temp_dir() as tmp:
+    with testing.temp_dir() as tmp:
         main = registered_main(tmp)
         branch, wt = claim_shell(main, "red/red")
         write(wt, "src/red/red.cpp", "int f(void) { return 1; }\n")
@@ -862,7 +865,7 @@ def selftest() -> int:
                "pruned %s" % rescue_ref_name("red/red") in step_of(out, "rescue ref audit")["why"],
                rescue_exists(main, "red/red")),
               (rescue_ref_name("red/red"), "redundant", True, True, None))
-    with unitutil.temp_dir() as tmp:
+    with testing.temp_dir() as tmp:
         main = registered_main(tmp)
         branch, wt = claim_shell(main, "unl/unl")
         apply_unit(wt, "unl/unl")
@@ -872,7 +875,7 @@ def selftest() -> int:
               (out["rescue_verdict"]["verdict"], out["rescue_verdict"]["pruned"], rescue_exists(main, "unl/unl"),
                "UNLANDED WORK" in step_of(out, "rescue ref audit")["why"], out["complete"]),
               ("unlanded", False, rescue_ref_name("unl/unl"), True, True))
-    with unitutil.temp_dir() as tmp:
+    with testing.temp_dir() as tmp:
         main = registered_main(tmp)
         branch, wt = claim_shell(main, "clean/clean")
         apply_unit(wt, "clean/clean")
@@ -884,7 +887,7 @@ def selftest() -> int:
               (None, None, "no rescue ref: nothing was parked", True))
 
     # the sweep: only merged claims; a live session is reported rather than forced
-    with unitutil.temp_dir() as tmp:
+    with testing.temp_dir() as tmp:
         main = new_repo(tmp)
         done_branch, _ = claimed(main, "Pl/pl_act")
         repo_git(main, "cherry-pick", done_branch)
@@ -906,7 +909,7 @@ def selftest() -> int:
                os.path.isdir(open_wt)), (False, False, True, True))
 
     # a branch selector: one unit can carry two claims and the registry records only one of them
-    with unitutil.temp_dir() as tmp:
+    with testing.temp_dir() as tmp:
         main = new_repo(tmp)
         old_branch, _old_wt = claimed(main, unit)
         second_branch = "worker/8033f270-second-claim"

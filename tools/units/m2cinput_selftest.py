@@ -12,6 +12,7 @@ data-only `gap_*` blob - without depending on a split object being present.
 The rows are the contract: when a rewrite changes on purpose, the row changes with it.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import contextlib
 import io
@@ -20,10 +21,8 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-if os.path.join(ROOT, "tools", "units") not in sys.path:
-    sys.path.insert(0, os.path.join(ROOT, "tools", "units"))
 
-import m2cinput as m2c  # noqa: E402  (imported through the sys.path shim above)
+from tools.units import m2cinput as m2c
 
 # One `.text` section, verbatim in the shape `objdump -dr --no-show-raw-insn` prints it.
 TEXT_OBJECT = "\n".join(

@@ -1,34 +1,15 @@
 #!/usr/bin/env python3
-"""Write a module `symbols.txt` from an RSO's export table, and report the import resolution.
-
-The export table is the only symbol information a retail RSO carries: name, section index, section
-offset and a name hash - no sizes and no local symbols. So the generated `symbols.txt` is a *seed*:
-it pins the names and addresses the original link exported, and the analyzer fills in the rest once a
-module can be split (see docs/rso-modules.md for the splitter blocker).
-
-Section names are derived from evidence, and the derivation is recorded per section:
-
-    proven    .init   the section holding the module's prolog entry point
-              .ctors  the section holding the `_ctors` label
-              .dtors  the section holding the `_dtors` label
-              .bss    the section with no file bytes whose size equals the header's bss size
-    inferred  everything else, by index order from the conventional REL section pool
-
-Usage:
-    python tools/rso/symbols.py --all [--out config/RMHE08] [--report build/tmp/rso-symbols/summary.md]
-    python tools/rso/symbols.py --rso <file.rso> --print
-"""
+"""Write a module `symbols.txt` seed from an RSO's export table, and report the import resolution. Spec: docs/tools/spec/rso.md.
+CLI: symbols.py --all [--out DIR] [--report MD] | --rso FILE [--print]."""
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import os
 import re
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # tools/
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import inventory
-import unitutil as uu
+from tools.lib import repo
 from tools.lib.project import SymbolMap
+from tools.rso import inventory
 
 # Fallback order for sections the evidence cannot name: small export-less sections first (extab /
 # extabindex are small and never carry exports), then the data sections.
@@ -118,7 +99,7 @@ def emit(mod, out_dir):
 
 def dol_symbols():
     """{name: line} for the DOL's symbols.txt - read with a stream, never loaded into a prompt."""
-    path = os.path.join(uu.ROOT, "config", "RMHE08", "symbols.txt")
+    path = os.path.join(repo.repo_root(), "config", "RMHE08", "symbols.txt")
     if not os.path.exists(path):
         return {}
     return {e.name: e.line.strip() for e in SymbolMap(path).rows()}
@@ -126,10 +107,10 @@ def dol_symbols():
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--dir", default=os.path.join(uu.ROOT, "orig", "RMHE08", "files"))
+    ap.add_argument("--dir", default=os.path.join(repo.repo_root(), "orig", "RMHE08", "files"))
     ap.add_argument("--rso", action="append", default=[])
     ap.add_argument("--all", action="store_true", help="every *.rso under --dir")
-    ap.add_argument("--out", default=os.path.join(uu.ROOT, "config", "RMHE08"),
+    ap.add_argument("--out", default=os.path.join(repo.repo_root(), "config", "RMHE08"),
                     help="root to write <module>/symbols.txt under")
     ap.add_argument("--report", help="write the section/import report here")
     ap.add_argument("--print", action="store_true", help="print instead of writing")
@@ -154,7 +135,7 @@ def main():
     for m in sorted(mods, key=lambda m: -m["size"]):
         module = os.path.splitext(os.path.basename(m["path"]))[0]
         path, count, names = emit(m, args.out)
-        print("%-18s %3d exports -> %s" % (module, count, os.path.relpath(path, uu.ROOT)))
+        print("%-18s %3d exports -> %s" % (module, count, os.path.relpath(path, repo.repo_root())))
         report.append("## %s (%s)" % (module, m["name"]))
         report.append("")
         report.append("| section | name | how | size |")
@@ -189,7 +170,7 @@ def main():
     if args.report:
         os.makedirs(os.path.dirname(args.report), exist_ok=True)
         open(args.report, "w", encoding="utf-8", newline="\n").write("\n".join(report))
-        print("wrote", os.path.relpath(args.report, uu.ROOT))
+        print("wrote", os.path.relpath(args.report, repo.repo_root()))
 
 
 if __name__ == "__main__":

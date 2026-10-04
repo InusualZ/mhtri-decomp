@@ -41,7 +41,7 @@ Inputs -> outputs: obj/ + src/ objects -> tables, exit.
 
 ## Lib dependencies
 
-objcompare, report (freshness, stamps); `unitutil.resolve_unit` for the unit.
+objcompare, report (freshness, stamps); `lib.units.Unit.resolve` for the unit.
 
 ## Test contract
 

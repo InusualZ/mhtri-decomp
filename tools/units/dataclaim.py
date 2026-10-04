@@ -18,14 +18,11 @@ from tools.lib.binary.elf import Elf as LibElf, ElfError
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
-for _path in (os.path.dirname(HERE), HERE):
-    if _path not in sys.path:
-        sys.path.insert(0, _path)
 
-import symbolpreflight as preflight  # noqa: E402
-import ledger as ledger_mod  # noqa: E402  (Objects/covering + the report's numbers)
-import dataqueue as dq  # noqa: E402  (the queue's own section order is this tool's sort key)
-import dataseams  # noqa: E402  (`.data` emission-order seams - a run spanning several TUs)
+from tools.units import symbolpreflight as preflight
+from tools.units import ledger as ledger_mod  # Objects/covering + the report's numbers
+from tools.lib.project.splits import SECTION_ORDER  # dtk's section order is this tool's sort key
+from tools.units import dataseams  # `.data` emission-order seams - a run spanning several TUs
 
 GAME = "RMHE08"
 QUEUE_REL = os.path.join("tools", "units", "data-queue.json")
@@ -51,7 +48,7 @@ QUEUE_WHY = {
 
 def section_key(section: str) -> tuple:
     """The queue's deterministic section order, so a `--limit` here is the queue's own prefix."""
-    order = dq.SECTION_ORDER
+    order = SECTION_ORDER
     return (order.index(section) if section in order else len(order), section)
 
 
@@ -775,7 +772,7 @@ def declaration_locations(root: str, names) -> dict[str, list[str]]:
     this says where the declaration actually sits, so an `owner-header` remedy beside `declared in:
     include/unsplit/<band>.h` shows the gap in one line. An empty list renders as `not declared`.
     """
-    from units import stylelint as sl  # noqa: PLC0415 - the one declaration reader
+    from tools.units import stylelint as sl  # noqa: PLC0415 - the one declaration reader
     want = set(names)
     out: dict[str, list[str]] = {n: [] for n in want}
     if not want:
@@ -862,10 +859,7 @@ def unit_data_references(root: str, unit: str) -> tuple[list[str], str | None]:
     """`(names, object)` for the data symbols the unit's object references. The target object first
     (what retail's TU needs), its source object as the fallback (a unit not split yet)."""
     rel = os.path.splitext(unit)[0] + ".o"
-    try:
-        from units import undefrefs as uref  # noqa: PLC0415 - one ELF relocation reader
-    except ImportError:                       # pragma: no cover - direct script execution
-        import undefrefs as uref              # type: ignore
+    from tools.units import undefrefs as uref  # noqa: PLC0415 - one ELF relocation reader
     for base in (OBJ_DIR, SRC_DIR):
         path = os.path.join(root, base, rel)
         if not os.path.exists(path):
@@ -898,7 +892,7 @@ def census_readers(root: str):
 
 def reference_report(root: str, unit: str) -> dict:
     """Classify every data symbol `unit` references and does not own, with a remedy per symbol."""
-    from units import stylelint as sl  # noqa: PLC0415 - the one ownership index
+    from tools.units import stylelint as sl  # noqa: PLC0415 - the one ownership index
     ownership = sl.load_ownership(root)
     if ownership is None:
         raise RuntimeError("no config/RMHE08/symbols.txt or splits.txt - nothing to decide against")
@@ -988,7 +982,7 @@ def render_references(payload: dict) -> str:
 def fixpoint_cli(unit: str, root: str = ROOT, as_json: bool = False) -> int:
     """`--unit U --fixpoint`: claim, re-judge, repeat (`datagap.fixpoint_plan`) and print the converged plan or the
     exact blocker. Read-only; `root` defaults to this tool's tree (a read-only look at another tree is `--root`)."""
-    from units import datagap as datagap_mod  # noqa: PLC0415 - the strict row's own reading
+    from tools.units import datagap as datagap_mod  # noqa: PLC0415 - the strict row's own reading
 
     unit = os.path.splitext(unit.replace("\\", "/"))[0]
     for line in datagap_mod.render_freshness("this tree's", datagap_mod.tree_freshness(root)):
@@ -1019,7 +1013,7 @@ def reference_cli(unit: str, as_json: bool = False, dry_run: bool = False) -> in
         return 2
     plan_info = None
     try:
-        from units import datagap as datagap_mod  # noqa: PLC0415 - the strict row's own reading
+        from tools.units import datagap as datagap_mod  # noqa: PLC0415 - the strict row's own reading
         plan_info = datagap_mod.unit_plan(ROOT, unit)
     except Exception as exc:                        # noqa: BLE001 - the plan is additive; the references stand alone
         print("dataclaim: strict claim plan unavailable (%s)" % exc, file=sys.stderr)
@@ -1222,7 +1216,7 @@ def selftest() -> int:
     check("rendering twice is byte-identical", render(ordered), render(sort_entries(ordered)))
     check("the render is valid JSON", json.loads(render(ordered))[0]["unit"], "c")
     check("the section order matches the queue's", section_key(".data") < section_key(".sdata2"), True)
-    check("an unknown section sorts last", section_key(".zzz")[0], len(dq.SECTION_ORDER))
+    check("an unknown section sorts last", section_key(".zzz")[0], len(SECTION_ORDER))
     check("every verdict is from the vocabulary", set(VERDICTS), {"safe", "lowers-score", "overlap", "unowned"})
     check("a summary counts the verdicts", "safe 1" in summary(ordered, "q.json"), True)
     check("an empty summary says so", summary([], "q.json"), "no runs - the queue is empty or absent")
@@ -1434,7 +1428,7 @@ def selftest() -> int:
     # `--unit U --fixpoint`: the converged plan (or the blocker) over a fixture tree, read-only
     import contextlib
     import io
-    from units import datagap as dg  # noqa: PLC0415
+    from tools.units import datagap as dg  # noqa: PLC0415
 
     with tempfile.TemporaryDirectory() as tmp:
         def put(rel, text):

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Read-only audit of `splits.txt`: twelve invariants per unit against the retail DOL and the map.
 Spec: docs/tools/spec/splitcheck.md. CLI: splitcheck.py --baseline [--json F] [--all] [--only INV]
-[--unit REGEX] [--intervals] | --readers SEC:START-END | --selftest."""
+[--unit REGEX] [--intervals] | --readers SEC:START-END."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
@@ -17,8 +17,7 @@ from tools.splits.invariants.audit import (FAIL, INVARIANTS, Ctx, analyse, ctors
                                            pool_groups, pool_intervals, print_defects, print_table, readers_report,
                                            report_json, seam_requests, top_defects, tree_root)
 
-TOOL = _cli.Tool("splitcheck", "docs/tools/spec/splitcheck.md", tests="tools/tests/splits/test_splitcheck.py",
-                 description=__doc__, common=())
+TOOL = _cli.Tool("splitcheck", "docs/tools/spec/splitcheck.md", description=__doc__, common=())
 
 
 def cmd_baseline(args):
@@ -92,8 +91,6 @@ def main(argv=None):
     ap.add_argument("--intervals", action="store_true",
                     help="with --baseline: print each pool value held at two addresses (read by --unit's units) with the interval a TU starts in")
     args = ap.parse_args(argv)
-    if args.selftest:
-        return TOOL.selftest()
     if args.readers:
         return cmd_readers(args)
     if args.baseline:

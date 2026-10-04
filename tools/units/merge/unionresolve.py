@@ -1,5 +1,5 @@
 """The landing path's union of a registration conflict (by `unionprose`'s rule) and the four invariants a wrong
-union breaks silently (`check_union`). Spec: docs/tools/spec/unionresolve.md. CLI: none (module)."""
+union breaks silently (`check_union`). Spec: docs/tools/spec/merge.md. CLI: none (module)."""
 from __future__ import annotations
 
 import collections

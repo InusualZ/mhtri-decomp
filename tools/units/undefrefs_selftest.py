@@ -15,6 +15,7 @@ candidate decides the cached index is built, a clean batch does not, and the ind
 `build/tmp/undefrefs/link-symbols.json`.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import os
 import shutil
@@ -23,12 +24,8 @@ import sys
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-if HERE not in sys.path:
-    sys.path.insert(0, HERE)
-if os.path.dirname(HERE) not in sys.path:
-    sys.path.insert(0, os.path.dirname(HERE))
 
-import undefrefs as ur  # noqa: E402
+from tools.units import undefrefs as ur
 
 SHT_PROGBITS = 1
 SHT_SYMTAB = 2

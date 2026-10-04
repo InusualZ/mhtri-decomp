@@ -7,7 +7,7 @@ and rewrites the shared files (`splits.txt`, `configure.py`) all-or-nothing with
 
 ## Users
 
-`agents/edit.py` (replace/normalise/check), `units/escape.py --write`, `units/sharedfiles.py` (and through it `symedit`,
+`agents/edit.py` (replace/normalise/check), `units/escape.py --write`, `dataqueue` (`Transaction`; WP6 deleted `units/sharedfiles.py`, through which `symedit`,
 `dataqueue`, `recordmerge`), `dataclaim`, `backlog`, `agents/sync_profiles.py`, `lib.cache`.
 
 ## Public API

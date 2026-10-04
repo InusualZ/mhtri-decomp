@@ -1,36 +1,8 @@
 #!/usr/bin/env python3
-"""ideas.py - find, read, add and check the matching playbook's ideas (docs/matching/NNN-slug.md).
-
-    python tools/agents/ideas.py find <words...> [--tag T] [--status S] [--applies V] [-n N]
-    python tools/agents/ideas.py show N
-    python tools/agents/ideas.py where N
-    python tools/agents/ideas.py new --title T --tags a,b [--kind codegen|process] [--slug s] [--applies a,b]
-    python tools/agents/ideas.py check [--demos]
-    python tools/agents/ideas.py demo-check [N ...|--all|--changed REF]
-    python tools/agents/ideas.py --selftest
-
-`find` ranks ideas by the query words against the title, tags, slug and problem sentence (the problem is written
-as the symptom, so search by what you see). `show` prints the file and, for an idea with a demo, the demo's
-path and the compile line. `new` allocates the next free id ATOMICALLY (an exclusive create of a per-id lock,
-so two lanes racing in one tree cannot take one id), scaffolds the idea (a `codegen` idea also gets a demo
-`.cpp` with the header below) and regenerates the index and the skill's copy. `check` is the whole gate: front
-matter schema, unique ids, file names agreeing with ids, the H1 agreeing with the title, index and skill copy
-fresh, every `demo:` existing, no orphan demo file, every demo header well-formed (`--demos` also compiles them,
-as `demo-check --all`). `demo-check` compiles each demo with the real MWCC (the base cflags read from
-configure.py, the demo's FLAGS replacing same-family flags) and tests its EXPECT lines against
-`objdump -d -r -t -h`; the vocabulary is `ideas_demo.py`'s.
-
-The parser is `sync_playbook_index.py`'s - this tool imports it and never forks it.
-
-DEMO HEADER (`NNN-slug.cpp`, one per codegen idea; stage 3 compiles it and checks the EXPECT lines):
-
-    /* Demo for idea NNN.
-     * FLAGS: -O4,p -inline auto       flags appended to the unit's base cflags (one line)
-     * MWCC: Wii/1.3                   compiler; optional, default Wii/1.3
-     * EXPECT: contains fmuls          repeatable; one assertion about the compiled object per line
-     * EXPECT: absent fmadds             (vocabulary: ideas_demo.py / docs/matching/README.md)
-     */
-"""
+"""Find, read, add and check the matching playbook's ideas (docs/matching/NNN-slug.md). Spec: docs/tools/spec/ideas.md.
+CLI: ideas.py find <words> [--tag T] [--status S] [--applies V] [-n N] | show N | where N | new --title T --tags a,b
+[--kind codegen|process] [--slug s] [--applies a,b] | check [--demos] | demo-check [N ...|--all|--changed REF] | --selftest."""
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import os
 import re
@@ -39,10 +11,10 @@ import sys
 import tempfile
 import time
 
+from tools.agents import ideas_demo
+from tools.agents import sync_playbook_index as spi
+
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, HERE)
-import sync_playbook_index as spi  # noqa: E402
-import ideas_demo  # noqa: E402
 
 DEFAULT_MWCC = "Wii/1.3"
 SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -196,7 +168,7 @@ def cmd_where(root, a, out=None):
 
 def compile_line(info, demo_rel):
     mw = info.get("MWCC", DEFAULT_MWCC)
-    return ("build/compilers/%s/mwcceppc.exe <the unit's base cflags: `python tools/unitutil.py info -u <unit>`> %s "
+    return ("build/compilers/%s/mwcceppc.exe <the unit's base cflags: `python tools/units/unitinfo.py -u <unit>`> %s "
             "-c %s -o build/tmp/demo.o" % (mw, info.get("FLAGS", ""), demo_rel)).replace("  ", " ")
 
 

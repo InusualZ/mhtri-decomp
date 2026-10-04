@@ -1,40 +1,6 @@
 #!/usr/bin/env python3
 """Turn worker outboxes into ready-to-land playbook drafts (docs/matching/NNN-slug.md idea stubs).
-
-The round's problem: many workers independently found the same levers - `#pragma peephole off` (five or
-more units), `#pragma fp_contract off` (four or more), and the trap that `#pragma optimization_level 1`
-does *not* turn the peephole off (two) - and two filed a `config_requests` entry asking for a row. Nothing
-wrote those rows automatically: they sat in `.pi/outbox/*.json` until the orchestrator got to them, and a
-lever rediscovered by five workers is a lever that was not written down in time.
-
-This tool closes that loop. It reads every outbox, classifies each finding against a small registry of
-*levers* and *traps*, groups duplicates (five identical findings become one row), and writes a draft
-`docs/matching.md` section in the house style (Problem / Why try it / Result / Example) plus the matching
-index row (informational: `tools/agents/sync_playbook_index.py` generates the real one), numbered from the current highest. The drafts go to `.pi/playbook-drafts/` - this tool
-**never edits `docs/**` or `CLAUDE.md`**; the orchestrator lands the drafts in one commit.
-
-    python tools/units/playbook.py                 # scan .pi/outbox, write .pi/playbook-drafts/
-    python tools/units/playbook.py --print         # the same report, without writing
-    python tools/units/playbook.py --outbox DIR --notes DIR --drafts DIR
-    python tools/units/playbook.py --selftest
-
-Where a finding can come from (all optional, the schemas drift between rounds):
-
-* `playbook_candidate` (object: title/problem/result) and `suggested_playbook_row` (string) - a worker's
-  explicit request;
-* `config_requests` naming `docs/matching.md`/`CLAUDE.md` (kind `shared-file`) or a `flag` change whose
-  evidence matches a registered lever;
-* `flags_probed` / `flag_probes` - an `adopt` verdict is a lever, a `reject`/`inconclusive` verdict can be a
-  registered trap;
-* `.pi/notes/*.md` for the traps a worker records in prose rather than in the outbox.
-
-A finding is only drafted when it carries evidence: a before/after number for a lever, or a measured probe
-for a trap. Everything else is reported under "not drafted" with the reason - a finding with no numbers is
-not a row.
-
-The registry (`LEVERS`) is the one place the curated framing lives; extending it is how a new lever becomes
-a row. It is deliberately data, so the next round's workers can be pointed at it.
-"""
+Spec: docs/tools/spec/playbook.md. CLI: playbook.py [--print] [--outbox DIR --notes DIR --drafts DIR] | --selftest."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 

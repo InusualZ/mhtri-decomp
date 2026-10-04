@@ -12,16 +12,15 @@ reported with both sizes (F39). A section present on one side, a differing byte 
 side only are pinned too; `compare_objects` is checked to be silent on identical objects.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import os
 import struct
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if os.path.join(ROOT, "tools", "units") not in sys.path:
-    sys.path.insert(0, os.path.join(ROOT, "tools", "units"))
 
-import sectiongap as sg  # noqa: E402  (imported through the sys.path shim above)
+from tools.units import sectiongap as sg
 
 SHT_PROGBITS, SHT_SYMTAB, SHT_STRTAB, SHT_RELA = 1, 2, 3, 4
 CHECK_COUNT = 0

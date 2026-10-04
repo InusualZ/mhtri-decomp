@@ -17,6 +17,7 @@ Two halves, both offline:
 No build, no `ninja`, no repository state.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import os
 import sys
@@ -24,12 +25,9 @@ import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
-for _p in (HERE, os.path.join(ROOT, "tools"), os.path.join(ROOT, "tools", "units")):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
 
-import relocdiff as rd             # noqa: E402
-import sectiongap_selftest as sgs  # noqa: E402  (the project's ELF32 fixture builder)
+from tools.objdiff import relocdiff as rd           
+from tools.units import sectiongap_selftest as sgs  # the project's ELF32 fixture builder
 
 CHECKS = 0
 FAILURES: list[str] = []
@@ -172,7 +170,7 @@ def test_gate() -> None:
 
 def test_by_owner() -> None:
     """`compare_by_owner`: identical, wrong callee name, wrong addend, shifted function, slid instruction."""
-    import undefrefs_selftest as us
+    from tools.units import undefrefs_selftest as us
     func = (1 << 4) | 2
 
     def obj(pad=0, callee="callee_a", addend=0, r1=4, r2=24):

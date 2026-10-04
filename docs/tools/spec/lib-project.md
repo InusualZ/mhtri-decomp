@@ -8,8 +8,8 @@ merges, and answers "who owns this address / this name" from one index. No API r
 ## Users
 
 `symbols/symedit.py` (the CLI over `SymbolMap`), `units/stylelint.py` (`Ownership` subclass with the lint's counters),
-`callers`, `callees`, `symbolpreflight`, `ledger`, `sharedfiles`, `splitcheck`, `objalign`/`objextab`, `datagap`, `vtableaudit`,
-`relocaudit`, `langcheck`, `unwindcut`, `m2cinput`, `dumpmap`, `unionresolve`, `land`, `mergebranch`, `brief`, `queue`,
+`callers`, `callees`, `symbolpreflight`, `ledger`, `splitcheck`, `objalign`/`objextab`, `datagap`, `vtableaudit`,
+`langcheck`, `unwindcut`, `m2cinput`, `dumpmap`, `unionresolve`, `land`, `mergebranch`, `brief`, `queue`,
 `dataorder`, `unitscore`, `flipcheck`, `backlog`, `mwlink_debugger`, `verifyunit`, `tudiscover`, `undefrefs`, `typeregistry`,
 `methodize`, `recompile`, `flags/infer`, `rso/symbols`.
 

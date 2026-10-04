@@ -7,8 +7,9 @@ transient Windows launch refusal and kills a whole process tree.
 
 ## Users
 
-`lib.git`, `unitutil` (installs the retry for every importer), `land.run`, `tools/selftest_site/sitecustomize.py` (installs
-the retry in every process the runner starts); the shims `units/subproc.py` and `spawnretry.py`.
+`lib.git`, the tools that start processes (each installs the retry explicitly: claims, slots, verifyunit, callees, unitinfo,
+the ideas demo compile), `land.run`, `tools/selftest_site/sitecustomize.py` (installs the retry in every process the runner
+starts); the live trap scan is `tools/tests/smoke/test_proc_traps.py` (WP6 deleted the shims `units/subproc.py`, `spawnretry.py`).
 
 ## Public API
 

@@ -110,5 +110,5 @@ spellings, unknown-option drop, sibling versions, `split_command` with a stub ni
 * `slug` is not here: the lane slug is `lib/lanes/naming.py`'s (WP3e).
 * `recompile.split_staleness` stays in `recompile` (it calls `claims._build_is_current`, a tool); so does
   `recompile.git_dirty` (its `runner` seam is what the staleness selftest drives).
-* `unitutil.compile_command`/`run_compile` keep `warn_if_foreign_worktree` for their remaining importers; the flag tools
+* `unitutil.compile_command`/`run_compile` (deleted in WP6 with `warn_if_foreign_worktree`, which no importer used) were; the flag tools
   resolve the invocation's tree themselves (`lib.repo.repo_root`) and call `split_command`/`run_tokens` directly.

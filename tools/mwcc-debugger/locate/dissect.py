@@ -1,16 +1,6 @@
 #!/usr/bin/env python3
-"""MWCC PE symbol/disassembly helper.
-
-Two jobs, both driven by the CodeView 'NB11' symbol blob that Metrowerks
-embeds in mwcceppc.exe:
-
-  syms  <exe> [regex]        list symbols (RVA, VA, name, section)
-  dis   <exe> <start> <end>  disassemble an address range, annotating call
-                             targets with their symbol names
-
-Addresses on the command line may be hex RVAs (default) or VAs if prefixed
-with 'va:'.  The image base is read from the PE header.
-"""
+"""MWCC PE symbol/disassembly helper over the CodeView 'NB11' blob in mwcceppc.exe.
+Spec: docs/tools/spec/mwcc-debugger.md. CLI: dissect.py syms <exe> [pattern] | dis <exe> <start> <end>."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 

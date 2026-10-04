@@ -8,6 +8,7 @@ and `--json`, and about the real tree: it must be clean and index.md must be in 
 
     python tools/agents/sync_playbook_index_selftest.py
 """
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import io
 import contextlib
@@ -16,8 +17,7 @@ import os
 import sys
 import tempfile
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import sync_playbook_index as spi  # noqa: E402
+from tools.agents import sync_playbook_index as spi
 
 RESULTS = []
 

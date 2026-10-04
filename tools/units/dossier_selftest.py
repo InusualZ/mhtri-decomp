@@ -13,16 +13,14 @@ compiler. When `build/RMHE08/obj/auto/800CCFB0_fn_800CCFB0.o` exists - the `ef_l
 `dossier.selftest()` holds the checks so this entry point and `dossier.py --selftest` cannot drift.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import os
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-for _path in (os.path.join(ROOT, "tools"), os.path.join(ROOT, "tools", "units")):
-    if _path not in sys.path:
-        sys.path.insert(0, _path)
 
-from units import dossier  # noqa: E402
+from tools.units import dossier
 
 
 def main() -> int:

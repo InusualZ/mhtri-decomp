@@ -1,23 +1,7 @@
 #!/usr/bin/env python3
-"""profileprobe.py - smoke-test subagent profiles and print the checklist to judge them by.
-
-A profile is a prompt, so the closest thing to a test has two halves:
-
-  T1 discovery - the file must appear as a project agent (`claude agents`).
-  T2 recall    - a reader child that runs nothing and answers, from its own prompt
-                 alone, what its job/limits/rules/verification/report are.
-
-T2 has caught a real defect already: the first `decompiler` draft mis-numbered
-section 6.5's rule table (rule 1 described as the vtable rule, which is rule 10),
-and the probe's "rules 5 and 8 are not in my context" is what exposed it.
-
-    python tools/agents/profileprobe.py <agent> [<agent> ...]
-
-writes .pi/probes/probe-<agent>.md, prints the launch command for each, and prints the per-agent checklist, so a
-profile change can be re-tested by re-running this and reading the replies
-against it. Behaviour on a real task (T3) is separate and is logged in
-docs/agent-profile-tests.md.
-"""
+"""Smoke-test subagent profiles and print the checklist to judge them by. Spec: docs/tools/spec/profileprobe.md.
+CLI: profileprobe.py <agent> [<agent> ...]."""
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import io
 import json
 import os

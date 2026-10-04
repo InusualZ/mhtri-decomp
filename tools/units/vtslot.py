@@ -1,63 +1,9 @@
 #!/usr/bin/env python3
-"""The reverse of `vtableaudit --at`: given a function address, find the `.data` table that holds it.
-
-`vtableaudit --at <table>` goes table -> slots. Lanes kept re-deriving the other direction by hand - the
-`network_transport` lane named 15 of 19 rows in ten minutes by packing a function's address big-endian and
-scanning the DOL's data sections for it, because the hit *is* the table slot and therefore names the class
-and the vtable offset. Its evidence is `MAIN/.pi/notes/net-transport-eeda.md`:
-
-    the .data run 0x805F94E0..0x805FA908 is TWO vtables with one log string between them, not five
-    interleaved tables: 0x805F9510 = NetworkPeerBuffer, 0x805F95E0 = NetworkPeerSocket.
-
-This is that hand recipe as a tool, for one or more addresses. For each address it reports **every 4-byte
-location in the DOL's loaded data sections whose value equals the address** - a vtable slot, a jump-table
-entry, an extabindex entry and a plain pointer in a struct all surface the same way - each labelled by the
-registered range that contains it (which unit, which section) or as an unregistered band. When the location
-sits inside a run of consecutive code pointers, it prints the table's base, the slot index and the byte
-offset, and the neighbouring slots' targets with their owning units and map symbols - the adjacency that is
-what makes a class name guessable.
-
-The table -> slots half is **not** re-implemented here: the run's slots are enumerated with
-`vtableaudit.vtable_slots` (the same function `--at` uses), and the owner of each target comes from
-`vtableaudit.owner_at`. The unit spelling goes through `claims.norm_unit`, the one definition every tool
-shares. The only new reader is the 4-byte big-endian word scan itself.
-
-What it does, in the order the report reads it:
-
-* **every word hit.** A 4-byte, 4-aligned word in a DOL *data* section whose value equals the address.
-  `.text` is not scanned: an address appearing there is an instruction immediate (the `lis`/`addi` pair's
-  split halves never form the full aligned word), not a pointer.
-* **where the hit is.** The registered split range that covers it, with the unit normalised through
-  `claims.norm_unit`, or `unregistered` when no range owns the band (the state the transport unit's `.data`
-  is still in - it is a config *request*, not a claim).
-* **the run it sits in.** A maximal run of consecutive words that are code pointers (addresses inside the
-  DOL's `.text`). One word is an ordinary pointer, not a table; `vtableaudit.MIN_RUN_WORDS` (2) is the same
-  threshold `--at` uses. A run is bounded by the DOL data section, by the registered range when the hit is
-  in one, and by a hard word cap; a run clipped by the cap says so (`truncated`) instead of guessing.
-* **the table base.** A Metrowerks/Itanium vtable is two RTTI words (offset-to-top and typeinfo) followed
-  by the function pointers; when those two words immediately precede the run and are zero, the base is
-  reported *including* them, which is the base the transport lane labelled its slots from (`networkPeer_init`
-  is slot 0x24 of the socket table at 0x805F95E0, `networkPeer_setInfo` slot 0x0C). The map symbol at the
-  base (`lbl_805F95E0`) is reported when `symbols.txt` names it.
-
-Read-only by construction: no `ninja`, no compile, no link, no write anywhere. The DOL header, sections and
-maps are read through `vtableaudit`'s readers (`dol_segments`/`dol_read`/`dol_text_ranges`) and
-`vtableaudit.load_tree`, never a second parser.
-
-    python tools/units/vtslot.py 0x803CDFC0                  # -> socket table 0x805F95E0, slot 0x24
-    python tools/units/vtslot.py 0x803CD854 0x803CF7A8       # a slot and a plain function (no hits)
-    python tools/units/vtslot.py --json 0x803CD854
-    python tools/units/vtslot.py 0x803CD854 0x803CDFC0 0x803CF7A8
-    python tools/units/vtslot.py --scan 0x805F9510 0x805FA908 # bounded band, report every pointer to it
-    python tools/units/vtslot.py --selftest
-
-`--scan` flips the question to "what points INTO this band": every 4-aligned code pointer whose target
-lands in `[start, end)` is reported with the same per-hit labelling, which names a whole table's callers at
-once. `--main` points at a tree holding `orig/RMHE08/sys/main.dol` and `config/RMHE08/` (default: this
-file's tree).
-"""
+"""The reverse of `vtableaudit --at`: given a function address, find the `.data` table slot that holds it.
+Spec: docs/tools/spec/vtslot.md. CLI: vtslot.py [--json] <addr> [<addr> ...] | --scan LO HI | --selftest."""
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import json
@@ -69,12 +15,9 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
-for _p in (os.path.dirname(HERE), HERE, os.path.join(ROOT, "tools", "elf")):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
 
-import claims  # noqa: E402  (norm_unit - the one spelling rule every tool shares)
-import vtableaudit as va  # noqa: E402  (dol_segments/dol_read/dol_text_ranges/load_tree, vtable_slots)
+from tools.lib.lanes.naming import norm_unit  # the one spelling rule every tool shares
+from tools.units import vtableaudit as va  # dol_segments/dol_read/dol_text_ranges/load_tree, vtable_slots
 
 GAME = "RMHE08"
 DOL_REL = os.path.join("orig", GAME, "sys", "main.dol")
@@ -271,9 +214,9 @@ def enrich_hit(tree: dict, blob: bytes, address: int, is_code: bool,
         "segment": segment,
         "registered": rng is not None,
         "band": "registered" if rng is not None else "unregistered",
-        "unit": claims.norm_unit(unit) if unit else None,
+        "unit": norm_unit(unit) if unit else None,
         "section": rng["section"] if rng is not None else None,
-        "range": ({"unit": claims.norm_unit(unit), "section": rng["section"],
+        "range": ({"unit": norm_unit(unit), "section": rng["section"],
                    "start": rng["start"], "end": rng["end"]} if rng is not None else None),
         "kind": None,
         "run": None,
@@ -313,7 +256,7 @@ def enrich_hit(tree: dict, blob: bytes, address: int, is_code: bool,
                            "owner": None, "symbol": None, "rtti": True})
     rows = header + [
         {"index": (s["address"] - base) // 4, "address": s["address"], "target": s["target"],
-         "owner": claims.norm_unit(s["owner"]) if s["owner"] else None,
+         "owner": norm_unit(s["owner"]) if s["owner"] else None,
          "symbol": s["symbol"], "rtti": False}
         for s in slots]
     rec["kind"] = "table"
@@ -413,10 +356,10 @@ def scan_band(main: str, start: int, end: int) -> dict:
             "location": location, "target": target, "segment": segment,
             "registered": rng is not None,
             "band": "registered" if rng is not None else "unregistered",
-            "unit": claims.norm_unit(unit) if unit else None,
+            "unit": norm_unit(unit) if unit else None,
             "section": rng["section"] if rng is not None else None,
             "target_symbol": map_symbol(tree, target, preferred=".text"),
-            "target_owner": claims.norm_unit(owner) if owner else None,
+            "target_owner": norm_unit(owner) if owner else None,
         })
     out["scan_s"] = round(time.perf_counter() - t, 6)
     return out
@@ -509,7 +452,7 @@ def main(argv=None) -> int:
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args(argv)
     if args.selftest:
-        import vtslot_selftest
+        from tools.units import vtslot_selftest
         return vtslot_selftest.selftest()
     main_tree = args.main or ROOT
     if args.scan is not None:

@@ -1,27 +1,6 @@
 #!/usr/bin/env python3
-"""mwcc_debugger.py - dump MWCC compiler internals while it compiles a file.
-
-Windows-native port of cadmic/mwcc-debugger (see PROVENANCE.md for the upstream
-commit and the list of changes).  Upstream runs the Windows compiler under
-`retrowin32` - an emulator whose only purpose is to run a Windows x86 binary on
-a POSIX host - and attaches gdb to its gdb stub.  On Windows the compiler
-already runs natively, so the emulator is the part that goes away: this port
-runs `gdb` directly on `mwcceppc.exe`.  The emulator path is still available
-for POSIX hosts via `--emulator PATH`.
-
-Two roles, as upstream:
-
-  * started as `python mwcc_debugger.py ...` -> `start_gdb()`: work out which
-    compiler build we were handed, sanity check the tool chain, then exec gdb
-    with this same file as its command script.
-  * sourced by gdb                             -> `run_compiler()`: set the
-    breakpoints for that build and dump compiler state to text files.
-
-Everything build-specific (addresses, table sizes, record layouts) lives in
-versions.py; this file is mechanism only.
-
-PORT: changes from upstream are marked with a `PORT:` comment.
-"""
+"""Dump MWCC compiler internals while it compiles a file: the Windows-native port of cadmic/mwcc-debugger.
+Spec: docs/tools/spec/mwcc-debugger.md. CLI: mwcc_debugger.py -a ARGS [--exe EXE] [-e EMULATOR] [-g GDB] [--gdb-port P] [--timeout S] FUNCTION [OUTPUT_DIR]."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
@@ -49,13 +28,14 @@ except ImportError:
     IN_GDB = False
 
 HERE = Path(__file__).resolve().parent
-if str(HERE) not in sys.path:
-    sys.path.insert(0, str(HERE))
 # PORT: the version tables live in a data module (upstream hard-coded them
 # inside init_mwcc_version()).  versions.py depends only on the repository's
 # tools/lib (the prologue above puts the root on sys.path), so it loads both
-# in the launcher and inside gdb's embedded Python.
-import versions  # noqa: E402
+# in the launcher and inside gdb's embedded Python; `tools/mwcc-debugger/` is
+# not an identifier but is a namespace package of `tools`, so it is imported by name.
+import importlib  # noqa: E402
+
+versions = importlib.import_module("tools.mwcc-debugger.versions")
 from tools.lib import proc as lib_proc  # noqa: E402
 
 

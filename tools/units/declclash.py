@@ -1,6 +1,6 @@
 """List function names declared more than once with *different text* in one source file's include closure.
 Spec: docs/tools/spec/declclash.md. CLI: declclash.py PATH.. [--only-different] [--fail-on-different] [--json]
-[--root R] | --selftest."""
+[--root R]."""
 
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
@@ -131,8 +131,7 @@ def report(paths, roots, only_different=False):
     return findings
 
 
-TOOL = cli.Tool("declclash", "docs/tools/spec/declclash.md", tests="tools/tests/units/test_declclash.py",
-                common=("root", "json"))
+TOOL = cli.Tool("declclash", "docs/tools/spec/declclash.md", common=("root", "json"))
 
 
 def main(argv=None):
@@ -153,7 +152,7 @@ def main(argv=None):
 
 def _main(parser, args):
     if not args.paths:
-        parser.error("at least one path is required (or --selftest)")
+        parser.error("at least one path is required")
 
     roots = [os.path.join(args.root, r) for r in INCLUDE_ROOTS]
     findings = report(args.paths, roots, args.only_different)

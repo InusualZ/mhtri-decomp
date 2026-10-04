@@ -8,7 +8,8 @@ import argparse
 import os
 import sys
 
-from tools import unitutil  # unit spec -> build/RMHE08/{src,obj} paths
+from tools.lib import repo as _repo
+from tools.lib import units as _units  # unit spec -> build/RMHE08/{src,obj} paths
 from tools.lib import objcompare
 from tools.units import poolseams  # literal pools as TU evidence: which differing pools are a partial pool
 
@@ -73,23 +74,23 @@ def main(argv=None) -> int:
     printed_header = False
     for spec in args.unit:
         try:
-            unit = unitutil.resolve_unit(spec)
+            unit = _units.Unit.resolve(spec, _repo.repo_root())
         except SystemExit as exc:
             print("sectiongap: cannot resolve %r: %s" % (spec, exc), file=sys.stderr)
             continue
         units += 1
-        missing = [p for p in (unit.obj, unit.target) if not os.path.exists(p)]
+        missing = [p for p in (unit.obj_ours, unit.obj_target) if not os.path.exists(p)]
         if missing:
-            print("sectiongap: %s: object missing (%s)" % (unit.name, ", ".join(missing)), file=sys.stderr)
+            print("sectiongap: %s: object missing (%s)" % (unit.report_name, ", ".join(missing)), file=sys.stderr)
             continue
-        rows = compare_objects(read_object(unit.obj, args.all_sections),
-                               read_object(unit.target, args.all_sections))
+        rows = compare_objects(read_object(unit.obj_ours, args.all_sections),
+                               read_object(unit.obj_target, args.all_sections))
         if any(r["section"] in POOL_SECTIONS for r in rows):
-            rows = add_pool_notes(rows, poolseams.note_for_unit(MAIN, unit.name))
+            rows = add_pool_notes(rows, poolseams.note_for_unit(MAIN, unit.report_name))
         if not rows:
             clean += 1
             print("%s: clean - every compared section has the same size, the same bytes and the same "
-                  "relocations" % unit.name)
+                  "relocations" % unit.report_name)
             continue
         if not printed_header:
             print("unit  section  ours  target  why")
@@ -97,7 +98,7 @@ def main(argv=None) -> int:
         diffs += len(rows)
         for row in rows:
             print("%s  %s  ours %s  target %s  %s"
-                  % (unit.name, row["section"], _size(row["ours"]), _size(row["target"]), row["why"]))
+                  % (unit.report_name, row["section"], _size(row["ours"]), _size(row["target"]), row["why"]))
 
     print("\n%d section difference(s) over %d unit(s); %d clean" % (diffs, units, clean))
     return 0    # a reporting tool: the output is the verdict, the exit status is not

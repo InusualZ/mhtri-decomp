@@ -10,7 +10,7 @@ import argparse
 import json
 import os
 
-from tools import unitutil as uu  # resolve_input: MAIN's build/ by path when the tree has none
+from tools.lib import repo as _repo  # resolve_input: MAIN's build/ by path when the tree has none
 from tools.lib import cache as libcache
 from tools.lib import refs as _refs  # the one reference index: dump parser, object fallback, cache, the query
 from tools.lib.report import rel_path
@@ -61,7 +61,7 @@ cache_of = _refs.dump_cache
 
 def asm_dir_of(root=ROOT):
     """The dump to READ: the tree's own `build/<game>/asm`, else MAIN's by path when the tree has none (a fresh worktree)."""
-    return uu.resolve_input(os.path.join("build", GAME, "asm"), root, _refs.has_dump)
+    return _repo.resolve_input(os.path.join("build", GAME, "asm"), root, _refs.has_dump, honour_env=_repo.is_served(root))
 
 
 def dump_signature(asm_dir, files):
@@ -80,7 +80,7 @@ def dump_state(asm_dir, files, root=ROOT):
     """
     if not files:
         return ("missing", "%s holds no `.s` file" % rel(asm_dir, root), DUMP_TOOL)
-    stamp = _refs.DumpStamp.for_tree(uu.ROOT, True, GAME)
+    stamp = _refs.DumpStamp.for_tree(_repo.repo_root(), True, GAME)
     if os.path.abspath(asm_dir) != os.path.abspath(stamp.asm_dir):
         return ("present", "%d file(s) (not the repository's dump: %s)"
                 % (len(files), rel(asm_dir, root)), None)
@@ -103,7 +103,8 @@ def load_index(root=ROOT, rebuild=False, asm_dir=None, cache=None):
 # relocations instead - the same address-keyed graph, coarser kinds, `source: elf`.
 def obj_dir_of(root=ROOT):
     """The split objects to READ: the tree's own `build/<game>/obj`, else MAIN's by path when the tree has none."""
-    return uu.resolve_input(os.path.join("build", GAME, "obj"), root, _refs._has_objects)
+    return _repo.resolve_input(os.path.join("build", GAME, "obj"), root, _refs._has_objects,
+                               honour_env=_repo.is_served(root))
 
 
 def all_object_files(root=ROOT):

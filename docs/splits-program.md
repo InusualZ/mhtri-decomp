@@ -1,5 +1,7 @@
 # The splits program (2026-09-30 .. 2026-10-03): history, and the knowledge that outlives its tools
 
+> Every tool this program ran is retired; what each was, its replacement and its history are `docs/tools/retired.md`.
+
 The program cut the whole DOL (not the RSO modules; `mh3.sel` is only their export list) into translation units (TUs) with
 evidence-backed edges before bodies were written. It is **finished and its tools are retired** (`docs/tools/retired.md`:
 `applysplits`, `dataattach`, `matchinggain`, the proposal half of `splitcheck`; the proposal files and window manifests were

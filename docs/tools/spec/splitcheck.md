@@ -17,9 +17,8 @@ reference decoder `lib.ppc.scan_refs` was extracted from.
 ```
 python tools/splits/splitcheck.py --baseline [--json F] [--all] [--only INV[,INV]] [--unit REGEX] [--intervals]
 python tools/splits/splitcheck.py --readers SECTION:START-END [--readers ...]
-python tools/splits/splitcheck.py --selftest
 ```
-Flags: `--all`, `--baseline`, `--dol`, `--intervals`, `--json`, `--limit`, `--only`, `--outbox`, `--readers`, `--selftest`, `--splits`,
+Flags: `--all`, `--baseline`, `--dol`, `--intervals`, `--json`, `--limit`, `--only`, `--outbox`, `--readers`, `--splits`,
 `--symbols`, `--unit`.
 Exit codes: 0 ok, 1 selftest failure, 2 no mode given (the `lib.findings` convention is the migration target; `migration.md`
 records the current behaviour). `--baseline` itself exits 0 whatever it finds: it is an audit list, not a gate.
@@ -43,7 +42,6 @@ records the current behaviour). `--baseline` itself exits 0 whatever it finds: i
 * The twelve invariants and their verdicts are `invariants.md` (one module each under `tools/splits/invariants/`).
 * `--baseline` exits 0 whatever it finds: it is an audit list, not a gate; `--json F` writes the per-unit verdicts, the
   boundary checks, the seam requests, the pool groups and (WP3c) the same verdicts as `lib.findings` rows under `rows`.
-* `--selftest` forwards to `tools/tests/splits/test_splitcheck.py` (`lib.cli.Tool`).
 
 ## Lib dependencies
 

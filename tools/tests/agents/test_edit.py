@@ -1,5 +1,5 @@
 """edit.py: replace/normalise/check on LF, CRLF and mixed files, `replace --old/--new` (escape's `--edit`) and
-`check --blob` (checklf's per-path check), each through the real CLI in a temp dir."""
+`check --blob` (the per-path line-ending check), each through the real CLI in a temp dir."""
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import os
 import subprocess
@@ -135,6 +135,32 @@ def test_check_blob(c):
                 "against LF)", (rc, "new.py: the path is not in git" in out), (1, True))
         rc, out = _run("check", "--blob", "--repo", repo, "--rev", "HEAD", "f.py", cwd=tempfile.gettempdir())
         c.check("--repo and --rev HEAD are honoured", (rc, "2 CRLF" in out), (1, True))
+
+
+def test_check_path_cases(c):
+    """`edit.check_path` (the per-path rule behind `check --blob`) on the cases the CLI test does not reach."""
+    from tools.agents import edit
+    with testing.GitFixture() as fx:
+        fx.init()
+        repo = str(fx.root)
+        path = os.path.join(repo, "f.py")
+        fx.commit({".gitattributes": b"* text=auto eol=lf\n", "f.py": b"import os\nprint(1)\n"}, "init")
+        _put(path, b"import os\r\nprint(1)\r\n")
+        fx.git("add", "-A")
+        c.check("the blob is still LF after `git add` of a CRLF file", edit.blob_of(repo, "f.py"), b"import os\nprint(1)\n")
+        c.check("... and HEAD's blob is read with rev HEAD", bool((edit.check_path(repo, "f.py", "HEAD") or {}).get("blob")),
+                True)
+        _put(path, b"import os\nprint(1)\n")
+        c.check("restoring LF clears the finding", edit.check_path(repo, "f.py"), None)
+        _put(os.path.join(repo, "new.py"), b"x = 1\n")
+        c.check("an untracked LF file is clean", edit.check_path(repo, "new.py"), None)
+        _put(path, b"import os\rprint(1)\n")
+        finding = edit.check_path(repo, "f.py")
+        c.check("a lone CR is reported as one", (bool(finding), finding and "lone CR" in finding["working"]), (True, True))
+        e = edit.endings(b"a\r\nb\nc\r\n")
+        c.check("endings counts CRLF apart from LF", (e["crlf"], e["lf"]), (2, 1))
+        _put(path, b"import os\nprint(2)\nprint(3)\n")
+        c.check("a changed LF file is not a line-ending finding", edit.check_path(repo, "f.py"), None)
 
 
 if __name__ == "__main__":

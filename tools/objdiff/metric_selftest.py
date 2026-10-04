@@ -13,13 +13,13 @@ The contract this pins is the one three tools used to break:
   `fn_80270018`: 99.88039 vs **100.0**).
 
 The official number - the one `build/RMHE08/report.json`, `ledger.py`, `brief.py` and `land.py` read -
-comes from `report generate`, which is what `unitutil.report_functions`/`report_measure` wrap, and what
+comes from `report generate`, which is what `lib.report.score_entries`/`symbol_score` run, and what
 `symdiff` (with `-u`), `tryvar` and `mwcc_matrix` now print. Layout:
 
 * **wire** checks with a stub objdiff runner: the exact objdiff invocations (`report generate` on a
   one-unit project with absolute paths; `functionRelocDiffs=none` on `diff`) and the parsing;
 * **integration** checks against the real tools and objects whenever a build tree exists, skipped (not
-  failed) otherwise: `unitutil.report_functions` == the project report, `symdiff` prints that number,
+  failed) otherwise: `lib.report.score_entries` == the project report, `symdiff` prints that number,
   `slotmap`'s TARGET/OURS columns come from the right side, `tryvar.match_pcts` and
   `mwcc_matrix.summarize` return it for real objects.
 """
@@ -33,9 +33,29 @@ import subprocess
 import sys
 import tempfile
 
-from tools import unitutil as uu
+from tools.lib import repo as _repo
+from tools.lib import report as _report
+from tools.lib import units as _units
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+OBJDIFF = os.path.join(ROOT, _report.OBJDIFF_REL)
+
+
+def objdiff(unit, symbol, out, runner=subprocess.run):
+    """`objdiff-cli diff` in project mode for one symbol of `unit` (`lib.report.project_diff`)."""
+    return _report.project_diff(ROOT, unit.report_name, symbol, out, OBJDIFF, runner=runner)
+
+
+def report_functions(target, base, unit_name=None, tmpdir=None, runner=subprocess.run):
+    """The official per-function scores of one object pair (`lib.report.score_entries`)."""
+    return _report.score_entries(target, base, unit_name, tmpdir or _repo.session_tmpdir(), objdiff=OBJDIFF,
+                                 cwd=ROOT, runner=runner)
+
+
+def report_measure(target, base, symbol, unit_name=None, tmpdir=None, runner=subprocess.run):
+    """The official score of one symbol (`lib.report.symbol_score`)."""
+    return _report.symbol_score(target, base, symbol, unit_name, tmpdir or _repo.session_tmpdir(), objdiff=OBJDIFF,
+                                cwd=ROOT, runner=runner)
 
 SYMDIFF = os.path.join(ROOT, "tools", "objdiff", "symdiff.py")
 SLOTMAP = os.path.join(ROOT, "tools", "objdiff", "slotmap.py")
@@ -76,17 +96,14 @@ def wire_objdiff() -> int:
                       open(out, "w", encoding="utf-8"))
             return _completed(argv)
 
-        unit = uu.Unit(name="main/Lib/file", lib="Lib", file="file", version="RMHE08",
-                       src=os.path.join(ROOT, "src", "Lib", "file.cpp"),
-                       obj_dir=os.path.join(tmp, "src", "Lib"), obj=os.path.join(tmp, "src", "Lib", "file.o"),
-                       target=os.path.join(tmp, "obj", "Lib", "file.o"))
-        path, _log = uu.objdiff(unit, "fn_1", out=out, runner=runner)
+        unit = _units.Unit("Lib/file", ".cpp", tmp)
+        path, _log = objdiff(unit, "fn_1", out=out, runner=runner)
         failures = _ok("objdiff returns the json path", path, out, failures)
         argv = seen.get("argv") or []
         failures = _truthy("objdiff passes functionRelocDiffs=none",
                            "functionRelocDiffs=none" in argv, failures)
         failures = _truthy("objdiff runs project mode for the unit",
-                           argv[:4] == [uu.OBJDIFF, "diff", "-p", "."], failures)
+                           argv[:4] == [OBJDIFF, "diff", "-p", "."], failures)
     return failures
 
 
@@ -112,30 +129,30 @@ def wire_report() -> int:
                 open(out, "w", encoding="utf-8"))
             return _completed(argv)
 
-        fns = uu.report_functions(target, base, unit_name="main/Lib/file", tmpdir=tmp, runner=runner)
+        fns = report_functions(target, base, unit_name="main/Lib/file", tmpdir=tmp, runner=runner)
         failures = _in_order(fns, ["fn_1", "fn_2"], failures)
         failures = _ok("report metric parsed", fns["fn_2"]["fuzzy_match_percent"], 42.5, failures)
         failures = _ok("target size carried", fns["fn_1"]["size"], "40", failures)
         cfg = seen.get("config") or {}
         failures = _ok("one-unit project", len(cfg.get("units") or []), 1, failures)
-        failures = _ok("project version", cfg.get("min_version"), uu.MIN_PROJECT_VERSION, failures)
+        failures = _ok("project version", cfg.get("min_version"), _report.MIN_PROJECT_VERSION, failures)
         unit = (cfg.get("units") or [{}])[0]
         failures = _ok("target_path absolute", unit.get("target_path"), os.path.abspath(target), failures)
         failures = _ok("base_path absolute", unit.get("base_path"), os.path.abspath(base), failures)
         failures = _ok("unit name carried", unit.get("name"), "main/Lib/file", failures)
         argv = seen.get("argv") or []
         failures = _truthy("report generate is the scoring path",
-                           argv[:3] == [uu.OBJDIFF, "report", "generate"], failures)
+                           argv[:3] == [OBJDIFF, "report", "generate"], failures)
 
-        m = uu.report_measure(target, base, "fn_1", unit_name="main/Lib/file", tmpdir=tmp, runner=runner)
+        m = report_measure(target, base, "fn_1", unit_name="main/Lib/file", tmpdir=tmp, runner=runner)
         failures = _ok("report_measure official number", m.get("match_percent"), 100.0, failures)
-        miss = uu.report_measure(target, base, "gone", unit_name="main/Lib/file", tmpdir=tmp, runner=runner)
+        miss = report_measure(target, base, "gone", unit_name="main/Lib/file", tmpdir=tmp, runner=runner)
         failures = _truthy("unknown symbol is an error, not a 0.0 score", "error" in miss, failures)
 
         def broken(argv, **kwargs):
             return subprocess.CompletedProcess(argv, 1, "", "boom")
 
-        err = uu.report_functions(target, base, tmpdir=tmp, runner=broken)
+        err = report_functions(target, base, tmpdir=tmp, runner=broken)
         failures = _truthy("a failed report is an error, not an empty score",
                            "_error" in err, failures)
     return failures
@@ -152,13 +169,13 @@ def wire_tmpdir() -> int:
     """
     failures = 0
     shared = os.path.join(ROOT, "build", "tmp", "unitutil")
-    first = uu.session_tmpdir()
+    first = _repo.session_tmpdir()
     failures = _truthy("the default scratch exists", os.path.isdir(first), failures)
     failures = _truthy("it is not the shared build/tmp/unitutil",
                        os.path.normcase(os.path.abspath(first))
                        != os.path.normcase(os.path.abspath(shared)), failures)
     failures = _ok("one directory per process keeps report_measure's path correct",
-                   uu.session_tmpdir(), first, failures)
+                   _repo.session_tmpdir(), first, failures)
 
     with tempfile.TemporaryDirectory() as tmp:
         target = os.path.join(tmp, "target.o")
@@ -173,32 +190,13 @@ def wire_tmpdir() -> int:
                 open(out, "w", encoding="utf-8"))
             return _completed(argv)
 
-        m = uu.report_measure(target, base, "fn_1", unit_name="u", runner=runner)
+        m = report_measure(target, base, "fn_1", unit_name="u", runner=runner)
         failures = _ok("report_measure official number with the default dir",
                        m.get("match_percent"), 100.0, failures)
         failures = _ok("and its report_json is in that dir",
                        os.path.normcase(os.path.abspath(os.path.dirname(m.get("report_json") or ""))),
                        os.path.normcase(os.path.abspath(first)), failures)
 
-        # `objdiff()`'s default `out` is the last shared scratch path: a per-file
-        # `build/tmp/<lib>_<file>_diff.json`, so two concurrent lanes measuring the same unit wrote and
-        # read the same rows. It routes through the same per-invocation helper now.
-        unit = uu.Unit(name="main/Lib/file", lib="Lib", file="file", version="RMHE08",
-                       src=os.path.join(ROOT, "src", "Lib", "file.cpp"),
-                       obj_dir=os.path.join(tmp, "src", "Lib"),
-                       obj=os.path.join(tmp, "src", "Lib", "file.o"),
-                       target=os.path.join(tmp, "obj", "Lib", "file.o"))
-        default_out, _log = uu.objdiff(unit, "fn_1", runner=runner)
-        failures = _truthy("objdiff's default out is in the session scratch dir",
-                           os.path.normcase(os.path.abspath(os.path.dirname(default_out or "")))
-                           == os.path.normcase(os.path.abspath(first)), failures)
-        failures = _truthy("... and not the shared per-file build/tmp path",
-                           os.path.normcase(os.path.abspath(default_out or ""))
-                           != os.path.normcase(os.path.abspath(os.path.join(ROOT, "build", "tmp",
-                                                                           "Lib_file_diff.json"))),
-                           failures)
-        failures = _truthy("... and the file the runner wrote is there",
-                           bool(default_out) and os.path.exists(default_out), failures)
     return failures
 
 
@@ -221,15 +219,15 @@ def _pick_unit():
     """A real unit with target+base objects and at least one scored function."""
     for spec in ("RSO/runtime", "Pl/pl_skill", "main/pl_act", "Camellia/camellia"):
         try:
-            unit = uu.resolve_unit(spec)
+            unit = _units.Unit.resolve(spec, ROOT)
         except SystemExit:
             continue
-        if _have(unit.target) and _have(unit.obj):
-            names = uu.function_names(unit.target)
+        if _have(unit.obj_target) and _have(unit.obj_ours):
+            names = _units.function_names(unit.obj_target)
             if names:
                 return unit
-    for unit in uu.list_units():
-        if _have(unit.target) and _have(unit.obj) and uu.function_names(unit.target):
+    for unit in _units.Unit.list(ROOT):
+        if _have(unit.obj_target) and _have(unit.obj_ours) and _units.function_names(unit.obj_target):
             return unit
     return None
 
@@ -237,7 +235,7 @@ def _pick_unit():
 def _project_report():
     """The freshly generated whole-project report, or None."""
     out = os.path.join(ROOT, "build", "tmp", "metric_selftest_report.json")
-    p = subprocess.run([uu.OBJDIFF, "report", "generate", "-p", ROOT, "-o", out],
+    p = subprocess.run([OBJDIFF, "report", "generate", "-p", ROOT, "-o", out],
                        cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if p.returncode != 0 or not os.path.exists(out):
         return None
@@ -249,20 +247,20 @@ def _project_report():
 
 def integration(unit, official_all) -> int:
     failures = 0
-    official = official_all.get(unit.name)
+    official = official_all.get(unit.report_name)
     if not official:
-        print("skip  integration (the project report has no functions for %s)" % unit.name)
+        print("skip  integration (the project report has no functions for %s)" % unit.report_name)
         return failures
 
     # 1. the shared primitive equals the project report for every function of the unit
-    fns = uu.report_functions(unit.target, unit.obj, unit.name, os.path.join(ROOT, "build", "tmp"))
+    fns = report_functions(unit.obj_target, unit.obj_ours, unit.report_name, os.path.join(ROOT, "build", "tmp"))
     if "_error" in fns:
         print("skip  integration (" + fns["_error"][:120] + ")")
         return failures
     mism = [(n, (fns.get(n) or {}).get("fuzzy_match_percent"), official[n])
             for n in official if isinstance(official[n], (int, float))
             and (fns.get(n) or {}).get("fuzzy_match_percent") != official[n]]
-    failures = _truthy("report_functions == project report (%d functions of %s)" % (len(official), unit.name),
+    failures = _truthy("report_functions == project report (%d functions of %s)" % (len(official), unit.report_name),
                        not mism, failures)
     if mism:
         print("        first mismatches: %r" % (mism[:3],))
@@ -272,7 +270,7 @@ def integration(unit, official_all) -> int:
         return failures
 
     # 2. symdiff prints the official number (and says so)
-    p = subprocess.run([sys.executable, SYMDIFF, "-u", unit.name, sym, "1"],
+    p = subprocess.run([sys.executable, SYMDIFF, "-u", unit.report_name, sym, "1"],
                        cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
     head = (p.stdout or "").splitlines()[0] if p.stdout else ""
     if p.returncode == 1 and "freshness  STALE" in (p.stderr or ""):
@@ -286,7 +284,7 @@ def integration(unit, official_all) -> int:
 
     # 3. slotmap labels the sides correctly (project mode: left = target)
     diff_json = os.path.join(ROOT, "build", "tmp", "metric_selftest_slotmap.json")
-    path, log = uu.objdiff(unit, sym, out=diff_json)
+    path, log = objdiff(unit, sym, out=diff_json)
     if not path:
         print("skip  slotmap orientation (objdiff failed: %s)" % log[:120])
         return failures
@@ -322,7 +320,7 @@ def _slotmap_rows(diff_json, symbol, index, unit=None):
     """{index: (target, ours)} from `slotmap --around index,index+1`, in either invocation mode."""
     cmd = [sys.executable, SLOTMAP]
     if unit is not None:
-        cmd += ["-u", unit.name, symbol]
+        cmd += ["-u", unit.report_name, symbol]
     else:
         cmd += [diff_json, symbol]
     cmd += ["--around", "%d,%d" % (index, index + 1)]
@@ -344,16 +342,16 @@ def _slotmap_rows(diff_json, symbol, index, unit=None):
 def integration_flag_tools(unit, official_all) -> int:
     """`tryvar.match_pcts` and `mwcc_matrix.summarize` must return the official per-function number."""
     failures = 0
-    official = official_all.get(unit.name) or {}
+    official = official_all.get(unit.report_name) or {}
     scored = {n: v for n, v in official.items() if isinstance(v, (int, float))}
     if not scored:
-        print("skip  flag-tool integration (no scored functions for %s)" % unit.name)
+        print("skip  flag-tool integration (no scored functions for %s)" % unit.report_name)
         return failures
 
     from tools.flags import mwcc_matrix, tryvar
     from tools.lib import units as lib_units
 
-    pcts = tryvar.match_pcts(unit.obj, unit.target)
+    pcts = tryvar.match_pcts(unit.obj_ours, unit.obj_target)
     if not pcts:
         print("skip  tryvar integration (no report result)")
         return failures
@@ -363,8 +361,8 @@ def integration_flag_tools(unit, official_all) -> int:
     if mism:
         print("        first mismatches: %r" % (mism[:3],))
 
-    path, err = mwcc_matrix.diff_unit(lib_units.Unit.resolve(unit.name, ROOT), "metric_selftest",
-                                      uu.function_names(unit.target)[0])
+    path, err = mwcc_matrix.diff_unit(lib_units.Unit.resolve(unit.report_name, ROOT), "metric_selftest",
+                                      _units.function_names(unit.obj_target)[0])
     if not path:
         print("skip  mwcc_matrix integration (%s)" % err[:120])
         return failures
@@ -385,18 +383,18 @@ def regression_metric_gap() -> int:
     """
     failures = 0
     try:
-        rso = uu.resolve_unit("RSO/runtime")
+        rso = _units.Unit.resolve("RSO/runtime", ROOT)
     except SystemExit:
         rso = None
-    if rso is not None and _have(rso.target) and _have(rso.obj):
+    if rso is not None and _have(rso.obj_target) and _have(rso.obj_ours):
         json_out = os.path.join(ROOT, "build", "tmp", "metric_selftest_pos.json")
-        uu.objdiff(rso, "RSOStaticLocateObject", out=json_out)
+        objdiff(rso, "RSOStaticLocateObject", out=json_out)
         data = json.load(open(json_out, encoding="utf-8"))
         pos = None
         for e in data["left"].get("symbols") or []:
             if e.get("name") == "RSOStaticLocateObject":
                 pos = e.get("match_percent")
-        m = uu.report_measure(rso.target, rso.obj, "RSOStaticLocateObject", rso.name)
+        m = report_measure(rso.obj_target, rso.obj_ours, "RSOStaticLocateObject", rso.report_name)
         failures = _truthy("normalisation gap is real (%s positional vs %s official)"
                            % (pos, m.get("match_percent")),
                            isinstance(pos, (int, float)) and m.get("match_percent") == 99.64103
@@ -405,11 +403,11 @@ def regression_metric_gap() -> int:
         print("skip  regression pin (RSO/runtime is not built)")
 
     try:
-        skill = uu.resolve_unit("Pl/pl_skill")
+        skill = _units.Unit.resolve("Pl/pl_skill", ROOT)
     except SystemExit:
         skill = None
-    if skill is not None and _have(skill.target) and _have(skill.obj):
-        m = uu.report_measure(skill.target, skill.obj, "fn_80270018", skill.name)
+    if skill is not None and _have(skill.obj_target) and _have(skill.obj_ours):
+        m = report_measure(skill.obj_target, skill.obj_ours, "fn_80270018", skill.report_name)
         failures = _truthy("reloc-only residual is 100 %% officially (pl_skill fn_80270018 = %s)"
                            % m.get("match_percent"), m.get("match_percent") == 100.0, failures)
     else:

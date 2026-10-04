@@ -57,7 +57,7 @@ extra      defined by OUR object and not by the target (a static, a helper or a 
 
 ## Lib dependencies
 
-objcompare (`defined_symbols`, `symbols`, `section_kind`); `unitutil.repo_root`.
+objcompare (`defined_symbols`, `symbols`, `section_kind`); `lib.repo.repo_root`.
 
 ## Test contract
 

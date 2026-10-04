@@ -1,53 +1,6 @@
 #!/usr/bin/env python3
-"""Inject the canonical section 6.5 rule table into the subagent profiles.
-
-WHY THIS EXISTS (the drift it fixes, measured 2026-09-27):
-
-The campaign's brief is machine-generated - it reads `docs/plan.md` section 6.5 verbatim through
-`brief.plan_section` - so it cannot drift. The subagent profiles are hand-written prose, and
-`.claude/agents/decompiler.md` and `.claude/agents/fixer.md` each *duplicated* the rule text (the
-decompiler inlined it across ~110 lines). Duplicated policy drifts, and nothing detected it: commit
-`4f3cb4ea1` deleted the `rule 7 deferred: <reason>` escape (rule 7 now fires on every `fn_` / `lbl_` /
-`loc_` / `unk` identifier in `src/`, whoever owns it - no exemption, no deferral; the land gate's
-`--diff` is the only grandfather), and both profiles went on teaching the deleted key as legal. The
-same rot was waiting for rule 11 (`void *`), which neither profile knew about - and again for rule 12
-(unowned data the unit must claim), which is why the block's rule count is computed from the table
-rather than written down here.
-
-THE MECHANISM: the rules are generated, the prose around them is hand-written.
-
-Between a BEGIN/END marker pair in each profile, this tool writes a block derived from the rule table
-of `docs/plan.md` section 6.5 - the canonical table - and nothing else:
-
-  * one line per rule: its number, the table's bold rule title, and the table's own meaning cell
-    (verbatim, so no operative exception can be summarised away);
-  * the section's enforcement sentences, selected from its enforcement paragraph.
-
-It is idempotent (`python tools/agents/sync_profiles.py` writes the block only when it differs), and
-`--check` exits non-zero when a profile's block does not match what the plan says today - so a rule
-change that forgets the profiles fails the check instead of silently leaving the prompts stale.
-
-The same tripwire covers the profile *set*, not only its text: a file in `.claude/agents/` whose frontmatter
-carries a `name:` (i.e. a profile, unlike `TESTS.md`, which is prose) that is **not** in `PROFILES` is an
-error that names the file. `surveyor.md` was added to the directory but not to `PROFILES`, and `--check`
-went on printing "all profiles in sync" while the new profile carried none of the rules - the exact failure
-this tool exists to prevent, one level up. A new profile is only covered once it is listed here.
-
-The block is generated from the *table*, so a new rule (rule 12) and every exception clause (rule 2's
-unowned extern -> `include/unsplit/`; rule 7's "no exemption and no deferral"; rule 11's
-`/* untyped: <reason> */`) reach every generated profile the moment the plan does. If the plan's section-6.5
-shape changes enough that the table cannot be parsed, this tool refuses loudly instead of writing a
-stale or empty block - that refusal is the next rule change's tripwire. The block's title says
-`rules 1-N` from the table's row count (N = 12 today), so no rule count is written down here to drift.
-
-    python tools/agents/sync_profiles.py            # regenerate every profile's block in place
-    python tools/agents/sync_profiles.py --check    # exit 1 when a profile is stale (writes nothing)
-    python tools/agents/sync_profiles.py --print    # show the block it would write, without touching a file
-    python tools/agents/sync_profiles.py --selftest # run tools/agents/sync_profiles_selftest.py
-
-Run it from MAIN (`docs/plan.md` is the authority there); the selftest runs the same code on fixtures
-and on the real tree.
-"""
+"""Inject docs/plan.md section 6.5's rule table into the subagent profiles between their BEGIN/END markers.
+Spec: docs/tools/spec/sync_profiles.md. CLI: sync_profiles.py [--check | --print | --selftest]."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 

@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
 """Teardown for a lane that is not a claim: rescue its unlanded commits to `refs/rescue/<slug>`, then remove it.
 Spec: docs/tools/spec/lane.md. CLI: python tools/units/lane.py list | teardown <branch> [--dry-run] [--force]
-[--base B] | --selftest; tests: tools/tests/units/test_lane.py."""
+[--base B]."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import os
-import tempfile
 
 from tools.lib import cli
 from tools.lib import repo as librepo
 from tools.lib.git import Git
 from tools.lib.lanes import naming, teardown as td
 
-TOOL = cli.Tool("lane", "docs/tools/spec/lane.md", tests="tools/tests/units/test_lane.py",
-                description=(__doc__ or "").splitlines()[0], common=())
+TOOL = cli.Tool("lane", "docs/tools/spec/lane.md", description=(__doc__ or "").splitlines()[0], common=())
 LANE_PREFIXES = naming.LANE_PREFIXES
 BASE = "main"
 slug = naming.lane_slug
@@ -130,8 +128,6 @@ def main() -> int:
     t.add_argument("--dry-run", action="store_true")
     t.add_argument("--force", action="store_true", help="allow a branch that is not a lane prefix")
     args = ap.parse_args()
-    if args.selftest:
-        return TOOL.selftest(cwd=tempfile.gettempdir())
     if args.cmd == "list":
         rows = lanes(args.base)
         if not rows:

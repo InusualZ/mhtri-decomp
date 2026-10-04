@@ -1,31 +1,7 @@
 #!/usr/bin/env python3
-"""sync_playbook_index.py - generate docs/matching/index.md from the front matter of docs/matching/NNN-slug.md.
-
-The matching playbook is one file per idea, `docs/matching/NNN-slug.md` (three-digit zero-padded, permanent id +
-a short slug), each opening with a front-matter block:
-
-    ---
-    id: 43
-    title: <the idea's title>
-    status: works            # works | ruled-out | todo | superseded
-    problem: <the Problem sentence, single line>
-    tags: [flags, source-shape]
-    applies: []              # compiler versions/libs it is known to apply to, e.g. [Wii/1.3]
-    demo:                    # NNN-slug.cpp when a compilable demonstration exists
-    ---
-
-`docs/matching/index.md` is GENERATED from those blocks (id, title, status, tags, problem; sorted by id, the
-problem capped at 220 characters). The tool refuses loudly - and writes nothing - on a duplicate id, a missing or
-malformed key, an unknown tag or status, a file name whose id/slug disagrees with its front matter, and a `demo`
-that names a missing file. Ids are permanent: 600+ citations of "playbook N" / "row N" exist in the tree.
-
-    python tools/agents/sync_playbook_index.py             # write docs/matching/index.md
-    python tools/agents/sync_playbook_index.py --check     # exit 1 when index.md is stale; write nothing
-    python tools/agents/sync_playbook_index.py --print     # print the generated index
-    python tools/agents/sync_playbook_index.py --where N   # print idea N's path (exit 1 when unknown)
-    python tools/agents/sync_playbook_index.py --json      # the parsed index as JSON
-    python tools/agents/sync_playbook_index.py --selftest  # fixtures: duplicates, bad keys, slug mismatch, ...
-"""
+"""Generate docs/matching/index.md from the front matter of docs/matching/NNN-slug.md. Spec: docs/tools/spec/sync_playbook_index.md.
+CLI: sync_playbook_index.py [--check | --print | --where N | --json | --selftest]."""
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import json
 import os

@@ -9,8 +9,8 @@ older than the sources it describes.
 ## Users
 
 `unitutil.report_functions/report_measure/measure_project`, `recompile` (`--measure`, `diff_rows`), `measure`, `ledger`,
-`verifyunit`, `unitscore`, `symdiff`, `relocdiff`, `reportdiff`, `land` (the base snapshot and the regression row),
-`tools/objdiff/freshguard.py` (a re-export shim until WP6).
+`verifyunit`, `unitscore`, `symdiff`, `relocdiff`, `land` (the base snapshot and the regression row); WP6 deleted the
+shims `tools/objdiff/freshguard.py`, `tools/units/reportdiff.py` and `tools/unitutil.py`.
 
 ## Public API
 

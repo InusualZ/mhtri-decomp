@@ -8,7 +8,7 @@ import os
 from tools.lib import objcompare, testing
 from tools.lib.binary.build import ElfBuilder
 from tools.lib.binary.elf import SHN_ABS
-from tools.units import relocaudit, undefrefs
+from tools.units import undefrefs
 
 TIER = "fixture"
 
@@ -112,13 +112,6 @@ def test_sweep(c):
         decls = undefrefs.declarations_for(undefrefs.declaration_index(root), "drawSpr2TF__FUcP9fltSpr2TFUc")
         c.check("the declaration lookup uses the linkage stem", [(d["file"], d["line"]) for d in decls],
                 [("include/owner.h", 1)])
-
-
-def test_relocaudit_shim(c):
-    c.check("relocaudit forwards to undefrefs --census --linkage with its own flags",
-            relocaudit.forwarded(["--unit", "ef/ef_cube.cpp", "--json"]),
-            ["--census", "--linkage", "--unit", "ef/ef_cube.cpp", "--json"])
-    c.check("... to the undefrefs beside it", os.path.basename(relocaudit.UNDEFREFS), "undefrefs.py")
 
 
 if __name__ == "__main__":

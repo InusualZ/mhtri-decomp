@@ -10,16 +10,14 @@ disk, so the check count is identical in MAIN and in a fresh worktree. `callers.
 checks, so this entry point and `callers.py --selftest` cannot drift.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import os
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-for _path in (os.path.join(ROOT, "tools"), os.path.join(ROOT, "tools", "units")):
-    if _path not in sys.path:
-        sys.path.insert(0, _path)
 
-from units import callers  # noqa: E402
+from tools.units import callers
 
 
 def main() -> int:

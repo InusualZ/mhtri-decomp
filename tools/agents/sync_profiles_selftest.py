@@ -20,6 +20,7 @@ It also pins the coverage tripwire: a file in `.claude/agents/` with a frontmatt
 new profile cannot be added without being checked.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import os
 import subprocess
@@ -27,10 +28,8 @@ import sys
 import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if os.path.join(ROOT, "tools", "agents") not in sys.path:
-    sys.path.insert(0, os.path.join(ROOT, "tools", "agents"))
 
-import sync_profiles as sp  # noqa: E402  (imported through the sys.path shim above)
+from tools.agents import sync_profiles as sp
 
 # A miniature section 6.5 with the shape the real one has: the table, the enforcement paragraph, and the
 # audit table that follows it. Rule 11 stands in for the `void *` rule and rule 12 for the owner's
@@ -218,9 +217,8 @@ def selftest() -> int:
           "ALREADY the unit's own" in real_block, True)
 
     # --- the brief and the profiles read the same bytes -------------------------------------------------
-    sys.path.insert(0, os.path.join(ROOT, "tools", "units"))
     try:
-        import brief  # noqa: E402
+        from tools.units import brief
         check("brief.plan_section and sync_profiles.plan_section agree",
               brief.plan_section(ROOT, sp.PLAN_HEADING), real)
     except Exception as exc:  # the units import chain is heavy; the check above already pins the text

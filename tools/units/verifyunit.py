@@ -13,7 +13,8 @@ import re
 import subprocess
 import tempfile
 
-from tools import unitutil
+from tools.lib import proc as _proc
+from tools.lib import repo as _repo
 from tools.lib import objcompare
 from tools.lib import project as _project  # the configure / splits readers
 from tools.lib import report as _report  # the 0 % rule, the arithmetic identity
@@ -353,7 +354,7 @@ def symbol_problems(rep_funcs: dict[str, dict], fresh: dict[str, dict],
 
 def _objdiff_path(main: str) -> str:
     cand = os.path.join(main, "build", "tools", "objdiff-cli.exe")
-    return cand if os.path.exists(cand) else unitutil.OBJDIFF
+    return cand if os.path.exists(cand) else os.path.join(_repo.repo_root(), _report.OBJDIFF_REL)
 
 
 def verify_units(main: str, units: list[str], objdiff: str | None = None,
@@ -419,7 +420,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("units", nargs="+", help="unit paths, e.g. hud/fn_80334568")
     ap.add_argument("--main", default=None, help="the tree to check (default: this repository)")
     args = ap.parse_args(argv)
-    main_root = args.main or unitutil.ROOT
+    _proc.install_spawn_retry()  # a launch Windows refuses transiently (WinError 5) is retried
+    main_root = args.main or _repo.repo_root()
     ok_reg, reg = registration_check(main_root, args.units)
     print("%s registration: %s" % ("PASS" if ok_reg else "FAIL", reg))
     ok_ind, ind, adv = verify_units(main_root, args.units)

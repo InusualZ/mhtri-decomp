@@ -52,7 +52,7 @@ Target: `tools/tests/units/test_measure.py` on `lib.testing` (`FixtureTree`/`Git
   since WP3b; it used to read as "no baseline" and printed no delta. On MAIN's report at 0375f98c4 that is 11 966 of
   20 507 function rows (233 units), so `--against-main` on one of those units now prints a delta (and may count an
   `up` row) where it printed none.
-* `moved`/`up`/`down` against a baseline are `lib.report.moved` + `direction` (the rule `reportdiff` reads).
+* `moved`/`up`/`down` against a baseline are `lib.report.moved` + `direction` (the rule `lib.report.compare` reads).
 
 ## History (the incidents behind the rules - keep the rule, drop the narrative when the rule is stable)
 

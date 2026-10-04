@@ -91,6 +91,14 @@ def test_trap_scan(c):
     c.check("binary mode needs no codec", traps('subprocess.run(["git"], capture_output=True, text=False)\n'), [])
     c.check("a ** splat is not claimed", traps('kw = {}\nsubprocess.run(["git"], text=True, **kw)\n'), [])
     c.check("text=<expression> is not claimed", traps('subprocess.run(["git"], text=flag)\n'), [])
+    c.check("the codec keyword may sit on the line after text=True",
+            traps('subprocess.run(["git"], text=True,\n               encoding=None)\n'), [])
+    c.check("a continuation line with no encoding is still a trap",
+            len(traps('subprocess.run(["git"], text=True,\n               cwd="/tmp")\n')), 1)
+    c.check("a runner indirection is scanned like any call",
+            len(traps('def go(runner):\n    return runner(["git"], capture_output=True, text=True, errors="replace")\n')), 1)
+    c.check("TEXT_KWARGS is the documented pair", (proc.TEXT_KWARGS["encoding"], proc.TEXT_KWARGS["errors"]),
+            ("utf-8", "replace"))
     with testing.FixtureTree() as tree:
         tree.write("tools/units/bad.py", 'import subprocess\np = subprocess.run(["git"], text=True)\n')
         tree.write("tools/units/good.py", 'import subprocess\np = subprocess.run(["git"], text=True, encoding="utf-8")\n')

@@ -136,7 +136,7 @@ def target_rows() -> int:
 
 
 def _report_runner(calls, functions, measures=None):
-    """A fake objdiff writing the report/objdiff shapes `unitutil` parses; records every command."""
+    """A fake objdiff writing the report/objdiff shapes `lib.report` parses; records every command."""
     def runner(argv, **kwargs):
         calls.append(list(argv))
         if "generate" in argv:

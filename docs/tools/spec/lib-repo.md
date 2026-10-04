@@ -7,7 +7,7 @@ originals hash to. It is also the choke point of the fixture tier's live-tree re
 
 ## Users
 
-`unitutil` (and through it its 40 importers), `symdiff`, `wtsafe`; every tool once WP3 removes its private resolver.
+`symdiff`, `wtsafe`, `callers`, `unitinfo` (WP6 deleted `unitutil`, the shim 40 files imported); every tool once WP3 removes its private resolver.
 
 ## Public API
 

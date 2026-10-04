@@ -16,7 +16,6 @@ line per attempt, in a `finally`, so an exception is logged as `error`; `land --
 ```
 python tools/units/landlog.py [summary] [--last N] [--json] [--main PATH]
 python tools/units/landlog.py list [--last N] [--json] [--main PATH]
-python tools/units/landlog.py --selftest
 ```
 `summary` (default): attempts, outcomes, the landed ratio, total and median wall time, the refusing rows and
 conflicted paths by frequency; `--json` is `lib.lanes.landlog.summary` plus `unreadable_lines`. `list`: one line per

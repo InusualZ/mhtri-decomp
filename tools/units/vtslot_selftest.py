@@ -18,6 +18,7 @@ CLI check runs the tool against a temp tree and confirms every fixture file is b
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import hashlib
 import json
@@ -28,10 +29,9 @@ import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import vtableaudit as va  # noqa: E402
-import vtslot as vs  # noqa: E402
+from tools.units import vtableaudit as va
+from tools.units import vtslot as vs
 
 TEXT_ADDR = 0x80004000
 DATA_ADDR = 0x80500000

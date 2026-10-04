@@ -17,8 +17,8 @@ flag exists, the exit convention applied to whatever `main` returns, and the JSO
   `--main`, `--limit N`, `--dry-run`, `--quiet`.
 * `SELFTEST_FLAG`: how the runner recognises a tool that runs its own selftest.
 * `package_of(rel, files)`: the topmost tool package (a directory below `tools/` with `__init__.py`, never
-  `tools/lib`/`tools/tests`) a file belongs to; `is_entry_point(rel, tree)`: a module-level `__main__` guard or a
-  test module; `runs_own_selftest(rel, text, files)`: the flag, an entry point, not a package module (WP4: the one
+  `tools/lib`/`tools/tests`) a file belongs to; `is_entry_point(rel, tree)`: a module-level `__main__` guard, a
+  test module, or a `*_selftest.py` (WP6: the runner starts each one as a program); `runs_own_selftest(rel, text, files)`: the flag, an entry point, not a package module (WP4: the one
   copy `selftest.py`, `tests/lib/test_layering.py` and `tests/lib/test_prologue.py` call).
 
 ## Invariants and rules
@@ -28,8 +28,9 @@ flag exists, the exit convention applied to whatever `main` returns, and the JSO
   on stderr with `<tool>: could not run: <why>` and exits 2. A `parser.error` keeps argparse's exit 2.
 * **`--json` with a `Verdict`** prints the one schema (`{"tool", "rows", "ok", "summary"}`); a tool that prints its
   own JSON returns an int and keeps its shape.
-* **`--selftest` is a forwarding shim** (until the WP6 sweep): `tests` is a callable (run in-process) or a path
-  relative to the repository root (run with this interpreter in `cwd`). The flag exists only when `tests` is set.
+* **`--selftest` through `tests`**: a callable (run in-process) or a path relative to the repository root (run with this
+  interpreter in `cwd`); the flag exists only when `tests` is set. WP6 removed it from every tool whose flag only forwarded
+  to a `tools/tests/` module (the runner runs those directly); `stylelint` keeps it for its in-tool selftest.
 * A tool keeps its own description and its own flags; the common flags are opt-in per tool (`common=`), so
   adopting `Tool` never adds a flag a tool does not honour.
 * `SELFTEST_FLAG` sees `add_argument("--selftest"` or `Tool(..., tests=...)`, never a mention in prose.
@@ -51,7 +52,8 @@ and to a script path; the discovery regex.
 ## Known gaps
 
 * 90 tool files still build their own `ArgumentParser` (91 on `main`); they move onto `Tool` with their family
-  packages (WP3), and the `--selftest` flags go in WP6.
+  packages (WP3); WP6 removed the forwarding `--selftest` flags (12), keeping `tudiscover`, `land` and `claims` (the
+  docs spell them) and every in-tool selftest.
 * `--root`/`--main` do not yet resolve a `Tree` (`lib.repo`); a tool reads `args.root` as before.
 * The prologue line check stays in `tools/tests/lib/test_prologue.py` (one copy); the spec's "prologue line check" is not
   duplicated here.

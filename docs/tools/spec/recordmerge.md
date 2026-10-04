@@ -14,10 +14,9 @@ skills (3); CLAUDE.md (1); docs (6)
 
 ```
 python tools/units/recordmerge.py --base <base> --other <other> [--out <path>] [--take other|base]
-python tools/units/recordmerge.py --selftest
 python tools/units/recordmerge.py --base include/ai/ainpc.h         --other worker/802d44f4-fn-802d44f4-bd0a:include/ai/ainpc.h --out include/ai/ainpc.h
 ```
-Flags: `--base`, `--dry-run`, `--json`, `--other`, `--out`, `--selftest`, `--take`.
+Flags: `--base`, `--dry-run`, `--json`, `--other`, `--out`, `--take`.
 Exit codes: 0 ok, 1 findings or refusal, 2 could not run (the `lib.findings` convention; today's tool documents none, so `migration.md` records the current behaviour before changing it).
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
 
@@ -42,7 +41,7 @@ text (the one transaction writer and the endings rule), git (a `<rev>:<path>` si
 ## Test contract
 
 Tier: fixture.
-The test (`tools/tests/units/test_recordmerge.py`, fixture tier; `recordmerge.py --selftest` runs it): The fixtures are deliberately small and hand-checked: each one exercises a rule the tool implements (splice into the filler, key members per struct, compare the declaration) or a reason it must refuse (a named member in the way, no room, a same-offset rename, a size it cannot infer). The real-world acceptance case - reproducing the `_AINPC_W` merge that was done by hand - is not here, because it depends on the repo's own history; it was run against `089491a7b` and is recorded in the commit that added this tool.
+The test (`tools/tests/units/test_recordmerge.py`, fixture tier): The fixtures are deliberately small and hand-checked: each one exercises a rule the tool implements (splice into the filler, key members per struct, compare the declaration) or a reason it must refuse (a named member in the way, no room, a same-offset rename, a size it cannot infer). The real-world acceptance case - reproducing the `_AINPC_W` merge that was done by hand - is not here, because it depends on the repo's own history; it was run against `089491a7b` and is recorded in the commit that added this tool.
 
 ## Known gaps
 

@@ -11,7 +11,7 @@ from pathlib import Path
 from tools.lib import testing
 from tools.lib.testing import Checker, FixtureTree, GitFixture, LiveTreeError
 from tools import selftest as runner
-from tools.units import sharedfiles
+from tools.lib.project import splits as project_splits
 
 TIER = "fixture"
 
@@ -70,8 +70,9 @@ def test_fixture_tree_layout(c):
         c.check("configure.py is real Python with the registered objects", objects,
                 [("Dir/file.c", True), ("Dir/other.cpp", False)])
         c.check("... and the lib names its cflags group", ns["config"].libs[0]["cflags"], ["-O4,p", "-fp_contract on"])
-        c.check("splits.txt is read by today's parser (sharedfiles.parse_ranges)",
-                sharedfiles.parse_ranges(tree.read("config/RMHE08/splits.txt")),
+        c.check("splits.txt is read by the one parser (lib.project.splits)",
+                [(r.unit, r.section, r.start, r.end)
+                 for r in project_splits.Splits.parse(tree.read("config/RMHE08/splits.txt")).ranges],
                 [("Dir/file.c", ".text", 0x80004000, 0x80004100), ("Dir/file.c", ".data", 0x80500000, 0x80500010),
                  ("Dir/other.cpp", ".text", 0x80004100, 0x80004180)])
         c.check("symbols.txt rows are the map's shape, in address order",
@@ -179,8 +180,8 @@ def test_allowed(c):
     with open(os.path.join(d, "x.txt"), "w") as fh:
         fh.write("x")
     c.check("a temp file is readable", open(os.path.join(d, "x.txt")).read(), "x")
-    import tools.units.sharedfiles
-    c.check("importing a tool reads its code", hasattr(tools.units.sharedfiles, "parse_ranges"), True)
+    import tools.agents.edit
+    c.check("importing a tool reads its code", hasattr(tools.agents.edit, "main"), True)
     out = subprocess.run([sys.executable, "-c", "import os; print(os.environ.get('TOOLS_TEST_TIER'))"],
                          cwd=d, capture_output=True, text=True).stdout.strip()
     c.check("a child process inherits the tier", out, "fixture")
@@ -190,6 +191,48 @@ def test_allowed(c):
     p = _run_child("", "nonsense")
     c.check("an unknown TIER is refused", p.returncode != 0 and "TIER must be one of" in p.stderr, True)
 
+
+
+def test_temp_dir_and_rmtree_retry(c):
+    with testing.temp_dir(prefix="tt-") as tmp:
+        c.check("temp_dir makes a directory outside the tree, named by its prefix",
+                (os.path.isdir(tmp), os.path.basename(tmp).startswith("tt-")), (True, True))
+        os.makedirs(os.path.join(tmp, "a", "b"))
+        ro = os.path.join(tmp, "a", "b", "ro.txt")
+        Path(ro).write_text("x", encoding="utf-8")
+        os.chmod(ro, 0o400)
+    c.check("... and removes it on exit, a read-only file included", os.path.exists(tmp), False)
+    d = tempfile.mkdtemp()
+    calls = []
+    real = testing.shutil.rmtree
+
+    def held(path, onexc=None, ignore_errors=False):
+        calls.append(path)
+        if len(calls) < 3 and not ignore_errors:
+            raise PermissionError(5, "held")
+        real(path)
+    testing.shutil.rmtree = held
+    sleeps = []
+    try:
+        testing.rmtree_retry(d, sleep=sleeps.append)
+    finally:
+        testing.shutil.rmtree = real
+    c.check("rmtree_retry retries a held directory with a growing backoff until it goes",
+            (os.path.exists(d), len(calls), sleeps), (False, 3, [0.1, 0.2]))
+    c.check("... and a path that does not exist is a no-op", testing.rmtree_retry(d), None)
+
+
+def test_isolate_live_state(c):
+    before = os.environ.get("CLAUDE_CONFIG_DIR")
+    try:
+        path = testing.isolate_live_state()
+        c.check("isolate_live_state points CLAUDE_CONFIG_DIR at a fresh empty directory",
+                (os.environ.get("CLAUDE_CONFIG_DIR"), os.listdir(path)), (path, []))
+    finally:
+        if before is None:
+            os.environ.pop("CLAUDE_CONFIG_DIR", None)
+        else:
+            os.environ["CLAUDE_CONFIG_DIR"] = before
 
 
 def test_rewrite_json_keeps_the_files_shape(c):

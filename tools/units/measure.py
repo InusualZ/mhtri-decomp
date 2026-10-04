@@ -162,7 +162,7 @@ def load_baseline(path: str, unit_name: str):
 
 def moved_summary(functions: dict, baseline: dict) -> dict:
     """How many rows moved against a baseline, and in which direction (`down` is a regression) -
-    `lib.report.moved` + `direction`, the rule `reportdiff` reads."""
+    `lib.report.moved` + `direction`, the rule `lib.report.compare` reads."""
     now = {name: row.get("score") for name, row in (functions or {}).items()}
     return _report.direction(_report.moved(numeric(baseline), numeric(now)))
 

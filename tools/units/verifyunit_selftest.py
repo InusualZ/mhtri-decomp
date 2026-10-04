@@ -24,6 +24,7 @@ live cross-check of a registered unit, the doctored-report fixture that must ref
 file - the shape is dtk's own, so no branch's build tree can supply it.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import json
 import os
@@ -34,12 +35,8 @@ import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
-if HERE not in sys.path:
-    sys.path.insert(0, HERE)
-if os.path.dirname(HERE) not in sys.path:
-    sys.path.insert(0, os.path.dirname(HERE))
 
-import verifyunit as vu  # noqa: E402
+from tools.units import verifyunit as vu
 
 
 def _ok(label, got, want, failures):
@@ -276,7 +273,7 @@ def build_object(sections, symbols) -> bytes:
     sections : [(name, data, flags)]                in shndx order
     symbols  : [(name, section, size, value, info)] the null symbol is implicit at index 0
 
-    `raw_symbol_rows`/`symbol_locations` go through `unitutil.read_elf`, so the fixture needs exactly
+    `raw_symbol_rows`/`symbol_locations` go through `lib.binary.elf.Elf`, so the fixture needs exactly
     what that reads: the ELF header's `shoff`/`shentsize`/`shnum`/`shstrndx`, `>IIIIIIIIII` section
     headers, the first `SHT_SYMTAB` as the symbol table, its `link` as the string table, and
     `>IIIBBH` symbol entries.

@@ -1,62 +1,10 @@
 #!/usr/bin/env python3
-"""Write `tools/units/data-queue.json`: the campaign's unowned data as a queue, not as comments.
-
-docs/plan.md 7.17. The retired tiler's data pass wrote the runs it saw into `splits.txt` as
-`# ... claim in the measured data pass` comments, and nothing reads them back. This tool is the writer
-for the queue `brief.py` already reads: one entry per **unowned data run**, in the shape the plan
-specifies,
-
-    {unit, section, start, end, labels, leak, density, verdict}
-
-with `brief.py`'s `data_queue_entries()` consuming it per unit (it accepts either a bare list or
-`{"entries": [...]}`; this writer emits the bare list).
-
-Where the backlog comes from - the same repository state the other tools read, never a stored list:
-
-* the **symbols** (`config/RMHE08/symbols.txt`, through `symbolpreflight.load_symbols`, which goes
-  through `symedit`; the file is 4.5 MB and is never printed or pasted),
-* the **owners** (`config/RMHE08/splits.txt`): a symbol is backlog when no claimed range covers its
-  `(section, address)`,
-* the **regions** (`build/RMHE08/config.json`, through `ledger.Objects`): which split object covers an
-  unclaimed address, so a run with no referencing unit still gets a stable, honest name,
-* the **references** (`build/tmp/tudiscover/graph.json`, the `tudiscover` cache): a data run whose
-  symbols are referenced by exactly one registered unit is attributed to that unit (`Pl/pl_act`), which
-  is what makes the queue useful to `brief.py`. The cache is read, never rebuilt - a stale stamp only
-  drops the reference attribution, it does not trigger the 200-400 s graph walk.
-
-The selection rule (pure, `select`): a symbol is backlog when it is not a function, its section is a
-data section (not `.text`, not an `extab`/`extabindex`/`.ctors`/`.dtors` fragment - those travel with
-the code unit that owns them), and no `splits.txt` range covers it.
-
-The run grouping (pure, `group_runs`): within one section, symbols are merged while each next address
-is at or before the current run's end, so a gap starts a new run and a zero-size label never does.
-
-The verdict is the queue's own, pre-measurement verdict, and it uses the decisions the plan already
-made: `never` for linker-generated data (`_rom_copy_info`, `_bss_init_info`, §8.4), `owner-held` for
-the TRK interrupt-vector table (the escalation queue keeps it unowned), `not claimed` when the run leaks
-across units or a claimed symbol sits inside it (`density < 0.5`), otherwise `proposed`.
-`dataclaim.py` (7.8) refines `proposed` with the target-vs-ours section measurement.
-
-    python tools/units/dataqueue.py                 # write the queue and print a summary
-    python tools/units/dataqueue.py --dry-run       # report what would be written, write nothing
-    python tools/units/dataqueue.py --limit 20      # a preview queue (deterministic prefix)
-    python tools/units/dataqueue.py --json          # the queue on stdout, write nothing
-    python tools/units/dataqueue.py --request <unit> <addr> [--size N] [--evidence E] [--unblocks R]
-    python tools/units/dataqueue.py --selftest
-
-**The data-claim request channel.** A lane that finds a genuinely unowned range *its own rows need* used
-to dead-end: rule 12 refuses a bare `extern`, and the brief says do not touch `splits.txt`. `--request`
-files it instead - address, size, the sole-referencer evidence and the rows it unblocks - into
-`.pi/data-requests.json` (gitignored, deduplicated, byte-deterministic; `slots.py collect` merges a lane's
-filings into MAIN's). It is only the **filing
-channel**: the ruling is the orchestrator's and goes through the `contact_supervisor` protocol. The brief
-(`brief.py`, section 5d) names the command, so no lane has to guess it.
-
-Writing is atomic (temp file + `os.replace`) and idempotent: the same repository state renders the same
-bytes, so re-running cannot churn the file.
-"""
+"""Write tools/units/data-queue.json: the campaign's unowned data as a queue; file a lane's data request.
+Spec: docs/tools/spec/dataqueue.md. CLI: dataqueue.py [--dry-run] [--limit N] [--json] | --request <unit> <addr> [--size N]
+[--evidence E] [--unblocks R] | --selftest."""
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import hashlib
@@ -66,17 +14,13 @@ import re
 import sys
 from pathlib import Path
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, HERE)
-sys.path.insert(0, os.path.dirname(HERE))
+from tools.lib.project import splits as _splits
+from tools.lib import text as sf  # the one writer for shared files (Transaction) - docs/plan.md 7.12
+from tools.units import dataseams  # `.data` emission-order seams: a run that spans several TUs
+from tools.units import symbolpreflight as preflight  # the splits.txt / symbols.txt parsers
 
-import sharedfiles as sf  # noqa: E402  (the one writer for shared files - docs/plan.md 7.12)
-import symbolpreflight as preflight  # noqa: E402  (the splits.txt / symbols.txt parsers)
-import dataseams  # noqa: E402  (`.data` emission-order seams: a run that spans several TUs)
-
-# dtk's section order (mirrors tudiscover.SECTION_ORDER) - the queue's deterministic sort key.
-SECTION_ORDER = [".init", "extab", "extabindex", ".text", ".ctors", ".dtors", ".rodata", ".data",
-                 ".bss", ".sdata", ".sbss", ".sdata2", ".sbss2"]
+# dtk's section order - the queue's deterministic sort key (`lib.project.splits`, the one copy).
+SECTION_ORDER = _splits.SECTION_ORDER
 # Sections the queue never covers: `.text` is code, the four fragments are per-function and per-unit
 # side effects that travel with the code unit (docs/plan.md §6.5 / CLAUDE.md "playbook 23").
 NON_DATA_SECTIONS = (".text",) + tuple(preflight.FRAGMENT_SECTIONS)
@@ -315,7 +259,7 @@ def write_queue(path: str, text: str) -> None:
     """Atomic write through the shared-file layer: a crash leaves the old queue or the new one.
 
     The queue is deterministic LF JSON, so the write is byte-identical to the old temp+`os.replace`;
-    routing it through `sharedfiles.Transaction` inherits the exact-bytes rollback and the single
+    routing it through `lib.text.Transaction` inherits the exact-bytes rollback and the single
     temp-file primitive the other shared-file writers use (docs/plan.md 7.12).
     """
     tx = sf.Transaction()
@@ -487,7 +431,7 @@ def read_graph_cache(root: str) -> tuple[dict, str]:
 
 def load_inputs(root: str) -> tuple[list[dict], list[dict], dict, object, str]:
     """(symbols, splits, funcs, cover, warning) from the ledger - the same state the other tools read."""
-    import ledger as ledger_mod  # noqa: E402  (kept out of the module import for the pure selftest)
+    from tools.units import ledger as ledger_mod  # kept out of the module import for the pure selftest
 
     led = ledger_mod.Ledger()
     symbols = [entry for entries in led.by_section.values() for entry in entries]
@@ -694,7 +638,7 @@ def selftest() -> int:
               sorted(str(p) for p in Path(tmp).rglob("*" + sf.TMP_SUFFIX)), [])
 
         # --- round-trip through brief.py's own reader
-        from units import brief as brief_mod  # noqa: E402
+        from tools.units import brief as brief_mod
         check("brief.py reads the queue back", brief_mod.data_queue_entries(tmp, "Pl/pl_act"),
               [e for e in entries if e["unit"] == "Pl/pl_act"])
         check("brief.py finds nothing for a unit with no runs",
@@ -864,7 +808,7 @@ def main() -> int:
     if args.selftest:
         return selftest()
 
-    root = os.path.abspath(args.root) if args.root else os.path.dirname(os.path.dirname(HERE))
+    root = os.path.abspath(args.root) if args.root else os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     if args.request:
         return cmd_request(root, args.request[0], args.request[1], size=args.size,
                            section=args.section, evidence=args.evidence, unblocks=args.unblocks,

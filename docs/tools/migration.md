@@ -91,6 +91,11 @@ step, and the gate lands every package.
 
 ### WP6 - the sweep (M, after WP4)
 
+**Done 2026-10-04** (status and numbers: `retired.md`, "Folded into another tool"; the commits are the branch's
+`tools/units: ...` series). Kept, with the reason in `retired.md`: `escape.py --edit` (the profiles name it), the
+`mergebranch.py`/`land.py`/`stylelint.py`/`brief.py`/`mwlink_debugger.py` shims (the compatibility list).
+
+
 * Delete the delegates and shims (`unitutil.py` -> re-export only what `mt.py` needs, then move `mt.py`'s forwarders to `lib.cli`;
   `--selftest` flags; `freshguard.py`, `reportdiff.py`, `subproc.py`, `spawnretry.py`, `sharedfiles.py`, `checklf.py`, `relocaudit.py`,
   `promote*.py`, `applysplits.py`, `dataattach.py`, `matchinggain.py`, `gen_trk_vectors.py`, `infer-run.md`, `relocaudit-findings.md`).

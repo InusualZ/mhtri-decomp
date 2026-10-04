@@ -20,8 +20,10 @@ The objdump-dependent rows are skipped (reported, not faked) when
 `build/binutils` has not been downloaded; the pure classification rows always run.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import contextlib
+import importlib
 import io
 import json
 import subprocess
@@ -31,10 +33,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
-if str(HERE) not in sys.path:
-    sys.path.insert(0, str(HERE))
-
-import verify_pcode as vp  # noqa: E402  (imported through the sys.path shim above)
+# `tools/mwcc-debugger/` is not an identifier, but it is a namespace package of `tools`: import it by name
+vp = importlib.import_module("tools.mwcc-debugger.locate.verify_pcode")
 
 AS = ROOT / "build/binutils/powerpc-eabi-as.exe"
 OBJDUMP = ROOT / "build/binutils/powerpc-eabi-objdump.exe"

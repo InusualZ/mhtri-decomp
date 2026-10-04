@@ -677,7 +677,7 @@ it is verified, not asserted.
 * **Row 46: the answer is the symbol, not the section.** The linker builds ctor/dtor entries from the
   `__*_reference` symbols; renaming an MWCC `.ctors$10` leaves the output byte-identical and renaming the symbols
   fails the link (catalogue id 205). A section-name compare cannot see this. Use `mwlink_debugger.py trace
-  [--link]` (§9.7); the **link step is `Wii/1.0`** (`build.ninja` global `mw_version`), per-object compiles `Wii/1.3`.
+  [--link]` (`docs/tools/README.md`, the roster's compiler and linker rows); the **link step is `Wii/1.0`** (`build.ninja` global `mw_version`), per-object compiles `Wii/1.3`.
 * **`.init` and link-generated data.** dtk classifies the TRK vector image as link PADDING (`pad_NN_ADDR_init`); a
   `type:function` symbol over the exact claimed extent retires the pad symbol (playbook 74; a sized
   `type:object` made `dol split` fail with an overlap error). MWCC pads every object in `.init` to 8 bytes.
@@ -695,56 +695,11 @@ F31's sibling class).
 
 ## 9. The tool roster
 
-One line per tool: what it is, and **use it when …**. Paths are relative to `MAIN`. Where a tool is still
-being built, the line says so; a tool named here without a mechanism is named because the campaign uses it, not
-because it is finished.
+The roster - one line per tool, **use it when ...** - is `docs/tools/README.md` ("Use it when: the roster"),
+beside the concept map and the spec index; each tool's contract is its `docs/tools/spec/<name>.md`. What stays
+here is the one procedure the roster used to carry.
 
-### 9.1 The lane, the claim and the environment
-
-| tool | use it when … |
-| --- | --- |
-| `tools/units/claims.py` | **any lane starts**: claim a unit (`--pipeline` opts into the three-phase loop, §1) — the claim cuts a fresh branch off `main`'s tip and holds a slot for the whole loop; `release` returns the slot and **fails closed** (E2, §2.3). |
-| `tools/units/slots.py` | **you need a lane directory**: `init` builds the six-slot pool, `status`/`verify` read the pool and prove a kept tree current — *a stale build tree is a lie* (§7), so reach for `verify` the moment a measurement is suspect; the reset is fail-closed. |
-| `tools/units/queue.py` | **you are choosing the next item**: `next` picks a unit, takes a free slot and prints the paste-ready spawn line with the claim's own worktree as `cwd`; it refuses while all six slots are taken, and refuses a `cwd` that resolves to MAIN. |
-| `tools/units/brief.py` | **you are launching a lane**: it generates `tools/units/briefs/<unit>.md`, the one file the worker reads — unit, inventory, residuals, decided items, the task, and the rules copied verbatim from the plan. *If the brief does not say it, it is not a rule.* |
-
-### 9.2 The gate, the merge and the landing
-
-| tool | use it when … |
-| --- | --- |
-| `tools/units/land.py` | **you are about to put a batch on `main`**: its rows are the law (§4). `--units` takes units *or* batch paths; `--no-outbox` is for a bookkeeping row, never for a code refusal; its `--diff` grandfathers existing rule findings and refuses *added* ones. |
-| `tools/units/integrate.py` (`land.py integrate`) | **lanes filed integrator requests**: classifies them, applies the mechanical ones (renames with their sweep, owner-header declarations, STOPGAP removal) on an `integrate/<date>` branch, builds once (narrowing a failed build per declaration), pre-runs the gate's drift/lint/undefrefs/vtable rows and prints the landing line (§10.10). `--dry-run` writes nothing. |
-| `tools/units/mergebranch.py` | **a branch was cut before `main` moved**: `resolve` brings `main` in by **row replacement** (never a union, never a `src/**` union), with the rule-2 **address** sweep — it supersedes the manual merge procedure (§5). |
-| `tools/units/flipcheck.py` | **you are deciding whether a unit may be flipped**: READY is **necessary, not sufficient**, and its relocation half does not run for an already-`Matching` unit (§8). |
-| `tools/objdiff/relocdiff.py <unit> --by-owner` | **a unit scores ~100 % and you want to know its relocations are the target's**: aligns relocations per owning symbol and compares type, symbol **name** and addend against the target object, printing only differences (`N/N relocations match`, exit 1 on any; a moved function is not a difference). Without `--by-owner` it prints both sides' tables paired by offset. objdiff scores a `bl` to the wrong symbol as equal, so this sees a wrong callee, vtable slot or pool entry that no score does. It runs on any built unit, `Matching` or not - the relocation half `flipcheck` skips for a `Matching` unit (§8). |
-| `tools/elf/objalign.py` | **a unit's claimed start is not 8-aligned**: clamp the compiled section's `sh_addralign` so mwld stops rounding the section up and shifting every later section (a build-step ELF fix). |
-| `tools/elf/objextab.py` | **a `Matching` unit's exception tables need the map's names**: give the MWCC object the `@etb_…`/`@eti_…` names `dtk dol split` synthesises, so the link resolves once the unit is the only definition (a build-step ELF fix). |
-
-### 9.3 The measurement
-
-| tool | use it when … |
-| --- | --- |
-| `tools/units/measure.py` | **you are searching**: score a whole unit in one compile and one `objdiff report`, printed as a per-symbol table. |
-| `tools/units/recompile.py --measure` | **you are proving one symbol**: one symbol per run, usable from any worktree; resolution is invocation-first and prints the path it used with its kind (`[worktree-split]` / `[registered]` / `[auto-fallback]`). Together with `measure.py` it is the **one** implementation of the official metric (§7). |
-| `tools/units/sectiongap.py` | **a flip is doubtful**: it prints each differing section **with its relocations**, not just a size — the `extab`/`extabindex` gaps `datagap.py` skips, and the right-size/wrong-offset record no size check can see (F39/F41; being built). |
-| `tools/units/datagap.py` | **a unit reads 100 % but may not be the target**: it compares the *data* sections' sizes, so you see the extra `.sdata2`/string pool objdiff does not count. |
-
-### 9.4 The record, the map, the language
-
-| tool | use it when … |
-| --- | --- |
-| `tools/units/symbolpreflight.py` | **before any source is written**: answer who owns an address and what a registration would touch — offline and bounded. |
-| `tools/symbols/symedit.py` | **you need a map row**: query and surgically edit `symbols.txt` (~65 700 lines) without loading it into context; the map row and the source change together. |
-| `tools/symbols/dumpmap.py` | **you want a rename candidate**: resolve `symbols.txt` names against the runtime dump's Dolphin map. |
-| `tools/splits/tudiscover.py` | **you need a TU boundary**: propose the translation-unit seam around an address, offline, from the data-section referrer runs. |
-| `tools/units/callees.py` | **you are about to write bodies**: name a unit's callees — every generated symbol its bodies reference, its owner, the call shape — before rule 7 bites. |
-| `tools/units/callers.py` | **you need "who calls / who reads this"**: the whole-DOL caller index, **address-keyed** because the `asm/` dump is stale (rule 12's evidence tool; the session called it the single most useful recon tool). |
-| `tools/units/dataclaim.py --unit U` | **rule 12 bit you (an `extern` of unowned data)**: every data symbol U references but does not own, its census sharers, and the exact `splits.txt` claim / named data-only unit to paste. Read-only; it never writes `splits.txt`. |
-| `tools/units/unwindcut.py <unit> <cut>` | **you are re-cutting a seam** (moving a unit's right edge to a function boundary): the `extabindex`/`extab` partition at the cut with the sum check, the paste-ready lines for both halves, and the `.ctors`/`.dtors` words the cut obliges you to drop. Read-only; it refuses a cut that is not a function boundary. |
-| `tools/units/langcheck.py` | **a unit's language is in question**: decide C vs C++ from evidence (a mangled definition, a `.cpp` `__FILE__` string), never from convenience. |
-| `tools/units/recordmerge.py` | **two lanes each hold a view of the same record header**: fold them into one definition with the checks the hand passes lacked. |
-
-#### 9.4.1 Claiming data: rule 12's three shapes, and the two recipes lanes kept re-deriving
+### 9.4.1 Claiming data: rule 12's three shapes, and the two recipes lanes kept re-deriving
 
 Rule 12 (`docs/plan.md` §6.5) refuses an `extern` of data **no registered `splits.txt` range covers**,
 and unlike rule 7 there is no rename remedy — the only remedies are ownership changes. There are exactly
@@ -802,49 +757,6 @@ The failure this prevents is the inverse of recipe 1's: claiming a shared pool (
 into one reader either fails to link or re-attributes bytes another unit also emits. `dataclaim.py --unit U`
 names the sharers from `callers.py`'s census and prints the block above whenever a referenced pool is read
 by a unit other than `U`.
-
-### 9.5 The rules and the audits
-
-| tool | use it when … |
-| --- | --- |
-| `tools/units/stylelint.py` | **you changed `src/` or `include/`**: rules 1–12 with `file:line`; `--diff <ref>` is the gate's add-only comparison (a recut's *moved* findings are credited one per removal from another file of the batch and printed as `moved`, a copy is not), `--budget` a debt read. |
-| `tools/units/vtableaudit.py` | **a unit owns a code-pointer run**: find a vtable it owns but does not emit and a hand-written `+0x00` table store — rule 10 made mechanical, with `--diff` at the gate. |
-| `tools/units/datagap.py --census --unit <unit>` | **before you report a unit**: the data its target object references that no claim covers (orphans, with neighbours, section and readers) plus the strict view - the unit's sole-owned pairs as `REFUSE` or `deferred <class>`; `dataclaim.py --unit <unit>` prints the `splits.txt` edit that claims the refusable ones. |
-| `tools/units/declclash.py` | **a cross-unit lane hits `(10197) illegal function overloading`**: list the function names declared more than once with *different text* in one include closure, before any source is edited. |
-
-### 9.6 The registers and the suite
-
-| tool | use it when … |
-| --- | --- |
-| `tools/units/backlog.py` | **you file or work the backlog**: one ranked register built from `.pi/outbox/*.json` and `.pi/notes/*.md`, with the credit ledger (one resolved item per new proposal claim). |
-| `tools/units/tooling.py` | **you file a tooling gap**: turn the reports' "Tooling and environment" entries into the ranked `docs/tooling-requests.md`, clustered by demand. |
-| `tools/selftest.py` | **before claiming green**: `--changed` maps `tools/**` diffs to selftests — a **docs** diff maps to **none**, so run `sync_profiles.py --check` and `sync_reference.py --check` by hand until the mapping lands (R7). |
-
-### 9.7 The compiler and the linker
-
-| tool | use it when … |
-| --- | --- |
-| `tools/mwcc-debugger/` + `locate/verify_pcode.py` | **a body differs and the source shapes are exhausted**: drive `mwcceppc.exe` under gdb, dump the per-pass PCode, and classify which optimizer pass is responsible. |
-| `tools/mwlink_debugger.py` | **the DOL hash moved after a flip**: interrogate `mwldeppc.exe` — trace / diagnose / align / phases. **In production** per its six-point gate: health-checked against `main.MAP`/`main.elf`, `main.elf` never written, 260/260 sampled inputs, with its own gaps note. |
-
-**Debugger detail worth knowing.** `mwcc-debugger`: run `verify_pcode.py` on the last dump first (`MATCH` or a
-real `FAIL`), then on the dump before the divergence for a `PASS-DELTA` that **names the pass**
-(`after-peephole` for the `lbzu` fusion), and write that pass into the unit header's residual; a missing gdb is
-one `fetch_gdb.py` line. `mwlink_debugger.py`: `trace` (kept/dropped, section addresses with bytes read back from
-the ELF, symbol resolution, decoded relocations, ctor/dtor rank), `trace --link` (the build's own link line into
-scratch, byte-identical to `main.elf`), `phases [--prove]`, `messages` (the linker's message catalogue lives in PE
-RT_STRING resources - why `strings` finds nothing), `verify`. **No `mwldeppc.exe` carries a CodeView blob** (31
-checked), so the compiler's lever is absent for the linker. Gaps channels: `.pi/notes/mwcc-debugger-gaps.md`,
-`.pi/notes/mwlink-debugger-gaps.md` (§6).
-
-### 9.8 Audit and recovery
-
-| tool | use it when … |
-| --- | --- |
-| `tools/units/rescue.py audit` | **you want to know if any `refs/rescue/*` holds unlanded work**: classifies `redundant` / `landed-with-drift` / `unlanded` / `unknown` (~40 s); `--prune` deletes only `redundant`. |
-| `tools/units/verifyunit.py` | **a `Matching` claim needs a byte-level backstop**: address-aware comparison, since `report.json` carries no evidence for `Matching` units (§7). |
-| `tools/units/backlog.py triage` | **the register may hold ghosts**: classifies open items resolved / stale / open from evidence and parks only what it can prove (§11). |
-| `tools/units/ledger.py` | **you need a headline number**: covered / closed / matched, re-measured, never quoted from a doc. |
 
 ---
 
@@ -1059,7 +971,7 @@ Grouped by cause; each cost a lane ~30 min the first time.
   `python tools/agents/edit.py replace FILE --old-file A --new-file B [--count N]` (the file's own endings kept,
   0 or more than N matches refused with line numbers, a diff printed); `edit.py normalise FILE...` rewrites to LF and
   `edit.py check [--fix]` lists tracked files whose on-disk endings differ from the index.
-* **Unit specs.** `unitutil.resolve_unit` (`symdiff.py -u`, `mt.py diff -u`, `unitscore.py`, `relocdiff.py`) takes a
+* **Unit specs.** `lib.units.Unit.resolve` (`symdiff.py -u`, `mt.py diff -u`, `unitscore.py`, `relocdiff.py`) takes a
   top-level unit exactly like a nested one (`main`, `main/mh3_pad`, `src/fn_80047398.cpp`; objdiff name
   `main/<file>`); a bare stem shared by two units is refused with the candidates - name the directory.
 * **Encoding.** Source stays UTF-8 with no BOM (`sjiswrap`); MWCC on this host turns a literal `\n` into CRLF
@@ -1083,17 +995,17 @@ Grouped by cause; each cost a lane ~30 min the first time.
 * **Selftest flakes (2026-09-30).** The gate row "all tool selftests pass" refused four landings on selftests
   that passed by hand. Measured causes: (1) `subprocess.run(["git", ...])` dying in `CreateProcess` with
   `PermissionError [WinError 5]` when many processes start at once (`queue`, `lane`, `land` in one suite run) - fixed
-  by `tools/spawnretry.py` (retries the launch; installed by `unitutil` and, for every selftest the runner starts, by
-  `tools/selftest_site/sitecustomize.py`); (2) a genuine id race in `ideas.py new` (two racers scanned, the winner
+  by `lib.proc.install_spawn_retry` (retries the launch; called by the tools that start processes and, for every
+  selftest the runner starts, by `tools/selftest_site/sitecustomize.py`); (2) a genuine id race in `ideas.py new` (two racers scanned, the winner
   wrote and deleted its lock, the loser then created the same lock: duplicate id, 2 of 40 runs) - fixed in
   `reserve_id` by re-checking after the lock; (3) temp-tree cleanup `PermissionError` - selftests use
-  `unitutil.temp_dir()` (`rmtree_retry`). **`tools/selftest.py` re-runs every failure once, alone**: a pass on the
+  `lib.testing.temp_dir()` (`rmtree_retry`). **`tools/selftest.py` re-runs every failure once, alone**: a pass on the
   re-run is a FLAKE - the row passes, stderr and the gate print `flaky: ... passed on isolated re-run` with the first
   failure's last lines, and one JSON line per flake goes to `.pi/selftest-flakes.jsonl` (count them:
   `wc -l .pi/selftest-flakes.jsonl`; a tool that keeps appearing there has a real race to fix, not a park). A test
   that fails twice refuses, and the refusal prints its last 40 lines. **A selftest must not read live state**: the
-  real `~/.claude/sessions` (`unitutil.isolate_live_state()` at the top of the slots/claims/land selftests), the real
-  `.pi/` registry and slot sentinels, or a fixed temp name - fixtures live under `unitutil.temp_dir()`.
+  real `~/.claude/sessions` (`lib.testing.isolate_live_state()` at the top of the slots/claims/land selftests), the
+  real `.pi/` registry and slot sentinels, or a fixed temp name - fixtures live under `lib.testing.temp_dir()`.
 * **Gate output.** `land.py land` prints `LEDGER: covered A -> B, closed ..., matched ..., bytes ...` on its own line
   directly above the (unchanged, long) `LANDED ...` answer line; read the answer with `land.answer_line` (last line).
 * **The worktree command guard is Claude Code's, not this repository's.** An Agent-tool lane launched with
@@ -1105,7 +1017,11 @@ Grouped by cause; each cost a lane ~30 min the first time.
   `python tools/.../$var.py` in a loop (a computed program or argument "cannot be shown not to be git"), and one long
   `&&` chain of heredocs plus `cmd /c` text; allowed - `awk -v`, `sed -n`, `cut | sort | uniq | wc`, `python -c "..."`,
   a `python - <<'EOF'` heredoc, a plain `for` loop over `echo`, `VAR=python; $VAR -c ...`, `cd <worktree> && python ...`
-  chains, and a redirect writing `<MAIN>/.pi/notes/<slug>.md`. The remedy is the one in the message: one plain command,
+  chains, and a redirect writing `<MAIN>/.pi/notes/<slug>.md`. Measured again 2026-10-04 (WP6 lane): also refused - a
+  `python - <<'EOF'` heredoc whose *text* names git (a string `"... git repository"`, a call `fx.git(...)`, a path
+  `tools/git/...`), `sed`/`python` given `$f` from a `for` loop or words from `xargs`, and `git` after `cd X &&` in one
+  line; the workaround is a script file written with the Write tool and run as `python <file>`, with literal paths. The
+  remedy is the one in the message: one plain command,
   run from the worktree, with no computed program name; to read MAIN, pass its path to the tool. The Write/Edit file
   tools refuse every MAIN path, `.pi/outbox/` and `.pi/notes/` included ("Edit the worktree copy of this file
   instead"), so such a lane writes its evidence under its own `.pi/` and `slots.py collect` copies it into MAIN.

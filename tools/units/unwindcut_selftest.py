@@ -16,6 +16,7 @@ No build, no `ninja`, no repository state: every fixture is a synthetic DOL (bui
 * the paste-ready text itself, so a formatting regression is a failure and not a surprise on a real cut.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import contextlib
 import io
@@ -25,10 +26,8 @@ import sys
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-if HERE not in sys.path:
-    sys.path.insert(0, HERE)
 
-import unwindcut as uc  # noqa: E402  (imported through the sys.path shim above)
+from tools.units import unwindcut as uc
 
 TEXT_BASE = 0x80001000
 ETAB_BASE = 0x80010000

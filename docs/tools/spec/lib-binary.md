@@ -8,7 +8,7 @@ the package `__init__` imports nothing, so a tool pays only for the submodule it
 ## Users
 
 The tools listed under this concept in `docs/tools/README.md`. Delegating today (WP1b): `elfsect`, `objalign`,
-`objextab`, `dwarfmap`, `unitutil.read_elf`, `dossier`, `infer`, `linkorder`, `flipcheck`, `langcheck`, `relocaudit`,
+`objextab`, `dwarfmap`, `dossier`, `infer`, `linkorder`, `flipcheck`, `langcheck`,
 `sectiongap`, `vtableaudit`, `dataclaim`, `datagap`, `dataseams`, `unwindcut`, `splitcheck`, `tudiscover`,
 `m2cinput` (and `phantom` through it), `accessextent`, `callees`, `verify_pcode`.
 

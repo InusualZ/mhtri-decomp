@@ -11,7 +11,7 @@ proposal half of `splitcheck`, its spec rewritten), `tools/attribute: retire the
 promote_batch` (`attribute.py`, `attribution-queue.json`, `promote.py`, `promote_batch.py` and their selftests),
 `docs/splits-program: rewrite as the program record, delete the proposals and window manifests` (the record is
 `docs/splits-program.md`; `docs/splits/phase4/homebutton-carried-notes.md` stays because 15 `src/`/`include/` headers cite it).
-The entries below are the evidence and history that were kept; `tools/splits/gen_trk_vectors.py` is still to retire.
+The entries below are the evidence and history that were kept; `tools/splits/gen_trk_vectors.py` went in WP6.
 
 * **`tools/splits/applysplits.py`** (1 899 lines, last 2026-10-01). Phase 4 of the program: plan/apply/manifest/verify per window.
   Evidence: the six windows are applied (`docs/splits/phase4/land-*.txt`, `manifest-*.md`); referenced only by `docs/splits/**` (20
@@ -52,24 +52,44 @@ The entries below are the evidence and history that were kept; `tools/splits/gen
   preserved, the pooled brief) and the byte-identity check across a move (`compare_objects`: a rename changes no instruction;
   a language change is expected to move bytes) are the invariants any future move tool must keep - `lib.objcompare.fingerprint`
   is the check.
-* **`tools/splits/gen_trk_vectors.py`** (119). One-shot generator of the two TRK interrupt-vector units; they were claimed and matched
+* **`tools/splits/gen_trk_vectors.py`** (119) - **deleted in WP6** (`tools/units: delete the retired shims and delegates and
+  re-home their checks on the lib tests`). One-shot generator of the two TRK interrupt-vector units; they were claimed and matched
   on 2026-09-28 (`preflight_selftest.py` docstring). Replacement: none. History: the reason there are two units (a label in the middle
   of an array; MWCC pads `.init` objects to 8 bytes) is in the unit's own header comment.
 
 ## Folded into another tool
 
-* **`tools/units/relocaudit.py`** (396) -> `undefrefs.py --census --linkage` (WP3a: the sweep, its label and its JSON moved into undefrefs, the rule into `lib.objcompare.linkage_audit`, the selftest to `tools/tests/units/test_undefrefs_linkage.py`; `relocaudit.py` forwards until WP6). Evidence: `undefrefs.unresolved_names` + `linkage_stem` is the
+**WP6 (2026-10-04) deleted every entry in this section** - the commit subjects are `tools/units: move the unitutil importers
+onto lib, add unitinfo for mt.py and delete the shim`, `tools/units: delete the retired shims and delegates and re-home their
+checks on the lib tests` and `tools/units: drop the --selftest flags that only forwarded to tools/tests`. Before each delete a
+reference scan (`.claude/`, `CLAUDE.md`, `docs/`, `tools/`) showed no importer left; the checks each shim's selftest carried
+moved to the lib tests named below. Kept: `escape.py --edit` (every profile still names it, and a profile edit is the
+orchestrator's) and the `mergebranch.py` shim (the CLI compatibility list).
+
+* **`tools/units/relocaudit.py`** (396) -> `undefrefs.py --census --linkage` (WP3a: the sweep, its label and its JSON moved into undefrefs, the rule into `lib.objcompare.linkage_audit`, the selftest to `tools/tests/units/test_undefrefs_linkage.py`; the forwarding shim was deleted in WP6). Evidence: `undefrefs.unresolved_names` + `linkage_stem` is the
   same comparison per unit, and `undefrefs` is what the gate runs; `relocaudit` has no caller. History: the exclusion list (locals,
   `@NNN`/`@etb_*` labels, `STT_FILE`, `.comment`) is the spec of `lib.objcompare.undefined`.
 * **`tools/units/relocaudit-findings.md`**, **`tools/flags/infer-run.md`**: dated outputs of one run; deleted (the commands that
   regenerate them are in the specs).
-* **`tools/units/checklf.py`** (153) -> `agents/edit.py check --blob` (a shim since WP3f, `spec/checklf.md`). Evidence: same concern as `edit.py check` (working tree vs
+* **`tools/units/checklf.py`** (153) -> `agents/edit.py check --blob` (a shim since WP3f; deleted with its spec in WP6, its
+  per-path cases moved to `tools/tests/agents/test_edit.py`). Evidence: same concern as `edit.py check` (working tree vs
   index endings); no caller. History: the invisibility it documents - after `git add`, `git diff`/`status`/`diff --cached` are all
   empty while the file on disk is CRLF - is the rule in `lib.text`'s spec.
 * **`tools/units/escape.py --edit`** -> `agents/edit.py replace`; `--escape`/`--bytes`/`--write` stay (the profiles use them).
-* **`tools/objdiff/freshguard.py`** -> `lib.report.Freshness`; **`tools/units/reportdiff.py`** -> `lib.report.regression` (+ a kept
-  `reportdiff` CLI); **`tools/units/subproc.py`**, **`tools/spawnretry.py`** -> `lib.proc`; **`tools/units/sharedfiles.py`** ->
-  `lib.text` + `lib.project.splits`; **`tools/unitutil.py`** -> `lib.repo` + `lib.units` + `lib.report` (shim until `mt.py` moves).
+  **Not deleted in WP6**: `decompiler.md`, `fixer.md`, `merger.md` and `codereviewer.md` still say "`escape.py --edit` is the
+  same rule, kept until the WP6 sweep"; the flag goes with the profile edit that drops that sentence.
+* **`tools/objdiff/freshguard.py`** -> `lib.report.Freshness` (its selftest's mode cases are `test_report.test_freshness_modes`);
+  **`tools/units/reportdiff.py`** (437) -> `lib.report.compare`/`regression`: deleted in WP6 although this page once said the
+  CLI would stay - it had no caller in the tree and is not in the CLI compatibility list; its rendering (moved rows, the
+  denominators, the exit status as the verdict) is in git history. **`tools/units/subproc.py`**, **`tools/spawnretry.py`** ->
+  `lib.proc` (the live trap scan is the smoke test `tests/smoke/test_proc_traps.py`; the spawn retry is installed explicitly by
+  the tools that start processes, where `unitutil`'s import used to do it); **`tools/units/sharedfiles.py`** -> `lib.text` +
+  `lib.project.splits`; **`tools/unitutil.py`** -> `lib.repo` + `lib.units` + `lib.report` + `lib.testing` (`temp_dir`,
+  `rmtree_retry`, `isolate_live_state`), and its `main` (the skill's `mt.py units|info`) -> `tools/units/unitinfo.py`.
+* **`tools/units/unionguard.py`, `unionresolve.py`, `unionprose.py`** (the top-level shims of `tools/units/merge/`) -> the
+  package modules, imported by `landing/branch.py`; their specs fold into `spec/merge.md`. No profile, skill or doc named them.
+* **`tools/flags/infer-run.md`**, **`tools/units/relocaudit-findings.md`**: deleted in WP6 (regenerate with `infer.py --markdown`,
+  `undefrefs.py --census --linkage`).
 
 ## Dead paths inside kept tools
 

@@ -18,6 +18,8 @@ PENDING_FILE = Path(__file__).with_name("prologue-pending.json")
 TEMPLATE = {"tools/project.py", "tools/ninja_syntax.py", "tools/download_tool.py", "tools/transform_dep.py",
             "tools/decompctx.py", "tools/changes_fmt.py"}
 SKIP_DIRS = {"__pycache__", "m2c"}
+#: Third-party code vendored byte for byte (PROVENANCE.md names the upstream commit; `make_port.py` reads it).
+VENDORED = {"tools/mwcc-debugger/upstream/mwcc_debugger.py"}
 
 
 def tool_files(root: Path) -> list[str]:
@@ -28,7 +30,7 @@ def tool_files(root: Path) -> list[str]:
         for fn in filenames:
             if fn.endswith(".py"):
                 rel = (Path(dirpath) / fn).relative_to(root).as_posix()
-                if rel not in TEMPLATE:
+                if rel not in TEMPLATE and rel not in VENDORED:
                     out.append(rel)
     return sorted(out)
 
@@ -87,8 +89,22 @@ def scan(root: Path) -> dict[str, list[str]]:
     return found
 
 
-def load_pending(path: Path = PENDING_FILE) -> list[str]:
+def load_entries(path: Path = PENDING_FILE) -> list:
+    """The pending entries as written: since WP6 each is `{"path": ..., "reason": ...}` (why it cannot conform)."""
     return list(json.loads(path.read_text(encoding="utf-8"))["pending"])
+
+
+def entry_path(entry) -> str:
+    return entry["path"] if isinstance(entry, dict) else entry
+
+
+def unjustified(entries: list) -> list[str]:
+    """The pending entries that do not state a reason (a bare path, or an empty `reason`)."""
+    return [entry_path(e) for e in entries if not (isinstance(e, dict) and str(e.get("reason", "")).strip())]
+
+
+def load_pending(path: Path = PENDING_FILE) -> list[str]:
+    return [entry_path(e) for e in load_entries(path)]
 
 
 def verdict(found: dict[str, list[str]], pending: list[str], root: Path) -> tuple[list[str], list[str], list[str]]:
@@ -120,6 +136,9 @@ def test_rule_on_fixtures(c):
             len(problems("tools/lib/x.py", PROLOGUE + "\n" + main)), 1)
     c.check("a test module is an entry point without a main block",
             len(problems("tools/tests/lib/test_x.py", "import os\n")), 1)
+    c.check("so is a legacy *_selftest.py (the runner starts it as a program)",
+            (problems("tools/units/x_selftest.py", PROLOGUE + "\ncheck()\n"),
+             len(problems("tools/units/x_selftest.py", "check()\n"))), ([], 1))
 
     with testing.FixtureTree() as tree:
         tree.write("tools/__init__.py", "")
@@ -128,8 +147,10 @@ def test_rule_on_fixtures(c):
         tree.write("tools/units/fixed.py", PROLOGUE + "\n" + main)
         tree.write("tools/m2c/m2c.py", "import sys\nsys.path.insert(0, 'x')\n")
         tree.write("tools/project.py", "import sys\nsys.path.insert(0, 'x')\n" + main)
+        tree.write("tools/mwcc-debugger/upstream/mwcc_debugger.py", "import sys\nsys.path.insert(0, 'x')\n" + main)
         found = scan(tree.root)
-        c.check("the submodule and the template files are not scanned", sorted(found), ["tools/units/old.py"])
+        c.check("the submodule, the template files and the vendored upstream are not scanned", sorted(found),
+                ["tools/units/old.py"])
         pending = ["tools/units/old.py", "tools/units/fixed.py", "tools/units/deleted.py"]
         c.check("a pending offender passes; a fixed pending file is stale; a deleted one is noted",
                 verdict(found, pending, tree.root), ([], ["tools/units/fixed.py"], ["tools/units/deleted.py"]))
@@ -137,6 +158,10 @@ def test_rule_on_fixtures(c):
         c.check("a NEW tool with a stray sys.path.insert fails",
                 verdict(scan(tree.root), pending, tree.root)[0], ["tools/units/new.py"])
         tree.write("tools/lib/bad.py", "import sys\nsys.path.insert(0, 'x')\n")
+        c.check("a pending entry without a reason is unjustified; one with a reason is not",
+                unjustified(["tools/units/a.py", {"path": "tools/units/b.py", "reason": " "},
+                             {"path": "tools/units/c.py", "reason": "vendored"}]),
+                ["tools/units/a.py", "tools/units/b.py"])
         c.check("a lib module can never be pending",
                 verdict(scan(tree.root), pending + ["tools/lib/bad.py"], tree.root)[0],
                 ["tools/lib/bad.py", "tools/units/new.py"])
@@ -159,12 +184,14 @@ def test_live_tree(c):
         print("note: pending entry %s no longer exists - `--prune` drops it" % rel)
     print("prologue: %d file(s) still pending migration" % (len(pending) - len(gone) - len(stale)))
     c.check("the pending list is sorted and has no duplicates", pending, sorted(set(pending)))
+    c.check("every pending entry states why it cannot conform (WP6)", unjustified(load_entries()), [])
 
 
 def prune() -> int:
     root = testing.live_root()
-    found, pending = scan(root), load_pending()
-    keep = [p for p in pending if (root / p).is_file() and p in found]
+    found, entries = scan(root), load_entries()
+    pending = [entry_path(e) for e in entries]
+    keep = [e for e in entries if (root / entry_path(e)).is_file() and entry_path(e) in found]
     data = json.loads(PENDING_FILE.read_text(encoding="utf-8"))
     data["pending"] = keep
     testing.rewrite_json(PENDING_FILE, data)   # the file's own indent: a prune is a minimal diff

@@ -7,6 +7,7 @@ This is the one gate whose failure mode is silent and total - a rewritten `build
 """
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import os
 import shutil
@@ -15,10 +16,9 @@ import sys
 import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.join(ROOT, "tools", "git"))
 
-import prepcommit as pc  # noqa: E402
-import guard  # noqa: E402
+from tools.git import prepcommit as pc
+from tools.git import guard
 
 FAIL: list[str] = []
 CHECKS = 0

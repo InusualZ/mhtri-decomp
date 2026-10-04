@@ -12,7 +12,9 @@ import re
 import struct
 import sys
 
-from tools import unitutil as uu
+from tools.lib import proc as _proc
+from tools.lib import repo as _repo
+from tools.lib import units as _units
 from tools.lib import names as libnames
 from tools.lib import ppc as _ppc
 from tools.lib.binary import objdump as lib_objdump
@@ -272,14 +274,14 @@ def scan_refs(names, roots=("src", "include"), limit=40, root=None):
 # --------------------------------------------------------------------------------------------------
 def report(unit, args, root=ROOT):
     """The whole survey for `unit` as a dict, so `main` can print it and a test can read it."""
-    target = unit.target
-    ours = unit.obj
+    target = unit.obj_target
+    ours = unit.obj_ours
     side_note = None
     if not os.path.exists(target):
         if not os.path.exists(ours):
             raise SystemExit("no split target object for %s\n  expected: %s\n"
                              "  (a proposal unit has no split object until it is registered)"
-                             % (unit.name, os.path.relpath(target, root)))
+                             % (unit.report_name, os.path.relpath(target, root)))
         target, ours, side_note = ours, None, "target object missing; read our object instead"
     with open(target, "rb") as fh:
         target_refs, _defined = code_references(fh.read())
@@ -341,7 +343,7 @@ def text_range(unit, root):
     path = os.path.join(root, "config", "RMHE08", "splits.txt")
     if not os.path.exists(path):
         return None
-    want = os.path.relpath(unit.src, os.path.join(root, "src")).replace(os.sep, "/")
+    want = os.path.relpath(unit.source, os.path.join(root, "src")).replace(os.sep, "/")
     block = next((b for b in Splits.read(path).blocks if b.unit == want), None)
     for r in (block.ranges if block else ()):
         if r.section == ".text":
@@ -351,8 +353,8 @@ def text_range(unit, root):
 
 def print_report(rep):
     unit = rep["unit"]
-    print("== %s: the generated symbols its bodies reference" % unit.name)
-    print("   src    %s" % os.path.relpath(unit.src, ROOT))
+    print("== %s: the generated symbols its bodies reference" % unit.report_name)
+    print("   src    %s" % os.path.relpath(unit.source, ROOT))
     print("   object %s%s" % (os.path.relpath(rep["target"], ROOT),
                               "  (read instead of the target)" if rep["side_note"] else ""))
     if rep["text_range"]:
@@ -420,7 +422,7 @@ def print_report(rep):
     print("   next: pick the name from the callee's owner/source, then"
           "  python tools/symbols/symedit.py rename <old> <new>")
     print("         (verify with  python .claude/skills/mwcc-unit-matching/scripts/mt.py diff -u %s <new>)"
-          % unit.name)
+          % unit.report_name)
     return 0
 
 
@@ -637,11 +639,7 @@ def selftest():
                      "/* fn_99999999 is only a comment */\n")
         with open(os.path.join(tmp, "build/RMHE08/obj/Lib/file.o"), "wb") as fh:
             fh.write(elf)
-        unit = uu.Unit(name="main/Lib/file", lib="Lib", file="file", version="RMHE08",
-                       src=os.path.join(tmp, "src/Lib/file.cpp"),
-                       obj_dir=os.path.join(tmp, "build/RMHE08/src/Lib"),
-                       obj=os.path.join(tmp, "build/RMHE08/src/Lib/file.o"),
-                       target=os.path.join(tmp, "build/RMHE08/obj/Lib/file.o"))
+        unit = _units.Unit("Lib/file", ".cpp", tmp)
         rep = report(unit, argparse.Namespace(no_scan=False, no_shape=True), root=tmp)
         by_name = {r["name"]: r for r in rep["rows"]}
         check("report: only generated names are rows", sorted(by_name),
@@ -698,10 +696,11 @@ def main(argv=None):
     args = ap.parse_args(argv)
     if not args.unit:
         ap.error("a unit spec is required (try `Lib/file`)")
-    unit = uu.resolve_unit(args.unit)
+    _proc.install_spawn_retry()  # a launch Windows refuses transiently (WinError 5) is retried
+    unit = _units.Unit.resolve(args.unit, _repo.repo_root())
     rep = report(unit, args)
     if args.json:
-        out = dict(unit=unit.name, src=os.path.relpath(unit.src, ROOT),
+        out = dict(unit=unit.report_name, src=os.path.relpath(unit.source, ROOT),
                    object=os.path.relpath(rep["target"], ROOT), text_range=rep["text_range"],
                    disasm_note=rep["disasm_note"], scanned=rep["scanned"],
                    references=[dict(name=r["name"], sides=r["sides"], shape=r["shape"],

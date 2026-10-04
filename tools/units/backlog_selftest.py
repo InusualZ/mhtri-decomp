@@ -12,6 +12,7 @@ two items; a `range` admission is done while a re-draw is open; a `flag` whose c
 status survives regeneration; and `refusal()` names the top item while an empty register does not refuse.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import json
 import os
@@ -20,12 +21,8 @@ import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
-if os.path.join(ROOT, "tools") not in sys.path:
-    sys.path.insert(0, os.path.join(ROOT, "tools"))
-if HERE not in sys.path:
-    sys.path.insert(0, HERE)
 
-import backlog as bl  # noqa: E402
+from tools.units import backlog as bl
 
 
 def outbox(unit, worker, when, requests):
@@ -678,7 +675,7 @@ def selftest() -> int:
     # The rule is `undefrefs.unresolved_names` (reached through `undefrefs.census`); this source reads it,
     # never re-implements it. The fixture is a real ELF32 object - `undefrefs_selftest.build_obj` is reused
     # rather than copied - so "the rule stops firing" is proved by re-running the rule, not by a mock.
-    import undefrefs_selftest as urs   # noqa: E402
+    from tools.units import undefrefs_selftest as urs 
 
     def undef_obj(name):
         return urs.build_obj([(".text", b"\0" * 8)],
@@ -782,7 +779,7 @@ def selftest() -> int:
     # --- the fifth source: strict data claims, one item per unit with refusable sole-owned data ----------
     # The rule is `datagap.strict_report`; this source reads it (through `dataclaim_counts`), never re-implements
     # it. The fixture is a real split tree: a unit whose target object relocates one unclaimed `.data` word.
-    import datagap as dgap   # noqa: E402
+    from tools.units import datagap as dgap 
 
     splits_head = "Sections:\n\t.text type:code align:32\n\t.data type:data align:32\n\n"
     splits_a = splits_head + "A/a.cpp:\n\t.text start:0x80010000 end:0x80010100\n"

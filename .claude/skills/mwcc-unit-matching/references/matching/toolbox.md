@@ -2,8 +2,8 @@
 
 All of them are unit-agnostic: pass `-u <unit>` (or omit it when the repo has exactly one unit with
 source), where `<unit>` is any of `Lib/file`, `main/Lib/file`, `src/Lib/file.c` or the object path.
-`tools/unitutil.py` is the shared layer - unit resolution, the real ninja command line, flag overriding,
-the ELF reader - and `tools/unitutil.py` with no arguments lists the units it can work on. **The last four rows
+`tools/lib/` is the shared layer - unit resolution and the real ninja command line (`lib.units`), the ELF
+reader (`lib.binary`) - and `tools/units/unitinfo.py` with no arguments lists the units it can work on. **The last four rows
 are the analysis tier** and take a unit *name* - or, for `callers.py`, an address or a symbol: they answer the
 questions the flag and shape tools cannot, and each is introduced where a lane reaches for it (`flipcheck.py`
 before any flip, the compiler debugger when a residual is down to one instruction, `mwlink_debugger.py` when a

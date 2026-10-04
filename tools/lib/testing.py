@@ -643,6 +643,58 @@ class GitFixture:
             self.cleanup()
 
 
+def rmtree_retry(path: str | os.PathLike, attempts: int = 8, sleep: Callable[[float], None] | None = None) -> None:
+    """`shutil.rmtree` that survives Windows holding a file for a moment: retries with a growing backoff, clears
+    the read-only bit git sets on `.git/objects`, and finally gives up silently (a leftover temp directory must
+    never fail a test)."""
+    import time
+    sleep = sleep or time.sleep
+
+    def onexc(func, p, _exc):
+        try:
+            os.chmod(p, 0o700)
+            func(p)
+        except OSError:
+            pass
+    for attempt in range(attempts):
+        if not os.path.exists(path):
+            return
+        try:
+            shutil.rmtree(path, onexc=onexc)
+        except OSError:
+            pass
+        if not os.path.exists(path):
+            return
+        sleep(0.1 * (attempt + 1))
+    shutil.rmtree(path, ignore_errors=True)
+
+
+class temp_dir:
+    """`tempfile.TemporaryDirectory()` with `rmtree_retry` cleanup: `with testing.temp_dir() as tmp:`."""
+
+    def __init__(self, prefix: str = "mhtri-") -> None:
+        self.name = tempfile.mkdtemp(prefix=prefix)
+
+    def __enter__(self) -> str:
+        return self.name
+
+    def __exit__(self, *exc: Any) -> None:
+        rmtree_retry(self.name)
+
+    def cleanup(self) -> None:
+        rmtree_retry(self.name)
+
+
+def isolate_live_state() -> str:
+    """Point `CLAUDE_CONFIG_DIR` at an empty temp dir for the rest of this process and return it, so a check of
+    a slot guard never sees the live lanes in `~/.claude/sessions`."""
+    import atexit
+    path = tempfile.mkdtemp(prefix="claude-config-")
+    os.environ["CLAUDE_CONFIG_DIR"] = path
+    atexit.register(rmtree_retry, path)
+    return path
+
+
 def capture(fn: Callable, *args: Any, **kwargs: Any) -> tuple[Any, str]:
     """Call `fn` with stdout captured; return (result, text). For checking what a function prints."""
     buf, real = io.StringIO(), sys.stdout

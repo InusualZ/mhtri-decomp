@@ -10,7 +10,7 @@ import sys
 
 from tools.lib import objcompare
 from tools.lib import project as _project  # the splits / map readers
-from tools.units import claims as claims_mod  # the one unit spelling rule (`claims.norm_unit`)
+from tools.lib.lanes.naming import norm_unit  # the one unit spelling rule
 from tools.units import dataseams  # `.data` emission-order seams: order-only / multi-TU diagnosis
 from tools.units import poolseams  # literal pools as TU evidence: a pool difference a fold explains
 
@@ -478,7 +478,7 @@ def main() -> int:
     if args.units:
         wanted = {}
         for u in args.units:
-            key = claims_mod.norm_unit(u.strip("/"))
+            key = norm_unit(u.strip("/"))
             wanted[key] = all_claims.get(key)
         missing = [u for u, c in wanted.items() if c is None]
         for u in missing:

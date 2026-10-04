@@ -16,9 +16,8 @@ profiles (`.claude/agents`) (1); CLAUDE.md (1); docs (1)
 python tools/units/declclash.py src/menu/fn_802E4978.cpp
 python tools/units/declclash.py --only-different --json src/hud/layout.cpp
 python tools/units/declclash.py include/unsplit/menu.h
-python tools/units/declclash.py --selftest
 ```
-Flags: `--fail-on-different`, `--json`, `--only-different`, `--root`, `--selftest`.
+Flags: `--fail-on-different`, `--json`, `--only-different`, `--root`.
 Exit codes: Exit status is 0 for a report and 1 only with `--fail-on-different` when a `DIFFERENT` name was found.
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
 
@@ -42,7 +41,7 @@ cscan.
 ## Test contract
 
 Tier: fixture.
-The test (`tools/tests/units/test_declclash.py`, fixture tier; `declclash.py --selftest` runs it): The fixtures are a hand-built tree: a root file that includes a small web of headers, two of which declare the same name with the same shape (a parameter rename), two with a genuinely different shape, a `struct`/`void`-spelling pair, a name that only exists in the generated include tree, a two-line prototype that must be ignored, and an include cycle. The real acceptance case - the 30-name clash set of `src/menu/fn_802E4978.cpp`, 25 headers - is recorded in `.pi/notes/rule2-clash-pass-802e4978.md` and in the commit that added this tool.
+The test (`tools/tests/units/test_declclash.py`, fixture tier): The fixtures are a hand-built tree: a root file that includes a small web of headers, two of which declare the same name with the same shape (a parameter rename), two with a genuinely different shape, a `struct`/`void`-spelling pair, a name that only exists in the generated include tree, a two-line prototype that must be ignored, and an include cycle. The real acceptance case - the 30-name clash set of `src/menu/fn_802E4978.cpp`, 25 headers - is recorded in `.pi/notes/rule2-clash-pass-802e4978.md` and in the commit that added this tool.
 
 ## Known gaps
 

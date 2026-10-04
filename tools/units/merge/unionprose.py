@@ -1,5 +1,5 @@
 """The one union rule: code hunks union, prose hunks take the superset, mixed warns; the one diff3 hunk reader.
-Spec: docs/tools/spec/unionprose.md. CLI: none (module; `tools/units/unionprose.py` is the entry point)."""
+Spec: docs/tools/spec/merge.md. CLI: none (module)."""
 from __future__ import annotations
 
 from dataclasses import dataclass

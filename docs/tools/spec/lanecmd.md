@@ -12,7 +12,7 @@ CLAUDE.md (1); docs (5); a re-export of `lib.lanes.launch` (`backlog`, `queue` a
 
 ## CLI
 
-Flags: `--selftest`.
+Flags: none.
 Exit codes: 0 ok, 1 findings or refusal, 2 could not run (the `lib.findings` convention; today's tool documents none, so `migration.md` records the current behaviour before changing it).
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
 
@@ -24,7 +24,6 @@ Inputs -> outputs: agent, cwd, task -> shell text.
 
 * The command is POSIX-shell text (git-bash on Windows). The task is single-quoted with `shlex.quote`, because tasks carry backticks and `$`; a task too long for a command line is staged as a file under `<main>/.pi/lanes/` and fed on stdin instead.
 * Answering a lane's question is `claude --resume <session-id> -p "<ruling>"` in the same cwd (`resume_call`): the session id is chosen here, at launch, so the orchestrator never has to discover it.
-* python tools/units/lanecmd.py --selftest
 
 ## Lib dependencies
 
@@ -33,7 +32,7 @@ lanes.launch.
 ## Test contract
 
 Tier: fixture.
-`tools/tests/units/test_lanecmd.py` (`--selftest` forwards to it).
+`tools/tests/units/test_lanecmd.py`.
 
 ## Known gaps
 

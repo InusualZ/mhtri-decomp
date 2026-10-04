@@ -1,14 +1,6 @@
 #!/usr/bin/env python3
-"""Mechanically lift the GC/1.1 and GC/2.6 address tables out of the
-*upstream* `mwcc_debugger.py` so the port does not re-type them.
-
-Upstream stores absolute VAs assuming a 0x400000 image base; we store
-image-relative RVAs, so this script subtracts the ImageBase it reads from the
-PE header of the compiler it is given (default 0x400000 for every MWCC PE we
-have).
-
-Usage: python extract_upstream_tables.py <upstream/mwcc_debugger.py> [exe]
-"""
+"""Lift the GC/1.1 and GC/2.6 address tables out of the upstream mwcc_debugger.py as image-relative RVAs.
+Spec: docs/tools/spec/mwcc-debugger.md. CLI: extract_upstream_tables.py <upstream/mwcc_debugger.py> [exe]."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Merge two views of the same record header into one definition (docs/matching.md 56).
 Spec: docs/tools/spec/recordmerge.md. CLI: recordmerge.py --base B --other O [--out P] [--take other|base]
-[--dry-run] [--json F] | --selftest."""
+[--dry-run] [--json F]."""
 
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
@@ -10,7 +10,6 @@ import argparse
 import json
 import re
 import sys
-import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -19,7 +18,7 @@ from tools.lib import repo as _repo
 from tools.lib import text as _text  # the one writer of shared files
 from tools.lib.git import Git
 
-TOOL = cli.Tool("recordmerge", "docs/tools/spec/recordmerge.md", tests="tools/tests/units/test_recordmerge.py")
+TOOL = cli.Tool("recordmerge", "docs/tools/spec/recordmerge.md")
 
 MEMBER_RE = re.compile(r"^(?P<indent>[ \t]*)/\* \+(?P<off>0x[0-9A-Fa-f]+) \*/ (?P<body>.*?)[ \t]*$")
 GROUP_RE = re.compile(r"^[ \t]*(?:typedef[ \t]+)?(?:struct|union|class)[ \t]+([A-Za-z_]\w*)")
@@ -463,16 +462,13 @@ def build_parser() -> argparse.ArgumentParser:
                     help="which side's declaration wins a same-offset conflict (default: other)")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--json", dest="json_out")
-    ap.add_argument("--selftest", action="store_true")
     return ap
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    if args.selftest:
-        return TOOL.selftest(cwd=tempfile.gettempdir())
     if not args.base or not args.other:
-        build_parser().error("--base and --other are required (or --selftest)")
+        build_parser().error("--base and --other are required")
 
     base_text, base_label = read_source(args.base)
     other_text, other_label = read_source(args.other)

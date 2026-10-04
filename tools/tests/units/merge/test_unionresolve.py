@@ -7,7 +7,6 @@ import tempfile
 
 from tools.lib import testing
 from tools.tests.units import merge_fixtures as fx
-from tools.units import unionresolve as shim
 from tools.units.merge import unionresolve as ur
 
 TIER = "fixture"
@@ -61,11 +60,10 @@ def test_union_file_refuses_a_blocked_hunk(c):
         good = os.path.join(tmp, "reg.txt")
         with open(good, "w", encoding="utf-8", newline="") as fh:
             fh.write("a\n<<<<<<< ours\nm\n=======\nb\n>>>>>>> theirs\n")
-        with contextlib.redirect_stdout(io.StringIO()) as buf:
-            rc = shim.main([good])
+        with contextlib.redirect_stdout(io.StringIO()):
+            n = ur.union_file(good)
         with open(good, encoding="utf-8", newline="") as fh:
-            c.check("the CLI unions a named file in place", (rc, fh.read(), "union-resolved 1" in buf.getvalue()),
-                    (0, "a\nm\nb\n", True))
+            c.check("union_file unions a named file in place", (n, fh.read()), (1, "a\nm\nb\n"))
 
 
 def test_invariants(c):
@@ -102,13 +100,6 @@ def test_invariants(c):
                                  (drop, merged_conf, "missing from the merged splits.txt"),
                                  (ov, merged_conf, "overlapping"),
                                  (merged, drop_obj, "missing from the merged configure.py"))], [True] * 4)
-
-
-def test_the_shim_keeps_the_old_names(c):
-    c.check("land.py's names resolve through tools/units/unionresolve.py",
-            [getattr(shim, n) is getattr(ur, n) for n in ("union_text_full", "check_union", "object_names",
-                                                          "split_units", "UNION_SCOPE")], [True] * 5)
-    c.raises("an unknown name is still an AttributeError", AttributeError, getattr, shim, "no_such_name")
 
 
 if __name__ == "__main__":

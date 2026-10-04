@@ -510,7 +510,7 @@ def pool_state(main: str) -> dict:
 def selftest() -> int:
     import contextlib
     import io
-    unitutil = claims.unitutil
+    from tools.lib import testing
     fails, checks = [], 0
 
     def check(name, got, want):
@@ -544,11 +544,11 @@ def selftest() -> int:
           [strictly_newer(["a", "b"], ["a", "b"]), strictly_newer(["a"], ["a", "b", "c"]), strictly_newer([], ["x", "y"]),
            strictly_newer(["a", "new"], ["a", "old"]), strictly_newer(["a", "b"], ["a"]), strictly_newer(["a"], [])],
           [None, 2, 2, None, None, None])
-    with unitutil.temp_dir() as tmp:
+    with testing.temp_dir() as tmp:
         check("unlanded_branches / unlanded_error outside a repo", (unlanded_branches(tmp), unlanded_error(tmp)), ([], None))
 
     # the queue is the registered units minus the Matching ones (2026-10-04: NOT the body-less ones only)
-    with unitutil.temp_dir() as tmp:
+    with testing.temp_dir() as tmp:
         write(tmp, "src/auto/stubA.c", "/* header only */\n")
         write(tmp, "src/auto/stubB.c", "/* header only */\n")
         write(tmp, "src/auto/done.c", "int f(void) { return 1; }\n")
@@ -627,7 +627,7 @@ def selftest() -> int:
         registry.save(tmp, {})
 
     # clusters: owner headers decide which units share a lane; a wave never splits them across lanes
-    with unitutil.temp_dir() as tmp:
+    with testing.temp_dir() as tmp:
         write(tmp, "include/types.h", "typedef int s32;\n")
         write(tmp, "include/net/net.h", '#include "types.h"\nstruct Net { s32 x; };\n')
         write(tmp, "include/net/inner.h", "struct Inner;\n")
@@ -682,7 +682,7 @@ def selftest() -> int:
         check("a cluster with no ready member is refused",
               _raises(lambda: next_cluster(tmp, "net", None, dry_run=True, ignore_backlog=True)), True)
 
-    with unitutil.temp_dir() as empty:
+    with testing.temp_dir() as empty:
         write(empty, "src/a/x.c", "int x;\n")
         write(empty, "configure.py", 'config.libs = [{"lib": "a", "objects": [Object(Matching, "a/x.c")]}]\n')
         check("an all-Matching tree has nothing to hand out", (pool_state(empty)["ready"], next_entry(empty)), ([], None))
@@ -697,7 +697,7 @@ def selftest() -> int:
             raise RuntimeError("git %s: %s" % (" ".join(args), p.stderr.strip()))
         return p.stdout.strip()
 
-    with unitutil.temp_dir() as tmp:
+    with testing.temp_dir() as tmp:
         repo = os.path.join(tmp, "mhtri-dtk")
         write(repo, "src/u/lo.c", "/* */\n")
         write(repo, "src/u/hi.c", "/* */\n")
@@ -722,7 +722,7 @@ def selftest() -> int:
               (True, False))
 
     # the credit ledger (owner, 2026-09-27): a `done` earns 1, a claim spends `ratio`; --ignore-backlog spends none
-    with unitutil.temp_dir() as tmp:
+    with testing.temp_dir() as tmp:
         write(tmp, "src/u/one.c", "/* */\n")
         write(tmp, "configure.py", 'config.libs = [{"lib": "u", "objects": [Object(NonMatching, "u/one.c")]}]\n')
         write(tmp, "config/RMHE08/splits.txt", "u/one.c:\n\t.text       start:0x80100000 end:0x80100100\n")
@@ -751,7 +751,7 @@ def selftest() -> int:
               (over2["unit"], len(backlog.load_ledger(tmp)["claims"])), ("u/one", 1))
 
     # the debt itself is claimable (`queue.py debt`), on the same lock and the same currency
-    with unitutil.temp_dir() as tmp:
+    with testing.temp_dir() as tmp:
         for sub in ("src/mod", "config/RMHE08", ".pi/outbox", ".pi/notes"):
             os.makedirs(os.path.join(tmp, sub), exist_ok=True)
         write(tmp, "configure.py", "config.libs = [\n]\n")

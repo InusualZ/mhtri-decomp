@@ -25,7 +25,7 @@ def _root(main: str | None = None) -> str:
 
 
 # The extensions dtk/MWCC build as C++ and as C. `.cp` is the one dtk-template already uses for
-# `Gecko_ExceptionPPC.cp`; `.c++` is in `unitutil.SOURCE_EXT`.
+# `Gecko_ExceptionPPC.cp`; `.c++` is in `lib.units.SOURCE_EXT`.
 CXX_EXT = (".cpp", ".cc", ".cxx", ".cp", ".c++")
 C_EXT = (".c",)
 
@@ -161,7 +161,7 @@ def _elf_sections(path: str) -> list[dict]:
 def elf_symbols(path: str) -> list[dict]:
     """Every named symbol in an ELF32 big-endian object, **including undefined and `STT_FILE`**.
 
-    `unitutil.read_elf` drops `shndx == 0` (undefined) and keeps but does not label `STT_FILE`; both
+    The generic view of `lib.binary.elf.Elf` used elsewhere drops `shndx == 0` (undefined) and keeps but does not label `STT_FILE`; both
     matter here - the undefined names *are* the relocation targets (the strongest callee evidence),
     and the FILE symbol is the circular one this tool must not read. Values are section-relative.
     """
