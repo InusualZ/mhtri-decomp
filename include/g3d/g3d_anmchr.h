@@ -59,6 +59,10 @@ s32 fn_800628C8(void *self, s32 key);      /* 0x800628C8 - the table entry looku
  * separate TU and its object already references the plain name. */
 u32 fn_800600C0(u32* p);
 
+/* 0x8005BF68 - the display width of the character at `glyph`: 1 for a half-width one, 2 otherwise
+ * (GUESS name, from the 1/2 result the network message layout adds to its line width). */
+u16 getGlyphWidth(const char* glyph);
+
 #ifdef __cplusplus
 }
 #endif

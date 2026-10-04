@@ -106,7 +106,7 @@
  * form's `__construct_new_array` block and the EABI rethrow the handler ends with), matches byte for
  * byte.  The two load-bearing source shapes that were measured rather than guessed:
  *   - the array form's handler must end in a call the compiler knows not to return, so the rethrow is
- *     spelled `fn_80458A60(0, 0, 0)` with `__attribute__((noreturn))` (the map's own name for the EABI
+ *     spelled `__throw(0, 0, 0)` with `__attribute__((noreturn))` (the map's own name for the EABI
  *     rethrow at 0x80458A60).  A source-level `throw;` compiles to the same call *plus* the
  *     six-instruction `__end__catch` bookkeeping and one extra extab action word (93.48 % measured).
  *   - fn_800A6134 needs its two sda2 constants in named locals, the second one declared where the
@@ -342,7 +342,7 @@ void fn_800A559C(EfSys* self); /* the system's constructor lives in ef/ef_effect
 void fn_800A5618(EfSys* self, s16 flag); /* ... and so does its destructor */
 void* __construct_new_array(void* block, void* (*ctor)(void*), void (*dtor)(void*), u32 size,
                             u32 count);
-void fn_80458A60(void*, void*, void*) __attribute__((noreturn)); /* the EABI rethrow */
+void __throw(void*, void*, void*) __attribute__((noreturn)); /* the EABI rethrow */
 void __register_global_object(void* object, void* dtor, void* link);
 void PSMTXCopy(const void* src, void* dst);
 }
@@ -415,7 +415,7 @@ extern "C" u32 fn_800A56B0(EfSys* self, u32 maxGroupID) {
                                                             sizeof(EfSysActivityList), maxGroupID);
         } catch (...) {
             fn_800A5908(list, block);
-            fn_80458A60(0, 0, 0);
+            __throw(0, 0, 0);
         }
     }
     self->mActivityList = list;

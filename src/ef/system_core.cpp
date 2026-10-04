@@ -68,7 +68,7 @@
  *     the `index < 0x20` bound check and keeps the index in r3, base in r4; every source order tried
  *     materialises the base after the branch.  The bodies' behaviour is right (the accessors agree with
  *     `get_move_work_*`), only the schedule differs.
- *   - `GameMode_set`/`PlayMode_set` (85 %), `fn_800CF638`/`fn_800CF650` (98.3 %), `fn_800D28FC` (83.3 %),
+ *   - `GameMode_set`/`PlayMode_set` (85 %), `fn_800CF638`/`fn_800CF650` (98.3 %), `setTransferDisplayState` (83.3 %),
  *     `fn_800D2954` (87.2 %), `get_move_work_adrs`/`get_move_work_max` (89.7/89.0 %), `fn_800CF8EC`
  *     (90.7 %), `fn_800CFD00` (93.1 %), `fn_800D2928` (95.9 %), `fn_800CE610` (99.6 %) and
  *     `system_w_clr` (99.9 %) are above the bar; their sub-instruction deltas are not chased.
@@ -179,7 +179,7 @@ extern "C" void MEMFreeToAllocator(void* allocator, void* ptr);
 extern "C" void MEMDestroyExpHeap(void* heap);
 extern "C" void* MEMCreateExpHeapEx(u32 base, u32 size, u32 align);
 extern "C" void MEMInitAllocatorForExpHeap(void* allocator, void* heap, u32 align);
-extern "C" u32 fn_804C2380(void* handle, u32 mode);
+extern "C" u32 MEMGetAllocatableSizeForExpHeapEx(void* handle, u32 mode);
 extern "C" u32 fn_80267548(void);
 
 /* --------------------------------------------------------------------------------------------- */
@@ -397,7 +397,7 @@ SysEntry* fn_800CE9F0(void) {
 
 /* 0x800CF61C - the stream handle's read-size report. */
 u32 fn_800CF61C(void* handle) {
-    return fn_804C2380(handle, 4);
+    return MEMGetAllocatableSizeForExpHeapEx(handle, 4);
 }
 
 /* 0x800CF73C - rebuild the work heap. */
@@ -550,7 +550,7 @@ void fn_800D2660(void) {
 }
 
 /* 0x800D28FC - step the display state. */
-void fn_800D28FC(u8 value) {
+void setTransferDisplayState(u8 value) {
     system_w.field_0xa58 = (u8)(value + 1);
 }
 

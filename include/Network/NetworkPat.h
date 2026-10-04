@@ -12,7 +12,7 @@
  * four slot pointers plus the mask.
  *
  * Each slot holds a pointer to a polymorphic object of its **own, unrelated** class: the three
- * constructors (`__ct__24NetworkSessionManagerPatFv` 0x803D68D0, `fn_803E0C18`, `fn_803F02C4`) share
+ * constructors (`__ct__24NetworkSessionManagerPatFv` 0x803D68D0, `__ct__15NetworkLayerPatFv`, `__ct__19NetworkCommunityPatFv`) share
  * no base-ctor call, so this is a container, not a class hierarchy.  What the elements do share is the
  * calling convention this unit and the holder impose on a slot: the **deleting destructor at vtable
  * `+0x08`** (called with the delete flag) and the **release hook at `+0x14`** - the offsets the four
@@ -29,14 +29,14 @@
  * 0x805FB0F0); its declaration lives in that unit's header. */
 class NetworkSessionManagerPat;
 
-/* The slot +0x08 element.  Its constructor is `fn_803F02C4` (allocation 0x25EC, table 0x805FC728 over
+/* The slot +0x08 element.  Its constructor is `__ct__19NetworkCommunityPatFv` (allocation 0x25EC, table 0x805FC728 over
  * the root table 0x805FC440) and the map names neither the class nor the table, so the name is
  * **GUESSED** from the accessor's own name `getNetworkCommunityPat` - the only name the binary gives
  * the slot. */
 class NetworkCommunityPat;
 
 /* The slot +0x0C element: a class derived from the root whose table the map names
- * `__vt__12NetworkLayer` (0x805FB5D0).  The installed object is built by `fn_803E0C18`, which calls
+ * `__vt__12NetworkLayer` (0x805FB5D0).  The installed object is built by `__ct__15NetworkLayerPatFv`, which calls
  * `NetworkLayer::NetworkLayer` (the root, which stores 0x805FB5D0) first. */
 class NetworkLayerPat;
 

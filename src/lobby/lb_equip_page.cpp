@@ -73,7 +73,7 @@
  *    `lis`/`addi`.  Declaring the table with an explicit small-data size is the next probe.
  *  - fn_80220AF0 95.62 % (96 B): retail materialises the `extsh`-ed index before the `lbzx`; ours folds
  *    it.  Best-scoring variant kept.
- *  - fn_8021F020 78.89 % (188 B): below the bar.  Two rows: retail keeps no third callee-saved register
+ *  - syncItemListClock 78.89 % (188 B): below the bar.  Two rows: retail keeps no third callee-saved register
  *    (ours saves `r29` for the surviving argument) and it emits `frsp f1,f1` + `fcmpo`/`cror` for the
  *    `depth == lbl_80799C7C` test where ours emits `fcmpu`.  `count` is converted unsigned (no `xoris`),
  *    which is why the parameter is `u32`.

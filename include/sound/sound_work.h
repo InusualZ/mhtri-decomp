@@ -310,7 +310,7 @@ void* fn_800E7264(void* node);
 void* fn_800E7CA4(void* state);
 void* dtor_800E54A8(void* obj, s32 flags);
 void* fn_800E5690(void* obj, s32 flags);
-void fn_804C2380(void* p, s32 kind);
+void MEMGetAllocatableSizeForExpHeapEx(void* p, s32 kind);
 void* MEMAllocFromAllocator(void* allocator, u32 size);
 void MEMFreeToExpHeap(void* heap, void* ptr);
 void __construct_array(void* array, void* ctor, void* dtor, int size, int count);

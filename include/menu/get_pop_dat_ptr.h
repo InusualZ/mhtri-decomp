@@ -18,6 +18,9 @@
 
 /* 0x803BEC70 - one option out of `option_w`, with index 20 inverted. */
 u8 get_option_cfg(u8 index);
+/* 0x803BEA28 - one option out of `option_w`, clamped to its table maximum, with index 20 inverted
+ * (`ck_option_cfg__FUc`). */
+u8 ck_option_cfg(u8 index);
 /* 0x803BEBF0 - one option out of the arena profile of the VS user work. */
 u8 get_arena_cfg(u8 index, u8 value);
 /* `event_demo_ck` (0x803C4814) is `lobby/lb_server_sel_trans.cpp`'s since the phase 4 recut; its header is included for the

@@ -94,7 +94,7 @@ extern "C" f32 lbl_80799884;
 extern "C" f64 lbl_807998D0;
 extern "C" f32 lbl_807998D8;
 extern "C" LbNpcSystemWork system_w;   /* .bss 0x806585E0 */
-extern "C" u8 lbl_806BF530[];
+extern "C" u8 lobby_state_block[];
 extern "C" u8 lbl_806AA6F0[];
 extern "C" u8 lbl_80794AB0;
 extern "C" u8* lbl_80794B18;
@@ -563,7 +563,7 @@ void fn_801FC6EC(void)
     }
     player_control_move();
     lbl_80794AB0 = 0;
-    if (fn_804276D8() == 1 && lbl_806BF530[3] == 0 && lobby_w.field_0x16F == 0 &&
+    if (fn_804276D8() == 1 && lobby_state_block[3] == 0 && lobby_w.field_0x16F == 0 &&
         lobby_w.field_0x163 == 0) {
         lobby_w.field_0x12C = 1;
         lobby_w.field_0x172 = 10;

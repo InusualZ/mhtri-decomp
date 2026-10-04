@@ -33,7 +33,7 @@
  *
  * Naming note: the map/dump carry only fn_XXXXXXXX for part of this range (checked with
  * `dumpmap.py lookup` over the inventory and `.pi/notes/dumpmap-join.json`): fn_804C1A60, fn_804C1BD0,
- * fn_804C1E00, fn_804C1EE0, fn_804C2200, fn_804C2380, fn_804C2460, fn_804C2470, fn_804C24C0, fn_804C24E0,
+ * fn_804C1E00, fn_804C1EE0, MEMAllocFromExpHeapEx, MEMGetAllocatableSizeForExpHeapEx, fn_804C2460, fn_804C2470, fn_804C24C0, fn_804C24E0,
  * fn_804C2550, fn_804C25C0, fn_804C26A0, fn_804C26E0, fn_804C2800, fn_804C2820, fn_804C2830, fn_804C2840,
  * fn_804C3F10..fn_804C40D0, fn_804C5770, fn_804C5BB0, fn_804C5D50, fn_804C5FE0, fn_804C61E0,
  * fn_804C6290, fn_804C6430, fn_804C64E0, fn_804C6660, fn_804C6710, fn_804C6810, fn_804C6900,
@@ -68,7 +68,7 @@ void MEMiInitHeapHead(MEMiHeapHead* heap, u32 signature, void* start, void* end,
 void* fn_804C1E00(MEMiHeapHead* heap, u32 size, u32 align);
 void* fn_804C1EE0(MEMiHeapHead* heap, u32 size, u32 align);
 void fn_804C1A60(MEMiHeapHead* heap);
-u32 fn_804C2380(MEMiHeapHead* heap, s32 size);
+u32 MEMGetAllocatableSizeForExpHeapEx(MEMiHeapHead* heap, s32 size);
 
 /* ---------------------------------------------------------------------------------------------------
  * mem_List - the doubly-linked list primitives the heaps and the allocator build on.
@@ -205,7 +205,7 @@ void* MEMDestroyExpHeap(void* heap)
 }
 
 /* Allocate `size` bytes at `align` (a negative alignment means "aligned down from the region end"). */
-void* fn_804C2200(MEMiHeapHead* heap, u32 size, s32 align)
+void* MEMAllocFromExpHeapEx(MEMiHeapHead* heap, u32 size, s32 align)
 {
     void* block;
 
@@ -228,7 +228,7 @@ void* fn_804C2200(MEMiHeapHead* heap, u32 size, s32 align)
 }
 
 /* The largest allocatable region for `size` (sign selects the search side). */
-u32 fn_804C2380(MEMiHeapHead* heap, s32 size)
+u32 MEMGetAllocatableSizeForExpHeapEx(MEMiHeapHead* heap, s32 size)
 {
     u32 best = 0;
     u32 bestOffset = 0xFFFFFFFF;

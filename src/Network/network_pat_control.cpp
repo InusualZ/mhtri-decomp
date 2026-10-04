@@ -12,18 +12,19 @@
  *
  * Sections: .text 0x80429B94..0x8043065C, extab 0x8001D368..0x8001D558, extabindex 0x8003DE54..0x8003E0DC,
  * .rodata 0x80571EA0..0x80572240 (`pat_ca_cert`, the only referrer is `updateNetworkPatControl`), .sbss
- * 0x80794CF8, and the `.data` runs 0x806038E8..0x80603CB8 (6 ranges in splits.txt, true claim 0x3D0 B =
- * the object's emit; `flipcheck` misreads a multi-range claim as "0x4C (+900)").  0x80603CB8..0x80603D10
- * (`lbl_80603CB8`, the jump table 0x80603CE4) is released: only `fn_8043065C` reads it.
+ * 0x80794CF8, and the `.data` run 0x80603750..0x80603D70 (the message layout's tag, colour and size tables
+ * `text_tag_names`/`text_color_index_table`/`text_font_size_table` are defined beside `applyTextTag`).
  *
- * Class model: `NetCtrlWk` (0xC4A0 B; only it is under `#pragma pack(1)`, for the `u32` run at the odd
+ * Class model: `NetCtrlWk` (0xC4A8 B, the `.bss` instance `net_ctrl_work`; only it is under `#pragma pack(1)`, for the `u32` run at the odd
  * offset +0x7996) is the `net_ctrl_wk` singleton with its static and instance members; the Pat layers are
  * the virtual classes in `Network/NetworkLayerPat.h` and `Network/NetworkCommunityPat.h` (slots declared,
  * never defined, so no vtable is emitted).  C-linkage free functions stay only for names other units call.
  *
  * Load-bearing shapes (measured): `#pragma peephole off` is per-function evidenced - with it removed 55
  * functions score lower (collectEvents 95.6 -> 63.3, copyPeerList 100 -> 92.7, setTextSize 100 -> 66.7, the
- * unit 93.61 -> 90.25 %) and none scores higher, so it stays for the whole file; server-index scans are
+ * unit 93.61 -> 90.25 %) and none scores higher, so it stays for the whole file - including the first band
+ * (2026-10-03: moving the pragma above `fn_80423E74` raised 8 band-1 functions, e.g. resetNetSlots 90.7 -> 100,
+ * PatCryptDecrypt 87.1 -> 96.7, and lowered none); server-index scans are
  * loops (MWCC unrolls them to the target shape); `(dst++)->assign(src++)` gives the target's
  * pointer-increment order in copyPeerList; `ai_npc_reaction_forward()` is called with no argument (r3 is
  * the caller's leftover in retail).
@@ -37,12 +38,22 @@
  * the count is stays unknown) and `resetFailureState` (a `blr` stub).
  *
  * Residuals (re-measure: `python tools/units/recompile.py Network/network_pat_control --measure <symbol>`):
- *  - 27 of 114 functions are open (87 at 100 %).  Worst: `get_server_type_name` 44.17 % (48 B), then
- *    copyRosterLists 82.6, getUtf8CharLength 84.1, submitSlotRequest 86.4, getPrintedWidth 88.2,
- *    `updateNetworkPatControl` 88.30 %, and the other 21 above 88 %: register allocation and unroll shape.
- *    `updateNetworkPatControl` also lost 0.04 when the shared band declared `lobby_world_block` as
- *    `u8[]` (the retail read is a `.sbss` pointer via r13; the array is addressed with lis/@l).
- *  - .text is 0x6A6C against the target's 0x6AC8 (-92 B); extab 0x1E0 against 0x1F0.
+ *  - 2026-10-03: 143 of 225 rows at 100 % (report metric 65.6 %).  Not written yet (no body): the state machines
+ *    `updateMessagePool` (5504 B) and `layerReflectCallback` (3704 B), `drawTextRuns`, the message-pool helpers
+ *    0x80427868..0x80428628 (they call NetworkLayerPat/NetworkCommunityPat slots their owners still declare as
+ *    `pad_NN()`), the transfer queue/mode updates, the NetworkInstance error accessors (0x804312B8..0x80431368)
+ *    and the static-init/ctor/dtor group 0x80431CD8..0x80432104 (it needs `NetCtrlWk`'s member classes and the
+ *    small network object as C++ classes, which `Network/network_writer_types.h` rules out for now).
+ *  - Partial: `updateNetworkPatControl` 88.6 % (retail saves r24..r31 in a 0x50 frame, ours r26.. in 0x30: a
+ *    whole-function allocation shift), `layoutTextRuns` 95.5 % (retail keeps the `tag != 4/8/9` loop test on a
+ *    constant 0; the glyph copy needs a `(s32)` cast to keep retail's `extsb`), `parseTextTags` 91.2 % (our
+ *    compiler folds the redundant `== '\\'` test), `initWorkRecord` 99.5 / `initNetworkPatControl` 99.6 % (one
+ *    folded store each; the placement `new` of the friend list is load-bearing - its EH frame moved
+ *    initWorkRecord 60 -> 99 %), `get_server_type_name` 44.2 % and the earlier register/unroll residuals.
+ *  - `exportNetworkSave` copies the save byte with a `(s32)` cast (retail sign-extends in both directions).
+ *  - `initNetworkLibrary` is handed `PatLibraryParams` cast to the owner's `sNetworkLibraryInitParam`: the same
+ *    0x2C block read two ways (this unit names the allocator/game words, the owner keeps `gameInfo[8]`);
+ *    folding them into one type is open (rule 1).
  *  - Data: the `.rodata` certificate is byte-identical after linking; the split object holds a relocation
  *    at +0x244 (dtk read the DER bytes 8014CB40 as a pointer), so the object compare shows 4 B. The
  *    `.sdata` 0x807939A0.. run (interleaved with fn_80423E74's 0x807939A8) and the `.sdata2` words
@@ -82,7 +93,7 @@
  * The array at 0x80603858 and the string at 0x806038D8 belong to the neighbour
  * `Network/network_pat_control.cpp`.
  *
- * Residuals: the two state machines `fn_804247D0` (0xE78, three jump tables) and `updateMessagePool`
+ * Residuals: the two state machines `layerReflectCallback` (0xE78, three jump tables) and `updateMessagePool`
  * (0x1580, one jump table) and the message-pool families that follow them are not reconstructed yet;
  * every function that is reconstructed below is listed in the outbox.  Re-measure with
  * `python tools/units/recompile.py fn_80423E74 --measure <symbol>`.
@@ -115,6 +126,22 @@
 #include "quest/quest_entry.h"                     /* get_userdata (declared there for its consumers) */
 #include "ef/fn_800CDB2C.h"
 #include "Network/NetworkPeerBase.h"
+#include "Network/net_session_close.h"   /* the session-close helpers - owner Network/net_session_close.cpp */
+#include "mh3_pad.h"                     /* setSoftresetFlag - owner mh3_pad.cpp */
+#include "sys_mem.h"                     /* operator new - owner sys_mem.cpp */
+
+#include "Network/constructNetworkLibrary.h"   /* initNetworkLibrary / updateNetworkPat / setNetworkSessionManagerPat (rule 2) */
+#include "Network/network_opening.h"   /* the mediator's terms and transfer-state setters - owner Network/network_opening.cpp */
+#include "OS/FindContainHeap_.h"       /* the expandable-heap API - owner OS/FindContainHeap_.c */
+#include "NAND/nand.h"                 /* OSReport - owner NAND/nand.c */
+#include "pad_connect.h"               /* game_mutex - owner pad_connect.cpp */
+#include "ef/system_core.h"            /* work_mem_alloc / setTransferDisplayState - owner ef/system_core.cpp */
+#include "sound/snd_stream_reloc.h"    /* clearReverbWorkArea / setStreamTransferMode - owner sound/snd_stream_reloc.cpp */
+#include "lobby/lb_menu_pos_tbl.h"     /* syncItemListClock - owner lobby/lb_menu_pos_tbl.cpp */
+#include "g3d/fn_80075DCC.h"            /* the placement operator new - owner g3d/fn_80075DCC.cpp */
+#include "g3d/fn_80063888.h"            /* the placement operator delete - owner g3d/fn_80063888.cpp */
+#include "enemy/lobby_state_block.h"   /* lobby_state_block - owner enemy/em020_prog.cpp (its leaf header) */
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -131,6 +158,7 @@ typedef struct PatCryptBuf {
  * Wrapper over Camellia_DecryptBlock's key schedule: build the 256-bit PatCamellia key schedule from
  * `rawKey`.  A tail call, so the retail body is a bare `b Camellia_Ekeygen`.
  */
+#pragma peephole off
 void fn_80423E74(const u8* rawKey)
 {
     Camellia_Ekeygen(0x100, rawKey, lbl_806D3670);
@@ -408,6 +436,50 @@ void fn_80426D10(void)
 }
 
 /*
+ * The connected-peer slot (0..3) whose id is `id`, or -1 (also while the layer is down or not ready, or
+ * when the id renders empty).
+ */
+s32 findPeerIndex(const NetId* id)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+    char text[16];
+    s32 i;
+
+    if (getNetworkLayerPat(getPatsObject(), 0) == NULL) {
+        return -1;
+    }
+    if (isLayerReady() == 0) {
+        return -1;
+    }
+    formatNetId(text, id);
+    if (text[0] == 0) {
+        return -1;
+    }
+    for (i = 0; i < 4; i++) {
+        if (work->peers_0x7488[i].id_0x00.text_0x00[0] != 0 && isSameNetId(id, &work->peers_0x7488[i].id_0x00) == 1) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+/*
+ * The layer's friend-table index (0..99) of the valid friend whose id is `id`, or -1.
+ */
+s32 findFriendIndex(const NetId* id)
+{
+    s32 i;
+    NetFriendTable* table = &getNetworkLayerPat(getPatsObject(), 0)->friends_3568;
+
+    for (i = 0; i < 100; i++) {
+        if (table->entries_0x004[i].valid_0x35 != 0 && isSameNetId(&table->entries_0x004[i].id_0x00, id) == 1) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+/*
  * Clear the four-entry message table back to the record's own name, free its 64 flags and mark entry 0
  * live.  Guarded on the network layer being up.
  */
@@ -429,6 +501,50 @@ void fn_80427024(void)
             memset(&work->slots_0x7996[i], 0, 4);
         }
     }
+}
+
+/*
+ * The first free peer slot (1..3) for the peer at `address`: -1 when it is already connected or every slot
+ * is taken.
+ */
+s32 findFreePeerSlot(const NetworkSmallObject* address)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+    char text[16];
+    s32 i;
+
+    formatNetId(text, (const NetId*)address);
+    for (i = 1; i < 4; i++) {
+        if (work->used_0x7988[i] != 0 &&
+            networkSmallObject_isEqual((const NetworkSmallObject*)&work->peer_addresses_0x7908[i], address) != 0) {
+            return -1;
+        }
+    }
+    for (i = 1; i < 4; i++) {
+        if (work->used_0x7988[i] == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+/*
+ * The connected peer slot (1..3) holding the peer at `address`, or -1.
+ */
+s32 findPeerSlot(const NetworkSmallObject* address)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+    char text[16];
+    s32 i;
+
+    formatNetId(text, (const NetId*)address);
+    for (i = 1; i < 4; i++) {
+        if (work->used_0x7988[i] != 0 &&
+            networkSmallObject_isEqual((const NetworkSmallObject*)&work->peer_addresses_0x7908[i], address) != 0) {
+            return i;
+        }
+    }
+    return -1;
 }
 
 /*
@@ -493,6 +609,37 @@ s32 fn_804276D8(void)
 }
 
 /*
+ * Clears the layer's command results and hands the layer its reflect callback; marks the layer callback
+ * installed.
+ */
+void installLayerCallback(void)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+    s32 i;
+
+    if (getNetworkLayerPat(getPatsObject(), 0) != NULL) {
+        for (i = 0; i < 36; i++) {
+            work->layer_results_0x6244[i] = 0;
+        }
+        getNetworkLayerPat(getPatsObject(), 0)->setReflectCallback((u32)layerReflectCallback, 0);
+        work->flag_0x012 = 1;
+    }
+}
+
+/*
+ * Whether the network layer is up and its state is ready (2).
+ */
+BOOL isLayerReady(void)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+
+    if (getNetworkLayerPat(getPatsObject(), 0) == NULL) {
+        return FALSE;
+    }
+    return work->layer_state_0x064 == 2;
+}
+
+/*
  * The `index`-th 0x2510-byte sub-record of the layer's 0xF1B0 table, as an address.
  */
 s32 fn_804281C4(s32 index)
@@ -517,24 +664,831 @@ void fn_80428218(void)
 }
 
 /*
- * Ask the resource system to release store `id` (a bare tail call).
+ * The message id of the layer's last error: the server's own reason inside the 50..75 detail range (or for
+ * detail 95), else the id of the error code (0 for an unknown one).
  */
-s32 fn_80428B08(void)
+s32 getNetErrorMessageId(void)
 {
-    return fn_804C2380(4);
+    NetErrorTriple* error = &net_ctrl_wk->net_error_0x134;
+
+    if (error != NULL) {
+        if ((u32)(error->detail_0x4 - 50) <= 25 && error->reason_0x8 != 0x80000000) {
+            return error->reason_0x8;
+        }
+        if (error->detail_0x4 == 95) {
+            return error->reason_0x8;
+        }
+        switch (error->code_0x0) {
+        case 0x80000002:
+            return 11620;
+        case 0x80050012:
+            if (error->detail_0x4 == 0x70) {
+                return 11621;
+            }
+            break;
+        case 0x80050011:
+            if (error->detail_0x4 == 0x70) {
+                return 11622;
+            }
+            break;
+        case 0x80050037:
+            return 11623;
+        case 0x80020001:
+            return 11624;
+        case 0x80000008:
+        case 0x80050000:
+            return 11625;
+        case 0x80030000:
+            return 11630;
+        case 0x80030001:
+            return 11631;
+        case 0x80030002:
+            return 11632;
+        case 0x80030003:
+            return 11633;
+        case 0x80030004:
+            return 11634;
+        case 0x80030005:
+            return 11635;
+        case 0x80030011:
+            return 11640;
+        case 0x80030012:
+            return 11641;
+        case 0x80030013:
+            return 11642;
+        case 0x80030014:
+            return 11643;
+        case 0x80030015:
+            return 11644;
+        case 0x80030021:
+            return 11650;
+        case 0x80030022:
+            return 11651;
+        case 0x80030031:
+            return 11660;
+        case 0x80030032:
+            return 11661;
+        case 0x80030033:
+            return 11662;
+        case 0x80030034:
+            return 11663;
+        case 0x80030035:
+            return 11664;
+        case 0x80030036:
+            return 11665;
+        case 0x80030037:
+            return 11666;
+        case 0x80030038:
+            return 11667;
+        case 0x80030039:
+            return 11668;
+        case 0x8003003A:
+            return 11669;
+        case 0x8003003B:
+            return 11670;
+        case 0x8003003C:
+            return 11671;
+        case 0x8003003D:
+            return 11672;
+        case 0x8003003E:
+            return 11673;
+        case 0x8003003F:
+            return 11674;
+        case 0x80030040:
+            return 11675;
+        case 0x80030041:
+            return 11676;
+        case 0x80030042:
+            return 11677;
+        case 0x80030043:
+            return 11678;
+        case 0x80030044:
+            return 11679;
+        }
+    }
+    return 0;
+}
+
+/*
+ * The socket library's allocator: a 32-byte aligned block of `size` from the network heap (NULL and a
+ * report when it fails or `size` is not positive).
+ */
+/* untyped: byte range - a raw heap block */
+void* soAlloc(u32 name, s32 size)
+{
+    void* block;
+
+    if (size > 0) {
+        OSLockMutex(game_mutex);
+        block = MEMAllocFromExpHeapEx(net_exp_heap, size, 0x20);
+        OSUnlockMutex(game_mutex);
+        net_heap_free_size = getNetHeapFreeSize(net_exp_heap);
+    } else {
+        block = NULL;
+    }
+    if (block == NULL) {
+        OSReport("so alloc fail\n");
+    }
+    return block;
+}
+
+/*
+ * The network heap's allocatable size (a bare tail call).
+ */
+u32 getNetHeapFreeSize(MEMiHeapHead* heap)
+{
+    return MEMGetAllocatableSizeForExpHeapEx(heap, 4);
+}
+
+/*
+ * The socket library's free: returns `block` to the network heap (a report when it is NULL or `size` is not
+ * positive).
+ */
+/* untyped: byte range - a raw heap block */
+void soFree(u32 name, void* block, s32 size)
+{
+    if (block != NULL && size > 0) {
+        OSLockMutex(game_mutex);
+        MEMFreeToExpHeap(net_exp_heap, block);
+        OSUnlockMutex(game_mutex);
+        net_heap_free_size = getNetHeapFreeSize(net_exp_heap);
+        return;
+    }
+    OSReport("so free fail\n");
+}
+
+/*
+ * The DWC library's allocator: a block of `size` aligned to `align` from the network heap (a report when it
+ * fails).  A zero `size` returns `align` uninitialised, as the retail code does.
+ */
+/* untyped: byte range - a raw heap block */
+void* dwcAlloc(u32 name, u32 size, s32 align)
+{
+    void* block;
+
+    if (size != 0) {
+        OSLockMutex(game_mutex);
+        block = MEMAllocFromExpHeapEx(net_exp_heap, size, align);
+        OSUnlockMutex(game_mutex);
+        net_heap_free_size = getNetHeapFreeSize(net_exp_heap);
+    }
+    if (block == NULL) {
+        OSReport("dwc alloc fail\n");
+    }
+    return block;
+}
+
+/*
+ * The DWC library's free: returns `block` to the network heap (a report when it is NULL).
+ */
+/* untyped: byte range - a raw heap block */
+void dwcFree(u32 name, void* block, u32 size)
+{
+    if (block != NULL) {
+        OSLockMutex(game_mutex);
+        MEMFreeToExpHeap(net_exp_heap, block);
+        OSUnlockMutex(game_mutex);
+        net_heap_free_size = getNetHeapFreeSize(net_exp_heap);
+        return;
+    }
+    OSReport("dwc free fail\n");
+}
+
+/*
+ * An empty query hook: always 0.
+ */
+s32 netNullQuery(void)
+{
+    return 0;
+}
+
+/*
+ * An empty hook.
+ */
+void netNullHook(void)
+{
+}
+
+/*
+ * A stub taking the system record.
+ */
+void resetSystemState(struct SystemWork* system)
+{
+}
+
+/*
+ * Points `net_ctrl_wk` at the work record and resets every part of it: the control state, the session
+ * results, the layer and pool records, the peer and message tables, the fetch state, the file buffers in
+ * MEM2 and the friend list built in place.
+ */
+void initWorkRecord(void)
+{
+    NetCtrlWk* work = &net_ctrl_work;
+    u8* buffer;
+    s32 i;
+
+    net_ctrl_wk = work;
+    work->pats_0x000 = NULL;
+    work->session_manager_0x004 = NULL;
+    work->layer_0x008 = NULL;
+    work->community_0x00C = NULL;
+    work->mode_0x010 = 0;
+    work->state_0x011 = 0;
+    work->flag_0x012 = 0;
+    work->flag_0x013 = 0;
+    work->entered_0x014 = 0;
+    work->flag_0x015 = 0;
+    work->flag_0x016 = 0;
+    work->sub_state_0x017 = 0;
+    work->cursor_0x01C = 0;
+    work->repeat_0x02C = 0;
+    work->step_0x018 = 0;
+    work->cursor_0x020 = 0;
+    work->repeat_0x030 = 0;
+    work->substep_0x019 = 0;
+    work->scroll_0x024 = 0;
+    work->repeat_0x034 = 0;
+    work->substep_0x01A = 0;
+    work->cursor_0x028 = 0;
+    work->repeat_0x038 = 0;
+    work->field_0x03C = 0;
+    work->server_slot_state_0x040[0] = 0;
+    work->server_slot_state_0x040[1] = 0;
+    work->server_slot_state_0x040[2] = 0;
+    work->server_slot_state_0x040[3] = 0;
+    work->profile_count_0x164 = 10;
+    work->profiles_0x168 = net_profile_table;
+    work->profile_index_0x170 = -1;
+    work->field_0x16C = 0;
+    work->ready_count_0x044 = 0;
+    work->leave_0x048 = 0;
+    work->flag_0x04C = 0;
+    work->error_0x050 = 0;
+    work->error_0x054 = 0;
+    work->error_0x058 = 0;
+    work->error_0x05C = 0;
+    work->error_0x060 = 0;
+    work->selected_server_0x06A = 0;
+    work->flag_0x06B = 0;
+    work->flag_0x06C = 0;
+    work->field_0x070 = 0;
+    work->server_index_0x074[0] = 0;
+    work->server_index_0x074[1] = 0;
+    work->server_index_0x074[2] = 0;
+    work->server_index_0x074[3] = 0;
+    for (i = 0; i < 44; i++) {
+        work->results_0x078[i] = 0;
+    }
+    memset(work->cleared_0x128, 0, 0x3C);
+    work->status_0x174 = 0;
+    work->row_count_0x178 = 0;
+    work->page_count_0x45C = 0;
+    memset(work->layer_results_0x6244, 0, 0xA4);
+    work->sizes_0x6310[0] = 0;
+    work->sizes_0x6310[1] = 0;
+    work->sizes_0x6310[2] = 0;
+    work->sizes_0x6310[3] = 0;
+    memset(work->pool_0x6320, 0, 0x1048);
+    for (i = 0; i < 0x40; i++) {
+        work->arrA_0x7A98[i] = 0;
+        work->arrB_0x7B98[i] = 0;
+        work->arrC_0x7C98[i] = 0;
+    }
+    for (i = 0; i < 16; i++) {
+        work->entries_0x7CD8[i].index_0x01 = i;
+    }
+    memset(&work->session_request_0x829C, 0, 0x20);
+    work->layer_state_0x064 = 0;
+    work->flag_0x068 = 0;
+    work->flag_0x069 = 0;
+    work->flag_0xBF2C = 0;
+    work->flag_0xBF2D = 0;
+    work->flag_0xBF2E = 0;
+    work->selected_server_0x06A = -1;
+    work->flag_0x06B = -1;
+    work->flag_0x06C = -1;
+    work->sizes_0x6310[0] = 0x2E0;
+    work->sizes_0x6310[1] = 0x200;
+    work->sizes_0x6310[2] = 0x2260;
+    system_w.net_result_wait_0x8c1 = 0;
+    work->screen_0xC150 = 0;
+    work->flag_0xC151 = 0;
+    work->action_0xC152 = 0;
+    work->error_code_0xC258 = 0;
+    work->sub_error_0xC259 = 0;
+    work->counter_0xC364 = 0;
+    work->settings_0x6210[0] = -1;
+    work->settings_0x6210[1] = -1;
+    work->settings_0x6210[2] = -1;
+    work->settings_0x6210[3] = -1;
+    work->flag_0xC1BD = 0;
+    work->account_name_0xC0C4[0] = 0;
+    work->nickname_0xC104[0] = 0;
+    work->flag_0xC368 = 0;
+    work->counter_0xC360 = 0;
+    work->counter_0xC362 = 0;
+    work->counter_0xC364 = 0;
+    work->timeout_0xC36C = 0;
+    work->field_0xC370 = 0;
+    work->field_0xC374 = 0;
+    work->flag_0xC369 = 0;
+    work->flag_0xC1BE = 0;
+    work->flag_0xC1BF = 0;
+    for (i = 0; i < 0x40; i++) {
+        memset(&work->slots_0x7996[i], 0, 4);
+    }
+    for (i = 0; i < 4; i++) {
+        memset(&work->peers_0x7488[i], 0, sizeof(NetPeerRec));
+    }
+    work->fetch_timeouts_0xC37C[0] = 0;
+    work->fetch_timeouts_0xC37C[1] = 0;
+    work->fetch_timeouts_0xC37C[2] = 0;
+    work->fetch_timeouts_0xC37C[3] = 0;
+    work->fetch_timeouts_0xC37C[4] = 0;
+    work->fetch_timeouts_0xC37C[5] = 0;
+    work->fetch_timeouts_0xC37C[6] = 0;
+    work->fetch_timeouts_0xC37C[7] = 0;
+    work->flag_0xC379 = 0;
+    strcpy(work->player_name_0xC1C8, system_w.player_name_0x8a3);
+    work->flag_0x82C4 = 0;
+    work->flag_0x82C6 = 0;
+    work->flag_0x82C5 = 0;
+    work->flag_0x82C7 = 0;
+    work->flag_0x82C8 = 0;
+    work->flag_0xC3F0 = 0;
+    work->flag_0xC3F2 = 0;
+    memset(work->server_types_0x82D8, 0, 0x140C);
+    memset(&work->times_0x96E4, 0, sizeof(NetRaidTimes));
+    memset(&work->bigdata_0x96F0, 0, sizeof(NetBigData));
+    memset(&work->notice_0x9FF4, 0, sizeof(NetServerNotice));
+    work->fetch_sums_0xA0E4[0] = 0;
+    work->fetch_sums_0xA0E4[1] = 0;
+    work->fetch_sums_0xA0E4[2] = 0;
+    work->fetch_sums_0xA0E4[3] = 0;
+    memset(work->community_results_0xA144, 0, 0x6C);
+    work->roster_count_0xA1B8 = 0;
+    work->field_0xC154 = 0;
+    memset(&work->screen_0xC158, 0, 4);
+    memset(work->flags_0xC1C0, 0, sizeof(work->flags_0xC1C0));
+    work->field_0xC28C = 0;
+    buffer = (u8*)0x9002FF60;
+    memset(buffer, 0, 0x8000);
+    for (i = 0; i < 10; i++) {
+        work->file_buffers_0xC39C[i] = buffer;
+        buffer += 0x400;
+    }
+    work->staging_0xC3EC = buffer;
+    memset(work->file_sums_0xC3C4, 0, sizeof(work->file_sums_0xC3C4));
+    memset(&lobby_state_block, 0, sizeof(lobby_state_block));
+    work->friend_list_0xC47C = new ((void*)0x90017F60) NetFriendList;
+    work->friend_list_0xC47C->count_0x00 = 0;
+    work->flag_0xC480 = 0;
+    work->timeout_0xC484 = 0;
+    work->field_0xC498 = 0;
+    work->flag_0xC499 = 0;
+    work->flag_0xC49A = 0;
+    work->flag_0xC49B = 0;
+    work->flag_0xC49C = 0;
+    work->flag_0xC49D = 0;
+    work->flag_0xC49E = 0;
+    work->field_0xC4A0 = 0;
+    work->flag_0xC49F = 0;
+    work->flags_0xC4A4[0] = 0;
+    work->flags_0xC4A4[1] = 0;
+    work->flags_0xC4A4[2] = 0;
+    work->flags_0xC4A4[3] = 0;
+}
+
+/*
+ * Allocates the work record's text-layout block and clears it.
+ */
+void allocateDialogRecord(void)
+{
+    net_ctrl_work.text_layout_0xC144 = (NetTextTagState*)work_mem_alloc(0x314);
+    memset(net_ctrl_work.text_layout_0xC144, 0, 0x314);
+}
+
+/*
+ * Brings the network control up: resets the work record, creates the network heap, hands the Pat library
+ * its allocators and game identity, checks the terms when the option asks for it, builds the three Pat
+ * layers and installs them, then creates the dialog and text-layout records and the transfer mode.
+ */
+void initNetworkPatControl(void)
+{
+    NetCtrlWk* work = &net_ctrl_work;
+    PatLibraryParams params;
+
+    net_ctrl_wk = work;
+    initWorkRecord();
+    work->field_0xC28C = 0;
+    if (work->field_0xC28C > 0) {
+        memcpy(work->player_name_0xC1C8, work->save_name_0xC1D3, sizeof(work->save_name_0xC1D3));
+    } else {
+        work->field_0xC28C = work->query_0xC288();
+    }
+    system_w.field_0x86b = 1;
+    work->pats_0x000 = &net_pats_object;
+    if (net_exp_heap == NULL) {
+        net_exp_heap = (MEMiHeapHead*)MEMCreateExpHeapEx((void*)0x93578000, 0x68000, 4);
+    }
+    copySoAllocator(&params.so_allocator_0x00, &pat_so_allocator);
+    params.flags_0x08 = 0;
+    params.alloc_0x0C = dwcAlloc;
+    params.free_0x10 = dwcFree;
+    params.game_name_0x14 = "mh3uswii";
+    params.game_code_0x18 = 'RMHE';
+    params.product_0x1C = 2900;
+    params.secret_0x20 = "IwkoVF";
+    params.extra_0x24 = "";
+    params.settings_0x28 = &work->pat_settings_0xC208;
+    initNetworkLibrary(getPatsObject(), (sNetworkLibraryInitParam*)&params);
+    if (get_option_cfg(28) == 1) {
+        initMediatorTerms(getInstance(), (void*)0x90037F60, 0x4400);
+        if (getMediatorTermsStatus(getInstance()) == 1) {
+            work->flag_0xC499 = 1;
+            if (isTermsCheckFinished(getPatTerms()) == 0) {
+                work->flag_0xC49A = 0;
+            } else {
+                work->flag_0xC49A = 1;
+                work->flag_0xC499 = 0;
+            }
+        } else {
+            work->flag_0xC499 = 0;
+        }
+    } else {
+        work->flag_0xC499 = 0;
+    }
+    work->layer_0x008 = new NetworkLayerPat;
+    work->session_manager_0x004 = new NetworkSessionManagerPat;
+    work->community_0x00C = new NetworkCommunityPat;
+    setNetworkLayerPat(getPatsObject(), work->layer_0x008);
+    setNetworkSessionManagerPat(getPatsObject(), work->session_manager_0x004);
+    setNetworkCommunityPat(getPatsObject(), work->community_0x00C);
+    resetControlState();
+    work->dialog_0xBF30 = work->create_dialog_0xC25C(work);
+    allocateDialogRecord();
+    system_w.net_active_0x7d4 = 0;
+    system_w.transfer_mode_0xa50 = 1;
+    system_w.transfer_flag_0xa51 = 0;
+    system_w.transfer_level_0xa52 = 4;
+    setMediatorTransferLevel(getInstance(), system_w.transfer_level_0xa52);
+}
+
+/*
+ * Whether the terms object has reached its finished state (20).
+ */
+u32 isTermsCheckFinished(struct PatTerms* terms)
+{
+    return terms->state_0x0C == 20;
+}
+
+/*
+ * Copies a socket allocator pair.
+ */
+void copySoAllocator(PatSoAllocator* dst, const PatSoAllocator* src)
+{
+    dst->alloc_0x00 = src->alloc_0x00;
+    dst->free_0x04 = src->free_0x04;
+}
+
+/*
+ * Runs the result callback the work record holds, when there is a work record.
+ */
+void invokeResultCallback(void)
+{
+    if (net_ctrl_wk != NULL) {
+        net_ctrl_wk->result_callback_0xC264();
+    }
+}
+
+/*
+ * Clears the control's state bytes, cursors, server slots, error words and the selected profile.
+ */
+void resetControlFields(void)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+
+    work->mode_0x010 = 0;
+    work->state_0x011 = 0;
+    work->flag_0x012 = 0;
+    work->flag_0x013 = 0;
+    work->entered_0x014 = 0;
+    work->flag_0x015 = 0;
+    work->flag_0x016 = 0;
+    work->sub_state_0x017 = 0;
+    work->cursor_0x01C = 0;
+    work->repeat_0x02C = 0;
+    work->step_0x018 = 0;
+    work->cursor_0x020 = 0;
+    work->repeat_0x030 = 0;
+    work->substep_0x019 = 0;
+    work->scroll_0x024 = 0;
+    work->repeat_0x034 = 0;
+    work->substep_0x01A = 0;
+    work->cursor_0x028 = 0;
+    work->repeat_0x038 = 0;
+    work->field_0x03C = 0;
+    work->server_slot_state_0x040[0] = 0;
+    work->server_slot_state_0x040[1] = 0;
+    work->server_slot_state_0x040[2] = 0;
+    work->server_slot_state_0x040[3] = 0;
+    work->profile_index_0x170 = -1;
+    work->ready_count_0x044 = 0;
+    work->selected_server_0x06A = 0;
+    work->flag_0x06B = 0;
+    work->flag_0x06C = 0;
+    work->field_0x070 = 0;
+    work->error_0x050 = 0;
+    work->error_0x054 = 0;
+    work->error_0x058 = 0;
+    work->error_0x05C = 0;
+    work->error_0x060 = 0;
+    work->flag_0x04C = 0;
+}
+
+/*
+ * The reflect callback the mediator is handed: records the result of a server-list (3), page-list (0x8001),
+ * status (0x8000) or plain (1, 2) request, and the error triple of a failed one.
+ */
+/* untyped: caller-owned payload - the mediator's event payload words */
+void patReflectCallback(s32 command, s32 unused, s32 result, s32 count, void* payload, void* unused2)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+
+    if (result < 0 && payload != NULL) {
+        work->reflect_error_0x14C = *(NetFetchError*)payload;
+    }
+    switch (command) {
+    case 0x8000:
+        work->status_0x174 = result;
+        break;
+    case 3:
+        if (result < 0) {
+            work->status_0x174 = result;
+        } else {
+            work->row_count_0x178 = (count < 8) ? count : 8;
+            if (work->row_count_0x178 != 0) {
+                memcpy(work->rows_0x17C, payload, work->row_count_0x178 * sizeof(NetRowRec));
+            }
+            work->status_0x174 = 1;
+        }
+        break;
+    case 0x8001:
+        if (result < 0) {
+            work->status_0x174 = result;
+        } else {
+            work->page_count_0x45C = (count < 8) ? count : 8;
+            if (work->page_count_0x45C != 0) {
+                memcpy(work->page_records_0x460, payload, work->page_count_0x45C << 6);
+            }
+            work->status_0x174 = 1;
+        }
+        break;
+    case 1:
+        if (result < 0) {
+            work->status_0x174 = result;
+        } else {
+            work->status_0x174 = 1;
+        }
+        break;
+    case 2:
+        if (result < 0) {
+            work->status_0x174 = result;
+        } else {
+            work->status_0x174 = 1;
+        }
+        break;
+    }
+}
+
+/*
+ * Hands the reflect callback to the pat interface (unless the system says not to), resets the message
+ * table and the session-close state, and clears the control's state bytes.
+ */
+void resetControlState(void)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+
+    if (system_w.field_0x86A == 0) {
+        setPatReflectPageRange((PatInterface*)getInstance_(), (u32)patReflectCallback, 0);
+    }
+    installLayerCallback();
+    installSessionCallback();
+    installCommunityCallback();
+    work->sub_state_0x017 = 0;
+    work->step_0x018 = 0;
+    work->substep_0x019 = 0;
+    work->substep_0x01A = 0;
+}
+
+/*
+ * Drops the three Pat layer pointers, destroys the network heap and shuts the network sound down.
+ */
+void resetPatInterfaces(void)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+
+    work->mode_0x010 = 0;
+    if (work->session_manager_0x004 != NULL) {
+        work->session_manager_0x004 = NULL;
+    }
+    work->state_0x011 = 0;
+    if (work->layer_0x008 != NULL) {
+        work->layer_0x008 = NULL;
+    }
+    work->flag_0x012 = 0;
+    if (work->community_0x00C != NULL) {
+        work->community_0x00C = NULL;
+    }
+    work->flag_0x013 = 0;
+    if (net_exp_heap != NULL) {
+        MEMDestroyExpHeap(net_exp_heap);
+        net_exp_heap = NULL;
+    }
+    system_w.net_active_0x7d4 = 0;
+    clearReverbWorkArea();
+}
+
+/*
+ * The per-frame network hook: while the system allows it and the control is live, it flags the soft
+ * reset, drives the Pat holder and updates the control.
+ */
+void runNetworkFrame(void)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+
+    if (system_w.field_0x86b != 0 && work->pats_0x000 != NULL) {
+        setSoftresetFlag(true);
+        updateNetworkPat(getPatsObject());
+        NetCtrlWk::updateIfActive();
+    }
+}
+
+/*
+ * Hands the network time, the schedule phase and the schedule period to the lobby clock.
+ */
+void syncScheduleClock(NetCtrlWk* work)
+{
+    u32 time = NetCtrlWk::getNetworkTime();
+    f32 phase = NetCtrlWk::getSchedulePhase();
+
+    syncItemListClock(time, work->schedule_0x85DC.period_0x04, phase);
+}
+
+/*
+ * A stub.
+ */
+void resetFailureState(NetCtrlWk* work)
+{
+}
+
+/*
+ * The per-frame timer tick: counts the lobby's timers and the two fetch timeouts down to zero.
+ */
+void tickPatControl(void)
+{
+    s32 i;
+    NetCtrlWk* work = net_ctrl_wk;
+
+    for (i = 0; i < lobby_state_block.timer_count_0x16D0; i++) {
+        if (lobby_state_block.timers_0x16F4[i].timer_0x00 != 0) {
+            lobby_state_block.timers_0x16F4[i].timer_0x00--;
+        }
+    }
+    if (work->timeout_0xC484 > 0) {
+        work->timeout_0xC484--;
+    }
+    if (work->timeout_0xC36C > 0) {
+        work->timeout_0xC36C--;
+    }
+}
+
+/*
+ * Clears the refresh timeout when either view key differs from the one last seen.
+ */
+void clearRefreshTimeoutOnChange(void)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+
+    if (work->view_key_0xC304 != work->seen_key_0xC310 || work->view_key_0xC308 != work->seen_key_0xC314) {
+        work->timeout_0xC484 = 0;
+    }
+}
+
+/*
+ * Clears the refresh timeout.
+ */
+void clearRefreshTimeout(void)
+{
+    net_ctrl_wk->timeout_0xC484 = 0;
+}
+
+/*
+ * Clears the big-data fetch timeout.
+ */
+void clearBigDataTimeout(void)
+{
+    net_ctrl_wk->timeout_0xC36C = 0;
+}
+
+/*
+ * Raises the network error: flags it, sends the control to its shutdown state (0x5A) and tells the system.
+ */
+void setErrorHappened(NetCtrlWk* work)
+{
+    work->flag_0xBF2D = 1;
+    work->sub_state_0x017 = 0x5A;
+    work->step_0x018 = 0;
+    system_w.net_result_wait_0x8c1 = 1;
+}
+
+/*
+ * Stores `code` and sends the control to its shutdown state.
+ */
+void abortNetworkControl(NetCtrlWk* work, u8 code)
+{
+    work->flag_0xBF2E = code;
+    work->sub_state_0x017 = 0x5A;
+    work->step_0x018 = 0;
+}
+
+/*
+ * Turns the current state into its failure state (0x0F -> 0x24, 0x17 -> 0x25) at step 0x0F.
+ */
+void failNetworkControl(NetCtrlWk* work)
+{
+    if (work->sub_state_0x017 == 0x0F) {
+        sendCheckRequest(1);
+        work->sub_state_0x017 = 0x24;
+    }
+    if (work->sub_state_0x017 == 0x17) {
+        work->sub_state_0x017 = 0x25;
+    }
+    work->step_0x018 = 0x0F;
+}
+
+/*
+ * Whether a terms update is running: the check is pending, not done, and the update is in flight (2).
+ */
+u32 isTermsUpdateRunning(void)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+
+    if (work->flag_0xC499 == 1 && work->flag_0xC49A == 0 && work->flag_0xC49E == 2) {
+        return TRUE;
+    }
+    return FALSE;
+}
+
+/*
+ * The terms-check result byte, or 0 when there is no work record.
+ */
+u8 getTermsCheckDone(void)
+{
+    if (net_ctrl_wk == NULL) {
+        return 0;
+    }
+    return net_ctrl_wk->flag_0xC49A;
+}
+
+/*
+ * Moves a finished terms check (1) on to acknowledged (2).
+ */
+void acknowledgeTermsCheck(void)
+{
+    if (net_ctrl_wk != NULL && net_ctrl_wk->flag_0xC49A == 1) {
+        net_ctrl_wk->flag_0xC49A = 2;
+    }
 }
 
 #ifdef __cplusplus
 }
 #endif
 
-
-#pragma peephole off
-
 /* The work-record singleton itself (`.sbss:0x80794CF8`, 4 B).  Its owner TU is unregistered and every
  * function in this band dereferences it, so this unit claims the range (rule 12) and defines it here;
  * the 0x80423E74 band above reaches the same row through the header's `extern`. */
 NetCtrlWk* net_ctrl_wk;
+
+/* The work record itself (`.bss` 0x806D3790, 0xC4A8 B; `initNetworkPatControl` points `net_ctrl_wk` at it)
+ * and the network heap handle (`.sbss` 0x80794CF4). */
+NetCtrlWk net_ctrl_work;
+MEMiHeapHead* net_exp_heap;
+
+/* The party table `net_ctrl_work.profiles_0x168` points at (`.bss` 0x806DFC68, 10 x 0x2B4). */
+NetProfileRec net_profile_table[10];
+
+/* The socket allocator pair handed to the Pat library (`.sdata` 0x807939A8) and the Pat holder (`.bss` 0x806DFC44,
+ * built by its owner's constructor 0x80419AD4 in retail). */
+PatSoAllocator pat_so_allocator = { soAlloc, soFree };
+NetworkPat net_pats_object;
+
+/* The localized error message table and its length (`.sbss` 0x80794CF0 / 0x80794D00). */
+char** net_err_msg_tbl_adrs;
+u16 net_err_msg_num;
+
+/* The network heap's allocatable size after the last allocation or free (`.sbss` 0x80794CFC). */
+u32 net_heap_free_size;
 
 /* The Nintendo Class 2 CA certificate (DER, 0x39C bytes) the pat interface pins for its secure
  * connections, and the length handed to it (the map's 0x80571EA0 `.rodata` blob and 0x807939A0
@@ -635,7 +1589,7 @@ void updateNetworkPatControl(void)
         break;
     case 3:
         if (work->error_0x05C == 0) {
-            work->status_0xA18C = 0;
+            work->community_results_0xA144[3].words_0x00[0] = 0;
             buildRosterSync(&work->roster_sync_0x61CC);
             getNetworkCommunityPat(getPatsObject(), 0)->syncFriends(&work->roster_sync_0x61CC);
         }
@@ -817,7 +1771,7 @@ void updateNetworkPatControl(void)
             sysSE_req(0);
             work->sub_state_0x017 = 0x5A;
             work->step_0x018 = 0;
-            work->field_0xC378 = 0;
+            work->flag_0xC378 = 0;
             return;
         }
         break;
@@ -919,12 +1873,12 @@ void updateNetworkPatControl(void)
         dialog->timer_0x128++;
         if (work->status_0x174 > 0 || work->error_0x058 != 0) {
             if (work->status_0x174 < 0 || work->error_0x058 < 0) {
-                if (work->net_error_0x134 + 0x7FFA0000 == 0x34U) {
+                if (work->net_error_0x134.code_0x0 + 0x7FFA0000 == 0x34U) {
                     dialog->timer_0x128 = (getWarningUInt(getInstance()) + 1) * 0x1E;
                     work->sub_state_0x017 = 0xAE;
                     return;
                 }
-                if (work->net_error_0x138 == 0x72) {
+                if (work->net_error_0x134.detail_0x4 == 0x72) {
                     work->sub_state_0x017 = 0xB3;
                     return;
                 }
@@ -1154,14 +2108,14 @@ void updateNetworkPatControl(void)
                             work->callback_0xC278();
                             work->screen_0xC158 = 4;
                             work->screen_0xC159 = 8;
-                            work->field_0xC378 = 1;
+                            work->flag_0xC378 = 1;
                             return;
                         }
                         {
                             NetUserData* user = (NetUserData*)get_userdata();
                             NetRowRec* row = &work->rows_0x17C[work->scroll_0x024 + work->cursor_0x020];
 
-                            work->status_0x6248 = 0;
+                            work->layer_results_0x6244[1] = 0;
                             work->status_0x174 = 0;
                             setPatField854((PatInterface*)getInstance_(), row->id_0x00);
                             setPatField860((PatInterface*)getInstance_(), user->name_0x03);
@@ -1227,8 +2181,8 @@ void updateNetworkPatControl(void)
         dialog->timer_0x128++;
         switch (work->step_0x018) {
         case 0:
-            if (work->status_0x6248 != 0) {
-                if (work->status_0x6248 < 0) {
+            if (work->layer_results_0x6244[1] != 0) {
+                if (work->layer_results_0x6244[1] < 0) {
                     setErrorHappened(work);
                     return;
                 }
@@ -1283,7 +2237,7 @@ void updateNetworkPatControl(void)
                     work->fetch_timeouts_0xC37C[i] = get_server_big_data_timeout_element(i);
                 }
             }
-            work->status_0x628C = 0;
+            work->layer_results_0x6244[18] = 0;
             getNetworkLayerPat(getPatsObject(), 0)->requestServers_24(0x50);
             work->sub_state_0x017 = 0xB;
             dialog->timer_0x128 = 0;
@@ -1296,12 +2250,12 @@ void updateNetworkPatControl(void)
     }
     case 0xB:
         dialog->timer_0x128++;
-        if (work->status_0x628C != 0) {
+        if (work->layer_results_0x6244[18] != 0) {
             NetSrvRec* server;
             u32 i;
             s32 n;
 
-            if (work->status_0x628C < 0) {
+            if (work->layer_results_0x6244[18] < 0) {
                 setErrorHappened(work);
                 return;
             }
@@ -1474,7 +2428,7 @@ void updateNetworkPatControl(void)
                 }
                 work->field_0xA120[0] = work->cursor_0x01C;
                 work->field_0xA120[1] = work->cursor_0x020;
-                work->status_0x6290 = 0;
+                work->layer_results_0x6244[19] = 0;
                 getNetworkLayerPat(getPatsObject(), 0)->selectServer_28(server->id_0x00);
                 work->sub_state_0x017 = 0xF;
                 dialog->timer_0x128 = 0;
@@ -1514,10 +2468,10 @@ void updateNetworkPatControl(void)
 
         dialog->timer_0x128 = counter + 1;
         ai_npc_reaction_forward();
-        if (work->status_0x6290 != 0) {
+        if (work->layer_results_0x6244[19] != 0) {
             NetworkSmallObject id;
 
-            if (work->status_0x6290 < 0) {
+            if (work->layer_results_0x6244[19] < 0) {
                 failNetworkControl(work);
                 return;
             }
@@ -1595,7 +2549,7 @@ void updateNetworkPatControl(void)
                 setErrorHappened(work);
                 return;
             }
-            work->status_0xA15C = 0;
+            work->community_results_0xA144[1].words_0x00[0] = 0;
             getNetworkCommunityPat(getPatsObject(), 0)->requestNews_38();
             work->sub_state_0x017 = 0x13;
             dialog->timer_0x128 = 0;
@@ -1611,13 +2565,13 @@ void updateNetworkPatControl(void)
 
         dialog->timer_0x128 = counter + 1;
         ai_npc_reaction_forward();
-        if (work->status_0xA15C != 0) {
-            if (work->status_0xA15C < 0) {
+        if (work->community_results_0xA144[1].words_0x00[0] != 0) {
+            if (work->community_results_0xA144[1].words_0x00[0] < 0) {
                 setErrorCode(5);
                 setErrorHappened(work);
                 return;
             }
-            work->status_0xA1A4 = 0;
+            work->community_tail_0xA1A4[0] = 0;
             getNetworkCommunityPat(getPatsObject(), 0)->requestBlockList();
             work->sub_state_0x017 = 0x14;
             dialog->timer_0x128 = 0;
@@ -1633,15 +2587,15 @@ void updateNetworkPatControl(void)
 
         dialog->timer_0x128 = counter + 1;
         ai_npc_reaction_forward();
-        if (work->status_0xA1A4 != 0) {
-            if (work->status_0xA1A4 < 0) {
+        if (work->community_tail_0xA1A4[0] != 0) {
+            if (work->community_tail_0xA1A4[0] < 0) {
                 setErrorCode(5);
                 setErrorHappened(work);
                 return;
             }
             work->layer_state_0x064 = 0;
             if (isOnlineFlagClear() == 0) {
-                work->status_0xA18C = 0;
+                work->community_results_0xA144[3].words_0x00[0] = 0;
                 buildRosterSync(&work->roster_sync_0x61CC);
                 getNetworkCommunityPat(getPatsObject(), 0)->syncFriends(&work->roster_sync_0x61CC);
             }
@@ -1659,16 +2613,16 @@ void updateNetworkPatControl(void)
         dialog->timer_0x128 = counter + 1;
         ai_npc_reaction_forward();
         if (isOnlineFlagClear() == 0) {
-            if (work->status_0xA18C == 0) {
+            if (work->community_results_0xA144[3].words_0x00[0] == 0) {
                 break;
             }
-            if (work->status_0xA18C < 0) {
+            if (work->community_results_0xA144[3].words_0x00[0] < 0) {
                 setErrorCode(5);
                 setErrorHappened(work);
                 return;
             }
         }
-        work->status_0x6268 = 0;
+        work->layer_results_0x6244[9] = 0;
         getNetworkLayerPat(getPatsObject(), 0)->requestCities_48(0x28);
         work->sub_state_0x017 = 0x16;
         work->step_0x018 = 0;
@@ -1687,10 +2641,10 @@ void updateNetworkPatControl(void)
         case 0:
             if (work->substep_0x019 == 0) {
                 dialog->timer_0x128++;
-                if (work->status_0x6268 == 0) {
+                if (work->layer_results_0x6244[9] == 0) {
                     break;
                 }
-                if (work->status_0x6268 < 0) {
+                if (work->layer_results_0x6244[9] < 0) {
                     failNetworkControl(work);
                     return;
                 }
@@ -1756,7 +2710,7 @@ void updateNetworkPatControl(void)
                 work->chosen_city_0xA134 = work->cursor_0x020 + work->cursor_0x01C * work->per_page_0xA13C;
                 city = &list->entries_0x004[work->chosen_city_0xA134];
                 strcpy(work->account_name_0xC0C4, city->name_0x04);
-                work->status_0x6258 = 0;
+                work->layer_results_0x6244[5] = 0;
                 getNetworkLayerPat(getPatsObject(), 0)->selectCity_3C(city->id_0x00);
                 work->sub_state_0x017 = 0x17;
                 work->step_0x018 = 0;
@@ -1770,8 +2724,8 @@ void updateNetworkPatControl(void)
         }
         break;
     case 0x17:
-        if (work->status_0x6258 != 0) {
-            if (work->status_0x6258 < 0) {
+        if (work->layer_results_0x6244[5] != 0) {
+            if (work->layer_results_0x6244[5] < 0) {
                 failNetworkControl(work);
                 work->account_name_0xC0C4[0] = 0;
                 return;
@@ -1783,15 +2737,15 @@ void updateNetworkPatControl(void)
             work->flag_0x82C4 = 0;
             work->flag_0x82C5 = 0;
             work->flag_0x82C7 = 0;
-            work->field_0x82C8 = 0;
+            work->flag_0x82C8 = 0;
             work->screen_0xC150 = 4;
             clearRefreshTimeout();
             return;
         }
         break;
     case 0x18:
-        if (work->status_0x6258 != 0) {
-            if (work->status_0x6258 < 0) {
+        if (work->layer_results_0x6244[5] != 0) {
+            if (work->layer_results_0x6244[5] < 0) {
                 setErrorHappened(work);
                 return;
             }
@@ -1807,20 +2761,20 @@ void updateNetworkPatControl(void)
     case 0x1F:
         switch (work->step_0x018) {
         case 0:
-            if (work->status_0xA18C != 0) {
-                if (work->status_0xA18C < 0) {
+            if (work->community_results_0xA144[3].words_0x00[0] != 0) {
+                if (work->community_results_0xA144[3].words_0x00[0] < 0) {
                     setErrorCode(5);
                     setErrorHappened(work);
                 } else {
-                    work->status_0xA174 = 0;
+                    work->community_results_0xA144[2].words_0x00[0] = 0;
                     startRosterFetch(0);
                     work->step_0x018 = 1;
                 }
             }
             break;
         case 1:
-            if (work->status_0xA174 != 0) {
-                if (work->status_0xA174 < 0) {
+            if (work->community_results_0xA144[2].words_0x00[0] != 0) {
+                if (work->community_results_0xA144[2].words_0x00[0] < 0) {
                     setErrorCode(5);
                     setErrorHappened(work);
                 } else {
@@ -1883,7 +2837,7 @@ void updateNetworkPatControl(void)
                 case 0:
                     work->flag_0x82C7 = 1;
                     work->link_state_0xC0BC = 0;
-                    work->status_0x62D0 = 0;
+                    work->layer_results_0x6244[35] = 0;
                     getNetworkLayerPat(getPatsObject(), 0)->requestAccount_84(0x20);
                     /* fallthrough */
                 case 1:
@@ -1894,7 +2848,7 @@ void updateNetworkPatControl(void)
                 default:
                     if (work->flag_0x82C4 == 0) {
                         work->flag_0x82C4 = 1;
-                        startShutdownTimer();
+                        requestCircleList();
                     }
                     break;
                 }
@@ -1933,7 +2887,7 @@ void updateNetworkPatControl(void)
             work->flag_0x82C4 = 0;
             work->flag_0x82C5 = 0;
             work->flag_0x82C7 = 0;
-            work->field_0x82C8 = 0;
+            work->flag_0x82C8 = 0;
             lb_quest_board_reset(0, 0);
             return;
         }
@@ -1964,7 +2918,7 @@ void updateNetworkPatControl(void)
                             clearPhaseSlot(0x12);
                             getNetworkSessionManagerPat(getPatsObject(), 0)->request412((u32)entry->name_0x04, entry->value_0x4C, slot);
                         } else {
-                            work->status_0x6280 = 0;
+                            work->layer_results_0x6244[15] = 0;
                             getNetworkLayerPat(getPatsObject(), 0)->sendMessage_64(entry->name_0x04, entry->value_0x4C, 1, entry->flags_0x03);
                         }
                     }
@@ -1990,7 +2944,7 @@ void updateNetworkPatControl(void)
         if ((pressed & 0x10) != 0) {
             sysSE_req(0);
             work->sub_error_0xC259 = 0;
-            work->status_0x628C = 0;
+            work->layer_results_0x6244[18] = 0;
             getNetworkLayerPat(getPatsObject(), 0)->requestServers_24(0x50);
             work->sub_state_0x017 = 0xB;
             dialog->timer_0x128 = 0;
@@ -2035,7 +2989,7 @@ void updateNetworkPatControl(void)
         work->dialog_0xBF30 = work->create_dialog_0xC25C(work);
         allocateDialogRecord();
         work->mode_0x010 = 2;
-        work->status_0x628C = 0;
+        work->layer_results_0x6244[18] = 0;
         getNetworkLayerPat(getPatsObject(), 0)->requestServers_24(0x50);
         work->sub_state_0x017 = 0xB;
         dialog->timer_0x128 = 0;
@@ -2050,7 +3004,7 @@ void updateNetworkPatControl(void)
         case 0:
             setTransferMode(0);
             if (NetCtrlWk::isSessionManagerReady() == 1) {
-                work->flag_0x098 = 0;
+                work->results_0x078[8] = 0;
                 clearPhaseSlot(0x20);
                 getNetworkSessionManagerPat(getPatsObject(), 0)->request444();
                 work->step_0x018++;
@@ -2082,13 +3036,13 @@ void updateNetworkPatControl(void)
             break;
         case 4:
             if (getNetworkCommunityPat(getPatsObject(), 0) != NULL) {
-                work->status_0xA14C = 0;
+                work->community_results_0xA144[0].words_0x00[2] = 0;
                 getNetworkCommunityPat(getPatsObject(), 0)->shutdown_20();
             }
             work->step_0x018++;
             return;
         case 5:
-            if (getNetworkCommunityPat(getPatsObject(), 0) == NULL || work->status_0xA14C != 0) {
+            if (getNetworkCommunityPat(getPatsObject(), 0) == NULL || work->community_results_0xA144[0].words_0x00[2] != 0) {
                 if (getNetworkSessionManagerPat(getPatsObject(), 0) != NULL) {
                     clearPhaseSlot(2);
                     getNetworkSessionManagerPat(getPatsObject(), 0)->request368();
@@ -2100,7 +3054,7 @@ void updateNetworkPatControl(void)
         case 6:
             if (getNetworkSessionManagerPat(getPatsObject(), 0) == NULL || isPhaseSlotDone(2) != 0) {
                 if (getNetworkLayerPat(getPatsObject(), 0) != NULL) {
-                    work->status_0x624C = 0;
+                    work->layer_results_0x6244[2] = 0;
                     getNetworkLayerPat(getPatsObject(), 0)->shutdown_20();
                 }
                 work->step_0x018++;
@@ -2108,7 +3062,7 @@ void updateNetworkPatControl(void)
             }
             break;
         case 7:
-            if (getNetworkLayerPat(getPatsObject(), 0) == NULL || work->status_0x624C != 0) {
+            if (getNetworkLayerPat(getPatsObject(), 0) == NULL || work->layer_results_0x6244[2] != 0) {
                 work->step_0x018++;
                 return;
             }
@@ -2164,7 +3118,7 @@ void updateNetworkPatControl(void)
         loadPatInterfaceBuffers();
         clearNetworkPat(getPatsObject());
         resetPatInterfaces();
-        work->reset_0x000 = 0;
+        work->pats_0x000 = NULL;
         work->flag_0xBF2C = 2;
         system_w.field_0x86b = 0;
         resetSystemState(&system_w);
@@ -2612,7 +3566,7 @@ BOOL NetCtrlWk::loadPeerCard(NetPlayerCard* card, u8 slot)
     if (profile == NULL) {
         return FALSE;
     }
-    slot_id = &profile->ids_0x0B0[slot].id_0x00;
+    slot_id = &profile->members_0x090[slot].id_0x20;
     peer = work->peers_0x7488;
     for (i = 0; i < 4; i++, peer++) {
         if (isSameNetId(slot_id, &peer->id_0x00) == 1) {
@@ -4595,4 +5549,419 @@ void NetTextTagState::parseTag(void)
     }
     cursor_0x308++;
 }
+
+/* The message tags `applyTextTag` recognises (`.data` 0x80603CB8), indexed by `NetTextTagState::tag_id_0x30E`. */
+const char* text_tag_names[11] = {
+    "DUMMY", "BODY", "SIZE", "COLOR", "BR", "CENTER", "LEFT", "RIGHT", "END", "LF", "C",
+};
+
+/* The text colour of each colour index (`.data` 0x80603D10) and the font size of each size index (0x80603D20). */
+u8 text_color_index_table[16] = {
+    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x04, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07,
+};
+s16 text_font_size_table[16] = {
+    0x0C, 0x0E, 0x10, 0x12, 0x14, 0x16, 0x1A, 0x1E, 0x22, 0x26, 0x2C, 0x30, 0x34, 0x3A, 0x34, 0x42,
+};
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/*
+ * Applies the tag `parseTag` just read to the run being filled: its flag bit, and the size, colour or
+ * line-feed digit it carries.
+ */
+void applyTextTag(NetTextTagState* state)
+{
+    s32 i;
+    u8 digit;
+    char scratch[8];
+
+    for (i = 0; i < 11; i++) {
+        if (findSubstring(state->tag_0x2D8, text_tag_names[i]) != NULL) {
+            break;
+        }
+    }
+    switch (i) {
+    case 1:
+        state->run_0x2F8->flags_0x04 |= 1;
+        state->mode_0x30C = 1;
+        break;
+    case 4:
+        state->run_0x2F8->flags_0x04 |= 8;
+        state->mode_0x30C = 2;
+        break;
+    case 5:
+        state->run_0x2F8->flags_0x04 |= 0x10;
+        break;
+    case 6:
+        state->run_0x2F8->flags_0x04 |= 0x20;
+        break;
+    case 7:
+        state->run_0x2F8->flags_0x04 |= 0x40;
+        break;
+    case 8:
+        state->run_0x2F8->flags_0x04 |= 0x80;
+        break;
+    case 2:
+        state->run_0x2F8->flags_0x04 |= 2;
+        digit = state->tag_0x2D8[5];
+        if ((u8)(digit - '0') <= 9) {
+            state->run_0x2F8->size_0x09 = digit - '0';
+        } else if ((u8)(digit - 'a') <= 5) {
+            state->run_0x2F8->size_0x09 = digit - 'a' + 10;
+        } else {
+            state->run_0x2F8->size_0x09 = digit - 'A' + 10;
+        }
+        if (state->run_0x2F8->size_0x09 > 15) {
+            state->run_0x2F8->size_0x09 = 5;
+        }
+        break;
+    case 3:
+        memset(scratch, 0, sizeof(scratch));
+        state->run_0x2F8->flags_0x04 |= 4;
+        digit = state->tag_0x2D8[6];
+        if ((u8)(digit - '0') <= 9) {
+            state->run_0x2F8->color_0x08 = digit - '0';
+        } else if ((u8)(digit - 'a') <= 5) {
+            state->run_0x2F8->color_0x08 = digit - 'a' + 10;
+        } else {
+            state->run_0x2F8->color_0x08 = digit - 'A' + 10;
+        }
+        if (state->run_0x2F8->color_0x08 > 15) {
+            state->run_0x2F8->color_0x08 = 7;
+        }
+        break;
+    case 10:
+        memset(scratch, 0, sizeof(scratch));
+        state->run_0x2F8->flags_0x04 |= 4;
+        digit = state->tag_0x2D8[2];
+        if ((u8)(digit - '0') <= 9) {
+            state->run_0x2F8->color_0x08 = digit - '0';
+        } else if ((u8)(digit - 'a') <= 5) {
+            state->run_0x2F8->color_0x08 = digit - 'a' + 10;
+        } else {
+            state->run_0x2F8->color_0x08 = digit - 'A' + 10;
+        }
+        if (state->run_0x2F8->color_0x08 > 15) {
+            state->run_0x2F8->color_0x08 = 7;
+        }
+        break;
+    case 9:
+        state->run_0x2F8->flags_0x04 |= 0x100;
+        state->run_0x2F8->lines_0x0A = state->tag_0x2D8[3] - '0';
+        if (state->run_0x2F8->lines_0x0A > 9) {
+            state->run_0x2F8->lines_0x0A = 9;
+        }
+        state->mode_0x30C = 2;
+        break;
+    }
+    state->tag_id_0x30E = i;
+}
+
+/*
+ * Consumes the tags at the cursor (a `<` not escaped by `\`), stopping after a tag that breaks the run.
+ */
+void parseTextTags(NetTextTagState* state)
+{
+    if (*state->cursor_0x308 == '\\' || *state->cursor_0x308 != '<') {
+        return;
+    }
+    do {
+        if (getUtf8CharLength((u8*)state->cursor_0x308) != 1 || *(u8*)state->cursor_0x308 != '<') {
+            return;
+        }
+        state->cursor_0x308++;
+        state->parseTag();
+        applyTextTag(state);
+    } while ((state->run_0x2F8->flags_0x04 & 0x188) == 0);
+}
+
+/*
+ * Splits the text at the cursor into runs (at most 30): tags start new runs, characters extend the last
+ * one, and the line's printed width is counted as it goes.
+ */
+void layoutTextRuns(NetTextTagState* state)
+{
+    u8 tag;
+    u8 runs;
+    s32 length;
+    u16 width;
+    char glyph[20];
+
+    memset(state, 0, sizeof(state->runs_0x000));
+    state->run_0x2F8 = state->runs_0x000;
+    state->last_0x2FC = state->runs_0x000;
+    tag = 0;
+    state->width_0x312 = tag;
+    state->tag_id_0x30E = tag;
+    runs = 0;
+    while (tag != 4 && tag != 8 && tag != 9) {
+        char* next;
+
+        if (runs > 30) {
+            state->status_0x30D = 1;
+            return;
+        }
+        next = flKnjMsgNumPtr(state->cursor_0x308, 8);
+        if (next != NULL) {
+            u32 count = next - state->cursor_0x308;
+            u32 i;
+
+            memset(glyph, 0, sizeof(glyph));
+            for (i = 0; i < count; i++) {
+                glyph[i] = (s32)state->cursor_0x308[i];
+            }
+            length = getUtf8CharLength((u8*)glyph);
+            width = getGlyphWidth(glyph);
+        } else {
+            length = getUtf8CharLength((u8*)state->cursor_0x308);
+            width = getGlyphWidth(state->cursor_0x308);
+        }
+        if (length == 1) {
+            if (*state->cursor_0x308 == 0) {
+                state->status_0x30D = 1;
+                return;
+            }
+            state->tag_id_0x30E = tag;
+            parseTextTags(state);
+            if (state->tag_id_0x30E == 0) {
+                u16 line = ++state->width_0x312;
+
+                if (*state->cursor_0x308 == '\\') {
+                    state->cursor_0x308++;
+                    state->run_0x2F8->flags_0x04 = 1;
+                    state->run_0x2F8->text_0x00 = state->cursor_0x308;
+                    state->run_0x2F8->length_0x0B = 1;
+                    state->last_0x2FC = state->run_0x2F8;
+                    state->run_0x2F8 = state->last_0x2FC + 1;
+                    runs++;
+                } else {
+                    if (*state->cursor_0x308 == '\n') {
+                        state->width_0x312 = line - 1;
+                    }
+                    state->cursor_0x308++;
+                    state->last_0x2FC->length_0x0B++;
+                }
+                continue;
+            }
+            if (state->tag_id_0x30E == 8 || state->tag_id_0x30E == 4 || state->tag_id_0x30E == 9) {
+                if (state->status_0x30D != 2 && state->tag_id_0x30E == 8) {
+                    state->status_0x30D = 1;
+                }
+                return;
+            }
+            if (*state->cursor_0x308 == '\\') {
+                state->cursor_0x308++;
+                state->run_0x2F8->length_0x0B = 1;
+                state->width_0x312++;
+            } else {
+                state->run_0x2F8->length_0x0B = tag;
+            }
+            state->run_0x2F8->text_0x00 = state->cursor_0x308;
+            state->last_0x2FC = state->run_0x2F8;
+            state->run_0x2F8 = state->last_0x2FC + 1;
+            runs++;
+            continue;
+        }
+        if (state->mode_0x30C == 2) {
+            state->mode_0x30C = 1;
+            state->run_0x2F8->flags_0x04 = 1;
+            state->run_0x2F8->text_0x00 = state->cursor_0x308;
+            state->run_0x2F8->length_0x0B = tag;
+            state->last_0x2FC = state->run_0x2F8;
+            state->run_0x2F8 = state->last_0x2FC + 1;
+        }
+        if (length == 0) {
+            length = 1;
+            width = 1;
+        }
+        state->cursor_0x308 += length;
+        state->last_0x2FC->length_0x0B += (u8)length;
+        state->width_0x312 += width;
+    }
+}
+
+#ifdef __cplusplus
+}
+#endif
+
+/*
+ * Lays out and prints an error message at (x, y) in the work record's text-layout block, line by line;
+ * returns the pen's final y (0 without a work record, a layout block or a valid first character).
+ */
+s16 MH3DispErrorString(s16 x, s16 y, s8* text)
+{
+    NetTextTagState* state;
+    s32 i;
+
+    if (net_ctrl_wk == NULL) {
+        return 0;
+    }
+    state = net_ctrl_wk->text_layout_0xC144;
+    if (state == NULL) {
+        return 0;
+    }
+    if (getUtf8CharLength((u8*)text) != 1) {
+        return 0;
+    }
+    state->pen_x_0x304 = x;
+    state->pen_y_0x306 = y;
+    state->origin_x_0x300 = x;
+    state->origin_y_0x302 = y;
+    state->color_0x310 = 7;
+    state->size_0x311 = 4;
+    state->align_0x30F = 6;
+    state->cursor_0x308 = (char*)text;
+    state->mode_0x30C = 0;
+    state->status_0x30D = 0;
+    setTextColor(7);
+    font_set_size(18, 18);
+    for (i = 0; i < 26; i++) {
+        layoutTextRuns(state);
+        drawTextRuns(state, 0, 0);
+        if (state->status_0x30D != 0) {
+            break;
+        }
+    }
+    setTextColor(7);
+    font_set_size(18, 18);
+    return state->pen_y_0x306;
+}
+
+/*
+ * The localized message for network error `code` (code 0's message when it is out of range).
+ */
+char* MH3GetErrorString2(s32 code)
+{
+    char** table = net_err_msg_tbl_adrs;
+
+    if (code >= net_err_msg_num) {
+        code = 0;
+    }
+    return table[code];
+}
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/*
+ * Copies the work record's network settings (name, support code, Pat settings, terms version and the save
+ * words) into the network save record.
+ */
+void exportNetworkSave(NetSaveRecord* save)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+
+    memcpy(save->name_0x68, work->save_name_0xC1D3, sizeof(save->name_0x68));
+    memcpy(save->support_code_0x48, work->support_code_0xC1DE, sizeof(save->support_code_0x48));
+    copyPatSettings(&save->settings_0x08, &work->pat_settings_0xC208);
+    save->terms_version_0x04 = work->terms_version_0xC200;
+    save->byte_0x73 = (s32)work->save_byte_0xC204;
+    save->words_0x78[0] = work->save_words_0xC248[0];
+    save->words_0x78[1] = work->save_words_0xC248[1];
+    save->words_0x78[2] = work->save_words_0xC248[2];
+    save->words_0x78[3] = work->save_words_0xC248[3];
+}
+
+/*
+ * Copies one Pat settings block.
+ */
+void copyPatSettings(PatSettings* dst, const PatSettings* src)
+{
+    *dst = *src;
+}
+
+/*
+ * Restores the work record's network settings from the network save record.
+ */
+void importNetworkSave(const NetSaveRecord* save)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+
+    memcpy(work->save_name_0xC1D3, save->name_0x68, sizeof(work->save_name_0xC1D3));
+    memcpy(work->support_code_0xC1DE, save->support_code_0x48, sizeof(work->support_code_0xC1DE));
+    copyPatSettings(&work->pat_settings_0xC208, &save->settings_0x08);
+    work->terms_version_0xC200 = save->terms_version_0x04;
+    work->save_byte_0xC204 = save->byte_0x73;
+    work->save_words_0xC248[0] = save->words_0x78[0];
+    work->save_words_0xC248[1] = save->words_0x78[1];
+    work->save_words_0xC248[2] = save->words_0x78[2];
+    work->save_words_0xC248[3] = save->words_0x78[3];
+}
+
+/*
+ * Derives the two transfer flags from the system's transfer mode bytes, hands them to the mediator and
+ * applies the transfer mode.
+ */
+void applyTransferSettings(void)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+
+    if (system_w.transfer_mode_0xa50 == 1) {
+        if (system_w.transfer_level_0xa52 == 0) {
+            work->transfer_flag_0x7990 = 1;
+        } else {
+            work->transfer_flag_0x7990 = 0;
+        }
+        work->transfer_flag_0x7991 = 0;
+    } else {
+        work->transfer_flag_0x7990 = 1;
+        work->transfer_flag_0x7991 = 1;
+    }
+    setMediatorTransferFlag6DD2(getInstance(), work->transfer_flag_0x7990);
+    setMediatorTransferFlag6DD1(getInstance(), work->transfer_flag_0x7991);
+    setTransferMode(system_w.transfer_mode_0xa50);
+}
+
+/*
+ * Takes the system's transfer level, re-derives the first transfer flag from it and hands the flag and the
+ * level to the mediator.
+ */
+void applyTransferLevel(void)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+
+    work->transfer_level_0x7993 = system_w.transfer_level_0xa52;
+    if (work->transfer_level_0x7993 == 0 || system_w.transfer_mode_0xa50 == 0) {
+        work->transfer_flag_0x7990 = 1;
+    } else {
+        work->transfer_flag_0x7990 = 0;
+    }
+    setMediatorTransferFlag6DD2(getInstance(), work->transfer_flag_0x7990);
+    setMediatorTransferLevel(getInstance(), system_w.transfer_level_0xa52);
+}
+
+/*
+ * Switches the transfer mode while a terms update runs: on (1) only once the layer is past its first state
+ * (else it switches off instead), off otherwise; the mediator, the work record and the sound/system bands are
+ * told the mode.
+ */
+void setTransferMode(u32 mode)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+
+    if (isTermsUpdateRunning() == 1) {
+        if (mode == 1) {
+            if (work->layer_state_0x064 > 1) {
+                setMediatorTransferMode(getInstance(), system_w.transfer_mode_0xa50);
+                work->flag_0xC49D = system_w.transfer_mode_0xa50;
+                setStreamTransferMode(system_w.transfer_mode_0xa50);
+                setTransferDisplayState(system_w.transfer_mode_0xa50);
+            } else {
+                setTransferMode(0);
+            }
+        } else {
+            setMediatorTransferMode(getInstance(), 0);
+            work->flag_0xC49D = 0;
+            setStreamTransferMode(0);
+            setTransferDisplayState(0);
+        }
+    }
+}
+
+#ifdef __cplusplus
+}
+#endif
 

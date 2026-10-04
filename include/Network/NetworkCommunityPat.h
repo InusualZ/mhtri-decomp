@@ -21,10 +21,14 @@ typedef struct NetId NetId;
 /* The roster block `NetCtrlWk::roster_sync_0x61CC` holds (defined by the work record header). */
 struct NetRosterSync;
 
-class NetworkCommunityPat {
+class NetworkCommunityPat {   /* size: 0x25EC (the allocation `initNetworkPatControl` makes for it) */
 public:
+    /* 0x803F02C4 - builds the community layer (defined by the owner's range; declared so `new` can name the
+     * class). */
+    NetworkCommunityPat();
+
     /* +0x08 */ virtual void pad_08();
-    /* +0x0C */ virtual void pad_0C();
+    /* +0x0C */ virtual void setReflectCallback(u32 callback, u32 user);   /* the reflect callback and its user word */
     /* +0x10 */ virtual void pad_10();
     /* +0x14 */ virtual void pad_14();
     /* +0x18 */ virtual void pad_18();
@@ -49,6 +53,8 @@ public:
     void acceptFriendRequest(const NetId* id);
     /* 0x803F1324 - requests the block list (once). */
     void requestBlockList(void);
+
+    /* +0x0004 */ u8 pad_0004[0x25E8];
 };
 
 /* Declarations moved here from `include/unsplit/Network.h, NetworkStream.h` (docs/plan.md 6.5 rule 2: the owner declares). */

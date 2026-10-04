@@ -305,11 +305,11 @@ extern "C" const f32 lbl_8079BC68; /* -400.0f */
 #include "sys_mem.h"
 
 
-/* The shared `.bss` lobby state block `lbl_806BF530` (0x806BF530, 0x2EB8 B): this unit reads its
+/* The shared `.bss` lobby state block `lobby_state_block` (0x806BF530, 0x2EB8 B): this unit reads its
  * `+0x03` quest-active byte, and the lobby's `lb_npc.cpp` reads the same byte.  Its own home is the
  * unclaimed `.bss` blob, so the declaration stays here until a unit owns the block (rule 2's unsplit
  * case, like `lbl_806BE340`). */
-extern u8 lbl_806BF530[];
+extern u8 lobby_state_block[];
 /* The shared `.bss` quest-page block (0x806BE340, ten 0x130-byte records) whose +0x03 byte
  * `em020_quest_page_ptr` returns the address of; declared by its owner's leaf header. */
 #include "lobby/lbl_806BE340.h"
@@ -842,14 +842,14 @@ void em020_unknown_flag_set(u8 value)
  * 0x8037583C */
 u32 em020_quest_active_ck(void)
 {
-    return lbl_806BF530[3] == 1;
+    return lobby_state_block[3] == 1;
 }
 
 /* Clears the shared lobby block's `+0x03` quest-active byte.
  * 0x80375858 */
 void em020_quest_active_clear(void)
 {
-    lbl_806BF530[3] = 0;
+    lobby_state_block[3] = 0;
 }
 
 /* Clears the nine quest-page records after the first in the shared quest-page block.
@@ -867,7 +867,7 @@ void em020_quest_pages_clear(void)
  * 0x80378F7C */
 u8* em020_row_ptr(u8 index)
 {
-    u8* rows = lbl_806BF530 + 0x13E6;
+    u8* rows = lobby_state_block + 0x13E6;
     return rows + index * 31;
 }
 
