@@ -1,103 +1,29 @@
 #!/usr/bin/env python3
-"""Independent verification for a landed batch: registration completeness, a per-symbol re-measure
-that does not read the report it audits, and split-target-object drift.
-
-Three failures got through the previous gate, and each of them has a check here.
-
-1. **A unit registered in name only.**  `hud/fn_80334568`'s source was committed while its
-   `configure.py` `Object(...)` line and its `splits.txt` block were left in the index, so the unit
-   existed as a file and *not* in the build.  `ninja build/RMHE08/ok` stayed green because a
-   `NonMatching` object is never linked, and the compile gate could not see it either: a unit with no
-   `configure.py` line has no `build/RMHE08/src/<unit>.o` target to scope `ninja -k 0` to.
-   `registration_problems` refuses it: every batch unit must have (a) an `Object(...)` line, (b) a
-   `splits.txt` block, and (c) an object target in the build graph.
-
-2. **A measurement taken on trust.**  The regression gate reads `build/RMHE08/report.json`, the very
-   file the batch was measured against - so a stale or wrong report is invisible to it.  The one lane
-   that did it right (the 8031A6C0 merger) re-derived everything: both objects bit-identical, the
-   split target object unchanged pre/post merge, and all 26 symbols re-scored from the objects.
-   `verify_units` is that independent path: it re-runs `objdiff report generate` itself over the
-   target/candidate objects and compares the result symbol-for-symbol against `report.json`, and it
-   reads the objects directly to check the score against the bytes.  `target_drift_problems` adds the
-   merger's strongest form: a `splits.txt` change that re-ranges a neighbour moves that neighbour's
-   split target object, and a neighbour the batch does not name is refused rather than assumed
-   harmless.
-
-3. **A measuring tool that lied.**  `recompile.py --measure` understated every score for months
-   because it left ninja's chained `objalign` argument relative.  `measure.py`'s selftest is the
-   pattern copied here: the independent run cross-checks against `report generate`'s own output (and
-   against the raw object bytes) instead of trusting itself, and `verifyunit_selftest.py` pins each
-   check against a fixture that must refuse.
-
-## which `objdiff-verify` (SKILL.md) checks the gate now performs
-
-The gate (through this module) now covers these documented checks; they no longer need to stay manual:
-
-* **§1/§3 rebuild the unit** - the compile gate (`ninja -k 0`, scoped) is the rebuild; this module
-  then re-runs `report generate` over the freshly built object pair.
-* **§4.5 a symbol present on one side but absent from the other is a mismatch** - `size_gap_problems`
-  names every symbol present on both sides that objdiff declines to pair (a >50 % size gap), which is
-  exactly the row that otherwise reads as untouched.
-* **§5.1 sizes first** - a symbol the report scores 100 % but whose sizes differ is refused
-  (`symbol_problems`).
-* **§5.2 per-symbol, and a function with no `fuzzy_match_percent` key is 0 %, not 100 %** -
-  `_score()` reads an absent key as 0, and `arithmetic_crosscheck` proves that reading by reproducing
-  the unit's `fuzzy_match_percent` from its listed partials; a mismatch refuses.
-* **§5.3 cross-check the arithmetic** - `arithmetic_crosscheck` is that identity.
-* **§5.4 data/byte content, not just size** - `raw_symbol_rows` byte-compares every symbol, so a
-  report 100 % whose bytes differ refuses even when the size matches.
-* **a dtk-generated row name is resolved by ADDRESS, not by name** - `dol split` names a range it
-  cannot attribute `pad_*`/`auto_*` (the TRK interrupt vectors have no function prologue, so the
-  target object carries `pad_00_80004380_init` for the bytes the map calls
-  `gTRKInterruptVectorTable`, and the label cannot win: an extent on it makes `dtk dol split` fail on
-  the overlap). objdiff pairs by name, so such a row is never paired and *no* report can score it -
-  the row is matched to our symbol at the same section+offset and judged by its bytes, which is what
-  it actually claims. Related, and the reason that byte rule is load-bearing rather than decorative:
-  `Object(Matching, ...)` sets `metadata.complete` in `objdiff.json`, and objdiff-cli then pins that
-  unit's completion percent at 100 **while still running its per-symbol diff** (measured 2026-09-28: a
-  corrupted `.init` object keeps `complete_code_percent` at 100.0 while its fuzzy percentage falls), so
-  the completion field of a Matching unit's report row is a claim the objects themselves must back.
-* **§7 a report number that disagrees with an object diff is a stale report** - `verify_units`'
-  symbol-for-symbol comparison of a *fresh* `report generate` against the committed `report.json`.
-* **the merger's regression proof (`.pi/notes/8031a6c0-fn-8031a6c0-e199.md`)** - per-symbol
-  reproduction from the objects plus split-target-object pre/post comparison.
-
-Still manual (deliberately not in the gate): naming/home decisions (§2), the symbol→unit lookup
-(§4 preamble - it greps `symbols.txt`), the instruction-level `diff_kind` reading (§4.3 - diagnostic,
-not a score), the flag hypotheses from `extab`/`.comment` (§5.5-5.6 - a hunch must not refuse a
-batch), and the write-up (§6).
-
-    python tools/units/verifyunit.py <unit> [<unit> ...]        # manual run against this tree
-"""
+"""Independent verification for a batch: registration (3 axes), a per-symbol re-measure that does not read the report
+it audits, size-gap rows and split-target drift. Spec: docs/tools/spec/verifyunit.md. CLI: verifyunit.py <unit>...
+[--main M]."""
 
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
-import hashlib
 import json
 import os
 import re
 import subprocess
-import sys
 import tempfile
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-if HERE not in sys.path:
-    sys.path.insert(0, HERE)
-if os.path.dirname(HERE) not in sys.path:
-    sys.path.insert(0, os.path.dirname(HERE))
-
-import measure as ms  # noqa: E402
-import unitutil  # noqa: E402
-from tools.lib import project as _project  # noqa: E402  (the configure / splits readers)
-from tools.lib import report as _report  # noqa: E402  (the 0 % rule, the arithmetic identity)
-from tools.lib import units as _units  # noqa: E402  (the unit spellings)
+from tools import unitutil
+from tools.lib import objcompare
+from tools.lib import project as _project  # the configure / splits readers
+from tools.lib import report as _report  # the 0 % rule, the arithmetic identity
+from tools.lib import units as _units  # the unit spellings
+from tools.units import measure as ms  # the fresh `report generate` (`score_report`)
 
 # one or more ninja outputs before the `:`, e.g. `build build\RMHE08\src\hud\fn_80334568.o: mwcc_sjis`
 _NINJA_BUILD_RE = re.compile(r"^build\s+(.+?):", re.M)
 # objdiff declines to pair a symbol whose one side is more than 50 % smaller than the other.
-OBJDIFF_SIZE_GAP = 1.5
+OBJDIFF_SIZE_GAP = objcompare.OBJDIFF_SIZE_GAP
 ARITH_TOL = _report.ARITH_TOL
 
 
@@ -210,50 +136,7 @@ def registration_check(main: str, units: list[str]) -> tuple[bool, str]:
 # 2a. split target-object drift (the merger's strongest form)
 # --------------------------------------------------------------------------------------------------
 
-def sha256_file(path: str) -> str:
-    h = hashlib.sha256()
-    with open(path, "rb") as fh:
-        for chunk in iter(lambda: fh.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
-
-
-# The two sections a symbol *rename* rewrites and a `splits.txt` re-range does not: the string tables a
-# rename touches by definition. Measured 2026-09-26 on `worker/803250b0-fn-803250b0-2a24`, whose 18
-# renames moved a neighbour's object hash without re-ranging anything: `extab`, `extabindex`, `.text`,
-# `.relaextabindex`, `.rela.text`, `.comment`, `.note.split` and `.shstrtab` were byte-identical and
-# only `.symtab`/`.strtab` differed - the renamed callees are *undefined* in that object, and dtk does
-# not reorder the symbol table on a rename (`.rela.text` was byte-identical too, so the relocation
-# symbol indices did not move either).
-_RENAME_FREE_SECTIONS = (".symtab", ".strtab")
-
-
-def target_object_fingerprint(path: str) -> str:
-    """A rename-insensitive content fingerprint of a split target object.
-
-    The drift check must catch a `splits.txt` change that re-ranged a unit the batch does not name,
-    and must not fire when the batch renamed symbols: a cross-unit rename legitimately rewrites the
-    symbol table of every unit that references the renamed name, and the map diff for it is already in
-    the batch. So the hash covers every section except the two string tables (name, size and content),
-    plus the defined symbols' geometry - `(value, size, type, section)` with the names dropped. A
-    re-range moves bytes or addresses; a rename moves neither, which is the whole point of the split.
-
-    A file that cannot be read as an ELF object falls back to its raw hash, so an unreadable object
-    that changed is still drift rather than a crash.
-    """
-    try:
-        secs, syms = unitutil.read_elf(path)
-    except Exception:                                            # not an ELF (or truncated): raw hash
-        return "raw:" + sha256_file(path)
-    h = hashlib.sha256()
-    for sec in secs:
-        if sec["sname"] in _RENAME_FREE_SECTIONS:
-            continue
-        h.update(("%s\0%08x\0" % (sec["sname"], sec["size"])).encode())
-        h.update(sec["data"])
-    for geom in sorted((v, size, typ, shndx) for _n, v, size, typ, shndx in syms):
-        h.update(("|%08x/%08x/%d/%d" % geom).encode())
-    return h.hexdigest()
+target_object_fingerprint = objcompare.fingerprint   # rename-insensitive: string tables skipped, names dropped
 
 
 def target_object_snapshot(main: str) -> dict[str, str | None]:
@@ -315,26 +198,7 @@ def target_drift_problems(before: dict[str, str | None], after: dict[str, str | 
 # 2b/3. the independent per-symbol re-measure
 # --------------------------------------------------------------------------------------------------
 
-def symbol_locations(path: str) -> dict[str, tuple[str, int, int, bytes]]:
-    """`{symbol_name: (section, offset, size, bytes)}` for an ELF object - functions and data alike.
-
-    The raw side of the comparison: it never touches objdiff or the report. The **section and offset**
-    are what let a symbol be found by ADDRESS rather than by name (`raw_symbol_rows`), which a
-    dtk-generated name makes necessary. A duplicate name keeps the first definition (the map can carry
-    aliases); a symbol the object does not define (section index 0, or an absolute/section index) is
-    skipped.
-    """
-    secs, syms = unitutil.read_elf(path)
-    out: dict[str, tuple[str, int, int, bytes]] = {}
-    for name, val, size, _typ, shndx in syms:
-        if name in out:
-            continue
-        try:
-            sec = secs[shndx]
-        except (IndexError, TypeError):
-            continue
-        out[name] = (sec["sname"], val, size, bytes(sec["data"][val:val + size]))
-    return out
+symbol_locations = objcompare.symbol_locations   # {name: (section, offset, size, bytes)}, no objdiff involved
 
 
 def object_symbols(path: str) -> dict[str, tuple[int, bytes]]:
@@ -342,59 +206,7 @@ def object_symbols(path: str) -> dict[str, tuple[int, bytes]]:
     return {n: (size, data) for n, (_sec, _off, size, data) in symbol_locations(path).items()}
 
 
-def _same_place(locations: dict[str, tuple[str, int, int, bytes]],
-                section: str, offset: int) -> list[tuple[str, int, bytes]]:
-    """Candidate symbols that start exactly at `(section, offset)`, best first.
-
-    Best first = the extent that can actually be compared: a symbol with no bytes (a section symbol,
-    or a sizeless map label like the `gTRKInterruptVectorTable` that sits at the same offset as the
-    `pad_` symbol dtk generated for it) is never chosen while a real one is available, and the caller
-    pulls the equal-size symbol forward before falling back to a differently-shaped one.
-    """
-    return [(n, size, data) for n, (sec, off, size, data) in locations.items()
-            if sec == section and off == offset and size > 0]
-
-
-def raw_symbol_rows(target_obj: str, candidate_obj: str) -> dict[str, dict]:
-    """Per symbol: both sizes, both presences, whether the bytes are identical, and how ours was found.
-
-    A row is keyed by the **target object's** symbol name, because that is the name objdiff lists and
-    the name `report.json` is quoted by. For a range dtk cannot attribute, that name is dtk's own
-    generated one: the analyzer finds no function prologue in the TRK interrupt vectors, so its target
-    object carries `pad_00_80004380_init` for bytes the map names `gTRKInterruptVectorTable` (and the
-    map label cannot win - giving it an extent makes `dtk dol split` fail on the overlap). objdiff
-    pairs by name, so such a row can never pair, and a name-keyed byte comparison reads our object as
-    not defining the symbol at all - which is how a byte-identical claim measured as a refusal
-    (2026-09-28, `worker/trk-init-vectors-2226`).
-
-    So when the name lookup misses, the candidate symbol starting at the **same section and offset**
-    stands in and `resolved_by` says `"address"`. `identical` stays the strict test it always was -
-    equal sizes and equal bytes - so a symbol that resolves by address but is truncated, mis-sized or
-    different still refuses; `symbol_problems` is what decides how far the resolution is trusted.
-    """
-    t = symbol_locations(target_obj)
-    c = symbol_locations(candidate_obj)
-    rows: dict[str, dict] = {}
-    for name in set(t) | set(c):
-        te, ce = t.get(name), c.get(name)
-        resolved_by = "name" if ce is not None else None
-        candidate_name = name if ce is not None else None
-        if ce is None and te is not None:
-            found = _same_place(c, te[0], te[1])
-            found.sort(key=lambda e: (e[1] != te[2], e[1]))   # the equal-size symbol first
-            if found:
-                candidate_name, cand_size, cand_data = found[0]
-                ce, resolved_by = (te[0], te[1], cand_size, cand_data), "address"
-        rows[name] = {
-            "target_size": te[2] if te else None,
-            "candidate_size": ce[2] if ce else None,
-            "in_target": te is not None,
-            "in_candidate": ce is not None,
-            "identical": bool(te and ce and te[2] == ce[2] and te[3] == ce[3]),
-            "candidate_name": candidate_name,
-            "resolved_by": resolved_by,
-        }
-    return rows
+raw_symbol_rows = objcompare.symbol_rows   # per target symbol: sizes, presence, identity, resolved by name/address
 
 
 def report_unit(report_data: dict, unit: str) -> dict | None:

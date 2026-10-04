@@ -36,7 +36,7 @@ Inputs -> outputs: src/obj objects, splits, map, link inputs -> reasons, exit.
 
 ## Lib dependencies
 
-objcompare, binary, project, findings, lanes.naming.
+objcompare (sizes, bytes, layout classes, `reloc_facts`, `link_index`, `undefined`), project; tool APIs: `claims.norm_unit`, `dataseams`, `poolseams`. No binutils: sizes and bytes are read from the objects (`objdump -h`/`objcopy` before WP3a).
 
 ## Test contract
 
@@ -46,4 +46,6 @@ Target: `tools/tests/units/test_flipcheck.py` on `lib.testing` (`FixtureTree`/`G
 
 ## Known gaps
 
-READY is necessary, not sufficient (pipeline 8); the relocation half does not run for an already-Matching unit
+* READY is necessary, not sufficient (pipeline 8); the relocation half does not run for an already-Matching unit.
+* WP3a (behaviour change, 1 unit on this tree): the link's reference set now reads every relocation section of an input, as undefrefs and the linker do; the old reader kept only the last of dtk's two `.rela.data` in `Network/NetworkCommunityPat`, so `Network/NetworkLayerPatStep`'s `stepRequest__15NetworkLayerPatFP14NetworkRequest` read as unreferenced (a false row-36 trim risk) and is READY now.
+* Its spelling note (a target reference starting with the name) is not `objcompare.spelling_hint`; unifying changes the refusal text lanes parse.

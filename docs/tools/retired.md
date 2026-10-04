@@ -58,7 +58,7 @@ The entries below are the evidence and history that were kept; `tools/splits/gen
 
 ## Folded into another tool
 
-* **`tools/units/relocaudit.py`** (396) -> `undefrefs.py --census`. Evidence: `undefrefs.unresolved_names` + `linkage_stem` is the
+* **`tools/units/relocaudit.py`** (396) -> `undefrefs.py --census --linkage` (WP3a: the sweep, its label and its JSON moved into undefrefs, the rule into `lib.objcompare.linkage_audit`, the selftest to `tools/tests/units/test_undefrefs_linkage.py`; `relocaudit.py` forwards until WP6). Evidence: `undefrefs.unresolved_names` + `linkage_stem` is the
   same comparison per unit, and `undefrefs` is what the gate runs; `relocaudit` has no caller. History: the exclusion list (locals,
   `@NNN`/`@etb_*` labels, `STT_FILE`, `.comment`) is the spec of `lib.objcompare.undefined`.
 * **`tools/units/relocaudit-findings.md`**, **`tools/flags/infer-run.md`**: dated outputs of one run; deleted (the commands that

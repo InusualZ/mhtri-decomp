@@ -21,7 +21,7 @@ the plan to get there is `migration.md`; what is dropped is `retired.md`; what t
 | who references what (index, census) | `lib/refs.py` | `spec/lib-refs.md` | callers, callees, accessextent, datagap, dataclaim, poolseams, tudiscover, splitcheck |
 | scores, the metric, freshness, regression | `lib/report.py` | `spec/lib-report.md` | ledger, verifyunit, unitscore, symdiff, measure, recompile, pairgap, datagap, brief, land, reportdiff, flags/* |
 | the unit and its compile command | `lib/units.py` | `spec/lib-units.md` | recompile, measure, unitscore, symdiff, flipcheck, datagap, verifyunit, brief, flags/* |
-| target vs ours comparisons | `lib/objcompare.py` | `spec/lib-objcompare.md` | datagap, sectiongap, pairgap, relocdiff, flipcheck, undefrefs, verifyunit |
+| target vs ours comparisons | `lib/objcompare.py` | `spec/lib-objcompare.md` | datagap, dataclosure, sectiongap, pairgap, relocdiff, flipcheck, undefrefs (+ relocaudit), verifyunit |
 | C/C++ text scanning | `lib/cscan.py` | `spec/lib-cscan.md` | stylelint, typeregistry, declclash, recordmerge, methodize, vtableaudit, shapes |
 | findings, rows, verdicts, add-only diff | `lib/findings.py` | `spec/lib-findings.md` | land, stylelint, vtableaudit, undefrefs, datagap, splitcheck, flipcheck, verifyunit, dataclaim, symbolpreflight, handoff |
 | the CLI entry point | `lib/cli.py` | `spec/lib-cli.md` | every tool |

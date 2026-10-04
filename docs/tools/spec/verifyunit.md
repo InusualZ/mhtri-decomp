@@ -35,7 +35,7 @@ Inputs -> outputs: configure.py, splits, build.ninja, objects, report -> problem
 
 ## Lib dependencies
 
-report, project, binary, objcompare, findings.
+objcompare (`fingerprint`, `symbol_locations`, `symbol_rows`), report, project, units; tool API: `measure.score_report`.
 
 ## Test contract
 

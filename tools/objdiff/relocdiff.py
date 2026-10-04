@@ -1,135 +1,36 @@
 #!/usr/bin/env python3
 """Relocation-level diff of one unit: the target object's relocations against ours, on both sides.
-
-    python tools/objdiff/relocdiff.py g3d/fn_8005AA28
-    python tools/objdiff/relocdiff.py --unit Pl/pl_act --unit menu/menu_note
-    python tools/objdiff/relocdiff.py g3d/fn_8005AA28 --section .text --rows 0
-    python tools/objdiff/relocdiff.py g3d/fn_8005AA28 --json r.json
-    python tools/objdiff/relocdiff.py g3d/fn_8005AA28 --check      # exit 1 when a relocation differs
-    python tools/objdiff/relocdiff.py Network/network_state --by-owner   # compact, robust to moved code
-    python tools/objdiff/relocdiff.py --selftest
-
-**Two pairings.** The default view pairs by section offset, so a function that moved (or one inserted
-instruction) makes every later relocation read as target-only + ours-only. `--by-owner` groups the
-relocations by the symbol that contains them and aligns each group in order: it prints only the real
-differences (a wrong name, type or addend, an inserted or dropped relocation, a symbol on one side only)
-and a non-failing `note` when only the offsets moved. Use `--by-owner` on a unit with residual `.text`
-differences; use the default view for the both-sides tables.
-
-**Why this tool exists.** objdiff scores a *relocation-name* mismatch as equal - this project runs it
-with `functionRelocDiffs=none`, so a `bl`/`lis`/`addi` to the wrong symbol of the same shape reads
-100 % - and a byte diff cannot see it either, because the relocated field holds the same value. Three
-separate lanes hand-rolled this comparison in throwaway scripts before it was shipped. The case that
-matters is a unit whose `.text` is byte-identical to the target's while its relocations are not: this
-tree holds 16 of them (e.g. `g3d/fn_8005AA28`, `menu/menu_note`, `Pl/pl_act`, `Pl/fn_80229ECC`), every
-one scored 100.00000 % by `unitscore.py`.
-
-**What it prints,** for each section that either side relocates:
-
-* both sides' relocations - section offset, target symbol name, relocation type, addend - merged on the
-  offset so the two sides read across;
-* the diff, in the four classes a lane acts on:
-    (a) relocations **only the target** has;
-    (b) relocations **only ours** has;
-    (c) the **same offset pointing at a different symbol** (the objdiff-invisible class);
-    (d) the **same symbol with a different type or addend**;
-* an explicit line when the two sets are **identical** - the answer most of the time, and the thing that
-  makes "byte- and relocation-identical" checkable rather than assumed.
-
-The unit's two object paths and their mtimes are named in the header (so a stale read is visible), and a
-prebuilt object older than a source in the unit's include closure is flagged with `stale` (the same rule
-`lib.report` (freshness) enforces for the scorers).
-
-**Reuse, not re-implementation.** The object is read by `tools/units/dossier.py`'s `parse_elf` - the
-project's ELF reader, already used by `callees.py` - which carries the RELA addend; the relocation type
-names come from the same module; the unit and its paths come from `tools/unitutil.py`; the staleness
-arithmetic is `lib.report` (freshness). This tool is the section-relocation *view*; `sectiongap.py`
-stays the section size/byte view and pairs relocations by name, while this one pairs by offset and
-carries addends. It deliberately does not decode an instruction's field, resolve a symbol in the link,
-or judge what `splits.txt` claims.
-"""
+Spec: docs/tools/spec/relocdiff.md. CLI: relocdiff.py <unit>... [--unit U] [--section S] [--rows N | --all] [--json F]
+[--check] [--by-owner] | --selftest."""
 from __future__ import annotations
 
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import json
 import os
 import sys
-from collections import Counter
 
-HERE = os.path.dirname(os.path.abspath(__file__))                 # tools/objdiff
-TOOLS = os.path.dirname(HERE)                                     # tools/
-for _path in (TOOLS, os.path.join(TOOLS, "units"), os.path.join(TOOLS, "elf"), HERE):
-    if _path not in sys.path:
-        sys.path.insert(0, _path)
+from tools import unitutil as uu
+from tools.lib import objcompare
+from tools.lib import report as _report
 
-import unitutil as uu                                             # noqa: E402
-from tools.lib import report as _report                         # noqa: E402  (root on the path via unitutil)
-from units import dossier                                         # noqa: E402
-
-
-# --------------------------------------------------------------------------------------------------
-# reading and the pure diff rule
-# --------------------------------------------------------------------------------------------------
-
-def read_relocs(path: str) -> tuple[dict[str, list[tuple[int, str, int, int]]] | None, str | None]:
-    """`{section: [(offset, symbol, type, addend), ...]}` for one object, or `(None, why)`.
-
-    `None` (not `{}`) distinguishes "unreadable/not an object" from "an object with no relocations", so
-    a missing build artefact is reported as unbuilt rather than as a falsely-clean unit.
-    """
-    try:
-        with open(path, "rb") as fh:
-            blob = fh.read()
-    except OSError as exc:
-        return None, "cannot read %s: %s" % (path, exc)
-    try:
-        _sections, _symbols, relocs = dossier.parse_elf(blob)
-    except ValueError as exc:
-        return None, "%s is not an ELF object: %s" % (path, exc)
-    out: dict[str, list[tuple[int, str, int, int]]] = {}
-    for r in relocs:
-        section = r.get("target") or r.get("section") or "?"
-        out.setdefault(section, []).append((r["offset"], r.get("symbol") or "", r["type"],
-                                            r.get("addend", 0)))
-    for rows in out.values():
-        rows.sort()
-    return out, None
+read_relocs = objcompare.reloc_rows          # `({section: [(offset, symbol, type, addend)]}, None)` or `(None, why)`
+owner_groups = objcompare.owner_groups
 
 
 def type_name(typ: int) -> str:
-    """`R_PPC_REL24` for a relocation kind this project emits, `R_PPC_<n>` otherwise."""
-    return dossier.RELOC_TYPES.get(typ, "R_PPC_%d" % typ)
+    """`R_PPC_REL24` for a relocation kind this view names, `R_PPC_<n>` otherwise (`objcompare.legacy_reloc_name`)."""
+    return objcompare.legacy_reloc_name(typ)
 
 
 def diff_relocs(ours: list, target: list) -> dict:
-    """The four-class diff of two relocation lists, pure so the selftest drives it with tuples.
+    """The four-class diff of two relocation lists (`objcompare.reloc_classes`, target first)."""
+    return objcompare.reloc_classes(target, ours)
 
-    Identity first (offset + symbol + type + addend, as a multiset), so an unchanged relocation is
-    never reported; what is left is paired **by offset**, which is what makes class (c) - the same
-    offset pointing at a different symbol - a single fact rather than two unrelated add/remove lines.
-    """
-    o, t = Counter(map(tuple, ours)), Counter(map(tuple, target))
-    identical = sum((o & t).values())
-    o_by, t_by = {}, {}
-    for off, sym, typ, add in (o - t).elements():
-        o_by.setdefault(off, []).append((sym, typ, add))
-    for off, sym, typ, add in (t - o).elements():
-        t_by.setdefault(off, []).append((sym, typ, add))
-    only_target, only_ours, diffsym, diffattr = [], [], [], []
-    for off in sorted(set(o_by) | set(t_by)):
-        mine, theirs = o_by.get(off, []), t_by.get(off, [])
-        while mine and theirs:
-            a, b = mine.pop(0), theirs.pop(0)
-            if a[0] != b[0]:
-                diffsym.append((off, a, b))              # (c) same offset, different symbol
-            else:
-                diffattr.append((off, a, b))             # (d) same symbol, different type/addend
-        only_ours.extend((off,) + x for x in mine)
-        only_target.extend((off,) + x for x in theirs)
-    return {"ours": len(ours), "target": len(target), "matched": identical,
-            "only_target": only_target, "only_ours": only_ours,
-            "different_symbol": diffsym, "different_attr": diffattr,
-            "identical": not (only_target or only_ours or diffsym or diffattr)}
+
+def compare_by_owner(ours, target) -> tuple[int, int, list[str]]:
+    """`(matching, total, lines)` aligned in order within each owning symbol (`objcompare.by_owner`)."""
+    return objcompare.by_owner(target, ours)
 
 
 # --------------------------------------------------------------------------------------------------
@@ -168,85 +69,6 @@ def unit_record(spec: str, sections: list[str] | None = None) -> dict:
                                 "ours": sorted(ours.get(name, [])),
                                 "target": sorted(target.get(name, []))})
     return rec
-
-
-def owner_groups(blob: bytes) -> dict:
-    """`{(section, owner): [(offset_in_owner, type, symbol, addend), ...]}` in offset order.
-
-    The owner is the defined symbol containing the relocated offset; a relocation with none (extabindex,
-    padding) groups under `(section, None)` at its absolute offset."""
-    _sections, symbols, relocs = dossier.parse_elf(blob)
-    table: dict[str, list[dict]] = {}
-    for s in symbols:
-        if s["name"] and s["section"] and s["type"] in (0, 1, 2):
-            table.setdefault(s["section"], []).append(s)
-    for lst in table.values():
-        lst.sort(key=lambda s: (s["value"], -s["size"]))
-    out: dict = {}
-    for r in relocs:
-        own = None
-        for s in table.get(r["target"], ()):
-            if s["value"] > r["offset"]:
-                break
-            if r["offset"] < s["value"] + max(s["size"], 1):
-                own = s
-        key = (r["target"], own["name"] if own else None)
-        off = r["offset"] - own["value"] if own else r["offset"]
-        out.setdefault(key, []).append((off, r["type_name"], r["symbol"] or "<section-symbol>", r["addend"]))
-    for lst in out.values():
-        lst.sort()
-    return out
-
-
-def compare_by_owner(ours: bytes, target: bytes) -> tuple[int, int, list[str]]:
-    """`(matching, total, lines)`: relocations aligned in ORDER within each owning symbol.
-
-    A function that moved, or an instruction that slid a few bytes, is not a difference (the offset-paired
-    view above drowns in those); only a changed type/name/addend or an inserted/dropped relocation is. Same
-    names at different offsets is a `note` line, which never fails. A symbol present on one side only is
-    one line. Relocations against a section symbol have no name and compare as `<section-symbol>`."""
-    import difflib
-    a, b = owner_groups(ours), owner_groups(target)
-    lines: list[str] = []
-    notes: list[str] = []
-    matched = 0
-    for key in sorted(set(a) | set(b), key=lambda k: (k[0] or "", k[1] or "")):
-        sec, own = key
-        x, y = a.get(key, []), b.get(key, [])
-        if own and not x:
-            lines.append("only in target  %s %s: absent from ours (%d relocation(s))" % (sec, own, len(y)))
-            continue
-        if own and not y:
-            lines.append("only in ours    %s %s: absent from the target (%d relocation(s))" % (sec, own, len(x)))
-            continue
-        where = "%s %s" % (sec, own) if own else sec
-        sm = difflib.SequenceMatcher(None, [i[1:] for i in x], [i[1:] for i in y], autojunk=False)
-        for op, i1, i2, j1, j2 in sm.get_opcodes():
-            if op == "equal":
-                matched += i2 - i1
-                if [i[0] for i in x[i1:i2]] != [i[0] for i in y[j1:j2]]:
-                    notes.append("note            %s: %d relocation(s) at different offsets, same names"
-                                 % (where, i2 - i1))
-                continue
-            for k in range(max(i2 - i1, j2 - j1)):
-                xi = x[i1 + k] if i1 + k < i2 else None
-                yi = y[j1 + k] if j1 + k < j2 else None
-                at = "+0x%x" % (xi or yi)[0]
-                if xi and yi:
-                    what = []
-                    if xi[1] != yi[1]:
-                        what.append("type %s vs %s" % (xi[1], yi[1]))
-                    if xi[2] != yi[2]:
-                        what.append("symbol %s vs %s" % (xi[2], yi[2]))
-                    if xi[3] != yi[3]:
-                        what.append("addend %+d vs %+d" % (xi[3], yi[3]))
-                    lines.append("differs         %s%s: %s  (ours vs target)" % (where, at, "; ".join(what)))
-                elif xi:
-                    lines.append("extra in ours   %s%s: ours has %s %s%+d" % (where, at, xi[1], xi[2], xi[3]))
-                else:
-                    lines.append("missing in ours %s%s: target has %s %s%+d" % (where, at, yi[1], yi[2], yi[3]))
-    total = max(sum(map(len, a.values())), sum(map(len, b.values())))
-    return matched, total, lines + notes
 
 
 def run_by_owner(units: list[str]) -> int:
