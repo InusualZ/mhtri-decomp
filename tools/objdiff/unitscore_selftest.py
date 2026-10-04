@@ -5,17 +5,17 @@
     python tools/objdiff/unitscore.py --selftest        (the same checks)
 
 **Fixtures only.** The tree is a fake repository in the system temp (`configure.py`, `src/demo/unit.cpp`
-with a header closure, `build/RMHE08/obj/` so `unitutil._versions()` finds the version, and a hand-written
+with a header closure, `build/RMHE08/obj/` so `lib.units.versions()` finds the version, and a hand-written
 `report.json`), and every mtime is set with `os.utime`, so the check count and the outcome are identical in
 MAIN, in a fresh worktree and in a slot. The fake tree is created outside the repository on purpose: a temp
-directory inside it is inside a git worktree, and `unitutil.repo_root()` would then resolve the real tree
+directory inside it is inside a git worktree, and `lib.repo.repo_root()` would then resolve the real tree
 and read the real report instead of the fixture.
 
-The fixture is deliberately **not** a git worktree, and does not need to be. `unitutil.repo_root()` roots a
+The fixture is deliberately **not** a git worktree, and does not need to be. `lib.repo.repo_root()` roots a
 run at the *invocation's* tree - its git worktree when there is one, else the `cwd` when the `cwd` is a tree
 at all - so a run with `cwd=<fixture>` resolves the fixture even though `git rev-parse` answers nothing. It
 used to fall back to the tool's own directory and silently score the real build; the fix is
-`unitutil.repo_root(start=)` / `resolve_unit(spec, root=)` and the `cwd`-that-is-a-tree rule.
+`lib.repo.repo_root(start=)` / `Unit.resolve(spec, root)` and the `cwd`-that-is-a-tree rule.
 
 The checks that matter are the two incidents the item exists for: a report older than the unit's source must
 be **refused** (exit 1, no numbers), and a report older than the unit's **object** must be refused too.
@@ -23,6 +23,7 @@ be **refused** (exit 1, no numbers), and a report older than the unit's **object
 **zero** objdiff invocations, and `--measure` exactly one.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import importlib.util
 import json
@@ -259,17 +260,18 @@ def selftest() -> int:
         fx.write_report()
         fx.set_times(report=-2 * DAY, obj=0, source=-DAY)
         calls = []
-        real = us.uu.report_functions
+        real = us._report.score
 
-        def fake(target, base, unit_name=None, tmpdir=None, runner=subprocess.run):
+        def fake(target, base, unit_name=None, tmpdir=None, **kw):
             calls.append((target, base, unit_name))
-            return {"solo": {"name": "solo", "size": 16, "fuzzy_match_percent": 75.0}}
+            return us._report.Report({"units": [{"name": unit_name, "measures": {}, "functions": [
+                {"name": "solo", "size": "16", "fuzzy_match_percent": 75.0}]}]})
 
         try:
-            us.uu.report_functions = fake
+            us._report.score = fake
             rec = us.run(fx.spec(us), measure=True)
         finally:
-            us.uu.report_functions = real
+            us._report.score = real
         fails = check("--measure issues exactly one objdiff invocation", len(calls), 1, fails)
         fails = check("... over the unit's own object pair", calls[0][:2] if calls else None,
                       (fx.target, fx.obj), fails)
@@ -283,20 +285,20 @@ def selftest() -> int:
         fx.set_times(report=-2 * DAY, obj=-2 * DAY, source=0)
         calls.clear()
         try:
-            us.uu.report_functions = fake
+            us._report.score = fake
             rec = us.run(fx.spec(us), measure=True)
         finally:
-            us.uu.report_functions = real
+            us._report.score = real
         fails = check("--measure refuses an object older than its source", rec["refused"], True, fails)
         fails = check("... saying why", any("not rebuilt" in r for r in rec["freshness"]["reasons"]),
                       True, fails)
         fails = check("... with no rows", rec["rows"], None, fails)
         rec = None
         try:
-            us.uu.report_functions = fake
+            us._report.score = fake
             rec = us.run(fx.spec(us), measure=True, force=True)
         finally:
-            us.uu.report_functions = real
+            us._report.score = real
         fails = check("... unless forced", (rec["refused"], len(rec["rows"] or [])), (False, 1), fails)
         fx.set_times(report=0, obj=-DAY, source=-2 * DAY)
 
@@ -304,8 +306,8 @@ def selftest() -> int:
         code = ("import importlib.util,sys,json;"
                 "spec=importlib.util.spec_from_file_location('u',%r);"
                 "m=importlib.util.module_from_spec(spec);sys.modules['u']=m;spec.loader.exec_module(m);"
-                "m.uu.report_functions=lambda *a,**k: (_ for _ in ()).throw(AssertionError('objdiff!'));"
-                "m.uu.OBJDIFF='nope-not-a-binary';"
+                "m._report.score=lambda *a,**k: (_ for _ in ()).throw(AssertionError('objdiff!'));"
+                "m._report.objdiff_cli=lambda *a,**k: 'nope-not-a-binary';"
                 "r=m.run(m.spec_of('demo/unit'));"
                 "print(json.dumps({'rows': len(r['rows'] or []), 'stale': r['freshness']['stale']}))" % TOOL)
         child = subprocess.run([sys.executable, "-c", code], cwd=fx.dir, capture_output=True, text=True,

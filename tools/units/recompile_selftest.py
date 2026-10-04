@@ -21,6 +21,7 @@ Three layers:
   for real symbols.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import contextlib
 import io
@@ -32,11 +33,10 @@ import sys
 import tempfile
 import time
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if os.path.join(ROOT, "tools", "units") not in sys.path:
-    sys.path.insert(0, os.path.join(ROOT, "tools", "units"))
+from tools.lib import units as lib_units
+from tools.units import recompile as rc
 
-import recompile as rc  # noqa: E402
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def _completed(argv):
@@ -129,9 +129,8 @@ def _pick_unit(root: str):
     """A real objdiff unit with target and base objects present and at least two scored functions.
 
     The two-symbol requirement is the point of the cross-check, so a unit with a single function is not a
-    candidate; `unitutil.frames` reads the target ELF directly, which is cheaper than a report round.
+    candidate; `lib.units.frames` reads the target ELF directly, which is cheaper than a report round.
     """
-    import unitutil
 
     path = os.path.join(root, "objdiff.json")
     if not os.path.exists(path):
@@ -143,7 +142,7 @@ def _pick_unit(root: str):
         if not (os.path.exists(target) and os.path.exists(base)):
             continue
         try:
-            names = unitutil.function_names(target)
+            names = lib_units.function_names(target)
         except Exception:
             continue
         if len(names) >= 2:
@@ -1117,32 +1116,36 @@ def main_root_rows() -> int:
         os.makedirs(os.path.join(main, ".git"))
         os.makedirs(slot)
         open(os.path.join(main, "configure.py"), "w", encoding="utf-8").write("# main\n")
-        real = rc.git
+        repo = rc._repo
+        real_tree, real_git = repo.main_tree, repo.Git
 
-        def hostile_git(args, cwd, check=True):
-            if args[:1] == ["rev-parse"]:
-                return os.path.join(main, ".git")
-            return ("worktree %s\nHEAD abc\nbranch refs/heads/main\n\n"
-                    "worktree %s\nHEAD def\ndetached\n" % (slot, main))
+        class FakeGit:
+            def __init__(self, cwd):
+                self.cwd = cwd
 
-        rc.git = hostile_git
+            def worktree_list(self):
+                return [repo_git.Worktree(path=slot), repo_git.Worktree(path=main)]
+
+        from tools.lib import git as repo_git
+        repo.Git = FakeGit
+        repo.main_tree = lambda root, honour_env=False: os.path.join(main)
         try:
             failures = _ok("MAIN is the common dir's parent, not the first worktree entry",
                            os.path.normcase(rc.main_root(slot)), os.path.normcase(main), failures)
         finally:
-            rc.git = real
+            repo.main_tree, repo.Git = real_tree, real_git
 
-        def old_git(args, cwd, check=True):
-            if args[:1] == ["rev-parse"]:
-                return ""
-            return "worktree %s\nHEAD abc\n\nworktree %s\nHEAD def\n" % (main, slot)
+        class OldGit(FakeGit):
+            def worktree_list(self):
+                return [repo_git.Worktree(path=main), repo_git.Worktree(path=slot)]
 
-        rc.git = old_git
+        repo.Git = OldGit
+        repo.main_tree = lambda root, honour_env=False: None
         try:
             failures = _ok("a git that cannot report a common dir falls back to the first entry",
                            os.path.normcase(rc.main_root(slot)), os.path.normcase(main), failures)
         finally:
-            rc.git = real
+            repo.main_tree, repo.Git = real_tree, real_git
     return failures
 
 

@@ -24,9 +24,17 @@ fresh-object proof, and finds the original object to score against.
   `lib_block(tree, spec)`, `sibling_for(main, wt, spec)`, `retarget(tokens, spec)`, `unit_tokens(main, wt, spec) ->
   (tokens, source)`, `rewrite(tokens, spec, main, wt) -> (tokens, object)`, `order_includes`, `include_pairs`,
   `retarget_object_helpers`, `absolutize`, `is_switch`.
-* The compile: `compile(spec, main, wt, dry_run, runner, tokens) -> {object, compiled, fresh, bytes, sections, log} |
-  {object, compiled: False, error} | {command, object, dry_run}`; `object_is_fresh(object, source)`; `section_sizes(obj)`;
-  `run_tokens(tokens, cwd, expect, scratch_dir, src, verbose)` (the flag tools' raw run).
+* The compile: `compile(spec, main, wt, dry_run, runner, tokens) -> CompileResult` - a frozen value that also reads as
+  the old mapping (`{object, compiled, fresh, bytes, sections, log}` | `{object, compiled: False, error}` |
+  `{command, object, dry_run}`; unset fields absent, so `dict(result)` is the old shape and `.get` keeps working);
+  `object_is_fresh(object, source)`; `section_sizes(obj)`; `run_tokens(tokens, cwd, expect, scratch_dir, src, verbose)`
+  (the flag tools' raw run).
+* An object's functions: `frames(obj) -> [(name, size, frame)]` (defined functions in address order, `frame` the N of a
+  leading `stwu`, `lib.ppc.stwu_frame`), `function_names(obj)`, `text_size(obj)`.
+* The flag tools: `split_command(unit)` (`split_flags` of the unit's own tree's ninja line), `split_flags(tokens) ->
+  (head, flags, tail)`, `family`, `VALUED`, `override_flags(flags, extra)` (`--flags-extra`: drop the same family with
+  its value, then append), `quiet(log)`, `compiler_token(head)`, `with_compiler_version(head, version)` (`1.3` or
+  `GC/3.0a3`), `drop_unknown_option(flags, log)`, `available_versions(head)` (the sibling version directories).
 * The target: `resolve_target(wt, main, spec, symbol) -> (path, kind in {worktree-split, registered, auto-fallback, missing},
   note)`, `proposal_target(wt, main, symbol)`, `resolve_map(wt, main, rel)`, `symbol_addresses`, `text_symbol_addresses`,
   `auto_text_runs`, `retired_object_dirs`.
@@ -59,7 +67,9 @@ fresh-object proof, and finds the original object to score against.
 
 ## Absorbs (today's implementations)
 
-`unitutil._versions/_find_src/_make/list_units/resolve_unit/compile_command/unquote/run_compile` (now delegates),
+`unitutil._versions/_find_src/_make/list_units/resolve_unit/compile_command/unquote/run_compile/split_flags/family/
+override_flags/quiet/text_size/frames/function_names/compiler_token/with_compiler_version/drop_unknown_option/
+available_versions` (now delegates), `infer.obj_path_for` (delegates to `target_rel`),
 `recompile.unit_source/normalize_unit/resolve_unit_source/_ninja_compile_lines/ninja_command/_unit_stem/retarget/lib_block/
 sibling_for/unit_tokens/retarget_object_helpers/rewrite/include_pairs/order_includes/source_path/object_is_fresh/
 section_sizes/is_switch/absolutize/same_tree/resolve_map/text_symbol_addresses/auto_text_runs/symbol_addresses/
@@ -74,19 +84,22 @@ sizes) - the last three imported on first use.
 
 ## Test contract
 
-Tier: fixture (`tools/tests/lib/test_units.py`, 47 checks). Every spelling in `duplication.md` (g) has one stem and report name;
+Tier: fixture (`tools/tests/lib/test_units.py`, 66 checks). Every spelling in `duplication.md` (g) has one stem and report name;
 `Unit.resolve` on a `FixtureTree` (nested, top-level, bare stem, refusals, registration lib/flag); `source_spelling`'s order;
 `rewrite`/`order_includes` (worktree include first even when MAIN lists its generated include first), helper retargeting, the
 `cmd /c` switch; `unit_tokens`' three sources with a stub ninja; `compile` with stub compilers (fresh, no object, stale);
-`proposal_target` by address through a renamed map and by run; `resolve_target`'s order.
+`proposal_target` by address through a renamed map and by run; `resolve_target`'s order; `frames`/`function_names`/
+`text_size` on an `ElfBuilder` object; the flag helpers (split, override with a quoted value, compiler swap in both
+spellings, unknown-option drop, sibling versions, `split_command` with a stub ninja); `CompileResult` as a mapping.
 
 ## Known gaps
 
-* `compile` returns a dict, not a `CompileResult` value: `recompile`, `measure` and their selftests read it with `.get`; the
-  value type waits for WP3b.
 * Not yet collapsed onto `stem`: `claims.norm_unit` and `promote.norm_unit` (lane keys, `lib/lanes/naming.py`, WP3e),
   `stylelint._unit_stem` (WP3d), `undefrefs._unit_stem` / `flipcheck.unit_name_for` / `datagap.object_path` /
   `relocaudit.object_paths` / `vtableaudit.object_paths` / `pairgap._stem_of` (WP3a), `dossier`/`unwindcut.resolve_unit`
-  (WP3c), `infer.obj_path_for` (WP3b), `brief.source_name` (WP3e), `mwlink_debugger.unit_of_object` (WP5).
+  (WP3c), `brief.source_name` (WP3e), `mwlink_debugger.unit_of_object` (WP5).
 * `slug` is not here: the lane slug is `lib/lanes/naming.py`'s (WP3e).
-* `recompile.split_staleness` stays in `recompile` (it calls `claims._build_is_current`, a tool).
+* `recompile.split_staleness` stays in `recompile` (it calls `claims._build_is_current`, a tool); so does
+  `recompile.git_dirty` (its `runner` seam is what the staleness selftest drives).
+* `unitutil.compile_command`/`run_compile` keep `warn_if_foreign_worktree` for their remaining importers; the flag tools
+  resolve the invocation's tree themselves (`lib.repo.repo_root`) and call `split_command`/`run_tokens` directly.

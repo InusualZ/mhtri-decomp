@@ -85,6 +85,8 @@ becomes it (`duplication.md` has the line numbers).
   (one place names `claims.json`, `backlog.json`, `land-base.json`, `data-requests.json`, `slots/`, `lanes/`, `outbox/`, `notes/`).
 * `ground_truth(tree)`: the DOL path and the pinned hashes from `config.yml` (`wtsafe.ground_truth`, `prepcommit.ground_truth_error`).
 * From: `unitutil`, `recompile`, `splitcheck`, `wtsafe`, `tudiscover`, `callers`, 20 root resolvers.
+* As built (WP3b): `main_checkout(root)` is `main_tree` with the first-worktree fallback a tool that must have a MAIN
+  needs (`recompile.main_root`, `measure.py`).
 
 ### `lib/proc.py` - subprocess
 
@@ -203,6 +205,10 @@ becomes it (`duplication.md` has the line numbers).
   `reportdiff.diff_*` became `diff_units/diff_symbols/diff_denominators` here, and folding `reportdiff`'s verdict and
   `measure.moved_summary` onto `regression` is WP3b (it changes their output; `applysplits` retired).
 * From: 16 readers, `unitutil.report_*`, `freshguard`, `reportdiff`.
+* As built (WP3b): `reportdiff`'s verdict is `compare` and `measure`'s baseline count reads the same `moved`/`direction`;
+  `regression` stays the gate's own policy over `snapshot`s (folding the two tools onto it would import its blind spots,
+  `spec/lib-report.md` Known gaps). `project_diff` (a tree's `diff -p . -u`) and `retry_transient` joined the scoring
+  half.
 
 ### `lib/units.py` - the unit
 
@@ -212,6 +218,9 @@ becomes it (`duplication.md` has the line numbers).
   worktree-includes-first rewrite); `compile(unit, tree, dry_run) -> CompileResult` (fresh-object assertion - `recompile.compile_unit`);
   `proposal_target(unit, symbol)` (`recompile.proposal_target`).
 * From: the 30 name functions, `unitutil`, `recompile`.
+* As built (WP3b): `compile` returns `CompileResult`, a frozen value that still reads as the old mapping; the flag tools'
+  command-line helpers (`split_command`, `override_flags`, `with_compiler_version`, ...) and an object's function frames
+  (`frames`, `function_names`, `text_size`) moved here from `unitutil`, which delegates.
 
 ### `lib/objcompare.py` - target vs ours
 

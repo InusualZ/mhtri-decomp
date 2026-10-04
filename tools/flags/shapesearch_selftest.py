@@ -14,17 +14,12 @@ spellings hand-written into a scratch `.c`" into a mode:
   score and first divergence" half that the score alone does not answer.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import os
-import sys
 import tempfile
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-for _p in (HERE, os.path.dirname(HERE)):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
-
-import shapesearch as ss  # noqa: E402
+from tools.flags import shapesearch as ss
 
 CHECKS = 0
 FAILURES: list[str] = []

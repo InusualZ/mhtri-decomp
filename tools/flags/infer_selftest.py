@@ -15,16 +15,14 @@ If the real split objects are present the test additionally asserts the known-ca
 confident miss - that is the property the tool exists to have.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import os
 import struct
-import sys
+
+from tools.flags import infer
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if os.path.join(ROOT, "tools", "flags") not in sys.path:
-    sys.path.insert(0, os.path.join(ROOT, "tools", "flags"))
-
-import infer  # noqa: E402
 
 SHT_PROGBITS = 1
 SHT_SYMTAB = 2
@@ -226,16 +224,12 @@ def test_repo_root():
     registered only in the worktree was reported as unregistered. Patches the one resolver it delegates
     to, so the check is deterministic on any host.
     """
-    tools = os.path.join(ROOT, "tools")
-    if tools not in sys.path:
-        sys.path.insert(0, tools)
-    import unitutil
-    real = unitutil.caller_worktree
-    unitutil.caller_worktree = lambda *a, **k: ROOT
+    real = infer.librepo.caller_worktree
+    infer.librepo.caller_worktree = lambda *a, **k: ROOT
     try:
         check(infer.repo_root() == ROOT, "repo_root is the caller's worktree")
     finally:
-        unitutil.caller_worktree = real
+        infer.librepo.caller_worktree = real
 
 
 def test_ground_truth_parser():

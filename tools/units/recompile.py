@@ -1,91 +1,6 @@
-"""Compile one unit **without ninja**, from any worktree, and prove the object is fresh.
-
-The problem this solves (docs/plan.md 7.1 + 7.15): a worker lives in its own git worktree, which has no
-`build.ninja`, no `objdiff.json` and no `build/RMHE08/` — and `unitutil` resolves all three from its own
-location, so `ninja build/RMHE08/src/<unit>.o` and `mt.py` simply do not work there. Two further traps it
-closes: MWCC writes the object into the *directory* named by `-o` (a hand-written command can silently
-compile nothing), and the filesystem's one-second mtime granularity makes a recompile of an unchanged file
-look like "no change" to anything that caches on (mtime, size).
-
-What it does instead:
-
-* resolves **MAIN** with `git worktree list --porcelain` and takes the toolchain, the include path and the
-  *target* object from there;
-* takes the real command line from MAIN's ninja (`ninja -t commands`), rewrites the three paths that must
-  change (the source, the `-o` directory, the `-i` search path), and runs it with MAIN as cwd;
-* puts the worktree's `-i` directories **first** and points every one of MAIN's at the worktree's copy of
-  that directory, so a worker's edit to an existing shared header is the header that gets compiled (see
-  `order_includes`; appending them - the old behaviour - left MAIN's copy first and silently measured the
-  wrong source, which is what the `eft004` round had to work around with a scratch measurer);
-* deletes the object first, then asserts the file exists and its mtime moved — a stale object is impossible;
-* prints the two object paths, the section sizes, and can measure a symbol **with the same objdiff code
-  path the official report uses** (`report generate` on a one-unit project), so the number equals
-  `build/RMHE08/report.json`'s `fuzzy_match_percent` for the same object.
-
-    python tools/units/recompile.py <unit> [--measure <symbol>] [--json] [--dry-run] [--selftest]
-
-The measurement trap this closes (`--measure` used to lie by ~0.36 points on `RSO/runtime`, which sent a
-worker chasing a regression that did not exist): objdiff-cli's explicit `diff` mode is **not** the
-report's metric. Two differences compound - `diff` defaults `functionRelocDiffs` to `data_value` while
-`report generate` defaults to `none` (so relocation-only differences count as mismatches), and even at the
-same setting the diff JSON's per-symbol `match_percent` is a different normalisation from the report's
-`fuzzy_match_percent`. `report generate` over a one-unit project is the only path that is the report by
-construction, and it costs ~0.04 s. `--measure` calls the *same* `unitutil.report_measure` primitive
-`tools/units/measure.py` scores a whole unit with, so there is one implementation of the metric and the
-two fronts cannot drift.
-
-**A proposal unit measures too** (CLAUDE.md, "the proposal-unit measurement gap"). A worker registers a
-fresh proposal in its own worktree first (`configure.py` + `splits.txt`, per the brief) and MAIN has
-neither a ninja rule nor a split object for the range until that registration lands. That used to be the
-end of `--measure`; three workers hand-built a harness each (borrow a sibling's command line, score
-against the retired `auto_*_text.o`, one spent 87 turns on it). Both halves are now the tool's own path,
-and neither MAIN's config nor the worktree is written:
-
-* the **command line** comes from MAIN's ninja (registered), the worktree's ninja (if the worker
-generated one), or - last - a registered sibling in the *same `config.libs` block* of the worktree's
-`configure.py`, with only the source, the `-o` directory and the `-lang` token pointed at this unit.
-Those are the flags `project.py` emits for that lib, not a hand-rolled approximation;
-* the **target object** is resolved from the invocation's own tree outward (`resolve_target`): the
-worktree's split object first, then MAIN's, then the retired `auto_*_text.o` that owns the symbol's address
-in whichever tree has it - the same original bytes the split will put in the registered object
-(`auto_<symbol[:20]>_text.o` for a single symbol, else the `auto_<nn>_<address>_text` run that covers it).
-
-A registered unit run from MAIN takes exactly the path it took before (MAIN's rule, MAIN's object). A unit
-run from a worktree that has its own copy - the filed double-take - takes **that** copy, and the CLI prints
-the resolved absolute path with its kind (`[worktree-split]`, `[registered]`, `[auto-fallback]`) **and the
-tree it came from**, so a measurement is never ambiguous about which tree it came from. The score is still
-`report generate`'s `fuzzy_match_percent`.
-
-**`--measure` prints the provenance of the number it reports.** The tree the invocation resolved in (its
-cwd), the target object it compared against (**path and mtime**), the object it compiled (**path and
-mtime**), and the map - then a `WARNING` when the target is MAIN's while the cwd is a worktree, because
-that score is MAIN's and a reader must not have to infer it from an absolute path. `--json` carries the same
-facts under `provenance`. This is the half a reader can check *after* the fact; `split_staleness` is the half
-that refuses before it. It re-derives nothing: `compile_unit` already deletes the object before compiling
-and asserts it reappears, so the printed `compiled_mtime` is a provably fresh file.
-
-**A stale split is refused, not silently measured (F40).** Preferring this tree's object is only safe while
-this tree's split actually reflects its own `symbols.txt`/`splits.txt`/DOL. A lane that edits its `splits.txt`
-(a seam re-draw, a new registration) and has **not** re-split still has the previous build's object on disk,
-so the "this tree's copy" the resolution just preferred is the *old range's* bytes - and MAIN's copy is the
-same old range, so falling back is not a fix either. `split_staleness` reuses the seeder's own guard
-(`claims._build_is_current`, the one `slots.verify` uses) and then asks which split input is both newer than
-this tree's `build/RMHE08/config.json` **and** an uncommitted edit to this tree (`git diff --quiet HEAD`),
-and the CLI refuses with the file and both mtimes named. The dirty test is load-bearing, not decoration: a
-fresh worktree's tracked files are all written at checkout time while `build/` keeps MAIN's mtimes, so
-`_build_is_current` is False in **every** fresh worktree and a pure-mtime rule would refuse every measurement.
-`--allow-stale-split` is the deliberate override.
-
-**The map follows the invocation too (F43).** The fallback locates the retired `auto_*text.o` by *address*,
-and the address comes from `config/RMHE08/symbols.txt`. Reading MAIN's copy alone made the tool refuse a
-branch that had renamed a symbol - "a symbol this branch renamed has no entry there" - because MAIN has
-never carried the new spelling. `resolve_map` applies `resolve_target`'s discipline to the map: the
-invocation tree's copy first, MAIN's as the fallback, and the address lookup merges both (the branch
-supplies the new name, MAIN the old one that the retired object is named after). The CLI prints the map it
-read with its kind, so a measurement is unambiguous about the map as well as the object.
-
-`<unit>` is the path from the repository root, e.g. `Pl/pl_act`, `main.cpp`, `auto/80040598_fn_80040598`.
-"""
+"""Compile one unit without ninja from any worktree with MAIN's real command line, prove the object fresh, and
+`--measure` one symbol with the official metric. Spec: docs/tools/spec/recompile.md.
+CLI: python tools/units/recompile.py <unit> [--measure <symbol>] [--source <path>] [--main <tree>] [--allow-stale-split] [--json] [--dry-run] | --selftest."""
 
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
@@ -96,14 +11,12 @@ import os
 import subprocess
 import sys
 import time
+
+from tools.lib import repo as _repo
+from tools.lib import report as _report  # the metric and the diagnostic rows
+from tools.lib import units as _units  # spellings, the compile command, the compile, the target
+from tools.lib.binary.elf import Elf
 from tools.lib.git import Git
-
-HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.dirname(HERE))
-
-import unitutil  # noqa: E402
-from tools.lib import report as _report  # noqa: E402  (the metric and the diagnostic rows)
-from tools.lib import units as _units  # noqa: E402  (spellings, the compile command, the compile, the target)
 
 SRC_EXT = _units.SOURCE_EXT
 
@@ -125,41 +38,16 @@ def worktree_root(start: str | None = None) -> str:
 
 
 def main_root(current: str) -> str:
-    """MAIN's worktree path - the tree that owns the toolchain, the ninja graph and the split objects.
-
-    Callers that genuinely need MAIN: `recompile.py`/`measure.py` take the compile **command line**, the
-    toolchain and the *target* split object from MAIN (a worktree has no `build.ninja` of its own), while
-    the source, `-o` directory and `-i` order are the caller's tree. The gate (`land.py`) runs from MAIN
-    and does not call this.
-
-    Resolution is by `git rev-parse --git-common-dir`, whose parent is MAIN by construction, **not** the
-    first `git worktree list` entry - that order is registration order, and a tool that pinned MAIN by it
-    could hand a lane a slot's tree (or, worse, read a tree it was not editing). Falls back to the first
-    worktree entry only when git cannot answer, so a non-git copy still works.
-    """
-    common = git(["rev-parse", "--path-format=absolute", "--git-common-dir"], current, check=False)
-    common = (common or "").strip()
-    if common and os.path.basename(common.replace("\\", "/")) == ".git":
-        main = os.path.dirname(os.path.abspath(common))
-        if os.path.exists(os.path.join(main, "configure.py")):
-            return main
-    out = git(["worktree", "list", "--porcelain"], current)
-    paths = [line.split(" ", 1)[1] for line in out.splitlines() if line.startswith("worktree ")]
-    return paths[0] if paths else current
+    """MAIN's worktree path - the tree that owns the toolchain, the ninja graph and the split objects
+    (`lib.repo.main_checkout`: the git common dir's parent, never the first worktree entry unless git
+    cannot answer)."""
+    return _repo.main_checkout(current)
 
 
 def main_worktree_list(current: str) -> list[dict]:
-    out = git(["worktree", "list", "--porcelain"], current)
-    entries, cur = [], None
-    for line in out.splitlines():
-        if line.startswith("worktree "):
-            cur = {"path": line.split(" ", 1)[1], "branch": None, "head": None}
-            entries.append(cur)
-        elif line.startswith("branch ") and cur is not None:
-            cur["branch"] = line.split(" ", 1)[1].replace("refs/heads/", "")
-        elif line.startswith("HEAD ") and cur is not None:
-            cur["head"] = line.split(" ", 1)[1]
-    return entries
+    """`[{path, branch, head}]` of `git worktree list` (`lib.git.Git.worktree_list`)."""
+    return [{"path": w.path, "branch": w.branch, "head": w.head}
+            for w in Git(current).worktree_list()]
 
 
 unit_source = _units.with_ext
@@ -266,14 +154,14 @@ object_is_fresh = _units.object_is_fresh
 section_sizes = _units.section_sizes
 
 
-MIN_PROJECT_VERSION = unitutil.MIN_PROJECT_VERSION
+MIN_PROJECT_VERSION = _report.MIN_PROJECT_VERSION
 
 
 def measure(target: str, base: str, symbol: str, objdiff: str, tmpdir: str,
-            unit: str = None, runner=subprocess.run) -> dict:
+            unit: str = None, runner=subprocess.run, cwd: str | None = None) -> dict:
     """The official score of one symbol (`lib.report.symbol_score`) plus the diagnostic rows behind it;
     the positional diff value is kept as `diff_match_percent` and is never the score."""
-    result = _report.symbol_score(target, base, symbol, unit, tmpdir, objdiff=objdiff, cwd=unitutil.ROOT,
+    result = _report.symbol_score(target, base, symbol, unit, tmpdir, objdiff=objdiff, cwd=cwd,
                                   runner=runner)
     if "error" in result:
         return result
@@ -320,10 +208,9 @@ def object_has_symbol(obj: str, symbol: str) -> bool:
     """Whether an object defines `symbol` at all - the check that separates "nothing to pair" from a
     renamed symbol, both of which `report generate` answers with a null `fuzzy_match_percent`."""
     try:
-        _secs, syms = unitutil.read_elf(obj)
+        return any(s.name == symbol and s.shndx for s in Elf.read(obj).symbols)
     except Exception:
         return False
-    return any(s[0] == symbol for s in syms)
 
 
 target_rel = _units.target_rel
@@ -349,7 +236,7 @@ STALE_SPLIT_FLAG = "--allow-stale-split"
 
 def _claims():
     """`claims` imported late: it imports this module at import time, so a top-level import would cycle."""
-    from units import claims
+    from tools.units import claims
     return claims
 
 
@@ -468,7 +355,7 @@ def main() -> int:
     ap.add_argument("--selftest", action="store_true", help="run the self-test and exit")
     args = ap.parse_args()
     if args.selftest:
-        import recompile_selftest
+        from tools.units import recompile_selftest
         return recompile_selftest.main()
     if not args.unit:
         ap.error("a unit is required (or --selftest)")
@@ -483,7 +370,7 @@ def main() -> int:
         refuse_if_split_stale(wt, main_wt, allow_stale=args.allow_stale_split)
     map_path, map_kind = resolve_map(wt, main_wt)
     tokens, cmd_source = unit_tokens(main_wt, wt, unit)
-    result = compile_unit(unit, main_wt, wt, dry_run=args.dry_run, tokens=tokens)
+    result = dict(compile_unit(unit, main_wt, wt, dry_run=args.dry_run, tokens=tokens))
     result.update({"unit": unit, "worktree": wt, "main": main_wt,
                    "symbol_map": map_path, "symbol_map_kind": map_kind})
     if cmd_source != "main":
@@ -502,7 +389,7 @@ def main() -> int:
             result["measure"] = {"symbol": args.measure, "error": target_note}
         else:
             result["measure"] = measure(target, result["object"], args.measure, _report.objdiff_cli(wt, main_wt),
-                                        unitutil.session_tmpdir(), unit=unit)
+                                        _repo.session_tmpdir(), unit=unit, cwd=wt)
             m = result["measure"]
             if target_kind == "auto-fallback" and "error" not in m and m.get("match_percent") is None:
                 # report pairs by name and answers a null (not an error) when pairing fails; say which of

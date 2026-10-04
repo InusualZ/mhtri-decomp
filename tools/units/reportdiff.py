@@ -1,42 +1,7 @@
 #!/usr/bin/env python3
-"""Diff two `build/<game>/report.json` snapshots: which rows moved, which units appeared, and the
-category denominators - the instrument two lanes hand-wrote and neither kept.
-
-    python tools/units/reportdiff.py <before.json> <after.json> [--json] [--changed-only] [--limit N]
-    python tools/units/reportdiff.py --selftest
-
-**The question this answers, and why it needs a tool.** Every data/declaration batch has to prove it
-did not move codegen ("the whole-project report is unchanged row for row"), and the two lanes that
-pinned the `Pl` `.sdata2` pool wrote the same JSON diff by hand - twice - from a scratch script that no
-one else could run. Their acceptance criteria were exactly the ones an ad-hoc diff gets wrong: *no row
-may drop* (a unit or symbol whose `fuzzy_match_percent` fell is a regression, even if the totals rose)
-and *any row that moves at all* must be named (the change is either explained by the batch or it is a
-surprise). This tool is that diff, with the exit status as the verdict.
-
-**What it prints.**
-
-* **unit rows whose score moved**, with before -> after (worst first), keyed on the unit's
-  `fuzzy_match_percent`;
-* **symbol rows whose score moved**, the same way, keyed on `(unit, symbol)` - the report's `functions`
-  rows, which is the level a lane can act on;
-* **units added and removed** (a claim re-tiles the `auto_*` units, so the set always churns - the
-  names are the evidence, not a count);
-* **the category denominators** - the project totals and every report `category` (`game`, `sdk`,
-  `auto`), as a before/after table with deltas: `fuzzy`, `matched_code`, `matched_data`, `total_units`,
-  `total_code`, `total_data`, `matched_functions`, `complete_*` and the percent columns.
-
-**Exit status is the verdict** (the house codes):
-
-* `0` nothing regressed - no unit or symbol row dropped, no numerator denominator fell;
-* `1` a row dropped - the drops are listed even when the aggregate improved;
-* `2` nothing comparable was found - a path that is missing, unreadable, not a report, or a pair with
-  no unit and no denominator in common. A traceback is never the answer.
-
-**Direction matters, so it is explicit.** `<before.json>` is the baseline, `<after.json>` the candidate;
-swapping the arguments swaps every delta and the verdict. Both files are ordinary `report.json`s (dtk's
-`ninja build/<game>/report.json`), so `git show` of a committed report, a copy of an earlier build, or
-MAIN's own report all work unchanged.
-"""
+"""Diff two report.json snapshots - moved rows, added/removed units, the denominators - with the verdict as the exit
+status (`lib.report.compare`). Spec: docs/tools/spec/reportdiff.md.
+CLI: python tools/units/reportdiff.py <before.json> <after.json> [--json] [--changed-only] [--limit N] [--eps E] | --selftest."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
@@ -80,32 +45,8 @@ diff_symbols = _report.diff_symbols
 diff_denominators = _report.diff_denominators
 
 
-def build(before: dict, after: dict, eps: float = DEFAULT_EPS,
-          before_path: str = "?", after_path: str = "?") -> dict:
-    """The whole diff as a JSON-safe payload, plus the verdict the exit status encodes."""
-    units = diff_units(before, after, eps)
-    symbols = diff_symbols(before, after, eps)
-    dens = diff_denominators(before, after, eps)
-    drops = ([{"kind": "unit", "name": r["unit"], "before": r["before"], "after": r["after"],
-               "delta": r["delta"]} for r in units["moved"] if r["delta"] < -eps]
-             + [{"kind": "symbol", "name": "%s/%s" % (r["unit"], r["symbol"]), "before": r["before"],
-                 "after": r["after"], "delta": r["delta"]} for r in symbols["moved"]
-                if r["delta"] < -eps]
-             + [{"kind": "denominator", "name": "%s/%s" % (r["scope"], r["metric"]),
-                 "before": r["before"], "after": r["after"], "delta": r["delta"]}
-                for r in dens if r["regressed"]])
-    common_units = len(set(unit_measures(before)) & set(unit_measures(after)))
-    shared_measures = len(set(denominators(before).get("project", {}))
-                          & set(denominators(after).get("project", {})))
-    comparable = common_units or shared_measures
-    return {
-        "before": before_path, "after": after_path, "eps": eps,
-        "units": units, "symbols": symbols, "denominators": dens,
-        "drops": drops, "regressed": bool(drops),
-        "comparable": {"common_units": common_units, "shared_measures": shared_measures,
-                       "ok": bool(comparable)},
-        "exit": 1 if drops else (0 if comparable else 2),
-    }
+#: The whole diff as a JSON-safe payload, plus the verdict the exit status encodes.
+build = _report.compare
 
 
 # --------------------------------------------------------------------------------------------------
@@ -160,10 +101,9 @@ def render(payload: dict, limit: int = 20, changed_only: bool = False) -> str:
         if len(shown) < len(units["moved"]):
             out.append("  ... (%d more, raise --limit; the count below is exact)"
                        % (len(units["moved"]) - len(shown)))
-    up = sum(1 for r in units["moved"] if r["delta"] > 0)
-    down = sum(1 for r in units["moved"] if r["delta"] < 0)
+    counts = _report.direction(units["moved"])
     out.append("  %d moved (%d up, %d down); %d added; %d removed"
-               % (len(units["moved"]), up, down, len(units["added"]), len(units["removed"])))
+               % (counts["moved"], counts["up"], counts["down"], len(units["added"]), len(units["removed"])))
     out.append("")
 
     out.append("== symbol rows whose score moved (worst first) ==")
@@ -176,10 +116,9 @@ def render(payload: dict, limit: int = 20, changed_only: bool = False) -> str:
         out.append(_table(("", "UNIT", "SYMBOL", "BEFORE", "AFTER", "DELTA"), rows))
         if len(shown) < len(symbols["moved"]):
             out.append("  ... (%d more, raise --limit)" % (len(symbols["moved"]) - len(shown)))
-    up = sum(1 for r in symbols["moved"] if r["delta"] > 0)
-    down = sum(1 for r in symbols["moved"] if r["delta"] < 0)
+    counts = _report.direction(symbols["moved"])
     out.append("  %d moved (%d up, %d down); %d added; %d removed"
-               % (len(symbols["moved"]), up, down, len(symbols["added"]), len(symbols["removed"])))
+               % (counts["moved"], counts["up"], counts["down"], len(symbols["added"]), len(symbols["removed"])))
     out.append("")
 
     out.append("== units added (%d) ==" % len(units["added"]))

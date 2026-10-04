@@ -7,6 +7,7 @@ import os
 import re
 import subprocess
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Callable
@@ -576,12 +577,75 @@ def section_sizes(obj: str) -> dict:
     return {s.name: s.size for s in elf.sections if s.name and s.size}
 
 
+def frames(obj: str) -> list[tuple[str, int, int | None]]:
+    """`[(name, size, frame)]` for every defined function of an object, in address order.
+
+    `frame` is the positive `N` of a leading `stwu rS,-N(rA)` (`lib.ppc.stwu_frame`), None without one.
+    """
+    from tools.lib.binary.elf import Elf
+    from tools.lib.ppc import stwu_frame
+    elf = Elf.read(obj)
+    out = []
+    funcs = sorted((s for s in elf.symbols if s.name and s.shndx and s.type == 2), key=lambda s: s.value)
+    for sym in funcs:
+        data = elf.sections[sym.shndx].raw
+        word = int.from_bytes(data[sym.value:sym.value + 4], "big") if len(data) >= sym.value + 4 else None
+        out.append((sym.name, sym.size, stwu_frame(word) if word is not None else None))
+    return out
+
+
+def function_names(obj: str) -> list[str]:
+    """The defined functions of an object, in address order."""
+    return [f[0] for f in frames(obj)]
+
+
+def text_size(obj: str) -> int:
+    """The size of an object's `.text` section (`StopIteration` when it has none)."""
+    from tools.lib.binary.elf import Elf
+    return next(s.size for s in Elf.read(obj).sections if s.name == ".text")
+
+
+@dataclass(frozen=True)
+class CompileResult(Mapping):
+    """What `compile` did: a value that also reads as the mapping of the keys it carries.
+
+    `compiled` with `fresh`/`bytes`/`sections`/`log`; a failure with `error`; a dry run with `command`
+    and `dry_run`. Unset fields are absent from the mapping, so `dict(result)` is the old return shape.
+    """
+    object: str
+    compiled: bool | None = None
+    fresh: bool | None = None
+    bytes: int | None = None
+    sections: dict | None = None
+    log: str | None = None
+    error: str | None = None
+    command: list | None = None
+    dry_run: bool | None = None
+
+    def _items(self) -> dict:
+        if self.dry_run:
+            return {"command": self.command, "object": self.object, "dry_run": True}
+        return {f: getattr(self, f) for f in self.__dataclass_fields__ if getattr(self, f) is not None}
+
+    def __getitem__(self, key: str):
+        items = self._items()
+        if key not in items:
+            raise KeyError(key)
+        return items[key]
+
+    def __iter__(self):
+        return iter(self._items())
+
+    def __len__(self) -> int:
+        return len(self._items())
+
+
 def compile(spelling: str, main: str, wt: str, dry_run: bool = False, runner: Callable = subprocess.run,
-            tokens: list[str] | None = None) -> dict:
+            tokens: list[str] | None = None) -> CompileResult:
     """Compile the unit in `wt` with `main`'s command line (or `tokens`) and prove the object is fresh.
 
-    Returns `{object, compiled, fresh, bytes, sections, log}`, `{object, compiled: False, error}`, or with
-    `dry_run` `{command, object, dry_run}`.
+    Returns a `CompileResult`: `{object, compiled, fresh, bytes, sections, log}`, `{object, compiled: False,
+    error}`, or with `dry_run` `{command, object, dry_run}`.
     """
     if tokens is None:
         tokens = ninja_command(main, spelling, runner=runner)
@@ -591,25 +655,25 @@ def compile(spelling: str, main: str, wt: str, dry_run: bool = False, runner: Ca
     existed = os.path.exists(obj)
     before = os.stat(obj).st_mtime_ns if existed else None
     if dry_run:
-        return {"command": cmd, "object": obj, "dry_run": True}
+        return CompileResult(obj, command=cmd, dry_run=True)
     if existed:
         os.remove(obj)
     started = time.time_ns()
     p = runner(cmd, cwd=main, capture_output=True, text=True, encoding="utf-8", errors="replace")
     log = (p.stdout or "") + (p.stderr or "")
     if p.returncode != 0:
-        return {"object": obj, "compiled": False, "error": log}
+        return CompileResult(obj, compiled=False, error=log)
     if not os.path.exists(obj):
-        return {"object": obj, "compiled": False,
-                "error": "the compiler returned 0 but wrote no object - MWCC's -o is a DIRECTORY; "
-                         "digest:\n" + log}
+        return CompileResult(obj, compiled=False,
+                             error="the compiler returned 0 but wrote no object - MWCC's -o is a DIRECTORY; "
+                                   "digest:\n" + log)
     after = os.stat(obj).st_mtime_ns
     fresh = after >= started and after != before
     ok, why = object_is_fresh(obj, source_path(wt, spelling))
     if not ok:
-        return {"object": obj, "compiled": False, "error": why}
-    return {"object": obj, "compiled": True, "fresh": fresh, "bytes": os.path.getsize(obj),
-            "sections": section_sizes(obj), "log": log}
+        return CompileResult(obj, compiled=False, error=why)
+    return CompileResult(obj, compiled=True, fresh=fresh, bytes=os.path.getsize(obj),
+                         sections=section_sizes(obj), log=log)
 
 
 def run_tokens(tokens: list[str], cwd: str, expect: str | None = None, scratch_dir: str | None = None,
@@ -645,6 +709,117 @@ def run_tokens(tokens: list[str], cwd: str, expect: str | None = None, scratch_d
         out += "\n!! object was NOT regenerated (%s) -- check the -o argument" % obj
         return 2, out, obj
     return p.returncode, out, obj
+
+
+# --------------------------------------------------------------------------------------------------
+# the flag tools: one command line split, its flags overridden, its compiler swapped
+# --------------------------------------------------------------------------------------------------
+
+#: MWCC options that take a following value token (the count), as this project's configure.py spells them.
+#: Used only to drop a conflicting earlier occurrence when `--flags-extra` overrides the same option.
+VALUED = {
+    "-proc": 1, "-align": 1, "-enum": 1, "-fp": 1, "-Cpp_exceptions": 1, "-inline": 1,
+    "-pragma": 1, "-maxerrors": 1, "-RTTI": 1, "-fp_contract": 1, "-str": 1, "-i": 1, "-ir": 1,
+    "-I": 1, "-use_lmw_stmw": 1, "-common": 1, "-lang": 1, "-opt": 1, "-pool": 1, "-schedule": 1,
+    "-sdata": 1, "-sdata2": 1, "-model": 1, "-abi": 1, "-encoding": 1, "-D": 0, "-U": 0,
+    "-gccinc": 0, "-nodefaults": 0, "-nosyspath": 0, "-multibyte": 0, "-gcc": 0, "-rostr": 0,
+}
+
+
+def split_flags(tokens: list[str]) -> tuple[list[str], list[str], list[str]]:
+    """(head, flags, tail): head = wrapper + compiler, tail = `-MMD -c <src> -o <dir>` and what follows."""
+    head_end = next(i for i, t in enumerate(tokens) if t.startswith("-") and i > 0)
+    tail_start = next(i for i, t in enumerate(tokens) if t == "-MMD")
+    return tokens[:head_end], tokens[head_end:tail_start], tokens[tail_start:]
+
+
+def split_command(unit: Unit, runner: Callable = subprocess.run) -> tuple[list[str], list[str], list[str]]:
+    """`split_flags` of the command the unit's own tree's ninja runs for it (`ninja_command`)."""
+    return split_flags(ninja_command(unit.root, unit.spelling, runner=runner))
+
+
+def family(tok: str) -> str | None:
+    """The option family a flag token belongs to (`-O3`, `-O4,p` -> `-O`), or None."""
+    if re.match(r"^-O\d", tok):
+        return "-O"
+    name = tok.split("=", 1)[0]
+    return name if name in VALUED else None
+
+
+def _value_len(tokens: list[str], i: int) -> int:
+    if VALUED.get(tokens[i], 0) == 0:
+        return 0
+    j = i + 1
+    if j < len(tokens) and tokens[j].startswith('"') and not tokens[j].endswith('"'):
+        while j < len(tokens) and not tokens[j].endswith('"'):
+            j += 1
+        return j - i
+    return VALUED[tokens[i]]
+
+
+def override_flags(flags: list[str], extra: str) -> list[str]:
+    """Apply `--flags-extra`: drop every earlier flag of a family `extra` names (with its value), then append."""
+    extras = extra.split()
+    families = {f for f in (family(t) for t in extras) if f}
+    out, i = [], 0
+    while i < len(flags):
+        if family(flags[i]) in families:
+            i += 1 + _value_len(flags, i)
+            continue
+        out.append(flags[i])
+        i += 1
+    return out + extras
+
+
+def quiet(out: str) -> str:
+    """MWCC's output without its informational `###` banner lines."""
+    return "\n".join(l for l in out.splitlines() if not l.startswith("###"))
+
+
+def compiler_token(head: list[str]) -> str:
+    """The MWCC executable token of a split command line."""
+    return next(t for t in head if t.endswith("mwcceppc.exe"))
+
+
+def with_compiler_version(head: list[str], version: str) -> list[str]:
+    """The same head with the compiler's version directory replaced: `1.3` (the unit's own family) or a
+    cross-family `GC/3.0a3`."""
+    fam, _, ver = version.partition("/")
+    out = []
+    for t in head:
+        if t.endswith("mwcceppc.exe"):
+            parts = re.split(r"[\\/]", t)
+            parts[-2] = ver if ver else fam
+            if ver:
+                parts[-3] = fam
+            sep = "\\" if "\\" in t else "/"
+            out.append(sep.join(parts))
+        else:
+            out.append(t)
+    return out
+
+
+def drop_unknown_option(flags: list[str], log: str) -> list[str] | None:
+    """`flags` without the option MWCC's `log` rejected as unknown (and its value), or None."""
+    m = re.search(r"Unknown option '([^']+)'", log)
+    if not m:
+        return None
+    bad = m.group(1)
+    out = list(flags)
+    for i, f in enumerate(out):
+        if f == bad or (f.startswith("-") and bad in f):
+            del out[i]
+            if i < len(out) and not out[i].startswith("-"):
+                del out[i]
+            return out
+    return None
+
+
+def available_versions(head: list[str]) -> list[str]:
+    """The compiler versions installed beside the one `head` names: the sibling directories of its version
+    directory (`build/compilers/Wii/1.3/mwcceppc.exe` -> every `build/compilers/Wii/<v>/`)."""
+    d = os.path.dirname(os.path.dirname(compiler_token(head)))
+    return sorted(e for e in os.listdir(d) if os.path.isdir(os.path.join(d, e))) if os.path.isdir(d) else []
 
 
 # --------------------------------------------------------------------------------------------------

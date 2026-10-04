@@ -41,14 +41,18 @@ Target: `tools/tests/units/test_measure.py` on `lib.testing` (`FixtureTree`/`Git
 
 ## Known gaps
 
-None recorded.
+* A baseline report row without a `fuzzy_match_percent` reads as **0 %** (the campaign rule, `lib.report.score_of`)
+  since WP3b; it used to read as "no baseline" and printed no delta. On MAIN's report at 0375f98c4 that is 11 966 of
+  20 507 function rows (233 units), so `--against-main` on one of those units now prints a delta (and may count an
+  `up` row) where it printed none.
+* `moved`/`up`/`down` against a baseline are `lib.report.moved` + `direction` (the rule `reportdiff` reads).
 
 ## History (the incidents behind the rules - keep the rule, drop the narrative when the rule is stable)
 
 * `tools/units/recompile.py --measure <symbol>` answers one symbol per run, which is the right shape for the *proof* step and the wrong shape for a search: a worker who wants to know whether a shape helped has to run it once per symbol of the unit, and each run recompiles the source and issues **two** objdiff calls (the report for the score, the positional diff for the rows). Workers hit that and each hand-wrote the same driver - `build/tmp/mp.py`, `build/tmp/measure_all.py`, `build/scratch/*.py`, `.pi/scratch/score.py` - a compile plus **one** report over the unit's own target object, printed as a per-symbol table. This is that driver, shipped.
-* takes the unit's **real** command line from the same construction `recompile.py` uses (`recompile.unit_tokens` -> MAIN's ninja, the worktree's ninja, then a same-lib sibling) and compiles it into this tree's `build/RMHE08/src/...` through `recompile.compile_unit` (fresh-object assertion included). Nothing about the command line is re-derived here;
+* takes the unit's **real** command line from the same construction `recompile.py` uses (`lib.units.unit_tokens` -> MAIN's ninja, the worktree's ninja, then a same-lib sibling) and compiles it into this tree's `build/RMHE08/src/...` through `recompile.compile_unit` (fresh-object assertion included). Nothing about the command line is re-derived here;
 * resolves the **target** object the way a worker needs it: the worktree's own split object first (a proposal whose registration has landed on the branch but not on MAIN), then MAIN's registered object, then MAIN's retired `auto_*_text` object for the symbol's address (`recompile.proposal_target`);
 * scores **every** symbol with one `report generate` over a one-unit project - the official `fuzzy_match_percent`, the same number `build/RMHE08/report.json` carries - and prints the unit's own official measures (``fuzzy_match_percent``, ``matched_functions``) beside a per-symbol table;
 * remembers the previous run's scores in `build/tmp/measure/<unit>.scores.json` and prints the **delta** per symbol, which is what tells a worker "did this shape work" without babysitting a spreadsheet;
 * `--baseline <report.json>` (or `--against-main`) makes that delta compare against a **saved** project report or **MAIN's** `build/RMHE08/report.json` instead of the tool's own last run - the shape the hand-written scorers all converged on (`build/probe/score.py` diffed a probe's rows against the committed report). One call then answers "every symbol of this unit, and what each one is worth against the build that landed", which is the per-iteration question. `--save` writes this run in that shape for the next one. A baseline that moved a row **down** is a regression, and the summary says so;
-* `--diff` (or a symbol focus) adds a compact instruction-level mismatch list for the symbol, read from `recompile.diff_rows`' diagnostic JSON - never quoted as the score.
+* `--diff` (or a symbol focus) adds a compact instruction-level mismatch list for the symbol, read from `lib.report.diff_rows`' diagnostic JSON - never quoted as the score.

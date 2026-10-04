@@ -1,28 +1,12 @@
 #!/usr/bin/env python3
-"""r1-relative stack-slot map for one symbol of an objdiff-cli diff.
-
-Usage:
-    python tools/objdiff/slotmap.py -u <unit> <symbol> [--map] [--slot 0xc8] [--around 700,730]
-    python tools/objdiff/slotmap.py <diff.json> <symbol> [--map] [--slot 0xc8] [--left ours|target]
-
-Invocation: the `-u` path runs objdiff in **project mode** (`-p . -u <unit>`), where **left = the target
-object and right = our build**. A pre-existing `diff.json` is assumed to be file mode
-(`-1 <ours> -2 <target>`, left = ours), as this docstring always said; `--left` overrides that guess.
-Because the two instruction streams are identical except for the r1 offsets, the offset mapping is
-recovered by index-aligned majority vote.
-
-The rows come from a diff run with `-c functionRelocDiffs=none` (unitutil.objdiff) - `report generate`'s
-default - so a relocation-only difference is not reported here as an argument mismatch. This tool prints
-no score on purpose: objdiff's `match_percent` is positional and not the campaign's metric; use
-`mt.py diff -u <unit> <symbol>` for the official number.
-"""
+"""r1-relative stack-slot map for one symbol of an objdiff-cli diff (rows only, never a score). Spec: docs/tools/spec/slotmap.md.
+CLI: python tools/objdiff/slotmap.py -u <unit> <symbol> | <diff.json> <symbol> [--left ours|target] [--map] [--slot 0xc8] [--around a,b]."""
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import json
 import os
 import re
-import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # tools/
-import unitutil as uu
+from tools.lib import repo, report, units
 
 
 LEFT_IS_TARGET = False   # set by cli(): project mode has left = target, file mode left = ours
@@ -45,9 +29,11 @@ def cli():
         if flag in a:
             i = a.index(flag)
             rest = a[:i] + a[i + 2:]
-            unit = uu.resolve_unit(a[i + 1])
+            root = repo.repo_root()
+            unit = units.Unit.resolve(a[i + 1], root)
             symbol = rest[0]
-            path, log = uu.objdiff(unit, symbol)
+            out = os.path.join(repo.session_tmpdir(), "%s_%s_diff.json" % (unit.module, unit.file))
+            path, log = report.project_diff(root, unit.report_name, symbol, out, report.objdiff_cli(root))
             if not path:
                 raise SystemExit("objdiff failed: " + log)
             sys.argv = [sys.argv[0], path, symbol] + rest[1:]
@@ -154,4 +140,5 @@ def main():
             print("%s %4d  %-46s | %s" % (mark, i, ti, oi))
 
 
-main()
+if __name__ == "__main__":
+    main()

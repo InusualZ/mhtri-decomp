@@ -21,14 +21,20 @@ older than the sources it describes.
   (missing file = the empty report), `Report.coerce(report | dict | None)`; `units()`, `unit(name)`, `entries(name)`,
   `functions(name) -> {symbol: score}`, `scores() -> {unit: {symbol: score}}`, `measures(name=None)`, `unit_measures()`,
   `symbol_measures() -> {(unit, symbol): score}`, `denominators()`, `arithmetic_check(name)`.
-* Comparisons: `diff_units`, `diff_symbols`, `diff_denominators` (moved rows worst first, added/removed, regression flags;
-  `MEASURE_ORDER`, `REGRESSION_KEYS`, `DEFAULT_EPS`).
+* Comparisons: `moved(before, after, eps)` (the one moved-row rule over two `{key: score}` maps), `direction(rows)`
+  (`{moved, up, down}`), `drops(rows, eps)`; `diff_units`, `diff_symbols`, `diff_denominators` (moved rows worst first,
+  added/removed, regression flags; `MEASURE_ORDER`, `REGRESSION_KEYS`, `DEFAULT_EPS`); `compare(before, after, eps,
+  before_path, after_path)` - the whole two-report diff with the "every moved row that fell" verdict as `exit`
+  (0 clean, 1 a drop, 2 nothing comparable) - `reportdiff`'s payload.
 * The gate's rule: `snapshot(report) -> {unit: {fuzzy, matched_code, symbols: {name: score < 100}}}`, `unit_grew(prior,
   after)`, `regression(before, after, allow=(), eps) -> (unauthorised, authorised)` as `(unit, what, before, after)`.
 * Scoring: `score(target, base, unit_name, tmpdir, *, objdiff, cwd, runner) -> Report` (raises `ReportError`),
   `score_entries(...) -> {symbol: entry} | {"_error": text}`, `symbol_score(...) -> {symbol, match_percent, target_size,
   report_json} | {symbol, error}`, `write_project(target, base, unit_name, tmpdir)`, `first_unit(report)`,
-  `diff_rows(target, base, symbol, objdiff, tmpdir, runner)` (rows, never a score), `objdiff_cli(root, main=None)`.
+  `diff_rows(target, base, symbol, objdiff, tmpdir, runner)` (rows, never a score), `project_diff(root, unit_name,
+  symbol, out, objdiff, runner) -> (path | None, log)` (`diff -p . -u` in a tree: the tree's own `objdiff.json`, rows
+  only), `objdiff_cli(root, main=None)`, `retry_transient(fn, attempts=4)` (a transient `PermissionError` retried
+  with backoff).
 * Freshness: `freshness(use_report, report_mtime, object_mtime, newest_source, report_path, object_path, rel)`,
   `unit_reasons(src, obj, root, rel)`, `report_reasons(report, obj, src, root, rel)`, `source_closure(src, root)`,
   `includes_of`, `resolve_include`, `newest`, `mtime`, `stamp`, `stamp_json`, `rel_path`; `Freshness` groups the three.
@@ -62,8 +68,9 @@ older than the sources it describes.
 
 ## Absorbs (today's implementations)
 
-`unitutil.report_functions/report_measure/measure_project` (now delegates), `freshguard` (all of it; the file is a
-re-export shim), `reportdiff.num/load_report/unit_measures/symbol_measures/denominators/diff_units/diff_symbols/
+`unitutil.report_functions/report_measure/measure_project/objdiff` (now delegates), `freshguard` (all of it; the file is a
+re-export shim), `symdiff.retry_transient`, `mwcc_matrix.diff_unit`'s and `slotmap`'s project-mode diff, `reportdiff.build`
+(now `compare`), `measure.moved_summary`'s count, `reportdiff.num/load_report/unit_measures/symbol_measures/denominators/diff_units/diff_symbols/
 diff_denominators`, `land.report_snapshot/unit_grew/report_regressions`, `recompile.measure/diff_rows`,
 `measure.score_report/objdiff_path`, `ledger`'s score table, `verifyunit.report_unit/_score/arithmetic_crosscheck`,
 `unitscore.rows_of`'s score.
@@ -74,22 +81,27 @@ diff_denominators`, `land.report_snapshot/unit_grew/report_regressions`, `recomp
 
 ## Test contract
 
-Tier: fixture (`tools/tests/lib/test_report.py`, 59 checks). The 0 % rule on every reader; `arithmetic_check` reproduces the
+Tier: fixture (`tools/tests/lib/test_report.py`, 72 checks). The 0 % rule on every reader; `arithmetic_check` reproduces the
 unit percent and fails the 100 % reading; `Report.load` refuses the three non-reports; the comparisons on the `reportdiff`
-fixtures, including a symbol losing its score as a drop to 0; `snapshot`/`regression`/`unit_grew` on hand-built snapshots;
-the scoring wire with a stub runner (one `report generate`, one-unit project, absolute paths, the pinned version, the error
-paths, `functionRelocDiffs=none` on diff rows); `Freshness` on temp mtimes (strict `<`, a header edit dates the object, report
-mode's two reasons). The integration rows (the real objects) stay in `tools/objdiff/metric_selftest.py`.
+fixtures, including a symbol losing its score as a drop to 0; `moved`/`direction`/`drops` and `compare`'s three exits;
+`snapshot`/`regression`/`unit_grew` on hand-built snapshots; the scoring wire with a stub runner (one `report generate`,
+one-unit project, absolute paths, the pinned version, the error paths, `functionRelocDiffs=none` on diff rows and on
+`project_diff`, `retry_transient`); `Freshness` on temp mtimes (strict `<`, a header edit dates the object, report mode's two
+reasons). The integration rows (the real objects) stay in `tools/objdiff/metric_selftest.py`.
 
 ## Known gaps
 
-* Three regression policies remain over the one comparison: `regression` (the gate), `reportdiff`'s "every moved row that
-  fell" verdict (a CLI with no caller) and `measure.moved_summary` (a count over measure's own rows). `applysplits` retired
-  with the program. Folding the last two onto `regression` changes their output, so it waits for WP3b (the score family).
+* Two regression policies remain over the one comparison, on purpose: `compare` ("every moved row that fell", over
+  two whole reports - `reportdiff`, and `measure`'s baseline count reads the same `moved`/`direction`) and `regression`
+  (the gate, over two `snapshot`s). WP3b folded `reportdiff`'s verdict and `measure.moved_summary` onto `moved`; folding
+  them onto `regression` would import its two blind spots below into tools that do not have them.
+* `regression` cannot see a symbol that was at 100 % and fell: `snapshot` holds only sub-100 % symbols, so the fallen
+  symbol is "new" (an extension), never a drop - including one that lost its score (100 -> unscored = 0 %). A gate
+  behaviour change; WP4 decides.
 * `unit_grew`'s matched-bytes signal compares numbers, but the report stores `matched_code` as a string, so in practice only
   the symbol-set signal fires. Kept as found (a gate behaviour change); WP4 decides.
-* `measure.load_baseline` still reads an unscored baseline row as "no baseline" rather than 0 % (it changes measure's delta
-  column); WP3b.
-* `source_closure` is C text scanning; `lib.cscan.include_closure` (WP2c) is its eventual home.
+* `source_closure` is C text scanning, but `lib.cscan.include_closure` is not a drop-in: it walks depth first (this is
+  breadth first, and `unitscore --json` prints `sources.paths` in this order) and reads includes from uncommented text
+  only through a caller's `read`. Moving it changes an output; left for the pass that owns `cscan`'s closure (3d).
 * `ledger.stale` (report vs `splits.txt`/`configure.py`) and `pairgap.report_scores`/`datagap.units_from_report` (WP3a) are
   still private readers.

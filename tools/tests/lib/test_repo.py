@@ -121,8 +121,19 @@ def test_main_and_inputs(c):
                 ["build/RMHE08/obj", "build/RMHE08/src", "build/RMHE08/asm", "build/RMHE08/report.json",
                  "orig/RMHE08/sys/main.dol", "config/RMHE08/config.yml", "objdiff.json"])
         c.check("Tree.input uses the fallback", same(t.input("only-main.bin"), fx.root / "only-main.bin"), True)
+        c.check("main_checkout of a worktree is MAIN", same(repo.main_checkout(wt), fx.root), True)
     with testing.FixtureTree() as tree:
         c.check("main_tree outside git is None", repo.main_tree(tree.root), None)
+        c.check("main_checkout of a non-repository copy is the copy itself",
+                same(repo.main_checkout(tree.root), tree.root), True)
+        with testing.FixtureTree() as other:
+            real = repo.main_tree
+            repo.main_tree = lambda root, honour_env=False: str(other.root)
+            try:
+                c.check("main_checkout takes main_tree's answer when it is a tree",
+                        same(repo.main_checkout(tree.root), other.root), True)
+            finally:
+                repo.main_tree = real
         c.check("a fixture Tree is its own MAIN", same(repo.Tree(tree.root).main, tree.root), True)
 
 

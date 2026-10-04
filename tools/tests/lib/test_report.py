@@ -96,6 +96,27 @@ def test_comparisons(c):
     c.check("a category fall is reported, not a verdict",
             (dens[("game", "matched_data")]["fell"], dens[("game", "matched_data")]["regressed"]), (True, False))
 
+    rows = report.moved({"a": 50.0, "b": 100.0, "c": 5.0, "d": None, "e": 1.0},
+                        {"a": 45.0, "b": 100.0, "c": 6.0, "d": 7.0, "f": 2.0})
+    c.check("moved: rows both sides score, that moved, in key order",
+            [(r["key"], r["delta"]) for r in rows], [("a", -5.0), ("c", 1.0)])
+    c.check("direction counts up and down", report.direction(rows), {"moved": 2, "up": 1, "down": 1})
+    c.check("drops are the rows that fell", [r["key"] for r in report.drops(rows)], ["a"])
+    c.check("a move inside eps is no move", report.moved({"a": 1.0}, {"a": 1.0 + 1e-12}), [])
+
+    payload = report.compare(before, after, before_path="b.json", after_path="a.json")
+    c.check("compare: every kind of drop is named",
+            sorted((d["kind"], d["name"]) for d in payload["drops"]),
+            [("denominator", "project/matched_data"), ("symbol", "main/a/fa"), ("symbol", "main/b/fc"),
+             ("unit", "main/b")])
+    c.check("... and exits 1, comparable over the common units",
+            (payload["exit"], payload["regressed"], payload["comparable"]["common_units"]), (1, True, 2))
+    c.check("compare: identical reports exit 0", report.compare(after, after)["exit"], 0)
+    c.check("compare: nothing in common exits 2",
+            report.compare(_rep({"x": (1.0, 1, {})}), _rep({"y": (1.0, 1, {})}))["exit"], 2)
+    c.check("compare: a gain is not a drop", report.compare(_rep({"u": (1.0, 1, {"f": (4, 10.0)})}),
+                                                            _rep({"u": (2.0, 1, {"f": (4, 20.0)})}))["exit"], 0)
+
 
 def test_snapshot_and_regression(c):
     r1 = _rep({"main/u": (50.0, 300, {"f": (100, 100.0), "g": (100, 40.0), "h": (100, None)}),
@@ -173,6 +194,27 @@ def test_scoring_wire(c):
         c.contains("... and score_entries returns it as `_error`",
                    report.score_entries(target, base, "u", tmp, objdiff="o", runner=_runner(seen, fns, rc=1))["_error"],
                    "objdiff report generate failed")
+        out = os.path.join(tmp, "pd", "diff.json")
+        path, _log = report.project_diff(tmp, "main/Lib/file", "fn_1", out, "objdiff-cli", runner=_runner(seen, fns))
+        c.check("project_diff: `diff -p . -u <unit> <symbol>` in the tree, rows with the report's relocation setting",
+                (path, seen["argv"][:7], seen["kwargs"]["cwd"], "functionRelocDiffs=none" in seen["argv"]),
+                (out, ["objdiff-cli", "diff", "-p", ".", "-u", "main/Lib/file", "fn_1"], tmp, True))
+        c.check("... and a failed diff has no path", report.project_diff(tmp, "u", "fn_1", out, "o",
+                                                                       runner=_runner(seen, fns, rc=1))[0], None)
+        tries = {"n": 0}
+
+        def flaky():
+            tries["n"] += 1
+            if tries["n"] < 3:
+                raise PermissionError(5)
+            return "ok"
+
+        c.check("retry_transient rides out a transient lock", (report.retry_transient(flaky), tries["n"]), ("ok", 3))
+
+        def locked():
+            raise PermissionError(5)
+
+        c.raises("... and gives up after its attempts", PermissionError, report.retry_transient, locked, 2)
         rows = report.diff_rows(target, base, "fn_1", "objdiff-cli", tmp, runner=_runner(seen, fns))
         c.expect("diff rows use the report's relocation setting", "functionRelocDiffs=none" in seen["argv"])
         c.check("diff rows expose the positional value as diff_match_percent, sizes per side",

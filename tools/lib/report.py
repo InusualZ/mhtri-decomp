@@ -216,7 +216,9 @@ def read(path: str | os.PathLike, default: dict | None = None) -> Report:
 # comparisons: moved rows, and the one regression rule
 # --------------------------------------------------------------------------------------------------
 
-def _moved(before: dict, after: dict, eps: float) -> list[dict]:
+def moved(before: dict, after: dict, eps: float = DEFAULT_EPS) -> list[dict]:
+    """`[{key, before, after, delta}]` for every key both maps score (no None) whose score moved by more than
+    `eps`, in key order - the one moved-row rule `diff_*`, `compare` and `measure` read."""
     rows = []
     for key in sorted(set(before) & set(after)):
         a, b = before[key], after[key]
@@ -226,6 +228,20 @@ def _moved(before: dict, after: dict, eps: float) -> list[dict]:
         if abs(delta) > eps:
             rows.append({"key": key, "before": a, "after": b, "delta": delta})
     return rows
+
+
+_moved = moved
+
+
+def direction(rows: list[dict]) -> dict:
+    """`{moved, up, down}` of moved rows (a row with `delta` < 0 is down - a fall)."""
+    return {"moved": len(rows), "up": sum(1 for r in rows if r["delta"] > 0),
+            "down": sum(1 for r in rows if r["delta"] < 0)}
+
+
+def drops(rows: list[dict], eps: float = DEFAULT_EPS) -> list[dict]:
+    """The moved rows that fell by more than `eps`: every one is a drop, whatever the aggregate did."""
+    return [r for r in rows if r["delta"] < -eps]
 
 
 def diff_units(before: "Report | dict", after: "Report | dict", eps: float = DEFAULT_EPS) -> dict:
@@ -266,6 +282,38 @@ def diff_denominators(before: "Report | dict", after: "Report | dict", eps: floa
                          "moved": delta is not None and abs(delta) > eps, "fell": fell,
                          "regressed": bool(fell and scope == "project" and key in REGRESSION_KEYS)})
     return rows
+
+
+def compare(before: "Report | dict", after: "Report | dict", eps: float = DEFAULT_EPS,
+            before_path: str = "?", after_path: str = "?") -> dict:
+    """Two reports compared row for row, with the "every moved row that fell" verdict as `exit`.
+
+    A unit or symbol row that dropped, or a project numerator (`REGRESSION_KEYS`) that fell, is a drop even
+    when the aggregate rose; `exit` is 1 on a drop, 0 when comparable and clean, 2 when the pair shares no
+    unit and no project measure. JSON-safe.
+    """
+    units = diff_units(before, after, eps)
+    symbols = diff_symbols(before, after, eps)
+    dens = diff_denominators(before, after, eps)
+    found = ([{"kind": "unit", "name": r["unit"], "before": r["before"], "after": r["after"],
+               "delta": r["delta"]} for r in drops(units["moved"], eps)]
+             + [{"kind": "symbol", "name": "%s/%s" % (r["unit"], r["symbol"]), "before": r["before"],
+                 "after": r["after"], "delta": r["delta"]} for r in drops(symbols["moved"], eps)]
+             + [{"kind": "denominator", "name": "%s/%s" % (r["scope"], r["metric"]),
+                 "before": r["before"], "after": r["after"], "delta": r["delta"]}
+                for r in dens if r["regressed"]])
+    rb, ra = Report.coerce(before), Report.coerce(after)
+    common_units = len(set(rb.unit_measures()) & set(ra.unit_measures()))
+    shared_measures = len(set(rb.denominators().get("project", {})) & set(ra.denominators().get("project", {})))
+    comparable = common_units or shared_measures
+    return {
+        "before": before_path, "after": after_path, "eps": eps,
+        "units": units, "symbols": symbols, "denominators": dens,
+        "drops": found, "regressed": bool(found),
+        "comparable": {"common_units": common_units, "shared_measures": shared_measures,
+                       "ok": bool(comparable)},
+        "exit": 1 if found else (0 if comparable else 2),
+    }
 
 
 def snapshot(report: "Report | dict | None") -> dict:
@@ -414,6 +462,37 @@ def symbol_score(target: str, base: str, symbol: str, unit_name: str | None = No
         return {"symbol": symbol, "error": "symbol is not in the target object (renamed? not in this unit?)"}
     return {"symbol": symbol, "match_percent": fn.get(SCORE_KEY), "target_size": fn.get("size"),
             "report_json": os.path.join(tmpdir, REPORT_FILE)}
+
+
+def project_diff(root: str, unit_name: str, symbol: str, out: str, objdiff: str,
+                 runner: Callable = subprocess.run) -> tuple[str | None, str]:
+    """`objdiff diff -p . -u <unit_name> <symbol>` in `root` (the tree's own `objdiff.json`; left = target,
+    right = ours) -> (json path or None, output). Rows only: `-c functionRelocDiffs=none` is the report's
+    classification, and the JSON's positional `match_percent` is never the score."""
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    p = runner([objdiff, "diff", "-p", ".", "-u", unit_name, symbol,
+                "-c", "functionRelocDiffs=none", "--format", "json", "-o", out],
+               cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    return (out if p.returncode == 0 else None), (p.stdout or "") + (p.stderr or "")
+
+
+def retry_transient(fn: Callable, attempts: int = 4):
+    """`fn()`, retrying a transient Windows sharing violation (`PermissionError`, WinError 5) with backoff.
+
+    A scoring run writes its project and report under its own scratch directory; this covers the one-shot
+    lock an antivirus or indexer can still hold on a file the run just created.
+    """
+    delay = 0.05
+    last: PermissionError | None = None
+    for i in range(attempts):
+        try:
+            return fn()
+        except PermissionError as exc:
+            last = exc
+            if i + 1 < attempts:
+                time.sleep(delay)
+                delay *= 2
+    raise (last if last else PermissionError("transient file lock"))
 
 
 def diff_rows(target: str, base: str, symbol: str, objdiff: str, tmpdir: str,
