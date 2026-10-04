@@ -149,6 +149,9 @@ extern "C" {
 
 s32  sendReqShut(NetworkInstance* self, s32 mode);
 s32  resetNetworkState3(NetworkInstance* self);
+/* 0x803FE8E4 / 0x803FF024 - the state machine's reset and its gated step out of state 5. */
+s32  resetNetworkState(NetworkInstance* self);
+s32  advanceNetworkState5(NetworkInstance* self);
 
 /* The callees this unit drives are declared in their owners' headers, which `network_state.cpp`
  * includes (rule 2): the request writers in `Network/NetworkCommunityPat.h`, the item writers, the

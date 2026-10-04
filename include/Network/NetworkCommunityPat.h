@@ -55,6 +55,7 @@ public:
 class NetworkLayerPat;             /* include/Network/NetworkLayerPat.h */
 typedef struct NetworkRequest NetworkRequest;   /* include/Network/NetworkSessionManager.h */
 class NetworkSocketHandle;
+class NetworkFileFetcher;          /* include/Network/network_pat_control.h */
 struct NetworkStreamWriterDefault;
 struct NetworkStreamWriter;
 struct NetworkSmallObject;
@@ -133,6 +134,15 @@ void notifyLayerSlotSummary(NetworkLayerPat* self);
 
 /* 0x803F7540 - the last error code the socket handle recorded (its +0x08 word). */
 s32 networkSocketHandle_getLastError(NetworkSocketHandle* handle);
+
+/* 0x803F7548 - construct the 0x24-byte Wii socket object `sNetworkLibraryWii::createSocket` allocates:
+ * the base constructor, its own table (0x805FC984), descriptor -1 at +0x0C and the rest cleared.  GUESS
+ * on the name (the retail symbol is the class's constructor; the class is not reconstructed yet). */
+NetworkSocketHandle* constructNetworkSocket(NetworkSocketHandle* socket);
+
+/* 0x803F73C0 - construct the 0x10-byte fetcher `sNetworkLibraryWii::createFetcher` builds for kind 2:
+ * the base constructor, then its own table (0x805FC8A8).  GUESS on the name, from that kind. */
+NetworkFileFetcher* constructNetworkFetcherKind2(NetworkFileFetcher* fetcher);
 
 /* 0x803F9E04 - binds a stream to the byte block it reads packets from (GUESS: the parent's init, then
  * the block pointer stored at +0x10). */

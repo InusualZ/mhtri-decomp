@@ -54,11 +54,21 @@ extern "C" {
 void  PatInterface_clear(PatInterface* self);
 s32   PatInterface_isReady(PatInterface* self);
 
+/* 0x803FD324 - the singleton's per-frame step the Pat holder's drive calls (GUESS from the caller). */
+void stepPatInterface(NetworkInstance* self);
+
 /* the singleton's callback slots */
 s32 isCallback(NetworkInstance* self, s32 index);
 void resetCallback(NetworkInstance* self, s32 index);
 
 void decrement60d4(NetworkInstance* self);
+/* 0x803FD298 - takes a reference on the singleton (+0x60D4); the first one opens it (its +0x0C slot). */
+void increment60d4(NetworkInstance* self);
+/* 0x803FD9CC - installs callback `index` (0..7) with its argument; 1, or -1 for a bad index. */
+/* untyped: caller-owned payload - handed back to the callback */
+s32 setCallback(NetworkInstance* self, void (*callback)(), void* arg, u32 index);
+/* 0x803FDCB0 - selects the connect server type (masked to 0..3). */
+void setConnectServerType(NetworkInstance* self, s32 type);
 s32 hasMultipleRefs60d4(NetworkInstance* self);
 /* untyped: caller-owned payload - the 0x208-byte error record copied in when non-null */
 s32 errorRecordCode613c(NetworkInstance* self, const void* record);

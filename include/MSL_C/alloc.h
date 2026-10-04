@@ -46,6 +46,9 @@ extern struct DWCiCType DWCi_digitClassTable;
 /* 0x8045DFA0 - the C library's `rand` (the 0x41C64E6D linear congruential step, top 15 bits). */
 s32 rand(void);
 
+/* 0x8045DFC0 - seed `rand` (the 8-byte setter right after it). */
+void srand(u32 seed);
+
 /* 0x80463E08 - the arctangent of `y / x` in radians (the libm `atan2` entry); `Pl/pl_yure.cpp` turns it into
  * a 16-bit angle word.  0x805015C8 - `out = mtx * v` (the paired-single matrix/vector multiply); the two
  * vectors may alias.  Added with that unit. */

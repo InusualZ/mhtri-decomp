@@ -6,13 +6,13 @@
  * BOUNDARY.  One function, both seams weak: `tudiscover at constructNetworkWiiMediator` says the
  * closure is the function alone; the nearest left candidate is 0x80417FD4 (weak, share 0.145) and the
  * right closure edge is 0x804189C8 (weak, share 0.071/0.100).  **Both seams are unproven** - the
- * two calls it makes (`constructNetworkLibrary`, the constructor body) and the `.sbss` slot it publishes
- * (`sNetworkWiiMediatorInstance`, also referenced from outside this range, `leak 1`) suggest the original file is
+ * two calls it makes (`operator new` and the `sNetworkLibraryWii` constructor) and the `.sbss` slot it publishes
+ * (`sNetworkLibrary::mpInstance`, also referenced from outside this range, `leak 1`) suggest the original file is
  * wider.  Sections: `.text` 0x80418988..0x804189C8, `extab` 0x8001CE34..0x8001CE4C,
  * `extabindex` 0x8003D800..0x8003D80C.
  *
  * WHAT IT IS.  The `sNetworkLibrary` mediator constructor thunk: allocate the 0x1408-byte object,
- * construct it, publish it to the singleton slot `sNetworkWiiMediatorInstance`.  The `.sbss` slot is
+ * construct it, publish it to the singleton slot `sNetworkLibrary::mpInstance`.  The `.sbss` slot is
  * *not* claimed: `leak 1` says another TU references it.
  *
  * LANGUAGE.  The task proposed this unit as `.c`, but the target allocates through `__nw__FUl`, the
@@ -30,15 +30,10 @@
  * extab (0x18) but the object emits no such section".  `-Cpp_exceptions on` (`cflags_network`,
  * flags-audit 2026-09-28) is what makes MWCC emit the record at all.
  *
- * ALLOCATED TYPE.  `NetworkLibrary` is the 0x1408 bytes the allocation's `li r3,0x1408` sizes; its
- * constructor body is the *neighbouring* 0x804189C8 (0x98 B, outside this range), which stores a
- * vtable at +0x00, initialises the fields from +0x9A up and returns `this` - the shape of a function
- * handed the object in `r3`.  Spelling that call as `constructNetworkLibrary(this)` and as the
- * parameterless `constructNetworkLibrary()` measure identically (`.text`, `extab` and `extabindex`
- * byte-identical both ways), so the class keeps the parameterless declaration
- * `include/unsplit/Network.h` already carries and the map row stays `constructNetworkLibrary`:
- * declaring the constructor out of line instead emits `__ct__14NetworkLibraryFv` and renames another
- * band's symbol for no byte of difference.
+ * ALLOCATED TYPE.  `sNetworkLibraryWii` (include/Network/constructNetworkLibrary.h), the 0x1408 bytes the
+ * allocation's `li r3,0x1408` sizes; its constructor is the neighbouring 0x804189C8
+ * (`__ct__18sNetworkLibraryWiiFv`), and the slot it publishes into is the base class's static
+ * `sNetworkLibrary::mpInstance` (0x80794CC0, defined by `Network/network_opening.cpp`).
  *
  * FLAGS.  The object deviates from the lib on one point, and it is in `configure.py` with the
  * evidence: `-O3` in place of the lib's `-O4,p`.  Retail's order is the plain source order -
@@ -51,27 +46,10 @@
  */
 #include "types.h"
 #include "sys_mem.h"
-#include "unsplit/Network.h"
-
-extern "C" {
-
-void constructNetworkWiiMediator(void);
-
-}
-
-/* The object the allocation creates.  Its constructor body is the neighbouring 0x804189C8, so the
- * type is owned here while its fields belong to that unit: nothing in this range reads one, and only
- * the size is load-bearing - it is the allocation's own `li r3,0x1408` - so the layout stays one
- * documented filler.
- * size: 0x1408 */
-class NetworkLibrary {
-public:
-    NetworkLibrary() { constructNetworkLibrary(); }
-
-    /* +0x000 */ u8 pad_00[0x1408];
-};
+#include "Network/constructNetworkWiiMediator.h"
+#include "Network/constructNetworkLibrary.h"   /* sNetworkLibraryWii */
 
 void constructNetworkWiiMediator(void)
 {
-    sNetworkWiiMediatorInstance = new NetworkLibrary();
+    sNetworkLibrary::mpInstance = new sNetworkLibraryWii();
 }

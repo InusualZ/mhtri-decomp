@@ -24,6 +24,16 @@ u8* DWCi_allocNode(u32 kind, u32 size, u32 align);
  * prefix out of the 0x8062FE10 table before calling `OSReport`). */
 void DWCi_report(u32 category, const char* format, ...);
 
+/* 0x805074B0 - register the DWC version string, start the Np layer with `npStartParam`, install the DWCi
+ * allocators, copy `gameName` (a string address) and set the library's initialised flag; 0, or -1 when
+ * the Np start fails (`sNetworkLibraryWii::init` logs "DWC_Init failed"). */
+s32 DWC_Init(u32 npStartParam, u32 gameName, u32 configWord, u32 allocParamA, u32 allocParamB);
+
+/* 0x805075B0 - the inverse of `DWC_Init`: reinstall the allocators, release the host lookup and the free
+ * list and clear the initialised flag `DWC_Init` set.  GUESS on the name (the body and the shutdown
+ * paths of `sNetworkLibraryWii::final`/`stop`, which call it right before `SOCleanup`). */
+void DWC_Shutdown(void);
+
 /* NHTTP / network utility layer */
 s32 DWC_GetLastErrorEx(s32* code, s32* type);
 

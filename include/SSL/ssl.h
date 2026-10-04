@@ -30,6 +30,11 @@ s32 SSLRead(s32 ssl, void* buf, s32 length); /* untyped: byte range */
 
 s32 SSLWrite(s32 ssl, void* buf, s32 length); /* untyped: byte range */
 
+/* 0x8051D048 - the user-facing network error code for a failed `SOStartup` result (the SDK's NET
+ * helper of that name; GUESS from its NCD-band neighbours and its one caller, which logs the negated
+ * result as "Network Error Code is %d"). */
+s32 NETGetStartupErrorCode(s32 result);
+
 /* 0x8051C058 - close the context. */
 s32 SSLShutdown(s32 ssl);
 
