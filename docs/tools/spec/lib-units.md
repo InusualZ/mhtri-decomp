@@ -104,7 +104,8 @@ spellings, unknown-option drop, sibling versions, `split_command` with a stub ni
 * Not yet collapsed onto `stem`: `claims.norm_unit` and `promote.norm_unit` (lane keys, `lib/lanes/naming.py`, WP3e),
   `stylelint._unit_stem` (WP3d), `undefrefs._unit_stem` / `flipcheck.unit_name_for` / `datagap.object_path` /
   `relocaudit.object_paths` / `vtableaudit.object_paths` / `pairgap._stem_of` (WP3a), `dossier`/`unwindcut.resolve_unit`
-  (WP3c), `brief.source_name` (WP3e), `mwlink_debugger.unit_of_object` (WP5).
+  (WP3c), `brief.source_name` (WP3e). `mwlink.link.unit_of_object` delegates to `stem` since WP5 (it keeps only the
+  cut at `/build/<version>/{src,obj}/`, which also takes an absolute path or another version directory).
 * `slug` is not here: the lane slug is `lib/lanes/naming.py`'s (WP3e).
 * `recompile.split_staleness` stays in `recompile` (it calls `claims._build_is_current`, a tool); so does
   `recompile.git_dirty` (its `runner` seam is what the staleness selftest drives).

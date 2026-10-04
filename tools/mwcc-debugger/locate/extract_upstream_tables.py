@@ -10,16 +10,15 @@ have).
 Usage: python extract_upstream_tables.py <upstream/mwcc_debugger.py> [exe]
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import ast
-import struct
-import sys
+
+from tools.lib.binary.pe import Pe
 
 
 def image_base(exe: str) -> int:
-    d = open(exe, "rb").read()
-    e = struct.unpack_from("<I", d, 0x3C)[0]
-    return struct.unpack_from("<I", d, e + 24 + 28)[0]
+    return Pe(exe).image_base
 
 
 def main():

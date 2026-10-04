@@ -115,6 +115,14 @@ vendored copy changes).
 * `fetch_gdb.py` installs a native mingw-w64 gdb and its runtime DLLs without
   MSYS2/pacman.
 
+**Repository integration**
+
+* The launcher carries the repository's one-line `sys.path` prologue, so
+  `versions.py` can use `tools/lib/binary/pe.py` (the repository's one PE
+  reader, shared with the linker debugger) in the launcher and inside gdb.
+* The gdb session is started through `tools/lib/proc.py` (`lib_proc.run`),
+  with gdb's output left on the terminal.
+
 **Wii/1.3 support (new)**
 
 * A version row for `build/compilers/Wii/1.3/mwcceppc.exe`, verified against

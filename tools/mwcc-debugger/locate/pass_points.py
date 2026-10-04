@@ -15,12 +15,11 @@ A breakpoint at the *return address* of a `call <pass>` is exactly upstream's
 Usage: python pass_points.py <exe> [rva:rva ...]
 """
 from __future__ import annotations
-
-import sys
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import capstone
 
-from dissect import Pe
+from tools.lib.binary.pe import Pe
 
 # Drivers, in dump order.  (name, start RVA, end RVA)
 DRIVERS = [
@@ -67,7 +66,7 @@ NAMES = {
 def main():
     exe = sys.argv[1]
     pe = Pe(exe)
-    symmap = pe.symmap()
+    symmap = pe.symbol_map()
     md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
     md.detail = True
     seen = {}

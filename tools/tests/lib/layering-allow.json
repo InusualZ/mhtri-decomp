@@ -1,5 +1,5 @@
 {
- "$comment": "The tool->tool import graph as it stood when the layering rule arrived (WP0, 2026-10-03, tree 923349423), resolved the way tools/tests/lib/test_layering.py resolves imports. It only shrinks: a new edge fails the test, and so does a listed edge whose files exist but no longer import; `python tools/tests/lib/test_layering.py --prune` drops stale and deleted edges and never adds one. A file split carries the moved code's edges and nothing else (WP3a: `datagap -> dataclosure`, and `dataclosure -> callers/poolseams` in place of datagap's own; that batch's net is -4).",
+ "$comment": "The tool->tool import graph as it stood when the layering rule arrived (WP0, 2026-10-03, tree 923349423), resolved the way tools/tests/lib/test_layering.py resolves imports. It only shrinks: a new edge fails the test, and so does a listed edge whose files exist but no longer import; `python tools/tests/lib/test_layering.py --prune` drops stale and deleted edges and never adds one. A file split carries the moved code's edges and nothing else (WP3a: `datagap -> dataclosure`, and `dataclosure -> callers/poolseams` in place of datagap's own; that batch's net is -4). WP5 split mwlink_debugger.py into the package tools/mwlink/ (imports inside one package are not edges, test_layering.package_of) and left the shim's one edge `mwlink_debugger.py -> mwlink/cli.py`, retired with the shim in WP6; the PE reader moved to lib.binary.pe, dropping `pass_points -> dissect`: that batch's net is 0.",
  "edges": [
   "tools/agents/edit_selftest.py -> tools/agents/edit.py",
   "tools/agents/edit_selftest.py -> tools/unitutil.py",
@@ -25,10 +25,10 @@
   "tools/git/guard_selftest.py -> tools/git/guard.py",
   "tools/git/guard_selftest.py -> tools/git/prepcommit.py",
   "tools/git/prepcommit.py -> tools/units/land.py",
-  "tools/mwcc-debugger/locate/pass_points.py -> tools/mwcc-debugger/locate/dissect.py",
   "tools/mwcc-debugger/locate/verify_pcode.py -> tools/mwcc-debugger/versions.py",
   "tools/mwcc-debugger/locate/verify_pcode_selftest.py -> tools/mwcc-debugger/locate/verify_pcode.py",
   "tools/mwcc-debugger/mwcc_debugger.py -> tools/mwcc-debugger/versions.py",
+  "tools/mwlink_debugger.py -> tools/mwlink/cli.py",
   "tools/objdiff/metric_selftest.py -> tools/flags/mwcc_matrix.py",
   "tools/objdiff/metric_selftest.py -> tools/flags/tryvar.py",
   "tools/objdiff/metric_selftest.py -> tools/unitutil.py",

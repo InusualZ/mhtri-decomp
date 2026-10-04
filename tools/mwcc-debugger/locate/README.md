@@ -7,7 +7,9 @@ these numbers, and because they must be re-derivable when the build changes.
 
 The tools in this directory are development-time only, and (except
 `extract_upstream_tables.py`) need `pip install capstone`; the shipped
-debugger itself has no dependencies beyond gdb.
+debugger itself has no dependencies beyond gdb and the repository's own
+`tools/lib` (the one PE reader, `tools/lib/binary/pe.py`, which these tools
+use too).
 
 ## The lever: Metrowerks' own symbol table
 

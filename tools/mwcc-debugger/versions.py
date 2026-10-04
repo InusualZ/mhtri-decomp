@@ -67,8 +67,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, fields
 from pathlib import Path
-import struct
 from typing import Optional
+
+# PORT: the PE reader is the repository's one copy; mwcc_debugger.py (and every locate/ tool that
+# imports this module) puts the repository root on sys.path first, inside gdb as well.
+from tools.lib.binary.pe import MACHINE_I386, Pe
 
 IMAGE_BASE = 0x400000
 
@@ -125,96 +128,14 @@ class MwccVersion:
 
 
 # ---------------------------------------------------------------------------
-# The PE / CodeView reader.  Several Wii-era mwcceppc.exe builds ship their own
-# CodeView 'NB11' symbol blob (the Metrowerks linker appends it after the last
-# section), which names every function and global together with its section and
-# offset.  That is how the Wii/1.3 row below was cross-checked: locate/dissect.py
+# The PE / CodeView reader is tools/lib/binary/pe.py (one copy, shared with the
+# linker debugger).  Several Wii-era mwcceppc.exe builds ship their own CodeView
+# 'NB11' symbol blob (the Metrowerks linker appends it after the last section),
+# which names every function and global together with its section and offset.
+# That is how the Wii/1.3 row below was cross-checked: locate/dissect.py
 # resolves the same symbols by name, and _verify_symbols() re-checks the row
 # against the binary every time the tool runs.
 # ---------------------------------------------------------------------------
-
-
-class Pe:
-    """Minimal PE32 reader: sections, RVA->file mapping, debug directory."""
-
-    def __init__(self, path):
-        self.path = str(path)
-        self.data = open(self.path, "rb").read()
-        d = self.data
-        e = struct.unpack_from("<I", d, 0x3C)[0]
-        self.machine = struct.unpack_from("<H", d, e + 4)[0]
-        nsec = struct.unpack_from("<H", d, e + 6)[0]
-        optsz = struct.unpack_from("<H", d, e + 20)[0]
-        opt = e + 24
-        self.image_base = struct.unpack_from("<I", d, opt + 28)[0]
-        self.dll_characteristics = struct.unpack_from("<H", d, opt + 70)[0]
-        self.opt_off = opt
-        self.sections = []
-        so = opt + optsz
-        for i in range(nsec):
-            s = so + 40 * i
-            name = d[s : s + 8].rstrip(b"\0").decode("latin-1")
-            vsize, va, rsize, rptr = struct.unpack_from("<IIII", d, s + 8)
-            self.sections.append((name, va, vsize, rptr, rsize))
-
-    def rva_to_off(self, rva):
-        for _name, va, vsize, rptr, rsize in self.sections:
-            if va <= rva < va + max(vsize, rsize):
-                if rva - va >= rsize:
-                    return None
-                return rptr + (rva - va)
-        return None
-
-    def read_rva(self, rva, size):
-        off = self.rva_to_off(rva)
-        if off is None:
-            return None
-        return self.data[off : off + size]
-
-    def debug_blob(self):
-        dd = self.opt_off + 96 + 8 * 6
-        rva, _size = struct.unpack_from("<II", self.data, dd)
-        if rva == 0:
-            return None
-        off = self.rva_to_off(rva)
-        if off is None:
-            return None
-        _c, _t, _maj, _min, _typ, dsize, _a, ptr = struct.unpack_from(
-            "<IIHHIIII", self.data, off
-        )
-        return self.data[ptr : ptr + dsize]
-
-    def symbols(self):
-        """[(rva, name, section name)] from the CodeView blob, or []."""
-        blob = self.debug_blob()
-        if not blob or blob[:4] != b"NB11":
-            return []
-        recs = []
-        i = 0
-        n = len(blob)
-        while i < n - 12:
-            ln = struct.unpack_from("<H", blob, i)[0]
-            if 8 <= ln <= 0x400 and i + 2 + ln <= n:
-                typ = struct.unpack_from("<H", blob, i + 2)[0]
-                zero = struct.unpack_from("<I", blob, i + 4)[0]
-                if zero == 0 and 0x1000 <= typ <= 0x10FF:
-                    off = struct.unpack_from("<I", blob, i + 8)[0]
-                    sec = struct.unpack_from("<H", blob, i + 12)[0]
-                    nlen = blob[i + 14]
-                    name = blob[i + 15 : i + 15 + nlen]
-                    if (
-                        1 <= sec <= len(self.sections)
-                        and 3 <= nlen <= 200
-                        and all(32 <= c < 127 for c in name)
-                        and 15 + nlen <= ln + 2
-                    ):
-                        secname, va, _vs, _rp, _rs = self.sections[sec - 1]
-                        recs.append((va + off, name.decode(), secname))
-                        i += 2 + ln
-                        continue
-            i += 1
-        recs.sort()
-        return recs
 
 
 # ---------------------------------------------------------------------------
@@ -483,10 +404,10 @@ def detect(exe):
     if not exe.exists():
         return None
     pe = Pe(exe)
-    if pe.machine != 0x014C:  # IMAGE_FILE_MACHINE_I386
+    if pe.machine != MACHINE_I386:
         return None
     for name, rva, expected in _PROBES:
-        if pe.read_rva(rva, len(expected)) == expected:
+        if pe.read(rva, len(expected)) == expected:
             return build(name, exe)
     return None
 
@@ -533,7 +454,7 @@ def _verify_symbols(version, pe):
     one being debugged, which would produce plausible-looking garbage - so this
     fails loudly rather than dumping nonsense.
     """
-    syms = {name: rva for rva, name, _sec in pe.symbols()}
+    syms = {name: rva for rva, name, _sec in pe.codeview_symbols()}
     if not syms:
         return
     problems = []

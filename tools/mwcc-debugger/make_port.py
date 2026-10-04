@@ -71,6 +71,7 @@ versions.py; this file is mechanism only.
 PORT: changes from upstream are marked with a `PORT:` comment.
 """
 from __future__ import annotations
+@@PROLOGUE@@
 
 import argparse
 from collections import defaultdict, OrderedDict
@@ -99,9 +100,11 @@ HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 # PORT: the version tables live in a data module (upstream hard-coded them
-# inside init_mwcc_version()).  versions.py has no dependencies, so it loads
-# both in the launcher and inside gdb's embedded Python.
+# inside init_mwcc_version()).  versions.py depends only on the repository's
+# tools/lib (the prologue above puts the root on sys.path), so it loads both
+# in the launcher and inside gdb's embedded Python.
 import versions  # noqa: E402
+from tools.lib import proc as lib_proc  # noqa: E402
 
 
 def read_mem(addr: int, size: int) -> memoryview:
@@ -1006,8 +1009,10 @@ def start_gdb():
     print("GDB command: " + " ".join(gdb_command), file=sys.stderr)
 
     try:
-        gdb_result = subprocess.run(
-            gdb_command, check=False, env=env, timeout=args.timeout
+        # PORT: the repository's one process runner (lib.proc), with gdb's
+        # output left on the terminal.
+        gdb_result = lib_proc.run(
+            gdb_command, env=env, timeout=args.timeout, stdout=None, stderr=None
         )
     except subprocess.TimeoutExpired:
         if emulator_process is not None:
@@ -1040,10 +1045,16 @@ if __name__ == "__main__":
 '''
 
 
+#: The repository's one-line prologue (tools/lib/__init__.py PROLOGUE), assembled here so that this
+#: generator, which needs no repository import, does not carry the line itself.
+PROLOGUE = ("import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve()"
+            ".parents if (p / \"tools\" / \"__init__.py\").is_file())))")
+
+
 def main():
     src = open(sys.argv[1], encoding="utf-8").read()
 
-    src = sub_once(src, HEADER_OLD, HEADER_NEW, "header")
+    src = sub_once(src, HEADER_OLD, HEADER_NEW.replace("@@PROLOGUE@@", PROLOGUE), "header")
     src, n = VERSION_OLD_RE.subn(lambda m: VERSION_NEW, src)
     assert n == 1, f"version table region matched {n} times"
 
