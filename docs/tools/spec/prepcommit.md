@@ -50,4 +50,4 @@ Target: `tools/tests/git/test_prepcommit.py` on `lib.testing` (`FixtureTree`/`Gi
 
 ## Known gaps
 
-None recorded.
+* `improved_since_base` still imports `land.py` (lazily, as `tools.units.land`, no `sys.path` edit since WP3f) for `read_base` and `ledger_numbers`; they become lib calls with the gate (WP4). `status_paths` is `Git.status_porcelain` and the report read is `lib.report.read(...).unit_measures()`.

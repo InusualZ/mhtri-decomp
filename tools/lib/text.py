@@ -28,20 +28,21 @@ class MatchCountError(ValueError):
 
 # --- endings ------------------------------------------------------------------------------------------------
 
+def ending_counts(data: bytes) -> dict[str, int]:
+    """`{"crlf", "lf", "lone_cr"}`: `lf` is a bare `\\n` (not part of a CRLF), `lone_cr` a `\\r` with no `\\n`."""
+    crlf = data.count(b"\r\n")
+    return {"crlf": crlf, "lf": data.count(b"\n") - crlf, "lone_cr": data.count(b"\r") - crlf}
+
+
 def endings(data: bytes, lone_cr: bool = True) -> str:
     """'lf', 'crlf', 'cr', 'mixed' or 'none' (no line break).
 
     With `lone_cr=False` a bare CR is not a line break (the `edit.py` reading: a file is classed by its
     `\\r\\n` against its bare `\\n` only).
     """
-    crlf = data.count(b"\r\n")
-    kinds = []
-    if crlf:
-        kinds.append("crlf")
-    if data.count(b"\n") - crlf:
-        kinds.append("lf")
-    if lone_cr and data.count(b"\r") - crlf:
-        kinds.append("cr")
+    counts = ending_counts(data)
+    kinds = [k for k, key in (("crlf", "crlf"), ("lf", "lf"), ("cr", "lone_cr"))
+             if counts[key] and (lone_cr or key != "lone_cr")]
     return "none" if not kinds else kinds[0] if len(kinds) == 1 else "mixed"
 
 
@@ -236,3 +237,66 @@ def append_blocks(text: str, blocks: Iterable[tuple[str, str]]) -> tuple[str, in
     if not text.endswith(nl):
         text += nl
     return text + nl + "".join(with_ending(b, nl) for _, b in fresh), len(fresh)
+
+
+# --- C string-literal escapes -------------------------------------------------------------------------------
+
+_SHORT = {"\\": "\\\\", '"': '\\"', "\n": "\\n", "\t": "\\t", "\r": "\\r",
+          "\a": "\\a", "\b": "\\b", "\f": "\\f", "\v": "\\v"}
+_UNSHORT = {"n": b"\n", "t": b"\t", "r": b"\r", "a": b"\a", "b": b"\b", "f": b"\f", "v": b"\v",
+            "\\": b"\\", '"': b'"', "'": b"'", "0": b"\0"}
+_OCTAL = "01234567"
+
+
+def c_escape(text: str) -> str:
+    """`raw text` -> a C string literal body (no quotes); a character outside printable ASCII becomes
+    `\\xHH` of its code point, everything `c_unescape` reads back byte for byte."""
+    out = []
+    for ch in text:
+        if ch in _SHORT:
+            out.append(_SHORT[ch])
+        elif 0x20 <= ord(ch) < 0x7F:
+            out.append(ch)
+        else:
+            out.append("\\x%02x" % ord(ch))
+    return "".join(out)
+
+
+def c_unescape(text: str) -> bytes:
+    """A C string literal body -> the exact bytes (`\\n`, `\\t`, `\\xHH`, `\\NNN` all understood).
+
+    An unknown escape is kept as the two literal characters it is - never silently dropped - so a typo
+    surfaces in the output instead of vanishing.
+    """
+    out = bytearray()
+    i, n = 0, len(text)
+    while i < n:
+        ch = text[i]
+        if ch != "\\" or i + 1 >= n:
+            out += ch.encode("utf-8")
+            i += 1
+            continue
+        nxt = text[i + 1]
+        if nxt in _UNSHORT:
+            out += _UNSHORT[nxt]
+            i += 2
+        elif nxt == "x":
+            j = i + 2
+            while j < n and j < i + 4 and text[j] in "0123456789abcdefABCDEF":
+                j += 1
+            if j == i + 2:
+                out += b"\\x"          # a bare `\x`: keep it, do not eat the following character
+                i += 2
+            else:
+                out.append(int(text[i + 2:j], 16) & 0xFF)
+                i = j
+        elif nxt in _OCTAL:
+            j = i + 1
+            while j < n and j < i + 4 and text[j] in _OCTAL:
+                j += 1
+            out.append(int(text[i + 1:j], 8) & 0xFF)
+            i = j
+        else:
+            out += ("\\" + nxt).encode("utf-8")
+            i += 2
+    return bytes(out)

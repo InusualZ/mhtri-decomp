@@ -196,12 +196,31 @@ class Git:
         return out
 
     def merge_file_diff3(self, ours: str | os.PathLike, base: str | os.PathLike,
-                         theirs: str | os.PathLike) -> tuple[bytes, int]:
-        """`git merge-file -p --diff3 ours base theirs`: (merged bytes, conflict count); writes nothing."""
-        p = self.run_bytes("merge-file", "-p", "--diff3", os.fspath(ours), os.fspath(base), os.fspath(theirs))
-        if p.returncode < 0:
+                         theirs: str | os.PathLike, labels: tuple[str, str, str] | None = None) -> tuple[bytes, int]:
+        """`git merge-file -p --diff3 ours base theirs`: (merged bytes, conflict count); writes nothing.
+
+        git's exit is the conflict count truncated to 127, or negative on error (255 once it reaches a shell):
+        anything outside 0..127 raises `GitError`. `labels` names the three sides in the markers (`-L`).
+        """
+        names = [a for label in (labels or ()) for a in ("-L", label)]
+        p = self.run_bytes("merge-file", "-p", "--diff3", *names, os.fspath(ours), os.fspath(base),
+                           os.fspath(theirs))
+        if not 0 <= p.returncode <= 127:
             raise GitError(("merge-file",), p.returncode, (p.stderr or b"").decode("utf-8", "replace"), self.cwd)
         return p.stdout, p.returncode
+
+    def merge_bytes(self, ours: bytes, base: bytes, theirs: bytes,
+                    labels: tuple[str, str, str] | None = None) -> tuple[bytes, int]:
+        """`merge_file_diff3` over three byte strings (written to a private temp dir, removed after)."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = []
+            for name, data in (("ours", ours), ("base", base), ("theirs", theirs)):
+                path = os.path.join(tmp, name)
+                with open(path, "wb") as fh:
+                    fh.write(data)
+                paths.append(path)
+            return self.merge_file_diff3(*paths, labels=labels)
 
     def stage(self, paths: Iterable[str]) -> None:
         """`git add -- <paths>`; an empty pathspec is refused (never `git add -A`)."""

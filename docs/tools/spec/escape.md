@@ -35,7 +35,7 @@ Inputs -> outputs: arg -> file.
 
 ## Lib dependencies
 
-text.
+text (`c_escape`/`c_unescape` - `encode`/`decode` moved there -, `replace_bytes`, `atomic_write`).
 
 ## Test contract
 
@@ -45,7 +45,7 @@ Target: `tools/tests/units/test_escape.py` on `lib.testing` (`FixtureTree`/`GitF
 
 ## Known gaps
 
-`--edit` folds into `edit.py replace`
+* `--edit` is `edit.py replace --old/--new`'s rule since WP3f (`lib.text.replace_bytes`): the needle matches across `\n` or `\r\n` and the replacement takes the matched span's ending. Before, it was an exact byte match, so an LF needle in a CRLF file was refused (0 matches) - that refusal is gone (a behaviour change; the refusal message for a wrong count is unchanged). The flag stays until the WP6 reference sweep.
 
 ## History (the incidents behind the rules - keep the rule, drop the narrative when the rule is stable)
 

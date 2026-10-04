@@ -106,6 +106,16 @@ def test_worktrees_and_merges(c):
         c.check("merge_file_diff3 counts the conflicts", conflicts, 1)
         c.contains("... and shows the base in diff3 style", merged, b"|||||||")
         c.check("... writing nothing", ours.read_bytes(), b"1\nX\n3\n")
+        two, count = g.merge_bytes(b"1\nX\n3\nA\n5\n", b"1\n2\n3\n4\n5\n", b"1\nY\n3\nB\n5\n",
+                                   labels=("ours", "base", "theirs"))
+        c.check("merge_bytes: two conflict hunks are a count of 2, not an error", count, 2)
+        c.check("... the labels name the sides in the markers",
+                [ln for ln in two.split(b"\n") if ln[:7] in (b"<<<<<<<", b"|||||||", b">>>>>>>")][:3],
+                [b"<<<<<<< ours", b"||||||| base", b">>>>>>> theirs"])
+        c.check("... a clean merge is a count of 0", g.merge_bytes(b"1\nX\n3\n", b"1\n2\n3\n", b"1\n2\n3\n"),
+                (b"1\nX\n3\n", 0))
+        c.raises("... and a git failure (a missing input) raises", GitError, g.merge_file_diff3,
+                 Path(tmp) / "missing", base, theirs)
         fx.checkout(a)
         fx.run("merge", b)
         c.check("unmerged_stages lists base/ours/theirs", sorted(g.unmerged_stages().get("f.txt", {})), [1, 2, 3])

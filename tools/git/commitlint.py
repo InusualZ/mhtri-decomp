@@ -1,64 +1,17 @@
 #!/usr/bin/env python3
-"""Lint commit messages against the convention CLAUDE.md defines ("Commit messages follow one convention").
-
-The convention is `<category>: <message>`, then an optional long description. CLAUDE.md is the
-specification; this tool checks only the part of it that is **mechanically** checkable:
-
-| # | check | how |
-| - | ----- | --- |
-| 1 | subject shape | the first line is `<category>: <message>` - a category token, a colon, a space, then the message |
-| 2 | category membership | the category names a place in the tree (`game/<module>`, `tools/<area>`, `agents/<profile|policy>`, `config/<what>`, `docs/<topic>`, `repo/<area>`) - see `derive_members` |
-| 3 | unknown member / family | a member not in a known family is an **error** (a typo or an invented module is exactly what that catches); an unknown **family** is a **warning** (the convention calls the list open, so a new family is added to CLAUDE.md deliberately) |
-| 4 | message length | at most 120 characters, counted *after* `<category>: `, so the category and its separator are not charged against it |
-| 5 | subject line, not a wall | the first line is not empty or all whitespace, and a body is separated from it by a blank line |
-
-**What it deliberately does not check.** The long description's *content* is a review matter, not a
-mechanical one. The convention bans *why* (reasoning, alternatives considered, an account of the work) from
-the description, but "no why" cannot be decided by a regular expression, and a heuristic that guessed wrong
-would flag messages a reviewer would accept - which is how a lint becomes hated and gets switched off. So
-the description's content is left to review; only its *shape* is checked here (check 5).
-
-**The membership sets are derived from the tree, never hard-coded** (`derive_members`), so the lint cannot
-drift from the tree it describes:
-
-* `game/<module>` - the directories under `src/`.  A member is matched **case-insensitively**: the
-  convention's own examples lower-case the prose (`game/network`), while the tree directory is
-  `src/Network`, and a lint that rejected the spec's example would be a false positive.
-* `tools/<area>` - a directory under `tools/` (the grouping: `tools/units`, `tools/git`, `tools/flags`),
-  or the **stem of any script at any depth** (`tools/units/land.py` -> `tools/land`,
-  `tools/units/stylelint.py` -> `tools/stylelint`).
-* `agents/<name>` - the profiles in `.claude/agents/*.md`, plus `policy` for CLAUDE.md.
-* `config/{flags,symbols,splits}` - the three inputs the convention names (configure.py -> `flags`,
-  symbols.txt -> `symbols`, splits.txt -> `splits`).
-* `docs/<topic>` - the documents under `docs/`.
-* `repo/<area>` - read from the files at the root: `readme`, `license`, `ci` (a `.github*` directory),
-  `gitignore`.
-
-    python tools/git/commitlint.py <message-file>         # the `commit-msg` hook shape git hands over
-    python tools/git/commitlint.py --message "<subject>"  # a one-liner
-    python tools/git/commitlint.py --last 20              # score the recent history
-    python tools/git/commitlint.py --install-hook [--force]
-    python tools/git/commitlint.py --selftest
-
-Exit status follows the house convention (`--diff`'s 0/1/2): **0** clean (a warning alone does not fail -
-an unknown family is legitimate), **1** one or more violations, **2** nothing was checked (no mode given,
-`--last 0`, or a history with no commits), so the tool can be wired into a gate later.
-
-**`--install-hook` is a convenience, not the enforcement path.** It writes an `sh`-compatible `commit-msg`
-hook to `.git/hooks/commit-msg` (mode 0755) that calls this tool with `"$1"`. That hook is untracked and
-therefore **per-clone**: it never travels with the repository, and it is not what stops a bad message - the
-enforcement is a gate that runs this tool directly (the same `0/1/2` it already speaks). Note also that when
-`core.hooksPath` is configured - `git config core.hooksPath tools/git/hooks` in this repo - git does **not**
-consult `.git/hooks`, so the installer says so rather than pretend the hook is active.
-"""
+"""Lint commit messages against CLAUDE.md's `<category>: <message>` convention (the mechanical part); exit 0/1/2.
+Spec: docs/tools/spec/commitlint.md. CLI: commitlint.py MESSAGE_FILE | --message M | --last N | --install-hook [--force] | --selftest [--root D]."""
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import os
 import re
-import subprocess
 import sys
 import difflib
+import tempfile
+
+from tools.lib.git import Git
 
 MAX_MESSAGE = 120                       # characters, counted after `<category>: `
 SUBJECT_RE = re.compile(r"^([^:\s]+): (.+)$")
@@ -264,17 +217,11 @@ def render(source: str, findings: list) -> str:
 def find_root(explicit: str | None) -> str:
     if explicit:
         return os.path.abspath(explicit)
-    proc = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True,
-                          encoding="utf-8", errors="replace")
-    if proc.returncode == 0 and proc.stdout.strip():
-        return proc.stdout.strip()
-    return os.getcwd()
+    return Git().toplevel() or os.getcwd()
 
 
 def _git_rev_parse_dir(root: str, what: str) -> str:
-    proc = subprocess.run(["git", "-C", root, "rev-parse", what], capture_output=True, text=True,
-                          encoding="utf-8", errors="replace")
-    value = proc.stdout.strip() if proc.returncode == 0 else ""
+    value = Git(root).out("rev-parse", what, check=False).strip()
     if not value:
         return ""
     if not os.path.isabs(value):
@@ -313,9 +260,7 @@ def check_last(root: str, count: int, members: dict, out=sys.stdout) -> int:
     if count <= 0:
         print("commitlint: --last %d checks nothing" % count, file=sys.stderr)
         return 2
-    proc = subprocess.run(["git", "-C", root, "log", "-n", str(count),
-                           "--format=%H" + FIELD_SEP + "%B" + HISTORY_SEP],
-                          capture_output=True, text=True, encoding="utf-8", errors="replace")
+    proc = Git(root).run("log", "-n", str(count), "--format=%H" + FIELD_SEP + "%B" + HISTORY_SEP)
     if proc.returncode != 0:
         print("commitlint: git log failed in %s: %s" % (root, (proc.stderr or "").strip()), file=sys.stderr)
         return 2
@@ -383,13 +328,17 @@ def install_hook(root: str, force: bool, out=sys.stdout) -> int:
         return 1
     print("commitlint: installed %s" % path, file=out)
 
-    hooks_path = subprocess.run(["git", "-C", root, "config", "--get", "core.hooksPath"],
-                                capture_output=True, text=True, encoding="utf-8",
-                                errors="replace").stdout.strip()
+    hooks_path = Git(root).out("config", "--get", "core.hooksPath", check=False).strip()
     if hooks_path:
         print("commitlint: core.hooksPath is `%s`, so git will not consult this hook - it is a "
               "per-clone convenience, not the enforcement path" % hooks_path, file=out)
     return 0
+
+
+def selftest() -> int:
+    """Run `tools/tests/git/test_commitlint.py` (the fixture tree and history) in a temp working directory."""
+    from tools.lib import cli
+    return cli.Tool("commitlint", tests="tools/tests/git/test_commitlint.py").selftest(cwd=tempfile.gettempdir())
 
 
 def main(argv: list | None = None) -> int:
@@ -408,8 +357,7 @@ def main(argv: list | None = None) -> int:
     args = ap.parse_args(argv)
 
     if args.selftest:
-        import commitlint_selftest
-        return commitlint_selftest.selftest()
+        return selftest()
 
     root = find_root(args.root)
 

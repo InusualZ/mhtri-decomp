@@ -1,22 +1,7 @@
 #!/usr/bin/env python3
-"""Prepare a commit for the current results - stage the paths, write the message, execute nothing.
-
-    python tools/git/prepcommit.py [--dry-run] [--split] [--message SUBJECT] [--commit]
-
-The decompile-symbol skill's last step is "leave a prepared commit". This is that step, and it exists because
-the parts that go wrong are mechanical:
-
-* `git add -A` would sweep up another agent's in-flight file (this repo has three agents in it),
-* build output, `orig/`, `.lavish/`, `.pi/` and scratch must never be staged, and a stray file in the tree
-  (a `.stackdump`, a `__pycache__`) is an accident worth refusing rather than committing,
-* the commit message is supposed to carry the *results*, and those numbers already exist in
-  `build/RMHE08/report.json`.
-
-What it does: classifies every path in `git status` into stage / refuse, stages only the stageable ones, writes
-the message (measured results included) to `.git/prepcommit_msg.txt`, prints the commit command - and stops.
-`--split` prints a one-concern-per-commit plan instead of staging everything at once. `--commit` runs the
-commit for you and is only for when the user has explicitly asked for one.
-"""
+"""Prepare a commit for the current results: classify `git status` into stage/refuse, stage only the stageable
+paths, write the measured message to the git dir, execute nothing. Spec: docs/tools/spec/prepcommit.md.
+CLI: prepcommit.py [--dry-run] [--split] [--message SUBJECT] [--commit]."""
 
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
@@ -24,10 +9,9 @@ import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file_
 import argparse
 import json
 import os
-import subprocess
 import sys
 from tools.lib.git import Git
-from tools.lib import repo
+from tools.lib import report, repo
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -108,16 +92,8 @@ def ground_truth_error(dol_path: str | None = None, sha_path: str | None = None)
 
 
 def status_paths() -> list[tuple[str, str]]:
-    """[(status, path)] for every tracked or untracked change git reports."""
-    rows = []
-    for line in git("status", "--porcelain", "-uall").splitlines():
-        if not line.strip():
-            continue
-        code, path = line[:2].strip(), line[3:]
-        if " -> " in path:  # rename
-            path = path.split(" -> ", 1)[1]
-        rows.append((code, path))
-    return rows
+    """[(status, path)] for every tracked or untracked change git reports (a rename: its new path)."""
+    return [(code.strip(), path) for code, path in Git(ROOT).status_porcelain()]
 
 
 def results_for(paths: list[str]) -> list[str]:
@@ -140,11 +116,7 @@ def results_for(paths: list[str]) -> list[str]:
 
 
 def _report_measures() -> dict:
-    report = os.path.join(ROOT, "build", "RMHE08", "report.json")
-    if not os.path.exists(report):
-        return {}
-    data = json.loads(open(report, "r", encoding="utf-8").read())
-    return {u.get("name", ""): (u.get("measures") or {}) for u in data.get("units", [])}
+    return report.read(os.path.join(ROOT, "build", "RMHE08", "report.json")).unit_measures()
 
 
 def _num(value):
@@ -170,11 +142,8 @@ def improved_since_base() -> bool:
     the current numbers out of `build/RMHE08/report.json`. If either is absent the delta is unknown, and
     unknown is reported as "no improvement" rather than warning on absent evidence.
     """
-    units = os.path.join(ROOT, "tools", "units")
-    if units not in sys.path:
-        sys.path.insert(0, units)
     try:
-        import land
+        from tools.units import land
         before = land.read_base(ROOT).get("ledger") or {}
         after = land.ledger_numbers(ROOT)
     except Exception:  # a missing build tree, or land's own imports, must never break a commit
