@@ -47,7 +47,7 @@ target-extra  the target has bytes ours does not (a range we failed to claim, or
 
 ## Lib dependencies
 
-objcompare, refs.census, project, report, findings, text.
+objcompare (`section_sizes`, `size_gaps`, `FLIP_DATA_SECTIONS`); tool APIs: `dataclosure` (the census, verdicts and rows), `dataseams`, `poolseams`.
 
 ## Test contract
 
@@ -57,7 +57,8 @@ Target: `tools/tests/units/test_datagap.py` on `lib.testing` (`FixtureTree`/`Git
 
 ## Known gaps
 
-the gate's snapshot rows (`--touched-by`, `--write-snapshot`, `--base-snapshot`) move to `dataclosure.py` (design 5)
+* WP3a: the census, the strict/span/fold verdicts and the gate's snapshot rows are `tools/units/dataclosure.py` (`spec/dataclosure.md`); `datagap.py` keeps the section gap, `--flip-blockers` and the CLI, and re-exports the closure's names for land/backlog/dataclaim/stylelint/poolseams until they import it themselves.
+* Its `--selftest` still runs the closure's checks (`dataclosure.selftest`).
 
 ## History (the incidents behind the rules - keep the rule, drop the narrative when the rule is stable)
 

@@ -6,171 +6,24 @@ from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import os
-import struct
 import sys
 
-from tools.lib.binary.elf import Elf as LibElf
+from tools import unitutil  # unit spec -> build/RMHE08/{src,obj} paths
+from tools.lib import objcompare
+from tools.units import poolseams  # literal pools as TU evidence: which differing pools are a partial pool
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-TOOLS = os.path.dirname(HERE)
-MAIN = os.path.dirname(TOOLS)
-sys.path.insert(0, TOOLS)
-import unitutil  # noqa: E402  (unit spec -> build/RMHE08/{src,obj} paths)
-sys.path.insert(0, HERE)
-import poolseams  # noqa: E402  (literal pools as TU evidence: which differing pools are a partial pool)
-
-# Sections that are bookkeeping, not the unit's code or data. `datagap.py` ignores them for the same
-# reason: they move with symbol-table and compiler-version churn, never with the source.
-META_SECTIONS = {"", ".comment", ".note.split", ".symtab", ".strtab", ".shstrtab", ".dynsym", ".dynstr"}
-# MWCC spells a relocation section `.rela<target>` (`relaextab` targets `extab`).
-RELOC_PREFIX = ".rela"
-
-# PPC relocation kinds the objects here carry, by `r_info & 0xff`; anything else is printed numerically.
-RELOC_TYPES = {
-    0: "R_PPC_NONE", 1: "R_PPC_ADDR32", 2: "R_PPC_ADDR24", 3: "R_PPC_ADDR16",
-    4: "R_PPC_ADDR16_LO", 5: "R_PPC_ADDR16_HI", 6: "R_PPC_ADDR16_HA",
-    7: "R_PPC_ADDR14", 8: "R_PPC_ADDR14_BRTAKEN", 9: "R_PPC_ADDR14_BRNTAKEN",
-    10: "R_PPC_REL24", 11: "R_PPC_REL14", 12: "R_PPC_REL14_BRTAKEN", 13: "R_PPC_REL14_BRNTAKEN",
-    14: "R_PPC_GOT16", 18: "R_PPC_PLTREL24", 21: "R_PPC_JMP_SLOT", 24: "R_PPC_UADDR32",
-    26: "R_PPC_REL32", 109: "R_PPC_EMB_SDA21", 116: "R_PPC_EMB_RELSDA",
-}
-
-# How many relocation differences, and how many offsets of one symbol, a line prints before summarising.
-MAX_RELOC_DIFFS = 6
-MAX_RELOC_OFFSETS = 8
-SHT_NOBITS = 8
-
-
-def _type_name(typ: int) -> str:
-    return RELOC_TYPES.get(typ, "R_PPC_%d" % typ)
-
-
-def read_object(path: str, all_sections: bool = False) -> dict:
-    """`{sections, order, relocs}` for one ELF32 big-endian object (a view over `lib.binary.elf`).
-
-    `sections` maps a content section name to `{size, data}` (`.rela*` sections are folded into
-    `relocs[target]`, a list of `(offset, type, symbol name)`); `order` is the section-header order,
-    so the report reads in the object's own layout. Metadata sections are omitted unless
-    `all_sections`, and `.bss`/`.sbss` (SHT_NOBITS) keep their size with no bytes.
-    """
-    elf = LibElf.read(path)
-    nsym = len(elf.symbols)
-    order: list[str] = []
-    sections: dict[str, dict] = {}
-    relocs: dict[str, list] = {}
-    by_rela: dict[int, list] = {}
-    for r in elf.relocs():
-        by_rela.setdefault(r.rela_index, []).append(
-            (r.offset, r.type, r.symbol_name if r.symbol < nsym else "?%d" % r.symbol))
-    for rela, _target in elf.rela_sections():  # a repeated section name: the last one wins, as before
-        relocs[rela.name[len(RELOC_PREFIX):]] = by_rela.get(rela.index, [])
-    for s in elf.sections:
-        if s.name.startswith(RELOC_PREFIX):
-            continue
-        if s.type == 0 or (not all_sections and s.name in META_SECTIONS):
-            continue
-        order.append(s.name)
-        sections[s.name] = {"size": s.size, "data": s.data}
-    return {"sections": sections, "order": order, "relocs": relocs}
-
-
-def _first_byte_diff(mine: bytes, theirs: bytes):
-    """First offset where two byte strings differ, or None when the shared prefix is equal."""
-    for i in range(min(len(mine), len(theirs))):
-        if mine[i] != theirs[i]:
-            return i
-    return None
-
-
-def _differing_bytes(mine: bytes, theirs: bytes) -> int:
-    """How many bytes differ, counting a length difference as its extra bytes."""
-    shared = min(len(mine), len(theirs))
-    return sum(1 for i in range(shared) if mine[i] != theirs[i]) + abs(len(mine) - len(theirs))
-
-
-def _fmt_offsets(pairs: list, limit: int = MAX_RELOC_OFFSETS) -> str:
-    """`+0x14, +0xAC, +0xB4 (R_PPC_ADDR32)` for a symbol's `(offset, type)` pairs, capped."""
-    pairs = sorted(pairs)
-    kinds = {typ for _off, typ in pairs}
-    shown = pairs[:limit]
-    if len(kinds) == 1 and kinds:
-        body = ", ".join("+0x%X" % off for off, _typ in shown) + " (%s)" % _type_name(next(iter(kinds)))
-    else:
-        body = ", ".join("+0x%X %s" % (off, _type_name(typ)) for off, typ in shown)
-    if len(pairs) > limit:
-        body += ", ... (%d more)" % (len(pairs) - limit)
-    return body
-
-
-def _group_by_symbol(relocs: list) -> dict:
-    out: dict[str, list] = {}
-    for offset, typ, symbol in relocs:
-        out.setdefault(symbol, []).append((offset, typ))
-    return out
-
-
-def reloc_reasons(ours: list, target: list, limit: int = MAX_RELOC_DIFFS) -> list:
-    """The relocation-list difference of one section, as reason strings (empty when identical).
-
-    Relocations are paired by symbol name, because that is the spelling a lane fixes; a name present on
-    one side only, or whose `(offset, type)` set moved, is named with both sides' offsets. This is the
-    F41 class: equal section sizes whose records sit at different offsets.
-    """
-    ours_by, target_by = _group_by_symbol(ours), _group_by_symbol(target)
-    reasons = []
-    for name in sorted(set(ours_by) | set(target_by)):
-        mine, theirs = ours_by.get(name), target_by.get(name)
-        if mine is None:
-            reasons.append("the target relocates `%s` at %s, ours does not" % (name, _fmt_offsets(theirs)))
-        elif theirs is None:
-            reasons.append("ours relocates `%s` at %s, the target does not" % (name, _fmt_offsets(mine)))
-        elif sorted(mine) != sorted(theirs):
-            reasons.append("relocations for `%s` differ: ours %s; target %s"
-                           % (name, _fmt_offsets(mine), _fmt_offsets(theirs)))
-    if len(reasons) > limit:
-        reasons = reasons[:limit] + ["... and %d more relocation difference(s)" % (len(reasons) - limit)]
-    return reasons
-
-
-def section_reasons(ours: dict | None, target: dict | None, ours_relocs: list, target_relocs: list) -> list:
-    """The reasons one section differs, in the order a lane reads them: size, bytes, relocations."""
-    if ours is None:
-        return ["missing from our object (the target's section is %d B)" % target["size"]]
-    if target is None:
-        return ["ours-extra: the target has no such section (%d B)" % ours["size"]]
-    reasons = []
-    if ours["size"] != target["size"]:
-        delta = ours["size"] - target["size"]
-        if delta > 0:
-            reasons.append("ours-extra 0x%X (%d B): our section is longer" % (delta, delta))
-        else:
-            reasons.append("target-extra 0x%X (%d B): the target's section is longer" % (-delta, -delta))
-    diff = _first_byte_diff(ours["data"], target["data"])
-    if diff is not None:
-        mine = ours["data"][diff] if diff < len(ours["data"]) else 0
-        theirs = target["data"][diff] if diff < len(target["data"]) else 0
-        reasons.append("bytes differ at +0x%X (ours %02x, target %02x) in %d of %d bytes"
-                       % (diff, mine, theirs, _differing_bytes(ours["data"], target["data"]),
-                          max(len(ours["data"]), len(target["data"]))))
-    reasons.extend(reloc_reasons(ours_relocs, target_relocs))
-    return reasons
+MAIN = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+META_SECTIONS = objcompare.META_SECTIONS
+MAX_RELOC_DIFFS = objcompare.MAX_RELOC_DIFFS
+MAX_RELOC_OFFSETS = objcompare.MAX_RELOC_OFFSETS
+read_object = objcompare.object_sections
+reloc_reasons = objcompare.reloc_reasons
+section_reasons = objcompare.section_reasons
 
 
 def compare_objects(ours: dict, target: dict) -> list:
-    """One row per differing section, in the target object's section order.
-
-    Returns `[{"section", "ours", "target", "why"}]` - empty when the two objects agree on every
-    compared section's size, bytes and relocations.
-    """
-    names = list(target["order"]) + [n for n in ours["order"] if n not in target["sections"]]
-    rows = []
-    for name in names:
-        mine, theirs = ours["sections"].get(name), target["sections"].get(name)
-        reasons = section_reasons(mine, theirs, ours["relocs"].get(name, []), target["relocs"].get(name, []))
-        if reasons:
-            rows.append({"section": name, "ours": mine["size"] if mine else 0,
-                         "target": theirs["size"] if theirs else 0, "why": "; ".join(reasons)})
-    return rows
+    """`[{"section", "ours", "target", "why"}]` per differing section, in the target's order (`objcompare.sections`)."""
+    return [gap.to_dict() for gap in objcompare.sections(target, ours)]
 
 
 def _size(n: int) -> str:
@@ -198,7 +51,7 @@ def add_pool_notes(rows: list, note: str | None) -> list:
 
 def selftest() -> int:
     """Delegates to `sectiongap_selftest.py` (fixtures only, no build and no repository state)."""
-    import sectiongap_selftest
+    from tools.units import sectiongap_selftest
     return sectiongap_selftest.selftest()
 
 

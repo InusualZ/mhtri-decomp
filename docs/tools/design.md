@@ -13,6 +13,8 @@ Decided design for `tools/` after `inventory.md`, `duplication.md` and `prose-au
    The import cycles that exist today (`claims <-> queue <-> slots`, `brief <-> dossier`, `datagap <-> poolseams`,
    `stylelint -> datagap -> undefrefs -> dossier -> brief`) are forbidden by construction: the lib has no cycles, and a tool
    importing a tool is a lint finding.
+   A file split carries the moved code's edges and nothing else (`datagap -> dataclosure`, and `dataclosure ->
+   callers/poolseams` in place of datagap's own): the allow-list swaps them in the same batch and its net never grows.
 3. **The code keeps one header line; the spec keeps the prose.** Every tool opens with
    `"""<one-line purpose>. Spec: docs/tools/spec/<name>.md. CLI: <shape>."""` and nothing else at module level. Rules live in the
    spec's "Invariants and rules"; incidents live there as a date in parentheses at most.
@@ -230,6 +232,12 @@ becomes it (`duplication.md` has the line numbers).
   `undefined(ours, target, providers, map, linker) -> hits` (`undefrefs.unresolved_names`, `relocaudit.audit_sets`);
   `fingerprint(obj)` (`datagap.object_fingerprint`, `verifyunit.target_object_fingerprint`).
 * Each returns `Finding`s; the CLIs (`datagap`, `sectiongap`, `pairgap`, `relocdiff`, `flipcheck`, `undefrefs`) render them.
+* As built (WP3a): the comparisons return value types (`SectionGap`, `SymbolGap`) and the dict shapes the tools already
+  rendered (`reloc_facts`, `object_sections`, the four relocation classes); `Row`s arrive with the gate (WP4). `fingerprint`
+  is two functions because it is two questions (`fingerprint`: target drift, rename-insensitive; `touch_fingerprint`:
+  TOUCHED, external targets by address), both byte-compatible with the stored snapshots. The link-input index
+  (`link_index`) moved here too, so `flipcheck` and `undefrefs` share one cached read of the link (and `flipcheck` no
+  longer runs binutils).
 
 ### `lib/cscan.py` - C/C++ text
 

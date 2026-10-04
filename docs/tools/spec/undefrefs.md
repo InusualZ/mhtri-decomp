@@ -37,12 +37,12 @@ Inputs -> outputs: src/obj objects, map, link inputs -> hits.
 * no input defines it and some input already references it (the link is already broken the same way).
 * Everything else is a name that must come from nowhere: a flip would leave it `undefined: '<name>'`. The refusal names the name, and where the target records a **different spelling at the same relocation offset** (or, when the layouts differ, the single same-stem spelling in the target) it names both - that spelling is the fix.
 * **Add-only (the row is a *delta*, not a verdict).** The tree already carries pre-existing debt: a census of the landed `NonMatching` units found 61 of 285 with a wrong-linkage/undefined reference already in the base object (`enemy/enemy_control` calls `ckResourceName` where the map's row is `ckResourceName__FPc`). Refusing those would refuse every batch that touches such a unit for debt it did not create - the same mistake `stylelint.py --diff` avoids ("an existing finding never blocks a landing, an *added* one refuses"). So the row refuses only a name that is **not in the batch base's own unresolved set**: at `record-base` time the base's objects for the batch's units are compiled once and their unresolved names cached (`snapshot_base`, keyed by the base source hash); the gate subtracts that set, refuses the new names only, and **reports** the pre-existing ones as debt (a note naming the unit, the count and the two spellings for the first). A unit whose base source did not exist is new, so every reference is its own. The census is a separate register (`--census`), never the gate's output.
-* **Why it is cheap.** The batch is a handful of units; the only non-trivial part is "which names does the link provide". `link_symbol_index` caches the link inputs' defined globals and references under `build/tmp/undefrefs/link-symbols.json` keyed by each input's size+mtime (the pattern `callers.py` uses for its ELF fallback), and on a miss re-reads only the inputs that changed - so a gate run pays for its own batch's objects, not the whole 2200-object link. `dossier.parse_elf` is the one ELF reader.
+* **Why it is cheap.** The batch is a handful of units; the only non-trivial part is "which names does the link provide". `link_symbol_index` caches the link inputs' defined globals and references under `build/tmp/undefrefs/link-symbols.json` keyed by each input's size+mtime (the pattern `callers.py` uses for its ELF fallback), and on a miss re-reads only the inputs that changed - so a gate run pays for its own batch's objects, not the whole 2200-object link. The index is `lib.objcompare.link_index`; the reader is `lib.objcompare.reloc_facts` (every relocation section, dtk's repeated `.rela.data` included).
 * **Not a nuisance.** A unit whose rows are wrong in *other* ways still passes: `Network/NetworkPat`'s 62 wrong vtable slots point at real functions that *are* `symbols.txt` rows, so this row is silent (the selftest pins it as a negative fixture). And a unit whose *only* wrong reference is pre-existing passes too (the selftest pins that as the regression test for add-only).
 
 ## Lib dependencies
 
-objcompare.undefined, binary, project, cache, findings, units.
+objcompare (`reloc_facts`, `link_index`, `undefined`, `linkage_sets`, `linkage_audit`), names, project; tool API: `recompile` (`--base`, lazily).
 
 ## Test contract
 
@@ -52,7 +52,8 @@ Target: `tools/tests/units/test_undefrefs.py` on `lib.testing` (`FixtureTree`/`G
 
 ## Known gaps
 
-absorbs `relocaudit` as `--census` (retired.md)
+* `relocaudit` is folded in as `--census --linkage [--unit U] [--no-decls] [--json]` (its sweep, label and JSON unchanged; its checks are `tools/tests/units/test_undefrefs_linkage.py`); `relocaudit.py` is a forwarding shim until WP6.
+* `check_object`/`check_units` still return line lists, not `lib.findings` rows (WP4).
 
 ## History (the incidents behind the rules - keep the rule, drop the narrative when the rule is stable)
 

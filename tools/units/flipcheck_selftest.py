@@ -26,8 +26,8 @@ The weaker layout class is pinned next to the strict one, because it is the shap
 (`Network/NetworkPat`: 11 of 12 symbols at a different address and 571 of 577 differing bytes outside the
 symbols' own addresses, the rest inside three of them): a moved symbol carrying a word of its own is still
 named, a mislaid minority with a residual elsewhere is not, and neither is a size/length/pad difference.
-`scratch_file` is pinned too - the objcopy extraction has to land in a directory that exists, because a
-`git worktree` has no `MAIN/.pi` and probing one made *every* byte check skip in silence.
+The byte extraction is pinned too - it reads the object itself, so it cannot skip in silence the way the old
+objcopy path did when a worktree had no `MAIN/.pi` to extract into.
 """
 from __future__ import annotations
 
@@ -462,26 +462,15 @@ def selftest() -> int:
         expect("a symbol whose size changed is not a mislaid layout",
                fc.mislaid_order(fn_b + fn_a, fn_a + fn_b, grow_ours, perm_tgt, ".text"), None)
 
-        # 17c. The objcopy extraction has to land in a directory that exists: `MAIN/.pi` is not in a
-        #      `git worktree`, and the old fixed path made objcopy fail, `raw_section` return None for both
-        #      sides and every byte check above skip without a word (`Network/NetworkPat` read READY).
-        saved_scratch = fc.SCRATCH
-        fc.SCRATCH = os.path.join(tmp, "no-such-scratch-dir")
-        try:
-            chosen = fc.scratch_file()
-        finally:
-            fc.SCRATCH = saved_scratch
-        expect("a missing scratch dir falls back to one that exists",
-               (os.path.isdir(os.path.dirname(chosen)),
-                os.path.dirname(chosen) == tempfile.gettempdir()), (True, True))
-        fc.SCRATCH = tmp
-        try:
-            expect("the preferred scratch dir is used when it is there",
-                   os.path.dirname(fc.scratch_file()), tmp)
-        finally:
-            fc.SCRATCH = saved_scratch
-        expect("the extraction file is per-process",
-               os.path.basename(fc.scratch_file()), "_flipcheck_%d.bin" % os.getpid())
+        # 17c. The byte extraction reads the object itself (`objcompare.section_data`), not objcopy: the old
+        #      objcopy path needed a scratch dir that a worktree lacked, `raw_section` returned None for
+        #      both sides and every byte check above skipped without a word (`Network/NetworkPat` read READY).
+        expect("a section's bytes are read without binutils", fc.raw_section(perm_ours, ".text"), fn_b + fn_a)
+        expect("an absent section is None, not empty", fc.raw_section(perm_ours, ".data"), None)
+        expect("a missing object is None", fc.raw_section(os.path.join(tmp, "absent.o"), ".text"), None)
+        twice = write(tmp, "twice.o", build_obj([(".data", b"\x01" * 4), (".data", b"\x02" * 8)], []))
+        expect("a repeated section name reads its last section (what objcopy left on top)",
+               (fc.raw_section(twice, ".data"), fc.sections(twice).get(".data", (0,))[0]), (b"\x02" * 8, 8))
 
         # 18. The general relocation check: every name our object references must be defined by our object,
         #     a `symbols.txt` row, or a link input other than the target object (`Network/NetworkWiiMediator`

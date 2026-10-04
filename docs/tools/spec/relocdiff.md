@@ -37,11 +37,11 @@ Inputs -> outputs: obj/ + src/ objects -> tables, exit.
 * the diff, in the four classes a lane acts on: (a) relocations **only the target** has; (b) relocations **only ours** has; (c) the **same offset pointing at a different symbol** (the objdiff-invisible class); (d) the **same symbol with a different type or addend**;
 * an explicit line when the two sets are **identical** - the answer most of the time, and the thing that makes "byte- and relocation-identical" checkable rather than assumed.
 * The unit's two object paths and their mtimes are named in the header (so a stale read is visible), and a prebuilt object older than a source in the unit's include closure is flagged with `stale` (the same rule `tools/objdiff/freshguard.py` enforces for the scorers).
-* **Reuse, not re-implementation.** The object is read by `tools/units/dossier.py`'s `parse_elf` - the project's ELF reader, already used by `callees.py` - which carries the RELA addend; the relocation type names come from the same module; the unit and its paths come from `tools/unitutil.py`; the staleness arithmetic is `tools/objdiff/freshguard.py`. This tool is the section-relocation *view*; `sectiongap.py` stays the section size/byte view and pairs relocations by name, while this one pairs by offset and carries addends. It deliberately does not decode an instruction's field, resolve a symbol in the link, or judge what `splits.txt` claims.
+* **Reuse, not re-implementation.** The relocations (with the RELA addend), the four classes and the owner view are `lib.objcompare`'s (`reloc_rows`, `reloc_classes`, `by_owner`); the relocation type names are `objcompare.legacy_reloc_name`; the unit and its paths come from `tools/unitutil.py`; the staleness arithmetic is `tools/objdiff/freshguard.py`. This tool is the section-relocation *view*; `sectiongap.py` stays the section size/byte view and pairs relocations by name, while this one pairs by offset and carries addends. It deliberately does not decode an instruction's field, resolve a symbol in the link, or judge what `splits.txt` claims.
 
 ## Lib dependencies
 
-objcompare, binary, report.Freshness, units.
+objcompare, report (freshness, stamps); `unitutil.resolve_unit` for the unit.
 
 ## Test contract
 
@@ -51,7 +51,7 @@ Target: `tools/tests/objdiff/test_relocdiff.py` on `lib.testing` (`FixtureTree`/
 
 ## Known gaps
 
-None recorded.
+Only six relocation kinds are named (`objcompare.legacy_reloc_name`); the full table would print `R_PPC_REL14` for the 6 `R_PPC_11` lines of `--all` on this tree.
 
 ## History (the incidents behind the rules - keep the rule, drop the narrative when the rule is stable)
 

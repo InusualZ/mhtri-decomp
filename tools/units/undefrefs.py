@@ -1,62 +1,7 @@
 #!/usr/bin/env python3
-"""The flip blocker a score cannot see: a relocation whose name no link input defines.
-
-**The incident this closes (2026-09-28, three times in one day).** A unit's rows can score 96-100 % while
-the object calls a symbol that no link input defines, because a `bl` under a *different relocation name*
-scores exactly the same as the right one. Measured: `quest/arenatask`'s `arena_eqdata_from_userdata` scored
-100.00 % while our object referenced `dl_acdata_to_ar_eqdata__FP11ArenaEqDataUc` and the target's was
-`dl_acdata_to_ar_eqdata__FP14_arena_eq_dataUc` (an 11-char struct tag against a 14-char one);
-`hud/cockpit_quest`'s two rows scored 96.38 / 96.50 % while referencing `get_move_work_adrs` under C
-linkage against the target's mangled `get_move_work_adrs__FUc`; and the Pat vtable's bytes were 114/114
-identical while only 50 of 112 slots relocated correctly. Each was a flip blocker, and no gate row that
-reads a score could see any of them.
-
-**What this row asks.** Not a relocation diff - one question, per unit in the batch: *does our object
-relocate a name that no link input can define?* For each relocation our compiled object
-(`build/RMHE08/src/<unit>.o`) carries, the name it references is fine when
-
-* our object defines it itself (a local/partial definition),
-* `config/RMHE08/symbols.txt` carries a row for it (the map is the project's name oracle),
-* another link input on `main.elf`'s link line defines it (global/weak) - the target object is excluded,
-  because a flip *replaces* it,
-* the linker script assigns it (`_stack_addr`, ...) or it is the EABI base / entry symbol,
-* the target object references it too but does not define it (the reference is already in the link,
-  unresolved - the flip adds nothing), or
-* no input defines it and some input already references it (the link is already broken the same way).
-
-Everything else is a name that must come from nowhere: a flip would leave it `undefined: '<name>'`. The
-refusal names the name, and where the target records a **different spelling at the same relocation offset**
-(or, when the layouts differ, the single same-stem spelling in the target) it names both - that spelling is
-the fix.
-
-**Add-only (the row is a *delta*, not a verdict).** The tree already carries pre-existing debt: a census
-of the landed `NonMatching` units found 61 of 285 with a wrong-linkage/undefined reference already in the
-base object (`enemy/enemy_control` calls `ckResourceName` where the map's row is `ckResourceName__FPc`).
-Refusing those would refuse every batch that touches such a unit for debt it did not create - the same
-mistake `stylelint.py --diff` avoids ("an existing finding never blocks a landing, an *added* one
-refuses"). So the row refuses only a name that is **not in the batch base's own unresolved set**: at
-`record-base` time the base's objects for the batch's units are compiled once and their unresolved names
-cached (`snapshot_base`, keyed by the base source hash); the gate subtracts that set, refuses the new
-names only, and **reports** the pre-existing ones as debt (a note naming the unit, the count and the two
-spellings for the first). A unit whose base source did not exist is new, so every reference is its own.
-The census is a separate register (`--census`), never the gate's output.
-
-**Why it is cheap.** The batch is a handful of units; the only non-trivial part is "which names does the
-link provide". `link_symbol_index` caches the link inputs' defined globals and references under
-`build/tmp/undefrefs/link-symbols.json` keyed by each input's size+mtime (the pattern `callers.py` uses for
-its ELF fallback), and on a miss re-reads only the inputs that changed - so a gate run pays for its own
-batch's objects, not the whole 2200-object link. `dossier.parse_elf` is the one ELF reader.
-
-**Not a nuisance.** A unit whose rows are wrong in *other* ways still passes: `Network/NetworkPat`'s 62
-wrong vtable slots point at real functions that *are* `symbols.txt` rows, so this row is silent (the
-selftest pins it as a negative fixture). And a unit whose *only* wrong reference is pre-existing passes too
-(the selftest pins that as the regression test for add-only).
-
-    python tools/units/undefrefs.py <unit> [...]   # the refusal, spelled out
-    python tools/units/undefrefs.py <unit> --base <rev>  # judge against the base revision's own objects
-    python tools/units/undefrefs.py --census [PATH]  # the pre-existing-debt register
-    python tools/units/undefrefs.py --selftest
-"""
+"""The flip blocker a score cannot see: a relocation our object carries that no link input can define (add-only).
+Spec: docs/tools/spec/undefrefs.md. CLI: undefrefs.py <unit>... [--base REV | --base-snapshot F] [--json] |
+--snapshot-base F | --census [--linkage [--unit U] [--no-decls] [--json]] [--census-out F] | --selftest."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
@@ -66,32 +11,27 @@ import json
 import os
 import re
 import shutil
-import struct
 import subprocess
 import sys
 import tempfile
-from tools.lib import cache as libcache
+import time
+
 from tools.lib import names as libnames
+from tools.lib import objcompare
+from tools.lib import project as _project  # the map reader, the registered units
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-if os.path.dirname(HERE) not in sys.path:
-    sys.path.insert(0, os.path.dirname(HERE))          # `tools/`, so `from units import dossier` works
-from units import dossier as dossier_mod  # noqa: E402
-from tools.lib import project as _project  # noqa: E402  (the map reader)
 
-# The relocation-type reader (`dossier.parse_elf`) is the one ELF scan. Relocations into extab/extabindex
-# are compiler bookkeeping, not names our code calls, so they are not this row's business (flipcheck treats
-# them the same way).
-BOOKKEEPING = ("extab", "extabindex")
+# Relocations into extab/extabindex are compiler bookkeeping, not names our code calls (flipcheck agrees).
+BOOKKEEPING = objcompare.BOOKKEEPING_SECTIONS
 # mwldeppc defines the EABI small-data bases itself; `__start` is the linker's default entry root. No object
 # and no `symbols.txt` row carries them.
-LINKER_SYMBOLS = ("_SDA_BASE_", "_SDA2_BASE_", "__start")
-# The linker script's own assignments (`_stack_addr = ...;`): the link supplies these, no object does.
-LINKER_ASSIGN_RE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_.]*)\s*=")
+LINKER_SYMBOLS = objcompare.LINKER_SYMBOLS
+LINKER_ASSIGN_RE = objcompare.LINKER_ASSIGN_RE
 GLOBAL_BINDING, WEAK_BINDING = 1, 2
-SCHEMA = 1
+SCHEMA = objcompare.LINK_INDEX_SCHEMA
 # `build/` is untracked and gitignored, so this never shows in the gate's tree-dirty guard.
-CACHE_REL = os.path.join("build", "tmp", "undefrefs", "link-symbols.json")
+CACHE_REL = objcompare.LINK_INDEX_REL
 SYMBOLS_REL = os.path.join("config", "RMHE08", "symbols.txt")
 LDSCRIPT_REL = os.path.join("build", "RMHE08", "ldscript.lcf")
 NINJA_REL = "build.ninja"
@@ -106,56 +46,17 @@ SOURCE_EXTS = (".c", ".cpp", ".cp")
 # ---------------------------------------------------------------------------------------------------------
 
 def link_inputs(main: str) -> list[str]:
-    """The object inputs on `main.elf`'s link line in `build.ninja`, MAIN-relative, normalised like the
-    caller builds a target path (`os.path.normpath`). `[]` when there is no link edge (never `None` here:
-    a missing link edge is an empty index, not an error)."""
-    path = os.path.join(main, NINJA_REL)
-    if not os.path.exists(path):
-        return []
-    lines = open(path, encoding="utf-8", errors="replace").read().splitlines()
-    for i, line in enumerate(lines):
-        head = line.split(":", 1)[0]
-        if not head.startswith("build ") or ": link " not in line or not head.rstrip().endswith("main.elf"):
-            continue
-        edge = [line]
-        while edge[-1].rstrip().endswith("$"):
-            i += 1
-            edge.append(lines[i])
-        inputs = []
-        for token in " ".join(edge).replace("$", " ").split()[3:]:     # skip `build`, target, `link`
-            if token in ("|", "||"):
-                break
-            inputs.append(os.path.normpath(token.replace("\\", os.sep)))
-        return inputs
-    return []
+    """The object inputs on `main.elf`'s link line in `build.ninja`, MAIN-relative (`objcompare.link_inputs`);
+    `[]` when there is no link edge (a missing link edge is an empty index, not an error)."""
+    return objcompare.link_inputs(os.path.join(main, NINJA_REL)) or []
 
 
 def load_object(path: str) -> dict | None:
-    """`{relocs, defined, refs}` for an ELF32 object, or None when it cannot be read.
-
-    `defined` is `{name: (section, info)}` for every symbol the object defines (locals included - a
-    relocation to a name the same object defines is not external). `refs` is every name its non-bookkeeping
-    relocations reference.
-    """
-    try:
-        blob = open(path, "rb").read()
-        _sections, symbols, relocs = dossier_mod.parse_elf(blob)
-    except (OSError, ValueError, struct.error):
-        return None
-    defined = {}
-    for s in symbols:
-        if s["name"] and s["shndx"]:
-            defined[s["name"]] = (s["section"], s["info"])
-    refs = set()
-    for r in relocs:
-        if r["symbol"] and not (r["target"] or "").startswith(BOOKKEEPING):
-            refs.add(r["symbol"])
-    return {"relocs": relocs, "defined": defined, "refs": refs}
+    """`{relocs, defined, refs}` for an ELF32 object, or None when it cannot be read (`objcompare.reloc_facts`)."""
+    return objcompare.reloc_facts(path)
 
 
-def provides_global(entry) -> bool:
-    """Whether a `defined` entry has a binding the linker resolves across objects (global/weak)."""
-    return bool(entry) and entry[1] >> 4 in (GLOBAL_BINDING, WEAK_BINDING)
+provides_global = objcompare.provides_global     # a `defined` entry the linker resolves across objects
 
 
 def map_rows(main: str) -> set[str]:
@@ -168,14 +69,7 @@ def map_rows(main: str) -> set[str]:
 
 def linker_symbols(main: str) -> set[str]:
     """The names the linker provides without an object: the script's assignments + the EABI/entry set."""
-    out = set(LINKER_SYMBOLS)
-    path = os.path.join(main, LDSCRIPT_REL)
-    if os.path.exists(path):
-        for line in open(path, encoding="utf-8", errors="replace"):
-            m = LINKER_ASSIGN_RE.match(line)
-            if m:
-                out.add(m.group(1))
-    return out
+    return set(LINKER_SYMBOLS) | objcompare.linker_assigned(os.path.join(main, LDSCRIPT_REL))
 
 
 def linkage_stem(name: str) -> str:
@@ -186,129 +80,27 @@ def linkage_stem(name: str) -> str:
 # the cached link-symbol index
 # ---------------------------------------------------------------------------------------------------------
 
-def _sig(path: str):
-    return libcache.stat_key(path)
-
-
 def link_symbol_index(main: str, cache_path: str | None = None, rebuild: bool = False) -> dict:
-    """`{providers: {name: [input, ...]}, ref_count: {name: n}, inputs: [input, ...]}` over the link inputs.
-
-    `providers` is the global/weak definition map; `ref_count` is how many link inputs reference each name
-    (the "already unresolved" exemption's signal). The per-input symbol lists are cached under
-    `build/tmp/undefrefs/link-symbols.json`, keyed by size+mtime, and only changed inputs are re-read.
-    """
-    inputs = link_inputs(main)
-    cache_path = cache_path or os.path.join(main, CACHE_REL)
-    cached = {}
-    if not rebuild and os.path.exists(cache_path):
-        try:
-            loaded = json.load(open(cache_path, encoding="utf-8"))
-            if isinstance(loaded, dict) and loaded.get("schema") == SCHEMA:
-                cached = loaded.get("inputs") or {}
-        except (OSError, ValueError):
-            cached = {}
-    fresh: dict[str, dict] = {}
-    changed = set(cached) != set(inputs)
-    for rel in inputs:
-        path = os.path.join(main, rel)
-        sig = _sig(path)
-        if sig is None:
-            continue
-        old = cached.get(rel)
-        if old and old.get("sig") == sig and "defined" in old and "refs" in old:
-            fresh[rel] = old
-            continue
-        changed = True
-        facts = load_object(path)
-        if facts is None:
-            fresh[rel] = {"sig": sig, "defined": [], "refs": []}
-            continue
-        fresh[rel] = {
-            "sig": sig,
-            "defined": sorted(n for n, e in facts["defined"].items() if provides_global(e)),
-            "refs": sorted(facts["refs"]),
-        }
-    providers: dict[str, list[str]] = {}
-    ref_count: dict[str, int] = {}
-    for rel, entry in fresh.items():
-        for name in entry["defined"]:
-            providers.setdefault(name, []).append(rel)
-        for name in entry["refs"]:
-            ref_count[name] = ref_count.get(name, 0) + 1
-    if changed:
-        # only write when an input appeared, vanished or moved: a warm gate run pays no 2 MB serialise
-        try:
-            os.makedirs(os.path.dirname(cache_path), exist_ok=True)
-            tmp = cache_path + ".tmp"
-            with open(tmp, "w", encoding="utf-8") as fh:
-                json.dump({"schema": SCHEMA, "inputs": fresh}, fh)
-            os.replace(tmp, cache_path)
-        except OSError:
-            pass                               # a read-only tree is not a reason to refuse
-    return {"providers": providers, "ref_count": ref_count, "inputs": inputs}
+    """`{providers: {name: [input, ...]}, ref_count: {name: n}, inputs: [input, ...]}` over the link inputs
+    (`objcompare.link_index`: per-input facts cached under `build/tmp/undefrefs/link-symbols.json`)."""
+    index = objcompare.link_index(main, link_inputs(main), cache_path or os.path.join(main, CACHE_REL), rebuild)
+    return {"providers": index["providers"], "ref_count": index["ref_count"], "inputs": index["inputs"]}
 
 
 # ---------------------------------------------------------------------------------------------------------
 # the rule
 # ---------------------------------------------------------------------------------------------------------
 
-def external_candidates(ours: dict, known: set[str]) -> list[tuple[str, int, str]]:
-    """`(section, offset, name)` for every non-bookkeeping relocation our object carries whose name it does
-    not define and the map/linker does not already name. The link index only has to answer these few."""
-    out = []
-    seen = set()
-    for r in ours["relocs"]:
-        name = r["symbol"]
-        if not name or (r["target"] or "").startswith(BOOKKEEPING):
-            continue
-        if name in ours["defined"] or name in known or name in seen:
-            continue
-        seen.add(name)
-        out.append((r["target"], r["offset"], name))
-    return out
-
-
-def spelling_hint(section: str, offset: int, name: str, target: dict | None) -> tuple[str, str] | None:
-    """`(target spelling, how)` for a candidate the target object records differently, or None.
-
-    First the exact relocation slot (`Network/arenatask`'s wrong struct tag sits at the same `.text`
-    offset). When the layouts differ (`hud/cockpit_quest`: our partial object is much shorter than the
-    target's full TU), fall back to the single name in the target with the same linkage stem.
-    """
-    if target is None:
-        return None
-    at = {r["symbol"] for r in target["relocs"]
-          if r["symbol"] and r["target"] == section and r["offset"] == offset
-          and not (r["target"] or "").startswith(BOOKKEEPING)}
-    other = sorted(x for x in at if x != name)
-    if len(other) == 1:
-        return other[0], "same offset"
-    stem = linkage_stem(name)
-    same = sorted({n for n in (set(target["defined"]) | target["refs"]) if n != name and
-                   linkage_stem(n) == stem})
-    if len(same) == 1:
-        return same[0], "same stem"
-    return None
+external_candidates = objcompare.external_candidates   # (section, offset, name) the link index must answer
+spelling_hint = objcompare.spelling_hint               # the target's spelling at the slot, or by linkage stem
 
 
 def unresolved_names(our: dict, target: dict | None, *, map_set: set[str],
                      providers: dict[str, list[str]], ref_count: dict[str, int], target_rel: str,
                      linker_set: set[str]) -> list[tuple[str, tuple[str, str] | None]]:
-    """The `(name, spelling hint)` our object relocates that no link input can define - the row's set."""
-    known = map_set | linker_set
-    target_refs = target["refs"] if target is not None else set()
-    target_defined = target["defined"] if target is not None else {}
-    target_providers = {target_rel} if target is not None else set()
-    hits = []
-    for section, offset, name in external_candidates(our, known):
-        if set(providers.get(name, ())) - target_providers:
-            continue                                   # another link input defines it
-        if name in target_refs and not provides_global(target_defined.get(name)):
-            continue                                   # the target only references it: already unresolved
-        if not providers.get(name) and ref_count.get(name, 0) > 0:
-            continue                                   # no input defines it, the link already references it
-        hits.append((name, spelling_hint(section, offset, name, target)))
-    return hits
+    """The `(name, spelling hint)` our object relocates that no link input can define (`objcompare.undefined`)."""
+    return objcompare.undefined(our, target, map_set=map_set, providers=providers, ref_count=ref_count,
+                                target_rel=target_rel, linker_set=linker_set)
 
 
 def render_hits(hits: list[tuple[str, tuple[str, str] | None]]) -> list[str]:
@@ -480,7 +272,7 @@ def _remove_base_worktree(main: str, path: str) -> None:
 
 def _compile_base_unit(unit: str, main: str, wt: str) -> dict:
     """Compile `unit` from the base worktree with the command `recompile.py` borrows from MAIN."""
-    from units import recompile  # noqa: PLC0415 - keep the import off the hot `--census` path
+    from tools.units import recompile  # noqa: PLC0415 - keep the import off the hot `--census` path
     rel = _base_source_rel(wt, unit) or ("src/%s.cpp" % _unit_stem(unit))
     return recompile.compile_unit(rel[len("src/"):], main, wt)
 
@@ -592,6 +384,154 @@ def census_markdown(rows: list[tuple[str, str, str | None, str | None]]) -> str:
 
 
 # ---------------------------------------------------------------------------------------------------------
+# the linkage census (`--census --linkage`, relocaudit folded in): our object's symbol spellings vs the target's
+# ---------------------------------------------------------------------------------------------------------
+
+# EABI register-save/restore helpers encode register allocation, not linkage: reported apart, never a repair.
+COMPILER_HELPER_RE = re.compile(r"^_(?:save|rest)(?:gpr|fpr)_\d+$")
+# The source/header extensions the declaration lookup reads, and how many rows it names per symbol.
+DECL_EXT = {".c", ".cpp", ".cc", ".cxx", ".cp", ".h", ".hpp", ".hh"}
+DECL_CAP = 4
+LINKAGE_KEYS = ("linkage_undefined", "other_undefined", "linkage_defined", "other_defined")
+
+
+def mismatch_kind(name: str) -> str:
+    """`compiler-helper` for an EABI register save/restore helper, `extra` for any other unmatched spelling."""
+    return "compiler-helper" if COMPILER_HELPER_RE.match(name) else "extra"
+
+
+def registered_units(main: str) -> list[dict]:
+    """Every registered unit from `configure.py` (`lib.project.Configure`, the one reader of `config.libs`)."""
+    return [{"path": o.path, "flag": o.flag}
+            for o in _project.Configure.load(os.path.join(main, "configure.py")).objects()]
+
+
+def object_paths(main: str, source_path: str) -> tuple[str, str]:
+    """`(our_object, target_object)` for a registered source path (its stem under build/RMHE08/{src,obj})."""
+    stem = os.path.splitext(source_path.replace("\\", "/"))[0]
+    return (os.path.join(main, "build", "RMHE08", "src", stem + ".o"),
+            os.path.join(main, "build", "RMHE08", "obj", stem + ".o"))
+
+
+def declaration_index(main: str) -> dict:
+    """`{token: [(relpath, lineno, text)]}` for every identifier on a declaration-shaped line of `src/`/`include/`
+    (a line with `(` or `;` that is not a comment or a directive): where the repair goes, in one walk."""
+    idx: dict[str, list] = {}
+    for base in ("src", "include"):
+        root = os.path.join(main, base)
+        if not os.path.isdir(root):
+            continue
+        for dirpath, dirnames, filenames in os.walk(root):
+            dirnames[:] = [d for d in dirnames if d != "__pycache__"]
+            for fn in filenames:
+                if os.path.splitext(fn)[1].lower() not in DECL_EXT:
+                    continue
+                p = os.path.join(dirpath, fn)
+                try:
+                    text = open(p, encoding="utf-8", errors="replace").read()
+                except OSError:
+                    continue
+                rel = os.path.relpath(p, main).replace("\\", "/")
+                for lineno, line in enumerate(text.splitlines(), 1):
+                    stripped = line.strip()
+                    if not stripped or stripped[0] in "*/#" or ("(" not in line and ";" not in line):
+                        continue
+                    for tok in set(re.findall(r"[A-Za-z_]\w*", line)):
+                        idx.setdefault(tok, []).append((rel, lineno, stripped))
+    return idx
+
+
+def declarations_for(idx: dict, name: str) -> list[dict]:
+    """Up to `DECL_CAP` src/header rows that spell `name`'s linkage stem, header rows first."""
+    rows = idx.get(linkage_stem(name), [])
+    rows = sorted(rows, key=lambda r: (0 if r[0].endswith((".h", ".hpp", ".hh")) else 1, r[0], r[1]))
+    return [{"file": f, "line": n, "text": t} for f, n, t in rows[:DECL_CAP]]
+
+
+def audit_unit(main: str, source_path: str, idx: dict | None = None) -> dict:
+    """One unit's linkage record (`objcompare.linkage_audit`); `status` is `clean`, `suspect` or `unbuilt`."""
+    our_obj, tgt_obj = object_paths(main, source_path)
+    our = objcompare.linkage_sets(our_obj)
+    tgt = objcompare.linkage_sets(tgt_obj)
+    if our is None or tgt is None:
+        missing = [p for p, s in ((our_obj, our), (tgt_obj, tgt)) if s is None]
+        return {"unit": source_path, "status": "unbuilt", "our": our_obj, "target": tgt_obj,
+                "missing": [os.path.relpath(p, main).replace("\\", "/") for p in missing],
+                "linkage_undefined": [], "other_undefined": [], "linkage_defined": [], "other_defined": []}
+    rec = objcompare.linkage_audit(our[0], our[1], tgt[0], tgt[1])
+    for key in ("linkage_undefined", "linkage_defined"):
+        for m in rec[key]:
+            m["kind"] = "linkage"
+    for key in ("other_undefined", "other_defined"):
+        for m in rec[key]:
+            m["kind"] = mismatch_kind(m["our"])
+    rec["status"] = "suspect" if any(rec[k] for k in rec) else "clean"
+    rec["unit"] = source_path
+    rec["our"] = os.path.relpath(our_obj, main).replace("\\", "/")
+    rec["target"] = os.path.relpath(tgt_obj, main).replace("\\", "/")
+    if idx is not None:
+        rec["declarations"] = {m["our"]: declarations_for(idx, m["our"]) for key in LINKAGE_KEYS for m in rec[key]}
+    return rec
+
+
+def linkage_sweep(main: str, with_decls: bool = True, only: str | None = None) -> dict:
+    """Audit every registered unit's spellings; the counts, the suspect records and the wall-clock cost."""
+    main = os.path.abspath(main)
+    t0 = time.time()
+    units = registered_units(main)
+    if only:
+        want = only.replace("\\", "/").strip("/")
+        units = [u for u in units
+                 if u["path"] == want or os.path.splitext(u["path"])[0] == os.path.splitext(want)[0]]
+    idx = declaration_index(main) if with_decls else None
+    records = [audit_unit(main, u["path"], idx) for u in units]
+    suspects = [r for r in records if r["status"] == "suspect"]
+    return {"root": main, "units_total": len(records),
+            "units_built": sum(1 for r in records if r["status"] != "unbuilt"),
+            "unbuilt": [r for r in records if r["status"] == "unbuilt"],
+            "clean": sum(1 for r in records if r["status"] == "clean"),
+            "undefined_suspects": sum(1 for r in suspects if r["linkage_undefined"] or r["other_undefined"]),
+            "defined_suspects": sum(1 for r in suspects if r["linkage_defined"] or r["other_defined"]),
+            "suspects": suspects, "elapsed_s": round(time.time() - t0, 3)}
+
+
+def render_linkage_row(m: dict) -> str:
+    return "    our %-56s -> target %s" % (m["our"], ", ".join(m["target"]) or "-")
+
+
+def render_linkage(s: dict, out=None) -> None:
+    """The linkage census as text (relocaudit's report, label kept so a reader's grep still finds it)."""
+    out = out or sys.stdout
+    print("relocaudit: %d registered units, %d built, %d clean, %d suspect (elapsed %.2fs)"
+          % (s["units_total"], s["units_built"], s["clean"], len(s["suspects"]), s["elapsed_s"]), file=out)
+    print("  suspects with an UNDEFINED-set disagreement: %d" % s["undefined_suspects"], file=out)
+    print("  suspects with a DEFINED-set disagreement:   %d" % s["defined_suspects"], file=out)
+    if s["unbuilt"]:
+        print("  unbuilt (no object to compare): %d" % len(s["unbuilt"]), file=out)
+        for r in s["unbuilt"]:
+            print("    %-48s missing %s" % (r["unit"], ", ".join(r["missing"])), file=out)
+    if not s["suspects"]:
+        print("  no suspect units.", file=out)
+        return
+    for r in s["suspects"]:
+        print("", file=out)
+        print("  %s" % r["unit"], file=out)
+        for label, key in (("wrong linkage (undefined)", "linkage_undefined"),
+                           ("extra reference, no target spelling (undefined)", "other_undefined"),
+                           ("wrong linkage (defined)", "linkage_defined"),
+                           ("stray definition, no target spelling (defined)", "other_defined")):
+            for m in r[key]:
+                if key.startswith("other") and m.get("kind") == "compiler-helper":
+                    print("  compiler register-save helper (register allocation, not linkage):", file=out)
+                else:
+                    print("  %s:" % label, file=out)
+                print(render_linkage_row(m), file=out)
+                for d in (r.get("declarations", {}).get(m["our"]) or []):
+                    print("      declared at %s:%d  %s" % (d["file"], d["line"], d["text"]), file=out)
+
+
+
+# ---------------------------------------------------------------------------------------------------------
 # the batch entry point the gate calls
 # ---------------------------------------------------------------------------------------------------------
 
@@ -638,8 +578,7 @@ def check_units(main: str, units: list[str], base_snapshot: dict | None = None,
 
 
 def selftest() -> int:
-    sys.path.insert(0, HERE)
-    import undefrefs_selftest
+    from tools.units import undefrefs_selftest
     return undefrefs_selftest.selftest()
 
 
@@ -654,7 +593,7 @@ def _load_snapshot(path: str) -> dict:
     return loaded if isinstance(loaded, dict) else {}
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         description="Refuse a unit whose object ADDS a relocation name no link input can define (a flip "
                     "blocker no score can see); pre-existing debt is reported, never refused.")
@@ -672,12 +611,25 @@ def main() -> int:
     ap.add_argument("--census", action="store_true",
                     help="print the pre-existing-debt register and exit")
     ap.add_argument("--census-out", metavar="PATH", help="write the register to PATH (markdown)")
+    ap.add_argument("--linkage", action="store_true",
+                    help="with --census: the linkage census instead - every registered unit's symbol spellings "
+                         "against its target object's (wrong-linkage rows, the folded relocaudit sweep)")
+    ap.add_argument("--unit", default=None, help="--census --linkage: one registered unit (path, any extension)")
+    ap.add_argument("--no-decls", action="store_true",
+                    help="--census --linkage: skip the src/include declaration lookup")
     ap.add_argument("--rebuild-index", action="store_true", help="ignore the cached link-symbol index")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--selftest", action="store_true")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
     if args.selftest:
         return selftest()
+    if args.linkage:
+        sweep = linkage_sweep(args.main, with_decls=not args.no_decls, only=args.unit)
+        if args.json:
+            print(json.dumps(sweep, indent=2))
+        else:
+            render_linkage(sweep)
+        return 0
     if args.rebuild_index:
         link_symbol_index(args.main, rebuild=True)
     if args.snapshot_base:

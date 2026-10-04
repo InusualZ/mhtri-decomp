@@ -1,73 +1,10 @@
 #!/usr/bin/env python3
 """Pair-gap report: the symbols a unit's object defines against the ones its target object has.
-
-The register's top-requested feedback item (8 filers, `tools/units/tooling.py`, kind `tooling`):
-
-    Teach objdiff (or the report) to pair symbols with a >50 % size gap: it declines them, so they
-    read as 0 % and hide real unpaired code.
-
-`objdiff-cli` is a downloaded third-party binary, so it cannot be taught anything - but its *report* is
-what every lane reads, and the report never prints our size.  A symbol whose body is a wildly different
-size therefore lands in the same place as a body nobody has written yet: a row at 0 % (objdiff omits the
-`fuzzy_match_percent` key when nothing matched - 12,777 of the 20,507 rows in this tree's report) or a
-row at a fraction of a percent that reads as "untouched".  This tool finds those symbols and says so.
-
-**What it measures.**  For one unit (or every unit the report knows), it reads the two split objects -
-
-    build/RMHE08/obj/<unit>.o   the target, split out of the DOL
-    build/RMHE08/src/<unit>.o   ours, compiled from src/
-
-- takes the symbols each one defines, and reports three classes:
-
-    size-gap   defined on BOTH sides, sizes apart by more than `--threshold` (default 50 %).  objdiff
-               pairs these by name, so they are neither unpaired nor absent: they are the wrong size.
-    missing    defined by the TARGET and not by our object (a body we have not written/emitted).
-    extra      defined by OUR object and not by the target (a static, a helper or a table the original
-               translation unit did not own).
-
-For every row it prints the name, both sizes, the size delta, the section and the report's score for that
-symbol - so the human sees the gap immediately and can tell "0 % because unwritten" from "0 % because the
-size is wrong".
-
-    python tools/objdiff/pairgap.py --summary                  # every unit: counts per class
-    python tools/objdiff/pairgap.py -u g3d/fn_80075DCC         # one unit, every class
-    python tools/objdiff/pairgap.py --mode gap                 # only the size gaps, whole tree
-    python tools/objdiff/pairgap.py --mode gap --threshold 25  # a looser gap
-    python tools/objdiff/pairgap.py --sections all             # include .data/.sdata2/sdata
-    python tools/objdiff/pairgap.py --json out.json            # machine-readable
-    python tools/objdiff/pairgap.py --selftest
-
-**Only the size delta is this tool's own arithmetic.**  The `report` column is a *cross-check* read out of
-`build/RMHE08/report.json`, which is an **order-only** target of `all_source`: after a source edit `ninja
-build/RMHE08/report.json` answers "no work to do" and you read the previous build's scores.  The tool
-compares the report's mtime against the objects and sources it scanned and prints which build it is
-reading, so a stale number is visible rather than believed.  `--no-report` skips the cross-check.
-
-**The one number that can be claimed.**  The three classes are facts about two ELF files and are exact.
-What objdiff *does* with a pair is not ours to state, so it was measured (2026-09-28, this tree).  objdiff
-**does** emit a report row for a >50 %-gap pair - it pairs by symbol name and does not decline on size -
-and of the 146 such pairs in the whole tree **125 carry a `fuzzy_match_percent` that is exactly one
-matched instruction** out of the target's (`612 B` vs `4 B` -> `1/153` = `0.6535948 %`), **16 carry a
-handful** (1.4 to 182.9 instructions: a body that is genuinely partial, `ef_cube`'s
-`fn_800CA200__FUiP2EmP2PmUiUiPvUsUif` at 5960 B vs 760 B reads `12.27 %`), and **5 carry no key at all**
-- `0 %`.  So the filer's "it declines them" is the *symptom* (a row that reads as untouched), not the
-mechanism; either way the fix is the same one this tool performs, because nothing in the report
-distinguishes "0 % because unwritten" from "0 % because the body is the wrong size".  `--limit 0` on
-`--mode gap` is the answer to that question for the whole tree in under a second.
-
-`tools/units/verifyunit.py`'s `size_gap_problems` is the gate-side cousin of this tool: it refuses at
-landing time a *claimed* pair that reads as untouched.  It reports only the no-key rows and only for the
-unit being verified; this tool is the discovery side - every unit, every class, both directions, plus the
-report cross-check - and it never refuses anything.
-
-Section scope: `.text`/`.init` by default.  `.data`/`.sdata`/`.sdata2`/`.rodata`/`.bss`/`.ctors`/`.dtors`
-byte gaps are `tools/units/datagap.py`'s job (it compares whole sections, including sections the target
-does not have at all); `--sections data|all` here is for the symbol-level view of the same bytes.  The
-metadata sections (`.comment`, `.strtab`/`.symtab`, `.note.split`, `.rela*`) are always excluded unless
-`--all-sections` is given.
-"""
+Spec: docs/tools/spec/pairgap.md. CLI: pairgap.py [<unit>...] [-u U] [--mode M] [--sections S] [--threshold P]
+[--summary] [--json F] [--check] | --selftest."""
 from __future__ import annotations
 
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import contextlib
 import json
@@ -75,85 +12,23 @@ import os
 import sys
 from dataclasses import dataclass, field
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-_TOOLS = os.path.dirname(HERE)
-if _TOOLS not in sys.path:
-    sys.path.insert(0, _TOOLS)          # tools/ - for unitutil's ELF reader
-import unitutil as uu  # noqa: E402
+from tools import unitutil as uu
+from tools.lib import objcompare
 
 # objdiff's report metric omits the key when nothing matched; the project reads that as 0 %, never 100 %.
 DEFAULT_THRESHOLD = 50.0                # percent
 DEFAULT_REPORT = os.path.join("build", "RMHE08", "report.json")
 
-# Sections that carry no unit content: the metadata tables.  Mirrors `tools/units/datagap.py`.
-META_SECTIONS = {".comment", ".note.split", ".shstrtab", ".strtab", ".symtab", ".dynsym", ".dynstr"}
-DATA_SECTIONS = {".data", ".sdata", ".sdata2", ".rodata", ".bss", ".sbss", ".ctors", ".dtors"}
+META_SECTIONS = objcompare.META_SECTIONS
+DATA_SECTIONS = objcompare.DATA_SECTIONS
+CLASS_ORDER = objcompare.CLASS_ORDER
+MODE_CLASSES = objcompare.MODE_CLASSES
+Sym = objcompare.SymbolSize             # one defined symbol: name, size, section
+section_kind = objcompare.section_kind
+wanted_kinds = objcompare.wanted_kinds
+read_symbols = objcompare.defined_symbols
+size_delta = objcompare.size_delta
 
-CLASS_ORDER = ("size-gap", "missing", "extra")
-MODE_CLASSES = {"gap": ("size-gap",), "missing": ("missing",), "extra": ("extra",),
-                "all": CLASS_ORDER}
-
-
-# --------------------------------------------------------------------------------------------------
-# the two objects
-# --------------------------------------------------------------------------------------------------
-
-@dataclass
-class Sym:
-    """One defined symbol: its size and the section it lives in."""
-    name: str
-    size: int
-    section: str
-
-
-def section_kind(section: str) -> str:
-    """`meta` | `code` | `data` | `other` for one ELF section name."""
-    if section in META_SECTIONS or section.startswith(".rela") or section.startswith(".note"):
-        return "meta"
-    if section in (".text", ".init") or section.startswith(".text.") or section.startswith(".init."):
-        return "code"
-    if section in DATA_SECTIONS:
-        return "data"
-    return "other"
-
-
-def wanted_kinds(scope: str, all_sections: bool = False) -> set[str]:
-    """The section kinds a `--sections` value selects."""
-    if scope == "code":
-        return {"code"}
-    if scope == "data":
-        return {"data"}
-    return {"code", "data", "other", "meta"} if all_sections else {"code", "data", "other"}
-
-
-def read_symbols(path: str, kinds: set[str]) -> dict[str, Sym]:
-    """{name: Sym} for every symbol `path` defines in a section of the wanted kinds.
-
-    `unitutil.read_elf` is the project's ELF32 big-endian reader (reused, not re-implemented).  Two
-    things it deliberately does not do matter here:
-
-    * a symbol whose `st_shndx` is one of the reserved values (`SHN_ABS` 0xFFF1, `SHN_COMMON` 0xFFF2,
-      `SHN_XINDEX` 0xFFFF) has no section index - MWCC emits one such symbol per object - so the section
-      name is derived only when the index is a real one and the symbol is skipped when the kind filter
-      cannot place it;
-    * it keeps duplicate names as separate rows; the last definition wins here, which matches how a link
-      resolves a repeated local label (MWCC does not emit two symbols of one name in one object).
-    """
-    secs, syms = uu.read_elf(path)
-    out: dict[str, Sym] = {}
-    for name, _value, size, _stype, shndx in syms:
-        if shndx >= len(secs):
-            continue                                    # SHN_ABS / SHN_COMMON - not a unit section
-        sname = secs[shndx]["sname"]
-        if section_kind(sname) not in kinds:
-            continue
-        out[name] = Sym(name=name, size=size, section=sname)
-    return out
-
-
-# --------------------------------------------------------------------------------------------------
-# the comparison (pure - the selftest drives it without files)
-# --------------------------------------------------------------------------------------------------
 
 @dataclass
 class Row:
@@ -182,50 +57,11 @@ class Row:
         return self.listed and self.score is None
 
 
-def size_delta(target_size: int, ours_size: int) -> float:
-    """Relative size difference, 0.0 (equal) .. 1.0 (one side zero or absent).
-
-    `(bigger - smaller) / bigger`, so "a 50 % size gap" means the smaller side is less than half the
-    larger one - the plain reading of "the sizes differ by 50 %".  It is the same measure
-    `tools/units/verifyunit.py` gates with at its 1.5x ratio, and the ratio is printed beside it so the
-    two readings of the same number can never be confused.
-    """
-    hi = max(target_size, ours_size)
-    if hi <= 0:
-        return 0.0
-    return (hi - min(target_size, ours_size)) / hi
-
-
 def compare(target: dict[str, Sym], ours: dict[str, Sym], threshold: float = DEFAULT_THRESHOLD,
             mode: str = "all") -> list[Row]:
-    """The rows of the requested classes between the target's symbols and ours.
-
-    `threshold` is a percentage (50 -> a 50 % size difference).  It gates the `size-gap` class only: a
-    symbol that is *absent* on one side is 100 % apart by definition and is reported whatever the
-    threshold says.
-    """
-    classes = MODE_CLASSES[mode]
-    frac = max(0.0, threshold) / 100.0
-    rows: list[Row] = []
-    for name in set(target) | set(ours):
-        t, o = target.get(name), ours.get(name)
-        if t and o:
-            delta = size_delta(t.size, o.size)
-            if delta > frac:
-                rows.append(Row(cls="size-gap", name=name, target_size=t.size, ours_size=o.size,
-                                section=t.section or o.section, delta=delta))
-            continue
-        if t and "missing" in classes:
-            rows.append(Row(cls="missing", name=name, target_size=t.size, ours_size=0,
-                            section=t.section, delta=1.0))
-        elif o and "extra" in classes:
-            rows.append(Row(cls="extra", name=name, target_size=0, ours_size=o.size,
-                            section=o.section, delta=1.0))
-    # drop the size-gap rows when the mode does not want them, after the loop has kept the branches flat
-    if "size-gap" not in classes:
-        rows = [r for r in rows if r.cls != "size-gap"]
-    rows.sort(key=lambda r: (CLASS_ORDER.index(r.cls), -max(r.target_size, r.ours_size), r.name))
-    return rows
+    """The rows of the requested classes between the target's symbols and ours (`objcompare.symbols`)."""
+    return [Row(cls=g.cls, name=g.name, target_size=g.target_size, ours_size=g.ours_size, section=g.section,
+                delta=g.delta) for g in objcompare.symbols(target, ours, threshold, mode)]
 
 
 # --------------------------------------------------------------------------------------------------
