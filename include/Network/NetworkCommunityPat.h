@@ -73,8 +73,8 @@ typedef struct NetworkRequest NetworkRequest;   /* include/Network/NetworkSessio
 typedef struct NetworkLayerRequest NetworkLayerRequest;   /* include/Network/NetworkLayerPat.h */
 class NetworkSocketHandle;
 class NetworkFileFetcher;          /* include/Network/network_pat_control.h */
-struct NetworkStreamWriterDefault;
-struct NetworkStreamWriter;
+class NetworkStreamWriterDefault;   /* include/Network/network_writer_types.h */
+class NetworkStreamWriter;          /* include/Network/network_writer_types.h */
 struct NetworkSmallObject;
 class NetworkStreamQueue;
 typedef struct NetworkRequestError NetworkRequestError;   /* include/unsplit/Network.h */

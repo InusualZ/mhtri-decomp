@@ -1953,7 +1953,7 @@ s32 NetworkSessionManagerPat::slot_19C(NetworkRequest* request)
         break;
     case 10:
         NetworkSessionSlotInfo_construct(&message);
-        message.smallObject_00.vtable->slot_28(&message.smallObject_00, (const u8*)&this->field_3CC);
+        ((NetworkSmallObjectSink*)&message.smallObject_00)->copyFrom((const u8*)&this->field_3CC);
         memcpy(message.name_20, this->matchOptions_3EC.name_10, sizeof(message.name_20));
         message.nameEnd_33 = 0;
         memset(&message.flag_34, 0, sizeof(message.flag_34));
@@ -2182,7 +2182,7 @@ void NetworkSessionManagerPat::exportCircleItem(NetworkSmallObject* dst, s32 idx
         return;
     }
     if (dst != NULL) {
-        dst->vtable->slot_28(dst, (const u8*)&this->circleList_AF0.items_04[idx].smallObject_108);
+        ((NetworkSmallObjectSink*)dst)->copyFrom((const u8*)&this->circleList_AF0.items_04[idx].smallObject_108);
     }
 }
 
@@ -2341,7 +2341,7 @@ s32 NetworkSessionManagerPat::getPlayerRecord(s8 idx, NetworkSmallObject* dst)
     if (dst == NULL) {
         return 0;
     }
-    dst->vtable->slot_28(dst, (const u8*)&this->players_538[idx].smallObject_08);
+    ((NetworkSmallObjectSink*)dst)->copyFrom((const u8*)&this->players_538[idx].smallObject_08);
     return 1;
 }
 
@@ -3161,7 +3161,7 @@ void NetworkSessionManagerPat::updatePlayerRecord(s8 index, const u8* address, c
     }
     if (address != NULL) {
         networkSmallObject_setAddress(&object, 3, address, 8);
-        player->smallObject_08.vtable->slot_28(&player->smallObject_08, (const u8*)&object);
+        ((NetworkSmallObjectSink*)&player->smallObject_08)->copyFrom((const u8*)&object);
     }
     if (name != NULL) {
         memcpy(player->name_28, name, sizeof(player->name_28) - 1);
@@ -3733,7 +3733,7 @@ void NetworkSessionManagerPat::receiveSessionChat(const u8* data, u32 size)
             NetworkSmallObjectSink::destroy(&sender);
             return;
         }
-        message.smallObject_00.vtable->slot_28(&message.smallObject_00, (const u8*)&sender);
+        ((NetworkSmallObjectSink*)&message.smallObject_00)->copyFrom((const u8*)&sender);
         memcpy(message.name_20, this->players_538[index].name_28, sizeof(message.name_20));
         message.nameEnd_33 = 0;
         memset(&message.flag_34, 0, sizeof(message.flag_34));

@@ -23,9 +23,25 @@ u32 isTermsUpdateFinished(struct PatTerms* terms);
 void getGameInfo2d1c(NetworkWiiMediator* self, u32* out);
 void setGameInfo2d1c(NetworkWiiMediator* self, u32* info);
 
-/* 0x80416890 / 0x8041690C - start the terms check / the terms update on the mediator singleton. */
+/* 0x80416890 / 0x8041690C / 0x8041693C - start the terms check / start and cancel the terms update on the terms
+ * object, when there is one. */
 void startTermsCheck(NetworkWiiMediator* self);
 void startTermsUpdate(NetworkWiiMediator* self);
+void cancelTermsUpdate(NetworkWiiMediator* self);
+
+/* 0x80416A2C / 0x80416A30 - the terms progress graded against the 17-step threshold table (0..16; 0 with no
+ * terms object), the first a forwarding thunk; 0x80416B58 the raw progress count. */
+s32 getTermsProgressLevel(NetworkWiiMediator* self);
+s32 getMediatorTermsProgressLevel(NetworkWiiMediator* self);
+u16 getMediatorTermsProgress(NetworkWiiMediator* self);
+/* 0x80416B90 / 0x80416BD8 - store / read the terms object's +0xE2 byte (0 with no terms object). */
+void setMediatorTermsFlag(NetworkWiiMediator* self, u32 flag);
+u8 getMediatorTermsFlag(NetworkWiiMediator* self);
+
+/* 0x804168F8 / 0x80416BD0 / 0x80416C10 - the terms object's ready byte (as 0/1) and its +0xE2 byte. */
+u32 isPatTermsReady(struct PatTerms* terms);
+void setPatTermsFlag(struct PatTerms* terms, u32 flag);
+u8 getPatTermsFlag(struct PatTerms* terms);
 
 /* The mediator's terms and transfer-state entry points the network pat control drives (GUESS names from the
  * bodies; the fields are the mediator's +0x6DD0 mode byte, the +0x6DD1/+0x6DD2 flag bytes and the +0x6DD4

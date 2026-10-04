@@ -171,30 +171,6 @@ typedef struct GameSpyNegotiation {
 } GameSpyNegotiation;   /* size: 0x10 */
 
 
-/* the two overlapping views of a DWC event message */
-typedef struct GameSpyChannelMsg {
-    /* +0x00 */ u8  channel_00;
-    /* +0x01 */ u8  pad_01[0x03];
-    /* +0x04 */ u32 peerId_04;
-    /* +0x08 */ u32 limit_08;
-    /* +0x0C */ u8  count_0C;
-    /* +0x0D */ u8  pad_0D[0x03];
-    /* +0x10 */ const GameSpyChannel* channels_10;
-} GameSpyChannelMsg;   /* size: 0x14 (approximation: only the leading words are addressed) */
-
-typedef struct GameSpyDataMsg {
-    /* +0x00 */ u32 channel_00;
-    /* +0x04 */ u32 writePos_04;
-    /* +0x08 */ u32 size_08;
-    /* +0x0C */ void* data_0C;
-} GameSpyDataMsg;   /* size: 0x10 (approximation: only the leading words are addressed) */
-
-/* DWC hands the same payload to both event codes, so the record is read through either view */
-typedef union GameSpyEventMsg {
-    /* +0x00 */ GameSpyChannelMsg channelView;
-    /* +0x00 */ GameSpyDataMsg dataView;
-} GameSpyEventMsg;   /* size: 0x14 */
-
 /* --------------------------------------------------------------------------------------------- */
 /* The data this unit owns, defined at the foot of `GameSpyInterfaceThread.cpp`.  `splits.txt` claims `.data`
  * 0x806031A0.. (the callback set and the string run), `.sbss` 0x80794CE0..0x80794CE8 and `.bss`

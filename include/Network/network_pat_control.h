@@ -1081,12 +1081,20 @@ void* memset(void* dst, int value, u32 size);
  * name below: they are derived from the caller's use) ---- */
 struct PatTerms;
 struct SystemWork;
-/* The terms object `getPatTerms` hands out, seen only as the state byte the band compares (20 = finished).
- * size: 0x10 (approximate: the highest byte read here) */
+/* The terms object `getPatTerms` hands out: the state byte the band compares (20 = check finished, 11 = update
+ * finished), the ready byte `initPatTerms` sets and `requestPatTermsCheck` clears (`isPatTermsReady`, and the
+ * update requests act only while it is set), the progress count the mediator grades against its threshold table
+ * (`getPatTermsProgress`) and the byte the mediator's `setMediatorTermsFlag`/`getMediatorTermsFlag` pass through.
+ * The names past `state_0x0C` are GUESSes from those bodies (`Network/network_opening.cpp`, `menu/menu_plsearch.cpp`).
+ * size: 0xE4 (approximate: the highest byte addressed is +0xE2) */
 struct PatTerms {
-    /* +0x00 */ u8 pad_0x00[0xC];
-    /* +0x0C */ u8 state_0x0C;
-    /* +0x0D */ u8 pad_0x0D[0x3];
+    /* +0x00 */ u8  pad_0x00[0xC];
+    /* +0x0C */ u8  state_0x0C;
+    /* +0x0D */ u8  ready_0x0D;
+    /* +0x0E */ u8  pad_0x0E[0xD2];
+    /* +0xE0 */ u16 progress_0xE0;
+    /* +0xE2 */ u8  flag_0xE2;
+    /* +0xE3 */ u8  pad_0xE3[0x1];
 };
 /* The socket allocator pair `initNetworkPatControl` copies out of `.sdata` 0x807939A8 (`pat_so_allocator`:
  * `soAlloc`, `soFree`).  size: 0x8 */

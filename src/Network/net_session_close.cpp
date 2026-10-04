@@ -23,11 +23,10 @@
  *    the static initialiser 0x80437204 (`net_community_state` is built with the NetworkCommunityPat band's
  *    constructor 0x803F0730 / destructor 0x803F0578, and the 0x20-byte address object at 0x806E1B18 with the
  *    small object's; both classes belong to that band, so `net_community_state` is a plain object here).
- *  - `communityReflectCallback` 97.6 %: the roster/recent copies dispatch the address object's +0x28 copy through
- *    the struct-of-function-pointers view (retail is a real virtual, request #21) and keep three induction
- *    pointers where retail keeps four; the mail text address is CSE'd as in the session callback (request #22).
- *    The roster helpers (`appendRosterEntry` 99.6 %, `removeRosterEntry` 97.5 % and their recent-list twins)
- *    carry the same +0x28 dispatch residual.
+ *  - `communityReflectCallback` 97.7 %: the roster/recent copies keep three induction pointers where retail keeps
+ *    four; the mail text address is CSE'd as in the session callback (request #22).  The address object's +0x28
+ *    copy is the sink's real virtual `copyFrom` (request #21: `appendRosterEntry`/`appendRecentEntry` 99.57 -> 100,
+ *    `removeRosterEntry`/`removeRecentEntry` 97.54 -> 97.80).
  *  - `sessionReflectCallback` 97.7 %: the case-29 message switch lowers to a binary compare tree where retail
  *    tests `(u32)(kind - 1) <= 3` linearly; the chat-record text address (+0x35) is CSE'd into r27 where retail
  *    recomputes it; the peer offset (index * 0x120) is recomputed for the chat-log call in cases 7 and 27; the
@@ -1935,7 +1934,7 @@ void appendRosterEntry(const NetRosterRec* src)
 
     if (roster->count_0x000 < 50) {
         entry = &roster->entries_0x004[roster->count_0x000];
-        entry->address_0x00.vtable->slot_28(&entry->address_0x00, (const u8*)&src->address_0x00);
+        ((NetworkSmallObjectSink*)&entry->address_0x00)->copyFrom((const u8*)&src->address_0x00);
         strcpy(entry->name_0x20, src->name_0x20);
         roster->count_0x000++;
     }
@@ -1959,7 +1958,7 @@ void removeRosterEntry(const NetworkSmallObject* address)
             NetRosterRec* entry = &roster->entries_0x004[i];
             NetRosterRec* next = &roster->entries_0x004[i + 1];
 
-            entry->address_0x00.vtable->slot_28(&entry->address_0x00, (const u8*)&next->address_0x00);
+            ((NetworkSmallObjectSink*)&entry->address_0x00)->copyFrom((const u8*)&next->address_0x00);
             strcpy(entry->name_0x20, next->name_0x20);
         }
         roster->count_0x000 = roster->count_0x000 - 1;
@@ -1980,7 +1979,7 @@ void appendRecentEntry(const NetworkSmallObject* address)
 
     if (recent->count_0x000 < 16) {
         entry = &recent->entries_0x004[recent->count_0x000];
-        entry->address_0x00.vtable->slot_28(&entry->address_0x00, (const u8*)address);
+        ((NetworkSmallObjectSink*)&entry->address_0x00)->copyFrom((const u8*)address);
         strcpy(entry->name_0x20, work->message_0xBF08);
         recent->count_0x000++;
     }
@@ -2004,7 +2003,7 @@ void removeRecentEntry(const NetworkSmallObject* address)
             NetRecentRec* entry = &recent->entries_0x004[i];
             NetRecentRec* next = &recent->entries_0x004[i + 1];
 
-            entry->address_0x00.vtable->slot_28(&entry->address_0x00, (const u8*)&next->address_0x00);
+            ((NetworkSmallObjectSink*)&entry->address_0x00)->copyFrom((const u8*)&next->address_0x00);
             strcpy(entry->name_0x20, next->name_0x20);
         }
         recent->count_0x000 = recent->count_0x000 - 1;
@@ -2080,8 +2079,7 @@ s32 communityReflectCallback(u32 command, s32 result, s32 count, void* data)
             for (i = 0; i < work->roster_0xA1B8.count_0x000; i++) {
                 NetRosterRec* entry = &work->roster_0xA1B8.entries_0x004[i];
 
-                entry->address_0x00.vtable->slot_28(&entry->address_0x00,
-                                                    (const u8*)&((NetRosterList*)data)->entries_0x004[i].address_0x00);
+                ((NetworkSmallObjectSink*)&entry->address_0x00)->copyFrom((const u8*)&((NetRosterList*)data)->entries_0x004[i].address_0x00);
                 strcpy(entry->name_0x20, ((NetRosterList*)data)->entries_0x004[i].name_0x20);
             }
         }
@@ -2266,8 +2264,7 @@ s32 communityReflectCallback(u32 command, s32 result, s32 count, void* data)
             for (i = 0; i < work->recent_0xBB84.count_0x000; i++) {
                 NetRecentRec* entry = &work->recent_0xBB84.entries_0x004[i];
 
-                entry->address_0x00.vtable->slot_28(&entry->address_0x00,
-                                                    (const u8*)&((NetRecentList*)data)->entries_0x004[i].address_0x00);
+                ((NetworkSmallObjectSink*)&entry->address_0x00)->copyFrom((const u8*)&((NetRecentList*)data)->entries_0x004[i].address_0x00);
                 strcpy(entry->name_0x20, ((NetRecentList*)data)->entries_0x004[i].name_0x20);
             }
         }
