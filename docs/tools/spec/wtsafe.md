@@ -8,7 +8,7 @@ Remove a worktree without letting a junction reach outside it, and prove `orig/`
 
 ## Users
 
-the landing gate (2); imported by `claims`, `lane`
+the landing gate (2); the implementation is `lib.lanes.teardown` (`claims` and `lane` call the lib since WP3e)
 
 ## CLI
 
@@ -36,9 +36,7 @@ lanes.teardown, repo (ground truth).
 
 ## Test contract
 
-Tier: fixture (junction round trip on Windows).
-Today's selftest: in-file `selftest()` (`--selftest`).
-Target: `tools/tests/units/test_wtsafe.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
+Tier: smoke. `tools/tests/units/test_wtsafe.py` (`--selftest` forwards to it): the junction round trip in temp dirs, the measured git hazard (Windows), and MAIN's `orig/` against `config.yml`'s pins (skipped when absent).
 
 ## Known gaps
 

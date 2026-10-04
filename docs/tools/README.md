@@ -29,7 +29,7 @@ the plan to get there is `migration.md`; what is dropped is `retired.md`; what t
 | the test harness | `lib/testing.py` | `spec/lib-testing.md` | every test under `tools/tests/` |
 | the outbox and notes | `lib/outbox.py` | `spec/lib-outbox.md` | handoff, backlog, tooling, playbook, brief, land, slots |
 | integrator requests: schema, legacy loader, classification, owners, STOPGAP | `lib/requests.py` | `spec/lib-requests.md` | integrate, stylelint, brief, handoff |
-| lanes: naming, registry, rescue, teardown, launch | `lib/lanes/` | `spec/lib-lanes.md` | claims, slots, lane, rescue, wtsafe, queue, lanecmd, worktreehook, brief |
+| lanes: naming, registry, sessions, slot pool, seeding, rescue, teardown, launch, landing log | `lib/lanes/` | `spec/lib-lanes.md` | claims, slots, lane, rescue, wtsafe, queue, lanecmd, worktreehook, landlog, brief, backlog, recompile |
 
 ## Spec index (the kept and new tools)
 
@@ -43,7 +43,7 @@ Core evidence: `callers`, `callees`, `accessextent`, `dossier`, `symedit`, `dump
 `sectiongap`, `pairgap`, `relocdiff`, `unitscore`, `symdiff`, `measure`, `unwindcut`, `vtslot`, `linkorder`, `m2cinput`,
 `typeregistry`, `declclash`, `elfsect`, `dwarfmap`, `reportdiff`.
 
-Agent plumbing: `claims`, `slots`, `lane`, `rescue`, `wtsafe`, `queue`, `lanecmd`, `worktreehook`, `brief`, `backlog`, `integrate`,
+Agent plumbing: `claims`, `slots`, `lane`, `rescue`, `wtsafe`, `queue`, `lanecmd`, `worktreehook`, `landlog`, `brief` (+ `briefing`), `backlog`, `integrate`,
 `tooling`, `mergebranch` (+ `unionresolve`, `unionguard`, `unionprose`), `recordmerge`, `edit`, `escape`, `profileprobe`, `install`.
 
 Matching experiments: `infer`, `frame`, `optsweep`, `mwcc_matrix`, `tryvar`, `shapesearch` (+ `shapes`), `slotmap`,

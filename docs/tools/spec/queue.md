@@ -1,54 +1,75 @@
-# `queue` - Hand the next pooled unit/proposal (or backlog debt) to a worker: claim, re-render the brief, print the spawn line; `--count N` strides a wave; refuses while unlanded work exists
+# `queue` - Hand the next registered unit (or a header/module cluster of them, or a backlog debt item) to a worker: claim, render the brief, print the spawn line; refuses while unlanded work exists
 
-<!-- generated from the module docstring of `tools/units/queue.py` at ec2609b46 by the tools-design lane; tightened by hand where marked -->
+<!-- rewritten by WP3e (2026-10-04): the registered units are the queue; the proposal/attribution paths and the address stride are gone -->
 
 ## Purpose
 
-Hand a pooled brief to a worker: claim the unit, promote the brief, print the spawn line.
+Hand the next registered unit (or a cluster of them) to a worker: claim it, render its brief, print the spawn line.
 
 ## Users
 
-the landing gate (1); CLAUDE.md (11); docs (29); imported by `claims`
+the landing gate (1); CLAUDE.md (11); docs (29); imported by `claims` (the claim CLI's brief + spawn)
 
 ## CLI
 
 ```
-python tools/units/queue.py next [--count N] [--worker NAME] [--dry-run] [--json] [--ignore-backlog]
+python tools/units/queue.py next [--count N | --cluster MODULE|HEADER] [--kind K] [--profile P] [--worker W]
+                                 [--dry-run] [--json] [--ignore-backlog] [--allow-unlanded B]... [--no-slots]
 python tools/units/queue.py list [--json]
-python tools/units/queue.py debt [--worker NAME] [--dry-run] [--json] [--ignore-backlog]
+python tools/units/queue.py debt [--worker W] [--dry-run] [--json] [--ignore-backlog]
 python tools/units/queue.py --selftest
 ```
 Subcommands: `next`, `list`, `debt`.
-Flags: `--allow-unlanded`, `--count`, `--dry-run`, `--ignore-backlog`, `--json`, `--kind`, `--no-slots`, `--profile`, `--ratio`, `--selftest`, `--worker`.
-Exit codes: 0 ok, 1 findings or refusal, 2 could not run (the `lib.findings` convention; today's tool documents none, so `migration.md` records the current behaviour before changing it).
-`--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
+Flags: `--allow-unlanded`, `--cluster`, `--count`, `--dry-run`, `--ignore-backlog`, `--json`, `--kind`, `--no-slots`, `--profile`, `--ratio`, `--selftest`, `--worker`.
+`list --json` keeps its shape `{dir, counts, next}`: `dir` is the brief pool directory, `counts` the registered units by
+state, `next` the first five ready units.
 
 ## Inputs and outputs
 
-Inputs -> outputs: pool, queue JSON, backlog, claims -> claim + brief + spawn line.
+Inputs -> outputs: `configure.py` (the `Object(flag, path)` rows), `splits.txt`, the claim registry and the `worker/`
+branches, the backlog -> claim + brief + spawn line.
 
 ## Invariants and rules
 
-* `debt` hands out the register's `naming`/`band-header` debt the same way: it claims the top open item on its file (`claims.claim`, the same worktree/branch lock), writes a brief naming every distinct at-fault name, and spends one credit through `backlog.record_claims` - one resolved item still earns exactly one. The register therefore both rations new proposal claims against the debt *and* lets a lane be tasked with paying it down.
-* `next --count N` claims a **wave** of N: a stride of N through the address-ordered queue, never N neighbours. Adjacency is the vector for almost every clash this campaign has had - the two halves of one translation unit are two adjacent proposals (`proposal/8007270C`+`proposal/80073180`, both `g3d_calcvtx.cpp`), a rule-2 boundary artefact appears when a neighbour registers a symbol you declare, and neighbouring units share owner headers and types by construction - so a wave takes proposals `i, i+N, i+2N, ...` instead. That is a **guarantee**, not a probability: two adjacent proposals can share a wave only if both indices are congruent mod N, which is impossible for N > 1. Random sampling would still put both halves of one TU in a wave about once in N tries. The stride is taken in the queue's own address order and never re-sorted, so a wave is spread across the address bands for free; the cost is cross-unit knowledge reuse (adjacent proposals tend to share a TU, a header, a type), so a wave is spread *within* a band rather than scattered for its own sake.
-* A pooled brief is claim-independent by construction: it is rendered against the worktree the claim *will* create (`claims.worktree_for`) and against the branch `claims.py claim` *will* make (`worker/<slug(unit)>`), so `--pool` can prepare it before a claim exists. The claim path re-renders rather than copies (see `promote`), so the brief a worker gets always matches the entry the queue holds at claim time, including a manually named branch whose slug (and therefore outbox path) is its own. The unit is claimed **before** the brief is written, so a worker never gets a brief whose outbox does not exist.
-* `list` shows the pool's state: briefs written, ready (unclaimed, no bodies), claimed (in flight), written (a unit that has gained a body - `brief.py --pool` prunes those), covered (its range is registered already, under whatever name - never handed out) and stale (no longer registered), plus the next few ready candidates in address order.
+* **The registered units are the queue** (owner, 2026-10-04): every `Object(...)` row whose flag is not `Matching` and
+  whose source exists. States: `ready`, `claimed` (a registry row, a cluster row's `units`, or the claim branch / the
+  throwaway worktree - the lock - holds it), `matching` (done; never handed out), `nosource`. The pool used to be the
+  body-less units only, which hid every NonMatching unit with a body (measured: 81 body-less of 331 NonMatching; the
+  queue now offers all 331).
+* `next` takes the ready unit with the lowest `.text` address (data-only units last, then by name), claims it first
+  (`claims.claim`: branch + slot or worktree), then renders the brief at the claim's slug path against the claim's own
+  worktree (`promote`) - a brief is never copied from `briefs/pool/`, and the outbox it names always exists.
+* `next --cluster NAME` claims **one lane for every ready unit of a cluster**: a module (`--cluster Network`: every
+  ready unit under `src/Network/`) or a header (`--cluster include/Network/net.h`: every ready unit whose include
+  closure contains it). The claim is keyed `cluster/<name>` and records `units`; every member then reads `claimed`.
+  The lane gets `briefs/<slug>.md` (the index: the members, the cluster's ack key and its one outbox) plus one brief
+  per member under `briefs/<slug>/`.
+* `next --count N` claims up to N lanes at once and **no two share an owner header or a module** (`disjoint_picks`,
+  in address order). Owner headers are the closure's headers under `include/`/`src/` minus the shared base and
+  fallbacks every unit sees (`include/types.h`, `include/dolphin/`, `include/MSL*`, `include/nw4r/`,
+  `include/unsplit/`). A wave that cannot fill reports its shortfall; `--cluster` gives the rest one lane. (The
+  address stride this replaces put header-sharing neighbours in concurrent lanes.)
+* The guards run before any claim, in this order: MAIN's HEAD is `main`, a slot is free (the concurrency cap), the
+  backlog credit covers the claim (`--ignore-backlog` spends nothing), and no branch holds work main lacks
+  (`--allow-unlanded B` parks one on purpose). A real claim is recorded in the backlog ledger.
+* `debt` hands out the register's top `naming`/`band-header` item on its file through the same lock and the same
+  credit (one resolved item earns exactly one).
+* The spawn's agent comes from `lib.lanes.launch.KIND_PROFILE` (`--profile` overrides, validated against
+  `PROFILES`); a spawn whose cwd resolves to MAIN is refused.
 
 ## Lib dependencies
 
-lanes, outbox, project, report.
+lanes (launch, naming, pool, registry), cscan (the include closure).
 
 ## Test contract
 
-Tier: fixture (injected claim function).
-Today's selftest (`tools/units/queue_selftest.py`): The checks run against a temp fixture with an injected claim function, so no git worktree, no `ninja` and no repository state are touched. What they pin: the pool's state machine (`ready` / `claimed` / `written` / `stale` / `unreadable`), the address order `next` picks, that `--dry-run` claims nothing, that the real flow claims the unit *before* promoting the brief, that the promoted brief is a copy of the pooled one at the claim's own slug, that a suffixed branch is re-rendered so its outbox path is the claim's, and that the printed spawn carries the cwd, name and task the orchestrator pastes. The wave selection is pinned too: a `next --count N` wave strides the address order, so no two picks are adjacent; `N=1` is the single pick `next_entry` makes; a claimed or covered stride position is skipped without breaking the stride; and fewer than N ready claims what exists and reports the shortfall instead of failing. `queue.selftest()` holds the checks so `queue.py --selftest` and this entry point cannot drift.
-Target: `tools/tests/units/test_queue.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
+Tier: fixture (temp trees, an injected claim function).
+Today's selftest: in-file `selftest()` (`--selftest`; the `queue_selftest.py` delegator was deleted in WP3e): the
+state machine over registered units, the address order, the cluster selection by header and by module, the
+no-shared-header wave and its shortfall, the cluster claim's index and member briefs, the branch lock, the MAIN-branch
+guard, the credit ledger and `debt`.
 
 ## Known gaps
 
-a claimed proposal is still `ready` for selection (CLAUDE.md known bug)
-
-## History (the incidents behind the rules - keep the rule, drop the narrative when the rule is stable)
-
-* `brief.py --pool` prepares the brief for every registered unit that has no bodies yet (owner's ask, 2026-09-23: "prepare briefs in advance and queue new work right away"), so the orchestrator can start a worker the instant a slot frees without deriving anything. This is the other half:
-* `next` picks the pooled unit with the lowest `.text` address that is still **unclaimed**, takes the claim (`claims.py claim` creates the worktree and the branch), renders the brief **from the current queue entry or `splits.txt` range**, writes it to the claim's own slug path, and prints the exact spawn line - cwd, name and task text - to paste. The brief is never copied from the pool: `brief.py --pool` skips a brief that already exists, so a queue regeneration can leave every pooled file describing the old range, and copying one handed a worker the wrong scope (`proposal/80119DEC`, 2026-09-25). The pool still decides *which* unit is next; it is not the source of the worker's brief.
+The cluster brief tells the lane to ack with the cluster key, but each member brief still prints its own unit's ack
+line. `brief.py --pool` now pre-renders 331 briefs (a few seconds each); `next` never needs it.

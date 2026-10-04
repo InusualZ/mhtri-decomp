@@ -1,51 +1,6 @@
-"""Hand a pooled brief to a worker: claim the unit, promote the brief, print the spawn line.
-
-`brief.py --pool` prepares the brief for every registered unit that has no bodies yet (owner's ask,
-2026-09-23: "prepare briefs in advance and queue new work right away"), so the orchestrator can start a
-worker the instant a slot frees without deriving anything. This is the other half:
-
-    python tools/units/queue.py next [--count N] [--worker NAME] [--dry-run] [--json] [--ignore-backlog]
-    python tools/units/queue.py list [--json]
-    python tools/units/queue.py debt [--worker NAME] [--dry-run] [--json] [--ignore-backlog]
-    python tools/units/queue.py --selftest
-
-`debt` hands out the register's `naming`/`band-header` debt the same way: it claims the top open item on its
-file (`claims.claim`, the same worktree/branch lock), writes a brief naming every distinct at-fault name, and
-spends one credit through `backlog.record_claims` - one resolved item still earns exactly one. The register
-therefore both rations new proposal claims against the debt *and* lets a lane be tasked with paying it down.
-
-`next` picks the pooled unit with the lowest `.text` address that is still **unclaimed**, takes the claim
-(`claims.py claim` creates the worktree and the branch), renders the brief **from the current queue entry or
-`splits.txt` range**, writes it to the claim's own slug path, and prints the exact spawn line - cwd, name and
-task text - to paste. The brief is never copied from the pool: `brief.py --pool` skips a brief that already
-exists, so a queue regeneration can leave every pooled file describing the old range, and copying one handed
-a worker the wrong scope (`proposal/80119DEC`, 2026-09-25). The pool still decides *which* unit is next; it
-is not the source of the worker's brief.
-
-`next --count N` claims a **wave** of N: a stride of N through the address-ordered queue, never N
-neighbours. Adjacency is the vector for almost every clash this campaign has had - the two halves of one
-translation unit are two adjacent proposals (`proposal/8007270C`+`proposal/80073180`, both
-`g3d_calcvtx.cpp`), a rule-2 boundary artefact appears when a neighbour registers a symbol you declare, and
-neighbouring units share owner headers and types by construction - so a wave takes proposals `i, i+N,
-i+2N, ...` instead. That is a **guarantee**, not a probability: two adjacent proposals can share a wave only
-if both indices are congruent mod N, which is impossible for N > 1. Random sampling would still put both
-halves of one TU in a wave about once in N tries. The stride is taken in the queue's own address order and
-never re-sorted, so a wave is spread across the address bands for free; the cost is cross-unit knowledge
-reuse (adjacent proposals tend to share a TU, a header, a type), so a wave is spread *within* a band rather
-than scattered for its own sake.
-
-A pooled brief is claim-independent by construction: it is rendered against the worktree the claim *will*
-create (`claims.worktree_for`) and against the branch `claims.py claim` *will* make (`worker/<slug(unit)>`),
-so `--pool` can prepare it before a claim exists. The claim path re-renders rather than copies (see
-`promote`), so the brief a worker gets always matches the entry the queue holds at claim time, including a
-manually named branch whose slug (and therefore outbox path) is its own. The unit is claimed **before** the
-brief is written, so a worker never gets a brief whose outbox does not exist.
-
-`list` shows the pool's state: briefs written, ready (unclaimed, no bodies), claimed (in flight), written (a
-unit that has gained a body - `brief.py --pool` prunes those), covered (its range is registered already,
-under whatever name - never handed out) and stale (no longer registered), plus the next few ready
-candidates in address order.
-"""
+"""Hand the next registered unit (or a header/module cluster of them) to a worker: claim it, render its brief,
+print the spawn line. Spec: docs/tools/spec/queue.md. CLI: python tools/units/queue.py next [--count N | --cluster
+NAME] [--kind K] [--profile P] [--worker W] [--dry-run] [--json] | list [--json] | debt [...] | --selftest."""
 
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
@@ -56,344 +11,196 @@ import json
 import os
 import re
 import subprocess
-import sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.dirname(HERE))
-
-from units import brief  # noqa: E402
-from tools.lib import project as _project  # noqa: E402  (the splits reader)
-
-from units import claims  # noqa: E402
-from units import lanecmd  # noqa: E402
-from units import recompile as rc  # noqa: E402
-from units import backlog  # noqa: E402
+from tools.lib import cscan
+from tools.lib.lanes import launch, naming, pool as slot_pool, registry
+from tools.units import backlog
+from tools.units import brief
+from tools.units import claims
 
 POOL_DEPTH = 5  # how many ready candidates `list` prints
+#: Headers every unit shares: a shared base or fallback, never a reason to keep two lanes apart.
+SHARED_HEADER_PREFIXES = ("include/dolphin/", "include/MSL", "include/unsplit/", "include/nw4r/", "include/types.h")
 
 
 def pool_dir(main: str) -> str:
     return brief.pool_dir(main)
 
 
-def pool_entries(main: str) -> list[dict]:
-    """Every brief in the pool, as `{slug, path, unit}` - `unit` is `None` for an unparseable file."""
-    out = []
-    d = pool_dir(main)
-    if not os.path.isdir(d):
-        return out
-    for name in sorted(os.listdir(d)):
-        if not name.endswith(".md"):
-            continue
-        path = os.path.join(d, name)
-        out.append({"slug": name[:-3], "path": path, "unit": brief.brief_unit(path)})
-    return out
-
-
-def registered_norm(main: str) -> set[str]:
-    return {claims.norm_unit(u) for u in brief.registered_units(main)}
-
-
-def registered_text_ranges(main: str) -> list[tuple[int, int]]:
-    """Every registered unit's `.text` block from `splits.txt`, as half-open `(start, end)` pairs."""
-    out = []
-    for unit in brief.registered_units(main):
-        rng = brief.splits_range(main, unit)
-        if ".text" in rng:
-            start, end = rng[".text"][0], rng[".text"][1]   # splits_range may carry a third field
-            out.append((start, end))
-    return out
-
-
-def ranges_cover(ranges: list[tuple[int, int]], start: int) -> bool:
-    """Whether `start` falls inside any half-open `(start, end)` range."""
-    return any(s <= start < e for s, e in ranges)
-
-
-def covered_by_registered(main: str, unit: str) -> bool:
-    """Whether a proposal's range already belongs to a registered translation unit.
-
-    The proposal the pool holds registers under whatever unit **name** its worker chose, so the pool's
-    "has no body yet" test cannot see that the range is gone - `800A99B4` and `800B99E8` were each handed
-    out again after landing, under different names, which costs a whole round.  The addresses are the
-    honest test: a proposal whose `.text` start sits inside a registered unit's `.text` is finished work.
-    """
-    p = brief.proposal_by_label(main, unit)
-    if not p:
-        return False
-    text = p.get("text") or []
-    if not text:
-        return False
-    return ranges_cover(registered_text_ranges(main), text[0])
-
-
-def is_proposal(main: str, unit: str) -> bool:
-    """Whether `unit` is a queue *label* rather than a registered unit path (option A)."""
-    want = claims.norm_unit(unit)
-    return any(claims.norm_unit(l) == want for l in brief.proposal_labels(main))
-
-
-def state(main: str, entry: dict, branches: set[str] | None = None) -> str:
-    """Where a pooled brief stands: `claimed`, `written`, `stale`, `unreadable` or `ready`.
-
-    Only `ready` may be handed out. A claimed unit is in flight (its brief has already been promoted), a
-    `written` unit has gained a body (the pool will prune it), and `stale` is no longer registered - so none
-    of them is offered as new work.
-
-    A claim is read the way `claims.claim` refuses one: its registry record **or its claim branch** (the lock,
-    which survives a lost registry record - a half-torn-down release, or two claims racing on `save_registry`).
-    Reading only the registry is what re-offered a claimed proposal on 2026-09-24 and made `queue.py next`
-    refuse at the branch. `branches` is the batch of live `worker/` branches from `claims.worker_branches`,
-    passed by the selectors; `None` asks for it once.
-
-    A **proposal** (option A) is the simpler case and takes a different route: it has no source and no
-    registration to check, so while it is in the queue it is work to hand out, and once the queue drops it -
-    which happens when the queue file is regenerated after its range was registered - it is stale.  Until
-    the queue is re-run, a proposal whose range is *already* registered under another name is `covered`.
-    """
-    unit = entry.get("unit")
-    if not unit:
-        return "unreadable"
-    if brief.claim_for(main, unit) or claims.lock_held(main, unit, branches):
-        return "claimed"
-    if is_proposal(main, unit):
-        return "covered" if covered_by_registered(main, unit) else "ready"
-    if claims.norm_unit(unit) not in registered_norm(main):
-        return "stale"
-    path = os.path.join(main, "src", *brief.source_name(unit, main).split("/"))
-    return "written" if brief.has_bodies(path) else "ready"
-
+# --- the queue: registered units, minus the Matching ones ---------------------------------------------------------
 
 def text_start(main: str, unit: str) -> int | None:
-    """The unit's `.text` start - from the proposal queue for a proposal, else from `splits.txt`."""
-    p = brief.proposal_by_label(main, unit)
-    if p:
-        return p["text"][0]
+    """The unit's `.text` start from `splits.txt` (None for a data-only unit)."""
     rng = brief.splits_range(main, unit)
     return rng[".text"][0] if ".text" in rng else None
 
 
-def order_key(main: str, entry: dict) -> tuple:
+def order_key(main: str, unit: str) -> tuple:
     """The campaign's order: lowest `.text` address first, then unit name."""
-    start = text_start(main, entry["unit"])
-    return (start is None, start or 0, entry["unit"] or "")
+    start = text_start(main, unit)
+    return (start is None, start or 0, unit)
 
 
-def ordered_entries(main: str, entries: list[dict] | None = None) -> list[dict]:
-    """**Every** pooled brief in address order - the queue as `next` walks it, unready entries included.
+def entries(main: str) -> list[dict]:
+    """Every registered unit as `{unit, flag, source}` (extensionless unit, source path from `src/`)."""
+    out, seen = [], set()
+    for c in brief.registered_objects(main):
+        unit = naming.norm_unit(c.path)
+        if unit in seen:
+            continue
+        seen.add(unit)
+        out.append({"unit": unit, "flag": c.flag, "source": c.path})
+    return out
 
-    The unready ones stay in the list on purpose: a wave strides over this order and skips what is not
-    ready *without breaking the stride*, and two adjacent proposals must be adjacent here for that skip to
-    mean anything.
-    """
-    entries = entries if entries is not None else pool_entries(main)
-    return sorted(entries, key=lambda e: order_key(main, e))
+
+def state(main: str, entry: dict, branches: set[str] | None = None, held: set[str] | None = None) -> str:
+    """Where a registered unit stands: `matching` (done, never handed out), `nosource`, `claimed` (a registry row
+    or a cluster claim holds it, or its claim branch exists - the lock), else `ready`."""
+    unit = entry["unit"]
+    if entry.get("flag") == "Matching":
+        return "matching"
+    if not os.path.exists(os.path.join(main, "src", *entry["source"].split("/"))):
+        return "nosource"
+    held = registry.claimed_units(registry.load(main)) if held is None else held
+    if unit in held or registry.lock_held(main, unit, branches):
+        return "claimed"
+    return "ready"
 
 
-def next_entry(main: str, entries: list[dict] | None = None) -> dict | None:
-    """The next ready brief: lowest `.text` address first, then unit name (the campaign's order)."""
-    ordered = ordered_entries(main, entries)
-    branches = claims.worker_branches(main)
-    ready = [e for e in ordered if state(main, e, branches) == "ready"]
+def ready_entries(main: str, rows: list[dict] | None = None) -> list[dict]:
+    """The ready units in address order."""
+    rows = entries(main) if rows is None else rows
+    branches = registry.worker_branches(main)
+    held = registry.claimed_units(registry.load(main))
+    ready = [e for e in rows if state(main, e, branches, held) == "ready"]
+    return sorted(ready, key=lambda e: order_key(main, e["unit"]))
+
+
+def next_entry(main: str) -> dict | None:
+    ready = ready_entries(main)
     return ready[0] if ready else None
 
 
-# --------------------------------------------------------------------------------------------------
-# wave spread: SYSTEM (the module of the nearest registered unit), then address distance
-# --------------------------------------------------------------------------------------------------
-_SYSTEM_HINTS: dict[str, tuple[tuple[int, int], list[tuple[int, int, str]]]] = {}
+# --- header closures: what puts two units in one lane ----------------------------------------------------------
+
+def _resolver(main: str):
+    roots = [os.path.join(main, "include"), os.path.join(main, "src")]
+
+    def resolve(name: str, includer: str) -> str | None:
+        return cscan.resolve_include(name, [os.path.dirname(includer)] + roots)
+    return resolve
 
 
-def system_hints(main: str) -> list[tuple[int, int, str]]:
-    """`(start, end, module)` for every registered `.text` range - the wave picker's system map.
-
-    The module is the first path component of the unit's name (`enemy/fn_801478FC.cpp` -> `enemy`), which is
-    what the linking band and a brief's class-3 evidence agree on.  It spreads a wave; it never decides a
-    unit's home.  The cache is keyed on the file's stat, not just its path: a run that starts before the map
-    exists must not keep answering "no systems" after it appears (the selftest's fixture does exactly that).
-    """
-    path = os.path.join(main, "config", "RMHE08", "splits.txt")
-    try:
-        st = os.stat(path)
-    except OSError:
-        return []
-    key = (st.st_mtime_ns, st.st_size)
-    cached = _SYSTEM_HINTS.get(main)
-    if cached and cached[0] == key:
-        return cached[1]
-    rows = sorted((r.start, r.end, r.unit.split("/")[0] if "/" in r.unit else r.unit)
-                  for r in _project.Splits.read(path).text_ranges())
-    _SYSTEM_HINTS[main] = (key, rows)
-    return rows
+def owner_headers(main: str, unit_source: str) -> set[str]:
+    """The headers in the unit's include closure that belong to some module (repo-relative, forward slashes),
+    minus the shared base and fallback headers (`SHARED_HEADER_PREFIXES`) every unit sees."""
+    path = os.path.join(main, "src", *unit_source.split("/"))
+    if not os.path.exists(path):
+        return set()
+    out = set()
+    for f in cscan.include_closure(path, _resolver(main)):
+        rel = os.path.relpath(f, main).replace("\\", "/")
+        if rel == unit_source or rel == "src/" + unit_source or not rel.endswith((".h", ".hpp")):
+            continue
+        if rel.startswith(SHARED_HEADER_PREFIXES):
+            continue
+        out.add(rel)
+    return out
 
 
-def hint_for(main: str, address: int) -> str:
-    """The system a proposal's address sits in: the module of the nearest registered range ('?' if none)."""
-    best = None
-    for start, end, module in system_hints(main):
-        d = 0 if start <= address < end else min(abs(address - start), abs(address - end))
-        if best is None or d < best[0]:
-            best = (d, module)
-    return best[1] if best else '?'
+def module_of(unit: str) -> str:
+    return unit.split("/", 1)[0] if "/" in unit else unit
 
 
-def entry_address(main: str, entry: dict) -> int:
-    """The `.text` address the queue orders by - from the pooled name (which always embeds it)."""
-    name = str(entry.get('unit') or entry.get('label') or '')
-    m = re.search(r'(?<![0-9A-Fa-f])([0-9A-Fa-f]{8})(?![0-9A-Fa-f])', name)
-    if m:
-        return int(m.group(1), 16)
-    try:
-        key = order_key(main, entry)
-        return int(key[0]) if isinstance(key, (tuple, list)) and key else int(key)
-    except Exception:
-        return 0
+def cluster_members(main: str, name: str, rows: list[dict] | None = None) -> tuple[list[dict], str]:
+    """`(ready entries, reason)` for `--cluster NAME`: a header path (every ready unit whose closure contains
+    it) or a module (every ready unit under `src/<module>/`)."""
+    ready = ready_entries(main, rows)
+    norm = name.replace("\\", "/").strip("/")
+    if norm.endswith((".h", ".hpp")):
+        if not os.path.exists(os.path.join(main, *norm.split("/"))):
+            raise SystemExit("REFUSED queue next --cluster: no header %s in %s" % (norm, main))
+        return [e for e in ready if norm in owner_headers(main, e["source"])], "units whose closure includes `%s`" % norm
+    return [e for e in ready if module_of(e["unit"]) == norm], "units under `src/%s/`" % norm
 
 
-def spread_picks(main: str, ordered: list[dict], is_ready: list[bool], count: int) -> list[int]:
-    """`count` ready indices: SYSTEM diversity first, address distance second, never index-adjacent.
-
-    Greedy and deterministic.  Start at the lowest ready address, then repeatedly take the candidate from a
-    system no pick has used, preferring the farthest; when every system is used, the farthest overall.  A
-    candidate index-adjacent to a pick is never considered (the two halves of one TU), so the wave comes back
-    SHORT when adjacency blocks it - the caller reports the shortfall instead of relaxing into the defect.
-    """
-    ready = [i for i, ok in enumerate(is_ready) if ok]
-    if not ready:
-        return []
-    addr = {i: entry_address(main, ordered[i]) for i in ready}
-    hint = {i: hint_for(main, addr[i]) for i in ready}
-    picks = [ready[0]]
-    used = {hint[ready[0]]}
-    while len(picks) < count:
-        best, best_score = None, None
-        for i in ready:
-            if i in picks or any(abs(i - j) == 1 for j in picks):
-                continue
-            score = (1 if hint[i] not in used else 0, min(abs(addr[i] - addr[j]) for j in picks))
-            if best_score is None or score > best_score:
-                best, best_score = i, score
-        if best is None:
+def disjoint_picks(main: str, ready: list[dict], count: int) -> list[dict]:
+    """Up to `count` ready units, in address order, no two sharing an owner header or a module - so no two
+    concurrent lanes edit one header (the address stride this replaces put header-sharing neighbours together)."""
+    picks, used_headers, used_modules = [], set(), set()
+    for e in ready:
+        if len(picks) >= count:
             break
-        picks.append(best)
-        used.add(hint[best])
-    return sorted(picks)
+        hdrs = owner_headers(main, e["source"])
+        mod = module_of(e["unit"])
+        if mod in used_modules or hdrs & used_headers:
+            continue
+        picks.append(e)
+        used_headers |= hdrs
+        used_modules.add(mod)
+    return picks
 
 
-def wave(main: str, count: int, entries: list[dict] | None = None) -> list[dict]:
-    """The `count` proposals one `--count N` wave claims: spread by SYSTEM, then by address distance.
-
-    A wave used to take indices `0, N, 2N, ...` of the address-ordered queue - a COUNT-based stride, so a
-    dense band filled it: six claims all landed in the `enemy` band, every brief edited the same `_ENEMY_WORK`
-    record, and every landing needed a hand merge.  The picker now takes `spread_picks`: SYSTEM first (the
-    module of the nearest registered unit, `hint_for`), address distance second, and never two
-    index-adjacent proposals - adjacent ones are often the two halves of one TU, which is the guard the old
-    stride had and this keeps as a HARD filter.  A wave therefore comes back SHORT when adjacency blocks it,
-    and the caller reports the shortfall rather than relaxing into the defect.  `count == 1` is `next_entry`'s
-    single pick unchanged.  Measured on the live pool, a 6-wave claims six different systems (`enemy`, `Pl`,
-    `ai`, `hud`, `Runtime.PPCEABI.H`, `RSO`) instead of six units from one band.
-    """
-    if count < 1:
-        raise SystemExit("REFUSED queue next | --count must be at least 1")
-    ordered = ordered_entries(main, entries)
-    branches = claims.worker_branches(main)
-    is_ready = [state(main, e, branches) == "ready" for e in ordered]
-    picked = spread_picks(main, ordered, is_ready, count) if count > 1 else \
-        [next(i for i, ok in enumerate(is_ready) if ok)]
-    return [ordered[i] for i in picked]
-
-
-def _same_path(a: str, b: str) -> bool:
-    return os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b))
-
-
-def _profile_for_kind(kind: str) -> str:
-    """The agent profile for a lane `kind` - `slots.profile_for_kind`, the project's **one** mapping.
-
-    `queue.py` used to carry its own `profile="decompiler"` default, so a lane taken through the queue
-    was launched as a unit lane whatever it actually was - the same wrong-profile failure `slots.spawn`
-    was built to end (three tooling lanes launched as `decompiler`, dragging the section 6.5 unit policy
-    and a no-subagents rule into a job with no unit). An unknown kind is refused there, with the list.
-    """
-    return claims._slots().profile_for_kind(kind)
-
+# --- the spawn and the brief ---------------------------------------------------------------------------------
 
 def _profiles() -> list[str]:
-    """`--profile`'s valid values - `slots.PROFILES`, the values of the **one** kind table.
-
-    `--profile` overrides the kind's mapping, and the override used to be unvalidated (main carried
-    `choices=[...]`; the branch replaced it with a bare `default=None`), so `--profile decompilerr` printed a
-    spawn line naming an agent that does not exist.
-    """
-    return list(claims._slots().PROFILES)
+    """`--profile`'s valid values: the profiles of the one kind table."""
+    return list(launch.PROFILES)
 
 
 def spawn_line(main: str, unit: str, slug: str, wt: str, brief_path: str,
                kind: str = "unit", profile: str | None = None) -> dict:
-    """The paste-ready spawn: agent, cwd and task text for the orchestrator.
-
-    `kind` is the lane kind and the agent profile comes from `slots.profile_for_kind(kind)` - the one
-    mapping `slots.spawn` also uses, so a queue spawn and a `slots.py spawn` for the same kind can never
-    disagree. `profile` is the deliberate override for a caller that needs an explicit one; the default is
-    `unit` -> `surveyor` (a registration-and-reconstruction lane is unit work, the project's
-    `.claude/agents/decompiler.md`), and `fix`/`merge`/`tooling`/`docs`/... come from the same table. A `unit` claim runs four legs: `surveyor` (the claim survey), `decompiler` (the bodies), a read-only `codereviewer` pass, then the decompiler resumes.
-
-    The task names the brief by its absolute MAIN path: the brief is written into MAIN *after* the worktree
-    was created, so the worktree's own checkout does not contain it. The call is a headless
-    `claude --agent <profile> -p <task>` run with its cwd at the worktree (`lanecmd.lane_call`); its final
-    message is the lane's report, and its session id is printed so a question can be answered by resuming it.
-
-    **`cwd` is the claim's own worktree, and MAIN is refused outright.**  A lane launched with its cwd set to
-    MAIN cloned its upstream *inside the repository root* (`.tmp-mwcc/`), and the next landing was refused
-    over the foreign path - collateral damage to a different lane's batch.  So the wrong thing is impossible
-    rather than discouraged: a spawn line whose cwd resolves to MAIN is a refusal, not a line to paste.
-    """
-    profile = profile or _profile_for_kind(kind)
-    if _same_path(wt, main):
+    """The paste-ready spawn (`launch.lane_call`): agent from the kind (or the override), the brief named by its
+    MAIN path, cwd the claim's own worktree - a cwd that resolves to MAIN is refused outright."""
+    profile = profile or launch.profile_for_kind(kind)
+    if registry.same_path(wt, main):
         raise SystemExit("REFUSED spawn %s: cwd resolves to MAIN (%s) - a lane runs in its own worktree, "
-                         "never the orchestrator's tree; take the claim first so the slot is the cwd."
-                         % (unit, wt))
+                         "never the orchestrator's tree; take the claim first so the slot is the cwd." % (unit, wt))
     task = ("Read %s (in MAIN) and do exactly what it says. "
             "Ack first: python tools/units/claims.py ack %s --agent %s-%s. "
             "End your turn with your report: your final message is the result the orchestrator receives."
             % (brief_path.replace("\\", "/"), unit, profile, slug))
     name = "%s-%s" % (profile, slug)
-    launch = lanecmd.lane_call(profile, wt, task, name=name, main=main, key=slug)
+    call = launch.lane_call(profile, wt, task, name=name, main=main, key=slug)
     return {"kind": kind, "agent": profile, "name": name, "cwd": wt, "task": task,
-            "sessionId": launch["session_id"], "call": launch["call"]}
+            "sessionId": call["session_id"], "call": call["call"]}
+
+
+def briefs_dir(main: str) -> str:
+    return os.path.join(main, "tools", "units", "briefs")
 
 
 def promote(main: str, unit: str, claim_slug: str, wt: str | None = None) -> str:
-    """Render the brief for `unit` at the claim's slug path, **from the current entry**.
-
-    The pool is a scheduling device, not the source of truth: `brief.py --pool` used to skip a brief that
-    already existed, so a regenerated queue file re-cutting a range left every pre-existing pooled brief
-    describing the OLD scope, and copying that file handed the worker the wrong work - `proposal/80119DEC`
-    got `.text 0x80119DEC..0x8011A34C` (two functions) while the queue had `..0x8011D448` (thirty-seven).
-    The brief is therefore re-rendered here against the current queue entry (or `splits.txt` range) and the
-    real claim, never copied, so a stale pooled file cannot reach a worker. The pool brief is still what
-    *selects* the unit; it is just not what the worker is handed.
-    """
-    dest = os.path.join(main, "tools", "units", "briefs", claim_slug + ".md")
+    """Render `unit`'s brief at the claim's slug path against the claim's own worktree (never a copied pool file)."""
+    dest = os.path.join(briefs_dir(main), claim_slug + ".md")
     os.makedirs(os.path.dirname(dest), exist_ok=True)
-    # the worktree the brief names is the claim's OWN (`wt`) when the caller has it - a slot claim's worktree
-    # is the slot dir, not `claims.worktree_for`'s `.ws-*` sibling, and the brief's "your tree" block and §1
-    # worktree row must be the cwd the spawn line hands out.
-    b, text = brief.brief_for(main, wt or claims.worktree_for(unit, main), unit, None)
+    _b, text = brief.brief_for(main, wt or naming.worktree_for(unit, main), unit, None)
     with open(dest, "w", encoding="utf-8", newline="\n") as fh:
         fh.write(text)
     return dest
 
 
-def branch_error(main: str) -> str | None:
-    """Refuse to claim from a HEAD that is not `main`.
+def promote_cluster(main: str, key: str, claim_slug: str, wt: str, units: list[str], reason: str) -> str:
+    """Render one brief per cluster unit under `briefs/<claim slug>/` and the cluster index at `<claim slug>.md`."""
+    sub = os.path.join(briefs_dir(main), claim_slug)
+    os.makedirs(sub, exist_ok=True)
+    paths = {}
+    for unit in units:
+        paths[unit] = os.path.join(sub, naming.slug(unit) + ".md")
+        _b, text = brief.brief_for(main, wt, unit, None)
+        with open(paths[unit], "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(text)
+    handoff = brief.handoff_paths(main, key)
+    dest = os.path.join(briefs_dir(main), claim_slug + ".md")
+    with open(dest, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(brief.cluster_index(main, key, wt, units, paths, handoff, reason))
+    return dest
 
-    The claim is rooted at MAIN's HEAD (`git worktree add -b <branch> <wt> <HEAD>`), so a claim made while
-    MAIN sits on another branch roots the worker on that branch's tip instead of main's - the same
-    2026-09-24 incident that moved 14 landings onto `tools/stylelint-rule2-unsplit`. Checked before the
-    worktree exists, so a refusal leaves nothing behind. `None` when git cannot be asked (the selftests run
-    in temp dirs that are not repositories).
-    """
+
+# --- the guards --------------------------------------------------------------------------------------------------
+
+def branch_error(main: str) -> str | None:
+    """Refuse to claim from a MAIN whose HEAD is not `main` (None when git cannot be asked)."""
     p = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=main,
                        capture_output=True, text=True, encoding="utf-8", errors="replace")
     branch = p.stdout.strip()
@@ -406,15 +213,7 @@ def branch_error(main: str) -> str | None:
 
 
 def strictly_newer(main_lines, branch_lines):
-    """How many lines the branch has that main's copy lacks, or None when the two have diverged.
-
-    Pure, so the selftest can exercise the rule without a repository. A branch is *strictly newer* only when
-    main's line set is a subset of the branch's: the branch lost nothing and gained something, so the file
-    carries work that was never landed. A diverged file (both sides have lines the other lacks) returns
-    None - that is the stale-or-superseded class the 2026-09-26 audit found on every branch left over from
-    an already-landed unit (older pad names, older comment wording), and refusing a spawn on it would stop
-    production for nothing.
-    """
+    """Lines the branch has that main's copy lacks when main's are a subset of the branch's; None if diverged."""
     m, b = set(main_lines), set(branch_lines)
     if m - b:
         return None
@@ -422,20 +221,13 @@ def strictly_newer(main_lines, branch_lines):
 
 
 def _file_lines(main: str, ref: str, path: str) -> list[str]:
-    """One file's lines at `ref`, or [] when that ref has no such file (a branch's new file)."""
     p = subprocess.run(["git", "show", "%s:%s" % (ref, path)], cwd=main,
                        capture_output=True, text=True, encoding="utf-8", errors="replace")
     return p.stdout.splitlines() if p.returncode == 0 else []
 
 
 def unlanded_branches(main: str, ignore: set[str] | None = None) -> list[tuple[str, list[tuple[str, int]]]]:
-    """Local branches whose content is strictly newer than main's, with the files and line counts.
-
-    This is the guard the owner asked for on 2026-09-26: finished work must not sit on a branch while a new
-    unit is started. It is content-based, not commit-based - the landing recipe cherry-picks *content*, so
-    every worker branch stays ahead of main by commits after its unit lands, and a commit-count test would
-    refuse every spawn forever. `[]` when git cannot be asked (the selftests run outside a repository).
-    """
+    """Local branches whose content is strictly newer than main's, with the files and line counts."""
     ignore = set(ignore or ())
     p = subprocess.run(["git", "for-each-ref", "--format=%(refname:short)", "refs/heads"], cwd=main,
                        capture_output=True, text=True, encoding="utf-8", errors="replace")
@@ -460,12 +252,7 @@ def unlanded_branches(main: str, ignore: set[str] | None = None) -> list[tuple[s
 
 
 def unlanded_error(main: str, allow: set[str] | None = None) -> str | None:
-    """The refusal a spawn raises while any branch still holds work main does not have. None when clear.
-
-    Deliberately narrow: only a *strictly newer* file counts (see `strictly_newer`), so this blocks on real
-    unlanded work - as `worker/802e4978-...` was, a whole registered unit that no landing had ever taken -
-    and not on the stale wording every landed branch leaves behind.
-    """
+    """The refusal while any branch holds work main does not have; None when clear."""
     hits = unlanded_branches(main, allow)
     if not hits:
         return None
@@ -481,108 +268,87 @@ def unlanded_error(main: str, allow: set[str] | None = None) -> str | None:
 
 
 def no_ready(main: str) -> str:
-    """The refusal both entry points raise when the queue has nothing to hand out."""
-    return ("no ready brief in %s\n"
-            "  run `python tools/units/brief.py --pool` first, or every pooled unit is claimed or written\n"
-            "  see: python tools/units/queue.py list" % pool_dir(main))
+    return ("no ready unit: every registered unit is Matching or claimed\n"
+            "  see: python tools/units/queue.py list")
 
 
-def claim_entry(main: str, entry: dict, worker: str | None, dry_run: bool, claim_fn,
-                kind: str = "unit", profile: str | None = None,
-                slots_mode: bool | None = None) -> dict:
-    """Claim one *selected* entry, promote its brief, and return its spawn.
+def slot_cap(main: str, slots_mode: bool | None = None) -> str | None:
+    """The slot-pool refusal when every slot is taken (None with `--no-slots` or no pool)."""
+    if slots_mode is False:
+        return None
+    return slot_pool.capacity_error(main)
 
-    `next` and a wave differ only in selection, so this is the one claim path both take: the unit is
-    claimed first and the brief is only promoted once the claim exists, so a worker is never handed an
-    outbox path that does not exist. `claim_fn` is injectable so the selftest can exercise the whole flow
-    without a git worktree. The worktree is read from the claim's own result, never re-derived from the
-    unit path - a slot claim's worktree is the slot directory, and the spawn's `cwd` must be that.
 
-    `kind` is passed to both halves: the claim records it on the slot (via `claims.claim`), and the spawn
-    renders its profile from `slots.profile_for_kind(kind)` - so the slot's lock and the spawn line agree.
-    """
-    unit = entry["unit"]
-    slug = claims.slug(unit)
-    sm = claims._slots()
-    use_slots = slots_mode is not False and sm.enabled(main)
-    if dry_run:
-        if use_slots:
-            pv = sm.preview(main, unit, claims.branch_for(unit))
-            wt = pv["dir"]
-            info = {"unit": unit, "branch": pv["branch"], "worktree": wt, "slot": pv["slot"],
-                    "dry_run": True}
-        else:
-            wt = claims.worktree_for(unit, main)
-            info = {"unit": unit, "branch": claims.branch_for(unit), "worktree": wt, "dry_run": True}
-        claim_slug = slug
-        brief_path = os.path.join(main, "tools", "units", "briefs", claim_slug + ".md")
-    else:
-        info = claim_fn(unit, main, worker, False, kind=kind)
-        wt = info.get("worktree") or claims.worktree_for(unit, main)
-        claim_slug = claims.claim_slug(main, unit) or slug
-        # "the wrong thing is impossible": a slot claim MUST hand out the slot's cwd.  If the claim names a
-        # slot, the worktree it returned has to be that slot's directory - never MAIN, never a `.ws-*` sibling.
-        if use_slots and info.get("slot") is not None:
-            expected = sm.slot_dir(main, info["slot"])
-            if not _same_path(wt, expected):
-                raise SystemExit("REFUSED spawn %s: claim slot %s has worktree %s, not the slot dir %s - a "
-                                 "slot claim must hand out the slot's cwd"
-                                 % (unit, info["slot"], wt, expected))
-        brief_path = promote(main, unit, claim_slug, wt)
-    return {"unit": unit, "slug": slug, "claim_slug": claim_slug, "worktree": wt, "brief": brief_path,
-            "pool_brief": entry["path"], "claim": info, "dry_run": dry_run,
-            "spawn": spawn_line(main, unit, claim_slug, wt, brief_path, kind, profile)}
+def _guards(main: str, what: str, dry_run: bool, slots_mode, ignore_backlog: bool, ratio: int, allow_unlanded) -> None:
+    """The refusals every claim path runs first: MAIN off `main`, the slot cap, the credit gate, unlanded work."""
+    if not dry_run:
+        bad_branch = branch_error(main)
+        if bad_branch:
+            raise SystemExit("REFUSED queue %s | %s" % (what, bad_branch))
+    cap = slot_cap(main, slots_mode)
+    if cap:
+        raise SystemExit("REFUSED queue %s | %s" % (what, cap))
+    if not ignore_backlog:
+        msg = backlog.refusal(main, ratio=ratio)
+        if msg:
+            raise SystemExit("REFUSED queue %s | %s" % (what, msg))
+    if not dry_run:
+        blocked = unlanded_error(main, set(allow_unlanded or ()))
+        if blocked:
+            raise SystemExit("REFUSED queue %s | %s" % (what, blocked))
 
 
 def _claim_record(out: dict, worker: str | None, ratio: int) -> dict:
-    """One ledger entry for a handed-out claim, so the spent side is auditable."""
-    return {"unit": out.get("unit"), "worker": worker or "",
-            "branch": (out.get("claim") or {}).get("branch"),
+    """One ledger entry for a handed-out claim."""
+    return {"unit": out.get("unit"), "worker": worker or "", "branch": (out.get("claim") or {}).get("branch"),
             "worktree": out.get("worktree"), "ratio": ratio,
             "when": _dt.datetime.now(_dt.timezone.utc).replace(microsecond=0).isoformat()}
 
 
-def slot_cap(main: str, slots_mode: bool | None = None) -> str | None:
-    """The slot-pool refusal a claim path raises when the pool is exhausted (None when not in use).
+# --- the claim paths ---------------------------------------------------------------------------------------------
 
-    A free slot **is** the concurrency cap: with a pool initialised, a seventh lane is refused instead of
-    constructing a seventh environment.  `slots_mode=False` (`--no-slots`) opts out and keeps the old path.
-    """
-    if slots_mode is False:
-        return None
-    return claims._slots().capacity_error(main)
+def claim_entry(main: str, entry: dict, worker: str | None, dry_run: bool, claim_fn,
+                kind: str = "unit", profile: str | None = None, slots_mode: bool | None = None,
+                units: list[str] | None = None, reason: str = "") -> dict:
+    """Claim one selected unit (or a cluster: `units` set), render its brief at the claim's slug path, and return
+    its spawn. The claim comes first, so a worker is never handed an outbox path that does not exist."""
+    unit = entry["unit"]
+    slug = naming.slug(unit)
+    use_slots = slots_mode is not False and slot_pool.enabled(main)
+    if dry_run:
+        if use_slots:
+            pv = slot_pool.preview(main, unit, naming.branch_for(unit))
+            wt = pv["dir"]
+            info = {"unit": unit, "branch": pv["branch"], "worktree": wt, "slot": pv["slot"], "dry_run": True}
+        else:
+            wt = naming.worktree_for(unit, main)
+            info = {"unit": unit, "branch": naming.branch_for(unit), "worktree": wt, "dry_run": True}
+        claim_slug = slug
+        brief_path = os.path.join(briefs_dir(main), claim_slug + ".md")
+    else:
+        info = claim_fn(unit, main, worker, False, kind=kind, **({"units": units} if units else {}))
+        wt = info.get("worktree") or naming.worktree_for(unit, main)
+        claim_slug = registry.claim_slug(main, unit) or slug
+        if use_slots and info.get("slot") is not None:
+            expected = slot_pool.slot_dir(main, info["slot"])
+            if not registry.same_path(wt, expected):
+                raise SystemExit("REFUSED spawn %s: claim slot %s has worktree %s, not the slot dir %s - a "
+                                 "slot claim must hand out the slot's cwd" % (unit, info["slot"], wt, expected))
+        brief_path = (promote_cluster(main, unit, claim_slug, wt, units, reason) if units
+                      else promote(main, unit, claim_slug, wt))
+    out = {"unit": unit, "slug": slug, "claim_slug": claim_slug, "worktree": wt, "brief": brief_path,
+           "claim": info, "dry_run": dry_run, "spawn": spawn_line(main, unit, claim_slug, wt, brief_path, kind, profile)}
+    if units:
+        out["units"] = list(units)
+    return out
 
 
-def next_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None,
-               kind: str = "unit", profile: str | None = None, allow_unlanded=None,
-               ignore_backlog: bool = False,
+def next_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None, kind: str = "unit",
+               profile: str | None = None, allow_unlanded=None, ignore_backlog: bool = False,
                ratio: int = backlog.RATIO_DEFAULT, slots_mode: bool | None = None) -> dict:
-    """Claim the next ready unit, promote its brief, and return the spawn.
-
-    Before the claim, `branch_error` refuses a MAIN whose HEAD is not `main`, because the worktree and
-    branch are cut from that HEAD; the **slot cap** refuses when every slot is taken (a free slot is the
-    concurrency cap); the backlog **credit gate** refuses when the balance does not cover a claim (the
-    owner's 2026-09-27 ratio: a `done` earns 1 credit, a claim spends `ratio`), unless `--ignore-backlog`
-    hands out work without spending on purpose; and `unlanded_error` refuses while any branch still holds
-    work main does not have. A real (non-dry) claim is recorded in the ledger.
-    """
+    """Claim the next ready unit (lowest `.text` address) behind the guards; a real claim is recorded."""
     claim_fn = claim_fn or claims.claim
-    if not dry_run:
-        # the worktree/branch is cut from MAIN's HEAD, so a claim made on another branch is rooted wrong
-        bad_branch = branch_error(main)
-        if bad_branch:
-            raise SystemExit("REFUSED queue next | %s" % bad_branch)
-    cap = slot_cap(main, slots_mode)
-    if cap:
-        raise SystemExit("REFUSED queue next | %s" % cap)
-    if not ignore_backlog:
-        backlog_msg = backlog.refusal(main, ratio=ratio)
-        if backlog_msg:
-            raise SystemExit("REFUSED queue next | %s" % backlog_msg)
-    if not dry_run:
-        blocked = unlanded_error(main, set(allow_unlanded or ()))
-        if blocked:
-            raise SystemExit("REFUSED queue next | %s" % blocked)
+    _guards(main, "next", dry_run, slots_mode, ignore_backlog, ratio, allow_unlanded)
     entry = next_entry(main)
     if entry is None:
         raise SystemExit(no_ready(main))
@@ -592,84 +358,80 @@ def next_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None,
     return out
 
 
-def next_briefs(main: str, worker: str | None, dry_run: bool, count: int, claim_fn=None,
-                kind: str = "unit", profile: str | None = None, allow_unlanded=None,
-                ignore_backlog: bool = False,
+def next_briefs(main: str, worker: str | None, dry_run: bool, count: int, claim_fn=None, kind: str = "unit",
+                profile: str | None = None, allow_unlanded=None, ignore_backlog: bool = False,
                 ratio: int = backlog.RATIO_DEFAULT, slots_mode: bool | None = None) -> dict:
-    """Claim a wave of up to `count` spread proposals and return their spawns, in address order.
-
-    Selection is `wave()` - a stride of `count` - and every claim goes through `claim_entry`, the same path
-    the single pick uses. The same guards as `next_brief` run first, and the credit gate is then re-checked
-    for the whole wave: a wave of N costs N x ratio credits, so a balance that covers one claim may not
-    cover three. A wave is also capped by the free slots - a slot is an environment, and a wave cannot claim
-    more environments than exist. A real wave is recorded in the ledger; `--ignore-backlog` hands out the
-    wave without spending. `claimed` below `requested` means the queue could not fill the wave.
-    """
+    """Claim up to `count` lanes at once, no two sharing an owner header or a module (`disjoint_picks`), capped
+    by the free slots and re-checked against the credit balance; `shortfall` says how many could not be filled."""
+    if count < 1:
+        raise SystemExit("REFUSED queue next | --count must be at least 1")
     claim_fn = claim_fn or claims.claim
     requested = count
-    if not dry_run:
-        bad_branch = branch_error(main)
-        if bad_branch:
-            raise SystemExit("REFUSED queue next | %s" % bad_branch)
-    cap = slot_cap(main, slots_mode)
-    if cap:
-        raise SystemExit("REFUSED queue next | %s" % cap)
-    if slots_mode is not False:
-        sm = claims._slots()
-        if sm.enabled(main):
-            free = sm.free_count(main)
-            if free < count:
-                count = free          # a wave never claims more environments than the pool has
-    if not ignore_backlog:
-        backlog_msg = backlog.refusal(main, ratio=ratio)
-        if backlog_msg:
-            raise SystemExit("REFUSED queue next | %s" % backlog_msg)
-    if not dry_run:
-        blocked = unlanded_error(main, set(allow_unlanded or ()))
-        if blocked:
-            raise SystemExit("REFUSED queue next | %s" % blocked)
-    chosen = wave(main, count)
+    _guards(main, "next", dry_run, slots_mode, ignore_backlog, ratio, allow_unlanded)
+    if slots_mode is not False and slot_pool.enabled(main):
+        count = min(count, slot_pool.free_count(main))
+    chosen = disjoint_picks(main, ready_entries(main), count)
     if not chosen:
         raise SystemExit(no_ready(main))
     if not ignore_backlog:
-        backlog_msg = backlog.refusal(main, ratio=ratio, wants=len(chosen))
-        if backlog_msg:
-            raise SystemExit("REFUSED queue next | %s" % backlog_msg)
-    out = [claim_entry(main, entry, worker, dry_run, claim_fn, kind, profile, slots_mode) for entry in chosen]
+        msg = backlog.refusal(main, ratio=ratio, wants=len(chosen))
+        if msg:
+            raise SystemExit("REFUSED queue next | %s" % msg)
+    out = [claim_entry(main, e, worker, dry_run, claim_fn, kind, profile, slots_mode) for e in chosen]
     if not dry_run and not ignore_backlog:
         backlog.record_claims(main, [_claim_record(c, worker, ratio) for c in out], ratio=ratio)
-    return {"requested": requested, "claimed": len(out), "shortfall": requested - len(out),
-            "dry_run": dry_run, "claims": out}
+    return {"requested": requested, "claimed": len(out), "shortfall": requested - len(out), "dry_run": dry_run,
+            "claims": out}
 
+
+def cluster_key(name: str) -> str:
+    """The claim key a cluster is held under: `cluster/<module>` or `cluster/<header path without .h>`."""
+    norm = name.replace("\\", "/").strip("/")
+    return "cluster/" + re.sub(r"\.(h|hpp)$", "", norm)
+
+
+def next_cluster(main: str, name: str, worker: str | None, dry_run: bool, claim_fn=None, kind: str = "unit",
+                 profile: str | None = None, allow_unlanded=None, ignore_backlog: bool = False,
+                 ratio: int = backlog.RATIO_DEFAULT, slots_mode: bool | None = None) -> dict:
+    """Claim ONE lane for every ready unit of a cluster - the units sharing an owner header, or a module - so no
+    two concurrent lanes ever hold header-sharing units. The claim records the units; one brief indexes them."""
+    claim_fn = claim_fn or claims.claim
+    _guards(main, "next", dry_run, slots_mode, ignore_backlog, ratio, allow_unlanded)
+    members, reason = cluster_members(main, name)
+    if not members:
+        raise SystemExit("REFUSED queue next --cluster %s: no ready unit in it (%s)" % (name, reason))
+    units = [e["unit"] for e in members]
+    key = cluster_key(name)
+    out = claim_entry(main, {"unit": key}, worker, dry_run, claim_fn, kind, profile, slots_mode,
+                      units=units, reason=reason)
+    out["reason"] = reason
+    if not dry_run and not ignore_backlog:
+        backlog.record_claims(main, [_claim_record(out, worker, ratio)], ratio=ratio)
+    return out
+
+
+# --- debt: a naming/band-header backlog item, claimed like a unit -------------------------------------------------
 
 def debt_candidates(main: str, items=None, **kw) -> list:
-    """The claimable debt items, in rank order: open `naming`/`band-header` items whose file is free.
-
-    A debt item is held on its **file** (`backlog.debt_unit`), so the same claim lock a unit proposal uses
-    says whether the file is already in flight.  An item whose file is claimed is skipped, never handed to a
-    second lane - the register would otherwise offer work that the claim path refuses at the branch.
-    `items` lets a caller pass a single `backlog.build` (the queue does), so selection does not re-lint.
-    """
+    """The claimable debt items in rank order: open `naming`/`band-header` items whose file is free."""
     pool = backlog.debt_items(items) if items is not None else backlog.open_debt_items(main, **kw)
-    branches = claims.worker_branches(main)
+    branches = registry.worker_branches(main)
     out = []
     for it in pool:
         unit = backlog.debt_unit(it)
-        if brief.claim_for(main, unit) or claims.lock_held(main, unit, branches):
+        if brief.claim_for(main, unit) or registry.lock_held(main, unit, branches):
             continue
         out.append(it)
     return out
 
 
 def no_debt(main: str) -> str:
-    """The refusal when no naming/band-header item is claimable."""
     return ("no claimable debt: no open naming/band-header item has names outstanding and an unclaimed "
             "file\n  run `python tools/units/backlog.py --print` to see the register")
 
 
 def write_debt_brief(main: str, claim_slug: str, text: str) -> str:
-    """Write a debt item's brief to the claim's own slug path (the file a unit claim's brief would use)."""
-    dest = os.path.join(main, "tools", "units", "briefs", claim_slug + ".md")
+    dest = os.path.join(briefs_dir(main), claim_slug + ".md")
     os.makedirs(os.path.dirname(dest), exist_ok=True)
     with open(dest, "w", encoding="utf-8", newline="\n") as fh:
         fh.write(text)
@@ -679,19 +441,7 @@ def write_debt_brief(main: str, claim_slug: str, text: str) -> str:
 def next_debt_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None,
                     ratio: int = backlog.RATIO_DEFAULT, ignore_backlog: bool = False,
                     slots_mode: bool | None = None, **kw) -> dict:
-    """Claim the top open naming/band-header debt item and hand a lane its file and distinct-name list.
-
-    The register *rations* new proposal claims against the debt; this is the other half - the debt itself is
-    **claimable**, exactly like a unit proposal, so the paydown becomes scheduled work instead of something a
-    lane does incidentally while passing through.  The claim is `claims.claim` (the same branch/worktree lock
-    a unit uses, held on the item's file), the credit is spent through `backlog.record_claims`, and one
-    resolved item still earns exactly one (`backlog.ledger_earned`).  The brief names every distinct name,
-    and the spawn's task leads with "clean the N names in this file".
-
-    The same guards as `next_brief` run first: the branch guard (the worktree is cut from MAIN's HEAD), the
-    slot cap (a free slot is the concurrency cap), the backlog credit gate (a claim spends `ratio`), and the
-    unlanded-branch guard; `--ignore-backlog` hands out the debt without spending, on purpose.
-    """
+    """Claim the top open naming/band-header debt item (held on its file) and hand a lane its name list."""
     claim_fn = claim_fn or claims.claim
     if not dry_run:
         bad_branch = branch_error(main)
@@ -702,8 +452,6 @@ def next_debt_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None,
         raise SystemExit("REFUSED queue debt | %s" % cap)
     items, meta = backlog.build(main, **kw)
     if not ignore_backlog:
-        # the same credit gate `next_brief` runs (`backlog.refusal`), asked once against this build; on a
-        # refusal the ready-to-paste message is rendered by `refusal` itself.
         open_ = [i for i in items if i.status == "open"]
         if open_:
             summary = backlog.ledger_summary(items, meta["ledger"]["claims"], ratio,
@@ -720,15 +468,13 @@ def next_debt_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None,
     item = candidates[0]
     unit = backlog.debt_unit(item)
     if dry_run:
-        # mirror `claim_entry`: a dry run claims nothing and never calls the claim function (a real
-        # `claims.claim` would refuse a MAIN-shaped path outside MAIN).
-        info = {"unit": unit, "branch": claims.branch_for(unit),
-                "worktree": claims.worktree_for(unit, main), "dry_run": True}
+        info = {"unit": unit, "branch": naming.branch_for(unit), "worktree": naming.worktree_for(unit, main),
+                "dry_run": True}
     else:
         info = claim_fn(unit, main, worker, False, kind="fix")
-    wt = info.get("worktree") or claims.worktree_for(unit, main)
-    claim_slug = claims.claim_slug(main, unit) or claims.slug(unit)
-    brief_path = os.path.join(main, "tools", "units", "briefs", claim_slug + ".md")
+    wt = info.get("worktree") or naming.worktree_for(unit, main)
+    claim_slug = registry.claim_slug(main, unit) or naming.slug(unit)
+    brief_path = os.path.join(briefs_dir(main), claim_slug + ".md")
     if not dry_run:
         brief_path = write_debt_brief(main, claim_slug, backlog.debt_brief(main, item))
     spawn = backlog.debt_task(main, item, cwd=wt, brief=brief_path)
@@ -736,32 +482,35 @@ def next_debt_brief(main: str, worker: str | None, dry_run: bool, claim_fn=None,
            "weight": item.weight, "count": item.count, "unit": unit, "claim": info,
            "worktree": wt, "brief": brief_path, "dry_run": dry_run, "spawn": spawn}
     if not dry_run and not ignore_backlog:
-        backlog.record_claims(main, [{"unit": unit, "worker": worker or "",
-                                      "branch": info.get("branch"), "worktree": wt, "ratio": ratio,
-                                      "kind": "debt", "backlog": item.key,
-                                      "when": _dt.datetime.now(_dt.timezone.utc).replace(
-                                          microsecond=0).isoformat()}],
+        backlog.record_claims(main, [{"unit": unit, "worker": worker or "", "branch": info.get("branch"),
+                                      "worktree": wt, "ratio": ratio, "kind": "debt", "backlog": item.key,
+                                      "when": _dt.datetime.now(_dt.timezone.utc).replace(microsecond=0).isoformat()}],
                               ratio=ratio)
     return out
 
 
 def pool_state(main: str) -> dict:
-    """The pool's counts by state, plus the ready candidates in order."""
-    entries = pool_entries(main)
-    branches = claims.worker_branches(main)
+    """The registered units' counts by state, plus the ready ones in address order."""
+    rows = entries(main)
+    branches = registry.worker_branches(main)
+    held = registry.claimed_units(registry.load(main))
     counts: dict[str, int] = {}
     ready = []
-    for entry in entries:
-        st = state(main, entry, branches)
+    for e in rows:
+        st = state(main, e, branches, held)
         counts[st] = counts.get(st, 0) + 1
         if st == "ready":
-            ready.append(entry)
-    ready.sort(key=lambda e: (text_start(main, e["unit"]) is None, text_start(main, e["unit"]) or 0,
-                              e["unit"] or ""))
-    return {"dir": pool_dir(main), "entries": entries, "counts": counts, "ready": ready}
+            ready.append(e)
+    ready.sort(key=lambda e: order_key(main, e["unit"]))
+    return {"dir": pool_dir(main), "entries": rows, "counts": counts, "ready": ready}
 
+
+# --- selftest ---------------------------------------------------------------------------------------------------
 
 def selftest() -> int:
+    import contextlib
+    import io
+    unitutil = claims.unitutil
     fails, checks = [], 0
 
     def check(name, got, want):
@@ -777,96 +526,79 @@ def selftest() -> int:
         except SystemExit:
             return True
 
-    import tempfile
-    # the unlanded-branch guard's rule, tested without a repository: only a strict superset blocks
-    check("strictly_newer: identical", strictly_newer(["a", "b"], ["a", "b"]), None)
-    check("strictly_newer: branch gained two", strictly_newer(["a"], ["a", "b", "c"]), 2)
-    check("strictly_newer: new file", strictly_newer([], ["x", "y"]), 2)
-    check("strictly_newer: diverged (stale pads)", strictly_newer(["a", "new"], ["a", "old"]), None)
-    check("strictly_newer: main is newer", strictly_newer(["a", "b"], ["a"]), None)
-    check("strictly_newer: empty branch", strictly_newer(["a"], []), None)
-    with claims.unitutil.temp_dir() as tmp:
-        check("unlanded_branches outside a repo", unlanded_branches(tmp), [])
-        check("unlanded_error outside a repo", unlanded_error(tmp), None)
-    with claims.unitutil.temp_dir() as tmp:
-        os.makedirs(os.path.join(tmp, "src", "auto"))
-        # two stubs at different .text addresses, and one that already has a body
-        for name in ("stubA", "stubB", "done"):
-            open(os.path.join(tmp, "src", "auto", name + ".c"), "w").write("/* header only */\n")
-        open(os.path.join(tmp, "src", "auto", "done.c"), "w").write("int f(void) { return 1; }\n")
-        open(os.path.join(tmp, "configure.py"), "w").write(
-            'config.libs = [\n    {\n        "lib": "auto",\n        "objects": [\n'
-            '            Object(NonMatching, "auto/stubA.c"),\n'
-            '            Object(NonMatching, "auto/stubB.c"),\n'
-            '            Object(NonMatching, "auto/done.c"),\n'
-            "        ],\n    },\n]\n")
-        os.makedirs(os.path.join(tmp, "config", "RMHE08"))
-        open(os.path.join(tmp, "config", "RMHE08", "splits.txt"), "w").write(
-            "auto/stubA.c:\n\t.text       start:0x80200000 end:0x80200100\n\n"
-            "auto/stubB.c:\n\t.text       start:0x80100000 end:0x80100100\n")
-        open(os.path.join(tmp, "config", "RMHE08", "symbols.txt"), "w").write(
-            "fn_80100000 = .text:0x80100000; // type:function size:0x40\n"
-            "fn_80200000 = .text:0x80200000; // type:function size:0x40\n")
+    def write(root, rel, text):
+        p = os.path.join(root, *rel.split("/"))
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(text)
 
-        out = brief.pool(tmp)
-        check("the pool wrote the two stubs only", sorted(out["wrote"]), ["auto/stubA", "auto/stubB"])
-        entries = pool_entries(tmp)
-        check("pool_entries finds both", len(entries), 2)
-        check("a pooled brief is parseable", {e["unit"] for e in entries}, {"auto/stubA", "auto/stubB"})
-        by_unit = {e["unit"]: e for e in entries}
-        check("an unclaimed no-body stub is ready", state(tmp, by_unit["auto/stubA"]), "ready")
-        check("the next ready brief is the lowest .text address",
-              next_entry(tmp)["unit"], "auto/stubB")
+    def fake_claim(unit, main, worker, dry_run, **kw):
+        reg = registry.load(main)
+        reg[unit] = {"branch": naming.branch_for(unit), "worktree": naming.worktree_for(unit, main),
+                     "kind": kw.get("kind"), **({"units": kw["units"]} if kw.get("units") else {})}
+        registry.save(main, reg)
+        return {"unit": unit, "branch": naming.branch_for(unit), "worktree": naming.worktree_for(unit, main),
+                "kind": kw.get("kind")}
+
+    check("strictly_newer: identical / gained / new file / diverged / main newer / empty branch",
+          [strictly_newer(["a", "b"], ["a", "b"]), strictly_newer(["a"], ["a", "b", "c"]), strictly_newer([], ["x", "y"]),
+           strictly_newer(["a", "new"], ["a", "old"]), strictly_newer(["a", "b"], ["a"]), strictly_newer(["a"], [])],
+          [None, 2, 2, None, None, None])
+    with unitutil.temp_dir() as tmp:
+        check("unlanded_branches / unlanded_error outside a repo", (unlanded_branches(tmp), unlanded_error(tmp)), ([], None))
+
+    # the queue is the registered units minus the Matching ones (2026-10-04: NOT the body-less ones only)
+    with unitutil.temp_dir() as tmp:
+        write(tmp, "src/auto/stubA.c", "/* header only */\n")
+        write(tmp, "src/auto/stubB.c", "/* header only */\n")
+        write(tmp, "src/auto/done.c", "int f(void) { return 1; }\n")
+        write(tmp, "src/auto/ok.c", "int g(void) { return 2; }\n")
+        write(tmp, "configure.py",
+              'config.libs = [\n    {\n        "lib": "auto",\n        "objects": [\n'
+              '            Object(NonMatching, "auto/stubA.c"),\n            Object(NonMatching, "auto/stubB.c"),\n'
+              '            Object(NonMatching, "auto/done.c"),\n            Object(Matching, "auto/ok.c"),\n'
+              '            Object(NonMatching, "auto/missing.c"),\n        ],\n    },\n]\n')
+        write(tmp, "config/RMHE08/splits.txt",
+              "auto/stubA.c:\n\t.text       start:0x80200000 end:0x80200100\n\n"
+              "auto/stubB.c:\n\t.text       start:0x80100000 end:0x80100100\n\n"
+              "auto/done.c:\n\t.text       start:0x80300000 end:0x80300100\n\n"
+              "auto/ok.c:\n\t.text       start:0x80400000 end:0x80400100\n")
+        write(tmp, "config/RMHE08/symbols.txt",
+              "fn_80100000 = .text:0x80100000; // type:function size:0x40\n"
+              "fn_80200000 = .text:0x80200000; // type:function size:0x40\n")
+        st = pool_state(tmp)
+        check("every registered unit has a state", st["counts"], {"ready": 3, "matching": 1, "nosource": 1})
+        check("a NonMatching unit with a body is ready (it used to be hidden as `written`)",
+              [e["unit"] for e in st["ready"]], ["auto/stubB", "auto/stubA", "auto/done"])
+        check("the next ready unit is the lowest .text address", next_entry(tmp)["unit"], "auto/stubB")
         check("text_start reads the split range", text_start(tmp, "auto/stubA"), 0x80200000)
+        registry.save(tmp, {"auto/stubB": {"branch": naming.branch_for("auto/stubB")}})
+        check("a registry claim takes the unit out of the ready set",
+              (next_entry(tmp)["unit"], pool_state(tmp)["counts"].get("claimed")), ("auto/stubA", 1))
+        registry.save(tmp, {"cluster/auto": {"branch": "worker/cluster-auto-1", "units": ["auto/stubA", "auto/done"]}})
+        check("a unit a cluster claim lists is claimed too", [e["unit"] for e in ready_entries(tmp)], ["auto/stubB"])
+        registry.save(tmp, {})
+        os.makedirs(naming.worktree_for("auto/stubB", tmp))
+        check("a leftover claim worktree is a held lock", next_entry(tmp)["unit"], "auto/stubA")
+        os.rmdir(naming.worktree_for("auto/stubB", tmp))
 
-        # a claim (the registry, no git) takes the unit out of the ready set
-        claims.save_registry(tmp, {"auto/stubB": {"branch": claims.branch_for("auto/stubB"),
-                                                  "worktree": claims.worktree_for("auto/stubB", tmp)}})
-        check("a claimed unit is not ready", state(tmp, by_unit["auto/stubB"]), "claimed")
-        check("the next ready brief skips the claimed one", next_entry(tmp)["unit"], "auto/stubA")
-        check("pool_state counts the claim", pool_state(tmp)["counts"].get("claimed"), 1)
-        claims.save_registry(tmp, {})
-
-        # a unit that gains a body is `written`, not ready
-        open(os.path.join(tmp, "src", "auto", "stubA.c"), "w").write("int g(void) { return 2; }\n")
-        check("a unit with a body is written", state(tmp, by_unit["auto/stubA"]), "written")
-        open(os.path.join(tmp, "src", "auto", "stubA.c"), "w").write("/* header only */\n")
-
-        # dry-run claims nothing, promotes nothing and still prints the spawn
         dry = next_brief(tmp, "w-demo", dry_run=True)
-        check("dry-run claims nothing", claims.load_registry(tmp), {})
-        check("dry-run leaves the pool brief in place", os.path.exists(by_unit["auto/stubB"]["path"]), True)
-        check("dry-run picks the lowest address", dry["unit"], "auto/stubB")
-        check("dry-run's spawn names the profile and the slug",
-              dry["spawn"]["name"], "surveyor-" + claims.slug("auto/stubB"))
-        check("dry-run's spawn has the worktree as cwd", dry["spawn"]["cwd"], claims.worktree_for("auto/stubB", tmp))
-        check("dry-run's spawn task names the brief", dry["brief"].replace("\\", "/") in dry["spawn"]["task"], True)
-        check("dry-run's spawn task names the unit", "auto/stubB" in dry["spawn"]["task"], True)
-        check("dry-run's spawn is a subagent call",
-              " claude --agent surveyor " in dry["spawn"]["call"], True)
-        check("... and a proposal lane defaults to the surveyor profile",
-              dry["spawn"]["agent"] == "surveyor", True)
-        check("... recording the kind it was taken as", dry["spawn"]["kind"], "unit")
-        # the profile comes from the ONE mapping (`slots.profile_for_kind`), so a queue spawn and a
-        # `slots.py spawn` for the same kind cannot disagree - and a tooling lane is NOT a decompiler lane
-        check("the kind decides the profile: fix -> fixer",
-              spawn_line(tmp, "auto/x", "s", "/w", "/b", "fix")["call"]
-              .find(" claude --agent fixer ") > 0, True)
-        check("the kind decides the profile: tooling -> worker (not decompiler)",
-              spawn_line(tmp, "auto/x", "s", "/w", "/b", "tooling")["agent"], "worker")
-        check("the kind decides the profile: review -> codereviewer",
-              spawn_line(tmp, "auto/x", "s", "/w", "/b", "review")["agent"], "codereviewer")
-        check("... an unknown kind is refused, with the valid list",
-              _raises(lambda: spawn_line(tmp, "auto/x", "s", "/w", "/b", "not-a-kind")), True)
-        check("... and an explicit profile still overrides the mapping",
+        check("dry-run claims nothing", registry.load(tmp), {})
+        check("dry-run picks the lowest address, the surveyor profile and the worktree as cwd",
+              (dry["unit"], dry["spawn"]["agent"], dry["spawn"]["name"], dry["spawn"]["cwd"], dry["spawn"]["kind"]),
+              ("auto/stubB", "surveyor", "surveyor-" + naming.slug("auto/stubB"), naming.worktree_for("auto/stubB", tmp),
+               "unit"))
+        check("dry-run's task names the brief and the unit, as a headless claude call",
+              (dry["brief"].replace("\\", "/") in dry["spawn"]["task"], "auto/stubB" in dry["spawn"]["task"],
+               " claude --agent surveyor " in dry["spawn"]["call"]), (True, True, True))
+        check("the kind decides the profile: fix -> fixer, tooling -> worker, review -> codereviewer",
+              [spawn_line(tmp, "auto/x", "s", "/w", "/b", k)["agent"] for k in ("fix", "tooling", "review")],
+              ["fixer", "worker", "codereviewer"])
+        check("... an unknown kind is refused", _raises(lambda: spawn_line(tmp, "auto/x", "s", "/w", "/b", "nope")), True)
+        check("... an explicit profile overrides the mapping",
               spawn_line(tmp, "auto/x", "s", "/w", "/b", "unit", "fixer")["agent"], "fixer")
-        # `--profile` is an override, so it is validated against the ONE table as well: main carried
-        # `choices=[...]`, the branch dropped it, and `--profile decompilerr` printed a spawn line naming an
-        # agent the harness does not have (review, queue.py:1229).
-        check("--profile's valid values are the kind table's profiles",
-              _profiles(), sorted(set(claims._slots().KIND_PROFILE.values())))
-        import contextlib
-        import io
+        check("--profile's valid values are the kind table's profiles", _profiles(),
+              sorted(set(launch.KIND_PROFILE.values())))
         saved_argv, err = sys.argv, io.StringIO()
         try:
             sys.argv = ["queue.py", "next", "--profile", "decompilerr", "--dry-run"]
@@ -878,513 +610,168 @@ def selftest() -> int:
                     check("an unknown `--profile` is refused", exc.code, 2)
         finally:
             sys.argv = saved_argv
-        check("... by argparse, listing the real profiles",
-              "choose from" in err.getvalue() and "decompiler" in err.getvalue(), True)
-        check("the spawn omits the `name` the default tool has no parameter for",
-              "name=" not in dry["spawn"]["call"], True)
-        check("the spawn asks for a final-message handoff, not a tool",
-              "final message" in dry["spawn"]["task"] and "subagent_done" not in dry["spawn"]["task"], True)
+        check("... by argparse, listing the real profiles", "choose from" in err.getvalue(), True)
+        check("the spawn asks for a final-message handoff", "final message" in dry["spawn"]["task"], True)
+        check("spawn_line refuses a cwd that is MAIN", _raises(lambda: spawn_line(tmp, "auto/x", "s", tmp, "/b")), True)
 
-        # the real flow with an injected claim (no git worktree): promote, then remove the pool brief
-        def fake_claim(unit, main, worker, dry_run, **kw):
-            claims.save_registry(main, {unit: {"branch": claims.branch_for(unit),
-                                               "worktree": claims.worktree_for(unit, main),
-                                               "kind": kw.get("kind"), "agent": kw.get("agent")}})
-            return {"unit": unit, "branch": claims.branch_for(unit),
-                    "worktree": claims.worktree_for(unit, main), "kind": kw.get("kind")}
+        real = next_brief(tmp, "w-demo", dry_run=False, claim_fn=fake_claim, ignore_backlog=True)
+        check("the real flow claims the unit", "auto/stubB" in registry.load(tmp), True)
+        check("the brief is at the claim's slug path", os.path.basename(real["brief"]),
+              registry.claim_slug(tmp, "auto/stubB") + ".md")
+        text = open(real["brief"], encoding="utf-8").read()
+        check("... rendered for the unit's current range, with the claim's outbox",
+              ("0x80100000" in text, "outbox" in text, "Pooled brief" in text), (True, True, False))
+        registry.save(tmp, {"auto/stubA": {"branch": naming.branch_for("auto/stubA") + "-zz"}})
+        suffixed = promote(tmp, "auto/stubA", naming.slug("auto/stubA") + "-zz")
+        check("a suffixed claim's brief names its own outbox", "-zz.json" in open(suffixed, encoding="utf-8").read(), True)
+        registry.save(tmp, {})
 
-        pooled_text = open(by_unit["auto/stubB"]["path"], encoding="utf-8").read()
-        real = next_brief(tmp, "w-demo", dry_run=False, claim_fn=fake_claim)
-        check("the real flow claims the unit", "auto/stubB" in claims.load_registry(tmp), True)
-        check("the promoted brief is at the claim's slug path",
-              os.path.basename(real["brief"]), claims.claim_slug(tmp, "auto/stubB") + ".md")
-        check("the promoted brief exists", os.path.exists(real["brief"]), True)
-        promoted_text = open(real["brief"], encoding="utf-8").read()
-        check("the promoted brief is re-rendered, not a copy of the pooled file",
-              promoted_text != pooled_text and "Pooled brief" not in promoted_text, True)
-        check("... and it states the unit's current range", "0x80100000" in promoted_text, True)
-        check("the pooled brief is left in place for `--pool` to refresh",
-              os.path.exists(by_unit["auto/stubB"]["path"]), True)
-        check("a claimed unit is still counted by pool_state", pool_state(tmp)["counts"].get("claimed"), 1)
-        check("the promoted brief keeps the claim's outbox", "outbox" in promoted_text, True)
-        claims.save_registry(tmp, {})
+    # clusters: owner headers decide which units share a lane; a wave never splits them across lanes
+    with unitutil.temp_dir() as tmp:
+        write(tmp, "include/types.h", "typedef int s32;\n")
+        write(tmp, "include/net/net.h", '#include "types.h"\nstruct Net { s32 x; };\n')
+        write(tmp, "include/net/inner.h", "struct Inner;\n")
+        write(tmp, "include/g/g.h", '#include "types.h"\n')
+        write(tmp, "src/net/a.cpp", '#include "net/net.h"\n#include "net/inner.h"\nvoid a() {}\n')
+        write(tmp, "src/net/b.cpp", '#include "net/net.h"\nvoid b() {}\n')
+        write(tmp, "src/g/c.cpp", '#include "g/g.h"\nvoid c() {}\n')
+        write(tmp, "src/h/d.cpp", '#include "net/inner.h"\nvoid d() {}\n')
+        write(tmp, "configure.py", 'config.libs = [{"lib": "x", "objects": [Object(NonMatching, "net/a.cpp"), '
+                                   'Object(NonMatching, "net/b.cpp"), Object(NonMatching, "g/c.cpp"), '
+                                   'Object(NonMatching, "h/d.cpp")]}]\n')
+        write(tmp, "config/RMHE08/splits.txt",
+              "net/a.cpp:\n\t.text       start:0x80100000 end:0x80100100\n\n"
+              "net/b.cpp:\n\t.text       start:0x80100100 end:0x80100200\n\n"
+              "g/c.cpp:\n\t.text       start:0x80200000 end:0x80200100\n\n"
+              "h/d.cpp:\n\t.text       start:0x80300000 end:0x80300100\n")
+        write(tmp, "config/RMHE08/symbols.txt", "fn_80100000 = .text:0x80100000; // type:function size:0x40\n")
+        check("owner_headers is the closure's module headers, minus the shared base",
+              sorted(owner_headers(tmp, "net/a.cpp")), ["include/net/inner.h", "include/net/net.h"])
+        check("a header cluster is every ready unit whose closure includes it",
+              ([e["unit"] for e in cluster_members(tmp, "include/net/net.h")[0]],
+               [e["unit"] for e in cluster_members(tmp, "include/net/inner.h")[0]]),
+              (["net/a", "net/b"], ["net/a", "h/d"]))
+        check("a module cluster is every ready unit under src/<module>/",
+              [e["unit"] for e in cluster_members(tmp, "net")[0]], ["net/a", "net/b"])
+        check("a missing header is refused", _raises(lambda: cluster_members(tmp, "include/nope.h")), True)
+        check("a wave never puts header- or module-sharing units in two lanes",
+              [e["unit"] for e in disjoint_picks(tmp, ready_entries(tmp), 4)], ["net/a", "g/c"])
+        check("... and a unit sharing nothing joins it", [e["unit"] for e in disjoint_picks(
+            tmp, [e for e in ready_entries(tmp) if e["unit"] != "net/a"], 4)], ["net/b", "g/c", "h/d"])
+        short = next_briefs(tmp, "w", dry_run=False, count=3, claim_fn=fake_claim, ignore_backlog=True)
+        check("a wave reports its shortfall instead of breaking the rule",
+              ((short["requested"], short["claimed"], short["shortfall"]), [c["unit"] for c in short["claims"]]),
+              ((3, 2, 1), ["net/a", "g/c"]))
+        check("--count below 1 is refused", _raises(lambda: next_briefs(tmp, None, dry_run=True, count=0)), True)
+        registry.save(tmp, {})
+        out = next_cluster(tmp, "include/net/net.h", "w", dry_run=False, claim_fn=fake_claim, ignore_backlog=True)
+        check("a cluster is ONE claim holding every member", (out["unit"], out["units"]),
+              ("cluster/include/net/net", ["net/a", "net/b"]))
+        check("... recorded in the registry, so every member reads claimed",
+              (registry.load(tmp)["cluster/include/net/net"]["units"], [e["unit"] for e in ready_entries(tmp)]),
+              (["net/a", "net/b"], ["g/c", "h/d"]))
+        index = open(out["brief"], encoding="utf-8").read()
+        check("the cluster brief indexes the per-unit briefs and acks with the cluster key",
+              ("# Cluster brief: cluster/include/net/net" in index, "`net/a`" in index and "`net/b`" in index,
+               "claims.py ack cluster/include/net/net" in index, "## 0 · Your tree" in index),
+              (True, True, True, True))
+        member = os.path.join(briefs_dir(tmp), out["claim_slug"], naming.slug("net/a") + ".md")
+        check("... each member's brief names the cluster's outbox",
+              (os.path.exists(member), out["claim_slug"] + ".json" in open(member, encoding="utf-8").read()), (True, True))
+        check("... and the spawn hands out that index", out["brief"].replace("\\", "/") in out["spawn"]["task"], True)
+        check("a cluster with no ready member is refused",
+              _raises(lambda: next_cluster(tmp, "net", None, dry_run=True, ignore_backlog=True)), True)
 
-        # a branch named with a suffix is re-rendered too, so its outbox path is the claim's own
-        claims.save_registry(tmp, {"auto/stubA": {"branch": claims.branch_for("auto/stubA") + "-zz",
-                                                  "worktree": claims.worktree_for("auto/stubA", tmp)}})
-        suffixed = promote(tmp, "auto/stubA", claims.slug("auto/stubA") + "-zz")
-        check("a suffixed claim's brief is re-rendered", "-zz.json" in open(suffixed, encoding="utf-8").read(), True)
-        claims.save_registry(tmp, {})
+    with unitutil.temp_dir() as empty:
+        write(empty, "src/a/x.c", "int x;\n")
+        write(empty, "configure.py", 'config.libs = [{"lib": "a", "objects": [Object(Matching, "a/x.c")]}]\n')
+        check("an all-Matching tree has nothing to hand out", (pool_state(empty)["ready"], next_entry(empty)), ([], None))
+        check("... next refuses", _raises(lambda: next_brief(empty, None, dry_run=True)), True)
+        check("... and so does a wave", _raises(lambda: next_briefs(empty, None, dry_run=True, count=3)), True)
 
-        # a brief whose unit is no longer registered is stale, never ready
-        open(os.path.join(tmp, "src", "auto", "ghost.c"), "w").write("/* header only */\n")
-        open(os.path.join(tmp, "tools", "units", "briefs", "pool", claims.slug("auto/ghost") + ".md"), "w").write(
-            "# Brief: auto/ghost\n")
-        ghost = [e for e in pool_entries(tmp) if e["unit"] == "auto/ghost"][0]
-        check("an unregistered brief is stale", state(tmp, ghost), "stale")
-        check("the stale brief is skipped", next_entry(tmp)["unit"], "auto/stubB")
-        check("an unparseable pool file is unreadable",
-              state(tmp, {"unit": None, "path": "x"}), "unreadable")
-
-        check("spawn_line's call is one line", "\n" not in spawn_line(tmp, "auto/x", "s", "/w", "/b")["call"], True)
-        # the wrong thing is impossible: a spawn line whose cwd is MAIN is a refusal, not a line to paste
-        try:
-            spawn_line(tmp, "auto/x", "s", tmp, "/b")
-            check("spawn_line refuses a cwd that is MAIN", "no error", "SystemExit")
-        except SystemExit as exc:
-            check("spawn_line refuses a cwd that is MAIN", "resolves to MAIN" in str(exc), True)
-        check("spawn_line carries the worktree's own path as cwd",
-              spawn_line(tmp, "auto/x", "s", os.path.join(tmp, "ws"), "/b")["cwd"],
-              os.path.join(tmp, "ws"))
-
-    # option A: a proposal is ready while it is in the queue, and stale once the queue drops it (which is
-    # what happens when its range is registered and the queue file is regenerated)
-    with claims.unitutil.temp_dir() as tmp:
-        os.makedirs(os.path.join(tmp, "src"))
-        os.makedirs(os.path.join(tmp, "tools", "units", "briefs", "pool"))
-        open(os.path.join(tmp, "configure.py"), "w").write("config.libs = [\n]\n")
-        claims.save_registry(tmp, {})
-        label = "proposal/80161660_fn_80161660.cpp"
-        with open(brief.queue_path(tmp), "w", encoding="utf-8") as fh:
-            json.dump({"version": 1, "units": [{"label": label, "text": [0x80161660, 0x801679B0],
-                                                   "count": 52, "bytes": 25424, "cxx": True}]}, fh)
-        open(os.path.join(tmp, "tools", "units", "briefs", "pool", claims.slug(label) + ".md"), "w").write(
-            "# Proposal brief: %s\n" % label)
-        entry = pool_entries(tmp)[0]
-        check("a pooled proposal brief is parseable", entry["unit"], claims.norm_unit(label))
-        check("a proposal is not a registered unit", is_proposal(tmp, label), True)
-        check("a proposal in the queue is ready", state(tmp, entry), "ready")
-        check("a proposal's address comes from the queue, not splits.txt",
-              text_start(tmp, label), 0x80161660)
-        check("next_entry picks the proposal", next_entry(tmp)["unit"], claims.norm_unit(label))
-        claims.save_registry(tmp, {claims.norm_unit(label): {"branch": "worker/x", "worker": "me"}})
-        check("a claimed proposal is not ready", state(tmp, entry), "claimed")
-        check("a claimed proposal is not handed out", next_entry(tmp), None)
-        claims.save_registry(tmp, {})
-
-        # the re-hand bug: once the range is registered - under whatever name its worker chose - the
-        # proposal is finished work, so neither the state nor next_entry may offer it again.
-        check("a range inside a registered unit is covered",
-              ranges_cover([(0x80160000, 0x80170000)], 0x80161660), True)
-        check("a range end is not covered (half-open)", ranges_cover([(0x80160000, 0x80161660)], 0x80161660), False)
-        check("no ranges covers nothing", ranges_cover([], 0x80161660), False)
-        saved_units, saved_range = brief.registered_units, brief.splits_range
-        brief.registered_units = lambda m: ["enemy/ef_emitterform"]
-        brief.splits_range = lambda m, u: {".text": (0x80160000, 0x80170000, "extra")}
-        check("a registered range covers the proposal", covered_by_registered(tmp, label), True)
-        check("a covered proposal is not ready", state(tmp, entry), "covered")
-        check("a covered proposal is not handed out", next_entry(tmp), None)
-        brief.splits_range = lambda m, u: {".text": (0x80170000, 0x80180000)}
-        check("a proposal outside every range stays ready", state(tmp, entry), "ready")
-        check("an unregistered proposal is not covered", covered_by_registered(tmp, "proposal/80161670_fn_80161670"), False)
-        brief.registered_units, brief.splits_range = saved_units, saved_range
-        with open(brief.queue_path(tmp), "w", encoding="utf-8") as fh:
-            json.dump({"version": 1, "units": []}, fh)
-        check("a proposal dropped from the queue is stale", state(tmp, entry), "stale")
-        check("a dropped proposal is not handed out", next_entry(tmp), None)
-        check("is_proposal is false for an ordinary unit", is_proposal(tmp, "auto/stubA"), False)
-
-    # a wave (`next --count N`) is a stride of N through the address order: two *adjacent* proposals can
-    # share a wave only if their indices are congruent mod N, impossible for N > 1. That is the property
-    # the campaign needs, because adjacency is what puts two workers on one TU (proposal/8007270C and
-    # proposal/80073180 are both g3d_calcvtx.cpp), makes a neighbour register a symbol you declare
-    # (the rule-2 boundary artefacts), and shares owner headers by construction.
-    with claims.unitutil.temp_dir() as tmp:
-        os.makedirs(os.path.join(tmp, "src"))
-        os.makedirs(os.path.join(tmp, "tools", "units", "briefs", "pool"))
-        open(os.path.join(tmp, "configure.py"), "w").write("config.libs = [\n]\n")
-        claims.save_registry(tmp, {})
-        labels = ["proposal/%08X_fn_%08X.cpp" % (0x80160000 + 0x100 * i, 0x80160000 + 0x100 * i)
-                  for i in range(6)]
-        with open(brief.queue_path(tmp), "w", encoding="utf-8") as fh:
-            json.dump({"version": 1, "units": [
-                {"label": l, "text": [0x80160000 + 0x100 * i, 0x80160000 + 0x100 * i + 0x80],
-                 "count": 1, "bytes": 128, "cxx": False} for i, l in enumerate(labels)]}, fh)
-        for l in labels:
-            open(os.path.join(tmp, "tools", "units", "briefs", "pool", claims.slug(l) + ".md"),
-                 "w", encoding="utf-8").write("# Proposal brief: %s\n" % l)
-        units = [claims.norm_unit(l) for l in labels]
-
-        def picks(chosen: list[dict]) -> list[int]:
-            """The fixture indices a selection made, in the order it returned them."""
-            return [units.index(e["unit"]) for e in chosen]
-
-        def adjacent(indexes: list[int]) -> bool:
-            """Whether any two picks are address-adjacent in the queue - the defect a wave must exclude."""
-            return any(b - a == 1 for a, b in zip(indexes, indexes[1:]))
-
-        check("the fixture is six adjacent ready proposals in address order",
-              [e["unit"] for e in ordered_entries(tmp)], units)
-        check("N=1 is the single pick next_entry makes", picks(wave(tmp, 1)), [0])
-        check("... and next_entry still agrees", next_entry(tmp)["unit"], units[0])
-        w3 = picks(wave(tmp, 3))
-        check("N=3 starts at the lowest ready address", w3[:1], [0])
-        check("... and then the two farthest non-adjacent indices", w3[1:], [2, 5])
-        check("... and claims three spread proposals", (len(w3), adjacent(w3)), (3, False))
-        for n in (2, 3):
-            sel = picks(wave(tmp, n))
-            check("N=%d claims N and never two adjacent" % n, (len(sel), adjacent(sel)), (n, False))
-        w6 = picks(wave(tmp, 6))
-        check("a wave of six on six adjacent proposals is capped by adjacency, not by readiness",
-              (len(w6), adjacent(w6)), (3, False))
-
-        # a claimed stride position is skipped and the walk continues at the next stride position, so the
-        # wave still fills - index 3 is claimed, and the wave comes back with 0, 2 and 5
-        claims.save_registry(tmp, {units[3]: {"branch": "worker/x", "worker": "me"}})
-        claimed3 = picks(wave(tmp, 3))
-        check("a claimed stride position is skipped", 3 not in claimed3, True)
-        check("... the stride keeps going and the wave still fills", (len(claimed3), adjacent(claimed3)), (3, False))
-        check("... taking the farthest non-adjacent ready neighbours", claimed3, [0, 2, 5])
-        claims.save_registry(tmp, {})
-
-        # the SYSTEM property: with a splits.txt naming two modules across the fixture's addresses, a wave
-        # must span both - that is what keeps two workers out of one shared record/header.  It is written
-        # here, at the end of this fixture's checks, so nothing before it sees registered ranges.
-        os.makedirs(os.path.join(tmp, "config", "RMHE08"))
-        open(os.path.join(tmp, "config", "RMHE08", "splits.txt"), "w", encoding="utf-8").write(
-            "enemy/fn_low.cpp:\n\t.text       start:0x80160000 end:0x80160280\n\n"
-            "Pl/fn_high.cpp:\n\t.text       start:0x80160280 end:0x80160600\n")
-        check("a proposal's system is the module of the nearest registered range",
-              [hint_for(tmp, text_start(tmp, u)) for u in units],
-              ["enemy", "enemy", "enemy", "Pl", "Pl", "Pl"])
-        pair = picks(wave(tmp, 2))
-        check("a wave takes the systems it can reach, not the nearest addresses",
-              [hint_for(tmp, text_start(tmp, units[i])) for i in pair], ["enemy", "Pl"])
-        three = picks(wave(tmp, 3))
-        check("... and a three-wave spans both systems while staying non-adjacent",
-              (len(set(hint_for(tmp, text_start(tmp, units[i])) for i in three)), adjacent(three)), (2, False))
-
-        # a covered proposal (its range is already registered under another name) is skipped the same way
-        saved_units, saved_range = brief.registered_units, brief.splits_range
-        brief.registered_units = lambda m: ["enemy/neighbour"]
-        brief.splits_range = lambda m, u: {".text": (0x80160300, 0x80160400)}
-        check("... a covered stride position is not ready either", state(tmp, ordered_entries(tmp)[3]), "covered")
-        covered3 = picks(wave(tmp, 3))
-        check("a covered stride position is skipped, stride intact",
-              (3 in covered3, len(covered3), adjacent(covered3)), (False, 3, False))
-        brief.registered_units, brief.splits_range = saved_units, saved_range
-
-        # fewer than N ready: claim what exists and report the shortfall instead of failing
-        claims.save_registry(tmp, {u: {"branch": "worker/x", "worker": "me"}
-                                   for u in (units[1], units[3], units[4], units[5])})
-        short = picks(wave(tmp, 3))
-        check("fewer than N ready claims what exists", (len(short), adjacent(short)), (2, False))
-        check("... and it is the ready pair, not the claimed neighbours", short, [0, 2])
-
-        def fake_claim(unit, main, worker, dry_run, **kw):
-            claims.save_registry(main, {unit: {"branch": claims.branch_for(unit),
-                                               "worktree": claims.worktree_for(unit, main)}})
-            return {"unit": unit, "branch": claims.branch_for(unit),
-                    "worktree": claims.worktree_for(unit, main)}
-
-        out = next_briefs(tmp, "w-wave", dry_run=False, count=3, claim_fn=fake_claim)
-        check("a short wave reports the shortfall rather than failing",
-              (out["requested"], out["claimed"], out["shortfall"]), (3, 2, 1))
-        check("... every claim carries its own spawn",
-              [c["unit"] for c in out["claims"]], [units[0], units[2]])
-        check("... and every spawn is a subagent call",
-              all(" claude --agent surveyor " in c["spawn"]["call"]
-                  for c in out["claims"]), True)
-        check("... claimed through the same path as a single pick",
-              units[2] in claims.load_registry(tmp), True)
-
-        # a full wave claims N proposals and nothing adjacent, on the untouched fixture
-        claims.save_registry(tmp, {})
-        dry3 = next_briefs(tmp, "w-wave", dry_run=True, count=3, claim_fn=fake_claim)
-        check("a dry-run wave claims nothing", (dry3["claimed"], claims.load_registry(tmp)), (3, {}))
-        check("... but returns every spawn the real wave would",
-              [c["unit"] for c in dry3["claims"]], [units[0], units[2], units[5]])
-        out = next_briefs(tmp, "w-wave", dry_run=False, count=3, claim_fn=fake_claim)
-        wave3 = [units.index(c["unit"]) for c in out["claims"]]
-        check("a full wave claims exactly N", (out["claimed"], out["shortfall"]), (3, 0))
-        check("... the three are the spread picks, non-adjacent", (wave3, adjacent(wave3)), ([0, 2, 5], False))
-        check("... and the addresses are the spaced ones",
-              [text_start(tmp, c["unit"]) for c in out["claims"]],
-              [0x80160000, 0x80160200, 0x80160500])
-        try:
-            next_briefs(tmp, None, dry_run=True, count=0)
-            check("a --count below 1 is refused", "no error", "SystemExit")
-        except SystemExit as exc:
-            check("a --count below 1 is refused", "at least 1" in str(exc), True)
-        try:
-            wave(tmp, 0)
-            check("... the selector refuses it too, so no caller can pass it through", "no error", "SystemExit")
-        except SystemExit as exc:
-            check("... the selector refuses it too, so no caller can pass it through", "at least 1" in str(exc), True)
-
-    # The pool is NOT the source of truth at claim time. `brief.py --pool` used to skip a brief that already
-    # existed, so a regenerated queue file re-cutting a range left every pre-existing pooled brief describing the
-    # OLD scope - and `queue.py next` copied it. `proposal/80119DEC` was handed `.text 0x80119DEC..0x8011A34C`
-    # (two functions) while the queue said `..0x8011D448` (thirty-seven). The claim path must render the
-    # current entry, and the stale pooled range must never appear in what the worker reads.
-    with claims.unitutil.temp_dir() as tmp:
-        os.makedirs(os.path.join(tmp, "src"))
-        os.makedirs(os.path.join(tmp, "tools", "units", "briefs", "pool"))
-        open(os.path.join(tmp, "configure.py"), "w").write("config.libs = [\n]\n")
-        claims.save_registry(tmp, {})
-        label = "proposal/80119DEC_fn_80119DEC.cpp"
-        pool_path = os.path.join(tmp, "tools", "units", "briefs", "pool", claims.slug(label) + ".md")
-        open(pool_path, "w", encoding="utf-8").write(
-            "# Proposal brief: %s\n\n"
-            "> **Pooled brief** - prepared by `brief.py --pool` before the claim.\n\n"
-            "| `.text` range | `0x80119DEC`-`0x8011A34C` (1376 bytes) |\n"
-            "| functions | 2 |\n" % label)
-        with open(brief.queue_path(tmp), "w", encoding="utf-8") as fh:
-            json.dump({"version": 1, "units": [{"label": label, "text": [0x80119DEC, 0x8011D448],
-                                                "count": 37, "bytes": 13916, "cxx": True,
-                                                "tu": {"verdict": "one-tu", "sources": ["eft029.cpp"],
-                                                       "partial_source": None, "open_seams": []}}]}, fh)
-
-        def fake_claim(unit, main, worker, dry_run, **kw):
-            claims.save_registry(main, {unit: {"branch": claims.branch_for(unit),
-                                               "worktree": claims.worktree_for(unit, main)}})
-            return {"unit": unit, "branch": claims.branch_for(unit),
-                    "worktree": claims.worktree_for(unit, main)}
-
-        check("the stale pool brief still selects the unit", next_entry(tmp)["unit"],
-              claims.norm_unit(label))
-        check("... and the pooled file really states the old range",
-              "0x8011A34C" in open(pool_path, encoding="utf-8").read(), True)
-        claimed = next_brief(tmp, "w-stale", dry_run=False, claim_fn=fake_claim)
-        rendered = open(claimed["brief"], encoding="utf-8").read()
-        check("the claim renders the CURRENT queue range", "0x8011D448" in rendered, True)
-        check("... and never the stale pooled range", "0x8011A34C" not in rendered, True)
-        check("... with the current function count", "| functions | 37 |" in rendered, True)
-        check("the stale pooled file is left untouched",
-              "0x8011A34C" in open(pool_path, encoding="utf-8").read(), True)
-
-    # an empty pool must refuse, not hand out a brief for a unit nobody prepared
-    with claims.unitutil.temp_dir() as empty:
-        os.makedirs(os.path.join(empty, "src"))
-        open(os.path.join(empty, "configure.py"), "w").write("config.libs = [\n]\n")
-        check("an empty pool has no ready brief", pool_state(empty)["ready"], [])
-        check("an empty pool has no next entry", next_entry(empty), None)
-        check("an empty pool has no wave", wave(empty, 3), [])
-        try:
-            next_brief(empty, None, dry_run=True)
-            check("an empty pool refuses to hand out a brief", "no error", "SystemExit")
-        except SystemExit as exc:
-            check("an empty pool refuses to hand out a brief", "no ready brief" in str(exc), True)
-        try:
-            next_briefs(empty, None, dry_run=True, count=3)
-            check("an empty pool refuses a wave", "no error", "SystemExit")
-        except SystemExit as exc:
-            check("an empty pool refuses a wave", "no ready brief" in str(exc), True)
-
-    # the claim is rooted at MAIN's HEAD: `queue.py next` must refuse when MAIN is not on `main`, or the
-    # worker's worktree and branch are cut from the wrong tip (the 2026-09-24 stale-`main` incident)
     def qgit(path, *args):
-        p = subprocess.run(["git", "-c", "user.email=selftest@example.invalid",
-                            "-c", "user.name=selftest", "-c", "commit.gpgsign=false", *args],
-                           cwd=path, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        p = subprocess.run(["git", "-c", "user.email=selftest@example.invalid", "-c", "user.name=selftest",
+                            "-c", "commit.gpgsign=false", *args], cwd=path, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace")
         if p.returncode != 0:
             raise RuntimeError("git %s: %s" % (" ".join(args), p.stderr.strip()))
         return p.stdout.strip()
 
-    with claims.unitutil.temp_dir() as tmp:
+    with unitutil.temp_dir() as tmp:
         repo = os.path.join(tmp, "mhtri-dtk")
-        os.makedirs(repo)
+        write(repo, "src/u/lo.c", "/* */\n")
+        write(repo, "src/u/hi.c", "/* */\n")
+        write(repo, "configure.py", 'config.libs = [{"lib": "u", "objects": [Object(NonMatching, "u/lo.c"), '
+                                    'Object(NonMatching, "u/hi.c")]}]\n')
+        write(repo, "config/RMHE08/splits.txt", "u/lo.c:\n\t.text       start:0x80100000 end:0x80100100\n\n"
+                                                "u/hi.c:\n\t.text       start:0x80200000 end:0x80200100\n")
         qgit(repo, "init", "-q")
         qgit(repo, "checkout", "-q", "-b", "main")
-        open(os.path.join(repo, "f.txt"), "w").write("base\n")
         qgit(repo, "add", "-A")
         qgit(repo, "commit", "-q", "-m", "claim-time main")
         check("a claim on main passes the branch guard", branch_error(repo), None)
+        qgit(repo, "branch", naming.branch_for("u/lo"))
+        check("a claim branch with no registry row is a held lock", next_entry(repo)["unit"], "u/hi")
+        qgit(repo, "branch", "-D", naming.branch_for("u/lo"))
+        check("... and a released one is ready again", next_entry(repo)["unit"], "u/lo")
         qgit(repo, "checkout", "-q", "-b", "throwaway-check")
         err = branch_error(repo)
-        check("a claim off main is refused", err is not None, True)
-        check("... the refusal names the branch it found", "throwaway-check" in (err or ""), True)
-        check("... and tells the caller to checkout main", "git checkout main" in (err or ""), True)
-        try:
-            next_brief(repo, None, dry_run=False)
-            check("queue next refuses off main", "no error", "SystemExit")
-        except SystemExit as exc:
-            check("queue next refuses off main", "throwaway-check" in str(exc), True)
-        check("... and claims nothing", os.path.exists(claims.registry_path(repo)), False)
+        check("a claim off main is refused, naming the branch", "throwaway-check" in (err or ""), True)
+        check("queue next refuses off main and claims nothing",
+              (_raises(lambda: next_brief(repo, None, dry_run=False)), os.path.exists(registry.registry_path(repo))),
+              (True, False))
 
-    # The claim lock is the BRANCH, not the registry: `claims.claim` refuses on the branch, so a claim whose
-    # registry entry was lost - a half-torn-down release, or two claims racing on `save_registry` - still owns
-    # its unit. Selection read only the registry and re-offered such a proposal, then `queue.py next` refused
-    # at the branch: the 2026-09-24 pool re-hand on the claim axis (the covered axis is `covered_by_registered`).
-    with claims.unitutil.temp_dir() as tmp:
-        repo = os.path.join(tmp, "mhtri-dtk")
-        os.makedirs(os.path.join(repo, "src"))
-        os.makedirs(os.path.join(repo, "tools", "units", "briefs", "pool"))
-        open(os.path.join(repo, "configure.py"), "w").write("config.libs = [\n]\n")
-        qgit(repo, "init", "-q")
-        qgit(repo, "checkout", "-q", "-b", "main")
-        claimed_label = "proposal/80100000_fn_80100000.cpp"   # lower address: what selection would offer first
-        fresh_label = "proposal/80200000_fn_80200000.cpp"
-        with open(brief.queue_path(repo), "w", encoding="utf-8") as fh:
-            json.dump({"version": 1, "units": [
-                {"label": claimed_label, "text": [0x80100000, 0x80100100], "count": 2, "bytes": 256,
-                 "cxx": False},
-                {"label": fresh_label, "text": [0x80200000, 0x80200100], "count": 2, "bytes": 256,
-                 "cxx": False},
-            ]}, fh)
-        for label in (claimed_label, fresh_label):
-            open(os.path.join(repo, "tools", "units", "briefs", "pool", claims.slug(label) + ".md"),
-                 "w", encoding="utf-8").write("# Proposal brief: %s\n" % label)
-        qgit(repo, "add", "-A")
-        qgit(repo, "commit", "-q", "-m", "pool-time main")
-        by_unit = {e["unit"]: e for e in pool_entries(repo)}
-        claimed_unit, fresh_unit = claims.norm_unit(claimed_label), claims.norm_unit(fresh_label)
-        check("a proposal with no claim is ready", state(repo, by_unit[claimed_unit]), "ready")
-        check("selection would offer it first", next_entry(repo)["unit"], claimed_unit)
-        # the branch is the claim (`claims.claim` made it) but the registry record is gone
-        qgit(repo, "branch", claims.branch_for(claimed_unit))
-        check("... the registry records no claim", brief.claim_for(repo, claimed_unit), {})
-        check("... but the branch is a held lock", claims.lock_held(repo, claimed_unit), True)
-        check("a live claim branch makes the proposal claimed", state(repo, by_unit[claimed_unit]), "claimed")
-        check("... and next_entry skips it for the fresh proposal", next_entry(repo)["unit"], fresh_unit)
-        check("... the branch is counted claimed", pool_state(repo)["counts"].get("claimed"), 1)
-        # releasing the claim (branch gone, registry empty) returns the proposal to the pool
-        qgit(repo, "branch", "-D", claims.branch_for(claimed_unit))
-        check("a released claim is ready again", state(repo, by_unit[claimed_unit]), "ready")
-        check("... and next_entry offers it first again", next_entry(repo)["unit"], claimed_unit)
-
-    # The owner's revised rule (2026-09-27): a credit ledger, not a hard refusal. A `done` earns 1 credit,
-    # a claim spends `ratio` (default 1), the register starts with 1. The first claim is handed out and
-    # recorded; the next is refused until a backlog item is resolved. `--ignore-backlog` is the deliberate
-    # override and spends nothing. `parked` earns nothing - parking removes a ghost, it does not buy a claim.
-    with claims.unitutil.temp_dir() as tmp:
-        os.makedirs(os.path.join(tmp, "src"))
-        os.makedirs(os.path.join(tmp, "tools", "units", "briefs", "pool"))
-        open(os.path.join(tmp, "configure.py"), "w").write("config.libs = [\n]\n")
-        claims.save_registry(tmp, {})
-        label = "proposal/80100000_fn_80100000.cpp"
-        with open(brief.queue_path(tmp), "w", encoding="utf-8") as fh:
-            json.dump({"version": 1, "units": [{"label": label, "text": [0x80100000, 0x80100100],
-                                                   "count": 2, "bytes": 256, "cxx": False}]}, fh)
-        open(os.path.join(tmp, "tools", "units", "briefs", "pool", claims.slug(label) + ".md"),
-             "w", encoding="utf-8").write("# Proposal brief: %s\n" % label)
-        # no outbox yet: the register is empty, so there is nothing to ration against and a claim flows
-        check("an empty backlog hands out a normal claim", next_brief(tmp, None, dry_run=True)["unit"],
-              claims.norm_unit(label))
-        # one open backlog item (a shared-file defect)
-        os.makedirs(os.path.join(tmp, ".pi", "outbox"))
-        with open(os.path.join(tmp, ".pi", "outbox", "lane.json"), "w", encoding="utf-8") as fh:
-            json.dump({"unit": "auto/x", "worker": "w1", "finished_at": "2026-09-01T00:00:00",
-                       "config_requests": [{"kind": "shared-file", "file": "include/unsplit/lobby.h",
-                                            "why": "the header's `s32 fn_80215C98(...)` has the wrong "
-                                                   "arity - every call site passes five arguments."}]}, fh)
-
-        def fake_claim(unit, main, worker, dry_run, **kw):
-            claims.save_registry(main, {unit: {"branch": claims.branch_for(unit),
-                                               "worktree": claims.worktree_for(unit, main)}})
-            return {"unit": unit, "branch": claims.branch_for(unit),
-                    "worktree": claims.worktree_for(unit, main)}
-
+    # the credit ledger (owner, 2026-09-27): a `done` earns 1, a claim spends `ratio`; --ignore-backlog spends none
+    with unitutil.temp_dir() as tmp:
+        write(tmp, "src/u/one.c", "/* */\n")
+        write(tmp, "configure.py", 'config.libs = [{"lib": "u", "objects": [Object(NonMatching, "u/one.c")]}]\n')
+        write(tmp, "config/RMHE08/splits.txt", "u/one.c:\n\t.text       start:0x80100000 end:0x80100100\n")
+        check("an empty backlog hands out a normal claim", next_brief(tmp, None, dry_run=True)["unit"], "u/one")
+        write(tmp, ".pi/outbox/lane.json", json.dumps(
+            {"unit": "auto/x", "worker": "w1", "finished_at": "2026-09-01T00:00:00",
+             "config_requests": [{"kind": "shared-file", "file": "include/unsplit/lobby.h",
+                                  "why": "the header's `s32 fn_80215C98(...)` has the wrong arity - every call "
+                                         "site passes five arguments."}]}))
         items_before, _ = backlog.build(tmp)
         check("the ledger starts at 1 credit", backlog.ledger_summary(items_before, [])["balance"], 1)
-        check("no claims are recorded yet", backlog.load_ledger(tmp)["claims"], [])
-        # PATH 1: balance >= 1 -> the claim is handed out AND recorded
         over = next_brief(tmp, "w-led", dry_run=False, claim_fn=fake_claim)
-        check("balance >= 1 hands out the claim", over["unit"], claims.norm_unit(label))
-        check("... and records exactly one claim in the ledger", len(backlog.load_ledger(tmp)["claims"]), 1)
-        check("... the recorded claim names the unit", backlog.load_ledger(tmp)["claims"][0]["unit"],
-              claims.norm_unit(label))
-        items_after, _ = backlog.build(tmp)
-        check("... and the balance is spent to 0",
-              backlog.ledger_summary(items_after, backlog.load_ledger(tmp)["claims"])["balance"], 0)
-        # PATH 2: balance 0 -> refused, naming the top item and printing the rule
+        check("balance >= 1 hands out the claim and records it",
+              (over["unit"], [c["unit"] for c in backlog.load_ledger(tmp)["claims"]]), ("u/one", ["u/one"]))
+        registry.save(tmp, {})
         try:
             next_brief(tmp, None, dry_run=True)
             check("balance 0 refuses the next claim", "no error", "SystemExit")
         except SystemExit as exc:
             msg = str(exc)
-            check("balance 0 refuses the next claim", "REFUSED queue next" in msg, True)
-            check("... shows the balance and its derivation",
-                  "balance is 0" in msg and "earns 1 credit" in msg, True)
-            check("... names the top backlog item", "include/unsplit/lobby.h" in msg, True)
-            check("... carries a paste-ready lane", "claude --agent" in msg, True)
-            check("... and says parked earns no credit", "`parked` earns no credit" in msg, True)
-        # PATH 3: --ignore-backlog -> handed out WITHOUT spending (release the unit PATH 1 claimed)
-        claims.save_registry(tmp, {})
+            check("balance 0 refuses, naming the balance, the top item and a paste-ready lane",
+                  ("REFUSED queue next" in msg, "balance is 0" in msg, "include/unsplit/lobby.h" in msg,
+                   "claude --agent" in msg), (True, True, True, True))
         over2 = next_brief(tmp, "w-ignore", dry_run=False, claim_fn=fake_claim, ignore_backlog=True)
-        check("--ignore-backlog hands out the claim", over2["unit"], claims.norm_unit(label))
-        check("... and spends nothing (the ledger is unchanged)",
-              len(backlog.load_ledger(tmp)["claims"]), 1)
-        # a `parked` item earns no credit; a resolved `done` does
-        item_key = [i.key for i in items_after if i.kind == "shared-file"][0]
-        parked_statuses = {item_key: "parked"}
-        parked_items = backlog.build_items(backlog.outbox_dir(tmp), backlog.notes_dir(tmp),
-                                           backlog.tooling_register_path(tmp), parked_statuses)
-        check("a parked item earns no credit", backlog.ledger_earned(parked_items), 0)
-        done_statuses = {item_key: "done"}
-        done_items = backlog.build_items(backlog.outbox_dir(tmp), backlog.notes_dir(tmp),
-                                         backlog.tooling_register_path(tmp), done_statuses)
-        check("a resolved `done` earns 1 credit", backlog.ledger_earned(done_items), 1)
-        # --ratio 2: one claim costs two credits, so the base 1 alone is not enough
-        os.remove(backlog.register_path(tmp))
-        try:
-            next_brief(tmp, None, dry_run=True, ratio=2)
-            check("--ratio 2 refuses when the balance is 1", "no error", "SystemExit")
-        except SystemExit as exc:
-            check("--ratio 2 refuses when the balance is 1", "needs 2 credit(s)" in str(exc), True)
-        check("... one resolution buys one credit (balance 2, so ratio 2 now covers)",
-              backlog.ledger_summary(done_items, [])["balance"], 2)
-        # the wave path is guarded the same way and `--ignore-backlog` still spends nothing
-        claims.save_registry(tmp, {})
-        wave_out = next_briefs(tmp, None, dry_run=False, count=1, ignore_backlog=True,
-                               claim_fn=fake_claim)
-        check("a wave with --ignore-backlog hands out without spending", wave_out["claimed"], 1)
-        check("... and leaves the ledger untouched", backlog.load_ledger(tmp)["claims"], [])
+        check("--ignore-backlog hands out the claim and spends nothing",
+              (over2["unit"], len(backlog.load_ledger(tmp)["claims"])), ("u/one", 1))
 
-    # The debt itself is claimable (`queue.py debt`): a naming/band-header item is handed to a lane exactly
-    # like a unit proposal - the same `claims.claim` worktree/branch lock (held on the item's file), the same
-    # credit balance - so the paydown is scheduled work instead of something a lane does incidentally.  One
-    # resolved item still earns exactly one credit.
-    with claims.unitutil.temp_dir() as tmp:
+    # the debt itself is claimable (`queue.py debt`), on the same lock and the same currency
+    with unitutil.temp_dir() as tmp:
         for sub in ("src/mod", "config/RMHE08", ".pi/outbox", ".pi/notes"):
             os.makedirs(os.path.join(tmp, sub), exist_ok=True)
-        open(os.path.join(tmp, "configure.py"), "w", encoding="utf-8").write("config.libs = [\n]\n")
-        for cfg in ("symbols.txt", "splits.txt"):
-            open(os.path.join(tmp, "config", "RMHE08", cfg), "w", encoding="utf-8").write("")
-        open(os.path.join(tmp, "src", "mod", "debt.c"), "w", encoding="utf-8").write(
-            "void fn_80040598(void) {}\nvoid fn_80040599(void) {}\nvoid fn_8004059A(void) {}\n")
-
-        def fake_claim_debt(unit, main, worker, dry_run, **kw):
-            claims.save_registry(main, {unit: {"branch": claims.branch_for(unit),
-                                               "worktree": claims.worktree_for(unit, main)}})
-            return {"unit": unit, "branch": claims.branch_for(unit),
-                    "worktree": claims.worktree_for(unit, main)}
-
+        write(tmp, "configure.py", "config.libs = [\n]\n")
+        write(tmp, "config/RMHE08/symbols.txt", "")
+        write(tmp, "config/RMHE08/splits.txt", "")
+        write(tmp, "src/mod/debt.c", "void fn_80040598(void) {}\nvoid fn_80040599(void) {}\nvoid fn_8004059A(void) {}\n")
         debt_items = backlog.open_debt_items(tmp)
-        check("the register offers a naming debt item to claim",
-              [(i.kind, i.target, i.weight) for i in debt_items],
+        check("the register offers a naming debt item to claim", [(i.kind, i.target, i.weight) for i in debt_items],
               [("naming", "src/mod/debt.c", 3)])
         before = backlog.build(tmp)[1]["summary"]["balance"]
-        out = next_debt_brief(tmp, "w-debt", dry_run=False, claim_fn=fake_claim_debt, slots_mode=False)
-        check("the queue hands out the debt item", (out["kind"], out["target"]),
-              ("naming", "src/mod/debt.c"))
-        check("... with its distinct name list as the brief", sorted(out["names"]),
-              ["fn_80040598", "fn_80040599", "fn_8004059A"])
-        check("... and the task is `clean the N names in this file`",
-              "clean the 3 distinct name(s) in `src/mod/debt.c`" in out["spawn"]["task"], True)
-        check("... the claim is held on the item's file", out["unit"], "src/mod/debt.c")
-        check("... the balance moves by exactly one",
-              before - backlog.build(tmp)[1]["summary"]["balance"], 1)
-        check("... exactly one claim is recorded", len(backlog.load_ledger(tmp)["claims"]), 1)
-        check("... and it is the debt claim", backlog.load_ledger(tmp)["claims"][0]["kind"], "debt")
-        # a claimed debt item is not handed out twice (the file's claim lock is the one a unit uses);
-        # `--ignore-backlog` bypasses the (now spent) credit gate so the skip is what is proved.
-        try:
-            next_debt_brief(tmp, None, dry_run=True, slots_mode=False, ignore_backlog=True)
-            check("a claimed debt item is not re-offered", "no error", "SystemExit")
-        except SystemExit as exc:
-            check("a claimed debt item is not re-offered", "no claimable debt" in str(exc), True)
-        # one resolved debt item earns exactly one credit (the same currency as every other item)
-        done_items = backlog.build_items(backlog.outbox_dir(tmp), backlog.notes_dir(tmp),
-                                         backlog.tooling_register_path(tmp),
-                                         {debt_items[0].key: "done"},
-                                         lint_items=backlog.collect_lint_items(tmp))
-        check("a resolved debt item earns exactly one credit", backlog.ledger_earned(done_items), 1)
-        # a dry run claims nothing and spends nothing
-        claims.save_registry(tmp, {})
-        dry = next_debt_brief(tmp, None, dry_run=True, slots_mode=False, ignore_backlog=True)
-        check("a dry run claims no debt", (dry["dry_run"], dry["claim"].get("dry_run")), (True, True))
-        check("... and spends nothing", len(backlog.load_ledger(tmp)["claims"]), 1)
+        out = next_debt_brief(tmp, "w-debt", dry_run=False, claim_fn=fake_claim, slots_mode=False)
+        check("the queue hands out the debt item with its names and task",
+              ((out["kind"], out["target"]), sorted(out["names"]), out["unit"],
+               "clean the 3 distinct name(s) in `src/mod/debt.c`" in out["spawn"]["task"]),
+              (("naming", "src/mod/debt.c"), ["fn_80040598", "fn_80040599", "fn_8004059A"], "src/mod/debt.c", True))
+        check("... spending exactly one credit, recorded as debt",
+              (before - backlog.build(tmp)[1]["summary"]["balance"], backlog.load_ledger(tmp)["claims"][0]["kind"]),
+              (1, "debt"))
+        check("a claimed debt item is not re-offered",
+              _raises(lambda: next_debt_brief(tmp, None, dry_run=True, slots_mode=False, ignore_backlog=True)), True)
 
     if fails:
         print("FAIL (%d)" % len(fails))
@@ -1395,50 +782,53 @@ def selftest() -> int:
     return 0
 
 
+# --- CLI ----------------------------------------------------------------------------------------------------------
+
+def _print_spawn(sp: dict) -> None:
+    print("spawn this worker:")
+    print("  agent: %s" % sp["agent"])
+    print("  label: %s  (the tool takes no name)" % sp["name"])
+    print("  cwd:   %s" % sp["cwd"])
+    print("  task:  %s" % sp["task"])
+    print("\n%s" % sp["call"])
+
+
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
     ap.add_argument("--selftest", action="store_true")
     sub = ap.add_subparsers(dest="cmd")
-    n = sub.add_parser("next", help="claim the next ready unit, promote its brief, print the spawn")
+    n = sub.add_parser("next", help="claim the next ready unit (or a cluster), render its brief, print the spawn")
     n.add_argument("--count", type=int, default=1,
-                   help="claim a wave of N proposals spread with a stride of N through the address order"
-                        " (default 1 - the single next proposal)")
+                   help="claim up to N lanes at once, no two sharing an owner header or a module (default 1)")
+    n.add_argument("--cluster", default=None, metavar="MODULE|HEADER",
+                   help="claim ONE lane for every ready unit of a module (`Network`) or of a header's include "
+                        "closure (`include/Network/net.h`)")
     n.add_argument("--worker", default=None)
     n.add_argument("--kind", default="unit",
-                   help="the lane kind; the agent profile comes from it via `slots.profile_for_kind` - "
-                        "`unit`->surveyor (a fresh claim is surveyed first, then reconstructed - the four-leg loop unit), "
-                        "`fix`->fixer, `merge`->merger, `tooling`/`docs`->worker, `review`->codereviewer, "
-                        "`scout`/`plan` read-only. An unknown kind is refused with the list (default: unit)")
+                   help="the lane kind -> agent profile (`unit`->surveyor, `fix`->fixer, `merge`->merger, "
+                        "`tooling`/`docs`->worker, `review`->codereviewer, `scout`/`plan` read-only; default unit)")
     n.add_argument("--profile", default=None, choices=_profiles(),
-                   help="override the agent profile the lane is launched with (default: derived from "
-                        "--kind, so a tooling lane is launched as `worker` and not as `decompiler`; an "
-                        "unknown profile is refused with the list of real ones)")
+                   help="override the agent profile the lane is launched with (default: derived from --kind)")
     n.add_argument("--dry-run", action="store_true")
     n.add_argument("--allow-unlanded", action="append", default=[], metavar="BRANCH",
-                   help="name a branch that is parked on purpose, so the unlanded-branch guard lets it "
-                        "through (repeatable; default is to refuse while any branch holds work main lacks)")
+                   help="name a branch that is parked on purpose, so the unlanded-branch guard lets it through")
     n.add_argument("--ignore-backlog", action="store_true",
-                   help="hand out a proposal even when the backlog credit balance does not cover it, without "
-                        "spending a credit - the deliberate override (a ratio of `done : claim` is the default)")
+                   help="hand out a claim even when the backlog credit balance does not cover it, without spending")
     n.add_argument("--no-slots", action="store_true",
-                   help="construct throwaway worktrees instead of taking from the reusable slot pool "
-                        "(the pre-pool path)")
+                   help="construct throwaway worktrees instead of taking from the reusable slot pool")
     n.add_argument("--ratio", type=int, default=backlog.RATIO_DEFAULT,
-                   help="credits one claim spends - K backlog items per claim (default 1: one resolved "
-                        "`done` buys one claim)")
+                   help="credits one claim spends (default 1: one resolved `done` buys one claim)")
     n.add_argument("--json", action="store_true")
-    l = sub.add_parser("list", help="the pool's state and the next ready candidates")
-    l.add_argument("--json", action="store_true")
+    lp = sub.add_parser("list", help="the registered units' state and the next ready candidates")
+    lp.add_argument("--json", action="store_true")
     d = sub.add_parser("debt", help="claim the top naming/band-header backlog item (clean its names)")
     d.add_argument("--worker", default=None)
     d.add_argument("--dry-run", action="store_true")
     d.add_argument("--ignore-backlog", action="store_true",
-                   help="hand out the debt even when the credit balance does not cover it, without "
-                        "spending a credit - the deliberate override")
+                   help="hand out the debt even when the credit balance does not cover it, without spending")
     d.add_argument("--no-slots", action="store_true",
                    help="construct a throwaway worktree instead of taking from the reusable slot pool")
-    d.add_argument("--ratio", type=int, default=backlog.RATIO_DEFAULT,
-                   help="credits the debt claim spends (default 1: one resolved item buys one claim)")
+    d.add_argument("--ratio", type=int, default=backlog.RATIO_DEFAULT, help="credits the debt claim spends")
     d.add_argument("--json", action="store_true")
     args = ap.parse_args()
 
@@ -1448,7 +838,7 @@ def main() -> int:
         ap.print_help()
         return 0
 
-    main_wt = rc.main_root(rc.worktree_root())
+    main_wt = registry.main_of()
     if args.cmd == "list":
         st = pool_state(main_wt)
         if args.json:
@@ -1456,12 +846,12 @@ def main() -> int:
                               "next": [e["unit"] for e in st["ready"][:POOL_DEPTH]]}, indent=2))
             return 0
         c = st["counts"]
-        print("pool %s" % st["dir"])
-        print("  briefs written : %d" % len(st["entries"]))
-        print("  ready          : %d  (unclaimed, no bodies)" % c.get("ready", 0))
-        print("  claimed        : %d  (in flight)" % c.get("claimed", 0))
-        print("  written        : %d  (unit has a body - prune with `brief.py --pool`)" % c.get("written", 0))
-        print("  stale          : %d  (no longer registered - prune with `brief.py --pool`)" % c.get("stale", 0))
+        print("queue: the registered units of %s" % os.path.join(main_wt, "configure.py"))
+        print("  registered     : %d" % len(st["entries"]))
+        print("  ready          : %d  (not Matching, unclaimed)" % c.get("ready", 0))
+        print("  claimed        : %d  (in flight, alone or in a cluster)" % c.get("claimed", 0))
+        print("  matching       : %d  (done - never handed out)" % c.get("matching", 0))
+        print("  nosource       : %d  (registered with no source file)" % c.get("nosource", 0))
         un = unlanded_branches(main_wt)
         if un:
             print("  unlanded       : %d branch(es) hold work main does not have - `next` refuses until they "
@@ -1470,90 +860,84 @@ def main() -> int:
                 print("      %s (%s)" % (branch, ", ".join("%s +%d" % (f, n) for f, n in files[:3])))
         else:
             print("  unlanded       : none - every branch's content is contained in main")
-        print("  covered        : %d  (range already registered under another name)" % c.get("covered", 0))
-        print("  unreadable     : %d" % c.get("unreadable", 0))
         if st["ready"]:
             print("\nnext %d ready (address order):" % min(POOL_DEPTH, len(st["ready"])))
             for e in st["ready"][:POOL_DEPTH]:
                 start = text_start(main_wt, e["unit"])
-                print("  %-10s  %-42s  %s" % ("0x%X" % start if start is not None else "?", e["unit"], e["slug"]))
+                print("  %-10s  %s" % ("0x%X" % start if start is not None else "?", e["unit"]))
         else:
-            print("\nno ready brief - run `python tools/units/brief.py --pool`")
+            print("\nno ready unit - every registered unit is Matching or claimed")
         return 0
 
     if args.cmd == "debt":
-        out = next_debt_brief(main_wt, args.worker, args.dry_run,
-                              ratio=args.ratio, ignore_backlog=args.ignore_backlog,
-                              slots_mode=(False if args.no_slots else None))
+        out = next_debt_brief(main_wt, args.worker, args.dry_run, ratio=args.ratio,
+                              ignore_backlog=args.ignore_backlog, slots_mode=(False if args.no_slots else None))
         if args.json:
             print(json.dumps(out, indent=2))
             return 0
-        sp = out["spawn"]
         if out["dry_run"]:
             print("DRY RUN - nothing claimed, nothing written\n")
         else:
             print("claimed debt %s (%s %s: %d name(s))\n  branch   %s\n  worktree %s\n  brief    %s\n"
                   % (out["item"], out["kind"], out["target"], len(out["names"]),
                      out["claim"].get("branch"), out["worktree"], out["brief"]))
-        print("spawn this worker:")
-        print("  agent: %s" % sp["agent"])
-        print("  label: %s  (the tool takes no name)" % sp["name"])
-        print("  cwd:   %s" % sp["cwd"])
-        print("  task:  %s" % sp["task"])
-        print("\n%s" % sp["call"])
+        _print_spawn(out["spawn"])
         return 0
 
     if args.cmd == "next":
+        common = dict(kind=args.kind, profile=args.profile, allow_unlanded=args.allow_unlanded,
+                      ignore_backlog=args.ignore_backlog, ratio=args.ratio,
+                      slots_mode=(False if args.no_slots else None))
+        if args.cluster and args.count != 1:
+            print("--cluster claims one lane for the whole cluster; --count does not apply")
+            return 2
+        if args.cluster:
+            out = next_cluster(main_wt, args.cluster, args.worker, args.dry_run, **common)
+            if args.json:
+                print(json.dumps(out, indent=2))
+                return 0
+            if out["dry_run"]:
+                print("DRY RUN - nothing claimed, nothing written\n")
+            print("cluster %s: %d unit(s) (%s)\n  %s" % (out["unit"], len(out["units"]), out["reason"],
+                                                       "\n  ".join(out["units"])))
+            if not out["dry_run"]:
+                print("  branch   %s\n  worktree %s\n  brief    %s\n" % (out["claim"].get("branch"), out["worktree"],
+                                                                      out["brief"]))
+            _print_spawn(out["spawn"])
+            return 0
         if args.count != 1:
-            out = next_briefs(main_wt, args.worker, args.dry_run, args.count, kind=args.kind,
-                              profile=args.profile,
-                              allow_unlanded=args.allow_unlanded, ignore_backlog=args.ignore_backlog,
-                              ratio=args.ratio, slots_mode=(False if args.no_slots else None))
+            out = next_briefs(main_wt, args.worker, args.dry_run, args.count, **common)
             if args.json:
                 print(json.dumps(out, indent=2))
                 return 0
             if out["dry_run"]:
                 print("DRY RUN - nothing claimed, nothing written\n")
             else:
-                print("claimed %d of %d proposals (stride %d through the address order):\n"
-                      % (out["claimed"], out["requested"], out["requested"]))
+                print("claimed %d of %d lane(s) (no two share an owner header or a module):\n"
+                      % (out["claimed"], out["requested"]))
             for i, c in enumerate(out["claims"], 1):
                 start = text_start(main_wt, c["unit"])
-                print("--- %d/%d  %s  %s"
-                      % (i, out["claimed"], "0x%X" % start if start is not None else "?", c["unit"]))
+                print("--- %d/%d  %s  %s" % (i, out["claimed"], "0x%X" % start if start is not None else "?", c["unit"]))
                 if not c["dry_run"]:
-                    print("  branch   %s\n  worktree %s\n  brief    %s"
-                          % (c["claim"].get("branch"), c["worktree"], c["brief"]))
-                sp = c["spawn"]
-                print("spawn this worker:")
-                print("  agent: %s" % sp["agent"])
-                print("  label: %s  (the tool takes no name)" % sp["name"])
-                print("  cwd:   %s" % sp["cwd"])
-                print("  task:  %s" % sp["task"])
-                print("\n%s\n" % sp["call"])
+                    print("  branch   %s\n  worktree %s\n  brief    %s" % (c["claim"].get("branch"), c["worktree"],
+                                                                         c["brief"]))
+                _print_spawn(c["spawn"])
+                print()
             if out["shortfall"]:
-                print("NOTE: claimed %d of the %d requested - the rest of the queue was not ready, or sat"
-                      " next to a claim already in this wave; `python tools/units/brief.py --pool`"
-                      " replenishes it" % (out["claimed"], out["requested"]))
+                print("NOTE: claimed %d of the %d requested - the other ready units share an owner header or a "
+                      "module with a lane in this wave; `--cluster <module|header>` gives them one lane"
+                      % (out["claimed"], out["requested"]))
             return 0
-        out = next_brief(main_wt, args.worker, args.dry_run, kind=args.kind, profile=args.profile,
-                         allow_unlanded=args.allow_unlanded, ignore_backlog=args.ignore_backlog,
-                         ratio=args.ratio, slots_mode=(False if args.no_slots else None))
+        out = next_brief(main_wt, args.worker, args.dry_run, **common)
         if args.json:
             print(json.dumps(out, indent=2))
             return 0
-        sp = out["spawn"]
         if out["dry_run"]:
             print("DRY RUN - nothing claimed, nothing written\n")
         else:
             print("claimed %s\n  branch   %s\n  worktree %s\n  brief    %s\n"
                   % (out["unit"], out["claim"].get("branch"), out["worktree"], out["brief"]))
-        print("spawn this worker:")
-        print("  agent: %s" % sp["agent"])
-        print("  label: %s  (the tool takes no name)" % sp["name"])
-        print("  cwd:   %s" % sp["cwd"])
-        print("  task:  %s" % sp["task"])
-        print("\n%s" % sp["call"])
+        _print_spawn(out["spawn"])
         return 0
     return 0
 

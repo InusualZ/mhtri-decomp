@@ -76,7 +76,14 @@ The entries below are the evidence and history that were kept; `tools/splits/gen
 * **`claims.py`'s herdr pane probing** (`herdr_exe`, `herdr_panes`, `herdr_read`, `herdr_close`, `resolve_pane`, `panes_for_claim`,
   `pane_probe`, the `--pane` flag; 50 references). Evidence: the pi harness and its pane tool were replaced by Claude Code on
   2026-09-29; live lanes are read from `~/.claude/sessions` (`slots.live_runs`). History: "a pane whose content moves is a worker
-  that is alive, whatever its ack file says" becomes "a session whose pid is alive" in `lib.lanes.registry.live_runs`.
+  that is alive, whatever its ack file says" becomes "a session whose pid is alive" in `lib.lanes.sessions.live_runs`. **Deleted
+  in WP3e** (owner: delete, no attic): `status`/`timeout`/`release` read `lib.lanes.sessions`, the brief's ack line lost `--pane`.
+* **`queue.py`'s and `brief.py`'s proposal/attribution paths** (71 + 145 references: `attribution-queue.json`, `proposals`,
+  `proposal_by_label`, `covered_by_registered`, `is_proposal`, `render_proposal`, the TU/data/pool seam notes, the
+  `stale`/`covered`/`written` states) and the **`--count` address stride** (`spread_picks`, `system_hints`). Deleted in WP3e
+  (owner, 2026-10-04, `docs/pipeline.md` 10.10): the registered units are the queue (not-`Matching`), `--count N` claims lanes
+  that share no owner header or module, and `--cluster <module|header>` gives header-sharing units one lane.
+  `tools/units/queue_selftest.py` (a delegator to `queue.py --selftest`) went with them.
 * **`MAIN/.pi/bin/applybranch.sh`, `landbranch.sh`, `mergelane.py`, `union.py`** (untracked) - deleted by the orchestrator (question 2 ruled); the tracked mentions went with `agents/policy: name land.py land --branch as the one landing path and retire the tiler lines`, `agents/merger: point the registration union at land.py resolve`, `docs/pipeline: name land.py land --branch in the plan, pipeline and profile-test docs` and `tools/units: drop the .pi/bin script mentions from the land, unionguard and unionresolve prose`. Evidence:
   `land.py land --branch` + `resolve` + `unionresolve` are the tracked implementation (its docstring says so); the scripts still end
   in `git add -A` (the sweep that bit twice) and reference `AGENTS.md`. Replacement: `land.py`; `CLAUDE.md` step 3 rewritten.

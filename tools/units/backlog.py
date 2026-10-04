@@ -138,7 +138,7 @@ TOOLS = os.path.dirname(HERE)
 if TOOLS not in sys.path:
     sys.path.insert(0, TOOLS)
 
-from units import lanecmd  # noqa: E402
+from tools.lib.lanes import launch as lanecmd  # noqa: E402  (the launch line)
 from tools.lib import project as _project  # noqa: E402  (the configure / splits readers)
 from units import tooling as tg  # noqa: E402  (the second source: its register is read, not rebuilt)
 from tools.lib import outbox as _outbox  # noqa: E402 (the outbox schema: FREE_TEXT_FIELDS is one definition)

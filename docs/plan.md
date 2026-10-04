@@ -18,8 +18,8 @@ its final home, by the worker that works it (§12).
 > **Status 2026-10-03.** The splits program is finished (`docs/splits-program.md`): `splits.txt` cuts the whole DOL into
 > registered units (354) with no unclaimed `.text`, and the bulk tiler (`attribute.py`), its proposal queue and the
 > `.pi/bin/*` landing scripts are retired (`docs/tools/retired.md`). Passages below that name `attribute.py`, a
-> "proposal" or the "attribute" step are the history of how units were first registered; today the pool is the registered
-> body-less units (`brief.py --pool`) and the only landing path is `land.py land --branch`.
+> "proposal" or the "attribute" step are the history of how units were first registered; today the queue is the registered
+> units that are not `Matching` (`queue.py list`) and the only landing path is `land.py land --branch`.
 
 ---
 
@@ -409,7 +409,8 @@ them are **project** profiles, tracked in `.claude/agents/`; the rest are the gl
 | **`codereviewer`** | a *style/convention review* of decompiled code: the match claim's honesty, naming (rule 7), placement (rule 2), types (rules 3-6/9/11), comments, codegen-adjacent hygiene. Read-only by construction - its tool list has no `write`/`edit` - and it reports ranked, evidence-backed findings instead of diffs | after a module's pass, before a flip campaign, or when a band's debt needs a scope statement |
 | `worker` | the generic lane: anything that is none of the above | the fallback, and the only profile the older rounds used |
 | `scout`, `planner`, `reviewer` | read-only recon, planning, independent review | before a batch, or when a plan/review is the deliverable |
-python tools/units/queue.py next --count 8            # agent: "decompiler" for every proposal lane
+python tools/units/queue.py next --count 6            # six lanes, no two sharing an owner header or a module
+python tools/units/queue.py next --cluster Network    # one lane for every ready unit of a module (or a header)
 python tools/units/queue.py next --profile fixer      # a repair lane
 The profile decides which rules the lane is held to (its isolation, its evidence file, the style rules it
 knows), so this is not a cosmetic choice - and the orchestrator, not the worker, chooses it.
@@ -1039,8 +1040,8 @@ and when a slot frees, prefer a new unit, a new symbol or the next attribution b
 The 11 units that *are* flipped: `Runtime.PPCEABI.H/{__start,__ppc_eabi_init,global_destructor_chain,__init_cpp_exceptions,memcpy,memset}`,
 `g3d/g3d_resanmamblight`, `Network/NetworkWiiMediator`, `OS/OSAlarm`, `lobby/lobby_scene`, `Pl/pl_master`.
 
-**The breadth queue is the pool** (§12, "Register once, at the final home"): the registered body-less units
-(`brief.py --pool`) that no worker has taken. They have no score, so they are not parked rows - a unit joins this
+**The breadth queue is the pool** (§12, "Register once, at the final home"): the registered units that are not
+`Matching` and that no worker has taken (`queue.py list`; until 2026-10-04 only the body-less ones). They have no score, so they are not parked rows - a unit joins this
 table only once a worker has measured it.
 
 ### The breadth blocker: rule 7 versus a unit with no bodies yet (owner, 2026-09-24)

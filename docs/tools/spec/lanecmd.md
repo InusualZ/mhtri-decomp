@@ -8,7 +8,7 @@ lanecmd.py - the one place a campaign lane's launch command is built.
 
 ## Users
 
-CLAUDE.md (1); docs (5); imported by `backlog`, `queue`, `slots`
+CLAUDE.md (1); docs (5); a re-export of `lib.lanes.launch` (`backlog`, `queue` and `slots` import the lib directly since WP3e)
 
 ## CLI
 
@@ -33,8 +33,7 @@ lanes.launch.
 ## Test contract
 
 Tier: fixture.
-Today's selftest: in-file `selftest()` (`--selftest`).
-Target: `tools/tests/units/test_lanecmd.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
+`tools/tests/units/test_lanecmd.py` (`--selftest` forwards to it).
 
 ## Known gaps
 

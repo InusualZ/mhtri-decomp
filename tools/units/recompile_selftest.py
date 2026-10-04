@@ -767,7 +767,7 @@ def _fresh_shape(tmp):
 
     A real `git worktree add` writes every tracked file at checkout time while `build/` is seeded from MAIN
     with `copy2` (mtimes preserved), so `config.json`/`build.ninja` are *older* than the map and the split
-    inputs - measured on this host, not assumed.  `claims._build_is_current(wt, wt)` is therefore False in
+    inputs - measured on this host, not assumed.  `seed.build_is_current(wt, wt)` is therefore False in
     **every** fresh worktree, which is why the mtime evidence alone cannot be the refusal.
     """
     main = _fake_main(tmp)
@@ -808,14 +808,14 @@ def split_staleness_rows() -> int:
     uncommitted-edit test is what tells the two apart.
     """
     failures = 0
-    claims = rc._claims()
+    seed = rc._seed()
     with tempfile.TemporaryDirectory() as tmp:
         main, wt = _fresh_shape(tmp)
         cfg = os.path.join(wt, "build", "RMHE08", "config.json")
 
         # the measured shape: the reused seeder guard says "not current" for a *fresh* worktree
         failures = _ok("a fresh worktree's split is not `current` per the seeder guard",
-                       claims._build_is_current(wt, wt), False, failures)
+                       seed.build_is_current(wt, wt), False, failures)
         failures = _ok("... but with no uncommitted edit it is not `stale`, so the common case measures",
                        rc.split_staleness(wt, main, dirty=lambda w, r: False), (False, []), failures)
         failures = _ok("... and the CLI gate lets it through",
@@ -851,7 +851,7 @@ def split_staleness_rows() -> int:
         os.utime(cfg, (now, now))
         failures = _ok("a re-split clears the refusal",
                        rc.split_staleness(wt, main, dirty=lambda w, r: True), (False, []), failures)
-        failures = _ok("... and the seeder guard agrees", claims._build_is_current(wt, wt), True, failures)
+        failures = _ok("... and the seeder guard agrees", seed.build_is_current(wt, wt), True, failures)
         old = time.time() - 3600
         os.utime(cfg, (old, old))
 
@@ -893,16 +893,16 @@ def split_staleness_rows() -> int:
                        ["git", "-C", wt, "diff", "--quiet", "HEAD", "--", "config/RMHE08/splits.txt"]
                        in seen, True, failures)
 
-        # every input this module names must be one `claims._build_is_current` reacts to, or the refusal
+        # every input this module names must be one `lib.lanes.seed.build_is_current` reacts to, or the refusal
         # message silently loses a file the day the seeder's list grows
         os.utime(cfg, (time.time() + 5, time.time() + 5))
-        failures = _ok("the fixture starts current", claims._build_is_current(wt, wt), True, failures)
+        failures = _ok("the fixture starts current", seed.build_is_current(wt, wt), True, failures)
         for rel in rc.SPLIT_INPUTS:
             p = os.path.join(wt, *rel.replace("/", os.sep).split(os.sep))
             before = os.stat(p).st_mtime
             future = time.time() + 60
             os.utime(p, (future, future))
-            failures = _ok("claims reacts to %s" % rel, claims._build_is_current(wt, wt), False, failures)
+            failures = _ok("claims reacts to %s" % rel, seed.build_is_current(wt, wt), False, failures)
             os.utime(p, (before, before))
     return failures
 

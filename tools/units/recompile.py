@@ -220,7 +220,7 @@ target_rel = _units.target_rel
 # The invocation tree's split must postdate the tree's own map/splits/DOL, or every object it holds
 # (and MAIN's for the same range) is the previous build's.
 # ---------------------------------------------------------------------------------------------------
-# The inputs dtk's split reads.  Kept in step with `claims._build_is_current` (the seeder's own guard,
+# The inputs dtk's split reads.  Kept in step with `lib.lanes.seed.build_is_current` (the seeder's own guard,
 # which `slots.verify` uses) - the selftest asserts claims reacts to each of them, so a change there that is
 # not mirrored here is caught rather than silently leaving the refusal message short one file.  Relative
 # paths, so the same tuple reads both roots.
@@ -234,10 +234,10 @@ SPLIT_INPUTS = (os.path.join("config", "RMHE08", "config.yml"),
 STALE_SPLIT_FLAG = "--allow-stale-split"
 
 
-def _claims():
-    """`claims` imported late: it imports this module at import time, so a top-level import would cycle."""
-    from tools.units import claims
-    return claims
+def _seed():
+    """The seeder's staleness guard (`lib.lanes.seed.build_is_current`), imported where it is used."""
+    from tools.lib.lanes import seed
+    return seed
 
 
 def git_dirty(wt: str, rel: str, runner=subprocess.run) -> bool:
@@ -263,7 +263,7 @@ def split_staleness(wt: str, main: str, dirty=None):
 
     1. **the trees differ** - run from MAIN the resolved target is MAIN's own object, which is the path a
        registered unit has always taken; nothing changes there.
-    2. **the seeder's guard** - `claims._build_is_current(wt, wt)`.  This is the existing staleness rule
+    2. **the seeder's guard** - `lib.lanes.seed.build_is_current(wt, wt)`.  This is the existing staleness rule
        (`slots.verify`, `seed_worktree_build`) rather than a second one that can drift from it.
     3. **this tree's own edit** - `config.json` predates a split input that `git diff` says this tree has
        changed.  Gate 2 alone is not enough: it is False in every fresh worktree (checkout mtimes vs the
@@ -280,7 +280,7 @@ def split_staleness(wt: str, main: str, dirty=None):
     cfg = os.path.join(wt, "build", "RMHE08", "config.json")
     if not os.path.isfile(cfg):
         return False, []
-    if _claims()._build_is_current(wt, wt):
+    if _seed().build_is_current(wt, wt):
         return False, []
     try:
         cfg_m = os.path.getmtime(cfg)
