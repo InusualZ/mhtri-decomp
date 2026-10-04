@@ -1,5 +1,6 @@
 /*
- * include/Network/NetworkWiiMediator.h - the class the 0x80413C64..0x804155D4 Network band owns.
+ * include/Network/NetworkWiiMediator.h - the class the 0x80413450..0x80417BC0 Network band owns (the round 3 fold of
+ * the mediator head, the class band and the former `Network/network_opening.cpp`, whose header folded in here).
  *
  * Reconstructed from the range's own disassembly and the runtime dump's map.  The dump spells the
  * member functions `NetworkWiiMediator::<method>`; the project's `symbols.txt` carries the same names
@@ -26,7 +27,7 @@
  * the two 1024-entry pointer arrays `parseReflectLines` clears and fills, and `line_table_c` the
  * one-entry array of its "single line" mode.  `pat_*` are the four words `initializeNetworkMediator`
  * and `updateOpeningState` keep the two `setPatRange` slots' address/length pairs in.  From +0x2BA8 on the
- * fields are the opening unit's (`Network/network_opening.cpp`): the NAS token, the game-info copy and the
+ * fields are the opening part's (the former `Network/network_opening.cpp`): the NAS token, the game-info copy and the
  * four transfer slots, each with its queue (the constructor 0x80413480 clears every one of them).  `pad_*`
  * is a gap no function touches. */
 /* One of the mediator's four transfer slots (`openMediatorTransferSlot` fills it).  size: 0x08 */
@@ -116,7 +117,7 @@ public:
     void getReflectPage(u8 page);
     void agreeReflect();
 
-    /* `Network/network_opening.cpp` (names GUESSED from the bodies) */
+    /* the opening part, 0x804155D4..0x80417BC0 (names GUESSED from the bodies) */
     void ECStart();
     char* getReflectName(char* out, u32 size);
     void openTransferSlot(s8 slot, u8 mode, f32 level);
@@ -142,7 +143,7 @@ public:
 };   /* size: 0xF1D8 (the allocation `sNetworkLibraryWii::init` makes) */
 
 /* The mediator's own virtual slots, read through its table (0x80602968, emitted by
- * `Network/network_layer_io.cpp`): the record view above keeps the table word inside `pad_000`, so a
+ * this unit once its constructor/destructor are written): the record view above keeps the table word inside `pad_000`, so a
  * dispatch through it is spelled through this view.  Nothing here is defined, so no table is emitted
  * (rule 10). */
 class NetworkWiiMediatorDispatch {
@@ -182,6 +183,85 @@ void setMediatorState68A(NetworkWiiMediatorFields* self, u8 value);
 /* 0x8041517C - splits reflect text source `source` (0..2) into the line tables */
 void parseReflectLines(NetworkWiiMediatorFields* self, s32 source);
 void getMediatorState68A(NetworkWiiMediatorFields* self, u8* out);
+
+#ifdef __cplusplus
+}
+#endif
+
+
+/* The opening part's and the head's free functions (moved here from `Network/network_opening.h` and
+ * `Network/network_layer_io.h` by the round 3 fold; docs/plan.md 6.5 rule 2: the owner declares). */
+struct PatTerms;
+typedef struct NetworkInstance NetworkInstance;   /* include/unsplit/Network.h */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* 0x80413450 - the Pat interface callback the mediator installs (slot 1): forwards the event to the
+ * mediator passed as the callback argument (GUESS name). */
+void mediatorEventCallback(u32 code, s32 a, s32 b, s32 c, const union GameSpyEventMsg* msg,
+                           NetworkWiiMediator* mediator);
+/* The reflect service singleton the mediator band forwards to and the language/event queries it reads. */
+NetworkReflectService* getReflectService(void);
+/* 0x80413AEC - whether the server is in maintenance (the status word reads 1). */
+s32 isMaintenanceMode(NetworkWiiMediator* self);
+s32 getReflectEventId(void);
+s32 getLanguage(void);
+
+u32 isTermsUpdateFinished(struct PatTerms* terms);
+
+/* 0x804166E0 / 0x80416620 - copy the mediator's nine DWC game-info words out / in (strings are copied
+ * into the mediator's own buffers on the way in). */
+void getGameInfo2d1c(NetworkWiiMediator* self, u32* out);
+void setGameInfo2d1c(NetworkWiiMediator* self, u32* info);
+
+/* 0x80416890 / 0x8041690C / 0x8041693C - start the terms check / start and cancel the terms update on the terms
+ * object, when there is one. */
+void startTermsCheck(NetworkWiiMediator* self);
+void startTermsUpdate(NetworkWiiMediator* self);
+void cancelTermsUpdate(NetworkWiiMediator* self);
+
+/* 0x80416A2C / 0x80416A30 - the terms progress graded against the 17-step threshold table (0..16; 0 with no
+ * terms object), the first a forwarding thunk; 0x80416B58 the raw progress count. */
+s32 getTermsProgressLevel(NetworkWiiMediator* self);
+s32 getMediatorTermsProgressLevel(NetworkWiiMediator* self);
+u16 getMediatorTermsProgress(NetworkWiiMediator* self);
+/* 0x80416B90 / 0x80416BD8 - store / read the terms object's +0xE2 byte (0 with no terms object). */
+void setMediatorTermsFlag(NetworkWiiMediator* self, u32 flag);
+u8 getMediatorTermsFlag(NetworkWiiMediator* self);
+
+/* 0x804168F8 / 0x80416BD0 / 0x80416C10 - the terms object's ready byte (as 0/1) and its +0xE2 byte. */
+u32 isPatTermsReady(struct PatTerms* terms);
+void setPatTermsFlag(struct PatTerms* terms, u32 flag);
+u8 getPatTermsFlag(struct PatTerms* terms);
+
+/* The mediator's terms and transfer-state entry points the network pat control drives (GUESS names from the
+ * bodies; the fields are the mediator's +0x6DD0 mode byte, the +0x6DD1/+0x6DD2 flag bytes and the +0x6DD4
+ * level float):
+ *  - 0x80416800 hands the terms object its buffer, resets the per-slot state and sets mode 1, flags 0 and the
+ *    default level;
+ *  - 0x804168C0 the terms object's status (0 when there is none);
+ *  - 0x8041696C stores the transfer mode, resetting the four slots when it changes;
+ *  - 0x804172CC / 0x804172DC / 0x804172EC store the +0x6DD1 flag, the +0x6DD2 flag and the level;
+ *  - 0x80415FAC posts the community profile's record through the opening step (modes 0 and 2), nonzero
+ *    when either accepted it. */
+/* untyped: byte range - the MEM2 buffer handed to the terms object */
+void initMediatorTerms(NetworkWiiMediator* self, void* buffer, u32 size);
+s32 getMediatorTermsStatus(NetworkWiiMediator* self);
+void setMediatorTransferMode(NetworkWiiMediator* self, u32 mode);
+/* 0x804169D4 - 0 while the transfer mode is 0 or no terms object exists, else `isTermsUpdateFinished` on it
+ * (GUESS name). */
+s32 isMediatorTermsUpdateFinished(NetworkWiiMediator* self);
+void setMediatorTransferFlag6DD1(NetworkWiiMediator* self, u8 flag);
+void setMediatorTransferFlag6DD2(NetworkWiiMediator* self, u8 flag);
+void setMediatorTransferLevel(NetworkWiiMediator* self, f32 level);
+s32 postMediatorRecord(NetworkWiiMediator* self, u8* record);
+
+/* The NAS login token and the user id/password paths the session state machine hands the opening
+ * (`Network/network_state.cpp` passes the mediator singleton). */
+char* getNASToken(NetworkWiiMediator* self);
+void setConnectionPaths(NetworkInstance* connection, const char* userId, const char* password);
 
 #ifdef __cplusplus
 }

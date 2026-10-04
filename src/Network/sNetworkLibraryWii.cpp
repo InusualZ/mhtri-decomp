@@ -66,7 +66,8 @@
 #include "Runtime.PPCEABI.H/memset.h"
 #include "sys_mem.h"
 #include "Network/PatInterface.h"
-#include "Network/NetworkCommunityPat.h"   /* constructNetworkSocket, constructNetworkFetcherKind2 */
+#include "Network/NetworkSocketWii.h"     /* constructNetworkSocket */
+#include "Network/NetworkFileFetcher.h"   /* constructNetworkFetcherKind2 */
 #include "SO/soi.h"                        /* SOInit, SOFinish, SOStartup, SOCleanup, SOGetHostID */
 #include "DWCi/dwc_error.h"                /* DWC_Init, DWC_Shutdown */
 #include "SSL/ssl.h"                       /* NETGetStartupErrorCode */

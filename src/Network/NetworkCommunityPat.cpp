@@ -1,24 +1,25 @@
 /*
- * Network/NetworkCommunityPat.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * Network/NetworkCommunityPat.cpp - STUB (no bodies yet).
  *
- * `.text` 0x803E4888..0x803FCC34.  Sections of the candidate unit: extab 0x8001ACC8..0x8001BCAC; extabindex 0x8003B01C..0x8003BF40; .text 0x803E4888..0x803FCC34; .ctors 0x8056F3BC..0x8056F3C0; .data 0x805FBC78..0x805FC324; .sdata 0x80793940..0x80793968; .sdata2 0x8079C790..0x8079C7D0.
+ * SECTIONS. extab 0x8001B178..0x8001B780; extabindex 0x8003B544..0x8003B8F8; .text 0x803F0294..0x803F6458; .data 0x805FC4D0..0x805FC820;
+ *   .sdata 0x80793948..0x80793950; .sdata2 0x8079C7A8..0x8079C7B8.
  *
- * WHAT IT IS. the `NetworkCommunityPat` band: the community/friend request code (`syncFriends`, `inviteFriend`, `removeFriend`,
- *   `requestBlockList`, `sendFriendRequest`, `acceptFriendRequest`), the layer slot notifications (`pollLayerSlots`,
- *   `notifyLayerSlotSummary`, `notifyLayerEvent`), the collection-log setters and the many `dtor_` helpers (423 functions,
- *   126 named in the map, `NetworkCommunityPat`'s manglings among them).  Its `.ctors` word is the band's static initialiser.
+ * WHAT IT IS. the `NetworkCommunityPat` class (constructor 0x803F02C4, table 0x805FC728, allocation 0x25EC): the community/friend
+ *   request code (`syncFriends`, `inviteFriend`, `removeFriend`, `requestBlockList`, `sendFriendRequest`, `acceptFriendRequest`),
+ *   the profile writers and `sendNtcCollectionLog`.  The class declaration lives in `include/Network/NetworkCommunityPat.h`.
  *
- * WHY IT SITS HERE. the phase 1 reconciliation (docs/splits/proposals/phase1-e.md) cut no seam inside 0x803E4888..0x803F73C0 and folded the
- *   `Network/network_packet` guess (0x803F73C0..0x803FCC34) into it; the left edge is the registered end of
- *   `Network/NetworkLayerPatStep.cpp` (grade guess).  It is probably several TUs (the 76 KB run has no pool or `.data` pin).
+ * WHY IT SITS HERE. the network pilot round 3 recut shrank the phase 4 stub (0x803E4888..0x803FCC34, which phase1-e.md had flagged
+ *   as several TUs) to the class's own run: `NetworkLayerPat` (to 0x803EF668) and its base `NetworkCommunity` (to 0x803F0294)
+ *   come before it, `NetworkFileFetcher`, `NetworkSocketWii`, `NetworkUniqueId`, `NetworkUnitPacket` and `PatConnection` after.
+ *   The `.data` run is the class's strings and table, the V->S seam at 0x805FC4D0 is its left edge.
  *
- * UNKNOWN. every body; the TU extent (phase1-e.md open question 3: the NetworkLayer TU spans the registered `NetworkLayerPatStep.cpp`);
- *   the class declaration lives in `include/Network/NetworkCommunityPat.h`.
+ * RESIDUAL (splitcheck). `pool` FAILs: the pool word 0x8079C7AC is first read at 0x803F0800, earlier than the word before it
+ *   (0x8079C7A8, first read at 0x803F0CE4) - not text order for one TU, or one read is a false decode; both words are read only
+ *   from this range.
  *
- * FLAGS. the `Network` lib's `cflags_network` (the registered neighbours add `-O3`/`-inline noauto` per unit; unmeasured here).
+ * UNKNOWN. every body (the inventory is `ledger.py unit Network/NetworkCommunityPat.cpp`, the map and `splits.txt`).
  *
- * The unit's `.data`/`.sdata`/`.sbss` claims are the candidate's (config/RMHE08/splits.txt); the symbols they hold are
- * in the map (`ledger.py unit Network/NetworkCommunityPat.cpp`), and the pass that writes the bodies defines them.
+ * FLAGS. the `Network` lib's `cflags_network`, unmeasured: there is no body to measure them on.
  */
 
 #include "Network/NetworkCommunityPat.h"

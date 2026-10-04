@@ -1,6 +1,6 @@
 /*
  * Declarations of `src/Network/NetworkSessionManagerPat.cpp` that are not class members: the two free functions inside the
- * unit's `.text` range (0x803D70B8..0x803E44C8).  The class itself is declared in `Network/NetworkSessionManager.h`.  Moved here
+ * unit's `.text` range (0x803D70B8..0x803DF2EC).  The class itself is declared in `Network/NetworkSessionManager.h`.  Moved here
  * from `include/Network/network_pat_control.h` when the phase 4 fold gave the unit the whole band.
  */
 #ifndef MHTRI_NETWORK_NETWORKSESSIONMANAGERPAT_H
@@ -39,20 +39,8 @@ struct PatTerms;
 extern "C" {
 #endif
 
-/* 0x803DF9A0 / 0x803DFACC / 0x803DFB7C - the layer id helpers, named by their own log strings
- * ("NetworkLayerIdImportFrom: ...", "NetworkLayerIdExportTo: ...", "NetworkUniqueIdEquals: ..."). */
-void NetworkLayerIdImportFrom(NetworkLayerId* id, u8 kind, const u8* data, u32 size);
-void NetworkLayerIdExportTo(const NetworkLayerId* id, u8* out, u32 size);
-BOOL NetworkUniqueIdEquals(const NetworkLayerId* a, const NetworkLayerId* b);
-
 /* GUESS: 0x803DECF0 clears the session manager's busy byte and releases its buffers. */
 void closeNetworkSessionManagerPat(NetworkSessionManagerPat* self);
-
-/* 0x803DFC34 - initialises a layer request record. */
-void initNetLayerRequest(NetLayerRequest* request);
-
-/* 0x803E247C - the terms object; 0x80416A18 - whether it reached its update-finished state. */
-struct PatTerms* getPatTerms(void);
 
 /* The Pat band's helpers (moved here from `Network/NetworkSessionManager.h`, which defines the records
  * they take).  `buildCircleInfoName` was the map's `fn_803DE524` until the Pat pass renamed it from what

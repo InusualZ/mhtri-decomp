@@ -4,7 +4,7 @@
 
 #include "types.h"
 #include "Network/network_transport.h"
-#include "Network/network_opening.h"   /* sNetworkLibrary, the base class */
+#include "Network/sNetworkLibrary.h"   /* sNetworkLibrary, the base class */
 
 /* Declarations moved here from `include/unsplit/Network.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 struct NetworkPat;

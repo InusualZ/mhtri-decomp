@@ -121,6 +121,7 @@
 #include "enemy/em_pop.h"                          /* matchesFileVersion, owner enemy/em_pop.cpp (rule 2) */
 #include "fn_80047398.h"                          /* decodePlayerCard, owner fn_80047398.cpp (rule 2) */
 #include "Network/NetworkCommunityPat.h"
+#include "Network/NetworkUniqueId.h"
 #include "Network/NetworkWiiMediator.h"
 #include "sound/fn_800E46E8.h"
 #include "sound/fn_800D7F54.h"
@@ -130,7 +131,7 @@
 #include "unsplit/Network.h"
 #include "Network/NetworkSessionManagerPat.h"
 #include "Network/PatInterface.h"       /* getGameTime / the Pat setters - owner Network/PatInterface.cpp */
-#include "Network/network_layer_io.h"   /* isMaintenanceMode - owner Network/network_layer_io.cpp */
+#include "Network/network_layer_io.h"
 #include "unsplit/lobby.h"
 #include "lobby/lb_entry_flags_clear.h"          /* lb_entry_flags_clear, owner lobby/lb_companion_ui.cpp (rule 2) */
 #include "lobby/lb_quest_board_reset.h"          /* lb_quest_board_reset, owner lobby/lb_quest_board.cpp (rule 2) */
@@ -144,7 +145,7 @@
 #include "sys_mem.h"                     /* operator new - owner sys_mem.cpp */
 
 #include "Network/sNetworkLibraryWii.h"   /* sNetworkLibraryInitParam (the Pat holder family is in Network/NetworkPat.h) */
-#include "Network/network_opening.h"   /* the mediator's terms and transfer-state setters - owner Network/network_opening.cpp */
+#include "Network/NetworkWiiMediator.h"   /* the mediator's terms and transfer-state setters - owner Network/NetworkWiiMediator.cpp */
 #include "OS/FindContainHeap_.h"       /* the expandable-heap API - owner OS/FindContainHeap_.c */
 #include "NAND/nand.h"                 /* OSReport - owner NAND/nand.c */
 #include "pad_connect.h"               /* game_mutex - owner pad_connect.cpp */

@@ -59,6 +59,7 @@
 #include "Runtime.PPCEABI.H/memcpy.h"    /* memcpy  - owner Runtime.PPCEABI.H/memcpy.c */
 #include "Runtime.PPCEABI.H/memset.h"    /* memset  - owner Runtime.PPCEABI.H/memset.c */
 #include "unsplit/Runtime.PPCEABI.H.h"   /* memmove / memcmp / snprintf - no registered owner */
+#include "Network/NetworkWiiMediator.h"     /* getGameInfo2d1c - owner Network/NetworkWiiMediator.cpp */
 
 /* retail keeps the unfused peephole forms across the whole band (see the header): `clrlwi`/`extsb` + `cmpwi`
  * in place of the recording forms, `clrlwi`+`slwi` in place of `clrlslwi`. */
