@@ -18,7 +18,10 @@
  * FLAGS.  C++ under `cflags_network` (`-Cpp_exceptions on` gives the `extab`), per-unit `-O3`/`-pool off` (`configure.py`);
  * file-scope `#pragma peephole off` (playbook 39); each `dont_inline` region keeps a retail `bl` that `-inline auto` folds.
  *
- * RESIDUALS.  `check` 97.27 % (retail's return-0 tail is shared, one `b`; ours duplicates it).
+ * SHAPES.  `check`'s states 0 and 10 `break` to one shared `return 0` after the switch (retail's single tail).
+ *
+ * RESIDUALS.  `.text` bytes match; `check`'s error code 0x80020002 is a plain immediate in ours where dtk's split
+ * relocates it against `@eti_8001FFF8+0xA` (an `extabindex` address that happens to equal the constant).
  */
 #include "types.h"
 #include "Network/network_transport.h"
@@ -151,7 +154,7 @@ s32 NetworkResolverWii::check()
         this->result_1538 = 0;
         OSResumeThread(this->thread_220);
         this->code_218 = 0xA;
-        return 0;
+        break;
     case 10:
         if (OSIsThreadTerminated(this->thread_220) != 0) {
             result = this->result_1538;
@@ -165,7 +168,7 @@ s32 NetworkResolverWii::check()
             }
             this->code_218 = 0xF;
         }
-        return 0;
+        break;
     case 15:
         this->code_218 = 0x14;
         this->count_214 = 0;
@@ -191,6 +194,7 @@ s32 NetworkResolverWii::check()
     default:
         return -1;
     }
+    return 0;
 }
 
 /* Copies one live record out of the peer's four-entry table. */

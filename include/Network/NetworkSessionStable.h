@@ -38,7 +38,10 @@ public:
     /* +0x14 */ u8* cursor_14;    /* where the reader stands */
 };   /* size: 0x18 */
 
-/* The four queues a slot owns (two send, two receive), built and destroyed by the writer band. */
+/* The four queues a slot owns (two send, two receive), built and destroyed by the writer band, and the
+   sequence/flush state and send rate that travel with them.  `resetSlot` addresses the trailing words off
+   the queues' own base (`stb r30,0x60(r29)` .. `stw r0,0x7C(r29)`), so they are members of this object; the
+   writer band's constructor (0x803CA570) builds only the four queues. */
 class NetworkSlotQueues {
 public:
     NetworkSlotQueues();
@@ -46,7 +49,30 @@ public:
 
     /* +0x00 */ NetworkStreamQueue send_00[2];
     /* +0x30 */ NetworkStreamQueue receive_30[2];
-};   /* size: 0x60 */
+    /* +0x60 */ u8 receiveStarted_60;       /* the receive sequence numbers were taken from the peer */
+    /* +0x61 */ u8 pad_61[0x03];
+    /* +0x64 */ f32 expiry_64;
+    /* +0x68 */ u8 resend_68;
+    /* +0x69 */ u8 pad_69[0x03];
+    /* +0x6C */ f32 lastSend_6C[2];         /* when each send queue last flushed */
+    /* +0x74 */ f32 rate_74;                /* the governor's send rate */
+    /* +0x78 */ f32 rateTarget_78;
+    /* +0x7C */ s32 byteLimit_7C;
+};   /* size: 0x80 (the slot's next member starts at +0xD4 = 0x54 + 0x80) */
+
+/* The slot's rate governor: when it last moved the rate, the floors it falls back to and the raise/lower
+   timestamps (GUESS on the name and every field name).  `resetSlot` addresses it off its own base
+   (`stfs f2,0x0(r28)` .. `stfs f2,0x14(r28)`). */
+class NetworkRateGovernor {
+public:
+    /* +0x00 */ f32 lastAdjust_00;
+    /* +0x04 */ f32 rateFloor_04;
+    /* +0x08 */ s32 byteFloor_08;
+    /* +0x0C */ u8 adjusting_0C;
+    /* +0x0D */ u8 pad_0D[0x03];
+    /* +0x10 */ f32 lastRaise_10;
+    /* +0x14 */ f32 lastLower_14;
+};   /* size: 0x18 (the slot's next member starts at +0xEC = 0xD4 + 0x18) */
 
 /* ---------------- the connection a slot owns ---------------------------------------------------- */
 
@@ -148,22 +174,7 @@ public:
     /* +0x040 */ u8 pad_40[0x10];
     /* +0x050 */ u32 nonce_50;               /* the nonce the peer announced */
     /* +0x054 */ NetworkSlotQueues queues_54;
-    /* +0x0B4 */ u8 receiveStarted_B4;       /* the receive sequence numbers were taken from the peer */
-    /* +0x0B5 */ u8 pad_B5[0x03];
-    /* +0x0B8 */ f32 expiry_B8;
-    /* +0x0BC */ u8 resend_BC;
-    /* +0x0BD */ u8 pad_BD[0x03];
-    /* +0x0C0 */ f32 lastSend_C0[2];         /* when each send queue last flushed */
-    /* +0x0C8 */ f32 rate_C8;                /* the governor's send rate */
-    /* +0x0CC */ f32 rateTarget_CC;
-    /* +0x0D0 */ s32 byteLimit_D0;
-    /* +0x0D4 */ f32 lastAdjust_D4;
-    /* +0x0D8 */ f32 rateFloor_D8;
-    /* +0x0DC */ s32 byteFloor_DC;
-    /* +0x0E0 */ u8 adjusting_E0;
-    /* +0x0E1 */ u8 pad_E1[0x03];
-    /* +0x0E4 */ f32 lastRaise_E4;
-    /* +0x0E8 */ f32 lastLower_E8;
+    /* +0x0D4 */ NetworkRateGovernor governor_D4;
     /* +0x0EC */ f32 waitStart_EC;
     /* +0x0F0 */ f32 coolStart_F0;
     /* +0x0F4 */ s32 sequence_F4;

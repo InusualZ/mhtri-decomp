@@ -24,7 +24,8 @@
  * `fmuls`+`fadds` in `move` and `upPerformance`); `dont_inline` around the nonce pair and the destructors, whose
  * `bl`s retail keeps.  Source shapes that are levers here, each measured: bodies in address order (a callee
  * defined after its caller is not inlined, as in retail); `4 <= index` for the slot bounds test (`index >= 4`
- * merges both compares into one unsigned one); `slots_14828[index].field` rather than a local slot pointer
+ * merges both compares into one unsigned one), spelled `index < 0 || 4 <= index` with an early return where
+ * retail branches over a `blr` (`kick`, `markLeft`, `setError`, `connect`); `slots_14828[index].field` rather than a local slot pointer
  * where retail recomputes the base; the packet getters return `u32` and the source casts `(u16)` where retail
  * masks; the `.sdata2` floats are `const` so loops hoist them; a ternary for the clamp in `updateRate`; the
  * return value of `execControlOne` is computed before the small object's destructor runs.
@@ -38,15 +39,18 @@
  * (-60); `extab` 0x2A0 against 0x488 (-488; 621 of 1160 bytes differ, 17 `@etb_` records only in the target and
  * 2 only in ours); `extabindex` 12 of 612 bytes differ; `.sdata2` 16 B unclaimable as above.  Rows:
  *  - register allocation and frame size in the long functions (`move`, `init`, `send`, `set`, `execControlOne`)
- *    and in `connect` (`bge` to the epilogue where retail has `blt` over a `b`, an extra `stw r29`, frame -0x20
- *    against -0x10, the two `stw 0x4828` stores in the other order);
- *  - `setError`, `markLeft` and `kick` end the bounds test with `bgelr` where retail branches over a `blr`;
+ *    and in `connect` (ours keeps the slot address live across the `start` call in r31: an extra `stw r29`,
+ *    frame -0x20 against -0x10, the `stw 0x4828` before the slot base is recomputed);
+ *  - `setError` is called, not inlined, in retail: it sits inside the `dont_inline` region with `markLeft`;
+ *  - `resetSlot` takes the queues and the governor through their own pointers (retail's `r29`/`r28` bases); left:
+ *    the address object's `slot_18` call loads the table off the slot base (`lwz r4,0x4858(r31)`) where retail
+ *    loads it off the object pointer in r3 - a real virtual call on the writer band's `NetworkSmallObject`;
  *  - `post` addresses `queueUsed_518[channel]` as base+index where retail folds the offset into the displacement;
  *  - the `writeOp*` and `writeSize` arguments are masked one instruction earlier than retail;
  *  - `move`: retail destroys the inlined `writeOp7` stream after the `setError` loop that follows it, ours before
  *    it (the `bl` at +0x360 lands eight bytes away and the `@eti_` immediate of the next `setError` is shifted);
  *  - `upPerformance`: retail reloads `networkRateFloor` (the `.sdata` word) for the clamp, ours reuses the
- *    register (the `lfs` at +0x70), and the `byteFloor`/`byteLimit` compare is `ble` against retail's `bge`;
+ *    register (the `lfs` at +0x70; a ternary clamp measured worse);
  *  - the string/jump-table labels (`@NNNN` against `lbl_...`), dtk's `@eti_` immediates and `_savegpr_`/`_restgpr_`
  *    entry points that follow the frame differences.
  */
@@ -242,19 +246,19 @@ void NetworkSessionStable::init(s8 isHost, NetworkSessionCallback callback, void
                                        (u16)(rand() + (u32)(networkMillisecondsPerSecond * getNetworkLogger()->getTime_60())));
         slot->queues_54.receive_30[0].attach(receiveBlock_A810[i], sizeof(receiveBlock_A810[i]));
         slot->queues_54.receive_30[1].attach(receiveAux_12810[i], sizeof(receiveAux_12810[i]));
-        slot->receiveStarted_B4 = 0;
-        slot->expiry_B8 = networkSessionZero;
-        slot->resend_BC = 0;
-        memset(slot->lastSend_C0, 0, sizeof(slot->lastSend_C0));
-        slot->rate_C8 = networkRateScale * networkSessionDefaultDelay;
-        slot->rateTarget_CC = networkRateFloor;
-        slot->byteLimit_D0 = 0x400;
-        slot->lastAdjust_D4 = networkSessionZero;
-        slot->adjusting_E0 = 0;
-        slot->rateFloor_D8 = networkRateFloor;
-        slot->byteFloor_DC = 0x400;
-        slot->lastRaise_E4 = networkSessionZero;
-        slot->lastLower_E8 = networkSessionZero;
+        slot->queues_54.receiveStarted_60 = 0;
+        slot->queues_54.expiry_64 = networkSessionZero;
+        slot->queues_54.resend_68 = 0;
+        memset(slot->queues_54.lastSend_6C, 0, sizeof(slot->queues_54.lastSend_6C));
+        slot->queues_54.rate_74 = networkRateScale * networkSessionDefaultDelay;
+        slot->queues_54.rateTarget_78 = networkRateFloor;
+        slot->queues_54.byteLimit_7C = 0x400;
+        slot->governor_D4.lastAdjust_00 = networkSessionZero;
+        slot->governor_D4.adjusting_0C = 0;
+        slot->governor_D4.rateFloor_04 = networkRateFloor;
+        slot->governor_D4.byteFloor_08 = 0x400;
+        slot->governor_D4.lastRaise_10 = networkSessionZero;
+        slot->governor_D4.lastLower_14 = networkSessionZero;
     }
     address_16CB8.object_00.vtable->slot_18(&address_16CB8.object_00);
     nonce_16CD8 = 0;
@@ -523,7 +527,7 @@ void NetworkSessionStable::move()
             } else if (networkRateMax + slot->retryTime_F8 <= time_16CDC) {
                 slot->retryTime_F8 = time_16CDC;
                 moveOutOfBand(index);
-                if (slot->receiveStarted_B4 != 0) {
+                if (slot->queues_54.receiveStarted_60 != 0) {
                     writeOp8or9(0, index);
                 }
             }
@@ -553,8 +557,8 @@ void NetworkSessionStable::move()
         if (usable >= 0) {
             channel = slot->queueUsed_518[1];
             slots_14828[usable].connection_2C->clearSendPending();
-            if (send(index, 0, slots_14828[index].resend_BC) != 0) {
-                slots_14828[index].resend_BC = 0;
+            if (send(index, 0, slots_14828[index].queues_54.resend_68) != 0) {
+                slots_14828[index].queues_54.resend_68 = 0;
             }
             queued = slot->queueUsed_518[channel];
             sendResult = send(index, 1, queued > 0);
@@ -779,83 +783,83 @@ NetworkUnitPacket::NetworkUnitPacket()
 void NetworkSessionStable::resetSlot(s8 index)
 {
     NetworkSessionSlot* slot;
+    NetworkSlotQueues* queues;
+    NetworkRateGovernor* governor;
 
-    if (index >= 0) {
-        if (index >= 4) {
-            return;
-        }
-        slot = &slots_14828[index];
+    if (index < 0 || 4 <= index) {
+        return;
+    }
+    slot = &slots_14828[index];
+    if (slot->connection_2C != NULL) {
+        queues = &slot->queues_54;
+        governor = &slot->governor_D4;
+        slot->connection_2C->reset();
         if (slot->connection_2C != NULL) {
-            slot->connection_2C->reset();
-            if (slot->connection_2C != NULL) {
-                delete slot->connection_2C;
-                slot->connection_2C = NULL;
-            }
-            slot->linkState_00 = 0;
-            slot->sessionState_04 = 0;
-            slot->closeState_08 = 0;
-            slot->sleepSeconds_0C = 0;
-            slot->relayIndex_10 = -1;
-            slot->relayDelay_14 = networkSessionDefaultDelay;
-            slot->established_18 = 0;
-            slot->authenticated_19 = 0;
-            slot->left_1A = 0;
-            slot->relayAck_1B = 0;
-            slot->shutdown_1C = 0;
-            memset(&slot->error_20, 0, sizeof(slot->error_20));
+            delete slot->connection_2C;
             slot->connection_2C = NULL;
-            slot->address_30.object_00.vtable->slot_18(&slot->address_30.object_00);
-            slot->nonce_50 = 0;
-            slot->waitStart_EC = networkSessionZero;
-            slot->coolStart_F0 = networkSessionZero;
-            slot->sequence_F4 = 0xFFFF;
-            slot->retryTime_F8 = networkSessionZero;
-            slot->retryCount_FC = 0;
-            slot->sleeping_100 = 0;
-            slot->sleepStart_104 = networkSessionZero;
-            slot->measureTime_108 = networkSessionZero;
-            slot->congestion_10C = networkSessionZero;
-            slot->congestionCount_110 = 0;
-            slot->measureSend_114 = networkSessionZero;
-            networkStreamQueue_clear(&slot->queues_54.send_00[0]);
-            networkStreamQueue_clear(&slot->queues_54.send_00[1]);
-            networkStreamQueue_clear(&slot->queues_54.receive_30[0]);
-            networkStreamQueue_clear(&slot->queues_54.receive_30[1]);
-            networkStreamQueue_setSequence(&slot->queues_54.send_00[0],
-                                           (u16)(rand() + (u32)(networkMillisecondsPerSecond * getNetworkLogger()->getTime_60())));
-            networkStreamQueue_setSequence(&slot->queues_54.send_00[1],
-                                           (u16)(rand() + (u32)(networkMillisecondsPerSecond * getNetworkLogger()->getTime_60())));
-            slot->receiveStarted_B4 = 0;
-            slot->resend_BC = 0;
-            slot->expiry_B8 = networkSessionZero;
-            slot->lastSend_C0[0] = networkSessionZero;
-            slot->lastSend_C0[1] = networkSessionZero;
-            slot->rate_C8 = networkRateScale * networkSessionDefaultDelay;
-            slot->rateTarget_CC = networkRateFloor;
-            slot->byteLimit_D0 = 0x400;
-            slot->lastAdjust_D4 = networkSessionZero;
-            slot->adjusting_E0 = 0;
-            slot->rateFloor_D8 = networkRateFloor;
-            slot->byteFloor_DC = 0x400;
-            slot->lastRaise_E4 = networkSessionZero;
-            slot->lastLower_E8 = networkSessionZero;
         }
+        slot->linkState_00 = 0;
+        slot->sessionState_04 = 0;
+        slot->closeState_08 = 0;
+        slot->sleepSeconds_0C = 0;
+        slot->relayIndex_10 = -1;
+        slot->relayDelay_14 = networkSessionDefaultDelay;
+        slot->established_18 = 0;
+        slot->authenticated_19 = 0;
+        slot->left_1A = 0;
+        slot->relayAck_1B = 0;
+        slot->shutdown_1C = 0;
+        memset(&slot->error_20, 0, sizeof(slot->error_20));
+        slot->connection_2C = NULL;
+        slot->address_30.object_00.vtable->slot_18(&slot->address_30.object_00);
+        slot->nonce_50 = 0;
+        slot->waitStart_EC = networkSessionZero;
+        slot->coolStart_F0 = networkSessionZero;
+        slot->sequence_F4 = 0xFFFF;
+        slot->retryTime_F8 = networkSessionZero;
+        slot->retryCount_FC = 0;
+        slot->sleeping_100 = 0;
+        slot->sleepStart_104 = networkSessionZero;
+        slot->measureTime_108 = networkSessionZero;
+        slot->congestion_10C = networkSessionZero;
+        slot->congestionCount_110 = 0;
+        slot->measureSend_114 = networkSessionZero;
+        networkStreamQueue_clear(&queues->send_00[0]);
+        networkStreamQueue_clear(&queues->send_00[1]);
+        networkStreamQueue_clear(&queues->receive_30[0]);
+        networkStreamQueue_clear(&queues->receive_30[1]);
+        networkStreamQueue_setSequence(&queues->send_00[0],
+                                       (u16)(rand() + (u32)(networkMillisecondsPerSecond * getNetworkLogger()->getTime_60())));
+        networkStreamQueue_setSequence(&queues->send_00[1],
+                                       (u16)(rand() + (u32)(networkMillisecondsPerSecond * getNetworkLogger()->getTime_60())));
+        queues->receiveStarted_60 = 0;
+        queues->resend_68 = 0;
+        queues->expiry_64 = networkSessionZero;
+        queues->lastSend_6C[0] = networkSessionZero;
+        queues->lastSend_6C[1] = networkSessionZero;
+        queues->rate_74 = networkRateScale * networkSessionDefaultDelay;
+        queues->rateTarget_78 = networkRateFloor;
+        queues->byteLimit_7C = 0x400;
+        governor->lastAdjust_00 = networkSessionZero;
+        governor->adjusting_0C = 0;
+        governor->rateFloor_04 = networkRateFloor;
+        governor->byteFloor_08 = 0x400;
+        governor->lastRaise_10 = networkSessionZero;
+        governor->lastLower_14 = networkSessionZero;
     }
 }
 
 /* Starts the slot's connection once, and arms its connect machine. */
 void NetworkSessionStable::connect(s8 index, u32 a, u32 b)
 {
-    if (index >= 0) {
-        if (4 <= index) {
-            return;
-        }
-        if (slots_14828[index].connection_2C != NULL && slots_14828[index].linkState_00 == 0) {
-            slots_14828[index].connection_2C->start(a, b);
-            slots_14828[index].linkState_00 = 1;
-            if (slots_14828[index].sessionState_04 == 0) {
-                slots_14828[index].sessionState_04 = 5;
-            }
+    if (index < 0 || 4 <= index) {
+        return;
+    }
+    if (slots_14828[index].connection_2C != NULL && slots_14828[index].linkState_00 == 0) {
+        slots_14828[index].connection_2C->start(a, b);
+        slots_14828[index].linkState_00 = 1;
+        if (slots_14828[index].sessionState_04 == 0) {
+            slots_14828[index].sessionState_04 = 5;
         }
     }
 }
@@ -883,13 +887,11 @@ void NetworkSessionStable::leave()
 /* Records a slot as kicked. */
 void NetworkSessionStable::kick(s8 index)
 {
-    if (index >= 0) {
-        if (4 <= index) {
-            return;
-        }
-        if (slots_14828[index].connection_2C != NULL) {
-            setError(index, NETWORK_ERROR_SESSION_KICKED, 0, 0x80000000, 1);
-        }
+    if (index < 0 || 4 <= index) {
+        return;
+    }
+    if (slots_14828[index].connection_2C != NULL) {
+        setError(index, NETWORK_ERROR_SESSION_KICKED, 0, 0x80000000, 1);
     }
 }
 
@@ -1041,8 +1043,8 @@ void NetworkSessionStable::setNetworkConnectionEvent(s32 event, s8 index, u32 ar
                 ((NetworkByteStream*)&packet)->takeU32(&slot->nonce_50);
                 ((NetworkByteStream*)&packet)->readLength(&sequenceTop);
                 ((NetworkByteStream*)&packet)->readLength(&sequenceLow);
-                if (slot->receiveStarted_B4 == 0) {
-                    slot->receiveStarted_B4 = 1;
+                if (slot->queues_54.receiveStarted_60 == 0) {
+                    slot->queues_54.receiveStarted_60 = 1;
                     networkStreamQueue_setSequence(&slot->queues_54.receive_30[0], sequenceTop);
                     networkStreamQueue_setSequence(&slot->queues_54.receive_30[1], sequenceLow);
                 }
@@ -1067,8 +1069,8 @@ void NetworkSessionStable::setNetworkConnectionEvent(s32 event, s8 index, u32 ar
                     slot = &slots_14828[i];
                     result = 0;
                     if (networkPacket_isHandshake(&reader) != 0) {
-                        if (slot->receiveStarted_B4 == 0) {
-                            slot->receiveStarted_B4 = 1;
+                        if (slot->queues_54.receiveStarted_60 == 0) {
+                            slot->queues_54.receiveStarted_60 = 1;
                             networkStreamQueue_setSequence(&slot->queues_54.receive_30[0], networkPacket_getSequenceA(&reader));
                             networkStreamQueue_setSequence(&slot->queues_54.receive_30[1], networkPacket_getSequenceB(&reader));
                         }
@@ -1078,7 +1080,7 @@ void NetworkSessionStable::setNetworkConnectionEvent(s32 event, s8 index, u32 ar
                         getNetworkLogger()->signal_0C(3, "NetworkSessionStable::setNetworkConnectionEvent: [%d] oob sqn received. sqntop:0x%04x sqnlow:0x%04x\n",
                                                       i, (u16)networkStreamWriter_size(&slot->queues_54.receive_30[0]),
                                                       (u16)networkStreamWriter_size(&slot->queues_54.receive_30[1]));
-                    } else if (slot->receiveStarted_B4 != 0) {
+                    } else if (slot->queues_54.receiveStarted_60 != 0) {
                         if (channel == 0) {
                             result = putTopPacket(&slot->queues_54.receive_30[channel], &reader);
                             networkStreamQueue_acknowledge(&slot->queues_54.send_00[channel], &reader);
@@ -1099,7 +1101,7 @@ void NetworkSessionStable::setNetworkConnectionEvent(s32 event, s8 index, u32 ar
                         if (result != 3) {
                             setError(i, (NetworkPeerErrorSource)result, 0, 0x80000000, 1);
                         } else {
-                            slot->resend_BC = 1;
+                            slot->queues_54.resend_68 = 1;
                         }
                     }
                     break;
@@ -1241,7 +1243,7 @@ s8 NetworkSessionStable::getRelayIndex(s8 index)
         return -1;
     }
     if (isConnected(index) != 0) {
-        return slots_14828[index].relayIndex_10;
+        return (s32)slots_14828[index].relayIndex_10;
     }
     return -1;
 }
@@ -1305,11 +1307,11 @@ s32 NetworkSessionStable::getBandwidth(s8 index)
     if (getUsableSlot(index) < 0) {
         return 0x400;
     }
-    step = slots_14828[index].rateTarget_CC;
+    step = slots_14828[index].queues_54.rateTarget_78;
     if (step <= networkRateUpStep) {
         step = networkRateUpStep;
     }
-    return (s32)((networkRateMax / step) * (f32)slots_14828[index].byteLimit_D0);
+    return (s32)((networkRateMax / step) * (f32)slots_14828[index].queues_54.byteLimit_7C);
 }
 
 /* Hands a value to a connected slot's connection. */
@@ -1354,18 +1356,14 @@ s32 NetworkSessionStable::getFreeSpace(s8 index)
 /* Marks a connected slot as having left. */
 void NetworkSessionStable::markLeft(s8 index)
 {
-    if (index >= 0) {
-        if (4 <= index) {
-            return;
-        }
-        if (slots_14828[index].connection_2C != NULL) {
-            slots_14828[index].left_1A = 1;
-            slots_14828[index].authenticated_19 = 0;
-        }
+    if (index < 0 || 4 <= index) {
+        return;
+    }
+    if (slots_14828[index].connection_2C != NULL) {
+        slots_14828[index].left_1A = 1;
+        slots_14828[index].authenticated_19 = 0;
     }
 }
-
-#pragma dont_inline off
 
 /* Records the first error of a connected slot and the kind of close it asks for. */
 /* untyped: caller-owned payload - the error source is a constant or a table address */
@@ -1373,28 +1371,27 @@ void NetworkSessionStable::setError(s8 index, NetworkPeerErrorSource source, u32
 {
     NetworkSessionSlot* slot;
 
-    if (index >= 0) {
-        if (index >= 4) {
-            return;
+    if (index < 0 || 4 <= index) {
+        return;
+    }
+    if (slots_14828[index].connection_2C != NULL) {
+        if (slots_14828[index].closeState_08 == 0) {
+            if ((u32)(kind - 1) <= 1) {
+                slots_14828[index].closeState_08 = kind;
+            } else {
+                slots_14828[index].closeState_08 = 3;
+            }
         }
         slot = &slots_14828[index];
-        if (slot->connection_2C != NULL) {
-            if (slot->closeState_08 == 0) {
-                if ((u32)(kind - 1) <= 1) {
-                    slot->closeState_08 = kind;
-                } else {
-                    slot->closeState_08 = 3;
-                }
-            }
-            slot = &slots_14828[index];
-            if (slot->error_20.source == NULL) {
-                slot->error_20.source = (const void*)source;
-                slot->error_20.argument = argument;
-                slot->error_20.code = code;
-            }
+        if (slot->error_20.source == NULL) {
+            slot->error_20.source = (const void*)source;
+            slot->error_20.argument = argument;
+            slot->error_20.code = code;
         }
     }
 }
+
+#pragma dont_inline off
 
 /* Flushes the channel's send queue of a slot into frames and hands them to the connection; returns 1 when
    a frame went out. */
@@ -1428,11 +1425,11 @@ s32 NetworkSessionStable::send(s8 index, s32 channel, s32 force)
     }
     connection = slots_14828[usable].connection_2C;
     if (channel == 0) {
-        interval = slots_14828[usable].rateTarget_CC;
-        rate = slots_14828[usable].rate_C8;
-        limit = (f32)slots_14828[usable].byteLimit_D0;
+        interval = slots_14828[usable].queues_54.rateTarget_78;
+        rate = slots_14828[usable].queues_54.rate_74;
+        limit = (f32)slots_14828[usable].queues_54.byteLimit_7C;
     }
-    if (time_16CDC <= interval + slots_14828[index].lastSend_C0[channel]) {
+    if (time_16CDC <= interval + slots_14828[index].queues_54.lastSend_6C[channel]) {
         networkStreamWriter_dtor(&packet, -1);
         networkStreamWriterDefault_dtor(&writer, -1);
         return 0;
@@ -1507,7 +1504,7 @@ s32 NetworkSessionStable::send(s8 index, s32 channel, s32 force)
             result = 1;
         }
         sentTotal += sent;
-        slots_14828[index].lastSend_C0[channel] = time_16CDC;
+        slots_14828[index].queues_54.lastSend_6C[channel] = time_16CDC;
         if (channel == 1 && sent > 0) {
             networkStreamQueue_discard(queue, sent, 0xBF);
             networkStreamQueue_setSequence(queue, (u16)(total + sent));
@@ -1787,60 +1784,55 @@ void NetworkSessionStable::sendStream(NetworkStreamWriter* stream, s32 channel, 
     u8 selected[4];
     s8 index;
     s32 n;
-    const s8* target;
     s32 appended;
 
-    if (channel >= 0) {
-        if (channel >= 2) {
-            return;
-        }
-        for (index = 0; index < 4; index++) {
-            selected[index] = 0;
-            if (slots_14828[index].connection_2C != 0 && slots_14828[index].receiveStarted_B4 != 0
-                && (networkPacket_isUserData(stream) == 0 || slots_14828[index].established_18 != 0)) {
-                target = targets;
-                for (n = count; n > 0; n--) {
-                    s8 value = *target;
+    if (channel < 0 || 2 <= channel) {
+        return;
+    }
+    for (index = 0; index < 4; index++) {
+        selected[index] = 0;
+        if (slots_14828[index].connection_2C != 0 && slots_14828[index].queues_54.receiveStarted_60 != 0
+            && (networkPacket_isUserData(stream) == 0 || slots_14828[index].established_18 != 0)) {
+            for (n = 0; n < count; n++) {
+                s8 value = targets[n];
 
-                    if (value == -1) {
+                if (value == -1) {
+                    selected[index] = 1;
+                    break;
+                }
+                if (value == -2) {
+                    if (index != (s8)ownIndex_14826) {
                         selected[index] = 1;
                         break;
                     }
-                    if (value == -2) {
-                        if (index != (s8)ownIndex_14826) {
-                            selected[index] = 1;
-                            break;
-                        }
-                    } else if (index == value) {
-                        selected[index] = 1;
-                        break;
-                    }
-                    target++;
+                } else if (index == value) {
+                    selected[index] = 1;
+                    break;
                 }
             }
         }
-        for (index = 0; index < 4; index++) {
-            if (selected[index] != 0
-                && (channel != 1 || limit >= 0xFE
-                    || !((f32)limit < (networkSessionPriorityScale
-                                       * ((slots_14828[index].congestion_10C - (f32)(u16)networkPacket_getFrameOverhead())
-                                          - (f32)(u16)networkPacket_getMessageOverhead()))
-                                          / networkSessionPriorityRange))) {
-                f32 expiry = slots_14828[index].expiry_B8;
+    }
+    for (index = 0; index < 4; index++) {
+        if (selected[index] != 0
+            && (channel != 1 || limit >= 0xFE
+                || !((f32)limit < (networkSessionPriorityScale
+                                   * ((slots_14828[index].congestion_10C - (f32)(u16)networkPacket_getFrameOverhead())
+                                      - (f32)(u16)networkPacket_getMessageOverhead()))
+                                      / networkSessionPriorityRange))) {
+            f32 expiry = slots_14828[index].queues_54.expiry_64;
 
-                if (networkSessionZero < expiry) {
-                    networkPacket_setTimestamp(stream, networkSessionNever * (time_16CDC + expiry));
+            if (networkSessionZero < expiry) {
+                networkPacket_setTimestamp(stream, networkSessionNever * (time_16CDC + expiry));
+            } else {
+                networkPacket_setTimestamp(stream, networkSessionZero);
+            }
+            appended = networkStreamQueue_append(&slots_14828[index].queues_54.send_00[channel], stream, 0xFF);
+            if (channel == 0) {
+                if (appended < 0) {
+                    getNetworkLogger()->log_14("NetworkSessionStable[%d] put send pool over (0x%x)\n", index, appended);
+                    setError(index, NETWORK_ERROR_PUT_OVERFLOW, appended, 0x80000000, 1);
                 } else {
-                    networkPacket_setTimestamp(stream, networkSessionZero);
-                }
-                appended = networkStreamQueue_append(&slots_14828[index].queues_54.send_00[channel], stream, 0xFF);
-                if (channel == 0) {
-                    if (appended < 0) {
-                        getNetworkLogger()->log_14("NetworkSessionStable[%d] put send pool over (0x%x)\n", index, appended);
-                        setError(index, NETWORK_ERROR_PUT_OVERFLOW, appended, 0x80000000, 1);
-                    } else {
-                        slots_14828[index].measureSend_114 = time_16CDC;
-                    }
+                    slots_14828[index].measureSend_114 = time_16CDC;
                 }
             }
         }
@@ -1994,11 +1986,11 @@ void NetworkSessionStable::updateRate(s8 index)
         return;
     }
     a = networkRateScale * getRoundTrip(index);
-    b = networkRateScale * slots_14828[index].rateTarget_CC;
+    b = networkRateScale * slots_14828[index].queues_54.rateTarget_78;
     r = (a < b) ? b : a;
     r = (networkRateMin < r) ? r : networkRateMin;
     r = (r < networkRateMax) ? r : networkRateMax;
-    slots_14828[index].rate_C8 = r;
+    slots_14828[index].queues_54.rate_74 = r;
 }
 
 /* Runs once every tick: decays the slot's pack interval towards the floor and reports it. */
@@ -2011,36 +2003,36 @@ void NetworkSessionStable::downPerformance(s8 index)
 
     slot = &slots_14828[index];
     t = time_16CDC;
-    if (t < networkRateMax + slot->lastLower_E8) {
+    if (t < networkRateMax + slot->governor_D4.lastLower_14) {
         return;
     }
-    slot->lastLower_E8 = t;
-    if (slot->adjusting_E0 == 0) {
-        slot->adjusting_E0 = 1;
-        slot->rateFloor_D8 = slot->rateTarget_CC;
-        slot->byteFloor_DC = slot->byteLimit_D0;
+    slot->governor_D4.lastLower_14 = t;
+    if (slot->governor_D4.adjusting_0C == 0) {
+        slot->governor_D4.adjusting_0C = 1;
+        slot->governor_D4.rateFloor_04 = slot->queues_54.rateTarget_78;
+        slot->governor_D4.byteFloor_08 = slot->queues_54.byteLimit_7C;
     }
-    slot->lastAdjust_D4 = time_16CDC;
-    if (slot->rateTarget_CC < rateStep_16CF8) {
-        delta = rateStep_16CF8 - slot->rateTarget_CC;
+    slot->governor_D4.lastAdjust_00 = time_16CDC;
+    if (slot->queues_54.rateTarget_78 < rateStep_16CF8) {
+        delta = rateStep_16CF8 - slot->queues_54.rateTarget_78;
         delta = delta * networkRateUpLerp;
         if (delta < networkRateDownStep) {
-            slot->rateTarget_CC = rateStep_16CF8;
+            slot->queues_54.rateTarget_78 = rateStep_16CF8;
         } else {
-            slot->rateTarget_CC = slot->rateTarget_CC + delta;
+            slot->queues_54.rateTarget_78 = slot->queues_54.rateTarget_78 + delta;
         }
         getNetworkLogger()->signal_0C(1, "NetworkSessionStable::downPerformance:[%d] down -> pack: %fs\n", (u32)index,
-                                      slot->rateTarget_CC);
+                                      slot->queues_54.rateTarget_78);
     }
-    if (slot->byteLimit_D0 > rateWindow_16CFC) {
-        step = (slot->byteLimit_D0 - rateWindow_16CFC) / 2;
+    if (slot->queues_54.byteLimit_7C > rateWindow_16CFC) {
+        step = (slot->queues_54.byteLimit_7C - rateWindow_16CFC) / 2;
         if (step < 16) {
-            slot->byteLimit_D0 = rateWindow_16CFC;
+            slot->queues_54.byteLimit_7C = rateWindow_16CFC;
         } else {
-            slot->byteLimit_D0 = slot->byteLimit_D0 - step;
+            slot->queues_54.byteLimit_7C = slot->queues_54.byteLimit_7C - step;
         }
         getNetworkLogger()->signal_0C(1, "NetworkSessionStable::downPerformance:[%d] down -> byte: %dbyte\n", (u32)index,
-                                      slot->byteLimit_D0);
+                                      slot->queues_54.byteLimit_7C);
     }
 }
 
@@ -2052,43 +2044,43 @@ void NetworkSessionStable::upPerformance(s8 index)
 
     slot = &slots_14828[index];
     t = time_16CDC;
-    if (t < networkRateMax + slot->lastRaise_E4) {
+    if (t < networkRateMax + slot->governor_D4.lastRaise_10) {
         return;
     }
-    slot->lastRaise_E4 = t;
-    if (networkRateMax + slot->lastAdjust_D4 < time_16CDC) {
-        slot->lastAdjust_D4 = time_16CDC;
-        slot->rateFloor_D8 = slot->rateFloor_D8 - networkRateDecay;
-        if (slot->rateFloor_D8 < networkRateFloor) {
-            slot->rateFloor_D8 = networkRateFloor;
+    slot->governor_D4.lastRaise_10 = t;
+    if (networkRateMax + slot->governor_D4.lastAdjust_00 < time_16CDC) {
+        slot->governor_D4.lastAdjust_00 = time_16CDC;
+        slot->governor_D4.rateFloor_04 = slot->governor_D4.rateFloor_04 - networkRateDecay;
+        if (slot->governor_D4.rateFloor_04 < networkRateFloor) {
+            slot->governor_D4.rateFloor_04 = networkRateFloor;
         }
-        slot->byteFloor_DC = slot->byteFloor_DC + 4;
-        if (slot->byteFloor_DC > 1024) {
-            slot->byteFloor_DC = 1024;
+        slot->governor_D4.byteFloor_08 = slot->governor_D4.byteFloor_08 + 4;
+        if (slot->governor_D4.byteFloor_08 > 1024) {
+            slot->governor_D4.byteFloor_08 = 1024;
         }
     }
-    if (slot->adjusting_E0 != 0) {
-        slot->adjusting_E0 = 0;
-        slot->rateFloor_D8 = slot->rateFloor_D8 + (slot->rateTarget_CC - slot->rateFloor_D8) * networkRateDownLerp;
-        slot->byteFloor_DC = slot->byteFloor_DC - (slot->byteFloor_DC - slot->byteLimit_D0) / 4;
+    if (slot->governor_D4.adjusting_0C != 0) {
+        slot->governor_D4.adjusting_0C = 0;
+        slot->governor_D4.rateFloor_04 = slot->governor_D4.rateFloor_04 + (slot->queues_54.rateTarget_78 - slot->governor_D4.rateFloor_04) * networkRateDownLerp;
+        slot->governor_D4.byteFloor_08 = slot->governor_D4.byteFloor_08 - (slot->governor_D4.byteFloor_08 - slot->queues_54.byteLimit_7C) / 4;
     }
-    if (slot->rateFloor_D8 < slot->rateTarget_CC) {
-        if (slot->rateTarget_CC < networkRateUpStep + slot->rateFloor_D8) {
-            slot->rateTarget_CC = slot->rateFloor_D8;
+    if (slot->governor_D4.rateFloor_04 < slot->queues_54.rateTarget_78) {
+        if (slot->queues_54.rateTarget_78 < networkRateUpStep + slot->governor_D4.rateFloor_04) {
+            slot->queues_54.rateTarget_78 = slot->governor_D4.rateFloor_04;
         } else {
-            slot->rateTarget_CC = slot->rateTarget_CC - (slot->rateTarget_CC - slot->rateFloor_D8) * networkRateUpLerp;
+            slot->queues_54.rateTarget_78 = slot->queues_54.rateTarget_78 - (slot->queues_54.rateTarget_78 - slot->governor_D4.rateFloor_04) * networkRateUpLerp;
         }
         getNetworkLogger()->signal_0C(1, "NetworkSessionStable::upPerformance[%d] up -> pack: %fs\n", (u32)index,
-                                      slot->rateTarget_CC);
+                                      slot->queues_54.rateTarget_78);
     }
-    if (slot->byteLimit_D0 > slot->byteFloor_DC) {
-        if (slot->byteFloor_DC - 32 < slot->byteLimit_D0) {
-            slot->byteLimit_D0 = slot->byteFloor_DC;
+    if (slot->queues_54.byteLimit_7C < slot->governor_D4.byteFloor_08) {
+        if (slot->governor_D4.byteFloor_08 - 32 < slot->queues_54.byteLimit_7C) {
+            slot->queues_54.byteLimit_7C = slot->governor_D4.byteFloor_08;
         } else {
-            slot->byteLimit_D0 = slot->byteLimit_D0 + (slot->byteFloor_DC - slot->byteLimit_D0) / 2;
+            slot->queues_54.byteLimit_7C = slot->queues_54.byteLimit_7C + (slot->governor_D4.byteFloor_08 - slot->queues_54.byteLimit_7C) / 2;
         }
         getNetworkLogger()->signal_0C(1, "NetworkSessionStable::upPerformance[%d] up -> byte: %dbyte\n", (u32)index,
-                                      slot->byteLimit_D0);
+                                      slot->queues_54.byteLimit_7C);
     }
 }
 
@@ -2132,21 +2124,19 @@ void NetworkSessionStable::moveOutOfBand(s8 index)
 /* Resolves the slot the session should transmit on: the slot itself, else the slot it is reached through. */
 s8 NetworkSessionStable::getUsableSlot(s8 index)
 {
-    NetworkSessionSlot* slot;
     NetworkSessionSlot* via;
-    s8 viaIndex;
+    s32 viaIndex;
 
     if (index < 0 || 4 <= index) {
         return -1;
     }
-    slot = &slots_14828[index];
-    if (slot->connection_2C == 0) {
+    if (slots_14828[index].connection_2C == 0) {
         return -1;
     }
-    if (slot->authenticated_19 != 0) {
+    if (slots_14828[index].authenticated_19 != 0) {
         return index;
     }
-    viaIndex = slot->relayIndex_10;
+    viaIndex = slots_14828[index].relayIndex_10;
     if (viaIndex < 0) {
         return -1;
     }

@@ -23,7 +23,8 @@
  * FLAGS.  C++ under `cflags_network` (`-Cpp_exceptions on` gives the `extab`), per-unit `-O3`/`-pool off` (`configure.py`);
  * file-scope `#pragma peephole off` (playbook 39); each `dont_inline` region keeps a retail `bl` that `-inline auto` folds.
  *
- * RESIDUALS.  `getSomething5` (8 B, a byte read at +0x6134 of another band's object) is not written.
+ * RESIDUALS.  none in `.text`.  `getSomething5` reads `NetworkStateMachine::binaryState_6134` (the view
+ *   `Network/network_state.h` owns); its map name is kept (a non-generated GUESS, rename requested via the integrator).
  */
 #include "types.h"
 #include "Network/network_transport.h"
@@ -32,6 +33,7 @@
    cannot be included beside `unsplit/OS.h`: the two band headers declare `OSCreateThread`/`OSResumeThread` with
    different signatures and a TU that sees both fails with `(10197) illegal function overloading`. */
 #include "unsplit/Network.h"
+#include "Network/network_state.h"
 #include "unsplit/Runtime.PPCEABI.H.h"
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
@@ -58,6 +60,13 @@ void LockMutex(void* mutex)
     NetworkPeerLock* lock = (NetworkPeerLock*)mutex;
 
     OSLockMutex(&lock->mutex_04);
+}
+
+/* Returns the state machine's binary state byte (+0x6134); 10 means the maintenance-reject path. */
+/* untyped: opaque handle passed through - callers hand over the session-manager instance */
+u32 getSomething5(void* self)
+{
+    return ((NetworkStateMachine*)self)->binaryState_6134;
 }
 
 /* Publishes the value the session's put path consults. */

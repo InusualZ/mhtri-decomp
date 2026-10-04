@@ -32,10 +32,13 @@
  * FLAGS.  C++ under `cflags_network` (`-Cpp_exceptions on` gives the `extab`), per-unit `-O3`/`-pool off` (`configure.py`);
  * file-scope `#pragma peephole off` (playbook 39); each `dont_inline` region keeps a retail `bl` that `-inline auto` folds.
  *
- * RESIDUALS.  `NetworkByteStream::takeRecord` 81.39 % (retail branches forward to the shared zero-store where ours
- * falls through, plus one `lhz` reload of the address-taken length local; both spellings were tried);
- * `NetworkMultipleUdp::receive` 94.06 % (the peer-index/length register pair is swapped: r31 in retail, r29 ours);
- * the object's `.text` is 4 B short of the claim.
+ * SHAPES.  `takeRecord` copies the address-taken length into a register local before testing it (else `lhz`
+ * reloads it) and keeps the zero-store in an `else` (retail's shared tail); `receive` computes the running total
+ * as `taken + 2` before testing it (retail's `addi` order).
+ *
+ * RESIDUALS.  `NetworkMultipleUdp::receive`: register colouring only - retail gives the peer index/`taken` r31, the
+ * used-count pointer r30 and the length/total r29, ours r29/r31/r30 (all 720 declaration orders measured: no
+ * change).
  */
 #include "types.h"
 #include "Network/network_transport.h"
@@ -379,11 +382,11 @@ s32 NetworkMultipleUdp::receive(s32 peerIndex, u8* out, s32 capacity)
     }
     memcpy(&length2, queue + taken, 2);
     length2 = getNetworkLogger()->flag_48(length2);
-    taken += 2;
-    if (*used < taken + length2) {
+    total = taken + 2;
+    if (*used < total + length2) {
         return 0;
     }
-    total = taken + length2;
+    total += length2;
     if (capacity < total) {
         return 0;
     }
@@ -508,25 +511,26 @@ void NetworkByteStream::forwardRecord(NetworkStreamSink* sink)
 void NetworkByteStream::takeRecord(NetworkPeerRecord* record)
 {
     u16 length;
+    u16 size;
 
     if (this->cursor_0C < 2) {
         return;
     }
     this->readLength(&length);
-    if (length > this->cursor_0C || length > record->size_04) {
+    size = length;
+    if (size <= this->cursor_0C && size <= record->size_04) {
+        record->size_04 = size;
+        if (size != 0) {
+            if (record->data_00 != NULL) {
+                memcpy(record->data_00, this->data_04, size);
+            }
+            this->cursor_0C -= record->size_04;
+            if (this->cursor_0C != 0) {
+                memmove(this->data_04, this->data_04 + record->size_04, this->cursor_0C);
+            }
+        }
+    } else {
         record->size_04 = 0;
-        return;
-    }
-    record->size_04 = length;
-    if (length == 0) {
-        return;
-    }
-    if (record->data_00 != NULL) {
-        memcpy(record->data_00, this->data_04, length);
-    }
-    this->cursor_0C -= length;
-    if (this->cursor_0C != 0) {
-        memmove(this->data_04, this->data_04 + length, this->cursor_0C);
     }
 }
 
