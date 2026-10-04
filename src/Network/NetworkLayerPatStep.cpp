@@ -3,7 +3,7 @@
  * 0x803E44C8..0x803E4888, 1 function / 960 B).
  *
  * NAMING (GUESS).  The range carries no `__FILE__` string and the dump answers `zz_03e44c8_`.  What
- * it is: the vtable slot +0x104 of `lbl_805FC1E0` (0x805FC1E0), the table `fn_803E0C18` stores into the
+ * it is: the vtable slot +0x104 of `lbl_805FC1E0` (0x805FC1E0), the table `__ct__15NetworkLayerPatFv` stores into the
  * `NetworkLayerPat` it builds (the class name is the pool strings' own: "NetworkLayerPat::move ...").
  * The body advances the `NetworkRequest` state at +0x00 (0 -> 5 -> 10 -> 15 -> 20 -> 25 -> 30, or 100
  * / 110 on failure) and issues the layer requests `sendReqLayerUp`, `sendReqLayerChildInfo` and

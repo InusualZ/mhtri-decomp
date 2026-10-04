@@ -488,7 +488,6 @@ u32 fn_805026D8(void);
 /* internal */ s32 dtor_8007B7F0(s32 arg0, s16 arg1);
 /* internal */ s32 fn_8007B834(s32 arg0);
 /* internal */ u32 fn_8007B864(s32 *arg0, s32 *arg1);
-/* internal */ s32 fn_8007B870(s32 arg1);
 /* internal */ s32 fn_8007B878(s32 arg0, s32 arg1);
 /* internal */ u32 fn_8007B8DC(s32 *arg0, s32 arg1);
 /* internal */ void fn_8007B93C(void* a0);
@@ -2761,9 +2760,15 @@ u32 fn_8007B864(s32 *arg0, s32 *arg1) {
     *arg0 = *arg1;
 }
 
-s32 fn_8007B870(s32 arg1) {
-    return arg1;
+}   /* extern "C": the placement `operator new` below has C++ linkage (`__nw__FUlPv`) */
+
+/* The placement `operator new`: the caller's address back, unchanged. */
+/* untyped: opaque handle passed through - the placement address the caller hands in */
+void* operator new(unsigned long size, void* place) {
+    return place;
 }
+
+extern "C" {
 
 s32 fn_8007B878(s32 arg0, s32 arg1) {
     fn_8007B8DC(0, 0);

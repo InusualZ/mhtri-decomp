@@ -42,7 +42,7 @@
  * Naming note: references only to OTHER units' unrenamed fn_XXXXXXXX symbols - every `fn_` this
  * file names (`fn_80396070`, `fn_80396248`, `fn_8039631C`, `fn_803963F4`, `fn_80396654`,
  * `fn_803967F0`, `fn_80396934`, `fn_80396944`, `fn_80395DF4`, `fn_8004DF10`, `sysSE_stop`,
- * `fn_80214EF0`, `fn_80215170`, `fn_803772A8`, `fn_803B7154`, `fn_804338E0`) is still
+ * `fn_80214EF0`, `fn_80215170`, `fn_803772A8`, `fn_803B7154`, `getProfileQuestRecord`) is still
  * `fn_XXXXXXXX` in the map and none is a row this unit defines (checked with
  * `python tools/symbols/symedit.py range 0x80394000 0x80397000` against the 18 renamed rows this
  * file owns).
@@ -63,6 +63,7 @@
 #include "types.h"
 #include "lobby/lb_quest_board.h"
 #include "quest/quest_entry.h"   /* `quest_record_find` (the owner's header, rule 2) */
+#include "Network/net_session_close.h"   /* `getProfileQuestRecord` (the owner's header, rule 2) */
 #include "Runtime.PPCEABI.H/memset.h"
 
 /* Declarations of this range's own symbols that are still unwritten (`fn_` in the map), so the
@@ -158,7 +159,7 @@ extern "C" void lb_quest_board_cursor_reset(LbQuestBoardWork* work) {
  * and the row/label semantics come from the two callees' own names. */
 extern "C" bool lb_quest_board_accept_input(void) {
     LbQuestBoardWork* work = lobby_w.menu_0xAC;
-    QuestRecord* row = quest_record_find(*fn_804338E0(work->index_0x249));
+    QuestRecord* row = quest_record_find(*getProfileQuestRecord(work->index_0x249));
     u32 current;
 
     if (row == NULL) {

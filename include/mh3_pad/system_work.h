@@ -101,7 +101,7 @@ typedef struct SystemWork {
     /* +0x7D1 */ u8 field_0x7d1;    /* set to 1 with +0x7D2 by the lobby pre-quest flow */
     /* +0x7D2 */ u8 field_0x7d2;    /* == 1 is the quest-work busy gate (`quest_work_busy_ck`) */
     /* +0x7D3 */ u8 field_0x7d3;    /* game_ready_ck: == 1 */
-    /* +0x7D4 */ u8 pad_0x7d4[0x1];
+    /* +0x7D4 */ u8 net_active_0x7d4;   /* GUESS name: the network control's start-up and Pat reset both clear it */
     /* +0x7D5 */ u8 field_0x7d5;
     /* +0x7D6 */ u8 leave_flag_0x7d6;   /* GUESS name: `arena_task` sets it to 1 with +0x7D5 when the arena hands back to the game mode */
     /* +0x7D7 */ u8 pad_0x7d7[0x1];
@@ -139,7 +139,8 @@ typedef struct SystemWork {
     /* +0x894 */ u32 field_0x894;
     /* +0x898 */ u8 pad_0x898[0x4];
     /* +0x89C */ u8 vs_player_done_0x89c[4];   /* GUESS name: per-player flag `arena_result_next` tests before raising +0x850 */
-    /* +0x8A0 */ u8 pad_0x8a0[0xE];
+    /* +0x8A0 */ u8 pad_0x8a0[0x3];
+    /* +0x8A3 */ char player_name_0x8a3[0xB];   /* the player name the network work record copies (`strcpy`) */
     /* +0x8AE */ u8 online_0x8ae;       /* GUESS name: 0 = offline play (`arena_result_next` then arms the solo flag), 1 = online */
     /* +0x8AF */ u8 field_0x8af;   /* non-zero selects the second column of `multi_arena_clr_time`
                                     * in `quest/quest_entry.cpp`'s arena time formatter */
@@ -169,7 +170,11 @@ typedef struct SystemWork {
     /* +0x931 */ u8 unk2353;
     /* +0x932 */ u8 pad_0x932[0x16];
     /* +0x948 */ void* field_0x948;    /* work-heap base, cleared by fn_800CE5B4 */
-    /* +0x94C */ u8 pad_0x94c[0x108];
+    /* +0x94C */ u8 pad_0x94c[0x104];
+    /* +0xA50 */ u8 transfer_mode_0xa50;    /* the network transfer mode (the network control's start-up sets 1) */
+    /* +0xA51 */ u8 transfer_flag_0xa51;    /* cleared with it (0) */
+    /* +0xA52 */ u8 transfer_level_0xa52;   /* the transfer level handed to the mediator (start-up sets 4) */
+    /* +0xA53 */ u8 pad_0xa53[0x1];
     /* +0xA54 */ void (*field_0xa54)(s32, s32);
     /* +0xA58 */ u8 field_0xa58;      /* pmic_disp_off clears */
     /* +0xA59 */ u8 pad_0xa59[0x3];

@@ -373,9 +373,6 @@ struct NetRosterSync;
 struct NetworkPat;
 }
 
-/* MH3GetErrorString2 (`MH3GetErrorString2__Fl`, C++ linkage) - the localized message for a network error code. */
-char* MH3GetErrorString2(s32 code);
-
 /* `__dl__FPv`'s real spelling (the caller's `operator delete`); see the ef units' convention.
  * It is a C++ operator, so it is declared outside the `extern "C"` block. */
 void operator delete(void* ptr) throw();

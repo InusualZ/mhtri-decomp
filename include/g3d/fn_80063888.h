@@ -134,6 +134,11 @@ u32 fn_80063FD0(void *p);                /* 0x80063FD0 - the checked `ResAnmScn`
 
 #ifdef __cplusplus
 }
+
+/* 0x80065804 - the placement `operator delete` (a bare `blr`); the landing pad of a placement `new` whose
+ * constructor throws calls it. */
+/* untyped: opaque handle passed through - the block and the placement address */
+void operator delete(void* block, void* place);
 #endif
 
 #endif /* MHTRI_G3D_FN_80063888_H */

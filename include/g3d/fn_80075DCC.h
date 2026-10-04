@@ -105,6 +105,11 @@ u32 fn_8007B878(s32 pDst, s32 offset);
 
 #ifdef __cplusplus
 }
+
+/* 0x8007B870 - the placement `operator new` (`mr r3,r4; blr`: hands the caller's address back); the network
+ * work record builds its friend list in place with it. */
+/* untyped: opaque handle passed through - the placement address the caller hands in */
+void* operator new(unsigned long size, void* place);
 #endif
 
 #endif /* MHTRI_G3D_FN_80075DCC_H */

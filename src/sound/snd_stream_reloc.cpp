@@ -79,8 +79,8 @@ void fn_800E87E0(void* alloc, void* free);
 
 s16 fn_800E8880(LevelSetting* setting);
 void* getInstance(void);
-void fn_800E89E0(u32 v);
-void fn_800E8D40(void);
+void setStreamTransferMode(u32 v);
+void clearReverbWorkArea(void);
 void fn_800E8D74(void);
 void fn_800E8E3C(s16* p);
 
@@ -300,13 +300,13 @@ extern "C" void* getInstance(void)
 }
 
 /* Records whether the given state is the "off" one. */
-extern "C" void fn_800E89E0(u32 v)
+extern "C" void setStreamTransferMode(u32 v)
 {
     lbl_80794A08[0] = (u8)(v == 1);
 }
 
 /* Clears the reverb work area. */
-extern "C" void fn_800E8D40(void)
+extern "C" void clearReverbWorkArea(void)
 {
     u32 size = 0x8000;
     void* base = (void*)0x90003F60;
@@ -621,7 +621,7 @@ extern "C" void fn_800E8730(void)
     level = OSDisableInterrupts();
     lbl_807949D8 = fn_8046D420((void*)fn_800E8888);
     OSRestoreInterrupts(level);
-    /* The same reverb work-area clear `fn_800E8D40` performs; retail has the body here too. */
+    /* The same reverb work-area clear `clearReverbWorkArea` performs; retail has the body here too. */
     lbl_807949E4 = 0x8000;
     lbl_807949E8 = 0x90003F60;
     lbl_807949EC = 0;

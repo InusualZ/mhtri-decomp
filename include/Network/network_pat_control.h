@@ -3,12 +3,10 @@
  * (`Network/network_pat_control.cpp`, `.text` 0x80429B94..0x8043065C).
  *
  * The `net_ctrl_wk` singleton (map: `.sbss:0x80794CF8`, a 4-byte pointer) is the record every
- * function in the band dereferences; its owner TU is unclaimed, so the extern lives here beside the
- * one unit that reads it today (docs/plan.md 6.5 rule 2's unsplit-address gap).  Only the offsets
- * this unit reads are named; every other byte stays `pad_0xNNN`.
+ * function in the band dereferences; it points at `net_ctrl_work` (`.bss` 0x806D3790), and the unit
+ * defines both.  Only the offsets the band's functions read are named; every other byte stays `pad_0xNNN`.
  *
- * `NetCtrlWk` size: 0xC4A0 approximate - the highest offset any function in the band touches is
- * +0xC49F; the record is larger than anything this unit proves.  It is a class: the band's functions
+ * `NetCtrlWk` size: 0xC4A8 - the map's size of `net_ctrl_work`.  It is a class: the band's functions
  * that work on the singleton are its (static) members, and it is packed because the record carries a
  * `u32` run at the odd offset +0x7996 that natural alignment would slide.
  *
@@ -20,6 +18,7 @@
 #define MHTRI_NETWORK_NETWORK_PAT_CONTROL_H
 
 #include "types.h"
+#include "OS/mem.h"                /* MEMiHeapHead - the network heap's head */
 #include "MSL_C/alloc.h"           /* strcpy (owner: MSL_C/alloc.cpp, rule 2) */
 #include "Network/NetworkPat.h"
 #include "Network/NetworkSessionManagerPat.h"   /* getPatsObject, isNetworkSessionManagerPatReady (owner's header, rule 2) */
@@ -32,7 +31,7 @@ extern "C" {
 /* One slot of the 16-entry server/message table at `NetCtrlWk::entries_0x7CD8` (stride 0x5C). */
 typedef struct NetCtrlEntry {
     /* +0x00 */ u8 in_use_0x00;
-    /* +0x01 */ u8 pad_0x01;
+    /* +0x01 */ u8 index_0x01;    /* the slot's own index (initWorkRecord numbers them) */
     /* +0x02 */ u8 kind_0x02;
     /* +0x03 */ u8 flags_0x03;
     /* +0x04 */ char name_0x04[0x48];
@@ -64,17 +63,32 @@ typedef struct NetPoolEntry {
 } NetPoolEntry; /* size: 0x20 */
 
 /*@TYPES begin@*/
-/* One 0x40-byte slot of a profile's id table: the id first, the rest untouched here. */
-typedef struct NetIdSlot {
-    /* +0x00 */ NetId id_0x00;
-    /* +0x0A */ u8 pad_0x0A[0x36];
-} NetIdSlot; /* size: 0x40 */
+/* One 0x40-byte member slot of a profile: the joined word and flag the session join writes, and the
+ * member's id at +0x20. */
+typedef struct NetMemberSlot {
+    /* +0x00 */ u32 joined_0x00;
+    /* +0x04 */ u8 flag_0x04;
+    /* +0x05 */ u8 pad_0x05[0x1B];
+    /* +0x20 */ NetId id_0x20;
+    /* +0x2A */ u8 pad_0x2A[0x16];
+} NetMemberSlot; /* size: 0x40 */
 
 /* The per-profile record `NetCtrlWk::profiles_0x168` points at (stride 0x2B4). */
 typedef struct NetProfileRec {
-    /* +0x000 */ u8 pad_0x000[0xB0];
-    /* +0x0B0 */ NetIdSlot ids_0x0B0[8];
-    /* +0x2B0 */ u8 pad_0x2B0[0x4];
+    /* +0x000 */ u8 pad_0x000[0x3C];
+    /* +0x03C */ s32 capacity_0x03C;
+    /* +0x040 */ s32 active_0x040;
+    /* +0x044 */ u8 pad_0x044[0xC];
+    /* +0x050 */ s32 value_0x050;
+    /* +0x054 */ u8 pad_0x054[0x4];
+    /* +0x058 */ s32 quest_0x058;       /* the quest id (copied to quest_id_0x190) */
+    /* +0x05C */ u8 pad_0x05C[0x30];
+    /* +0x08C */ u8 rank_0x08C;
+    /* +0x08D */ u8 flag_0x08D;
+    /* +0x08E */ u8 pad_0x08E[0x2];
+    /* +0x090 */ NetMemberSlot members_0x090[4];
+    /* +0x190 */ u16 quest_id_0x190;   /* the quest record id `getProfileQuestRecord` hands out */
+    /* +0x192 */ u8 pad_0x192[0x122];
 } NetProfileRec; /* size: 0x2B4 */
 
 /* The name field of a peer record (0x14 bytes). */
@@ -98,6 +112,13 @@ typedef struct NetPeerRec {
 
     void assign(const NetPeerRec* src);
 } NetPeerRec; /* size: 0x120 */
+
+/* One 0x20-byte peer address object (`NetCtrlWk::peer_addresses_0x7908`): a small network object the
+ * record's constructor builds with `networkSmallObject_construct`; compared with `networkSmallObject_isEqual`.
+ * size: 0x20 */
+typedef struct NetPeerAddress {
+    /* +0x00 */ u8 bytes_0x00[0x20];
+} NetPeerAddress; /* size: 0x20 */
 
 /* The peer list `NetCtrlWk::copyPeerList` copies out for the caller: the count, then the four records. */
 typedef struct NetPeerList {
@@ -346,18 +367,42 @@ typedef struct NetSlotIds {
     /* +0x0C */ u32 slot_0x0C;
 } NetSlotIds; /* size: 0x10 */
 
+/* One 12-byte run of a laid-out message: where its text starts, the tag flags it carries (1 body, 2 size,
+ * 4 colour, 8 line break, 0x10..0x80 alignment, 0x100 line feed), the colour and size indices, the line-feed
+ * count and the run's length in bytes. */
+typedef struct NetTextRun {
+    /* +0x00 */ char* text_0x00;
+    /* +0x04 */ u32 flags_0x04;
+    /* +0x08 */ u8 color_0x08;
+    /* +0x09 */ u8 size_0x09;
+    /* +0x0A */ u8 lines_0x0A;
+    /* +0x0B */ u8 length_0x0B;
+} NetTextRun; /* size: 0xC */
+
 /* The text-layout state `NetTextTagState::parseTag` parses tags out of (GUESS on the owner: a message layout record);
- * only the tag buffer, the read cursor and the status byte are named.  size: 0x30E (approximate) */
+ * the work record's `text_layout_0xC144` is one (allocateDialogRecord allocates 0x314 bytes for it).
+ * size: 0x314 */
 typedef struct NetTextTagState {
-    /* +0x000 */ u8 pad_0x000[0x2D8];
+    /* +0x000 */ NetTextRun runs_0x000[50];
+    /* +0x258 */ char line_0x258[0x80];     /* the run being printed, NUL-terminated */
     /* +0x2D8 */ char tag_0x2D8[0x20];
-    /* +0x2F8 */ u8 pad_0x2F8[0x10];
+    /* +0x2F8 */ NetTextRun* run_0x2F8;     /* the run being filled (layout) or printed (draw) */
+    /* +0x2FC */ NetTextRun* last_0x2FC;    /* the run text is appended to */
+    /* +0x300 */ s16 origin_x_0x300;
+    /* +0x302 */ s16 origin_y_0x302;
+    /* +0x304 */ s16 pen_x_0x304;
+    /* +0x306 */ s16 pen_y_0x306;
     /* +0x308 */ char* cursor_0x308;
-    /* +0x30C */ u8 pad_0x30C;
-    /* +0x30D */ u8 status_0x30D;
+    /* +0x30C */ u8 mode_0x30C;          /* 2 = start a new run before the next character */
+    /* +0x30D */ u8 status_0x30D;        /* 1 = laid out to the end, 2 = a broken tag */
+    /* +0x30E */ u8 tag_id_0x30E;        /* the index of the last tag in text_tag_names */
+    /* +0x30F */ u8 align_0x30F;         /* 5 centre, 6 left, 7 right */
+    /* +0x310 */ u8 color_0x310;
+    /* +0x311 */ u8 size_0x311;          /* index into text_font_size_table */
+    /* +0x312 */ u16 width_0x312;        /* the characters on the current line */
 
     void parseTag(void);
-} NetTextTagState; /* size: 0x30E (approximate) */
+} NetTextTagState; /* size: 0x314 */
 
 /* One 0x5C-byte row of the login server list (`NetCtrlWk::rows_0x17C`): the server id and its name. */
 typedef struct NetRowRec {
@@ -365,11 +410,84 @@ typedef struct NetRowRec {
     /* +0x04 */ char name_0x04[0x58];
 } NetRowRec; /* size: 0x5C */
 
+/* One key/value pair of the roster-sync block: the presence key (1..7) and its state byte. */
+typedef struct NetRosterSyncItem {
+    /* +0x00 */ s32 key_0x00;
+    /* +0x04 */ s8 value_0x04;
+    /* +0x05 */ u8 pad_0x05[0x3];
+} NetRosterSyncItem; /* size: 0x8 */
+
 /* The roster-sync block `NetCtrlWk::roster_sync_0x61CC` (built by `buildRosterSync`, sent by
- * `NetworkCommunityPat::syncFriends`); its layout is the callee's own.  size: 0x44 */
+ * `NetworkCommunityPat::syncFriends`): the pair count and up to eight pairs.  size: 0x44 */
 struct NetRosterSync {
-    /* +0x00 */ u8 bytes_0x00[0x44];
+    /* +0x00 */ s32 count_0x00;
+    /* +0x04 */ NetRosterSyncItem items_0x04[8];
 };
+
+/* An 8-byte member of the Pat settings block (an s64 wrapped in a record: the wrapper is what gives the
+ * aggregate copy its high-word-first move order). */
+#pragma pack(push, 4)
+typedef struct PatSettingsPair {
+    /* +0x00 */ s64 value_0x00;
+} PatSettingsPair; /* size: 0x8 */
+
+/* The 0x40-byte Pat settings block the work record keeps at +0xC208 and the network save carries.  The
+ * member split is the one `copyPatSettings`'s aggregate copy reveals (single words and the 8-byte s64 moves;
+ * packed to 4 so the s64 members keep their offsets); the meaning of each member is not known. */
+typedef struct PatSettings {
+    /* +0x00 */ u32 word_0x00;
+    /* +0x04 */ PatSettingsPair pair_0x04;
+    /* +0x0C */ u32 word_0x0C;
+    /* +0x10 */ PatSettingsPair pair_0x10;
+    /* +0x18 */ u32 word_0x18;
+    /* +0x1C */ u32 word_0x1C;
+    /* +0x20 */ u32 word_0x20;
+    /* +0x24 */ u32 word_0x24;
+    /* +0x28 */ PatSettingsPair pair_0x28;
+    /* +0x30 */ PatSettingsPair pair_0x30;
+    /* +0x38 */ u32 word_0x38;
+    /* +0x3C */ u32 word_0x3C;
+} PatSettings; /* size: 0x40 */
+#pragma pack(pop)
+
+/* The network save record `exportNetworkSave`/`importNetworkSave` move to and from the work record.
+ * size: 0x88 (approximate: the highest byte written) */
+typedef struct NetSaveRecord {
+    /* +0x00 */ u8 pad_0x00[0x4];
+    /* +0x04 */ s32 terms_version_0x04;
+    /* +0x08 */ PatSettings settings_0x08;
+    /* +0x48 */ char support_code_0x48[0x20];
+    /* +0x68 */ char name_0x68[0xB];
+    /* +0x73 */ s8 byte_0x73;
+    /* +0x74 */ u8 pad_0x74[0x4];
+    /* +0x78 */ s32 words_0x78[4];
+} NetSaveRecord; /* size: 0x88 (approximate) */
+
+/* One 0x18-byte community command result record (`NetCtrlWk::community_results_0xA144`). */
+typedef struct NetCommunityResult {
+    /* +0x00 */ s32 words_0x00[6];
+} NetCommunityResult; /* size: 0x18 */
+
+/* An error triple the layer leaves: the error code, its detail and the server's reason word.  size: 0xC */
+typedef struct NetErrorTriple {
+    /* +0x0 */ u32 code_0x0;
+    /* +0x4 */ s32 detail_0x4;
+    /* +0x8 */ s32 reason_0x8;
+} NetErrorTriple; /* size: 0xC */
+
+/* The pending session-manager request (`NetCtrlWk::session_request_0x829C`): a busy word, the command, the
+ * completion handler `sessionReflectCallback` calls with the status and the four result values, and two
+ * state bytes (`ok_0x21` = the request succeeded). */
+typedef struct NetSessionRequest {
+    /* +0x00 */ s32 busy_0x00;
+    /* +0x04 */ s32 command_0x04;
+    /* +0x08 */ void (*done_0x08)(s32 status, s32* values);
+    /* +0x0C */ s32 status_0x0C;
+    /* +0x10 */ s32 values_0x10[4];
+    /* +0x20 */ u8 pending_0x20;
+    /* +0x21 */ u8 ok_0x21;
+    /* +0x22 */ u8 pad_0x22[0x2];
+} NetSessionRequest; /* size: 0x24 */
 
 /* The confirm-dialog record `NetCtrlWk::dialog_0xBF30` points at; only the four bytes and the counter
  * the state machine drives are named.  size: 0x12A (approximate) */
@@ -424,30 +542,36 @@ typedef struct NetUserData {
 #pragma pack(push, 1)
 typedef struct NetCtrlWk {
 /*@NetCtrlWk begin@*/
-    /* +0x000 */ s32 reset_0x000;
-    /* +0x004 */ u8 pad_0x004[0xC];
+    /* +0x000 */ NetworkPat* pats_0x000;   /* the Pat holder `net_pats_object` (initNetworkPatControl) */
+    /* +0x004 */ NetworkSessionManagerPat* session_manager_0x004;  /* built by initNetworkPatControl */
+    /* +0x008 */ NetworkLayerPat* layer_0x008;
+    /* +0x00C */ NetworkCommunityPat* community_0x00C;
     /* +0x010 */ u8 mode_0x010;
     /* +0x011 */ u8 state_0x011;
-    /* +0x012 */ u8 pad_0x012[0x2];
+    /* +0x012 */ u8 flag_0x012;
+    /* +0x013 */ u8 flag_0x013;
     /* +0x014 */ u8 entered_0x014;
     /* +0x015 */ u8 flag_0x015;
     /* +0x016 */ u8 flag_0x016;
     /* +0x017 */ u8 sub_state_0x017;
     /* +0x018 */ u8 step_0x018;
     /* +0x019 */ u8 substep_0x019;
-    /* +0x01A */ u8 pad_0x01A[0x2];
+    /* +0x01A */ u8 substep_0x01A;
+    /* +0x01B */ u8 pad_0x01B;
     /* +0x01C */ s32 cursor_0x01C;
     /* +0x020 */ s32 cursor_0x020;
     /* +0x024 */ s32 scroll_0x024;
-    /* +0x028 */ u8 pad_0x028[0x4];
+    /* +0x028 */ s32 cursor_0x028;
     /* +0x02C */ s32 repeat_0x02C;
     /* +0x030 */ s32 repeat_0x030;
-    /* +0x034 */ u8 pad_0x034[0xC];
+    /* +0x034 */ s32 repeat_0x034;
+    /* +0x038 */ s32 repeat_0x038;
+    /* +0x03C */ s32 field_0x03C;
     /* +0x040 */ u8 server_slot_state_0x040[4];
-    /* +0x044 */ u32 ready_count_0x044;
-    /* +0x048 */ u8 pad_0x048[0x4];
+    /* +0x044 */ s32 ready_count_0x044;
+    /* +0x048 */ s32 leave_0x048;      /* 1 while a leave is pending (the 0x1E request's completion tests it) */
     /* +0x04C */ s32 flag_0x04C;
-    /* +0x050 */ u8 pad_0x050[0x4];
+    /* +0x050 */ s32 error_0x050;
     /* +0x054 */ s32 error_0x054;
     /* +0x058 */ s32 error_0x058;
     /* +0x05C */ s32 error_0x05C;
@@ -455,22 +579,27 @@ typedef struct NetCtrlWk {
     /* +0x064 */ s32 layer_state_0x064;
     /* +0x068 */ u8 flag_0x068;
     /* +0x069 */ u8 flag_0x069;
-    /* +0x06A */ u8 selected_server_0x06A;
-    /* +0x06B */ u8 pad_0x06B[0x9];
+    /* +0x06A */ s8 selected_server_0x06A;   /* this player's slot, -1 = none */
+    /* +0x06B */ s8 flag_0x06B;
+    /* +0x06C */ s8 flag_0x06C;
+    /* +0x06D */ u8 pad_0x06D[0x3];
+    /* +0x070 */ s32 field_0x070;
     /* +0x074 */ s8 server_index_0x074[4];
-    /* +0x078 */ u8 pad_0x078[0x20];
-    /* +0x098 */ s32 flag_0x098;
-    /* +0x09C */ u8 pad_0x09C[0x98];
-    /* +0x134 */ u32 net_error_0x134;
-    /* +0x138 */ s32 net_error_0x138;
-    /* +0x13C */ u8 pad_0x13C[0x2C];
+    /* +0x078 */ s32 results_0x078[44];   /* one result word per session command (sessionReflectCallback) */
+    /* +0x128 */ u8 cleared_0x128[0xC];   /* first bytes of the 0x3C run initWorkRecord clears */
+    /* +0x134 */ NetErrorTriple net_error_0x134;   /* the layer's last error (getNetErrorMessageId maps it) */
+    /* +0x140 */ NetFetchError session_error_0x140;
+    /* +0x14C */ NetFetchError reflect_error_0x14C;
+    /* +0x158 */ u8 pad_0x158[0xC];
+    /* +0x164 */ s32 profile_count_0x164;
     /* +0x168 */ NetProfileRec* profiles_0x168;
-    /* +0x16C */ u8 pad_0x16C[0x4];
+    /* +0x16C */ s32 field_0x16C;
     /* +0x170 */ s32 profile_index_0x170;
     /* +0x174 */ s32 status_0x174;
     /* +0x178 */ u32 row_count_0x178;
-    /* +0x17C */ NetRowRec rows_0x17C[13];
-    /* +0x628 */ u8 pad_0x628[0x38];
+    /* +0x17C */ NetRowRec rows_0x17C[8];
+    /* +0x45C */ u32 page_count_0x45C;
+    /* +0x460 */ u8 page_records_0x460[8][0x40];
     /* +0x660 */ u32 server_count_0x660;
     /* +0x664 */ u8 pad_0x664[0x4];
     /* +0x668 */ NetSrvRec servers_0x668[100];
@@ -480,23 +609,12 @@ typedef struct NetCtrlWk {
     /* +0x6134 */ u8 pad_0x6134[0x98];
     /* +0x61CC */ NetRosterSync roster_sync_0x61CC;
     /* +0x6210 */ u32 settings_0x6210[4];
-    /* +0x6220 */ u8 pad_0x6220[0x28];
-    /* +0x6248 */ s32 status_0x6248;
-    /* +0x624C */ s32 status_0x624C;
-    /* +0x6250 */ u8 pad_0x6250[0x8];
-    /* +0x6258 */ s32 status_0x6258;
-    /* +0x625C */ u8 pad_0x625C[0xC];
-    /* +0x6268 */ s32 status_0x6268;
-    /* +0x626C */ u8 pad_0x626C[0x14];
-    /* +0x6280 */ s32 status_0x6280;
-    /* +0x6284 */ u8 pad_0x6284[0x8];
-    /* +0x628C */ s32 status_0x628C;
-    /* +0x6290 */ s32 status_0x6290;
-    /* +0x6294 */ u8 pad_0x6294[0x3C];
-    /* +0x62D0 */ s32 status_0x62D0;
+    /* +0x6220 */ u8 pad_0x6220[0x24];
+    /* +0x6244 */ s32 layer_results_0x6244[36];   /* one result word per layer command (installLayerCallback clears them) */
     /* +0x62D4 */ u8 pad_0x62D4[0x14];
     /* +0x62E8 */ s32 peer_count_0x62E8;
-    /* +0x62EC */ u8 pad_0x62EC[0x34];
+    /* +0x62EC */ u8 pad_0x62EC[0x24];
+    /* +0x6310 */ u32 sizes_0x6310[4];   /* 0x2E0 / 0x200 / 0x2260 / 0 after init */
     /* +0x6320 */ NetPoolEntry pool_0x6320[128];
     /* +0x7320 */ u8 pad_0x7320[0x48];
     /* +0x7368 */ char name_0x7368[0xA];
@@ -506,21 +624,30 @@ typedef struct NetCtrlWk {
         u8 msgTable_0x7488[0x480];   /* the byte view `Network/network_pat_control.cpp` indexes */
         NetPeerRec peers_0x7488[4];
     };
-    /* +0x7908 */ u8 pad_0x7908[0x80];
+    /* +0x7908 */ NetPeerAddress peer_addresses_0x7908[4];   /* the peers' address objects (the record's ctor builds them) */
     /* +0x7988 */ u8 used_0x7988[4];
-    /* +0x798C */ u8 pad_0x798C[0xA];
+    /* +0x798C */ u8 pad_0x798C[0x4];
+    /* +0x7990 */ u8 transfer_flag_0x7990;   /* handed to the mediator (0x804172DC) */
+    /* +0x7991 */ u8 transfer_flag_0x7991;   /* handed to the mediator (0x804172CC) */
+    /* +0x7992 */ u8 transfer_flag_0x7992;
+    /* +0x7993 */ u8 transfer_level_0x7993;
+    /* +0x7994 */ u8 peer_total_0x7994;
+    /* +0x7995 */ u8 pad_0x7995;
     /* +0x7996 */ u32 slots_0x7996[0x40];
     /* +0x7A96 */ u8 pad_0x7A96[0x2];
     /* +0x7A98 */ u32* arrA_0x7A98[0x40];
     /* +0x7B98 */ u32 arrB_0x7B98[0x40];
     /* +0x7C98 */ u8 arrC_0x7C98[0x40];
     /* +0x7CD8 */ NetCtrlEntry entries_0x7CD8[16];
-    /* +0x8298 */ u8 pad_0x8298[0x2C];
+    /* +0x8298 */ u8 pad_0x8298[0x4];
+    /* +0x829C */ NetSessionRequest session_request_0x829C;
+    /* +0x82C0 */ u8 pad_0x82C0[0x4];
     /* +0x82C4 */ u8 flag_0x82C4;
     /* +0x82C5 */ u8 flag_0x82C5;
     /* +0x82C6 */ u8 flag_0x82C6;
     /* +0x82C7 */ u8 flag_0x82C7;
-    /* +0x82C8 */ s32 field_0x82C8;
+    /* +0x82C8 */ u8 flag_0x82C8;
+    /* +0x82C9 */ u8 pad_0x82C9[0x3];
     /* +0x82CC */ NetworkFileFetcher* fetcher_0x82CC;
     /* +0x82D0 */ u32 fetch_step_0x82D0;
     /* +0x82D4 */ s32 fetch_index_0x82D4;
@@ -548,17 +675,9 @@ typedef struct NetCtrlWk {
     /* +0xA138 */ s32 pages_0xA138;
     /* +0xA13C */ s32 per_page_0xA13C;
     /* +0xA140 */ s32 total_0xA140;
-    /* +0xA144 */ u8 pad_0xA144[0x8];
-    /* +0xA14C */ s32 status_0xA14C;
-    /* +0xA150 */ u8 pad_0xA150[0xC];
-    /* +0xA15C */ s32 status_0xA15C;
-    /* +0xA160 */ u8 pad_0xA160[0x14];
-    /* +0xA174 */ s32 status_0xA174;
-    /* +0xA178 */ u8 pad_0xA178[0x14];
-    /* +0xA18C */ s32 status_0xA18C;
-    /* +0xA190 */ u8 pad_0xA190[0x14];
-    /* +0xA1A4 */ s32 status_0xA1A4;
-    /* +0xA1A8 */ u8 pad_0xA1A8[0x10];
+    /* +0xA144 */ NetCommunityResult community_results_0xA144[4];   /* installCommunityCallback clears the first three */
+    /* +0xA1A4 */ s32 community_tail_0xA1A4[3];
+    /* +0xA1B0 */ u8 pad_0xA1B0[0x8];
     /* +0xA1B8 */ s32 roster_count_0xA1B8;
     /* +0xA1BC */ NetRosterRec roster_0xA1BC[50];
     /* +0xBB84 */ s32 recent_count_0xBB84;
@@ -578,28 +697,36 @@ typedef struct NetCtrlWk {
     /* +0xC0BE */ u8 pad_0xC0BE[0x6];
     /* +0xC0C4 */ char account_name_0xC0C4[0x40];
     /* +0xC104 */ char nickname_0xC104[0x40];
-    /* +0xC144 */ u8 pad_0xC144[0xC];
+    /* +0xC144 */ NetTextTagState* text_layout_0xC144;   /* allocateDialogRecord: work_mem_alloc(0x314) */
+    /* +0xC148 */ u8 pad_0xC148[0x8];
     /* +0xC150 */ u8 screen_0xC150;
-    /* +0xC151 */ u8 pad_0xC151[0x1];
+    /* +0xC151 */ u8 flag_0xC151;
     /* +0xC152 */ u8 action_0xC152;
-    /* +0xC153 */ u8 pad_0xC153[0x5];
+    /* +0xC153 */ u8 start_done_0xC153;   /* set by the session close's completion, read by isSessionStartDone */
+    /* +0xC154 */ s32 field_0xC154;
     /* +0xC158 */ u8 screen_0xC158;
     /* +0xC159 */ u8 screen_0xC159;
     /* +0xC15A */ u8 pad_0xC15A[0x63];
     /* +0xC1BD */ s8 flag_0xC1BD;
     /* +0xC1BE */ u8 flag_0xC1BE;
     /* +0xC1BF */ u8 flag_0xC1BF;
-    /* +0xC1C0 */ u8 pad_0xC1C0[0x8];
-    /* +0xC1C8 */ char player_name_0xC1C8[0x16];
+    /* +0xC1C0 */ u8 flags_0xC1C0[0x4];
+    /* +0xC1C4 */ u8 pad_0xC1C4[0x4];
+    /* +0xC1C8 */ char player_name_0xC1C8[0xB];
+    /* +0xC1D3 */ char save_name_0xC1D3[0xB];   /* the name the network save keeps (exportNetworkSave) */
     /* +0xC1DE */ char support_code_0xC1DE[0x20];
     /* +0xC1FE */ u8 pad_0xC1FE[0x2];
     /* +0xC200 */ s32 terms_version_0xC200;
-    /* +0xC204 */ u8 pad_0xC204[0x54];
+    /* +0xC204 */ s8 save_byte_0xC204;
+    /* +0xC205 */ u8 pad_0xC205[0x3];
+    /* +0xC208 */ PatSettings pat_settings_0xC208;   /* handed to the Pat holder by initNetworkPatControl */
+    /* +0xC248 */ s32 save_words_0xC248[4];
     /* +0xC258 */ s8 error_code_0xC258;
     /* +0xC259 */ s8 sub_error_0xC259;
     /* +0xC25A */ u8 pad_0xC25A[0x2];
     /* +0xC25C */ NetDialog* (*create_dialog_0xC25C)(NetCtrlWk* work);
-    /* +0xC260 */ u8 pad_0xC260[0x8];
+    /* +0xC260 */ u8 pad_0xC260[0x4];
+    /* +0xC264 */ void (*result_callback_0xC264)(void);
     /* +0xC268 */ void (*callback_0xC268)(void);
     /* +0xC26C */ u8 pad_0xC26C[0x4];
     /* +0xC270 */ void (*callback_0xC270)(void);
@@ -608,25 +735,34 @@ typedef struct NetCtrlWk {
     /* +0xC27C */ s32 (*callback_0xC27C)(void);
     /* +0xC280 */ void (*callback_0xC280)(void);
     /* +0xC284 */ s32 (*callback_0xC284)(void);
-    /* +0xC288 */ u8 pad_0xC288[0x8];
+    /* +0xC288 */ s32 (*query_0xC288)(void);   /* initNetworkPatControl stores its answer at +0xC28C */
+    /* +0xC28C */ s32 field_0xC28C;
     /* +0xC290 */ s8* result_0xC290;
     /* +0xC294 */ NetLayerRequest layer_request_0xC294;
     /* +0xC2C8 */ NetId target_id_0xC2C8;
     /* +0xC2D2 */ u8 pad_0xC2D2[0x16];
     /* +0xC2E8 */ char text_0xC2E8[0x18];
     /* +0xC300 */ s32 msg_state_0xC300;
-    /* +0xC304 */ u8 pad_0xC304[0x3C];
+    /* +0xC304 */ s32 view_key_0xC304;     /* compared with seen_key_0xC310 (GUESS on the pair's role) */
+    /* +0xC308 */ s32 view_key_0xC308;     /* compared with seen_key_0xC314 */
+    /* +0xC30C */ u8 pad_0xC30C[0x4];
+    /* +0xC310 */ s32 seen_key_0xC310;
+    /* +0xC314 */ s32 seen_key_0xC314;
+    /* +0xC318 */ u8 pad_0xC318[0x28];
     /* +0xC340 */ NetId request_id_0xC340;
     /* +0xC34A */ u8 pad_0xC34A[0x16];
     /* +0xC360 */ u16 counter_0xC360;
     /* +0xC362 */ u16 counter_0xC362;
     /* +0xC364 */ u32 counter_0xC364;
-    /* +0xC368 */ u8 pad_0xC368[0x1];
+    /* +0xC368 */ u8 flag_0xC368;
     /* +0xC369 */ u8 flag_0xC369;
     /* +0xC36A */ u8 pad_0xC36A[0x2];
     /* +0xC36C */ s32 timeout_0xC36C;
-    /* +0xC370 */ u8 pad_0xC370[0x8];
-    /* +0xC378 */ s32 field_0xC378;
+    /* +0xC370 */ s32 field_0xC370;
+    /* +0xC374 */ s32 field_0xC374;
+    /* +0xC378 */ u8 flag_0xC378;
+    /* +0xC379 */ u8 flag_0xC379;     /* cleared when the session join marks this player's slot */
+    /* +0xC37A */ u8 pad_0xC37A[0x2];
     /* +0xC37C */ s32 fetch_timeouts_0xC37C[8];
     /* +0xC39C */ u8* file_buffers_0xC39C[10];
     /* +0xC3C4 */ u32 file_sums_0xC3C4[10];
@@ -649,10 +785,13 @@ typedef struct NetCtrlWk {
     /* +0xC498 */ s8 field_0xC498;
     /* +0xC499 */ u8 flag_0xC499;
     /* +0xC49A */ u8 flag_0xC49A;
-    /* +0xC49B */ u8 pad_0xC49B[0x3];
+    /* +0xC49B */ u8 flag_0xC49B;
+    /* +0xC49C */ u8 flag_0xC49C;
+    /* +0xC49D */ u8 flag_0xC49D;
     /* +0xC49E */ u8 flag_0xC49E;
     /* +0xC49F */ u8 flag_0xC49F;
-
+    /* +0xC4A0 */ s32 field_0xC4A0;
+    /* +0xC4A4 */ u8 flags_0xC4A4[4];
 
     /* Members of the work record (each is a function of the band, in address order). */
     static void updateIfActive(void);
@@ -745,11 +884,15 @@ typedef struct NetCtrlWk {
     s32 stepStagingDownload(s32 file, u16 version);
     static s32 stepStagingDownloadIfUp(s32 file, u32 version);
 /*@NetCtrlWk end@*/
-} NetCtrlWk; /* size: 0xC4A0 (approximate, see above) */
+} NetCtrlWk; /* size: 0xC4A8 (the .bss instance net_ctrl_work) */
 #pragma pack(pop)
 
-/* The work-record singleton, defined by another (unclaimed) TU. */
+/* The work-record singleton pointer (`.sbss` 0x80794CF8) and the record it points at (`.bss` 0x806D3790),
+ * both defined by `Network/network_pat_control.cpp`. */
 extern NetCtrlWk* net_ctrl_wk;
+extern NetCtrlWk net_ctrl_work;
+/* The network heap (`.sbss` 0x80794CF4, a MEM expanded-heap handle). */
+extern MEMiHeapHead* net_exp_heap;
 
 /* The network facade the band drives. */
 /* The band's entry points that keep C linkage in the map (`can_enter_server` and its siblings are the
@@ -791,6 +934,9 @@ void setTextSize(s16 size);
 void printTextRuns(s16 x, s16 y, s32 unused, char* text);
 char* getOnlineSupportCode(void);
 char* get_network_sub_error_msg(void);
+/* 0x80431194 / 0x80431304 - prints an error message (returns the final pen y); the message of an error code. */
+s16 MH3DispErrorString(s16 x, s16 y, s8* text);
+char* MH3GetErrorString2(s32 code);
 
 /* The 0x80423E74..0x80429B94 band's declarations (absorbed from `fn_80423E74.h` at phase 4): the PatCamellia wrapper over the
  * retail Camellia cipher and the work record's arena vectors, slot table and message pool. */
@@ -822,7 +968,6 @@ void resetNetSlots(NetCtrlWk* work);
  * unused word, the argument count and the argument words (at most four). */
 s32 queueNetCommand(u32 command, s8* result, s32 unused, s32 arg_count, const s32* args);
 void syncScheduleClock(NetCtrlWk* work);
-s32 fn_804C2380(u32 id);
 
 /* The layer facade both network units drive.  `getNetworkLayerPat` and the holder type it takes are
  * declared in their owner's header, `Network/NetworkPat.h`, which this header reaches through
@@ -839,6 +984,90 @@ void* memset(void* dst, int value, u32 size);
  * name below: they are derived from the caller's use) ---- */
 struct PatTerms;
 struct SystemWork;
+/* The terms object `getPatTerms` hands out, seen only as the state byte the band compares (20 = finished).
+ * size: 0x10 (approximate: the highest byte read here) */
+struct PatTerms {
+    /* +0x00 */ u8 pad_0x00[0xC];
+    /* +0x0C */ u8 state_0x0C;
+    /* +0x0D */ u8 pad_0x0D[0x3];
+};
+/* The socket allocator pair `initNetworkPatControl` copies out of `.sdata` 0x807939A8 (`pat_so_allocator`:
+ * `soAlloc`, `soFree`).  size: 0x8 */
+typedef struct PatSoAllocator {
+    /* untyped: byte range - a raw heap block */
+    /* +0x00 */ void* (*alloc_0x00)(u32 name, s32 size);
+    /* untyped: byte range - a raw heap block */
+    /* +0x04 */ void (*free_0x04)(u32 name, void* block, s32 size);
+} PatSoAllocator; /* size: 0x8 */
+/* 0x80426D24 / 0x80426E08 / 0x804270D4 / 0x804271A8 / 0x80427814 - the peer and friend lookups (by id, by
+ * address object) and whether the layer is ready (GUESS names from the bodies). */
+s32 findPeerIndex(const NetId* id);
+s32 findFriendIndex(const NetId* id);
+s32 findFreePeerSlot(const struct NetworkSmallObject* address);
+s32 findPeerSlot(const struct NetworkSmallObject* address);
+BOOL isLayerReady(void);
+/* 0x80427714 / 0x804247D0 - installs the layer's reflect callback (and clears the layer status words);
+ * the callback itself. */
+void installLayerCallback(void);
+/* untyped: caller-owned payload - the layer's reflect payload */
+s32 layerReflectCallback(u32 command, s32 result, s32 count, void* data);
+/* 0x80428CAC - points `net_ctrl_wk` at the work record and resets all of it (GUESS name). */
+void initWorkRecord(void);
+extern NetProfileRec net_profile_table[10];
+/* 0x804292F8 - builds the work record, the network heap and the three Pat layers (GUESS name). */
+void initNetworkPatControl(void);
+/* 0x804295B8 - copies a socket allocator pair. */
+void copySoAllocator(PatSoAllocator* dst, const PatSoAllocator* src);
+/* The parameter block `initNetworkPatControl` hands the Pat library (0x80419BB4): the allocators, the game
+ * name and code, the product id, two strings and the settings block.  size: 0x2C */
+typedef struct PatLibraryParams {
+    /* +0x00 */ PatSoAllocator so_allocator_0x00;
+    /* +0x08 */ u32 flags_0x08;
+    /* untyped: byte range - a raw heap block */
+    /* +0x0C */ void* (*alloc_0x0C)(u32 name, u32 size, s32 align);
+    /* untyped: byte range - a raw heap block */
+    /* +0x10 */ void (*free_0x10)(u32 name, void* block, u32 size);
+    /* +0x14 */ const char* game_name_0x14;
+    /* +0x18 */ u32 game_code_0x18;
+    /* +0x1C */ s32 product_0x1C;
+    /* +0x20 */ const char* secret_0x20;
+    /* +0x24 */ const char* extra_0x24;
+    /* +0x28 */ struct PatSettings* settings_0x28;
+} PatLibraryParams; /* size: 0x2C */
+/* The socket allocator pair (`.sdata` 0x807939A8) and the Pat holder (`.bss` 0x806DFC44). */
+extern PatSoAllocator pat_so_allocator;
+extern NetworkPat net_pats_object;
+/* 0x804295CC - runs the work record's result callback. */
+void invokeResultCallback(void);
+/* 0x804295EC - clears the control's state bytes, cursors and error words. */
+void resetControlFields(void);
+/* 0x804297E0 - installs the reflect callbacks and resets the control's state bytes. */
+void resetControlState(void);
+/* 0x804298F0 - the per-frame network hook. */
+void runNetworkFrame(void);
+/* 0x80429A08 / 0x80429A54 - clear the refresh timeout on a view change; clear the big-data timeout. */
+void clearRefreshTimeoutOnChange(void);
+void clearBigDataTimeout(void);
+/* 0x80429B10 / 0x80429B4C / 0x80429B6C - the terms-check queries (GUESS names from the flag bytes). */
+u32 isTermsUpdateRunning(void);
+u8 getTermsCheckDone(void);
+void acknowledgeTermsCheck(void);
+/* 0x804286F0 - the message id of the layer's last error (GUESS name: its values are message ids). */
+s32 getNetErrorMessageId(void);
+/* 0x80428A78..0x80428CA4 - the socket and DWC allocators over the network heap, the heap's free size, and
+ * two empty hooks (GUESS names: the failure strings name the libraries). */
+/* untyped: byte range - a raw heap block */
+void* soAlloc(u32 name, s32 size);
+u32 getNetHeapFreeSize(MEMiHeapHead* heap);
+/* untyped: byte range - a raw heap block */
+void soFree(u32 name, void* block, s32 size);
+/* untyped: byte range - a raw heap block */
+void* dwcAlloc(u32 name, u32 size, s32 align);
+/* untyped: byte range - a raw heap block */
+void dwcFree(u32 name, void* block, u32 size);
+s32 netNullQuery(void);
+void netNullHook(void);
+extern u32 net_heap_free_size;
 /* 0x80424198 - points the record's arena vectors at the shared arena (allocating it on first use). */
 void setupArenaVectors(NetCtrlWk* work);
 /* 0x80429A68 - raises the network error (state 0x5A) for the work record. */
@@ -884,13 +1113,34 @@ extern char pat_server_host[];
 extern "C" {
 #endif
 
+/* 0x8043065C / 0x80430958 / 0x804309E8 / 0x80430D8C - the message layout: apply the tag just parsed, consume
+ * the tags at the cursor, split the text into runs, print the runs (GUESS names from the bodies). */
+void applyTextTag(NetTextTagState* state);
+void parseTextTags(NetTextTagState* state);
+void layoutTextRuns(NetTextTagState* state);
+void drawTextRuns(NetTextTagState* state, s16 size, s16 line_gap);
+
+/* 0x8043137C / 0x80431420 / 0x804314A4 - the network save: export the work record's settings, copy a Pat
+ * settings block, import them back (GUESS names from the fields they move). */
+void exportNetworkSave(NetSaveRecord* save);
+void copyPatSettings(PatSettings* dst, const PatSettings* src);
+void importNetworkSave(const NetSaveRecord* save);
+
+/* The error message table and its length (`.sbss` 0x80794CF0 / 0x80794D00). */
+extern char** net_err_msg_tbl_adrs;
+extern u16 net_err_msg_num;
+
 /* 0x80431324 / 0x804312B8 - the message for the network error / sub-error `-1` (a generic failure). */
 char* getDefaultErrorMessage(void);
 
 char* getDefaultSubErrorMessage(void);
 
 /* 0x8043172C - switches the transfer mode (1 on / 0 off). */
-void setTransferMode(s32 mode);
+void setTransferMode(u32 mode);
+
+/* 0x8043159C / 0x80431690 - apply the system's transfer mode and transfer level (GUESS names). */
+void applyTransferSettings(void);
+void applyTransferLevel(void);
 
 /* 0x80431A9C / 0x804317E8 - the transfer queue and mode updates the control runs each frame. */
 void updateTransferQueue(void);

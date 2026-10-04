@@ -148,11 +148,14 @@ typedef struct NetFriendEntry {
     /* +0x4C */ u8 pad_0x4C[0x10];
 } NetFriendEntry; /* size: 0x5C */
 
-/* The friend list the two friend-list sources share: a count followed by the entries. */
+/* The friend list the two friend-list sources share: a count followed by the entries.  size: 0x23F4 (the
+ * network work record builds one in place at 0x90017F60; its constructor is 0x803E1104) */
 typedef struct NetFriendList {
     /* +0x00 */ s32 count_0x00;
-    /* +0x04 */ NetFriendEntry entries_0x04[1];   /* `count_0x00` entries */
-} NetFriendList;
+    /* +0x04 */ NetFriendEntry entries_0x04[100];   /* `count_0x00` entries */
+
+    NetFriendList();
+} NetFriendList; /* size: 0x23F4 */
 
 class NetworkLayer;
 struct NetworkLayerRequest;
@@ -311,10 +314,13 @@ public:
     /* +0x078 */ NetworkLayerRequest pool_78[2];        /* the two requests `allocRequest` hands out */
 };   /* size: 0x1C0 (the derived constructor's first member array starts at +0x1C8) */
 
-class NetworkLayerPat {   /* size: 0x6BC34+ (approximate) */
+class NetworkLayerPat {   /* size: 0x6EE8C (the allocation `initNetworkPatControl` makes for it) */
 public:
+    /* 0x803E0C18 - builds the layer (defined by the owner's range; declared so `new` can name the class). */
+    NetworkLayerPat();
+
     /* +0x08 */ virtual void pad_08();
-    /* +0x0C */ virtual void pad_0C();
+    /* +0x0C */ virtual void setReflectCallback(u32 callback, u32 user);   /* the reflect callback and its user word */
     /* +0x10 */ virtual void pad_10();
     /* +0x14 */ virtual void pad_14();
     /* +0x18 */ virtual void pad_18();
@@ -382,7 +388,9 @@ public:
     /* +0xF1AC */ s32 communityCount_F1AC;
     /* +0xF1B0 */ NetCommunityRec communities_F1B0[40];
     /* +0x6BC30 */ s32 friendCount_6BC30;
-    /* +0x6BC34 */ NetFriendEntry friends_6BC34[1];   /* `friendCount_6BC30` entries */
+    /* +0x6BC34 */ NetFriendEntry friends_6BC34[100];   /* `friendCount_6BC30` entries (with the count, a
+                                                          `NetFriendList`'s 0x23F4 bytes) */
+    /* +0x6E024 */ u8 pad_6E024[0xE68];
 
     /* Advances the request state in `request` by one step; true once the request finished. */
     bool stepRequest(NetworkLayerRequest* request);

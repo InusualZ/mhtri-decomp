@@ -449,7 +449,9 @@ extern "C" u32 fn_800655DC(void)
     return (u32)*fn_8005DC60(&local, lbl_8056F588);
 }
 
-extern "C" void fn_80065804(void)
+/* The placement `operator delete`: nothing to release. */
+/* untyped: opaque handle passed through - the block and the placement address */
+void operator delete(void* block, void* place)
 {
 }
 

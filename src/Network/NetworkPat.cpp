@@ -21,11 +21,11 @@
  * type and the family's declarations live in `include/Network/NetworkPat.h` (this file's own header,
  * rule 2); the type moved there when the `network_pat_control` unit needed it (rule 1).
  *
- * TYPES.  The slots are typed from the install site `fn_804292F8` (0x804294A0..0x8042951C), which
+ * TYPES.  The slots are typed from the install site `initNetworkPatControl` (0x804294A0..0x8042951C), which
  * stores the pointer each slot's own **class constructor** has just returned, and from the accessor's
  * own value dispatch: slot +0x00 is a `NetworkSessionManagerPat` (`__ct__24NetworkSessionManagerPatFv`
- * 0x803D68D0), +0x08 the object built by `fn_803F02C4`, +0x0C the `NetworkLayer`-derived object built
- * by `fn_803E0C18`.  Slot +0x04 is never installed - no setter and no getter for it exists anywhere in
+ * 0x803D68D0), +0x08 the object built by `__ct__19NetworkCommunityPatFv`, +0x0C the `NetworkLayer`-derived object built
+ * by `__ct__15NetworkLayerPatFv`.  Slot +0x04 is never installed - no setter and no getter for it exists anywhere in
  * the DOL (a whole-image scan for the setter shape finds +0x00/+0x08/+0x0C only) - so its value stays
  * an untyped handle and the `delete`/`clear` pair is dead code that always sees NULL.
  *

@@ -412,7 +412,7 @@ void set_BGM_volume(u8 index);
 /* Releases a resource of kind 4. */
 extern "C" void fn_800EEEF4(void* p)
 {
-    fn_804C2380(p, 4);
+    MEMGetAllocatableSizeForExpHeapEx(p, 4);
 }
 
 /* The Chacha companion's "kamen" voice bank. */

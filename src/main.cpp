@@ -986,7 +986,7 @@ extern "C" void fn_8004030C(_MH_VEC2* v)
 
 /* ---- 0x80040360-0x80040478: the screen-size accessors and the game's expansion-heap allocator ---- */
 
-extern "C" void* fn_804C2200(void* heap, u32 size, u32 align);
+extern "C" void* MEMAllocFromExpHeapEx(void* heap, u32 size, u32 align);
 extern "C" void MEMFreeToExpHeap(void* heap, void* block);
 extern "C" void copyVec2(_MH_VEC2* dst, const _MH_VEC2* src);
 
@@ -1038,7 +1038,7 @@ extern "C" void* fn_80040420(u32 size)
 {
     void* block = NULL;
     if (size != 0) {
-        block = fn_804C2200(lbl_80794788, size, 8);
+        block = MEMAllocFromExpHeapEx(lbl_80794788, size, 8);
     }
     return block;
 }

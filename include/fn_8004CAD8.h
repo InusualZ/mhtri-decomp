@@ -304,6 +304,9 @@ void userdata_record_b_count_add(const u16* counts);
 void userdata_quest_stat_set(const Q_QuestStat* src);
 /* 0x8004E710 - copies one 16-byte quest stat. */
 void quest_stat_copy(Q_QuestStat* dst, const Q_QuestStat* src);
+/* 0x8004FFA4 - a bare `b strstr`: the first occurrence of `needle` in `haystack`, or NULL (GUESS name; the
+ * network message layout tests it against its tag names). */
+char* findSubstring(const char* haystack, const char* needle);
 }
 #endif
 
