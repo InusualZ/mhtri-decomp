@@ -74,6 +74,8 @@ typedef struct NetworkWiiMediatorFields {
  * record); the class only adds the member functions this band defines. */
 class NetworkWiiMediator : public NetworkWiiMediatorFields {
 public:
+    /* 0x80413480 (`Network/network_layer_io.cpp`) - stores the table 0x80602968 at +0x00 after its base. */
+    NetworkWiiMediator();
 
     void reflectInit(NetworkWiiMediatorReflectFn callback, void* arg);
     void reflectStart();
@@ -89,7 +91,19 @@ public:
     char* getAccountWaitQueue(char* out, u32 size);
     void getReflectPage(u8 page);
     void agreeReflect();
-};
+
+    /* +0x60D8 */ u8 pad_60D8[0x9100];
+};   /* size: 0xF1D8 (the allocation `sNetworkLibraryWii::init` makes) */
+
+/* The mediator's own virtual slots, read through its table (0x80602968, emitted by
+ * `Network/network_layer_io.cpp`): the record view above keeps the table word inside `pad_000`, so a
+ * dispatch through it is spelled through this view.  Nothing here is defined, so no table is emitted
+ * (rule 10). */
+class NetworkWiiMediatorDispatch {
+public:
+    /* +0x08 */ virtual ~NetworkWiiMediatorDispatch();
+    /* +0x0C */ virtual void update();
+};   /* size: 0x04 (the object's leading table word) */
 
 
 #ifdef __cplusplus

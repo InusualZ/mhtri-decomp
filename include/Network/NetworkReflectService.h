@@ -23,6 +23,11 @@ typedef struct GameSpyChannel {
     /* +0x27 */ u8  tail_27;
 } GameSpyChannel;   /* size: 0x28 */
 
+/* The reflect callback the mediator registers (`reflectInit` stores it at +0x78C and the service
+ * calls it back with four words and two payload pointers - the `PFllllPvPv_v` half of
+ * `reflectInit__18NetworkWiiMediatorFPFllllPvPv_vPv`). */
+typedef void (*NetworkWiiMediatorReflectFn)(s32, s32, s32, s32, void*, void*);
+
 /* The reflect service: the GameSpy search/connect state machine the mediator starts, stops and agrees
  * through.  One definition for both of its users (unified 2026-10-03 from the two compatible views the
  * mediator band and the GameSpy band carried; every offset and the size are unchanged):
@@ -40,12 +45,13 @@ public:
     /* +0x0000 - the vtable pointer; slot +0x08 is the finalizer `reflectFinal` calls with flag 1 */
     virtual void finalize(s32 flags);
 
-    /* +0x0004 */ u8  pad_04[0x08];
+    /* +0x0004 */ NetworkWiiMediatorReflectFn callback_04;
+    /* +0x0008 */ void* callbackArg_08;
     /* +0x000C */ u32 flags_0C;
     /* +0x0010 */ s32 task_10;
     /* +0x0014 */ u8  searchStep_14;
     /* +0x0015 */ u8  connectStep_15;
-    /* +0x0016 */ u8  pad_16;
+    /* +0x0016 */ u8  startStep_16;
     /* +0x0017 */ u8  callbackStep_17;
     /* +0x0018 */ u8  channel_18;
     /* +0x0019 */ u8  pad_19[0x03];
@@ -56,8 +62,7 @@ public:
     /* +0x8164 */ u32 limit_8164;
     /* +0x8168 */ u32 writePos_8168;
 
-    /* forwards a work record (code, three words, payload) to the callback pair at +0x04 / +0x08;
-       defined by the neighbouring band, the only body here that is not this unit's */
+    /* forwards a work record (code, three words, payload) to the callback pair at +0x04 / +0x08 */
     /* untyped: caller-owned payload - each work code carries its own record */
     void notify(u32 code, s32 a, s32 b, s32 c, void* data);
     /* one step of the connect-attempt callback sub-machine */
@@ -72,10 +77,6 @@ public:
     void applyEvent(u32 code, s32 a, s32 b, s32 c, const GameSpyEventMsg* msg);
 };   /* size: 0x816C (the allocation `reflectInit` makes; the last field the GameSpy band addresses is +0x8168) */
 
-/* The reflect callback the mediator registers (`reflectInit` stores it at +0x78C and the service
- * calls it back with four words and two payload pointers - the `PFllllPvPv_v` half of
- * `reflectInit__18NetworkWiiMediatorFPFllllPvPv_vPv`). */
-typedef void (*NetworkWiiMediatorReflectFn)(s32, s32, s32, s32, void*, void*);
 
 #ifdef __cplusplus
 extern "C" {
@@ -84,10 +85,25 @@ extern "C" {
 void initReflectService(NetworkReflectService* service, NetworkWiiMediatorReflectFn callback,
                         void* arg);   /* untyped: the callback's user payload, caller-owned */
 void finalizeReflectService(NetworkReflectService* service);
-void setReflectServicePage(NetworkReflectService* service, u32 page);
+void setReflectServicePage(NetworkReflectService* service, u8 page);
 void reflectServiceStart(NetworkReflectService* service);
 void reflectServiceStop(NetworkReflectService* service);
 void reflectServiceAgree(NetworkReflectService* service);
+
+/* 0x8041A194 - the Pat interface's event callback slot 7 (installed by the start sequence): hands the DWC
+ * event to `applyEvent` on the service passed as the callback argument. */
+void reflectServiceEventCallback(u32 code, s32 a, s32 b, s32 c, const GameSpyEventMsg* msg,
+                                 NetworkReflectService* service);
+/* 0x8041A354 / 0x8041A368 - clear the callback pair and the start flag, then the task and step state. */
+void resetReflectService(NetworkReflectService* service);
+void resetReflectServiceTask(NetworkReflectService* service);
+/* 0x8041A3E4 - the per-frame step: the callback sub-machine, else the start sequence, else the task. */
+void updateReflectService(NetworkReflectService* service);
+/* 0x8041A5D0 - one step of the start sequence (library start, Pat interface open, server choice). */
+void stepReflectServiceStart(NetworkReflectService* service);
+
+/* 0x80794CD8 - the live service (the constructor publishes it, `getReflectService` reads it). */
+extern NetworkReflectService* sNetworkReflectService;
 
 #ifdef __cplusplus
 }

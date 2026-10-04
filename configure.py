@@ -1978,7 +1978,11 @@ config.libs = [
             # src/Network/NetworkWiiMediator.cpp.
             Object(NonMatching, "Network/NetworkWiiMediator.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
-            Object(NonMatching, "Network/network_opening.cpp"),  # phase 4 stub
+            # Per-object flag deviation (brief section 8.2), instruction-level evidence: measured over the 22
+            # `sNetworkLibrary` rows, the lib's `-O4,p` scores ctor/dtor/final/the pool helpers 77-93 % (the
+            # constant setup hoisted above the callee-save stores) and `-O3` puts all of them at 100 %.
+            Object(NonMatching, "Network/network_opening.cpp",
+                   cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             # Per-object flag deviation (brief section 8.2), instruction-level evidence: retail's
             # `constructNetworkWiiMediator` is the plain source order - `li r3,0x1408` lands *after*
             # the two callee-save stores and the `cmpwi r3,0` after `mr r31,r3`; `-O4,p` hoists both
@@ -1991,7 +1995,12 @@ config.libs = [
             # extab record is the one a C++ `new` expression emits - see the unit header.
             Object(Matching, "Network/constructNetworkWiiMediator.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
-            Object(NonMatching, "Network/constructNetworkLibrary.cpp"),  # phase 4 stub
+            # Per-object flag deviation (brief section 8.2), instruction-level evidence: the sibling units' `-O3`
+            # schedule.  Measured over the same first-pass source: 75.54058 % at the lib's `-O4,p` (every framed
+            # body hoists its constant setup above the callee-save stores) against 91.81757 % at `-O3`, every row
+            # equal or higher.  Evidence: the unit header of src/Network/constructNetworkLibrary.cpp.
+            Object(NonMatching, "Network/constructNetworkLibrary.cpp",
+                   cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             # Per-object flag deviation (brief section 8.2), instruction-level evidence: the three
             # `deleteNetwork*Pat` helpers get the target's block order and the target's `bl` to the
             # sibling `clearNetwork*Pat` (retail calls it; `-inline auto` folds the 36-byte callee in
@@ -2005,7 +2014,12 @@ config.libs = [
             # 0x8041A170 (+0x24), so the old edge orphaned that function into an `auto_*` unit.
             Object(Matching, "Network/NetworkPat.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
-            Object(NonMatching, "Network/NetworkReflectService.cpp"),  # phase 4 stub
+            # Per-object flag deviation (brief section 8.2), instruction-level evidence, the sibling units'
+            # pair: measured over the unit's 13 written rows, the lib's `-O4,p`/`-inline auto` gives 68.95 %,
+            # `-O3` 81.77 % (`reflectServiceStart` then inlines `resetReflectServiceTask`, which retail calls:
+            # 40.54 -> 30.54), and `-O3`/`-inline noauto` puts 12 of them at 100 %.
+            Object(NonMatching, "Network/NetworkReflectService.cpp",
+                   cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `803D3CE8_NetworkSessionManager.cpp` (`.text` now 0x803D4904..0x803D70B8: the twelve `NetworkSessionStable`
             # op-code writers that opened the range moved to `Network/NetworkSessionStable.cpp`, whose

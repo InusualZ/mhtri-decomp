@@ -28,6 +28,12 @@ void OSUnlockMutex(void* mutex);
 
 void OSReport(const char* format, ...);
 
+/* 0x804D4D70 / 0x804D4D50 - the low 32 bits of the time base / the whole 64-bit time base (the SDK's
+ * signed `OSTime`; one tick is a quarter of the bus clock). */
+u32 OSGetTick(void);
+
+s64 OSGetTime(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -17,6 +17,21 @@ typedef struct NetworkWiiMediatorFields NetworkWiiMediatorFields;   /* include/N
 class NetworkWiiMediator;                         /* include/Network/NetworkWiiMediator.h */
 class NetworkReflectService;                      /* include/Network/NetworkReflectService.h */
 
+/* The network library's linear-congruential random generator (`sNetworkLibrary::mpRandom`): the constructor
+ * 0x80413384 stores the table 0x806024A0 and the classic `rand` constants (seed 1, multiplier 0x41C64E6D,
+ * increment 12345, result shift 16, mask 0x7FFF); 0x80413424 steps it.  Class name GUESSED.  size: 0x18 */
+class NetworkRandom {
+public:
+    NetworkRandom();
+    /* +0x08 */ virtual ~NetworkRandom();
+
+    /* +0x04 */ u32 seed;
+    /* +0x08 */ u32 multiplier;
+    /* +0x0C */ u32 increment;
+    /* +0x10 */ u32 shift;
+    /* +0x14 */ u32 mask;
+};
+
 #ifdef __cplusplus
 extern "C" {
 #endif

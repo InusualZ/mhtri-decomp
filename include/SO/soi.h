@@ -62,6 +62,30 @@ s32 SORecv(s32 fd, void* buf, s32 length, s32 flags); /* untyped: byte range */
 
 s32 SOSend(s32 fd, void* buf, s32 length, s32 flags); /* untyped: byte range */
 
+/* The SO library's allocator pair (the SDK's `SOLibraryConfig`): `SOInit` is handed the block's address.
+ * size: 0x08 - the two words `sNetworkLibraryWii::init` tests for NULL before the call. */
+typedef void* (*SOAllocFunc)(u32 name, s32 size); /* untyped: caller-owned payload */
+typedef void (*SOFreeFunc)(u32 name, void* ptr, s32 size); /* untyped: caller-owned payload */
+typedef struct SOLibraryConfig {
+    /* +0x00 */ SOAllocFunc alloc;
+    /* +0x04 */ SOFreeFunc free;
+} SOLibraryConfig;
+
+/* 0x8051E864 / 0x8051EA30 - bring the SO library up with the allocator pair / take it down; -7 when it
+ * already was (the strings `sNetworkLibraryWii::init`/`final` log next to each call). */
+s32 SOInit(const SOLibraryConfig* config);
+
+s32 SOFinish(void);
+
+/* 0x8051EB2C / 0x8051EF60 - start / stop the network interface; -7 when already done (the worker-thread
+ * bodies of `sNetworkLibraryWii::start`/`stop`). */
+s32 SOStartup(void);
+
+s32 SOCleanup(void);
+
+/* 0x80520B54 - the console's own host address, stored by `sNetworkLibraryWii::start` as its host id. */
+u32 SOGetHostID(void);
+
 /* 0x80521DE0 - 1 while the layers `VFipf2Init` brings up are up.  (The word it reads is the flag
  * `VFipf2Init` sets and `VFipf2Shutdown` clears.) */
 u32 VFipf2IsInitialized(void);
