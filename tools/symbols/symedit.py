@@ -349,6 +349,58 @@ def cmd_merge_batch(a):
     return merge(a, read_merge_rows(a.mapfile))
 
 
+#: The trees `--rewrite` edits and the files it reads there: the source, never docs/ or tools/ (a regenerable
+#: cache keeps its own name strings; the map is the authority there).
+REWRITE_ROOTS = ("src", "include")
+
+
+def rewrite_tree(root, pairs, comments=False, dry_run=False, roots=REWRITE_ROOTS):
+    """Rewrite every code reference to a `pairs` key under `roots` (and, with `comments`, every comment
+    mention) - `lib.cscan.rewrite_identifiers` per file, which never touches a string literal, an `#include`
+    line, a path-shaped or string-table-shaped token. Writes byte-exactly (line endings kept, atomic).
+    Returns `[(relpath, {name: {"code", "comment", "skipped"}})]` for every file that changed."""
+    from tools.lib import cscan, text as libtext
+    pairs = {o: n for o, n in pairs.items() if o != n}
+    changed = []
+    if not pairs:
+        return changed
+    for sub in roots:
+        base_root = os.path.join(root, sub)
+        if not os.path.isdir(base_root):
+            continue
+        for base, dirs, files in os.walk(base_root):
+            dirs[:] = sorted(d for d in dirs if d not in (".git", "build", "__pycache__"))
+            for fn in sorted(files):
+                if not fn.endswith(SRC_SUFFIXES + (".cp", ".cc")):
+                    continue
+                p = os.path.join(base, fn)
+                try:
+                    old = libtext.read_text(p)
+                except (OSError, UnicodeDecodeError):
+                    continue
+                new, counts = cscan.rewrite_identifiers(old, pairs, comments)
+                if new != old:
+                    if not dry_run:
+                        libtext.atomic_write(p, new)
+                    changed.append((os.path.relpath(p, root).replace("\\", "/"),
+                                    {k: v for k, v in counts.items() if any(v.values())}))
+    return changed
+
+
+def print_rewrite(changed, dry_run):
+    total = {"code": 0, "comment": 0, "kept_comment": 0, "skipped": 0}
+    for rel, counts in changed:
+        for c in counts.values():
+            for k in total:
+                total[k] += c[k]
+        print("%s %s (%s)" % ("would rewrite" if dry_run else "rewrote", rel,
+                              ", ".join("%s %d/%d" % (n, c["code"], c["comment"]) for n, c in sorted(counts.items()))))
+    print("%s %d file(s): %d code reference(s), %d comment mention(s); left alone: %d comment mention(s) "
+          "(no --comments), %d string/include/path/string-table spelling(s) - counted in changed files only"
+          % ("dry-run:" if dry_run else "rewrite:", len(changed), total["code"], total["comment"],
+             total["kept_comment"], total["skipped"]))
+
+
 def rename(a, pairs):
     _text, nl, lines, changed, applied = plan_rename(a.file, pairs, a.force)
     if not a.dry_run:
@@ -359,6 +411,10 @@ def rename(a, pairs):
     for old, new in applied:
         print("no-op: %s -> %s (already applied)" % (old, new))
     print("%s %d symbol(s) in %s" % ("dry-run:" if a.dry_run else "wrote", len(changed), a.file))
+    if getattr(a, "rewrite", False):
+        # the other half: every pair, applied or already in the map (a re-run finishes a half-done sweep)
+        print_rewrite(rewrite_tree(REPO, dict(pairs), getattr(a, "comments", False), a.dry_run), a.dry_run)
+        return 0
     if not a.no_refs:
         for old, _new in pairs:
             print("-- references to %s:" % old)
@@ -425,6 +481,7 @@ def main():
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--force", action="store_true", help="allow overwriting an existing name")
     p.add_argument("--no-refs", action="store_true", help="skip the reference scan")
+    add_rewrite(p)
     p.set_defaults(func=lambda a: rename(a, [(a.old, a.new)]))
 
     p = sub.add_parser("rename-batch", parents=[common],
@@ -433,7 +490,16 @@ def main():
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--force", action="store_true")
     p.add_argument("--no-refs", action="store_true")
+    add_rewrite(p)
     p.set_defaults(func=cmd_batch)
+
+    p = sub.add_parser("rewrite-batch", parents=[common],
+                       help="rewrite source references only (no map edit) from a file of 'old new' lines - "
+                            "a lane's stale spelling of a name the map already changed")
+    p.add_argument("mapfile")
+    p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--comments", action="store_true", help="also rewrite comment mentions (never paths)")
+    p.set_defaults(func=cmd_rewrite_batch)
 
     p = sub.add_parser("merge-batch", parents=[common],
                        help="merge phantom fn_* rows from 'merge <phantom> <previous> <size>' lines")
@@ -453,15 +519,32 @@ def main():
     sys.exit(a.func(a) or 0)
 
 
-def cmd_batch(a):
+def add_rewrite(p):
+    p.add_argument("--rewrite", action="store_true",
+                   help="also rewrite the code references under src/ and include/ (never a string literal, an "
+                        "#include line, a path or a string-table spelling)")
+    p.add_argument("--comments", action="store_true",
+                   help="with --rewrite: also rewrite comment mentions of the old name (never path-shaped ones)")
+
+
+def read_pairs(mapfile):
     pairs = []
-    with open(a.mapfile, "r", encoding="utf-8") as fh:
+    with open(mapfile, "r", encoding="utf-8") as fh:
         for line in fh:
             line = line.split("#")[0].strip()
             if line:
                 old, new = line.split()[:2]
                 pairs.append((old, new))
-    return rename(a, pairs)
+    return pairs
+
+
+def cmd_batch(a):
+    return rename(a, read_pairs(a.mapfile))
+
+
+def cmd_rewrite_batch(a):
+    print_rewrite(rewrite_tree(REPO, dict(read_pairs(a.mapfile)), a.comments, a.dry_run), a.dry_run)
+    return 0
 
 
 # --------------------------------------------------------------------------------------------------
@@ -879,6 +962,40 @@ def selftest() -> int:
         check("the default map is the invocation tree's (its marker is found)", marker in (p.stdout or ""),
               True)
         check("... and the command succeeds there", p.returncode, 0)
+
+    # --- --rewrite: the code references follow the map, never a path, a string or another tree ------
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "src" / "Mod").mkdir(parents=True)
+        (root / "include" / "Mod").mkdir(parents=True)
+        (root / "docs").mkdir()
+        (root / "src" / "Mod" / "a.cpp").write_bytes(
+            b'#include "Mod/fn_80040598.h"\r\nvoid fn_80040598(void);\r\nvoid g() { fn_80040598(); log("fn_80040598"); }'
+            b"\r\n/* fn_80040598 */\r\n")
+        (root / "include" / "Mod" / "fn_80040598.h").write_bytes(b"void fn_80040598(void);\n")
+        (root / "docs" / "n.md").write_bytes(b"fn_80040598\n")
+        changed = rewrite_tree(str(root), {"fn_80040598": "doThing"})
+        a = (root / "src" / "Mod" / "a.cpp").read_bytes()
+        check("rewrite: the code references follow", a.count(b"doThing"), 2)
+        check("rewrite: the include path and the string are left", (a.count(b'"Mod/fn_80040598.h"'),
+                                                                     a.count(b'log("fn_80040598")')), (1, 1))
+        check("rewrite: a comment mention is left without --comments", b"/* fn_80040598 */" in a, True)
+        check("rewrite: CRLF survives (and no bare LF appears)", (a.count(b"\r\n"), a.count(b"\n")), (4, 4))
+        check("rewrite: a header is swept too",
+              (root / "include" / "Mod" / "fn_80040598.h").read_bytes(), b"void doThing(void);\n")
+        check("rewrite: docs/ is not the source", (root / "docs" / "n.md").read_bytes(), b"fn_80040598\n")
+        check("rewrite: it reports the files it changed", sorted(r for r, _c in changed),
+              ["include/Mod/fn_80040598.h", "src/Mod/a.cpp"])
+        rewrite_tree(str(root), {"fn_80040598": "doThing"}, comments=True)
+        check("rewrite --comments: the comment mention follows",
+              b"/* doThing */" in (root / "src" / "Mod" / "a.cpp").read_bytes(), True)
+        before = (root / "src" / "Mod" / "a.cpp").read_bytes()
+        check("rewrite: a second run changes nothing", rewrite_tree(str(root), {"fn_80040598": "doThing"}), [])
+        check("rewrite: ... and writes nothing", (root / "src" / "Mod" / "a.cpp").read_bytes(), before)
+        (root / "src" / "Mod" / "b.c").write_bytes(b"int x = fn_80040598;\n")
+        check("rewrite --dry-run: reports and writes nothing",
+              ([r for r, _c in rewrite_tree(str(root), {"fn_80040598": "doThing"}, dry_run=True)],
+               (root / "src" / "Mod" / "b.c").read_bytes()), (["src/Mod/b.c"], b"int x = fn_80040598;\n"))
 
     # --- `at` on a data address picks the data section, not `.text` -------------------------------
     # The filed bug: `at 0x80500000` defaulted to `.text`, so a data address above the whole `.text`

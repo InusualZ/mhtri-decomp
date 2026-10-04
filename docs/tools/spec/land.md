@@ -27,6 +27,8 @@ Subcommands: `record-base`, `verify`, `land`, `resolve`.
 Flags: `--allow-orphan`, `--allow-regression`, `--allow-rule10`, `--allow-rule12`, `--already-applied`, `--base`, `--branch`, `--dry-run`, `--json`, `--main`, `--message`, `--no-build`, `--no-commit`, `--no-outbox`, `--no-release`, `--no-selftests`, `--selftest`, `--unit-rename`, `--units`, `--worktree`.
 Exit codes: `verify` 0 when every row passed, 1 otherwise; `land` prints one `LANDED ...` / `REFUSED ...` line on stdout (the gate log goes to stderr) and its exit status is that answer; a refusal never reaches `git commit`. Every refusal line carries the row's KIND: `GATE` (the batch is bad) or `BOOKKEEPING` (the landing's own state is stale; the remedy is printed).
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
+* `land.py integrate ARGS...` forwards to `tools/units/integrate.py ARGS` unchanged (by subprocess); applying requests
+  is not landing - the branch it builds lands through `land --branch`.
 
 ## Inputs and outputs
 

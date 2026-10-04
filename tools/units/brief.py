@@ -227,6 +227,39 @@ def config_schema_lines() -> list[str]:
     return lines
 
 
+def integrator_lines() -> list[str]:
+    """The integrator-request contract as the brief renders it, from `lib.requests` (the one schema integrate.py
+    reads): where requests go, the kinds, the STOPGAP marker and the trial rule for a lane applying one itself."""
+    from tools.lib import requests as _requests
+    lines = ["",
+             "### Integrator requests (a foreign symbol you need named, declared or moved)",
+             "",
+             "A change in a unit you do not own is not yours to make: file it, one JSON object per line, in "
+             "`MAIN/.pi/outbox/<slug>-requests.json`, and `python tools/units/integrate.py` applies the batch "
+             "(renames with their sweep, owner-header declarations, the STOPGAP blocks it clears). "
+             "`python tools/units/handoff.py --check-requests <file>` validates it. Fields: `id` (`<slug>#<n>`), "
+             "`kind`, `symbol` or `address`, `section`, `proposed_name`, `confidence` (certain|evidence|guess), "
+             "`prototype` (the exact C line), `evidence`; optional `owner_unit` (cross-checked against the map) and "
+             "`stopgap` (`{file, id}`). A `decl` of an `fn_`/`lbl_` symbol must carry `proposed_name`.",
+             "",
+             "| kind | needs | what it is |",
+             "| --- | --- | --- |"]
+    for row in _requests.schema_rows():
+        lines.append("| `%s` | %s | %s |" % (row["kind"], ", ".join("`%s`" % n for n in row["needs"]) or "-",
+                                            row["means"]))
+    lines += ["",
+              "While the request is open, a declaration you cannot do without goes in a STOPGAP block that names it: "
+              "`/* STOPGAP-BEGIN(<id>) */ ... /* STOPGAP-END(<id>) */`. The marker exempts nothing (the declarations "
+              "still count for rules 2 and 7 at the gate), and a block whose id is no open request is itself a "
+              "stylelint finding; integrate deletes the block when it applies the request.",
+              "",
+              "Trial rule (owner, 2026-10-04): you may apply a `rename` or `decl-move` yourself when the owner unit "
+              "has no live claim (`claims.py list`), the confidence is `certain` or `evidence`, and `integrate.py "
+              "--dry-run` plus the build show names-only drift for every other unit. GUESS names, record "
+              "unification and seams stay with the integrator."]
+    return lines
+
+
 def claim_for(main: str, unit: str) -> dict:
     """The unit's active claim from `MAIN/.pi/claims.json` - `{}` when it is unclaimed.
 
@@ -1001,6 +1034,7 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
     lines.append("A worker **registers its own unit** (`splits.txt` + `configure.py`, part 2) and builds freely **in its own worktree** - including the full `ninja` - but never runs the **split**, the **link**, `land.py` or `claims.py release`, never edits `symbols.txt` or `CLAUDE.md`, and never commits on `main`. Everything else you need changed goes into the outbox's `config_requests`.")
     _teardown_lines(lines)
     lines.extend(config_schema_lines())
+    lines.extend(integrator_lines())
     lines.append("")
     lines.append("**Do not fan out subagents.** You work alone in *your* worktree, on *your* branch, and make the "
                  "one commit; you have no tool to spawn agents. If the unit is too big for one lane, say so in "
@@ -1397,6 +1431,7 @@ def render_proposal(main: str, b: dict, task: str | None, pool: bool = False) ->
     lines.append("changed goes into the outbox's `config_requests`.")
     _teardown_lines(lines)
     lines.extend(config_schema_lines())
+    lines.extend(integrator_lines())
     lines.append("")
     lines.append("**Do not fan out subagents.** You work alone in *your* worktree, on *your* branch, and make the "
                  "one commit; you have no tool to spawn agents. If the unit is too big for one lane, say so in "
@@ -2206,6 +2241,12 @@ def selftest() -> int:
           all(f in table for row in handoff_mod.config_schema_rows() for f in row["needs"]), True)
     check("the brief names every flags_probed field",
           all(f in table for f in handoff_mod.FLAG_PROBE_FIELDS), True)
+    from tools.lib import requests as _requests
+    pilot = "\n".join(integrator_lines())
+    check("the brief names every integrator request kind (lib.requests, the schema integrate.py reads)",
+          [k for k in _requests.KINDS if "`%s`" % k not in pilot], [])
+    check("the brief shows the STOPGAP marker integrate.py deletes",
+          "STOPGAP-BEGIN(<id>)" in pilot and "STOPGAP-END(<id>)" in pilot, True)
     brief_shaped = {"unit": "Pl/pl_act", "worker": "a", "finished_at": "2026-01-01T00:00:00",
                     "unit_percent": 50.0, "symbols": [{"name": "fn_1", "percent": 50.0}],
                     "residual": "none", "measured_with": "recompile.py", "blockers": [],

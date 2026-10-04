@@ -356,6 +356,24 @@ often an `owner_merge` artefact - verify it.
   its file and its count, and list it in the unit header's residual - never silence it with a comment. The only
   grandfather is the land gate's `--diff`, which passes a finding that already existed and refuses an *added* one.
 
+## Integrator requests and the STOPGAP marker
+
+A change you need in a unit another lane owns - a rename of its symbol, a declaration in its header, a field of its
+type, a seam - is **filed, not made**: one JSON object per line in `MAIN/.pi/outbox/<slug>-requests.json`, schema
+`tools/lib/requests.py` (`id` = `<slug>#<n>`, `kind` = rename | decl | decl-move | field | seam | unit-rename | config |
+info, `symbol` or `address`, `proposed_name`, `confidence` = certain | evidence | guess, `prototype` = the exact C line,
+`evidence`; a `decl` of an `fn_`/`lbl_` symbol must carry `proposed_name`). Validate it with `python
+tools/units/handoff.py --check-requests <file>`; the orchestrator applies the batch with `python tools/units/integrate.py`.
+
+* A declaration you cannot do without until the request is applied goes in a block that names the request:
+  `/* STOPGAP-BEGIN(<id>) */ ... /* STOPGAP-END(<id>) */`. integrate deletes the block when it applies the request.
+  The marker **exempts nothing**: the declarations inside still count for rules 2 and 7, and a block whose id is no
+  open request is itself a stylelint finding.
+* **Trial rule (owner, 2026-10-04):** you may apply a `rename` or `decl-move` yourself when (a) the owner unit has no
+  live claim (`claims.py list`), (b) the confidence is certain or evidence, and (c) `integrate.py --dry-run` and the
+  build show names-only drift for every other unit. GUESS names, record unification and seams stay with the
+  integrator.
+
 ## C++ units: reconstruct the class, not a struct with a `self` parameter
 
 **Trace the shape before you type it.** Three steps answer "is this a class hierarchy?" cheaply, and any

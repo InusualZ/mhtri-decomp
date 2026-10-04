@@ -150,6 +150,7 @@ from tools.lib.git import Git
 
 from tools.lib import cscan
 from tools.lib import findings as _findings
+from tools.lib import requests as _requests
 from tools.lib import project as _project
 from tools.lib.project import ownership as _ownership
 
@@ -970,6 +971,59 @@ def _finding(src: Source, rule: int, line: int, detail: str, token: str | None =
     return _findings.Finding(rule, src.rel, line, token, detail, text=src.line_text(line).strip()[:160]).to_dict()
 
 
+# --------------------------------------------------------------------------------------------------
+# the STOPGAP block: a lane's pilot-only foreign declarations, cleared by the integrator
+# --------------------------------------------------------------------------------------------------
+# `/* STOPGAP-BEGIN(<id>) */ ... /* STOPGAP-END(<id>) */` wraps declarations a lane could not put in their
+# owner's header; `<id>` is the integrator request (`<slug>#<n>`) that clears it (`integrate.py` deletes the
+# block when it applies the request). The marker exempts nothing - the declarations inside still report rule 2
+# and rule 7 like any other - and a block whose id names no OPEN request (none filed, or already applied or
+# rejected) is itself a rule-2 finding: it is a foreign declaration with no path to its owner.
+_REQUEST_DIRS: "list[str] | None" = None
+_OPEN_IDS: "set[str] | None" = None
+
+
+def set_request_dirs(dirs: "list[str] | None") -> None:
+    """The outbox directories whose `<slug>-requests.json` (+ status sidecar) define the open request ids; None:
+    the invocation tree's and MAIN's `.pi/outbox`, read on first use."""
+    global _REQUEST_DIRS, _OPEN_IDS
+    _REQUEST_DIRS, _OPEN_IDS = dirs, None
+
+
+def open_request_ids() -> set:
+    global _OPEN_IDS, _REQUEST_DIRS
+    if _OPEN_IDS is None:
+        if _REQUEST_DIRS is None:
+            from tools.lib import repo as _repo
+            try:
+                root = _repo.repo_root()
+                dirs = [os.path.join(root, ".pi", "outbox"), os.path.join(_repo.main_checkout(root), ".pi", "outbox")]
+            except Exception:                                    # noqa: BLE001 - outside a repository
+                dirs = []
+            _REQUEST_DIRS = dirs
+        _OPEN_IDS = _requests.open_ids(_REQUEST_DIRS)
+    return _OPEN_IDS
+
+
+def stopgap_findings(src: "Source") -> list[dict]:
+    """A STOPGAP block whose id is no open integrator request, and a BEGIN/END without its partner."""
+    if "STOPGAP-" not in src.text:
+        return []
+    out = []
+    open_ids = None
+    for rid, start, _end in _requests.stopgap_blocks(src.text):
+        if open_ids is None:
+            open_ids = open_request_ids()
+        if rid not in open_ids:
+            out.append(_finding(src, 2, src.line_of(start),
+                                "STOPGAP block `%s` names no open integrator request - file the request (or the "
+                                "declarations go to their owner's header now)" % rid, token=rid))
+    for rid, pos in _requests.unpaired_stopgaps(src.text):
+        out.append(_finding(src, 2, src.line_of(pos), "STOPGAP marker `%s` has no matching BEGIN/END" % rid,
+                            token=rid))
+    return out
+
+
 def _rule2_finding(src: Source, line: int, name: str, detail: str) -> dict:
     """A rule-2 finding, carrying the declared **symbol** as data and not only inside the message.
 
@@ -1341,6 +1395,7 @@ def lint_source(src: Source, ownership: "Ownership | None" = None) -> list[dict]
         out.sort(key=lambda f: (f["rule"], f["line"]))
         return out
     if is_shared_header(src.rel):
+        out.extend(stopgap_findings(src))
         # an ordinary `include/` header: rules 2 and 12 are the section-6.5 rules it carries. Rules 3-9 are
         # body/`src/` rules, and rules 10/11 for headers are reported by `header_pragma_findings` and
         # `header_rule11_findings` rather than here (2026-09-28). Rule 12 is here because a header is where
@@ -1431,6 +1486,7 @@ def lint_source(src: Source, ownership: "Ownership | None" = None) -> list[dict]
 
     out.extend(rule11_findings(src))
     out.extend(rule13_findings(src))
+    out.extend(stopgap_findings(src))
 
     out.sort(key=lambda f: (f["rule"], f["line"]))
     return out
@@ -2560,6 +2616,29 @@ def selftest() -> int:
           lines_of("/* written as *(s16*)((u8*)self + 0x1C) */\nvoid f(void) {}\n", 6), [])
     check("rule6: two sites on one line are two findings",
           lines_of("void f(u8* p) {\n    a = *(u32*)((u8*)p + 4); b = *(u32*)((u8*)p + 8);\n}\n", 6), [2, 2])
+
+    # --- the STOPGAP block: no open request id is a rule-2 finding; the marker exempts nothing ---------
+    with tempfile.TemporaryDirectory() as tmp:
+        with open(os.path.join(tmp, "lane-a-requests.json"), "w", encoding="utf-8") as fh:
+            fh.write('{"id": "lane-a#1", "kind": "decl", "symbol": "foo", "evidence": "x"}\n'
+                     '{"id": "lane-a#2", "kind": "decl", "symbol": "bar", "evidence": "x"}\n')
+        with open(os.path.join(tmp, "lane-a-requests.status.json"), "w", encoding="utf-8") as fh:
+            fh.write('{"lane-a#2": {"status": "applied"}}\n')
+        set_request_dirs([tmp])
+        gap = "/* STOPGAP-BEGIN(%s) */\nvoid foo(void);\n/* STOPGAP-END(%s) */\n"
+        msgs = lambda text: [f["detail"] for f in lint_source(Source("x.c", "src/A/a.c", text)) if "STOPGAP" in f["detail"]]
+        check("stopgap: a block naming an open request is not a finding", msgs(gap % ("lane-a#1", "lane-a#1")), [])
+        check("stopgap: a block naming an applied request is", len(msgs(gap % ("lane-a#2", "lane-a#2"))), 1)
+        check("stopgap: a block naming no request at all is", len(msgs(gap % ("lane-z#9", "lane-z#9"))), 1)
+        check("stopgap: ... and it is rule 2", [f["rule"] for f in lint_source(Source("x.c", "src/A/a.c",
+                                                gap % ("lane-z#9", "lane-z#9"))) if "STOPGAP" in f["detail"]], [2])
+        check("stopgap: an unpaired BEGIN is a finding", len(msgs("/* STOPGAP-BEGIN(lane-a#1) */\nint x;\n")), 1)
+        check("stopgap: the marker exempts nothing (the fn_ inside still fires rule 7)",
+              lines_of((gap % ("lane-a#1", "lane-a#1")).replace("foo", "fn_80001234"), 7, "src/A/a.c"), [2])
+        check("stopgap: a header is held to it too",
+              len([f for f in lint_source(Source("x.h", "include/A/a.h", gap % ("lane-z#9", "lane-z#9")))
+                   if "STOPGAP" in f["detail"]]), 1)
+        set_request_dirs(None)
 
     # --- rule 7: names ----------------------------------------------------------------------------
     check("rule7: fn_ name is a violation", lines_of("void fn_80040598(void) {}\n", 7), [1])

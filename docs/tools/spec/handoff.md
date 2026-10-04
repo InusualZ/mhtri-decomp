@@ -21,6 +21,9 @@ python tools/units/handoff.py --selftest
 Flags: `--check`, `--json`, `--selftest`, `--template`.
 Exit codes: 0 ok, 1 findings or refusal, 2 could not run (the `lib.findings` convention; today's tool documents none, so `migration.md` records the current behaviour before changing it).
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
+* `handoff.py --check-requests FILE`: validates a lane's `<slug>-requests.json` (`lib.outbox.check_requests`, the
+  `lib.requests` schema); a new-schema line's problems are errors (exit 1), a free-text line is a note saying what the
+  integrator's loader read from it.
 
 ## Inputs and outputs
 

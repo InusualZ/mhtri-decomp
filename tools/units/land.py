@@ -4948,6 +4948,10 @@ def selftest() -> int:
             fh.write("prose with an em dash %s and an EDIT\n" % dash)
         check("... while a real edit is dirt, naming CLAUDE.md", "CLAUDE.md" in (require_clean_tree(tmp) or ""), True)
 
+    check("integrate: `land.py integrate ARGS` runs integrate.py with ARGS unchanged",
+          integrate_command(["--dry-run", "--lane", "x"])[1:], [INTEGRATE, "--dry-run", "--lane", "x"])
+    check("integrate: the forward target exists", os.path.isfile(INTEGRATE), True)
+
     strays = sp.trap_sites(SELF_REPO)
     check("every text-mode subprocess call in tools/ pins its codec (F34's rule)", strays, [])
 
@@ -4960,7 +4964,19 @@ def selftest() -> int:
     return 0
 
 
+INTEGRATE = os.path.join(SELF_REPO, "tools", "units", "integrate.py")
+
+
+def integrate_command(argv: list[str]) -> list[str]:
+    """`land.py integrate ARGS` is `integrate.py ARGS`, unchanged: the integrator is its own tool (applying requests
+    is not landing - the batch it builds lands through `land --branch` like any other), so this is a forward, by
+    subprocess, never an import (the layering rule)."""
+    return [sys.executable, INTEGRATE] + list(argv)
+
+
 def main() -> int:
+    if sys.argv[1:2] == ["integrate"]:
+        return subprocess.run(integrate_command(sys.argv[2:])).returncode
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--selftest", action="store_true")
     sub = ap.add_subparsers(dest="cmd")
@@ -5029,6 +5045,8 @@ def main() -> int:
     ld.add_argument("--already-applied", action="store_true", dest="already_applied",
                     help="the batch was applied before `record-base` ran, so its paths are in the base's "
                          "dirty snapshot; stage them anyway (otherwise `land` refuses and says so)")
+    sub.add_parser("integrate", help="forward to tools/units/integrate.py (apply the lanes' integrator requests "
+                                     "in one batch on an integrate/<date> branch); every argument passes through")
     rs = sub.add_parser("resolve", help="union-resolve a branch's registration append-conflict in a "
                                          "scratch tree (never in MAIN); exit status is the answer")
     rs.add_argument("--branch", required=True, help="the worker branch to resolve")

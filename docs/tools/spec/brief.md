@@ -20,6 +20,8 @@ python tools/units/brief.py --check-promoted
 Flags: `--check-promoted`, `--force`, `--json`, `--no-prune`, `--out`, `--pool`, `--prune-promoted`, `--selftest`, `--stdout`, `--task`.
 Exit codes: 0 ok, 1 findings or refusal, 2 could not run (the `lib.findings` convention; today's tool documents none, so `migration.md` records the current behaviour before changing it).
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
+* Part 6 renders the integrator-request contract (`brief.integrator_lines`, from `lib.requests.SCHEMA`): the request
+  file, the kinds, the STOPGAP marker and the 2026-10-04 trial rule.
 
 ## Inputs and outputs
 
