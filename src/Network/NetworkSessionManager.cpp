@@ -76,10 +76,12 @@
  *  - `networkSessionReflectCallback` 54.58 %: the target saves all six incoming argument registers
  *    before building the callee's, ours does the minimal four-move rotation; the two are equivalent
  *    and the naive form is not reachable from the source side (48 B).
- *  - `NetworkRequest_begin` 91.38 %: the target inlines the three-word `va_list` setup, ours calls
- *    the `__va_start` intrinsic, because the pinned toolchain ships no `<stdarg.h>` and the
- *    CodeWarrior macro form is not reachable (`__builtin_va_start` does not exist).
- *    `tools/units/flipcheck.py` reports `__va_start` as a flip blocker for this reason.
+ *  - `NetworkRequest_begin` is 100 % (pilot L2): the inlined three-word `va_list` setup is the
+ *    CodeWarrior `va_start` expansion `__builtin_va_info(&ap)` (the `net_va_start` macro), not the
+ *    `__va_start` call.  The request's handler is a real pointer-to-member (`NetworkRequestDesc`, owner
+ *    `NetworkSessionManager*`): the resets assign the null member pointer (retail's 12-byte `__ptmf_null`
+ *    copy, kept unfused by a scoped `#pragma peephole off`), `NetworkRequest::run` is MWCC's `__ptmf_scall`
+ *    call, and the descriptors are `&NetworkSessionManager::<handler>` constants.
  *  - `.text` is 284 B short of the claim, so `.text`/`extab` cannot flip yet: `copyRecord` (-96 B)
  *    plus the functions whose bodies compress.  `flipcheck` reports `.text` 0x32B4 vs 0x33D0 and
  *    `extab` 0x2E4 vs 0x4EC.
@@ -110,7 +112,7 @@
 
 /* `NetworkVaState` and the two variadic intrinsics live in this unit's header (rule 2 keeps the
    declaration with the TU that needs it). */
-#define net_va_start(ap) __va_start(&(ap))
+#define net_va_start(ap) __builtin_va_info(&(ap))
 #define net_va_arg(ap, type) (*(type*)__va_arg(&(ap), 1))
 
 /* Rule 2: the symbols this unit calls but does not own come from their owner's headers, never from a
@@ -135,7 +137,6 @@ void* NetworkRequest_deleteElement(NetworkRequest*, s16);
 void NetworkRequest_clear(NetworkRequest*);
 NetworkRequest* NetworkRequest_construct(NetworkRequest*);
 s32 NetworkRequest_isOwned(NetworkRequest*);
-void zz_03d5084_ptmf_scall(NetworkRequest*);
 void NetworkRequest_begin(NetworkRequest*, NetworkSessionManager*, NetworkRequestDesc, u32, ...);
 void NetworkRequest_cancel(NetworkRequest*);
 s32 NetworkRequest_isCancelled(NetworkRequest*);
@@ -176,6 +177,7 @@ NetworkSessionManager::NetworkSessionManager()
     }
 }
 
+#pragma peephole off
 extern "C" void NetworkRequest_reset(NetworkRequest* self)
 {
     self->state_00 = 0;
@@ -185,9 +187,7 @@ extern "C" void NetworkRequest_reset(NetworkRequest* self)
     self->unused_24 = 0;
     self->cancelled_74 = 0;
     self->owner_94 = 0;
-    self->desc_98 = __ptmf_null.this_delta;
-    self->desc_9C = __ptmf_null.vtbl_offset;
-    self->desc_A0 = __ptmf_null.func_data;
+    self->handler_98 = 0;
     self->count_28 = 0;
     self->record_54 = 0;
     self->record_58 = 0;
@@ -213,6 +213,7 @@ extern "C" void NetworkRequest_reset(NetworkRequest* self)
     self->args_2C[6] = 0;
     self->args_2C[7] = 0;
 }
+#pragma peephole on
 
 extern "C" void* NetworkRequest_deleteElement(NetworkRequest* self, s16 flags)
 {
@@ -293,7 +294,7 @@ void NetworkSessionManager::release()
 void NetworkSessionManager::move()
 {
     NetworkRequest* req;
-    NetworkSessionManagerLogger* log;
+    NetworkLogger* log;
     NetworkBuffer* buf;
     s32 i;
 
@@ -324,8 +325,8 @@ void NetworkSessionManager::move()
                     if (j == 21) {
                         break;
                     }
-                    log = (NetworkSessionManagerLogger*)getNetworkLogger();
-                    log->vtable->log_14(log, "NetworkSessionManager::move: request[%d] is moving, stand by...\n", j);
+                    log = getNetworkLogger();
+                    log->log_14("NetworkSessionManager::move: request[%d] is moving, stand by...\n", j);
                     continue;
                 }
             case 3:
@@ -358,7 +359,7 @@ void NetworkSessionManager::move()
             this->request_state_64[i] = 1;
         }
         if (req != 0 && this->request_state_64[i] != 0) {
-            zz_03d5084_ptmf_scall(req);
+            req->run();
             if (NetworkRequest_isOwned(req) == 0) {
                 NetworkSessionManager_deleteRequest(this, &this->requests_10[i]);
                 this->request_state_64[i] = 0;
@@ -374,36 +375,36 @@ extern "C" s32 NetworkRequest_isOwned(NetworkRequest* self)
 }
 #pragma dont_inline off
 
-extern "C" void zz_03d5084_ptmf_scall(NetworkRequest* self)
+void NetworkRequest::run()
 {
-    if (self->owner_94 != 0 && __ptmf_scall(self) != 0) {
-        NetworkRequest_clear(self);
+    if (this->owner_94 != 0 && (this->owner_94->*this->handler_98)(this) != 0) {
+        NetworkRequest_clear(this);
     }
 }
 
 /* The request descriptors `request364`..`request444` pass by value: `{0, op code, 0}`, in the order the
    target lays them out. */
-NetworkRequestDesc networkRequestDesc364 = {0, 364, 0};
-NetworkRequestDesc networkRequestDesc368 = {0, 368, 0};
-NetworkRequestDesc networkRequestDesc372 = {0, 372, 0};
-NetworkRequestDesc networkRequestDesc376 = {0, 376, 0};
-NetworkRequestDesc networkRequestDesc380 = {0, 380, 0};
-NetworkRequestDesc networkRequestDesc384 = {0, 384, 0};
-NetworkRequestDesc networkRequestDesc388 = {0, 388, 0};
-NetworkRequestDesc networkRequestDesc432 = {0, 432, 0};
-NetworkRequestDesc networkRequestDesc416 = {0, 416, 0};
-NetworkRequestDesc networkRequestDesc420 = {0, 420, 0};
-NetworkRequestDesc networkRequestDesc424 = {0, 424, 0};
-NetworkRequestDesc networkRequestDesc404 = {0, 404, 0};
-NetworkRequestDesc networkRequestDesc436 = {0, 436, 0};
-NetworkRequestDesc networkRequestDesc440 = {0, 440, 0};
-NetworkRequestDesc networkRequestDesc444 = {0, 444, 0};
-NetworkRequestDesc networkRequestDesc408 = {0, 408, 0};
-NetworkRequestDesc networkRequestDesc412 = {0, 412, 0};
-NetworkRequestDesc networkRequestDesc392 = {0, 392, 0};
-NetworkRequestDesc networkRequestDesc396 = {0, 396, 0};
-NetworkRequestDesc networkRequestDesc400 = {0, 400, 0};
-NetworkRequestDesc networkRequestDesc428 = {0, 428, 0};
+NetworkRequestDesc networkRequestDesc364 = &NetworkSessionManager::updateSession;
+NetworkRequestDesc networkRequestDesc368 = &NetworkSessionManager::shutdown;
+NetworkRequestDesc networkRequestDesc372 = &NetworkSessionManager::handleCircleCreate;
+NetworkRequestDesc networkRequestDesc376 = &NetworkSessionManager::slot_178;
+NetworkRequestDesc networkRequestDesc380 = &NetworkSessionManager::handleCircleListLayer;
+NetworkRequestDesc networkRequestDesc384 = &NetworkSessionManager::handleCircleJoin;
+NetworkRequestDesc networkRequestDesc388 = &NetworkSessionManager::slot_184;
+NetworkRequestDesc networkRequestDesc432 = &NetworkSessionManager::handleCircleMatchStart;
+NetworkRequestDesc networkRequestDesc416 = &NetworkSessionManager::slot_1A0;
+NetworkRequestDesc networkRequestDesc420 = &NetworkSessionManager::slot_1A4;
+NetworkRequestDesc networkRequestDesc424 = &NetworkSessionManager::slot_1A8;
+NetworkRequestDesc networkRequestDesc404 = &NetworkSessionManager::handleCircleInfoSet;
+NetworkRequestDesc networkRequestDesc436 = &NetworkSessionManager::handleGameSpyError;
+NetworkRequestDesc networkRequestDesc440 = &NetworkSessionManager::slot_1B8;
+NetworkRequestDesc networkRequestDesc444 = &NetworkSessionManager::handleCircleMatchEnd;
+NetworkRequestDesc networkRequestDesc408 = &NetworkSessionManager::handleCircleMatchEndInfo;
+NetworkRequestDesc networkRequestDesc412 = &NetworkSessionManager::slot_19C;
+NetworkRequestDesc networkRequestDesc392 = &NetworkSessionManager::slot_188;
+NetworkRequestDesc networkRequestDesc396 = &NetworkSessionManager::handleServerTimeout;
+NetworkRequestDesc networkRequestDesc400 = &NetworkSessionManager::slot_190;
+NetworkRequestDesc networkRequestDesc428 = &NetworkSessionManager::handleCircleMatchOptionSet;
 
 /* The request-id source `NetworkRequest_begin` post-increments. */
 u32 NetworkRequest_idCounter;
@@ -427,18 +428,16 @@ extern "C" void NetworkRequest_begin(NetworkRequest* req, NetworkSessionManager*
                             NetworkRequestDesc desc, u32 count, ...)
 {
     NetworkVaState args;
-    NetworkSessionManagerLogger* log;
+    NetworkLogger* log;
     u32 i;
 
     NetworkRequest_reset(req);
-    log = (NetworkSessionManagerLogger*)getNetworkLogger();
-    req->timeout_50 = log->vtable->getTime_60(log);
+    log = getNetworkLogger();
+    req->timeout_50 = log->getTime_60();
     req->requestId_70 = NetworkRequest_idCounter;
     NetworkRequest_idCounter = req->requestId_70 + 1;
     req->owner_94 = owner;
-    req->desc_98 = desc.id_0;
-    req->desc_9C = desc.value_4;
-    req->desc_A0 = desc.type_8;
+    req->handler_98 = desc;
     req->count_28 = count > 8 ? 8 : count;
     net_va_start(args);
     for (i = 0; i < req->count_28; i++) {
@@ -982,8 +981,8 @@ extern "C" void NetworkSessionManager_deleteRequest(NetworkSessionManager* self,
 {
     if (*slot != 0) {
         if (NetworkRequest_isOwned(*slot) != 0) {
-            NetworkSessionManagerLogger* log = (NetworkSessionManagerLogger*)getNetworkLogger();
-            log->vtable->log_14(log, "NetworkSessionManager::deleteRequest: request is moving.\n");
+            NetworkLogger* log = getNetworkLogger();
+            log->log_14("NetworkSessionManager::deleteRequest: request is moving.\n");
         }
         NetworkRequest_clear(*slot);
     }
@@ -1018,12 +1017,12 @@ extern "C" void NetworkRequest_setRecord(NetworkRequest* self, u32 a, u32 b, u32
 extern "C" s32 NetworkRequest_getArgument(NetworkRequest* self, u32 idx)
 {
     u32 count;
-    NetworkSessionManagerLogger* log;
+    NetworkLogger* log;
 
     count = self->count_28;
     if (count <= idx) {
-        log = (NetworkSessionManagerLogger*)getNetworkLogger();
-        log->vtable->warn_10(log, "NetworkRequest::getArgument: arg no over %d <= %d\n", count, idx);
+        log = getNetworkLogger();
+        log->warn_10("NetworkRequest::getArgument: arg no over %d <= %d\n", count, idx);
         return 0;
     }
     return (s32)self->args_2C[idx];
@@ -1036,14 +1035,14 @@ extern "C" s32 NetworkRequest_getArgument(NetworkRequest* self, u32 idx)
 /* True once the request has been waiting longer than its own interval. */
 extern "C" s32 NetworkRequest_isTimedOut(NetworkRequest* self)
 {
-    NetworkSessionManagerLogger* log;
+    NetworkLogger* log;
     s32 result;
 
     result = 0;
     LockMutex(self->mutex_78);
     if (self->interval_4C != networkRequestTimerIdle) {
-        log = (NetworkSessionManagerLogger*)getNetworkLogger();
-        if (log->vtable->getTime_60(log) - self->timeout_50 > self->interval_4C) {
+        log = getNetworkLogger();
+        if (log->getTime_60() - self->timeout_50 > self->interval_4C) {
             result = 1;
         }
     }
@@ -1054,11 +1053,11 @@ extern "C" s32 NetworkRequest_isTimedOut(NetworkRequest* self)
 /* Restarts the wait: the current clock becomes the baseline and the interval is replaced. */
 extern "C" void NetworkRequest_restartTimer(NetworkRequest* self, f32 interval)
 {
-    NetworkSessionManagerLogger* log;
+    NetworkLogger* log;
 
     LockMutex(self->mutex_78);
-    log = (NetworkSessionManagerLogger*)getNetworkLogger();
-    self->timeout_50 = log->vtable->getTime_60(log);
+    log = getNetworkLogger();
+    self->timeout_50 = log->getTime_60();
     self->interval_4C = interval;
     UnlockMutex(self->mutex_78);
 }
@@ -1183,6 +1182,7 @@ extern "C" void NetworkRequestPat_clear(NetworkRequest* self)
     NetworkRequestPat_reset(self);
 }
 
+#pragma peephole off
 extern "C" void NetworkRequestPat_reset(NetworkRequest* self)
 {
     self->state_00 = 0;
@@ -1192,9 +1192,7 @@ extern "C" void NetworkRequestPat_reset(NetworkRequest* self)
     self->unused_24 = 0;
     self->cancelled_74 = 0;
     self->owner_94 = 0;
-    self->desc_98 = __ptmf_null.this_delta;
-    self->desc_9C = __ptmf_null.vtbl_offset;
-    self->desc_A0 = __ptmf_null.func_data;
+    self->handler_98 = 0;
     self->count_28 = 0;
     self->record_54 = 0;
     self->record_58 = 0;
@@ -1220,6 +1218,7 @@ extern "C" void NetworkRequestPat_reset(NetworkRequest* self)
     self->args_2C[6] = 0;
     self->args_2C[7] = 0;
 }
+#pragma peephole on
 
 extern "C" NetworkRequest* NetworkRequestPat_construct(NetworkRequest* self)
 {
@@ -1288,7 +1287,7 @@ void NetworkSessionManagerPat::clear()
     this->udp_65C = 0;
     this->field_660 = 0;
     networkPatAttachBuffer((NetworkBuffer*)this);
-    this->circleList_AF0.pad_00[0] = 0;
+    this->circleList_AF0.count_00 = 0;
     for (i = 0; i < 32; i++) {
         networkPatResetCircleInfo(this, i);
     }
@@ -1335,8 +1334,8 @@ void NetworkSessionManagerPat::release()
     }
     if (GameSpyInterfaceThread::getInstance() != 0) {
         if (this->field_6E75 != 0) {
-            NetworkSessionManagerLogger* log = (NetworkSessionManagerLogger*)getNetworkLogger();
-            log->vtable->warn_10(log, "NetworkSessionManagerPat::final: finalNetwork have not done.\n");
+            NetworkLogger* log = getNetworkLogger();
+            log->warn_10("NetworkSessionManagerPat::final: finalNetwork have not done.\n");
             this->field_6E75 = 0;
             thread = GameSpyInterfaceThread::getInstance();
             thread->canClose();

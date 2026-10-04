@@ -60,7 +60,7 @@ enum {
 };
 
 #pragma peephole off
-bool NetworkLayerPat::stepRequest(NetworkRequest* request)
+bool NetworkLayerPat::stepRequest(NetworkLayerRequest* request)
 {
     NetworkRequestError error;
 
@@ -166,7 +166,7 @@ bool NetworkLayerPat::stepRequest(NetworkRequest* request)
 
     case STEP_CANCELLED:
         busy_3D1 = 0;
-        NetworkRequest_getError(request, &error);
+        request->getRecord(&error);
         notifyLayerEvent(this, 4, error.code_00, 1, &error, context_08);
         pollLayerSlots(this);
         notifyLayerSlotSummary(this);
@@ -174,7 +174,7 @@ bool NetworkLayerPat::stepRequest(NetworkRequest* request)
 
     case STEP_FAILED:
         busy_3D1 = 0;
-        NetworkRequest_getError(request, &error);
+        request->getRecord(&error);
         notifyLayerEvent(this, 4, error.code_00, 1, &error, context_08);
         notifyLayerEvent(this, 3, error.code_00, 1, &error, context_08);
         return true;

@@ -54,6 +54,7 @@ public:
 /* Declarations moved here from `include/unsplit/Network.h, NetworkStream.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 class NetworkLayerPat;             /* include/Network/NetworkLayerPat.h */
 typedef struct NetworkRequest NetworkRequest;   /* include/Network/NetworkSessionManager.h */
+typedef struct NetworkLayerRequest NetworkLayerRequest;   /* include/Network/NetworkLayerPat.h */
 class NetworkSocketHandle;
 class NetworkFileFetcher;          /* include/Network/network_pat_control.h */
 struct NetworkStreamWriterDefault;
@@ -119,12 +120,12 @@ void notifyLayerEvent(NetworkLayerPat* self, u32 kind, s32 code, u32 has_info, N
 /* GUESS on both names: 0x803EF3C0 and 0x803EF4C8 are the siblings of `setCollectionLog` for the two
  * fixed codes the state machine's flag tests report (0x80060033 and 0x80060012); the names follow the
  * flag bits that select them (bit 0 = the session dropped, bit 1 = the request was cancelled). */
-void setCollectionLogSessionLost(NetworkLayerPat* self, NetworkRequest* request);
+void setCollectionLogSessionLost(NetworkLayerPat* self, NetworkLayerRequest* request);
 
-void setCollectionLogAborted(NetworkLayerPat* self, NetworkRequest* request);
+void setCollectionLogAborted(NetworkLayerPat* self, NetworkLayerRequest* request);
 
 /* 0x803EF568 - records `code` (+ two arguments) as the request's error and reports it to the server. */
-void setCollectionLog(NetworkLayerPat* self, NetworkRequest* request, u32 code, u32 arg_a, u32 arg_b);
+void setCollectionLog(NetworkLayerPat* self, NetworkLayerRequest* request, u32 code, u32 arg_a, u32 arg_b);
 
 /* GUESS: 0x803EB9D4 walks the layer's 100 child slots and releases each finished one. */
 void pollLayerSlots(NetworkLayerPat* self);
@@ -170,6 +171,12 @@ void networkPacket_begin(NetworkStreamWriter* self, s32 mode);
 
 /* 0x803F8BDC - appends the 14-byte address record; returns the bytes written. */
 u32 networkPacket_writeRecord(NetworkStreamWriter* self, const NetworkSmallObject* value);
+
+/* 0x803F8830 - sets the address object from `size` raw bytes of address kind `kind` (GUESS on the name). */
+void networkSmallObject_setAddress(NetworkSmallObject* self, u8 kind, const u8* data, u32 size);
+
+/* 0x803F8810 - true when the address object holds a valid address (GUESS on the name). */
+s32 networkSmallObject_isValid(const NetworkSmallObject* self);
 
 /* 0x803F8904 - true when both address records are set and equal. */
 s32 networkSmallObject_isEqual(const NetworkSmallObject* a, const NetworkSmallObject* b);
