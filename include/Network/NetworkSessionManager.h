@@ -37,10 +37,21 @@ typedef struct NetworkSessionRecordBlock {
 /* The record classes the Pat layer's arrays hold.  Each size is evidenced (the `__construct_array` /
    `__destroy_arr` element sizes, and the field offsets the range addresses); only the one member each
    constructor initialises is named, everything else is filler. */
+/* The chat message record the Pat layer reports (event 18 for this console's own message, 19 for a received
+   one): the sender's address, name and text, the caller's tag word and the server time it was stamped with.
+   The name says "slot info" for historical reasons (the map's `NetworkSessionSlotInfo_*` rows); the layout is
+   the one `slot_19C` and `receiveSessionChat` fill on their stack. */
 typedef struct NetworkSessionSlotInfo {
-    NetworkSmallObject smallObject_00;   /* +0x00 */
-    u8 pad_10[0x64];                     /* +0x10..+0x73 (size not evidenced; only +0x00 is built) */
-} NetworkSessionSlotInfo;   /* size: 0x74 (approximation) */
+    NetworkSmallObject smallObject_00;   /* +0x00 - the sender's address object */
+    char name_20[0x13];                  /* +0x20 - the sender's name (19 characters) */
+    u8 nameEnd_33;                       /* +0x33 - its terminator */
+    u8 flag_34;                          /* +0x34 - cleared by both fillers */
+    char text_35[0x200];                 /* +0x35 - the message (at most 0x1FF characters) */
+    u8 textEnd_235;                      /* +0x235 */
+    u8 pad_236[0x02];                    /* +0x236..+0x237 */
+    u32 tag_238;                         /* +0x238 - the sender's tag word */
+    s32 time_23C;                        /* +0x23C - `getServerDateTime` when the message was reported */
+} NetworkSessionSlotInfo;   /* size: 0x240 */
 
 /* One circle (lobby room) entry.  The name, the record block and the four counters are the fields the
    Pat getters read (`getCircleItemName` copies at most 0x100 name bytes, `getCircleItemRecord` 0x48 record
@@ -64,7 +75,6 @@ typedef struct NetworkSessionCircleInfo {
     s32 ownerId_004;                      /* +0x004 */
     char name_008[0x100];                 /* +0x008 - `setCircleInfo` stores at most 63 characters */
     NetworkSmallObject smallObject_108;   /* +0x108 - the circle's address object `exportCircleItem` copies out */
-    u8 pad_118[0x10];                     /* +0x118..+0x127 (the address object is 0x20 B; only 0x10 is typed) */
     NetworkCircleOptions options_128;     /* +0x128 */
     s32 limitA_170;                       /* +0x170 */
     s32 limitB_174;                       /* +0x174 */
@@ -92,7 +102,6 @@ typedef struct NetworkSessionPlayerRecord {
     u8 linked_04;                        /* +0x04 - cleared on removal while a session exists (GUESS on the name) */
     u8 pad_05[0x03];                     /* +0x05..+0x07 */
     NetworkSmallObject smallObject_08;   /* +0x08 - the player's address object `getPlayerRecord` copies out */
-    u8 pad_18[0x10];                     /* +0x18..+0x27 (the address object is 0x20 B; only 0x10 is typed) */
     char name_28[0x14];                  /* +0x28 - `getPlayerRecordName` copies at most 0x14 bytes */
     s32 value_3C;                        /* +0x3C - the payload of event 21 (`announcePlayers`) */
     NetworkPeerAddress address_40;       /* +0x40 - the Udp peer `removePlayerRecord` drops */
@@ -114,6 +123,7 @@ extern "C" u32* __va_arg(NetworkVaState* ap, s32 type);
 /* ---------------- NetworkRequest ---------------------------------------------------------- */
 class NetworkSessionManager;
 struct NetworkRequest;
+struct NetworkErrorInfo;   /* the 12-byte error record - Network/gamespy_interface_types.h */
 
 /* A request's handler: a member function of the manager that reports completion (non-zero).  The starters
    pass it by value (the `networkRequestDescNNN` constants are `{0, handler slot, 0}`), the request keeps
@@ -151,6 +161,11 @@ typedef struct NetworkRequest {
     NetworkRequestDesc handler_98;     /* +0x98..+0xA3 - the member function the request runs */
 
     void run();   /* runs the handler; a handler that reports completion clears the record */
+    s32 getRecord(NetworkErrorInfo* out);    /* the error record, under the mutex; false while none is set */
+    void setRecord(u32 a, u32 b, u32 c);     /* stores the error record, under the mutex */
+    s32 getArgument(u32 idx);                /* the starter's word argument `idx` (0 past the count) */
+    s32 isTimedOut();                        /* waiting longer than `interval_4C` (never while idle) */
+    void restartTimer(f32 interval);         /* the clock becomes the baseline, the interval is replaced */
 } NetworkRequest;           /* size: 0xA4 */
 
 /* One entry of the name list: `copyNameList` copies an entry only when its first word is set. */
@@ -294,14 +309,14 @@ public:
     virtual s32 handleServerTimeout(NetworkRequest* request) = 0; /* +0x18C */
     virtual s32 slot_190(NetworkRequest* request) = 0;   /* +0x190 */
     virtual s32 handleCircleInfoSet(NetworkRequest* request) = 0; /* +0x194 */
-    virtual s32 handleCircleMatchEndInfo(NetworkRequest* request) = 0; /* +0x198 */
+    virtual s32 handleCircleLeave(NetworkRequest* request) = 0; /* +0x198 */
     virtual s32 slot_19C(NetworkRequest* request) = 0;   /* +0x19C */
     virtual s32 slot_1A0(NetworkRequest* request) = 0;   /* +0x1A0 */
     virtual s32 slot_1A4(NetworkRequest* request) = 0;   /* +0x1A4 */
     virtual s32 slot_1A8(NetworkRequest* request) = 0;   /* +0x1A8 */
     virtual s32 handleCircleMatchOptionSet(NetworkRequest* request) = 0; /* +0x1AC */
     virtual s32 handleCircleMatchStart(NetworkRequest* request) = 0; /* +0x1B0 */
-    virtual s32 handleGameSpyError(NetworkRequest* request) = 0; /* +0x1B4 */
+    virtual s32 moveStartSession(NetworkRequest* request) = 0; /* +0x1B4 */
     virtual s32 slot_1B8(NetworkRequest* request) = 0;   /* +0x1B8 */
     virtual s32 handleCircleMatchEnd(NetworkRequest* request) = 0; /* +0x1BC */
     virtual s8 mapId_1C0(s32 value) = 0;                   /* +0x1C0 */
@@ -326,12 +341,15 @@ public:
 typedef struct PatCircleInfo {
     /* +0x000 */ s32 id_000;
     /* +0x004 */ char name_004[0x40];
-    /* +0x044 */ s8 flag_044;
-    /* +0x045 */ u8 pad_045[0x11];
+    /* +0x044 */ s8 flag_044;          /* 1 = the block carries a session name */
+    /* +0x045 */ char sessionName_045[0x0F];
+    /* +0x054 */ u8 sessionNameEnd_054;
+    /* +0x055 */ u8 pad_055;
     /* +0x056 */ u8 records_56[0x100];
     /* +0x156 */ u16 recordCount_156;
     /* +0x158 */ char comment_158[0x90];
-    /* +0x1E8 */ u8 pad_1E8[0x170];
+    /* +0x1E8 */ u8 commentEnd_1E8;
+    /* +0x1E9 */ u8 pad_1E9[0x16F];
     /* +0x358 */ s32 limitA_358;
     /* +0x35C */ s32 usedA_35C;
     /* +0x360 */ s32 limitB_360;
@@ -341,8 +359,60 @@ typedef struct PatCircleInfo {
     /* +0x370 */ u8 address_370[0x08];
     /* +0x378 */ s8 mode_378;
     /* +0x379 */ s8 state_379;
-    /* +0x37A */ u8 pad_37A[0x2];
+    /* +0x37A */ s8 state_37A;   /* `handleCircleInfoSet` writes the same open (1) / closed (-1) value as +0x379 */
+    /* +0x37B */ u8 pad_37B;
 } PatCircleInfo;   /* size: 0x37C */
+
+/* The 0x30-byte match option block `sendReqCircleMatchOptionSet` sends (the manager keeps its own at +0x3EC;
+ * `handleCircleMatchOptionSet` sends a zeroed one carrying only the mode byte). */
+typedef struct PatMatchOptions {
+    /* +0x00 */ u8 pad_00[0x04];
+    /* +0x04 */ u16 sessionKey_04;     /* 10000..19999, drawn at login (`updateSession`) */
+    /* +0x06 */ s8 mode_06;            /* 2 = the match is reported to the server when it ends */
+    /* +0x07 */ u8 pad_07;
+    /* +0x08 */ u8 userId_08[0x08];    /* this console's selected id (`getSelectedID`) */
+    /* +0x10 */ char name_10[0x13];    /* this console's name (`slot_19C` copies 19 characters into its chat record) */
+    /* +0x23 */ u8 pad_23[0x0D];
+} PatMatchOptions;   /* size: 0x30 */
+
+/* One search condition of the list at +0x7E8: an option slot, its comparison kind (1..6), whether it is set
+   and the value (`packCircleConditions` maps the kind to the server's operator). */
+typedef struct PatCondition {
+    /* +0x00 */ u8 slot_00;
+    /* +0x01 */ u8 kind_01;
+    /* +0x02 */ u8 pad_02[0x02];
+    /* +0x04 */ u32 enabled_04;     /* 1 = the condition is set */
+    /* +0x08 */ s32 value_08;
+} PatCondition;   /* size: 0xC */
+
+/* The condition list: a count at +0x04 (clamped to 8) and the eight conditions. */
+typedef struct PatConditionList {
+    /* +0x00 */ u32 head_00;
+    /* +0x04 */ u32 count_04;
+    /* +0x08 */ PatCondition entries_08[8];
+} PatConditionList;   /* size: 0x68 */
+
+/* One packed search filter `packCircleConditions` builds from a condition: the server's operator (5, 6, 4,
+   3, 2, 1 for the condition kinds 1..6), the option number (slot + 1), the enable flag and the value. */
+typedef struct PatCircleFilter {
+    /* +0x00 */ u8 op_00;
+    /* +0x01 */ u8 pad_01[0x03];
+    /* +0x04 */ u8 slot_04;
+    /* +0x05 */ u8 enabled_05;
+    /* +0x06 */ u8 pad_06[0x02];
+    /* +0x08 */ s32 value_08;
+} PatCircleFilter;   /* size: 0xC */
+
+/* The 10-byte header every session chat packet opens with (`sendSessionChat` writes it, `readChatHeader`
+   reads it back): the packet kind (2 = chat), the target slot (-1 = everyone), the sender's slot and the
+   caller's tag word. */
+typedef struct PatChatHeader {
+    /* +0x00 */ u8 kind_00;
+    /* +0x01 */ s8 target_01;
+    /* +0x02 */ u8 pad_02[0x02];
+    /* +0x04 */ u32 sender_04;
+    /* +0x08 */ u32 tag_08;
+} PatChatHeader;   /* size: 0xC */
 
 /* One entry of a packed option list: an option number, its enable flag and its value. */
 typedef struct PatCircleOption {
@@ -384,7 +454,7 @@ class NetworkSessionManagerPat;
    the vtable offset it fills (`slot_068`), which is this class's own existing scheme
    (`slot_13C`/`slot_140`/`slot_148` in the base).  The parameter lists come from the argument
    registers each body reads before writing them, with the pointer types the bodies demonstrate
-   (`NetworkRequest*` for the 21 handlers, which all call `NetworkRequest_getArgument`/
+   (`NetworkRequest*` for the 21 handlers, which all call `NetworkRequest::getArgument`/
    `getRecord`).  A later pass that writes one of these bodies owns refining both.  The slot census
    (index, address, target, owner) is `python tools/units/vtableaudit.py --at 0x805FB0F8 --json`. */
 class NetworkSessionManagerPat : public NetworkSessionManager {
@@ -448,14 +518,14 @@ public:
     virtual s32 handleServerTimeout(NetworkRequest* request); /* +0x18C */
     virtual s32 slot_190(NetworkRequest* request);       /* +0x190 */
     virtual s32 handleCircleInfoSet(NetworkRequest* request); /* +0x194 */
-    virtual s32 handleCircleMatchEndInfo(NetworkRequest* request); /* +0x198 */
+    virtual s32 handleCircleLeave(NetworkRequest* request); /* +0x198 - leaves the circle (event 16) */
     virtual s32 slot_19C(NetworkRequest* request);       /* +0x19C */
     virtual s32 slot_1A0(NetworkRequest* request);       /* +0x1A0 */
     virtual s32 slot_1A4(NetworkRequest* request);       /* +0x1A4 */
     virtual s32 slot_1A8(NetworkRequest* request);       /* +0x1A8 */
     virtual s32 handleCircleMatchOptionSet(NetworkRequest* request); /* +0x1AC */
     virtual s32 handleCircleMatchStart(NetworkRequest* request); /* +0x1B0 */
-    virtual s32 handleGameSpyError(NetworkRequest* request); /* +0x1B4 */
+    virtual s32 moveStartSession(NetworkRequest* request); /* +0x1B4 - its own log string "moveStartSession::mMatchPhase(0) NG" */
     virtual s32 slot_1B8(NetworkRequest* request);       /* +0x1B8 */
     virtual s32 handleCircleMatchEnd(NetworkRequest* request); /* +0x1BC */
     virtual s8 mapId_1C0(s32 value);                      /* +0x1C0 */
@@ -472,6 +542,7 @@ public:
     void removePlayerRecord(s8 index, s32 counted);       /* 0x803DE150 (GUESS) */
     void updatePlayerRecord(s8 index, const u8* address, const char* name, u32 state); /* 0x803DE238 (GUESS) */
     s32 packCircleOptions(PatCircleOption* dst, s32 max, NetworkNameList* src);      /* 0x803DE360 (GUESS) */
+    s32 packCircleConditions(PatCircleFilter* dst, s32 max, PatConditionList* src); /* 0x803DE3F4 (GUESS: the search filters of the circle list query) */
     s32 uniqueIdToMember(const NetworkSmallObject* id);   /* 0x803DE6D4 - its own log string names it */
     void resetCircleState();                              /* 0x803DE7C8 (GUESS: clears the pending circle publish) */
     void announcePlayers();                               /* 0x803DE82C (GUESS: re-posts every remote player's events) */
@@ -481,55 +552,74 @@ public:
     void setCircleComment(const char* comment);           /* 0x803DF0C8 (GUESS: the 144-character text `move` publishes beside the mode) */
     void setCircleMode(u8 mode);                          /* 0x803DF144 (GUESS: arms the pending mode byte `move` consumes) */
     void post(const u8* data, s32 size, s8 channel, s8 index); /* 0x803DF180 - forwards to the session's `post` */
+    void beginCircleLeave();                                    /* 0x803DA294 (GUESS: drops the pending publish, rewinds the leave steps) */
+    s32 stepCircleLeave(NetworkErrorInfo* error);               /* 0x803DA2C8 (GUESS: one step of leaving the circle) */
+    void readChatHeader(PatChatHeader* out, const u8* data);    /* 0x803DC0E4 (GUESS: parses the 10-byte chat header) */
+    void sendSessionChat(const char* text, u32 tag, s8 target); /* 0x803DC184 (GUESS: the chat packet over the session) */
+    void receiveSessionChat(const u8* data, u32 size);          /* 0x803DC2E4 (GUESS: reports a received chat packet, event 19) */
+    s8 connectPeer(const NetworkSmallObject* address, u32 value); /* 0x803DEB38 (GUESS: opens a session slot for a layer member) */
+    void reportSessionError(const NetworkErrorInfo* info);      /* 0x803DEDE0 (GUESS: sends the record and the thread's error to the server) */
+    void setSessionLog(NetworkRequest* request, u32 code, u32 arg_a, u32 arg_b); /* 0x803DF1CC (GUESS: the layer's `setCollectionLog`) */
+    void setSessionLogAborted(NetworkRequest* request);     /* 0x803DF24C (GUESS: requestFlags bit 1, code 0x80050012) */
+    void setSessionLogSessionLost(NetworkRequest* request); /* 0x803DF29C (GUESS: requestFlags bit 0, code 0x80050031) */
 
     NetworkRequest pool2_1C4[2];               /* +0x1C4..+0x30B */
-    u8 pad_30C[0x54];                          /* +0x30C..+0x35F */
-    s32 field_360[21];                         /* +0x360..+0x3B3 */
-    u8 pad_3B4[0x04];                          /* +0x3B4..+0x3B7 */
+    u32 requestFlags_30C[21];                  /* +0x30C..+0x35F - per request: bit 0 = session lost, bit 1 = cancelled, higher bits = the replies */
+    s32 requestIds_360[21];                    /* +0x360..+0x3B3 - per request: the id the last `sendReq*` returned (-1 = none) */
+    u8 leaveState_3B4;                         /* +0x3B4 - `stepCircleLeave`'s step (0, 5, 10) */
+    u8 pad_3B5[0x03];                          /* +0x3B5..+0x3B7 */
     f32 field_3B8;                             /* +0x3B8 */
     f32 field_3BC;                             /* +0x3BC */
-    u8 field_3C0;                              /* +0x3C0 */
-    u8 field_3C1;                              /* +0x3C1 */
+    u8 connected_3C0;                          /* +0x3C0 - zero: every request fails with 0x80050001; `shutdown` clears it */
+    u8 matchRunning_3C1;                       /* +0x3C1 - a match is running (`handleCircleMatchEnd` fails with 0x80050045 without one) */
     u8 field_3C2;                              /* +0x3C2 */
     u8 field_3C3;                              /* +0x3C3 */
     s32 field_3C4;                             /* +0x3C4 */
     u8 field_3C8;                              /* +0x3C8 */
     u8 pad_3C9[0x03];                          /* +0x3C9..+0x3CB */
     NetworkSmallObject field_3CC;              /* +0x3CC */
-    u8 pad_3DC[0x10];                          /* +0x3DC..+0x3EB */
-    u8 field_3EC[0x30];                        /* +0x3EC..+0x41B */
+    PatMatchOptions matchOptions_3EC;          /* +0x3EC..+0x41B - the options `sendReqCircleMatchOptionSet` sends */
     s32 circleInfoRequestId_41C;               /* +0x41C - the id `sendReqCircleInfoSet` sends under (`canSend_28`: > 0 once assigned) */
-    u8 pad_420[0x104];                         /* +0x420..+0x523 */
+    s32 circleOwnerId_420;                     /* +0x420 - the joined circle's owner id (from the received block's +0x368) */
+    char circleName_424[0x100];                /* +0x424..+0x523 - the joined circle's name (63 characters + terminator) */
     s32 limitB_524;                            /* +0x524 - the session's own counters, read by `getWord_5xx` */
     s32 limitA_528;                            /* +0x528 - players added (`addPlayerRecord` counts every one) */
     s32 usedB_52C;                             /* +0x52C */
     s32 usedA_530;                             /* +0x530 - players added with the `counted` flag */
     u8 flag_534;                               /* +0x534 - `getByte_534` */
-    u8 pad_535;                                /* +0x535 */
+    u8 circleLost_535;                         /* +0x535 - the circle went away: leaving it needs no server request (GUESS on the name) */
     s8 selfIndex_536;                          /* +0x536 - this console's slot (GUESS: `circleAvailable` compares it with +0x537) */
     s8 hostIndex_537;                          /* +0x537 - the host's slot (GUESS) */
     NetworkSessionPlayerRecord players_538[4]; /* +0x538..+0x657 */
     NetworkSingleTcp* tcp_658;                 /* +0x658 - the Tcp connection, pumped by `NetworkSingleTcp::move` */
     NetworkMultipleUdp* udp_65C;               /* +0x65C - the Udp socket, pumped by `NetworkMultipleUdp::move` */
-    s32 field_660;                             /* +0x660 */
-    u8 pad_664[0x13C];                         /* +0x664..+0x79F */
+    NetworkResolverBase* resolver_660;         /* +0x660 - the resolver the library lent the session (released on shutdown) */
+    s32 matchMemberCount_664;                  /* +0x664 - the payload count of the match-start event (24) */
+    u8 matchMembers_668[4];                    /* +0x668 - the match members' slots (the event's payload) */
+    u8 matchPhase_66C;                         /* +0x66C - `mMatchPhase` in `moveStartSession`'s log string: 0 = none, 3 = the session started */
+    u8 pad_66D;                                /* +0x66D */
+    u8 matchData_66E[0x126];                   /* +0x66E..+0x793 - cleared with the match (GUESS: the rest of the match record) */
+    s32 errorCode_794;                         /* +0x794 - the error record the GameSpy handler reports (3 words) */
+    s32 errorParam1_798;                       /* +0x798 */
+    s32 errorParam2_79C;                       /* +0x79C */
     NetworkNameList nameList_7A0;              /* +0x7A0..+0x7E7 - `buildCircleInfoName` reads it */
-    u8 nameListTail_7E8[0x68];                 /* +0x7E8..+0x84F - `copyNameListTail` copies 0x68 bytes in */
+    PatConditionList conditionList_7E8;        /* +0x7E8..+0x84F - `copyNameListTail` copies the 0x68 bytes in */
     char sessionName_850[0x100];               /* +0x850..+0x94F - `setSessionName` (255 characters + terminator) */
     u32 circleRecordCount_950;                 /* +0x950 - records waiting to be sent (max 256) */
     u8 circleRecords_954[0x100];               /* +0x954..+0xA53 - the records `move` copies out */
     char circleComment_A54[0x91];              /* +0xA54..+0xAE4 - `setCircleComment` (144 characters + terminator) */
     u8 field_AE5;                              /* +0xAE5 - `setCircleMode`'s value: `move` sends mode 1 when set, 2 otherwise */
     u8 field_AE6;                              /* +0xAE6 - pending-mode flag `move` consumes */
-    u8 pad_AE7[0x9];                           /* +0xAE7..+0xAF0 */
+    u8 pad_AE7;                                /* +0xAE7 */
+    s32 listCursor_AE8;                        /* +0xAE8 - circles fetched so far by the list query (`slot_178`) */
+    s32 listTotal_AEC;                         /* +0xAEC - circles the list query found */
     NetworkSessionCircleList circleList_AF0;   /* +0xAF0..+0x6E73 */
     u8 field_6E74;                             /* +0x6E74 */
     u8 field_6E75;                             /* +0x6E75 */
 };   /* size: 0x6E76 */
 
-/* The Pat session units' views of the mediator records (`PatInterface`, `GameSpyInterfaceThread`,
- * `NetworkErrorInfo`) and the no-argument `PatInterface_*` spellings live in
- * `Network/session_mediator_views.h`, included only by the units that use them. */
+/* The mediator records (`PatInterface`, `GameSpyInterfaceThread`, `NetworkErrorInfo`) are their owners'
+ * (`Network/PatInterface.h`, `Network/gamespy_interface_types.h`), included only by the units that use them. */
 
 /* ---------------- externs ----------------------------------------------------------------- */
 
@@ -595,8 +685,6 @@ void networkSessionReflectCallback(void* a0, void* a1, s8 a2, void* a3, void* a4
 void networkSessionReflectCallbackEx(void* a0, void* a1, void* a2, void* a3, void* a4, void* a5);
 
 /* this unit's own record/stream helpers, defined in the tail of the range */
-s32 NetworkRequest_isTimedOut(NetworkRequest* self);
-void NetworkRequest_restartTimer(NetworkRequest* self, f32 interval);
 void NetworkRequest_copyRecord(NetworkSessionRecordBlock* dst, const NetworkSessionRecordBlock* src);
 NetworkSessionSlotInfo* NetworkSessionSlotInfo_construct(NetworkSessionSlotInfo* self);
 NetworkSessionSlotInfo* NetworkSessionSlotInfo_dtor(NetworkSessionSlotInfo* self, s16 flags);

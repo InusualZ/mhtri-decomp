@@ -85,6 +85,12 @@
  *  - `.text` is 284 B short of the claim, so `.text`/`extab` cannot flip yet: `copyRecord` (-96 B)
  *    plus the functions whose bodies compress.  `flipcheck` reports `.text` 0x32B4 vs 0x33D0 and
  *    `extab` 0x2E4 vs 0x4EC.
+ *  - Pilot L2 round 2: the Pat constructor/`init`/`release` use the owner's `PatInterface` and the 0x44A0-byte
+ *    `GameSpyInterfaceThread` view, and run under `#pragma peephole off` (retail keeps `lwz r12,0(r3)` after the
+ *    `mr r3,this` copy); `release`'s close loop is a `do {} while`; the request record helpers `getRecord`/`setRecord`/
+ *    `getArgument`/`isTimedOut`/`restartTimer` are `NetworkRequest` members (map rows renamed).  Open: the Pat
+ *    destructor and `clear` (95.6 / 97.8) - the deleting-flag `extsh` and the struct-of-function-pointers
+ *    `NetworkSmallObject` dispatch (L1's `Network/network_writer_types.h`).
  *  - GUESS names: `NetworkSessionSlotInfo_*`, `NetworkSessionCircleInfo_*`, `NetworkSessionCircleList_*`
  *    and `NetworkSessionPlayerRecord_*` come from their container offsets and `net_va_arg`/`memset`
  *    use; `networkSessionReflectCallbackEx` and the `network<span>*` accessor names are derived from
@@ -108,7 +114,9 @@
 #include "Network/NetworkSessionManager.h"
 #include "Network/NetworkSessionManagerPat.h"   /* the Pat buffer helpers and the reflection adapters */
 #include "Network/NetworkCommunityPat.h"        /* networkSmallObject_construct */
-#include "Network/session_mediator_views.h"     /* the Pat side's PatInterface / GameSpyInterfaceThread views */
+#include "Network/gamespy_interface_types.h"    /* GameSpyInterfaceThread / NetworkErrorInfo - owner Network/GameSpyInterfaceThread.cpp */
+#include "Network/sGameSpyInterfaceThread.h"    /* sGameSpyInterfaceThread - owner Network/GameSpyInterfaceThread.cpp */
+#include "Network/PatInterface.h"              /* PatInterface - owner Network/PatInterface.cpp */
 
 /* `NetworkVaState` and the two variadic intrinsics live in this unit's header (rule 2 keeps the
    declaration with the TU that needs it). */
@@ -142,9 +150,6 @@ void NetworkRequest_cancel(NetworkRequest*);
 s32 NetworkRequest_isCancelled(NetworkRequest*);
 NetworkRequest* NetworkSessionManager_allocRequest(NetworkSessionManager*);
 void NetworkSessionManager_deleteRequest(NetworkSessionManager*, NetworkRequest**);
-s32 NetworkRequest_getRecord(NetworkRequest*, u32*);
-void NetworkRequest_setRecord(NetworkRequest*, u32, u32, u32);
-s32 NetworkRequest_getArgument(NetworkRequest*, u32);
 }
 
 /* ---- extra neighbouring globals ---- */
@@ -396,10 +401,10 @@ NetworkRequestDesc networkRequestDesc416 = &NetworkSessionManager::slot_1A0;
 NetworkRequestDesc networkRequestDesc420 = &NetworkSessionManager::slot_1A4;
 NetworkRequestDesc networkRequestDesc424 = &NetworkSessionManager::slot_1A8;
 NetworkRequestDesc networkRequestDesc404 = &NetworkSessionManager::handleCircleInfoSet;
-NetworkRequestDesc networkRequestDesc436 = &NetworkSessionManager::handleGameSpyError;
+NetworkRequestDesc networkRequestDesc436 = &NetworkSessionManager::moveStartSession;
 NetworkRequestDesc networkRequestDesc440 = &NetworkSessionManager::slot_1B8;
 NetworkRequestDesc networkRequestDesc444 = &NetworkSessionManager::handleCircleMatchEnd;
-NetworkRequestDesc networkRequestDesc408 = &NetworkSessionManager::handleCircleMatchEndInfo;
+NetworkRequestDesc networkRequestDesc408 = &NetworkSessionManager::handleCircleLeave;
 NetworkRequestDesc networkRequestDesc412 = &NetworkSessionManager::slot_19C;
 NetworkRequestDesc networkRequestDesc392 = &NetworkSessionManager::slot_188;
 NetworkRequestDesc networkRequestDesc396 = &NetworkSessionManager::handleServerTimeout;
@@ -722,10 +727,8 @@ void NetworkSessionManager::request428(u32 a)
 
 void NetworkSessionManager::abortRequest4()
 {
-    NetworkRequest* req = this->requests_10[4];
-
-    if (req != 0 && NetworkRequest_isCancelled(req) == 0) {
-        NetworkRequest_cancel(req);
+    if (this->requests_10[4] != 0 && NetworkRequest_isCancelled(this->requests_10[4]) == 0) {
+        NetworkRequest_cancel(this->requests_10[4]);
     }
 }
 
@@ -743,10 +746,8 @@ extern "C" s32 NetworkRequest_isCancelled(NetworkRequest* self)
 
 void NetworkSessionManager::abortRequest14()
 {
-    NetworkRequest* req = this->requests_10[14];
-
-    if (req != 0 && NetworkRequest_isCancelled(req) == 0) {
-        NetworkRequest_cancel(req);
+    if (this->requests_10[14] != 0 && NetworkRequest_isCancelled(this->requests_10[14]) == 0) {
+        NetworkRequest_cancel(this->requests_10[14]);
     }
 }
 
@@ -770,7 +771,9 @@ s32 NetworkSessionManager::getInt(s8 value)
     if (this->buffer == 0) {
         return 0;
     }
-    return this->buffer->getInt(mapId_1C0(value));
+    s8 slot = mapId_1C0(value);
+
+    return this->buffer->getInt(slot);
 }
 
 f32 NetworkSessionManager::getFloat(s8 value)
@@ -778,7 +781,9 @@ f32 NetworkSessionManager::getFloat(s8 value)
     if (this->buffer == 0) {
         return networkRequestZero;
     }
-    return this->buffer->getFloat(mapId_1C0(value));
+    s8 slot = mapId_1C0(value);
+
+    return this->buffer->getFloat(slot);
 }
 
 void NetworkSessionManager::broadcastPlayerSlots(u32 a, u32 b)
@@ -989,43 +994,46 @@ extern "C" void NetworkSessionManager_deleteRequest(NetworkSessionManager* self,
     *slot = 0;
 }
 
-extern "C" s32 NetworkRequest_getRecord(NetworkRequest* self, u32* out)
+/* Copies the request's error record out under its mutex; false while none is set. */
+s32 NetworkRequest::getRecord(NetworkErrorInfo* out)
 {
     s32 result;
 
     result = 0;
-    LockMutex(self->mutex_78);
-    if (self->record_54 != 0) {
+    LockMutex(this->mutex_78);
+    if (this->record_54 != 0) {
         result = 1;
-        out[0] = self->record_54;
-        out[1] = self->record_58;
-        out[2] = self->record_5C;
+        out->code_00 = this->record_54;
+        out->param1_04 = this->record_58;
+        out->param2_08 = this->record_5C;
     }
-    UnlockMutex(self->mutex_78);
+    UnlockMutex(this->mutex_78);
     return result;
 }
 
-extern "C" void NetworkRequest_setRecord(NetworkRequest* self, u32 a, u32 b, u32 c)
+/* Stores the request's error record under its mutex. */
+void NetworkRequest::setRecord(u32 a, u32 b, u32 c)
 {
-    LockMutex(self->mutex_78);
-    self->record_58 = b;
-    self->record_5C = c;
-    self->record_54 = a;
-    UnlockMutex(self->mutex_78);
+    LockMutex(this->mutex_78);
+    this->record_58 = b;
+    this->record_5C = c;
+    this->record_54 = a;
+    UnlockMutex(this->mutex_78);
 }
 
-extern "C" s32 NetworkRequest_getArgument(NetworkRequest* self, u32 idx)
+/* The starter's word argument `idx`, 0 (and a warning) past the count it was given. */
+s32 NetworkRequest::getArgument(u32 idx)
 {
     u32 count;
     NetworkLogger* log;
 
-    count = self->count_28;
+    count = this->count_28;
     if (count <= idx) {
         log = getNetworkLogger();
         log->warn_10("NetworkRequest::getArgument: arg no over %d <= %d\n", count, idx);
         return 0;
     }
-    return (s32)self->args_2C[idx];
+    return (s32)this->args_2C[idx];
 }
 
 /* ----------------------------------------------------------------------------------------- */
@@ -1033,33 +1041,33 @@ extern "C" s32 NetworkRequest_getArgument(NetworkRequest* self, u32 idx)
 /* ----------------------------------------------------------------------------------------- */
 
 /* True once the request has been waiting longer than its own interval. */
-extern "C" s32 NetworkRequest_isTimedOut(NetworkRequest* self)
+s32 NetworkRequest::isTimedOut()
 {
     NetworkLogger* log;
     s32 result;
 
     result = 0;
-    LockMutex(self->mutex_78);
-    if (self->interval_4C != networkRequestTimerIdle) {
+    LockMutex(this->mutex_78);
+    if (networkRequestTimerIdle != this->interval_4C) {
         log = getNetworkLogger();
-        if (log->getTime_60() - self->timeout_50 > self->interval_4C) {
+        if (log->getTime_60() - this->timeout_50 > this->interval_4C) {
             result = 1;
         }
     }
-    UnlockMutex(self->mutex_78);
+    UnlockMutex(this->mutex_78);
     return result;
 }
 
 /* Restarts the wait: the current clock becomes the baseline and the interval is replaced. */
-extern "C" void NetworkRequest_restartTimer(NetworkRequest* self, f32 interval)
+void NetworkRequest::restartTimer(f32 interval)
 {
     NetworkLogger* log;
 
-    LockMutex(self->mutex_78);
+    LockMutex(this->mutex_78);
     log = getNetworkLogger();
-    self->timeout_50 = log->getTime_60();
-    self->interval_4C = interval;
-    UnlockMutex(self->mutex_78);
+    this->timeout_50 = log->getTime_60();
+    this->interval_4C = interval;
+    UnlockMutex(this->mutex_78);
 }
 
 /* Moves the 0x60-byte record block an out-of-band request carries. */
@@ -1101,7 +1109,7 @@ extern "C" void networkSessionReflectCallback(void* a0, void* a1, s8 a2, void* a
 /* untyped: caller-owned payload - the six arguments are forwarded unchanged */
 extern "C" void networkSessionReflectCallbackEx(void* a0, void* a1, void* a2, void* a3, void* a4, void* a5)
 {
-    networkSessionReflect1(a5, a0, a1, a2, a3, a4);
+    networkSessionReflect1((NetworkSessionManagerPat*)a5, (s32)a0, (s32)a1, (s32)a2, (s32)a3, (const u8*)a4);
 }
 
 extern "C" NetworkSessionCircleList* NetworkSessionCircleList_dtor(NetworkSessionCircleList* self, s16 flags)
@@ -1233,6 +1241,8 @@ extern "C" NetworkRequest* NetworkRequestPat_construct(NetworkRequest* self)
 
 /* Builds the Pat side of the session: its own request pair, its player records and the circle
    list, then the two on-demand singletons the Pat layer drives. */
+#pragma dont_inline on
+#pragma peephole off
 NetworkSessionManagerPat::NetworkSessionManagerPat()
 {
     __construct_array(&this->pool2_1C4[0], (void*)NetworkRequestPat_construct,
@@ -1251,6 +1261,7 @@ NetworkSessionManagerPat::NetworkSessionManagerPat()
     this->clear();
 }
 
+#pragma peephole reset
 #pragma dont_inline on
 NetworkSessionManagerPat::~NetworkSessionManagerPat()
 {
@@ -1272,21 +1283,21 @@ void NetworkSessionManagerPat::clear()
 
     this->NetworkSessionManager::clear();
     for (i = 0; i < 21; i++) {
-        this->field_360[i] = -1;
+        this->requestIds_360[i] = -1;
     }
-    this->field_3B8 = this->field_3BC = networkSessionPatTimeOrigin;
-    this->field_3C0 = 0;
-    this->field_3C1 = 0;
+    this->field_3BC = this->field_3B8 = networkSessionPatTimeOrigin;
+    this->connected_3C0 = 0;
+    this->matchRunning_3C1 = 0;
     this->field_3C2 = 0;
     this->field_3C3 = 0;
     this->field_3C4 = 0;
     this->field_3C8 = 0;
     this->field_3CC.vtable->slot_18(&this->field_3CC);
-    memset(&this->field_3EC[0], 0, 48);
+    memset(&this->matchOptions_3EC, 0, sizeof(this->matchOptions_3EC));
     this->tcp_658 = 0;
     this->udp_65C = 0;
-    this->field_660 = 0;
-    networkPatAttachBuffer((NetworkBuffer*)this);
+    this->resolver_660 = 0;
+    networkPatAttachBuffer(this);
     this->circleList_AF0.count_00 = 0;
     for (i = 0; i < 32; i++) {
         networkPatResetCircleInfo(this, i);
@@ -1296,6 +1307,7 @@ void NetworkSessionManagerPat::clear()
 
 /* Starts a Pat session: the interface singletons, the base's own init and then a clear. */
 #pragma dont_inline on
+#pragma peephole off
 void NetworkSessionManagerPat::init(u32 a, u32 b)
 {
     if (getInstance_() == 0) {
@@ -1309,6 +1321,7 @@ void NetworkSessionManagerPat::init(u32 a, u32 b)
     this->clear();
 }
 
+#pragma peephole reset
 /* Tears the Pat session down: drains the game-spy thread, then runs the base's release. */
 void NetworkSessionManagerPat::release()
 {
@@ -1318,19 +1331,18 @@ void NetworkSessionManagerPat::release()
 
     networkPatReleaseBuffer(this);
     if (getInstance_() != 0) {
-        PatInterface_clear();
-        pat = (PatInterface*)getInstance_();
-        if (PatInterface_isReady() == 0) {
+        PatInterface_clear((PatInterface*)getInstance_());
+        if (PatInterface_isReady((PatInterface*)getInstance_()) == 0) {
             pat = (PatInterface*)getInstance_();
             if (pat != 0) {
-                pat->destroy(1);
+                pat->finalize(1);
             }
         }
     }
-    context = (void*)this->field_660;
+    context = this->resolver_660;
     if (context != 0) {
         networkLog_destroyContext((NetworkSessionManagerLogger*)getNetworkLogger(), context);
-        this->field_660 = 0;
+        this->resolver_660 = 0;
     }
     if (GameSpyInterfaceThread::getInstance() != 0) {
         if (this->field_6E75 != 0) {
@@ -1342,14 +1354,10 @@ void NetworkSessionManagerPat::release()
             thread = GameSpyInterfaceThread::getInstance();
             thread->armCancel();
         }
+        do {
+        } while (GameSpyInterfaceThread::getInstance()->requestClose());
         thread = GameSpyInterfaceThread::getInstance();
-        while (thread->requestClose()) {
-            thread = GameSpyInterfaceThread::getInstance();
-        }
-        thread = GameSpyInterfaceThread::getInstance();
-        if (thread != 0) {
-            thread->destroy(1);
-        }
+        delete thread;
     }
     this->NetworkSessionManager::release();
 }

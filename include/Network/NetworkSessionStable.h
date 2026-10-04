@@ -146,7 +146,7 @@ public:
     ~NetworkSlotSmallObject();
 
     /* +0x00 */ NetworkSmallObject object_00;
-};   /* size: 0x10 */
+};   /* size: 0x20 */
 
 /* One of the session's four slots: a peer's link state, error record, connection, address, queues and the
    rate governor (GUESS on every name).  The offsets are relative to the slot. */
@@ -171,7 +171,6 @@ public:
     /* +0x020 */ NetworkPeerErrorRecord error_20;   /* the first error the slot recorded */
     /* +0x02C */ NetworkConnectionStable* connection_2C;
     /* +0x030 */ NetworkSlotSmallObject address_30;
-    /* +0x040 */ u8 pad_40[0x10];
     /* +0x050 */ u32 nonce_50;               /* the nonce the peer announced */
     /* +0x054 */ NetworkSlotQueues queues_54;
     /* +0x0D4 */ NetworkRateGovernor governor_D4;
@@ -285,7 +284,6 @@ public:
     /* +0x14827 */ u8 pad_14827;
     /* +0x14828 */ NetworkSessionSlot slots_14828[4];
     /* +0x16CB8 */ NetworkSlotSmallObject address_16CB8;   /* this session's own address record */
-    /* +0x16CC8 */ u8 pad_16CC8[0x10];
     /* +0x16CD8 */ u32 nonce_16CD8;
     /* +0x16CDC */ f32 time_16CDC;
     /* +0x16CE0 */ f32 hostSeen_16CE0;

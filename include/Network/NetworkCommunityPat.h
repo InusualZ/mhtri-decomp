@@ -40,6 +40,16 @@ public:
     /* +0x30 */ virtual void pad_30();
     /* +0x34 */ virtual void pad_34();
     /* +0x38 */ virtual void requestNews_38();
+    /* +0x3C */ virtual void pad_3C();
+    /* +0x40 */ virtual void pad_40();
+    /* +0x44 */ virtual void pad_44();
+    /* +0x48 */ virtual void pad_48();
+    /* +0x4C */ virtual void writeProfile_4C(const u8* data, u32 size);   /* 0x803F60C4: the whole block (offset 0) */
+    /* +0x50 */ virtual void writeProfileRange_50(const u8* data, u32 size, u32 offset);   /* 0x803F60D8: offset + size <= 0x100 */
+    /* +0x54 */ virtual void pad_54();
+    /* +0x58 */ virtual void pad_58();
+    /* +0x5C */ virtual void pad_5C();
+    /* +0x60 */ virtual void request_60(const u8* data, s32 id, u32 size, u32 flags);   /* 0x803F0068 (GUESS: a request starter with descriptor 0x805FC3F0) */
 
     /* 0x803F10E4 - sends the friend roster held at `roster` (`NetCtrlWk::roster_sync_0x61CC`). */
     void syncFriends(NetRosterSync* roster);
@@ -183,6 +193,9 @@ void networkSmallObject_setAddress(NetworkSmallObject* self, u8 kind, const u8* 
 
 /* 0x803F8810 - true when the address object holds a valid address (GUESS on the name). */
 s32 networkSmallObject_isValid(const NetworkSmallObject* self);
+
+/* 0x803F88B0 - writes the address object's raw address into `out` (at most `size` bytes). */
+void exportTo(const NetworkSmallObject* self, u8* out, u32 size);
 
 /* 0x803F8904 - true when both address records are set and equal. */
 s32 networkSmallObject_isEqual(const NetworkSmallObject* a, const NetworkSmallObject* b);

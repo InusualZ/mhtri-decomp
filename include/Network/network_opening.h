@@ -41,6 +41,9 @@ void startTermsUpdate(NetworkWiiMediator* self);
 void initMediatorTerms(NetworkWiiMediator* self, void* buffer, u32 size);
 s32 getMediatorTermsStatus(NetworkWiiMediator* self);
 void setMediatorTransferMode(NetworkWiiMediator* self, u32 mode);
+/* 0x804169D4 - 0 while the transfer mode is 0 or no terms object exists, else `isTermsUpdateFinished` on it
+ * (GUESS name). */
+s32 isMediatorTermsUpdateFinished(NetworkWiiMediator* self);
 void setMediatorTransferFlag6DD1(NetworkWiiMediator* self, u8 flag);
 void setMediatorTransferFlag6DD2(NetworkWiiMediator* self, u8 flag);
 void setMediatorTransferLevel(NetworkWiiMediator* self, f32 level);

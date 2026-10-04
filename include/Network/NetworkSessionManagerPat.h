@@ -32,11 +32,18 @@ typedef struct NetworkRequest NetworkRequest;   /* include/Network/NetworkSessio
 typedef struct NetworkRequestError NetworkRequestError;   /* include/unsplit/Network.h */
 typedef struct NetworkNameList NetworkNameList;           /* include/Network/NetworkSessionManager.h */
 class NetworkBuffer;                                      /* include/Network/network_writer_types.h */
+typedef struct NetworkLayerId NetworkLayerId;             /* include/Network/NetworkLayerPat.h */
 struct PatTerms;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* 0x803DF9A0 / 0x803DFACC / 0x803DFB7C - the layer id helpers, named by their own log strings
+ * ("NetworkLayerIdImportFrom: ...", "NetworkLayerIdExportTo: ...", "NetworkUniqueIdEquals: ..."). */
+void NetworkLayerIdImportFrom(NetworkLayerId* id, u8 kind, const u8* data, u32 size);
+void NetworkLayerIdExportTo(const NetworkLayerId* id, u8* out, u32 size);
+BOOL NetworkUniqueIdEquals(const NetworkLayerId* a, const NetworkLayerId* b);
 
 /* GUESS: 0x803DECF0 clears the session manager's busy byte and releases its buffers. */
 void closeNetworkSessionManagerPat(NetworkSessionManagerPat* self);
@@ -57,20 +64,23 @@ void networkPatResetCircleInfo(NetworkSessionManagerPat* self, s32 index);
 void createCircleLayer(NetworkSessionManagerPat* self, const struct PatCircleInfo* info, struct PatCircleOptionList* options);
 void deleteCircleListLayer(NetworkSessionManagerPat* self, s32 id);
 void changeCircleListLayer(NetworkSessionManagerPat* self, const struct PatCircleInfo* info, struct PatCircleOptionList* options);
-void networkPatAttachBuffer(NetworkBuffer* buffer);
+void networkPatAttachBuffer(NetworkSessionManagerPat* self);
 void networkPatReleaseBuffer(NetworkSessionManagerPat* self);
 
 /* the two reflection adapters the session manager installs as callbacks */
 /* untyped: caller-owned payload - the six arguments are forwarded unchanged */
 void networkSessionReflect0(void* a0, void* a1, s8 a2, void* a3, void* a4, void* a5);
-/* untyped: caller-owned payload - the six arguments are forwarded unchanged */
-void networkSessionReflect1(void* a0, void* a1, void* a2, void* a3, void* a4, void* a5);
+/* the server message callback: the manager, the message code, the request id it answers, a flag, the
+ * element count and the message bytes */
+void networkSessionReflect1(NetworkSessionManagerPat* self, s32 code, s32 requestId, s32 flag, s32 count,
+                            const u8* data);
 
 /* 0x80793930 / 0x80793934 - the two `.sdata` floats `initNetworkSessionStable` copies into a new
  * session through the vtable's +0x54/+0x58 slots; 0x8079C764 the `.sdata2` float it publishes
  * through +0x60. */
 extern f32 networkSessionTimeoutSeconds;
 extern f32 networkSessionIntervalSeconds;
+extern f32 networkSessionLimitSeconds;   /* 0x80793938 (GUESS: the third timeout the circle block can set, 20..100 s) */
 extern f32 networkSessionPeriodSeconds;
 
 #ifdef __cplusplus

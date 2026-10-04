@@ -10,6 +10,10 @@
 
 #include "types.h"
 
+struct PatCircleOptionList;
+struct PatMatchOptions;
+typedef struct PatCircleFilter PatCircleFilter;   /* include/Network/NetworkSessionManager.h */
+
 typedef struct NetworkInstance NetworkInstance;   /* include/unsplit/Network.h */
 typedef struct NetworkStateMachine NetworkStateMachine;   /* include/Network/network_state.h */
 typedef struct PatCircleInfo PatCircleInfo;       /* include/Network/NetworkSessionManager.h */
@@ -73,9 +77,6 @@ u32 sendReqLayerUserList(NetworkInstance* self);
 /* 0x80413AEC - whether the server is in maintenance (the status word reads 1). */
 s32 isMaintenanceMode(NetworkWiiMediator* self);
 
-/* the circle-info request the Pat session manager's `move` sends (the block is `PatCircleInfo`) */
-void sendReqCircleInfoSet(NetworkInstance* instance, u32 request_id, PatCircleInfo* info, const char* name);
-
 /* The request emitters the session state machine (`Network/network_state.cpp`) drives. */
 void sendReqAuthenticationToken(NetworkInstance* self, const char* token);
 void sendReqMaintenance(NetworkInstance* self);
@@ -116,6 +117,36 @@ void mediatorEventCallback(u32 code, s32 a, s32 b, s32 c, const union GameSpyEve
                            NetworkWiiMediator* mediator);
 s32 getLanguage(void);
 s32 getReflectEventId(void);
+
+/* The circle (lobby room) requests the Pat session manager sends: each writes its op-code and returns the
+ * request id (stored whole by the caller - playbook 66); the `sendNtc*` notices return nothing.  Names
+ * marked GUESS come from the manager's call sites (`.pi/outbox/net2-l2-101a-requests.json`): the List
+ * Head/Data/Foot triple is the op-code run 0xD0/0xD2/0xD4, Kick 0xD6 sends a user id, Chat 0xE8 has no
+ * reply slot (0xE9 follows it), the three value notices wrap `sendNtcCircleBinary` (kinds 1/2 and 3)
+ * and its addressed twin. */
+u32 sendReqCircleCreate(NetworkInstance* self, PatCircleInfo* info, PatCircleOptionList* options);   /* 0x804025B4 */
+u32 sendReqCircleInfo(NetworkInstance* self, s32 circleId, s32 mode);                                /* 0x80402630 */
+u32 sendReqCircleJoin(NetworkInstance* self, PatCircleInfo* info);                                   /* 0x804026B4 */
+u32 sendReqCircleLeave(NetworkInstance* self, s32 circleId);                                         /* 0x8040275C */
+u32 sendReqCircleMatchOptionSet(NetworkInstance* self, PatMatchOptions* options);                    /* 0x804027C0 */
+u32 sendReqCircleMatchStart(NetworkInstance* self);                                                  /* 0x80402880 */
+u32 sendReqCircleMatchEnd(NetworkInstance* self, s32 mode);                                          /* 0x804028CC */
+u32 sendReqCircleInfoSet(NetworkInstance* instance, u32 request_id, PatCircleInfo* info, const char* name); /* 0x80402930 */
+u32 sendReqCircleListLayer(NetworkInstance* self);                                                   /* 0x804029AC */
+u32 sendReqCircleListHead(NetworkInstance* self, s32 mode, s32 count, PatCircleFilter* filters, s32 filterCount,
+                          u32 flag);                                                       /* 0x80402A64 (GUESS) */
+u32 sendReqCircleListData(NetworkInstance* self, s32 first, s32 count);                   /* 0x80402B04 (GUESS) */
+u32 sendReqCircleListFoot(NetworkInstance* self);                                         /* 0x80402B80 (GUESS) */
+u32 sendReqCircleKick(NetworkInstance* self, const char* userId);                         /* 0x80402BCC (GUESS) */
+u32 sendReqCircleHost(NetworkInstance* self, s32 circleId);                                          /* 0x80402C64 */
+u32 sendReqCircleUserList(NetworkInstance* self);                                                    /* 0x80402CC8 */
+void sendNtcCircleChat(NetworkInstance* self, PatMatchOptions* options, const char* text);  /* 0x80402E5C (GUESS) */
+u32 sendReqCircleTell(NetworkInstance* self, const char* userId, PatMatchOptions* options,
+                      const char* text);                                                  /* 0x80402EE8 (GUESS) */
+void sendNtcCircleUserValue(NetworkInstance* self, s32 circleId, s32 value, u8 notify);     /* 0x80402FD0 (GUESS) */
+void sendNtcCircleUserValueReply(NetworkInstance* self, s32 circleId, s32 value,
+                                 const u8* address);                                      /* 0x804030A8 (GUESS) */
+void sendNtcCircleMatchState(NetworkInstance* self, s32 circleId, s32 state);               /* 0x80403174 (GUESS) */
 
 #ifdef __cplusplus
 }

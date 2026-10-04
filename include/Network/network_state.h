@@ -180,6 +180,13 @@ extern const char maskedUserName[7];       /* 0x80793968 - the map's own size, s
 
 /* 0x803FFE88 - sends the server-timeout request built from the three words at `values`. */
 s32 sendServerTimeout(NetworkInstance* self, const u32* values);
+
+/* 0x803FF060 */
+s32 handleNetworkState2(NetworkInstance* self);
+/* 0x803FF4EC */
+s32 handleNetworkState2Fmp(NetworkInstance* self);
+/* 0x803FF994 */
+s32 handleNetworkState2Binary(NetworkInstance* self);
 }
 
 #endif /* NETWORK_STATE_H */

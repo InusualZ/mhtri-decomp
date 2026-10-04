@@ -157,8 +157,43 @@ typedef struct NetFriendList {
     NetFriendList();
 } NetFriendList; /* size: 0x23F4 */
 
+/* The 0x44-byte layer user id `NetworkLayerIdImportFrom`/`NetworkLayerIdExportTo` fill and read (their own log
+ * strings name them): an id kind (1..5) and up to 0x40 id bytes. */
+typedef struct NetworkLayerId {
+    /* +0x00 */ u8 kind_00;
+    /* +0x01 */ u8 pad_01[0x03];
+    /* +0x04 */ u8 data_04[0x40];
+} NetworkLayerId;   /* size: 0x44 */
+
+/* One field of the user-field block `NetworkLayerPat::sendUserFields_5C` sends: its kind (1..7 a value held inline
+ * at +0x08, 8 a pointer at +0x08, 9 a pointer and a 16-bit size, anything else an empty field). */
+typedef struct NetUserField {
+    /* +0x00 */ u8 kind_00;
+    /* +0x01 */ u8 pad_01[0x07];
+    /* +0x08 */ const u8* data_08;   /* kinds 1..7: the value itself, inline */
+    /* +0x0C */ u16 size_0C;         /* kind 9 */
+    /* +0x0E */ u8 pad_0E[0x02];
+} NetUserField;   /* size: 0x10 */
+
+/* The user-field block: how many fields are set (at most 64) and the fields. */
+typedef struct NetUserFields {
+    /* +0x000 */ u32 count_000;
+    /* +0x004 */ u32 pad_004;
+    /* +0x008 */ NetUserField fields_008[64];
+} NetUserFields;   /* size: 0x408 */
+
+/* The position record `NetworkLayerPat::sendUserPosition_60` publishes (GUESS on the names: three floats and three
+ * words, sent only when it changed and the throttle interval passed). */
+typedef struct NetUserPosition {
+    /* +0x00 */ f32 position_00[3];
+    /* +0x0C */ s32 value_0C[3];
+} NetUserPosition;   /* size: 0x18 */
+
+/* The layer id helpers are defined by `Network/NetworkSessionManagerPat.cpp` and declared in its header. */
+
 class NetworkLayer;
 struct NetworkLayerRequest;
+struct NetworkErrorInfo;   /* the 12-byte error record - Network/gamespy_interface_types.h */
 typedef struct NetworkRequestError NetworkRequestError;   /* include/unsplit/Network.h */
 
 /* The handler a layer request runs: a member function of the layer that reports completion (non-zero). */
@@ -336,12 +371,12 @@ public:
     /* +0x40 */ virtual void pad_40();
     /* +0x44 */ virtual void pad_44();
     /* +0x48 */ virtual void requestCities_48(s32 count);
-    /* +0x4C */ virtual void pad_4C();
-    /* +0x50 */ virtual void pad_50();
+    /* +0x4C */ virtual void request_4C(u32 a);   /* `NetworkLayer::request_4C` */
+    /* +0x50 */ virtual void request_50(u32 a);   /* `NetworkLayer::request_50` */
     /* +0x54 */ virtual void pad_54();
     /* +0x58 */ virtual void pad_58();
-    /* +0x5C */ virtual void pad_5C();
-    /* +0x60 */ virtual void pad_60();
+    /* +0x5C */ virtual void sendUserFields_5C(NetUserFields* fields);   /* 0x803E2B10 (GUESS: the user fields, clamped to 64) */
+    /* +0x60 */ virtual void sendUserPosition_60(const NetUserPosition* position);   /* 0x803E2D7C (GUESS) */
     /* +0x64 */ virtual void sendMessage_64(const char* text, s32 value, s32 flag, u8 flags);
     /* +0x68 */ virtual void setPageSize_68(s32 size);
     /* +0x6C */ virtual void requestRefresh_6C(s32 code, s32 mask);
@@ -352,13 +387,26 @@ public:
     /* +0x80 */ virtual void pad_80();
     /* +0x84 */ virtual void requestAccount_84(s32 kind);
     /* +0x88 */ virtual void pad_88();
-    /* +0x8C */ virtual void pad_8C();
+    /* +0x8C */ virtual void exportLayerId_8C(NetworkLayerId* out);   /* 0x803EE054: this console's id (kind 3, 16 bytes) */
     /* +0x90 */ virtual void pad_90();
     /* +0x94 */ virtual void pad_94();
     /* +0x98 */ virtual void submitSettings_98(NetLayerSettings* settings);
     /* +0x9C */ virtual void submitRequest_9C(NetLayerRequest* request);
-    /* +0xA0 */ virtual void pad_A0();
+    /* +0xA0 */ virtual void setPresence_A0(const NetLayerSettings* presence);   /* 0x803EE1A8 (GUESS: the four presence pairs) */
     /* +0xA4 */ virtual void submitSelect_A4(NetLayerRequest* request);
+    /* +0xA8 */ virtual void pad_A8();
+    /* +0xAC */ virtual void pad_AC();
+    /* +0xB0 */ virtual void pad_B0();
+    /* +0xB4 */ virtual void pad_B4();
+    /* +0xB8 */ virtual void pad_B8();
+    /* +0xBC */ virtual void pad_BC();
+    /* +0xC0 */ virtual void pad_C0();
+    /* +0xC4 */ virtual void pad_C4();
+    /* +0xC8 */ virtual void pad_C8();
+    /* +0xCC */ virtual void pad_CC();
+    /* +0xD0 */ virtual void pad_D0();
+    /* +0xD4 */ virtual void pad_D4();
+    /* +0xD8 */ virtual void setMediatorValue_D8(u8 value);   /* 0x803EE748 (GUESS: forwards to the mediator's 0x80416B90) */
 
     /* +0x0004 */ u8 pad_0004[0x4];
     /* +0x0008 */ u32 context_08;   /* the context word every layer event is reported with */
@@ -398,6 +446,15 @@ public:
     s8 getMemberSlot(const NetworkSmallObject* id);
     /* 0x803EF220 (GUESS) - copies member slot `slot`'s address into `out` (cleared first). */
     void getMemberAddress(s8 slot, NetworkSmallObject* out);
+    /* 0x803EEED0 (GUESS) - marks the friend linked to session slot `slot` connected (state 3). */
+    void onSessionConnected(s8 slot);
+    /* 0x803EEF1C (GUESS) - marks the friend linked to session slot `slot` failed and keeps its error. */
+    void onSessionFailed(s8 slot, const NetworkErrorInfo* error);
+    /* 0x803EF010 (GUESS) - the friend whose session slot is `slot`, -1 when none is. */
+    s8 findSessionFriend(s8 slot);
+    /* 0x803EF2B4 (GUESS) - the negotiation state of the member at `address`: 0 pending, 1 failed, 2 still
+     * connecting (`moveStartSession` waits while it reads 0 or 2). */
+    u8 getMemberStatus(const NetworkSmallObject* address);
 };
 
 #endif

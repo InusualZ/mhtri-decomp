@@ -5,7 +5,7 @@
 Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python tools/agents/ideas.py where N` prints the path, `ideas.py find <words>` searches). The idea column links to it, `status` is `works | ruled-out | todo | superseded` (one table per status),
 `tags` come from the fixed vocabulary in [README.md](README.md), and the problem column is the opening of the idea's own problem sentence, truncated at 220 characters.
 
-## Ideas that work (85)
+## Ideas that work (86)
 
 | # | idea | status | tags | problem |
 | --- | --- | --- | --- | --- |
@@ -94,6 +94,7 @@ Every idea has one file, `NNN-slug.md`, and the **id is permanent** (`python too
 | 97 | [A record passed by value to a virtual slot: give the pointer slot an inline by-value overload](097-by-value-virtual-overload.md) | works | source-shape, vtable | Retail builds a 12-byte error record twice (the record, then its argument copy with the constants re-materialised) and passes the copy's address through `lwz r12,0(r3)` / `lwz r12,0x288(r12)`; the pointer-typed virtual... |
 | 98 | [A class's vtable pointer lands where its first virtual is declared](098-vptr-follows-first-virtual.md) | works | source-shape, vtable | After a hand-wired `void* vtable_00` becomes a real `virtual ~Class()`, every field access in the class moves four bytes and dozens of rows drop ten points with nothing but an offset changed. |
 | 99 | [An aggregate copy's single/pair grouping names the record's members (an s64 inside a record)](099-aggregate-copys-single-pair.md) | works | source-shape | A word-by-word copy function mixes single `lwz/stw` moves with `lwz r5; lwz r0; stw r5; stw r0` pairs at irregular offsets |
+| 100 | [A signed range test keeps its two compares only when the upper bound is written constant-first](100-range-test-constant-first.md) | works | source-shape | Retail tests an index with two signed compares (`cmpwi x,0; blt` then `cmpwi x,32; bge`) and our build emits one `cmplwi x,31`, which shortens the function and shifts every branch after it. |
 
 ## Ruled out - tried and it did not work, do not re-run (11)
 
