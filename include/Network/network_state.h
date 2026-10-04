@@ -3,7 +3,7 @@
  * owns, declared here so consumers include the owner's header (docs/plan.md 6.5 rule 2).
  *
  * `sendReqShut` (0x803FFDCC, opcode 0x04) and `resetNetworkState3` (0x803FE924) are the two the
- * GameSpy band (`Network/fn_8041A87C.cpp`) calls; every other symbol the range owns is declared and
+ * GameSpy band (`Network/GameSpyInterfaceThread.cpp`) calls; every other symbol the range owns is declared and
  * defined in `src/Network/network_state.cpp` itself.  The `NetworkInstance` layout lives in
  * `include/unsplit/Network.h` (a shared type, not an owned symbol).
  *
@@ -141,7 +141,7 @@ typedef struct SessionTimeoutPayload {
     /* +0x03 */ u8  pad_03;
 } SessionTimeoutPayload;   /* size: 0x04 */
 
-/* The DWC error record `NetworkInstanceVtable::postError_288` takes (0x10 B; `Network/fn_8041A87C.h`
+/* The DWC error record `NetworkInstanceVtable::postError_288` takes (0x10 B; `Network/GameSpyInterfaceThread.h`
  * owns the named definition, this unit builds an equivalent record and casts). */
 /* `NetworkPostedError` (0x0C B) is defined in `unsplit/Network.h`, beside the class that dispatches it. */
 
@@ -176,6 +176,8 @@ extern const u32 requestHeaderWord0;       /* 0x8079C7E0 */
 extern const u32 requestHeaderWord1;       /* 0x8079C7E4 */
 extern const char maskedUserName[7];       /* 0x80793968 - the map's own size, so MWCC uses sda21 */
 
+/* 0x803FFE88 - sends the server-timeout request built from the three words at `values`. */
+s32 sendServerTimeout(NetworkInstance* self, const u32* values);
 }
 
 #endif /* NETWORK_STATE_H */

@@ -12,6 +12,11 @@
  *
  * UNKNOWN. every body; the C-linkage surface the callers use is declared in `include/Network/PatInterface.h`.
  *
+ * NAMES (GUESS, integrator 2026-10-04, from the bodies, in the scheme of `errorRecordCode613c`/`getErrorInfo654c`):
+ *   `clearErrorRecord613c` 0x803FD674 clears the 0x208-byte record at +0x613C while no error is pending (+0x654C);
+ *   `buildErrorInfo613c` 0x803FD6D8 fills a caller's three-word error from a code and the record's code;
+ *   `getErrorInfoOrCode654c` 0x803FD7BC copies the pending error and substitutes a negative code for 0x80000000.
+ *
  * FLAGS. the `Network` lib's `cflags_network` (unmeasured).
  *
  * The unit's `.data`/`.sdata`/`.sbss` claims are the candidate's (config/RMHE08/splits.txt); the symbols they hold are

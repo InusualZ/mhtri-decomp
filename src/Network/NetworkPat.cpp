@@ -1,6 +1,6 @@
 /*
- * Network/NetworkPat.cpp - the `sNetworkLibrary` "*Pat" accessor family
- * (`.text` 0x80419EC4..0x8041A194, 12 functions / 720 B).
+ * Network/NetworkPat.cpp - the four-slot Pat holder: its constructor, destructor and drive functions, then the
+ * "*Pat" accessor family (`.text` 0x80419AD4..0x8041A194, 19 functions / 1728 B).
  *
  * BOUNDARY.  Both seams are weak and **unproven** as *code* cuts, but the right edge is now settled
  * from the map instead: `symbols.txt` has `getNetworkLayerPat` 0x8041A150 (+0x20) and then
@@ -10,9 +10,15 @@
  * function) and the unit now holds all twelve rows the accessor pair owns, the new one at 100 %.
  * `tudiscover at getNetworkSessionManagerPat` still gives the closure as the function alone and its
  * left candidates are far away (0x80418988 weak, share 0.094); `tudiscover at getNetworkLayerPat`
- * reports share 0.075 with right candidates 0x8041AD30 / 0x8041AEA8.  Sections: `.text`
- * 0x80419EC4..0x8041A194, `extab` 0x8001CF70..0x8001CF88, `extabindex` 0x8003D92C..0x8003D950 (3
- * unwind records, byte-identical to ours under the exceptions pragma below).
+ * reports share 0.075 with right candidates 0x8041AD30 / 0x8041AEA8.  The left seam is 0x80419AD4: the holder's
+ * constructor, destructor, `initNetworkLibrary`, `clearNetworkPat`, `updateNetworkPat`,
+ * `deleteNetworkSessionManagerPat` and `setNetworkSessionManagerPat` all operate on this holder and sit right
+ * after `sNetworkLibraryWii`'s last table slot (0x80419AD0); `.data` order bounds the next TU start in
+ * 0x80418A60..0x8041A1C4.  They moved here from `Network/sNetworkLibraryWii.cpp` byte-identical (that unit's
+ * `-O3`/`-inline noauto`, and its file-scope `#pragma peephole off`, scoped here to the moved block).  The holder
+ * word `sNetworkPatInstance` (.sbss 0x80794CD0) stays that unit's claim (its header says why).  Sections:
+ * `.text` 0x80419AD4..0x8041A194, `extab` 0x8001CF40..0x8001CF88, `extabindex` 0x8003D8E4..0x8003D950
+ * (9 unwind records, byte-identical to ours).
  *
  * WHAT IT IS.  The four-slot holder's accessor family: each slot +0x00 / +0x04 / +0x08 / +0x0C has an
  * "install" setter, an "uninstall" (`self->slot != value ? -1 : clear`), a "delete" helper and - for
@@ -35,9 +41,8 @@
  * `deleteNetworkCommunityPat` install, unset and delete slot +0x08 (the getter `getNetworkCommunityPat`
  * reads +0x08), and the `layer`/`sessionManager` families follow the same scheme at +0x0C / +0x00.
  * Slot +0x04 has no getter in the dump, so its three helpers are named after the offset:
- * `clearNetworkPatSlot04` / `deleteNetworkPatSlot04`.  `0x80419EA4` (the +0x00 installer,
- * 0x80419EA4) is the same class and lies just below the left seam - a residual of the boundary,
- * recorded rather than claimed.
+ * `clearNetworkPatSlot04` / `deleteNetworkPatSlot04`.  The +0x00 installer `setNetworkSessionManagerPat`
+ * (0x80419EA4) is the last function of the moved holder block.
  *
  * NAMING GUESS.  `NetworkCommunityPat` is this batch's name for slot +0x08's class: the map carries no
  * mangled row, no `__vt__` and no ctor for it, and the only name the binary gives the slot is the
@@ -74,11 +79,19 @@
  * every row at 100 %.
  */
 #include "Network/NetworkPat.h"
+#include "Network/sNetworkLibraryWii.h"   /* sNetworkLibrary, constructNetworkWiiMediator, registerNetworkObject */
+#include "Network/NetworkWiiMediator.h"   /* NetworkWiiMediatorDispatch */
+#include "Network/PatInterface.h"         /* getInstance_, stepPatInterface */
+#include "unsplit/Network.h"              /* getNetworkLogger */
+#include "sound/fn_800E46E8.h"            /* getInstance - the mediator accessor */
+#include "Runtime.PPCEABI.H/memset.h"
+#include "sys_mem.h"
+#include "MSL_C/alloc.h"                  /* srand */
 
 /* The slot calling convention, as a view: only the two slots the `deleteNetwork*Pat` helpers call are
  * named, and no slot is defined here - the element's own table is emitted by its class's band.  The
- * +0x18 driver the holder's `fn_80419CF0` dispatches is deliberately absent: this unit never reaches
- * it, and a declared virtual at index i sits at +8+4*i. */
+ * +0x18 driver `updateNetworkPat` dispatches is reached through `NetworkPatSlotDriver` below (the moved block's
+ * own view, kept as it was measured); a declared virtual at index i sits at +8+4*i. */
 class NetworkPatSlotProtocol {
 public:
     /* +0x08 */ virtual void destroy_08(u32 flags);
@@ -86,6 +99,124 @@ public:
     /* +0x10 */ virtual void pad_10();
     /* +0x14 */ virtual void release_14();
 };   /* size: 0x04 - the element's own leading vtable word; only ever reached through a pointer */
+
+/* The protocol every Pat holder slot's element follows (its own band emits the table): the deleting
+ * destructor at +0x08, the release hook at +0x14 and the per-frame drive at +0x18.  Declared, never
+ * defined, so no table is emitted here (rule 10). */
+class NetworkPatSlotDriver {
+public:
+    /* +0x08 */ virtual ~NetworkPatSlotDriver();
+    /* +0x0C */ virtual void pad_0C();
+    /* +0x10 */ virtual void pad_10();
+    /* +0x14 */ virtual void release();
+    /* +0x18 */ virtual void drive();
+};   /* size: 0x04 (the object's leading table word) */
+
+#pragma peephole off
+
+NetworkPat* constructNetworkPat(NetworkPat* holder)
+{
+    sNetworkPatInstance = holder;
+    holder->installed_10 = -1;
+    registerNetworkObject(holder, 1);
+    memset(&holder->sessionManager_00, 0, sizeof(holder->sessionManager_00));
+    memset(&holder->slot04_04, 0, sizeof(holder->slot04_04));
+    memset(&holder->community_08, 0, sizeof(holder->community_08));
+    memset(&holder->layer_0C, 0, sizeof(holder->layer_0C));
+    return holder;
+}
+
+NetworkPat* destroyNetworkPat(NetworkPat* holder, s16 flags)
+{
+    if (holder != NULL) {
+        clearNetworkPat(holder);
+        sNetworkPatInstance = NULL;
+        if (flags > 0) {
+            operator delete(holder);
+        }
+    }
+    return holder;
+}
+
+s32 initNetworkLibrary(NetworkPat* holder, sNetworkLibraryInitParam* param)
+{
+    constructNetworkWiiMediator();
+    if (((sNetworkLibrary*)getNetworkLogger())->init(param) < 0) {
+        return -1;
+    }
+    srand((u32)((sNetworkLibrary*)getNetworkLogger())->getTime(0));
+    return 0;
+}
+
+void clearNetworkPat(NetworkPat* holder)
+{
+    if (holder->sessionManager_00 != NULL) {
+        deleteNetworkSessionManagerPat(holder, 0);
+    }
+    if (holder->slot04_04 != NULL) {
+        deleteNetworkPatSlot04(holder, 0);
+    }
+    if (holder->community_08 != NULL) {
+        deleteNetworkCommunityPat(holder, 0);
+    }
+    if (holder->layer_0C != NULL) {
+        deleteNetworkLayerPat(holder, 0);
+    }
+    if (getNetworkLogger() != NULL) {
+        ((sNetworkLibrary*)getNetworkLogger())->final();
+        delete (sNetworkLibrary*)getNetworkLogger();
+    }
+}
+
+void updateNetworkPat(NetworkPat* holder)
+{
+    if (getNetworkLogger() != NULL) {
+        ((sNetworkLibrary*)getNetworkLogger())->updateTime();
+    }
+    if (getInstance() != NULL) {
+        ((NetworkWiiMediatorDispatch*)getInstance())->update();
+    }
+    if (getInstance_() != NULL) {
+        stepPatInterface(getInstance_());
+    }
+    if ((holder->installed_10 & 1) && holder->sessionManager_00 != NULL) {
+        ((NetworkPatSlotDriver*)holder->sessionManager_00)->drive();
+    }
+    if ((holder->installed_10 & 2) && holder->slot04_04 != NULL) {
+        ((NetworkPatSlotDriver*)holder->slot04_04)->drive();
+    }
+    if ((holder->installed_10 & 4) && holder->community_08 != NULL) {
+        ((NetworkPatSlotDriver*)holder->community_08)->drive();
+    }
+    if ((holder->installed_10 & 8) && holder->layer_0C != NULL) {
+        ((NetworkPatSlotDriver*)holder->layer_0C)->drive();
+    }
+}
+
+void deleteNetworkSessionManagerPat(NetworkPat* holder, s32 index)
+{
+    NetworkPatSlotDriver* entry;
+
+    if (index == 0) {
+        entry = (NetworkPatSlotDriver*)(&holder->sessionManager_00)[index];
+        if (entry != NULL) {
+            entry->release();
+            clearNetworkSessionManagerPat(holder, (NetworkSessionManagerPat*)entry);
+            delete entry;
+        }
+    }
+}
+
+s32 setNetworkSessionManagerPat(NetworkPat* holder, NetworkSessionManagerPat* value)
+{
+    if (holder->sessionManager_00 == NULL) {
+        holder->sessionManager_00 = value;
+        return 0;
+    }
+    return -1;
+}
+
+#pragma peephole on
 
 NetworkSessionManagerPat* getNetworkSessionManagerPat(NetworkPat* self, s32 index)
 {

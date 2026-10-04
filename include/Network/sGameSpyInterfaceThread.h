@@ -1,5 +1,5 @@
 /*
- * include/Network/sGameSpyInterfaceThread.h - the live worker-thread pointer `src/Network/fn_8041A87C.cpp`
+ * include/Network/sGameSpyInterfaceThread.h - the live worker-thread pointer `src/Network/GameSpyInterfaceThread.cpp`
  * defines (`.sbss` 0x80794CE4, claimed by that unit).  A leaf header (docs/plan.md 6.5 rule 2): a consumer
  * that cannot include the owner's full header - `Network/NetworkSessionManager.h` carries its own partial
  * view of `GameSpyInterfaceThread` - includes this one for the pointer.

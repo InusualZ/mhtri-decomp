@@ -1,6 +1,6 @@
-/* Declarations owned by `src/Network/constructNetworkLibrary.*` (docs/plan.md 6.5 rule 2): a consumer includes this header instead of declaring the symbols itself. */
-#ifndef MHTRI_NETWORK_CONSTRUCTNETWORKLIBRARY_H
-#define MHTRI_NETWORK_CONSTRUCTNETWORKLIBRARY_H
+/* Declarations owned by `src/Network/sNetworkLibraryWii.*` (docs/plan.md 6.5 rule 2): a consumer includes this header instead of declaring the symbols itself. */
+#ifndef MHTRI_NETWORK_SNETWORKLIBRARYWII_H
+#define MHTRI_NETWORK_SNETWORKLIBRARYWII_H
 
 #include "types.h"
 #include "Network/network_transport.h"
@@ -77,30 +77,23 @@ public:
 extern "C" {
 #endif
 
-/* 0x80419AD4 / 0x80419B54 - the Pat holder's constructor (publishes it as `sNetworkPatInstance`, clears the
- * four slots, enables all of them) and its deleting destructor. */
-struct NetworkPat* constructNetworkPat(struct NetworkPat* holder);
-struct NetworkPat* destroyNetworkPat(struct NetworkPat* holder, s16 flags);
-
-/* 0x80419BB4 - creates the library, runs its `init` and seeds the C random generator from its clock. */
-s32 initNetworkLibrary(struct NetworkPat* holder, sNetworkLibraryInitParam* param);
-
-/* 0x80419C2C / 0x80419E1C - the Pat holder reset and the session-manager slot delete. */
-void clearNetworkPat(struct NetworkPat* holder);
-
-/* 0x80419CF0 - the per-frame drive: the library clock, the mediator, the Pat interface, then every enabled slot. */
-void updateNetworkPat(struct NetworkPat* holder);
-
-void deleteNetworkSessionManagerPat(struct NetworkPat* holder, s32 index);
-
-/* 0x80419EA4 - installs the session-manager slot when it is empty (0), else -1. */
-s32 setNetworkSessionManagerPat(struct NetworkPat* holder, NetworkSessionManagerPat* value);
-
 /* 0x80794CD0 - the Pat holder the constructor publishes (`getPatsObject` reads it). */
 extern struct NetworkPat* sNetworkPatInstance;
+
+/* 0x8041891C / 0x80418940 / 0x80418964 - the three worker-thread entry points `sNetworkLibraryWii`
+ * starts: SO start-up, SO clean-up and the DWC initialisation; each is handed the library. */
+/* untyped: caller-owned payload - the thread argument */
+void* networkLibrarySOStartupThread(void* library);
+/* untyped: caller-owned payload - the thread argument */
+void* networkLibrarySOCleanupThread(void* library);
+/* untyped: caller-owned payload - the thread argument */
+void* networkLibraryDwcInitThread(void* library);
+
+/* 0x80418988 - creates the Wii network library and publishes it as `sNetworkLibrary::mpInstance`. */
+void constructNetworkWiiMediator(void);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* MHTRI_NETWORK_CONSTRUCTNETWORKLIBRARY_H */
+#endif /* MHTRI_NETWORK_SNETWORKLIBRARYWII_H */

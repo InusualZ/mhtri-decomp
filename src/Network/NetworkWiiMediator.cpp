@@ -106,15 +106,15 @@
  * input: `fn_803FCC34` -> `__ct__12PatInterfaceFv` (0x803FCC34) and `constructReflectService` ->
  * `__ct__21NetworkReflectServiceFv` (0x8041A1C4), both unowned bands whose symbols the `new` sites
  * already spelled that way; `create__22GameSpyInterfaceThreadFv` -> `__ct__22GameSpyInterfaceThreadFv`
- * (0x8041C66C), whose owner `Network/fn_8041A87C.cpp` turned its `create()` into the class's
+ * (0x8041C66C), whose owner `Network/GameSpyInterfaceThread.cpp` turned its `create()` into the class's
  * constructor in the same change; and `fn_803D6A98` -> `GameSpyInterfaceThread_getInstance`
- * (0x803D6A98, `Network/NetworkSessionManager.cpp`), with the referrers in `include/Network/fn_8041A87C.h` and
- * `src/Network/fn_8041A87C.cpp`.  Re-measured: every `.text` row and the whole-project progress are
+ * (0x803D6A98, `Network/NetworkSessionManager.cpp`), with the referrers in `include/Network/GameSpyInterfaceThread.h` and
+ * `src/Network/GameSpyInterfaceThread.cpp`.  Re-measured: every `.text` row and the whole-project progress are
  * unchanged, and `flipcheck.py` reports exactly the four complaints it did before, no new one.
  *
  * Those four rows were **renamed again** by `worker/fn-803d3ce8-2477`, to the owners' own definition
  * spellings (the map rows at 36030, 36676, 36678 and 57701), and the referrers this file and
- * `src/Network/fn_8041A87C.cpp` carried were left on the old ones - `flipcheck.py` then reported "3
+ * `src/Network/GameSpyInterfaceThread.cpp` carried were left on the old ones - `flipcheck.py` then reported "3
  * referenced symbol(s) are defined by nothing a flip can use - clearPatInterface,
  * getGameSpyInterfaceThread, isPatInterfaceReady" for this unit.  They are spelled
  * `GameSpyInterfaceThread_getInstance`, `PatInterface_clear` and `PatInterface_isReady` here now, and
@@ -135,7 +135,7 @@
 #include "Network/PatInterface.h"            /* the singleton's Pat accessors */
 #include "Network/NetworkReflectService.h"   /* the reflect service's entry points */
 #include "Network/network_layer_io.h"        /* getReflectService / getNetworkWiiMediator / getLanguage / getReflectEventId */
-#include "Network/GameSpyInterfaceThread.h"  /* the worker thread `initializeNetworkMediator` spawns */
+#include "Network/gamespy_interface_types.h"  /* the worker thread `initializeNetworkMediator` spawns */
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
 #include "unsplit/Runtime.PPCEABI.H.h"
@@ -149,7 +149,7 @@
  * this band allocates it and calls its five buffer setters by their mangled member names. */
 
 /* The GameSpy worker thread `initializeNetworkMediator` spawns is `GameSpyInterfaceThread`
- * (`Network/GameSpyInterfaceThread.h`, the class alone - the GameSpy band's full header is not needed). */
+ * (`Network/gamespy_interface_types.h`, the class alone - the GameSpy band's full header is not needed). */
 
 /* `operator new` is what the band's allocation lowers to (`__nw__FUl`). */
 void* operator new(unsigned long size);   /* untyped: allocation returns a raw byte range */

@@ -1,5 +1,9 @@
 /*
- * fn_8041A87C.cpp - the GameSpy interface / peer band, `.text` 0x8041A87C..0x8041DF10.
+ * GameSpyInterfaceThread.cpp - the GameSpy interface / peer band, `.text` 0x8041A87C..0x8041DF10.
+ *
+ * FILE NAME.  Registered under the map stem `fn_8041A87C.cpp`; renamed for the worker-thread class whose methods
+ * fill the range (`__ct__22GameSpyInterfaceThreadFv`, `tGameSpyInterface`, `step`, `publishRequest`).  The class's
+ * type-only header, read by the mediator band, is `Network/gamespy_interface_types.h`.
  *
  * WHAT IT IS.  Four object types share the range: five `NetworkReflectService` methods (connect/search
  * sub-machines, the DWC event applier), the GT2 socket callbacks and the worker thread
@@ -55,7 +59,7 @@
  */
 
 #include "types.h"
-#include "Network/fn_8041A87C.h"
+#include "Network/GameSpyInterfaceThread.h"
 #include "Runtime.PPCEABI.H/memcpy.h"    /* memcpy  - owner Runtime.PPCEABI.H/memcpy.c */
 #include "Runtime.PPCEABI.H/memset.h"    /* memset  - owner Runtime.PPCEABI.H/memset.c */
 #include "unsplit/Runtime.PPCEABI.H.h"   /* memmove / memcmp / snprintf - no registered owner */
@@ -76,7 +80,7 @@ extern "C" {
 
 /* ---- this unit's free (callback and entry-point) bodies, in address order --------------------- -
  * Every other body in the range is a member of one of the four classes, so those are declared in
- * include/Network/fn_8041A87C.h and not here.  The DWC callbacks are installed through
+ * include/Network/GameSpyInterfaceThread.h and not here.  The DWC callbacks are installed through
  * `(NetworkCallback)`, so they keep the C spelling and the flat parameter lists retail shows. */
 void gt2SocketErrorCallback(void);
 void natNegProgressCallback(void);
@@ -126,7 +130,7 @@ void NetworkReflectService::updateCallbackStep()
             callbackStep_17 = 4;
             break;
         }
-        if ((u8)getSomething5(getInstance_()) == 0) {
+        if ((u8)getNetworkBinaryState(getInstance_()) == 0) {
             callbackStep_17 = 4;
             break;
         }
@@ -1828,7 +1832,7 @@ void NetworkTimedHandler::clear()
     expired_18 = 0;
 }
 
-/* ---- the zero-initialised data this unit owns (declared in include/Network/fn_8041A87C.h; the
+/* ---- the zero-initialised data this unit owns (declared in include/Network/GameSpyInterfaceThread.h; the
  * callback set is defined above, ahead of the first log string, because MWCC emits `.data` in
  * definition order and retail's set precedes the whole string run) ------------------------------- */
 

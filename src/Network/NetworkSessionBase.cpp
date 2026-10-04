@@ -23,8 +23,8 @@
  * FLAGS.  C++ under `cflags_network` (`-Cpp_exceptions on` gives the `extab`), per-unit `-O3`/`-pool off` (`configure.py`);
  * file-scope `#pragma peephole off` (playbook 39); each `dont_inline` region keeps a retail `bl` that `-inline auto` folds.
  *
- * RESIDUALS.  none in `.text`.  `getSomething5` reads `NetworkStateMachine::binaryState_6134` (the view
- *   `Network/network_state.h` owns); its map name is kept (a non-generated GUESS, rename requested via the integrator).
+ * RESIDUALS.  none in `.text`.  `getNetworkBinaryState` reads `NetworkStateMachine::binaryState_6134` (the view
+ *   `Network/network_state.h` owns); the name is a GUESS from that field (renamed from `getSomething5` by the integrator).
  */
 #include "types.h"
 #include "Network/network_transport.h"
@@ -64,7 +64,7 @@ void LockMutex(void* mutex)
 
 /* Returns the state machine's binary state byte (+0x6134); 10 means the maintenance-reject path. */
 /* untyped: opaque handle passed through - callers hand over the session-manager instance */
-u32 getSomething5(void* self)
+u32 getNetworkBinaryState(void* self)
 {
     return ((NetworkStateMachine*)self)->binaryState_6134;
 }

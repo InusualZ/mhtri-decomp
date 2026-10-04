@@ -1924,8 +1924,8 @@ config.libs = [
         "host": False,
         "objects": [
             # Registered once, at its final home (docs/plan.md 12), the Capcom `Network` reconnaissance
-            # lane (branch worker/net-capcom).  Five units; `constructNetworkWiiMediator` has flipped (see its
-            # entry below), `initNetworkSessionStable` was folded into `Network/NetworkSessionManagerPat.cpp` at
+            # lane (branch worker/net-capcom).  Five units; `constructNetworkWiiMediator` flipped and was later
+            # folded into `Network/sNetworkLibraryWii.cpp` (its TU), `initNetworkSessionStable` was folded into `Network/NetworkSessionManagerPat.cpp` at
             # phase 4 (its per-unit -O3 evidence below is kept), the other three are `Object(NonMatching, ...)`.
             #   Network/initNetworkSessionStable.cpp (folded)  .text 0x803DEA30..0x803DEB38 (264 B, 1 fn)
             #   Network/network_state.cpp              .text 0x803FE8E4..0x804006A8 (8900 B, 21 fn)
@@ -1983,24 +1983,21 @@ config.libs = [
             # constant setup hoisted above the callee-save stores) and `-O3` puts all of them at 100 %.
             Object(NonMatching, "Network/network_opening.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
-            # Per-object flag deviation (brief section 8.2), instruction-level evidence: retail's
-            # `constructNetworkWiiMediator` is the plain source order - `li r3,0x1408` lands *after*
-            # the two callee-save stores and the `cmpwi r3,0` after `mr r31,r3`; `-O4,p` hoists both
-            # ahead of their producers (18/18 instructions, same multiset).  Measured: 75.00000 at
-            # `-O4,p`, 100.00000 (64 B, byte-identical) at `-O3`.
-            # Matching: `.text` 0x40, `extab` 0x18 and `extabindex` 0xC all byte-identical to the
-            # target object, and all nine relocation names equal (`__nw__FUl` at 0x14,
-            # `constructNetworkLibrary` at 0x24, `sNetworkWiiMediatorInstance` at 0x28; `__dl__FPv`
-            # at extab+0x14; `constructNetworkWiiMediator` and `@etb_8001CE34` in extabindex).  The
-            # extab record is the one a C++ `new` expression emits - see the unit header.
-            Object(Matching, "Network/constructNetworkWiiMediator.cpp",
+            # Registered once, at its final home: split out of `Network/network_opening.cpp` (the `.data` order
+            # seam, unit header).  The base-class rows the `-O3` evidence above was measured on are this unit's.
+            Object(NonMatching, "Network/sNetworkLibrary.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             # Per-object flag deviation (brief section 8.2), instruction-level evidence: the sibling units' `-O3`
             # schedule.  Measured over the same first-pass source: 75.54058 % at the lib's `-O4,p` (every framed
             # body hoists its constant setup above the callee-save stores) against 91.81757 % at `-O3`, every row
-            # equal or higher.  Evidence: the unit header of src/Network/constructNetworkLibrary.cpp.
-            Object(NonMatching, "Network/constructNetworkLibrary.cpp",
-                   cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
+            # equal or higher.  Evidence: the unit header of src/Network/sNetworkLibraryWii.cpp.
+            # The folded-in `constructNetworkWiiMediator` (0x80418988) had the same deviation as its own unit:
+            # 75.00000 at `-O4,p`, 100.00000 at `-O3` (`li r3,0x1408` after the callee-save stores).
+            # `-inline noauto` since the fold (measured 2026-10-04): retail's `initNetworkLibrary` *calls*
+            # `constructNetworkWiiMediator`; in one TU `-inline auto` folds it and the inlined constructor in
+            # (256 B against 120 B, 100.00 -> 0.00); with `noauto` every one of the unit's 41 rows is unchanged.
+            Object(NonMatching, "Network/sNetworkLibraryWii.cpp",
+                   cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
             # Per-object flag deviation (brief section 8.2), instruction-level evidence: the three
             # `deleteNetwork*Pat` helpers get the target's block order and the target's `bl` to the
             # sibling `clearNetwork*Pat` (retail calls it; `-inline auto` folds the 36-byte callee in
@@ -2104,7 +2101,7 @@ config.libs = [
             # (`lis r4,lbl_806033C8@ha ; addi r4,r4,lbl_806033C8@l`).  Unit-level, measured 2026-09-30: 99.87 % / 64 rows at 100 with the flag, 98.21 % / 59 without it
             # (natNegCompletedCallback 89.78, gt2ConnectAttemptCallback 88.74, runNasLogin 92.46, startMatch 84.70 lower, none higher);
             # an object that owns log strings after a recut needs the same flag.
-            Object(NonMatching, "Network/fn_8041A87C.cpp",
+            Object(NonMatching, "Network/GameSpyInterfaceThread.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto", "-pool off"]),
         ],
     },

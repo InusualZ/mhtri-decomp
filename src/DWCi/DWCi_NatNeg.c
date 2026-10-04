@@ -101,7 +101,7 @@
 #include "unsplit/Runtime.PPCEABI.H.h"   /* sprintf / memcmp / memcpy / strlen */
 
 /* The sized form of this unit's own `natNegMessageMagic`.  The owner's header has to carry the *unsized*
- * spelling, because `src/Network/fn_8041A87C.cpp` (which reaches this symbol through
+ * spelling, because `src/Network/GameSpyInterfaceThread.cpp` (which reaches this symbol through
  * `include/unsplit/Network.h`) is ADDR16_HA/LO throughout, and a sized array yields the SDA form; the
  * first use of the symbol in a translation unit fixes its addressing for every later use, so this line
  * has to precede every body.  Ten of this unit's sites are SDA21 in the target; the eleventh,
