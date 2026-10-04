@@ -1,6 +1,6 @@
 """Apply the lanes' integrator requests in one batch: renames + sweep, owner-header declarations, STOPGAP removal.
 Spec: docs/tools/spec/integrate.md. CLI: python tools/units/integrate.py [--requests F..|--lane SLUG..] [--names F]
-[--base B] [--branch B] [--dry-run] [--no-build] [--commit] [--json]; tests: tools/tests/units/test_integrate.py."""
+[--base B] [--branch B] [--dry-run] [--no-build] [--no-commit] [--json]; tests: tools/tests/units/test_integrate.py."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
@@ -1422,10 +1422,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--no-mangle-check", action="store_true", help="skip mangle.py on C++ declarations")
     ap.add_argument("--retries", type=int, default=4,
                     help="narrowing rounds after a refused declaration or a failed build (default 4)")
-    ap.add_argument("--commit", action="store_true", help="commit the result as two commits (renames, the rest)")
+    ap.add_argument("--no-commit", action="store_true",
+                    help="leave the result in the working tree (the default commits it as two commits: renames, the rest)")
+    ap.add_argument("--commit", action="store_true", help=argparse.SUPPRESS)
     ap.add_argument("--write-status", action="store_true", help="write each request's verdict to its sidecar")
     ap.add_argument("--json", action="store_true")
-    return run(ap.parse_args(argv))
+    args = ap.parse_args(argv)
+    args.commit = not args.no_commit and not args.dry_run
+    return run(args)
 
 
 if __name__ == "__main__":
