@@ -173,8 +173,8 @@ It is the *librarian* of the compounding asset (§9), not the fastest decompiler
 >
 > Two things this section described are **superseded outright**: the manual merge procedure (now
 > `tools/units/mergebranch.py resolve`) and per-claim worktree construction (now the slot pool, with
-> `--no-slots` as the documented fallback for a one-off lane). The `subagent_done` completion tool is gone with
-> `pi-herdr-subagents`; the handoff is the worker's **final message**. For the queue itself — which unit is
+> `--no-slots` as the documented fallback for a one-off lane). The pi harness, its herdr panes and the
+> `subagent_done` tool are gone (2026-09-29, removed from the tools in WP3e); the handoff is the worker's **final message**. For the queue itself — which unit is
 > worked next, and the batching law — see §3, §6 and §12 below.
 >
 > **In-line references to `§5.1`–`§5.6` elsewhere in this file now resolve to `docs/pipeline.md`** — §2 for the
@@ -282,9 +282,8 @@ a mis-launched lane detects it in its first turn.
   `pl-act-09c6`), and the two drifted for three commits before the branch-derived form settled it.
 * **The handoff is the worker's final message.** A worker is a headless `claude --agent <profile> -p` process
   run with its cwd at the slot (`tools/units/lanecmd.py` builds the command): when it exits, its last assistant
-  message is what the orchestrator reads from the run's output. A pane-launched worker (the manual route below)
-  delivers the same last message into its pane, plus its outbox, and the orchestrator wakes on the pane going
-  idle. Either way there is no completion *tool* to call, so a brief that asked for one would name a tool the
+  message is what the orchestrator reads from the run's output; an in-session subagent (the worktree-hook route
+  below) returns it as the Agent tool's result. Either way there is no completion *tool* to call, so a brief that asked for one would name a tool the
   worker does not have. `brief.py` emits the final-message
   instruction in part 4, and a hand-written brief must carry it too.
 * **`tools/m2c` is a submodule, and a slot keeps it initialised.** A slot is never removed, so the `git
@@ -319,28 +318,23 @@ The worker has its own context window and its final message is the run's output.
 work: the worker's `recompile.py` resolves that worktree from its cwd and MAIN's toolchain and target object
 from git - no junction, no environment variable. The printed `--session-id` is how a lane's question is
 answered: `claude --resume <session-id> -p "<ruling>"` in the same cwd (`lanecmd.resume_call`).
-**The manual route (herdr panes).** A worker the orchestrator launches by hand in a herdr pane never reports
-through the tool, so the orchestrator wakes on the pane going idle (`herdr agent wait <name> --until idle
---until blocked`) and reads the outbox. Keep such workers out of the orchestrator's own pane - a split of it
-drops agents into the middle of its work - and use the session's **Worker tab**:
-herdr tab list                                     # the tab labelled Worker, e.g. w1:t2
-herdr pane split <a pane inside that tab> --cwd <the worker's worktree> --direction down
-herdr agent start <name> --kind claude --pane <the new pane id>   # check `herdr agent start --help` for the kind name
-herdr agent prompt <name> "<read your brief; ack first; then end with your report>"
-herdr agent wait <name> --until idle --until blocked
-**Teardown is part of the round.** After the handoff and after the integration: close the worker's pane
-(`herdr pane close <pane id>`), **then** `claims.py release <unit>`. A live pane holds its worktree as its cwd
-and Windows refuses to delete a directory a process is sitting in ("Device or resource busy", or
-`git worktree remove` failing with "Permission denied"), so releasing first fails and leaves a directory that
-nothing can remove until that pane goes away. If a worktree cannot be removed, ask who is sitting in it - it may
-be the owner's own pane. **A headless worker has no pane**, so this step is skipped for it and
-`claims.py release <unit>` returns the slot to main's tip (keeping the warm trees), deletes the branch and
+**The current flow** (the herdr manual-pane route was deleted with the pi harness; WP3e removed its code):
+* **Claim:** `queue.py next` (a unit) or `slots.py spawn --kind <unit|fix|merge|tooling|docs|review|scout|plan>`
+  takes a pooled slot, cuts the branch and prints the launch line with the right profile.
+* **Launch, headless:** the printed `claude --agent <profile> ... -p` line, run in the background with its cwd at the slot.
+* **Launch, in-session:** `worktreehook.py arm --slot N`, then one Agent-tool call with `isolation: "worktree"`; the
+  `WorktreeCreate` hook hands that lane the armed slot (one bound slot per arm; `CLAUDE.md`, "Agent harness").
+* **Collect:** `slots.py collect --path <worktree> --release` copies the outbox and notes into MAIN.
+**Teardown is part of the round.** A live lane is a Claude Code session (`~/.claude/sessions/<pid>.json`) whose cwd
+is the slot; Windows refuses to delete a directory a process is sitting in, so `release`/`reclaim` refuse a slot a
+live session is working in - let the lane exit first. If a worktree cannot be removed, ask who is sitting in it.
+Then `claims.py release <unit>` returns the slot to main's tip (keeping the warm trees), deletes the branch and
 clears the slot lock; for a **throwaway** worktree (`--no-slots`) it removes the worktree instead. Nothing
 in a round constructs a worktree by hand.
 ### 5.2 The worker's input — one generated file, nothing else
-**A brief ends by requiring the report as the final message.** The orchestrator is handed a tool-spawned
-worker's result from the headless `claude` process's output when it exits, and reads a pane-launched
-worker's pane and outbox once it is idle. Neither path needs a completion tool, and neither survives the worker
+**A brief ends by requiring the report as the final message.** The orchestrator is handed a headless
+worker's result from the `claude` process's output when it exits, and an in-session subagent's as the Agent
+tool's result. Neither path needs a completion tool, and neither survives the worker
 ending on a tool call or saying nothing - so the brief's part 4 makes the ≤ 15-line digest the last thing the
 worker writes. `brief.py`
 emits the instruction, and a hand-written brief must carry it too.
@@ -397,7 +391,7 @@ information, late.
 | a worktree cannot resolve the toolchain/target | `recompile.py` fails with the missing path | fail loudly — never let a worker silently compile nothing |
 | the unit is only partially matched | the outbox says so and its score is below `main`'s | **measure before merging**: worse than `main` → drop the branch and re-brief; better → merge, record the residual in the header, mark the unit `partial` in the ledger |
 | `main` moved while the worker ran | the cherry-pick conflicts, or the worker's base is old | the worker rebases on `main` before handoff (`git rebase main`); the orchestrator re-measures after the cherry-pick regardless |
-| a claim cannot be released | `git worktree remove` fails with `Permission denied`, or the directory gives "Device or resource busy" | a live pane is **sitting in** the worktree (its cwd *is* the worktree) and Windows refuses to delete a directory a process is in. Teardown is part of the round: `herdr pane close <pane>`, then `claims.py release <unit>` - and if that pane is the owner's, ask first, because a stale claim blocks the unit rather than losing anything. A **slot** claim never removes the directory anyway: release detaches the slot at main's tip, deletes the branch and clears the lock |
+| a claim cannot be released | `git worktree remove` fails with `Permission denied`, or the directory gives "Device or resource busy" | a live Claude Code session is **sitting in** the worktree (its cwd *is* the worktree) and Windows refuses to delete a directory a process is in. Teardown is part of the round: let the lane exit (`release` refuses while `~/.claude/sessions` lists it), then `claims.py release <unit>` - and if the session is the owner's, ask first, because a stale claim blocks the unit rather than losing anything. A **slot** claim never removes the directory anyway: release detaches the slot at main's tip, deletes the branch and clears the lock |
 | a claimed seam is wrong | the unit's functions will not match | revisit the seam while the unit is small — matching settles the boundary |
 ### 5.4.1 The agent profiles
 The campaign runs each lane under the profile that matches its job (owner's instruction, 2026-09-26). Four of
@@ -425,8 +419,8 @@ A terminal multiplexer cannot tell "finished" from "never started": both read as
 four external workers that ambiguity cost forty minutes - one agent sat idle while the other ground through its
 unit, and the orchestrator had no cheap way to see which was which. Three mechanisms remove it:
 * **Acknowledge first.** A worker's first action, before it reads the target disassembly, is
-  `python tools/units/claims.py ack <unit> --agent <name> --pane <pane>`, which writes
-  `MAIN/.pi/ack/<slug>.json`: the branch, the agent, the pane and a timestamp. Spawning a worker and seeing no
+  `python tools/units/claims.py ack <unit> --agent <name>`, which writes
+  `MAIN/.pi/ack/<slug>.json`: the branch, the agent and a timestamp. Spawning a worker and seeing no
   ack within two minutes is an unambiguous failure, and the claim can be reclaimed immediately.
 * **Heartbeat per iteration.** The same command with `--progress <symbol>` after every function the worker
   measures. The `progress` list is the difference between "quiet because it is thinking" and "quiet because it
@@ -1297,14 +1291,14 @@ whose round produced nothing.
 
 `claims.py release <unit>` is the one-shot: rescue ref -> **audit that ref** (`redundant` pruned and the
 deletion printed, drift reported and kept, `unlanded`/`unknown` surfaced loudly with the ref, its unit(s) and
-its date and kept - a verdict is reported, never enforced) -> pane close -> **return the slot** (detach at
+its date and kept - a verdict is reported, never enforced) -> **return the slot** (detach at
 main's tip, clear the lock, refresh the warm tree) - or `git worktree remove --force` for a throwaway worktree -
 -> `branch -D` -> `prune`, then the registry entry. It must be **idempotent and total** - every step says what it
-did or why it was skipped (already gone, never existed, pane still active) - because aborting on an
+did or why it was skipped (already gone, never existed) - because aborting on an
 already-removed target is how the 2026-09-23 Camellia tangle happened: its claim could not be released, a
 merged branch then blocked the re-claim, and a leftover directory blocked the new worktree, all three cleared
-by hand. The one real refusal is a **live pane**, which pins the worktree as its cwd on Windows (5.1) - that
-stays an abort, naming the pane.
+by hand. The one real refusal is a **live session**, which pins the worktree as its cwd on Windows (5.1) - that
+stays an abort, naming the session.
 
 The flow calls it, so nobody has to remember: `land.py` releases the claim of the unit it just gated, and
 `claims.py release --all-merged` sweeps every finished worker in one command.
@@ -1320,7 +1314,7 @@ worked without per-batch approval.** The loop is one unit of work wide and the s
    **one re-split and one `land.py` gate** per batch - renames, phantom merges, range claims and source work ride
    the same split (item 4 of the constraints above).
 3. **Land** one unit at a time: cherry-pick, gate, commit, `claims.py release` (which returns the slot for the
-   next lane and deletes the branch; close any pane first - a live pane holds the slot's cwd on Windows).
+   next lane and deletes the branch; it refuses while a live session holds the slot's cwd on Windows).
 4. **Refill**: as soon as a slot frees, launch the next item, so the round never drains.
 
 Work is chosen by the ledger: the next attribution run by the block view, the next residual unit by the per-module

@@ -1,5 +1,5 @@
 {
-  "$comment": "Entry points and modules that predate the one-line prologue (tools/lib/__init__.py PROLOGUE), generated 2026-10-03 by WP0 from the tree at 923349423. The list only shrinks: tools/tests/lib/test_prologue.py fails on an offender not listed here and on a listed file that now conforms; `python tools/tests/lib/test_prologue.py --prune` drops conforming and deleted entries and never adds one. WP6 (52 entries at WP0, 41 before the sweep) left one entry, and every entry now states its reason.",
+  "$comment": "Entry points and modules that predate the one-line prologue (tools/lib/__init__.py PROLOGUE), generated 2026-10-03 by WP0 from the tree at 923349423. The list only shrinks: tools/tests/lib/test_prologue.py fails on an offender not listed here and on a listed file that now conforms; `python tools/tests/lib/test_prologue.py --prune` drops conforming and deleted entries and never adds one. 146 entries at WP0 (37ff9164e), 52 before the WP6 sweep (d2ecb8560), 1 after it (fb1e8051d); every entry now states its reason.",
   "pending": [
     {
       "path": "tools/selftest_site/sitecustomize.py",

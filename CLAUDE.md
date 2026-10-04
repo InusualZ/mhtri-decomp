@@ -84,9 +84,10 @@ The full policy, with its dated reasons, is `docs/pipeline.md` 13.1 and the ruli
   otherwise). Land the orchestrator-side tools/docs batch first (`land.py land --already-applied`), then the lanes.
 * **A lane gets the profile that matches its job** - `.claude/agents/` (tracked): `decompiler` (unit work), `fixer` (a refused
   gate or measured regression), `merger` (a refused apply / a fold), `codereviewer` (read-only review), `worker` (tooling and
-  docs; the fallback), plus the read-only globals `scout`/`planner`/`reviewer`. `python tools/units/slots.py spawn --kind KIND
-  [--slot N]` decides and prints the launch line (`unit`, `fix`, `merge`, `tooling`/`docs`, `review`, `scout`/`plan`; an unknown
-  kind is refused). When a prompt and the profile disagree, **the profile wins**. A profile edit is not live until
+  docs; the fallback), `surveyor` (the first leg of a unit claim), plus the read-only globals `scout`/`planner`/`reviewer`.
+  `python tools/units/slots.py spawn --kind KIND [--slot N]` decides and prints the launch line (`unit`->`surveyor`, `fix`,
+  `merge`, `tooling`/`docs`, `review`, `scout`/`plan`; an unknown kind is refused). No kind maps to `decompiler`: its legs
+  take `queue.py next --profile decompiler`, or the in-session route on the claim's slot (`worktreehook.py arm --slot N`). When a prompt and the profile disagree, **the profile wins**. A profile edit is not live until
   `tools/agents/install.sh` has copied it to `~/.claude/agents/` (it refuses when the section 6.5 block is stale).
 * A lane is a headless `claude --agent <profile> -p <task>` at a slot (`tools/units/lanecmd.py`); it cannot block on a question -
   it ends its turn with the request and is resumed. Harness details: `docs/pipeline.md` 13.2.
@@ -145,8 +146,13 @@ include/types.h           The project's common scalar types (u8..s64, f32/f64, B
 orig/RMHE08/              Original game files (read-only, gitignored). main.dol, files/mh3.sel, ...
 build/                    Everything generated: build.ninja, compilers/, tools/, RMHE08/ (gitignored)
 tools/                    Tooling: dtk-template's scripts at the top level, plus ours grouped by what they do (agents/,
-                          units/, splits/, symbols/, flags/, objdiff/, elf/, git/, lib/, mwcc-debugger/, mwlink-debugger/,
-                          m2c/). The inventory with one line per tool is docs/tools.md -> docs/tools/inventory.md.
+                          units/, splits/, symbols/, flags/, objdiff/, elf/, git/, mwcc-debugger/, mwlink-debugger/, m2c/).
+                          The live map (concept -> lib module -> tools, spec index) is docs/tools/README.md;
+                          docs/tools/inventory.md is a frozen snapshot of 2026-10-03, before the migration.
+tools/lib/                The shared library every tool stands on (repo, git, text, binary/, project/, report, lanes/, ...).
+tools/mwlink/             The linker debugger package; tools/mwlink_debugger.py is its CLI shim.
+tools/rso/                The RSO module tools (inventory, symbols.txt seeds); dormant, docs/tools/spec/rso.md.
+tools/tests/              The lib.testing suites (fixture and smoke tiers) that tools/selftest.py discovers.
 docs/                     All documentation, ours and dtk-template's; short bullets, one file per topic. plan.md is the
                           campaign plan; pipeline.md the mechanics and rulings; matching/ the playbook; tools.md the tool
                           docs; memory-dump.md the shared Ghidra runtime dump; splits-program.md the splits record;

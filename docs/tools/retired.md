@@ -63,8 +63,9 @@ The entries below are the evidence and history that were kept; `tools/splits/gen
 onto lib, add unitinfo for mt.py and delete the shim`, `tools/units: delete the retired shims and delegates and re-home their
 checks on the lib tests` and `tools/units: drop the --selftest flags that only forwarded to tools/tests`. Before each delete a
 reference scan (`.claude/`, `CLAUDE.md`, `docs/`, `tools/`) showed no importer left; the checks each shim's selftest carried
-moved to the lib tests named below. Kept: `escape.py --edit` (every profile still names it, and a profile edit is the
-orchestrator's) and the `mergebranch.py` shim (the CLI compatibility list).
+moved to the lib tests named below. Kept, because the CLI compatibility list (`migration.md`) spells their paths: the shims
+`mergebranch.py`, `land.py`, `stylelint.py`, `brief.py` and `mwlink_debugger.py`, and the entry points `claims.py`, `slots.py`
+and `queue.py`.
 
 * **`tools/units/relocaudit.py`** (396) -> `undefrefs.py --census --linkage` (WP3a: the sweep, its label and its JSON moved into undefrefs, the rule into `lib.objcompare.linkage_audit`, the selftest to `tools/tests/units/test_undefrefs_linkage.py`; the forwarding shim was deleted in WP6). Evidence: `undefrefs.unresolved_names` + `linkage_stem` is the
   same comparison per unit, and `undefrefs` is what the gate runs; `relocaudit` has no caller. History: the exclusion list (locals,
@@ -75,9 +76,9 @@ orchestrator's) and the `mergebranch.py` shim (the CLI compatibility list).
   per-path cases moved to `tools/tests/agents/test_edit.py`). Evidence: same concern as `edit.py check` (working tree vs
   index endings); no caller. History: the invisibility it documents - after `git add`, `git diff`/`status`/`diff --cached` are all
   empty while the file on disk is CRLF - is the rule in `lib.text`'s spec.
-* **`tools/units/escape.py --edit`** -> `agents/edit.py replace`; `--escape`/`--bytes`/`--write` stay (the profiles use them).
-  **Not deleted in WP6**: `decompiler.md`, `fixer.md`, `merger.md` and `codereviewer.md` still say "`escape.py --edit` is the
-  same rule, kept until the WP6 sweep"; the flag goes with the profile edit that drops that sentence.
+* **`tools/units/escape.py --edit`** -> `agents/edit.py replace --old/--new`; `--escape`/`--bytes`/`--write` stay (the profiles
+  use them). Deleted after WP6, once `ea2987a9a` pointed the profiles at `edit.py replace`; its cases (count refusal, zero
+  matches, empty needle, LF needle in a CRLF file) are covered by `tools/tests/agents/test_edit.py` and `tools/tests/lib/test_text.py`.
 * **`tools/objdiff/freshguard.py`** -> `lib.report.Freshness` (its selftest's mode cases are `test_report.test_freshness_modes`);
   **`tools/units/reportdiff.py`** (437) -> `lib.report.compare`/`regression`: deleted in WP6 although this page once said the
   CLI would stay - it had no caller in the tree and is not in the CLI compatibility list; its rendering (moved rows, the

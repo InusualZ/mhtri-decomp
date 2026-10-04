@@ -1,5 +1,7 @@
 # Tool inventory (every tracked file under `tools/`)
 
+**Frozen snapshot, not maintained**: it describes the tree before the WP0-WP6 migration. The live map is `README.md`.
+
 Measured on branch `worktree-agent-a086d791dd01bc183` at `ec2609b46` (2026-10-03). 184 tracked paths: 183 files below plus the
 `tools/m2c` submodule (vendored, out of scope). Numbers come from `git ls-files`, a tokenizer pass (doc = docstring lines,
 cmt = `#` comment lines, prose % = (doc+cmt)/(non-blank lines)), `git log -1 --format=%cs` (last), `git log --format=%h | wc -l`

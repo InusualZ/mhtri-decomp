@@ -1,7 +1,8 @@
 # Open questions for the owner
 
 Only decisions the design cannot make alone. Each has a recommendation; the design and migration assume the recommendation
-unless ruled otherwise.
+unless ruled otherwise. **Still open for the owner (2026-10-04): question 4 (`worktreehook.py`) and question 12 (the `rso/`
+tools)**; both stay as the recommendation says until ruled.
 
 1. **RULED 2026-10-03: retired (done).** **Retire `tools/units/attribute.py` and `attribution-queue.json`?** The splits program put every TU edge into `splits.txt`;
    `queue.py next` already hands out registered body-less units from `brief --pool`. The tiler's queue is a snapshot that goes
@@ -12,9 +13,9 @@ unless ruled otherwise.
    (`CLAUDE.md` step 3 names `applybranch.sh`; `land.py`'s docstring says the resolver was brought into the repo). The scripts end
    in `git add -A` and reference `AGENTS.md`. *Recommendation:* yes; WP4 rewrites `CLAUDE.md` step 3 and `docs/pipeline.md` section 5,
    and the four scripts are deleted from `.pi/bin` by the orchestrator (they are untracked; no commit removes them).
-3. **Delete the herdr pane code from `claims.py`?** Fifty references to the pi harness's pane tool; live lanes are read from
+3. **RULED: deleted in WP3e (`0553ebfe5`, done).** **Delete the herdr pane code from `claims.py`?** Fifty references to the pi harness's pane tool; live lanes are read from
    `~/.claude/sessions` since 2026-09-29. *Recommendation:* delete in WP3e; stall detection = ack age + session pid alive.
-4. **`worktreehook.py` - keep as a prototype or retire?** The in-session subagent path (`isolation: "worktree"`) is marked
+4. **OPEN (owner).** **`worktreehook.py` - keep as a prototype or retire?** The in-session subagent path (`isolation: "worktree"`) is marked
    PROTOTYPE and its payload cannot identify the lane (its docstring). *Recommendation:* keep it, on `lib.lanes`, excluded from
    the fixture tier and from the gate's selftest row (smoke only), until the orchestrator says it is used in production; retire
    otherwise in WP6.
@@ -39,7 +40,7 @@ unless ruled otherwise.
 11. **`commitlint`'s `docs/<topic>` members.** They are derived from top-level `docs/*.md` only, so `docs/tools:` needed the entry page
     `docs/tools.md` (added in this batch, mirroring `docs/matching.md`). *Recommendation:* teach `derive_members` that a directory
     `docs/<dir>/` with a `README.md` is a member too; keep the entry page either way (it is the convention's own shape).
-12. **The `rso/` tools.** Keep dormant (recommended; their seed maps are tracked) or retire.
+12. **OPEN (owner).** **The `rso/` tools.** Keep dormant (recommended; their seed maps are tracked) or retire.
 13. **The debuggers' location.** `tools/mwlink_debugger.py` becomes the package `tools/mwlink/` (shim kept); `tools/mwcc-debugger/`
     keeps its hyphenated directory (it is not imported as a package). *Recommendation:* as stated; a hyphenated directory cannot
     be a package, which is why `mwcc-debugger` stays script-run.

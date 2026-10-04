@@ -38,7 +38,7 @@ The contents of this section follow a very simple format:
 
 `[0xB size: 0x1]` Version(?): `XX`
 
-It's not known whether this field actually affects `mwld` in any way, but it's configurable for completeness sake. (See `mw_comment_version` in [`config.yml`](/config/RMHE08/config.yml).)
+It's not known whether this field actually affects `mwld` in any way, but it's configurable for completeness sake. (See `mw_comment_version` in [`config.yml`](../config/RMHE08/config.yml).)
 
 Known values:
 
