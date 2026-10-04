@@ -337,6 +337,16 @@ def test_query_and_index(c):
         c.check("runs: the per-address reader sets and their seam", (len(runs["runs"]), runs["seams"]),
                 (2, [0x80500024]))
     with testing.FixtureTree() as tree:
+        # the map renamed the target after the dump was written: every site must print the map's spelling
+        dump_tree(tree)
+        for name, sec, addr, size in QUERY_MAP:
+            tree.add_symbol("quest_start__FUc" if name == "quest_init__FUc" else name, sec, addr, size)
+        idx = refs.RefIndex.load(str(tree.root))
+        rep = idx.query("0x80001280")
+        c.check("a stale dump: the sites print the current map's name, the dump's text is kept beside it",
+                [(r["instruction"], r.get("dump_instruction")) for r in rep["references"]],
+                [("bl quest_start__FUc", "bl quest_init__FUc")] * 2)
+    with testing.FixtureTree() as tree:
         tree.add_symbol("caller", ".text", 0x80001000, 0x20)
         tree.add_symbol("callee", ".text", 0x80002000, 0x10)
         tree.add_object("probe/unit.o", ElfBuilder().section(".text", b"\x48\x00\x00\x01" * 8)

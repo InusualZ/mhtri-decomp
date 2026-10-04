@@ -353,6 +353,12 @@ def load_tree(main: str, ref: str | None = None) -> dict:
         return read_text(os.path.join(main, rel)) or ""
     splits = parse_splits(text(SPLITS_REL))
     symbols = parse_symbols(text(SYMBOLS_REL))
+    object_symbols = symbols
+    if ref:
+        # the objects are the working tree's on both sides, so a relocation may spell either map's name for
+        # an address: the working map first (the objects were split with it), the ref's for a name it lacks
+        object_symbols = dict(symbols)
+        object_symbols.update(parse_symbols(read_text(os.path.join(main, SYMBOLS_REL)) or ""))
     blob = None
     dol = os.path.join(main, DOL_REL)
     try:
@@ -366,7 +372,7 @@ def load_tree(main: str, ref: str | None = None) -> dict:
         text = merge_ranges([(r["start"], r["end"]) for u in splits.values() for r in u
                              if r["section"] in CODE_SECTIONS])
         source = "splits"
-    return {"main": main, "splits": splits, "symbols": symbols, "blob": blob,
+    return {"main": main, "splits": splits, "symbols": symbols, "object_symbols": object_symbols, "blob": blob,
             "text_ranges": merge_ranges(text), "text_source": source}
 
 
@@ -592,6 +598,7 @@ def audit_unit(tree: dict, path: str, flag: str) -> dict:
 
     # -- (a)+(b) the owned runs and their verdict ------------------------------------------------
     our_bases = {r["object"]: r["start"] for r in own}
+    object_symbols = tree.get("object_symbols", tree["symbols"])
     for rng in own:
         section, object_section = rng["section"], rng["object"]
         start, end = rng["start"], rng["end"]
@@ -605,7 +612,7 @@ def audit_unit(tree: dict, path: str, flag: str) -> dict:
             rec["range_mismatch"].append({"section": object_section, "splits": end - start,
                                           "object": sec["size"]})
         count = min(sec["size"], end - start) // 4
-        resolved = [read_word(target, object_section, 4 * i, our_bases, tree["symbols"])
+        resolved = [read_word(target, object_section, 4 * i, our_bases, object_symbols)
                     for i in range(count)]
         flags = [is_code_pointer(k, v, s, tree["text_ranges"]) for k, v, s in resolved]
         for first, words in find_runs(flags):
@@ -616,7 +623,7 @@ def audit_unit(tree: dict, path: str, flag: str) -> dict:
                    "targets": [resolved[first + i][1] for i in range(words)],
                    "verdict": None, "emitted": None, "referenced": None, "values_match": None,
                    "our_section": None}
-            _verdict_run(run, object_section, first, words, start, our, our_bases, tree["symbols"],
+            _verdict_run(run, object_section, first, words, start, our, our_bases, object_symbols,
                          tree["text_ranges"])
             rec["runs"].append(run)
 
@@ -872,7 +879,8 @@ def violation_rows(s: dict, rename: dict | None = None) -> dict:
     rows: dict = {}
     for run in s["violations"]:
         key = "run:%s:%08X" % (run["section"], run["address"])
-        rows[key] = {"unit": run["unit"], "kind": "run",
+        rows[key] = {"unit": run["unit"], "kind": "run", "section": run["section"],
+                     "address": run["address"], "words": run["words"],
                      "where": "%s %s 0x%08X (%d words)" % (run["unit"], run["section"],
                                                            run["address"], run["words"])}
     for ref in s["references"]:
@@ -882,6 +890,39 @@ def violation_rows(s: dict, rename: dict | None = None) -> dict:
         rows[key] = {"unit": ref["unit"], "kind": "ref",
                      "where": "%s:%d assigns %s" % (ref["file"], ref["line"], ref["symbol"])}
     return rows
+
+
+def diff_rows(before: dict, after: dict) -> dict:
+    """`{"added", "removed", "shifted"}` between two `violation_rows` results - the `--diff` verdict.
+
+    A run key is its start address, so a run whose first word stopped (or started) resolving as a code
+    pointer moves its key by a word although it is the same table. An added run that overlaps a removed run
+    of the same section is that table: it is paired into `shifted` (`[added_key, removed_key]`) and leaves
+    both lists. Only `added` refuses.
+    """
+    added = sorted(set(after) - set(before))
+    removed = sorted(set(before) - set(after))
+
+    def span(row):
+        return row["section"], row["address"], row["address"] + 4 * row["words"]
+
+    shifted = []
+    for key in list(added):
+        row = after[key]
+        if row.get("kind") != "run" or "address" not in row:
+            continue
+        sec, lo, hi = span(row)
+        for old in removed:
+            other = before[old]
+            if other.get("kind") != "run" or "address" not in other:
+                continue
+            osec, olo, ohi = span(other)
+            if osec == sec and olo < hi and lo < ohi:
+                shifted.append([key, old])
+                added.remove(key)
+                removed.remove(old)
+                break
+    return {"added": added, "removed": removed, "shifted": shifted}
 
 
 def violation_keys(s: dict, rename: dict | None = None) -> list:
@@ -1141,17 +1182,22 @@ def main(argv=None) -> int:
         # so its `ref:` keys have to be translated to the paths the working tree now spells.  Run keys are
         # already keyed on the range, which a rename keeps.
         rename = rename_map(main_tree, args.diff)
-        before = violation_keys(back, rename)
-        after = violation_keys(s)
-        added = sorted(set(after) - set(before))
+        before_rows, after_rows = violation_rows(back, rename), violation_rows(s)
+        before, after = sorted(before_rows), sorted(after_rows)
+        d = diff_rows(before_rows, after_rows)
+        added = d["added"]
         if args.json:
-            print(json.dumps({"ref": args.diff, "added": added,
-                              "before": before, "after": after}, indent=2))
+            print(json.dumps({"ref": args.diff, "added": added, "removed": d["removed"],
+                              "shifted": d["shifted"], "before": before, "after": after}, indent=2))
             return 1 if added else 0
-        print("vtableaudit --diff %s: %d rule-10 violation(s) before, %d after, %d added"
-              % (args.diff, len(before), len(after), len(added)))
+        print("vtableaudit --diff %s: %d rule-10 violation(s) before, %d after, %d added, %d removed, %d shifted"
+              % (args.diff, len(before), len(after), len(added), len(d["removed"]), len(d["shifted"])))
         for key in added:
-            print("  ADDED %s" % key)
+            print("  ADDED   %s  %s" % (key, after_rows[key]["where"]))
+        for key in d["removed"]:
+            print("  REMOVED %s  %s" % (key, before_rows[key]["where"]))
+        for new, old in d["shifted"]:
+            print("  SHIFTED %s -> %s  %s" % (old, new, after_rows[new]["where"]))
         return 1 if added else 0
     if args.order and not args.json:
         print("vtableaudit --order: %d finding(s) over %d built units"

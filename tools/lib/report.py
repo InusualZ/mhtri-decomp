@@ -268,6 +268,60 @@ def diff_symbols(before: "Report | dict", after: "Report | dict", eps: float = D
     return {"moved": moved, "added": sorted(set(sa) - set(sb)), "removed": sorted(set(sb) - set(sa))}
 
 
+def address_rows(report: "Report | dict", unit: str | None = None) -> list[dict]:
+    """`[{unit, name, address, size, score}]` for every function row (of `unit` when given), with the 0 % rule.
+
+    `address` is the row's `metadata.virtual_address` (the DOL address, which a rename or a re-home keeps), or
+    None when the report carries none."""
+    rows = []
+    for u in Report.coerce(report).units():
+        if unit is not None and u["name"] != unit:
+            continue
+        for f in u.get("functions") or []:
+            if not f.get("name"):
+                continue
+            addr = num((f.get("metadata") or {}).get("virtual_address"))
+            rows.append({"unit": u["name"], "name": f["name"], "address": None if addr is None else int(addr),
+                         "size": int(num(f.get("size")) or 0), "score": score_of(f)})
+    return rows
+
+
+def address_key(row: dict) -> tuple:
+    """The pairing key of an `address_rows` row: its address, or `(unit, name)` for a row with none."""
+    return ("a", row["address"]) if row["address"] is not None else ("n", row["unit"], row["name"])
+
+
+def diff_by_address(before: list[dict], after: list[dict], eps: float = DEFAULT_EPS) -> dict:
+    """Two `address_rows` lists paired by address: `{up, down, new, removed, renamed, paired}`.
+
+    A row renamed or moved to another unit between the two still pairs (the address is the identity); `up`/`down`
+    are the moved rows (`moved`'s rule) with both names, `new`/`removed` the rows only one side has, `renamed` the
+    paired rows whose name or unit changed. The first row of a repeated key wins."""
+    bk: dict = {}
+    ak: dict = {}
+    for r in before:
+        bk.setdefault(address_key(r), r)
+    for r in after:
+        ak.setdefault(address_key(r), r)
+    out: dict = {"up": [], "down": [], "new": [], "removed": [], "renamed": [], "paired": len(set(bk) & set(ak))}
+    for m in moved({k: r["score"] for k, r in bk.items()}, {k: r["score"] for k, r in ak.items()}, eps):
+        b, a = bk[m["key"]], ak[m["key"]]
+        row = {"unit": a["unit"], "name": a["name"], "address": a["address"], "size": a["size"],
+               "before_unit": b["unit"], "before_name": b["name"],
+               "before": m["before"], "after": m["after"], "delta": m["delta"]}
+        out["up" if m["delta"] > 0 else "down"].append(row)
+    out["down"].sort(key=lambda r: (r["delta"], r["unit"], r["name"]))
+    out["up"].sort(key=lambda r: (-r["delta"], r["unit"], r["name"]))
+    out["new"] = sorted((ak[k] for k in set(ak) - set(bk)), key=lambda r: (r["unit"], r["name"]))
+    out["removed"] = sorted((bk[k] for k in set(bk) - set(ak)), key=lambda r: (r["unit"], r["name"]))
+    out["renamed"] = sorted(({"address": ak[k]["address"], "before_unit": bk[k]["unit"], "before_name": bk[k]["name"],
+                              "unit": ak[k]["unit"], "name": ak[k]["name"]}
+                             for k in set(ak) & set(bk)
+                             if (ak[k]["unit"], ak[k]["name"]) != (bk[k]["unit"], bk[k]["name"])),
+                            key=lambda r: (r["unit"], r["name"]))
+    return out
+
+
 def diff_denominators(before: "Report | dict", after: "Report | dict", eps: float = DEFAULT_EPS) -> list[dict]:
     """The project total and every category, measure by measure, with the delta and a regression flag."""
     db, da = Report.coerce(before).denominators(), Report.coerce(after).denominators()

@@ -44,6 +44,16 @@ ours-extra    ours has bytes in a section the target does not have at all (the u
 target-extra  the target has bytes ours does not (a range we failed to claim, or data we dropped)
 ```
 * `--flip-blockers` is the list to work: units whose **code already matches** (`fuzzy_match_percent` at or above `--min-fuzzy`, default 99) and whose only remaining defect is `ours-extra` bytes in a data section. A raw `ours-extra` listing is noisier than it looks - a unit with unwritten bodies reports `.text` ours-extra too, which is progress, not a defect. `--mode` selects the direction to report (default `ours-extra`, the direction that blocks a flip) and `--flip-blockers` narrows it to the data sections. Sections that only carry metadata (`.comment`, the string/symbol tables, `.note.split`) are ignored unless `--all-sections` is given; everything else - `.text`, `.data`, `.sdata`, `.sdata2`, `.bss`, `.sbss`, `.rodata`, `extab`, `extabindex`, `.ctors`, `.dtors` and the `.rela*` sections - is compared.
+* **`--row`'s base objects come from a base, never from the judged tree (2026-10-04).** "Not touched (compiled object
+  unchanged)" means the base's and the tree's `lib.objcompare.touch_fingerprint`s are equal (`fingerprints_equal`). With
+  `--base-snapshot FILE` the base is that file; with `--base-root T` it is tree `T`'s live snapshot; with neither,
+  `base_root` was the tree itself and the snapshot fingerprinted the batch's own object against itself, so every unit
+  read "not touched" whatever its batch did (`network_opening` in the final integrator batch `de74ae758`, 15 new
+  bodies). `row_snapshot` now empties that snapshot's `objects` and prints why: a unit with an object is judged
+  `TOUCHED: object changed (no base object to compare)` - the gate's existing reading of a missing base object. The
+  gate itself was never affected: `land.py record-base` compiles the batch units at the base and stores that snapshot.
+  Replay: `datagap.py --row Network/network_opening.cpp --base-ref de74ae758^ --touched-by` read "not touched" before
+  and reads `TOUCHED` after.
 
 ## Lib dependencies
 

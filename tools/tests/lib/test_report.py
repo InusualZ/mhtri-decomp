@@ -104,6 +104,20 @@ def test_comparisons(c):
     c.check("drops are the rows that fell", [r["key"] for r in report.drops(rows)], ["a"])
     c.check("a move inside eps is no move", report.moved({"a": 1.0}, {"a": 1.0 + 1e-12}), [])
 
+    def fn(name, addr, pct):
+        return {"name": name, "size": "4", "fuzzy_match_percent": pct, "metadata": {"virtual_address": str(addr)}}
+    b = report.address_rows({"units": [{"name": "main/x", "functions": [fn("fn_10", 16, 40.0), fn("g", 32, 9.0)]},
+                                       {"name": "main/y", "functions": [fn("h", 48, 5.0)]}]})
+    a = report.address_rows({"units": [{"name": "main/z", "functions": [fn("f", 16, 50.0), fn("k", 64, 1.0)]},
+                                       {"name": "main/y", "functions": [fn("h", 48, 4.0)]}]})
+    d = report.diff_by_address(b, a)
+    c.check("diff_by_address: a renamed row moved to another unit pairs by its address",
+            [(r["before_unit"], r["before_name"], r["unit"], r["name"], r["delta"]) for r in d["up"]],
+            [("main/x", "fn_10", "main/z", "f", 10.0)])
+    c.check("... a fall is down, an unpaired row new or removed",
+            ([r["name"] for r in d["down"]], [r["name"] for r in d["new"]], [r["name"] for r in d["removed"]],
+             d["paired"], len(d["renamed"])), (["h"], ["k"], ["g"], 2, 1))
+
     payload = report.compare(before, after, before_path="b.json", after_path="a.json")
     c.check("compare: every kind of drop is named",
             sorted((d["kind"], d["name"]) for d in payload["drops"]),

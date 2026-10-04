@@ -438,6 +438,15 @@ def selftest() -> int:
           lines_of("void foo(void);\n", 2, "include/mod/other.h", idx), [1])
     check("leaf header: the convention applies under include/ only",
           lines_of("void foo(void);\n", 2, "src/mod/foo.h", idx), [1])
+    check("leaf header: a forward declaration after the guard and an #include keeps it a leaf",
+          lines_of("#ifndef FOO_H\n#define FOO_H\n#include \"types.h\"\nstruct Bar;\nvoid foo(struct Bar* b);\n"
+                   "#endif\n", 2, leaf, idx), [])
+    check("... because a forward-declared type is no declaration, wherever the directives put it",
+          [n for n, _l in header_declarations(Source("x", leaf, "#include \"types.h\"\nstruct Bar;\n"
+                                                                 "typedef struct Baz Baz;\nvoid foo(Baz* b);\n"))],
+          ["foo"])
+    check("... and a second unit's symbol beside the forward declaration still makes it foreign",
+          lines_of("#include \"types.h\"\nstruct Bar;\nvoid foo(void);\nvoid bar(void);\n", 2, leaf, idx), [3, 4])
     check("leaf header: path-stem ownership is unchanged",
           lines_of("void foo(void);\nvoid bar(void);\n", 2, "include/mod/a.h", idx), [2])
     check("rule2 header: the owner's own header is clean",

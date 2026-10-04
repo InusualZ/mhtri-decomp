@@ -20,9 +20,11 @@ python tools/objdiff/unitscore.py <unit> --json             # the whole record, 
 python tools/objdiff/unitscore.py <unit> --force-stale      # score anyway, STALE stays in the output
 python tools/objdiff/unitscore.py <unit> --refresh          # ninja build/RMHE08/report.json first (costs a build)
 python tools/objdiff/unitscore.py <unit> --measure --refresh   # ninja the unit's object first, then one call
+python tools/objdiff/unitscore.py <unit> --baseline B.json  # the unit's rows against a claim-time report, by address
+python tools/objdiff/unitscore.py --baseline B.json         # every unit of the report against B (exit 1 on a down row)
 python tools/objdiff/unitscore.py --selftest
 ```
-Flags: `--force-stale`, `--json`, `--measure`, `--refresh`, `--report`, `--selftest`, `--threshold`.
+Flags: `--baseline`, `--force-stale`, `--json`, `--measure`, `--refresh`, `--report`, `--selftest`, `--threshold`.
 Exit codes: **Exit status is the answer**: 0 the numbers are printable (current, or explicitly forced), 1 the freshness guard refused, 2 a usage or input error (no report, an unreadable report, the unit missing from it) - a traceback is never the answer.
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
 
@@ -35,6 +37,16 @@ Inputs -> outputs: report.json or objects -> table/JSON.
 * `<unit>` is the path from the repository root (`quest/arenatask`, `Pl/pl_act`); the extension may be omitted, and `src/`/`main/`/`build/RMHE08/...` prefixes are accepted.
 * **Reuse, not re-implementation.** The unit and its paths come from `lib.units.Unit.resolve` in the invocation's tree (`lib.repo.repo_root`); the report entry's identity and scoring conventions come from `tools/units/verifyunit.py` (`report_unit`, `unit_stem`, and its "a function with no `fuzzy_match_percent` key is 0 %, not 100 %" reading); the one-report score comes from `unitutil.report_functions` through `tools/objdiff/symdiff.py`'s scratch/retry helpers. There is one implementation of each, and this file holds none of them. The staleness arithmetic itself (the three mtimes, the include closure, the verdict) is `tools/objdiff/freshguard.py`, shared with `symdiff.py`, so "which file is newer" has one answer.
 * **Exit status is the answer**: 0 the numbers are printable (current, or explicitly forced), 1 the freshness guard refused, 2 a usage or input error (no report, an unreadable report, the unit missing from it) - a traceback is never the answer.
+* **`--baseline B` pairs rows by address, never by name (2026-10-04).** Every row is keyed by its
+  `metadata.virtual_address` (`lib.report.diff_by_address`), so a row renamed or moved to another unit since the
+  claim-time report still pairs; the output lists `UP`/`DOWN` (both names when they differ), `NEW` and `REMOVED`
+  rows and a `renamed` count, and a `DOWN` row is exit 1. With a unit, the current side is that unit's rows (from
+  the report, or the objects with `--measure`, after the freshness guard) and the baseline side every baseline row
+  at one of their addresses plus the rows the unit held; with no unit, every unit of `--report` (no freshness
+  guard: the current report's path and mtime are printed). It replaces the lanes' `cmp.py`, which keyed a row by
+  `(unit, section offset)`: on L1's round-2 pair (slot1 `before-report.json` against its final report) `cmp.py`
+  read 200 up / 70 down, every one of the 70 a rename or a move whose row did not fall; `--baseline` reads 130 up,
+  0 down, 132 renamed, 20 507 paired.
 * **`--refresh` costs a build, and says so.** It runs `ninja build/RMHE08/report.json` in the unit's tree before the read: the report depends on `all_source`, so every stale object of the tree is compiled first (and a changed map or `splits.txt` re-splits). With `--measure` it builds only the unit's object, the one thing that mode reads. The record carries `refreshed: {target, seconds, ok, error}`; a failed build is exit 2 with ninja's tail, and the freshness guard still runs on the rebuilt files. `--refresh --report R` is a usage error: an arbitrary report is not a ninja target.
 
 ## Lib dependencies
@@ -45,6 +57,9 @@ report, units, repo, proc.
 
 Tier: fixture (fake repo outside the tree).
 Today's selftest (`tools/objdiff/unitscore_selftest.py`): **Fixtures only.** The tree is a fake repository in the system temp (`configure.py`, `src/demo/unit.cpp` with a header closure, `build/RMHE08/obj/` so `unitutil._versions()` finds the version, and a hand-written `report.json`), and every mtime is set with `os.utime`, so the check count and the outcome are identical in MAIN, in a fresh worktree and in a slot. The fake tree is created outside the repository on purpose: a temp directory inside it is inside a git worktree, and `unitutil.repo_root()` would then resolve the real tree and read the real report instead of the fixture. The fixture is deliberately **not** a git worktree, and does not need to be. `unitutil.repo_root()` roots a run at the *invocation's* tree - its git worktree when there is one, else the `cwd` when the `cwd` is a tree at all - so a run with `cwd=<fixture>` resolves the fixture even though `git rev-parse` answers nothing. It used to fall back to the tool's own directory and silently score the real build; the fix is `unitutil.repo_root(start=)` / `resolve_unit(spec, root=)` and the `cwd`-that-is-a-tree rule.
+`--baseline` (block 15): a renamed row and a row moved in from a neighbour pair by address, a fall is DOWN and exits 1,
+a lost row is REMOVED, the no-unit mode, no down row exits 0, an unreadable baseline exits 2; `tests/lib/test_report.py`
+pins `diff_by_address`. Keying by name instead fails 6 checks.
 Target: `tools/tests/objdiff/test_unitscore.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
 
 ## Known gaps

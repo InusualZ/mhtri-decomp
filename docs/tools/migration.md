@@ -190,7 +190,8 @@ tools/units/mangle.py <X>
 tools/units/escape.py --write|--escape
 tools/units/claims.py ack|claim|release
 tools/selftest.py [--changed [main]] [--json]
-tools/objdiff/unitscore.py <X> [--report|--measure]
+tools/objdiff/unitscore.py <X> [--report|--measure|--baseline <X>]
+tools/objdiff/fnasm.py -u <X> <X> | --side <X> | --object <X> | --raw | --json
 tools/flags/shapesearch.py -u <X>
 tools/units/recompile.py <X> [--measure <sym>]
 tools/units/ledger.py [--json] | unit <X>
@@ -213,7 +214,7 @@ tools/units/attribute.py plan <X> <X>        (until question 1 is decided)
 tools/objdiff/symdiff.py -u <X>
 tools/objdiff/pairgap.py
 tools/m2c/m2c.py -t ppc-mwcc-c ...
-tools/flags/tryvar.py -u <X>
+tools/flags/tryvar.py -u <X> [--variants <X>] [--permute <X>] [--symbol <X>] [--json]
 tools/flags/optsweep.py -u <X>
 tools/agents/ideas.py where|find|check|new|demo-check [--all]
 tools/units/worktreehook.py arm

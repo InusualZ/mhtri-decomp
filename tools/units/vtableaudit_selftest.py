@@ -538,6 +538,83 @@ def selftest() -> int:
         check("... and an unchanged tree maps nothing",
               va.rename_map(tmp, "HEAD"), {})
 
+    # -- a map rename between the ref and the tree: the run keeps its key (L1 round 2, 35fe065d8) ------
+    # The objects are the working tree's on both sides, so a relocation spells the RENAMED name; the back side
+    # used to resolve it through the ref's map only, the first word stopped being a code pointer and the run
+    # read as `run:...104` before and `run:...100` after - one added, one removed, for one rename.
+    check("diff_rows pairs an overlapping run of the same section as shifted",
+          va.diff_rows({"run:.data:80050104": {"kind": "run", "section": ".data", "address": 0x80050104,
+                                               "words": 2, "unit": "u", "where": ""}},
+                       {"run:.data:80050100": {"kind": "run", "section": ".data", "address": 0x80050100,
+                                               "words": 3, "unit": "u", "where": ""}}),
+          {"added": [], "removed": [], "shifted": [["run:.data:80050100", "run:.data:80050104"]]})
+    check("... and a disjoint run is added, the other removed",
+          va.diff_rows({"run:.data:80050200": {"kind": "run", "section": ".data", "address": 0x80050200,
+                                               "words": 2, "unit": "u", "where": ""}},
+                       {"run:.data:80050100": {"kind": "run", "section": ".data", "address": 0x80050100,
+                                               "words": 3, "unit": "u", "where": ""}}),
+          {"added": ["run:.data:80050100"], "removed": ["run:.data:80050200"], "shifted": []})
+    with tempfile.TemporaryDirectory() as tmp:
+        def rg(*args: str) -> str:
+            return subprocess.run(["git", "-c", "user.email=selftest@example.invalid",
+                                   "-c", "user.name=selftest", "-c", "commit.gpgsign=false", *args],
+                                  cwd=tmp, capture_output=True, check=True, text=True,
+                                  encoding="utf-8", errors="replace").stdout.strip()
+        files = {
+            "config/RMHE08/splits.txt": "t/gone.cpp:\n\t.text       start:0x80004000 end:0x80004100\n"
+                                        "\t.data       start:0x80050100 end:0x8005010C\n",
+            "config/RMHE08/symbols.txt": "fn_80004000 = .text:0x80004000; // type:function size:0x10\n"
+                                         "fn_80004010 = .text:0x80004010; // type:function size:0x10\n",
+            "configure.py": 'config.libs = [\n    Object(NonMatching, "t/gone.cpp"),\n]\n',
+            "src/t/gone.cpp": "int x;\n",
+        }
+        for rel, body in files.items():
+            os.makedirs(os.path.dirname(os.path.join(tmp, rel)), exist_ok=True)
+            with open(os.path.join(tmp, rel), "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(body)
+        os.makedirs(os.path.join(tmp, "orig", "RMHE08", "sys"), exist_ok=True)
+        with open(os.path.join(tmp, "orig", "RMHE08", "sys", "main.dol"), "wb") as fh:
+            fh.write(dol_header())
+        # word 0 names the destructor by its NEW (undefined, address-less) spelling, words 1-2 a defined symbol
+        target = build_object(
+            [("", 0, 0, 0, 0), ("fn_80004010", 0x10, 16, GLOBAL_FUNC, 1),
+             ("__dt__4GoneFv", 0, 0, GLOBAL_FUNC, SHN_UNDEF)],
+            [(TEXT, 1, b"\x00" * 0x100), (DATA, 1, b"\x00" * 12)],
+            [(DATA, 0, 2, R_PPC_ADDR32, 0), (DATA, 4, 1, R_PPC_ADDR32, 0), (DATA, 8, 1, R_PPC_ADDR32, 0)])
+        ours = build_object([("", 0, 0, 0, 0), ("fn_80004000", 0, 16, GLOBAL_FUNC, 1)],
+                            [(TEXT, 1, b"\x00" * 0x100)])
+        write_elf(os.path.join(tmp, "build", "RMHE08", "obj", "t", "gone.o"), target)
+        write_elf(os.path.join(tmp, "build", "RMHE08", "src", "t", "gone.o"), ours)
+        with open(os.path.join(tmp, ".gitignore"), "w", encoding="utf-8") as fh:
+            fh.write("build/\norig/\n")
+        rg("init", "-q")
+        rg("add", "-A")
+        rg("commit", "-q", "-m", "base")
+        base_ref = rg("rev-parse", "HEAD")
+        with open(os.path.join(tmp, "config", "RMHE08", "symbols.txt"), "w", encoding="utf-8",
+                  newline="\n") as fh:
+            fh.write(files["config/RMHE08/symbols.txt"].replace("fn_80004000", "__dt__4GoneFv"))
+        rg("commit", "-q", "-am", "rename the destructor")
+        after_rows = va.violation_rows(va.sweep(tmp))
+        before_rows = va.violation_rows(va.sweep(tmp, text_ref=base_ref), va.rename_map(tmp, base_ref))
+        check("a map rename keeps the run's key: the back side resolves the object's new spelling",
+              (sorted(before_rows), sorted(after_rows)), (["run:.data:80050100"], ["run:.data:80050100"]))
+        check("... so --diff reads it as nothing added, removed or shifted",
+              va.diff_rows(before_rows, after_rows), {"added": [], "removed": [], "shifted": []})
+        tool = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vtableaudit.py")
+        p = subprocess.run([sys.executable, tool, "--main", tmp, "--diff", base_ref],
+                           capture_output=True, text=True, encoding="utf-8", errors="replace")
+        check("--diff on the CLI reports 0 added, 0 removed and exits 0",
+              (p.returncode, "0 added, 0 removed, 0 shifted" in p.stdout), (0, True))
+        # a real removal is printed, not left implicit: drop the claim's .data at HEAD
+        with open(os.path.join(tmp, "config", "RMHE08", "splits.txt"), "w", encoding="utf-8",
+                  newline="\n") as fh:
+            fh.write("t/gone.cpp:\n\t.text       start:0x80004000 end:0x80004100\n")
+        p = subprocess.run([sys.executable, tool, "--main", tmp, "--diff", base_ref],
+                           capture_output=True, text=True, encoding="utf-8", errors="replace")
+        check("--diff prints the removed set it used to hide",
+              (p.returncode, "REMOVED run:.data:80050100" in p.stdout), (0, True))
+
     # -- `--at`: one vtable out of the DOL, with each target's owner ---------------------------------
     # The census a lane hand-built twice (114 slots, 62 wrong) - the mode exists so it is never built by
     # hand again.  The fixture's DOL is the table one, so the slots are real DOL words.
