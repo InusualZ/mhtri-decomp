@@ -18,7 +18,8 @@ the plan to get there is `migration.md`; what is dropped is `retired.md`; what t
 | `symbols.txt`, `splits.txt`, `configure.py`, ownership | `lib/project/` | `spec/lib-project.md` | symedit, stylelint, symbolpreflight, ledger, datagap, dataclaim, dataqueue, flipcheck, vtableaudit, unwindcut, land, brief, queue, ... |
 | ELF, DOL, objdump text, DWARF, fixture builders | `lib/binary/` | `spec/lib-binary.md` | elfsect, objalign, objextab, dwarfmap, dossier, linkorder, langcheck, flipcheck, verifyunit, datagap, sectiongap, pairgap, relocdiff, undefrefs, vtableaudit, vtslot, unwindcut, m2cinput, callees, infer, mwlink |
 | instruction decode, reference scan | `lib/ppc.py` | `spec/lib-ppc.md` | splitcheck, phantom, infer, dossier, accessextent, callers, vtableaudit |
-| who references what (index, census) | `lib/refs.py` | `spec/lib-refs.md` | callers, callees, accessextent, datagap, dataclaim, poolseams, tudiscover, splitcheck |
+| who references what (index, census, the query, the dump's stamp) | `lib/refs.py` | `spec/lib-refs.md` | callers, accessextent, datagap, dataclosure, dataclaim, poolseams, tudiscover, splitcheck |
+| the TU-seam evidence (data order, pool, source names) | `tools/splits/seams/evidence.py` | `spec/seams.md` | tudiscover, dataorder, dataseams, poolseams, langcheck, splitcheck |
 | scores, the metric, freshness, regression | `lib/report.py` | `spec/lib-report.md` | ledger, verifyunit, unitscore, symdiff, measure, recompile, pairgap, datagap, brief, land, reportdiff, flags/* |
 | the unit and its compile command | `lib/units.py` | `spec/lib-units.md` | recompile, measure, unitscore, symdiff, flipcheck, datagap, verifyunit, brief, flags/* |
 | target vs ours comparisons | `lib/objcompare.py` | `spec/lib-objcompare.md` | datagap, dataclosure, sectiongap, pairgap, relocdiff, flipcheck, undefrefs (+ relocaudit), verifyunit |
@@ -37,7 +38,8 @@ Core gate: `land`, `verifyunit`, `stylelint`, `vtableaudit`, `undefrefs`, `flipc
 `ideas`, `sync_playbook_index`, `sync_profiles`.
 
 Core evidence: `callers`, `callees`, `accessextent`, `dossier`, `symedit`, `dumpmap`, `phantom`, `mangle`, `methodize`,
-`symbolpreflight`, `tudiscover`, `dataorder`, `dataseams`, `poolseams`, `splitcheck`, `dump_asm`, `dataclaim`, `dataqueue`,
+`symbolpreflight`, `tudiscover`, `dataorder`, `dataseams`, `poolseams` (+ `seams`), `splitcheck` (+ `invariants`), `dump_asm`,
+`dataclaim`, `dataqueue`,
 `sectiongap`, `pairgap`, `relocdiff`, `unitscore`, `symdiff`, `measure`, `unwindcut`, `vtslot`, `linkorder`, `m2cinput`,
 `typeregistry`, `declclash`, `elfsect`, `dwarfmap`, `reportdiff`.
 

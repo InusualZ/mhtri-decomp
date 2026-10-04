@@ -8,7 +8,8 @@ Propose the translation-unit (TU) boundary around an address, offline.
 
 ## Users
 
-configure.py / the build (6); skills (17); CLAUDE.md (2); docs (27); imported by `attribute`, `callers`, `dataorder`, `dataseams`, `dump_asm`, `langcheck`, `poolseams`
+configure.py / the build (6); skills (17); CLAUDE.md (2); docs (27); imported by `dump_asm` (the dump's paths and stamp); WP3c: `callers`, `dataorder`, `dataseams`, `langcheck` and
+`poolseams` no longer import it (the stamp is `lib.refs.DumpStamp`, the seam rules `tools/splits/seams/evidence.py`)
 
 ## CLI
 
@@ -47,7 +48,9 @@ Inputs -> outputs: build/RMHE08/asm, map, DOL -> scored cuts, build/tmp/tudiscov
 
 ## Lib dependencies
 
-refs, binary, project, cache, repo.
+`lib.refs` (the per-function graph, the dump regexes, `DumpStamp`, `has_dump`),
+`lib.project`, `lib.repo` (the tree paths, resolved on first use); the seam evidence (`seams.md`: the data order, the pool
+literal and value-witness rules, the source-name rule, the map tables, the image); `poolseams` (the fold groups of `at`).
 
 ## Test contract
 

@@ -24,7 +24,7 @@ None of its own: `python tools/units/datagap.py --census [--unit U]`, `--row UNI
 ## Inputs and outputs
 
 Inputs: `config/RMHE08/{splits,symbols}.txt`, `build/RMHE08/obj/**.o` (the census), `build/RMHE08/src/**.o` (pool sizes, the
-touch fingerprints), `callers.py`'s reader index (`readers_index`), git (`splits_at_ref`, `git_unit_renames`). Outputs: records,
+touch fingerprints), the reader index (`readers_index`: `lib.refs.RefIndex`, `callers.py`'s), git (`splits_at_ref`, `git_unit_renames`). Outputs: records,
 verdicts and snapshots as dicts; it writes nothing.
 
 ## Invariants and rules
@@ -44,8 +44,8 @@ verdicts and snapshots as dicts; it writes nothing.
 
 ## Lib dependencies
 
-`lib.objcompare` (`section_sizes`, `reloc_facts`, `touch_fingerprint`, `fingerprints_equal`), `lib.refs` (the census),
-`lib.project` (splits, map); tool APIs: `poolseams` (the pool-sharing groups), `callers` (the reader index, lazily).
+`lib.objcompare` (`section_sizes`, `reloc_facts`, `touch_fingerprint`, `fingerprints_equal`), `lib.refs` (the census and,
+WP3c, the reader index `RefIndex`); tool API: `poolseams` (the pool-sharing groups).
 
 ## Test contract
 
@@ -55,6 +55,7 @@ temp trees of fixture objects) run from `datagap.py --selftest` through `dataclo
 ## Known gaps
 
 * The gate's rows are still dicts of lines, not `lib.findings.Row`s (WP4 rebuilds the rows).
-* `readers_index` goes through `callers.py` until `lib.refs.RefIndex` arrives (WP3c).
+* `readers_index` reads `lib.refs.RefIndex` (WP3c); the census helpers (`parse_splits_text`, `load_data_symbols`,
+  `census`) are `lib.refs.census_claims`/`census_symbols`/`tree_census`.
 * The checks live in the module; re-homing them to `tools/tests/units/test_dataclosure.py` needs their bare global references
   qualified, which is a rewrite of 700 lines of fixtures, not a move.

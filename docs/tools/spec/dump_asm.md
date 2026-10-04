@@ -37,7 +37,7 @@ repo, proc, cache.
 ## Test contract
 
 Tier: fixture (temp config).
-Today's selftest (`tools/splits/dump_asm_selftest.py`): The risk `write_asm: false` introduces is a dump that silently outlives the map it was generated from (stale asm zeroes codegen fingerprints - see `asm_files()`'s docstring), so the two things worth pinning down are the temp-config rewrite that keeps the repo's own `config.yml` untouched, and the state machine in `tudiscover.asm_stamp_status`: missing / unstamped / fresh / stale / truncated. Both read their inputs from module globals, so this points those at a temp tree: no dtk, no real dump, no writes outside the temp directory.
+Today's selftest (`tools/splits/dump_asm_selftest.py`): The risk `write_asm: false` introduces is a dump that silently outlives the map it was generated from (stale asm zeroes codegen fingerprints - see `asm_files()`'s docstring), so the two things worth pinning down are the temp-config rewrite that keeps the repo's own `config.yml` untouched, and the state machine in `tudiscover.asm_stamp_status` (`lib.refs.DumpStamp` since WP3c): missing / unstamped / fresh / stale / truncated. Both read their inputs from module globals, so this points those at a temp tree: no dtk, no real dump, no writes outside the temp directory.
 Target: `tools/tests/splits/test_dump_asm.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
 
 ## Known gaps

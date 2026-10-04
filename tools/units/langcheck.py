@@ -14,6 +14,7 @@ from tools.lib import names as libnames
 
 from tools.lib.binary.elf import Elf as LibElf, ElfError
 from tools.lib.project import Configure, Splits
+import tools.splits.seams.evidence as _ev  # the seam evidence: the source-name rule, the map tables, the image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -28,9 +29,9 @@ def _root(main: str | None = None) -> str:
 CXX_EXT = (".cpp", ".cc", ".cxx", ".cp", ".c++")
 C_EXT = (".c",)
 
-# The same bare-source-name filter `tudiscover.source_file_label` uses, so the two agree on what counts
-# as a `__FILE__` string. A path separator is allowed because some assert strings carry one.
-SRCFILE_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_./\\-]*\.(?:c|cpp|cc|cxx|cp|c\+\+)$")
+# The bare-source-name filter the seam evidence uses (`tudiscover.source_file_label` too), so the tools agree
+# on what counts as a `__FILE__` string. A path separator is allowed because some assert strings carry one.
+SRCFILE_RE = _ev.SOURCE_NAME_RE
 
 # MWCC's C++ exception tables. C has no exceptions, so their presence in an object is evidence the
 # translation unit was compiled as C++ - unless the lib sets `-Cpp_exceptions on` (the confound
@@ -209,17 +210,18 @@ _ORACLE: dict = {}
 def oracle(main: str | None = None):
     """`(labels, dol)` from the symbol map and the retail image, loaded once - `(None, None)` on failure.
 
-    `labels` is `tudiscover.load_map()`'s label table (name -> {section, addr, size, kind}); `dol` is a
-    `tudiscover.Dol`, so `lbl_XXXX` string content can be read back. Neither the graph nor the analysis
-    is needed here, which is what keeps `brief.py` cheap.
+    `labels` is the seam evidence's label table (`evidence.map_tables`: name -> {section, addr, size, kind});
+    `dol` is an `evidence.Image`, so `lbl_XXXX` string content can be read back. Neither the graph nor the
+    analysis is needed here, which is what keeps `brief.py` cheap.
     """
     key = _root(main)
     if key not in _ORACLE:
         try:
-            sys.path.insert(0, os.path.join(key, "tools", "splits"))
-            import tudiscover as td
-            _fns, labels = td.load_map()
-            dol = td.Dol(td.DOL) if os.path.exists(td.DOL) else None
+            from tools.lib import repo as _repo  # noqa: PLC0415
+            _fns, labels = _ev.map_tables(os.path.join(key, "config", "RMHE08", "symbols.txt"))
+            dol_path = _repo.resolve_input(os.path.join("orig", "RMHE08", "sys", "main.dol"), key, os.path.isfile,
+                                           honour_env=_repo.is_served(key))
+            dol = _ev.Image(dol_path) if os.path.exists(dol_path) else None
             _ORACLE[key] = (labels, dol, None)
         except Exception as exc:                                    # missing orig/map, or a bad map
             _ORACLE[key] = (None, None, "%s: %s" % (type(exc).__name__, exc))

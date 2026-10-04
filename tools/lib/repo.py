@@ -142,6 +142,14 @@ def resolve_input(rel: str, root: str | os.PathLike, probe: Callable[[str], bool
     return local
 
 
+def is_served(root: str | os.PathLike) -> bool:
+    """Whether `root` is the tree the tools serve (`repo_root()`), the one `$MHTRI_MAIN` applies to; always False
+    under the fixture tier, which never resolves the live tree (`unitutil._serves`, for a lib caller)."""
+    if testing.current_tier() == "fixture":
+        return False
+    return os.path.normcase(os.path.abspath(root)) == os.path.normcase(repo_root())
+
+
 _SESSION = {"dir": None}
 
 

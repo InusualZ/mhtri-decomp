@@ -7,29 +7,18 @@ from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
-import bisect
-import collections
 import json
 import os
-import re
-import sys
+
+from tools import unitutil as uu  # resolve_input: MAIN's build/ by path when the tree has none
 from tools.lib import cache as libcache
+from tools.lib import refs as _refs  # the one reference index: dump parser, object fallback, cache, the query
+from tools.lib.report import rel_path
+from tools.lib.repo import VERSION
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-TOOLS = os.path.dirname(HERE)
-ROOT = os.path.dirname(TOOLS)
-for _path in (TOOLS, HERE, os.path.join(TOOLS, "symbols"), os.path.join(TOOLS, "splits")):
-    if _path not in sys.path:
-        sys.path.insert(0, _path)
-
-import tudiscover as td  # noqa: E402  (GAME, ASM_DIR, and the dump's own stamp: one definition of stale)
-import unitutil as uu  # noqa: E402  (resolve_input: MAIN's build/ by path when the tree has none)
-from tools.lib import refs as _refs  # noqa: E402  (the one reference index: dump parser, object fallback, cache)
-from tools.lib.project import Ownership  # noqa: E402  (the one ownership index; the rule-2 lint's too)
-from units import callees as cl  # noqa: E402  (classify_owner: the owner vocabulary callees reports in)
-
+ROOT = str(pathlib.Path(__file__).resolve().parents[2])
 SCHEMA = _refs.SCHEMA
-GAME = td.GAME
+GAME = VERSION
 DUMP_TOOL = "python tools/splits/dump_asm.py"
 CODE_SECTIONS = _refs.CODE_SECTIONS
 KINDS = _refs.KINDS
@@ -38,8 +27,8 @@ DATA_KINDS = _refs.DATA_KINDS                       # the address is used, not e
 ARG_WINDOW = _refs.ARG_WINDOW                       # instructions scanned back for the r3 argument
 
 # --------------------------------------------------------------------------------------------------
-# the dump and the object fallback: the parser, the index and its cache are `lib.refs` (one reference
-# index); this tool keeps where the inputs live and how the answer is printed
+# the dump, the object fallback, the index, the map and the query are `lib.refs` (one reference index);
+# this tool keeps where the inputs live, the dump's verdict and how the answer is printed
 # --------------------------------------------------------------------------------------------------
 LOAD_MNEMONICS = _refs.LOAD_MNEMONICS
 SCAN_RE = _refs.SCAN_RE
@@ -56,20 +45,23 @@ key_of = _refs.key_of
 attach_derived = _refs.attach_derived
 object_signature = _refs.object_signature
 coalesce = _refs.coalesce
+Map = _refs.RefMap
+plain_name = _refs.plain_name
+find_target = _refs.find_target
+fmt_addr = _refs.fmt_addr
+query = _refs.query
+caller_of = _refs.caller_of
+norm_reader = _refs.norm_reader
+reader_units = _refs.reader_units
+readers_of = _refs.readers_of
+range_report = _refs.range_report
+all_asm_files = _refs.dump_files      # every `.s` of the dump (`.stamp.json` is not a unit), sorted
+cache_of = _refs.dump_cache
 
 
 def asm_dir_of(root=ROOT):
     """The dump to READ: the tree's own `build/<game>/asm`, else MAIN's by path when the tree has none (a fresh worktree)."""
-    return uu.resolve_input(os.path.join("build", GAME, "asm"), root, td.has_dump)
-
-
-def cache_of(root=ROOT):
-    return os.path.join(root, "build", "tmp", "callers", "graph.json")
-
-
-def all_asm_files(asm_dir):
-    """Every `.s` of the dump (`.stamp.json` is not a unit). Sorted, so a build is deterministic."""
-    return _refs.dump_files(asm_dir)
+    return uu.resolve_input(os.path.join("build", GAME, "asm"), root, _refs.has_dump)
 
 
 def dump_signature(asm_dir, files):
@@ -84,16 +76,16 @@ def build_index(asm_dir, files):
 def dump_state(asm_dir, files, root=ROOT):
     """-> (state, message, remedy): `missing` is never answered with a count of zero callers.
 
-    The fresh/stale verdict is `tudiscover.asm_stamp_status()`'s, so this tool, `dump_asm.py` and an
-    attribution lane all read the dump's age the same way.
+    The fresh/stale verdict is the dump's own stamp (`lib.refs.DumpStamp`, what `tudiscover` and `dump_asm.py` read).
     """
     if not files:
         return ("missing", "%s holds no `.s` file" % rel(asm_dir, root), DUMP_TOOL)
-    if os.path.abspath(asm_dir) != os.path.abspath(td.ASM_DIR):
+    stamp = _refs.DumpStamp.for_tree(uu.ROOT, True, GAME)
+    if os.path.abspath(asm_dir) != os.path.abspath(stamp.asm_dir):
         return ("present", "%d file(s) (not the repository's dump: %s)"
                 % (len(files), rel(asm_dir, root)), None)
     try:
-        state, msg = td.asm_stamp_status()
+        state, msg = stamp.status()
     except OSError as exc:
         # a fresh worktree has no `orig/**`: the dump is there, its stamp just cannot be checked
         return ("present", "%d file(s); the dump's stamp could not be checked (%s)"
@@ -103,29 +95,15 @@ def dump_state(asm_dir, files, root=ROOT):
 
 
 def load_index(root=ROOT, rebuild=False, asm_dir=None, cache=None):
-    """-> (index, info) - from the cache when it is the same dump, else built (`lib.refs.load_index`)."""
-    asm_dir = asm_dir or asm_dir_of(root)
-    cache = cache or cache_of(root)
-    files = all_asm_files(asm_dir)
-    if not files:
-        return None, {"asm_dir": asm_dir, "cache": cache, "files": 0, "cached": False, "rebuilt": False,
-                      "reason": "no dump", "stats": {}}
-    index, info = _refs.load_index(cache, dump_signature(asm_dir, files), len(files),
-                                   lambda: build_index(asm_dir, files), rebuild,
-                                   "the dump changed since the index was built")
-    info["asm_dir"] = asm_dir
-    return index, info
+    """-> (index, info) - from the cache when it is the same dump, else built (`lib.refs.load_dump_index`)."""
+    return _refs.load_dump_index(root, rebuild, asm_dir or asm_dir_of(root), cache or cache_of(root), game=GAME)
 
 
 # No dump (it is written only on demand): the split objects under `build/<game>/obj` answer from their
 # relocations instead - the same address-keyed graph, coarser kinds, `source: elf`.
-def _has_objects(d):
-    return any(n.endswith(".o") for _dp, _dirs, names in os.walk(d) for n in names)
-
-
 def obj_dir_of(root=ROOT):
     """The split objects to READ: the tree's own `build/<game>/obj`, else MAIN's by path when the tree has none."""
-    return uu.resolve_input(os.path.join("build", GAME, "obj"), root, _has_objects)
+    return uu.resolve_input(os.path.join("build", GAME, "obj"), root, _refs._has_objects)
 
 
 def all_object_files(root=ROOT):
@@ -140,234 +118,17 @@ def build_elf_index(obj_dir, files, cmap):
 
 def load_elf_index(root=ROOT, rebuild=False, cmap=None, cache=None):
     """`load_index`'s fallback: the same index shape, built from the split objects, cached the same way."""
-    obj_dir = obj_dir_of(root)
-    cache = cache or os.path.join(root, "build", "tmp", "callers", "elf-graph.json")
-    files = all_object_files(root)
-    if not files:
-        return None, {"asm_dir": obj_dir, "cache": cache, "files": 0, "cached": False, "rebuilt": False,
-                      "reason": "no objects", "stats": {}, "source": "elf"}
-    cmap = cmap if cmap is not None else load_map(root)
-    index, info = _refs.load_index(cache, object_signature(obj_dir, files), len(files),
-                                   lambda: build_elf_index(obj_dir, files, cmap), rebuild,
-                                   "the objects changed since the index was built")
-    info.update(asm_dir=obj_dir, source="elf")
-    return index, info
-# the current symbol map, through symedit-style access (never printed - non-negotiable 7)
-# --------------------------------------------------------------------------------------------------
-class Map:
-    """`symbols.txt` + `splits.txt` as an address index: current names, owners, function extents.
-
-    Names come through the same `Ownership` index `tools/units/stylelint.py` lints with (parsed once per
-    mtime, never printed), so this tool and the rule-2 lint cannot disagree about who owns an address.
-    `by_addr` and `funcs` are inverted from it for the query: `address -> current name`.
-    """
-
-    def __init__(self, ownership, root=ROOT):
-        self.own = ownership
-        self.root = root
-        self.symbols = ownership.symbols if ownership else {}
-        self.by_addr, self.funcs = {}, []
-        for name, rows in self.symbols.items():
-            for section, addr, type_ in rows:
-                self.by_addr.setdefault(addr, (name, section, type_))
-                if section in CODE_SECTIONS and type_ == "function":
-                    self.funcs.append((addr, name))
-        self.funcs.sort()
-        self.func_addrs = [a for a, _n in self.funcs]
-
-    def available(self):
-        return bool(self.symbols)
-
-    def name_at(self, addr):
-        """-> (name, section, type) of the map row *exactly* at `addr`, or None."""
-        return self.by_addr.get(addr)
-
-    def function_at(self, addr):
-        """-> (address, name) of the function containing a code `addr`, or None.
-
-        Bisect over the map's own function rows, so no size is guessed. It is the fallback for an
-        instruction outside any `.fn` block (`.init` scaffolding); everywhere else the container is the
-        dump's own block, resolved by `caller_of`.
-        """
-        if not self.funcs:
-            return None
-        i = bisect.bisect_right(self.func_addrs, addr) - 1
-        return self.funcs[i] if i >= 0 else None
-
-    def source_exists(self, unit):
-        if not unit:
-            return False
-        return os.path.exists(os.path.join(self.root, "src", unit.replace("\\", "/")))
-
-    def owner(self, name):
-        """-> (label, state, unit) for a name, in `callees.classify_owner`'s vocabulary."""
-        return cl.classify_owner(self.own.resolve(name) if (self.own and name) else None,
-                                 self.source_exists)
-
-    def owner_at(self, addr, section=None, name=None):
-        """-> (label, state, unit) for a caller, by its name when the map has it, else by its address."""
-        if name and name in self.symbols:
-            return self.owner(name)
-        rows = self.own.ranges.get(section) if (self.own and section) else None
-        for start, end, unit in rows or ():
-            if start <= addr < end:
-                exists = self.source_exists(unit)
-                if not exists:
-                    return (unit + " (no source yet)", "registered", unit)
-                return (unit, "reconstructed", unit)
-        hit = self.by_addr.get(addr)
-        if hit:
-            return self.owner(hit[0])
-        return ("unsplit address", "unsplit", None)
+    return _refs.load_object_index(root, rebuild, cmap, cache, game=GAME, obj_dir=obj_dir_of(root))
 
 
 def load_map(root=ROOT):
     """The map, or an empty one when the tree has no `symbols.txt` (a scratch fixture)."""
-    return Map(Ownership.load(root), root)
-
-
-def plain_name(name):
-    """A mangled name's plain form: `quest_init__FUc` -> `quest_init` (a query convenience)."""
-    return name.split("__", 1)[0]
-
-
-def find_target(query, index, cmap):
-    """-> (address or None, candidates, how): an address, or the names a name query matched.
-
-    `how` is `address`, `map`, `dump` (the name is only in the *stale* dump - see the module docstring)
-    or the tier of the name match. More than one candidate is returned as a list, deduplicated with the
-    current map's names first: this never guesses between two symbols, it prints them.
-    """
-    m = re.fullmatch(r"(?:0[xX])?([0-9A-Fa-f]{1,8})", query)
-    if m and (query[:2].lower() == "0x" or len(query) == 8):
-        return int(m.group(1), 16), [], "address"
-    labels = index["labels"]
-    if query in cmap.symbols:
-        return None, [query], "map"
-    if query in labels:
-        return None, [query], "dump"
-    for pool in (cmap.symbols, labels):
-        plain = [n for n in pool if plain_name(n) == query]
-        if plain:
-            return None, plain, "plain name"
-    return None, list(dict.fromkeys(n for n in list(cmap.symbols) + list(labels)
-                                    if query in n))[:200], "substring"
-
-
-# --------------------------------------------------------------------------------------------------
-# the query
-# --------------------------------------------------------------------------------------------------
-def fmt_addr(addr):
-    return "0x%08X" % addr if addr is not None else "-"
+    return _refs.RefMap.load(root)
 
 
 def rel(path, root=ROOT):
     """`path` relative to `root` with forward slashes - a stable string for output and for JSON."""
-    try:
-        return os.path.relpath(path, root).replace("\\", "/")
-    except ValueError:
-        return path.replace("\\", "/")
-
-
-def query(query, index, cmap, kinds=None, limit=40, pointers=False):
-    """-> the report dict for one query: the target, its references, and why each is named as it is."""
-    addr, candidates, how = find_target(query, index, cmap)
-    rep = {"query": query, "resolved": None, "candidates": candidates, "how": how,
-           "references": [], "counts": {k: 0 for k in KINDS}, "notes": [], "limit": limit,
-           "pointer_hidden": 0}
-    if addr is None:
-        if len(candidates) != 1:
-            rep["error"] = ("%d name(s) match %r" % (len(candidates), query)) if candidates else \
-                ("%r is neither in the symbol map nor in the asm dump" % query)
-            return rep
-        name = candidates[0]
-        hit = cmap.symbols.get(name)
-        if hit:
-            if len(hit) != 1:
-                rep["error"] = "%r has %d rows in the symbol map (a duplicate): pass an address" \
-                    % (name, len(hit))
-                return rep
-            addr, how = hit[0][1], "map"
-        else:
-            addr, how = index["labels"][name][0], "dump"
-    rep["how"] = how
-
-    names = index["_label_at"].get(addr, [])
-    map_hit = cmap.name_at(addr)
-    name = map_hit[0] if map_hit else (names[0] if names else fmt_addr(addr))
-    lab = index["labels"].get(name) or (index["labels"].get(names[0]) if names else None)
-    section = map_hit[1] if map_hit else (lab[2] if lab else None)
-    asm_label = next((n for n in names if n != name), None) if map_hit else None
-    if map_hit:
-        label, state, unit = cmap.owner(name)
-    else:
-        label, state, unit = cmap.owner_at(addr, section)
-    rep["resolved"] = {
-        "address": fmt_addr(addr), "name": name, "section": section, "kind":
-        "code" if section in CODE_SECTIONS else ("data" if section else "unknown"),
-        "size": lab[1] if lab else 0, "owner": label, "owner_state": state, "unit": unit,
-        "asm_label": asm_label, "in_map": bool(map_hit), "name_source": "map" if map_hit else "dump",
-    }
-    if how == "dump" and map_hit and map_hit[0] != query:
-        rep["notes"].append("the queried name is the dump's (stale) label: the current map calls %s %s"
-                            % (fmt_addr(addr), map_hit[0]))
-
-    # a reference the dump could not resolve by name was left keyed on that name: the current map may
-    # name the address now (the rename-since-the-dump case, in both directions), so retry it here
-    rows, retried = _refs.rows_at(index, addr, (name, query, asm_label))
-    for nm in retried:
-        rep["notes"].append("a reference printed as %r (in neither the dump's label table nor the map) "
-                            "was resolved through the current map" % nm)
-
-    if not pointers:
-        rep["pointer_hidden"] = sum(1 for r in rows if r[1] == "pointer")
-        rows = [r for r in rows if r[1] != "pointer"]
-    # the `lis`+`addi` pairs become one site before anything is counted, so every number below (and in
-    # the "no site matched the filter" note) is the same kind of site
-    rows = coalesce([r for r in rows if r[1] not in ("addr", "read", "write")]) + \
-        coalesce([r for r in rows if r[1] in ("addr", "read", "write")])
-    rep["all_kinds"] = dict(collections.Counter(r[1] for r in rows))
-    if kinds:
-        rows = [r for r in rows if r[1] in kinds]
-    if not rows and rep["all_kinds"]:
-        rep["notes"].append("no %s reference here, but %d other reference(s): drop the filter"
-                            % ("/".join(kinds or ()), sum(rep["all_kinds"].values())))
-    rows.sort(key=lambda r: r[0])
-
-    refs = []
-    for site, kind_, func, text, arg in rows:
-        faddr, fname = caller_of(index, cmap, site, func)
-        owner, ostate, _unit = cmap.owner_at(faddr, None, fname) if faddr is not None else ("", "", None)
-        refs.append({"kind": kind_, "site": fmt_addr(site),
-                     "caller": {"address": fmt_addr(faddr), "name": fname, "owner": owner,
-                                "owner_state": ostate} if faddr is not None else None,
-                     "instruction": text, "arg": arg or None})
-    rep["references"] = refs
-    counts = collections.Counter(r["kind"] for r in refs)
-    for k in KINDS:
-        rep["counts"][k] = counts.get(k, 0)
-    rep["counts"]["sites"] = len(refs)
-    rep["counts"]["functions"] = len({r["caller"]["address"] for r in refs if r["caller"]})
-    return rep
-
-
-def caller_of(index, cmap, site, func):
-    """-> (address, name) of who holds a reference, current name first, the dump's label second.
-
-    The container is the `.fn`/`.obj` block the dump put the instruction in, so it needs no size guess.
-    The *current* map wins only when it has a symbol exactly at that block's start: where it does not
-    (an unsplit band, or a function the map has not named) the previous map row is not this function, so
-    the dump's own block label is the only honest answer - and it is exactly the caller name the strip
-    would have used anyway, at the same address.
-    """
-    if func is None:                       # an instruction outside any block (`.init` scaffolding)
-        hit = cmap.function_at(site)
-        return hit if hit else (None, None)
-    hit = cmap.name_at(func)
-    if hit:
-        return func, hit[0]
-    name = index["_funcs"].get(func) or (index["_label_at"].get(func) or [None])[0]
-    return func, name or fmt_addr(func)
+    return rel_path(path, root)
 
 
 def _owner_column(rep):
@@ -453,68 +214,6 @@ def print_report(rep, info=None, state=None, msg=None, remedy=None, root=ROOT, a
     for note in rep["notes"]:
         print("   note   %s" % note)
     return 0
-
-
-# --------------------------------------------------------------------------------------------------
-# the per-address referrer census, and its runs over a range - the `.sdata2`/`.data` seam evidence
-# --------------------------------------------------------------------------------------------------
-# A data pool's edges are not chosen, they are measured: two objects' pools are merged by MWLD, so the
-# run one unit owns is exactly the maximal span of addresses whose *reader set* is constant, and the
-# address where that set changes is the seam. The pool lanes pinned both edges with a separate
-# `callers.py <address>` invocation per address (~1-2 s each off the cached graph); this is the same
-# census in one load, grouped, so the edges fall out of one command.
-def norm_reader(label):
-    """A census owner label -> a unit name, or None for the labels that are not units.
-
-    `Pl/pl_act_step.cpp` -> `Pl/pl_act_step`; an `unsplit address` or `unsplit (ef)` label is not a
-    unit; a label is normalised so a reader set joins `splits.txt` and `dataclaim.py`'s sharer list.
-    """
-    if not label:
-        return None
-    label = label.strip()
-    if label in ("unsplit address", "unsplit") or label.startswith("unsplit ("):
-        return None
-    if label.endswith(" (no source yet)"):
-        label = label[: -len(" (no source yet)")]
-    if label.endswith((".c", ".cpp", ".cp")):
-        label = os.path.splitext(label)[0]
-    return label
-
-
-def reader_units(rep):
-    """`{unit: site count}` for one query report - who references an address, in the unit vocabulary."""
-    counts = {}
-    for ref in rep.get("references", ()):
-        unit = norm_reader((ref.get("caller") or {}).get("owner"))
-        if unit:
-            counts[unit] = counts.get(unit, 0) + 1
-    return counts
-
-
-def readers_of(index, cmap):
-    """`readers_of(address) -> {unit: sites}` - the sharing census, built from this index and nothing else.
-
-    A cached wrapper around the one `query` this tool already has, so the `--range` runs and
-    `dataclaim.py`'s sharer census cannot disagree about who reads an address.
-    """
-    cache: dict[int, dict] = {}
-
-    def readers(address):
-        if address not in cache:
-            cache[address] = reader_units(query("0x%08X" % address, index, cmap, limit=0))
-        return cache[address]
-
-    return readers
-
-
-def range_report(index, cmap, lo, hi, step=4):
-    """The per-address referrer runs over `[lo, hi]` (both ends inclusive), stepping `step` bytes.
-
-    Every address's reader set comes from `readers_of`; contiguous addresses whose sets are equal
-    collapse into one run, and the first address of every run but the first is a **seam** - the
-    boundary a lane otherwise measures one `callers.py` invocation at a time.
-    """
-    return _refs.runs_over(readers_of(index, cmap), lo, hi, step)
 
 
 def print_range(payload, root=ROOT, asm_dir=None, state=None, each=False):
@@ -866,6 +565,8 @@ def selftest():
     import shutil
     import tempfile
 
+    from tools.lib.binary.build import ElfBuilder
+
     fails, checks = [], 0
 
     def check(name, got, want):
@@ -1196,10 +897,9 @@ def selftest():
         with open(os.path.join(elf_tree, "config", GAME, "splits.txt"), "w", encoding="utf-8",
                   newline="") as fh:
             fh.write("probe/unit.c:\n\t.text       start:0x80001000 end:0x80001020\n")
-        elf = cl._fixture_elf(b"\x48\x00\x00\x01" * 8,
-                              [("", 0, 0, 0, 0), ("caller", 0, 0x20, 0x12, 1),
-                               ("callee", 0, 0, 0x10, 0), ("gData", 0, 0, 0x12, 0)],
-                              [(0x08, 2, 10), (0x0C, 3, 6)])
+        elf = (ElfBuilder().section(".text", b"\x48\x00\x00\x01" * 8)
+               .symbol("caller", ".text", 0, 0x20, type="func").symbol("callee").symbol("gData", type="func")
+               .reloc(".text", 0x08, "callee", 10).reloc(".text", 0x0C, "gData", 6).build())
         with open(os.path.join(elf_tree, "build", GAME, "obj", "probe", "unit.o"), "wb") as fh:
             fh.write(elf)
         elf_cmap = load_map(elf_tree)

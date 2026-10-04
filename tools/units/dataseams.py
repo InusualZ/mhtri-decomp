@@ -7,18 +7,25 @@ import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file_
 import os
 import sys
 
+from tools.lib import repo as _repo
 from tools.lib.binary.elf import Elf as LibElf
+import tools.splits.seams.evidence as ev
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-TOOLS = os.path.dirname(HERE)
-for _p in (os.path.join(TOOLS, "splits"), TOOLS, HERE):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
-
-STRONG = ("V->S", "zigzag")
+STRONG = ev.STRONG_KINDS
 #: A V->S gap with at most this many symbols is cut (at the end of its tail); a wider one only warns.
-NARROW = 8
+NARROW = ev.NARROW
 _CACHE: dict = {}
+
+
+def _paths() -> dict:
+    """The tree's map, splits and retail DOL (the DOL MAIN's by path in a fresh worktree), resolved on first use."""
+    if "paths" not in _CACHE:
+        root = _repo.repo_root()
+        _CACHE["paths"] = {"root": root, "symbols": os.path.join(root, "config", ev.GAME, "symbols.txt"),
+                           "splits": os.path.join(root, "config", ev.GAME, "splits.txt"),
+                           "dol": _repo.resolve_input(os.path.join("orig", ev.GAME, "sys", "main.dol"), root,
+                                                      os.path.isfile, honour_env=True)}
+    return _CACHE["paths"]
 
 
 def load_strong() -> list[dict]:
@@ -31,15 +38,8 @@ def load_strong() -> list[dict]:
     if "seams" in _CACHE:
         return _CACHE["seams"]
     try:
-        import dataorder as do
-        import tudiscover as td
-        syms = do.classify_all(do.load_symbols(), td.Dol(do.DOL))
-        found = [s for s in do.seams(syms) if s["kind"] in STRONG]
-        at = {x.addr: i for i, x in enumerate(syms)}
-        for row in found:
-            if row["kind"] == "V->S" and row["addr"] in at:
-                k = min(at[row["addr"]] + row.get("tail", 0), len(syms) - 1)
-                row["cut"] = syms[k].addr
+        paths = _paths()
+        found = ev.strong_seams(ev.retail_symbols(paths["symbols"], paths["dol"]))
         _CACHE["error"] = None
     except Exception as exc:  # noqa: BLE001 - see the docstring
         found = []
@@ -160,8 +160,7 @@ def unit_data_range(unit: str, section: str = ".data") -> tuple[int, int] | None
     if section != ".data":
         return None
     try:
-        import dataorder as do
-        for start, (name, end) in do.unit_data_ranges().items():
+        for start, (name, end) in ev.section_ranges(_paths()["splits"], ".data").items():
             if os.path.splitext(name)[0] == os.path.splitext(unit)[0]:
                 return start, end
     except Exception:  # noqa: BLE001
@@ -280,7 +279,7 @@ def selftest() -> int:
               "order-only" in (seam_note("u", "o.o", "other.o", seams=sm, rng=(0x1000, 0x1300)) or ""), False)
     finally:
         g["section_chunks"] = saved
-    if os.path.exists(os.path.join(os.path.dirname(TOOLS), "orig", "RMHE08", "sys", "main.dol")):
+    if os.path.exists(os.path.join(_paths()["root"], "orig", "RMHE08", "sys", "main.dol")):
         real = seams_in(load_strong(), 0x805F94E0, 0x805FA4EC)
         check("real DOL: the four network_transport V->S seams are in the unit's run",
               [s["addr"] for s in real if s["kind"] == "V->S"], [0x805F9570, 0x805F9610, 0x805F9958, 0x805F9A40])

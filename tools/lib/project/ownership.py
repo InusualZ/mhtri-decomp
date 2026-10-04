@@ -271,3 +271,33 @@ _REF_CACHE: dict = {}
 def load(root: str | os.PathLike, auto: bool = False) -> Ownership | None:
     """`Ownership.load(root)`."""
     return Ownership.load(root, auto=auto)
+
+
+def owner_label(resolution: dict | None, source_exists: Callable[[str | None], bool]) -> tuple[str, str, str | None]:
+    """`(label, state, unit)` for one `Ownership.resolve` result - the owner vocabulary `callers`/`callees` print:
+    `reconstructed` (a registered unit with a source under `src/`), `registered` (a claim, no source yet), `unsplit`
+    (no registered owner; the label names the band when the bracketing claims agree), `duplicate` or `unmapped`."""
+    if resolution is None:
+        return ("not in the symbol map", "unmapped", None)
+    kind = resolution.get("kind")
+    if kind == "dup":
+        return ("duplicate row in the symbol map", "duplicate", None)
+    if kind == "unsplit":
+        module = resolution.get("module")
+        where = "unsplit address"
+        if module:
+            where = "unsplit (%s)" % module
+        return (where, "unsplit", None)
+    unit = resolution.get("unit")
+    if source_exists(unit):
+        return (unit, "reconstructed", unit)
+    return (unit + " (no source yet)", "registered", unit)
+
+
+def source_exists(root: str | os.PathLike) -> Callable[[str | None], bool]:
+    """A predicate: does the unit named in `splits.txt` have its file under `<root>/src/`?"""
+    def exists(unit: str | None) -> bool:
+        if not unit:
+            return False
+        return os.path.exists(os.path.join(root, "src", unit.replace("\\", "/")))
+    return exists

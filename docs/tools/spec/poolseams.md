@@ -8,7 +8,7 @@ poolseams.py - the literal pool as TU-seam evidence: which registered units are 
 
 ## Users
 
-skills (3); docs (6); imported by `attribute`, `datagap`, `flipcheck`, `sectiongap`, `tudiscover`
+skills (3); docs (6); imported by `dataclosure`, `datagap`, `flipcheck`, `sectiongap`, `tudiscover`
 
 ## CLI
 
@@ -28,7 +28,7 @@ Inputs -> outputs: datagap census, splits, map, DOL -> groups.
 
 ## Invariants and rules
 
-* This module turns that into data. It reads nothing itself: the references come from `datagap.census` (the one relocation reader over the registered units' TARGET objects), the claims from `splits.txt`, the symbol types from the map, the values (optional) from the retail DOL. Everything below is a pure function of those, so the `--selftest` fixtures need no build tree.
+* This module turns that into data. It reads nothing itself: the references come from `lib.refs.tree_census` (the one relocation census over the registered units' TARGET objects), the claims from `splits.txt`, the symbol types from the map, the values (optional) from the retail DOL. Everything below is a pure function of those, so the `--selftest` fixtures need no build tree.
 * (`datagap.py --pool-seams` is the same census; `tudiscover.py at`, `datagap.py` deferral classes, `flipcheck.py`, `sectiongap.py` and `brief.py` consume `group_of`.)
 * What is and is not evidence (measured exceptions, docs/pool-seams.md section 4):
 * **literal** - an `.sdata2` object of 4 or 8 bytes, or an `.sdata` string: an edge.
@@ -38,7 +38,9 @@ Inputs -> outputs: datagap census, splits, map, DOL -> groups.
 
 ## Lib dependencies
 
-refs.census, project, binary.dol.
+`lib.refs` (`tree_census`, `census_claims`, `census_symbols` - WP3c: no longer
+through `datagap`, so the `datagap <-> poolseams` cycle is gone), the seam evidence (`seams.md`: `is_literal`,
+`is_value_witness`, `components`, `MAGIC`, `Image` for the values).
 
 ## Test contract
 

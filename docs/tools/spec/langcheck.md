@@ -41,7 +41,8 @@ Inputs -> outputs: target .o, DOL, map, configure.py -> verdicts.
 
 ## Lib dependencies
 
-binary, names, project.configure, report.
+binary, names, project.configure, report; the seam evidence (`seams.md`: the
+source-name rule, the map tables and the image of the `__FILE__` oracle - WP3c, was a lazy `tudiscover` import).
 
 ## Test contract
 
