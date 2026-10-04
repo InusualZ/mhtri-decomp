@@ -677,6 +677,10 @@ def selftest():
               any("resolved through the current map" in n for n in rep_ptr["notes"]), True)
         check("query: the dump's stale label for the target is reported",
               rep["resolved"]["asm_label"], "fn_80001280")
+        check("text: a stale dump label is respelled by the current map at its address (the call, @ha/@l)",
+              [_refs.current_text(t, index, cmap) for t in ("bl fn_80001280", "lis r3, fn_80001280@ha",
+                                                           "bl fn_80001200", "li r3, 0x0")],
+              ["bl quest_init__FUc", "lis r3, quest_init__FUc@ha", "bl fn_80001200", "li r3, 0x0"])
         code, out = run(rep, info=info, root=tmp, asm=asm)
         check("report: it exits 0", code, 0)
         check_in("report: the stale label is called out", "stale label", out)

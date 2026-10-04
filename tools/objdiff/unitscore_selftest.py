@@ -387,6 +387,51 @@ def selftest() -> int:
                       (True, None), fails)
         p = fx.run("demo/unit", "--refresh", "--report", fx.report)
         fails = check("refresh: --report cannot be rebuilt (usage error)", p.returncode, 2, fails)
+
+        # 15. --baseline: every row against a claim-time report, PAIRED BY ADDRESS (the lanes' cmp.py)
+        fx.write_report()
+        fx.set_times(report=0, obj=-DAY, source=-2 * DAY)
+        base = os.path.join(fx.dir, "before.json")
+
+        def row(name, addr, pct=None):
+            r = {"name": name, "size": "64", "metadata": {"virtual_address": str(addr)}}
+            if pct is not None:
+                r["fuzzy_match_percent"] = pct
+            return r
+        with open(base, "w", encoding="utf-8") as fh:
+            json.dump({"units": [
+                {"name": "main/demo/neighbour", "functions": [row("fn_80001000", 0x80001000, 100.0)]},
+                {"name": "main/demo/unit", "functions": [
+                    row("fn_80001040", 0x80001040, 40.0), row("gamma_twenty", 0x80001080, 30.0),
+                    row("delta_unscored", 0x800010C0), row("old_gone", 0x80001100, 10.0)]}]}, fh)
+        rec = us.run(fx.spec(us), baseline=base)
+        d = rec["baseline"]
+        fails = check("baseline: a renamed row pairs by address and its rise is UP",
+                      [(r["name"], r["before_name"], r["before"], r["after"]) for r in d["up"]],
+                      [("beta_half", "fn_80001040", 40.0, 50.0)], fails)
+        fails = check("baseline: a fall is DOWN", [(r["name"], r["before"], r["after"]) for r in d["down"]],
+                      [("gamma_twenty", 30.0, 20.0)], fails)
+        fails = check("baseline: a row moved in from a neighbour pairs too (renamed, not new)",
+                      ([r["name"] for r in d["new"]],
+                       sorted((r["before_unit"], r["name"]) for r in d["renamed"])),
+                      ([], [("main/demo/neighbour", "alpha_hundred"), ("main/demo/unit", "beta_half")]), fails)
+        fails = check("baseline: a row the unit lost is REMOVED", [r["name"] for r in d["removed"]],
+                      ["old_gone"], fails)
+        p = fx.run("demo/unit", "--baseline", base)
+        fails = check("baseline: a DOWN row exits 1", p.returncode, 1, fails)
+        fails = contains("... and is printed with both scores", p.stdout, "DOWN", fails)
+        p = fx.run("--baseline", base)
+        fails = check("baseline with no unit: every unit of the report, exit 1 on the down row",
+                      (p.returncode, "1 down" in p.stdout, "1 removed" in p.stdout), (1, True, True), fails)
+        with open(base, "w", encoding="utf-8") as fh:
+            json.dump({"units": [{"name": "main/demo/unit", "functions": [row("fn_80001080", 0x80001080, 10.0)]}]},
+                      fh)
+        p = fx.run("--baseline", base, "--json")
+        got = json.loads(p.stdout) if p.returncode in (0, 1) else {}
+        fails = check("baseline: no down row exits 0, the rest are new", (p.returncode, len(got.get("new", []))),
+                      (0, 3), fails)
+        p = fx.run("--baseline", os.path.join(fx.dir, "missing.json"))
+        fails = check("baseline: an unreadable baseline is exit 2", p.returncode, 2, fails)
     finally:
         fx.cleanup()
 
@@ -402,7 +447,7 @@ def selftest() -> int:
     if fails:
         print("FAIL (%d)" % fails)
         return 1
-    print("ok - 80 checks")
+    print("ok - 89 checks")
     return 0
 
 

@@ -979,6 +979,40 @@ def caller_of(index: dict, cmap: RefMap, site: int, func):
     return func, name or fmt_addr(func)
 
 
+_TOKEN_RE = re.compile(r"(?<![\w@$.])[A-Za-z_.@$][\w@$.]*")
+_SUFFIX_RE = re.compile(r"@(?:ha|h|l|sda21|sda2)$")
+
+
+def current_text(text: str | None, index: dict, cmap: RefMap, target: int | None = None,
+                 name: str | None = None) -> str | None:
+    """Dump text with its symbol operands spelled by the current map, so a site prints the live map's name
+    (`bl networkStreamWriter_dtor` -> `bl __dt__19NetworkStreamWriterFv`, `lis r3,lbl_X@ha` -> `lis r3,name@ha`).
+
+    A token in the dump's label table is respelled by the map row at that label's address. With the site's `target`
+    and its current `name`, a token in neither the label table nor the map that sits where only a symbol can (a
+    branch's operand, a `@ha`/`@l`/`@sda21` operand, a `.4byte` entry) names the target - the site was indexed by its
+    address, not its text - and is respelled too. Anything else is kept."""
+    if not text:
+        return text
+    labels = index.get("labels") or {}
+    mnemonic = text.split(None, 1)[0] if text.split() else ""
+    symbol_slot = mnemonic.startswith("b") or mnemonic == ".4byte"
+
+    def respell(m):
+        token = m.group(0)
+        suffix = _SUFFIX_RE.search(token) if token not in labels else None
+        base = token[:suffix.start()] if suffix else token
+        tail = suffix.group(0) if suffix else ""
+        lab = labels.get(base)
+        if lab:
+            hit = cmap.name_at(lab[0])
+            return hit[0] + tail if hit else token
+        if name and base != name and base not in cmap.symbols and m.start() > 0 and (suffix or symbol_slot):
+            return name + tail
+        return token
+    return _TOKEN_RE.sub(respell, text)
+
+
 def query(query_text: str, index: dict, cmap: RefMap, kinds=None, limit: int = 40, pointers: bool = False) -> dict:
     """-> the report dict for one query: the target, its references, and why each is named as it is."""
     addr, candidates, how = find_target(query_text, index, cmap)
@@ -1048,10 +1082,14 @@ def query(query_text: str, index: dict, cmap: RefMap, kinds=None, limit: int = 4
     for site, kind_, func, text, arg in rows:
         faddr, fname = caller_of(index, cmap, site, func)
         owner, ostate, _unit = cmap.owner_at(faddr, None, fname) if faddr is not None else ("", "", None)
-        refs.append({"kind": kind_, "site": fmt_addr(site),
-                     "caller": {"address": fmt_addr(faddr), "name": fname, "owner": owner,
-                                "owner_state": ostate} if faddr is not None else None,
-                     "instruction": text, "arg": arg or None})
+        row = {"kind": kind_, "site": fmt_addr(site),
+               "caller": {"address": fmt_addr(faddr), "name": fname, "owner": owner,
+                          "owner_state": ostate} if faddr is not None else None,
+               "instruction": current_text(text, index, cmap, addr, name if map_hit else None),
+               "arg": current_text(arg, index, cmap) or None}
+        if row["instruction"] != text:
+            row["dump_instruction"] = text
+        refs.append(row)
     rep["references"] = refs
     counts = collections.Counter(r["kind"] for r in refs)
     for k in KINDS:

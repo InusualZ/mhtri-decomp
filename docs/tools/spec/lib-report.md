@@ -26,6 +26,10 @@ older than the sources it describes.
   added/removed, regression flags; `MEASURE_ORDER`, `REGRESSION_KEYS`, `DEFAULT_EPS`); `compare(before, after, eps,
   before_path, after_path)` - the whole two-report diff with the "every moved row that fell" verdict as `exit`
   (0 clean, 1 a drop, 2 nothing comparable) - `reportdiff`'s payload.
+* Address pairing: `address_rows(report, unit=None) -> [{unit, name, address, size, score}]` (the address is the
+  row's `metadata.virtual_address`), `address_key(row)`, `diff_by_address(before_rows, after_rows, eps) -> {up, down,
+  new, removed, renamed, paired}` - a row renamed or moved to another unit pairs by its address (`unitscore
+  --baseline`).
 * The gate's rule: `snapshot(report) -> {unit: {fuzzy, matched_code, symbols: {name: score}, all: True}}`, `unit_grew(prior,
   after)`, `regression(before, after, allow=(), eps) -> (unauthorised, authorised)` as `(unit, what, before, after)`.
 * Scoring: `score(target, base, unit_name, tmpdir, *, objdiff, cwd, runner) -> Report` (raises `ReportError`),

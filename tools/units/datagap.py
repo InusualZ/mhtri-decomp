@@ -192,11 +192,45 @@ def selftest() -> int:
     finally:
         dataseams.seam_note = real
 
+    # --row's base: a live snapshot of the judged tree itself must not supply the "base" objects (network_opening,
+    # 2026-10-04: its own new object fingerprinted against itself read "compiled object unchanged")
+    fp = {"body": "new", "ext": {}}
+    fake = lambda root, units: {"unit_claims": {"A/a": {}}, "objects": {"A/a": dict(fp)}}  # noqa: E731
+    snap, note = row_snapshot("/t", "/t", ["A/a.cpp"], snapshot=fake)
+    eq((snap["objects"], note is not None), ({}, True), "--row on one tree: no base objects, and a note says why")
+    eq(dataclosure.touch_verdicts(["A/a"], snap, {"A/a": {}}, {"A/a": fp})["A/a"],
+       {"touched": True, "reasons": ["object changed (no base object to compare)"]},
+       "... so the unit is judged touched, never 'compiled object unchanged' by construction")
+    snap, note = row_snapshot("/t", "/base", ["A/a.cpp"], snapshot=fake)
+    eq((snap["objects"], note), ({"A/a": fp}, None), "--row with a separate --base-root keeps that tree's objects")
+    eq(dataclosure.touch_verdicts(["A/a"], snap, {"A/a": {}}, {"A/a": fp})["A/a"]["touched"], False,
+       "... and an equal fingerprint there is 'not touched'")
+
     # the data closure (the census, the strict/span/fold verdicts, the gate rows) lives in dataclosure.py
     dataclosure.selftest(eq)
 
     print(f"datagap selftest: {checks} checks OK")
     return 0
+
+
+def row_snapshot(root: str, base_root: str, units: list[str], snapshot_file: str | None = None,
+                 snapshot=None) -> tuple[dict, str | None]:
+    """`(base snapshot, note)` for `--row`: the recorded file, or `base_root`'s live snapshot.
+
+    A live snapshot of the tree being judged (`base_root` is `root`) cannot hold the base's compiled objects - it
+    would fingerprint the batch's own object against itself and call every unit "compiled object unchanged" - so
+    its `objects` is emptied and the note says why: a unit with an object is then judged touched ("no base object
+    to compare"), never untouched by construction."""
+    if snapshot_file:
+        with open(snapshot_file, encoding="utf-8") as fh:
+            return json.load(fh), None
+    snap = (snapshot or snapshot_orphans)(base_root, [os.path.splitext(u.strip())[0] for u in units if u.strip()])
+    if os.path.abspath(base_root) != os.path.abspath(root):
+        return snap, None
+    snap["objects"] = {}
+    return snap, ("base objects: none to compare - the base tree is the tree being judged, so its compiled objects "
+                  "are the batch's own; pass --base-root <a tree built at the base> or --base-snapshot FILE "
+                  "(`--write-snapshot` there) to judge 'object changed'")
 
 
 def main(argv=None) -> int:
@@ -248,11 +282,9 @@ def main(argv=None) -> int:
         return 0
     if args.row:
         base_root = args.base_root or args.root
-        if args.base_snapshot:
-            with open(args.base_snapshot, encoding="utf-8") as fh:
-                snap = json.load(fh)
-        else:
-            snap = snapshot_orphans(base_root, [os.path.splitext(u.strip())[0] for u in args.row.split(",") if u.strip()])
+        snap, note = row_snapshot(args.root, base_root, args.row.split(","), args.base_snapshot)
+        if note:
+            print(note)
         if args.base_ref:
             snap["claims"] = claims_at_ref(args.root, args.base_ref)
             snap["unit_claims"] = unit_claim_table(splits_at_ref(args.root, args.base_ref))

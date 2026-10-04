@@ -78,10 +78,12 @@ def _file_scope_declarations(src: Source) -> list[tuple[str, str, int]]:
     an `extern`, and it is *transparent*: its contents are file scope, which is where declarations live.
     A file-scope statement ending in `;` that introduces a name is returned; a type forward declaration
     (`struct Foo;`) introduces no symbol from the map and is skipped; a function body's `{` is a real
-    scope, so a definition is never returned.
+    scope, so a definition is never returned.  Preprocessor lines are blanked first (`lib.cscan.mask_preproc`): a
+    header's guard or `#include` would otherwise open the first statement's segment, so a forward declaration right
+    after it (`#include "types.h"` / `struct Foo;`) no longer read as type-only and named `Foo` as a declaration.
     """
     out: list[tuple[str, str, int]] = []
-    code = src.code
+    code = cscan.mask_preproc(src.code)
     depth = 0
     transparent: list[bool] = []
     stmt_start = 0

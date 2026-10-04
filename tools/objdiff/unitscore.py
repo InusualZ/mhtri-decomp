@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Every symbol of one unit from one report read, refusing a stale report. Spec: docs/tools/spec/unitscore.md.
-CLI: python tools/objdiff/unitscore.py <unit> [--measure] [--refresh] [--threshold P] [--report R] [--json] [--force-stale] | --selftest."""
+CLI: python tools/objdiff/unitscore.py <unit> [--measure] [--refresh] [--threshold P] [--report R] [--baseline B] [--json] [--force-stale]
+| --baseline B [--report R] [--json] | --selftest."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
@@ -215,6 +216,56 @@ def score_by_measure(spec: Spec, tmpdir: str | None = None) -> tuple[dict | None
 
 
 # --------------------------------------------------------------------------------------------------
+# --baseline: every row against a claim-time report, paired by address
+# --------------------------------------------------------------------------------------------------
+
+def load_baseline(path: str) -> tuple[_report.Report | None, str | None]:
+    """The baseline report, or `(None, why)`."""
+    try:
+        return _report.Report.load(path), None
+    except _report.ReportError as exc:
+        return None, "cannot read the baseline: %s" % exc
+
+
+def baseline_diff(baseline: "_report.Report | dict", current: "_report.Report | dict",
+                  unit_name: str | None = None) -> dict:
+    """`lib.report.diff_by_address` of the baseline against the current rows - of one unit, or of every unit.
+
+    For one unit the current side is that unit's rows and the baseline side is every baseline row at one of
+    their addresses (a row that moved in from a neighbour pairs with its old unit's row) plus the baseline
+    rows the unit itself held (the ones it lost are `removed`)."""
+    after = _report.address_rows(current, unit_name)
+    before = _report.address_rows(baseline)
+    if unit_name is not None:
+        keys = {_report.address_key(r) for r in after}
+        before = [r for r in before if _report.address_key(r) in keys or r["unit"] == unit_name]
+    out = _report.diff_by_address(before, after)
+    out["scope"] = unit_name or "all units"
+    out["rows_before"], out["rows_after"] = len(before), len(after)
+    return out
+
+
+def render_baseline(diff: dict, baseline: str, current: str) -> None:
+    """The `--baseline` block: one count line, then every down, up, new and removed row."""
+    print("baseline   %s -> %s, %s, paired by address: %d paired, %d up, %d down, %d new, %d removed, "
+          "%d renamed" % (baseline, current, diff["scope"], diff["paired"], len(diff["up"]), len(diff["down"]),
+                          len(diff["new"]), len(diff["removed"]), len(diff["renamed"])))
+
+    def addr(r):
+        return "0x%08X" % r["address"] if r.get("address") is not None else "-"
+
+    for tag in ("down", "up"):
+        for r in diff[tag]:
+            same = (r["before_unit"], r["before_name"]) == (r["unit"], r["name"])
+            was = "" if same else "   (was %s %s)" % (r["before_unit"], r["before_name"])
+            print("  %-7s %-10s %-34s %-44s %9.4f -> %9.4f%s"
+                  % (tag.upper(), addr(r), r["unit"], r["name"], r["before"], r["after"], was))
+    for tag in ("new", "removed"):
+        for r in diff[tag]:
+            print("  %-7s %-10s %-34s %-44s %9.4f" % (tag.upper(), addr(r), r["unit"], r["name"], r["score"]))
+
+
+# --------------------------------------------------------------------------------------------------
 # the run
 # --------------------------------------------------------------------------------------------------
 
@@ -268,7 +319,8 @@ def refresh(spec: Spec, measure: bool = False, runner=None) -> dict:
 
 
 def run(spec: Spec, *, report: str | None = None, threshold: float | None = None, force: bool = False,
-        measure: bool = False, tmpdir: str | None = None, refresh_build: bool = False, runner=None) -> dict:
+        measure: bool = False, tmpdir: str | None = None, refresh_build: bool = False, runner=None,
+        baseline: str | None = None) -> dict:
     """Score the unit and build the record. `refused` is the freshness guard's verdict, not an error.
     `refresh_build` first rebuilds what the score reads (`refresh`); a failed build is the record's error."""
     report_path = os.path.abspath(report) if report else spec.report
@@ -337,6 +389,14 @@ def run(spec: Spec, *, report: str | None = None, threshold: float | None = None
     if record["refused"]:
         record["rows"] = None
         record["shown"] = 0
+    elif baseline is not None:
+        base, why = load_baseline(baseline)
+        if base is None:
+            record["error"] = why
+        else:
+            named = dict(entry, name=spec.unit_name)
+            record["baseline"] = dict(baseline_diff(base, {"units": [named]}, spec.unit_name),
+                                      path=os.path.abspath(baseline))
     return record
 
 
@@ -392,6 +452,9 @@ def render(record: dict) -> None:
         addr = "0x%08X" % r["address"] if r["address"] is not None else "-"
         print("%-50s %8d %11.5f  %-10s%s" % (r["name"], r["size"], r["match_percent"], addr, flag))
     print(record["summary"])
+    if record.get("baseline"):
+        mode = "objects on disk" if record["mode"] == "measure" else rel(record["report"]["path"])
+        render_baseline(record["baseline"], rel(record["baseline"]["path"]), mode)
 
 
 def cli(argv: list[str] | None = None) -> int:
@@ -413,14 +476,19 @@ def cli(argv: list[str] | None = None) -> int:
     ap.add_argument("--force-stale", action="store_true",
                     help="print the numbers even when the report (or object) is older than the unit's "
                          "sources - the STALE verdict stays in the output")
+    ap.add_argument("--baseline", metavar="REPORT",
+                    help="compare every row with this (claim-time) report, paired by address: up/down/new/"
+                         "removed rows, exit 1 on a down row; with no unit, every unit of --report")
     ap.add_argument("--selftest", action="store_true", help="run the selftest and exit")
     args = ap.parse_args(argv)
 
     if args.selftest:
         from tools.objdiff import unitscore_selftest
         return unitscore_selftest.selftest()
+    if not args.unit and args.baseline:
+        return cli_baseline_all(args.baseline, args.report, args.json)
     if not args.unit:
-        ap.error("a unit is required (or --selftest)")
+        ap.error("a unit is required (or --baseline, or --selftest)")
     if args.refresh and args.report and not args.measure:
         ap.error("--refresh rebuilds the tree's own build/RMHE08/report.json; it cannot rebuild --report")
 
@@ -430,14 +498,42 @@ def cli(argv: list[str] | None = None) -> int:
         print(str(exc), file=sys.stderr)
         return 2
     record = run(spec, report=args.report, threshold=args.threshold, force=args.force_stale,
-                 measure=args.measure, refresh_build=args.refresh)
+                 measure=args.measure, refresh_build=args.refresh, baseline=args.baseline)
     if args.json:
         print(json.dumps(record, indent=2))
     else:
         render(record)
     if record["error"]:
         return 2
-    return 1 if record["refused"] else 0
+    if record["refused"]:
+        return 1
+    return 1 if (record.get("baseline") or {}).get("down") else 0
+
+
+def cli_baseline_all(baseline: str, report: str | None, as_json: bool) -> int:
+    """`--baseline B` with no unit: every unit of the current report against B (the lanes' `cmp.py`).
+
+    No freshness guard here - no unit names the sources to check - so the current report's path and mtime are
+    printed with the numbers. Exit 1 on a down row, 2 when either report cannot be read."""
+    tree = _repo.repo_root()
+    current_path = os.path.abspath(report) if report else os.path.join(tree, REPORT_REL)
+    base, why = load_baseline(baseline)
+    if base is None:
+        print("unitscore: " + why, file=sys.stderr)
+        return 2
+    try:
+        current = _report.Report.load(current_path)
+    except _report.ReportError as exc:
+        print("unitscore: cannot read the current report: %s" % exc, file=sys.stderr)
+        return 2
+    diff = dict(baseline_diff(base, current), path=os.path.abspath(baseline), current=current_path,
+                current_mtime_iso=stamp(mtime(current_path)))
+    if as_json:
+        print(json.dumps(diff, indent=2))
+    else:
+        print("report     %s  %s" % (_rel(current_path, tree), diff["current_mtime_iso"]))
+        render_baseline(diff, _rel(diff["path"], tree), _rel(current_path, tree))
+    return 1 if diff["down"] else 0
 
 
 def main() -> int:

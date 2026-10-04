@@ -41,7 +41,9 @@ the dump regexes, `DumpStamp`, `has_dump`).
   `load_dump_index(root, rebuild, asm_dir, cache, honour_env, game)`, `load_object_index(root, rebuild, cmap, cache,
   honour_env, game, obj_dir)`; `RefMap` (the map as an address index, `RefMap.load(root)`; `name_at`, `function_at`,
   `owner`, `owner_at` in `lib.project.ownership.owner_label`'s vocabulary); `plain_name`, `fmt_addr`, `find_target`,
-  `caller_of`, `query(text, index, cmap, kinds, limit, pointers) -> report`, `norm_reader(label)`, `reader_units(report)`,
+  `caller_of`, `current_text(text, index, cmap, target, name)` (a dump text's symbol operands respelled by the live
+  map at their addresses; `query` applies it to every row, keeping `dump_instruction`),
+  `query(text, index, cmap, kinds, limit, pointers) -> report`, `norm_reader(label)`, `reader_units(report)`,
   `readers_of(index, cmap)`, `range_report(index, cmap, lo, hi, step)`; `RefIndex.load(root, rebuild, honour_env=None)` ->
   `index`, `info`, `cmap`, `source` (`asm` / `elf`), `asm_dir` with `query`, `readers_of`, `runs`.
 * The text scan: `text_refs(chunks, sda13, sda2, is_data, fn_starts, same_function) -> TextRefs(refs, loads, stores, passes,

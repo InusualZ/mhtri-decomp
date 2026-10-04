@@ -61,6 +61,14 @@ None: modules. The CLI is `stylelint.py`'s (`cli.main`), spec `stylelint.md`.
 * **Rule 13's mangling estimate is `lib.names`.** It was `import mangle`, which resolved only while `tools/units/` was on
   `sys.path` (a script in that directory); a caller from anywhere else (a `tools/tests/` module, `python -m`) silently got
   no estimate and a different detail text. Every script's output is unchanged.
+* **A forward declaration is never a declaration, and a leaf header may carry one (2026-10-04).** Rule 2's
+  file-scope walk (`r02_extern._file_scope_declarations`) skips a type-only statement (`struct Foo;`, `class Foo;`,
+  `typedef struct Foo Foo;`) - it names a type, not a map symbol - and that was always the intent. It blanks
+  preprocessor lines first (`lib.cscan.mask_preproc`): before, a header's guard or `#include` opened the first
+  statement's segment, so a forward declaration right after it did not match the type-only pattern and read as a
+  declaration of `Foo`, an unowned name, which made `leaf_header_owner` reject the header and reported every symbol
+  in it as foreign. The leaf rule itself is unchanged: a symbol of a second unit, or an unowned one, still makes the
+  header foreign.
 * **The selftest flag is the entry point's.** `stylelint.py` registers the selftest with `lib.cli.Tool(tests=...)`, the
   shape `tools/selftest.py` discovers; `cli.py` spells `--selftest` through a constant so the runner does not mistake a
   package module for a second entry point (`tools/units/merge/*.py` show that failure mode: each is listed as a tool).
@@ -74,7 +82,7 @@ One tool edge: `diff -> tools/units/dataclosure.py` (the fold map `derive_file_a
 ## Test contract
 
 `python tools/units/stylelint.py --selftest` (the runner's entry `tools/units/stylelint`): 445 checks, unchanged by the
-split; 451 with the move+rename rows (two of them fail on the old `removed` keying). Re-homing it to `tools/tests/units/test_stylelint.py` (fixture tier; the one live read is
+split; 451 with the move+rename rows (two of them fail on the old `removed` keying); 454 with the leaf forward-declaration rows (two fail without the preprocessor mask). Re-homing it to `tools/tests/units/test_stylelint.py` (fixture tier; the one live read is
 `load_ownership(".")`, which the runner's temp cwd turns into "no map") is WP6's.
 
 ## Measured (WP3d)
@@ -96,6 +104,16 @@ On main at `dadbdf8e9`, old vs new `lib.findings.removed`: `--budget --json`, `-
 `0375f98c4~1` and `ee7d53b06~1` (text with `--list-added`, and JSON) identical bytes. `--diff 3f7532ded~1` (a batch with
 renames) credits 13 more moves (4 147 -> 4 160; additions 1 123 -> 1 110), each a re-homed owner path or a renamed token
 moving out of a folded file. `--ref worker/net2-l3-2c54` (105fe4cc6): +1 rule 12 -> clean, one move credited.
+
+## Measured (forward declarations in a leaf header, 2026-10-04)
+
+On main at `5347af8fa`, `--budget --json` before vs after the preprocessor mask: rule 2 3 921 -> 3 863 (-58), total
+49 981 -> 49 923, every other rule identical. The 58 are the whole rule-2 count of four leaf headers that each
+forward-declare a type after their guard - `include/ef/fn_800FE978.h` (1, `struct _EFT;`),
+`include/enemy/fn_8012BA00.h` (1), `include/enemy/fn_8015D860.h` (8) and `include/enemy/fn_801B4458.h` (48,
+`struct Vec;`); each declares only symbols its folded owner defines, so each now reads as that owner's leaf header.
+`rule2_gaps['not in symbols.txt']` 599 -> 588 and `unique.extern_symbols` 2 859 -> 2 802 are the same forward-declared
+type names no longer counted as declarations. The selftest pins the shape (two checks fail without the mask).
 
 ## Known gaps
 
