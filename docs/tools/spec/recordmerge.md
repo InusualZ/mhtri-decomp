@@ -37,14 +37,14 @@ Inputs -> outputs: two headers -> merged header.
 
 ## Lib dependencies
 
-cscan, text.
+text (the one transaction writer and the endings rule), git (a `<rev>:<path>` side, read in the invocation's tree).
 
 ## Test contract
 
 Tier: fixture.
-Today's selftest (`tools/units/recordmerge_selftest.py`): The fixtures are deliberately small and hand-checked: each one exercises a rule the tool implements (splice into the filler, key members per struct, compare the declaration) or a reason it must refuse (a named member in the way, no room, a same-offset rename, a size it cannot infer). The real-world acceptance case - reproducing the `_AINPC_W` merge that was done by hand - is not here, because it depends on the repo's own history; it was run against `089491a7b` and is recorded in the commit that added this tool.
-Target: `tools/tests/units/test_recordmerge.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
+The test (`tools/tests/units/test_recordmerge.py`, fixture tier; `recordmerge.py --selftest` runs it): The fixtures are deliberately small and hand-checked: each one exercises a rule the tool implements (splice into the filler, key members per struct, compare the declaration) or a reason it must refuse (a named member in the way, no room, a same-offset rename, a size it cannot infer). The real-world acceptance case - reproducing the `_AINPC_W` merge that was done by hand - is not here, because it depends on the repo's own history; it was run against `089491a7b` and is recorded in the commit that added this tool.
 
 ## Known gaps
 
-None recorded.
+`parse` is a line-oriented member reader (`/* +0xNN */ decl;` per line) and stays here: `lib.cscan.type_definitions` reads
+declarators, not offset annotations, and does not keep the line layout a merge rewrites.

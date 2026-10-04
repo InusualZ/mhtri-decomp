@@ -45,7 +45,11 @@ Inputs -> outputs: splits, map, DOL, objects, src -> rows.
 
 ## Lib dependencies
 
-binary, project, cscan, findings, names.
+binary (elf, dol), project, cscan (`type_definitions`/`members`/`CLASS_OPEN_RE` for the fn-table index, `strip_comments`
+for every source scan, `INCLUDE_RE` for the class order), git, repo (the default `--main` is the invocation's tree).
+Measured (WP3d): `--json` identical on the live tree; over the 931 `src/`+`include/` files the old regex blanker and
+`lib.cscan.strip_comments` differ on 2 files and the type index (1 596 types), the fn-table fields (3), the assignment
+scan (34 hits) and the class order of all 354 units are identical.
 
 ## Test contract
 

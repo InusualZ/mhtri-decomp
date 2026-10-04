@@ -261,6 +261,10 @@ becomes it (`duplication.md` has the line numbers).
   because their callers ask different questions; `include_closure` takes a `resolve(name, includer)` callable rather
   than roots, since declclash and stylelint search different bases. `statements`, `type_definitions`, `pragmas` and
   `calls` wait for 3b/3d (the spec's Known gaps).
+  As built (WP3d): `type_definitions(text)` is vtableaudit's index (`(name, [Member(decl, name, fn_ptr)])`, no offsets:
+  the size and offset comments are the lint's rules 3-4, read per rule); `calls(code, name)` and `split_params` serve
+  methodize and the lint; `include_closure` is also `lib.report.source_closure` (depth first - the one closure order).
+  `statements`, `pragmas` and `recordmerge.parse` stay out (the spec's Known gaps).
 * From: `stylelint` (`strip`, `match_brace`, `struct_defs`, `iter_fields`, `function_declarations`, `_resolve_include`),
   `typeregistry` (`strip_comments`, `extract_decls`, `_match_brace`), `vtableaudit.type_definitions/_members`, `declclash.closure/shape`,
   `recordmerge.parse`, `methodize._call_sites`, `shapes.strip_comments/match_brace/split_statements`, `freshguard.source_closure`.
@@ -328,7 +332,7 @@ The CLI names, subcommands and flags the profiles/skills/docs use stay (section 
 | tool | verdict | lib it stands on | keeps / notes |
 | --- | --- | --- | --- |
 | `units/land.py` | SPLIT | findings, git, project, report, units, objcompare, outbox, lanes | a ~400-line CLI over `tools/units/landing/` (section 5) |
-| `units/stylelint.py` | SPLIT | cscan, project.Ownership, findings, git | `landing`-independent; rules as `tools/units/stylelint_rules/r01..r13.py` |
+| `units/stylelint.py` | SPLIT | cscan, project.Ownership, findings, git | `landing`-independent; rules as `tools/units/stylelint_rules/r01..r13.py`. As built (WP3d): `stylelint.py` star-imports `stylelint_rules/api.py` (every old name, one layering edge) and registers the selftest with `lib.cli.Tool`; `spec/stylelint_rules.md` |
 | `units/vtableaudit.py` | KEEP (thin) | binary, project, cscan, findings | the run rule and the `+0x00` store scan |
 | `units/undefrefs.py` | MERGE (absorbs `relocaudit`) | objcompare.undefined, cache, findings | `--census` is relocaudit's sweep |
 | `units/datagap.py` | SPLIT | objcompare, refs.census, project, report, findings | CLI `datagap` (section gap) + `dataclosure` module for the strict/span/fold/snapshot rows the gate uses |
@@ -393,6 +397,12 @@ The CLI names, subcommands and flags the profiles/skills/docs use stay (section 
 `r13_method.py` (each `findings(source, ctx) -> [Finding]` with its exemption marker logic), `context.py` (sources, ownership,
 rule-13 include context), `diff.py` (`--diff REF`: added/removed identities, rename credits, move credits, deleted files), `refs.py`
 (at-ref loading via `lib.git`), `report.py` (budget, rule-2 report). Lexing is `lib.cscan`; ownership is `lib.project.Ownership`.
+As built (WP3d): the rule modules sit at the package's top level (`stylelint_rules/r01_shared_type.py` ...), plus
+`common.py` (paths, `Source`, the finding shape, the one field walk), `lint.py` (`lint_source` and the header walks),
+`cli.py`, `selftest.py` and `api.py` (the facade); rule 13's include context lives in `r13_method.py`. A rule returns
+the finding dicts it always did (`lib.findings.Finding.to_dict()` plus rule-specific keys `--diff`/`methodize` read), so
+`Finding` objects wait for the batch that moves those readers. `diff.judge` is the one judgement `--diff` and `--ref`
+share, and `refs.texts_at_ref` reads a ref's tree in one `git cat-file --batch` (`--diff` 66-87 s -> 10-45 s).
 
 **`units/slots.py` (3 384) -> `lib/lanes/registry.py` + `tools/units/slots.py`**: pool manifest, locks, markers, live runs and
 `slot_state` move to the lib (they are read by `claims`, `queue`, `worktreehook`, `selftest`); `seed.py` (the build seeding that

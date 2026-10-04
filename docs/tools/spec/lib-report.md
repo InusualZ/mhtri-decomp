@@ -100,8 +100,10 @@ reasons). The integration rows (the real objects) stay in `tools/objdiff/metric_
   behaviour change; WP4 decides.
 * `unit_grew`'s matched-bytes signal compares numbers, but the report stores `matched_code` as a string, so in practice only
   the symbol-set signal fires. Kept as found (a gate behaviour change); WP4 decides.
-* `source_closure` is C text scanning, but `lib.cscan.include_closure` is not a drop-in: it walks depth first (this is
-  breadth first, and `unitscore --json` prints `sources.paths` in this order) and reads includes from uncommented text
-  only through a caller's `read`. Moving it changes an output; left for the pass that owns `cscan`'s closure (3d).
+* `source_closure` delegates to `lib.cscan.include_closure` since WP3d (depth first, the preprocessor's order; comments
+  removed through `cscan.remove_comments` before `cscan.includes`; no depth cap - each file is visited once). The one
+  output that moved is the order of `unitscore --json`'s `sources.paths`: on the 354 registered units the set is the
+  same for all, the order differs for 210 (`lib-cscan.md`); `INCLUDE_RE`/`MAX_INCLUDE_DEPTH` are gone (`freshguard`
+  re-exported them; nothing read them).
 * `ledger.stale` (report vs `splits.txt`/`configure.py`) and `pairgap.report_scores`/`datagap.units_from_report` (WP3a) are
   still private readers.

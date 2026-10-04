@@ -1,29 +1,7 @@
 #!/usr/bin/env python3
 """Derive the mangled name MWCC emits for a C++ declaration, so the map can be renamed to it.
-
-A C++ unit's symbols are mangled. Our symbol map spells them the way dtk does when it cannot demangle
-(`fn_800CCCF8`), and the original object's name is the mangled one - so a C++ definition whose name does
-not match the map's spelling is invisible to objdiff, and the tempting workaround is `extern "C"`.
-
-**It is not needed.** The map is a build input, not a description of the original's symbol table: rename
-the map symbol to the mangled name our source emits and objdiff pairs it by name, the relocations match,
-and the front-end stays the one the unit really had (docs/plan.md, "The language comes from the symbol").
-This tool produces that spelling. It is the other half of a rename, so it prints the `symedit.py` command
-too.
-
-    python tools/units/mangle.py 'void Pl_Skill_ck(_PLW* self, u8 x)'
-    python tools/units/mangle.py --unit Pl/pl_act.cpp 'void Pl_Skill_ck(_PLW*, u8)'
-    python tools/units/mangle.py --file decls.cpp --json
-    python tools/units/mangle.py --selftest
-
-The snippet is a **declaration**; a body is appended when it has none (`{ }`), because only a *defined*
-symbol appears in the object's function table. A full definition may be passed instead - it is used
-verbatim. Whatever the declaration needs (a struct, a typedef, an include) has to be in the snippet: the
-tool compiles it as its own translation unit with the flags of `--unit`.
-
-Only the compiler's **front-end** decides the mangled spelling, so the `--unit` flags matter only in that
-they select the compiler version and `-lang=c++`; they are not a claim about the unit being renamed.
-"""
+Spec: docs/tools/spec/mangle.md. CLI: mangle.py SNIPPET | --file F [--unit U] [--old NAME] [--no-include]
+[--json] [--verbose] | --selftest."""
 
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
@@ -31,16 +9,11 @@ import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file_
 import argparse
 import json
 import os
-import re
-import subprocess
 import sys
 import tempfile
 from tools.lib import names as libnames
-
-HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.dirname(HERE))
-
-import unitutil  # noqa: E402
+from tools.lib import repo as _repo
+from tools.lib import units as _units
 
 # Any registered C++ unit will do: its command line carries the compiler version and `-lang=c++`, which is
 # all the mangler reads. Kept small and stable rather than "whatever is first".
@@ -79,17 +52,18 @@ def mangle(snippet: str, unit_spec: str | None = None, verbose: bool = False,
     Raises `SystemExit` when the unit's command line cannot be resolved - the same failure `recompile.py`
     raises, and for the same reason: a hand-written command line would drift from what ninja runs.
     """
-    unit = unitutil.resolve_unit(unit_spec or DEFAULT_UNIT)
-    tokens = unitutil.compile_command(unit)
+    root = _repo.repo_root()
+    unit = _units.Unit.resolve(unit_spec or DEFAULT_UNIT, root)
+    tokens = _units.ninja_command(root, unit.spelling)
     with tempfile.TemporaryDirectory() as scratch:
         src = os.path.join(scratch, "mangle_probe.cpp")
         with open(src, "w", encoding="utf-8", newline="\n") as fh:
             fh.write(stub_source(snippet, preamble))
-        rc, out, obj = unitutil.run_compile(tokens, scratch_dir=scratch, src=src, verbose=verbose)
+        rc, out, obj = _units.run_tokens(tokens, root, scratch_dir=scratch, src=src, verbose=verbose)
         if rc != 0 or not os.path.exists(obj):
             raise SystemExit("the snippet did not compile with %s's command line:\n%s"
-                             % (unit.name, unitutil.quiet(out)))
-        return unitutil.function_names(obj), out
+                             % (unit.report_name, _units.quiet(out)))
+        return _units.function_names(obj), out
 
 
 # --------------------------------------------------------------------------------------------------
@@ -119,7 +93,7 @@ def _print(names: list[str], out: str, old: str | None, as_json: bool) -> int:
         return 0
     if not names:
         print("no function symbol was defined - is the snippet a declaration the compiler accepted?")
-        print(unitutil.quiet(out))
+        print(_units.quiet(out))
         return 1
     for n in names:
         print(n)

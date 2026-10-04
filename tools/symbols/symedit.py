@@ -1,42 +1,7 @@
 #!/usr/bin/env python3
 """Query and surgically edit a dtk symbol map without loading it into context.
-
-`config/RMHE08/symbols.txt` is ~65 700 lines / 4.5 MB and the per-module RSO maps add 4 462 more
-lines.  Never paste those files into a prompt or read them whole - go through this script, which
-prints only the lines you asked for and changes only the name token you asked it to change.
-
-Usage (default file: config/RMHE08/symbols.txt, override with --file):
-
-    symedit.py find   <regex> [--limit N] [--section .text] [--type function]
-    symedit.py show   <name> [<name> ...]
-    symedit.py at     <address> [--count N]          # symbols around an address, in order
-    symedit.py range  <start> <end> [--section S]    # members of a split range
-    symedit.py refs   <name> [--roots src include docs] [--code-only]
-    symedit.py check                                 # duplicate names / addresses, bad lines
-    symedit.py rename <old> <new> [--dry-run] [--force] [--no-refs]
-    symedit.py rename-batch <file> [--dry-run]       # lines: "old new" (# comments allowed)
-    symedit.py merge-batch <file> [--dry-run] [--no-refs]   # lines: "merge <phantom> <previous> <size>"
-    symedit.py --selftest                            # the checks, against temp fixtures only
-
-`rename` writes through `tools/units/sharedfiles.py` (docs/plan.md 7.12): the edit is a temp file +
-`os.replace` transaction that restores the previous bytes exactly if it fails, and the map's own line
-ending is preserved.  Before a byte is written it asserts the shape a rename depends on - the old name
-is defined exactly once, on a line that parses as a map line, and the rewrite yields a line that parses
-back as the new name.  Re-applying a rename that is already in the file is a no-op.  It refuses when
-the new name is already taken (unless `--force`), when `--force` would still leave one name at two
-addresses, and when the new name is not a valid symbol name; it warns about in-repo references to the
-old name (a rename is always two edits: this file *and* the source - see CLAUDE.md -> Conventions ->
-"Commenting and naming").
-
-`merge-batch` is the other half of `tools/symbols/phantom.py` (docs/plan.md 7.9): a phantom is an
-unnamed `fn_*` that is really the previous function's dead epilogue, so a merge grows the previous
-symbol's `size:` and deletes the phantom's line.  Per row it refuses - before any write - unless both
-symbols are defined exactly once, in the same section, the previous ends exactly at the phantom's
-address, no other name sits at that address, the stated size is exactly the two sizes added, the two
-scopes agree, and the phantom has no in-repo reference.  An already-merged row is a no-op.  When the
-plan's previous name is stale (a rename landed after `phantom.py` ran), the refusal names the symbol
-that actually ends at the phantom's address instead of guessing.
-"""
+Spec: docs/tools/spec/symedit.md. CLI: symedit.py find|show|at|range|refs|check|rename|rename-batch|rewrite-batch|merge-batch
+[--file F] [--json] [--limit N] [--roots R..] | --selftest."""
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import os
@@ -44,25 +9,23 @@ import re
 import sys
 from pathlib import Path
 
+from tools.lib import repo as _repo  # the invocation-tree resolver
+from tools.lib import text as _text  # the one atomic writer and the endings rule
+from tools.lib.project import symbols as _sym  # the one map parser and the rename/merge planner
+
 DEFAULT_FILE = "config/RMHE08/symbols.txt"
-_UNITS = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, "units")
-_UNITS = os.path.normpath(_UNITS)
-# `unitutil.py` (the invocation-tree resolver) lives one level up, beside `units/`
-_TOOLS = os.path.normpath(os.path.join(_UNITS, os.pardir))
-for _p in (_UNITS, _TOOLS):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
+_REPO: "str | None" = None
 
-import sharedfiles as sf  # noqa: E402  the one writer for shared files - docs/plan.md 7.12
-import unitutil as _uu  # noqa: E402  the invocation-tree resolver (`repo_root`)
-from tools.lib.project import symbols as _sym  # noqa: E402  the one map parser and the rename/merge planner
 
-# The tree a relative `--file` resolves against. `symedit` **writes** the map (rename/rename-batch), so a
-# MAIN-hardcoded root means a lane that invoked MAIN's copy from its own worktree renamed symbols *in MAIN*
-# - or, reading, refused to find a name the branch had just introduced. `unitutil.repo_root` is the
-# invocation-first resolver the other tools use (`git rev-parse --show-toplevel`, falling back to this
-# file's tree outside a worktree), so the map is the caller's tree's map.
-REPO = _uu.repo_root()
+def repo() -> str:
+    """The tree a relative `--file` and the reference scan resolve against: the invocation's tree
+    (`lib.repo.repo_root`), resolved on first use - never at import time."""
+    global _REPO
+    if _REPO is None:
+        _REPO = _repo.repo_root()
+    return _REPO
+
+
 LINE_RE = _sym.LINE_RE
 
 
@@ -135,7 +98,7 @@ def find_refs(names, roots, limit, exclude=None):
     pats = {n: re.compile(r"\b%s\b" % re.escape(n)) for n in names}
     hits = {n: [] for n in names}
     for root in roots:
-        base_root = os.path.join(REPO, root)
+        base_root = os.path.join(repo(), root)
         if not os.path.isdir(base_root):
             continue
         for base, dirs, files in os.walk(base_root):
@@ -151,7 +114,7 @@ def find_refs(names, roots, limit, exclude=None):
                         for i, line in enumerate(fh, 1):
                             for name, pat in pats.items():
                                 if len(hits[name]) < limit and pat.search(line):
-                                    hits[name].append((os.path.relpath(p, REPO), i,
+                                    hits[name].append((os.path.relpath(p, repo()), i,
                                                        line.strip()[:160]))
                 except OSError:
                     continue
@@ -262,7 +225,7 @@ def _lib_call(fn, *args, **kwargs):
 
 
 def _rewrite_line(line, old, new):
-    """The name token of one definition line, replaced - or `sf.AnchorError` if it is not that shape."""
+    """The name token of one definition line, replaced - or `_text.AnchorError` if it is not that shape."""
     return _lib_call(_sym.rewrite_name, line, old, new)
 
 
@@ -286,7 +249,7 @@ def apply_rename(path, nl, lines, changed):
 
 
 def _resize_line(line, name, new_size):
-    """The `size:` field of one definition line, set to `new_size` - or `sf.AnchorError`."""
+    """The `size:` field of one definition line, set to `new_size` - or `_text.AnchorError`."""
     return _lib_call(_sym.resize, line, name, new_size)
 
 
@@ -413,7 +376,7 @@ def rename(a, pairs):
     print("%s %d symbol(s) in %s" % ("dry-run:" if a.dry_run else "wrote", len(changed), a.file))
     if getattr(a, "rewrite", False):
         # the other half: every pair, applied or already in the map (a re-run finishes a half-done sweep)
-        print_rewrite(rewrite_tree(REPO, dict(pairs), getattr(a, "comments", False), a.dry_run), a.dry_run)
+        print_rewrite(rewrite_tree(repo(), dict(pairs), getattr(a, "comments", False), a.dry_run), a.dry_run)
         return 0
     if not a.no_refs:
         for old, _new in pairs:
@@ -515,7 +478,7 @@ def main():
         ap.print_help()
         sys.exit(0)
     if not os.path.isabs(a.file):
-        a.file = os.path.join(REPO, a.file)
+        a.file = os.path.join(repo(), a.file)
     sys.exit(a.func(a) or 0)
 
 
@@ -543,7 +506,7 @@ def cmd_batch(a):
 
 
 def cmd_rewrite_batch(a):
-    print_rewrite(rewrite_tree(REPO, dict(read_pairs(a.mapfile)), a.comments, a.dry_run), a.dry_run)
+    print_rewrite(rewrite_tree(repo(), dict(read_pairs(a.mapfile)), a.comments, a.dry_run), a.dry_run)
     return 0
 
 
@@ -583,7 +546,7 @@ def selftest() -> int:
                        for n, loc, c in rows) + nl
 
     def temps(root):
-        return sorted(str(p) for p in Path(root).rglob("*" + sf.TMP_SUFFIX))
+        return sorted(str(p) for p in Path(root).rglob("*" + _text.TMP_SUFFIX))
 
     def changed_lines(before, after, nl):
         b, a = before.split(nl), after.split(nl)
@@ -604,9 +567,9 @@ def selftest() -> int:
             check("plan %s: the line is rewritten" % label, changed[0][3],
                   "bar = .text:0x80040600; // type:function size:0x4")
             apply_rename(p, nl2, lines, changed)
-            after = sf.read_text(p)
+            after = _text.read_text(p)
             check("apply %s: exactly one line changed" % label, changed_lines(text, after, nl), 1)
-            check("apply %s: the ending survives" % label, sf.line_ending(after), nl)
+            check("apply %s: the ending survives" % label, _text.line_ending(after), nl)
             if nl == "\r\n":
                 check("apply CRLF: no bare LF appeared", after.replace("\r\n", "").count("\n"), 0)
                 check("apply CRLF: the ending count is unchanged", after.count("\r\n"), text.count("\r\n"))
@@ -645,9 +608,9 @@ def selftest() -> int:
 
     # --- the shape/anchor gate ------------------------------------------------------------------
     check("shape: a line without '=' is refused",
-          raises(lambda: _rewrite_line("foo .text:0x100;", "foo", "bar"), sf.AnchorError), True)
+          raises(lambda: _rewrite_line("foo .text:0x100;", "foo", "bar"), _text.AnchorError), True)
     check("shape: a line whose name is not the token is refused",
-          raises(lambda: _rewrite_line("foo = .text:0x100;", "bar", "baz"), sf.AnchorError), True)
+          raises(lambda: _rewrite_line("foo = .text:0x100;", "bar", "baz"), _text.AnchorError), True)
     check("shape: a map line rewrites", _rewrite_line("foo = .text:0x100; // c", "foo", "bar"),
           "bar = .text:0x100; // c")
 
@@ -727,7 +690,7 @@ def selftest() -> int:
         check("rename: returns 0", rc, 0)
         check("rename: prints the line it changed", "bar = .text:0x80040600;" in buf.getvalue(), True)
         check("rename: reports one symbol written", "wrote 1 symbol(s)" in buf.getvalue(), True)
-        check("rename: the new name is in the file", "bar = .text:0x80040600;" in sf.read_text(p), True)
+        check("rename: the new name is in the file", "bar = .text:0x80040600;" in _text.read_text(p), True)
 
     # --- phantom merges: the happy path (grow + delete), both line endings ------------------------
     mrows = [("prev", ".text:0x80041000", "type:function size:0x20"),
@@ -747,13 +710,13 @@ def selftest() -> int:
             check("merge %s: the deleted line is the phantom" % label, lines[deleted[0]],
                   "fn_80041020 = .text:0x80041020; // type:function size:0x4")
             apply_merge(p, nl2, lines, grown, deleted)
-            after = sf.read_text(p)
+            after = _text.read_text(p)
             want = [("prev = .text:0x80041000; // type:function size:0x24"
                      if x == "prev = .text:0x80041000; // type:function size:0x20" else x)
                     for x in text.split(nl)
                     if x != "fn_80041020 = .text:0x80041020; // type:function size:0x4"]
             check("merge %s: exactly one line grew and one vanished" % label, after.split(nl), want)
-            check("merge %s: the ending survives" % label, sf.line_ending(after), nl)
+            check("merge %s: the ending survives" % label, _text.line_ending(after), nl)
             if nl == "\r\n":
                 check("merge CRLF: no bare LF appeared", after.replace("\r\n", "").count("\n"), 0)
             else:
@@ -773,10 +736,10 @@ def selftest() -> int:
           "prev = .text:0x80041000; // type:function size:0x24")
     check("resize: a line naming another symbol is refused",
           raises(lambda: _resize_line("other = .text:0x80041000; // type:function size:0x20",
-                                      "prev", 0x24), sf.AnchorError), True)
+                                      "prev", 0x24), _text.AnchorError), True)
     check("resize: a line without a size is refused",
           raises(lambda: _resize_line("prev = .text:0x80041000; // type:function", "prev", 0x24),
-                 sf.AnchorError), True)
+                 _text.AnchorError), True)
 
     # --- phantom merges: every refusal leaves the file untouched ---------------------------------
     def merge_plan(map_rows, rows_, scan=None):
@@ -900,9 +863,9 @@ def selftest() -> int:
         with redirect_stdout(buf):
             rc = cmd_merge_batch(ns)
         check("merge cmd: returns 0", rc, 0)
-        check("merge cmd: the phantom line is gone", "fn_80041020" in sf.read_text(p), False)
+        check("merge cmd: the phantom line is gone", "fn_80041020" in _text.read_text(p), False)
         check("merge cmd: the previous grew",
-              "prev = .text:0x80041000; // type:function size:0x24" in sf.read_text(p), True)
+              "prev = .text:0x80041000; // type:function size:0x24" in _text.read_text(p), True)
         check("merge cmd: reports the counts",
               "wrote 1 merged, 1 deleted, 0 already merged" in buf.getvalue(), True)
         once = p.read_bytes()

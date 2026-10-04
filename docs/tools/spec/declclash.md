@@ -42,8 +42,7 @@ cscan.
 ## Test contract
 
 Tier: fixture.
-Today's selftest (`tools/units/declclash_selftest.py`): The fixtures are a hand-built tree: a root file that includes a small web of headers, two of which declare the same name with the same shape (a parameter rename), two with a genuinely different shape, a `struct`/`void`-spelling pair, a name that only exists in the generated include tree, a two-line prototype that must be ignored, and an include cycle. The real acceptance case - the 30-name clash set of `src/menu/fn_802E4978.cpp`, 25 headers - is recorded in `.pi/notes/rule2-clash-pass-802e4978.md` and in the commit that added this tool.
-Target: `tools/tests/units/test_declclash.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
+The test (`tools/tests/units/test_declclash.py`, fixture tier; `declclash.py --selftest` runs it): The fixtures are a hand-built tree: a root file that includes a small web of headers, two of which declare the same name with the same shape (a parameter rename), two with a genuinely different shape, a `struct`/`void`-spelling pair, a name that only exists in the generated include tree, a two-line prototype that must be ignored, and an include cycle. The real acceptance case - the 30-name clash set of `src/menu/fn_802E4978.cpp`, 25 headers - is recorded in `.pi/notes/rule2-clash-pass-802e4978.md` and in the commit that added this tool.
 
 ## Known gaps
 

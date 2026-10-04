@@ -1,46 +1,6 @@
 #!/usr/bin/env python3
 """The registry of shared types and helpers - what already exists, and who copied it.
-
-The project's rule (CLAUDE.md -> Conventions; docs/plan.md section 6.5 rule 1) is that a type more than
-one unit needs is declared **once**, under `include/`, and included where needed - a declaration moves
-there the *second* time a unit needs it. Nothing told a worker what already existed, so two units created
-`include/ef.h` and `include/nw4r/math.h` independently while three others each defined the same
-`VEC3`/`EfWork` locally and deferred the consolidation to nobody. This tool is the missing lookup: it
-scans `include/**` and every `src/**` file, and answers, per declaration:
-
-* **where it is defined** - every file (a header, a unit, or both);
-* **which units use it** - a unit uses a declaration when it includes the defining header, names the
-  declaration in its source, or owns a map symbol whose (mangled) name encodes it;
-* **whether it is duplicated debt** - a shared header's name that a unit re-defines (rule 1), a name
-  two units both define with no header owning it, or a name one unit defines that another names without
-  including it (rule 1, before there is a header);
-* **whether a helper prototype is repeated** - the same `extern` carried by several files (rule 2).
-
-    python tools/units/typeregistry.py                     # the duplication report, human-readable
-    python tools/units/typeregistry.py --json              # the same, machine-readable
-    python tools/units/typeregistry.py --unit Pl/pl_act    # the shared headers that unit should use
-    python tools/units/typeregistry.py --report <path.md>  # write the report to a file
-    python tools/units/typeregistry.py --selftest
-
-`brief.py` consumes `registry()` + `relevant_headers()` directly, so a worker's brief names the shared
-headers its unit should reuse instead of re-create. The scan is textual by design - it is a *lookup* for
-the worker, not a compiler - and every finding names the file and line a human can open.
-
-What is scanned, and what a "declaration" is:
-
-| kind | how it is found |
-| --- | --- |
-| `struct` / `union` / `enum` / `class` | the keyword plus its body; the tag and any trailing `typedef` alias are both recorded |
-| `typedef` | a non-aggregate `typedef`; the declarator (including `(*fn)` function pointers and arrays) |
-| `using` | a C++ alias (`using Foo = ...;`) |
-| `inline` | an `inline`/`__inline` function definition (a helper meant to be shared) |
-| `macro` | a `#define` (object- or function-like) |
-| `extern` | a file-scope `extern` declaration (a helper prototype - rule 2's duplicate when two files both carry it) |
-
-`include/types.h` is the project's scalar base: every unit including it is normal, so it is only reported
-when a unit *redefines* one of its names, and `src/Camellia/camellia.c` is the documented vendor
-exception (EXCEPTIONS below).
-"""
+Spec: docs/tools/spec/typeregistry.md. CLI: typeregistry.py [--unit U] [--json] [--report F] [--no-map] [--root R] | --selftest."""
 
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
@@ -54,11 +14,10 @@ import re
 import sys
 from tools.lib import cscan
 from tools.lib import names as libnames
+from tools.lib import repo as _repo
 
 from tools.lib import project as _project
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.dirname(os.path.dirname(HERE))
 
 SHARED_DIR = "include"
 UNIT_DIR = "src"
@@ -710,7 +669,7 @@ extern void Panic(const char* f, int line, ...);
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--root", default=REPO_ROOT, help="repository root (default: this checkout)")
+    ap.add_argument("--root", default=None, help="repository root (default: the invocation's tree)")
     ap.add_argument("--unit", default=None, help="show the shared headers one unit should reuse")
     ap.add_argument("--json", action="store_true", help="machine-readable output")
     ap.add_argument("--report", default=None, help="write the markdown report to this path")
@@ -721,7 +680,7 @@ def main() -> int:
     if args.selftest:
         return selftest()
 
-    root = os.path.abspath(args.root)
+    root = os.path.abspath(args.root or _repo.repo_root())
     reg = registry(root)
 
     if args.unit:
