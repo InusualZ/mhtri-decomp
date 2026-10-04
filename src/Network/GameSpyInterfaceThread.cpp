@@ -55,7 +55,8 @@
  * first argument.  `init`, `publishRequest`: register colouring.  Sections: `.data` 1392 of 1396 B until the
  * cut, `extab` 360 of 380 B (a 20-byte cleanup record against `dtor_803CA338`, the peer's member-mutex
  * destructor, which the hand-modelled `NetworkPeerGameSpy::destroy` does not produce; retry a real
- * `NetworkPeerBase` derivation with a member mutex in the peer TU after the cut).
+ * `NetworkPeerBase` derivation with a member mutex in the peer TU after the cut).  `runNasLogin` casts the
+ * `DWCSvlResult*` it hands `DWC_SVLGetTokenAsync` to the owner's `s32` parameter (request net2-l4-cff5#2).
  */
 
 #include "types.h"
@@ -623,10 +624,10 @@ extern "C" void gt2PingCallback(void)
 }
 
 /* Stores the id the timed handler waits for. */
-void GameSpyInterfaceThread::setWaitHandle(s32 limit)
+void GameSpyInterfaceThread::setWaitHandle(DWCSvlResult* result)
 {
     stage_98 = 0;
-    handle_94 = limit;
+    svlResult_94 = result;
 }
 
 /* Runs the NAS-login handshake the timed handler drives, one step per frame. */
@@ -667,7 +668,7 @@ s32 GameSpyInterfaceThread::runNasLogin()
         if (DWC_SVLBegin() == 0) {
             DWC_SVLEnd();
             stage_98 = 4;
-        } else if (DWC_SVLGetTokenAsync(sEmptyString, handle_94) == 0) {
+        } else if (DWC_SVLGetTokenAsync(sEmptyString, (s32)svlResult_94) == 0) {
             DWC_SVLEnd();
             stage_98 = 4;
         } else {

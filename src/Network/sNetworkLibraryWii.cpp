@@ -49,12 +49,10 @@
  * GUESS names there: `DWC_Shutdown`, `NETGetStartupErrorCode`, `constructNetworkSocket`,
  * `constructNetworkFetcherKind2` (evidence beside each declaration).
  *
- * RESIDUALS.  `createResolver` (0x804199E8, 64 B) is not written: retail is `new NetworkResolverWii()` (0x1568
- * bytes), but the owner's header declares the class abstract (`NetworkResolverBase::slot_1C` pure) and
- * 0x1564 bytes, so neither spelling compiles to it from here (integrator request filed).  `createSocket`/`createFetcher` (kind 2) call constructors whose classes are
+ * RESIDUALS.  Every `.text` row matches.  `createSocket`/`createFetcher` (kind 2) call constructors whose classes are
  * not reconstructed (C-named GUESSes), so they are spelled as `operator new` + the call; the `.text` is the same, the `extab`
  * cleanup record a real `new` emits is not.  Data: `.data` 0x61C of the claimed 0x620 and `.sbss` 4 of 8
- * (trailing alignment words); `extab`/`extabindex` short by the three records above.
+ * (trailing alignment words); `extab` short by those two cleanup records (280 of 292 B).
  */
 #include "types.h"
 #include "Network/sNetworkLibraryWii.h"
@@ -521,6 +519,11 @@ void sNetworkLibraryWii::accumulateElapsed(f32* elapsed, u32* lastTick)
     }
 }
 #pragma fp_contract reset
+
+NetworkResolverWii* sNetworkLibraryWii::createResolver()
+{
+    return new NetworkResolverWii();
+}
 
 NetworkSocketHandle* sNetworkLibraryWii::createSocket()
 {

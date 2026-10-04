@@ -14,12 +14,14 @@
  *
  * BOUNDARY (residual, reported).  This range and `Network/GameSpyInterfaceThread.cpp` are one TU: the class's remaining
  * methods (`updateCallbackStep`, `dispatchTask`, `runSearch`, `runConnect`, `applyEvent`) open the neighbour,
- * and the class's table 0x80603190 sits in the neighbour's `.data` after this unit's string - the layout one
- * object gives when the destructor here is the key function.
+ * and the class's table 0x80603190 follows this unit's strings in the unclaimed gap before the neighbour's
+ * `.data` (0x806031A0) - the layout one object gives when the destructor here is the key function.
  *
  * UNWRITTEN.  The deleting destructor 0x8041A238 (156 B): defining it makes MWCC emit the class table into
- * this object, while the target's table is in the neighbour's range (ours-extra `.data`); it waits for the
- * seam to be redrawn.
+ * this object, while the table (0x80603190) and the stop string before it (0x80603154) are unclaimed and read
+ * from the neighbour's range (ours-extra `.data`); it waits for the seam request net2-l4-cff5#1 (.text to
+ * 0x8041B194, .data to 0x806031A0, the five members moved here; splitcheck: both units ok, NRS data-order and
+ * vtable unknown -> ok).
  *
  * FLAGS.  `-O3`/`-inline noauto` in place of the lib's `-O4,p`/`-inline auto` (configure.py, with the
  * numbers), and `#pragma peephole off` like the rest of the library.  `setReflectServicePage` takes the page

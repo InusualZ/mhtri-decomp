@@ -18,6 +18,7 @@
 #define MHTRI_NETWORK_PATINTERFACE_H
 
 #include "types.h"
+#include "Network/sNetworkLibrary.h"   /* sNetworkLibraryError - the error triple `reportPatError` takes */
 
 typedef struct NetworkInstance NetworkInstance;           /* include/unsplit/Network.h */
 typedef struct NetworkStateMachine NetworkStateMachine;   /* include/Network/network_state.h */
@@ -25,8 +26,8 @@ typedef struct NetworkStateMachine NetworkStateMachine;   /* include/Network/net
 /* The network singleton (`getInstance_` returns it).  Moved here from the mediator band
  * (`Network/NetworkWiiMediator.cpp`), which allocates it with `new` - 0xD640 bytes, the allocation
  * `initializeNetworkMediator` makes - and calls its five buffer setters by their mangled member names
- * (`setTermsBuffer__12PatInterfaceFPScUl`).  Only the vtable word is evidenced as a field: the bands
- * reach the record through the C accessors below.  The constructor is out of line
+ * (`setTermsBuffer__12PatInterfaceFPScUl`).  The vtable word and the opening state byte are the fields
+ * evidenced so far: the bands reach the record through the C accessors below.  The constructor is out of line
  * (`__ct__12PatInterfaceFv`, 0x803FCC34), the virtual is declared and not defined here, so no table is
  * emitted by a consumer.
  *
@@ -37,7 +38,9 @@ public:
     PatInterface();
     /* +0x00 - the vtable pointer; slot +0x08 is the deleting finalizer */
     virtual void finalize(s32 flags);
-    /* +0x04 */ u8 pad_004[0xD63C];
+    /* +0x0004 */ u8 pad_0004[0x60CD];
+    /* +0x60D1 */ u8 opening_state;     /* the opening sub-step the mediator's progress reads (0 and 90 ignored) */
+    /* +0x60D2 */ u8 pad_60D2[0x756E];
     void setTermsBuffer(s8* buffer, u32 size);
     void setMaintenanceBuffer(s8* buffer, u32 size);
     void setAnnounceBuffer(s8* buffer, u32 size);
@@ -62,6 +65,14 @@ s32 isCallback(NetworkInstance* self, s32 index);
 void resetCallback(NetworkInstance* self, s32 index);
 
 void decrement60d4(NetworkInstance* self);
+/* 0x803FD258 - takes a reference on the singleton like `increment60d4`, and the first one also clears the
+ * receive buffer's head before opening it (GUESS name). */
+void openPatInterface(NetworkInstance* self);
+/* 0x803FD90C - keeps the first error triple (+0x654C) and dispatches it to the session handlers with
+ * code `kind` (GUESS name). */
+void reportPatError(NetworkInstance* self, u32 kind, sNetworkLibraryError error);
+/* 0x803FD944 - dispatches event `code` with a payload to the session handlers (GUESS name). */
+void notifyPatEvent(NetworkInstance* self, u32 code, u32 count, const u8* data);
 /* 0x803FD298 - takes a reference on the singleton (+0x60D4); the first one opens it (its +0x0C slot). */
 void increment60d4(NetworkInstance* self);
 /* 0x803FD9CC - installs callback `index` (0..7) with its argument; 1, or -1 for a bad index. */

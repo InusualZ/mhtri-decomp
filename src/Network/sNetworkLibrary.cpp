@@ -22,8 +22,15 @@
  * except `init`, which `#pragma pool_data off` takes from 94.04 to 100); `#pragma peephole off` like the Wii
  * half (the reload of the table word through r3 before each virtual call).
  *
- * UNWRITTEN.  `convertTime` (0x80417FDC, 904 B) and `dateToTime` (0x80418364, 864 B) - the 64-bit calendar
- * arithmetic.
+ * CALENDAR.  `convertTime`/`dateToTime` count days from 1 January of year 0; every unit constant is an unsigned
+ * 64-bit macro (retail divides through `__div2u`/`__mod2u` and compares with a 64-bit subtract), the products
+ * `n * 366ULL` keep the dead sign extension retail has, and `convertTime` adds each cycle as `(s16)(n * k)`
+ * (retail `extsh`es the product, not the sum).  The month table `sMonthDays` (.data 0x80602988) is defined here.
+ *
+ * RESIDUALS.  `dateToTime` 99.94: the unrolled month loop computes `months - 8` before `months - 1` in retail
+ * (two adjacent instructions swapped; loop/declaration/type variants measured, none reorders them).  `extab` is
+ * 96 of 136 B: retail's constructor and destructor carry cleanup records for the member mutex
+ * (`dtor_803CA338`), which needs the mutex as a class member with a destructor (NetworkSessionManager's type).
  */
 
 #include "Network/sNetworkLibrary.h"
@@ -52,6 +59,23 @@ public:
     /* +0x20 */ virtual void pad_20();
     /* +0x24 */ virtual void releaseFetcher();
 };   /* size: 0x04 (the object's leading table word) */
+
+/* The calendar constants (the day count, the leap rule and the microsecond units are all unsigned 64-bit:
+ * retail divides through `__div2u`/`__mod2u` and compares with an unsigned 64-bit subtract). */
+#define NETWORK_USEC_PER_SECOND     1000000ULL
+#define NETWORK_USEC_PER_MINUTE     60000000ULL
+#define NETWORK_USEC_PER_HOUR       3600000000ULL
+#define NETWORK_USEC_PER_DAY        86400000000ULL
+#define NETWORK_DAYS_PER_YEAR       365ULL
+#define NETWORK_DAYS_PER_4_YEARS    1461ULL
+#define NETWORK_DAYS_PER_100_YEARS  36524ULL
+#define NETWORK_DAYS_PER_400_YEARS  146097ULL
+
+/* Days per month, common year then leap year (.data 0x80602988). */
+static s32 sMonthDays[2][12] = {
+    { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 },
+    { 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 },
+};
 
 /* The base library's statics (.sbss 0x80794CC0..0x80794CCC, in this order). */
 sNetworkLibrary* sNetworkLibrary::mpInstance;
@@ -207,6 +231,117 @@ u64 sNetworkLibrary::netToHost64(u64 value)
 void sNetworkLibrary::setTimeZone(s32 minutes)
 {
     timeZoneMinutes = minutes;
+}
+
+/* Splits a microsecond time (shifted by the time zone) into the calendar fields. */
+void sNetworkLibrary::convertTime(s64 time, NetworkDateTime* out)
+{
+    s32 days;
+    s32 leap;
+    s32 month;
+    s32 cycles;
+    s32* lengths;
+    u64 us;
+
+    if (out == NULL) {
+        return;
+    }
+    time += (s64)timeZoneMinutes * NETWORK_USEC_PER_MINUTE;
+    days = time / NETWORK_USEC_PER_DAY;
+    out->weekIndex = (days - 2) / 7;
+    out->weekday = (days - 2) % 7;
+    cycles = days / NETWORK_DAYS_PER_400_YEARS;
+    days = days % NETWORK_DAYS_PER_400_YEARS;
+    out->year = cycles * 400;
+    if (days < 366ULL) {
+        leap = 1;
+    } else {
+        cycles = (days - 1) / NETWORK_DAYS_PER_100_YEARS;
+        days = (days - 1) % NETWORK_DAYS_PER_100_YEARS;
+        out->year += (s16)(cycles * 100);
+        if (days < 365ULL) {
+            leap = 0;
+        } else {
+            cycles = (days + 1) / NETWORK_DAYS_PER_4_YEARS;
+            days = (days + 1) % NETWORK_DAYS_PER_4_YEARS;
+            out->year += (s16)(cycles * 4);
+            if (days < 366ULL) {
+                leap = 1;
+            } else {
+                cycles = (days - 1) / NETWORK_DAYS_PER_YEAR;
+                days = (days - 1) % NETWORK_DAYS_PER_YEAR;
+                out->year += (s16)cycles;
+                leap = 0;
+            }
+        }
+    }
+    lengths = sMonthDays[leap];
+    for (month = 0; month < 12; month++) {
+        if (days < lengths[month]) {
+            break;
+        }
+        days -= lengths[month];
+    }
+    out->month = month + 1;
+    out->day = days + 1;
+    us = time % NETWORK_USEC_PER_DAY;
+    out->hour = us / NETWORK_USEC_PER_HOUR;
+    us %= NETWORK_USEC_PER_HOUR;
+    out->minute = us / NETWORK_USEC_PER_MINUTE;
+    us %= NETWORK_USEC_PER_MINUTE;
+    out->second = us / NETWORK_USEC_PER_SECOND;
+}
+
+/* Normalises the month, then turns the calendar fields back into microseconds (minus the time zone). */
+s64 sNetworkLibrary::dateToTime(NetworkDateTime* date)
+{
+    s32 leap;
+    s32 year;
+    s32 n100;
+    s32 n4;
+    s32 counted;
+    s32 before;
+    s32 days;
+    s32 month;
+    s32 months;
+    s64 time;
+
+    leap = 0;
+    while (date->month > 12) {
+        date->year++;
+        date->month -= 12;
+    }
+    while (date->month <= 0) {
+        date->year--;
+        date->month += 12;
+    }
+    year = date->year;
+    before = year - 1;
+    counted = before / 400;
+    days = counted * 366ULL;
+    n100 = before / 100 - counted;
+    days += n100 * NETWORK_DAYS_PER_YEAR;
+    counted += n100;
+    n4 = before / 4 - counted;
+    days += n4 * 366ULL;
+    counted += n4;
+    days += (before - counted) * NETWORK_DAYS_PER_YEAR;
+    days += 366;
+    if (year % 4 == 0) {
+        if (year % 100 != 0) {
+            leap = 1;
+        } else if (year % 400 == 0) {
+            leap = 1;
+        }
+    }
+    months = date->month;
+    for (month = 1; month < months; month++) {
+        days += sMonthDays[leap][month - 1];
+    }
+    days += date->day - 1;
+    time = days * NETWORK_USEC_PER_DAY + date->hour * NETWORK_USEC_PER_HOUR
+         + (date->second * NETWORK_USEC_PER_SECOND + date->minute * NETWORK_USEC_PER_MINUTE);
+    return time - (s64)timeZoneMinutes * NETWORK_USEC_PER_MINUTE;
 }
 
 NetworkResolverWii* sNetworkLibrary::acquireResolver()

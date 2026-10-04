@@ -43,7 +43,7 @@
  * NAMING GUESSES (rule 6.5: a guess is stated, not hidden).  The 26 callees the bodies call that no
  * registered unit owns answered only `fn_XXXXXXXX` in the map, so they were renamed through `symedit.py`
  * in this pass and every one of those names is a GUESS: `fn_803FE388` -> `setPatRange`, `fn_803FE744` ->
- * `setPatReflectField30`, `fn_8041241C` -> `getNetworkWiiMediator`, `fn_8041A1C4` ->
+ * `setPatReflectField30`, `fn_8041241C` -> `getNetworkPool`, `fn_8041A1C4` ->
  * the reflect service's constructor, `fn_80413BF8` -> `getReflectEventId` and so on - each named for the
  * singleton (`PatInterface`) or the service (`NetworkReflectService`) it belongs to and the field or slot
  * it works on.  Within this file, `getReflectField30/34/38` and `getAccountQuery1..5` are positional (the
@@ -134,7 +134,7 @@
 #include "Network/NetworkWiiMediator.h"
 #include "Network/PatInterface.h"            /* the singleton's Pat accessors */
 #include "Network/NetworkReflectService.h"   /* the reflect service's entry points */
-#include "Network/network_layer_io.h"        /* getReflectService / getNetworkWiiMediator / getLanguage / getReflectEventId */
+#include "Network/network_layer_io.h"        /* getReflectService / getNetworkPool / getLanguage / getReflectEventId */
 #include "Network/gamespy_interface_types.h"  /* the worker thread `initializeNetworkMediator` spawns */
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
@@ -170,10 +170,10 @@ void getMediatorFlag78C(NetworkWiiMediatorFields* self, u8* out);
 void initializeNetworkMediator(NetworkWiiMediatorFields* self, u32 value);
 
 u32   getMediatorField24(NetworkWiiMediatorFields* self);
-u8    getMediatorFlag6B(NetworkWiiMediatorFields* self);
-u8    getMediatorFlag60D1(NetworkWiiMediatorFields* self);
-void  setMediatorTimestamp(NetworkWiiMediatorFields* self, u64 value);
-u64   getMediatorTimestamp(NetworkWiiMediatorFields* self);
+u8    getNetworkPoolProgress(NetworkPool* self);
+u8    getPatOpeningState(PatInterface* self);
+void  setNetworkPoolTimestamp(NetworkPool* self, u64 value);
+u64   getNetworkPoolTimestamp(NetworkPool* self);
 s32   getAccountQuery1(NetworkWiiMediatorFields* self);
 s32   getAccountQuery2(NetworkWiiMediatorFields* self);
 s32   getAccountQuery3(NetworkWiiMediatorFields* self);
@@ -259,7 +259,7 @@ s32  NetworkWiiMediator::getOpeningProgress()
         self->flag_1E = self->flag_1C;
     }
     if (getInstance_() != NULL) {
-        u8 state = getMediatorFlag60D1((NetworkWiiMediatorFields*)getInstance_());
+        u8 state = getPatOpeningState(getInstance_());
         if (state != 0 && state != 90) {
             self->flag_1F = state;
         }
@@ -269,8 +269,8 @@ s32  NetworkWiiMediator::getOpeningProgress()
             return 100;
         }
         u8 progress = 0;
-        if (getNetworkWiiMediator() != NULL) {
-            progress = getMediatorFlag6B(getNetworkWiiMediator());
+        if (getNetworkPool() != NULL) {
+            progress = getNetworkPoolProgress(getNetworkPool());
         }
         return progress + 90;
     }
@@ -584,8 +584,8 @@ void loadPatInterfaceBuffers()
     }
 }
 u32 getMediatorField24(NetworkWiiMediatorFields* self) { return self->field_24; }
-u8 getMediatorFlag6B(NetworkWiiMediatorFields* self) { return self->field_6B; }
-u8 getMediatorFlag60D1(NetworkWiiMediatorFields* self) { return self->flag_60D1; }
+u8 getNetworkPoolProgress(NetworkPool* self) { return self->progress; }
+u8 getPatOpeningState(PatInterface* self) { return self->opening_state; }
 void updatePatInterface180(NetworkWiiMediatorFields* self, u32 a, u32 b, u32 c)
 {
     (void)self;
@@ -635,8 +635,8 @@ u64 setServerTimeResult(NetworkWiiMediatorFields* self)
     (void)self;
     if (getInstance_() != NULL) {
         u64 stamp = 0;
-        if (getNetworkWiiMediator() != NULL) {
-            stamp = getMediatorTimestamp(getNetworkWiiMediator());
+        if (getNetworkPool() != NULL) {
+            stamp = getNetworkPoolTimestamp(getNetworkPool());
         }
         if (stamp != 0) {
             return stamp;
@@ -645,21 +645,21 @@ u64 setServerTimeResult(NetworkWiiMediatorFields* self)
     }
     return 0;
 }
-u64 getMediatorTimestamp(NetworkWiiMediatorFields* self)
+u64 getNetworkPoolTimestamp(NetworkPool* self)
 {
-    return self->stamp_3A10;
+    return self->timestamp;
 }
 void setMediatorState68A(NetworkWiiMediatorFields* self, u8 value)
 {
-    if ((u32)value == 0 && getNetworkWiiMediator() != NULL) {
-        setMediatorTimestamp(getNetworkWiiMediator(), 0);
+    if ((u32)value == 0 && getNetworkPool() != NULL) {
+        setNetworkPoolTimestamp(getNetworkPool(), 0);
     }
     self->flag_68A = value;
 }
 #pragma peephole on
-void setMediatorTimestamp(NetworkWiiMediatorFields* self, u64 value)
+void setNetworkPoolTimestamp(NetworkPool* self, u64 value)
 {
-    self->stamp_3A10 = value;
+    self->timestamp = value;
 }
 void getMediatorState68A(NetworkWiiMediatorFields* self, u8* out)
 {

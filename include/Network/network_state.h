@@ -152,6 +152,8 @@ s32  resetNetworkState3(NetworkInstance* self);
 /* 0x803FE8E4 / 0x803FF024 - the state machine's reset and its gated step out of state 5. */
 s32  resetNetworkState(NetworkInstance* self);
 s32  advanceNetworkState5(NetworkInstance* self);
+/* 0x803FE95C - one step of the login sub-machine; nonzero once it has finished. */
+s32  handleNetworkState1(NetworkInstance* self);
 
 /* The callees this unit drives are declared in their owners' headers, which `network_state.cpp`
  * includes (rule 2): the request writers in `Network/NetworkCommunityPat.h`, the item writers, the

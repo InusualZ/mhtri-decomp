@@ -40,7 +40,7 @@ void startTermsUpdate(NetworkWiiMediator* self);
 /* untyped: byte range - the MEM2 buffer handed to the terms object */
 void initMediatorTerms(NetworkWiiMediator* self, void* buffer, u32 size);
 s32 getMediatorTermsStatus(NetworkWiiMediator* self);
-void setMediatorTransferMode(NetworkWiiMediator* self, u8 mode);
+void setMediatorTransferMode(NetworkWiiMediator* self, u32 mode);
 void setMediatorTransferFlag6DD1(NetworkWiiMediator* self, u8 flag);
 void setMediatorTransferFlag6DD2(NetworkWiiMediator* self, u8 flag);
 void setMediatorTransferLevel(NetworkWiiMediator* self, f32 level);
@@ -48,7 +48,7 @@ s32 postMediatorRecord(NetworkWiiMediator* self, u8* record);
 
 /* The NAS login token and the user id/password paths the session state machine hands the opening
  * (`Network/network_state.cpp` passes the mediator singleton). */
-u32 getNASToken(NetworkInstance* instance);
+char* getNASToken(NetworkWiiMediator* self);
 void setConnectionPaths(NetworkInstance* connection, const char* userId, const char* password);
 
 #ifdef __cplusplus

@@ -34,8 +34,8 @@ typedef struct sNetworkLibraryError {
     /* +0x08 */ s32 code;
 } sNetworkLibraryError;
 
-/* The calendar record `convertTime` fills and `dateToTime` turns back into microseconds.
- * size: 0x14 */
+/* The calendar record `convertTime` fills and `dateToTime` turns back into microseconds (the day count
+ * starts at 1 January of year 0, proleptic Gregorian).  size: 0x14 */
 typedef struct NetworkDateTime {
     /* +0x00 */ s16 year;
     /* +0x02 */ s16 month;
@@ -45,7 +45,7 @@ typedef struct NetworkDateTime {
     /* +0x0A */ s16 second;
     /* +0x0C */ s16 weekday;
     /* +0x0E */ u8 pad_0x0E[0x02];
-    /* +0x10 */ s32 dayOfYear;
+    /* +0x10 */ s32 weekIndex;      /* (days - 2) / 7 - GUESS: a running week count, the weekday's quotient */
 } NetworkDateTime;
 
 /* The platform-independent network library: the singleton the whole Network band reaches through

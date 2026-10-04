@@ -28,6 +28,15 @@ class NetworkPeerGameSpy;
 /* the GameSpy worker thread object (the string pool spells its methods `NetworkGameSpyInterface::<method>`) */
 /* --------------------------------------------------------------------------------------------- */
 
+/* The DWC service-locator result `DWC_SVLGetTokenAsync` fills (the SDK's `DWCSvlResult`: a status, the host and
+ * the token): `GameSpyInterfaceThread::runNasLogin` hands the one the mediator keeps to the SDK.  size: 0x174 */
+typedef struct DWCSvlResult {
+    /* +0x000 */ s32  status;
+    /* +0x004 */ char svlhost[65];
+    /* +0x045 */ char svltoken[301];
+    /* +0x172 */ u8   pad_172[0x02];
+} DWCSvlResult;
+
 typedef struct NetworkErrorInfo {
     /* +0x00 */ s32 code_00;
     /* +0x04 */ s32 param1_04;
@@ -84,7 +93,7 @@ public:
     /* +0x0088 */ s32 paramD_88;
     /* +0x008C */ s32 paramE_8C;
     /* +0x0090 */ s32 result_90;
-    /* +0x0094 */ s32 handle_94;
+    /* +0x0094 */ DWCSvlResult* svlResult_94;
     /* +0x0098 */ s32 stage_98;
     /* +0x009C */ char name_9C[0x80];
     /* +0x011C */ u8  idByte_11C;
@@ -176,8 +185,8 @@ public:
     void  setBufferSize(s16 size);
     /* starts a NAT negotiation between the two peer ids */
     void  startNegotiation(const GameSpyPeerId* a, const GameSpyPeerId* b);
-    /* sets the handle the NAS login waits for */
-    void  setWaitHandle(s32 limit);
+    /* sets the service-locator result the NAS login fills */
+    void  setWaitHandle(DWCSvlResult* result);
     /* runs the NAS-login handshake the timed handler drives, one step per frame */
     s32   runNasLogin();
     /* hands the index's receiver slot to the object stored for it (a tail call) */
