@@ -189,12 +189,7 @@ them before you form an opinion, and cite the rule number rather than your taste
 
 Run the project's own tools and cite their output rather than re-deriving a judgement by eye.
 
-**Your shell rejects compound commands** when you run in a worktree-isolated tree: a `for` loop, process
-substitution (`<(...)`), `&&`/`;` chains and `git -C <other tree>` are refused as "too complex to verify that
-it stays inside the worktree". Every probe here is one plain command; to look at another tree, pass its path
-to the tool (`--report <path>`, `--main <path>`) or read the file with your file tools, and run the command once
-per unit instead of looping. A one-off Python probe goes in as a single `python <file under .pi/tmp/>`, never a
-shell loop.
+**Your shell refuses commands that could run git outside the worktree** when you run in a worktree-isolated tree (it is Claude Code's built-in isolation, not a repo rule): `git -C <other tree>`, `cd <other tree> && git ...`, a program or argument computed by the shell (`$VAR`, a loop variable, `xargs` words), and a heredoc whose text mentions git. Plain `for` loops, `&&` chains inside your worktree, `awk -v`, `sed -n` and `python -c` are fine. To look at another tree, pass its path to the tool (`--report <path>`, `--main <path>`) or read the file with your file tools.
 
 * `python tools/units/stylelint.py --budget` (the backlog per unit) or `--diff <ref>` (only what a change
   added; it selects the merge base itself);
@@ -321,7 +316,7 @@ lines with a stray `L`. Use the helper instead:
 
 `replace` matches across `\n` or `\r\n`, keeps the file's own endings, and **refuses, writing nothing, when the
 match count is not the N you asserted** - that is the difference between a rewrite and a corruption. Assert the count
-every time (`escape.py --edit` is the same rule, kept until the WP6 sweep).
+every time (`edit.py replace --old/--new` is that rule; `escape.py` keeps only `--write` and `--escape`).
 
 ## Commit messages
 
