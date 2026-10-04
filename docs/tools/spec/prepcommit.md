@@ -29,16 +29,23 @@ Inputs -> outputs: git status, report.json -> staged index, .git/prepcommit_msg.
 * `git add -A` would sweep up another agent's in-flight file (this repo has three agents in it),
 * build output, `orig/`, `.lavish/`, `.pi/` and scratch must never be staged, and a stray file in the tree (a `.stackdump`, a `__pycache__`) is an accident worth refusing rather than committing,
 * the commit message is supposed to carry the *results*, and those numbers already exist in `build/RMHE08/report.json`.
+* **Ground truth.** `config/RMHE08/build.sha1` is always refused, and the DOL hash it states is cross-checked against
+  `orig/RMHE08/sys/main.dol` before anything is staged. `config/RMHE08/config.yml` is staged only when its worktree copy
+  differs from HEAD's in the relocation-analysis keys (`block_relocations`, `add_relocations`) and comment lines alone
+  (owner ruling 2026-10-03); any other key refuses with the key named. The decision is `tools.lib.repo.config_change`,
+  the same function the pre-commit hook reaches through `guard.py config`; `classify(path, texts=(head, new))` takes the
+  pair explicitly for a test.
 * What it does: classifies every path in `git status` into stage / refuse, stages only the stageable ones, writes the message (measured results included) to `.git/prepcommit_msg.txt`, prints the commit command - and stops. `--split` prints a one-concern-per-commit plan instead of staging everything at once. `--commit` runs the commit for you and is only for when the user has explicitly asked for one.
 
 ## Lib dependencies
 
-git, report, repo.
+git, report, repo (`config_change`, `CONFIG_PATH`).
 
 ## Test contract
 
 Tier: fixture.
-No selftest today.
+`tools/git/guard_selftest.py` pins `classify` (the refusals, and every `config.yml` allowed/refused pair through
+`classify(path, texts)`) and `ground_truth_error`.
 Target: `tools/tests/git/test_prepcommit.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
 
 ## Known gaps

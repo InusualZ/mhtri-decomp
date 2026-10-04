@@ -11,24 +11,40 @@
 # The decisions and the fixes live in tools/git/guard.py so they are callable and testable without a shell:
 #   * `eol`        - normalise a textish staged blob's CRs and re-stage it; refuse a binary staged blob
 #   * `autocrlf`   - warn (never refuse) when core.autocrlf=true silently defeats eol=lf
+#   * `config`     - refuse a config.yml change outside its relocation-analysis keys
+#                    (`block_relocations`, `add_relocations` may change - owner ruling 2026-10-03)
 
-staged=$(git diff --cached --name-only --diff-filter=ACMR)
+# D included and renames split into D+A: deleting or moving the ground truth is rewriting it.
+staged=$(git diff --cached --name-only --no-renames --diff-filter=ACMD)
 
-bad=$(printf '%s\n' "$staged" | grep -E '^(orig/|build/|config/RMHE08/(build\.sha1|config\.yml))$' || true)
+bad=$(printf '%s\n' "$staged" | grep -E '^(orig/|build/)|^config/RMHE08/build\.sha1$' || true)
 if [ -n "$bad" ]; then
     echo "pre-commit: refusing to commit:" >&2
     printf '  %s\n' $bad >&2
     echo "  orig/** is the original game data (non-negotiable 1) and build/** is build output (rule 2);" >&2
-    echo "  config/RMHE08/build.sha1 and config.yml are the DOL's ground truth - rewriting either voids" >&2
-    echo "  every later 'ninja build/RMHE08/ok' (docs/plan.md 7.18)." >&2
+    echo "  config/RMHE08/build.sha1 is the DOL's ground truth - rewriting it voids every later" >&2
+    echo "  'ninja build/RMHE08/ok' (docs/plan.md 7.18)." >&2
     exit 1
 fi
 
 root=$(git rev-parse --show-toplevel)
 guard="$root/tools/git/guard.py"
+config_staged=$(printf '%s\n' "$staged" | grep -E '^config/RMHE08/config\.yml$' || true)
 if [ ! -f "$guard" ]; then
+    if [ -n "$config_staged" ]; then
+        echo "pre-commit: refusing config/RMHE08/config.yml - $guard is missing, so its keys cannot be checked." >&2
+        exit 1
+    fi
     echo "pre-commit: warning - $guard is missing, so the EOL guard did not run." >&2
     exit 0
+fi
+
+# config.yml is the DOL's ground truth (docs/plan.md 7.18) except for the analyzer's relocation hints;
+# guard.py config compares the staged copy with HEAD's, key by key, and names what it refuses.
+if [ -n "$config_staged" ] && ! python "$guard" config >&2; then
+    echo "pre-commit: refusing config/RMHE08/config.yml - only block_relocations / add_relocations and" >&2
+    echo "  comment lines may change; every other key is the DOL's ground truth (docs/plan.md 7.18)." >&2
+    exit 1
 fi
 
 python "$guard" autocrlf || true

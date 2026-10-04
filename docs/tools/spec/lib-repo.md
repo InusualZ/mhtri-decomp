@@ -24,6 +24,11 @@ originals hash to. It is also the choke point of the fixture tier's live-tree re
 * `session_tmpdir()`: one unique directory per process under the system temp, removed at exit.
 * `scratch(tool, root) -> build/tmp/<tool>/` (created); `state(name, root) -> .pi/<name>` for a name on `STATE_NAMES`.
 * `ground_truth(root) -> {rel path: sha1}` from `config.yml`'s `hash`/`selfile_hash`; `verify_ground_truth(root)`.
+* `config_change(old, new) -> {ok, reason, changed}`: may this `config.yml` change be committed - only when every
+  differing top-level key is in `CONFIG_MUTABLE_KEYS` (`block_relocations`, `add_relocations`; owner ruling
+  2026-10-03); `config_blocks(text) -> ({key: lines}, problems)` is its stdlib-only reader (comments and blank lines
+  dropped; a repeated key or an unplaceable line is a problem, and a problem refuses). `CONFIG_PATH` is the file's
+  repo-relative path. Callers: `guard.py config` (the pre-commit hook) and `prepcommit.classify`.
 * `Tree(root)` (frozen): `main`, `is_worktree`, `is_slot`, `build(version)`, `obj_dir`, `src_obj_dir`, `asm_dir`,
   `report_json`, `orig_dol`, `config_yml`, `objdiff_json`, `input(rel, probe)`; `Tree.find(start)`.
 * `guard(path, what)`: the choke point (below).
