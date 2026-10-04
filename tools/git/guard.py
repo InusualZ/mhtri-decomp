@@ -6,8 +6,9 @@ is the logic behind it now: it can say what a staged path needs, and its CLI doe
 
     guard.py autocrlf    # warn (never refuse) when core.autocrlf=true, which silently defeats eol=lf
     guard.py eol         # EOL case: normalise a textish staged blob's CRs and re-stage it; refuse a binary
+    guard.py config      # refuse a staged config.yml change outside the relocation-analysis keys
 
-The two decisions are plain functions - `eol_case`, `autocrlf_warning` - so a test can
+The decisions are plain functions - `eol_case`, `autocrlf_warning`, `config_change` - so a test can
 call them directly (with the staged text or the staged paths handed in) without a shell and without first
 building a git command; the CLI is the thin layer that reads the staged paths from git and performs the fix.
 
@@ -20,6 +21,14 @@ walks `git status`, classifies paths into stage/refuse and writes a message.  Th
 concern and have to run for *any* commit, including a plain `git commit` that never calls prepcommit - so
 they live in a small importable module with no side effects on import, which both the hook and
 `guard_selftest.py` can call.
+
+**`config.yml` is ground truth, with one door.**  Its keys name the DOL, its hash, the selfile and the map
+paths (docs/plan.md 7.18), so a change to any of them refuses.  The analyzer's relocation hints
+(`block_relocations`, `add_relocations`) are the exception the owner ruled on 2026-10-03: they change what dtk
+*reads* as a relocation, never what the DOL is, and a verified change to them is committable.  The one
+implementation is `tools.lib.repo.config_change`, beside the ground-truth reader: the hook calls
+`guard.py config` (staged vs HEAD) and `prepcommit.py` calls the function (worktree vs HEAD), so the two can
+never disagree.
 """
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
@@ -28,6 +37,7 @@ import argparse
 import os
 
 from tools.lib.git import Git
+from tools.lib.repo import CONFIG_PATH, config_change
 
 def _git(root, *args, input=None):
     return Git(root).run_bytes(*args, input=input)
@@ -105,6 +115,11 @@ def autocrlf_warning(root: str = ".") -> str | None:
     return None
 
 
+def _committed_text(root: str, spec: str) -> str | None:
+    out = _git(root, "cat-file", "-p", spec)
+    return out.stdout.decode("utf-8", "replace") if out.returncode == 0 else None
+
+
 # --- what the CLI does with each decision ---------------------------------------------------------
 
 def strip_cr(data: bytes) -> bytes:
@@ -177,6 +192,16 @@ def cmd_eol(args) -> int:
     return 1 if refused else 0
 
 
+def cmd_config(args) -> int:
+    """The staged config.yml (the index) against HEAD's; silent and 0 when the index carries no change."""
+    root = args.root
+    verdict = config_change(_committed_text(root, "HEAD:" + CONFIG_PATH),
+                            _committed_text(root, ":" + CONFIG_PATH))
+    if verdict["changed"] or not verdict["ok"]:
+        print("guard: %s %s" % ("allowing" if verdict["ok"] else "refusing", verdict["reason"]))
+    return 0 if verdict["ok"] else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="the pre-commit guards behind tools/git/hooks/pre-commit")
     ap.add_argument("--root", default=None, help="repository root (default: `git rev-parse --show-toplevel`)")
@@ -184,6 +209,7 @@ def main(argv: list[str] | None = None) -> int:
     for name, fn, blurb in (
         ("autocrlf", cmd_autocrlf, "warn when core.autocrlf=true defeats eol=lf (never refuses)"),
         ("eol", cmd_eol, "normalise CRs in staged text blobs and re-stage; refuse staged binary blobs"),
+        ("config", cmd_config, "refuse a staged config.yml change outside block_relocations/add_relocations"),
     ):
         sub.add_parser(name, help=blurb).set_defaults(func=fn)
     args = ap.parse_args(argv)

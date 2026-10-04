@@ -32,13 +32,67 @@ def check(name: str, got, want) -> None:
 
 
 # --- classify(): the ground truth and the original data are refused ------------------------------------------
-for path in ("config/RMHE08/build.sha1", "config/RMHE08/config.yml", "orig/RMHE08/sys/main.dol",
+for path in ("config/RMHE08/build.sha1", "orig/RMHE08/sys/main.dol",
              "build/RMHE08/main.dol", "build.ninja", "objdiff.json", ".pi/notes/x.md", ".lavish/a.html",
              "src/main.o"):
     check(f"refuse {path}", pc.classify(path)[0], "refuse")
 
 # the ground truth gets its own reason, not the generic "build output" one
 check("ground truth reason", "ground truth" in pc.classify("config/RMHE08/build.sha1")[1], True)
+
+# --- config_change(): config.yml may change only in its relocation-analysis keys and comments -----------------
+CFG = ("# Path to the main.dol file.\n"
+       "object: orig/RMHE08/sys/main.dol\n"
+       "hash: BF4850739478CAAEDFE675949EB7C28595A7FDE9\n"
+       "\n"
+       "selfile: orig/RMHE08/files/mh3.sel\n"
+       "# (optional) gap symbols.\n"
+       "fill_gaps: true\n")
+BLOCK = ("\n# NETWORK_ERROR_* immediates are constants, not addresses.\n"
+         "block_relocations:\n"
+         "- target: extabindex:0x80020000\n"
+         "  end: extabindex:0x80020010\n")
+CFG_BLOCKED = CFG + BLOCK
+CFG_BLOCKED2 = CFG_BLOCKED + "- target: extabindex:0x80030000\n  end: extabindex:0x80030050\n"
+
+ALLOWED = {
+    "add block_relocations": (CFG, CFG_BLOCKED),
+    "add a block_relocations entry": (CFG_BLOCKED, CFG_BLOCKED2),
+    "remove block_relocations": (CFG_BLOCKED, CFG),
+    "add add_relocations": (CFG, CFG + "add_relocations:\n- source: 0x80001000\n  target: fn_80002000\n"),
+    "edit a comment": (CFG, CFG.replace("# Path to the main.dol file.", "# The original DOL.")),
+    "add a blank line": (CFG, CFG.replace("fill_gaps", "\nfill_gaps")),
+    "CRLF vs LF only": (CFG, CFG.replace("\n", "\r\n")),
+    "unchanged": (CFG, CFG),
+}
+REFUSED = {
+    "change object": (CFG, CFG.replace("object: orig/RMHE08/sys/main.dol", "object: orig/RMHE08/sys/other.dol")),
+    "change hash": (CFG, CFG.replace("BF48", "0000")),
+    "change selfile": (CFG, CFG.replace("mh3.sel", "mh4.sel")),
+    "delete a top-level key": (CFG, CFG.replace("fill_gaps: true\n", "")),
+    "rename a key": (CFG, CFG.replace("fill_gaps:", "fill_gap:")),
+    "add an unrelated key": (CFG, CFG + "write_asm: true\n"),
+    "mixed allowed + refused": (CFG, CFG_BLOCKED.replace("fill_gaps: true", "fill_gaps: false")),
+    "a key repeated": (CFG, CFG + BLOCK + BLOCK),
+    "a column-0 line that is no key": (CFG, CFG + "block_relocations\n"),
+    "file created": (None, CFG),
+    "file deleted": (CFG, None),
+}
+for name, (old, new) in ALLOWED.items():
+    verdict = guard.config_change(old, new)
+    check(f"config allows: {name}", verdict["ok"], True)
+    check(f"prepcommit stages: {name}", pc.classify("config/RMHE08/config.yml", (old, new))[0], "stage")
+for name, (old, new) in REFUSED.items():
+    verdict = guard.config_change(old, new)
+    check(f"config refuses: {name}", verdict["ok"], False)
+    check(f"prepcommit refuses: {name}", pc.classify("config/RMHE08/config.yml", (old, new))[0], "refuse")
+check("the refusal names the frozen key", "`selfile`" in guard.config_change(*REFUSED["change selfile"])["reason"],
+      True)
+check("the mixed refusal names only the frozen key",
+      "changes `fill_gaps`;" in guard.config_change(*REFUSED["mixed allowed + refused"])["reason"], True)
+check("the changed keys are reported", guard.config_change(CFG, CFG_BLOCKED)["changed"], ["block_relocations"])
+check("a trailing comment on a value line is content",
+      guard.config_change(CFG, CFG.replace("fill_gaps: true", "fill_gaps: true # x"))["ok"], False)
 
 # --- classify(): real work is still staged -------------------------------------------------------------------
 for path in ("src/Pl/pl_act.cpp", "tools/units/ledger.py", "docs/plan.md", "configure.py", "CLAUDE.md",
@@ -97,7 +151,7 @@ def temp_repo() -> str:
     """A throwaway repo with its own copy of the hooks and tools, so the hook runs there and not here."""
     tmp = tempfile.mkdtemp(prefix="guard-selftest-")
     for rel in ("tools/git/guard.py", "tools/git/hooks/pre-commit", "tools/__init__.py", "tools/lib/__init__.py",
-                "tools/lib/git.py", "tools/lib/proc.py"):
+                "tools/lib/git.py", "tools/lib/proc.py", "tools/lib/repo.py", "tools/lib/testing.py"):
         dst = os.path.join(tmp, rel)
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         shutil.copy(os.path.join(ROOT, rel), dst)
@@ -170,6 +224,61 @@ try:
     check("autocrlf: the hook warns", "core.autocrlf=true" in out, True)
 finally:
     shutil.rmtree(repo, ignore_errors=True)
+
+# 4. config.yml and the path refusals through the real hook: a repo whose first commit (hook bypassed) holds the
+#    ground truth, then one commit attempt per case, each from that same base.
+def ground_truth_repo() -> str:
+    repo = temp_repo()
+    os.makedirs(os.path.join(repo, "config", "RMHE08"))
+    write(repo, "config/RMHE08/config.yml", CFG)
+    write(repo, "config/RMHE08/build.sha1", "BF4850739478CAAEDFE675949EB7C28595A7FDE9  build/RMHE08/main.dol\n")
+    run(repo, "add", "-A")
+    run(repo, "commit", "-q", "--no-verify", "-m", "base")
+    return repo
+
+
+def write(repo: str, rel: str, text: str) -> None:
+    path = os.path.join(repo, *rel.split("/"))
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="") as fh:
+        fh.write(text)
+
+
+HOOK_CASES = (  # (name, {path: new text | None to delete}, should the commit land?)
+    ("add block_relocations", {"config/RMHE08/config.yml": CFG_BLOCKED}, True),
+    ("edit a config comment", {"config/RMHE08/config.yml": ALLOWED["edit a comment"][1]}, True),
+    ("change object", {"config/RMHE08/config.yml": REFUSED["change object"][1]}, False),
+    ("change selfile", {"config/RMHE08/config.yml": REFUSED["change selfile"][1]}, False),
+    ("delete a top-level key", {"config/RMHE08/config.yml": REFUSED["delete a top-level key"][1]}, False),
+    ("rename a key", {"config/RMHE08/config.yml": REFUSED["rename a key"][1]}, False),
+    ("mixed allowed + refused", {"config/RMHE08/config.yml": REFUSED["mixed allowed + refused"][1]}, False),
+    ("delete config.yml", {"config/RMHE08/config.yml": None}, False),
+    ("touch build.sha1", {"config/RMHE08/build.sha1": "0" * 40 + "  build/RMHE08/main.dol\n"}, False),
+    ("delete build.sha1", {"config/RMHE08/build.sha1": None}, False),
+    ("allowed config + build.sha1", {"config/RMHE08/config.yml": CFG_BLOCKED,
+                                     "config/RMHE08/build.sha1": "0" * 40 + "\n"}, False),
+    ("a file under orig/", {"orig/RMHE08/sys/main.dol": "dol"}, False),
+    ("a file under build/", {"build/RMHE08/main.elf": "elf"}, False),
+    ("an ordinary file", {"src/a.c": "int a;\n"}, True),
+)
+for name, edits, lands in HOOK_CASES:
+    repo = ground_truth_repo()
+    try:
+        head = run(repo, "rev-parse", "HEAD").stdout.strip()
+        for rel, text in edits.items():
+            if text is None:
+                run(repo, "rm", "-q", "--", rel)
+            else:
+                write(repo, rel, text)
+                run(repo, "add", "-f", "--", rel)
+        result = run(repo, "commit", "-m", "t")
+        out = result.stdout + result.stderr
+        moved = run(repo, "rev-parse", "HEAD").stdout.strip() != head
+        check(f"hook {'accepts' if lands else 'refuses'}: {name}", (result.returncode == 0, moved), (lands, lands))
+        if not lands:
+            check(f"hook refusal names the path: {name}", any(rel in out for rel in edits), True)
+    finally:
+        shutil.rmtree(repo, ignore_errors=True)
 
 # --- the hook: present, executable in the index where git records modes, and covering the four refusals -------
 hook = os.path.join(ROOT, "tools", "git", "hooks", "pre-commit")

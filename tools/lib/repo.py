@@ -195,6 +195,81 @@ def verify_ground_truth(root: str | os.PathLike, want: dict[str, str] | None = N
     return bad
 
 
+CONFIG_PATH = "config/%s/config.yml" % VERSION
+#: The top-level config.yml keys a commit may add, change or remove (owner ruling 2026-10-03).
+CONFIG_MUTABLE_KEYS = ("block_relocations", "add_relocations")
+
+
+def config_blocks(text: str) -> tuple[dict[str, list[str]], list[str]]:
+    """config.yml's top-level keys -> their content lines, plus the problems that stop a safe reading.
+
+    A minimal reader for the subset this file uses, stdlib only: a column-0 `key:` opens a block, and an
+    indented line or a column-0 `- ` list item belongs to the open block.  Full-line comments and blank lines
+    are dropped, so editing one is no change; a trailing comment on a value line is content (conservative).
+    A duplicate key, a line before the first key or a column-0 line that is no key is a problem - the caller
+    refuses rather than guess what dtk would read.
+    """
+    blocks: dict[str, list[str]] = {}
+    problems: list[str] = []
+    current = None
+    for n, raw in enumerate(text.replace("\r\n", "\n").replace("\r", "\n").split("\n"), 1):
+        line = raw.rstrip()
+        stripped = line.lstrip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if line[0] not in " \t-":
+            key, sep, _ = line.partition(":")
+            if not sep or not key or key != key.strip() or " " in key:
+                problems.append("line %d is neither a comment nor a `key:` - %r" % (n, line))
+                current = None
+                continue
+            if key in blocks:
+                problems.append("line %d repeats the key `%s`" % (n, key))
+            blocks[key] = [line]
+            current = key
+            continue
+        if current is None:
+            problems.append("line %d belongs to no key - %r" % (n, line))
+            continue
+        blocks[current].append(line)
+    return blocks, problems
+
+
+def config_change(old: str | None, new: str | None) -> dict:
+    """Decide whether a config.yml change may be committed: `{ok, reason, changed}`.
+
+    config.yml is the DOL's ground truth (docs/plan.md 7.18) except for dtk's relocation hints, which change what
+    the analyzer reads as a relocation and never what the DOL is (owner ruling 2026-10-03).  The one
+    implementation: the pre-commit hook (`guard.py config`, staged vs HEAD) and `prepcommit.classify` (worktree
+    vs HEAD) both call it.  `old` is the committed text (HEAD; None when absent) and `new` the text to commit (None when deleted).
+    ok only when every top-level key that differs is in `CONFIG_MUTABLE_KEYS` and both sides read cleanly;
+    `changed` lists the differing keys, sorted.  No textual change, or a comment-only one, is ok.
+    """
+    if old == new:
+        return {"ok": True, "reason": "unchanged", "changed": []}
+    if old is None or new is None:
+        return {"ok": False, "changed": [],
+                "reason": "%s would be %s - it is the DOL's ground truth (docs/plan.md 7.18)"
+                          % (CONFIG_PATH, "created" if old is None else "deleted")}
+    before, bad_before = config_blocks(old)
+    after, bad_after = config_blocks(new)
+    if bad_before or bad_after:
+        side = ("the committed copy: " + bad_before[0]) if bad_before else ("the new copy: " + bad_after[0])
+        return {"ok": False, "changed": [], "reason": "cannot read %s safely - %s" % (CONFIG_PATH, side)}
+    changed = sorted(k for k in set(before) | set(after) if before.get(k) != after.get(k))
+    frozen = [k for k in changed if k not in CONFIG_MUTABLE_KEYS]
+    if frozen:
+        return {"ok": False, "changed": changed,
+                "reason": "%s changes %s; only %s may change (owner ruling 2026-10-03) - the other keys are the "
+                          "DOL's ground truth (docs/plan.md 7.18)"
+                          % (CONFIG_PATH, ", ".join("`%s`" % k for k in frozen),
+                             " / ".join("`%s`" % k for k in CONFIG_MUTABLE_KEYS))}
+    if not changed:
+        return {"ok": True, "changed": [], "reason": "comment or blank-line change only"}
+    return {"ok": True, "changed": changed,
+            "reason": "relocation-analysis keys only: " + ", ".join(changed)}
+
+
 @dataclass(frozen=True)
 class Tree:
     """A repository tree and the locations the tools read in it."""

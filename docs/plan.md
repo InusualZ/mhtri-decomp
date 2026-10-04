@@ -745,7 +745,7 @@ tool is not done until `land.py` calls it or the plan says who runs it**.
 
 | item | state | evidence |
 | --- | --- | --- |
-| 7.18 ground-truth guard | **done** | `prepcommit.py` refuses `build.sha1`/`config.yml` and cross-checks the DOL hash; tracked `tools/git/hooks/pre-commit`; `tools/git/guard_selftest.py` (33 checks); both refusal paths exercised by hand |
+| 7.18 ground-truth guard | **done** | `prepcommit.py` refuses `build.sha1`/`config.yml` (except `config.yml`'s `block_relocations`/`add_relocations` keys, 2026-10-03) and cross-checks the DOL hash; tracked `tools/git/hooks/pre-commit`; `tools/git/guard_selftest.py` (33 checks); both refusal paths exercised by hand |
 | 7.1 + 7.15 `recompile.py` | **done** | compiles without ninja from a worktree that has **no `build/`**, asserts the mtime moved, prints section sizes, measures with `objdiff-cli -1/-2`; verified in MAIN (94.78261 %) and in a scratch worktree (identical, MAIN's object untouched) |
 | 7.2 `claims.py` | **done** | branch-as-lock (`worker/<slug>`), registry in `MAIN/.pi/claims.json`, `list`/`release`/`expire`; refuses a second claim; 12 checks |
 | 7.3 `brief.py` | **done** | six parts, rules extracted verbatim from §6.5/§8, inventory parsed in-process; for `Pl/pl_act`: 115 symbols, 5 below the bar, every score real |
@@ -855,7 +855,9 @@ orchestrator runs `python tools/splits/dump_asm.py --check` and regenerates when
 
 **8.1 Repository rules (non-negotiable).** Never modify `orig/RMHE08/**`. **Never edit `config/RMHE08/build.sha1` or
 `config/RMHE08/config.yml`** - they are the ground truth the campaign is measured against, and a rewritten hash
-would make every later `ok` meaningless (7.18 enforces it). Never commit build output, original files or
+would make every later `ok` meaningless (7.18 enforces it). The one exception is `config.yml`'s relocation-analysis
+keys (`block_relocations`, `add_relocations`) and comments, committable once measured (owner ruling 2026-10-03; the
+hook and `prepcommit.py` refuse every other key). Never commit build output, original files or
 scratch. Never change compiler flags/`mw_version`/tool tags to make something build - a flag change needs
 instruction-level evidence and is called out explicitly. `Matching` only when byte-identical. Do not rename or
 delete a map symbol unless nothing else depends on it. Never rewrite history, never push. Never print

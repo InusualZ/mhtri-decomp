@@ -170,5 +170,26 @@ def test_ground_truth(c):
                 ["orig/RMHE08/files/mh3.sel", "orig/RMHE08/sys/main.dol"])
 
 
+def test_config_change(c):
+    base = "# the DOL\nobject: orig/RMHE08/sys/main.dol\nhash: %s\nfill_gaps: true\n" % ("0" * 40)
+    hint = base + "block_relocations:\n- target: extabindex:0x80020000\n  end: extabindex:0x80020010\n"
+    blocks, problems = repo.config_blocks(hint)
+    c.check("config_blocks: a column-0 list item belongs to the open key",
+            blocks["block_relocations"][1:], ["- target: extabindex:0x80020000", "  end: extabindex:0x80020010"])
+    c.check("... and the file reads cleanly", problems, [])
+    c.check("a relocation hint may be added", repo.config_change(base, hint)["ok"], True)
+    c.check("... and is named", repo.config_change(base, hint)["changed"], ["block_relocations"])
+    c.check("add_relocations may change too",
+            repo.config_change(base, base + "add_relocations:\n- source: 0x1\n")["ok"], True)
+    c.check("a comment edit is no change", repo.config_change(base, base.replace("the DOL", "DOL"))["ok"], True)
+    c.check("the DOL path may not change", repo.config_change(base, base.replace("main.dol", "x.dol"))["ok"], False)
+    c.check("a removed key refuses", repo.config_change(base, base.replace("fill_gaps: true\n", ""))["ok"], False)
+    c.check("a hint riding a frozen change refuses",
+            repo.config_change(base, hint.replace("true", "false"))["changed"], ["block_relocations", "fill_gaps"])
+    c.check("... and the verdict is a refusal", repo.config_change(base, hint.replace("true", "false"))["ok"], False)
+    c.check("a deleted file refuses", repo.config_change(base, None)["ok"], False)
+    c.check("an unreadable line refuses", repo.config_change(base, base + "stray\n")["ok"], False)
+
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))

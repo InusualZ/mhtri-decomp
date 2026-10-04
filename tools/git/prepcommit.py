@@ -27,6 +27,7 @@ import os
 import subprocess
 import sys
 from tools.lib.git import Git
+from tools.lib import repo
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -36,9 +37,10 @@ REFUSE_PREFIXES = ("build/", "orig/", ".lavish/", ".pi/", ".vscode/", ".idea/", 
 REFUSE_FILES = ("objdiff.json", "compile_commands.json", "build.ninja")
 REFUSE_SUFFIXES = (".o", ".elf", ".dol", ".rel", ".map", ".MAP", ".exe", ".stackdump", ".pyc")
 # Ground truth (docs/plan.md 7.18): `build.sha1` states the original DOL's hash and `config.yml` is the analyzer
-# config the whole campaign is measured against. A commit that rewrites either would make every later
-# `ninja build/RMHE08/ok` meaningless, so they are refused here *and* cross-checked against the real DOL below.
-GROUND_TRUTH_FILES = ("config/RMHE08/build.sha1", "config/RMHE08/config.yml")
+# config the whole campaign is measured against. A commit that rewrites `build.sha1` would make every later
+# `ninja build/RMHE08/ok` meaningless, so it is refused here *and* cross-checked against the real DOL below.
+# `config.yml` is refused unless only its relocation-analysis keys change - `lib.repo.config_change` decides.
+GROUND_TRUTH_FILES = ("config/RMHE08/build.sha1",)
 ORIGINAL_DOL = "orig/RMHE08/sys/main.dol"
 
 
@@ -56,10 +58,23 @@ def msg_path() -> str:
     return path if os.path.isabs(path) else os.path.join(ROOT, path)
 
 
-def classify(path: str) -> tuple[str, str]:
-    """-> ('stage' | 'refuse', reason)."""
+def config_texts(root: str = ROOT) -> tuple[str | None, str | None]:
+    """config.yml as HEAD has it and as the worktree has it - what `git add` would stage from."""
+    head = Git(root).run("cat-file", "-p", "HEAD:" + repo.CONFIG_PATH)
+    path = os.path.join(root, *repo.CONFIG_PATH.split("/"))
+    work = open(path, "r", encoding="utf-8", errors="replace").read() if os.path.isfile(path) else None
+    return (head.stdout if head.returncode == 0 else None), work
+
+
+def classify(path: str, texts: tuple[str | None, str | None] | None = None) -> tuple[str, str]:
+    """-> ('stage' | 'refuse', reason). `texts` is config.yml's (HEAD, new) pair, read from ROOT when omitted."""
     if path in GROUND_TRUTH_FILES:
         return "refuse", "ground truth - rewriting it would void every later `ok` (plan 7.18)"
+    if path == repo.CONFIG_PATH:
+        verdict = repo.config_change(*(texts if texts is not None else config_texts()))
+        if not verdict["ok"]:
+            return "refuse", "ground truth - " + verdict["reason"]
+        return "stage", verdict["reason"]
     if path in REFUSE_FILES or path.endswith(REFUSE_SUFFIXES):
         return "refuse", "build output or scratch, never committed"
     if path.startswith(REFUSE_PREFIXES):
