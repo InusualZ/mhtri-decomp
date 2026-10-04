@@ -528,3 +528,62 @@ def include_closure(start: str, resolve: Callable[[str, str], str | None],
 
     visit(start)
     return order
+
+
+# --- identifier rewriting (a rename's other half) ------------------------------------------------------------
+
+#: The suffixes a path mention ends with (`fn_805113B0.h` is a file, never the symbol).
+PATH_SUFFIXES = (".c", ".h", ".cpp", ".hpp", ".cp", ".cc", ".o", ".s", ".inc")
+#: A character beside the name that makes it a path segment (`/`, `\`) or a string-table / member spelling
+#: (`@stringBase0`, `name$1`, `.name`), never the identifier itself.
+_PATH_ADJ = "/\\"
+_STRTAB_BEFORE = "@$."
+_STRTAB_AFTER = "@$"
+_INCLUDE_LINE = re.compile(r"[ \t]*#[ \t]*include\b")
+
+
+def rewrite_identifiers(text: str, pairs: dict[str, str], comments: bool = False) -> tuple[str, dict[str, dict]]:
+    """`text` with every whole-word occurrence of a `pairs` key replaced by its value, and the counts per name.
+
+    Rewritten: a code token; with `comments`, also a comment's mention. Never rewritten (counted `skipped`): a
+    string or char literal (program data - a name in a log string is the binary's bytes), an `#include` line, a
+    token beside `/` or `\\` or followed by a source suffix (a path - the file keeps its name), and a token after
+    `@`, `$` or `.` or before `@`, `$` (a string-table, section or member spelling). `\\b` treats `_` as a word
+    character, so a mangled `name__Fv` never matches `name`. Counts: `{name: {"code", "comment", "kept_comment",
+    "skipped"}}` (`kept_comment`: a comment mention left because `comments` is off).
+    """
+    counts = {k: {"code": 0, "comment": 0, "kept_comment": 0, "skipped": 0} for k in pairs}
+    if not pairs or not any(k in text for k in pairs):
+        return text, counts
+    rx = re.compile(r"\b(%s)\b" % "|".join(re.escape(n) for n in sorted(pairs, key=len, reverse=True)))
+    regions = spans(text)
+    starts = [s.start for s in regions]
+    out: list[str] = []
+    last = 0
+    for m in rx.finditer(text):
+        name, a, b = m.group(1), m.start(), m.end()
+        j = bisect.bisect_right(starts, a) - 1
+        kind = regions[j].kind if j >= 0 and regions[j].start <= a < regions[j].end else "code"
+        before = text[a - 1] if a else ""
+        after = text[b] if b < len(text) else ""
+        path_like = (before in _PATH_ADJ or after in _PATH_ADJ
+                     or any(text.startswith(s, b) and not text[b + len(s):b + len(s) + 1].isalnum()
+                            for s in PATH_SUFFIXES))
+        strtab_like = (before and before in _STRTAB_BEFORE) or (after and after in _STRTAB_AFTER)
+        include_line = _INCLUDE_LINE.match(text, text.rfind("\n", 0, a) + 1) is not None
+        if kind in ("string", "char") or include_line or path_like or strtab_like:
+            rewrite = False
+        elif kind in ("block", "line"):
+            rewrite = comments
+        else:
+            rewrite = True
+        if rewrite:
+            out.append(text[last:a])
+            out.append(pairs[name])
+            last = b
+            counts[name]["comment" if kind in ("block", "line") else "code"] += 1
+        else:
+            counts[name]["kept_comment" if kind in ("block", "line") and rewrite is False and not (
+                include_line or path_like or strtab_like) else "skipped"] += 1
+    out.append(text[last:])
+    return "".join(out), counts

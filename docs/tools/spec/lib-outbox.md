@@ -20,6 +20,8 @@ the free-text fields every intake reads, the validator the gate refuses on, and 
   `errors_and_warnings(findings) -> (errors, warnings)`.
 * `Entry(path, data, error)`: `.stem`, `text(field)`, `requests()`, `units()`, `symbols()`;
   `load_outbox(path)`, `load_outboxes(dir, warn=None, keep_bad=False)`, `load_notes(dir) -> {stem: text}`.
+* `requests_path(dir, slug)`, `check_requests(path) -> (errors, notes)`: the lane's integrator requests beside its
+  outbox (`lib.requests` owns the schema).
 
 ## Invariants and rules
 

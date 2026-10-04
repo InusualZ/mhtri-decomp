@@ -106,5 +106,36 @@ def test_includes_and_closure(c):
         c.check("resolve_include: None outside the bases", cscan.resolve_include("missing.h", [inc]), None)
 
 
+def test_rewrite_identifiers(c):
+    pairs = {"fn_80001000": "doThing", "lbl_80002000": "thing_table"}
+    text = ('#include "Mod/fn_80001000.h"\n'
+            '#include <Mod/fn_80001000.h>\n'
+            'void fn_80001000(void);   /* the `fn_80001000` call */\n'
+            'x = lbl_80002000[3] + fn_80001000__Fv + @fn_80001000;\n'
+            'log("fn_80001000 failed"); c = \'f\';\n'
+            '// see src/Mod/fn_80001000.c and fn_80001000.\n'
+            'y = s.fn_80001000; z = fn_800010001;\n')
+    new, counts = cscan.rewrite_identifiers(text, pairs)
+    lines = new.split("\n")
+    c.check("a quoted include path is left", lines[0], '#include "Mod/fn_80001000.h"')
+    c.check("an angle include is left", lines[1], "#include <Mod/fn_80001000.h>")
+    c.check("the code token is rewritten, the comment mention is kept by default", lines[2],
+            "void doThing(void);   /* the `fn_80001000` call */")
+    c.check("a data label is rewritten; a mangling and an @-spelling are not", lines[3],
+            "x = thing_table[3] + fn_80001000__Fv + @fn_80001000;")
+    c.check("a string literal is never rewritten", lines[4], 'log("fn_80001000 failed"); c = \'f\';')
+    c.check("a member spelling and a longer hex are left", lines[6], "y = s.fn_80001000; z = fn_800010001;")
+    c.check("the counts", counts["fn_80001000"], {"code": 1, "comment": 0, "kept_comment": 2, "skipped": 6})
+    new2, counts2 = cscan.rewrite_identifiers(text, pairs, comments=True)
+    lines2 = new2.split("\n")
+    c.check("with comments, a comment mention is rewritten", lines2[2], "void doThing(void);   /* the `doThing` call */")
+    c.check("... but a path in a comment never is", lines2[5], "// see src/Mod/fn_80001000.c and doThing.")
+    c.check("... and the counts move", (counts2["fn_80001000"]["comment"], counts2["fn_80001000"]["kept_comment"]),
+            (2, 0))
+    crlf = "a = fn_80001000;\r\nb = 1;\r\n"
+    c.check("line endings are kept", cscan.rewrite_identifiers(crlf, pairs)[0], "a = doThing;\r\nb = 1;\r\n")
+    c.check("an untouched text comes back as is", cscan.rewrite_identifiers("int x;\n", pairs)[0], "int x;\n")
+
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))

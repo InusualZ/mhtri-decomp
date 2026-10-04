@@ -713,6 +713,7 @@ because it is finished.
 | tool | use it when … |
 | --- | --- |
 | `tools/units/land.py` | **you are about to put a batch on `main`**: its rows are the law (§4). `--units` takes units *or* batch paths; `--no-outbox` is for a bookkeeping row, never for a code refusal; its `--diff` grandfathers existing rule findings and refuses *added* ones. |
+| `tools/units/integrate.py` (`land.py integrate`) | **lanes filed integrator requests**: classifies them, applies the mechanical ones (renames with their sweep, owner-header declarations, STOPGAP removal) on an `integrate/<date>` branch, builds once (narrowing a failed build per declaration), pre-runs the gate's drift/lint/undefrefs/vtable rows and prints the landing line (§10.10). `--dry-run` writes nothing. |
 | `tools/units/mergebranch.py` | **a branch was cut before `main` moved**: `resolve` brings `main` in by **row replacement** (never a union, never a `src/**` union), with the rule-2 **address** sweep — it supersedes the manual merge procedure (§5). |
 | `tools/units/flipcheck.py` | **you are deciding whether a unit may be flipped**: READY is **necessary, not sufficient**, and its relocation half does not run for an already-`Matching` unit (§8). |
 | `tools/objdiff/relocdiff.py <unit> --by-owner` | **a unit scores ~100 % and you want to know its relocations are the target's**: aligns relocations per owning symbol and compares type, symbol **name** and addend against the target object, printing only differences (`N/N relocations match`, exit 1 on any; a moved function is not a difference). Without `--by-owner` it prints both sides' tables paired by offset. objdiff scores a `bl` to the wrong symbol as equal, so this sees a wrong callee, vtable slot or pool entry that no score does. It runs on any built unit, `Matching` or not - the relocation half `flipcheck` skips for a `Matching` unit (§8). |
@@ -978,6 +979,32 @@ audited on the spot: `redundant` is pruned, drift is reported, `unlanded`/`unkno
 * **A `Matching` flip is one unit per commit, byte-identical, with a green `ok`** (§8); a lane on an exhausted
   row records the residual with both measurements and does not use `goto` (rule 8).
 
+### 10.10 Integrator requests (the network pilot, 2026-10-03/04)
+
+A lane that needs a change in another lane's unit files it in `MAIN/.pi/outbox/<slug>-requests.json` (schema:
+`tools/lib/requests.py`, spec `docs/tools/spec/lib-requests.md`); `python tools/units/integrate.py` (or `land.py
+integrate`) applies the batch on an `integrate/<date>` branch and prints the `land.py land --branch` line. Declarations
+the lane needs meanwhile go in a `STOPGAP-BEGIN(<id>)`/`STOPGAP-END(<id>)` block (§6.5 still counts them; a block with no
+open request is a stylelint finding).
+
+* **What the hand integrator cost.** L4: 16 min, 45 tool calls; L3: about 40 min by commit time, about 150 calls. The
+  four request files held 76 requests; the analysis read 35 as mechanical, 3 semi, 38 judgement, and the loader's static
+  classification reads 38 / 3 / 35 (`integrate.py --dry-run`; the difference is the GUESS renames it counts as
+  mechanical once a `--names` decision exists).
+* **What the tool reproduces (replays, measured 2026-10-04).** L4 from `eaa276e90` with 4 name decisions: one build,
+  130 s, the map commit byte-identical to `b2437f691`, the declaration delta identical to `85b3d86f5` in 5 of 8 files -
+  the 3 that differ are the `SOLibraryConfig` move (the stopgap prototype names a type `SO/soi.h` cannot see, so
+  `SOInit` stays behind as judgement). L3 from `29bc505fe` with 24 decisions: 212 s (one full build plus three
+  incremental narrowing rounds, 49 s of ninja), the map commit byte-identical to `6834716e8` (18 renames, 17 swept files), the
+  declaration delta identical to `81604ed4d` in 14 of 20 files; the 6 that differ are type changes the build refused
+  (`net_exp_heap` as `MEMiHeapHead*`, the `initNetworkLibrary` cast), the member call `setCircleMode`, the
+  `lobby_state_block` leaf header, and `MH3GetErrorString2`, which the tool moves in the first pass (the hand did it in
+  `829c6fd69`). Prose differs throughout: the tool writes an address comment, the hand wrote the evidence.
+* **Findings.** The owner's definition is the right prototype (a lane's guess at `setStreamTransferMode(u8)` was
+  `u32` in the owner); a lane's stale spelling of a name another lane already renamed (`fn_80419CF0`) is the common
+  case and is a source rewrite, not a map edit; MWCC reports one error per object per run, so narrowing a failed build
+  takes one incremental round per wrong declaration; a header read by C cannot be handed a forward-declared game type.
+
 ---
 
 ## 11. Owner rulings (standing policy, dated)
@@ -1009,6 +1036,10 @@ These are decisions, not lessons. Do not relax one without the owner.
 | 2026-10-03 | **Retire the tiler:** `attribute.py`, `attribution-queue.json`, `promote*.py`, `applysplits`, `dataattach`, `matchinggain` and the proposal half of `splitcheck` are removed (`docs/tools/retired.md`); `splits.txt` is the queue and the pool is the registered body-less units. |
 | 2026-10-03 | **One landing path:** `python tools/units/land.py land --branch worker/<slug>`; the `.pi/bin/*` scripts (`applybranch`, `landbranch`, `mergelane`, `union`) are deleted. |
 | 2026-10-03 | **Tools framework (`docs/tools/design.md`):** a selftest is a fixture (builds its tree with `lib.testing`, cannot see the live tree) or smoke (may read it, tolerant, own tier); `docs/tools/questions.md` items 3-14 stay open and the design assumes each recommendation until the owner rules. |
+| 2026-10-03 | **Network pilot:** the stack (`src/Network/*`, 25 units) is worked by four lane groups (L1 transport, L2 session core, L3 game control, L4 mediator + GameSpy) after an X3 header-prep step. |
+| 2026-10-03 | **Pilot naming exception:** a pilot lane may leave a foreign-owned `fn_`/`lbl_` name and file an outbox request; the orchestrator is the integrator (a batch after every 3-5 landings). |
+| 2026-10-03 | **`mpMediator__15sNetworkLibrary` (`.sbss` 0x80794CC4) keeps its split**; the L4 lane decides from the bodies (it did: a static of the base class, no move), files the sound-side `getInstance` as an ownership request and records the residual in the unit header. |
+| 2026-10-04 | **Build the integrator** (`tools/units/integrate.py`, `tools/lib/requests.py`). Trial rule: a lane may apply a `rename` or `decl-move` itself when the owner unit has no live claim, the confidence is certain/evidence and `integrate` proves names-only drift for the other units; GUESS names, record unification and seams stay with the integrator. |
 | standing | A rule enforced by remembering is not a rule: a rule change ships with its tool row (`stylelint`, `vtableaudit`, `sync_profiles`) in the same batch. |
 
 ---

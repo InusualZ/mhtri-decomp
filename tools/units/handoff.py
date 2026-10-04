@@ -107,6 +107,7 @@ def digest(unit: str, rows: list[dict]) -> str:
 
 
 def selftest() -> int:
+    import tempfile
     fails, checks = [], 0
 
     def check(name, got, want):
@@ -158,6 +159,16 @@ def selftest() -> int:
     check("an out-of-schema kind with no content is still rejected",
           bool(validate(dict(good, config_requests=[{"kind": "tooling"}]), {"fn_1"})[0]), True)
     check("residual 'none' is allowed", validate(dict(good, residual="none"), {"fn_1"})[0], [])
+    with tempfile.TemporaryDirectory() as tmp:
+        rq = os.path.join(tmp, "lane-a-requests.json")
+        with open(rq, "w", encoding="utf-8") as fh:
+            fh.write('{"id": "lane-a#1", "kind": "rename", "symbol": "fn_1", "proposed_name": "doIt", "evidence": "x"}\n'
+                     '{"id": "lane-a#2", "kind": "decl", "symbol": "fn_2", "evidence": "x"}\n'
+                     '{"kind": "rename", "symbol": "fn_3", "proposed": "doThat", "evidence": "x"}\n')
+        errs, notes = _outbox.check_requests(rq)
+        check("--check-requests: a decl of a generated name without a name is an error", errs,
+              ["line 2: decl of the generated name fn_2 needs `proposed_name` (rule 7: the integrator names it)"])
+        check("--check-requests: a free-text line is a note, not an error", len(notes), 1)
 
     # the outbox a worker writes by following the brief's schema table must validate clean: this is the
     # round-trip the two tools share (brief.py renders `config_schema_rows()`, the worker fills it in).
@@ -250,12 +261,23 @@ def main() -> int:
     ap.add_argument("unit", nargs="?")
     ap.add_argument("--template", action="store_true", help="print the outbox JSON to fill in")
     ap.add_argument("--check", default=None, metavar="FILE", help="validate an outbox entry")
+    ap.add_argument("--check-requests", default=None, metavar="FILE",
+                    help="validate a lane's <slug>-requests.json (lib.requests schema; free-text lines are noted)")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
 
     if args.selftest:
         return selftest()
+
+    if args.check_requests:
+        errors, notes = _outbox.check_requests(args.check_requests)
+        for n in notes:
+            print("note: %s" % n)
+        for e in errors:
+            print("ERROR: %s" % e)
+        print("%d error(s), %d free-text line(s)" % (len(errors), len(notes)))
+        return 1 if errors else 0
 
     wt = rc.worktree_root()
     main = rc.main_root(wt)

@@ -30,6 +30,9 @@ closure), `flags/shapes.py` (`remove_comments`), and through `stylelint` `mergeb
   `include_closure(start, resolve, read=None, angle=False)`.
 * `to_dict()` on `TypeDef`/`Declaration` gives the dict shape the tools carried (`Declaration` has `body` only
   on a definition).
+* `rewrite_identifiers(text, pairs, comments=False) -> (text, counts)`: a rename's other half on one file - code tokens
+  always, comment mentions with `comments`, never a literal, an `#include` line, a path-shaped or string-table-shaped
+  token (`symedit.py --rewrite` walks the tree with it).
 
 ## Invariants and rules
 

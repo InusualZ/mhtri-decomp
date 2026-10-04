@@ -247,6 +247,39 @@ def load_outboxes(directory: str, warn: TextIO | None = None, keep_bad: bool = F
     return out
 
 
+def requests_path(directory: str, slug: str) -> str:
+    """`<directory>/<slug>-requests.json` - the lane's integrator requests, one JSON object per line, beside its
+    outbox (the schema is `lib.requests.SCHEMA`; the integrator's verdicts go to the `.status.json` sidecar)."""
+    from tools.lib import requests as _requests
+    return os.path.join(directory, slug + _requests.REQUESTS_SUFFIX)
+
+
+def check_requests(path: str) -> tuple[list[str], list[str]]:
+    """`(errors, notes)` for a lane's request file: a new-schema line is validated (`lib.requests.validate`); a
+    free-text line is accepted and noted with what the loader read from it (kind, class, targets)."""
+    from tools.lib import requests as _requests
+    errors, notes = [], []
+    for n, line in enumerate(_read(path).splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError as exc:
+            errors.append("line %d: not JSON (%s)" % (n, exc))
+            continue
+        if not isinstance(row, dict):
+            errors.append("line %d: not an object" % n)
+            continue
+        if "id" in row:
+            errors += ["line %d: %s" % (n, e) for e in _requests.validate(row)]
+        else:
+            req = _requests.normalise_legacy(row, os.path.basename(path), n)
+            cls, why = _requests.classify(req)
+            notes.append("line %d: free text, read as %s / %s (%s): %s" % (
+                n, req.kind, cls, why, ", ".join(t.symbol for t in req.targets) or "no symbol"))
+    return errors, notes
+
+
 def load_notes(directory: str) -> dict[str, str]:
     """`{stem: text}` for every `*.md` in `directory` that can be read, sorted by path."""
     out = {}
