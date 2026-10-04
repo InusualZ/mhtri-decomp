@@ -56,7 +56,7 @@ git, repo.
 
 Tier: fixture (fixture tree + fixture history).
 Today's selftest (`tools/git/commitlint_selftest.py`): Every check runs against a **fixture tree** and a **fixture git history** built in a temp directory, never against this repository's working tree or HEAD, so the result cannot move when the tree does. The two mechanisms that decide the lint - the derived member sets and the message checks - are exercised both as pure functions and through the CLI, so the exit codes (0/1/2) are pinned too.
-Target: `tools/tests/git/test_commitlint.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
+Now: `tools/tests/git/test_commitlint.py` (83 checks, re-homed; `--selftest` forwards; `commitlint_selftest.py` is deleted). The tool's git calls go through `lib.git` (`toplevel`, `log`, `rev-parse`, `config`).
 
 ## Known gaps
 

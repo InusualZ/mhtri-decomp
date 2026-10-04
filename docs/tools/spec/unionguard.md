@@ -36,16 +36,17 @@ Inputs -> outputs: index stages -> verdict, cleanup.
 * For every conflicted path the tool prints what each side did (deleted / renamed / modified) and exits **non-zero** with the offending paths named, so the landing can stop *before* it stages a tree that cannot build. A tree whose conflicts are all disjoint additions still unions exactly as before.
 * **A refusal also undoes the apply.** `land.py` runs this guard *after* `git apply -3`, which has already merged into the index: UU/AA entries for the conflicts and cleanly-applied hunks staged. Refusing and then only printing "resolve these by hand" left `main` mid-conflict - staged files, conflict stages, and a `ninja` that cannot regenerate `build.ninja` - until somebody cleaned it up by hand. So on refusal the guard restores every path the branch's diff touched (`git checkout HEAD -- <path>` when HEAD has it, a delete when it does not) and runs `git reset` to drop the index stages, printing exactly what it restored and anything still dirty. `--no-cleanup` keeps the old behaviour for a deliberate inspection.
 * `land.py` passes the branch and the conflicted paths; with no paths it inspects `git ls-files -u`.
+* **`git merge-file` exits with the conflict count** (truncated to 127; negative, i.e. 255, on error). The guard read any exit other than 0/1 as a failure, so a path with **two or more** overlapping hunks raised `RuntimeError` instead of being refused (WP3f, measured on a fixture: old raises, new classifies the overlap). `lib.git.merge_file_diff3` now raises only outside 0..127.
 
 ## Lib dependencies
 
-git, merge.
+git (`unmerged_stages`, `merge_bytes`, `renames`) and the package module `tools/units/merge/unionprose.py` (`has_base_region`, the one diff3 hunk reader). The implementation is `tools/units/merge/unionguard.py`; `tools/units/unionguard.py` is the entry point and forwards every old name (`land.py` imports it).
 
 ## Test contract
 
 Tier: fixture (real git repos).
 Today's selftest (`tools/units/unionguard_selftest.py`): The guard exists because a plain ours-then-theirs union is only safe for **disjoint additions**; on a delete, a rename, or both sides editing the same region it silently writes a tree that cannot build (measured 2026-09-25: `configure.py` registered both halves of a rename; ten shared g3d headers unioned into "illegal function overloading"). The cases below are the contract: every unsafe case must be refused, and the disjoint union must still pass through and union. A refusal must also undo the `git apply -3` that `land.py` has already run - clean tree, no UU/AA, nothing staged - while `--no-cleanup` keeps the conflicted index for inspection. Every case builds a real git repo and a real unmerged index - no repository state, no build, no mocks.
-Target: `tools/tests/units/test_unionguard.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
+Now: `tools/tests/units/test_unionguard.py` on `GitFixture` (the standalone `unionguard_selftest.py` is deleted; `--selftest` forwards). The disjoint-union case unions with the real `merge.unionresolve.union_file`, not the local mirror the old selftest kept, and a two-hunk case pins the exit-count fix below.
 
 ## Known gaps
 

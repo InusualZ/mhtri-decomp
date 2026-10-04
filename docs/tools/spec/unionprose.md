@@ -33,13 +33,12 @@ Inputs -> outputs: diff3 text -> text.
 
 ## Lib dependencies
 
-text.
+none (stdlib). The implementation is `tools/units/merge/unionprose.py`, which also holds the one diff3 hunk reader (`segments`/`Hunk`, used by the union and by `unionguard.has_base_region`), `markers_in`, and `cover` - the superset computation `prose_superset` (one hunk) and `addadd_choice` (one add/add file) both decide on. `tools/units/unionprose.py` is a shim.
 
 ## Test contract
 
 Tier: fixture (pure text).
-Today's selftest: in-file `selftest()` (`--selftest`).
-Target: `tools/tests/units/test_unionprose.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
+`tools/tests/units/test_unionprose.py` (`--selftest` forwards); the real-conflict constants are in `tools/tests/units/merge_fixtures.py`.
 
 ## Known gaps
 

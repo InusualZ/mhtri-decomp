@@ -35,13 +35,13 @@ Inputs -> outputs: conflicted text -> text, verdict.
 
 ## Lib dependencies
 
-text, project, merge (unionprose).
+project (`Splits`, `object_calls`) and the package module `tools/units/merge/unionprose.py` (`union_markers`). The implementation is `tools/units/merge/unionresolve.py`; `tools/units/unionresolve.py` is the entry point and forwards every old name (`land.py`, `rescue.py` import it).
 
 ## Test contract
 
 Tier: fixture (pure text).
 Today's selftest (`tools/units/unionresolve_selftest.py`): Pure text: no git, no repository state, no build. The cases pin the union (`ours` then `theirs`, the `--diff3` base section dropped, a clean file passed through) and each of the four invariant assertions `check_union` makes, because a wrong union breaks *silently* and the assertions are the only thing that sees it. The end-to-end git fixture, including the unsafe-union refusal, lives in `land.py --selftest`.
-Target: `tools/tests/units/test_unionresolve.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
+Now: `tools/tests/units/test_unionresolve.py` (the standalone `unionresolve_selftest.py` is deleted; `--selftest` forwards).
 
 ## Known gaps
 

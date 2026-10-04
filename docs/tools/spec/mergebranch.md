@@ -40,17 +40,17 @@ Inputs -> outputs: git merge state -> resolved commit.
 
 ## Lib dependencies
 
-git, text, project, merge (unionprose).
+git (`Git.merge_bytes`, `renames`, `show`), text (`line_ending`, `atomic_write`), cscan (`strip`), project, repo (`state`), and the package module `tools/units/merge/unionprose.py` (the union rule, `addadd_choice`). The implementation is `tools/units/merge/mergebranch.py`; `tools/units/mergebranch.py` is the entry point and forwards every old name to it.
 
 ## Test contract
 
 Tier: fixture (GitFixture).
-Today's selftest: in-file `selftest()` (`--selftest`).
-Target: `tools/tests/units/test_mergebranch.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
+`tools/tests/units/test_mergebranch.py` (120 checks, the old in-file selftest re-homed; `--selftest` forwards to it). The two real prose conflicts and the pre-fix union live once in `tools/tests/units/merge_fixtures.py`.
 
 ## Known gaps
 
-None recorded.
+* `newline_of` is `lib.text.line_ending` over the whole blob (it read the first 64 KiB): a file whose first CRLF lies past 64 KiB now restores as CRLF (WP3f; 0 such files in the tree when measured).
+* The pre-flight still imports `land.py` (lazily, never fatal) for `rule7_defer_growth`, `band_ownership_warnings` and `units_from_branch`: those move with the gate's rows in WP4.
 
 ## History (the incidents behind the rules - keep the rule, drop the narrative when the rule is stable)
 

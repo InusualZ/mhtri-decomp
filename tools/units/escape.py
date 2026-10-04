@@ -1,28 +1,6 @@
 #!/usr/bin/env python3
-"""Write C string literals and source text from the command line **without a heredoc**.
-
-    python tools/units/escape.py --escape "raw text"          # -> the C string literal body
-    python tools/units/escape.py --bytes "line1\\nline2"       # -> the exact bytes
-    python tools/units/escape.py --write OUT.txt "a\\nb"       # write the exact bytes to a file
-    python tools/units/escape.py --write OUT.txt --append "a"  # append instead of replace
-    python tools/units/escape.py --edit FILE --old "a\\nb" --new "a\\tc" [--count N]
-    python tools/units/escape.py --selftest
-
-**Why this exists (the paste/heredoc hazard).** Three separate incidents in one day: a shell heredoc
-silently ate a `\\n` in a rewritten C string literal and left a broken comment line in a landed file; a
-lane's report had to be appended three times because bash truncated a long heredoc; and a working-tree
-edit replaced two real source lines with a stray `L`. A heredoc is a second parser between you and the
-bytes, and it is not the one that reads them.
-
-This tool replaces it: pass the text as **one quoted argument with C-style escapes** (`\\n`, `\\t`,
-`\\x41`, ...), and it writes the bytes itself. `--escape` is the other direction - type raw text and get
-the literal body when you have to paste one. `--edit` is the safe rewrite: it operates on **bytes**,
-reports the match count, and refuses when the count is not the one you asserted (the "assert the match
-count" pattern) - so a replacement that matched zero or two places writes nothing instead of corrupting
-the file.
-
-The bytes are only ever Python `bytes`; nothing goes through a shell.
-"""
+"""Write C string literals and exact bytes from one quoted argument, without a heredoc; `--edit` is `edit.py replace`.
+Spec: docs/tools/spec/escape.md. CLI: escape.py --escape T | --bytes T | --write FILE [--append] T | --edit FILE --old T --new T [--count N] | --selftest."""
 
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
@@ -33,67 +11,15 @@ import sys
 
 from tools.lib import text as libtext
 
-# The two characters that always need escaping inside a C string literal, plus the control characters
-# with a short spelling. Everything else non-printable becomes `\xHH`.
-SHORT = {"\\": "\\\\", '"': '\\"', "\n": "\\n", "\t": "\\t", "\r": "\\r",
-         "\a": "\\a", "\b": "\\b", "\f": "\\f", "\v": "\\v"}
-UNSHORT = {"n": b"\n", "t": b"\t", "r": b"\r", "a": b"\a", "b": b"\b", "f": b"\f", "v": b"\v",
-           "\\": b"\\", '"': b'"', "'": b"'", "0": b"\0"}
-OCTAL = "01234567"
-
 
 def encode(text: str) -> str:
-    """`raw text` -> a C string literal **body** (no surrounding quotes) that decodes back to it."""
-    out = []
-    for ch in text:
-        if ch in SHORT:
-            out.append(SHORT[ch])
-        elif 0x20 <= ord(ch) < 0x7F:
-            out.append(ch)
-        else:
-            out.append("\\x%02x" % ord(ch))
-    return "".join(out)
+    """`raw text` -> a C string literal **body** (`lib.text.c_escape`)."""
+    return libtext.c_escape(text)
 
 
 def decode(text: str) -> bytes:
-    """A C string literal body -> the exact bytes (`\\n`, `\\t`, `\\xHH`, `\\NNN` all understood).
-
-    An unknown escape is kept as the two literal characters it is - never silently dropped - so a typo
-    surfaces in the output instead of vanishing.
-    """
-    out = bytearray()
-    i = 0
-    n = len(text)
-    while i < n:
-        ch = text[i]
-        if ch != "\\" or i + 1 >= n:
-            out += ch.encode("utf-8")
-            i += 1
-            continue
-        nxt = text[i + 1]
-        if nxt in UNSHORT:
-            out += UNSHORT[nxt]
-            i += 2
-        elif nxt == "x":
-            j = i + 2
-            while j < n and j < i + 4 and text[j] in "0123456789abcdefABCDEF":
-                j += 1
-            if j == i + 2:
-                out += b"\\x"          # a bare `\x`: keep it, do not eat the following character
-                i += 2
-            else:
-                out.append(int(text[i + 2:j], 16) & 0xFF)
-                i = j
-        elif nxt in OCTAL:
-            j = i + 1
-            while j < n and j < i + 4 and text[j] in OCTAL:
-                j += 1
-            out.append(int(text[i + 1:j], 8) & 0xFF)
-            i = j
-        else:
-            out += ("\\" + nxt).encode("utf-8")
-            i += 2
-    return bytes(out)
+    """A C string literal body -> the exact bytes (`lib.text.c_unescape`; an unknown escape stays literal)."""
+    return libtext.c_unescape(text)
 
 
 def atomic_write(path: str, data: bytes, append: bool = False) -> None:
@@ -101,18 +27,21 @@ def atomic_write(path: str, data: bytes, append: bool = False) -> None:
 
 
 def edit(path: str, old: bytes, new: bytes, count: int = 1) -> int:
-    """Byte-level replace in `path`, asserting `count` matches. Returns the matches replaced."""
+    """Replace `old` in `path`, asserting `count` matches (`lib.text.replace_bytes`: the needle matches across
+    `\\n` or `\\r\\n` and the replacement takes the ending of the span it replaces - `edit.py replace`'s rule)."""
     if not old:
         raise SystemExit("--old is empty; refusing to replace every position")
     with open(path, "rb") as fh:
         data = fh.read()
-    found = data.count(old)
-    if found != count:
+    try:
+        after, lines = libtext.replace_bytes(data, old, new, count)
+    except libtext.MatchCountError as exc:
+        found = len(exc.lines)
         raise SystemExit("REFUSED: %s contains %d match(es) of the old text, not the %d asserted - "
                          "nothing written (re-run with --count %d if that is right)"
-                         % (path, found, count, found))
-    atomic_write(path, data.replace(old, new))
-    return found
+                         % (path, found, count, found)) from None
+    atomic_write(path, after)
+    return len(lines)
 
 
 def selftest() -> int:
@@ -157,6 +86,12 @@ def selftest() -> int:
             check("... byte-exactly", fh.read(), b"int a = Y;\nint b = Y;\n")
         check("edit refuses zero matches", _raises(lambda: edit(path, b"ZZZ", b"Y", count=1)), True)
         check("edit refuses an empty old", _raises(lambda: edit(path, b"", b"Y", count=1)), True)
+        crlf = os.path.join(tmp, "crlf.c")
+        atomic_write(crlf, b"int a;\r\nint b;\r\n")
+        check("edit matches an LF needle in a CRLF file (edit.py replace's rule)",
+              edit(crlf, b"int a;\nint b;\n", b"int a;\nint c;\n"), 1)
+        with open(crlf, "rb") as fh:
+            check("... and the replacement keeps the file's CRLF", fh.read(), b"int a;\r\nint c;\r\n")
 
     # --- the CLI, as a lane types it --------------------------------------------------------------
     import contextlib

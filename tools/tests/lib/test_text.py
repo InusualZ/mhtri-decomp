@@ -20,6 +20,22 @@ def test_endings(c):
             (b"a\r\nb\r\n", b"a\nb\n"))
     c.check("line_ending / with_ending on text", (text.line_ending("a\r\nb"), text.line_ending("a\nb"),
                                                   text.with_ending("a\r\nb\n", "\r\n")), ("\r\n", "\n", "a\r\nb\r\n"))
+    c.check("ending_counts counts CRLF apart from a bare LF and a lone CR",
+            text.ending_counts(b"a\r\nb\nc\r\nd\re"), {"crlf": 2, "lf": 1, "lone_cr": 1})
+    c.check("... and nothing in a file with no break", text.ending_counts(b"ab"), {"crlf": 0, "lf": 0, "lone_cr": 0})
+
+
+def test_c_escapes(c):
+    c.check("c_escape: newline, quote, backslash, control, printable",
+            [text.c_escape(s) for s in ("a\nb", 'say "hi"', "C:\\x", "\x01", "hello world")],
+            ["a\\nb", 'say \\"hi\\"', "C:\\\\x", "\\x01", "hello world"])
+    c.check("c_unescape: \\n, \\x41, \\101 (octal), \\t\\r",
+            [text.c_unescape(s) for s in ("a\\nb", "\\x41", "\\101", "\\t\\r")], [b"a\nb", b"A", b"A", b"\t\r"])
+    c.check("an unknown escape and a bare \\x stay literal",
+            (text.c_unescape("a\\qb"), text.c_unescape("\\xg")), (b"a\\qb", b"\\xg"))
+    c.check("a trailing backslash is kept", text.c_unescape("a\\"), b"a\\")
+    c.check("the round trip is exact", text.c_unescape(text.c_escape("line1\nline2\t\"q\"\\")),
+            b"line1\nline2\t\"q\"\\")
 
 
 def test_replace_bytes(c):

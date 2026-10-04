@@ -1,35 +1,7 @@
 #!/usr/bin/env python3
-"""The pre-commit guards, as logic plus a CLI the hook calls.
-
-`tools/git/hooks/pre-commit` used to be a shell script that could only *refuse* a bad commit.  This module
-is the logic behind it now: it can say what a staged path needs, and its CLI does the fix.
-
-    guard.py autocrlf    # warn (never refuse) when core.autocrlf=true, which silently defeats eol=lf
-    guard.py eol         # EOL case: normalise a textish staged blob's CRs and re-stage it; refuse a binary
-    guard.py config      # refuse a staged config.yml change outside the relocation-analysis keys
-
-The decisions are plain functions - `eol_case`, `autocrlf_warning`, `config_change` - so a test can
-call them directly (with the staged text or the staged paths handed in) without a shell and without first
-building a git command; the CLI is the thin layer that reads the staged paths from git and performs the fix.
-
-**The index blob, not the worktree.**  A commit carries the *index*, so the EOL case reads the staged blob
-(`git cat-file -p :<path>`) rather than the file on disk: a CRLF blob in the index is what would land,
-whatever the worktree looks like.
-
-**Why this lives here and not in `prepcommit.py`.**  `prepcommit.py` is a staging/commit-message CLI: it
-walks `git status`, classifies paths into stage/refuse and writes a message.  The guards are a different
-concern and have to run for *any* commit, including a plain `git commit` that never calls prepcommit - so
-they live in a small importable module with no side effects on import, which both the hook and
-`guard_selftest.py` can call.
-
-**`config.yml` is ground truth, with one door.**  Its keys name the DOL, its hash, the selfile and the map
-paths (docs/plan.md 7.18), so a change to any of them refuses.  The analyzer's relocation hints
-(`block_relocations`, `add_relocations`) are the exception the owner ruled on 2026-10-03: they change what dtk
-*reads* as a relocation, never what the DOL is, and a verified change to them is committable.  The one
-implementation is `tools.lib.repo.config_change`, beside the ground-truth reader: the hook calls
-`guard.py config` (staged vs HEAD) and `prepcommit.py` calls the function (worktree vs HEAD), so the two can
-never disagree.
-"""
+"""The pre-commit guards (`autocrlf` warns, `eol` normalises a staged CR text blob or refuses a binary, `config`
+refuses a frozen config.yml key), as logic plus the CLI the hook calls. Spec: docs/tools/spec/guard.md.
+CLI: guard.py [--root R] autocrlf | eol | config."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
@@ -39,34 +11,26 @@ import os
 from tools.lib.git import Git
 from tools.lib.repo import CONFIG_PATH, config_change
 
+
 def _git(root, *args, input=None):
     return Git(root).run_bytes(*args, input=input)
 
 
-def _git_text(root, *args) -> str:
-    out = _git(root, *args).stdout
-    return out.decode("utf-8", "replace")
-
-
 def repo_root(path: str = ".") -> str:
     """The working-tree root for `git -C path`, else `path` itself.  Hooks run at the root already."""
-    out = _git_text(path, "rev-parse", "--show-toplevel").strip()
-    return out or os.path.abspath(path)
+    return Git(path).toplevel() or os.path.abspath(path)
 
 
 def staged_paths(root: str = ".") -> list[str]:
     """Every path staged for this commit that exists in the index (added/copied/modified/renamed)."""
-    return [line for line in _git_text(root, "diff", "--cached", "--name-only", "--diff-filter=ACMR")
+    return [line for line in Git(root).out("diff", "--cached", "--name-only", "--diff-filter=ACMR", check=False)
             .splitlines() if line]
 
 
 def index_blob(root: str, path: str) -> bytes | None:
-    """The staged blob's bytes (`git cat-file -p :<path>`), or None when the path is not in the index.
-
-    `:` names the index, deliberately: the guard must judge what would be committed, not what is on disk.
-    """
-    out = _git(root, "cat-file", "-p", ":" + path)
-    return out.stdout if out.returncode == 0 else None
+    """The staged blob's bytes, or None when the path is not in the index: the guard judges what would be
+    committed, not what is on disk (`lib.git.Git.cat_index`)."""
+    return Git(root).cat_index(path)
 
 
 # --- the two decisions (pure enough to call without a hook) ------------------------------------
@@ -134,7 +98,7 @@ def _force_index_lf(root: str, path: str, data: bytes) -> bool:
     re-add CRs on `git add` must not undo the fix, so this writes the blob and points the index entry at it.
     """
     sha = _git(root, "hash-object", "-w", "--no-filters", "--stdin", input=data).stdout.decode().strip()
-    ls = _git_text(root, "ls-files", "-s", "--", path).strip()
+    ls = Git(root).out("ls-files", "-s", "--", path, check=False).strip()
     if not sha or not ls:
         return False
     mode = ls.split()[0]

@@ -24,7 +24,7 @@ The 16 wrappers delegate their process call here: `claims.git/_git_quiet`, `land
 * blobs and the index: `show(ref, path) -> bytes | None` (CRLF kept), `cat_index(path) -> bytes | None`,
   `ls_files(*paths, eol=False)` (paths, or `(index class, worktree class, attr, path)` rows), `status_porcelain(untracked)`
   (`[(XY, path)]`, a rename's new path), `diff_names(a, b=None, *paths)`, `renames(a, b)`, `unmerged_stages(path=None)`
-  (`{path: {stage: sha}}`), `merge_file_diff3(ours, base, theirs) -> (bytes, conflicts)` (writes nothing).
+  (`{path: {stage: sha}}`), `merge_file_diff3(ours, base, theirs, labels=None) -> (bytes, conflicts)` (writes nothing; `labels` are the three `-L` names), `merge_bytes(ours, base, theirs, labels=None)` (the same over three byte strings, through a private temp dir - `mergebranch.merge_file` and `unionguard.three_way_overlap` both called their own copy).
 * writes: `stage(paths)`, `unstage(paths)`, `commit(message_file, pathspec) -> sha`.
 * worktrees: `worktree_list() -> [Worktree(path, head, branch, bare, detached, locked, prunable)]` (MAIN first),
   `worktree_add(path, branch, start=None, new=True)`, `worktree_remove(path, force=False)`.
@@ -35,6 +35,7 @@ The 16 wrappers delegate their process call here: `claims.git/_git_quiet`, `land
 * **No `git add -A` anywhere**: `stage`, `unstage` and `commit` refuse an empty pathspec (`ValueError`).
 * Every path a call returns is forward-slashed; every path argument to `show`/`cat_index` is forward-slashed first.
 * The environment is inherited, never scrubbed: the hook's `GIT_INDEX_FILE`/`GIT_DIR` must reach the call.
+* **`merge-file` exits with the conflict count** (truncated to 127), negative on error (255 once it passes a shell): `merge_file_diff3` raises `GitError` outside 0..127 and returns the count otherwise. `unionguard` read any exit but 0/1 as a failure, so two conflict hunks raised (WP3f).
 * A wrapper keeps its own failure policy (its message, `SystemExit` vs `RuntimeError` vs `None`); only the process call is
   shared, so each tool's output and exit code are unchanged.
 
@@ -51,11 +52,9 @@ The process call of the 16 wrappers listed above (`duplication.md` (d)); `stylel
 
 Tier: fixture (`tools/tests/lib/test_git.py`, on a `GitFixture`). Each call's shape; `show` returns the blob bytes unchanged
 (CRLF kept) and takes a backslashed path; `stage`/`commit` refuse an empty pathspec and commit exactly the pathspec;
-`worktree_list` puts MAIN first; `merge_tree` and `merge_file_diff3` report a conflict; `unmerged_stages` lists 1/2/3.
+`worktree_list` puts MAIN first; `merge_tree` and `merge_file_diff3` report a conflict; `merge_bytes` counts two hunks as 2 (not an error), puts the labels in the markers and returns 0 for a clean merge; a missing input raises; `unmerged_stages` lists 1/2/3.
 
 ## Known gaps
 
-* `guard.index_blob` reads `cat-file -p :path` through `guard._git`, i.e. already through here; it becomes
-  `Git.cat_index` when `guard` is thinned (WP3f).
-* `recompile.main_worktree_list` and `queue._file_lines`, `land._is_ancestor`, `checklf.blob_of` still spell their git
+* `recompile.main_worktree_list` and `queue._file_lines`, `land._is_ancestor` still spell their git
   question through their wrapper rather than the typed method; their families' packages switch them.

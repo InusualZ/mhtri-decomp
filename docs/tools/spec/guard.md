@@ -65,7 +65,7 @@ Target: `tools/tests/git/test_guard.py` on `lib.testing` (`FixtureTree`/`GitFixt
 
 ## Known gaps
 
-None recorded.
+* `guard_selftest.py` is still the legacy shape (it reads the live hook and the ground truth): splitting it into a fixture module and a smoke module is open. `index_blob`/`repo_root`/`staged_paths` are `lib.git` calls (`cat_index`, `toplevel`, `out`) since WP3f.
 
 ## History (the incidents behind the rules - keep the rule, drop the narrative when the rule is stable)
 

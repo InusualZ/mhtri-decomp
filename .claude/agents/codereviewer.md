@@ -317,10 +317,11 @@ lines with a stray `L`. Use the helper instead:
 
     python tools/units/escape.py --write FILE "a\nb"      # C escapes \n \t \r \ \" \xHH \NNN -> exact bytes
     python tools/units/escape.py --escape FILE            # reverse: raw bytes -> a pasteable C literal
-    python tools/units/escape.py --edit FILE --old "..." --new "..." --count N
+    python tools/agents/edit.py replace FILE --old "..." --new "..." --count N   # C escapes; LF or CRLF
 
-`--edit` works at byte level and **refuses, writing nothing, when the match count is not the N you asserted** - that
-is the difference between a rewrite and a corruption. Assert the count every time.
+`replace` matches across `\n` or `\r\n`, keeps the file's own endings, and **refuses, writing nothing, when the
+match count is not the N you asserted** - that is the difference between a rewrite and a corruption. Assert the count
+every time (`escape.py --edit` is the same rule, kept until the WP6 sweep).
 
 ## Commit messages
 

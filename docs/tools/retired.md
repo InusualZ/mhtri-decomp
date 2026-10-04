@@ -63,7 +63,7 @@ The entries below are the evidence and history that were kept; `tools/splits/gen
   `@NNN`/`@etb_*` labels, `STT_FILE`, `.comment`) is the spec of `lib.objcompare.undefined`.
 * **`tools/units/relocaudit-findings.md`**, **`tools/flags/infer-run.md`**: dated outputs of one run; deleted (the commands that
   regenerate them are in the specs).
-* **`tools/units/checklf.py`** (153) -> `agents/edit.py check --blob`. Evidence: same concern as `edit.py check` (working tree vs
+* **`tools/units/checklf.py`** (153) -> `agents/edit.py check --blob` (a shim since WP3f, `spec/checklf.md`). Evidence: same concern as `edit.py check` (working tree vs
   index endings); no caller. History: the invisibility it documents - after `git add`, `git diff`/`status`/`diff --cached` are all
   empty while the file on disk is CRLF - is the rule in `lib.text`'s spec.
 * **`tools/units/escape.py --edit`** -> `agents/edit.py replace`; `--escape`/`--bytes`/`--write` stay (the profiles use them).
