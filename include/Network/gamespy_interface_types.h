@@ -28,14 +28,9 @@ class NetworkPeerGameSpy;
 /* the GameSpy worker thread object (the string pool spells its methods `NetworkGameSpyInterface::<method>`) */
 /* --------------------------------------------------------------------------------------------- */
 
-/* The DWC service-locator result `DWC_SVLGetTokenAsync` fills (the SDK's `DWCSvlResult`: a status, the host and
- * the token): `GameSpyInterfaceThread::runNasLogin` hands the one the mediator keeps to the SDK.  size: 0x174 */
-typedef struct DWCSvlResult {
-    /* +0x000 */ s32  status;
-    /* +0x004 */ char svlhost[65];
-    /* +0x045 */ char svltoken[301];
-    /* +0x172 */ u8   pad_172[0x02];
-} DWCSvlResult;
+/* The DWC service-locator result `GameSpyInterfaceThread::runNasLogin` hands the SDK (defined by its owner,
+ * `DWCi/dwc_nasfunc.h`; only pointers to it are held here). */
+struct DWCSvlResult;
 
 /* The error triple `GameSpyInterfaceThread::getErrorStruct` fills (three words) and the Pat band copies and
  * forwards: +0x04 is compared with 75 signed.  size: 0xC - `NetworkSessionManagerPat::move`'s frame gives the record

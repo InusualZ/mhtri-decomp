@@ -2057,16 +2057,16 @@ Network/NetworkPat.cpp:
 	.text       start:0x80419AD4 end:0x8041A194
 
 Network/NetworkReflectService.cpp:
-	extab       start:0x8001CF88 end:0x8001CFF0
-	extabindex  start:0x8003D950 end:0x8003D9BC
-	.text       start:0x8041A194 end:0x8041A87C
-	.data       start:0x80603118 end:0x80603154
+	extab       start:0x8001CF88 end:0x8001D010
+	extabindex  start:0x8003D950 end:0x8003D9EC
+	.text       start:0x8041A194 end:0x8041B194
+	.data       start:0x80603118 end:0x806031A0
 	.sbss       start:0x80794CD8 end:0x80794CE0
 
 Network/GameSpyInterfaceThread.cpp:
-	extab       start:0x8001CFF0 end:0x8001D16C
-	extabindex  start:0x8003D9BC end:0x8003DBD8
-	.text       start:0x8041A87C end:0x8041DF10
+	extab       start:0x8001D010 end:0x8001D16C
+	extabindex  start:0x8003D9EC end:0x8003DBD8
+	.text       start:0x8041B194 end:0x8041DF10
 	.data       start:0x806031A0 end:0x80603714
 	.bss        start:0x806D3650 end:0x806D3670
 	.sdata      start:0x80793990 end:0x807939A0

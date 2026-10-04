@@ -355,7 +355,8 @@ public:
     /* +0x1C (GUESS: binds the stream to a block that is full) */ virtual void bind(u8* block, u32 size);
     /* +0x20 (GUESS) */ virtual s32 fill(u8* out, u32 size);
     /* +0x24 (GUESS) */ virtual s32 put(const u8* data, u32 size);
-    /* +0x28 (GUESS: offset-derived) */ virtual void slot_28();
+    /* +0x28 (GUESS: copies another sink's record in - the roster, peer and session address copies dispatch it
+       with the source record) */ virtual void copyFrom(const u8* src);
     /* +0x2C (GUESS: offset-derived) */ virtual void slot_2C();
     /* +0x30 (GUESS: offset-derived) */ virtual void slot_30();
     /* +0x34 (GUESS: offset-derived) */ virtual void slot_34();

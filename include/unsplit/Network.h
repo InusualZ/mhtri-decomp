@@ -352,10 +352,6 @@ extern u32 lbl_80603740[];
  * this band).  A band header that still declared them would collide with the owners' definitions.
  */
 
-/* the warning `updateCallbackStep` logs: a string of the neighbouring NetworkReflectService TU (its run ends at
-   that class's vtable 0x80603190, which unsplit code reads), so no claim of this band's unit can cover it */
-extern const char lbl_80603154[];
-
 /* ---- the layer request state machine's callees (0x803DECF0..0x803EF4C8, 0x8040144C..0x80401B68) ---- */
 
 /* The request record `NetworkRequest_getError` copies out: the three words `NetworkRequest_setError`

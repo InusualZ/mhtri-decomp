@@ -1,6 +1,6 @@
 /*
  * include/Network/NetworkReflectService.h - the declarations `src/Network/NetworkReflectService.cpp` owns
- * (`.text` 0x8041A194..0x8041A87C, the `NetworkReflectService` class's C-linkage entry points).
+ * (`.text` 0x8041A194..0x8041B194, the `NetworkReflectService` class: its members and C-linkage entry points).
  *
  * The unit has no bodies yet, so every parameter list is the one its caller (the mediator band,
  * `Network/NetworkWiiMediator.cpp`) demonstrates.  Moved here from that caller (docs/plan.md 6.5 rule 2:
@@ -11,9 +11,6 @@
 
 #include "types.h"
 
-/* the DWC event message `applyEvent` folds in (defined in `Network/GameSpyInterfaceThread.h`, beside its two views) */
-union GameSpyEventMsg;
-
 /* One entry of the service's channel table (and of the channel list a DWC event carries). */
 typedef struct GameSpyChannel {
     /* +0x00 */ u8  ownerId_00;
@@ -22,6 +19,30 @@ typedef struct GameSpyChannel {
     /* +0x08 */ u8  address_08[0x1F];
     /* +0x27 */ u8  tail_27;
 } GameSpyChannel;   /* size: 0x28 */
+
+/* the two overlapping views of the DWC event message `applyEvent` folds in */
+typedef struct GameSpyChannelMsg {
+    /* +0x00 */ u8  channel_00;
+    /* +0x01 */ u8  pad_01[0x03];
+    /* +0x04 */ u32 peerId_04;
+    /* +0x08 */ u32 limit_08;
+    /* +0x0C */ u8  count_0C;
+    /* +0x0D */ u8  pad_0D[0x03];
+    /* +0x10 */ const GameSpyChannel* channels_10;
+} GameSpyChannelMsg;   /* size: 0x14 (approximation: only the leading words are addressed) */
+
+typedef struct GameSpyDataMsg {
+    /* +0x00 */ u32 channel_00;
+    /* +0x04 */ u32 writePos_04;
+    /* +0x08 */ u32 size_08;
+    /* +0x0C */ void* data_0C;
+} GameSpyDataMsg;   /* size: 0x10 (approximation: only the leading words are addressed) */
+
+/* DWC hands the same payload to both event codes, so the record is read through either view */
+typedef union GameSpyEventMsg {
+    /* +0x00 */ GameSpyChannelMsg channelView;
+    /* +0x00 */ GameSpyDataMsg dataView;
+} GameSpyEventMsg;   /* size: 0x14 */
 
 /* The reflect callback the mediator registers (`reflectInit` stores it at +0x78C and the service
  * calls it back with four words and two payload pointers - the `PFllllPvPv_v` half of
@@ -35,15 +56,15 @@ typedef void (*NetworkWiiMediatorReflectFn)(s32, s32, s32, s32, void*, void*);
  *     (retail's `lwz r12, 0(r3)` / `lwz r12, 8(r12)`) and allocates the object with `new` - 0x816C bytes,
  *     the allocation `reflectInit` makes - so the class carries the real virtual and the out-of-line
  *     constructor (the unit-level builder at 0x8041A1C4, `__ct__21NetworkReflectServiceFv`);
- *   - the GameSpy band (`Network/GameSpyInterfaceThread.cpp`) defines five of its members and addresses the fields
- *     below.
- * The virtual is declared and never defined in either user, so no vtable is emitted there (the table
- * belongs to the unit that defines `finalize`). */
+ *   - the owner (`Network/NetworkReflectService.cpp`) defines every member, the five GameSpy sub-machines
+ *     (`updateCallbackStep`..`applyEvent`) included, and the destructor that emits the table. */
 class NetworkReflectService {
 public:
     NetworkReflectService();
-    /* +0x0000 - the vtable pointer; slot +0x08 is the finalizer `reflectFinal` calls with flag 1 */
-    virtual void finalize(s32 flags);
+    /* +0x0000 - the vtable pointer the compiler stores; the deleting destructor is the class's one virtual
+     * (slot +0x08, which `reflectFinal` reaches through `delete`) and the key function, so
+     * `Network/NetworkReflectService.cpp` emits the table (`__vt__21NetworkReflectService`, 0x80603190) */
+    virtual ~NetworkReflectService();
 
     /* +0x0004 */ NetworkWiiMediatorReflectFn callback_04;
     /* +0x0008 */ void* callbackArg_08;

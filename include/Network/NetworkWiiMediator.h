@@ -17,7 +17,8 @@
 
 #include "types.h"
 #include "Network/NetworkReflectService.h"   /* NetworkWiiMediatorReflectFn - the reflect service's callback type */
-#include "Network/gamespy_interface_types.h" /* DWCSvlResult */
+#include "Network/gamespy_interface_types.h"
+#include "DWCi/dwc_nasfunc.h"               /* DWCSvlResult - owner DWCi/dwc_nasfunc.cpp */
 
 /* The mediator's field layout, traced from the disassembly: every offset below is one an instruction
  * in this unit addresses.  `buffer_A`/`buffer_B` are the two 0x106-byte blocks the accessors copy,

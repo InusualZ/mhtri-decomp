@@ -246,10 +246,7 @@ void NetworkWiiMediator::reflectFinal()
         return;
     }
     finalizeReflectService(getReflectService());
-    NetworkReflectService* service = getReflectService();
-    if (service != NULL) {
-        service->finalize(1);
-    }
+    delete getReflectService();
 }
 #pragma peephole off
 s32  NetworkWiiMediator::getOpeningProgress()

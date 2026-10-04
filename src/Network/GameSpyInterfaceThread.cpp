@@ -1,21 +1,18 @@
 /*
- * GameSpyInterfaceThread.cpp - the GameSpy interface / peer band, `.text` 0x8041A87C..0x8041DF10.
+ * GameSpyInterfaceThread.cpp - the GameSpy interface / peer band, `.text` 0x8041B194..0x8041DF10.
  *
  * FILE NAME.  Registered under the map stem `fn_8041A87C.cpp`; renamed for the worker-thread class whose methods
  * fill the range (`__ct__22GameSpyInterfaceThreadFv`, `tGameSpyInterface`, `step`, `publishRequest`).  The class's
  * type-only header, read by the mediator band, is `Network/gamespy_interface_types.h`.
  *
- * WHAT IT IS.  Four object types share the range: five `NetworkReflectService` methods (connect/search
- * sub-machines, the DWC event applier), the GT2 socket callbacks and the worker thread
+ * WHAT IT IS.  The GT2 socket callbacks and three object types share the range: the worker thread
  * `GameSpyInterfaceThread`, `NetworkPeerGameSpy` and `NetworkTimedHandler`.  Each owns its bodies as members;
  * every call through a foreign object's vtable goes through a declared `virtual` on that class (the only
  * shape MWCC emits as `lwz r12, 0x0(r3)` / `lwz r12, <slot>(r12)`).
  *
- * SEAMS (the registration was unproven; now evidenced, a recut is filed in the outbox).  Three or four TUs:
- * (1) `updateCallbackStep`..`applyEvent` (0x8041A87C..0x8041B194) are `NetworkReflectService` members: its ctor
- * is `__ct__21NetworkReflectService` (0x8041A1C4), the thunk at 0x8041A194 tail-calls `applyEvent`, the one at
- * 0x8041A5A8 is its `notify`, and `updateCallbackStep` logs the string at 0x80603154 that precedes that class's
- * vtable 0x80603190.  (2) The thread's vtable 0x806036A0 is followed by the peer's strings 0x806036B0: a
+ * SEAMS.  (1) The left edge 0x8041B194 is the recut of request net2-l4-cff5#1: `updateCallbackStep`..`applyEvent`
+ * (0x8041A87C..0x8041B194) are `NetworkReflectService` members and moved to `Network/NetworkReflectService.cpp`
+ * with their string 0x80603154 and the class table 0x80603190.  (2) The thread's vtable 0x806036A0 is followed by the peer's strings 0x806036B0: a
  * vtable-to-string seam at 0x8041D750 (`NetworkPeerGameSpy`, vtable 0x80603714).  (3) The timed handler's vtable
  * 0x80603740 rises above the peer's: a third TU at 0x8041DE20.
  *
@@ -34,12 +31,11 @@
  *
  * DATA (INTERIM).  Claimed and emitted: `.data` 0x806031A0..0x80603714 (the callback set first, then the log
  * strings as literals in retail's order, then the thread vtable), `.bss` 0x806D3650..0x806D3670 and `.sbss`
- * 0x80794CE0..0x80794CE8.  The `.data` claim is interim and both edges are suspect: the left edge holds only if
- * the Reflect TU takes 0x80603154..0x806031A0, and the right edge 0x80603714 is probably false - the thread TU
- * should end at 0x806036B0 (peer strings and vtable belong to the peer TU).  Deferred by the data tools:
- * `lbl_80603154` and `lbl_80603740` (span-blocked, they belong to the Reflect and timed-handler TUs) and the
- * `.sdata` entries `sRejectMessageNG`, `sEmptyString`, `sPortFormat` (isolated run).  The two `lbl_` names stay:
- * renaming an extern of unclaimed data adds a rule-12 finding.  The callback set is defined ahead of the first
+ * 0x80794CE0..0x80794CE8.  The `.data` claim is interim: its left edge is the Reflect TU's end, but the right
+ * edge 0x80603714 is probably false - the thread TU should end at 0x806036B0 (peer strings and vtable belong to
+ * the peer TU).  Deferred by the data tools: `lbl_80603740` (span-blocked, it belongs to the timed-handler TU)
+ * and the `.sdata` entries `sRejectMessageNG`, `sEmptyString`, `sPortFormat` (isolated run).  The `lbl_` name
+ * stays: renaming an extern of unclaimed data adds a rule-12 finding.  The callback set is defined ahead of the first
  * literal because MWCC emits `.data` in definition order.
  *
  * NAMES.  The six `gt2*Callback` bodies and `DWC_GetLastErrorEx` come from the pool strings; every other name
@@ -55,8 +51,7 @@
  * first argument.  `init`, `publishRequest`: register colouring.  Sections: `.data` 1392 of 1396 B until the
  * cut, `extab` 360 of 380 B (a 20-byte cleanup record against `dtor_803CA338`, the peer's member-mutex
  * destructor, which the hand-modelled `NetworkPeerGameSpy::destroy` does not produce; retry a real
- * `NetworkPeerBase` derivation with a member mutex in the peer TU after the cut).  `runNasLogin` casts the
- * `DWCSvlResult*` it hands `DWC_SVLGetTokenAsync` to the owner's `s32` parameter (request net2-l4-cff5#2).
+ * `NetworkPeerBase` derivation with a member mutex in the peer TU after the cut).
  */
 
 #include "types.h"
@@ -104,293 +99,6 @@ s32 runThread(GameSpyInterfaceThread* self);
 GT2ConnectionCallbacks sGameSpyConnectionCallbacks = {
     gt2ConnectedCallback, gt2ReceivedCallback, gt2ClosedCallback, gt2PingCallback
 };
-
-/* ------------------------------------------------------------------------------------------------ */
-
-/* Runs the connect-attempt callback sub-machine, one step per frame. */
-void NetworkReflectService::updateCallbackStep()
-{
-    u8 step;
-
-    if (callbackStep_17 != 0 && getInstance_() == NULL) {
-        WARN_LOG(lbl_80603154);
-        callbackStep_17 = 0;
-    }
-    step = callbackStep_17;
-    switch (step) {
-    case 1:
-        if (connectStep_15 == 0) {
-            callbackStep_17 = 6;
-            break;
-        }
-        if (isCallback(getInstance_(), 7) == 0) {
-            callbackStep_17 = 5;
-            break;
-        }
-        if (hasMultipleRefs60d4(getInstance_()) != 0) {
-            callbackStep_17 = 4;
-            break;
-        }
-        if ((u8)getNetworkBinaryState(getInstance_()) == 0) {
-            callbackStep_17 = 4;
-            break;
-        }
-        flags_0C = 0;
-        sendReqShut(getInstance_(), 1);
-        callbackStep_17 += 1;
-        break;
-    case 2:
-        if ((flags_0C & 1) != 0 || (flags_0C & 2) != 0 || (flags_0C & 0x10) != 0) {
-            flags_0C = 0;
-            resetNetworkState3(getInstance_());
-            callbackStep_17 += 1;
-        }
-        break;
-    case 3:
-        if ((flags_0C & 8) != 0) {
-            callbackStep_17 += 1;
-        }
-        break;
-    case 4:
-        resetCallback(getInstance_(), 7);
-        callbackStep_17 += 1;
-        break;
-    case 5:
-        decrement60d4(getInstance_());
-        callbackStep_17 += 1;
-        break;
-    case 6: {
-        NetworkLogger* lm = getNetworkLogger();
-        if (lm->isVerbose_3C() > 0) {
-            callbackStep_17 += 1;
-        }
-        break;
-    }
-    case 7:
-        callbackStep_17 = 0;
-        connectStep_15 = 0;
-        notify(0x6003, 0, 0, 0, NULL);
-        break;
-    default:
-        break;
-    }
-}
-
-/* Dispatches to the search sub-machine (task 1) or the connect sub-machine (task 2). */
-s32 NetworkReflectService::dispatchTask()
-{
-    switch (task_10) {
-    case 1:
-        return runSearch();
-    case 2:
-        return runConnect();
-    default:
-        return 0;
-    }
-}
-
-/* Runs the GameSpy connect sub-machine, one step per frame. */
-s32 NetworkReflectService::runSearch()
-{
-    u32 pending;
-    u32 offset;
-    u32 size;
-    u32 info[3];
-
-    switch (searchStep_14) {
-    case 0:
-        flags_0C = 0;
-        sendReqChannelInfo(getInstance_(), channel_18);
-        searchStep_14 = 5;
-        break;
-    case 5:
-        pending = flags_0C;
-        if ((pending & 1) != 0) {
-            searchStep_14 = 0x6E;
-        } else if ((pending & 2) != 0) {
-            searchStep_14 = 0x64;
-        } else if ((pending & 0x80) != 0) {
-            writePos_8168 = 0;
-            searchStep_14 = 0x0A;
-        }
-        break;
-    case 0x0A:
-        flags_0C = 0;
-        offset = writePos_8168;
-        size = limit_8164 - offset;
-        size = size >= 0x2000 ? 0x2000 : size;
-        sendReqChannelData(getInstance_(), channel_18, offset, size);
-        searchStep_14 = 0x0F;
-        break;
-    case 0x0F:
-        pending = flags_0C;
-        if ((pending & 1) != 0) {
-            searchStep_14 = 0x6E;
-        } else if ((pending & 2) != 0) {
-            searchStep_14 = 0x64;
-        } else if ((pending & 0x100) != 0) {
-            if (limit_8164 - writePos_8168 != 0) {
-                searchStep_14 = 0x0A;
-            } else {
-                searchStep_14 = 0x14;
-            }
-        }
-        break;
-    case 0x14:
-        notify(0x6004, 0, 0, 1, &channel_18);
-        return 1;
-    case 0x64:
-        info[0] = 0x80000007;
-        info[1] = 0;
-        info[2] = (u32)errorRecordCode613c(getInstance_(), 0);
-        notify(0x6004, 0, (s32)info[0], 1, info);
-        return 1;
-    case 0x6E:
-        getErrorInfo654c(getInstance_(), info);
-        notify(0x6004, 0, (s32)info[0], 1, info);
-        notify(0x6001, 0, (s32)info[0], 1, info);
-        return 1;
-    default:
-        break;
-    }
-    return 0;
-}
-
-/* Runs the GameSpy NAT/connect sub-machine, one step per frame. */
-s32 NetworkReflectService::runConnect()
-{
-    u32 pending;
-    u32 info[3];
-
-    switch (searchStep_14) {
-    case 0:
-        flags_0C = 0;
-        sendReqConnect(getInstance_());
-        searchStep_14 = 5;
-        break;
-    case 5:
-        pending = flags_0C;
-        if ((pending & 1) != 0) {
-            searchStep_14 = 0x6E;
-        } else if ((pending & 2) != 0) {
-            searchStep_14 = 0x64;
-        } else if ((pending & 0x200) != 0) {
-            searchStep_14 = 0x0A;
-        }
-        break;
-    case 0x0A:
-        notify(0x6005, 0, 0, 0, NULL);
-        return 1;
-    case 0x64:
-        info[0] = 0x80000007;
-        info[1] = 0;
-        info[2] = (u32)errorRecordCode613c(getInstance_(), 0);
-        notify(0x6005, 0, (s32)info[0], 1, info);
-        return 1;
-    case 0x6E:
-        getErrorInfo654c(getInstance_(), info);
-        notify(0x6005, 0, (s32)info[0], 1, info);
-        notify(0x6001, 0, (s32)info[0], 1, info);
-        return 1;
-    default:
-        break;
-    }
-    return 0;
-}
-
-/* Applies a DWC event to the interface, then folds the event bits into the state machine's flags. */
-void NetworkReflectService::applyEvent(u32 code, s32 a, s32 b, s32 c, const GameSpyEventMsg* msg)
-{
-    u32 limit;
-    GameSpyChannel* dst;
-    u32 size;
-    const GameSpyChannel* src;
-    s32 i;
-
-    switch (code) {
-    case 0x8000:
-    case 0x8007: {
-        u32 info[3];
-
-        if (task_10 <= 0) {
-            getErrorInfo654c(getInstance_(), info);
-            notify(0x6001, 0, (s32)info[0], 1, info);
-        }
-        flags_0C |= 1;
-        break;
-    }
-    case 0x8002:
-        flags_0C |= 2;
-        break;
-    case 0x8004:
-        if (b != 0) {
-            flags_0C |= 1;
-        }
-        break;
-    case 0x8005:
-        flags_0C |= 8;
-        break;
-    case 0x8006:
-        flags_0C |= 1;
-        break;
-    case 0x8080:
-        src = msg->channelView.channels_10;
-        if (msg->channelView.channel_00 != channel_18) {
-            NetworkPostedError error;
-
-            error.code_00 = 0x80000000;
-            error.param1_04 = 0;
-            error.param2_08 = 0;
-            ((NetworkInstanceDispatch*)getInstance_())->postError(error);
-            break;
-        }
-        peerId_1C = msg->channelView.peerId_04;
-        channelCount_8020 = msg->channelView.count_0C;
-        if (channelCount_8020 > 8) {
-            channelCount_8020 = 8;
-        }
-        limit = msg->channelView.limit_08;
-        limit_8164 = limit;
-        if (limit_8164 > 0x8000) {
-            limit_8164 = 0x7FFF;
-        }
-        for (i = 0, dst = channels_8024; i < channelCount_8020; i++) {
-            dst->ownerId_00 = src->ownerId_00;
-            dst->peerId_04 = src->peerId_04;
-            memcpy(dst->address_08, src->address_08, 0x1F);
-            dst->tail_27 = 0;
-            src++;
-            dst++;
-        }
-        flags_0C |= 0x80;
-        break;
-    case 0x8081:
-        if (msg->dataView.channel_00 != channel_18 ||
-            msg->dataView.writePos_04 != writePos_8168) {
-            NetworkPostedError error;
-
-            error.code_00 = 0x80000000;
-            error.param1_04 = 0;
-            error.param2_08 = 0;
-            ((NetworkInstanceDispatch*)getInstance_())->postError(error);
-            break;
-        }
-        limit = limit_8164 - writePos_8168;
-        size = msg->dataView.size_08;
-        if (limit < size) {
-            size = limit;
-        }
-        memcpy(recvArea_20 + writePos_8168, msg->dataView.data_0C, size);
-        writePos_8168 += size;
-        flags_0C |= 0x100;
-        break;
-    case 0x8082:
-        flags_0C |= 0x200;
-        break;
-    default:
-        break;
-    }
-}
 
 /* Drops every socket of the three-slot table, one request record at a time. */
 extern "C" void gt2SocketErrorCallback(void)
@@ -668,7 +376,7 @@ s32 GameSpyInterfaceThread::runNasLogin()
         if (DWC_SVLBegin() == 0) {
             DWC_SVLEnd();
             stage_98 = 4;
-        } else if (DWC_SVLGetTokenAsync(sEmptyString, (s32)svlResult_94) == 0) {
+        } else if (DWC_SVLGetTokenAsync(sEmptyString, svlResult_94) == 0) {
             DWC_SVLEnd();
             stage_98 = 4;
         } else {

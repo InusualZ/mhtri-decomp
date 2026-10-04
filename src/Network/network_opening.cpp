@@ -38,14 +38,20 @@
  * `memcpy`, and keeps the activity byte's address in r5); `pushTransferRecord` 98.71 (callee-saved registers
  * r29-r31 permuted; declaration order and a pointer-free spelling measured, neither moves it);
  * `setGameInfo2d1c` 99.85 (the title length lands in r29 where retail reuses r28).  `getNASToken` returns
- * the token inside `DWCSvlResult`, whose owner signature `DWC_SVLGetTokenAsync(const char*, s32)` still
- * takes an `s32` (integrator request filed; `GameSpyInterfaceThread::runNasLogin` casts).
+ * the token inside `DWCSvlResult` (owner `DWCi/dwc_nasfunc.h`).
  *
  * UNWRITTEN.  The word filter 0x804155D4 (2520 B) and `postMediatorRecord`; the forwarding wrappers over the
  * `NetworkPool` singleton 0x80416028..0x80416578 (its methods are `Network/network_layer_io.cpp`'s, unnamed);
- * the terms wrappers over the `PatTerms` object (its methods live in `menu/menu_plsearch.cpp`'s range,
- * unnamed: `initMediatorTerms`, `startTermsCheck`, `getMediatorTermsStatus`, ...); the sound helpers
- * 0x804170D8..0x804171A4.
+ * the sound helpers 0x804170D8..0x804171A4.
+ *
+ * TERMS WRAPPERS (0x80416800..0x80416C18, written from request net2-l4-cff5#3).  Every name this pass gave -
+ * `cancelTermsUpdate`, `getTermsProgressLevel` (a forwarding thunk), `getMediatorTermsProgressLevel`,
+ * `getMediatorTermsProgress`, `set/getMediatorTermsFlag`, the leaf accessors `isPatTermsReady` and
+ * `set/getPatTermsFlag`, and the `menu/menu_plsearch.cpp` callees `initPatTerms`, `requestPatTermsCheck`,
+ * `requestPatTermsUpdate`, `cancelPatTermsUpdate`, `getPatTermsProgress` - is a GUESS from the bodies.  Each leaf
+ * accessor sits right after its first caller, the layout MWCC gives an uninlined inline function.
+ * `setPatTermsFlag` takes a `u32` under `#pragma peephole on` (the raw `stb`, like `setMediatorTransferMode`);
+ * a `u8` parameter puts a `clrlwi` in it (47.50) or in `setMediatorTermsFlag` (96.25).
  */
 #include "Network/network_opening.h"
 #include "Network/NetworkWiiMediator.h"
@@ -57,6 +63,8 @@
 #include "Network/NetworkSessionBase.h"    /* getNetworkBinaryState */
 #include "enemy/em020_ai.h"                /* getInstance_ */
 #include "unsplit/Network.h"               /* getNetworkLogger */
+#include "Network/network_pat_control.h"     /* struct PatTerms; getPatTerms (through NetworkSessionManagerPat.h) */
+#include "menu/menu_plsearch.h"            /* initPatTerms and the terms object's requests */
 #include "MSL_C/alloc.h"                   /* memmove, snprintf */
 #include "MSL/strlen.h"
 
@@ -152,6 +160,63 @@ void getGameInfo2d1c(NetworkWiiMediator* self, u32* out)
     out[8] = self->game_info[8];
 }
 
+/* Hands the terms object its buffer, empties every transfer slot and sets mode 1, both flags clear and the
+ * default level. */
+/* untyped: byte range - the MEM2 buffer handed to the terms object */
+void initMediatorTerms(NetworkWiiMediator* self, void* buffer, u32 size)
+{
+    s32 i;
+
+    initPatTerms(getPatTerms(), buffer, size);
+    self->closeTransferSlots();
+    for (i = 0; i < 4; i++) {
+        self->clearTransferQueue(i);
+    }
+    self->transfer_mode = 1;
+    self->transfer_flag_6DD1 = 0;
+    self->transfer_flag_6DD2 = 0;
+    self->transfer_level = 1.0f;
+}
+
+/* Starts the terms check, when there is a terms object. */
+void startTermsCheck(NetworkWiiMediator* self)
+{
+    if (getPatTerms() != NULL) {
+        requestPatTermsCheck(getPatTerms());
+    }
+}
+
+/* The terms object's ready state, 0 when there is none. */
+s32 getMediatorTermsStatus(NetworkWiiMediator* self)
+{
+    if (getPatTerms() != NULL) {
+        return isPatTermsReady(getPatTerms());
+    }
+    return 0;
+}
+
+/* Whether the terms object's ready byte is set. */
+u32 isPatTermsReady(PatTerms* terms)
+{
+    return terms->ready_0x0D != 0;
+}
+
+/* Starts the terms update, when there is a terms object. */
+void startTermsUpdate(NetworkWiiMediator* self)
+{
+    if (getPatTerms() != NULL) {
+        requestPatTermsUpdate(getPatTerms());
+    }
+}
+
+/* Cancels the terms update, when there is a terms object. */
+void cancelTermsUpdate(NetworkWiiMediator* self)
+{
+    if (getPatTerms() != NULL) {
+        cancelPatTermsUpdate(getPatTerms());
+    }
+}
+
 /* Stores the transfer mode, dropping every slot's queue when it changes. */
 #pragma peephole on
 void setMediatorTransferMode(NetworkWiiMediator* self, u32 mode)
@@ -166,6 +231,86 @@ void setMediatorTransferMode(NetworkWiiMediator* self, u32 mode)
     self->transfer_mode = mode;
 }
 #pragma peephole off
+
+/* Whether the terms update finished: 0 while the transfer mode is 0 or there is no terms object. */
+s32 isMediatorTermsUpdateFinished(NetworkWiiMediator* self)
+{
+    if (self->transfer_mode != 0 && getPatTerms() != NULL) {
+        return isTermsUpdateFinished(getPatTerms());
+    }
+    return 0;
+}
+
+/* Whether the terms object reached its update-finished state (11). */
+u32 isTermsUpdateFinished(PatTerms* terms)
+{
+    return terms->state_0x0C == 11;
+}
+
+/* Forwards to the graded terms progress. */
+s32 getTermsProgressLevel(NetworkWiiMediator* self)
+{
+    return getMediatorTermsProgressLevel(self);
+}
+
+/* Grades the terms progress count against the threshold table: the index of the first threshold it does not
+ * exceed (16 past the sixteenth), 0 when there is no terms object. */
+s32 getMediatorTermsProgressLevel(NetworkWiiMediator* self)
+{
+    if (getPatTerms() != NULL) {
+        u16 progress = getPatTermsProgress(getPatTerms());
+        u16 thresholds[17] = {
+            83, 117, 165, 234, 330, 467, 659, 931, 1316, 1859, 2626, 3709, 5239, 7401, 10455, 14768, 20860
+        };
+        s32 level;
+
+        for (level = 0; level < 16; level++) {
+            if (progress <= thresholds[level]) {
+                break;
+            }
+        }
+        return level;
+    }
+    return 0;
+}
+
+/* The terms progress count, 0 when there is no terms object. */
+u16 getMediatorTermsProgress(NetworkWiiMediator* self)
+{
+    if (getPatTerms() != NULL) {
+        return getPatTermsProgress(getPatTerms());
+    }
+    return 0;
+}
+
+/* Stores the terms object's +0xE2 byte, when there is a terms object. */
+void setMediatorTermsFlag(NetworkWiiMediator* self, u32 flag)
+{
+    if (getPatTerms() != NULL) {
+        setPatTermsFlag(getPatTerms(), flag);
+    }
+}
+
+#pragma peephole on
+void setPatTermsFlag(PatTerms* terms, u32 flag)
+{
+    terms->flag_0xE2 = flag;
+}
+#pragma peephole off
+
+/* The terms object's +0xE2 byte, 0 when there is no terms object. */
+u8 getMediatorTermsFlag(NetworkWiiMediator* self)
+{
+    if (getPatTerms() != NULL) {
+        return getPatTermsFlag(getPatTerms());
+    }
+    return 0;
+}
+
+u8 getPatTermsFlag(PatTerms* terms)
+{
+    return terms->flag_0xE2;
+}
 
 /* Activates slot `slot` with its mode and level (while the terms object is up) and empties its queue. */
 void NetworkWiiMediator::openTransferSlot(s8 slot, u8 mode, f32 level)

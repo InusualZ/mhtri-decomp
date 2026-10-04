@@ -294,7 +294,7 @@ void NetworkSessionStable::init(s8 isHost, NetworkSessionCallback callback, void
     rateStep_16CF8 = networkSessionRateStep;
     rateWindow_16CFC = networkSessionRateWindow;
     joined_16D00 = isHost;
-    address_16CB8.object_00.vtable->slot_28(&address_16CB8.object_00, address);
+    ((NetworkSmallObjectSink*)&address_16CB8.object_00)->copyFrom(address);
     nonce_16CD8 = networkSessionNonce_generate();
     getNetworkLogger()->signal_0C(3, "NetworkSessionStable::init: my nonce is 0x%08x\n", nonce_16CD8);
     ownIndex_14826 = set(1, address);
@@ -774,7 +774,7 @@ s32 NetworkSessionStable::set(s32 isSelf, const u8* address)
     connection->open(onConnectionEvent, this, index, &info);
     slot = &slots_14828[index];
     slot->connection_2C = connection;
-    slot->address_30.object_00.vtable->slot_28(&slot->address_30.object_00, address);
+    ((NetworkSmallObjectSink*)&slot->address_30.object_00)->copyFrom(address);
     slot->nonce_50 = 0;
     return index;
 }

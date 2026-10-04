@@ -49,9 +49,9 @@
  *    in their own saved registers (ours CSEs them), the chat-record text address is CSE'd across
  *    `getInstance()` as in net_session_close (request #22), and the invite pointer is formed with a `subi`
  *    where ours re-derives the `addis` base.
- *  - `queueNetCommand` 98.8 % (one store scheduled before the loop's pointer bump), `resetMessagePool` 95.7 % (the
- *    address objects' +0x28 copy goes through the struct-of-function-pointers view; retail dispatches a real
- *    virtual, request net2-l3-2c54#21).
+ *  - `queueNetCommand` 98.8 % (one store scheduled before the loop's pointer bump), `resetMessagePool` 96.8 % (the
+ *    address objects' +0x28 copy is the sink's real virtual `copyFrom` since request net2-l3-2c54#21; the rest is
+ *    scheduling).
  *  - GUESS names added 2026-10-04: `allocPoolEntry`/`freePoolEntry`, `allocArenaBlock`/`setArenaBlockValue`/`resetSlotTable`/`findSlotByOwner`/
  *    `resetPeerTable`/`findFreePeerEvent`/`refreshFriendList`/`updatePeerCardBlock` (from their bodies),
  *    `net_peer_join_stamp` (the frame stamp layer command 5 takes), `net_arena_base` (the arena pointer), the
@@ -1097,14 +1097,12 @@ void resetMessagePool(void)
 
                 exportTo(&listed->address_0x00, (u8*)id_text, 8);
                 if (strcmp(id_text, work->name_0x7368) == 0) {
-                    work->peer_addresses_0x7908[0].object_0x00.vtable->slot_28(&work->peer_addresses_0x7908[0].object_0x00,
-                                                                             (const u8*)&listed->address_0x00);
+                    ((NetworkSmallObjectSink*)&work->peer_addresses_0x7908[0].object_0x00)->copyFrom((const u8*)&listed->address_0x00);
                 } else {
                     strcpy(work->peers_0x7488[slot].id_0x00.text_0x00, id_text);
                     strcpy(work->peers_0x7488[slot].name_0x0A.text_0x00, listed->name_0x20);
                     work->used_0x7988[slot] = 1;
-                    work->peer_addresses_0x7908[slot].object_0x00.vtable->slot_28(
-                        &work->peer_addresses_0x7908[slot].object_0x00, (const u8*)&listed->address_0x00);
+                    ((NetworkSmallObjectSink*)&work->peer_addresses_0x7908[slot].object_0x00)->copyFrom((const u8*)&listed->address_0x00);
                     slot++;
                 }
             }

@@ -10,6 +10,16 @@
 struct DWCiConn;
 struct DWCiReq;
 
+/* The service-locator result `DWC_SVLGetTokenAsync` fills (the SDK's `DWCSvlResult`: a status, the host and the
+ * token).  size: 0x174 - the mediator memsets 0x174 bytes at its +0x2BA8 before handing it over, and
+ * `getNASToken` returns +0x2BA8 + 0x45 (`svltoken`). */
+typedef struct DWCSvlResult {
+    /* +0x000 */ s32  status;
+    /* +0x004 */ char svlhost[65];
+    /* +0x045 */ char svltoken[301];
+    /* +0x172 */ u8   pad_172[0x02];
+} DWCSvlResult;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -73,7 +83,7 @@ s32 DWC_SVLBegin(void);
 
 void DWC_SVLEnd(void);
 
-s32 DWC_SVLGetTokenAsync(const char* svl, s32 handle);
+s32 DWC_SVLGetTokenAsync(const char* svl, DWCSvlResult* result);
 
 s32 DWC_SVLProcess(void);
 

@@ -116,9 +116,8 @@ typedef struct NetworkSmallObjectVtable {
     void* rtti_04;
     u8 pad08[0x10];
     void (*slot_18)(void* self);   /* +0x18 */
-    u8 pad1C[0x0C];
-    void (*slot_28)(struct NetworkSmallObject* self, const u8* value);   /* +0x28 (GUESS: copies the address record in) */
-} NetworkSmallObjectVtable;   /* size: 0x2C (approximation - only +0x18 and +0x28 are called) */
+    u8 pad1C[0x10];                /* +0x1C..+0x2B; +0x28 is the sink's `copyFrom`, called through the class */
+} NetworkSmallObjectVtable;   /* size: 0x2C (approximation - only +0x18 is called through this view) */
 
 typedef struct NetworkSmallObject {
     NetworkSmallObjectVtable* vtable;   /* +0x00 */
