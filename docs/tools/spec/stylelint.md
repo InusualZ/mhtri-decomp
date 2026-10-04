@@ -57,7 +57,7 @@ Inputs -> outputs: src, include, map, splits -> findings, budget.
 | 10 | a codegen pragma lives in the TU that needs it | a `#pragma` whose name is codegen-affecting (`peephole`, `optimization_level`, `fp_contract`, ...) in a file under `include/` (a `.c`/`.cpp` is never reported). A pragma leaks into every TU that includes the header |
 | 11 | no `void *` parameter or return type | a `void` `*` in a function declaration's parameter list or return type (a declaration, never a cast). Erasing the type hides what a heterogeneous call site is actually passing; the only exemption is a per-declaration `/* untyped: <reason> */` marker whose reason names which genuinely-untyped case it is - a byte range, an opaque handle passed through, or a caller-owned payload |
 | 12 | data a unit uses that no registered range claims is the unit's to claim | an `extern` declaration (the `extern` keyword) of a symbol whose `symbols.txt` type is an **object** and whose address falls in **no** registered `splits.txt` range. The declaration is the defect: the unit that reads or writes the bytes claims the range in its own section and matches it, so the finding names the address the claim covers |
-| 13 | a method is a member | a free function named `<Type>_<name>` whose first parameter is `<Type>*`/`const <Type>*`/`<Type>&` (a member) or with no such parameter (a static member), for a type the project defines, in `.cpp` sources and the headers they include; exempt only with a standing `/* free: <reason> */` marker; `<Type>_ctor`/`_dtor`/`_construct`/`_destruct` whose first parameter is a *different* type is a C-style helper (hand-added: the code's table stops at 12 while `rule13_findings` is implemented; `docs/plan.md` section 6.5 is canonical) |
+| 13 | a method is a member | a free function named `<Type>_<name>` whose first parameter is `<Type>*`/`const <Type>*`/`<Type>&` (a member) or with no such parameter (a static member), for a type the project defines, in `.cpp` sources and the headers they include; exempt only with a standing `/* free: <reason> */` marker; `<Type>_ctor`/`_dtor`/`_construct`/`_destruct` whose first parameter is a *different* type is a C-style helper (`docs/plan.md` section 6.5 is canonical) |
 * Rule 2 is checked from `config/RMHE08/symbols.txt` (a symbol's section and address) + `config/RMHE08/splits.txt` (each registered unit's ranges) and reads **both** declaration shapes a file can make: the `extern` keyword and a plain function prototype (`void foo(void);` - the `extern`-only scanner could not see the latter, so `src/Network/fn_8041A87C.cpp`'s local `memset`/`memcpy` and `src/DWCi/fn_805113B0.c`'s `DWCi_GetStringLength` were invisible while four real sites existed in the Network scope). A declaration a file makes for a symbol another registered unit owns is a finding - move it to that unit's header and `#include` it. A symbol with **no registered owner** (the map resolves it to an unsplit address) is a finding too: the local declaration is the defect and it belongs in a band header under `include/unsplit/`. When the registered bands interleave across modules (a `sound` unit sits inside the `ef` band) so no module is sound, the finding names the band directory only rather than guess a `<module>.h`, and the local declaration is still wrong in the `src/` file. A symbol missing from the map, a duplicate map row, and an address the map gives no section stay counted gaps (`Ownership.gaps`) - the map cannot judge them, so they are not guessed. The owning unit's own public header is not a finding: `_owns` recognises `include/<module>/<stem>.h` as the owner's header (before that fix the own header read as foreign, so extending rule 2 to headers would have reported ~30 owners' own headers in the Network scope alone). An ordinary `include/<module>/*.h` header is judged by this rule (a foreign declaration there is a finding; an unowned symbol stays, because the module header carries public names the splits map has not registered and the band is the detector for those). The band is checked as well - `include/unsplit/*.h` is a file a batch may change, and a declaration there of a symbol a registered unit owns is a finding, because the owner's typed definition collides with it (`(10197) illegal function overloading`); an unowned symbol stays, which is the band's purpose. A definition in the band is not a declaration and is left alone.
 * The backlog is a burn-down, not a gate: `--diff` fails only when a (rule, file) count rises, so touching a unit with 300 `unk*` fields is allowed as long as the touch adds none. A **new** file starts from zero, so its violations are all additions - new work is held to the rules from its first commit.
 * **Rule 7 has no exemption and no deferral.** Every `fn_XXXXXXXX`, `lbl_XXXXXXXX`, `loc_XXXXXXXX` and bare `unk*` identifier in `src/` is a finding, whoever owns the symbol: this unit's, another unit's, an unowned one, or a name the map does not know. A data label is not "the owner's to name" any more - leaving a generated spelling on either side of an ownership line is the defect. The rule applies to a file with no bodies too, and **no comment exempts anything**: a `rule 7 deferred` line is now just inert text, not a key.
@@ -70,19 +70,27 @@ Inputs -> outputs: src, include, map, splits -> findings, budget.
   rule-2 findings, in `src/` and in shared headers. The marker exempts nothing: the declarations inside report as usual.
   The open ids come from the invocation tree's and MAIN's `.pi/outbox` (`set_request_dirs` for a fixture).
 
+## Layout
+
+The code is the package `tools/units/stylelint_rules/` (WP3d): one module per rule (`r01_shared_type` ...
+`r13_method`), `lint`, `diff` (the one `--diff`/`--ref` judgement), `refs`, `report`, `cli`, and `api`, the facade this
+file star-imports - every name importers spell `stylelint.<name>` still resolves. The module map, the seams and the
+measured equivalence are `stylelint_rules.md`.
+
 ## Lib dependencies
 
-cscan, project.Ownership, findings, git, names.
+cscan, project (`Ownership`, `SymbolMap`, `Splits`), findings, git, names, requests; the fold map from
+`tools/units/dataclosure.py` (`--diff`'s split credit).
 
 ## Test contract
 
 Tier: fixture; smoke: the real map resolves a named symbol to *a* registered owner (never a named module).
-Today's selftest: in-file `selftest()` (`--selftest`).
+Today's selftest: `tools/units/stylelint_rules/selftest.py`, run by `stylelint.py --selftest` (445 checks).
 Target: `tools/tests/units/test_stylelint.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
 
 ## Known gaps
 
-the docstring's rule table stops at rule 12 while rule 13 is implemented; `--budget --headers` and the band report are rule-2-only views
+`--budget --headers` and the band report are rule-2-only views; the package's own gaps are in `stylelint_rules.md`.
 
 ## History (the incidents behind the rules - keep the rule, drop the narrative when the rule is stable)
 

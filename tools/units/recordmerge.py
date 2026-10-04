@@ -1,61 +1,25 @@
 #!/usr/bin/env python3
 """Merge two views of the same record header into one definition (docs/matching.md 56).
-
-A header that describes a game record (`_AINPC_W`, `_HIT_W`) is written by several lanes at once, and
-every lane's branch carries its own view of the same struct: the same members at the same offsets, plus
-the fields that lane's bodies needed.  The orchestrator has to fold those views into the one header the
-whole tree shares, and doing it by hand has gone wrong the same way three times - so this tool *is* the
-procedure, with the checks the hand passes lacked.
-
-    python tools/units/recordmerge.py --base <base> --other <other> [--out <path>] [--take other|base]
-    python tools/units/recordmerge.py --selftest
-
-`<base>` is normally the working file (the live header, CRLF on this host); `<other>` is normally a
-revision, in `git show` spelling:
-
-    python tools/units/recordmerge.py --base include/ai/ainpc.h \
-        --other worker/802d44f4-fn-802d44f4-bd0a:include/ai/ainpc.h --out include/ai/ainpc.h
-
-**The three rules** (docs/matching.md 56, learned on `_AINPC_W`).
-
-1. *Splice into the filler.*  The live header is the base.  For every member the other view names and
-   the base does not have at that offset, find the base **filler** covering that offset, take the new
-   member's size from the *other* header's own layout (the distance to its next member - never from the
-   declared type), and split the filler into `[gap][new member][gap]`.
-2. *Key members per struct.*  A header may define several structs, and an offset-keyed member map sizes
-   a field from the wrong one: `_AINPC_W` shares its file with a smaller struct whose `0x0` matched
-   first, which sized the 1-byte `active` as 12 bytes and then refused every splice for lack of room.
-   Every lookup here is per group.
-3. *Compare the declaration, not just `(offset, name)`.*  Two views can declare one offset differently -
-   `u8 field_0x3F8;` against `u8 field_0x3F8[4];` - and an `(offset, name)` test calls that "already
-   there" while the newcomer's own source fails to compile against it (`illegal operands 'unsigned char'
-   [ 'unsigned char'`).  Which side is right depends on which side's *code* depends on the declaration,
-   so this tool reports the conflict and takes `--take` (default `other`: the incoming branch is the
-   source that has to compile), dropping or shrinking the base members the winning declaration covers.
-
-**It refuses to write while anything is unresolved** - a named member in the way, a filler with no room
-or no known end, a group only one side has, a same-offset rename, a member whose size is the struct
-total - and prints the per-group delta so a human can see what would change.  A merge that applies is
-still not a proof: the test is that **both** sides' sources compile (whole-tree `ninja -k 0` at
-0 FAILED) **and** that the rows hold (`ninja changes` must print no line for a unit that already owned
-the record).  This tool cannot check either - it makes the edit reproducible and its invariants explicit.
-"""
+Spec: docs/tools/spec/recordmerge.md. CLI: recordmerge.py --base B --other O [--out P] [--take other|base]
+[--dry-run] [--json F] | --selftest."""
 
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import json
 import re
-import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "tools"))
-sys.path.insert(0, str(ROOT / "tools" / "units"))
+from tools.lib import cli
+from tools.lib import repo as _repo
+from tools.lib import text as _text  # the one writer of shared files
+from tools.lib.git import Git
 
-import sharedfiles as sf  # noqa: E402  the one writer of shared files
+TOOL = cli.Tool("recordmerge", "docs/tools/spec/recordmerge.md", tests="tools/tests/units/test_recordmerge.py")
 
 MEMBER_RE = re.compile(r"^(?P<indent>[ \t]*)/\* \+(?P<off>0x[0-9A-Fa-f]+) \*/ (?P<body>.*?)[ \t]*$")
 GROUP_RE = re.compile(r"^[ \t]*(?:typedef[ \t]+)?(?:struct|union|class)[ \t]+([A-Za-z_]\w*)")
@@ -437,8 +401,7 @@ def read_source(spec: str) -> tuple[str, str]:
     """A file path, or `git show` spelling `<rev>:<path>`; returns (text, what to call it)."""
     if ":" in spec and not Path(spec).exists():
         rev, path = spec.split(":", 1)
-        r = subprocess.run(["git", "show", f"{rev}:{path}"], cwd=ROOT,
-                           capture_output=True, text=True, encoding="utf-8", errors="replace")
+        r = Git(_repo.repo_root()).run("show", f"{rev}:{path}")
         if r.returncode != 0:
             raise SystemExit(f"git show {spec} failed: {r.stderr.strip()}")
         return r.stdout, spec
@@ -507,8 +470,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.selftest:
-        import recordmerge_selftest
-        return recordmerge_selftest.selftest()
+        return TOOL.selftest(cwd=tempfile.gettempdir())
     if not args.base or not args.other:
         build_parser().error("--base and --other are required (or --selftest)")
 
@@ -523,13 +485,13 @@ def main(argv: list[str] | None = None) -> int:
         out = Path(args.base.split(":", 1)[1])
     written = False
     if out is not None and plan.ok and not args.dry_run:
-        nl = sf.line_ending(sf.read_text(out)) if out.exists() else sf.line_ending(base_text)
+        nl = _text.line_ending(_text.read_text(out)) if out.exists() else _text.line_ending(base_text)
         if not nl:
             nl = "\n"
-        tx = sf.Transaction()
+        tx = _text.Transaction()
         try:
             text = plan.text if plan.text.endswith("\n") else plan.text + "\n"
-            tx.write(out, sf.with_ending(text, nl))
+            tx.write(out, _text.with_ending(text, nl))
             written = True
         finally:
             tx.cleanup()

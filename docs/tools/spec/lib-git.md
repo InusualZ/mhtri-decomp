@@ -21,7 +21,8 @@ The 16 wrappers delegate their process call here: `claims.git/_git_quiet`, `land
 * refs and history: `rev_parse(rev) -> sha | None`, `head()`, `current_branch() -> name | None` (detached), `toplevel()`,
   `common_dir()` (absolute), `merge_base(a, b)`, `is_ancestor(a, b)`, `fork_point(branch, base="main")`, `merge_tree(a, b)`
   (in memory), `refs(prefix) -> {ref: sha}`, `update_ref(ref, value | delete=True)`, `branch_exists/create/delete`.
-* blobs and the index: `show(ref, path) -> bytes | None` (CRLF kept), `cat_index(path) -> bytes | None`,
+* blobs and the index: `show(ref, path) -> bytes | None` (CRLF kept), `show_many(ref, paths) -> {path: bytes | None}`
+  (one `git cat-file --batch` for many blobs - a tree, not a file at a time), `cat_index(path) -> bytes | None`,
   `ls_files(*paths, eol=False)` (paths, or `(index class, worktree class, attr, path)` rows), `status_porcelain(untracked)`
   (`[(XY, path)]`, a rename's new path), `diff_names(a, b=None, *paths)`, `renames(a, b)`, `unmerged_stages(path=None)`
   (`{path: {stage: sha}}`), `merge_file_diff3(ours, base, theirs, labels=None) -> (bytes, conflicts)` (writes nothing; `labels` are the three `-L` names), `merge_bytes(ours, base, theirs, labels=None)` (the same over three byte strings, through a private temp dir - `mergebranch.merge_file` and `unionguard.three_way_overlap` both called their own copy).

@@ -58,6 +58,11 @@ def test_blobs_index_status(c):
         c.check("show returns the blob bytes unchanged (CRLF kept)", g.show("HEAD", "crlf.txt"), b"one\r\ntwo\r\n")
         c.check("show of an absent path is None", g.show("HEAD", "nope.txt"), None)
         c.check("show takes a backslashed path", g.show("HEAD", "dir\\x.c"), b"x\n")
+        many = g.show_many("HEAD", ["crlf.txt", "nope.txt", "dir", "dir\\x.c"])
+        c.check("show_many reads each blob as show does; an absent path or a tree is None",
+                many, {"crlf.txt": b"one\r\ntwo\r\n", "nope.txt": None, "dir": None, "dir/x.c": b"x\n"})
+        c.check("show_many of nothing runs nothing", g.show_many("HEAD", []), {})
+        c.check("show_many at a bad ref is all None", g.show_many("no-such-ref", ["crlf.txt"]), {"crlf.txt": None})
         (fx.root / "dir" / "x.c").write_text("staged\n", encoding="utf-8", newline="\n")
         (fx.root / "new.txt").write_text("n\n", encoding="utf-8", newline="\n")
         c.raises("stage refuses an empty pathspec", ValueError, g.stage, [])

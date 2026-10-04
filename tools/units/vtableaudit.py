@@ -11,22 +11,15 @@ import json
 import os
 import re
 import struct
-import subprocess
 import sys
 import time
 from tools.lib.git import Git
 
+from tools.lib import cscan  # comments/literals, class definitions and their members, includes
+from tools.lib import project as _project  # registered units, splits and map: the one parser
+from tools.lib import repo as _repo
 from tools.lib.binary.dol import Dol as LibDol
 from tools.lib.binary.elf import Elf as LibElf, ElfError
-
-HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(os.path.dirname(HERE))
-for _p in (HERE,):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
-
-from tools.lib import project as _project  # noqa: E402  (registered units, splits and map: the one parser)
-import dossier  # noqa: E402  (parse_elf - the one ELF object reader, for the `--at` reference side)
 
 GAME = "RMHE08"
 SPLITS_REL = os.path.join("config", GAME, "splits.txt")
@@ -77,8 +70,7 @@ LEGACY_VTABLE_FIELDS = ("vtable", "vtbl")
 # the original was a class with `virtual` methods and MWCC emitted the table and the store itself. A
 # function-pointer member is `RET (*name)(args);`; a struct with at least one of them is the pointee of such
 # a field.
-FN_PTR_RE = re.compile(r"\(\s*[*&]*\s*(?P<name>[A-Za-z_]\w*)\s*\)\s*\(")
-CLASS_OPEN_RE = re.compile(r"\b(?:typedef\s+)?(class|struct)\b\s*([A-Za-z_]\w*)?\s*(?::[^{;]*)?\{")
+CLASS_OPEN_RE = cscan.CLASS_OPEN_RE
 
 SOURCE_EXT = (".c", ".cc", ".cpp", ".cxx", ".cp", ".c++")
 
@@ -394,89 +386,22 @@ def unit_list(main: str, tree: dict, ref: str | None = None) -> list:
 # --------------------------------------------------------------------------------------------------
 # the definition index: a member at +0x00 that holds a function-pointer table
 # --------------------------------------------------------------------------------------------------
-_BLANKERS = (re.compile(r"/\*.*?\*/", re.S), re.compile(r"//[^\n]*"),
-             re.compile(r'"(?:\\.|[^"\\])*"'), re.compile(r"'(?:\\.|[^'\\])*'"))
-
-
 def blank_literals(text: str) -> str:
-    """Replace comments and string/char literals with same-length blanks, keeping newlines.
-
-    Brace matching and field splitting must not see a `{` inside a comment or a `;` inside a literal - a
-    declaration comment with an address in it is common here. Positions are preserved, so a reported line
-    is still the source's line.
-    """
-    def rep(m):
-        return "".join("\n" if c == "\n" else " " for c in m.group(0))
-    for rx in _BLANKERS:
-        text = rx.sub(rep, text)
-    return text
-
-
-def _match_brace(code: str, open_pos: int):
-    """Index of the `}` matching the `{` at `open_pos`, or None. Comment/literal-free input."""
-    depth = 0
-    for i in range(open_pos, len(code)):
-        if code[i] == "{":
-            depth += 1
-        elif code[i] == "}":
-            depth -= 1
-            if depth == 0:
-                return i
-    return None
-
-
-def _members(body: str):
-    """`[(type_text, name, is_fn_ptr)]` for the top-level `;`-terminated members of a class body.
-
-    Nested braces (an inline function body, an anonymous union) are skipped as one chunk, and a member whose
-    declarator ends in `= ...` (an initializer) keeps the name before the `=`. An access specifier is not a
-    member.
-    """
-    out, start, depth, i = [], 0, 0, 0
-    while i < len(body):
-        c = body[i]
-        if c in "{({":
-            depth += 1
-        elif c in "})":
-            depth = max(0, depth - 1)
-        elif c == ";" and depth == 0:
-            chunk = body[start:i].strip()
-            start = i + 1
-            if chunk:
-                head = chunk.split("=", 1)[0].strip()
-                fp = FN_PTR_RE.search(head)
-                if fp:                              # `RET (*name)(args);` - a function pointer member
-                    out.append((head[:fp.start()] + head[fp.end():], fp.group("name"), True))
-                else:
-                    m = re.search(r"([A-Za-z_]\w*)\s*(?:\[[^\]]*\])?$", head)
-                    if m and not re.fullmatch(r"(public|private|protected|virtual)", m.group(1)):
-                        out.append((head[:m.start(1)] + head[m.end(1):], m.group(1), False))
-        i += 1
-    return out
+    """Comments and string/char literals blanked, positions and newlines kept (`lib.cscan.strip_comments`): brace
+    matching and field splitting never see a `{` inside a comment or a `;` inside a literal, and a reported line
+    is still the source's line."""
+    return cscan.strip_comments(text)
 
 
 def type_definitions(texts: dict) -> dict:
-    """`{type_name: [(member_type_text, member_name, source_file)]}` for every struct/class in `texts`.
-
-    `texts` is `{path: text}`; a typedef'd anonymous definition takes the name after the closing brace. A
-    heavier parser would be wrong here - the index feeds a heuristic, and the shape it needs ("is this
-    member a pointer to a struct of function pointers") is decidable from the declarators alone.
-    """
+    """`{type_name: [(member_type_text, member_name, source_file, is_fn_ptr)]}` for every struct/class in `texts`
+    (`{path: text}`) - `lib.cscan.type_definitions`; a typedef'd anonymous definition takes the name after its
+    closing brace. The index feeds a heuristic, and the shape it needs ("is this member a pointer to a struct of
+    function pointers") is decidable from the declarators alone."""
     defs = {}
     for path, text in texts.items():
-        code = blank_literals(text)
-        for m in CLASS_OPEN_RE.finditer(code):
-            close = _match_brace(code, m.end() - 1)
-            if close is None:
-                continue
-            name = m.group(2)
-            if not name:
-                tail = re.match(r"\s*([A-Za-z_]\w*)?\s*;", code[close + 1:close + 120])
-                name = (tail.group(1) if tail else None) if tail else None
-            if not name:
-                continue
-            defs.setdefault(name, []).extend(
-                (t.strip(), n, path, fn) for t, n, fn in _members(code[m.end():close]))
+        for name, members in cscan.type_definitions(text):
+            defs.setdefault(name, []).extend((m.decl.strip(), m.name, path, m.fn_ptr) for m in members)
     return defs
 
 
@@ -705,7 +630,6 @@ def audit_unit(tree: dict, path: str, flag: str) -> dict:
 # (d) emission order of one built object's `.data`
 # --------------------------------------------------------------------------------------------------
 VT_NAME_RE = re.compile(r"^__vt__(\d+)(.+)$")
-INCLUDE_RE = re.compile(r'^\s*#\s*include\s*[<"]([^>"]+)[>"]', re.M)
 CLASS_DEF_RE = re.compile(r"\b(?:class|struct)\s+([A-Za-z_]\w*)\s*(?::[^{;]*)?\{")
 
 
@@ -731,7 +655,7 @@ def class_order_from_texts(text_of, root: str) -> list:
             return
         seen.add(key)
         code = blank_literals(text)
-        events = [(m.start(), "inc", m.group(1)) for m in INCLUDE_RE.finditer(text)]
+        events = [(m.start(), "inc", m.group(2)) for m in cscan.INCLUDE_RE.finditer(text)]
         events += [(m.start(), "cls", m.group(1)) for m in CLASS_DEF_RE.finditer(code)]
         for _pos, kind, val in sorted(events):
             if kind == "cls":
@@ -1043,7 +967,7 @@ def reference_slots(main: str, tree: dict, address: int, count: int) -> dict:
     """`{slot_index: symbol}` from the **reference object**'s relocations over the table at `address`.
 
     The DOL resolves addresses, so the symbol behind a slot is only in the reference object's `.rela`
-    rows - and `dossier.parse_elf` is the one ELF reader (this tool's `read_object` re-implements it; the
+    rows - and `lib.binary.elf` is the one ELF reader (this tool's `read_object` re-implements it; the
     mode exists so nobody writes a third). `{}` when the table's unit has no built object.
     """
     unit = owner_at(tree, address)
@@ -1059,8 +983,8 @@ def reference_slots(main: str, tree: dict, address: int, count: int) -> dict:
     except OSError:
         return {}
     try:
-        _sections, _symbols, relocs = dossier.parse_elf(blob)
-    except ValueError:
+        relocs = LibElf.read(blob).relocs()
+    except ElfError:
         return {}
     base_off = address - rng["start"]
     out = {}
@@ -1068,12 +992,12 @@ def reference_slots(main: str, tree: dict, address: int, count: int) -> dict:
     # comes from `sh_info`, which a hand-built fixture may leave 0, while the section name is always set.
     rela_name = ".rela" + rng["object"]
     for rel in relocs:
-        if rel["section"] != rela_name or not (base_off <= rel["offset"] < base_off + 4 * count):
+        if rel.rela != rela_name or not (base_off <= rel.offset < base_off + 4 * count):
             continue
-        name = rel["symbol"] or ""
-        if rel["addend"]:
-            name = "%s + 0x%X" % (name, rel["addend"])
-        out[(rel["offset"] - base_off) // 4] = name
+        name = rel.symbol_name or ""
+        if rel.addend:
+            name = "%s + 0x%X" % (name, rel.addend)
+        out[(rel.offset - base_off) // 4] = name
     return out
 
 
@@ -1167,7 +1091,7 @@ def render(s: dict, out=sys.stdout, show_runs=True, show_refs=True, show_section
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--main", default=None, help="tree holding configure.py and build/ (default: this file's)")
+    ap.add_argument("--main", default=None, help="tree holding configure.py and build/ (default: the invocation's)")
     ap.add_argument("--unit", default=None, help="one registered unit (path, with or without extension)")
     ap.add_argument("--runs", action="store_true", help="report only the owned code-pointer runs")
     ap.add_argument("--sections", action="store_true", help="report only the section-size differences")
@@ -1183,9 +1107,9 @@ def main(argv=None) -> int:
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args(argv)
     if args.selftest:
-        import vtableaudit_selftest
+        from tools.units import vtableaudit_selftest
         return vtableaudit_selftest.selftest()
-    main_tree = args.main or ROOT
+    main_tree = args.main or _repo.repo_root()
     if args.at is not None:
         try:
             address = int(args.at, 0)

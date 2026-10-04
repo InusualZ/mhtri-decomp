@@ -67,6 +67,41 @@ def test_struct_defs_and_fields(c):
                                                  t.line_text(2), t.span_lines(0, 17)), (1, 2, "struct A {", (1, 2)))
 
 
+def test_type_definitions_and_members(c):
+    text = ("/* struct Fake { int no; }; */\ntypedef struct {\n    void (*init)(void* self);\n    int (*tick)(int);\n"
+            "    u32 rtti_00;\n} Vtbl;\nclass Base : public Root {\npublic:\n    Vtbl* vtbl; /* +0x00 */\n"
+            "    u8 pad[4] = {0};\n    void inl(void) { int x; x = 1; }\n    virtual;\n};\nstruct { int anon; };\n"
+            'const char* s = "struct Str { int q; };";\n')
+    defs = cscan.type_definitions(text)
+    c.check("names: a typedef'd anonymous body takes its alias, a base clause is read, an unnamed one and a definition "
+            "inside a comment or a literal are not", [n for n, _m in defs], ["Vtbl", "Base"])
+    vt = dict(defs)["Vtbl"]
+    c.check("function-pointer members", [(m.name, m.fn_ptr) for m in vt],
+            [("init", True), ("tick", True), ("rtti_00", False)])
+    c.check("a function pointer's declarator is its text with `(*name)(` cut out (vtableaudit's shape)",
+            vt[0].decl.replace(" ", ""), "voidvoid*self)")
+    base = dict(defs)["Base"]
+    c.check("members: an initializer keeps the name before `=`; an inline body does not end a chunk, so the next `;` "
+            "names its last identifier (a known quirk, kept)", [m.name for m in base], ["vtbl", "pad", "x"])
+    c.check("... and a member's declarator starts at the previous `;` or the brace, an access label included (kept)",
+            base[0].decl.split(), ["public:", "Vtbl*"])
+    c.check("a bare access label or `virtual` is never a member",
+            [m.name for m in cscan.members(" public: ; virtual ; int a; ")], ["a"])
+
+
+def test_split_params_and_calls(c):
+    code = "f(a, g(b, c), d[1, 2]) + f( ) + f(x"
+    c.check("split_params: top-level commas only, with absolute offsets",
+            cscan.split_params(code, 2, 21), [("a", 2), (" g(b, c)", 4), (" d[1, 2]", 13)])
+    c.check("split_params: an empty range is one empty chunk", cscan.split_params(code, 2, 2), [("", 2)])
+    calls = cscan.calls(code, "f")
+    c.check("calls: each whole-word call with its matched paren; the unmatched one is skipped",
+            [(k.start, k.end) for k in calls], [(0, 22), (25, 29)])
+    c.check("calls: the arguments are split_params chunks; `f( )` has one blank chunk",
+            ([a for a, _o in calls[0].args], [a for a, _o in calls[1].args]), (["a", " g(b, c)", " d[1, 2]"], [" "]))
+    c.check("calls: `ff(` and `f_(` are other names", cscan.calls("ff(1); f_(2); f (3);", "f")[0].start, 14)
+
+
 def test_declared_name(c):
     for seg, want in ((" void foo(int a)", "foo"), (" void (*cb)(void)", "cb"), (" int (*getf(int))(void)", "getf"),
                       (" u32 table[4] = {0}", "table"), (" int x = 3", "x"), ("  ", None)):

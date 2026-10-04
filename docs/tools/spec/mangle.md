@@ -35,7 +35,8 @@ Inputs -> outputs: declaration -> mangled name.
 
 ## Lib dependencies
 
-units, proc, names.
+units (`Unit.resolve`, `ninja_command`, `run_tokens`, `function_names`, `quiet`), repo, names (the estimates, re-exported
+for `methodize`).
 
 ## Test contract
 

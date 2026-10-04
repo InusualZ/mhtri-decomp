@@ -1,28 +1,6 @@
 """List function names declared more than once with *different text* in one source file's include closure.
-
-Problem it solves: a unit that legitimately needs a callee owned by another unit must `#include` that
-unit's header.  When the band headers (`include/unsplit/*.h`, `include/ef.h`, ...) still carry their own
-copy of the same declaration, MWCC stops with `(10197) illegal function overloading` at the *first*
-clashing line and `-maxerrors 1` hides the rest - so the cost of a cross-unit lane reads as one error
-after another instead of a finite list.  This tool turns that into the list, before any source is edited.
-
-It is descriptive, not authoritative: it compares declaration *text* (with parameter names and
-`struct `/`extern ` spelling normalised away), so it is conservative in both directions.
-
-  * `DIFFERENT` names are worth inspecting but may still be the same type (`VEC3*` vs
-    `nw4r::math::VEC3*` is one type when `VEC3` is that typedef).
-  * `SAME` names differ only in whitespace, parameter names or the `struct `/`extern ` keyword.
-  * C vs C++ *linkage* cannot be seen here (a declaration inside an `extern "C"` block and one outside it
-    are different symbols); read the file when a pair matters.
-
-Usage:
-    python tools/units/declclash.py src/menu/fn_802E4978.cpp
-    python tools/units/declclash.py --only-different --json src/hud/layout.cpp
-    python tools/units/declclash.py include/unsplit/menu.h
-    python tools/units/declclash.py --selftest
-
-Exit status is 0 for a report and 1 only with `--fail-on-different` when a `DIFFERENT` name was found.
-"""
+Spec: docs/tools/spec/declclash.md. CLI: declclash.py PATH.. [--only-different] [--fail-on-different] [--json]
+[--root R] | --selftest."""
 
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
@@ -153,13 +131,8 @@ def report(paths, roots, only_different=False):
     return findings
 
 
-def _selftest():
-    import declclash_selftest
-
-    return declclash_selftest.selftest()
-
-
-TOOL = cli.Tool("declclash", "docs/tools/spec/declclash.md", tests=_selftest, common=("root", "json"))
+TOOL = cli.Tool("declclash", "docs/tools/spec/declclash.md", tests="tools/tests/units/test_declclash.py",
+                common=("root", "json"))
 
 
 def main(argv=None):

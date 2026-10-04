@@ -245,6 +245,16 @@ def test_freshness(c):
         closure = {os.path.relpath(p, root).replace("\\", "/") for p in report.source_closure(str(src), str(root))}
         c.check("the closure follows include/ transitively, never a system or commented header",
                 closure, {"src/Dir/u.cpp", "include/Dir/u.h", "include/deep.h"})
+        order_root = root / "order"
+        _touch(order_root / "include" / "a.h", base, '#include "deep.h"\n')
+        _touch(order_root / "include" / "deep.h", base)
+        _touch(order_root / "include" / "z.h", base, '/*\n#include "gone.h"\n*/\n')
+        _touch(order_root / "include" / "gone.h", base)   # it exists: only the comment keeps it out
+        _touch(order_root / "src" / "o.cpp", base, '#include "a.h"\n#include "z.h"\n#include "a.h"\n')
+        c.check("the closure is in the preprocessor's order: depth first, each file once, a block-commented include none",
+                [os.path.relpath(p, order_root).replace("\\", "/")
+                 for p in report.source_closure(str(order_root / "src" / "o.cpp"), str(order_root))],
+                ["src/o.cpp", "include/a.h", "include/deep.h", "include/z.h"])
         obj, rep = root / "build" / "u.o", root / "build" / "report.json"
         _touch(obj, base + 10)
         c.check("an equal stamp is current (strict <)", report.unit_reasons(str(src), str(obj), str(root))[0], [])

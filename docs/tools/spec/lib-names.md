@@ -53,4 +53,6 @@ relocaudit/undefrefs tests pin plus the constructor cases; `peel_tokens`; the me
 
 * `linkage_stem` does not split a class member's mangling (`send__16NetworkSingleTcpFPCUcl` stays whole): neither copy did,
   and the relocaudit report depends on it; deciding it is WP3a's (`undefrefs --census`).
-* `stylelint`'s rule 7/9 regexes search source *text* (`\bfn_[0-9A-Fa-f]{8}\b`), not names; they move with the lint (3d).
+* `stylelint`'s rule 7/9 regexes search source *text* (`\bfn_[0-9A-Fa-f]{8}\b`), not names; they live in
+  `stylelint_rules/r07_generated_name.py` and `r09_mangled.py` (WP3d). Rule 13's mangling estimate now calls
+  `estimate_member_mangling`/`estimate_static_mangling` here directly (it went through `mangle`).

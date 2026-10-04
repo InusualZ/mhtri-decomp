@@ -45,17 +45,21 @@ Inputs -> outputs: DOL, map, dump -> records.
 
 ## Lib dependencies
 
-binary.dol, ppc, project.symbols, names.
+binary (`Dol`, and `DolBuilder` for the fixture image), ppc, project (`SymbolMap`), repo (the default `--file`/`--dol`
+are the invocation's tree). No tool import: `symedit refs` is run as a process for `explain`.
 
 ## Test contract
 
-Tier: fixture (FakeImage).
+Tier: fixture (a `DolBuilder` image).
 Today's selftest: in-file `selftest()` (`--selftest`).
 Target: `tools/tests/symbols/test_phantom.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
 
 ## Known gaps
 
-None recorded.
+`DumpMap` is a second reader of the dump format `dumpmap.parse_map_text` reads: it takes a line's first token and its
+second-to-last, so each of the 109 glued line pairs dumpmap splits yields one entry - the second address under the first
+name. It has no lib home yet (a `phantom -> dumpmap` import would be a new tool edge); unifying it changes the dump half
+of phantom's verdicts, so it needs its own measured batch.
 
 ## History (the incidents behind the rules - keep the rule, drop the narrative when the rule is stable)
 

@@ -136,6 +136,29 @@ class Git:
         p = self.run_bytes("show", "%s:%s" % (ref, slash(path)))
         return p.stdout if p.returncode == 0 else None
 
+    def show_many(self, ref: str, paths: Iterable[str | os.PathLike]) -> dict[str, bytes | None]:
+        """`{path: bytes at ref, or None}` for every path, read through one `git cat-file --batch` - the bytes `show`
+        returns, without a process per file (a whole tree at a ref is hundreds of blobs)."""
+        keys = [slash(p) for p in paths]
+        out: dict[str, bytes | None] = {k: None for k in keys}
+        if not keys:
+            return out
+        p = self.run_bytes("cat-file", "--batch", input="".join("%s:%s\n" % (ref, k) for k in keys).encode("utf-8"))
+        data, pos = p.stdout or b"", 0
+        for key in keys:
+            nl = data.find(b"\n", pos)
+            if nl < 0:
+                break
+            head = data[pos:nl].split(b" ")
+            pos = nl + 1
+            if len(head) != 3 or not head[2].isdigit():
+                continue                                   # `<object> missing` / `ambiguous`: no bytes follow
+            size = int(head[2])
+            if head[1] == b"blob":
+                out[key] = data[pos:pos + size]
+            pos += size + 1                                # the content and its trailing newline
+        return out
+
     def cat_index(self, path: str | os.PathLike) -> bytes | None:
         """The staged blob's bytes (`:path`), or None when the path is not in the index."""
         p = self.run_bytes("cat-file", "-p", ":" + slash(path))

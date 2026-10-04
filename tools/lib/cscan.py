@@ -187,6 +187,71 @@ def fields(code: str, open_pos: int, close_pos: int) -> list[tuple[int, int]]:
     return out
 
 
+#: A class/struct definition head with an optional `typedef` and base clause (`vtableaudit`'s index): group 2 is
+#: the tag, None for `typedef struct { ... } Name;`.
+CLASS_OPEN_RE = re.compile(r"\b(?:typedef\s+)?(class|struct)\b\s*([A-Za-z_]\w*)?\s*(?::[^{;]*)?\{")
+_FN_PTR_MEMBER = re.compile(r"\(\s*[*&]*\s*(?P<name>[A-Za-z_]\w*)\s*\)\s*\(")
+_TYPEDEF_TAIL = re.compile(r"\s*([A-Za-z_]\w*)?\s*;")
+
+
+@dataclass(frozen=True)
+class Member:
+    """A `;`-terminated member of a class body: its declarator text without the name, the name, and whether it
+    is a function pointer (`RET (*name)(args);`)."""
+    decl: str
+    name: str
+    fn_ptr: bool
+
+
+def members(body: str) -> list[Member]:
+    """The top-level members of a class body (comment- and literal-free text).
+
+    Nested braces and parentheses (an inline function body, an anonymous union) are one chunk; a declarator with
+    an initializer keeps the name before the `=`; an access specifier or `virtual` alone is not a member.
+    """
+    out, start, depth, i = [], 0, 0, 0
+    while i < len(body):
+        c = body[i]
+        if c in "{(":
+            depth += 1
+        elif c in "})":
+            depth = max(0, depth - 1)
+        elif c == ";" and depth == 0:
+            chunk = body[start:i].strip()
+            start = i + 1
+            if chunk:
+                head = chunk.split("=", 1)[0].strip()
+                fp = _FN_PTR_MEMBER.search(head)
+                if fp:
+                    out.append(Member(head[:fp.start()] + head[fp.end():], fp.group("name"), True))
+                else:
+                    m = re.search(r"([A-Za-z_]\w*)\s*(?:\[[^\]]*\])?$", head)
+                    if m and not re.fullmatch(r"(public|private|protected|virtual)", m.group(1)):
+                        out.append(Member(head[:m.start(1)] + head[m.end(1):], m.group(1), False))
+        i += 1
+    return out
+
+
+def type_definitions(text: str) -> list[tuple[str, list[Member]]]:
+    """`(name, members)` for every class/struct definition in raw `text`, in order (`CLASS_OPEN_RE`); a typedef'd
+    anonymous definition takes the name after its closing brace, and an unnamed one is skipped. Comments and
+    literals are blanked first (`strip_comments`), so a brace or `;` inside one is never read."""
+    code = strip_comments(text)
+    out = []
+    for m in CLASS_OPEN_RE.finditer(code):
+        close = match_brace(code, m.end() - 1)
+        if close < 0:
+            continue
+        name = m.group(2)
+        if not name:
+            tail = _TYPEDEF_TAIL.match(code[close + 1:close + 120])
+            name = tail.group(1) if tail else None
+        if not name:
+            continue
+        out.append((name, members(code[m.end():close])))
+    return out
+
+
 # --- declarations --------------------------------------------------------------------------------------------
 
 #: Keywords that start a statement, never a declaration.
@@ -246,6 +311,48 @@ class Declaration:
         if self.body is not None:
             d["body"] = self.body
         return d
+
+
+def split_params(code: str, start: int, end: int) -> list[tuple[str, int]]:
+    """`(chunk, absolute_offset)` for each comma-separated item at bracket depth 0 (`()`, `[]`, `{}`) of
+    `code[start:end]` - a parameter list or a call's arguments; an empty range is one empty chunk."""
+    out = []
+    depth = 0
+    chunk_start = start
+    for i in range(start, end):
+        c = code[i]
+        if c in "([{":
+            depth += 1
+        elif c in ")]}":
+            depth -= 1
+        elif c == "," and depth == 0:
+            out.append((code[chunk_start:i], chunk_start))
+            chunk_start = i + 1
+    out.append((code[chunk_start:end], chunk_start))
+    return out
+
+
+@dataclass(frozen=True)
+class Call:
+    """A call `name(args)` in stripped code: `start` is the name's offset, `end` one past the `)`, `args` the
+    `split_params` chunks of the argument list (empty for `name()`)."""
+    start: int
+    end: int
+    args: tuple[tuple[str, int], ...]
+
+
+def calls(code: str, name: str) -> list[Call]:
+    """Every call of `name` in stripped `code`: the whole word followed by `(`, with its matching `)`; an
+    unmatched one is skipped. A declaration or definition head has the same shape - the caller filters it."""
+    out = []
+    for m in re.finditer(r"\b%s\b\s*\(" % re.escape(name), code):
+        open_pos = m.end() - 1
+        close = match_paren(code, open_pos)
+        if close < 0:
+            continue
+        args = tuple(split_params(code, open_pos + 1, close)) if close > open_pos + 1 else ()
+        out.append(Call(m.start(), close + 1, args))
+    return out
 
 
 def _declared_name_pos(segment: str) -> tuple[str | None, int]:

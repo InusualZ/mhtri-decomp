@@ -1,49 +1,7 @@
 #!/usr/bin/env python3
 """Plan the migration of `Type_name(Type* self, ...)` free functions to `Type::name` members (rule 13).
-
-docs/plan.md section 6.5 rule 13: a free function named `<Type>_<name>` whose first parameter is the type's own
-`self` is a member function spelled the C way; the **static form** (owner ruling 2026-09-29) is the same name with
-no `Type* self` (`GameSpyInterfaceThread_getInstance(void)`), a **static member**: the plan then reads
-`static R name(args);` in the class, `R Type::name(args)` for the definition, callers `Type::name(...)`, and the
-compiler's mangling is the plain member one with no `this` and no `C` (`getInstance__22GameSpyInterfaceThreadFv`).
-Each plan entry says `kind: member` or `kind: static`. This tool is the read-only planner for fixing one: it lists, per
-function, where it is declared and defined, every reference in `src/` and `include/` (comment-aware), the
-member signature to write, the mangled name the compiler will then emit, and the map row it must rename.
-
-    python tools/units/methodize.py NetworkSingleTcp             # the plan for one type
-    python tools/units/methodize.py --all                        # every type that has a finding
-    python tools/units/methodize.py NetworkSingleTcp --batch out.txt   # a `symedit.py rename-batch` input
-    python tools/units/methodize.py NetworkSingleTcp --exact     # confirm each mangling with the real compiler
-    python tools/units/methodize.py --class NetworkTcp --fn networkPeer_send=send --fn networkPeer_recv=recv \
-        --unit Network/network_socket_streams.cpp --batch out.txt      # explicit mapping (below)
-    python tools/units/methodize.py --map networkPeer_send=NetworkTcp::send --map-file map.json
-    python tools/units/methodize.py --selftest
-
-Explicit mapping: when the free functions do not share the class's prefix (`networkPeerStream_*` -> `NetworkByteStream`,
-`networkPeer_*` -> Tcp or Udp by address order), name each `old=Class::member` (`--map`, repeatable; `--map-file` is a
-JSON object of the same pairs; `--class C --fn old=member` is the short form). Each function is found by its exact name
-(no prefix or `Type* self` naming needed): a first parameter of type `Class*`/`const Class*`/`Class&` is the `this`
-(kind member), anything else makes it a static member. The plan adds, per function, the exact edits it can determine
-(`edits`: the definition header rewritten to `Class::member(...)`, a declaration to move into the class, every call
-site rewritten to `obj->member(...)` / `Class::member(...)`) and writes the rename-batch. The mangling is estimated by
-`mangle.py`; with `--unit <src path>` (or `--obj <file.o>`) it is VERIFIED against the function symbols of that built
-object: a name the object defines is `verified`, and a Class::member the object defines under a *different* mangling
-refuses the plan (exit 2, no batch written). An object built before the migration only carries the old names and
-leaves the estimate unconfirmed (say so, rebuild, rerun). Two mappings that mangle to one name are refused.
-
-It **never edits source or the map**. A lane does the source half (declare in the class, define `Type::name`,
-sweep the call sites) and measures it (playbook 60: `this` arrives in r3 like the old `self`, so a non-virtual
-method should be codegen-neutral, but the declaration set is a codegen input); the orchestrator applies the
-map half with `python tools/symbols/symedit.py rename-batch <file>`.
-
-How the findings are found: it calls `stylelint.rule13_findings` over `src/` and `include/` (one rule, one
-implementation), so a function the lint exempts with `/* free: <reason> */` is not planned. The mangled name
-is `mangle.estimate_member_mangling` (a pure-text estimate, marked `~`) unless `--exact` compiles the member
-through `mangle.mangle` (needs the build tree's compiler). **In the batch file only an exact name is an active
-rename**; an estimate is written as a comment, because a wrong map name un-pairs the symbol in objdiff. A
-constructor/destructor-shaped name (`construct`, `ctor`, `dtor`, `destruct`, `init`-less) is flagged: its
-mangling is `__ct__`/`__dt__`, not the method form, so no rename is proposed for it.
-"""
+Spec: docs/tools/spec/methodize.md. CLI: methodize.py TYPE | --all | --map OLD=CLASS::MEMBER.. [--map-file F] [--class C --fn OLD=M..]
+[--unit U | --obj O] [--batch F] [--exact] [--json] [--root R] | --selftest."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
@@ -51,17 +9,16 @@ import argparse
 import json
 import os
 import re
-import subprocess
 import sys
 import tempfile
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, HERE)
-sys.path.insert(0, os.path.dirname(HERE))
-
-import mangle as mg  # noqa: E402
-import stylelint as sl  # noqa: E402
-from tools.lib import project as _project  # noqa: E402  (the map line parser)
+from tools.lib import cscan
+from tools.lib import names as libnames
+from tools.lib import repo as _repo
+from tools.lib import units as _units
+from tools.lib.project import SymbolMap  # the one map parser
+from tools.units import mangle as mg  # `mangle()`: the compiler's exact spelling (`--exact`)
+from tools.units import stylelint as sl  # rule 13 itself: the findings this tool plans
 
 SYMBOLS = os.path.join("config", "RMHE08", "symbols.txt")
 CTOR_LIKE_RE = re.compile(r"^(?:construct|ctor|dtor|destruct|destroy|delete)(?:$|[A-Z_0-9])", re.I)
@@ -69,9 +26,8 @@ CONFIRMED = ("exact", "verified")
 
 
 def repo_root() -> str:
-    p = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True,
-                       encoding="utf-8", errors="replace")
-    return p.stdout.strip() if p.returncode == 0 and p.stdout.strip() else os.getcwd()
+    """The invocation's tree (`lib.repo.repo_root`)."""
+    return _repo.repo_root()
 
 
 # --------------------------------------------------------------------------------------------------
@@ -115,14 +71,10 @@ def map_rows(root: str, names: set) -> dict:
     rows: dict = {}
     if not names or not os.path.isfile(path):
         return rows
-    with open(path, "r", encoding="utf-8", errors="replace") as fh:
-        for line in fh:
-            head = line.split(" ", 1)[0]
-            if head in names:
-                e = _project.parse_line(line.strip())
-                if e is not None and e.name == head:
-                    rows[head] = {"section": e.section, "address": "0x%08X" % e.address,
-                                  "attrs": e.line.partition(";")[2].strip()}
+    for e in SymbolMap(path).rows():
+        if e.name in names:
+            rows[e.name] = {"section": e.section, "address": "0x%08X" % e.address,
+                            "attrs": e.line.partition(";")[2].strip()}
     return rows
 
 
@@ -131,7 +83,8 @@ def exact_mangling(f: dict) -> str | None:
     idents = set()
     for chunk in list(f["params"]) + [f["ret"]]:
         idents.update(re.findall(r"[A-Za-z_]\w*", chunk))
-    known = set(mg._PRIMITIVE_CODES) | mg._QUALIFIERS | {"unsigned", "signed", "long", "short", "int", "char", "void"}
+    known = set(libnames.PRIMITIVE_CODES) | libnames.QUALIFIERS | {"unsigned", "signed", "long", "short", "int", "char",
+                                                                    "void"}
     fwd = "".join("struct %s;\n" % i for i in sorted(idents - known - {f["owner"]}) if i[:1].isupper())
     params = ", ".join(f["params"])
     snippet = ("%sstruct %s;\n%sstruct %s { %s%s %s(%s)%s; };\n%s %s::%s(%s)%s"
@@ -207,28 +160,10 @@ def parse_mapping(pairs: list[str], class_name: str | None = None, fns: list[str
 
 
 def _call_sites(src: "sl.Source", name: str, skip: set) -> list[tuple[int, int, list[str]]]:
-    """`(start, end, args)` of every call `name(args)` in code (offsets into the file), minus `skip` lines."""
-    out = []
-    for m in re.finditer(r"\b%s\b\s*\(" % re.escape(name), src.code):
-        if (src.rel, src.line_of(m.start())) in skip:
-            continue
-        open_pos = m.end() - 1
-        depth, close = 0, None
-        for i in range(open_pos, len(src.code)):
-            c = src.code[i]
-            if c == "(":
-                depth += 1
-            elif c == ")":
-                depth -= 1
-                if depth == 0:
-                    close = i
-                    break
-        if close is None:
-            continue
-        chunks = sl._split_parameters(src.code, open_pos + 1, close) if close > open_pos + 1 else []
-        args = [src.text[o:o + len(c)].strip() for c, o in chunks]
-        out.append((m.start(), close + 1, args))
-    return out
+    """`(start, end, args)` of every call `name(args)` in code (offsets into the file), minus `skip` lines
+    (`lib.cscan.calls`); each argument is the original text of its chunk."""
+    return [(call.start, call.end, [src.text[o:o + len(c)].strip() for c, o in call.args])
+            for call in cscan.calls(src.code, name) if (src.rel, src.line_of(call.start)) not in skip]
 
 
 def _receiver(arg: str) -> str:
@@ -260,12 +195,12 @@ def plan_mapping(root: str, mapping: dict, obj_names: list[str] | None = None,
         decls, defs, first, edits, skip = [], [], None, [], set()
         found = []
         for src in sources:
-            code = sl._mask_preproc(src.code)
-            for d in sl.function_declarations(src):
-                if d["name"] != old:
+            code = cscan.mask_preproc(src.code)
+            for d in cscan.function_declarations(src):
+                if d.name != old:
                     continue
-                chunks = sl._split_parameters(code, d["params_pos"], d["params_pos"] + len(d["params"]))
-                found.append((src, d, [c.strip() for c, _o in chunks]))
+                chunks = cscan.split_params(code, d.params_pos, d.params_pos + len(d.params))
+                found.append((src, d.to_dict(), [c.strip() for c, _o in chunks]))
         if not found:
             errors.append("%s: no declaration or definition found in src/ or include/" % old)
             continue
@@ -300,7 +235,7 @@ def plan_mapping(root: str, mapping: dict, obj_names: list[str] | None = None,
             note = "constructor/destructor-shaped member name: decide its `__ct__`/`__dt__` spelling by hand"
         else:
             note = None
-            mangled = mg.estimate_member_mangling(cls, member, first["params"], const_self=first["const_self"])
+            mangled = libnames.estimate_member_mangling(cls, member, first["params"], const_self=first["const_self"])
             if exact:
                 ex = exact_mangling(first)
                 if ex:
@@ -605,8 +540,7 @@ def main(argv: list[str] | None = None) -> int:
             if not os.path.isfile(obj):
                 print("the object %s is not built; manglings stay estimates (build it to verify)" % obj)
             else:
-                import unitutil
-                names = unitutil.function_names(obj)
+                names = _units.function_names(obj)
         entries, errors = plan_mapping(root, mapping, names, exact=args.exact)
         sys.stdout.write((json.dumps(entries, indent=1) + "\n") if args.json else render(entries))
         if errors:

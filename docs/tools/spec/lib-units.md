@@ -102,7 +102,8 @@ spellings, unknown-option drop, sibling versions, `split_command` with a stub ni
 ## Known gaps
 
 * Not yet collapsed onto `stem`: `claims.norm_unit` and `promote.norm_unit` (lane keys, `lib/lanes/naming.py`, WP3e),
-  `stylelint._unit_stem` (WP3d), `undefrefs._unit_stem` / `flipcheck.unit_name_for` / `datagap.object_path` /
+  `stylelint._unit_stem` (kept by WP3d on purpose: the split credit's file->unit key strips any extension, so a private
+  header `src/x/foo.h` counts as unit `x/foo`'s file, and `stem` would leave `.h` on and change the credit), `undefrefs._unit_stem` / `flipcheck.unit_name_for` / `datagap.object_path` /
   `relocaudit.object_paths` / `vtableaudit.object_paths` / `pairgap._stem_of` (WP3a), `dossier`/`unwindcut.resolve_unit`
   (WP3c), `brief.source_name` (WP3e). `mwlink.link.unit_of_object` delegates to `stem` since WP5 (it keeps only the
   cut at `/build/<version>/{src,obj}/`, which also takes an absolute path or another version directory).

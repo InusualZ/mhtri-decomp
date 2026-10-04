@@ -10,6 +10,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
+from tools.lib import cscan
+
 #: The per-function score key of report version 2; a function entry **without** it scores 0 %, not 100 %.
 SCORE_KEY = "fuzzy_match_percent"
 #: The oldest objdiff that reads the one-unit project this module writes.
@@ -533,11 +535,6 @@ def diff_rows(target: str, base: str, symbol: str, objdiff: str, tmpdir: str,
 # freshness: is a prebuilt object (or the report) older than the sources it describes?
 # --------------------------------------------------------------------------------------------------
 
-#: A one-line `#include`; comments are stripped first so a commented-out one is not a dependency.
-INCLUDE_RE = re.compile(r'^\s*#\s*include\s*[<"]([^>"]+)[>"]', re.M)
-MAX_INCLUDE_DEPTH = 12
-
-
 def mtime(path: str) -> float | None:
     """The file's mtime, or None when it does not exist."""
     try:
@@ -592,16 +589,19 @@ def freshness(use_report: bool, report_mtime: float | None, object_mtime: float 
     return reasons
 
 
+def _uncommented(path: str) -> str:
+    """A source file's text with its comments removed (`lib.cscan.remove_comments`): a commented-out `#include` is
+    not a dependency."""
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        return cscan.remove_comments(fh.read())
+
+
 def includes_of(path: str) -> list[str]:
-    """The `#include` targets named in a source file, comments removed."""
+    """The `#include` targets (quoted and angle) named in a source file, comments removed; [] when unreadable."""
     try:
-        with open(path, encoding="utf-8", errors="replace") as fh:
-            text = fh.read()
+        return cscan.includes(_uncommented(path))
     except OSError:
         return []
-    text = re.sub(r"/\*.*?\*/", " ", text, flags=re.S)
-    text = re.sub(r"//[^\n]*", " ", text)
-    return INCLUDE_RE.findall(text)
 
 
 def rel_path(path: str, tree: str) -> str:
@@ -632,24 +632,11 @@ def resolve_include(name: str, from_dir: str, root: str) -> str | None:
 
 
 def source_closure(src: str, root: str) -> list[str]:
-    """The unit's source file and every in-tree header it reaches, transitively (deduplicated)."""
-    out: list[str] = []
-    seen: set[str] = set()
-    todo: list[tuple[str, int]] = [(os.path.abspath(src), 0)]
-    while todo:
-        path, depth = todo.pop(0)
-        key = os.path.normcase(os.path.abspath(path))
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append(path)
-        if depth >= MAX_INCLUDE_DEPTH:
-            continue
-        for name in includes_of(path):
-            hit = resolve_include(name, os.path.dirname(path), root)
-            if hit and os.path.normcase(os.path.abspath(hit)) not in seen:
-                todo.append((hit, depth + 1))
-    return out
+    """The unit's source file and every in-tree header it reaches, transitively, each once - in the preprocessor's
+    order (`lib.cscan.include_closure`: depth first, an include expanded where it stands)."""
+    return cscan.include_closure(os.path.abspath(src),
+                                 lambda name, includer: resolve_include(name, os.path.dirname(includer), root),
+                                 read=_uncommented, angle=True)
 
 
 def newest(paths: list[str]) -> tuple[str, float] | None:

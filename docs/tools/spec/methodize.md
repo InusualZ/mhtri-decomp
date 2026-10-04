@@ -37,7 +37,9 @@ Inputs -> outputs: src, include, map, object -> plan, batch file.
 
 ## Lib dependencies
 
-cscan, project, names, units, binary.
+cscan (`calls`, `split_params`, `function_declarations`, `mask_preproc`), project (`SymbolMap`), names (the mangling
+estimate), units (`function_names`), repo; the rule-13 findings from `stylelint` and the compiled spelling from
+`mangle.mangle` (its two tool imports).
 
 ## Test contract
 

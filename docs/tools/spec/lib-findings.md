@@ -73,9 +73,12 @@ over a corpus of row shapes.
 
 ## Known gaps
 
-* stylelint still passes findings as dicts (`to_dict()` at creation); the 3d split moves the rules to `Finding`.
+* stylelint still passes findings as dicts (`to_dict()` at creation): its rules carry extra keys (`symbol`, rule 13's
+  `owner`/`method`/`mangled`/`static`...) that `--diff`, `methodize` and `backlog` read, so the 3d split kept the dict and
+  left the move to `Finding` (with an `extra` mapping) to a batch that changes those readers too.
 * `land.py`'s checks are still built as tuples and rendered through `Row` (`rows_of`); WP4 builds `Row`s directly.
-* Not yet producing these shapes (their packages): `stylelint.apply_move_credits/diff_deltas` (3d),
-  `vtableaudit.violation_rows/keys` (3d), `undefrefs.check_object`, `datagap.strict_verdict`, `flipcheck.check`,
+* Not yet producing these shapes: `stylelint_rules/diff.py`'s `apply_move_credits`/`judge` (their `Judgement` is the
+  comparison's own value; `added`/`removed` already come from here), `vtableaudit.violation_rows/keys` (the gate reads
+  their keys), `undefrefs.check_object`, `datagap.strict_verdict`, `flipcheck.check`,
   `verifyunit.*_problems`, `dataclaim.classify` (3a), `splitcheck.Results` (3c), `symbolpreflight.severity_for`,
   `unionresolve.check_union` (3f).

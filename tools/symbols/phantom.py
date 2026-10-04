@@ -16,16 +16,15 @@ import subprocess
 import sys
 import zipfile
 
+from tools.lib import ppc as _ppc  # the one instruction decoder
+from tools.lib import repo as _repo
+from tools.lib.binary.build import DolBuilder  # the selftest's DOL fixture
+from tools.lib.binary.dol import Dol  # the read-only DOL image (address -> bytes)
+from tools.lib.project import SymbolMap  # the one map parser - never read symbols.txt directly
+
 HERE = os.path.dirname(os.path.abspath(__file__))
-TOOLS = os.path.dirname(HERE)
-ROOT = os.path.dirname(TOOLS)
-
-from tools.lib import ppc as _ppc  # noqa: E402  the one instruction decoder
-from tools.symbols import symedit  # noqa: E402  the map parser - never read symbols.txt directly
-from tools.units.m2cinput import Dol  # noqa: E402  the read-only DOL image (address -> bytes)
-
-DEFAULT_FILE = os.path.join(ROOT, "config", "RMHE08", "symbols.txt")
-DEFAULT_DOL = os.path.join(ROOT, "orig", "RMHE08", "sys", "main.dol")
+SYMBOLS_REL = os.path.join("config", "RMHE08", "symbols.txt")
+DOL_REL = os.path.join("orig", "RMHE08", "sys", "main.dol")
 DUMP_PATHS = ("D:/WiiExperiment/DumpSymbols.zip", "D:/WiiExperiment/Dump_Loading85.raw.map")
 DUMP_MEMBER = "Dump_Loading85.raw.map"
 UNNAMED = re.compile(r"^fn_[0-9A-Fa-f]{8}$")
@@ -65,7 +64,7 @@ def index_refs(image) -> Refs:
     """Every static reference to a code address in the linked image, per channel (see `Refs`); the decode is
     `lib.ppc` (`branch_target`, `materialisations`)."""
     refs = Refs()
-    text = [s for s in image.sections[:7] if s[2]]
+    text = [(s.offset, s.address, s.size) for s in image.segments if s.kind == "text"]
     ranges = [(a, a + size) for _o, a, size in text]
 
     def is_code(value: int) -> bool:
@@ -80,7 +79,7 @@ def index_refs(image) -> Refs:
         for _site, value in _ppc.materialisations(code, start, 16):
             if is_code(value):
                 refs.add("addrloads", value)
-    for offset, start, size in image.sections[7:]:
+    for offset, start, size in [(s.offset, s.address, s.size) for s in image.slots if s.kind == "data"]:
         for i in range(0, size - 3, 4):
             word = struct.unpack_from(">I", image.data, offset + i)[0]
             if is_code(word):
@@ -159,7 +158,7 @@ def find_dump(path: str | None = None) -> str | None:
 # ---------------------------------------------------------------------------------------- classification
 
 def first_instruction(image, address: int) -> int | None:
-    raw = image.read(address, 4)
+    raw = image.bytes_at(address, 4)
     return struct.unpack(">I", raw)[0] if raw and len(raw) == 4 else None
 
 
@@ -170,11 +169,11 @@ def looks_like_prologue(image, address: int) -> bool:
 
 def is_dead_epilogue(image, symbol: dict) -> bool:
     """The phantom's own shape: the symbol's bytes are exactly one `blr` (`lib.ppc`)."""
-    return _ppc.is_dead_epilogue(image.read(symbol["address"], symbol["size"]))
+    return _ppc.is_dead_epilogue(image.bytes_at(symbol["address"], symbol["size"]))
 
 
 def bytes_at(image, address: int, size: int) -> str:
-    raw = image.read(address, size)
+    raw = image.bytes_at(address, size)
     return raw.hex() if raw and len(raw) == size else ""
 
 
@@ -284,7 +283,7 @@ def classify(symbol: dict, previous: dict | None, refs: Refs, dump: DumpMap | No
 
 
 def in_text(image, address: int) -> bool:
-    return any(start <= address < start + size for _o, start, size in image.sections[:7] if size)
+    return image.in_text(address)
 
 
 def by_section(entries) -> dict[str, list[dict]]:
@@ -431,21 +430,14 @@ def symedit_refs(name: str) -> str | None:
 
 # ------------------------------------------------------------------------------------------------ selftest
 
-class FakeImage:
-    """A DOL-shaped image for the selftest: 7 text sections (padded) then the data sections."""
-
-    def __init__(self, text: list[tuple[int, bytes]], data: list[tuple[int, bytes]]) -> None:
-        self.sections: list[tuple[int, int, int]] = []
-        self.data = bytearray()
-        for address, blob in (list(text) + [(0, b"")] * 7)[:7] + list(data):
-            self.sections.append((len(self.data), address, len(blob)))
-            self.data += blob
-
-    def read(self, address: int, size: int) -> bytes | None:
-        for offset, start, length in self.sections:
-            if start <= address and address + size <= start + length:
-                return bytes(self.data[offset + address - start: offset + address - start + size])
-        return None
+def FakeImage(text: list[tuple[int, bytes]], data: list[tuple[int, bytes]]) -> Dol:
+    """A DOL image for the selftest (`lib.binary.build.DolBuilder`): text slots first, then the data slots."""
+    builder = DolBuilder()
+    for address, blob in text:
+        builder.text(address, blob)
+    for address, blob in data:
+        builder.data(address, blob)
+    return Dol(builder.build())
 
 
 def _b(from_address: int, to_address: int) -> int:
@@ -675,7 +667,7 @@ def selftest() -> int:
     options = {o for action in parser._actions for o in action.option_strings}
     check("contract: no --apply/--write option exists", options & {"--apply", "--write", "--fix"}, set())
     check("contract: the module never imports a symbol-map writer",
-          hasattr(symedit, "rename") and not hasattr(sys.modules[__name__], "apply"), True)
+          "symedit" in sys.modules[__name__].__dict__ or hasattr(sys.modules[__name__], "apply"), False)
 
     if fails:
         print("FAIL (%d)" % len(fails))
@@ -693,8 +685,8 @@ def build_parser() -> argparse.ArgumentParser:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("command", nargs="?", default="scan", choices=["scan", "explain"])
     ap.add_argument("target", nargs="?", help="explain: a symbol name or 0x address")
-    ap.add_argument("--file", default=DEFAULT_FILE, help="symbol map")
-    ap.add_argument("--dol", default=DEFAULT_DOL, help="original DOL (read-only)")
+    ap.add_argument("--file", default=None, help="symbol map (default: the tree's config/RMHE08/symbols.txt)")
+    ap.add_argument("--dol", default=None, help="original DOL, read-only (default: the tree's orig/RMHE08/sys/main.dol)")
     ap.add_argument("--dump", default="auto", help="runtime symbol map (.zip/.map) or `auto`")
     ap.add_argument("--max-size", type=lambda s: int(s, 0), default=MAX_SIZE,
                     help="candidate size ceiling in bytes (default %d)" % MAX_SIZE)
@@ -709,7 +701,7 @@ def build_parser() -> argparse.ArgumentParser:
 def cmd_scan(args, image, entries, dump) -> int:
     refs = index_refs(image)
     records, unnamed_total = scan(entries, image, refs, dump, args.max_size, args.section)
-    text_sections = len([s for s in image.sections[:7] if s[2]])
+    text_sections = len([s for s in image.segments if s.kind == "text"])
     if args.json:
         print(json.dumps({"counts": counts(records), "unnamed_total": unnamed_total,
                           "dump": dump.path if dump else None, "records": records}, indent=2))
@@ -751,11 +743,15 @@ def main() -> int:
     args = build_parser().parse_args()
     if args.selftest:
         return selftest()
+    if args.file is None or args.dol is None:
+        root = _repo.repo_root()
+        args.file = args.file or os.path.join(root, SYMBOLS_REL)
+        args.dol = args.dol or os.path.join(root, DOL_REL)
     if not os.path.exists(args.dol):
         print("missing DOL: %s" % args.dol)
         return 2
-    image = Dol(args.dol)
-    entries = list(symedit.entries(args.file))
+    image = Dol.read(args.dol)
+    entries = [e.to_dict() for e in SymbolMap(args.file).rows()]
     dump = DumpMap.load(args.dump)
     if dump is None and args.dump != "auto":
         print("warning: no dump oracle at %s - merge verdicts degrade to unclear" % args.dump)

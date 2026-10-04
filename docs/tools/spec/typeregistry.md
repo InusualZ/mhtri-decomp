@@ -48,7 +48,7 @@ Inputs -> outputs: include, src, map -> report.
 
 ## Lib dependencies
 
-cscan, project.symbols.
+cscan, project (`SymbolMap`, `Splits`), names (`peel_tokens`), repo (the default `--root` is the invocation's tree).
 
 ## Test contract
 
