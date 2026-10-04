@@ -20,7 +20,11 @@
  *
  * SHAPES.  `check`'s states 0 and 10 `break` to one shared `return 0` after the switch (retail's single tail).
  *
- * RESIDUALS.  `.text` bytes match; `check`'s error code 0x80020002 is a plain immediate in ours where dtk's split
+ * CLASS.  `NetworkResolverWii` is concrete and 0x1568 B (`sNetworkLibraryWii::createResolver` is `new` of 0x1568):
+ * the thread record is 8-aligned, and the derived table has no sixth slot - its trailing zero word, like the base
+ * table's, is the 8-byte `.data` alignment, so the object's `.data` is 0x44 of the claimed 0x48 and the link pads it.
+ *
+ * RESIDUALS.  As `Matching` the DOL hash holds (measured 2026-10-04).  `.text` bytes match; `check`'s error code 0x80020002 is a plain immediate in ours where dtk's split
  * relocates it against `@eti_8001FFF8+0xA` (an `extabindex` address that happens to equal the constant).
  */
 #include "types.h"

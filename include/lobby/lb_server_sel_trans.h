@@ -32,18 +32,7 @@ void fn_803C7F88(void);
 }
 #endif
 
-/* Declarations moved here from `include/unsplit/NetworkStream.h` (docs/plan.md 6.5 rule 2: the owner declares). */
-struct NetworkStreamWriter;
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/* 0x803CB9B4 - builds an empty packet (the `NetworkBuffer` base, then its own table). */
-void networkPacket_construct(NetworkStreamWriter* self);
-
-#ifdef __cplusplus
-}
-#endif
+/* The writer classes' constructors and destructors this unit defines (0x803CB8FC..0x803CBA2C) are declared
+   on their classes in `Network/network_writer_types.h`. */
 
 #endif /* MHTRI_LOBBY_LB_SERVER_SEL_TRANS_H */

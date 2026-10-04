@@ -2061,9 +2061,9 @@ config.libs = [
             # log strings in one function, so the flag stays on all eight rather than being re-discovered per row.
             Object(Matching, "Network/NetworkPeerBase.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
-            Object(NonMatching, "Network/NetworkPeerBuffer.cpp",
+            Object(Matching, "Network/NetworkPeerBuffer.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
-            Object(NonMatching, "Network/NetworkPeerUdp.cpp",
+            Object(Matching, "Network/NetworkPeerUdp.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
             Object(NonMatching, "Network/NetworkPeerMcs.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
