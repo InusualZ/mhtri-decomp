@@ -250,6 +250,13 @@ def looks_like_prologue(word: int | None) -> bool:
     return word >> 26 == 47
 
 
+def stwu_frame(word: int) -> int | None:
+    """The frame size of an `stwu rS,-N(rA)` word (opcode 37) as the positive `N`, else None."""
+    if word >> 26 != 37:
+        return None
+    return -signed(word & 0xFFFF, 16)
+
+
 def is_dead_epilogue(code: bytes | None) -> bool:
     """A phantom's own shape: the bytes are exactly one `blr`."""
     return bool(code) and len(code) == 4 and struct.unpack(">I", code)[0] == BLR

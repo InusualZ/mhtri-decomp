@@ -112,6 +112,9 @@ def test_shapes(c):
     c.check("a lone blr is a dead epilogue", (ppc.is_dead_epilogue(code(BLR)), ppc.is_dead_epilogue(code(BLR, BLR)),
                                               ppc.is_dead_epilogue(code(NOP)), ppc.is_dead_epilogue(b""), ppc.is_dead_epilogue(None)),
             (True, False, False, False, False))
+    c.check("stwu_frame is the positive N of `stwu rS,-N(rA)`, None for anything else",
+            [ppc.stwu_frame(w) for w in (stwu(1, 1, -0x10), stwu(1, 1, -0x1F0), stwu(3, 4, 0x8), mflr(0), BLR)],
+            [0x10, 0x1F0, -0x8, None, None])
 
 
 def test_written_reg_and_sda(c):

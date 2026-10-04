@@ -43,8 +43,10 @@ Target: `tools/tests/flags/test_mwcc_matrix.py` on `lib.testing` (`FixtureTree`/
 
 ## Known gaps
 
-leaves a foreign object in the unit's output path
+* leaves a foreign object in the unit's output path
+* `--list-versions` listed the files of the compiler's own version directory until WP3b; it now lists the sibling version
+  directories (`lib.units.available_versions`, shared with `frame.py --versions`).
 
 ## History (the incidents behind the rules - keep the rule, drop the narrative when the rule is stable)
 
-* The `match` column is the **official report metric** (`report generate`'s `fuzzy_match_percent`, `unitutil.report_functions`) - the number that closes a symbol, not objdiff's positional `diff` value. The diff JSON is still generated and used for the two sizes and the `first-diff@` index, because the report carries neither. This matters for flag decisions: `diff` defaults `functionRelocDiffs` to `data_value` while the report defaults to `none`, so relocation-only differences used to read as sub-100 % code here (`pl_skill` fn_80270018: 99.88 % positionally, **100.0 %** officially).
+* The `match` column is the **official report metric** (`report generate`'s `fuzzy_match_percent`, `lib.report.score_entries`) - the number that closes a symbol, not objdiff's positional `diff` value. The diff JSON is still generated and used for the two sizes and the `first-diff@` index, because the report carries neither. This matters for flag decisions: `diff` defaults `functionRelocDiffs` to `data_value` while the report defaults to `none`, so relocation-only differences used to read as sub-100 % code here (`pl_skill` fn_80270018: 99.88 % positionally, **100.0 %** officially).

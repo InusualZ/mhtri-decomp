@@ -49,7 +49,9 @@ Target: `tools/tests/units/test_recompile.py` on `lib.testing` (`FixtureTree`/`G
 
 ## Known gaps
 
-None recorded.
+* `main_root` is `lib.repo.main_checkout`; `worktree_root` and `git_dirty` stay here as the seams the selftest
+  drives (`git_dirty` takes a `runner`, which `lib.git.Git` does not).
+* `main_worktree_list` (read by `claims`, WP3e) is a view over `lib.git.Git.worktree_list`.
 
 ## History (the incidents behind the rules - keep the rule, drop the narrative when the rule is stable)
 

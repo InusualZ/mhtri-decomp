@@ -1,45 +1,7 @@
 #!/usr/bin/env python3
-"""Search *source shapes* of one function for the codegen the original object has.
-
-This is the source-side twin of `tools/flags/tryvar.py`: where tryvar varies the compiler flags, this
-varies the source - declaration order and types, named temporaries, casts and signedness, statement
-order, compound assignment vs assignment, field form vs pointer arithmetic, dead copies, the switch tail
-and `default`-first shapes, condition/branch form, ternaries and loop shape. It exists because the
-residual on a near-matching unit is almost always *codegen* (allocator web order, a branch direction, a
-register colouring) and finding it by hand cost the earlier sessions hundreds of hand-written variants
-per function.
-
-The loop is the one tryvar already uses for flags, lifted to the source:
-
-    generate variants -> compile each with the unit's *real* ninja command line -> score each with
-    objdiff's official report metric -> deduplicate identical objects -> rank
-
-Nothing here writes to the repository's source: every candidate is compiled from a scratch copy under
-`build/tmp/shapes/<run>/`, and only a single object is compiled (no link, no `ninja` build edge). The
-score is `unitutil.report_functions` - `report generate`'s `fuzzy_match_percent`, the number
-`build/RMHE08/report.json`, `ledger.py` and `land.py` read - not objdiff `diff`'s positional value.
-
-Usage:
-    python tools/flags/shapesearch.py -u Pl/pl_act                     # worst function, all generators
-    python tools/flags/shapesearch.py -u Pl/pl_act -f fn_8027BC48
-    python tools/flags/shapesearch.py -u Pl/pl_act -f fn_8027BC48 --gens switch,cond --depth 2
-    python tools/flags/shapesearch.py -u Pl/pl_act -f fn_8027BC48 --top 10 --jobs 8
-    python tools/flags/shapesearch.py -u Pl/pl_act -f fn_8027BC48 --emit <label>   # dump the winner
-    python tools/flags/shapesearch.py -u Pl/pl_act -f fn_8027BC48 --expr "return 0;" --expr "return 1;"
-    python tools/flags/shapesearch.py -u Pl/pl_act -f fn_8027BC48 --expr-file cands.txt
-    python tools/flags/shapesearch.py --list-gens
-
-`--expr` / `--expr-file` are the **candidate-expression** mode: instead of the generated source shapes,
-each candidate is a body you write, compiled with the unit's real cflags and scored with the same
-machinery as the search, and each is printed with its score **and its first divergence**. A lane that
-hand-wrote twelve spellings into a scratch `.c` to attribute one residual did the same thing by hand; a
-file separates its candidates with a line of `---` (without one, each non-empty non-`#` line is one),
-and `--emit <label>` dumps a candidate's full source plus its body diff.
-
-Ranking is by the target function's official score; the table also shows the unit mean and the number of
-functions the variant regressed, so a shape that fixes the function by breaking its neighbours is not
-mistaken for a win.
-"""
+"""Search *source shapes* of one function for the codegen the original object has. Spec: docs/tools/spec/shapesearch.md.
+CLI: python tools/flags/shapesearch.py -u <unit> [-f <symbol>] [--gens G] [--depth N] [--expr E | --expr-file F] [--emit L] | --list-gens."""
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import concurrent.futures
 import hashlib
@@ -51,11 +13,23 @@ import sys
 import time
 import difflib
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # tools/
-import unitutil as uu
-import shapes as sh
+from tools.flags import shapes as sh
+from tools.lib import repo, report, units
 
-SCRATCH = os.path.join(uu.ROOT, "build", "tmp", "shapes")
+#: The tree a run reads and its scratch directory (`build/tmp/shapes/`), bound by `bind()` in `main()`.
+ROOT = None
+SCRATCH = None
+
+
+def bind(root):
+    """Point the run at `root`: probe compiles run there and scratch lives under its `build/tmp/shapes/`."""
+    global ROOT, SCRATCH
+    ROOT, SCRATCH = root, os.path.join(root, "build", "tmp", "shapes")
+
+
+def report_functions(target, obj, unit_name=None, tmpdir=None):
+    """`lib.report.score_entries` for one probe object of the bound tree."""
+    return report.score_entries(target, obj, unit_name, tmpdir, objdiff=report.objdiff_cli(ROOT), cwd=ROOT)
 
 
 # --------------------------------------------------------------------------------------------------
@@ -64,7 +38,7 @@ SCRATCH = os.path.join(uu.ROOT, "build", "tmp", "shapes")
 
 def compile_tokens(unit):
     """The unit's real ninja command line, with `-MMD` dropped (the probe writes no dep file)."""
-    head, flags, tail = uu.split_flags(uu.compile_command(unit))
+    head, flags, tail = units.split_command(unit)
     tail = [t for t in tail if t != "-MMD"]
     return head + flags + tail
 
@@ -80,13 +54,13 @@ def _run_one(job):
         toks = list(tokens)
         toks[toks.index("-c") + 1] = probe_src
         toks[toks.index("-o") + 1] = probe_dir
-        p = subprocess.run(toks, cwd=uu.ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        p = subprocess.run(toks, cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
         obj = os.path.join(probe_dir, "shapes_probe.o")
         if p.returncode != 0 or not os.path.exists(obj):
-            return {"idx": idx, "error": uu.quiet((p.stdout or "") + (p.stderr or ""))[:300]}
+            return {"idx": idx, "error": units.quiet((p.stdout or "") + (p.stderr or ""))[:300]}
         raw = open(obj, "rb").read()
         ohash = hashlib.sha1(raw).hexdigest()
-        entries = uu.report_functions(target, obj, unit_name=unit_name, tmpdir=probe_dir)
+        entries = report_functions(target, obj, unit_name=unit_name, tmpdir=probe_dir)
         if "_error" in entries:
             return {"idx": idx, "error": entries["_error"][:300]}
         pcts = {n: e.get("fuzzy_match_percent") for n, e in entries.items()
@@ -99,7 +73,7 @@ def _run_one(job):
                        if n in base_scores and v > base_scores[n] + 0.005)
         size = None
         try:
-            size = uu.text_size(obj)
+            size = units.text_size(obj)
         except Exception:
             pass
         return {"idx": idx, "func_pct": fpct, "unit_mean": mean, "regressed": regressed,
@@ -156,17 +130,17 @@ def build_level(parents, gens, per_gen, round_robin=True):
 
 def run_batch(unit, tokens, candidates, symbol, base_scores, run_id, jobs, verbose=False):
     """Compile+score every (label, body) candidate. Returns the result dicts in order."""
-    src = open(unit.src, encoding="utf-8", errors="surrogateescape").read()
+    src = open(unit.source, encoding="utf-8", errors="surrogateescape").read()
     func = sh.find_definition(src, symbol)
     if func is None:
-        raise SystemExit("cannot find a definition of %r in %s" % (symbol, unit.src))
-    ext = os.path.splitext(unit.src)[1]
+        raise SystemExit("cannot find a definition of %r in %s" % (symbol, unit.source))
+    ext = os.path.splitext(unit.source)[1]
     jobs_list = []
     for i, (label, body) in enumerate(candidates):
         src_text = apply_body(src, func, body)
         probe_dir = os.path.join(SCRATCH, run_id, "v%05d" % i)
-        jobs_list.append((i, tokens, src_text, probe_dir, unit.target, symbol,
-                          unit.name, base_scores, ext))
+        jobs_list.append((i, tokens, src_text, probe_dir, unit.obj_target, symbol,
+                          unit.report_name, base_scores, ext))
     results = [None] * len(jobs_list)
     t0 = time.time()
     with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
@@ -186,11 +160,11 @@ def run_batch(unit, tokens, candidates, symbol, base_scores, run_id, jobs, verbo
 def probe_rows(target, obj, symbol, unit_name, tmpdir):
     """Side-by-side rows for one probe object, or None. Rows are (kind, target_fmt, ours_fmt)."""
     os.makedirs(tmpdir, exist_ok=True)
-    proj = uu.measure_project(target, obj, unit_name, tmpdir)
+    proj = report.write_project(target, obj, unit_name, tmpdir)
     out = os.path.join(tmpdir, "shapes_diff.json")
-    p = subprocess.run([uu.OBJDIFF, "diff", "-p", proj, "-u", unit_name or "measure", symbol,
+    p = subprocess.run([report.objdiff_cli(ROOT), "diff", "-p", proj, "-u", unit_name or "measure", symbol,
                         "-c", "functionRelocDiffs=none", "--format", "json", "-o", out],
-                       cwd=uu.ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
+                       cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if p.returncode != 0 or not os.path.exists(out):
         return None
     d = json.load(open(out, encoding="utf-8"))
@@ -258,7 +232,7 @@ def search_function(unit, tokens, src, symbol, gens, depth, beam, max_c, per_gen
     """Run the shape search for one function. Returns a result dict."""
     func = sh.find_definition(src, symbol)
     if func is None:
-        return {"symbol": symbol, "error": "no definition in %s" % os.path.relpath(unit.src, uu.ROOT)}
+        return {"symbol": symbol, "error": "no definition in %s" % os.path.relpath(unit.source, ROOT)}
     base_body = src[func[1] + 1:func[2]]
     base_pct = base_scores[symbol]
     if verbose:
@@ -324,7 +298,7 @@ def print_table(unit, res, run_id, top):
     elif best:
         print("\nno candidate beat the baseline (best %.3f%% at %s)" % (best[2]["func_pct"], best[0]))
     if best:
-        print(summarize_diff(unit.target, best[2]["obj"], res["symbol"], unit.name,
+        print(summarize_diff(unit.obj_target, best[2]["obj"], res["symbol"], unit.report_name,
                              os.path.join(SCRATCH, run_id, "diff_best")))
 
 
@@ -427,7 +401,7 @@ def expr_mode(unit, tokens, src, ext, sym, exprs, base_scores, run_id, jobs, emi
         print("%-4s %s" % ("err", "%s: %s" % (label, (r.get("error") or "?").splitlines()[0])))
     print("\ncandidate                              func%       first divergence")
     for (label, body), r in ok:
-        div = divergence_of(unit.target, r["obj"], sym, unit.name,
+        div = divergence_of(unit.obj_target, r["obj"], sym, unit.report_name,
                             os.path.join(SCRATCH, run_id, "expr_diff", re.sub(r"\W", "_", label)))
         print("%-38s %-11.5f %s" % (label, pct_of(r), div))
     if errs:
@@ -454,7 +428,7 @@ def main():
     args = ap.parse_args()
 
     if args.selftest:
-        import shapesearch_selftest
+        from tools.flags import shapesearch_selftest
         return shapesearch_selftest.selftest()
 
     if args.list_gens:
@@ -462,20 +436,21 @@ def main():
             print("%-12s %s" % (g, (sh.GENERATORS[g].__doc__ or "").splitlines()[0]))
         return
 
-    unit = uu.resolve_unit(args.unit)
-    if not os.path.exists(unit.target):
-        raise SystemExit("no target object at %s - split the unit first" % unit.target)
+    bind(repo.repo_root())
+    unit = units.Unit.resolve(args.unit, ROOT)
+    if not os.path.exists(unit.obj_target):
+        raise SystemExit("no target object at %s - split the unit first" % unit.obj_target)
     tokens = compile_tokens(unit)
-    src = open(unit.src, encoding="utf-8", errors="surrogateescape").read()
-    ext = os.path.splitext(unit.src)[1]
+    src = open(unit.source, encoding="utf-8", errors="surrogateescape").read()
+    ext = os.path.splitext(unit.source)[1]
     run_id = "run_%s_%d" % (re.sub(r"\W", "_", unit.file), int(time.time()))
 
     # baseline: the unmodified source compiled through the probe path (also the unit's function list)
     base_dir = os.path.join(SCRATCH, run_id, "base")
-    base = _run_one((0, tokens, src, base_dir, unit.target, "", unit.name, {}, ext))
+    base = _run_one((0, tokens, src, base_dir, unit.obj_target, "", unit.report_name, {}, ext))
     if "error" in base:
         raise SystemExit("baseline compile failed:\n" + base["error"])
-    base_entries = uu.report_functions(unit.target, base["obj"], unit_name=unit.name, tmpdir=base_dir)
+    base_entries = report_functions(unit.obj_target, base["obj"], unit_name=unit.report_name, tmpdir=base_dir)
     base_scores = {n: e.get("fuzzy_match_percent") for n, e in base_entries.items()
                    if isinstance(e.get("fuzzy_match_percent"), (int, float))}
     base_mean = sum(base_scores.values()) / len(base_scores) if base_scores else 0.0
@@ -486,13 +461,13 @@ def main():
             raise SystemExit("unknown generator %r (see --list-gens)" % g)
 
     print("unit %s   functions %d   unit mean %.3f%%   scratch %s"
-          % (unit.name, len(base_scores), base_mean, os.path.relpath(os.path.join(SCRATCH, run_id), uu.ROOT)))
+          % (unit.report_name, len(base_scores), base_mean, os.path.relpath(os.path.join(SCRATCH, run_id), ROOT)))
 
     exprs = expr_candidates(args.expr, args.expr_file)
     if exprs:
         symbol = args.function or worst_function(unit, base_scores)
         if symbol is None:
-            raise SystemExit("every function in %s already scores 100%% - name one with -f" % unit.name)
+            raise SystemExit("every function in %s already scores 100%% - name one with -f" % unit.report_name)
         if symbol not in base_scores:
             raise SystemExit("symbol %r is not in the target object's report (renamed? wrong unit?)"
                              % symbol)
@@ -532,11 +507,11 @@ def main():
             for lo, hi, body, _sym, _label in sorted(winners, key=lambda w: w[0], reverse=True):
                 combined = combined[:lo] + body + combined[hi:]
             cdir = os.path.join(SCRATCH, run_id, "combined")
-            r = _run_one((0, tokens, combined, cdir, unit.target, "", unit.name, {}, ext))
+            r = _run_one((0, tokens, combined, cdir, unit.obj_target, "", unit.report_name, {}, ext))
             if "error" in r:
                 print("combined source did not compile: %s" % r["error"])
             else:
-                ent = uu.report_functions(unit.target, r["obj"], unit_name=unit.name, tmpdir=cdir)
+                ent = report_functions(unit.obj_target, r["obj"], unit_name=unit.report_name, tmpdir=cdir)
                 sc = {n: e.get("fuzzy_match_percent") for n, e in ent.items()
                       if isinstance(e.get("fuzzy_match_percent"), (int, float))}
                 cm = sum(sc.values()) / len(sc) if sc else 0.0
@@ -548,7 +523,7 @@ def main():
 
     symbol = args.function or worst_function(unit, base_scores)
     if symbol is None:
-        raise SystemExit("every function in %s already scores 100%%" % unit.name)
+        raise SystemExit("every function in %s already scores 100%%" % unit.report_name)
     if symbol not in base_scores:
         raise SystemExit("symbol %r is not in the target object's report (renamed? wrong unit?)" % symbol)
     fdir = os.path.join(run_id, re.sub(r"\W", "_", symbol))

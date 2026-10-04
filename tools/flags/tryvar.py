@@ -1,47 +1,16 @@
 #!/usr/bin/env python3
-"""Try source rewrites of a unit and report the resulting objdiff match, per function.
-
-The harness is generic: it copies the unit's source, applies a variant's rewrite, compiles that copy with
-the unit's exact ninja command line, and diffs it against the split target object. The real source is
-never modified and the unit's object is never clobbered. Variants live in a separate data file, so the
-rewrites for one unit do not leak into the tool.
-
-The per-function number this prints is the **official report metric** (`report generate`'s
-`fuzzy_match_percent`, via `unitutil.report_functions`) - the same number `build/RMHE08/report.json`,
-`ledger.py` and `land.py` read. objdiff's explicit `diff` mode is deliberately not used for the score:
-it defaults `functionRelocDiffs` to `data_value` (the report defaults to `none`, so relocation-only
-differences counted as mismatches there) and its `match_percent` is a different normalisation (measured
-on this repo: `pl_skill` fn_80270018 reads 99.88 % positionally and **100.0 %** officially).
-
-Usage:
-    python tools/flags/tryvar.py                        # every variant of the default variant file
-    python tools/flags/tryvar.py --list
-    python tools/flags/tryvar.py <name> [<name> ...]
-    python tools/flags/tryvar.py -u <unit> [--variants <file.py>]
-    python tools/flags/tryvar.py --apply <name>          # LAND the winning rewrite in the real source
-
-A variant file (default: `tools/flags/variants/<lib>.py`, i.e. next to this script, named after the
-unit's library) defines:
-
-    VARIANTS = [(name, repls), ...]
-
-where `repls` is either a list of `(old, new)` string pairs or a callable `src -> src` (returning `None`
-means "the pattern did not match").
-
-`--apply <name>` writes that variant's rewrite into the unit's real source file (preserving its line
-endings), so a win becomes progress on the unit instead of staying an experiment. It refuses to write
-anything unless the rewrite applies cleanly and actually changes the file. Rebuild and re-measure
-afterwards - the recorded evidence must come from the real source, not from the probe.
-"""
+"""Try source rewrites of a unit and report the official per-function score of each. Spec: docs/tools/spec/tryvar.md.
+CLI: python tools/flags/tryvar.py [-u <unit>] [<name>...] [--variants <file.py>] [--flags-extra "<flags>"] [--list] [--apply <name>]."""
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import importlib.util
 import os
-import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # tools/
-import unitutil as uu
+from tools.lib import repo, report, text, units
 
-SCRATCH = os.path.join(uu.ROOT, "build", "tmp", "probe")
+
+def scratch(unit):
+    return os.path.join(unit.root, "build", "tmp", "probe")
 
 
 def load_variants(path):
@@ -54,27 +23,29 @@ def load_variants(path):
 def default_variants_path(unit):
     """`tools/flags/variants/<lib>.py`, falling back to the lower-case spelling (case-sensitive FS)."""
     d = os.path.join(os.path.dirname(os.path.abspath(__file__)), "variants")
-    lib = unit.lib or "main"            # a top-level unit has no directory: its variants file is main.py
+    lib = unit.module or "main"            # a top-level unit has no directory: its variants file is main.py
     for name in (lib + ".py", lib.lower() + ".py"):
         if os.path.exists(os.path.join(d, name)):
             return os.path.join(d, name)
     return os.path.join(d, lib + ".py")
 
 
-def match_pcts(probe_obj, target_obj, symbol=None):
+def match_pcts(probe_obj, target_obj, symbol=None, root=None):
     """{function: (official_match_percent, ours_size, target_size)} for a probe object.
 
-    The percent is the report metric for the object pair (`unitutil.report_functions`), not the positional
+    The percent is the report metric for the object pair (`lib.report.score_entries`), not the positional
 diff value. The two sizes come from the objects' own symbol tables, so every function the probe emitted
     is listed; `symbol` is accepted for backwards compatibility and ignored - the report scores the whole
     object pair, which is what a variant comparison needs.
     """
-    entries = uu.report_functions(target_obj, probe_obj)
+    root = root or repo.repo_root()
+    entries = report.score_entries(target_obj, probe_obj, None, repo.session_tmpdir(),
+                                   objdiff=report.objdiff_cli(root), cwd=root)
     if "_error" in entries:
         print("objdiff report failed: " + entries["_error"][:400])
         return None
-    ours = {n: sz for n, sz, _f in uu.frames(probe_obj)}
-    tgt = {n: sz for n, sz, _f in uu.frames(target_obj)}
+    ours = {n: sz for n, sz, _f in units.frames(probe_obj)}
+    tgt = {n: sz for n, sz, _f in units.frames(target_obj)}
     res = {}
     for name, e in entries.items():
         pct = e.get("fuzzy_match_percent")
@@ -96,22 +67,22 @@ def apply_variant(src, repls):
 
 
 def run(unit, tokens, symbol, name, repls):
-    src = open(unit.src, encoding="utf-8", errors="surrogateescape").read()
+    src = open(unit.source, encoding="utf-8", errors="surrogateescape").read()
     new = apply_variant(src, repls)
     if new is None:
         print("%-26s SKIP (rewrite did not apply)" % name)
         return
-    ext = os.path.splitext(unit.src)[1]
-    probe_src = os.path.join(os.path.dirname(unit.src), unit.file + "_probe" + ext)
+    ext = os.path.splitext(unit.source)[1]
+    probe_src = os.path.join(os.path.dirname(unit.source), unit.file + "_probe" + ext)
     with open(probe_src, "w", encoding="utf-8", errors="surrogateescape") as f:
         f.write(new)
     try:
-        rc, log, obj = uu.run_compile(tokens, scratch_dir=SCRATCH, src=probe_src)
+        rc, log, obj = units.run_tokens(tokens, unit.root, scratch_dir=scratch(unit), src=probe_src)
         if rc != 0:
-            print("%-26s COMPILE FAILED\n%s" % (name, uu.quiet(log)[:600]))
+            print("%-26s COMPILE FAILED\n%s" % (name, units.quiet(log)[:600]))
             return
-        pcts = match_pcts(obj, unit.target, symbol)
-        size = uu.text_size(obj)
+        pcts = match_pcts(obj, unit.obj_target, symbol, unit.root)
+        size = units.text_size(obj)
     finally:
         if os.path.exists(probe_src):
             os.remove(probe_src)
@@ -134,10 +105,11 @@ def main():
                     help="apply this variant's rewrite to the unit's real source and exit")
     args = ap.parse_args()
 
-    unit = uu.resolve_unit(args.unit)
+    root = repo.repo_root()
+    unit = units.Unit.resolve(args.unit, root)
     path = args.variants or default_variants_path(unit)
     if not os.path.exists(path):
-        raise SystemExit("no variant file at %s (pass --variants)" % os.path.relpath(path, uu.ROOT))
+        raise SystemExit("no variant file at %s (pass --variants)" % os.path.relpath(path, root))
     variants = load_variants(path)
     if args.list:
         for name, _ in variants:
@@ -146,35 +118,35 @@ def main():
     if args.apply:
         sel = [(n, r) for n, r in variants if n == args.apply]
         if not sel:
-            raise SystemExit("no variant named %r in %s" % (args.apply, os.path.relpath(path, uu.ROOT)))
-        raw = open(unit.src, "rb").read()
+            raise SystemExit("no variant named %r in %s" % (args.apply, os.path.relpath(path, root)))
+        raw = open(unit.source, "rb").read()
         crlf = b"\r\n" in raw
-        text = raw.decode("utf-8", "surrogateescape").replace("\r\n", "\n")
-        new = apply_variant(text, sel[0][1])
+        lf = raw.decode("utf-8", "surrogateescape").replace("\r\n", "\n")
+        new = apply_variant(lf, sel[0][1])
         if new is None:
             raise SystemExit("variant %r did not apply cleanly - nothing written" % args.apply)
-        if new == text:
+        if new == lf:
             raise SystemExit("variant %r is a no-op for the current source - nothing written" % args.apply)
         out = new.replace("\n", "\r\n") if crlf else new
-        open(unit.src, "wb").write(out.encode("utf-8", "surrogateescape"))
-        obj = os.path.relpath(unit.obj, uu.ROOT)
-        print("applied %r to %s (%+d bytes)" % (args.apply, os.path.relpath(unit.src, uu.ROOT),
+        text.atomic_write(unit.source, out.encode("utf-8", "surrogateescape"))
+        obj = os.path.relpath(unit.obj_ours, root)
+        print("applied %r to %s (%+d bytes)" % (args.apply, os.path.relpath(unit.source, root),
                                                 len(out) - len(raw)))
         print("now rebuild and re-measure:")
         print("  ninja %s" % obj)
         print("  python %s diff -u %s <symbol>   (and the report's matched_functions)"
-              % (os.path.relpath(__file__, uu.ROOT), unit.name))
+              % (os.path.relpath(__file__, root), unit.report_name))
         return
 
-    if not os.path.exists(unit.target):
-        raise SystemExit("no target object at %s - split the unit first" % unit.target)
+    if not os.path.exists(unit.obj_target):
+        raise SystemExit("no target object at %s - split the unit first" % unit.obj_target)
 
-    head, flags, tail = uu.split_flags(uu.compile_command(unit))
-    tokens = head + uu.override_flags(flags, args.flags_extra) + tail
-    symbol = uu.function_names(unit.target)[0]
+    head, flags, tail = units.split_command(unit)
+    tokens = head + units.override_flags(flags, args.flags_extra) + tail
+    symbol = units.function_names(unit.obj_target)[0]
     selected = [(n, r) for n, r in variants if not args.names or n in args.names]
     print("unit %s   variants from %s   (%d/%d selected)"
-          % (unit.name, os.path.relpath(path, uu.ROOT), len(selected), len(variants)))
+          % (unit.report_name, os.path.relpath(path, root), len(selected), len(variants)))
     print("%-26s %s" % ("variant", "result"))
     for name, repls in selected:
         run(unit, tokens, symbol, name, repls)

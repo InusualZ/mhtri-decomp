@@ -109,6 +109,19 @@ def main_tree(root: str | os.PathLike, honour_env: bool = False) -> str | None:
     return os.path.dirname(out) if os.path.basename(out) == ".git" else None
 
 
+def main_checkout(root: str | os.PathLike) -> str:
+    """MAIN for a tool that must have one: `main_tree(root)` when it is a tree, else the first `git worktree
+    list` entry (registration order - only a fallback), else `root` itself (a non-git copy)."""
+    main = main_tree(root)
+    if main and os.path.exists(os.path.join(main, MARKER)):
+        return main
+    try:
+        worktrees = Git(os.fspath(root)).worktree_list()
+    except Exception:
+        worktrees = []
+    return worktrees[0].path if worktrees else os.fspath(root)
+
+
 def resolve_input(rel: str, root: str | os.PathLike, probe: Callable[[str], bool] = os.path.exists,
                   honour_env: bool = False) -> str:
     """A build/orig input: `rel` under `root`, else (read-only) under MAIN when `root` has none.

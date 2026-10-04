@@ -24,6 +24,7 @@ comes from `report generate`, which is what `unitutil.report_functions`/`report_
   `mwcc_matrix.summarize` return it for real objects.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import json
 import os
@@ -32,11 +33,9 @@ import subprocess
 import sys
 import tempfile
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.join(ROOT, "tools"))
-sys.path.insert(0, os.path.join(ROOT, "tools", "flags"))
+from tools import unitutil as uu
 
-import unitutil as uu  # noqa: E402
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 SYMDIFF = os.path.join(ROOT, "tools", "objdiff", "symdiff.py")
 SLOTMAP = os.path.join(ROOT, "tools", "objdiff", "slotmap.py")
@@ -49,7 +48,7 @@ def _completed(argv):
 def _ok(label, got, want, failures):
     if got == want:
         print(f"ok    {label}")
-        return 0
+        return failures
     print(f"FAIL  {label}\n        got:  {got!r}\n        want: {want!r}")
     return failures + 1
 
@@ -57,7 +56,7 @@ def _ok(label, got, want, failures):
 def _truthy(label, cond, failures):
     if cond:
         print(f"ok    {label}")
-        return 0
+        return failures
     print(f"FAIL  {label}")
     return failures + 1
 
@@ -276,10 +275,14 @@ def integration(unit, official_all) -> int:
     p = subprocess.run([sys.executable, SYMDIFF, "-u", unit.name, sym, "1"],
                        cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
     head = (p.stdout or "").splitlines()[0] if p.stdout else ""
-    failures = _truthy("symdiff prints the report metric for %s" % sym,
-                       ("match %s" % official[sym]) in head and "report metric" in head, failures)
-    if not (("match %s" % official[sym]) in head and "report metric" in head):
-        print("        header: %s" % head)
+    if p.returncode == 1 and "freshness  STALE" in (p.stderr or ""):
+        # the object predates its sources here (a fresh worktree's checkout): symdiff refuses by design
+        print("skip  symdiff header (the unit's object is older than its sources in this tree)")
+    else:
+        failures = _truthy("symdiff prints the report metric for %s" % sym,
+                           ("match %s" % official[sym]) in head and "report metric" in head, failures)
+        if not (("match %s" % official[sym]) in head and "report metric" in head):
+            print("        header: %s" % head)
 
     # 3. slotmap labels the sides correctly (project mode: left = target)
     diff_json = os.path.join(ROOT, "build", "tmp", "metric_selftest_slotmap.json")
@@ -347,8 +350,8 @@ def integration_flag_tools(unit, official_all) -> int:
         print("skip  flag-tool integration (no scored functions for %s)" % unit.name)
         return failures
 
-    import tryvar
-    import mwcc_matrix
+    from tools.flags import mwcc_matrix, tryvar
+    from tools.lib import units as lib_units
 
     pcts = tryvar.match_pcts(unit.obj, unit.target)
     if not pcts:
@@ -360,7 +363,8 @@ def integration_flag_tools(unit, official_all) -> int:
     if mism:
         print("        first mismatches: %r" % (mism[:3],))
 
-    path, err = mwcc_matrix.diff_unit(unit, "metric_selftest", uu.function_names(unit.target)[0])
+    path, err = mwcc_matrix.diff_unit(lib_units.Unit.resolve(unit.name, ROOT), "metric_selftest",
+                                      uu.function_names(unit.target)[0])
     if not path:
         print("skip  mwcc_matrix integration (%s)" % err[:120])
         return failures

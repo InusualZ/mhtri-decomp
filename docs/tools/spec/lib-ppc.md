@@ -27,6 +27,8 @@ bytes for the data addresses a function forms, reads or writes, and decodes the 
   and `scan_calls(code, start, fn_starts) -> [(site, target)]` - `splitcheck`'s scanner, verbatim.
 * `materialisations(code, start, window=16) -> [(site, value)]`: the narrow `lis rD` + `addi|ori rD, rD` idiom.
 * `looks_like_prologue(word)`, `is_dead_epilogue(code)`.
+* `stwu_frame(word)`: the positive N of `stwu rS,-N(rA)` (opcode 37), else None - the frame column of
+  `lib.units.frames` (was `unitutil.frames`' inline decode).
 * `decode_rw(mnemonic, operands) -> (reads, writes, is_branch, is_call, decoded)`; `BRANCH_MNEMONICS`, `CALL_MNEMONICS`.
 * Tables: `LOADS_INT`, `STORES`, `FP_MEM`, `LOAD_OPS`, `STORE_OPS`, `UPDATE_OPS`, `WIDTH`, `VOLATILE`, `X_ARITH`, `X_LOADS`,
   `X_LOGIC`, `RECORD_OPCODES`, `FMA_XO`/`FMUL_XO`/`FADD_XO`/`FSUB_XO`, `PSQ_INDEXED_XO`, `NARROW_STORE_OPS`, `LIS_WINDOW`.

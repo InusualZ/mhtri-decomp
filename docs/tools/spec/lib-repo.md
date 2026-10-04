@@ -15,6 +15,8 @@ originals hash to. It is also the choke point of the fixture tier's live-tree re
   worktree, else a `cwd` that is itself a tree), and only a `cwd` that is no tree falls back to the packaged copy
   (`PACKAGED_ROOT`, the tree this file sits in). `SystemExit` when no tree is found.
 * `caller_worktree(start=None)`, `cwd_tree()`: the two halves of that rule.
+* `main_checkout(root) -> str`: MAIN for a tool that must have one - `main_tree(root)` when it holds `configure.py`,
+  else the first `git worktree list` entry, else `root` (`recompile.main_root`, `measure.py`).
 * `main_tree(root, honour_env=False) -> str | None`: the parent of `git rev-parse --git-common-dir`; `honour_env` lets a
   `$MHTRI_MAIN` that names a directory override it (the tree the tools serve, never a fixture). None outside git.
 * `resolve_input(rel, root, probe=os.path.exists, honour_env=False) -> str`: `rel` under `root`, else under MAIN by path,

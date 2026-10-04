@@ -10,10 +10,11 @@ residual one-shot lock `os.remove`/`open` can still raise.
 
 The second: `-u <unit>` scores the unit's **prebuilt** object, and the stale-object incident is that a
 lane read it twice without the source having been rebuilt. `stale_reasons` (through
-`tools/objdiff/freshguard.py`) must name the newer file, cover a header in the include closure, and
+`lib.report`'s freshness) must name the newer file, cover a header in the include closure, and
 `main()` must refuse (exit 1, no score printed) rather than report a build that no longer exists.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import contextlib
 import importlib.util
@@ -36,9 +37,9 @@ def _load():
 
 
 class _FakeUnit:
-    target = "target.o"
-    obj = "base.o"
-    name = "mod/unit"
+    obj_target = "target.o"
+    obj_ours = "base.o"
+    report_name = "mod/unit"
 
 
 def check(name, got, want, fails):
@@ -46,7 +47,7 @@ def check(name, got, want, fails):
     CHECKS += 1
     if got == want:
         print("ok    " + name)
-        return 0
+        return fails
     print("FAIL  %s\n        got:  %r\n        want: %r" % (name, got, want))
     return fails + 1
 
@@ -59,7 +60,9 @@ def main() -> int:
     shared = os.path.normpath(os.path.join(ROOT, "build", "tmp", "unitutil"))
     d1 = symdiff.session_tmpdir()
     fails = check("a scratch directory exists", os.path.isdir(d1), True, fails)
-    fails = check("... with the symdiff- prefix", os.path.basename(d1).startswith("symdiff-"), True, fails)
+    fails = check("... the process's own lib.repo.session_tmpdir()", d1, symdiff.librepo.session_tmpdir(), fails)
+    fails = check("... with its tools-session- prefix", os.path.basename(d1).startswith("tools-session-"), True,
+                  fails)
     fails = check("... and it is not the shared build/tmp/unitutil",
                   os.path.normpath(d1) != shared, True, fails)
     fails = check("... one directory per invocation", symdiff.session_tmpdir(), d1, fails)
@@ -81,20 +84,22 @@ def main() -> int:
         print("        (child rc=%s stderr=%s)" % (child.returncode, child.stderr[:200]))
 
     # 3. the report/diff calls are handed the unique directory, never the shared default
-    import unitutil as uu
+    lib = symdiff._report
     seen = {}
-    real_funcs, real_measure = uu.report_functions, uu.report_measure
+    real_funcs, real_measure = lib.score_entries, lib.symbol_score
 
-    def fake_funcs(target, base, unit_name=None, tmpdir=None, runner=subprocess.run):
+    def fake_funcs(target, base, unit_name=None, tmpdir=None, **kw):
         seen["funcs_tmpdir"] = tmpdir
         return {"fn": {"name": "fn", "size": 4, "fuzzy_match_percent": 100.0}}
 
-    def fake_measure(target, base, symbol, unit_name=None, tmpdir=None, runner=subprocess.run):
+    def fake_measure(target, base, symbol, unit_name=None, tmpdir=None, **kw):
         seen["measure_tmpdir"] = tmpdir
         return {"symbol": symbol, "match_percent": 100.0}
 
+    real_root = symdiff.ROOT
     try:
-        uu.report_functions, uu.report_measure = fake_funcs, fake_measure
+        symdiff.ROOT = tempfile.gettempdir()           # a fixture tree: the fakes never reach objdiff
+        lib.score_entries, lib.symbol_score = fake_funcs, fake_measure
         symdiff.official_match(_FakeUnit, "fn")
         fails = check("official_match uses the unique scratch directory",
                       seen.get("measure_tmpdir"), d1, fails)
@@ -103,7 +108,8 @@ def main() -> int:
         fails = check("list_symbols uses the unique scratch directory",
                       seen.get("funcs_tmpdir"), d1, fails)
     finally:
-        uu.report_functions, uu.report_measure = real_funcs, real_measure
+        lib.score_entries, lib.symbol_score = real_funcs, real_measure
+        symdiff.ROOT = real_root
 
     # 4. the transient Windows sharing violation is retried, then given up on
     tries = {"n": 0}
@@ -151,11 +157,11 @@ def main() -> int:
             fh.write(b"\x7fELF")
 
         class _Fixture:
-            name = "demo/unit"
+            report_name = "demo/unit"
 
         fx = _Fixture()
-        fx.src = src
-        fx.obj = obj
+        fx.source = src
+        fx.obj_ours = obj
         base = 1_000_000.0
         os.utime(header, (base, base))
         os.utime(src, (base, base))
@@ -174,17 +180,17 @@ def main() -> int:
                       bool(reasons) and "unit.h" in reasons[0], True, fails)
 
         # and `main()` refuses loudly (exit 1, nothing on stdout) instead of printing stale numbers
-        real_cli, real_root = symdiff.cli, uu.ROOT
+        real_cli, real_root = symdiff.cli, symdiff.ROOT
         try:
             symdiff.cli = lambda: (None, None, fx)
-            uu.ROOT = tmp                              # `main()` resolves the unit's tree from uu.ROOT
+            symdiff.ROOT = tmp                         # `main()` resolves the unit's tree from symdiff.ROOT
             out = io.StringIO()
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
                 rc = symdiff.main()
             fails = check("main() refuses a stale object", rc, 1, fails)
             fails = check("... printing no score", out.getvalue().strip(), "", fails)
         finally:
-            symdiff.cli, uu.ROOT = real_cli, real_root
+            symdiff.cli, symdiff.ROOT = real_cli, real_root
 
     if fails:
         print("FAIL (%d)" % fails)

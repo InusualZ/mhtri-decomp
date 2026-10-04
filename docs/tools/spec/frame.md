@@ -43,4 +43,5 @@ Target: `tools/tests/flags/test_frame.py` on `lib.testing` (`FixtureTree`/`GitFi
 
 ## Known gaps
 
-None recorded.
+* `--versions` with no value listed the files of the compiler's own version directory (`lmgr8c.dll`, `mwcceppc.exe`,
+  ...) instead of the installed versions; since WP3b it lists the sibling version directories (`lib.units.available_versions`).

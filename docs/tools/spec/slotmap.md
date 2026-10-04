@@ -26,7 +26,7 @@ Inputs -> outputs: diff.json -> table.
 ## Invariants and rules
 
 * Invocation: the `-u` path runs objdiff in **project mode** (`-p . -u <unit>`), where **left = the target object and right = our build**. A pre-existing `diff.json` is assumed to be file mode (`-1 <ours> -2 <target>`, left = ours), as this docstring always said; `--left` overrides that guess. Because the two instruction streams are identical except for the r1 offsets, the offset mapping is recovered by index-aligned majority vote.
-* The rows come from a diff run with `-c functionRelocDiffs=none` (unitutil.objdiff) - `report generate`'s default - so a relocation-only difference is not reported here as an argument mismatch. This tool prints no score on purpose: objdiff's `match_percent` is positional and not the campaign's metric; use `mt.py diff -u <unit> <symbol>` for the official number.
+* The rows come from a diff run with `-c functionRelocDiffs=none` (`lib.report.project_diff`) - `report generate`'s default - so a relocation-only difference is not reported here as an argument mismatch. This tool prints no score on purpose: objdiff's `match_percent` is positional and not the campaign's metric; use `mt.py diff -u <unit> <symbol>` for the official number.
 
 ## Lib dependencies
 

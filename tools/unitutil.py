@@ -21,9 +21,7 @@ line the build would run, including whatever `configure.py` put in that unit's `
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import atexit
 import os
-import re
 import shutil
-import struct
 import subprocess
 import tempfile
 import time
@@ -100,15 +98,7 @@ class temp_dir:
     def cleanup(self) -> None:
         rmtree_retry(self.name)
 
-# Options that take a following value token, as used by this project's configure.py. Used only to
-# remove a conflicting earlier occurrence when `--flags-extra` overrides the same option.
-VALUED = {
-    "-proc": 1, "-align": 1, "-enum": 1, "-fp": 1, "-Cpp_exceptions": 1, "-inline": 1,
-    "-pragma": 1, "-maxerrors": 1, "-RTTI": 1, "-fp_contract": 1, "-str": 1, "-i": 1, "-ir": 1,
-    "-I": 1, "-use_lmw_stmw": 1, "-common": 1, "-lang": 1, "-opt": 1, "-pool": 1, "-schedule": 1,
-    "-sdata": 1, "-sdata2": 1, "-model": 1, "-abi": 1, "-encoding": 1, "-D": 0, "-U": 0,
-    "-gccinc": 0, "-nodefaults": 0, "-nosyspath": 0, "-multibyte": 0, "-gcc": 0, "-rostr": 0,
-}
+VALUED = _units.VALUED
 SOURCE_EXT = _units.SOURCE_EXT
 
 
@@ -222,49 +212,10 @@ def compile_command(unit):
 unquote = _units.unquote
 
 
-def split_flags(tokens):
-    """(head, flags, tail): head = wrapper + compiler, tail = `-MMD -c <src> -o <dir>`."""
-    head_end = next(i for i, t in enumerate(tokens) if t.startswith("-") and i > 0)
-    tail_start = next(i for i, t in enumerate(tokens) if t == "-MMD")
-    return tokens[:head_end], tokens[head_end:tail_start], tokens[tail_start:]
-
-
-def family(tok):
-    """The option family a flag token belongs to (`-O3`, `-O4,p` -> `-O`), or None."""
-    if re.match(r"^-O\d", tok):
-        return "-O"
-    name = tok.split("=", 1)[0]
-    return name if name in VALUED else None
-
-
-def _value_len(tokens, i):
-    """How many tokens after `tokens[i]` make up its value (handles quoted values with spaces)."""
-    if VALUED.get(tokens[i], 0) == 0:
-        return 0
-    j = i + 1
-    if j < len(tokens) and tokens[j].startswith('"') and not tokens[j].endswith('"'):
-        while j < len(tokens) and not tokens[j].endswith('"'):
-            j += 1
-        return j - i
-    return VALUED[tokens[i]]
-
-
-def override_flags(flags, extra):
-    """Apply `--flags-extra` to a flag list: drop earlier flags of the same family, then append.
-
-    Dropping matters: `-O3` must replace the project's `-O4,p`, not sit next to it.
-    """
-    extras = extra.split()
-    families = {f for f in (family(t) for t in extras) if f}
-    out = []
-    i = 0
-    while i < len(flags):
-        if family(flags[i]) in families:
-            i += 1 + _value_len(flags, i)
-            continue
-        out.append(flags[i])
-        i += 1
-    return out + extras
+split_flags = _units.split_flags
+family = _units.family
+_value_len = _units._value_len
+override_flags = _units.override_flags
 
 
 def run_compile(tokens, expect=None, scratch_dir=None, src=None, verbose=False):
@@ -273,9 +224,7 @@ def run_compile(tokens, expect=None, scratch_dir=None, src=None, verbose=False):
     return _units.run_tokens(tokens, _root(), expect=expect, scratch_dir=scratch_dir, src=src, verbose=verbose)
 
 
-def quiet(out):
-    """Drop MWCC's informational banner lines from its output."""
-    return "\n".join(l for l in out.splitlines() if not l.startswith("###"))
+quiet = _units.quiet
 
 
 # --- minimal ELF32 big-endian reader (enough for MWCC objects) --------------------------------
@@ -293,28 +242,9 @@ def read_elf(path):
     return secs, syms
 
 
-def text_size(obj):
-    secs, _ = read_elf(obj)
-    return next(s for s in secs if s["sname"] == ".text")["size"]
-
-
-def frames(obj):
-    """[(name, size, frame)] for every function, in address order; frame is negative (or None)."""
-    secs, syms = read_elf(obj)
-    out = []
-    for name, val, size, typ, shndx in sorted([s for s in syms if s[3] == 2], key=lambda x: x[1]):
-        sec = secs[shndx]
-        frame = None
-        if len(sec["data"]) >= val + 4:
-            word = struct.unpack_from(">I", sec["data"], val)[0]
-            if word >> 26 == 37:                       # stwu r1, -N(r1)
-                frame = -struct.unpack_from(">h", sec["data"], val + 2)[0]   # positive magnitude
-        out.append((name, size, frame))
-    return out
-
-
-def function_names(obj):
-    return [f[0] for f in frames(obj)]
+text_size = _units.text_size
+frames = _units.frames
+function_names = _units.function_names
 
 
 # --- objdiff -----------------------------------------------------------------------------------
@@ -344,11 +274,7 @@ def objdiff(unit, symbol, out=None, runner=subprocess.run):
     `report_measure()` / `report_functions()` for a score, and this only for row detail.
     """
     out = out or os.path.join(session_tmpdir(), "%s_%s_diff.json" % (unit.lib, unit.file))
-    os.makedirs(os.path.dirname(out), exist_ok=True)
-    p = runner([_objdiff(), "diff", "-p", ".", "-u", unit.name, symbol,
-                "-c", "functionRelocDiffs=none", "--format", "json", "-o", out],
-               cwd=_root(), capture_output=True, text=True, encoding="utf-8", errors="replace")
-    return (out if p.returncode == 0 else None), (p.stdout or "") + (p.stderr or "")
+    return _report.project_diff(_root(), unit.name, symbol, out, _objdiff(), runner=runner)
 
 
 # --- official scoring: `report generate`, not `diff` (lib.report.score) -------------------------
@@ -388,59 +314,10 @@ def any_function(obj):
 
 # --- compiler selection ------------------------------------------------------------------------
 
-def compiler_token(head):
-    """The MWCC executable token of a split command line (e.g. build\\compilers\\Wii\\1.3\\mwcceppc.exe)."""
-    return next(t for t in head if t.endswith("mwcceppc.exe"))
-
-
-def with_compiler_version(head, version):
-    """Same command line, but with the compiler version component replaced.
-
-    `version` is a bare version ("1.3", the unit's own family) or a cross-family spec
-    ("GC/3.0a3").  The cross-family form is how a unit's compiler family is verified: a unit can come
-    from a different toolchain than the rest of the game (prebuilt SDK libraries in particular), and
-    the target object's `.comment` cannot answer that because it is synthesized from `config.yml`
-    (see docs/matching.md 17).
-    """
-    family, _, ver = version.partition("/")
-    out = []
-    for t in head:
-        if t.endswith("mwcceppc.exe"):
-            parts = re.split(r"[\\/]", t)
-            parts[-2] = ver if ver else family
-            if ver:
-                parts[-3] = family
-            sep = "\\" if "\\" in t else "/"
-            out.append(sep.join(parts))
-        else:
-            out.append(t)
-    return out
-
-
-def drop_unknown_option(flags, log):
-    """Remove the option MWCC rejected, so a matrix can span compiler generations.
-
-    Older compilers do not know every option the unit's command line uses (GC 1.x rejects
-    `-gccinc`, for instance), which would otherwise abort the whole sweep.
-    """
-    m = re.search(r"Unknown option '([^']+)'", log)
-    if not m:
-        return None
-    bad = m.group(1)
-    out = list(flags)
-    for i, f in enumerate(out):
-        if f == bad or (f.startswith("-") and bad in f):
-            del out[i]
-            if i < len(out) and not out[i].startswith("-"):
-                del out[i]
-            return out
-    return None
-
-
-def available_versions(head):
-    """Compiler versions installed next to the one this unit uses."""
-    d = os.path.dirname(compiler_token(head))
-    return sorted(os.listdir(d)) if os.path.isdir(d) else []
+compiler_token = _units.compiler_token
+with_compiler_version = _units.with_compiler_version
+drop_unknown_option = _units.drop_unknown_option
+available_versions = _units.available_versions
 
 
 def main():

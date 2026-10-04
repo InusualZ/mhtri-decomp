@@ -1,48 +1,6 @@
 #!/usr/bin/env python3
-"""Every symbol of one unit, from **one** report read - and a freshness verdict that refuses a stale one.
-
-    python tools/objdiff/unitscore.py <unit>                    # every symbol, worst first (0 objdiff calls)
-    python tools/objdiff/unitscore.py <unit> --measure          # score the objects on disk (exactly 1 call)
-    python tools/objdiff/unitscore.py <unit> --threshold 99.9   # only the rows below the threshold
-    python tools/objdiff/unitscore.py <unit> --json             # the whole record, mtimes included
-    python tools/objdiff/unitscore.py <unit> --force-stale      # score anyway, STALE stays in the output
-    python tools/objdiff/unitscore.py --selftest
-
-`<unit>` is the path from the repository root (`quest/arenatask`, `Pl/pl_act`); the extension may be
-omitted, and `src/`/`main/`/`build/RMHE08/...` prefixes are accepted.
-
-**Why this tool exists.** Scoring a unit one symbol at a time costs one objdiff invocation per symbol, and
-a 70-row unit is 70 of them; lanes kept hand-writing the same driver (`build/tmp/unitreport.py`,
-`build/scratch/score.py`, `.pi/scratch/score.py`) and the re-inventions produced *wrong* numbers - one
-scored a stale object twice and reported two false improvements. A report over the tree already carries
-every symbol of every unit; the only thing missing was a reader that does not lie about its freshness.
-
-**The hazard this is built around.** `build/RMHE08/report.json` is an **order-only** target of `all_source`
-in `build.ninja`: after a source edit, `ninja build/RMHE08/report.json` prints "no work to do" and the file
-still holds the PREVIOUS build's scores. That cost one lane three iterations that looked like "all new
-functions score 0 %". So every run measures and prints three mtimes - the report's, the unit's object's and
-the newest source under the unit - and **refuses to print numbers** (exit 1) when the report predates
-either of the other two. `--force-stale` overrides the refusal; the STALE verdict and its reasons stay in
-the output and in the JSON (`"freshness"`), so a forced run is never mistakable for a clean one.
-
-`--measure` is the escape hatch for exactly that case: instead of the project report it scores the unit's
-already-built object pair with **one** `objdiff report generate` (the same primitive `symdiff.py -u <unit>`
-and `measure.py` use, ~0.2 s for a 19-symbol unit). The guard then applies to the object: a source newer
-than the object means the object was never rebuilt, and that is refused the same way (that is the incident
-above, seen from the other side). Neither mode ever issues N calls: report mode issues zero.
-
-**Reuse, not re-implementation.** The unit and its paths come from `tools/unitutil.py` (`resolve_unit`,
-`ROOT`); the report entry's identity and scoring conventions come from `tools/units/verifyunit.py`
-(`report_unit`, `unit_stem`, and its "a function with no `fuzzy_match_percent` key is 0 %, not 100 %"
-reading); the one-report score comes from `unitutil.report_functions` through `tools/objdiff/symdiff.py`'s
-scratch/retry helpers. There is one implementation of each, and this file holds none of them. The
-staleness arithmetic itself (the three mtimes, the include closure, the verdict) is
-`tools/objdiff/freshguard.py`, shared with `symdiff.py`, so "which file is newer" has one answer.
-
-**Exit status is the answer**: 0 the numbers are printable (current, or explicitly forced), 1 the
-freshness guard refused, 2 a usage or input error (no report, an unreadable report, the unit missing from
-it) - a traceback is never the answer.
-"""
+"""Every symbol of one unit from one report read, refusing a stale report. Spec: docs/tools/spec/unitscore.md.
+CLI: python tools/objdiff/unitscore.py <unit> [--measure] [--threshold P] [--report R] [--json] [--force-stale] | --selftest."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
@@ -50,21 +8,13 @@ import argparse
 import json
 import os
 import sys
-import time
 from dataclasses import dataclass, field
 
-HERE = os.path.dirname(os.path.abspath(__file__))                 # tools/objdiff
-TOOLS = os.path.dirname(HERE)                                     # tools/
-for _path in (TOOLS, os.path.join(TOOLS, "units"), HERE):
-    if _path not in sys.path:
-        sys.path.insert(0, _path)
-
-import unitutil as uu                                             # noqa: E402
-import symdiff                                                    # noqa: E402
-from tools.lib import project as _project                         # noqa: E402
-from tools.lib import report as _report                           # noqa: E402
-from tools.lib import units as _units                             # noqa: E402
-from tools.lib.report import (mtime, stamp, stamp_json, freshness, source_closure,  # noqa: E402
+from tools.lib import project as _project
+from tools.lib import repo as _repo
+from tools.lib import report as _report
+from tools.lib import units as _units
+from tools.lib.report import (mtime, stamp, stamp_json, freshness, source_closure,
                               newest, rel_path as _rel)
 
 REPORT_REL = os.path.join("build", "RMHE08", "report.json")
@@ -98,16 +48,15 @@ class Row:
 
 
 def spec_of(unit_spec: str, report: str | None = None, tree: str | None = None) -> Spec:
-    """Resolve a unit spec through `unitutil`, plus its include closure and the tree's report path.
+    """Resolve a unit spec (`lib.units.Unit.resolve`), plus its include closure and the tree's report path.
 
-    `tree` names the tree to read and is passed straight to `unitutil.resolve_unit(root=...)`, so the
-    unit's own paths land under it - a fixture that is not a git worktree resolves there instead of
-    silently reading `unitutil.ROOT` (the real tree).
+    `tree` names the tree to read (default: the invocation's, `lib.repo.repo_root()`), so the unit's own
+    paths land under it - a fixture that is not a git worktree resolves there, never in the real tree.
     """
-    root = tree or uu.ROOT
-    unit = uu.resolve_unit(unit_spec, root=root)
-    src = unit.src if os.path.isabs(unit.src) else os.path.join(root, unit.src)
-    return Spec(unit=_units.stem(unit.name), unit_name=unit.name, obj=unit.obj, target=unit.target,
+    root = tree or _repo.repo_root()
+    unit = _units.Unit.resolve(unit_spec, root)
+    src = unit.source if os.path.isabs(unit.source) else os.path.join(root, unit.source)
+    return Spec(unit=unit.key, unit_name=unit.report_name, obj=unit.obj_ours, target=unit.obj_target,
                 src=src, tree=root, report=os.path.abspath(report) if report else os.path.join(root, REPORT_REL),
                 sources=source_closure(src, root))
 
@@ -235,8 +184,8 @@ def measure_report(spec: Spec, report_path: str) -> tuple[dict | None, str | Non
 def score_by_measure(spec: Spec, tmpdir: str | None = None) -> tuple[dict | None, str | None]:
     """The unit's symbols scored from the objects on disk with exactly one `objdiff report generate`.
 
-    This is `symdiff.py -u <unit>`'s primitive (`unitutil.report_functions` through symdiff's unique
-    scratch directory and its transient-lock retry), so the numbers are the same code path as the project
+    This is `symdiff.py -u <unit>`'s primitive (`lib.report.score` in the process's unique scratch
+    directory, with `lib.report.retry_transient`), so the numbers are the same code path as the project
     report - and a missing target object is an error naming the path, never a table of 0 %.
     """
     if not os.path.exists(spec.obj):
@@ -248,34 +197,19 @@ def score_by_measure(spec: Spec, tmpdir: str | None = None) -> tuple[dict | None
                       "in this tree yet (`python configure.py && ninja`) - `python tools/units/measure.py "
                       "%s` resolves a proposal's target object and compiles in one step"
                       % (spec.target, spec.unit))
-    scratch = tmpdir or symdiff.session_tmpdir()
+    scratch = tmpdir or _repo.session_tmpdir()
+    objdiff = _report.objdiff_cli(spec.tree)
     try:
-        entries = symdiff.retry_transient(
-            lambda: uu.report_functions(spec.target, spec.obj, unit_name=spec.unit_name, tmpdir=scratch))
+        rep = _report.retry_transient(
+            lambda: _report.score(spec.target, spec.obj, spec.unit_name, scratch, objdiff=objdiff, cwd=spec.tree))
+    except _report.ReportError as exc:
+        return None, ("one `report generate` over %s / %s failed: %s" % (spec.target, spec.obj, exc))
     except OSError as exc:
         return None, ("cannot run objdiff (%s): %s - `python tools/units/measure.py %s` finds the "
-                      "tree's own binary" % (uu.OBJDIFF, exc, spec.unit))
-    if "_error" in entries:
-        return None, ("one `report generate` over %s / %s failed: %s"
-                      % (spec.target, spec.obj, entries["_error"]))
-    functions = [dict(e) for e in entries.values()]
-    return {"name": spec.unit_name, "functions": functions,
-            "measures": _measures_from_one_unit_report(scratch)}, None
-
-
-def _measures_from_one_unit_report(tmpdir: str) -> dict:
-    """The unit measures out of the one-unit report `unitutil.report_functions` just wrote.
-
-    A file read, not an invocation: `report_functions` returns only the functions, and `--measure` is asked
-    for the same `matched_functions`/`matched_code`/`total_code` the project report carries. The path is
-    the one `unitutil` documents as its output (`<tmpdir>/unitutil_report.json`); an unreadable or
-    unparsable file leaves the measures empty rather than failing a run that has its rows already.
-    """
-    try:
-        data = json.load(open(os.path.join(tmpdir, "unitutil_report.json"), encoding="utf-8"))
-        return ((data.get("units") or [{}])[0] or {}).get("measures") or {}
-    except (OSError, ValueError, IndexError):
-        return {}
+                      "tree's own binary" % (objdiff, exc, spec.unit))
+    unit = _report.first_unit(rep)
+    functions = [dict(e) for e in (unit.get("functions") or []) if e.get("name")]
+    return {"name": spec.unit_name, "functions": functions, "measures": unit.get("measures") or {}}, None
 
 
 # --------------------------------------------------------------------------------------------------
@@ -450,7 +384,7 @@ def cli(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     if args.selftest:
-        import unitscore_selftest
+        from tools.objdiff import unitscore_selftest
         return unitscore_selftest.selftest()
     if not args.unit:
         ap.error("a unit is required (or --selftest)")

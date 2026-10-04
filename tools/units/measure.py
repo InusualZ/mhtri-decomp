@@ -1,65 +1,19 @@
 #!/usr/bin/env python3
 """Score a whole unit in one compile and one `objdiff report generate` - the search-loop measurer.
-
-`tools/units/recompile.py --measure <symbol>` answers one symbol per run, which is the right shape for the
-*proof* step and the wrong shape for a search: a worker who wants to know whether a shape helped has to run
-it once per symbol of the unit, and each run recompiles the source and issues **two** objdiff calls (the
-report for the score, the positional diff for the rows). Workers hit that and each hand-wrote the same
-driver - `build/tmp/mp.py`, `build/tmp/measure_all.py`, `build/scratch/*.py`, `.pi/scratch/score.py` - a
-compile plus **one** report over the unit's own target object, printed as a per-symbol table. This is that
-driver, shipped.
-
-    python tools/units/measure.py <unit> [symbol] [--json] [-q]
-
-What it does, in order, and the only place it differs from `recompile.py`:
-
-* takes the unit's **real** command line from the same construction `recompile.py` uses
-  (`recompile.unit_tokens` -> MAIN's ninja, the worktree's ninja, then a same-lib sibling) and compiles
-  it into this tree's `build/RMHE08/src/...` through `recompile.compile_unit` (fresh-object assertion
-  included). Nothing about the command line is re-derived here;
-* resolves the **target** object the way a worker needs it: the worktree's own split object first (a
-  proposal whose registration has landed on the branch but not on MAIN), then MAIN's registered object,
-  then MAIN's retired `auto_*_text` object for the symbol's address (`recompile.proposal_target`);
-* scores **every** symbol with one `report generate` over a one-unit project - the official
-  `fuzzy_match_percent`, the same number `build/RMHE08/report.json` carries - and prints the unit's own
-  official measures (``fuzzy_match_percent``, ``matched_functions``) beside a per-symbol table;
-* remembers the previous run's scores in `build/tmp/measure/<unit>.scores.json` and prints the **delta**
-  per symbol, which is what tells a worker "did this shape work" without babysitting a spreadsheet;
-* `--baseline <report.json>` (or `--against-main`) makes that delta compare against a **saved** project
-  report or **MAIN's** `build/RMHE08/report.json` instead of the tool's own last run - the shape the
-  hand-written scorers all converged on (`build/probe/score.py` diffed a probe's rows against the committed
-  report). One call then answers "every symbol of this unit, and what each one is worth against the build
-  that landed", which is the per-iteration question. `--save` writes this run in that shape for the next
-  one. A baseline that moved a row **down** is a regression, and the summary says so;
-* `--diff` (or a symbol focus) adds a compact instruction-level mismatch list for the symbol, read from
-  `recompile.diff_rows`' diagnostic JSON - never quoted as the score.
-
-One compile, one report, N symbols: the cost of the search loop is the compiler, not N x the measurer.
-`recompile.py --measure` remains the tool for a single-symbol proof; this one is for the round.
-
-The unit is the path from the repository root (`Pl/pl_act`, `Camellia/camellia`, `auto/8005AA28_fn_8005AA28`);
-the extension may be omitted and is inferred from the worktree's `src/`. Run it from the worktree you are
-editing, or from MAIN with `--main` left to `git worktree list`; the source, `-o` directory and `-i` order
-are always this tree's (that half is `recompile.py`'s, not this file's).
-"""
-
+Spec: docs/tools/spec/measure.md. CLI: python tools/units/measure.py <unit> [symbol] [--diff] [--json] [-q] [--sort S]
+[--limit N] [--no-cache] [--baseline <report.json> | --against-main] [--save <path>] [--main <tree>]."""
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import argparse
 import json
 import os
 import re
 import subprocess
-import sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.dirname(HERE))
-sys.path.insert(0, HERE)
-
-import unitutil  # noqa: E402
-import recompile as rc  # noqa: E402
-from tools.lib import report as _report  # noqa: E402  (importable once unitutil has put the root on the path)
-from tools.lib import units as _units  # noqa: E402
+from tools.lib import repo as _repo
+from tools.lib import report as _report
+from tools.lib import units as _units
 
 STATE_DIR = os.path.join("build", "tmp", "measure")
 
@@ -79,17 +33,25 @@ def objdiff_path(wt: str, main: str) -> str:
     return _report.objdiff_cli(wt, main)
 
 
-# Resolution lives in `recompile` so `recompile.py --measure` and this tool cannot disagree about which
+# Resolution lives in `lib.units` so `recompile.py --measure` and this tool cannot disagree about which
 # tree's object is the target (the filed trap: a worktree with its own split object was scored against
-# MAIN's copy). These are the same function objects, not copies; the docstring is `recompile.resolve_target`.
-target_rel = rc.target_rel
-resolve_target = rc.resolve_target
+# MAIN's copy). These are the same function objects, not copies.
+target_rel = _units.target_rel
+resolve_target = _units.resolve_target
+
+
+def worktree_root() -> str:
+    """The tree the caller is in (`git rev-parse --show-toplevel` from the cwd)."""
+    top = _repo.caller_worktree()
+    if not top:
+        raise SystemExit("git rev-parse --show-toplevel failed in %s: not a git worktree" % os.getcwd())
+    return top
 
 
 def candidate_functions(obj: str):
     """[(name, size)] for the functions of our own object, in address order ([] when it is not ELF)."""
     try:
-        return [(name, int(size)) for name, size, _frame in unitutil.frames(obj)]
+        return [(name, int(size)) for name, size, _frame in _units.frames(obj)]
     except Exception:
         return []
 
@@ -99,7 +61,7 @@ def score_report(target: str, base: str, unit_name: str, tmpdir: str, objdiff: s
     """One `report generate` over the pair (`lib.report.score`) -> ({name: entry}, unit measures,
     error-or-report-path)."""
     try:
-        rep = _report.score(target, base, unit_name, tmpdir, objdiff=objdiff, cwd=unitutil.ROOT, runner=runner)
+        rep = _report.score(target, base, unit_name, tmpdir, objdiff=objdiff, runner=runner)
     except _report.ReportError as exc:
         return None, {}, str(exc)
     unit = _report.first_unit(rep)
@@ -124,11 +86,11 @@ def instruction_diff_rows(target: str, base: str, symbol: str, objdiff: str, tmp
                           runner=subprocess.run) -> dict:
     """Compact instruction-level mismatches for one symbol, from objdiff's diagnostic `diff`.
 
-    The metric in that JSON (`match_percent`, exposed by `recompile.diff_rows` as
+    The metric in that JSON (`match_percent`, exposed by `lib.report.diff_rows` as
     `diff_match_percent`) is **not** the report's - it is included as `diff_match_percent` and never
-    printed as the score. The `functionRelocDiffs=none` the rows need is `recompile.diff_rows`'s.
+    printed as the score. The `functionRelocDiffs=none` the rows need is `lib.report.diff_rows`'s.
     """
-    detail = rc.diff_rows(target, base, symbol, objdiff, tmpdir, runner=runner)
+    detail = _report.diff_rows(target, base, symbol, objdiff, tmpdir, runner=runner)
     if "error" in detail:
         return {"error": detail["error"]}
 
@@ -191,27 +153,18 @@ def load_baseline(path: str, unit_name: str):
     for u in data.get("units") or []:
         name = u.get("name") or ""
         if name == unit_name or name.endswith("/" + unit_name):
-            rows = numeric({f.get("name"): f.get("fuzzy_match_percent")
-                            for f in u.get("functions") or []})
+            # a report row without a score is 0 %, never "no baseline" (`lib.report.score_of`)
+            rows = {f["name"]: _report.score_of(f) for f in u.get("functions") or [] if f.get("name")}
             return rows, path
     return None, ("baseline %s has no unit %s (it carries %d unit(s))"
                   % (path, unit_name, len(data.get("units") or [])))
 
 
 def moved_summary(functions: dict, baseline: dict) -> dict:
-    """How many rows moved against a baseline, and in which direction (`down` is a regression)."""
-    moved = up = down = 0
-    for name, row in (functions or {}).items():
-        now, before = row.get("score"), (baseline or {}).get(name)
-        if not (isinstance(now, (int, float)) and isinstance(before, (int, float))):
-            continue
-        if abs(now - before) > 1e-9:
-            moved += 1
-            if now > before:
-                up += 1
-            else:
-                down += 1
-    return {"moved": moved, "up": up, "down": down}
+    """How many rows moved against a baseline, and in which direction (`down` is a regression) -
+    `lib.report.moved` + `direction`, the rule `reportdiff` reads."""
+    now = {name: row.get("score") for name, row in (functions or {}).items()}
+    return _report.direction(_report.moved(numeric(baseline), numeric(now)))
 
 
 def save_run(path: str, result: dict) -> None:
@@ -258,24 +211,24 @@ def collect(unit: str, wt: str, main: str, symbol: str = None, runner=subprocess
         if baseline is None:
             return {"unit": unit, "worktree": wt, "main": main, "compiled": False,
                     "error": note}
-    tokens, command_source = rc.unit_tokens(main, wt, unit, runner=runner)
-    compiled = rc.compile_unit(unit, main, wt, tokens=tokens, runner=runner)
+    tokens, command_source = _units.unit_tokens(main, wt, unit, runner=runner)
+    compiled = _units.compile(unit, main, wt, tokens=tokens, runner=runner)
     if not compiled.get("compiled"):
         return {"unit": unit, "worktree": wt, "main": main, "compiled": False,
                 "error": compiled.get("error", "compile failed")}
     obj = compiled["object"]
     # the measurement boundary's own stale guard: a compile that wrote nothing must never be scored
-    ok, why = rc.object_is_fresh(obj, rc.source_path(wt, unit))
+    ok, why = _units.object_is_fresh(obj, _units.source_path(wt, unit))
     if not ok:
         return {"unit": unit, "worktree": wt, "main": main, "compiled": False, "error": why}
     candidates = candidate_functions(obj)
     names = [name for name, _size in candidates]
 
     # The fallback locates the target by address, so it needs a symbol even for a whole-unit run - and the
-    # map that supplies the address is resolved from THIS tree outward (`rc.resolve_map`: a branch that
+    # map that supplies the address is resolved from THIS tree outward (`lib.units.resolve_map`: a branch that
     # renamed a symbol has its own `symbols.txt`). Both are reported, so the number is never ambiguous.
     probe = symbol or (names[0] if names else unit)
-    map_path, map_kind = rc.resolve_map(wt, main)
+    map_path, map_kind = _units.resolve_map(wt, main)
     target, kind, note = resolve_target(wt, main, unit, probe)
     result = {
         "unit": unit, "worktree": wt, "main": main, "object": obj, "compiled": True,
@@ -496,8 +449,8 @@ def main(argv=None) -> int:
     ap.add_argument("--save", default=None, help="write this run's scores here, for a later --baseline")
     args = ap.parse_args(argv)
 
-    wt = rc.worktree_root()
-    main_wt = args.main or rc.main_root(wt)
+    wt = worktree_root()
+    main_wt = args.main or _repo.main_checkout(wt)
     baseline = args.baseline
     if args.against_main:
         baseline = os.path.join(main_wt, "build", "RMHE08", "report.json")

@@ -165,5 +165,69 @@ def test_target_resolution(c):
         c.check("the map follows the invocation", units.resolve_map(w, m)[1], "worktree-map")
 
 
+def test_object_facts(c):
+    from tools.lib.binary.build import ElfBuilder
+    stwu, mflr, blr = 0x9421FFE0, 0x7C0802A6, 0x4E800020          # stwu r1,-0x20(r1) / mflr r0 / blr
+    text = b"".join(w.to_bytes(4, "big") for w in (mflr, blr, stwu, blr, blr))
+    b = ElfBuilder().section(".text", text).section(".data", b"\0" * 8)
+    b.symbol("leaf", ".text", 0x0, 8, bind="global", type="func")
+    b.symbol("framed", ".text", 0x8, 8, bind="global", type="func")
+    b.symbol("tail", ".text", 0x10, 4, bind="local", type="func")
+    b.symbol("table", ".data", 0x0, 8, bind="global", type="object")
+    b.symbol("extern_fn")
+    with tempfile.TemporaryDirectory() as tmp:
+        obj = os.path.join(tmp, "u.o")
+        Path(obj).write_bytes(b.build())
+        c.check("frames: every defined function in address order, the stwu frame or None",
+                units.frames(obj), [("leaf", 8, None), ("framed", 8, 0x20), ("tail", 4, None)])
+        c.check("function_names follows frames", units.function_names(obj), ["leaf", "framed", "tail"])
+        c.check("text_size is the .text section's size", units.text_size(obj), len(text))
+
+
+def test_flag_helpers(c):
+    tokens = ["sjiswrap.exe", "build\\compilers\\Wii\\1.3\\mwcceppc.exe", "-O4,p", "-inline", "auto", "-pragma",
+              '"cats', 'off"', "-lang=c", "-MMD", "-c", "src/a.c", "-o", "build/RMHE08/src"]
+    head, flags, tail = units.split_flags(tokens)
+    c.check("split_flags: wrapper+compiler / flags / -MMD tail",
+            (head, tail), (tokens[:2], ["-MMD", "-c", "src/a.c", "-o", "build/RMHE08/src"]))
+    c.check("family groups -O levels and valued options", [units.family(t) for t in ("-O3", "-O4,p", "-inline", "-x")],
+            ["-O", "-O", "-inline", None])
+    c.check("override_flags drops the same family (and its value, quoted or not), then appends",
+            units.override_flags(flags, "-O3 -inline noauto -pragma x"), ["-lang=c", "-O3", "-inline", "noauto", "-pragma", "x"])
+    c.check("override_flags with nothing extra is the identity", units.override_flags(flags, ""), flags)
+    c.check("quiet drops the ### banner", units.quiet("### banner\nerror: x\n### more"), "error: x")
+    c.check("with_compiler_version swaps the version directory",
+            units.with_compiler_version(head, "1.0")[1], "build\\compilers\\Wii\\1.0\\mwcceppc.exe")
+    c.check("... and a cross-family spec swaps the family too",
+            units.with_compiler_version(head, "GC/3.0a3")[1], "build\\compilers\\GC\\3.0a3\\mwcceppc.exe")
+    c.check("drop_unknown_option removes the rejected option and its value",
+            units.drop_unknown_option(["-a", "-gccinc", "-inline", "auto"], "Unknown option '-inline'"), ["-a", "-gccinc"])
+    c.check("... and answers None when the log names none", units.drop_unknown_option(["-a"], "fine"), None)
+    with tempfile.TemporaryDirectory() as tmp:
+        d = Path(tmp, "Wii")
+        for v in ("1.3", "1.0"):
+            (d / v).mkdir(parents=True)
+        c.check("available_versions lists the compiler's siblings",
+                units.available_versions([str(d / "1.3" / "mwcceppc.exe")]), ["1.0", "1.3"])
+    with testing.FixtureTree() as tree:
+        tree.add_unit("Pl/a.c")
+        u = units.Unit.resolve("Pl/a", str(tree.root))
+        line = " ".join(tokens) + "\n"
+        got = units.split_command(u, _ninja({(str(tree.root), "build/RMHE08/src/Pl/a.o"): line}))
+        c.check("split_command is split_flags of the unit's own tree's ninja line", got[0], head)
+
+
+def test_compile_result(c):
+    ok = units.CompileResult("o.o", compiled=True, fresh=False, bytes=4, sections={}, log="")
+    c.check("a CompileResult reads as the old dict, falsy fields kept", dict(ok),
+            {"object": "o.o", "compiled": True, "fresh": False, "bytes": 4, "sections": {}, "log": ""})
+    c.check("... with .get and `in`", (ok.get("error"), "error" in ok, ok["bytes"]), (None, False, 4))
+    c.raises("... and a KeyError for an absent key", KeyError, lambda: ok["error"])
+    dry = units.CompileResult("o.o", command=["cc"], dry_run=True)
+    c.check("a dry run keeps the old key order", list(dict(dry)), ["command", "object", "dry_run"])
+    bad = units.CompileResult("o.o", compiled=False, error="boom")
+    c.check("a failure", dict(bad), {"object": "o.o", "compiled": False, "error": "boom"})
+
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))

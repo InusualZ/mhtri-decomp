@@ -1,58 +1,42 @@
 #!/usr/bin/env python3
-"""Side-by-side instruction diff for one symbol of a unit.
-
-Usage:
-    python tools/objdiff/symdiff.py -u <unit>                             # list every symbol + score
-    python tools/objdiff/symdiff.py -u <unit> <symbol> [n] [--all]        # runs objdiff for you
-    python tools/objdiff/symdiff.py <diff.json> <symbol> [n] [--all]      # reuse an existing diff
-    python tools/objdiff/symdiff.py -u <unit> --force-stale               # score a stale object anyway
-
-`-u <unit>` scores the unit's **prebuilt** object (`build/RMHE08/src/<unit>.o`), so it refuses to print
-numbers when a source or header under the unit is newer than that object (exit 1, naming the newer
-file): a lane that measured a stale object reported two "improvements" that were never built. The rule
-and its arithmetic live in `lib.report` (freshness), shared with `unitscore.py`; `--force-stale`
-scores it anyway and says so on stderr.
-
-A bare `-u <unit>` is the **first measurement of a unit in one command**: it lists every symbol the
-unit owns with its official report score, worst first. It used to raise an IndexError traceback
-(measured 2026-09-27: a lane lost its first turn to it), and the scores are the same
-`fuzzy_match_percent` the single-symbol path prints, so the listing and the diff never disagree.
-
-Left  = the -1 object, Right = the -2 object (file mode), or target/base in project mode
-(`-p . -u <unit>`, where left = target and right = our build).
-
-The `match` figure printed with `-u` is the **official report metric** (`report generate`'s
-`fuzzy_match_percent` - what `build/RMHE08/report.json`, `ledger.py` and `land.py` read), with the
-positional `diff` value shown beside it when it differs. A pre-existing `diff.json` has no unit context,
-so that path prints the positional value and says so: objdiff's `match_percent` is positional (one
-inserted/deleted instruction shifts every later instruction, so a single early divergence can report
-~0 %) and its relocation default differs from the report's. Read the first divergence, not the percentage.
-
-Every run writes its project, report and diff JSON under a **unique** temp directory
-(`session_tmpdir()`), removed at exit.  The shared `build/tmp/unitutil/unitutil_report.json` was held by
-another process twice and raised `PermissionError [WinError 5]`, costing a measurement round (2026-09-28);
-a unique directory (with a transient-lock retry) removes the collision.
-"""
+"""Side-by-side instruction diff for one symbol of a unit, with its official score. Spec: docs/tools/spec/symdiff.md.
+CLI: python tools/objdiff/symdiff.py -u <unit> [<symbol> [n]] [--all] [--force-stale] | <diff.json> <symbol> [n] [--all]."""
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
-import atexit
 import json
 import os
-import shutil
-import sys
-import tempfile
-import time
-from tools.lib import repo as librepo
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # tools/
-_HERE = os.path.dirname(os.path.abspath(__file__))                 # tools/objdiff
-if _HERE not in sys.path:
-    sys.path.insert(0, _HERE)
-import unitutil as uu
+from tools.lib import repo as librepo
 from tools.lib import report as _report
+from tools.lib import units as _units
+
+#: The tree the run reads (`lib.repo.repo_root()` on first use); a fixture assigns it.
+ROOT = None
+
+
+def run_root() -> str:
+    global ROOT
+    if ROOT is None:
+        ROOT = librepo.repo_root()
+    return ROOT
 
 
 def session_tmpdir() -> str:
     return librepo.session_tmpdir()
+
+
+retry_transient = _report.retry_transient
+
+
+def report_functions(unit):
+    """`{function: report entry}` of the unit's prebuilt object pair - one `report generate`."""
+    return _report.score_entries(unit.obj_target, unit.obj_ours, unit.report_name, session_tmpdir(),
+                                 objdiff=_report.objdiff_cli(run_root()), cwd=run_root())
+
+
+def report_measure(unit, name):
+    """The official score of one symbol of the unit's prebuilt object pair."""
+    return _report.symbol_score(unit.obj_target, unit.obj_ours, name, unit.report_name, session_tmpdir(),
+                                objdiff=_report.objdiff_cli(run_root()), cwd=run_root())
 
 
 def stale_reasons(unit, root: str | None = None) -> list[str]:
@@ -64,32 +48,13 @@ def stale_reasons(unit, root: str | None = None) -> list[str]:
     a lane measured exactly that, twice, and reported two "improvements" that were never compiled. This
     is the same rule `unitscore.py` enforces (`lib.report` (freshness) holds the arithmetic), applied
     to the tool that scores without one. `root` is the tree the include closure is resolved in (default
-    `unitutil.ROOT`); the selftest passes a fixture tree.
+    the run's tree); the selftest passes a fixture tree.
     """
-    root = root or uu.ROOT
-    src = unit.src if os.path.isabs(unit.src) else os.path.join(root, unit.src)
-    reasons, _newest = _report.unit_reasons(src, unit.obj, root,
-                                              rel=lambda p: _report.rel_path(p, root))
+    tree = root or run_root()
+    src = unit.source if os.path.isabs(unit.source) else os.path.join(tree, unit.source)
+    reasons, _newest = _report.unit_reasons(src, unit.obj_ours, tree,
+                                            rel=lambda p: _report.rel_path(p, tree))
     return reasons
-
-
-def retry_transient(fn, attempts: int = 4):
-    """Call `fn()`, retrying the transient Windows sharing violation (WinError 5) with backoff.
-
-    The unique directory already removes the collision; this covers a transient antivirus/indexer lock
-    on the file the caller just created, which `os.remove`/`open` can still raise once.
-    """
-    delay = 0.05
-    last: PermissionError | None = None
-    for i in range(attempts):
-        try:
-            return fn()
-        except PermissionError as exc:
-            last = exc
-            if i + 1 < attempts:
-                time.sleep(delay)
-                delay *= 2
-    raise (last if last else PermissionError("transient file lock"))
 
 
 def cli():
@@ -107,11 +72,12 @@ def cli():
                 raise SystemExit("usage: symdiff.py -u <unit> [<symbol>] [n] [--all]"
                                  " | symdiff.py <diff.json> <symbol> [n] [--all]")
             rest = a[:i] + a[i + 2:]
-            unit = uu.resolve_unit(a[i + 1])
+            unit = _units.Unit.resolve(a[i + 1], run_root())
             if not rest or rest[0] == "--all":
                 return None, None, unit
             symbol = rest[0]
-            path, log = uu.objdiff(unit, symbol, out=os.path.join(session_tmpdir(), "diff.json"))
+            path, log = _report.project_diff(run_root(), unit.report_name, symbol,
+                                             os.path.join(session_tmpdir(), "diff.json"), _report.objdiff_cli(run_root()))
             if not path:
                 raise SystemExit("objdiff failed: " + log)
             sys.argv = [sys.argv[0], path, symbol] + rest[1:]
@@ -129,18 +95,17 @@ def list_symbols(unit) -> int:
     `report.json` carries), never a fabricated 0.0: a target object that does not exist yet is an error
     that names the path and says why, so a proposal unit's first run is not read as "everything 0 %".
     """
-    entries = retry_transient(lambda: uu.report_functions(unit.target, unit.obj, unit.name,
-                                                          tmpdir=session_tmpdir()))
+    entries = retry_transient(lambda: report_functions(unit))
     if "_error" in entries:
         raise SystemExit(
             "cannot score %s: %s\n  target object: %s\n"
             "  (a proposal unit has no split object until its registration lands; check the target exists "
-            "and the tree is built)" % (unit.name, entries["_error"], unit.target))
+            "and the tree is built)" % (unit.report_name, entries["_error"], unit.obj_target))
     rows = sorted(entries.values(),
                   key=lambda e: (e.get("fuzzy_match_percent")
                                  if e.get("fuzzy_match_percent") is not None else 0.0,
                                  e.get("name") or ""))
-    print("== %s: %d symbol(s), report metric (fuzzy_match_percent), worst first" % (unit.name, len(rows)))
+    print("== %s: %d symbol(s), report metric (fuzzy_match_percent), worst first" % (unit.report_name, len(rows)))
     print("%-44s %9s %9s  %s" % ("symbol", "size B", "match %", ""))
     for e in rows:
         pct = e.get("fuzzy_match_percent")
@@ -205,8 +170,7 @@ def official_match(unit, name):
     """The report metric for `name`, or None when it cannot be obtained (never a fabricated score)."""
     if unit is None:
         return None
-    m = retry_transient(lambda: uu.report_measure(unit.target, unit.obj, name, unit.name,
-                                                  tmpdir=session_tmpdir()))
+    m = retry_transient(lambda: report_measure(unit, name))
     if "error" in m:
         return None
     return m.get("match_percent")
@@ -227,7 +191,7 @@ def main():
             if not force:
                 print("refused    a stale object would print numbers that are not this build's; nothing "
                       "shown.\n           rebuild (`ninja %s`) or pass --force-stale to score it anyway "
-                      "(the verdict stays)." % unit.name, file=sys.stderr)
+                      "(the verdict stays)." % unit.report_name, file=sys.stderr)
                 return 1
             print("freshness  (forced by --force-stale)", file=sys.stderr)
     if name is None and unit is not None:

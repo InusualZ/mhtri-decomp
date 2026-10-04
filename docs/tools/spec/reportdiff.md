@@ -50,4 +50,7 @@ Target: `tools/tests/units/test_reportdiff.py` on `lib.testing` (`FixtureTree`/`
 
 ## Known gaps
 
-no caller today; the lib's regression rule is the keeper
+* no caller today. Since WP3b the verdict (`build`) is `lib.report.compare` - "every moved row that fell" over
+  `lib.report.moved`/`drops`, the rule `measure.py --baseline` counts with too; this file keeps only the renderer and the
+  CLI. The gate's `lib.report.regression` is a different policy on purpose (it judges a batch against a `record-base`
+  snapshot that holds only sub-100 % symbols): see `lib-report.md` Known gaps.

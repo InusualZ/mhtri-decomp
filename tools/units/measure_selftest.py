@@ -22,6 +22,7 @@ Layers:
   compiled unit are present, skipped (not failed) otherwise.
 """
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import json
 import os
@@ -31,16 +32,10 @@ import sys
 import tempfile
 import time
 
+from tools.units import measure as ms
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
-if HERE not in sys.path:
-    sys.path.insert(0, HERE)
-if os.path.dirname(HERE) not in sys.path:
-    sys.path.insert(0, os.path.dirname(HERE))
-
-import measure as ms  # noqa: E402
-import recompile as rc  # noqa: E402
-import unitutil  # noqa: E402
 
 
 def _ok(label, got, want, failures):
@@ -360,6 +355,13 @@ def baseline_rows() -> int:
         failures = _ok("a project report's unit is found by name", rows, {"a": 50.0, "b": 100.0},
                        failures)
         failures = _ok("... and the note names the file", note, report, failures)
+        unscored = os.path.join(tmp, "unscored.json")
+        json.dump({"units": [{"name": "main/prop/unit", "functions": [
+            {"name": "a", "fuzzy_match_percent": 50.0}, {"name": "u", "size": "8"}]}]},
+            open(unscored, "w", encoding="utf-8"))
+        rows, _ = ms.load_baseline(unscored, "main/prop/unit")
+        failures = _ok("a report row without a score is a 0 % baseline, not a missing one", rows,
+                       {"a": 50.0, "u": 0.0}, failures)
         rows, err = ms.load_baseline(report, "main/prop/other")
         failures = _ok("a unit the report lacks is refused", rows, None, failures)
         failures = _ok("... and the refusal names it", "prop/other" in err, True, failures)

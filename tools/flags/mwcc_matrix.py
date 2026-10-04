@@ -1,40 +1,18 @@
 #!/usr/bin/env python3
-"""Compile a unit with several MWCC versions and/or flag overrides and summarize the objdiff result.
-
-The compile command is the exact one ninja would run for that unit (so whatever `configure.py` puts in
-the unit's `cflags` is honoured); `--flags-extra` overrides same-family flags, and a compiler version
-argument swaps the MWCC executable. The object is written to the unit's real output path so that
-objdiff's project mode can diff it against the split target object.
-
-The `match` column is the **official report metric** (`report generate`'s `fuzzy_match_percent`,
-`unitutil.report_functions`) - the number that closes a symbol, not objdiff's positional `diff` value.
-The diff JSON is still generated and used for the two sizes and the `first-diff@` index, because the
-report carries neither. This matters for flag decisions: `diff` defaults `functionRelocDiffs` to
-`data_value` while the report defaults to `none`, so relocation-only differences used to read as
-sub-100 % code here (`pl_skill` fn_80270018: 99.88 % positionally, **100.0 %** officially).
-
-Usage:
-    python tools/flags/mwcc_matrix.py                          # the unit's own compiler, no overrides
-    python tools/flags/mwcc_matrix.py -u <unit>
-    python tools/flags/mwcc_matrix.py -u <unit> --flags-extra "-O3 -inline noauto"
-    python tools/flags/mwcc_matrix.py -u <unit> 1.0 1.3 1.5    # one run per compiler version
-
-Writes: build/tmp/matrix/<label>.json (raw objdiff diff per variant)
-        build/tmp/matrix/summary.txt (the printed table)
-Leaves a foreign object behind - restore with:
-    rm -f <unit obj> && ninja <unit obj>
-"""
+"""Compile a unit with several MWCC versions and/or flag overrides and summarize the official score per function.
+Spec: docs/tools/spec/mwcc_matrix.md. CLI: python tools/flags/mwcc_matrix.py [-u <unit>] [<version>...]
+[--flags-extra "<flags>"] [--list-versions]."""
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import json
 import os
-import subprocess
-import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # tools/
-import unitutil as uu
+from tools.lib import repo, report, units
 
-OUTDIR = os.path.join(uu.ROOT, "build", "tmp", "matrix")
-OBJDIFF = os.path.join(uu.ROOT, "build", "tools", "objdiff-cli.exe")
+
+def outdir(unit):
+    """`build/tmp/matrix/` of the unit's tree: the raw diffs and `summary.txt`."""
+    return os.path.join(unit.root, "build", "tmp", "matrix")
 
 
 def od_symbols(d, side):
@@ -60,19 +38,15 @@ def diff_unit(unit, label, symbol):
     `-c functionRelocDiffs=none` matches the report's default, so the `first-diff@` index is not a
     relocation-only difference the official metric ignores.
     """
-    out = os.path.join(OUTDIR, label.replace("/", "_") + ".json")
-    cmd = [OBJDIFF, "diff", "-p", ".", "-u", unit.name, symbol,
-           "-c", "functionRelocDiffs=none", "--format", "json", "-o", out]
-    p = subprocess.run(cmd, cwd=uu.ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
-    if p.returncode != 0:
-        return None, (p.stdout or "") + (p.stderr or "")
-    return out, ""
+    out = os.path.join(outdir(unit), label.replace("/", "_") + ".json")
+    path, log = report.project_diff(unit.root, unit.report_name, symbol, out, report.objdiff_cli(unit.root))
+    return (path, "") if path else (None, log)
 
 
 def summarize(path, official=None):
     """Rows for one variant: (name, target size, ours size, match percent, first diff).
 
-    `official` is `{function: fuzzy_match_percent}` from `unitutil.report_functions` for the same object
+    `official` is `{function: fuzzy_match_percent}` from `lib.report.score_entries` for the same object
     pair - the score a flag decision must be made on. The diff JSON's own `match_percent` is positional
     and relocation-sensitive, so it is only a fallback for a function the report did not score (marked
     with `~` in the printed row).
@@ -110,32 +84,33 @@ def main():
     ap.add_argument("--list-versions", action="store_true", help="print installed compiler versions")
     args = ap.parse_args()
 
-    unit = uu.resolve_unit(args.unit)
-    head, flags, tail = uu.split_flags(uu.compile_command(unit))
+    unit = units.Unit.resolve(args.unit, repo.repo_root())
+    root = unit.root
+    head, flags, tail = units.split_command(unit)
     if args.list_versions:
-        print("\n".join(uu.available_versions(head)))
+        print("\n".join(units.available_versions(head)))
         return
-    flags = uu.override_flags(flags, args.flags_extra)
-    symbol = uu.function_names(unit.target)[0] if os.path.exists(unit.target) else None
+    flags = units.override_flags(flags, args.flags_extra)
+    symbol = units.function_names(unit.obj_target)[0] if os.path.exists(unit.obj_target) else None
     if symbol is None:
-        raise SystemExit("no target object at %s - split the unit first" % unit.target)
+        raise SystemExit("no target object at %s - split the unit first" % unit.obj_target)
 
-    os.makedirs(OUTDIR, exist_ok=True)
+    os.makedirs(outdir(unit), exist_ok=True)
     lines = []
     for version in (args.versions or [None]):
         label = (version or "default") + ("__" + "_".join(args.flags_extra.split())
                                           if args.flags_extra else "")
-        head_v = uu.with_compiler_version(head, version) if version else head
+        head_v = units.with_compiler_version(head, version) if version else head
         flags_v = list(flags)
-        rc, log, obj = uu.run_compile(head_v + flags_v + tail, expect=unit.obj)
+        rc, log, obj = units.run_tokens(head_v + flags_v + tail, root, expect=unit.obj_ours)
         while rc != 0 and len(flags_v) > 1:
-            trimmed = uu.drop_unknown_option(flags_v, log)
+            trimmed = units.drop_unknown_option(flags_v, log)
             if trimmed is None:
                 break
             flags_v = trimmed
-            rc, log, obj = uu.run_compile(head_v + flags_v + tail, expect=unit.obj)
+            rc, log, obj = units.run_tokens(head_v + flags_v + tail, root, expect=unit.obj_ours)
         if rc != 0:
-            msg = "%s: COMPILE FAILED rc=%d\n%s" % (label, rc, uu.quiet(log)[:800])
+            msg = "%s: COMPILE FAILED rc=%d\n%s" % (label, rc, units.quiet(log)[:800])
             print(msg)
             lines.append(msg)
             continue
@@ -145,8 +120,8 @@ def main():
             print(msg)
             lines.append(msg)
             continue
-        official = uu.report_functions(unit.target, unit.obj, unit.name,
-                                       os.path.join(uu.ROOT, "build", "tmp", "matrix"))
+        official = report.score_entries(unit.obj_target, unit.obj_ours, unit.report_name, outdir(unit),
+                                        objdiff=report.objdiff_cli(root), cwd=root)
         if "_error" in official:
             print("%s: WARNING the report metric is unavailable, positional values below are marked ~:\n  %s"
                   % (label, official["_error"][:200]))
@@ -160,10 +135,10 @@ def main():
         block.append("")
         lines += block
         print("\n".join(block))
-    open(os.path.join(OUTDIR, "summary.txt"), "w").write("\n".join(lines))
-    print("wrote", os.path.relpath(os.path.join(OUTDIR, "summary.txt"), uu.ROOT))
+    open(os.path.join(outdir(unit), "summary.txt"), "w").write("\n".join(lines))
+    print("wrote", os.path.relpath(os.path.join(outdir(unit), "summary.txt"), root))
     print("restore the unit object with: rm -f %s && ninja %s"
-          % (os.path.relpath(unit.obj, uu.ROOT), os.path.relpath(unit.obj, uu.ROOT)))
+          % (os.path.relpath(unit.obj_ours, root), os.path.relpath(unit.obj_ours, root)))
 
 
 if __name__ == "__main__":
