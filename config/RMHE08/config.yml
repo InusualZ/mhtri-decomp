@@ -66,3 +66,7 @@ block_relocations:
   end: extabindex:0x80020010
 - target: extabindex:0x80030000
   end: extabindex:0x80030050
+# The error code 0x80060034 that updateSession loads (lis/addi at 0x803D7564) is a constant, not
+# fn_8005FE68+0x1CC.
+- source: .text:0x803D7564
+  end: .text:0x803D756C
