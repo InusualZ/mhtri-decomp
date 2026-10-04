@@ -57,3 +57,12 @@ symbols_known: false
 # When alignments are fully known (e.g. from a complete map file),
 # this can be set to false.
 fill_gaps: true
+
+# dtk reads the NETWORK_ERROR_* immediates (0x80020001/2, 0x80030002..0x8003004B) as
+# addresses and relocates them against extabindex labels; they are plain constants.
+# Measured (network pilot, L1): 21 functions up, 0 down, main.dol unchanged.
+block_relocations:
+- target: extabindex:0x80020000
+  end: extabindex:0x80020010
+- target: extabindex:0x80030000
+  end: extabindex:0x80030050
