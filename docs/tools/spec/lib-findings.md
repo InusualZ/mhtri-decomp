@@ -37,6 +37,10 @@ results), `lib.cli` (the JSON on `--json`, the exit code).
 * **Credits**: each base identity is admitted under every spelling `credit` gives it (the old name and the new,
   for a map rename or a re-homed file), so a rename is never one removal plus one addition. `removed` is the
   mirror: one removal per identity per file, unless a credited spelling is still there.
+* **A removal is keyed by the after side's spelling**: the first spelling `credit` gives, else the base one. So a
+  finding that moved file *and* was renamed in the same batch meets its addition on `(rule, token, detail)` and a move
+  credit can match it (stylelint's `apply_move_credits`); without a credit, or when `credit` returns the finding
+  unchanged, the key is the base `(rule, token, detail)` exactly as before.
 * **A gate row has a KIND** (GATE: the batch is bad; BOOKKEEPING: the landing's own state is stale). A row whose
   kind is missing or unknown reads as GATE - a refusal of unknown kind is never soft-pedalled.
 * **Rendering is the gate's table, byte for byte** (lanes parse it): a `check / result` header, `%-58s` names cut
@@ -59,7 +63,8 @@ None (stdlib).
 ## Test contract
 
 Tier: fixture (`tools/tests/lib/test_findings.py`). The credit model rows of stylelint's selftest (repeat spelling,
-new token, per-file identity, two details, a credited rename and its old-spelling referrer), `removed`, the
+new token, per-file identity, two details, a credited rename and its old-spelling referrer), `removed` (and its
+after-side key: a moved+renamed removal meets its addition, an in-place rename is neither, another rule never), the
 table's exact bytes (header, PASS evidence, FAIL detail, the cuts, a `None` detail), KIND normalisation, the
 Verdict fold, the JSON round trip and every exit code.
 

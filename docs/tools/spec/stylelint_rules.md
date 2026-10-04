@@ -50,6 +50,14 @@ None: modules. The CLI is `stylelint.py`'s (`cli.main`), spec `stylelint.md`.
 * **One judgement.** `diff.judge` is the credit pipeline (`rename_map`, `added_identities`, `apply_move_credits`,
   `apply_rename_credits`, the detail and the credit lines) for both comparisons; `cli.report_comparison` is their one
   renderer. `--diff` and `--ref` differ only in where each side is read from and in their summary sentence.
+* **A move that also renamed is a move.** `apply_move_credits` matches an addition against the removals keyed
+  `(rule, token, detail)`; `lib.findings.removed` spells each removal's key the way the after side does
+  (`renamed_finding` through `rename_map` and the file map), so a finding whose map row the batch renamed *and* which
+  moved file in the same batch (L3, 2026-10-04: `lbl_80794868` -> `frame_counter`, the rule-12 extern from
+  `src/main.cpp` to `include/unsplit/unknown.h`) is one credited move, not +1. The same rule, the same renamed token,
+  one credit per removal; another rule, or a copy that leaves the original in place, is still added. Every rule whose
+  token or detail names the symbol (2, 7, 11, 12, 13 ...) is covered, because the translation is on the finding, not
+  per rule.
 * **Rule 13's mangling estimate is `lib.names`.** It was `import mangle`, which resolved only while `tools/units/` was on
   `sys.path` (a script in that directory); a caller from anywhere else (a `tools/tests/` module, `python -m`) silently got
   no estimate and a different detail text. Every script's output is unchanged.
@@ -66,7 +74,7 @@ One tool edge: `diff -> tools/units/dataclosure.py` (the fold map `derive_file_a
 ## Test contract
 
 `python tools/units/stylelint.py --selftest` (the runner's entry `tools/units/stylelint`): 445 checks, unchanged by the
-split. Re-homing it to `tools/tests/units/test_stylelint.py` (fixture tier; the one live read is
+split; 451 with the move+rename rows (two of them fail on the old `removed` keying). Re-homing it to `tools/tests/units/test_stylelint.py` (fixture tier; the one live read is
 `load_ownership(".")`, which the runner's temp cwd turns into "no map") is WP6's.
 
 ## Measured (WP3d)
@@ -81,6 +89,13 @@ On the tree at `1c0e5252b` (+ main through `af8b41844`), old monolith vs the pac
   files, 671 moves) and on the refusing self-comparisons.
 * Wall time of `--diff`: 66 / 70 / 78 / 87 s -> 10 / 17 / 26 / 45 s (the four header walks and rule 1 at the ref read
   ~2 650 blobs one `git show` each; now one `cat-file --batch` per tree). `--budget --json` 25 s before and after.
+
+## Measured (move + rename, 2026-10-04)
+
+On main at `dadbdf8e9`, old vs new `lib.findings.removed`: `--budget --json`, `--budget` and `--diff` on `main`,
+`0375f98c4~1` and `ee7d53b06~1` (text with `--list-added`, and JSON) identical bytes. `--diff 3f7532ded~1` (a batch with
+renames) credits 13 more moves (4 147 -> 4 160; additions 1 123 -> 1 110), each a re-homed owner path or a renamed token
+moving out of a folded file. `--ref worker/net2-l3-2c54` (105fe4cc6): +1 rule 12 -> clean, one move credited.
 
 ## Known gaps
 

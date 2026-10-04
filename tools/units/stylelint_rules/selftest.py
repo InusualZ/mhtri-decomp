@@ -1729,6 +1729,41 @@ def selftest() -> int:
           file_absorbers({"A/g1": ["A/f", "A/zz"], "A/g2": ["A/f"], "A/g3": ["A/zz"]}, [F], [G1, G2, G3]),
           {F: [G1, G2]})
 
+    # --- MOVE + RENAME: a finding that moved file while the batch renamed its map row (2026-10-04) ---------
+    # The L3 incident: `lbl_80794868` -> `frame_counter` in symbols.txt, the rule-12 extern moved from
+    # src/main.cpp to include/unsplit/unknown.h; the removal was keyed under the old spelling, the addition under
+    # the new, so the move read as +1.
+    def _r12(file, token, line=1):
+        return {"rule": 12, "file": file, "line": line, "token": token,
+                "detail": "`%s` is unowned data - no registered range covers `.sbss:0x80794868`" % token}
+
+    ren = {"lbl_80794868": "frame_counter"}
+    M, U = "src/main.cpp", "include/unsplit/unknown.h"
+
+    def _mr(before, after, symbols=ren):
+        fresh0 = added_identities(before, after, symbols)
+        left, moves = apply_move_credits(fresh0, before, after, symbols)
+        return ({k: [f["token"] for f in v] for k, v in left.items()},
+                [(m["rule"], m["token"], m["from"], m["to"]) for m in moves])
+
+    check("(move+rename 1) a finding moved to another file under its renamed spelling is credited as a move",
+          _mr([_r12(M, "lbl_80794868")], [_r12(U, "frame_counter")]),
+          ({}, [(12, "frame_counter", M, U)]))
+    check("... and without the rename map it is still one removal plus one addition",
+          _mr([_r12(M, "lbl_80794868")], [_r12(U, "frame_counter")], symbols={}),
+          ({(12, U): ["frame_counter"]}, []))
+    check("(move+rename 2) renamed in place, same file: a rename, neither added nor moved",
+          _mr([_r12(M, "lbl_80794868")], [_r12(M, "frame_counter")]), ({}, []))
+    check("(move+rename 3) renamed and moved but under another rule: not credited",
+          _mr([_r12(M, "lbl_80794868")], [dict(_fnd(2, U, "frame_counter"))]),
+          ({(2, U): ["frame_counter"]}, []))
+    check("(move+rename 4) a genuinely new finding beside a credited move is still added",
+          _mr([_r12(M, "lbl_80794868")], [_r12(U, "frame_counter"), _r12(U, "other_data")]),
+          ({(12, U): ["other_data"]}, [(12, "frame_counter", M, U)]))
+    check("(move+rename 5) a renamed copy that leaves the original in place earns nothing",
+          _mr([_r12(M, "lbl_80794868")], [_r12(M, "frame_counter"), _r12(U, "frame_counter")]),
+          ({(12, U): ["frame_counter"]}, []))
+
     # --- --findings: the listing of the --diff / --budget set, filtered ----------------------------------
     listed = [_af(7, "src/Network/b.cpp", 9, "fn_00000009"), _af(2, "src/Network/a.cpp", 4, "lbl_1"),
               _af(7, "src/Network/a.cpp", 2, "fn_00000002"), _af(7, "src/Pl/p.cpp", 1, "fn_00000001"),

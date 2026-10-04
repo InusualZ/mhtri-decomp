@@ -96,7 +96,13 @@ def added(before: Iterable, after: Iterable, credit: Credit | None = None) -> di
 
 def removed(before: Iterable, after: Iterable, credit: Credit | None = None) -> dict:
     """`{(rule, token, detail): [file, ...]}` - one entry per base identity a file stopped carrying under every
-    spelling `credit` gives it; the mirror of `added`."""
+    spelling `credit` gives it; the mirror of `added`.
+
+    The key is spelled the way the **after** side spells the identity - the first spelling `credit` gives (a map
+    rename, a re-homed path), else the base spelling - so a removal can be matched to the addition another file of
+    the same batch made under the new name (a move that also renamed). Without a credit, or when `credit` gives the
+    finding back unchanged, the key is the base identity's own `(rule, token, detail)`.
+    """
     here_by: dict = {}
     for f in after:
         here_by.setdefault((_get(f, "rule"), _get(f, "file")), set()).add(identity(f))
@@ -108,9 +114,11 @@ def removed(before: Iterable, after: Iterable, credit: Credit | None = None) -> 
             continue
         seen.add(ident)
         here = here_by.get((_get(f, "rule"), _get(f, "file")), set())
-        if ident in here or any(identity(g) in here for g in (credit(f) if credit else ())):
+        spellings = list(credit(f)) if credit else []
+        if ident in here or any(identity(g) in here for g in spellings):
             continue
-        out.setdefault((_get(f, "rule"), _get(f, "token"), _get(f, "detail")), []).append(_get(f, "file"))
+        now = spellings[0] if spellings else f
+        out.setdefault((_get(now, "rule"), _get(now, "token"), _get(now, "detail")), []).append(_get(f, "file"))
     return out
 
 
