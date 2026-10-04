@@ -2029,31 +2029,32 @@ Network/NetworkWiiMediator.cpp:
 	.data       start:0x806024B8 end:0x80602824
 
 Network/network_opening.cpp:
-	extab       start:0x8001CBF4 end:0x8001CE34
-	extabindex  start:0x8003D524 end:0x8003D800
-	.text       start:0x804155D4 end:0x80418988
+	extab       start:0x8001CBF4 end:0x8001CD94
+	extabindex  start:0x8003D524 end:0x8003D764
+	.text       start:0x804155D4 end:0x80417BC0
 	.rodata     start:0x80570E70 end:0x80570E98
-	.data       start:0x80602988 end:0x80602AF8
-	.sbss       start:0x80794CC0 end:0x80794CD0
+	.data       start:0x80602824 end:0x80602968
 	.sdata2     start:0x8079C874 end:0x8079C878
 
-Network/constructNetworkWiiMediator.cpp:
-	extab       start:0x8001CE34 end:0x8001CE4C
-	extabindex  start:0x8003D800 end:0x8003D80C
-	.text       start:0x80418988 end:0x804189C8
+Network/sNetworkLibrary.cpp:
+	extab       start:0x8001CD94 end:0x8001CE1C
+	extabindex  start:0x8003D764 end:0x8003D7DC
+	.text       start:0x80417BC0 end:0x8041891C
+	.data       start:0x80602988 end:0x80602AF8
+	.sbss       start:0x80794CC0 end:0x80794CD0
 
-Network/constructNetworkLibrary.cpp:
-	extab       start:0x8001CE4C end:0x8001CF70
-	extabindex  start:0x8003D80C end:0x8003D92C
-	.text       start:0x804189C8 end:0x80419EC4
+Network/sNetworkLibraryWii.cpp:
+	extab       start:0x8001CE1C end:0x8001CF40
+	extabindex  start:0x8003D7DC end:0x8003D8E4
+	.text       start:0x8041891C end:0x80419AD4
 	.data       start:0x80602AF8 end:0x80603118
 	.sbss       start:0x80794CD0 end:0x80794CD8
 	.sdata2     start:0x8079C878 end:0x8079C888
 
 Network/NetworkPat.cpp:
-	extab       start:0x8001CF70 end:0x8001CF88
-	extabindex  start:0x8003D92C end:0x8003D950
-	.text       start:0x80419EC4 end:0x8041A194
+	extab       start:0x8001CF40 end:0x8001CF88
+	extabindex  start:0x8003D8E4 end:0x8003D950
+	.text       start:0x80419AD4 end:0x8041A194
 
 Network/NetworkReflectService.cpp:
 	extab       start:0x8001CF88 end:0x8001CFF0
@@ -2062,7 +2063,7 @@ Network/NetworkReflectService.cpp:
 	.data       start:0x80603118 end:0x80603154
 	.sbss       start:0x80794CD8 end:0x80794CE0
 
-Network/fn_8041A87C.cpp:
+Network/GameSpyInterfaceThread.cpp:
 	extab       start:0x8001CFF0 end:0x8001D16C
 	extabindex  start:0x8003D9BC end:0x8003DBD8
 	.text       start:0x8041A87C end:0x8041DF10

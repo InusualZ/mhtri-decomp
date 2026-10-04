@@ -1,13 +1,13 @@
 /*
  * include/Network/NetworkPat.h - the four-slot "*Pat" holder and the accessor family that walks it.
  *
- * Owner: `Network/NetworkPat.cpp` (`.text` 0x80419EC4..0x8041A194).  The record and the family moved
+ * Owner: `Network/NetworkPat.cpp` (`.text` 0x80419AD4..0x8041A194).  The record and the family moved
  * here with the `Network/network_pat_control.cpp` pass: a second unit needed the type, and a
  * declaration belongs with the unit that owns the symbol (docs/plan.md 6.5 rules 1 and 2).
  *
  * The holder's extent comes from this band's own evidence, not from the accessors: the constructor
- * `fn_80419AD4` (0x80419AD4, in the unclaimed range just below this unit's left seam) writes
- * `+0x10 = -1`, and the drive method `fn_80419CF0` reads that word as a four-bit per-slot enable mask
+ * `constructNetworkPat` (0x80419AD4, this unit's first function) writes
+ * `+0x10 = -1`, and the drive function `updateNetworkPat` reads that word as a four-bit per-slot enable mask
  * before dispatching each enabled slot at vtable `+0x18`.  The record is therefore **0x14** bytes,
  * four slot pointers plus the mask.
  *
@@ -40,6 +40,9 @@ class NetworkCommunityPat;
  * `NetworkLayer::NetworkLayer` (the root, which stores 0x805FB5D0) first. */
 class NetworkLayerPat;
 
+/* `sNetworkLibrary::init`'s parameter block (`Network/network_opening.h`). */
+struct sNetworkLibraryInitParam;
+
 typedef struct NetworkPat {
     /* +0x00 */ NetworkSessionManagerPat* sessionManager_00;
     /* +0x04 */ void* slot04_04;   /* never installed in this build - see `clearNetworkPatSlot04` */
@@ -51,6 +54,25 @@ typedef struct NetworkPat {
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* 0x80419AD4 / 0x80419B54 - the Pat holder's constructor (publishes it as `sNetworkPatInstance`, clears the
+ * four slots, enables all of them) and its deleting destructor. */
+struct NetworkPat* constructNetworkPat(struct NetworkPat* holder);
+struct NetworkPat* destroyNetworkPat(struct NetworkPat* holder, s16 flags);
+
+/* 0x80419BB4 - creates the library, runs its `init` and seeds the C random generator from its clock. */
+s32 initNetworkLibrary(struct NetworkPat* holder, struct sNetworkLibraryInitParam* param);
+
+/* 0x80419C2C / 0x80419E1C - the Pat holder reset and the session-manager slot delete. */
+void clearNetworkPat(struct NetworkPat* holder);
+
+/* 0x80419CF0 - the per-frame drive: the library clock, the mediator, the Pat interface, then every enabled slot. */
+void updateNetworkPat(struct NetworkPat* holder);
+
+void deleteNetworkSessionManagerPat(struct NetworkPat* holder, s32 index);
+
+/* 0x80419EA4 - installs the session-manager slot when it is empty (0), else -1. */
+s32 setNetworkSessionManagerPat(struct NetworkPat* holder, NetworkSessionManagerPat* value);
 
 /* Getters.  `index` is signed (`cmpwi r4,0`) and only 0 is accepted. */
 NetworkSessionManagerPat* getNetworkSessionManagerPat(NetworkPat* self, s32 index);

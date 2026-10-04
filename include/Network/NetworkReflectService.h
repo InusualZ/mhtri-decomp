@@ -11,7 +11,7 @@
 
 #include "types.h"
 
-/* the DWC event message `applyEvent` folds in (defined in `Network/fn_8041A87C.h`, beside its two views) */
+/* the DWC event message `applyEvent` folds in (defined in `Network/GameSpyInterfaceThread.h`, beside its two views) */
 union GameSpyEventMsg;
 
 /* One entry of the service's channel table (and of the channel list a DWC event carries). */
@@ -35,7 +35,7 @@ typedef void (*NetworkWiiMediatorReflectFn)(s32, s32, s32, s32, void*, void*);
  *     (retail's `lwz r12, 0(r3)` / `lwz r12, 8(r12)`) and allocates the object with `new` - 0x816C bytes,
  *     the allocation `reflectInit` makes - so the class carries the real virtual and the out-of-line
  *     constructor (the unit-level builder at 0x8041A1C4, `__ct__21NetworkReflectServiceFv`);
- *   - the GameSpy band (`Network/fn_8041A87C.cpp`) defines five of its members and addresses the fields
+ *   - the GameSpy band (`Network/GameSpyInterfaceThread.cpp`) defines five of its members and addresses the fields
  *     below.
  * The virtual is declared and never defined in either user, so no vtable is emitted there (the table
  * belongs to the unit that defines `finalize`). */

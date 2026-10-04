@@ -1,18 +1,21 @@
 /*
- * Network/constructNetworkLibrary.cpp - `sNetworkLibraryWii`, the Wii implementation of the network library
- * singleton, and the Pat holder's constructor/destructor/drive functions.
+ * Network/sNetworkLibraryWii.cpp - `sNetworkLibraryWii`, the Wii implementation of the network library
+ * singleton.
  *
- * `.text` 0x804189C8..0x80419EC4.  Sections: extab 0x8001CE4C..0x8001CF70; extabindex 0x8003D80C..0x8003D92C;
+ * `.text` 0x8041891C..0x80419AD4.  Sections: extab 0x8001CE1C..0x8001CF40; extabindex 0x8003D7DC..0x8003D8E4;
  * .data 0x80602AF8..0x80603118 (the log strings, then the class table 0x80603080); .sbss 0x80794CD0..0x80794CD8
  * (`sNetworkPatInstance`); .sdata2 0x8079C878..0x8079C888 (0.0f, 1e-6f, the u32->float bias).
+ *
+ * FILE NAME.  Registered as `constructNetworkLibrary.cpp` (the map stem of 0x804189C8, now
+ * `__ct__18sNetworkLibraryWiiFv`); renamed for the class the unit is.
  *
  * WHAT IT IS.  The log strings name the class (`sNetworkLibraryWii::init/final/start/stop`, and
  * `sNetworkLibrary::start/stop` for the shared messages); the table at 0x80603080 inherits the base's
  * non-pure slots (`setLogLevel`, the byte-order helpers, the calendar helpers) from `Network/network_opening.cpp`,
  * whose table 0x80602A60 is the base `sNetworkLibrary`'s.  Every method and field name is a GUESS from the
  * body and the strings; the SDK calls are named from the strings next to them (`SOInit`, `SOFinish`,
- * `SOStartup`, `SOCleanup`, `DWC_Init`).  Order: ctor, dtor, the table's own slots, the three worker-thread
- * bodies, `start`, `stop`, the clock and address slots, the three factories, then the Pat holder family.
+ * `SOStartup`, `SOCleanup`, `DWC_Init`).  Order: the three worker-thread entry points,
+ * `constructNetworkWiiMediator`, ctor, dtor, the table's own slots, the three worker-thread bodies, `start`, `stop`, the clock and address slots, the three factories.
  *
  * MPMEDIATOR (first item of the pilot brief).  `mpMediator__15sNetworkLibrary` (.sbss 0x80794CC4) is a
  * static member of the *base* class (its mangling says so), like its neighbours 0x80794CC0 (`mpInstance`,
@@ -22,13 +25,18 @@
  * `final`; `getInstance` in `sound/snd_stream_reloc.cpp` (0x800E89D8) is the header-inline accessor
  * instantiated in the first TU that used it, not a misplaced definition.
  *
- * BOUNDARY (residual, reported).  The `.data` order seam (base table 0x80602A60 followed by this unit's
- * strings, `tudiscover`) puts this TU's start in 0x80417CC4..0x804189C8; the three worker-thread entry points
- * 0x8041891C/0x80418940/0x80418964 (`network_opening`) and `constructNetworkWiiMediator` 0x80418988 call only
- * into this class, so the real seam is probably 0x8041891C.  And the Pat holder family 0x80419AD4..0x80419EC4
- * is `NetworkPat`'s (constructor, destructor, drive), most likely the head of `Network/NetworkPat.cpp`.
+ * BOUNDARY.  The `.data` order seam (base table 0x80602A60 followed by this unit's strings, `tudiscover`) puts
+ * this TU's start in 0x80417C44..0x80418A60; the three worker-thread entry points 0x8041891C/0x80418940/0x80418964
+ * and `constructNetworkWiiMediator` 0x80418988 call only into this class, so the left seam is 0x8041891C (moved
+ * here from `network_opening` and from the retired one-function unit `constructNetworkWiiMediator.cpp`, which
+ * was byte-identical in `.text`/`extab`/`extabindex`: its extab record is the one a real `new` emits, with
+ * `__dl__FPv` as the cleanup).  The right seam is 0x80419AD4: the class's last table slot (`resume`, 0x80419AD0)
+ * closes it, and the Pat holder family above it (constructor, destructor, drive) moved to `Network/NetworkPat.cpp`.
+ * The `.sbss` word 0x80794CD0 (`sNetworkPatInstance`) is written only by that family and read by `getPatsObject`,
+ * so it is probably the Pat TU's too; it stays claimed and defined here because `NetworkPat` is `Matching` and
+ * its object would emit 4 B of the 8-byte claim (`flipcheck`: `.sbss` 0x4 against 0x8, the next TU's alignment).
  *
- * FLAGS.  `-O3` in place of the lib's `-O4,p` (configure.py, with the numbers).  File scope:
+ * FLAGS.  `-O3` and `-inline noauto` in place of the lib's `-O4,p`/`-inline auto` (configure.py, with the numbers).  File scope:
  * `#pragma peephole off` (retail keeps `extsh`+`cmpwi` on the `s16` delete flags and reloads the table word
  * through r3 before each virtual call: dtor 92.55 -> 100, updateNetworkPat 94.40 -> 100) and
  * `#pragma pool_data off` (every string is its own `lis`/`addi`: init 93.58 -> 100, start 91.31 -> 97.32, then 100 with the shared retry tail);
@@ -49,7 +57,7 @@
  * (trailing alignment words); `extab`/`extabindex` short by the three records above.
  */
 #include "types.h"
-#include "Network/constructNetworkLibrary.h"
+#include "Network/sNetworkLibraryWii.h"
 #include "Network/NetworkWiiMediator.h"
 #include "Network/network_pat_control.h"   /* NetworkFileFetcher */
 #include "Network/network_transport_types.h"   /* NetworkResolverWii */
@@ -59,7 +67,6 @@
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
 #include "sys_mem.h"
-#include "Network/constructNetworkWiiMediator.h"
 #include "Network/PatInterface.h"
 #include "Network/NetworkCommunityPat.h"   /* constructNetworkSocket, constructNetworkFetcherKind2 */
 #include "SO/soi.h"                        /* SOInit, SOFinish, SOStartup, SOCleanup, SOGetHostID */
@@ -68,18 +75,6 @@
 #include "MSL_C/alloc.h"                   /* srand */
 #include "NAND/nand.h"                     /* OSGetTick, OSGetTime */
 
-/* The protocol every Pat holder slot's element follows (its own band emits the table): the deleting
- * destructor at +0x08, the release hook at +0x14 and the per-frame drive at +0x18.  Declared, never
- * defined, so no table is emitted here (rule 10). */
-class NetworkPatSlotDriver {
-public:
-    /* +0x08 */ virtual ~NetworkPatSlotDriver();
-    /* +0x0C */ virtual void pad_0C();
-    /* +0x10 */ virtual void pad_10();
-    /* +0x14 */ virtual void release();
-    /* +0x18 */ virtual void drive();
-};   /* size: 0x04 (the object's leading table word) */
-
 /* The OS bus clock, read out of the low-memory arena (the SDK's `OS_BUS_CLOCK`). */
 #define NETWORK_BUS_CLOCK (*(u32*)0x800000F8)
 #define NETWORK_TICKS_TO_USEC(ticks) (((ticks) * 8) / ((NETWORK_BUS_CLOCK / 4) / 125000))
@@ -87,8 +82,35 @@ public:
 #pragma peephole off
 #pragma pool_data off
 
-/* The Pat holder the constructor publishes. */
+/* The Pat holder `constructNetworkPat` (`Network/NetworkPat.cpp`) publishes; see BOUNDARY. */
 NetworkPat* sNetworkPatInstance;
+
+/* untyped: caller-owned payload - the thread argument */
+void* networkLibrarySOStartupThread(void* library)
+{
+    ((sNetworkLibraryWii*)library)->runSOStartup();
+    return NULL;
+}
+
+/* untyped: caller-owned payload - the thread argument */
+void* networkLibrarySOCleanupThread(void* library)
+{
+    ((sNetworkLibraryWii*)library)->runSOCleanup();
+    return NULL;
+}
+
+/* untyped: caller-owned payload - the thread argument */
+void* networkLibraryDwcInitThread(void* library)
+{
+    ((sNetworkLibraryWii*)library)->runDwcInit();
+    return NULL;
+}
+
+/* Creates the Wii network library and publishes it as the singleton. */
+void constructNetworkWiiMediator(void)
+{
+    sNetworkLibrary::mpInstance = new sNetworkLibraryWii();
+}
 
 /* Clears the run state, the clock and both address tables. */
 sNetworkLibraryWii::sNetworkLibraryWii()
@@ -526,110 +548,4 @@ NetworkFileFetcher* sNetworkLibraryWii::createFetcher(u32 kind)
 
 void sNetworkLibraryWii::resume()
 {
-}
-
-extern "C" {
-
-NetworkPat* constructNetworkPat(NetworkPat* holder)
-{
-    sNetworkPatInstance = holder;
-    holder->installed_10 = -1;
-    registerNetworkObject(holder, 1);
-    memset(&holder->sessionManager_00, 0, sizeof(holder->sessionManager_00));
-    memset(&holder->slot04_04, 0, sizeof(holder->slot04_04));
-    memset(&holder->community_08, 0, sizeof(holder->community_08));
-    memset(&holder->layer_0C, 0, sizeof(holder->layer_0C));
-    return holder;
-}
-
-NetworkPat* destroyNetworkPat(NetworkPat* holder, s16 flags)
-{
-    if (holder != NULL) {
-        clearNetworkPat(holder);
-        sNetworkPatInstance = NULL;
-        if (flags > 0) {
-            operator delete(holder);
-        }
-    }
-    return holder;
-}
-
-s32 initNetworkLibrary(NetworkPat* holder, sNetworkLibraryInitParam* param)
-{
-    constructNetworkWiiMediator();
-    if (((sNetworkLibrary*)getNetworkLogger())->init(param) < 0) {
-        return -1;
-    }
-    srand((u32)((sNetworkLibrary*)getNetworkLogger())->getTime(0));
-    return 0;
-}
-
-void clearNetworkPat(NetworkPat* holder)
-{
-    if (holder->sessionManager_00 != NULL) {
-        deleteNetworkSessionManagerPat(holder, 0);
-    }
-    if (holder->slot04_04 != NULL) {
-        deleteNetworkPatSlot04(holder, 0);
-    }
-    if (holder->community_08 != NULL) {
-        deleteNetworkCommunityPat(holder, 0);
-    }
-    if (holder->layer_0C != NULL) {
-        deleteNetworkLayerPat(holder, 0);
-    }
-    if (getNetworkLogger() != NULL) {
-        ((sNetworkLibrary*)getNetworkLogger())->final();
-        delete (sNetworkLibrary*)getNetworkLogger();
-    }
-}
-
-void updateNetworkPat(NetworkPat* holder)
-{
-    if (getNetworkLogger() != NULL) {
-        ((sNetworkLibrary*)getNetworkLogger())->updateTime();
-    }
-    if (getInstance() != NULL) {
-        ((NetworkWiiMediatorDispatch*)getInstance())->update();
-    }
-    if (getInstance_() != NULL) {
-        stepPatInterface(getInstance_());
-    }
-    if ((holder->installed_10 & 1) && holder->sessionManager_00 != NULL) {
-        ((NetworkPatSlotDriver*)holder->sessionManager_00)->drive();
-    }
-    if ((holder->installed_10 & 2) && holder->slot04_04 != NULL) {
-        ((NetworkPatSlotDriver*)holder->slot04_04)->drive();
-    }
-    if ((holder->installed_10 & 4) && holder->community_08 != NULL) {
-        ((NetworkPatSlotDriver*)holder->community_08)->drive();
-    }
-    if ((holder->installed_10 & 8) && holder->layer_0C != NULL) {
-        ((NetworkPatSlotDriver*)holder->layer_0C)->drive();
-    }
-}
-
-void deleteNetworkSessionManagerPat(NetworkPat* holder, s32 index)
-{
-    NetworkPatSlotDriver* entry;
-
-    if (index == 0) {
-        entry = (NetworkPatSlotDriver*)(&holder->sessionManager_00)[index];
-        if (entry != NULL) {
-            entry->release();
-            clearNetworkSessionManagerPat(holder, (NetworkSessionManagerPat*)entry);
-            delete entry;
-        }
-    }
-}
-
-s32 setNetworkSessionManagerPat(NetworkPat* holder, NetworkSessionManagerPat* value)
-{
-    if (holder->sessionManager_00 == NULL) {
-        holder->sessionManager_00 = value;
-        return 0;
-    }
-    return -1;
-}
-
 }

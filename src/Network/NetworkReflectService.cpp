@@ -12,7 +12,7 @@
  * `stepReflectServiceStart`, `reflectServiceEventCallback`, `sNetworkReflectService`) are GUESSES from the
  * bodies.  The log string says `ReflectInterface::start()`, so the retail class name may differ.
  *
- * BOUNDARY (residual, reported).  This range and `Network/fn_8041A87C.cpp` are one TU: the class's remaining
+ * BOUNDARY (residual, reported).  This range and `Network/GameSpyInterfaceThread.cpp` are one TU: the class's remaining
  * methods (`updateCallbackStep`, `dispatchTask`, `runSearch`, `runConnect`, `applyEvent`) open the neighbour,
  * and the class's table 0x80603190 sits in the neighbour's `.data` after this unit's string - the layout one
  * object gives when the destructor here is the key function.

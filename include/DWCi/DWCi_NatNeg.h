@@ -76,7 +76,7 @@ extern char DWCi_natNegHostFormat[6];
 /* 0x80794380 - the NATNEG message signature every announce opens with and every received datagram is
  * compared against.  Deliberately *unsized* here: a sized array reaches the symbol SDA21 while an
  * unsized one reaches it ADDR16_HA/LO (`lis`/`addi`), and the two consumers' target objects need the
- * two forms - `src/Network/fn_8041A87C.cpp` is ADDR16 throughout, and it sees only this header (via
+ * two forms - `src/Network/GameSpyInterfaceThread.cpp` is ADDR16 throughout, and it sees only this header (via
  * `include/unsplit/Network.h`), so this is the form the shared declaration has to carry.  The unit's
  * own source re-declares it sized before its first use, for the target's ten SDA21 sites (the first
  * use of a symbol fixes its addressing for the whole translation unit - playbook row 12, the reloc
@@ -151,7 +151,7 @@ extern void (*DWCi_natNegPollCallback)(u32, struct DWCiNatNegSession*);
 
 /* 0x80794380 is declared **once**, above, as `natNegMessageMagic`, and unsized on purpose: an unknown-
  * size array is the shape that gets the `lis`/`addi` (ADDR16_HA/LO) pair the target's relocation asks for,
- * so sizing it would move `Network/fn_8041A87C.cpp`'s codegen.  It moved here from
+ * so sizing it would move `Network/GameSpyInterfaceThread.cpp`'s codegen.  It moved here from
  * `include/unsplit/Network.h`, which had declared it while the range was unowned; the band reaches it by
  * including this header (rule 2). */
 #ifdef __cplusplus

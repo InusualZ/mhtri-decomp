@@ -18,7 +18,7 @@
    through this include - a band header that still declared them would collide with the owner's
    definitions (docs/plan.md 6.5 rule 2). */
 #include "Network/network_transport.h"
-#include "Network/constructNetworkLibrary.h"
+#include "Network/sNetworkLibraryWii.h"
 #include "DWCi/dwc_nasfunc.h"
 #include "DWCi/dwc_error.h"
 #include "Network/net_session_close.h"
@@ -92,7 +92,7 @@ typedef struct NetworkPostedError {
 } NetworkPostedError;   /* size: 0x0C */
 
 /* The same object dispatched as a real virtual: the `postError` sites of
- * `fn_8041A87C.cpp` pass the record by value, and that is retail's `lwz r12, 0x0(r3)` /
+ * `GameSpyInterfaceThread.cpp` pass the record by value, and that is retail's `lwz r12, 0x0(r3)` /
  * `lwz r12, 0x288(r12)` shape - the struct view above stages the table through a scratch register
  * instead.  The slot is 161 declared virtuals in, so the unnamed ones consume the table; none is
  * defined and MWCC emits no table of its own (rule 10). */
@@ -338,8 +338,8 @@ extern u32 lbl_80603740[];
 
 /* Three declarations that used to stand here are owned now, so each lives in its OWNER's header and is
  * reached through this band by including it (section 6.5 rule 2, 2026-09-28): `sGameSpySocket` and
- * `sGameSpyInterfaceThread` by `Network/fn_8041A87C.cpp`, whose `splits.txt` claims
- * `.sbss:0x80794CE0..0x80794CE8` - they are declared in `include/Network/fn_8041A87C.h`, the header of
+ * `sGameSpyInterfaceThread` by `Network/GameSpyInterfaceThread.cpp`, whose `splits.txt` claims
+ * `.sbss:0x80794CE0..0x80794CE8` - they are declared in `include/Network/GameSpyInterfaceThread.h`, the header of
  * the unit that defines them - and `natNegMessageMagic` by `DWCi/DWCi_NatNeg.c`, whose `.sdata` run
  * 0x80794368..0x807943A0 covers it (declared in `include/DWCi/DWCi_NatNeg.h`, included at the top of
  * this band).  A band header that still declared them would collide with the owners' definitions.

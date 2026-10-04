@@ -15,11 +15,11 @@
  *     where the target allocates 0xD640 (`lis r3,0x1` / `subi r3,r3,0x29c0`); its virtual is named
  *     `destroy(u32)` where the owner's is `finalize(s32)` (the same +0x08 slot), and it adds
  *     `static getInstance()`.
- *   - `GameSpyInterfaceThread` (owner header `Network/GameSpyInterfaceThread.h`, 0x44A0 bytes): no
+ *   - `GameSpyInterfaceThread` (owner header `Network/gamespy_interface_types.h`, 0x44A0 bytes): no
  *     fields, so `new GameSpyInterfaceThread()` allocates 4 where the target allocates 0x44A0
  *     (`li r3,0x44a0`); `destroy(u32)` stands for the owner's virtual destructor, and `canClose`
  *     (void vs s32) and `requestClose` (bool vs u8) return different types.
- *   - `NetworkErrorInfo` (owner `Network/GameSpyInterfaceThread.h`: `s32 code_00, param1_04, param2_08,
+ *   - `NetworkErrorInfo` (owner `Network/gamespy_interface_types.h`: `s32 code_00, param1_04, param2_08,
  *     reported_0C`): this view's words are `u32` and named `value_00, code_04, extra_08, pad_0C`, so
  *     `NetworkSessionManagerPat::move` compares +0x04 with `cmplwi` where the target has `cmpwi r0,75`.
  *   - `PatInterface_clear`/`PatInterface_isReady` take the singleton in r3 (`Network/PatInterface.h`);
@@ -30,7 +30,7 @@
 #define MHTRI_NETWORK_SESSION_MEDIATOR_VIEWS_H
 
 #include "types.h"
-#include "Network/sGameSpyInterfaceThread.h"   /* sGameSpyInterfaceThread - owner Network/fn_8041A87C.cpp */
+#include "Network/sGameSpyInterfaceThread.h"   /* sGameSpyInterfaceThread - owner Network/GameSpyInterfaceThread.cpp */
 
 /* the Pat interface singletons the Pat methods build on demand (another band) */
 class PatInterface {

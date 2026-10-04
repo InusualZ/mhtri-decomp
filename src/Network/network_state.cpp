@@ -71,7 +71,7 @@
  * map's existing `getSomethingN` scheme), `dispatchSessionHandlers` (0x8041233C, walks the session's
  * eight handler slots), `setConnectionPaths` (0x80416320), `getInstance` (0x800E89D8, dump name - the
  * mediator singleton getter, **owned by `src/sound/fn_800E46E8.cpp`**, whose declaration and
- * `Network/fn_8041A87C.h`'s were updated in the same change) and the six sub-state predicates
+ * `Network/GameSpyInterfaceThread.h`'s were updated in the same change) and the six sub-state predicates
  * `isSubState_8254_3`/`isSubState_894F_2..6` (named for the field and value each tests).  The five
  * `lbl_` rows were named from their content and use: `sessionTimeoutParam`/`sessionTimeoutParam2`
  * (0x8079C7D8/DDA = the bytes {1,2,3}), `requestHeaderWord0`/`requestHeaderWord1` (0x8079C7E0/E4 =
@@ -115,7 +115,7 @@
  *    mask survives only where the operand comes from memory (see `sendReqLoginInfo`) or is a
  *    `u8`-typed conversion the optimizer cannot see through; (b) the vcall's vptr load - retail's
  *    `lwz r12,0(r3)` + `lwz r12,0x288(r12)` is the genuine-virtual shape while our table view stages
- *    it through a scratch register (`lwz r5,0(r27)`), and the sibling `Network/fn_8041A87C.cpp` gets
+ *    it through a scratch register (`lwz r5,0(r27)`), and the sibling `Network/GameSpyInterfaceThread.cpp` gets
  *    the r12 form from the same table view, so it is allocator choice, not the declaration.  Two
  *    measured shapes are landed: `count` declared *before* `found`, and the index/increment pair
  *    written `count = count + 1; tags[count - 1] = N;` rather than `tags[count] = N; count++;`.

@@ -130,7 +130,7 @@
 #include "mh3_pad.h"                     /* setSoftresetFlag - owner mh3_pad.cpp */
 #include "sys_mem.h"                     /* operator new - owner sys_mem.cpp */
 
-#include "Network/constructNetworkLibrary.h"   /* initNetworkLibrary / updateNetworkPat / setNetworkSessionManagerPat (rule 2) */
+#include "Network/sNetworkLibraryWii.h"   /* sNetworkLibraryInitParam (the Pat holder family is in Network/NetworkPat.h) */
 #include "Network/network_opening.h"   /* the mediator's terms and transfer-state setters - owner Network/network_opening.cpp */
 #include "OS/FindContainHeap_.h"       /* the expandable-heap API - owner OS/FindContainHeap_.c */
 #include "NAND/nand.h"                 /* OSReport - owner NAND/nand.c */

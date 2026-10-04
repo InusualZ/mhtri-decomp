@@ -19,7 +19,7 @@ void LockMutex(void* mutex);
 /* untyped: opaque handle passed through - only the peer band owns the mutex layout */
 void UnlockMutex(void* mutex);
 /* untyped: opaque handle passed through - the peer the caller already holds */
-u32 getSomething5(void* self);
+u32 getNetworkBinaryState(void* self);
 void NetworkSessionStable_setNotifyValue(u32 value);
 }
 
