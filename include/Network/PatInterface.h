@@ -9,10 +9,6 @@
  * spelling is the bodies' pass.  Moved here from `include/unsplit/Network.h`,
  * `include/Network/network_state.h` and `src/Network/NetworkWiiMediator.cpp` (docs/plan.md 6.5 rule 2:
  * the owner declares).
- *
- * One signature disagreement is left at its consumer: `include/Network/session_mediator_views.h` keeps
- * the no-argument `PatInterface_clear`/`PatInterface_isReady` the Pat session units call (the target
- * passes the singleton there too; spelling it changes those units' code - see that header).
  */
 #ifndef MHTRI_NETWORK_PATINTERFACE_H
 #define MHTRI_NETWORK_PATINTERFACE_H
@@ -20,8 +16,11 @@
 #include "types.h"
 #include "Network/sNetworkLibrary.h"   /* sNetworkLibraryError - the error triple `reportPatError` takes */
 
+struct NetworkErrorInfo;
+
 typedef struct NetworkInstance NetworkInstance;           /* include/unsplit/Network.h */
 typedef struct NetworkStateMachine NetworkStateMachine;   /* include/Network/network_state.h */
+typedef struct NetworkFmpSlot NetworkFmpSlot;             /* include/Network/network_state.h */
 
 /* The network singleton (`getInstance_` returns it).  Moved here from the mediator band
  * (`Network/NetworkWiiMediator.cpp`), which allocates it with `new` - 0xD640 bytes, the allocation
@@ -30,9 +29,7 @@ typedef struct NetworkStateMachine NetworkStateMachine;   /* include/Network/net
  * evidenced so far: the bands reach the record through the C accessors below.  The constructor is out of line
  * (`__ct__12PatInterfaceFv`, 0x803FCC34), the virtual is declared and not defined here, so no table is
  * emitted by a consumer.
- *
- * NOT YET THE ONLY VIEW: `include/Network/session_mediator_views.h` carries the Pat session units'
- * interim view (no fields, so `sizeof` is 4) - unifying it changes those units' code, recorded there. */
+ */
 class PatInterface {
 public:
     PatInterface();
@@ -83,7 +80,8 @@ void setConnectServerType(NetworkInstance* self, s32 type);
 s32 hasMultipleRefs60d4(NetworkInstance* self);
 /* untyped: caller-owned payload - the 0x208-byte error record copied in when non-null */
 s32 errorRecordCode613c(NetworkInstance* self, const void* record);
-void getErrorInfo654c(NetworkInstance* self, u32* info);
+/* 0x803FD794 - copies the kept error triple (+0x654C) out when `info` is non-null and returns its first word (the error code, 0 when none is kept). */
+s32 getErrorInfo654c(NetworkInstance* self, u32* info);
 
 /* 0x803768F8-band clock: the network singleton's game time (GUESS: the caller passes the singleton). */
 u32 getGameTime(NetworkInstance* self);
@@ -136,6 +134,34 @@ u32 getFmpSlotIndex(NetworkStateMachine* self, u32 value);
 u8*  createStack(NetworkStateMachine* self, u32 size, u32* outSize);
 void growStackSize(NetworkStateMachine* self, u32 size);
 void chooseServerAddress(NetworkStateMachine* self, u32 a, u32 b);
+
+/* 0x803FD674 */
+void clearErrorRecord613c(NetworkInstance* self);
+/* 0x803FD6D8 */
+void buildErrorInfo613c(NetworkInstance* self, u32 code, NetworkErrorInfo* out);
+/* 0x803FD7BC */
+void getErrorInfoOrCode654c(NetworkInstance* self, u32 code, NetworkErrorInfo* out);
+/* 0x803FDC80 - 1 when the +0x611B flag is already set, else sets it and returns 0 (GUESS name: a test-and-set
+ * in the scheme of `set611b`; the circle list query retries until it returns 0). */
+s32 testAndSet611b(NetworkInstance* self);
+/* 0x803FDCA4 */
+void set611b(NetworkInstance* self);
+/* 0x803FDE10 - the selection word +0x65F0 (0..3) and its table entry at +0x65F4; both -1 when out of range
+ * (GUESS name). */
+void getFmpSelection(NetworkInstance* self, s32* kind, s32* index);
+/* 0x803FDECC */
+s32 getServerDateTime(NetworkInstance* self);
+/* 0x803FDF24 - copies FMP slot `index` (0x40 bytes at +0x6C40) to `out`: -1 for a null `out`, -2 out of
+ * range, else `index` (GUESS name). */
+void copyFmpSlot(NetworkInstance* self, NetworkFmpSlot* out, s32 index);
+/* 0x803FE470 */
+void getSelectedID(NetworkInstance* self, u8* out);
+/* 0x803FE488 */
+void getSelectedHunterName(NetworkInstance* self, char* out);
+/* 0x803FE4A0 */
+void setSomething(NetworkInstance* self, s32 value);
+/* 0x803FE4A8 */
+s8 getSomething4(NetworkInstance* self);
 
 #ifdef __cplusplus
 }

@@ -893,7 +893,7 @@ s32 GameSpyInterfaceThread::initialize()
 }
 
 /* Reports whether a close is already pending, arming the step flag if so. */
-u8 GameSpyInterfaceThread::requestClose()
+bool GameSpyInterfaceThread::requestClose()
 {
     if (closePending_123 != 0 || cancelPending_122 != 0) {
         stepRequested_126 = 1;

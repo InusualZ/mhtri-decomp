@@ -122,7 +122,7 @@ typedef struct NetworkSmallObjectVtable {
 
 typedef struct NetworkSmallObject {
     NetworkSmallObjectVtable* vtable;   /* +0x00 */
-    u8 pad_04[0x0C];                    /* +0x04..+0x0F */
-} NetworkSmallObject;   /* size: 0x10 (approximation - only the +0x18 dispatch is evidenced) */
+    u8 pad_04[0x1C];                    /* +0x04..+0x1F */
+} NetworkSmallObject;   /* size: 0x20 - every record that embeds it leaves 0x20 bytes before its next field, and the Pat manager's stack copies need 0x20 for retail's frames */
 
 #endif /* NETWORK_NETWORK_WRITER_TYPES_H */

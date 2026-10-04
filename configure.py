@@ -2550,7 +2550,10 @@ config.libs = [
             # extent and the 1.0f circle-info interval at 0x8079C758.  Same game-root `main` lib and
             # cflags_main as its link neighbours (the object carries extab/extabindex for the rest of
             # the band, and C++ virtual dispatch).
-            Object(NonMatching, "Network/NetworkSessionManagerPat.cpp"),
+            # `-pool off` (playbook 43): the layer id helpers address each of their three warning strings with
+            # their own lis/addi; with pooling on they share one base (NetworkLayerIdImportFrom 79.47 -> 99.47,
+            # NetworkLayerIdExportTo 79.64 -> 99.32 with the flag; no other row of the unit moves).
+            Object(NonMatching, "Network/NetworkSessionManagerPat.cpp", extra_cflags=["-pool off"]),
             # Phase 4 (docs/splits/phase4, window fg): the HOME-button (HBM) code in link order.  The units from 0x8052A040 to
             # 0x80542D8C are stubs; the keyboard units absorb the former fn_805482CC / homebutton/fn_8054E894 / fn_80555374 /
             # keyboard_ui / keyboard / gui / tiHKBManager sources (their evidence is in the unit and header comments).

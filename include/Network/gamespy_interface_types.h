@@ -11,9 +11,9 @@
  * `initializeNetworkMediator` and the Pat session manager's constructor); the field run ends at +0x4499
  * under `#pragma pack(1)`, so the tail is padding.
  *
- * NOT YET THE ONLY VIEW: `include/Network/session_mediator_views.h` carries the Pat session units'
- * interim view (no fields, so `sizeof` is 4, and member return types that differ) - unifying it changes
- * those units' code, recorded there.
+ * The one view: the Pat session units' former interim view of this class and its record is folded in - the error
+ * record is 12 bytes (a 0x10 record lowers 10 Pat rows, measured), `requestClose` returns `bool` (a `u8` makes both
+ * callers re-extend it) and `started_120` is the `bool` it returns.
  */
 #ifndef MHTRI_NETWORK_GAMESPY_INTERFACE_TYPES_H
 #define MHTRI_NETWORK_GAMESPY_INTERFACE_TYPES_H
@@ -37,12 +37,14 @@ typedef struct DWCSvlResult {
     /* +0x172 */ u8   pad_172[0x02];
 } DWCSvlResult;
 
+/* The error triple `GameSpyInterfaceThread::getErrorStruct` fills (three words) and the Pat band copies and
+ * forwards: +0x04 is compared with 75 signed.  size: 0xC - `NetworkSessionManagerPat::move`'s frame gives the record
+ * 12 bytes (0x14..0x20). */
 typedef struct NetworkErrorInfo {
     /* +0x00 */ s32 code_00;
     /* +0x04 */ s32 param1_04;
     /* +0x08 */ s32 param2_08;
-    /* +0x0C */ s32 reported_0C;
-} NetworkErrorInfo;   /* size: 0x10 */
+} NetworkErrorInfo;
 
 /* The worker thread object.  The pool's own logs spell its methods `NetworkGameSpyInterface::<method>`, but
  * the map's names (`__ct__22GameSpyInterfaceThreadFv`, `GameSpyInterfaceThreadInit`) say `GameSpyInterfaceThread`
@@ -100,7 +102,7 @@ public:
     /* +0x011D */ u8  idByte_11D;
     /* +0x011E */ u8  idByte_11E;
     /* +0x011F */ u8  idByte_11F;
-    /* +0x0120 */ u8  started_120;
+    /* +0x0120 */ bool started_120;      /* `requestClose` returns it as its bool result */
     /* +0x0121 */ u8  stopRequested_121;
     /* +0x0122 */ u8  cancelPending_122;
     /* +0x0123 */ u8  closePending_123;
@@ -154,7 +156,7 @@ public:
     /* ticks the GameSpy clock and counts one more frame */
     s32   updateClock();
     /* reports whether a close is already pending, arming the step flag if so */
-    u8    requestClose();
+    bool  requestClose();
     /* returns the interface phase */
     s32   getPhase();
     /* returns the running state, or -1 while the interface is not running */

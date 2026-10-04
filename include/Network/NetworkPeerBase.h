@@ -14,7 +14,7 @@
 #include "Network/network_writer_types.h"
 
 /* The small transport object seen as a stream sink (GUESS on the name: retail's small object is the writer band's
-   `NetworkSmallObject`, a 0x10-byte record with the sink's layout).  Its deleting destructor is the
+   `NetworkSmallObject`, a 0x20-byte record with the sink's layout).  Its deleting destructor is the
    compiler-emitted `__dt__22NetworkSmallObjectSinkFv`: it runs the sink's destructor with in-charge flag 0, frees
    on request and stores no table (the key function `clear` is defined in the writer band, so none is emitted). */
 class NetworkSmallObjectSink : public NetworkStreamSink {

@@ -148,9 +148,11 @@ public:
 
 /* What the Tcp and Udp users share: a vptr word and the socket they were opened on at +0x04.  Size
    evidence: `NetworkSingleTcp::open` copies the connection's address to +0x08 (`memcpy(&address_08, ..)`),
-   so the base ends there; nothing reads the +0x00 word, which is why it stays `unused_`. */
+   so the base ends there.  The +0x00 word is the vptr: `networkPatReleaseBuffer` (0x803DE948) deletes the Tcp
+   connection and the Udp socket through slot +0x08 with r4 = 1 (`delete p`), so the base declares the virtual
+   destructor; it is defined nowhere in our source, so no table is emitted (rule 10). */
 struct NetworkSocketUser {
-    void* unused_00;                 /* +0x00 */
+    /* +0x08 */ virtual ~NetworkSocketUser();
     NetworkSocketHandle* handle_04;  /* +0x04 - the socket the user owns */
 };   /* size: 0x08 */
 
@@ -168,6 +170,7 @@ struct NetworkSingleTcp : public NetworkSocketUser {
     u8  recv_20[0x2400];             /* +0x20..+0x241F */
     u32 recvUsed_2420;               /* +0x2420 - bytes received */
 
+    /* +0x08 */ virtual ~NetworkSingleTcp();
     void disconnect();
     void move();
     s32 open(const NetworkPeerAddress* address);
@@ -197,6 +200,7 @@ struct NetworkMultipleUdp : public NetworkSocketUser {
     u8  pad_63C2[0x02];              /* +0x63C2..+0x63C3 */
     s32 used_63C4[4];                /* +0x63C4..+0x63D3 - bytes queued per peer */
 
+    /* +0x08 */ virtual ~NetworkMultipleUdp();
     void disconnect();
     void move();
     void release();

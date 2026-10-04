@@ -5,8 +5,8 @@
  * PHASE 4 FOLD (docs/splits/phase4, window e).  The unit is now the candidate range 0x803D70B8..0x803E44C8: it also
  * holds `initNetworkSessionStable` (0x803DEA30..0x803DEB38), absorbed from the former Matching unit
  * `Network/initNetworkSessionStable.cpp` (second header below).  That unit was built with `cflags_network` minus
- * `-O4,p` plus `-O3`; this row keeps the survivor's `cflags_main`, so the merged unit is `NonMatching`.  The rest of
- * the range's text (53452 B) is unwritten.
+ * `-O4,p` plus `-O3`; this row keeps the survivor's `cflags_main`, so the merged unit is `NonMatching`.  What is
+ * still unwritten is listed under (8).
  *
  * WHY THIS UNIT EXISTS.  MWCC emits a class's vtable in the translation unit that defines the class's
  * **key function** - the first non-inline, non-pure virtual declared in the class - and
@@ -38,7 +38,7 @@
  * 0x803DE56C/0x803DE5F4, 0x803DEF38..0x803DF178 - 20,068 B), so each declaration's name and parameter
  * list is a reconstruction from that body: `handleCircleJoin` calls `sendReqCircleJoin`,
  * `getCircleInfoCount` is `lwz r3,0xAF0(r3)`, the 21 request handlers read their argument as a
- * `NetworkRequest*` and call `NetworkRequest_getArgument`.  Where a body identifies nothing, the name is
+ * `NetworkRequest*` and call `NetworkRequest::getArgument`.  Where a body identifies nothing, the name is
  * the vtable offset it fills (`slot_068`), which is this class's own scheme (`slot_13C` in the base).
  * The map rows carry those mangled spellings because the TARGET object's relocation name is generated
  * from the map: the pairing is the declaration's, so a later pass that refines a name refines the map
@@ -94,15 +94,40 @@
  * received `PatCircleInfo` block, the players from the reflection handlers; names are GUESSES from the bodies
  * (`setCircleInfo`/`addCircleInfo`/`removeCircleInfo`, `resetPlayerRecord`/`addPlayerRecord`/
  * `removePlayerRecord`/`updatePlayerRecord`, `packCircleOptions`; `postEvent`'s fifth argument is a per-event
- * payload - an error record, an index or a state byte).  Residuals: the address object is 0x20 B but the
- * shared `NetworkSmallObject` type is 0x10 B, so `updatePlayerRecord`'s and `slot_1C4`'s stack copy gets a
- * 0x30 frame where retail's is 0x40; `setCircleInfo` compares the option's enable byte with `cmplwi` where retail has
- * `cmpwi` (u8, s8 and bool spellings tried); `packCircleOptions` addresses the name entries from the list
+ * payload - an error record, an index or a state byte).  Residuals: the stack copies need the full 0x20-byte
+ * `NetworkSmallObject`, which gives `slot_1C4` retail's 0x40 frame (100 %); `setCircleInfo` compares the option's
+ * enable byte with `cmplwi` where retail has `cmpwi` (u8, s8 and bool spellings tried); `packCircleOptions` addresses the name entries from the list
  * base where retail strength-reduces a pointer at +0x08 (the explicit pointer spelling swaps two registers,
  * 96.16 vs 98.32).
  * SEAM (not ours to move - pilot rule 5, filed as a request): `datagap.py` reads the claimed `.data` as at least
  * three TUs (seams in [0x805FB2B8, 0x805FB5D0) and [0x805FB718, 0x805FC1E0)): this manager, `NetworkLayer`
  * (`.text` from 0x803DF2EC) and `NetworkLayerPat` (from its constructor 0x803E0C18).
+ * (8) Request handlers and callbacks (pilot L2, round 2, 0x803D72F4..0x803DF2EC).  Every handler is the same state
+ *   machine over `NetworkRequest::state_00` (0 start, its own wait steps, 100 cancelled, 110 failed = also event 3);
+ *   `requestFlags_30C[i]` / `requestIds_360[i]` are the reply bits and request ids of request slot i, which the
+ *   server message callback `networkSessionReflect1` sets.  Names: `moveStartSession` and `matchPhase_66C` are its
+ *   own log string's ("moveStartSession::mMatchPhase(0) NG"); `handleCircleLeave` (was `handleCircleMatchEndInfo`),
+ *   the chat, leave and log helpers and every message record view are GUESSES from the bodies.  Lever found here:
+ *   `32 <= id` keeps retail's two signed compares where `id >= 32` merges them into one `cmplwi` (also in
+ *   `Network/NetworkSessionStable.cpp`); `-(!x)` gives retail's `cntlzw`/`srwi`/`neg` where `-(x == 0)` gives `extrwi`.
+ *   Residuals (measured): `updateSession` is 100 since `config.yml` blocks dtk's relocation on its error code
+ *   0x80060034; `networkSessionReflect1` 99.66 and `moveStartSession` 99.94 - one
+ *   callee-saved register colouring each; `networkSessionReflect0` 98.68 - the event-code select's scheduling;
+ *   `slot_19C` 98.33 and `isNetworkSessionManagerPatReady` 3.33 - `NetworkSessionBase::getUserFlagB` is declared
+ *   `u8` in L1's header (`clrlwi` re-extension); `receiveSessionChat` 99.93 - the struct-of-function-pointers
+ *   `NetworkSmallObject` dispatch (L1 field request); `handleCircleJoin` 99.97 - the jump table's label name.
+ *   Callees in other lanes' units are declared in their owners' headers (integrated from
+ *   `.pi/outbox/net2-l2-101a-requests.json`); `getNetworkBinaryState` (owner header `u32`) is narrowed with a `(u8)`
+ *   cast at each call.  The mediator records are the owners' (`Network/gamespy_interface_types.h`,
+ *   `Network/PatInterface.h`, `Network/NetworkWiiMediator.h`); the error record is 12 bytes (0x10 lowers 10 rows).
+ *   UNWRITTEN: `networkPatReleaseBuffer` (232 B - deletes the Tcp/Udp objects through the virtual destructor
+ *   `Network/network_transport_types.h` now declares), `getPatTerms` (8 B - its `.sbss` word belongs to `menu/menu_plsearch.cpp`, no
+ *   declaration), the two record copies 0x803DFCA8/0x803DFD2C, and the whole `NetworkLayerPat` part
+ *   0x803E0BE8..0x803E44C8 (constructor, member destructors, request handlers - the class is still a slot view; its
+ *   real base is `NetworkLayer` and its vtable lies in `Network/NetworkCommunityPat.cpp`'s `.data`, so defining its
+ *   destructor here would emit the table into the wrong object until the seam is re-drawn).  The layer id helpers
+ *   (`NetworkLayerIdImportFrom`/`ExportTo`, `NetworkUniqueIdEquals`, named by their log strings) are written; they
+ *   need the unit's `-pool off` (configure.py) and differ only in their string labels' names.
  */
 
 /* Absorbed unit `Network/initNetworkSessionStable.cpp` (phase 4 fold):
@@ -158,11 +183,126 @@
 #include "Network/NetworkCommunityPat.h"         /* networkSmallObject_construct/_setAddress - owner Network/NetworkCommunityPat.cpp */
 #include "Network/NetworkPeerBase.h"             /* NetworkSmallObjectSink::destroy - owner Network/NetworkPeerBase.cpp */
 #include "Network/NetworkSessionBase.h"          /* LockMutex/UnlockMutex - owner Network/NetworkSessionBase.cpp */
-#include "Network/session_mediator_views.h"     /* GameSpyInterfaceThread / NetworkErrorInfo (the Pat side's views) */
+#include "Network/gamespy_interface_types.h"    /* GameSpyInterfaceThread / NetworkErrorInfo - owner Network/GameSpyInterfaceThread.cpp */
+#include "Network/PatInterface.h"              /* PatInterface - owner Network/PatInterface.cpp */
+#include "Network/NetworkWiiMediator.h"         /* NetworkWiiMediator::pushTransferRecord - owner Network/network_opening.cpp */
+#include "Network/network_state.h"              /* sendServerTimeout - owner Network/network_state.cpp */
+#include "Network/sNetworkLibraryWii.h"         /* sNetworkPatInstance - owner Network/sNetworkLibraryWii.cpp */
+#include "enemy/em020_ai.h"                     /* getInstance_ - owner enemy/em020_ai.cpp */
+#include "MSL_C/alloc.h"                        /* rand - owner MSL_C/alloc.cpp */
+#include "sound/fn_800E46E8.h"                  /* getInstance (the mediator singleton) - owner sound/fn_800E46E8.cpp */
+
+
+/* The steps every request handler shares: 0 starts the request, 100 reports a cancelled one, 110 a failed
+ * one (which also raises the session error, event 3); the steps between are each handler's own waits. */
+enum {
+    REQUEST_START = 0,
+    REQUEST_CANCELLED = 100,
+    REQUEST_FAILED = 110
+};
+
+/* `requestFlags_30C` bits every handler tests first. */
+enum {
+    REQUEST_SESSION_LOST = 0x1,
+    REQUEST_ABORTED = 0x2
+};
 
 /* The callback word the base stores at +0x04 and `move` runs: six arguments, the error record it was
  * handed as the fifth and the base's second word as the sixth.  The typedef exists only because the
  * base's field is a `u32` (see the file header) - this is the original's own cast. */
+/* The session's three timeouts (`.sdata`, this unit's): `initNetworkSessionStable` hands them to a new session,
+ * the circle block received in `networkSessionReflect1` may replace them and `networkPatAttachBuffer` puts
+ * them back. */
+f32 networkSessionTimeoutSeconds = 48.0f;
+f32 networkSessionIntervalSeconds = 60.0f;
+f32 networkSessionLimitSeconds = 60.0f;
+
+/* The record `connectPeer` hands the session with a new slot: the GameSpy thread and the caller's word. */
+typedef struct PatPeerConnect {
+    /* +0x00 */ GameSpyInterfaceThread* thread_00;
+    /* +0x04 */ u32 value_04;
+} PatPeerConnect;   /* size: 0x8 */
+
+/* The server messages `networkSessionReflect1` receives (GUESS on every name: the layouts are the offsets the
+ * handler reads).  A circle record is the circle block followed by its option list. */
+typedef struct PatCircleRecord {
+    /* +0x000 */ PatCircleInfo info_000;
+    /* +0x37C */ PatCircleOptionList options_37C;
+} PatCircleRecord;   /* size: 0x480 (the stride of the circle list messages) */
+
+/* A player joined or left the circle (0x8045 / 0x8047). */
+typedef struct PatPlayerNotice {
+    /* +0x00 */ u32 circleId_00;
+    /* +0x04 */ s8 slot_04;
+    /* +0x05 */ u8 kind_05;          /* 2 = a counted player */
+    /* +0x06 */ u8 address_06[0x08]; /* its first byte is non-zero for a valid notice */
+    /* +0x0E */ char name_0E[0x14];
+} PatPlayerNotice;   /* size: 0x24 (approximation - the last field read is the name) */
+
+/* One entry of the member list (0x805E) and the member state notice (0x804B). */
+typedef struct PatMemberEntry {
+    /* +0x00 */ u8 pad_00[0x06];
+    /* +0x06 */ s8 state_06;
+    /* +0x07 */ s8 slot_07;
+    /* +0x08 */ u8 address_08[0x08];
+    /* +0x10 */ char name_10[0x14];
+    /* +0x24 */ u8 pad_24[0x0C];
+} PatMemberEntry;   /* size: 0x30 */
+
+/* One match member (0x804E): its peer address and slot. */
+typedef struct PatMatchMember {
+    /* +0x00 */ NetworkPeerAddress address_00;
+    /* +0x06 */ u8 pad_06;
+    /* +0x07 */ s8 slot_07;
+    /* +0x08 */ u8 pad_08[0x28];
+} PatMatchMember;   /* size: 0x30 */
+
+/* The match start notice (0x804E): the member array, the match kind and the three session timeouts. */
+typedef struct PatMatchNotice {
+    /* +0x00 */ u32 circleId_00;
+    /* +0x04 */ PatMatchMember* members_04;
+    /* +0x08 */ u8 kind_08;          /* 1 = a lone member is not a match */
+    /* +0x09 */ u8 pad_09[0x03];
+    /* +0x0C */ u32 timeout_0C;      /* 16..80 s */
+    /* +0x10 */ u32 interval_10;     /* 20..100 s */
+    /* +0x14 */ u32 pad_14;
+    /* +0x18 */ u32 limit_18;        /* 20..100 s */
+} PatMatchNotice;   /* size: 0x1C */
+
+/* One field of a binary notice (0x805F). */
+typedef struct PatBinaryField {
+    /* +0x00 */ u8 type_00;          /* 1 */
+    /* +0x01 */ u8 pad_01[0x07];
+    /* +0x08 */ u8 kind_08;          /* 1 value, 2 value + reply, 3 link state */
+    /* +0x09 */ u8 pad_09[0x07];
+    /* +0x10 */ u8 type_10;          /* 2 */
+    /* +0x11 */ u8 pad_11[0x07];
+    /* +0x18 */ u32 value_18;
+} PatBinaryField;   /* size: 0x1C */
+
+/* The binary notice: the sender's 8-byte address first, then its fields. */
+typedef struct PatBinaryNotice {
+    /* +0x00 */ u8 address_00[0x08]; /* its first byte is non-zero for a valid notice */
+    /* +0x08 */ u32 pad_08;
+    /* +0x0C */ PatBinaryField* fields_0C;
+} PatBinaryNotice;   /* size: 0x10 */
+
+/* A chat message relayed by the server (0x8060 / 0x8062). */
+typedef struct PatServerChat {
+    /* +0x000 */ char text_000[0x100];
+    /* +0x100 */ u32 tag_100;
+    /* +0x104 */ s32 time_104;
+    /* +0x108 */ u8 address_108[0x08];
+    /* +0x110 */ char name_110[0x13];
+} PatServerChat;   /* size: 0x124 (approximation - the last field read is the name) */
+
+/* The payload of event 37 (`slot_190`): an enable word and a time (GUESS on both names: the body stores 1
+ * and `networkRequestTimerReset`). */
+typedef struct PatEventTimer {
+    /* +0x00 */ s32 enabled_00;
+    /* +0x04 */ f32 time_04;
+} PatEventTimer;   /* size: 0x8 */
+
 #pragma peephole off
 typedef void (*PatErrorCallback)(u32, u32, u32, u32, NetworkErrorInfo*, u32);
 
@@ -188,8 +328,8 @@ void NetworkSessionManagerPat::move()
         if (this->field_6E75 != 0) {
             if (GameSpyInterfaceThread::getInstance()->getResult() < 0) {
                 GameSpyInterfaceThread::getInstance()->getErrorStruct(&info);
-                if (info.code_04 == 0x4B) {
-                    ((PatErrorCallback)this->unused_04)(3, 0, info.value_00, 1, &info, this->unused_08);
+                if (info.param1_04 == 0x4B) {
+                    ((PatErrorCallback)this->unused_04)(3, 0, info.code_00, 1, &info, this->unused_08);
                     ((NetworkInstanceDispatch*)getInstance_())->postError(*(NetworkPostedError*)&info);
                     GameSpyInterfaceThread::getInstance()->clearError();
                 }
@@ -228,15 +368,282 @@ void NetworkSessionManagerPat::move()
     }
 }
 
+/* Logs this console in (event 1): checks the account, installs the reflect callback, then runs the server's
+ * login, FMP and binary stages (each ended with a shut request), sends the circle notice settings and finally
+ * takes this console's ids, a random session key and the hunter name. */
+s32 NetworkSessionManagerPat::updateSession(NetworkRequest* request)
+{
+    NetworkFmpSlot slot;
+    NetworkErrorInfo error;
+    u8 userId[8];
+    s32 kind;
+    s32 index;
+    s32 result;
+
+    switch (request->state_00) {
+    case REQUEST_START:
+        if (this->connected_3C0 != 0) {
+            setSessionLog(request, 0x80050012, 106, 0);
+            request->state_00 = REQUEST_CANCELLED;
+        } else {
+            this->connected_3C0 = 1;
+            request->state_00 = 5;
+        }
+        break;
+    case 5:
+        result = getNetworkLogger()->checkAccount_38(0, &error);
+        if (result < 0) {
+            setSessionLog(request, error.code_00, error.param1_04, error.param2_08);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (result > 0) {
+            request->state_00 = 10;
+        }
+        break;
+    case 10:
+        openPatInterface(getInstance_());
+        setCallback(getInstance_(), (void (*)())networkSessionReflectCallbackEx, this, 3);
+        if (getErrorInfo654c(getInstance_(), NULL) != 0) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if ((u8)getNetworkBinaryState(getInstance_()) != 0) {
+            request->state_00 = 80;
+        } else {
+            setConnectServerType(getInstance_(), 0);
+            this->requestFlags_30C[1] = 0;
+            resetNetworkState(getInstance_());
+            request->state_00 = 15;
+        }
+        break;
+    case 15:
+        if (this->requestFlags_30C[1] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (this->requestFlags_30C[1] & REQUEST_ABORTED) {
+            setSessionLogAborted(request);
+            request->state_00 = REQUEST_CANCELLED;
+        } else {
+            result = handleNetworkState2(getInstance_());
+            if (result < 0) {
+                setSessionLog(request, 0x80050012, 108, result);
+                request->state_00 = REQUEST_CANCELLED;
+            } else if (result > 0) {
+                this->requestFlags_30C[1] = 0;
+                sendReqShut(getInstance_(), 2);
+                request->state_00 = 20;
+            }
+        }
+        break;
+    case 20:
+        if ((this->requestFlags_30C[1] & REQUEST_SESSION_LOST) || (this->requestFlags_30C[1] & REQUEST_ABORTED) ||
+            (this->requestFlags_30C[1] & 0x10)) {
+            this->requestFlags_30C[1] = 0;
+            resetNetworkState3(getInstance_());
+            request->state_00 = 25;
+        }
+        break;
+    case 25:
+        if (this->requestFlags_30C[1] & 0x8) {
+            if (isSubState_894F_4or6((PatInterface*)getInstance_()) != 0) {
+                request->setRecord(0x80060034, 0, 0);
+                request->state_00 = REQUEST_CANCELLED;
+            } else if (isSubState_894F_5((PatInterface*)getInstance_()) != 0) {
+                request->setRecord(0x80060035, 0, 0);
+                request->state_00 = REQUEST_CANCELLED;
+            } else if (isSubState_894F_3((PatInterface*)getInstance_()) != 0) {
+                request->setRecord(0x80050012, 114, 0);
+                request->state_00 = REQUEST_CANCELLED;
+            } else {
+                request->state_00 = 30;
+            }
+        }
+        break;
+    case 30:
+        if (this->requestFlags_30C[1] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (getSomething4(getInstance_()) < 0) {
+            request->setRecord(0x80050033, 0, 0);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (getSomething4(getInstance_()) > 0) {
+            this->requestFlags_30C[1] = 0;
+            resetNetworkState(getInstance_());
+            request->state_00 = 35;
+        }
+        setSomething(getInstance_(), 0);
+        break;
+    case 35:
+        if (this->requestFlags_30C[1] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (this->requestFlags_30C[1] & REQUEST_ABORTED) {
+            setSessionLogAborted(request);
+            request->state_00 = REQUEST_CANCELLED;
+        } else {
+            result = handleNetworkState2Fmp(getInstance_());
+            if (result < 0) {
+                setSessionLog(request, 0x80050012, 109, result);
+                request->state_00 = REQUEST_CANCELLED;
+            } else if (result > 0) {
+                this->requestFlags_30C[1] = 0;
+                sendReqShut(getInstance_(), 2);
+                request->state_00 = 40;
+            }
+        }
+        break;
+    case 40:
+        if ((this->requestFlags_30C[1] & REQUEST_SESSION_LOST) || (this->requestFlags_30C[1] & REQUEST_ABORTED) ||
+            (this->requestFlags_30C[1] & 0x10)) {
+            this->requestFlags_30C[1] = 0;
+            resetNetworkState3(getInstance_());
+            request->state_00 = 45;
+        }
+        break;
+    case 45:
+        if (this->requestFlags_30C[1] & 0x8) {
+            request->state_00 = 50;
+        }
+        break;
+    case 50:
+        setConnectServerType(getInstance_(), 1);
+        this->requestFlags_30C[1] = 0;
+        resetNetworkState(getInstance_());
+        request->state_00 = 55;
+        break;
+    case 55:
+        if (this->requestFlags_30C[1] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (this->requestFlags_30C[1] & REQUEST_ABORTED) {
+            setSessionLogAborted(request);
+            request->state_00 = REQUEST_CANCELLED;
+        } else {
+            result = handleNetworkState2Binary(getInstance_());
+            if (result < 0) {
+                setSessionLog(request, 0x80050012, 110, result);
+                request->state_00 = REQUEST_CANCELLED;
+            } else if (result > 0) {
+                request->state_00 = 60;
+            }
+        }
+        break;
+    case 60:
+        if (this->requestFlags_30C[1] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (getSomething4(getInstance_()) < 0) {
+            setSessionLog(request, 0x80050033, 0, 0);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (getSomething4(getInstance_()) > 0) {
+            getFmpSelection(getInstance_(), &kind, &index);
+            if (kind != 1 || index < 0) {
+                setSessionLog(request, 0x80050002, 0, 0);
+                request->state_00 = REQUEST_CANCELLED;
+                break;
+            }
+            copyFmpSlot(getInstance_(), &slot, index);
+            this->requestFlags_30C[1] = 0;
+            sendReqFmpInfo(getInstance_(), slot.payload_00, 1);
+            request->state_00 = 65;
+        }
+        setSomething(getInstance_(), 0);
+        break;
+    case 65:
+        if (this->requestFlags_30C[1] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (this->requestFlags_30C[1] & REQUEST_ABORTED) {
+            setSessionLogAborted(request);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (this->requestFlags_30C[1] & 0x20) {
+            this->requestFlags_30C[1] = 0;
+            sendReqShut(getInstance_(), 2);
+            request->state_00 = 70;
+        }
+        break;
+    case 70:
+        if ((this->requestFlags_30C[1] & REQUEST_SESSION_LOST) || (this->requestFlags_30C[1] & REQUEST_ABORTED) ||
+            (this->requestFlags_30C[1] & 0x10)) {
+            this->requestFlags_30C[1] = 0;
+            resetNetworkState3(getInstance_());
+            request->state_00 = 75;
+        }
+        break;
+    case 75:
+        if (this->requestFlags_30C[1] & 0x8) {
+            setConnectServerType(getInstance_(), 1);
+            this->requestFlags_30C[1] = 0;
+            resetNetworkState(getInstance_());
+            request->state_00 = 77;
+        }
+        break;
+    case 77:
+        if (this->requestFlags_30C[1] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (this->requestFlags_30C[1] & REQUEST_ABORTED) {
+            setSessionLogAborted(request);
+            request->state_00 = REQUEST_CANCELLED;
+        } else {
+            result = handleNetworkState2Binary(getInstance_());
+            if (result < 0) {
+                setSessionLog(request, 0x80050012, 110, result);
+                request->state_00 = REQUEST_CANCELLED;
+            } else if (result > 0) {
+                request->state_00 = 80;
+            }
+        }
+        break;
+    case 80:
+        this->requestFlags_30C[1] = 0;
+        sendReqCircleInfoNoticeSet(getInstance_());
+        request->state_00 = 85;
+        break;
+    case 85:
+        if (this->requestFlags_30C[1] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (this->requestFlags_30C[1] & REQUEST_ABORTED) {
+            setSessionLogAborted(request);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (this->requestFlags_30C[1] & 0x2000000) {
+            request->state_00 = 90;
+        }
+        break;
+    case 90:
+        if (GameSpyInterfaceThread::getInstance() != NULL) {
+            GameSpyInterfaceThread::getInstance()->initialize();
+            this->field_6E75 = 1;
+        }
+        getSelectedID(getInstance_(), userId);
+        networkSmallObject_setAddress(&this->field_3CC, 3, userId, sizeof(userId));
+        getNetworkLogger()->readMatchOptions_78(0, &this->matchOptions_3EC);
+        this->matchOptions_3EC.sessionKey_04 = rand() % 10000 + 10000;
+        getSelectedID(getInstance_(), this->matchOptions_3EC.userId_08);
+        getSelectedHunterName(getInstance_(), this->matchOptions_3EC.name_10);
+        postEvent(1, 0, 0, 0, NULL, this->unused_08);
+        return 1;
+    case REQUEST_CANCELLED:
+        request->getRecord(&error);
+        postEvent(1, 0, error.code_00, 1, &error, this->unused_08);
+        return 1;
+    case REQUEST_FAILED:
+        request->getRecord(&error);
+        postEvent(1, 0, error.code_00, 1, &error, this->unused_08);
+        postEvent(3, 0, error.code_00, 1, &error, this->unused_08);
+        return 1;
+    }
+    return 0;
+}
+
 /* Reports error 0x80050011 for the request slot +0x184 and finishes. */
 s32 NetworkSessionManagerPat::slot_184(NetworkRequest* request)
 {
     NetworkErrorInfo info;
 
-    info.value_00 = 0x80050011;
-    info.code_04 = 0;
-    info.extra_08 = 0;
-    postEvent(6, 0, info.value_00, 1, &info, this->unused_08);
+    info.code_00 = 0x80050011;
+    info.param1_04 = 0;
+    info.param2_08 = 0;
+    postEvent(6, 0, info.code_00, 1, &info, this->unused_08);
     return 1;
 }
 
@@ -247,15 +654,1493 @@ s32 NetworkSessionManagerPat::slot_1B8(NetworkRequest* request)
     return 1;
 }
 
+/* Arms the session for a fresh request pair (event 8); error 0x8005003A while a circle id is still assigned. */
+s32 NetworkSessionManagerPat::slot_188(NetworkRequest* request)
+{
+    NetworkErrorInfo info;
+
+    if (canSend_28() != 0) {
+        info.code_00 = 0x8005003A;
+        info.param1_04 = 0;
+        info.param2_08 = 0;
+        postEvent(8, 0, 0, 1, &info, this->unused_08);
+        return 1;
+    }
+    this->matchRunning_3C1 = 0;
+    networkPatAttachBuffer(this);
+    postEvent(8, 0, 0, 0, NULL, this->unused_08);
+    return 1;
+}
+
+/* Publishes this console's +0x3C value to the circle and reports it (event 20); error 0x80050037 while no
+ * circle id is assigned. */
+s32 NetworkSessionManagerPat::slot_1A0(NetworkRequest* request)
+{
+    s32 value = request->getArgument(0);
+    NetworkErrorInfo info;
+
+    if (canSend_28() == 0) {
+        info.code_00 = 0x80050037;
+        info.param1_04 = 0;
+        info.param2_08 = 0;
+        postEvent(20, 0, info.code_00, 1, &info, this->unused_08);
+        return 1;
+    }
+    this->players_538[this->selfIndex_536].value_3C = value;
+    sendNtcCircleUserValue(getInstance_(), this->circleInfoRequestId_41C, value, 0);
+    postEvent(20, this->selfIndex_536, 0, 1, &value, this->unused_08);
+    return 1;
+}
+
+/* Reports each timed-out circle id of the argument list (event 9: its records, or error 0x80050002 for an
+ * unknown id, which is also sent to the server), then the end of the list (event 10). */
+s32 NetworkSessionManagerPat::handleServerTimeout(NetworkRequest* request)
+{
+    u32 count = request->getArgument(0);
+    s32* ids = (s32*)request->getArgument(1);
+    u32 i;
+
+    for (i = 0; i < count; i++) {
+        s32 id = ids[i];
+        u32 values[3];
+        NetworkErrorInfo info;
+
+        if (id < 0 || 32 <= id || this->circleList_AF0.items_04[id].id_000 <= 0) {
+            info.code_00 = 0x80050002;
+            info.param1_04 = 0;
+            info.param2_08 = id;
+            values[0] = 0x80050002;
+            values[1] = 0;
+            values[2] = id;
+            sendServerTimeout(getInstance_(), values);
+            postEvent(9, 0, info.code_00, 1, &info, this->unused_08);
+        } else {
+            postEvent(9, 0, id, this->circleList_AF0.items_04[id].recordCount_184,
+                      this->circleList_AF0.items_04[id].records_188, this->unused_08);
+        }
+    }
+    postEvent(10, 0, 0, 0, NULL, this->unused_08);
+    return 1;
+}
+
+/* Reports `count` reset timers (event 37, one per index) and the end of the list (event 38). */
+s32 NetworkSessionManagerPat::slot_190(NetworkRequest* request)
+{
+    s32 count = request->getArgument(0);
+    PatEventTimer timer;
+    s32 i;
+
+    request->getArgument(1);
+    timer.enabled_00 = 1;
+    timer.time_04 = networkRequestTimerReset;
+    for (i = 0; i < count; i++) {
+        postEvent(37, 0, i, 1, &timer, this->unused_08);
+    }
+    postEvent(38, 0, 0, 0, NULL, this->unused_08);
+    return 1;
+}
+
+/* Shuts the session down step by step: releases the resolver, closes the GameSpy thread, tells the server
+ * (shut mode 1) while the interface is still referenced, drops callback 3 and waits for the log to drain
+ * before reporting the end (event 2). */
+s32 NetworkSessionManagerPat::shutdown(NetworkRequest* request)
+{
+    switch (request->state_00) {
+    case REQUEST_START:
+        if (this->connected_3C0 == 0) {
+            request->state_00 = 40;
+            break;
+        }
+        if (this->resolver_660 != NULL) {
+            this->resolver_660->resetCode();
+            if (this->resolver_660->check() == 0) {
+                break;
+            }
+            networkLog_destroyContext((NetworkSessionManagerLogger*)getNetworkLogger(), this->resolver_660);
+            this->resolver_660 = NULL;
+        }
+        if (GameSpyInterfaceThread::getInstance() != NULL) {
+            if (this->field_6E75 != 0) {
+                this->field_6E75 = 0;
+                GameSpyInterfaceThread::getInstance()->canClose();
+                GameSpyInterfaceThread::getInstance()->armCancel();
+            }
+            if (GameSpyInterfaceThread::getInstance()->requestClose()) {
+                break;
+            }
+        }
+        if (getInstance_() == NULL) {
+            request->state_00 = 30;
+        } else if (isCallback(getInstance_(), 3) == 0) {
+            request->state_00 = 30;
+        } else if (hasMultipleRefs60d4(getInstance_()) != 0) {
+            request->state_00 = 20;
+        } else if ((u8)getNetworkBinaryState(getInstance_()) == 0) {
+            request->state_00 = 20;
+        } else {
+            this->requestFlags_30C[2] = 0;
+            sendReqShut(getInstance_(), 1);
+            request->state_00 = 5;
+        }
+        break;
+    case 5:
+        if ((this->requestFlags_30C[2] & REQUEST_SESSION_LOST) || (this->requestFlags_30C[2] & REQUEST_ABORTED) ||
+            (this->requestFlags_30C[2] & 0x10)) {
+            this->requestFlags_30C[2] = 0;
+            resetNetworkState3(getInstance_());
+            request->state_00 = 10;
+        }
+        break;
+    case 10:
+        if (this->requestFlags_30C[2] & 0x8) {
+            request->state_00 = 20;
+        }
+        break;
+    case 20:
+        resetCallback(getInstance_(), 3);
+        decrement60d4(getInstance_());
+        request->state_00 = 30;
+        break;
+    case 30:
+        if (getNetworkLogger()->isVerbose_3C() > 0) {
+            request->state_00 = 40;
+        }
+        break;
+    case 40:
+        this->connected_3C0 = 0;
+        postEvent(2, 0, 0, 0, NULL, this->unused_08);
+        return 1;
+    }
+    return 0;
+}
+
+/* Sends this console's match mode (event 26 with its state byte).  Inside a match setup it also re-takes the
+ * host's layer slot as subhost and reports the match members (event 25); a pending error code (+0x3C4) is
+ * reported (event 12) once no circle request is running. */
+s32 NetworkSessionManagerPat::handleCircleMatchOptionSet(NetworkRequest* request)
+{
+    s32 mode = request->getArgument(0);
+    PatMatchOptions options;
+    NetworkErrorInfo error;
+    NetworkErrorInfo pending;
+
+    switch (request->state_00) {
+    case REQUEST_START:
+        if (this->connected_3C0 == 0) {
+            setSessionLog(request, 0x80050001, 0, 0);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (canSend_28() == 0) {
+            setSessionLog(request, 0x80050037, 0, 0);
+            request->state_00 = REQUEST_CANCELLED;
+        } else {
+            memset(&options, 0, sizeof(options));
+            options.mode_06 = (s8)mode;
+            this->requestFlags_30C[18] = 0;
+            this->requestIds_360[18] = sendReqCircleMatchOptionSet(getInstance_(), &options);
+            request->state_00 = 5;
+        }
+        break;
+    case 5:
+        if (this->requestFlags_30C[18] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (this->requestFlags_30C[18] & REQUEST_ABORTED) {
+            setSessionLogAborted(request);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (this->requestFlags_30C[18] & 0x100000) {
+            request->state_00 = 10;
+        }
+        break;
+    case 10:
+        if (this->field_3C4 == 0 && (this->field_3C3 == 0 || this->matchOptions_3EC.mode_06 != 2)) {
+            this->matchOptions_3EC.mode_06 = (s8)mode;
+        }
+        this->players_538[this->selfIndex_536].state_03 = (mode != 0);
+        if (this->players_538[this->selfIndex_536].announced_01 != 0) {
+            postEvent(26, this->selfIndex_536, 0, 1, &this->players_538[this->selfIndex_536].state_03,
+                      this->unused_08);
+            if (this->field_3C3 != 0) {
+                if (this->matchPhase_66C != 0) {
+                    s8 slot = mapId_1C0(this->hostIndex_537);
+
+                    if (slot >= 0 && this->buffer != NULL) {
+                        ((NetworkSessionStable*)this->buffer)->setSubhostIndex(slot);
+                    } else {
+                        error.code_00 = 0x80000000;
+                        error.param1_04 = 0;
+                        error.param2_08 = 0;
+                        ((NetworkInstanceDispatch*)getInstance_())->postError(*(NetworkPostedError*)&error);
+                        setSessionLogSessionLost(request);
+                        request->state_00 = REQUEST_FAILED;
+                        break;
+                    }
+                }
+                postEvent(25, this->selfIndex_536, -(!this->matchPhase_66C), this->matchMemberCount_664,
+                          this->matchMembers_668, this->unused_08);
+            }
+        }
+        if (this->field_3C4 != 0 && this->requests_10[6] == NULL && this->requests_10[11] == NULL) {
+            if (this->players_538[this->selfIndex_536].announced_01 != 0) {
+                pending.code_00 = this->field_3C4;
+                pending.param1_04 = 0;
+                pending.param2_08 = 0;
+                postEvent(12, 0, pending.code_00, 1, &pending, this->unused_08);
+            }
+            networkPatAttachBuffer(this);
+        }
+        this->field_3C2 = 0;
+        this->field_3C3 = 0;
+        this->field_3C4 = 0;
+        return 1;
+    case REQUEST_CANCELLED:
+        this->field_3C2 = 0;
+        this->field_3C3 = 0;
+        this->field_3C4 = 0;
+        request->getRecord(&error);
+        postEvent(26, 0, error.code_00, 1, &error, this->unused_08);
+        return 1;
+    case REQUEST_FAILED:
+        this->field_3C2 = 0;
+        this->field_3C3 = 0;
+        this->field_3C4 = 0;
+        request->getRecord(&error);
+        postEvent(26, 0, error.code_00, 1, &error, this->unused_08);
+        postEvent(3, 0, error.code_00, 1, &error, this->unused_08);
+        return 1;
+    }
+    return 0;
+}
+
+/* Runs the circle list query (event 5): the search with the packed conditions, then the found circles ten at a
+ * time (at most 32), then the query's end; the conditions are cleared either way. */
+s32 NetworkSessionManagerPat::slot_178(NetworkRequest* request)
+{
+    s32 count = request->getArgument(0);
+    s32 first;
+    s32 batch;
+    NetworkErrorInfo error;
+    PatCircleFilter filters[8];
+    s32 filterCount;
+    u32 sortFlag;
+
+    switch (request->state_00) {
+    case REQUEST_START:
+        this->field_6E74 = 0;
+        if (this->connected_3C0 == 0) {
+            setSessionLog(request, 0x80050001, 0, 0);
+            request->state_00 = REQUEST_CANCELLED;
+            break;
+        }
+        if (count <= 0) {
+            setSessionLog(request, 0x80050002, 0, count);
+            request->state_00 = REQUEST_CANCELLED;
+            break;
+        }
+        request->state_00++;
+    case 1:
+        if (testAndSet611b(getInstance_()) == 0) {
+            filterCount = packCircleConditions(filters, 8, &this->conditionList_7E8);
+            this->requestFlags_30C[4] = 0;
+            sortFlag = (this->conditionList_7E8.head_00 & 4) ? 1 : 0;
+            this->requestIds_360[4] = sendReqCircleListHead(getInstance_(), 1, count, filters, filterCount, sortFlag);
+            request->state_00 = 5;
+        }
+        break;
+    case 5:
+        if (this->requestFlags_30C[4] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (this->requestFlags_30C[4] & REQUEST_ABORTED) {
+            setSessionLogAborted(request);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (this->requestFlags_30C[4] & 0x1000) {
+            this->circleList_AF0.count_00 = 0;
+            if (this->listTotal_AEC > 0) {
+                this->listCursor_AE8 = 0;
+                request->state_00 = 10;
+            } else {
+                request->state_00 = 20;
+            }
+        }
+        break;
+    case 10:
+        this->requestFlags_30C[4] = 0;
+        first = this->listCursor_AE8;
+        batch = (this->listTotal_AEC - first < 10) ? this->listTotal_AEC - first : 10;
+        this->requestIds_360[4] = sendReqCircleListData(getInstance_(), first + 1, batch);
+        request->state_00 = 15;
+        break;
+    case 15:
+        if (this->requestFlags_30C[4] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (this->requestFlags_30C[4] & REQUEST_ABORTED) {
+            setSessionLogAborted(request);
+            request->state_00 = 20;
+        } else if (this->requestFlags_30C[4] & 0x2000) {
+            if (this->circleList_AF0.count_00 < 32 && this->listTotal_AEC - this->listCursor_AE8 > 0) {
+                request->state_00 = 10;
+            } else {
+                request->state_00 = 20;
+            }
+        }
+        break;
+    case 20:
+        this->requestFlags_30C[4] = 0;
+        this->requestIds_360[4] = sendReqCircleListFoot(getInstance_());
+        request->state_00 = 25;
+        break;
+    case 25:
+        if (this->requestFlags_30C[4] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (this->requestFlags_30C[4] & REQUEST_ABORTED) {
+            setSessionLogAborted(request);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (this->requestFlags_30C[4] & 0x4000) {
+            memset(&error, 0, sizeof(error));
+            request->getRecord(&error);
+            if (error.code_00 != 0) {
+                request->state_00 = REQUEST_CANCELLED;
+            } else {
+                request->state_00 = 30;
+            }
+        }
+        break;
+    case 30:
+        set611b(getInstance_());
+        memset(&this->conditionList_7E8, 0, sizeof(this->conditionList_7E8));
+        postEvent(5, 0, 0, 0, NULL, this->unused_08);
+        return 1;
+    case REQUEST_CANCELLED:
+        request->getRecord(&error);
+        if (error.code_00 != 0x80050001 && error.code_00 != 0x80050002) {
+            set611b(getInstance_());
+        }
+        memset(&this->conditionList_7E8, 0, sizeof(this->conditionList_7E8));
+        postEvent(5, 0, error.code_00, 1, &error, this->unused_08);
+        return 1;
+    case REQUEST_FAILED:
+        request->getRecord(&error);
+        set611b(getInstance_());
+        memset(&this->conditionList_7E8, 0, sizeof(this->conditionList_7E8));
+        postEvent(5, 0, error.code_00, 1, &error, this->unused_08);
+        postEvent(3, 0, error.code_00, 1, &error, this->unused_08);
+        return 1;
+    }
+    return 0;
+}
+
+/* Leaves the circle (event 16): ends a mode-2 match or clears this console's match mode with the server first,
+ * publishes what is still pending, then runs the leave steps; a circle that went away meanwhile just ends. */
+s32 NetworkSessionManagerPat::handleCircleLeave(NetworkRequest* request)
+{
+    PatCircleInfo circleInfo;
+    PatCircleOptionList options;
+    PatMatchOptions matchOptions;
+    NetworkErrorInfo error;
+
+    switch (request->state_00) {
+    case REQUEST_START:
+        if (this->connected_3C0 == 0) {
+            setSessionLog(request, 0x80050001, 0, 0);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (canSend_28() == 0) {
+            setSessionLog(request, 0x80050037, 0, 0);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (this->matchOptions_3EC.mode_06 == 2) {
+            this->requestFlags_30C[11] = 0;
+            this->requestIds_360[11] = sendReqCircleMatchEnd(getInstance_(), 0);
+            request->state_00 = 5;
+        } else if (this->players_538[this->selfIndex_536].state_03 != 0) {
+            memset(&matchOptions, 0, sizeof(matchOptions));
+            matchOptions.mode_06 = 0;
+            this->requestFlags_30C[11] = 0;
+            this->requestIds_360[11] = sendReqCircleMatchOptionSet(getInstance_(), &matchOptions);
+            request->state_00 = 15;
+        } else {
+            request->state_00 = 20;
+        }
+        break;
+    case 5:
+        if (this->requestFlags_30C[11] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (this->requestFlags_30C[11] & REQUEST_ABORTED) {
+            if (this->circleLost_535 != 0) {
+                request->state_00 = 40;
+            } else {
+                setSessionLogAborted(request);
+                request->state_00 = REQUEST_CANCELLED;
+            }
+        } else if (this->requestFlags_30C[11] & 0x400000) {
+            request->state_00 = 20;
+        }
+        break;
+    case 15:
+        if (this->requestFlags_30C[11] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (this->requestFlags_30C[11] & REQUEST_ABORTED) {
+            if (this->circleLost_535 != 0) {
+                request->state_00 = 40;
+            } else {
+                setSessionLogAborted(request);
+                request->state_00 = REQUEST_CANCELLED;
+            }
+        } else if (this->requestFlags_30C[11] & 0x100000) {
+            request->state_00 = 20;
+        }
+        break;
+    case 20:
+        if (circleAvailable(this) == 0 ||
+            (this->circleRecordCount_950 == 0 && this->nameList_7A0.count_04 == 0 && this->field_AE6 == 0)) {
+            request->state_00 = 30;
+            break;
+        }
+        this->field_3B8 = getNetworkLogger()->getTime_60();
+        memset(&circleInfo, 0, sizeof(circleInfo));
+        if (this->circleRecordCount_950 != 0) {
+            circleInfo.recordCount_156 = (this->circleRecordCount_950 >= 256) ? 256 : this->circleRecordCount_950;
+            memcpy(circleInfo.records_56, this->circleRecords_954, circleInfo.recordCount_156);
+            this->circleRecordCount_950 = 0;
+        }
+        if (this->field_AE6 != 0) {
+            circleInfo.mode_378 = (this->field_AE5 != 0) ? 1 : 2;
+            this->field_AE6 = 0;
+        }
+        memset(&options, 0, sizeof(options));
+        if (this->nameList_7A0.count_04 != 0) {
+            buildCircleInfoName(this, &options, &this->nameList_7A0);
+            this->nameList_7A0.count_04 = 0;
+        }
+        this->requestIds_360[11] = sendReqCircleInfoSet(
+            getInstance_(), this->circleInfoRequestId_41C, &circleInfo, (const char*)&options);
+        request->state_00 = 25;
+        break;
+    case 25:
+        if (this->requestFlags_30C[11] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (this->requestFlags_30C[11] & REQUEST_ABORTED) {
+            if (this->circleLost_535 != 0) {
+                request->state_00 = 40;
+            } else {
+                setSessionLogAborted(request);
+                request->state_00 = REQUEST_CANCELLED;
+            }
+        } else if (this->requestFlags_30C[11] & 0x10000) {
+            request->state_00 = 30;
+        }
+        break;
+    case 30:
+        beginCircleLeave();
+        request->state_00 = 35;
+        break;
+    case 35:
+        switch (stepCircleLeave(&error)) {
+        case 1:
+            request->state_00 = 40;
+            break;
+        case -1:
+            setSessionLog(request, error.code_00, error.param1_04, error.param2_08);
+            request->state_00 = REQUEST_CANCELLED;
+            break;
+        case -2:
+            request->setRecord(error.code_00, error.param1_04, error.param2_08);
+            request->state_00 = REQUEST_FAILED;
+            break;
+        }
+        break;
+    case 40:
+        postEvent(16, 0, 0, 0, NULL, this->unused_08);
+        return 1;
+    case REQUEST_CANCELLED:
+        request->getRecord(&error);
+        postEvent(16, 0, error.code_00, 1, &error, this->unused_08);
+        return 1;
+    case REQUEST_FAILED:
+        request->getRecord(&error);
+        postEvent(16, 0, error.code_00, 1, &error, this->unused_08);
+        postEvent(3, 0, error.code_00, 1, &error, this->unused_08);
+        return 1;
+    }
+    return 0;
+}
+
+/* Creates a circle for `maxPlayers` (1..4, `reserved` of them held back) and becomes its host (event 4 with
+ * the circle's list index): sends the pending name, comment, records and mode, then the match options, then
+ * reads the circle back; a failure after the create leaves the circle again. */
+s32 NetworkSessionManagerPat::handleCircleCreate(NetworkRequest* request)
+{
+    s32 maxPlayers = request->getArgument(0);
+    s32 reserved = request->getArgument(1);
+    PatCircleInfo info;
+    PatCircleOptionList options;
+    NetworkErrorInfo error;
+    s32 index;
+
+    switch (request->state_00) {
+    case REQUEST_START:
+        if (this->connected_3C0 == 0) {
+            setSessionLog(request, 0x80050001, 0, 0);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (maxPlayers < 1 || maxPlayers > 4 || reserved < 0 || maxPlayers <= reserved) {
+            setSessionLog(request, 0x80050002, 0, 0);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (canSend_28() != 0) {
+            setSessionLog(request, 0x8005003A, 0, 0);
+            request->state_00 = REQUEST_CANCELLED;
+        } else {
+            memset(&info, 0, sizeof(info));
+            info.limitB_360 = maxPlayers;
+            info.usedB_364 = reserved;
+            if (this->sessionName_850[0] != 0) {
+                info.flag_044 = 1;
+                memcpy(info.sessionName_045, this->sessionName_850, sizeof(info.sessionName_045));
+                info.sessionNameEnd_054 = 0;
+            }
+            if (this->circleComment_A54[0] != 0) {
+                memcpy(info.comment_158, this->circleComment_A54, sizeof(info.comment_158));
+                info.commentEnd_1E8 = 0;
+            }
+            if (this->circleRecordCount_950 != 0) {
+                info.recordCount_156 = (this->circleRecordCount_950 >= 256) ? 256 : this->circleRecordCount_950;
+                memcpy(info.records_56, this->circleRecords_954, info.recordCount_156);
+                this->circleRecordCount_950 = 0;
+            }
+            if (this->field_AE5 != 0) {
+                info.mode_378 = 1;
+            }
+            memset(&options, 0, sizeof(options));
+            if (this->nameList_7A0.count_04 != 0) {
+                buildCircleInfoName(this, &options, &this->nameList_7A0);
+                this->nameList_7A0.count_04 = 0;
+            }
+            this->field_3B8 = getNetworkLogger()->getTime_60();
+            this->field_AE6 = 0;
+            this->limitB_524 = maxPlayers;
+            this->usedB_52C = reserved;
+            this->requestFlags_30C[3] = 0;
+            this->requestIds_360[3] = sendReqCircleCreate(getInstance_(), &info, &options);
+            request->state_00 = 5;
+        }
+        break;
+    case 5:
+        if (this->requestFlags_30C[3] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (this->requestFlags_30C[3] & REQUEST_ABORTED) {
+            this->limitB_524 = 0;
+            this->usedB_52C = 0;
+            setSessionLogAborted(request);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (this->requestFlags_30C[3] & 0x40) {
+            request->state_00 = 10;
+        }
+        break;
+    case 10:
+        this->requestFlags_30C[3] = 0;
+        this->requestIds_360[3] = sendReqCircleMatchOptionSet(getInstance_(), &this->matchOptions_3EC);
+        request->state_00 = 15;
+        break;
+    case 15:
+        if (this->requestFlags_30C[3] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (this->requestFlags_30C[3] & REQUEST_ABORTED) {
+            setSessionLogAborted(request);
+            request->state_00 = 90;
+        } else if (this->requestFlags_30C[3] & 0x100000) {
+            request->state_00 = 20;
+        }
+        break;
+    case 20:
+        this->requestFlags_30C[3] = 0;
+        this->requestIds_360[3] = sendReqCircleInfo(getInstance_(), this->circleInfoRequestId_41C, 0);
+        request->state_00 = 25;
+        break;
+    case 25:
+        if (this->requestFlags_30C[3] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (this->requestFlags_30C[3] & REQUEST_ABORTED) {
+            setSessionLogAborted(request);
+            request->state_00 = 90;
+        } else if (this->requestFlags_30C[3] & 0x8000) {
+            request->state_00 = 30;
+        }
+        break;
+    case 30:
+        resetCircleState();
+        if (this->field_6E74 != 0) {
+            for (index = 0; index < 32; index++) {
+                if (this->circleInfoRequestId_41C == this->circleList_AF0.items_04[index].id_000) {
+                    break;
+                }
+            }
+            if (index >= 32) {
+                setSessionLog(request, 0x80050037, 0, 0);
+                request->state_00 = 90;
+                break;
+            }
+            postEvent(4, this->selfIndex_536, 0, 1, &index, this->unused_08);
+        } else {
+            postEvent(4, this->selfIndex_536, 0, 0, NULL, this->unused_08);
+        }
+        this->players_538[this->selfIndex_536].announced_01 = 1;
+        announcePlayers();
+        if (this->players_538[this->hostIndex_537].announced_01 != 0) {
+            postEvent(14, this->hostIndex_537, 0, 0, NULL, this->unused_08);
+        }
+        return 1;
+    case 90:
+        beginCircleLeave();
+        request->state_00 = 95;
+        break;
+    case 95:
+        switch (stepCircleLeave(&error)) {
+        case 1:
+            request->state_00 = REQUEST_CANCELLED;
+            break;
+        case -1:
+            ((NetworkInstanceDispatch*)getInstance_())->postError(*(NetworkPostedError*)&error);
+        case -2:
+            request->setRecord(error.code_00, error.param1_04, error.param2_08);
+            request->state_00 = REQUEST_FAILED;
+            break;
+        }
+        break;
+    case REQUEST_CANCELLED:
+        resetCircleState();
+        request->getRecord(&error);
+        postEvent(4, 0, error.code_00, 1, &error, this->unused_08);
+        return 1;
+    case REQUEST_FAILED:
+        resetCircleState();
+        request->getRecord(&error);
+        postEvent(4, 0, error.code_00, 1, &error, this->unused_08);
+        postEvent(3, 0, error.code_00, 1, &error, this->unused_08);
+        return 1;
+    }
+    return 0;
+}
+
+/* Joins circle `index` of the last list (event 6): the join, the match options, the member list, the circle
+ * and its host, then waits (30 s) until every other member is linked; a failure after the join leaves the
+ * circle again, and so does the circle going away midway (0x80050036). */
+s32 NetworkSessionManagerPat::handleCircleJoin(NetworkRequest* request)
+{
+    s32 index = request->getArgument(0);
+    PatCircleInfo info;
+    NetworkErrorInfo error;
+    s8 i;
+
+    if (this->circleLost_535 != 0 && request->state_00 != 25 && request->state_00 != 35 &&
+        request->state_00 != 45 && request->state_00 != 55 && request->state_00 < 90) {
+        setSessionLog(request, 0x80050036, 0, 0);
+        request->state_00 = 90;
+    }
+    switch (request->state_00) {
+    case REQUEST_START:
+        this->nameList_7A0.count_04 = 0;
+        this->circleRecordCount_950 = 0;
+        this->field_AE5 = 0;
+        this->field_AE6 = 0;
+        if (this->connected_3C0 == 0) {
+            setSessionLog(request, 0x80050001, 0, 0);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (canSend_28() != 0) {
+            setSessionLog(request, 0x8005003A, 0, 0);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (index < 0 || index >= getCircleInfoCount()) {
+            setSessionLog(request, 0x80050002, 0, index);
+            request->state_00 = REQUEST_CANCELLED;
+        } else {
+            memset(&info, 0, sizeof(info));
+            info.id_000 = this->circleList_AF0.items_04[index].id_000;
+            info.ownerId_368 = this->circleList_AF0.items_04[index].ownerId_004;
+            if (this->sessionName_850[0] != 0) {
+                info.flag_044 = 1;
+                memcpy(info.sessionName_045, this->sessionName_850, sizeof(info.sessionName_045));
+                info.sessionNameEnd_054 = 0;
+            }
+            this->limitB_524 = this->circleList_AF0.items_04[index].limitB_174;
+            this->requestFlags_30C[6] = 0;
+            this->requestIds_360[6] = sendReqCircleJoin(getInstance_(), &info);
+            request->state_00 = 15;
+        }
+        break;
+    case 15:
+        if (this->requestFlags_30C[6] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (this->requestFlags_30C[6] & REQUEST_ABORTED) {
+            this->limitB_524 = 0;
+            setSessionLogAborted(request);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (this->requestFlags_30C[6] & 0x20000) {
+            this->circleInfoRequestId_41C = this->circleList_AF0.items_04[index].id_000;
+            request->state_00 = 20;
+        }
+        break;
+    case 20:
+        this->requestFlags_30C[6] = 0;
+        this->requestIds_360[6] = sendReqCircleMatchOptionSet(getInstance_(), &this->matchOptions_3EC);
+        request->state_00 = 25;
+        break;
+    case 25:
+        if (this->requestFlags_30C[6] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (this->requestFlags_30C[6] & REQUEST_ABORTED) {
+            setSessionLogAborted(request);
+            request->state_00 = 90;
+        } else if (this->requestFlags_30C[6] & 0x100000) {
+            request->state_00 = 30;
+        }
+        break;
+    case 30:
+        this->requestFlags_30C[6] = 0;
+        this->requestIds_360[6] = sendReqCircleUserList(getInstance_());
+        request->state_00 = 35;
+        break;
+    case 35:
+        if (this->requestFlags_30C[6] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (this->requestFlags_30C[6] & REQUEST_ABORTED) {
+            setSessionLogAborted(request);
+            request->state_00 = 90;
+        } else if (this->requestFlags_30C[6] & 0x80) {
+            request->state_00 = 40;
+        }
+        break;
+    case 40:
+        this->requestFlags_30C[6] = 0;
+        this->requestIds_360[6] = sendReqCircleInfo(getInstance_(), this->circleInfoRequestId_41C, 0);
+        request->state_00 = 45;
+        break;
+    case 45:
+        if (this->requestFlags_30C[6] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (this->requestFlags_30C[6] & REQUEST_ABORTED) {
+            setSessionLogAborted(request);
+            request->state_00 = 90;
+        } else if (this->requestFlags_30C[6] & 0x8000) {
+            request->state_00 = 50;
+        }
+        break;
+    case 50:
+        this->requestFlags_30C[6] = 0;
+        this->requestIds_360[6] = sendReqCircleHost(getInstance_(), this->circleInfoRequestId_41C);
+        request->state_00 = 55;
+        break;
+    case 55:
+        if (this->requestFlags_30C[6] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (this->requestFlags_30C[6] & REQUEST_ABORTED) {
+            setSessionLogAborted(request);
+            request->state_00 = 90;
+        } else if (this->requestFlags_30C[6] & 0x40000) {
+            sendNtcCircleUserValue(getInstance_(), this->circleInfoRequestId_41C, this->players_538[this->selfIndex_536].value_3C,
+                        1);
+            request->restartTimer(30.0f);
+            request->state_00 = 60;
+        }
+        break;
+    case 60:
+        if ((u8)getNetworkBinaryState(getInstance_()) == 0) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+            break;
+        }
+        for (i = 0; i < getWord_524(); i++) {
+            if (this->players_538[i].active_00 != 0 && i != this->selfIndex_536 && this->players_538[i].flag_02 == 0) {
+                if (request->isTimedOut() != 0) {
+                    setSessionLog(request, 0x80000002, 0, 0);
+                    request->state_00 = 90;
+                }
+                return 0;
+            }
+        }
+        resetCircleState();
+        postEvent(6, this->selfIndex_536, 0, 0, NULL, this->unused_08);
+        this->players_538[this->selfIndex_536].announced_01 = 1;
+        announcePlayers();
+        if (this->players_538[this->hostIndex_537].announced_01 != 0) {
+            postEvent(14, this->hostIndex_537, 0, 0, NULL, this->unused_08);
+        }
+        return 1;
+    case 90:
+        beginCircleLeave();
+        request->state_00 = 95;
+        break;
+    case 95:
+        switch (stepCircleLeave(&error)) {
+        case 1:
+            request->state_00 = REQUEST_CANCELLED;
+            break;
+        case -1:
+            ((NetworkInstanceDispatch*)getInstance_())->postError(*(NetworkPostedError*)&error);
+        case -2:
+            request->setRecord(error.code_00, error.param1_04, error.param2_08);
+            request->state_00 = REQUEST_FAILED;
+            break;
+        }
+        break;
+    case REQUEST_CANCELLED:
+        resetCircleState();
+        request->getRecord(&error);
+        postEvent(6, 0, error.code_00, 1, &error, this->unused_08);
+        return 1;
+    case REQUEST_FAILED:
+        resetCircleState();
+        request->getRecord(&error);
+        postEvent(6, 0, error.code_00, 1, &error, this->unused_08);
+        postEvent(3, 0, error.code_00, 1, &error, this->unused_08);
+        return 1;
+    }
+    return 0;
+}
+
+/* Starts the match session (event 28): checks every match member's negotiation (event 36 for a failed one,
+ * 35 when this console's own failed), waits until the GameSpy thread reaches phase 1 and every member is
+ * linked, then raises the session's flag B (`matchPhase_66C` = 3). */
+s32 NetworkSessionManagerPat::moveStartSession(NetworkRequest* request)
+{
+    NetworkErrorInfo error;
+    u8 member;
+    s32 i;
+
+    if ((u8)getNetworkBinaryState(getInstance_()) == 0) {
+        if (request->state_00 < 90) {
+            request->state_00 = 90;
+        }
+    } else if (canSend_28() == 0) {
+        setSessionLog(request, 0x80050037, 0, 0);
+        request->state_00 = REQUEST_CANCELLED;
+    }
+    switch (request->state_00) {
+    case REQUEST_START:
+        if (this->connected_3C0 == 0) {
+            setSessionLog(request, 0x80050001, 0, 0);
+            request->state_00 = REQUEST_CANCELLED;
+            break;
+        }
+        if (this->matchRunning_3C1 != 0) {
+            setSessionLog(request, 0x80050046, 0, 0);
+            request->state_00 = REQUEST_CANCELLED;
+            break;
+        }
+        this->matchRunning_3C1 = 1;
+        if (this->buffer != NULL) {
+            ((NetworkSessionBase*)this->buffer)->discardAll();
+        }
+        if (this->matchPhase_66C == 0 || this->matchPhase_66C == 3) {
+            setSessionLog(request, 0x80050011, 0, 0);
+            request->state_00 = REQUEST_CANCELLED;
+            break;
+        }
+        if (this->limitA_528 > 1 &&
+            (GameSpyInterfaceThread::getInstance() == NULL || GameSpyInterfaceThread::getInstance()->getState() != 1)) {
+            if (GameSpyInterfaceThread::getInstance() == NULL) {
+                setSessionLog(request, 0x80050011, 0, -1);
+            } else {
+                GameSpyInterfaceThread::getInstance()->getErrorStruct(&error);
+                setSessionLog(request, error.code_00, error.param1_04, error.param2_08);
+            }
+            this->matchPhase_66C = 0;
+            request->state_00 = REQUEST_CANCELLED;
+            break;
+        }
+        if (getNetworkLayerPat(getPatsObject(), 0) != NULL) {
+            if (getNetworkLayerPat(getPatsObject(), 0)->getMemberStatus(&this->field_3CC) == 1) {
+                this->matchPhase_66C = 0;
+                postEvent(35, 0, this->errorCode_794, 1, &this->errorCode_794, this->unused_08);
+            } else {
+                for (i = 0; i < this->matchMemberCount_664; i++) {
+                    member = this->matchMembers_668[i];
+                    if (this->players_538[(s8)member].active_00 != 0 && (s8)member != this->selfIndex_536 &&
+                        getNetworkLayerPat(getPatsObject(), 0)->getMemberStatus(
+                            &this->players_538[(s8)member].smallObject_08) == 1) {
+                        postEvent(36, (s8)member, -1, 0, NULL, this->unused_08);
+                    }
+                }
+            }
+        }
+        request->state_00++;
+        break;
+    case 1:
+        if (this->matchPhase_66C == 0) {
+            setSessionLog(request, this->errorCode_794, this->errorParam1_798, this->errorParam2_79C);
+            request->state_00 = 90;
+            break;
+        }
+        if (this->limitA_528 > 1) {
+            if (GameSpyInterfaceThread::getInstance() == NULL || GameSpyInterfaceThread::getInstance()->getState() != 1 ||
+                GameSpyInterfaceThread::getInstance()->getPhase() < 0) {
+                if (GameSpyInterfaceThread::getInstance() == NULL) {
+                    setSessionLog(request, 0x80050011, 0, -2);
+                } else {
+                    GameSpyInterfaceThread::getInstance()->getErrorStruct(&error);
+                    setSessionLog(request, error.code_00, error.param1_04, error.param2_08);
+                }
+                this->matchPhase_66C = 0;
+                request->state_00 = 90;
+                break;
+            }
+            if (GameSpyInterfaceThread::getInstance()->getPhase() != 1) {
+                break;
+            }
+        }
+        for (i = 0; i < this->matchMemberCount_664; i++) {
+            member = this->matchMembers_668[i];
+            if (this->players_538[(s8)member].active_00 != 0 && getNetworkLayerPat(getPatsObject(), 0) != NULL) {
+                u8 status = getNetworkLayerPat(getPatsObject(), 0)->getMemberStatus(
+                    &this->players_538[(s8)member].smallObject_08);
+
+                if (status == 0) {
+                    return 0;
+                }
+                if (status == 2) {
+                    return 0;
+                }
+            }
+        }
+        sendNtcCircleMatchState(getInstance_(), this->circleInfoRequestId_41C, 3);
+        request->state_00++;
+        break;
+    case 2:
+        if (this->matchPhase_66C == 0) {
+            getNetworkLogger()->warn_10("moveStartSession::mMatchPhase(0) NG\n");
+            setSessionLog(request, this->errorCode_794, this->errorParam1_798, this->errorParam2_79C);
+            request->state_00 = 90;
+            break;
+        }
+        for (i = 0; i < this->matchMemberCount_664; i++) {
+            member = this->matchMembers_668[i];
+            if (this->players_538[(s8)member].active_00 != 0 && (s8)member != this->selfIndex_536 &&
+                this->players_538[(s8)member].linked_04 != 3) {
+                return 0;
+            }
+        }
+        if (this->buffer == NULL) {
+            setSessionLog(request, 0x80050037, 0, 0);
+            request->state_00 = 90;
+            break;
+        }
+        this->matchPhase_66C = 3;
+        ((NetworkSessionBase*)this->buffer)->setUserFlagB(1);
+        this->field_3BC = getNetworkLogger()->getTime_60();
+        postEvent(28, 0, 0, 0, NULL, this->unused_08);
+        return 1;
+    case 90:
+        request->state_00 = 95;
+        break;
+    case 95:
+        if ((u8)getNetworkBinaryState(getInstance_()) == 0) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else {
+            request->state_00 = REQUEST_CANCELLED;
+        }
+        break;
+    case REQUEST_CANCELLED:
+        this->matchPhase_66C = 0;
+        request->getRecord(&error);
+        postEvent(28, 0, error.code_00, 1, &error, this->unused_08);
+        return 1;
+    case REQUEST_FAILED:
+        this->matchPhase_66C = 0;
+        request->getRecord(&error);
+        postEvent(28, 0, error.code_00, 1, &error, this->unused_08);
+        postEvent(3, 0, error.code_00, 1, &error, this->unused_08);
+        return 1;
+    }
+    return 0;
+}
+
+/* Starts a match in this console's circle (event 24 with the match members); only the host may.  When this
+ * console was announced it takes the host's layer slot as the session's subhost. */
+s32 NetworkSessionManagerPat::handleCircleMatchStart(NetworkRequest* request)
+{
+    NetworkErrorInfo error;
+
+    switch (request->state_00) {
+    case REQUEST_START:
+        if (this->connected_3C0 == 0) {
+            setSessionLog(request, 0x80050001, 0, 0);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (circleAvailable(this) == 0) {
+            setSessionLog(request, 0x80050032, 0, 0);
+            request->state_00 = REQUEST_CANCELLED;
+        } else {
+            this->requestFlags_30C[7] = 0;
+            this->requestIds_360[7] = sendReqCircleMatchStart(getInstance_());
+            request->state_00 = 5;
+        }
+        break;
+    case 5:
+        if (this->requestFlags_30C[7] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (this->requestFlags_30C[7] & REQUEST_ABORTED) {
+            setSessionLogAborted(request);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (this->requestFlags_30C[7] & 0x200000) {
+            request->state_00 = 10;
+        }
+        break;
+    case 10:
+        if (this->players_538[this->selfIndex_536].announced_01 != 0) {
+            s8 slot = mapId_1C0(this->hostIndex_537);
+
+            if (slot >= 0 && this->buffer != NULL) {
+                ((NetworkSessionStable*)this->buffer)->setSubhostIndex(slot);
+            }
+            postEvent(24, this->selfIndex_536, 0, this->matchMemberCount_664, this->matchMembers_668,
+                      this->unused_08);
+        }
+        return 1;
+    case REQUEST_CANCELLED:
+        request->getRecord(&error);
+        postEvent(24, 0, error.code_00, 1, &error, this->unused_08);
+        return 1;
+    case REQUEST_FAILED:
+        request->getRecord(&error);
+        postEvent(24, 0, error.code_00, 1, &error, this->unused_08);
+        postEvent(3, 0, error.code_00, 1, &error, this->unused_08);
+        return 1;
+    }
+    return 0;
+}
+
+/* Ends the running match (event 32): clears the session's flag B and, in match mode 2, tells the server
+ * first; error 0x80050045 while no match is running. */
+s32 NetworkSessionManagerPat::handleCircleMatchEnd(NetworkRequest* request)
+{
+    NetworkErrorInfo error;
+
+    switch (request->state_00) {
+    case REQUEST_START:
+        if (this->connected_3C0 == 0) {
+            setSessionLog(request, 0x80050001, 0, 0);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (this->matchRunning_3C1 == 0) {
+            setSessionLog(request, 0x80050045, 0, 0);
+            request->state_00 = REQUEST_CANCELLED;
+        } else {
+            if (this->buffer != NULL) {
+                ((NetworkSessionBase*)this->buffer)->setUserFlagB(0);
+            }
+            if (this->matchOptions_3EC.mode_06 != 2) {
+                request->state_00 = 10;
+            } else {
+                this->requestFlags_30C[10] = 0;
+                this->requestIds_360[10] = sendReqCircleMatchEnd(getInstance_(), 1);
+                request->state_00 = 5;
+            }
+        }
+        break;
+    case 5:
+        if (this->requestFlags_30C[10] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (this->requestFlags_30C[10] & REQUEST_ABORTED) {
+            setSessionLogAborted(request);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (this->requestFlags_30C[10] & 0x400000) {
+            request->state_00 = 10;
+        }
+        break;
+    case 10:
+        this->matchRunning_3C1 = 0;
+        this->matchPhase_66C = 0;
+        postEvent(32, 0, 0, 0, NULL, this->unused_08);
+        return 1;
+    case REQUEST_CANCELLED:
+        request->getRecord(&error);
+        postEvent(32, 0, error.code_00, 1, &error, this->unused_08);
+        return 1;
+    case REQUEST_FAILED:
+        request->getRecord(&error);
+        postEvent(32, 0, error.code_00, 1, &error, this->unused_08);
+        postEvent(3, 0, error.code_00, 1, &error, this->unused_08);
+        return 1;
+    }
+    return 0;
+}
+
+/* Asks the server for the circle list (event 39 once it arrived); the requested count must be positive. */
+s32 NetworkSessionManagerPat::handleCircleListLayer(NetworkRequest* request)
+{
+    s32 count = request->getArgument(0);
+    NetworkErrorInfo error;
+
+    switch (request->state_00) {
+    case REQUEST_START:
+        if (this->connected_3C0 == 0) {
+            setSessionLog(request, 0x80050001, 0, 0);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (count <= 0) {
+            setSessionLog(request, 0x80050002, 0, count);
+            request->state_00 = REQUEST_CANCELLED;
+        } else {
+            this->requestFlags_30C[5] = 0;
+            this->requestIds_360[5] = sendReqCircleListLayer(getInstance_());
+            request->state_00 = 5;
+        }
+        break;
+    case 5:
+        if (this->requestFlags_30C[5] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (this->requestFlags_30C[5] & REQUEST_ABORTED) {
+            setSessionLogAborted(request);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (this->requestFlags_30C[5] & 0x800) {
+            request->state_00 = 10;
+        }
+        break;
+    case 10:
+        postEvent(39, 0, 0, 0, NULL, this->unused_08);
+        return 1;
+    case REQUEST_CANCELLED:
+        request->getRecord(&error);
+        postEvent(39, 0, error.code_00, 1, &error, this->unused_08);
+        return 1;
+    case REQUEST_FAILED:
+        request->getRecord(&error);
+        postEvent(39, 0, error.code_00, 1, &error, this->unused_08);
+        postEvent(3, 0, error.code_00, 1, &error, this->unused_08);
+        return 1;
+    }
+    return 0;
+}
+
+/* Opens or closes this console's circle to new members (the flag at +0x534, event 15); only the host may. */
+s32 NetworkSessionManagerPat::handleCircleInfoSet(NetworkRequest* request)
+{
+    s32 open = request->getArgument(0);
+    PatCircleInfo info;
+    NetworkErrorInfo error;
+
+    switch (request->state_00) {
+    case REQUEST_START:
+        if (this->connected_3C0 == 0) {
+            setSessionLog(request, 0x80050001, 0, 0);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (circleAvailable(this) == 0) {
+            setSessionLog(request, 0x80050032, 0, 0);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (this->flag_534 == (open != 0)) {
+            request->state_00 = 10;
+        } else {
+            memset(&info, 0, sizeof(info));
+            if (open != 0) {
+                info.state_379 = 1;
+                info.state_37A = 1;
+            } else {
+                info.state_379 = -1;
+                info.state_37A = -1;
+            }
+            this->requestFlags_30C[8] = 0;
+            this->requestIds_360[8] = sendReqCircleInfoSet(
+                getInstance_(), this->circleInfoRequestId_41C, &info, NULL);
+            request->state_00 = 5;
+        }
+        break;
+    case 5:
+        if (this->requestFlags_30C[8] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (this->requestFlags_30C[8] & REQUEST_ABORTED) {
+            setSessionLogAborted(request);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (this->requestFlags_30C[8] & 0x10000) {
+            request->state_00 = 10;
+        }
+        break;
+    case 10:
+        this->flag_534 = (open != 0);
+        postEvent(15, 0, 0, 1, &this->flag_534, this->unused_08);
+        return 1;
+    case REQUEST_CANCELLED:
+        request->getRecord(&error);
+        postEvent(15, 0, error.code_00, 1, &error, this->unused_08);
+        return 1;
+    case REQUEST_FAILED:
+        request->getRecord(&error);
+        postEvent(15, 0, error.code_00, 1, &error, this->unused_08);
+        postEvent(3, 0, error.code_00, 1, &error, this->unused_08);
+        return 1;
+    }
+    return 0;
+}
+
+/* Sends a chat message (event 18 with this console's own copy): over the session when it runs, else through
+ * the server - to everyone for target -1, or to the target player's user id. */
+s32 NetworkSessionManagerPat::slot_19C(NetworkRequest* request)
+{
+    const char* text = (const char*)request->getArgument(0);
+    u32 tag = request->getArgument(1);
+    s32 target = request->getArgument(2);
+    NetworkSessionSlotInfo message;
+    PatMatchOptions options;
+    NetworkErrorInfo error;
+    char userId[8];
+    u32 length;
+
+    switch (request->state_00) {
+    case REQUEST_START:
+        if (this->connected_3C0 == 0) {
+            setSessionLog(request, 0x80050001, 0, 0);
+            request->state_00 = REQUEST_CANCELLED;
+            break;
+        }
+        if (canSend_28() == 0) {
+            setSessionLog(request, 0x80050037, 0, 0);
+            request->state_00 = REQUEST_CANCELLED;
+            break;
+        }
+        if (text[0] == 0) {
+            setSessionLog(request, 0x80050002, 0, -1);
+            request->state_00 = REQUEST_CANCELLED;
+            break;
+        }
+        if (target != -1) {
+            if (target < 0 || target >= getWord_524() || target == this->selfIndex_536) {
+                setSessionLog(request, 0x80050002, 0, target);
+                request->state_00 = REQUEST_CANCELLED;
+                break;
+            }
+            if (this->players_538[target].active_00 == 0) {
+                setSessionLog(request, 0x80050011, 0, target);
+                request->state_00 = REQUEST_CANCELLED;
+                break;
+            }
+        }
+        if (this->buffer != NULL && ((NetworkSessionBase*)this->buffer)->getUserFlagB() != 0) {
+            sendSessionChat(text, tag, target);
+            request->state_00 = 10;
+            break;
+        }
+        memset(&options, 0, sizeof(options));
+        *(u32*)&options = tag;
+        if (target == -1) {
+            sendNtcCircleChat(getInstance_(), &options, text);
+            request->state_00 = 10;
+        } else {
+            exportTo(&this->players_538[target].smallObject_08, (u8*)userId, sizeof(userId));
+            this->requestFlags_30C[15] = 0;
+            this->requestIds_360[15] = sendReqCircleTell(getInstance_(), userId, &options, text);
+            request->state_00 = 5;
+        }
+        break;
+    case 5:
+        if (this->requestFlags_30C[15] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (this->requestFlags_30C[15] & REQUEST_ABORTED) {
+            setSessionLogAborted(request);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (this->requestFlags_30C[15] & 0x4000000) {
+            request->state_00 = 10;
+        }
+        break;
+    case 10:
+        NetworkSessionSlotInfo_construct(&message);
+        message.smallObject_00.vtable->slot_28(&message.smallObject_00, (const u8*)&this->field_3CC);
+        memcpy(message.name_20, this->matchOptions_3EC.name_10, sizeof(message.name_20));
+        message.nameEnd_33 = 0;
+        memset(&message.flag_34, 0, sizeof(message.flag_34));
+        length = (strlen(text) < sizeof(message.text_35) - 1) ? strlen(text) : sizeof(message.text_35) - 1;
+        memcpy(message.text_35, text, length);
+        message.text_35[length] = 0;
+        message.textEnd_235 = 0;
+        message.tag_238 = tag;
+        message.time_23C = getServerDateTime(getInstance_());
+        postEvent(18, this->selfIndex_536, 0, 1, &message, this->unused_08);
+        NetworkSessionSlotInfo_dtor(&message, -1);
+        return 1;
+    case REQUEST_CANCELLED:
+        request->getRecord(&error);
+        postEvent(18, 0, error.code_00, 1, &error, this->unused_08);
+        return 1;
+    case REQUEST_FAILED:
+        request->getRecord(&error);
+        postEvent(18, 0, error.code_00, 1, &error, this->unused_08);
+        postEvent(3, 0, error.code_00, 1, &error, this->unused_08);
+        return 1;
+    }
+    return 0;
+}
+
+/* Asks the server to remove player `index` from this console's circle (event 22); only the host may, and
+ * never for itself or an absent player. */
+s32 NetworkSessionManagerPat::slot_1A4(NetworkRequest* request)
+{
+    s8 index = request->getArgument(0);
+    char userId[8];
+    NetworkErrorInfo info;
+
+    switch (request->state_00) {
+    case REQUEST_START:
+        if (this->connected_3C0 == 0) {
+            setSessionLog(request, 0x80050001, 0, 0);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (circleAvailable(this) == 0) {
+            setSessionLog(request, 0x80050032, 0, 0);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (index < 0 || getWord_524() <= index) {
+            setSessionLog(request, 0x80050002, 0, index);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (this->players_538[index].active_00 == 0 || index == this->selfIndex_536) {
+            setSessionLog(request, 0x80050011, 0, index);
+            request->state_00 = REQUEST_CANCELLED;
+        } else {
+            exportTo(&this->players_538[index].smallObject_08, (u8*)userId, sizeof(userId));
+            this->requestFlags_30C[17] = 0;
+            this->requestIds_360[17] = sendReqCircleKick(getInstance_(), userId);
+            request->state_00 = 5;
+        }
+        break;
+    case 5:
+        if (this->requestFlags_30C[17] & REQUEST_SESSION_LOST) {
+            setSessionLogSessionLost(request);
+            request->state_00 = REQUEST_FAILED;
+        } else if (this->requestFlags_30C[17] & REQUEST_ABORTED) {
+            setSessionLogAborted(request);
+            request->state_00 = REQUEST_CANCELLED;
+        } else if (this->requestFlags_30C[17] & 0x1000000) {
+            request->state_00 = 10;
+        }
+        break;
+    case 10:
+        postEvent(22, index, 0, 0, NULL, this->unused_08);
+        return 1;
+    case REQUEST_CANCELLED:
+        request->getRecord(&info);
+        postEvent(22, 0, info.code_00, 1, &info, this->unused_08);
+        return 1;
+    case REQUEST_FAILED:
+        request->getRecord(&info);
+        postEvent(22, 0, info.code_00, 1, &info, this->unused_08);
+        postEvent(3, 0, info.code_00, 1, &info, this->unused_08);
+        return 1;
+    }
+    return 0;
+}
+
+/* Drops the pending circle publish and rewinds the leave steps. */
+void NetworkSessionManagerPat::beginCircleLeave()
+{
+    resetCircleState();
+    this->leaveState_3B4 = 0;
+}
+
+/* One step of leaving the circle: asks the server unless the circle is already gone; 1 when done, 0 while
+ * waiting, -1 / -2 with `error` filled when the request was cancelled / the session was lost. */
+s32 NetworkSessionManagerPat::stepCircleLeave(NetworkErrorInfo* error)
+{
+    u32 record[0x82];
+
+    switch (this->leaveState_3B4) {
+    case 0:
+        if (canSend_28() == 0 || this->circleLost_535 != 0) {
+            this->leaveState_3B4 = 10;
+        } else {
+            this->requestFlags_30C[11] = 0;
+            this->requestIds_360[11] = sendReqCircleLeave(getInstance_(), this->circleInfoRequestId_41C);
+            this->leaveState_3B4 = 5;
+        }
+        break;
+    case 5:
+        if (this->requestFlags_30C[11] & REQUEST_SESSION_LOST) {
+            getErrorInfoOrCode654c(getInstance_(), 0x80050031, error);
+            return -2;
+        }
+        if (this->requestFlags_30C[11] & REQUEST_ABORTED) {
+            if (this->circleLost_535 != 0) {
+                this->leaveState_3B4 = 10;
+                break;
+            }
+            errorRecordCode613c(getInstance_(), record);
+            error->code_00 = 0x80050012;
+            error->param1_04 = 0;
+            error->param2_08 = record[0];
+            return -1;
+        }
+        if (this->requestFlags_30C[11] & 0x80000) {
+            this->leaveState_3B4 = 10;
+        }
+        break;
+    case 10:
+        networkPatAttachBuffer(this);
+        return 1;
+    }
+    return 0;
+}
+
+/* Resets the Pat side of the session: the joined circle, the counters and slots, the player records, the
+ * session's flag B, the match record, the three timeouts and the pending publish. */
+void networkPatAttachBuffer(NetworkSessionManagerPat* self)
+{
+    s32 i;
+
+    self->matchOptions_3EC.mode_06 = 0;
+    self->circleInfoRequestId_41C = 0;
+    memset(self->circleName_424, 0, sizeof(self->circleName_424));
+    self->limitB_524 = 0;
+    self->limitA_528 = 0;
+    self->usedB_52C = 0;
+    self->usedA_530 = 0;
+    self->flag_534 = 0;
+    self->circleLost_535 = 0;
+    self->selfIndex_536 = -1;
+    self->hostIndex_537 = -2;
+    if (self->buffer != NULL) {
+        ((NetworkSessionStable*)self->buffer)->clearSubhostIndex();
+    }
+    for (i = 0; i < 4; i++) {
+        self->resetPlayerRecord(i);
+    }
+    if (self->buffer != NULL) {
+        ((NetworkSessionBase*)self->buffer)->setUserFlagB(0);
+    }
+    self->matchMemberCount_664 = 0;
+    self->matchPhase_66C = 0;
+    memset(self->matchData_66E, 0, sizeof(self->matchData_66E));
+    networkSessionTimeoutSeconds = 48.0f;
+    networkSessionIntervalSeconds = networkSessionPeriodSeconds;
+    networkSessionLimitSeconds = networkSessionPeriodSeconds;
+    self->nameList_7A0.count_04 = 0;
+    self->conditionList_7E8.count_04 = 0;
+    memset(self->sessionName_850, 0, sizeof(self->sessionName_850));
+    self->circleRecordCount_950 = 0;
+    memset(self->circleComment_A54, 0, sizeof(self->circleComment_A54));
+    self->field_AE5 = 0;
+    self->field_AE6 = 0;
+}
+
+/* The Pat holder the library constructor published. */
+NetworkPat* getPatsObject(void)
+{
+    return sNetworkPatInstance;
+}
+
 /* Reports error 0x80050011 for the request slot +0x1A8 and finishes. */
 s32 NetworkSessionManagerPat::slot_1A8(NetworkRequest* request)
 {
     NetworkErrorInfo info;
 
-    info.value_00 = 0x80050011;
-    info.code_04 = 0;
-    info.extra_08 = 0;
-    postEvent(23, 0, info.value_00, 1, &info, this->unused_08);
+    info.code_00 = 0x80050011;
+    info.param1_04 = 0;
+    info.param2_08 = 0;
+    postEvent(23, 0, info.code_00, 1, &info, this->unused_08);
     return 1;
 }
 
@@ -484,6 +2369,537 @@ f32 NetworkSessionManagerPat::getTimeSincePublish()
 }
 #pragma peephole off
 
+
+/* The session's event callback (installed by `initNetworkSessionStable` through
+ * `networkSessionReflectCallback`): 1 a slot connected, 2 a user packet (event 29), 3 a slot failed (events 35
+ * / 36), 4 a chat packet, 5 a terms update for the friend on that slot.  The parameters keep the forwarder's
+ * untyped spelling: the manager, the event, the slot, the packet's two words and its bytes. */
+/* untyped: caller-owned payload - the six arguments are forwarded unchanged by networkSessionReflectCallback */
+void networkSessionReflect0(void* a0, void* a1, s8 a2, void* a3, void* a4, void* a5)
+{
+    NetworkSessionManagerPat* self = (NetworkSessionManagerPat*)a0;
+    const u8* data = (const u8*)a5;
+    NetworkSmallObject address;
+    PatChatHeader header;
+    s32 player = self->slot_1C4(a2);
+    u8 kind;
+    s32 code;
+
+    switch ((s32)a1) {
+    case 1:
+        if (getNetworkLayerPat(getPatsObject(), 0) != NULL) {
+            getNetworkLayerPat(getPatsObject(), 0)->onSessionConnected(a2);
+        }
+        break;
+    case 2:
+        if ((s8)player >= 0 && self->players_538[(s8)player].announced_01 != 0) {
+            self->postEvent(29, player, (s32)a3, (s32)a4, data, self->unused_08);
+        }
+        break;
+    case 3:
+        if (getNetworkLayerPat(getPatsObject(), 0) != NULL) {
+            networkSmallObject_construct(&address);
+            getNetworkLayerPat(getPatsObject(), 0)->getMemberAddress(a2, &address);
+            if (networkSmallObject_isEqual(&address, &self->field_3CC) != 0) {
+                self->reportSessionError((const NetworkErrorInfo*)data);
+                self->errorCode_794 = ((const NetworkErrorInfo*)data)->code_00;
+                self->errorParam1_798 = ((const NetworkErrorInfo*)data)->param1_04;
+                self->errorParam2_79C = ((const NetworkErrorInfo*)data)->param2_08;
+            }
+            getNetworkLayerPat(getPatsObject(), 0)->onSessionFailed(a2, (const NetworkErrorInfo*)data);
+            NetworkSmallObjectSink::destroy(&address);
+        }
+        if ((s8)player >= 0 && self->matchRunning_3C1 != 0) {
+            if ((s8)player == self->selfIndex_536) {
+                self->matchPhase_66C = 0;
+                if (isNetworkSessionManagerPatReady(self) != 0) {
+                    self->postEvent(35, 0, self->errorCode_794, 1, &self->errorCode_794, self->unused_08);
+                }
+            } else {
+                if (self->udp_65C != NULL) {
+                    self->udp_65C->remove(&self->players_538[(s8)player].address_40);
+                }
+                if (self->matchPhase_66C != 0 && self->players_538[(s8)player].announced_01 != 0) {
+                    self->postEvent(36, player, ((const NetworkErrorInfo*)data)->code_00, 1, data, self->unused_08);
+                }
+            }
+        }
+        break;
+    case 4:
+        kind = data[0];
+        if ((s8)player >= 0) {
+            switch (kind) {
+            case 1:
+                self->readChatHeader(&header, data);
+                if (self->players_538[(s8)player].announced_01 != 0) {
+                    code = 31;
+                    if ((s8)player == self->selfIndex_536) {
+                        code = 30;
+                    }
+                    self->postEvent(code, player, 0, 0, NULL, self->unused_08);
+                }
+                break;
+            case 2:
+                self->receiveSessionChat(data, (u32)a4);
+                break;
+            }
+        }
+        break;
+    case 5:
+        if (getMediatorTermsStatus(getInstance()) != 0 && isMediatorTermsUpdateFinished(getInstance()) != 0 &&
+            getNetworkLayerPat(getPatsObject(), 0) != NULL) {
+            s8 friendIndex = getNetworkLayerPat(getPatsObject(), 0)->findSessionFriend(a2);
+
+            getInstance()->pushTransferRecord(friendIndex, (const u8*)((const u32*)data)[1], (s32)((const u32*)data)[0]);
+        }
+        break;
+    }
+}
+
+/* The server's message callback (installed with `setCallback(..., 3)` through `networkSessionReflectCallbackEx`):
+ * each message code sets the reply bits the waiting request handlers poll, or updates the circle, player and
+ * match records directly. */
+void networkSessionReflect1(NetworkSessionManagerPat* self, s32 code, s32 requestId, s32 flag, s32 count,
+                            const u8* data)
+{
+    s32 i;
+
+    switch (code) {
+    case 0x8000:
+    case 0x8007:
+        for (i = 0; i < 21; i++) {
+            if (self->requests_10[i] != NULL) {
+                break;
+            }
+        }
+        if (i == 21) {
+            NetworkErrorInfo error;
+
+            getErrorInfoOrCode654c(getInstance_(), 0x80050031, &error);
+            self->postEvent(3, 0, error.code_00, 1, &error, self->unused_08);
+        }
+        for (i = 0; i < 21; i++) {
+            self->requestFlags_30C[i] |= REQUEST_SESSION_LOST;
+        }
+        break;
+    case 0x8006:
+        self->requestFlags_30C[1] |= 0x10;
+        self->requestFlags_30C[2] |= 0x10;
+        for (i = 0; i < 21; i++) {
+            self->requestFlags_30C[i] |= REQUEST_SESSION_LOST;
+        }
+        break;
+    case 0x8002:
+        self->requestFlags_30C[1] |= REQUEST_ABORTED;
+        self->requestFlags_30C[2] |= REQUEST_ABORTED;
+        for (i = 0; i < 21; i++) {
+            if (requestId == self->requestIds_360[i]) {
+                self->requestFlags_30C[i] |= REQUEST_ABORTED;
+            }
+        }
+        break;
+    case 0x8004:
+        if (flag != 0) {
+            for (i = 0; i < 21; i++) {
+                self->requestFlags_30C[i] |= REQUEST_SESSION_LOST;
+            }
+        }
+        break;
+    case 0x8005:
+        self->requestFlags_30C[1] |= 0x8;
+        self->requestFlags_30C[2] |= 0x8;
+        break;
+    case 0x8008:
+        self->requestFlags_30C[1] |= 0x20;
+        break;
+    case 0x8042:
+        self->circleInfoRequestId_41C = *(const s32*)data;
+        if (self->circleInfoRequestId_41C <= 0) {
+            NetworkErrorInfo error;
+
+            error.code_00 = 0x80000000;
+            error.param1_04 = 0;
+            error.param2_08 = 0;
+            ((NetworkInstanceDispatch*)getInstance_())->postError(*(NetworkPostedError*)&error);
+            break;
+        }
+        self->limitA_528 = 0;
+        self->usedA_530 = 0;
+        self->selfIndex_536 = 0;
+        self->hostIndex_537 = 0;
+        self->addPlayerRecord(0, self->matchOptions_3EC.userId_08, self->matchOptions_3EC.name_10, 0, 0, 0);
+        self->requestFlags_30C[3] |= 0x40;
+        break;
+    case 0x8054:
+        self->listTotal_AEC = ((const s32*)data)[1];
+        self->requestFlags_30C[4] |= 0x1000;
+        break;
+    case 0x8055:
+        if (count <= 0) {
+            NetworkErrorInfo error;
+
+            error.code_00 = 0x80000000;
+            error.param1_04 = 0;
+            error.param2_08 = 0;
+            ((NetworkInstanceDispatch*)getInstance_())->postError(*(NetworkPostedError*)&error);
+            break;
+        }
+        if (count > 32 - self->circleList_AF0.count_00) {
+            count = 32 - self->circleList_AF0.count_00;
+        }
+        for (i = 0; i < count; i++) {
+            self->addCircleInfo(self->circleList_AF0.count_00, &((const PatCircleRecord*)data)->info_000,
+                                (PatCircleOptionList*)&((const PatCircleRecord*)data)->options_37C);
+            data += sizeof(PatCircleRecord);
+        }
+        self->listCursor_AE8 += count;
+        self->requestFlags_30C[4] |= 0x2000;
+        break;
+    case 0x8056:
+        self->requestFlags_30C[4] |= 0x4000;
+        break;
+    case 0x8063:
+        self->requestFlags_30C[1] |= 0x2000000;
+        break;
+    case 0x8053:
+        self->circleList_AF0.count_00 = 0;
+        self->field_6E74 = 1;
+        for (i = 0; i < 32; i++) {
+            networkPatResetCircleInfo(self, i);
+        }
+        for (i = 0; i < count; i++) {
+            self->addCircleInfo(((const PatCircleRecord*)data)->info_000.slotNumber_36C - 1,
+                                &((const PatCircleRecord*)data)->info_000,
+                                (PatCircleOptionList*)&((const PatCircleRecord*)data)->options_37C);
+            data += sizeof(PatCircleRecord);
+        }
+        self->requestFlags_30C[5] |= 0x800;
+        break;
+    case 0x8064:
+        createCircleLayer(self, &((const PatCircleRecord*)data)->info_000,
+                          (PatCircleOptionList*)&((const PatCircleRecord*)data)->options_37C);
+        break;
+    case 0x8065:
+        changeCircleListLayer(self, &((const PatCircleRecord*)data)->info_000,
+                              (PatCircleOptionList*)&((const PatCircleRecord*)data)->options_37C);
+        break;
+    case 0x8066:
+        deleteCircleListLayer(self, *(const s32*)data);
+        break;
+    case 0x8044: {
+        self->circleInfoRequestId_41C = *(const s32*)data;
+        self->selfIndex_536 = ((const PatPlayerNotice*)data)->slot_04;
+        if (self->circleInfoRequestId_41C <= 0 || ((const PatPlayerNotice*)data)->slot_04 < 0 ||
+            self->getWord_524() <= ((const PatPlayerNotice*)data)->slot_04) {
+            NetworkErrorInfo error;
+
+            error.code_00 = 0x80000000;
+            error.param1_04 = 0;
+            error.param2_08 = 0;
+            ((NetworkInstanceDispatch*)getInstance_())->postError(*(NetworkPostedError*)&error);
+            break;
+        }
+        self->addPlayerRecord(((const PatPlayerNotice*)data)->slot_04, self->matchOptions_3EC.userId_08,
+                              self->matchOptions_3EC.name_10, 0, 0, 0);
+        self->requestFlags_30C[6] |= 0x20000;
+        break;
+    }
+    case 0x8045: {
+        u8 slot = ((const PatPlayerNotice*)data)->slot_04;
+
+        if ((s8)data[6] != 0 && (s8)slot >= 0 && (s8)slot < self->getWord_524()) {
+            self->addPlayerRecord((s8)slot, ((const PatPlayerNotice*)data)->address_06,
+                                  ((const PatPlayerNotice*)data)->name_0E, 0,
+                                  ((const PatPlayerNotice*)data)->kind_05 == 2,
+                                  self->requests_10[3] == NULL && self->requests_10[6] == NULL);
+        }
+        break;
+    }
+    case 0x8046:
+        self->requestFlags_30C[11] |= 0x80000;
+        break;
+    case 0x8047: {
+        u8 slot = ((const PatPlayerNotice*)data)->slot_04;
+
+        if ((s8)data[6] != 0 && (s8)slot >= 0 && (s8)slot < self->getWord_524()) {
+            self->removePlayerRecord((s8)slot, ((const PatPlayerNotice*)data)->kind_05 == 2);
+        }
+        break;
+    }
+    case 0x8043:
+        self->circleOwnerId_420 = ((const PatCircleInfo*)data)->ownerId_368;
+        memcpy(self->circleName_424, ((const PatCircleInfo*)data)->name_004, 63);
+        self->circleName_424[63] = 0;
+        self->limitA_528 = ((const PatCircleInfo*)data)->limitA_358;
+        self->usedA_530 = ((const PatCircleInfo*)data)->usedA_35C;
+        self->limitB_524 = ((const PatCircleInfo*)data)->limitB_360;
+        self->usedB_52C = ((const PatCircleInfo*)data)->usedB_364;
+        self->requestFlags_30C[3] |= 0x8000;
+        self->requestFlags_30C[6] |= 0x8000;
+        break;
+    case 0x8051:
+        if (requestId == self->requestIds_360[11]) {
+            self->requestFlags_30C[11] |= 0x10000;
+        }
+        if (requestId == self->requestIds_360[8]) {
+            self->requestFlags_30C[8] |= 0x10000;
+        }
+        break;
+    case 0x805E:
+        for (i = 0; i < count; i++) {
+            u8 slot = ((const PatMemberEntry*)data)->slot_07;
+
+            if ((s8)slot >= 0 && (s8)slot < self->getWord_524() && (s8)slot != self->selfIndex_536 &&
+                self->players_538[(s8)slot].active_00 == 0) {
+                self->addPlayerRecord((s8)slot, ((const PatMemberEntry*)data)->address_08,
+                                      ((const PatMemberEntry*)data)->name_10,
+                                      ((const PatMemberEntry*)data)->state_06 != 0, 0, 0);
+            }
+            data += sizeof(PatMemberEntry);
+        }
+        self->requestFlags_30C[6] |= 0x80;
+        break;
+    case 0x805C: {
+        u8 slot = ((const PatPlayerNotice*)data)->slot_04;
+
+        if ((s8)slot < 0 || (s8)slot >= self->getWord_524()) {
+            NetworkErrorInfo error;
+
+            error.code_00 = 0x80000000;
+            error.param1_04 = 0;
+            error.param2_08 = 0;
+            ((NetworkInstanceDispatch*)getInstance_())->postError(*(NetworkPostedError*)&error);
+            break;
+        }
+        self->hostIndex_537 = (s8)slot;
+        self->requestFlags_30C[6] |= 0x40000;
+        break;
+    }
+    case 0x805D: {
+        u8 slot = ((const PatPlayerNotice*)data)->slot_04;
+        s8 subhost;
+
+        if ((s8)slot >= 0 && (s8)slot < self->getWord_524() && self->players_538[(s8)slot].active_00 != 0 &&
+            self->hostIndex_537 != (s8)slot) {
+            self->hostIndex_537 = (s8)slot;
+            if (self->players_538[(s8)slot].announced_01 != 0) {
+                self->postEvent(14, (s8)slot, 0, 0, NULL, self->unused_08);
+            }
+            subhost = self->mapId_1C0(self->hostIndex_537);
+            if (subhost >= 0 && self->buffer != NULL) {
+                ((NetworkSessionStable*)self->buffer)->setSubhostIndex(subhost);
+            }
+        }
+        break;
+    }
+    case 0x804A:
+        self->requestFlags_30C[3] |= 0x100000;
+        self->requestFlags_30C[6] |= 0x100000;
+        if (requestId == self->requestIds_360[18]) {
+            self->field_3C2 = 1;
+            self->requestFlags_30C[18] |= 0x100000;
+        }
+        if (requestId == self->requestIds_360[11]) {
+            self->matchOptions_3EC.mode_06 = 0;
+            self->players_538[self->selfIndex_536].state_03 = 0;
+            self->requestFlags_30C[11] |= 0x100000;
+        }
+        break;
+    case 0x804B:
+        self->updatePlayerRecord(((const PatMemberEntry*)data)->slot_07, NULL, NULL,
+                                 ((const PatMemberEntry*)data)->state_06 != 0);
+        break;
+    case 0x804D:
+        self->requestFlags_30C[7] |= 0x200000;
+        break;
+    case 0x804E: {
+        const PatMatchMember* member = ((const PatMatchNotice*)data)->members_04;
+        s32 index;
+        u8 slot;
+
+        self->matchMemberCount_664 = 0;
+        self->matchPhase_66C = 0;
+        memset(self->matchData_66E, 0, sizeof(self->matchData_66E));
+        if (count > 4) {
+            count = 4;
+        }
+        for (index = 0; index < count; index++, member++) {
+            slot = member->slot_07;
+
+            if ((s8)slot >= 0 && (s8)slot < self->getWord_524()) {
+                NetworkSessionPlayerRecord* player = &self->players_538[(s8)slot];
+
+                if (player->active_00 != 0) {
+                    if ((s8)slot == self->selfIndex_536) {
+                        self->matchPhase_66C = 1;
+                        if (((const PatMatchNotice*)data)->timeout_0C >= 16 &&
+                            ((const PatMatchNotice*)data)->timeout_0C <= 80) {
+                            networkSessionTimeoutSeconds = ((const PatMatchNotice*)data)->timeout_0C;
+                        }
+                        if (((const PatMatchNotice*)data)->interval_10 >= 20 &&
+                            ((const PatMatchNotice*)data)->interval_10 <= 100) {
+                            networkSessionIntervalSeconds = ((const PatMatchNotice*)data)->interval_10;
+                        }
+                        if (((const PatMatchNotice*)data)->limit_18 >= 20 &&
+                            ((const PatMatchNotice*)data)->limit_18 <= 100) {
+                            networkSessionLimitSeconds = ((const PatMatchNotice*)data)->limit_18;
+                        }
+                        self->matchOptions_3EC.mode_06 = 2;
+                    } else {
+                        memcpy(player->address_40.ip_00, member->address_00.ip_00, sizeof(player->address_40.ip_00));
+                        player->address_40.port_04 = member->address_00.port_04;
+                    }
+                    self->matchMembers_668[self->matchMemberCount_664++] = slot;
+                }
+            }
+        }
+        if (self->matchPhase_66C != 0 && ((const PatMatchNotice*)data)->kind_08 == 1 &&
+            self->matchMemberCount_664 != 1) {
+            self->matchPhase_66C = 0;
+        }
+        if (circleAvailable(self) != 0) {
+            break;
+        }
+        if (self->field_3C2 != 0) {
+            self->field_3C3 = 1;
+            break;
+        }
+        if (self->players_538[self->selfIndex_536].announced_01 != 0) {
+            if (self->matchPhase_66C != 0) {
+                s8 subhost = self->mapId_1C0(self->hostIndex_537);
+
+                if (subhost >= 0 && self->buffer != NULL) {
+                    ((NetworkSessionStable*)self->buffer)->setSubhostIndex(subhost);
+                } else {
+                    NetworkErrorInfo error;
+
+                    error.code_00 = 0x80000000;
+                    error.param1_04 = 0;
+                    error.param2_08 = 0;
+                    ((NetworkInstanceDispatch*)getInstance_())->postError(*(NetworkPostedError*)&error);
+                    break;
+                }
+            }
+            self->postEvent(25, self->selfIndex_536, -(!self->matchPhase_66C), self->matchMemberCount_664,
+                            self->matchMembers_668, self->unused_08);
+        }
+        break;
+    }
+    case 0x804F:
+        if (requestId == self->requestIds_360[10]) {
+            self->matchOptions_3EC.mode_06 = 1;
+            self->players_538[self->selfIndex_536].state_03 = 1;
+            self->requestFlags_30C[10] = 0x400000;
+        }
+        if (requestId == self->requestIds_360[11]) {
+            self->matchOptions_3EC.mode_06 = 0;
+            self->players_538[self->selfIndex_536].state_03 = 0;
+            self->requestFlags_30C[11] = 0x400000;
+        }
+        break;
+    case 0x805F: {
+        const PatBinaryField* field = ((const PatBinaryNotice*)data)->fields_0C;
+
+        if ((s8)((const PatBinaryNotice*)data)->address_00[0] != 0 && field->type_00 == 1) {
+            u8 kind = field->kind_08;
+
+            if (field->type_10 == 2) {
+                u32 value = field->value_18;
+                NetworkSmallObject address;
+                s8 player;
+
+                networkSmallObject_construct(&address);
+                networkSmallObject_setAddress(&address, 3, data, 8);
+                switch (kind) {
+                case 2:
+                    sendNtcCircleUserValueReply(getInstance_(), self->circleInfoRequestId_41C,
+                                self->players_538[self->selfIndex_536].value_3C, data);
+                case 1:
+                    player = self->uniqueIdToMember(&address);
+                    if (player >= 0) {
+                        self->players_538[player].flag_02 = 1;
+                        if (value != self->players_538[player].value_3C) {
+                            self->players_538[player].value_3C = value;
+                            if (self->players_538[player].announced_01 != 0) {
+                                self->postEvent(21, player, 0, 1, &self->players_538[player].value_3C,
+                                                self->unused_08);
+                            }
+                        }
+                    }
+                    break;
+                case 3:
+                    player = self->uniqueIdToMember(&address);
+                    if (player >= 0 && value == 3) {
+                        self->players_538[player].linked_04 = value;
+                    }
+                    break;
+                }
+                NetworkSmallObjectSink::destroy(&address);
+            }
+        }
+        break;
+    }
+    case 0x8057:
+        self->requestFlags_30C[17] |= 0x1000000;
+        break;
+    case 0x8049:
+    case 0x8058:
+        self->circleLost_535 = 1;
+        if (self->field_3C2 != 0) {
+            self->field_3C4 = (code == 0x8049) ? 0x80050037 : 0x80050036;
+            break;
+        }
+        if (self->requests_10[6] == NULL && self->requests_10[11] == NULL) {
+            if (self->players_538[self->selfIndex_536].announced_01 != 0) {
+                NetworkErrorInfo error;
+
+                error.code_00 = (code == 0x8049) ? 0x80050037 : 0x80050036;
+                error.param1_04 = 0;
+                error.param2_08 = 0;
+                self->postEvent(12, 0, error.code_00, 1, &error, self->unused_08);
+            }
+            networkPatAttachBuffer(self);
+        }
+        break;
+    case 0x8061:
+        self->requestFlags_30C[15] |= 0x4000000;
+        break;
+    case 0x8060:
+    case 0x8062:
+        if ((s8)data[0] != 0 && (s8)data[0x108] != 0) {
+            NetworkSessionSlotInfo message;
+            s8 player;
+
+            NetworkSessionSlotInfo_construct(&message);
+            networkSmallObject_setAddress(&message.smallObject_00, 3, ((const PatServerChat*)data)->address_108, 8);
+            memcpy(message.name_20, ((const PatServerChat*)data)->name_110, sizeof(message.name_20));
+            message.nameEnd_33 = 0;
+            memset(&message.flag_34, 0, sizeof(message.flag_34));
+            memcpy(message.text_35, ((const PatServerChat*)data)->text_000, 0xFF);
+            message.text_35[0xFF] = 0;
+            message.textEnd_235 = 0;
+            message.tag_238 = ((const PatServerChat*)data)->tag_100;
+            message.time_23C = ((const PatServerChat*)data)->time_104;
+            player = self->uniqueIdToMember(&message.smallObject_00);
+            if (player >= 0) {
+                self->postEvent(19, player, 0, 1, &message, self->unused_08);
+            }
+            NetworkSessionSlotInfo_dtor(&message, -1);
+        }
+        break;
+    case 0x8067:
+        self->requestFlags_30C[9] |= 0x8000000;
+        break;
+    case 0x8068:
+        if ((s8)data[0] == 1) {
+            self->matchPhase_66C = 0;
+        }
+        break;
+    case 0x8069:
+        memcpy(self->matchData_66E, data, sizeof(self->matchData_66E));
+        break;
+    }
+}
 
 /* Clears circle entry `index` (0..31): ids, name, address, options, counters, records and comment. */
 void networkPatResetCircleInfo(NetworkSessionManagerPat* self, s32 index)
@@ -789,6 +3205,58 @@ s32 NetworkSessionManagerPat::packCircleOptions(PatCircleOption* dst, s32 max, N
     return count;
 }
 
+/* Packs the set conditions of `src` (at most eight, the list's count clamped in place) into search filters,
+ * mapping each condition kind to the server's operator; returns how many were packed (at most `max`). */
+s32 NetworkSessionManagerPat::packCircleConditions(PatCircleFilter* dst, s32 max, PatConditionList* src)
+{
+    s32 count;
+    PatCondition* condition;
+    u32 i;
+
+    if (dst == NULL || max <= 0 || src == NULL) {
+        return 0;
+    }
+    count = 0;
+    if (src->count_04 > 8) {
+        src->count_04 = 8;
+    }
+    for (i = 0, condition = src->entries_08; i < src->count_04; condition++, i++) {
+        dst->slot_04 = condition->slot_00 + 1;
+        switch (condition->kind_01) {
+        case 1:
+            dst->op_00 = 5;
+            break;
+        case 2:
+            dst->op_00 = 6;
+            break;
+        case 3:
+            dst->op_00 = 4;
+            break;
+        case 4:
+            dst->op_00 = 3;
+            break;
+        case 5:
+            dst->op_00 = 2;
+            break;
+        case 6:
+            dst->op_00 = 1;
+            break;
+        default:
+            continue;
+        }
+        if (condition->enabled_04 == 1) {
+            dst->enabled_05 = 1;
+            dst->value_08 = condition->value_08;
+            dst++;
+            count++;
+            if (count >= max) {
+                break;
+            }
+        }
+    }
+    return count;
+}
+
 /* Packs the name list's enabled entries into the circle-info option list `dst` (at most 32). */
 void buildCircleInfoName(NetworkSessionManagerPat* self, PatCircleOptionList* dst, NetworkNameList* src)
 {
@@ -972,6 +3440,66 @@ void closeNetworkSessionManagerPat(NetworkSessionManagerPat* self)
     networkPatReleaseBuffer(self);
 }
 
+/* Opens a session slot (kind 6) for the layer member at `address` and connects it with the GameSpy thread;
+ * the slot, 0 for this console's own address, -1 while the session is not ready, -2 when no slot is free. */
+s8 NetworkSessionManagerPat::connectPeer(const NetworkSmallObject* address, u32 value)
+{
+    PatPeerConnect peer;
+    s32 slot;
+
+    if (GameSpyInterfaceThread::getInstance() == NULL || this->buffer == NULL || address == NULL || value == 0 ||
+        this->field_3C8 == 0) {
+        return -1;
+    }
+    if (networkSmallObject_isEqual(&this->field_3CC, address) != 0) {
+        return 0;
+    }
+    slot = ((NetworkSessionBase*)this->buffer)->set(6, (const u8*)address);
+    if ((s8)slot < 0) {
+        return -2;
+    }
+    peer.value_04 = value;
+    peer.thread_00 = GameSpyInterfaceThread::getInstance();
+    ((NetworkSessionBase*)this->buffer)->connect((s8)slot, (u32)&peer, 1);
+    return (s8)slot;
+}
+
+/* Sends the error record (when given) and the GameSpy thread's own error (when set) to the server. */
+void NetworkSessionManagerPat::reportSessionError(const NetworkErrorInfo* info)
+{
+    u32 values[3];
+    NetworkErrorInfo threadError;
+
+    if (info != NULL) {
+        values[0] = info->code_00;
+        values[1] = info->param1_04;
+        values[2] = info->param2_08;
+        sendServerTimeout(getInstance_(), values);
+    }
+    if (GameSpyInterfaceThread::getInstance() != NULL) {
+        GameSpyInterfaceThread::getInstance()->getErrorStruct(&threadError);
+        if (threadError.code_00 != 0) {
+            values[0] = threadError.code_00;
+            values[1] = threadError.param1_04;
+            values[2] = threadError.param2_08;
+            sendServerTimeout(getInstance_(), values);
+        }
+    }
+}
+
+/* Hands an event to the callback at +0x04; an error event without a code of its own (a negative value with a
+ * record, other than events 12, 28 and 35) takes the singleton's pending error first. */
+/* untyped: caller-owned payload - an error record, an index or a state byte, by event */
+void NetworkSessionManagerPat::postEvent(s32 code, s8 slot, s32 value, s32 kind, const void* payload, u32 context)
+{
+    if (value < 0 && payload != NULL && code != 28 && code != 35 && code != 12 && getInstance_() != NULL &&
+        getErrorInfo654c(getInstance_(), NULL) != 0) {
+        getErrorInfoOrCode654c(getInstance_(), 0x80050031, (NetworkErrorInfo*)payload);
+        value = ((const NetworkErrorInfo*)payload)->code_00;
+    }
+    ((PatErrorCallback)this->unused_04)(code, slot, value, kind, (NetworkErrorInfo*)payload, context);
+}
+
 /* Logs and hands the host connection index to the session (indices 0..3 only). */
 void NetworkSessionManagerPat::setHostConnectionIndex(s8 index)
 {
@@ -1017,7 +3545,7 @@ void NetworkSessionManagerPat::copyNameList(const NetworkNameList* src)
 void NetworkSessionManagerPat::copyNameListTail(const u8* src)
 {
     if (src != NULL) {
-        memcpy(this->nameListTail_7E8, src, sizeof(this->nameListTail_7E8));
+        memcpy(&this->conditionList_7E8, src, sizeof(this->conditionList_7E8));
     }
 }
 
@@ -1116,6 +3644,140 @@ BOOL isNetworkSessionManagerPatReady(NetworkSessionManagerPat* session_manager)
         return session->getUserFlagB();
     }
     return FALSE;
+}
+
+/* Reads the 10-byte chat header at `data` into `out`. */
+void NetworkSessionManagerPat::readChatHeader(PatChatHeader* out, const u8* data)
+{
+    u8 target;
+    NetworkUnitPacket packet;
+
+    packet.bind((u8*)data, 10);
+    ((NetworkByteStream*)&packet)->takeByte(&out->kind_00);
+    ((NetworkByteStream*)&packet)->takeByte(&target);
+    ((NetworkByteStream*)&packet)->takeU32(&out->sender_04);
+    ((NetworkByteStream*)&packet)->takeU32(&out->tag_08);
+    out->target_01 = target;
+}
+
+/* Sends a chat packet over the session: the header, this console's address and the text, to the target's
+ * layer slot (or to everyone for -1); nothing when the target has no slot. */
+void NetworkSessionManagerPat::sendSessionChat(const char* text, u32 tag, s8 target)
+{
+    if (this->buffer != NULL) {
+        u8 buffer[0x280];
+        NetworkUnitPacket packet;
+        NetworkPeerRecord record;
+        s8 slot;
+
+        record.data_00 = (void*)text;
+        record.size_04 = strlen(text);
+        packet.attach(buffer, sizeof(buffer));
+        ((NetworkByteStream*)&packet)->putByte(2);
+        ((NetworkByteStream*)&packet)->putByte(target);
+        ((NetworkByteStream*)&packet)->putU32(this->selfIndex_536);
+        ((NetworkByteStream*)&packet)->putU32(tag);
+        ((NetworkByteStream*)&packet)->pullRecord((NetworkStreamSink*)&this->field_3CC);
+        ((NetworkByteStream*)&packet)->putRecord(&record);
+        slot = -2;
+        if (target != -1) {
+            slot = mapId_1C0(target);
+            if (slot < 0) {
+                return;
+            }
+        }
+        ((NetworkSessionBase*)this->buffer)->sendOp4(((NetworkByteStream*)&packet)->getData(),
+                                                     ((NetworkByteStream*)&packet)->getSize(), slot);
+    }
+}
+
+/* Reports a chat packet received over the session (event 19) when it comes from an announced player whose
+ * address matches the one the packet carries. */
+void NetworkSessionManagerPat::receiveSessionChat(const u8* data, u32 size)
+{
+    NetworkSessionSlotInfo message;
+    u8 text[0x200];
+    NetworkSmallObject sender;
+    NetworkUnitPacket packet;
+    NetworkPeerRecord record;
+    u32 senderWord;
+    u32 tag;
+    u8 kind;
+    u8 target;
+    s8 index;
+    u32 length;
+
+    networkSmallObject_construct(&sender);
+    record.data_00 = text;
+    record.size_04 = sizeof(text);
+    packet.bind((u8*)data, size);
+    ((NetworkByteStream*)&packet)->takeByte(&kind);
+    ((NetworkByteStream*)&packet)->takeByte(&target);
+    ((NetworkByteStream*)&packet)->takeU32(&senderWord);
+    ((NetworkByteStream*)&packet)->takeU32(&tag);
+    ((NetworkByteStream*)&packet)->forwardRecord((NetworkStreamSink*)&sender);
+    ((NetworkByteStream*)&packet)->takeRecord(&record);
+    index = senderWord;
+    if (index < 0 || index >= getWord_524()) {
+        NetworkSmallObjectSink::destroy(&sender);
+        return;
+    }
+    if (index == this->selfIndex_536) {
+        NetworkSmallObjectSink::destroy(&sender);
+        return;
+    }
+    if (this->players_538[index].announced_01 != 0) {
+        NetworkSessionSlotInfo_construct(&message);
+        if (networkSmallObject_isEqual(&sender, &this->players_538[index].smallObject_08) == 0) {
+            NetworkSessionSlotInfo_dtor(&message, -1);
+            NetworkSmallObjectSink::destroy(&sender);
+            return;
+        }
+        message.smallObject_00.vtable->slot_28(&message.smallObject_00, (const u8*)&sender);
+        memcpy(message.name_20, this->players_538[index].name_28, sizeof(message.name_20));
+        message.nameEnd_33 = 0;
+        memset(&message.flag_34, 0, sizeof(message.flag_34));
+        length = (record.size_04 < sizeof(message.text_35) - 1) ? record.size_04 : sizeof(message.text_35) - 1;
+        memcpy(message.text_35, record.data_00, length);
+        message.text_35[length] = 0;
+        message.textEnd_235 = 0;
+        message.tag_238 = tag;
+        message.time_23C = getServerDateTime(getInstance_());
+        postEvent(19, index, 0, 1, &message, this->unused_08);
+        NetworkSessionSlotInfo_dtor(&message, -1);
+    }
+    NetworkSmallObjectSink::destroy(&sender);
+}
+
+/* Reports `code`/`arg_a`/`arg_b` to the server and records them as the request's error. */
+void NetworkSessionManagerPat::setSessionLog(NetworkRequest* request, u32 code, u32 arg_a, u32 arg_b)
+{
+    u32 values[3];
+
+    values[0] = code;
+    values[1] = arg_a;
+    values[2] = arg_b;
+    sendServerTimeout(getInstance_(), values);
+    clearErrorRecord613c(getInstance_());
+    request->setRecord(code, arg_a, arg_b);
+}
+
+/* Records the cancelled-request error (0x80050012) the singleton builds as the request's error. */
+void NetworkSessionManagerPat::setSessionLogAborted(NetworkRequest* request)
+{
+    NetworkErrorInfo info;
+
+    buildErrorInfo613c(getInstance_(), 0x80050012, &info);
+    request->setRecord(info.code_00, info.param1_04, info.param2_08);
+}
+
+/* Records the session-lost error (the singleton's own record, else 0x80050031) as the request's error. */
+void NetworkSessionManagerPat::setSessionLogSessionLost(NetworkRequest* request)
+{
+    NetworkErrorInfo info;
+
+    getErrorInfoOrCode654c(getInstance_(), 0x80050031, &info);
+    request->setRecord(info.code_00, info.param1_04, info.param2_08);
 }
 
 /* ----------------------------------------------------------------------------------------- */
@@ -1279,6 +3941,79 @@ void NetworkLayer::move()
             }
         }
     }
+}
+
+/* Sets `id` to `size` bytes (at most 0x3C) of id kind `kind`, warning on a bad argument. */
+void NetworkLayerIdImportFrom(NetworkLayerId* id, u8 kind, const u8* data, u32 size)
+{
+    if (id == NULL) {
+        getNetworkLogger()->warn_10("NetworkLayerIdImportFrom: arg->this is null.\n");
+        return;
+    }
+    if (data == NULL) {
+        getNetworkLogger()->warn_10("NetworkLayerIdImportFrom: arg->data is null.\n");
+        return;
+    }
+    if (size > 0x3C) {
+        getNetworkLogger()->warn_10("NetworkLayerIdImportFrom: this->max < arg->size\n");
+        return;
+    }
+    if (size == 0) {
+        getNetworkLogger()->log_14("NetworkLayerIdImportFrom: arg->size is zero.\n");
+        return;
+    }
+    memset(id, 0, sizeof(id->data_04));
+    id->kind_00 = kind;
+    id->pad_01[0] = 0;
+    id->pad_01[1] = 0;
+    id->pad_01[2] = 0;
+    memcpy(id->data_04, data, size);
+}
+
+/* Copies `size` id bytes (at most 0x3C) out of `id`, warning on a bad argument. */
+void NetworkLayerIdExportTo(const NetworkLayerId* id, u8* out, u32 size)
+{
+    if (id == NULL) {
+        getNetworkLogger()->warn_10("NetworkLayerIdExportTo: arg->layer_id is null.\n");
+        return;
+    }
+    if (out == NULL) {
+        getNetworkLogger()->warn_10("NetworkLayerIdExportTo: arg->data is null.\n");
+        return;
+    }
+    if (size > 0x3C) {
+        getNetworkLogger()->warn_10("NetworkLayerIdExportTo: this->len < arg->size\n");
+        return;
+    }
+    memcpy(out, id->data_04, size);
+}
+
+/* True when both ids are of the same known kind (1..5) and their first 0x40 bytes agree. */
+BOOL NetworkUniqueIdEquals(const NetworkLayerId* a, const NetworkLayerId* b)
+{
+    s32 kind;
+
+    if (a == NULL) {
+        getNetworkLogger()->warn_10("NetworkUniqueIdEquals: arg1 is null.\n");
+        return FALSE;
+    }
+    if (b == NULL) {
+        getNetworkLogger()->warn_10("NetworkUniqueIdEquals: arg2 is null.\n");
+        return FALSE;
+    }
+    kind = a->kind_00;
+    if (kind != (s32)b->kind_00) {
+        return FALSE;
+    }
+    switch (kind) {
+    case 1:
+    case 2:
+    case 3:
+    case 4:
+    case 5:
+        return memcmp(a, b, 0x40) == 0;
+    }
+    return FALSE;
 }
 
 #pragma dont_inline on

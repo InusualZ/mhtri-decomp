@@ -26,6 +26,7 @@
 #include "menu/menu_plsearch.h"
 
 typedef struct NetworkErrorInfo NetworkErrorInfo;
+typedef struct PatMatchOptions PatMatchOptions;   /* include/Network/NetworkSessionManager.h */
 typedef struct NetId NetId;                 /* include/Network/NetworkLayerPat.h */
 typedef struct NetLayerRequest NetLayerRequest; /* include/Network/NetworkLayerPat.h */
 /* the record's layout lives in `include/Network/NetworkSessionManager.h`, beside the GameSpy handshake that
@@ -55,7 +56,7 @@ public:
     /* +0x2C */ virtual void pad_2C();
     /* +0x30 */ virtual void pad_30();
     /* +0x34 */ virtual void pad_34();
-    /* +0x38 */ virtual void pad_38();
+    /* +0x38 (the login step's account check: negative with the error filled, positive when done) */ virtual s32 checkAccount_38(s32 kind, NetworkErrorInfo* error);
     /* +0x3C */ virtual s32  isVerbose_3C();
     /* +0x40 */ virtual void pad_40();
     /* +0x44 */ virtual void pad_44();
@@ -66,6 +67,12 @@ public:
     /* +0x58 */ virtual void pad_58();
     /* +0x5C */ virtual void pad_5C();
     /* +0x60 */ virtual f32  getTime_60();
+    /* +0x64 */ virtual void pad_64();
+    /* +0x68 */ virtual void pad_68();
+    /* +0x6C */ virtual void pad_6C();
+    /* +0x70 */ virtual void pad_70();
+    /* +0x74 */ virtual void pad_74();
+    /* +0x78 (reads this console's match options into out) */ virtual void readMatchOptions_78(s32 kind, PatMatchOptions* out);
 };   /* size: 0x04 (the object's leading vtable word) */
 
 /* ---- the network singleton `getInstance_` returns -------------------------------------------- */
