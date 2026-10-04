@@ -42,7 +42,7 @@
  * NAMING GUESS.  `NetworkCommunityPat` is this batch's name for slot +0x08's class: the map carries no
  * mangled row, no `__vt__` and no ctor for it, and the only name the binary gives the slot is the
  * accessor `getNetworkCommunityPat`.  `NetworkLayer` (+0x0C) is the map's own table name
- * (`NetworkLayer_VTable` 0x805FB5D0), i.e. the root of that slot's hierarchy.
+ * (`__vt__12NetworkLayer` 0x805FB5D0, formerly `NetworkLayer_VTable`), i.e. the root of that slot's hierarchy.
  *
  * SLOT PROTOCOL.  The three `deleteNetwork*Pat` helpers share one shape and it is the only thing the
  * four unrelated element classes have in common - not a shared base class.  With `index == 0` they

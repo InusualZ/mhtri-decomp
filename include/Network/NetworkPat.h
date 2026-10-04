@@ -36,8 +36,8 @@ class NetworkSessionManagerPat;
 class NetworkCommunityPat;
 
 /* The slot +0x0C element: a class derived from the root whose table the map names
- * `NetworkLayer_VTable` (0x805FB5D0).  The installed object is built by `fn_803E0C18`, which calls
- * `fn_803DF2EC` (the root, which stores 0x805FB5D0) first. */
+ * `__vt__12NetworkLayer` (0x805FB5D0).  The installed object is built by `fn_803E0C18`, which calls
+ * `NetworkLayer::NetworkLayer` (the root, which stores 0x805FB5D0) first. */
 class NetworkLayerPat;
 
 typedef struct NetworkPat {

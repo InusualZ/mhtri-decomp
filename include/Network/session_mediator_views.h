@@ -46,11 +46,11 @@ public:
  * +0x00/+0x04/+0x08 into its own copy, so only those three are named; the tail is untouched anywhere
  * and is padding.  size: 0x10 (approximate - only +0x00..+0x0B is evidenced). */
 struct NetworkErrorInfo {
-    /* +0x00 */ u32 value_00;
-    /* +0x04 */ u32 code_04;
-    /* +0x08 */ u32 extra_08;
-    /* +0x0C */ u32 pad_0C;
-};
+    /* +0x00 */ s32 value_00;
+    /* +0x04 */ s32 code_04;
+    /* +0x08 */ s32 extra_08;
+};   /* size: 0xC - `NetworkSessionManagerPat::move`'s frame gives the record 12 bytes (0x14..0x20) and compares
+        the code signed (`cmpwi r0,75`) */
 
 class GameSpyInterfaceThread {
 public:
