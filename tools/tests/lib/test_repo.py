@@ -91,6 +91,32 @@ def test_import_time_roots(c):
             del unitutil.ROOT
 
 
+def test_is_served(c):
+    with testing.refusals_expected() as seen:
+        c.check("no tree is the served one under the fixture tier, and asking resolves nothing live",
+                repo.is_served(str(testing.LIVE_ROOT)), False)
+    c.check("... no refusal was needed", len(seen.refused), 0)
+    with testing.FixtureTree() as tree:
+        c.check("a fixture is never the served tree", repo.is_served(str(tree.root)), False)
+
+
+def test_seam_tools_import_without_a_root(c):
+    from tools.splits import dataorder, tudiscover  # noqa: F401 - their tree paths resolve on first use
+    from tools.units import dataseams  # noqa: F401
+    c.expect("tudiscover resolves no path at import", "ASM_DIR" not in vars(tudiscover) and "ROOT" not in vars(tudiscover))
+    c.expect("dataorder resolves no path at import", "DOL" not in vars(dataorder) and not dataorder._PATHS)
+    with testing.FixtureTree() as tree:
+        tudiscover.ROOT = str(tree.root)            # an assigned path pins it; the others follow it
+        try:
+            c.check("tudiscover's paths follow an assigned ROOT",
+                    (tudiscover._g("SYMBOLS"), tudiscover._g("LOCAL_ASM_DIR")),
+                    (os.path.join(str(tree.root), "config", "RMHE08", "symbols.txt"),
+                     os.path.join(str(tree.root), "build", "RMHE08", "asm")))
+        finally:
+            for name in tudiscover._LAZY:
+                vars(tudiscover).pop(name, None)
+
+
 def test_main_and_inputs(c):
     with testing.GitFixture() as fx, tempfile.TemporaryDirectory() as tmp:
         fx.init()

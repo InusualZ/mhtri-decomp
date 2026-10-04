@@ -13,16 +13,14 @@ import struct
 import sys
 import zipfile
 
+from tools.lib import ppc as _ppc
+from tools.lib import project as _project
+from tools.lib import repo as _repo
+from tools.lib import units as _units
+from tools.lib.binary.dol import Dol as LibDol
 from tools.lib.binary.elf import Elf as LibElf, ElfError
 
-from tools.lib.binary.dol import Dol as LibDol
-from tools.lib import ppc as _ppc
-
-HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(os.path.dirname(HERE))
-for _path in (os.path.join(ROOT, "tools"), os.path.dirname(HERE), HERE):
-    if _path not in sys.path:
-        sys.path.insert(0, _path)
+ROOT = str(pathlib.Path(__file__).resolve().parents[2])
 
 GAME = "RMHE08"
 DOL_REL = os.path.join("orig", GAME, "sys", "main.dol")
@@ -242,7 +240,7 @@ _MAPLOOKUP_CACHE: dict = {}
 def looks_like_string(data: bytes) -> bool:
     """Whether the bytes are a NUL-terminated printable C string - the `.data` string-pool shape.
 
-    The map's `data:string` annotation is the primary signal, but `brief.map_rows` keeps only the
+    The map's `data:string` annotation is the primary signal, but `map_rows` keeps only the
     `type:object` field, so this is the fallback that stops a string pool rendering as raw hex.
     """
     end = data.find(b"\0") if data else -1
@@ -278,22 +276,24 @@ def literal_value(data: bytes, kind: str) -> str:
 # the analysis
 # ------------------------------------------------------------------------------------------------------------------
 
-def map_lookup(main: str) -> dict:
-    """`{name: map row}` for the whole symbol map, through `brief.py`'s in-process parser and cache.
+def map_rows(main: str) -> list[dict]:
+    """Every typed map row as `{name, section, address, size, type}`, in file order (`lib.project.SymbolMap`)."""
+    path = os.path.join(main, "config", GAME, "symbols.txt") if main else None
+    if not path or not os.path.exists(path):
+        return []
+    return [{"name": e.name, "section": e.section, "address": e.address, "size": e.size, "type": e.type}
+            for e in _project.SymbolMap(path).rows() if e.type]
 
-    The dict is cached per (path, mtime): `brief.py --pool` builds a dossier per unit in one process,
-    and rebuilding a 65k-entry dict for every one of them is pure waste.
-    """
-    try:
-        from units import brief  # lazy: brief imports this module at load time
-    except ImportError:  # running dossier.py as a plain script
-        import brief  # type: ignore
+
+def map_lookup(main: str) -> dict:
+    """`{name: map row}` for the whole symbol map, cached per (path, mtime): `brief.py --pool` builds a dossier per
+    unit in one process, and rebuilding a 65k-entry dict for every one of them is pure waste."""
     path = os.path.join(main, "config", GAME, "symbols.txt") if main else None
     key = (path, os.path.getmtime(path) if path and os.path.exists(path) else None)
     cached = _MAPLOOKUP_CACHE.get(key)
     if cached is not None:
         return cached
-    out = {r["name"]: r for r in (brief.map_rows(main) or [])}
+    out = {r["name"]: r for r in map_rows(main)}
     _MAPLOOKUP_CACHE.clear()
     _MAPLOOKUP_CACHE[key] = out
     return out
@@ -790,17 +790,6 @@ def selftest() -> int:
         check("the render names the source file", "`ef_line.cpp`" in text, True)
         check("the render carries the panic lines", "42, 43, 44" in text, True)
         check("the render has a blanks section", "Blanks - what the binary does not answer" in text, True)
-        # the brief integration: a worker's brief *is* the dossier plus the task (plan 7.3)
-        try:
-            from units import brief as brief_mod
-        except ImportError:
-            import brief as brief_mod  # type: ignore
-        b = brief_mod.build(ROOT, ROOT, "auto/800CCFB0_fn_800CCFB0", None)
-        btext = brief_mod.render(ROOT, b, None)
-        check("the brief carries the dossier block", "The binary dossier" in btext, True)
-        check("the brief's dossier names the source file", "`ef_line.cpp`" in btext, True)
-        check("the dossier rides part 2, before the unit header",
-              btext.index("The binary dossier") < btext.index("## 3 · What is already known"), True)
 
     if fails:
         print("FAIL (%d)" % len(fails))
@@ -821,15 +810,15 @@ def resolve_unit(main: str, unit: str) -> tuple[str, str, dict, list]:
     The CLI uses this instead of `brief.build` so that `dossier.py <unit>` never touches `ninja` (not even
     the read-only `ninja -t commands` the brief needs for its flags) and works before the unit is built.
     """
-    try:
-        from units import brief  # lazy: brief imports this module at load time
-    except ImportError:
-        import brief  # type: ignore
     unit = unit.strip("/")
-    name = brief.source_name(unit, main)
-    ranges = brief.splits_range(main, unit)
+    name = _units.source_spelling(unit, [main])
+    splits = os.path.join(main, "config", GAME, "splits.txt")
+    claims = _project.Splits.cached(splits).claims(name) if os.path.exists(splits) else []
+    ranges = {r.section: (r.start, r.end, r.size) for r in claims}
     text = ranges.get(".text")
-    syms = brief.symbols_in_range(main, text[0], text[1]) if text else []
+    syms = [dict(r) for r in map_rows(main) if text[0] <= r["address"] < text[1]] if text else []
+    if text and not syms:
+        print("WARNING: no symbols found in 0x%X-0x%X - check the split range" % (text[0], text[1]), file=sys.stderr)
     target = os.path.join(main, "build", GAME, "obj", *name.split("/"))
     target = os.path.splitext(target)[0] + ".o"
     return name, target, ranges, syms
@@ -850,8 +839,7 @@ def main() -> int:
         ap.print_help()
         return 0
 
-    from units import recompile as rc  # type: ignore
-    main_root = rc.main_root(rc.worktree_root())
+    main_root = _repo.main_checkout(_repo.caller_worktree() or os.getcwd())
     _name, target, ranges, syms = resolve_unit(main_root, args.unit)
     d = build(main_root, args.unit, target, ranges=ranges, map_symbols=syms, dump=not args.no_dump)
     if args.json:

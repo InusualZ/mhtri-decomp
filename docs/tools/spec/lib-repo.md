@@ -21,6 +21,8 @@ originals hash to. It is also the choke point of the fixture tier's live-tree re
   `$MHTRI_MAIN` that names a directory override it (the tree the tools serve, never a fixture). None outside git.
 * `resolve_input(rel, root, probe=os.path.exists, honour_env=False) -> str`: `rel` under `root`, else under MAIN by path,
   else `root`'s own path (so the error names it). Read-only inputs only.
+* `is_served(root) -> bool` (WP3c): whether `root` is `repo_root()`, the tree `$MHTRI_MAIN` applies to (`unitutil._serves`
+  for a lib caller); always False under the fixture tier, which never resolves the live tree.
 * `session_tmpdir()`: one unique directory per process under the system temp, removed at exit.
 * `scratch(tool, root) -> build/tmp/<tool>/` (created); `state(name, root) -> .pi/<name>` for a name on `STATE_NAMES`.
 * `ground_truth(root) -> {rel path: sha1}` from `config.yml`'s `hash`/`selfile_hash`; `verify_ground_truth(root)`.
@@ -68,7 +70,9 @@ root, and a process given a live path all raise.
 
 * 19 private resolvers outside `unitutil` remain (`recompile.worktree_root/main_root` - which also falls back to the first
   worktree row -, `infer`, `methodize`, `guard`, `commitlint`, `sync_*`, `backlog`, `rescue`, `slots`, `worktreehook`,
-  `wtsafe.main_worktree`, `langcheck`, `unwindcut`) and the module-level `ROOT = dirname(...)` constants of `callers`,
-  `tudiscover`, `dataorder`, `symbolpreflight`, `ledger`, `flipcheck`, `datagap`, `selftest`, `accessextent`: each goes
-  with its family's WP3 package, because removing a module-level `ROOT` is a fixture rewrite of that tool's tests.
+  `wtsafe.main_worktree`, `langcheck`, `unwindcut`) and the module-level `ROOT = dirname(...)` constants of `symbolpreflight`,
+  `ledger`, `flipcheck`, `datagap`, `selftest`: each goes with its family's WP3 package, because removing a module-level
+  `ROOT` is a fixture rewrite of that tool's tests. WP3c: `tudiscover` and `dataorder` resolve their tree paths on first use
+  (assignable, so `dump_asm_selftest` still pins them); `callers`, `callees`, `accessextent`, `dossier` keep only the file's
+  own tree as `ROOT` (a path computation, nothing resolved at import).
 * `state()` is not called yet: the 40 `.pi/` spellings move with WP3e (lanes).

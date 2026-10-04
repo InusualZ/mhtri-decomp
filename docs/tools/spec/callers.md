@@ -8,7 +8,8 @@ Who calls this function / who reads this data: the whole-DOL caller index, keyed
 
 ## Users
 
-the landing gate (1); profiles (`.claude/agents`) (6); skills (13); CLAUDE.md (2); docs (53); imported by `accessextent`, `dataclaim`, `datagap`
+the landing gate (1); profiles (`.claude/agents`) (6); skills (13); CLAUDE.md (2); docs (53); no tool imports it (WP3c:
+`accessextent`, `dataclaim`, `dataclosure` read `lib.refs.RefIndex`, the same index and query)
 
 ## CLI
 
@@ -47,7 +48,8 @@ Inputs -> outputs: build/RMHE08/asm or obj/ -> build/tmp/callers/graph.json -> r
 
 ## Lib dependencies
 
-refs, ppc, project, cache, binary, repo.
+`lib.refs` (the index, the cache, `RefMap`, `query`, `readers_of`, `range_report`, `DumpStamp`), `lib.cache`
+(`stat_digest`), `lib.report` (`rel_path`), `lib.repo` (`VERSION`); `unitutil.resolve_input` for the input locations.
 
 ## Test contract
 
@@ -57,7 +59,10 @@ Target: `tools/tests/units/test_callers.py` on `lib.testing` (`FixtureTree`/`Git
 
 ## Known gaps
 
-two censuses (dump, objects) of unequal detail; `accessextent` re-decodes to repair. The parser, both index builds and the cache are `lib.refs` (WP2a); this tool keeps the input locations, the owner labels (`query`) and the rendering.
+two censuses (dump, objects) of unequal detail; `accessextent` re-decodes to repair. The parser, both index builds, the
+cache (WP2a), the map, the query, the readers and the runs (WP3c) are `lib.refs`; this tool keeps the input locations, the
+dump's verdict line and the rendering. Its selftest is still the in-file `selftest()` (150 checks; the object fallback's
+fixture is an `ElfBuilder` now, not `callees._fixture_elf`).
 
 ## History (the incidents behind the rules - keep the rule, drop the narrative when the rule is stable)
 

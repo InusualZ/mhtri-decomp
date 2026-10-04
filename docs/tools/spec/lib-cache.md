@@ -42,6 +42,7 @@ Tier: fixture (`tools/tests/lib/test_cache.py`). Each state on a temp directory;
 
 ## Known gaps
 
-* `callers.load_index`, `tudiscover.asm_stamp_status` (five states, with `truncated`), `undefrefs.link_symbol_index` (a
-  per-input incremental cache) and `verifyunit.target_object_snapshot` keep their own envelopes; moving them onto `Stamped`
-  changes their file format, so it rides their packages (2a refs, 3a, 3c).
+* `callers.load_index` (now `lib.refs.load_index`), the asm dump's stamp (now `lib.refs.DumpStamp`, WP3c: five states, with
+  `truncated`), `undefrefs.link_symbol_index` (a per-input incremental cache) and `verifyunit.target_object_snapshot` keep their
+  own envelopes: moving them onto `Stamped` changes their file format (every existing dump would read `unstamped` until
+  `dump_asm.py` reran), so WP3c moved the code and kept the format.

@@ -10,25 +10,18 @@ import json
 import os
 import re
 import struct
-import subprocess
 import sys
-import tempfile
+
+from tools import unitutil as uu
 from tools.lib import names as libnames
-
-from tools.lib.binary import objdump as lib_objdump
 from tools.lib import ppc as _ppc
+from tools.lib.binary import objdump as lib_objdump
+from tools.lib.binary.elf import Elf, ElfError, reloc_name
+from tools.lib.project import Ownership, Splits  # the one ownership index; the lint's too
+from tools.lib.project.ownership import owner_label, source_exists
+from tools.symbols import symedit  # the bounded, classified in-repo reference scan (its public API)
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-TOOLS = os.path.dirname(HERE)
-ROOT = os.path.dirname(TOOLS)
-for _path in (TOOLS, HERE, os.path.join(TOOLS, "symbols")):
-    if _path not in sys.path:
-        sys.path.insert(0, _path)
-
-import unitutil as uu  # noqa: E402
-import dossier  # noqa: E402  (the project's ELF32-BE reader; do not grow a second one)
-from tools.lib.project import Ownership, Splits  # noqa: E402  (the one ownership index; the lint's too)
-import symedit  # noqa: E402  (the bounded, classified in-repo reference scan)
+ROOT = str(pathlib.Path(__file__).resolve().parents[2])
 
 CODE_SECTIONS = (".text", ".init")
 CALL_TYPES = (10,)          # R_PPC_REL24 - the `bl` form (what a C call compiles to)
@@ -49,16 +42,19 @@ def code_references(blob):
     (a call, or the address of a data label taken for a load). The second return value is every name the
     object *defines* here, so the caller can say whether the callee is this unit's own or another's.
     """
-    sections, symbols, relocs = dossier.parse_elf(blob)
-    defined = {s["name"] for s in symbols if s["shndx"]}
+    try:
+        elf = Elf.read(blob)
+    except ElfError:
+        raise ValueError("not an ELF object") from None
+    defined = {s.name for s in elf.symbols if s.shndx}
     refs = {}
-    for r in relocs:
-        name = r.get("symbol")
-        if r.get("target") not in CODE_SECTIONS or not is_generated(name):
+    for r in elf.relocs():
+        name = r.symbol_name if r.symbol < len(elf.symbols) else None
+        if r.section not in CODE_SECTIONS or not is_generated(name):
             continue
         refs.setdefault(name, []).append(dict(
-            offset=r["offset"], type=r["type"], type_name=r["type_name"],
-            call=r["type"] in CALL_TYPES, addend=r.get("addend"),
+            offset=r.offset, type=r.type, type_name=reloc_name(r.type, "type-%d"),
+            call=r.type in CALL_TYPES, addend=r.addend,
             defined_here=name in defined))
     return refs, defined
 
@@ -77,36 +73,8 @@ def merge_sides(target_refs, ours_refs):
 # --------------------------------------------------------------------------------------------------
 # ownership: symbols.txt + splits.txt, through the lint's own index
 # --------------------------------------------------------------------------------------------------
-def classify_owner(resolution, source_exists):
-    """-> (label, state, unit) for one `Ownership.resolve` result.
-
-    `state` is one of `reconstructed` (a registered unit with source in `src/`), `registered` (a split
-    range but no source yet), `unsplit` (no registered owner), `duplicate` or `unmapped`.
-    """
-    if resolution is None:
-        return ("not in the symbol map", "unmapped", None)
-    kind = resolution.get("kind")
-    if kind == "dup":
-        return ("duplicate row in the symbol map", "duplicate", None)
-    if kind == "unsplit":
-        module = resolution.get("module")
-        where = "unsplit address"
-        if module:
-            where = "unsplit (%s)" % module
-        return (where, "unsplit", None)
-    unit = resolution.get("unit")
-    if source_exists(unit):
-        return (unit, "reconstructed", unit)
-    return (unit + " (no source yet)", "registered", unit)
-
-
-def make_source_exists(root):
-    """-> a predicate: does the owner unit named in `splits.txt` have a file under `src/`?"""
-    def exists(unit):
-        if not unit:
-            return False
-        return os.path.exists(os.path.join(root, "src", unit.replace("\\", "/")))
-    return exists
+classify_owner = owner_label            # (label, state, unit) for one `Ownership.resolve` result
+make_source_exists = source_exists      # does the unit named in `splits.txt` have its file under `src/`?
 
 
 # --------------------------------------------------------------------------------------------------
@@ -464,7 +432,7 @@ def print_report(rep):
 def _fixture_elf(text_bytes, syms, relocs):
     """An ELF32-BE MWCC-shaped object: `syms` = (name, value, size, info, shndx), `relocs` = (off, sym, type).
 
-    Only what `dossier.parse_elf` reads is built: a `.text`, a SHT_RELA targeting it, a `.symtab`/`.strtab`
+    Only what `code_references` reads is built: a `.text`, a SHT_RELA targeting it, a `.symtab`/`.strtab`
     pair and the section-name table. The check is that this tool's own readers work on a known input, not
     that MWCC's format is re-implemented.
     """

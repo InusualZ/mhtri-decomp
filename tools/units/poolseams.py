@@ -1,50 +1,18 @@
 #!/usr/bin/env python3
-"""poolseams.py - the literal pool as TU-seam evidence: which registered units are ONE original translation unit.
-
-The premise (docs/pool-seams.md, playbook idea 94, measured 2026-09-30): MWCC emits **one literal pool per
-translation unit**, one entry per distinct value, in first-use order, and `mwldeppc` does not merge pools across
-objects.  So a pool literal (an `.sdata2` float/double, an `.sdata` string) whose address is read by two registered
-units means those units are **one** original TU that the registry has cut into pieces - a *fold candidate*, and a
-unit that is a partial pool of that TU can never reproduce its `.sdata2`/`.sdata` alone.  The converse: the same
-value at two addresses inside what a registry unit treats as one TU cannot happen (the compiler would have reused
-the first entry), so such a unit already spans more than one TU.
-
-This module turns that into data.  It reads nothing itself: the references come from `datagap.census` (the one
-relocation reader over the registered units' TARGET objects), the claims from `splits.txt`, the symbol types from
-the map, the values (optional) from the retail DOL.  Everything below is a pure function of those, so the
-`--selftest` fixtures need no build tree.
-
-    python tools/units/poolseams.py                 # the census: groups of registered units that share a pool
-    python tools/units/poolseams.py --unit <unit>   # the group a unit belongs to (or "no pool-sharing group")
-    python tools/units/poolseams.py --json out.json
-    python tools/units/poolseams.py --selftest
-
-(`datagap.py --pool-seams` is the same census; `tudiscover.py at`, `datagap.py` deferral classes, `flipcheck.py`,
-`sectiongap.py` and `brief.py` consume `group_of`.)
-
-What is and is not evidence (measured exceptions, docs/pool-seams.md section 4):
-
-* **literal** - an `.sdata2` object of 4 or 8 bytes, or an `.sdata` string: an edge.
-* **non-literal** - any other `.sdata2`/`.sdata` object, and every `.data`/`.bss`/`.sbss`/`.rodata` object: a named
-  global, a table or a variable.  Several TUs reference those legitimately; never an edge.
-* a literal whose value is the int->float magic `0x43300000_80000000` / `0x43300000_00000000` is still a per-TU pool
-  entry (the linker does not synthesise it), so it stays an edge and is only *counted* (`magic`).
-* a unit that holds one value at two pool addresses **spans several TUs** (`coarse`): its group is reported, but its
-  pool is not a single run, so its adjacency/order verdicts are demoted.
-"""
+"""The literal pool as TU evidence: groups of registered units that share a pool entry (fold candidates).
+Spec: docs/tools/spec/poolseams.md. CLI: poolseams.py [--unit U] [--json F] [--top N] [--no-values] | --selftest."""
 from __future__ import annotations
+import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
 import os
 import sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-TOOLS = os.path.dirname(HERE)
-for _p in (TOOLS, HERE):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
+from tools.lib import refs as _refs
+import tools.splits.seams.evidence as ev
 
-LITERAL_SECTIONS = (".sdata2", ".sdata")
-MAGIC = (bytes.fromhex("4330000080000000"), bytes.fromhex("4330000000000000"))
+GAME_DIR = ev.GAME
+LITERAL_SECTIONS = ev.LITERAL_SECTIONS
+MAGIC = ev.MAGIC
 #: a text gap this small between two group members is alignment, not foreign code
 GAP_SLACK = 0x40
 
@@ -61,13 +29,8 @@ def data_kind(entry: dict) -> str:
 
 
 def is_literal(entry: dict) -> bool:
-    """True for an object MWCC pools per TU: an `.sdata2` 4/8-byte scalar or an `.sdata` string."""
-    sec, size = entry.get("section"), int(entry.get("size") or 0)
-    if sec == ".sdata2":
-        return size in (4, 8)
-    if sec == ".sdata":
-        return data_kind(entry) == "string"
-    return False
+    """True for an object MWCC pools per TU (`evidence.is_literal`): an `.sdata2` 4/8-byte object or an `.sdata` string."""
+    return ev.is_literal(entry.get("section"), int(entry.get("size") or 0), data_kind(entry), entry.get("type", "object"))
 
 
 def literal_table(symbols: dict) -> dict[int, dict]:
@@ -134,24 +97,8 @@ def text_spans(ranges: dict) -> dict[str, list[tuple[int, int]]]:
 
 
 def components(edges: dict[int, dict]) -> list[set[str]]:
-    """Connected components of the units over the pool-sharing addresses (union-find)."""
-    parent: dict[str, str] = {}
-
-    def find(x):
-        parent.setdefault(x, x)
-        while parent[x] != x:
-            parent[x] = parent[parent[x]]
-            x = parent[x]
-        return x
-
-    for e in edges.values():
-        units = sorted(e["units"])
-        for u in units[1:]:
-            parent[find(u)] = find(units[0])
-    groups: dict[str, set[str]] = {}
-    for u in list(parent):
-        groups.setdefault(find(u), set()).add(u)
-    return [g for g in groups.values() if len(g) >= 2]
+    """Connected components of the units over the pool-sharing addresses (`evidence.components`)."""
+    return ev.components((units[0], u) for units in (sorted(e["units"]) for e in edges.values()) for u in units[1:])
 
 
 def adjacency(members: set[str], spans: dict[str, list], all_ranges: list[tuple[int, int, str]]) -> dict:
@@ -225,7 +172,8 @@ def coarse_units(records: list[dict], ranges: dict, lits: dict[int, dict], value
     if value_of is None:
         return {}
     touch: dict[str, set[int]] = {}
-    typed = {a for a, e in lits.items() if e["section"] == ".sdata2" and data_kind(e) in ("float", "double")}
+    typed = {a for a, e in lits.items()
+             if ev.is_value_witness(e["section"], int(e.get("size") or 0), data_kind(e), e.get("type", "object"))}
     for r in records:
         if r["address"] in typed:
             touch.setdefault(r["unit"], set()).add(r["address"])
@@ -403,19 +351,15 @@ def load_census(root: str, with_values: bool = True) -> dict:
     key = (os.path.abspath(root), with_values)
     if key in _CACHE:
         return _CACHE[key]
-    from units import datagap as dg  # noqa: PLC0415 - the census reader; a lazy import keeps this module pure
-
-    ranges = dg.load_claims(root)
-    (records, _stats), _n, _read = dg.census(root, None, ranges=ranges)
-    symbols = dg.load_data_symbols(root)
+    with open(os.path.join(root, "config", GAME_DIR, "splits.txt"), encoding="utf-8", errors="replace") as fh:
+        ranges = _refs.census_claims(fh.read())
+    (records, _stats), _n, _read = _refs.tree_census(root, None, ranges, GAME_DIR)
+    symbols = _refs.census_symbols(os.path.join(root, "config", GAME_DIR, "symbols.txt"))
     value_of = None
     if with_values:
-        dol_path = os.path.join(root, "orig", dg.GAME_DIR, "sys", "main.dol")
+        dol_path = os.path.join(root, "orig", GAME_DIR, "sys", "main.dol")
         if os.path.exists(dol_path):
-            sys.path.insert(0, os.path.join(TOOLS, "splits"))
-            import tudiscover as td  # noqa: PLC0415
-
-            dol = td.Dol(dol_path)
+            dol = ev.Image(dol_path)
             value_of = lambda a, n: dol.read(a, n) if n else None  # noqa: E731
     census = build_groups(records, ranges, literal_table(symbols), value_of)
     _CACHE[key] = census
@@ -597,7 +541,8 @@ def main(argv=None) -> int:
     import json
 
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--root", default=os.path.dirname(TOOLS), help="the tree to read (default: this tool's tree)")
+    ap.add_argument("--root", default=str(pathlib.Path(__file__).resolve().parents[2]),
+                    help="the tree to read (default: this tool's tree)")
     ap.add_argument("--unit", help="only the group this unit belongs to")
     ap.add_argument("--top", type=int, default=25)
     ap.add_argument("--json", help="write the census to this file")

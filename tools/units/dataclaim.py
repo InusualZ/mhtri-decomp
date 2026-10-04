@@ -760,15 +760,11 @@ def recommend(rec: dict, unit: str, unit_ranges: list[tuple[int, int]]) -> dict:
 def norm_reader(label: str | None) -> str | None:
     """A census owner label -> a unit name, or None for the labels that are not units.
 
-    The one implementation is `callers.norm_reader` (the tool that builds the census); this re-export is
-    what `dataclaim`'s sharer lists and its selftest read through, so the two tools cannot disagree
-    about who a label names.
+    The one implementation is `lib.refs.norm_reader` (the census's own); this re-export is what `dataclaim`'s
+    sharer lists and its selftest read through, so the two cannot disagree about who a label names.
     """
-    try:
-        from units import callers as callers_mod  # noqa: PLC0415
-    except ImportError:                           # pragma: no cover - direct script execution
-        import callers as callers_mod             # type: ignore
-    return callers_mod.norm_reader(label)
+    from tools.lib import refs as _refs  # noqa: PLC0415
+    return _refs.norm_reader(label)
 
 
 def declaration_locations(root: str, names) -> dict[str, list[str]]:
@@ -882,30 +878,19 @@ def unit_data_references(root: str, unit: str) -> tuple[list[str], str | None]:
 
 
 def census_readers(root: str):
-    """`(readers_of, info)` from `callers.py`'s census - reused, never a second graph.
+    """`(readers_of, info)` from the one reference index (`lib.refs.RefIndex`, `callers.py`'s) - never a second graph.
 
-    `readers_of(address) -> {unit: sites}` normalises the census's owner labels to unit names so a
-    sharer list joins the unit vocabulary everything else uses. The census itself is `callers.py`'s
-    (the asm dump when present, the split objects' relocations otherwise); this only reads it.
+    `readers_of(address) -> {unit: sites}` normalises the index's owner labels to unit names so a sharer list joins
+    the unit vocabulary everything else uses (the asm dump when present, the split objects' relocations otherwise).
     """
-    try:
-        from units import callers as callers_mod  # noqa: PLC0415
-    except ImportError:                           # pragma: no cover - direct script execution
-        import callers as callers_mod             # type: ignore
-    cmap = callers_mod.load_map(root)
-    asm_dir = callers_mod.asm_dir_of(root)
-    files = callers_mod.all_asm_files(asm_dir)
-    if files:
-        index, info = callers_mod.load_index(root=root, asm_dir=asm_dir)
-        source = "asm"
-    else:
-        index, info = callers_mod.load_elf_index(root=root, cmap=cmap)
-        source = "elf"
+    from tools.lib import refs as _refs  # noqa: PLC0415
+    refs = _refs.RefIndex.load(root)
+    index, info, source = refs.index, refs.info, refs.source
     if index is None:
         return None, {"source": source, "state": "missing", "reason": info.get("reason")}
-    # One census, one implementation: `callers.readers_of` wraps the query this tool would otherwise
-    # rebuild, so the sharer list here and `callers.py --range`'s runs are the same reader sets.
-    return callers_mod.readers_of(index, cmap), {"source": source, "state": "present",
+    # One census, one implementation: `readers_of` wraps the query `callers.py` prints, so the sharer list here
+    # and `callers.py --range`'s runs are the same reader sets.
+    return refs.readers_of(), {"source": source, "state": "present",
                                                  "files": info.get("files"),
                                                  "cached": info.get("cached"),
                                                  "reason": info.get("reason")}

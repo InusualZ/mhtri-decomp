@@ -1,7 +1,8 @@
-"""Who references what: the address-keyed reference index (asm dump or target objects), the census, the text scan.
-Spec: docs/tools/spec/lib-refs.md. CLI: none (library)."""
+"""Who references what: the address-keyed reference index (asm dump or target objects) and its query, the dump's stamp,
+the census, the text scan. Spec: docs/tools/spec/lib-refs.md. CLI: none (library)."""
 from __future__ import annotations
 
+import bisect
 import collections
 import json
 import os
@@ -65,6 +66,94 @@ def dump_files(asm_dir: str) -> list[str]:
 def is_scaffolding(path: str, asm_dir: str) -> bool:
     """Whether a dump file is a top-level `auto_*` scaffolding copy rather than a unit's own file."""
     return os.path.dirname(os.path.abspath(path)) == os.path.abspath(asm_dir)
+
+
+def has_dump(d: str) -> bool:
+    """Whether a directory holds at least one `.s` file (the probe that picks the dump a tree reads)."""
+    for _dp, _dirs, names in os.walk(d):
+        if any(n.endswith(".s") for n in names):
+            return True
+    return False
+
+
+class DumpStamp:
+    """The asm dump's stamp, `<asm_dir>/.stamp.json`: what the dump is a function of (the map, the splits, the DOL dtk's
+    split reads) and its five states - fresh, missing, unstamped, stale, truncated. `local_dir` is the tree's own dump
+    (the only one a tool writes), `root` the tree messages are relative to."""
+
+    REMEDY = "tools/splits/dump_asm.py"
+
+    def __init__(self, asm_dir: str, symbols: str, splits: str, dol: str, game: str = "RMHE08",
+                 local_dir: str | None = None, root: str | None = None, stamp: str | None = None) -> None:
+        self.asm_dir, self.symbols, self.splits, self.dol, self.game = asm_dir, symbols, splits, dol, game
+        self.local_dir = local_dir if local_dir is not None else asm_dir
+        self.root = root
+        self.path = stamp if stamp is not None else os.path.join(asm_dir, ".stamp.json")
+
+    @classmethod
+    def for_tree(cls, root: str, honour_env: bool = False, game: str = "RMHE08") -> "DumpStamp":
+        """The stamp of the dump `root` reads (its own, else MAIN's by path), over its map, splits and retail DOL."""
+        from tools.lib import repo  # noqa: PLC0415 - the tree-level loaders only
+        return cls(dump_dir(root, honour_env, game), os.path.join(root, "config", game, "symbols.txt"),
+                   os.path.join(root, "config", game, "splits.txt"),
+                   repo.resolve_input(os.path.join("orig", game, "sys", "main.dol"), root, os.path.isfile, honour_env),
+                   game, os.path.join(root, "build", game, "asm"), root)
+
+    def rel(self, path: str) -> str:
+        """`path` relative to the tree, or as-is when that is not expressible (Windows drives)."""
+        try:
+            return os.path.relpath(path, self.root) if self.root else path
+        except ValueError:
+            return path
+
+    def is_main_fallback(self) -> bool:
+        """True when the dump is read from another tree's `build/` (MAIN's) because this tree has none."""
+        return os.path.normcase(os.path.abspath(self.asm_dir)) != os.path.normcase(os.path.abspath(self.local_dir))
+
+    def current(self) -> dict:
+        """The stamp the dump would carry now."""
+        files = dump_files(self.asm_dir)
+        return {"game": self.game, "symbols": libcache.content_hash(self.symbols),
+                "splits": libcache.content_hash(self.splits), "dol": libcache.content_hash(self.dol),
+                "files": len(files), "bytes": sum(os.path.getsize(f) for f in files),
+                "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+
+    def write(self, extra: dict | None = None) -> dict:
+        """Stamp the current dump (atomically; `tools/splits/dump_asm.py` calls it after a split)."""
+        stamp = self.current()
+        if extra:
+            stamp.update(extra)
+        tmp = self.path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(stamp, fh, indent=1, sort_keys=True)
+            fh.write("\n")
+        os.replace(tmp, self.path)
+        return stamp
+
+    def status(self) -> tuple[str, str]:
+        """`(state, message)`: fresh / missing / unstamped / stale / truncated, with the remedy in the message."""
+        cur = self.current()
+        rel = self.rel(self.asm_dir)
+        if not cur["files"]:
+            return "missing", "no `.s` file under %s - run %s" % (rel, self.REMEDY)
+        if not os.path.exists(self.path):
+            return "unstamped", "%d file(s), no stamp - run %s" % (cur["files"], self.REMEDY)
+        try:
+            with open(self.path, encoding="utf-8") as fh:
+                old = json.load(fh)
+            assert isinstance(old, dict)
+        except (ValueError, OSError, AssertionError) as exc:
+            return "unstamped", "%d file(s), unreadable stamp (%s) - run %s" % (cur["files"], exc, self.REMEDY)
+        note = " [MAIN's dump at %s, read-only]" % rel if self.is_main_fallback() else ""
+        changed = [k for k in ("symbols", "splits", "dol") if old.get(k) != cur[k]]
+        if changed:
+            return "stale", "%s changed since the dump (%s) - run %s%s" % (
+                "/".join(changed), old.get("utc", "unknown time"), self.REMEDY, note)
+        if cur["files"] < old.get("files", 0):
+            return "truncated", "%d of %d file(s) are gone - run %s" % (
+                old["files"] - cur["files"], old["files"], self.REMEDY)
+        return "fresh", "%d file(s), matches symbols.txt/splits.txt/main.dol (dumped %s)%s" % (
+            cur["files"], old.get("utc", "unknown time"), note)
 
 
 def file_rank(path: str, asm_dir: str) -> tuple[int, int]:
@@ -534,6 +623,48 @@ def census(obj_dir: str, units, symbols: dict, ranges: dict) -> tuple[tuple[list
     return census_records(unit_refs, symbols, ranges), len(unit_refs)
 
 
+def census_claims(text: str) -> dict[str, list[tuple[int, int, str]]]:
+    """`{section: [(start, end, unit)]}` (sorted) from the text of a `splits.txt`; the unit has no extension."""
+    from tools.lib import project  # noqa: PLC0415 - only the tree-level census reads the project files
+    return {section: sorted((s, e, os.path.splitext(u)[0]) for s, e, u in rows)
+            for section, rows in project.Splits.parse(text).by_section().items()}
+
+
+def census_symbols(path: str) -> dict[str, dict]:
+    """`{name: {section, address, size, type, line}}` from a `symbols.txt` (a duplicated name is dropped: ambiguous)."""
+    from tools.lib import project  # noqa: PLC0415
+    out: dict[str, dict] = {}
+    dup = set()
+    for e in (r.to_dict() for r in project.SymbolMap(path).rows()):
+        if e["name"] in out:
+            dup.add(e["name"])
+        out[e["name"]] = e
+    for name in dup:
+        out.pop(name, None)
+    return out
+
+
+def census_units(ranges: dict, units=None) -> list[str]:
+    """The registered units of the claims, narrowed to `units` (extensions dropped) when given."""
+    registered = sorted({u for rows in ranges.values() for _s, _e, u in rows})
+    if units is not None:
+        want = {os.path.splitext(u)[0] for u in units}
+        registered = [u for u in registered if u in want]
+    return registered
+
+
+def tree_census(root: str, units=None, ranges: dict | None = None, game: str = "RMHE08"):
+    """`((records, stats), registered, read)` for the registered units' TARGET objects as they stand in `root`:
+    the claims from `config/<game>/splits.txt` (unless `ranges` is given), the map, `build/<game>/obj`."""
+    if ranges is None:
+        with open(os.path.join(root, "config", game, "splits.txt"), encoding="utf-8", errors="replace") as fh:
+            ranges = census_claims(fh.read())
+    registered = census_units(ranges, units)
+    found, read = census(os.path.join(root, "build", game, "obj"), registered,
+                         census_symbols(os.path.join(root, "config", game, "symbols.txt")), ranges)
+    return found, len(registered), read
+
+
 # --- the retail-text scan (the splitcheck context's readers) --------------------------------------------------
 
 @dataclass(frozen=True)
@@ -671,3 +802,339 @@ def function_graph(files, fns: dict, labels: dict, rel_root: str) -> dict:
         for name, own in rel_owners(txt, fns, labels).items():
             owners[name] |= own
     return {"funcs": graph, "extab": extab, "owners": {k: sorted(v) for k, v in owners.items()}, "fn_check": check}
+
+
+# --- the query: the index for a tree, current names and owners, one address's report ------------------------
+
+def _has_objects(d: str) -> bool:
+    return any(n.endswith(".o") for _dp, _dirs, names in os.walk(d) for n in names)
+
+
+def dump_dir(root: str, honour_env: bool = False, game: str = "RMHE08") -> str:
+    """The dump a tree READS: its own `build/<game>/asm`, else MAIN's by path when it has none (a fresh worktree)."""
+    from tools.lib import repo  # noqa: PLC0415 - the tree-level loaders only
+    return repo.resolve_input(os.path.join("build", game, "asm"), root, has_dump, honour_env)
+
+
+def objects_dir(root: str, honour_env: bool = False, game: str = "RMHE08") -> str:
+    """The split objects a tree READS: its own `build/<game>/obj`, else MAIN's by path when it has none."""
+    from tools.lib import repo  # noqa: PLC0415
+    return repo.resolve_input(os.path.join("build", game, "obj"), root, _has_objects, honour_env)
+
+
+def dump_cache(root: str) -> str:
+    """Where the dump index is cached (`build/tmp/callers/graph.json`, the format `callers.py` always wrote)."""
+    return os.path.join(root, "build", "tmp", "callers", "graph.json")
+
+
+def objects_cache(root: str) -> str:
+    return os.path.join(root, "build", "tmp", "callers", "elf-graph.json")
+
+
+def load_dump_index(root: str, rebuild: bool = False, asm_dir: str | None = None, cache: str | None = None,
+                    honour_env: bool = False, game: str = "RMHE08") -> tuple[dict | None, dict]:
+    """`(index, info)` over the tree's dump - from the cache when it is the same dump, else built; `(None, info)`
+    when there is no dump."""
+    asm_dir = asm_dir or dump_dir(root, honour_env, game)
+    cache = cache or dump_cache(root)
+    files = dump_files(asm_dir)
+    if not files:
+        return None, {"asm_dir": asm_dir, "cache": cache, "files": 0, "cached": False, "rebuilt": False,
+                      "reason": "no dump", "stats": {}}
+    index, info = load_index(cache, libcache.stat_digest(files, asm_dir), len(files),
+                             lambda: build_dump_index(asm_dir, files, game), rebuild,
+                             "the dump changed since the index was built")
+    info["asm_dir"] = asm_dir
+    return index, info
+
+
+def load_object_index(root: str, rebuild: bool = False, cmap: "RefMap | None" = None, cache: str | None = None,
+                      honour_env: bool = False, game: str = "RMHE08",
+                      obj_dir: str | None = None) -> tuple[dict | None, dict]:
+    """`load_dump_index`'s fallback: the same index shape, built from the split objects' relocations, cached the
+    same way (`source: elf`)."""
+    obj_dir = obj_dir or objects_dir(root, honour_env, game)
+    cache = cache or objects_cache(root)
+    files = object_files(obj_dir)
+    if not files:
+        return None, {"asm_dir": obj_dir, "cache": cache, "files": 0, "cached": False, "rebuilt": False,
+                      "reason": "no objects", "stats": {}, "source": "elf"}
+    cmap = cmap if cmap is not None else RefMap.load(root)
+    index, info = load_index(cache, object_signature(obj_dir, files), len(files),
+                             lambda: build_object_index(obj_dir, files, cmap.symbols, game), rebuild,
+                             "the objects changed since the index was built")
+    info.update(asm_dir=obj_dir, source="elf")
+    return index, info
+
+
+class RefMap:
+    """`symbols.txt` + `splits.txt` as an address index: current names, owners, function extents.
+
+    Names come through `lib.project.Ownership` (the rule-2 lint's index, parsed once per mtime, never printed), so
+    a reference report and the lint cannot disagree about who owns an address; `by_addr` and `funcs` are inverted
+    from it for the query: `address -> current name`.
+    """
+
+    def __init__(self, ownership, root: str) -> None:
+        self.own = ownership
+        self.root = root
+        self.symbols = ownership.symbols if ownership else {}
+        self.by_addr, self.funcs = {}, []
+        for name, rows in self.symbols.items():
+            for section, addr, type_ in rows:
+                self.by_addr.setdefault(addr, (name, section, type_))
+                if section in CODE_SECTIONS and type_ == "function":
+                    self.funcs.append((addr, name))
+        self.funcs.sort()
+        self.func_addrs = [a for a, _n in self.funcs]
+
+    @classmethod
+    def load(cls, root: str) -> "RefMap":
+        """The map of `root`, or an empty one when the tree has no `symbols.txt` (a scratch fixture)."""
+        from tools.lib.project import Ownership  # noqa: PLC0415
+        return cls(Ownership.load(root), root)
+
+    def available(self) -> bool:
+        return bool(self.symbols)
+
+    def name_at(self, addr: int):
+        """-> (name, section, type) of the map row *exactly* at `addr`, or None."""
+        return self.by_addr.get(addr)
+
+    def function_at(self, addr: int):
+        """-> (address, name) of the function containing a code `addr` (a bisect over the map's function rows)."""
+        if not self.funcs:
+            return None
+        i = bisect.bisect_right(self.func_addrs, addr) - 1
+        return self.funcs[i] if i >= 0 else None
+
+    def source_exists(self, unit) -> bool:
+        if not unit:
+            return False
+        return os.path.exists(os.path.join(self.root, "src", unit.replace("\\", "/")))
+
+    def owner(self, name):
+        """-> (label, state, unit) for a name, in `lib.project.ownership.owner_label`'s vocabulary."""
+        from tools.lib.project.ownership import owner_label  # noqa: PLC0415
+        return owner_label(self.own.resolve(name) if (self.own and name) else None, self.source_exists)
+
+    def owner_at(self, addr: int, section: str | None = None, name: str | None = None):
+        """-> (label, state, unit) for a caller, by its name when the map has it, else by its address."""
+        if name and name in self.symbols:
+            return self.owner(name)
+        rows = self.own.ranges.get(section) if (self.own and section) else None
+        for start, end, unit in rows or ():
+            if start <= addr < end:
+                exists = self.source_exists(unit)
+                if not exists:
+                    return (unit + " (no source yet)", "registered", unit)
+                return (unit, "reconstructed", unit)
+        hit = self.by_addr.get(addr)
+        if hit:
+            return self.owner(hit[0])
+        return ("unsplit address", "unsplit", None)
+
+
+def plain_name(name: str) -> str:
+    """A mangled name's plain form: `quest_init__FUc` -> `quest_init` (a query convenience)."""
+    return name.split("__", 1)[0]
+
+
+def fmt_addr(addr) -> str:
+    return "0x%08X" % addr if addr is not None else "-"
+
+
+def find_target(query_text: str, index: dict, cmap: RefMap):
+    """-> (address or None, candidates, how): an address, or the names a name query matched.
+
+    `how` is `address`, `map`, `dump` (the name is only in the stale dump) or the tier of the name match; more than
+    one candidate is returned as a list, the current map's names first - it never guesses between two symbols.
+    """
+    m = re.fullmatch(r"(?:0[xX])?([0-9A-Fa-f]{1,8})", query_text)
+    if m and (query_text[:2].lower() == "0x" or len(query_text) == 8):
+        return int(m.group(1), 16), [], "address"
+    labels = index["labels"]
+    if query_text in cmap.symbols:
+        return None, [query_text], "map"
+    if query_text in labels:
+        return None, [query_text], "dump"
+    for pool in (cmap.symbols, labels):
+        plain = [n for n in pool if plain_name(n) == query_text]
+        if plain:
+            return None, plain, "plain name"
+    return None, list(dict.fromkeys(n for n in list(cmap.symbols) + list(labels)
+                                    if query_text in n))[:200], "substring"
+
+
+def caller_of(index: dict, cmap: RefMap, site: int, func):
+    """-> (address, name) of who holds a reference, current name first, the dump's label second: the container is
+    the `.fn`/`.obj` block the dump put the instruction in, and the current map wins only with a row at its start."""
+    if func is None:                       # an instruction outside any block (`.init` scaffolding)
+        hit = cmap.function_at(site)
+        return hit if hit else (None, None)
+    hit = cmap.name_at(func)
+    if hit:
+        return func, hit[0]
+    name = index["_funcs"].get(func) or (index["_label_at"].get(func) or [None])[0]
+    return func, name or fmt_addr(func)
+
+
+def query(query_text: str, index: dict, cmap: RefMap, kinds=None, limit: int = 40, pointers: bool = False) -> dict:
+    """-> the report dict for one query: the target, its references, and why each is named as it is."""
+    addr, candidates, how = find_target(query_text, index, cmap)
+    rep = {"query": query_text, "resolved": None, "candidates": candidates, "how": how,
+           "references": [], "counts": {k: 0 for k in KINDS}, "notes": [], "limit": limit,
+           "pointer_hidden": 0}
+    if addr is None:
+        if len(candidates) != 1:
+            rep["error"] = ("%d name(s) match %r" % (len(candidates), query_text)) if candidates else \
+                ("%r is neither in the symbol map nor in the asm dump" % query_text)
+            return rep
+        name = candidates[0]
+        hit = cmap.symbols.get(name)
+        if hit:
+            if len(hit) != 1:
+                rep["error"] = "%r has %d rows in the symbol map (a duplicate): pass an address" \
+                    % (name, len(hit))
+                return rep
+            addr, how = hit[0][1], "map"
+        else:
+            addr, how = index["labels"][name][0], "dump"
+    rep["how"] = how
+
+    names = index["_label_at"].get(addr, [])
+    map_hit = cmap.name_at(addr)
+    name = map_hit[0] if map_hit else (names[0] if names else fmt_addr(addr))
+    lab = index["labels"].get(name) or (index["labels"].get(names[0]) if names else None)
+    section = map_hit[1] if map_hit else (lab[2] if lab else None)
+    asm_label = next((n for n in names if n != name), None) if map_hit else None
+    if map_hit:
+        label, state, unit = cmap.owner(name)
+    else:
+        label, state, unit = cmap.owner_at(addr, section)
+    rep["resolved"] = {
+        "address": fmt_addr(addr), "name": name, "section": section, "kind":
+        "code" if section in CODE_SECTIONS else ("data" if section else "unknown"),
+        "size": lab[1] if lab else 0, "owner": label, "owner_state": state, "unit": unit,
+        "asm_label": asm_label, "in_map": bool(map_hit), "name_source": "map" if map_hit else "dump",
+    }
+    if how == "dump" and map_hit and map_hit[0] != query_text:
+        rep["notes"].append("the queried name is the dump's (stale) label: the current map calls %s %s"
+                            % (fmt_addr(addr), map_hit[0]))
+
+    # a reference the dump could not resolve by name was left keyed on that name: the current map may
+    # name the address now (the rename-since-the-dump case, in both directions), so retry it here
+    rows, retried = rows_at(index, addr, (name, query_text, asm_label))
+    for nm in retried:
+        rep["notes"].append("a reference printed as %r (in neither the dump's label table nor the map) "
+                            "was resolved through the current map" % nm)
+
+    if not pointers:
+        rep["pointer_hidden"] = sum(1 for r in rows if r[1] == "pointer")
+        rows = [r for r in rows if r[1] != "pointer"]
+    # the `lis`+`addi` pairs become one site before anything is counted, so every number below (and in
+    # the "no site matched the filter" note) is the same kind of site
+    rows = coalesce([r for r in rows if r[1] not in ("addr", "read", "write")]) + \
+        coalesce([r for r in rows if r[1] in ("addr", "read", "write")])
+    rep["all_kinds"] = dict(collections.Counter(r[1] for r in rows))
+    if kinds:
+        rows = [r for r in rows if r[1] in kinds]
+    if not rows and rep["all_kinds"]:
+        rep["notes"].append("no %s reference here, but %d other reference(s): drop the filter"
+                            % ("/".join(kinds or ()), sum(rep["all_kinds"].values())))
+    rows.sort(key=lambda r: r[0])
+
+    refs = []
+    for site, kind_, func, text, arg in rows:
+        faddr, fname = caller_of(index, cmap, site, func)
+        owner, ostate, _unit = cmap.owner_at(faddr, None, fname) if faddr is not None else ("", "", None)
+        refs.append({"kind": kind_, "site": fmt_addr(site),
+                     "caller": {"address": fmt_addr(faddr), "name": fname, "owner": owner,
+                                "owner_state": ostate} if faddr is not None else None,
+                     "instruction": text, "arg": arg or None})
+    rep["references"] = refs
+    counts = collections.Counter(r["kind"] for r in refs)
+    for k in KINDS:
+        rep["counts"][k] = counts.get(k, 0)
+    rep["counts"]["sites"] = len(refs)
+    rep["counts"]["functions"] = len({r["caller"]["address"] for r in refs if r["caller"]})
+    return rep
+
+
+def norm_reader(label):
+    """A report's owner label -> a unit name, or None for the labels that are not units (`unsplit ...`): a
+    `.c`/`.cpp` extension and a ` (no source yet)` suffix are dropped, so a reader set joins `splits.txt`."""
+    if not label:
+        return None
+    label = label.strip()
+    if label in ("unsplit address", "unsplit") or label.startswith("unsplit ("):
+        return None
+    if label.endswith(" (no source yet)"):
+        label = label[: -len(" (no source yet)")]
+    if label.endswith((".c", ".cpp", ".cp")):
+        label = os.path.splitext(label)[0]
+    return label
+
+
+def reader_units(rep: dict) -> dict:
+    """`{unit: site count}` for one query report - who references an address, in the unit vocabulary."""
+    counts = {}
+    for ref in rep.get("references", ()):
+        unit = norm_reader((ref.get("caller") or {}).get("owner"))
+        if unit:
+            counts[unit] = counts.get(unit, 0) + 1
+    return counts
+
+
+def readers_of(index: dict, cmap: RefMap):
+    """`readers_of(address) -> {unit: sites}` - the sharing census, a cached wrapper around `query`, so the runs and
+    every sharer list cannot disagree about who reads an address."""
+    cache: dict[int, dict] = {}
+
+    def readers(address):
+        if address not in cache:
+            cache[address] = reader_units(query("0x%08X" % address, index, cmap, limit=0))
+        return cache[address]
+
+    return readers
+
+
+def range_report(index: dict, cmap: RefMap, lo: int, hi: int, step: int = 4) -> dict:
+    """The per-address referrer runs over `[lo, hi]` (both inclusive): `runs_over(readers_of(...))`."""
+    return runs_over(readers_of(index, cmap), lo, hi, step)
+
+
+@dataclass
+class RefIndex:
+    """The reference index a tree answers from: its dump when it has one, else its split objects' relocations
+    (`source` `asm` / `elf`), with the current map. `index` is None when the tree has neither."""
+    index: dict | None
+    info: dict
+    cmap: RefMap
+    source: str
+    asm_dir: str
+
+    @classmethod
+    def load(cls, root: str, rebuild: bool = False, honour_env: bool | None = None,
+             game: str = "RMHE08") -> "RefIndex":
+        """The dump index when the tree reads a dump, else the object fallback; `honour_env` (default: whether
+        `root` is the served tree) lets `$MHTRI_MAIN` pick MAIN."""
+        if honour_env is None:
+            from tools.lib import repo  # noqa: PLC0415
+            honour_env = repo.is_served(root)
+        cmap = RefMap.load(root)
+        asm_dir = dump_dir(root, honour_env, game)
+        if dump_files(asm_dir):
+            index, info = load_dump_index(root, rebuild, asm_dir, honour_env=honour_env, game=game)
+            return cls(index, info, cmap, "asm", asm_dir)
+        index, info = load_object_index(root, rebuild, cmap, honour_env=honour_env, game=game)
+        return cls(index, info, cmap, "elf", asm_dir)
+
+    def query(self, query_text: str, kinds=None, limit: int = 40, pointers: bool = False) -> dict:
+        return query(query_text, self.index, self.cmap, kinds, limit, pointers)
+
+    def readers_of(self):
+        return readers_of(self.index, self.cmap)
+
+    def runs(self, lo: int, hi: int, step: int = 4) -> dict:
+        return range_report(self.index, self.cmap, lo, hi, step)

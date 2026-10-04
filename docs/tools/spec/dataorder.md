@@ -8,7 +8,8 @@ dataorder.py - translation-unit seams read from the *order* of retail `.data`.
 
 ## Users
 
-profiles (`.claude/agents`) (2); skills (6); CLAUDE.md (1); docs (13); imported by `dataseams`, `splitcheck`, `tudiscover`
+profiles (`.claude/agents`) (2); skills (6); CLAUDE.md (1); docs (13); no tool imports it (WP3c: the classifier and the
+seams are `tools/splits/seams/evidence.py`, which `dataseams`, `tudiscover` and the `splitcheck` invariants read)
 
 ## CLI
 
@@ -32,7 +33,8 @@ Inputs -> outputs: DOL + symbols.txt -> seams.
 
 ## Lib dependencies
 
-binary.dol, project.symbols, project.splits.
+The seam evidence (`seams.md`: every rule above lives there now - this
+tool is its `scan`/`at` view), `lib.repo` (the tree's map, splits and DOL, resolved on first use).
 
 ## Test contract
 

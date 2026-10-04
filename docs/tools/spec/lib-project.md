@@ -42,7 +42,9 @@ Ownership, Owner, AutoObjects, Refused, ShapeError`.
   `Ownership.at_ref(root, ref, show=None)` (`show(ref, rel) -> bytes | None`, default `lib.git.Git(root).show`),
   `from_files`, `from_texts`; `covering`, `owner_of(section, address) -> Owner(state, unit, section, range, band)`, `band_of`
   (alias `module`), `resolve(name)`, `name_at`, `resolution_at`, `unit_of_symbol`, `symbols_of_unit(unit, section)`;
-  `AutoObjects.load(config_json, obj_dir)` / `from_config`; `module_name(unit)`; `symbol_index(rows)`.
+  `AutoObjects.load(config_json, obj_dir)` / `from_config`; `module_name(unit)`; `symbol_index(rows)`;
+  `owner_label(resolution, source_exists) -> (label, state, unit)` (WP3c, from `callees.classify_owner`: the vocabulary
+  `callers`/`callees` print) and `source_exists(root)` (from `callees.make_source_exists`).
 
 ## Invariants and rules
 
@@ -107,8 +109,8 @@ scan on a sample.
 ## Known gaps
 
 * The tools' own interval searches over their own shapes stay (`symbolpreflight.covering`, `linkorder.covering_any`,
-  `poolseams.owner_of`, `vtslot.containing_range`, `dataorder.unit_of`, `datagap.classify_address`,
-  `dataclaim.symbol_lookup`): their inputs now come from this module; WP3a/3c retire them with their callers.
+  `poolseams.owner_of`, `vtslot.containing_range`, `dataclaim.symbol_lookup`): their inputs now come from this module.
+  `dataorder.unit_of` is the seam evidence's `range_of` (WP3c) and `datagap.classify_address` is `lib.refs` (WP2a).
 * `datagap.splits_plan` edits `splits.txt` text line by line; it becomes `Splits` edits in WP3a (`dataclosure`).
 * `preflight_selftest.load_repo` keeps its own parser on purpose (a second opinion over the live tree).
 * `land.units_from_branch` (through `unionresolve.object_names`) reads only one-line `Object(kind, "unit")` calls, as before:

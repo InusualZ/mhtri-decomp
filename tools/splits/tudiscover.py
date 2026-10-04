@@ -9,37 +9,48 @@ import hashlib
 import json
 import os
 import re
-import struct
 import sys
 import time
-from tools.lib import cache as libcache
-from tools.lib.binary.dol import Dol as LibDol
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # tools/
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))                   # tools/splits/ (dataorder)
-import unitutil as uu  # noqa: E402  (repo root + build layout)
-from tools.lib import project as _project  # noqa: E402  (the map / splits readers)
-from tools.lib import refs as _refs  # noqa: E402  (the dump's per-function graph)
+from tools.lib import project as _project  # the map / splits readers
+from tools.lib import refs as _refs  # the dump's per-function graph and its stamp
+from tools.lib import repo as _repo
+import tools.splits.seams.evidence as ev  # the seam evidence: data order, the pool model, source names
 
-ROOT = uu.ROOT
-GAME = "RMHE08"
-SYMBOLS = os.path.join(ROOT, "config", GAME, "symbols.txt")
-SPLITS = os.path.join(ROOT, "config", GAME, "splits.txt")
-LOCAL_ASM_DIR = os.path.join(ROOT, "build", GAME, "asm")      # the tree's own dump: the only place a tool WRITES
+GAME = ev.GAME
+has_dump = _refs.has_dump
 
-
-def has_dump(d):
-    """Whether a directory holds at least one `.s` file."""
-    for _dp, _dirs, names in os.walk(d):
-        if any(n.endswith(".s") for n in names):
-            return True
-    return False
+#: The tree's paths, resolved on first use (never at import) and assignable (`td.ASM_DIR = ...` pins one):
+#: `ASM_DIR`/`DOL` are READ from the tree's own, else MAIN's by path (a fresh worktree has no `build/`);
+#: `LOCAL_ASM_DIR` is the tree's own dump, the only place a tool WRITES.
+_LAZY = ("ROOT", "SYMBOLS", "SPLITS", "LOCAL_ASM_DIR", "ASM_DIR", "DOL", "CACHE", "ASM_STAMP")
 
 
-#: where the dump is READ from: the tree's own, else MAIN's by path (a fresh worktree has no `build/`); same for the DOL
-ASM_DIR = uu.resolve_input(os.path.join("build", GAME, "asm"), ROOT, has_dump)
-DOL = uu.resolve_input(os.path.join("orig", GAME, "sys", "main.dol"), ROOT, os.path.isfile)
-CACHE = os.path.join(ROOT, "build", "tmp", "tudiscover", "graph.json")
+def _g(name):
+    """The current value of one lazy tree path (an assigned value wins)."""
+    g = globals()
+    if name not in g:
+        root = g.get("ROOT") or _repo.repo_root()
+        g.setdefault("ROOT", root)
+        g.setdefault("SYMBOLS", os.path.join(root, "config", GAME, "symbols.txt"))
+        g.setdefault("SPLITS", os.path.join(root, "config", GAME, "splits.txt"))
+        g.setdefault("LOCAL_ASM_DIR", os.path.join(root, "build", GAME, "asm"))
+        if "ASM_DIR" not in g:
+            g["ASM_DIR"] = _repo.resolve_input(os.path.join("build", GAME, "asm"), root, has_dump, honour_env=True)
+        if "DOL" not in g:
+            g["DOL"] = _repo.resolve_input(os.path.join("orig", GAME, "sys", "main.dol"), root, os.path.isfile,
+                                           honour_env=True)
+        g.setdefault("CACHE", os.path.join(root, "build", "tmp", "tudiscover", "graph.json"))
+        g.setdefault("ASM_STAMP", os.path.join(g["ASM_DIR"], ".stamp.json"))
+    return g[name]
+
+
+def __getattr__(name):
+    if name in _LAZY:
+        return _g(name)
+    raise AttributeError("module %r has no attribute %r" % (__name__, name))
+
+
 SCHEMA = 10     # bump on any change to what `build_graph()` stores (the stamp also hashes the code)
 
 # Section order for the printed `splits.txt` block (matches config/RMHE08/splits.txt's header).
@@ -50,7 +61,7 @@ TOKEN_RE = _refs.TOKEN_RE
 CALL_RE = _refs.CALL_RE
 SAVE_RE = _refs.SAVE_RE
 REC_RE = _refs.REC_RE
-SRCFILE_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_./\\-]*\.(?:c|cpp|cc|cxx|cp)$")
+SRCFILE_RE = ev.SOURCE_NAME_RE
 ETI_RE = _refs.ETI_RE
 FOURBYTE_RE = _refs.FOURBYTE_RE
 # The whole-unit extent dtk prints in the header comment of every `.s`, in either spelling the tree
@@ -105,29 +116,12 @@ NO_REF_SECTIONS = _refs.NO_REF_SECTIONS
 
 
 
-class Dol(LibDol):
-    """Address -> bytes for the retail image (traced through the DOL's section table, `lib.binary.dol`)."""
-
-    def __init__(self, path):
-        with open(path, "rb") as handle:
-            super().__init__(handle.read(), path)
-        self.secs = [(s.address, s.size, s.offset) for s in self.segments]
-
-    def read(self, addr, n):
-        return self.bytes_from(addr, n)
+Dol = ev.Image   # address -> bytes for the retail image (`read` may run past a segment end)
 
 
 def load_map():
-    """(functions, labels): names -> records, straight from the symbol map (never printed)."""
-    fns, labels = {}, {}
-    for e in _project.SymbolMap(SYMBOLS).rows():
-        if e.section == ".text" and e.type == "function":
-            fns[e.name] = {"addr": e.address, "size": e.size, "scope": "local" if e.scope == "local" else ""}
-        elif e.section != ".text":
-            # `kind` is the `data:` attribute (`Symbol.kind`), never the `.data:` of the address.
-            labels[e.name] = {"section": e.section, "addr": e.address, "size": e.size, "kind": e.kind,
-                              "local": e.scope == "local"}
-    return fns, labels
+    """(functions, labels): names -> records, straight from the symbol map (`evidence.map_tables`)."""
+    return ev.map_tables(_g("SYMBOLS"))
 
 
 # Duplicate/stale copies of one unit's asm that `asm_files()` resolved (refilled on every call).
@@ -163,7 +157,7 @@ def dedupe_ranges(paths, fns):
             ranges[path] = (int(m.group(1), 16), int(m.group(2), 16))
         else:
             unkeyed.append(path)
-            ASM_NO_RANGE.append(os.path.relpath(path, ASM_DIR))
+            ASM_NO_RANGE.append(os.path.relpath(path, _g("ASM_DIR")))
     keep = list(unkeyed)
     by_range = collections.defaultdict(list)
     for path, key in ranges.items():
@@ -178,8 +172,8 @@ def dedupe_ranges(paths, fns):
         kept = [s[2] for s in scored if s[0] == best and s[1] == top]
         keep.extend(kept)
         ASM_RANGE_DUPS.append({"range": "0x%08X..0x%08X" % key,
-                               "kept": [os.path.relpath(p, ASM_DIR) for p in kept],
-                               "dropped": [os.path.relpath(s[2], ASM_DIR)
+                               "kept": [os.path.relpath(p, _g("ASM_DIR")) for p in kept],
+                               "dropped": [os.path.relpath(s[2], _g("ASM_DIR"))
                                            for s in scored if s[2] not in kept],
                                "resolved": len(kept) == 1})
 
@@ -197,8 +191,8 @@ def dedupe_ranges(paths, fns):
         start, end = ranges[path]
         if end <= max_end and map_fn_hits(path, fns) == 0:
             ASM_SUBRANGE.append({"range": "0x%08X..0x%08X" % (start, end),
-                                 "kept": os.path.relpath(max_path, ASM_DIR),
-                                 "dropped": os.path.relpath(path, ASM_DIR)})
+                                 "kept": os.path.relpath(max_path, _g("ASM_DIR")),
+                                 "dropped": os.path.relpath(path, _g("ASM_DIR"))})
             continue
         pruned.append(path)
         if end > max_end:
@@ -217,97 +211,51 @@ def map_fn_hits(path, fns):
     return sum(1 for n in FN_NAME_RE.findall(txt) if n in fns)
 
 
-ASM_STAMP = os.path.join(ASM_DIR, ".stamp.json")
-
-
 def use_local_dump():
     """Point the dump at the tree's OWN `build/<game>/asm` - what the tool that WRITES the dump (`dump_asm.py`) calls first,
     so a fallback to MAIN's dump can never make it write into MAIN."""
     global ASM_DIR, ASM_STAMP
-    ASM_DIR = LOCAL_ASM_DIR
+    ASM_DIR = _g("LOCAL_ASM_DIR")
     ASM_STAMP = os.path.join(ASM_DIR, ".stamp.json")
 
 
 def dump_is_main_fallback():
     """True when the dump is read from another tree's `build/` (MAIN's) because this tree has none."""
-    return os.path.normcase(os.path.abspath(ASM_DIR)) != os.path.normcase(os.path.abspath(LOCAL_ASM_DIR))
+    return _stamp().is_main_fallback()
 
 
 def repo_rel(path):
     """`path` relative to the repo root, or as-is when that is not expressible (Windows drives)."""
     try:
-        return os.path.relpath(path, ROOT)
+        return os.path.relpath(path, _g("ROOT"))
     except ValueError:
         return path
 
 
+def _stamp():
+    """The dump's stamp (`lib.refs.DumpStamp`) over this module's current paths."""
+    return _refs.DumpStamp(_g("ASM_DIR"), _g("SYMBOLS"), _g("SPLITS"), _g("DOL"), GAME, _g("LOCAL_ASM_DIR"), _g("ROOT"),
+                           _g("ASM_STAMP"))
+
+
 def dump_files():
     """Every `.s` in the dump. The directory also holds `.stamp.json`, which is not a unit."""
-    out = []
-    for dirpath, _dirs, names in os.walk(ASM_DIR):
-        for n in names:
-            if n.endswith(".s"):
-                out.append(os.path.join(dirpath, n))
-    return out
+    return _refs.dump_files(_g("ASM_DIR"))
 
 
 def dump_stamp():
     """What the dump in `build/<game>/asm/` is a function of: the three files dtk's split reads."""
-    files = dump_files()
-    return {
-        "game": GAME,
-        "symbols": libcache.content_hash(SYMBOLS),
-        "splits": libcache.content_hash(SPLITS),
-        "dol": libcache.content_hash(DOL),
-        "files": len(files),
-        "bytes": sum(os.path.getsize(f) for f in files),
-        "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-    }
+    return _stamp().current()
 
 
 def write_asm_stamp(extra=None):
     """Stamp the current dump (called by `tools/splits/dump_asm.py` after a split)."""
-    stamp = dump_stamp()
-    if extra:
-        stamp.update(extra)
-    tmp = ASM_STAMP + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        json.dump(stamp, fh, indent=1, sort_keys=True)
-        fh.write("\n")
-    os.replace(tmp, ASM_STAMP)
-    return stamp
+    return _stamp().write(extra)
 
 
 def asm_stamp_status():
-    """`(state, message)` for the dump: fresh / missing / unstamped / stale / truncated.
-
-    `config.yml` sets `write_asm: false`, so the dump only changes when `tools/splits/dump_asm.py`
-    writes it - and every number in this tool is a function of it. Staleness is otherwise silent and
-    expensive: `asm_files()`'s docstring records a stale copy printing `bl fn_80456DD4` where the
-    canonical one prints `bl _savegpr_14`, which zeroes a codegen fingerprint.
-    """
-    cur = dump_stamp()
-    rel = repo_rel(ASM_DIR)
-    if not cur["files"]:
-        return "missing", "no `.s` file under %s - run tools/splits/dump_asm.py" % rel
-    if not os.path.exists(ASM_STAMP):
-        return "unstamped", "%d file(s), no stamp - run tools/splits/dump_asm.py" % cur["files"]
-    try:
-        old = json.load(open(ASM_STAMP, encoding="utf-8"))
-        assert isinstance(old, dict)
-    except (ValueError, OSError, AssertionError) as exc:
-        return "unstamped", "%d file(s), unreadable stamp (%s) - run tools/splits/dump_asm.py" \
-            % (cur["files"], exc)
-    note = " [MAIN's dump at %s, read-only]" % repo_rel(ASM_DIR) if dump_is_main_fallback() else ""
-    changed = [k for k in ("symbols", "splits", "dol") if old.get(k) != cur[k]]
-    if changed:
-        return "stale", "%s changed since the dump (%s) - run tools/splits/dump_asm.py%s" \
-            % ("/".join(changed), old.get("utc", "unknown time"), note)
-    if cur["files"] < old.get("files", 0):
-        return "truncated", "%d of %d file(s) are gone - run tools/splits/dump_asm.py" \
-            % (old["files"] - cur["files"], old["files"])
-    return "fresh", "%d file(s), matches symbols.txt/splits.txt/main.dol (dumped %s)%s" \
-        % (cur["files"], old.get("utc", "unknown time"), note)
+    """`(state, message)` for the dump: fresh / missing / unstamped / stale / truncated (`lib.refs.DumpStamp`)."""
+    return _stamp().status()
 
 
 def asm_files(fns=None):
@@ -326,11 +274,11 @@ def asm_files(fns=None):
     `dedupe_ranges()`.
     """
     out = []
-    for dirpath, _dirs, names in os.walk(ASM_DIR):
+    for dirpath, _dirs, names in os.walk(_g("ASM_DIR")):
         for n in names:
             if not n.endswith(".s"):
                 continue
-            if dirpath == ASM_DIR and n.startswith("auto_") and not n.endswith("_text.s"):
+            if dirpath == _g("ASM_DIR") and n.startswith("auto_") and not n.endswith("_text.s"):
                 continue          # per-function scaffolding / data dumps: not a unit's `.text`
             out.append(os.path.join(dirpath, n))
     del ASM_COLLISIONS[:]
@@ -342,8 +290,8 @@ def asm_files(fns=None):
         by_stem[os.path.basename(path)[:-len(".s")]].append(path)
     keep = []
     for stem, paths in sorted(by_stem.items()):
-        top = [p for p in paths if os.path.dirname(p) == ASM_DIR]
-        deep = [p for p in paths if os.path.dirname(p) != ASM_DIR]
+        top = [p for p in paths if os.path.dirname(p) == _g("ASM_DIR")]
+        deep = [p for p in paths if os.path.dirname(p) != _g("ASM_DIR")]
         if top and deep:
             keep.extend(deep)          # the configured unit's directory wins, deterministically
             ASM_COLLISIONS.append({"stem": stem, "kept": deep, "dropped": top, "resolved": True})
@@ -377,7 +325,8 @@ def parse_fingerprint():
              REC_RE.pattern, FOURBYTE_RE.pattern, HEADER_RANGE_RE.pattern, AT_SPELLED_RE.pattern]
     try:
         import inspect
-        for fn in (asm_files, dedupe_ranges, load_map, rel_owners, build_graph, resolve_name, _refs.function_graph):
+        for fn in (asm_files, dedupe_ranges, load_map, ev.map_tables, rel_owners, build_graph, resolve_name,
+                   _refs.function_graph):
             parts.append(inspect.getsource(fn))
     except (OSError, TypeError, IOError):
         parts.append("source unavailable")
@@ -410,7 +359,7 @@ def stale_files(out):
         rel.append(d["dropped"])
     pairs = []
     for r in sorted(set(rel)):
-        p = os.path.join(ASM_DIR, r)
+        p = os.path.join(_g("ASM_DIR"), r)
         if os.path.exists(p):
             pairs.append((p, r))
     return pairs
@@ -442,7 +391,7 @@ def parse_report(out):
                             ", ".join("%s (%d lines, %d spans)" % tuple(m)
                                       for m in c["parse_misses"][:5])))
     if col:
-        live = [d for d in col if any(os.path.exists(os.path.join(ASM_DIR, x))
+        live = [d for d in col if any(os.path.exists(os.path.join(_g("ASM_DIR"), x))
                                       for x in (d.get("dropped") or []))]
         lines.append("asm duplicates     %d stem(s) exist in more than one asm directory (the"
                      " deeper, configured-unit copy is kept)%s:"
@@ -453,7 +402,7 @@ def parse_report(out):
                             ", ".join(dup["dropped"]) or "-",
                             "" if dup["resolved"] else "   UNRESOLVED (both kept)"))
     if rd:
-        live = [d for d in rd if any(os.path.exists(os.path.join(ASM_DIR, x))
+        live = [d for d in rd if any(os.path.exists(os.path.join(_g("ASM_DIR"), x))
                                      for x in (d.get("dropped") or []))]
         lines.append("range duplicates   %d section range(s) are covered by more than one parsed"
                      " file (the copy whose `.fn` names the symbol map is kept)%s:"
@@ -468,7 +417,7 @@ def parse_report(out):
                          % (len(rd) - 10))
     sub = out.get("subrange") or []
     if sub:
-        left = [d for d in sub if os.path.exists(os.path.join(ASM_DIR, d["dropped"]))]
+        left = [d for d in sub if os.path.exists(os.path.join(_g("ASM_DIR"), d["dropped"]))]
         lines.append("sub-range copies   %d file(s) sit inside another file's range and name no"
                      " function the map knows%s:"
                      % (len(sub), "  (all pruned)" if not left else "  - `prune --apply` removes them"))
@@ -494,13 +443,13 @@ def build_graph(fns, labels, force=False):
             "  `write_asm: false`); it is a separate one-command, ~8 s step. Make it, then re-run:\n"
             "      python tools/splits/dump_asm.py\n"
             "  Reporting 0 functions is the missing dump, not an empty map."
-            % (repo_rel(ASM_DIR), GAME))
-    stamp = {"schema": SCHEMA, "symbols": hashlib.sha1(open(SYMBOLS, "rb").read()).hexdigest(),
+            % (repo_rel(_g("ASM_DIR")), GAME))
+    stamp = {"schema": SCHEMA, "symbols": hashlib.sha1(open(_g("SYMBOLS"), "rb").read()).hexdigest(),
              "files": len(files), "bytes": sum(os.path.getsize(f) for f in files),
              "parse": parse_fingerprint()}
-    if not force and os.path.exists(CACHE):
+    if not force and os.path.exists(_g("CACHE")):
         try:
-            cached = json.load(open(CACHE, encoding="utf-8"))
+            cached = json.load(open(_g("CACHE"), encoding="utf-8"))
             if cached.get("stamp") == stamp:
                 print("# graph cache: build/tmp/tudiscover/graph.json (%d files)" % stamp["files"],
                       file=sys.stderr)
@@ -509,18 +458,18 @@ def build_graph(fns, labels, force=False):
         except (ValueError, OSError):
             pass
     t0 = time.time()
-    parsed = _refs.function_graph(files, fns, labels, ASM_DIR)
+    parsed = _refs.function_graph(files, fns, labels, _g("ASM_DIR"))
     graph, extab = parsed["funcs"], parsed["extab"]
     out = {"stamp": stamp, "files": len(files), "funcs": graph, "extab": extab,
            "owners": parsed["owners"],
-           "collisions": [{k: [os.path.relpath(p, ASM_DIR) for p in v] if k in ("kept", "dropped")
+           "collisions": [{k: [os.path.relpath(p, _g("ASM_DIR")) for p in v] if k in ("kept", "dropped")
                            else v for k, v in c.items()} for c in ASM_COLLISIONS],
            "range_dups": list(ASM_RANGE_DUPS),
            "subrange": list(ASM_SUBRANGE),
            "no_range": list(ASM_NO_RANGE),
            "fn_check": parsed["fn_check"]}
-    os.makedirs(os.path.dirname(CACHE), exist_ok=True)
-    json.dump(out, open(CACHE, "w", encoding="utf-8"))
+    os.makedirs(os.path.dirname(_g("CACHE")), exist_ok=True)
+    json.dump(out, open(_g("CACHE"), "w", encoding="utf-8"))
     print("# graph: %d functions (%d with extab) from %d files in %.1fs -> build/tmp/tudiscover/graph.json"
           % (len(graph), len(extab), len(files), time.time() - t0), file=sys.stderr)
     warn_parse(out)
@@ -545,10 +494,8 @@ def duplicate_values(labels, dol):
 
 
 def is_pool_literal(lab):
-    """An object MWCC pools per TU: an `.sdata2` 4/8-byte scalar or an `.sdata` string literal."""
-    if lab["section"] == ".sdata2":
-        return lab["size"] in (4, 8)
-    return lab["section"] == ".sdata" and lab["kind"] == "string"
+    """An object MWCC pools per TU (`evidence.is_literal`): an `.sdata2` 4/8-byte object or an `.sdata` string literal."""
+    return ev.is_literal(lab["section"], lab["size"], lab["kind"], lab.get("type", "object"))
 
 
 def classify(labels, refs_of, ordered, addr, size, span_max, dup, pool=False):
@@ -592,9 +539,9 @@ def pool_dedupe_cuts(labels, refs_of, dol):
         return [], []
     seen = collections.defaultdict(list)
     for name, lab in labels.items():
-        if name not in refs_of or lab["section"] != ".sdata2" or lab["kind"] not in ("float", "double"):
-            continue          # `.sdata` strings can be initialised arrays (never pooled); an untyped/`4byte` word can be
-                              # half of an 8-byte object the map cut in two (two 0xFFFFFFFF words read by one `lfd`)
+        if name not in refs_of or not ev.is_value_witness(lab["section"], lab["size"], lab["kind"],
+                                                         lab.get("type", "object")):
+            continue          # only a typed `.sdata2` float/double proves a value (`evidence.is_value_witness`)
         raw = dol.read(lab["addr"], lab["size"])
         if raw:
             seen[(lab["section"], bytes(raw))].append((lab["addr"], name))
@@ -629,9 +576,9 @@ def data_order_records(addr, size, refs_of, dol, mode, syms=None):
     dict per seam with its status: `pinned` (a strict interval), `overlap` (the two sides' referrers
     interleave: the rule does not hold for this seam) or `no-referrers` (nothing to place it by).
     """
-    import dataorder as do
+    do = ev
     if syms is None:
-        syms = do.classify_all(do.load_symbols(), dol)
+        syms = ev.classify_all(ev.map_rows(_g("SYMBOLS")), dol)
     # V->tail is no evidence at all (a vtable followed by strings and no later vtable may be an inline tail),
     # so only V->S, zigzag and (on request) V->D become observations.
     found = [f for f in do.seams(syms)
@@ -1016,7 +963,7 @@ def extab_runs(an, labels, graph, lo, hi):
 def report(args):
     fns, labels = load_map()
     graph = build_graph(fns, labels, force=False)
-    dol = Dol(DOL)
+    dol = Dol(_g("DOL"))
     an = analyse(fns, labels, graph, dol, args.span_max, args.source_span_max, args.data_order)
     ordered, idx = an["ordered"], an["idx"]
 
@@ -1146,9 +1093,8 @@ def pool_fold_info(match_lo, match_hi, ext_lo, ext_hi):
         units = [os.path.splitext(u)[0] for u in units]
         out = {"units": units, "scope": scope, "groups": []}
         if units:
-            sys.path.insert(0, os.path.join(ROOT, "tools", "units"))
-            import poolseams
-            census = poolseams.load_census(ROOT)
+            from tools.units import poolseams  # noqa: PLC0415 - the pool census: evidence, not a dependency
+            census = poolseams.load_census(_g("ROOT"))
             seen = set()
             for u in units:
                 g = poolseams.group_of(census, u)
@@ -1250,7 +1196,7 @@ def print_human(res, ordered, fns, sug_lo, sug_hi):
 
 def claimed_units():
     """`splits.txt` as ground truth: {unit: {section: (start, end)}} for every claimed range."""
-    out = {b.unit: {r.section: (r.start, r.end) for r in b.ranges} for b in _project.Splits.read(SPLITS).blocks}
+    out = {b.unit: {r.section: (r.start, r.end) for r in b.ranges} for b in _project.Splits.read(_g("SPLITS")).blocks}
     return {u: s for u, s in out.items() if ".text" in s}
 
 
@@ -1426,7 +1372,7 @@ def tier_pins(an, claimed=None):
 def cmd_bench(args):
     fns, labels = load_map()
     graph = build_graph(fns, labels, force=args.force)
-    an = analyse(fns, labels, graph, Dol(DOL), args.span_max, args.source_span_max, args.data_order)
+    an = analyse(fns, labels, graph, Dol(_g("DOL")), args.span_max, args.source_span_max, args.data_order)
     rows, classes = tier_labels(an, fns, labels, args.seeds_per_unit, args.max_funcs)
     score = {"labels": rows, "label_classes": classes,
              "sweep": tier_sweep(an, labels, args.seeds, args.seed, args.max_funcs),
@@ -1485,13 +1431,13 @@ def cmd_bench(args):
             print("        %-10s %4d cuts  hit %3d  miss %3d  unknown %4d  precision %.3f"
                   % (kind, row["cuts"], row["hit"], row["miss"], row["unknown"], row["precision"]))
     if args.save:
-        path = args.save if os.path.isabs(args.save) else os.path.join(ROOT, args.save)
+        path = args.save if os.path.isabs(args.save) else os.path.join(_g("ROOT"), args.save)
         os.makedirs(os.path.dirname(path), exist_ok=True)
         json.dump(score, open(path, "w", encoding="utf-8"))
-        print("# saved to %s" % os.path.relpath(path, ROOT), file=sys.stderr)
+        print("# saved to %s" % os.path.relpath(path, _g("ROOT")), file=sys.stderr)
     if args.compare:
         old = json.load(open(args.compare if os.path.isabs(args.compare)
-                             else os.path.join(ROOT, args.compare), encoding="utf-8"))
+                             else os.path.join(_g("ROOT"), args.compare), encoding="utf-8"))
         print("# vs %s" % args.compare, file=sys.stderr)
         for key in ("median", "p75", "p90", "max", "guard_hits", "singleton_share",
                     "leak_free_share", "mean_density"):
@@ -1549,7 +1495,7 @@ def cmd_stats(args):
               " map; run `python tools/splits/dump_asm.py` first" % state, file=sys.stderr)
     fns, labels = load_map()
     graph = build_graph(fns, labels, force=args.force)
-    dol = Dol(DOL)
+    dol = Dol(_g("DOL"))
     an = analyse(fns, labels, graph, dol, args.span_max, args.source_span_max, args.data_order)
     covered = set(graph["funcs"])
     print("functions in map   %d" % len(fns))
@@ -1640,13 +1586,12 @@ def data_order_stats(an, fns, claimed=None):
 
 def cmd_dataorder(args):
     """List every `.data` emission-order seam with its `.text` interval and how it sits against the other evidence."""
-    import dataorder as do
     fns, labels = load_map()
     graph = build_graph(fns, labels, force=False)
-    an = analyse(fns, labels, graph, Dol(DOL), args.span_max, args.source_span_max,
+    an = analyse(fns, labels, graph, Dol(_g("DOL")), args.span_max, args.source_span_max,
                  "weak" if args.weak else args.data_order if args.data_order != "off" else "on")
     st = data_order_stats(an, fns)
-    ranges = do.unit_data_ranges()
+    ranges = ev.section_ranges(_g("SPLITS"), ".data")
     print("seams %d   status %s" % (st["seams"], dict(st["by_status"])))
     print("by seam kind/status %s" % {"%s/%s" % k: v for k, v in sorted(st["by_seam"].items())})
     print("pinned intervals agreeing with a registered unit's .text start: %d" % len(st["at_unit_start"]))
@@ -1660,7 +1605,7 @@ def cmd_dataorder(args):
     for r in st["rows"]:
         if args.addr and r["addr"] != args.addr:
             continue
-        u = do.unit_of(ranges, r["addr"])
+        u = ev.range_of(ranges, r["addr"])
         line = "0x%08X %-6s %-12s" % (r["addr"], r["seam"], r["status"])
         if r["status"] == "pinned":
             line += " .text 0x%08X..0x%08X" % (an["addr"][r["lo"]], an["addr"][r["hi"]])
@@ -1679,7 +1624,7 @@ def cmd_dataorder(args):
 
 def selftest():
     """Fixtures only: the data-order observation on a synthetic map, no asm dump and no DOL."""
-    import dataorder as do
+    do = ev
     fails, checks = [], 0
 
     def check(name, got, want):
@@ -1849,19 +1794,19 @@ def cmd_prune(args):
         print("  %s" % rel)
     if len(asm) > args.limit:
         print("  ... and %d more" % (len(asm) - args.limit))
-    npath = os.path.join(ROOT, "build.ninja")
+    npath = os.path.join(_g("ROOT"), "build.ninja")
     ninja = open(npath, encoding="utf-8", errors="replace").read() if os.path.exists(npath) else ""
     obj = []
     if args.include_obj:
         for _p, rel in asm:
-            cand = os.path.join(os.path.dirname(ASM_DIR), "obj", rel[:-2] + ".o")
+            cand = os.path.join(os.path.dirname(_g("ASM_DIR")), "obj", rel[:-2] + ".o")
             # A path guard, not a basename guard: `obj/camellia.o` shares its basename with the
             # canonical `obj/Camellia/camellia.o`, and build.ninja only ever names the latter.
-            if os.path.exists(cand) and os.path.relpath(cand, ROOT).replace(os.sep, "/") not in ninja:
+            if os.path.exists(cand) and os.path.relpath(cand, _g("ROOT")).replace(os.sep, "/") not in ninja:
                 obj.append(cand)
         print("stale obj files    %d (the same units; none is referenced by build.ninja)" % len(obj))
         for c in obj[:args.limit]:
-            print("  %s" % os.path.relpath(c, ROOT))
+            print("  %s" % os.path.relpath(c, _g("ROOT")))
     if not args.apply:
         print("\ndry run: nothing deleted. Add --apply to remove them.")
         return 0

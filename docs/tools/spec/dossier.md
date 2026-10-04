@@ -52,7 +52,13 @@ Target: `tools/tests/units/test_dossier.py` on `lib.testing` (`FixtureTree`/`Git
 
 ## Known gaps
 
-imports `brief` (a cycle) - design 5 breaks it
+* WP3c broke the `brief` cycle from this side: the map rows are `lib.project.SymbolMap`, the CLI's unit is
+  `lib.units.source_spelling` + `Splits.claims`, MAIN is `lib.repo.main_checkout` (no `brief`, no `recompile` import).
+  `brief` still imports `dossier` to embed the block.
+* The selftest's real-object branch names `build/RMHE08/obj/auto/800CCFB0_fn_800CCFB0.o`, which no longer exists (the unit is
+  `ef/ef_line`), so it never runs; its brief-integration checks were removed from this test with the `brief` import - they
+  belong in `brief`'s test (reserved for the lanes package, 3e).
+* `parse_elf` stays for `vtableaudit` (3d); `callees` reads `lib.binary.elf` directly.
 
 ## History (the incidents behind the rules - keep the rule, drop the narrative when the rule is stable)
 

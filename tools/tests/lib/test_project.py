@@ -448,6 +448,24 @@ def test_ownership(c):
         c.check("... an unsized last object is open-ended", own2.owner_of(".text", 0x80009000).state, "auto")
 
 
+def test_owner_label(c):
+    from tools.lib.project.ownership import owner_label, source_exists
+    with _tree() as tree:
+        own = Ownership.load(tree.root)
+        exists = source_exists(tree.root)
+        c.check("a registered unit with a source is reconstructed", owner_label(own.resolve("one_fn"), exists),
+                ("a/one.c", "reconstructed", "a/one.c"))
+        c.check("an unsplit name inside one module's band names the band", owner_label(own.resolve("gap_fn"), exists),
+                ("unsplit (a)", "unsplit", None))
+        c.check("an unsplit name between two modules", owner_label(own.resolve("band_gap"), exists),
+                ("unsplit address", "unsplit", None))
+        c.check("absent, and a duplicate row", (owner_label(None, exists), owner_label({"kind": "dup"}, exists)),
+                (("not in the symbol map", "unmapped", None), ("duplicate row in the symbol map", "duplicate", None)))
+        c.check("a claim with no source yet is registered", owner_label({"kind": "owned", "unit": "z/none.c"}, exists),
+                ("z/none.c (no source yet)", "registered", "z/none.c"))
+        c.check("source_exists: no unit is no source", (exists(None), exists("")), (False, False))
+
+
 def test_ownership_at_ref_and_subclass(c):
     with _tree() as tree:
         texts = {"config/RMHE08/symbols.txt": tree.read("config/RMHE08/symbols.txt"),

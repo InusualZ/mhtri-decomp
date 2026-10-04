@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 
 from tools.lib import objcompare
-from tools.lib import project as _project  # the one splits / map parser
 from tools.lib import refs as _refs  # the census over target objects
 from tools.units import poolseams  # literal pools as TU evidence: a deferral a pool-sharing group explains
 
@@ -31,10 +30,7 @@ CENSUS_SECTIONS = _refs.CENSUS_SECTIONS
 GAME_DIR = "RMHE08"
 
 
-def parse_splits_text(text: str) -> dict[str, list[tuple[int, int, str]]]:
-    """`{section: [(start, end, unit)]}` (sorted) from the text of a `splits.txt`; the unit has no extension."""
-    return {section: sorted((s, e, os.path.splitext(u)[0]) for s, e, u in rows)
-            for section, rows in _project.Splits.parse(text).by_section().items()}
+parse_splits_text = _refs.census_claims   # `{section: [(start, end, unit)]}` (sorted, no extension) from splits text
 
 
 def merged(ranges) -> list[tuple[int, int]]:
@@ -978,25 +974,11 @@ def claims_at_ref(root: str, ref: str) -> dict:
 
 
 def load_data_symbols(root: str) -> dict[str, dict]:
-    """`{name: {section, address, size, type}}` from `symbols.txt` (a duplicated name is dropped: ambiguous)."""
-    out: dict[str, dict] = {}
-    dup = set()
-    for e in (r.to_dict() for r in _project.SymbolMap(os.path.join(root, "config", GAME_DIR, "symbols.txt")).rows()):
-        if e["name"] in out:
-            dup.add(e["name"])
-        out[e["name"]] = e
-    for name in dup:
-        out.pop(name, None)
-    return out
+    """`{name: {section, address, size, type}}` from `symbols.txt` (`lib.refs.census_symbols`)."""
+    return _refs.census_symbols(os.path.join(root, "config", GAME_DIR, "symbols.txt"))
 
 
-def _registered(ranges: dict, units: list[str] | None) -> list[str]:
-    """The registered units of the claims, narrowed to `units` (extensions dropped) when given."""
-    registered = sorted({u for rows in ranges.values() for _s, _e, u in rows})
-    if units is not None:
-        want = {os.path.splitext(u)[0] for u in units}
-        registered = [u for u in registered if u in want]
-    return registered
+_registered = _refs.census_units
 
 
 def census_inputs(root: str, units: list[str] | None = None, ranges: dict | None = None) -> tuple[dict, int]:
@@ -1012,11 +994,7 @@ def census_inputs(root: str, units: list[str] | None = None, ranges: dict | None
 def census(root: str, units: list[str] | None = None, ranges: dict | None = None):
     """`(records, stats), registered, read` for the registered units' TARGET objects as they stand in `root`
     (`lib.refs.census`)."""
-    ranges = ranges if ranges is not None else load_claims(root)
-    registered = _registered(ranges, units)
-    found, read = _refs.census(os.path.join(root, "build", GAME_DIR, "obj"), registered, load_data_symbols(root),
-                               ranges)
-    return found, len(registered), read
+    return _refs.tree_census(root, units, ranges if ranges is not None else load_claims(root), GAME_DIR)
 
 
 # -- which batch units the STRICT row judges: "touched" means a REAL change (owner, 2026-09-29: "Only real changes") --
@@ -1400,24 +1378,18 @@ def batch_orphans(root: str, units: list[str], base_snapshot: dict | None, allow
 
 
 def readers_index(root: str):
-    """`query(address) -> (registered {unit: sites}, unsplit_sites)` from `callers.py`'s index, or None."""
-    from tools.units import callers as callers_mod  # noqa: PLC0415 - the reader index (lib.refs.RefIndex in 3c)
-
-    cmap = callers_mod.load_map(root)
-    asm_dir = callers_mod.asm_dir_of(root)
-    if callers_mod.all_asm_files(asm_dir):
-        index, _info = callers_mod.load_index(root=root, asm_dir=asm_dir)
-    else:
-        index, _info = callers_mod.load_elf_index(root=root, cmap=cmap)
-    if index is None:
+    """`query(address) -> (registered {unit: sites}, unsplit_sites)` from the reference index (`lib.refs.RefIndex`,
+    `callers.py`'s), or None."""
+    refs = _refs.RefIndex.load(root)
+    if refs.index is None:
         return None
 
     def query(address: int):
         units: dict[str, int] = {}
         unsplit = 0
-        rep = callers_mod.query("0x%08X" % address, index, cmap, limit=0)
+        rep = refs.query("0x%08X" % address, limit=0)
         for ref in rep.get("references", ()):
-            name = callers_mod.norm_reader((ref.get("caller") or {}).get("owner"))
+            name = _refs.norm_reader((ref.get("caller") or {}).get("owner"))
             if name:
                 units[name] = units.get(name, 0) + 1
             else:

@@ -8,7 +8,8 @@ Name the callees of a unit's range: every generated symbol its bodies reference,
 
 ## Users
 
-docs (5); imported by `accessextent`, `callers`
+docs (5); no tool imports it (WP3c: the owner vocabulary is
+`lib.project.ownership.owner_label`, the register decode `lib.ppc.decode_rw`)
 
 ## CLI
 
@@ -31,7 +32,7 @@ Inputs -> outputs: target .o, map, splits, src -> table.
 * `owner` / `state` - `symbols.txt` (address + section) and `splits.txt` (ranges), through the *same* `Ownership` index the lint uses (`tools/units/stylelint.py`), so this tool and the lint can never disagree about who owns an address. `state=reconstructed` means the owner unit has source in `src/` (rename its source too); `state=registered` means a split range but no source yet (the map row is the only half); `state=unsplit` means no registered owner at all (a band header under `include/unsplit/`).
 * `shape` - the instructions at the reference site, read out of the target's own disassembly (`dtk elf disasm`, the same build tool directory as objdiff-cli): which argument registers the caller materialises (`r3..rN`) and whether it reads the return. This is a *heuristic inference* - the object carries no prototype - but it is the evidence a name is derived from, and it is exact for the common shapes. The tool says which way it is unsure instead of guessing: `0 (r3 live-in)` (the preceding call's return flows into r3), `0?` (nothing materialised but a branch separates r3's def from the call), and `?`/`N undecoded` when an instruction in the window is outside the decoder's subset.
 * `files` / `XF` - every in-repo `code` mention of the name. The scan is `symedit.find_refs`'s classification (`src/` + `include/`, so the `path` bucket that protects `#include`s applies here too) done in one pass instead of one pass per name. `XF` (cross-file) is set when the code references live in **more than one file**: those need the repo-wide `symedit.py rename`, not a local edit.
-* **Layout.** This lives in `tools/units/` beside `dossier.py` and `symbolpreflight.py` rather than in `tools/objdiff/`: `tools/objdiff/` is the objdiff-cli wrapper directory (`symdiff.py`, `slotmap.py`), while this tool never calls objdiff - it reads the object, the ownership map and the source tree, which is the `tools/units/` layer. It reuses `dossier.parse_elf` (the project's ELF reader) rather than growing a second one.
+* **Layout.** This lives in `tools/units/` beside `dossier.py` and `symbolpreflight.py` rather than in `tools/objdiff/`: `tools/objdiff/` is the objdiff-cli wrapper directory (`symdiff.py`, `slotmap.py`), while this tool never calls objdiff - it reads the object, the ownership map and the source tree, which is the `tools/units/` layer. It reads the object through `lib.binary.elf` (the project's one ELF reader) rather than growing a second one.
 * **It is a reader.** No `src/` edits, no renames, no writes to any shared file.
 * **When a unit has nothing to rename it says so plainly** - that is the good answer, and this tool exists to make it a one-command answer rather than a reassurance:
 ```
@@ -40,7 +41,10 @@ Inputs -> outputs: target .o, map, splits, src -> table.
 
 ## Lib dependencies
 
-refs, binary, project.Ownership, names, cscan.
+`lib.binary.elf` (the target object's relocations - WP3c, was
+`dossier.parse_elf`), `lib.binary.objdump` (`dtk elf disasm`), `lib.ppc` (the call-shape decode), `lib.project`
+(`Ownership`, `Splits`, `owner_label`, `source_exists`), `lib.names`; the reference scan is `symedit`'s public
+`REF_SUFFIXES`/`group_hits`.
 
 ## Test contract
 

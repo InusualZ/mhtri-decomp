@@ -8,7 +8,7 @@ dataseams.py - the `.data` emission-order seams (tools/splits/dataorder.py) as a
 
 ## Users
 
-skills (1); docs (3); imported by `dataclaim`, `datagap`, `dataorder`, `dataqueue`, `flipcheck`
+skills (1); docs (3); imported by `dataclaim`, `datagap`, `dataqueue`, `flipcheck`
 
 ## CLI
 
@@ -31,7 +31,8 @@ Inputs -> outputs: dataorder -> seams.
 
 ## Lib dependencies
 
-seams (dataorder), project.
+The seam evidence (`seams.md`: `strong_seams`, `NARROW`, `section_ranges`,
+`retail_symbols`), `lib.binary.elf`, `lib.repo`.
 
 ## Test contract
 

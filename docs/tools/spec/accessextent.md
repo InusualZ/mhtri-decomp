@@ -50,7 +50,9 @@ Inputs -> outputs: callers index, main.elf, objdump -> verdict.
 
 ## Lib dependencies
 
-refs, ppc, binary.objdump, project.
+`lib.refs` (`RefIndex`: the census of sites, the dump or the object fallback -
+WP3c, was `callers`), `lib.ppc` (`decode_rw`, `CALL_MNEMONICS` - was through `callees`), `lib.binary.objdump`, `lib.report`
+(`rel_path`), `lib.repo` (`VERSION`).
 
 ## Test contract
 

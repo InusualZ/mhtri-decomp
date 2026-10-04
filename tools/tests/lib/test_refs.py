@@ -225,5 +225,132 @@ def test_function_graph(c):
                 ("lbl_80500000", "@12", None))
 
 
+def test_dump_stamp(c):
+    with testing.FixtureTree() as tree:
+        asm = tree.build_dir / "asm"
+        asm.mkdir(parents=True)
+        dol = tree.write("orig/RMHE08/sys/main.dol", b"dol")
+        sym, spl = tree.config_dir / "symbols.txt", tree.config_dir / "splits.txt"
+        local = str(asm)
+        st = refs.DumpStamp(local, str(sym), str(spl), str(dol), "RMHE08", local, str(tree.root))
+        c.check("an empty dump is missing", st.status()[0], "missing")
+        c.check("... and the message names the remedy", "tools/splits/dump_asm.py" in st.status()[1], True)
+        tree.add_asm("unit.s", ".fn x\n.endfn x\n")
+        c.check("a dump without a stamp is unstamped", st.status()[0], "unstamped")
+        stamp = st.write({"note": "fixture"})
+        c.check("the written stamp counts the .s files only and keeps the extra keys", (stamp["files"], stamp["note"]),
+                (1, "fixture"))
+        c.check("no temp file is left behind", os.path.exists(st.path + ".tmp"), False)
+        c.check("a stamped dump is fresh, and the tree's own dump is no fallback",
+                (st.status()[0], st.is_main_fallback(), "[MAIN's dump" in st.status()[1]), ("fresh", False, False))
+        tree.add_symbol("renamed", ".text", 0x80001000, 4)
+        c.check("a map edit makes it stale, naming the input", (st.status()[0], st.status()[1].startswith("symbols")),
+                ("stale", True))
+        st.write()
+        tree.add_asm("unit2.s", ".fn y\n.endfn y\n")
+        c.check("a new unit file does not invalidate the inputs", st.status()[0], "fresh")
+        st.write()
+        os.remove(asm / "unit2.s")
+        c.check("a lost file is truncated", st.status()[0], "truncated")
+        tree.write(st.path, "not json")
+        c.check("an unreadable stamp is unstamped", st.status()[0], "unstamped")
+        other = refs.DumpStamp(local, str(sym), str(spl), str(dol), "RMHE08", str(tree.root / "elsewhere"),
+                               str(tree.root))
+        other.write()
+        c.check("a dump read from another tree says it is MAIN's, read-only",
+                (other.is_main_fallback(), "[MAIN's dump at" in other.status()[1]), (True, True))
+        ft = refs.DumpStamp.for_tree(str(tree.root))
+        c.check("for_tree: the tree's own dump, map, splits and DOL", (ft.asm_dir, ft.dol, ft.status()[0]),
+                (local, str(dol), "fresh"))
+        c.check("has_dump probes for a .s file", (refs.has_dump(local), refs.has_dump(str(tree.root / "src"))),
+                (True, False))
+
+
+def test_tree_census(c):
+    with testing.FixtureTree() as tree:
+        tree.add_unit("A/a.c", ranges={".text": (0x80001000, 0x80001020)})
+        tree.add_unit("B/b.cpp", ranges={".text": (0x80001020, 0x80001040), ".sbss": (0x805F0000, 0x80600000)})
+        tree.add_symbol("caller", ".text", 0x80001000, 0x20)
+        tree.add_symbol("glob", ".sbss", 0x80600000, 4, type="object")
+        tree.add_symbol("mine", ".sbss", 0x805F0000, 4, type="object")
+        tree.add_object("A/a.o", elf_with([("caller", ".text", 0, 0x20, "func"), ("glob", None, 0, 0, "notype"),
+                                          ("mine", None, 0, 0, "notype")],
+                                         [(".text", 10, "glob", "R_PPC_ADDR16_HA"), (".text", 14, "mine",
+                                                                                     "R_PPC_EMB_SDA21")]))
+        claims = refs.census_claims(tree.read("config/RMHE08/splits.txt"))
+        c.check("census_claims: sorted per section, the unit without its extension",
+                (claims[".text"], claims[".sbss"]),
+                ([(0x80001000, 0x80001020, "A/a"), (0x80001020, 0x80001040, "B/b")], [(0x805F0000, 0x80600000, "B/b")]))
+        c.check("census_units narrows by name in either spelling",
+                (refs.census_units(claims), refs.census_units(claims, ["B/b.cpp"])), (["A/a", "B/b"], ["B/b"]))
+        symbols = refs.census_symbols(str(tree.config_dir / "symbols.txt"))
+        c.check("census_symbols: name -> row", (symbols["glob"]["section"], symbols["glob"]["address"]),
+                (".sbss", 0x80600000))
+        tree.write(tree.config_dir / "symbols.txt", tree.read("config/RMHE08/symbols.txt")
+                   + "glob = .sbss:0x80600010; // type:object size:0x4 scope:global\n")
+        c.check("... a duplicated name is dropped (ambiguous)",
+                "glob" in refs.census_symbols(str(tree.config_dir / "symbols.txt")), False)
+        tree.add_symbol("glob", ".sbss", 0x80600000, 4, type="object")
+        (records, _stats), registered, read = refs.tree_census(str(tree.root))
+        c.check("tree_census: the registered units, the objects that exist, one record per referenced symbol",
+                (registered, read, sorted((r["unit"], r["name"], r["status"]) for r in records)),
+                (2, 1, [("A/a", "glob", "orphan"), ("A/a", "mine", "other")]))
+        c.check("... narrowed to a unit", refs.tree_census(str(tree.root), ["B/b"])[1:], (1, 0))
+
+
+QUERY_MAP = [("quest_init__FUc", ".text", 0x80001280, 0x40), ("caller", ".text", 0x80001000, 0x1C),
+             ("with_data", ".text", 0x80001060, 0x18)]
+
+
+def test_query_and_index(c):
+    with testing.FixtureTree() as tree:
+        dump_tree(tree)
+        for name, sec, addr, size in QUERY_MAP:
+            tree.add_symbol(name, sec, addr, size)
+        tree.add_symbol("lbl_80500020", ".data", 0x80500020, 4, type="object")
+        tree.add_unit("menu/multi_result.cpp", ranges={".text": (0x80001000, 0x80001100)})
+        idx = refs.RefIndex.load(str(tree.root))
+        c.check("a tree with a dump answers from it", (idx.source, idx.index is not None), ("asm", True))
+        c.check("... and caches it where callers.py always did", os.path.exists(refs.dump_cache(str(tree.root))), True)
+        rep = idx.query("quest_init__FUc")
+        c.check("a name resolves through the current map", (rep["how"], rep["resolved"]["address"]),
+                ("map", "0x80001280"))
+        c.check("two call sites, the canonical text", [(r["site"], r["instruction"]) for r in rep["references"]],
+                [("0x80001008", "bl quest_init__FUc"), ("0x80001204", "bl quest_init__FUc")])
+        c.check("a caller inside a registered unit with a source is reconstructed; one outside is unsplit",
+                [(r["caller"]["name"], r["caller"]["owner_state"]) for r in rep["references"]],
+                [("caller", "reconstructed"), ("fn_80001200", "unsplit")])
+        c.check("the plain spelling finds the mangled name", refs.find_target("quest_init", idx.index, idx.cmap)[1:],
+                (["quest_init__FUc"], "plain name"))
+        c.check("an ambiguous or unknown query is an error, never a guess",
+                "error" in idx.query("nosuchsymbol"), True)
+        c.check("a code filter keeps calls only, and says what it hid",
+                idx.query("0x80500020", kinds=["call"])["notes"][0].startswith("no call reference here"), True)
+        c.check("norm_reader: a unit label without its extension or suffix, None for unsplit",
+                [refs.norm_reader(x) for x in ("menu/multi_result.cpp", "Pl/x.c (no source yet)", "unsplit (ef)",
+                                               "unsplit address", "")],
+                ["menu/multi_result", "Pl/x", None, None, None])
+        readers = idx.readers_of()
+        c.check("readers_of: the reader units of an address, cached", (readers(0x80500020), readers(0x80500020)),
+                ({"menu/multi_result": 2}, {"menu/multi_result": 2}))
+        runs = idx.runs(0x80500020, 0x80500024)
+        c.check("runs: the per-address reader sets and their seam", (len(runs["runs"]), runs["seams"]),
+                (2, [0x80500024]))
+    with testing.FixtureTree() as tree:
+        tree.add_symbol("caller", ".text", 0x80001000, 0x20)
+        tree.add_symbol("callee", ".text", 0x80002000, 0x10)
+        tree.add_object("probe/unit.o", ElfBuilder().section(".text", b"\x48\x00\x00\x01" * 8)
+                        .symbol("caller", ".text", 0, 0x20, type="func").symbol("callee")
+                        .reloc(".text", 0x08, "callee", 10))
+        idx = refs.RefIndex.load(str(tree.root))
+        c.check("no dump: the split objects answer (source elf)", (idx.source, idx.info.get("source")), ("elf", "elf"))
+        c.check("... with the same query", [r["caller"]["name"] for r in idx.query("callee")["references"]],
+                ["caller"])
+    with testing.FixtureTree() as tree:
+        idx = refs.RefIndex.load(str(tree.root))
+        c.check("neither a dump nor objects: no index, and the reason", (idx.index, idx.info["reason"]),
+                (None, "no objects"))
+
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))

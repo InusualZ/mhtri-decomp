@@ -13,23 +13,15 @@ import functools
 import json
 import os
 import re
-import shutil
-import subprocess
 import sys
 
+from tools.lib import ppc as _ppc  # decode_rw: the tree's one register read/write decode
+from tools.lib import refs as _refs  # the census: sites, addresses, the object fallback (`callers.py`'s index)
 from tools.lib.binary import objdump as lib_objdump
+from tools.lib.report import rel_path
+from tools.lib.repo import VERSION as GAME
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-TOOLS = os.path.dirname(HERE)
-ROOT = os.path.dirname(TOOLS)
-for _path in (TOOLS, HERE, os.path.join(TOOLS, "symbols"), os.path.join(TOOLS, "splits")):
-    if _path not in sys.path:
-        sys.path.insert(0, _path)
-
-from units import callers as C  # noqa: E402  (the census: sites, addresses, the cached-global fallback)
-from units import callees as cl  # noqa: E402  (decode_rw: the tree's one register read/write decode)
-
-GAME = C.GAME
+ROOT = str(pathlib.Path(__file__).resolve().parents[2])
 ELF_REL = os.path.join("build", GAME, "main.elf")
 OBJDUMP_RELS = (os.path.join("build", "binutils", "powerpc-eabi-objdump.exe"),
                 os.path.join("build", "binutils", "powerpc-eabi-objdump"))
@@ -241,7 +233,7 @@ def find_loops(insns, fstart):
     """Every backward branch inside one function. A `b`/`bdnz`/`blt` to a lower address is a loop."""
     loops = []
     for addr, mnem, ops in insns:
-        if mnem in cl._CALL or mnem in ("blr", "blrl", "bctr", "bcctr"):
+        if mnem in _ppc.CALL_MNEMONICS or mnem in ("blr", "blrl", "bctr", "bcctr"):
             continue
         if not mnem.startswith("b"):
             continue
@@ -283,7 +275,7 @@ def writes_of(mnem, ops):
     Cached: one function is decoded repeatedly (every loop's body, every bound lookup), and the decode
     is a pure function of the two operand strings.
     """
-    _reads, writes, is_branch, is_call, decoded = cl.decode_rw(mnem, ops)
+    _reads, writes, is_branch, is_call, decoded = _ppc.decode_rw(mnem, ops)
     if decoded:
         return writes, is_branch, is_call
     if is_branch:
@@ -733,12 +725,12 @@ def mem_callees(cmap):
     """
     out = {}
     for name in cmap.symbols:
-        stem = C.plain_name(name)
+        stem = _refs.plain_name(name)
         base = "memset" if stem not in MEM_SIZE_REG and stem.rsplit("_", 1)[-1] in MEM_SIZE_REG \
             else stem
         if base in MEM_SIZE_REG:
             for section, addr, _type in cmap.symbols[name]:
-                if section in C.CODE_SECTIONS:
+                if section in _refs.CODE_SECTIONS:
                     out[addr] = (name, MEM_SIZE_REG[base], MEM_BUF_REGS[base], MEM_CLASS[base])
     return out
 
@@ -786,7 +778,7 @@ def refine_kinds(refs, funcs):
     out = []
     for r in refs:
         ins = site_insn(r, funcs) if r["kind"] == "addr" else None
-        out.append(dict(r, kind=C.mem_kind(ins[1])) if ins is not None else r)
+        out.append(dict(r, kind=_refs.mem_kind(ins[1])) if ins is not None else r)
     return out
 
 
@@ -890,11 +882,11 @@ def interior_sites(index, aliases):
 
 def analyze(target, index, cmap, info, objdump, elf, accessor_names=None, root=ROOT):
     """The whole answer for one queried address: its extent, its far accesses, its unresolved sites."""
-    rep = C.query(target, index, cmap, limit=0, pointers=True)
+    rep = _refs.query(target, index, cmap, limit=0, pointers=True)
     out = {"query": target, "resolved": rep.get("resolved"), "error": rep.get("error"),
            "census": {"counts": rep.get("counts"), "how": rep.get("how"),
                       "notes": rep.get("notes")},
-           "elf": C.rel(elf, root), "objdump": objdump,
+           "elf": rel_path(elf, root), "objdump": objdump,
            "verdict": {}, "accesses": [], "unresolved": [], "literal": [], "interior": [],
            "accessors": [], "counts": {}}
     if rep.get("error"):
@@ -908,7 +900,7 @@ def analyze(target, index, cmap, info, objdump, elf, accessor_names=None, root=R
     mem_calls = [r for r in refs if r["kind"] == "call"]           # cache refs that are calls: none
     extra_calls = []
     for name in sorted({m[0] for m in mem.values()}):
-        q = C.query(name, index, cmap, kinds=["call"], limit=0)
+        q = _refs.query(name, index, cmap, kinds=["call"], limit=0)
         extra_calls.extend(r for r in q.get("references", []) if r["kind"] == "call")
 
     needed = {}
@@ -941,7 +933,7 @@ def analyze(target, index, cmap, info, objdump, elf, accessor_names=None, root=R
             hit2 = cmap.symbols.get(name)
             if hit2:
                 for section, a, _t in hit2:
-                    if section in C.CODE_SECTIONS:
+                    if section in _refs.CODE_SECTIONS:
                         accessors[a] = name
     out["accessors"] = sorted({"0x%08X %s" % (a, n) for a, n in accessors.items()})
 
@@ -1071,18 +1063,18 @@ def analyze_seeded(seed, index, cmap, info, objdump, elf, kind=None, root=ROOT):
 
     The result carries the same shape `analyze` returns, so `print_report` and `build_verdict` serve both.
     """
-    rep = C.query(seed, index, cmap, limit=0, pointers=True)
+    rep = _refs.query(seed, index, cmap, limit=0, pointers=True)
     out = {"query": seed, "resolved": rep.get("resolved"), "error": rep.get("error"),
            "census": {"counts": rep.get("counts"), "how": rep.get("how"),
                       "notes": rep.get("notes")},
-           "elf": C.rel(elf, root), "objdump": objdump,
+           "elf": rel_path(elf, root), "objdump": objdump,
            "verdict": {}, "accesses": [], "unresolved": [], "literal": [], "interior": [],
            "accessors": [], "counts": {}, "seed": None}
     if rep.get("error"):
         return out
     hit = rep["resolved"]
     faddr = int(hit["address"], 16)
-    if hit.get("section") not in C.CODE_SECTIONS:
+    if hit.get("section") not in _refs.CODE_SECTIONS:
         out["error"] = ("--block %s is %s: the seed must be a function whose return value is the block"
                         % (seed, hit.get("section") or "not code"))
         out["verdict"] = {"error": out["error"]}
@@ -1090,7 +1082,7 @@ def analyze_seeded(seed, index, cmap, info, objdump, elf, kind=None, root=ROOT):
 
     # The census of a seeded query is the set of *call sites* of the accessor, not references to a
     # symbol: at each one r3 is the block after the call, and the function around it is interpreted.
-    q = C.query(seed, index, cmap, kinds=["call"], limit=0)
+    q = _refs.query(seed, index, cmap, kinds=["call"], limit=0)
     calls = q.get("references", [])
     out["seed"] = {"name": hit["name"], "address": hit["address"]}
     out["accessors"] = ["%s %s returns the block in r3" % (hit["address"], hit["name"])]
@@ -1439,7 +1431,7 @@ def main(argv=None, root=ROOT):
         return 2
     if not os.path.exists(elf):
         print("== no target ELF")
-        print("   %s does not exist, so the sites' instructions cannot be decoded." % C.rel(elf, root))
+        print("   %s does not exist, so the sites' instructions cannot be decoded." % rel_path(elf, root))
         print("   the census alone says *that* the address is read, never how far.")
         return 2
     if not args.target and not args.block:
@@ -1454,18 +1446,14 @@ def main(argv=None, root=ROOT):
             block_seed = m.group(1)
             block_kind = parse_int(m.group(2)) if m.group(2) is not None else None
 
-    cmap = C.load_map(root)
-    index, info = C.load_index(root=root, rebuild=args.rebuild)
-    source = "asm"
+    refs = _refs.RefIndex.load(root, rebuild=args.rebuild)
+    cmap, index, info, source = refs.cmap, refs.index, refs.info, refs.source
     if index is None:
-        index, info = C.load_elf_index(root=root, rebuild=args.rebuild, cmap=cmap)
-        source = "elf"
-        if index is None:
-            print("== no census")
-            print("   neither %s nor the split objects exist, so there are no reference sites."
-                  % C.rel(C.asm_dir_of(root), root))
-            print("   remedy: %s" % DUMP_TOOL)
-            return 2
+        print("== no census")
+        print("   neither %s nor the split objects exist, so there are no reference sites."
+              % rel_path(refs.asm_dir, root))
+        print("   remedy: %s" % DUMP_TOOL)
+        return 2
     try:
         if args.block:
             rep = analyze_seeded(block_seed, index, cmap, info, objdump, elf, kind=block_kind,
@@ -1478,7 +1466,7 @@ def main(argv=None, root=ROOT):
         print("   %s" % exc)
         return 2
     rep["census"]["source"] = source
-    rep["index"] = {"path": C.rel(info["cache"], root), "cached": info.get("cached"),
+    rep["index"] = {"path": rel_path(info["cache"], root), "cached": info.get("cached"),
                     "rebuilt": info.get("rebuilt"), "reason": info.get("reason"),
                     "refs": info.get("stats", {}).get("refs")}
     if args.json:
@@ -1826,14 +1814,12 @@ def selftest():
     elf, objdump = elf_of(), find_objdump()
     rep = None
     if not (elf and os.path.exists(elf) and objdump):
-        notes.append("acceptance run skipped: no %s or no objdump in this tree" % C.rel(elf))
+        notes.append("acceptance run skipped: no %s or no objdump in this tree" % rel_path(elf, ROOT))
         check("acceptance: skipped only when the tree cannot run it",
               bool(not os.path.exists(elf) or not objdump), True)
     else:
-        cmap = C.load_map()
-        index, info = C.load_index()
-        if index is None:
-            index, info = C.load_elf_index(cmap=cmap)
+        refs = _refs.RefIndex.load(ROOT)
+        cmap, index, info = refs.cmap, refs.index, refs.info
         if index is None:
             # an ELF but no dump *and* no split objects: the tool has no census at all, and says so
             # rather than answering; there is nothing here to assert an extent against.

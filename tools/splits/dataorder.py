@@ -1,27 +1,6 @@
 #!/usr/bin/env python3
-"""dataorder.py - translation-unit seams read from the *order* of retail `.data`.
-
-MWCC lays out one TU's `.data` in a fixed order (measured with the project's flags, see
-`docs/data-order-seams.md`): initialised globals over 8 B in definition order, the strings of out-of-line
-functions in first-use order, **vtables in the reverse of class order**, then the strings of **inline** functions
-(the "inline tail": in-class bodies and free `inline` functions, one unmerged copy per instance).  So a TU is
-`D* S* V* s*`, and the linker concatenates TU fragments.  In retail:
-
-* **V->S** (strong) - two vtable groups with strings between them: the second group is another TU, and the
-  boundary lies somewhere in the gap (after any inline tail).  A vtable followed by strings and *no* later vtable
-  is `V->tail` (weak): it may be an inline tail of the same TU, which is exactly what the g3d "contradictions"
-  were.  **A vtable followed by strings is not by itself a seam.**
-* **V->D** (weak) - a vtable followed by ordinary data (a jump table is `.data` too, its place is unmeasured);
-* **zigzag** - two *adjacent* vtables whose owners' first code slots go **up** in address are two TUs (inside one
-  TU they descend).
-
-This module is the reusable core: classify the DOL's `.data` symbols, list the seams, cut a run into TU
-fragments.  It reads only the DOL and `config/RMHE08/symbols.txt`.  Nothing is written.
-
-  dataorder.py scan [--json]                    # every seam in the DOL, with the counts `docs/data-order-seams.md` quotes
-  dataorder.py at <address|symbol> [--window N] # the symbols around one address, their kinds and the seams between
-  dataorder.py --selftest
-"""
+"""Classify retail `.data` symbols and list the TU seams MWCC's emission order implies (V->S, zigzag).
+Spec: docs/tools/spec/dataorder.md. CLI: dataorder.py scan [--json] | at <address|symbol> [--window N] | --selftest."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
@@ -30,258 +9,58 @@ import collections
 import json
 import os
 import re
-import sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.dirname(HERE))
-sys.path.insert(0, HERE)
+from tools.lib import repo as _repo
+import tools.splits.seams.evidence as ev
+# the reusable core lives in the seams evidence module; these names are this tool's public API
+from tools.splits.seams.evidence import (VTABLE, STRING, DATA, PRINTABLE, PAD_MAX, STRONG_KINDS, TAIL_RUN_MAX,  # noqa: F401
+                                         HEADER_NAME_RE, SOURCE_NAME_RE, Sym, is_header_name, is_source_name,
+                                         inline_tail, text_range, data_symbols, classify, classify_all, seams,
+                                         zigzag_pairs, fragments)
 
-import unitutil as uu  # noqa: E402  (repo root + build layout)
-from tools.lib import project as _project  # noqa: E402  (the map / splits readers)
-
-ROOT = uu.ROOT
-GAME = "RMHE08"
-SYMBOLS = os.path.join(ROOT, "config", GAME, "symbols.txt")
-SPLITS = os.path.join(ROOT, "config", GAME, "splits.txt")
-DOL = uu.resolve_input(os.path.join("orig", GAME, "sys", "main.dol"), ROOT, os.path.isfile)   # MAIN's copy in a fresh worktree
-
-VTABLE, STRING, DATA = "V", "S", "D"
-PRINTABLE = set(range(32, 127)) | {9, 10, 13}
-#: A `D` symbol this small between a vtable and the next symbol is alignment padding, not a new object.
-PAD_MAX = 8
-STRONG_KINDS = ("V->S", "zigzag")
+GAME = ev.GAME
+_PATHS: dict = {}
 
 
-class Sym:
-    """One `.data` symbol with its size, kind and (for a vtable) owner - the address of its first code slot."""
-
-    __slots__ = ("addr", "size", "name", "kind", "owner", "text")
-
-    def __init__(self, addr, size, name, kind=DATA, owner=None, text=None):
-        self.addr, self.size, self.name, self.kind, self.owner, self.text = addr, size, name, kind, owner, text
-
-    def as_dict(self):
-        d = {"addr": self.addr, "size": self.size, "name": self.name, "kind": self.kind}
-        if self.owner is not None:
-            d["owner"] = self.owner
-        return d
+def _paths() -> dict:
+    """The tree's map, splits and retail DOL, resolved on first use (MAIN's DOL by path in a fresh worktree)."""
+    if not _PATHS:
+        root = _repo.repo_root()
+        _PATHS.update(ROOT=root, SYMBOLS=os.path.join(root, "config", GAME, "symbols.txt"),
+                      SPLITS=os.path.join(root, "config", GAME, "splits.txt"),
+                      DOL=_repo.resolve_input(os.path.join("orig", GAME, "sys", "main.dol"), root, os.path.isfile,
+                                              honour_env=True))
+    return _PATHS
 
 
-HEADER_NAME_RE = re.compile(r"^[A-Za-z0-9_./\\-]*\.(?:h|hpp|inl)$")
+def __getattr__(name):
+    if name in ("ROOT", "SYMBOLS", "SPLITS", "DOL"):
+        return _paths()[name]
+    raise AttributeError("module %r has no attribute %r" % (__name__, name))
 
 
-def is_header_name(text: str | None) -> bool:
-    """A bare header file name (`g3d_resnode_ac.h`): the `__FILE__` of an assert in an INLINE function."""
-    return bool(text) and bool(HEADER_NAME_RE.match(text.strip()))
-
-
-SOURCE_NAME_RE = re.compile(r"^[A-Za-z0-9_./\-]*\.(?:c|cc|cpp|cp)$")
-#: Most non-header strings that may sit between two header names (or before the first one) of one inline tail:
-#: the assert message and the class-name argument of an inline instance (`ResLightSet`, `%s::%s: Object not valid.`).
-TAIL_RUN_MAX = 3
-
-
-def is_source_name(text: str | None) -> bool:
-    """A bare source file name (`g3d_anmvis.cpp`): the `__FILE__` of an assert in an OUT-OF-LINE function."""
-    return bool(text) and bool(SOURCE_NAME_RE.match(text.strip()))
-
-
-def inline_tail(gap: list["Sym"]) -> int:
-    """How many leading symbols of a `V->S` gap are the first TU's inline tail (0 when nothing says so).
-
-    An inline function's assert leaves a run of unmerged strings after the vtables - message, class name and the
-    *header* `__FILE__` (`g3d_resnode_ac.h`), one copy per instance - whereas the next TU's own strings lead with
-    its source `__FILE__` (`g3d_anmvis.cpp`) or a message of its own.  The tail is therefore the leading run of
-    strings up to and including the LAST header name that comes before the first source-file name, with at
-    most `TAIL_RUN_MAX` other strings between two header names.  A gap with no header name (the
-    `network_transport` gaps) has tail 0; a non-string symbol or a source-file name ends the run.
-    """
-    last = run = 0
-    for n, s in enumerate(gap):
-        if s.kind != STRING or is_source_name(s.text):
-            break
-        if is_header_name(s.text):
-            last, run = n + 1, 0
-        else:
-            run += 1
-            if run > TAIL_RUN_MAX:
-                break
-    return last
-
-
-def load_symbols(path: str = SYMBOLS) -> list[tuple[str, int, int | None, str]]:
+def load_symbols(path: str | None = None) -> list[tuple[str, int, int | None, str]]:
     """`(section, address, size-or-None, name)` for every map row."""
-    return [(e.section, e.address, e.size if e.sized else None, e.name) for e in _project.SymbolMap(path).rows()]
-
-
-def text_range(rows) -> tuple[int, int]:
-    """The `.init`/`.text` span, from the map: a vtable slot must point into it."""
-    text = [r for r in rows if r[0] in (".text", ".init")]
-    return min(r[1] for r in text), max(r[1] + (r[2] or 0) for r in text)
-
-
-def data_symbols(rows) -> list[tuple[int, int, str]]:
-    """The `.data` rows as `(address, size, name)`, sizes filled from the next symbol when the map has none."""
-    data = sorted((r for r in rows if r[0] == ".data"), key=lambda r: r[1])
-    out = []
-    for i, (_sec, addr, size, name) in enumerate(data):
-        nxt = data[i + 1][1] if i + 1 < len(data) else None
-        if not size:
-            size = (nxt - addr) if nxt else 4
-        if nxt and nxt > addr:
-            size = min(size, nxt - addr)
-        out.append((addr, size, name))
-    return out
-
-
-def classify(blob: bytes | None, tlo: int, thi: int) -> tuple[str, int | None]:
-    """`(kind, owner)` of one symbol's bytes.
-
-    A **vtable** is at least three words, a leading `0, 0` header (the game builds `-RTTI off`) and every other
-    word a code pointer or zero, with at least one pointer.  A jump table has no header, so it is *data*.  A
-    **string** is printable, NUL-terminated (trailing padding allowed) and at least two characters.
-    """
-    if not blob:
-        return DATA, None
-    if len(blob) >= 12 and len(blob) % 4 == 0:
-        w = [int.from_bytes(blob[i:i + 4], "big") for i in range(0, len(blob), 4)]
-        if w[0] == 0 and w[1] == 0 and all(x == 0 or tlo <= x < thi for x in w[2:]):
-            ptr = [x for x in w[2:] if x]
-            if ptr:
-                return VTABLE, ptr[0]
-    s = blob.rstrip(b"\0")
-    if len(s) >= 2 and all(c in PRINTABLE for c in s) and sum(1 for c in s if c >= 32) >= 2:
-        return STRING, None
-    return DATA, None
-
-
-def classify_all(rows, reader) -> list[Sym]:
-    """Every `.data` symbol classified, in address order.  `reader.read(addr, n)` returns the retail bytes."""
-    tlo, thi = text_range(rows)
-    out = []
-    for addr, size, name in data_symbols(rows):
-        blob = reader.read(addr, size)
-        kind, owner = classify(blob, tlo, thi)
-        text = blob.rstrip(b"\0").decode("latin-1") if kind == STRING else None
-        out.append(Sym(addr, size, name, kind, owner, text))
-    return out
-
-
-def seams(syms: list[Sym]) -> list[dict]:
-    """Every seam after a vtable group: `{addr, kind, before, after, ...}` in address order.
-
-    `kind` is
-    * `V->S` (strong) - strings between this vtable group and a LATER vtable: another TU starts in the gap.
-      `addr` is the earliest the new TU can begin (the first string), `latest` the next vtable, `width` the
-      number of symbols in the gap, `tail` how many leading symbols are the first TU's inline tail
-      (`inline_tail`: strings up to the last header name before the first source-file name) - the boundary is
-      after them;
-    * `V->tail` (weak) - strings after the vtable group with no later vtable: an inline tail or another TU;
-    * `V->D` (weak) - an object over 8 B that is not a string (a jump table is one too);
-    * `zigzag` (strong) - two adjacent vtables, owners going up.
-    Padding (a `D` of at most 8 B) is skipped.
-    """
-    out = []
-    for i, a in enumerate(syms):
-        if a.kind != VTABLE:
-            continue
-        j = i + 1
-        while j < len(syms) and syms[j].kind == DATA and syms[j].size <= PAD_MAX:
-            j += 1
-        if j >= len(syms):
-            continue
-        b = syms[j]
-        row = {"addr": b.addr, "before": a.name, "after": b.name}
-        if b.kind == STRING:
-            k = j
-            while k < len(syms) and syms[k].kind != VTABLE:
-                k += 1
-            tail = inline_tail(syms[j:k])
-            if k < len(syms):
-                row.update(kind="V->S", latest=syms[k].addr, width=k - j, tail=tail)
-            else:
-                row.update(kind="V->tail", width=k - j, tail=tail)
-        elif b.kind == DATA:
-            row["kind"] = "V->D"
-        elif a.owner is not None and b.owner is not None and b.owner > a.owner:
-            row["kind"] = "zigzag"
-        else:
-            continue
-        out.append(row)
-    return out
-
-
-def zigzag_pairs(syms: list[Sym]) -> collections.Counter:
-    """How many adjacent vtable pairs go `up` (a seam), `down` (the same TU) or `tie` (equal owners: no evidence)."""
-    c = collections.Counter()
-    for i, a in enumerate(syms):
-        if a.kind != VTABLE:
-            continue
-        j = i + 1
-        while j < len(syms) and syms[j].kind == DATA and syms[j].size <= PAD_MAX:
-            j += 1
-        if j < len(syms) and syms[j].kind == VTABLE and a.owner and syms[j].owner:
-            c["up" if syms[j].owner > a.owner else ("down" if syms[j].owner < a.owner else "tie")] += 1
-    return c
+    return ev.map_rows(path or _paths()["SYMBOLS"])
 
 
 def narrow_gap() -> int:
-    """`dataseams.NARROW`, the widest `V->S` gap (in symbols) whose boundary is cut rather than only reported."""
-    tools = os.path.dirname(HERE)
-    for p in (os.path.join(tools, "units"), tools):
-        if p not in sys.path:
-            sys.path.insert(0, p)
-    import dataseams
-    return dataseams.NARROW
+    """The widest `V->S` gap (in symbols) whose boundary is cut rather than only reported (`evidence.NARROW`)."""
+    return ev.NARROW
 
 
-def fragments(syms: list[Sym], weak: bool = False) -> list[list[Sym]]:
-    """Cut the run at every strong seam (and the weak `V->D`/`V->tail` ones when `weak`): one list per probable TU.
-
-    A `V->S` gap of at most `dataseams.NARROW` symbols is cut at its estimated boundary, the first symbol after
-    the row's `tail` inline-tail strings; a wider gap is not cut (a boundary is somewhere in it, and where is
-    unknown).  A zigzag and the weak kinds cut at their address.
-    """
-    at = {s.addr: i for i, s in enumerate(syms)}
-    narrow = narrow_gap()
-    cuts = set()
-    for row in seams(syms):
-        if not (weak or row["kind"] in STRONG_KINDS):
-            continue
-        if row["kind"] == "V->S":
-            if row["width"] > narrow:
-                continue
-            cuts.add(syms[min(at[row["addr"]] + row["tail"], len(syms) - 1)].addr)
-        else:
-            cuts.add(row["addr"])
-    out, cur = [], []
-    for s in syms:
-        if s.addr in cuts and cur:
-            out.append(cur)
-            cur = []
-        cur.append(s)
-    if cur:
-        out.append(cur)
-    return out
-
-
-def unit_data_ranges(path: str = SPLITS) -> dict[int, tuple[str, int]]:
+def unit_data_ranges(path: str | None = None) -> dict[int, tuple[str, int]]:
     """`start -> (unit, end)` for every registered unit `.data` range."""
-    return {r.start: (r.unit, r.end) for r in _project.Splits.read(path).ranges if r.section == ".data"}
+    return ev.section_ranges(path or _paths()["SPLITS"], ".data")
 
 
-def unit_of(ranges: dict, addr: int):
-    for start, (unit, end) in ranges.items():
-        if start <= addr < end:
-            return unit, start, end
-    return None
+unit_of = ev.range_of
 
 
 def scan_dol() -> dict:
     """The whole-DOL numbers: classification counts, seams by kind, where they fall (registered / unclaimed)."""
-    import tudiscover as td
     rows = load_symbols()
-    syms = classify_all(rows, td.Dol(DOL))
+    syms = classify_all(rows, ev.Image(_paths()["DOL"]))
     ranges = unit_data_ranges()
     found = seams(syms)
     inside, unclaimed, at_start = [], [], []
@@ -324,10 +103,9 @@ def resolve_address(token: str, rows) -> int:
 
 
 def cmd_at(args) -> int:
-    import tudiscover as td
     rows = load_symbols()
     addr = resolve_address(args.target, rows)
-    syms = classify_all(rows, td.Dol(DOL))
+    syms = classify_all(rows, ev.Image(_paths()["DOL"]))
     idx = min(range(len(syms)), key=lambda i: abs(syms[i].addr - addr))
     lo, hi = max(0, idx - args.window), min(len(syms), idx + args.window + 1)
     cut = {s["addr"]: s["kind"] for s in seams(syms)}
@@ -487,10 +265,10 @@ def selftest() -> int:
     narrow_gap_run = run((V, None), (S, "m"), (S, "a.h"), (S, "next"), (V, None))
     check("a narrow gap is cut after its tail", [[s.name for s in f] for f in fragments(narrow_gap_run)],
           [["V0", "S1", "S2"], ["S3", "V4"]])
-    check("fragments() reuses dataseams' threshold", narrow_gap(), 8)
+    check("fragments() reuses the seams threshold (dataseams cuts with it too)", narrow_gap(), 8)
 
     # the real DOL, when the repo has it: the network_transport seams the discovery came from
-    if os.path.exists(DOL) and os.path.exists(SYMBOLS):
+    if os.path.exists(_paths()["DOL"]) and os.path.exists(_paths()["SYMBOLS"]):
         out = scan_dol()
         check("real DOL: vtables were found", out["kinds"].get(VTABLE, 0) > 150, True)
         # inside the unit while it was one TU, at a registered unit's start since it was split (Network/NetworkPeerMcs

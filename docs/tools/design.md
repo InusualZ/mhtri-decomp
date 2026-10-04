@@ -15,6 +15,8 @@ Decided design for `tools/` after `inventory.md`, `duplication.md` and `prose-au
    importing a tool is a lint finding.
    A file split carries the moved code's edges and nothing else (`datagap -> dataclosure`, and `dataclosure ->
    callers/poolseams` in place of datagap's own): the allow-list swaps them in the same batch and its net never grows.
+   WP3c's `tools/splits/seams/` and `tools/splits/invariants/` are tool packages in section 5's sense (an `__init__.py`, imported
+   as `import tools.splits.<package>.<module> as x`, so no edge names the package marker).
 3. **The code keeps one header line; the spec keeps the prose.** Every tool opens with
    `"""<one-line purpose>. Spec: docs/tools/spec/<name>.md. CLI: <shape>."""` and nothing else at module level. Rules live in the
    spec's "Invariants and rules"; incidents live there as a date in parentheses at most.
@@ -57,6 +59,8 @@ tools/
   tests/                   every selftest, re-homed (section 7)
     <area>/test_<tool>.py
   units/ symbols/ splits/ objdiff/ elf/ git/ agents/ flags/   the thin tools (same paths and names as today)
+  splits/seams/            the TU-seam evidence (`evidence.py`) the four seam CLIs share (WP3c)
+  splits/invariants/       the `splits.txt` audit, one module per invariant; `splitcheck.py` is its CLI (WP3c)
   mwcc-debugger/ mwlink/   the compiler and linker debuggers (packages; shims keep the old paths)
   selftest.py              the runner (discovers tools/tests/**)
   project.py ninja_syntax.py download_tool.py transform_dep.py decompctx.py changes_fmt.py   template, untouched
@@ -194,6 +198,14 @@ becomes it (`duplication.md` has the line numbers).
 * As built (WP2a): the index stays the cache's JSON dict with functions over it (`build_dump_index`, `build_object_index`,
   `load_index`, `rows_at`, `runs_over`), because four tools read the dict's keys and a typed `RefIndex` would change the
   cache format; the class arrives with 3c, which rewrites those readers. `spec/lib-refs.md` "Known gaps" lists the rest.
+* As built (WP3c): `RefIndex.load(root)` wraps that dict (the dump when the tree reads one, else the objects) with the map
+  (`RefMap`) and `callers`' query, readers and runs, moved verbatim; `accessextent`, `dataclaim` and `dataclosure` read it
+  instead of importing `callers`. Names resolve through `RefMap` over `Ownership` with
+  `lib.project.ownership.owner_label` (was `callees.classify_owner`). The asm dump's stamp is `DumpStamp` here, not on
+  `lib.cache.Stamped`: the dump is this module's input, and `Stamped`'s envelope would turn every existing `.stamp.json`
+  `unstamped`. The tree-level census (`census_claims`, `census_symbols`, `tree_census`) moved here from `dataclosure`, so
+  `poolseams` stopped importing `datagap` (the cycle). `Ref` per row and `callers_of`/`callees_of` are not built: no reader
+  asked for them.
 
 ### `lib/report.py` - scores
 
@@ -320,8 +332,8 @@ The CLI names, subcommands and flags the profiles/skills/docs use stay (section 
 | `units/ledger.py` | KEEP (thin) | project, report | totals / next / unit |
 | `units/recompile.py`, `units/measure.py`, `objdiff/unitscore.py`, `objdiff/symdiff.py` | KEEP (thin) | units, report, repo | one metric already; drop their private resolvers |
 | `units/callers.py`, `units/callees.py`, `units/accessextent.py`, `units/dossier.py` | KEEP (thin) | refs, ppc, binary, project, names | the abstract interpreter stays in `accessextent` |
-| `splits/tudiscover.py`, `splits/dataorder.py`, `units/dataseams.py`, `units/poolseams.py` | MERGE into `tools/splits/seams/` | refs, binary, project, cache, findings | the four evidence kinds computed once; CLIs kept as entry points |
-| `splits/splitcheck.py` | SPLIT | ppc (its scanner moves out), project, findings | keeps `--baseline` (the phase-5 audit) as invariants over `Row`s; proposal rendering/lint retired with the program |
+| `splits/tudiscover.py`, `splits/dataorder.py`, `units/dataseams.py`, `units/poolseams.py` | MERGE into `tools/splits/seams/` | refs, binary, project, cache, findings | the four evidence kinds computed once; CLIs kept as entry points. As built (WP3c): the entry points stay at their paths and import `tools/splits/seams/evidence.py` (the data order, the pool literal and value-witness rules, the source-name rule, `components`, the readers); the evidence *readers* stay per tool (dump graph, retail decode, census) - `spec/seams.md` |
+| `splits/splitcheck.py` | SPLIT | ppc (its scanner moves out), project, findings | keeps `--baseline` (the phase-5 audit) as invariants over `Row`s; proposal rendering/lint retired with the program. As built (WP3c): `tools/splits/invariants/` (13 modules), `splitcheck.py` 108 lines, `Results.rows()` renders `lib.findings.Row`s - `spec/invariants.md` |
 | `splits/applysplits.py`, `splits/dataattach.py`, `splits/matchinggain.py` | RETIRE | - | the program is applied (`retired.md`) |
 | `units/attribute.py` | RETIRE (question 1) | - | its `queue` is superseded by split-proven units in `splits.txt` |
 | `symbols/symedit.py` | KEEP (thin) | project.symbols, text, git | the CLI over `SymbolMap` |
@@ -407,6 +419,9 @@ names the package's spec (`test_headers`).
 Also split: **`splits/splitcheck.py` (3 578)** -> `lib.ppc.scan_refs` + `lib.refs` (its `Ctx`), `tools/splits/invariants/*.py`
 (order, coverage, text-cut, extab, ctors, pool, data-order, vtable, jumptable, bss, local-static - each a `Row` producer), the
 `--baseline` CLI; proposal loading/linting/rendering (`load_proposal` ... `render`, ~900 lines) retired with the program.
+As built (WP3c): each invariant module keeps its `check_<name>(ctx, res)` signature and accumulates into the one `Results`
+store, which renders the `Row`s (`Results.rows()`, written under `rows` by `--json`); `Ctx` lives in `invariants/context.py`;
+`audit.py` is the package's API; the in-file selftest is `tools/tests/splits/test_splitcheck.py`.
 
 ## 6. The rule / finding / gate-row framework
 
