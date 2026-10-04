@@ -10,7 +10,7 @@ import json
 import os
 from pathlib import Path
 
-from tools.lib import PROLOGUE, testing
+from tools.lib import PROLOGUE, cli, testing
 
 TIER = "smoke"
 PENDING_FILE = Path(__file__).with_name("prologue-pending.json")
@@ -54,16 +54,8 @@ def path_mutations(tree: ast.AST) -> list[int]:
     return sorted(set(lines))
 
 
-def is_entry_point(rel: str, tree: ast.Module) -> bool:
-    """A file run as a program: a module-level `if __name__ == "__main__":`, or a test module."""
-    name = rel.rsplit("/", 1)[-1]
-    if rel.startswith("tools/tests/") and name.startswith("test_"):
-        return True
-    for node in tree.body:
-        if isinstance(node, ast.If) and isinstance(node.test, ast.Compare) \
-                and isinstance(node.test.left, ast.Name) and node.test.left.id == "__name__":
-            return True
-    return False
+#: A file run as a program (`lib.cli.is_entry_point`): only an entry point carries the prologue.
+is_entry_point = cli.is_entry_point
 
 
 def problems(rel: str, text: str) -> list[str]:
@@ -175,7 +167,7 @@ def prune() -> int:
     keep = [p for p in pending if (root / p).is_file() and p in found]
     data = json.loads(PENDING_FILE.read_text(encoding="utf-8"))
     data["pending"] = keep
-    PENDING_FILE.write_text(json.dumps(data, indent=1) + "\n", encoding="utf-8", newline="\n")
+    testing.rewrite_json(PENDING_FILE, data)   # the file's own indent: a prune is a minimal diff
     print("pruned %d entr(ies); %d pending" % (len(pending) - len(keep), len(keep)))
     return 0
 

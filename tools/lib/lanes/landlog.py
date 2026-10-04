@@ -9,6 +9,8 @@ import time
 from collections import Counter
 from dataclasses import asdict, dataclass, field
 
+from tools.lib import repo as _repo
+
 LOG_NAME = "land-log.jsonl"
 OUTCOMES = ("landed", "refused", "conflict", "error")
 SCHEMA = 1
@@ -43,7 +45,8 @@ class Attempt:
 
 
 def log_path(main: str) -> str:
-    return os.path.join(main, ".pi", LOG_NAME)
+    """`<main>/.pi/land-log.jsonl` (`lib.repo.state`: the one list of campaign state names)."""
+    return str(_repo.state(LOG_NAME, main))
 
 
 def append(main: str, attempt: Attempt) -> str:

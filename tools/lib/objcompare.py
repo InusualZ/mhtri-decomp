@@ -866,7 +866,8 @@ def linkage_audit(our_defined, our_undefined, tgt_defined, tgt_undefined) -> dic
 
 # --- fingerprints -----------------------------------------------------------------------------------------------
 
-def _sha256_file(path: str) -> str:
+def file_sha256(path: str) -> str:
+    """The sha256 of a file's bytes (the raw half the gate pairs with `fingerprint` to tell a names-only change)."""
     h = hashlib.sha256()
     with open(path, "rb") as fh:
         for chunk in iter(lambda: fh.read(1 << 20), b""):
@@ -885,7 +886,7 @@ def fingerprint(path: str) -> str:
     try:
         elf = Elf.read(path)
     except Exception:                                            # noqa: BLE001 - not an ELF (or truncated)
-        return "raw:" + _sha256_file(path)
+        return "raw:" + file_sha256(path)
     h = hashlib.sha256()
     for sec in elf.sections:
         if sec.name in RENAME_FREE_SECTIONS:

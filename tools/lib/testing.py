@@ -292,6 +292,28 @@ def run(ns: dict, argv: Iterable[str] | None = None) -> int:
     return c.summary()
 
 
+# --- the allow-lists a test shrinks (`--prune`) ---------------------------------------------------------------
+
+def json_indent(text: str, default: int = 1) -> int:
+    """The indent unit a JSON document was written with: the leading spaces of its first indented line."""
+    for line in text.splitlines()[1:]:
+        stripped = line.lstrip(" ")
+        if stripped and len(stripped) < len(line):
+            return len(line) - len(stripped)
+    return default
+
+
+def rewrite_json(path: str | os.PathLike, data: Any) -> None:
+    """Write `data` back to an existing JSON file in that file's own shape - its indent unit, raw non-ASCII kept
+    raw when the file already has it, LF and a trailing newline - so a `--prune` is a minimal diff (the dropped
+    lines and at most one moved comma), never a reformat of the whole file."""
+    p = Path(path)
+    old = p.read_text(encoding="utf-8") if p.exists() else ""
+    raw = any(ord(ch) > 127 for ch in old)
+    p.write_text(json.dumps(data, indent=json_indent(old), ensure_ascii=not raw) + "\n", encoding="utf-8",
+                 newline="\n")
+
+
 # --- FixtureTree ------------------------------------------------------------------------------------------
 
 SECTIONS = (".init", "extab", "extabindex", ".text", ".ctors", ".dtors", ".rodata", ".data", ".bss", ".sdata",

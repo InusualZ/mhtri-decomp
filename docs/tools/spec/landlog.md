@@ -8,7 +8,8 @@ most, which paths conflict most, how long a landing takes - the evidence the gat
 
 ## Users
 
-The orchestrator; the WP4 gate writes the log (`landlog.append`, three lines in `land.py land` - `lib-lanes.md`).
+The orchestrator; the gate writes the log (`tools/units/landing/flow.py`: `land` and `land_branch` each append one
+line per attempt, in a `finally`, so an exception is logged as `error`; `land --branch` logs once).
 
 ## CLI
 
@@ -28,8 +29,8 @@ Inputs -> outputs: `.pi/land-log.jsonl` -> text or JSON on stdout (read-only).
 ## Invariants and rules
 
 * A line that is not a JSON object is reported by number, never fatal.
-* The log is append-only and gitignored (`.pi/`); `lib.repo.STATE_NAMES` does not list it yet (the gate writes it
-  through `lib.lanes.landlog.log_path`).
+* The log is append-only and gitignored (`.pi/`); `lib.lanes.landlog.log_path` resolves it through
+  `lib.repo.state("land-log.jsonl")` (on `STATE_NAMES` since WP4).
 
 ## Lib dependencies
 
@@ -41,4 +42,8 @@ Tier: fixture. `tools/tests/units/test_landlog.py` (the CLI); the format is `too
 
 ## Known gaps
 
-Nothing writes the log until WP4 adds the hook to `land.py`.
+The log starts at WP4's landing (no history before it). `land.py verify` and `record-base` are not attempts and
+write nothing. The `refused_row` of a refusal before the gate names the guard (`--message`, `HEAD is main`,
+`branch exists`, `clean tree`, `units from the branch`, `apply`, `pre-flight (paths outside the batch)`, `paths
+outside the batch (after the build)`, `already applied`, `nothing to stage`, `git commit`); a gate refusal names its
+first failing row.

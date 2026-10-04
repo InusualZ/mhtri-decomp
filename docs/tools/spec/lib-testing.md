@@ -13,6 +13,8 @@ The tools listed under this concept in `docs/tools/README.md`.
 * `Checker`: `check(name, got, want)`, `expect`, `raises`, `contains`, `summary()` -> `ok - N checks` / `FAIL: ...`
 * `FixtureTree(tmp)`: `configure.py`, `config/RMHE08/{symbols,splits}.txt`, `src/`, `include/`, `build/RMHE08/{obj,src}/` objects from `ElfBuilder`, `report.json`, optional asm dump; `add_unit`, `add_symbol`, `claim`; created outside the repository
 * `GitFixture(tmp)`: `init`, `commit`, `branch`, `worktree`, `conflict`
+* `json_indent(text)`, `rewrite_json(path, data)`: write an allow-list back in its own shape (indent unit, raw
+  non-ASCII kept), so `test_prologue.py --prune` / `test_layering.py --prune` are minimal diffs (WP4)
 * `TIER = 'fixture' | 'smoke'`; under `fixture`, `lib.repo.repo_root()` without `start=` raises
 * `assert_live_allowed(what)`, `assert_path_allowed(path, what)` (raises only for a path inside the live tree): the seams
   `lib.repo` calls; `refusals_expected()` - a `with` block whose refusals are the point of a test OF the guard, so they do

@@ -392,6 +392,16 @@ The CLI names, subcommands and flags the profiles/skills/docs use stay (section 
 * `renames.py` - `--unit-rename` pairs and snapshot-key renaming.
 * `release.py` - the release plan through `lib.lanes.teardown`.
 * Tests: `tools/tests/units/test_landing_*.py` on `GitFixture` + `FixtureTree`; the 1 875-line `selftest()` is split along the rows.
+As built (WP4): three modules the list above lacks - `common.py` (the path classes, the KIND wording, `run`/`git`,
+and `Batch`, the one run's rows and hand-offs; it imports nothing of the package, which is what keeps the package
+free of cycles), `state.py` (the recorded allowances and `--unit-rename` pairs - `renames.py` above - read as
+`state.<NAME>`), `message.py` (the commit message file); `gate.py` holds `verify` (`PRE_BUILD` then the build),
+`flow.py` `land`/`land_branch`, `cli.py` `main`, `api.py` the one namespace `land.py` re-exports. The rows'
+`selftests.py`, `subject.py`, `knowledge.py` are as listed; `stage.py`'s `land_decision` and `branch.py` are as
+listed. The re-homed selftest is one module, `tools/tests/units/test_land.py` (16 test functions along the old
+sections), plus `tools/tests/units/landing/` (the golden table, the landing log, the base report rebuild, the
+names-only neighbours); a package module's header names `landing.md` (the
+topmost package: `test_headers` reads a nested package as one tool).
 
 **`units/stylelint.py` (4 924) -> `tools/units/stylelint.py` + `stylelint_rules/`**: `rules/r01_shared_type.py` ...
 `r13_method.py` (each `findings(source, ctx) -> [Finding]` with its exemption marker logic), `context.py` (sources, ownership,

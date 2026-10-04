@@ -62,9 +62,10 @@ lane->wtsafe and slots->lanecmd are gone). Import the module you need; `lanes/__
 * A worktree claim with a live session in its tree is refused before anything is touched (Windows will not delete a
   directory a process sits in); a slot claim is refused by `pool.release_blockers` on the same signal. The herdr pane
   probing this replaces is deleted (`retired.md`).
-* The landing log hook WP4 adds to `land.py land` (three lines, around the existing landing call):
-  `t0 = time.time()`, then after the outcome is known
-  `landlog.append(main, landlog.Attempt(branch, outcome, time.time() - t0, refused_row=row, conflicts=tuple(paths), units=tuple(units), commit=sha))`.
+* The landing log hook (WP4, `tools/units/landing/flow.py`): `t0 = time.time()` before the landing, then in a
+  `finally` `landlog.append(main, landlog.Attempt(branch, outcome, time.time() - t0, refused_row=row,
+  conflicts=tuple(paths), units=tuple(units), commit=sha))`; a failure to write the log is a warning, never a
+  different answer.
 
 ## Test contract
 

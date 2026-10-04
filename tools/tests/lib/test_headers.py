@@ -22,8 +22,10 @@ def expected_spec(rel: str, packages: frozenset = frozenset()) -> str:
     parts = rel.split("/")
     if rel.startswith("tools/lib/") and len(parts) > 3:
         return "docs/tools/spec/lib-%s.md" % parts[2]
-    if rel.rsplit("/", 1)[0] in packages:
-        return "docs/tools/spec/%s.md" % parts[-2]
+    # the TOPMOST package (`tools/units/landing/rows/tree.py` -> `landing.md`): a nested package is still one tool
+    for depth in range(2, len(parts)):
+        if "/".join(parts[:depth]) in packages:
+            return "docs/tools/spec/%s.md" % parts[depth - 1]
     stem = parts[-1][:-3]
     return "docs/tools/spec/%s%s.md" % ("lib-" if rel.startswith("tools/lib/") else "", stem)
 
@@ -88,6 +90,10 @@ def test_rule_on_fixtures(c):
     c.check("... and its own stem when the directory is not a package",
             header_problems("tools/mwlink/trace.py", pkg),
             ["names docs/tools/spec/mwlink.md, expected docs/tools/spec/trace.md"])
+    nested = frozenset({"tools/units/landing", "tools/units/landing/rows"})
+    c.check("a module of a NESTED package names the topmost package's spec",
+            header_problems("tools/units/landing/rows/tree.py", '"""H. Spec: docs/tools/spec/landing.md."""\n',
+                            packages=nested), [])
     c.check("tests, selftests, package markers are out of scope",
             [in_scope(p) for p in ("tools/tests/lib/test_x.py", "tools/units/x_selftest.py", "tools/lib/__init__.py",
                                    "tools/units/x.py")], [False, False, False, True])

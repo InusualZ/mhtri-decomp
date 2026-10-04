@@ -92,7 +92,7 @@ SITE_DIR = os.path.join(HERE, "selftest_site")
 
 # a tool "exposes --selftest" when it registers the flag or is a `lib.cli.Tool` with `tests=` (not when a
 # docstring merely mentions it)
-from tools.lib.cli import SELFTEST_FLAG  # noqa: E402
+from tools.lib.cli import SELFTEST_FLAG, runs_own_selftest  # noqa: E402,F401
 # the count shapes the tools print: `ok - 12 checks`, `9/9 checks passed`, `all 6 checks passed`,
 # `12 checks` - anything else is reported as `-` and the exit status is still the verdict.
 COUNT_PATTERNS = (
@@ -359,17 +359,19 @@ def discover_legacy(root: str = ROOT) -> tuple[list[Entry], list[str]]:
     tools: dict[str, str] = {}       # key -> tool path
     standalones: dict[str, str] = {}  # key -> selftest path
     tests_dir = os.path.normcase(os.path.join(root, *TESTS_REL.split("/")))
+    found: list[str] = []
     for dirpath, dirnames, filenames in os.walk(os.path.join(root, "tools")):
         dirnames[:] = [d for d in dirnames if d != "__pycache__"
                        and os.path.normcase(os.path.join(dirpath, d)) != tests_dir]
-        for fn in filenames:
-            if not fn.endswith(".py"):
-                continue
-            full = os.path.join(dirpath, fn)
-            if fn.endswith("_selftest.py"):
-                standalones[_key_for(full, root)] = _rel(full, root)
-            elif SELFTEST_FLAG.search(_read(full)):
-                tools[_key_for(full, root)] = _rel(full, root)
+        found += [os.path.join(dirpath, fn) for fn in filenames if fn.endswith(".py")]
+    rels = frozenset(_rel(full, root) for full in found)
+    for full in found:
+        if full.endswith("_selftest.py"):
+            standalones[_key_for(full, root)] = _rel(full, root)
+        elif runs_own_selftest(_rel(full, root), _read(full), rels):
+            # an entry point that registers `--selftest`; a package module (`tools/units/merge/mergebranch.py`)
+            # or a module with no `__main__` guard runs nothing on its own, so it is not an entry
+            tools[_key_for(full, root)] = _rel(full, root)
 
     entries: list[Entry] = []
     for key in sorted(set(tools) | set(standalones)):
@@ -763,23 +765,31 @@ def selftest() -> int:
             with open(p, "w", encoding="utf-8") as fh:
                 fh.write(text)
 
+        main_guard = 'if __name__ == "__main__":\n    main()\n'
         # a: the tool delegates to the standalone -> one tool entry
-        w("tools/units/alpha.py", 'ap.add_argument("--selftest")\nimport alpha_selftest\n')
+        w("tools/units/alpha.py", 'ap.add_argument("--selftest")\nimport alpha_selftest\n' + main_guard)
         w("tools/units/alpha_selftest.py", "def selftest():\n    return 0\n")
         # b: the standalone delegates to the tool -> one tool entry
-        w("tools/units/beta.py", 'ap.add_argument("--selftest")\ndef selftest():\n    return 0\n')
+        w("tools/units/beta.py", 'ap.add_argument("--selftest")\ndef selftest():\n    return 0\n' + main_guard)
         w("tools/units/beta_selftest.py", "import beta\nbeta.selftest()\n")
         # g: neither delegates -> both entries (complementary, e.g. ledger)
-        w("tools/units/gamma.py", 'ap.add_argument("--selftest")\ndef selftest():\n    return 0\n')
+        w("tools/units/gamma.py", 'ap.add_argument("--selftest")\ndef selftest():\n    return 0\n' + main_guard)
         w("tools/units/gamma_selftest.py", "def selftest():\n    return 0\n")
         # d: tool only, e: standalone only
-        w("tools/units/delta.py", 'ap.add_argument("--selftest")\n')
+        w("tools/units/delta.py", 'ap.add_argument("--selftest")\n' + main_guard)
         w("tools/units/eps_selftest.py", "def selftest():\n    return 0\n")
+        # not entries (WP4): a package module that registers the flag, and a module with no `__main__` guard -
+        # `python <file> --selftest` would run nothing (the old discovery ran `merge/mergebranch.py` that way)
+        w("tools/units/pkg/__init__.py")
+        w("tools/units/pkg/cli.py", 'ap.add_argument("--selftest")\n' + main_guard)
+        w("tools/units/noguard.py", 'ap.add_argument("--selftest")\n')
         entries, notes = discover(tmp)
         by = {e.name: e for e in entries}
         check("a tool->standalone pair collapses", sorted(by),
               ["tools/units/alpha", "tools/units/beta", "tools/units/delta", "tools/units/eps",
                "tools/units/gamma", "tools/units/gamma_selftest"])
+        check("... and a package module or an unguarded module is never an entry",
+              [k for k in by if "pkg" in k or "noguard" in k], [])
         check("... and keeps the tool, not the standalone", by["tools/units/alpha"].kind, "tool")
         check("a standalone->tool pair keeps the tool", by["tools/units/beta"].kind, "tool")
         check("a complementary pair keeps both", by["tools/units/gamma_selftest"].kind, "standalone")
@@ -878,8 +888,9 @@ def selftest() -> int:
             fh.write(text)
 
     with tempfile.TemporaryDirectory() as tmp:
-        write_under(tmp, "tools/units/alpha.py", 'ap.add_argument("--selftest")\n')
-        write_under(tmp, "tools/units/beta.py", 'ap.add_argument("--selftest")\n')
+        guard = 'if __name__ == "__main__":\n    main()\n'
+        write_under(tmp, "tools/units/alpha.py", 'ap.add_argument("--selftest")\n' + guard)
+        write_under(tmp, "tools/units/beta.py", 'ap.add_argument("--selftest")\n' + guard)
         write_under(tmp, "tools/lib/testing.py", "")
         write_under(tmp, "tools/tests/units/test_alpha.py",
                     "from tools.lib import testing\nTIER = 'fixture'\nALLOW = 'allow.json'\n")

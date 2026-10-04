@@ -61,10 +61,7 @@ def remove_worktree(main: str, path: str) -> str:
     return teardown.remove_worktree_checked(main, path)
 
 
-def rescue_exists(main: str, unit: str) -> str | None:
-    """The rescue ref holding `unit`'s work, or None."""
-    ref = rescue_ref_name(unit)
-    return ref if registry.ref_exists(main, ref) else None
+rescue_exists = registry.rescue_exists
 
 
 def _git_quiet(args: list[str], cwd: str) -> str | None:

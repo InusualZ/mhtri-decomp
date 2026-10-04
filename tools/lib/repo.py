@@ -23,8 +23,9 @@ MARKER = "configure.py"
 #: A slot is a sibling of MAIN named `<main>.slot<N>`.
 SLOT_RE = re.compile(r"\.slot\d+$")
 #: The one list of campaign state under `.pi/`; `state()` refuses any other name.
-STATE_NAMES = ("claims.json", "backlog.json", "land-base.json", "data-requests.json", "merge-state.json",
-               "ledger.json", "spend.json", "state.md", "slots", "lanes", "outbox", "notes", "tasks", "bin")
+STATE_NAMES = ("claims.json", "backlog.json", "land-base.json", "land-log.jsonl", "data-requests.json",
+               "merge-state.json", "ledger.json", "spend.json", "state.md", "slots", "lanes", "outbox", "notes",
+               "tasks", "bin", "ack")
 #: The originals `config.yml` pins, by the key that pins each.
 GROUND_TRUTH_KEYS = (("hash", "orig/%s/sys/main.dol" % VERSION), ("selfile_hash", "orig/%s/files/mh3.sel" % VERSION))
 
