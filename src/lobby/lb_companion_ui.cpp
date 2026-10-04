@@ -36,7 +36,7 @@
  * 2D library - `get_lsp_data`, `draw_sprite_ary`/`draw_sprite_idx`/`draw_sprite_anim_*`,
  * `draw_font`/`draw_font_idx`, `subTransSet(Prio)`, `sysSE_req` - and read the lobby state
  * (`lb_param_w`, `lb_deli_data`, `Screen_w`, `system_w`) plus the lobby string helper `LbStr`.  The
- * act dispatchers (`lb_act_dispatch`, `fn_80339F10`) are called from the game-root dispatcher at
+ * act dispatchers (`lb_act_dispatch`, `lb_act_dispatch_ex`) are called from the game-root dispatcher at
  * 0x80432154 as `(u8 index, LbActReq* req)`, and every per-act handler below has that shape.
  *
  * MODULE AND NAME (brief section 2).  1. No `__FILE__` string: the range's whole `.data`/`.sdata`
@@ -64,7 +64,7 @@
  *    must-link exists in either direction;
  *  - the `scope:local` anchors (654 `.data` labels, 0/653 owner-order inversions DOL-wide) put
  *    this band's three switch tables in order - 0x805E27D4 <- lb_act_dispatch, 0x805E27F8 <-
- *    fn_80339F10, 0x805E71FC <- fn_8033C9B0 - and the `.data`/`.sdata` runs continue across both
+ *    lb_act_dispatch_ex, 0x805E71FC <- fn_8033C9B0 - and the `.data`/`.sdata` runs continue across both
  *    edges with ascending owners (fn_8033F13C -> fn_8033F270).  That is the `candidate, never
  *    proof` class: a contiguous data run with ascending owners looks identical whether it is one
  *    object or two adjacent ones, which is why the DOL alone cannot settle this seam.

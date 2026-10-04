@@ -1776,7 +1776,7 @@ void em_net_send(_ENEMY_WORK* work, u8 kind, u16 param) {
 
 /* The client's own enemy receiver: resolves the message's enemy id and dispatches on its kind to the
  * matching applier, ignoring messages this client sent itself. */
-void em_net_recv(_ENEMY_WORK* unused_work, const NetEmStateMsg* msg) {
+void em_net_recv(u8 slot, const NetEmStateMsg* msg) {
     _ENEMY_WORK* work;
     s8 own;
 

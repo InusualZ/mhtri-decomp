@@ -39,7 +39,7 @@ extern u32 lbl_80794A00;            /* reverb time counter */
 extern void* mpMediator__15sNetworkLibrary;
 extern u32 lbl_807949F8;
 extern u32 lbl_807949FC;
-extern u32 lbl_80794868;
+extern u32 frame_counter;
 extern u8 lbl_80698AE0[0x10];
 extern void* lbl_807949D8;
 
@@ -81,7 +81,7 @@ s16 fn_800E8880(LevelSetting* setting);
 void* getInstance(void);
 void setStreamTransferMode(u32 v);
 void clearReverbWorkArea(void);
-void fn_800E8D74(void);
+void advanceReverbClock(void);
 void fn_800E8E3C(s16* p);
 
 u32 fn_804C2830(void);
@@ -115,7 +115,7 @@ void fn_800E93E0(ReverbLine* line);
 void fn_800E8634(u32 idx, u32 entry_idx);
 void fn_800E8698(void);
 void fn_800E86E8(u32 id);
-void fn_800E8CC8(s16* src, s32 count);
+void pushReverbSamples(s16* src, s32 count);
 void fn_800E8DA4(void);
 void* fn_800E8DE0(void* obj, s32 flags);
 
@@ -321,7 +321,7 @@ extern "C" void clearReverbWorkArea(void)
 }
 
 /* Advances the reverb time counter with interrupts off. */
-extern "C" void fn_800E8D74(void)
+extern "C" void advanceReverbClock(void)
 {
     u32 level = OSDisableInterrupts();
 
@@ -564,14 +564,14 @@ extern "C" void fn_800E86E8(u32 id)
 }
 
 /* Copies one buffer into the ring the reverb time counter walks. */
-extern "C" void fn_800E8CC8(s16* src, s32 count)
+extern "C" void pushReverbSamples(s16* src, s32 count)
 {
     u32 pos = lbl_807949EC;
     s16* dst;
     s32 n;
 
     lbl_807949F8 = pos;
-    lbl_807949FC = lbl_80794868;
+    lbl_807949FC = frame_counter;
     dst = (s16*)(pos + lbl_807949E8);
     n = count / 2;
     while (n-- > 0) {

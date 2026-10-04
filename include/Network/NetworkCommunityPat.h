@@ -198,7 +198,7 @@ s32 networkSmallObject_isValid(const NetworkSmallObject* self);
 void exportTo(const NetworkSmallObject* self, u8* out, u32 size);
 
 /* 0x803F8904 - true when both address records are set and equal. */
-s32 networkSmallObject_isEqual(const NetworkSmallObject* a, const NetworkSmallObject* b);
+u32 networkSmallObject_isEqual(const NetworkSmallObject* a, const NetworkSmallObject* b);
 
 /* 0x803F8E88 - stamps the message with `seconds`. */
 void networkPacket_setTimestamp(NetworkStreamWriter* self, f32 seconds);

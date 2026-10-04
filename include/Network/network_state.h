@@ -187,6 +187,9 @@ s32 handleNetworkState2(NetworkInstance* self);
 s32 handleNetworkState2Fmp(NetworkInstance* self);
 /* 0x803FF994 */
 s32 handleNetworkState2Binary(NetworkInstance* self);
+
+/* 0x803FFF50 - sends the check request: two tag bytes and a packed record of `size` bytes. */
+s32 sendReqUnknownCheck(NetworkInstance* self, const u8* tags, const u8* data, u32 size);
 }
 
 #endif /* NETWORK_STATE_H */

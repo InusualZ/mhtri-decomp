@@ -140,7 +140,7 @@ typedef struct LbMenuRow8 {
 /* The 0x50-byte block at `lb_item_list_state` (the item-list page's own state). */
 typedef struct LbMenuItemState {
     /* +0x00 */ u32 active_0x00;
-    /* +0x04 */ u32 stamp_0x04;      /* the tick the page last advanced on (`lbl_80794868`) */
+    /* +0x04 */ u32 stamp_0x04;      /* the tick the page last advanced on (`frame_counter`) */
     /* +0x08 */ u8 unused_0x08[0x0C];
     /* +0x14 */ f32 count_0x14;      /* the row count as a float (converted unsigned) */
     /* +0x18 */ f32 step_0x18;       /* how far one row advances per tick */
@@ -184,7 +184,7 @@ extern const u16 lbl_805BAA14[];
 extern const f32 lbl_80799CD8;       /* .sdata2 0x80799CD8 */
 extern const f32 lbl_80799C78;       /* .sdata2 0x80799C78 - the per-row step scale */
 extern const f32 lbl_80799C7C;       /* .sdata2 0x80799C7C - the "scrolled to the end" mark */
-extern u32 lbl_80794868;             /* .sbss 0x80794868 - the page's tick counter */
+extern u32 frame_counter;             /* .sbss 0x80794868 - the page's tick counter */
 s32 CalculateEvents();
 /* 0x80223E54 - the `.text` helper in this unit's range (0x8021E1EC-0x80224AC4) that
  * `Pl/fn_80262940.cpp` calls on the actor model; an unmangled `fn_` stem, so C linkage.  Owned here by

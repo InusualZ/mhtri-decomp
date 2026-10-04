@@ -334,7 +334,7 @@ extern "C" void fn_800FA420(nw4r::math::VEC3* out);
 extern "C" void mhchar_construct(void* out);
 extern "C" u32 fn_8021F218(void);
 extern "C" f32 fn_8021F228(u32 index);
-extern "C" s32 fn_8021F238(void);
+extern "C" s32 getItemListSelection(void);
 extern "C" u32 Pl_motion_input_ck(void* work);
 extern "C" s32 fn_80291BBC(void* a, u8 area, s32 handle, void* out, s32 limit);
 extern "C" void fn_802AE1DC(StageColourRec* rec);

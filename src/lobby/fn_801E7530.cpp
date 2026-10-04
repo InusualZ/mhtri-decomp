@@ -586,7 +586,7 @@ void fn_801E843C(LbMenuWork* self)
     draw_font_idx(0x1D7DU, (s8*)LbStr(0, 0x11BU), 0, &anchor);
     draw_font_idx(0x1D7EU, (s8*)LbStr(0, 0x11CU), 0, &anchor);
     if (self->list_mode_0x0C - 1U > 1U) {
-        type = ((fn_8021F238() - 1) == 0) + 0x1D6F;
+        type = ((getItemListSelection() - 1) == 0) + 0x1D6F;
         memcpy(name, big->name_0x4068, 2);
         idx = big->index_0x406C;
         kind = big->tail_0x6010[0];

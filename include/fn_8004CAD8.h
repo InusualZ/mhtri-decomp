@@ -240,6 +240,12 @@ void fn_8004EAF4(void* dst, const void* src);
  * last.  Added with `menu/menu_row.cpp`, its consumer (rule 2). */
 void fn_8004EA58(const void* entry);
 
+/* 0x8004FC80 - packs item-box page `page` (a 0x2DC-byte record) out of the lobby world block (GUESS name: its caller
+ * is the network box-page check request). */
+void exportItemBoxPage(u8* record, s32 page);
+/* 0x8004FD6C - packs the equipment set (a 0xF0-byte record) out of the lobby world block (GUESS name). */
+void exportEquipRecord(u8* record);
+
 #ifdef __cplusplus
 }
 #endif

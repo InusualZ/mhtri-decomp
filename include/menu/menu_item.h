@@ -274,7 +274,7 @@ extern ItemSpeciesRecord lbl_805DBFB8[]; /* .data:0x805DBFB8 - 132 x 0x0C B */
  *     in for `_HIT_W`'s sibling records, collide in one TU) and `fn_80040598.cpp` (`fn_8004082C`)
  *     have no header that declares these, so the shapes here are this unit's call sites' - the
  *     practice `include/Pl/fn_8028F66C.h` documents for the same situation.
- *   * `ef/fn_800CDB2C.cpp`'s header declares `fn_800CF208` as `u8`, while the retail caller keeps a
+ *   * `ef/fn_800CDB2C.cpp`'s header declares `GameMode_ck` as `u8`, while the retail caller keeps a
  *     `clrlwi` on the widened form (the same per-consumer-view split `include/Pl/pl_act.h`'s
  *     `fn_8027D050` note records), so the declaration here is the call site's 32-bit view.
  *   * the rest (`game_ready_ck`, `fn_8004082C`'s neighbours, `fn_804273EC`, ...) sit in no registered
@@ -289,7 +289,7 @@ extern ItemSpeciesRecord lbl_805DBFB8[]; /* .data:0x805DBFB8 - 132 x 0x0C B */
  *     documents for the same situation, with one hard constraint: including `mh3_pad.h` here is
  *     impossible because it and `ef.h` (which `pl.h` pulls in for the records above) collide in one
  *     translation unit.
- *   * `ef/fn_800CDB2C.cpp`'s header declares `fn_800CF208` as `u8`, while the retail caller keeps a
+ *   * `ef/fn_800CDB2C.cpp`'s header declares `GameMode_ck` as `u8`, while the retail caller keeps a
  *     `clrlwi` on the widened form (the per-consumer-view split `include/Pl/pl_act.h`'s
  *     `fn_8027D050` note records), so the declaration here is the call site's 32-bit view.
  *   * the rest (`quest_select_ready_ck`, `fn_802FBA60`, `fn_8031A638`, `fn_802DA2D4`, `fn_802DB26C`,
@@ -382,7 +382,7 @@ void fn_802A4D98(MenuSlot* slot);
  * are visible in one TU. */
 s32 screen_split_mode_ck(void);
 void fn_8004082C(void);
-u8 fn_800CF208(void);
+u8 GameMode_ck(void);
 u32 move_work_state_ck(void);
 u32 game_ready_ck(void);
 u32 quest_select_ready_ck(void);

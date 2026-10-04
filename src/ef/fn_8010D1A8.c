@@ -248,7 +248,7 @@ extern f64 lbl_80796840; /* the int-to-double magic */
 
 extern EftLight* eft_res_model_get(void);
 extern void fn_800F8A44(void* p, s32 n);
-extern u8 fn_800CF208(void);
+extern u8 GameMode_ck(void);
 extern Eft* fn_8010D70C(Plw* source, s32 arg1, s32 arg2, s32 arg3);
 extern void fn_8010D824(Eft* self);
 extern void fn_8010D8B0(Eft* self);
@@ -453,7 +453,7 @@ void fn_8010D50C(Eft* self)
 /* Spawns the sub-effect whose variant depends on the current game mode. */
 void fn_8010D608(Plw* source)
 {
-    if (fn_800CF208() == 2) {
+    if (GameMode_ck() == 2) {
         if (fn_8010D70C(source, 4, 0, 1) == 0) {
         }
     } else {

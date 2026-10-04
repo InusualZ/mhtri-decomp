@@ -19,6 +19,10 @@ void startAccountLoad(void);
 
 s32 pollAccountLoad(s16 frame);
 
+/* 0x8044F520 - the lobby mailbox inside the lobby state block (+0x1FC4); `Network/net_session_close.cpp`
+ * appends received mail to it (GUESS name: the body returns that address).  `NetMailBox` is that consumer's. */
+struct NetMailBox* getLobbyMailBox(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -36,7 +36,9 @@ typedef struct LbLobbyWork {
         u8 field_0x003;   /* the NPC band resets it to 0xFF */
     };
     /* +0x006 */ u8 field_0x006;
-    /* +0x007 */ u8 unused_0x007[0x05];
+    /* +0x007 */ u8 unused_0x007[0x02];
+    /* +0x009 */ u8 community_flag_0x009;   /* cleared when community command 12 succeeds (GUESS name) */
+    /* +0x00A */ u8 unused_0x00A[0x02];
     /* +0x00C */ u32 slots_0x00C[2];
     /* +0x014 */ u8 field_0x014;
     /* +0x015 */ u8 unused_0x015[0x12];
@@ -107,7 +109,7 @@ typedef struct LbLobbyWork {
     /* +0x162 */ union {
         u8 unused_0x162[0x14];
         struct {
-            /* +0x162 */ u8 pad_0x162;
+            /* +0x162 */ u8 item_list_selection_0x162;   /* the item list's selected row, stored by the session's case 4 (GUESS) */
             /* +0x163 */ u8 field_0x163;
             /* +0x164 */ u8 pad_0x164[0x0B];
             /* +0x16F */ s8 field_0x16F;

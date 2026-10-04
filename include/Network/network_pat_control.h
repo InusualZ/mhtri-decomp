@@ -23,6 +23,7 @@
 #include "Network/NetworkPat.h"
 #include "Network/NetworkSessionManagerPat.h"   /* getPatsObject, isNetworkSessionManagerPatReady (owner's header, rule 2) */
 #include "Network/NetworkLayerPat.h"   /* NetId and the layer records the work record embeds */
+#include "Network/network_writer_types.h"   /* NetworkSmallObject - the roster entries' address objects */
 
 #ifdef __cplusplus
 extern "C" {
@@ -63,12 +64,16 @@ typedef struct NetPoolEntry {
 } NetPoolEntry; /* size: 0x20 */
 
 /*@TYPES begin@*/
-/* One 0x40-byte member slot of a profile: the joined word and flag the session join writes, and the
- * member's id at +0x20. */
+/* One 0x40-byte member slot of a profile: the joined word and flag the session join writes, the value
+ * session commands 20/21 report, the member's display name (`getPlayerRecordName`, 16 bytes) and the
+ * member's id at +0x20 (`getPlayerRecord`). */
 typedef struct NetMemberSlot {
     /* +0x00 */ u32 joined_0x00;
     /* +0x04 */ u8 flag_0x04;
-    /* +0x05 */ u8 pad_0x05[0x1B];
+    /* +0x05 */ u8 pad_0x05[0x3];
+    /* +0x08 */ s32 value_0x08;
+    /* +0x0C */ char name_0x0C[0x10];
+    /* +0x1C */ u8 pad_0x1C[0x4];
     /* +0x20 */ NetId id_0x20;
     /* +0x2A */ u8 pad_0x2A[0x16];
 } NetMemberSlot; /* size: 0x40 */
@@ -96,9 +101,23 @@ typedef struct NetPeerName {
     /* +0x00 */ char text_0x00[0x14];
 } NetPeerName; /* size: 0x14 */
 
-/* The 0x100-byte character blob of a peer record (`decodePlayerCard` decodes it). */
+/* The 0x100-byte character blob of a peer record (`decodePlayerCard` decodes it; the peer's community profile).
+ * It is the peer's `NetUserProfile` (net_session_close.h) seen through the words the record copy moves: +0x05
+ * the region (copied into the circle record's region row when a member joins), +0x9C the mediator record and
+ * +0xF9 the in-party byte (a member in a party gets no ready/unready chat line). */
 typedef struct NetPeerBlob {
-    /* +0x00 */ u32 words_0x00[0x40];
+    union {
+        /* +0x00 */ u32 words_0x00[0x40];
+        struct {
+            /* +0x00 */ u8 pad_0x00[0x5];
+            /* +0x05 */ u8 region_0x05;
+            /* +0x06 */ u8 pad_0x06[0x96];
+            /* +0x9C */ u8 record_0x9C[0x56];   /* the record the mediator is handed when the peer joins */
+            /* +0xF2 */ u8 pad_0xF2[0x7];
+            /* +0xF9 */ u8 in_party_0xF9;
+            /* +0xFA */ u8 pad_0xFA[0x6];
+        };
+    };
 } NetPeerBlob; /* size: 0x100 */
 
 /* One 0x120-byte connected-peer record (`NetCtrlWk::peers_0x7488`): the id, a 0x14-byte name field and the
@@ -117,7 +136,10 @@ typedef struct NetPeerRec {
  * record's constructor builds with `networkSmallObject_construct`; compared with `networkSmallObject_isEqual`.
  * size: 0x20 */
 typedef struct NetPeerAddress {
-    /* +0x00 */ u8 bytes_0x00[0x20];
+    union {
+        /* +0x00 */ u8 bytes_0x00[0x20];
+        /* +0x00 */ NetworkSmallObject object_0x00;
+    };
 } NetPeerAddress; /* size: 0x20 */
 
 /* The peer list `NetCtrlWk::copyPeerList` copies out for the caller: the count, then the four records. */
@@ -275,9 +297,37 @@ typedef struct NetSettingsWords {
 /* One 0xC-byte invite slot (`NetCtrlWk::invites_0xBF3C`): the invited name and a filled flag (GUESS on
  * the record's role: `NetCtrlWk::checkOwnInvite` compares its name with this player's own). */
 typedef struct NetInviteRec {
-    /* +0x00 */ char name_0x00[0xB];
+    /* +0x00 */ char id_text_0x00[0xA];
+    /* +0x0A */ u8 index_0x0A;   /* the entry's own 1-based index */
     /* +0x0B */ u8 valid_0x0B;
 } NetInviteRec; /* size: 0xC */
+
+/* One invite the layer reports (layer commands 31..35): the inviter's id, the 1-based invite index and its
+ * valid byte.  size: 0x24 */
+typedef struct NetInviteEntry {
+    /* +0x00 */ NetId id_0x00;
+    /* +0x0A */ u8 pad_0x0A[0x16];
+    /* +0x20 */ u8 index_0x20;
+    /* +0x21 */ u8 valid_0x21;
+    /* +0x22 */ u8 pad_0x22[0x2];
+} NetInviteEntry; /* size: 0x24 */
+
+/* The invite list layer command 35 delivers: the count and up to 32 entries.  size: 0x484 */
+typedef struct NetInviteList {
+    /* +0x000 */ s32 count_0x000;
+    /* +0x004 */ NetInviteEntry entries_0x004[32];
+} NetInviteList; /* size: 0x484 */
+
+/* The chat record the session (commands 18/19), community (10/20) and layer (15/16) callbacks deliver: the
+ * sender's id object, its display name, the message text the mediator is handed and the text colour.
+ * size: 0x23C (approximate: the highest byte read) */
+typedef struct NetSessionChatRecord {
+    /* +0x000 */ NetId sender_0x000;
+    /* +0x00A */ u8 pad_0x00A[0x16];
+    /* +0x020 */ char name_0x020[0x15];
+    /* +0x035 */ u8 text_0x035[0x203];
+    /* +0x238 */ s32 color_0x238;
+} NetSessionChatRecord; /* size: 0x23C (approximate) */
 
 /* One 0x180-byte text record of the big-data file. */
 typedef struct NetBigDataRec {
@@ -290,21 +340,43 @@ typedef struct NetBigData {
     /* +0x900 */ u32 event_bits_0x900;
 } NetBigData; /* size: 0x904 */
 
-/* One 0x84-byte roster entry (`NetCtrlWk::roster_0xA1BC`): the id and a 0x14-byte name at +0x20. */
+/* One 0x84-byte roster entry (`NetCtrlWk::roster_0xA1B8`): the member's address object (read as an id by
+ * `formatNetId`, copied through the object's +0x28 slot) and a 0x14-byte name at +0x20. */
 typedef struct NetRosterRec {
-    /* +0x00 */ NetId id_0x00;
-    /* +0x0A */ u8 pad_0x0A[0x16];
-    /* +0x20 */ u8 name_0x20[0x14];
-    /* +0x34 */ u8 pad_0x34[0x50];
+    union {
+        /* +0x00 */ NetId id_0x00;
+        /* +0x00 */ NetworkSmallObject address_0x00;   /* 0x20 bytes */
+    };
+    /* +0x20 */ char name_0x20[0x14];
+    /* +0x34 */ u8 pad_0x34;
+    /* +0x35 */ u8 state_0x35;   /* in a presence update (community command 22): 1 = added as a friend, 2.. = other states */
+    /* +0x36 */ u8 pad_0x36[0x4E];
 } NetRosterRec; /* size: 0x84 */
 
-/* One 0x38-byte recent-player entry (`NetCtrlWk::recent_0xBB88`): the id and a 0x14-byte name at +0x20. */
+/* One 0x38-byte recent-player entry (`NetCtrlWk::recent_0xBB84`): the address object and a 0x14-byte name at
+ * +0x20. */
 typedef struct NetRecentRec {
-    /* +0x00 */ NetId id_0x00;
-    /* +0x0A */ u8 pad_0x0A[0x16];
-    /* +0x20 */ u8 name_0x20[0x14];
+    union {
+        /* +0x00 */ NetId id_0x00;
+        /* +0x00 */ NetworkSmallObject address_0x00;   /* 0x20 bytes */
+    };
+    /* +0x20 */ char name_0x20[0x14];
     /* +0x34 */ u8 pad_0x34[0x4];
 } NetRecentRec; /* size: 0x38 */
+
+/* The friend roster (`NetCtrlWk::roster_0xA1B8`, and the payload community command 6 delivers): the count and
+ * up to 50 entries.  size: 0x19CC */
+typedef struct NetRosterList {
+    /* +0x000 */ s32 count_0x000;
+    /* +0x004 */ NetRosterRec entries_0x004[50];
+} NetRosterList; /* size: 0x19CC */
+
+/* The recent-player list (`NetCtrlWk::recent_0xBB84`, and the payload of community command 24): the count and
+ * up to 16 entries.  size: 0x384 */
+typedef struct NetRecentList {
+    /* +0x000 */ s32 count_0x000;
+    /* +0x004 */ NetRecentRec entries_0x004[16];
+} NetRecentList; /* size: 0x384 */
 
 /* One row the roster copy hands out: the name and the id as text. */
 typedef struct NetRosterView {
@@ -463,11 +535,6 @@ typedef struct NetSaveRecord {
     /* +0x78 */ s32 words_0x78[4];
 } NetSaveRecord; /* size: 0x88 (approximate) */
 
-/* One 0x18-byte community command result record (`NetCtrlWk::community_results_0xA144`). */
-typedef struct NetCommunityResult {
-    /* +0x00 */ s32 words_0x00[6];
-} NetCommunityResult; /* size: 0x18 */
-
 /* An error triple the layer leaves: the error code, its detail and the server's reason word.  size: 0xC */
 typedef struct NetErrorTriple {
     /* +0x0 */ u32 code_0x0;
@@ -528,6 +595,17 @@ typedef struct NetListMenu {
     /* +0x60C */ NetListView views2_0x60C[8];
 } NetListMenu; /* size: 0x76C */
 
+/* The per-member circle records the session manager publishes (`NetCtrlWk::circle_records_0xC3F4`, sent with
+ * `setCircleRecords`): each member's id text and display name (written when the member joins, cleared when
+ * it leaves) and its region byte (`getUserRegion` for this player, the peer card's +0x05 for the others).
+ * size: 0x88 */
+typedef struct NetCircleRecords {
+    /* +0x00 */ char id_text_0x00[4][0x10];
+    /* +0x40 */ char name_0x40[4][0x10];
+    /* +0x80 */ u8 region_0x80[4];
+    /* +0x84 */ u8 pad_0x84[0x4];
+} NetCircleRecords; /* size: 0x88 */
+
 /* The user record `get_userdata` hands out, seen only as the name at +0x03 the band copies. */
 typedef struct NetUserData {
     /* +0x00 */ u8 pad_0x00[0x3];
@@ -586,9 +664,9 @@ typedef struct NetCtrlWk {
     /* +0x070 */ s32 field_0x070;
     /* +0x074 */ s8 server_index_0x074[4];
     /* +0x078 */ s32 results_0x078[44];   /* one result word per session command (sessionReflectCallback) */
-    /* +0x128 */ u8 cleared_0x128[0xC];   /* first bytes of the 0x3C run initWorkRecord clears */
+    /* +0x128 */ NetFetchError community_error_0x128;   /* the community layer's last error triple (initWorkRecord clears the 0x3C run from here) */
     /* +0x134 */ NetErrorTriple net_error_0x134;   /* the layer's last error (getNetErrorMessageId maps it) */
-    /* +0x140 */ NetFetchError session_error_0x140;
+    /* +0x140 */ NetErrorTriple session_error_0x140;   /* the session layer's last error (MH3GetSessionErrorCode maps it) */
     /* +0x14C */ NetFetchError reflect_error_0x14C;
     /* +0x158 */ u8 pad_0x158[0xC];
     /* +0x164 */ s32 profile_count_0x164;
@@ -602,14 +680,19 @@ typedef struct NetCtrlWk {
     /* +0x460 */ u8 page_records_0x460[8][0x40];
     /* +0x660 */ u32 server_count_0x660;
     /* +0x664 */ u8 pad_0x664[0x4];
-    /* +0x668 */ NetSrvRec servers_0x668[100];
+    /* +0x668 */ NetSrvRec servers_0x668[80];   /* layer command 18 copies the count and the list as 0x1408 bytes */
+    /* +0x1A68 */ u8 layer_block_0x1A68[0x74];   /* the 0x74-byte block layer command 8 delivers */
+    /* +0x1ADC */ s32 layer_value_0x1ADC;        /* the word layer command 11 delivers */
+    /* +0x1AE0 */ NetRecentRec layer_peers_0x1AE0[20];   /* the layer's peer list (address object and name) resetMessagePool rebuilds from */
+    /* +0x1F40 */ u8 pad_0x1F40[0x28];
     /* +0x1F68 */ u8 pad_0x1F68[0x1F68];
     /* +0x3ED0 */ NetSlot* slot_list_0x3ED0;
     /* +0x3ED4 */ NetSlot slots_0x3ED4[100];
     /* +0x6134 */ u8 pad_0x6134[0x98];
     /* +0x61CC */ NetRosterSync roster_sync_0x61CC;
     /* +0x6210 */ u32 settings_0x6210[4];
-    /* +0x6220 */ u8 pad_0x6220[0x24];
+    /* +0x6220 */ u16 layer_stack_0x6220[16];   /* the layer ids entered (command 5 pushes, command 4 pops) */
+    /* +0x6240 */ s32 layer_depth_0x6240;
     /* +0x6244 */ s32 layer_results_0x6244[36];   /* one result word per layer command (installLayerCallback clears them) */
     /* +0x62D4 */ u8 pad_0x62D4[0x14];
     /* +0x62E8 */ s32 peer_count_0x62E8;
@@ -632,7 +715,7 @@ typedef struct NetCtrlWk {
     /* +0x7992 */ u8 transfer_flag_0x7992;
     /* +0x7993 */ u8 transfer_level_0x7993;
     /* +0x7994 */ u8 peer_total_0x7994;
-    /* +0x7995 */ u8 pad_0x7995;
+    /* +0x7995 */ u8 peer_cards_changed_0x7995;   /* cleared once a peer's card block was refreshed (community command 11) */
     /* +0x7996 */ u32 slots_0x7996[0x40];
     /* +0x7A96 */ u8 pad_0x7A96[0x2];
     /* +0x7A98 */ u32* arrA_0x7A98[0x40];
@@ -641,7 +724,7 @@ typedef struct NetCtrlWk {
     /* +0x7CD8 */ NetCtrlEntry entries_0x7CD8[16];
     /* +0x8298 */ u8 pad_0x8298[0x4];
     /* +0x829C */ NetSessionRequest session_request_0x829C;
-    /* +0x82C0 */ u8 pad_0x82C0[0x4];
+    /* +0x82C0 */ s32 join_result_0x82C0;   /* the join command's (4) result word, copied by the session callback */
     /* +0x82C4 */ u8 flag_0x82C4;
     /* +0x82C5 */ u8 flag_0x82C5;
     /* +0x82C6 */ u8 flag_0x82C6;
@@ -675,13 +758,11 @@ typedef struct NetCtrlWk {
     /* +0xA138 */ s32 pages_0xA138;
     /* +0xA13C */ s32 per_page_0xA13C;
     /* +0xA140 */ s32 total_0xA140;
-    /* +0xA144 */ NetCommunityResult community_results_0xA144[4];   /* installCommunityCallback clears the first three */
-    /* +0xA1A4 */ s32 community_tail_0xA1A4[3];
-    /* +0xA1B0 */ u8 pad_0xA1B0[0x8];
-    /* +0xA1B8 */ s32 roster_count_0xA1B8;
-    /* +0xA1BC */ NetRosterRec roster_0xA1BC[50];
-    /* +0xBB84 */ s32 recent_count_0xBB84;
-    /* +0xBB88 */ NetRecentRec recent_0xBB88[16];
+    /* +0xA144 */ s32 community_results_0xA144[27];   /* one result word per community command (communityReflectCallback) */
+    /* +0xA1B0 */ s32 cmd4_value_0xA1B0;   /* the word community command 4 reports */
+    /* +0xA1B4 */ s32 cmd5_value_0xA1B4;   /* the word community command 5 reports */
+    /* +0xA1B8 */ NetRosterList roster_0xA1B8;
+    /* +0xBB84 */ NetRecentList recent_0xBB84;
     /* +0xBF08 */ char message_0xBF08[0x24];
     /* +0xBF2C */ u8 flag_0xBF2C;
     /* +0xBF2D */ u8 flag_0xBF2D;
@@ -689,12 +770,12 @@ typedef struct NetCtrlWk {
     /* +0xBF2F */ u8 pad_0xBF2F[0x1];
     /* +0xBF30 */ NetDialog* dialog_0xBF30;
     /* +0xBF34 */ NetListMenu* list_0xBF34;
-    /* +0xBF38 */ u8 pad_0xBF38[0x4];
-    /* +0xBF3C */ NetInviteRec invites_0xBF3C[8];
-    /* +0xBF9C */ u8 pad_0xBF9C[0x120];
+    /* +0xBF38 */ s32 invite_count_0xBF38;
+    /* +0xBF3C */ NetInviteRec invites_0xBF3C[32];
     /* +0xC0BC */ s8 link_state_0xC0BC;
     /* +0xC0BD */ u8 flag_0xC0BD;
-    /* +0xC0BE */ u8 pad_0xC0BE[0x6];
+    /* +0xC0BE */ u8 pad_0xC0BE[0x2];
+    /* +0xC0C0 */ s32 link_id_0xC0C0;   /* compared with layer command 37's word (a match clears flag_0xC0BD) */
     /* +0xC0C4 */ char account_name_0xC0C4[0x40];
     /* +0xC104 */ char nickname_0xC104[0x40];
     /* +0xC144 */ NetTextTagState* text_layout_0xC144;   /* allocateDialogRecord: work_mem_alloc(0x314) */
@@ -751,10 +832,10 @@ typedef struct NetCtrlWk {
     /* +0xC318 */ u8 pad_0xC318[0x28];
     /* +0xC340 */ NetId request_id_0xC340;
     /* +0xC34A */ u8 pad_0xC34A[0x16];
-    /* +0xC360 */ u16 counter_0xC360;
-    /* +0xC362 */ u16 counter_0xC362;
-    /* +0xC364 */ u32 counter_0xC364;
-    /* +0xC368 */ u8 flag_0xC368;
+    /* +0xC360 */ u16 idle_hold_0xC360;     /* pad 0's hold word last frame (refreshServerScreen's idle check) */
+    /* +0xC362 */ u16 idle_press_0xC362;    /* pad 0's press word last frame */
+    /* +0xC364 */ s32 idle_frames_0xC364;   /* frames both stayed unchanged (36000 raises error 23) */
+    /* +0xC368 */ s8 flag_0xC368;
     /* +0xC369 */ u8 flag_0xC369;
     /* +0xC36A */ u8 pad_0xC36A[0x2];
     /* +0xC36C */ s32 timeout_0xC36C;
@@ -771,7 +852,7 @@ typedef struct NetCtrlWk {
     /* +0xC3F1 */ u8 pad_0xC3F1[0x1];
     /* +0xC3F2 */ u8 flag_0xC3F2;
     /* +0xC3F3 */ u8 pad_0xC3F3[0x1];
-    /* +0xC3F4 */ u8 record_0xC3F4[0x88];
+    /* +0xC3F4 */ NetCircleRecords circle_records_0xC3F4;   /* handed to the session manager (setCircleRecords) */
     /* +0xC47C */ NetFriendList* friend_list_0xC47C;
     /* +0xC480 */ u8 flag_0xC480;
     /* +0xC481 */ u8 pad_0xC481[0x3];
@@ -782,7 +863,7 @@ typedef struct NetCtrlWk {
     /* +0xC48C */ s32 hold_0xC48C;
     /* +0xC490 */ s32 group_max_0xC490;
     /* +0xC494 */ s32 group_0xC494;
-    /* +0xC498 */ s8 field_0xC498;
+    /* +0xC498 */ s8 field_0xC498;   /* set once layer command 40 has answered */
     /* +0xC499 */ u8 flag_0xC499;
     /* +0xC49A */ u8 flag_0xC49A;
     /* +0xC49B */ u8 flag_0xC49B;
@@ -955,15 +1036,31 @@ void Camellia_EncryptBlock(int keyBitLength, const unsigned char* plaintext,
 void Camellia_DecryptBlock(int keyBitLength, const unsigned char* cipherText,
                            const PatCamelliaKey keyTable, unsigned char* plaintext);
 
-/* The unit's Camellia key schedule (.bss 0x806D3670, 0x110 B) and the 64 x 0x400 arena base
- * (.sbss 0x80794CEC); neither has a registered owner. */
+/* The unit's Camellia key schedule (.bss 0x806D3670, 0x110 B), the 64 x 0x400 arena base (.sbss 0x80794CEC)
+ * and the frame stamp of the last layer re-entry (.sbss 0x80794CE8, layer command 5): the peer-join chat line
+ * is skipped in the frame the stamp was taken. */
 extern PatCamelliaKey lbl_806D3670;
-extern u8* lbl_80794CEC;
+extern u8* net_arena_base;
+extern u32 net_peer_join_stamp;
 
 /* Unsplit game callees. */
 u8* fn_800404BC(u32 size);
 /* The band's own entry points this neighbour calls (owner: src/Network/network_pat_control.cpp, rule 2). */
 void resetNetSlots(NetCtrlWk* work);
+/* 0x80427868 - copies `size` bytes of a peer's card block (at `offset`) from a community update into the peer
+ * record whose id is `id` (GUESS name: community command 13 hands it the payload's id, bytes, size and offset). */
+s32 updatePeerCardBlock(const NetId* id, const u8* src, u32 size, s32 offset);
+/* 0x80424444 / 0x804244D8 / 0x804245C8 / 0x804246F8 - the arena blocks (hand one out, set its value word), the
+ * slot table reset and the slot lookup by owner (GUESS names from the bodies). */
+u32* allocArenaBlock(void);
+void setArenaBlockValue(u32 block, u32 value);
+void resetSlotTable(void);
+NetSlot* findSlotByOwner(void* owner /* untyped: opaque handle - the owner pointer the slot was handed */);
+/* 0x80427024 / 0x80427240 / 0x80428628 - reset the peer table, find a free peer-event word, copy the layer's
+ * friend list into the work record (GUESS names from the bodies). */
+void resetPeerTable(void);
+u32* findFreePeerEvent(void);
+void refreshFriendList(void);
 /* 0x80427284 - queues a network command (1 = accepted): the command id, the caller's result byte, an
  * unused word, the argument count and the argument words (at most four). */
 s32 queueNetCommand(u32 command, s8* result, s32 unused, s32 arg_count, const s32* args);

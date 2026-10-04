@@ -17,6 +17,10 @@ extern "C" {
  * `Network/net_session_close.cpp` hands the community layer. */
 s32 buildNetUserProfile(struct NetUserProfile* profile);
 
+/* 0x8004AC6C - takes a received community profile back into the user data; the sibling of `buildNetUserProfile`
+ * (GUESS name). */
+void applyNetUserProfile(const u8* profile);
+
 #ifdef __cplusplus
 }
 #endif

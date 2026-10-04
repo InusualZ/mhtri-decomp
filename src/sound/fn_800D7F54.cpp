@@ -1307,7 +1307,7 @@ struct SeSysWork {
 
 /* --- declarations ------------------------------------------------------------------------------ */
 
-extern "C" u8 fn_800CF208(void);
+extern "C" u8 GameMode_ck(void);
 extern "C" u32 fn_800D843C(void);
 extern "C" void fn_800D9DB4(_se_w* se, s32 a, u32 b, s32 c, s32 d);
 extern "C" u32 fn_800DAE48(void);
@@ -1580,7 +1580,7 @@ extern "C" void fn_800DCAAC(nw4r::math::VEC3* pos) {
     u32 id = 0x10;
     id |= 0x80000000;
 
-    if (fn_800CF208() == 2) {
+    if (GameMode_ck() == 2) {
         fn_800DBE94(0, id, pos);
     } else {
         fn_800DA72C(0, id, pos);
@@ -1964,7 +1964,7 @@ struct SeMoveWork {
 
 extern "C" _se_w* lbl_80794978;
 
-extern "C" u8 fn_800CF208(void);
+extern "C" u8 GameMode_ck(void);
 /* Owned by `ef/system_core.cpp` (rule 2).  The declaration stays here, in the block form, because this
  * unit's view is `s32` where the owner's is `u32` and the return type is load-bearing (the two call
  * sites here narrow it with `(s8)`/`(u8)` before indexing the move-work record). */
@@ -2010,7 +2010,7 @@ extern "C" void fn_800D80B8(void) {
     s32 i;
     SeEntry* entry;
 
-    if (fn_800CF208() == 2) {
+    if (GameMode_ck() == 2) {
         lb_npc_func.field_0x04();
     }
     self->field_0x2927D = 0;
@@ -2018,7 +2018,7 @@ extern "C" void fn_800D80B8(void) {
     SeMoveWork* work = (SeMoveWork*)get_move_work_adrs__FUc(2);
     if (work != NULL) {
         work += (s8)my_player_no();
-        if (fn_800CF208() == 1) {
+        if (GameMode_ck() == 1) {
             self->field_0x2927D = fn_802EED0C(work);
         }
     }
@@ -2164,7 +2164,7 @@ extern "C" SeEntry* fn_800D9804(s32 kind, _ENEMY_WORK* enemy,
         entry->kind = kind;
         entry->callback = callback;
         entry->state = 2;
-        if (fn_800CF208() != 2) {
+        if (GameMode_ck() != 2) {
             entry->field_0x0C = enemy_view->field_0x08 * 4 + 24;
         } else {
             entry->field_0x0C = fn_800F08E0();
@@ -2565,7 +2565,7 @@ void get_joint_wpos_ai(_AINPC_W* npc, u32 joint, nw4r::math::VEC3* pos);
 u32 em_area_ck(_ENEMY_WORK* enemy);
 
 extern "C" u32 stage_water_area_ck(void);
-extern "C" u8 fn_800CF208(void);
+extern "C" u8 GameMode_ck(void);
 extern "C" u32 fn_800F26B8(s32 handle, u32 id, s32 which);
 extern "C" u32 fn_802BE088(void);
 extern "C" void fn_800F2714(s32 handle, u32 id, s32 which, u32 value);
@@ -2877,7 +2877,7 @@ extern "C" void fn_800D92E4(_se_w* work, SeSlot* slot) {
             }
         } else if (work == NULL) {
             dist = fn_80050EF4(&sys->field_0x00004, &s->pos);
-        } else if (fn_800CF208() == 2 && event_demo_ck__Fv() == 0) {
+        } else if (GameMode_ck() == 2 && event_demo_ck__Fv() == 0) {
             if (w->field_0x008 == 12 || w->field_0x008 == 8) {
                 dist = fn_80050EF4(&sys->field_0x0001C, &s->pos);
             } else {
@@ -2928,7 +2928,7 @@ extern "C" u8 system_w[];
 
 extern "C" void fn_800D87B8(SeSlot* slot);
 extern "C" void fn_800D8AB0(SeSlot* slot);
-extern "C" u8 fn_800CF208(void);
+extern "C" u8 GameMode_ck(void);
 extern "C" u32 event_demo_ck__Fv(void);
 extern "C" s32 get_fade_stat__Fl(s32 which);
 
@@ -2956,7 +2956,7 @@ extern "C" void fn_800D8404(SeSlot* slot) {
 }
 
 /* Non-zero while sound effects must stay silent: no work object, the work object's disable byte set, a
- * `fn_800CF208` state of 3, the system's demo flag, or a fade state of 2. */
+ * `GameMode_ck` state of 3, the system's demo flag, or a fade state of 2. */
 extern "C" u32 fn_800D843C(void) {
     SeWork* work = get_move_work_adrs__FUc(0);
     if (work != NULL) {
@@ -2964,7 +2964,7 @@ extern "C" u32 fn_800D843C(void) {
             return 1;
         }
     }
-    if (fn_800CF208() == 0 || fn_800CF208() == 3) {
+    if (GameMode_ck() == 0 || GameMode_ck() == 3) {
         return 0;
     }
     if (system_w[0x30] != 0) {

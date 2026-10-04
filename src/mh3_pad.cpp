@@ -67,7 +67,7 @@
 #include "OS/mem.h"            /* MEMAllocator (rule 1) */
 #include "RSO/runtime.h"     /* RSOModule + RSOStaticLocateObject (rule 2) */
 #include "fn_80040598.h"     /* the game-root RSO loaders (rule 2) */
-#include "ef/fn_800CDB2C.h"  /* fn_800CF208 / fn_800CEE2C (rule 2) */
+#include "ef/fn_800CDB2C.h"  /* GameMode_ck / fn_800CEE2C (rule 2) */
 #include "mh3_pad/task.h"    /* `TaskSlot` (rule 1) */
 #include "quest/arenatask.h" /* arena_task: the arena-select task ArenaSelExec installs (rule 2) */
 #include "Runtime.PPCEABI.H/memset.h"
@@ -757,7 +757,7 @@ void setWpadCallback(void)
 /* `GameModeExec__Fv` - pick the task body for the current game mode. */
 void GameModeExec(void)
 {
-    switch (fn_800CF208()) {
+    switch (GameMode_ck()) {
     case 1:
         system_w.field_0x868 = 0;
         Tsk_Change((void*)&fn_8028BF1C, 4);
