@@ -1978,9 +1978,11 @@ config.libs = [
             # src/Network/NetworkWiiMediator.cpp.
             Object(NonMatching, "Network/NetworkWiiMediator.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
-            # Per-object flag deviation (brief section 8.2), instruction-level evidence: measured over the 22
-            # `sNetworkLibrary` rows, the lib's `-O4,p` scores ctor/dtor/final/the pool helpers 77-93 % (the
-            # constant setup hoisted above the callee-save stores) and `-O3` puts all of them at 100 %.
+            # Per-object flag deviation (brief section 8.2), instruction-level evidence, re-measured on this unit's
+            # own rows (2026-10-04): at the lib's `-O4,p` every framed body hoists its setup above the callee-save
+            # stores - openingStart 85.88, openTransferSlot 70.12, clearTransferQueue 65.25, pushTransferRecord
+            # 73.76, popTransferRecord 78.74 - against 100 / 100 / 100 / 98.71 / 97.19 at `-O3`; leaf bodies are
+            # identical under both.
             Object(NonMatching, "Network/network_opening.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             # Registered once, at its final home: split out of `Network/network_opening.cpp` (the `.data` order

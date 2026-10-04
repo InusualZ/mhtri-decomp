@@ -283,7 +283,7 @@ s32 handleNetworkState1(NetworkInstance* self)
             break;
         }
         st->sessionState_6132 += 5;
-        sendReqAuthenticationToken(self, getNASToken((NetworkInstance*)getInstance()));
+        sendReqAuthenticationToken(self, getNASToken(getInstance()));
         break;
     case 20:
         if (isOpeningMaintenanceServer((PatInterface*)st) == 0) {
