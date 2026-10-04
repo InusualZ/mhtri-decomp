@@ -35,6 +35,10 @@ ALLOWED_FILES = ("configure.py", "CLAUDE.md", ".gitignore", "README.md", "LICENS
 BASE_FILE = os.path.join(".pi", "land-base.json")
 
 
+#: `config.yml` - outside the path lists, admitted by content (`outside_batch`, `config_verdict`).
+CONFIG_PATH = _repo.CONFIG_PATH
+
+
 # Tool scratch a batch never owns, and the only thing outside `ALLOWED_*` this gate tolerates. An
 # `objdiff-cli diff` run from the repo root - typically a caller that names its dump after the symbol it is
 # looking at (`d910.json`, the `diff` of fn_8009A910, plus a byte-identical `t910.json`) - leaves these in the
@@ -252,8 +256,8 @@ def failed_compile_outputs(output: str) -> list[str]:
 
 def worktree_root(start: str | None = None) -> str:
     """The tree the caller is in - resolved from the *cwd* (`rev-parse --show-toplevel`), never from this
-    file's location."""
-    return git(["rev-parse", "--show-toplevel"], start or os.getcwd()).strip()
+    file's location (`lib.repo.worktree_root`)."""
+    return _repo.worktree_root(start)
 
 
 def main_root(current: str) -> str:
@@ -313,13 +317,35 @@ def unit_owned_paths(units: list[str]) -> set[str]:
     return owned
 
 
+def config_verdict(main: str) -> dict:
+    """`lib.repo.config_change` of `main`'s working-tree `config.yml` against its HEAD copy - the decision the
+    pre-commit hook (`guard.py config`) makes on the staged copy, so the gate and the hook cannot disagree."""
+    p = run(["git", "show", "HEAD:" + _repo.CONFIG_PATH], main)
+    old = p.stdout if p.returncode == 0 else None
+    path = os.path.join(main, *_repo.CONFIG_PATH.split("/"))
+    new = None
+    if os.path.isfile(path):
+        with open(path, encoding="utf-8", newline="") as fh:
+            new = fh.read()
+    return _repo.config_change(old, new)
+
+
 def outside_batch(paths: list[str], allowed: tuple[str, ...] = ALLOWED_PREFIXES,
-                  allowed_files: tuple[str, ...] = ALLOWED_FILES) -> list[str]:
-    """Paths a batch may not touch: everything the plan keeps for the orchestrator, minus its own writes."""
+                  allowed_files: tuple[str, ...] = ALLOWED_FILES, main: str | None = None) -> list[str]:
+    """Paths a batch may not touch: everything the plan keeps for the orchestrator, minus its own writes.
+
+    `config.yml` is judged by content when `main` is given: a change of its relocation-analysis keys only
+    (`config_verdict`, the hook's own rule) belongs to the batch; any other change - and every path the lists
+    do not name, `build.sha1` among them - stays outside it."""
     bad = []
+    verdict = None
     for path in paths:
         if path in allowed_files or path.startswith(allowed):
             continue
+        if path == _repo.CONFIG_PATH and main is not None:
+            verdict = verdict or config_verdict(main)
+            if verdict["ok"]:
+                continue
         bad.append(path)
     return bad
 

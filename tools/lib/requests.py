@@ -150,7 +150,9 @@ def validate(entry: dict) -> list[str]:
     if proto is not None:
         if "\n" in str(proto) or not str(proto).strip().endswith(";"):
             out.append("prototype must be one C line ending in `;`")
-        else:
+        elif kind != "field":
+            # a `field` prototype is a member-slot fragment (`u8 net_active;`) of the type `symbol` names - the
+            # symbol lives in `symbol` (required above), never in the fragment
             want = pname or sym
             if want and not re.search(r"\b%s\b" % re.escape(str(want)), str(proto)):
                 out.append("prototype does not declare %s" % want)
@@ -389,8 +391,13 @@ def classify(req: Request, decisions: dict | None = None) -> tuple[str, str]:
     if req.kind == "info":
         return "judgement", "information only: no edit is asked (%s)" % (req.proposed[:60] or "a note")
     if req.kind == "config":
-        if re.search(r"\b(block_relocations|add_relocations)\b", req.symbol_text() + req.proposed):
-            return "mechanical", "config.yml relocation-analysis keys (the guard's door)"
+        # read from `proposed` alone: the old test glued `symbol` to it, so `updateSessionblock_relocations` had no
+        # word boundary and the L2 round-2 #42 read as judgement
+        key, _items, why = config_items(req.proposed, (req.targets[0].section if req.targets else None))
+        if key:
+            return "mechanical", "config.yml relocation-analysis keys (the guard's door): %s" % why
+        if _CFG_KEY_RE.search(req.proposed or ""):
+            return "judgement", "a relocation-key proposal the integrator cannot read: %s" % why
         return "judgement", "config.yml outside the relocation-analysis keys"
     if not req.targets:
         return "judgement", "no symbol could be read from the request"
@@ -424,6 +431,57 @@ def classify(req: Request, decisions: dict | None = None) -> tuple[str, str]:
 
 def _addr_key(address: int | None) -> str:
     return "0x%08X" % address if address is not None else ""
+
+
+# --- config proposals -------------------------------------------------------------------------------------------
+
+_CFG_KEY_RE = re.compile(r"\b(block_relocations|add_relocations)\b")
+_CFG_RANGE_RE = re.compile(r"(?:(\.[a-z0-9]+):)?(0x[0-9A-Fa-f]{1,8})\s*\.\.\s*(?:\.[a-z0-9]+:)?(0x[0-9A-Fa-f]{1,8})")
+_CFG_ADDR_RE = re.compile(r"(?:(\.[a-z0-9]+):)?\b(0x[0-9A-Fa-f]{1,8})\b")
+
+
+def config_items(proposed: str, section: str | None = None) -> tuple[str | None, list[str], str]:
+    """`(key, [YAML list item], why)` for a `config` request's `proposed`, in any of the forms lanes file:
+
+    * YAML - `block_relocations:` (or `add_relocations:`) then `- ...` items, taken as written;
+    * a range - `block_relocations source .text:0xA..0xB` / `block_relocations: 0xA..0xB` -> `source`/`end`;
+    * instruction addresses - `block_relocations: 0xA and 0xB` -> `source: <first>`, `end: <last + 4>` (a block covers
+      the instructions it names);
+    * `add_relocations source .text:0xA type R_PPC_ADDR16_HA target SYM` -> `source`/`type`/`target`.
+
+    A section defaults to `section` (the request's) or `.text`. `key` is None (and `why` says why) when the text names
+    no relocation key or no address, so the request stays judgement."""
+    text = proposed or ""
+    m = re.match(r"\s*(block_relocations|add_relocations)\s*:\s*\n", text)
+    if m:
+        items = [b.strip() for b in re.split(r"(?m)^-", text[m.end():]) if b.strip()]
+        return m.group(1), ["- " + b for b in items], "YAML items"
+    km = _CFG_KEY_RE.search(text)
+    if not km:
+        return None, [], "the proposal names no relocation-analysis key"
+    key = km.group(1)
+    rest = re.sub(r"\([^)]*\)", " ", text[km.end():])      # an aside's address (`(the constant 0x80060034)`) is not one
+    sec = section or ".text"
+    if key == "add_relocations":
+        src = re.search(r"\bsource\s*:?\s*" + _CFG_ADDR_RE.pattern, rest)
+        typ = re.search(r"\btype\s*:?\s*(R_PPC_\w+)", rest)
+        tgt = re.search(r"\btarget\s*:?\s*([A-Za-z_.$@][\w.$@:+]*)", rest)
+        if not (src and typ and tgt):
+            return None, [], "add_relocations needs `source <addr> type <R_PPC_*> target <symbol>`"
+        return key, ["- source: %s:0x%08X\n  type: %s\n  target: %s" % (src.group(1) or sec, int(src.group(2), 16),
+                                                                        typ.group(1), tgt.group(1))], \
+            "add_relocations prose"
+    r = _CFG_RANGE_RE.search(rest)
+    if r:
+        s = r.group(1) or sec
+        return key, ["- source: %s:0x%08X\n  end: %s:0x%08X" % (s, int(r.group(2), 16), s, int(r.group(3), 16))], \
+            "a range"
+    addrs = [(m.group(1), int(m.group(2), 16)) for m in _CFG_ADDR_RE.finditer(rest)]
+    if not addrs:
+        return None, [], "the proposal names no address"
+    s = next((a for a, _ in addrs if a), None) or sec
+    lo, hi = min(a for _, a in addrs), max(a for _, a in addrs) + 4
+    return key, ["- source: %s:0x%08X\n  end: %s:0x%08X" % (s, lo, s, hi)], "instruction addresses"
 
 
 # --- decisions (--names FILE) ---------------------------------------------------------------------------------

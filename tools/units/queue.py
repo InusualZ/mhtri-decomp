@@ -1,6 +1,6 @@
 """Hand the next registered unit (or a header/module cluster of them) to a worker: claim it, render its brief,
 print the spawn line. Spec: docs/tools/spec/queue.md. CLI: python tools/units/queue.py next [--count N | --cluster
-NAME] [--kind K] [--profile P] [--worker W] [--dry-run] [--json] | list [--json] | debt [...] | --selftest."""
+NAME [--cross-module]] [--kind K] [--profile P] [--worker W] [--dry-run] [--json] | list [--json] | debt [...] | --selftest."""
 
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
@@ -112,15 +112,34 @@ def module_of(unit: str) -> str:
     return unit.split("/", 1)[0] if "/" in unit else unit
 
 
-def cluster_members(main: str, name: str, rows: list[dict] | None = None) -> tuple[list[dict], str]:
-    """`(ready entries, reason)` for `--cluster NAME`: a header path (every ready unit whose closure contains
-    it) or a module (every ready unit under `src/<module>/`)."""
+def header_module(header: str) -> str | None:
+    """The module directory a header sits in (`include/<Module>/x.h` -> `<Module>`); None for a top-level header."""
+    parts = header.replace("\\", "/").strip("/").split("/")
+    if parts and parts[0] == "include":
+        parts = parts[1:]
+    return parts[0] if len(parts) > 1 else None
+
+
+def cluster_members(main: str, name: str, rows: list[dict] | None = None,
+                    cross_module: bool = False) -> tuple[list[dict], str]:
+    """`(ready entries, reason)` for `--cluster NAME`: a header path - every ready unit **of the header's own module**
+    whose closure contains it (`cross_module` drops the module bound: every unit that merely includes a hub header,
+    whatever its module) - or a module (every ready unit under `src/<module>/`)."""
     ready = ready_entries(main, rows)
     norm = name.replace("\\", "/").strip("/")
     if norm.endswith((".h", ".hpp")):
         if not os.path.exists(os.path.join(main, *norm.split("/"))):
             raise SystemExit("REFUSED queue next --cluster: no header %s in %s" % (norm, main))
-        return [e for e in ready if norm in owner_headers(main, e["source"])], "units whose closure includes `%s`" % norm
+        hits = [e for e in ready if norm in owner_headers(main, e["source"])]
+        mod = header_module(norm)
+        if cross_module or mod is None:
+            why = "every module" if cross_module else "a top-level header: no module bound"
+            return hits, "units whose closure includes `%s` (%s)" % (norm, why)
+        kept = [e for e in hits if module_of(e["unit"]).lower() == mod.lower()]
+        dropped = len(hits) - len(kept)
+        return kept, ("units of `src/%s/` whose closure includes `%s`%s" % (
+            mod, norm, " (%d unit(s) of other modules that include it left out; --cross-module takes them)" % dropped
+            if dropped else ""))
     return [e for e in ready if module_of(e["unit"]) == norm], "units under `src/%s/`" % norm
 
 
@@ -392,12 +411,14 @@ def cluster_key(name: str) -> str:
 
 def next_cluster(main: str, name: str, worker: str | None, dry_run: bool, claim_fn=None, kind: str = "unit",
                  profile: str | None = None, allow_unlanded=None, ignore_backlog: bool = False,
-                 ratio: int = backlog.RATIO_DEFAULT, slots_mode: bool | None = None) -> dict:
-    """Claim ONE lane for every ready unit of a cluster - the units sharing an owner header, or a module - so no
-    two concurrent lanes ever hold header-sharing units. The claim records the units; one brief indexes them."""
+                 ratio: int = backlog.RATIO_DEFAULT, slots_mode: bool | None = None,
+                 cross_module: bool = False) -> dict:
+    """Claim ONE lane for every ready unit of a cluster - the units of a header's module sharing that owner header
+    (`cross_module`: every module's), or a module - so no two concurrent lanes ever hold header-sharing units. The
+    claim records the units; one brief indexes them."""
     claim_fn = claim_fn or claims.claim
     _guards(main, "next", dry_run, slots_mode, ignore_backlog, ratio, allow_unlanded)
-    members, reason = cluster_members(main, name)
+    members, reason = cluster_members(main, name, cross_module=cross_module)
     if not members:
         raise SystemExit("REFUSED queue next --cluster %s: no ready unit in it (%s)" % (name, reason))
     units = [e["unit"] for e in members]
@@ -647,10 +668,18 @@ def selftest() -> int:
         write(tmp, "config/RMHE08/symbols.txt", "fn_80100000 = .text:0x80100000; // type:function size:0x40\n")
         check("owner_headers is the closure's module headers, minus the shared base",
               sorted(owner_headers(tmp, "net/a.cpp")), ["include/net/inner.h", "include/net/net.h"])
-        check("a header cluster is every ready unit whose closure includes it",
+        check("a header cluster is every ready unit OF THE HEADER'S MODULE whose closure includes it",
               ([e["unit"] for e in cluster_members(tmp, "include/net/net.h")[0]],
                [e["unit"] for e in cluster_members(tmp, "include/net/inner.h")[0]]),
-              (["net/a", "net/b"], ["net/a", "h/d"]))
+              (["net/a", "net/b"], ["net/a"]))
+        check("... the reason names the units of other modules it left out",
+              "1 unit(s) of other modules" in cluster_members(tmp, "include/net/inner.h")[1], True)
+        check("--cross-module takes back a unit of another module that merely includes the header",
+              [e["unit"] for e in cluster_members(tmp, "include/net/inner.h", cross_module=True)[0]],
+              ["net/a", "h/d"])
+        check("header_module: include/<Module>/x.h -> Module, a top-level header has none",
+              (header_module("include/Network/network_transport.h"), header_module("include/types.h")),
+              ("Network", None))
         check("a module cluster is every ready unit under src/<module>/",
               [e["unit"] for e in cluster_members(tmp, "net")[0]], ["net/a", "net/b"])
         check("a missing header is refused", _raises(lambda: cluster_members(tmp, "include/nope.h")), True)
@@ -802,7 +831,9 @@ def main() -> int:
                    help="claim up to N lanes at once, no two sharing an owner header or a module (default 1)")
     n.add_argument("--cluster", default=None, metavar="MODULE|HEADER",
                    help="claim ONE lane for every ready unit of a module (`Network`) or of a header's include "
-                        "closure (`include/Network/net.h`)")
+                        "closure within the header's own module (`include/Network/net.h`)")
+    n.add_argument("--cross-module", action="store_true",
+                   help="with a header --cluster: also take units of other modules whose closure includes it")
     n.add_argument("--worker", default=None)
     n.add_argument("--kind", default="unit",
                    help="the lane kind -> agent profile (`unit`->surveyor, `fix`->fixer, `merge`->merger, "
@@ -892,7 +923,8 @@ def main() -> int:
             print("--cluster claims one lane for the whole cluster; --count does not apply")
             return 2
         if args.cluster:
-            out = next_cluster(main_wt, args.cluster, args.worker, args.dry_run, **common)
+            out = next_cluster(main_wt, args.cluster, args.worker, args.dry_run, cross_module=args.cross_module,
+                               **common)
             if args.json:
                 print(json.dumps(out, indent=2))
                 return 0

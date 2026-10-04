@@ -1915,6 +1915,71 @@ def test_land_branch(c):
               [ln.split(" ")[0] for ln in buf.getvalue().splitlines() if ln.strip()][-2:], ["LEDGER:", "LANDED"])
 
 
+CFG_BASE = ("object: orig/RMHE08/sys/main.dol\nfill_gaps: true\nblock_relocations:\n"
+            "- target: extabindex:0x80020000\n  end: extabindex:0x80020010\n")
+CFG_BLOCK = CFG_BASE + ("# the updateSession error code is a constant\n- source: .text:0x803D7564\n"
+                        "  end: .text:0x803D756C\n")
+
+
+def _config_branch(tmp, branch_files):
+    """`main` with a registration and a config.yml; `worker/x` registers a unit and writes `branch_files`."""
+    repo_git(tmp, "init", "-q")
+    repo_git(tmp, "checkout", "-q", "-b", "main")
+    _write_tree(tmp, dict(_registration_files(), **{"config/RMHE08/config.yml": CFG_BASE,
+                                                    "config/RMHE08/build.sha1": "BF48  build/RMHE08/main.dol\n"}))
+    repo_git(tmp, "checkout", "-q", "-b", "worker/x")
+    files = _registration_files("menu/branch.cpp:\n\t.text       start:0x80000800 end:0x80001000\n",
+                                '            Object(NonMatching, "menu/branch.cpp"),\n')
+    files["src/menu/branch.cpp"] = "int b(void) { return 1; }\n"
+    files.update(branch_files)
+    _write_tree(tmp, files)
+    repo_git(tmp, "checkout", "-q", "main")
+
+
+def test_land_branch_config_relocations(c):
+    """A `block_relocations`-only config.yml change rides a `land --branch` batch (the hook's own rule decides);
+    any other key, and build.sha1, still refuse at pre-flight with main unchanged (the L2 round-2 refusal)."""
+    check = c.check
+    with testing.temp_dir() as tmp:
+        _config_branch(tmp, {"config/RMHE08/config.yml": CFG_BLOCK})
+        head = repo_git(tmp, "rev-parse", "HEAD")
+        buf = io.StringIO()
+        with mock.patch.object(L.gate, "verify", _land_verify_ok), contextlib.redirect_stdout(buf), \
+                contextlib.redirect_stderr(io.StringIO()):
+            code = L.land_branch(tmp, "worker/x", units=["menu/branch"], no_build=True, check_outbox=False,
+                                 release_claims=False, subject="selftest")
+        check("config: a block_relocations-only change lands with the unit batch", (code, L.answer_line(
+            buf.getvalue()).split(" ")[0]), (0, "LANDED"))
+        check("... in the one commit, with the unit source",
+              sorted(repo_git(tmp, "diff", "--name-only", head, "HEAD").splitlines()),
+              ["config/RMHE08/config.yml", "config/RMHE08/splits.txt", "configure.py", "src/menu/branch.cpp"])
+        check("... and the tree is clean afterwards", L.require_clean_tree(tmp), None)
+        check("outside_batch admits config.yml by content only when MAIN is named",
+              (L.outside_batch(["config/RMHE08/config.yml"]), L.outside_batch(["config/RMHE08/config.yml"], main=tmp)),
+              (["config/RMHE08/config.yml"], []))
+    for label, files, cause in (
+            ("a frozen key (fill_gaps)", {"config/RMHE08/config.yml": CFG_BLOCK.replace("fill_gaps: true",
+                                                                                        "fill_gaps: false")},
+             "`fill_gaps`"),
+            ("build.sha1", {"config/RMHE08/config.yml": CFG_BLOCK,
+                            "config/RMHE08/build.sha1": "0000  build/RMHE08/main.dol\n"}, None)):
+        with testing.temp_dir() as tmp:
+            _config_branch(tmp, files)
+            head = repo_git(tmp, "rev-parse", "HEAD")
+            out, err = io.StringIO(), io.StringIO()
+            with mock.patch.object(L.gate, "verify", _land_verify_ok), contextlib.redirect_stdout(out), \
+                    contextlib.redirect_stderr(err):
+                code = L.land_branch(tmp, "worker/x", units=["menu/branch"], no_build=True, check_outbox=False,
+                                     release_claims=False, subject="selftest")
+            check("config: %s still refuses at pre-flight" % label,
+                  (code, "pre-flight" in (L.answer_line(out.getvalue()) + err.getvalue()).lower()
+                   or "outside the batch" in out.getvalue()), (1, True))
+            check("... main did not move and the apply was undone",
+                  (repo_git(tmp, "rev-parse", "HEAD"), L.require_clean_tree(tmp)), (head, None))
+            if cause:
+                check("... and the pre-flight names the frozen key", cause in err.getvalue(), True)
+
+
 def test_ledger_line(c):
     """The short ledger line and the answer line."""
     check = c.check

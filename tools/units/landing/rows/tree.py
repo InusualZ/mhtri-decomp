@@ -186,13 +186,16 @@ def tolerate_scratch(main: str, paths: list[str], act: bool = True) -> str:
 LANE_SCRATCH_MARKERS = (".tmp-", ".ws-", "tmp-")
 
 
-def likely_cause(path: str) -> str | None:
+def likely_cause(path: str, main: str | None = None) -> str | None:
     """A named cause for a foreign path that looks like lane scratch - `None` when the name says nothing.
 
     Deliberately name-based and conservative: this only *suggests* a cause in the pre-flight report, it never
     changes the verdict.  What it names is the failure this lane exists for - a lane launched in MAIN rather
-    than in its slot.
+    than in its slot.  A refused `config.yml` (with `main`) names the hook's own reason.
     """
+    if main is not None and path == common.CONFIG_PATH:
+        return ("config.yml may change only in block_relocations/add_relocations: %s"
+                % common.config_verdict(main)["reason"])
     parts = path.replace("\\", "/").split("/")
     if any(p.startswith(m) for p in parts for m in LANE_SCRATCH_MARKERS):
         return ("looks like lane scratch in MAIN - a lane was launched with its cwd set to MAIN (or cloned "
@@ -214,9 +217,9 @@ def preflight_foreign(main: str) -> list[dict]:
     afterwards - it just makes the common case (a foreign path already there) cost a second, not minutes.
     """
     rows = changed_status(main)
-    outside = outside_batch([path for _code, path in rows])
+    outside = outside_batch([path for _code, path in rows], main=main)
     scratch = set(scratch_paths(outside))
-    return [{"path": p, "cause": likely_cause(p)} for p in outside if p not in scratch]
+    return [{"path": p, "cause": likely_cause(p, main)} for p in outside if p not in scratch]
 
 
 def preflight_report(main: str, foreign: list[dict] | None = None) -> str | None:
@@ -263,7 +266,7 @@ def base_row(b: Batch) -> None:
 def paths_row(b: Batch) -> None:
     """3. every changed path belongs to a batch; tool scratch is tolerated, named and (unless dry-run) de-indexed."""
     b.paths = changed_paths(b.main)
-    bad = outside_batch(b.paths)
+    bad = outside_batch(b.paths, main=b.main)
     b.scratch = scratch_paths(bad)
     bad = [p for p in bad if p not in b.scratch]
     if b.scratch:
@@ -277,7 +280,7 @@ def paths_row(b: Batch) -> None:
 def conflict_marker_row(b: Batch) -> None:
     """3b. no batch file carries a git conflict marker (scoped to the batch's own stageable files)."""
     markers = conflict_marker_files(b.main, land_stageable(b.units, changed_status(b.main),
-                                                         base_dirty_paths(b.main)))
+                                                         base_dirty_paths(b.main), main=b.main))
     b.check("no batch file carries a git conflict marker", not markers,
             "; ".join("%s:%d %s" % (p, n, m) for p, n, m in markers[:6]),
             remedy="resolve the conflict in that file and re-commit it - a marker is not source, and the build "

@@ -295,6 +295,13 @@ def slot_of_path(main: str, path: str | None) -> int | None:
     return None
 
 
+def lock_for_path(main: str, path: str | None) -> dict:
+    """The lock record of the slot `path` is, `{}` when it is no slot or holds no lock (a spawned lane's claim:
+    its unit, branch, kind and the unit set it holds)."""
+    n = slot_of_path(main, path)
+    return read_lock(main, n) if n is not None else {}
+
+
 def registry_claims_by_slot(main: str) -> tuple[dict, bool]:
     """`(claim records keyed by slot number, readable)` from `.pi/claims.json`; a legacy row with only a
     `worktree` is matched by resolving that path to a slot."""

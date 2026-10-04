@@ -16,7 +16,8 @@ sidecar and the STOPGAP marker.
 * `SCHEMA`, `KINDS` (`rename`, `decl`, `decl-move`, `field`, `seam`, `unit-rename`, `config`, `info`), `CONFIDENCES`
   (`certain`, `evidence`, `guess`), `CLASSES` (`mechanical`, `semi`, `judgement`), `STATUSES`, `ID_RE` (`<slug>#<n>`).
 * `validate(entry) -> [problem]` - a new-schema object: id, kind, evidence, `symbol|address`, `proposed_name` for a
-  rename and for a `decl` of a generated name, a one-line `prototype` that declares the name, `stopgap {file, id}`.
+  rename and for a `decl` of a generated name, a one-line `prototype` that declares the name (a `field` request's
+  prototype is a member-slot fragment of the type in `symbol`, so only its one-line shape is checked), `stopgap {file, id}`.
 * `Request` / `Target`; `load_file(path)` (JSON lines or a list; a new-schema line keeps its id, a free-text line
   becomes `<slug>#<line>` through `normalise_legacy`, an unparsable line an `info` request - nothing is dropped);
   `request_files(dir)`, `slug_of(path)`.
@@ -26,8 +27,14 @@ sidecar and the STOPGAP marker.
   four type tokens, none prose), `header_in`, GUESS -> `guess`.
 * `classify(req, decisions) -> (class, reason)` - static (never reads the tree). Seams, unit renames, info and field
   changes are judgement; a `decl` asking for a class/linkage/type change is judgement, one asking for a return or
-  parameter tweak is semi; a rename to a member/ctor/dtor mangling is judgement; everything else is mechanical (a GUESS
-  needs a decision at apply time).
+  parameter tweak is semi; a rename to a member/ctor/dtor mangling is judgement; a `config` is mechanical exactly when
+  `config_items` reads it; everything else is mechanical (a GUESS needs a decision at apply time).
+* `config_items(proposed, section=None) -> (key, [YAML item], why)` - a relocation-analysis proposal in any form a lane
+  files: YAML items as written, a range (`block_relocations source .text:0xA..0xB`), instruction addresses
+  (`block_relocations: 0xA and 0xB` -> `source: A`, `end: B + 4`; an address in parentheses is an aside, not a target),
+  `add_relocations source A type R_PPC_* target S`; `key` None (with the reason) otherwise. Before 2026-10-04 the
+  classifier glued `symbol` to `proposed` (`updateSessionblock_relocations` has no word boundary), so L2's #42 read as
+  judgement.
 * `load_decisions(path)` (`old new` lines; `old` is a spelling or `0xADDR`), `decision_for(target, decisions)`.
 * `resolve(req, ownership, decisions) -> [Resolved]`, `resolve_target`: by name, by a C++ function's one mangled row
   (`ck_option_cfg` -> `ck_option_cfg__FUc`), else by address (a lane's `fn_X` the map has renamed is `stale`); the owner

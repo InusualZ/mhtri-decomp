@@ -1,5 +1,5 @@
 """Print the report skeleton a worker fills in, and validate what comes back. Spec: docs/tools/spec/handoff.md.
-CLI: handoff.py <unit> [--template | --check FILE] | --selftest."""
+CLI: handoff.py <unit> [--template | --check FILE [--map TREE]] | --check-requests FILE | --selftest."""
 
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
@@ -40,6 +40,13 @@ def owned_symbols(main: str, units: list[str]) -> set[str]:
         if rng.get(".text"):
             owned |= {s["name"] for s in brief_mod.symbols_in_range(main, rng[".text"][0], rng[".text"][1])}
     return owned
+
+
+def map_tree(worktree: str, explicit: str | None = None) -> str:
+    """The tree whose map and splits `--check` reads ownership from: `--map TREE` when given, else the invocation's
+    own worktree - a branch that renamed symbols validates against its own map, not MAIN's (where the new names do
+    not exist yet). Run in MAIN, that is MAIN."""
+    return os.path.abspath(explicit) if explicit else worktree
 
 
 def outbox_path(main: str, unit: str) -> str:
@@ -142,6 +149,37 @@ def selftest() -> int:
         check("--check-requests: a decl of a generated name without a name is an error", errs,
               ["line 2: decl of the generated name fn_2 needs `proposed_name` (rule 7: the integrator names it)"])
         check("--check-requests: a free-text line is a note, not an error", len(notes), 1)
+        fq = os.path.join(tmp, "lane-b-requests.json")
+        with open(fq, "w", encoding="utf-8") as fh:
+            fh.write('{"id": "lane-b#1", "kind": "field", "symbol": "NetworkLayerPat", "prototype": '
+                     '"void (*sendPacket)(const u8* data, s32 size);", "evidence": "slot +0x5C"}\n'
+                     '{"id": "lane-b#2", "kind": "field", "prototype": "u8 net_active;", "evidence": "x"}\n'
+                     '{"id": "lane-b#3", "kind": "decl", "symbol": "SOInit", "prototype": "s32 SOStart(void);",'
+                     ' "evidence": "x"}\n')
+        errs, _notes = _outbox.check_requests(fq)
+        check("--check-requests: a field's member-slot prototype need not spell the type; a field still needs "
+              "`symbol`; a decl's prototype must still declare its symbol", errs,
+              ["line 2: field: needs `symbol`", "line 3: prototype does not declare SOInit"])
+
+    # --map: a branch that renamed a symbol validates against its own map; MAIN's map does not know the name yet
+    with tempfile.TemporaryDirectory() as tmp:
+        trees = {}
+        for label, name in (("main", "fn_00000100"), ("branch", "sendReqCircleKick")):
+            cfg = os.path.join(tmp, label, "config", "RMHE08")
+            os.makedirs(cfg)
+            with open(os.path.join(cfg, "splits.txt"), "w", encoding="utf-8") as fh:
+                fh.write("A/a.c:\n    .text start:0x100 end:0x200\n")
+            with open(os.path.join(cfg, "symbols.txt"), "w", encoding="utf-8") as fh:
+                fh.write("%s = .text:0x100; // type:function size:0x10\n" % name)
+            trees[label] = os.path.join(tmp, label)
+        renamed = dict(good, unit="A/a", symbols=[{"name": "sendReqCircleKick", "percent": 100.0}])
+        check("--map: the default is the invocation's own worktree", map_tree(trees["branch"]), trees["branch"])
+        check("--map: an explicit tree wins", map_tree(trees["branch"], trees["main"]),
+              os.path.abspath(trees["main"]))
+        check("--map: the branch's own map owns the renamed symbol",
+              validate(renamed, owned_symbols(map_tree(trees["branch"]), ["A/a"]))[0], [])
+        check("... MAIN's map (the old reading) calls it not owned",
+              any("not owned" in e for e in validate(renamed, owned_symbols(trees["main"], ["A/a"]))[0]), True)
 
     # the outbox a worker writes by following the brief's schema table must validate clean: this is the
     # round-trip the two tools share (brief.py renders `config_schema_rows()`, the worker fills it in).
@@ -234,6 +272,9 @@ def main() -> int:
     ap.add_argument("unit", nargs="?")
     ap.add_argument("--template", action="store_true", help="print the outbox JSON to fill in")
     ap.add_argument("--check", default=None, metavar="FILE", help="validate an outbox entry")
+    ap.add_argument("--map", default=None, metavar="TREE",
+                    help="with --check: read symbol ownership from this tree's map/splits (default: the current "
+                         "worktree's - a branch with renames validates against its own map)")
     ap.add_argument("--check-requests", default=None, metavar="FILE",
                     help="validate a lane's <slug>-requests.json (lib.requests schema; free-text lines are noted)")
     ap.add_argument("--json", action="store_true")
@@ -263,7 +304,7 @@ def main() -> int:
         if not declared:
             fallback = claims.norm_unit((args.unit or "").strip("/"))
             declared = [fallback] if fallback else []
-        owned = owned_symbols(main, declared)
+        owned = owned_symbols(map_tree(wt, args.map), declared)
         errors, warnings = validate(entry, owned)
         if args.json:
             print(json.dumps({"errors": errors, "warnings": warnings}, indent=2))

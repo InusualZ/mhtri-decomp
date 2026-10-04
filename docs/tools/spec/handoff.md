@@ -15,15 +15,22 @@ the landing gate (1); docs (11); imported by `backlog`, `brief`, `land`
 ```
 python tools/units/handoff.py <unit>                  # the digest skeleton (a table to fill in the reply)
 python tools/units/handoff.py <unit> --template       # the outbox JSON to fill in
-python tools/units/handoff.py <unit> --check FILE     # validate an outbox entry
+python tools/units/handoff.py <unit> --check FILE [--map TREE]   # validate an outbox entry
+python tools/units/handoff.py --check-requests FILE
 python tools/units/handoff.py --selftest
 ```
-Flags: `--check`, `--json`, `--selftest`, `--template`.
+Flags: `--check`, `--check-requests`, `--json`, `--map`, `--selftest`, `--template`.
+* `--map TREE`: the tree whose `symbols.txt`/`splits.txt` the ownership check reads (`map_tree`); the default is the
+  invocation's own worktree, so a branch that renamed symbols validates against its own map (run in MAIN, that is
+  MAIN). Measured on the L2 round-2 outbox (`net2-l2-101a.json`, 2026-10-04): 0 errors against the branch's map, 16
+  "not owned" errors against the pre-batch main map the old `--check` always read.
 Exit codes: 0 ok, 1 findings or refusal, 2 could not run (the `lib.findings` convention; today's tool documents none, so `migration.md` records the current behaviour before changing it).
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
 * `handoff.py --check-requests FILE`: validates a lane's `<slug>-requests.json` (`lib.outbox.check_requests`, the
   `lib.requests` schema); a new-schema line's problems are errors (exit 1), a free-text line is a note saying what the
-  integrator's loader read from it.
+  integrator's loader read from it. A `field` request's `prototype` is a member-slot fragment of the type `symbol`
+  names, so it need not spell the type (the symbol is required in `symbol`); every other kind's prototype must still
+  declare its symbol.
 
 ## Inputs and outputs
 

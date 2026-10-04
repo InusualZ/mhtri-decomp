@@ -13,8 +13,10 @@ gate. The behaviour, the rows and the incidents behind them are `land.md`; this 
 
 ## Layout (WP4)
 
-* `common.py` - the batch path classes (`outside_batch`, `is_scratch`, `unit_owned_paths`), the row KIND and the
-  refusal wording (`failing_checks`, `failure_summary`), `run`/`git`, `read_base`, `worktree_root`/`main_root`, the
+* `common.py` - the batch path classes (`outside_batch` - with `main=` the content door for a relocation-keys-only
+  `config.yml` change, `config_verdict` -, `is_scratch`, `unit_owned_paths`), the row KIND and the
+  refusal wording (`failing_checks`, `failure_summary`), `run`/`git`, `read_base`, `worktree_root`
+  (`lib.repo.worktree_root`)/`main_root`, the
   compile targets, and `Batch`: one `verify` run (inputs, the `lib.findings.Row`s so far, the values a later row
   reads). Imports nothing of the package.
 * `state.py` - the invocation's recorded allowances (`--allow-rule10/12`, `--allow-orphan`) and `--unit-rename`
@@ -58,7 +60,9 @@ findings, git, lanes (naming, registry, teardown, landlog), project, proc, repo,
 ## Test contract
 
 Tier: fixture. `tools/tests/units/test_land.py` (the re-homed `land.py --selftest`: the guard, staging, the rows'
-decisions, `land`/`land --branch` on fixture repos, the resolver, the CLI) and
+decisions, `land`/`land --branch` on fixture repos - among them `test_land_branch_config_relocations`: a
+`block_relocations`-only `config.yml` lands with the unit batch in one commit, a frozen key or `build.sha1` refuses at
+pre-flight with main unchanged -, the resolver, the CLI) and
 `tools/tests/units/landing/`: `test_gate_golden.py` (eleven scenarios, the whole table), `test_landlog_hook.py` (the
 landing log), `test_base_report.py` (the base report rebuild and its row), `test_neighbours.py` (names-only
 neighbours).

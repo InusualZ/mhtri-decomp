@@ -32,9 +32,9 @@ def worktree_root(start: str | None = None) -> str:
     """The tree the caller is in - resolved from the *cwd*, never from this file's location.
 
     Invoking `MAIN/tools/units/recompile.py` from inside a worktree must compile the worktree's source, not
-    MAIN's; that is the whole point of 7.15.
+    MAIN's; that is the whole point of 7.15 (`lib.repo.worktree_root`).
     """
-    return git(["rev-parse", "--show-toplevel"], start or os.getcwd()).strip()
+    return _repo.worktree_root(start)
 
 
 def main_root(current: str) -> str:

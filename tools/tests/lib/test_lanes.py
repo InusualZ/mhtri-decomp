@@ -109,6 +109,21 @@ def test_launch(c):
              "**Do not land.**" in block), (True, True, True, True))
 
 
+def test_task_units(c):
+    task = ("Lane L2 SESSION CORE (round 2).\nUnits: NetworkSessionManager, NetworkSessionManagerPat (100 of 203 rows "
+            "at 100%; 103 left: updateSession 2436 B, handleCircleCreate 1868), NetworkPat (Matching).\n"
+            "Owned headers: NetworkSessionManager.h\nunits: Ignored\n")
+    c.check("task_units reads the first Units: line, asides dropped", launch.task_units(task),
+            ["NetworkSessionManager", "NetworkSessionManagerPat", "NetworkPat"])
+    c.check("... and nothing from a task without one", launch.task_units("Fix the gate."), [])
+    registered = ["Network/NetworkSessionManager.cpp", "Network/NetworkSessionManagerPat.cpp", "Network/NetworkPat.cpp",
+                  "sound/NetworkPat.cpp", "Network/NetworkLayerPatStep.cpp"]
+    c.check("resolve_units: a bare stem names its one registered unit; an ambiguous stem and a stranger are unresolved",
+            launch.resolve_units(["NetworkSessionManager", "NetworkPat", "Nope", "Network/NetworkLayerPatStep.cpp"],
+                                 registered),
+            (["Network/NetworkSessionManager", "Network/NetworkLayerPatStep"], ["NetworkPat", "Nope"]))
+
+
 def test_teardown_steps(c):
     order = []
     steps = [teardown.step("one", lambda: order.append(1) or "noted"), teardown.skip("two", "nothing to do"),

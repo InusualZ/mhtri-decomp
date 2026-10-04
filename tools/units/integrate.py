@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import tempfile
 import time
 from dataclasses import dataclass, field
@@ -23,6 +24,7 @@ from tools.lib import report as libreport
 from tools.lib import repo as librepo
 from tools.lib import requests as R
 from tools.lib import text as libtext
+from tools.lib import units as libunits
 from tools.lib.git import Git
 from tools.lib.project import Ownership, Splits
 
@@ -189,11 +191,14 @@ class DeclOp:
     owned_by_lane: bool = False
     implicit: bool = False          # a rename's declaration: moved only when the lane declared it locally
     move: bool = False              # a decl-move: a band header's declaration of an owned symbol is removed too
+    leaf: bool = False              # declared in its leaf header `include/<module>/<symbol>.h` (the full one clashed)
+    force: bool = False             # a rename's declaration the build proved a caller needs
+    full_header: str | None = None  # the owner's full header, when `leaf` moved the declaration out of it
     result: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {"name": self.name, "map_name": self.map_name, "header": self.header, "owner": self.owner,
-                "cpp_linkage": self.cpp, "data": self.data, **self.result}
+                "cpp_linkage": self.cpp, "data": self.data, "leaf": self.leaf, **self.result}
 
 
 DATA_SECTIONS = (".data", ".bss", ".sbss", ".sdata", ".rodata", ".sdata2", ".sbss2")
@@ -213,10 +218,22 @@ def live_units(main: str) -> set[str]:
         rows = json.loads(p.stdout or "[]")
     except json.JSONDecodeError:
         return set()
+    return units_of_rows(rows)
+
+
+def units_of_rows(rows) -> set[str]:
+    """Every unit an unmerged `claims.py list --json` row holds: its own `unit` (not the `(unregistered)`
+    placeholder) and its `units` - the unit set a cluster claim or a spawned lane's slot lock records."""
     if isinstance(rows, dict):
         rows = rows.get("claims") or rows.get("rows") or []
-    return {r["unit"] for r in rows if isinstance(r, dict) and r.get("unit") and r.get("unit") != "(unregistered)"
-            and not r.get("merged")}
+    out: set[str] = set()
+    for r in rows:
+        if not isinstance(r, dict) or r.get("merged"):
+            continue
+        if r.get("unit") and r.get("unit") != "(unregistered)":
+            out.add(r["unit"])
+        out.update(u for u in r.get("units") or [] if isinstance(u, str) and u)
+    return out
 
 
 def plan(requests: list[R.Request], ownership: Ownership, decisions: dict, live: set[str],
@@ -285,8 +302,12 @@ def plan(requests: list[R.Request], ownership: Ownership, decisions: dict, live:
             if spelled != final and _ident(spelled) and spelled != r.current and R.source_name(r.current) != spelled:
                 it.rewrites.append((spelled, final))
             hint = r.target.prototype
-            if hint and spelled != final:
-                hint = re.sub(r"\b%s\b" % re.escape(spelled), final, hint)
+            # the prototype spells the filed name or the lane's proposed one; a --names decision may have chosen a
+            # third (L2 round 2: `isCircleListBusy` filed, `testAndSet611b` decided - the declaration named the wrong
+            # function and every caller failed)
+            for old in dict.fromkeys(x for x in (spelled, r.target.proposed_name, r.current) if x and _ident(x)):
+                if hint and old != final:
+                    hint = re.sub(r"\b%s\b" % re.escape(old), final, hint)
             it.decls.append(DeclOp(req.id, final, new or r.current, r.address, r.section, r.owner, r.header,
                                    cpp=libnames.is_mangled(r.current), hint=hint,
                                    data=(r.section or "") in DATA_SECTIONS,
@@ -621,15 +642,99 @@ def collapse_blank_runs(text: str, original: str) -> str:
     return text
 
 
+def _strip_declarations(inner: str) -> str:
+    """`inner` without its function prototypes and `extern` variable declarations (what a STOPGAP block stands in
+    for); what is left - a typedef the code casts through, a helper type - is code the unit still uses."""
+    t = cscan.Text(inner)
+    spans = []
+    for d in cscan.function_declarations(t):
+        if d.body is None:
+            span = statement_span(inner, t, d.pos, d.name)
+            # `typedef s32 (*Getter)(...)` reads as a prototype of `Getter` to cscan: it is a type the code casts
+            # through, not a declaration of a symbol
+            if span and not re.match(r"\s*typedef\b", cscan.strip_comments(inner[span[0]:span[1]])):
+                spans.append(span)
+    masked = cscan.mask_preproc(t.code)
+    for m in re.finditer(r"\bextern\b[^;{}()]*;", masked):
+        span = statement_span(inner, t, m.start() + len("extern"), "")
+        if span and not any(s <= span[0] < e for s, e in spans):
+            spans.append(span)
+    for s, e in sorted(spans, reverse=True):
+        inner = inner[:s] + inner[e:]
+    return inner
+
+
 def remove_stopgap_blocks(text: str, ids: set[str]) -> tuple[str, list[str], list[int]]:
-    """Delete every `STOPGAP-BEGIN(<id>)..STOPGAP-END(<id>)` block whose id is in `ids`."""
+    """Delete every `STOPGAP-BEGIN(<id>)..STOPGAP-END(<id>)` block whose id is in `ids`: its markers and its
+    declarations go; any other code inside (a typedef a call site casts through - the L2 batch's
+    `CircleInfoSetSender`, whose removal broke the build) stays where it was, unwrapped."""
     done, points = [], []
     for rid, s, e in sorted(R.stopgap_blocks(text), key=lambda x: -x[1]):
         if rid in ids:
-            text = text[:s] + text[e:]
+            block = text[s:e]
+            b = R.STOPGAP_BEGIN_RE.search(block)
+            f = R.STOPGAP_END_RE.search(block, b.end())
+            rest = _strip_declarations(block[b.end():f.start()])
+            if cscan.strip_comments(rest).strip():
+                rest = rest.lstrip("\r\n").rstrip(" \t")
+                nl = libtext.line_ending(text)
+                keep = rest if rest.endswith("\n") else rest + nl
+            else:
+                keep = ""
+            text = text[:s] + keep + text[e:]
             done.append(rid)
             points.append(s)
     return text, done, points
+
+
+def leaf_header(op: "DeclOp") -> str:
+    """The leaf header of `op`'s symbol: `include/<the owner header's directory>/<symbol>.h` (section 6.5 rule 2's
+    one other owner spelling - for an owner whose full header clashes with a consumer)."""
+    base = os.path.dirname(op.header).replace("\\", "/") or "include"
+    return "%s/%s.h" % (base, op.name)
+
+
+def adopt_leaf(files: Files, op: "DeclOp") -> None:
+    """Point `op` at its leaf header when one already declares the symbol (an earlier pass's fallback), so a rerun
+    never declares it a second time in the clashing full header."""
+    lp = leaf_header(op)
+    if not op.leaf and lp != op.header and files.exists(lp) and op.name in files.declared(lp):
+        op.full_header, op.header, op.leaf = op.header, lp, True
+
+
+def decl_sites(files: Files, op: "DeclOp", scope_files: set[str]) -> list[tuple]:
+    """Every prototype/`extern` of `op.name` outside its header: `(file, start, end, statement, in_scope)`, where
+    `in_scope` says the integrator may remove it (the lane's files, a lane-owned symbol, a decl-move's band)."""
+    owner_src = "src/%s" % op.owner if op.owner else None
+    sites = []
+    for r in files.all():
+        if r == op.header:
+            continue
+        t = files.get(r)
+        if op.name not in t:
+            continue
+        in_scope = ((r in scope_files and r != owner_src) or (op.owned_by_lane and r != owner_src)
+                    or (op.move and (r.startswith("include/unsplit/") or r == owner_src)))
+        for s, e, stmt in find_prototypes(t, op.name):
+            sites.append((r, s, e, stmt, in_scope))
+    return sites
+
+
+def needs_declaration(files: Files, op: "DeclOp", all_files: bool = False):
+    """Whether a file other than the owner's source and header calls `op.name` without seeing a declaration of it
+    (`all_files`: the list of those files, for the report)."""
+    owner_src = "src/%s" % op.owner if op.owner else None
+    out = []
+    for r in files.all():
+        if r in (op.header, owner_src):
+            continue
+        t = files.get(r)
+        if op.name not in t or not _code_refers(t, op.name) or files.sees(r, op.name):
+            continue
+        if not all_files:
+            return True
+        out.append(r)
+    return out if all_files else False
 
 
 def apply_decls(files: Files, ops: list[DeclOp], scope_files: set[str], applied_ids: set[str],
@@ -644,18 +749,22 @@ def apply_decls(files: Files, ops: list[DeclOp], scope_files: set[str], applied_
 
     def refuse(op: DeclOp, why: str) -> None:
         """A rename's implicit declaration that cannot move is a note, not a refusal: the rename still applies and
-        the lane's (renamed) local declaration stays where it is."""
-        if op.implicit:
+        the lane's (renamed) local declaration stays where it is. One that a caller NEEDS (`needed_by`) is a
+        refusal: without it the rename leaves the caller with no declaration."""
+        if op.implicit and not op.result.get("needed_by"):
             if why not in op.result.setdefault("not_moved", []):
                 op.result["not_moved"].append(why)
         else:
             op.result.setdefault("refused", []).append(why)
             failures.setdefault(op.rid, []).append(why)
 
-    # 0. explicit STOPGAP blocks of the applied requests go first (their declarations go with them)
+    # 0. explicit STOPGAP blocks of the applied requests go first (their declarations go with them, and are kept as
+    #    the lane's spelling of a prototype nothing else spells)
+    removed: list[tuple[str, str]] = []
     for r in files.all():
         t = files.get(r)
         if "STOPGAP-BEGIN" in t:
+            removed += [(r, t[s:e]) for rid, s, e in R.stopgap_blocks(t) if rid in applied_ids]
             new, done, _points = remove_stopgap_blocks(t, applied_ids)
             if done:
                 files.set(r, new)
@@ -664,20 +773,15 @@ def apply_decls(files: Files, ops: list[DeclOp], scope_files: set[str], applied_
         op.result = {}
     for op in ops:
         owner_src = "src/%s" % op.owner if op.owner else None
-        sites = []
-        for r in files.all():
-            if r == op.header:
+        adopt_leaf(files, op)
+        sites = decl_sites(files, op, scope_files)
+        if op.implicit and not any(x[4] for x in sites) and not op.force:
+            # a rename's declaration: moved when the lane declared it locally, and written to the owner header when
+            # a caller would otherwise see none (its STOPGAP block went in step 0 - the L2 batch's 9 renames)
+            if not needs_declaration(files, op):
+                op.result["skipped"] = "no declaration in the lane's scope to move, and every caller sees one"
                 continue
-            t = files.get(r)
-            if op.name not in t:
-                continue
-            in_scope = ((r in scope_files and r != owner_src) or (op.owned_by_lane and r != owner_src)
-                        or (op.move and (r.startswith("include/unsplit/") or r == owner_src)))
-            for s, e, stmt in find_prototypes(t, op.name):
-                sites.append((r, s, e, stmt, in_scope))
-        if op.implicit and not any(x[4] for x in sites):
-            op.result["skipped"] = "no declaration in the lane's scope to move"
-            continue
+            op.result["needed_by"] = needs_declaration(files, op, all_files=True)
         proto, source = None, None
         if owner_src and files.exists(owner_src):
             proto = definition_prototype(files.get(owner_src), op.name, op.data)
@@ -685,6 +789,9 @@ def apply_decls(files: Files, ops: list[DeclOp], scope_files: set[str], applied_
         if not proto and op.hint:
             proto, source = op.hint.strip(), "the request"
         lane_site = next((x for x in sites if x[4]), None) or (sites[0] if sites else None)
+        if lane_site is None:
+            lane_site = next(((r, s, e, stmt, False) for r, block in removed
+                              for s, e, stmt in find_prototypes(block, op.name)), None)
         marker = None
         if lane_site:
             lines = lane_site[3].strip("\r\n").splitlines()
@@ -696,7 +803,8 @@ def apply_decls(files: Files, ops: list[DeclOp], scope_files: set[str], applied_
                 proto = re.sub(r'^extern\s+"C"\s+', "", proto)
                 if not op.data:
                     proto = re.sub(r"^extern\s+", "", proto)
-                source = "the lane's declaration (%s)" % lane_site[0]
+                source = "the lane's declaration (%s%s)" % (lane_site[0], "" if lane_site in sites else
+                                                              ", its STOPGAP block")
         if not proto:
             refuse(op, "%s: no prototype (the request, the owner and the lane spell none)" % op.name)
             continue
@@ -1110,31 +1218,50 @@ def dedupe_ops(ops: list[DeclOp]) -> list[DeclOp]:
     return [op for op in ops if best.get((op.name, op.header)) is op]
 
 
-def apply_config(path: str, it: Item) -> dict:
-    """Append the request's YAML list items under their relocation-analysis key, refused through the guard's own
-    rule (`lib.repo.config_change`); an item already present is a no-op."""
-    old = libtext.read_text(path)
-    m = re.match(r"\s*(block_relocations|add_relocations)\s*:\s*\n", it.config or "")
-    if not m:
-        return {it.req.id: ["the config proposal names no relocation-analysis key"]}
-    key, items = m.group(1), (it.config or "")[m.end():]
+def config_edit(old: str, it: Item) -> tuple[str, int, str | None, str | None]:
+    """`(new text, items added, key, refusal)`: the request's relocation items (`lib.requests.config_items`, every form
+    a lane files) appended at the end of their key's block, judged by the guard's own rule (`lib.repo.config_change`);
+    an item already present is not added again."""
+    section = it.req.targets[0].section if it.req.targets else None
+    key, items, why = R.config_items(it.config or "", section)
+    if not key:
+        return old, 0, None, why
     nl = libtext.line_ending(old)
-    blocks = [b.strip() for b in re.split(r"(?m)^-", items) if b.strip()]
-    new = old
-    added = 0
-    for b in blocks:
-        entry = "- " + b.replace("\n", nl)
-        if b.splitlines()[0].strip() in new:
+    new, added = old, 0
+    for item in items:
+        first = item.splitlines()[0][2:].strip()
+        if first in new:
             continue
-        km = re.search(r"(?m)^%s:\s*\r?\n" % key, new)
-        if km:
-            new = new[:km.end()] + entry + nl + new[km.end():]
-        else:
+        entry = item.replace("\n", nl)
+        lines = new.splitlines(keepends=True)
+        at = next((i for i, ln in enumerate(lines) if re.match(r"%s:\s*$" % key, ln.rstrip("\r\n"))), None)
+        if at is None:
             new = new.rstrip("\r\n") + nl + key + ":" + nl + entry + nl
+        else:
+            last = at
+            for i in range(at + 1, len(lines)):
+                s = lines[i]
+                if s[:1] in ("-", " ", "\t"):
+                    last = i
+                elif s.strip() and not s.startswith("#"):
+                    break
+            if not lines[last].endswith(("\n", "\r")):
+                lines[last] += nl
+            lines.insert(last + 1, entry + nl)
+            new = "".join(lines)
         added += 1
     verdict = librepo.config_change(old, new)
     if not verdict["ok"]:
-        return {it.req.id: ["the guard refuses the config change: %s" % verdict["reason"]]}
+        return old, 0, key, "the guard refuses the config change: %s" % verdict["reason"]
+    return new, added, key, None
+
+
+def apply_config(path: str, it: Item) -> dict:
+    """Apply one config request to `path` (`config_edit`); `{rid: [why]}` on a refusal."""
+    old = libtext.read_text(path)
+    new, added, key, refusal = config_edit(old, it)
+    if refusal:
+        return {it.req.id: [refusal]}
     if added:
         libtext.atomic_write(path, new)
     it.notes.append("config: %d item(s) added under %s" % (added, key) if added else "config: already present")
@@ -1216,9 +1343,285 @@ def module_of(files: list[str]) -> str:
     return max(counts, key=lambda k: (counts[k], k)) if counts else "network"
 
 
-def run(args) -> int:
+# --- narrowing a failed build ------------------------------------------------------------------------------------
+
+_QUOTED_RE = re.compile(r"'([A-Za-z_~][\w:~]*)")
+_CLASH_RE = re.compile(r"redefin|redeclar|already (?:been )?defined|multiply.defined", re.I)
+_UNDEFINED_RE = re.compile(r"undefined identifier", re.I)
+
+
+def object_source(root: str, obj: str) -> str | None:
+    """`src/<stem>.<ext>` of a ninja object target `build/RMHE08/src/<stem>.o` (the extension the tree has)."""
+    stem = obj.replace("\\", "/").split("/src/", 1)[-1]
+    stem = stem[:-2] if stem.endswith(".o") else stem
+    for ext in (".cpp", ".c", ".cp", ".cc"):
+        if os.path.isfile(os.path.join(root, "src", stem + ext)):
+            return "src/%s%s" % (stem, ext)
+    return None
+
+
+def error_command(tokens: list[str], scratch_dir: str) -> list[str] | None:
+    """The build's compile command for one object, with every error reported (`-maxerrors 0`: the project's
+    `-maxerrors 1` stops MWCC at the first error of an object) and the object written to `scratch_dir` - the build's
+    own object and flags are untouched. None when the command has no `-o`."""
+    toks = list(tokens)
+    if "&&" in toks:
+        toks = toks[:toks.index("&&")]
+    if "-o" not in toks:
+        return None
+    if "-maxerrors" in toks and toks.index("-maxerrors") + 1 < len(toks):
+        toks[toks.index("-maxerrors") + 1] = "0"
+    else:
+        toks.insert(toks.index("-o"), "0")
+        toks.insert(toks.index("0"), "-maxerrors")
+    toks[toks.index("-o") + 1] = scratch_dir
+    return toks
+
+
+def object_errors(root: str, failed: list[str], runner=None) -> tuple[list[dict], list[str]]:
+    """Every compiler error of each failed object - one direct compile per object (`error_command`), so a round
+    narrows every wrong declaration of an object at once instead of one per round. -> (errors, notes); an error
+    carries the `object` it came from."""
+    runner = runner or proc.run
+    errors, notes = [], []
+    for obj in failed:
+        stem = obj.replace("\\", "/").split("/src/", 1)[-1]
+        stem = stem[:-2] if stem.endswith(".o") else stem
+        try:
+            tokens = libunits.ninja_command(root, stem)
+        except SystemExit as exc:
+            notes.append("%s: no compile command (%s)" % (obj, str(exc).splitlines()[0]))
+            continue
+        tmp = tempfile.mkdtemp(prefix="integrate-errors-")
+        try:
+            cmd = error_command(tokens, tmp)
+            if cmd is None:
+                notes.append("%s: the compile command has no -o" % obj)
+                continue
+            p = runner(cmd, cwd=root, timeout=600)
+            found = parse_build_errors((p.stdout or "") + (p.stderr or ""))
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        for e in found:
+            e["object"] = obj
+        errors += found
+    return errors, notes
+
+
+def _ops_by_name(items: list[Item]) -> dict[str, list[tuple[Item, DeclOp]]]:
+    out: dict[str, list[tuple[Item, DeclOp]]] = {}
+    for it in items:
+        if it.state == "apply":
+            for d in it.live_decls():
+                out.setdefault(d.name, []).append((it, d))
+    return out
+
+
+def revert(it: Item, why: str) -> None:
+    it.state, it.why = "reverted", why
+
+
+def to_leaf(items: list[Item], name: str) -> list[str]:
+    """Move every live declaration of `name` to its leaf header; -> the leaf paths (empty when already there)."""
+    moved = []
+    for _it, d in _ops_by_name(items).get(name, []):
+        if d.leaf:
+            continue
+        lp = leaf_header(d)
+        d.full_header, d.header, d.leaf = d.header, lp, True
+        moved.append(lp)
+    return sorted(set(moved))
+
+
+def narrow(items: list[Item], errors: list[dict], failed: list[str], root: str | None = None) -> dict:
+    """Blame every compiler error of a failed build and pick each culprit's remedy, all in one round:
+
+    * a redefinition in an owner header this batch declared into or included (a type the full header redefines
+      for the consumer) -> the declarations move to their **leaf** header (`include/<module>/<symbol>.h`);
+    * `undefined identifier 'X'` for a rename's target whose declaration was skipped -> the declaration is
+      **forced** into the owner header (a caller needs it); a second time, the rename is **reverted**;
+    * any other error naming a declared symbol in its message -> that declaration is **excluded** everywhere
+      (the owner's prototype and the call site disagree: judgement with the compiler's message);
+    * an error naming only a renamed symbol -> the rename is **reverted**;
+    * the rest go through `culprits` (the line text, then the edits that touched the failed source).
+
+    -> `{excluded, leaf, forced, reverted, unattributed}`; nothing in the first four means no progress."""
+    out = {"excluded": [], "leaf": [], "forced": [], "reverted": [], "unattributed": []}
+    rest = []
+    for e in errors:
+        ops = _ops_by_name(items)
+        renamed = {n: it for it in items if it.state == "apply" for _o, n in it.renames + it.rewrites}
+        msg = e.get("message", "")
+        efile = e.get("file", "").replace("\\", "/")
+        where = "%s:%d %s" % (efile, e.get("line", 0), (msg or e.get("text", "").strip())[:120])
+        quoted = [q.split("::")[-1] for q in _QUOTED_RE.findall(msg)]
+        named = [q for q in dict.fromkeys(quoted) if q in ops or q in renamed]
+        if _CLASH_RE.search(msg) and not [q for q in named if q in ops]:
+            src = object_source(root, e.get("object", "")) if root else None
+            hit = sorted({d.name for lst in ops.values() for _it, d in lst
+                          if d.header == efile and not d.leaf and d.result.get("prototype")
+                          and (not d.result.get("already_declared") or (src and src in d.result.get("includes_added", [])))})
+            if hit:
+                for name in hit:
+                    if to_leaf(items, name):
+                        out["leaf"].append(name)
+                continue
+        if not named:
+            rest.append(e)
+            continue
+        for q in named:
+            if q in ops and _UNDEFINED_RE.search(msg):
+                undeclared = [(it, d) for it, d in ops[q] if not d.result.get("prototype") or d.result.get("skipped")]
+                if undeclared:
+                    for it, d in undeclared:
+                        if d.force:
+                            revert(it, "the build still finds no declaration of %s: %s" % (q, where))
+                            out["reverted"].append(it.req.id)
+                        else:
+                            d.force = True
+                            out["forced"].append(q)
+                    continue
+            if q in ops:
+                exclude_everywhere(items, q, "the build failed on it: " + where)
+                out["excluded"].append(q)
+            elif q in renamed and renamed[q].state == "apply":
+                revert(renamed[q], "the build failed on its rename: " + where)
+                out["reverted"].append(renamed[q].req.id)
+    if rest:
+        ops, hit = culprits(items, rest, failed)
+        for it, name in ops:
+            why = "; ".join("%s:%d %s" % (e["file"], e["line"], e.get("message") or e["text"].strip()[:80])
+                            for e in rest if name in e["text"] + e.get("message", ""))[:300]
+            exclude_everywhere(items, name, "the build failed on it: " + (why or "an edit it made is in a failed object"))
+            out["excluded"].append(name)
+        for it in items:
+            if it.req.id in hit and it.state == "apply":
+                revert(it, "the build failed on its rename")
+                out["reverted"].append(it.req.id)
+        if not ops and not hit:
+            out["unattributed"] = ["%s:%d %s" % (e["file"], e["line"], e.get("message", "")) for e in rest[:6]]
+    for k in ("excluded", "leaf", "forced", "reverted"):
+        out[k] = list(dict.fromkeys(out[k]))
+    return out
+
+
+def progressed(verdict: dict) -> bool:
+    return any(verdict.get(k) for k in ("excluded", "leaf", "forced", "reverted"))
+
+
+# --- already applied: the tree (and the sidecar) say a request needs nothing ------------------------------------
+
+def mark_applied(root: str, items: list[Item], scope: set[str]) -> int:
+    """Turn every `apply` item the tree already satisfies into `done` ("already applied"), so a rerun never
+    re-proposes it: no rename left to do, no stale spelling left in the code, no STOPGAP block of its id, and each
+    declaration present in its owner header or its leaf header with no foreign declaration left in scope (a rename's
+    declaration may instead be unneeded: every caller sees one); a config request whose items config.yml already
+    carries. -> the number marked."""
+    files = Files(root)
+    stopgap_ids = set()
+    for r in files.all():
+        text = files.get(r)
+        if "STOPGAP-BEGIN" in text:
+            stopgap_ids |= {rid for rid, _s, _e in R.stopgap_blocks(text)}
+    spelled: dict[str, bool] = {}
+
+    def in_code(name: str) -> bool:
+        if name not in spelled:
+            spelled[name] = any(name in files.get(r) and _code_refers(files.get(r), name) for r in files.all())
+        return spelled[name]
+
+    n = 0
+    for it in items:
+        if it.state != "apply" or it.renames or it.req.id in stopgap_ids:
+            continue
+        if any(in_code(old) for old, _new in it.rewrites):
+            continue
+        why = []
+        if it.config:
+            cfg = os.path.join(root, "config", "RMHE08", "config.yml")
+            old = libtext.read_text(cfg) if os.path.exists(cfg) else ""
+            _new, added, key, refusal = config_edit(old, it)
+            if refusal or added:
+                continue
+            why.append("config.yml carries every %s item" % key)
+        ok = True
+        for d in it.live_decls():
+            adopt_leaf(files, d)
+            if any(x[4] for x in decl_sites(files, d, scope)):
+                ok = False
+                break
+            if files.exists(d.header) and d.name in files.declared(d.header):
+                why.append("%s in %s" % (d.name, d.header))
+            elif d.implicit and not needs_declaration(files, d):
+                why.append("%s: every caller sees a declaration" % d.name)
+            else:
+                ok = False
+                break
+        if ok:
+            it.state, it.why = "done", "already applied (the tree): " + ("; ".join(why) or "nothing left to do")
+            n += 1
+    return n
+
+
+# --- the run ---------------------------------------------------------------------------------------------------------
+
+def scope_files(root: str, lane_scope: set[str]) -> set[str]:
+    """The files a removal may edit: the lane's units plus every source carrying a STOPGAP marker."""
+    files = Files(root)
+    scope = set(lane_scope)
+    for r in files.all():
+        if r.startswith("src/") and "STOPGAP" in files.get(r):
+            scope.add(r)
+    return scope
+
+
+def file_snapshot(root: str, paths: list[str]) -> dict[str, bytes]:
+    out = {}
+    for r in paths:
+        p = os.path.join(root, r)
+        if os.path.isfile(p):
+            with open(p, "rb") as fh:
+                out[r] = fh.read()
+    return out
+
+
+def write_snapshot(root: str, snap: dict[str, bytes]) -> None:
+    for r, data in snap.items():
+        libtext.atomic_write(os.path.join(root, r), data)
+
+
+def head_matches(root: str, snap: dict[str, bytes]) -> list[str]:
+    """The snapshot paths whose committed (HEAD) bytes differ from the green tree's - empty when the commits are the
+    tree that built."""
+    g = Git(root)
+    return [r for r, data in sorted(snap.items()) if (g.show("HEAD", r) or b"").replace(b"\r\n", b"\n")
+            != data.replace(b"\r\n", b"\n")]
+
+
+def write_config_patch(root: str, base: str, branch: str) -> str | None:
+    """The config.yml change as a patch file under `build/tmp/integrate/` (never a unit commit) -> its path."""
+    rel_cfg = librepo.CONFIG_PATH
+    p = Git(root).run("diff", base, "--", rel_cfg)
+    if p.returncode != 0 or not (p.stdout or "").strip():
+        return None
+    path = os.path.join(str(librepo.scratch("integrate", root)), "%s-config.patch" % re.sub(r"[^\w.-]+", "-", branch))
+    libtext.atomic_write(path, p.stdout if p.stdout.endswith("\n") else p.stdout + "\n")
+    return path
+
+
+def refuse_base(root: str, out: str, log: list[str]) -> dict:
+    """The base build's verdict when it failed: the failed objects and their first errors (all of them per object)."""
+    failed = failed_objects(out)
+    errs, _notes = object_errors(root, failed)
+    return {"ok": False, "failed": failed, "errors": (errs or parse_build_errors(out))[:12]}
+
+
+def run(args, root: str | None = None) -> int:
+    """The batch: plan, base build, apply/build/narrow rounds, then commit the green tree (exit 0) - or refuse with
+    exit 1 (a dirty tree, a base that does not compile, a build that never went green). `root`: the tree (default:
+    the invocation's)."""
     t_start = time.time()
-    root = librepo.repo_root()
+    root = root or librepo.repo_root()
     main = librepo.main_checkout(root)
     outbox_dir = args.outbox or os.path.join(main, ".pi", "outbox")
     paths = list(args.requests or [])
@@ -1252,11 +1655,30 @@ def run(args) -> int:
     items = plan(requests, ownership, decisions, live, lane_names, status)
     summary = {"tree": root, "requests": len(requests), "files": [os.path.basename(p) for p in paths],
                "classes": {c: sum(1 for i in items if i.cls == c) for c in R.CLASSES}}
+    summary["already_applied"] = mark_applied(root, items, scope_files(root, lane_scope))
     if args.dry_run:
         return emit(args, items, summary, log, t_start)
+    prev_branch = g.current_branch()
     branch = make_branch(root, args.base, args.branch)
     base_head = g.head()
     summary.update({"branch": branch, "base": base_head})
+    build_time = 0.0
+    if not args.no_build:
+        # (b) the base must compile before anything is applied: a base broken by a merge of main is the operator's
+        # to fix, and narrowing against it would blame the batch for the base's errors
+        ok, out, dt = run_build(root, log)
+        build_time += dt
+        if not ok:
+            summary["base_build"] = refuse_base(root, out, log)
+            if branch != prev_branch and prev_branch:
+                g.run("switch", prev_branch)
+                g.run("branch", "-D", branch)
+            summary["final"] = ("REFUSED: the base %s does not compile (%d object(s) failed) - nothing was applied; fix "
+                                "the base first (a merge of main is the usual cause)"
+                                % (base_head[:10], len(summary["base_build"]["failed"])))
+            emit(args, items, summary, log, t_start)
+            return 1
+        summary["base_build"] = {"ok": True, "seconds": round(dt)}
     report_path = os.path.join(root, BUILD, "report.json")
     before_report = None
     if os.path.exists(report_path):
@@ -1267,11 +1689,12 @@ def run(args) -> int:
     before_objects = None if args.no_build else snapshot_objects(root)
     created: list[str] = []
     rounds = []
-    build_time = 0.0
     untracked_before = {p for _c, p in g.status_porcelain("all") if _c == "??"}
     built_ok: bool | None = False
     try:
         for attempt in range(1 + args.retries):
+            if attempt:
+                restore(root, base_head, created)        # each round starts from the base; the last one is kept
             res = apply_plan(root, items, lane_scope, not args.no_comments, not args.no_mangle_check)
             created = [f for f in res["files"] if g.run("ls-files", "--error-unmatch", f).returncode != 0]
             fail_now = res["failures"]
@@ -1279,8 +1702,11 @@ def run(args) -> int:
                 for it in items:
                     for d in it.live_decls():
                         if d.result.get("refused"):
-                            exclude_everywhere(items, d.name, "; ".join(d.result["refused"]))
-                restore(root, base_head, created)
+                            if d.implicit and d.result.get("needed_by") and it.state == "apply":
+                                revert(it, "its callers need a declaration the owner header cannot take: %s"
+                                       % "; ".join(d.result["refused"]))
+                            else:
+                                exclude_everywhere(items, d.name, "; ".join(d.result["refused"]))
                 rounds.append({"round": attempt + 1, "apply_refused": sorted(fail_now)})
                 continue
             if args.no_build:
@@ -1289,29 +1715,20 @@ def run(args) -> int:
                 break
             ok, out, dt = run_build(root, log)
             build_time += dt
-            errs = parse_build_errors(out)
-            failed = failed_objects(out)
-            rounds.append({"round": attempt + 1, "build_ok": ok, "seconds": round(dt), "failed": failed,
-                           "errors": errs[:8]})
             if ok:
+                rounds.append({"round": attempt + 1, "build_ok": True, "seconds": round(dt)})
                 built_ok = True
                 break
-            ops, hit = culprits(items, errs, failed)
-            for it, name in ops:
-                why = "; ".join("%s:%d %s" % (e["file"], e["line"], e.get("message") or e["text"].strip()[:80])
-                                for e in errs if name in e["text"] + e.get("message", ""))[:300]
-                exclude_everywhere(items, name, "the build failed on it: " + (why or "an edit it made is in a failed "
-                                                                                  "object"))
-            for it in items:
-                if it.req.id in hit:
-                    it.state, it.why = "reverted", "the build failed on its rename"
-            restore(root, base_head, created)
-            if not ops and not hit:
+            failed = failed_objects(out)
+            errs, notes = object_errors(root, failed)
+            errs = errs or parse_build_errors(out)
+            verdict = narrow(items, errs, failed, root)
+            rounds.append({"round": attempt + 1, "build_ok": False, "seconds": round(dt), "failed": failed,
+                           "errors": errs[:12], "narrowed": {k: v for k, v in verdict.items() if v},
+                           **({"notes": notes} if notes else {})})
+            if not progressed(verdict):
                 summary["build_failed_unattributed"] = failed
                 break
-        if built_ok is False:
-            restore(root, base_head, created)
-            summary["final"] = "the build never went green in %d round(s): the tree is back at the base" % len(rounds)
     except BaseException:
         # a crash mid-apply leaves nothing behind: the tracked files go back to the base, new files are removed
         new_files = [p for _c, p in g.status_porcelain("all") if _c == "??" and p not in untracked_before
@@ -1320,10 +1737,18 @@ def run(args) -> int:
         raise
     summary["rounds"] = rounds
     summary["build_seconds"] = round(build_time)
+    changed = sorted(set(Git(root).diff_names(base_head)) | set(created))
+    if built_ok is False:
+        # (a) a tree that did not build is never committed: it is left for the operator, and the run fails
+        summary["left_in_tree"] = changed
+        summary["final"] = ("REFUSED: the build never went green in %d round(s) - NOTHING was committed; the working "
+                            "tree holds the last attempt (%d file(s)) for the operator: `git checkout -- .` and "
+                            "remove the new files to discard it" % (len(rounds), len(changed)))
+        emit(args, items, summary, log, t_start)
+        return 1
     after_targets = target_snapshot(root)
     d = drift(before_targets, after_targets)
-    changed = Git(root).diff_names(base_head) + created
-    units = sorted(set(changed_units(root, base_head, created)) | set(d["content"]))
+    units = sorted(set(changed_units(root, base_head, created)) | set(d["content"]) | set(d["names_only"]))
     summary["drift"] = d
     summary["units"] = units
     # a unit header that still describes a removed stopgap is prose the integrator cannot rewrite: name it
@@ -1340,31 +1765,55 @@ def run(args) -> int:
         summary["objects"] = objects_same(before_objects, root)
     if not args.no_gate and not args.no_build:
         summary["gate"] = gate_prerun(root, base_head, units)
-    if args.commit:
+    # (h) the relocation-analysis change is a separate patch, never part of the unit commits
+    patch = write_config_patch(root, base_head, branch)
+    if patch:
+        g.run("checkout", base_head, "--", librepo.CONFIG_PATH)
+        summary["config_patch"] = patch
+        summary["config_apply"] = ("git apply %s  (then `ninja` + the score check, and commit it alone as "
+                                   "`config/analysis: ...`)" % patch.replace("\\", "/"))
+    changed = [f for f in changed if f != librepo.CONFIG_PATH]
+    if built_ok is None:
+        summary["final"] = "--no-build: the result is left in the working tree (a tree that was not built is never committed)"
+    elif args.commit:
+        snap = file_snapshot(root, changed)
         restore(root, base_head, created)
-        res1 = apply_plan(root, items, lane_scope, not args.no_comments, False, stage="renames")
+        apply_plan(root, items, lane_scope, not args.no_comments, False, stage="renames")
         ren_pairs = list(dict.fromkeys(p for it in items if it.state == "apply" for p in it.renames))
-        n_ren = len(ren_pairs)
-        c1 = commit_stage(root, "config/symbols: name the %d symbols the integrated requests ask for" % n_ren,
-                          "\n".join("%s %s" % p for p in ren_pairs)) if n_ren else None
-        res2 = apply_plan(root, items, lane_scope, not args.no_comments, False, stage="rest")
-        mod = module_of(res2["files"])
-        c2 = commit_stage(root, "game/%s: declare the integrated callees in their owners' headers" % mod,
-                          "\n".join(sorted(res2["files"]))) if res2["files"] else None
-        summary["commits"] = [c for c in (c1, c2) if c]
-        del res1
+        commits = []
+        if ren_pairs:
+            ok1, _out1, dt1 = run_build(root, log)
+            build_time += dt1
+            if ok1:
+                commits.append(commit_stage(root, "config/symbols: name the %d symbols the integrated requests ask for"
+                                            % len(ren_pairs), "\n".join("%s %s" % p for p in ren_pairs)))
+            else:
+                summary["renames_commit"] = "folded into the second commit: the renames alone do not compile"
+        write_snapshot(root, snap)
+        mod = module_of(changed)
+        if Git(root).diff_names("HEAD") or [f for f in created if os.path.exists(os.path.join(root, f))]:
+            subject = ("game/%s: declare the integrated callees in their owners' headers" % mod if commits or not ren_pairs
+                       else "game/%s: name the %d integrated symbols and declare the callees in their owners' headers"
+                       % (mod, len(ren_pairs)))
+            commits.append(commit_stage(root, subject, "\n".join(sorted(changed))))
+        summary["commits"] = [c for c in commits if c]
+        summary["commits_verified"] = not head_matches(root, snap)
+        summary["build_seconds"] = round(build_time)
     summary["land"] = land_command(branch, units, changed)
     if args.write_status:
         for p in paths:
             slug = R.slug_of(p)
             updates = {it.req.id: {"status": _status(it), "note": it.why or it.reason}
-                       for it in items if it.req.id.startswith(slug + "#") and it.state != "done"}
+                       for it in items if it.req.id.startswith(slug + "#")
+                       and (it.state != "done" or it.why.startswith("already applied"))}
             if updates:
                 R.write_status(p, updates)
     return emit(args, items, summary, log, t_start)
 
 
 def _status(it: Item) -> str:
+    if it.state == "done":
+        return "applied"
     return {"apply": "applied", "judgement": "judgement", "deferred": "deferred", "reverted": "judgement"}.get(
         it.state, "open")
 
@@ -1374,19 +1823,22 @@ def emit(args, items: list[Item], summary: dict, log: list[str], t_start: float)
     groups = {"applied": [i for i in items if i.state == "apply"],
               "judgement": [i for i in items if i.state in ("judgement", "reverted")],
               "deferred": [i for i in items if i.state == "deferred"],
-              "done": [i for i in items if i.state == "done"]}
+              "already applied": [i for i in items if i.state == "done"]}
     if args.json:
         print(json.dumps({"summary": summary, "items": [i.to_dict() for i in items], "log": log}, indent=1))
         return 0
     print("integrate: %d request(s) from %s - classes %s" % (
         summary["requests"], ", ".join(summary["files"]),
         ", ".join("%s %d" % (k, v) for k, v in summary["classes"].items())))
-    for label in ("applied", "judgement", "deferred"):
+    for label in ("applied", "judgement", "deferred", "already applied"):
         print("\n## %s (%d)%s" % (label, len(groups[label]), " - dry run: nothing was written" if args.dry_run and
                                     label == "applied" else ""))
         for it in groups[label]:
             what = ", ".join("%s->%s" % p for p in it.renames)
             decl = ", ".join("%s in %s" % (d.name, d.header) for d in it.live_decls())
+            if label == "already applied":
+                print("- %s [%s] %s" % (it.req.id, it.req.kind, it.why))
+                continue
             print("- %s [%s] %s%s%s" % (it.req.id, it.req.kind, what, (" | decl " + decl) if decl else "",
                                         (" | " + it.why) if it.why and label != "applied" else
                                         (" | " + it.reason) if label == "applied" and not what and not decl else ""))
@@ -1396,15 +1848,16 @@ def emit(args, items: list[Item], summary: dict, log: list[str], t_start: float)
                 for d in it.live_decls():
                     for why in d.result.get("not_moved", [])[:1]:
                         print("    kept in the lane: %s" % why[:200])
-    for key in ("rounds", "final", "build_seconds", "drift", "report", "objects", "gate", "stopgap_mentions", "units",
-                "commits", "land"):
+    for key in ("base_build", "rounds", "final", "build_seconds", "drift", "report", "objects", "gate",
+                "stopgap_mentions", "units", "config_patch", "config_apply", "renames_commit", "commits",
+                "commits_verified", "left_in_tree", "land"):
         if key in summary:
             print("\n%s: %s" % (key, json.dumps(summary[key]) if not isinstance(summary[key], str) else summary[key]))
     print("\n%d s total" % summary["seconds"])
     return 0
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None, root: str | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--requests", nargs="*", help="request files (default: every *-requests.json in the outbox)")
     ap.add_argument("--lane", nargs="*", help="lane slugs whose <slug>-requests.json to read")
@@ -1415,21 +1868,21 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--base", default=None, help="the branch to integrate onto (default: the current HEAD)")
     ap.add_argument("--branch", default=None, help="the integrate branch (default integrate/<date>)")
     ap.add_argument("--dry-run", action="store_true", help="classify, resolve and plan; write nothing")
-    ap.add_argument("--no-build", action="store_true")
+    ap.add_argument("--no-build", action="store_true", help="skip the builds (and so never commit)")
     ap.add_argument("--no-gate", action="store_true", help="skip the stylelint/undefrefs/vtableaudit pre-run")
     ap.add_argument("--no-claims", action="store_true", help="do not ask claims.py for live lanes")
     ap.add_argument("--no-comments", action="store_true", help="the sweep leaves comment mentions alone")
     ap.add_argument("--no-mangle-check", action="store_true", help="skip mangle.py on C++ declarations")
-    ap.add_argument("--retries", type=int, default=4,
-                    help="narrowing rounds after a refused declaration or a failed build (default 4)")
+    ap.add_argument("--retries", type=int, default=12,
+                    help="narrowing rounds after a refused declaration or a failed build (default 12)")
     ap.add_argument("--no-commit", action="store_true",
                     help="leave the result in the working tree (the default commits it as two commits: renames, the rest)")
     ap.add_argument("--commit", action="store_true", help=argparse.SUPPRESS)
     ap.add_argument("--write-status", action="store_true", help="write each request's verdict to its sidecar")
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
-    args.commit = not args.no_commit and not args.dry_run
-    return run(args)
+    args.commit = not args.no_commit and not args.dry_run and not args.no_build
+    return run(args, root)
 
 
 if __name__ == "__main__":

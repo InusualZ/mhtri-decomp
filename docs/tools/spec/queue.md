@@ -13,14 +13,14 @@ the landing gate (1); CLAUDE.md (11); docs (29); imported by `claims` (the claim
 ## CLI
 
 ```
-python tools/units/queue.py next [--count N | --cluster MODULE|HEADER] [--kind K] [--profile P] [--worker W]
+python tools/units/queue.py next [--count N | --cluster MODULE|HEADER [--cross-module]] [--kind K] [--profile P] [--worker W]
                                  [--dry-run] [--json] [--ignore-backlog] [--allow-unlanded B]... [--no-slots]
 python tools/units/queue.py list [--json]
 python tools/units/queue.py debt [--worker W] [--dry-run] [--json] [--ignore-backlog]
 python tools/units/queue.py --selftest
 ```
 Subcommands: `next`, `list`, `debt`.
-Flags: `--allow-unlanded`, `--cluster`, `--count`, `--dry-run`, `--ignore-backlog`, `--json`, `--kind`, `--no-slots`, `--profile`, `--ratio`, `--selftest`, `--worker`.
+Flags: `--allow-unlanded`, `--cluster`, `--count`, `--cross-module`, `--dry-run`, `--ignore-backlog`, `--json`, `--kind`, `--no-slots`, `--profile`, `--ratio`, `--selftest`, `--worker`.
 `list --json` keeps its shape `{dir, counts, next}`: `dir` is the brief pool directory, `counts` the registered units by
 state, `next` the first five ready units.
 
@@ -40,8 +40,11 @@ branches, the backlog -> claim + brief + spawn line.
   (`claims.claim`: branch + slot or worktree), then renders the brief at the claim's slug path against the claim's own
   worktree (`promote`) - a brief is never copied from `briefs/pool/`, and the outbox it names always exists.
 * `next --cluster NAME` claims **one lane for every ready unit of a cluster**: a module (`--cluster Network`: every
-  ready unit under `src/Network/`) or a header (`--cluster include/Network/net.h`: every ready unit whose include
-  closure contains it). The claim is keyed `cluster/<name>` and records `units`; every member then reads `claimed`.
+  ready unit under `src/Network/`) or a header (`--cluster include/Network/net.h`: every ready unit **of the header's
+  own module directory** whose include closure contains it - `--cross-module` adds the units of other modules that
+  merely include it, and a top-level header has no module bound). Measured 2026-10-04 on
+  `include/Network/network_transport.h`: 35 units over 8 modules before the bound (enemy, lobby, Pl, stage, hud, ef,
+  quest pulled in through a hub include), 17 `Network` units after; the reason line names how many it left out. The claim is keyed `cluster/<name>` and records `units`; every member then reads `claimed`.
   The lane gets `briefs/<slug>.md` (the index: the members, the cluster's ack key and its one outbox) plus one brief
   per member under `briefs/<slug>/`.
 * `next --count N` claims up to N lanes at once and **no two share an owner header or a module** (`disjoint_picks`,

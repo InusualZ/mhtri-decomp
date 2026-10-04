@@ -3,8 +3,11 @@ kind -> profile table; the resume line that answers a lane. Spec: docs/tools/spe
 from __future__ import annotations
 
 import os
+import re
 import shlex
 import uuid
+
+from tools.lib.lanes import naming
 
 #: Longer than this and the task is staged as a file and fed on stdin (Windows caps a command line near 32 K).
 INLINE_LIMIT = 8000
@@ -132,6 +135,57 @@ def tree_block(main: str, path: str) -> str:
     lines.append("**Do not land.** A worker never runs `land.py` and never commits on `main` - landing is the")
     lines.append("orchestrator's job, exactly as teardown is.")
     return "\n".join(lines).strip("\n")
+
+
+_UNITS_LINE_RE = re.compile(r"(?mi)^\s*units?\s*:\s*(.+)$")
+
+
+def _drop_parens(text: str) -> str:
+    """`text` without its (possibly nested) parenthesised asides - a task's notes on a unit (`(Matching)`)."""
+    out, depth = [], 0
+    for ch in text:
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth = max(0, depth - 1)
+        elif depth == 0:
+            out.append(ch)
+    return "".join(out)
+
+
+def task_units(task: str) -> list[str]:
+    """The unit names a task's first `Units:` line lists (comma-separated; asides in parentheses and a trailing
+    period dropped), in order and de-duplicated; `[]` when the task names none."""
+    m = _UNITS_LINE_RE.search(task or "")
+    if not m:
+        return []
+    out: list[str] = []
+    for part in _drop_parens(m.group(1)).split(","):
+        tok = re.match(r"\s*`?([A-Za-z_][\w./-]*)", part)
+        if tok:
+            name = tok.group(1).rstrip(".")
+            if name and name not in out:
+                out.append(name)
+    return out
+
+
+def resolve_units(names: list[str], registered: list[str]) -> tuple[list[str], list[str]]:
+    """`(units, unresolved)`: each name as the registered unit it spells (`Dir/stem`, extensionless) - a path is
+    taken as given, a bare stem must match exactly one registered unit's basename; the rest are unresolved."""
+    stems: dict[str, list[str]] = {}
+    for unit in registered:
+        u = naming.norm_unit(unit.strip("/"))
+        stems.setdefault(u.rsplit("/", 1)[-1], []).append(u)
+    units, unresolved = [], []
+    for name in names:
+        n = naming.norm_unit(name.strip("/"))
+        hit = [n] if "/" in n else stems.get(n, [])
+        if len(hit) == 1:
+            if hit[0] not in units:
+                units.append(hit[0])
+        else:
+            unresolved.append(name)
+    return units, unresolved
 
 
 def resume_call(cwd: str, session_id: str, message: str) -> str:

@@ -130,8 +130,19 @@ def ack(unit: str, main: str, agent: str | None = None, progress: str | None = N
 
 # --- the views ------------------------------------------------------------------------------------------------
 
+UNREGISTERED = "(unregistered)"
+
+
+def unregistered(row: dict) -> bool:
+    """A view row no registry entry backs - a stray worktree, or a lane `slots.py spawn` took (its slot lock
+    names it): the registry teardowns (`release_merged`, `expire --apply`) skip it."""
+    return row.get("unit") == UNREGISTERED or row.get("registered") is False
+
+
 def claims_view(main: str) -> list[dict]:
-    """Every worker claim git or the registry knows about, enriched with what the worker left behind."""
+    """Every worker claim git or the registry knows about, enriched with what the worker left behind. A row
+    whose claim records a unit set (a cluster claim's `units`, a spawned lane's slot lock) carries it as
+    `units`; a lane a slot lock names but the registry does not is `registered: False` under the lock's name."""
     reg = load_registry(main)
     rows: list[dict] = []
     seen: set[str] = set()
@@ -142,12 +153,26 @@ def claims_view(main: str) -> list[dict]:
         seen.add(branch)
         unit = next((u for u, v in reg.items() if v.get("branch") == branch), None)
         record = reg.get(unit or "", {})
-        rows.append({"unit": unit or "(unregistered)", "branch": branch, "worktree": wt.path,
+        extra: dict = {}
+        if unit is None:
+            lock = pool.lock_for_path(main, wt.path)
+            if lock.get("unit") and lock.get("branch") == branch:
+                extra = {"registered": False, "kind": lock.get("kind")}
+                if lock.get("units"):
+                    extra["units"] = list(lock["units"])
+                label = lock["unit"]
+            else:
+                label = UNREGISTERED
+        else:
+            label = unit
+            if record.get("units"):
+                extra["units"] = list(record["units"])
+        rows.append({"unit": label, "branch": branch, "worktree": wt.path,
                      "worker": record.get("worker"), "claimed_at": record.get("claimed_at"),
                      "base": record.get("base"), "merged": merged_into_main(main, branch),
                      "outbox": bool(unit and os.path.exists(outbox_path(main, unit))),
                      "acked": bool(unit) and os.path.exists(ack_path(main, unit)),
-                     "exists": os.path.isdir(wt.path)})
+                     "exists": os.path.isdir(wt.path), **extra})
     for unit, record in reg.items():
         branch = record.get("branch")
         if branch in seen:
@@ -157,7 +182,8 @@ def claims_view(main: str) -> list[dict]:
                      "claimed_at": record.get("claimed_at"), "base": record.get("base"),
                      "merged": bool(branch) and merged_into_main(main, branch),
                      "outbox": os.path.exists(outbox_path(main, unit)),
-                     "acked": os.path.exists(ack_path(main, unit)), "exists": os.path.isdir(path)})
+                     "acked": os.path.exists(ack_path(main, unit)), "exists": os.path.isdir(path),
+                     **({"units": list(record["units"])} if record.get("units") else {})})
     return sorted(rows, key=lambda r: r["unit"])
 
 
@@ -170,7 +196,7 @@ def claim_status(main: str, ack_seconds: float = 120, stall_minutes: float = 20,
     for row in (claims_view(main) if view is None else view):
         unit = row["unit"]
         record = reg.get(unit, {})
-        data = load_ack(main, unit) if unit != "(unregistered)" else {}
+        data = load_ack(main, unit) if not unregistered(row) else {}
         claimed = _age_seconds(row.get("claimed_at"))
         acked = _age_seconds(data.get("acked_at"))
         progress = _age_seconds(data.get("last_progress_at"))
@@ -418,7 +444,7 @@ def release_merged(main: str, dry_run: bool = False, probe=None) -> dict:
     out: dict = {"released": [], "skipped": [], "refused": [], "complete": True, "dry_run": dry_run}
     for row in claims_view(main):
         unit, branch = row["unit"], row.get("branch")
-        if unit == "(unregistered)":
+        if unregistered(row):
             out["skipped"].append({"unit": unit, "branch": branch, "why": "no registry entry"})
             continue
         if not row.get("merged"):
@@ -484,7 +510,7 @@ def expire(main: str, minutes: int, apply: bool) -> list[dict]:
             stale.append(row)
     if apply:
         for row in stale:
-            if row["unit"] == "(unregistered)":
+            if unregistered(row):
                 row["released"] = False
                 row["error"] = "no registry entry"
                 continue
@@ -1042,6 +1068,9 @@ def main() -> int:
             print("%-34s %-30s %-10s %-7s %-7s %-7s %s"
                   % (row["unit"][:34], (row["branch"] or "")[:30], (row.get("worker") or "")[:10],
                      row["merged"], row["outbox"], row.get("acked", False), row.get("claimed_at") or ""))
+            if row.get("units"):
+                print("    holds %d unit(s)%s: %s" % (len(row["units"]), " (slot lock, no registry row)"
+                                                       if row.get("registered") is False else "", ", ".join(row["units"])))
         stranded = [r for r in rows if not r.get("acked", False)]
         if stranded:
             print()

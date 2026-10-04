@@ -26,7 +26,10 @@ python tools/units/claims.py --selftest
 ```
 `release`'s step list (`done`/`skip`/`would`/`FAILED` lines) and its final `complete` are parsed by lanes and the gate
 and stay as they were. `list --json` rows: `unit, branch, worktree, worker, claimed_at, base, merged, outbox, acked,
-exists` (unchanged).
+exists` (unchanged for an old row), plus `units` when the claim records a unit set (a cluster claim's registry row,
+a spawned lane's slot lock) and `registered: false` / `kind` for a lane `slots.py spawn` took (listed under its lock's
+name, e.g. `lane/net2-l2`, instead of `(unregistered)`). The text `list` prints a `holds N unit(s): ...` line under
+such a row.
 
 ## Inputs and outputs
 
@@ -40,6 +43,11 @@ session registry -> branch + slot/worktree + registry row; teardown steps.
   reconstructs from the worktrees when the registry is missing, and the registry is a convenience on top.
 * A claim may hold several units (`units` in its row: a `queue.py next --cluster` claim); every listed unit reads as
   claimed, and its brief names the cluster's outbox (`lib.lanes.registry.record_holding`).
+* A spawned lane has no registry row; its slot lock carries its unit set (`slots.py spawn --units`, else the task's
+  `Units:` line), `claims_view` reads it through `lib.lanes.pool.lock_for_path`, and `integrate.py`'s live-owner check
+  counts every unit it holds. Such a row is `unregistered(row)`: `release --all-merged` and `expire --apply` skip it
+  (the slot's own `release` is its teardown, and clears the unit set with the lock). Before 2026-10-04 the network
+  pilot's lanes listed as `(unregistered)` with no units, so integrate saw no owner for their files.
 * `release` is the **one-shot, idempotent** teardown: rescue ref (+ its verdict) -> slot return, or worktree remove
   -> prune -> branch delete -> registry entry -> ack file. Every step reports what it did or why it was skipped
   (`lib.lanes.teardown`), so releasing an already-released claim is a clean no-op. Refusals: an unmerged claim with
