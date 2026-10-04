@@ -122,7 +122,8 @@ def test_snapshot_and_regression(c):
     r1 = _rep({"main/u": (50.0, 300, {"f": (100, 100.0), "g": (100, 40.0), "h": (100, None)}),
                "main/auto_01_80000000_text": (0.0, 4, {"x": (4, 10.0)})})
     snap = report.snapshot(r1)
-    c.check("the snapshot lists sub-100 symbols, an unscored one at 0.0", snap["main/u"]["symbols"], {"g": 40.0, "h": 0.0})
+    c.check("the snapshot lists every symbol, an unscored one at 0.0, and marks the row",
+            (snap["main/u"]["symbols"], snap["main/u"]["all"]), ({"f": 100.0, "g": 40.0, "h": 0.0}, True))
     c.check("an older report's match_percent is read",
             report.snapshot({"units": [{"name": "u", "functions": [{"name": "f", "match_percent": 5.0}]}]})["u"]["symbols"],
             {"f": 5.0})
@@ -141,6 +142,19 @@ def test_snapshot_and_regression(c):
     c.check("the average speaks when nothing grew and no symbol fell",
             report.regression(base, snapped({"g": 40.0, "h": 0.0}, fuzzy=45.0))[0], [("main/u", "unit fuzzy", 50.0, 45.0)])
     c.check("more matched bytes is growth", report.unit_grew(base["main/u"], snapped({"g": 40.0, "h": 0.0}, matched=200)["main/u"]), True)
+    c.check("... read as numbers: the report stores matched_code as a string",
+            report.unit_grew(snapped({"g": 40.0}, matched="100")["main/u"], snapped({"g": 40.0}, matched="200")["main/u"]),
+            True)
+    full = snapped({"f": 100.0, "g": 40.0, "h": 0.0})
+    full["main/u"]["all"] = True
+    c.check("a symbol at 100 % that fell is a drop (the full snapshot sees it)",
+            report.regression(full, snapped({"f": 90.0, "g": 40.0, "h": 0.0}))[0], [("main/u", "f", 100.0, 90.0)])
+    c.check("... and so is one that lost its score (100 -> unscored = 0.0)",
+            report.regression(full, snapped({"f": 0.0, "g": 40.0, "h": 0.0}))[0], [("main/u", "f", 100.0, 0.0)])
+    c.check("a rename of a 100 % symbol is not growth (unit_grew reads the sub-100 % set)",
+            report.unit_grew(full["main/u"], snapped({"f2": 100.0, "g": 40.0, "h": 0.0})["main/u"]), False)
+    c.check("a pre-WP4 base (sub-100 only) against a full snapshot: a symbol at 100 % after is no drop or growth",
+            report.regression(base, snapped({"f": 100.0, "g": 40.0, "h": 0.0})), ([], []))
     c.check("an allowed unit's drop is authorised",
             report.regression(base, snapped({"g": 30.0, "h": 0.0}), ["main/u"]), ([], [("main/u", "g", 40.0, 30.0)]))
     auto = {"main/auto_01_80000000_text": {"fuzzy": 9.0, "matched_code": 1, "symbols": {"x": 10.0}}}

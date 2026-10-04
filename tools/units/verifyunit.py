@@ -150,6 +150,16 @@ def target_object_snapshot(main: str) -> dict[str, str | None]:
     The fingerprint is `target_object_fingerprint`, not the file's hash: a rename must not read as a
     re-range (see that function).
     """
+    return _target_objects(main, target_object_fingerprint)
+
+
+def target_object_hashes(main: str) -> dict[str, str | None]:
+    """`{unit_stem: sha256 of the split target object's bytes | None}` - the raw half beside
+    `target_object_snapshot`: a unit whose bytes changed while its fingerprint did not changed by names only."""
+    return _target_objects(main, objcompare.file_sha256)
+
+
+def _target_objects(main: str, digest) -> dict[str, str | None]:
     try:
         splits_text = open(_join(main, "config/RMHE08/splits.txt"), encoding="utf-8",
                            errors="replace").read()
@@ -158,8 +168,20 @@ def target_object_snapshot(main: str) -> dict[str, str | None]:
     out: dict[str, str | None] = {}
     for stem in sorted(splits_unit_names(splits_text)):
         path = _join(main, target_object_rel(stem))
-        out[stem] = target_object_fingerprint(path) if os.path.exists(path) else None
+        out[stem] = digest(path) if os.path.exists(path) else None
     return out
+
+
+def names_only_changes(fp_before: dict, fp_after: dict, raw_before: dict, raw_after: dict,
+                       batch_stems: list[str]) -> list[str]:
+    """The units the batch does not name whose split target object changed by names only: the same fingerprint,
+    different bytes (a `symbols.txt` rename rewrites every referencing unit's symbol table). Not drift - reported so
+    the landing can name them."""
+    batch = {unit_stem(u) for u in batch_stems}
+    return sorted(s for s in set(fp_before) & set(fp_after)
+                  if s not in batch and fp_before[s] is not None and fp_before[s] == fp_after[s]
+                  and raw_before.get(s) is not None and raw_after.get(s) is not None
+                  and raw_before[s] != raw_after[s])
 
 
 def target_drift_problems(before: dict[str, str | None], after: dict[str, str | None],

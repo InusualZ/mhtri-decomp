@@ -3,6 +3,7 @@ Spec: docs/tools/spec/lib-cli.md. CLI: none (library)."""
 from __future__ import annotations
 
 import argparse
+import ast
 import os
 import re
 import subprocess
@@ -26,6 +27,42 @@ _FLAGS = {
 #: How `tools/selftest.py` recognises a tool that runs its own selftest: it registers `--selftest`, or it is a
 #: `Tool` built with `tests=`.
 SELFTEST_FLAG = re.compile(r"""add_argument\(\s*['"]--selftest['"]|\bTool\([^)]*\btests\s*=""")
+
+
+def package_of(rel: str, files: set[str] | frozenset[str]) -> str | None:
+    """The tool package `rel` belongs to: its topmost directory below `tools/` that has an `__init__.py`
+    (`tools/mwlink/trace.py` -> `tools/mwlink`), never `tools/lib` or `tools/tests`. `files` is the tree's
+    `tools/**/*.py` as forward-slash paths. A package is one tool split into modules."""
+    parts = rel.split("/")
+    for depth in range(2, len(parts)):
+        d = "/".join(parts[:depth])
+        if d not in ("tools/lib", "tools/tests") and d + "/__init__.py" in files:
+            return d
+    return None
+
+
+def is_entry_point(rel: str, tree: ast.Module) -> bool:
+    """A file run as a program: a module-level `if __name__ == "__main__":`, or a test module."""
+    name = rel.rsplit("/", 1)[-1]
+    if rel.startswith("tools/tests/") and name.startswith("test_"):
+        return True
+    for node in tree.body:
+        if isinstance(node, ast.If) and isinstance(node.test, ast.Compare) \
+                and isinstance(node.test.left, ast.Name) and node.test.left.id == "__name__":
+            return True
+    return False
+
+
+def runs_own_selftest(rel: str, text: str, files: set[str] | frozenset[str]) -> bool:
+    """Whether `tools/selftest.py` runs `python <rel> --selftest`: the text registers the flag (`SELFTEST_FLAG`),
+    the file is an entry point (`is_entry_point`) and it is not a module of a tool package (`package_of`) - a
+    package module that mentions the flag (a CLI module the package's shim imports) runs nothing on its own."""
+    if not SELFTEST_FLAG.search(text) or package_of(rel, files) is not None:
+        return False
+    try:
+        return is_entry_point(rel, ast.parse(text))
+    except SyntaxError:
+        return True        # a broken tool still runs (and fails) rather than vanishing from the inventory
 
 _REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

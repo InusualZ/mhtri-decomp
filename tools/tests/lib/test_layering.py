@@ -9,7 +9,7 @@ import ast
 import json
 from pathlib import Path
 
-from tools.lib import testing
+from tools.lib import cli, testing
 from tools.tests.lib.test_prologue import tool_files
 
 TIER = "smoke"
@@ -79,16 +79,8 @@ class Resolver:
         return cands[0] if cands else None
 
 
-def package_of(rel: str, files: set[str]) -> str | None:
-    """The tool package `rel` belongs to: its topmost directory below `tools/` that has an `__init__.py`
-    (`tools/mwlink/trace.py` -> `tools/mwlink`), never `tools/lib` (lib imports are not edges anyway) or
-    `tools/tests`. A package is one tool split into modules, so an import inside it is not a tool->tool edge."""
-    parts = rel.split("/")
-    for depth in range(2, len(parts)):
-        d = "/".join(parts[:depth])
-        if d not in ("tools/lib", "tools/tests") and d + "/__init__.py" in files:
-            return d
-    return None
+#: The tool package a file belongs to (`lib.cli.package_of`): an import inside one package is not an edge.
+package_of = cli.package_of
 
 
 def edges(root: Path) -> tuple[set[tuple[str, str]], list[tuple[str, str]]]:
@@ -226,7 +218,7 @@ def prune() -> int:
     keep = [k for k in allow if k in have]
     data = json.loads(ALLOW_FILE.read_text(encoding="utf-8"))
     data["edges"] = keep
-    ALLOW_FILE.write_text(json.dumps(data, indent=1) + "\n", encoding="utf-8", newline="\n")
+    testing.rewrite_json(ALLOW_FILE, data)   # the file's own indent: a prune is a minimal diff
     print("pruned %d edge(s); %d allowed" % (len(allow) - len(keep), len(keep)))
     return 0
 

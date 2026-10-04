@@ -34,7 +34,6 @@
     "tools/units/dossier_selftest.py",
     "tools/units/flipcheck_selftest.py",
     "tools/units/handoff.py",
-    "tools/units/land.py",
     "tools/units/ledger.py",
     "tools/units/ledger_selftest.py",
     "tools/units/linkorder.py",

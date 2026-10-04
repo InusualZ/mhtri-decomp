@@ -26,7 +26,7 @@ older than the sources it describes.
   added/removed, regression flags; `MEASURE_ORDER`, `REGRESSION_KEYS`, `DEFAULT_EPS`); `compare(before, after, eps,
   before_path, after_path)` - the whole two-report diff with the "every moved row that fell" verdict as `exit`
   (0 clean, 1 a drop, 2 nothing comparable) - `reportdiff`'s payload.
-* The gate's rule: `snapshot(report) -> {unit: {fuzzy, matched_code, symbols: {name: score < 100}}}`, `unit_grew(prior,
+* The gate's rule: `snapshot(report) -> {unit: {fuzzy, matched_code, symbols: {name: score}, all: True}}`, `unit_grew(prior,
   after)`, `regression(before, after, allow=(), eps) -> (unauthorised, authorised)` as `(unit, what, before, after)`.
 * Scoring: `score(target, base, unit_name, tmpdir, *, objdiff, cwd, runner) -> Report` (raises `ReportError`),
   `score_entries(...) -> {symbol: entry} | {"_error": text}`, `symbol_score(...) -> {symbol, match_percent, target_size,
@@ -95,11 +95,12 @@ reasons). The integration rows (the real objects) stay in `tools/objdiff/metric_
   two whole reports - `reportdiff`, and `measure`'s baseline count reads the same `moved`/`direction`) and `regression`
   (the gate, over two `snapshot`s). WP3b folded `reportdiff`'s verdict and `measure.moved_summary` onto `moved`; folding
   them onto `regression` would import its two blind spots below into tools that do not have them.
-* `regression` cannot see a symbol that was at 100 % and fell: `snapshot` holds only sub-100 % symbols, so the fallen
-  symbol is "new" (an extension), never a drop - including one that lost its score (100 -> unscored = 0 %). A gate
-  behaviour change; WP4 decides.
-* `unit_grew`'s matched-bytes signal compares numbers, but the report stores `matched_code` as a string, so in practice only
-  the symbol-set signal fires. Kept as found (a gate behaviour change); WP4 decides.
+* WP4 decided both blind spots by replaying the last 15 report-affecting landings' fresh base/after reports
+  (`.pi/notes/worktree-agent-a67d2563a558742ce.md`, the WP4 report): `snapshot` now holds every symbol (`"all": True`), so a symbol at 100 % that falls, or
+  loses its score (100 -> 0.0), is a drop (none did in the 15); `unit_grew` reads `matched_code` as a number (its answer
+  changed for 14 unit pairs, no verdict) and keeps reading the sub-100 % set of either format (counting a full
+  snapshot's 100 % names would make a rename "growth": it would have flipped 7210b07c9's `ef/effect` allowance to
+  stale). Verdicts on the 15: identical, also against a pre-WP4 (sub-100) base.
 * `source_closure` delegates to `lib.cscan.include_closure` since WP3d (depth first, the preprocessor's order; comments
   removed through `cscan.remove_comments` before `cscan.includes`; no depth cap - each file is visited once). The one
   output that moved is the order of `unitscore --json`'s `sources.paths`: on the 354 registered units the set is the

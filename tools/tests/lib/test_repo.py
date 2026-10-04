@@ -171,6 +171,9 @@ def test_scratch_state_session(c):
         c.check("state names the .pi file", repo.state("claims.json", tree.root).relative_to(tree.root).as_posix(),
                 ".pi/claims.json")
         c.raises("state refuses a name off the one list", ValueError, repo.state, "random.json", tree.root)
+        c.check("the heartbeat dir and the landing log are on the list (WP4)",
+                [repo.state(n, tree.root).relative_to(tree.root).as_posix() for n in ("ack", "land-log.jsonl")],
+                [".pi/ack", ".pi/land-log.jsonl"])
     d = repo.session_tmpdir()
     c.check("session_tmpdir is one directory per process", (repo.session_tmpdir() == d, os.path.isdir(d)), (True, True))
     env = dict(os.environ, PYTHONPATH=str(Path(repo.__file__).parents[2]))

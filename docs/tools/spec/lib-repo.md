@@ -24,7 +24,8 @@ originals hash to. It is also the choke point of the fixture tier's live-tree re
 * `is_served(root) -> bool` (WP3c): whether `root` is `repo_root()`, the tree `$MHTRI_MAIN` applies to (`unitutil._serves`
   for a lib caller); always False under the fixture tier, which never resolves the live tree.
 * `session_tmpdir()`: one unique directory per process under the system temp, removed at exit.
-* `scratch(tool, root) -> build/tmp/<tool>/` (created); `state(name, root) -> .pi/<name>` for a name on `STATE_NAMES`.
+* `scratch(tool, root) -> build/tmp/<tool>/` (created); `state(name, root) -> .pi/<name>` for a name on `STATE_NAMES` (WP4 added `ack`, the heartbeat directory
+  `lib.lanes.registry.ack_path` resolves through it, and `land-log.jsonl`, `lib.lanes.landlog.log_path`'s).
 * `ground_truth(root) -> {rel path: sha1}` from `config.yml`'s `hash`/`selfile_hash`; `verify_ground_truth(root)`.
 * `config_change(old, new) -> {ok, reason, changed}`: may this `config.yml` change be committed - only when every
   differing top-level key is in `CONFIG_MUTABLE_KEYS` (`block_relocations`, `add_relocations`; owner ruling

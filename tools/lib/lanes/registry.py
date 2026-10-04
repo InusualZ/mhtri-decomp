@@ -128,8 +128,8 @@ def notes_path(main: str, unit: str) -> str:
 
 
 def ack_path(main: str, unit: str) -> str:
-    """The heartbeat, keyed by the unit (a branch suffix must not move it)."""
-    return os.path.join(main, ".pi", "ack", naming.ack_name(unit))
+    """The heartbeat, keyed by the unit (a branch suffix must not move it); under `lib.repo.state("ack")`."""
+    return os.path.join(str(librepo.state("ack", main)), naming.ack_name(unit))
 
 
 def load_ack(main: str, unit: str) -> dict:
@@ -161,6 +161,12 @@ def branch_exists(main: str, branch: str) -> bool:
 
 def ref_exists(main: str, ref: str) -> bool:
     return Git(main).run("show-ref", "--verify", "--quiet", ref).returncode == 0
+
+
+def rescue_exists(main: str, unit: str) -> str | None:
+    """The rescue ref holding `unit`'s work (`naming.rescue_ref`), or None."""
+    ref = naming.rescue_ref(unit)
+    return ref if ref_exists(main, ref) else None
 
 
 def worker_branches(main: str) -> set[str]:

@@ -319,10 +319,12 @@ def compare(before: "Report | dict", after: "Report | dict", eps: float = DEFAUL
 
 
 def snapshot(report: "Report | dict | None") -> dict:
-    """`{unit: {"fuzzy", "matched_code", "symbols": {name: score < 100}}}` - what a batch is judged against.
+    """`{unit: {"fuzzy", "matched_code", "symbols": {name: score}, "all": True}}` - what a batch is judged against.
 
-    A symbol is listed when it is below 100 % under the 0 % rule (an unscored function is listed at 0.0);
-    an older report's `match_percent` is read when `fuzzy_match_percent` is absent.
+    Every function is listed under the 0 % rule (an unscored one at 0.0), so a symbol at 100 % that falls - or loses
+    its score - is visible to `regression`; `"all"` marks the row (a snapshot written before WP4 listed only the
+    sub-100 % symbols and has no marker). An older report's `match_percent` is read when `fuzzy_match_percent` is
+    absent.
     """
     out = {}
     for unit in Report.coerce(report).units():
@@ -331,32 +333,41 @@ def snapshot(report: "Report | dict | None") -> dict:
         for fn in unit.get("functions") or []:
             pct = fn.get(SCORE_KEY, fn.get("match_percent"))
             pct = float(pct) if isinstance(pct, (int, float)) and not isinstance(pct, bool) else 0.0
-            if fn.get("name") and pct < 100.0:
+            if fn.get("name"):
                 symbols[fn["name"]] = round(pct, 4)
         if measures or symbols:
             out[unit["name"]] = {"fuzzy": measures.get(SCORE_KEY), "matched_code": measures.get("matched_code"),
-                                 "symbols": symbols}
+                                 "symbols": symbols, "all": True}
     return out
 
 
+def _below_100(row: dict) -> dict:
+    """A snapshot row's sub-100 % symbols - the set `unit_grew` reads for either snapshot format."""
+    return {s: v for s, v in (row.get("symbols") or {}).items() if not isinstance(v, (int, float)) or v < 100.0}
+
+
 def unit_grew(prior: dict, after: dict, eps: float = DEFAULT_EPS) -> bool:
-    """A snapshot row only gained: a sub-100 % symbol it did not hold, or more matched bytes."""
-    prior_syms = prior.get("symbols") or {}
-    after_syms = after.get("symbols") or {}
+    """A snapshot row only gained: a sub-100 % symbol it did not hold, or more matched bytes.
+
+    The symbol half reads the sub-100 % symbols of either format (a full snapshot's 100 % rows would count a rename
+    as growth); the bytes half reads `matched_code` as a number (the report stores it as a string)."""
+    prior_syms, after_syms = _below_100(prior), _below_100(after)
     if len(after_syms) > len(prior_syms) or any(s not in prior_syms for s in after_syms):
         return True
-    bm, am = prior.get("matched_code"), after.get("matched_code")
-    return isinstance(bm, (int, float)) and isinstance(am, (int, float)) and am > bm + eps
+    bm, am = num(prior.get("matched_code")), num(after.get("matched_code"))
+    return bm is not None and am is not None and am > bm + eps
 
 
 def regression(before: dict, after: dict, allow: list[str] | tuple = (),
                eps: float = DEFAULT_EPS) -> tuple[list[tuple], list[tuple]]:
     """The one regression rule over two `snapshot`s -> (unauthorised, authorised) as (unit, what, before, after).
 
-    A symbol the previous snapshot held whose score fell is a drop, whatever the aggregate did; a symbol it
-    did not hold is new, never a drop; a symbol gone from `after` reached 100 %. The unit average speaks only
-    when no symbol does and the unit did not grow (`unit_grew`). `auto_*` scaffold units (outside `/auto/`)
-    are bookkeeping. `allow` names units whose drops an explicit rule authorised (substring match).
+    A symbol the previous snapshot held whose score fell is a drop, whatever the aggregate did - from 100 % too, and
+    to 0.0 when it lost its score (a full snapshot holds every symbol); a symbol it did not hold is new, never a
+    drop; a symbol gone from `after` is not judged by name (it reached 100 % under a pre-WP4 snapshot, or it was
+    renamed or moved). The unit average speaks only when no symbol does and the unit did not grow (`unit_grew`).
+    `auto_*` scaffold units (outside `/auto/`) are bookkeeping. `allow` names units whose drops an explicit rule
+    authorised (substring match).
     """
     unauthorised, authorised = [], []
     for unit, after_vals in after.items():

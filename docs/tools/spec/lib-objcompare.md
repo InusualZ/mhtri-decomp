@@ -39,7 +39,8 @@ object for drift and for "touched". Every function takes a path, the bytes of an
   providers, ref_count, target_rel, linker_set) -> [(name, hint)]`.
 * Linkage: `linkage_sets(obj) -> (global defined, undefined) | None`, `linkage_audit(our_def, our_undef, tgt_def, tgt_undef)`.
 * Fingerprints: `fingerprint(path) -> str` (target drift), `touch_fingerprint(path, symbols) -> {body, ext} | None`,
-  `fingerprints_equal(a, b)` (TOUCHED).
+  `fingerprints_equal(a, b)` (TOUCHED), `file_sha256(path)` (the raw half the gate pairs with `fingerprint`:
+  `verifyunit.target_object_hashes` / `names_only_changes`, WP4).
 * Constants: `META_SECTIONS`, `DATA_SECTIONS`, `FLIP_DATA_SECTIONS`, `BOOKKEEPING_SECTIONS`, `EABI_LINKER_SYMBOLS`,
   `ENTRY_SYMBOLS`, `LINKER_SYMBOLS`, `LINK_INDEX_REL`, `RENAME_FREE_SECTIONS`, `UNSTABLE_SECTIONS`, `OBJDIFF_SIZE_GAP`.
 

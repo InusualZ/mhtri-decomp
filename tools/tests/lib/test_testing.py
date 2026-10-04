@@ -191,5 +191,25 @@ def test_allowed(c):
     c.check("an unknown TIER is refused", p.returncode != 0 and "TIER must be one of" in p.stderr, True)
 
 
+
+def test_rewrite_json_keeps_the_files_shape(c):
+    import json
+    with tempfile.TemporaryDirectory() as d:
+        two = os.path.join(d, "two.json")
+        text = '{\n  "$comment": "x",\n  "pending": [\n    "a",\n    "b",\n    "c"\n  ]\n}\n'
+        Path(two).write_text(text, encoding="utf-8", newline="\n")
+        c.check("the indent unit is read from the file", (testing.json_indent(text), testing.json_indent("{}")), (2, 1))
+        data = json.loads(text)
+        data["pending"] = ["a", "c"]
+        testing.rewrite_json(two, data)
+        c.check("a prune of an indent-2 file drops one line and changes nothing else",
+                Path(two).read_text(encoding="utf-8"), text.replace('    "b",\n', ""))
+        one = os.path.join(d, "one.json")
+        Path(one).write_text('{\n "edges": [\n  "a -> b"\n ],\n "note": "café"\n}\n', encoding="utf-8")
+        testing.rewrite_json(one, {"edges": [], "note": "café"})
+        c.check("an indent-1 file keeps indent 1 and its raw non-ASCII",
+                Path(one).read_text(encoding="utf-8"), '{\n "edges": [],\n "note": "café"\n}\n')
+
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))

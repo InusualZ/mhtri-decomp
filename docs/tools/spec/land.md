@@ -5,6 +5,7 @@
 ## Purpose
 
 The land gate: one command that runs the batch checklist and refuses to let a bad batch through.
+Since WP4 `land.py` is the CLI shim and the gate is the package `tools/units/landing/` (layout: `landing.md`).
 
 ## Users
 
@@ -34,10 +35,14 @@ Exit codes: `verify` 0 when every row passed, 1 otherwise; `land` prints one `LA
 
 Inputs -> outputs: main tree, branch, .pi/land-base.json -> rows, commit.
 
-## The rows of `verify` (hand-tightened from `land.py:2474-2943`; the order is the run order)
+## The rows of `verify` (the order is the run order: `landing/gate.py` `PRE_BUILD`, then the build; one function per row in `landing/rows/`)
 
-1. ground truth: `build.sha1` equals the DOL's hash (GATE).
-2. `main` has not moved since the batch base; the base was recorded (`record-base`) (BOOKKEEPING).
+1. ground truth: `build.sha1` equals the DOL's hash, both read in the tree the gate judges (GATE; before WP4 they
+   were read in the tree `prepcommit.py` lives in - the same tree for a gate run in MAIN).
+2. `main` has not moved since the batch base; the base was recorded (`record-base`) (BOOKKEEPING). `record-base`
+   rebuilds `build/RMHE08/report.json` (`ninja`) before it snapshots it, so the base's scores are the base tree's; a
+   rebuild that failed or changed the tree adds the row "the batch base's report.json was rebuilt at record-base"
+   (BOOKKEEPING; no row otherwise, and none for a base recorded before WP4).
 3. every changed path belongs to the batch (tool scratch `d<digits>.json`/`t<digits>.json` is tolerated and named); no batch file carries a conflict marker (GATE).
 4. every unit's outbox validates (`handoff.validate`; skipped with a printed note for `--branch` naming a branch that is not `worker/<slug>` - only a claim's lane writes an outbox, while a `worker/*` branch and a `--units` landing stay strict); every unit's branch carries its work as commits; batch units named (or `--no-outbox` for an orchestrator-only batch) (BOOKKEEPING).
 5. style lint (section 6.5) adds no violation (`stylelint --diff <base>`, add-only, with rename/move credits) (GATE).
@@ -51,9 +56,14 @@ Inputs -> outputs: main tree, branch, .pi/land-base.json -> rows, commit.
 13. every unit the batch flips to `Matching` is `flipcheck` READY (GATE).
 14. rule 10 (vtable ownership) adds no violation (`vtableaudit --diff`, add-only; `--allow-rule10` records an allowance) (GATE).
 15. data closure: no batch unit's target object references data no claim covers, and no unit the batch really changes leaves data only it references unclaimed (`datagap` snapshot rows; `--allow-orphan`) (GATE); the base must carry the snapshot (BOOKKEEPING).
-16. no unit's split target object moved under the batch (a neighbour re-ranged) (GATE).
+16. no unit's split target object moved under the batch (a neighbour re-ranged) (GATE) - "moved" is the
+    rename-insensitive `objcompare.fingerprint`; a unit the batch does not name whose bytes changed by names only (a
+    map rename rewrites its symbol table) is not drift and is listed in the row's evidence and the gate log
+    ("name them in --units"), never auto-added: the replay of the last 15 report-affecting landings found such units in 7 of them (79 registered units),
+    and adding them would put them under the unit-scoped rows (undefined references, the strict data closure) a
+    replay of reports cannot judge - a proposal, not a change.
 17. per-symbol re-measure reproduces the report from the objects (`verifyunit.verify_units`): fresh `report generate`, 100 % claims checked against bytes, the unit percent reproduced from its partials (GATE).
-18. no symbol or unit regressed (per symbol; a NEW symbol is never a regression; the unit average only for a unit that did not grow); every `--allow-regression` was actually needed (GATE).
+18. no symbol or unit regressed (per symbol, every symbol - one at 100 % that fell or lost its score included; a NEW symbol is never a regression; the unit average only for a unit that did not grow, `matched_code` read as a number); every `--allow-regression` was actually needed (GATE).
 19. `ok` was recreated by THIS run (the stamp is deleted before the run) (GATE).
 20. knowledge delta present if the batch improved something (`playbook`, a warning) and the ledger delta is reported.
 21. claim released for every gated unit (`claims.release`; deferred when a row above failed; `--no-release` skips) (BOOKKEEPING).
@@ -71,17 +81,21 @@ Inputs -> outputs: main tree, branch, .pi/land-base.json -> rows, commit.
 
 ## Lib dependencies
 
-findings, git, project, report, units, objcompare, outbox, lanes, proc.
+findings, git, lanes, project, proc, repo, report (the per-module list is `landing.md`).
 
 ## Test contract
 
-Tier: fixture (GitFixture + FixtureTree); smoke: a no-op verify on the live tree.
-Today's selftest: in-file `selftest()` (`--selftest`).
-Target: `tools/tests/units/test_land.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
+Tier: fixture. `tools/tests/units/test_land.py` (the re-homed in-file selftest, 467 checks; `land.py --selftest`
+forwards to it and to `tools/tests/units/landing/`) and `tools/tests/units/landing/test_gate_golden.py` (the table on
+eleven fixture batches, against `gate_golden.py` recorded from the monolith). The live-tree comparison (the same rows
+on replayed landings) is a measurement in the WP4 report, not a suite test: a live `verify` runs the lint and the
+suite.
 
 ## Known gaps
 
-the gate shells out to flipcheck/langcheck/stylelint/ledger/playbook/selftest/commitlint and parses text; `linkorder` is not a row; `land --branch` (with `resolve`) is the one landing path (questions.md 2, ruled)
+the gate shells out to flipcheck/stylelint/ledger/selftest/commitlint and parses their output (the tools have no
+row API yet); `linkorder` is not a row; `verify --json` is accepted and ignored; `land --branch` (with `resolve`) is
+the one landing path (questions.md 2, ruled)
 
 ## History (the incidents behind the rules - keep the rule, drop the narrative when the rule is stable)
 

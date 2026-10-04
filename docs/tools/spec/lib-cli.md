@@ -16,6 +16,10 @@ flag exists, the exit convention applied to whatever `main` returns, and the JSO
 * `COMMON = ("json", "root", "main", "limit", "dry_run", "quiet")` - the flags `--json`, `--root` (default `.`),
   `--main`, `--limit N`, `--dry-run`, `--quiet`.
 * `SELFTEST_FLAG`: how the runner recognises a tool that runs its own selftest.
+* `package_of(rel, files)`: the topmost tool package (a directory below `tools/` with `__init__.py`, never
+  `tools/lib`/`tools/tests`) a file belongs to; `is_entry_point(rel, tree)`: a module-level `__main__` guard or a
+  test module; `runs_own_selftest(rel, text, files)`: the flag, an entry point, not a package module (WP4: the one
+  copy `selftest.py`, `tests/lib/test_layering.py` and `tests/lib/test_prologue.py` call).
 
 ## Invariants and rules
 
