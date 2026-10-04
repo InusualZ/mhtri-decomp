@@ -17,9 +17,12 @@
  * FLAGS.  C++ under `cflags_network` (`-Cpp_exceptions on` gives the `extab`), per-unit `-O3`/`-pool off` (`configure.py`);
  * file-scope `#pragma peephole off` (playbook 39); each `dont_inline` region keeps a retail `bl` that `-inline auto` folds.
  *
- * RESIDUALS.  `send`/`receive`/`move`/`reset` 99.2-99.8 % (the same `NETWORK_ERROR_*` immediates, playbook 58's
- * class; `receive` also has its capacity registers swapped); `.text` differs from the target by 33 B, all
- * relocations.
+ * SHAPES.  `send`/`receive` declare the error code at function scope (a block-scope `error` takes r28, retail
+ * r31) and `receive` declares `cursor, length, length2` in that order (the two length slots at 0xA/0x8).
+ *
+ * RESIDUALS.  Code only in relocations: the `NETWORK_ERROR_*` immediates (0x8003xxxx) are plain `lis`/`addi`
+ * pairs in ours where dtk's split relocates them against `@eti_` extabindex rows; `.text` differs from the
+ * target by 18 B, all such relocation fields.  As `Matching` the DOL hash holds (measured 2026-10-03).
  */
 #include "types.h"
 #include "Network/network_transport.h"
@@ -55,6 +58,7 @@ void NetworkPeerUdp::setContext(const void* context)
    scratch packet and sends it to the peer's slot on the Udp socket; the byte count, or -1. */
 s32 NetworkPeerUdp::send(const u8* data, s32 size, const u8* data2, s32 size2, s8 kind)
 {
+    s32 error;
     u16 prefix;
     u16 prefix2;
     s8 kindByte;
@@ -98,7 +102,7 @@ s32 NetworkPeerUdp::send(const u8* data, s32 size, const u8* data2, s32 size2, s
     }
     result = this->udp_14->send(this->peerIndex_10, networkUdpPacketBuffer, total);
     if (result < 0) {
-        s32 error = this->udp_14->getError();
+        error = this->udp_14->getError();
         networkPeerError_set(this, (const void*)NETWORK_ERROR_PEER_SEND, this->udp_14->getAvailableToRead(), error);
         result = -1;
     }
@@ -109,9 +113,10 @@ s32 NetworkPeerUdp::send(const u8* data, s32 size, const u8* data2, s32 size2, s
    kind byte); the raw byte count, 0 when nothing is queued, -1 on failure. */
 s32 NetworkPeerUdp::receive(u8* out, s32* size, u8* out2, s32* size2, u8* kind)
 {
-    u16 length2;
+    s32 error;
     u8* cursor;
     u16 length;
+    u16 length2;
     s32 received;
     s32 capacity;
     s32 capacity2;
@@ -127,7 +132,7 @@ s32 NetworkPeerUdp::receive(u8* out, s32* size, u8* out2, s32* size2, u8* kind)
     }
     received = this->udp_14->receive(this->peerIndex_10, networkUdpPacketBuffer, 0x5DC);
     if (received < 0) {
-        s32 error = this->udp_14->getError();
+        error = this->udp_14->getError();
         networkPeerError_set(this, (const void*)NETWORK_ERROR_PEER_RECEIVE, this->udp_14->getAvailableToRead(), error);
         return -1;
     }
