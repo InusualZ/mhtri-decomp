@@ -46,11 +46,14 @@ Inputs -> outputs: splits, map, DOL, objects, src -> rows.
   reads the ref's map for the text half, but the objects are the working tree's, so a relocation in them is resolved
   through the working tree's map first and the ref's for a name only it has (`load_tree`'s `object_symbols`): a map
   rename of a table's first entry no longer drops that word from the run and moves the key (L1 round 2,
-  `35fe065d8` vs its parent: 2 added + 2 silent removals before, 0 / 0 after). An added run that still overlaps a
-  removed run of the same section is reported `SHIFTED` (the same table), never added; the removed set is printed
-  (`REMOVED`) and is in the `--json` output (`removed`, `shifted`). Only `added` exits 1. The gate row
-  (`landing/rows/rules.py`) shares the sweep, so the resolution fix reaches it; it does not use `diff_rows`'
-  pairing yet.
+  `35fe065d8` vs its parent: 2 added + 2 silent removals before, 0 / 0 after). An added run whose start AND end
+  each lie within `SHIFT_WORDS` (1) word of a removed run of the same section is reported `SHIFTED` (the same table:
+  its first or last word stopped resolving), never added; the removed set is printed (`REMOVED`) and is in the
+  `--json` output (`removed`, `shifted`). Only `added` exits 1. **An overlap alone does not pair (2026-10-05):** the
+  first version paired any overlap, and a replay of the `850127ccb` recut showed it pairing a new 630-word run with a
+  removed 7-word one (and a 79-word run with an 8-word one) - two of the three rule-10 keys that landing really added
+  (and took as recorded allowances) would have passed silently. The gate row (`landing/rows/rules.py`) shares the
+  sweep **and** `diff_rows` (since 2026-10-05), so the lane-side `--diff` and the gate give one verdict.
 * `--at <addr>` is the census mode: it reads the vtable at `<addr>` straight out of the DOL and prints every slot with the registered unit that **owns** its target (by address, never by name) and the symbol the map names there, plus the reference object's relocation symbol for that slot (`dossier.parse_elf`). One lane hand-built that list twice and got 62 of 114 slots wrong, each time by parsing the DOL header's grouped offset/address/size fields by hand - this mode parses them once, in `dol_segments`/`dol_read`.
 
 ## Lib dependencies

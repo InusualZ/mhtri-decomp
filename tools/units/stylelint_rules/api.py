@@ -3,7 +3,7 @@ Spec: docs/tools/spec/stylelint_rules.md. CLI: none (the stylelint package; `sty
 from __future__ import annotations
 
 from tools.units.stylelint_rules.common import (  # noqa: F401
-    SRC, UNSPLIT, UNSPLIT_UNRESOLVED, HEADERS, HEADER_SUFFIXES, SUFFIXES, EXEMPT, RULE7_NOTES, RULE_NAMES, UNCHECKED,
+    SRC, UNSPLIT, UNSPLIT_UNRESOLVED, HEADERS, HEADER_SUFFIXES, SUFFIXES, EXEMPT, RULE7_NOTES, RULE_NAMES, AUDIT_RULES, UNCHECKED,
     strip, Source, STRUCT_RE, match_brace, struct_defs, iter_fields, field_name, RULE1_TYPE_RE, type_defs,
     is_unsplit_header, is_shared_header, _finding, _rule2_finding, RULE11_MARKER_RE, match_paren, _mask_preproc,
     function_declarations, _untyped_marker, _split_parameters, source_files, rel_of, read_text, all_sources,
@@ -34,7 +34,7 @@ from tools.units.stylelint_rules.r06_pointer_arith import (  # noqa: F401
     _PTR_TYPE, RULE6_RE, MEM_FUNCS, enclosing_call,
 )
 from tools.units.stylelint_rules.r07_generated_name import (  # noqa: F401
-    RULE7_FN_RE, RULE7_UNK_RE, RULE7_LBL_RE, RULE7_DEFER_RE,
+    RULE7_FN_RE, RULE7_UNK_RE, RULE7_LBL_RE,
 )
 from tools.units.stylelint_rules.r08_goto import (  # noqa: F401
     RULE8_RE,
@@ -42,7 +42,7 @@ from tools.units.stylelint_rules.r08_goto import (  # noqa: F401
 from tools.units.stylelint_rules.r09_mangled import (  # noqa: F401
     RULE9_MANGLED_RE, RULE9_CALL_RE, _DECL_HEAD_RE, _DECL_KEYWORDS, _statement_head, looks_like_declaration,
 )
-from tools.units.stylelint_rules.r10_pragma import (  # noqa: F401
+from tools.units.stylelint_rules.r14_pragma import (  # noqa: F401
     CODEGEN_PRAGMAS, CODEGEN_PRAGMA_RE, codegen_pragma_findings,
 )
 from tools.units.stylelint_rules.r11_untyped import (  # noqa: F401
@@ -77,7 +77,8 @@ from tools.units.stylelint_rules.refs import (  # noqa: F401
     rule1_counts_at_ref,
 )
 from tools.units.stylelint_rules.report import (  # noqa: F401
-    budget, unique_names, print_rule2_report, print_budget, source_files_of, select_findings, print_findings_listing,
+    budget, rule10_counts, unique_names, print_rule2_report, print_budget, source_files_of, select_findings,
+    print_findings_listing,
     print_findings,
 )
 from tools.units.stylelint_rules.cli import (  # noqa: F401
@@ -86,7 +87,7 @@ from tools.units.stylelint_rules.cli import (  # noqa: F401
 
 __all__ = [
     "SRC", "UNSPLIT", "UNSPLIT_UNRESOLVED", "HEADERS", "HEADER_SUFFIXES", "SUFFIXES", "EXEMPT", "RULE7_NOTES",
-    "RULE_NAMES", "UNCHECKED", "strip", "Source", "STRUCT_RE", "match_brace", "struct_defs", "iter_fields",
+    "RULE_NAMES", "AUDIT_RULES", "UNCHECKED", "strip", "Source", "STRUCT_RE", "match_brace", "struct_defs", "iter_fields",
     "field_name", "RULE1_TYPE_RE", "type_defs", "is_unsplit_header", "is_shared_header", "_finding",
     "_rule2_finding", "RULE11_MARKER_RE", "match_paren", "_mask_preproc", "function_declarations", "_untyped_marker",
     "_split_parameters", "source_files", "rel_of", "read_text", "all_sources", "header_files",
@@ -101,7 +102,7 @@ __all__ = [
     "OFFSET_RE",
     "UNK_FIELD_RE",
     "_PTR_TYPE", "RULE6_RE", "MEM_FUNCS", "enclosing_call",
-    "RULE7_FN_RE", "RULE7_UNK_RE", "RULE7_LBL_RE", "RULE7_DEFER_RE",
+    "RULE7_FN_RE", "RULE7_UNK_RE", "RULE7_LBL_RE",
     "RULE8_RE",
     "RULE9_MANGLED_RE", "RULE9_CALL_RE", "_DECL_HEAD_RE", "_DECL_KEYWORDS", "_statement_head",
     "looks_like_declaration",
@@ -127,7 +128,8 @@ __all__ = [
     "git_bytes", "changed_src_files", "findings_at_ref", "deleted_src_files", "findings_of_deleted",
     "changed_src_files_between", "findings_of_ref", "unresolved_declarations_of_ref", "sources_of_ref",
     "src_paths_at_ref", "rule1_findings_at_ref", "rule1_counts_at_ref",
-    "budget", "unique_names", "print_rule2_report", "print_budget", "source_files_of", "select_findings",
+    "budget", "rule10_counts", "unique_names", "print_rule2_report", "print_budget", "source_files_of",
+    "select_findings",
     "print_findings_listing", "print_findings",
     "_same_commit", "_fork_point", "_resolve_diff_ref", "ref_comparison", "main",
 ]

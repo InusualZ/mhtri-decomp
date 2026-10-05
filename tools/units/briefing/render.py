@@ -197,12 +197,12 @@ def _precommit_lines(lines: list[str]) -> None:
     a rename commit staged only the `git mv` because it also passed the renamed-away path.
     """
     lines.append("")
-    lines.append("**Check the gate from your own worktree before you commit** - it is importable, so run its")
-    lines.append("naming rule yourself instead of paying a refusal round. Both commands must print `[]`:")
+    lines.append("**Check the gate from your own worktree before you commit** - run its naming rule (the")
+    lines.append("lint) and its band check yourself instead of paying a refusal round. The lint must add no")
+    lines.append("violation and the second command must print `[]`:")
     lines.append("")
     lines.append("```sh")
-    lines.append("python -c \"import sys;sys.path[:0]=['tools','tools/units'];from units import land;"
-                 "print(land.rule7_defer_growth(r'.','main'))\"        # run with your worktree as cwd")
+    lines.append("python tools/units/stylelint.py --diff main             # run with your worktree as cwd")
     lines.append("python -c \"import sys;sys.path[:0]=['tools','tools/units'];from units import land;"
                  "print(land.band_ownership_warnings(r'.','main'))\"   # likewise")
     lines.append("```")

@@ -20,7 +20,7 @@ UNSPLIT = "include/unsplit"
 # modules (a `sound` unit inside the `ef` band): no `<module>.h` is sound, so the finding names the band
 # directory instead. It is not a path component, so it cannot collide with a real module name.
 UNSPLIT_UNRESOLVED = "<band unresolved>"
-# Every shared header lives under `include/` (the unsplit band is `include/unsplit/`).  Rule 10 scans this
+# Every shared header lives under `include/` (the unsplit band is `include/unsplit/`).  Rule 14 scans this
 # whole tree: a codegen pragma is lexically scoped to the rest of every TU that includes the header, so
 # one in the tree silently changes code that does not belong to the header's author.
 HEADERS = "include"
@@ -48,12 +48,16 @@ RULE_NAMES = {
     7: "no auto-generated name survives (`fn_XXXXXXXX` / `lbl_XXXXXXXX` / `loc_XXXXXXXX` / bare `unkNN`)",
     8: "goto is forbidden",
     9: "no mangled spelling used as a callable identifier (call/declare the owner)",
-    10: "a codegen pragma lives in the TU that needs it, not in a shared header",
+    10: "a vtable we own is compiler output (vtableaudit's violations; `--budget` reads them, the lint has none)",
     11: "no `void *` parameter or return type (mark the declaration `/* untyped: <reason> */` if genuinely untyped)",
     12: "data no registered range claims is the unit's to claim and match (an `extern` for it is the finding)",
     13: "a method is a member (`<Type>_<name>(<Type>* self, ...)` is `<Type>::<name>`; mark a genuine C function "
         "`/* free: <reason> */`)",
+    14: "a codegen pragma lives in the TU that needs it, not in a shared header",
 }
+#: Rules the lint itself never reports: plan 6.5 rule 10 (vtable ownership) is `tools/units/vtableaudit.py`'s, so
+#: `--budget` fills its column from the audit (`report.rule10_counts`) and the lint's own sets carry no rule-10 row.
+AUDIT_RULES = {10: "tools/units/vtableaudit.py"}
 # No rule is unchecked any more. Rule 2's remaining gap is dynamic (an unsplit address whose bracketing
 # registered units name different modules), so it is reported from `Ownership.gaps`, not from here.
 UNCHECKED: list[tuple[int, str]] = []

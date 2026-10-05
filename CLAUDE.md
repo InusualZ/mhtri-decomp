@@ -262,7 +262,8 @@ The incident behind each is in `docs/pipeline.md` 13.3.
   * **Work under the campaign plan (`docs/plan.md` 6.5) is held to a stricter standard**: no `fn_XXXXXXXX`/`unkNN` survives in
     `src/`, every reconstructed type states its size, every field carries its offset and a context name (padding excepted),
     shared types live in one header, an `extern` lives with the owner unit, no pointer arithmetic to reach a field.
-    `tools/units/stylelint.py` enforces the thirteen rules at the land gate (regenerate profiles with
+    `tools/units/stylelint.py` enforces the fourteen rules at the land gate - rule 10 through `tools/units/vtableaudit.py`
+    (regenerate profiles with
     `tools/agents/sync_profiles.py` after a rule change).
 * **Style:** match the file you are editing; new project code is 4-space-indent C. Files are UTF-8 and **LF in the repository and
   the working tree** (`.gitattributes`: `* text=auto eol=lf`; a clone must not set `core.autocrlf=true`; the hook is per clone:

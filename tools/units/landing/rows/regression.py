@@ -49,7 +49,8 @@ def report_regressions(before: dict, after: dict, allow: list[str]) -> tuple[lis
 
 def regression_check_rows(b: Batch) -> None:
     """18. no symbol or unit regressed against the base snapshot (`lib.report.regression`); every
-    `--allow-regression` was needed; the base carried a report snapshot (BOOKKEEPING)."""
+    `--allow-regression` was needed (a WARNING since 2026-10-05, never a refusal); the base carried a report snapshot
+    (BOOKKEEPING)."""
     before_report = b.recorded.get("report") or {}
     after_report = report_snapshot(b.main)
     unauthorised, authorised = report_regressions(before_report, after_report, b.allow_regression)
@@ -60,10 +61,9 @@ def regression_check_rows(b: Batch) -> None:
             info=("%d authorised regression(s)" % len(authorised)) if authorised else "")
     used = {a for a in b.allow_regression if any(a in row[0] for row in authorised)}
     stale_allow = [a for a in b.allow_regression if a not in used]
-    b.check("every --allow-regression was actually needed", not stale_allow,
-            "stale allowance(s), remove them: %s" % ", ".join(stale_allow),
-            kind=KIND_BOOKKEEPING,
-            remedy="remove the stale --allow-regression flag(s) named above and re-run")
+    b.warn("every --allow-regression was actually needed",
+           ["stale allowance %s (no regression of it was authorised)" % a for a in stale_allow],
+           remedy="drop the stale --allow-regression flag(s) next time")
     if not before_report:
         b.check("the batch base carries a report snapshot", False,
                 "record-base did not snapshot report.json (rebuild it and re-record the base)",

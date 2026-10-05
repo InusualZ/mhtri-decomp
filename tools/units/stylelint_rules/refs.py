@@ -8,7 +8,7 @@ from tools.lib.git import Git
 from tools.units.stylelint_rules.common import HEADERS, HEADER_SUFFIXES, SRC, SUFFIXES, Source
 from tools.units.stylelint_rules.context import Ownership
 from tools.units.stylelint_rules.r01_shared_type import rule1_findings
-from tools.units.stylelint_rules.r10_pragma import codegen_pragma_findings
+from tools.units.stylelint_rules.r14_pragma import codegen_pragma_findings
 from tools.units.stylelint_rules.r11_untyped import rule11_findings
 from tools.units.stylelint_rules.r12_unclaimed_data import rule12_findings
 from tools.units.stylelint_rules.r13_method import rule13_findings
@@ -77,17 +77,17 @@ def headers_at_ref(root: str, ref: str, rename: dict | None = None) -> list[Sour
 
 
 def header_pragma_findings_at_ref(root: str, ref: str, rename: dict | None = None) -> list[dict]:
-    """Rule-10 findings for `include/` as it was at `ref`, keyed `(rule, path_now)` - the back side.
+    """Rule-14 findings for `include/` as it was at `ref`, keyed `(rule, path_now)` - the back side.
 
     `rename` is `{path_at_ref: path_now}` (see `renames_of`): a renamed header keeps its finding under the
     path the *working tree* spells, so the whole-tree walk lines up with `header_pragma_findings`'s walk -
-    without it, a rename alone reported the header's existing rule-10 finding as an addition.
+    without it, a rename alone reported the header's existing rule-14 (then rule-10) finding as an addition.
     """
     return [f for src in headers_at_ref(root, ref, rename) for f in codegen_pragma_findings(src)]
 
 
 def header_pragma_counts_at_ref(root: str, ref: str, rename: dict | None = None) -> dict:
-    """Rule-10 counts for `include/` as it was at `ref`, keyed `(rule, path_now)` - the `--diff` back side."""
+    """Rule-14 counts for `include/` as it was at `ref`, keyed `(rule, path_now)` - the `--diff` back side."""
     return rule_counts(header_pragma_findings_at_ref(root, ref, rename))
 
 

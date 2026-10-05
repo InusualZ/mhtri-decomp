@@ -3,24 +3,67 @@ Spec: docs/tools/spec/stylelint_rules.md. CLI: none (the stylelint package; `sty
 from __future__ import annotations
 
 import collections
+import json
+import os
 import re
+import subprocess
+import sys
+import time
 
 from tools.lib import findings as _findings
-from tools.units.stylelint_rules.common import EXEMPT, RULE7_NOTES, RULE_NAMES, UNCHECKED, UNSPLIT_UNRESOLVED
+from tools.units.stylelint_rules.common import (AUDIT_RULES, EXEMPT, RULE7_NOTES, RULE_NAMES, UNCHECKED,
+    UNSPLIT_UNRESOLVED)
 from tools.units.stylelint_rules.lint import rule11_local_total
 
 
-def budget(findings: list[dict]) -> dict:
-    """Per-unit rule counts plus the totals, both keyed by unit (path relative to the repo root)."""
+def budget(findings: list[dict], rule10: dict | None = None) -> dict:
+    """Per-unit rule counts plus the totals, both keyed by unit (path relative to the repo root).
+
+    `rule10` is `{file: count}` from vtableaudit (`rule10_counts`) - plan 6.5 rule 10 is the audit's, the lint has
+    no rule-10 finding - added to the rule-10 column and to `total`; `findings` stays the lint's own count. `None`
+    (the audit was not run or could not read the tree) leaves the column at 0 and `rule10` null in the JSON."""
     per: dict[str, dict] = {}
+
+    def row_of(rel: str) -> dict:
+        return per.setdefault(rel, {"file": rel, "total": 0, "rules": {str(r): 0 for r in RULE_NAMES}})
     for f in findings:
-        row = per.setdefault(f["file"], {"file": f["file"], "total": 0,
-                                         "rules": {str(r): 0 for r in RULE_NAMES}})
+        row = row_of(f["file"])
         row["rules"][str(f["rule"])] += 1
         row["total"] += 1
+    for rel, n in sorted((rule10 or {}).items()):
+        row = row_of(rel)
+        row["rules"]["10"] += n
+        row["total"] += n
     totals = {str(r): sum(row["rules"][str(r)] for row in per.values()) for r in RULE_NAMES}
     return {"units": [per[k] for k in sorted(per)], "totals": totals,
-            "total": sum(totals.values()), "findings": len(findings), "unique": unique_names(findings)}
+            "total": sum(totals.values()), "findings": len(findings), "unique": unique_names(findings),
+            "rule10": None if rule10 is None else {"source": AUDIT_RULES[10], "violations": sum(rule10.values())}}
+
+
+def rule10_counts(root: str) -> tuple[dict | None, str]:
+    """`({file: count}, note)` - plan 6.5 rule 10's violations per source file, read from `vtableaudit.py --json`
+    (a subprocess: the audit is a tool, not a library of the lint). A run counts against `src/<unit>`, an own-range
+    vtable write against its file - the same two kinds the gate's rule-10 row compares. `(None, why)` when the
+    audit cannot run or read the tree; the note says how long it took and how many units were unbuilt."""
+    audit = os.path.join(root, *AUDIT_RULES[10].split("/"))
+    t0 = time.time()
+    try:
+        p = subprocess.run([sys.executable, audit, "--main", root, "--json"], cwd=root, capture_output=True,
+                           text=True, encoding="utf-8", errors="replace")
+        data = json.loads(p.stdout) if p.returncode == 0 else None
+    except (OSError, ValueError):
+        data = None
+    if not isinstance(data, dict):
+        return None, "rule 10: vtableaudit could not read this tree - the column stays 0"
+    out: dict = collections.Counter()
+    for run in data.get("violations") or []:
+        out["src/" + run["unit"].replace("\\", "/")] += 1
+    for ref in data.get("references") or []:
+        if ref.get("kind") == "own":
+            rel = ref["file"].replace("\\", "/")
+            out[rel if rel.startswith("src/") else "src/" + rel] += 1
+    return dict(out), ("rule 10 (vtableaudit, %.1f s): %d violation(s) over %d file(s); %d unit(s) unbuilt"
+                       % (time.time() - t0, sum(out.values()), len(out), len(data.get("unbuilt") or [])))
 
 
 def unique_names(findings: list[dict]) -> dict:
@@ -63,8 +106,8 @@ def print_rule2_report(ownership: "Ownership | None") -> None:
 
 
 def print_budget(findings: list[dict], ownership: "Ownership | None" = None,
-                 root: str | None = None) -> None:
-    b = budget(findings)
+                 root: str | None = None, rule10: dict | None = None, rule10_note: str = "") -> None:
+    b = budget(findings, rule10)
     width = max([len(row["file"]) for row in b["units"]] + [len("TOTAL")])
     head = "".join("  r%d" % r for r in RULE_NAMES)
     print("%-*s  %4s%s" % (width, "unit", "tot", head))
@@ -82,6 +125,8 @@ def print_budget(findings: list[dict], ownership: "Ownership | None" = None,
              u["unk_identifiers"], u["label_names"], u["mangled_names"]))
     print("%d finding(s) over %d unit(s), %d file(s) with findings"
           % (b["findings"], len(b["units"]), len(source_files_of(findings))))
+    if rule10_note:
+        print(rule10_note + " - the r10 column; plan 6.5 rule 10 is vtableaudit's, the codegen-pragma check is r14")
     r11 = [f for f in findings if f["rule"] == 11]
     print("rule 11 (banned outright): %d finding(s) over %d file(s) with a `void *` parameter/return type"
           % (len(r11), len(source_files_of(r11))))

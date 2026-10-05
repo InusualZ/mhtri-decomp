@@ -540,8 +540,7 @@ def preflight(root: str, todo: list[str], base: str) -> list[str]:
         from tools.units import land
     except Exception as exc:  # pragma: no cover - depends on the tree
         return ["pre-flight skipped (land.py not importable here: %s)" % exc]
-    for fn, label in (("rule7_defer_growth", "rule 7 (generated names added by this merge)"),
-                      ("band_ownership_warnings", "band-header ownership")):
+    for fn, label in (("band_ownership_warnings", "band-header ownership"),):
         f = getattr(land, fn, None)
         if f is None:
             continue

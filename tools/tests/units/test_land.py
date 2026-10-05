@@ -47,7 +47,7 @@ def fake_verify_with(write, gate_code=0, gate_problems=()):
     """A `verify` stand-in: `write(main)` is "the build", then the gate's verdict and its problems."""
 
     def fake_verify(main, units, base, dry_run, no_build, allow_regression=None, check_outbox=True,
-                    release_claims=True, problems=None, branch=None, no_selftests=False):
+                    release_claims=True, problems=None, branch=None, no_selftests=False, warnings=None):
         write(main)
         if problems is not None:
             problems.extend(gate_problems)
@@ -197,7 +197,7 @@ def _conflicted_worktree(tmp, branch="worker/x", name="scratch"):
 
 def _land_verify_ok(main, units, base, dry_run, no_build, allow_regression=None,
                     check_outbox=True, release_claims=True, problems=None, branch=None,
-                    no_selftests=False):
+                    no_selftests=False, warnings=None):
     L.write_land_message(main, "land: %s\n\nledger: (fixture)\n" % ",".join(units))
     return 0
 
@@ -817,50 +817,12 @@ def test_pathspec_commit(c):
 
 
 def test_rule_rows(c):
-    """Rule 7's escape growth, rule 10 add-only, the data-closure allowance, rule 12."""
+    """Row 8's deletion, rule 10 add-only, the data-closure allowance, rule 12."""
     check = c.check
-    # the rule-7 row still judges GROWTH of the `rule 7 deferred` escape (the escape itself is inert to the
-    # lint since the 2026-09-27 no-exemption ruling): an existing escape is tolerated, a grown one is refused
-    # for a name the batch's own unit defines, and for a file registered at a generated stem. The cases are
-    # the ones the 803253bc and 8032c920 lanes produced.
-    def defer_repo(rel, base_text, text):
-        tmp = tempfile.mkdtemp(prefix="land-defer-")
-        repo_git(tmp, "init", "-q")
-        repo_git(tmp, "checkout", "-q", "-b", "main")
-        path = os.path.join(tmp, rel)
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w", encoding="utf-8") as fh:
-            fh.write(base_text)
-        repo_git(tmp, "add", "-A")
-        repo_git(tmp, "commit", "-q", "-m", "base")
-        base_sha = repo_git(tmp, "rev-parse", "HEAD")
-        with open(path, "w", encoding="utf-8") as fh:
-            fh.write(text)
-        return tmp, base_sha
-
-    defer = "/* rule 7 deferred: the map has only fn_XXXXXXXX for this range */\n"
-    d1, sha1 = defer_repo("src/enemy/em_action.cpp", "void em_act_dispatch(void) {}\n",
-                          defer + "void fn_802B2978(void) {}\n")
-    check("rule7: a file that DEFINES its own generated name REFUSES",
-          L.rule7_defer_growth(d1, sha1) != [], True)
-    d2, sha2 = defer_repo("src/enemy/em_action.cpp", "void em_act_dispatch(void) {}\n",
-                          defer + "void fn_802B2978(void);\nvoid em_act_dispatch(void) {}\n")
-    check("rule7: a prototype of another unit's generated name is tolerated",
-          L.rule7_defer_growth(d2, sha2), [])
-    d3, sha3 = defer_repo("src/enemy/fn_8033041C.cpp", "",
-                          defer + "void em_act_dispatch(void) {}\n")
-    check("rule7: a unit registered at a generated file name REFUSES",
-          L.rule7_defer_growth(d3, sha3) != [], True)
-    d4, sha4 = defer_repo("src/enemy/em_action.cpp", defer + "void em_act_dispatch(void) {}\n",
-                          defer + "/* rewritten header */\nvoid em_act_dispatch(void) {}\n")
-    check("rule7: rewriting a file that already had the escape passes",
-          L.rule7_defer_growth(d4, sha4), [])
-    d5, sha5 = defer_repo("src/enemy/fn_8033041C.cpp", "",
-                          defer + "void em_act_dispatch(void);\n/* no bodies yet: the name is provisional */\n")
-    check("rule7: a BODYLESS unit at a generated file name is tolerated",
-          L.rule7_defer_growth(d5, sha5), [])
-    for d in (d1, d2, d3, d4, d5):
-        shutil.rmtree(d, ignore_errors=True)
+    # gate row 8 (the `rule 7 deferred` escape's growth) is deleted (2026-10-05): rule 7 is the lint's (row 5)
+    check("rule7: no gate row judges the `rule 7 deferred` escape any more",
+          (hasattr(L, "rule7_defer_growth"), hasattr(L, "rule7_row"),
+           any(getattr(r, "__name__", "") == "rule7_row" for r in L.PRE_BUILD)), (False, False, False))
 
     # --- rule 10: the row is ADD-only, like the lint's `--diff` ------------------------------------
     # The keys are `vtableaudit.violation_rows`'s rename-stable shape: a run by its range (an address is
@@ -883,6 +845,47 @@ def test_rule_rows(c):
     check("rule10: a batch touching a file that already has one passes",
           L.rule10_growth(existing, existing, ["ai/fn_802CC794"]),
           ([], ["ai/fn_802CC794.cpp .data"]))
+
+    # --- rule 10 identity pairing (2026-10-05): the row decides with `vtableaudit.diff_rows`, so a `run:` key that
+    # moved because the run's first word stopped resolving is SHIFTED, never added; a real new run still refuses.
+    def run_row(addr, words, unit="sound/sound_obj", section=".data"):
+        return {"unit": unit, "kind": "run", "section": section, "address": addr, "words": words,
+                "where": "%s %s 0x%08X" % (unit, section, addr)}
+    base_runs = {"run:.data:80598038": run_row(0x80598038, 6),
+                 "ref:src/sound/sound_obj.cpp:767:lbl_80597DF8": {"unit": "sound/sound_obj", "kind": "ref",
+                                                                 "where": "x"}}
+    moved = {"run:.data:8059803C": run_row(0x8059803C, 5),
+             "ref:src/sound/sound_obj.cpp:767:lbl_80597DF8": base_runs["ref:src/sound/sound_obj.cpp:767:lbl_80597DF8"]}
+    check("rule10 pairing: a run whose start moved by a word inside the old run is SHIFTED, not added",
+          L.rule10_growth(base_runs, moved, [])[0], [])
+    fresh = dict(base_runs, **{"run:.data:805B2328": run_row(0x805B2328, 4)})
+    check("rule10 pairing: a genuinely new run (no removed run overlaps it) is still refused",
+          L.rule10_growth(base_runs, fresh, [])[0], ["run:.data:805B2328"])
+    grown = {"run:.data:805FB808": run_row(0x805FB808, 630)}
+    check("rule10 pairing: a run that GREW over a removed run (the 850127ccb recut: 630 words over 7) is an addition",
+          L.rule10_growth({"run:.data:805FBD68": run_row(0x805FBD68, 7)}, grown, [])[0], ["run:.data:805FB808"])
+    beside = dict(base_runs, **{"run:.data:8059803C": run_row(0x8059803C, 5)})
+    check("rule10 pairing: a new run overlapping a run that is STILL there is an addition (only a removed run pairs)",
+          L.rule10_growth(base_runs, beside, [])[0], ["run:.data:8059803C"])
+    other_sec = {"run:.rodata:8059803C": run_row(0x8059803C, 5, section=".rodata")}
+    check("rule10 pairing: an overlap in another section does not pair",
+          L.rule10_growth({"run:.data:80598038": run_row(0x80598038, 6)}, other_sec, [])[0],
+          ["run:.rodata:8059803C"])
+    renum = {"run:.data:80598038": run_row(0x80598038, 6),
+             "ref:src/sound/sound_obj.cpp:770:lbl_80597DF8": {"unit": "sound/sound_obj", "kind": "ref", "where": "y"}}
+    check("rule10 pairing: `ref:` keys stay a set difference (a moved line is an addition, as before)",
+          L.rule10_growth(base_runs, renum, [])[0], ["ref:src/sound/sound_obj.cpp:770:lbl_80597DF8"])
+    import tools.units.vtableaudit as _vta
+    with mock.patch.object(_vta, "sweep", lambda main, text_ref=None: {}), \
+            mock.patch.object(_vta, "violation_rows", lambda s, rename=None: {"run:.data:80598038": run_row(0x80598038, 6,
+                                                                                                    unit="sound/x.cpp")}):
+        snap = L.rule10_violations(".")
+    check("rule10 pairing: the gate's snapshot keeps the span `diff_rows` pairs on (section, address, words)",
+          {k: (v["unit"], v.get("section"), v.get("address"), v.get("words")) for k, v in snap.items()},
+          {"run:.data:80598038": ("sound/x", ".data", 0x80598038, 6)})
+    two_new = dict(moved, **{"run:.data:80598050": run_row(0x80598050, 2)})
+    check("rule10 pairing: one removed run pairs with ONE added run - the second overlapping addition still refuses",
+          L.rule10_growth(base_runs, two_new, [])[0], ["run:.data:80598050"])
 
     # --- the data-closure row: ADD-only over (unit, orphan address) pairs; datagap's own selftest has the
     # end-to-end fixtures (real objects), this pins the allowance plumbing and the row's decision shape.
@@ -1187,22 +1190,27 @@ def test_rescued_branch_and_already_applied(c):
         check("... naming the branch check",
               any(p.startswith("every unit's branch carries its work as commits") for p in problems), True)
         # the outbox row and `land --branch`: a pilot/worktree branch has no per-unit outbox and is not asked
-        # for one; a `worker/*` claim branch with no outbox is still refused (2026-10-04)
+        # for one; a `worker/*` claim branch with no outbox is WARNED, never refused (2026-10-05: the outbox is a
+        # bookkeeping record; the branch-commits row stays the "the work exists" refusal)
         os.remove(claims.outbox_path(tmp, unit))
-        outbox_rows = {}
+        outbox_rows, outbox_warned, codes = {}, {}, {}
         for name in ("pilot/net-l3", "worker/pl-act-zz99"):
             repo_git(tmp, "checkout", "-q", "-b", name)
             with open(os.path.join(tmp, "src", "Pl", "pl_act.c"), "a", encoding="utf-8") as fh:
                 fh.write(name + "\n")
             repo_git(tmp, "commit", "-q", "-am", name)
             repo_git(tmp, "checkout", "-q", "main")
-            seen = []
+            seen, warned = [], []
             with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-                L.verify(tmp, [unit], repo_git(tmp, "rev-parse", "HEAD"), dry_run=True, no_build=True,
-                       problems=seen, branch=name)
+                codes[name] = L.verify(tmp, [unit], repo_git(tmp, "rev-parse", "HEAD"), dry_run=True, no_build=True,
+                                       problems=seen, branch=name, warnings=warned)
             outbox_rows[name] = any(p.startswith("every unit's outbox validates") for p in seen)
-        check("outbox: a non-claim branch with no outbox passes the row", outbox_rows["pilot/net-l3"], False)
-        check("outbox: a worker/* branch with no outbox is still refused", outbox_rows["worker/pl-act-zz99"], True)
+            outbox_warned[name] = any(w.startswith("every unit's outbox validates: ") for w in warned)
+        check("outbox: a non-claim branch with no outbox passes the row and warns nothing",
+              (outbox_rows["pilot/net-l3"], outbox_warned["pilot/net-l3"]), (False, False))
+        check("outbox: a worker/* branch with no outbox is WARNED (the warnings out-param), not refused",
+              (outbox_rows["worker/pl-act-zz99"], outbox_warned["worker/pl-act-zz99"], codes["worker/pl-act-zz99"]),
+              (False, True, 0))
         check("outbox: the skip note names the branch", "pilot/x" in (L.outbox_skip_note("pilot/x") or ""), True)
         check("outbox: no --branch is strict", L.outbox_skip_note(None), None)
 

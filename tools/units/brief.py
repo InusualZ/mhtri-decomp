@@ -139,8 +139,9 @@ def selftest() -> int:
         check("the brief states rule 7 has no exemption or deferral",
               "no exemption and no deferral" in brief_text and "`rule 7 deferred` comment exempts nothing" in brief_text,
               True)
-        check("the brief tells the worker to run the gate's naming rule locally",
-              "land.rule7_defer_growth" in brief_text and "land.band_ownership_warnings" in brief_text, True)
+        check("the brief tells the worker to run the gate's naming rule (the lint) and band check locally",
+              "stylelint.py --diff main" in brief_text and "land.band_ownership_warnings" in brief_text
+              and "rule7_defer_growth" not in brief_text, True)
         check("the brief bans claims.py release with its consequence",
               "NEVER run `claims.py release`" in brief_text and "WIPED the directory" in brief_text, True)
         check("the brief ships the per-lane measurer and the whole-tree diff",

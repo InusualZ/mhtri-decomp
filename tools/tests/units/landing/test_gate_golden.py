@@ -229,6 +229,40 @@ def test_golden(c):
         c.check("%s: rows (name, status, kind, order)" % name, got.get(name, {}).get("rows"), golden[name]["rows"])
 
 
+def test_post_build_refusal_names_its_row(c):
+    """A post-build refusal reaches `problems` (what `land` reads): before 2026-10-05 only the pre-build rows did, so
+    `land` refused a red build naming no row and the landing log recorded `nothing to stage`."""
+    from tools.units.landing import api, flow
+    sc = next(s for s in SCENARIOS if s.name == "unit-object-rows-refuse")
+    problems: list = []
+    got = capture(lambda *a, **k: api.verify(*a, problems=problems, **k), sc)
+    c.check("the post-build scenario refuses", got["exit"], 1)
+    c.check("... and its failing rows reach `problems`, the first one first",
+            flow.failing_row(problems), "every batch unit is registered (configure.py + splits.txt + build graph)")
+    c.check("... every FAIL row of the table is named once",
+            len(problems), sum(1 for r in got["rows"] if r[1] == "FAIL"))
+    _action, why = api.land_decision(False, [], problems, api.kinds_from_failures(problems))
+    c.check("... so the refusal line names the row instead of a bare 'the gate failed'",
+            "every batch unit is registered" in why, True)
+
+
+def test_bookkeeping_rows_warn(c):
+    """The outbox row and the stale `--allow-regression` row are WARNINGS (2026-10-05): their findings reach the
+    `warnings` out-parameter, their rows PASS, and the verdict comes from the other rows alone."""
+    from tools.units.landing import api
+    got = {}
+    for name in ("two-units-outbox-refusal", "two-units-neighbour-moved-regressed", "unit"):
+        sc = next(s for s in SCENARIOS if s.name == name)
+        warned: list = []
+        res = capture(lambda *a, **k: api.verify(*a, warnings=warned, **k), sc)
+        got[name] = (res["exit"], sorted({w.split(":", 1)[0] for w in warned}))
+    c.check("the missing outbox is a warning; the branch-commits row still refuses that batch",
+            got["two-units-outbox-refusal"], (1, ["every unit's outbox validates"]))
+    c.check("the stale --allow-regression is a warning; the regression and drift rows still refuse",
+            got["two-units-neighbour-moved-regressed"], (1, ["every --allow-regression was actually needed"]))
+    c.check("a clean unit batch warns nothing", got["unit"], (0, []))
+
+
 def test_golden_is_not_vacuous(c):
     from tools.tests.units.landing.gate_golden import GOLDEN as golden
     statuses = {r[1] for g in golden.values() for r in g["rows"]}

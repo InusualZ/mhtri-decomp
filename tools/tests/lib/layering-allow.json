@@ -222,10 +222,6 @@
    "reason": "the re-measure row is verifyunit.verify_units"
   },
   {
-   "edge": "tools/units/landing/rows/rules.py -> tools/units/briefing/sources.py",
-   "reason": "a file with no bodies is detected by the brief's own text_has_bodies"
-  },
-  {
    "edge": "tools/units/landing/rows/rules.py -> tools/units/stylelint_rules/api.py",
    "reason": "the section 6.5 rows are the lint's (the gate runs the lint, not a copy)"
   },

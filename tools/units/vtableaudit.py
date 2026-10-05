@@ -38,6 +38,11 @@ NOBITS_SECTIONS = (".bss", ".sbss", ".sbss2")
 # A table needs at least two entries: one code pointer in a data section is an ordinary pointer.
 MIN_RUN_WORDS = 2
 
+# How far a run's start and end may each move and still be the same table in `diff_rows`: one word, the shape of
+# "the first (or last) word stopped resolving as a code pointer". An overlap alone is not enough - the 2026-10-04
+# recut paired a new 630-word run with a removed 7-word run and would have hidden a real addition.
+SHIFT_WORDS = 1
+
 # Section-level bookkeeping, never part of the comparison: the symbol/string tables, the compiler banner, the
 # splitter's own note, relocation companions and debug sections.
 META_PREFIXES = (".rela", ".debug", ".group", ".llvm")
@@ -896,9 +901,11 @@ def diff_rows(before: dict, after: dict) -> dict:
     """`{"added", "removed", "shifted"}` between two `violation_rows` results - the `--diff` verdict.
 
     A run key is its start address, so a run whose first word stopped (or started) resolving as a code
-    pointer moves its key by a word although it is the same table. An added run that overlaps a removed run
-    of the same section is that table: it is paired into `shifted` (`[added_key, removed_key]`) and leaves
-    both lists. Only `added` refuses.
+    pointer moves its key by a word although it is the same table. An added run of the same section whose start
+    AND end each lie within `SHIFT_WORDS` words of a removed run's is that table: it is paired into `shifted`
+    (`[added_key, removed_key]`) and leaves both lists. A mere overlap does not pair - a run that grew over a
+    neighbour (a recut that claims new tables next to an old one) is an addition. Only `added` refuses; the land
+    gate's rule-10 row decides with this function too.
     """
     added = sorted(set(after) - set(before))
     removed = sorted(set(before) - set(after))
@@ -917,7 +924,8 @@ def diff_rows(before: dict, after: dict) -> dict:
             if other.get("kind") != "run" or "address" not in other:
                 continue
             osec, olo, ohi = span(other)
-            if osec == sec and olo < hi and lo < ohi:
+            if osec == sec and olo < hi and lo < ohi and abs(lo - olo) <= 4 * SHIFT_WORDS \
+                    and abs(hi - ohi) <= 4 * SHIFT_WORDS:
                 shifted.append([key, old])
                 added.remove(key)
                 removed.remove(old)

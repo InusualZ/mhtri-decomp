@@ -1,4 +1,4 @@
-"""Rule 10 (lint half): a codegen pragma lives in the TU that needs it, never in a shared header.
+"""Rule 14: a codegen pragma lives in the TU that needs it, never in a shared header (rule 10 is vtableaudit's).
 Spec: docs/tools/spec/stylelint_rules.md. CLI: none (the stylelint package; `stylelint.py` is the CLI)."""
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import re
 from tools.units.stylelint_rules.common import HEADERS, _finding
 
 
-# The codegen-affecting pragma names for rule 10.  A `#pragma` is lexically scoped to the rest of the
+# The codegen-affecting pragma names for rule 14.  A `#pragma` is lexically scoped to the rest of the
 # translation unit that reaches it, so one in a shared header leaks the pass onto every including TU -
 # measured 2026-09-27 in both directions: a lane matched a file only because of a leaked
 # `#pragma peephole off`, and another lost rows until it was restated where it was wanted.  The pragma
@@ -24,14 +24,14 @@ CODEGEN_PRAGMA_RE = re.compile(
 
 
 def codegen_pragma_findings(src: "Source") -> list[dict]:
-    """Rule 10 for one file: a codegen pragma in a **shared header**.  The path gate is here, not in the
+    """Rule 14 for one file: a codegen pragma in a **shared header**.  The path gate is here, not in the
     caller, so a `.c`/`.cpp` can never be reported however this is invoked.  `src.code` blanks
     comments/literals, so a pragma *named* in a comment is not a finding - only a real directive is."""
     if not src.rel.replace("\\", "/").startswith(HEADERS + "/"):
         return []
     out = []
     for m in CODEGEN_PRAGMA_RE.finditer(src.code):
-        out.append(_finding(src, 10, src.line_of(m.start()),
+        out.append(_finding(src, 14, src.line_of(m.start()),
                             "codegen pragma `#pragma %s` in a shared header - state it in the "
                             "`.c`/`.cpp` that needs it, never in the header" % m.group(1), token=m.group(1)))
     return out
