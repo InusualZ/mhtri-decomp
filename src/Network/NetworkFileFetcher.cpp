@@ -34,7 +34,6 @@
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
 #include "MSL_C/alloc.h"                         /* sscanf, snprintf */
-#include "Network/network_layer_io.h"   /* sendReqBinaryHead, sendReqBinaryChecksum, sendReqBinaryData, sendReqBinaryFoot */
 
 #pragma peephole off
 /* Retail calls every helper (the step functions, `setError`) rather than folding it into its caller. */

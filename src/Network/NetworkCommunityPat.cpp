@@ -38,7 +38,7 @@
  *   same mutex-member action `NetworkCommunity` records.
  *
  * FOREIGN NAMES (the lane's requests `net3-b-ad17#1..#17`, integrated).  The community senders are
- *   `Network/network_layer_io.cpp`'s, named from their Pat op-codes and the protocol's own `recvAns*` trace strings
+ *   `Network/PatInterface.cpp`'s, named from their Pat op-codes and the protocol's own `recvAns*` trace strings
  *   (request N, answer N+1): `sendReqTell` 245, `sendReqBinaryUser` 248, `sendReqUserSearchInfo` 265,
  *   `sendReqUserStatusSet` 269, `sendReqFriendAdd` 273, `sendReqFriendAccept` 276, `sendReqFriendDelete` 279,
  *   `sendReqFriendList` 281, `sendReqBlackAdd` 283, `sendReqBlackDelete` 285, `sendReqBlackList` 287.  So `blockPlayer`/
@@ -54,8 +54,6 @@
 #include "Network/NetworkSessionManager.h"       /* networkInstance_initMutex, NetworkRequest_idCounter, NetworkVaState */
 #include "Network/NetworkSessionBase.h"          /* LockMutex/UnlockMutex, getNetworkBinaryState */
 #include "Network/PatInterface.h"                /* PatInterface and its C surface */
-#include "Network/network_state.h"               /* the state machine's requests */
-#include "Network/network_layer_io.h"            /* sendReqFmpInfo */
 #include "Network/network_pat_control.h"         /* NetRosterSync */
 #include "Network/NetworkPat.h"                  /* getNetworkLayerPat */
 #include "Network/NetworkSessionManagerPat.h"    /* getPatsObject */
@@ -229,9 +227,7 @@ void NetworkCommunityPat::release()
         PatInterface_clear((PatInterface*)getInstance_());
         if (PatInterface_isReady((PatInterface*)getInstance_()) == 0) {
             pat = (PatInterface*)getInstance_();
-            if (pat != NULL) {
-                pat->finalize(1);
-            }
+            delete pat;
         }
     }
     NetworkCommunity::release();

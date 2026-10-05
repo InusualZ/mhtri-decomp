@@ -50,7 +50,7 @@
  *   0x80060034 immediate in `handleConnect` (0x803E30F4), as for `updateSession`.
  *   Records the handlers send or report are views in `include/Network/NetworkLayerPat.h` (sizes from the frames and the
  *   memsets); the chat message is the session manager's `NetworkSessionSlotInfo`; the layer requests' field list and
- *   layer record are `network_layer_io.cpp`'s `PatTagList`/`PatLayerData`, and the layer address goes to it as its
+ *   layer record are `PatInterface.cpp`'s `PatTagList`/`PatLayerData`, and the layer address goes to it as its
  *   16-byte `path`.  Callee names decided at integration: `sendReqLayerUserInfoSet` (0x80401AF4, recvAnsLayerUserInfoSet's
  *   slot), `sendReqLayerTell` (0x8040211C, the `sendReqCircleTell` shape), `sendNtcLayerUserTransfer` (0x80403230, GUESS).
  *
@@ -77,7 +77,6 @@
 #include "unsplit/Network.h"
 #include "Network/NetworkSessionManagerPat.h"
 #include "Network/NetworkSessionBase.h"   /* LockMutex/UnlockMutex - owner Network/NetworkSessionBase.cpp */
-#include "Network/network_layer_io.h"   /* sendReqLayerUp / sendReqLayerChildInfo / sendReqLayerUserList */
 #include "Network/gamespy_interface_types.h"  /* GameSpyInterfaceThread / NetworkErrorInfo - owner Network/GameSpyInterfaceThread.cpp */
 #include "Network/NetworkWiiMediator.h"   /* the mediator's terms flag and transfer slots - owner Network/NetworkWiiMediator.cpp */
 #include "sound/fn_800E46E8.h"            /* getInstance (the mediator singleton) - owner sound/fn_800E46E8.cpp */
@@ -85,7 +84,6 @@
 #include "Runtime.PPCEABI.H/memset.h"
 #include "MSL/strlen.h"
 #include "Network/PatInterface.h"          /* getErrorInfo654c / buildErrorInfo613c / clearErrorRecord613c - owner Network/PatInterface.cpp */
-#include "Network/network_state.h"         /* sendServerTimeout - owner Network/network_state.cpp */
 
 /* The log codes the request reports (0x8006xxxx = the layer's own error range). */
 enum {
@@ -2036,9 +2034,7 @@ void NetworkLayerPat::release()
         PatInterface_clear((PatInterface*)getInstance_());
         if (PatInterface_isReady((PatInterface*)getInstance_()) == 0) {
             pat = (PatInterface*)getInstance_();
-            if (pat != NULL) {
-                pat->finalize(1);
-            }
+            delete pat;
         }
     }
     NetworkLayer::release();

@@ -17,9 +17,7 @@
 
 #include "types.h"
 #include "unsplit/Network.h"
-#include "Network/network_state.h"
 #include "Network/PatInterface.h"             /* isCallback / resetCallback / the error accessors - owner Network/PatInterface.cpp */
-#include "Network/network_layer_io.h"         /* sendReqChannelInfo / sendReqChannelData / sendReqConnect - owner Network/network_layer_io.cpp */
 #include "Network/NetworkReflectService.h"    /* NetworkReflectService / GameSpyChannel - owner Network/NetworkReflectService.cpp */
 #include "Network/gamespy_interface_types.h"   /* the worker thread class and its error record */
 #include "Network/sGameSpyInterfaceThread.h"  /* the live thread pointer this unit defines */

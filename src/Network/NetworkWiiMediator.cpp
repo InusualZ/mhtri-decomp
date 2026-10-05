@@ -10,7 +10,7 @@
  * reads as one TU's D/S/V run with no seam until V->D at 0x80602988, and the tables are stored by the constructor
  * 0x80413480 (0x80602968) and by 0x80413714 (0x80602978), inside the head.  The left cut is 0x80413450, not
  * 0x80413384: `NetworkRandom`'s table 0x806024A0 precedes the first jump table 0x806024B8, so `NetworkRandom`
- * (0x80413384..0x80413450) stays `Network/network_layer_io.cpp`'s.  Sections: extab 0x8001C9B4..0x8001CD94,
+ * (0x80413384..0x80413450) is `Network/NetworkPool.cpp`'s.  Sections: extab 0x8001C9B4..0x8001CD94,
  * extabindex 0x8003D278..0x8003D764, .rodata 0x80570E70..0x80570E98, .data 0x806024B8..0x80602988, .sdata2
  * 0x8079C874..0x8079C878.  The two tables are claimed (data closure: only the head reads them) and stay
  * unemitted until the constructor and destructor are written (rule 10: the class then emits them).
@@ -211,12 +211,11 @@
 #include "Network/NetworkWiiMediator.h"
 #include "Network/PatInterface.h"            /* the singleton's Pat accessors */
 #include "Network/NetworkReflectService.h"   /* the reflect service's entry points */
-#include "Network/network_layer_io.h"        /* getReflectService / getNetworkPool / getLanguage / getReflectEventId */
+#include "Network/NetworkPool.h"          /* getNetworkPool */
 #include "Network/gamespy_interface_types.h"  /* the worker thread `initializeNetworkMediator` spawns */
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
 #include "unsplit/Runtime.PPCEABI.H.h"
-#include "Network/network_state.h"         /* resetNetworkState, resetNetworkState3, handleNetworkState1, sendReqShut */
 #include "Network/NetworkSessionBase.h"    /* getNetworkBinaryState */
 #include "enemy/em020_ai.h"                /* getInstance_ */
 #include "unsplit/Network.h"               /* getNetworkLogger */
@@ -240,18 +239,6 @@
 void* operator new(unsigned long size);   /* untyped: allocation returns a raw byte range */
 
 extern "C" {
-/* the retired NetworkWiiMediator.c symbol, carried across verbatim */
-void getReflectPageBuffer(char* self, char** subobject, unsigned int* limit);
-
-void setMediatorBufferA(NetworkWiiMediatorFields* self, const u8* src);
-void getMediatorBufferA(NetworkWiiMediatorFields* self, u8* dst);
-void setMediatorBufferB(NetworkWiiMediatorFields* self, const u8* src);
-void getMediatorBufferB(NetworkWiiMediatorFields* self, u8* dst);
-void getMediatorNameBuffer(NetworkWiiMediatorFields* self, u32* out1, u8* out2);
-void setMediatorFlag78B(NetworkWiiMediatorFields* self, u8 value);
-void getMediatorField288(NetworkWiiMediatorFields* self, u32* out);
-void setMediatorFlag78C(NetworkWiiMediatorFields* self, u8 value);
-void getMediatorFlag78C(NetworkWiiMediatorFields* self, u8* out);
 void initializeNetworkMediator(NetworkWiiMediatorFields* self, u32 value);
 
 u32   getMediatorField24(NetworkWiiMediatorFields* self);
@@ -264,10 +251,6 @@ s32   getAccountQuery2(NetworkWiiMediatorFields* self);
 s32   getAccountQuery3(NetworkWiiMediatorFields* self);
 s32   getAccountQuery4(NetworkWiiMediatorFields* self);
 s32   getAccountQuery5(NetworkWiiMediatorFields* self);
-void  getReflectPageRange(NetworkWiiMediatorFields* self, u32* out1, u32* out2);
-void  getReflectField30(NetworkWiiMediatorFields* self, u32* out);
-void  getReflectField34(NetworkWiiMediatorFields* self, u32* out);
-void  getReflectField38(NetworkWiiMediatorFields* self, u32* out);
 
 s32  getReflectModeFromLanguage();
 u64  updateServerTime(NetworkWiiMediatorFields* self);
@@ -276,10 +259,8 @@ s32  queryOpeningFlag208(NetworkWiiMediatorFields* self);
 s32  queryOpeningFlag250(NetworkWiiMediatorFields* self);
 s32  queryOpeningFlag290(NetworkWiiMediatorFields* self);
 char* getReflectPageText(char* self, char* out, u32 size);
-void getReflectName3C(NetworkWiiMediatorFields* self, char* out, u32 size);
 void getMediaVersionString(NetworkWiiMediatorFields* self, char* out, u32 size);
 void getStr1String(NetworkWiiMediatorFields* self, char* out, u32 size);
-void getReflectName5C(NetworkWiiMediatorFields* self, char* out, u32 size);
 void updatePatField854(NetworkWiiMediatorFields* self, u32 value);
 void updatePatField860(NetworkWiiMediatorFields* self, u32 value);
 s32  isNameSymbolChar(NetworkWiiMediatorFields* self, char value);
@@ -291,7 +272,7 @@ s32  validateReflectName(NetworkWiiMediatorFields* self, const char* name);
 s32  buildReflectPacket(NetworkWiiMediatorFields* self, const char* text, s32* skipCount, s32* flags);
 
 /* The singleton's Pat surface is declared in `Network/PatInterface.h`, the reflect service's in
- * `Network/NetworkReflectService.h` and the layer queries in `Network/network_layer_io.h`. */
+ * `Network/NetworkReflectService.h` and the layer queries in `Network/PatInterface.h`. */
 
 } /* extern "C" */
 
@@ -665,9 +646,7 @@ void loadPatInterfaceBuffers()
         return;
     }
     PatInterface* instance = getPatInstance();
-    if (instance != NULL) {
-        instance->finalize(1);
-    }
+    delete instance;
 }
 u32 getMediatorField24(NetworkWiiMediatorFields* self) { return self->field_24; }
 u8 getNetworkPoolProgress(NetworkPool* self) { return self->progress; }

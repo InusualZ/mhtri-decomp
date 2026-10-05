@@ -163,14 +163,12 @@
 #include "types.h"
 #include "sys_mem.h"
 #include "Network/NetworkSessionManagerPat.h"   /* the unit's own header: its free functions and constants (rule 2) */
-#include "Network/network_layer_io.h"            /* sendReqCircleInfoSet - owner Network/network_layer_io.cpp */
 #include "Network/NetworkLayerPat.h"             /* NetworkLayerPat - the layer the manager drives */
 #include "Network/NetworkUniqueId.h"            /* NetworkUniqueId - owner Network/NetworkUniqueId.cpp */
 #include "Network/NetworkSessionBase.h"          /* LockMutex/UnlockMutex - owner Network/NetworkSessionBase.cpp */
 #include "Network/gamespy_interface_types.h"    /* GameSpyInterfaceThread / NetworkErrorInfo - owner Network/GameSpyInterfaceThread.cpp */
 #include "Network/PatInterface.h"              /* PatInterface - owner Network/PatInterface.cpp */
 #include "Network/NetworkWiiMediator.h"         /* NetworkWiiMediator::pushTransferRecord - owner Network/NetworkWiiMediator.cpp */
-#include "Network/network_state.h"              /* sendServerTimeout - owner Network/network_state.cpp */
 #include "Network/sNetworkLibraryWii.h"         /* sNetworkPatInstance - owner Network/sNetworkLibraryWii.cpp */
 #include "enemy/em020_ai.h"                     /* getInstance_ - owner enemy/em020_ai.cpp */
 #include "MSL_C/alloc.h"                        /* rand - owner MSL_C/alloc.cpp */

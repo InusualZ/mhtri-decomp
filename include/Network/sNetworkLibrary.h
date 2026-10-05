@@ -15,7 +15,7 @@ class NetworkLogger;          /* include/unsplit/Network.h */
 class NetworkWiiMediator;     /* include/Network/NetworkWiiMediator.h */
 class NetworkResolverWii;     /* include/Network/network_transport_types.h */
 class NetworkFileFetcher;     /* include/Network/network_pat_control.h */
-class NetworkRandom;          /* include/Network/network_layer_io.h */
+class NetworkRandom;          /* include/Network/NetworkPool.h */
 
 /* The block `sNetworkLibrary::init` is handed: the SO allocator pair `SOInit` takes by address, then the
  * DWC game-info words the mediator keeps (`mode` -1 skips them; the eight values are all required).

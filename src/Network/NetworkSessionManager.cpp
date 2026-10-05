@@ -1293,9 +1293,7 @@ void NetworkSessionManagerPat::release()
         PatInterface_clear((PatInterface*)getInstance_());
         if (PatInterface_isReady((PatInterface*)getInstance_()) == 0) {
             pat = (PatInterface*)getInstance_();
-            if (pat != 0) {
-                pat->finalize(1);
-            }
+            delete pat;
         }
     }
     context = this->resolver_660;

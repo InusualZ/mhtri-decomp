@@ -71,7 +71,7 @@
 #include "enemy/postChatLogLine.h"   /* postChatLogLine - owner enemy/em_prog_support.cpp (its leaf header) */
 #include "lobby/lb_npc.h"   /* lb_party_state_reset */
 #include "lobby/lb_act_dispatch.h"   /* lb_act_dispatch, lb_act_dispatch_ex - owner lobby/lb_companion_ui.cpp (its leaf header) */
-#include "Network/network_state.h"   /* sendReqUnknownCheck */
+#include "Network/PatInterface.h"   /* owner Network/PatInterface.cpp (the state machine and the packet layer) */
 #include "fn_8004CAD8.h"   /* exportItemBoxPage, exportEquipRecord */
 #include "hud/cockpit.h"   /* cockpitShowNewMail */
 #include "menu/menu_plsearch.h"   /* getLobbyMailBox */

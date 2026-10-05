@@ -273,8 +273,8 @@ typedef struct NetLayerFilter {
     /* +0x08 */ s32 value_08;
 } NetLayerFilter;   /* size: 0xC */
 
-/* The layer requests' field list and layer record are `network_layer_io.cpp`'s (`PatTagList` of `PatTagValue`s,
- * `PatLayerData`; include/Network/network_layer_io.h): the layer fills and sends them. */
+/* The layer requests' field list and layer record are `PatInterface.cpp`'s (`PatTagList` of `PatTagValue`s,
+ * `PatLayerData`; include/Network/PatInterface.h): the layer fills and sends them. */
 typedef struct PatTagValue PatTagValue;
 typedef struct PatTagList PatTagList;
 

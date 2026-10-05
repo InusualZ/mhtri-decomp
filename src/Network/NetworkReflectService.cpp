@@ -26,8 +26,6 @@
 #include "types.h"
 #include "Network/NetworkReflectService.h"
 #include "Network/PatInterface.h"
-#include "Network/network_state.h"
-#include "Network/network_layer_io.h"  /* sendReqChannelInfo / sendReqChannelData / sendReqConnect */
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Network/sNetworkLibrary.h"    /* sNetworkLibrary, sNetworkLibraryError */
 #include "unsplit/Network.h"            /* getNetworkLogger */
@@ -104,9 +102,7 @@ void finalizeReflectService(NetworkReflectService* service)
         if (!PatInterface_isReady((PatInterface*)getInstance_())) {
             PatInterface* pat = (PatInterface*)getInstance_();
 
-            if (pat != NULL) {
-                pat->finalize(1);
-            }
+            delete pat;
         }
     }
 }

@@ -35,7 +35,7 @@
 
 #include "Network/sNetworkLibrary.h"
 #include "Network/sNetworkLibraryWii.h"   /* sNetworkLibraryWii - the worker-thread bodies */
-#include "Network/network_layer_io.h"          /* NetworkRandom */
+#include "Network/NetworkPool.h"               /* NetworkRandom */
 #include "Network/NetworkSessionManager.h"     /* networkInstance_initMutex / dtor_803CA338 - the member mutex */
 #include "unsplit/Network.h"                   /* getNetworkLogger */
 #include "Runtime.PPCEABI.H/memset.h"

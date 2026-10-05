@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-int strcmp(const char* a, const char* b);      /* 0x8045F684, consumed by `Network/network_state.cpp` */
+int strcmp(const char* a, const char* b);      /* 0x8045F684, consumed by `Network/PatInterface.cpp` */
 int sprintf(char* dst, const char* fmt, ...); /* 0x8045DECC */
 char* strchr(const char* s, int c);           /* 0x8045F7E0 */
 int atoi(const char* s);                      /* 0x804616B4 */
