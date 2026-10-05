@@ -3,6 +3,8 @@ Spec: docs/tools/spec/landing.md. CLI: none (a module of the `land.py` gate)."""
 from __future__ import annotations
 
 import contextlib
+import os
+import shlex
 import sys
 import time
 
@@ -45,13 +47,56 @@ def failing_row(problems: list[str]) -> str | None:
     return problems[0].split(" [", 1)[0] if problems else None
 
 
+#: The row a failed commit step records - the landing log's `refused_row` beside outcome `error`.
+COMMIT_ROW = "git commit (after the gate passed)"
+#: The batch's pathspec, NUL-separated, beside `land_msg.txt` - what the printed recovery command reads.
+PATHS_FILE = "land_paths.txt"
+
+
+def _commit_failed(main: str, rec: dict, units: list[str], stageable: list[str], msg_file: str, head_before: str,
+                   failure: str) -> int:
+    """The commit step failed after a green gate: record outcome `error`, say what state MAIN is in and print the
+    exact recovery command; -> exit status 1. The batch is left applied and staged (not undone - the gate passed,
+    and re-running it costs a full gate), and the message is kept for the recovery command."""
+    head = git(["rev-parse", "HEAD"], main, check=False).strip()
+    rec.update(outcome="error", row=COMMIT_ROW, extra={"error": failure[:500], "paths": len(stageable)})
+    label = ",".join(units)
+    if head and head != head_before:
+        rec["commit"] = head[:9]
+        print("STATE: main moved to %s - the commit landed, then the step after it failed (%s); the claims were "
+              "NOT released and the teardown did not run" % (head[:9], failure), file=sys.stderr)
+        print("ERROR %s | committed as %s, then failed: %s - release the claims by hand" % (label, head[:9], failure))
+        return 1
+    paths_file = os.path.join(os.path.dirname(msg_file), PATHS_FILE)
+    with open(paths_file, "w", encoding="utf-8", newline="") as fh:
+        fh.write("".join(p + "\0" for p in stageable))
+    staged = [p for p in git(["diff", "--cached", "--name-only"], main, check=False).splitlines() if p]
+    q = lambda path: shlex.quote(path.replace("\\", "/"))       # a POSIX-shell command, as the orchestrator runs it
+    commit_cmd = ("git -C %s commit -F %s --pathspec-from-file=%s --pathspec-file-nul"
+                  % (q(main), q(msg_file), q(paths_file)))
+    abandon_cmd = ("git -C %s restore --source=HEAD --staged --worktree --pathspec-from-file=%s --pathspec-file-nul"
+                   % (q(main), q(paths_file)))
+    print("STATE: the gate passed and the batch is applied, but the commit step failed: %s\n"
+          "  main is still at %s (nothing committed); %d batch path(s), %d path(s) staged in the index\n"
+          "  the message is kept at %s and the batch's pathspec is written to %s\n"
+          "  recover (commit exactly the batch):  %s\n"
+          "  or abandon it (restore every batch path to HEAD):  %s\n"
+          "  then release the claims (`land.py` did not reach its teardown)"
+          % (failure, head_before[:9], len(stageable), len(staged), msg_file, paths_file, commit_cmd, abandon_cmd),
+          file=sys.stderr)
+    print("ERROR %s | the commit step failed after the gate passed (%s) - main unchanged, the batch is left staged; "
+          "recover with: %s" % (label, failure, commit_cmd))
+    return 1
+
+
 def _log(main: str, branch: str, rec: dict, t0: float) -> None:
     try:
         landlog.append(main, landlog.Attempt(branch, rec["outcome"], round(time.time() - t0, 1),
                                              refused_row=rec["row"], conflicts=tuple(rec["conflicts"]),
                                              units=tuple(rec["units"]), commit=rec["commit"],
                                              allow=rec.get("allow") or {},
-                                             warnings=tuple(rec.get("warnings") or ())))
+                                             warnings=tuple(rec.get("warnings") or ()),
+                                             extra=dict(rec.get("extra") or {})))
     except OSError as exc:                         # the log is evidence; it never changes a landing's answer
         print("WARNING: the landing log was not written (%s)" % exc, file=sys.stderr)
 
@@ -115,8 +160,9 @@ def _land_branch(main, branch, rec, units, base, no_build, allow_regression, che
                         outcome="conflict" if rec["conflicts"] else "refused")
     code = _land(main, norm, rec, None, no_build, allow_regression, check_outbox=check_outbox,
                  release_claims=release_claims, subject=subject, branch=branch, no_selftests=no_selftests)
-    if code != 0 and git(["rev-parse", "HEAD"], main).strip() == head_before:
-        # the gate refused before committing: undo the apply so a refused landing is not a half-landing
+    if code != 0 and rec.get("row") != COMMIT_ROW and git(["rev-parse", "HEAD"], main).strip() == head_before:
+        # the gate refused before committing: undo the apply so a refused landing is not a half-landing (a commit
+        # step that failed after a green gate keeps the batch staged and prints its recovery - `_commit_failed`)
         undo_apply(main, applied_base, branch)
         print("NOTE: the apply was undone - main is back at %s" % head_before[:8], file=sys.stderr)
     if code == 0:
@@ -154,7 +200,11 @@ def land(main: str, units: list[str], base: str | None, no_build: bool,
     * the commit uses the gate's own message, so there is no separate `git commit -F` to get wrong;
     * the commit is `git commit -F msg -- <the batch's paths>`: no pathspec means the whole index, which
       swept another stream's staged edit into a land twice on 2026-09-23 (`85f3d4b5`, `d50fdd32`). Paths the
-      index holds but the batch does not are left staged, and a warning names them;
+      index holds but the batch does not are left staged, and a warning names them. A pathspec over the argv
+      budget goes to git on stdin (`Git.run_paths`): `git commit -- <687 paths>` exceeded the Windows command line
+      on 2026-10-05, after a green gate;
+    * a commit step that fails after a green gate is outcome `error` on row `COMMIT_ROW`: the batch stays applied
+      and staged, and the answer names MAIN's state and the exact recovery command (`_commit_failed`);
     * the gate log goes to **stderr** and stdout carries exactly one answer line, so `tail -1` is the answer
       whether or not the exit status survived the pipe;
     * the exit status *is* the answer: 0 landed, 1 refused (or landed with an incomplete teardown);
@@ -247,18 +297,23 @@ def _land(main: str, units: list[str], rec: dict, base: str | None, no_build: bo
     if subject is not None:
         # the guard above means subject is a real one here, never the empty shell substitution
         write_land_message(main, message_body_with_subject(open(msg_file, encoding="utf-8").read(), subject))
-    stage_batch(main, stageable)
-    foreign = staged_elsewhere(main, stageable)
-    if foreign:
-        print(foreign_warning(foreign), file=sys.stderr)
-    # A pathspec, never a bare `git commit`: that takes the whole index and is how another stream's staged
-    # edit landed under the batch's message twice on 2026-09-23.
-    p = commit_pathspec(main, msg_file, stageable)
-    if p.returncode != 0:
-        clear_land_message(main)
-        tail = ((p.stderr or p.stdout) or "").strip().splitlines()
-        return _refused(rec, "REFUSED %s | git commit failed: %s" % (",".join(norm_units), tail[-1] if tail else ""),
-                        "git commit", outcome="error")
+    head_before = git(["rev-parse", "HEAD"], main).strip()
+    try:
+        stage_batch(main, stageable)
+        foreign = staged_elsewhere(main, stageable)
+        if foreign:
+            print(foreign_warning(foreign), file=sys.stderr)
+        # A pathspec, never a bare `git commit`: that takes the whole index and is how another stream's staged
+        # edit landed under the batch's message twice on 2026-09-23.
+        p = commit_pathspec(main, msg_file, stageable)
+        failure = None
+        if p.returncode != 0:
+            tail = ((p.stderr or p.stdout) or "").strip().splitlines()
+            failure = "git commit exited %d: %s" % (p.returncode, tail[-1] if tail else "")
+    except (Exception, SystemExit) as exc:      # `git()` raises SystemExit; an OS refusal raises OSError
+        failure = "%s: %s" % (type(exc).__name__, exc)
+    if failure:
+        return _commit_failed(main, rec, norm_units, stageable, msg_file, head_before, failure)
     sha = git(["rev-parse", "--short", "HEAD"], main).strip()
     rec.update(outcome="landed", commit=sha, row=None)
     teardown, incomplete = [], []

@@ -17,6 +17,10 @@ starts); the live trap scan is `tools/tests/smoke/test_proc_traps.py` (WP6 delet
   `errors="replace"`, `capture_output` unless the caller routes `stdout`/`stderr`); `run_bytes(...)` (bytes).
 * `TEXT_KWARGS`, `TEXT_KEYWORDS`.
 * `kill_tree(proc)`: `taskkill /F /T` on Windows, the process group elsewhere.
+* `ARGV_BUDGET = 8192`, `argv_size(args)` (bytes, plus a space and two quotes each), `argv_chunks(args, budget=None)`
+  (in-order runs within the budget), `run_chunked(head, args, cwd=None, timeout=None)` (one exact run within the budget,
+  else one run per chunk with stdout/stderr concatenated and the first non-zero exit kept) - for a list whose runs
+  compose (names, a patch, `ninja`/`flipcheck` targets), never for a commit; `lib.git.Git.run_paths` builds on them.
 * `install_spawn_retry() -> bool` (no-op off Windows, idempotent), `retrying(init, sleep, attempts, backoff)`,
   `is_transient(exc)`, `SPAWN_ATTEMPTS = 6`, `SPAWN_BACKOFF_S = 0.1`.
 * `trap_sites(root, subdir="tools", skip_selftests=False)`, `module_traps(tree)`, `call_traps(node)`: the AST scan for a
@@ -33,6 +37,10 @@ starts); the live trap scan is `tools/tests/smoke/test_proc_traps.py` (WP6 delet
 * **The spawn retry** (2026-09-30): under parallel load `CreateProcess` raised `PermissionError [WinError 5]` for an
   executable that was fine a moment later. Only `winerror == 5` is retried (six attempts, 0.1 s growing backoff, ~1.5 s);
   anything else is raised at once.
+* **The command-line budget** (2026-10-05): Windows' `CreateProcess` refuses a line over 32,767 characters
+  (`[WinError 206] The filename or extension is too long`); a 687-path `git commit -- <paths>` crashed a landing after
+  its gate passed. A variable-length list goes through `run_chunked` (or `Git.run_paths`); within 8 KB the argv is
+  unchanged, so a small batch behaves exactly as before.
 
 ## Absorbs (today's implementations)
 
@@ -48,7 +56,8 @@ None (stdlib).
 
 Tier: fixture (`tools/tests/lib/test_proc.py`). A non-ASCII byte decodes as UTF-8 and a non-UTF-8 byte never raises; a
 WinError 5 is retried then raised after `SPAWN_ATTEMPTS`, any other error at once; `kill_tree` ends a process; the trap
-scan finds the trap, not the fixed spelling, skips vendored code and reports a broken file. The live tree's trap count is
+scan finds the trap, not the fixed spelling, skips vendored code and reports a broken file; `argv_chunks` keeps order and
+the budget, and `run_chunked` passes 5,000 words (65 KB) under `testing.argv_limit()` that refuses the one-launch spelling. The live tree's trap count is
 `land.py`'s own selftest row (`trap_sites(SELF_REPO)` is empty).
 
 ## Known gaps

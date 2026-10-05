@@ -5,7 +5,8 @@ from __future__ import annotations
 import os
 import subprocess
 
-from tools.units.landing.common import (KIND_BOOKKEEPING, KIND_GATE, git, is_scratch, outside_batch, run,
+from tools.lib.git import Git
+from tools.units.landing.common import (KIND_BOOKKEEPING, KIND_GATE, git, is_scratch, outside_batch,
     unit_owned_paths)
 
 
@@ -120,8 +121,12 @@ def foreign_warning(foreign: list[str]) -> str:
 
 def commit_pathspec(main: str, msg_file: str, stageable: list[str]) -> subprocess.CompletedProcess:
     """Commit exactly the batch's paths. `git commit` with no pathspec commits the whole index; with one it
-    commits the named paths (read from the working tree) and leaves every other staged path staged."""
-    return run(["git", "commit", "-F", msg_file, "--", *stageable], main)
+    commits the named paths (read from the working tree) and leaves every other staged path staged. A pathspec
+    over the argv budget goes to git on stdin (`Git.run_paths`, the same semantics): `git commit -- <687 paths>`
+    exceeded the Windows command line on 2026-10-05."""
+    if not stageable:
+        raise ValueError("commit_pathspec: an empty pathspec commits the whole index - name the paths")
+    return Git(main).run_paths(["commit", "-F", msg_file], stageable)
 
 
 def stage_batch(main: str, stageable: list[str]) -> None:
@@ -130,4 +135,6 @@ def stage_batch(main: str, stageable: list[str]) -> None:
     not) on its own. So a rename's source path can stay in the pathspec without breaking the staging step."""
     existing = [p for p in stageable if os.path.exists(os.path.join(main, p))]
     if existing:
-        git(["add", "--", *existing], main)
+        p = Git(main).run_paths(["add"], existing)
+        if p.returncode != 0:
+            raise SystemExit("git add failed in %s for %d path(s): %s" % (main, len(existing), p.stderr.strip()))

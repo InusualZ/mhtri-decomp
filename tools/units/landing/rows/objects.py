@@ -6,6 +6,7 @@ import os
 import sys
 
 from tools.lib import names as _names
+from tools.lib import proc
 from tools.lib import project as _project
 from tools.lib.lanes import naming
 import tools.units.undefrefs as uref
@@ -20,7 +21,7 @@ def flipcheck_problems(main: str, units: list[str]) -> list[str]:
     """`flipcheck.py` refusals for the units a batch flips: one line per unit with its reasons."""
     if not units:
         return []
-    p = run([sys.executable, os.path.join("tools", "units", "flipcheck.py"), *units], main)
+    p = proc.run_chunked([sys.executable, os.path.join("tools", "units", "flipcheck.py")], units, cwd=main)
     problems, cur = [], None
     for line in (p.stdout or "").splitlines():
         if line.startswith("NOT READY"):

@@ -7,10 +7,11 @@ import subprocess
 import sys
 
 import tools.git.prepcommit as pc
+from tools.lib.git import Git
 from tools.units.landing import common
 from tools.units.landing.base import base_dirty_paths
 from tools.units.landing.common import (Batch, KIND_BOOKKEEPING, changed_paths, changed_status, git, outside_batch,
-    run, scratch_paths)
+    scratch_paths)
 from tools.units.landing.stage import land_stageable
 
 
@@ -160,7 +161,7 @@ def unstage_scratch(main: str, paths: list[str]) -> tuple[list[str], list[str]]:
     victims = [p for p in paths if p in staged]
     if not victims:
         return [], []
-    p = run(["git", "reset", "-q", "HEAD", "--", *victims], main)
+    p = Git(main).run_paths(["reset", "-q", "HEAD"], victims)
     return (victims, []) if p.returncode == 0 else ([], victims)
 
 

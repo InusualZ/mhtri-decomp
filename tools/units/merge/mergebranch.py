@@ -519,7 +519,7 @@ def resolve(root: str, branch: str | None, dry_run: bool, as_json: bool) -> int:
     # stage the merge's own paths, never the whole tree (deletions were staged by `git rm` above)
     present = [p for p in todo if os.path.isfile(os.path.join(root, p))]
     if present:
-        p = g.run("add", "--", *present)
+        p = g.run_paths(["add"], present)
         if p.returncode != 0:
             return bail("staging the merge's own paths failed: %s" % (p.stderr or p.stdout).strip()[:200])
     p = g.run("commit", "-q", "-m", msg)
@@ -560,7 +560,7 @@ def preflight(root: str, todo: list[str], base: str) -> list[str]:
         pass
     if units:
         targets = ["build/RMHE08/src/%s.o" % u for u in units]
-        p = proc.run(["ninja", *targets], cwd=root)
+        p = proc.run_chunked(["ninja"], targets, cwd=root)
         failed = [l for l in (p.stdout + p.stderr).splitlines() if l.startswith("FAILED")]
         notes.append("compile %d unit(s): %s" % (len(units), "ok" if not failed else
                                                  "FAILED %d - %s" % (len(failed), failed[0][:90])))

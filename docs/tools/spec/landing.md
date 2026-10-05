@@ -28,7 +28,10 @@ prints the `land.band_ownership_warnings` command beside `stylelint.py --diff ma
   halves of the snapshot come from `rows/objects.py` and `rows/data.py`. Its report rebuild runs the registry's `report`
   command (`lib.artifacts`) unconditionally - ninja judges freshness, a no-op is 0.06 s.
 * `message.py` - `.git/land_msg.txt`: written only by a green gate, cleared by every refusal; `message_error`.
-* `stage.py` - `land_stageable`, `looks_already_applied`, the pathspec commit, `land_decision`.
+* `stage.py` - `land_stageable`, `looks_already_applied`, the pathspec commit, `land_decision`. `stage_batch` and
+  `commit_pathspec` go through `Git.run_paths`: a pathspec within `proc.ARGV_BUDGET` (8 KB) is today's exact
+  `git commit -F <msg> -- <paths>`, a longer one is read from stdin (`--pathspec-from-file=- --pathspec-file-nul`) with
+  the same semantics - only the named paths are committed, another stream's staged file stays staged.
 * `branch.py` - `land --branch`'s apply (merge-base diff, `git apply -3`), the registration union (`unionguard`,
   `unionresolve`), `resolve`, the resolve-helper sweep, `undo_apply`.
 * `release.py` - `release_plan`, `release_unit` (the one `claims.release` call), the release rows.
@@ -39,7 +42,12 @@ prints the `land.band_ownership_warnings` command beside `stylelint.py --diff ma
   `data.py` (`dataclosure`), `regression.py` (`lib.report.regression`); `objects.new_unit_name_row` (pre-build, rule 7: a unit newly registered under a generated name refuses); `knowledge.py` (7.10) was deleted
   2026-10-05 with its row.
 * `gate.py` - `verify`: `PRE_BUILD` rows in order, then the build and the rows that read it, the message body.
-* `flow.py` - `land` and `land_branch` (gate -> stage -> commit -> release, one answer line).
+* `flow.py` - `land` and `land_branch` (gate -> stage -> commit -> release, one answer line). A stage or commit step
+  that fails after a green gate (a non-zero exit or any exception) is `_commit_failed`: outcome `error` on row
+  `COMMIT_ROW` with the error in the landing log's `extra`, the batch left applied and staged (`land --branch` does not
+  undo it), the message kept, the pathspec written to `.git/land_paths.txt`, and stderr names MAIN's state, the
+  recovery (`git -C <main> commit -F .git/land_msg.txt --pathspec-from-file=.git/land_paths.txt --pathspec-file-nul`)
+  and the abandon command (`git restore --source=HEAD --staged --worktree` over the same file); the claims stay held.
 * `cli.py` - the parser and `main`; `--selftest` forwards to the test modules.
 * `api.py` - every name of the package in one namespace (what `land.py` re-exports).
 
@@ -54,8 +62,12 @@ shim's `land.py -> landing/api.py`); `recompile`, `subproc` and `unitutil` are n
   listed in `land.md`'s Known gaps (stylelint, selftest, commitlint, ledger, flipcheck run as subprocesses).
 * The gate's table (row names, statuses, kinds, order) is pinned by `tools/tests/units/landing/test_gate_golden.py`
   against `gate_golden.py`, recorded from the monolithic `land.py` before the split.
-* A test patches where the code looks a name up: `gate.verify` (what `flow.land` calls), `tree.run` (the scratch
-  unstage), `common.worktree_root`/`common.main_root` (the CLI's tree resolution).
+* A test patches where the code looks a name up: `gate.verify` (what `flow.land` calls), `proc.run` (the scratch
+  unstage goes through `Git.run_paths`), `flow.commit_pathspec` (the commit step), `common.worktree_root`/
+  `common.main_root` (the CLI's tree resolution).
+* **No variable-length list on a command line** (2026-10-05): a batch's paths reach git through `Git.run_paths` and a
+  target list reaches `ninja`/`flipcheck` through `proc.run_chunked`; the bounded lists (`UNION_SCOPE`'s two paths,
+  `BAND_ROOTS`) stay literal.
 
 ## Lib dependencies
 
@@ -69,7 +81,10 @@ decisions, `land`/`land --branch` on fixture repos - among them `test_land_branc
 pre-flight with main unchanged -, the resolver, the CLI) and
 `tools/tests/units/landing/`: `test_gate_golden.py` (thirteen scenarios, the whole table - the two `new-unit-*` ones pin the new-unit name row's refusal and its rename credit), `test_landlog_hook.py` (the
 landing log), `test_base_report.py` (the base report rebuild and its row), `test_neighbours.py` (names-only
-neighbours).
+neighbours), `test_long_paths.py` (the golden fixture's `bulk` kind - 1,500 renames, 3,000 pathspec entries - landed
+through `flow.land` under `testing.argv_limit()`, the simulated 32,767-character limit: it lands; the old command-line
+commit is caught as outcome `error` and its printed recovery commits the batch; a raising commit step's printed abandon
+restores the tree; over the budget an unrelated staged file stays uncommitted).
 
 ## Known gaps
 

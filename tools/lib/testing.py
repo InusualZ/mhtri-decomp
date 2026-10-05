@@ -704,3 +704,32 @@ def capture(fn: Callable, *args: Any, **kwargs: Any) -> tuple[Any, str]:
     finally:
         sys.stdout = real
     return result, buf.getvalue()
+
+
+class argv_limit:
+    """Make every process launch whose command line exceeds `limit` characters fail the way Windows does (an
+    `OSError` naming `[WinError 206] The filename or extension is too long`), on any OS, for the `with` block - so a
+    test of a long path list fails on Linux too when the code passes the list on the command line. The size is the
+    argv as `subprocess.list2cmdline` spells it (what `CreateProcess` receives); `refused` collects the sizes it
+    refused and `largest` the longest line it let through. Default 32,767: the real `CreateProcess` limit."""
+
+    def __init__(self, limit: int = 32767) -> None:
+        self.limit, self.refused, self.largest, self._real = limit, [], 0, None
+
+    def __enter__(self) -> "argv_limit":
+        self._real = real = subprocess.Popen.__init__
+        guard = self
+
+        def limited(popen, args, *a, **kw):
+            line = args if isinstance(args, str) else subprocess.list2cmdline([os.fspath(x) for x in args])
+            if len(line) > guard.limit:
+                guard.refused.append(len(line))
+                raise FileNotFoundError(2, "simulated [WinError 206] The filename or extension is too long "
+                                           "(%d > %d characters)" % (len(line), guard.limit))
+            guard.largest = max(guard.largest, len(line))
+            return real(popen, args, *a, **kw)
+        subprocess.Popen.__init__ = limited
+        return self
+
+    def __exit__(self, *exc: Any) -> None:
+        subprocess.Popen.__init__ = self._real

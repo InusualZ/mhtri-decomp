@@ -105,8 +105,23 @@ def git(root, *args):
     return testing.GitFixture(root).git(*args)
 
 
+#: The long-path batch (2026-10-05: the 687-path header move crashed the commit step on the Windows command line):
+#: BULK_N headers move out of the retired `include/` root by a plain rename, so the batch is BULK_N deletions plus
+#: BULK_N new files - 3,000 paths, about 115 KB, three times the 32,767-character `CreateProcess` limit. The kind is
+#: not in SCENARIOS (the golden is unchanged): `test_long_paths.py` lands it through the whole flow.
+BULK_N = 1500
+BULK_OLD = ["include/Bulk/bulk_header_number_%04d.h" % i for i in range(BULK_N)]
+BULK_NEW = [p.replace("include/", "src/", 1) for p in BULK_OLD]
+
+
 def build_fixture(root: str, sc: Scenario) -> None:
     fx = testing.GitFixture(root).init()
+    if sc.kind == "bulk":
+        os.makedirs(os.path.join(root, "include", "Bulk"))
+        for rel in BULK_OLD:
+            with open(os.path.join(root, *rel.split("/")), "w", encoding="utf-8", newline="\n") as fh:
+                fh.write("int %s;\n" % os.path.basename(rel)[:-2])
+        git(root, "add", "--", "include")
     files = {"configure.py": CONF, "config/RMHE08/splits.txt": SPLITS, "config/RMHE08/symbols.txt": SYMBOLS,
              "src/Net/net_old.cpp": "int net_old(void) { return 0; }\n",
              "src/Net/net.h": "#ifndef NET_H\n#define NET_H\nint net_old(void);\n#endif\n",
@@ -146,6 +161,10 @@ def build_fixture(root: str, sc: Scenario) -> None:
                 fh.write("int net_new(void);\n")
         else:
             git(root, "mv", "include/Net/old.h", "src/Net/old.h")
+    elif sc.kind == "bulk":
+        os.makedirs(os.path.join(root, "src", "Bulk"))
+        for old, new in zip(BULK_OLD, BULK_NEW):
+            os.replace(os.path.join(root, *old.split("/")), os.path.join(root, *new.split("/")))
     elif sc.kind == "tools":
         with open(os.path.join(root, "tools", "units", "fixture_tool.py"), "w", encoding="utf-8") as fh:
             fh.write("X = 2\n")
@@ -170,9 +189,10 @@ def orphans_stub(*_a, **_k):
             "added": [], "pre_existing": [], "strict_counts": {}, "sole_owned": [], "untouched_pairs": {}}
 
 
-def capture(verify, sc: Scenario, mods: dict | None = None) -> dict:
-    """Run `verify` on a fresh fixture for `sc` with the boundary stubs; -> `{exit, rows: [[name, status, kind]]}`."""
-    root = tempfile.mkdtemp(prefix="gate-golden-")
+def capture(verify, sc: Scenario, mods: dict | None = None, root: str | None = None) -> dict:
+    """Run `verify` on a fresh fixture for `sc` with the boundary stubs; -> `{exit, rows: [[name, status, kind]]}`.
+    `root` is the (empty) directory to build the fixture in; a fresh temp directory by default."""
+    root = root or tempfile.mkdtemp(prefix="gate-golden-")
     build_fixture(root, sc)
     real_run = proc.run
     seen = {"rows": None}
