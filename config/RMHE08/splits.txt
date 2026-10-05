@@ -2067,29 +2067,23 @@ Network/PatConnection.cpp:
 	.sdata      start:0x80793960 end:0x80793968
 
 Network/PatInterface.cpp:
-	extab       start:0x8001BCAC end:0x8001BD9C
-	extabindex  start:0x8003BF40 end:0x8003C06C
-	.text       start:0x803FCC34 end:0x803FE8E4
-	.data       start:0x80600978 end:0x80600BA0
-	.sbss       start:0x80794CB0 end:0x80794CB8
-	.sdata2     start:0x8079C7D0 end:0x8079C7D8
-
-Network/network_state.cpp:
-	extab       start:0x8001BD9C end:0x8001BE24
-	extabindex  start:0x8003C06C end:0x8003C138
-	.text       start:0x803FE8E4 end:0x804006A8
-	.sdata      start:0x80793968 end:0x80793970
-	.sdata2     start:0x8079C7D8 end:0x8079C7E8
-
-Network/network_layer_io.cpp:
-	extab       start:0x8001BE24 end:0x8001C9B4
-	extabindex  start:0x8003C138 end:0x8003D278
-	.text       start:0x804006A8 end:0x80413450
+	extab       start:0x8001BCAC end:0x8001C8F4
+	extabindex  start:0x8003BF40 end:0x8003D170
+	.text       start:0x803FCC34 end:0x804123F8
 	.rodata     start:0x80570E20 end:0x80570E70
-	.data       start:0x80600BA0 end:0x806024B8
-	.sdata      start:0x80793970 end:0x80793990
+	.data       start:0x80600978 end:0x80602428
+	.sdata      start:0x80793968 end:0x80793988
+	.sbss       start:0x80794CB0 end:0x80794CB8
+	.sdata2     start:0x8079C7D0 end:0x8079C868
+
+Network/NetworkPool.cpp:
+	extab       start:0x8001C8F4 end:0x8001C9B4
+	extabindex  start:0x8003D170 end:0x8003D278
+	.text       start:0x804123F8 end:0x80413450
+	.data       start:0x80602428 end:0x806024B8
+	.sdata      start:0x80793988 end:0x80793990
 	.sbss       start:0x80794CB8 end:0x80794CC0
-	.sdata2     start:0x8079C7E8 end:0x8079C874
+	.sdata2     start:0x8079C868 end:0x8079C874
 
 Network/NetworkWiiMediator.cpp:
 	extab       start:0x8001C9B4 end:0x8001CD94

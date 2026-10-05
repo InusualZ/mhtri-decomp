@@ -1,14 +1,18 @@
 /*
  * include/Network/PatInterface.h - the declarations `src/Network/PatInterface.cpp` owns
- * (`.text` 0x803FCC34..0x803FE8E4, the `PatInterface` singleton's C-linkage surface).
+ * (`.text` 0x803FCC34..0x804123F8: the `PatInterface` singleton, its request state machine and its packet layer).
  *
- * The unit has no bodies yet, so every parameter list is the one its callers' calls demonstrate; the
- * first parameter is the singleton (`this` in r3 - the target bodies read it), spelled the way each
- * caller holds it: `PatInterface` (the mediator band), `NetworkInstance` (what `getInstance_` returns,
- * the band header's typedef of this class since request net3-d-03c2#1) or
- * `NetworkStateMachine` (the state machine's spelling, a typedef of `PatInterface`).  Moved here from `include/unsplit/Network.h`,
- * `include/Network/network_state.h` and `src/Network/NetworkWiiMediator.cpp` (docs/plan.md 6.5 rule 2:
- * the owner declares).
+ * Since the round 4 fold (owner ruling 2026-10-05: one TU) this one header carries what
+ * `include/Network/network_state.h` and the head of `include/Network/network_layer_io.h` declared: the state
+ * machine's entry points and the `sendReq*`/`recv*`/reader/writer surface of the packet layer.  The tail's
+ * `NetworkPool`/`NetworkRandom` live in `include/Network/NetworkPool.h`.
+ *
+ * Every parameter list of a body not written yet is the one its callers' calls demonstrate; the first parameter
+ * is the singleton (`this` in r3 - the target bodies read it), spelled the way each caller holds it:
+ * `PatInterface` (the mediator band), `NetworkInstance` (what `getInstance_` returns, the band header's typedef
+ * of this class since request net3-d-03c2#1) or `NetworkStateMachine` (the state machine's spelling, a typedef
+ * of `PatInterface`).  Moved here from `include/unsplit/Network.h` and `src/Network/NetworkWiiMediator.cpp`
+ * (docs/plan.md 6.5 rule 2: the owner declares).
  */
 #ifndef MHTRI_NETWORK_PATINTERFACE_H
 #define MHTRI_NETWORK_PATINTERFACE_H
@@ -19,16 +23,8 @@
 #include "Network/gamespy_interface_types.h"   /* NetworkErrorInfo - the kept error triple */
 
 #include "unsplit/Network.h"           /* NetworkInstance (an alias of PatInterface), NetworkPostedError */
-
-/* The 8-byte header of one received packet (the connection keeps it at +0x60AA): `recvCommand` matches the three
- * op-code bytes against the packet table, a status of -1/1 selects `recvAnsNg`/`recvAnsAlert`, and the handlers hand
- * the request id on to the session handlers. */
-typedef struct PatPacketHeader {
-    /* +0x00 */ u8 size_00[2];
-    /* +0x02 */ u8 requestId_02[2];   /* copied out with `memcpy` - the packet is a byte stream */
-    /* +0x04 */ u8 opcode_04[3];
-    /* +0x07 */ s8 status_07;         /* -1 negative reply, 1 alert, else the handler's own */
-} PatPacketHeader;   /* size: 0x08 */
+#include "Network/PatConnection.h"     /* PatConnection - the base class, PatPacketHeader */
+#include "sound/fn_800E46E8.h"         /* getInstance - the state machine's mediator lookup */
 
 /* One 0x5C-byte user row: the local row at +0x8B54 and each row of the array `+0x8BB8` points at.
  * `sendReqUserObject` compares one against the other field by field. */
@@ -84,16 +80,16 @@ typedef struct NetworkFmpSlot {
  * `initializeNetworkMediator` makes - and calls its five buffer setters by their mangled member names
  * (`setTermsBuffer__12PatInterfaceFPScUl`).  The constructor is out of line (`__ct__12PatInterfaceFv`,
  * 0x803FCC34): it first calls the base constructor 0x803FAE9C (`Network/PatConnection.cpp`'s range), then stores
- * the 161-slot table 0x80602198 (3 slots in this unit, 158 in `Network/network_layer_io.cpp`'s range).  The
- * virtual is declared and not defined here, so no table is emitted by a consumer.  The fields from +0x60E8 on are
- * the request state machine's (`Network/network_state.cpp`, which spells the type `NetworkStateMachine`, a
- * typedef of this class); every gap is padding that keeps the offsets exact.
+ * the 161-slot table 0x80602198 (every slot in this unit's range).  The
+ * key function (the destructor) is defined in `src/Network/PatInterface.cpp`, so only that object emits the table.  The fields from +0x60E8 on are
+ * the request state machine's (which spells the type `NetworkStateMachine`, a typedef of this class); every gap is padding that keeps the offsets exact.
  */
-class PatInterface {
+class PatInterface : public PatConnection {
 public:
+    /* 0x803FCC34 */
     PatInterface();
-    /* +0x00 - the vtable pointer; slot +0x08 is the deleting finalizer */
-    virtual void finalize(s32 flags);
+    /* +0x008 - 0x803FCF8C */
+    virtual ~PatInterface();
     /* +0x00C - restores the defaults (the base constructor calls it through the table) */
     virtual void resetDefaults();
     /* +0x010..+0x280 - the packet handlers: `recvCommand` finds the header's op-code in the packet table
@@ -268,17 +264,10 @@ public:
     s32 recvAnsNg(s32 index, const PatPacketHeader* header);
     s32 recvAnsAlert(s32 index, const PatPacketHeader* header);
 
-    /* the connected server's tag every handler's log line starts with (defined in `Network/network_layer_io.cpp`) */
+    /* the connected server's tag every handler's log line starts with (defined in `Network/PatInterface.cpp`) */
     inline const char* getServerName();
 
-    /* +0x0004 */ u8 pad_0004[0x60A6];   /* the connection base's buffers (`Network/PatConnection.cpp`) */
-    /* +0x60AA */ PatPacketHeader header_60AA;   /* the packet being dispatched */
-    /* +0x60B2 */ u8 pad_60B2[0x02];
-    /* +0x60B4 */ u8* readCursor_60B4;   /* the readers' position in the packet body */
-    /* +0x60B8 */ u8 pad_60B8[0x18];
-    /* +0x60D0 */ u8 cryptEnabled_60D0;   /* the receive loop decrypts the body while set */
-    /* +0x60D1 */ u8 opening_state;     /* the opening sub-step the mediator's progress reads (0 and 90 ignored) */
-    /* +0x60D2 */ u8 pad_60D2[0x02];
+    /* +0x0000..+0x60D4 - `PatConnection` (the table pointer, the buffers, the packet header) */
     /* +0x60D4 */ s32 refCount_60D4;   /* `increment60d4`/`decrement60d4` */
     /* +0x60D8 */ PatEventCallback eventCallbacks_60D8[8];   /* `dispatchSessionHandlers` calls each bound one */
     /* +0x60F8 */ u32 eventCallbackArgs_60F8[8];   /* the argument each callback is handed last */
@@ -317,15 +306,13 @@ public:
     /* +0x65E8 */ u32 mySearchValue_65E8;   /* this client's own search row values (`recvAnsUserSearchInfoMine`) */
     /* +0x65EC */ u32 mySearchValue_65EC;
     /* +0x65F0 */ s32 serverType_65F0;   /* the connected server: 0 LMP, 1 FMP, 2 OPN, 3 RFP (`setConnectServerType`) */
-    /* +0x65F4 */ u8 pad_65F4[0x04];
-    /* +0x65F8 */ u32 fmpSelected_65F8;   /* the chosen FMP slot index */
-    /* +0x65FC */ u8 pad_65FC[0x000C];
-    /* +0x6608 */ u32 fmpSlotCount_6608;   /* number of live rows in `fmpSlots_6C40` */
-    /* +0x660C */ u8 pad_660C[0x04];
-    /* +0x6610 */ u32 rfpConnected_6610;   /* set once the RFP server's address arrived (`recvAnsRfpConnect`) */
-    /* +0x6614 */ u8 pad_6614[0x0106];
-    /* +0x671A */ u8 fmpReserve_671A[0x0106];
-    /* +0x6820 */ u8 pad_6820[0x020C];
+    /* +0x65F4 */ u32 serverIndex_65F4[4];   /* per server type (`serverType_65F0`): the chosen address, -1 for none
+                                             * (the constructor's `memset`); [1] is the chosen FMP slot */
+    /* +0x6604 */ u32 serverCount_6604[4];   /* per server type: the known addresses - the constructor sets LMP and OPN to 1;
+                                             * [1] is the number of live rows in `fmpSlots_6C40`, [3] is set once the
+                                             * RFP server's address arrived (`recvAnsRfpConnect`) */
+    /* +0x6614 */ u8 serverReserve_6614[4][0x0106];   /* per server type, a server block (the constructor clears all four);
+                                                     * [1] is the FMP reply's (`recvAnsFmpInfo`) */
     /* +0x6A2C */ PatServerAddress serverAddress_6A2C;   /* the server to connect to (`chooseServerAddress`) */
     /* +0x6B32 */ PatServerAddress lmpServer_6B32;   /* the lobby server (`recvAnsLmpConnect`, or the mediator's first address) */
     /* +0x6C38 */ u32 fmpListActive_6C38;
@@ -360,7 +347,7 @@ public:
     /* +0x82A0 */ u8* userListPtr_82A0;
     /* +0x82A4 */ u8* vulgarityPtr_82A4;
     /* +0x82A8 */ u8* patchMessageBuffer_82A8;
-    /* +0x82AC */ u8 loginFields_82AC[0x08];   /* the tag/value block `sendReqLoginInfo` builds */
+    /* +0x82AC */ u32 loginFields_82AC[2];   /* the tag/value block `sendReqLoginInfo` builds (`resetDefaults` clears both words) */
     /* +0x82B4 */ u8 loginInfoSent_82B4;
     /* +0x82B5 */ u8 pad_82B5[0x0020];
     /* +0x82D5 */ char userIdText_82D5[0x2C];
@@ -404,9 +391,12 @@ public:
     void setAnnounceBuffer(s8* buffer, u32 size);
     void setNoChargeBuffer(s8* buffer, u32 size);
     void setPatchMessageBuffer(s8* buffer, u32 size);
+
+    /* .sbss 0x80794CB0 - the live singleton (the constructor publishes it, the destructor clears it, `getInstance_` reads it) */
+    static PatInterface* mpInstance;
 };   /* size: 0xD640 (the allocation `initializeNetworkMediator` makes) */
 
-/* The request state machine's spelling of the singleton (`Network/network_state.cpp`, `Network/PatConnection.h`). */
+/* The request state machine's spelling of the singleton (this unit's state machine, `Network/PatConnection.h`). */
 typedef PatInterface NetworkStateMachine;
 
 #ifdef __cplusplus
@@ -535,6 +525,532 @@ void getSelectedHunterName(NetworkInstance* self, char* out);
 void setSomething(NetworkInstance* self, s32 value);
 /* 0x803FE4A8 */
 s8 getSomething4(NetworkInstance* self);
+
+#ifdef __cplusplus
+}
+#endif
+
+/* ==== the packet layer (the former `Network/network_layer_io.cpp` head) ==================================== */
+
+typedef struct NetLayerFilter NetLayerFilter;           /* include/Network/NetworkLayerPat.h */
+typedef struct NetUserPosition NetUserPosition;         /* include/Network/NetworkLayerPat.h */
+typedef struct NetLayerUserRecord NetLayerUserRecord;   /* include/Network/NetworkLayerPat.h */
+struct PatCircleOptionList;
+struct PatMatchOptions;
+typedef struct PatCircleFilter PatCircleFilter;   /* include/Network/NetworkSessionManager.h */
+
+typedef struct PatCircleInfo PatCircleInfo;       /* include/Network/NetworkSessionManager.h */
+typedef struct NetworkWiiMediatorFields NetworkWiiMediatorFields;   /* include/Network/NetworkWiiMediator.h */
+class NetworkWiiMediator;                         /* include/Network/NetworkWiiMediator.h */
+class NetworkReflectService;                      /* include/Network/NetworkReflectService.h */
+
+/* ---- the records the packet handlers read and hand to the session handlers ---------------------------------- */
+
+/* One tagged value of a `PatTagList`: `type` 1 carries the 32-bit `value`. */
+typedef struct PatTagValue {
+    /* +0x0 */ u8  tag_0;
+    /* +0x1 */ u8  type_1;
+    /* +0x2 */ u8  pad_2[2];
+    /* +0x4 */ u32 value_4;
+} PatTagValue;   /* size: 0x8 */
+
+/* Up to 32 tagged values (`readUnkByteIntStruct` reads `count` of them; records of 260 bytes). */
+typedef struct PatTagList {
+    /* +0x000 */ u8          count_000;
+    /* +0x001 */ u8          pad_001[3];
+    /* +0x004 */ PatTagValue values_004[32];
+} PatTagList;   /* size: 0x104 */
+
+/* One layer (a lobby level) as `readLayerData` fills it: only the fields the handlers touch are named. */
+typedef struct PatLayerData {
+    /* +0x000 */ u8  pad_000[0x04];
+    /* +0x004 */ u8   path_004[0x10];   /* `readUnkShortArrayStruct` fills it before the layer's own items */
+    /* +0x014 */ char name_014[0x40];   /* item 3 of the layer requests (`writeLayerDownData`) */
+    /* +0x054 */ s16 layerId_054;      /* the id `recvAnsLayerChildInfo` read first */
+    /* +0x056 */ u8  pad_056[0x27];
+    /* +0x07D */ s8  isCurrent_07D;    /* selects `recvAnsLayerInfo`'s event (GUESS) */
+    /* +0x07E */ u8  pad_07E[0xC0];
+    /* +0x13E */ u8  binary_13E[0x100]; /* the binary info `NetworkLayerPat::handleLayerInfoSet` copies in */
+    /* +0x23E */ u16 value_23E;        /* the layer setting request sends item 23 while it is nonzero (the binary size) */
+} PatLayerData;   /* size: 0x240 (the handlers clear 576 bytes) */
+
+/* One layer record of the layer info and list answers: the layer and its tag list. */
+typedef struct PatLayerInfo {
+    /* +0x000 */ u8           kind_000;   /* `recvNtcLayerUserNum` reads it first */
+    /* +0x001 */ u8           pad_001[0x03];
+    /* +0x004 */ PatLayerData layer_004;
+    /* +0x244 */ PatTagList   tags_244;
+} PatLayerInfo;   /* size: 0x348 (the list answers allocate 840 bytes a row) */
+
+/* One user of a layer (`readLayerUserData`): the handlers read its short id first. */
+typedef struct PatLayerUser {
+    /* +0x000 */ char userId_000[0x08];
+    /* +0x008 */ char name_008[0x20];    /* the host answers read it after the id */
+    /* +0x028 */ u8   path_028[0x50];    /* the host answers' layer path (`readUnkShortArrayStruct`) */
+    /* +0x078 */ u8   pad_078[0xC8];
+} PatLayerUser;   /* size: 0x140 (the handlers clear 320 bytes) */
+
+/* One row of the layer user lists: the user and its tag list. */
+typedef struct PatLayerUserInfo {
+    /* +0x000 */ PatLayerUser user_000;
+    /* +0x140 */ PatTagList   tags_140;
+} PatLayerUserInfo;   /* size: 0x244 (the list answers allocate 580 bytes a row) */
+
+/* The inline value of one received item: the scalars `readItemList` reads by type (the strings and byte arrays keep a
+ * pointer into the call stack here instead). */
+typedef union PatItemValue {
+    /* +0x0 */ u32 word;
+    /* +0x0 */ f32 real;
+} PatItemValue;   /* size: 0x4 */
+
+/* One typed item of a received item list (`readItemList`): its tag, its type (0..9) and its value. */
+typedef struct PatItem {
+    /* +0x00 */ u8           tag_00;
+    /* +0x01 */ u8           type_01;
+    /* +0x02 */ u8           pad_02[0x06];
+    /* +0x08 */ PatItemValue value_08;
+    /* +0x0C */ u8           pad_0C[0x04];   /* a string or byte array's length (`readItemList`) */
+} PatItem;   /* size: 0x10 (`createItemListStack` sizes the array in 16-byte rows) */
+
+/* A received item list: `initItemList` binds `capacity_03` rows at `items_04`, `readItemList` fills `count_02` of them
+ * (more than the capacity is an overflow the handlers do not report).  Names GUESS from the two bodies. */
+typedef struct PatItemList {
+    /* +0x0 */ u16      marker_00;     /* `initItemList` stores 1, `readItemList` reads it first (0: no items) */
+    /* +0x2 */ u8       count_02;
+    /* +0x3 */ u8       capacity_03;
+    /* +0x4 */ PatItem* items_04;
+} PatItemList;   /* size: 0x8 */
+
+/* A binary item notice from a layer or circle member: the sender's id and its item list. */
+typedef struct PatItemNotice {
+    /* +0x00 */ char        userId_00[0x08];
+    /* +0x08 */ PatItemList items_08;
+} PatItemNotice;   /* size: 0x10 (the handlers clear 16 bytes) */
+
+/* A layer member's position notice: the sender's id and the position its six items carry (tags 1..3 the floats,
+ * 4..6 the words - the values `NetworkLayerPat::sendUserPosition_60` sends as a `NetUserPosition`). */
+typedef struct PatUserPositionNotice {
+    /* +0x00 */ char userId_00[0x08];
+    /* +0x08 */ f32  position_08[3];
+    /* +0x14 */ s32  value_14[3];
+} PatUserPositionNotice;   /* size: 0x20 (the handler clears 32 bytes) */
+
+/* One detail search answer as the session handlers receive it (on the call stack): the layer, its tag list and its
+ * users (a second call-stack block).  Name GUESS from `recvAnsLayerDetailSearchData`. */
+typedef struct PatDetailSearchResult {
+    /* +0x000 */ s32               userCount_000;   /* clamped to the rows the call stack could hold */
+    /* +0x004 */ PatLayerUserInfo* users_004;
+    /* +0x008 */ u8                pad_008[0x04];
+    /* +0x00C */ PatLayerData      layer_00C;
+    /* +0x24C */ PatTagList        tags_24C;
+} PatDetailSearchResult;   /* size: 0x350 (the handler takes 848 bytes off the call stack) */
+
+/* The sender of a chat or tell (`readChatData`). */
+typedef struct PatChatInfo {
+    /* +0x00 */ u32  value_00;
+    /* +0x04 */ u8   pad_04[0x04];
+    /* +0x08 */ char userId_08[0x08];   /* the tells read it before the sender's items */
+    /* +0x10 */ u8   pad_10[0x20];
+} PatChatInfo;   /* size: 0x30 */
+
+/* One chat or tell as the session handlers receive it: the text and its sender. */
+typedef struct PatChatMessage {
+    /* +0x000 */ char        text_000[0x100];
+    /* +0x100 */ PatChatInfo sender_100;
+} PatChatMessage;   /* size: 0x130 (the handlers clear 304 bytes) */
+
+/* One mediation lock entry (`readMediationData`): the user and the lock value. */
+typedef struct PatMediation {
+    /* +0x0 */ char userId_0[0x08];
+    /* +0x8 */ u8   value_8;
+    /* +0x9 */ u8   pad_9;
+} PatMediation;   /* size: 0xA (the notices clear 10 bytes, the list answer 32 of them) */
+
+/* One circle (a hunting party) as the circle answers read it: its id, the info items and the tag list. */
+typedef struct PatCircleEntry {
+    /* +0x000 */ s32        circleId_000;
+    /* +0x004 */ u8         pad_004[0x378];
+    /* +0x37C */ PatTagList tags_37C;
+} PatCircleEntry;   /* size: 0x480 (the handlers clear 1152 bytes) */
+
+/* One member event of a circle: the circle, the member's slot and state, its id and name. */
+typedef struct PatCircleUser {
+    /* +0x00 */ s32  circleId_00;
+    /* +0x04 */ s8   slot_04;    /* sent 1-based (`readCircleSlot`) */
+    /* +0x05 */ u8   state_05;
+    /* +0x06 */ char userId_06[0x08];
+    /* +0x0E */ char name_0E[0x20];
+    /* +0x2E */ u8   pad_2E[0x02];
+} PatCircleUser;   /* size: 0x30 (the handlers clear 48 bytes) */
+
+/* One circle member's match options (`readCircleMatchData`; the match start notice fills the head itself). */
+typedef struct PatCircleMatch {
+    /* +0x00 */ u8   flag_00;
+    /* +0x01 */ u8   pad_01[0x03];
+    /* +0x04 */ u16  value_04;
+    /* +0x06 */ u8   pad_06;
+    /* +0x07 */ s8   slot_07;    /* sent 1-based (`readCircleSlot`) */
+    /* +0x08 */ char userId_08[0x08];
+    /* +0x10 */ u8   pad_10[0x20];
+} PatCircleMatch;   /* size: 0x30 (the handlers clear 48 bytes, the user list 4 of them) */
+
+/* The match start notice as the session handlers receive it: the members (on the handler's stack) and the tail. */
+typedef struct PatMatchStart {
+    /* +0x00 */ s32             count_00;     /* 1..4 members */
+    /* +0x04 */ PatCircleMatch* members_04;
+    /* +0x08 */ u8              flag_08;      /* the optional tail, read while the block has bytes left */
+    /* +0x09 */ u8              pad_09[0x03];
+    /* +0x0C */ u32             values_0C[4];
+} PatMatchStart;   /* size: 0x1C (the handler clears 28 bytes) */
+
+/* The kick notice: a kind byte and a byte string with its length. */
+typedef struct PatKickList {
+    /* +0x000 */ u8  kind_000;
+    /* +0x001 */ u8  pad_001;
+    /* +0x002 */ u8  data_002[0x100];
+    /* +0x102 */ u16 size_102;
+} PatKickList;   /* size: 0x104 (the handler clears 260 bytes) */
+
+/* The MCS server a match starts on: its address and name. */
+typedef struct PatMcsServer {
+    /* +0x000 */ char host_000[0x104];   /* the `PatServerAddress` layout */
+    /* +0x104 */ u16  port_104;
+    /* +0x106 */ char name_106[0x20];
+} PatMcsServer;   /* size: 0x126 (the handler clears 294 bytes) */
+
+/* The sender block of the binary notices (`readNtcCompoundData`). */
+typedef struct PatNtcCompound {
+    /* +0x00 */ u32  value_00;
+    /* +0x04 */ char userId_04[0x08];   /* the user notice reads it first */
+    /* +0x0C */ u8   pad_0C[0x20];
+} PatNtcCompound;   /* size: 0x2C (the handlers clear 44 bytes) */
+
+/* A binary notice from a user or the server: the bytes, their length and the sender. */
+typedef struct PatBinaryMessage {
+    /* +0x000 */ u8             data_000[0x100];
+    /* +0x100 */ u16            size_100;
+    /* +0x102 */ u8             pad_102[0x02];
+    /* +0x104 */ PatNtcCompound sender_104;
+} PatBinaryMessage;   /* size: 0x130 */
+
+/* A user's binary notice: the user, a kind, the bytes, their length and a value. */
+typedef struct PatUserBinaryNotice {
+    /* +0x000 */ char userId_000[0x08];
+    /* +0x008 */ u8   kind_008;
+    /* +0x009 */ u8   data_009[0x100];
+    /* +0x109 */ u8   pad_109[0x03];
+    /* +0x10C */ u32  size_10C;
+    /* +0x110 */ u32  value_110;
+} PatUserBinaryNotice;   /* size: 0x114 */
+
+/* One user search row (`readUserSearchData`) and its tag list. */
+typedef struct PatUserSearch {
+    /* +0x000 */ u8         pad_000[0x228];
+    /* +0x228 */ u32        value_228;    /* `recvAnsUserSearchInfoMine` keeps both values */
+    /* +0x22C */ u32        value_22C;
+    /* +0x230 */ PatTagList tags_230;
+} PatUserSearch;   /* size: 0x334 (the list answer allocates 820 bytes a row) */
+
+/* One friend (`readFriendData`). */
+typedef struct PatFriend {
+    /* +0x00 */ u32  value_00;
+    /* +0x04 */ char userId_04[0x08];
+    /* +0x0C */ u8   pad_0C[0x20];
+    /* +0x2C */ s8   state_2C;   /* the friend notice reads it last */
+    /* +0x2D */ u8   pad_2D[0x03];
+} PatFriend;   /* size: 0x30 */
+
+/* One black list entry (`readBlackListData`). */
+typedef struct PatBlackListEntry {
+    /* +0x00 */ char userId_00[0x08];
+    /* +0x08 */ u8   pad_08[0x24];
+} PatBlackListEntry;   /* size: 0x2C */
+
+/* The agreement's page info as the session handlers receive it (the page records on the call stack). */
+typedef struct PatAgreementInfo {
+    /* +0x00 */ u8  version_00;
+    /* +0x01 */ u8  pad_01[0x0B];
+    /* +0x0C */ u8  pageCount_0C;
+    /* +0x0D */ u8  pad_0D[0x03];
+    /* +0x10 */ u8* pages_10;   /* `pageCount_0C` records of 40 bytes */
+} PatAgreementInfo;   /* size: 0x14 */
+
+/* One agreement page as the session handlers receive it (the text on the call stack). */
+typedef struct PatAgreementPage {
+    /* +0x0 */ u32 page_0;
+    /* +0x4 */ u32 value_4;
+    /* +0x8 */ u32 size_8;
+    /* +0xC */ u8* data_C;
+} PatAgreementPage;   /* size: 0x10 */
+
+/* One binary transfer chunk as the session handlers receive it. */
+typedef struct PatBinaryChunk {
+    /* +0x0 */ u32 fileHandle_0;
+    /* +0x4 */ u32 offset_4;
+    /* +0x8 */ u32 size_8;
+    /* +0xC */ u8* data_C;   /* the call stack's copy of the chunk */
+} PatBinaryChunk;   /* size: 0x10 */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* the channel requests the GameSpy band sends */
+void sendReqChannelInfo(NetworkInstance* self, u32 handle);
+u32 sendReqChannelData(NetworkInstance* self, u32 handle, u32 offset, u32 size);
+u32 sendReqConnect(NetworkInstance* self);
+
+/* The layer requests: each writes its op-code and returns the request id (the callee narrows it to 16
+ * bits, but its caller stores the full register, so the declared type is the wide one - playbook 66). */
+u32 sendReqLayerUp(NetworkInstance* self);
+u32 sendReqLayerChildInfo(NetworkInstance* self, s16 layer_id, u32 unused_arg);
+u32 sendReqLayerUserList(NetworkInstance* self);
+
+/* The request emitters the session state machine (`Network/network_state.cpp`) drives. */
+u32 sendReqAuthenticationToken(NetworkInstance* self, const char* token);
+u32 sendReqMaintenance(NetworkInstance* self);
+u32 sendReqTermsVersion(NetworkInstance* self);
+u32 sendReqTerms(NetworkInstance* self, u32 a, u32 b, u32 len);
+u32 sendReqAnnounce(NetworkInstance* self);
+u32 sendReqNoCharge(NetworkInstance* self);
+u32 sendReqVulgarityInfoLow(NetworkInstance* self, s32 mode);
+u32 sendReqVulgarityLow(NetworkInstance* self, s32 mode, u32 slice, u32 offset, u32 length);
+u32 sendReqLmpConnect(NetworkInstance* self);
+u32 sendReqMediaVersionInfo(NetworkInstance* self);
+u32 sendReqRfpConnect(NetworkInstance* self);
+u32 sendReqFmpListVersion(NetworkInstance* self);
+u32 sendReqFmpListHead(NetworkInstance* self, s32 first, s32 count);
+u32 sendReqFmpListData(NetworkInstance* self, u32 start, u32 count);
+u32 sendReqFmpListFoot(NetworkInstance* self);
+u32 sendReqFmpInfo(NetworkInstance* self, u32 value, s32 brief);
+/* The layer session's requests (op-codes 89..115). */
+u32 sendReqLayerStart(NetworkInstance* self);
+u32 sendReqLayerEnd(NetworkInstance* self);
+u32 sendReqLayerJump(NetworkInstance* self, const u8* path, u32 value);
+u32 sendReqLayerCreateHead(NetworkInstance* self, s16 layerId);
+u32 sendReqLayerCreateSet(NetworkInstance* self, s16 layerId, PatLayerData* layer, PatTagList* tags);
+u32 sendReqLayerCreateFoot(NetworkInstance* self, s16 layerId, u8 move);
+u32 sendReqLayerDown(NetworkInstance* self, s16 layerId, PatLayerData* layer);
+u32 sendReqLayerJumpReady(NetworkInstance* self, const u8* path, u32 value);
+u32 sendReqLayerJumpGo(NetworkInstance* self, const u8* path, u32 value);
+u32 sendReqLayerInfoSet(NetworkInstance* self, PatLayerData* layer, PatTagList* tags);
+u32 sendReqLayerInfo(NetworkInstance* self, const u8* path, const PatTagList* tags, s8 mode);
+u32 sendReqLayerParentInfo(NetworkInstance* self, const PatTagList* tags);
+u32 sendReqLayerChildListHead(NetworkInstance* self, s32 first, s32 count);
+u32 sendReqLayerChildListData(NetworkInstance* self, s32 first, s32 count);
+u32 sendReqLayerChildListFoot(NetworkInstance* self);
+u32 sendReqLayerSiblingListHead(NetworkInstance* self, s32 first, s32 count);
+u32 sendReqLayerSiblingListData(NetworkInstance* self, s32 first, s32 count);
+u32 sendReqLayerSiblingListFoot(NetworkInstance* self);
+u32 sendReqLayerHost(NetworkInstance* self, const u8* path);
+u32 sendReqLayerUserListData(NetworkInstance* self, s32 first, s32 count);
+u32 sendReqLayerUserListFoot(NetworkInstance* self);
+u32 sendReqLayerUserSearchData(NetworkInstance* self, s32 first, s32 count);
+u32 sendReqLayerUserSearchFoot(NetworkInstance* self);
+/* The binary transfer requests return the request id the reply is matched against. */
+s32 sendReqBinaryHead(NetworkInstance* self, u8 fileId, s8 mode);
+s32 sendReqBinaryData(NetworkInstance* self, u8 fileId, u32 handle, u32 offset, u32 size);
+s32 sendReqBinaryFoot(NetworkInstance* self, u8 fileId);
+void sendReqCircleInfoNoticeSet(NetworkInstance* self);
+void reqUserSearchInfoMine(NetworkInstance* self, s32 mode);
+
+/* The item writers and the hand-off dispatch the state machine calls with its own view of the session. */
+void writeUInt8Array2(NetworkStateMachine* self, u8 count, const u8* data);
+/* The request item writers: a layer path, a layer's tagged items, a tag list, a 2-byte array, the off-by-one
+ * counters the server reads 1-based (0x8040F068/0x8040F05C, GUESS names) and the two fixed item lists the layer
+ * requests ask for (0x8040F1B0 the layer items, 0x8040F208 the user items; GUESS names). */
+void writeUnkShortArray(NetworkStateMachine* self, const u8* path);
+void writeLayerDownData(NetworkStateMachine* self, PatLayerData* layer, u8 count, const u8* tags);
+void writeUnkByteIntStruct(NetworkStateMachine* self, PatTagList* tags);
+void writeUnk2ByteArray(NetworkStateMachine* self, const PatTagList* tags);
+void writeShortPlusOne(NetworkStateMachine* self, s16 value);
+void writeBytePlusOne(NetworkStateMachine* self, s8 value);
+void writeLayerItemRequest(NetworkStateMachine* self);
+void writeUserItemRequest(NetworkStateMachine* self);
+void putItemAny(NetworkStateMachine* self, const u8* values, u32 count, const u8* tags);
+void putItemTaggedLongs(NetworkStateMachine* self, const u32* values, u8 count, const u8* tags);
+void putItemTaggedBytes(NetworkStateMachine* self, const u8* values, u8 count, const u8* tags);
+void putUserSlotObjects(NetworkStateMachine* self, const u8* row, u8 count, const u8* tags);
+void dispatchSessionHandlers(NetworkStateMachine* self, u32 code, const u8* requestId, s32 value, u32 count, const u8* data);
+
+/* The packet body readers the handlers call: the login block's tagged items at +0x82AC, `count` user rows. */
+void readChargeInfo(NetworkStateMachine* self, u8* loginFields);
+void readUserObjects(NetworkStateMachine* self, NetworkUserRow* rows, s32 count);
+/* Reads `count` FMP slots into `slots` (the server-name block of each into `reserve`). */
+void readFmpCompoundData(NetworkStateMachine* self, NetworkFmpSlot* slots, u8* reserve, s32 count);
+/* Reads `count` media version records (item 2 is the text `getStr1` returns; `unused` is not read). */
+void readMediaVersionData(NetworkStateMachine* self, u8* unused, s32 count);
+/* 0x80410C44 - reads one slice of a body transfer (its offset and length) into `buffer`: -1 (and a kept failure)
+ * when the offset is not the next one or the buffer is full, else 0 (GUESS name). */
+s32 readBodySlice(NetworkStateMachine* self, u8* buffer, u32 capacity);
+/* The record readers: layers, the counting layer form (0x80411074, GUESS name: the user-number notice reads it),
+ * the layer path, tag lists, layer users, and the off-by-one counters the server sends 1-based. */
+void readLayerData(NetworkStateMachine* self, PatLayerData* layers, s32 count);
+void readLayerCountData(NetworkStateMachine* self, PatLayerData* layers, s32 count);
+void readUnkShortArrayStruct(NetworkStateMachine* self, u8* path);
+void readUnkByteIntStruct(NetworkStateMachine* self, PatTagList* lists, s32 count);
+void readLayerUserData(NetworkStateMachine* self, PatLayerUser* users, s32 count);
+void readShortMinusOne(NetworkStateMachine* self, s16* out);
+void readByteMinusOne(NetworkStateMachine* self, s8* out);
+/* 0x80411478 - reads a 1-based circle slot (a twin of `readByteMinusOne`; GUESS name). */
+void readCircleSlot(NetworkStateMachine* self, s8* out);
+void readChatData(NetworkStateMachine* self, PatChatInfo* senders, s32 count);
+void readMediationData(NetworkStateMachine* self, PatMediation* entries, s32 count);
+void readCircleInfoDataArray(NetworkStateMachine* self, PatCircleEntry* circles, s32 count);
+void readCircleMatchData(NetworkStateMachine* self, PatCircleMatch* members, s32 count);
+void readNtcCompoundData(NetworkStateMachine* self, PatNtcCompound* senders, s32 count);
+void readUserSearchData(NetworkStateMachine* self, PatUserSearch* rows, s32 count);
+/* 0x80411BD8 - reads `count` 7-byte user status records (GUESS name). */
+void readUserStatusData(NetworkStateMachine* self, u8* status, s32 count);
+void readFriendData(NetworkStateMachine* self, PatFriend* friends, s32 count);
+void readBlackListData(NetworkStateMachine* self, PatBlackListEntry* entries, s32 count);
+void readAgreementPageData(NetworkStateMachine* self, u8* pages, s32 count);
+/* 0x80411FC4 - reads `count` agreement page info records' items (GUESS name). */
+void readAgreementInfoData(NetworkStateMachine* self, PatAgreementInfo* infos, s32 count);
+/* The received item lists (GUESS names from the bodies): 0x8040E7F4 binds `capacity` rows at `items` and marks the
+ * list; 0x8041043C reads the list's marker, count and typed items (strings and byte arrays into `buffer`, at most
+ * `size` bytes); 0x803FE4D8 takes the rows off the call stack (at most 64, 8-byte aligned: `reserved` carries the
+ * alignment in and the padding out) and binds them; 0x803FE590 gives the rows and the padding back. */
+void initItemList(NetworkStateMachine* self, PatItemList* list, PatItem* items, u8 capacity);
+void readItemList(NetworkStateMachine* self, PatItemList* list, u8* buffer, u16 size);
+void createItemListStack(NetworkStateMachine* self, PatItemList* list, u32* reserved);
+void releaseItemListStack(NetworkStateMachine* self, PatItemList* list, u32 reserved);
+/* Writes `count` tagged items of the login block (`tags` selects each one). */
+void putSomethingList(NetworkStateMachine* self, const u8* loginFields, u8 count, const u8* tags);
+
+/* The circle (lobby room) requests the Pat session manager sends: each writes its op-code and returns the
+ * request id (stored whole by the caller - playbook 66); the `sendNtc*` notices return nothing.  Names
+ * marked GUESS come from the manager's call sites (`.pi/outbox/net2-l2-101a-requests.json`): the List
+ * Head/Data/Foot triple is the op-code run 0xD0/0xD2/0xD4, Kick 0xD6 sends a user id, Chat 0xE8 has no
+ * reply slot (0xE9 follows it), the three value notices wrap `sendNtcCircleBinary` (kinds 1/2 and 3)
+ * and its addressed twin. */
+u32 sendReqCircleCreate(NetworkInstance* self, PatCircleInfo* info, PatCircleOptionList* options);   /* 0x804025B4 */
+u32 sendReqCircleInfo(NetworkInstance* self, s32 circleId, s32 mode);                                /* 0x80402630 */
+u32 sendReqCircleJoin(NetworkInstance* self, PatCircleInfo* info);                                   /* 0x804026B4 */
+u32 sendReqCircleLeave(NetworkInstance* self, s32 circleId);                                         /* 0x8040275C */
+u32 sendReqCircleMatchOptionSet(NetworkInstance* self, PatMatchOptions* options);                    /* 0x804027C0 */
+u32 sendReqCircleMatchStart(NetworkInstance* self);                                                  /* 0x80402880 */
+u32 sendReqCircleMatchEnd(NetworkInstance* self, s32 mode);                                          /* 0x804028CC */
+u32 sendReqCircleInfoSet(NetworkInstance* instance, u32 request_id, PatCircleInfo* info, const char* name); /* 0x80402930 */
+u32 sendReqCircleListLayer(NetworkInstance* self);                                                   /* 0x804029AC */
+u32 sendReqCircleListHead(NetworkInstance* self, s32 mode, s32 count, PatCircleFilter* filters, s32 filterCount,
+                          u32 flag);                                                       /* 0x80402A64 (GUESS) */
+u32 sendReqCircleListData(NetworkInstance* self, s32 first, s32 count);                   /* 0x80402B04 (GUESS) */
+u32 sendReqCircleListFoot(NetworkInstance* self);                                         /* 0x80402B80 (GUESS) */
+u32 sendReqCircleKick(NetworkInstance* self, const char* userId);                         /* 0x80402BCC (GUESS) */
+u32 sendReqCircleHost(NetworkInstance* self, s32 circleId);                                          /* 0x80402C64 */
+u32 sendReqCircleUserList(NetworkInstance* self);                                                    /* 0x80402CC8 */
+void sendNtcCircleChat(NetworkInstance* self, PatMatchOptions* options, const char* text);  /* 0x80402E5C (GUESS) */
+u32 sendReqCircleTell(NetworkInstance* self, const char* userId, PatMatchOptions* options,
+                      const char* text);                                                  /* 0x80402EE8 (GUESS) */
+void sendNtcCircleUserValue(NetworkInstance* self, s32 circleId, s32 value, u8 notify);     /* 0x80402FD0 (GUESS) */
+void sendNtcCircleUserValueReply(NetworkInstance* self, s32 circleId, s32 value,
+                                 const u8* address);                                      /* 0x804030A8 (GUESS) */
+void sendNtcCircleMatchState(NetworkInstance* self, s32 circleId, s32 state);               /* 0x80403174 (GUESS) */
+
+/* The user search, user binary and friend requests (op-codes 252..285; the names of 276/279/285 are GUESSES from the
+ * op-code order). */
+u32 sendReqUserSearchSet(NetworkInstance* self, PatTagList* tags);
+u32 sendReqUserBinarySet(NetworkInstance* self, u32 value, const u8* data, u32 size);
+u32 sendReqUserBinaryNotice(NetworkInstance* self, u8 kind, const char* text, u32 a, u32 b);
+u32 sendReqUserSearchData(NetworkInstance* self, s32 first, s32 count);
+u32 sendReqUserSearchFoot(NetworkInstance* self);
+u32 sendReqFriendAccept(NetworkInstance* self, const char* userId, u8 accept);
+u32 sendReqFriendDelete(NetworkInstance* self, const char* userId);
+u32 sendReqBlackDelete(NetworkInstance* self, const char* userId);
+
+/* 0x80400F28 (GUESS) - request op 0x47: the checksum of file `fileId`; returns the request id. */
+s32 sendReqBinaryChecksum(NetworkInstance* self, u8 fileId);
+
+/* 0x80401AF4 - request op 136, between sendReqLayerHost and sendReqLayerUserList (recvAnsLayerUserInfoSet's slot) */
+u32 sendReqLayerUserInfoSet(NetworkInstance* self, const NetLayerUserRecord* record);
+/* 0x80401F50 */
+void sendNtcLayerUserPosition(NetworkInstance* self, const NetUserPosition* position);
+/* 0x80402090 */
+u32 sendNtcLayerChat(NetworkInstance* self, u8 channel, const PatMatchOptions* options, const char* text);
+/* 0x8040211C - request op 159 after sendNtcLayerChat, as sendReqCircleTell follows sendNtcCircleChat (recvAnsLayerTell) */
+u32 sendReqLayerTell(NetworkInstance* self, const u8* userId, const PatMatchOptions* options, const char* text);
+/* 0x80402248 */
+u32 sendReqLayerMediationLock(NetworkInstance* self, u8 lock, u8 key);
+/* 0x804022E4 */
+u32 sendReqLayerMediationUnlock(NetworkInstance* self, u8 lock, u8 key);
+/* 0x80402380 */
+u32 sendReqLayerMediationList(NetworkInstance* self, u8 mode, u8 count);
+/* 0x80402404 */
+u32 sendReqLayerDetailSearchHead(NetworkInstance* self, u32 kind, u32 mode, s32 count, const NetLayerFilter* filters, s32 filterCount);
+/* 0x804024EC */
+u32 sendReqLayerDetailSearchData(NetworkInstance* self, s32 first, s32 count);
+/* 0x80402568 */
+u32 sendReqLayerDetailSearchFoot(NetworkInstance* self);
+/* 0x80403230 */
+void sendNtcLayerUserTransfer(NetworkInstance* self, u32 state, const u8* userId, u32 active);
+
+/* 0x8040354C */
+s32 sendReqTell(NetworkInstance* self, const u8* id, const u32* options, const char* text);
+/* 0x804035D8 */
+s32 sendReqBinaryUser(NetworkInstance* self, const u8* id, const u8* data, u16 size);
+/* 0x80403978 */
+s32 sendReqUserSearchInfo(NetworkInstance* self, const u8* query, s32 mode);
+/* 0x80403A88 */
+s32 sendReqUserStatusSet(NetworkInstance* self, const u8* settings);
+/* 0x80403BF4 */
+s32 sendReqFriendAdd(NetworkInstance* self, const u8* id, const u32* options, const char* text);
+/* 0x80403D60 */
+s32 sendReqFriendList(NetworkInstance* self, s32 mode, s32 max);
+/* 0x80403DE4 */
+s32 sendReqBlackAdd(NetworkInstance* self, const u8* id, const u32* options);
+/* 0x80403EDC */
+s32 sendReqBlackList(NetworkInstance* self, s32 mode, s32 max);
+
+#ifdef __cplusplus
+}
+#endif
+
+/* ==== the request state machine (the former `Network/network_state.cpp`) ===================================== */
+
+/* The 3-byte payload `sendServerTimeout` builds from the two unowned constants. */
+typedef struct SessionTimeoutPayload {
+    /* +0x00 */ u16 code_00;
+    /* +0x02 */ u8  reason_02;
+    /* +0x03 */ u8  pad_03;
+} SessionTimeoutPayload;   /* size: 0x04 */
+
+/* `NetworkPostedError` (0x0C B) is defined in `unsplit/Network.h`; `PatInterface::postError` takes it by value. */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+s32  sendReqShut(NetworkInstance* self, s32 mode);
+s32  resetNetworkState3(NetworkInstance* self);
+/* 0x803FE8E4 / 0x803FF024 - the state machine's reset and its gated step out of state 5. */
+s32  resetNetworkState(NetworkInstance* self);
+s32  advanceNetworkState5(NetworkInstance* self);
+/* 0x803FE95C - one step of the login sub-machine; nonzero once it has finished. */
+s32  handleNetworkState1(NetworkInstance* self);
+
+/* The band's request-header constants (no registered owner; declared, never defined - playbook 29).
+ * `sessionTimeoutParam`/`Param2` are the bytes {1,2,3}, `requestHeaderWord0`/`Word1` the 8-byte block
+ * {1,2,3,5,4,6,7,8} `sendReqOpcode1B` copies, `maskedUserName` the "******" sentinel
+ * `sendReqUserObject` compares a row's short name against. */
+extern const u16 sessionTimeoutParam;      /* 0x8079C7D8 */
+extern const u8  sessionTimeoutParam2;     /* 0x8079C7DA */
+extern const u32 requestHeaderWord0;       /* 0x8079C7E0 */
+extern const u32 requestHeaderWord1;       /* 0x8079C7E4 */
+extern const char maskedUserName[7];       /* 0x80793968 - the map's own size, so MWCC uses sda21 */
+
+/* 0x803FFE88 - sends the server-timeout request built from the three words at `values`. */
+s32 sendServerTimeout(NetworkInstance* self, const u32* values);
+
+/* 0x803FF060 */
+s32 handleNetworkState2(NetworkInstance* self);
+/* 0x803FF4EC */
+s32 handleNetworkState2Fmp(NetworkInstance* self);
+/* 0x803FF994 */
+s32 handleNetworkState2Binary(NetworkInstance* self);
+
+/* 0x803FFF50 - sends the check request: two tag bytes and a packed record of `size` bytes. */
+s32 sendReqUnknownCheck(NetworkInstance* self, const u8* tags, const u8* data, u32 size);
 
 #ifdef __cplusplus
 }

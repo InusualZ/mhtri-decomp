@@ -461,7 +461,7 @@ typedef struct PatCircleOptionList {
  * are declared with their classes in `Network/network_transport_types.h`.  The free helpers that take
  * the records above are owned by registered units and declared in their owners' headers (rule 2):
  * `buildCircleInfoName`, `circleAvailable` and the `networkPat*` buffer helpers in
- * `Network/NetworkSessionManagerPat.h`, `sendReqCircleInfoSet` in `Network/network_layer_io.h`. */
+ * `Network/NetworkSessionManagerPat.h`, `sendReqCircleInfoSet` in `Network/PatInterface.h`. */
 class NetworkSessionManagerPat;
 
 /* -------------------------------- NetworkSessionManagerPat ---------------------------------- */

@@ -184,6 +184,28 @@ void setMediatorState68A(NetworkWiiMediatorFields* self, u8 value);
 void parseReflectLines(NetworkWiiMediatorFields* self, s32 source);
 void getMediatorState68A(NetworkWiiMediatorFields* self, u8* out);
 
+/* The mediator's mirrors of the `PatInterface` state: the singleton's constructor reads them (the reflect page range,
+ * fields and names, the reply buffer, the two server blocks, the flags and the ticket) and its destructor writes the
+ * server blocks and the flags back.  Moved here from `src/Network/NetworkWiiMediator.cpp` when the constructor was
+ * written (docs/plan.md 6.5 rule 2: the owner declares).  `getReflectPageBuffer` is the retired
+ * `NetworkWiiMediator.c` symbol, carried across verbatim. */
+void getReflectPageBuffer(char* self, char** subobject, unsigned int* limit);
+void setMediatorBufferA(NetworkWiiMediatorFields* self, const u8* src);
+void getMediatorBufferA(NetworkWiiMediatorFields* self, u8* dst);
+void setMediatorBufferB(NetworkWiiMediatorFields* self, const u8* src);
+void getMediatorBufferB(NetworkWiiMediatorFields* self, u8* dst);
+void getMediatorNameBuffer(NetworkWiiMediatorFields* self, u32* out1, u8* out2);
+void setMediatorFlag78B(NetworkWiiMediatorFields* self, u8 value);
+void getMediatorField288(NetworkWiiMediatorFields* self, u32* out);
+void setMediatorFlag78C(NetworkWiiMediatorFields* self, u8 value);
+void getMediatorFlag78C(NetworkWiiMediatorFields* self, u8* out);
+void getReflectPageRange(NetworkWiiMediatorFields* self, u32* out1, u32* out2);
+void getReflectField30(NetworkWiiMediatorFields* self, u32* out);
+void getReflectField34(NetworkWiiMediatorFields* self, u32* out);
+void getReflectField38(NetworkWiiMediatorFields* self, u32* out);
+void getReflectName3C(NetworkWiiMediatorFields* self, char* out, u32 size);
+void getReflectName5C(NetworkWiiMediatorFields* self, char* out, u32 size);
+
 #ifdef __cplusplus
 }
 #endif

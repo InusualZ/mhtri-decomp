@@ -24,7 +24,7 @@
  * file-scope `#pragma peephole off` (playbook 39); each `dont_inline` region keeps a retail `bl` that `-inline auto` folds.
  *
  * RESIDUALS.  none in `.text`.  `getNetworkBinaryState` reads `NetworkStateMachine::binaryState_6134` (the view
- *   `Network/network_state.h` owns); the name is a GUESS from that field (renamed from `getSomething5` by the integrator).
+ *   `Network/PatInterface.h` owns); the name is a GUESS from that field (renamed from `getSomething5` by the integrator).
  */
 #include "types.h"
 #include "Network/network_transport.h"
@@ -33,7 +33,7 @@
    cannot be included beside `unsplit/OS.h`: the two band headers declare `OSCreateThread`/`OSResumeThread` with
    different signatures and a TU that sees both fails with `(10197) illegal function overloading`. */
 #include "unsplit/Network.h"
-#include "Network/network_state.h"
+#include "Network/PatInterface.h"   /* owner Network/PatInterface.cpp (the state machine and the packet layer) */
 #include "unsplit/Runtime.PPCEABI.H.h"
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"

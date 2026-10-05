@@ -1928,7 +1928,7 @@ config.libs = [
             # folded into `Network/sNetworkLibraryWii.cpp` (its TU), `initNetworkSessionStable` was folded into `Network/NetworkSessionManagerPat.cpp` at
             # phase 4 (its per-unit -O3 evidence below is kept), the other three are `Object(NonMatching, ...)`.
             #   Network/initNetworkSessionStable.cpp (folded)  .text 0x803DEA30..0x803DEB38 (264 B, 1 fn)
-            #   Network/network_state.cpp              .text 0x803FE8E4..0x804006A8 (8900 B, 21 fn)
+            #   Network/network_state.cpp (folded)     .text 0x803FE8E4..0x804006A8 (8900 B, 21 fn)
             #   Network/NetworkWiiMediator.cpp         .text 0x80413C64..0x804155D4 (6490 B, 79 fn)
             #   Network/constructNetworkWiiMediator.cpp  .text 0x80418988..0x804189C8 (64 B, 1 fn)
             #   Network/NetworkPat.cpp                 .text 0x80419EC4..0x8041A170 (328 B, 11 fn)
@@ -1955,9 +1955,8 @@ config.libs = [
             # +0x8C/+0xA4/+0xBC; `__dl__FPv` at extab+0x14; `initNetworkSessionStable` and
             # `@etb_8001A630` in extabindex).  The extab record and the last `.text` byte are source
             # shapes, not flags - the `new` expression and the file-scope `#pragma peephole off`, both
-            # with their measured evidence in the unit header.
-            Object(NonMatching, "Network/network_state.cpp",
-                   cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
+            # with their measured evidence in the unit header.  `Network/network_state.cpp` was folded into
+            # `Network/PatInterface.cpp` (round 4, owner ruling 2026-10-05: one TU); its row is below.
             # `NetworkLayerPat` (round 3 recut, 0x803E0BE8..0x803EF668): it folded the former one-function unit
             # `Network/NetworkLayerPatStep.cpp` (`stepRequest`, 0x803E44C8) and keeps its flags.  `-O3` like the sibling
             # session units: measured with the lib's `-O4,p` (everything else equal) `stepRequest` scores 90.14167 %,
@@ -1995,13 +1994,20 @@ config.libs = [
             # the lib default setTermVersion/setAnnounceBuffer/increment60d4 schedule their stores out of source order
             # (60.00/77.78/80.00, 100 at `-O3`) and `-inline auto` folds getServerTime/getGameTime/getFmpSize/setSomething
             # into their callers (getServerDateTime 53.71, copyFmpSlot 82.18, setPatByte6138On 17.50; 100 at noauto).
+            # Round 4 fold (owner ruling 2026-10-05: one TU): the unit also holds the former `Network/network_state.cpp`
+            # and the head of the former `Network/network_layer_io.cpp` (0x803FCC34..0x804123F8).  Both had `-O3` with
+            # the same evidence (network_state 69.42 -> 81.93 at `-O3`; recvReqLineCheck/recvAnsServerTime/recvAnsShut
+            # 82.13/78.25/72.67 -> 100 at `-O3`) and `-inline auto`; in one TU `-inline auto` would fold this unit's
+            # accessors into the packet layer's callers, which retail calls - so the merged unit keeps this row's
+            # `-inline noauto` (every folded row measured equal or higher: the unit header's FLAGS line).
             Object(NonMatching, "Network/PatInterface.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
-            # Per-object flag deviation, instruction-level evidence: `-O3` like the sibling session units - with the
-            # lib's `-O4,p` recvReqLineCheck scores 82.13, recvAnsServerTime 78.25 and recvAnsShut 72.67 (the log call's
-            # argument setup hoisted into the `bl getNetworkLogger` latency slot), against 100.00 for all three at `-O3`.
-            Object(NonMatching, "Network/network_layer_io.cpp",
-                   cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
+            # The tail of the former `Network/network_layer_io.cpp` (0x804123F8..0x80413450: `NetworkPool`, the NHTTP
+            # wrappers, `NetworkRandom`), its own TU since the PatInterface fold.  No bodies yet; the flags are the old
+            # row's `-O3` plus `-inline noauto` (fn_80412424 calls the 2-instruction `getNetworkPool` defined before it,
+            # which `-inline auto` would fold in) - unmeasured until a body lands.
+            Object(NonMatching, "Network/NetworkPool.cpp",
+                   cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
             # Per-object flag deviation (brief section 8.2), instruction-level evidence: measured over
             # the unit's 79 rows, the lib's `-O4,p` leaves getAccountBan/Warning/WaitQueue at 42.86 and
             # getReflectName3C at 51.28 where `-O3` puts all four at 100.00, and `-inline auto` scores
