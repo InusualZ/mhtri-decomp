@@ -855,7 +855,8 @@ s32 handleNetworkState2Binary(NetworkInstance* self)
     case 40:
         if (((NetworkStateMachine*)self)->binaryTextReady_D408 != 0 && ((NetworkStateMachine*)self)->dataTotal_825C != 0) {
             ((NetworkStateMachine*)self)->requestState_6135 += 5;
-            sendReqBinaryData(self, ((NetworkStateMachine*)self)->binaryActive_D400, ((NetworkStateMachine*)self)->binarySize_D404, 0);
+            sendReqBinaryData(self, ((NetworkStateMachine*)self)->binaryActive_D400, ((NetworkStateMachine*)self)->binarySize_D404, 0,
+                              ((NetworkStateMachine*)self)->dataTotal_825C);
             break;
         }
         ((NetworkStateMachine*)self)->requestState_6135 += 10;

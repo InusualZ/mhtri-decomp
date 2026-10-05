@@ -23,7 +23,8 @@
 #include "Network/NetworkPat.h"
 #include "Network/NetworkSessionManagerPat.h"   /* getPatsObject, isNetworkSessionManagerPatReady (owner's header, rule 2) */
 #include "Network/NetworkLayerPat.h"   /* NetId and the layer records the work record embeds */
-#include "Network/network_writer_types.h"   /* NetworkSmallObject - the roster entries' address objects */
+#include "Network/network_writer_types.h"   /* NetworkUniqueId - the roster entries' address objects */
+#include "Network/NetworkFileFetcher.h"     /* NetworkFileFetcher - the fetch state machines' client */
 
 #ifdef __cplusplus
 extern "C" {
@@ -132,14 +133,10 @@ typedef struct NetPeerRec {
     void assign(const NetPeerRec* src);
 } NetPeerRec; /* size: 0x120 */
 
-/* One 0x20-byte peer address object (`NetCtrlWk::peer_addresses_0x7908`): a small network object the
- * record's constructor builds with `networkSmallObject_construct`; compared with `networkSmallObject_isEqual`.
- * size: 0x20 */
+/* One 0x20-byte peer address object (`NetCtrlWk::peer_addresses_0x7908`): a `NetworkUniqueId` the work
+ * record's constructor builds; compared with `NetworkUniqueId::equals`.  size: 0x20 */
 typedef struct NetPeerAddress {
-    union {
-        /* +0x00 */ u8 bytes_0x00[0x20];
-        /* +0x00 */ NetworkSmallObject object_0x00;
-    };
+    /* +0x00 */ NetworkUniqueId object_0x00;
 } NetPeerAddress; /* size: 0x20 */
 
 /* The peer list `NetCtrlWk::copyPeerList` copies out for the caller: the count, then the four records. */
@@ -236,26 +233,8 @@ typedef struct NetServerNotice {
     /* +0x00 */ u8 bytes_0x00[0xF0];
 } NetServerNotice; /* size: 0xF0 */
 
-/* The remote-file client the fetch state machines drive (constructor `NetworkFileFetcher::NetworkFileFetcher`, `open` at
- * 0x803F6A94, error copy `NetworkFileFetcher::copyError`; GUESS on the class name: it opens a numbered file on the
- * server, polls, reads and closes).  A class with declared, undefined virtuals: MWCC emits no table of
- * ours (rule 10), and the slots are +8+4*i. */
-class NetworkFileFetcher {   /* size: 0x48 */
-public:
-    /* +0x08 */ virtual ~NetworkFileFetcher();
-    /* +0x0C */ virtual s32 poll(u32* status);
-    /* +0x10 */ virtual s32 open(s32 flags, const char* path);
-    /* +0x14 */ virtual s32 read(void* buffer, s32 size);   /* untyped: byte range (the caller's file buffer) */
-    /* +0x18 */ virtual void pad_18();
-    /* +0x1C */ virtual void pad_1C();
-    /* +0x20 */ virtual void pad_20();
-    /* +0x24 */ virtual s32 close();
-
-    NetworkFileFetcher();
-    void copyError(NetFetchError* error);
-private:
-    /* +0x04 */ u8 pad_04[0x44];
-};
+/* The remote-file client the fetch state machines drive, `NetworkFileFetcher`, is declared by its owner's header
+ * `Network/NetworkFileFetcher.h` (included above). */
 
 /* The three list views the layer's list copies fill (all 0x2C or 0x30 bytes per row). */
 typedef struct NetListView {
@@ -343,10 +322,7 @@ typedef struct NetBigData {
 /* One 0x84-byte roster entry (`NetCtrlWk::roster_0xA1B8`): the member's address object (read as an id by
  * `formatNetId`, copied through the object's +0x28 slot) and a 0x14-byte name at +0x20. */
 typedef struct NetRosterRec {
-    union {
-        /* +0x00 */ NetId id_0x00;
-        /* +0x00 */ NetworkSmallObject address_0x00;   /* 0x20 bytes */
-    };
+    /* +0x00 */ NetworkUniqueId address_0x00;   /* 0x20 bytes */
     /* +0x20 */ char name_0x20[0x14];
     /* +0x34 */ u8 pad_0x34;
     /* +0x35 */ u8 state_0x35;   /* in a presence update (community command 22): 1 = added as a friend, 2.. = other states */
@@ -356,10 +332,7 @@ typedef struct NetRosterRec {
 /* One 0x38-byte recent-player entry (`NetCtrlWk::recent_0xBB84`): the address object and a 0x14-byte name at
  * +0x20. */
 typedef struct NetRecentRec {
-    union {
-        /* +0x00 */ NetId id_0x00;
-        /* +0x00 */ NetworkSmallObject address_0x00;   /* 0x20 bytes */
-    };
+    /* +0x00 */ NetworkUniqueId address_0x00;   /* 0x20 bytes */
     /* +0x20 */ char name_0x20[0x14];
     /* +0x34 */ u8 pad_0x34[0x4];
 } NetRecentRec; /* size: 0x38 */
@@ -1108,8 +1081,8 @@ typedef struct PatSoAllocator {
  * address object) and whether the layer is ready (GUESS names from the bodies). */
 s32 findPeerIndex(const NetId* id);
 s32 findFriendIndex(const NetId* id);
-s32 findFreePeerSlot(const struct NetworkSmallObject* address);
-s32 findPeerSlot(const struct NetworkSmallObject* address);
+s32 findFreePeerSlot(const NetworkUniqueId* address);
+s32 findPeerSlot(const NetworkUniqueId* address);
 BOOL isLayerReady(void);
 /* 0x80427714 / 0x804247D0 - installs the layer's reflect callback (and clears the layer status words);
  * the callback itself. */

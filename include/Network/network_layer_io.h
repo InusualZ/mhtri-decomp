@@ -91,9 +91,10 @@ void sendReqFmpListHead(NetworkInstance* self, s32 a, s32 b);
 void sendReqFmpListData(NetworkInstance* self, u32 start, u32 count);
 void sendReqFmpListFoot(NetworkInstance* self);
 void sendReqFmpInfo(NetworkInstance* self, u32 value, s32 flag);
-void sendReqBinaryHead(NetworkInstance* self, s32 a, s32 b);
-void sendReqBinaryData(NetworkInstance* self, s32 a, u32 size, s32 flag);
-void sendReqBinaryFoot(NetworkInstance* self, s32 a);
+/* The binary transfer requests return the request id the reply is matched against. */
+s32 sendReqBinaryHead(NetworkInstance* self, u8 fileId, u8 mode);
+s32 sendReqBinaryData(NetworkInstance* self, u8 fileId, u32 handle, u32 offset, u32 size);
+s32 sendReqBinaryFoot(NetworkInstance* self, u8 fileId);
 void sendReqCircleInfoNoticeSet(NetworkInstance* self);
 void reqUserSearchInfoMine(NetworkInstance* self, s32 mode);
 
@@ -137,6 +138,9 @@ void sendNtcCircleUserValue(NetworkInstance* self, s32 circleId, s32 value, u8 n
 void sendNtcCircleUserValueReply(NetworkInstance* self, s32 circleId, s32 value,
                                  const u8* address);                                      /* 0x804030A8 (GUESS) */
 void sendNtcCircleMatchState(NetworkInstance* self, s32 circleId, s32 state);               /* 0x80403174 (GUESS) */
+
+/* 0x80400F28 (GUESS) - request op 0x47: the checksum of file `fileId`; returns the request id. */
+s32 sendReqBinaryChecksum(NetworkInstance* self, u8 fileId);
 
 #ifdef __cplusplus
 }

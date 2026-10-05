@@ -46,13 +46,11 @@
  *
  * CALLEES.  The SO/DWC/NET/MSL/socket callees are declared by their owners' headers (`SO/soi.h`,
  * `DWCi/dwc_error.h`, `SSL/ssl.h`, `MSL_C/alloc.h`, `NAND/nand.h`, `Network/NetworkCommunityPat.h`).
- * GUESS names there: `DWC_Shutdown`, `NETGetStartupErrorCode`, `constructNetworkSocket`,
- * `constructNetworkFetcherKind2` (evidence beside each declaration).
+ * GUESS names there: `DWC_Shutdown`, `NETGetStartupErrorCode` (evidence beside each declaration).
  *
- * RESIDUALS.  Every `.text` row matches.  `createSocket`/`createFetcher` (kind 2) call constructors whose classes are
- * not reconstructed (C-named GUESSes), so they are spelled as `operator new` + the call; the `.text` is the same, the `extab`
- * cleanup record a real `new` emits is not.  Data: `.data` 0x61C of the claimed 0x620 and `.sbss` 4 of 8
- * (trailing alignment words); `extab` short by those two cleanup records (280 of 292 B).
+ * RESIDUALS.  Every `.text` row matches.  Data: `.data` 0x61C of the claimed 0x620 and `.sbss` 4 of 8 (trailing
+ * alignment words); `extab` 312 of 292 B: the six `__dl__FPv` cleanup records match retail now that `createSocket` /
+ * `createFetcher` are real `new`s, and one `__dt__15sNetworkLibraryFv` record more than retail is left.
  */
 #include "types.h"
 #include "Network/sNetworkLibraryWii.h"
@@ -66,8 +64,8 @@
 #include "Runtime.PPCEABI.H/memset.h"
 #include "sys_mem.h"
 #include "Network/PatInterface.h"
-#include "Network/NetworkSocketWii.h"     /* constructNetworkSocket */
-#include "Network/NetworkFileFetcher.h"   /* constructNetworkFetcherKind2 */
+#include "Network/NetworkSocketWii.h"     /* NetworkSocketWii */
+#include "Network/NetworkFileFetcher.h"   /* NetworkNullFetcher */
 #include "SO/soi.h"                        /* SOInit, SOFinish, SOStartup, SOCleanup, SOGetHostID */
 #include "DWCi/dwc_error.h"                /* DWC_Init, DWC_Shutdown */
 #include "SSL/ssl.h"                       /* NETGetStartupErrorCode */
@@ -528,26 +526,15 @@ NetworkResolverWii* sNetworkLibraryWii::createResolver()
 
 NetworkSocketHandle* sNetworkLibraryWii::createSocket()
 {
-    NetworkSocketHandle* socket = (NetworkSocketHandle*)operator new(0x24);
-
-    if (socket != NULL) {
-        constructNetworkSocket(socket);
-    }
-    return socket;
+    return (NetworkSocketHandle*)new NetworkSocketWii();
 }
 
 NetworkFileFetcher* sNetworkLibraryWii::createFetcher(u32 kind)
 {
-    NetworkFileFetcher* fetcher;
-
     if (kind != 2) {
         return new NetworkFileFetcher();
     }
-    fetcher = (NetworkFileFetcher*)operator new(0x10);
-    if (fetcher != NULL) {
-        constructNetworkFetcherKind2(fetcher);
-    }
-    return fetcher;
+    return (NetworkFileFetcher*)new NetworkNullFetcher();
 }
 
 void sNetworkLibraryWii::resume()

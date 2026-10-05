@@ -1,7 +1,7 @@
 /*
  * include/Network/network_writer_types.h - the bit-stream writer band's classes the session units share.
  *
- * The stream frame objects, the `NetworkBuffer` class, the logger view and the small object were
+ * The stream frame objects, the `NetworkBuffer` class and the logger view were
  * declared in `Network/NetworkSessionManager.h`; `Network/NetworkSessionStable.h` needs them below the
  * session class, so they live here once (rule 1) and both headers include this one.  Every type keeps
  * the size and layout evidence it carried there.
@@ -12,6 +12,7 @@
 
 #include "types.h"
 #include "Network/network_transport_types.h"   /* NetworkStreamSink */
+#include "Network/NetworkUniqueId.h"           /* NetworkUniqueId - the address object the session records embed */
 
 /* ---------------- the bit-stream writer's frame objects (the writer band's classes) ------------- */
 
@@ -32,7 +33,8 @@ public:
     NetworkStreamWriter();
     virtual ~NetworkStreamWriter();
 
-    u8 unused_10[0x08];   /* +0x10..+0x17 */
+    /* +0x10 */ u8* message_10;   /* the message (or, in the framed writer, the frame) the packet stands at */
+    /* +0x14 */ u8* cursor_14;    /* the read cursor in the current message's payload */
 };   /* size: 0x18 */
 
 class NetworkStreamWriterDefault : public NetworkStreamWriter {
@@ -106,22 +108,5 @@ typedef struct NetworkManagerLoggerVtable {
 typedef struct NetworkSessionManagerLogger {
     NetworkManagerLoggerVtable* vtable;   /* +0x00 */
 } NetworkSessionManagerLogger;   /* size: 0x04 */
-
-/* The small object the writer band's `networkSmallObject_construct`/`_dtor` manage.  Its +0x00 word
-   is a function-pointer table - `NetworkSessionManagerPat::clear` dispatches its +0x18 slot - so it is
-   modelled as a struct with a vtable member, never as a polymorphic class: a class would make MWCC
-   initialise the vptr of every element of the four record arrays, which the target does not do. */
-typedef struct NetworkSmallObjectVtable {
-    void* rtti_00;
-    void* rtti_04;
-    u8 pad08[0x10];
-    void (*slot_18)(void* self);   /* +0x18 */
-    u8 pad1C[0x10];                /* +0x1C..+0x2B; +0x28 is the sink's `copyFrom`, called through the class */
-} NetworkSmallObjectVtable;   /* size: 0x2C (approximation - only +0x18 is called through this view) */
-
-typedef struct NetworkSmallObject {
-    NetworkSmallObjectVtable* vtable;   /* +0x00 */
-    u8 pad_04[0x1C];                    /* +0x04..+0x1F */
-} NetworkSmallObject;   /* size: 0x20 - every record that embeds it leaves 0x20 bytes before its next field, and the Pat manager's stack copies need 0x20 for retail's frames */
 
 #endif /* NETWORK_NETWORK_WRITER_TYPES_H */

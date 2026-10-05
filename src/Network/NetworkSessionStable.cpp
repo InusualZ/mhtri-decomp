@@ -28,7 +28,7 @@
  * retail branches over a `blr` (`kick`, `markLeft`, `setError`, `connect`); `slots_14828[index].field` rather than a local slot pointer
  * where retail recomputes the base; the packet getters return `u32` and the source casts `(u16)` where retail
  * masks; the `.sdata2` floats are `const` so loops hoist them; a ternary for the clamp in `updateRate`; the
- * return value of `execControlOne` is computed before the small object's destructor runs; the nonce sum as two
+ * return value of `execControlOne` is computed before the address object's destructor runs; the nonce sum as two
  * statements (`nonce = rand(); nonce += stamp;` gives retail's `add r3,r3,r31`, one expression commutes it).
  *
  * DATA.  The claim holds the strings, the jump table and both tables, and `flipcheck.py` reports the `.data`
@@ -40,23 +40,19 @@
  * band's constructors and destructors, declared in `Network/network_writer_types.h`): the implicit destructor at
  * each exit is what emits retail's `extab` cleanup records.  A stream retail builds mid-function is declared
  * at that point (`move`'s congestion packet, `getFreeSpace`), and `setNetworkConnectionEvent`'s reader lives
- * in a block so it is destroyed before the small object.
+ * in a block so it is destroyed before the address object.  The `address` locals are `NetworkUniqueId`s, so their
+ * scope-exit destructors and cleanup records are MWCC's too.
  *
- * RESIDUALS (`flipcheck.py`, `relocdiff.py --by-owner`).  NOT READY: `.text` 0x5224 against the claim's 0x522C
- * (-8); `extab` 0x430 against 0x488 - every record but two matches in size: `setNetworkConnectionEvent` (0x30
- * against 0x48) and `execControlOne` (0x08 against 0x48) also destroy their `address` small object through
- * cleanup records, which needs it to be a real `NetworkSmallObjectSink` local, i.e. the writer band's
- * `networkSmallObject_construct` (0x803F87B8) named `__ct__22NetworkSmallObjectSinkFv` (its body chains the sink
- * constructor and stores the table whose +0x08 is `__dt__22NetworkSmallObjectSinkFv`; request
- * net2-l1-f15b#1, the owner unit is a live lane's); `extabindex` differs in the same two rows; `.sdata2` 16 B
- * unclaimable as above.  Rows:
+ * RESIDUALS (`flipcheck.py`, `relocdiff.py --by-owner`).  NOT READY: `.text` 0x521C against the claim's 0x522C
+ * (-16, the per-row size deltas below); `extab` is 0x488 like the target since the `address` locals became
+ * `NetworkUniqueId`s (every record matches in size; 42 bytes differ, the code ranges of the rows whose sizes still
+ * differ); `extabindex` differs in the same rows; `.sdata2` 16 B unclaimable as above.  Rows:
  *  - register allocation and frame size in the long functions (`move`, `init`, `send`, `set`, `execControlOne`)
  *    and in `connect` (ours keeps the slot address live across the `start` call in r31: an extra `stw r29`,
  *    frame -0x20 against -0x10, the `stw 0x4828` before the slot base is recomputed);
  *  - `setError` is called, not inlined, in retail: it sits inside the `dont_inline` region with `markLeft`;
  *  - `resetSlot` takes the queues and the governor through their own pointers (retail's `r29`/`r28` bases); left:
- *    the address object's `slot_18` call loads the table off the slot base (`lwz r4,0x4858(r31)`) where retail
- *    loads it off the object pointer in r3 - a real virtual call on the writer band's `NetworkSmallObject`;
+ *    the slot base's `addis` is scheduled before the `mulli` where retail computes it after;
  *  - `post` addresses `queueUsed_518[channel]` as base+index where retail folds the offset into the displacement,
  *    and folds the `0 <= channel < 1` test into one `bne` where retail keeps both compares (spelling every access
  *    `slots_14828[index].` without the slot local folds the 0x4D40 displacement but emits `lwzx`/`stwx`: 79.82 %
@@ -169,19 +165,17 @@ NetworkSessionStable::NetworkSessionStable()
 
 #pragma dont_inline on
 
-/* Destroys the address object's small object. */
+/* Destroys the address record's unique id. */
 NetworkSlotSmallObject::~NetworkSlotSmallObject()
 {
-    ((NetworkSmallObjectSink*)&object_00)->NetworkSmallObjectSink::~NetworkSmallObjectSink();
 }
 
 /* Retail keeps the `bl` into the object's own constructor/destructor rather than folding it (the two
    live in different original objects), so the inline pass is off for these. */
 
-/* Builds the address object around the writer band's small object. */
+/* Builds the address record around a unique id. */
 NetworkSlotSmallObject::NetworkSlotSmallObject()
 {
-    networkSmallObject_construct(&object_00);
 }
 
 /* Destroys the slot's queues and its address object. */
@@ -243,7 +237,7 @@ void NetworkSessionStable::init(s8 isHost, NetworkSessionCallback callback, void
         slot->shutdown_1C = 0;
         memset(&slot->error_20, 0, sizeof(slot->error_20));
         slot->connection_2C = NULL;
-        slot->address_30.object_00.vtable->slot_18(&slot->address_30.object_00);
+        slot->address_30.object_00.clear();
         slot->nonce_50 = 0;
         slot->waitStart_EC = networkSessionZero;
         slot->coolStart_F0 = networkSessionZero;
@@ -283,7 +277,7 @@ void NetworkSessionStable::init(s8 isHost, NetworkSessionCallback callback, void
         slot->governor_D4.lastRaise_10 = networkSessionZero;
         slot->governor_D4.lastLower_14 = networkSessionZero;
     }
-    address_16CB8.object_00.vtable->slot_18(&address_16CB8.object_00);
+    address_16CB8.object_00.clear();
     nonce_16CD8 = 0;
     time_16CDC = getNetworkLogger()->getTime_60();
     hostSeen_16CE0 = networkSessionZero;
@@ -295,7 +289,7 @@ void NetworkSessionStable::init(s8 isHost, NetworkSessionCallback callback, void
     rateStep_16CF8 = networkSessionRateStep;
     rateWindow_16CFC = networkSessionRateWindow;
     joined_16D00 = isHost;
-    ((NetworkSmallObjectSink*)&address_16CB8.object_00)->copyFrom(address);
+    address_16CB8.object_00.copyFrom(address);
     nonce_16CD8 = networkSessionNonce_generate();
     getNetworkLogger()->signal_0C(3, "NetworkSessionStable::init: my nonce is 0x%08x\n", nonce_16CD8);
     ownIndex_14826 = set(1, address);
@@ -775,7 +769,7 @@ s32 NetworkSessionStable::set(s32 isSelf, const u8* address)
     connection->open(onConnectionEvent, this, index, &info);
     slot = &slots_14828[index];
     slot->connection_2C = connection;
-    ((NetworkSmallObjectSink*)&slot->address_30.object_00)->copyFrom(address);
+    slot->address_30.object_00.copyFrom(address);
     slot->nonce_50 = 0;
     return index;
 }
@@ -826,7 +820,7 @@ void NetworkSessionStable::resetSlot(s8 index)
         slot->shutdown_1C = 0;
         memset(&slot->error_20, 0, sizeof(slot->error_20));
         slot->connection_2C = NULL;
-        slot->address_30.object_00.vtable->slot_18(&slot->address_30.object_00);
+        slot->address_30.object_00.clear();
         slot->nonce_50 = 0;
         slot->waitStart_EC = networkSessionZero;
         slot->coolStart_F0 = networkSessionZero;
@@ -1005,7 +999,7 @@ s32 NetworkSessionStable::isConnected(s8 index)
 void NetworkSessionStable::setNetworkConnectionEvent(s32 event, s8 index, u32 arg, s32 size, const u8* data)
 {
     NetworkUnitPacket packet;
-    NetworkSmallObject address;
+    NetworkUniqueId address;
     NetworkSessionSlot* slot;
     u16 sequenceTop;
     u16 sequenceLow;
@@ -1015,7 +1009,6 @@ void NetworkSessionStable::setNetworkConnectionEvent(s32 event, s8 index, u32 ar
     u32 result;
     NetworkConnectionEventRecord record;
 
-    networkSmallObject_construct(&address);
     {
         NetworkStreamWriterDefault reader;
         switch (event) {
@@ -1047,7 +1040,7 @@ void NetworkSessionStable::setNetworkConnectionEvent(s32 event, s8 index, u32 ar
             } else {
                 packet.bind((u8*)data, size);
                 ((NetworkByteStream*)&packet)->forwardRecord((NetworkStreamSink*)&address);
-                if (networkSmallObject_isEqual(&address, &slot->address_30.object_00) == 0) {
+                if (address.equals(&slot->address_30.object_00) == 0) {
                     markLeft(index);
                     getNetworkLogger()->log_14("NetworkSessionStable::setNetworkConnectionEvent: [%d] auth error.\n", index);
                 } else {
@@ -1138,7 +1131,6 @@ void NetworkSessionStable::setNetworkConnectionEvent(s32 event, s8 index, u32 ar
             break;
         }
     }
-    NetworkSmallObjectSink::destroy(&address);
 }
 
 #pragma dont_inline on
@@ -1583,7 +1575,7 @@ void NetworkSessionStable::discardControlMessages(s8 index)
    or the negated message type when the message is refused. */
 s32 NetworkSessionStable::execControlOne(s8 index, NetworkStreamWriter* packet)
 {
-    NetworkSmallObject address;
+    NetworkUniqueId address;
     NetworkSessionSlot* slot;
     u8 type;
     u32 value;
@@ -1592,7 +1584,6 @@ s32 NetworkSessionStable::execControlOne(s8 index, NetworkStreamWriter* packet)
     s32 result;
     f32 delay;
 
-    networkSmallObject_construct(&address);
     slot = &slots_14828[index];
     networkPacket_takeByte(packet, &type);
     switch (type) {
@@ -1611,7 +1602,6 @@ s32 NetworkSessionStable::execControlOne(s8 index, NetworkStreamWriter* packet)
         networkPacket_takeU32(packet, &other);
         if (networkSessionNonce_isValid(other) == 0) {
             result = -(s32)type;
-            NetworkSmallObjectSink::destroy(&address);
             return result;
         }
         getNetworkLogger()->signal_0C(3, "NetworkSessionStable::execControlOne:[%d] sync drop control -> 0x%08x\n", index, other);
@@ -1653,21 +1643,18 @@ s32 NetworkSessionStable::execControlOne(s8 index, NetworkStreamWriter* packet)
         if (networkSessionNonce_isValid(other) == 0) {
             getNetworkLogger()->warn_10("NetworkSessionStable::execControlOne:[%d] relay auth error -> he think:0x%08x\n", index, other);
             result = -(s32)type;
-            NetworkSmallObjectSink::destroy(&address);
             return result;
         }
         if (nonce_16CD8 != other) {
             getNetworkLogger()->warn_10("NetworkSessionStable::execControlOne:[%d] relay auth error -> mine:0x%08x <=> he think:0x%08x\n",
                                         index, nonce_16CD8, other);
             result = -(s32)type;
-            NetworkSmallObjectSink::destroy(&address);
             return result;
         }
         networkPacket_takeU32(packet, &other);
         if (networkSessionNonce_isValid(other) == 0) {
             getNetworkLogger()->warn_10("NetworkSessionStable::execControlOne:[%d] relay auth error -> his:0x%08x\n", index, other);
             result = -(s32)type;
-            NetworkSmallObjectSink::destroy(&address);
             return result;
         }
         if (networkSessionNonce_isValid(slot->nonce_50) != 0) {
@@ -1675,7 +1662,6 @@ s32 NetworkSessionStable::execControlOne(s8 index, NetworkStreamWriter* packet)
                 getNetworkLogger()->warn_10("NetworkSessionStable::execControlOne:[%d] relay auth error -> i think:0x%08x <=> his:0x%08x\n",
                                             index, slot->nonce_50, other);
                 result = -(s32)type;
-                NetworkSmallObjectSink::destroy(&address);
                 return result;
             }
             if (type == 8 && slot->relayIndex_10 < 0) {
@@ -1697,7 +1683,7 @@ s32 NetworkSessionStable::execControlOne(s8 index, NetworkStreamWriter* packet)
     case 10: {
         networkPacket_takeRecord(packet, &address);
         for (found = 0; found < 4; found++) {
-            if (networkSmallObject_isEqual(&slots_14828[found].address_30.object_00, &address) != 0) {
+            if (slots_14828[found].address_30.object_00.equals(&address) != 0) {
                 break;
             }
         }
@@ -1728,14 +1714,13 @@ s32 NetworkSessionStable::execControlOne(s8 index, NetworkStreamWriter* packet)
         networkPacket_takeByte(packet, &type);
         if (slot->authenticated_19 != 0) {
             for (found = 0; found < 4; found++) {
-                if (networkSmallObject_isEqual(&slots_14828[found].address_30.object_00, &address) != 0) {
+                if (slots_14828[found].address_30.object_00.equals(&address) != 0) {
                     break;
                 }
             }
             if (found < 4) {
                 if (networkSessionNonce_isValid(other) == 0) {
                     result = -(s32)type;
-                    NetworkSmallObjectSink::destroy(&address);
                     return result;
                 }
                 if (networkSessionNonce_isValid(slots_14828[found].nonce_50) == 0) {
@@ -1762,10 +1747,8 @@ s32 NetworkSessionStable::execControlOne(s8 index, NetworkStreamWriter* packet)
     }
     default:
         result = -(s32)type;
-        NetworkSmallObjectSink::destroy(&address);
         return result;
     }
-    NetworkSmallObjectSink::destroy(&address);
     return 0;
 }
 
@@ -1893,7 +1876,7 @@ void NetworkSessionStable::writeOp10(s8 index)
 }
 
 /* Frames op code 11 with an address record, the nonce, the delay and a kind, and sends it to the slot `index`. */
-void NetworkSessionStable::writeOp11(s8 index, const NetworkSmallObject* address, u32 nonce, s8 kind, f32 delay)
+void NetworkSessionStable::writeOp11(s8 index, const NetworkUniqueId* address, u32 nonce, s8 kind, f32 delay)
 {
     NetworkStreamWriter stream;
     s8 term;

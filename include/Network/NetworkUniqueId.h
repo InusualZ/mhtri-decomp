@@ -1,36 +1,39 @@
 /*
- * include/Network/NetworkUniqueId.h - the free functions of `src/Network/NetworkUniqueId.cpp` (`.text` 0x803F84B8..0x803F89CC): the address-object (unique id) helpers.
- * Moved here from `Network/NetworkCommunityPat.h` when the network pilot round 3 recut gave the range its own unit
- * (docs/plan.md 6.5 rule 2: the owner declares).
+ * include/Network/NetworkUniqueId.h - the class `src/Network/NetworkUniqueId.cpp` defines (`.text` 0x803F84B8..0x803F89CC):
+ * the network unique id, a stream sink bound to its own 14-byte address record.
  */
 #ifndef MHTRI_NETWORK_NETWORKUNIQUEID_H
 #define MHTRI_NETWORK_NETWORKUNIQUEID_H
 
 #include "types.h"
+#include "Network/network_transport_types.h"   /* NetworkStreamSink */
 
-struct NetworkSmallObject;
+/* The raw address a unique id carries: its kind (1..5 are known kinds) and up to ten address bytes.  The
+   helpers clear, compare and bind exactly 14 bytes, the record's size. */
+struct NetworkUniqueIdData {
+    /* +0x00 */ u8 kind_00;
+    /* +0x01 */ u8 reserved_01[3];
+    /* +0x04 */ u8 bytes_04[10];
+};   /* size: 0x0E (evidence: the memset/memcmp length and the `attach` capacity) */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+/* The unique id (the log strings name `NetworkUniqueId::exportTo` and `NetworkUniqueId::equals`): a stream sink
+   whose block is its own address record at +0x10.  Table 0x805FCC58 is emitted from this unit (`bind`, defined
+   out of line at the end of the unit, is the key function); the destructor's only copy sits at the left edge of
+   `Network/NetworkPeerBase.cpp` (0x803CCDF8), so it is declared here and defined there. */
+class NetworkUniqueId : public NetworkStreamSink {
+public:
+    NetworkUniqueId();
+    /* +0x1C */ virtual void bind(u8* block, u32 size);
+    /* +0x08 */ virtual ~NetworkUniqueId();
+    /* +0x2C */ virtual void slot_2C();
 
-/* untyped: opaque handle passed through - only the writer band owns the layout */
-void networkSmallObject_construct(void* self);
+    s32 isValid() const;
+    void importFrom(u8 kind, const u8* data, u32 size);
+    void exportTo(u8* out, u32 size) const;
+    u32 equals(const NetworkUniqueId* other) const;
 
-/* 0x803F8830 - sets the address object from `size` raw bytes of address kind `kind` (GUESS on the name). */
-void networkSmallObject_setAddress(NetworkSmallObject* self, u8 kind, const u8* data, u32 size);
-
-/* 0x803F8810 - true when the address object holds a valid address (GUESS on the name). */
-s32 networkSmallObject_isValid(const NetworkSmallObject* self);
-
-/* 0x803F88B0 - writes the address object's raw address into `out` (at most `size` bytes). */
-void exportTo(const NetworkSmallObject* self, u8* out, u32 size);
-
-/* 0x803F8904 - true when both address records are set and equal. */
-u32 networkSmallObject_isEqual(const NetworkSmallObject* a, const NetworkSmallObject* b);
-
-#ifdef __cplusplus
-}
-#endif
+    /* +0x10 */ NetworkUniqueIdData data_10;
+    /* +0x1E */ u8 pad_1E[2];
+};   /* size: 0x20 (every record that embeds one leaves 0x20 bytes before its next field) */
 
 #endif /* MHTRI_NETWORK_NETWORKUNIQUEID_H */

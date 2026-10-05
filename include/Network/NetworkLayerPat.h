@@ -277,9 +277,9 @@ public:
     /* Advances the request state in `request` by one step; true once the request finished. */
     bool stepRequest(NetworkLayerRequest* request);
     /* 0x803EF1D4 (GUESS) - the member slot whose friend entry carries address `id`, -1 when none does. */
-    s8 getMemberSlot(const NetworkSmallObject* id);
+    s8 getMemberSlot(const NetworkUniqueId* id);
     /* 0x803EF220 (GUESS) - copies member slot `slot`'s address into `out` (cleared first). */
-    void getMemberAddress(s8 slot, NetworkSmallObject* out);
+    void getMemberAddress(s8 slot, NetworkUniqueId* out);
     /* 0x803EEED0 (GUESS) - marks the friend linked to session slot `slot` connected (state 3). */
     void onSessionConnected(s8 slot);
     /* 0x803EEF1C (GUESS) - marks the friend linked to session slot `slot` failed and keeps its error. */
@@ -288,7 +288,7 @@ public:
     s8 findSessionFriend(s8 slot);
     /* 0x803EF2B4 (GUESS) - the negotiation state of the member at `address`: 0 pending, 1 failed, 2 still
      * connecting (`moveStartSession` waits while it reads 0 or 2). */
-    u8 getMemberStatus(const NetworkSmallObject* address);
+    u8 getMemberStatus(const NetworkUniqueId* address);
 };
 
 /* The free functions of `src/Network/NetworkLayerPat.cpp`'s range (0x803E0BE8..0x803EF668), moved here from

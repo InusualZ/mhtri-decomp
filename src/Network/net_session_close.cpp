@@ -34,7 +34,7 @@
  *    spelled with a block-local `req` pointer: an inline helper (or `work->session_request_0x829C.` directly)
  *    rematerialises the `addis` base after the call (-4 points).
  *  - `isSameNetId`, `isSessionMember`/`isSessionMemberId`/`findSessionMemberSlot`/`lookupFriendSlot` reach 100 % with
- *    `NetworkSmallObject` at its retail 0x20 (the stack object's frame size).
+ *    `NetworkUniqueId` at its retail 0x20 (the stack object's frame size).
  *  - Partial: `installCommunityCallback` 88.4 % (retail strides the three result records from the work pointer;
  *    the 2-D index folds the offsets), `onSessionCloseDone` 96.9 % (the member loop's registers; the member's
  *    +0x20 id is handed to `getPlayerRecord` as the small network object it copies into),
@@ -62,7 +62,7 @@
 #include "Network/NetworkUniqueId.h"            /* the address-object helpers - owner Network/NetworkUniqueId.cpp */
 #include "MSL/strlen.h"                        /* strlen - owner MSL/strlen.cpp */
 #include "enemy/em020_ai.h"                     /* getInstance_ - owner enemy/em020_ai.cpp */
-#include "Network/NetworkPeerBase.h"            /* NetworkSmallObjectSink::destroy - owner Network/NetworkPeerBase.cpp */
+#include "Network/NetworkUniqueId.h"            /* NetworkUniqueId - owner Network/NetworkUniqueId.cpp */
 #include "ef/get_move_work_adrs.h"              /* get_move_work_adrs - owner ef/fn_800CDB2C.cpp */
 #include "lobby/lb_menu_pos_tbl.h"              /* getItemListSelection - owner lobby/lb_menu_pos_tbl.cpp */
 #include "hud/net_char_sync.h"                  /* Pl_net_recv, em_net_recv, emc_net_recv - owner hud/pl_frame_sync.cpp */
@@ -270,7 +270,7 @@ s32 sessionReflectCallback(s32 command, s8 member, s32 result, s32 count, void* 
                 slot_member->joined_0x00 = 1;
                 slot_member->flag_0x04 = 0;
                 getNetworkSessionManagerPat(getPatsObject(), 0)->getPlayerRecord(
-                    member, (NetworkSmallObject*)&slot_member->id_0x20);
+                    member, (NetworkUniqueId*)&slot_member->id_0x20);
                 getNetworkSessionManagerPat(getPatsObject(), 0)->getPlayerRecordName(member, slot_member->name_0x0C,
                                                                                      16);
                 work->server_slot_state_0x040[member] = 1;
@@ -1166,7 +1166,7 @@ void onSessionCloseDone(s32 status, s32* values)
         member = profile->members_0x090;
         for (i = 0; i < 4; member++, i++) {
             if (member->joined_0x00 == 1) {
-                getNetworkSessionManagerPat(getPatsObject(), 0)->getPlayerRecord(i, (NetworkSmallObject*)&member->id_0x20);
+                getNetworkSessionManagerPat(getPatsObject(), 0)->getPlayerRecord(i, (NetworkUniqueId*)&member->id_0x20);
             }
         }
         work->start_done_0xC153 = 1;
@@ -1564,33 +1564,28 @@ u16 getSelectedQuestId(void)
 /*
  * Whether the address object `address` belongs to one of the four session members.
  */
-s32 isSessionMember(const NetworkSmallObject* address)
+s32 isSessionMember(const NetworkUniqueId* address)
 {
     s32 found = 0;
-    NetworkSmallObject member;
+    NetworkUniqueId member;
     s32 i;
 
-    networkSmallObject_construct(&member);
     if (getNetworkSessionManagerPat(getPatsObject(), 0) == NULL) {
-        NetworkSmallObjectSink::destroy(&member);
         return 0;
     }
     if (address == NULL) {
-        NetworkSmallObjectSink::destroy(&member);
         return 0;
     }
-    if (networkSmallObject_isValid(address) == 0) {
-        NetworkSmallObjectSink::destroy(&member);
+    if (address->isValid() == 0) {
         return 0;
     }
     for (i = 0; i < 4; i++) {
         if (getNetworkSessionManagerPat(getPatsObject(), 0)->getPlayerRecord(i, &member) != 0 &&
-            networkSmallObject_isEqual(address, &member) != 0) {
+            address->equals(&member) != 0) {
             found = 1;
             break;
         }
     }
-    NetworkSmallObjectSink::destroy(&member);
     return found;
 }
 
@@ -1599,45 +1594,37 @@ s32 isSessionMember(const NetworkSmallObject* address)
  */
 s32 isSessionMemberId(const NetId* id)
 {
-    NetworkSmallObject address;
+    NetworkUniqueId address;
     s32 found;
 
-    networkSmallObject_construct(&address);
     importNetId((NetId*)&address, id);
     found = isSessionMember(&address);
-    NetworkSmallObjectSink::destroy(&address);
     return found;
 }
 
 /*
  * The session slot (0..3) of the member whose address object is `address`, or -1.
  */
-s8 findSessionMemberSlot(const NetworkSmallObject* address)
+s8 findSessionMemberSlot(const NetworkUniqueId* address)
 {
-    NetworkSmallObject member;
+    NetworkUniqueId member;
     s8 i;
 
-    networkSmallObject_construct(&member);
     if (getNetworkSessionManagerPat(getPatsObject(), 0) == NULL) {
-        NetworkSmallObjectSink::destroy(&member);
         return -1;
     }
     if (address == NULL) {
-        NetworkSmallObjectSink::destroy(&member);
         return -1;
     }
-    if (networkSmallObject_isValid(address) == 0) {
-        NetworkSmallObjectSink::destroy(&member);
+    if (address->isValid() == 0) {
         return -1;
     }
     for (i = 0; i < 4; i++) {
         if (getNetworkSessionManagerPat(getPatsObject(), 0)->getPlayerRecord(i, &member) != 0 &&
-            networkSmallObject_isEqual(address, &member) != 0) {
-            NetworkSmallObjectSink::destroy(&member);
+            address->equals(&member) != 0) {
             return i;
         }
     }
-    NetworkSmallObjectSink::destroy(&member);
     return -1;
 }
 
@@ -1646,13 +1633,11 @@ s8 findSessionMemberSlot(const NetworkSmallObject* address)
  */
 s8 lookupFriendSlot(const u8* id)
 {
-    NetworkSmallObject address;
+    NetworkUniqueId address;
     s8 slot;
 
-    networkSmallObject_construct(&address);
     importNetId((NetId*)&address, (const NetId*)id);
     slot = findSessionMemberSlot(&address);
-    NetworkSmallObjectSink::destroy(&address);
     return slot;
 }
 
@@ -1912,13 +1897,13 @@ void requestFriendSync(s8* result)
 /*
  * Whether the address object `address` is on the friend roster.
  */
-s32 isRosterMember(const NetworkSmallObject* address)
+s32 isRosterMember(const NetworkUniqueId* address)
 {
     NetRosterList* roster = &net_ctrl_wk->roster_0xA1B8;
     s32 i;
 
     for (i = 0; i < roster->count_0x000; i++) {
-        if (networkSmallObject_isEqual(address, &roster->entries_0x004[i].address_0x00) == 1U) {
+        if (address->equals(&roster->entries_0x004[i].address_0x00) == 1U) {
             return 1;
         }
     }
@@ -1935,7 +1920,7 @@ void appendRosterEntry(const NetRosterRec* src)
 
     if (roster->count_0x000 < 50) {
         entry = &roster->entries_0x004[roster->count_0x000];
-        ((NetworkSmallObjectSink*)&entry->address_0x00)->copyFrom((const u8*)&src->address_0x00);
+        entry->address_0x00.copyFrom((const u8*)&src->address_0x00);
         strcpy(entry->name_0x20, src->name_0x20);
         roster->count_0x000++;
     }
@@ -1944,13 +1929,13 @@ void appendRosterEntry(const NetRosterRec* src)
 /*
  * Removes the roster entry whose address object is `address`, moving the later entries up.
  */
-void removeRosterEntry(const NetworkSmallObject* address)
+void removeRosterEntry(const NetworkUniqueId* address)
 {
     NetRosterList* roster = &net_ctrl_wk->roster_0xA1B8;
     s32 i;
 
     for (i = 0; i < roster->count_0x000; i++) {
-        if (networkSmallObject_isEqual(address, &roster->entries_0x004[i].address_0x00) == 1U) {
+        if (address->equals(&roster->entries_0x004[i].address_0x00) == 1U) {
             break;
         }
     }
@@ -1959,7 +1944,7 @@ void removeRosterEntry(const NetworkSmallObject* address)
             NetRosterRec* entry = &roster->entries_0x004[i];
             NetRosterRec* next = &roster->entries_0x004[i + 1];
 
-            ((NetworkSmallObjectSink*)&entry->address_0x00)->copyFrom((const u8*)&next->address_0x00);
+            entry->address_0x00.copyFrom((const u8*)&next->address_0x00);
             strcpy(entry->name_0x20, next->name_0x20);
         }
         roster->count_0x000 = roster->count_0x000 - 1;
@@ -1972,7 +1957,7 @@ void removeRosterEntry(const NetworkSmallObject* address)
 /*
  * Appends the address object `address` to the recent-player list, named with the work record's message text.
  */
-void appendRecentEntry(const NetworkSmallObject* address)
+void appendRecentEntry(const NetworkUniqueId* address)
 {
     NetCtrlWk* work = net_ctrl_wk;
     NetRecentRec* entry;
@@ -1980,7 +1965,7 @@ void appendRecentEntry(const NetworkSmallObject* address)
 
     if (recent->count_0x000 < 16) {
         entry = &recent->entries_0x004[recent->count_0x000];
-        ((NetworkSmallObjectSink*)&entry->address_0x00)->copyFrom((const u8*)address);
+        entry->address_0x00.copyFrom((const u8*)address);
         strcpy(entry->name_0x20, work->message_0xBF08);
         recent->count_0x000++;
     }
@@ -1989,13 +1974,13 @@ void appendRecentEntry(const NetworkSmallObject* address)
 /*
  * Removes the recent-player entry whose address object is `address`, moving the later entries up.
  */
-void removeRecentEntry(const NetworkSmallObject* address)
+void removeRecentEntry(const NetworkUniqueId* address)
 {
     NetRecentList* recent = &net_ctrl_wk->recent_0xBB84;
     s32 i;
 
     for (i = 0; i < recent->count_0x000; i++) {
-        if (networkSmallObject_isEqual(address, &recent->entries_0x004[i].address_0x00) == 1U) {
+        if (address->equals(&recent->entries_0x004[i].address_0x00) == 1U) {
             break;
         }
     }
@@ -2004,7 +1989,7 @@ void removeRecentEntry(const NetworkSmallObject* address)
             NetRecentRec* entry = &recent->entries_0x004[i];
             NetRecentRec* next = &recent->entries_0x004[i + 1];
 
-            ((NetworkSmallObjectSink*)&entry->address_0x00)->copyFrom((const u8*)&next->address_0x00);
+            entry->address_0x00.copyFrom((const u8*)&next->address_0x00);
             strcpy(entry->name_0x20, next->name_0x20);
         }
         recent->count_0x000 = recent->count_0x000 - 1;
@@ -2080,7 +2065,7 @@ s32 communityReflectCallback(u32 command, s32 result, s32 count, void* data)
             for (i = 0; i < work->roster_0xA1B8.count_0x000; i++) {
                 NetRosterRec* entry = &work->roster_0xA1B8.entries_0x004[i];
 
-                ((NetworkSmallObjectSink*)&entry->address_0x00)->copyFrom((const u8*)&((NetRosterList*)data)->entries_0x004[i].address_0x00);
+                entry->address_0x00.copyFrom((const u8*)&((NetRosterList*)data)->entries_0x004[i].address_0x00);
                 strcpy(entry->name_0x20, ((NetRosterList*)data)->entries_0x004[i].name_0x20);
             }
         }
@@ -2231,7 +2216,7 @@ s32 communityReflectCallback(u32 command, s32 result, s32 count, void* data)
                 *work->result_0xC290 = -1;
             }
         } else {
-            appendRecentEntry((const NetworkSmallObject*)data);
+            appendRecentEntry((const NetworkUniqueId*)data);
             if (work->result_0xC290 != NULL) {
                 *work->result_0xC290 = 1;
             }
@@ -2244,7 +2229,7 @@ s32 communityReflectCallback(u32 command, s32 result, s32 count, void* data)
                 *work->result_0xC290 = -1;
             }
         } else {
-            removeRecentEntry((const NetworkSmallObject*)data);
+            removeRecentEntry((const NetworkUniqueId*)data);
             if (work->result_0xC290 != NULL) {
                 *work->result_0xC290 = 1;
             }
@@ -2265,7 +2250,7 @@ s32 communityReflectCallback(u32 command, s32 result, s32 count, void* data)
             for (i = 0; i < work->recent_0xBB84.count_0x000; i++) {
                 NetRecentRec* entry = &work->recent_0xBB84.entries_0x004[i];
 
-                ((NetworkSmallObjectSink*)&entry->address_0x00)->copyFrom((const u8*)&((NetRecentList*)data)->entries_0x004[i].address_0x00);
+                entry->address_0x00.copyFrom((const u8*)&((NetRecentList*)data)->entries_0x004[i].address_0x00);
                 strcpy(entry->name_0x20, ((NetRecentList*)data)->entries_0x004[i].name_0x20);
             }
         }
@@ -2278,7 +2263,7 @@ s32 communityReflectCallback(u32 command, s32 result, s32 count, void* data)
             }
         } else {
             work->community_results_0xA144[command] = 1;
-            removeRosterEntry((const NetworkSmallObject*)data);
+            removeRosterEntry((const NetworkUniqueId*)data);
             if (work->result_0xC290 != NULL) {
                 *work->result_0xC290 = 1;
             }
@@ -2289,11 +2274,11 @@ s32 communityReflectCallback(u32 command, s32 result, s32 count, void* data)
             work->community_results_0xA144[command] = result;
         } else {
             work->community_results_0xA144[command] = 1;
-            if (isRosterMember((const NetworkSmallObject*)data) == 0) {
+            if (isRosterMember((const NetworkUniqueId*)data) == 0) {
                 char id_text[0x14];
                 NetRosterRec* presence = (NetRosterRec*)data;
 
-                formatNetId(id_text, &presence->id_0x00);
+                formatNetId(id_text, (const NetId*)&presence->address_0x00);
                 if (presence->state_0x35 == 1) {
                     appendRosterEntry(presence);
                     addFriendNotice(id_text, presence->name_0x20);
@@ -2349,7 +2334,7 @@ s32 communityReflectCallback(u32 command, s32 result, s32 count, void* data)
 void formatNetId(char* out, const NetId* id)
 {
     memset(out, 0, 10);
-    exportTo((const NetworkSmallObject*)id, (u8*)out, 10);
+    ((const NetworkUniqueId*)id)->exportTo((u8*)out, 10);
     for (; *out != 0; out++) {
         if (*out == '%') {
             *out = '*';
@@ -2362,7 +2347,7 @@ void formatNetId(char* out, const NetId* id)
  */
 void importNetId(NetId* dst, const NetId* src)
 {
-    networkSmallObject_setAddress((NetworkSmallObject*)dst, 3, (const u8*)src, 6);
+    ((NetworkUniqueId*)dst)->importFrom(3, (const u8*)src, 6);
 }
 
 /*
@@ -2370,13 +2355,11 @@ void importNetId(NetId* dst, const NetId* src)
  */
 u32 isSameNetId(const NetId* left, const NetId* right)
 {
-    NetworkSmallObject object;
+    NetworkUniqueId object;
     u32 same;
 
-    networkSmallObject_construct(&object);
-    networkSmallObject_setAddress(&object, 3, (const u8*)right, 6);
-    same = networkSmallObject_isEqual((const NetworkSmallObject*)left, &object);
-    NetworkSmallObjectSink::destroy(&object);
+    object.importFrom(3, (const u8*)right, 6);
+    same = ((const NetworkUniqueId*)left)->equals(&object);
     return same;
 }
 

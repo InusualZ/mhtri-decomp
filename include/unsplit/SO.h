@@ -19,6 +19,7 @@
 #define MHTRI_UNSPLIT_SO_H
 
 #include "types.h"
+#include "SO/soi.h"                             /* SOSockAddrIn, SOConnect */
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,15 +27,6 @@ extern "C" {
 
 /* 0x80520668 - host-to-network 16-bit byte swap. */
 u16 SOHtoNs(u16 port);
-
-/* The IPv4 socket address `SOConnect` takes: the length byte (8), the family (2, AF_INET), the port in
- * network order and the address word. size: 0x8 */
-typedef struct SOSockAddrIn {
-    /* +0x0 */ u8 len;
-    /* +0x1 */ u8 family;
-    /* +0x2 */ u16 port;
-    /* +0x4 */ u32 addr;
-} SOSockAddrIn;
 
 /* The resolver result `SOGetAddrInfo` fills and `SOFreeAddrInfo` releases (a getaddrinfo record).
  * size: 0x20 */
@@ -48,9 +40,6 @@ typedef struct SOAddrInfo {
     /* +0x18 */ SOSockAddrIn* addr;
     /* +0x1C */ struct SOAddrInfo* next;
 } SOAddrInfo;
-
-/* 0x8051FE40 - connect the socket to the address. */
-s32 SOConnect(s32 fd, SOSockAddrIn* addr);
 
 /* 0x80520D0C / 0x80520FF0 - resolve a host name (getaddrinfo) and release the result. */
 s32 SOGetAddrInfo(const char* node, const char* service, const SOAddrInfo* hints, SOAddrInfo** result);

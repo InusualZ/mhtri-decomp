@@ -34,15 +34,20 @@ typedef struct NetworkSessionRecordBlock {
     NetworkSessionRecordPair rest_08[11];   /* +0x08..+0x5F */
 } NetworkSessionRecordBlock;   /* size: 0x60 */
 
-/* The record classes the Pat layer's arrays hold.  Each size is evidenced (the `__construct_array` /
-   `__destroy_arr` element sizes, and the field offsets the range addresses); only the one member each
-   constructor initialises is named, everything else is filler. */
+/* The record classes the Pat layer's arrays and stack frames hold.  Each size is evidenced (the
+   `__construct_array` / `__destroy_arr` element sizes, and the field offsets the range addresses).  Each embeds a
+   `NetworkUniqueId`, so each has a constructor and a destructor of its own (this unit defines them out of line, in
+   the target's order); the containers' array construction and the stack objects' cleanup are MWCC's. */
 /* The chat message record the Pat layer reports (event 18 for this console's own message, 19 for a received
    one): the sender's address, name and text, the caller's tag word and the server time it was stamped with.
    The name says "slot info" for historical reasons (the map's `NetworkSessionSlotInfo_*` rows); the layout is
    the one `slot_19C` and `receiveSessionChat` fill on their stack. */
-typedef struct NetworkSessionSlotInfo {
-    NetworkSmallObject smallObject_00;   /* +0x00 - the sender's address object */
+class NetworkSessionSlotInfo {
+public:
+    NetworkSessionSlotInfo();
+    ~NetworkSessionSlotInfo();
+
+    NetworkUniqueId smallObject_00;      /* +0x00 - the sender's address object */
     char name_20[0x13];                  /* +0x20 - the sender's name (19 characters) */
     u8 nameEnd_33;                       /* +0x33 - its terminator */
     u8 flag_34;                          /* +0x34 - cleared by both fillers */
@@ -51,7 +56,7 @@ typedef struct NetworkSessionSlotInfo {
     u8 pad_236[0x02];                    /* +0x236..+0x237 */
     u32 tag_238;                         /* +0x238 - the sender's tag word */
     s32 time_23C;                        /* +0x23C - `getServerDateTime` when the message was reported */
-} NetworkSessionSlotInfo;   /* size: 0x240 */
+};   /* size: 0x240 */
 
 /* One circle (lobby room) entry.  The name, the record block and the four counters are the fields the
    Pat getters read (`getCircleItemName` copies at most 0x100 name bytes, `getCircleItemRecord` 0x48 record
@@ -70,11 +75,15 @@ typedef struct NetworkCircleOptions {
     NetworkCircleOptionSlot slots_08[8];  /* +0x08..+0x47 */
 } NetworkCircleOptions;   /* size: 0x48 */
 
-typedef struct NetworkSessionCircleInfo {
+class NetworkSessionCircleInfo {
+public:
+    NetworkSessionCircleInfo();
+    ~NetworkSessionCircleInfo();
+
     s32 id_000;                           /* +0x000 - the circle id (0 = free entry) */
     s32 ownerId_004;                      /* +0x004 */
     char name_008[0x100];                 /* +0x008 - `setCircleInfo` stores at most 63 characters */
-    NetworkSmallObject smallObject_108;   /* +0x108 - the circle's address object `exportCircleItem` copies out */
+    NetworkUniqueId smallObject_108;      /* +0x108 - the circle's address object `exportCircleItem` copies out */
     NetworkCircleOptions options_128;     /* +0x128 */
     s32 limitA_170;                       /* +0x170 */
     s32 limitB_174;                       /* +0x174 */
@@ -87,26 +96,34 @@ typedef struct NetworkSessionCircleInfo {
     char comment_288[0x91];               /* +0x288 - 144 characters + terminator */
     u8 active_319;                        /* +0x319 - the info's state was neither 0 nor -1 (GUESS on the name) */
     u8 pad_31A[0x02];                     /* +0x31A..+0x31B */
-} NetworkSessionCircleInfo;   /* size: 0x31C */
+};   /* size: 0x31C */
 
-typedef struct NetworkSessionCircleList {
+class NetworkSessionCircleList {
+public:
+    NetworkSessionCircleList();
+    ~NetworkSessionCircleList();
+
     s32 count_00;                            /* +0x00 - `getCircleInfoCount` */
     NetworkSessionCircleInfo items_04[32];   /* +0x04..+0x6383 */
-} NetworkSessionCircleList;   /* size: 0x6384 */
+};   /* size: 0x6384 */
 
-typedef struct NetworkSessionPlayerRecord {
+class NetworkSessionPlayerRecord {
+public:
+    NetworkSessionPlayerRecord();
+    ~NetworkSessionPlayerRecord();
+
     u8 active_00;                        /* +0x00 - tested before every read of the record */
     u8 announced_01;                     /* +0x01 - the join event was posted (the leave event clears it) */
     u8 flag_02;                          /* +0x02 */
     u8 state_03;                         /* +0x03 - `updatePlayerRecord` posts event 27 when it changes */
     u8 linked_04;                        /* +0x04 - cleared on removal while a session exists (GUESS on the name) */
     u8 pad_05[0x03];                     /* +0x05..+0x07 */
-    NetworkSmallObject smallObject_08;   /* +0x08 - the player's address object `getPlayerRecord` copies out */
+    NetworkUniqueId smallObject_08;      /* +0x08 - the player's address object `getPlayerRecord` copies out */
     char name_28[0x14];                  /* +0x28 - `getPlayerRecordName` copies at most 0x14 bytes */
     s32 value_3C;                        /* +0x3C - the payload of event 21 (`announcePlayers`) */
     NetworkPeerAddress address_40;       /* +0x40 - the Udp peer `removePlayerRecord` drops */
     u8 pad_46[0x02];                     /* +0x46..+0x47 */
-} NetworkSessionPlayerRecord;   /* size: 0x48 */
+};   /* size: 0x48 */
 
 /* The variadic helpers: the pinned toolchain ships no `<stdarg.h>`, so the CodeWarrior `va_list`
    layout and the two compiler intrinsics the header expands to are declared here. */
@@ -167,6 +184,17 @@ typedef struct NetworkRequest {
     s32 isTimedOut();                        /* waiting longer than `interval_4C` (never while idle) */
     void restartTimer(f32 interval);         /* the clock becomes the baseline, the interval is replaced */
 } NetworkRequest;           /* size: 0xA4 */
+
+/* The Pat layer's own request record: the same 0xA4-byte record with a constructor and a destructor of its own
+   (the pair the Pat constructor's `__construct_array` passes, distinct from the base pool's), so the Pat manager's
+   member construction runs it in member order (GUESS on the name: derived from its owner). */
+class NetworkRequestPat {
+public:
+    NetworkRequestPat();
+    ~NetworkRequestPat();
+
+    /* +0x00 */ NetworkRequest request_00;
+};   /* size: 0xA4 */
 
 /* One entry of the name list: `copyNameList` copies an entry only when its first word is set. */
 typedef struct NetworkNameEntry {
@@ -237,7 +265,7 @@ public:
     virtual void slot_06C() = 0;                          /* +0x06C */
     virtual s32 getCircleInfoCount() = 0;                 /* +0x070 */
     virtual void getCircleItemName(char* dst, s32 size, s32 idx) = 0; /* +0x074 */
-    virtual void exportCircleItem(NetworkSmallObject* dst, s32 idx) = 0; /* +0x078 */
+    virtual void exportCircleItem(NetworkUniqueId* dst, s32 idx) = 0; /* +0x078 */
     virtual void getCircleItemRecord(char* dst, s32 idx) = 0; /* +0x07C */
     virtual u32 getCircleItemWord_170(s32 idx) = 0;       /* +0x080 */
     virtual u32 getCircleItemWord_174(s32 idx) = 0;       /* +0x084 */
@@ -269,7 +297,7 @@ public:
     virtual u32 getSize_524_52C() = 0;                    /* +0x0EC */
     virtual void getPlayerRecordName(s8 idx, char* dst, s32 size) = 0; /* +0x0F0 */
     virtual void clearStringWithId(u32 id, char* dst, s32 size) = 0; /* +0x0F4 */
-    virtual s32 getPlayerRecord(s8 idx, NetworkSmallObject* dst) = 0; /* +0x0F8 */
+    virtual s32 getPlayerRecord(s8 idx, NetworkUniqueId* dst) = 0; /* +0x0F8 */
     virtual u32 slot_0FC() = 0;                           /* +0x0FC */
     virtual u8 getByte_534() = 0;                         /* +0x100 */
     virtual f32 getTimeSincePublish() = 0;                /* +0x104 */
@@ -478,7 +506,7 @@ public:
     virtual void slot_06C();                              /* +0x06C */
     virtual s32 getCircleInfoCount();                     /* +0x070 */
     virtual void getCircleItemName(char* dst, s32 size, s32 idx); /* +0x074 */
-    virtual void exportCircleItem(NetworkSmallObject* dst, s32 idx); /* +0x078 */
+    virtual void exportCircleItem(NetworkUniqueId* dst, s32 idx); /* +0x078 */
     virtual void getCircleItemRecord(char* dst, s32 idx); /* +0x07C */
     virtual u32 getCircleItemWord_170(s32 idx);           /* +0x080 */
     virtual u32 getCircleItemWord_174(s32 idx);           /* +0x084 */
@@ -497,7 +525,7 @@ public:
     virtual u32 getSize_524_52C();                        /* +0x0EC */
     virtual void getPlayerRecordName(s8 idx, char* dst, s32 size); /* +0x0F0 */
     virtual void clearStringWithId(u32 id, char* dst, s32 size); /* +0x0F4 */
-    virtual s32 getPlayerRecord(s8 idx, NetworkSmallObject* dst); /* +0x0F8 */
+    virtual s32 getPlayerRecord(s8 idx, NetworkUniqueId* dst); /* +0x0F8 */
     virtual u32 slot_0FC();                               /* +0x0FC */
     virtual u8 getByte_534();                             /* +0x100 */
     virtual f32 getTimeSincePublish();                    /* +0x104 */
@@ -543,7 +571,7 @@ public:
     void updatePlayerRecord(s8 index, const u8* address, const char* name, u32 state); /* 0x803DE238 (GUESS) */
     s32 packCircleOptions(PatCircleOption* dst, s32 max, NetworkNameList* src);      /* 0x803DE360 (GUESS) */
     s32 packCircleConditions(PatCircleFilter* dst, s32 max, PatConditionList* src); /* 0x803DE3F4 (GUESS: the search filters of the circle list query) */
-    s32 uniqueIdToMember(const NetworkSmallObject* id);   /* 0x803DE6D4 - its own log string names it */
+    s32 uniqueIdToMember(const NetworkUniqueId* id);   /* 0x803DE6D4 - its own log string names it */
     void resetCircleState();                              /* 0x803DE7C8 (GUESS: clears the pending circle publish) */
     void announcePlayers();                               /* 0x803DE82C (GUESS: re-posts every remote player's events) */
     s32 joinSession();                                    /* 0x803DEC34 (GUESS: marks the session joined, sets its timeouts) */
@@ -557,13 +585,13 @@ public:
     void readChatHeader(PatChatHeader* out, const u8* data);    /* 0x803DC0E4 (GUESS: parses the 10-byte chat header) */
     void sendSessionChat(const char* text, u32 tag, s8 target); /* 0x803DC184 (GUESS: the chat packet over the session) */
     void receiveSessionChat(const u8* data, u32 size);          /* 0x803DC2E4 (GUESS: reports a received chat packet, event 19) */
-    s8 connectPeer(const NetworkSmallObject* address, u32 value); /* 0x803DEB38 (GUESS: opens a session slot for a layer member) */
+    s8 connectPeer(const NetworkUniqueId* address, u32 value); /* 0x803DEB38 (GUESS: opens a session slot for a layer member) */
     void reportSessionError(const NetworkErrorInfo* info);      /* 0x803DEDE0 (GUESS: sends the record and the thread's error to the server) */
     void setSessionLog(NetworkRequest* request, u32 code, u32 arg_a, u32 arg_b); /* 0x803DF1CC (GUESS: the layer's `setCollectionLog`) */
     void setSessionLogAborted(NetworkRequest* request);     /* 0x803DF24C (GUESS: requestFlags bit 1, code 0x80050012) */
     void setSessionLogSessionLost(NetworkRequest* request); /* 0x803DF29C (GUESS: requestFlags bit 0, code 0x80050031) */
 
-    NetworkRequest pool2_1C4[2];               /* +0x1C4..+0x30B */
+    NetworkRequestPat pool2_1C4[2];            /* +0x1C4..+0x30B */
     u32 requestFlags_30C[21];                  /* +0x30C..+0x35F - per request: bit 0 = session lost, bit 1 = cancelled, higher bits = the replies */
     s32 requestIds_360[21];                    /* +0x360..+0x3B3 - per request: the id the last `sendReq*` returned (-1 = none) */
     u8 leaveState_3B4;                         /* +0x3B4 - `stepCircleLeave`'s step (0, 5, 10) */
@@ -577,7 +605,7 @@ public:
     s32 field_3C4;                             /* +0x3C4 */
     u8 field_3C8;                              /* +0x3C8 */
     u8 pad_3C9[0x03];                          /* +0x3C9..+0x3CB */
-    NetworkSmallObject field_3CC;              /* +0x3CC */
+    NetworkUniqueId field_3CC;                 /* +0x3CC */
     PatMatchOptions matchOptions_3EC;          /* +0x3EC..+0x41B - the options `sendReqCircleMatchOptionSet` sends */
     s32 circleInfoRequestId_41C;               /* +0x41C - the id `sendReqCircleInfoSet` sends under (`canSend_28`: > 0 once assigned) */
     s32 circleOwnerId_420;                     /* +0x420 - the joined circle's owner id (from the received block's +0x368) */
@@ -667,7 +695,7 @@ extern u32 NetworkRequest_idCounter;
 
 /* neighbouring helpers.  Each `untyped:` marker below is the honest case for that declaration: a
    record whose layout this range never reads.  The reflection adapters `networkSessionReflect0`/`1`
-   are declared in `Network/NetworkSessionManagerPat.h` and `networkSmallObject_construct` in
+   are declared in `Network/NetworkSessionManagerPat.h` and `NetworkUniqueId` in
    `Network/NetworkCommunityPat.h` (their owners' headers). */
 
 /* untyped: opaque handle passed through - only the writer band owns the layout */
@@ -686,16 +714,6 @@ void networkSessionReflectCallbackEx(void* a0, void* a1, void* a2, void* a3, voi
 
 /* this unit's own record/stream helpers, defined in the tail of the range */
 void NetworkRequest_copyRecord(NetworkSessionRecordBlock* dst, const NetworkSessionRecordBlock* src);
-NetworkSessionSlotInfo* NetworkSessionSlotInfo_construct(NetworkSessionSlotInfo* self);
-NetworkSessionSlotInfo* NetworkSessionSlotInfo_dtor(NetworkSessionSlotInfo* self, s16 flags);
-NetworkSessionCircleList* NetworkSessionCircleList_construct(NetworkSessionCircleList* self);
-NetworkSessionCircleList* NetworkSessionCircleList_dtor(NetworkSessionCircleList* self, s16 flags);
-NetworkSessionCircleInfo* NetworkSessionCircleInfo_construct(NetworkSessionCircleInfo* self);
-NetworkSessionCircleInfo* NetworkSessionCircleInfo_dtor(NetworkSessionCircleInfo* self, s16 flags);
-NetworkSessionPlayerRecord* NetworkSessionPlayerRecord_construct(NetworkSessionPlayerRecord* self);
-NetworkSessionPlayerRecord* NetworkSessionPlayerRecord_dtor(NetworkSessionPlayerRecord* self, s16 flags);
-NetworkRequest* NetworkRequestPat_construct(NetworkRequest* self);
-NetworkRequest* NetworkRequestPat_dtor(NetworkRequest* self, s16 flags);
 void NetworkRequestPat_reset(NetworkRequest* self);
 void NetworkRequestPat_clear(NetworkRequest* self);
 /* untyped: caller-owned payload - the array constructors take raw element pointers */

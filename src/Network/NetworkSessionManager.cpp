@@ -32,10 +32,12 @@
  * table, 51 relocations) is claimed and byte-identical.  `NetworkSessionManagerPat` declares `move`
  * FIRST so that it is the class's key function - its body lives in the next band (0x803D70B8) - which
  * is why MWCC emits the Pat constructor's `__vt__24NetworkSessionManagerPat` store without emitting a
- * second table into this object; the target's `.data` is the base table alone.  The four record
- * classes are structs with a vtable member, not polymorphic classes: a class makes MWCC initialise the
- * vptr of every element of the `__construct_array`-built arrays (measured: the Pat constructor
- * 252 -> 544 B).  See `tools/units/vtableaudit.py`.
+ * second table into this object; the target's `.data` is the base table alone.  The record classes
+ * (`NetworkSessionSlotInfo`, `NetworkSessionCircleInfo`/`List`, `NetworkSessionPlayerRecord`, `NetworkRequestPat`)
+ * are plain classes that embed a `NetworkUniqueId`, with out-of-line constructors and destructors in the target's
+ * order; the Pat manager's member construction and destruction (the `__construct_array`/`__destroy_arr` pairs)
+ * are MWCC's.  The unique id's own constructor is out of line, so no element's vptr is stored inline (the
+ * 252 -> 544 B blow-up an inline-vptr record class once caused).  See `tools/units/vtableaudit.py`.
  *
  * LANGUAGE AND SECTIONS.  C++ (`__nw__FUl` / `__dl__FPv` / `__ptmf_scall`); `cflags_network`'s
  * `-Cpp_exceptions on` for
@@ -55,9 +57,7 @@
  * `NetworkSessionManager` table, 51 relocations) is claimed and byte-identical; `NetworkBuffer`
  * (table at 0x805F9150) is another band's and a *declared* class with no virtual defined here, so MWCC
  * emits no table for it (the `NetworkBuffer` conversion took 11 rows to 100 % and 9 more up - measured, no
- * row down); `NetworkSessionStable`'s table (0x805FA6E8) is emitted by `Network/NetworkSessionStable.cpp`.  The
- * four record classes stay structs with a vtable member: a class makes MWCC initialise the vptr of
- * every element of the `__construct_array`-built arrays (Pat constructor 252 -> 544 B).
+ * row down); `NetworkSessionStable`'s table (0x805FA6E8) is emitted by `Network/NetworkSessionStable.cpp`.
  *
  * OTHER LAYOUT FACTS.  `NetworkSessionSlot` is 0x924 B, the stride the target's `mulli` uses (the
  * declaration only named fields to +0xDC, so the array stride was wrong); `NetworkStreamWriter` is
@@ -88,11 +88,13 @@
  *  - Pilot L2 round 2: the Pat constructor/`init`/`release` use the owner's `PatInterface` and the 0x44A0-byte
  *    `GameSpyInterfaceThread` view, and run under `#pragma peephole off` (retail keeps `lwz r12,0(r3)` after the
  *    `mr r3,this` copy); `release`'s close loop is a `do {} while`; the request record helpers `getRecord`/`setRecord`/
- *    `getArgument`/`isTimedOut`/`restartTimer` are `NetworkRequest` members (map rows renamed).  Open: the Pat
- *    destructor and `clear` (95.6 / 97.8) - the deleting-flag `extsh` and the struct-of-function-pointers
- *    `NetworkSmallObject` dispatch (L1's `Network/network_writer_types.h`).
- *  - GUESS names: `NetworkSessionSlotInfo_*`, `NetworkSessionCircleInfo_*`, `NetworkSessionCircleList_*`
- *    and `NetworkSessionPlayerRecord_*` come from their container offsets and `net_va_arg`/`memset`
+ *    `getArgument`/`isTimedOut`/`restartTimer` are `NetworkRequest` members (map rows renamed).  Round 3: the Pat
+ *    destructor, `clear` and the record constructors/destructors are 100 % since the records are classes around
+ *    `NetworkUniqueId` and run under `#pragma peephole off` (retail's unfused `extsh`+`cmpwi` of the deleting flag
+ *    and `lwz r12,0(r3)` after the `addi r3`).  The base pool's `NetworkRequest_deleteElement` keeps the hand-written
+ *    form (the same `extsh` residual): converting it needs `NetworkRequest` itself to be a class.
+ *  - GUESS names: `NetworkSessionSlotInfo`, `NetworkSessionCircleInfo`, `NetworkSessionCircleList`,
+ *    `NetworkSessionPlayerRecord` and `NetworkRequestPat` come from their container offsets and `net_va_arg`/`memset`
  *    use; `networkSessionReflectCallbackEx` and the `network<span>*` accessor names are derived from
  *    the callee each forwards to.  The `slot_14C`..`slot_168` wrappers are named for their vtable slot
  *    (offset-derived, the buffer class owner's names are unknown).
@@ -113,7 +115,7 @@
 #include "types.h"
 #include "Network/NetworkSessionManager.h"
 #include "Network/NetworkSessionManagerPat.h"   /* the Pat buffer helpers and the reflection adapters */
-#include "Network/NetworkUniqueId.h"            /* networkSmallObject_construct */
+#include "Network/NetworkUniqueId.h"            /* NetworkUniqueId - the records' address objects */
 #include "Network/gamespy_interface_types.h"    /* GameSpyInterfaceThread / NetworkErrorInfo - owner Network/GameSpyInterfaceThread.cpp */
 #include "Network/sGameSpyInterfaceThread.h"    /* sGameSpyInterfaceThread - owner Network/GameSpyInterfaceThread.cpp */
 #include "Network/PatInterface.h"              /* PatInterface - owner Network/PatInterface.cpp */
@@ -1080,23 +1082,19 @@ extern "C" void NetworkRequest_copyRecord(NetworkSessionRecordBlock* dst, const 
 /* The small per-player records the Pat layer owns                                            */
 /* ----------------------------------------------------------------------------------------- */
 
-/* The four record classes below each hold one `networkSmallObject_construct` member; the ctor and
-   the deleting element destructor are the pair their containers pass to `__construct_array`. */
-extern "C" NetworkSessionSlotInfo* NetworkSessionSlotInfo_construct(NetworkSessionSlotInfo* self)
+/* The record classes below each hold one `NetworkUniqueId`; their constructors and destructors are the pairs the
+   containers' array construction passes to `__construct_array`.  Retail keeps the unfused `extsh`+`cmpwi` of the
+   deleting flag, so the peephole pass is off for the records. */
+#pragma peephole off
+
+/* Builds the chat record around its sender's address. */
+NetworkSessionSlotInfo::NetworkSessionSlotInfo()
 {
-    networkSmallObject_construct(&self->smallObject_00);
-    return self;
 }
 
-extern "C" NetworkSessionSlotInfo* NetworkSessionSlotInfo_dtor(NetworkSessionSlotInfo* self, s16 flags)
+/* Destroys the chat record's sender address. */
+NetworkSessionSlotInfo::~NetworkSessionSlotInfo()
 {
-    if (self != 0) {
-        NetworkSmallObjectSink::destroy(&self->smallObject_00);
-        if (flags > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
 }
 
 /* The reflection callbacks: both re-order the six incoming arguments and tail-call the real body. */
@@ -1112,32 +1110,19 @@ extern "C" void networkSessionReflectCallbackEx(void* a0, void* a1, void* a2, vo
     networkSessionReflect1((NetworkSessionManagerPat*)a5, (s32)a0, (s32)a1, (s32)a2, (s32)a3, (const u8*)a4);
 }
 
-extern "C" NetworkSessionCircleList* NetworkSessionCircleList_dtor(NetworkSessionCircleList* self, s16 flags)
+/* Destroys the 32 circle entries. */
+NetworkSessionCircleList::~NetworkSessionCircleList()
 {
-    if (self != 0) {
-        __destroy_arr(&self->items_04[0], (void*)NetworkSessionCircleInfo_dtor, 796, 32);
-        if (flags > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
 }
 
-extern "C" NetworkSessionCircleInfo* NetworkSessionCircleInfo_construct(NetworkSessionCircleInfo* self)
+/* Builds a circle entry around its address. */
+NetworkSessionCircleInfo::NetworkSessionCircleInfo()
 {
-    networkSmallObject_construct(&self->smallObject_108);
-    return self;
 }
 
-extern "C" NetworkSessionCircleInfo* NetworkSessionCircleInfo_dtor(NetworkSessionCircleInfo* self, s16 flags)
+/* Destroys a circle entry's address. */
+NetworkSessionCircleInfo::~NetworkSessionCircleInfo()
 {
-    if (self != 0) {
-        NetworkSmallObjectSink::destroy(&self->smallObject_108);
-        if (flags > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
 }
 
 GameSpyInterfaceThread* GameSpyInterfaceThread::getInstance()
@@ -1145,44 +1130,30 @@ GameSpyInterfaceThread* GameSpyInterfaceThread::getInstance()
     return sGameSpyInterfaceThread;
 }
 
-extern "C" NetworkSessionCircleList* NetworkSessionCircleList_construct(NetworkSessionCircleList* self)
+/* Builds the 32 circle entries. */
+NetworkSessionCircleList::NetworkSessionCircleList()
 {
-    __construct_array(&self->items_04[0], (void*)NetworkSessionCircleInfo_construct,
-                      (void*)NetworkSessionCircleInfo_dtor, 796, 32);
-    return self;
 }
 
-extern "C" NetworkSessionPlayerRecord* NetworkSessionPlayerRecord_dtor(NetworkSessionPlayerRecord* self, s16 flags)
+/* Destroys a player record's address. */
+NetworkSessionPlayerRecord::~NetworkSessionPlayerRecord()
 {
-    if (self != 0) {
-        NetworkSmallObjectSink::destroy(&self->smallObject_08);
-        if (flags > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
 }
 
-extern "C" NetworkSessionPlayerRecord* NetworkSessionPlayerRecord_construct(NetworkSessionPlayerRecord* self)
+/* Builds a player record around its address. */
+NetworkSessionPlayerRecord::NetworkSessionPlayerRecord()
 {
-    networkSmallObject_construct(&self->smallObject_08);
-    return self;
 }
 
 /* ----------------------------------------------------------------------------------------- */
 /* The Pat layer's own NetworkRequest array                                                   */
 /* ----------------------------------------------------------------------------------------- */
 
-extern "C" NetworkRequest* NetworkRequestPat_dtor(NetworkRequest* self, s16 flags)
+/* Empties the request record and destroys its mutex. */
+NetworkRequestPat::~NetworkRequestPat()
 {
-    if (self != 0) {
-        NetworkRequestPat_clear(self);
-        dtor_803CA338(self->mutex_78, -1);
-        if (flags > 0) {
-            operator delete(self);
-        }
-    }
-    return self;
+    NetworkRequestPat_clear(&request_00);
+    dtor_803CA338(request_00.mutex_78, -1);
 }
 
 extern "C" void NetworkRequestPat_clear(NetworkRequest* self)
@@ -1190,7 +1161,6 @@ extern "C" void NetworkRequestPat_clear(NetworkRequest* self)
     NetworkRequestPat_reset(self);
 }
 
-#pragma peephole off
 extern "C" void NetworkRequestPat_reset(NetworkRequest* self)
 {
     self->state_00 = 0;
@@ -1226,14 +1196,14 @@ extern "C" void NetworkRequestPat_reset(NetworkRequest* self)
     self->args_2C[6] = 0;
     self->args_2C[7] = 0;
 }
-#pragma peephole on
 
-extern "C" NetworkRequest* NetworkRequestPat_construct(NetworkRequest* self)
+/* Builds the request record: its mutex, then an empty record. */
+NetworkRequestPat::NetworkRequestPat()
 {
-    networkInstance_initMutex(self->mutex_78);
-    NetworkRequestPat_reset(self);
-    return self;
+    networkInstance_initMutex(request_00.mutex_78);
+    NetworkRequestPat_reset(&request_00);
 }
+#pragma peephole on
 
 /* ----------------------------------------------------------------------------------------- */
 /* NetworkSessionManagerPat                                                                   */
@@ -1245,12 +1215,6 @@ extern "C" NetworkRequest* NetworkRequestPat_construct(NetworkRequest* self)
 #pragma peephole off
 NetworkSessionManagerPat::NetworkSessionManagerPat()
 {
-    __construct_array(&this->pool2_1C4[0], (void*)NetworkRequestPat_construct,
-                      (void*)NetworkRequestPat_dtor, 0xA4, 2);
-    networkSmallObject_construct(&this->field_3CC);
-    __construct_array(&this->players_538[0], (void*)NetworkSessionPlayerRecord_construct,
-                      (void*)NetworkSessionPlayerRecord_dtor, 72, 4);
-    NetworkSessionCircleList_construct(&this->circleList_AF0);
     if (getInstance_() == 0) {
         new PatInterface();
     }
@@ -1261,17 +1225,11 @@ NetworkSessionManagerPat::NetworkSessionManagerPat()
     this->clear();
 }
 
-#pragma peephole reset
 #pragma dont_inline on
+/* Releases the Pat session; MWCC destroys the members and the base after the body. */
 NetworkSessionManagerPat::~NetworkSessionManagerPat()
 {
-    if (this != 0) {
-        this->release();
-        NetworkSessionCircleList_dtor(&this->circleList_AF0, -1);
-        __destroy_arr(&this->players_538[0], (void*)NetworkSessionPlayerRecord_dtor, 72, 4);
-        ((NetworkSmallObjectSink*)&this->field_3CC)->NetworkSmallObjectSink::~NetworkSmallObjectSink();
-        __destroy_arr(&this->pool2_1C4[0], (void*)NetworkRequestPat_dtor, 0xA4, 2);
-    }
+    this->release();
 }
 
 #pragma dont_inline on
@@ -1292,7 +1250,7 @@ void NetworkSessionManagerPat::clear()
     this->field_3C3 = 0;
     this->field_3C4 = 0;
     this->field_3C8 = 0;
-    this->field_3CC.vtable->slot_18(&this->field_3CC);
+    this->field_3CC.clear();
     memset(&this->matchOptions_3EC, 0, sizeof(this->matchOptions_3EC));
     this->tcp_658 = 0;
     this->udp_65C = 0;
@@ -1304,6 +1262,7 @@ void NetworkSessionManagerPat::clear()
     }
     this->field_6E74 = 0;
 }
+#pragma peephole reset
 
 /* Starts a Pat session: the interface singletons, the base's own init and then a clear. */
 #pragma dont_inline on
