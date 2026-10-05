@@ -362,5 +362,34 @@ def test_query_and_index(c):
                 (None, "no objects"))
 
 
+def test_dump_index_is_keyed_on_content(c):
+    """dtk rewrites every `.s` on every split: the same bytes must stay a cache hit, a changed byte must not."""
+    with testing.FixtureTree() as tree:
+        asm, files = dump_tree(tree)
+        root = str(tree.root)
+        _i, info = refs.load_dump_index(root, asm_dir=asm)
+        c.check("first load builds", info["rebuilt"], True)
+        c.check("the signature names its rule", info["signature"].startswith(refs.SIGNATURE_RULE), True)
+        for f in files:                                 # what a no-change dump refresh does
+            data = open(f, "rb").read()
+            st = os.stat(f)
+            open(f, "wb").write(data)
+            os.utime(f, ns=(st.st_atime_ns, st.st_mtime_ns + 2_000_000_000))
+        _i, info = refs.load_dump_index(root, asm_dir=asm)
+        c.check("a rewrite with the same bytes is a cache hit", (info["cached"], info["reason"]), (True, "cache hit"))
+        unit = os.path.join(asm, "menu", "multi_result.s")
+        text = open(unit, encoding="utf-8").read()
+        open(unit, "w", encoding="utf-8", newline="").write(text.replace("quest_init__FUc", "quest_init__FUC", 1))
+        _i, info = refs.load_dump_index(root, asm_dir=asm)
+        c.check("a same-size edit in one function rebuilds, with the shared reason", (info["rebuilt"], info["reason"]),
+                (True, refs.DUMP_CHANGED + " since the index was built"))
+        c.check("the memo lives in the tree's build/tmp", os.path.isfile(refs.dump_memo(root)), True)
+        stale = dict(json.loads(open(refs.dump_cache(root), encoding="utf-8").read()))
+        stale["signature"] = refs.libcache.stat_digest(files, asm)
+        tree.write(refs.dump_cache(root), json.dumps(stale))
+        _i, info = refs.load_dump_index(root, asm_dir=asm)
+        c.check("a stat-signed cache from before reads as changed, never as a hit", info["rebuilt"], True)
+
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))

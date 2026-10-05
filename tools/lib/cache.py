@@ -44,6 +44,58 @@ def stat_digest(paths: Iterable[str | os.PathLike], base: str | os.PathLike, alg
     return h.hexdigest()
 
 
+#: the per-file memo `content_digest` keeps: `{"version": 1, "files": {normcased abs path: [mtime_ns, size, sha1]}}`
+MEMO_VERSION = 1
+
+
+def _read_memo(path: str | None) -> dict:
+    if not path:
+        return {}
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(data, dict) or data.get("version") != MEMO_VERSION or not isinstance(data.get("files"), dict):
+        return {}
+    return data["files"]
+
+
+def content_digest(paths: Iterable[str | os.PathLike], base: str | os.PathLike, memo: str | os.PathLike | None = None,
+                   algo: str = "sha1") -> str:
+    """One digest over every file's name (relative to `base`, forward-slashed) and the hash of its bytes.
+
+    The signature for a dump a tool rewrites without changing it (dtk rewrites every `.s` on every split): the same
+    bytes give the same digest whatever the mtimes say. `memo` (a JSON path) keeps each file's hash under its
+    `[mtime_ns, size]`, so only a file whose stat moved is read again; the memo is rewritten (atomically) only when an
+    entry changed, an entry whose file is gone is dropped, and an unreadable memo is ignored, never trusted.
+    """
+    memo = os.fspath(memo) if memo is not None else None
+    old = _read_memo(memo)
+    new: dict = {}
+    h = hashlib.new(algo)
+    for path in paths:
+        key = os.path.normcase(os.path.abspath(path))
+        st = os.stat(path)
+        hit = old.get(key)
+        if isinstance(hit, list) and len(hit) == 3 and hit[0] == st.st_mtime_ns and hit[1] == st.st_size:
+            digest = hit[2]
+        else:
+            digest = content_hash(path, algo)
+        new[key] = [st.st_mtime_ns, st.st_size, digest]
+        name = os.path.relpath(path, base).replace("\\", "/")
+        h.update(("%s\0%s\n" % (name, digest)).encode("utf-8"))
+    if memo:
+        merged = {k: v for k, v in old.items() if k not in new and os.path.exists(k)}   # another caller's subset
+        merged.update(new)
+        if merged != old:
+            try:
+                text.atomic_write(memo, json.dumps({"version": MEMO_VERSION, "files": merged}, sort_keys=True))
+            except OSError:
+                pass
+    return h.hexdigest()
+
+
 class Stamped:
     """A JSON cache at `path` whose payload is valid only for the inputs it was built from.
 

@@ -34,7 +34,7 @@ Inputs -> outputs: build/RMHE08/asm or obj/ -> build/tmp/callers/graph.json -> r
 * **The trap this tool exists to survive: the dump is stale, and its labels are printed stale.** `build/RMHE08/asm/` is dtk's disassembly of the symbol map *as of the split* (see `tools/splits/dump_asm.py`); a `bl` whose callee was renamed afterwards still prints the OLD label, so grepping the dump for the new name finds nothing. The dump in this tree carries the proof: at 0x803A146C the canonical `menu/multi_result.s` prints `bl game_mode_sub_state_set1`, while the stale top-level copy `auto_fn_803A13B4_text.s` still prints `bl fn_803A1680` - one instruction, two labels, and only one of them is in `symbols.txt`. Therefore:
 * **the graph is built on addresses.** A `bl`/`b` target is decoded from the instruction's own displacement (`NIA = CIA + EXTS(LI||0b00)`), so it is exact and needs no map at all; a data reference (`X@ha`/`@l`/`@sda21`/...) resolves its name through *the dump's own label table* (the `# <section>:0xOFF | 0xADDR | size:` headers), which is stale in exactly the same way the reference is, so an old name still lands on the right address;
 * **names are resolved per run** through the current map, via `symedit`-style streaming access (never printing `symbols.txt` - non-negotiable 7), so a caller renamed since the dump is named correctly and a query on a *new* name is answered by address;
-* **the index is cached** (`build/tmp/callers/graph.json`) and rebuilt only when the dump changes - a signature over every `.s` file's path, size and mtime. A `symbols.txt` edit does **not** rebuild it: the graph holds no name from the map. In this tree the build is 245 258 references over 54 256 target addresses and takes 8-10 s; a cached query answers in ~1.3 s.
+* **the index is cached** (`build/tmp/callers/graph.json`) and rebuilt only when the dump changes - a signature over every `.s` file's path and content (`lib.refs.dump_signature`, since 2026-10-05; a dump refresh that changes no byte keeps the cache). A `symbols.txt` edit does **not** rebuild it: the graph holds no name from the map. In this tree the build is 245 258 references over 54 256 target addresses and takes 8-10 s; a cached query answers in ~1.3 s.
 * **What it reports, and what each column is evidence for.**
 * `call` - a `bl`/`bla` whose target address the encoding decodes. This is the "who calls this" answer.
 * `branch` - `b`/`ba` to a *symbol* (a tail call, or a jump into another function). The `.L_ADDR` branches inside one function are not callers and are not indexed.
@@ -64,7 +64,7 @@ Inputs -> outputs: build/RMHE08/asm or obj/ -> build/tmp/callers/graph.json -> r
 ## Lib dependencies
 
 `lib.refs` (the index, the cache, `RefMap`, `query`, `readers_of`, `range_report`, `DumpStamp`), `lib.cache`
-(`stat_digest`), `lib.report` (`rel_path`), `lib.repo` (`VERSION`); `lib.repo.resolve_input` for the input locations.
+(`dump_signature`), `lib.report` (`rel_path`), `lib.repo` (`VERSION`); `lib.repo.resolve_input` for the input locations.
 
 ## Test contract
 

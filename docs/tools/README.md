@@ -40,7 +40,7 @@ Core gate: `land`, `verifyunit`, `stylelint`, `vtableaudit`, `undefrefs`, `flipc
 Core evidence: `callers`, `callees`, `accessextent`, `dossier`, `symedit`, `dumpmap`, `phantom`, `mangle`, `methodize`,
 `symbolpreflight`, `tudiscover`, `dataorder`, `dataseams`, `poolseams` (+ `seams`), `splitcheck` (+ `invariants`), `dump_asm`,
 `dataclaim`, `dataqueue`,
-`sectiongap`, `pairgap`, `relocdiff`, `unitscore`, `symdiff`, `fnasm`, `measure`, `unwindcut`, `vtslot`, `linkorder`, `m2cinput`,
+`sectiongap`, `pairgap`, `relocdiff`, `unitscore`, `symdiff`, `fnasm`, `immreloc`, `measure`, `unwindcut`, `vtslot`, `linkorder`, `m2cinput`,
 `typeregistry`, `declclash`, `elfsect`, `dwarfmap`, `unitinfo`.
 
 Agent plumbing: `claims`, `slots`, `lane`, `rescue`, `wtsafe`, `queue`, `lanecmd`, `worktreehook`, `landlog`, `brief` (+ `briefing`), `backlog`, `integrate`,

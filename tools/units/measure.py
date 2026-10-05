@@ -41,11 +41,8 @@ resolve_target = _units.resolve_target
 
 
 def worktree_root() -> str:
-    """The tree the caller is in (`git rev-parse --show-toplevel` from the cwd)."""
-    top = _repo.caller_worktree()
-    if not top:
-        raise SystemExit("git rev-parse --show-toplevel failed in %s: not a git worktree" % os.getcwd())
-    return top
+    """The tree the caller is in (`lib.repo.worktree_root`: `git rev-parse --show-toplevel` from the cwd)."""
+    return _repo.worktree_root()
 
 
 def candidate_functions(obj: str):

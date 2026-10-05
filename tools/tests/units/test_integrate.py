@@ -444,5 +444,103 @@ def test_run_refusals_and_commit(c):
                 "land.py land --branch integrate/fx --units Lane/lane" in out, True)
 
 
+MULTI_LANE = ('#include "types.h"\n\n/* STOPGAP-BEGIN(net3-c#4) */\nextern "C" s32 SOInit(void);\n'
+              'extern "C" u32 SOGetHostID(void);\n/* STOPGAP-END(net3-c#4) */\n\n'
+              "void f(void) { SOInit(); SOGetHostID(); }\n")
+
+
+def _multi():
+    return R.from_entry({"id": "net3-c#4", "kind": "decl", "evidence": "x",
+                         "prototypes": [{"address": "0x8051E864", "proposed_name": "SOInit",
+                                         "prototype": "s32 SOInit(void);"}, "u32 SOGetHostID(void);"]})
+
+
+def _multi_tree(tmp):
+    write(tmp, "config/RMHE08/symbols.txt", SYMBOLS)
+    write(tmp, "config/RMHE08/splits.txt", SPLITS)
+    write(tmp, "include/types.h", "typedef int s32;\ntypedef unsigned int u32;\n")
+    write(tmp, "include/SO/soi.h", SOI_H)
+    write(tmp, "src/SO/soi.cpp", '#include "SO/soi.h"\n')
+    write(tmp, "src/Lane/lane.cpp", MULTI_LANE)
+
+
+def test_prototypes_apply_as_one_unit(c):
+    own = Ownership.from_texts(SYMBOLS, SPLITS)
+    it = ig.plan([_multi()], own, {}, set(), set(), {})[0]
+    c.check("one request plans every declaration (and the rename its generated name needs)",
+            (it.state, [d.name for d in it.decls], it.renames),
+            ("apply", ["SOInit", "SOGetHostID"], [("fn_8051E864", "SOInit")]))
+    with tempfile.TemporaryDirectory() as tmp:
+        _multi_tree(tmp)
+        files = ig.Files(tmp)
+        fails = ig.apply_decls(files, it.live_decls(), {"src/Lane/lane.cpp"}, {it.req.id})
+        files.flush()
+        soi, lane = read(tmp, "include/SO/soi.h"), read(tmp, "src/Lane/lane.cpp")
+        c.check("both declarations land in the owner header", (fails, "s32 SOInit(void);" in soi,
+                "u32 SOGetHostID(void);" in soi), ({}, True, True))
+        c.check("... and the one STOPGAP block covering both is gone", ("STOPGAP" in lane, "SOInit(void);" in lane),
+                (False, False))
+    it = ig.plan([_multi()], own, {}, set(), set(), {})[0]
+    it.exclude("SOGetHostID", "the build failed on it")
+    c.check("excluding one declaration of a prototypes request excludes them all",
+            (sorted(it.excluded), it.live_decls()), (["SOGetHostID", "SOInit"], []))
+    c.check("... the reason names the one that failed", it.excluded["SOInit"],
+            "applied as one unit with SOGetHostID, which is excluded")
+    legacy = ig.plan([req("decl", "SOGetHostID, fn_8051E864", "declare them", n=7)], own,
+                     {"fn_8051E864": "SOInit"}, set(), set(), {})[0]
+    legacy.exclude("SOGetHostID", "x")
+    c.check("a legacy multi-target request still excludes one at a time", [d.name for d in legacy.live_decls()],
+            ["SOInit"])
+    with tempfile.TemporaryDirectory() as tmp:
+        _multi_tree(tmp)
+        it.renames = []                                   # the renames stage is its own commit
+        res = ig.apply_plan(tmp, [it], {"src/Lane/lane.cpp"}, False, False, stage="rest")
+        c.check("a request with an excluded declaration keeps its STOPGAP block", (res["failures"],
+                read(tmp, "src/Lane/lane.cpp")), ({}, MULTI_LANE))
+
+def test_already_applied_through_the_owner(c):
+    """L3 round 2: `em_net_recv` sits in a header the owner's source includes, `lb_act_dispatch_ex` in the owner's leaf
+    header named for its sibling - `--dry-run` re-proposed both."""
+    syms = SYMBOLS + "lb_act_dispatch = .text:0x80070004; // type:function size:0x4\n" \
+                     "lb_act_dispatch_ex = .text:0x80070008; // type:function size:0x4\n" \
+                     "other_owner_fn = .text:0x8051E900; // type:function size:0x4\n"
+    own = Ownership.from_texts(syms, SPLITS)
+    with tempfile.TemporaryDirectory() as tmp:
+        write(tmp, "config/RMHE08/symbols.txt", syms)
+        write(tmp, "config/RMHE08/splits.txt", SPLITS)
+        write(tmp, "include/types.h", "typedef unsigned int u32;\n")
+        write(tmp, "include/Lane/lane.h", "#include \"types.h\"\n")
+        write(tmp, "include/Lane/shared_sync.h", "#include \"types.h\"\nvoid laneHelper(u32 x);\n")
+        write(tmp, "src/Lane/lane.cpp", '#include "Lane/lane.h"\n#include "Lane/shared_sync.h"\n'
+                                        "void laneHelper(u32 x) {}\nvoid lb_act_dispatch(void) {}\n"
+                                        "void lb_act_dispatch_ex(u32 i) {}\n")
+        write(tmp, "include/Lane/lb_act_dispatch.h", "void lb_act_dispatch(void);\nvoid lb_act_dispatch_ex(u32 i);\n")
+        write(tmp, "src/Net/user.cpp", '#include "Lane/shared_sync.h"\n#include "Lane/lb_act_dispatch.h"\n'
+                                       "void g(void) { laneHelper(1); lb_act_dispatch_ex(2); }\n")
+        reqs = [R.from_entry({"id": "l3#11", "kind": "decl", "address": "0x80070000", "proposed_name": "laneHelper",
+                              "prototype": "void laneHelper(u32 x);", "evidence": "x"}),
+                R.from_entry({"id": "l3#8", "kind": "decl", "symbol": "lb_act_dispatch_ex",
+                              "prototype": "void lb_act_dispatch_ex(u32 i);", "evidence": "x"})]
+        own_named = Ownership.from_texts(syms.replace("fn_80070000", "laneHelper"), SPLITS)
+        items = ig.plan(reqs, own_named, {}, set(), set(), {})
+        c.check("before: both plan to apply", [i.state for i in items], ["apply", "apply"])
+        c.check("without the ownership index only the closure case counts as applied",
+                (ig.mark_applied(tmp, ig.plan(reqs, own_named, {}, set(), set(), {}), set(), None)), 1)
+        n = ig.mark_applied(tmp, items, set(), own_named)
+        c.check("a declaration in a header the owner's source includes, and one in the owner's leaf header, are "
+                "already applied", (n, [i.state for i in items], [i.why for i in items]),
+                (2, ["done", "done"], ["already applied (the tree): laneHelper in include/Lane/shared_sync.h",
+                                       "already applied (the tree): lb_act_dispatch_ex in include/Lane/lb_act_dispatch.h"]))
+        write(tmp, "include/Lane/lb_act_dispatch.h", "void lb_act_dispatch(void);\nvoid lb_act_dispatch_ex(u32 i);\n"
+                                                     "void other_owner_fn(void);\n")
+        items = ig.plan(reqs[1:], own_named, {}, set(), set(), {})
+        c.check("a header that also declares another unit's symbol is no leaf of the owner",
+                (ig.mark_applied(tmp, items, set(), own_named), items[0].state), (0, "apply"))
+    c.check("Ownership.leaf_header_owner: named for a declared symbol, every name one unit's",
+            (own.leaf_header_owner("include/Lane/lb_act_dispatch.h", ["lb_act_dispatch", "lb_act_dispatch_ex"]),
+             own.leaf_header_owner("include/Lane/other.h", ["lb_act_dispatch"]),
+             own.leaf_header_owner("include/unsplit/lb_act_dispatch.h", ["lb_act_dispatch"])),
+            ("Lane/lane.cpp", None, None))
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))

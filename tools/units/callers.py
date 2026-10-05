@@ -11,7 +11,6 @@ import json
 import os
 
 from tools.lib import repo as _repo  # resolve_input: MAIN's build/ by path when the tree has none
-from tools.lib import cache as libcache
 from tools.lib import refs as _refs  # the one reference index: dump parser, object fallback, cache, the query
 from tools.lib.report import rel_path
 from tools.lib.repo import VERSION
@@ -64,8 +63,8 @@ def asm_dir_of(root=ROOT):
     return _repo.resolve_input(os.path.join("build", GAME, "asm"), root, _refs.has_dump, honour_env=_repo.is_served(root))
 
 
-def dump_signature(asm_dir, files):
-    return libcache.stat_digest(files, asm_dir)
+def dump_signature(asm_dir, files, root=None):
+    return _refs.dump_signature(asm_dir, files, root)
 
 
 def build_index(asm_dir, files):
@@ -852,7 +851,7 @@ def selftest():
             fh.write("\n")
         _i4, info4 = load_index(root=tmp, asm_dir=asm, cache=cache)
         check("cache: a dump edit rebuilds", (info4["cached"], info4["rebuilt"]), (False, True))
-        check("cache: the rebuild says why", info4["reason"], "the dump changed since the index was built")
+        check("cache: the rebuild says why", info4["reason"], "the dump's content changed since the index was built")
         index5, info5 = load_index(root=tmp, asm_dir=asm, cache=cache)
         check("cache: the rebuild is cached again", info5["cached"], True)
         check("cache: a forced rebuild ignores the cache",
@@ -880,7 +879,7 @@ def selftest():
         _i, info_sig = load_index(root=tmp, asm_dir=asm, cache=cache)
         check("cache: another dump's signature is rebuilt",
               (info_sig["cached"], info_sig["reason"]),
-              (False, "the dump changed since the index was built"))
+              (False, "the dump's content changed since the index was built"))
 
         # a missing dump is never answered with a count of zero callers
         empty = os.path.join(tmp, "empty-tree")

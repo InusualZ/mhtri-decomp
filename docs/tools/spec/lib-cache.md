@@ -6,7 +6,7 @@ Says whether a cached artefact still describes its inputs, and gives the per-fil
 
 ## Users
 
-`callers.dump_signature` (`stat_digest`), `tudiscover.dump_stamp` (`content_hash`), `undefrefs._sig` (`stat_key`); `Stamped`
+`lib.refs.dump_signature` (`content_digest`: `callers`' index and `tudiscover`'s graph), `tudiscover.dump_stamp` (`content_hash`), `undefrefs._sig` (`stat_key`); `Stamped`
 for every new cache.
 
 ## Public API
@@ -15,7 +15,14 @@ for every new cache.
   one (a discovered set); `state() in {missing, unstamped, stale, fresh}`, `load()` (the payload when fresh, else None),
   `save(payload)` (atomic), `signature()`.
 * `content_hash(path, algo="sha1")`, `stat_key(path) -> [mtime_ns, size] | None`, `stat_digest(paths, base, algo="sha1")`
-  (one digest over each file's base-relative name, size and mtime - `callers.py`'s dump signature, byte-identical).
+  (one digest over each file's base-relative name, size and mtime - `callers.py`'s dump signature until 2026-10-05).
+* `content_digest(paths, base, memo=None, algo="sha1")`: one digest over each file's base-relative name and the hash of its
+  bytes, so a tool that rewrites a file without changing it (dtk's split rewrites every `.s`) keeps the digest. `memo` (a
+  JSON path, `{"version": 1, "files": {abs path: [mtime_ns, size, sha1]}}`) answers an unmoved stat without reading the
+  file; only a file whose stat moved is re-read, the memo is rewritten only when an entry changed, a gone file's entry is
+  dropped and an unreadable memo is ignored. Measured over the 415-file / 89 MB dump: ~0.2 s with every file re-read
+  (sha1 0.37 s, crc32 0.28 s, sha256 0.31 s, stat-only 0.05 s over MAIN's 2 488 files / 142 MB), the stat cost when the memo
+  answers.
 
 ## Invariants and rules
 

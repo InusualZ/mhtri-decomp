@@ -42,10 +42,6 @@
    "reason": "reads the seam evidence (data order, pools, source names) from its one home, tools/splits/seams/evidence.py; moving it to lib is open (it is a tool-level model, not a shared primitive)"
   },
   {
-   "edge": "tools/splits/dump_asm.py -> tools/splits/tudiscover.py",
-   "reason": "the dump's location and stamp are tudiscover's (its only reader): dump_asm writes what tudiscover checks"
-  },
-  {
    "edge": "tools/splits/invariants/context.py -> tools/splits/seams/evidence.py",
    "reason": "reads the seam evidence (data order, pools, source names) from its one home, tools/splits/seams/evidence.py; moving it to lib is open (it is a tool-level model, not a shared primitive)"
   },

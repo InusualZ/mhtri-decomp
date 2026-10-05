@@ -53,7 +53,9 @@ Inputs -> outputs: build/RMHE08/asm, map, DOL -> scored cuts, build/tmp/tudiscov
   `stats`-only: `at`, `bench`, `dataorder` and `prune` used a stale dump silently); a refresh that cannot run (no `dtk` in this
   tree) warns and goes on. Fresh: stdout byte-identical (measured on `stats` and `at camellia_setup128`).
 * `cache --check` answers for the graph cache without building it (`lib.artifacts`' `tudiscover-graph` check), because the
-  stamp hashes this tool's own parse code.
+  stamp hashes this tool's own parse code. The stamp keys the dump by `lib.refs.dump_signature` (every file's name and bytes,
+  the rule `callers`' index uses) - it was the file count and byte total, which a same-size edit did not move - and a stale
+  verdict names what moved in `STAMP_WORDS`' words (`the dump's content changed`, as `callers` says it).
 * Nothing is written outside `build/tmp/` and this tree's `build/RMHE08/` (the dump refresh): the `splits.txt` block is
   printed, never applied.
 

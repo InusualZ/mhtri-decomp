@@ -82,5 +82,49 @@ def test_file_keys(c):
         c.check("... and moves when a file is rewritten", cache.stat_digest([p], root) != before, True)
 
 
+def test_content_digest(c):
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "dump" / "sub").mkdir(parents=True)
+        a, b = root / "dump" / "a.s", root / "dump" / "sub" / "b.s"
+        a.write_bytes(b"one")
+        b.write_bytes(b"two")
+        memo = root / "memo.json"
+        files = [a, b]
+        d0 = cache.content_digest(files, root / "dump", memo)
+        want = "".join("%s\0%s\n" % (n, hashlib.sha1(d).hexdigest()) for n, d in (("a.s", b"one"), ("sub/b.s", b"two")))
+        c.check("the digest is name + sha1 of the bytes per file", d0, hashlib.sha1(want.encode()).hexdigest())
+        stat_before = cache.stat_digest(files, root / "dump")
+        _bump(a, b"one")
+        c.check("a rewrite with the same bytes (newer mtime) keeps the digest",
+                cache.content_digest(files, root / "dump", memo), d0)
+        c.check("... where the stat rule moves", cache.stat_digest(files, root / "dump") != stat_before, True)
+        _bump(a, b"onE")
+        c.check("a same-size content change moves it", cache.content_digest(files, root / "dump", memo) != d0, True)
+        a.write_bytes(b"one")
+        c.check("... and back", cache.content_digest(files, root / "dump", memo), d0)
+        c.check("a renamed file moves it", cache.content_digest([a, b], root, memo) != d0, True)
+        reads = []
+        real = cache.content_hash
+        cache.content_hash = lambda p, algo="sha1": (reads.append(str(p)), real(p, algo))[1]
+        try:
+            cache.content_digest(files, root / "dump", memo)
+            c.check("an unmoved stat is answered from the memo (no file read)", reads, [])
+            _bump(b, b"two")
+            cache.content_digest(files, root / "dump", memo)
+            c.check("only the file whose stat moved is read again", reads, [str(b)])
+            memo.write_text("not json", encoding="utf-8")
+            del reads[:]
+            c.check("an unreadable memo is ignored, never trusted", (cache.content_digest(files, root / "dump", memo),
+                    len(reads)), (d0, 2))
+        finally:
+            cache.content_hash = real
+        c.check("without a memo the answer is the same", cache.content_digest(files, root / "dump"), d0)
+        b.unlink()
+        cache.content_digest([a], root / "dump", memo)
+        kept = json.loads(memo.read_text(encoding="utf-8"))["files"]
+        c.check("a deleted file leaves the memo", [os.path.basename(k) for k in kept], ["a.s"])
+
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))
