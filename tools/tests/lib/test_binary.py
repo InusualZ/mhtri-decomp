@@ -93,6 +93,13 @@ def test_repeated_section_name(c):
     rel = elf.relocs(".data")
     c.check("relocations carry their relocation section's index, not just its name",
             [(r.rela, r.rela_index > second.index, r.symbol_name) for r in rel], [(".rela.data", True, "ext")])
+    # a relocation addressed by section index lands on the second piece, with its own `.rela.data`
+    b2 = ElfBuilder().section(".data", b"AAAA").section(".data", b"BBBBBBBB").symbol("ext")
+    elf2 = Elf.read(b2.reloc(".data", 0, "ext", 1).reloc(2, 4, "ext", 1).build())
+    first2, second2 = [s for s in elf2.sections if s.name == ".data"]
+    c.check("reloc(<index>) targets that piece: one `.rela.data` per piece, each paired by sh_info",
+            sorted((rela.info, len(rela.data)) for rela, _t in elf2.rela_sections()),
+            [(first2.index, 12), (second2.index, 12)])
 
 
 def test_fixture_tree_takes_a_builder(c):

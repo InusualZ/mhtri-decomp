@@ -184,10 +184,47 @@ def resolve_symbol(sym: dict, section_names, bases: dict, symbols_by_name: dict)
     if shndx >= 0xFF00:                                     # SHN_ABS / SHN_COMMON
         return (value, None) if shndx == 0xFFF1 else (None, None)
     if 0 < shndx < len(section_names):
-        sec = section_names[shndx]
-        base = bases.get(sec)
-        return (base + value, sec) if base is not None else (None, None)
+        key = section_names[shndx]
+        address = based_address(bases.get(key), value)
+        return (address, section_name(key)) if address is not None else (None, None)
     return None, None
+
+
+def object_key(name: str, occurrence: int) -> str:
+    """The key of the `occurrence`-th (1-based) section called `name` in one object: `name`, then `name#2`, ...
+
+    dtk splits a unit that owns two ranges of one section into two object sections with the SAME name, each
+    with its own `.rela<name>` (measured: a `.data` claim cut at a symbol boundary gives `.data` 0xD60 and
+    `.data` 0x1CE0). Keyed by name alone the second hid the first, so the first range was read out of the
+    second section - every run of the second block reported again at the first block's addresses.
+    """
+    return name if occurrence <= 1 else "%s#%d" % (name, occurrence)
+
+
+def section_name(key: str) -> str:
+    """The section name an `object_key` stands for (`.data#2` -> `.data`)."""
+    head, sep, tail = key.rpartition("#")
+    return head if sep and tail.isdigit() else key
+
+
+def based_address(base, value: int):
+    """The address of offset `value` in an object section whose base is `base`, or None.
+
+    `base` is an int (the section sits at one address) or a list of `(offset, start, size)` segments - one
+    object section that holds several split ranges back to back, as our compiled object does for a unit
+    whose target carries two `.data` sections. An offset past the last segment extrapolates from it.
+    """
+    if base is None:
+        return None
+    if isinstance(base, int):
+        return base + value
+    for offset, start, size in base:
+        if offset <= value < offset + size:
+            return start + value - offset
+    if not base:
+        return None
+    offset, start, _size = base[-1]
+    return start + value - offset
 
 
 def read_word(obj: dict, section: str, offset: int, bases: dict, symbols_by_name: dict):
@@ -245,6 +282,39 @@ def section_diff(ours: dict, target: dict) -> list:
             kind = "short" if a < b else "long"
         out.append({"section": name, "ours": a, "target": b, "kind": kind})
     return sorted(out, key=lambda d: (d["section"], d["kind"]))
+
+
+def section_sizes(obj: dict) -> dict:
+    """`{section name: total size}` of one object - a name dtk repeats (`object_key`) is summed, not overwritten."""
+    out: dict = {}
+    for key, sec in obj["sections"].items():
+        name = section_name(key)
+        out[name] = out.get(name, 0) + sec["size"]
+    return out
+
+
+def range_layout(own: list):
+    """`(target_bases, our_bases, [(range, target_key, our_offset)])` for one unit's split ranges.
+
+    The target object carries one section per range, so the k-th range (in address order) of an object
+    section name is the k-th section of that name (`object_key`) and sits at its own start. Our compiled
+    object carries ONE section per name holding those ranges back to back, so its base is a segment list
+    and a range starts `our_offset` bytes into it.
+    """
+    by_name: dict = {}
+    for rng in own:
+        by_name.setdefault(rng["object"], []).append(rng)
+    target_bases, our_bases, place = {}, {}, {}
+    for name, ranges in by_name.items():
+        offset, segments = 0, []
+        for k, rng in enumerate(sorted(ranges, key=lambda r: r["start"]), 1):
+            key = object_key(name, k)
+            target_bases[key] = rng["start"]
+            segments.append((offset, rng["start"], rng["end"] - rng["start"]))
+            place[id(rng)] = (key, offset)
+            offset += rng["end"] - rng["start"]
+        our_bases[name] = segments[0][1] if len(segments) == 1 else segments
+    return target_bases, our_bases, [(rng,) + place[id(rng)] for rng in own]
 
 
 def classify_reference(address: int, unit_ranges, all_ranges) -> str:
@@ -318,18 +388,20 @@ def read_object(path: str):
 
     The `.symtab` rows are kept **with their indices** (`lib.binary.elf`), because a relocation names its
     symbol by index and the reader must not drop a row (the undefined rows are exactly the ones an
-    object-only reader has no address for). Relocations are grouped by the section they apply to, so a
-    lookup is `relocs[section][offset]`.
+    object-only reader has no address for). Sections, `order` and relocations are keyed by `object_key`, so a
+    repeated name stays apart (`.data`, `.data#2`) and a lookup is `relocs[key][offset]`.
     """
     try:
         elf = LibElf.read(path)
     except (OSError, ElfError):
         return None
-    sections, order = {}, []
+    sections, order, seen = {}, [], {}
     for s in elf.sections:
-        order.append(s.name)
-        sections[s.name] = {"name": s.name, "typ": s.type, "size": s.size, "link": s.link,
-                            "entsize": s.entsize, "data": s.data}
+        seen[s.name] = seen.get(s.name, 0) + 1
+        key = object_key(s.name, seen[s.name])
+        order.append(key)
+        sections[key] = {"name": s.name, "typ": s.type, "size": s.size, "link": s.link,
+                         "entsize": s.entsize, "data": s.data}
     obj = {"sections": sections, "order": order, "symbols": [], "relocs": {}}
     if elf.symtab is not None and elf.symtab.data:
         obj["symbols"] = [{"name": s.name, "value": s.value, "size": s.size, "bind": s.bind, "type": s.type,
@@ -337,9 +409,10 @@ def read_object(path: str):
     by_rela: dict[int, dict] = {}
     for r in elf.relocs():
         by_rela.setdefault(r.rela_index, {})[r.offset] = (r.type, r.symbol, r.addend)
-    for rela, _target in elf.rela_sections():  # a repeated section name: the last one wins, as before
+    for rela, target in elf.rela_sections():  # keyed by the target's `object_key`: a repeated name stays apart
         if rela.data:
-            obj["relocs"][rela.name[5:]] = by_rela.get(rela.index, {})
+            key = order[rela.info] if 0 < rela.info < len(order) else target
+            obj["relocs"][key] = by_rela.get(rela.index, {})
     return obj
 
 
@@ -597,27 +670,25 @@ def audit_unit(tree: dict, path: str, flag: str) -> dict:
         return rec
 
     # -- (c) section completeness, ours vs the target, every non-.text section ------------------------
-    ours_sizes = {n: s["size"] for n, s in our["sections"].items()}
-    target_sizes = {n: s["size"] for n, s in target["sections"].items()}
-    rec["sections"] = section_diff(ours_sizes, target_sizes)
+    rec["sections"] = section_diff(section_sizes(our), section_sizes(target))
 
     # -- (a)+(b) the owned runs and their verdict ------------------------------------------------
-    our_bases = {r["object"]: r["start"] for r in own}
+    target_bases, our_bases, layout = range_layout(own)
     object_symbols = tree.get("object_symbols", tree["symbols"])
-    for rng in own:
+    for rng, target_key, our_offset in layout:
         section, object_section = rng["section"], rng["object"]
         start, end = rng["start"], rng["end"]
         if section not in DATA_SECTIONS:
             continue
-        sec = target["sections"].get(object_section)
+        sec = target["sections"].get(target_key)
         if sec is None or not sec["data"]:
-            rec["missing"].append("target:" + object_section)
+            rec["missing"].append("target:" + target_key)
             continue
         if sec["size"] != end - start:
             rec["range_mismatch"].append({"section": object_section, "splits": end - start,
                                           "object": sec["size"]})
         count = min(sec["size"], end - start) // 4
-        resolved = [read_word(target, object_section, 4 * i, our_bases, object_symbols)
+        resolved = [read_word(target, target_key, 4 * i, target_bases, object_symbols)
                     for i in range(count)]
         flags = [is_code_pointer(k, v, s, tree["text_ranges"]) for k, v, s in resolved]
         for first, words in find_runs(flags):
@@ -628,8 +699,8 @@ def audit_unit(tree: dict, path: str, flag: str) -> dict:
                    "targets": [resolved[first + i][1] for i in range(words)],
                    "verdict": None, "emitted": None, "referenced": None, "values_match": None,
                    "our_section": None}
-            _verdict_run(run, object_section, first, words, start, our, our_bases, object_symbols,
-                         tree["text_ranges"])
+            _verdict_run(run, object_section, our_offset // 4 + first, words, start, our, our_bases,
+                         object_symbols, tree["text_ranges"])
             rec["runs"].append(run)
 
     rec["order"] = emission_order(our, class_order(main, path))

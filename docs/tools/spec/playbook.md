@@ -1,4 +1,4 @@
-# `playbook` - Turn outbox findings into playbook idea drafts under `.pi/playbook-drafts/` (the gate's knowledge-delta row calls it)
+# `playbook` - Turn outbox findings into playbook idea drafts under `.pi/playbook-drafts/` (run by hand; the gate's knowledge-delta row that called it was deleted 2026-10-05)
 
 <!-- generated from the module docstring of `tools/units/playbook.py` at ec2609b46 by the tools-design lane; tightened by hand where marked -->
 
@@ -8,7 +8,7 @@ Turn worker outboxes into ready-to-land playbook drafts (docs/matching/NNN-slug.
 
 ## Users
 
-the landing gate (3)
+the orchestrator, by hand (the landing gate's row 20 called it until 2026-10-05)
 
 ## CLI
 

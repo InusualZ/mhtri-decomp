@@ -42,7 +42,8 @@ The tools listed under this concept in `docs/tools/README.md`. Delegating today 
   (ValueError there), `cstring`, `data_dir(i)`, `debug_entries()`, `debug_blob()`, `codeview_symbols()` (the `NB11`
   blob: `[(rva, name, section)]`, cached), `symbol_map()`, `imports()`, `iat_slots()` (`{name: slot VA}`),
   `resources()`, `string_blocks()` (RT_STRING). Refuses (ValueError) no `MZ`, no `PE\0\0`, a non-PE32 header.
-* `build.ElfBuilder` (`section`, `nobits`, `symbol`, `file_symbol`, `reloc`, `comment(version)`, `build`, `write`;
+* `build.ElfBuilder` (`section`, `nobits`, `symbol`, `file_symbol`, `reloc` (a section name - its first section - or
+  a 1-based section index, for a repeated name), `comment(version)`, `build`, `write`;
   locals first unless `keep_order`), `build.PeBuilder` (`section(name, data, vsize, va)`, `imports`, `strings`,
   `codeview`, `rva`, `build`, `write`) and `build.DolBuilder` (`text`, `data`, `bss`, `pad`, `entry`, `build`, `write`).
   `lib.testing.FixtureTree.add_object` accepts a builder.

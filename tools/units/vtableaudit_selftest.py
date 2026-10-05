@@ -36,6 +36,7 @@ import tempfile
 from pathlib import Path
 
 
+from tools.lib.binary.build import ElfBuilder
 from tools.units import vtableaudit as va
 
 # info byte = (bind << 4) | type
@@ -772,6 +773,58 @@ def selftest() -> int:
               (s2["units_built"], [r["unit"] for r in s2["unbuilt"]]), (3, ["t/gone.cpp"]))
         check("the unbuilt unit names the missing path",
               s2["unbuilt"][0]["missing"], ["build/RMHE08/src/t/gone.o"])
+
+    # -- a unit with TWO .data ranges: dtk writes two `.data` sections into its target object -------
+    check("object_key / section_name round-trip", [va.object_key(".data", 1), va.object_key(".data", 2),
+                                                   va.section_name(".data#2"), va.section_name(".ctors$10")],
+          [".data", ".data#2", ".data", ".ctors$10"])
+    check("based_address: an int base, a segment list, past the last segment",
+          [va.based_address(0x100, 8), va.based_address([(0, 0x100, 0x10), (0x10, 0x200, 0x20)], 0x18),
+           va.based_address([(0, 0x100, 0x10), (0x10, 0x200, 0x20)], 0x30), va.based_address(None, 0)],
+          [0x108, 0x208, 0x220, None])
+    with tempfile.TemporaryDirectory() as tmp:
+        files = {
+            os.path.join("config", "RMHE08", "splits.txt"):
+                "t/two.cpp:\n\t.text       start:0x80004000 end:0x80004100\n"
+                "\t.data       start:0x80050000 end:0x80050010\n\t.data       start:0x80050010 end:0x80050030\n",
+            os.path.join("config", "RMHE08", "symbols.txt"):
+                "fn_80004000 = .text:0x80004000; // type:function size:0x10\n"
+                "fn_80004010 = .text:0x80004010; // type:function size:0x10\n",
+            "configure.py": 'config.libs = [\n    Object(NonMatching, "t/two.cpp"),\n]\n',
+        }
+        for rel, text in files.items():
+            os.makedirs(os.path.dirname(os.path.join(tmp, rel)) or tmp, exist_ok=True)
+            with open(os.path.join(tmp, rel), "w", encoding="utf-8") as fh:
+                fh.write(text)
+        write_elf(os.path.join(tmp, "orig", "RMHE08", "sys", "main.dol"), dol_header())
+        # the target: block A (0x10 bytes) holds a 2-word run at +4, block B (0x20 bytes) a 3-word run at +8 -
+        # each in its own `.data` section (section 2 and 3) with its own relocations
+        target = (ElfBuilder().section(TEXT, b"\x00" * 0x100).section(DATA, b"\x00" * 0x10)
+                  .section(DATA, b"\x00" * 0x20)
+                  .symbol("fn_80004000", TEXT, 0, 16, type="func").symbol("fn_80004010", TEXT, 0x10, 16, type="func"))
+        for section, offset in ((2, 4), (2, 8), (3, 8), (3, 12), (3, 16)):
+            target.reloc(section, offset, "fn_80004000", R_PPC_ADDR32)
+        # ours: ONE `.data` with both blocks back to back; block A's run is emitted, block B's words are zero
+        # and `.text` stores the address of `tblB` (block B's run, +0x18 into our `.data`) - referenced
+        ours = (ElfBuilder().section(TEXT, b"\x00" * 0x100).section(DATA, b"\x00" * 0x30)
+                .symbol("fn_80004000", TEXT, 0, 16, type="func").symbol("tblB", DATA, 0x18, 12, type="object"))
+        ours.reloc(DATA, 4, "fn_80004000", R_PPC_ADDR32).reloc(DATA, 8, "fn_80004000", R_PPC_ADDR32)
+        ours.reloc(TEXT, 0x20, "tblB", R_PPC_ADDR32)
+        write_elf(os.path.join(tmp, "build", "RMHE08", "obj", "t", "two.o"), target.build())
+        write_elf(os.path.join(tmp, "build", "RMHE08", "src", "t", "two.o"), ours.build())
+        before = tree_digest(tmp)
+        two = va.sweep(tmp)
+        rec = two["records"][0]
+        check("two .data ranges: each block's run at its own address, no phantom copy of block B in block A",
+              [(r["address"], r["words"]) for r in two["runs"]], [(0x80050004, 2), (0x80050018, 3)])
+        check("two .data ranges: block A emitted by our one .data; block B referenced through our segment base",
+              [r["verdict"] for r in two["runs"]], ["emitted", "referenced"])
+        check("two .data ranges: each target section is its range's size (no range mismatch)",
+              rec["range_mismatch"], [])
+        check("two .data ranges: section completeness sums the target's two .data (0x30 = ours)",
+              [d for d in rec["sections"] if d["section"] == DATA], [])
+        check("two .data ranges: no violation, and nothing written", (two["violations"], tree_digest(tmp)),
+              ([], before))
 
     # -- (d) the .data emission order ----------------------------------------------------------
     def order_obj(names):

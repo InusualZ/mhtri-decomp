@@ -92,8 +92,8 @@ The canonical table for rules 1-14 is `docs/plan.md` section 6.5; this block is 
   2026-09-26): when the merge brings the batch to symbols the map spells as generated stems, the merger may
   rename, and must then finish the rename's other half (the map **and** every source/header that spells the
   name) inside the merge commit. This is what lets a merge lane land a unit whose registration still rests on
-  the map's `fn_XXXXXXXX` names - the gate refuses a batch that leaves its own unit's symbols generated
-  (`land.py`'s `rule7_defer_growth`), a `rule 7 deferred` comment exempts nothing, and a merge lane is often the only
+  the map's `fn_XXXXXXXX` names - the gate's lint row (`stylelint --diff`) refuses a batch that adds a generated
+  name in `src/`, a `rule 7 deferred` comment exempts nothing, and a merge lane is often the only
   one that can fix it. Derive each name
   from the symbol's own body, mark a thin guess in the unit header, rename the file too when its stem is
   generated, and leave references to **other** units' unrenamed symbols alone. Worked pattern and the three
