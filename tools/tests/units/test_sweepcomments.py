@@ -5,9 +5,11 @@ left."""
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import contextlib
 import io
+import json
 from collections import Counter
 
 from tools.lib import testing
+from tools.lib.binary.build import ElfBuilder
 from tools.units import sweepcomments as sw
 
 TIER = "fixture"
@@ -209,6 +211,87 @@ def test_if0_fixes_census(c):
         c.check("--list-stale prints a total and exits 0", (rc, "total" in out.getvalue()), (0, True))
     finally:
         g.cleanup()
+
+
+def _unit_tree():
+    """A fixture project: `mod/u.c` claims `.text` 0x80001000..0x80001060 (six functions and a label, one function
+    outside) and `.data`; the report scores them 100, 0, unscored, 100, 0, 50 - one row without an address."""
+    t = testing.FixtureTree()
+    t.add_unit("mod/u.c", ranges={".text": (0x80001000, 0x80001060), ".data": (0x80100000, 0x80100010)})
+    names = ["u_init", "u_zero_a", "u_zero_b", "u_done", "u_zero_c", "u_half"]
+    for i, n in enumerate(names):
+        t.add_symbol(n, ".text", 0x80001000 + 0x10 * i, 0x10)
+    t.add_symbol("u_table", ".data", 0x80100000, 0x10, type="object")
+    t.add_symbol("other_fn", ".text", 0x80002000, 0x10)
+    t.add_symbol("u_label", ".text", 0x80001008, 0, type="label")
+    scores = [100.0, 0.0, None, 100.0, 0.0, 50.0]
+    funcs = []
+    for i, (n, s) in enumerate(zip(names, scores)):
+        row = {"name": n, "size": "16"}
+        if s is not None:
+            row["fuzzy_match_percent"] = s
+        if n != "u_zero_b":
+            row["metadata"] = {"virtual_address": str(0x80001000 + 0x10 * i)}
+        funcs.append(row)
+    t.write(t.build_dir / "report.json", json.dumps({"units": [
+        {"name": "main/mod/u", "measures": {"fuzzy_match_percent": 41.67, "total_code": "96"}, "functions": funcs}]}))
+    testing.GitFixture(t.root).init()                    # the CLI's --root resolves a worktree
+    return t
+
+
+def test_unit_facts(c):
+    t = _unit_tree()
+    try:
+        root = str(t.root)
+        f = sw.unit_facts(root, "src/mod/u.c")
+        c.check("RANGE is the splits.txt claim per section",
+                [(r["section"], r["start"], r["end"]) for r in f["ranges"]],
+                [(".text", 0x80001000, 0x80001060), (".data", 0x80100000, 0x80100010)])
+        c.check("the function count is the map's .text functions inside the claim", f["functions"], 6)
+        c.check("the report counts: 2 at 100, 1 partial, 3 at 0 (an unscored row is 0 %)",
+                {k: f["report"][k] for k in ("functions", "full", "partial", "zero")},
+                {"functions": 6, "full": 2, "partial": 1, "zero": 3})
+        z = f["runs"]["zero"]
+        c.check("zero runs are contiguous in address order and a 100 % function ends one; a row without an "
+                "address takes the map's",
+                [(r["first"], r["last"], r["count"], r["start"], r["end"]) for r in z],
+                [("u_zero_a", "u_zero_b", 2, 0x80001010, 0x80001030), ("u_zero_c", "u_zero_c", 1, 0x80001040,
+                                                                       0x80001050)])
+        c.check("a partial run carries its scores", [(r["first"], r["low"], r["high"]) for r in f["runs"]["partial"]],
+                [("u_half", 50.0, 50.0)])
+        c.check("flipcheck's verdict comes through its --json: no object is a blocker",
+                (f["flipcheck"].get("ready"), any("no compiled object" in p for p in f["flipcheck"]["problems"])),
+                (False, True))
+        c.check("the same unit by any spelling", sw.unit_facts(root, "main/mod/u", flip=False)["unit"], "mod/u.c")
+        text = b"\x01" * 0x60
+        data = b"\x02" * 0x10
+        for side in ("obj", "src"):
+            t.add_object("mod/u.o", ElfBuilder().section(".text", text).section(".data", data)
+                         .symbol("u_init", ".text", 0, 0x10, type="func"), side=side)
+        c.check("an object that fills the claim byte for byte reads READY", sw.unit_facts(root, "mod/u")["flipcheck"],
+                {"ready": True, "problems": [], "notes": sw.unit_facts(root, "mod/u")["flipcheck"]["notes"]})
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            rc = sw.TOOL.run(sw.main, ["--root", root, "--unit", "mod/u.c"], parser=sw.build_parser())
+        lines = out.getvalue().splitlines()
+        c.check("the text form: RANGE, the runs with their address spans, the verdict",
+                (rc, lines[1], "    0x80001010..0x80001030  u_zero_a .. u_zero_b (2)" in lines,
+                 "FLIPCHECK  READY" in lines),
+                (0, "RANGE      .text 0x80001000..0x80001060 (0x60), .data 0x80100000..0x80100010 (0x10)", True, True))
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            rc = sw.TOOL.run(sw.main, ["--root", root, "--unit", "mod/u.c", "--json", "--no-flipcheck"],
+                             parser=sw.build_parser())
+        data = json.loads(out.getvalue())
+        c.check("--json carries the same facts; --no-flipcheck skips the call",
+                (rc, data["functions"], len(data["runs"]["zero"]), "flipcheck" in data), (0, 6, 2, False))
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+            rc = sw.TOOL.run(sw.main, ["--root", root, "--unit", "mod/nope.c"], parser=sw.build_parser())
+        c.check("a unit splits.txt does not register cannot run (exit 2)", (rc, "no splits.txt entry" in err.getvalue()),
+                (2, True))
+    finally:
+        t.cleanup()
 
 
 if __name__ == "__main__":

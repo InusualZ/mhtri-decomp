@@ -20,10 +20,11 @@ the repository, so it cannot drift from it.
 
 Your work belongs **only** inside your worktree - the `cwd` you were launched with. `git rev-parse --show-toplevel`
 must end in your slot's directory; if it does not, **STOP and report** rather than working. MAIN's tracked files
-are read-only to you: its `src/`, `docs/`, `tools/`, `config/`, `configure.py`. There is **one**
-exception, and it is not tracked - the campaign's evidence files, `MAIN/.pi/outbox/<slug>.json` and
-`MAIN/.pi/notes/<slug>.md` (`<slug>` is your branch minus `worker/`). Update those; they are what a later session
-reads.
+are read-only to you: its `src/`, `docs/`, `tools/`, `config/`, `configure.py`, and its `.pi/` too. The campaign's
+evidence files are written **in your own worktree**, untracked: `.pi/outbox/<slug>.json` and `.pi/notes/<slug>.md`
+(`<slug>` is your branch minus `worker/`). Update those; the orchestrator copies them into MAIN with
+`python tools/units/slots.py collect --path <your worktree>` before the worktree goes, and they are what a later
+session reads.
 
 A lane that writes to MAIN fails the *next* landing: the gate's first precondition is that main's tree is clean,
 and the row it fails names no one. Two lanes learned this the repeated way; a landing of someone else's work is

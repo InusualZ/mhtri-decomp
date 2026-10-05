@@ -5,11 +5,12 @@
 Rewrites the comment text of `src/**/*.{c,cp,cpp,h,hpp,inc}` (never code, string literals or `#include` lines),
 `configure.py`'s `#` comments and, for paths, the hand-written docs, one operation per run so each lands as its own
 commit. It also counts what is left: the stale-path markers rule 15 refuses and the narrative markers rule 15 counts as advisory.
+`--unit` prints, in one call, the facts a unit header's RANGE and RESIDUALS lines state.
 
 ## Users
 
 The comment sweep's mechanical stage (stage 1); `--list-stale` counts what rule 15 refuses (the same `lib.comments` data); `--markers`
-sizes stage 3's judgement batches.
+sizes stage 3's judgement batches; `--unit` is the header-rewrite lane's read (stage 3) in place of a hand script.
 
 ## CLI
 
@@ -20,12 +21,16 @@ python tools/units/sweepcomments.py --fixes   [--apply]                     # he
 python tools/units/sweepcomments.py --if0     [--apply] [FILE...]           # `#if 0` blocks
 python tools/units/sweepcomments.py --list-stale [--scope src|all] [--top N] [--json]
 python tools/units/sweepcomments.py --markers    [--scope src|all] [--top N] [--json]
+python tools/units/sweepcomments.py --unit UNIT [--unit UNIT ...] [--no-flipcheck] [--json]   # header facts
 python tools/units/sweepcomments.py --selftest
 ```
 Without `--apply` a pass reports what it would change and writes nothing. Exit codes: 0 done (or nothing to do), 1 a
 `--fixes` entry was refused, 2 could not run or no operation named. `--json`: `{op, applied, files_changed,
 lines_removed, lines_rewritten_or_removed, rules, files, refused_protected, dangling_include, unmapped_provenance,
-inherited_kept, inherited_removed, refusals}`; the census: `{scope, totals, files}`.
+inherited_kept, inherited_removed, refusals}`; the census: `{scope, totals, files}`; `--unit`: `{unit, report_name,
+ranges: [{section, start, end, size}], functions, report: {fuzzy_match_percent, functions, full, partial, zero,
+stale} | null, runs: {zero, partial: [{first, last, count, start, end, low, high}]}, flipcheck: {ready, problems,
+notes} | {error}}` (a list for several units). `--unit` exits 0, or 2 for a unit `splits.txt` does not register.
 
 ## Inputs and outputs
 
@@ -74,12 +79,24 @@ Writes only the selected files, byte-exactly (`lib.text.atomic_write`, line endi
   are `lib.comments`' (`STALE_MARKERS`, `HISTORY_MARKERS`, `stale_hits`), the data section 6.5 rule 15 refuses from:
   one copy, re-exported here under the old names.
 * Idempotent: a second run of any pass changes nothing.
+* **`--unit`** (read-only; any spelling `lib.units.stem` reads: `src/mod/x.cpp`, `mod/x`, `main/mod/x`): RANGE is the
+  unit's `splits.txt` block, one `section start..end (size)` per range in file order; the function count is the
+  map's `type:function` rows inside the `.text` ranges; the report half reads `build/RMHE08/report.json`
+  (`lib.report.address_rows`, the 0 % rule: an unscored row is 0 %) and cuts the functions, in address order, into
+  maximal runs of one class - 0 %, partial, 100 % (a 100 % function ends a run) - each printed as
+  `start..end  first .. last (count[, low-high %])`; a row without `metadata.virtual_address` takes the map's
+  address. `STALE` flags a report older than the unit's object. The blockers are flipcheck's own verdict, read
+  from `flipcheck.py --json --root TREE <unit>` (the layering rule forbids a new tool->tool import, so the call
+  is a subprocess on the JSON contract, never a parse of the text) - every ` - ` line, row 36 as its one summary.
+  Measured on `Network/NetworkWiiMediator` (main `6a1c9583a`, MAIN's build copied): `.text 0x80413450..0x80417BC0`,
+  165 functions, 119/12/34 at 100/partial/0 % in 6 zero runs and 8 partial runs, 13 blockers; 2.6 s for it and
+  `Network/net_session_close` together.
 
 ## Lib dependencies
 
 `lib.cli`, `lib.comments` (the census vocabulary and the stale judgement), `lib.cscan`, `lib.facts` (the
-inherited-header decision), `lib.git`, `lib.project.splits`, `lib.repo`
-(`include_spelling`, `moved_header`), `lib.text`.
+inherited-header decision), `lib.git`, `lib.project.splits`, `lib.project.symbols`, `lib.proc`, `lib.report`,
+`lib.repo` (`include_spelling`, `moved_header`), `lib.text`, `lib.units`; `flipcheck.py --json` as a subprocess.
 
 ## Test contract
 
@@ -87,8 +104,12 @@ Tier: fixture (`tools/tests/units/test_sweepcomments.py`: a temp git repo; every
 code/strings/`#include` untouched, CRLF kept, Camellia and record docs excluded, `configure.py` and markdown spellings,
 idempotence; the history rules, the inherited-header pair kept for a unique fact and removed otherwise, the lock keeping
 a line count; the model reproducing every comment shape; the protected refusal; `#if 0`; a fix refused against splits;
-the census). Mutation checks: no lock fails 3 checks, no protected guard 1, no facts gate 1, every include resolving 1,
-`unit_at` ignoring the start address 1.
+the census; `--unit` on a `FixtureTree`: the ranges, the function count with a label in range, the 0 % / partial
+runs with a 100 % function between two zeros and an address-less row, flipcheck's blocker without an object and READY
+with a byte-identical one, the text and JSON forms, exit 2 for an unknown unit). Mutation checks: no lock fails 3
+checks, no protected guard 1, no facts gate 1, every include resolving 1, `unit_at` ignoring the start address 1;
+for `--unit` (52 checks) a 100 % function not ending a run 3, no map address fallback 3, counting every map row in
+range 2, a fixed flipcheck verdict 1, an unscored row read as non-zero 4.
 
 ## Known gaps
 

@@ -1013,7 +1013,11 @@ registry_mod = registry
 
 def unlanded_reason(main: str, n: int) -> str | None:
     """Why slot `n` must NOT be released yet (a dirty tree, or a branch main does not contain); None if clear."""
-    d = slot_dir(main, n)
+    return unlanded_reason_at(main, slot_dir(main, n))
+
+
+def unlanded_reason_at(main: str, d: str) -> str | None:
+    """`unlanded_reason` for any worktree directory `d` (a slot, or a plain worktree a lane ran in)."""
     dirty = slot_dirty(d)
     if dirty:
         return "uncommitted changes (%d row(s), e.g. %s)" % (len(dirty), dirty[0])

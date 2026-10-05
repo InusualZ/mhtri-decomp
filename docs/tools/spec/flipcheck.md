@@ -15,11 +15,16 @@ the landing gate (4); profiles (`.claude/agents`) (8); skills (31); docs (51)
 ```
 python tools/units/flipcheck.py                 # every registered unit
 python tools/units/flipcheck.py <unit> [...]    # named units
+python tools/units/flipcheck.py --verbose <unit> # row 36: one line per force-active symbol after the summary
+python tools/units/flipcheck.py --json [--root TREE] <unit> [...]   # the verdict as data (another tree's files)
 python tools/units/flipcheck.py --selftest      # the link/byte/claim checks, against fixtures only
 ```
-Flags: `--selftest`.
+Flags: `--selftest`, `--verbose`, `--json`, `--root TREE` (`set_root`: every path re-derived from TREE).
 Exit codes: Exit status is non-zero when any unit is not flip-ready.
-`--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
+`--json`: the `lib.findings` schema `{tool, rows, ok, summary}`, one row per unit (FAIL detail = the problems joined
+by `; `, a PASS row's evidence = the notes), plus `units: {unit: {ready, problems, notes}}` and `missing` (a unit
+with no `splits.txt` entry, also a FAIL row); exit 1 when any unit is not ready or missing. `sweepcomments --unit`
+reads it.
 
 ## Inputs and outputs
 
@@ -32,6 +37,7 @@ Inputs -> outputs: src/obj objects, splits, map, link inputs -> reasons, exit.
 * `no compiled object (build/RMHE08/src/<unit>.o) - compile it first` means the object is absent. When the object **is** there but emits none of the sections this check compares (a bodyless unit whose object is `.comment` and nothing else - `NHTTP/NHTTP_os_RVL`), the line says exactly that and names what `splits.txt` claims instead, because the old wording sent lanes into a rebuild loop (`ninja -n` answers "no work to do").
 * A section byte difference prints the **first** differing byte on its own line (unchanged), then the **differing-byte count**, then - when the two sections are the same size and every symbol's bytes match at its *own* address - names the section a **permutation**: the object's layout is the source's definition order, not the address order. That class (`Network/NetworkPat`: 577 of 720 `.text` bytes mislaid, every per-symbol score at 100 %) is invisible to the first-byte line, which reads the same as a three-instruction residual. The same defect got measured with a moved symbol carrying a word of its own too (`NetworkPat`'s three `delete*` functions score 99.7 %, not 100 %), which no lane can act on either, so a fourth line names the weaker case as `the section's layout is a permutation` when the sizes agree, every shared symbol has the same size on both sides, at least one sits at a different address and the mislaid layout accounts for more of the differing bytes than the symbols' own content does.
 * Referenced symbol(s) our object relocates that a flip would leave **undefined**: not defined by our object, no row in `symbols.txt`, no link input other than the target object providing them, and the target object not defining them either (`Network/NetworkWiiMediator`: four constructor names, `undefined: '<name>'` on a flip). This is the general relocation half of a flip check, not just the `@etb_`/`@eti_` fragment class.
+* **Row 36 is one line per unit**: the target-exported symbols our `.comment` leaves un-exported and nothing in the link references are folded into `row 36: N function(s) force-active in retail .comment, not in ours: a, b, c, d, e, f, ... (first 6) - ...; mark each __declspec(export) (--verbose lists all)` (`row36_lines`; `ROW36_FIRST` names). `--verbose` adds the old per-symbol line (`ROW36_SYMBOL_LINE`, the wording `comment_trim_risks` still returns) after it. Measured on `Network/NetworkWiiMediator` at `6a1c9583a`: 22 row-36 lines -> 1 (53 -> 32 output lines for it and `Network/net_session_close`), every other line identical; the gate's `flipcheck_problems` reads the ` - ` lines, so a refusal still names the row.
 * Exit status is non-zero when any unit is not flip-ready.
 
 ## Lib dependencies
@@ -42,6 +48,7 @@ objcompare (sizes, bytes, layout classes, `reloc_facts`, `link_index`, `undefine
 
 Tier: fixture.
 Today's selftest (`tools/units/flipcheck_selftest.py`): No build, no `ninja` and no repository state: every object is a fixture ELF32 big-endian image written by this file, so the contract is pinned - how a `.comment` entry maps to an ELF symbol, that entries are paired by name (the target and our object order their symbol tables differently), that only an *unreferenced* symbol is a trim risk, and that metadata sections, 0-size labels and the reverse flag direction are ignored. The map-symbol check is pinned on the same means: a `@etb_`/`@eti_` symbol only the target defines that *another* linked object references (and no input, ours included, provides) is reported - now as an informational note, because `tools/elf/objextab.py` names those symbols in the build (a current object provides them, and then the check is silent). The three classes a refusal has to tell apart are pinned here too, on fixtures: an object that exists but emits none of the compared sections is *not* "no compiled object" (the wording is asserted verbatim, as is the first-difference line the lanes parse); a same-size section whose symbols all carry their bytes at their own address is named a permutation, and a size/layout/pad/single-symbol difference is not; and a referenced name nothing a flip can use defines is reported while the pinned exemptions (defined here, a map row, another provider, the target's own unresolved reference, the linker script's own symbols) stay silent.
+The row-36 summary is pinned there too (`row36_lines`, and `check` folding eight risks into one line, nine with `verbose`). `--json` and `--root` run end to end in `tools/tests/units/test_sweepcomments.py` (`--unit` on a `FixtureTree`: NOT READY without an object, READY with a byte-identical one).
 Target: `tools/tests/units/test_flipcheck.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
 
 ## Known gaps

@@ -1,5 +1,5 @@
 """Can our object fill every section the unit's splits.txt claims? Sizes, bytes, permutation, undefined refs.
-Spec: docs/tools/spec/flipcheck.md. CLI: flipcheck.py [<unit> ...] | --selftest."""
+Spec: docs/tools/spec/flipcheck.md. CLI: flipcheck.py [<unit> ...] [--verbose] [--json] [--root TREE] | --selftest."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
@@ -8,6 +8,7 @@ import os
 import re
 import sys
 
+from tools.lib import findings as _findings
 from tools.lib import objcompare
 from tools.lib import project as _project  # the splits / map readers
 from tools.lib.lanes.naming import norm_unit  # the one unit spelling rule
@@ -21,6 +22,18 @@ SRC = os.path.join(MAIN, "build", "RMHE08", "src")
 NINJA = os.path.join(MAIN, "build.ninja")
 # the symbol map: a name with a row here is a definition the project has, whatever object emits it
 SYMBOLS = os.path.join(MAIN, "config", "RMHE08", "symbols.txt")
+
+
+def set_root(root: str) -> None:
+    """Read another tree: every path this module reads (`MAIN`, `SPLITS`, `SRC`, `NINJA`, `SYMBOLS`, `LDSCRIPT`) is
+    re-derived from `root`. The default is the tree this file lives in."""
+    global MAIN, SPLITS, SRC, NINJA, SYMBOLS, LDSCRIPT
+    MAIN = os.path.abspath(root)
+    SPLITS = os.path.join(MAIN, "config", "RMHE08", "splits.txt")
+    SRC = os.path.join(MAIN, "build", "RMHE08", "src")
+    NINJA = os.path.join(MAIN, "build.ninja")
+    SYMBOLS = os.path.join(MAIN, "config", "RMHE08", "symbols.txt")
+    LDSCRIPT = os.path.join(MAIN, "build", "RMHE08", "ldscript.lcf")
 
 # Fragments the *compiler* generates as a side effect of the unit's code: the exception tables and the
 # constructor/destructor reference words. A matched unit produces them, so they are part of its match and are
@@ -209,8 +222,9 @@ def provides_global(defined: dict[str, tuple[str, int]], name: str) -> bool:
     return objcompare.provides_global(defined.get(name))
 
 
-def forced_active(path: str = LDSCRIPT) -> set[str]:
+def forced_active(path: str | None = None) -> set[str]:
     """The FORCEACTIVE symbols in the linker script - roots the linker will not deadstrip."""
+    path = LDSCRIPT if path is None else path
     if not os.path.exists(path):
         return set()
     out: set[str] = set()
@@ -352,8 +366,40 @@ def comment_trim_risks(unit: str, obj_path: str, src_path: str,
                        refs: set[str]) -> tuple[list[str], int, bool]:
     """Row 36: target-exported symbols our object leaves un-exported that nothing in the link references.
 
-    Returns (problems, exported symbols examined, whether both `.comment` sections were readable).
+    Returns (problems, exported symbols examined, whether both `.comment` sections were readable): one problem line
+    per symbol, in the target's `.comment` order (`row36_lines` folds them into the one summary line `check` prints).
     """
+    risks, checked, compared = comment_trim_candidates(obj_path, src_path, refs)
+    return [ROW36_SYMBOL_LINE % (unit, name, size) for name, size in risks], checked, compared
+
+
+#: The per-symbol row-36 line (`--verbose`, and `comment_trim_risks`' problems).
+ROW36_SYMBOL_LINE = ("%s: .comment marks %s (0x%X bytes) force-active (0x08) but our object does not, and "
+                     "no code/data relocation in the link references it - the linker will deadstrip it and "
+                     "shift every later section (row 36); mark it __declspec(export)")
+#: How many names the row-36 summary line spells before `...`.
+ROW36_FIRST = 6
+
+
+def row36_lines(unit: str, risks: list[tuple[str, int]], verbose: bool = False) -> list[str]:
+    """The refusal lines for a unit's row-36 trim risks: ONE summary line with the count and the first
+    `ROW36_FIRST` names (a 22-function unit used to print 22 near-identical lines), then - with `verbose` - the
+    per-symbol lines. Nothing when there is no risk."""
+    if not risks:
+        return []
+    names = [name for name, _size in risks]
+    shown = ", ".join(names[:ROW36_FIRST]) + (", ... (first %d)" % ROW36_FIRST if len(names) > ROW36_FIRST else "")
+    out = ["row 36: %d function(s) force-active in retail .comment, not in ours: %s - unreferenced in the link, "
+           "so the linker deadstrips them and shifts every later section; mark each __declspec(export)%s"
+           % (len(names), shown, "" if verbose or len(names) <= ROW36_FIRST else " (--verbose lists all)")]
+    if verbose:
+        out += [ROW36_SYMBOL_LINE % (unit, name, size) for name, size in risks]
+    return out
+
+
+def comment_trim_candidates(obj_path: str, src_path: str,
+                            refs: set[str]) -> tuple[list[tuple[str, int]], int, bool]:
+    """Row 36's judgement: `([(name, size)], exported symbols examined, both `.comment`s readable)`."""
     target = comment_symbols(obj_path)
     ours = comment_symbols(src_path)
     if target is None or ours is None:
@@ -379,15 +425,13 @@ def comment_trim_risks(unit: str, obj_path: str, src_path: str,
             continue                     # already exported
         if name in refs:
             continue                     # referenced from code/data somewhere: the linker keeps it
-        problems.append("%s: .comment marks %s (0x%X bytes) force-active (0x08) but our object does not, and "
-                        "no code/data relocation in the link references it - the linker will deadstrip it and "
-                        "shift every later section (row 36); mark it __declspec(export)"
-                        % (unit, name, entry["size"]))
+        problems.append((name, entry["size"]))
     return problems, checked, True
 
 
 def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
-          link_ctx: dict | None = None, map_rows: set[str] | None = None) -> tuple[list[str], list[str]]:
+          link_ctx: dict | None = None, map_rows: set[str] | None = None,
+          verbose: bool = False) -> tuple[list[str], list[str]]:
     src_path = os.path.join(SRC, unit + ".o")
     target_rel = os.path.normpath(os.path.join("build", "RMHE08", "obj", unit + ".o"))
     obj_path = os.path.join(MAIN, target_rel)
@@ -429,7 +473,8 @@ def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
     # our `.comment` does not force-active. Needs the whole link's reference set, so it is passed in.
     flag_problems, checked, compared = ([], 0, False)
     if refs is not None:
-        flag_problems, checked, compared = comment_trim_risks(unit, obj_path, src_path, refs)
+        risks, checked, compared = comment_trim_candidates(obj_path, src_path, refs)
+        flag_problems = row36_lines(unit, risks, verbose)
     problems += flag_problems
     if compared and not flag_problems:
         notes.append(".comment: no un-exported symbol at deadstrip risk (row 36, %d target-exported symbol(s) "
@@ -454,6 +499,15 @@ def check(unit: str, claim: dict[str, tuple[int, int]], refs: set[str] | None,
     return problems, notes
 
 
+def link_setup() -> tuple[dict | None, set[str] | None, set[str]]:
+    """`(link_ctx, refs, map_rows)` - what `check` needs for the link-wide rows (row 36 and the undefined
+    references); `(None, None, set())` when the link inputs are unknown (no `build.ninja`)."""
+    link_ctx = link_reference_context()
+    if link_ctx is None:
+        return None, None, set()
+    return link_ctx, set(link_ctx["ref_count"]) | forced_active() | set(ENTRY_SYMBOLS), map_symbols()
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description="Is a unit ready to flip to Object(Matching, ...)? Checks the object against the claim "
@@ -461,18 +515,20 @@ def main() -> int:
                     "bytes. The DOL itself remains the only proof.")
     ap.add_argument("units", nargs="*")
     ap.add_argument("--selftest", action="store_true", help="run the self-test and exit")
+    ap.add_argument("--verbose", action="store_true",
+                    help="row 36: one line per force-active symbol after the summary line (default: the summary)")
+    ap.add_argument("--json", action="store_true",
+                    help="the lib.findings schema: one row per unit, plus `units` {unit: {ready, problems, notes}} "
+                         "and `missing`")
+    ap.add_argument("--root", default=None, help="the tree to read (default: the tree this file lives in)")
     args = ap.parse_args()
     if args.selftest:
         from tools.units import flipcheck_selftest
         return flipcheck_selftest.selftest()
+    if args.root:
+        set_root(args.root)
 
-    link_ctx = link_reference_context()
-    if link_ctx is not None:
-        refs = set(link_ctx["ref_count"]) | forced_active() | set(ENTRY_SYMBOLS)
-        map_rows = map_symbols()
-    else:
-        refs = None
-        map_rows = set()
+    link_ctx, refs, map_rows = link_setup()
 
     all_claims = claims()
     if args.units:
@@ -481,10 +537,11 @@ def main() -> int:
             key = norm_unit(u.strip("/"))
             wanted[key] = all_claims.get(key)
         missing = [u for u, c in wanted.items() if c is None]
-        for u in missing:
+        for u in missing if not args.json else ():
             print("%s: no splits.txt entry" % u)
         wanted = {u: c for u, c in wanted.items() if c is not None}
     else:
+        missing = []
         wanted = {}
         for root, _, files in os.walk(SRC):
             for f in sorted(files):
@@ -494,8 +551,13 @@ def main() -> int:
                         wanted[u] = all_claims[u]
 
     bad = 0
+    results = {}
     for unit, claim in sorted(wanted.items()):
-        problems, notes = check(unit, claim, refs, link_ctx, map_rows)
+        problems, notes = check(unit, claim, refs, link_ctx, map_rows, verbose=args.verbose)
+        results[unit] = {"ready": not problems, "problems": problems, "notes": notes}
+        if args.json:
+            bad += bool(problems)
+            continue
         if problems:
             bad += 1
             print("NOT READY  %s" % unit)
@@ -505,6 +567,12 @@ def main() -> int:
             print("READY      %s (%d section(s) match the claim)" % (unit, len(claim)))
             for n in notes:
                 print("   . %s" % n)
+    if args.json:
+        rows = [_findings.Row.check(u, r["ready"], "; ".join(r["problems"]), "; ".join(r["notes"]))
+                for u, r in results.items()]
+        rows += [_findings.Row.check(u, False, "no splits.txt entry") for u in missing]
+        print(_findings.render_json("flipcheck", _findings.Verdict.of(rows), units=results, missing=missing))
+        return 1 if bad or missing else 0
     print("\n%d of %d unit(s) ready" % (len(wanted) - bad, len(wanted)))
     return 1 if bad else 0
 

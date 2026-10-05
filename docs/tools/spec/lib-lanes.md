@@ -35,7 +35,8 @@ lane->wtsafe and slots->lanecmd are gone). Import the module you need; `lanes/__
   steps run at handover; `NINJA_RUNNER` is the test seam), `release_blockers` (a live session, a dirty tree, commits
   no branch reaches), `lock_for_path(main, path)` (the lock of the slot a path is - a spawned lane's claim and unit
   set), `acquire`/`preview`/`release`/`reclaim_verdict`/`reclaim_slot` (a slot on a branch whose tree
-  `merge-tree` proves applied is reclaimed, rescue ref first), `unlanded_reason`.
+  `merge-tree` proves applied is reclaimed, rescue ref first), `unlanded_reason` (a slot) / `unlanded_reason_at` (any
+  worktree directory: the one rule both read).
 * `seed`: `seed_worktree_build` (toolchain and build tree by copy, `orig/` by copy below 64 MB else junctioned, the
   `tools/m2c` submodule, ninja state with `.ninja_deps` re-pointed via `ninja_deps_rewrite`, inputs aged behind the
   outputs), `build_is_current(build_root, input_root)` (the one staleness rule the seeder, the slot guard and

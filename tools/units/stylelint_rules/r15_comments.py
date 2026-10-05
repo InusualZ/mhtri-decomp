@@ -32,8 +32,16 @@ _CLAUSE = r"[^\n%,;.]{0,20}?"
 PERCENT_RE = re.compile(r"\b%s\b%s\d+(?:\.\d+)?[ \t]*%%|\d+(?:\.\d+)?[ \t]*%%%s\b%s\b"
                         % (_SCORE_WORDS, _CLAUSE, _CLAUSE, _SCORE_WORDS), re.I)
 #: A function comment restates its own symbol only when the name is distinctive enough to be the symbol: a short
-#: generic member name (`init`, `draw`) is ordinary prose.
+#: generic member name (`init`, `draw`) is ordinary prose. The qualified (`Type::name`) and mangled (`name__4TypeFv`)
+#: spellings are the symbol at any length.
 SELF_NAME_MIN = 6
+#: A name that is one plain word (`connect`, `receive`, `Release`) is the symbol only where the text spells an
+#: identifier - in backticks or as a call `name(` - since the bare word is the verb the comment means; an
+#: identifier-shaped name (`PatCryptEncrypt`, `net_foo_reset`, `send2`) is the symbol wherever it stands as a word.
+PLAIN_WORD_RE = re.compile(r"[A-Za-z][a-z]*\Z")
+#: A rule-11/13 exemption marker (`/* free: ... */`, `/* untyped: ... */`) is evidence, not a description: it is not
+#: read for its own name.
+MARKER_COMMENT_RE = re.compile(r"/\*+\s*(?:free|untyped):")
 
 # --------------------------------------------------------------------------------------------------
 # the tree the stale-path check asks "does this path exist?" of
@@ -151,10 +159,40 @@ def advisory_findings(src: Source, comments: str, fcomments) -> list[dict]:
         out.append(_r15(src, src.line_of(m.start()), "percent", "a matching percentage in a comment", m.group()))
     for d, start, text in fcomments:
         name = d["name"]
-        if len(name) >= SELF_NAME_MIN and re.search(r"(?<![\w:])%s(?!\w)" % re.escape(name), text):
+        if restates_own_name(name, qualifier_of(d.get("ret", "")), text):
             out.append(_r15(src, src.line_of(start), "self-name",
                             "function comment restates its own symbol `%s`" % name, name))
     return out
+
+
+_QUALIFIER_RE = re.compile(r"([A-Za-z_]\w*)\s*::\s*~?\s*\Z")
+
+
+def qualifier_of(ret: str) -> "str | None":
+    """The class or namespace a definition is qualified with (`void Foo::bar(` -> `Foo`), None for a free name."""
+    m = _QUALIFIER_RE.search(ret)
+    return m.group(1) if m else None
+
+
+def restates_own_name(name: str, qual: "str | None", text: str) -> bool:
+    """Whether a function comment spells the function's own symbol, as a whole word (case-sensitive): the qualified
+    `Type::name` (another class's `Base::name` is not the symbol), the mangling `name__<len><Type>...` (a free name's
+    `name__F...`), or the bare name - an identifier-shaped one anywhere, a plain word only as `` `name` `` or `name(`.
+    A constructor's or destructor's bare name is the class, which a comment may name freely; an exemption marker is
+    never read."""
+    if MARKER_COMMENT_RE.match(text):
+        return False
+    w = re.escape(name)
+    if qual and re.search(r"(?<![\w:])%s\s*::\s*~?%s(?!\w)" % (re.escape(qual), w), text):
+        return True
+    for m in re.finditer(r"(?<![\w:])%s__(\w+)" % w, text):
+        if ("%d%s" % (len(qual), qual) in m.group(1)) if qual else m.group(1).startswith("F"):
+            return True
+    if len(name) < SELF_NAME_MIN or name == qual:
+        return False
+    if PLAIN_WORD_RE.match(name):
+        return bool(re.search(r"`%s[`(]|(?<![\w:`])%s\(" % (w, w), text))
+    return bool(re.search(r"(?<![\w:])%s(?!\w)" % w, text))
 
 
 def findings(src: Source, ownership=None) -> list[dict]:

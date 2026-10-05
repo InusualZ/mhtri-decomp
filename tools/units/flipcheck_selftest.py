@@ -206,6 +206,40 @@ def selftest() -> int:
         expect("trim risk names the symbol and size", ("fn_A" in problems[0], "0x20" in problems[0]), (True, True))
         expect("trim risk mentions the fix", "__declspec(export)" in problems[0], True)
 
+        # 4b. `check` folds the row-36 risks into ONE summary line (count, first six names); `verbose` adds the
+        #     per-symbol lines after it, each the `comment_trim_risks` wording.
+        many = [("fn_%d" % i, 0x10 + i) for i in range(8)]
+        summary = fc.row36_lines("U", many)
+        expect("row 36: one line for eight risks", len(summary), 1)
+        expect("row 36: the line names the count and the first six, then `...`",
+               (summary[0].startswith("row 36: 8 function(s) force-active in retail .comment, not in ours: "
+                                      "fn_0, fn_1, fn_2, fn_3, fn_4, fn_5, ... (first 6)"),
+                "fn_6" in summary[0], "--verbose" in summary[0], "__declspec(export)" in summary[0]),
+               (True, False, True, True))
+        verbose = fc.row36_lines("U", many, verbose=True)
+        expect("row 36 --verbose: the summary then one line per symbol",
+               (len(verbose), verbose[0].split(" - ")[0] == summary[0].split(" - ")[0], verbose[1:]),
+               (9, True, [fc.ROW36_SYMBOL_LINE % ("U", n, s) for n, s in many]))
+        expect("row 36: six or fewer risks are all named, no `...`",
+               ("..." in fc.row36_lines("U", many[:6])[0], "fn_5" in fc.row36_lines("U", many[:6])[0]), (False, True))
+        expect("row 36: no risk, no line", fc.row36_lines("U", []), [])
+        expect("comment_trim_risks keeps the per-symbol wording",
+               problems, [fc.ROW36_SYMBOL_LINE % ("U", "fn_A", 0x20)])
+        saved = (fc.MAIN, fc.SRC)
+        fc.MAIN, fc.SRC = tmp, os.path.join(tmp, "build", "RMHE08", "src")
+        try:
+            for side, flags in (("obj", {n: 0x08 for n, _s in many}), ("src", {})):
+                os.makedirs(os.path.join(tmp, "build", "RMHE08", side, "M"), exist_ok=True)
+                write(os.path.join(tmp, "build", "RMHE08", side, "M"), "u.o",
+                      build_obj([(".text", b"\0" * 0x100)], [(n, s, ".text", 0x12) for n, s in many], flags=flags))
+            claim = {".text": (0x100, 2)}
+            got = fc.check("M/u", claim, set())[0]
+            expect("check: eight row-36 risks are one refusal line", (len(got), got[0].startswith("row 36: 8 ")),
+                   (1, True))
+            expect("check --verbose: summary plus eight", len(fc.check("M/u", claim, set(), verbose=True)[0]), 9)
+        finally:
+            fc.MAIN, fc.SRC = saved
+
         # 5. A 0-size label has nothing to trim.
         zero = write(tmp, "zero.o", target_with_flags({"fn_A": (0x0, ".text", 0x12)}, {"fn_A": 0x08}))
         expect("0-size symbol ignored", fc.comment_trim_risks("U", zero, ours_clear, set())[0], [])

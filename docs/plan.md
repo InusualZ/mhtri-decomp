@@ -275,8 +275,9 @@ a mis-launched lane detects it in its first turn.
   the orchestrator picks the range (`git cherry-pick <merge-base>..worker/<slug>`) rather than silently
   dropping all but the last.
 * **Evidence lives in `MAIN`, not in the worktree.** `.pi/` is a directory inside each worktree, so an outbox or
-  notes file written there is destroyed by `git worktree remove` (or blocks it as untracked). A worker writes
-  `MAIN/.pi/outbox/<slug>.json` and `MAIN/.pi/notes/<slug>.md` — `MAIN` it already resolved — so the evidence
+  notes file written there is destroyed by `git worktree remove` (or blocks it as untracked). A worktree lane
+  writes its own `.pi/outbox/<slug>.json` and `.pi/notes/<slug>.md` (MAIN is read-only to it) and the orchestrator
+  copies them into `MAIN/.pi/` with `slots.py collect --path <worktree>` before the worktree goes, so the evidence
   outlives the worktree. **`<slug>` is the claim's branch minus `worker/`** (`claims.slug_of_branch`), the one rule
   `brief.py`, `handoff.py`, `land.py` and `claims.py` all read: a unit's *path* is not its *name* (`Pl/pl_act` vs
   `pl-act-09c6`), and the two drifted for three commits before the branch-derived form settled it.
