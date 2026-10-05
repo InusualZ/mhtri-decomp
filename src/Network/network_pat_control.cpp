@@ -5574,7 +5574,7 @@ BOOL NetCtrlWk::sendFriendRequest(const NetId* id, const char* message, s8* resu
     work->result_0xC290 = result;
     *result = 0;
     strcpy(work->message_0xBF08, message);
-    getNetworkCommunityPat(getPatsObject(), 0)->sendFriendRequest(&work->request_id_0xC340);
+    getNetworkCommunityPat(getPatsObject(), 0)->blockPlayer(&work->request_id_0xC340);
     return TRUE;
 }
 
@@ -5591,7 +5591,7 @@ BOOL NetCtrlWk::acceptFriendRequest(const NetId* id, s8* result)
     importNetId(&work->request_id_0xC340, id);
     work->result_0xC290 = result;
     *result = 0;
-    getNetworkCommunityPat(getPatsObject(), 0)->acceptFriendRequest(&work->request_id_0xC340);
+    getNetworkCommunityPat(getPatsObject(), 0)->unblockPlayer(&work->request_id_0xC340);
     return TRUE;
 }
 

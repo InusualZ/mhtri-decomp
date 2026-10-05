@@ -221,7 +221,7 @@ void NetworkLayerIdImportFrom(NetworkLayerId* id, u8 kind, const u8* data, u32 s
         getNetworkLogger()->log_14("NetworkLayerIdImportFrom: arg->size is zero.\n");
         return;
     }
-    memset(id, 0, sizeof(id->data_04));
+    memset(id, 0, sizeof(*id));
     id->kind_00 = kind;
     id->pad_01[0] = 0;
     id->pad_01[1] = 0;

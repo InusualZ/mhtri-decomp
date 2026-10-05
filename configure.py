@@ -1968,9 +1968,14 @@ config.libs = [
             # Phase 4 stubs (docs/splits/phase4, window e): units of the reconciled candidate with no bodies yet.
             # Each source's header says what the range is and what is unknown; flags are the lib default, unmeasured.
             # Round 3 recut of the phase 4 stub (unit headers): the community base class and the units after the class.
-            # No bodies yet, so the flags are the lib default, unmeasured.
-            Object(NonMatching, "Network/NetworkCommunity.cpp"),
-            Object(NonMatching, "Network/NetworkCommunityPat.cpp"),
+            # `NetworkCommunity`: `-O3 -inline noauto` like `NetworkLayerPat` - measured over the unit's 27 rows (same
+            # source, peephole off), the lib's `-O4,p -inline auto` scores 67.22 % (5/27 at 100) against 99.97 % (26/27).
+            Object(NonMatching, "Network/NetworkCommunity.cpp",
+                   cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
+            # `NetworkCommunityPat`: the same flags - measured over the unit's 87 rows, `-O4,p -inline auto` scores 84.24 %
+            # (4/87 at 100) against 99.97 % (84/87).
+            Object(NonMatching, "Network/NetworkCommunityPat.cpp",
+                   cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
             Object(NonMatching, "Network/NetworkFetcherBase.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             Object(NonMatching, "Network/NetworkFileFetcher.cpp",

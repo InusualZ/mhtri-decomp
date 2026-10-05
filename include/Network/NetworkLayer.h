@@ -9,13 +9,13 @@
 
 #include "types.h"
 
-/* The 0x44-byte layer user id `NetworkLayerIdImportFrom`/`NetworkLayerIdExportTo` fill and read (their own log
- * strings name them): an id kind (1..5) and up to 0x40 id bytes. */
+/* The 0x40-byte layer user id `NetworkLayerIdImportFrom`/`NetworkLayerIdExportTo` fill and read (their own log
+ * strings name them): an id kind (1..5) and up to 0x3C id bytes. */
 typedef struct NetworkLayerId {
     /* +0x00 */ u8 kind_00;
     /* +0x01 */ u8 pad_01[0x03];
-    /* +0x04 */ u8 data_04[0x40];
-} NetworkLayerId;   /* size: 0x44 */
+    /* +0x04 */ u8 data_04[0x3C];
+} NetworkLayerId;   /* size: 0x40 (the importer's memset; at most 0x3C id bytes are copied in or out) */
 
 class NetworkLayer;
 struct NetworkLayerRequest;
