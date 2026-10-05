@@ -33,6 +33,7 @@
  *   from the slot offset or the field it touches (GUESS).
  */
 #include "Network/NetworkLayer.h"                /* the unit's own header: the layer base class and its free functions */
+#include "Network/NetworkLayerPat.h"             /* NetLayerRequest, NetFriendRec - the records the free functions copy */
 #include "Network/NetworkSessionManager.h"       /* networkInstance_initMutex - the record's mutex */
 #include "unsplit/Network.h"                     /* getNetworkLogger, dtor_803CA338 - no registered owner */
 #include "Runtime.PPCEABI.H/memcpy.h"
@@ -273,6 +274,35 @@ BOOL NetworkUniqueIdEquals(const NetworkLayerId* a, const NetworkLayerId* b)
         return memcmp(a, b, 0x40) == 0;
     }
     return FALSE;
+}
+
+/* Clears a layer request record: the count, the items, the unique id, the text and the flag. */
+void initNetLayerRequest(NetLayerRequest* request)
+{
+    request->count_0x00 = 0;
+    memset(request->items_0x04, 0, sizeof(request->items_0x04));
+    request->id_34.clear();
+    memset(request->text_54, 0, sizeof(request->text_54));
+    memset(&request->flag_68, 0, sizeof(request->flag_68));
+}
+
+/* Copies a layer request record field by field (the unique id through its own copy). */
+void copyNetLayerRequest(NetLayerRequest* dst, const NetLayerRequest* src)
+{
+    dst->count_0x00 = src->count_0x00;
+    memcpy(dst->items_0x04, src->items_0x04, sizeof(dst->items_0x04));
+    dst->id_34.copyFrom((const u8*)&src->id_34);
+    memcpy(dst->text_54, src->text_54, sizeof(dst->text_54));
+    memcpy(&dst->flag_68, &src->flag_68, sizeof(dst->flag_68));
+}
+
+/* Copies a friend record: the unique id through its own copy, the name, the flag and the valid byte. */
+void copyNetFriendRec(NetFriendRec* dst, const NetFriendRec* src)
+{
+    dst->id_0x00.copyFrom((const u8*)&src->id_0x00);
+    memcpy(dst->name_0x20, src->name_0x20, sizeof(dst->name_0x20));
+    memcpy(&dst->flag_0x34, &src->flag_0x34, sizeof(dst->flag_0x34));
+    dst->valid_0x35 = src->valid_0x35;
 }
 
 #pragma dont_inline on

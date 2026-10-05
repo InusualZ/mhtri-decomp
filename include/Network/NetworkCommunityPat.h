@@ -17,10 +17,6 @@
 #include "Network/NetworkLayer.h"       /* NetworkLayerId - the peer record embeds one */
 #include "menu/movie.h"                 /* NetworkFriendInfo - the record a friend entry ends with */
 
-/* The network id the friend requests take (defined in `Network/NetworkLayerPat.h`; only its address crosses the calls
- * below, so the name is enough and this header stays free of the session types). */
-typedef struct NetId NetId;
-
 /* The roster block `NetCtrlWk::roster_sync_0x61CC` holds (defined by the work record header). */
 struct NetRosterSync;
 
@@ -206,13 +202,13 @@ public:
     /* 0x803F10E4 - sends the friend roster held at `roster` (`NetCtrlWk::roster_sync_0x61CC`). */
     void syncFriends(NetRosterSync* roster);
     /* 0x803F1204 - sends an invite to `id`; `kind` is the invite type. */
-    void inviteFriend(const NetId* id, s32 kind);
+    void inviteFriend(const NetworkUniqueId* id, s32 kind);
     /* 0x803F129C - removes `id` from the friend list. */
-    void removeFriend(const NetId* id);
+    void removeFriend(const NetworkUniqueId* id);
     /* 0x803F139C - adds `id` to the server's block list (Pat request 283, BlackAdd). */
-    void blockPlayer(const NetId* id);
+    void blockPlayer(const NetworkUniqueId* id);
     /* 0x803F1424 - removes `id` from the server's block list (Pat request 285, BlackDelete). */
-    void unblockPlayer(const NetId* id);
+    void unblockPlayer(const NetworkUniqueId* id);
     /* 0x803F1324 - requests the block list (once). */
     void requestBlockList(void);
 

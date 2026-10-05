@@ -386,7 +386,7 @@ void NetworkCommunityPat::sendFriendMessage(const NetworkUniqueId* id, const cha
     }
 }
 
-void NetworkCommunityPat::inviteFriend(const NetId* id, s32 kind)
+void NetworkCommunityPat::inviteFriend(const NetworkUniqueId* id, s32 kind)
 {
     NetworkCommunityPatRequest* req;
 
@@ -399,7 +399,7 @@ void NetworkCommunityPat::inviteFriend(const NetId* id, s32 kind)
     }
 }
 
-void NetworkCommunityPat::removeFriend(const NetId* id)
+void NetworkCommunityPat::removeFriend(const NetworkUniqueId* id)
 {
     NetworkCommunityPatRequest* req;
 
@@ -425,7 +425,7 @@ void NetworkCommunityPat::requestBlockList(void)
     }
 }
 
-void NetworkCommunityPat::blockPlayer(const NetId* id)
+void NetworkCommunityPat::blockPlayer(const NetworkUniqueId* id)
 {
     NetworkCommunityPatRequest* req;
 
@@ -438,7 +438,7 @@ void NetworkCommunityPat::blockPlayer(const NetId* id)
     }
 }
 
-void NetworkCommunityPat::unblockPlayer(const NetId* id)
+void NetworkCommunityPat::unblockPlayer(const NetworkUniqueId* id)
 {
     NetworkCommunityPatRequest* req;
 

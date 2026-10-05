@@ -35,6 +35,8 @@ void fn_8004030C(struct _MH_VEC2* v);
 struct _MH_VEC2;
 void get_ScreenSize(_MH_VEC2* v);
 int ck_WideMode(void);
+/* 0x8003FBFC `check_change_widemode_flag__Fv` - whether a video-mode change was requested. */
+u8 check_change_widemode_flag(void);
 #endif
 
 #endif /* MHTRI_MAIN_H */

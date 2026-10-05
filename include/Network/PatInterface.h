@@ -540,7 +540,6 @@ struct PatMatchOptions;
 typedef struct PatCircleFilter PatCircleFilter;   /* include/Network/NetworkSessionManager.h */
 
 typedef struct PatCircleInfo PatCircleInfo;       /* include/Network/NetworkSessionManager.h */
-typedef struct NetworkWiiMediatorFields NetworkWiiMediatorFields;   /* include/Network/NetworkWiiMediator.h */
 class NetworkWiiMediator;                         /* include/Network/NetworkWiiMediator.h */
 class NetworkReflectService;                      /* include/Network/NetworkReflectService.h */
 
@@ -1028,6 +1027,9 @@ s32  resetNetworkState(NetworkInstance* self);
 s32  advanceNetworkState5(NetworkInstance* self);
 /* 0x803FE95C - one step of the login sub-machine; nonzero once it has finished. */
 s32  handleNetworkState1(NetworkInstance* self);
+/* 0x804004C8 / 0x804004D8 - the FMP list query's reset and one step of it (`NetworkLayerPat::handleServerList`). */
+s32  resetNetworkState4(NetworkInstance* self);
+s32  handleNetworkState4(NetworkInstance* self, s32 arg);
 
 /* The band's request-header constants (no registered owner; declared, never defined - playbook 29).
  * `sessionTimeoutParam`/`Param2` are the bytes {1,2,3}, `requestHeaderWord0`/`Word1` the 8-byte block
@@ -1051,6 +1053,28 @@ s32 handleNetworkState2Binary(NetworkInstance* self);
 
 /* 0x803FFF50 - sends the check request: two tag bytes and a packed record of `size` bytes. */
 s32 sendReqUnknownCheck(NetworkInstance* self, const u8* tags, const u8* data, u32 size);
+
+/* 0x803FE03C - keeps the selected FMP slot and its reserve record while the server type is 1, else -1
+ * (GUESS name, NetworkLayerPat's handleServerSelect calls it before another server is chosen). */
+s32 saveFmpSelection(NetworkInstance* self);
+/* 0x803FE154 - while the server type is 1, whether the PAT phase reads 5, else -1 (GUESS name: the caller reports
+ * the layer's server-rejected error when it is non-zero). */
+s32 isFmpServerRejected(NetworkInstance* self);
+/* 0x803FE5A0 - appends one tagged item (`type` 0..9; a value pointer, plus `size` for the sized kind) to an item list
+ * (GUESS name, the `createItemListStack`/`releaseItemListStack` siblings' scheme). */
+void appendItemList(NetworkStateMachine* self, PatItemList* list, u8 tag, u8 type, const u8* value, u16 size);
+/* 0x80401BD4 */
+u32 sendReqLayerUserListHead(NetworkInstance* self, u8 kind, const u8* path, u32 first, u32 count);
+/* 0x80401D30 */
+u32 sendReqLayerUserSearchHead(NetworkInstance* self, u8 kind, const u8* path, u32 first, u32 count, const char* userId, const char* name, const NetLayerFilter* filters, s32 filterCount);
+/* 0x80401EC8 - sends op 154: the sender's compound record and the item list, the shape `recvNtcLayerBinary` reads
+ * (name from that receiver). */
+u32 sendNtcLayerBinary(NetworkInstance* self, PatItemList list);
+/* 0x80403460 - packs (from, to, state) as four items and sends them with `sendNtcLayerBinary` (GUESS name: the
+ * caller is NetworkLayerPat's NAT pair-state update). */
+void sendNtcLayerBinaryNatState(NetworkInstance* self, u32 from, u32 to, s8 state);
+/* 0x804037EC */
+u32 sendReqUserSearchHead(NetworkInstance* self, u32 kind, u32 count, const char* userId, const char* name, const NetLayerFilter* filters, s32 filterCount, u8 flag);
 
 #ifdef __cplusplus
 }

@@ -884,9 +884,7 @@ extern "C" {
 /* defined here */
 s32 resetNetworkState(NetworkInstance* self);
 s32 resetNetworkState3(NetworkInstance* self);
-s32 resetNetworkState4(NetworkInstance* self);
 s32 handleNetworkState1(NetworkInstance* self);
-s32 handleNetworkState4(NetworkInstance* self, s32 arg);
 s32 advanceNetworkState5(NetworkInstance* self);
 s32 sendReqServerTime(NetworkInstance* self);
 s32 sendReqShut(NetworkInstance* self, s32 mode);
@@ -1288,12 +1286,12 @@ s32 handleNetworkState2(NetworkInstance* self)
     case 110:
         setConnectionPaths((NetworkInstance*)getInstance(), st->userIdText_82D5,
                            st->userPasswordText_8301);
-        setMediatorState68A((NetworkWiiMediatorFields*)getInstance(), 0);
+        setMediatorState68A(getInstance(), 0);
         st->requestState_6135 = 10;
         break;
     case 120:
         st->loginInfoSent_82B4 = 3;
-        setMediatorState68A((NetworkWiiMediatorFields*)getInstance(), 0);
+        setMediatorState68A(getInstance(), 0);
         st->requestState_6135 = 10;
         break;
     case 230:
@@ -1336,7 +1334,7 @@ s32 handleNetworkState2Fmp(NetworkInstance* self)
             } else {
                 u8 mediatorState;
 
-                getMediatorState68A((NetworkWiiMediatorFields*)getInstance(), &mediatorState);
+                getMediatorState68A(getInstance(), &mediatorState);
                 if (mediatorState == 1) {
                     st->requestState_6135 = 100;
                     break;

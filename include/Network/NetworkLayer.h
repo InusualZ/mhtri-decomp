@@ -20,12 +20,12 @@ typedef struct NetworkLayerId {
 class NetworkLayer;
 struct NetworkLayerRequest;
 /* The records the pure slots take, defined beside the class that implements them (include/Network/NetworkLayerPat.h). */
-struct NetId;
 struct NetUserFields;
 struct NetUserPosition;
-struct NetCityRec;
+struct NetServerRec;
 struct NetLayerSettings;
 struct NetLayerRequest;
+class NetworkUniqueId;     /* include/Network/NetworkUniqueId.h */
 struct NetworkErrorInfo;   /* the 12-byte error record - Network/gamespy_interface_types.h */
 typedef struct NetworkRequestError NetworkRequestError;   /* include/unsplit/Network.h */
 
@@ -101,7 +101,7 @@ public:
     virtual void shutdown_20();   /* +0x020 */
     virtual void requestServers_24(s32 count);   /* +0x024 */
     virtual void selectServer_28(s32 id);   /* +0x028 */
-    virtual void readServerId_2C(NetId* id) = 0;                 /* +0x02C */
+    virtual void readServerId_2C(NetworkUniqueId* id) = 0;              /* +0x02C */
     virtual void readServerName_30(char* out, s32 size) = 0;     /* +0x030 */
     virtual void readServerText_34(char* out, s32 size) = 0;     /* +0x034 */
     virtual void request_38();                     /* +0x038 */
@@ -124,7 +124,7 @@ public:
     virtual void request_7C(u32 a, u32 b);         /* +0x07C */
     virtual void request_80(u32 a);                /* +0x080 */
     virtual void requestAccount_84(s32 kind);   /* +0x084 */
-    virtual void readSelectedServer_88(NetCityRec* out) = 0;                 /* +0x088 */
+    virtual void readSelectedServer_88(NetServerRec* out) = 0;               /* +0x088 */
     virtual void exportLayerId_8C(NetworkLayerId* out) = 0;                  /* +0x08C */
     virtual void readUserName_90(char* out, s32 size) = 0;                   /* +0x090 */
     virtual void setComment_94(const char* text) = 0;                        /* +0x094 */
@@ -150,7 +150,7 @@ public:
     virtual BOOL isFriendTransferActive_E4(s8 slot) = 0;                     /* +0x0E4 */
     virtual BOOL isFriendTransferReady_E8(s8 slot) = 0;                      /* +0x0E8 */
     virtual u8 getFriendFlagC084_EC(s8 slot) = 0;                            /* +0x0EC */
-    virtual u8 getFriendTransferFlag_F0(s8 slot) = 0;                        /* +0x0F0 */
+    virtual BOOL getFriendTransferFlag_F0(s8 slot) = 0;                      /* +0x0F0 */
     virtual s32 handleConnect(NetworkLayerRequest* request) = 0;          /* +0x0F4 - `request_1C` */
     virtual s32 handleDisconnect(NetworkLayerRequest* request) = 0;       /* +0x0F8 - `request_20` */
     virtual s32 handleServerList(NetworkLayerRequest* request) = 0;       /* +0x0FC - `request_24` */
@@ -186,6 +186,7 @@ public:
 };   /* size: 0x1C0 (the derived constructor's first member array starts at +0x1C8) */
 
 typedef struct NetLayerRequest NetLayerRequest;   /* include/Network/NetworkLayerPat.h */
+struct NetFriendRec;                               /* include/Network/NetworkLayerPat.h */
 
 #ifdef __cplusplus
 extern "C" {
@@ -197,11 +198,14 @@ void NetworkLayerIdImportFrom(NetworkLayerId* id, u8 kind, const u8* data, u32 s
 void NetworkLayerIdExportTo(const NetworkLayerId* id, u8* out, u32 size);
 BOOL NetworkUniqueIdEquals(const NetworkLayerId* a, const NetworkLayerId* b);
 
-/* 0x803DFC34 - initialises a layer request record. */
+/* 0x803DFC34 - clears a layer request record (the unique id through its +0x18 `clear`). */
 void initNetLayerRequest(NetLayerRequest* request);
 /* 0x803DFCA8 (GUESS) - copies a layer request record (`NetworkLayerPat::submitRequest_9C`/`submitSelect_A4` store
  * theirs with it): the count, the items, the embedded unique id (through its +0x28 `copyFrom`) and the tail. */
 void copyNetLayerRequest(NetLayerRequest* dst, const NetLayerRequest* src);
+/* 0x803DFD2C (GUESS) - copies a friend record (`NetworkLayerPat::handleUserList` splits the friend list with it): the
+ * unique id through its own copy, the name and the two flag bytes. */
+void copyNetFriendRec(NetFriendRec* dst, const NetFriendRec* src);
 
 #ifdef __cplusplus
 }

@@ -2,8 +2,8 @@
  * Network/NetworkWiiMediator.cpp - the `NetworkWiiMediator` unit (`.text` 0x80413450..0x80417BC0).
  *
  * ROUND 3 FOLD (network pilot).  One TU: the mediator head 0x80413450..0x80413C64 (`mediatorEventCallback`, the
- * constructor 0x80413480, the destructor helpers, `getReflectService`, `isMaintenanceMode`, `getReflectEventId`,
- * `getLanguage` - formerly the tail of `Network/network_layer_io.cpp`, no bodies yet), the class band
+ * constructors and destructors, `getReflectService`, `update`, `isMaintenanceMode`, `getReflectEventId`,
+ * `getLanguage` - formerly the tail of `Network/network_layer_io.cpp`), the class band
  * 0x80413C64..0x804155D4 (the original text below) and the opening part 0x804155D4..0x80417BC0 (the former unit
  * `Network/network_opening.cpp`, folded in byte-identical - its header follows the class band's, below).  Evidence:
  * the band's `.data` (the three jump tables, the opening strings and the two mediator tables 0x80602968/0x80602978)
@@ -12,10 +12,22 @@
  * 0x80413384: `NetworkRandom`'s table 0x806024A0 precedes the first jump table 0x806024B8, so `NetworkRandom`
  * (0x80413384..0x80413450) is `Network/NetworkPool.cpp`'s.  Sections: extab 0x8001C9B4..0x8001CD94,
  * extabindex 0x8003D278..0x8003D764, .rodata 0x80570E70..0x80570E98, .data 0x806024B8..0x80602988, .sdata2
- * 0x8079C874..0x8079C878.  The two tables are claimed (data closure: only the head reads them) and stay
- * unemitted until the constructor and destructor are written (rule 10: the class then emits them).
+ * 0x8079C874..0x8079C878.
  * The opening part keeps its file-scope pragmas (`auto_inline off`, `pool_data off`, peephole) from where it
  * starts, so the class band above it compiles as before.
+ *
+ * THE HEAD'S CLASSES (round 4).  `NetworkMediator` (table 0x80602978: its destructor 0x804136D0 and a pure `update`)
+ * and `NetworkWiiMediator : NetworkMediator` (table 0x80602968: its destructor 0x80413724 and `update` 0x804138EC),
+ * with the terms object `PatTerms` (`menu/PatTerms.h`, constructor/destructor in `menu/menu_plsearch.cpp`) as the
+ * member at +0x6DD8; this unit emits both tables (the `.data` claim is byte-complete).  `NetworkMediator` is a GUESS
+ * from the `sNetworkLibrary`/`sNetworkLibraryWii` pairing; `update`, `deleteNetworkPool` and the `flag_21` setters
+ * `enableMediatorLinkError`/`disableMediatorLinkError` are GUESSes from the bodies.
+ * The constructors and destructors sit under `#pragma peephole off` (retail stages the table address in r0 and keeps
+ * `extsh`+`cmpwi` on the destructor flag).
+ * The `.sdata2` claim starts at 0x8079C870 (the constructor's `0.0f`, then `initMediatorTerms`'s `1.0f`; NetworkPool's
+ * only pool read is 0x8079C868).  Head residuals: `isMaintenanceMode`, `getReflectEventId`, `getLanguage`, 0x80413980/0x80413A34 (the five 4-byte words copied in
+ * and out), 0x80413B18 (the SO link check) are unwritten (their SC/SO callees have no
+ * declaration a consumer can include yet).
  *
  * THE CLASS BAND (0x80413C64..0x804155D4) - its notes as written before the fold:
  *
@@ -224,6 +236,11 @@
 #include "MSL_C/alloc.h"                   /* memmove, snprintf */
 #include "MSL/strlen.h"
 
+/* The console's bus clock in Hz (low memory 0x800000F8), spelled exactly as `unsplit/OS.h` defines `OS_BUS_CLOCK`:
+   that header clashes with this unit's includes (its thread prototypes), so the one-line spelling is kept locally. */
+#define OS_BUS_CLOCK (*(u32*)0x800000F8)
+
+
 /* The reflect sub-service the mediator starts, stops and agrees through is `NetworkReflectService`
  * (`Network/NetworkReflectService.h`): this band dispatches into its `+0x08` slot and allocates it with
  * `new` - its out-of-line constructor keeps the allocation alive across the call (the `mr r31,r3` of
@@ -239,37 +256,37 @@
 void* operator new(unsigned long size);   /* untyped: allocation returns a raw byte range */
 
 extern "C" {
-void initializeNetworkMediator(NetworkWiiMediatorFields* self, u32 value);
+void initializeNetworkMediator(NetworkWiiMediator* self, u32 value);
 
-u32   getMediatorField24(NetworkWiiMediatorFields* self);
+u32   getMediatorField24(NetworkWiiMediator* self);
 u8    getNetworkPoolProgress(NetworkPool* self);
 u8    getPatOpeningState(PatInterface* self);
 void  setNetworkPoolTimestamp(NetworkPool* self, u64 value);
 u64   getNetworkPoolTimestamp(NetworkPool* self);
-s32   getAccountQuery1(NetworkWiiMediatorFields* self);
-s32   getAccountQuery2(NetworkWiiMediatorFields* self);
-s32   getAccountQuery3(NetworkWiiMediatorFields* self);
-s32   getAccountQuery4(NetworkWiiMediatorFields* self);
-s32   getAccountQuery5(NetworkWiiMediatorFields* self);
+s32   getAccountQuery1(NetworkWiiMediator* self);
+s32   getAccountQuery2(NetworkWiiMediator* self);
+s32   getAccountQuery3(NetworkWiiMediator* self);
+s32   getAccountQuery4(NetworkWiiMediator* self);
+s32   getAccountQuery5(NetworkWiiMediator* self);
 
 s32  getReflectModeFromLanguage();
-u64  updateServerTime(NetworkWiiMediatorFields* self);
-u64  setServerTimeResult(NetworkWiiMediatorFields* self);
-s32  queryOpeningFlag208(NetworkWiiMediatorFields* self);
-s32  queryOpeningFlag250(NetworkWiiMediatorFields* self);
-s32  queryOpeningFlag290(NetworkWiiMediatorFields* self);
+u64  updateServerTime(NetworkWiiMediator* self);
+u64  setServerTimeResult(NetworkWiiMediator* self);
+s32  queryOpeningFlag208(NetworkWiiMediator* self);
+s32  queryOpeningFlag250(NetworkWiiMediator* self);
+s32  queryOpeningFlag290(NetworkWiiMediator* self);
 char* getReflectPageText(char* self, char* out, u32 size);
-void getMediaVersionString(NetworkWiiMediatorFields* self, char* out, u32 size);
-void getStr1String(NetworkWiiMediatorFields* self, char* out, u32 size);
-void updatePatField854(NetworkWiiMediatorFields* self, u32 value);
-void updatePatField860(NetworkWiiMediatorFields* self, u32 value);
-s32  isNameSymbolChar(NetworkWiiMediatorFields* self, char value);
-s32  isShiftJisLeadByte(NetworkWiiMediatorFields* self, u8 value);
-void parseReflectLines(NetworkWiiMediatorFields* self, s32 source);
-s32  parseReflectPacket(NetworkWiiMediatorFields* self, char* out, const char* in, u32 unused4,
+void getMediaVersionString(NetworkWiiMediator* self, char* out, u32 size);
+void getStr1String(NetworkWiiMediator* self, char* out, u32 size);
+void updatePatField854(NetworkWiiMediator* self, u32 value);
+void updatePatField860(NetworkWiiMediator* self, u32 value);
+s32  isNameSymbolChar(NetworkWiiMediator* self, char value);
+s32  isShiftJisLeadByte(NetworkWiiMediator* self, u8 value);
+void parseReflectLines(NetworkWiiMediator* self, s32 source);
+s32  parseReflectPacket(NetworkWiiMediator* self, char* out, const char* in, u32 unused4,
                         u32 length, s32 allowSymbolMap);
-s32  validateReflectName(NetworkWiiMediatorFields* self, const char* name);
-s32  buildReflectPacket(NetworkWiiMediatorFields* self, const char* text, s32* skipCount, s32* flags);
+s32  validateReflectName(NetworkWiiMediator* self, const char* name);
+s32  buildReflectPacket(NetworkWiiMediator* self, const char* text, s32* skipCount, s32* flags);
 
 /* The singleton's Pat surface is declared in `Network/PatInterface.h`, the reflect service's in
  * `Network/NetworkReflectService.h` and the layer queries in `Network/PatInterface.h`. */
@@ -282,6 +299,161 @@ s32  buildReflectPacket(NetworkWiiMediatorFields* self, const char* text, s32* s
 static inline PatInterface* getPatInstance(void)
 {
     return (PatInterface*)getInstance_();
+}
+
+extern "C" {
+
+/* Forwards a Pat interface event to the mediator the callback was installed with. */
+void mediatorEventCallback(u32 code, s32 a, s32 b, s32 c, const union GameSpyEventMsg* msg,
+                           NetworkWiiMediator* mediator)
+{
+    mediator->applyEvent(code, a, b, c, msg);
+}
+
+}
+
+/* The head keeps retail's unfused forms (the table address staged in r0, the destructors' extsh+cmpwi). */
+#pragma peephole off
+
+/* Builds the mediator: the terms object, every buffer and table cleared, the default term/maintenance texts and
+   the four transfer slots closed and emptied. */
+NetworkWiiMediator::NetworkWiiMediator()
+{
+    s32 slot;
+
+    memset(cleared_004, 0, 4);
+    memset(cleared_008, 0, 4);
+    memset(cleared_00C, 0, 4);
+    memset(cleared_010, 0, 4);
+    memset(cleared_014, 0, 4);
+    flag_1C = 0;
+    flag_1D = 0;
+    flag_1E = 0;
+    flag_1F = 0;
+    field_28 = 0;
+    field_2C = 0;
+    field_30 = 0;
+    field_34 = 22;
+    field_38 = 5;
+    memset(reflect_name_3C, 0, 32);
+    memset(reflect_name_5C, 0, 32);
+    memset(buffer_A, 0, 262);
+    memset(buffer_B, 0, 262);
+    memset(name_buffer_68B, 0, 256);
+    memset(field_288, 0, 1026);
+    flag_68A = 0;
+    flag_78B = 0;
+    flag_78C = 0;
+    library_started = 0;
+    flag_21 = 0;
+    field_24 = 0;
+    memset(reflect_page, 0, 1024);
+    memset(&terms_default, 0, 1);
+    memset(&maintenance_default, 0, 1);
+    memset(single_line_buffer, 0, 1);
+    memset(line_table_a, 0, 4096);
+    memset(line_table_b, 0, 4096);
+    memset(line_table_c, 0, 4);
+    pat_terms_ptr = (u32)&terms_default;
+    pat_maintenance_ptr = (u32)&maintenance_default;
+    pat_terms_size = 1;
+    pat_maintenance_size = 1;
+    memset(game_info, 0, 36);
+    memset(game_info_name, 0, 17);
+    memset(game_info_secret, 0, 17);
+    memset(game_info_title, 0, 52);
+    closeTransferSlots();
+    for (slot = 0; slot < 4; slot++) {
+        clearTransferQueue(slot);
+    }
+    transfer_mode = 0;
+    transfer_flag_6DD1 = 1;
+    transfer_flag_6DD2 = 1;
+    transfer_level = 0.0f;
+}
+
+/* The interface owns nothing. */
+NetworkMediator::~NetworkMediator()
+{
+}
+
+/* Builds the interface (its table alone). */
+NetworkMediator::NetworkMediator()
+{
+}
+
+/* Tears the network down in order: the Pat interface, the reflect service, the GameSpy worker thread (waiting
+   while it still runs), the terms check (waiting until it finishes) and the network pool. */
+NetworkWiiMediator::~NetworkWiiMediator()
+{
+    if (getInstance_() != NULL) {
+        PatInterface_clear(getInstance_());
+        delete getInstance_();
+    }
+    if (getReflectService() != NULL) {
+        finalizeReflectService(getReflectService());
+        delete getReflectService();
+    }
+    if (GameSpyInterfaceThread::getInstance() != NULL) {
+        while (GameSpyInterfaceThread::getInstance()->requestClose()) {
+            OSSleepTicks(17 * (s64)(OS_BUS_CLOCK / 4 / 1000));
+        }
+        delete GameSpyInterfaceThread::getInstance();
+    }
+    if (getPatTerms() != NULL) {
+        requestPatTermsCheck(getPatTerms());
+        while (updatePatTerms(getPatTerms()) == 0) {
+            OSSleepTicks(17 * (s64)(OS_BUS_CLOCK / 4 / 1000));
+        }
+    }
+    deleteNetworkPool();
+}
+
+#pragma peephole on
+
+extern "C" {
+
+/* The reflect service singleton (null until `reflectInit` builds it). */
+NetworkReflectService* getReflectService(void)
+{
+    return sNetworkReflectService;
+}
+
+}
+
+/* The per-frame step: the network pool and the terms object first, then the opening stop or start the flags
+   request, or else the reflect service. */
+void NetworkWiiMediator::update()
+{
+    if (getNetworkPool() != NULL) {
+        getNetworkPool()->update();
+    }
+    if (getPatTerms() != NULL) {
+        updatePatTerms(getPatTerms());
+    }
+    if (flag_1D != 0) {
+        openingStop();
+    } else if (flag_1C != 0) {
+        openingStart();
+    } else if (getReflectService() != NULL) {
+        updateReflectService(getReflectService());
+    }
+}
+
+extern "C" {
+
+/* Makes the link check (0x80413B18) report the link as down (error 0x80000008, code 93) without asking SO. */
+void enableMediatorLinkError(NetworkWiiMediator* self)
+{
+    self->flag_21 = 1;
+}
+
+/* Lets the link check ask SO again. */
+void disableMediatorLinkError(NetworkWiiMediator* self)
+{
+    self->flag_21 = 0;
+}
+
 }
 
 /* retired Network/NetworkWiiMediator.c, carried across verbatim (100 %) */
@@ -321,7 +493,7 @@ void NetworkWiiMediator::reflectFinal()
 #pragma peephole off
 s32  NetworkWiiMediator::getOpeningProgress()
 {
-    NetworkWiiMediatorFields* self = (NetworkWiiMediatorFields*)this;
+    NetworkWiiMediator* self = (NetworkWiiMediator*)this;
     if (self->flag_1C != 0) {
         self->flag_1E = self->flag_1C;
     }
@@ -374,7 +546,7 @@ s32  NetworkWiiMediator::isOpeningAnnounce()
 }
 char* NetworkWiiMediator::getAccountBan(char* out, u32 size)
 {
-    NetworkWiiMediatorFields* self = (NetworkWiiMediatorFields*)this;
+    NetworkWiiMediator* self = (NetworkWiiMediator*)this;
     if (size != 0) {
         u32 length = (size < 1024) ? size - 1 : 1023;
         memcpy(out, self->reflect_page, length);
@@ -384,7 +556,7 @@ char* NetworkWiiMediator::getAccountBan(char* out, u32 size)
 }
 char* NetworkWiiMediator::getAccountWarning(char* out, u32 size)
 {
-    NetworkWiiMediatorFields* self = (NetworkWiiMediatorFields*)this;
+    NetworkWiiMediator* self = (NetworkWiiMediator*)this;
     if (size != 0) {
         u32 length = (size < 1024) ? size - 1 : 1023;
         memcpy(out, self->reflect_page, length);
@@ -394,7 +566,7 @@ char* NetworkWiiMediator::getAccountWarning(char* out, u32 size)
 }
 char* NetworkWiiMediator::getAccountWaitQueue(char* out, u32 size)
 {
-    NetworkWiiMediatorFields* self = (NetworkWiiMediatorFields*)this;
+    NetworkWiiMediator* self = (NetworkWiiMediator*)this;
     if (size != 0) {
         u32 length = (size < 1024) ? size - 1 : 1023;
         memcpy(out, self->reflect_page, length);
@@ -545,62 +717,62 @@ s32 getReflectModeFromLanguage()
         return 12;
     }
 }
-void setMediatorBufferA(NetworkWiiMediatorFields* self, const u8* src)
+void setMediatorBufferA(NetworkWiiMediator* self, const u8* src)
 {
     if (src == NULL) {
         return;
     }
     memcpy(self->buffer_A, src, 262);
 }
-void getMediatorBufferA(NetworkWiiMediatorFields* self, u8* dst)
+void getMediatorBufferA(NetworkWiiMediator* self, u8* dst)
 {
     if (dst == NULL) {
         return;
     }
     memcpy(dst, self->buffer_A, 262);
 }
-void setMediatorBufferB(NetworkWiiMediatorFields* self, const u8* src)
+void setMediatorBufferB(NetworkWiiMediator* self, const u8* src)
 {
     if (src == NULL) {
         return;
     }
     memcpy(self->buffer_B, src, 262);
 }
-void getMediatorBufferB(NetworkWiiMediatorFields* self, u8* dst)
+void getMediatorBufferB(NetworkWiiMediator* self, u8* dst)
 {
     if (dst == NULL) {
         return;
     }
     memcpy(dst, self->buffer_B, 262);
 }
-void getMediatorNameBuffer(NetworkWiiMediatorFields* self, u32* out1, u8* out2)
+void getMediatorNameBuffer(NetworkWiiMediator* self, u32* out1, u8* out2)
 {
     *out1 = (u32)&self->name_buffer_68B;
     *out2 = self->flag_78B;
 }
-void setMediatorFlag78B(NetworkWiiMediatorFields* self, u8 value)
+void setMediatorFlag78B(NetworkWiiMediator* self, u8 value)
 {
     self->flag_78B = value;
 }
-void getMediatorField288(NetworkWiiMediatorFields* self, u32* out)
+void getMediatorField288(NetworkWiiMediator* self, u32* out)
 {
     *out = (u32)&self->field_288;
 }
-void setMediatorFlag78C(NetworkWiiMediatorFields* self, u8 value)
+void setMediatorFlag78C(NetworkWiiMediator* self, u8 value)
 {
     self->flag_78C = value;
 }
-void getMediatorFlag78C(NetworkWiiMediatorFields* self, u8* out)
+void getMediatorFlag78C(NetworkWiiMediator* self, u8* out)
 {
     *out = self->flag_78C;
 }
-void resetMediatorState(NetworkWiiMediatorFields* self)
+void resetMediatorState(NetworkWiiMediator* self)
 {
     initializeNetworkMediator(self, 0);
 }
 /* Builds the Pat interface the opening reads through, spawns the GameSpy worker thread if it is not
  * running, then points the two Pat buffer slots at this mediator's term/maintenance blocks. */
-void initializeNetworkMediator(NetworkWiiMediatorFields* self, u32 value)
+void initializeNetworkMediator(NetworkWiiMediator* self, u32 value)
 {
     if (getPatInstance() == NULL) {
         new PatInterface();
@@ -614,7 +786,7 @@ void initializeNetworkMediator(NetworkWiiMediatorFields* self, u32 value)
     setPatRange(getPatInstance(), 2, self->pat_maintenance_ptr, self->pat_maintenance_size);
     self->field_24 = value;
 }
-void resetMediatorFlags(NetworkWiiMediatorFields* self)
+void resetMediatorFlags(NetworkWiiMediator* self)
 {
     self->flag_1C = 1;
     self->flag_1E = 0;
@@ -622,7 +794,7 @@ void resetMediatorFlags(NetworkWiiMediatorFields* self)
     self->flag_68A = 0;
     self->flag_21 = 0;
 }
-void resetMediatorFlag1D(NetworkWiiMediatorFields* self)
+void resetMediatorFlag1D(NetworkWiiMediator* self)
 {
     self->flag_1D = 1;
     self->flag_1C = 0;
@@ -648,24 +820,24 @@ void loadPatInterfaceBuffers()
     PatInterface* instance = getPatInstance();
     delete instance;
 }
-u32 getMediatorField24(NetworkWiiMediatorFields* self) { return self->field_24; }
+u32 getMediatorField24(NetworkWiiMediator* self) { return self->field_24; }
 u8 getNetworkPoolProgress(NetworkPool* self) { return self->progress; }
 u8 getPatOpeningState(PatInterface* self) { return self->opening_state; }
-void updatePatInterface180(NetworkWiiMediatorFields* self, u32 a, u32 b, u32 c)
+void updatePatInterface180(NetworkWiiMediator* self, u32 a, u32 b, u32 c)
 {
     (void)self;
     if (getPatInstance() != NULL) {
         updatePatInterface(getPatInstance(), a, b, c);
     }
 }
-void updateTermVersion(NetworkWiiMediatorFields* self, u32 value)
+void updateTermVersion(NetworkWiiMediator* self, u32 value)
 {
     (void)self;
     if (getPatInstance() != NULL) {
         setTermVersion(getPatInstance(), value);
     }
 }
-void updateOpeningState(NetworkWiiMediatorFields* self, u32 slot, u32 address, u32 size)
+void updateOpeningState(NetworkWiiMediator* self, u32 slot, u32 address, u32 size)
 {
     if (slot == 2) {
         if (getPatInstance() != NULL) {
@@ -681,7 +853,7 @@ void updateOpeningState(NetworkWiiMediatorFields* self, u32 slot, u32 address, u
     self->pat_terms_ptr = address;
     self->pat_terms_size = size;
 }
-u64 updateServerTime(NetworkWiiMediatorFields* self)
+u64 updateServerTime(NetworkWiiMediator* self)
 {
     if (getPatInstance() != NULL) {
         u32 seconds = getServerTime(getPatInstance());
@@ -695,7 +867,7 @@ u64 updateServerTime(NetworkWiiMediatorFields* self)
  * mediator has none yet.  The fallback lands in the *high* half of the 64-bit value, the way the
  * retail code builds it (`li r3,0` + `mr r4,<result>`). */
 #pragma peephole off
-u64 setServerTimeResult(NetworkWiiMediatorFields* self)
+u64 setServerTimeResult(NetworkWiiMediator* self)
 {
     (void)self;
     if (getPatInstance() != NULL) {
@@ -714,7 +886,7 @@ u64 getNetworkPoolTimestamp(NetworkPool* self)
 {
     return self->timestamp;
 }
-void setMediatorState68A(NetworkWiiMediatorFields* self, u8 value)
+void setMediatorState68A(NetworkWiiMediator* self, u8 value)
 {
     if ((u32)value == 0 && getNetworkPool() != NULL) {
         setNetworkPoolTimestamp(getNetworkPool(), 0);
@@ -726,11 +898,11 @@ void setNetworkPoolTimestamp(NetworkPool* self, u64 value)
 {
     self->timestamp = value;
 }
-void getMediatorState68A(NetworkWiiMediatorFields* self, u8* out)
+void getMediatorState68A(NetworkWiiMediator* self, u8* out)
 {
     *out = self->flag_68A;
 }
-s32 queryOpeningFlag208(NetworkWiiMediatorFields* self)
+s32 queryOpeningFlag208(NetworkWiiMediator* self)
 {
     (void)self;
     if (getPatInstance() != NULL) {
@@ -738,7 +910,7 @@ s32 queryOpeningFlag208(NetworkWiiMediatorFields* self)
     }
     return 0;
 }
-s32 queryOpeningFlag250(NetworkWiiMediatorFields* self)
+s32 queryOpeningFlag250(NetworkWiiMediator* self)
 {
     (void)self;
     if (getPatInstance() != NULL) {
@@ -746,7 +918,7 @@ s32 queryOpeningFlag250(NetworkWiiMediatorFields* self)
     }
     return 0;
 }
-s32 queryOpeningFlag278(NetworkWiiMediatorFields* self)
+s32 queryOpeningFlag278(NetworkWiiMediator* self)
 {
     (void)self;
     if (getPatInstance() != NULL) {
@@ -754,7 +926,7 @@ s32 queryOpeningFlag278(NetworkWiiMediatorFields* self)
     }
     return 0;
 }
-s32 queryOpeningFlag290(NetworkWiiMediatorFields* self)
+s32 queryOpeningFlag290(NetworkWiiMediator* self)
 {
     (void)self;
     if (getPatInstance() != NULL) {
@@ -762,7 +934,7 @@ s32 queryOpeningFlag290(NetworkWiiMediatorFields* self)
     }
     return 0;
 }
-s32 queryOpeningFlag2A8(NetworkWiiMediatorFields* self)
+s32 queryOpeningFlag2A8(NetworkWiiMediator* self)
 {
     (void)self;
     if (getPatInstance() != NULL) {
@@ -770,7 +942,7 @@ s32 queryOpeningFlag2A8(NetworkWiiMediatorFields* self)
     }
     return 0;
 }
-s32 queryOpeningFlag2C0(NetworkWiiMediatorFields* self)
+s32 queryOpeningFlag2C0(NetworkWiiMediator* self)
 {
     (void)self;
     if (getPatInstance() != NULL) {
@@ -778,11 +950,11 @@ s32 queryOpeningFlag2C0(NetworkWiiMediatorFields* self)
     }
     return 0;
 }
-s32 getAccountQuery1(NetworkWiiMediatorFields* self) { (void)self; return 0; }
-s32 getAccountQuery2(NetworkWiiMediatorFields* self) { (void)self; return 0; }
-s32 getAccountQuery3(NetworkWiiMediatorFields* self) { (void)self; return 0; }
-s32 getAccountQuery4(NetworkWiiMediatorFields* self) { (void)self; return 0; }
-s32 getAccountQuery5(NetworkWiiMediatorFields* self) { (void)self; return 0; }
+s32 getAccountQuery1(NetworkWiiMediator* self) { (void)self; return 0; }
+s32 getAccountQuery2(NetworkWiiMediator* self) { (void)self; return 0; }
+s32 getAccountQuery3(NetworkWiiMediator* self) { (void)self; return 0; }
+s32 getAccountQuery4(NetworkWiiMediator* self) { (void)self; return 0; }
+s32 getAccountQuery5(NetworkWiiMediator* self) { (void)self; return 0; }
 char* getReflectPageText(char* self, char* out, u32 size)
 {
     if (size != 0) {
@@ -792,7 +964,7 @@ char* getReflectPageText(char* self, char* out, u32 size)
     }
     return self + 0x78D;
 }
-char* getAccountName(NetworkWiiMediatorFields* self, char* out, u32 size)
+char* getAccountName(NetworkWiiMediator* self, char* out, u32 size)
 {
     (void)self;
     if (getPatInstance() != NULL) {
@@ -808,7 +980,7 @@ char* getAccountName(NetworkWiiMediatorFields* self, char* out, u32 size)
     }
     return 0;
 }
-s32 getWarningUInt(NetworkWiiMediatorFields* self)
+s32 getWarningUInt(NetworkWiiMediator* self)
 {
     (void)self;
     if (getPatInstance() != NULL) {
@@ -816,15 +988,15 @@ s32 getWarningUInt(NetworkWiiMediatorFields* self)
     }
     return 0;
 }
-void getReflectPageRange(NetworkWiiMediatorFields* self, u32* out1, u32* out2)
+void getReflectPageRange(NetworkWiiMediator* self, u32* out1, u32* out2)
 {
     *out1 = self->field_28;
     *out2 = self->field_2C;
 }
-void getReflectField30(NetworkWiiMediatorFields* self, u32* out) { *out = self->field_30; }
-void getReflectField34(NetworkWiiMediatorFields* self, u32* out) { *out = self->field_34; }
-void getReflectField38(NetworkWiiMediatorFields* self, u32* out) { *out = self->field_38; }
-void getReflectName3C(NetworkWiiMediatorFields* self, char* out, u32 size)
+void getReflectField30(NetworkWiiMediator* self, u32* out) { *out = self->field_30; }
+void getReflectField34(NetworkWiiMediator* self, u32* out) { *out = self->field_34; }
+void getReflectField38(NetworkWiiMediator* self, u32* out) { *out = self->field_38; }
+void getReflectName3C(NetworkWiiMediator* self, char* out, u32 size)
 {
     if (size != 0) {
         u32 length = (size < 32) ? size - 1 : 31;
@@ -832,7 +1004,7 @@ void getReflectName3C(NetworkWiiMediatorFields* self, char* out, u32 size)
         out[length] = 0;
     }
 }
-void getMediaVersionString(NetworkWiiMediatorFields* self, char* out, u32 size)
+void getMediaVersionString(NetworkWiiMediator* self, char* out, u32 size)
 {
     (void)self;
     u32 length = 0;
@@ -845,7 +1017,7 @@ void getMediaVersionString(NetworkWiiMediatorFields* self, char* out, u32 size)
         out[length] = 0;
     }
 }
-void getStr1String(NetworkWiiMediatorFields* self, char* out, u32 size)
+void getStr1String(NetworkWiiMediator* self, char* out, u32 size)
 {
     (void)self;
     u32 length = 0;
@@ -858,7 +1030,7 @@ void getStr1String(NetworkWiiMediatorFields* self, char* out, u32 size)
         out[length] = 0;
     }
 }
-void getReflectName5C(NetworkWiiMediatorFields* self, char* out, u32 size)
+void getReflectName5C(NetworkWiiMediator* self, char* out, u32 size)
 {
     if (size != 0) {
         u32 length = (size < 32) ? size - 1 : 31;
@@ -866,7 +1038,7 @@ void getReflectName5C(NetworkWiiMediatorFields* self, char* out, u32 size)
         out[length] = 0;
     }
 }
-void setReflectPageRange(NetworkWiiMediatorFields* self, u32 address, u32 size)
+void setReflectPageRange(NetworkWiiMediator* self, u32 address, u32 size)
 {
     if (getPatInstance() != NULL) {
         setPatReflectPageRange(getPatInstance(), address, size);
@@ -874,28 +1046,28 @@ void setReflectPageRange(NetworkWiiMediatorFields* self, u32 address, u32 size)
     self->field_28 = address;
     self->field_2C = size;
 }
-void setReflectField30(NetworkWiiMediatorFields* self, u32 value)
+void setReflectField30(NetworkWiiMediator* self, u32 value)
 {
     if (getPatInstance() != NULL) {
         setPatReflectField30(getPatInstance(), value);
     }
     self->field_30 = value;
 }
-void setReflectField34(NetworkWiiMediatorFields* self, u32 value)
+void setReflectField34(NetworkWiiMediator* self, u32 value)
 {
     if (getPatInstance() != NULL) {
         setPatReflectField34(getPatInstance(), value);
     }
     self->field_34 = value;
 }
-void setReflectField38(NetworkWiiMediatorFields* self, u32 value)
+void setReflectField38(NetworkWiiMediator* self, u32 value)
 {
     if (getPatInstance() != NULL) {
         setPatReflectField38(getPatInstance(), value);
     }
     self->field_38 = value;
 }
-void setReflectName3C(NetworkWiiMediatorFields* self, char* name)
+void setReflectName3C(NetworkWiiMediator* self, char* name)
 {
     if (getPatInstance() != NULL) {
         setPatReflectName3C(getPatInstance(), name);
@@ -904,7 +1076,7 @@ void setReflectName3C(NetworkWiiMediatorFields* self, char* name)
     memcpy((char*)&self->reflect_name_3C, name, length);
     ((char*)&self->reflect_name_3C)[length] = 0;
 }
-void setReflectName5C(NetworkWiiMediatorFields* self, char* name)
+void setReflectName5C(NetworkWiiMediator* self, char* name)
 {
     if (getPatInstance() != NULL) {
         setPatReflectName5C(getPatInstance(), name);
@@ -913,21 +1085,21 @@ void setReflectName5C(NetworkWiiMediatorFields* self, char* name)
     memcpy((char*)&self->reflect_name_5C, name, length);
     ((char*)&self->reflect_name_5C)[length] = 0;
 }
-void updatePatField854(NetworkWiiMediatorFields* self, u32 value)
+void updatePatField854(NetworkWiiMediator* self, u32 value)
 {
     (void)self;
     if (getPatInstance() != NULL) {
         setPatField854(getPatInstance(), value);
     }
 }
-void updatePatField860(NetworkWiiMediatorFields* self, u32 value)
+void updatePatField860(NetworkWiiMediator* self, u32 value)
 {
     (void)self;
     if (getPatInstance() != NULL) {
         setPatField860(getPatInstance(), (const char*)value);
     }
 }
-s32 isShiftJisLeadByte(NetworkWiiMediatorFields* self, u8 value)
+s32 isShiftJisLeadByte(NetworkWiiMediator* self, u8 value)
 {
     (void)self;
     if ((value >= 129 && value <= 159) || (value >= 224 && value <= 239)) {
@@ -936,7 +1108,7 @@ s32 isShiftJisLeadByte(NetworkWiiMediatorFields* self, u8 value)
     return 0;
 }
 #pragma peephole off
-s32 isNameSymbolChar(NetworkWiiMediatorFields* self, char value)
+s32 isNameSymbolChar(NetworkWiiMediator* self, char value)
 {
     (void)self;
     u8 symbol = (u8)value;
@@ -949,7 +1121,7 @@ s32 isNameSymbolChar(NetworkWiiMediatorFields* self, char value)
     return 1;
 }
 #pragma peephole on
-void parseReflectLines(NetworkWiiMediatorFields* self, s32 source)
+void parseReflectLines(NetworkWiiMediator* self, s32 source)
 {
     char** table;
     s32 count;
@@ -1004,7 +1176,7 @@ void parseReflectLines(NetworkWiiMediatorFields* self, s32 source)
 /* Decodes one reflect reply packet at `in` into `out`: the 0xC3 lead-byte escapes, the
  * lower-case -> upper-case fold, and the symbol map the reflect service keys on.  Returns the number
  * of bytes written (0 or 1 has no meaning here: 1 for a decoded byte, 2 for a two-byte escape). */
-s32 parseReflectPacket(NetworkWiiMediatorFields* self, char* out, const char* in, u32 unused4,
+s32 parseReflectPacket(NetworkWiiMediator* self, char* out, const char* in, u32 unused4,
                        u32 length, s32 allowSymbolMap)
 {
     (void)self;
@@ -1064,7 +1236,7 @@ s32 parseReflectPacket(NetworkWiiMediatorFields* self, char* out, const char* in
 }
 
 #pragma peephole off
-s32 validateReflectName(NetworkWiiMediatorFields* self, const char* name)
+s32 validateReflectName(NetworkWiiMediator* self, const char* name)
 {
     const char* cursor;
     s32 count;
@@ -1080,7 +1252,7 @@ s32 validateReflectName(NetworkWiiMediatorFields* self, const char* name)
 /* Scans one reflected name and reports the shape the reflect service has to be told about: the
  * characters a `*`-escape covers go into `skipCount` and the matched escape into `flags`, so the
  * caller knows which of the four name forms the text is.  Returns the character count left over. */
-s32 buildReflectPacket(NetworkWiiMediatorFields* self, const char* text, s32* skipCount, s32* flags)
+s32 buildReflectPacket(NetworkWiiMediator* self, const char* text, s32* skipCount, s32* flags)
 {
     (void)self;
     s32 count = 0;
@@ -1138,6 +1310,15 @@ s32 buildReflectPacket(NetworkWiiMediatorFields* self, const char* text, s32* sk
 #pragma peephole off
 #pragma auto_inline off
 #pragma pool_data off
+
+/* Finalizes the network pool singleton, then deletes it. */
+void NetworkWiiMediator::deleteNetworkPool()
+{
+    if (getNetworkPool() != NULL) {
+        getNetworkPool()->destroySession();
+        delete getNetworkPool();
+    }
+}
 
 /* Starts the EC sequence on the pool singleton, refused while the opening runs. */
 void NetworkWiiMediator::ECStart()
@@ -1458,7 +1639,7 @@ s32 NetworkWiiMediator::pushTransferRecord(s8 slot, const u8* data, s32 size)
 
 /* Takes the oldest record of the slot's queue into `out` (when it fits in `max` bytes) and returns its
  * length; also ages the slot's activity, re-judging it every 15 polls. */
-u16 NetworkWiiMediator::popTransferRecord(s8 slot, u8* out, s32 max)
+s32 NetworkWiiMediator::popTransferRecord(s8 slot, u8* out, s32 max)
 {
     u16 length;
     s32* queued;

@@ -150,15 +150,6 @@ typedef struct GameSpyResultInfo {
     /* +0x08 */ GameSpyAddress address_08;
 } GameSpyResultInfo;   /* size: 0x10 */
 
-/* the id pair `fn_8041D530` starts a NAT negotiation from */
-typedef struct GameSpyPeerId {
-    /* +0x00 */ u32 peerId_00;
-    /* +0x04 */ u32 mode_04;
-    /* +0x08 */ u32 session_08;
-    /* +0x0C */ u16 port_0C;
-    /* +0x0E */ u16 pad_0E;
-} GameSpyPeerId;   /* size: 0x10 */
-
 /* the peer thread's NAT-negotiation record (`sNatNegState`) */
 typedef struct GameSpyNegotiation {
     /* +0x00 */ u32 active_00;

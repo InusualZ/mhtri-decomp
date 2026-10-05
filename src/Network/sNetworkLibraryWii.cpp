@@ -255,7 +255,7 @@ void sNetworkLibraryWii::final()
         setLastError(0x80000007, 0x4D, result);
     }
     if (mpMediator != NULL) {
-        delete (NetworkWiiMediatorDispatch*)mpMediator;
+        delete mpMediator;
         mpMediator = NULL;
     }
     sNetworkLibrary::final();

@@ -15,8 +15,9 @@
 #include "Network/NetworkUniqueId.h"         /* NetworkUniqueId - the server id member */
 #include "Network/gamespy_interface_types.h" /* NetworkErrorInfo - the kept session error (owner Network/GameSpyInterfaceThread.cpp) */
 
-/* The 10-byte network user id the friend/peer code copies and compares (`importNetId` imports one,
- * `isSameNetId` compares two, `formatNetId` renders one as text).  size: 0xA */
+/* The exported form of a network id: the bytes `NetworkUniqueId::exportTo` writes (`formatNetId` renders ten of them,
+ * the peer records keep that text) and `importNetId`/`isSameNetId` read back (six raw bytes, kind 3).  The id object
+ * itself is `NetworkUniqueId` (include/Network/NetworkUniqueId.h).  size: 0xA */
 typedef struct NetId {
     /* +0x00 */ char text_0x00[0xA];
 } NetId; /* size: 0xA */
@@ -30,12 +31,21 @@ typedef struct NetLayerRequestItem {
     /* +0x08 */ s32 value_0x08;
 } NetLayerRequestItem; /* size: 0xC */
 
-/* The request record `NetworkLayerPat::submitRequest_9C`/`submitSelect_A4` take (initialised by
- * `initNetLayerRequest`): a count and up to four items.  size: 0x34 */
-typedef struct NetLayerRequest {
+/* The request record `NetworkLayerPat::submitRequest_9C`/`submitSelect_A4` take (`initNetLayerRequest` clears it,
+ * `copyNetLayerRequest` copies it field by field): a count and up to four items, the unique id and the text a select
+ * searches for, and a flag byte.  The id makes it a class the compiler builds (implicit constructor 0x803E1230,
+ * destructor 0x803E0FBC). */
+struct NetLayerRequest {
     /* +0x00 */ s32 count_0x00;
     /* +0x04 */ NetLayerRequestItem items_0x04[4];
-} NetLayerRequest; /* size: 0x34 */
+    /* +0x34 */ NetworkUniqueId id_34;      /* `NetCtrlWk::submitIdSelect` imports the id it selects */
+    /* +0x54 */ char text_54[0x14];        /* `NetCtrlWk::submitTextSelect` copies the text it selects */
+    /* +0x68 */ u8 flag_68;
+    /* +0x69 */ u8 pad_69[0x3];
+
+    NetLayerRequest();    /* 0x803E1230 - called out of line by the layer's and the work record's constructors */
+    ~NetLayerRequest();   /* 0x803E0FBC */
+};   /* size: 0x6C (the layer keeps two at a 0x6C stride, +0xF0C4 and +0xF130) */
 
 /* The settings record `NetworkLayerPat::submitSettings_98` takes: a count of four and four
  * (enabled, value) pairs.  size: 0x24 */
@@ -70,6 +80,27 @@ typedef struct NetCityRec {
     /* +0x7A */ u8 pad_0x7A[0x2];
 } NetCityRec; /* size: 0x7C */
 
+/* One server the server list reports (`exportServerRec` fills it from an FMP slot; GUESS on the names of the three
+ * words, the slot's own). */
+struct NetServerRec {
+    /* +0x00 */ u32 id_00;
+    /* +0x04 */ char name_04[0x20];   /* 31 characters of the slot's name and a terminator */
+    /* +0x24 */ char text_24[0x1];    /* the exporter copies `sizeof - 1` = 0 bytes and terminates it */
+    /* +0x25 */ u8 pad_25[0x3];
+    /* +0x28 */ u32 done_28;
+    /* +0x2C */ u32 total_2C;
+    /* +0x30 */ u32 value_30;
+    /* +0x34 */ u8 pad_34[0x4];
+    /* +0x38 */ u64 time_38;
+};   /* size: 0x40 (the stride `handleServerList` fills) */
+
+/* The server list `handleServerList` reports: a count and up to 80 servers. */
+struct NetServerList {
+    /* +0x000 */ u32 count_000;
+    /* +0x004 */ u8 pad_004[0x4];
+    /* +0x008 */ NetServerRec entries_008[80];
+};   /* size: 0x1408 */
+
 /* The city list: a count and the 40 entries (`NetworkLayerPat::cities_540`).  size: 0x1364 */
 typedef struct NetCityList {
     /* +0x000 */ u32 count_0x000;
@@ -92,41 +123,77 @@ typedef struct NetRoomList {
     /* +0x004 */ NetRoomRec entries_0x004[40];
 } NetRoomList; /* size: 0x1CC4 */
 
-/* One 0x38-byte entry of the layer's friend id table (`NetCtrlWk::hasFriendDetail` searches it by id). */
-typedef struct NetFriendRec {
-    /* +0x00 */ NetId id_0x00;
-    /* +0x0A */ u8 pad_0x0A[0x16];
-    /* +0x20 */ u8 data_0x20[0x14];   /* cleared and copied with the id (`clearFriendRec`, `copyNetFriendRec`) */
+/* One 0x38-byte entry of the layer's friend id table (`NetCtrlWk::hasFriendDetail` searches it by id): the friend's
+ * unique id, its name and two flags.  The id is a real `NetworkUniqueId`, so the compiler builds and destroys each
+ * entry (constructor 0x803E1180, destructor 0x803E0E94). */
+struct NetFriendRec {
+    /* +0x00 */ NetworkUniqueId id_0x00;
+    /* +0x20 */ char name_0x20[0x14];   /* cleared and copied with the id (`clearFriendRec`, `copyNetFriendRec`) */
     /* +0x34 */ u8 flag_0x34;
     /* +0x35 */ u8 valid_0x35;
     /* +0x36 */ u8 pad_0x36[0x2];
 
-    /* The id at +0x00 is a `NetworkUniqueId` (the table's element constructor 0x803E1180 builds one there); the field
-     * keeps the consumers' `NetId` spelling, and the layer reaches the object through this view. */
-    NetworkUniqueId* address() { return (NetworkUniqueId*)&this->id_0x00; }
-} NetFriendRec; /* size: 0x38 */
+    NetFriendRec();
+    ~NetFriendRec();   /* out of line: `NetFriendEntry`'s destructor calls it (an implicit one is inlined) */
+};   /* size: 0x38 */
 
-/* The friend id table: a count and the 100 entries (`NetworkLayerPat::friends_3568`).  size: 0x15E4 */
-typedef struct NetFriendTable {
-    /* +0x000 */ s32 count_0x000;
+/* The friend id table: a count and the 100 entries (`NetworkLayerPat::friends_3568`).  Its constructor 0x803E1264 and
+ * destructor 0x803E101C are called out of line (`handleUserList`, `NetCtrlWk`'s constructor), so they are declared and
+ * defined in `src/Network/NetworkLayerPat.cpp` rather than left implicit (MWCC inlines an implicit one).  size: 0x15E4 */
+struct NetFriendTable {
+    /* +0x000 */ u32 count_0x000;   /* unsigned: `handleUserList` compares it with `cmplw` */
     /* +0x004 */ NetFriendRec entries_0x004[100];
-} NetFriendTable; /* size: 0x15E4 */
 
-/* One 0x24-byte friend session record (only the state word `clearFriendSlot` clears is named). */
+    NetFriendTable();
+    ~NetFriendTable();
+};   /* size: 0x15E4 */
+
+/* One 0x24-byte friend session record, paired with the friend of the same index: whether the friend is online and
+ * the two packed words the friend list view shows (`NetCtrlWk::copyFriendList`). */
 typedef struct NetFriendSession {
-    /* +0x00 */ u32 state_00;
-    /* +0x04 */ u8 pad_04[0x20];
-} NetFriendSession;   /* size: 0x24 */
+    /* +0x00 */ s32 state_00;    /* non-zero = online (`clearFriendSlot` clears it) */
+    /* +0x04 */ u8 pad_04[0x4];
+    /* +0x08 */ u32 status_08;   /* the top byte is the status the view shows */
+    /* +0x0C */ u8 pad_0C[0x4];
+    /* +0x10 */ u32 area_10;     /* the top half is the area the view shows */
+    /* +0x14 */ u8 pad_14[0x10];
+} NetFriendSession;   /* size: 0x24 (the 36 bytes `handleUserList` copies per entry) */
 
-/* One 0x104-byte detail record paired with the friend of the same index (GUESS on the base: only the
- * flag byte at +0x101 is read). */
+/* A friend roster: the friend table and the session record of each friend (GUESS on the name) - the payload
+ * `handleUserList` builds on its stack and reports (the event's record is the roster's address, the sessions follow the
+ * table at +0x15E4).  The layer (+0x3568) and every community record (+0x11C) hold the same two runs as separate members. */
+struct NetFriendRoster {
+    /* +0x0000 */ NetFriendTable table_0000;
+    /* +0x15E4 */ NetFriendSession sessions_15E4[100];
+};   /* size: 0x23F4 */
+
+/* One 0x104-byte detail record paired with the friend of the same index (GUESS on the names: only the state word
+ * `clearFriendSlot` clears and the flag byte `NetCtrlWk::hasFriendDetail` reads are named). */
 typedef struct NetFriendDetail {
-    /* +0x000 */ u8 pad_0x000[0x4];
-    /* +0x004 */ u32 state_0x004;   /* cleared with the friend slot (`clearFriendSlot`) */
-    /* +0x008 */ u8 pad_0x008[0xF9];
-    /* +0x101 */ u8 flag_0x101;
-    /* +0x102 */ u8 pad_0x102[0x2];
+    /* +0x000 */ u32 state_0x000;   /* cleared with the friend slot (`clearFriendSlot`) */
+    /* +0x004 */ u8 pad_0x004[0xF9];
+    /* +0x0FD */ u8 flag_0x0FD;
+    /* +0x0FE */ u8 pad_0x0FE[0x6];
 } NetFriendDetail; /* size: 0x104 */
+
+/* The friend event `pollFriendSlot` reports (event 6): the friend record and its detail record (GUESS on the name). */
+struct NetFriendNotice {
+    /* +0x000 */ NetFriendRec rec_000;
+    /* +0x038 */ NetFriendDetail detail_038;
+
+    NetFriendNotice();    /* 0x803EB9A4 */
+    ~NetFriendNotice();   /* 0x803EB8BC */
+};   /* size: 0x13C */
+
+/* The friend status event `pollFriendSlot` reports (event 13): the friend's unique id and its status word (GUESS on
+ * the name). */
+struct NetFriendStatusNotice {
+    /* +0x00 */ NetworkUniqueId id_00;
+    /* +0x20 */ u32 status_20;
+
+    NetFriendStatusNotice();    /* 0x803EB974 */
+    ~NetFriendStatusNotice();   /* 0x803EB918 */
+};   /* size: 0x24 */
 
 /* One 0x2510-byte entry of the layer's community list (the lobby's group rows); only the fields the
  * list view copies out are named. */
@@ -150,29 +217,37 @@ typedef struct NetCommunityRec {
     /* +0x0110 */ s32 enabled_0x0110;
     /* +0x0114 */ s32 slot_0x0114;
     /* +0x0118 */ u8 state_0x0118;   /* `getCommunityState_AC` */
-    /* +0x0119 */ u8 pad_0x0119[0x23F7];
+    /* +0x0119 */ u8 pad_0x0119[0x3];
+    /* +0x011C */ NetFriendTable members_0x011C;                /* the record's implicit constructor 0x803E11FC builds it */
+    /* +0x1700 */ NetFriendSession memberSessions_0x1700[100];
 } NetCommunityRec; /* size: 0x2510 */
 
-/* One 0x5C-byte friend-list entry (`NetCtrlWk::copyFriendList` copies id, name and two packed words out). */
-typedef struct NetFriendEntry {
-    /* +0x00 */ NetId id_0x00;
-    /* +0x0A */ u8 pad_0x0A[0x16];
-    /* +0x20 */ char name_0x20[0x18];
-    /* +0x38 */ s32 online_0x38;
-    /* +0x3C */ u8 pad_0x3C[0x4];
-    /* +0x40 */ u32 status_0x40;
-    /* +0x44 */ u8 pad_0x44[0x4];
-    /* +0x48 */ u32 area_0x48;
-    /* +0x4C */ u8 pad_0x4C[0x10];
-} NetFriendEntry; /* size: 0x5C */
+/* The community list: a count and the 40 records (`NetworkLayerPat::communities_F1AC`; implicit constructor 0x803E11B0,
+ * destructor 0x803E0EF0). */
+struct NetCommunityList {
+    /* +0x00000 */ s32 count_0x00000;
+    /* +0x00004 */ NetCommunityRec entries_0x00004[40];
+
+    NetCommunityList();
+    ~NetCommunityList();
+};   /* size: 0x5CA84 */
+
+/* One 0x5C-byte friend-list entry: the friend record and its session record side by side (`handleUserList` splits a
+ * list into the two tables; `NetCtrlWk::copyFriendList` copies id, name and the two packed words out).  Implicit
+ * constructor 0x803E1150, destructor 0x803E0E38. */
+struct NetFriendEntry {
+    /* +0x00 */ NetFriendRec rec_00;
+    /* +0x38 */ NetFriendSession session_38;
+};   /* size: 0x5C */
 
 /* The friend list the two friend-list sources share: a count followed by the entries.  size: 0x23F4 (the
  * network work record builds one in place at 0x90017F60; its constructor is 0x803E1104) */
 typedef struct NetFriendList {
-    /* +0x00 */ s32 count_0x00;
+    /* +0x00 */ u32 count_0x00;   /* unsigned: the list readers clamp it with `cmplwi` */
     /* +0x04 */ NetFriendEntry entries_0x04[100];   /* `count_0x00` entries */
 
     NetFriendList();
+    ~NetFriendList();   /* 0x803E0DCC */
 } NetFriendList; /* size: 0x23F4 */
 
 /* One field of the user-field block `NetworkLayerPat::sendUserFields_5C` sends: its kind (1..7 a value held inline
@@ -260,6 +335,9 @@ struct NetLayerMediationEntry {
 struct NetLayerMediationList {
     /* +0x000 */ s32 count_000;
     /* +0x004 */ NetLayerMediationEntry entries_004[32];
+
+    NetLayerMediationList();    /* 0x803E1088 */
+    ~NetLayerMediationList();   /* 0x803E0D04 */
 };   /* size: 0x484 */
 
 /* One search filter a detail search sends (`packLayerFilters` builds them from a `NetLayerRequest`'s items): the
@@ -276,7 +354,15 @@ typedef struct NetLayerFilter {
 /* The layer requests' field list and layer record are `PatInterface.cpp`'s (`PatTagList` of `PatTagValue`s,
  * `PatLayerData`; include/Network/PatInterface.h): the layer fills and sends them. */
 typedef struct PatTagValue PatTagValue;
+typedef struct NetworkFmpSlot NetworkFmpSlot;   /* include/Network/PatInterface.h - the FMP slot `exportServerRec` reads */
 typedef struct PatTagList PatTagList;
+
+/* The mixed voice of the transfer peers (the move warning's "mVoiceMixed.mSize"): the samples and their size in
+ * bytes (528 is one whole frame). */
+struct NetVoiceBuffer {
+    /* +0x000 */ s16 mData[0x17A];
+    /* +0x2F4 */ s32 mSize;
+};   /* size: 0x2F8 (the class's last field: it ends at the allocation size 0x6EE8C) */
 
 /* The layer the Pat network game drives (the pool strings name it: "NetworkLayerPat::move ...").  It derives from
  * `NetworkLayer`: the constructor 0x803E0C18 calls `NetworkLayer::NetworkLayer` first, then stores the table
@@ -297,12 +383,12 @@ public:
     virtual void clear();                                                     /* +0x010 */
     virtual void release();                                                   /* +0x014 */
     virtual void move();                                                      /* +0x018 */
-    virtual void readServerId_2C(NetId* id);                                  /* +0x02C */
+    virtual void readServerId_2C(NetworkUniqueId* id);                        /* +0x02C */
     virtual void readServerName_30(char* out, s32 size);                      /* +0x030 */
     virtual void readServerText_34(char* out, s32 size);                      /* +0x034 */
     virtual void sendUserFields_5C(NetUserFields* fields);                    /* +0x05C (GUESS: the user fields, clamped to 64) */
     virtual void sendUserPosition_60(const NetUserPosition* position);        /* +0x060 (GUESS) */
-    virtual void readSelectedServer_88(NetCityRec* out);                      /* +0x088 */
+    virtual void readSelectedServer_88(NetServerRec* out);                    /* +0x088 */
     virtual void exportLayerId_8C(NetworkLayerId* out);                       /* +0x08C - this console's id (kind 3, 16 bytes) */
     virtual void readUserName_90(char* out, s32 size);                        /* +0x090 */
     virtual void setComment_94(const char* text);                             /* +0x094 */
@@ -326,7 +412,7 @@ public:
     virtual BOOL isFriendTransferActive_E4(s8 slot);                          /* +0x0E4 */
     virtual BOOL isFriendTransferReady_E8(s8 slot);                           /* +0x0E8 */
     virtual u8 getFriendFlagC084_EC(s8 slot);                                 /* +0x0EC */
-    virtual u8 getFriendTransferFlag_F0(s8 slot);                             /* +0x0F0 */
+    virtual BOOL getFriendTransferFlag_F0(s8 slot);                           /* +0x0F0 */
     virtual s32 handleConnect(NetworkLayerRequest* request);                  /* +0x0F4 */
     virtual s32 handleDisconnect(NetworkLayerRequest* request);               /* +0x0F8 */
     virtual s32 handleServerList(NetworkLayerRequest* request);               /* +0x0FC */
@@ -407,6 +493,23 @@ public:
     void reflect(s32 code, s32 requestId, s32 flag, s32 count, const u8* data);
     /* 0x803EA77C (GUESS) - takes this console's layer login record. */
     void applyLoginRecord(const NetLayerLoginRecord* record);
+    /* 0x803E9C84 / 0x803E9CBC (GUESS on both names) - read the user list of the layer at `address` into the friend list
+     * in batches of 10 rows (head, data, foot); with `filterCount >= 0` the rows are a user search's.  A step returns 0
+     * while it waits, 1 when the foot arrived clean, -1 when the session dropped and -2 when it was cancelled. */
+    s32 readUserList(NetLayerAddress* address, BOOL wide, u32 first, s32 count, NetworkLayerRequest* request);
+    s32 readUserRows(NetLayerAddress* address, BOOL wide, u32 first, s32 count, const char* userId, const char* name,
+                     NetLayerFilter* filters, s32 filterCount, NetworkLayerRequest* request);
+    /* 0x803E1914 / 0x803E1A14 (GUESS on both names) - halve a run of voice samples into `out` (the pairs averaged), and
+     * mix a peer's samples into `out` at twice the rate, scaled by the mediator's transfer level; both return the
+     * output size in bytes, 0 when `out` is too small. */
+    s32 downsampleVoice(s16* out, s32 outSize, const s16* in, s32 inSize);
+    s32 mixVoice(s16* out, s32 outSize, const s16* in, s32 inSize);
+    /* 0x803EEDCC (GUESS) - the valid friend slot whose GameSpy peer id is `peerId`, -1 when none (or `peerId` 0). */
+    s8 findFriendByPeerId(u32 peerId);
+    /* 0x803EECA0 (GUESS) - tells the layer the NAT negotiation state of the peer pair `from`/`to` (not for one peer). */
+    void sendPairState(u32 from, u32 to, s8 state);
+    /* 0x803EA61C (GUESS) - copies an FMP slot into a server record. */
+    void exportServerRec(NetServerRec* out, const NetworkFmpSlot* slot);
     /* 0x803EB75C (GUESS) - polls friend slot `index` (written later; declared for `pollLayerSlots`). */
     void pollFriendSlot(u32 index);
 
@@ -433,10 +536,13 @@ public:
     /* +0x042C */ u32 serverValue_42C;
     /* +0x0430 */ u32 serverValue_430;
     /* +0x0434 */ u16 serverPort_434;
-    /* +0x0436 */ u8 pad_0436[0xE];
+    /* +0x0436 */ u8 pad_0436[0x2];
+    /* +0x0438 */ u32 negotiateFrom_438;   /* the peer ids of the pair `move` is negotiating (0: none) */
+    /* +0x043C */ u32 negotiateTo_43C;
+    /* +0x0440 */ u8 negotiated_440;       /* set once the pair's result was recorded */
+    /* +0x0441 */ u8 pad_0441[0x3];
     /* +0x0444 */ NetworkErrorInfo sessionError_444;   /* the error a failed member session left while a request ran */
-    /* +0x0450 */ u32 serverValue_450;
-    /* +0x0454 */ u8 pad_0454[0x20];
+    /* +0x0450 */ NetLayerSettings presence_450;       /* `setPresence_A0`'s pairs; `move` sends them while `flag_3D2` is set */
     /* +0x0474 */ NetLayerAddress address_474;   /* this console's layer address (`exportLayerId_8C` exports it as kind 3) */
     /* +0x0484 */ char userName_484[0x40];   /* `readUserName_90` copies at most 63 characters */
     /* +0x04C4 */ u8 hostMode_4C4;   /* selects the user-list step after the child-info reply */
@@ -445,13 +551,11 @@ public:
     /* +0x04CC */ u8 layerInfo_4CC[0x74];   /* the record the layer-info handlers report with their done event */
     /* +0x0540 */ NetCityList cities_540;
     /* +0x18A4 */ NetRoomList rooms_18A4;
-    /* +0x3568 */ NetFriendTable friends_3568;
-    /* +0x4B4C */ NetFriendSession friendSessions_4B4C[99];   /* per friend slot (`clearFriendSlot` clears the state of
-                                                               slot 0..99 at a 0x24 stride: approximation, the region
-                                                               up to +0x5958 holds 99 whole records and a 0x20 tail) */
-    /* +0x5938 */ u8 pad_5938[0x20];
-    /* +0x5958 */ NetFriendDetail details_5958[100];
-    /* +0xBEE8 */ u8 pad_BEE8[0x4];
+    /* +0x3568 */ NetFriendTable friends_3568;                  /* the friend slots (with the sessions below, the shape of a
+                                                                   `NetFriendRoster`; separate members: the destructor calls
+                                                                   the table's destructor with no null check) */
+    /* +0x4B4C */ NetFriendSession friendSessions_4B4C[100];   /* per friend slot */
+    /* +0x595C */ NetFriendDetail details_595C[100];
     /* +0xBEEC */ u32 friendStatus_BEEC[100];   /* per friend slot (GUESS: a status word `clearFriendSlot` resets) */
     /* +0xC07C */ s8 transferSlot_C07C;   /* the friend slot whose transfer state the mode setters refresh (-1: none) */
     /* +0xC07D */ u8 pad_C07D[0x3];
@@ -459,8 +563,9 @@ public:
     /* +0xC084 */ u8 friendFlagC084_C084[100];
     /* +0xC0E8 */ u8 friendTransfer_C0E8[100];   /* per friend slot: the transfer is active */
     /* +0xC14C */ u8 friendTransferMode_C14C[100];
-    /* +0xC1B0 */ u8 friendKey_C1B0[100][0x10];      /* per friend slot, 16 bytes */
-    /* +0xC7F0 */ u8 friendMessage_C7F0[100][0x64];  /* per friend slot, 100 bytes */
+    /* +0xC1B0 */ GameSpyPeerId friendPeers_C1B0[100];   /* per friend slot: its GameSpy peer id (`move` negotiates pairs) */
+    /* +0xC7F0 */ s8 pairState_C7F0[100][100];           /* per pair of friend slots: the NAT negotiation state
+                                                            (GUESS: 0 none, 1 negotiated, 2 running, 3 failed, 4 retry) */
     /* +0xEF00 */ s8 friendSession_EF00[100];        /* per friend slot: the session slot linked to it, -1 when none */
     /* +0xEF64 */ u8 memberStatus_EF64[100];   /* per friend slot: 0 pending, 1 failed, 2 connecting, 3 connected */
     /* +0xEFC8 */ u8 friendFlagEFC8_EFC8[100];
@@ -472,23 +577,20 @@ public:
     /* +0xF040 */ u8 pad_F040[0x20];
     /* +0xF060 */ char comment_F060[0x40];   /* `setComment_94` copies at most 63 characters */
     /* +0xF0A0 */ NetLayerSettings settings_F0A0;
-    /* +0xF0C4 */ NetLayerRequest request_F0C4;   /* `submitRequest_9C`'s record (the first 0x34 of 0x6C bytes) */
-    /* +0xF0F8 */ u8 pad_F0F8[0x38];
-    /* +0xF130 */ NetLayerRequest select_F130;   /* `submitSelect_A4`'s record (the first 0x34 of 0x6C bytes) */
-    /* +0xF164 */ u8 pad_F164[0x38];
+    /* +0xF0C4 */ NetLayerRequest request_F0C4;   /* `submitRequest_9C`'s record */
+    /* +0xF130 */ NetLayerRequest select_F130;    /* `submitSelect_A4`'s record */
     /* +0xF19C */ s32 pendingRequestId_F19C;   /* GUESS: a request id is already pending when it is >= 0 */
     /* +0xF1A0 */ s32 listCursor_F1A0;   /* the next row a list read asks for */
     /* +0xF1A4 */ s32 listTotal_F1A4;    /* the rows the list head announced */
     /* +0xF1A8 */ u8 parentInfo_F1A8;   /* set while the layer-info request asks for the parent layer */
     /* +0xF1A9 */ u8 pad_F1A9[0x3];
-    /* +0xF1AC */ s32 communityCount_F1AC;
-    /* +0xF1B0 */ NetCommunityRec communities_F1B0[40];
-    /* +0x6BC30 */ s32 friendCount_6BC30;
-    /* +0x6BC34 */ NetFriendEntry friends_6BC34[100];   /* `friendCount_6BC30` entries (with the count, a
-                                                          `NetFriendList`'s 0x23F4 bytes) */
+    /* +0xF1AC */ NetCommunityList communities_F1AC;
+    /* +0x6BC30 */ NetFriendList friendList_6BC30;
     /* +0x6E024 */ NetLayerRecord layerRecord_6E024;   /* the record `handleLayerInfoById` reports with its done event */
     /* +0x6E128 */ NetLayerMediationList mediationList_6E128;
-    /* +0x6E5AC */ u8 pad_6E5AC[0x8E0];
+    /* +0x6E5AC */ s16 voiceInput_6E5AC[0x17A];   /* the microphone samples and a peer's popped transfer record */
+    /* +0x6E8A0 */ s16 voiceSend_6E8A0[0x17A];    /* the downsampled samples `move` posts to the session members */
+    /* +0x6EB94 */ NetVoiceBuffer voiceMixed_6EB94;   /* "mVoiceMixed" (the move warning names it) */
 };
 
 /* The free functions of `src/Network/NetworkLayerPat.cpp`'s range (0x803E0BE8..0x803EF668), moved here from

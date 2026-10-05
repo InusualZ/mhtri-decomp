@@ -25,6 +25,7 @@
 #include "Network/NetworkLayerPat.h"   /* NetId and the layer records the work record embeds */
 #include "Network/network_writer_types.h"   /* NetworkUniqueId - the roster entries' address objects */
 #include "Network/NetworkFileFetcher.h"     /* NetworkFileFetcher - the fetch state machines' client */
+#include "menu/PatTerms.h"                  /* PatTerms - the terms object (owner menu/menu_plsearch.cpp) */
 
 #ifdef __cplusplus
 extern "C" {
@@ -75,26 +76,41 @@ typedef struct NetMemberSlot {
     /* +0x08 */ s32 value_0x08;
     /* +0x0C */ char name_0x0C[0x10];
     /* +0x1C */ u8 pad_0x1C[0x4];
-    /* +0x20 */ NetId id_0x20;
-    /* +0x2A */ u8 pad_0x2A[0x16];
+    /* +0x20 */ NetworkUniqueId id_0x20;   /* the slot's implicit constructor 0x80431EC8 builds it */
 } NetMemberSlot; /* size: 0x40 */
 
-/* The per-profile record `NetCtrlWk::profiles_0x168` points at (stride 0x2B4). */
+/* The 136-byte block a circle carries in its record bytes (`NetworkSessionCircleInfo::records_188`, taken only when
+ * the circle reports exactly 136 of them): four 16-byte labels, four more and four small counts the copy clamps to
+ * 1..8.  GUESS names from that copy (`copyCircleToProfile`).  size: 0x88 */
+typedef struct NetProfileLabels {
+    /* +0x00 */ char label_0x00[4][0x10];
+    /* +0x40 */ char sublabel_0x40[4][0x10];
+    /* +0x80 */ u8 count_0x80[4];
+    /* +0x84 */ u8 pad_0x84[0x4];
+} NetProfileLabels; /* size: 0x88 */
+
+/* The per-profile record `NetCtrlWk::profiles_0x168` points at (stride 0x2B4): the circle (lobby room) copied in by
+ * `copyCircleToProfile`/`onCircleListReceived` - its id, name, address object, size and option block - and the
+ * four session member slots. */
 typedef struct NetProfileRec {
-    /* +0x000 */ u8 pad_0x000[0x3C];
+    /* +0x000 */ u8 index_0x000;            /* the profile's own index */
+    /* +0x001 */ u8 pad_0x001[0x3];
+    /* +0x004 */ s32 circle_id_0x004;
+    /* +0x008 */ char name_0x008[0x14];
+    /* +0x01C */ NetworkUniqueId address_0x01C;
     /* +0x03C */ s32 capacity_0x03C;
-    /* +0x040 */ s32 active_0x040;
-    /* +0x044 */ u8 pad_0x044[0xC];
-    /* +0x050 */ s32 value_0x050;
-    /* +0x054 */ u8 pad_0x054[0x4];
-    /* +0x058 */ s32 quest_0x058;       /* the quest id (copied to quest_id_0x190) */
-    /* +0x05C */ u8 pad_0x05C[0x30];
+    /* +0x040 */ s32 active_0x040;          /* the circle's first limit word: 0 leaves the profile empty */
+    /* +0x044 */ NetworkCircleOptions options_0x044;   /* slot 1's value is the quest id (copied to quest_id_0x190) */
     /* +0x08C */ u8 rank_0x08C;
     /* +0x08D */ u8 flag_0x08D;
     /* +0x08E */ u8 pad_0x08E[0x2];
     /* +0x090 */ NetMemberSlot members_0x090[4];
     /* +0x190 */ u16 quest_id_0x190;   /* the quest record id `getProfileQuestRecord` hands out */
-    /* +0x192 */ u8 pad_0x192[0x122];
+    /* +0x192 */ s8 option_0x192;      /* option slot 0's value, narrowed */
+    /* +0x193 */ u8 pad_0x193[0x5];
+    /* +0x198 */ char comment_0x198[0x94];   /* the circle comment (at most 144 characters) */
+    /* +0x22C */ NetProfileLabels labels_0x22C;
+    /* +0x2B4 */
 } NetProfileRec; /* size: 0x2B4 */
 
 /* The name field of a peer record (0x14 bytes). */
@@ -284,8 +300,7 @@ typedef struct NetInviteRec {
 /* One invite the layer reports (layer commands 31..35): the inviter's id, the 1-based invite index and its
  * valid byte.  size: 0x24 */
 typedef struct NetInviteEntry {
-    /* +0x00 */ NetId id_0x00;
-    /* +0x0A */ u8 pad_0x0A[0x16];
+    /* +0x00 */ NetworkUniqueId id_0x00;
     /* +0x20 */ u8 index_0x20;
     /* +0x21 */ u8 valid_0x21;
     /* +0x22 */ u8 pad_0x22[0x2];
@@ -301,8 +316,7 @@ typedef struct NetInviteList {
  * sender's id object, its display name, the message text the mediator is handed and the text colour.
  * size: 0x23C (approximate: the highest byte read) */
 typedef struct NetSessionChatRecord {
-    /* +0x000 */ NetId sender_0x000;
-    /* +0x00A */ u8 pad_0x00A[0x16];
+    /* +0x000 */ NetworkUniqueId sender_0x000;
     /* +0x020 */ char name_0x020[0x15];
     /* +0x035 */ u8 text_0x035[0x203];
     /* +0x238 */ s32 color_0x238;
@@ -448,6 +462,19 @@ typedef struct NetTextTagState {
 
     void parseTag(void);
 } NetTextTagState; /* size: 0x314 */
+
+/* The 16 bytes `NetworkLayerIdExportTo` writes for a layer id, as the layer-change checks read them: the server
+ * word and the two level numbers below it (GUESS names: a zero room/city means the console stands above that
+ * level).  size: 0x10 */
+typedef struct NetLayerIdText {
+    /* +0x00 */ u8 kind_0x00;
+    /* +0x01 */ u8 pad_0x01[0x3];
+    /* +0x04 */ u32 server_0x04;
+    /* +0x08 */ u8 pad_0x08[0x2];
+    /* +0x0A */ u16 city_0x0A;
+    /* +0x0C */ u16 room_0x0C;
+    /* +0x0E */ u8 pad_0x0E[0x2];
+} NetLayerIdText; /* size: 0x10 */
 
 /* One 0x5C-byte row of the login server list (`NetCtrlWk::rows_0x17C`): the server id and its name. */
 typedef struct NetRowRec {
@@ -661,7 +688,8 @@ typedef struct NetCtrlWk {
     /* +0x1F68 */ u8 pad_0x1F68[0x1F68];
     /* +0x3ED0 */ NetSlot* slot_list_0x3ED0;
     /* +0x3ED4 */ NetSlot slots_0x3ED4[100];
-    /* +0x6134 */ u8 pad_0x6134[0x98];
+    /* +0x6134 */ u8 pad_0x6134[0x58];
+    /* +0x618C */ NetworkLayerId layer_id_0x618C;   /* the layer id `saveLayerId` keeps for the change checks */
     /* +0x61CC */ NetRosterSync roster_sync_0x61CC;
     /* +0x6210 */ u32 settings_0x6210[4];
     /* +0x6220 */ u16 layer_stack_0x6220[16];   /* the layer ids entered (command 5 pushes, command 4 pops) */
@@ -752,7 +780,8 @@ typedef struct NetCtrlWk {
     /* +0xC0C4 */ char account_name_0xC0C4[0x40];
     /* +0xC104 */ char nickname_0xC104[0x40];
     /* +0xC144 */ NetTextTagState* text_layout_0xC144;   /* allocateDialogRecord: work_mem_alloc(0x314) */
-    /* +0xC148 */ u8 pad_0xC148[0x8];
+    /* +0xC148 */ s32 profile_write_0xC148;   /* the profile-write request word the community writes take (always 2) */
+    /* +0xC14C */ u8 pad_0xC14C[0x4];
     /* +0xC150 */ u8 screen_0xC150;
     /* +0xC151 */ u8 flag_0xC151;
     /* +0xC152 */ u8 action_0xC152;
@@ -792,19 +821,16 @@ typedef struct NetCtrlWk {
     /* +0xC288 */ s32 (*query_0xC288)(void);   /* initNetworkPatControl stores its answer at +0xC28C */
     /* +0xC28C */ s32 field_0xC28C;
     /* +0xC290 */ s8* result_0xC290;
-    /* +0xC294 */ NetLayerRequest layer_request_0xC294;
-    /* +0xC2C8 */ NetId target_id_0xC2C8;
-    /* +0xC2D2 */ u8 pad_0xC2D2[0x16];
-    /* +0xC2E8 */ char text_0xC2E8[0x18];
+    /* +0xC294 */ NetLayerRequest layer_request_0xC294;   /* the record's constructor 0x8043202C builds it (0x803E1230) */
     /* +0xC300 */ s32 msg_state_0xC300;
     /* +0xC304 */ s32 view_key_0xC304;     /* compared with seen_key_0xC310 (GUESS on the pair's role) */
     /* +0xC308 */ s32 view_key_0xC308;     /* compared with seen_key_0xC314 */
     /* +0xC30C */ u8 pad_0xC30C[0x4];
     /* +0xC310 */ s32 seen_key_0xC310;
     /* +0xC314 */ s32 seen_key_0xC314;
-    /* +0xC318 */ u8 pad_0xC318[0x28];
-    /* +0xC340 */ NetId request_id_0xC340;
-    /* +0xC34A */ u8 pad_0xC34A[0x16];
+    /* +0xC318 */ s32 seen_key_0xC318;
+    /* +0xC31C */ u8 pad_0xC31C[0x24];
+    /* +0xC340 */ NetworkUniqueId request_id_0xC340;   /* the record's constructor 0x8043202C builds it */
     /* +0xC360 */ u16 idle_hold_0xC360;     /* pad 0's hold word last frame (refreshServerScreen's idle check) */
     /* +0xC362 */ u16 idle_press_0xC362;    /* pad 0's press word last frame */
     /* +0xC364 */ s32 idle_frames_0xC364;   /* frames both stayed unchanged (36000 raises error 23) */
@@ -866,7 +892,7 @@ typedef struct NetCtrlWk {
     static BOOL isRequestStateTwo(void);
     static void setRequestStateOne(void);
     static BOOL loadPeerCard(NetPlayerCard* card, u8 slot);
-    static char* findPeerName(NetId* id);
+    static char* findPeerName(const NetworkUniqueId* id);
     static BOOL isConnectionSettled(void);
     static BOOL pollBigDataFetch(void);
     static BOOL pollNoticeFetch(void);
@@ -1022,7 +1048,7 @@ u8* fn_800404BC(u32 size);
 void resetNetSlots(NetCtrlWk* work);
 /* 0x80427868 - copies `size` bytes of a peer's card block (at `offset`) from a community update into the peer
  * record whose id is `id` (GUESS name: community command 13 hands it the payload's id, bytes, size and offset). */
-s32 updatePeerCardBlock(const NetId* id, const u8* src, u32 size, s32 offset);
+s32 updatePeerCardBlock(const NetworkUniqueId* id, const u8* src, u32 size, s32 offset);
 /* 0x80424444 / 0x804244D8 / 0x804245C8 / 0x804246F8 - the arena blocks (hand one out, set its value word), the
  * slot table reset and the slot lookup by owner (GUESS names from the bodies). */
 u32* allocArenaBlock(void);
@@ -1054,21 +1080,7 @@ void* memset(void* dst, int value, u32 size);
  * name below: they are derived from the caller's use) ---- */
 struct PatTerms;
 struct SystemWork;
-/* The terms object `getPatTerms` hands out: the state byte the band compares (20 = check finished, 11 = update
- * finished), the ready byte `initPatTerms` sets and `requestPatTermsCheck` clears (`isPatTermsReady`, and the
- * update requests act only while it is set), the progress count the mediator grades against its threshold table
- * (`getPatTermsProgress`) and the byte the mediator's `setMediatorTermsFlag`/`getMediatorTermsFlag` pass through.
- * The names past `state_0x0C` are GUESSes from those bodies (`Network/network_opening.cpp`, `menu/menu_plsearch.cpp`).
- * size: 0xE4 (approximate: the highest byte addressed is +0xE2) */
-struct PatTerms {
-    /* +0x00 */ u8  pad_0x00[0xC];
-    /* +0x0C */ u8  state_0x0C;
-    /* +0x0D */ u8  ready_0x0D;
-    /* +0x0E */ u8  pad_0x0E[0xD2];
-    /* +0xE0 */ u16 progress_0xE0;
-    /* +0xE2 */ u8  flag_0xE2;
-    /* +0xE3 */ u8  pad_0xE3[0x1];
-};
+/* The terms object `getPatTerms` hands out is `menu/menu_plsearch.cpp`'s class `PatTerms` (`menu/PatTerms.h`). */
 /* The socket allocator pair `initNetworkPatControl` copies out of `.sdata` 0x807939A8 (`pat_so_allocator`:
  * `soAlloc`, `soFree`).  size: 0x8 */
 typedef struct PatSoAllocator {
@@ -1079,11 +1091,16 @@ typedef struct PatSoAllocator {
 } PatSoAllocator; /* size: 0x8 */
 /* 0x80426D24 / 0x80426E08 / 0x804270D4 / 0x804271A8 / 0x80427814 - the peer and friend lookups (by id, by
  * address object) and whether the layer is ready (GUESS names from the bodies). */
-s32 findPeerIndex(const NetId* id);
+s32 findPeerIndex(const NetworkUniqueId* id);
 s32 findFriendIndex(const NetId* id);
 s32 findFreePeerSlot(const NetworkUniqueId* address);
 s32 findPeerSlot(const NetworkUniqueId* address);
 BOOL isLayerReady(void);
+/* 0x8042822C / 0x8042826C / 0x80428538 - keep the layer's id, read how it changed since, and classify the change
+ * (GUESS names from the bodies). */
+void saveLayerId(void);
+void readLayerIdChange(s32* changed, u32* server, s32* city, s32* room);
+s32 classifyLayerIdChange(void);
 /* 0x80427714 / 0x804247D0 - installs the layer's reflect callback (and clears the layer status words);
  * the callback itself. */
 void installLayerCallback(void);
@@ -1220,8 +1237,9 @@ void setTransferMode(u32 mode);
 void applyTransferSettings(void);
 void applyTransferLevel(void);
 
-/* 0x80431A9C / 0x804317E8 - the transfer queue and mode updates the control runs each frame. */
-void updateTransferQueue(void);
+/* 0x80431A9C - hands the layer each connected friend's transfer mode; 0x804317E8 - the transfer mode update; the
+ * control runs both each frame (GUESS names). */
+void updateFriendTransferModes(void);
 
 void updateTransferMode(void);
 
