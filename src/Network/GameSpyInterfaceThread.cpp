@@ -23,7 +23,7 @@
  *
  * LOAD-BEARING SHAPES.  The vtable pointer sits where the first virtual is declared, so `~GameSpyInterfaceThread`
  * comes first in the class (playbook 98); being the key function it makes this unit emit `__vt__` and `__dt__`.
- * The error record is passed by value through `NetworkInstanceDispatch`'s inline overload (playbook 97).
+ * The error record is passed by value through `PatInterface`'s inline `postError` overload (playbook 97).
  * `unregisterReceiver` keeps an element pointer across its call (playbook 96); `executeError` copies the two
  * values it logs so the switch re-reads the stack; `isQueued` is the plain three-way return.  `profile_4485` is
  * five `u32` at the odd offset 0x4485 (the class's `#pragma pack(1)`); the connect call's out parameter is one
@@ -231,7 +231,7 @@ extern "C" void gt2ConnectAttemptCallback(s32 unused0, s32 socket, s32 unused1, 
             error.code_00 = 0x80000007;
             error.param1_04 = 0x5F;
             error.param2_08 = 0x2D6A;
-            ((NetworkInstanceDispatch*)getInstance_())->postError(error);
+            ((PatInterface*)getInstance_())->postError(error);
         }
     } else {
         GameSpyInterfaceThread::getInstance()->publishRequest(-0x2DAE, 0xFF, peerId);
@@ -263,7 +263,7 @@ extern "C" void gt2ConnectedCallback(s32 socket, s32 result, s32 unused, s32 tim
             error.code_00 = 0x80000007;
             error.param1_04 = 0x5F;
             error.param2_08 = 0x2D6A;
-            ((NetworkInstanceDispatch*)getInstance_())->postError(error);
+            ((PatInterface*)getInstance_())->postError(error);
         }
     } else {
         error = timeout > 0 ? -0x2DA0 : -0x2DAD;

@@ -77,18 +77,11 @@ public:
 
 /* ---- the network singleton `getInstance_` returns -------------------------------------------- */
 
-/* The singleton `getInstance_` returns, read as a *data* slot.  `network_state.cpp` reaches
- * `postError` through this view because its record is passed **by value** there - the by-value copy's
- * address is what retail hands the callee - and a struct of typed function pointers is the shape that
- * keeps that call and its table read separate. */
-typedef struct NetworkInstanceVtable {
-    /* +0x000 */ u8 pad_00[0x288];
-    /* +0x288 */ void (*postError_288)(void* self, NetworkErrorInfo* info);
-} NetworkInstanceVtable;   /* size: 0x28C */
-
-typedef struct NetworkInstance {
-    /* +0x00 */ NetworkInstanceVtable* vtable;
-} NetworkInstance;   /* size: 0x04 */
+/* The singleton `getInstance_` returns is the `PatInterface` (`getInstance_` loads `mpInstance__12PatInterface`,
+ * which `__ct__12PatInterfaceFv` stores; request net3-d-03c2#1): the band's spelling is an alias of the class,
+ * whose layout and 161 virtual slots live in `include/Network/PatInterface.h`. */
+class PatInterface;
+typedef PatInterface NetworkInstance;
 
 /* The DWC error record `postError` takes **by value** (a by-value parameter makes MWCC build the argument copy
  * and re-materialise the constants, which is retail's shape at every caller). */
@@ -98,178 +91,9 @@ typedef struct NetworkPostedError {
     /* +0x08 */ s32 param2_08;
 } NetworkPostedError;   /* size: 0x0C */
 
-/* The same object dispatched as a real virtual: the `postError` sites of
- * `GameSpyInterfaceThread.cpp` pass the record by value, and that is retail's `lwz r12, 0x0(r3)` /
- * `lwz r12, 0x288(r12)` shape - the struct view above stages the table through a scratch register
- * instead.  The slot is 161 declared virtuals in, so the unnamed ones consume the table; none is
- * defined and MWCC emits no table of its own (rule 10). */
-class NetworkInstanceDispatch {
-public:
-    /* +0x008 */ virtual void pad_008();
-    /* +0x00C */ virtual void pad_00C();
-    /* +0x010 */ virtual void pad_010();
-    /* +0x014 */ virtual void pad_014();
-    /* +0x018 */ virtual void pad_018();
-    /* +0x01C */ virtual void pad_01C();
-    /* +0x020 */ virtual void pad_020();
-    /* +0x024 */ virtual void pad_024();
-    /* +0x028 */ virtual void pad_028();
-    /* +0x02C */ virtual void pad_02C();
-    /* +0x030 */ virtual void pad_030();
-    /* +0x034 */ virtual void pad_034();
-    /* +0x038 */ virtual void pad_038();
-    /* +0x03C */ virtual void pad_03C();
-    /* +0x040 */ virtual void pad_040();
-    /* +0x044 */ virtual void pad_044();
-    /* +0x048 */ virtual void pad_048();
-    /* +0x04C */ virtual void pad_04C();
-    /* +0x050 */ virtual void pad_050();
-    /* +0x054 */ virtual void pad_054();
-    /* +0x058 */ virtual void pad_058();
-    /* +0x05C */ virtual void pad_05C();
-    /* +0x060 */ virtual void pad_060();
-    /* +0x064 */ virtual void pad_064();
-    /* +0x068 */ virtual void pad_068();
-    /* +0x06C */ virtual void pad_06C();
-    /* +0x070 */ virtual void pad_070();
-    /* +0x074 */ virtual void pad_074();
-    /* +0x078 */ virtual void pad_078();
-    /* +0x07C */ virtual void pad_07C();
-    /* +0x080 */ virtual void pad_080();
-    /* +0x084 */ virtual void pad_084();
-    /* +0x088 */ virtual void pad_088();
-    /* +0x08C */ virtual void pad_08C();
-    /* +0x090 */ virtual void pad_090();
-    /* +0x094 */ virtual void pad_094();
-    /* +0x098 */ virtual void pad_098();
-    /* +0x09C */ virtual void pad_09C();
-    /* +0x0A0 */ virtual void pad_0A0();
-    /* +0x0A4 */ virtual void pad_0A4();
-    /* +0x0A8 */ virtual void pad_0A8();
-    /* +0x0AC */ virtual void pad_0AC();
-    /* +0x0B0 */ virtual void pad_0B0();
-    /* +0x0B4 */ virtual void pad_0B4();
-    /* +0x0B8 */ virtual void pad_0B8();
-    /* +0x0BC */ virtual void pad_0BC();
-    /* +0x0C0 */ virtual void pad_0C0();
-    /* +0x0C4 */ virtual void pad_0C4();
-    /* +0x0C8 */ virtual void pad_0C8();
-    /* +0x0CC */ virtual void pad_0CC();
-    /* +0x0D0 */ virtual void pad_0D0();
-    /* +0x0D4 */ virtual void pad_0D4();
-    /* +0x0D8 */ virtual void pad_0D8();
-    /* +0x0DC */ virtual void pad_0DC();
-    /* +0x0E0 */ virtual void pad_0E0();
-    /* +0x0E4 */ virtual void pad_0E4();
-    /* +0x0E8 */ virtual void pad_0E8();
-    /* +0x0EC */ virtual void pad_0EC();
-    /* +0x0F0 */ virtual void pad_0F0();
-    /* +0x0F4 */ virtual void pad_0F4();
-    /* +0x0F8 */ virtual void pad_0F8();
-    /* +0x0FC */ virtual void pad_0FC();
-    /* +0x100 */ virtual void pad_100();
-    /* +0x104 */ virtual void pad_104();
-    /* +0x108 */ virtual void pad_108();
-    /* +0x10C */ virtual void pad_10C();
-    /* +0x110 */ virtual void pad_110();
-    /* +0x114 */ virtual void pad_114();
-    /* +0x118 */ virtual void pad_118();
-    /* +0x11C */ virtual void pad_11C();
-    /* +0x120 */ virtual void pad_120();
-    /* +0x124 */ virtual void pad_124();
-    /* +0x128 */ virtual void pad_128();
-    /* +0x12C */ virtual void pad_12C();
-    /* +0x130 */ virtual void pad_130();
-    /* +0x134 */ virtual void pad_134();
-    /* +0x138 */ virtual void pad_138();
-    /* +0x13C */ virtual void pad_13C();
-    /* +0x140 */ virtual void pad_140();
-    /* +0x144 */ virtual void pad_144();
-    /* +0x148 */ virtual void pad_148();
-    /* +0x14C */ virtual void pad_14C();
-    /* +0x150 */ virtual void pad_150();
-    /* +0x154 */ virtual void pad_154();
-    /* +0x158 */ virtual void pad_158();
-    /* +0x15C */ virtual void pad_15C();
-    /* +0x160 */ virtual void pad_160();
-    /* +0x164 */ virtual void pad_164();
-    /* +0x168 */ virtual void pad_168();
-    /* +0x16C */ virtual void pad_16C();
-    /* +0x170 */ virtual void pad_170();
-    /* +0x174 */ virtual void pad_174();
-    /* +0x178 */ virtual void pad_178();
-    /* +0x17C */ virtual void pad_17C();
-    /* +0x180 */ virtual void pad_180();
-    /* +0x184 */ virtual void pad_184();
-    /* +0x188 */ virtual void pad_188();
-    /* +0x18C */ virtual void pad_18C();
-    /* +0x190 */ virtual void pad_190();
-    /* +0x194 */ virtual void pad_194();
-    /* +0x198 */ virtual void pad_198();
-    /* +0x19C */ virtual void pad_19C();
-    /* +0x1A0 */ virtual void pad_1A0();
-    /* +0x1A4 */ virtual void pad_1A4();
-    /* +0x1A8 */ virtual void pad_1A8();
-    /* +0x1AC */ virtual void pad_1AC();
-    /* +0x1B0 */ virtual void pad_1B0();
-    /* +0x1B4 */ virtual void pad_1B4();
-    /* +0x1B8 */ virtual void pad_1B8();
-    /* +0x1BC */ virtual void pad_1BC();
-    /* +0x1C0 */ virtual void pad_1C0();
-    /* +0x1C4 */ virtual void pad_1C4();
-    /* +0x1C8 */ virtual void pad_1C8();
-    /* +0x1CC */ virtual void pad_1CC();
-    /* +0x1D0 */ virtual void pad_1D0();
-    /* +0x1D4 */ virtual void pad_1D4();
-    /* +0x1D8 */ virtual void pad_1D8();
-    /* +0x1DC */ virtual void pad_1DC();
-    /* +0x1E0 */ virtual void pad_1E0();
-    /* +0x1E4 */ virtual void pad_1E4();
-    /* +0x1E8 */ virtual void pad_1E8();
-    /* +0x1EC */ virtual void pad_1EC();
-    /* +0x1F0 */ virtual void pad_1F0();
-    /* +0x1F4 */ virtual void pad_1F4();
-    /* +0x1F8 */ virtual void pad_1F8();
-    /* +0x1FC */ virtual void pad_1FC();
-    /* +0x200 */ virtual void pad_200();
-    /* +0x204 */ virtual void pad_204();
-    /* +0x208 */ virtual void pad_208();
-    /* +0x20C */ virtual void pad_20C();
-    /* +0x210 */ virtual void pad_210();
-    /* +0x214 */ virtual void pad_214();
-    /* +0x218 */ virtual void pad_218();
-    /* +0x21C */ virtual void pad_21C();
-    /* +0x220 */ virtual void pad_220();
-    /* +0x224 */ virtual void pad_224();
-    /* +0x228 */ virtual void pad_228();
-    /* +0x22C */ virtual void pad_22C();
-    /* +0x230 */ virtual void pad_230();
-    /* +0x234 */ virtual void pad_234();
-    /* +0x238 */ virtual void pad_238();
-    /* +0x23C */ virtual void pad_23C();
-    /* +0x240 */ virtual void pad_240();
-    /* +0x244 */ virtual void pad_244();
-    /* +0x248 */ virtual void pad_248();
-    /* +0x24C */ virtual void pad_24C();
-    /* +0x250 */ virtual void pad_250();
-    /* +0x254 */ virtual void pad_254();
-    /* +0x258 */ virtual void pad_258();
-    /* +0x25C */ virtual void pad_25C();
-    /* +0x260 */ virtual void pad_260();
-    /* +0x264 */ virtual void pad_264();
-    /* +0x268 */ virtual void pad_268();
-    /* +0x26C */ virtual void pad_26C();
-    /* +0x270 */ virtual void pad_270();
-    /* +0x274 */ virtual void pad_274();
-    /* +0x278 */ virtual void pad_278();
-    /* +0x27C */ virtual void pad_27C();
-    /* +0x280 */ virtual void pad_280();
-    /* +0x284 */ virtual void pad_284();
-    /* +0x288 */ virtual void postError(NetworkErrorInfo* info);
-
-    /* the by-value spelling: the caller's argument copy is what the virtual slot is handed */
-    inline void postError(NetworkPostedError info) { postError((NetworkErrorInfo*)&info); }
-};   /* size: 0x04 (the object's leading vtable word) */
+/* The session units' dispatch spelling of the same object (the `postError` slot +0x288 and its by-value
+ * inline are `PatInterface`'s). */
+typedef PatInterface NetworkInstanceDispatch;
 
 extern "C" {
 

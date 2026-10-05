@@ -1986,8 +1986,17 @@ config.libs = [
             Object(NonMatching, "Network/NetworkUnitPacket.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             Object(NonMatching, "Network/PatConnection.cpp"),
-            Object(NonMatching, "Network/PatInterface.cpp"),
-            Object(NonMatching, "Network/network_layer_io.cpp"),
+            # Per-object flag deviation, instruction-level evidence: `-O3 -inline noauto` like the mediator unit - with
+            # the lib default setTermVersion/setAnnounceBuffer/increment60d4 schedule their stores out of source order
+            # (60.00/77.78/80.00, 100 at `-O3`) and `-inline auto` folds getServerTime/getGameTime/getFmpSize/setSomething
+            # into their callers (getServerDateTime 53.71, copyFmpSlot 82.18, setPatByte6138On 17.50; 100 at noauto).
+            Object(NonMatching, "Network/PatInterface.cpp",
+                   cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
+            # Per-object flag deviation, instruction-level evidence: `-O3` like the sibling session units - with the
+            # lib's `-O4,p` recvReqLineCheck scores 82.13, recvAnsServerTime 78.25 and recvAnsShut 72.67 (the log call's
+            # argument setup hoisted into the `bl getNetworkLogger` latency slot), against 100.00 for all three at `-O3`.
+            Object(NonMatching, "Network/network_layer_io.cpp",
+                   cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             # Per-object flag deviation (brief section 8.2), instruction-level evidence: measured over
             # the unit's 79 rows, the lib's `-O4,p` leaves getAccountBan/Warning/WaitQueue at 42.86 and
             # getReflectName3C at 51.28 where `-O3` puts all four at 100.00, and `-inline auto` scores

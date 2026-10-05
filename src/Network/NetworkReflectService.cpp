@@ -479,7 +479,7 @@ void NetworkReflectService::applyEvent(u32 code, s32 a, s32 b, s32 c, const Game
             error.code_00 = 0x80000000;
             error.param1_04 = 0;
             error.param2_08 = 0;
-            ((NetworkInstanceDispatch*)getInstance_())->postError(error);
+            ((PatInterface*)getInstance_())->postError(error);
             break;
         }
         peerId_1C = msg->channelView.peerId_04;
@@ -510,7 +510,7 @@ void NetworkReflectService::applyEvent(u32 code, s32 a, s32 b, s32 c, const Game
             error.code_00 = 0x80000000;
             error.param1_04 = 0;
             error.param2_08 = 0;
-            ((NetworkInstanceDispatch*)getInstance_())->postError(error);
+            ((PatInterface*)getInstance_())->postError(error);
             break;
         }
         limit = limit_8164 - writePos_8168;
