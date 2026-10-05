@@ -4,6 +4,24 @@ What a `ninja` run costs, what it is spent on, and the knobs that change it. Mea
 (Windows, 32 logical CPUs, Python 3.12) from `.ninja_log` and file mtimes; the numbers below are the
 clean samples, so treat them as ~±50 % under load.
 
+## Re-measured 2026-10-04 (415 split objects)
+
+The tables below were measured at **13 584 objects**; the split now writes **415** (the units were registered at their
+homes) and every cost fell with it. From MAIN's `.ninja_log` and a timed run in a worktree:
+
+| edge | then | 2026-10-04 |
+| --- | --- | --- |
+| `config.json` (`dtk dol split`, `write_asm: false`) | ~18 s | **1.8-1.9 s** |
+| the same split with the asm (`dump_asm.py`, 410 `.s`) | 200-400 s | **3.4-3.6 s wall** (dtk 3.0 s) |
+| `main.elf` (the link) | ~70-88 s | **0.5-0.6 s** |
+| `report.json` | ~1.5-3.5 s | **1.1-1.2 s** |
+| a full slot seed (`build/RMHE08`, asm excluded) | - | **0.71 s** (892 files, 42 MB); an incremental `slots.py refresh` 0.16 s |
+
+So `write_asm: true` would now add ~1.5 s to a split, not 200-400 s; `config.yml` keeps `write_asm: false` (the owner's
+2026-10-04 decision) and the tools refresh the dump themselves instead (`lib.artifacts`, `python tools/units/fresh.py
+status`). The derived caches on top of the dump cost more than the dump: `tudiscover`'s graph 17 s cold, `callers`' index
+11.8 s cold (and dtk rewrites every `.s`, so each dump invalidates the latter).
+
 ## What dominates
 
 | edge | measured | what it is |

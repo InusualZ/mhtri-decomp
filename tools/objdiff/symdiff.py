@@ -5,6 +5,7 @@ import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file_
 import json
 import os
 
+from tools.lib import artifacts as _artifacts
 from tools.lib import repo as librepo
 from tools.lib import report as _report
 from tools.lib import units as _units
@@ -55,6 +56,13 @@ def stale_reasons(unit, root: str | None = None) -> list[str]:
     reasons, _newest = _report.unit_reasons(src, unit.obj_ours, tree,
                                             rel=lambda p: _report.rel_path(p, tree))
     return reasons
+
+
+def object_context(unit, root: str | None = None) -> "_artifacts.Context":
+    """The registry context of `unit`'s prebuilt object (`lib.artifacts` `objects`: its refresh command and check)."""
+    tree = root or run_root()
+    src = unit.source if os.path.isabs(unit.source) else os.path.join(tree, unit.source)
+    return _artifacts.Context(tree, src=src, obj=unit.obj_ours)
 
 
 def cli():
@@ -182,16 +190,23 @@ def main():
     if force:
         sys.argv = [sys.argv[0]] + [a for a in argv if a != "--force-stale"]
     path, name, unit = cli()
+    # the freshness policy (`lib.artifacts`): refuse by default, --force-stale = FRESH=warn, FRESH=auto compiles first
+    policy = _artifacts.effective_policy("warn" if force else None, "refuse")
+    force = policy == "warn"
     if unit is not None:
         reasons = stale_reasons(unit)
+        ctx = object_context(unit)
+        if reasons and policy == "auto":
+            _artifacts.refresh("objects", ctx)
+            reasons = stale_reasons(unit)
         if reasons:
             print("freshness  STALE%s" % (" (forced)" if force else ""), file=sys.stderr)
             for reason in reasons:
                 print("             - " + reason, file=sys.stderr)
             if not force:
                 print("refused    a stale object would print numbers that are not this build's; nothing "
-                      "shown.\n           rebuild (`ninja %s`) or pass --force-stale to score it anyway "
-                      "(the verdict stays)." % unit.report_name, file=sys.stderr)
+                      "shown.\n           rebuild (`%s`, or FRESH=auto) or pass --force-stale to score it "
+                      "anyway (the verdict stays)." % _artifacts.get("objects").display(ctx), file=sys.stderr)
                 return 1
             print("freshness  (forced by --force-stale)", file=sys.stderr)
     if name is None and unit is not None:

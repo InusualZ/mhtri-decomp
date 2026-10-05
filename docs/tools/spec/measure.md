@@ -38,7 +38,9 @@ units, report, repo.
 
 ## Test contract
 
-Tier: fixture (fake runners); smoke: integration against the live report.
+Tier: fixture (fake runners); smoke: integration against the live report. The integration check compiles a copy of
+`src/Camellia/` in a scratch tree and scores it against the live target: compiling into the live tree's own object
+rewrote it outside ninja, which made every later `ninja` rebuild it (2026-10-04).
 Today's selftest (`tools/units/measure_selftest.py`): The contract this pins is the one that made 61 workers write their own driver: **one compile and one `objdiff report generate` for all N symbols of a unit**, scored with the official `fuzzy_match_percent` (the metric `build/RMHE08/report.json` carries), with the worktree's own split object preferred over MAIN's retired fallback. `recompile.py --measure` answers one symbol per run with two objdiff calls; this tool must not turn that into N runs. Layers:
 Target: `tools/tests/units/test_measure.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
 

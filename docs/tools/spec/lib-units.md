@@ -29,7 +29,8 @@ fresh-object proof, and finds the original object to score against.
   the old mapping (`{object, compiled, fresh, bytes, sections, log}` | `{object, compiled: False, error}` |
   `{command, object, dry_run}`; unset fields absent, so `dict(result)` is the old shape and `.get` keeps working);
   `object_is_fresh(object, source)`; `section_sizes(obj)`; `run_tokens(tokens, cwd, expect, scratch_dir, src, verbose)`
-  (the flag tools' raw run).
+  (the flag tools' raw run; with `scratch_dir` the chained `objalign.py`/`objextab.py` follow the scratch object too -
+  before 2026-10-04 they still rewrote the tree's real object, and failed where it did not exist).
 * An object's functions: `frames(obj) -> [(name, size, frame)]` (defined functions in address order, `frame` the N of a
   leading `stwu`, `lib.ppc.stwu_frame`), `function_names(obj)`, `text_size(obj)`.
 * The flag tools: `split_command(unit)` (`split_flags` of the unit's own tree's ninja line), `split_flags(tokens) ->

@@ -326,7 +326,13 @@ def integration_rows() -> int:
         print("skip  integration cross-check (Camellia/camellia not in the report)")
         return 0
     failures = 0
-    result = ms.collect("Camellia/camellia", ROOT, ROOT, symbol="camellia_setup256", use_cache=False)
+    # compile into a scratch tree, never ROOT's own `build/RMHE08/src/Camellia/camellia.o`: rewriting that object
+    # outside ninja is what left it "dirty" on every later `ninja` run (`ninja -d explain`: stored deps info out of
+    # date), so every landing - whose gate runs this selftest - left MAIN's report older than its objects
+    with tempfile.TemporaryDirectory() as tmp:
+        wt = os.path.join(tmp, "wt")
+        shutil.copytree(os.path.dirname(unit_src), os.path.join(wt, "src", "Camellia"))
+        result = ms.collect("Camellia/camellia", wt, ROOT, symbol="camellia_setup256", use_cache=False)
     failures = _ok("collect compiles the unit", result.get("compiled"), True, failures)
     got = (result.get("measures") or {}).get("fuzzy_match_percent")
     failures = _ok("the unit score equals build/RMHE08/report.json", got, official["fuzzy"], failures)

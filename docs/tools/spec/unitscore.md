@@ -47,6 +47,7 @@ Inputs -> outputs: report.json or objects -> table/JSON.
   `(unit, section offset)`: on L1's round-2 pair (slot1 `before-report.json` against its final report) `cmp.py`
   read 200 up / 70 down, every one of the 70 a rename or a move whose row did not fall; `--baseline` reads 130 up,
   0 down, 132 renamed, 20 507 paired.
+* **The freshness policy is `lib.artifacts`' (2026-10-04).** Default `refuse` (unchanged); `--force-stale` is `FRESH=warn`; `FRESH=auto` rebuilds what the score reads (`--refresh`'s target, which is now the registry's `report` / `objects` command) only when the guard would refuse, then scores. Fresh: output unchanged.
 * **`--refresh` costs a build, and says so.** It runs `ninja build/RMHE08/report.json` in the unit's tree before the read: the report depends on `all_source`, so every stale object of the tree is compiled first (and a changed map or `splits.txt` re-splits). With `--measure` it builds only the unit's object, the one thing that mode reads. The record carries `refreshed: {target, seconds, ok, error}`; a failed build is exit 2 with ninja's tail, and the freshness guard still runs on the rebuilt files. `--refresh --report R` is a usage error: an arbitrary report is not a ninja target.
 
 ## Lib dependencies

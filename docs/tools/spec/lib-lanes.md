@@ -39,7 +39,9 @@ lane->wtsafe and slots->lanecmd are gone). Import the module you need; `lanes/__
 * `seed`: `seed_worktree_build` (toolchain and build tree by copy, `orig/` by copy below 64 MB else junctioned, the
   `tools/m2c` submodule, ninja state with `.ninja_deps` re-pointed via `ninja_deps_rewrite`, inputs aged behind the
   outputs), `build_is_current(build_root, input_root)` (the one staleness rule the seeder, the slot guard and
-  `recompile` share).
+  `recompile` share - since 2026-10-04 it is `lib.artifacts.split_reasons` + `manifest_reasons`, the registry's rule).
+* `pool.refresh_slot(main, n, force=False)`: the registry's `slot-build` refresh (`slots.py refresh N`) - verify, re-seed
+  only what differs (`seed_worktree_build(..., overwrite=True)`), re-verify; refuses a LIVE slot and a stale MAIN.
 * `rescue`: `make`, `delete`, `list_refs`, `classify`/`audit` (redundant / landed-with-drift / unlanded / unknown, from
   the ref's registration diff against its merge-base, else its touched `src/` paths), `verdict(main, ref)` (read at
   the teardown that creates the ref; prunes only `redundant`; never raises).

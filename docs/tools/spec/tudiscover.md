@@ -18,13 +18,15 @@ tudiscover.py at <address|symbol> [--window 40] [--json] [--splits]
 [--unit src/<Lib>/<file>.c] [--max-funcs 400]
 tudiscover.py stats                 # cache + coverage + observation counts
 tudiscover.py cache [--force]       # (re)build build/tmp/tudiscover/graph.json
+tudiscover.py cache --check         # is the graph cache current? builds nothing (exit 0 fresh, 1 stale, 2 no dump)
+# every graph-reading subcommand: [--refresh | --no-refresh]  (default: refresh a stale asm dump, ~3.5 s)
 tudiscover.py dataorder             # the `.data` emission-order seams mapped to `.text` intervals
 tudiscover.py --selftest            # fixtures only, no asm dump needed
 tudiscover.py bench [--seeds 400] [--seed 7] [--seeds-per-unit 64] [--max-funcs 400]
 [--json] [--save F] [--compare F]     # the tool's own scorecard
 ```
 Subcommands: `at`, `stats`, `cache`, `bench`, `dataorder`, `prune`.
-Flags: `--addr`, `--all`, `--allow-stale`, `--apply`, `--compare`, `--data-order`, `--force`, `--include-obj`, `--json`, `--limit`, `--max-funcs`, `--pool-model`, `--save`, `--seed`, `--seeds`, `--seeds-per-unit`, `--selftest`, `--source-span-max`, `--span-max`, `--splits`, `--top`, `--unit`, `--weak`, `--window`.
+Flags: `--addr`, `--all`, `--allow-stale`, `--apply`, `--check`, `--compare`, `--data-order`, `--force`, `--include-obj`, `--json`, `--limit`, `--max-funcs`, `--no-refresh`, `--pool-model`, `--refresh`, `--save`, `--seed`, `--seeds`, `--seeds-per-unit`, `--selftest`, `--source-span-max`, `--span-max`, `--splits`, `--top`, `--unit`, `--weak`, `--window`.
 Exit codes: 0 ok, 1 findings or refusal, 2 could not run (the `lib.findings` convention; today's tool documents none, so `migration.md` records the current behaviour before changing it).
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
 
@@ -44,7 +46,16 @@ Inputs -> outputs: build/RMHE08/asm, map, DOL -> scored cuts, build/tmp/tudiscov
 * **alignment gap** (soft) - a >4 byte gap; weak in this binary, where `.text` is one run with gaps of only 4/8/12 bytes.
 * Every observation above is read from inside the `.fn <name>`..`.endfn <name>` span of the function it belongs to. Section *data* blocks that follow the last `.endfn` are not part of any function, and a label's own `.obj` block is not a reference to it - reading them as one is how a dangling data block became a fake two-referrer must-link anchor. A data object's `.rel <target symbol>, <label>` lines do name the symbol holding the relocated target address (`@1845`, a table of addresses inside `RSOStaticLocateObject`); that is used only as *ownership* of the object for its data run, never as a reference, so a table with several relocated functions cannot merge them.
 * What is deliberately *not* used: dtk's `auto_*` units (they are per-function build scaffolding, not TU evidence), naive `lbl_` sharing (`.sbss` 69.8 % and `.bss` 60 % of labels are shared by several functions and are ordinary cross-TU globals), and a repeated `.sdata`/`.data` *string* (an initialised `char[]` is a distinct object, never pooled). A repeated `.sdata2` float is used only through the pool model above: the repeat itself is the boundary evidence, not a mere coincidence of values.
-* Nothing is written outside `build/tmp/`: the `splits.txt` block is printed, never applied.
+* **The dump is made current before it is read (2026-10-04, `lib.artifacts`).** Every graph-reading subcommand (`at`,
+  `stats`, `cache`, `bench`, `dataorder`, `prune`) calls `ensure_dump`: a missing or stale dump is rebuilt by
+  `python tools/splits/dump_asm.py` in this tree (default policy `auto`; 3.4-3.6 s at 410 files), then read from this tree's
+  own `build/RMHE08/asm`. `--no-refresh` / `FRESH=warn` reads it as it is with one WARNING line (the old behaviour, which was
+  `stats`-only: `at`, `bench`, `dataorder` and `prune` used a stale dump silently); a refresh that cannot run (no `dtk` in this
+  tree) warns and goes on. Fresh: stdout byte-identical (measured on `stats` and `at camellia_setup128`).
+* `cache --check` answers for the graph cache without building it (`lib.artifacts`' `tudiscover-graph` check), because the
+  stamp hashes this tool's own parse code.
+* Nothing is written outside `build/tmp/` and this tree's `build/RMHE08/` (the dump refresh): the `splits.txt` block is
+  printed, never applied.
 
 ## Lib dependencies
 

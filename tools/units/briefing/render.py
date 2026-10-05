@@ -216,16 +216,18 @@ def _dump_asm_hint(lines: list[str]) -> None:
 
     The build does not write that directory (`config.yml` sets `write_asm: false`), so a lane's first
     `python tools/splits/tudiscover.py at 0x...` reports **0 functions** and reads as a tool bug -
-    measured 2026-09-27: it cost a lane its first turn. `python tools/splits/dump_asm.py` is one
-    command and ~8 s (not the 200-400 s the older build docs quote), so the fix is named here.
+    measured 2026-09-27: it cost a lane its first turn. Since `lib.artifacts` (2026-10-04) `tudiscover`
+    makes the dump itself when it is missing or stale (`python tools/splits/dump_asm.py`, 3.5 s measured),
+    so the hint says that and names the one status command.
 
     The objdump path is named here for the same reason: two lanes lost minutes on 2026-09-28 to
     `objdump: command not found`, because nothing is on `PATH` and the build's copy is under `build/`.
     """
-    lines.append("**Recon prerequisite - the asm dump.** `build/RMHE08/asm/` is not built by default "
-                 "(`write_asm: false`): run `python tools/splits/dump_asm.py` (~8 s) before any "
-                 "`python tools/splits/tudiscover.py at 0x...`. Without it `tudiscover` reports "
-                 "**0 functions** - that is the missing dump, not a bug in the tool.")
+    lines.append("**Derived artifacts - a tool refreshes its own; run `python tools/units/fresh.py status` to "
+                 "see.** `build/RMHE08/asm/` is not built by default (`write_asm: false`): `tudiscover` runs "
+                 "`python tools/splits/dump_asm.py` (~3.5 s) itself when the dump is missing or stale "
+                 "(`--no-refresh` reads it as it is), and `callers.py` answers from the split objects unless "
+                 "you pass `--refresh`. `FRESH=auto|warn|refuse` overrides a tool's default.")
     lines.append("")
     lines.append("**To read one function's bytes, use the build's own binutils - nothing is on `PATH`:** "
                  "`build/binutils/powerpc-eabi-objdump.exe -d build/RMHE08/obj/<Unit>.o` "

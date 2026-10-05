@@ -62,6 +62,7 @@ def main(argv=None):
         print("a dump is a full split: objects (skipped when unchanged) + the asm, then the stamp")
         return 0
 
+    os.makedirs(BUILD_DIR, exist_ok=True)             # a fresh worktree has no build/<game> yet
     with open(TMP_CONFIG, "w", encoding="utf-8", newline="") as fh:
         fh.write(temp_config())
     before = len(td.dump_files())

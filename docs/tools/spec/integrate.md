@@ -29,6 +29,9 @@ python tools/units/land.py integrate ARGS...        # the same, forwarded unchan
   `game/<module>: declare the integrated callees in their owners' headers` (everything else, written byte for byte from
   the tree that built: `commits_verified`); both subjects pass `commitlint.py`. `--no-commit` leaves the green tree in
   the working tree; `--dry-run` and `--no-build` never commit; `--commit` is accepted and ignored.
+* `--no-build` copies the before report without a base build, so it checks it first (`lib.artifacts` `report`, policy
+  warn: the operator asked for no build): a stale report is recorded as `before_report_stale` and logged with its reason
+  and refresh command (2026-10-04). With a build, `ninja -k 0` is the freshness judge and nothing changes.
 * `--write-status` records each request's verdict (`applied` / `judgement` / `deferred`) in its sidecar; a request the
   tree already satisfies is recorded `applied`.
 * exit 0 when the batch went green (the verdicts are in the report); **1 on a refusal**: a dirty tree, a base that does

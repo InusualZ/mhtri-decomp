@@ -7,6 +7,7 @@ import os
 import sys
 import time
 
+from tools.lib import artifacts as _artifacts
 from tools.lib import report as _report
 from tools.lib.lanes import naming
 from tools.units.landing import state
@@ -28,7 +29,8 @@ def rebuild_report(main: str) -> dict | None:
     if not os.path.exists(os.path.join(main, "build.ninja")):
         return None
     t0 = time.time()
-    p = run(["ninja", "build/RMHE08/report.json"], main)
+    # the registry's `report` refresh command (`lib.artifacts`), run unconditionally: ninja is the freshness judge
+    p = run(_artifacts.get("report").command(_artifacts.Context(main)), main)
     out = {"returncode": p.returncode, "seconds": round(time.time() - t0, 1)}
     if p.returncode != 0:
         out["detail"] = command_detail(p)

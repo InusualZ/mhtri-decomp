@@ -15,6 +15,7 @@ import tempfile
 import time
 from dataclasses import dataclass, field
 
+from tools.lib import artifacts as _artifacts
 from tools.lib import cscan
 from tools.lib import names as libnames
 from tools.lib import objcompare
@@ -1685,6 +1686,14 @@ def run(args, root: str | None = None) -> int:
         before_report = os.path.join(tempfile.gettempdir(), "integrate-report-before-%d.json" % os.getpid())
         with open(report_path, "rb") as src, open(before_report, "wb") as dst:
             dst.write(src.read())
+        if args.no_build:
+            # no base build ran, so the report may describe an older build (`lib.artifacts` `report`, warn: the
+            # operator asked for no build)
+            st = _artifacts.status("report", _artifacts.Context(root))
+            if not st.fresh:
+                summary["before_report_stale"] = st.reason
+                log.append("WARNING: the before report is %s - %s; the score comparison may use older numbers (%s)"
+                           % (st.state, st.reason, st.remedy()))
     before_targets = target_snapshot(root)
     before_objects = None if args.no_build else snapshot_objects(root)
     created: list[str] = []

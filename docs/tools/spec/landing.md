@@ -22,7 +22,8 @@ gate. The behaviour, the rows and the incidents behind them are `land.md`; this 
 * `state.py` - the invocation's recorded allowances (`--allow-rule10/12`, `--allow-orphan`) and `--unit-rename`
   pairs, read as `state.<NAME>` (a re-exported copy would not see a setter's rebinding).
 * `base.py` - `record-base` and the readers it stores (ledger, report snapshot, dirty set); the object and data
-  halves of the snapshot come from `rows/objects.py` and `rows/data.py`.
+  halves of the snapshot come from `rows/objects.py` and `rows/data.py`. Its report rebuild runs the registry's `report`
+  command (`lib.artifacts`) unconditionally - ninja judges freshness, a no-op is 0.06 s.
 * `message.py` - `.git/land_msg.txt`: written only by a green gate, cleared by every refusal; `message_error`.
 * `stage.py` - `land_stageable`, `looks_already_applied`, the pathspec commit, `land_decision`.
 * `branch.py` - `land --branch`'s apply (merge-base diff, `git apply -3`), the registration union (`unionguard`,
