@@ -1,7 +1,8 @@
 /*
- * The C++ allocation group: `operator new` / `operator delete` and the two unnamed helpers beside them.
+ * The C++ allocation group: `operator new` / `operator new[]` / `operator delete` and the unnamed helper beside them.
  *
- * .text 0x80040478-0x80040598 - `__nw__FUl` (0x44, operator new), `fn_800404BC` (0x44), `__dl__FPv` (0x4C,
+ * .text 0x80040478-0x80040598 - `__nw__FUl` (0x44, operator new), `__nwa__FUl` (0x44, operator new[]: the
+ * standard new/new[]/delete/delete[] order and a body identical to `operator new`'s), `__dl__FPv` (0x4C,
  * operator delete), `fn_8004054C` (0x4C), in that order and nothing else. Both operators work over the game's
  *
  * `fn_8004054C` must keep its `__declspec(export)`: it is the object's trailing function and nothing in the
@@ -72,7 +73,7 @@ void* operator new(unsigned long size) throw()
     return fn_80040420(size);
 }
 
-extern "C" void* fn_800404BC(unsigned long size) throw()
+void* operator new[](unsigned long size) throw()
 {
     return fn_80040420(size);
 }

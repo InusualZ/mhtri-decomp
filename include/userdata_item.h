@@ -7,10 +7,16 @@
 #include "types.h"
 
 struct NetUserProfile;   /* include/Network/net_session_close.h */
+struct _EQUIP;           /* the 12-byte equipment record - include/Pl/pl.h */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* 0x8004A20C - copies one 12-byte equipment record field by field (two bytes, two halfwords, the word at +0x06,
+ * the halfword at +0x0A); `dst` comes back in r3.  NAME (a GUESS in the scheme of its neighbour `item_pair_copy`):
+ * its ~240 callers copy the player's, the lobby's and the community profile's equipment slots with it. */
+struct _EQUIP* equip_record_copy(struct _EQUIP* dst, const struct _EQUIP* src);
 
 /* 0x8004A5AC - clears the 0x100-byte community profile and fills it from the save's user data (0 when there
  * is none).  GUESS name: the body copies the user record's bytes, names and equipment type into the profile

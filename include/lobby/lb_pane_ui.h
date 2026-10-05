@@ -154,7 +154,7 @@ void fn_801EC7AC(LbPageOwner* owner);
 u32 fn_8004D70C(s32 id);
 void fn_802DB140(u16* rows, s16 a, s16 b, u16 c, const _mh_ivec2_* pos);
 void sprite_frame_apply(_SPR_DATA_* spr, u32 id, u8 flag, s32 arg);
-void fn_8004A20C(LbIconRec* dst, const LbIconRec* src);
+void equip_record_copy(LbIconRec* dst, const LbIconRec* src);
 void fn_801F8318(LbPage* self, s16 x, s16 y);
 void fn_801F6DBC(void* dst, s16 x, s16 y, u8* ptr);
 void fn_801F353C(const s16* table, s16* out_max, s16* out_count);

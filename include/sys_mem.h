@@ -25,6 +25,8 @@ void __dl__FPv(void* p);
 
 #ifdef __cplusplus /* C++-only: outside the extern "C" block, so C++ linkage is kept */
 void* operator new(unsigned long size) throw();
+/* 0x800404BC - `__nwa__FUl`: the array form, the same body as `operator new`. */
+void* operator new[](unsigned long size) throw();
 void operator delete(void* p) throw();
 #endif
 

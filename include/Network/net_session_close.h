@@ -67,6 +67,11 @@ u8* getCommunityMemberRecord(u8 index);
 void requestCommunityNews(s8* result);
 void requestCommunityBlockList(s8* result);
 void requestFriendSync(s8* result);
+/* 0x80435E34 - asks the community layer for the profile of the peer whose id text is `id` (imported into the
+ * 0x20-byte id object 0x806E1B18) and parks `result` for the callback; for mode 1 with a quest-page slot `index`
+ * that already holds a server timeout it answers from the lobby state block instead.  NAME (a GUESS from the
+ * body; the message pool's command 24 calls it). */
+void requestPeerProfileById(const char* id, s8* result, s8 mode, u8 index);
 
 /* 0x804362E0..0x8043656C - the friend roster and the recent-player list: membership, append and remove. */
 s32 isRosterMember(const NetworkUniqueId* address);

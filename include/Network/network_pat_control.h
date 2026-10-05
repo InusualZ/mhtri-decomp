@@ -1042,8 +1042,14 @@ extern PatCamelliaKey lbl_806D3670;
 extern u8* net_arena_base;
 extern u32 net_peer_join_stamp;
 
-/* Unsplit game callees. */
-u8* fn_800404BC(u32 size);
+/* 0x80423E74 / 0x80423E88 / 0x8042402C - the PatCamellia wrapper `PatConnection` calls: build the 256-bit key
+ * schedule from `rawKey` (a tail call into `Camellia_Ekeygen`; name a GUESS in the scheme of `PatCryptDecrypt`),
+ * and encrypt / decrypt `*len` bytes of `buf` in place (`encryptBuffer` logs "PatCryptEncrypt fail" on the first's
+ * failure, which names it; `PatCryptDecrypt` is the map's own). */
+void PatCryptSetKey(const u8* rawKey);
+s32 PatCryptEncrypt(u8* buf, u16* len);
+s32 PatCryptDecrypt(u8* buf, u16* len);
+
 /* The band's own entry points this neighbour calls (owner: src/Network/network_pat_control.cpp, rule 2). */
 void resetNetSlots(NetCtrlWk* work);
 /* 0x80427868 - copies `size` bytes of a peer's card block (at `offset`) from a community update into the peer

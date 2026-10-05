@@ -14,10 +14,10 @@
  * stores the 161-slot table 0x80602198 whose slots are the destructor 0x803FCF8C, `resetDefaults` and the packet
  * handlers up to `recvCommand` 0x804120B8, and the table is followed by the V->S seam at 0x80602428 ("NHTTPStartup",
  * the next TU's first string).  Edges: left 0x803FCC34 is the `.data` vtable-then-string seam that ends
- * `Network/PatConnection.cpp`; right 0x804123F8 - `fn_804123F8` is the `NHTTPDestroy` callback whose address only the
- * tail's `fn_804130EC` takes and which calls only the tail (`getNetworkPool`, `fn_80412918`), so it opens
+ * `Network/PatConnection.cpp`; right 0x804123F8 - `onNHTTPDestroyed` is the `NHTTPDestroy` callback whose address only the
+ * tail's `stepCleanup__11NetworkPoolFv` takes and which calls only the tail (`getNetworkPool`, `advanceCleanup__11NetworkPoolFv`), so it opens
  * `Network/NetworkPool.cpp`.  The data edges follow the readers: `.sdata` 0x80793988 (read by the tail's
- * `fn_80412C98`), `.sbss` 0x80794CB8 (`getNetworkPool`'s word) and `.sdata2` 0x8079C868 (the tail's `fn_8041275C`) are
+ * `fn_80412C98`), `.sbss` 0x80794CB8 (`getNetworkPool`'s word) and `.sdata2` 0x8079C868 (the tail's `clearState__11NetworkPoolFv`) are
  * the tail's; everything before them is read only by this range.  `splitcheck --unit`: data-order PASS (the old
  * `network_layer_io` FAIL is gone).
  *
@@ -44,13 +44,15 @@
  *   (0x80602198) and the constructor stores it.  Not written: `stepPatInterface`,
  *   `postError` (+0x288), `buildErrorInfo613c`, `getErrorInfoOrCode654c`, `pushStack`, `setConnectServerType`,
  *   `chooseServerAddress`, `getFmpSelection`, the FMP/server helpers 0x803FDE48..0x803FE154, `updatePatInterface`
- *   (a tail call into `PatConnection`'s unnamed 0x803FB5E0), `getPatServerTime`, `getPatAccountName`,
- *   `getSomething4` (its declared `s8` return would add an `extsb` retail does not have), 0x803FE410 and the
+ *   (a tail call into `PatConnection`'s `setSecureServer`), `getPatServerTime`, `getPatAccountName`,
+ *   `getSomething4` (its declared `s8` return would add an `extsb` retail does not have), `getBinaryToken` and the
  *   stack/notice helpers 0x803FE4D8..0x803FE5A0.
  *
  * NAMES (GUESS, integrator 2026-10-04, from the bodies, in the scheme of `errorRecordCode613c`/`getErrorInfo654c`):
  *   `clearErrorRecord613c` 0x803FD674 clears the 0x208-byte record at +0x613C while no error is pending (+0x654C);
- *   `buildErrorInfo613c` 0x803FD6D8 fills a caller's three-word error from a code and the record's code;
+ *   `buildErrorInfo613c` 0x803FD6D8 fills a caller's three-word error from a code and the record's code (its code
+ *   constants 0x80050038 / 0x80050044 read as relocations to `fn_8004CAD8.cpp`'s functions in the split object: false
+ *   references, the `block_relocations` case `Network/NetworkFileFetcher.cpp` records);
  *   `getErrorInfoOrCode654c` 0x803FD7BC copies the pending error and substitutes a negative code for 0x80000000.
  *
  * RESIDUALS.  reportPatError 76.71 (retail materialises `&pendingError_654C` after the code load, ours before).

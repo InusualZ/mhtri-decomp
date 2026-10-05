@@ -198,6 +198,16 @@ public:
     /* 0x803FB490 - one step of the connection's close: arms it (state 0 -> 10), then releases the log context and
      * the socket and returns 1 once closed, else 0 (GUESS name from the body). */
     s32 disconnect();
+    /* 0x803FB018 - one step of the connect state machine (+0x60D1: resolve, socket, the secure open when
+     * `setSecureServer` armed it, connect); the failures fill `error` and log "PatConnection::connectServer ...
+     * fail" (.data 0x80600500..), which names it. */
+    s32 connectServer(NetworkErrorInfo* error);
+    /* 0x803FB634 - receives what the socket holds into the receive buffer; "PatConnection::receiveCommand fail"
+     * (.data 0x806005B8) names it. */
+    s32 receiveCommand(NetworkErrorInfo* error);
+    /* 0x803FB77C (GUESS name) - takes the next whole packet out of the receive buffer, decrypts it while
+     * `cryptEnabled_60D0` is set ("PatCryptDecrypt fail") and hands its header to `recvCommand` (+0x284). */
+    s32 dispatchCommand(NetworkErrorInfo* error);
 
     /* +0x0004 */ u8 pad_0004[0x60A6];   /* the connection's buffers and socket state */
     /* +0x60AA */ PatPacketHeader header_60AA;   /* the packet being dispatched */
@@ -226,6 +236,13 @@ void writeUInt32Shared(NetworkStateMachine* self, u32 value);
 void writeUInt8Array(NetworkStateMachine* self, const u8* data, u16 count);
 void writeBool(NetworkStateMachine* self, s8 value);
 
+/* 0x803FB5CC / 0x803FB5E0 / 0x803FB5F0 (GUESS names from the bodies) - copy the 4-byte server address
+ * `setServerAddress` stored at +0x84 to `out`; store the host, root certificate and its size (+0x60C4..+0x60CC)
+ * that `connectServer` hands the socket's `openSecure`; set the PatCamellia key and raise `cryptEnabled_60D0`. */
+void getServerAddress(NetworkStateMachine* self, u8* out);
+void setSecureServer(NetworkStateMachine* self, const char* host, const u8* rootCA, s32 rootCASize);
+void enableCrypt(NetworkStateMachine* self, const u8* key);
+
 /* 0x803FBB04 */
 void readUInt8(NetworkStateMachine* self, u8* out);
 /* 0x803FBB20 */
@@ -234,6 +251,9 @@ void readUInt16(NetworkStateMachine* self, u16* out);
 void readUInt32_(NetworkStateMachine* self, u32* out);
 /* 0x803FBC6C */
 void readUInt8_(NetworkStateMachine* self, s8* out);
+/* 0x803FBCA8 - the signed halfword reader (`readUInt16` into a temporary, stored as `s16`), named in its
+ * siblings' scheme (`readUInt8_`/`readInt32`, `writeInt16`). */
+void readInt16(NetworkStateMachine* self, s16* out);
 /* 0x803FBCE0 */
 void readInt32(NetworkStateMachine* self, s32* out);
 /* 0x803FBD18 */

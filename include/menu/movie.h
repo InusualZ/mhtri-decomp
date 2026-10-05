@@ -19,4 +19,17 @@ public:
     /* +0x04 */ u8 data_04[0x48];
 };   /* size: 0x4C (the constructor's memset of 0x48 bytes after the table pointer) */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* 0x8043F280 - the +0x0A byte of the movie player's state (.bss 0x806E28A0), which its playback loop 0x8043ED34
+ * raises while a movie runs (with screen dimming disabled) and clears after.  NAME (a GUESS): the pad reader, the
+ * system core and the network message pool all skip their work while it reads 1. */
+u8 isMoviePlaying(void);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_MENU_MOVIE_H */

@@ -16,7 +16,7 @@
  *
  * Residuals (2026-10-05: 71 of 88 rows at 100 %, report metric 92.5 %):
  *  - Not written: `refreshRosterCache` (it reads NetworkLayerPat's u16 at +0xF02C, a field the layer class - lane A's -
- *    does not declare yet); `fn_80435E34`/`fn_80435F48` (they need the 0x20-byte address object at 0x806E1B18 and
+ *    does not declare yet); `requestPeerProfileById`/`fn_80435F48` (they need the 0x20-byte address object at 0x806E1B18 and
  *    NetworkCommunityPat's 0x803F0F20); `fn_80436220` (192 B: it calls NetworkCommunityPat's slot +0x48 and its
  *    0x803F116C, neither declared yet); the static initialiser 0x80437204 (`net_community_state` is built with the
  *    NetworkCommunityPat band's constructor 0x803F0730 / destructor 0x803F0578, and the 0x20-byte address object at

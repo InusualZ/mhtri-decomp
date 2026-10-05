@@ -2,7 +2,7 @@
  * Network/NetworkWiiMediator.cpp - the `NetworkWiiMediator` unit (`.text` 0x80413450..0x80417BC0).
  *
  * ROUND 3 FOLD (network pilot).  One TU: the mediator head 0x80413450..0x80413C64 (`mediatorEventCallback`, the
- * constructors and destructors, `getReflectService`, `update`, `isMaintenanceMode`, `getReflectEventId`,
+ * constructors and destructors, `getReflectService`, `update`, `isMessageRestricted`, `getCountryCode`,
  * `getLanguage` - formerly the tail of `Network/network_layer_io.cpp`), the class band
  * 0x80413C64..0x804155D4 (the original text below) and the opening part 0x804155D4..0x80417BC0 (the former unit
  * `Network/network_opening.cpp`, folded in byte-identical - its header follows the class band's, below).  Evidence:
@@ -25,9 +25,10 @@
  * The constructors and destructors sit under `#pragma peephole off` (retail stages the table address in r0 and keeps
  * `extsh`+`cmpwi` on the destructor flag).
  * The `.sdata2` claim starts at 0x8079C870 (the constructor's `0.0f`, then `initMediatorTerms`'s `1.0f`; NetworkPool's
- * only pool read is 0x8079C868).  Head residuals: `isMaintenanceMode`, `getReflectEventId`, `getLanguage`, 0x80413980/0x80413A34 (the five 4-byte words copied in
- * and out), 0x80413B18 (the SO link check) are unwritten (their SC/SO callees have no
- * declaration a consumer can include yet).
+ * only pool read is 0x8079C868).  Head residuals: `isMessageRestricted`, `getCountryCode`, `getLanguage`, 0x80413980/0x80413A34 (the five 4-byte words copied in
+ * and out), `checkMediatorLink` (the SO link check) are unwritten; their callees are declared since 2026-10-05
+ * (`SCCheckPCMessageRestriction`/`SCGetCountryCode`/`SCGetLanguage` in `SC/sc.h`, `SOGetInterfaceOpt` in `SO/soi.h`;
+ * the voice path's in `ARC/arc.h`, `MSL_C/alloc.h` (`labs`) and `menu/menu_plsearch.h`).
  *
  * THE CLASS BAND (0x80413C64..0x804155D4) - its notes as written before the fold:
  *
@@ -76,7 +77,7 @@
  * registered unit owns answered only `fn_XXXXXXXX` in the map, so they were renamed through `symedit.py`
  * in this pass and every one of those names is a GUESS: `fn_803FE388` -> `setPatRange`, `fn_803FE744` ->
  * `setPatReflectField30`, `fn_8041241C` -> `getNetworkPool`, `fn_8041A1C4` ->
- * the reflect service's constructor, `fn_80413BF8` -> `getReflectEventId` and so on - each named for the
+ * the reflect service's constructor, `fn_80413BF8` -> `getCountryCode` and so on - each named for the
  * singleton (`PatInterface`) or the service (`NetworkReflectService`) it belongs to and the field or slot
  * it works on.  Within this file, `getReflectField30/34/38` and `getAccountQuery1..5` are positional (the
  * dump has no name and no caller reveals the field's meaning); `queryOpeningFlagNNN` and
@@ -592,7 +593,7 @@ void NetworkWiiMediator::agreeReflect()
  * kind the reflect reply carries, and 48 for everything else. */
 s32 dispatchReflectEvent()
 {
-    switch (getReflectEventId()) {
+    switch (getCountryCode()) {
     case 65:
         return 1;
     case 66:

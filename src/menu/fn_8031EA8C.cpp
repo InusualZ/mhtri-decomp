@@ -56,7 +56,7 @@ u32   fn_8004D70C(u32 value);
 s32   fn_800CEF18(u32 value);
 s32   fn_80217934(void);
 void  fn_803B4C64(void);
-void  fn_802E0468(u8 index, s32 value);
+void  setCockpitTransferMode(u8 index, s32 value);
 void  fn_802DFCD4(void);
 void* memset(void* dst, int value, u32 size);
 void  sysSE_stop(s32 value);
@@ -333,7 +333,7 @@ extern "C" void fn_8032422C(void) {
     s32 i;
 
     for (i = 0; i < 10; i++) {
-        fn_802E0468((u8)i, 0);
+        setCockpitTransferMode((u8)i, 0);
     }
     fn_802DFCD4();
     ai_slots_clear();

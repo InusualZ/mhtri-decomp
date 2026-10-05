@@ -118,6 +118,11 @@ typedef struct SOPollFD {
 /* 0x8051FE40 - connect the socket to the address. */
 s32 SOConnect(s32 fd, SOSockAddrIn* addr);
 
+/* 0x80521158 - read one option of a network interface (NULL: the default one) into `value` (`*length`
+ * bytes); negative on error.  The mediator's link check passes NULL, level 0xFFFE, option 0x1005 and a word. */
+struct SOInterface;
+s32 SOGetInterfaceOpt(struct SOInterface* iface, s32 level, s32 option, void* value, s32* length); /* untyped: byte range */
+
 /* 0x8051F110 (GUESS) - the current thread's error word (OSThread +0x30C), or the library's own word when no
  * thread is running. */
 s32 SOiGetLastError(void);
