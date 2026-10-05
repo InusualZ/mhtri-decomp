@@ -5,7 +5,7 @@
  * Every offset is one the target instructions address.  `NetworkReflectService` (five methods here), the
  * worker thread `GameSpyInterfaceThread`, `NetworkPeerGameSpy` and `NetworkTimedHandler` own member
  * functions; the foreign objects the target dispatches through (`GameSpyReceiver`, `NetworkPeerCallback`,
- * and `NetworkLogger`/`NetworkInstanceDispatch` in `include/unsplit/Network.h`) are classes with real
+ * `NetworkLogger` in `include/unsplit/Network.h` and `PatInterface` in `include/Network/PatInterface.h`) are classes with real
  * virtuals - the only shape MWCC emits as `lwz r12, 0x0(r3)` / `lwz r12, <slot>(r12)`; none is
  * constructed here, so no vtable is emitted for them.  `GameSpyInterfaceThread` is the exception: its
  * destructor is the class's one virtual, so this unit emits its vtable.  The peer's and the timed

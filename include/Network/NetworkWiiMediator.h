@@ -192,7 +192,8 @@ void getMediatorState68A(NetworkWiiMediatorFields* self, u8* out);
 /* The opening part's and the head's free functions (moved here from `Network/network_opening.h` and
  * `Network/network_layer_io.h` by the round 3 fold; docs/plan.md 6.5 rule 2: the owner declares). */
 struct PatTerms;
-typedef struct NetworkInstance NetworkInstance;   /* include/unsplit/Network.h */
+class PatInterface;                               /* include/Network/PatInterface.h */
+typedef PatInterface NetworkInstance;             /* include/unsplit/Network.h: the band's alias */
 
 #ifdef __cplusplus
 extern "C" {

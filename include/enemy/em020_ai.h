@@ -12,9 +12,9 @@
 
 #include "types.h"
 
-/* The network singleton `getInstance_` returns: the owner of the record is
- * `include/unsplit/Network.h`, which only needs the tag here. */
-struct NetworkInstance;
+/* The network singleton `getInstance_` returns (`mpInstance__12PatInterface`): the class is
+ * `include/Network/PatInterface.h`'s, and only the tag is needed here. */
+class PatInterface;
 /* The shared enemy work record `em020_aim_target_ck` takes a pointer to. */
 struct _ENEMY_WORK;
 
@@ -23,7 +23,7 @@ extern "C" {
 #endif
 
 /* 0x803768F0 - the network singleton (an 8-byte accessor). */
-struct NetworkInstance* getInstance_(void);
+PatInterface* getInstance_(void);
 /* 0x803768F8 - the lobby's "can leave the map" predicate (`lobby_w` +0x163/+0x16F/+0x0B0). */
 u32 fn_803768F8(void);
 /* 0x80377664 - the network big-data request entry (the `fn_804273EC(1, 0, 0)` wrapper). */

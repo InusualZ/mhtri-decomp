@@ -284,8 +284,8 @@ s32 handleNetworkState1(NetworkInstance* self)
         break;
     case 20:
         if (isOpeningMaintenanceServer((PatInterface*)st) == 0) {
-            if (st->announcePending_8270 != 0) {
-                *st->announceBufferPtr_8290 = 0;
+            if (st->maintenanceSize_8270 != 0) {
+                *st->maintenanceBuffer_8290 = 0;
             }
             st->sessionState_6132 += 10;
             break;
@@ -306,7 +306,7 @@ s32 handleNetworkState1(NetworkInstance* self)
         sendReqTermsVersion(self);
         break;
     case 40:
-        if (st->termsReady_8268 == 0 || st->dataTotal_825C == 0 || st->termsSize_826C == 0) {
+        if (st->termsChanged_8268 == 0 || st->dataTotal_825C == 0 || st->termsSize_826C == 0) {
             if (st->termsSize_826C != 0) {
                 *st->termsBufferPtr_828C = 0;
             }
@@ -326,7 +326,7 @@ s32 handleNetworkState1(NetworkInstance* self)
 
         st->sessionState_6132 += 5;
         len = st->dataTotal_825C - st->dataSent_8260;
-        sendReqTerms(self, st->termsBuffer_8264, st->dataSent_8260,
+        sendReqTerms(self, st->termsVersion_8264, st->dataSent_8260,
                      len < 8192 ? len : 8192);
         break;
     }
@@ -339,8 +339,8 @@ s32 handleNetworkState1(NetworkInstance* self)
         break;
     case 60:
         if (isOpeningMaintenanceServer((PatInterface*)st) != 0) {
-            if (st->serverInfoPending_8274 != 0) {
-                *st->serverInfoPtr_8294 = 0;
+            if (st->announceSize_8274 != 0) {
+                *st->announceBuffer_8294 = 0;
             }
             st->sessionState_6132 = 245;
             break;
@@ -349,7 +349,7 @@ s32 handleNetworkState1(NetworkInstance* self)
         sendReqAnnounce(self);
         break;
     case 70:
-        if (st->chargePending_8278 == 0) {
+        if (st->noChargeSize_8278 == 0) {
             st->sessionState_6132 += 10;
             break;
         }
@@ -382,7 +382,7 @@ s32 handleNetworkState1(NetworkInstance* self)
 
         st->sessionState_6132 += 5;
         len = st->dataTotal_825C - st->dataSent_8260;
-        sendReqVulgarityLow(self, 2, st->sendSlice_8258, len < 8192 ? len : 8192);
+        sendReqVulgarityLow(self, 2, st->sendSlice_8258, st->dataSent_8260, len < 8192 ? len : 8192);
         break;
     }
     case 105:
@@ -418,7 +418,7 @@ s32 handleNetworkState1(NetworkInstance* self)
 
         st->sessionState_6132 += 5;
         len = st->dataTotal_825C - st->dataSent_8260;
-        sendReqVulgarityLow(self, 1, st->sendSlice_8258, len < 8192 ? len : 8192);
+        sendReqVulgarityLow(self, 1, st->sendSlice_8258, st->dataSent_8260, len < 8192 ? len : 8192);
         break;
     }
     case 135:
@@ -779,7 +779,7 @@ s32 handleNetworkState2Fmp(NetworkInstance* self)
         break;
     }
     case 70:
-        if (st->handlersArmed_60E8 == 0) {
+        if (st->eventCallbacks_60D8[4] == 0) {
             dispatchSessionHandlers(st, 0x8001, 0, 0, st->fmpSlotCount_6608,
                                     (const u8*)st->fmpSlots_6C40);
         }
@@ -1096,7 +1096,7 @@ s32 sendReqUserObject(NetworkInstance* self, s32 index, NetworkUserRow* row)
         info.code_00 = -2147483648;
         info.param1_04 = 0;
         info.param2_08 = 0;
-        ((void (*)(void*, NetworkPostedError))((NetworkInstance*)self)->vtable->postError_288)(self, info);
+        ((PatInterface*)self)->postError(info);
         return -1;
     }
     found = (NetworkUserRow*)(((NetworkStateMachine*)self)->userRows_8BB8 + index * 92);
@@ -1150,7 +1150,7 @@ s32 handleNetworkState4(NetworkInstance* self, s32 arg)
 
     switch (st->fmpState_6137) {
     case 0:
-        if ((s32)st->sessionMode_65F0 != 0 && (s32)st->sessionMode_65F0 != 1) {
+        if ((s32)st->serverType_65F0 != 0 && (s32)st->serverType_65F0 != 1) {
             return -st->fmpState_6137;
         }
         st->fmpState_6137 += 5;
