@@ -57,6 +57,9 @@ f32 atan2f(f32 y, f32 x);
 /* 0x8045F37C */
 int sscanf(const char* src, const char* fmt, ...);
 
+/* 0x8045F858 */
+char* strtok(char* string, const char* delimiters);
+
 #ifdef __cplusplus
 }
 #endif

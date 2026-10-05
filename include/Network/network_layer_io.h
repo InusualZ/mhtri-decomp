@@ -452,6 +452,23 @@ u32 sendReqLayerDetailSearchFoot(NetworkInstance* self);
 /* 0x80403230 */
 void sendNtcLayerUserTransfer(NetworkInstance* self, u32 state, const u8* userId, u32 active);
 
+/* 0x8040354C */
+s32 sendReqTell(NetworkInstance* self, const u8* id, const u32* options, const char* text);
+/* 0x804035D8 */
+s32 sendReqBinaryUser(NetworkInstance* self, const u8* id, const u8* data, u16 size);
+/* 0x80403978 */
+s32 sendReqUserSearchInfo(NetworkInstance* self, const u8* query, s32 mode);
+/* 0x80403A88 */
+s32 sendReqUserStatusSet(NetworkInstance* self, const u8* settings);
+/* 0x80403BF4 */
+s32 sendReqFriendAdd(NetworkInstance* self, const u8* id, const u32* options, const char* text);
+/* 0x80403D60 */
+s32 sendReqFriendList(NetworkInstance* self, s32 mode, s32 max);
+/* 0x80403DE4 */
+s32 sendReqBlackAdd(NetworkInstance* self, const u8* id, const u32* options);
+/* 0x80403EDC */
+s32 sendReqBlackList(NetworkInstance* self, s32 mode, s32 max);
+
 #ifdef __cplusplus
 }
 #endif
