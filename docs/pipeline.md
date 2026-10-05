@@ -940,6 +940,28 @@ open request is a stylelint finding).
   again); the gate still decides rule 10 by set difference (adopt `vtableaudit.diff_rows`'s SHIFTED pairing); a
   cascading compiler error can exclude a declaration that was fine; the lane brief should require a build check after
   `git merge main` (L3's merged base did not compile until the integrator fixed `exportTo`).
+* **Round 3 (2026-10-05).** Recut first (integrator batch `850127ccb`: 363 units, mediator folded with network_opening,
+  `NetworkLayer`/`NetworkLayerPat`/`NetworkCommunity`/`NetworkFileFetcher`/`NetworkSocketWii`/`NetworkUniqueId`/
+  `NetworkUnitPacket`/`PatConnection` split out), then lane C alone (`NetworkUniqueId` as a class, `b774e3ace`), then lanes
+  A, B, D in parallel (D `f0c4a075b`, A `81d54cb4d`, B `aa5f74ea3`), each followed by its own integrator batch.
+  Ledger across round 3: closed 8472 -> 9107, matched 6255 -> 6880, bytes covered 787,208 -> 895,064, `.text` fuzzy
+  28.14 % -> 30.31 %. `splitcheck`: pool FAIL 76 (unchanged), data-order FAIL 13 -> 11. No two lanes conflicted on a
+  header; every refusal was bookkeeping, a recut artefact or a lane branch that did not carry its integration commit.
+* **Round 3 findings.** (1) `integrate.py` cuts an `integrate/<date>` branch and leaves the lane branch behind: the
+  gate then judges the pre-integration tree (lane B's first land attempt): fast-forward the lane branch to the integrate
+  commit before landing. (2) A merge of main into a lane branch can silently break the build (two lanes declared the
+  same callee with different types; a typedef changes a function's mangling): the merged base must build before the
+  integrator starts. (3) A config change that removes a relocation changes the target object of every unit that
+  held it: name those units (`enemy/em005_act`) in `--units`. (4) The recorded rule-10 keys for a recut
+  (`run:.data:805FB7C0/805FB808/805FC1E8`) were accepted under the standing ruling; `NetworkLayerPat`'s table is now
+  emitted. (5) `-O3` (and `-inline noauto`, peephole off per file) was needed for every new band unit: record the
+  measured evidence in `configure.py` and the unit header. (6) `NetworkInstance`, `NetworkStateMachine` and
+  `PatInterface` are now one type; `NetworkUniqueId` is a 0x20-byte class (the fix for the old `NetworkSmallObject`).
+* **Owner rulings pending after round 3.** Whether `PatInterface`, `network_state` and the head of `network_layer_io`
+  are one TU (their `.data` says yes, the measured pragmas say no: its constructor/destructor cannot be written to emit
+  table `0x80602198` while the units stay separate); `NetId` against `NetworkUniqueId` in the friend table;
+  `setTransferSlotMode` `u8` against `u32` (trade of 2.7 points on one row for 0.25 on two); the `0x80794868` `.sbss`
+  claim; whether `write_asm` stays false (it now costs about 1.5 s per split: the tools refresh the dump themselves).
 * **Owner rulings pending after round 2.** The three-way split of `NetworkSessionManagerPat` (wait for a
   `NetworkCommunityPat` recut: pool FAIL would rise 76 -> 77 otherwise); folding `network_layer_io`'s tail with
   `NetworkWiiMediator` and `network_opening` (their `.data` reads as one TU); the `0x80794868` `.sbss` claim (playbook 53);
