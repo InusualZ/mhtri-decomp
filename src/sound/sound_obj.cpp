@@ -1,7 +1,6 @@
 /* sound/sound_obj.cpp - the global sound object and its reverb delay lines
  *
  * `.text` 0x800E5430..0x800E7D34, 65 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): recut registered unit, built from `sound/fn_800E46E8.cpp`.
  * Name is a GUESS: the unit owns the 0xE60 B global sound object `lbl_80697980` and the line destructors `dtor_800E54A8`/`dtor_800E5548`.
  * Each function keeps the `#pragma` state it had in its retired source.
  */

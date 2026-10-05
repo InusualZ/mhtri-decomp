@@ -37,7 +37,7 @@
  * 0x8030D338 fragment, 5 screen wrappers of the old `ef/fn_8030681C.cpp` head, the 50 rows the
  * never-landed `menu/fn_80313E24.cpp` brought) plus the five bodies this pass added.
  *
- * THIS PASS (2026-09-28).  Seven bodies written and measured (7.71 % -> 8.99 %), plus the names of 22
+ * THIS PASS.  Seven bodies written and measured (7.71 % -> 8.99 %), plus the names of 22
  * of this unit's own `fn_XXXXXXXX` rows (rule 7), which the new call sites needed anyway:
  *   `put_lsp_sprite_offset` (0x8030FAC0, 160 B), `put_lsp_sprite_runs` (0x80312F18, 108 B),
  *       `put_equip_panel_row_variant` (0x803115E0, 124 B) and `put_equip_panel_row`
@@ -76,7 +76,7 @@
  *       equip panel's per-kind dispatcher, its three variants differing only in the case-0 builder.
  *       They call `fn_802E14CC__FUsP6_EQUIPPC10_mh_ivec2_` and `fn_8030A05C` (below) calls
  *       `fn_802E1134__FUsUcUlPC10_mh_ivec2_`; both addresses are in `hud/layout.cpp`'s registered
- *       range and both are declared in `include/hud/layout.h` **inside its `extern "C"` block**, so
+ *       range and both are declared in `hud/layout.h` **inside its `extern "C"` block**, so
  *       our object emits the unmangled name and `undefrefs.py` refuses the unit.  The fixing pass is
  *       mechanical: rename the two symbols (rule 7), move those two declarations into that header's
  *       C++-scope block, sweep `src/hud/layout.cpp`, and land these four bodies unchanged.
@@ -84,14 +84,14 @@
  *       `fn_802E1134` blocker.
  *   `fn_8030C314` (520 B) **measured 87.50 %** as `put_equip_category_panel` - the per-category panel
  *       dispatch.  Its tail calls `get_rare_color` (0x802DB254, owned by `ai/fn_802D44F4.cpp`), which
- *       `include/hud/layout.h` likewise declares `extern "C"`: our object emits `get_rare_color`
+ *       `hud/layout.h` likewise declares `extern "C"`: our object emits `get_rare_color`
  *       where the map has `get_rare_color__FUc`.  Declaring it at C++ scope in the *owner's* header
- *       (`include/ai/fn_802D44F4.h`, rule 2's home) clashes with that declaration while this unit
+ *       (`ai/fn_802D44F4.h`, rule 2's home) clashes with that declaration while this unit
  *       includes `hud/layout.h`, so the fix is the same one-line move.  Its `EquipWork` view stays
  *       below, because `equip_detail_page_refresh` takes it too.
  *   `PutPageArrow` (0x802DAF48) and `GetEquipName` (0x8027E9F0) were the same class of blocker and are
  *       fixed in this commit: each is now declared at C++ scope in its owner's header
- *       (`include/ai/fn_802D44F4.h` and `include/Pl/fn_8027D684.h`), so our object emits the map's
+ *       (`ai/fn_802D44F4.h` and `Pl/fn_8027D684.h`), so our object emits the map's
  *       mangled spelling.  `undefrefs.py` listed both before that fix and lists neither now.
  *   `get_lsp_data` (0x802E0550) is the one unresolved reference `undefrefs.py` still reports, and it
  *       is **pre-existing** (`git show main:src/menu/menu_infomation.cpp` spells it 9 times): the same
@@ -118,10 +118,10 @@
  * measures 81.48 -> 94.63 across the move because the merged unit compiles it with `cflags_menu`
  * (`-opt nopeephole`), which that body's target codegen wants.
  *
- * TYPES.  `MenuSlot` (include/menu/menu_item.h) is the 0x330-byte menu working record; the
+ * TYPES.  `MenuSlot` (menu/menu_item.h) is the 0x330-byte menu working record; the
  * `+0x19E`/`+0x1A0..+0x1A3`/`+0x1B0`/`+0x1EC`/`+0x1F0` fields this unit's tail reads were named on it
  * with `menu/fn_80313E24.cpp`, which is where `menu_item.h`'s own `fn_8031A638(MenuSlot*)` caller puts
- * them too.  `StatusScreenWork` (include/menu/menu_infomation.h) is the head's partial view of the
+ * them too.  `StatusScreenWork` (menu/menu_infomation.h) is the head's partial view of the
  * same record - it lives in this unit's header because `ef/fn_8030681C.cpp`'s two below-the-seam
  * bodies read it as well.  The three tail records (`EquipColumnPanel`, `EquipSlotInfo`,
  * `EquipSubInfo`) and `EquipListWork` are this unit's own.  `EquipWork` (this unit's own, defined
@@ -311,9 +311,9 @@ void fn_8031A638(MenuSlot*);
 /* Callees other units own.  Most are declared in their owner's header and included above
  * (`fn_8027FF88`, `fn_8027F11C`, `fn_8027ECAC`, `fn_8027FFFC` in `Pl/fn_8027D684.h`; `Pl_Skill_slot_item_get`
  * and `pl_item_add` in `Pl/pl_skill.h`; `fn_8029FFFC` and `get_menu_lsp_tbl` in `menu/menu_item.h`;
- * `GameMode_ck` in `ef/fn_800CDB2C.h`; `put_lsp_anchor_offset` and `get_str_tbl` in `include/unsplit/menu.h`).
+ * `GameMode_ck` in `ef/fn_800CDB2C.h`; `put_lsp_anchor_offset` and `get_str_tbl` in `unsplit/menu.h`).
  * The two below cannot: `fn_8031AE38`/`fn_8031BFEC` are owned by `menu/fn_8031A6C0.cpp`, whose header
- * declares neither and `include/unsplit/menu.h` (their old home) may not.  Declared here as this unit's
+ * declares neither and `unsplit/menu.h` (their old home) may not.  Declared here as this unit's
  * view, the way `lobby/fn_801EC9F8.cpp` declares its own. */
 void fn_8031AE38(MenuSlot* self);
 void fn_8031BFEC(void* cursor, s32 kind, MenuSlot* owner);

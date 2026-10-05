@@ -6,7 +6,7 @@
  * flag word and the +0x20/+0x2C/+0x38 vectors.  The nw4r name is `g3d_resnode.h`'s, so the record lives
  * here once and is included where needed.  `g3d/g3d_calcworld.cpp` still carries its own partial 0x1C
  * view of the same name in its source (it pre-dates this header); folding it onto this definition is a
- * residual for the conformance sweep, exactly as `include/nw4r/g3d/res_anm.h` records for its two
+ * residual for the conformance sweep, exactly as `nw4r/g3d/res_anm.h` records for its two
  * records - the layouts agree at +0x18, so the fold is mechanical.
  *
  * `AnmResult` is the animation-result record the node reads and writes (`g3d_calcworld.cpp` builds the

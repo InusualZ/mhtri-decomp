@@ -1,8 +1,7 @@
 /*
- * ef/eft_slot.cpp - phase 4 unit, `.text` 0x803432B4..0x80348A48 (76 functions, 22420 bytes).
+ * ef/eft_slot.cpp - unit, `.text` 0x803432B4..0x80348A48 (76 functions, 22420 bytes).
  *
- * PHASE 4 (docs/splits/phase4, window d).  Recut of eft_slot.cpp: its functions whose address lies in this range, in
- * address order; the rest of the range keeps its original bytes.  34 of 76 functions have a body here.
+ * 34 of 76 functions have a body here.
  *
  * FLAGS.  `cflags_main`.  The tail (0x80348A48..) is `menu/menu_effect_slot.cpp`.
  *
@@ -15,7 +14,7 @@
  * `ef/eft050.cpp`'s state dispatcher calls); every symbol this file DEFINES is named from its own body
  * (NAMES below, and the evidence next to each declaration).  The escape below records what is left.
  *
- * WHAT IT IS.  Every body drives the 0x48-byte effect instance `_EFT` (`include/ef.h`): the
+ * WHAT IT IS.  Every body drives the 0x48-byte effect instance `_EFT` (`ef.h`): the
  * range reads `flag_0x01`, `state_0x05`, `field_0x06`, `timer_0x0C`, `pos_0x18`, `rot_0x24`,
  * `work_0x38` and `area_0x44`, spawns and releases models through `ef/eft_res.cpp`'s
  * `res_eft_model_create`/`res_eft_UV_model_create`, and gates on the effect manager's
@@ -29,7 +28,7 @@
  * 0x8079B320..0x8079B360, and no `.rodata` string is referenced at all.  2. `dumpmap.py lookup`
  * answers only `zz_` placeholders (see the rule-7 line above).  3. The module is `ef` from the code:
  * the range's `self` is `_EFT` field for field (`+0x01`/`+0x05`/`+0x06`/`+0x0C`/`+0x18`/`+0x38`/
- * `+0x44`, the `include/ef.h` layout the sibling `ef/eft035.cpp` measured), it calls
+ * `+0x44`, the `ef.h` layout the sibling `ef/eft035.cpp` measured), it calls
  * `res_eft_model_create`/`res_eft_UV_model_create` (`ef/eft_res.cpp`) and the effect manager
  * `eft_control`; 4. nothing names the range - `dumpmap.py lookup` answers the dump's `zz_XXXXXXXX_`
  * placeholder for its entry points (`fn_803432B4`, `enemy_data_grp`, `eft_slot_spawn_targets`,
@@ -38,7 +37,7 @@
  * may refine.
  *
  * NAMES.  The file is `eft_slot` because the range is the `eft` family's 10-entry slot pool
- * (`lbl_806BF0A0`, one 0x3C-byte `EftSlot` per entry - the record `include/enemy/ENEMY_DATA.h` also
+ * (`lbl_806BF0A0`, one 0x3C-byte `EftSlot` per entry - the record `enemy/ENEMY_DATA.h` also
  * views as the enemy per-entry data record) plus the enemy-record scan that drives it, and the family
  * dispatches into it from the `.data` tables above.  The 34 definitions, by body:
  *
@@ -50,7 +49,7 @@
  *   * `enemy_data_find`/`enemy_data_grp` are named for the ENEMY band's use, not this one's: its
  *     20+ call sites (`enemy/fn_8013BE60.c`, `enemy/fn_80165FC8.cpp`, `enemy/fn_80170600.cpp`,
  *     `enemy/em_action.cpp`) read the returned record as `_ENEMY_DATA` (its one home is
- *     `include/enemy/ENEMY_DATA.h`) and call `enemy_data_grp(team, id)` for the group the table is
+ *     `enemy/ENEMY_DATA.h`) and call `enemy_data_grp(team, id)` for the group the table is
  *     keyed on.  This unit owns both addresses, so the names have to serve those call sites;
  *   * the definition table (`lbl_805E9168`, the `EftDef` records): `eft_def_get`, `eft_def_flags`,
  *     `eft_def_handler`, `eft_def_model_block`;

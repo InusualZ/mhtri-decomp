@@ -1,7 +1,7 @@
 /*
- * stage/stg_w.cpp - phase 4 unit, `.text` 0x802AD9C0..0x802B5640 (131 functions, 31872 bytes).
+ * stage/stg_w.cpp - unit, `.text` 0x802AD9C0..0x802B5640 (131 functions, 31872 bytes).
  *
- * PHASE 4 (docs/splits/phase4, window d).  Fold of 3 registered units: stg_w.cpp, fn_802B2978.c, fn_802B2AA0.cpp.  The
+ * Fold of 3 registered units: stg_w.cpp, fn_802B2978.c, fn_802B2AA0.cpp.  The
  * functions below are the ones those sources define, in address order; every other function of the range keeps its
  * original bytes.  75 of 131 functions have a body here.
  *
@@ -25,8 +25,7 @@
 /*
  * stage/stg_w.cpp - the stage-work block and its accessors.
  *
- * `.text` 0x802AD9C0-0x802B2978 (98 functions, 20408 B).  Registered from
- * `proposal/802AD9C0_get_stg_w__Fv.cpp`.
+ * `.text` 0x802AD9C0-0x802B2978 (98 functions, 20408 B).
  *
  * Module `stage`.  The lib and the sibling below are `stage/` (`stage/fn_802B2978.c`), and the
  * range's own entry points name the subsystem: `get_stg_w` hands back the stage-work block `stage_w`
@@ -94,7 +93,7 @@
  * the two 0x4F8-byte per-area objects and the area colour/effect drivers that read them.
  *
  * `.text` 0x802B2AA0-0x802B5C58 (39 functions, 12728 B), the run right after `stage/fn_802B2978.c`.
- * Registered once, at its final home (docs/plan.md 12), from `proposal/802B2AA0_fn_802B2AA0.cpp`.
+ * Registered once, at its final home (docs/plan.md 12).
  *
  * Name.  Module `stage`: the left neighbour is `stage/fn_802B2978.c`, the lib this file sits in is
  * `stage`, and the range's own entry points are the stage-work block (`stage_w`, .bss 0x806B87C0,
@@ -114,7 +113,7 @@
  * the retail object carries extab/extabindex, which a no-exceptions C unit could not.
  *
  * The band's types, its own entry points and the callee declarations live in
- * `include/stage/fn_802B2AA0.h` (docs/plan.md 6.5 rules 1-5); this file is the bodies.
+ * `stage/fn_802B2AA0.h` (docs/plan.md 6.5 rules 1-5); this file is the bodies.
  *
  * Sections: .text 0x802B2AA0-0x802B5C58; extab 0x80013D34-0x80013E3C (33 8-byte records - the
  * extabindex table has one entry per function that contains a `bl`); extabindex
@@ -128,7 +127,7 @@
  * pooled constant is `extern`-declared and never defined (playbook 29).
  *
  * `.sbss` 0x80794B60-0x80794B68 is claimed for `shell_set_func_ptr` (the shell-set job table pointer, typed
- * in `include/stage/shell_set_func_ptr.h`; 111 functions in 38 units read it, nothing in the DOL stores it, an
+ * in `stage/shell_set_func_ptr.h`; 111 functions in 38 units read it, nothing in the DOL stores it, an
  * RSO does).  Definer: LOW confidence (about one in three) - `.sbss` follows the text order of the defining
  * TUs, which brackets the word between Pl/fn_8028F66C|fn_80295EF4 (0x80794B58, a `u8`) and light/light.cpp
  * (0x80794B68), i.e. any of menu_item, menu_message, stage/shell, Pl/pl_yure, stage/stg_w, this unit or
@@ -419,7 +418,7 @@ extern "C" bool fn_802B0B04(u8 index, u8 bit)
 
 /* Remaps an id through lbl_805CED40; an unmapped id (0xFF) is returned unchanged.  The parameter is
  * wider than a byte: retail masks it (`clrlwi`) before the table index, so the original signature
- * was not the byte one `include/unsplit/unknown.h` guessed. */
+ * was not the byte one `unsplit/unknown.h` guessed. */
 extern "C" u32 stage_map_kind_get(u32 kind)
 {
     u8 mapped = lbl_805CED40[(u8)kind];

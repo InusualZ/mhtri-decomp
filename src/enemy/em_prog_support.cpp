@@ -1,8 +1,7 @@
 /*
- * enemy/em_prog_support.cpp - phase 4 unit, `.text` 0x80383148..0x80385EE0 (75 functions, 11672 bytes).
+ * enemy/em_prog_support.cpp - unit, `.text` 0x80383148..0x80385EE0 (75 functions, 11672 bytes).
  *
- * PHASE 4 (docs/splits/phase4, window d).  Recut of fn_80382310.cpp: its functions whose address lies in this range,
- * in address order; the rest of the range keeps its original bytes.  47 of 75 functions have a body here.
+ * 47 of 75 functions have a body here.
  *
  * FLAGS.  `cflags_main`.  GUESS (rule 7): the stem names the shared support block of the note-pane band; the four
  * helper names `note_pane_mode_set`, `note_pane_motion_set`, `note_pane_motion_end_ck`, `qn_chr_flag_set` are derived
@@ -128,7 +127,7 @@ struct NotePane {
 };
 
 /* The note record types this band shares with the band above it (0x803A3A50..) live in
- * `include/enemy/note_work.h` (rule 1: one definition, included).
+ * `enemy/note_work.h` (rule 1: one definition, included).
  */
 
 /* The band's own data / unsplit globals (referenced, never defined - rule 2/10). */

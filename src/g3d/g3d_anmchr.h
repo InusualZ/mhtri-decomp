@@ -73,7 +73,7 @@ u16 getGlyphWidth(const char* glyph);
  * cluster wraps, and it is the `font_print_ex` spelling the map records.  Declared at C++ scope,
  * outside the `extern "C"` block above, so a consumer's call mangles to the map's names.
  * Added with `menu/menu_item.cpp` (rule 2: this range owns the three addresses); `font_set_size` is
- * also declared by `include/unsplit/lobby.h`, with the same signature, so a consumer may include
+ * also declared by `unsplit/lobby.h`, with the same signature, so a consumer may include
  * both. */
 void font_set_size(s16 x, s16 y);
 /* 0x8005B740 `flfntGetPosX__Fv` (`g3d_anmchr.cpp`, C++ scope) - the font pen's x position. */
@@ -104,7 +104,7 @@ void flfntStackReset(void);
 void msg_str_gen(char* src, char* dst);
 char* flKnjMsgNumPtr(char* s, s32 index);
 /* 0x8005C7E0 - the substring search the font helpers share (a thin `strchr`); the owner defines it
- * at C linkage, as does `include/menu/menu_item_page.h`, which declares the same signature. */
+ * at C linkage, as does `menu/menu_item_page.h`, which declares the same signature. */
 extern "C" char* flfntStrChr(char* s, s32 c);
 
 /* `utf82unicode2` (`0x8005BE40`) is the other string helper this range owns, added with

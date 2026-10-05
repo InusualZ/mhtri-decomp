@@ -2,7 +2,7 @@
  * lobby/lb_server_sel_trans.cpp - the demo/event work accessors and the server-selection transition band,
  * `.text` 0x803C3A5C..0x803CCDF8.
  *
- * Phase 4 recut of `menu/get_pop_dat_ptr` (docs/splits/phase4): the registered unit's range ended at 0x803C4BA0 and its
+ * Phase 4 recut of `menu/get_pop_dat_ptr`: the registered unit's range ended at 0x803C4BA0 and its
  * tail (0x803C3A5C..0x803C4B74, the demo work accessors below) joins the 0x803C4B74..0x803CCDF8 band no registered unit held
  * (33368 B, unwritten, so `.text` measures 0 % for it).  The `demo_work` block (.bss 0x806D2B20) these accessors read is
  * this unit's `.bss` claim.  Module `lobby` and the name `lb_server_sel_trans` are the candidate's (a GUESS from the band's

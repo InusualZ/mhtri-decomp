@@ -522,25 +522,23 @@ config.warn_missing_source = True
 config.libs = [
 
     {
-        # Promoted from auto/802D0DCC_fn_802D0DCC.c (docs/plan.md: an auto unit stops being scaffolding).
         "lib": "ai",
         "mw_version": "Wii/1.3",
         "cflags": cflags_main,
         "progress_category": "game",
         "objects": [
-                        # Phase 4 (docs/splits/phase4, window d): fold of ai/fn_802D0DCC.c (was Matching, demoted), fn_802CC794, fn_802C474C, fn_802C5D10, fn_802D0F34
+                        # Phase 4: fold of ai/fn_802D0DCC.c (was Matching, demoted), fn_802CC794, fn_802C474C, fn_802C5D10, fn_802D0F34
                         # and the head of fn_802D44F4, plus the tail of light/light.cpp; the lib's cflags_main, the same for every absorbed unit.
                         Object(NonMatching, "ai/ai_npc.cpp"),
-                        # Registered from proposal/802D44F4_fn_802D44F4.cpp (`.text`
+                        # Registered (`.text`
                         # 0x802D44F4..0x802DDC04, 165 functions / 38672 B).  See the unit header for
                         # the seam, module and language evidence.
-                        # Phase 4 (window d): the band's tail (0x802D9EA4..0x802E0740), recut from ai/fn_802D44F4.cpp; same cflags_main.
+                        # Phase 4: the band's tail (0x802D9EA4..0x802E0740), recut from ai/fn_802D44F4.cpp; same cflags_main.
                         Object(NonMatching, "hud/cockpit.cpp"),
         ],
     },
 
     {
-        # Promoted from auto/802B2978_fn_802B2978.c (docs/plan.md: an auto unit stops being scaffolding).
         "lib": "stage",
         "mw_version": "Wii/1.3",
         "cflags": cflags_main,
@@ -564,12 +562,11 @@ config.libs = [
             # stage band's same deviation (see `stage/stg_w.cpp`).
             Object(NonMatching, "stage/shell.cpp"),
             Object(NonMatching, "stage/stg_w.cpp"),
-            # Camera band 0x802B5C58-0x802BEAAC (132 functions, 36436 B), registered from
-            # proposal/802B5C58_fn_802B5C58.cpp.  The lib and cflags are the neighbours' ("stage"
+            # Camera band 0x802B5C58-0x802BEAAC (132 functions, 36436 B), registered.  The lib and cflags are the neighbours' ("stage"
             # and "ai" both build with cflags_main / Wii/1.3) and the module is `camera`: the range's
             # own named exports are get_camera_pos / get_camera_direction / get_current_view_mtx /
             # set_quake_sub, and the seam at 0x802B5C58 is a .sdata2 pool jump.
-            # Phase 4 (window d): fold of the head of stage/fn_802B2AA0.cpp, camera/fn_802B5C58.cpp and the head of light/light.cpp; the lib's cflags_main.
+            # Phase 4: fold of the head of stage/fn_802B2AA0.cpp, camera/fn_802B5C58.cpp and the head of light/light.cpp; the lib's cflags_main.
             Object(NonMatching, "camera/camera_main.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
             # `802BEAAC_fn_802BEAAC.cpp` (`.text` 0x802BEAAC..0x802C474C, 103 functions / 23712 B) -
@@ -586,7 +583,6 @@ config.libs = [
     },
 
     {
-        # Promoted from auto/80324F7C_fn_80324F7C.c (docs/plan.md: an auto unit stops being scaffolding).
         "lib": "hud",
         "mw_version": "Wii/1.3",
         # cflags_hud = cflags_main + `-opt nopeephole`: every object in this lib needs the unfused forms
@@ -609,7 +605,7 @@ config.libs = [
             # range keeps `bl`s to its own tiny helpers (`fn_802E0DA8` -> `fn_802E0CE4`) and carries the
             # 74 extab records `-Cpp_exceptions on` emits.
             Object(NonMatching, "hud/layout.cpp"),
-            # Registered from proposal/802E7408_fn_802E7408.cpp (`.text` 0x802E7408..0x802EBED8, 64
+            # Registered (`.text` 0x802E7408..0x802EBED8, 64
             # functions / 19152 B; extab 0x800150C4..0x8001529C and extabindex 0x8003378C..0x80033A50,
             # 59 records each - both runs start exactly where `hud/layout.cpp`'s band's runs end).
             # The name is class-1 evidence: `.data` 0x805D5D08 is the bare source name
@@ -628,9 +624,9 @@ config.libs = [
             #   quest_gauge_blend_update  82.810 -> 100.000
             #   quest_gauge_draw          93.728 ->  96.270
             # weighted code 16553.20 B -> 16765.04 B matched, no row lower with the flag.
-            # Phase 4 (window d): fold of menu/fn_802E4978.cpp, this unit, hud/fn_802EBED8.cpp and the head of ef/eft035.cpp; `-pool off` is this unit's own and now covers the absorbed bodies (see the unit header).
+            # Phase 4: fold of menu/fn_802E4978.cpp, this unit, hud/fn_802EBED8.cpp and the head of ef/eft035.cpp; `-pool off` is this unit's own and now covers the absorbed bodies (see the unit header).
             Object(NonMatching, "hud/cockpit_quest.cpp", cflags=[*cflags_hud, "-pool off"]),
-            # Registered from proposal/803250B0_fn_803250B0.cpp, at its final home (docs/plan.md 12):
+            # Registered, at its final home (docs/plan.md 12):
             # `.text` 0x803250B0..0x803253BC (1 function, 0x30C B) plus the range's own extab
             # 0x80016224..0x8001622C and extabindex 0x8003519C..0x800351A8 (one framed function; both
             # runs start exactly where `hud/fn_80324F7C.c`'s end and the next registered band begins, and
@@ -662,13 +658,13 @@ config.libs = [
             # unit's first promotion candidate.  Not `Matching`: our object also emits the 0x164-byte
             # dispatcher switch table (`jumptable_805E0EA0`), which stays unclaimed (span-blocked by
             # `enemy/em_pl_frame`), and an 8-byte `.sdata2` pool entry.  The seam is unproven.
-            # Phase 4 (window d): fold of enemy/em_pl_frame.cpp (no bodies) and hud/net_char_sync.cpp, cflags_hud of the lib.
+            # Phase 4: fold of enemy/em_pl_frame.cpp (no bodies) and hud/net_char_sync.cpp, cflags_hud of the lib.
             Object(NonMatching, "hud/pl_frame_sync.cpp"),
         ],
     },
 
     {
-        # New module, registered from proposal/8029F3C8_body_set__FP7_BODY_WP10_BODY_DATAUcUlUc: the
+        # New module, registered: the
         # item menu (`.text` 0x8029F3C8..0x802A6624, 99 functions, 0x725C B; extab
         # 0x8001360C..0x800137D4 and extabindex 0x80030F90..0x8003123C for the 57 framed functions in
         # that range - both runs are exactly the gap between the bracketing auto objects).  Module
@@ -687,7 +683,7 @@ config.libs = [
         "progress_category": "game",
         "objects": [
             Object(NonMatching, "menu/menu_item.cpp"),
-            Object(NonMatching, "menu/menu_item_sub.cpp"),  # phase 4 stub (window d): new unit after ef/eft053, cflags_menu of the lib
+            Object(NonMatching, "menu/menu_item_sub.cpp"),  # phase 4 stub: new unit after ef/eft053, cflags_menu of the lib
             # The continuation of the menu band: proposal `802A6624_fn_802A6624.cpp` (`.text`
             # 0x802A6624..0x802AD9C0, 139 functions / 29596 B; extab 0x800137D4..0x80013B0C and
             # extabindex 0x8003123C..0x80031710).  Module `menu` from the left neighbour and from the
@@ -698,7 +694,7 @@ config.libs = [
             # as `menu_item.cpp`: the band carries 0 record-form instructions and keeps its tiny
             # same-file `bl`s.
             Object(NonMatching, "menu/menu_message.cpp"),
-            # Registered from proposal/8030D338_Put_equip_dtl_basis_sword_colorX__FP4_PLWP12_EQU.cpp
+            # Registered
             # and re-drawn by the seam round (`.text` 0x80308FB4..0x8031A6C0, 149 functions /
             # 71436 B).  Module `menu` and file name `menu_infomation.cpp` are class-1 evidence:
             # `.data` 0x805DCCDC is the bare `__FILE__` string, it has exactly one copy in the DOL
@@ -708,7 +704,7 @@ config.libs = [
             # extab 0x80015B54..0x80015F3C (125 records), extabindex 0x80034764..0x80034D40
             # (125 x 12 B).
             Object(NonMatching, "menu/menu_infomation.cpp"),
-            # Registered from proposal/8031A6C0_fn_8031A6C0.cpp (the `.text` 0x8031A6C0..0x8031EA8C
+            # Registered (the `.text` 0x8031A6C0..0x8031EA8C
             # run, 59 functions / 17356 B): the item/equipment selection screen.  Module `menu`,
             # map stem as file name (brief section 2, class 4 - the band's own `.data` run carries
             # only the *neighbouring* TU's `menu_infomation.cpp` string, never this range's).  The
@@ -718,8 +714,8 @@ config.libs = [
             # the unit header names the bodies still to write.
             Object(NonMatching, "menu/fn_8031A6C0.cpp"),
             Object(NonMatching, "menu/menu_item_effect.cpp"),  # phase 4 recut of the line above (its tail), same cflags_menu
-            Object(NonMatching, "menu/menu_effect_slot.cpp"),  # phase 4 stub (window d): tail recut of ef/eft_slot.cpp, cflags_menu of the lib
-            # Registered from proposal/8031EA8C_fn_8031EA8C.cpp: the continuation of the
+            Object(NonMatching, "menu/menu_effect_slot.cpp"),  # phase 4 stub: tail recut of ef/eft_slot.cpp, cflags_menu of the lib
+            # Registered: the continuation of the
             # item/equipment selection-screen band above `menu/fn_8031A6C0.cpp` (`.text`
             # 0x8031EA8C..0x80324F7C, 67 functions / 25840 B; extab 0x80016074..0x8001621C and
             # extabindex 0x80034F14..0x80035190, both runs contiguous with the predecessor's and the
@@ -730,7 +726,7 @@ config.libs = [
             # below: `infer.py` reads the peephole off on its objects (`fn_80324CC4`, 0 record forms
             # with 2 fold-shaped pairs) and `-use_lmw_stmw off`.
             Object(NonMatching, "menu/fn_8031EA8C.cpp"),
-            # Registered from proposal/80349DD8_fn_80349DD8.cpp (`.text` 0x80349DD8..0x8034C0C4, 22
+            # Registered (`.text` 0x80349DD8..0x8034C0C4, 22
             # functions / 8940 B; extab 0x80016FE4..0x80017094, extabindex 0x8003663C..0x80036744,
             # `.data` 0x805E91E8..0x805E91F8, `.sdata` 0x807932F0..0x80793308).  Module `menu` from the
             # band its own `.data`/`.sdata` fragments sit in and from its entry points
@@ -742,7 +738,7 @@ config.libs = [
             # its menu siblings.  `.data`/`.sdata` are claimed: both are this object's own and
             # byte-identical to the target's (`datagap.py` reports no data gap).
             Object(NonMatching, "menu/menu_item_page.cpp"),
-            # Registered from proposal/8034C0C4_fn_8034C0C4.cpp (`.text` 0x8034C0C4..0x8034C1D0, one
+            # Registered (`.text` 0x8034C0C4..0x8034C1D0, one
             # function / 268 B): the note-list entry table.  Module `menu` and file name
             # `menu_note.cpp` are class-1 evidence - the range's `__FILE__` string `.data` 0x805E91F8
             # reads "menu_note.cpp", it has exactly ONE copy in the DOL, and it is referenced by
@@ -760,7 +756,7 @@ config.libs = [
             # player band is the `extabindex` and `.sdata2` runs breaking at 0x8034D2B0.  File name
             # a GUESS from the dominant type; evidence in the file header.  `cflags_menu` (this lib).
             Object(NonMatching, "menu/menu_row.cpp"),
-            # Registered once, at its final home, from proposal/803967F0_fn_803967F0.cpp: the
+            # Registered once, at its final home: the
             # quest-result screen band (`.text` 0x803967F0..0x8039D278, 85 functions / 0x6A88 B).
             # Module `menu` (evidence class 3): the `.data` band its own tables sit in carries
             # `menu_note.cpp` (0x805E91F8) below and `menu_placeinfo.cpp` (0x80604780) above, and
@@ -775,7 +771,7 @@ config.libs = [
             # unit's `.data`/`.sdata`/`.sdata2` runs are not claimed until the bodies that emit
             # them land (see the unit header's residual list).
             Object(NonMatching, "menu/menu_result.cpp"),
-            # Registered once, at its final home, from proposal/8039D278_fn_8039D278.cpp: the
+            # Registered once, at its final home: the
             # multiplayer-result screen's box cursor band plus the enemy action/substate dispatchers
             # that share its address range (`.text` 0x8039D278..0x803A3A50, 80 functions / 0x67D8 B).
             # Module `menu` (evidence class 3): the range's head is the multi-result screen, its
@@ -791,7 +787,7 @@ config.libs = [
             # the residual list; a seam re-draw is the follow-up.  Same `cflags_menu` as its menu
             # siblings.
             Object(NonMatching, "menu/multi_result.cpp"),
-            # Registered once, at its final home, from proposal/803BE30C_get_pop_dat_ptr__Fv.cpp: the
+            # Registered once, at its final home: the
             # pop-data / option / demo system file (`.text` 0x803BE30C..0x803C4BA0, 110 functions /
             # 26772 B).  Module `menu` (evidence class 3): the range's callee surface is the menu 2D
             # library's and it shares 48-66 callees with `menu_result.cpp`/`menu_item.cpp`/
@@ -804,7 +800,7 @@ config.libs = [
             # them (docs/plan.md 8.4).  Same `cflags_menu` as its menu siblings.
             Object(NonMatching, "menu/get_pop_dat_ptr.cpp"),
             Object(NonMatching, "lobby/lb_server_sel_trans.cpp"),  # phase 4 recut of the line above (its tail), same cflags_menu
-            # Registered once, at its final home, from proposal/803AA4A4_fn_803AA4A4.cpp: the quest
+            # Registered once, at its final home: the quest
             # entry/init band (`.text` 0x803AA4A4..0x803B0F98, 70 functions / 27380 B) with extab
             # 0x80018A6C..0x80018C54 (60 records) and extabindex 0x80038E08..0x800390E4 (60 x 12 B) -
             # both runs are exactly the gap between the bracketing registrations.  Module `quest` from
@@ -819,7 +815,7 @@ config.libs = [
             # shows in its own extab record).
             Object(NonMatching, "quest/quest_item_slot.cpp"),
             Object(NonMatching, "quest/quest_entry.cpp"),
-            # Registered once, at its final home, from proposal/803B465C_fn_803B465C.cpp: the field-side
+            # Registered once, at its final home: the field-side
             # enemy population/roster manager (`.text` 0x803B465C..0x803BE30C, 139 functions / 40112 B;
             # extab 0x80018DC4..0x80019164 and extabindex 0x8003930C..0x8003987C, both the exact gap
             # between the bracketing auto objects).  Module `enemy` (evidence class 3+4, GUESS recorded
@@ -855,7 +851,7 @@ config.libs = [
             # This pass writes 6 of the 19 bodies (740 B of 10784); the other 13 keep their original
             # bytes and are listed with their blockers in the unit header and the outbox.
             Object(NonMatching, "quest/arenatask.cpp"),
-            # Phase 4 stubs (docs/splits/phase4, window e): candidate units with no bodies yet, `cflags_menu` of the lib.
+            # Phase 4 stubs: candidate units with no bodies yet, `cflags_menu` of the lib.
             Object(NonMatching, "menu/menu_placeinfo.cpp"),
             Object(NonMatching, "menu/movie.cpp"),
             Object(NonMatching, "menu/menu_plsearch.cpp"),
@@ -864,13 +860,12 @@ config.libs = [
     },
 
     {
-        # Promoted from auto/8012BA00_fn_8012BA00.c (docs/plan.md: an auto unit stops being scaffolding).
         "lib": "enemy",
         "mw_version": "Wii/1.3",
         "cflags": cflags_main,
         "progress_category": "game",
         "objects": [
-            # Registered once, at its final home (docs/plan.md 12).  The `proposal/8011D448_fn_8011D448.cpp`
+            # Registered once, at its final home (docs/plan.md 12).  The `enemy/fn_8011D448.cpp`
             # range (`.text` 0x8011D448..0x801251D0, 101 functions / 32136 B): the enemy module's
             # effect-spawner band - the `_EFT` creators whose owner is an `_ENEMY_WORK` (they install
             # `fn_8011D8C0`/`fn_8011D9B8` release/dispatch callbacks exactly like `ef/eft001.cpp`) and
@@ -881,11 +876,11 @@ config.libs = [
             # extabindex 0x80026844..0x80026BEC (78 x 12 B), .text 0x8011D448..0x801251D0.  C++ from the
             # range's mangled callees; every plain `fn_XXXXXXXX` definition is `extern "C"`.
             Object(NonMatching, "enemy/fn_8011D448.cpp"),
-                        # proposal/801251D0_fn_801251D0.cpp: the enemy control unit
+                        # enemy/em_common.cpp: the enemy control unit
             # (0x801251D0..0x8012BA00, 145 symbols). Registered once, at its final home
             # (docs/plan.md 12); cflags are this lib's.
             Object(NonMatching, "enemy/em_common.cpp"),
-            # Registered from proposal/80137604_fn_80137604 (a 0x80137604 run discovery
+            # Registered (a 0x80137604 run discovery
             # proposed): an enemy's per-motion action/rotation update set, 20 functions / 0x2670
             # bytes.  Module `enemy` from the link band (both bracketing units are `enemy`) and
             # from the code (it calls `em_act_ck(_ENEMY_WORK*)`, `get_enemy_data`, ...); C++
@@ -894,7 +889,7 @@ config.libs = [
             # placeholders, so the file keeps the map's own stem (see the unit's header).
             Object(NonMatching, "enemy/em_motion_update.cpp"),
             Object(NonMatching, "enemy/fn_80138074.c"),
-            # Registered from proposal/8013ACC4_fn_8013ACC4.cpp (a 0x8013ACC4 run discovery
+            # Registered (a 0x8013ACC4 run discovery
             # proposed): the enemy user-data command interpreter and its 0x100-entry dispatch
             # table, 3 functions / 0x119C bytes.  Module `enemy` from the link band (both
             # bracketing units are `enemy`) and from the code (`_ENEMY_WORK`, `fn_8013A900`);
@@ -903,7 +898,7 @@ config.libs = [
             # own stem (see the unit's header).
             Object(NonMatching, "enemy/fn_8013ACC4.cpp"),
             Object(NonMatching, "enemy/em_kind.cpp"),
-            # Registered from proposal/801411B8_fn_801411B8.cpp: the enemy control TU's lower half,
+            # Registered: the enemy control TU's lower half,
             # 155 functions / 0x6B28 bytes (0x801411B8..0x80147CE0), plus the extab/extabindex runs
             # its 107 framed functions carry.  Module `enemy` and file `enemy_control.cpp` from the
             # `__FILE__` string at 0x805A1BB8 ("enemy_control.cpp"), referenced only by this range's
@@ -920,13 +915,13 @@ config.libs = [
             # 104 functions).  C++ (the range defines three em003_* manglings).  The boundary is
             # provisional - see the unit header.
             Object(NonMatching, "enemy/em003_prog.cpp"),
-            # proposal/8015D860_fn_8015D860.cpp: the em008 per-action state-step band
+            # enemy/em008_prog.cpp: the em008 per-action state-step band
             # (0x8015D860..0x8015E854, 28 functions), the run between the two units above and
             # below.  C++ (the range's callees are manglings and it allocates with `operator
             # new`); registered once, at its final home - the file keeps the map's `fn_XXXXXXXX`
             # stem because no `__FILE__` string names it (rule 7 deferred, see the unit header).
             Object(NonMatching, "enemy/em008_prog.cpp"),
-            # Registered from proposal/80165FC8_fn_80165FC8.cpp: the enemy per-area seat/action unit
+            # Registered: the enemy per-area seat/action unit
             # (0x80165FC8..0x801679B0, 21 functions / 0x19E8 bytes), the exact unclaimed gap between
             # the two registered units above and below (each ends where this range begins/ends), plus
             # the extab/extabindex runs its 18 framed functions carry and the one .ctors word for its
@@ -938,7 +933,7 @@ config.libs = [
             Object(NonMatching, "enemy/em010_prog.cpp"),
             Object(NonMatching, "enemy/em011_prog.cpp"),
             Object(NonMatching, "enemy/em015_prog.cpp"),
-            # Registered from proposal/80181C88_fn_80181C88.cpp (the 0x80181C88 run discovery
+            # Registered (the 0x80181C88 run discovery
             # proposed): the enemy MHchar material/step band 0x80181C88..0x80182D5C, 21 functions /
             # 0x10D4 bytes, plus the 16 extab/extabindex entries its functions carry.  Module
             # `enemy` from the link band (fn_80178378.cpp ends at this range's start, fn_80182D5C.cpp
@@ -950,7 +945,7 @@ config.libs = [
             # file keeps the map's own stem (see the unit's header).
             Object(NonMatching, "enemy/em016_prog.cpp"),
             Object(NonMatching, "enemy/em012_prog.cpp"),
-            # Registered from proposal/80191598_fn_80191598.cpp (a 0x80191598 run discovery
+            # Registered (a 0x80191598 run discovery
             # proposed): the enemy aim/action group the per-enemy class tables at 0x805AA960..
             # 0x805AAA60 hold, 26 functions / 0x1154 bytes plus its extab/extabindex run.
             # Module `enemy` from the link band and the code (`em_act_ck(_ENEMY_WORK*)`,
@@ -959,8 +954,7 @@ config.libs = [
             # the dump answers only `zz_` placeholders, so the file keeps the map's own stem (see
             # the unit's header).
             Object(NonMatching, "enemy/em018_prog.cpp"),
-            # Registered once, at its final home (docs/plan.md 12) from
-            # proposal/801CCBC4_fn_801CCBC4.cpp (the 0x801CCBC4 run discovery proposed; 58
+            # Registered once, at its final home (docs/plan.md 12) (the 0x801CCBC4 run discovery proposed; 58
             # functions / 0x76C8 bytes): the enemy action/step band 0x801CCBC4..0x801D428C, plus the
             # extab run 0x8000FF4C..0x800100D4 and the extabindex run 0x8002BDDC..0x8002C028 its 49
             # framed functions carry.  Module `enemy` from the link band (the unit below is
@@ -971,7 +965,7 @@ config.libs = [
             # No `__FILE__` string is reachable from the range and the runtime dump answers only
             # `zz_` placeholders, so the file keeps the map's own stem (see the unit's header).
             Object(NonMatching, "enemy/em005_act.cpp"),
-            # Registered from proposal/801B0010_fn_801B0010.cpp (a 0x801B0010 run discovery
+            # Registered (a 0x801B0010 run discovery
             # proposed): the em030 (enemy #30) program unit, 60 functions / 0x4448 bytes plus the
             # extab/extabindex entries its 45 framed functions carry.  Module `enemy` from the link
             # band (both bracketing units are `enemy`) and from the range's own data: the `.data`
@@ -983,8 +977,7 @@ config.libs = [
             # own stem (see the unit's header).
             Object(NonMatching, "enemy/em030_prog.cpp"),
             Object(NonMatching, "enemy/em034_prog.cpp"),
-            # Registered once, at its final home (docs/plan.md 12) from
-            # proposal/801D80EC_fn_801D80EC: the enemy action band 0x801D80EC..0x801DB8E0, 49
+            # Registered once, at its final home (docs/plan.md 12): the enemy action band 0x801D80EC..0x801DB8E0, 49
             # functions / 0x37F4 bytes, plus the extab run 0x800101E4..0x8001031C (39 records) and
             # the extabindex run 0x8002C1C0..0x8002C394 (39 records) its framed functions carry.
             # Module `enemy` from the link band (the unit below is `enemy/fn_801D428C.cpp` and the
@@ -994,8 +987,7 @@ config.libs = [
             # string is reachable and the runtime dump answers only `zz_` placeholders, so the file
             # keeps the map's own stem (see the unit header).
             Object(NonMatching, "enemy/em007_act.cpp"),
-            # Registered once, at its final home (docs/plan.md 12) from
-            # proposal/8019ED34_fn_8019ED34.cpp (the 0x8019ED34 gap between this unit and
+            # Registered once, at its final home (docs/plan.md 12) (the 0x8019ED34 gap between this unit and
             # `enemy/fn_801A4504.cpp`; 2026-09-30 recut: left edge 0x8019E670 (the end of the preceding TU's
             # static initializer), the former enemy/fn_801A4504.cpp folded in and the head of
             # enemy/fn_801A9540.cpp taken up to 0x801AA154, one TU): the enemy motion/action band 0x8019ED34..0x801A4504, 65
@@ -1015,7 +1007,7 @@ config.libs = [
             # Registered in the 2026-09-30 recut: the em040 translation unit (no bodies written yet); the name
             # follows `em040_prog_tbl` (0x805B2808), the first data of its `.data` chunk (see the unit's header).
             Object(NonMatching, "enemy/em040_ai.cpp"),
-            # Registered from proposal/801BD6C0_fn_801BD6C0.cpp: the enemy motion/act-instruction
+            # Registered: the enemy motion/act-instruction
             # band's continuation, 128 functions / 0xC944 bytes (0x801BD6C0..0x801CA004) plus the
             # extab run 0x8000FACC..0x8000FDFC (102 records) and the extabindex run
             # 0x8002B71C..0x8002BBE4 (102 x 12 B) its framed functions carry.  Module `enemy` from
@@ -1025,8 +1017,7 @@ config.libs = [
             # callees.  No `__FILE__` string survives and the dump answers only `zz_` placeholders,
             # so the file keeps the map's own stem (see the unit header).
             Object(NonMatching, "enemy/em006_prog.cpp"),
-            # Registered once, at its final home (docs/plan.md 12) from
-            # proposal/801CA004_fn_801CA004.cpp: the enemy action/state band, 47 functions /
+            # Registered once, at its final home (docs/plan.md 12): the enemy action/state band, 47 functions /
             # 0x2BC0 bytes (0x801CA004..0x801CCBC4), plus the extab run 0x8000FDFC..0x8000FF4C and
             # the extabindex run 0x8002BBE4..0x8002BDDC its 42 framed functions carry.  Module
             # `enemy` from the link band (both bracketing registered units are `enemy/*`) and from
@@ -1035,8 +1026,7 @@ config.libs = [
             # is reachable and the dump answers only `zz_` placeholders, so the file keeps the
             # map's own stem (see the unit header).
             Object(NonMatching, "enemy/em004_act.cpp"),
-            # Registered once, at its final home (docs/plan.md 12) from
-            # proposal/801A9540_fn_801A9540.cpp: the enemy per-action state-machine band
+            # Registered once, at its final home (docs/plan.md 12): the enemy per-action state-machine band
             # (`.text` 0x801A9540..0x801B0010, 82 functions / 0x6AD0 bytes) plus its
             # extab run 0x8000F324..0x8000F54C (69 records) and extabindex run
             # 0x8002ABA0..0x8002AEDC (69 x 12 B).  Module `enemy` from the link band (both
@@ -1048,7 +1038,7 @@ config.libs = [
             # with `nm -u` over its 82 split objects) and the runtime dump answers only `zz_`
             # placeholders, so the file keeps the map's own stem (see the unit's header).
             Object(NonMatching, "enemy/em027_prog.cpp"),
-            # Registered once, at its final home (docs/plan.md 12) from proposal/8035E034_fn_8035E034.cpp:
+            # Registered once, at its final home (docs/plan.md 12):
             # the em033/em035 enemy-program handlers (`.text` 0x8035E034..0x8035F2B4, 16 functions /
             # 0x1280 bytes) plus their extab/extabindex group.  Module `enemy` from the `.data` program
             # tables `em033_prog_tbl`/`em035_prog_tbl` that list the range's entry points and from the
@@ -1056,9 +1046,9 @@ config.libs = [
             # `__FILE__` string is reachable and the dump answers only `zz_` placeholders).  Sections:
             # extab 0x80017574..0x800175DC (13 records), extabindex 0x80036E94..0x80036F30 (13 x 12 B),
             # `.text` 0x8035E034..0x8035F2B4.  C++; every plain `fn_` definition is `extern "C"`.
-            # Phase 4 (window d): fold of the head of ef/eft052.cpp (no bodies) and enemy/fn_8035E034.cpp; cflags_main of the lib.
+            # Phase 4: fold of the head of ef/eft052.cpp (no bodies) and enemy/fn_8035E034.cpp; cflags_main of the lib.
             Object(NonMatching, "enemy/em033_prog.cpp"),
-            # Registered once, at its final home (docs/plan.md 12) from proposal/8034C1D0 and re-cut
+            # Registered once, at its final home (docs/plan.md 12) and re-cut
             # 2026-09-29 to the em024 monster's own AI: `.text` 0x8034F138..0x80358624 (69 functions /
             # 38124 B), extab 0x800171A4..0x8001736C (57 records), extabindex 0x800368DC..0x80036B88
             # (57 x 12 B), `.data` 0x805EBBE0..0x805ED0C0 (`em024_prog_tbl`, the switch jump tables and
@@ -1069,7 +1059,7 @@ config.libs = [
             # File name a GUESS from `em024_prog_tbl` and the enemy id 0x18 tested by the caller of
             # `em024_action11_state5_ck`.  C++; every plain `fn_` definition is `extern "C"`.
             Object(NonMatching, "enemy/em024_ai.cpp"),
-            # Registered from proposal/8035F2B4_fn_8035F2B4.cpp, re-cut to the em035 program's own
+            # Registered, re-cut to the em035 program's own
             # half: `.text` 0x8035F2B4..0x8035FC18 (20 functions / 2404 B) plus its extab run
             # 0x800175DC..0x80017634 (11 records) and extabindex run 0x80036F30..0x80036FB4
             # (11 x 12 B), both contiguous with `enemy/fn_8035E034.cpp`'s runs above.  The brief's
@@ -1090,8 +1080,7 @@ config.libs = [
             # neighbours plus a file-wide `#pragma peephole off` (the target keeps the unfused
             # `addi`+`cmpwi` timer compares).
             Object(NonMatching, "enemy/em035_prog.cpp"),
-            # Registered once, at its final home (docs/plan.md 12) from
-            # proposal/8036CF64_fn_8036CF64.cpp: the em020 enemy program
+            # Registered once, at its final home (docs/plan.md 12): the em020 enemy program
             # (`.text` 0x8036CF64..0x80375084, 57 functions / 0x8120 B, plus its extab run
             # 0x800178E4..0x80017A5C - 47 records - and extabindex run 0x800373BC..0x800375F0 -
             # 47 x 12 B; each is exactly the gap the bracketing split objects leave).  Module
@@ -1109,8 +1098,7 @@ config.libs = [
             # `em020_prog_tbl`'s first entry (0x8036E2BC) is the apparent cut - a re-cut is requested
             # in this batch's `config_requests`.  See the unit header for the full evidence.
             Object(NonMatching, "enemy/em020_prog.cpp"),
-            # Registered once, at its final home (docs/plan.md 12) from
-            # proposal/80375424_fn_80375424.cpp: the em019 monster-AI file's body
+            # Registered once, at its final home (docs/plan.md 12): the em019 monster-AI file's body
             # (`.text` 0x80378F9C..0x8037EA64, 61 functions / 0x5AC8 bytes) with its extab
             # 0x80017C44..0x80017DBC (47 records) and extabindex 0x800378CC..0x80037B00
             # (47 x 12 B).  Module `enemy` and the name `em019` from `em019_prog_tbl`
@@ -1140,8 +1128,8 @@ config.libs = [
             # 0x8001622C-0x80016464, extabindex 0x800351A8-0x800354FC and the one `.ctors` word
             # 0x8056F39C -> fn_8032C65C.
             Object(NonMatching, "enemy/em_action.cpp"),
-            # Phase 4 (window d): folded into enemy/em020_prog.cpp (was Matching, demoted).
-            # Registered once, at its final home (docs/plan.md 12) from proposal/80387844_fn_80387844.cpp, renamed in phase 4 from `enemy/fn_80387844`:
+            # Phase 4: folded into enemy/em020_prog.cpp (was Matching, demoted).
+            # Registered once, at its final home (docs/plan.md 12), renamed in phase 4 from `enemy/fn_80387844`:
             # the em009 enemy's monster-AI action band, `.text` 0x803868DC..0x8038EC44 (2026-09-30 recut of the
             # range first registered as 0x80387844..0x8038E8E8; see the unit's header).  Module `enemy` from the code (every body drives the shared `_ENEMY_WORK` record
             # through `em_frame_check__FP11_ENEMY_WORKUsff`, `em_after_frame_check`, `get_joint_wpos_em`,
@@ -1151,7 +1139,7 @@ config.libs = [
             # signatures (rule 9).  No `__FILE__` string is reachable from the range and the runtime dump
             # answers only `zz_` placeholders, so the file stem is derived from the map's `em009_act_*` names.
             Object(NonMatching, "enemy/em009_act.cpp"),
-            # Registered once, at its final home (docs/plan.md 12) from proposal/80382310_fn_80382310.cpp:
+            # Registered once, at its final home (docs/plan.md 12):
             # the enemy note-pane/program band's shared support block, `.text` 0x80382310..0x803868DC, extab to
             # 0x8001803C, extabindex to 0x80037EC0 (2026-09-30 recut of the range first registered as
             # 0x80382310..0x80387844).  Module `enemy` from the code (every body drives the shared
@@ -1162,10 +1150,10 @@ config.libs = [
             # callees through their real signatures (rule 9).  No `__FILE__` string is referenced by the
             # range and the runtime dump answers only `zz_` placeholders, so the file keeps the map's own
             # `fn_80382310` stem.
-            # Phase 4 (window d): the old range is recut into enemy/em019_ai.cpp (head), enemy/em_prog_support.cpp and enemy/em_prog_tail.cpp; same cflags_main.
+            # Phase 4: the old range is recut into enemy/em019_ai.cpp (head), enemy/em_prog_support.cpp and enemy/em_prog_tail.cpp; same cflags_main.
             Object(NonMatching, "enemy/em_prog_support.cpp"),
             Object(NonMatching, "enemy/em_prog_tail.cpp"),
-            # Registered from proposal/802F5138_fn_802F5138.cpp (`.text` 0x802F5138..0x802FA9A0, 72
+            # Registered (`.text` 0x802F5138..0x802FA9A0, 72
             # functions / 22632 B).  Module `enemy` from the code (of the range's 194 distinct
             # callees the largest block is the enemy module - `em_die_ck`, `em_work_die_ck`,
             # `em_frame_check`, `fn_8012EC74.cpp`'s motion band - and every body drives the shared
@@ -1182,8 +1170,7 @@ config.libs = [
             # extabindex 0x80034074).
             Object(NonMatching, "enemy/fn_802F5138.cpp"),
             Object(NonMatching, "enemy/em_sub_state_prog.cpp"),  # phase 4 recut of the line above (its tail), same cflags_main
-            # Registered once, at its final home (docs/plan.md 12) from
-            # proposal/8032C920_fn_8032C920.cpp, whose range 0x8032C920..0x80334568 turned out to be
+            # Registered once, at its final home (docs/plan.md 12), whose range 0x8032C920..0x80334568 turned out to be
             # two TUs (`--max-bytes` had cut them in one).  FIRST TU 0x8032C920..0x8033041C, 74
             # functions / 15100 B: the enemy work record's action band - it hands its r3 record to
             # `em_frame_check`/`em_act_ck`/`em_die_ck`/`em_after_frame_check`/`em_get_mot_no`
@@ -1197,25 +1184,24 @@ config.libs = [
             # only `zz_` placeholders, so the file name and its own symbols come from the bodies and
             # the module's `em_<noun>_<verb>` scheme (the merger lane's naming pass, 2026-09-26).
             Object(NonMatching, "enemy/em_act_step.cpp"),
-            Object(NonMatching, "enemy/em_act_step_tail.cpp"),  # phase 4 stub (window d): tail recut of the line above, same cflags_main
+            Object(NonMatching, "enemy/em_act_step_tail.cpp"),  # phase 4 stub: tail recut of the line above, same cflags_main
         ],
     },
 
     {
-        # Promoted from auto/800D7F54_fn_800D7F54.cpp (docs/plan.md: an auto unit stops being scaffolding).
         "lib": "sound",
         "mw_version": "Wii/1.3",
         "cflags": cflags_main,
         "progress_category": "game",
         "objects": [
                         Object(NonMatching, "sound/fn_800D7F54.cpp"),
-            # Registered from proposal/800DD1F0_fn_800DD1F0.cpp (125 symbols / 0x6ACC bytes) and recut in phase 4: the head is folded into
+            # Registered (125 symbols / 0x6ACC bytes) and recut in phase 4: the head is folded into
             # sound/fn_800D7F54.cpp, this row is the SE request cluster's middle, then the `MHchar` model class and the job request.
             # `sound` module (src/unsplit/sound.h is the band) and C++ (the `* __FP...` / `move__6MHcharFUs` manglings).
             Object(NonMatching, "sound/se_req.cpp"),
             Object(NonMatching, "sound/mhchar.cpp"),
             Object(NonMatching, "sound/sound_job.cpp"),
-            # Registered from proposal/800E3CBC_fn_800E3CBC.cpp (the 0x800E3CBC run discovery
+            # Registered (the 0x800E3CBC run discovery
             # proposed).  Module from the placed link-neighbour sound/fn_800E46E8.cpp; the dump's
             # prim_init_all/set_blendmode/set_zmode name the functions, not the TU (see the file header).
             Object(NonMatching, "sound/fn_800E3CBC.cpp"),
@@ -1223,7 +1209,7 @@ config.libs = [
             Object(NonMatching, "sound/sound_obj.cpp"),
             Object(NonMatching, "sound/snd_stream_reloc.cpp"),
             Object(NonMatching, "sound/snd_level_tbl.cpp"),
-            # Registered from proposal/800E8E60_fn_800E8E60.cpp (a 0x800E8E60 run discovery proposed).
+            # Registered (a 0x800E8E60 run discovery proposed).
             # The quest/challenge sound work system: 149 functions / 0x6978 bytes.  C++ from the range's
             # own mangled symbols; no `__FILE__` string survives, so the map's stem is the file name.
             Object(NonMatching, "sound/fn_800E8E60.cpp"),
@@ -1231,7 +1217,7 @@ config.libs = [
             Object(NonMatching, "sound/snd_voice_pool.cpp"),
             Object(NonMatching, "sound/quest_snd.cpp"),
             Object(NonMatching, "sound/snd_bank_loader.cpp"),
-            # Registered from proposal/800F2A94_fn_800F2A94.cpp (a 0x800F2A94 run discovery proposed,
+            # Registered (a 0x800F2A94 run discovery proposed,
             # 88 functions / 27408 B).  Same lib and same cflags as its neighbours: the range continues the
             # sound band up to the effect (eft_control) block at 0x800F6520.  Flags are this lib's
             # cflags_main; the per-symbol measurements are in the worker's outbox.
@@ -1240,14 +1226,12 @@ config.libs = [
     },
 
     {
-        # Promoted from auto/800BFFD4_fn_800BFFD4.cpp (docs/plan.md: an auto unit stops being scaffolding).
         "lib": "ef",
         "mw_version": "Wii/1.3",
         "cflags": cflags_main,
         "progress_category": "game",
         "objects": [
-            # Registered once, at its final home (docs/plan.md 12) from
-            # proposal/80358624_fn_80358624.cpp: the `eft052` effect family (its `_EFT` tag is 52)
+            # Registered once, at its final home (docs/plan.md 12): the `eft052` effect family (its `_EFT` tag is 52)
             # and the cockpit item-page band it draws from (`.text` 0x80358624..0x8035E034, 92
             # functions / 23056 B).  Module `ef` (brief class 3): the range is an `eft` family plus
             # the cockpit hold/item layer in exactly the shape the registered `ef/eft050.cpp`
@@ -1266,7 +1250,7 @@ config.libs = [
             # `.sdata2` pool 0x8079B640..0x8079B704 and the extab/extabindex records stay
             # unclaimed (the pooled constants and tables are declared, never defined).
             Object(NonMatching, "ef/eft052.cpp"),
-            # Registered once, at its final home (docs/plan.md 12).  The `proposal/8009B374_fn_8009B374`
+            # Registered once, at its final home (docs/plan.md 12).  The `ef/ef_util.cpp`
             # range (`.text` 0x8009B374..0x8009CD64, 16 functions / 6640 B): the NW4R effect library's
             # shared math/utility file.  The range's own `__FILE__` string (`ef_util.cpp` at 0x80591948,
             # read out of orig/RMHE08/sys/main.dol) names the TU - see the unit's file header.  Sections:
@@ -1276,26 +1260,26 @@ config.libs = [
             # cannot move the object or change its codegen.
             Object(NonMatching, "ef/ef_util.cpp"),
             # Registered once, at its final home (docs/plan.md 12).  The
-            # `proposal/8009CDBC_fn_8009CDBC` range (0x8009CDBC..0x800A3044, 26 functions): the
+            # `ef/ef_animcurve.cpp` range (0x8009CDBC..0x800A3044, 26 functions): the
             # effect library's key-frame animation curve.  The range's own `__FILE__` string
             # (`ef_animcurve.cpp` at 0x80591E68) names the TU - see the unit's file header.  Sections:
             # extab 0x80009A98..0x80009B40, extabindex 0x80022BC0..0x80022CBC,
             # .text 0x8009CDBC..0x800A3044.
             Object(NonMatching, "ef/ef_animcurve.cpp"),
             # Registered once, at its final home (docs/plan.md 12).  The
-            # `proposal/800A3044_fn_800A3044` range (0x800A3044..0x800A388C, 7 functions): the NW4R
+            # `ef/ef_creationqueue.cpp` range (0x800A3044..0x800A388C, 7 functions): the NW4R
             # effect library's creation queue.  The range's own `__FILE__` string (`ef_creationqueue.cpp`
             # at 0x805922C0) names the TU - see the unit's file header.
             Object(NonMatching, "ef/ef_creationqueue.cpp"),
             # Registered once, at its final home (docs/plan.md 12).  The
-            # `proposal/800A388C_fn_800A388C` range (0x800A388C..0x800A40F4, 9 functions): the NW4R
+            # `ef/ef_draworder.cpp` range (0x800A388C..0x800A40F4, 9 functions): the NW4R
             # effect library's draw-order helpers.  The range's own `__FILE__` string
             # (`ef_draworder.cpp` at 0x805923A0) names the TU - see the unit's file header.  Sections:
             # extab 0x80009B60..0x80009BA0, extabindex 0x80022CEC..0x80022D4C,
             # .text 0x800A388C..0x800A40F4.
             Object(NonMatching, "ef/ef_draworder.cpp"),
             # Registered once, at its final home (docs/plan.md 12).  The
-            # `proposal/800A40F4_fn_800A40F4` range (0x800A40F4..0x800A56B0, 39 functions): the NW4R
+            # `ef/ef_effect.cpp` range (0x800A40F4..0x800A56B0, 39 functions): the NW4R
             # effect library's `nw4r::ef::Effect` object (its table lbl_80592588, the create/retire
             # paths, the emitter sweeps and the EffectSystem constructor/destructor).  The range's own
             # `__FILE__` string (`ef_effect.cpp` at 0x80592430) names the TU - see the unit's file
@@ -1303,7 +1287,7 @@ config.libs = [
             # .text 0x800A40F4..0x800A56B0.
             Object(NonMatching, "ef/ef_effect.cpp"),
             # Registered once, at its final home (docs/plan.md 12).  The
-            # `proposal/800A56B0_fn_800A56B0` range (0x800A56B0..0x800A6350, 23 functions): the game side
+            # `ef/ef_effectsystem.cpp` range (0x800A56B0..0x800A6350, 23 functions): the game side
             # of the NW4R effect library's system object.  The range's own `__FILE__` string
             # (`ef_effectsystem.cpp` at 0x80592698) names the TU - see the unit's file header.  Sections:
             # extab 0x80009C38..0x80009CD4, extabindex 0x80022E30..0x80022EE4,
@@ -1311,7 +1295,7 @@ config.libs = [
             Object(NonMatching, "ef/ef_effectsystem.cpp"),
                         Object(NonMatching, "ef/ef_drawstripestrategy.cpp"),
             Object(NonMatching, "ef/ef_particlemanager.cpp"),
-            # Registered once, at its final home (docs/plan.md 12).  The `proposal/800AEE48_fn_800AEE48`
+            # Registered once, at its final home (docs/plan.md 12).  The `ef/fn_800AEE48.cpp`
             # range, recut in phase 4: this row keeps the first two TUs (ef_postfield.cpp, ef_resource.cpp) of `nw4r::ef`; the
             # ef_drawstripestrategy.cpp head is `ef/ef_drawstripestrategy.cpp` (its row is above, by file order of the old registration).
             # C++ from the `.cpp` __FILE__ strings and Panic__Q24nw4r2dbFPCciPCce.
@@ -1322,7 +1306,7 @@ config.libs = [
                         Object(NonMatching, "ef/ef_drawsmoothstripestrategy.cpp"),
             Object(NonMatching, "ef/ef_drawstrategyimpl.cpp"),
             Object(NonMatching, "ef/ef_drawfreestrategy.cpp"),
-            # Registered from proposal/800C9540_fn_800C9540.cpp (a 0x800C9540 run discovery proposed).
+            # Registered (a 0x800C9540 run discovery proposed).
             Object(NonMatching, "ef/ef_torus.cpp"),
             Object(NonMatching, "ef/ef_cube.cpp"),
             Object(NonMatching, "ef/ef_cylinder.cpp"),
@@ -1342,18 +1326,18 @@ config.libs = [
             Object(NonMatching, "ef/ef_point.cpp"),
             # Carved out of the 0x800CDB2C proposal range on 2026-09-30: the `ef_sphere.cpp` TU (one function; see the unit header).
             Object(NonMatching, "ef/ef_sphere.cpp"),
-            # Registered from proposal/800CDB2C_fn_800CDB2C.cpp (a 0x800CDB2C run discovery proposed at a --max-bytes cap, recut
+            # Registered (a 0x800CDB2C run discovery proposed at a --max-bytes cap, recut
             # 2026-09-30 and renamed in phase 4) - the game-system core; see the unit's file header.
             Object(NonMatching, "ef/system_core.cpp"),
             Object(NonMatching, "ef/eft001.cpp"),
             # Registered once, at its final home (docs/plan.md 12).  The
-            # `proposal/800F6520_fn_800F6520` range (0x800F6520..0x800F95A4, 43 functions): the game's
+            # `ef/eft_res.cpp` range (0x800F6520..0x800F95A4, 43 functions): the game's
             # eft resource manager (eft_control, the 256-slot proID table, the load/create path and the
             # effect-heap push).  Module `ef` from both bracketing units; the name follows the siblings'
             # scheme - see the unit's file header for the evidence.
             Object(NonMatching, "ef/eft_res.cpp"),
             # Registered once, at its final home (docs/plan.md 12).  The
-            # `proposal/800F95A4_fn_800F95A4` range: the game's `effect.cpp` manager, named from the
+            # `ef/effect.cpp` range: the game's `effect.cpp` manager, named from the
             # range's own `__FILE__` string (0x8059B5D0, cited by fn_800F9884's Panic).
             Object(NonMatching, "ef/effect.cpp"),
             Object(NonMatching, "ef/eft_model_slot.cpp"),
@@ -1367,26 +1351,26 @@ config.libs = [
             Object(NonMatching, "ef/eft007.cpp"),
             Object(NonMatching, "ef/eft009.cpp"),
             Object(NonMatching, "ef/fn_80104BD0.c"),
-            # Registered once, at its final home (docs/plan.md 12).  proposal/80105314_fn_80105314:
+            # Registered once, at its final home (docs/plan.md 12).  ef/fn_80105314.cpp:
             # a maximal unclaimed run, seam unproven; class 4 decided the name (the map's
             # fn_80105314 stem, the scheme the bracketing fn_80104BD0/fn_8010D1A8 units use) and
             # the range holds several original effect families - see the unit's file header.
             Object(NonMatching, "ef/fn_80105314.cpp"),
             Object(NonMatching, "ef/eft013_fx.cpp"),
-            # Registered from proposal/8010BDE4_fn_8010BDE4.cpp (a 0x8010BDE4 run discovery proposed).
+            # Registered (a 0x8010BDE4 run discovery proposed).
             # The range's own symbols are plain fn_XXXXXXXX (rule 7 deferred); it is built as C++
             # because every callee it reaches is a C++ mangling (rule 9) - see the unit's header.
             Object(NonMatching, "ef/fn_8010BDE4.cpp"),
             Object(NonMatching, "ef/fn_8010D1A8.c"),
             # Registered once, at its final home (docs/plan.md 12).  The
-            # `proposal/801121DC_eft019_set__FPQ34nw4r4math4VEC3UcUc` range: named from the runtime
+            # `ef/eft019.cpp` range: named from the runtime
             # dump's own `eft019_set` (dumpmap.py), C++ from its mangled definition.
             Object(NonMatching, "ef/eft019.cpp"),
             Object(NonMatching, "ef/fn_80114E34.cpp"),
             Object(NonMatching, "ef/eft022_fx.cpp"),
             Object(NonMatching, "ef/fn_8011722C.c"),
             # Registered once, at its final home (docs/plan.md 12).  The
-            # `proposal/801173AC_fn_801173AC.cpp` range (`.text` 0x801173AC..0x80119C44, 30 functions
+            # `ef/fn_801173AC.cpp` range (`.text` 0x801173AC..0x80119C44, 30 functions
             # / 10392 B): the tail of the eft024 job machine, the whole eft025 player family, the whole
             # eft026 enemy family and the head of eft028.  Two of the range's own definitions are
             # manglings (`eft026_set__FP4_PLWUcUlUl`, `eft028_set_koware__FUcPQ34nw4r4math4VEC3Ucl`), so
@@ -1396,7 +1380,7 @@ config.libs = [
             Object(NonMatching, "ef/fn_801173AC.cpp"),
             Object(NonMatching, "ef/eft026_fx.cpp"),
             Object(NonMatching, "ef/fn_80119C44.c"),
-            # Registered once, at its final home (docs/plan.md 12).  The `proposal/80119DEC_fn_80119DEC`
+            # Registered once, at its final home (docs/plan.md 12).  The `ef/eft029.cpp`
             # range, at the TU-bounded 0x80119DEC..0x8011D448 the attribution queue carries: the runtime
             # dump's own `eft029_set_scale` / `eft029_set_kaihou` name the TU (dumpmap.py); C++ from
             # their mangled definitions.  See the unit's file header for the stale-brief record.
@@ -1413,7 +1397,7 @@ config.libs = [
             # two-cluster evidence.
             Object(NonMatching, "ef/eft035.cpp"),
             # Registered once, at its final home (docs/plan.md 12).  The
-            # `proposal/8033F270_fn_8033F270` range (`.text` 0x8033F270..0x803432B4, 46 functions /
+            # `ef/eft050.cpp` range (`.text` 0x8033F270..0x803432B4, 46 functions /
             # 16452 B): the runtime dump's own `eft050_set` at 0x80342F34 names the TU (dumpmap.py;
             # every other address is the dump's `zz_XXXXXXXX_` placeholder), so the module is `ef`
             # and the file follows the `eft00X.cpp` scheme of the neighbours.  Sections: extab
@@ -1422,8 +1406,7 @@ config.libs = [
             # seam is unproven (one maximal unclaimed run); see the unit's file header.
             Object(NonMatching, "ef/eft050.cpp"),
             Object(NonMatching, "ef/fn_803066F0.c"),
-            # Registered once, at its final home (docs/plan.md 12) from
-            # proposal/8030681C_fn_8030681C.cpp, and re-drawn by the seam round (`.text`
+            # Registered once, at its final home (docs/plan.md 12), and re-drawn by the seam round (`.text`
             # 0x8030681C..0x80308FB4, 32 functions / 10136 B): the eft041/042 effect machine, whose
             # first body drives fn_803066F0's `_EFT` record and which defines `eft042_set2`.  The
             # `menu_infomation.cpp` `__FILE__` string's referrer set puts the seam at 0x80308FB4 (the
@@ -1433,7 +1416,7 @@ config.libs = [
             # bracket).  C++; every plain `fn_` definition is `extern "C"`.  Sections: extab
             # 0x80015AB4..0x80015B54 (20 records), extabindex 0x80034674..0x80034764 (20 x 12 B).
             Object(NonMatching, "ef/fn_8030681C.cpp"),
-            # proposal/803432B4_fn_803432B4.cpp: the `_EFT` family at `.text` 0x803432B4..0x80349DD8
+            # ef/eft_slot.cpp: the `_EFT` family at `.text` 0x803432B4..0x80349DD8
             # (92 functions / 0x6B24 bytes).  Module `ef` from the code: the range's `self` is the
             # 0x48-byte `_EFT` field for field (`flag_0x01`, `state_0x05`, `field_0x06`,
             # `timer_0x0C`, `pos_0x18`, `work_0x38`, `area_0x44` - the `src/ef.h` layout), it
@@ -1448,7 +1431,7 @@ config.libs = [
             # 0x800362F4..0x8003663C, `.ctors` 0x8056F3A4, `.data` 0x805E9168..0x805E91E8.  C++;
             # every plain `fn_` definition is `extern "C"`.
             Object(NonMatching, "ef/eft_slot.cpp"),
-            # Registered from proposal/80366618_fn_80366618.cpp, whose 0x80366618..0x8036CF64 range is a
+            # Registered, whose 0x80366618..0x8036CF64 range is a
             # discovery `--max-bytes` cut.  `tudiscover.py at 0x80366618` returns a 15-function MATCH SET,
             # 0x80366618..0x8036A690, from two must-link `lbl_8079B744` anchors; the range's private
             # `.sdata2` run (0x8079B740..0x8079B820, no leak) ends at its last referrer `fn_80369D50`,
@@ -1463,7 +1446,6 @@ config.libs = [
     },
 
     {
-        # Promoted from auto/8009AA78_fn_8009AA78.c (docs/plan.md: an auto unit stops being scaffolding).
         "lib": "gx",
         "mw_version": "Wii/1.3",
         "cflags": cflags_main,
@@ -1504,14 +1486,14 @@ config.libs = [
         "cflags": cflags_ppceabi,
         "progress_category": "sdk",  # str | List[str]
         "objects": [
-            # Phase 4 stubs (docs/splits/phase4, window e): MSL/runtime candidate units with no bodies yet.
+            # Phase 4 stubs: MSL/runtime candidate units with no bodies yet.
             Object(NonMatching, "MSL/strlen.cpp"),
             Object(NonMatching, "Runtime.PPCEABI.H/__va_arg.cpp"),
             Object(NonMatching, "Runtime.PPCEABI.H/global_destructor_chain.c"),
             Object(NonMatching, "Runtime.PPCEABI.H/CPlusLibPPC.cpp"),
             Object(NonMatching, "Runtime.PPCEABI.H/runtime.cpp"),
             Object(NonMatching, "MSL_C/alloc.cpp"),
-            # Phase 4 stubs (docs/splits/phase4, window fg): the MSL libm (fdlibm) units after MSL_C/alloc.
+            # Phase 4 stubs (window fg): the MSL libm (fdlibm) units after MSL_C/alloc.
             Object(NonMatching, "MSL/e_asin.cpp"),
             Object(NonMatching, "MSL/e_atan2.cpp"),
             Object(NonMatching, "MSL/e_fmod.cpp"),
@@ -1567,7 +1549,7 @@ config.libs = [
         # tiebreak is the comment version (config.yml mw_comment_version: 14 == 3.0a3's 0e byte,
         # 3.0a5.2 and the Wii compilers emit 0f) - that is a config value, not retail evidence, since
         # the DOL carries no .comment section at all.
-        # Method: docs/matching.md 17 (cross-family version matrix).
+        # Method: playbook 17 (cross-family version matrix).
         "mw_version": "GC/3.0a3",
         "cflags": cflags_rso,
         "host": False,
@@ -1687,7 +1669,7 @@ config.libs = [
         "objects": [
             # 36-byte `ResAnmAmbLight`-cluster accessor.  Re-homed from the mis-named
             # `g3d/g3d_resanmamblight.c` when the wQ-recut carved the real `g3d_resanmamblight.cpp`
-            # (0x80089F94) out of auto/800898B0: its neighbours cite `g3d_anmscn.cpp` and the region's
+            # (0x80089F94) out of g3d/g3d_resanm.c: its neighbours cite `g3d_anmscn.cpp` and the region's
             # data fragment is g3d_anmscn.cpp's, so the file took its own TU's name.  Real C++ since the
             # wR-mangling pass: the map's `fn_800680A8`/`fn_80066C8C` were placeholders, so the source mangles
             # and the MAP was renamed to `fn_800680A8__FPv`/`fn_80066C8C__FPv` (playbook 48); the object is
@@ -1711,14 +1693,14 @@ config.libs = [
             # cluster keeps the map's own stem, as `g3d/fn_80063888.cpp` did beside it; internal seam
             # near 0x8006946C/0x800697D4/0x80069CF4 (see the file header).
             Object(NonMatching, "g3d/fn_800680CC.cpp"),   # 0x800680CC-0x8006EAC0
-            # Registered from proposal/8006EE78_fn_8006EE78 (the 0x8006EE78 range).  The range spans
+            # Registered (the 0x8006EE78 range).  The range spans
             # two original TUs, proven by their own `__FILE__` strings read out of orig/RMHE08/sys/main.dol:
             # fn_8006EE78's Panic cites `lbl_8058D7E0` = "g3d_calcmaterial.cpp", and fn_8006F738 - the
             # file's first body - cites `lbl_8058D938` = "g3d_calcview.cpp".  Each is registered once at
             # its final home; the seam is 0x8006F738 and is also the extab/extabindex boundary.
             Object(NonMatching, "g3d/g3d_calcmaterial.cpp"), # 0x8006EE78-0x8006F738
             Object(NonMatching, "g3d/g3d_calcview.cpp"),     # 0x8006F738-0x8007270C
-            # Registered from proposal/8006EAC0_fn_8006EAC0 (the 0x8006EAC0-0x8006EE78 maximal
+            # Registered (the 0x8006EAC0-0x8006EE78 maximal
             # unclaimed run).  `g3d` from the region's own `__FILE__` string (`lbl_8058D6C0` =
             # "g3d_anmvis.cpp", reached by fn_8006EAC0/ECB4/ED84's nw4r::db::Panic asserts).
             Object(NonMatching, "g3d/g3d_anmvis.cpp"),     # 0x8006EAC0-0x8006EE78
@@ -1845,7 +1827,7 @@ config.libs = [
             # `.text` 0x800916FC-0x80093990, `extab` 0x80009208-0x800093A8 (52 records),
             # `extabindex` 0x80021EE8-0x80022158 (52 entries).  See the file header.
             Object(NonMatching, "g3d/g3d_resanmtexsrt.cpp"), # 0x800916FC-0x80093990
-            # Registered from proposal/800D77B0_fn_800D77B0 (the 0x800D77B0 two-function run).  `g3d`
+            # Registered (the 0x800D77B0 two-function run).  `g3d`
             # from `g3d/g3d_calcworld.cpp`, which calls fn_800D77B0 (`fn_800737CC`'s per-node matrix
             # builder) and names it; the range's own data has no `__FILE__` string, so the name stays
             # the map's `fn_` stem (docs/plan.md 12, the register-once rule).
@@ -1964,7 +1946,7 @@ config.libs = [
             # (0x803E3598, now defined in the same TU) is inlined into `stepRequest` (90.74 against 100.00; retail calls it).
             Object(NonMatching, "Network/NetworkLayerPat.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
-            # Phase 4 stubs (docs/splits/phase4, window e): units of the reconciled candidate with no bodies yet.
+            # Phase 4 stubs: units of the reconciled candidate with no bodies yet.
             # Each source's header says what the range is and what is unknown; flags are the lib default, unmeasured.
             # Round 3 recut of the phase 4 stub (unit headers): the community base class and the units after the class.
             # `NetworkCommunity`: `-O3 -inline noauto` like `NetworkLayerPat` - measured over the unit's 27 rows (same
@@ -2124,7 +2106,7 @@ config.libs = [
             # so no consumer may claim them without taking rows only the other consumer reads.
             # One owner is what lets every consumer include `Network/network_shared_data.h`
             # instead of declaring the words into its own file, which is the rule-12 finding those
-            # 14 declarations were in `include/Network/NetworkSessionManager.h`.  Registered once, at its
+            # 14 declarations were in `Network/NetworkSessionManager.h`.  Registered once, at its
             # final home; the `-O3` override above does not apply (no code in this unit).
             Object(NonMatching, "Network/network_shared_data.cpp"),
             # Registered once, at its final home (docs/plan.md 12): proposal
@@ -2298,7 +2280,7 @@ config.libs = [
             # like the AX band above, and the source restores -O4,p's 16-byte function alignment with
             # `#pragma function_align 16` (every start in the range is 16-aligned).
             Object(NonMatching, "EXI/ProbeBarnacle.c"),
-            # Phase 4 stubs (docs/splits/phase4, window fg): SDK candidate units with no bodies yet.
+            # Phase 4 stubs (window fg): SDK candidate units with no bodies yet.
             Object(NonMatching, "TRK/TRK_flush_cache.cpp"),
             Object(NonMatching, "ARC/arc.cpp"),
             Object(NonMatching, "BTE/gki_buffer.cpp"),
@@ -2373,8 +2355,7 @@ config.libs = [
             Object(NonMatching, "lobby/lb_menu_scratch.cpp"),
             Object(NonMatching, "lobby/lb_menu_pos_tbl.cpp"),
             Object(NonMatching, "lobby/lb_equip_page.cpp"),
-            # Registered once, at its final home (docs/plan.md 12) from
-            # proposal/802FA9A0_fn_802FA9A0.cpp: the lobby event/status band
+            # Registered once, at its final home (docs/plan.md 12): the lobby event/status band
             # (`.text` 0x802FA9A0..0x8030121C, 120 symbols / 26748 B, plus its extab run
             # 0x800156B4..0x80015964 and extabindex run 0x80034074..0x8003447C - 86 records each, both
             # exactly the gap between the bracketing registered units' runs).  It links between the
@@ -2385,8 +2366,7 @@ config.libs = [
             # (class 4).  Same `cflags_lobby` as the band below, with the per-file
             # `#pragma exceptions on` the other lobby units use to emit the unwind records.
             Object(NonMatching, "lobby/fn_802FA9A0.cpp"),
-            # Registered once, at its final home (docs/plan.md 12) from
-            # proposal/8030121C_fn_8030121C.cpp: the lobby UI band
+            # Registered once, at its final home (docs/plan.md 12): the lobby UI band
             # (`.text` 0x8030121C..0x803066F0, 52 symbols / 21716 B, plus its extab run
             # 0x80015964..0x80015AAC and extabindex run 0x8003447C..0x80034668 - both exactly the gap
             # between the bracketing registered units' runs).  Module `lobby` (class 3): the range's
@@ -2397,7 +2377,7 @@ config.libs = [
             # (class 4).  Same `cflags_lobby` as the band below, with the per-file
             # `#pragma exceptions on` the other lobby units use to emit the unwind records.
             Object(NonMatching, "lobby/fn_8030121C.cpp"),
-            # proposal/80338808_fn_80338808.cpp: the lobby companion/status UI band
+            # lobby/lb_companion_ui.cpp: the lobby companion/status UI band
             # (`.text` 0x80338808..0x8033F270, 133 functions / 27240 B, plus its extab run
             # 0x80016994..0x80016CA4 and extabindex run 0x80035CC4..0x8003615C - 98 records each,
             # both exactly the gap the bracketing split objects leave: `fn_803386C4`'s record ends
@@ -2418,9 +2398,8 @@ config.libs = [
             # either edge, and the `.data`/`.sdata` runs continue across both with ascending owners
             # (candidate-only class); see the unit header for the counts and the bracket.
             Object(NonMatching, "lobby/lb_companion_ui.cpp"),
-            Object(NonMatching, "lobby/lb_screen_step.cpp"),  # phase 4 stub (window d): new unit, cflags_lobby of the lib
-            # Registered once, at its final home (docs/plan.md 12) from
-            # proposal/80365C84_fn_80365C84.cpp: the lobby menu page's frame step and its
+            Object(NonMatching, "lobby/lb_screen_step.cpp"),  # phase 4 stub: new unit, cflags_lobby of the lib
+            # Registered once, at its final home (docs/plan.md 12): the lobby menu page's frame step and its
             # info/text selector (`.text` 0x80365C84..0x80366618, 2 functions / 2452 B, plus their
             # extab run 0x800177C4..0x800177D4 and extabindex run 0x8003720C..0x80037224 - each run
             # is exactly the gap the bracketing split objects leave).  Module `lobby` and the names
@@ -2453,7 +2432,7 @@ config.libs = [
             # `draw_font_idx__FUsPScUlPC10_mh_ivec2_`) reached through their real signatures (rule 9).
             # Same `cflags_lobby` as its siblings.  Same `cflags_lobby` as the band above.
             Object(NonMatching, "lobby/lb_quest_board.cpp"),
-            # Registered from proposal/8038E8E8_fn_8038E8E8.cpp: the lobby list/detail UI band
+            # Registered: the lobby list/detail UI band
             # (`.text` 0x8038E8E8..0x80394038, 70 functions / 22352 B) plus its extab run
             # 0x8001819C..0x8001833C (52 x 8 B) and extabindex run 0x800380D0..0x80038340
             # (52 x 12 B) - both runs are exactly the gap the bracketing units leave
@@ -2466,7 +2445,7 @@ config.libs = [
             # `em009_prog_tbl` entry slots end) - both are in the unit header and the outbox.
             # Same `cflags_lobby` as its siblings with the per-file `#pragma exceptions on`.
             Object(NonMatching, "lobby/lb_quest_ui.cpp"),
-            # Registered once, at its final home from proposal/803A3A50_fn_803A3A50 (`.text`
+            # Registered once, at its final home (`.text`
             # 0x803A3A50..0x803AA4A4, 95 functions / 27220 B; extab 0x8001882C..0x80018A6C and
             # extabindex 0x80038AA8..0x80038E08, both exactly the gap the bracketing registered
             # units leave; `.data` 0x805F2038..0x805F2090, the range's two private switch tables).
@@ -2597,7 +2576,7 @@ config.libs = [
             # NetworkLayerIdExportTo 83.05 -> 100.00 with the flag, no other row moves.  The Network lib's flags
             # (cflags_network, `-O3 -inline noauto`, `-pool off`) score every row identically, so the bodies' own lib stays.
             Object(NonMatching, "Network/NetworkLayer.cpp", extra_cflags=["-pool off"]),
-            # Phase 4 (docs/splits/phase4, window fg): the HOME-button (HBM) code in link order.  The units from 0x8052A040 to
+            # Phase 4 (window fg): the HOME-button (HBM) code in link order.  The units from 0x8052A040 to
             # 0x80542D8C are stubs; the keyboard units absorb the former fn_805482CC / homebutton/fn_8054E894 / fn_80555374 /
             # keyboard_ui / keyboard / gui / tiHKBManager sources (their evidence is in the unit and header comments).
             Object(NonMatching, "homebutton/fn_8052A040.cpp"),

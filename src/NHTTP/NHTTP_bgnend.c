@@ -2,7 +2,7 @@
  * NHTTP_bgnend.c - the Revolution SDK NHTTP library's begin/end TU, `.text`
  * 0x805145B8..0x80515010 (27 functions, 2648 B).
  *
- * REGISTRATION (recon lane, 2026-09-27).  Left edge 0x805145B8 is the NHTTP library start: the
+ * REGISTRATION.  Left edge 0x805145B8 is the NHTTP library start: the
  * `-func_align 16` -> `-func_align 4` change at this address (every function above it is 16-byte
  * aligned with `gap_*` padding, this one and everything below packs on 4) is a hard instruction-level
  * boundary, and `NHTTPi_alloc` (0x805145E8), `NHTTPi_free`, `NHTTPi_SetError`, `NHTTPi_SetSSLError`
@@ -23,7 +23,7 @@
  *
  * SECTIONS.  `.text` only - the target object is exactly that (the four `.data` literal groups and
  * the one `.rodata` code table the bodies address belong to dtk's auto data runs, so they are
- * declared `extern` in `include/unsplit/NHTTP.h` and never defined here; playbook 29/58).
+ * declared `extern` in `unsplit/NHTTP.h` and never defined here; playbook 29/58).
  *
  * FLAGS.  `cflags_nhttp` (`Wii/1.3`, `-func_align 4`, copied from `cflags_dwc`/`cflags_os`) - the
  * 4-byte packing above is the evidence for the alignment; nothing else is tuned.

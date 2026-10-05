@@ -1,4 +1,4 @@
-/* auto/80104BD0_fn_80104BD0.c - one function, .text 0x80104BD0..0x80105314.
+/* ef/fn_80104BD0.c - one function, .text 0x80104BD0..0x80105314.
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * Per-frame handler of the enemy hit-effect controller.  It reads the enemy work object and the
@@ -52,7 +52,7 @@
  * (only the offsets this unit reads); the sibling units still carry private copies, so the shared ones
  * belong in `include/` the next time one of them is touched.
  *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/80104BD0_fn_80104BD0.c`.
+ * Inventory, addresses and sizes: `python tools/units/ledger.py unit ef/fn_80104BD0.c`.
  */
 
 #include "types.h"

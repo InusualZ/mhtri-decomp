@@ -6,8 +6,8 @@
 
 #include "types.h"
 
-struct NetUserProfile;   /* include/Network/net_session_close.h */
-struct _EQUIP;           /* the 12-byte equipment record - include/Pl/pl.h */
+struct NetUserProfile;   /* Network/net_session_close.h */
+struct _EQUIP;           /* the 12-byte equipment record - Pl/plw.h */
 
 #ifdef __cplusplus
 extern "C" {

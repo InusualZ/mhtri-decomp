@@ -1,5 +1,5 @@
 /*
- * include/Network/NetworkLayer.h - the declarations of `src/Network/NetworkLayer.cpp`: the layer base class `NetworkLayer`,
+ * Network/NetworkLayer.h - the declarations of `src/Network/NetworkLayer.cpp`: the layer base class `NetworkLayer`,
  * its request record `NetworkLayerRequest`, the layer user id and the free functions of the unit's range
  * (0x803DF2EC..0x803E0BE8).  Moved here from `Network/NetworkLayerPat.h` and `Network/NetworkSessionManagerPat.h` when the
  * recut gave the class its own unit (docs/plan.md 6.5 rule 2: the owner declares).
@@ -19,15 +19,15 @@ typedef struct NetworkLayerId {
 
 class NetworkLayer;
 struct NetworkLayerRequest;
-/* The records the pure slots take, defined beside the class that implements them (include/Network/NetworkLayerPat.h). */
+/* The records the pure slots take, defined beside the class that implements them (Network/NetworkLayerPat.h). */
 struct NetUserFields;
 struct NetUserPosition;
 struct NetServerRec;
 struct NetLayerSettings;
 struct NetLayerRequest;
-class NetworkUniqueId;     /* include/Network/NetworkUniqueId.h */
+class NetworkUniqueId;     /* Network/NetworkUniqueId.h */
 struct NetworkErrorInfo;   /* the 12-byte error record - Network/gamespy_interface_types.h */
-typedef struct NetworkRequestError NetworkRequestError;   /* include/unsplit/Network.h */
+typedef struct NetworkRequestError NetworkRequestError;   /* unsplit/Network.h */
 
 /* The handler a layer request runs: a member function of the layer that reports completion (non-zero). */
 typedef s32 (NetworkLayer::*NetworkLayerHandler)(NetworkLayerRequest* request);
@@ -185,8 +185,8 @@ public:
     /* +0x078 */ NetworkLayerRequest pool_78[2];        /* the two requests `allocRequest` hands out */
 };   /* size: 0x1C0 (the derived constructor's first member array starts at +0x1C8) */
 
-typedef struct NetLayerRequest NetLayerRequest;   /* include/Network/NetworkLayerPat.h */
-struct NetFriendRec;                               /* include/Network/NetworkLayerPat.h */
+typedef struct NetLayerRequest NetLayerRequest;   /* Network/NetworkLayerPat.h */
+struct NetFriendRec;                               /* Network/NetworkLayerPat.h */
 
 #ifdef __cplusplus
 extern "C" {

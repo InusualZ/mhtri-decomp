@@ -1,17 +1,17 @@
 /*
- * include/Network/PatInterface.h - the declarations `src/Network/PatInterface.cpp` owns
+ * Network/PatInterface.h - the declarations `src/Network/PatInterface.cpp` owns
  * (`.text` 0x803FCC34..0x804123F8: the `PatInterface` singleton, its request state machine and its packet layer).
  *
  * Since the round 4 fold (owner ruling 2026-10-05: one TU) this one header carries what
- * `include/Network/network_state.h` and the head of `include/Network/network_layer_io.h` declared: the state
+ * `Network/network_state.h` and the head of `Network/network_layer_io.h` declared: the state
  * machine's entry points and the `sendReq*`/`recv*`/reader/writer surface of the packet layer.  The tail's
- * `NetworkPool`/`NetworkRandom` live in `include/Network/NetworkPool.h`.
+ * `NetworkPool`/`NetworkRandom` live in `Network/NetworkPool.h`.
  *
  * Every parameter list of a body not written yet is the one its callers' calls demonstrate; the first parameter
  * is the singleton (`this` in r3 - the target bodies read it), spelled the way each caller holds it:
  * `PatInterface` (the mediator band), `NetworkInstance` (what `getInstance_` returns, the band header's typedef
  * of this class since request net3-d-03c2#1) or `NetworkStateMachine` (the state machine's spelling, a typedef
- * of `PatInterface`).  Moved here from `include/unsplit/Network.h` and `src/Network/NetworkWiiMediator.cpp`
+ * of `PatInterface`).  Moved here from `unsplit/Network.h` and `src/Network/NetworkWiiMediator.cpp`
  * (docs/plan.md 6.5 rule 2: the owner declares).
  */
 #ifndef MHTRI_NETWORK_PATINTERFACE_H
@@ -538,16 +538,16 @@ s8 getSomething4(NetworkInstance* self);
 
 /* ==== the packet layer (the former `Network/network_layer_io.cpp` head) ==================================== */
 
-typedef struct NetLayerFilter NetLayerFilter;           /* include/Network/NetworkLayerPat.h */
-typedef struct NetUserPosition NetUserPosition;         /* include/Network/NetworkLayerPat.h */
-typedef struct NetLayerUserRecord NetLayerUserRecord;   /* include/Network/NetworkLayerPat.h */
+typedef struct NetLayerFilter NetLayerFilter;           /* Network/NetworkLayerPat.h */
+typedef struct NetUserPosition NetUserPosition;         /* Network/NetworkLayerPat.h */
+typedef struct NetLayerUserRecord NetLayerUserRecord;   /* Network/NetworkLayerPat.h */
 struct PatCircleOptionList;
 struct PatMatchOptions;
-typedef struct PatCircleFilter PatCircleFilter;   /* include/Network/NetworkSessionManager.h */
+typedef struct PatCircleFilter PatCircleFilter;   /* Network/NetworkSessionManager.h */
 
-typedef struct PatCircleInfo PatCircleInfo;       /* include/Network/NetworkSessionManager.h */
-class NetworkWiiMediator;                         /* include/Network/NetworkWiiMediator.h */
-class NetworkReflectService;                      /* include/Network/NetworkReflectService.h */
+typedef struct PatCircleInfo PatCircleInfo;       /* Network/NetworkSessionManager.h */
+class NetworkWiiMediator;                         /* Network/NetworkWiiMediator.h */
+class NetworkReflectService;                      /* Network/NetworkReflectService.h */
 
 /* ---- the records the packet handlers read and hand to the session handlers ---------------------------------- */
 

@@ -6,7 +6,7 @@
  * player views it, and the rest drive the item bar, the quest text and the action-button prompt.
  *
  * The 0x194-byte work record and the two records it points at are this unit's own view; where a
- * record is also read by `Pl`/`enemy` the owner header (`include/pl.h`'s `_PLW`) carries the fuller
+ * record is also read by `Pl`/`enemy` the owner header (`pl.h`'s `_PLW`) carries the fuller
  * layout and this file keeps only the offsets it reads (a view, folded by the next pass - rule 1).
  *
  * The outbound block at the bottom is rule 2's blocked case: the callees whose owner's header cannot
@@ -201,17 +201,17 @@ u32 get_move_work_max(u8 kind);
 
 /* Outbound callees a registered unit owns whose header cannot be included from here (rule 2's blocked
  * case - the owner's header is unusable in this translation unit, and the declaration cannot sit in
- * `include/unsplit/menu.h` at all):
+ * `unsplit/menu.h` at all):
  *
- *   * `include/hud/cockpit_quest_marker.h` (0x802EC4F0-0x802EF730), `include/hud/cockpit_quest.h`
- *     (0x802E796C-0x802EA33C) and `include/hud/layout.h` (0x802E0B54/0x802E270C): all three clash with
- *     `include/unsplit/lobby.h`, which this unit needs for `drawshape_*`/`draw_sprite_*`, on
+ *   * `hud/cockpit_quest_marker.h` (0x802EC4F0-0x802EF730), `hud/cockpit_quest.h`
+ *     (0x802E796C-0x802EA33C) and `hud/layout.h` (0x802E0B54/0x802E270C): all three clash with
+ *     `unsplit/lobby.h`, which this unit needs for `drawshape_*`/`draw_sprite_*`, on
  *     `_mh_ivec2_`, `spr_data_copy`, `fn_802E0DA8`, `draw_sprite_anim_ary`, `get_move_work_adrs` and
  *     `get_move_work_max`; `hud/cockpit_quest.h` additionally redefines `CockpitWork` and declares
  *     `cockpit_work` with its own record type.
- *   * `include/ai/fn_802D0F34.h` (0x802D27E0): redefines `_HIT_W` against `include/menu/menu_item.h`
+ *   * `ai/fn_802D0F34.h` (0x802D27E0): redefines `_HIT_W` against `menu/menu_item.h`
  *     and declares `get_move_work_adrs` as `u8*` against this header's `void*`.
- *   * `include/mh3_pad.h` (0x80046F0C): clashes with `include/pl.h` on its own pre-existing
+ *   * `mh3_pad.h` (0x80046F0C): clashes with `pl.h` on its own pre-existing
  *     `setVec3` declaration.
  *
  * Each is a `shared-file` request in the unit's outbox, `sqrt_f32`'s included.  The signatures are
@@ -225,7 +225,7 @@ u32 fn_80046F0C(void*);                /* 0x80046F0C mh3_pad.cpp */
 s32 fn_802D27E0(void);                  /* 0x802D27E0 ai/fn_802D0F34.cpp */
 s32 fn_802E0B54(u16);                   /* 0x802E0B54 hud/layout.cpp */
 u32 color_lerp(u32, u32, u8, f32, f32);/* 0x802E270C hud/layout.cpp */
-/* 0x80050BC0 - `include/fn_8004CAD8.h` settles ONE float argument (from the callee's own body), and
+/* 0x80050BC0 - `fn_8004CAD8.h` settles ONE float argument (from the callee's own body), and
  * that is the honest declaration; it cannot be used here yet: this unit's call site reproduces the
  * target's register allocation only with the 3-argument view, measured on `fn_802E5D68` at 95.675674
  * against 95.47298 for the one-argument form (`sqrt_f32((f32)(sq + dy * dy))`, and the same with
@@ -254,9 +254,9 @@ void fn_802EF424(void);                 /* 0x802EF424 hud/fn_802EBED8.cpp */
 void fn_802EF6B0(void);                 /* 0x802EF6B0 hud/fn_802EBED8.cpp */
 void fn_802EF730(void);                 /* 0x802EF730 hud/fn_802EBED8.cpp */
 /* 0x8033A850 `lobby/lb_companion_ui.cpp` (the companion/status UI band, formerly the band entry
- * `fn_8033A850` in `include/unsplit/menu.h` - the band may not carry a symbol a registered unit
+ * `fn_8033A850` in `unsplit/menu.h` - the band may not carry a symbol a registered unit
  * owns).  The owner's header cannot be included here: it redefines `_mh_ivec2_` against
- * `include/unsplit/lobby.h`, which this unit needs (measured - `(10296) class '_mh_ivec2_'
+ * `unsplit/lobby.h`, which this unit needs (measured - `(10296) class '_mh_ivec2_'
  * redefined`).  The zero-argument signature is this unit's call site. */
 s32 lb_quest_work_active_ck(void);
 

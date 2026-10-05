@@ -12,8 +12,8 @@
  *
  * The band's *owned* data is not here: the data pass of 2026-09-28 claimed the runs the two units
  * store into, so those declarations moved to their owners' headers and this header includes them -
- * `include/DWCi/DWCi_NatNeg.h` (`.sdata` 0x80794368..0x807943A0, `.sbss` 0x80795828..0x80795878,
- * `.bss` 0x807614D8..0x80762A20) and `include/DWCi/DWCi_Np_CPUCopyFast.h` (`.sdata`
+ * `DWCi/DWCi_NatNeg.h` (`.sdata` 0x80794368..0x807943A0, `.sbss` 0x80795828..0x80795878,
+ * `.bss` 0x807614D8..0x80762A20) and `DWCi/DWCi_Np_CPUCopyFast.h` (`.sdata`
  * 0x80794200..0x80794210, `.sbss` 0x807957D0..0x807957F8).  Rule 2 put them there, not here.
  *
  * The types the declarations reach are the units' own views, so only forward declarations are here

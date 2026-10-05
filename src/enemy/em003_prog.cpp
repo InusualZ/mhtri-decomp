@@ -1,7 +1,6 @@
 /* enemy/em003_prog.cpp - enemy 003 program
  *
  * `.text` 0x80154E40..0x8015D860, 68 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): recut registered unit, built from `enemy/fn_801550FC.cpp`.
  * Renamed from `fn_801550FC`: the unit's `.data` holds `em003_prog_tbl` (0x805A44A8) and its `.text` starts at 0x80154E40.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  */
@@ -34,7 +33,7 @@
  * `fn_*` symbols are `extern "C"` so objdiff pairs them by name, and the mangled callees are declared
  * and called through their real signatures (rule 9).
  *
- * Object: `_ENEMY_WORK`, included from `include/enemy.h` (the union of every consumer's copy).  Name
+ * Object: `_ENEMY_WORK`, included from `enemy.h` (the union of every consumer's copy).  Name
  * evidence: the mangled callee `em_frame_check__FP11_ENEMY_WORKUsff` carries the type name.  The
  * fields this unit walks were added to that header with their offsets (+0x331, the +0x332 union, the
  * +0x334..+0x336 bytes, +0x338, +0x33C, +0xA0D); the +0x332 union keeps the signed-short reading

@@ -1,5 +1,5 @@
 /*
- * include/Network/PatConnection.h - the declarations of `src/Network/PatConnection.cpp` (`.text` 0x803FAE9C..0x803FCC34): the
+ * Network/PatConnection.h - the declarations of `src/Network/PatConnection.cpp` (`.text` 0x803FAE9C..0x803FCC34): the
  * `PatConnection` class (the `PatInterface` base) and the session band's request writers.
  * Moved here from `Network/NetworkCommunityPat.h` when the network pilot round 3 recut gave the range its own unit
  * (docs/plan.md 6.5 rule 2: the owner declares).
@@ -10,7 +10,7 @@
 #include "types.h"
 #include "Network/gamespy_interface_types.h"   /* NetworkErrorInfo - the error `postError` takes */
 
-class PatInterface;                       /* include/Network/PatInterface.h */
+class PatInterface;                       /* Network/PatInterface.h */
 
 /* The 8-byte header of one received packet (the connection keeps it at +0x60AA): `recvCommand` matches the three
  * op-code bytes against the packet table, a status of -1/1 selects `recvAnsNg`/`recvAnsAlert`, and the handlers hand

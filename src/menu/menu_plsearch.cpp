@@ -1,5 +1,5 @@
 /*
- * menu/menu_plsearch.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * menu/menu_plsearch.cpp - STUB (no bodies yet).
  *
  * `.text` 0x80448404..0x804513FC.  Sections of the candidate unit: extab 0x8001DF24..0x8001E18C; extabindex 0x8003EBEC..0x8003EF88; .text 0x80448404..0x804513FC; .data 0x806073F0..0x80607E50; .bss 0x806E40C0..0x806F4658; .sdata 0x80793B88..0x80793C0C; .sbss 0x80794D50..0x80794D64.
  *

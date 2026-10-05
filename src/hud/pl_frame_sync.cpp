@@ -1,7 +1,7 @@
 /*
- * hud/pl_frame_sync.cpp - phase 4 unit, `.text` 0x8033041C..0x80338808 (125 functions, 33772 bytes).
+ * hud/pl_frame_sync.cpp - unit, `.text` 0x8033041C..0x80338808 (125 functions, 33772 bytes).
  *
- * PHASE 4 (docs/splits/phase4, window d).  Fold of 2 registered units: em_pl_frame.cpp, net_char_sync.cpp.  The
+ * Fold of 2 registered units: em_pl_frame.cpp, net_char_sync.cpp.  The
  * functions below are the ones those sources define, in address order; every other function of the range keeps its
  * original bytes.  77 of 125 functions have a body here.
  *
@@ -14,7 +14,7 @@
  */
 /* ---- header inherited from src/enemy/em_pl_frame.cpp (written against its pre-phase-4 range) ---- */
 /*
- * enemy/em_pl_frame.cpp - the second half of proposal/8032C920_fn_8032C920.cpp's range, `.text`
+ * enemy/em_pl_frame.cpp - the second half of enemy/em_act_step.cpp's range, `.text`
  * 0x8033041C..0x80334568 (48 functions, 16716 B).  Registered once, at its final home (docs/plan.md
  * 12): that proposal's range 0x8032C920..0x80334568 was one `--max-bytes` cut over **two** translation
  * units, and the seam re-draw of 2026-09-26 split it into `enemy/em_act_step.cpp` (first half, 74
@@ -89,7 +89,7 @@
  * `-Cpp_exceptions on` produces, and the band's callees are the same mangled C++ symbols.
  *
  * THE RECORD.  Nothing is written yet.  The first half's file keeps the `_EM_CHARA_WORK` view and
- * `include/unsplit/enemy.h` carries the first half's pool declarations only; this unit's pool labels
+ * `unsplit/enemy.h` carries the first half's pool declarations only; this unit's pool labels
  * (listed under SECTIONS) are NOT declared there and have to be declared, as externs, in this unit's
  * own header when its bodies arrive.
  *
@@ -106,7 +106,7 @@
  * the player family (`Pl_net_*`, kinds 1-9 of the message header, plus the act dispatcher and the two act
  * entries that open the range), the enemy family (`em_net_*`, kinds 1-7), the enemy-control family
  * (`emc_net_*`, kinds 1-2) and the effect-slot family (`eft_net_*`, modes 1-8).  Each message is one struct
- * in `include/hud/net_char_sync.h`; its constructor and `NetMsgHeader::fill` are real class members (their map
+ * in `hud/net_char_sync.h`; its constructor and `NetMsgHeader::fill` are real class members (their map
  * rows carry the manglings).
  *
  * Home, name and evidence:

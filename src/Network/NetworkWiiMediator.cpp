@@ -1,7 +1,7 @@
 /*
  * Network/NetworkWiiMediator.cpp - the `NetworkWiiMediator` unit (`.text` 0x80413450..0x80417BC0).
  *
- * ROUND 3 FOLD (network pilot).  One TU: the mediator head 0x80413450..0x80413C64 (`mediatorEventCallback`, the
+ * ROUND 3 FOLD.  One TU: the mediator head 0x80413450..0x80413C64 (`mediatorEventCallback`, the
  * constructors and destructors, `getReflectService`, `update`, `isMessageRestricted`, `getCountryCode`,
  * `getLanguage` - formerly the tail of `Network/network_layer_io.cpp`), the class band
  * 0x80413C64..0x804155D4 (the original text below) and the opening part 0x804155D4..0x80417BC0 (the former unit
@@ -16,7 +16,7 @@
  * The opening part keeps its file-scope pragmas (`auto_inline off`, `pool_data off`, peephole) from where it
  * starts, so the class band above it compiles as before.
  *
- * THE HEAD'S CLASSES (round 4).  `NetworkMediator` (table 0x80602978: its destructor 0x804136D0 and a pure `update`)
+ * THE HEAD'S CLASSES.  `NetworkMediator` (table 0x80602978: its destructor 0x804136D0 and a pure `update`)
  * and `NetworkWiiMediator : NetworkMediator` (table 0x80602968: its destructor 0x80413724 and `update` 0x804138EC),
  * with the terms object `PatTerms` (`menu/PatTerms.h`, constructor/destructor in `menu/menu_plsearch.cpp`) as the
  * member at +0x6DD8; this unit emits both tables (the `.data` claim is byte-complete).  `NetworkMediator` is a GUESS
@@ -52,7 +52,7 @@
  * WHAT IT IS.  The mediator's account/opening/reflect query surface (the reflected class methods at
  * 0x8041416C..0x80414B88) plus the helpers around them; the jumptable-referenced 0x80414BF0..0x804155D4
  * block is the reflect sub-machine.  C++ (the mangled member names), so the class is declared in
- * `include/Network/NetworkWiiMediator.h` and every unmangled helper is `extern "C"`.
+ * `Network/NetworkWiiMediator.h` and every unmangled helper is `extern "C"`.
  *
  * FLAGS.  `cflags_network` + `-O3 -inline noauto` (the `Object(...)` line in `configure.py`), measured
  * over the whole unit: `-O4,p` leaves getAccountBan/Warning/WaitQueue at 42.86 and getReflectName3C at
@@ -141,7 +141,7 @@
  * already spelled that way; `create__22GameSpyInterfaceThreadFv` -> `__ct__22GameSpyInterfaceThreadFv`
  * (0x8041C66C), whose owner `Network/GameSpyInterfaceThread.cpp` turned its `create()` into the class's
  * constructor in the same change; and `fn_803D6A98` -> `GameSpyInterfaceThread_getInstance`
- * (0x803D6A98, `Network/NetworkSessionManager.cpp`), with the referrers in `include/Network/GameSpyInterfaceThread.h` and
+ * (0x803D6A98, `Network/NetworkSessionManager.cpp`), with the referrers in `Network/GameSpyInterfaceThread.h` and
  * `src/Network/GameSpyInterfaceThread.cpp`.  Re-measured: every `.text` row and the whole-project progress are
  * unchanged, and `flipcheck.py` reports exactly the four complaints it did before, no new one.
  *
@@ -181,7 +181,7 @@
  * NAMES.  `ECStart`, `openingStart` and `openingStop` are the strings' own; every other member name is a
  * GUESS from the body (the field it reads or writes), and so are the callees this pass named in their
  * owners' headers (`reportPatError`, `notifyPatEvent`, `openPatInterface`, `mediatorEventCallback`,
- * `NetworkPool::start`/`isECStarted`).  The slot family's fields are named in include/Network/NetworkWiiMediator.h.
+ * `NetworkPool::start`/`isECStarted`).  The slot family's fields are named in Network/NetworkWiiMediator.h.
  * `NetworkPool::isECStarted` (0x8041793C) is the pool's accessor, emitted in this range.
  *
  * BOUNDARY.  The base library class `sNetworkLibrary` that followed (0x80417BC0..0x8041891C) is its own unit,

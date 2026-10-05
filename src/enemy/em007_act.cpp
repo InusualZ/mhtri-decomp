@@ -1929,7 +1929,7 @@ void fn_8004FFC8(void* a, void* b, void* c, f32 d);
 void draw_shape_arm(struct _ENEMY_WORK* self, u32 a, u32 b);
 
 /* the unclaimed enemy action band below this range (0x801CB308..0x801D3CF8) - the dispatchers'
- * tail-call targets.  Their band header is `include/unsplit/enemy.h` and the move is recorded as a
+ * tail-call targets.  Their band header is `unsplit/enemy.h` and the move is recorded as a
  * `shared-file` request in the outbox; until it lands this file carries its own copy. */
 void fn_801CCCE8(struct _ENEMY_WORK* self);
 void fn_801CE898(struct _ENEMY_WORK* self);
@@ -2583,7 +2583,7 @@ void fn_8005D1AC(void* out, u32 a);
 void fn_8006FDCC(void* a);
 void fn_800810DC(void* self, u32 a);
 
-/* `stage_map_kind_get`, `get_now_mapno` and `get_now_areano` come from `include/unsplit/unknown.h`. */
+/* `stage_map_kind_get`, `get_now_mapno` and `get_now_areano` come from `unsplit/unknown.h`. */
 
 /* ----------------------------------------------------------------------------------------------------
  * the definitions (C linkage: they keep the map's own `fn_XXXXXXXX` names)

@@ -2,8 +2,8 @@
  *
  * `pl_model_state_set` (`.text` 0x80267270, inside that unit's range 0x80262940..0x802693C4) was declared
  * in three wrong places before this header existed (docs/plan.md 6.5 rule 2): `enemy/fn_801B0010.cpp`
- * carried a local copy, `include/unsplit/Pl.h` - a fallback band - carried another, and
- * `include/Pl/fn_8025F088.h` carries a third, differently-typed one whose range does not cover the
+ * carried a local copy, `unsplit/Pl.h` - a fallback band - carried another, and
+ * `Pl/fn_8025F088.h` carries a third, differently-typed one whose range does not cover the
  * address.  This is the owner's header; the signature is the owner's own definition
  * (`src/Pl/fn_80262940.cpp:478`, `void (_PLW*, u32, s32, u16)`), and the return is `void` there.
  *

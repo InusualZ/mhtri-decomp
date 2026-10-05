@@ -1,10 +1,10 @@
 /*
- * include/DWCi/DWCi_NatNeg.h - the DWCi NATNEG / transport-tail unit (`src/DWCi/DWCi_NatNeg.c`,
+ * DWCi/DWCi_NatNeg.h - the DWCi NATNEG / transport-tail unit (`src/DWCi/DWCi_NatNeg.c`,
  * `.text` 0x80512490..0x805145B8).
  *
  * Rule 2: this unit owns these symbols, so their declarations live here and every consumer includes
- * this header - the GameSpy interface unit reaches them through `include/unsplit/Network.h`, which
- * includes this header, and the band header `include/unsplit/DWCi.h` includes it too (that is how
+ * this header - the GameSpy interface unit reaches them through `unsplit/Network.h`, which
+ * includes this header, and the band header `unsplit/DWCi.h` includes it too (that is how
  * `src/DWCi/fn_805113B0.c` and this unit itself see the data).  The data ranges
  * (`.sdata` 0x80794368..0x807943A0, `.sbss` 0x80795828..0x80795878, `.bss` 0x807614D8..0x80762A20)
  * were claimed by the data pass on 2026-09-28; nothing here is defined (playbook 29 - the bytes are
@@ -59,7 +59,7 @@ void DWCi_NatNegSendPacket(void* data, u32 size, void* header);
 /* 0x80512490: lazy string/length accessor (the seam function; body in DWCi_NatNeg.c). */
 void DWCi_GetStringLength(void** buf, int* len);
 
-/* ---- the data the unit's claimed runs own (splits.txt, 2026-09-28) ---------------------------- */
+/* ---- the data the unit's claimed runs own (splits.txt) ---------------------------- */
 
 /* 0x80794368 (.sdata) - the empty string `DWCi_GetStringLength` defaults a NULL buffer to, and
  * 0x80794370/78/7C the unit's own "%s:%d" / "%s" / ":%d" trio.  A second copy of the trio at
@@ -77,7 +77,7 @@ extern char DWCi_natNegHostFormat[6];
  * compared against.  Deliberately *unsized* here: a sized array reaches the symbol SDA21 while an
  * unsized one reaches it ADDR16_HA/LO (`lis`/`addi`), and the two consumers' target objects need the
  * two forms - `src/Network/GameSpyInterfaceThread.cpp` is ADDR16 throughout, and it sees only this header (via
- * `include/unsplit/Network.h`), so this is the form the shared declaration has to carry.  The unit's
+ * `unsplit/Network.h`), so this is the form the shared declaration has to carry.  The unit's
  * own source re-declares it sized before its first use, for the target's ten SDA21 sites (the first
  * use of a symbol fixes its addressing for the whole translation unit - playbook row 12, the reloc
  * kind is a codegen input).  RESIDUAL: `DWCi_natNegPollReplies` reaches it ABSOLUTELY in the target, which
@@ -96,7 +96,7 @@ extern char DWCi_natNegGameName[];
 
 /* 0x807625C0 (.bss) - the two-buffer address-string ring `DWCi_formatAddress` /
  * `DWCi_natNegFormatAddress` write into, `DWCi_addressRingIndex` (declared unowned in
- * `include/unsplit/DWCi.h`) selecting the half.  It is declared here because it falls inside this
+ * `unsplit/DWCi.h`) selecting the half.  It is declared here because it falls inside this
  * unit's `.bss` run 0x807614D8..0x80762A20 - which is the claim's own documented residual: the word
  * belongs to `src/DWCi/fn_805113B0.c` on the reloc evidence, but the run cannot be drawn thin enough
  * to leave it out without a link-order cycle (playbook 53).  When 0x80509DB0..0x805113B0 is
@@ -152,7 +152,7 @@ extern void (*DWCi_natNegPollCallback)(u32, struct DWCiNatNegSession*);
 /* 0x80794380 is declared **once**, above, as `natNegMessageMagic`, and unsized on purpose: an unknown-
  * size array is the shape that gets the `lis`/`addi` (ADDR16_HA/LO) pair the target's relocation asks for,
  * so sizing it would move `Network/GameSpyInterfaceThread.cpp`'s codegen.  It moved here from
- * `include/unsplit/Network.h`, which had declared it while the range was unowned; the band reaches it by
+ * `unsplit/Network.h`, which had declared it while the range was unowned; the band reaches it by
  * including this header (rule 2). */
 #ifdef __cplusplus
 }

@@ -66,7 +66,7 @@ struct _se_w {
 /* The actor/motion object the SE work hangs off (`+0xAFC`) - the union of the views the band reads.
  * size: 0xB00 (at least)
  *
- * `include/pl.h` owns the full union-of-views definition of the same record (docs/plan.md 6.5 rule 1),
+ * `pl.h` owns the full union-of-views definition of the same record (docs/plan.md 6.5 rule 1),
  * and a unit that needs both this header and that one used to fail with a redefinition.  This
  * narrower view is therefore only defined when pl.h has not been included. */
 #ifndef PL_H

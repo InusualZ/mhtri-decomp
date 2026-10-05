@@ -3,7 +3,7 @@
  *
  * `.text` 0x8021E1EC..0x8021F020 (14 functions), `.bss` 0x806AA8C8..0x806AAA88 (`lb_menu_scratch`, 0x1C0 B), `.data` 0x480 B,
  * `.sdata` 0x10 B, `.sdata2` 0x18 B, `.ctors` 4 B, extab 0x30 B and extabindex 0x48 B.  Phase 4 recut of
- * `lobby/fn_8021E1EC` (docs/splits/phase4): the registered range 0x8021E1EC..0x80224AC4 is three TUs of the candidate -
+ * `lobby/fn_8021E1EC`: the registered range 0x8021E1EC..0x80224AC4 is three TUs of the candidate -
  * this one, `lobby/lb_menu_pos_tbl` and `lobby/lb_equip_page`; each part keeps the former source's text for its own
  * functions, the shared declarations and its own `.bss` definitions.
  *
@@ -14,8 +14,7 @@
 /* ==== recut from lobby/fn_8021E1EC.cpp (0x8021E1EC..0x8021F020) ==== */
 /* lobby/fn_8021E1EC.cpp - a lobby screen layer (item/equipment page family).
  *
- * `.text` 0x8021E1EC..0x80224AC4 (108 functions, 26840 B), registered from
- * `proposal/8021E1EC_fn_8021E1EC.cpp`.
+ * `.text` 0x8021E1EC..0x80224AC4 (108 functions, 26840 B), registered.
  *
  * Module `lobby`.  The range's callees are the lobby UI API - `LbStr__FUcUs` (13 call sites),
  * `draw_sprite_ary` (23), `draw_font_idx` (17), `get_lsp_data` (40), `ItemName`, `put_menu_cursor`,

@@ -1,7 +1,6 @@
 /* enemy/em006_prog.cpp - enemy 006 program
  *
  * `.text` 0x801BB758..0x801C29F8, 11 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): recut registered unit, built from `enemy/fn_801BD6C0.cpp`.
  * Renamed from `fn_801BD6C0`: the unit's `.data` holds `em006_prog_tbl` (0x805B28D0) and its `.text` starts at 0x801BB758.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  */

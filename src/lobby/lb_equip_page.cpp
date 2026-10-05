@@ -2,7 +2,7 @@
  * lobby/lb_equip_page.cpp - the lobby item/equipment page layer and the player actor's per-model SE/motion rig update.
  *
  * `.text` 0x80220038..0x80229ECC (118 functions), `.data` 0x34F8 B, `.sdata` 0x140 B, `.sdata2` 0x128 B, extab 0x320 B and extabindex
- * 0x4B0 B.  Phase 4 fold/recut (docs/splits/phase4): the tail of `lobby/fn_8021E1EC` (0x80220038..0x80224AC4) and the whole of
+ * 0x4B0 B.  Phase 4 fold/recut: the tail of `lobby/fn_8021E1EC` (0x80220038..0x80224AC4) and the whole of
  * `Pl/fn_80224AC4` (0x80224AC4..0x80229ECC) are one TU of the candidate (one `.sdata2`/`.data` pool run).
  *
  * Name: GUESS, from the item/equipment page the first half draws; no `__FILE__` string covers the range.
@@ -15,8 +15,7 @@
 /* ==== recut from lobby/fn_8021E1EC.cpp (0x80220038..0x80224AC4) ==== */
 /* lobby/fn_8021E1EC.cpp - a lobby screen layer (item/equipment page family).
  *
- * `.text` 0x8021E1EC..0x80224AC4 (108 functions, 26840 B), registered from
- * `proposal/8021E1EC_fn_8021E1EC.cpp`.
+ * `.text` 0x8021E1EC..0x80224AC4 (108 functions, 26840 B), registered.
  *
  * Module `lobby`.  The range's callees are the lobby UI API - `LbStr__FUcUs` (13 call sites),
  * `draw_sprite_ary` (23), `draw_font_idx` (17), `get_lsp_data` (40), `ItemName`, `put_menu_cursor`,
@@ -392,7 +391,7 @@ void fn_802235A4(u32* base)
  *   2. no runtime-dump name - `dumpmap.py lookup 0x80224AC4` answers `zz_0224ac4_`;
  *   3. the code is `Pl`: every actor parameter is a `_PLW*` (`Get_motion_no__FP4_PLW`,
  *      `Pl_master_ck__FP4_PLW`, `Pl_act_ck__FP4_PLWUcUs`), the SE work is `_PLW.field_0xAF4`, and
- *      `include/unsplit/Pl.h` already homes this range's tail (`fn_80229CB4`/`fn_80229E10`/
+ *      `unsplit/Pl.h` already homes this range's tail (`fn_80229CB4`/`fn_80229E10`/
  *      `fn_80229EA8`) in the `Pl` band.  The `lobby` lib next door cannot host it: the target object
  *      carries extab/extabindex while `cflags_lobby` is `-Cpp_exceptions off`, and the range contains
  *      zero record-form instructions - the `-opt nopeephole` fingerprint of `cflags_pl`.
@@ -416,8 +415,8 @@ void fn_802235A4(u32* base)
  *  - fn_80226A4C 0x80226A4C (148 B) is written but **not landed**: its whole body is two
  *    `fn_80045330` copies, and that symbol is owned by `src/mh3_pad.cpp`, whose header re-declares
  *    `VEC3_ctor`/`setVec3` with different parameter types than `ef.h` - so including
- *    `include/mh3_pad.h` from a unit that also includes `pl.h` (which pulls `ef.h`) is an illegal
- *    overload.  The fix is a rule-2/rule-1 pass over `include/mh3_pad.h` (one declaration per symbol,
+ *    `mh3_pad.h` from a unit that also includes `pl.h` (which pulls `ef.h`) is an illegal
+ *    overload.  The fix is a rule-2/rule-1 pass over `mh3_pad.h` (one declaration per symbol,
  *    in the owner's header); until then the function is left out rather than declared locally.
  *  - the remaining 28 functions are not reconstructed yet, largest first: fn_802283C8 1584 B,
  *    fn_80227354 1452 B, fn_80226EC4 1168 B, fn_80226728 740 B, fn_8022632C 1020 B, fn_80225734
@@ -429,7 +428,7 @@ void fn_802235A4(u32* base)
  *    0x80225F48/0x802260E4/0x8022632C/0x80226728 family is a template (all seven start with
  *    `lwz r5,316(r3); lfs f0,72(r5); fcmpo` against `lbl_80799CDC` - the `_PLW.physics_0x13C` body
  *    pitch test) and is the cheapest block left; it needs `_PLW_PHYSICS`'s `+0x48` float, which is
- *    `MHchar +0x44` in today's `include/pl.h` (still a `pad_0x44` there) and would have to move out of
+ *    `MHchar +0x44` in today's `pl.h` (still a `pad_0x44` there) and would have to move out of
  *    `src/ef/fn_80114E34.cpp` first.
  */
 

@@ -1,14 +1,14 @@
 /*
  * `Pl/fn_8028F66C.cpp`'s outbound declarations (the ground/hit collision TU).
  *
- * `copyVec3` (0x80041E40) is `src/mh3_pad.cpp`'s and comes from `include/mh3_pad.h`, which this unit
- * includes - the `(10197)` clash this header used to record (`include/ef.h` spelling `VEC3_ctor` as
+ * `copyVec3` (0x80041E40) is `src/mh3_pad.cpp`'s and comes from `mh3_pad.h`, which this unit
+ * includes - the `(10197)` clash this header used to record (`ef.h` spelling `VEC3_ctor` as
  * `(VEC3*)` against `mh3_pad.h`'s `(void*)`, measured 2026-09-27) is closed: both headers spell the
  * three helpers identically now.
  *
  * `fn_8012A8F8` is owned by `enemy/fn_801251D0.cpp`; its header does not declare the symbol yet
  * (`(u16*)writer`-style stub), so the shape here is this unit's call site: it zeroes a `PlBox`.
- * It follows the practice `include/enemy/fn_80165FC8.h` documents for the same situation ("their
+ * It follows the practice `enemy/fn_80165FC8.h` documents for the same situation ("their
  * owners' headers do not declare these, or declare a different signature; the shapes here are the
  * call sites'").  When that owner writes its body the declaration moves to its header.
  */
@@ -27,7 +27,7 @@ extern "C" {
  * at +0x08.  Evidence: `fn_802977E4` - the record's own initialiser at 0x802977E4 - writes exactly
  * this shape (`sth` +0x00, `stb` +0x02, `stb` +0x03, `sth` +0x04, `stb` +0x06, `stb` +0x07, then
  * `setVector3(+0x08, ...)`), and `fn_8012A624` constructs only the +0x08 vector.  The scalar fields
- * keep offsets until a reader names them (rule 5's accepted fallback, as in `include/pl.h`).
+ * keep offsets until a reader names them (rule 5's accepted fallback, as in `pl.h`).
  * size: 0x14 */
 struct LandData {
     /* +0x00 */ u16 field_0x00;

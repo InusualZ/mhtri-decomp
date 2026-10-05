@@ -5,7 +5,7 @@
  *
  * `getInstance_` (0x803768F0), `fn_803768F8` (0x803768F8) and `fn_80377664` (0x80377664) all sit
  * inside the unit's claimed range, so the consumers that used to read them out of
- * `include/unsplit/Network.h` / `include/unsplit/lobby.h` include this header instead.
+ * `unsplit/Network.h` / `unsplit/lobby.h` include this header instead.
  */
 #ifndef MHTRI_ENEMY_EM020_AI_H
 #define MHTRI_ENEMY_EM020_AI_H
@@ -13,7 +13,7 @@
 #include "types.h"
 
 /* The network singleton `getInstance_` returns (`mpInstance__12PatInterface`): the class is
- * `include/Network/PatInterface.h`'s, and only the tag is needed here. */
+ * `Network/PatInterface.h`'s, and only the tag is needed here. */
 class PatInterface;
 /* The shared enemy work record `em020_aim_target_ck` takes a pointer to. */
 struct _ENEMY_WORK;

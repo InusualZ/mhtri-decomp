@@ -1,8 +1,7 @@
 /* lobby/fn_801E7530.cpp - the lobby menu-layer group.
  *
  * `.text` 0x801E7530..0x801EC9E0 (77 functions, 21680 B), extab 0x800105B4..0x8001079C (61 unwind-only
- * 8-byte records), extabindex 0x8002C778..0x8002CA54 (61 x 12 B).  Registered from
- * `proposal/801E7530_fn_801E7530.cpp`.
+ * 8-byte records), extabindex 0x8002C778..0x8002CA54 (61 x 12 B).
  *
  * Module `lobby`.  The range's callees are the lobby UI API (`lobby_w` .bss 0x806AAB44, `LbStr`,
  * `lb_param_w`, `get_lsp_data`, `GetMenuFontColor`, `set_blendmode`, `draw_font_idx`,

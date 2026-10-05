@@ -46,7 +46,7 @@ u8 fn_8027F11C(void* equip);
 void* fn_8027ECAC(struct _EQUIP* equip);
 u32 fn_8027FFFC(struct _EQUIP* equip);
 
-/* 0x8027DC64 - the player's slot-occupied flag (`include/unsplit/Pl.h`'s +0x00 byte, the first byte
+/* 0x8027DC64 - the player's slot-occupied flag (`unsplit/Pl.h`'s +0x00 byte, the first byte
  * of the record at 0x806BB7A0), read as a boolean.  `enemy/em020_handlers.cpp`'s `em020_condition_ck`
  * mode 2 compares it against 1, so it is declared here - the owner defines it `extern "C"` at
  * `src/Pl/fn_8027D684.cpp:166` (rule 2: this range owns the address).  `u32`, not the owner's `s32`:

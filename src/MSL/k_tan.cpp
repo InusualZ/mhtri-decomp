@@ -1,5 +1,5 @@
 /*
- * MSL/k_tan.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * MSL/k_tan.cpp - STUB (no bodies yet).
  *
  * `.text` 0x80467320..0x80467570.  Sections of the candidate unit: .text 0x80467320..0x80467570; .rodata 0x805733A8..0x80573410; .sdata2 0x8079CE70..0x8079CEA8.
  *

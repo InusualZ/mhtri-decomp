@@ -1,9 +1,9 @@
 /* Declarations the enemy action band `enemy/em009_act.cpp` needs that its owner headers cannot
  * carry without breaking the C consumers: the two move-work accessors the band walks by their 0xB20
  * stride.  `ef/fn_800CDB2C.cpp` owns the addresses (0x800CFA90/0x800CFAD0), but its own header cannot
- * hold the C++-scope spelling beside `include/unsplit/ef.h`'s C-scope one (MWCC 10505 illegal
+ * hold the C++-scope spelling beside `unsplit/ef.h`'s C-scope one (MWCC 10505 illegal
  * overloading, hit by `Pl/fn_80273B14.cpp`), so the C++ consumers that already carry it - `include/
- * enemy/fn_80165FC8.h`, `include/Pl/fn_8025F088.h`, `include/ai/fn_802D0F34.h` - keep their own copy
+ * enemy/fn_80165FC8.h`, `Pl/fn_8025F088.h`, `ai/fn_802D0F34.h` - keep their own copy
  * and so does this unit.  The map names are manglings, so the declarations sit at C++ scope (rule 9).
  */
 #ifndef MHTRI_ENEMY_FN_80387844_H

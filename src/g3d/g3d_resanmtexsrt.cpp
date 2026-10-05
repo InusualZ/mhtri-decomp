@@ -4,7 +4,7 @@
  * 8852 B).
  *
  * Registered once, at its final home (docs/plan.md 12), from the pooled proposal
- * `proposal/800916FC_fn_800916FC.cpp`.
+ * `g3d/g3d_resanmtexsrt.cpp`.
  *
  * Naming - which evidence class decided it.  Class 1 decides: the range's own `.data` pool holds
  * the bare source-file name `g3d_resanmtexsrt.cpp` (lbl_80590928 at 0x80590928), the file argument
@@ -326,7 +326,7 @@ extern "C" u32 fn_80091D20(void* self, void* key) {
 extern "C" u32 fn_80092444(void* self);             /* this unit (0x80092444) */
 extern "C" s32 fn_80092330(void* dict, void* arg); /* this unit (0x80092330); `s32` is
                                                     * main's band declaration (see
-                                                    * include/unsplit/g3d.h) */
+                                                    * unsplit/g3d.h) */
 
 /* The ten "no-key" accessors: build the dictionary name from the category label, resolve the
  * `ResFile` root dictionary at +0x18, look the entry up, then read the body word through the

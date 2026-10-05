@@ -1,5 +1,5 @@
 /*
- * RVLGX/GXTexture_tail.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * RVLGX/GXTexture_tail.cpp - STUB (no bodies yet).
  *
  * `.text` 0x804B8020..0x804C1760.  Sections of the candidate unit: .text 0x804B8020..0x804C1760; .data 0x8061ABE4..0x8061AE00; .bss 0x80747300..0x80748B90; .sdata 0x80793E60..0x80793F00; .sbss 0x80795228..0x80795298; .sdata2 0x8079D160..0x8079D270.
  *

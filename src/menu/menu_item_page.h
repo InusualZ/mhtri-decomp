@@ -2,11 +2,11 @@
  * `menu/menu_item_page.cpp`'s own view: the item page draw layer's entry points and the callees it
  * calls.  See the unit's source header for the module/name evidence and the residuals.
  *
- * Rule 2 note (the practice `include/menu/fn_802E4978.h` documents): the callees below are declared here
- * or come from `include/unsplit/<band>.h`, because the owner headers collide in one translation unit -
- * `include/hud/layout.h` and `include/lobby/lb_pane_ui.h` define `_mh_ivec2_`/`_SPR_DATA_` differently
- * from `include/unsplit/lobby.h` (`get_lsp_data` is `void*` there and `_SPR_DATA_*` in the owner's), and
- * `include/menu/menu_item.h` already pulls `pl.h`.
+ * Rule 2 note (the practice `menu/fn_802E4978.h` documents): the callees below are declared here
+ * or come from `unsplit/<band>.h`, because the owner headers collide in one translation unit -
+ * `hud/layout.h` and `lobby/lb_pane_ui.h` define `_mh_ivec2_`/`_SPR_DATA_` differently
+ * from `unsplit/lobby.h` (`get_lsp_data` is `void*` there and `_SPR_DATA_*` in the owner's), and
+ * `menu/menu_item.h` already pulls `pl.h`.
  */
 #ifndef MHTRI_MENU_MENU_ITEM_PAGE_H
 #define MHTRI_MENU_MENU_ITEM_PAGE_H
@@ -50,7 +50,7 @@ typedef struct MenuRowRec {
 
 /* The 2D integer vector the menu/HUD helpers exchange (`_mh_ivec2_` in the map's manglings) and the
  * sprite-data tag the `draw_*` family takes by reference (`_SPR_DATA_`).  Both are this unit's view:
- * `include/unsplit/lobby.h` and `include/hud/layout.h` define the tag and the vector as well, and
+ * `unsplit/lobby.h` and `hud/layout.h` define the tag and the vector as well, and
  * including either here collides with this unit's own `_SPR_DATA_` view in the source. */
 struct _SPR_DATA_;
 typedef struct _mh_ivec2_ {
@@ -147,7 +147,7 @@ s32 strcmp(const s8* a, const s8* b);
 /* ---- the callees whose map names are manglings (rule 9: declare the real signature) ---- */
 #ifdef __cplusplus
 
-/* The sprite/font library `hud/layout.cpp` owns (the shapes `include/unsplit/lobby.h` carries, minus
+/* The sprite/font library `hud/layout.cpp` owns (the shapes `unsplit/lobby.h` carries, minus
  * its `lobby_world_block` array view - this unit needs the pointer the map records). */
 void* get_lsp_data(u16 id, _mh_ivec2_* out);
 void draw_sprite(const _SPR_DATA_& spr, const _mh_ivec2_* pos);

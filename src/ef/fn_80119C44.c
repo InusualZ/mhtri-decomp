@@ -1,9 +1,9 @@
-/* auto/80119C44_fn_80119C44.c - the effect-record constructor and its three hooks,
+/* ef/fn_80119C44.c - the effect-record constructor and its three hooks,
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  * `.text` 0x80119C44..0x80119DEC (5 functions, in address order).
  *
  * What it is.  `fn_80119C44` is the constructor of a 0x48-byte effect record (`_EFT_HEAP`, the same object
- * `auto/800FCED4_fn_800FCED4.cpp` and `auto/800FD520_fn_800FD520.c` drive): it gates on the current
+ * `auto/800FCED4_fn_800FCED4.cpp` and `ef/fn_800FD520.c` drive): it gates on the current
  * area, takes a record from the `eft_res_slot_get` pool with a 0x18-byte work block attached, seeds the work
  * block's effect count and scale, stamps the type/area, and installs the two handlers that travel with
  * the record - `fn_80119D10` as the pool-release hook at +0x40 and `fn_80119D9C` as the per-frame
@@ -12,7 +12,7 @@
  * start (`fn_80119DEC`) or the type handler (`fn_8011A2A0`/`fn_8011A34C`/`fn_8011ACF0`/`fn_8011AD00`).
  *
  * Language.  The unit's own symbols are plain (`fn_80119C44`, `fn_80119D10`, ...), so the file is C and
- * the mangled callee is declared by its map spelling - the same finding as `auto/800FD520_fn_800FD520.c`
+ * the mangled callee is declared by its map spelling - the same finding as `ef/fn_800FD520.c`
  * (a mangled *callee* is not evidence of a C++ unit; only a mangled definition or a `.cpp` `__FILE__`
  * string would be).  The `extab`/`extabindex` fragment the object carries comes from `cflags_main`'s
  * `-Cpp_exceptions on`, not from a C++ source.
@@ -55,7 +55,7 @@
  * and are copies of the neighbours' definitions (`auto/800FCED4_fn_800FCED4.cpp`'s `_EFT_HEAP`/`_EFT_WORK`);
  * all of them belong in one shared header, which does not exist yet.
  *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/80119C44_fn_80119C44.c`.
+ * Inventory, addresses and sizes: `python tools/units/ledger.py unit ef/fn_80119C44.c`.
  */
 
 #include "ef/eft_state_flags_set.h" /* eft_state_flags_set (rule 2: the owner's header) */

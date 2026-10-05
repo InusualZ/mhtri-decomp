@@ -1,5 +1,5 @@
 /*
- * include/OS/mem.h - the Nintendo SDK memory-library records the `OS` module's low-level runtime band uses.
+ * OS/mem.h - the Nintendo SDK memory-library records the `OS` module's low-level runtime band uses.
  *
  * The layout is read from the band's disassembly (0x804C1760..0x804C6D68): `mem_List`'s node is `{prev,next}`
  * at `object + list->offset`, the heap head stores its signature at +0x00, its start/end at +0x18/+0x1C, its

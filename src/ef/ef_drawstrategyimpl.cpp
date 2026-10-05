@@ -2,7 +2,7 @@
  * .text 0x800C5DB8..0x800C9540 (69 functions / 0x3788 bytes).
  *
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * tools/units/dossier.py proposal/800C5DB8_fn_800C5DB8: every .text row of the split object is a bare
+ * tools/units/dossier.py ef/ef_drawstrategyimpl.cpp: every .text row of the split object is a bare
  * fn_ name).
  *
  * The original source file is named by evidence class 1: the unit's own `.data` pool carries the bare
@@ -24,7 +24,7 @@
  * retail `layer >= 0 && layer < 3` assert materialises into a register while every source shape tried
  * here branches on the compare directly (residual recorded).
  *
- * Codegen lever: this unit needs the **peephole pass off** (docs/matching.md row 39). Retail keeps the
+ * Codegen lever: this unit needs the **peephole pass off** (playbook 39). Retail keeps the
  * unfused `clrlwi`/`extsh`/`extsb` in front of every narrowing GX FIFO store, which `-O3`'s peephole
  * folds away; `#pragma peephole off` is what the sibling `ef/ef_drawsmoothstripestrategy.cpp` needed
  * for the same out-of-line writer family.
@@ -41,7 +41,7 @@
 
 /* `nw4r::db::Panic` - the real declaration; the front end reproduces the map's
  * `Panic__Q24nw4r2dbFPCciPCce` spelling (tools/units/mangle.py confirms it). Declaring the mangled
- * spelling instead would re-mangle it and break the link (docs/matching.md 50); rule 9. */
+ * spelling instead would re-mangle it and break the link (playbook 50); rule 9. */
 #ifdef __cplusplus
 namespace nw4r {
 namespace db {

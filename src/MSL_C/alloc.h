@@ -1,7 +1,7 @@
 /*
  * Declarations of `src/MSL_C/alloc.cpp` - the MSL C library block (`.text` 0x804578FC..0x804642C8): the string, stdio and
  * conversion helpers the SDK links instead of a `stdlib` (`-nosyspath` leaves the prototypes to the unit that calls them).
- * Moved here from `include/unsplit/Runtime.PPCEABI.H.h` when the phase 4 split registered the unit; that band header
+ * Moved here from `unsplit/Runtime.PPCEABI.H.h` when the phase 4 split registered the unit; that band header
  * includes this one.  Other units that still declare them locally (`src/g3d/g3d_resanmtexsrt.cpp`,
  * `src/homebutton/keyboard_ui.cpp`, `src/light/light.cpp`, `src/g3d/g3d_anmchr.cpp`) can adopt it when next touched.
  */
@@ -32,7 +32,7 @@ u16* wcsncpy(u16* dst, const u16* src, u32 n);
 }
 #endif
 
-/* Declarations moved here from `include/unsplit/DWCi.h, NetworkStream.h, unknown.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+/* Declarations moved here from `unsplit/DWCi.h, NetworkStream.h, unknown.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 struct DWCiCType;
 
 #ifdef __cplusplus

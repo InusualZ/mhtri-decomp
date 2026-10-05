@@ -1,5 +1,5 @@
 /*
- * menu/movie.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * menu/movie.cpp - STUB (no bodies yet).
  *
  * `.text` 0x8043D524..0x804459DC.  Sections of the candidate unit: extab 0x8001DBEC..0x8001DE9C; extabindex 0x8003E718..0x8003EB20; .text 0x8043D524..0x804459DC; .ctors 0x8056F3CC..0x8056F3D0; .data 0x806047D0..0x80604D2C; .bss 0x806E26E0..0x806E3E10; .sdata 0x80793A80..0x80793B28; .sbss 0x80794D08..0x80794D18; .sdata2 0x8079C8D0..0x8079C960.
  *

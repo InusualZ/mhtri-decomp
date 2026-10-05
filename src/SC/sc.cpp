@@ -1,5 +1,5 @@
 /*
- * SC/sc.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * SC/sc.cpp - STUB (no bodies yet).
  *
  * `.text` 0x804DAE40..0x804E45B0.  Sections of the candidate unit: .text 0x804DAE40..0x804E45B0; .rodata 0x80573B58..0x80573C40; .data 0x80629CA8..0x8062AB68; .bss 0x8074E460..0x8075B110; .sdata 0x80794000..0x80794148; .sbss 0x80795440..0x807955C8; .sdata2 0x8079D330..0x8079D3C0.
  *

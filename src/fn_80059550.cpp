@@ -9,7 +9,7 @@
  *
  * The game-root "system message / save-create" callback unit.  `.text` 0x80059550..0x8005AA28 (0x14D8 B,
  * 12 functions), extab 0x800072D0..0x80007310, extabindex 0x8001F5A8..0x8001F608 (8 framed functions).
- * The range is one maximal unclaimed run (attribute.py, `proposal/80059550_fn_80059550.cpp`); its seam is
+ * The range is one maximal unclaimed run (attribute.py, `fn_80059550.cpp`); its seam is
  * unproven - it is a proposal cap, not a TU boundary (see below).
  *
  * Naming - which evidence class decided it.
@@ -124,7 +124,7 @@ typedef struct BetaWork {
     /* +0x0E */ s16 taskIndex;
 } BetaWork; /* size: 0x10 */
 
-/* `fltSpr2TF` now lives in its owner's header `include/fn_80047398.h` (rule 1: one definition). */
+/* `fltSpr2TF` now lives in its owner's header `fn_80047398.h` (rule 1: one definition). */
 
 /* The NW4R-`ResMat`-style validity-checked handle the `fn_8005A8E0..fn_8005AA20` cluster wraps.
  * size: 0x04 */

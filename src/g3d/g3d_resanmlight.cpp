@@ -3,13 +3,13 @@
  * channel accessors, `.text` 0x8008F8E4-0x800908FC (31 functions, 0x1018 B).
  *
  * Registered once, at its final home (docs/plan.md 12), from the pooled proposal
- * `proposal/8008F8E4_fn_8008F8E4`.  Naming - evidence class 1, a `__FILE__` string: the range's first
+ * `g3d/g3d_resanmlight.cpp`.  Naming - evidence class 1, a `__FILE__` string: the range's first
  * body `fn_8008F8E4` passes `.data` 0x80590440 = "g3d_resanmlight.cpp" as its `nw4r::db::Panic` file
  * argument (`python tools/symbols/dumpmap.py lookup 0x80590440`).  The preceding registered unit
  * `g3d/g3d_resanmfog.cpp` ends exactly at 0x8008F8E4 and its header names that string as this unit's
  * first body, so the left seam is proven.
  *
- * The right seam 0x800908FC is the pinned first body of the next TU (`proposal/800908FC`: its
+ * The right seam 0x800908FC is the pinned first body of the next TU (`g3d/g3d_resanmscn.cpp`: its
  * `fn_800908FC` cites `g3d_resanmscn.cpp`) and is registered separately by its own worker; the sibling
  * proposals `800916FC`/`80093990`/`800947A4` carve the rest of the discovery cap.  The proposal brief's
  * stated 0x8008F8E4-0x80097D40 cap therefore overlaps those four siblings, so this unit is registered

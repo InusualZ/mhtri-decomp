@@ -6,7 +6,7 @@
 #include "nw4r/math.h"
 #include "ef/pRoot.h"
 
-/* Declarations moved here from `include/unsplit/g3d.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+/* Declarations moved here from `unsplit/g3d.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 #ifdef __cplusplus
 extern "C" {
 #endif

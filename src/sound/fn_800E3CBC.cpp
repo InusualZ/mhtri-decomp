@@ -1,6 +1,6 @@
 /*
  * sound/fn_800E3CBC.cpp - the 0x800E3CBC..0x800E46E8 band: the primitive-record pools and their GX state
- * helpers.  Registered from `proposal/800E3CBC_fn_800E3CBC.cpp` (12 functions, 2604 B).
+ * helpers.  Registered (12 functions, 2604 B).
  *
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * `python tools/symbols/dumpmap.py lookup <addr>`: nine of the twelve addresses carry a `zz_` placeholder,
@@ -127,7 +127,7 @@ typedef struct PrimMgr {
 /* ------------------------------------------------------------------ externs */
 
 /* Not-yet-reconstructed `sound`-band symbols (the bracketing registered units both name `sound`); the
- * declarations belong in `include/unsplit/sound.h` and are requested there in the outbox. */
+ * declarations belong in `unsplit/sound.h` and are requested there in the outbox. */
 extern "C" {
 extern u32 lbl_807949A0[2];     /* .sbss record-list bases */
 extern u32 lbl_807949A8[2];     /* .sbss record-list counts */
@@ -162,7 +162,7 @@ void GXSetBlendMode(u32 a, u32 b, u32 c, u32 d);
 void GXSetZMode(u32 a, u32 b, u32 c);
 }
 
-/* `sound/fn_800E46E8.cpp` owns fn_800E46E8; its declaration is in include/sound/fn_800E46E8.h. */
+/* `sound/fn_800E46E8.cpp` owns fn_800E46E8; its declaration is in sound/fn_800E46E8.h. */
 
 /* Forward declarations for the mutually recursive bodies below. */
 extern "C" s32 fn_800E4148(PrimRec* self, const WorkBuf* arg);

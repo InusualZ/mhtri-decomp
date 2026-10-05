@@ -1,7 +1,7 @@
 /*
- * enemy/em019_ai.cpp - phase 4 unit, `.text` 0x80378F9C..0x80383148 (92 functions, 41388 bytes).
+ * enemy/em019_ai.cpp - unit, `.text` 0x80378F9C..0x80383148 (92 functions, 41388 bytes).
  *
- * PHASE 4 (docs/splits/phase4, window d).  Fold of 4 registered units: em019_ai.cpp, em019_prog.cpp, em_act_mot.cpp,
+ * Fold of 4 registered units: em019_ai.cpp, em019_prog.cpp, em_act_mot.cpp,
  * fn_80382310.cpp.  The functions below are the ones those sources define, in address order; every other function of
  * the range keeps its original bytes.  28 of 92 functions have a body here.
  *
@@ -18,7 +18,7 @@
  * 0x800378CC..0x80037B00 (47 x 12 B).
  *
  * WHAT IT IS.  Monster-AI code of the em019 program, continued from `enemy/em020_ai.cpp`: every body
- * takes the shared `_ENEMY_WORK` record (`include/enemy/ENEMY_WORK.h`) and drives it through the
+ * takes the shared `_ENEMY_WORK` record (`enemy/ENEMY_WORK.h`) and drives it through the
  * enemy core API (`em_frame_check`, `get_joint_wpos_em`, `get_em_chg_scale`, `em_mot_set` /
  * `em_mot_set_ck` / `em_mot_end_ck`) and the game's work blocks (`system_w`, `lobby_w`,
  * `get_move_work_adrs`, `my_player_no`, `Psw`).
@@ -266,7 +266,7 @@ extern "C" f32 lbl_8079BD08;   /* 110.0 */
 extern "C" f32 lbl_8079BD24;   /* 100.0 */
 extern "C" f32 lbl_8079BE88;   /* -20.0 */
 
-/* `include/stage/fn_802B2AA0.h` (this unit's `shell_set_func_ptr` owner) declares `setVec3` with
+/* `stage/fn_802B2AA0.h` (this unit's `shell_set_func_ptr` owner) declares `setVec3` with
  * a `void` result, while the target's call site consumes the returned pointer; the band reaches it
  * through the signature its own body has.  `em035_prog.cpp` records the same gap, and the outbox
  * carries the shared-file request. */

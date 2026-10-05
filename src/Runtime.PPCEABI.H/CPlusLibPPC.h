@@ -1,6 +1,6 @@
 /*
  * Declarations of `src/Runtime.PPCEABI.H/CPlusLibPPC.cpp` (the MSL C++ array runtime, `.text` 0x80456704..0x80456C88).
- * Moved here from `include/unsplit/Runtime.PPCEABI.H.h` when the phase 4 split registered the unit.
+ * Moved here from `unsplit/Runtime.PPCEABI.H.h` when the phase 4 split registered the unit.
  */
 #ifndef MHTRI_RUNTIME_PPCEABI_H_CPLUSLIBPPC_H
 #define MHTRI_RUNTIME_PPCEABI_H_CPLUSLIBPPC_H

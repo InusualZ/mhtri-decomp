@@ -23,7 +23,7 @@ void fn_80529B50(u8 index, u32 value);
 }
 #endif
 
-/* Declarations moved here from `include/unsplit/DWCi.h, SO.h, VF.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+/* Declarations moved here from `unsplit/DWCi.h, SO.h, VF.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 #ifdef __cplusplus
 extern "C" {
 #endif

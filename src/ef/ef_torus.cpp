@@ -35,7 +35,7 @@
  * The unit's `.data` run (0x80594BA8 "ef_torus.cpp" + the three assert formats + the vtable
  * lbl_80594C58 at 0x80594C58) and its compiler-generated `.sdata2` pool (the literal floats,
  * 0x80796208..0x80796240) are **not** claimed in `splits.txt`: the strings are declared `extern`
- * and never defined here, so the object emits no `.data` (docs/matching.md 29, docs/plan.md 8.4).
+ * and never defined here, so the object emits no `.data` (playbook 29, docs/plan.md 8.4).
  * Two `range` requests ride the outbox - the data pass claims/defines them once the source emits
  * the bytes.  The `extab`/`extabindex` fragments travel with the code unit and are claimed below.
  *

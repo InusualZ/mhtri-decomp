@@ -4,7 +4,7 @@
 
 #include "types.h"
 
-/* Declarations moved here from `include/unsplit/SC.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+/* Declarations moved here from `unsplit/SC.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 #ifdef __cplusplus
 extern "C" {
 #endif

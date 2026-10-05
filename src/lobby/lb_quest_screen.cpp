@@ -58,7 +58,7 @@
  *     `fn_803A8994` 0x3B8, `fn_803A79C0` 0x318.
  *   - the lobby screen band (0x803A52A4..0x803A75D8) is BLOCKED on a view merge, not on effort: it
  *     switches on `lobby_w.menu_0xAC`'s +0x00 byte but reads that object's +0x28/+0x2A/+0x3C/+0xD0
- *     with meanings that do not agree with `LbMenuWork` in `include/unsplit/lobby.h` (+0x2A has no
+ *     with meanings that do not agree with `LbMenuWork` in `unsplit/lobby.h` (+0x2A has no
  *     name at all, +0x3C is `value_0x3C`).  Re-typing it changes the declaration set of every unit
  *     that includes that header (playbook 60), so it belongs in one merge pass with the
  *     `lobby/fn_8020C588.h` / `fn_8021E1EC.h` / `fn_801F3294.h` views of the same block.

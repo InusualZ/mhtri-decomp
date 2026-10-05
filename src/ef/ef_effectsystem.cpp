@@ -20,7 +20,7 @@
  * `Panic__Q24nw4r2dbFPCciPCce` / `Warning__Q24nw4r2dbFPCciPCce` callees and the range's own `.data` item
  * `lbl_8059283C` (the table the last constructor stores).  The seam is proven on both sides: the range
  * starts where `ef/ef_effect.cpp` ends (its own `__FILE__` string - "ef_effect.cpp" at 0x80592430 - heads
- * the *previous* pool, and discovery records this boundary as proposal/800A40F4's seam
+ * the *previous* pool, and discovery records this boundary as ef/ef_effect.cpp's seam
  * `"ef_effectsystem.cpp" starts here`), and it stops at ef/ef_emitter.cpp's first instruction
  * (0x800A6350, whose pool starts with "ef_emitter.cpp" at 0x80592850).  The extab and extabindex runs
  * break at exactly those two addresses.
@@ -68,14 +68,14 @@
  *     handler calls the empty `fn_800A5908` and rethrows.
  *   - the effect object's +0x1C is a *table*, not a sub-object: every entry is called with the effect
  *     itself as the first argument (`RetireEffect`, `fn_800A49B8` and `CreateEffect` all do).
- *   - `include/ef.h` declares `class EffectSystem` (rule 9 needs `RetireEffect` to be its member).  That
+ *   - `ef.h` declares `class EffectSystem` (rule 9 needs `RetireEffect` to be its member).  That
  *     declaration carries the two `virtual_0xN` placeholders ef/eft004.cpp reaches through
  *     `fn_800A4420`, i.e. it models the *memory manager* (`mMemoryManager`, this object's first word) as
  *     if it were the system, so it cannot also be the system's real layout.  The layout this file works
- *     with is therefore stated once here, as `EfSys` (rule 1 debt: the two must become one `include/ef.h`
+ *     with is therefore stated once here, as `EfSys` (rule 1 debt: the two must become one `ef.h`
  *     definition - booked in this unit's outbox, it would touch ef/eft004.cpp's one indirect call).
  *   - `RetireEffect` returns a value (`li r3, 1` / `li r3, 0` in the target, and the sweep adds it), so
- *     `include/ef.h`'s `void RetireEffect(Effect*)` is corrected to the mapped owner's real one; the one
+ *     `ef.h`'s `void RetireEffect(Effect*)` is corrected to the mapped owner's real one; the one
  *     consumer, ef/eft004.cpp, ignores the value and its `.text` is unchanged.  The same holds for
  *     `Effect::RetireEmitterAll` (the sweep adds its result too).
  *

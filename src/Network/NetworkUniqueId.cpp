@@ -24,7 +24,7 @@
  * RESIDUALS. Every `.text` row is 100 %; `.text`, `extab` and `extabindex` are byte-identical in size.  `flipcheck`
  *   is NOT READY on `.data` alone: the object emits 0x2C4 B against the claim's 0x2C8 - the table is 0x3C B and the
  *   claim ends on the 8-aligned start of the next unit's `.data`, so the last 4 B are alignment the object does
- *   not carry (a trial `Matching` flip linked `main.dol` with the right SHA-1, 2026-10-04; the unit stays
+ *   not carry (a trial `Matching` flip linked `main.dol` with the right SHA-1; the unit stays
  *   `NonMatching` while the gate's flipcheck refuses the short claim).  The log strings pair by address but not by name (`@NNN` against the map's `lbl_805FC9D0..`).
  */
 

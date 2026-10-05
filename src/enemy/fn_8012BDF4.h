@@ -17,7 +17,7 @@ extern "C" {
 #endif
 
 s32 em_act_ck__FP11_ENEMY_WORKUcUc(struct _ENEMY_WORK* work, u8 a, u8 b);
-/* NOTE (2026-09-27): the `s32 em_act_ck(...)` declaration that used to sit *here*, inside this
+/* NOTE: the `s32 em_act_ck(...)` declaration that used to sit *here*, inside this
  * `extern "C"` block, made every consumer that includes this header emit the unmangled `em_act_ck`
  * while the map (and the retail objects) reference the mangling `em_act_ck__FP11_ENEMY_WORKUcUc`: the
  * first declaration of a name fixes its language linkage, so the C-linkage block above was winning
@@ -75,7 +75,7 @@ s32 fn_8012E8F4(f32 seconds);
 #ifdef __cplusplus
 void em_busy_set(struct _ENEMY_WORK* self);
 #endif
-/* 0x8012C220 / 0x8012C4E8 - this unit's own definitions, moved here from `include/unsplit/enemy.h`
+/* 0x8012C220 / 0x8012C4E8 - this unit's own definitions, moved here from `unsplit/enemy.h`
  * (rule 2): the band header had them as if no unit owned the address.  Signatures are the owner's
  * definitions (`s32 fn_8012C220(u32 team, u32 state_sub)`; `void fn_8012C4E8(u32 team, u32 state_sub,
  * s16 arg3, void* ref, f32 radius)`); `enemy/fn_80147CE0.cpp` calls both with those argument types. */

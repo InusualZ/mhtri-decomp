@@ -3,7 +3,7 @@
  * action layer and the player-character control band.
  *
  * `.text` 0x801FBF78..0x80212810 (389 functions), `.bss` 0x2C00 B, `.data` 0xA78 B, `.sbss` 0x58 B, `.sdata` 0x70 B, `.sdata2` 0x398 B,
- * `.ctors` 4 B, extab 0x958 B and extabindex 0xE04 B.  Phase 4 fold (docs/splits/phase4): the four registered units
+ * `.ctors` 4 B, extab 0x958 B and extabindex 0xE04 B.  Phase 4 fold: the four registered units
  * `lobby/lb_npc`, `lobby/fn_802029B4`, `lobby/fn_802076D4` and `lobby/fn_8020C588` are one TU of the candidate (the `.sdata2`
  * pool and the `lb_npc` `.bss` tables run on across their old edges); their bodies are kept below in text order, each under
  * its own former header.
@@ -24,7 +24,7 @@
  *
  * `.text` 0x801FBF78..0x802029B4 (127 functions, 27196 B), extab 0x80010ADC..0x80010DBC,
  * extabindex 0x8002CF34..0x8002D384 (92 x 12 B), .ctors 0x8056F35C..0x8056F360 (one word, fn_801FF700).
- * Registered once, at its final home (docs/plan.md 12), from proposal/801FBF78_fn_801FBF78.cpp.
+ * Registered once, at its final home (docs/plan.md 12).
  *
  * Module `lobby`: the range owns the `lb_npc` NPC work array (.bss 0x806A7BA0, 0x12 x 0x268), the npc
  * data tables (`npc_data_town`, `npc_data_village`, `npc_lp_tbl`, `npc_model_*`, `npc_sub_data`,
@@ -795,7 +795,7 @@ void fn_801FD174(_LB_NPC* self)
 /* ==== absorbed from lobby/fn_802029B4.cpp (0x802029B4..0x80207698) ==== */
 /* lobby/fn_802029B4.cpp - `.text` 0x802029B4..0x802076D4 (68 functions, 0x4D20 bytes), extab
  * 0x80010DBC..0x80010F7C (56 unwind records), extabindex 0x8002D384..0x8002D624 (56 x 12 B).
- * Registered once, at its final home (docs/plan.md 12), from proposal/802029B4_fn_802029B4.cpp.
+ * Registered once, at its final home (docs/plan.md 12).
  *
  * What it is.  The lobby NPC work band: every function takes the shared `_LB_NPC` record and runs a
  * byte state machine on `_LB_NPC::field_0x006` (0..3), arming one of the NPC's motions through the
@@ -816,7 +816,7 @@ void fn_801FD174(_LB_NPC* self)
  *   2. `dumpmap.py lookup` answers `zz_02029b4_` for the range (a placeholder is not evidence).
  *   3. The band is `lobby`: both bracketing registered units are `lobby` (`lobby/lb_npc.cpp` below at
  *      0x801FBF78..0x802029B4, `lobby/fn_80212810.cpp` above at 0x80212810..0x80219260), the code takes
- *      the `_LB_NPC` record `include/lobby/lb_npc.h` owns, calls its helpers, and reads the band's own
+ *      the `_LB_NPC` record `lobby/lb_npc.h` owns, calls its helpers, and reads the band's own
  *      `.bss` (`lb_npc_move_data`, `lobby_w`).  The file keeps the map's own stem, like its neighbours.
  *
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
@@ -2852,7 +2852,7 @@ void fn_802050AC(_LB_NPC* self)
  * `.text` 0x802076D4..0x8020C588 (82 functions, 20148 B), extab 0x80010F7C..0x80011184 and extabindex
  * 0x8002D624..0x8002D930 (both 65 records, abutting the bracketing registered units
  * `lobby/lb_npc.cpp` and `lobby/fn_80212810.cpp`).  Registered once, at its final home
- * (docs/plan.md 12), from proposal/802076D4_fn_802076D4.cpp.
+ * (docs/plan.md 12).
  *
  * Module and language.  `lobby`: the range reads `lobby_w`/`lb_npc_move_data`/`lb_param_w`, calls the
  * neighbours' `fn_801FExxx`/`fn_801FDE3C` and the lobby UI helpers (`LbStr`, `get_lsp_data`), and both
@@ -2875,9 +2875,9 @@ void fn_802050AC(_LB_NPC* self)
  * handlers this range defines, which is the strongest hint that the real seam is 0x80207698.
  *
  * Two record types.  The range's functions take one of two records and both are already reconstructed:
- *   - `_LB_NPC` (include/lobby/lb_npc.h, 0x268 B) for the act-state functions - `fn_802076D4` reads the
+ *   - `_LB_NPC` (lobby/lb_npc.h, 0x268 B) for the act-state functions - `fn_802076D4` reads the
  *     VEC3 at +0x10 and the VEC3 at +0x1EC, and `_LB_NPC` is the only view with both.
- *   - `_PLW` (include/pl.h, 0xB20) for the ones that drive the player work and reach past +0x268
+ *   - `_PLW` (pl.h, 0xB20) for the ones that drive the player work and reach past +0x268
  *     (`fn_8020A3E4` walks +0x322, `fn_80208928` memcmps the name at +0xB05, most call
  *     `Pl_chr_setX`/`Pl_master_ck`, whose map parameter type is `_PLW*`).
  *
@@ -3394,11 +3394,11 @@ s32 get_fade_stat(s32 slot);
  * extabindex 0x8002D930..0x8002DD38 (86 x 12 B) and one `.data` jump table
  * `jumptable_805B9770` 0x805B9770..0x805B97BC (19 words, the arms of `fn_80212760`'s switch - the
  * table at 0x805B96D8 in front of it is `fn_80211E68`'s and is unclaimed while that body is not
- * written).  Registered from `proposal/8020C588_fn_8020C588.cpp`.
+ * written).
  *
  * Module `lobby`: both registered units bracketing the range in the address band are `lobby`
  * (`lobby/lb_npc.cpp` ends at 0x802029B4, `lobby/fn_80212810.cpp` starts at 0x80212810), and this
- * range both **defines** `LbStr__FUcUs` - the lobby string helper `include/unsplit/lobby.h` declares
+ * range both **defines** `LbStr__FUcUs` - the lobby string helper `unsplit/lobby.h` declares
  * and `lobby/fn_801E7530.cpp`/`fn_80212810.cpp` call - and reads `lobby_w` and the lobby UI tables.
  *
  * Name.  No `__FILE__` string is reachable from the range and the runtime dump answers only
@@ -3422,7 +3422,7 @@ s32 get_fade_stat(s32 slot);
  *    split target object (MAIN has no `obj/lobby/fn_8020C588.o`, so `recompile.py --measure` falls
  *    back to the retired single-symbol objects and cannot pair these).
  *  - the other 91 functions are unwritten.  Every one of them takes the shared `_PLW` player record
- *    and drives it with `Pl_act_ck`/`Pl_master_ck`/`Pl_frame_check`, so the blocker is `include/pl.h`,
+ *    and drives it with `Pl_act_ck`/`Pl_master_ck`/`Pl_frame_check`, so the blocker is `pl.h`,
  *    which still spells the offsets this range reads `pad_*`/`unk*` (+0x004/+0x005/+0x006 state,
  *    +0x028 timer, +0x03C/+0x040/+0x044 floats, +0x0B4/+0x0B6, +0x30E, +0x313, +0x354,
  *    +0x656/+0x657, +0x265..0x267, +0x5C8).  Naming them in `pl.h` is the sanctioned ``wave 2'' work
@@ -3432,7 +3432,7 @@ s32 get_fade_stat(s32 slot);
  *    not covered by the `Naming note` line above).
  *  - `fn_80212370` (352 B) reads the `Psw` pad record's 0x2C0..0x2DF bytes; the only `PlayerPad`
  *    definition lives in `src/mh3_pad.cpp` (rule 1: a shared type in one header), so naming them here
- *    would copy it.  Config_request: move `PlayerPad` into `include/mh3_pad.h`.
+ *    would copy it.  Config_request: move `PlayerPad` into `mh3_pad.h`.
  *  - `fn_80211E68` (504 B, 0x80211E68) is the range's other jump-table switch and needs no `_PLW`
  *    field, only `Pl_act_ck(_PLW*, u8, u16)` + `my_player_work_get()` passed straight through.  Its arms are
  *    in the DOL's table order `0, 28|33|37, 27, 7, 17, 23, 24, 2, 21, 22, 3, 15, 4, 11, 5, 6, 8, 12,

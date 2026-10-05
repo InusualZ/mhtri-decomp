@@ -6,7 +6,7 @@
  * sequence of objects the linker placed next to each other, so this file reconstructs the functions
  * whose own evidence is complete and leaves the rest to the seam re-draw.
  *
- * SEAM EVIDENCE (measured, 2026-09-27):
+ * SEAM EVIDENCE (measured):
  *   - the left edge 0x8039D278 is the cap `menu/menu_result.cpp` was registered at, and the two
  *     bands share a record layout: that unit's `q_result_phase_enter`/`fn_8039D0C8` iterate the same
  *     +0x33DC array of 0x18-byte records that `multi_box_records_step` walks, so the real boundary
@@ -53,7 +53,7 @@
  *     `em_action3_sub0/2`, `em_action6_sub0/1`, `fn_8039E5CC`, `fn_803A1110`, ...) take them as motion
  *     parameters; naming them from the value alone would invent semantics the binary does not carry,
  *     so they stay unclaimed until the enemy band's own unit registers and claims the run.
- *   - the `+0x328` union in `include/enemy/ENEMY_WORK.h` has no byte view: `fn_8039E68C`, `fn_8039E718`
+ *   - the `+0x328` union in `enemy/ENEMY_WORK.h` has no byte view: `fn_8039E68C`, `fn_8039E718`
  *     and `em_action1_sub5` all write +0x328/+0x329 as *separate bytes* (the target emits two `stb`
  *     where the existing `s16 field_0x328` view would emit one `sth`), so they need a named byte-pair
  *     union member added by whoever owns that header next.

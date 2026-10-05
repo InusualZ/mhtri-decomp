@@ -1,7 +1,6 @@
 /* enemy/em027_prog.cpp - enemy 027 program
  *
  * `.text` 0x801AA154..0x801B0010, 47 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): recut registered unit, built from `enemy/fn_801A9540.cpp`.
  * Renamed from `fn_801A9540`: the unit's `.data` holds `em027_prog_tbl` (0x805B06D0) and its `.text` starts at 0x801AA154.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  */
@@ -31,7 +30,7 @@
  *     (`enemy/fn_8019ED34.cpp` below, `enemy/fn_801B7020.cpp` above), and every callee out of the
  *     range is enemy-band (`em_act_ck`, `em_frame_check`, `em_get_mot_no`, `get_joint_wmat_em`,
  *     `get_move_work_adrs`, `em_action_finish`, `em_mot_set`, ...); every body drives the
- *     `_ENEMY_WORK` record `include/enemy/ENEMY_WORK.h` owns.
+ *     `_ENEMY_WORK` record `enemy/ENEMY_WORK.h` owns.
  *   * class 4 keeps the name: nothing supports a file name, so the map's own `fn_801A9540` stem is
  *     the file name (the sibling units use the same scheme).
  *
@@ -53,7 +52,7 @@
  * (`em_move_mode_set(self, 0)` starts the motion, `em_mot_set`/`em_mot_set_ck` set it, `em_mot_end_ck`/
  * `em_approach_step` report it, `em_action_finish(self)` ends the action).  `fn_801AD1F0`/`fn_801AD3F0` are
  * the two program-table dispatchers (the `.data` tables `lbl_805B07E0`.. and `lbl_805B0C08`..).
- * The bodies read `_ENEMY_WORK` fields through `include/enemy/ENEMY_WORK.h` and the enemy-band
+ * The bodies read `_ENEMY_WORK` fields through `enemy/ENEMY_WORK.h` and the enemy-band
  * callees through their owner headers.
  *
  * Status (measured with `python tools/units/recompile.py enemy/fn_801A9540.cpp --measure <symbol>`,
@@ -84,7 +83,7 @@
  *     signature has three parameters where the target's call sites pass four - r3 `self`, r4 the
  *     table, r5 0, r6 the id (measured at both this range's call sites and at
  *     `enemy/fn_8014A1BC.c`'s: `lis/addi r4,table; li r5,0; li r6,id; b 0x801251D0`, and the callee
- *     itself is `clrlwi r5,r5,24; b 0x80124C5C`).  Writing them needs `include/enemy/fn_801251D0.h`
+ *     itself is `clrlwi r5,r5,24; b 0x80124C5C`).  Writing them needs `enemy/fn_801251D0.h`
  *     and the `extern "C" void em_se_tbl_play(...)` definition in `src/enemy/fn_801251D0.cpp` moved to
  *     the four-argument form - a shared-file edit outside this unit's registration, so it is left
  *     as a recorded correction for the owner rather than made here.

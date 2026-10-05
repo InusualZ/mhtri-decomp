@@ -2,7 +2,7 @@
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * What it is.  The first two TUs of the NintendoWare-for-Revolution effect library (`nw4r::ef`) that the discovery's
- * `proposal/800AEE48_fn_800AEE48.cpp` range (0x800AEE48..0x800B99E8, capped at `--max-bytes`) held.  The split object's own `__FILE__`
+ * `ef/fn_800AEE48.cpp` range (0x800AEE48..0x800B99E8, capped at `--max-bytes`) held.  The split object's own `__FILE__`
  * strings name them, in `.data` order (which is `.text` order): `ef_postfield.cpp` (0x80593580) and `ef_resource.cpp` (0x80593690), plus the
  * header strings `res_drawparam_ac.h` and `res_emitterparam_ac.h`.  Provisional internal seam, from the panic-site file strings:
  *   0x800AEE48..0x800B2810   ef_postfield.cpp          (fn_800AF440 / fn_800B18F0 cite it)

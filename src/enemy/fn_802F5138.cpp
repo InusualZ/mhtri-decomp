@@ -1,8 +1,7 @@
 /*
- * enemy/fn_802F5138.cpp - phase 4 unit, `.text` 0x802F5138..0x802F9994 (61 functions, 18524 bytes).
+ * enemy/fn_802F5138.cpp - unit, `.text` 0x802F5138..0x802F9994 (61 functions, 18524 bytes).
  *
- * PHASE 4 (docs/splits/phase4, window d).  Recut of fn_802F5138.cpp: its functions whose address lies in this range,
- * in address order; the rest of the range keeps its original bytes.  27 of 61 functions have a body here.
+ * 27 of 61 functions have a body here.
  *
  * FLAGS.  `cflags_main`.  The tail of the old range (0x802F9994..) is `enemy/em_sub_state_prog.cpp`.
  *
@@ -64,7 +63,7 @@
  *    chain; `(f32)(s32)` where retail keeps the `xoris` conversion; a scoped `#pragma peephole off`
  *    per function (`fn_802F8B28`, `fn_802F9774`, `fn_802F96B4`, `fn_802F51DC`) - file-wide off costs
  *    `fn_802F5B98` 62.5 -> 20.8 %.
- *  - `include/enemy/fn_801251D0.h` gained the four-argument C++ view of 0x801251D0 and
+ *  - `enemy/fn_801251D0.h` gained the four-argument C++ view of 0x801251D0 and
  *    `enemy/em009_act.cpp`'s 28 call sites moved to it (both targets set r6 = the id):
  *    `fn_8038BD28` 96.729 -> 100.0 %.  The outbox asks the orchestrator to confirm that shared-file
  *    edit on the batch.

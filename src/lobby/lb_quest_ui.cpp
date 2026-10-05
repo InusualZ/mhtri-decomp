@@ -56,10 +56,10 @@
  * RULE 2 BOUNDARY ARTEFACT (reported, not resolved here).  Two of the switch arms of
  * `lb_ui_detail_step` tail into 0x80394144 / 0x80394154, which the *next* band owns
  * (`src/lobby/lb_quest_board.cpp` landed on main after this branch was cut).  That unit's header does
- * not declare them, so this branch declares them in the band header `include/unsplit/lobby.h` and
+ * not declare them, so this branch declares them in the band header `unsplit/lobby.h` and
  * reports it: `land.band_ownership_warnings` lists the two lines (a warning the gate never refuses -
  * see its docstring), and the fix on the merged tree is to move the two declarations into
- * `include/lobby/lb_quest_board.h`.
+ * `lobby/lb_quest_board.h`.
  *
  * Naming note: references only to other units' unrenamed fn_XXXXXXXX symbols (checked with
  * `grep -rn "fn_80" src/lobby/lb_quest_ui.cpp` - the only `fn_` names this file names
@@ -99,7 +99,7 @@
  * an approximation (nothing in this range allocates or `memset`s it). size: 0x1A8 (approximate) */
 /* One record of the screen's pooled-effect list at `+0x038`: a count followed by the handles the
  * effect library retires.  This unit keeps its own view because the next band's header
- * (`include/lobby/lb_quest_board.h`, which documents the same record as `LbEftList`) only exists on
+ * (`lobby/lb_quest_board.h`, which documents the same record as `LbEftList`) only exists on
  * main - this branch was cut before it landed, so the fold is recorded in the outbox instead. size: 0x8 */
 typedef struct LbUiEftList {
     /* +0x000 */ s32 count_0x000;

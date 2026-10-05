@@ -1,7 +1,7 @@
 /*
  * The unit's own view of the menu list work the first (0x802A6624-0x802A7CC8) block operates on,
  * plus the window's message/frame/dialog entry points' declarations.  Re-homed here from
- * `include/menu/fn_802A6624.h` on 2026-09-29 (the unit is `menu/menu_message.cpp` now; its file
+ * `menu/fn_802A6624.h` on 2026-09-29 (the unit is `menu/menu_message.cpp` now; its file
  * header carries the name's derivation, the two open seam questions and the residuals).
  *
  * The block is the menu's list/cursor layer: `menu_list_fill` fills the list at +0x1BE from one of two
@@ -41,7 +41,7 @@ typedef struct MenuMoveRecord {
     /* +0x5E5 */ u8 unused_0x5E5[0xB20 - 0x5E5];
 } MenuMoveRecord;
 
-/* The 2D integer position the menu/HUD helpers exchange.  Same record as `include/unsplit/lobby.h`'s
+/* The 2D integer position the menu/HUD helpers exchange.  Same record as `unsplit/lobby.h`'s
  * `_mh_ivec2_` (0x4 B); named locally so the calls can keep the map's `...P10_mh_ivec2_` mangling
  * (via `struct _mh_ivec2_` forward declarations) without including that header, whose
  * `menu_cursor_step` declaration this range owns - see the unit header's rule-2 note.
@@ -90,8 +90,8 @@ struct MenuListWork {
     /* +0x1D2 */ char long_name_0x1D2[0x0E];
 };
 
-/* The range's own entry points the neighbouring units call.  `include/unsplit/lobby.h` and
- * `include/lobby/lb_pane_ui.h` published them while the band had no registered unit; this range now
+/* The range's own entry points the neighbouring units call.  `unsplit/lobby.h` and
+ * `lobby/lb_pane_ui.h` published them while the band had no registered unit; this range now
  * owns 0x802A6624-0x802AA6A8 (re-cut from 0x802AD9C0 on 2026-09-29 and 0x802AA764 on 2026-09-30; the unit header has the open seams),
  * so the declarations live here and both headers include this one (docs/plan.md 6.5 rule 2).  The spellings are this range's own definitions' (the `s32` first two
  * parameters are what the retail call sites need: a narrow argument must not be narrowed back to `s16`

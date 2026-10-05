@@ -1,5 +1,5 @@
 /*
- * MSL/e_asin.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * MSL/e_asin.cpp - STUB (no bodies yet).
  *
  * `.text` 0x804642C8..0x80464560.  Sections of the candidate unit: .text 0x804642C8..0x80464560; .sdata2 0x8079CAB8..0x8079CB40.
  *

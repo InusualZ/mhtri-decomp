@@ -243,7 +243,7 @@ extern void Panic__Q24nw4r2dbFPCciPCce(const char* file, int line, const char* f
 
 /* nw4r::math and effect-library helpers, all still `fn_*` in the symbol map.
  * The two `src/mh3_pad.cpp` helpers declared here (`VEC3_ctor`, `setVec3`) are spelled EXACTLY as
- * `include/mh3_pad/vec3.h` spells them - that header is their owner's.  The two used to disagree
+ * `mh3_pad/vec3.h` spells them - that header is their owner's.  The two used to disagree
  * (the owner's header carried the record's type, these carried `void*`), so a TU including both
  * failed with MWCC `(10197) illegal function overloading` (measured on `src/Pl/fn_8028F66C.cpp`;
  * the `mh3_pad/control.h` bracket note, filed 2026-09-27).  Both spellings now name the record's
@@ -263,7 +263,7 @@ extern void fn_800A99B4(s32 ctx, Vec* out, EfWork* em, Vec* pos, Vec* a, Vec* b,
 extern u16 fn_800A9FB0(s32 ctx, u16 id, f32 scale, EfWork* em);
 extern f32 fn_800A8A08(u32* progress);                              /* pseudo-random 0..1 */
 /* 0x80050BC0 is NOT declared here: `src/fn_8004CAD8.cpp` owns the address and publishes it in
- * `include/fn_8004CAD8.h` (rule 2), which this unit includes.  The `(f32 a, f32 b)` view that stood
+ * `fn_8004CAD8.h` (rule 2), which this unit includes.  The `(f32 a, f32 b)` view that stood
  * here was wrong about the callee's arity - its body reads only f1 and returns `x * FrSqrt(x)` - and
  * it collided with the owner's declaration in every TU that included both headers
  * (`(10197) illegal function overloading`, measured on `src/fn_80059550.cpp`).  The second float the

@@ -3,7 +3,7 @@
  * GameSpy NAT-negotiation client (the `natneg.c` of the SDK, in Nintendo's DWC build) and the address
  * helpers it shares with the transport.
  *
- * REGISTRATION (recon lane, 2026-09-27).  Left edge 0x80512490 is the seam with the registered
+ * REGISTRATION.  Left edge 0x80512490 is the seam with the registered
  * `DWCi_sendControlFrame` unit: `tudiscover.py at 0x80512490` reports `cut 18642 0x80512490 strong x2`
  * (two independent .sdata run jumps, DWCi_addressFormatPort -> DWCi_emptyString and DWCi_emptyString ->
  * 0x80794370), so a TU begins at 0x80512490.  Right edge 0x805145B8 is a HARD instruction-level cut:
@@ -32,7 +32,7 @@
  * FLAGS.  `cflags_base` without the lib's `-func_align 4` (see `configure.py`): the 16-byte function
  * alignment reproduces the loop-alignment `nop` of `DWCi_natNegTickIdleSockets` (98.48 -> 100.00).
  *
- * MEASURED (2026-09-29, Wii/1.3, this build): 17 functions written, unit 97.72 %.  Byte-identical (11):
+ * MEASURED (Wii/1.3, this build): 17 functions written, unit 97.72 %.  Byte-identical (11):
  * `DWCi_GetStringLength`, `DWCi_natNegFormatAddress`, `DWCi_natNegPollRepliesOnce`,
  * `DWCi_natNegDetermineNatType`, `DWCi_NatNegCleanup`, `DWCi_natNegTickIdleSockets`,
  * `DWCi_NatNegEndSession`, `DWCi_NatNegProcess`, `DWCi_NatNegSendPacket`, `DWCi_natNegOnConnectPing`,
@@ -84,7 +84,7 @@
  *     six parameters in the target and before them here; declaration order does not move it (600 of the
  *     5040 orders sampled).
  *
- * DATA.  Claimed by the data pass (2026-09-28) and still only declared: `.sdata` 0x80794368..0x807943A0,
+ * DATA.  Claimed by the data pass and still only declared: `.sdata` 0x80794368..0x807943A0,
  * `.sbss` 0x80795828..0x80795878, `.bss` 0x807614D8..0x80762A20 (`datagap.py --mode both`: target-extra
  * .bss 5448 B, .sbss 80 B, .sdata 56 B; ours 0 - unchanged by this pass).  Two ranges the bodies now
  * need are filed in the outbox: `.bss` 0x80762A20 (0x200 B, the socket receive buffer, sole referencer
@@ -102,7 +102,7 @@
 
 /* The sized form of this unit's own `natNegMessageMagic`.  The owner's header has to carry the *unsized*
  * spelling, because `src/Network/GameSpyInterfaceThread.cpp` (which reaches this symbol through
- * `include/unsplit/Network.h`) is ADDR16_HA/LO throughout, and a sized array yields the SDA form; the
+ * `unsplit/Network.h`) is ADDR16_HA/LO throughout, and a sized array yields the SDA form; the
  * first use of the symbol in a translation unit fixes its addressing for every later use, so this line
  * has to precede every body.  Ten of this unit's sites are SDA21 in the target; the eleventh,
  * `DWCi_natNegPollReplies`, is `lis`/`addi` and cannot be reached in the same unit (see the header). */

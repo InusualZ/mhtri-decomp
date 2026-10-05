@@ -62,5 +62,5 @@ shadows the moved one is refused).
 
 ## Known gaps
 
-* It does not edit comments that mention `include/` paths (292 source files carry 752 such mentions at 0e592b75d); a
-  comment sweep is separate, measured work.
+* It does not edit comments that mention `include/` paths (292 source files carry 752 such mentions at 0e592b75d);
+  `tools/units/sweepcomments.py --paths` is that sweep (`spec/sweepcomments.md`).

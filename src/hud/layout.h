@@ -4,7 +4,7 @@
  * `_SPR_DATA_` record they all take.  Its consumers are the lobby screens
  * (`lobby/fn_801E7530.cpp`, `lobby/fn_801E0ADC.cpp`), the move indicator (`src/hud/fn_80324F7C.c`)
  * and the cockpit HUD above it, so the *public* half of this header is the set that
- * `include/unsplit/lobby.h` used to declare while no unit owned these addresses.
+ * `unsplit/lobby.h` used to declare while no unit owned these addresses.
  *
  * `_mh_ivec2_` / `_mh_tex_uv_` / `_SPR_DATA_` are spelled with the map's own type names - the
  * manglings (`draw_sprite__FRC10_SPR_DATA_PC10_mh_ivec2_`, `...PC11_mh_tex_uv_...`) only come out
@@ -14,8 +14,8 @@
  * Rule-2 debt, recorded rather than guessed: the callees below whose map names carry an argument
  * list are declared at global C++ scope with the signature the target's call site shows (rule 9),
  * and the ones with a `fn_`/`lbl_` stem keep C linkage; the owner headers that exist today are
- * `include/fn_8004CAD8.h` (some of the `fn_8005xxxx` helpers), `include/g3d/g3d_anmchr.h` (the
- * font helpers) and `include/menu/menu_item.h` (the item table), and each owner's header should
+ * `fn_8004CAD8.h` (some of the `fn_8005xxxx` helpers), `g3d/g3d_anmchr.h` (the
+ * font helpers) and `menu/menu_item.h` (the item table), and each owner's header should
  * carry its own declaration - these are this unit's own view until that pass happens.
  */
 #ifndef MHTRI_HUD_LAYOUT_H
@@ -180,8 +180,8 @@ u32 anim_step_color(u32* out, const _SPR_ANIM_* anim, u16 frame);
 
 /* `color_lerp` (0x802E270C) is **not declared here** - `src/hud/layout.cpp` declares it
  * `extern "C"` instead.  Three consumer headers already declare the same name with their own
- * signatures (`include/hud/cockpit_quest.h` as `s32 color_lerp(s32, s32, f32)`,
- * `include/menu/fn_802E4978.h` with five parameters and `include/menu/menu_item_page.h` with two)
+ * signatures (`hud/cockpit_quest.h` as `s32 color_lerp(s32, s32, f32)`,
+ * `menu/fn_802E4978.h` with five parameters and `menu/menu_item_page.h` with two)
  * and their call sites pass that many arguments, so a declaration here is a C++ overload clash the
  * moment a consumer includes both headers (measured: `(10197) illegal function overloading` in
  * `hud/cockpit_quest.cpp` and `ef/eft050.cpp`).  Those three are pre-existing rule-2 debt; folding

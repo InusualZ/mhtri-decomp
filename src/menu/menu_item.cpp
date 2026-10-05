@@ -3,7 +3,7 @@
  * menu's own pages.
  *
  * `.text` 0x80297E34..0x802A6624 (about 170 functions), `.bss` 0xDF0 B, `.data` 0x384 B, `.sdata` 0x28 B and `.sdata2` 0x78 B (the unit's
- * `__FILE__` string is this file's name).  Phase 4 fold/recut (docs/splits/phase4): the tail of `Pl/fn_80295EF4` (0x80297E34..0x8029F3C8)
+ * `__FILE__` string is this file's name).  Phase 4 fold/recut: the tail of `Pl/fn_80295EF4` (0x80297E34..0x8029F3C8)
  * and the registered `menu/menu_item` are one TU of the candidate; the head of `Pl/fn_80295EF4` goes to `Pl/pl_coll`.  The
  * unit crosses the window edge 0x802A0000 (its text ends at 0x802A6624).
  *
@@ -255,7 +255,7 @@ extern "C" u32 fn_8029A140(_HIT_W* self)
  * colour table, three switch tables and two strings) is left unclaimed because the bodies declare
  * those objects instead of defining them (row 29).
  *
- * FOLD (2026-09-26).  `attribute.py`'s `--max-bytes` cap split one real translation unit into two
+ * FOLD.  `attribute.py`'s `--max-bytes` cap split one real translation unit into two
  * proposals, and two lanes registered the same file name independently: the `__FILE__` static
  * `lbl_805CDFC8` (".data 0x805CDFC8", 0xE B = `menu_item.cpp`) is passed by every `nw4r::db::Panic`
  * assert of *both* ranges (the folded half's line numbers 396/579/1175, and the landed half's own
@@ -384,12 +384,12 @@ extern "C" u32 fn_8029A140(_HIT_W* self)
  *     `(10505) illegal overloading` this fold's rule-2 move tripped in `Pl/fn_80273B14.cpp`, which
  *     now includes this header), and the residual rows are that widening, not an instruction count.
  *   * the folded half (its four own residuals, retained): `get_move_work_adrs`/`get_move_work_max`
- *     are owned by `ef/fn_800CDB2C.cpp` but declared at C scope in `include/unsplit/ef.h` (the
+ *     are owned by `ef/fn_800CDB2C.cpp` but declared at C scope in `unsplit/ef.h` (the
  *     owner's header does not declare them), so this unit references the plain name where the target
  *     reloc is the mangling `get_move_work_adrs__FUc` - a reloc-name-only difference (the sibling
  *     `Pl/fn_80273B14.cpp` carries the same one); `fn_802A5444` is 4 B too large (its
  *     `menu_cursor_step(self->item_cursor, self->item_count, keys, 1, 2)` call narrows `item_count`, a
- *     `u8`, to the `s16` second parameter `include/unsplit/lobby.h` declares, while retail's call site
+ *     `u8`, to the `s16` second parameter `unsplit/lobby.h` declares, while retail's call site
  *     has no `extsh` - a `u32`/`s32` second parameter satisfies both of the range's call sites, a
  *     shared-file request rather than an edit to a band header another unit measures against);
  *     `fn_802A5E64` 97.13 (the instruction stream matches; the remaining rows are register numbers -
@@ -478,7 +478,7 @@ typedef struct MENU_ITEM_SLOT {
 /* The item record `GetItemData` hands back.  Only the two bytes this range tests are named.
 
 /* The sprite-data block the `draw_font`/`draw_sprite` family takes by reference: only the colour word
- * `_SPR_DATA_` +0x1C is named here (it is what the highlighted row overwrites).  `include/unsplit/lobby.h`
+ * `_SPR_DATA_` +0x1C is named here (it is what the highlighted row overwrites).  `unsplit/lobby.h`
  * forward-declares the tag; this is its definition. size: 0x20 (the frame
  * `lobby/fn_801F3294.cpp` reserves for it) */
 typedef struct _SPR_DATA_ {
@@ -545,7 +545,7 @@ typedef struct MENU_ITEM_W {
  * plain names) plus the two it hands a *pointer* view of the record to.  This unit's own
  * symbols among them - `fn_802A04EC`, `fn_8029FFFC`, `fn_802A4D98`, `fn_8029F7C4`,
  * `fn_8029F7E0`, `get_menu_lsp_tbl`, `GetItemData` - are declared once, in
- * `include/menu/menu_item.h`, and the call sites below follow those declarations (see
+ * `menu/menu_item.h`, and the call sites below follow those declarations (see
  * VIEWS in the file header for the two that cross the two views of the record). */
 extern "C" {
 

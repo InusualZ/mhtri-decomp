@@ -2,7 +2,7 @@
  * `lb_param_w` - the lobby/option parameter block (.bss 0x806590B4, 0x9C B), defined by `src/mh3_pad.cpp`
  * (its `.bss` 0x806585B8-0x806694E8 is that unit's own).  The one home of the type (rule 1; the
  * object is declared in `lb_param_w.h`); it merges the three per-consumer views the tree carried before:
- * the lobby band's (`flag_0x0C`/`value_0x10`/`value_0x16..`, `include/unsplit/lobby.h`), the companion page's
+ * the lobby band's (`flag_0x0C`/`value_0x10`/`value_0x16..`, `unsplit/lobby.h`), the companion page's
  * (`entry_0x08`, `sub_0x26..sub_0x30`) and `Pl/fn_80273B14.cpp`'s act-id/bonus rows (the same bytes as
  * `flag_0x0C[0..2]` / `value_0x10[0..2]`).
  */

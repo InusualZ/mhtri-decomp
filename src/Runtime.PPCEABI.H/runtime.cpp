@@ -1,5 +1,5 @@
 /*
- * Runtime.PPCEABI.H/runtime.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * Runtime.PPCEABI.H/runtime.cpp - STUB (no bodies yet).
  *
  * `.text` 0x80456CE0..0x80457420.  Sections of the candidate unit: .text 0x80456CE0..0x80457420; .rodata 0x80572438..0x80572450.
  *

@@ -1,5 +1,5 @@
 /*
- * include/Network/NetworkFileFetcher.h - the fetcher and socket classes of four neighbouring units (`.text`
+ * Network/NetworkFileFetcher.h - the fetcher and socket classes of four neighbouring units (`.text`
  * 0x803F6458..0x803F7538): the abstract file fetcher with its error record (`Network/NetworkFetcherBase.cpp`), the
  * Pat-server fetcher `NetworkFileFetcher` (`Network/NetworkFileFetcher.cpp`), the kind-2 fetcher whose every
  * operation succeeds at once (`Network/NetworkNullFetcher.cpp`), and the abstract socket base `NetworkSocketWii`
@@ -11,7 +11,7 @@
 #include "types.h"
 #include "Network/network_transport_types.h"   /* NetworkPeerAddress */
 
-struct NetFetchError;              /* include/Network/network_pat_control.h */
+struct NetFetchError;              /* Network/network_pat_control.h */
 
 /* The fetcher interface `sNetworkLibraryWii::createFetcher` hands out (GUESS on the name: the table 0x805FC820 is a
    destructor and six empty - pure - slots, the constructor clears the error record): the first failure's error

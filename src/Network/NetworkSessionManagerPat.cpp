@@ -1,8 +1,8 @@
 /*
- * Network/NetworkSessionManagerPat.cpp - `NetworkSessionManagerPat`'s key function, i.e. the TU in
- * which the class's vtable is emitted (`.text` 0x803D70B8..0x803D72F4, 572 B).
+ * Network/NetworkSessionManagerPat.cpp - `.text` 0x803D70B8..0x803DF2EC (106 functions); its first function
+ * (0x803D70B8..0x803D72F4, 572 B) is `NetworkSessionManagerPat`'s key function, so the class's vtable is emitted here.
  *
- * PHASE 4 FOLD (docs/splits/phase4, window e).  The unit is now the range 0x803D70B8..0x803DF2EC (the network pilot
+ * The unit is now the range 0x803D70B8..0x803DF2EC (the network pilot
  * round 3 recut moved 0x803DF2EC..0x803E44C8 out to `Network/NetworkLayer.cpp` and `Network/NetworkLayerPat.cpp`): it also
  * holds `initNetworkSessionStable` (0x803DEA30..0x803DEB38), absorbed from the former Matching unit
  * `Network/initNetworkSessionStable.cpp` (second header below).  That unit was built with `cflags_network` minus
@@ -11,7 +11,7 @@
  *
  * WHY THIS UNIT EXISTS.  MWCC emits a class's vtable in the translation unit that defines the class's
  * **key function** - the first non-inline, non-pure virtual declared in the class - and
- * `NetworkSessionManagerPat::move` is that function (`include/Network/NetworkSessionManager.h` declares it first
+ * `NetworkSessionManagerPat::move` is that function (`Network/NetworkSessionManager.h` declares it first
  * for exactly this reason).  The target says which TU that was: `__vt__24NetworkSessionManagerPat` sits
  * at 0x805FB0F0, one byte past the end of this band's own `.data` run start (0x805FAAD0, where the two
  * Pat message strings and the three jump tables of this band's other functions live), i.e. this band,
@@ -34,7 +34,7 @@
  * **all 112** slots the target relocates, each naming the symbol the target's object names.  It did not
  * before - the base leaves 62 of those slots pure, so 61 of them were emitted as `0x00000000` and the
  * 62nd as the base's `setFlag79` - and closing them is what `NetworkSessionManagerPat`'s declaration
- * block in `include/Network/NetworkSessionManager.h` is for: one override per filled slot.  What is still
+ * block in `Network/NetworkSessionManager.h` is for: one override per filled slot.  What is still
  * UNWRITTEN is the 62 overriding bodies.  They live in bands no unit has claimed (0x803D72F4..0x803DDB64,
  * 0x803DE56C/0x803DE5F4, 0x803DEF38..0x803DF178 - 20,068 B), so each declaration's name and parameter
  * list is a reconstruction from that body: `handleCircleJoin` calls `sendReqCircleJoin`,
@@ -62,7 +62,7 @@
  * pairs by address but not by symbol name: its bytes are identical and its row does not merge against
  * the map's `lbl_8079C758`.  Naming it would mean claiming a symbol the original did not have, so it
  * stays a pool entry (playbook 58).
- * (5) Bodies written by the network pilot (lane L2): the circle/player getters 0x803DBA2C..0x803DC0E4 and the
+ * (5) Bodies written by the network pilot: the circle/player getters 0x803DBA2C..0x803DC0E4 and the
  * setters/stubs 0x803DEF38..0x803DF1CC.  Open residuals in them, each blocked on a header another lane owns:
  *   - the address objects are `NetworkUniqueId`s (`Network/NetworkUniqueId.h`), a class, so every +0x28 `copyFrom`
  *     is a real virtual call; the slot is still typed `const u8*` by the sink's declaration
@@ -78,9 +78,9 @@
  * `setCircleMode` (0x803DF144, the +0xAE5 byte and the +0xAE6 pending flag `move` consumes), `post` (0x803DF180,
  * forwards to the session's +0x3C `post`); the circle/player counters are named limit/used from the getters'
  * subtraction (GUESS).
- * (6) NetworkLayer (pilot L2, 0x803DF2EC..0x803E0BE8) moved with its residuals to `Network/NetworkLayer.cpp` at the
+ * (6) NetworkLayer (0x803DF2EC..0x803E0BE8) moved with its residuals to `Network/NetworkLayer.cpp` at the
  * round 3 recut.
- * (7) Circle list and player records (pilot L2, 0x803DDA90..0x803DE56C): the circle entries are filled from the
+ * (7) Circle list and player records (0x803DDA90..0x803DE56C): the circle entries are filled from the
  * received `PatCircleInfo` block, the players from the reflection handlers; names are GUESSES from the bodies
  * (`setCircleInfo`/`addCircleInfo`/`removeCircleInfo`, `resetPlayerRecord`/`addPlayerRecord`/
  * `removePlayerRecord`/`updatePlayerRecord`, `packCircleOptions`; `postEvent`'s fifth argument is a per-event
@@ -92,7 +92,7 @@
  * 96.16 vs 98.32).
  * SEAM: re-drawn by the round 3 recut - the `.data` V->S seam at 0x805FB2B8 is now this unit's right edge, and
  * `NetworkLayer` / `NetworkLayerPat` are their own units.
- * (8) Request handlers and callbacks (pilot L2, round 2, 0x803D72F4..0x803DF2EC).  Every handler is the same state
+ * (8) Request handlers and callbacks (0x803D72F4..0x803DF2EC).  Every handler is the same state
  *   machine over `NetworkRequest::state_00` (0 start, its own wait steps, 100 cancelled, 110 failed = also event 3);
  *   `requestFlags_30C[i]` / `requestIds_360[i]` are the reply bits and request ids of request slot i, which the
  *   server message callback `networkSessionReflect1` sets.  Names: `moveStartSession` and `matchPhase_66C` are its

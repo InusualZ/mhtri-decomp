@@ -233,7 +233,7 @@
  * sendReqFriendList, 0x80403DE4/0x80403EDC and sendReqChannelInfo; and every `recv*` handler.  Not written: the item
  * readers/writers 0x8040E0D0..0x80412188, `recvCommand` and `dispatchSessionHandlers`.
  *
- * NAMES (GUESS, round 4, from the bodies): the received item lists the binary and position notices read -
+ * NAMES (GUESS, from the bodies): the received item lists the binary and position notices read -
  *   `initItemList` 0x8040E7F4 (binds the rows, marks the list), `readItemList` 0x8041043C (the marker, the count and
  *   up to ten item types), `createItemListStack` 0x803FE4D8 (at most 64 16-byte rows off the call stack) and
  *   `releaseItemListStack` 0x803FE590 (gives them back); the records `PatItem`/`PatItemList`/`PatItemNotice`/

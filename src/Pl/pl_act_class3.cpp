@@ -2,7 +2,7 @@
  * (24 functions / 7816 B), with its extab 0x800170F4..0x800171A4 (22 records), extabindex
  * 0x800367D4..0x800368DC (22 x 12 B), `.data` 0x805E9248..0x805EBBE0 (the act tables), `.sdata`
  * 0x80793308..0x80793330 (five 8-byte table-pair words) and `.sdata2` 0x8079B3A8..0x8079B3C8 (the
- * unit's float pool).  Re-cut out of `enemy/em024_ai.cpp` (2026-09-29): that unit's range
+ * unit's float pool).  Re-cut out of `enemy/em024_ai.cpp`: that unit's range
  * 0x8034C1D0..0x80358624 was three translation units, and this is the second of them.  No body is
  * written yet; this file is the registration and the evidence.
  *

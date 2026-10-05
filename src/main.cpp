@@ -227,7 +227,7 @@ extern u32 mem2_arena_bounds[3];
 extern u32 warning_counts[8];
 
 
-/* The game/system state block `system_w` (0xA5C B) comes from `include/unsplit/unknown.h`: its module
+/* The game/system state block `system_w` (0xA5C B) comes from `unsplit/unknown.h`: its module
  * is undecided (no `.bss` range is registered), so the type and the declaration live there (rule 1/2). */
 
 extern char _f_text[];
@@ -281,7 +281,7 @@ extern "C" u32 GXInit(void* base, u32 size);
 extern "C" void fn_804BA7A0(f32, f32, f32, f32, f32, f32);
 extern "C" void GXSetViewport(f32, f32, f32, f32, f32, f32);
 extern "C" void GXSetScissor(u32, u32, u32, u32);
-/* The SDK clear-colour record `GXColor` comes from `include/gx.h` (rule 1). */
+/* The SDK clear-colour record `GXColor` comes from `gx.h` (rule 1). */
 extern "C" void GXSetCopyClear(GXColor clr, u32 mask);
 extern "C" void GXSetDispCopySrc(u32, u32, u32, u32);
 extern "C" void GXSetDispCopyDst(u32, u32);
@@ -322,7 +322,7 @@ extern "C" void OSInit(void);
 extern "C" void DVDInit(void);
 extern "C" void NANDInit(void);
 extern "C" void OSRestart(u32 resetCode);
-/* memset comes from include/Runtime.PPCEABI.H/memset.h (rule 2). */
+/* memset comes from Runtime.PPCEABI.H/memset.h (rule 2). */
 
 extern "C" void fn_8003F4D8(void);
 extern "C" void fn_8003F58C(u8 arg);

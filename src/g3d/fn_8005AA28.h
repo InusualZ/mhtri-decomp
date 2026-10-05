@@ -1,6 +1,6 @@
 /*
  * The `nw4r::g3d::ResMat`-cluster accessors owned by `g3d/fn_8005AA28.cpp`
- * (0x8005AA28-0x8005ABD8; registered from proposal/8005AA28_fn_8005AA28).
+ * (0x8005AA28-0x8005ABD8; registered).
  *
  * A declaration belongs in the symbol's owner's header (docs/plan.md 6.5 rule 2), so the whole cluster
  * moves here: `g3d/g3d_anmvis.cpp` calls `fn_8005AA44` (the `g3d_resmat_ac.h` assert-then-set/clear flag

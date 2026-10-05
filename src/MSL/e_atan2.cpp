@@ -1,5 +1,5 @@
 /*
- * MSL/e_atan2.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * MSL/e_atan2.cpp - STUB (no bodies yet).
  *
  * `.text` 0x80464560..0x804647B8.  Sections of the candidate unit: .text 0x80464560..0x804647B8; .sdata2 0x8079CB40..0x8079CB98.
  *

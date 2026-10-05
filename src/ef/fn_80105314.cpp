@@ -1,7 +1,6 @@
 /* ef/fn_80105314.cpp - the effect band at 0x80105314
  *
  * `.text` 0x80105314..0x80107250, 28 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): recut registered unit; the functions of the neighbouring units were cut out of this file.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  */
 

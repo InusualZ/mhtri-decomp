@@ -4,7 +4,7 @@
  * `.text` 0x80056F24..0x80059550 (0x262C B, 59 symbols), `extab` 0x80007218..0x800072D0,
  * `extabindex` 0x8001F494..0x8001F5A8, `.ctors` 0x8056F2CC..0x8056F2D0 (the `fn_800594DC` static-init
  * word).  This is the maximal unclaimed run the discovery capped at 0x80056F24 (`attribute.py`
- * `proposal/80056F24_fn_80056F24.cpp`); the neighbouring runs were registered alongside it this session.
+ * `fn_80056F24.cpp`); the neighbouring runs were registered alongside it this session.
  *
  * Naming - which evidence class decided it.
  *   * Class 1 (`__FILE__` string) FAILS for this range.  Every data reference the range makes is a float

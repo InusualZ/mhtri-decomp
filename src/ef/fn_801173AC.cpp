@@ -1,7 +1,6 @@
 /* ef/fn_801173AC.cpp - the effect band at 0x801173AC
  *
  * `.text` 0x801173AC..0x80117DA8, 10 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): recut registered unit; the functions of the neighbouring units were cut out of this file.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  */
 

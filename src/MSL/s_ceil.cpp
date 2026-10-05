@@ -1,5 +1,5 @@
 /*
- * MSL/s_ceil.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * MSL/s_ceil.cpp - STUB (no bodies yet).
  *
  * `.text` 0x804677A0..0x804678EC.  Sections of the candidate unit: .text 0x804677A0..0x804678EC; .sdata2 0x8079CED0..0x8079CEE0.
  *

@@ -3,8 +3,8 @@
  * Declarations for the symbols of that range OTHER units call (docs/plan.md 6.5 rule 2: an extern
  * lives with the TU that owns the symbol).  They moved here with the unit's registration:
  *
- *   * `fn_801B0010` was parked in `include/unsplit/enemy.h` with the note "owned by the
- *     still-unregistered proposal/801B0010 range" - the band header is for symbols with no owner, so
+ *   * `fn_801B0010` was parked in `unsplit/enemy.h` with the note "owned by the
+ *     still-unregistered enemy/em030_prog.cpp range" - the band header is for symbols with no owner, so
  *     the declaration left it, and `enemy/fn_801A9540.cpp` (its caller) includes this header now.
  *   * `fn_801B4348` / `fn_801B4398` were declared in `enemy/fn_801B4458.cpp`'s own callee block,
  *     which is the same boundary artefact one step further down the band; that unit includes this

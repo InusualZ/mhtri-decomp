@@ -100,7 +100,7 @@ f32 fn_80052214(const f32* a, const f32* b);
  * touches f2), not from the call sites: the `f2` a retail caller materialises before the call is the
  * hoisted common subexpression `1.0f - t` that its `else` branch reuses (ef_disc 0x800CCA7C/0x800CCA98,
  * ef_cylinder 0x800CBD20/0x800CBD3C).  The `(f32, f32)` spelling this symbol used to carry in
- * `include/ef.h` was the wrong view and made every TU including both headers fail to compile. */
+ * `ef.h` was the wrong view and made every TU including both headers fail to compile. */
 f32 sqrt_f32(f32 x);
 /* 0x8005024C - the `SinFIdx` wrapper `enemy/fn_80181E24.cpp`'s alpha computation calls: it narrows
  * its argument to u16 (`clrlwi r3,r3,16`), scales the `anim_tick_angle` result and returns
@@ -110,7 +110,7 @@ f32 fn_8005024C(u16 idx);
 /* 0x80050CF4 - the SDK vector subtract (`ps_sub` on two paired loads): `dst = a - b`. */
 void PSVECSubtract(f32* dst, const f32* a, const f32* b);
 /* 0x800504D4/0x8005050C - the two GX pipe-setup helpers `g3d/g3d_state.cpp` calls (rule 2, moved
- * out of that unit's local extern block on landing, 2026-09-25). */
+ * out of that unit's local extern block on landing). */
 void mtx34_identity(void* pOut);
 /* 0x80051574 - `dst = dst * src` (the 3x4 matrix product) and 0x80050AF4 - the packed angle word of a
  * direction vector. */

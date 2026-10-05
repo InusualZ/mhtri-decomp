@@ -25,7 +25,7 @@ struct _ENEMY_WORK;
 extern "C" {
 #endif
 
-/* The record `enemy_data_find` returns lives in `include/enemy/ENEMY_DATA.h` (rule 1: one home
+/* The record `enemy_data_find` returns lives in `enemy/ENEMY_DATA.h` (rule 1: one home
  * for the type, now that a second unit reads it). */
 #include "enemy/ENEMY_DATA.h"
 
@@ -69,7 +69,7 @@ u32 fn_80129A1C(struct _ENEMY_WORK* self, u16 a, u32 b, s16* timer);
 u32 fn_80129A70(struct _ENEMY_WORK* self, u16 a);
 u32 fn_80129D3C(struct _ENEMY_WORK* self);
 u8 fn_80129DB8(struct _ENEMY_WORK* self);
-/* 0x8012A014 - owned by `include/enemy/fn_801251D0.h`; the spelling here is the owner's (its body
+/* 0x8012A014 - owned by `enemy/fn_801251D0.h`; the spelling here is the owner's (its body
  * forwards r7/r8 to `fn_80129F5C` as the pair of table pointers it walks, `cmpwi r4,0`).  The older
  * `u32 d, const void* e` copy was the second declaration that stopped this header and the owner's
  * being included together (same class as `fn_80128A8C`). */
@@ -113,7 +113,7 @@ void mtx34_concat_assign(nw4r::math::MTX34* dst, const nw4r::math::MTX34* src);
 void* fn_80097EB0(void* sub, s32 a);
 u32 fn_802B0998(u32 kind);
 /* `enemy_data_find`/`enemy_data_grp` (0x803438E4 / 0x803439D4): declared in their owner's header,
- * `include/ef/eft_slot.h`, since `ef/eft_slot.cpp` registered the band that defines them (rule 2). */
+ * `ef/eft_slot.h`, since `ef/eft_slot.cpp` registered the band that defines them (rule 2). */
 void rotMatrixX(u32 angle, nw4r::math::MTX34* m);
 void rotMatrixZ(u32 angle, nw4r::math::MTX34* m);
 

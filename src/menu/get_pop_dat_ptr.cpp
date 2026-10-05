@@ -62,11 +62,11 @@
  *     declarations sit in its own source at 397-398) and `set_now_brightness` (0x8003FC50, owned by
  *     `main/main.cpp`, declared nowhere).  Giving those two owners their headers is a cross-unit
  *     change with a re-measure of both units; it is the second follow-up.
- *   * `not_in_demo` (0x803C482C, `fn_803C482C`) is not written: `include/lobby/lb_companion_ui.h`
+ *   * `not_in_demo` (0x803C482C, `fn_803C482C`) is not written: `lobby/lb_companion_ui.h`
  *     declares the same symbol as `s32 fn_803C482C(void* psw)`, so naming it here needs that header's
  *     call-site signature settled first.
  *   * The pop-file-name strings (0x805F84E0/0x805F84F8/0x805F8510) and the option default table
- *     (0x805F8548) are declared in `include/unsplit/menu.h` and never defined, the same shape
+ *     (0x805F8548) are declared in `unsplit/menu.h` and never defined, the same shape
  *     `menu/menu_note.cpp` records for its own `.data` literals.
  *   * `option_w`'s element type is unsigned here (`lbzx`, no `extsb`, in `ck_option_cfg`) while the
  *     target's `set_option_cfg` converts its value to a signed byte before the store; one of the two

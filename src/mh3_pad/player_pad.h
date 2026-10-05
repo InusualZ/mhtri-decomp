@@ -4,7 +4,7 @@
  * array with `__construct_array` over 0x350-byte elements, as it does the twin `Psw_prev`).  The one home of
  * the record type (rule 1; the object is declared in `Psw.h`); it merges the views the tree
  * carried before: `mh3_pad.cpp`'s own (`mode`, `field_0x..`), `Pl/fn_80273B14.h`'s control words and the
- * lobby band's button words (`include/unsplit/lobby.h`).  Only the named offsets are read by matched
+ * lobby band's button words (`unsplit/lobby.h`).  Only the named offsets are read by matched
  * code; the rest is padding until a unit needs it.
  */
 #ifndef MHTRI_MH3_PAD_PLAYER_PAD_H

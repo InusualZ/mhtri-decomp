@@ -7,7 +7,7 @@
  * header (`resolve` returns `unsplit` with no module: the nearest registered range below is
  * `EXI/ProbeBarnacle.c` and the nearest above `OS/FindContainHeap_.c`, different modules).  The
  * library is `IOS` - the SDK's internal-OS layer, carried by the symbols' own `IOS_` prefix - and no
- * `include/IOS/` owner exists, so this file is their home.
+ * `IOS/` owner exists, so this file is their home.
  *
  * Added with the networking conformance pass (the `NWC24/nwc24_io.c` registration declared all four
  * locally).  `EXI/ProbeBarnacle.c` declares three of them locally too; it can `#include` this header

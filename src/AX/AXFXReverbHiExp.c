@@ -4,7 +4,7 @@
  * validator).
  *
  * Phase 4 recut: the tail of the former AX/AXFXReverbHi.c from AXFXReverbHiExpInit; the head wrappers stay in
- * AX/AXFXReverbHi.c.  The layout is in include/AX/AXFXReverbHi.h.
+ * AX/AXFXReverbHi.c.  The layout is in AX/AXFXReverbHi.h.
  *
  * Naming note: 0x804751A0 carries the map/dump name `DVDCancel`, which is semantically wrong (its body frees the
  * reverb's delay lines and is the effect's shutdown helper).  The map is ground truth, so the name is kept.

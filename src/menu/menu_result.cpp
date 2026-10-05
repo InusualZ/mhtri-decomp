@@ -61,7 +61,7 @@
 #include "enemy/em_pop.h"   /* quest_flag_10_ck (rule 2: its owner) */
 
 /* The `sprintf`/`strcpy`/`strcat` family sits in an address band whose bracketing registered units
- * name different modules, so rule 2's home for them is `include/unsplit/*.h`'s documented gap and
+ * name different modules, so rule 2's home for them is `unsplit/*.h`'s documented gap and
  * they are declared here (the same spelling `menu/fn_802E4978.cpp` uses). */
 extern "C" {
 int sprintf(char*, const char*, ...);

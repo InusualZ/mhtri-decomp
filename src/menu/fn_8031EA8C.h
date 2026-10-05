@@ -1,5 +1,5 @@
 /*
- * include/menu/fn_8031EA8C.h - this band's view of the two records its functions drive.
+ * menu/fn_8031EA8C.h - this band's view of the two records its functions drive.
  *
  * The band (`src/menu/fn_8031EA8C.cpp`, `.text` 0x8031EA8C..0x80324F7C) is the continuation of the
  * `menu` selection-screen band below it (`menu/fn_8031A6C0.cpp`): its head is the per-state updater of
@@ -7,7 +7,7 @@
  * handlers.  Everything here is traced from the range's own disassembly; every offset is one the
  * target instructions address and every width is the load/store the target uses there.
  *
- * `MenuFxWork` is the effect instance's +0x38 work record, cast from `_EFT::work_0x38` (`include/ef.h`
+ * `MenuFxWork` is the effect instance's +0x38 work record, cast from `_EFT::work_0x38` (`ef.h`
  * is the owner of `_EFT` itself).  `MenuQuestWork` is this band's view of the 0x2000-byte screen work
  * block the tail functions reset and edit; only the fields the band touches are named.
  */

@@ -6,7 +6,7 @@
  * Registration (brief section 2).  Module, evidence class 3 (what the code does plus the naming scheme
  * of its neighbours): the range is the immediate continuation of `gx/fn_8009AA78.c`, reads the same
  * `.sdata2` prompt constants and emits through the same write-gather-pipe writers (`fn_8009AC98`/
- * `AC44`/`AB1C` owned by that unit, `fn_800868A0` from `include/unsplit/g3d.h`), so it is registered in
+ * `AC44`/`AB1C` owned by that unit, `fn_800868A0` from `unsplit/g3d.h`), so it is registered in
  * the same `gx` lib block and directory.  Name, evidence class 4: the map has only the `fn_XXXXXXXX`
  * stem for both symbols and the runtime dump resolves only `zz_`, so the stem is kept and no name is
  * invented.

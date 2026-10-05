@@ -6,7 +6,7 @@
 #include "DWCi/DWCi_NatNeg.h"            /* the NATNEG half's own data (rule 2: the owner declares it) */
 #include "DWCi/DWCi_Np_CPUCopyFast.h"    /* the Np unit's own data (rule 2) */
 
-/* Declarations moved here from `include/unsplit/DWCi.h, Network.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+/* Declarations moved here from `unsplit/DWCi.h, Network.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 #ifdef __cplusplus
 extern "C" {
 #endif

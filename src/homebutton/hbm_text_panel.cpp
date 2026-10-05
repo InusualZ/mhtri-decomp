@@ -37,7 +37,7 @@
  *
  * Sections this unit owns: `.text` 0x805482CC..0x8054E894 only.  The target object carries no data
  * section at all, so every constant the range loads is another unit's pool entry and is declared
- * `extern` here (playbook 29/58), never defined - see `include/unsplit/unknown.h`.
+ * `extern` here (playbook 29/58), never defined - see `unsplit/unknown.h`.
  *
  * Sections: our object emits `.text` only, the same section list as the target object - `datagap.py
  * --unit fn_805482CC --mode both` reports an empty `ours-extra`, and the `extab`/`extabindex` the lib's

@@ -2,7 +2,7 @@
  *
  * The declarations the lobby menu-layer unit (`src/lobby/fn_801E7530.cpp`) needs live here, not in its
  * own source: docs/plan.md 6.5 rule 2 says an extern belongs with the unit that owns the symbol, or in
- * `include/unsplit/<module>.h` when no unit owns it.  Every address below is unclaimed in splits.txt and
+ * `unsplit/<module>.h` when no unit owns it.  Every address below is unclaimed in splits.txt and
  * its bracketing registered bands name `lobby`.
  *
  * The `fn_XXXXXXXX` names and `lbl_*` objects keep the map's own spelling.  The C-linkage functions are
@@ -21,7 +21,7 @@
  * ranges are registered now (`menu/menu_message.cpp`, `camera/fn_802B5C58.cpp`), so their declarations
  * live in these headers and this one re-exports them for the units that already include it.  The
  * `ef/eft052.cpp` entry points this header used to declare (`eft052_page_count_add`,
- * `eft052_hold_row_get`, `eft052_hold_entry_set`) made the same move into `include/ef/eft052.h`. */
+ * `eft052_hold_row_get`, `eft052_hold_entry_set`) made the same move into `ef/eft052.h`. */
 #include "camera/camera.h"
 #include "ef/eft052.h"
 #include "menu/menu_message.h"
@@ -457,12 +457,12 @@ s32 fn_80222848(s32, s16 *);
 s32 fn_80222BC4(void*, s32, u8);
 /* `menu_hold_row_draw_by_lsp`/`menu_cursor_step_fixed_tail`/`menu_cursor_step_open_last`/`menu_cursor_step`/`toggle_word_step` (0x802A7C04-0x802A8F50) were
  * declared here while the menu band had no registered unit.  `menu/menu_message.cpp` owns that range
- * now, so its header `include/menu/menu_message.h` declares them and this header includes it (rule 2).
+ * now, so its header `menu/menu_message.h` declares them and this header includes it (rule 2).
  * They stood here with `s16` returns and `void*`/`s32` tails while the owner defines `s32` - that
  * mismatch is the `(10505) illegal overloading` this move clears. */
 s32 fn_802DE224(void);
 /* `fn_802BBA64`/`fn_802BBAC0`/`fn_802BBAC4` (0x802BBA64-0x802BBAF4) were declared here as `s32 (s32)`;
- * `camera/fn_802B5C58.cpp` owns that range and `include/camera/camera.h` - included by this header -
+ * `camera/fn_802B5C58.cpp` owns that range and `camera/camera.h` - included by this header -
  * declares them `void (u8)` (rule 2). */
 s32 fn_802DF6E4(s32);
 s32 fn_802E0DA8(s16 *, u16, s16 *);
@@ -499,10 +499,10 @@ extern f32 lbl_80799B20;
 
 /* `GetMenuFontColor` (0x802AA3EC, the map's `GetMenuFontColor__Fbbbb`) was declared here while the
  * menu band had no registered unit; `menu/menu_message.cpp` owns the address now and the owner's header
- * `include/menu/menu_message.h`, included above, declares it with this same spelling (rule 2). */
+ * `menu/menu_message.h`, included above, declares it with this same spelling (rule 2). */
 /* `ItemName` (0x8029F628) and `put_menu_cursor` (0x802A2564) were declared here while the band between
  * `Pl/fn_80295EF4.cpp` and `stage/stg_w.cpp` had no registered unit.  `menu/menu_item.cpp` now owns
- * both addresses, so the declarations live in its header `include/menu/menu_item.h` (rule 2) - the
+ * both addresses, so the declarations live in its header `menu/menu_item.h` (rule 2) - the
  * `ItemName` one had a different return type here, which is the `(10505) illegal overloading` class. */
 void* LbStr(u8, u16);
 s32 chk_pointer(void);
@@ -518,7 +518,7 @@ void draw_sprite_idx(u16, const _mh_ivec2_*);
 void font_set_size(s16, s16);
 void* get_lsp_data(u16, _mh_ivec2_*);
 /* `get_option_cfg` (0x803BEC70) is no longer declared here: the range that defines it,
- * `src/menu/get_pop_dat_ptr.cpp`, owns it and publishes it in `include/menu/get_pop_dat_ptr.h`,
+ * `src/menu/get_pop_dat_ptr.cpp`, owns it and publishes it in `menu/get_pop_dat_ptr.h`,
  * which this header includes below (rule 2). */
 #include "menu/get_pop_dat_ptr.h"
 

@@ -1,7 +1,6 @@
 /* sound/fn_800E8E60.cpp - the head of the quest/challenge sound work system (voice-slot lists and pools)
  *
  * `.text` 0x800E8E60..0x800E9D00, 33 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): recut registered unit; the functions of the neighbouring units were cut out of this file.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  */
 

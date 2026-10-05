@@ -1,7 +1,7 @@
 /*
- * ai/ai_npc.cpp - phase 4 unit, `.text` 0x802C2700..0x802D9EA4 (357 functions, 96164 bytes).
+ * ai/ai_npc.cpp - unit, `.text` 0x802C2700..0x802D9EA4 (357 functions, 96164 bytes).
  *
- * PHASE 4 (docs/splits/phase4, window d).  Fold of 7 registered units: light.cpp, fn_802C474C.cpp, fn_802C5D10.cpp,
+ * Fold of 7 registered units: light.cpp, fn_802C474C.cpp, fn_802C5D10.cpp,
  * fn_802CC794.cpp, fn_802D0DCC.c, fn_802D0F34.cpp, fn_802D44F4.cpp.  The functions below are the ones those sources
  * define, in address order; every other function of the range keeps its original bytes.  204 of 357 functions have a
  * body here.
@@ -32,8 +32,7 @@
  * light/light.cpp - the map light work: its record, its constructors, its per-frame channels and its
  * accessors.
  *
- * `.text` 0x802BEAAC-0x802C474C (103 functions, 23712 B).  Registered from
- * `proposal/802BEAAC_fn_802BEAAC.cpp`.
+ * `.text` 0x802BEAAC-0x802C474C (103 functions, 23712 B).
  *
  * Module `light` and file name `light.cpp` come from evidence class 2 (brief section 2): the range's
  * own symbols the retail symbol table knows are `light_init__Fv` (0x802BF284), `light_move__Fv`
@@ -129,7 +128,7 @@
  *     band's own run (`leak 0`, four labels) and belongs to the measured data pass, so they are
  *     `extern`-declared here and used as load operands.  The `.sdata2`
  *     constants are the same case (`shell_set_func_ptr` comes from `stage/shell_set_func_ptr.h`).
- *   * the record's tail fields (+0x3C2..+0x498) are new in `include/ai/ainpc.h`; its owner
+ *   * the record's tail fields (+0x3C2..+0x498) are new in `ai/ainpc.h`; its owner
  *     `src/ai/fn_802CC794.cpp` still carries its own inline copy of the union and has to include the
  *     header instead (rule 1).
  *   * five rows are not byte-identical; what still differs, first divergence first:
@@ -147,8 +146,7 @@
  * ai/fn_802C5D10.cpp - the AI-NPC sub-state machines' first block: the per-motion step dispatchers
  * that drive an `_AINPC_W`'s scripted motion.
  *
- * `.text` 0x802C5D10-0x802CC794 (76 functions, 27268 B).  Registered from
- * `proposal/802C5D10_fn_802C5D10.cpp`.
+ * `.text` 0x802C5D10-0x802CC794 (76 functions, 27268 B).
  *
  * Module `ai`, and the file keeps the map's stem (brief section 2, class 4): the record every
  * function takes in r3 is the `_AINPC_W` the neighbouring `ai/fn_802CC794.cpp` band reconstructs -
@@ -197,9 +195,9 @@
  *
  *  - fn_802C5ECC 91.41 %, fn_802C6110 96.92 %, fn_802C6318 93.55 %: retail's `setVec3` call
  *    reuses the callee's return pointer (`mr r4, r3`) where ours rematerialises the local's address
- *    (`addi r4, r1, N`) - the declaration `pl.h` reaches (`include/ef.h`, through which `_PLW`
+ *    (`addi r4, r1, N`) - the declaration `pl.h` reaches (`ef.h`, through which `_PLW`
  *    arrives) spells that helper `void`, while the target's own code proves it returns its `out`
- *    pointer (`include/enemy/fn_80165FC8.h` has the `VEC3*` spelling, but it clashes with `ef.h`'s
+ *    pointer (`enemy/fn_80165FC8.h` has the `VEC3*` spelling, but it clashes with `ef.h`'s
  *    `Vec*` one so the two cannot both be included).  fn_802C6318 also keeps a signed compare chain
  *    where retail tests three unsigned ranges, and its flag masks are CSE'd into each other.
  *  - fn_802C5D10 99.05 %: retail has one extra `clrlwi r0, r31, 24` at its third flag test, which
@@ -302,8 +300,8 @@
  * band below (`fn_802CD770`, `fn_802D0C9C`, `ai_skill_ck`, `fn_802D0DCC`) and to
  * `get_move_work_adrs(3)`.  So the module is `ai`; the file keeps the map's stem (brief section 2,
  * class 4 - nothing in the object names the original source file).  The record and the attack entry
- * embedded in it live in `include/ai/ai_npc.h`; the cross-unit declarations are in
- * `include/ai/fn_802D0F34.h`.
+ * embedded in it live in `ai/ai_npc.h`; the cross-unit declarations are in
+ * `ai/fn_802D0F34.h`.
  *
  * Sections this unit owns: .text 0x802D0F34..0x802D44F4, extab 0x80014844..0x8001496C (37 8-byte
  * records), extabindex 0x80032ACC..0x80032C88, .data 0x805D4E80..0x805D5000 (the four
@@ -313,10 +311,10 @@
  * Flags: `cflags_main` (`Wii/1.3`, `-O3 -inline noauto`, `-Cpp_exceptions on`) - the neighbour `ai`
  * lib's setting, and `-Cpp_exceptions on` is what emits the target's extab.
  *
- * Rule-1 debt: `_HIT_W` is defined here (through `include/ai/ai_npc.h`) as well as in
- * `include/menu/menu_item.h` and `include/menu/hit_attack_list_push.h`, which carry their own partial views of
+ * Rule-1 debt: `_HIT_W` is defined here (through `ai/ai_npc.h`) as well as in
+ * `menu/menu_item.h` and `menu/hit_attack_list_push.h`, which carry their own partial views of
  * the same record; none of them names the offsets this band reads.  `_AINPC_W` likewise also lives in
- * `include/ai/ainpc.h` (the `fn_802CC794.cpp`/`fn_802C474C.cpp` view) - `include/ai/ai_npc.h` carries
+ * `ai/ainpc.h` (the `fn_802CC794.cpp`/`fn_802C474C.cpp` view) - `ai/ai_npc.h` carries
  * the note and the two must be folded by the next `ai` worker.
  *
  * Score at this commit: 90.96 % fuzzy (13760/13760 B of `.text`, 52 of 90 functions byte-identical,
@@ -376,11 +374,11 @@
  *     front-end reproduces the map's own mangling (rule 9).
  *
  * Types: the record the whole AI band drives is `_AINPC_W`, whose shared home is
- * `include/ai/ainpc.h` (main already created it as the union of the `ai` band's accessors); this
+ * `ai/ainpc.h` (main already created it as the union of the `ai` band's accessors); this
  * unit added the offsets its own bodies name to that file - +0x000, +0x172, +0x20C..+0x23E,
  * +0x33A, +0x374, +0x3B0..+0x3BC, +0x3D4..+0x3DC, +0x3F4..+0x414, +0x424, +0x431..+0x438,
  * +0x450, +0x46C, +0x47C, +0x483 - rather than carrying a second copy (rule 1).  The four tuning
- * tables it indexes are declared in `include/unsplit/ai.h` (no registered unit owns them, rule 2).
+ * tables it indexes are declared in `unsplit/ai.h` (no registered unit owns them, rule 2).
  *
  * Flags: `cflags_main`, plus `#pragma peephole off` for the whole file - retail keeps the unfused
  * `clrlwi`+`slwi` / `clrlwi`+`cmpwi` forms that the peephole pass folds into `clrlslwi` and a
@@ -420,7 +418,7 @@
 #include "nw4r/math.h"
 
 /* Owner headers (rule 2): every symbol a registered unit defines is declared in that unit's header,
- * never here.  `include/unsplit/unknown.h` carries the module-ambiguous ones. */
+ * never here.  `unsplit/unknown.h` carries the module-ambiguous ones. */
 #include "ef/fn_800CDB2C.h"
 #include "fn_80047398.h"
 #include "fn_8004CAD8.h"

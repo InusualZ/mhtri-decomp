@@ -1,7 +1,6 @@
 /* sound/quest_snd.cpp - the quest sound work routines
  *
  * `.text` 0x800EE014..0x800EEAE0, 6 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): recut registered unit, built from `sound/fn_800E8E60.cpp`.
  * Each function keeps the `#pragma` state it had in its retired source.
  */
 

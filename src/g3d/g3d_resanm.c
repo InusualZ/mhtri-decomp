@@ -2,7 +2,7 @@
  * nw4r g3d: g3d_resanm.cpp - the float and color animation-channel evaluators, `.text`
  * 0x800898B0-0x80089F94 (10 functions).
  *
- * Re-cut from `auto/800898B0_fn_800898B0.c` (docs/plan.md 12 item 5, a bulk attribution spanning three
+ * Re-cut (docs/plan.md 12 item 5, a bulk attribution spanning three
  * original TUs).  `fn_800898B0`/`fn_80089C6C` panic with `__FILE__` = `g3d_resanm.cpp` (lines 105/135/
  * 176/206) and the retail data fragment is 0x8058FDC8-0x8058FE90, so the range is `g3d_resanm.cpp`.
  * The byte-lerp helpers `fn_80089E9C`..`fn_80089F90` carry no data reference of their own; the report's
@@ -31,7 +31,7 @@
 extern void Panic__Q24nw4r2dbFPCciPCce(const char *file, int line, const char *msg, ...);
 
 /* nw4r math / resource helpers owned by unsplit units.  `fn_80082F18` comes from
- * `include/unsplit/g3d.h` (rule 2). */
+ * `unsplit/g3d.h` (rule 2). */
 extern f32 anim_tick_angle(u16 value);
 extern f32 fn_800610AC(f32 value);
 extern void fn_8005B1B4(u32 *self, u32 value);

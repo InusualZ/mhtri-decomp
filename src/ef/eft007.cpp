@@ -1,7 +1,7 @@
 /* ef/eft007.cpp - effect 007 (the player-weapon controller and the enemy emitter)
  *
  * `.text` 0x80102994..0x80103D28, 16 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): recut registered unit; the tail of the retired `ef/eft007.cpp` (the `em` head went to `ef/em_effect_ctrl.cpp`).
+ * Phase 4: recut registered unit; the tail of the retired `ef/eft007.cpp` (the `em` head went to `ef/em_effect_ctrl.cpp`).
  * Each function keeps the `#pragma` state it had in its retired source.
  */
 

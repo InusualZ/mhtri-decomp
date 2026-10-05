@@ -1,4 +1,4 @@
-/* auto/800CCFB0_fn_800CCFB0.c - one function, .text 0x800CCFB0..0x800CD584.
+/* ef/ef_line.cpp - one function, .text 0x800CCFB0..0x800CD584.
  *
  * The unit is the NW4R effect library's `nw4r::ef` module.  The assert strings it references name the
  * file `ef_line.cpp` (0x80594EE0), the panic formatter is `nw4r::db::Panic`, and the sibling units pin

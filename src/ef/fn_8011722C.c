@@ -1,8 +1,8 @@
-/* auto/8011722C_fn_8011722C.c - the kind-1 start stage of the effect job machine,
+/* ef/fn_8011722C.c - the kind-1 start stage of the effect job machine,
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  * `.text` 0x8011722C..0x801173AC (one function, `fn_8011722C`).
  *
- * What it is.  The previous unit (auto/80114E34_fn_80114E34.cpp, 0x80114E34..0x8011722C) holds the
+ * What it is.  The previous unit (ef/fn_80114E34.cpp, 0x80114E34..0x8011722C) holds the
  * job's update hook `fn_80116FDC`, a four-state switch on `job->state_0x05` that dispatches into
  * `fn_80117018`/`fn_80117050`/`fn_80117074`/`fn_80117084`; inside state 0 and state 1 a second byte,
  * `job->kind_0x02`, selects a variant (`fn_80117088`/`fn_8011722C` for kind 0/1 in state 0,
@@ -35,13 +35,13 @@
  * `fn_80117088`) view the very same `job->work_0x38` block as 32 `MHchar*` slots plus two `s16`
  * counters, so the block is really one allocation with two views.  `MHchar` is `eft_res_model_get`'s
  * 0x168-byte `eft_control` slot (the pointer it returns is slot+4), and only the three fields this
- * function touches are named.  The 3-float vector is `Vec` from the shared `include/ef.h`, not a
+ * function touches are named.  The 3-float vector is `Vec` from the shared `ef.h`, not a
  * fourth local `Vec3`.
  *
  * Language.  The unit's own symbol is plain (`fn_8011722C`, `-lang=c`), so the file is C and the
- * mangled nw4r callees are declared by their map spelling, as auto/800FD520_fn_800FD520.c does.
+ * mangled nw4r callees are declared by their map spelling, as ef/fn_800FD520.c does.
  *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/8011722C_fn_8011722C.c`.
+ * Inventory, addresses and sizes: `python tools/units/ledger.py unit ef/fn_8011722C.c`.
  */
 
 #include "ef/fn_80116FCC.h" /* fn_80116FCC (rule 2: the owner's header) */

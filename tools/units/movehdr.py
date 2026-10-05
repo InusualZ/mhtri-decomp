@@ -13,6 +13,7 @@ import tempfile
 from dataclasses import dataclass, field
 
 from tools.lib import cli
+from tools.lib import repo as _repo
 
 TOOL = cli.Tool("movehdr", "docs/tools/spec/movehdr.md", tests="tools/tests/units/test_movehdr.py",
                 description=(__doc__ or "").splitlines()[0], common=("json", "root", "dry_run"))
@@ -20,11 +21,9 @@ TOOL = cli.Tool("movehdr", "docs/tools/spec/movehdr.md", tests="tools/tests/unit
 #: The default rule: `include/P` -> `src/P`.
 OLD_ROOT = "include"
 NEW_ROOT = "src"
-#: The exceptions to the default rule: a header whose mirrored path would put an owner-looking stem in the wrong
-#: directory. `nw4r/g3d/g3d_resmat.h` declares `src/g3d/g3d_resmat.cpp`'s symbols, so it moves beside that unit.
-EXCEPTIONS = {
-    "include/nw4r/g3d/g3d_resmat.h": "src/g3d/g3d_resmat.h",
-}
+#: The exceptions to the default rule (`lib.repo.HEADER_MOVE_EXCEPTIONS`, the one table): a header whose mirrored path
+#: would put an owner-looking stem in the wrong directory.
+EXCEPTIONS = _repo.HEADER_MOVE_EXCEPTIONS
 #: The second include root every compile carries (`configure.py`: `-i build/<ver>/include`); read from disk.
 BUILD_INCLUDE = "build/RMHE08/include"
 #: Files whose `#include "..."` lines are simulated.

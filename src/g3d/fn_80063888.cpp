@@ -35,7 +35,7 @@
  * stylelint's rule 7 refuses the landing without this line.  The two name-map exceptions
  * (`PlayPolicy_Onetime/Loop`) are written through their namespace owner (rule 9) when reconstructed.
  *
- * The cross-unit declarations (rule 2) live in `include/g3d/fn_80063888.h`; four other units call into
+ * The cross-unit declarations (rule 2) live in `g3d/fn_80063888.h`; four other units call into
  * this cluster and include that header.
  */
 
@@ -461,7 +461,7 @@ void operator delete(void* block, void* place)
  * one field of the resolved config record.
  * --------------------------------------------------------------------------------------------- */
 
-/* `ResAnmScnConfig` moved to include/g3d/fn_80063888.h (rule 1) when g3d/g3d_resanmlight.cpp became
+/* `ResAnmScnConfig` moved to g3d/fn_80063888.h (rule 1) when g3d/g3d_resanmlight.cpp became
  * the second consumer; `fn_8006584C`'s declaration moved with it (rule 2). */
 
 extern "C" u16 fn_80065828(void *p)
@@ -570,7 +570,7 @@ typedef struct {
 } ResAnmAmbLightWord; /* size: 0x14 (approximate - only the +0x10 word this accessor reads is evidenced) */
 
 /* `ResAnmLightConfig` and the `fn_80066DB4`/`fn_80066E80` declarations moved to
- * include/g3d/fn_80063888.h (rules 1 and 2) when g3d/g3d_resanmlight.cpp became the second consumer. */
+ * g3d/fn_80063888.h (rules 1 and 2) when g3d/g3d_resanmlight.cpp became the second consumer. */
 
 extern "C" u32 fn_80066C68(void *p)
 {
@@ -838,7 +838,7 @@ extern "C" void fn_80064988(G3dFlagWord *self, u32 bits, s32 set)
         self->field_0x0C &= ~bits;
 }
 
-/* `fn_800649B4` is declared in `include/g3d/fn_80063888.h` with the object as an opaque `void*` (the
+/* `fn_800649B4` is declared in `g3d/fn_80063888.h` with the object as an opaque `void*` (the
  * ScnMdl pointer `g3d/g3d_scnmdl.cpp`'s fn_8007EA08 passes unchanged, per the target object's
  * `li r4,4; b` tail call) and this file's definition has to spell the same C-linkage parameter type
  * or the two declarations collide as illegal overloading.  The body casts to the local

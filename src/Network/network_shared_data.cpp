@@ -18,8 +18,8 @@
  *
  * SOURCE DEFINES NOTHING.  The bytes are the original's and a `NonMatching` unit contributes exactly
  * those bytes to the link, so the DOL is untouched; what the registration buys is the ownership, plus
- * `include/Network/network_shared_data.h` as the one place a consumer declares a word (rule 2).  The
- * 14 declarations that header carries were moved there verbatim from `include/Network/NetworkSessionManager.h`,
+ * `Network/network_shared_data.h` as the one place a consumer declares a word (rule 2).  The
+ * 14 declarations that header carries were moved there verbatim from `Network/NetworkSessionManager.h`,
  * where they were rule 12's finding while the run had no owner.
  *
  * EXTENTS (both 4-aligned, both ends proven by the reader set, not by a byte cap):

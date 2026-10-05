@@ -5,8 +5,8 @@
 #include "types.h"
 #include "Network/network_transport.h"
 
-/* Declarations moved here from `include/unsplit/Network.h` (docs/plan.md 6.5 rule 2: the owner declares). */
-typedef struct NetId NetId;                 /* include/Network/NetworkLayerPat.h */
+/* Declarations moved here from `unsplit/Network.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+typedef struct NetId NetId;                 /* Network/NetworkLayerPat.h */
 struct NetRosterSync;
 
 #ifdef __cplusplus

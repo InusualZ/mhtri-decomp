@@ -1,5 +1,5 @@
 /*
- * include/Network/sNetworkLibrary.h - the base network library class `sNetworkLibrary`, its records and the
+ * Network/sNetworkLibrary.h - the base network library class `sNetworkLibrary`, its records and the
  * free helpers its unit defines.  Owner: `src/Network/sNetworkLibrary.cpp` (docs/plan.md 6.5 rule 2: a consumer
  * includes this header instead of declaring the symbols itself).  Moved out of `Network/network_opening.h`
  * with the unit split; that header includes this one.
@@ -11,11 +11,11 @@
 #include "Network/network_transport.h"
 #include "SO/soi.h"                     /* SOLibraryConfig - the init block's first member */
 
-class NetworkLogger;          /* include/unsplit/Network.h */
-class NetworkWiiMediator;     /* include/Network/NetworkWiiMediator.h */
-class NetworkResolverWii;     /* include/Network/network_transport_types.h */
-class NetworkFileFetcher;     /* include/Network/network_pat_control.h */
-class NetworkRandom;          /* include/Network/NetworkPool.h */
+class NetworkLogger;          /* unsplit/Network.h */
+class NetworkWiiMediator;     /* Network/NetworkWiiMediator.h */
+class NetworkResolverWii;     /* Network/network_transport_types.h */
+class NetworkFileFetcher;     /* Network/network_pat_control.h */
+class NetworkRandom;          /* Network/NetworkPool.h */
 
 /* The block `sNetworkLibrary::init` is handed: the SO allocator pair `SOInit` takes by address, then the
  * DWC game-info words the mediator keeps (`mode` -1 skips them; the eight values are all required).

@@ -1,5 +1,5 @@
 /*
- * include/unsplit/Network.h - declarations for the Network band's callees that no registered unit owns.
+ * unsplit/Network.h - declarations for the Network band's callees that no registered unit owns.
  *
  * Filled in by the `8041A87C_fn_8041A87C` lane: the helpers the 0x8041A87C..0x8041DF10 range calls
  * (the debug manager, the DWC/GameSpy socket layer, the OS thread API and the neighbouring `fn_`
@@ -26,10 +26,10 @@
 #include "menu/menu_plsearch.h"
 
 typedef struct NetworkErrorInfo NetworkErrorInfo;
-typedef struct PatMatchOptions PatMatchOptions;   /* include/Network/NetworkSessionManager.h */
-typedef struct NetId NetId;                 /* include/Network/NetworkLayerPat.h */
-typedef struct NetLayerRequest NetLayerRequest; /* include/Network/NetworkLayerPat.h */
-/* the record's layout lives in `include/Network/NetworkSessionManager.h`, beside the GameSpy handshake that
+typedef struct PatMatchOptions PatMatchOptions;   /* Network/NetworkSessionManager.h */
+typedef struct NetId NetId;                 /* Network/NetworkLayerPat.h */
+typedef struct NetLayerRequest NetLayerRequest; /* Network/NetworkLayerPat.h */
+/* the record's layout lives in `Network/NetworkSessionManager.h`, beside the GameSpy handshake that
  * fills it: `NetworkInstance::postError` below only takes a pointer to it. */
 
 /* the DWC callbacks are installed as unprototyped pointers and the callee casts them back */
@@ -79,7 +79,7 @@ public:
 
 /* The singleton `getInstance_` returns is the `PatInterface` (`getInstance_` loads `mpInstance__12PatInterface`,
  * which `__ct__12PatInterfaceFv` stores; request net3-d-03c2#1): the band's spelling is an alias of the class,
- * whose layout and 161 virtual slots live in `include/Network/PatInterface.h`. */
+ * whose layout and 161 virtual slots live in `Network/PatInterface.h`. */
 class PatInterface;
 typedef PatInterface NetworkInstance;
 
@@ -162,17 +162,17 @@ extern u32 lbl_80603740[];
 
 /* 0x80794380 `natNegMessageMagic` - the NATNEG message signature this unit compares the head of a
  * received datagram against - is deliberately *not* declared here: the bytes belong to the NATNEG
- * unit, so rule 2 puts the declaration in `include/DWCi/DWCi_NatNeg.h` (included above), and that
+ * unit, so rule 2 puts the declaration in `DWCi/DWCi_NatNeg.h` (included above), and that
  * is the *unsized* spelling this unit needs.  It addresses the symbol with `lis`/`addi`
  * (ADDR16_HA/LO, the target's relocation kind), while the owner's own source re-declares it sized
  * for the SDA21 form its ten sites use (playbook row 12 - the reloc kind is a codegen input). */
 
 /* Three declarations that used to stand here are owned now, so each lives in its OWNER's header and is
- * reached through this band by including it (section 6.5 rule 2, 2026-09-28): `sGameSpySocket` and
+ * reached through this band by including it (section 6.5 rule 2): `sGameSpySocket` and
  * `sGameSpyInterfaceThread` by `Network/GameSpyInterfaceThread.cpp`, whose `splits.txt` claims
- * `.sbss:0x80794CE0..0x80794CE8` - they are declared in `include/Network/GameSpyInterfaceThread.h`, the header of
+ * `.sbss:0x80794CE0..0x80794CE8` - they are declared in `Network/GameSpyInterfaceThread.h`, the header of
  * the unit that defines them - and `natNegMessageMagic` by `DWCi/DWCi_NatNeg.c`, whose `.sdata` run
- * 0x80794368..0x807943A0 covers it (declared in `include/DWCi/DWCi_NatNeg.h`, included at the top of
+ * 0x80794368..0x807943A0 covers it (declared in `DWCi/DWCi_NatNeg.h`, included at the top of
  * this band).  A band header that still declared them would collide with the owners' definitions.
  */
 
@@ -186,9 +186,9 @@ typedef struct NetworkRequestError {
     u32 arg_08;
 } NetworkRequestError;   /* size: 0x0C */
 
-class NetworkLayerPat;             /* include/Network/NetworkLayerPat.h */
-class NetworkSessionManagerPat;    /* include/Network/NetworkSessionManager.h */
-typedef struct NetworkRequest NetworkRequest;   /* include/Network/NetworkSessionManager.h */
+class NetworkLayerPat;             /* Network/NetworkLayerPat.h */
+class NetworkSessionManagerPat;    /* Network/NetworkSessionManager.h */
+typedef struct NetworkRequest NetworkRequest;   /* Network/NetworkSessionManager.h */
 
 /* The request/layer state machine's owned callees live in their owners' headers (rule 2):
  * `NetworkRequest_getError` in `Network/NetworkSessionManagerPat.h`, `notifyLayerEvent` in

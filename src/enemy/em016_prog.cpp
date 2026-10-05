@@ -1,7 +1,7 @@
 /* enemy/em016_prog.cpp - enemy 016 program
  *
  * `.text` 0x80182C40..0x80192348, 89 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): fold of 4 registered units, built from `enemy/fn_80181C88.cpp`, `enemy/fn_80182D5C.cpp`, `enemy/fn_8018B3B8.cpp`, `enemy/fn_80191598.cpp`.
+ * Phase 4: fold of 4 registered units, built from `enemy/fn_80181C88.cpp`, `enemy/fn_80182D5C.cpp`, `enemy/fn_8018B3B8.cpp`, `enemy/fn_80191598.cpp`.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  *
  * Kept views: the retired sources declared 20 callee(s) with different signatures (`assignVec3`, `eft_spawn_type11`, `em_alt_mode_ck`, `em_fall_start`, `em_mot_set`, `em_move_mode_set`, `em_water_check`, `fn_80126324`, `fn_80129A70`, `fn_80129DB8`, `fn_8012A014`, `fn_8012A204`, ...); each function keeps its own source's view through a function-pointer cast macro (`<name>_viewN`, `<name>_cN`), which compiles to the same direct call, so the fold does not move any body.
@@ -35,13 +35,13 @@
  * `em_frame_check__FP11_ENEMY_WORKUsff`, `em_die_ck__FP11_ENEMY_WORK` - through their real
  * signatures (rule 9), and `_ENEMY_WORK` carries `nw4r::math::VEC3` members.
  *
- * Types.  `_ENEMY_WORK` comes from its single home `include/enemy/ENEMY_WORK.h` (rule 1), not from
- * the older `include/enemy.h` copy.  Two bytes that header did not name yet were added there with
+ * Types.  `_ENEMY_WORK` comes from its single home `enemy/ENEMY_WORK.h` (rule 1), not from
+ * the older `enemy.h` copy.  Two bytes that header did not name yet were added there with
  * their offsets preserved (both are pure padding splits, so no other field moved):
  *   * `+0x1EC  u16 bits_0x1EC` - `fn_8018493C` does `lhz r0,0x1ec` then `clrlwi r3,r0,27`
  *     (`& 0x1F`) to derive its 0x96/0x5A frame countdown.
  *   * `+0x482  u8 field_0x482` - `fn_80184CE0`/`fn_80184C28` pick the approach float with it
- *     (`lbz r0,0x482; cmpwi r0,0; beq`); `include/enemy.h` already carried the same byte.
+ *     (`lbz r0,0x482; cmpwi r0,0; beq`); `enemy.h` already carried the same byte.
  * The pool constants this unit loads are declared `extern`, never defined (playbook 29): redefining
  * them would rebuild the pool instead of addressing the target's.
  *
@@ -61,7 +61,7 @@
  *     `fn_8018484C` 98.33, `fn_8018493C` 97.78, `fn_80185D60` 97.44.  The target evaluates the
  *     FLOAT argument of `em_motion_param_set`/`em_approach_start` before the integer one (`lfs f1,pool` then
  *     `li r4,imm`); MWCC evaluates in declaration order, so that needs a `(self, f32, s32)` view of
- *     those two band symbols, while `include/unsplit/enemy.h` (and the landed consumers
+ *     those two band symbols, while `unsplit/enemy.h` (and the landed consumers
  *     `enemy/fn_801550FC.cpp`, `enemy/fn_80147CE0.cpp`) carry `(self, s32, f32)`.  Both spellings
  *     are ABI-equivalent (one FPR slot and one GPR slot), which is why the body still links and
  *     measures: this is the declaration-order residual `enemy/fn_80147CE0.cpp` already recorded.
@@ -77,7 +77,7 @@
  *     are both small constants is folded away.  A `u32` local (`u32 motion = ... ; em_mot_set(self,
  *     (u16)motion, ...)`) keeps the range unknown and is what `fn_801846BC` now uses - it moved the
  *     row rather than restoring it, so the remaining loss is that one instruction.  (The C view of
- *     `em_mot_set` in `include/unsplit/enemy.h` is `(self, s32, s32, s32)`; a `u16` parameter would
+ *     `em_mot_set` in `unsplit/enemy.h` is `(self, s32, s32, s32)`; a `u16` parameter would
  *     emit the truncation for free, but changing it would re-measure every landed consumer.)
  *   * REGISTER COLOURING, vtable store - `fn_80183440` 99.33.  Retail materialises `lbl_805AD340`
  *     into **r0** (`lis r3,@ha; addi r0,r3,@l; stw r0,0(r31)`), this build into r3.  Three spellings
@@ -121,9 +121,9 @@
  *   and are declared (not defined) above, so those two dispatchers already measure 100 %.
  *
  * Callees.  Everything the written bodies call is declared where it belongs (rule 2): the unsplit
- * enemy band in `include/unsplit/enemy.h`, the owner units in `include/enemy/fn_801251D0.h`,
- * `include/enemy/fn_8012BDF4.h`, `include/enemy/fn_80138074.h`, `include/enemy/fn_80147CE0.h`,
- * `include/ef/fn_80105314.h`, `include/mh3_pad.h`, `include/sys_mem.h`.  Four declarations were moved
+ * enemy band in `unsplit/enemy.h`, the owner units in `enemy/fn_801251D0.h`,
+ * `enemy/fn_8012BDF4.h`, `enemy/fn_80138074.h`, `enemy/fn_80147CE0.h`,
+ * `ef/fn_80105314.h`, `mh3_pad.h`, `sys_mem.h`.  Four declarations were moved
  * into those owner headers by this unit and are filed as `shared-file` config requests:
  * `fn_80126324` + `fn_80128030` (owner `enemy/fn_801251D0.cpp`), `fn_8012E664` + `fn_8012E694`
  * (owner `enemy/fn_8012BDF4.cpp`), plus `fn_801337FC`, `f32 fn_8013026C(_ENEMY_WORK*)` and
@@ -137,7 +137,7 @@
  * `fn_80191598`.
  *
  * `.text` 0x8018B3B8..0x80191598 (24 functions, 0x61E0 B), extab 0x8000ECC4..0x8000ED64,
- * extabindex 0x8002A210..0x8002A300.  Registered from `proposal/8018B3B8_fn_8018B3B8.cpp`.
+ * extabindex 0x8002A210..0x8002A300.
  *
  * Module `enemy`, decided by class 3 (what the code does plus the neighbours' scheme): both
  * bracketing registered units are `enemy/*` (the unit below ends exactly at 0x8018B3B8 and
@@ -160,8 +160,8 @@
  * `setVector3__FPQ34nw4r4math4VEC3fff`, `setTevKColor__6MHcharFUl14_GXTevKColorIDP8_GXColor`) through
  * their real signatures (rule 9), and `_ENEMY_WORK::char_0x024` is the `MHchar` base `pl.h` owns.
  *
- * Types.  `_ENEMY_WORK` comes from its single home `include/enemy/ENEMY_WORK.h` (rule 1), not from
- * the older `include/enemy.h` copy.  This band reads the +0x350..+0x35E bytes as a run of signed
+ * Types.  `_ENEMY_WORK` comes from its single home `enemy/ENEMY_WORK.h` (rule 1), not from
+ * the older `enemy.h` copy.  This band reads the +0x350..+0x35E bytes as a run of signed
  * 16-bit TEV colour words (`fn_80191038` does `lha`/`sth` at +0x350/+0x352/+0x354/+0x356/+0x358 and
  * `fn_801913FC` `lha` at +0x35A/+0x35C), where the header had byte views; the three union members
  * the range needs (`tev_0x350`, `tev_0x354`, the +0x358 union member) were added there with the
@@ -207,10 +207,10 @@
  * entry):
  *   * the plain band callees declared in this file (`fn_8018479C`, `fn_80184D98`, `fn_80183DCC`,
  *     `fn_80184488`, `fn_80184BF8`, `fn_801861E4`, `fn_80186960`, `fn_80189C7C`, `fn_8018A974`,
- *     `fn_8018AB64`, `fn_8018AB94`..`fn_8018B258`) belong in `include/unsplit/enemy.h` or their
+ *     `fn_8018AB64`, `fn_8018AB94`..`fn_8018B258`) belong in `unsplit/enemy.h` or their
  *     owner's header (rule 2); they are elected `_ENEMY_WORK*`-typed here.
  *   * the shell callback table is the shared `ShellSetFuncs` of `stage/shell_set_func_ptr.h`.
- *   * the +0x350..+0x35E TEV union members added to `include/enemy/ENEMY_WORK.h` (`tev_0x350`,
+ *   * the +0x350..+0x35E TEV union members added to `enemy/ENEMY_WORK.h` (`tev_0x350`,
  *     `tev_0x354`, the +0x358 union member) are this unit's signed-short view; they should be named
  *     once for the band.
  */
@@ -219,7 +219,7 @@
 /* enemy/fn_80191598.cpp - the enemy aim/action group of the `ResUserDataAc` class set.
  *
  * `.text` 0x80191598..0x801926EC (26 functions, 4436 B), extab 0x8000ED64..0x8000EDF4,
- * extabindex 0x8002A300..0x8002A3D8.  Registered from `proposal/80191598_fn_80191598.cpp`.
+ * extabindex 0x8002A300..0x8002A3D8.
  *
  * Module `enemy`.  The range's callees are the enemy work API
  * (`em_act_ck__FP11_ENEMY_WORKUcUc`, `em_parts_damage_level_get__FP11_ENEMY_WORKUc`,
@@ -242,7 +242,7 @@
  * lookup on the range's inventory: all 26 names are bare `.text` entries in
  * config/RMHE08/symbols.txt and the runtime dump has only `zz_XXXXXXXX_` placeholders for them)
  *
- * Types.  This range reads `_ENEMY_WORK` bytes that `include/enemy.h` views differently: it steps
+ * Types.  This range reads `_ENEMY_WORK` bytes that `enemy.h` views differently: it steps
  * +0x328/+0x32C/+0x330/+0x338/+0x33C as 4-byte fixed-point angle words where that header has a
  * `VEC3 v_0x320` and 16-bit timers, and it reads +0x344/+0x348/+0x34C as floats where the header has
  * padding.  The unit therefore carries its own view (`EmActWork`), exactly as `enemy/fn_8013ACC4.cpp`
@@ -303,17 +303,17 @@
  *
  * Type and declaration follow-ups (the outbox carries each as a `shared-file`/`config_requests` entry):
  *   * `_ENEMY_WORK`'s +0x328..+0x3A4 aim record, the +0x590 cluster array's live byte and position,
- *     +0x9F6 and +0x1E0/0x1E1/0x1E2 belong in `include/enemy.h` (this range's view of 0x328..0x33E
+ *     +0x9F6 and +0x1E0/0x1E1/0x1E2 belong in `enemy.h` (this range's view of 0x328..0x33E
  *     contradicts that header's `VEC3 v_0x320`/16-bit timers).
- *   * `ResUserDataAc` (this range's `EmUserData` view) belongs in `include/enemy/fn_80138074.h`, its
- *     owner's header - `include/enemy/fn_80138074.h` declares `fn_8013A654` with `_ENEMY_WORK*` where
+ *   * `ResUserDataAc` (this range's `EmUserData` view) belongs in `enemy/fn_80138074.h`, its
+ *     owner's header - `enemy/fn_80138074.h` declares `fn_8013A654` with `_ENEMY_WORK*` where
  *     the callee's own body reads +0x04/+0x08 (settled from the callee, rule 6 of the playbook).
  *   * the plain prototypes at the top of this file (`em_move_mode_set`, `fn_80126324`, `fn_80129xxx`,
  *     `fn_8013918C`, `joint_mtx_store`, `joint_mtx_load`, `fn_8013A654`, `fn_8008E8D0`, `fn_8008EE68`,
  *     `fn_800FBB90`, `eft_rot_vec_copy`, `fn_805012E8`, `mtx34_trans_add`, `mtx34_trans_get`, `MTX34_ctor`,
  *     `fn_800516F0`, `setVec3`, `copyVec3`, `VEC3_ctor`, `assignVec3`, `stage_map_kind_get`,
- *     `fn_80182D5C`) belong in their owners' headers / `include/unsplit/enemy.h`; `setVec3`'s
- *     `void` return in `include/mh3_pad.h` is wrong for this range's call sites, which read its r3.
+ *     `fn_80182D5C`) belong in their owners' headers / `unsplit/enemy.h`; `setVec3`'s
+ *     `void` return in `mh3_pad.h` is wrong for this range's call sites, which read its r3.
  *   * the unit registers a `.ctors` word (0x8056F33C..0x8056F340, added by the split itself): the
  *     original translation unit has a static constructor, most plausibly the one that fills the five
  *     static vectors `fn_80192204` builds (`vec_pair_80191598_0`..`vec_default_80191598`).
@@ -769,7 +769,7 @@ extern u32 lbl_805ACC00[];
 extern u32 lbl_805ACD80[];
 }
 
-/* `_CP_VECTOR` is `include/ef.h`'s type (three words).  That header is not includable here: its
+/* `_CP_VECTOR` is `ef.h`'s type (three words).  That header is not includable here: its
  * `setVec3` declaration returns void, where this range's call sites read the callee's r3 (see
  * `fn_80192108`/`fn_80192204`), so the outbox carries the header fix instead. */
 struct _CP_VECTOR;
@@ -849,7 +849,7 @@ void cpSetRotMatrix(struct _CP_VECTOR* rot, MTX34* mtx);
 extern "C" {
 /* The plain callees.  Their signatures are this range's own call sites (the arity and the return
  * width the target's registers show); they belong in their owner's header or in
- * `include/unsplit/enemy.h`, and the outbox carries that list - the same interim spelling
+ * `unsplit/enemy.h`, and the outbox carries that list - the same interim spelling
  * `enemy/fn_8013ACC4.cpp` uses for its neighbours. */
 void fn_803B9BA0(EmActWork* self, VEC3* pos, s32 value);
 

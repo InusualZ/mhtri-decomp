@@ -4,8 +4,7 @@
  * `g3d/g3d_resanmscn.cpp` (`.text` 0x800908FC-0x800916FC) owns the `ResAnmScn` channel getters and the
  * `ResAnmTexPat` accessor/bind cluster.  The right-hand `g3d/g3d_resanmtexsrt.cpp` unit
  * (0x800916FC-0x80093990) consumes the five `ResAnmTexPat` helpers below through its
- * `ResFile`/`ResDic` chain and used to declare them locally, because the range was registered from
- * `proposal/800908FC_fn_800908FC` without a header; registering `g3d_resanmscn.cpp` makes the
+ * `ResFile`/`ResDic` chain and used to declare them locally, because the range was registered without a header; registering `g3d_resanmscn.cpp` makes the
  * addresses owned, so the declarations move here (rule 2) and the consumer includes this header.
  *
  * All five keep C linkage (the map carries plain `fn_XXXXXXXX` stems).  The signatures are the owner's

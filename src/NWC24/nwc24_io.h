@@ -1,11 +1,11 @@
 /*
- * include/NWC24/nwc24_io.h - the NWC24 device/utility half (`src/NWC24/nwc24_io.c`, `.text`
+ * NWC24/nwc24_io.h - the NWC24 device/utility half (`src/NWC24/nwc24_io.c`, `.text`
  * 0x8051E068..0x8051E864).
  *
  * Rule 2: this unit owns the `/dev/net/kd/*` fd + ioctl wrappers, the user-id CRC/unscramble pair,
  * the RTC pair and the shutdown pair, so `NWC24/nwc24_msg.c` includes this header instead of
  * declaring them.  The device-path literals it opens have no owner and live in
- * `include/unsplit/NWC24.h`, which this file includes.
+ * `unsplit/NWC24.h`, which this file includes.
  */
 #ifndef MHTRI_NWC24_NWC24_IO_H
 #define MHTRI_NWC24_NWC24_IO_H
@@ -46,7 +46,7 @@ BOOL NWC24iRequestShutdown(BOOL final, u32 event);
 }
 #endif
 
-/* Declarations moved here from `include/unsplit/NWC24.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+/* Declarations moved here from `unsplit/NWC24.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 #ifdef __cplusplus
 extern "C" {
 #endif

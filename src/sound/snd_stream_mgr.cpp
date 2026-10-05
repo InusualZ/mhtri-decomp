@@ -1,7 +1,6 @@
 /* sound/snd_stream_mgr.cpp - the stream manager and its slot routines
  *
  * `.text` 0x800E9D00..0x800ED780, 17 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): recut registered unit, built from `sound/fn_800E8E60.cpp`.
  * Name is a GUESS: the unit owns the stream manager `lbl_8069A810` (0xD8 B `.bss`).
  * Each function keeps the `#pragma` state it had in its retired source.
  */

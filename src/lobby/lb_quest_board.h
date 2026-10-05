@@ -4,8 +4,8 @@
  *
  * `lobby_w` (`LbQuestBoardLobby`): the `.bss` lobby work block is 0x17C bytes at 0x806AAB44 and
  * every lobby unit needs a different set of its bytes.  The band's own convention, already carried
- * by `include/lobby/lb_npc.h`, `include/lobby/fn_8020C588.h`, `include/lobby/fn_8021E1EC.h`,
- * `include/lobby/fn_802FA9A0.h` and `include/unsplit/lobby.h`, is one view per unit - the views
+ * by `lobby/lb_npc.h`, `include/lobby/fn_8020C588.h`, `lobby/fn_8021E1EC.h`,
+ * `lobby/fn_802FA9A0.h` and `unsplit/lobby.h`, is one view per unit - the views
  * genuinely disagree (different byte is the "state" to each), so no single header can hold them and
  * this one keeps only the offsets the quest-board screen reads.
  */

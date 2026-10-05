@@ -1,4 +1,4 @@
-/* auto/800FD520_fn_800FD520.c - the state-0 handler of the eft002 effect machine,
+/* ef/fn_800FD520.c - the state-0 handler of the eft002 effect machine,
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  * `.text` 0x800FD520..0x800FD718 (one function, `fn_800FD520`).
  *
@@ -38,9 +38,9 @@
  * `Pl/pl_act.cpp`'s `_PLW`); all three belong in one shared header, which does not exist yet.
  *
  * Language.  The unit's own symbol is plain (`fn_800FD520`), so the file stays C and the mangled
- * callees are declared by their map spelling, as `auto/803066F0_fn_803066F0.c` does.
+ * callees are declared by their map spelling, as `ef/fn_803066F0.c` does.
  *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/800FD520_fn_800FD520.c`.
+ * Inventory, addresses and sizes: `python tools/units/ledger.py unit ef/fn_800FD520.c`.
  */
 
 #include "types.h"

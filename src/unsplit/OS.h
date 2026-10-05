@@ -51,7 +51,7 @@ void OSRestoreInterrupts(BOOL level);
 
 /* 0x804D1EE0 / 0x804D1F20 - the OS mutex pair `NHTTP/NHTTP_bgnend.c` initialises and locks its
  * request-list mutex with (0x804D2000, `OSUnlockMutex`, is the third of the set; it is declared
- * locally by `OS/FindContainHeap_.c` and in `include/unsplit/Network.h` and is not needed here, so
+ * locally by `OS/FindContainHeap_.c` and in `unsplit/Network.h` and is not needed here, so
  * it is not restated).  Neither address is inside a registered unit, and the nearest registered
  * ranges below and above name different modules (`OS/OSAlarm.c` / `RSO/runtime.c`), so stylelint's
  * rule 2 reports them as an unplaceable gap - the module the band names is `OS`, which is this file. */

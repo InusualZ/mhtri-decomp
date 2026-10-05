@@ -109,8 +109,10 @@ def derive_members(root: str) -> dict:
     members["docs"] = docs
 
     # `layout` is the tree's own directory structure (where sources and headers live: the 2026-10-05 move of every
-    # header from include/ beside its source) - a repository change no single module, tool or config file owns
-    repo: set = {"layout"}
+    # header from include/ beside its source) - a repository change no single module, tool or config file owns.
+    # `comments` is a comment-only sweep across every module (the comment sweep's stage 1, 2026-10-05): no single
+    # `game/<module>` owns a change that touches comments in all of them
+    repo: set = {"layout", "comments"}
     try:
         root_names = [n.lower() for n in os.listdir(root)]
     except OSError:

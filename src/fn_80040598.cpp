@@ -66,7 +66,7 @@
  *     -func_align 4` were all measured worse; `-O4,p` costs this function 22 points and drops
  *     `CntSdRsoTerminate` from 100 % to 84.3 %, so `-O3 -inline noauto` stands.
  *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/80040598_fn_80040598.cpp`.
+ * Inventory, addresses and sizes: `python tools/units/ledger.py unit fn_80040598.cpp`.
  * The file name is provisional - `auto/` plus the first symbol's address - because nothing in the object
  * names the original source file.  Rename it the moment there is evidence.
  */
@@ -101,7 +101,7 @@ extern u32 lbl_807947C4;
 extern u8 lbl_807947C8;
 
 /* The keyboard tail of the game's system interface block `system_w` lives in
- * `include/unsplit/unknown.h` (rule 1/2: the type and its declaration are shared with `main.cpp` and
+ * `unsplit/unknown.h` (rule 1/2: the type and its declaration are shared with `main.cpp` and
  * `enemy/fn_8014A1BC.c`, and the symbol's module is undecided). */
 /* Loads the object at `path` into `buffer`, registers it with the RSO runtime, and publishes the end of
  * its BSS as the top of the memory pool `mode` selects.  Returns the buffer, or NULL if the open or the

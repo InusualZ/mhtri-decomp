@@ -18,7 +18,7 @@
  *   0x80602490 sits before `NetworkRandom`'s 0x806024A0, the reverse of MWCC's vtable order for one TU, so
  *   `NetworkRandom` (constructor 0x80413384) is probably a TU of its own starting in 0x804130EC..0x80413384 - not
  *   cut here (the round 4 fold keeps the tail whole).  No bodies yet; the classes are declared in
- *   `include/Network/NetworkPool.h`, the inventory is `ledger.py unit Network/NetworkPool.cpp` and the map.
+ *   `Network/NetworkPool.h`, the inventory is `ledger.py unit Network/NetworkPool.cpp` and the map.
  */
 
 #include "Network/NetworkPool.h"

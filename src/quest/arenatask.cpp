@@ -3,7 +3,7 @@
  * acdata -> `_arena_eq_data` conversion, the task `ArenaSelExec` (0x80041A34) installs, and the
  * per-player arena setup the task drives.
  *
- * `.text` 0x804459E4..0x80448404 (19 functions, 10784 B; the object emits 11024 B, `arena_task` being 244 B
+ * `.text` 0x804459DC..0x80448404 (20 functions, 10792 B; the object emits 11024 B, `arena_task` being 244 B
  * over), extab 0x8001DE9C..0x8001DF24, extabindex 0x8003EB20..0x8003EBEC.  Definitions follow `.text`
  * address order (the object is a permutation of the target once the unit flips).  Module `quest` and file
  * name `arenatask.cpp` are class-1 evidence: `.data` 0x80607390 is the bare `__FILE__` string

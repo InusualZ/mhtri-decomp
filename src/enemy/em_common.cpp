@@ -1,7 +1,7 @@
 /* enemy/em_common.cpp - the enemy common control set (`get_enemy_data`, `em_work_die_ck`, ...)
  *
  * `.text` 0x801251D0..0x8013791C, 135 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): fold of 6 registered units, built from `enemy/fn_801251D0.cpp`, `enemy/fn_8012BA00.c`, `enemy/fn_8012BDF4.cpp`, `enemy/fn_8012E968.cpp`, `enemy/fn_8012EC74.cpp`, `enemy/fn_80137604.cpp`.
+ * Phase 4: fold of 6 registered units, built from `enemy/fn_801251D0.cpp`, `enemy/fn_8012BA00.c`, `enemy/fn_8012BDF4.cpp`, `enemy/fn_8012E968.cpp`, `enemy/fn_8012EC74.cpp`, `enemy/fn_80137604.cpp`.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  *
  * Kept views: the retired sources declared 22 callee(s) with different signatures (`em_act_ck__FP11_ENEMY_WORKUcUc`, `em_alt_mode_ck`, `em_area_ck`, `em_status_ck`, `fn_80050EF4`, `fn_8012B944`, `fn_8012B9BC`, `fn_8012BA00`, `fn_8012D0B4`, `fn_8012D188`, `fn_8012D1A8`, `fn_8012D23C`, ...); each function keeps its own source's view through a function-pointer cast macro (`<name>_viewN`, `<name>_cN`), which compiles to the same direct call, so the fold does not move any body.
@@ -9,7 +9,7 @@
  */
 
 /* Retired header of `enemy/fn_801251D0.cpp` (kept for its notes and residuals): */
-/* auto/801251D0_fn_801251D0.cpp - the enemy control unit, 43 function(s) so far, `.text`
+/* enemy/em_common.cpp - the enemy control unit, 43 function(s) so far, `.text`
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with dumpmap.py: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  * 0x801251D0..0x8012BA00 (26672 bytes, 145 symbols).
  *
@@ -50,7 +50,7 @@
  * so their stores stay unmasked - with `u32` parameters the peephole-off build re-materialises the
  * `clrlwi` before each `stb`/`sth`.
  *
- * `_ENEMY_WORK` (0xB1C) is the shared record `include/enemy.h` owns; this unit adds the fields its
+ * `_ENEMY_WORK` (0xB1C) is the shared record `enemy.h` owns; this unit adds the fields its
  * accessors read (`timer_0x18`, `field_0x60`, `field_0x1F4`, `state_0x9FA`) by splitting that header's
  * padding, never a second definition.
  */
@@ -225,7 +225,7 @@
  * the pool literals stay with the data pass (playbook 29), so nothing but `.text`/`extab`/`extabindex`
  * is claimed.
  *
- * Types.  `_ENEMY_WORK` is the shared 0xB18 record in `include/enemy/ENEMY_WORK.h` (rule 1); this unit
+ * Types.  `_ENEMY_WORK` is the shared 0xB18 record in `enemy/ENEMY_WORK.h` (rule 1); this unit
  * named the byte it measures that the header still had as padding (`+0x8AA` as `mode_0x8AA`) and gave
  * `+0x00A`'s measured meaning a comment - its *name* stays the header's `field_0x00A`, because
  * `src/enemy/fn_80170600.cpp` already reads that byte under it.  The area/group table entry and the
@@ -299,7 +299,7 @@
  * move-work records) are *read*, never defined, so nothing but `.text`/`extab`/`extabindex` is claimed
  * (playbook 29: pool literals stay with the data pass).
  *
- * Types.  `_ENEMY_WORK` is the shared 0xB18 record in `include/enemy/ENEMY_WORK.h` (rule 1).  This
+ * Types.  `_ENEMY_WORK` is the shared 0xB18 record in `enemy/ENEMY_WORK.h` (rule 1).  This
  * unit named the bytes it measures that the header still had as padding, at their measured offsets:
  * `+0x00B` (the effect-queue argument byte), `+0x1AC` (a height compared against 0.9 * the model
  * scale), `+0x43B` (the per-motion kind gate), `+0x7AC`/`0x7B0` (the second window counter and its
@@ -329,7 +329,7 @@
  *   * em_motion_window_ck 97.65 % (204/204 B) - the final `field_0x7A0/0x7A4 <= rate+pad` is materialised by
  *     this build's allocator branchlessly (`mfcr` + `extrwi`) where retail keeps the branch
  *     (`bne ret0` + `li r3,1`); an `if (...) return 1; return 0;` shape is worse (212 B, 95.98 %), so
- *     the value-return form is applied.  Register-colouring residual, docs/matching.md row 22;
+ *     the value-return form is applied.  Register-colouring residual, playbook 22;
  *   * em_team_damage_under_ck 96.13 % (272/280 B) and em_team_damage_over_ck 96.99 % (272/280 B) - every instruction matches
  *     except the two-instruction dead loop counter (`li r4,0` + `addi r4,r4,1`); this build drops an
  *     unused `i`, retail keeps it.  The same residual `enemy/fn_8012E968.cpp` records for its walk
@@ -394,13 +394,13 @@
  * `fn_XXXXXXXX` name, so they are all `extern "C"`; the mangled callees are declared at C++ scope
  * before the linkage block, so this front-end mangles them back to the map's spelling.
  *
- * Types.  `_ENEMY_WORK` is the shared 0xB18 record in `include/enemy/ENEMY_WORK.h` (rule 1).  The
+ * Types.  `_ENEMY_WORK` is the shared 0xB18 record in `enemy/ENEMY_WORK.h` (rule 1).  The
  * offsets these twenty functions read are named there (`field_0x00D`/`0x00E`/`0x012`/`0x016`/`018`,
  * `state_0x017`, `field_0x018`/`01A`, `field_0x1BC`/`1C0`/`1C4`/`1C8`/`1D0`/`1DE`/`1E7`,
  * `field_0x218`, `slots_0x244` and its `EmMotionSlot` records, `field_0x43F`, `field_0x7C8`..`0x94C`,
  * `field_0xAEE`); the bytes between them stay `unused_0xNN` padding so every measured offset of the
  * units that already include the header keeps its place.  `EnemyData`'s definition lives in
- * `include/enemy.h`, which defines `_ENEMY_WORK` a second time and so cannot be included beside
+ * `enemy.h`, which defines `_ENEMY_WORK` a second time and so cannot be included beside
  * `enemy/ENEMY_WORK.h` (rule 1), so `fn_80137C20` reads the one word it needs with the owner's own
  * declaration.
  *
@@ -862,7 +862,7 @@ extern "C" {
 /* ------------------------------------------------------------------------------------------------
  * The plain `fn_XXXXXXXX` callees.  The map spells them as C symbols, so the whole set - the map's own
  * definitions included - is `extern "C"`: without it this C++ front-end would mangle them
- * (`fn_801376BC__FP11_ENEMY_WORK`) and objdiff would pair nothing (docs/matching.md row 42).
+ * (`fn_801376BC__FP11_ENEMY_WORK`) and objdiff would pair nothing (playbook 42).
  * Their owning units' headers do not carry them yet, so they are declared here (rule 2's interim home
  * for the enemy band, the same one `enemy/fn_80177890.cpp` uses).
  * ------------------------------------------------------------------------------------------------ */

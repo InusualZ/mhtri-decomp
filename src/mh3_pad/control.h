@@ -1,7 +1,7 @@
 /* The pad/control entry points of `src/mh3_pad.cpp`.
  *
  * Bracket note (docs/plan.md 6.5 rule 2): this file exists so a Pl unit can reach the pad query
- * without dragging the whole of `include/mh3_pad.h` in.  The clash it was filed for - `include/ef.h`
+ * without dragging the whole of `mh3_pad.h` in.  The clash it was filed for - `ef.h`
  * spelling `copyVec3`/`setVec3`/`VEC3_ctor` with a different record type than the owner's header,
  * MWCC `(10197)` - is CLOSED: every header now spells them `nw4r::math::VEC3*` (rule 11).
  */

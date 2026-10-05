@@ -1,5 +1,5 @@
 /*
- * include/Network/NetworkPat.h - the four-slot "*Pat" holder and the accessor family that walks it.
+ * Network/NetworkPat.h - the four-slot "*Pat" holder and the accessor family that walks it.
  *
  * Owner: `Network/NetworkPat.cpp` (`.text` 0x80419AD4..0x8041A194).  The record and the family moved
  * here with the `Network/network_pat_control.cpp` pass: a second unit needed the type, and a

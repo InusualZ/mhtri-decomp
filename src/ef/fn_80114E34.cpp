@@ -1,12 +1,11 @@
 /* ef/fn_80114E34.cpp - the effect band at 0x80114E34
  *
  * `.text` 0x80114E34..0x801153D0, 8 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): recut registered unit; the functions of the neighbouring units were cut out of this file.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  */
 
 /* Retired header of `ef/fn_80114E34.cpp` (kept for its notes and residuals): */
-/* auto/80114E34_fn_80114E34.cpp - the eft020/021/022 effect cluster and the eft023/024 job machine,
+/* ef/fn_80114E34.cpp - the eft020/021/022 effect cluster and the eft023/024 job machine,
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  * `.text` 0x80114E34..0x8011722C (45 functions, in address order).
  *
@@ -56,7 +55,7 @@
  * and fn_80115100 (88.53 %, 28 B long - the `_GXColor` by-value temp grows the frame).  The exact
  * per-function numbers live in `build/RMHE08/report.json`, never here.
  *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/80114E34_fn_80114E34.cpp`.
+ * Inventory, addresses and sizes: `python tools/units/ledger.py unit ef/fn_80114E34.cpp`.
  */
 
 #include "types.h"

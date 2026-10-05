@@ -1,7 +1,7 @@
 /* The enemy unit `enemy/fn_8012EC74.cpp` (0x8012EC74..0x80137604): its band's arming helpers, which
  * the neighbouring action units call.
  *
- * Declarations moved here from `include/unsplit/enemy.h` (docs/plan.md 6.5 rule 2: an extern lives
+ * Declarations moved here from `unsplit/enemy.h` (docs/plan.md 6.5 rule 2: an extern lives
  * with the TU that owns the symbol).  The bodies are still to be written - the signatures are the
  * call sites', with the argument registers and return register recorded per function.
  */
@@ -84,7 +84,7 @@ void fn_80132154(struct _ENEMY_WORK* self);
 /* 0x801339AC - this unit's own definition, added by `enemy/fn_801B0010.cpp` (rule 2): r3 the work
  * record, the answer in r3 (compared against 1 by every call site). */
 u32 em_break_state_ck(struct _ENEMY_WORK* self);
-/* 0x80133DB0 - the angle stepper this unit owns.  MOVED here from `include/unsplit/enemy.h` (rule 2:
+/* 0x80133DB0 - the angle stepper this unit owns.  MOVED here from `unsplit/enemy.h` (rule 2:
  * the owner is this unit, and the band header's `u16 fn_80133DB0()` was the no-prototype form).  The
  * signature is the owner's consumers': `enemy/fn_80137604.cpp` declares `(u16, u16, u16)` and
  * `enemy/fn_8014A1BC.c` calls it with three `(u16)`-cast arguments; the answer is a 16-bit angle. */
@@ -105,7 +105,7 @@ void fn_80131FA0(struct _ENEMY_WORK* self, u32 a);
  * each is a leaf this unit never re-enters. */
 /* `em_mot_speed_set` is deliberately NOT declared here: it is one of the 0x8012F symbols whose C
  * consumer (`enemy/fn_8014A1BC.c`) calls it with `self` only and relies on the old-style
- * declaration, so `include/unsplit/enemy.h` carries its `#ifdef __cplusplus` / `#else void
+ * declaration, so `unsplit/enemy.h` carries its `#ifdef __cplusplus` / `#else void
  * em_mot_speed_set();` split form - the shape `em_ground_ck`, `fn_801303FC`, `fn_80133F4C` and
  * `em_move_offset_step_update` keep there too, and the form the C++ consumers that do not include this header
  * (`enemy/fn_801550FC.cpp`, `enemy/fn_8015E854.cpp`) reach it through.  A prototype here is an
@@ -148,7 +148,7 @@ void fn_80136DF4(struct _ENEMY_WORK* self);
 f32 em_water_check(struct _ENEMY_WORK* self);
 f32 get_em_chg_scale(struct _ENEMY_WORK* self);
 /* `fn_80131034` is deliberately NOT declared here: its map name is the plain `fn_80131034`, so its
- * consumers reach the `extern "C"` form `include/unsplit/enemy.h` already carries.  A C++-linkage
+ * consumers reach the `extern "C"` form `unsplit/enemy.h` already carries.  A C++-linkage
  * copy here is an MWCC 10505 "illegal overloading" against that one. */
 /* 0x80135940 - the model scale.  The target's symbol is the C++ mangling
  * `get_em_scale__FP11_ENEMY_WORK` (mangle.py: `f32 get_em_scale(_ENEMY_WORK*)`), so it is declared at

@@ -1,8 +1,7 @@
 /*
- * hud/cockpit.cpp - phase 4 unit, `.text` 0x802D9EA4..0x802E0740 (132 functions, 26780 bytes).
+ * hud/cockpit.cpp - unit, `.text` 0x802D9EA4..0x802E0740 (132 functions, 26780 bytes).
  *
- * PHASE 4 (docs/splits/phase4, window d).  Recut of fn_802D44F4.cpp: its functions whose address lies in this range,
- * in address order; the rest of the range keeps its original bytes.  1 of 132 functions have a body here.
+ * 1 of 132 functions have a body here.
  *
  * FLAGS.  `cflags_main` (the ai lib's group, the old ai/fn_802D44F4.cpp's); the `.data`/`.bss` of the AI-NPC page
  * state it holds are defined here.
@@ -37,11 +36,11 @@
  *     front-end reproduces the map's own mangling (rule 9).
  *
  * Types: the record the whole AI band drives is `_AINPC_W`, whose shared home is
- * `include/ai/ainpc.h` (main already created it as the union of the `ai` band's accessors); this
+ * `ai/ainpc.h` (main already created it as the union of the `ai` band's accessors); this
  * unit added the offsets its own bodies name to that file - +0x000, +0x172, +0x20C..+0x23E,
  * +0x33A, +0x374, +0x3B0..+0x3BC, +0x3D4..+0x3DC, +0x3F4..+0x414, +0x424, +0x431..+0x438,
  * +0x450, +0x46C, +0x47C, +0x483 - rather than carrying a second copy (rule 1).  The four tuning
- * tables it indexes are declared in `include/unsplit/ai.h` (no registered unit owns them, rule 2).
+ * tables it indexes are declared in `unsplit/ai.h` (no registered unit owns them, rule 2).
  *
  * Flags: `cflags_main`, plus `#pragma peephole off` for the whole file - retail keeps the unfused
  * `clrlwi`+`slwi` / `clrlwi`+`cmpwi` forms that the peephole pass folds into `clrlslwi` and a

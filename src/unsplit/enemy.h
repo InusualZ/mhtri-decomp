@@ -197,7 +197,7 @@ void fn_80170EF4(struct _ENEMY_WORK* self, u32 a);
 void fn_8012F5C4(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d);
 /* `fn_80154784` (0x80154784) was declared here (from `enemy/fn_801B0010.cpp`'s call site) as
  * `u32 (struct _ENEMY_WORK*)` while the band had no registered unit.  `enemy/fn_801502C8.cpp` owns
- * 0x801502C8-0x801545B8 now, and its header `include/enemy/fn_801502C8.h` declares the symbol with
+ * 0x801502C8-0x801545B8 now, and its header `enemy/fn_801502C8.h` declares the symbol with
  * that same unsigned spelling (the call site reads the answer unsigned) - this band header includes
  * it (rule 2). */
 u32 fn_8012EC3C(struct _ENEMY_WORK* self);
@@ -218,10 +218,10 @@ void fn_80132224(struct _ENEMY_WORK* self);
 void fn_80132264(struct _ENEMY_WORK* self);
 /* `fn_80154CA4`/`fn_801545B8` (0x80154CA4/0x801545B8) were declared here (moved from
  * `enemy/fn_80147CE0.cpp`'s call sites) while the band 0x801545B8..0x80154CA4 had no registered
- * unit.  `enemy/fn_801502C8.cpp` owns 0x801502C8-0x801545B8 now, so `include/enemy/fn_801502C8.h`
+ * unit.  `enemy/fn_801502C8.cpp` owns 0x801502C8-0x801545B8 now, so `enemy/fn_801502C8.h`
  * (included above) declares both: `fn_80154CA4` takes the record and `fn_801545B8` the 0x18-byte
  * spawn record; the spellings here were the call sites' `void*`/`u32` view (rule 2). */
-/* `em_spawn_request` (0x80141B88) moved to its owner's header, `include/enemy/enemy_control.h`. */
+/* `em_spawn_request` (0x80141B88) moved to its owner's header, `enemy/enemy_control.h`. */
 /* The unclaimed `.text` run 0x801926EC..0x801993E0 (a proposal of its own, registered by nobody
  * yet): its per-action entry points are what the dispatchers in `enemy/fn_801926EC.cpp` switch
  * over.  Added with that unit's registration (docs/plan.md 6.5 rule 2): the address band brackets as
@@ -262,7 +262,7 @@ void fn_801A42F4(struct _ENEMY_WORK* self, u32 joint, Vec3* a, Vec3* b);
 void fn_801A437C(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c, u32 d, f32 e);
 /* 0x80346268 - the two-argument request `enemy/em_action.cpp`'s entry action's case 11 makes when
  * the enemy data entry is latched.  `ef/eft_slot.cpp` registered the band that owns the address, so
- * the declaration moved to that unit's header, `include/ef/eft_slot.h` (rule 2). */
+ * the declaration moved to that unit's header, `ef/eft_slot.h` (rule 2). */
 
 /* The `0x803253BC` band's pooled constants - the `.sdata2` run 0x8079AF4C..0x8079B100 and the
  * `.data` word its action record's first field is set to.  Declared, never defined (playbook 29):

@@ -1,7 +1,7 @@
 /*
  * `system_w` - the game/system state block (.bss 0x806585E0, 0xA5C B), defined by `src/mh3_pad.cpp`
  * (its `.bss` 0x806585B8-0x806694E8 is that unit's own, `splits.txt`).  This is the one home of its type
- * (rule 1); the object is declared in `system_w.h`, which `include/unsplit/unknown.h` includes for its consumers.
+ * (rule 1); the object is declared in `system_w.h`, which `unsplit/unknown.h` includes for its consumers.
  *
  * Union of the three private copies the type used to exist as:
  *   - `main.cpp`: the largest view, naming the bytes it polls at +0x01, +0x08 and +0x863..+0x931;

@@ -60,7 +60,7 @@
  * cross-unit findings belong to the next sweep and are booked in the unit's outbox:
  *   - `src/ef/ef_point.cpp:73` defines its own partial `EfEmitter` (same nw4r class, 0x100-byte
  *     lower bound).  This file's type is `EfEmitterObj` so the batch adds no second definition, but
- *     the two must become one `include/ef/ef_emitter.h` definition (rule 1) once this unit has a
+ *     the two must become one `ef/ef_emitter.h` definition (rule 1) once this unit has a
  *     header;
  *   - nine units declare this unit's symbols `extern` (`fn_800A8A08`, `fn_800A7F00`, `fn_800A8A04`,
  *     `fn_800A8C24`, `fn_800A8998`); those declarations now resolve to an owner and belong in that

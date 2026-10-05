@@ -1,5 +1,5 @@
 /*
- * SSL/ssl.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * SSL/ssl.cpp - STUB (no bodies yet).
  *
  * `.text` 0x8051B7FC..0x8051D710.  Sections of the candidate unit: .text 0x8051B7FC..0x8051D710; .data 0x80630F88..0x80631128; .bss 0x80763900..0x80766980; .sdata 0x80794420..0x80794438; .sbss 0x80795888..0x80795898.
  *

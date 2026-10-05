@@ -1,5 +1,5 @@
 /*
- * include/Network/NetworkSessionStable.h - the session classes `Network/NetworkSessionStable.cpp` owns: the `NetworkSessionStable` session
+ * Network/NetworkSessionStable.h - the session classes `Network/NetworkSessionStable.cpp` owns: the `NetworkSessionStable` session
  * (derived from `NetworkSessionBase`), the four-slot table it keeps, the connection object each slot owns
  * and the unit packet class.
  *

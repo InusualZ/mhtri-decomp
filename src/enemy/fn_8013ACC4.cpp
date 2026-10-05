@@ -32,7 +32,7 @@
  *
  * Types.  `_ENEMY_WORK` (= `EmWork` here) is reconstructed from this range's own field offsets.  It is
  * a *view*, like the ones `enemy/fn_80138074.c` and `enemy/fn_8013BE60.c` carry: the shared home
- * `include/enemy/ENEMY_WORK.h` cannot be used as-is because its view of this range's own fields
+ * `enemy/ENEMY_WORK.h` cannot be used as-is because its view of this range's own fields
  * disagrees with the disassembly - it calls +0x424 a word of `values_0x3A4[]`, +0x958 an `s32` (this
  * range loads it and dereferences it as the stream cursor), +0x95F/+0x999/+0x99B padding or array
  * bytes (this range reads and writes all three as flags/counters), and +0x9A4 an `EmCmdRec*` (this
@@ -129,7 +129,7 @@ struct EmRunRec {
 
 /* The interpreter's own record: a lower bound of 0xB18 (the tail is the unit's `open_level_no` band,
  * which this range never touches).  See the unit header for why this is a view rather than
- * `include/enemy/ENEMY_WORK.h`.
+ * `enemy/ENEMY_WORK.h`.
  * size: 0xB18 */
 struct EmWork {
     /* +0x0000 */ u8 unused_0x0000[0x036C];
@@ -190,7 +190,7 @@ struct EmUserSave {
 /* ----------------------------------------------------------------------------------------------- */
 /* Callees.  The map spells every one of them as a C symbol, so the whole set - this unit's own three */
 /* entry points included - sits in one `extern "C"` block: without it this C++ front-end would mangle */
-/* every name and objdiff would pair nothing (docs/matching.md row 42, and the trap              */
+/* every name and objdiff would pair nothing (playbook 42, and the trap              */
 /* `enemy/fn_8013F764.cpp` documents).  They are plain prototypes rather than `extern` declarations  */
 /* (the band's interim home for another unit's symbol: rule 2 keys on the `extern` keyword, and these */
 /* are views of the arity this range's own call sites prove - a handler this range reads `r3` from    */

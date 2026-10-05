@@ -1,7 +1,6 @@
 /* ef/eft004_fx.cpp - effect 004 fx band
  *
  * `.text` 0x80100448..0x80101DF4, 21 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): recut registered unit, built from `ef/eft004.cpp`.
  * Each function keeps the `#pragma` state it had in its retired source.
  */
 

@@ -1,7 +1,6 @@
 /* ef/effect.cpp - the effect handle helpers (root matrix, colour and scale changes, key lookups)
  *
  * `.text` 0x800F95A4..0x800FACAC, 36 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): recut registered unit; the functions of the neighbouring units were cut out of this file.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  */
 

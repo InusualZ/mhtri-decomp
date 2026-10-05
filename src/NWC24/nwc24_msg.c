@@ -80,7 +80,7 @@
  * everything the bodies reference outside those ranges - the work block `.bss` 0x80766980, the
  * scheduler flags `.sbss` 0x807958A8-0x807958B4, the user-work pointer `.sbss` 0x80795898 and the
  * device-path literals `.data` 0x80631178+ - belongs to no registered unit and is declared `extern`
- * in `include/unsplit/NWC24.h` (playbook 29/58: declare, never define).
+ * in `unsplit/NWC24.h` (playbook 29/58: declare, never define).
  *
  * LOAD-BEARING SHAPES (second pass, each measured on its own):
  *   - the file carries `#pragma dont_inline on`: retail KEEPS the `bl NWC24IsMsgLibOpened` /

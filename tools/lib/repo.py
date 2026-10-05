@@ -55,6 +55,22 @@ def include_spelling(rel: str) -> str:
     return rel
 
 
+#: The move's exceptions to `include/P` -> `src/P`: a header whose mirrored path would put an owner-looking stem in the
+#: wrong directory (`nw4r/g3d/g3d_resmat.h` declares `src/g3d/g3d_resmat.cpp`'s symbols, so it moved beside that unit).
+HEADER_MOVE_EXCEPTIONS = {
+    "include/nw4r/g3d/g3d_resmat.h": "src/g3d/g3d_resmat.h",
+}
+
+
+def moved_header(rel: str) -> str:
+    """Where the pre-move header path `include/P` lives since the 2026-10-05 move: the exception's target, else `src/P`.
+    A path outside `include/` is returned unchanged."""
+    rel = rel.replace("\\", "/")
+    if not rel.startswith(LEGACY_HEADER_ROOT + "/"):
+        return rel
+    return HEADER_MOVE_EXCEPTIONS.get(rel) or HEADER_ROOT + "/" + rel[len(LEGACY_HEADER_ROOT) + 1:]
+
+
 def include_roots(root: str | os.PathLike | None = None) -> tuple[str, str]:
     """The compile's include search roots relative to the tree, in `configure.py` order."""
     return (header_root(root), BUILD_INCLUDE_REL)

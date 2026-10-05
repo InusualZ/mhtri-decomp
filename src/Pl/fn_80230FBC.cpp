@@ -57,7 +57,7 @@
  * scratch copy of the object (the `.comment` entry left at 8 - the linker does not use it) links to
  * sha1 BF485073... with 0 differing bytes.  Details in `src/Pl/fn_8023C2D0.cpp`'s header.
  * Resolved the same way - `tools/elf/objalign.py` (e242dfecf) plus the flip (6d0cf5705), green; see
- * that header and docs/matching.md section 55.
+ * that header and playbook 55.
  */
 
 #include "types.h"

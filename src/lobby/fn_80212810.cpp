@@ -1,7 +1,6 @@
 /* lobby/fn_80212810.cpp - the lobby item/equipment page layer.
  *
- * `.text` 0x80212810..0x80219260 (105 functions, 27216 B).  Registered from
- * `proposal/80212810_fn_80212810.cpp`.
+ * `.text` 0x80212810..0x80219260 (105 functions, 27216 B).
  *
  * Module `lobby`.  The range's callees are the lobby UI API (`LbStr`, `draw_sprite_ary`,
  * `get_lsp_data`, `GetMenuFontColor`, `put_menu_cursor`) and the `.bss` run this unit reads names
@@ -53,7 +52,7 @@ extern const u8 lbl_805B97F4[];
 extern u8* lbl_805B9B50[];
 
 /* Foreign unsplit callees whose bracketing registered units name different modules (rule 2's named
- * gap - Pl below, stage/sound above), so no `include/unsplit/<module>.h` is sound for them. */
+ * gap - Pl below, stage/sound above), so no `unsplit/<module>.h` is sound for them. */
 extern "C" {
 u8 equip_kind_table_class(u8 id);
 void* fn_8027EC50(u8 id, u16 sel);

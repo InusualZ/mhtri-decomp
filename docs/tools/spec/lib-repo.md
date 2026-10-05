@@ -42,7 +42,8 @@ originals hash to. It is also the choke point of the fixture tier's live-tree re
   `LEGACY_HEADER_ROOT` (`include`, read only for a ref older than the move), `HEADER_ROOTS` (both, for those history
   readers), `BUILD_INCLUDE_REL`; `header_root(root=None)` (the tree's include root), `include_roots(root=None)` (the
   compile's `-i` roots in `configure.py` order) and `include_spelling(rel)` (how a source `#include`s the header at `rel`:
-  the path below its root).
+  the path below its root); `HEADER_MOVE_EXCEPTIONS` (the move's one exception table, movehdr's `EXCEPTIONS`) and
+  `moved_header(rel)` (where a pre-move `include/P` lives now: the exception's target, else `src/P`).
 
 ## Invariants and rules
 

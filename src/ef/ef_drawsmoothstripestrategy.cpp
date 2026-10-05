@@ -1,4 +1,4 @@
-/* auto/800BFFD4_fn_800BFFD4.c - nw4r::ef DrawSmoothStripeStrategy + DrawStrategyImpl, 0x800BFFD4..0x800C9540.
+/* ef/ef_drawsmoothstripestrategy.cpp - nw4r::ef DrawSmoothStripeStrategy + DrawStrategyImpl, 0x800BFFD4..0x800C9540.
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * 118 functions / 0x956C bytes of the NintendoWare-for-Revolution effect library (`nw4r::ef`).  The
@@ -12,7 +12,7 @@
  * This file is registered as `.c` (the attribution pass chose the extension without that evidence), so
  * it is written C-compatible and every definition sits inside an `extern "C"` guard: compiled as C the
  * guards vanish, compiled as C++ (the promotion the outbox requests) the names stay unmangled and
- * objdiff still pairs them by the map's `fn_XXXXXXXX` (docs/matching.md row 42).
+ * objdiff still pairs them by the map's `fn_XXXXXXXX` (playbook 42).
  *
  * Layout in address order:
  *   0x800BFFD4..0x800C6158  ef_drawsmoothstripestrategy.cpp - DrawSmoothStripeStrategy (Draw,
@@ -25,7 +25,7 @@
  *                           kept whole by the attribution pass (the seam needs a re-check before the
  *                           extension is trusted - `langcheck.py` says the same).
  *
- * Codegen lever: this unit needs the **peephole pass off** (docs/matching.md row 39).  Retail keeps the
+ * Codegen lever: this unit needs the **peephole pass off** (playbook 39).  Retail keeps the
  * unfused `clrlwi`/`extsh`/`extsb` in front of every narrowing FIFO store, which `-O3`'s peephole folds
  * away; `#pragma peephole off` is what the `auto` library's other GX-writer unit (8009AA78) needed too,
  * and with it the whole out-of-line writer family matches.
@@ -45,9 +45,9 @@
  * outbox.  Until that lands the compile is C and the object cannot emit the target's `extab`/`extabindex`
  * group, which is why the unit can never be `Matching` in this shape.
  *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/800BFFD4_fn_800BFFD4.c`; the
+ * Inventory, addresses and sizes: `python tools/units/ledger.py unit ef/ef_drawsmoothstripestrategy.cpp`; the
  * binary dossier (source names, panic line map, pool literals): `python tools/units/dossier.py
- * auto/800BFFD4_fn_800BFFD4`.
+ * ef/ef_drawsmoothstripestrategy.cpp`.
  */
 
 #include "ef.h"
@@ -56,7 +56,7 @@
 
 /* `nw4r::db::Panic` - the real declaration; the front-end reproduces the map's
  * `Panic__Q24nw4r2dbFPCciPCce` spelling (tools/units/mangle.py confirms it). Declaring the mangled
- * spelling instead would re-mangle it and break the link (docs/matching.md 50); rule 9. */
+ * spelling instead would re-mangle it and break the link (playbook 50); rule 9. */
 #ifdef __cplusplus
 namespace nw4r {
 namespace db {

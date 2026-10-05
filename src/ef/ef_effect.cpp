@@ -59,11 +59,11 @@
  *     `#line`.
  *   - a file-scoped `#pragma peephole off` reproduces the deleting destructor's `extsh` + `cmpwi` flag
  *     test (the same shape ef/ef_draworder.cpp and ef/ef_effectsystem.cpp needed it for).
- *   - the effect record is a *local* view (`EfEff`, `EfEffEmitter`, `EfEffManager`): `include/ef.h`
+ *   - the effect record is a *local* view (`EfEff`, `EfEffEmitter`, `EfEffManager`): `ef.h`
  *     declares `struct Effect` as the union of the sibling units' private copies and models the memory
  *     manager at its first word, so it cannot carry this unit's own layout.  Rule 1 debt, booked in the
- *     outbox: the union and this layout have to become one `include/ef.h` definition.
- *   - the three map-named methods are declared in `include/ef.h`; their definitions here cast `this` to
+ *     outbox: the union and this layout have to become one `ef.h` definition.
+ *   - the three map-named methods are declared in `ef.h`; their definitions here cast `this` to
  *     the local record.  `ForeachParticleManager` is corrected to `u32` (the target returns the count
  *     the walk accumulates and the sweep units add it).
  *
@@ -92,7 +92,7 @@
  * EfEffEmitter::mField_0xB4 is `s32` (retail uses `cmpwi`); fn_800A5114's bit is 0x10000
  * (`oris r0,r0,1` / `rlwinm r0,r0,0,16,14`); fn_800A559C/5618 return the object.
  *
- * `include/ef.h` was edited for the owner's real `ForeachParticleManager` return type (`u32`); the
+ * `ef.h` was edited for the owner's real `ForeachParticleManager` return type (`u32`); the
  * four direct consumers and six more ef.h users recompile to byte-identical `.text` in this worktree
  * (see the unit's .pi/notes).  rule 1 debt booked in the outbox: ef.h's union `struct Effect` and
  * this unit's local record must become one definition.

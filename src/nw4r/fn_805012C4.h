@@ -32,7 +32,7 @@ void* fn_80501C9C(void* list, u16 n);            /* List_GetNth */
 }
 #endif
 
-/* Declarations moved here from `include/unsplit/unknown.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+/* Declarations moved here from `unsplit/unknown.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 #ifdef __cplusplus
 extern "C" {
 #endif

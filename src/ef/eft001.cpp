@@ -1,7 +1,6 @@
 /* ef/eft001.cpp - effect 001 setup
  *
  * `.text` 0x800FAE08..0x800FBE64, 7 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): recut registered unit; the functions of the neighbouring units were cut out of this file.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  */
 
@@ -11,7 +10,7 @@
  * fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt; the one non-fn_ name,
  * eft001_set_pos__FPQ34nw4r4math4VEC3UlP10_CP_VECTORUcf, is the unit's own runtime-dump name).
  *
- * Registered from proposal/800FAE08_fn_800FAE08.cpp.  The name is `eft001`: the range's only real
+ * The name is `eft001`: the range's only real
  * runtime-dump symbol is `eft001_set_pos` (dumpmap lookup 0x800FC250), and its family is the
  * neighbouring ef/eft002.cpp / eft004.cpp / eft007.cpp / eft009.cpp units.  C++ from that mangled
  * definition (langcheck: conclusive) and from the mangled undefined callees.

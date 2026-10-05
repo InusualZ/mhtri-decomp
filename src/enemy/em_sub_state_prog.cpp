@@ -1,8 +1,7 @@
 /*
- * enemy/em_sub_state_prog.cpp - phase 4 unit, `.text` 0x802F9994..0x802FA9A0 (11 functions, 4108 bytes).
+ * enemy/em_sub_state_prog.cpp - unit, `.text` 0x802F9994..0x802FA9A0 (11 functions, 4108 bytes).
  *
- * PHASE 4 (docs/splits/phase4, window d).  Recut of fn_802F5138.cpp: its functions whose address lies in this range,
- * in address order; the rest of the range keeps its original bytes.  5 of 11 functions have a body here.
+ * 5 of 11 functions have a body here.
  *
  * FLAGS.  `cflags_main`.  GUESS (rule 7): the stem names the sub-state dispatchers (`state_sub`, +0x1E6) the old
  * header documents.
@@ -64,7 +63,7 @@
  *    chain; `(f32)(s32)` where retail keeps the `xoris` conversion; a scoped `#pragma peephole off`
  *    per function (`fn_802F8B28`, `fn_802F9774`, `fn_802F96B4`, `fn_802F51DC`) - file-wide off costs
  *    `fn_802F5B98` 62.5 -> 20.8 %.
- *  - `include/enemy/fn_801251D0.h` gained the four-argument C++ view of 0x801251D0 and
+ *  - `enemy/fn_801251D0.h` gained the four-argument C++ view of 0x801251D0 and
  *    `enemy/em009_act.cpp`'s 28 call sites moved to it (both targets set r6 = the id):
  *    `fn_8038BD28` 96.729 -> 100.0 %.  The outbox asks the orchestrator to confirm that shared-file
  *    edit on the batch.

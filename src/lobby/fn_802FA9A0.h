@@ -1,11 +1,11 @@
 /* Declarations for the symbols `src/lobby/fn_802FA9A0.cpp` owns, and this range's own view of the
  * `.bss`/`.sbss`/`.data` blocks it reads (docs/plan.md 6.5 rule 2).
  *
- * The range is the lobby band `0x802FA9A0..0x8030121C` (proposal/802FA9A0).  Its module is `lobby`:
+ * The range is the lobby band `0x802FA9A0..0x8030121C` (lobby/fn_802FA9A0.cpp).  Its module is `lobby`:
  * its own predicates read the lobby work block `lobby_w` (`.bss` 0x806AAB44) at +0x003/+0x15F/+0x161,
  * and its callees are the lobby UI API (`LbStr`).  The addresses below are unclaimed in splits.txt (or
  * lie inside this range's own unclaimed data runs), so this header is their rule-2 home - the same
- * pattern as `include/lobby/fn_8021E1EC.h` and `include/lobby/fn_8020C588.h`, whose `lobby_w` and
+ * pattern as `lobby/fn_8021E1EC.h` and `include/lobby/fn_8020C588.h`, whose `lobby_w` and
  * `lobby_world_block` views are also this-range-specific.
  */
 #ifndef MHTRI_LOBBY_FN_802FA9A0_H
@@ -45,7 +45,7 @@ typedef struct LbKujiraWork {
 /* The block the `.sbss` pointer `lobby_world_block` (0x80794880) points at, as this range sees it: the
  * mode byte at +0x3E01 (`fn_802FB5E4`), the per-kind state bytes at +0x4654 (`fn_802FB8EC`) and the
  * flag bytes at +0x4832..+0x4834 (`fn_802FF248`/`fn_802FF234`/`fn_802FF29C`).  Everything between them
- * is filler.  size: 0x6010 (the neighbour view's extent - `include/lobby/fn_8021E1EC.h`; this range
+ * is filler.  size: 0x6010 (the neighbour view's extent - `lobby/fn_8021E1EC.h`; this range
  * reads nothing above +0x4834) */
 typedef struct LbBlockView {
     /* +0x0000 */ u8 unused_0x0000[0x3E01];
@@ -113,9 +113,9 @@ void fn_802FF478(LbKujiraWork* work);
 /* The four per-action step machines the `enemy` band below this range (`enemy/fn_802F5138.cpp`, whose
  * `fn_802FA964` dispatches into them) tail-calls: 0x802FA9A0, 0x802FAB98, 0x802FAFB4, 0x802FAFC4 -
  * all inside this range, so they are this unit's own symbols and belong here rather than in the
- * caller's include/unsplit band (rule 2).  They are still unwritten; the parameter is the caller's
+ * caller's unsplit band (rule 2).  They are still unwritten; the parameter is the caller's
  * record (`_ENEMY_WORK`), the only type the call sites set.  Added by the merge lane that re-homed
- * them out of `include/unsplit/unknown.h`. */
+ * them out of `unsplit/unknown.h`. */
 void fn_802FA9A0(struct _ENEMY_WORK* work);
 void fn_802FAB98(struct _ENEMY_WORK* work);
 void fn_802FAFB4(struct _ENEMY_WORK* work);

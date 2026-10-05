@@ -26,8 +26,8 @@
  * body - the load/call surface quoted next to each declaration - and is a guess a later pass may refine.
  *
  * Residuals and recorded choices:
- *   * The callee declarations are this unit's own view, in the shape `include/menu/fn_802E4978.h` and
- *     `include/hud/layout.h` record for their bands: the C-linkage names sit in one `extern "C"` block,
+ *   * The callee declarations are this unit's own view, in the shape `menu/fn_802E4978.h` and
+ *     `hud/layout.h` record for their bands: the C-linkage names sit in one `extern "C"` block,
  *     and the mangled ones at C++ scope.  `menu_slot_panel_draw`'s own header declares it `void` while its body takes the
  *     u8 index this call site passes (`clrlwi r3,r3,24`), and `menu_busy_ck`'s header says `u32` while
  *     every call site here compares with a signed `cmpwi`, so both are declared to this call site.

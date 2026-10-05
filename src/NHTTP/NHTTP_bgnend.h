@@ -1,5 +1,5 @@
 /*
- * include/NHTTP/NHTTP_bgnend.h - the NHTTP begin/end unit (`src/NHTTP/NHTTP_bgnend.c`, `.text`
+ * NHTTP/NHTTP_bgnend.h - the NHTTP begin/end unit (`src/NHTTP/NHTTP_bgnend.c`, `.text`
  * 0x805145B8..0x80515010).
  *
  * Rule 2: this unit owns the error/alloc/list/mutex/comm-thread entry points, so `d_nhttp.c`
@@ -131,7 +131,7 @@ void NHTTPi_free(void* block); /* untyped: byte range */
 }
 #endif
 
-/* Declarations moved here from `include/unsplit/NHTTP.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+/* Declarations moved here from `unsplit/NHTTP.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 #ifdef __cplusplus
 extern "C" {
 #endif

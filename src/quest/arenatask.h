@@ -8,7 +8,7 @@
  * `fn_804463C4`/`fn_80445D58`; the naming pass that registered the band renamed the rows and moved the
  * declarations here.
  *
- * The `extern`s below came from the band header `include/unsplit/arena.h` when this unit claimed its
+ * The `extern`s below came from the band header `unsplit/arena.h` when this unit claimed its
  * own `.bss 0x806E3E10..0x806E40C0`, `.sbss 0x80794D3C..0x80794D50`, `.sdata 0x80793B28..0x80793B88`,
  * `.sdata2 0x8079C960..0x8079C998` and `.data 0x80604D30..0x806073F0` runs in
  * `config/RMHE08/splits.txt` (rule 12: the unit that uses the bytes claims and matches them; rule 2:

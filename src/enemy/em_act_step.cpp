@@ -1,8 +1,7 @@
 /*
- * enemy/em_act_step.cpp - phase 4 unit, `.text` 0x8032C920..0x80330194 (70 functions, 14452 bytes).
+ * enemy/em_act_step.cpp - unit, `.text` 0x8032C920..0x80330194 (70 functions, 14452 bytes).
  *
- * PHASE 4 (docs/splits/phase4, window d).  Recut of em_act_step.cpp: its functions whose address lies in this range,
- * in address order; the rest of the range keeps its original bytes.  34 of 70 functions have a body here.
+ * 34 of 70 functions have a body here.
  *
  * FLAGS.  `cflags_main`.  The tail (0x80330194..) is `enemy/em_act_step_tail.cpp`.
  *
@@ -14,8 +13,7 @@
  * enemy/em_act_step.cpp - the enemy work record's action-step band: the step function of each of the
  * record's first four action ids, the motion each of their phases arms, and the record's own class (its
  * constructor, vtable and destructor halves) with the effect-offset and seat-aim helpers.  `.text`
- * 0x8032C920..0x8033041C (74 functions, 15100 B).  Registered once, at its final home, from
- * `proposal/8032C920_fn_8032C920.cpp` (docs/plan.md 12) - that proposal's range 0x8032C920..0x80334568
+ * 0x8032C920..0x8033041C (74 functions, 15100 B).  Registered once, at its final home (docs/plan.md 12) - that proposal's range 0x8032C920..0x80334568
  * was one `--max-bytes` cut over TWO translation units, and the seam re-draw of 2026-09-26 split it
  * here; `enemy/em_pl_frame.cpp` is the other half (0x8033041C..0x80334568, 48 functions / 16716 B).
  *
@@ -27,7 +25,7 @@
  * subject (`em_frame_check__FP11_ENEMY_WORKUsff`, `em_act_ck__FP11_ENEMY_WORKUcUc`,
  * `em_die_ck__FP11_ENEMY_WORK`, `em_after_frame_check__FP11_ENEMY_WORKUsff`,
  * `em_get_mot_no__FP11_ENEMY_WORK`, 67 call sites), and every field it reads on that pointer is one
- * `include/enemy/ENEMY_WORK.h` names for `_ENEMY_WORK`: +0x005 the per-motion state, +0x188 `pos`,
+ * `enemy/ENEMY_WORK.h` names for `_ENEMY_WORK`: +0x005 the per-motion state, +0x188 `pos`,
  * +0x1BC/+0x1C0/+0x1C4 the rotation triple, +0x1CC the seat-preference float, +0x328 the per-slot
  * block, +0x338, +0x834 the "already seated" byte, +0xB14 the `_se_w` handle.  The bracketing
  * registered units are `hud/fn_80324F7C.c` (below) and `enemy/em_pl_frame.cpp` (the other half of this
@@ -38,7 +36,7 @@
  * `fn_XXXXXXXX` file stem) was the registration's name for want of anything better; the naming pass
  * below replaced it with what the band *is*.
  *
- * NAMING (merger lane, 2026-09-26: the batch's own symbols, the gate's rule 7 refusal).  Every address
+ * NAMING (2026-09-26: the batch's own symbols, the gate's rule 7 refusal).  Every address
  * of the range is a bare `fn_XXXXXXXX` row in the map and `tools/symbols/dumpmap.py lookup` answers
  * `zz_XXXXXXXX_` for all of them, so no name here comes from evidence class 1 or 2 - each one is
  * **derived from the function's own body** (the fields it reads on the record, the API calls it makes,
@@ -49,7 +47,7 @@
  * pairs by name, so half a rename measures 0 %).  The scheme, and the datum behind each name:
  *
  *  - `em_act_step_<n>` = the record's step function for action id `n`: the band's own dispatcher
- *    `fn_8032FA88` switches on `+0x1E5 action` (the field `include/enemy/ENEMY_WORK.h` names as the id
+ *    `fn_8032FA88` switches on `+0x1E5 action` (the field `enemy/ENEMY_WORK.h` names as the id
  *    `em_act_ck` matches) and its jump table's cases 0..3 call these four, so each one is the step of
  *    that action state and each switches on `+0x1E6 state_sub` for its phase;
  *  - `em_act_arm_<motion>[...]` = one phase of such a step, which arms a motion through the record's
@@ -124,7 +122,7 @@
  * "C"` so objdiff pairs it by the map's name (playbook 42); a C++ definition would mangle and measure
  * 0 %.
  *
- * SEAM - SETTLED (seam re-draw, 2026-09-26): the proposal's range is two translation units and the cut
+ * SEAM - SETTLED (seam re-draw): the proposal's range is two translation units and the cut
  * is 0x8033041C.  Three instruments agree, and none of them is the behavioural argument the first note
  * used:
  *  - the extabindex run names its own functions - entry 57 (at 0x800357A8) is `fn_8033041C`, so this
@@ -158,17 +156,17 @@
  * 0x8079B108..0x8079B210 (this unit's pool half) is deliberately NOT claimed: a `.sdata2` claim links
  * only while the object emits no pool of its own and ours emits the compiler's 8-byte magic (playbook
  * 23/58), so its labels stay declarations (playbook 29).  The other half's pool half
- * 0x8079B210..0x8079B2AC is not this unit's and is not declared here either - `include/unsplit/enemy.h`
+ * 0x8079B210..0x8079B2AC is not this unit's and is not declared here either - `unsplit/enemy.h`
  * now carries this half's words only.
  *
  * FLAGS.  `cflags_main` (Wii/1.3, `-O3 -inline noauto -Cpp_exceptions on`), the bracketing enemy units'
  * set - the range's callees and its extab presence agree with it, so nothing per-unit is added.
  *
  * THE RECORD.  `_EM_CHARA_WORK` below is this unit's view of the record: the offsets
- * `include/enemy/ENEMY_WORK.h` does not name yet (+0x354 as an `f32`, +0x565/+0x566/+0x56B, +0x5C6,
+ * `enemy/ENEMY_WORK.h` does not name yet (+0x354 as an `f32`, +0x565/+0x566/+0x56B, +0x5C6,
  * +0x454) are kept here because that header is shared and a worker may not edit it; the outbox carries
  * the `shared-file` request that folds them in.  The view is a union of the two shared views of the same
- * record (`_ENEMY_WORK` in `include/enemy/ENEMY_WORK.h`, `_PLW` in `include/pl.h`), which is why callees
+ * record (`_ENEMY_WORK` in `enemy/ENEMY_WORK.h`, `_PLW` in `pl.h`), which is why callees
  * that declare `_PLW*` are called through a cast of the same pointer.
  *
  * RESIDUALS.  34 of the unit's 74 functions are written (10732 B of 15100), 24 of them byte-identical;
@@ -271,7 +269,7 @@ struct EmHandleBlock {
 };
 
 /* The record every function in this range takes in r3 (docs/plan.md 6.5 rules 3-5: size from the
- * range's largest access - +0xB14, the `_se_w` handle - and from `include/enemy/ENEMY_WORK.h`'s 0xB18;
+ * range's largest access - +0xB14, the `_se_w` handle - and from `enemy/ENEMY_WORK.h`'s 0xB18;
  * every field ascending and named from its use).  Offset +0x000 is the class vtable the constructor
  * `em_work_ctor` stores, so the class's object *is* this record.
  * size: 0xB18 */

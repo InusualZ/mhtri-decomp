@@ -1,5 +1,5 @@
 /*
- * MSL/e_rem_pio2.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * MSL/e_rem_pio2.cpp - STUB (no bodies yet).
  *
  * `.text` 0x80465714..0x80465A98.  Sections of the candidate unit: .text 0x80465714..0x80465A98; .rodata 0x805731D0..0x80573358; .sdata2 0x8079CD58..0x8079CDB0.
  *

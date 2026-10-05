@@ -27,7 +27,7 @@
  * every body from 0x80308FB4 up belongs to `menu/menu_infomation.cpp`, whose range now starts exactly
  * there.  One constant stays: the two screen bodies below the cut, `fn_80308EC0` and `fn_80308F1C`,
  * are this unit's because they sit below 0x80308FB4; they read the shared `StatusScreenWork` record
- * from `include/menu/menu_infomation.h` and call that unit's `fn_8030A1D0`.  The effect machine's own
+ * from `menu/menu_infomation.h` and call that unit's `fn_8030A1D0`.  The effect machine's own
  * edge is where its two clusters part:
  *   0x8030681C..0x80308E34 (22 rows, 19 drawn)  the eft041/eft042 effect machine: `_EFT` work areas
  *       at +0x38, `res_eft_*` model creation, `MHchar` transforms, `eftGetKey*` colour keys, the
@@ -39,13 +39,13 @@
  * first `extabindex` record of the next unit, so 20 records stay here and 20 is exactly the count
  * this range's framed functions need.
  *
- * Types.  `_EFT` (include/ef.h) is the 0x48-byte record `eft_res_slot_get` pools; its `work_0x38` is the
+ * Types.  `_EFT` (ef.h) is the 0x48-byte record `eft_res_slot_get` pools; its `work_0x38` is the
  * 64-byte per-effect work area `fn_800F8B44` hands out.  The work area's head is the same everywhere
  * (a model count, the pooled `MHchar` handle, the `res_eft_*_model_create` result), but its tail is
  * per family: effect 41 (and effect 42's kind-0 bodies) read four `_g3d_work` handles at +0x0C, effect
  * 42's kind-1 body a `VEC3` and an `f32` there, and kind-2 bodies an `f32` scale in the create-result
  * word - so the two sites that disagree are spelled as unions on the one `Eft042Work` here, each union
- * member naming the site that uses it (rule 5).  `MHchar` is include/pl.h's record (its `area_0x16`
+ * member naming the site that uses it (rule 5).  `MHchar` is pl.h's record (its `area_0x16`
  * and `rot_0x54` are what the spawners copy); `res_eft_UV_model_create*` returns the `nw4r::ef::Effect`
  * whose two dispatched vtable slots are the local `EftUvModel` view.
  *
@@ -88,7 +88,7 @@
  *   fn_80307E44 (0xAB8)  the kind-0 state-1 body (the same family's per-frame walk, `eftGetKey*`).
  *   fn_80308A30 (0x2D0)  the kind-2 state-1 body: three `nw4r::g3d::ScnMdl::CopiedMatAccess` round
  *                        trips over `ResTexSrt`/`GetEffectMtx`/`SetEffectMtx`; it needs the full nw4r
- *                        g3d class views (include/nw4r/g3d/scnmdl.h carries only part of them today).
+ *                        g3d class views (nw4r/g3d/scnmdl.h carries only part of them today).
  * Those three are the whole remainder: the range's other 23 rows are written.
  *
  * Data (measured, 5d).  Our object emits **no** `.data`/`.sdata`/`.sdata2`/`.rodata` at all: `objdump

@@ -37,7 +37,7 @@
  * emits the target's `li rN, @sda21` form instead of `lis`/`addi` (the same lever as
  * `g3d/g3d_anmvis.cpp`).
  *
- * Flip status - `Object(Matching, ...)` (2026-09-27).  The unit used to be blocked by the
+ * Flip status - `Object(Matching, ...)`.  The unit used to be blocked by the
  * extab/extabindex map-name class: `Object(Matching, ...)` failed with `undefined: '@eti_800222FC'`,
  * referenced from `lbl_8057CED0` in `auto_07_8057C820_data.o` - the unclaimed `.data` blob at
  * 0x8057C820, whose word at 0x8057EA88 (0x80022300) is dtk's *guessed* relocation into the extabindex

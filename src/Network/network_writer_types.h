@@ -1,5 +1,5 @@
 /*
- * include/Network/network_writer_types.h - the bit-stream writer band's classes the session units share.
+ * Network/network_writer_types.h - the bit-stream writer band's classes the session units share.
  *
  * The stream frame objects, the `NetworkBuffer` class and the logger view were
  * declared in `Network/NetworkSessionManager.h`; `Network/NetworkSessionStable.h` needs them below the

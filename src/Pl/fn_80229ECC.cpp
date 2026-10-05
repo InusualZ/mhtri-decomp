@@ -47,7 +47,7 @@
  * header (`Pl/pl_act.h`, `Pl/pl_master.h`, `sound/fn_800D7F54.h`, `ef/fn_800CDB2C.h`); the five with
  * no owner live in the unsplit band (`unsplit/Pl.h`, `unsplit/unknown.h` for `Get_motion_no`).  Two
  * `_PLW` fields are named here for the first time - `field_0xAF4` / `field_0xAF8` (the actor's two
- * `_se_w` works) - added to `include/pl.h`; `pad_0x001`, `unk2` and `unk5A7` there were renamed to
+ * `_se_w` works) - added to `pl.h`; `pad_0x001`, `unk2` and `unk5A7` there were renamed to
  * `field_0x001`, `field_0x002` and `field_0x5A7` because this unit reads all three (rule 5).
  */
 

@@ -1,7 +1,7 @@
 /* Pl/pl_act_step.cpp - the player action step set
  *
  * `.text` 0x802430E8..0x802673A4, 104 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): fold of 6 registered units, built from `Pl/fn_802430E8.cpp`, `Pl/fn_802489D4.cpp`, `Pl/pl_act_step.cpp`, `Pl/fn_80258FCC.cpp`, `Pl/fn_8025F088.cpp`, `Pl/fn_80262940.cpp`.
+ * Phase 4: fold of 6 registered units, built from `Pl/fn_802430E8.cpp`, `Pl/fn_802489D4.cpp`, `Pl/pl_act_step.cpp`, `Pl/fn_80258FCC.cpp`, `Pl/fn_8025F088.cpp`, `Pl/fn_80262940.cpp`.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  *
  * Kept views: the retired sources declared 2 callee(s) with different signatures (`fn_8025E298`, `fn_802DE578`); each function keeps its own source's view through a function-pointer cast macro (`<name>_viewN`, `<name>_cN`), which compiles to the same direct call, so the fold does not move any body.
@@ -51,9 +51,9 @@
  * `fn_8024794C`/`fn_80247CC4`/`fn_80247D74`/`fn_80248018`/`fn_802482C4`/`fn_802485C8` - are declared
  * here only as far as a written caller needs them, and build as undefined relocations; the inventory
  * is `config/RMHE08/symbols.txt`.  Two of them are half-blocked on a header clash rather than on
- * codegen: `fn_80246654` needs `get_move_work_adrs` from `include/enemy/fn_80165FC8.h`, which cannot
+ * codegen: `fn_80246654` needs `get_move_work_adrs` from `enemy/fn_80165FC8.h`, which cannot
  * be included beside `sound/se.h` (both declare `fn_800532DC`/`setVec3` with different types), and
- * `fn_80247CC4` needs `VEC3_ctor`/`fn_8012A624` and a full `VEC3` local through `include/ef.h`.
+ * `fn_80247CC4` needs `VEC3_ctor`/`fn_8012A624` and a full `VEC3` local through `ef.h`.
  */
 
 /* Retired header of `Pl/fn_802489D4.cpp` (kept for its notes and residuals): */
@@ -101,7 +101,7 @@
  * Flags: the lib's `cflags_pl` (`-O3 -inline noauto -opt nopeephole -Cpp_exceptions on`,
  * mw_version Wii/1.0), the Pl lib's measured flag set.
  *
- * Type work: the `_PLW` offsets this band touches that `include/pl.h` still spelled `unkNN` or hid
+ * Type work: the `_PLW` offsets this band touches that `pl.h` still spelled `unkNN` or hid
  * inside a `pad_` run were given names there in this batch (+0x018, +0x0AC, +0x37A, +0x5B8,
  * +0x5BA, +0x656, +0x657).  Where the context supports a meaning the field got one; where it only
  * fixes the offset the field follows the header's existing `field_0xNN` convention.
@@ -174,8 +174,8 @@
  *     the same hand-off with the two trailing arguments 0;
  *   * `Pl_act_set_step_table` (0x802770E8, `Pl/pl_act.cpp`) - installs the per-act `.data` record at
  *     `+0x318` and clears the `+0x313`/`+0x322` state it drives.
- * The four declarations those names had in `include/hud/net_char_sync.h` moved to their owner's header
- * in the same change (the hud unit includes it), and `include/unsplit/Pl.h`'s copies are gone.
+ * The four declarations those names had in `hud/net_char_sync.h` moved to their owner's header
+ * in the same change (the hud unit includes it), and `unsplit/Pl.h`'s copies are gone.
  *
  * Language: C++ - the map's undefined set carries real manglings (`Pl_Skill_ck__FP4_PLWUs`,
  * `Pl_cat_skill_ck__FP4_PLWUs`, `Pl_frame_check__FP4_PLWUlff`, `GetGroundHit2__FPQ34nw4r4math4VEC3UlUcPUc`)
@@ -230,7 +230,7 @@
  *     never defined (playbook 29 - and the owner unit's source intentionally defines nothing), so
  *     `datagap.py --unit Pl/pl_frame_data` reports `.sdata2 target-extra 408 B`: the bytes are the
  *     original's and a `NonMatching` unit contributes exactly those to the link.
- *   * `include/pl.h` gained **named union members only** (`field_0x406/408/40A/40C/410/422`,
+ *   * `pl.h` gained **named union members only** (`field_0x406/408/40A/40C/410/422`,
  *     `field_0x42E/430/432/434/436`) for the timer run `pl_act_step_84` clears; headers carry rules
  *     2/12 only, so no rule 5 finding is created, the `_PLW` layout is unchanged and no consumer's
  *     codegen moves (the whole-project report was diffed row by row: 0 changes).
@@ -303,7 +303,6 @@
  *    fn_8025D850 260 B, fn_8025D954 228 B, fn_8025DA38 420 B, fn_8025DBDC 352 B, fn_8025DD3C 252 B,
  *    fn_8025DE38 180 B, fn_8025DEEC 140 B, fn_8025DF78 336 B, fn_8025E0C8 380 B, fn_8025E448 1960 B,
  *    fn_8025EBF0 104 B, fn_8025EC58 152 B, fn_8025ED00 756 B, fn_8025EFF4 148 B
- *    They are the next pass's work.
  *
  * Load-bearing source shapes found here (they cost several variants each):
  *  - a byte field's `x = x - 1` emits a redundant narrowing (`extsb r0,r0`); `x--` does not.
@@ -341,9 +340,9 @@
  * `mw_version Wii/1.0`), the Pl lib's measured flag set - the extab/extabindex pair above is what
  * `-Cpp_exceptions on` reproduces.
  *
- * Rule 2 debt (recorded, not hidden): `include/Pl/fn_8025F088.h` declares the callees this unit needs
+ * Rule 2 debt (recorded, not hidden): `Pl/fn_8025F088.h` declares the callees this unit needs
  * whose owners' headers do not declare them (the `enemy/fn_80165FC8.h` precedent).  Moving each to
- * its owner's header is a later pass; `include/unsplit/Pl.h`'s five declarations that this
+ * its owner's header is a later pass; `unsplit/Pl.h`'s five declarations that this
  * registration makes owned (`fn_8025FA00`, `fn_80260A18`, `fn_80261770`, `fn_802621B0`,
  * `fn_80262688`) were removed here.
  *
@@ -376,7 +375,7 @@
  * The extabindex run for this file is 0x8002F514-0x8002F6E8 (39 records, first `fn_80262940`, last
  * `fn_8026910C`); the next record is `fn_802695A4` at 0x8002F6E8, i.e. the four functions
  * 0x802693C4-0x802695A4 may belong to this file - they are left to their own proposal
- * (`proposal/802693C4_fn_802693C4`) and recorded here as the open seam question.
+ * (`Pl/pl_act.cpp`) and recorded here as the open seam question.
  *
  * Flags: the unit uses `cflags_pl` (`-O3 -inline noauto -opt nopeephole -Cpp_exceptions on`,
  * `mw_version Wii/1.0`), the Pl lib's measured flag set.

@@ -3,7 +3,7 @@
  * 0x8008F6E8-0x8008F8E4 (2 functions, 0x1FC B).
  *
  * Registered once, at its final home (docs/plan.md 12), from the pooled proposal
- * `proposal/8008F6E8_fn_8008F6E8`.  Naming - evidence class 1, a `__FILE__` string:
+ * `g3d/g3d_resanmfog.cpp`.  Naming - evidence class 1, a `__FILE__` string:
  * `fn_8008F6E8`'s `nw4r::db::Panic` assert (line 43) passes `.data` 0x805903F0 =
  * "g3d_resanmfog.cpp" (`python tools/symbols/dumpmap.py lookup 0x805903F0`), and the next
  * function `fn_8008F8E4` - outside this range - passes `.data` 0x80590440 =

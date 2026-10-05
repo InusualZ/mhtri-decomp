@@ -76,7 +76,7 @@
  *  - `networkSessionReflectCallback` 54.58 %: the target saves all six incoming argument registers
  *    before building the callee's, ours does the minimal four-move rotation; the two are equivalent
  *    and the naive form is not reachable from the source side (48 B).
- *  - `NetworkRequest_begin` is 100 % (pilot L2): the inlined three-word `va_list` setup is the
+ *  - `NetworkRequest_begin` is 100 %: the inlined three-word `va_list` setup is the
  *    CodeWarrior `va_start` expansion `__builtin_va_info(&ap)` (the `net_va_start` macro), not the
  *    `__va_start` call.  The request's handler is a real pointer-to-member (`NetworkRequestDesc`, owner
  *    `NetworkSessionManager*`): the resets assign the null member pointer (retail's 12-byte `__ptmf_null`
@@ -156,7 +156,7 @@ void NetworkSessionManager_deleteRequest(NetworkSessionManager*, NetworkRequest*
 
 /* ---- extra neighbouring globals ---- */
 /* The four addresses themselves are declared in the band's data header (rule 2).  They cannot come
-   from `include/unsplit/Network.h`: that header declares `dtor_803CA338(void*, s32)` where this
+   from `unsplit/Network.h`: that header declares `dtor_803CA338(void*, s32)` where this
    file's own header declares `dtor_803CA338(void*)`, and including both fails to compile - the
    reason `include/unsplit/NetworkData.h` exists.  `getNetworkLogger` and the logger type live in this
    unit's own header. */

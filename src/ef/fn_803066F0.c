@@ -1,4 +1,4 @@
-/* auto/803066F0_fn_803066F0.c - the initialisation step of one effect's update machine, `.text`
+/* ef/fn_803066F0.c - the initialisation step of one effect's update machine, `.text`
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  * 0x803066F0-0x8030681C (one function, `fn_803066F0`).
  *
@@ -43,13 +43,13 @@
  * The unit's `.comment` is `"CodeWarrior" 0x0f` (Wii/1.3) while the target's is `0x0e` - a different
  * compiler build, not codegen: `.comment` is not allocated, so it does not reach the link.
  *
- * PHASE 4 (window d): DEMOTED to `Object(NonMatching)`.  The candidate claims this unit's `.sdata` word (the ".brres" string, 0x80792B70..0x80792B78)
+ * PHASE 4: DEMOTED to `Object(NonMatching)`.  The candidate claims this unit's `.sdata` word (the ".brres" string, 0x80792B70..0x80792B78)
  * and files the 1.0f `.sdata2` word at 0x8079ADE0 with `ef/fn_8030681C.cpp` (override row 49: that range holds 8-byte entries and cannot start
  * 4 mod 8).  The source now emits the string and the float as literals: `.sdata` comes out 7 B against the claimed 8 B (the claim carries the
  * 1-byte alignment pad) and the float is an extra 4 B `.sdata2` the claim no longer holds, so `flipcheck.py` refuses the section and the unit
  * stays a candidate for a fold with its neighbour (the pool is one TU's: `flipcheck` suggests `ef/fn_803066F0` + `ef/fn_8030681C`).
  *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/803066F0_fn_803066F0.c`.
+ * Inventory, addresses and sizes: `python tools/units/ledger.py unit ef/fn_803066F0.c`.
  * The file name is provisional - `auto/` plus the first symbol's address - because nothing in the object
  * names the original source file.  Rename it the moment there is evidence.
  */

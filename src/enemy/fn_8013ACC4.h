@@ -4,7 +4,7 @@
  * Declarations moved here from the consumer units' `src/` files (docs/plan.md 6.5 rule 2: an extern
  * lives with the TU that owns the symbol).  The signature set is what the consumers used
  * (`enemy/fn_8013BE60.c` and `enemy/fn_8013F764.cpp` pass a `u8**` cursor, a command id and a `s16*`
- * value slot; `include/unsplit/enemy.h` carries the same signature today and can drop it once those
+ * value slot; `unsplit/enemy.h` carries the same signature today and can drop it once those
  * two units include this header).
  *
  * `fn_8013ACC4` itself is this unit's entry point and has no cross-unit caller in the recovered code,

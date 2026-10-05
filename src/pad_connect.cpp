@@ -3,7 +3,7 @@
  * the mutex/pad-connect init `fn_80046C80`, `setSoftresetFlag`, the `system_w.field_0x30` flag setters, `screen_split_mode_ck`,
  * the 32-bit word copy helpers), `.bss` 0x806694D0..0x806694E8 (`game_mutex`), `.data` 0xD0, `.sdata` 0x8, `.sdata2` 0x18.
  *
- * Seam (phase 4): the old `mh3_pad.cpp` ran 0x800408A8..0x80047398 as one proposal-capped unit; the reconciled candidate cuts it at
+ * Seam: the old `mh3_pad.cpp` ran 0x800408A8..0x80047398 as one proposal-capped unit; the reconciled candidate cuts it at
  * 0x80046C80 (the unit's own extab group and the `.bss` `game_mutex` object start there) and keeps `mh3_pad.cpp` for the pad / mode
  * half.  The `"mh3_pad.cpp"` `__FILE__` string stays with `mh3_pad.cpp`.
  *

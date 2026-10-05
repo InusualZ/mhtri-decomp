@@ -1,5 +1,5 @@
 /*
- * include/hud/cockpit_icon_data.h - the quest cockpit's map icon tables and the flash animation id list, owned by
+ * hud/cockpit_icon_data.h - the quest cockpit's map icon tables and the flash animation id list, owned by
  * the data-only unit `hud/cockpit_icon_data.cpp`.
  *
  * The tables are declared as incomplete arrays on purpose: the readers (`hud/cockpit_quest.cpp`) reach them with

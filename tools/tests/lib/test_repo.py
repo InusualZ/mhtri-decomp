@@ -214,5 +214,11 @@ def test_config_change(c):
     c.check("an unreadable line refuses", repo.config_change(base, base + "stray\n")["ok"], False)
 
 
+def test_moved_header(c):
+    c.check("include/P lives at src/P since the move", repo.moved_header("include/Network/x.h"), "src/Network/x.h")
+    c.check("the exception table wins", repo.moved_header("include/nw4r/g3d/g3d_resmat.h"), "src/g3d/g3d_resmat.h")
+    c.check("a path outside include/ is unchanged", repo.moved_header("src/a/include/b.h"), "src/a/include/b.h")
+
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))

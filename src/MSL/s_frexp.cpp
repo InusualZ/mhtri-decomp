@@ -1,5 +1,5 @@
 /*
- * MSL/s_frexp.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * MSL/s_frexp.cpp - STUB (no bodies yet).
  *
  * `.text` 0x80467B30..0x80467BB8.  Sections of the candidate unit: .text 0x80467B30..0x80467BB8; .sdata2 0x8079CEF8..0x8079CF00.
  *

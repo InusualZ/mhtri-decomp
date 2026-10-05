@@ -1,7 +1,6 @@
 /*
  * Pl/fn_802840DC.cpp - the player's shell (gunner shot) band of the `Pl` module.  `.text`
- * 0x802840DC-0x80288CEC (54 functions, 0x4C10 B); registered from
- * `proposal/802840DC_fn_802840DC.cpp`, whose seam is unproven (the extent settles as the
+ * 0x802840DC-0x80288CEC (54 functions, 0x4C10 B); registered, whose seam is unproven (the extent settles as the
  * functions match).  Nothing is claimed out of `.data`/`.sdata`/`.sdata2`: the band's jump tables,
  * attack-row tables and pool constants are still emitted by the neighbouring `auto_*` objects, so
  * they are declared and never defined (invariant 8.4 / playbook 29).
@@ -15,12 +14,12 @@
  * `Pl_atk_act_flag_ck`, `Pl_Skill_ck`, `Pl_frame_check`, `Pl_master_ck`) and both registered
  * neighbours (`Pl/pl_act.cpp` below 0x8027D684, `Pl/fn_80288CEC.cpp` at 0x80288CEC) are Pl units.
  * The tables and pool constants of the band's unowned Pl-side callees live in
- * `include/unsplit/Pl.h`; its 16 per-act handlers sit inside `Pl/fn_8027D684.cpp`'s registered
- * range, so they live in this unit's own header `include/Pl/fn_802840DC.h` (rule 2 - the band header
+ * `unsplit/Pl.h`; its 16 per-act handlers sit inside `Pl/fn_8027D684.cpp`'s registered
+ * range, so they live in this unit's own header `Pl/fn_802840DC.h` (rule 2 - the band header
  * must not declare a symbol a registered unit owns); and the three `Pl/pl_act.cpp` owns were added
- * to `include/Pl/pl_act.h` (`fn_80277974`, `Pl_get_gunner_pos`, `Pl_get_gunner_vec`).
+ * to `Pl/pl_act.h` (`fn_80277974`, `Pl_get_gunner_pos`, `Pl_get_gunner_vec`).
  *
- * `include/pl.h` notes for this band (both edits keep `sizeof(_PLW) == 0xB20`, proved with an MWCC
+ * `pl.h` notes for this band (both edits keep `sizeof(_PLW) == 0xB20`, proved with an MWCC
  * probe: a `char[sizeof(_PLW)]` global read back with `nm`): `+0x310`/`+0x312` name the charge gauge
  * and level out of the pre-merge `unk30F` run, and `+0x484` names the actor's own attack entry (`_HIT_W`
  * in `Pl/pl_act.cpp`, which `fn_80277974` fills) - that one sits in a union anchored at +0x480 because

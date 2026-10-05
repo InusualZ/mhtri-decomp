@@ -3,7 +3,7 @@
  * cluster, `.text` 0x800908FC-0x800916FC (24 functions, 0xE00 B).
  *
  * Registered once, at its final home (docs/plan.md 12), from the pooled proposal
- * `proposal/800908FC_fn_800908FC`.  Naming - evidence class 1, a `__FILE__` string: the five channel
+ * `g3d/g3d_resanmscn.cpp`.  Naming - evidence class 1, a `__FILE__` string: the five channel
  * getters (fn_800908FC..fn_8009107C, lines 122/162/202/241/281 and 132/172/212/251/291) pass
  * `.data` 0x80590700 = "g3d_resanmscn.cpp" to `nw4r::db::Panic`, and the next function outside this
  * range (fn_800916FC, line 0x800916FC) passes 0x80590928 = "g3d_resanmtexsrt.cpp".  So the module is
@@ -55,7 +55,7 @@
  * build/RMHE08/obj/ (`auto_fn_800908FC_text.o`, `auto_03_80090AC0_text.o`, ...).  Every one of the 24
  * symbols is measured; the per-symbol numbers are in `.pi/outbox/800908fc-fn-800908fc-ab7b.json`.
  *
- * Reconstruction status (official report metric `fuzzy_match_percent`, 2026-09-25): 23 of the 24
+ * Reconstruction status (official report metric `fuzzy_match_percent`): 23 of the 24
  * symbols are at **100.00 %** - all five getters, all eight null-safe offset helpers, and every
  * `ResAnmTexPat` accessor (fn_8009125C, fn_80091280, fn_800912D4, fn_800912F8, fn_8009135C, fn_80091364,
  * fn_80091394, fn_80091584, fn_80091614, fn_80091628) - and fn_800913A0 is at 99.30 %.  The section sizes

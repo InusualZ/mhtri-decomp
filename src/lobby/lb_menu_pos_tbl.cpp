@@ -3,7 +3,7 @@
  *
  * `.text` 0x8021F020..0x80220038 (20 functions), `.bss` 0x806AAA88..0x806AACC0 (`lb_item_list_state`, `lb_page_state_0/1`,
  * `lb_menu_pos_tbl`, `lb_menu_pos_extra`, `lobby_w`; 0x238 B), `.data` 0x10 B, `.sdata2` 0x60 B, `.ctors` 4 B, extab 0x60 B and
- * extabindex 0x90 B.  Phase 4 recut of `lobby/fn_8021E1EC` (docs/splits/phase4): see `lobby/lb_menu_scratch.cpp` for the
+ * extabindex 0x90 B.  Phase 4 recut of `lobby/fn_8021E1EC`: see `lobby/lb_menu_scratch.cpp` for the
  * three-way split.
  *
  * Name: the candidate's (`lb_menu_pos_tbl` is the position table `fn_8021FF5C` fills).
@@ -13,8 +13,7 @@
 /* ==== recut from lobby/fn_8021E1EC.cpp (0x8021F020..0x80220038) ==== */
 /* lobby/fn_8021E1EC.cpp - a lobby screen layer (item/equipment page family).
  *
- * `.text` 0x8021E1EC..0x80224AC4 (108 functions, 26840 B), registered from
- * `proposal/8021E1EC_fn_8021E1EC.cpp`.
+ * `.text` 0x8021E1EC..0x80224AC4 (108 functions, 26840 B), registered.
  *
  * Module `lobby`.  The range's callees are the lobby UI API - `LbStr__FUcUs` (13 call sites),
  * `draw_sprite_ary` (23), `draw_font_idx` (17), `get_lsp_data` (40), `ItemName`, `put_menu_cursor`,
@@ -152,7 +151,7 @@ f32 fn_8021F228(void)
     return lb_item_list_state.depth_0x34;
 }
 
-/* The selected row; also published to the sound unit through `include/unsplit/lobby.h`. */
+/* The selected row; also published to the sound unit through `unsplit/lobby.h`. */
 s32 getItemListSelection(void)
 {
     return lb_item_list_state.selected_0x38;

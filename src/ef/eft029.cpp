@@ -1,7 +1,6 @@
 /* ef/eft029.cpp - effect 029 setup
  *
  * `.text` 0x80119DEC..0x8011AD58, 2 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): recut registered unit; the functions of the neighbouring units were cut out of this file.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  */
 
@@ -25,7 +24,7 @@
  * `.text` 0x80119DEC..0x8011A34C, 2 functions.  `brief.py --pool` skips a brief that already exists,
  * and the attribution queue was regenerated with TU-bounded ranges (`70c91ab0`, queue mtime 10:22:55)
  * after that brief was pooled; `queue.py next` then copied the stale file at claim time (brief mtime
- * 10:25:38).  The authoritative queue entry `proposal/80119DEC_fn_80119DEC` is 0x80119DEC..0x8011D448,
+ * 10:25:38).  The authoritative queue entry `ef/eft029.cpp` is 0x80119DEC..0x8011D448,
  * 37 functions, 13916 bytes, and its own TU analysis declined the brief's endpoint: 0x8011A34C is the
  * `jumptable_805A0780 -> jumptable_805A07AC` data-run seam ("a candidate seam inside it was not
  * taken"), not a TU seam.  Registered at the queue's TU range per the owner's decision, so the
@@ -33,7 +32,7 @@
  *
  * Sections: `.text` 0x80119DEC..0x8011D448, `extab` 0x8000C56C..0x8000C5F4 (17 records) and
  * `extabindex` 0x8002670C..0x800267D8 (17 x 12 B), the runs the bracketing registered units
- * (`ef/fn_80119C44.c` below, `proposal/8011D448` above) leave for this one.  No `.ctors`/`.dtors` word.
+ * (`ef/fn_80119C44.c` below, `enemy/fn_8011D448.cpp` above) leave for this one.  No `.ctors`/`.dtors` word.
  *
  * State (this round): the brief's 2 functions are written -
  *   fn_80119DEC (0x4B4)  per-frame handler: runs the timer down, advances state_0x05, picks the effect

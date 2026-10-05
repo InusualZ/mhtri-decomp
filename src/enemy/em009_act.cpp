@@ -1,5 +1,5 @@
 /* enemy/em009_act.cpp - the enemy monster-AI action band (the `em009` TU), `.text` 0x803868DC..0x8038EC44.
- * Naming note (phase 4): the unit was `enemy/fn_80387844`, a stem that is not its `.text` start; it is
+ * Naming note: the unit was `enemy/fn_80387844`, a stem that is not its `.text` start; it is
  * named for the `em009_act_*` slot functions the range holds (`em009_act_noop` 0x8038E8E8, ...) and the
  * `em009_prog_tbl` table beside it (GUESS: the `_act` suffix is the map's own, the file stem is derived).
  *

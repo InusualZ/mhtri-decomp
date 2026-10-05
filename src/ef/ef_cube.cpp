@@ -1,5 +1,5 @@
 #include "mh3_pad/vec3.h" /* the owner header (rule 2) */
-/* auto/800C9DD0_fn_800C9DD0.c - the ef_cube.cpp translation unit, .text 0x800C9DD0..0x800CB948.
+/* ef/ef_cube.cpp - the ef_cube.cpp translation unit, .text 0x800C9DD0..0x800CB948.
  *
  * fn_800C9DD0 (0x800C9DD0, 1072 B) is complete and matches except for one register choice (99.94 %).
  * fn_800CA200 (0x800CA200, 5960 B) has only its three pointer asserts so far (12.27 %) - the body is
@@ -49,7 +49,7 @@
  *     `fmuls f0,f0,f2; fmuls f1,f0,f1; fadds f30,f0,f1`), which `-fp_contract on` fuses into
  *     `fmsubs`/`fmadds`. Writing each site through a temporary reproduces retail's pairs too, so the
  *     pragma is not strictly required for this unit - it is the honest form of the same finding, and
- *     the neighbouring ef unit (auto/800CB948_fn_800CB948, ef_cylinder.cpp) measured the identical
+ *     the neighbouring ef unit (ef/ef_cylinder.cpp, ef_cylinder.cpp) measured the identical
  *     thing on four sites there. With the pragma fn_800C9DD0 measures 99.94 %, exactly as with the
  *     temporaries; without either, 94.24 %.
  *
@@ -80,7 +80,7 @@
  *   (`dataqueue.py`'s `FRAGMENT_SECTIONS`) and are claimed in `splits.txt` with its `.text`;
  *   `.ctors`/`.dtors` are added after the split. Everything else above waits for the measured pass.
  *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/800C9DD0_fn_800C9DD0.c`.
+ * Inventory, addresses and sizes: `python tools/units/ledger.py unit ef/ef_cube.cpp`.
  */
 
 /* The unit keeps its own scalar typedefs: `types.h` spells `u32` `unsigned long` while this unit's

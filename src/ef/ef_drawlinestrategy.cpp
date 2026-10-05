@@ -27,8 +27,8 @@
  * of its own, so the pool strings and floats below are declared, never defined.
  *
  * Shared types and externs (docs/plan.md 6.5): the ef-band callees the owning unit does not exist for
- * yet live in `include/unsplit/ef.h` (fn_800C5F74, fn_800C6064, fn_800C68E8) and
- * `include/unsplit/g3d.h` (fn_800710BC); the types below are this unit's private views (the layouts
+ * yet live in `unsplit/ef.h` (fn_800C5F74, fn_800C6064, fn_800C68E8) and
+ * `unsplit/g3d.h` (fn_800710BC); the types below are this unit's private views (the layouts
  * differ from the same-named copies other ef units carry - `_ParticleManager` here reads +0x24 while
  * ef_line.cpp's reads a vtable at +0x1C), so they carry unit-qualified names rather than duplicating a
  * `src/` type (rule 1).

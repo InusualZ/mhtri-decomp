@@ -1,5 +1,5 @@
 /*
- * include/Network/NetworkPeerBase.h - the symbols `Network/NetworkPeerBase.cpp` owns that the rest of the Network band calls
+ * Network/NetworkPeerBase.h - the symbols `Network/NetworkPeerBase.cpp` owns that the rest of the Network band calls
  * (the error-record accessors).  `NetworkUniqueId`'s destructor is compiled here as well; the class is declared in
  * its owner's header, `Network/NetworkUniqueId.h`.
  *

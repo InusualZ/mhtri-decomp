@@ -1,5 +1,5 @@
 /*
- * MTX/mtxvec.c - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * MTX/mtxvec.c - STUB (no bodies yet).
  *
  * `.text` 0x804C68A0..0x804C6900.  Sections of the candidate unit: .text 0x804C68A0..0x804C6900.
  *

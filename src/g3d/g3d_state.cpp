@@ -18,7 +18,7 @@
  *    at 0x800894C8` calls it a *strong* cut (`.sdata2` lbl_80795EA0 -> lbl_80795EA8).
  *  - **interior**: a second `.data` fragment opens at 0x8058FCE8 (the `g3d_resvtx_ac.h` /
  *    `ResVtxFurVec` / `ResVtxTexCoord` strings), so the last ~35 functions are a second TU: the reconciled
- *    candidate cuts the run at 0x80088E24 and `g3d_resvtx.cpp` takes the tail (phase 4).
+ *    candidate cuts the run at 0x80088E24 and `g3d_resvtx.cpp` takes the tail.
  *
  * Naming note: the symbol map has only `fn_XXXXXXXX` for this range (checked with
  * `tools/symbols/dumpmap.py` over the range and the proposal's 202-entry inventory - every name is a
@@ -420,7 +420,7 @@ u8 fn_80086FFC(StateByte1* pSelf) {
     return pSelf->mByte;
 }
 
-/* The two write-gather-pipe stores (the window lives in `include/gx.h`, rule 1). */
+/* The two write-gather-pipe stores (the window lives in `gx.h`, rule 1). */
 void fn_800868D8(u32 value) {
     GXWGFifo.u32 = value;
 }

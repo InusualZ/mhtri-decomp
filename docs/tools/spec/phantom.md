@@ -63,4 +63,4 @@ of phantom's verdicts, so it needs its own measured batch.
 
 ## History (the incidents behind the rules - keep the rule, drop the narrative when the rule is stable)
 
-* A phantom is an unnamed `fn_XXXXXXXX` in `config/RMHE08/symbols.txt` that the map treats as a function while the bytes at its address are really part of the *previous* function's body: the dead epilogue MWCC emits after a `mtctr`/`bctr` tail-call dispatcher, a jump-table island, or padding. `docs/plan.md` 7.9 records the incident: five 4-byte `fn_*` in `auto/80040598_fn_80040598` were not functions (dead epilogues) and cost four dispatchers their last 11 points (`docs/matching.md` 25).
+* A phantom is an unnamed `fn_XXXXXXXX` in `config/RMHE08/symbols.txt` that the map treats as a function while the bytes at its address are really part of the *previous* function's body: the dead epilogue MWCC emits after a `mtctr`/`bctr` tail-call dispatcher, a jump-table island, or padding. `docs/plan.md` 7.9 records the incident: five 4-byte `fn_*` in `auto/80040598_fn_80040598` were not functions (dead epilogues) and cost four dispatchers their last 11 points (playbook 25).

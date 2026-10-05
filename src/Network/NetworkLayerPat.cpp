@@ -1,7 +1,7 @@
 /*
  * Network/NetworkLayerPat.cpp - the `NetworkLayerPat` layer (`.text` 0x803E0BE8..0x803EF668).
  *
- * RECUT (network pilot round 3).  The unit is the class's whole band: from 0x803E0BE8 (after `NetworkLayer`'s last
+ * RECUT.  The unit is the class's whole band: from 0x803E0BE8 (after `NetworkLayer`'s last
  *   function, `setFlag76`) through the constructor 0x803E0C18, the request handlers, the member helpers and the three
  *   `setCollectionLog*` siblings, to 0x803EF668 where `NetworkCommunity`'s constructor opens the next unit.  The left part
  *   (0x803E0BE8..0x803E44C8) was the tail of `Network/NetworkSessionManagerPat.cpp`, the middle the former one-function unit
@@ -14,7 +14,7 @@
  *   0x8079C780..0x8079C7A0 (every word read only from this range), extab 0x8001A810..0x8001B0A0, extabindex
  *   0x8003AE0C..0x8003B448.  What is still unwritten: `ledger.py unit Network/NetworkLayerPat.cpp` / `unitscore.py`.
  *
- * CLASS (round 3).  `NetworkLayerPat` derives from `NetworkLayer` (`include/Network/NetworkLayerPat.h`): the constructor
+ * CLASS.  `NetworkLayerPat` derives from `NetworkLayer` (`Network/NetworkLayerPat.h`): the constructor
  *   calls `NetworkLayer::NetworkLayer` and stores 0x805FC1E0, whose 79 slots are the base's own functions or this
  *   unit's overrides.  The table is emitted here from the class (key function `stepRequest`, declared first); every
  *   overriding map row carries the compiler's mangling, so both objects' `.rela.data` name the same symbols.  The
@@ -38,7 +38,7 @@
  * Flags: the lib's `-O4,p` is replaced by `-O3` like the sibling session units (configure.py carries the per-row
  * measurement, `getRecord` included).
  *
- * HANDLERS (round 3).  Every request handler is the session manager's state machine over `NetworkLayerRequest::state_00`
+ * HANDLERS.  Every request handler is the session manager's state machine over `NetworkLayerRequest::state_00`
  *   (0 start, its own wait steps, 100 cancelled, 110 failed = also event 3); `requestFlags_310[slot]` / `requestIds_368[slot]`
  *   are the reply bits and request ids of request slot `slot` (`requests_0C`'s index; 21 = the layer's own slot at
  *   +0x1C0), set by `reflect`.  Event numbers, reply bits and error codes are the enums above.  Levers found here:
@@ -48,7 +48,7 @@
  *   (`packLayerSettings` 98.32 -> 100); `setFlag75` and the base's slot take `u32` (no `clrlwi` before either call, the
  *   base's store is byte-identical under a local `#pragma peephole on`).  `config.yml` blocks dtk's relocation on the
  *   0x80060034 immediate in `handleConnect` (0x803E30F4), as for `updateSession`.
- *   Records the handlers send or report are views in `include/Network/NetworkLayerPat.h` (sizes from the frames and the
+ *   Records the handlers send or report are views in `Network/NetworkLayerPat.h` (sizes from the frames and the
  *   memsets); the chat message is the session manager's `NetworkSessionSlotInfo`; the layer requests' field list and
  *   layer record are `PatInterface.cpp`'s `PatTagList`/`PatLayerData`, and the layer address goes to it as its
  *   16-byte `path`.  Callee names decided at integration: `sendReqLayerUserInfoSet` (0x80401AF4, recvAnsLayerUserInfoSet's

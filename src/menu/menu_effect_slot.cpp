@@ -1,5 +1,5 @@
 /*
- * menu/menu_effect_slot.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * menu/menu_effect_slot.cpp - STUB (no bodies yet).
  *
  * `.text` 0x80348A48..0x80349DD8 (16 functions, 5008 bytes).  Sections of the candidate unit: .text 0x80348A48..0x80349DD8; extab 0x80016F74..0x80016FE4; extabindex 0x80036594..0x8003663C.
  *

@@ -11,7 +11,7 @@
  * set_move_work_max, create_move_work, TPLtexLoad, loading_disp_set, hbm_disable, hbm_enable,
  * pmic_disp_off, get_str_tbl_ptr, get_str_tbl, push_g3d_wk - carry a name)
  *
- * What it is.  The brief's `proposal/800CDB2C_fn_800CDB2C` range is one of discovery's `--max-bytes`
+ * What it is.  The brief's `ef/ef_sphere.cpp` range is one of discovery's `--max-bytes`
  * cuts and its seam is a guess: the range is **several original translation units**, not one.  The
  * evidence is the split objects' own `__FILE__` strings (from MAIN's `build/RMHE08/asm/auto_*.s`,
  * which carries the pooled `.data` labels), in address order:
@@ -39,7 +39,7 @@
  * The game-system core - `system_w` and its mode/loading accessors, the file loader and the work
  * heap - is the middle of the range and the reason it is not one ef file.  This unit owns the
  * `system_w` interface, so `SystemWork`'s newly-evidenced fields were added in
- * `include/unsplit/unknown.h` (the symbol is unsplit - no `.bss` range is registered - so that is its
+ * `unsplit/unknown.h` (the symbol is unsplit - no `.bss` range is registered - so that is its
  * named home; docs/plan.md 6.5 rule 2's gap).
  *
  * Status.  70 of the 165 symbols are reconstructed (0x9EC = 2540 B of 0x6A80), 63 of them at the

@@ -1,12 +1,12 @@
 /*
- * include/DWCi/DWCi_Np_CPUCopyFast.h - the DWCi state-machine unit (`src/DWCi/DWCi_Np_CPUCopyFast.c`,
+ * DWCi/DWCi_Np_CPUCopyFast.h - the DWCi state-machine unit (`src/DWCi/DWCi_Np_CPUCopyFast.c`,
  * `.text` 0x80507C40..0x80509DB0).
  *
  * Rule 2: this unit owns the data runs below (`config/RMHE08/splits.txt`: `.data`
  * 0x8062FF90..0x806302C8, `.sdata` 0x80794200..0x80794210, `.sbss` 0x807957D0..0x807957F8 - the
  * `.data` run was claimed by the data pass on 2026-09-28, the other two before it), so their
  * declarations live here and every consumer includes this header.  The band header
- * `include/unsplit/DWCi.h` includes it, which is how this unit and `src/DWCi/fn_805113B0.c` reach
+ * `unsplit/DWCi.h` includes it, which is how this unit and `src/DWCi/fn_805113B0.c` reach
  * them.  The `.data` run is *defined* by `src/DWCi/DWCi_Np_CPUCopyFast.c`; the `.sdata` and `.sbss`
  * objects are still declarations only (playbook 29 - the bytes are the target object's).  `.sdata`
  * cannot be defined at all: its two name strings are zero-initialised, and the compiler puts such an
@@ -108,7 +108,7 @@ extern char DWCi_reportLoginTimeout[];
 }
 #endif
 
-/* Declarations moved here from `include/unsplit/DWCi.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+/* Declarations moved here from `unsplit/DWCi.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 #ifdef __cplusplus
 extern "C" {
 #endif

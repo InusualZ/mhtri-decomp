@@ -51,7 +51,7 @@
 
 /* nw4r::db::Panic.  The map already carries its real C++ mangling (Panic__Q24nw4r2dbFPCciPCce); declaring
  * that spelling as a C++ identifier re-mangles it, so the owner is declared instead and the front-end
- * reproduces the map's name (docs/matching.md 50, docs/plan.md 6.5 rule 9). */
+ * reproduces the map's name (playbook 50, docs/plan.md 6.5 rule 9). */
 namespace nw4r {
 namespace db {
 void Panic(const char* file, int line, const char* fmt, ...);

@@ -142,10 +142,10 @@
  * callers; the int->float scale conversions read `field_0x7a4` as SIGNED (`xoris` + `0x4330`); and
  * the per-part table is `parts_0x838[part]`, stride 6.
  *
- * Types.  `_EFT` (0x48, `include/ef.h`) is the pooled effect record; `_EFT::work_0x38` is the
+ * Types.  `_EFT` (0x48, `ef.h`) is the pooled effect record; `_EFT::work_0x38` is the
  * per-family work block, so this unit carries the three work views its functions reach:
  * `_EFT_FX_GROUP` (0x44-byte groups), `_EFT_FX_POOL` (flat run) and `_EFT_FX_FULL` (the `0xA8` pool:
- * state, scale, the two id words and the target vector).  `_ENEMY_WORK` (0xB1C, `include/enemy.h`) is
+ * state, scale, the two id words and the target vector).  `_ENEMY_WORK` (0xB1C, `enemy.h`) is
  * the spawning enemy.  Only the offsets the written bodies read are named; every size is stated.
  */
 
@@ -210,12 +210,12 @@ s32 em_get_mot_no(_ENEMY_WORK* enemy);
 void get_camera_pos(nw4r::math::VEC3* out);
 
 
-/* `src/mh3_pad.cpp` owns the three 3-float helpers; `include/mh3_pad.h` and `include/ef.h` now
+/* `src/mh3_pad.cpp` owns the three 3-float helpers; `mh3_pad.h` and `ef.h` now
  * spell them with the same record type (`nw4r::math::VEC3*`, docs/plan.md 6.5 rule 11), so both
  * headers can be included here and neither needs a local copy of the declaration. */
 }
 
-/* `get_em_scale` (0x80135940) is in the unsplit enemy band, so its home is `include/unsplit/enemy.h` -
+/* `get_em_scale` (0x80135940) is in the unsplit enemy band, so its home is `unsplit/enemy.h` -
  * which is read-only for a worker and carries only the mangled spelling
  * (`get_em_scale__FP11_ENEMY_WORK`), which rule 9 forbids calling.  Declared at C++ scope with the
  * plain spelling so it mangles back to the map name (`ef/eft009.cpp` and `ef/fn_80105314.cpp` do the

@@ -1,8 +1,8 @@
 /*
- * include/Network/NetworkLayerPat.h - the declarations of `src/Network/NetworkLayerPat.cpp`: the class `NetworkLayerPat`
+ * Network/NetworkLayerPat.h - the declarations of `src/Network/NetworkLayerPat.cpp`: the class `NetworkLayerPat`
  * (derived from `NetworkLayer`), the records its slots take, and the free functions of the unit's range.
  *
- * `NetworkLayerPat` is the +0x0C element of the `NetworkPat` holder (include/Network/NetworkPat.h).  Its table
+ * `NetworkLayerPat` is the +0x0C element of the `NetworkPat` holder (Network/NetworkPat.h).  Its table
  * 0x805FC1E0 (0x144 B) is emitted by the unit from the class (rule 10); the method names are the pool strings'
  * ("NetworkLayerPat::move ...") where they exist, otherwise derived from the bodies (GUESS, see the unit header).
  */
@@ -17,7 +17,7 @@
 
 /* The exported form of a network id: the bytes `NetworkUniqueId::exportTo` writes (`formatNetId` renders ten of them,
  * the peer records keep that text) and `importNetId`/`isSameNetId` read back (six raw bytes, kind 3).  The id object
- * itself is `NetworkUniqueId` (include/Network/NetworkUniqueId.h).  size: 0xA */
+ * itself is `NetworkUniqueId` (Network/NetworkUniqueId.h).  size: 0xA */
 typedef struct NetId {
     /* +0x00 */ char text_0x00[0xA];
 } NetId; /* size: 0xA */
@@ -352,9 +352,9 @@ typedef struct NetLayerFilter {
 } NetLayerFilter;   /* size: 0xC */
 
 /* The layer requests' field list and layer record are `PatInterface.cpp`'s (`PatTagList` of `PatTagValue`s,
- * `PatLayerData`; include/Network/PatInterface.h): the layer fills and sends them. */
+ * `PatLayerData`; Network/PatInterface.h): the layer fills and sends them. */
 typedef struct PatTagValue PatTagValue;
-typedef struct NetworkFmpSlot NetworkFmpSlot;   /* include/Network/PatInterface.h - the FMP slot `exportServerRec` reads */
+typedef struct NetworkFmpSlot NetworkFmpSlot;   /* Network/PatInterface.h - the FMP slot `exportServerRec` reads */
 typedef struct PatTagList PatTagList;
 
 /* The mixed voice of the transfer peers (the move warning's "mVoiceMixed.mSize"): the samples and their size in

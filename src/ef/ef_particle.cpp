@@ -8,7 +8,7 @@
  * asserts that come from `particle.h` pass that header's own name (`lbl_80592E78`/`lbl_80592EB4`/...),
  * which is what an nw4r assert macro defined in a header does.
  *
- * The class is the engine's particle record (`include/ef.h`): a dispatch-table pointer at +0x1C, the
+ * The class is the engine's particle record (`ef.h`): a dispatch-table pointer at +0x1C, the
  * emitter-parameter sub-record at +0x20, the position at +0xCC and the phase index at +0xDC.
  *
  * State (measured with `recompile.py`'s report path, target object

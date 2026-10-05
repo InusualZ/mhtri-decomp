@@ -1,5 +1,5 @@
 /*
- * include/Runtime.PPCEABI.H/ptmf.h - what `Runtime.PPCEABI.H/ptmf.c` owns: the pointer-to-member-function record, the
+ * Runtime.PPCEABI.H/ptmf.h - what `Runtime.PPCEABI.H/ptmf.c` owns: the pointer-to-member-function record, the
  * null record every member-function-pointer field is initialised from, and the two helpers the compiler emits calls to.
  */
 

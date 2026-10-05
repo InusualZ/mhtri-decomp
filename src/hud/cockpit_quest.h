@@ -5,7 +5,7 @@
  * (`_ENEMY_WORK`) and the two cockpit work records `cockpit_work[2]` (0x194 B each, `menu/fn_802E4978.cpp`'s
  * storage).
  *
- * One record, two views: `include/menu/fn_802E4978.h` (the band below) names the fields it reads of
+ * One record, two views: `menu/fn_802E4978.h` (the band below) names the fields it reads of
  * `cockpit_work`/`cockpit_state`, this header the ones this band reads; every member keeps its offset, so neither
  * view moves.  Two headers for one record is the rule 1 debt the fold (`merge` item) closes.
  *
@@ -140,7 +140,7 @@ typedef struct PitTrap {
 } PitTrap;
 
 /* The one-player cockpit state at `cockpit_state` (the sub-screen selector).  Its owner is
- * `src/menu/fn_802E4978.cpp` (`include/menu/fn_802E4978.h`, which cannot be included here - it
+ * `src/menu/fn_802E4978.cpp` (`menu/fn_802E4978.h`, which cannot be included here - it
  * redefines `CockpitWork` - so this is the same one-record-two-views debt as above, filed).  This
  * band reads the player count and the flag pair `quest_targets_update_b` shifts.  size: 0x88 */
 typedef struct CockpitState {

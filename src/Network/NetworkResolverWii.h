@@ -1,5 +1,5 @@
 /*
- * include/Network/NetworkResolverWii.h - the symbols `Network/NetworkResolverWii.cpp` owns that the rest of the Network band calls
+ * Network/NetworkResolverWii.h - the symbols `Network/NetworkResolverWii.cpp` owns that the rest of the Network band calls
  * (the lookup thread's entry and the lookup it runs).
  *
  * The declarations moved out of `Network/network_transport.h` when `Network/network_transport.cpp` was split

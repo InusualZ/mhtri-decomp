@@ -1,5 +1,5 @@
 /*
- * homebutton/fn_8055FD58.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * homebutton/fn_8055FD58.cpp - STUB (no bodies yet).
  *
  * `.text` 0x8055FD58..0x8056083C.  Sections of the candidate unit: .text 0x8055FD58..0x8056083C; .ctors 0x8056F420..0x8056F424; .data 0x80655BD8..0x80655F50.
  *

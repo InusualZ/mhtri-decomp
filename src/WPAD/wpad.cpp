@@ -1,5 +1,5 @@
 /*
- * WPAD/wpad.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * WPAD/wpad.cpp - STUB (no bodies yet).
  *
  * `.text` 0x804E45B0..0x80500E10.  Sections of the candidate unit: .text 0x804E45B0..0x80500E10; .rodata 0x80573C40..0x80573CD8; .data 0x8062AB68..0x8062F9C0; .bss 0x8075B110..0x80760C78; .sdata 0x80794148..0x807941E8; .sbss 0x807955C8..0x80795768; .sdata2 0x8079D3C0..0x8079D494.
  *

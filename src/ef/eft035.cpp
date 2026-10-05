@@ -1,8 +1,7 @@
 /*
- * ef/eft035.cpp - phase 4 unit, `.text` 0x802F2238..0x802F5138 (28 functions, 12032 bytes).
+ * ef/eft035.cpp - unit, `.text` 0x802F2238..0x802F5138 (28 functions, 12032 bytes).
  *
- * PHASE 4 (docs/splits/phase4, window d).  Recut of eft035.cpp: its functions whose address lies in this range, in
- * address order; the rest of the range keeps its original bytes.  17 of 28 functions have a body here.
+ * 17 of 28 functions have a body here.
  *
  * FLAGS.  `cflags_main`.  The first 11 functions of the old range moved to `hud/cockpit_quest.cpp` (no source existed
  * for them).

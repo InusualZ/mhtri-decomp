@@ -1,5 +1,5 @@
 /*
- * include/NHTTP/NHTTP_os_RVL.h - the NHTTP RVL platform unit (`src/NHTTP/NHTTP_os_RVL.c`, `.text`
+ * NHTTP/NHTTP_os_RVL.h - the NHTTP RVL platform unit (`src/NHTTP/NHTTP_os_RVL.c`, `.text`
  * 0x80515010..0x80515774).
  *
  * Rule 2: this unit owns `NHTTPi_InitRequestInfo` (and the RVL thread/receive-buffer helpers), so
@@ -86,7 +86,7 @@ void* NHTTPi_commThreadMain(void* arg);
 }
 #endif
 
-/* Declarations moved here from `include/unsplit/NHTTP.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+/* Declarations moved here from `unsplit/NHTTP.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 #ifdef __cplusplus
 extern "C" {
 #endif

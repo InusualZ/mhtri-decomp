@@ -1,5 +1,5 @@
 /*
- * include/Network/NetworkSocketWii.h - the class `src/Network/NetworkSocketWii.cpp` defines (`.text` 0x803F7538..0x803F84B8):
+ * Network/NetworkSocketWii.h - the class `src/Network/NetworkSocketWii.cpp` defines (`.text` 0x803F7538..0x803F84B8):
  * the Wii socket over the SO library (and SSL for mode 4), and the two error accessors the socket streams poll.
  */
 #ifndef MHTRI_NETWORK_NETWORKSOCKETWII_H

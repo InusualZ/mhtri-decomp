@@ -128,7 +128,7 @@
  *    with `i` or `slots[i]` alone it is 91.41 %, the allocator's callee-saved pair mirrors,
  *    playbook 63).  Its only callee was `fn_802752C8`, renamed `Pl_item_id_usable_ck`: retail
  *    passes a second argument (`li r4,0` here, 1 in `em_pop`, 2 in `ai`) that the callee's body
- *    never reads, so the **declaration** carries it (`include/Pl/fn_80273B14.h`); the Pl unit was
+ *    never reads, so the **declaration** carries it (`Pl/fn_80273B14.h`); the Pl unit was
  *    re-measured after the change and every row of it is unchanged (`Pl_item_id_usable_ck` keeps
  *    its own 96.47 % residual - three `cmpwi`/`cmplwi` choices).
  *  - `quest_result_field_text_get` (684 B, this pass's second row) is byte-identical too, and it
@@ -141,7 +141,7 @@
  *    strings and their pointer table are DEFINED here (the target's pool labels are map globals the
  *    unit does not claim); the three accented characters are `\x` byte escapes so the file stays
  *    ASCII and `sjiswrap` cannot re-encode them.  `QuestRecord`'s text runs (+0x000, +0x02E,
- *    +0x08C, +0x0B5, +0x0DE, +0x13C, +0x19A, +0x1C9) are named in `include/unsplit/menu.h` now,
+ *    +0x08C, +0x0B5, +0x0DE, +0x13C, +0x19A, +0x1C9) are named in `unsplit/menu.h` now,
  *    which is also where the field-kind numbering comes from.
  *  - the `QuestElement` size correction to the 0x60 its own target objects use (`addi r5,r5,96` in
  *    `quest_element_value_get`) moved **eight** rows up and none down: `quest_field2E8_text_get`
@@ -176,7 +176,7 @@
  * `fn_803B177C` (1596 B).
  *
  * `quest_element_set` (0x803A9DEC) is declared where rule 2 wants it - in its owner's header
- * `include/lobby/lb_quest_screen.h`, whose unit's registered `.text` 0x803A3A50-0x803AA4A4 covers
+ * `lobby/lb_quest_screen.h`, whose unit's registered `.text` 0x803A3A50-0x803AA4A4 covers
  * the address.  The owner's own source does not cite it yet (its row is unwritten); this file's two
  * call sites reach it through that header.
  *
@@ -208,12 +208,12 @@
  * 288 B -> 128 B and `.rela.data` 456 B -> 384 B.  It is nonetheless not landable today:
  * `stylelint.py --diff` counts the declaration as an ADDED finding whichever way it is spelled - in
  * this file as rule 2 + rule 12 (there is no owner's header for it, and no registered range covers
- * 0x8060E888) and in the band header `include/unsplit/menu.h` as two rule-12 findings - because the
+ * 0x8060E888) and in the band header `unsplit/menu.h` as two rule-12 findings - because the
  * claim rule 12 asks for is exactly the cycle above.  So the definition stays and the clash is
  * handed to the same tooling item: it disappears with the claim (multi-run support or a data-only
  * unit for the strings run).  The pool constants the band
  * addresses (`frames_per_second_60f`, `percent_scale_100f`, `quest_grade_ratio_*`) are declared
- * `extern` in `include/unsplit/menu.h` and never defined here, so no `.sdata2` is emitted for them.
+ * `extern` in `unsplit/menu.h` and never defined here, so no `.sdata2` is emitted for them.
  * The other data row is `ours-extra .sdata2 16 B`: MWCC's implicit int->float magic
  * (`0x4330000080000000` unsigned / `0x4330000000000000` signed), which the compiler pools per TU and
  * `quest_grade_get`/`quest_grade_rank_get`/`quest_grade_text_cur_get` are the band's first users of.
@@ -226,9 +226,9 @@
  * `quest_element_value_get`/`quest_element_value_at`/`quest_element_remaining_get`/
  * `quest_all_player_item_count_sum` accessors at 0x803B4BEC..0x803B68F0 are the quest band's own but
  * sit inside `enemy/em_pop.cpp`'s registered range (a `--max-bytes` cap over several bands), so their
- * declarations went into that owner's header (`include/enemy/em_pop.h`), which already carries the
+ * declarations went into that owner's header (`enemy/em_pop.h`), which already carries the
  * same shape for its own unwritten rows.  `str_tbl_33_get` (0x802DFACC) is unowned and stays in its
- * band header `include/unsplit/lobby.h`.  `system_w.field_0x8af` (0x8AF) was split out of
+ * band header `unsplit/lobby.h`.  `system_w.field_0x8af` (0x8AF) was split out of
  * `SystemWork`'s `pad_0x898`, and `QuestRecord` gained `field_0x36C` while its +0x30C word became
  * the byte pair `quest_monster_text_get` reads (it was an unused `s32`).
  *
@@ -238,7 +238,7 @@
  * `fn_803B6150` -> `quest_element_remaining_get` (also swept in `src/Pl/pl_act.cpp`, its only
  * referrer), `fn_803B61DC` -> `quest_all_player_item_count_sum`, `fn_803B4E50` ->
  * `quest_flag_10000000_ck`, and `fn_802DFACC` -> `str_tbl_33_get` (swept in
- * `include/unsplit/lobby.h` and `src/lobby/fn_801E7530.cpp`).
+ * `unsplit/lobby.h` and `src/lobby/fn_801E7530.cpp`).
  *
  * FLAGS: `menu`'s `cflags_menu` (`-O3 -inline noauto -opt nopeephole -Cpp_exceptions on`, Wii/1.3).
  */
@@ -280,7 +280,7 @@
 #include "Pl/fn_80273B14.h"               /* `Pl_item_id_usable_ck`, the id-usable predicate (rule 2) */
 
 /* The band's quest-work pointer in this unit's own view of the record.  `quest_work_ptr` itself is
- * `.sbss` band data `include/unsplit/menu.h` declares, and that header cannot take this unit's
+ * `.sbss` band data `unsplit/menu.h` declares, and that header cannot take this unit's
  * offsets, so the two views are cast rather than merged. */
 #define QUEST_WORK ((Q_ItemWork*)quest_work_ptr)
 

@@ -90,7 +90,7 @@ extern "C" {
 
 /* 0x803B6078 - fills two u16s from the work's per-slot pair when the slot is armed.
  * 0x803B8E1C - the em_set work's own state word.
- * Both moved out of `include/unsplit/menu.h` when this unit registered their addresses
+ * Both moved out of `unsplit/menu.h` when this unit registered their addresses
  * (rule 2: the owner's header carries them). */
 u16 em_work_slot_pair_get(u16 index, s16* out);
 s32 em_set_work_state_get(void);

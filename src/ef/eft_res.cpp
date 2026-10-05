@@ -199,7 +199,7 @@ inline EftProSlot* eft_pro_slots(void) {
 
 /* ---------------------------------------------------------------------------------------------------
  * this unit's own entry points (the callers' declarations belong in the owner's header; the extern
- * sweep at the end of the round moves them to include/ef/eft_res.h)
+ * sweep at the end of the round moves them to ef/eft_res.h)
  * ------------------------------------------------------------------------------------------------- */
 
 #ifdef __cplusplus

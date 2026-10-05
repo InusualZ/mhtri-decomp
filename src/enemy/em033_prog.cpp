@@ -1,7 +1,7 @@
 /*
- * enemy/em033_prog.cpp - phase 4 unit, `.text` 0x8035BAB4..0x8035F2B4 (55 functions, 14336 bytes).
+ * enemy/em033_prog.cpp - unit, `.text` 0x8035BAB4..0x8035F2B4 (55 functions, 14336 bytes).
  *
- * PHASE 4 (docs/splits/phase4, window d).  Fold of 2 registered units: eft052.cpp, fn_8035E034.cpp.  The functions
+ * Fold of 2 registered units: eft052.cpp, fn_8035E034.cpp.  The functions
  * below are the ones those sources define, in address order; every other function of the range keeps its original
  * bytes.  16 of 55 functions have a body here.
  *
@@ -204,7 +204,7 @@
  * Callees outside this unit.
  * ---------------------------------------------------------------------------------------------- */
 
-/* The three vector helpers the game-root draw layer owns; `include/mh3_pad.h` and `include/ef.h`
+/* The three vector helpers the game-root draw layer owns; `mh3_pad.h` and `ef.h`
  * now spell them with the same record type (`nw4r::math::VEC3*`, docs/plan.md 6.5 rule 11), so no
  * local copy of the declaration is needed. */
 extern "C" void fn_8008E8D0(void* a, void* b);

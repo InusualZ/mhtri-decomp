@@ -4,12 +4,12 @@
  * is that header for the nw4r g3d render/dispatch cluster registered from proposal `80075DCC`
  * (`.text` 0x80075DCC-0x8007C540).
  *
- * The seven plain-`fn_XXXXXXXX` symbols below used to sit in `include/unsplit/g3d.h`, the fallback
+ * The seven plain-`fn_XXXXXXXX` symbols below used to sit in `unsplit/g3d.h`, the fallback
  * band for a g3d-module symbol with no registered owner.  Registering the cluster makes them owned, so
  * the declarations move here and the consumers (`g3d/g3d_basic.cpp`, `g3d/g3d_camera.cpp`,
  * `gx/fn_8009AA78.c`, `ef/ef_drawfreestrategy.cpp`, `ef/ef_drawstrategyimpl.cpp`,
  * `g3d/fn_80063888.cpp`) include this header instead.  The transfer itself is recorded in the outbox
- * as a `shared-file` request, because it edits files (`include/unsplit/g3d.h` and the consumers) that
+ * as a `shared-file` request, because it edits files (`unsplit/g3d.h` and the consumers) that
  * the batch applies together.
  *
  * All of them carry the map's own `fn_XXXXXXXX` stem, so they keep C linkage.
@@ -46,7 +46,7 @@ void fn_8007A5A8(void* self, f32 x, f32 y, f32 z);
 void fn_8007A724(void* self, f32 x, f32 y, f32 z);
 
 /* 0x8007B5F4/0x8007BB8C - the ScnRoot state lookups `g3d/g3d_state.cpp` calls (rule 2, moved out of
- * include/unsplit/g3d.h when this unit registered, 2026-09-25).  `fn_8007BB8C` stores what it finds
+ * unsplit/g3d.h when this unit registered).  `fn_8007BB8C` stores what it finds
  * through its out-parameter and returns that parameter; `fn_8007B5F4` registers `pKey` under the
  * state object. */
 u32 fn_8007B5F4(void* pSelf, const u32* pKey);
