@@ -1,17 +1,12 @@
 /*
- * Network/NetworkNullFetcher.cpp - the kind-2 file fetcher `NetworkNullFetcher`, whose operations all succeed at once.
- *
- * SECTIONS. extab 0x8001B850..0x8001B87C; extabindex 0x8003B9D0..0x8003B9F4; .text 0x803F73C0..0x803F74D8;
- *   .data 0x805FC8A8..0x805FC8D0 (the class table).
- *
- * WHAT IT IS. The fetcher `sNetworkLibraryWii::createFetcher` builds for kind 2 (declared in
- *   `Network/NetworkFileFetcher.h`): every slot returns 0 and `open` clears the error record.  The class name is a
- *   GUESS from the bodies.
- *
- * WHY IT SITS HERE. Cut out of `Network/NetworkFileFetcher.cpp` (request net3-c-47f5#1): the `.data` zigzag seam at
- *   0x805FC8A8 (this table follows the fetcher's going up, where one TU emits its tables in reverse).
- *
- * FLAGS. `cflags_network` with `-O3` like the fetcher; `#pragma peephole off` and `#pragma dont_inline on` as there.
+ * Network/NetworkNullFetcher.cpp - the kind-2 file fetcher `sNetworkLibraryWii::createFetcher` builds: every slot
+ *   returns 0 at once and `open` clears the error record.
+ * RANGE. .text 0x803F73C0-0x803F74D8 (9 functions); .data 0x805FC8A8-0x805FC8D0 (the class table), extab, extabindex.
+ *   The left edge is the `.data` zigzag seam at 0x805FC8A8 (this table follows the fetcher's going up, where one TU
+ *   emits its tables in reverse).
+ * FLAGS. `-O3` (configure.py) like the fetcher; file-scope `#pragma peephole off` and `#pragma dont_inline on` as there.
+ * NAMES. `NetworkNullFetcher` is a GUESS from the bodies (declared in `Network/NetworkFileFetcher.h`).
+ * RESIDUALS. none.
  */
 
 #include "Network/NetworkFileFetcher.h"

@@ -1,8 +1,6 @@
 /*
- * Network/NetworkLayer.h - the declarations of `src/Network/NetworkLayer.cpp`: the layer base class `NetworkLayer`,
- * its request record `NetworkLayerRequest`, the layer user id and the free functions of the unit's range
- * (0x803DF2EC..0x803E0BE8).  Moved here from `Network/NetworkLayerPat.h` and `Network/NetworkSessionManagerPat.h` when the
- * recut gave the class its own unit (docs/plan.md 6.5 rule 2: the owner declares).
+ * Network/NetworkLayer.h - the declarations of `Network/NetworkLayer.cpp`: `NetworkLayer`, its request record
+ *   `NetworkLayerRequest`, the layer user id and the unit's free functions.
  */
 #ifndef MHTRI_NETWORK_NETWORKLAYER_H
 #define MHTRI_NETWORK_NETWORKLAYER_H

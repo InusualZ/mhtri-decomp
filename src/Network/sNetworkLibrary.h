@@ -1,8 +1,6 @@
 /*
- * Network/sNetworkLibrary.h - the base network library class `sNetworkLibrary`, its records and the
- * free helpers its unit defines.  Owner: `src/Network/sNetworkLibrary.cpp` (docs/plan.md 6.5 rule 2: a consumer
- * includes this header instead of declaring the symbols itself).  Moved out of `Network/network_opening.h`
- * with the unit split; that header includes this one.
+ * Network/sNetworkLibrary.h - the base network library class `sNetworkLibrary`, its records and the free helpers
+ *   `Network/sNetworkLibrary.cpp` defines.
  */
 #ifndef MHTRI_NETWORK_SNETWORKLIBRARY_H
 #define MHTRI_NETWORK_SNETWORKLIBRARY_H

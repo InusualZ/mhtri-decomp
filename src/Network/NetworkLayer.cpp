@@ -1,36 +1,25 @@
 /*
- * Network/NetworkLayer.cpp - the layer base class `NetworkLayer` (`.text` 0x803DF2EC..0x803E0BE8).
- *
- * WHAT IT IS.  The base `NetworkLayerPat` builds on: its own "NetworkLayer::move"/"NetworkLayer::deleteRequest" strings, the
- *   table 0x805FB5D0 = `__vt__12NetworkLayer` (emitted here from the class - key function `~NetworkLayer`), declared in
- *   `Network/NetworkLayer.h`.  It parallels `NetworkSessionManager` one word earlier; its request record `NetworkLayerRequest`
- *   carries a real pointer-to-member handler (the reset is MWCC's null-member-pointer copy of `__ptmf_null`, `run` its
- *   `__ptmf_scall` call) and a real ctor/dtor (the pool's `__construct_array` pair).  The 22 descriptor constants are the
- *   named `NetworkLayerHandler` globals `networkLayerRequestDescNN`.  The layer id helpers (`NetworkLayerIdImportFrom`/
- *   `ExportTo`, `NetworkUniqueIdEquals`, named by their own log strings) sit in the same range.
- *
- * WHY IT SITS HERE (recut).  The bodies were written by pilot lane L2 inside
- *   `Network/NetworkSessionManagerPat.cpp`; the `.data` there read as three TUs (V->S seam at 0x805FB2B8), and the unit
- *   holds exactly the run that seam opens: `.text` from the constructor 0x803DF2EC (the manager's last function,
- *   `setSessionLogSessionLost`, ends there) to 0x803E0BE8 (`NetworkLayerPat`'s first), `.data` 0x805FB2B8..0x805FB718 (its
- *   strings, the descriptors 0x805FB494.. and the table), `.sdata2` 0x8079C778..0x8079C780 (read only from this range),
- *   extab 0x8001A6A8..0x8001A810, extabindex 0x8003AC38..0x8003AE0C.  The bodies moved byte-identical.
- *
- * FLAGS.  Measured on this unit's own rows (configure.py carries the evidence): `cflags_main` with `-pool off` (playbook 43 -
- *   the id helpers address each warning string with their own lis/addi).  File-scope `#pragma peephole off`: the bodies
- *   were written under the source file's peephole-off region and keep it.
- *
- * TABLE.  79 slots (+0x08..+0x140): the derived table 0x805FC1E0 is 0x144 B, so the base has no slot +0x144 -
- *   the map's `__vt__12NetworkLayer` is 0x144 B and the claim's last 4 bytes (0x805FB714) are the alignment before the next
- *   object's `.data` (our object's `.data` is 0x45C of the claimed 0x460).  The pure slots carry the names and parameters of
- *   `NetworkLayerPat`'s overrides; the request starters the game calls carry the consumers' spellings (`closeSession_1C`,
- *   `requestServers_24`, ... - `Network/network_pat_control.cpp`), with the argument types those call sites pass.
- *
- * RESIDUALS.  `NetworkLayer::move` keeps the unrolled inner scan's trip count 3 in r0 where retail holds it in a
- *   callee-saved register (r29) - one extra saved register shifts every allocation; the constructor's second pool loop is
- *   spelled with an explicit pointer (98.17; the indexed spelling scores 97.32) and still swaps the counter/pointer
- *   registers; the id helpers differ only in their string labels' names.  Every name except the class's own is derived
- *   from the slot offset or the field it touches (GUESS).
+ * Network/NetworkLayer.cpp - the layer base class `NetworkLayer` that `NetworkLayerPat` builds on (its own
+ *   "NetworkLayer::move"/"NetworkLayer::deleteRequest" strings), and the layer id helpers (`NetworkLayerIdImportFrom`/
+ *   `ExportTo`, `NetworkUniqueIdEquals`, named by their log strings).  It parallels `NetworkSessionManager` one word
+ *   earlier.
+ * RANGE. .text 0x803DF2EC-0x803E0BE8 (46 functions); .data 0x805FB2B8-0x805FB718 (strings, the descriptors 0x805FB494..,
+ *   the table 0x805FB5D0), .sdata2 0x8079C778-0x8079C780 (read only from this range), extab, extabindex.  The left edge
+ *   is the `.data` V->S seam at 0x805FB2B8 (the session manager's `setSessionLogSessionLost` ends at 0x803DF2EC).
+ * FLAGS. The game-root `cflags_main` plus `-pool off` (configure.py; measured in docs/network.md: the id
+ *   helpers address each warning string with their own `lis`/`addi`); file-scope `#pragma peephole off`.
+ * NAMES. Every name except the class's own is a GUESS from the slot offset or the field it touches; the 22 descriptors
+ *   are the `NetworkLayerHandler` globals `networkLayerRequestDescNN`; the request starters the game calls carry the
+ *   consumers' spellings (`closeSession_1C`, `requestServers_24`, ... - `Network/network_pat_control.cpp`).
+ * RESIDUALS. `NetworkLayer::move`: the unrolled inner scan's trip count 3 sits in r0 where retail holds it in r29 - one
+ *   saved register more shifts every allocation.  The constructor: the second pool loop (an explicit pointer,
+ *   the closer of the two spellings measured) swaps the counter/pointer registers.  `.data` is 0x45C of the claimed
+ *   0x460 (the last 4 bytes, 0x805FB714, are alignment); the id helpers' string labels pair by address only.
+ * SHAPES. `__vt__12NetworkLayer` is emitted here from the class (key function `~NetworkLayer`, rule 10): 79 slots
+ *   (+0x08..+0x140; the derived table 0x805FC1E0 is 0x144 B, so the base has no slot +0x144), the pure slots carrying
+ *   `NetworkLayerPat`'s override names.  `NetworkLayerRequest` carries a real pointer-to-member handler (the reset is
+ *   MWCC's `__ptmf_null` copy, `run` its `__ptmf_scall` call) and a real ctor/dtor (the pool's `__construct_array`
+ *   pair).
  */
 #include "Network/NetworkLayer.h"                /* the unit's own header: the layer base class and its free functions */
 #include "Network/NetworkLayerPat.h"             /* NetLayerRequest, NetFriendRec - the records the free functions copy */

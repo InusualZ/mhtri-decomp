@@ -1,4 +1,4 @@
-/* Declarations owned by `src/Network/sNetworkLibraryWii.*` (docs/plan.md 6.5 rule 2): a consumer includes this header instead of declaring the symbols itself. */
+/* Network/sNetworkLibraryWii.h - the declarations of `Network/sNetworkLibraryWii.cpp`. */
 #ifndef MHTRI_NETWORK_SNETWORKLIBRARYWII_H
 #define MHTRI_NETWORK_SNETWORKLIBRARYWII_H
 

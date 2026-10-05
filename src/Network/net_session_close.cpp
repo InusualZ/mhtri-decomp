@@ -1,60 +1,47 @@
 /*
- * Network/net_session_close.cpp - the session-manager half of the network control: the session reflect
- * callback and its command results, the session join / close / abort requests, the pending-action
- * handlers, the friend-roster sync and the community callback (`.text` 0x80432104..0x80437270; 88
- * functions).  Every function works on the `net_ctrl_wk` record `Network/network_pat_control.cpp` owns.
- *
- * Sections: extab 0x8001D824..0x8001DA94; extabindex 0x8003E214..0x8003E514; .text 0x80432104..0x80437270;
- * .ctors 0x8056F3C4..0x8056F3C8; .data 0x80603D70..0x80603E90; .bss 0x806E1770..0x806E1B38.
- *
- * Name: no `__FILE__` string covers the range; the left edge is the end of the `Network/network_pat_control`
- * fold, the right edge the end of the `.ctors` initialiser's closure (0x80431CD8).  Function names are GUESSES
- * from the bodies (the session command each one issues or reads back).
- *
- * Lib/flags: `cflags_main` (the link neighbour's group); `#pragma peephole off` for the whole file, as in
- * the neighbour (measured on the first bodies: the kept `extsb`/`cmpwi` pairs need it).
- *
- * Residuals (2026-10-05: 71 of 88 rows at 100 %, report metric 92.5 %):
- *  - Not written: `refreshRosterCache` (it reads NetworkLayerPat's u16 at +0xF02C, a field the layer class - lane A's -
- *    does not declare yet); `requestPeerProfileById`/`fn_80435F48` (they need the 0x20-byte address object at 0x806E1B18 and
- *    NetworkCommunityPat's 0x803F0F20); `fn_80436220` (192 B: it calls NetworkCommunityPat's slot +0x48 and its
- *    0x803F116C, neither declared yet); the static initialiser 0x80437204 (`net_community_state` is built with the
- *    NetworkCommunityPat band's constructor 0x803F0730 / destructor 0x803F0578, and the 0x20-byte address object at
- *    0x806E1B18 with the small object's; both classes belong to that band, so `net_community_state` is a plain object).
- *  - The profile writes: `sendProfileHead` 92.8 % (retail computes the first presence value before the
- *    count store and keeps it in r4; ours stores the value after the count), `startRosterFetch` 95.5 % (the four
- *    callee-saved registers permuted: retail r31 result / r28 work / r30 profile, ours r29 / r30 / r28; declaration
- *    order does not move it), `onCircleListReceived` 98.2 % (work and the circle cursor swap r30/r31; the best of 120
- *    declaration orders).  The community writes pass the work record's request word and the profile through
- *    `request_60`'s `(const u8*, s32, ...)` parameters with casts, and the presence record goes to `setPresence_A0`
- *    cast to `NetLayerSettings` (the same 0x24 bytes read two ways; unifying them is open, rule 1).  The `userdata_item`
- *    profile fillers (`fillNetUserProfile*`, GUESS names from the bytes each copies) are declared in `userdata_item.h`.  GUESS names: `sendProfileHead`,
- *    `sendProfileRange7C`, `sendProfileRank`, `sendProfileRecord`, `resendProfileRecord`, the `NetProfileRec` fields
- *    and `NetProfileLabels`.  `copyCircleToProfile`'s range test is two early returns (an `||` folds into one unsigned
- *    compare: 97.91 -> 100).
- *  - `communityReflectCallback` 97.7 %: the roster/recent copies keep three induction pointers where retail keeps
- *    four; the mail text address is CSE'd as in the session callback (request #22).  The address object's +0x28
- *    copy is the sink's real virtual `copyFrom` (request #21: `appendRosterEntry`/`appendRecentEntry` 99.57 -> 100,
- *    `removeRosterEntry`/`removeRecentEntry` 97.54 -> 97.80).
- *  - `sessionReflectCallback` 97.7 %: the case-29 message switch lowers to a binary compare tree where retail
- *    tests `(u32)(kind - 1) <= 3` linearly; the chat-record text address (+0x35) is CSE'd into r27 where retail
- *    recomputes it; the peer offset (index * 0x120) is recomputed for the chat-log call in cases 7 and 27; the
- *    server-slot copy keeps an `extsb` before its `stb` (cases 24/25).  Each session-request completion is
- *    spelled with a block-local `req` pointer: an inline helper (or `work->session_request_0x829C.` directly)
- *    rematerialises the `addis` base after the call (-4 points).
- *  - `isSameNetId`, `isSessionMember`/`isSessionMemberId`/`findSessionMemberSlot`/`lookupFriendSlot` reach 100 % with
- *    `NetworkUniqueId` at its retail 0x20 (the stack object's frame size).
- *  - Partial: `installCommunityCallback` 88.4 % (retail strides the three result records from the work pointer;
- *    the 2-D index folds the offsets), `onSessionCloseDone` 96.9 % (the member loop's registers; the member's
- *    +0x20 id is handed to `getPlayerRecord` as the small network object it copies into),
- *    `getProfileMemberCounts` 99.6 %, `buildRosterSync` 99.3 % (one register swap), `getProfileQuestRecord` 98.6 %.
- *  - GUESS names added 2026-10-04: `setMoveWorkMemberState` (writes 4 when a member drops), `sendBoxPageCheckRequest`
- *    (its record is packed by the item-box page exporter), the community helpers `getCommunityUserProfile`/
- *    `getCommunityStateBlock`/`getCommunityMemberRecord` (offsets into the state block), `requestCommunityNews`/
- *    `requestCommunityBlockList`/`requestFriendSync` (the community call each issues), the roster/recent helpers
- *    (what each does to the list), `net_community_state` (the block community command 17 delivers), the member
- *    lookups `isSessionMember`/`isSessionMemberId`/`findSessionMemberSlot` (they walk the four session players)
- *    and `postQuestBoardRecord` (its one caller is the quest board).
+ * Network/net_session_close.cpp - the session-manager half of the network control: the session reflect callback and its
+ *   command results, the session join / close / abort requests, the pending-action handlers, the friend-roster sync and
+ *   the community callback, all on the `net_ctrl_wk` record `Network/network_pat_control.cpp` owns.
+ * RANGE. .text 0x80432104-0x80437270 (88 functions); .ctors 0x8056F3C4-0x8056F3C8, .data 0x80603D70-0x80603E90, .bss
+ *   0x806E1770-0x806E1B38, extab, extabindex.  The left edge is the end of `Network/network_pat_control.cpp`.
+ * FLAGS. The game-root `cflags_main` (the link neighbour's group); file-scope `#pragma peephole off`, as in the
+ *   neighbour (the kept `extsb`/`cmpwi` pairs need it).
+ * NAMES. No `__FILE__` string covers the range; the file name and the function names are GUESSes from the bodies (the
+ *   session command each issues or reads back): `sendProfileHead`, `sendProfileRange7C`, `sendProfileRank`,
+ *   `sendProfileRecord`, `resendProfileRecord`, the `NetProfileRec` fields, `NetProfileLabels`,
+ *   `setMoveWorkMemberState` (writes 4 when a member drops), `sendBoxPageCheckRequest` (its record is packed by the
+ *   item-box page exporter), `getCommunityUserProfile`/`getCommunityStateBlock`/`getCommunityMemberRecord` (offsets
+ *   into the state block), `requestCommunityNews`/`requestCommunityBlockList`/`requestFriendSync` (the community call
+ *   each issues), the roster/recent helpers, `net_community_state` (the block community command 17 delivers),
+ *   `isSessionMember`/ `isSessionMemberId`/`findSessionMemberSlot` (they walk the four session players),
+ *   `postQuestBoardRecord` (its one caller is the quest board); the `userdata_item` profile fillers
+ *   `fillNetUserProfile*` (declared in `userdata_item.h`).
+ * RESIDUALS. Unwritten: `refreshRosterCache` (it reads NetworkLayerPat's u16 at +0xF02C, which the class does not
+ *   declare); `requestPeerProfileById`/`fn_80435F48` (the 0x20-byte address object at 0x806E1B18 and
+ *   NetworkCommunityPat's 0x803F0F20); `fn_80436220` (NetworkCommunityPat's slot +0x48 and its 0x803F116C, not
+ *   declared); the static initialiser 0x80437204 (`net_community_state` is built with the NetworkCommunityPat band's
+ *   constructor 0x803F0730 / destructor 0x803F0578, so it stays a plain object), so the claimed `.ctors` word is not
+ *   emitted.  `flipcheck`: `sendBoxPageCheckRequest` is force-active in retail's `.comment` and not in ours (row 36).
+ *   Partial rows:
+ *  - `sessionReflectCallback`: the case-29 message switch lowers to a binary compare tree where retail tests
+ *    `(u32)(kind - 1) <= 3` linearly; the chat-record text address (+0x35) is CSE'd into r27; the peer offset (index *
+ *    0x120) is recomputed for the chat-log call in cases 7 and 27; cases 24/25 keep an `extsb` before the `stb`;
+ *  - `communityReflectCallback`: the roster/recent copies keep three induction pointers where retail keeps four; the
+ *    mail text address is CSE'd as above; `removeRosterEntry`/`removeRecentEntry`: the same copy shape;
+ *  - `sendProfileHead`: retail computes the first presence value before the count store and keeps it in r4;
+ *  - `startRosterFetch`: the four callee-saved registers permuted (retail r31 result / r28 work / r30 profile);
+ *  - `onCircleListReceived`: work and the circle cursor swap r30/r31 (the best of 120 declaration orders);
+ *  - `installCommunityCallback`: retail strides the three result records from the work pointer, the 2-D index folds
+ *    them;
+ *  - `onSessionCloseDone`: the member loop's registers; `buildRosterSync`: one register swap; `getProfileMemberCounts`,
+ *    `getProfileQuestRecord`: not characterised (the objdiff rows).
+ * SHAPES. Each session-request completion uses a block-local `req` pointer (an inline helper, or the field spelled
+ *   directly, rematerialises the `addis` base after the call); `copyCircleToProfile`'s range test is two early returns
+ *   (an `||` folds into one unsigned compare); `NetworkUniqueId` is its retail 0x20 B (the member lookups depend on it);
+ *   the address object's +0x28 copy is the sink's real virtual `copyFrom`; the member's +0x20 id goes to
+ *   `getPlayerRecord` as the small network object it copies into.  The community writes pass the request word and
+ *   profile through `request_60`'s `(const u8*, s32, ...)` parameters with casts, and the presence record goes to
+ *   `setPresence_A0` cast to `NetLayerSettings` (the same 0x24 bytes read two ways; unifying them is a rule-1 item).
  */
 
 #include "Network/net_session_close.h"
@@ -163,11 +150,8 @@ static inline void copyServerIndexes(NetCtrlWk* work, const u8* slots, s32 count
     }
 }
 
-/*
- * The session manager's reflect callback: records command `command`'s result word (and, for a failed join,
- * leave or kick, the error triple), then runs the command's own bookkeeping and the pending request's
- * completion.
- */
+/* The session manager's reflect callback: records the command's result word (and a failed join/leave/kick's error
+ * triple), then runs the command's bookkeeping and the pending request's completion. */
 /* untyped: caller-owned payload - each session command delivers its own record */
 s32 sessionReflectCallback(s32 command, s8 member, s32 result, s32 count, void* data)
 {
@@ -796,11 +780,8 @@ void onSessionJoined(s32 status, s32* values)
     work->step_0x018 = 0;
 }
 
-/*
- * Requests the session join (session command 4): publishes the party size and quest as the name list, the
- * session name and comment, arms circle mode 1 and publishes this player's circle record; 0 when there is no
- * session manager or a request is busy.
- */
+/* Requests the session join (command 4): publishes the party size and quest, the session name and comment, arms circle
+ * mode 1 and publishes this player's circle record; 0 without a session manager or while a request is busy. */
 s32 requestSessionJoin(const NetJoinParams* params)
 {
     NetCtrlWk* work = net_ctrl_wk;
@@ -2304,11 +2285,8 @@ void removeRecentEntry(const NetworkUniqueId* address)
     }
 }
 
-/*
- * The community layer's reflect callback: records command `command`'s result word (and a failure's error
- * triple), copies what the command delivered (the roster, the recent players, the community state, mail,
- * presence changes) and reports the outcome through the caller's result byte.
- */
+/* The community layer's reflect callback: records the result word (and a failure's error triple), copies what the
+ * command delivered (roster, recent players, state, mail, presence) and reports through the caller's result byte. */
 /* untyped: caller-owned payload - each community command delivers its own record */
 s32 communityReflectCallback(u32 command, s32 result, s32 count, void* data)
 {

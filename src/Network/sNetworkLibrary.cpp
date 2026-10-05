@@ -1,36 +1,23 @@
 /*
- * Network/sNetworkLibrary.cpp - `sNetworkLibrary`, the platform-independent half of the network library singleton
- * (the strings say `SDD NETWORK LIBRARY`); the Wii half is `Network/sNetworkLibraryWii.cpp`.
- *
- * `.text` 0x80417BC0..0x8041891C.  Sections: extab 0x8001CD94..0x8001CE1C; extabindex 0x8003D764..0x8003D7DC;
- * .data 0x80602988..0x80602AF8 (the month-length table, the class's strings, then its table 0x80602A60);
- * .sbss 0x80794CC0..0x80794CD0 (`mpInstance`, `mpMediator`, `mpRandom`).
- *
- * BOUNDARY.  Split out of `Network/network_opening.cpp`: the `.data` order seam (vtable 0x80602978 followed by the
- * month table 0x80602988, `tudiscover dataorder`) pins this TU's start in `.text` 0x80417944..0x80417C44, and
- * the base constructor 0x80417BC0 is the first function there that touches the class (`fn_80417B30` before it is
- * an event-flag callback `network_layer_io` tail-calls).  The right seam 0x8041891C is the Wii half's
- * (its header).  The whole `.data` of the old unit is this class's (`dateToTime` reads the month table, the
- * constructor and `init` the strings); the old unit's `.rodata`/`.sdata2` are read by the opening steps and stayed.
- *
- * NAMES.  The class and every method name are GUESSES from the bodies and strings
- * (Network/sNetworkLibrary.h).  `networkLog_destroyContext` (really the release half of
- * `acquireResolver`) and `networkSocketPool_acquire`/`_release` (really members over the socket table) keep
- * the C names and parameter types their callers in other lanes use; integrator requests are filed.
- *
- * FLAGS.  `-O3` in place of the lib's `-O4,p` (configure.py: every row 77-93 % at `-O4,p`, all 100 % at `-O3`
- * except `init`, which `#pragma pool_data off` takes from 94.04 to 100); `#pragma peephole off` like the Wii
- * half (the reload of the table word through r3 before each virtual call).
- *
- * CALENDAR.  `convertTime`/`dateToTime` count days from 1 January of year 0; every unit constant is an unsigned
- * 64-bit macro (retail divides through `__div2u`/`__mod2u` and compares with a 64-bit subtract), the products
- * `n * 366ULL` keep the dead sign extension retail has, and `convertTime` adds each cycle as `(s16)(n * k)`
- * (retail `extsh`es the product, not the sum).  The month table `sMonthDays` (.data 0x80602988) is defined here.
- *
- * RESIDUALS.  `dateToTime` 99.94: the unrolled month loop computes `months - 8` before `months - 1` in retail
- * (two adjacent instructions swapped; loop/declaration/type variants measured, none reorders them).  `extab` is
- * 96 of 136 B: retail's constructor and destructor carry cleanup records for the member mutex
- * (`dtor_803CA338`), which needs the mutex as a class member with a destructor (NetworkSessionManager's type).
+ * Network/sNetworkLibrary.cpp - `sNetworkLibrary`, the platform-independent half of the network library singleton (the
+ *   strings say `SDD NETWORK LIBRARY`); the Wii half is `Network/sNetworkLibraryWii.cpp`.
+ * RANGE. .text 0x80417BC0-0x8041891C (21 functions); .data 0x80602988-0x80602AF8 (the month-length table `sMonthDays`,
+ *   the class's strings, then its table 0x80602A60), .sbss 0x80794CC0-0x80794CD0 (`mpInstance`, `mpMediator`,
+ *   `mpRandom`), extab, extabindex.  The left edge: the `.data` order seam (vtable 0x80602978, then the month table
+ *   0x80602988) pins the start in 0x80417944..0x80417C44, and the base constructor 0x80417BC0 is the first function
+ *   there that touches the class (`NetworkWiiMediator::applyEvent`, 0x80417B30, is the mediator's).
+ * FLAGS. `-O3` (configure.py; measured in docs/network.md); file-scope `#pragma pool_data off` (`init`)
+ *   and `#pragma peephole off` like the Wii half (the reload of the table word through r3 before each virtual call).
+ * NAMES. The class and every method name are GUESSes from the bodies and strings (`Network/sNetworkLibrary.h`).
+ *   `networkLog_destroyContext` (the release half of `acquireResolver`) and `networkSocketPool_acquire`/`_release`
+ *   (members over the socket table) keep the C names and parameter types their callers use.
+ * RESIDUALS. `dateToTime`: the unrolled month loop computes `months - 8` before `months - 1` in retail (two adjacent
+ *   instructions swapped; loop/declaration/type variants measured).  `extab` is 96 of 136 B: retail's constructor and
+ *   destructor carry cleanup records for the member mutex (`dtor_803CA338`), which needs the mutex as a class member
+ *   with a destructor (NetworkSessionManager's type).
+ * SHAPES. `convertTime`/`dateToTime` count days from 1 January of year 0; every unit constant is an unsigned 64-bit
+ *   macro (retail divides through `__div2u`/`__mod2u`), the products `n * 366ULL` keep retail's dead sign extension,
+ *   and `convertTime` adds each cycle as `(s16)(n * k)` (retail `extsh`es the product, not the sum).
  */
 
 #include "Network/sNetworkLibrary.h"

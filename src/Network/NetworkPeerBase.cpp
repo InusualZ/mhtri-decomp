@@ -1,26 +1,16 @@
 /*
- * Network/NetworkPeerBase.cpp - the abstract peer (the class holding the error record every peer constructor
- *   chains), its deleting destructor, the `networkPeerError_*` record accessors and `NetworkUniqueId`'s deleting
- *   destructor.
- *
- * One translation unit of the retail Network transport band, split out of `Network/network_transport.cpp`
- * (docs/network-transport-split.md holds the evidence and the confidence of each cut).  `.text`
- * 0x803CCDF8..0x803CCF30, `.data` 0x805F94E0..0x805F9510, extab 0x800198C8..0x800198E0, extabindex
- * 0x8003A0BC..0x8003A0E0.
- *
- * NAMES.  `NetworkPeerBase` and the `networkPeerError_*` accessors are GUESSed names (derived from behaviour).
- * `NetworkUniqueId`'s deleting destructor (the class is `Network/NetworkUniqueId.cpp`'s, its table's +0x08 slot) sits
- * at the range's left edge, a discovery cap, so its TU is unproven: it is defined here because this range holds its
- * only copy.  Every name here is the map's or a derived one; the derived ones are marked GUESS in
- * `Network/network_transport_types.h`.
- *
- * TABLE.  Its table (0x805F94E0, 0x30 B) is emitted from `NetworkPeerBase::destroy`, the key function (rule 10).
- *
- * FLAGS.  C++ under `cflags_network` (`-Cpp_exceptions on` gives the `extab`), per-unit `-O3`/`-pool off` (`configure.py`);
- * file-scope `#pragma peephole off` (playbook 39); each `dont_inline` region keeps a retail `bl` that `-inline auto` folds.
- *
- * RESIDUALS.  All 6 rows at 100 %; `flipcheck.py` reports READY (`.text`, `.data`, `extab`, `extabindex` byte-
- * identical).
+ * Network/NetworkPeerBase.cpp - the abstract peer, its `networkPeerError_*` record accessors and `NetworkUniqueId`'s
+ *   deleting destructor.
+ * RANGE. .text 0x803CCDF8-0x803CCF30 (6 functions); .data 0x805F94E0-0x805F9510 (the class table), extab, extabindex.
+ *   One TU of the transport band; the cuts and their confidence: docs/network.md.
+ * FLAGS. `-O3 -pool off` (configure.py; measured in docs/network.md); file-scope `#pragma peephole off`
+ *   (playbook 39).
+ * NAMES. `NetworkPeerBase` and the `networkPeerError_*` accessors are GUESSes from behaviour (marked in
+ *   `Network/network_transport_types.h`).
+ * RESIDUALS. none.
+ * SHAPES. The table is emitted from `NetworkPeerBase::destroy`, the key function (rule 10).  `NetworkUniqueId`'s
+ *   deleting destructor (its table's +0x08 slot) is defined here: the range holds its only copy, at the left edge,
+ *   a discovery cap.  Each `dont_inline` region keeps a retail `bl` that `-inline auto` folds.
  */
 #include "types.h"
 #include "Network/network_transport.h"

@@ -1,115 +1,53 @@
 /*
- * NetworkSessionManager.cpp - the Network session band, `.text` 0x803D4904..0x803D70B8.  The twelve
- * `NetworkSessionStable` functions that used to open the range (0x803D3CE8..0x803D4904: the op-code
- * packet writers, the rate governor, `moveOutOfBand`, `getUsableSlot`) now live in
- * `Network/NetworkSessionStable.cpp`: the `.data` order puts their strings before that unit's tables.
- * The unit opens with `NetworkSessionManager::NetworkSessionManager` (0x803D4904), which names the file (a GUESS:
- * the tile spans more than one original TU and no `__FILE__` string evidences a name).
- *
- * WHAT IT IS.  The serialization/state half of the Wii network session subsystem: the request pool and its state machine on
- * `NetworkSessionManager` (21 request slots, a two-slot `NetworkRequest` pool at +0x7C, virtual
- * dispatch), and the `NetworkSessionManagerPat` half that owns its own request pair, the per-player
- * records and the 32-entry circle list.
- *
- * MODULE AND NAME (brief section 2, evidence order).  1. No `__FILE__` string is reachable: every
- * `lis`/`addi` pair in the range resolves to a float constant, a `.data` request descriptor or one of
- * the class log strings, never to a source-file-name literal.  2. `dumpmap.py lookup` answers only
- * `zz_XXXXXXXX_` for the code.  3. The code and the vtables place the band in `Network` (the
- * registered neighbour is `Network/NetworkWiiMediator.cpp`).  The tile spans more than one original TU,
- * so no single evidenced file name covers it.
- *
- * HOW THE NAMES WERE RECOVERED (rule 7).  The `.data` log strings name their own emitters, and each is
- * loaded by exactly one function in the range: "NetworkSessionManager::move:
- * request[%d] is moving ..." (0x805FA788) -> `NetworkSessionManager::move` (the old `slot_18`);
- * "NetworkSessionManagerPat::final ..." (0x805FAB08) -> the Pat flush.  The 21 request descriptors are
- * 12-byte `{0, opcode, 0}` records, so each `requestNNN` is named by its own op code.  The float
- * constants every body loads were read out of the DOL and named from their use (`networkRateMax` =
- * 1.0f, `networkRateScale` = 2.0f, `networkMillisecondsPerSecond` = 1000.0f, ...).  Everything else in
- * the name set that is not evidenced is marked GUESS below.
- *
- * CLASS AND RULE 10.  Both vtables this range owns are emitted by MWCC from the class declarations,
- * never written by hand.  `.data` 0x805FA908..0x805FAAD0 (456 B, the base `NetworkSessionManager`
- * table, 51 relocations) is claimed and byte-identical.  `NetworkSessionManagerPat` declares `move`
- * FIRST so that it is the class's key function - its body lives in the next band (0x803D70B8) - which
- * is why MWCC emits the Pat constructor's `__vt__24NetworkSessionManagerPat` store without emitting a
- * second table into this object; the target's `.data` is the base table alone.  The record classes
- * (`NetworkSessionSlotInfo`, `NetworkSessionCircleInfo`/`List`, `NetworkSessionPlayerRecord`, `NetworkRequestPat`)
- * are plain classes that embed a `NetworkUniqueId`, with out-of-line constructors and destructors in the target's
- * order; the Pat manager's member construction and destruction (the `__construct_array`/`__destroy_arr` pairs)
- * are MWCC's.  The unique id's own constructor is out of line, so no element's vptr is stored inline (the
- * 252 -> 544 B blow-up an inline-vptr record class once caused).  See `tools/units/vtableaudit.py`.
- *
- * LANGUAGE AND SECTIONS.  C++ (`__nw__FUl` / `__dl__FPv` / `__ptmf_scall`); `cflags_network`'s
- * `-Cpp_exceptions on` for
- * the target's `extab`/`extabindex`.  `#pragma dont_inline on` scopes keep the four Pat methods'
- * calls to the base's `clear`/`init`/`release` and to the record destructors as the target's `bl`s
- * (without them MWCC inlines 220 of `clear`'s 276 bytes).
- *
- * PEEPHOLE.  The 21 `request*` rows (364, and the contiguous 368..444 block) need the peephole pass
- * off, scoped by two `#pragma peephole off`/`on` pairs.  With it on, MWCC fuses the descriptor address
- * materialisation into the first word's load (`addi r5,r4,@l` + `lwz r4,0(r5)` becomes
- * `lwzu r4,@l(r5)`), which is 4 B shorter than the target's 120/136/152/168 B; the pass is the
- * lever and not the flag (playbook 39/41: the command line's `-opt nopeephole` is accepted and
- * changes nothing).  All 21 rows are 100 % with the pragma.  `NetworkRequest_begin` and
- * `hasBuffer` sit inside/next to the region and do not move.
- *
- * RULE 10 - the two dispatches.  `.data` 0x805FA908..0x805FAAD0 (456 B, the base
- * `NetworkSessionManager` table, 51 relocations) is claimed and byte-identical; `NetworkBuffer`
- * (table at 0x805F9150) is another band's and a *declared* class with no virtual defined here, so MWCC
- * emits no table for it (the `NetworkBuffer` conversion took 11 rows to 100 % and 9 more up - measured, no
- * row down); `NetworkSessionStable`'s table (0x805FA6E8) is emitted by `Network/NetworkSessionStable.cpp`.
- *
- * OTHER LAYOUT FACTS.  `NetworkSessionSlot` is 0x924 B, the stride the target's `mulli` uses (the
- * declaration only named fields to +0xDC, so the array stride was wrong); `NetworkStreamWriter` is
- * 0x20 B, not 0x24 (`send8`'s retail frame is 0x30 with the writer at +0x10, so one writer is 0x20 B;
- * 0x24 also forced our local to +0x0C - the frames themselves do not move with the size).
- *
- * STATUS / RESIDUALS (92.15 % fuzzy, 51 of 101 symbols at 100 %; `.text` 12980 vs 13264 B).
- *  - `NetworkRequest_copyRecord` 15.73 % (target 148 B, ours 52 B): the target copies the 96-byte
- *    record as two words then eleven word pairs; `*dst = *src` makes MWCC emit `lmw`/`stmw` instead
- *    (measured: `-use_lmw_stmw off` for this unit changes nothing).  The shape is not reachable from
- *    the source side; the function is referenced only from this object's own `extab`.
- *  - `slot_144` 46.10 % and `sendBatch_138`/`slot_13C`/`slot_140` 83.8-84.6 %: the buffer dispatch
- *    is now the canonical one; what is left is the staging order of the mapped byte array plus the
- *    `clrlwi` the target gives the `u8` flags argument at the call (ours passes it unmasked - the
- *    byte-for-byte `mr`/`clrlwi` pair is not reachable from any source spelling tried).
- *  - `networkSessionReflectCallback` 54.58 %: the target saves all six incoming argument registers
- *    before building the callee's, ours does the minimal four-move rotation; the two are equivalent
- *    and the naive form is not reachable from the source side (48 B).
- *  - `NetworkRequest_begin` is 100 %: the inlined three-word `va_list` setup is the
- *    CodeWarrior `va_start` expansion `__builtin_va_info(&ap)` (the `net_va_start` macro), not the
- *    `__va_start` call.  The request's handler is a real pointer-to-member (`NetworkRequestDesc`, owner
- *    `NetworkSessionManager*`): the resets assign the null member pointer (retail's 12-byte `__ptmf_null`
- *    copy, kept unfused by a scoped `#pragma peephole off`), `NetworkRequest::run` is MWCC's `__ptmf_scall`
- *    call, and the descriptors are `&NetworkSessionManager::<handler>` constants.
- *  - `.text` is 284 B short of the claim, so `.text`/`extab` cannot flip yet: `copyRecord` (-96 B)
- *    plus the functions whose bodies compress.  `flipcheck` reports `.text` 0x32B4 vs 0x33D0 and
- *    `extab` 0x2E4 vs 0x4EC.
- *  - Pilot L2 round 2: the Pat constructor/`init`/`release` use the owner's `PatInterface` and the 0x44A0-byte
- *    `GameSpyInterfaceThread` view, and run under `#pragma peephole off` (retail keeps `lwz r12,0(r3)` after the
- *    `mr r3,this` copy); `release`'s close loop is a `do {} while`; the request record helpers `getRecord`/`setRecord`/
- *    `getArgument`/`isTimedOut`/`restartTimer` are `NetworkRequest` members (map rows renamed).  Round 3: the Pat
- *    destructor, `clear` and the record constructors/destructors are 100 % since the records are classes around
- *    `NetworkUniqueId` and run under `#pragma peephole off` (retail's unfused `extsh`+`cmpwi` of the deleting flag
- *    and `lwz r12,0(r3)` after the `addi r3`).  The base pool's `NetworkRequest_deleteElement` keeps the hand-written
- *    form (the same `extsh` residual): converting it needs `NetworkRequest` itself to be a class.
- *  - GUESS names: `NetworkSessionSlotInfo`, `NetworkSessionCircleInfo`, `NetworkSessionCircleList`,
- *    `NetworkSessionPlayerRecord` and `NetworkRequestPat` come from their container offsets and `net_va_arg`/`memset`
- *    use; `networkSessionReflectCallbackEx` and the `network<span>*` accessor names are derived from
- *    the callee each forwards to.  The `slot_14C`..`slot_168` wrappers are named for their vtable slot
- *    (offset-derived, the buffer class owner's names are unknown).
- *  - `.sdata2` is EMPTY (was 20 B over the target): every literal the range loaded is the map's
- *    named constant.
- *  - `extab` 0x2E4 vs 0x4EC and `extabindex` vs the target are short because 284 B of `.text` is
- *    still compressed away.
- *  - `.data` 0x805FA788..0x805FAB48 is claimed and written (the request descriptors as globals placed after
- *    `move`, the four log strings as literals) but does not byte-match: retail puts the base table between
- *    `deleteRequest`'s string and `getArgument`'s, so the original TU ends after the table (emission-order seam,
- *    `datagap.py --unit`: boundary in 0x805FAAD0..0x805FB0F0, `.text` 0x803D6514..0x803D65F4) while ours emits it
- *    last; the tile needs a split there (not drawn).  `.sbss` 0x80794CA0 is claimed at its 8 B map extent, the
- *    object emits the 4 B word.  0x80572428 (`.rodata`, 16 zero bytes) is the runtime's `__ptmf_null`, owned by
- *    `Runtime.PPCEABI.H/ptmf.c`, not by this unit: the rodata order puts it after `network_pat_control`'s
- *    0x80571EA0..0x80572240, so claiming it here is a dtk link-order cycle.
+ * Network/NetworkSessionManager.cpp - the request pool and state machine of `NetworkSessionManager` (21 request slots, a
+ *   two-slot `NetworkRequest` pool at +0x7C) and the first `NetworkSessionManagerPat` methods (its request pair, the
+ *   per-player records, the 32-entry circle list).
+ * RANGE. .text 0x803D4904-0x803D70B8 (89 functions); .data 0x805FA788-0x805FAB48, .sbss 0x80794CA0-0x80794CA8, extab,
+ *   extabindex.  The left edge is `NetworkSessionStable`'s `.data` seam: its op-code writers, rate governor,
+ *   `moveOutOfBand` and `getUsableSlot` (0x803D3CE8..0x803D4904) have their strings before its tables. `datagap.py
+ *   --unit` reads an emission-order seam inside: retail puts the base table between `deleteRequest`'s string and
+ *   `getArgument`'s, so the original TU ends after the table (`.text` boundary in 0x803D6514..0x803D65F4) - not cut.
+ * FLAGS. `-O3` (configure.py; measured in docs/network.md).  `#pragma dont_inline on` scopes keep the Pat
+ *   methods' calls to the base's `clear`/`init`/`release` and the record destructors as `bl`s (else MWCC inlines 220 of
+ *   `clear`'s 276 bytes); `#pragma peephole off` scopes (below).
+ * NAMES. The file name is a GUESS (no `__FILE__` string; `dumpmap.py` answers only `zz_` names).  The log strings name
+ *   their emitters ("NetworkSessionManager::move: request[%d] is moving ..." 0x805FA788,
+ *   "NetworkSessionManagerPat::final ..." 0x805FAB08); each `requestNNN` is named by the op code of its 12-byte `{0,
+ *   opcode, 0}` descriptor; the float constants are named from their use (`networkRateMax` 1.0f, `networkRateScale`
+ *   2.0f, `networkMillisecondsPerSecond` 1000.0f).  GUESSes: `NetworkSessionSlotInfo`,
+ *   `NetworkSessionCircleInfo`/`List`, `NetworkSessionPlayerRecord`, `NetworkRequestPat` (container offsets,
+ *   `net_va_arg`/`memset` use), `networkSessionReflectCallbackEx` and the `network<span>*` accessors (the callee each
+ *   forwards to), the `slot_14C`..`slot_168` wrappers (their vtable slot).
+ * RESIDUALS. `.text` 0x2714 against 0x27B4; `extab` 0x3DC against 0x40C; `.data` 0x3B8 against 0x3C0 (-8; 225 of 960
+ *   bytes differ), written but out of order (the base table last, see RANGE); `.sbss` emits the 4 B word of the 8 B
+ *   claim.
+ *  - `NetworkRequest_copyRecord`: retail copies the 96-byte record as two words then eleven word pairs, `*dst = *src`
+ *    emits `lmw`/`stmw` (`-use_lmw_stmw off` changes nothing), so `copyRecord` is 96 B short; it is referenced only from
+ *    this object's `extab`;
+ *  - `slot_144`, `sendBatch_138`, `slot_13C`, `slot_140`: the staging order of the mapped byte array, and the `clrlwi`
+ *    retail gives the `u8` flags argument at the call (no spelling tried reaches the `mr`/`clrlwi` pair);
+ *  - `networkSessionReflectCallback`: retail saves all six incoming argument registers before building the callee's,
+ *    ours does the minimal four-move rotation;
+ *  - `NetworkRequest_deleteElement`: retail's unfused `extsh` of the deleting flag needs `NetworkRequest` to be a class;
+ *  - the constructor, destructor, `clear`, `release`, `move`, `putTerminatorA`/`C`,
+ *    `NetworkSessionManager_allocRequest`: not characterised one by one (the objdiff rows).
+ * SHAPES. Both tables are compiler output (rule 10): the base table 0x805FA908..0x805FAAD0 (456 B) is emitted here;
+ *   `NetworkSessionManagerPat` declares `move` FIRST so it is the key function (its body opens the next unit), so the
+ *   Pat constructor stores `__vt__24NetworkSessionManagerPat` without a second table here.  `NetworkBuffer` (table
+ *   0x805F9150) is a declared class with no virtual defined here, so no table is emitted for it.
+ *  - the record classes embed a `NetworkUniqueId` with out-of-line constructors/destructors in the target's order; the
+ *    unique id's constructor is out of line, so no element's vptr is stored inline;
+ *  - the 21 `request*` rows sit in two `#pragma peephole off`/`on` pairs (on, MWCC fuses the descriptor address into
+ *    `lwzu r4,@l(r5)`, 4 B short; `-opt nopeephole` changes nothing, playbook 39/41); the Pat
+ *    constructor/`init`/`release` (with the 0x44A0-byte `GameSpyInterfaceThread` view), destructor, `clear` and record
+ *    ctors/dtors run under `#pragma peephole off` too (retail's `lwz r12,0(r3)` after the `mr r3,this` copy, the
+ *    unfused `extsh`+`cmpwi` of the deleting flag);
+ *  - `NetworkSessionSlot` is 0x924 B (the target's `mulli` stride); `NetworkStreamWriter` is 0x20 B (`send8`'s frame is
+ *    0x30 with the writer at +0x10);
+ *  - `NetworkRequest_begin`'s inlined `va_list` setup is `__builtin_va_info(&ap)` (the `net_va_start` macro, not the
+ *    `__va_start` call `va_start` would give); the request handler is a real pointer-to-member (`NetworkRequestDesc`):
+ *    the resets copy `__ptmf_null` (0x80572428, owned by `Runtime.PPCEABI.H/ptmf.c`), `NetworkRequest::run` is MWCC's
+ *    `__ptmf_scall`; `release`'s close loop is a `do {} while`.
  */
 
 #include "types.h"
@@ -158,7 +96,7 @@ void NetworkSessionManager_deleteRequest(NetworkSessionManager*, NetworkRequest*
 /* The four addresses themselves are declared in the band's data header (rule 2).  They cannot come
    from `unsplit/Network.h`: that header declares `dtor_803CA338(void*, s32)` where this
    file's own header declares `dtor_803CA338(void*)`, and including both fails to compile - the
-   reason `include/unsplit/NetworkData.h` exists.  `getNetworkLogger` and the logger type live in this
+   reason `unsplit/NetworkData.h` exists.  `getNetworkLogger` and the logger type live in this
    unit's own header. */
 
 /* ----------------------------------------------------------------------------------------- */
@@ -1281,7 +1219,7 @@ void NetworkSessionManagerPat::init(u32 a, u32 b)
 }
 
 #pragma peephole reset
-/* Tears the Pat session down: drains the game-spy thread, then runs the base's release. */
+/* Tears the Pat session down: drains the game-spy thread, then runs the base class's teardown. */
 void NetworkSessionManagerPat::release()
 {
     GameSpyInterfaceThread* thread;

@@ -1,19 +1,9 @@
 /*
- * Network/gamespy_interface_types.h - the GameSpy worker thread class and its error record.
- *
- * Owner: `src/Network/GameSpyInterfaceThread.cpp`, which defines the constructor (`__ct__22GameSpyInterfaceThreadFv`,
- * 0x8041C66C), the destructor (the class's key function, so that unit emits `__vt__22GameSpyInterfaceThread`)
- * and every member below except `getInstance` (defined by `Network/NetworkSessionManager.cpp`).  A
- * type-only header (no free symbol is declared here) so the mediator band can name the class without
- * the GameSpy band's whole header (`Network/GameSpyInterfaceThread.h`).
- *
- * The size is the allocation both `new GameSpyInterfaceThread()` sites make (0x44A0: the mediator's
- * `initializeNetworkMediator` and the Pat session manager's constructor); the field run ends at +0x4499
- * under `#pragma pack(1)`, so the tail is padding.
- *
- * The one view: the Pat session units' former interim view of this class and its record is folded in - the error
- * record is 12 bytes (a 0x10 record lowers 10 Pat rows, measured), `requestClose` returns `bool` (a `u8` makes both
- * callers re-extend it) and `started_120` is the `bool` it returns.
+ * Network/gamespy_interface_types.h - the GameSpy worker thread class and its error record, type-only so the mediator
+ *   band can name the class (owner `Network/GameSpyInterfaceThread.cpp`; `getInstance` is
+ *   `Network/NetworkSessionManager.cpp`'s).
+ * SHAPES. The size is the allocation both `new GameSpyInterfaceThread()` sites make (0x44A0; the field run ends at
+ *   +0x4499 under `#pragma pack(1)`); the error record is 12 bytes and `requestClose` returns `bool` (`started_120`).
  */
 #ifndef MHTRI_NETWORK_GAMESPY_INTERFACE_TYPES_H
 #define MHTRI_NETWORK_GAMESPY_INTERFACE_TYPES_H

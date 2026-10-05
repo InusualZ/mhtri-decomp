@@ -1,10 +1,6 @@
 /*
- * Network/NetworkReflectService.h - the declarations `src/Network/NetworkReflectService.cpp` owns
- * (`.text` 0x8041A194..0x8041B194, the `NetworkReflectService` class: its members and C-linkage entry points).
- *
- * The unit has no bodies yet, so every parameter list is the one its caller (the mediator band,
- * `Network/NetworkWiiMediator.cpp`) demonstrates.  Moved here from that caller (docs/plan.md 6.5 rule 2:
- * the owner declares).
+ * Network/NetworkReflectService.h - the declarations of `Network/NetworkReflectService.cpp`: the `NetworkReflectService`
+ *   members and C-linkage entry points.
  */
 #ifndef MHTRI_NETWORK_NETWORKREFLECTSERVICE_H
 #define MHTRI_NETWORK_NETWORKREFLECTSERVICE_H
@@ -50,8 +46,8 @@ typedef union GameSpyEventMsg {
 typedef void (*NetworkWiiMediatorReflectFn)(s32, s32, s32, s32, void*, void*);
 
 /* The reflect service: the GameSpy search/connect state machine the mediator starts, stops and agrees
- * through.  One definition for both of its users (unified 2026-10-03 from the two compatible views the
- * mediator band and the GameSpy band carried; every offset and the size are unchanged):
+ * through.  One definition for both of its users (the mediator band and the GameSpy band; every
+ * offset and the size are the ones both read):
  *   - the mediator band (`Network/NetworkWiiMediator.cpp`) dispatches into the table's first slot
  *     (retail's `lwz r12, 0(r3)` / `lwz r12, 8(r12)`) and allocates the object with `new` - 0x816C bytes,
  *     the allocation `reflectInit` makes - so the class carries the real virtual and the out-of-line

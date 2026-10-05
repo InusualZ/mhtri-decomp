@@ -1,158 +1,53 @@
 /*
- * Network/NetworkSessionManagerPat.cpp - `.text` 0x803D70B8..0x803DF2EC (106 functions); its first function
- * (0x803D70B8..0x803D72F4, 572 B) is `NetworkSessionManagerPat`'s key function, so the class's vtable is emitted here.
- *
- * The unit is now the range 0x803D70B8..0x803DF2EC (the network pilot
- * round 3 recut moved 0x803DF2EC..0x803E44C8 out to `Network/NetworkLayer.cpp` and `Network/NetworkLayerPat.cpp`): it also
- * holds `initNetworkSessionStable` (0x803DEA30..0x803DEB38), absorbed from the former Matching unit
- * `Network/initNetworkSessionStable.cpp` (second header below).  That unit was built with `cflags_network` minus
- * `-O4,p` plus `-O3`; this row keeps the survivor's `cflags_main`, so the merged unit is `NonMatching`.  What is
- * still unwritten is listed under (8).
- *
- * WHY THIS UNIT EXISTS.  MWCC emits a class's vtable in the translation unit that defines the class's
- * **key function** - the first non-inline, non-pure virtual declared in the class - and
- * `NetworkSessionManagerPat::move` is that function (`Network/NetworkSessionManager.h` declares it first
- * for exactly this reason).  The target says which TU that was: `__vt__24NetworkSessionManagerPat` sits
- * at 0x805FB0F0, one byte past the end of this band's own `.data` run start (0x805FAAD0, where the two
- * Pat message strings and the three jump tables of this band's other functions live), i.e. this band,
- * not `Network/NetworkSessionManager.cpp` - whose object carries the *base* table alone.  So the table is claimed
- * here with the key function, and the class's other ~100 overrides (whose bodies are still `fn_`
- * rows in the two bands) are the residual: see the file header of `Network/NetworkSessionManager.h` for the
- * slot census.
- *
- * SECTIONS.  `.text` 0x803D70B8..0x803D72F4 (exactly the key function's extent), `.data`
- * 0x805FB0F0..0x805FB2B8 (exactly `__vt__24NetworkSessionManagerPat`, 0x1C8 B) and `.sdata2`
- * 0x8079C758..0x8079C75C (4 B = 1.0f, the circle-info interval `move` compares against).  The key
- * function has no `extab`/`extabindex` record (no extabindex entry names it, unlike the 22 functions of
- * the rest of the band), so none is claimed.  The `.data`/`.sdata2` claims are the *owning symbol's*
- * extent, not the whole contiguous `.data` run 0x805FAAD0..0x805FB2B8: that run is this band's, but its
- * strings and jump tables belong to functions that are not reconstructed yet, and claiming bytes our
- * object does not emit would be a claim without an emission (playbook 78).  A later pass that
- * reconstructs them extends the claim to the whole run.
- *
- * RESIDUALS.  (1) The table is now complete at the reloc level: our object carries a relocation at
- * **all 112** slots the target relocates, each naming the symbol the target's object names.  It did not
- * before - the base leaves 62 of those slots pure, so 61 of them were emitted as `0x00000000` and the
- * 62nd as the base's `setFlag79` - and closing them is what `NetworkSessionManagerPat`'s declaration
- * block in `Network/NetworkSessionManager.h` is for: one override per filled slot.  What is still
- * UNWRITTEN is the 62 overriding bodies.  They live in bands no unit has claimed (0x803D72F4..0x803DDB64,
- * 0x803DE56C/0x803DE5F4, 0x803DEF38..0x803DF178 - 20,068 B), so each declaration's name and parameter
- * list is a reconstruction from that body: `handleCircleJoin` calls `sendReqCircleJoin`,
- * `getCircleInfoCount` is `lwz r3,0xAF0(r3)`, the 21 request handlers read their argument as a
- * `NetworkRequest*` and call `NetworkRequest::getArgument`.  Where a body identifies nothing, the name is
- * the vtable offset it fills (`slot_068`), which is this class's own scheme (`slot_13C` in the base).
- * The map rows carry those mangled spellings because the TARGET object's relocation name is generated
- * from the map: the pairing is the declaration's, so a later pass that refines a name refines the map
- * row with it.  Census (never transcribe it - regenerate): `python tools/units/vtableaudit.py --at
- * 0x805FB0F8 --json` gives all 112 rows (index, address, target, owner); the `.data` offsets ARE the
- * slot offsets (`+0x008` deleting destructor, `+0x018` the key function, four bytes a slot, 114 words
- * to `+0x1C8`), so both objects' `.rela.data` compare slot for slot.
- * The map boundary this work moved: the target's `+0x03C` points at 0x803DF0C4, a 4-byte `blr` inside
- * what the map had as `fn_803DF0A4`'s 0x24-byte extent.  A slot holds a function entry, and `void f() {}`
- * is exactly `blr` - so 0x803DF0C4 is the empty `setFlag79` override and 0x803DF0A4 ends at 0x20; the
- * extent was shrunk and the 4-byte row added with it.
- * (2) `move` matches (572 B): the error record is the 12-byte signed `NetworkErrorInfo` view forwarded by value
- * (`NetworkPostedError`), the publish test is `1.0f + last < now`, the record count is the `>= 256 ? 256 : n`
- * ternary and the mode byte is signed `set ? 1 : 2`.  PEEPHOLE: the pass is off file-wide (from `move` on; it
- * also closes `slot_1B8`), on again only around `getTimeSincePublish` (97.86 on, 96.25 off).
- * (3) The callback at `+0x04` is called through a cast (`unused_04` is the base's `u32`, and the base's
- * `init(u32, u32)` mangles as `init__21NetworkSessionManagerFUlUl`, so its parameter list cannot be
- * retyped to the callback without renaming that row and every call site).
- * (4) The `.sdata2` word is emitted as the pool entry the original had - anonymous, `@417` here - so it
- * pairs by address but not by symbol name: its bytes are identical and its row does not merge against
- * the map's `lbl_8079C758`.  Naming it would mean claiming a symbol the original did not have, so it
- * stays a pool entry (playbook 58).
- * (5) Bodies written by the network pilot: the circle/player getters 0x803DBA2C..0x803DC0E4 and the
- * setters/stubs 0x803DEF38..0x803DF1CC.  Open residuals in them, each blocked on a header another lane owns:
- *   - the address objects are `NetworkUniqueId`s (`Network/NetworkUniqueId.h`), a class, so every +0x28 `copyFrom`
- *     is a real virtual call; the slot is still typed `const u8*` by the sink's declaration
- *     (`Network/network_transport_types.h`) where every caller passes another unique id (the cast at each site).
- *   - `NetworkSessionBase::getUserFlagB` (+0x84, `Network/network_transport_types.h`) returns `u8`, so our
- *     callers re-extend it (`clrlwi.`) where retail uses the full word (`cmpwi r3,0` in
- *     `getTimeSincePublish`, a plain `bctr` tail call in `isNetworkSessionManagerPatReady`).
- *   - The base's +0x0C field is typed `NetworkBuffer*` but holds the `NetworkSessionBase` that
- *     `initNetworkSessionStable` allocates (its slots +0x3C/+0x84 are the session's `post`/`getUserFlagB`);
- *     the Pat bodies read it through a `NetworkSessionBase*` cast until the field is retyped (it changes
- *     `Network/NetworkSessionManager.cpp`'s calls, so it is that unit's measured pass).
- * Names derived here (GUESS, from the bodies): `setCircleComment` (0x803DF0C8, copies <= 144 chars to +0xA54),
- * `setCircleMode` (0x803DF144, the +0xAE5 byte and the +0xAE6 pending flag `move` consumes), `post` (0x803DF180,
- * forwards to the session's +0x3C `post`); the circle/player counters are named limit/used from the getters'
- * subtraction (GUESS).
- * (6) NetworkLayer (0x803DF2EC..0x803E0BE8) moved with its residuals to `Network/NetworkLayer.cpp` at the
- * round 3 recut.
- * (7) Circle list and player records (0x803DDA90..0x803DE56C): the circle entries are filled from the
- * received `PatCircleInfo` block, the players from the reflection handlers; names are GUESSES from the bodies
- * (`setCircleInfo`/`addCircleInfo`/`removeCircleInfo`, `resetPlayerRecord`/`addPlayerRecord`/
- * `removePlayerRecord`/`updatePlayerRecord`, `packCircleOptions`; `postEvent`'s fifth argument is a per-event
- * payload - an error record, an index or a state byte).  The stack copies are real `NetworkUniqueId` /
- * `NetworkSessionSlotInfo` locals (MWCC's scope-exit destructors and cleanup records), each declared in the block
- * retail constructs it in.  Residuals: `setCircleInfo` compares the option's
- * enable byte with `cmplwi` where retail has `cmpwi` (u8, s8 and bool spellings tried); `packCircleOptions` addresses the name entries from the list
- * base where retail strength-reduces a pointer at +0x08 (the explicit pointer spelling swaps two registers,
- * 96.16 vs 98.32).
- * SEAM: re-drawn by the round 3 recut - the `.data` V->S seam at 0x805FB2B8 is now this unit's right edge, and
- * `NetworkLayer` / `NetworkLayerPat` are their own units.
- * (8) Request handlers and callbacks (0x803D72F4..0x803DF2EC).  Every handler is the same state
- *   machine over `NetworkRequest::state_00` (0 start, its own wait steps, 100 cancelled, 110 failed = also event 3);
- *   `requestFlags_30C[i]` / `requestIds_360[i]` are the reply bits and request ids of request slot i, which the
- *   server message callback `networkSessionReflect1` sets.  Names: `moveStartSession` and `matchPhase_66C` are its
- *   own log string's ("moveStartSession::mMatchPhase(0) NG"); `handleCircleLeave` (was `handleCircleMatchEndInfo`),
- *   the chat, leave and log helpers and every message record view are GUESSES from the bodies.  Lever found here:
- *   `32 <= id` keeps retail's two signed compares where `id >= 32` merges them into one `cmplwi` (also in
- *   `Network/NetworkSessionStable.cpp`); `-(!x)` gives retail's `cntlzw`/`srwi`/`neg` where `-(x == 0)` gives `extrwi`.
- *   Residuals (measured): `updateSession` is 100 since `config.yml` blocks dtk's relocation on its error code
- *   0x80060034; `networkSessionReflect1` 99.66 and `moveStartSession` 99.94 - one
- *   callee-saved register colouring each; `networkSessionReflect0` 98.68 - the event-code select's scheduling;
- *   `slot_19C` 98.33 and `isNetworkSessionManagerPatReady` 3.33 - `NetworkSessionBase::getUserFlagB` is declared
- *   `u8` in L1's header (`clrlwi` re-extension); `handleCircleJoin` 99.97 - the jump table's label name.
- *   Callees in other lanes' units are declared in their owners' headers (integrated from
- *   `.pi/outbox/net2-l2-101a-requests.json`); `getNetworkBinaryState` (owner header `u32`) is narrowed with a `(u8)`
- *   cast at each call.  The mediator records are the owners' (`Network/gamespy_interface_types.h`,
- *   `Network/PatInterface.h`, `Network/NetworkWiiMediator.h`); the error record is 12 bytes (0x10 lowers 10 rows).
- *   UNWRITTEN: `networkPatReleaseBuffer` (232 B - deletes the Tcp/Udp objects through the virtual destructor
- *   `Network/network_transport_types.h` now declares).  `getPatTerms`, the two record copies 0x803DFCA8/0x803DFD2C
- *   and the `NetworkLayerPat` part left with the round 3 recut, the layer id helpers and their `-pool off` with
- *   `Network/NetworkLayer.cpp`.
- */
-
-/* Absorbed unit `Network/initNetworkSessionStable.cpp` (phase 4 fold):
-
- * Network/initNetworkSessionStable.cpp - `initNetworkSessionStable`
- * (0x803DEA30..0x803DEB38, 264 B).
- *
- * BOUNDARY.  One function, both seams weak: `tudiscover at initNetworkSessionStable` reports the
- * closure as the function alone, the nearest left cut 0x803DD750 and right cut 0x803DEDE0 are both
- * single-signal (codegen fingerprint change, share 0.093 / 0.113).  The closure edge is taken on both
- * sides, so **both seams are unproven** - the original TU may extend up to 0x803DEDE0 (its next
- * function, `0x803DEB38`, and the six following it are just as plausibly the same file).
- * Sections: `.text` 0x803DEA30..0x803DEB38, `extab` 0x8001A630..0x8001A648,
- * `extabindex` 0x8003AB9C..0x8003ABA8 (the object's one unwind record).
- *
- * WHAT IT IS.  The NetworkSessionStable opener: it rejects a second init (+0xC already set returns
- * -1), allocates the session (`NetworkSessionStable`, `Network/NetworkSessionStable.h`), runs its `init`
- * with the reflect callback `networkSessionReflectCallback` and the band's work buffer, seeds the host,
- * subhost and connection intervals from the float pool (0x8079C764 / 0x80793930 / 0x80793934), flips
- * the +0x3C8 ready flag and returns the session's own slot index (the callee's -1 when no slot was
- * free).  Module `Network` (the class names and the registered neighbour).
- *
- * LANGUAGE.  The task proposed this unit as `.c`, but the target allocates through `__nw__FUl`, the
- * C++ global `operator new` (defined in `sys_mem.cpp`), and dispatches five methods through the
- * session object's vtable - both C++-only.  The file is therefore `.cpp`; the function keeps C linkage
- * (`extern "C"`) so the unmangled `initNetworkSessionStable` symbol is unchanged.
- *
- * FLAGS.  Per-unit `-O3` in `configure.py` (the lib default `-O4,p` hoists the constant setup into the
- * prologue and lays the two early returns out inline): the source scores 81.39 % at `-O4,p` and
- * 100.00 % at `-O3` - the same flag shape as the sibling `Network/NetworkSessionManager.cpp`.  C++ exceptions come
- * from the lib flag `-Cpp_exceptions on` (`cflags_network`); they are what makes MWCC emit the
- * `extab`/`extabindex` pair, and the `new` expression gives the record the target's 24-byte shape.
- * `#pragma peephole off` is the last byte of the match: with the pass on MWCC folds the first
- * dispatch's vptr-load base into the `mr r3,r31` copy (`lwz r12,0(r31)`) where retail keeps
- * `lwz r12,0(r3)`.
- *
- * NAMES.  The session is the real class `NetworkSessionStable`; the setters are the virtual slots the
- * base class names (`setHostTimeout`, `setSubhostTimeout`, `setConnectionInterval`).  `getOwnIndex` is
- * declared `s32` on purpose: the target's call site narrows with `extsb`, which MWCC only emits for a
- * callee the caller declares wider than its own `s8` return.
+ * Network/NetworkSessionManagerPat.cpp - `NetworkSessionManagerPat`: its key function `move` (so the class table is
+ *   emitted here), the request handlers and callbacks, the circle list and player records, and
+ *   `initNetworkSessionStable`, the NetworkSessionStable opener.
+ * RANGE. .text 0x803D70B8-0x803DF2EC (106 functions); .data 0x805FAB48-0x805FB2B8 (the Pat strings, the jump tables and
+ *   `__vt__24NetworkSessionManagerPat` 0x805FB0F0), .sdata 0x80793930-0x80793940 (the session's three timeouts), .sdata2
+ *   0x8079C758-0x8079C778, extab, extabindex.  The right edge is the `.data` V->S seam at 0x805FB2B8.
+ * FLAGS. The game-root `cflags_main` (configure.py; docs/network.md); file-scope `#pragma peephole off`
+ *   from `move` on (retail keeps `lwz r12,0(r3)` after the `mr r3,r31` copy; it also closes `slot_1B8`), on again only
+ *   around `getTimeSincePublish`.
+ * NAMES. `moveStartSession` and `matchPhase_66C` are its log string's ("moveStartSession::mMatchPhase(0) NG").  GUESSes
+ *   from the bodies: `handleCircleLeave`, the chat/leave/log helpers, every message record view, `setCircleComment`
+ *   (0x803DF0C8, copies <= 144 chars to +0xA54), `setCircleMode` (0x803DF144), `post` (0x803DF180), the limit/used
+ *   counters, `setCircleInfo`/`addCircleInfo`/`removeCircleInfo`, the `*PlayerRecord` family, `packCircleOptions`.
+ *   Where a body identifies nothing, an override is named for the vtable offset it fills (`slot_068`, as `slot_13C` in
+ *   the base).
+ * RESIDUALS. `networkPatReleaseBuffer`: unwritten (232 B; deletes the Tcp/Udp objects through the virtual destructor).
+ *  - `isNetworkSessionManagerPatReady`, `slot_19C`, `getTimeSincePublish`: `NetworkSessionBase::getUserFlagB` (+0x84,
+ *    `Network/network_transport_types.h`) returns `u8`, so our callers re-extend it (`clrlwi.`) where retail uses the
+ *    full word (`cmpwi r3,0`, a plain `bctr` tail call);
+ *  - `networkSessionReflect1`, `moveStartSession`: one callee-saved register colouring each;
+ *  - `networkSessionReflect0`: the event-code select's scheduling;
+ *  - `setCircleInfo`: the option's enable byte compares with `cmplwi` where retail has `cmpwi` (u8, s8, bool tried);
+ *  - `packCircleOptions`: the name entries are addressed from the list base where retail strength-reduces a pointer at
+ *    +0x08 (the explicit pointer spelling swaps two registers);
+ *  - `updatePlayerRecord`: not characterised (the objdiff row);
+ *  - `.sdata2`: the pool entries pair by address, not by name (anonymous `@NNN` against the map's `lbl_8079C758`;
+ *    naming one would claim a symbol the original did not have, playbook 58);
+ *  - `.sdata` 0xC against 0x10; `flipcheck` reads both small-data pools as a partial pool of a TU spanning several
+ *    units (fold candidate with the session/transport units, low confidence).
+ * SHAPES. `Network/NetworkSessionManager.h` declares `move` first so it is the key function; the table is compiler
+ *   output with one override per filled slot (`python tools/units/vtableaudit.py --at 0x805FB0F8 --json` regenerates
+ *   the 112-row census; the `.data` offsets are the slot offsets).  The `+0x03C` slot is the empty `setFlag79` override
+ *   at 0x803DF0C4 (`void f() {}` is exactly `blr`).
+ *  - `move`: the error record is the 12-byte signed `NetworkErrorInfo` view passed by value (`NetworkPostedError`; 0x10
+ *    lowers ten rows), the publish test is `1.0f + last < now`, the record count the `>= 256 ? 256 : n` ternary, the
+ *    mode byte signed `set ? 1 : 2`;
+ *  - every handler is one state machine over `NetworkRequest::state_00` (0 start, its own waits, 100 cancelled, 110
+ *    failed); `requestFlags_30C[i]`/`requestIds_360[i]` are the reply bits and ids `networkSessionReflect1` sets;
+ *  - `32 <= id` keeps retail's two signed compares (`id >= 32` merges them into one `cmplwi`); `-(!x)` gives retail's
+ *    `cntlzw`/`srwi`/`neg` where `-(x == 0)` gives `extrwi`;
+ *  - the stack copies are real `NetworkUniqueId`/`NetworkSessionSlotInfo` locals declared in the block retail constructs
+ *    them in (MWCC's scope-exit destructors and cleanup records); every +0x28 `copyFrom` is a virtual call, its slot
+ *    still typed `const u8*` by the sink's declaration, so each site casts;
+ *  - the callback at +0x04 is called through a cast (`init__21NetworkSessionManagerFUlUl` fixes the base's parameter
+ *    list); the base's +0x0C `NetworkBuffer*` field holds a `NetworkSessionBase` and is read through a cast;
+ *    `getNetworkBinaryState` (an owner-header `u32`) is narrowed with `(u8)` at each call;
+ *  - `initNetworkSessionStable` is C++ (`__nw__FUl`, five virtual calls) with C linkage; its `new` expression gives the
+ *    target's 24-byte extab record; `getOwnIndex` is declared `s32` so the call site narrows with `extsb` as retail.
+ *  - `updateSession`'s error code 0x80060034 is a `config.yml` relocation block.
  */
 
 #include "Network/NetworkSessionManager.h"
@@ -288,12 +183,8 @@ typedef struct PatEventTimer {
 #pragma peephole off
 typedef void (*PatErrorCallback)(u32, u32, u32, u32, NetworkErrorInfo*, u32);
 
-/*
- * One frame of the Pat layer's per-frame work, in the order the target runs it: pump the two channels,
- * hand a finished GameSpy error to the session, run the base's own `move`, then - when the session can
- * send and the circle is available - publish the pending circle records and the session name once a
- * second has passed since the last publish.
- */
+/* One frame of the Pat layer, in retail's order: pump the two channels, hand a finished GameSpy error to the session,
+ * run the base's `move`, then publish the pending circle records and the session name once a second has passed. */
 void NetworkSessionManagerPat::move()
 {
     NetworkErrorInfo info;        /* the error record the thread filled in */
@@ -350,9 +241,9 @@ void NetworkSessionManagerPat::move()
     }
 }
 
-/* Logs this console in (event 1): checks the account, installs the reflect callback, then runs the server's
- * login, FMP and binary stages (each ended with a shut request), sends the circle notice settings and finally
- * takes this console's ids, a random session key and the hunter name. */
+/* Logs this console in (event 1): the account check, the reflect callback, the login, FMP and binary stages (each
+ * ended with a shut request), the circle notice settings, then this console's ids, a random session key and the
+ * hunter name. */
 s32 NetworkSessionManagerPat::updateSession(NetworkRequest* request)
 {
     NetworkFmpSlot slot;
@@ -722,9 +613,8 @@ s32 NetworkSessionManagerPat::slot_190(NetworkRequest* request)
     return 1;
 }
 
-/* Shuts the session down step by step: releases the resolver, closes the GameSpy thread, tells the server
- * (shut mode 1) while the interface is still referenced, drops callback 3 and waits for the log to drain
- * before reporting the end (event 2). */
+/* Shuts the session down step by step: the resolver, the GameSpy thread, the server (shut mode 1) while the interface
+ * is referenced, callback 3, then waits for the log to drain and reports the end (event 2). */
 s32 NetworkSessionManagerPat::shutdown(NetworkRequest* request)
 {
     switch (request->state_00) {
@@ -796,9 +686,8 @@ s32 NetworkSessionManagerPat::shutdown(NetworkRequest* request)
     return 0;
 }
 
-/* Sends this console's match mode (event 26 with its state byte).  Inside a match setup it also re-takes the
- * host's layer slot as subhost and reports the match members (event 25); a pending error code (+0x3C4) is
- * reported (event 12) once no circle request is running. */
+/* Sends this console's match mode (event 26); inside a match setup it re-takes the host's layer slot as subhost and
+ * reports the members (event 25); a pending error code (+0x3C4) is reported (event 12) once no circle request runs. */
 s32 NetworkSessionManagerPat::handleCircleMatchOptionSet(NetworkRequest* request)
 {
     s32 mode = request->getArgument(0);
@@ -1150,9 +1039,8 @@ s32 NetworkSessionManagerPat::handleCircleLeave(NetworkRequest* request)
     return 0;
 }
 
-/* Creates a circle for `maxPlayers` (1..4, `reserved` of them held back) and becomes its host (event 4 with
- * the circle's list index): sends the pending name, comment, records and mode, then the match options, then
- * reads the circle back; a failure after the create leaves the circle again. */
+/* Creates a circle for `maxPlayers` (1..4, `reserved` held back) and hosts it (event 4): the pending name, comment,
+ * records and mode, the match options, then reads the circle back; a failure after the create leaves it again. */
 s32 NetworkSessionManagerPat::handleCircleCreate(NetworkRequest* request)
 {
     s32 maxPlayers = request->getArgument(0);
@@ -1308,9 +1196,8 @@ s32 NetworkSessionManagerPat::handleCircleCreate(NetworkRequest* request)
     return 0;
 }
 
-/* Joins circle `index` of the last list (event 6): the join, the match options, the member list, the circle
- * and its host, then waits (30 s) until every other member is linked; a failure after the join leaves the
- * circle again, and so does the circle going away midway (0x80050036). */
+/* Joins circle `index` of the last list (event 6): join, match options, members, circle and host, then waits (30 s)
+ * until every member is linked; a failure after the join, or the circle going away (0x80050036), leaves it again. */
 s32 NetworkSessionManagerPat::handleCircleJoin(NetworkRequest* request)
 {
     s32 index = request->getArgument(0);
@@ -1488,9 +1375,8 @@ s32 NetworkSessionManagerPat::handleCircleJoin(NetworkRequest* request)
     return 0;
 }
 
-/* Starts the match session (event 28): checks every match member's negotiation (event 36 for a failed one,
- * 35 when this console's own failed), waits until the GameSpy thread reaches phase 1 and every member is
- * linked, then raises the session's flag B (`matchPhase_66C` = 3). */
+/* Starts the match session (event 28): checks each member's negotiation (event 36, 35 for this console's own), waits
+ * for GameSpy phase 1 and every link, then raises the session's flag B (`matchPhase_66C` = 3). */
 s32 NetworkSessionManagerPat::moveStartSession(NetworkRequest* request)
 {
     NetworkErrorInfo error;
@@ -2352,10 +2238,8 @@ f32 NetworkSessionManagerPat::getTimeSincePublish()
 #pragma peephole off
 
 
-/* The session's event callback (installed by `initNetworkSessionStable` through
- * `networkSessionReflectCallback`): 1 a slot connected, 2 a user packet (event 29), 3 a slot failed (events 35
- * / 36), 4 a chat packet, 5 a terms update for the friend on that slot.  The parameters keep the forwarder's
- * untyped spelling: the manager, the event, the slot, the packet's two words and its bytes. */
+/* The session's event callback (via `networkSessionReflectCallback`): 1 a slot connected, 2 a user packet (event 29),
+ * 3 a slot failed (events 35/36), 4 a chat packet, 5 a terms update for the friend on that slot. */
 /* untyped: caller-owned payload - the six arguments are forwarded unchanged by networkSessionReflectCallback */
 void networkSessionReflect0(void* a0, void* a1, s8 a2, void* a3, void* a4, void* a5)
 {
@@ -2437,9 +2321,8 @@ void networkSessionReflect0(void* a0, void* a1, s8 a2, void* a3, void* a4, void*
     }
 }
 
-/* The server's message callback (installed with `setCallback(..., 3)` through `networkSessionReflectCallbackEx`):
- * each message code sets the reply bits the waiting request handlers poll, or updates the circle, player and
- * match records directly. */
+/* The server's message callback (`setCallback(..., 3)` through `networkSessionReflectCallbackEx`): each code sets the
+ * reply bits the waiting handlers poll, or updates the circle, player and match records directly. */
 void networkSessionReflect1(NetworkSessionManagerPat* self, s32 code, s32 requestId, s32 flag, s32 count,
                             const u8* data)
 {

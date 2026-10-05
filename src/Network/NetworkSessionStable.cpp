@@ -1,75 +1,47 @@
 /*
  * Network/NetworkSessionStable.cpp - `NetworkSessionStable`, the stable session the Network band opens
- *   (`initNetworkSessionStable`): its four slots, connection hand-off, control/event handling, rate governor
- *   and op-code packet writers.
- *
- * One translation unit of the retail Network transport band.  `.text` 0x803CF6D8..0x803D4904, extab
- * 0x80019AB4..0x80019F3C, extabindex 0x8003A344..0x8003A5A8, `.data` 0x805F9A40..0x805FA788.  The seam at
- * 0x803D4904 is proven by the `.data` order (`dataorder.py at 0x805FA6E8`, `tudiscover`: the two tables are
- * followed by `NetworkSessionManager`'s first string, and the down/up performance and out-of-band strings sit
- * before them), so the twelve op-code writers and rate functions that opened `Network/NetworkSessionManager.cpp`
- * (0x803D3CE8..0x803D4904) belong here; that unit now starts at 0x803D4904.
- *
- * CLASSES.  `NetworkSessionStable : NetworkSessionBase` (every one of the base's 38 slots is overridden here),
- * `NetworkSessionSlot` (0x924 B, four of them), `NetworkSlotSmallObject`, the connection/queue classes the writer
- * band owns (declared only) and `NetworkUnitPacket : NetworkStreamSink`.  The tables are compiler output
- * (rule 10): 0x805FA6E8 from `~NetworkSessionStable`, 0x805FA6A8 from `~NetworkUnitPacket`.  Slot, field and
- * method names are the log strings' (`init`, `set`, `put`, `send`, `move`, `execControl`, `execControlOne`,
- * `setNetworkConnectionEvent`, `downPerformance`, `upPerformance`, `moveOutOfBand`) or GUESSes read off the body,
- * each marked in `Network/NetworkSessionStable.h`; the callees in the unsplit writer band are named from their
- * bodies in `unsplit/NetworkStream.h` (GUESS on all of them).
- *
- * FLAGS.  C++ under `cflags_network` (`-Cpp_exceptions on` gives the `extab`), per-unit `-O3`/`-pool off`
- * (`configure.py`); file-scope `#pragma peephole off` (playbook 39) and `#pragma fp_contract off` (retail keeps
- * `fmuls`+`fadds` in `move` and `upPerformance`); `dont_inline` around the nonce pair and the destructors, whose
- * `bl`s retail keeps.  Source shapes that are levers here, each measured: bodies in address order (a callee
- * defined after its caller is not inlined, as in retail); `4 <= index` for the slot bounds test (`index >= 4`
- * merges both compares into one unsigned one), spelled `index < 0 || 4 <= index` with an early return where
- * retail branches over a `blr` (`kick`, `markLeft`, `setError`, `connect`); `slots_14828[index].field` rather than a local slot pointer
- * where retail recomputes the base; the packet getters return `u32` and the source casts `(u16)` where retail
- * masks; the `.sdata2` floats are `const` so loops hoist them; a ternary for the clamp in `updateRate`; the
- * return value of `execControlOne` is computed before the address object's destructor runs; the nonce sum as two
- * statements (`nonce = rand(); nonce += stamp;` gives retail's `add r3,r3,r31`, one expression commutes it).
- *
- * DATA.  The claim holds the strings, the jump table and both tables, and `flipcheck.py` reports the `.data`
- * section byte-identical.  The object also emits 16 B of `.sdata2` int-to-float magic constants that retail
- * loads from `Network/network_shared_data.cpp`'s pool (playbook 58: this unit is not their sole referencer, so
- * they cannot be claimed).
- *
- * STREAMS.  Every `NetworkStreamWriter`/`NetworkStreamWriterDefault` local is a real class object (the writer
- * band's constructors and destructors, declared in `Network/network_writer_types.h`): the implicit destructor at
- * each exit is what emits retail's `extab` cleanup records.  A stream retail builds mid-function is declared
- * at that point (`move`'s congestion packet, `getFreeSpace`), and `setNetworkConnectionEvent`'s reader lives
- * in a block so it is destroyed before the address object.  The `address` locals are `NetworkUniqueId`s, so their
- * scope-exit destructors and cleanup records are MWCC's too.
- *
- * RESIDUALS (`flipcheck.py`, `relocdiff.py --by-owner`).  NOT READY: `.text` 0x521C against the claim's 0x522C
- * (-16, the per-row size deltas below); `extab` is 0x488 like the target since the `address` locals became
- * `NetworkUniqueId`s (every record matches in size; 42 bytes differ, the code ranges of the rows whose sizes still
- * differ); `extabindex` differs in the same rows; `.sdata2` 16 B unclaimable as above.  Rows:
- *  - register allocation and frame size in the long functions (`move`, `init`, `send`, `set`, `execControlOne`)
- *    and in `connect` (ours keeps the slot address live across the `start` call in r31: an extra `stw r29`,
- *    frame -0x20 against -0x10, the `stw 0x4828` before the slot base is recomputed);
- *  - `setError` is called, not inlined, in retail: it sits inside the `dont_inline` region with `markLeft`;
- *  - `resetSlot` takes the queues and the governor through their own pointers (retail's `r29`/`r28` bases); left:
- *    the slot base's `addis` is scheduled before the `mulli` where retail computes it after;
- *  - `post` addresses `queueUsed_518[channel]` as base+index where retail folds the offset into the displacement,
- *    and folds the `0 <= channel < 1` test into one `bne` where retail keeps both compares (spelling every access
- *    `slots_14828[index].` without the slot local folds the 0x4D40 displacement but emits `lwzx`/`stwx`: 79.82 %
- *    against 84.22 %, reverted);
- *  - the `writeOp*` and `writeSize` arguments are masked one instruction earlier than retail;
- *  - `move`: retail destroys the inlined `writeOp7` stream after the `setError` loop that follows it, ours before
- *    it (the `bl` at +0x360 lands eight bytes away and the `@eti_` immediate of the next `setError` is shifted);
- *  - one-register colouring rows (each tried, none reachable from the source so far): `leave`/`put`/`moveOutOfBand`
- *    load `ownIndex_14826` into r0 before the `extsb` where retail loads into the destination (an `s8` field
- *    fixes them and `init`, and costs `getOwnIndex` and `moveOutOfBand` more - measured, reverted);
- *    `getUsableSlot` is the mirror image on `relayIndex_10` (an `s8` local measured worse); `sendStream` swaps
- *    r26/r29; `moveOutOfBand` keeps one more saved register (frame 0x50 against 0x40) and does not stage the
- *    two `networkStreamWriter_size` results through r0 (dropping the `(u16)` casts changes nothing);
- *  - `upPerformance`: retail reloads `networkRateFloor` (the `.sdata` word) for the clamp, ours reuses the
- *    register (the `lfs` at +0x70; a ternary clamp measured worse);
- *  - the string/jump-table labels (`@NNNN` against `lbl_...`), dtk's `@eti_` immediates and `_savegpr_`/`_restgpr_`
- *    entry points that follow the frame differences.
+ *   (`initNetworkSessionStable`): its slots, connection hand-off, control/event handling, rate governor and op-code
+ *   packet writers.
+ * RANGE. .text 0x803CF6D8-0x803D4904 (73 functions); .data 0x805F9A40-0x805FA788 (strings, the jump table, both class
+ *   tables), extab, extabindex.  The right edge is proven by the `.data` order (`dataorder.py at 0x805FA6E8`): the two
+ *   tables are followed by `NetworkSessionManager`'s first string, so the op-code writers 0x803D3CE8-0x803D4904 are
+ *   here.
+ * FLAGS. `-O3 -pool off` (configure.py; measured in docs/network.md); file-scope `#pragma peephole off`
+ *   (playbook 39) and `#pragma fp_contract off` (retail keeps `fmuls`+`fadds` in `move` and `upPerformance`).
+ * NAMES. Slot, field and method names are the log strings' (`init`, `set`, `put`, `send`, `move`, `execControl`,
+ *   `execControlOne`, `setNetworkConnectionEvent`, `downPerformance`, `upPerformance`, `moveOutOfBand`) or GUESSes read
+ *   off the body, each marked in `Network/NetworkSessionStable.h`; the writer-band callees are GUESSes in
+ *   `unsplit/NetworkStream.h`.
+ * RESIDUALS. `.text` 0x521C against the claim's 0x522C; `extab`/`extabindex` differ in the rows whose sizes differ;
+ *   the object emits 16 B of `.sdata2` int-to-float constants retail loads from `Network/network_shared_data.cpp`
+ *   (playbook 58: not their sole referencer, so unclaimable).  Rows:
+ *  - `move`, `init`, `send`, `set`, `execControlOne`: register allocation and frame size; `move` also destroys the
+ *    inlined `writeOp7` stream before the `setError` loop that follows it, retail after (the `bl` at +0x360);
+ *  - `connect`: ours keeps the slot address live across the `start` call in r31 (an extra `stw r29`, frame -0x20
+ *    against -0x10, the `stw 0x4828` before the slot base is recomputed);
+ *  - `resetSlot`: the slot base's `addis` is scheduled before the `mulli`, retail after;
+ *  - `post`: `queueUsed_518[channel]` is addressed base+index where retail folds the offset into the displacement, and
+ *    the `0 <= channel < 1` test folds into one `bne` (spelling every access `slots_14828[index].` folds the 0x4D40
+ *    displacement but emits `lwzx`/`stwx`, worse);
+ *  - `writeOp11` and the other `writeOp*` writers: the arguments are masked one instruction earlier than retail;
+ *  - `leave`/`put`/`moveOutOfBand`: `ownIndex_14826` loads into r0 before the `extsb` (an `s8` field fixes them and
+ *    costs `getOwnIndex` more); `getUsableSlot` is the mirror image on `relayIndex_10`; `sendStream` swaps r26/r29;
+ *    `moveOutOfBand` keeps one more saved register (frame 0x50 against 0x40);
+ *  - `upPerformance`: retail reloads `networkRateFloor` (the `.sdata` word) for the clamp, ours reuses the register;
+ *  - `downPerformance`, `setNetworkConnectionEvent`: not characterised one by one (the objdiff rows);
+ *  - `.data`: the string/jump-table labels pair by address, not by name (`@NNNN` against `lbl_...`).
+ * SHAPES. `NetworkSessionStable : NetworkSessionBase` overrides all 38 base slots; the tables are compiler output
+ *   (rule 10): 0x805FA6E8 from `~NetworkSessionStable`, 0x805FA6A8 from `~NetworkUnitPacket`.
+ *  - bodies in address order (a callee defined after its caller is not inlined, as in retail);
+ *  - `dont_inline` around the nonce pair and the destructors, whose `bl`s retail keeps;
+ *  - the slot bounds test is `index < 0 || 4 <= index` with an early return (`index >= 4` merges both compares);
+ *  - `slots_14828[index].field` rather than a local slot pointer where retail recomputes the base;
+ *  - the packet getters return `u32` and the source casts `(u16)` where retail masks; the `.sdata2` floats are `const`;
+ *  - `execControlOne` computes its return value before the address object's destructor runs; the nonce sum is two
+ *    statements (`nonce = rand(); nonce += stamp;` gives retail's `add r3,r3,r31`);
+ *  - every `NetworkStreamWriter`/`NetworkStreamWriterDefault` and `address` (`NetworkUniqueId`) local is a real class
+ *    object: its scope-exit destructor emits retail's `extab` cleanup record; a stream retail builds mid-function is
+ *    declared at that point, and `setNetworkConnectionEvent`'s reader lives in a block so it dies before the address.
  */
 #include "types.h"
 #include "Network/network_transport.h"
@@ -348,9 +320,8 @@ inline void NetworkSessionStable::writeOp7()
     sendStream(&stream, 1, 1, &term, 0xFF);
 }
 
-/* One tick of the session: steps every slot's close, link and session machines, flushes what is queued
-   for it, then measures the congestion of the usable slots, tunes the rate governor and times out a
-   missing host or subhost. */
+/* One tick: steps every slot's close, link and session machines and flushes its queue, then measures the usable
+   slots' congestion, tunes the rate governor and times out a missing host or subhost. */
 void NetworkSessionStable::move()
 {
     NetworkSessionSlot* slot;
@@ -858,7 +829,7 @@ void NetworkSessionStable::resetSlot(s8 index)
     }
 }
 
-/* Starts the slot's connection once, and arms its connect machine. */
+/* Starts the slot's link once and arms its link state machine. */
 void NetworkSessionStable::connect(s8 index, u32 a, u32 b)
 {
     if (index < 0 || 4 <= index) {
@@ -993,9 +964,8 @@ s32 NetworkSessionStable::isConnected(s8 index)
 
 /* Connection events and control messages                                                     */
 
-/* Handles an event a slot's connection reports: an error, a relay or a leave, a shutdown, the establish
-   handshake, or a frame that is queued on the slot it belongs to (or forwarded through the slot that
-   reaches its target). */
+/* Handles a slot connection's event: an error, a relay or leave, a shutdown, the establish handshake, or a frame queued
+   on its slot (or forwarded through the slot that reaches its target). */
 void NetworkSessionStable::setNetworkConnectionEvent(s32 event, s8 index, u32 arg, s32 size, const u8* data)
 {
     NetworkUnitPacket packet;
@@ -1570,9 +1540,8 @@ void NetworkSessionStable::discardControlMessages(s8 index)
     } while (i < 2);
 }
 
-/* Executes one control message of a slot: sleep and wake notices, the sync-drop nonce list, relayed user
-   data, drop and leave notices, the relay authentication handshake and the relay route search.  Returns 0,
-   or the negated message type when the message is refused. */
+/* Executes one control message of a slot (sleep/wake, the sync-drop nonce list, relayed data, drop/leave, the relay
+   handshake and route search); 0, or the negated message type when it is refused. */
 s32 NetworkSessionStable::execControlOne(s8 index, NetworkStreamWriter* packet)
 {
     NetworkUniqueId address;

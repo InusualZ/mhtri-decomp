@@ -1,31 +1,17 @@
 /*
- * Network/NetworkResolverWii.cpp - the Wii name resolver: constructor, destructor, the lookup thread and the
- *   `check` state machine.  Its log string names the class (`NetworkResolverWii::check`).
- *
- * One translation unit of the retail Network transport band, split out of `Network/network_transport.cpp`
- * (docs/network-transport-split.md holds the evidence and the confidence of each cut).  `.text`
- * 0x803CF14C..0x803CF654, `.data` 0x805F9958..0x805F99A0, extab 0x80019A68..0x80019AAC, extabindex
- * 0x8003A2F0..0x8003A338.
- *
- * NAMES.  The thread entry and lookup names are GUESSes.  Every name here is the map's or a derived one; the
- * derived ones are marked GUESS in `Network/network_transport_types.h`.
- *
- * EDGE UNPROVEN: the right edge (0x803CF654) is a guess - `tudiscover` reports only weak signals there; the
- * `.data` seams fix only that the next TU starts inside the SessionBase interval.
- *
- * TABLE.  Its table (0x805F9980, 0x20 B) is emitted from `~NetworkResolverWii`, the key function (rule 10).
- *
- * FLAGS.  C++ under `cflags_network` (`-Cpp_exceptions on` gives the `extab`), per-unit `-O3`/`-pool off` (`configure.py`);
- * file-scope `#pragma peephole off` (playbook 39); each `dont_inline` region keeps a retail `bl` that `-inline auto` folds.
- *
- * SHAPES.  `check`'s states 0 and 10 `break` to one shared `return 0` after the switch (retail's single tail).
- *
- * CLASS.  `NetworkResolverWii` is concrete and 0x1568 B (`sNetworkLibraryWii::createResolver` is `new` of 0x1568):
- * the thread record is 8-aligned, and the derived table has no sixth slot - its trailing zero word, like the base
- * table's, is the 8-byte `.data` alignment, so the object's `.data` is 0x44 of the claimed 0x48 and the link pads it.
- *
- * RESIDUALS.  As `Matching` the DOL hash holds (measured 2026-10-04).  `.text` bytes match; `check`'s error code 0x80020002 is a plain immediate in ours where dtk's split
- * relocates it against `@eti_8001FFF8+0xA` (an `extabindex` address that happens to equal the constant).
+ * Network/NetworkResolverWii.cpp - the Wii name resolver: constructor, destructor, the lookup thread and the `check`
+ *   state machine.  Its log string names the class (`NetworkResolverWii::check`).
+ * RANGE. .text 0x803CF14C-0x803CF654 (8 functions); .data 0x805F9958-0x805F99A0, extab, extabindex.  One TU of the
+ *   transport band: docs/network.md (the right edge is unproven: `tudiscover` gives only weak signals).
+ * FLAGS. `-O3 -pool off` (configure.py; measured in docs/network.md); file-scope `#pragma peephole off`
+ *   (playbook 39).
+ * NAMES. The thread entry and lookup names are GUESSes (marked in `Network/network_transport_types.h`).
+ * RESIDUALS. none in `.text`; `check`'s error code 0x80020002 is a plain immediate in ours where the target relocates it
+ *   against `@eti_8001FFF8+0xA` (an `extabindex` address equal to the constant).  The DOL hash holds with it linked.
+ * SHAPES. The table (0x805F9980) is emitted from `~NetworkResolverWii`, the key function (rule 10).
+ *   `NetworkResolverWii` is concrete and 0x1568 B (`sNetworkLibraryWii::createResolver` is `new` of 0x1568); the derived
+ *   table has no sixth slot - its trailing zero word is the 8-byte `.data` alignment, so the object's `.data` is 0x44
+ *   of the claimed 0x48.  `check`'s states 0 and 10 `break` to one shared `return 0` after the switch.
  */
 #include "types.h"
 #include "Network/network_transport.h"
@@ -119,9 +105,8 @@ void networkResolver_lookup(NetworkResolverWii* self)
     self->result_1538 = SOGetAddrInfo(self->lookupName_153C, NULL, &self->hints_1540, &self->addrInfo_1560);
 }
 
-/* Walks the lookup state: an address literal resolves at once, anything else starts the lookup thread
-   (state 0), waits for it (0x0A), collects up to four addresses (0x0F) and then reports how many it has
-   (0x14).  A failure parks the machine in 0x5A. */
+/* One step of the lookup: an address literal resolves at once, else start the thread (0), wait (0x0A), collect up to
+   four addresses (0x0F) and report the count (0x14); a failure parks the machine in 0x5A. */
 s32 NetworkResolverWii::check()
 {
     u8 literal[4];

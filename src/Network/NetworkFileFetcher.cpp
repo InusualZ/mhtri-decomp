@@ -1,30 +1,18 @@
 /*
- * Network/NetworkFileFetcher.cpp - the Pat-server file fetcher `NetworkFileFetcher`.
- *
- * SECTIONS. extab 0x8001B790..0x8001B850; extabindex 0x8003B910..0x8003B9D0; .text 0x803F6524..0x803F73C0;
- *   .data 0x805FC848..0x805FC8A8 (`onReply`'s jump table, then the class table 0x805FC880); .sdata
- *   0x80793950..0x80793958 (the "%d" format).
- *
- * WHAT IT IS. `NetworkFileFetcher` (table 0x805FC880): `open`/`read`/`list`/`close`/`queryChecksum` start a command
- *   that `poll` steps, sending `sendReqBinaryHead`/`Data`/`Foot` and the checksum request and waiting for the reply
- *   bits `onReply` (the Pat callback slot 2, through `fileFetcherReplyCallback`) sets.  `Network/NetworkFileFetcher.h`
- *   declares it with the classes of its three neighbour units: `NetworkFetcherBase` (`Network/NetworkFetcherBase.cpp`),
- *   `NetworkNullFetcher` (`Network/NetworkNullFetcher.cpp`) and `NetworkSocketBase` (`Network/NetworkSocketBase.cpp`).
- *   Every member name except `NetworkFileFetcher` and its constructor (the map's) is a GUESS from the bodies: the
- *   command numbers, the "unsupported" `write`/`remove` slots, the reply bits.
- *
- * WHY IT SITS HERE. the network pilot round 3 recut of the phase 4 stub `Network/NetworkCommunityPat.cpp`, cut four
- *   ways at the `.data` seams (request net3-c-47f5#1): a V->D seam at 0x805FC848 and zigzag seams at 0x805FC8A8 and
- *   0x805FC8D0 - one TU emits its jump tables first and its class tables in reverse.
- *
- * FLAGS. `cflags_network` with `-O3` like the session and transport siblings; file-scope `#pragma peephole off`
- *   (retail's unfused `extsh`+`cmpwi` of the deleting flag and `clrlwi`+`cmpwi` of the bit tests).
- *
- * RESIDUALS. 19 of 20 rows at 100 %.  `onReply` 99.62: the read reply's `transferred_20` copy sits in r4 and
- *   the available byte count in r7 where retail has them the other way round (all 24 declaration orders of the
- *   locals measured; dropping the `end` local put `end` in retail's r0).  The error code 0x800A0004 is relocated in the
- *   target (dtk reads it as `fn_8009F85C+0x7A8`); the `block_relocations` entries in `config.yml` remove those
- *   relocations.  `sendReqBinaryChecksum` (0x80400F28, request op 0x47) is a GUESS name.
+ * Network/NetworkFileFetcher.cpp - the Pat-server file fetcher `NetworkFileFetcher`: `open`/`read`/`list`/`close`/
+ *   `queryChecksum` start a command that `poll` steps, sending `sendReqBinaryHead`/`Data`/`Foot` and the checksum
+ *   request and waiting for the reply bits `onReply` (Pat callback slot 2, through `fileFetcherReplyCallback`) sets.
+ * RANGE. .text 0x803F6524-0x803F73C0 (20 functions); .data 0x805FC848-0x805FC8A8 (`onReply`'s jump table, then the
+ *   class table 0x805FC880), .sdata 0x80793950-0x80793958 (the "%d" format), extab, extabindex.  The four fetcher/socket
+ *   units are cut at the `.data` seams: V->D at 0x805FC848, zigzag at 0x805FC8A8 and 0x805FC8D0.
+ * FLAGS. `-O3` (configure.py) like the session and transport siblings; file-scope `#pragma peephole off` (retail's
+ *   unfused `extsh`+`cmpwi` of the deleting flag and `clrlwi`+`cmpwi` of the bit tests) and `#pragma dont_inline on`.
+ * NAMES. Every member name except `NetworkFileFetcher` and its constructor (the map's) is a GUESS from the bodies: the
+ *   command numbers, the "unsupported" `write`/`remove` slots, the reply bits; `sendReqBinaryChecksum` (0x80400F28,
+ *   request op 0x47) too.  `Network/NetworkFileFetcher.h` also declares the three neighbour units' classes.
+ * RESIDUALS. `onReply`: the read reply's `transferred_20` copy sits in r4 and the available byte count in r7, retail the
+ *   other way round (all 24 declaration orders of the locals measured).  The error code 0x800A0004 is relocated in the
+ *   target (`fn_8009F85C+0x7A8`); `config.yml`'s `block_relocations` entries remove those relocations.
  */
 
 #include "Network/NetworkFileFetcher.h"

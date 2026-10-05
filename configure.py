@@ -285,20 +285,8 @@ cflags_g3d = [
     "-Cpp_exceptions on",
 ]
 
-# Network and OS flags (src/Network/NetworkWiiMediator.cpp - formerly the 20-byte NetworkWiiMediator.c,
-# retired by the worker/net-capcom batch - and src/OS/OSAlarm.c): cflags_base + -func_align 4.
-# Evidence: both retail objects are `.text align 2**2`, while cflags_base's -O4,p implies -func_align 16, which
-# is what our objects emit. Flipping NetworkWiiMediator with that alignment made the linker round the object's
-# start up to the next 16-byte boundary: `dtk dol diff` reported fn_80413F3C expected at 0x80413F3C but found at
-# 0x80413F40, every following symbol shifted by 4, and main.dol stopped matching build.sha1. Section sizes were
-# already identical, so the alignment was the entire difference - the same finding as cflags_ppceabi above.
+# cflags_network and cflags_os: -func_align 4 (+ -Cpp_exceptions on for Network); measurements in docs/network.md.
 cflags_network = [*cflags_base, "-func_align", "4", "-Cpp_exceptions", "on"]
-# `-Cpp_exceptions on` (flags-audit 2026-09-28): every one of the lib's 7 registered objects carries
-# extab/extabindex in the target (24 B .. 1260 B), and 7 of 7 spelled it out as a file-wide
-# `#pragma exceptions on`. Measured with the lib flag on and all 7 pragmas deleted: all 7 objects'
-# allocatable sections byte-identical, every unit score identical, main.dol still
-# BF4850739478CAAEDFE675949EB7C28595A7FDE9. The pragmas were the symptom of the lib default
-# (`cflags_base`'s `off`) disagreeing with the lib's own bytes; the flag is the fix.
 cflags_os = [*cflags_base, "-func_align", "4"]
 # DWCi (the Wii Wi-Fi Connection SDK library the retail link places between the game's own SDK uses
 # and NHTTP).  Same shape as the sibling SDK groups above: the retail .text packs the band's
@@ -1905,224 +1893,89 @@ config.libs = [
         "cflags": cflags_network,
         "host": False,
         "objects": [
-            # Registered once, at its final home (docs/plan.md 12), the Capcom `Network` reconnaissance
-            # lane (branch worker/net-capcom).  Five units; `constructNetworkWiiMediator` flipped and was later
-            # folded into `Network/sNetworkLibraryWii.cpp` (its TU), `initNetworkSessionStable` was folded into `Network/NetworkSessionManagerPat.cpp` at
-            # phase 4 (its per-unit -O3 evidence below is kept), the other three are `Object(NonMatching, ...)`.
-            #   Network/initNetworkSessionStable.cpp (folded)  .text 0x803DEA30..0x803DEB38 (264 B, 1 fn)
-            #   Network/network_state.cpp (folded)     .text 0x803FE8E4..0x804006A8 (8900 B, 21 fn)
-            #   Network/NetworkWiiMediator.cpp         .text 0x80413C64..0x804155D4 (6490 B, 79 fn)
-            #   Network/constructNetworkWiiMediator.cpp  .text 0x80418988..0x804189C8 (64 B, 1 fn)
-            #   Network/NetworkPat.cpp                 .text 0x80419EC4..0x8041A170 (328 B, 11 fn)
-            # The *seams*: NetworkWiiMediator's left edge 0x80413C64 is the lane's only two-signal
-            # (strong) cut (`.data` jumptable run jump); every other edge is the weak closure edge and
-            # is recorded as unproven in each file's header.  `Network/NetworkWiiMediator.cpp` folds in
-            # the retired `Network/NetworkWiiMediator.c` (`fn_80413F3C` at 0x80413F3C) so the whole
-            # class band has one owner; the fold-in is part of this batch, not a later one.
-            # Per-unit flag deviation (brief section 8.2), instruction-level evidence: the two
-            # session-manager units are `-O3` scheduling, like the sibling `Network/NetworkSessionManager.cpp`
-            # below.  With the lib's `-O4,p` every framed function hoists its constant-argument
-            # setup into the prologue's `mflr`->`stw` latency slot (sendReqCommonKey: the target is
-            # `stw r0,20; stw r31,12; stw r30,8; mr r30,r3; li r4,18; li r5,0; bl` while ours puts
-            # the two `li` before the saves), and the FMP/request switch tails are laid out
-            # unsorted.  Measured over the same source: `Network/network_state.cpp` 69.42 % at
-            # `-O4,p` -> 81.93 % at `-O3` (five more functions at 100 %),
-            # `Network/initNetworkSessionStable.cpp` 81.39 % -> 100.00 % (re-measured on the landed
-            # source; the numbers as first landed were 63.26 % -> 92.88 %).  `-func_align 4` is kept
-            # from `cflags_network` (the range packs on 4-byte boundaries).
-            # Matching: the 264-byte `.text`, `extab` 0x18 and `extabindex` 0xC are all byte-identical
-            # to the target object and all ten relocations name the same symbols at the same offsets
-            # (`__nw__FUl` at .text+0x34, `constructNetworkSessionObject` at +0x44,
-            # `networkSessionReflectCallback` at +0x66/+0x6A, the three float constants at
-            # +0x8C/+0xA4/+0xBC; `__dl__FPv` at extab+0x14; `initNetworkSessionStable` and
-            # `@etb_8001A630` in extabindex).  The extab record and the last `.text` byte are source
-            # shapes, not flags - the `new` expression and the file-scope `#pragma peephole off`, both
-            # with their measured evidence in the unit header.  `Network/network_state.cpp` was folded into
-            # `Network/PatInterface.cpp` (round 4, owner ruling 2026-10-05: one TU); its row is below.
-            # `NetworkLayerPat` (round 3 recut, 0x803E0BE8..0x803EF668): it folded the former one-function unit
-            # `Network/NetworkLayerPatStep.cpp` (`stepRequest`, 0x803E44C8) and keeps its flags.  `-O3` like the sibling
-            # session units: measured with the lib's `-O4,p` (everything else equal) `stepRequest` scores 90.14167 %,
-            # against 100.00000 % at `-O3`.  `-inline noauto` since the fold: with `-inline auto` the member `getRecord`
-            # (0x803E3598, now defined in the same TU) is inlined into `stepRequest` (90.74 against 100.00; retail calls it).
+            # Flags: unit header of src/Network/NetworkLayerPat.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/NetworkLayerPat.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
-            # Phase 4 stubs: units of the reconciled candidate with no bodies yet.
-            # Each source's header says what the range is and what is unknown; flags are the lib default, unmeasured.
-            # Round 3 recut of the phase 4 stub (unit headers): the community base class and the units after the class.
-            # `NetworkCommunity`: `-O3 -inline noauto` like `NetworkLayerPat` - measured over the unit's 27 rows (same
-            # source, peephole off), the lib's `-O4,p -inline auto` scores 67.22 % (5/27 at 100) against 99.97 % (26/27).
+            # Flags: unit header of src/Network/NetworkCommunity.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/NetworkCommunity.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
-            # `NetworkCommunityPat`: the same flags - measured over the unit's 87 rows, `-O4,p -inline auto` scores 84.24 %
-            # (4/87 at 100) against 99.97 % (84/87).
+            # Flags: unit header of src/Network/NetworkCommunityPat.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/NetworkCommunityPat.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
+            # Flags: unit header of src/Network/NetworkFetcherBase.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/NetworkFetcherBase.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
+            # Flags: unit header of src/Network/NetworkFileFetcher.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/NetworkFileFetcher.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
+            # Flags: unit header of src/Network/NetworkNullFetcher.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/NetworkNullFetcher.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
+            # Flags: unit header of src/Network/NetworkSocketBase.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/NetworkSocketBase.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
+            # Flags: unit header of src/Network/NetworkSocketWii.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/NetworkSocketWii.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
+            # Flags: unit header of src/Network/NetworkUniqueId.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/NetworkUniqueId.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
+            # Flags: unit header of src/Network/NetworkUnitPacket.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/NetworkUnitPacket.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
+            # Flags: unit header of src/Network/PatConnection.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/PatConnection.cpp"),
-            # Per-object flag deviation, instruction-level evidence: `-O3 -inline noauto` like the mediator unit - with
-            # the lib default setTermVersion/setAnnounceBuffer/increment60d4 schedule their stores out of source order
-            # (60.00/77.78/80.00, 100 at `-O3`) and `-inline auto` folds getServerTime/getGameTime/getFmpSize/setSomething
-            # into their callers (getServerDateTime 53.71, copyFmpSlot 82.18, setPatByte6138On 17.50; 100 at noauto).
-            # Round 4 fold (owner ruling 2026-10-05: one TU): the unit also holds the former `Network/network_state.cpp`
-            # and the head of the former `Network/network_layer_io.cpp` (0x803FCC34..0x804123F8).  Both had `-O3` with
-            # the same evidence (network_state 69.42 -> 81.93 at `-O3`; recvReqLineCheck/recvAnsServerTime/recvAnsShut
-            # 82.13/78.25/72.67 -> 100 at `-O3`) and `-inline auto`; in one TU `-inline auto` would fold this unit's
-            # accessors into the packet layer's callers, which retail calls - so the merged unit keeps this row's
-            # `-inline noauto` (every folded row measured equal or higher: the unit header's FLAGS line).
+            # Flags: unit header of src/Network/PatInterface.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/PatInterface.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
-            # The tail of the former `Network/network_layer_io.cpp` (0x804123F8..0x80413450: `NetworkPool`, the NHTTP
-            # wrappers, `NetworkRandom`), its own TU since the PatInterface fold.  No bodies yet; the flags are the old
-            # row's `-O3` plus `-inline noauto` (fn_80412424 calls the 2-instruction `getNetworkPool` defined before it,
-            # which `-inline auto` would fold in) - unmeasured until a body lands.
+            # Flags: unit header of src/Network/NetworkPool.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/NetworkPool.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
-            # Per-object flag deviation (brief section 8.2), instruction-level evidence: measured over
-            # the unit's 79 rows, the lib's `-O4,p` leaves getAccountBan/Warning/WaitQueue at 42.86 and
-            # getReflectName3C at 51.28 where `-O3` puts all four at 100.00, and `-inline auto` scores
-            # validateReflectName 0.00 where `-inline noauto` scores it 88.28 - no other function moves under
-            # either setting.  Same finding as the lib's other units.  Evidence: the unit header of
-            # src/Network/NetworkWiiMediator.cpp.
-            # Round 3 fold: the unit also holds the former `Network/network_opening.cpp` (0x804155D4..0x80417BC0), whose
-            # own rows (2026-10-04) showed the same `-O3` signature - at the lib's `-O4,p` every framed body hoists its
-            # setup above the callee-save stores (openingStart 85.88, openTransferSlot 70.12, clearTransferQueue 65.25,
-            # pushTransferRecord 73.76, popTransferRecord 78.74 against 100 / 100 / 100 / 98.71 / 97.19 at `-O3`); its
-            # file-scope `#pragma auto_inline off` already was `-inline noauto` for its part, so the merged unit keeps
-            # this row's flags (MEASURE line in the round 3 report).
+            # Flags: unit header of src/Network/NetworkWiiMediator.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/NetworkWiiMediator.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
-            # Registered once, at its final home: split out of the former `Network/network_opening.cpp` (now folded into
-            # `Network/NetworkWiiMediator.cpp`; the `.data` order seam, unit header).  Its base-class rows show the same
-            # `-O3` evidence.
+            # Flags: unit header of src/Network/sNetworkLibrary.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/sNetworkLibrary.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
-            # Per-object flag deviation (brief section 8.2), instruction-level evidence: the sibling units' `-O3`
-            # schedule.  Measured over the same first-pass source: 75.54058 % at the lib's `-O4,p` (every framed
-            # body hoists its constant setup above the callee-save stores) against 91.81757 % at `-O3`, every row
-            # equal or higher.  Evidence: the unit header of src/Network/sNetworkLibraryWii.cpp.
-            # The folded-in `constructNetworkWiiMediator` (0x80418988) had the same deviation as its own unit:
-            # 75.00000 at `-O4,p`, 100.00000 at `-O3` (`li r3,0x1408` after the callee-save stores).
-            # `-inline noauto` since the fold (measured 2026-10-04): retail's `initNetworkLibrary` *calls*
-            # `constructNetworkWiiMediator`; in one TU `-inline auto` folds it and the inlined constructor in
-            # (256 B against 120 B, 100.00 -> 0.00); with `noauto` every one of the unit's 41 rows is unchanged.
+            # Flags: unit header of src/Network/sNetworkLibraryWii.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/sNetworkLibraryWii.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
-            # Per-object flag deviation (brief section 8.2), instruction-level evidence: the three
-            # `deleteNetwork*Pat` helpers get the target's block order and the target's `bl` to the
-            # sibling `clearNetwork*Pat` (retail calls it; `-inline auto` folds the 36-byte callee in
-            # and costs the unit 4 bytes per helper), and the eight already-matching rows do not move.
-            # Measured on the freshly written bodies: 2.85714 at the lib's `-O4,p`/`-inline auto`,
-            # 99.71429 at `-O3`/`-inline noauto` (140 B, the target size).  The file's
-            # `#pragma exceptions on` is not a flag change: the lib's `-Cpp_exceptions off` leaves our
-            # object with no `extab`/`extabindex` while the target has 24 B / 36 B, and the pragma
-            # reproduces both exactly without moving a `.text` byte.  The unit's `.text` right edge is
-            # 0x8041A194, not the pre-fix 0x8041A170: the map's `clearNetworkLayerPat` starts at
-            # 0x8041A170 (+0x24), so the old edge orphaned that function into an `auto_*` unit.
+            # Flags: unit header of src/Network/NetworkPat.cpp; measurements in docs/network.md.
             Object(Matching, "Network/NetworkPat.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
-            # Per-object flag deviation (brief section 8.2), instruction-level evidence, the sibling units'
-            # pair: measured over the unit's 13 written rows, the lib's `-O4,p`/`-inline auto` gives 68.95 %,
-            # `-O3` 81.77 % (`reflectServiceStart` then inlines `resetReflectServiceTask`, which retail calls:
-            # 40.54 -> 30.54), and `-O3`/`-inline noauto` puts 12 of them at 100 %.
+            # Flags: unit header of src/Network/NetworkReflectService.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/NetworkReflectService.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `803D3CE8_NetworkSessionManager.cpp` (`.text` now 0x803D4904..0x803D70B8: the twelve `NetworkSessionStable`
-            # op-code writers that opened the range moved to `Network/NetworkSessionStable.cpp`, whose
-            # `.data` order proved the seam at 0x803D4904) - the Network session band: the
-            # `NetworkSessionManager` request pool/state machine and the first `NetworkSessionManagerPat`
-            # virtual slots.  Module `Network` from the class names and the registered neighbour
-            # `Network/NetworkWiiMediator.cpp`; no `__FILE__` string and only `zz_` dump names cover the
-            # range, and the tile spans more than one original TU, so the file keeps the map stem
-            # (brief section 2, class 3 module + class 4 name).  C++ (mangled `__nw__FUl`/`__dl__FPv`),
-            # exceptions off, so `.text` only.  The seam is unproven (discovery byte cap).
-            # Per-unit flag deviation (brief section 8.2), instruction-level evidence: every framed
-            # function in the range is -O3 scheduling - fn_803D53B0's prologue is `stw r31,28; stw r30,24;
-            # mr r30,r3; mr r31,r4` and its global-descriptor copy is the plain `lwz/stw` block, both of
-            # which `-O4,p` destroys (it interleaves the saves and folds the copy into `lwzu`).  Measured:
-            # the same source scores fn_803D53B0 59.79 % at `-O4,p` and 95.15 % at `-O3`, fn_803D4904
-            # 70.42 % -> 93.24 %, NetworkSessionManager 81.63 % -> 92.23 %.  `-func_align 4` is kept (the 4-byte
-            # functions `fn_803D4B5C`/`fn_803D5D64` prove it).  This is the object's cflags, not the lib's:
-            # the sibling `NetworkWiiMediator.cpp` is byte-identical at `-O4,p`.
+            # Flags: unit header of src/Network/NetworkSessionManager.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/NetworkSessionManager.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
-            # The Network transport band, `.text` 0x803CCDF8..0x803D3CE8, registered as eight units -
-            # one per translation unit (docs/network-transport-split.md holds the evidence and the
-            # confidence of each cut: the retail `.data` interleaves each class's vtable with its own
-            # strings, which one TU cannot emit, and the `extabindex` entries tile in the same order).
-            # Module `Network` from the class names and the registered neighbours
-            # (`Network/NetworkSessionManager.cpp` abuts the last one exactly in extab/extabindex); no `__FILE__`
-            # string names any of them, so every file name is derived from the classes it holds and is a
-            # GUESS (recorded in each unit's header).  C++ (`__dl__FPv`, virtual dispatch); the lib's
-            # `-Cpp_exceptions on` supplies the target's extab/extabindex.
-            # Per-unit flag deviation (brief section 8.2), instruction-level evidence, unchanged by the
-            # split: `-O3` like the two sibling session units - measured on the combined unit, the lib's
-            # `-O4,p` put 14 rows at 100 % (unit score 4.05), `-O3` put 37 of 38 there (unit score 7.37);
-            # and `-pool off` on `network_socket_streams` alone (playbook 43) - the target materialises each log string with its own
-            # `lis`/`addi` pair (`NetworkMultipleUdp_receive`: `lis r4,lbl_805F988C@ha` / `addi
-            # r4,r4,lbl_805F988C@l`, then `lis r4,lbl_805F98C4@ha`), where the default pooling addresses
-            # every string of a function through one `@stringBase0` register; toggling it moved one row
-            # (`NetworkMultipleUdp_receive` 89.53 % -> 94.06 %) and lowered none.  Measured 2026-09-29: `-pool`
-            # (not `-str`) is the lever - with it on, a function referencing three or more distinct `@NNN` strings addresses the
-            # second off the first's base (`addi r28,r5,<first>` then `addi r4,r28,<delta>`); it is a no-op
-            # on the other seven units of this group TODAY (each object is byte-identical without it), but they are
-            # TUs of the same retail family and the session units still have ~60 unwritten rows, several with three or more
-            # log strings in one function, so the flag stays on all eight rather than being re-discovered per row.
+            # Flags: unit header of src/Network/NetworkPeerBase.cpp; measurements in docs/network.md.
             Object(Matching, "Network/NetworkPeerBase.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
+            # Flags: unit header of src/Network/NetworkPeerBuffer.cpp; measurements in docs/network.md.
             Object(Matching, "Network/NetworkPeerBuffer.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
+            # Flags: unit header of src/Network/NetworkPeerUdp.cpp; measurements in docs/network.md.
             Object(Matching, "Network/NetworkPeerUdp.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
+            # Flags: unit header of src/Network/NetworkPeerMcs.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/NetworkPeerMcs.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
+            # Flags: unit header of src/Network/network_socket_streams.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/network_socket_streams.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
+            # Flags: unit header of src/Network/NetworkResolverWii.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/NetworkResolverWii.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
+            # Flags: unit header of src/Network/NetworkSessionBase.cpp; measurements in docs/network.md.
             Object(Matching, "Network/NetworkSessionBase.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
+            # Flags: unit header of src/Network/NetworkSessionStable.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/NetworkSessionStable.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
-            # A **data-only** unit: the Network band's shared small-data pool, `.sdata2`
-            # 0x8079C690-0x8079C758 (200 B) and `.sdata` 0x80793900-0x80793930 (48 B), whose source
-            # defines nothing (playbook 23/53 route 2, playbook 54; the model is
-            # `Pl/pl_frame_data.cpp`).  Both runs are read by more than one party -
-            # the Network transport units and `Network/NetworkSessionManager.cpp` share
-            # 0x8079C6EC..0x8079C754, and unsplit (Network) code reads 0x8079C690 and 0x8079C750 -
-            # so no consumer may claim them without taking rows only the other consumer reads.
-            # One owner is what lets every consumer include `Network/network_shared_data.h`
-            # instead of declaring the words into its own file, which is the rule-12 finding those
-            # 14 declarations were in `Network/NetworkSessionManager.h`.  Registered once, at its
-            # final home; the `-O3` override above does not apply (no code in this unit).
+            # Flags: unit header of src/Network/network_shared_data.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/network_shared_data.cpp"),
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `8041A87C_fn_8041A87C.cpp` (`.text` 0x8041A87C..0x8041DF10, 71 functions / 13972 B).
-            # Per-object flags (brief 8.2), instruction-level evidence: retail *calls* the small
-            # file-static helpers from the big state machines - fn_8041DCDC's target body is
-            # `lwz r3,0x6634; lwz r4,0x6638; bl fn_8041C9D8; extsb` (72 B) while `-inline auto` folds
-            # the 128-byte callee into it (156 B), and fn_8041DD58/fn_8041CA94 grow the same way.
-            # With `-inline noauto` the sizes land on the target and the unit's .text gap shrinks.
-            # `-pool off` (playbook 43), instruction-level evidence from claiming the unit's `.data` string
-            # run (2026-09-30): once the log strings are this TU's own literals the default pooling
-            # addresses them off one `...data.0` base (`lis r5,...data.0@ha ; addi r30,r5,...@l`, then
-            # `addi r4,r30,0x218`), where the target gives every string its own `lis`/`addi` pair
-            # (`lis r4,lbl_806033C8@ha ; addi r4,r4,lbl_806033C8@l`).  Unit-level, measured 2026-09-30: 99.87 % / 64 rows at 100 with the flag, 98.21 % / 59 without it
-            # (natNegCompletedCallback 89.78, gt2ConnectAttemptCallback 88.74, runNasLogin 92.46, startMatch 84.70 lower, none higher);
-            # an object that owns log strings after a recut needs the same flag.
+            # Flags: unit header of src/Network/GameSpyInterfaceThread.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/GameSpyInterfaceThread.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto", "-pool off"]),
         ],
@@ -2544,37 +2397,13 @@ config.libs = [
             # the runtime dump answers only `FUN_`/`zz_` placeholders (class 3/4 in the brief; see the
             # file header).
             Object(NonMatching, "fn_80056F24.cpp"),
-            # Phase 4 fold: the unit is 0x80423E74-0x80432104 - it absorbed the former `fn_80423E74.cpp`
-            # work-record / PatCamellia band (0x80423E74-0x80429B94, 77 functions; same lib and `cflags_main`).
-            # Registered once, at its final home (docs/plan.md 12): proposal
-            # `80429B94_fn_80429B94` - the 0x80429B94-0x8043065C network pat-control band (114
-            # functions, 27336 B) with extab 0x8001D368-0x8001D558 and extabindex 0x8003DE54-0x8003E0DC.
-            # Game code that drives getPatsObject/getNetworkSessionManagerPat and reads the lobby
-            # singleton `lobby_w`; no `__FILE__` string and no runtime-dump source name cover the
-            # range, so the name is evidence class 3 - the band's own vocabulary (`getPatsObject`,
-            # `getNetworkSessionManagerPat`, `updatePatInterface180`, `setPatField854`) plus the
-            # module its four sibling units share - and the generated stem `fn_80429B94.cpp` is gone.
-            # It takes the game-root `main` lib and cflags_main (Wii/1.3, -O3, -inline noauto,
-            # -Cpp_exceptions on - the target object carries extab/extabindex).
+            # Flags: unit header of src/Network/network_pat_control.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/network_pat_control.cpp"),
-            Object(NonMatching, "Network/net_session_close.cpp"),  # phase 4 stub (link neighbour's lib and cflags_main)
-            # Registered once, at its final home (docs/plan.md 12): the key function of
-            # `NetworkSessionManagerPat` - `move` (0x803D70B8, 572 B), the head of the queue's
-            # `803D70B8_fn_803D70B8` band.  MWCC emits a class's vtable in the TU that defines its key
-            # function, and the target's `__vt__24NetworkSessionManagerPat` (0x805FB0F0) sits in this
-            # band's own `.data` run (0x805FAAD0.., right after `Network/NetworkSessionManagerPat`'s
-            # base table), so the unit claims the key function's `.text` extent, the table's `.data`
-            # extent and the 1.0f circle-info interval at 0x8079C758.  Same game-root `main` lib and
-            # cflags_main as its link neighbours (the object carries extab/extabindex for the rest of
-            # the band, and C++ virtual dispatch).
-            # The unit's `-pool off` left with the layer id helpers (round 3 recut): re-measured on the remaining rows, no
-            # row moves with or without it (94/106 at 100 either way), so the row takes the lib's cflags_main.
+            # Flags: unit header of src/Network/net_session_close.cpp; measurements in docs/network.md.
+            Object(NonMatching, "Network/net_session_close.cpp"),
+            # Flags: unit header of src/Network/NetworkSessionManagerPat.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/NetworkSessionManagerPat.cpp"),
-            # `NetworkLayer` (round 3 recut, 0x803DF2EC..0x803E0BE8; bodies moved from the unit above, same lib and cflags_main).
-            # `-pool off` (playbook 43): the layer id helpers address each of their three warning strings with their own
-            # lis/addi; with pooling on they share one base - measured on this unit, NetworkLayerIdImportFrom 82.13 -> 100.00,
-            # NetworkLayerIdExportTo 83.05 -> 100.00 with the flag, no other row moves.  The Network lib's flags
-            # (cflags_network, `-O3 -inline noauto`, `-pool off`) score every row identically, so the bodies' own lib stays.
+            # Flags: unit header of src/Network/NetworkLayer.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/NetworkLayer.cpp", extra_cflags=["-pool off"]),
             # Phase 4 (window fg): the HOME-button (HBM) code in link order.  The units from 0x8052A040 to
             # 0x80542D8C are stubs; the keyboard units absorb the former fn_805482CC / homebutton/fn_8054E894 / fn_80555374 /

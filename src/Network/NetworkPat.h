@@ -1,38 +1,22 @@
 /*
- * Network/NetworkPat.h - the four-slot "*Pat" holder and the accessor family that walks it.
- *
- * Owner: `Network/NetworkPat.cpp` (`.text` 0x80419AD4..0x8041A194).  The record and the family moved
- * here with the `Network/network_pat_control.cpp` pass: a second unit needed the type, and a
- * declaration belongs with the unit that owns the symbol (docs/plan.md 6.5 rules 1 and 2).
- *
- * The holder's extent comes from this band's own evidence, not from the accessors: the constructor
- * `constructNetworkPat` (0x80419AD4, this unit's first function) writes
- * `+0x10 = -1`, and the drive function `updateNetworkPat` reads that word as a four-bit per-slot enable mask
- * before dispatching each enabled slot at vtable `+0x18`.  The record is therefore **0x14** bytes,
- * four slot pointers plus the mask.
- *
- * Each slot holds a pointer to a polymorphic object of its **own, unrelated** class: the three
- * constructors (`__ct__24NetworkSessionManagerPatFv` 0x803D68D0, `__ct__15NetworkLayerPatFv`, `__ct__19NetworkCommunityPatFv`) share
- * no base-ctor call, so this is a container, not a class hierarchy.  What the elements do share is the
- * calling convention this unit and the holder impose on a slot: the **deleting destructor at vtable
- * `+0x08`** (called with the delete flag) and the **release hook at `+0x14`** - the offsets the four
- * `deleteNetwork*` helpers read - plus the **`+0x18` driver** the holder's own dispatch calls.  The
- * element classes are only ever reached through a pointer from here, so they are declared, never
- * defined, in this header; their tables belong to the bands that construct them.
+ * Network/NetworkPat.h - the four-slot "*Pat" holder and its accessor family (owner `Network/NetworkPat.cpp`).
+ * SHAPES. The record is 0x14 B: `constructNetworkPat` writes `+0x10 = -1` and `updateNetworkPat` reads it as the
+ *   per-slot enable mask before calling each slot's `+0x18` driver.  The slots hold unrelated classes (their
+ *   constructors share no base call) that share the deleting destructor at vtable `+0x08` and the release hook at
+ *   `+0x14`; they are declared, never defined, here (their tables belong to the bands that construct them).
  */
 #ifndef MHTRI_NETWORK_NETWORKPAT_H
 #define MHTRI_NETWORK_NETWORKPAT_H
 
 #include "types.h"
 
-/* The class `Network/NetworkSessionManager.cpp` reconstructs (table `__vt__24NetworkSessionManagerPat`,
- * 0x805FB0F0); its declaration lives in that unit's header. */
+/* The slot +0x00 element; its table `__vt__24NetworkSessionManagerPat` (0x805FB0F0) is emitted by
+ * `Network/NetworkSessionManagerPat.cpp` (the key function `move`), the class is declared in
+ * `Network/NetworkSessionManager.h`. */
 class NetworkSessionManagerPat;
 
-/* The slot +0x08 element.  Its constructor is `__ct__19NetworkCommunityPatFv` (allocation 0x25EC, table 0x805FC728 over
- * the root table 0x805FC440) and the map names neither the class nor the table, so the name is
- * **GUESSED** from the accessor's own name `getNetworkCommunityPat` - the only name the binary gives
- * the slot. */
+/* The slot +0x08 element, named by its own "NetworkCommunityPat::deleteRequest" string: constructor
+ * `__ct__19NetworkCommunityPatFv` (allocation 0x25EC), table 0x805FC728 over the root table 0x805FC440. */
 class NetworkCommunityPat;
 
 /* The slot +0x0C element: a class derived from the root whose table the map names

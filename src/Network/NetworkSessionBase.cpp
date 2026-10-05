@@ -1,30 +1,19 @@
 /*
- * Network/NetworkSessionBase.cpp - the session base class (its destructor is the key function that emits the
- *   0xA0-byte table) and the mutex/notify accessors the manager calls.
- *
- * One translation unit of the retail Network transport band, split out of `Network/network_transport.cpp`
- * (docs/network-transport-split.md holds the evidence and the confidence of each cut).  `.text`
- * 0x803CF654..0x803CF6D8, `.data` 0x805F99A0..0x805F9A40, extab 0x80019AAC..0x80019AB4, extabindex
- * 0x8003A338..0x8003A344.
- *
- * NAMES.  `NetworkSessionBase` is a GUESS (evidenced by `resetAllSlots__20NetworkSessionStableFv` driving its +0x1C slot and the
- * setters' slot positions).  Every name here is the map's or a derived one; the derived ones are marked GUESS in
- * `Network/network_transport_types.h`.
- *
- * EDGES.  The left edge (0x803CF654) is unproven: `tudiscover` reports only weak signals there.  The right edge
- * (0x803CF6D8) is set by the setters' evidence: `setLimits`/`setHostTimeout`/`setSubhostTimeout`/`setRate` write
- * only globals that NetworkSessionStable functions read and are called only from Stable functions (0x803D2314
- * and 0x803D2368), so they live in `Network/NetworkSessionStable.cpp`; the destructor (the vtable's key function)
- * stays here.
- *
- * TABLE.  Its table (0x805F99A0, 0xA0 B: the deleting destructor, 33 pure slots and the four setters, which are
- * defined in the Stable unit) is emitted from `~NetworkSessionBase`, the key function (rule 10).
- *
- * FLAGS.  C++ under `cflags_network` (`-Cpp_exceptions on` gives the `extab`), per-unit `-O3`/`-pool off` (`configure.py`);
- * file-scope `#pragma peephole off` (playbook 39); each `dont_inline` region keeps a retail `bl` that `-inline auto` folds.
- *
- * RESIDUALS.  none in `.text`.  `getNetworkBinaryState` reads `NetworkStateMachine::binaryState_6134` (the view
- *   `Network/PatInterface.h` owns); the name is a GUESS from that field (renamed from `getSomething5` by the integrator).
+ * Network/NetworkSessionBase.cpp - the session base class (its destructor is the key function that emits the 0xA0-byte
+ *   table) and the mutex/notify accessors the manager calls.
+ * RANGE. .text 0x803CF654-0x803CF6D8 (6 functions); .data 0x805F99A0-0x805F9A40, extab, extabindex.  One TU of the
+ *   transport band: docs/network.md (the left edge is unproven; the four setters `setLimits`/
+ *   `setHostTimeout`/`setSubhostTimeout`/`setRate` write only globals NetworkSessionStable reads and are called only
+ *   from it (0x803D2314, 0x803D2368), so they live in `Network/NetworkSessionStable.cpp`).
+ * FLAGS. `-O3 -pool off` (configure.py; measured in docs/network.md); file-scope `#pragma peephole off`
+ *   (playbook 39).
+ * NAMES. `NetworkSessionBase` is a GUESS (`resetAllSlots__20NetworkSessionStableFv` drives its +0x1C slot; the setters'
+ *   slot positions).  `getNetworkBinaryState` is a GUESS from the field it reads,
+ *   `NetworkStateMachine::binaryState_6134` (the view `Network/PatInterface.h` owns).  The other derived names are
+ *   marked in `Network/network_transport_types.h`.
+ * RESIDUALS. none.
+ * SHAPES. The table (0x805F99A0: the deleting destructor, 33 pure slots and the four setters) is emitted from
+ *   `~NetworkSessionBase`, the key function (rule 10).  Each `dont_inline` region keeps a retail `bl`.
  */
 #include "types.h"
 #include "Network/network_transport.h"

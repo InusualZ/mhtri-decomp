@@ -1,8 +1,6 @@
 /*
- * Network/PatConnection.h - the declarations of `src/Network/PatConnection.cpp` (`.text` 0x803FAE9C..0x803FCC34): the
- * `PatConnection` class (the `PatInterface` base) and the session band's request writers.
- * Moved here from `Network/NetworkCommunityPat.h` when the network pilot round 3 recut gave the range its own unit
- * (docs/plan.md 6.5 rule 2: the owner declares).
+ * Network/PatConnection.h - the declarations of `Network/PatConnection.cpp`: the `PatConnection` class (the
+ *   `PatInterface` base) and the session band's request writers.
  */
 #ifndef MHTRI_NETWORK_PATCONNECTION_H
 #define MHTRI_NETWORK_PATCONNECTION_H

@@ -1,24 +1,16 @@
 /*
- * Network/NetworkPeerMcs.cpp - the Mcs peer: constructor, the table slots, the connect machine and the shared Mcs
- *   scratch packet and retry time.  Its log string names the class (`NetworkPeerMcs::put`).
- *
- * One translation unit of the retail Network transport band, split out of `Network/network_transport.cpp`
- * (docs/network-transport-split.md holds the evidence and the confidence of each cut).  `.text`
- * 0x803CD764..0x803CE060, `.data` 0x805F9570..0x805F9610, extab 0x80019968..0x800199B0, extabindex
- * 0x8003A170..0x8003A1DC, `.bss` 0x806D3240..0x806D3650, `.sbss` 0x80794C98..0x80794CA0.
- *
- * NAMES.  The slot names other than the log-named `put` are GUESSes.  Every name here is the map's or a derived
- * one; the derived ones are marked GUESS in `Network/network_transport_types.h`.
- *
- * TABLE.  Its table (0x805F95E0, 0x30 B) is emitted from `NetworkPeerMcs::destroy`, the key function (rule 10).
- *
- * FLAGS.  C++ under `cflags_network` (`-Cpp_exceptions on` gives the `extab`), per-unit `-O3`/`-pool off` (`configure.py`);
- * file-scope `#pragma peephole off` (playbook 39); each `dont_inline` region keeps a retail `bl` that `-inline auto` folds.
- *
- * RESIDUALS.  `send`/`receive`/`put`/`move` 99.7-99.8 % (the same `NETWORK_ERROR_*` immediates, playbook 58's
- * class); `.text` differs from the target by 36 B, all relocations; `.sbss` holds the 4-byte `networkMcsRetryTime`
- * against the claimed 8 B (the map's size is the gap to the next 8-aligned `.sbss` object; the section's 8-byte
- * alignment pads it).  As `Matching` the DOL hash holds (measured 2026-10-04).
+ * Network/NetworkPeerMcs.cpp - the Mcs peer: constructor, table slots, the connect machine, the shared Mcs scratch
+ *   packet and retry time.  Its log string names the class (`NetworkPeerMcs::put`).
+ * RANGE. .text 0x803CD764-0x803CE060 (10 functions); .data 0x805F9570-0x805F9610, .bss 0x806D3240-0x806D3650, .sbss
+ *   0x80794C98-0x80794CA0, extab, extabindex.  One TU of the transport band: docs/network.md.
+ * FLAGS. `-O3 -pool off` (configure.py; measured in docs/network.md); file-scope `#pragma peephole off`
+ *   (playbook 39).
+ * NAMES. The slot names other than the log-named `put` are GUESSes (marked in `Network/network_transport_types.h`).
+ * RESIDUALS. none in the rows; the `NETWORK_ERROR_*` immediates are relocated against `@eti_` rows in the target
+ *   (playbook 58): 36 B of `.text`.  `.sbss` holds the 4-byte `networkMcsRetryTime` against the claimed 8 B (the
+ *   section's 8-byte alignment pads it).  The DOL hash holds with it linked.
+ * SHAPES. The table (0x805F95E0) is emitted from `NetworkPeerMcs::destroy`, the key function (rule 10).  Each
+ *   `dont_inline` region keeps a retail `bl` that `-inline auto` folds.
  */
 #include "types.h"
 #include "Network/network_transport.h"
@@ -202,9 +194,8 @@ s32 NetworkPeerMcs::put(const u8* data, s32 length, u32 a, u32 b, u32 c)
     return length;
 }
 
-/* Walks the peer's connect machine one step: a listening peer re-registers with its connection once
-   the retry interval has passed; a connecting peer opens the socket (state 0), waits for it to finish
-   and publishes its label (state 1).  1 when it made progress, 0 when idle, -1 on failure. */
+/* One step of the peer's connect machine: a listening peer re-registers after the retry interval; a connecting peer
+   opens the socket (0), waits and publishes its label (1).  1 on progress, 0 when idle, -1 on failure. */
 s32 NetworkPeerMcs::move()
 {
     s32 result;

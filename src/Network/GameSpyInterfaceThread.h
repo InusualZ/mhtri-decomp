@@ -1,15 +1,8 @@
 /*
- * Network/GameSpyInterfaceThread.h - the classes and data of the 0x8041A87C Network band
- * (`src/Network/GameSpyInterfaceThread.cpp`; its header carries the seam evidence, the flags and the residuals).
- *
- * Every offset is one the target instructions address.  `NetworkReflectService` (five methods here), the
- * worker thread `GameSpyInterfaceThread`, `NetworkPeerGameSpy` and `NetworkTimedHandler` own member
- * functions; the foreign objects the target dispatches through (`GameSpyReceiver`, `NetworkPeerCallback`,
- * `NetworkLogger` in `unsplit/Network.h` and `PatInterface` in `Network/PatInterface.h`) are classes with real
- * virtuals - the only shape MWCC emits as `lwz r12, 0x0(r3)` / `lwz r12, <slot>(r12)`; none is
- * constructed here, so no vtable is emitted for them.  `GameSpyInterfaceThread` is the exception: its
- * destructor is the class's one virtual, so this unit emits its vtable.  The peer's and the timed
- * handler's tables (0x80603714, 0x80603740) belong to other TUs and stay hand-wired.
+ * Network/GameSpyInterfaceThread.h - the classes and data of `Network/GameSpyInterfaceThread.cpp`.
+ * SHAPES. The foreign objects the target dispatches through (`GameSpyReceiver`, `NetworkPeerCallback`, `NetworkLogger`
+ *   in `unsplit/Network.h`, `PatInterface`) are classes with real virtuals, never constructed here, so no table is
+ *   emitted for them; the peer's and the timed handler's tables (0x80603714, 0x80603740) belong to other TUs.
  */
 
 #ifndef MHTRI_NETWORK_GAMESPYINTERFACETHREAD_H

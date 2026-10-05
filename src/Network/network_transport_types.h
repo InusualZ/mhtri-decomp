@@ -1,17 +1,7 @@
 /*
- * Network/network_transport_types.h - the types the Network transport band's units share.
- *
- * The band `.text` 0x803CCDF8..0x803D3CE8 was one unit (`Network/network_transport.cpp`) and is now eight
- * (docs/network-transport-split.md).  The classes are used by more than one of them - the peers by the socket
- * users and the session, the resolver base by the Wii resolver - so they live here once (rule 1) and each unit's
- * own function declarations live in that unit's header (`Network/<stem>.h`, rule 2); `Network/network_transport.h`
- * includes them all for the band's consumers.
- *
- * The types are reconstructed from the range's own instructions: the abstract peer whose error record every peer
- * constructor fills, the payload buffer, Udp and Mcs peers derived from it, the two resolver classes and the
- * session base - the classes whose tables the units' objects emit - plus the socket users and the byte stream.
- * Every field carries the offset the target addresses and a name from what the range stores in it; a field the
- * range never touches is `unused_`/`pad_` with its offset kept (rules 3-5).
+ * Network/network_transport_types.h - the classes the eight transport units share (docs/network.md):
+ *   the abstract peer and its payload buffer, Udp and Mcs peers, the two resolver classes, the session base, the socket
+ *   users and the byte stream, reconstructed from the range's own instructions (rule 1).
  */
 
 #ifndef NETWORK_NETWORK_TRANSPORT_TYPES_H
@@ -189,8 +179,8 @@ struct NetworkSingleTcp : public NetworkSocketUser {
    its own 0x1770-byte reassembly buffer behind the one datagram buffer at +0x26.  The datagram is 0x5DC
    bytes because that is the capacity `NetworkMultipleUdp::move` reads with and `receivePackets` frames into; the
    map's 0x5E0 for the `.bss` scratch packet is dtk's gap to the next symbol (a 32-byte boundary), i.e. the
-   same 0x5DC plus alignment - the source declares that scratch as [0x5E0] because [0x5DC] measures the
-   `.bss` row at 70 %.  Size: (approximation - the last word the range touches, `used_63C4[3]`, ends at
+   same 0x5DC plus alignment - the source declares that scratch as [0x5E0] because [0x5DC] leaves the
+   `.bss` row short of the target.  Size: (approximation - the last word the range touches, `used_63C4[3]`, ends at
    +0x63D4). */
 struct NetworkMultipleUdp : public NetworkSocketUser {
     u8  pad_08[0x06];                /* +0x08..+0x0D */

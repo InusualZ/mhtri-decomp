@@ -1,9 +1,6 @@
 /*
- * Network/NetworkFileFetcher.h - the fetcher and socket classes of four neighbouring units (`.text`
- * 0x803F6458..0x803F7538): the abstract file fetcher with its error record (`Network/NetworkFetcherBase.cpp`), the
- * Pat-server fetcher `NetworkFileFetcher` (`Network/NetworkFileFetcher.cpp`), the kind-2 fetcher whose every
- * operation succeeds at once (`Network/NetworkNullFetcher.cpp`), and the abstract socket base `NetworkSocketWii`
- * derives from (`Network/NetworkSocketBase.cpp`).
+ * Network/NetworkFileFetcher.h - the fetcher and socket classes of four neighbouring units: `NetworkFetcherBase`,
+ *   `NetworkFileFetcher`, `NetworkNullFetcher` and `NetworkSocketBase` (each defined in its own `Network/<class>.cpp`).
  */
 #ifndef MHTRI_NETWORK_NETWORKFILEFETCHER_H
 #define MHTRI_NETWORK_NETWORKFILEFETCHER_H

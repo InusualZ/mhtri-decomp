@@ -1,31 +1,16 @@
 /*
- * Network/NetworkSocketWii.cpp - the Wii socket `NetworkSocketWii` over the SO library (SSL for mode 4), and the
- *   two error accessors the socket streams poll.
- *
- * SECTIONS. extab 0x8001B884..0x8001B918; extabindex 0x8003BA00..0x8003BAC0; .text 0x803F7538..0x803F84B8;
- *   .data 0x805FC920..0x805FC9D0 (the two log strings and the table 0x805FC984); .sdata2 0x8079C7B8..0x8079C7C0
- *   (the 120-second SSL handshake limit).
- *
- * WHAT IT IS. The "NetworkSocketWii::init()"/"::open()" strings name the class; it implements the sixteen slots of
- *   `NetworkSocketBase` (`Network/NetworkSocketBase.cpp`): `open` creates the SO socket (stream for modes 1/4,
- *   datagram for 2) and sets it non-blocking with its options, `openSecure` adds the SSL context, `connect` /
- *   `pollConnect` run the non-blocking connect (and the SSL handshake), `listen`/`accept` the server side,
- *   `send`/`receive` move the bytes.  Failures leave an error source (0x8001000x) and the SO/SSL result in the base's
- *   error words.  Slot, field and helper names are GUESSes from the bodies; the SO callees are the RVL SO API in
- *   its own order (the map rows renamed in this change: `SOSocket` .. `SOPoll`).
- *
- * WHY IT SITS HERE. the network pilot round 3 recut of the phase 4 stub `Network/NetworkCommunityPat.cpp`.  Left edge
- *   0x803F7538: the two 8-byte accessors read the base's error words and carry no extab record, so nothing pins
- *   them to the socket base before them (request net3-c-47f5#1 offers both placements).
- *
- * FLAGS. `cflags_network` with `-O3` like the transport siblings; file-scope `#pragma peephole off` (retail's
- *   unfused `extsh`+`cmpwi` and bit tests) and `#pragma dont_inline on` (retail calls `setOptions` and
- *   `getErrorSource`).
- *
- * RESIDUALS. Every `.text` row matches.  The error
- *   sources 0x80010001..0x80010015 are relocated in the target (dtk reads them as `@etb_8000FFFC+N` and friends);
- *   the `block_relocations` entries in `config.yml` remove those relocations.  `SOiGetLastError` (0x8051F110, the
- *   thread error accessor) is a GUESS name.
+ * Network/NetworkSocketWii.cpp - the Wii socket `NetworkSocketWii` over the SO library (SSL for mode 4), and the two
+ *   error accessors the socket streams poll.  The "NetworkSocketWii::init()"/"::open()" strings name the class.
+ * RANGE. .text 0x803F7538-0x803F84B8 (22 functions); .data 0x805FC920-0x805FC9D0 (the two log strings and the table
+ *   0x805FC984), .sdata2 0x8079C7B8-0x8079C7C0 (the 120-second SSL handshake limit), extab, extabindex.  The left edge
+ *   is unpinned: the two 8-byte accessors carry no extab record and could sit with the socket base before them.
+ * FLAGS. `-O3` (configure.py) like the transport siblings; file-scope `#pragma peephole off` (retail's unfused
+ *   `extsh`+`cmpwi` and bit tests) and `#pragma dont_inline on` (retail calls `setOptions` and `getErrorSource`).
+ * NAMES. Slot, field and helper names are GUESSes from the bodies: `open` creates the SO socket (stream for modes 1/4,
+ *   datagram for 2), `openSecure` adds the SSL context, `connect`/`pollConnect` run the non-blocking connect and
+ *   handshake, `listen`/`accept` the server side.  `SOiGetLastError` (0x8051F110, the thread error accessor) is a GUESS.
+ * RESIDUALS. none in `.text`; the error sources 0x80010001..0x80010015 are relocated in the target (dtk reads them as
+ *   `@etb_8000FFFC+N` and friends); `config.yml`'s `block_relocations` entries remove those relocations.
  */
 
 #include "Network/NetworkSocketWii.h"
@@ -182,7 +167,7 @@ s32 NetworkSocketWii::shutdown()
     return close();
 }
 
-/* Starts the non-blocking connect to `address` (a would-block result is not a failure). */
+/* Starts the non-blocking link to `address` (a would-block result is not a failure). */
 s32 NetworkSocketWii::connect(const NetworkPeerAddress* address)
 {
     SOSockAddrIn sa;
@@ -468,8 +453,8 @@ s32 NetworkSocketWii::send(const u8* data, s32 size, const NetworkPeerAddress* a
     return result;
 }
 
-/* Receives at most `size` bytes (and the sender's address on a UDP socket); 0 when nothing is waiting, the byte
-   count, or -1 when the receive failed or a stream was closed by the peer. */
+/* Reads at most `size` bytes (and the sender's address on a UDP socket); 0 when nothing is waiting, the byte
+   count, or -1 when the read failed or a stream was closed by the peer. */
 s32 NetworkSocketWii::receive(u8* out, s32 size, NetworkPeerAddress* address)
 {
     SOSockAddrIn sa;

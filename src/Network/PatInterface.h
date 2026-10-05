@@ -1,18 +1,9 @@
 /*
- * Network/PatInterface.h - the declarations `src/Network/PatInterface.cpp` owns
- * (`.text` 0x803FCC34..0x804123F8: the `PatInterface` singleton, its request state machine and its packet layer).
- *
- * Since the round 4 fold (owner ruling 2026-10-05: one TU) this one header carries what
- * `Network/network_state.h` and the head of `Network/network_layer_io.h` declared: the state
- * machine's entry points and the `sendReq*`/`recv*`/reader/writer surface of the packet layer.  The tail's
- * `NetworkPool`/`NetworkRandom` live in `Network/NetworkPool.h`.
- *
- * Every parameter list of a body not written yet is the one its callers' calls demonstrate; the first parameter
- * is the singleton (`this` in r3 - the target bodies read it), spelled the way each caller holds it:
- * `PatInterface` (the mediator band), `NetworkInstance` (what `getInstance_` returns, the band header's typedef
- * of this class since request net3-d-03c2#1) or `NetworkStateMachine` (the state machine's spelling, a typedef
- * of `PatInterface`).  Moved here from `unsplit/Network.h` and `src/Network/NetworkWiiMediator.cpp`
- * (docs/plan.md 6.5 rule 2: the owner declares).
+ * Network/PatInterface.h - the declarations of `Network/PatInterface.cpp`: the `PatInterface` singleton, its request
+ *   state machine and its packet layer (`NetworkPool`/`NetworkRandom` are `Network/NetworkPool.h`'s).
+ * SHAPES. An unwritten body's parameter list is the one its callers demonstrate; the first parameter is the singleton
+ *   (`this` in r3), spelled as each caller holds it: `PatInterface`, or the typedefs `NetworkInstance` (what
+ *   `getInstance_` returns) and `NetworkStateMachine`.
  */
 #ifndef MHTRI_NETWORK_PATINTERFACE_H
 #define MHTRI_NETWORK_PATINTERFACE_H
@@ -925,7 +916,7 @@ void putSomethingList(NetworkStateMachine* self, const u8* loginFields, u8 count
 
 /* The circle (lobby room) requests the Pat session manager sends: each writes its op-code and returns the
  * request id (stored whole by the caller - playbook 66); the `sendNtc*` notices return nothing.  Names
- * marked GUESS come from the manager's call sites (`.pi/outbox/net2-l2-101a-requests.json`): the List
+ * marked GUESS come from the manager's call sites: the List
  * Head/Data/Foot triple is the op-code run 0xD0/0xD2/0xD4, Kick 0xD6 sends a user id, Chat 0xE8 has no
  * reply slot (0xE9 follows it), the three value notices wrap `sendNtcCircleBinary` (kinds 1/2 and 3)
  * and its addressed twin. */

@@ -1,16 +1,8 @@
 /*
- * Network/NetworkWiiMediator.h - the class the 0x80413450..0x80417BC0 Network band owns (the round 3 fold of
- * the mediator head, the class band and the former `Network/network_opening.cpp`, whose header folded in here).
- *
- * Reconstructed from the range's own disassembly and the runtime dump's map.  The dump spells the
- * member functions `NetworkWiiMediator::<method>`; the project's `symbols.txt` carries the same names
- * already mangled (`reflectInit__18NetworkWiiMediatorPFllllPvPv_vPv`, `getAccountBan__18NetworkWiiMediatorFPcUl`),
- * so the declarations below are chosen so MWCC mangles them back to those exact spellings.
- *
- * The two polymorphic classes are `NetworkMediator` (table 0x80602978) and `NetworkWiiMediator` (table
- * 0x80602968): the unit defines both constructors and destructors and `NetworkWiiMediator::update`, so it emits
- * both tables (rule 10).  The plain member functions are non-virtual.  `reflectInit`'s first parameter is the
- * callback the retail body stores at +0x78C - the `PFllllPvPv_v` half of the mangled name.
+ * Network/NetworkWiiMediator.h - the classes of `Network/NetworkWiiMediator.cpp`: `NetworkMediator` (table 0x80602978)
+ *   and `NetworkWiiMediator` (table 0x80602968), both emitted by the unit (rule 10); the plain members are non-virtual.
+ * SHAPES. The declarations mangle back to the map's spellings (`getAccountBan__18NetworkWiiMediatorFPcUl`);
+ *   `reflectInit`'s first parameter is the callback the body stores at +0x78C (the `PFllllPvPv_v` half of its name).
  */
 #ifndef NETWORK_WII_MEDIATOR_H
 #define NETWORK_WII_MEDIATOR_H
@@ -222,8 +214,7 @@ void getReflectName5C(NetworkWiiMediator* self, char* out, u32 size);
 #endif
 
 
-/* The opening part's and the head's free functions (moved here from `Network/network_opening.h` and
- * `Network/network_layer_io.h` by the round 3 fold; docs/plan.md 6.5 rule 2: the owner declares). */
+/* The opening part's and the head's free functions (docs/plan.md 6.5 rule 2: the owner declares). */
 struct PatTerms;
 class PatInterface;                               /* Network/PatInterface.h */
 typedef PatInterface NetworkInstance;             /* unsplit/Network.h: the band's alias */

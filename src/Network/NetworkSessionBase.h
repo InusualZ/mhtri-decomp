@@ -1,10 +1,6 @@
 /*
- * Network/NetworkSessionBase.h - the symbols `Network/NetworkSessionBase.cpp` owns that the rest of the Network band calls
- * (the mutex wrappers, the session accessor and the notify setter).
- *
- * The declarations moved out of `Network/network_transport.h` when `Network/network_transport.cpp` was split
- * into one unit per translation unit (docs/network-transport-split.md): a declaration belongs with the TU that
- * defines the symbol (rule 2).  The types they use are `Network/network_transport_types.h`'s.
+ * Network/NetworkSessionBase.h - the mutex wrappers, the session accessor and the notify setter of
+ *   `Network/NetworkSessionBase.cpp`; the types are `Network/network_transport_types.h`'s.
  */
 
 #ifndef NETWORK_NETWORK_SESSION_BASE_H

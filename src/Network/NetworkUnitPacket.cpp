@@ -1,47 +1,32 @@
 /*
  * Network/NetworkUnitPacket.cpp - the unit packet band: the message packet (`networkPacket_*`, the 0x18-byte
- *   `NetworkStreamWriter`), the 22-byte framed writer/reader (`networkStreamWriter_*` / `networkStreamReader_*`, the
+ *   `NetworkStreamWriter`), the 22-byte framed writer/reader (`networkStreamWriter_*`/`networkStreamReader_*`, the
  *   0x1C-byte `NetworkStreamWriterDefault`) and the queue of framed messages (`networkStreamQueue_*`).
- *
- * SECTIONS. extab 0x8001B96C..0x8001BBCC; extabindex 0x8003BB20..0x8003BDF0; .text 0x803F89CC..0x803FAE9C;
- *   .data 0x805FCC98..0x805FCE50; .sdata 0x80793958..0x80793960; .sdata2 0x8079C7C0..0x8079C7D0.
- *
- * WHAT IT IS. The log strings name the classes `NetworkUnitPacket` ("::test: CRC error", "Invalid version") and
- *   `NetworkUnitPacketPool` (`putTopPacket`/`putLowPacket`/`putAllPacket`); the project still spells them by the
- *   older names `NetworkStreamWriter`/`NetworkStreamWriterDefault`/`NetworkStreamQueue` that every caller uses.  A
- *   message is a big-endian u16 payload size, a flag byte (0x80 user data, 0x40 a timestamp follows, 0x3F the
- *   value count), the optional timestamp (milliseconds), the optional value block and the payload; a frame is a
- *   22-byte header (version, payload length, the two sequence numbers, the two nonces, the flag byte at +0x11, the
- *   CRC at +0x12 and the two key bytes at +0x14/+0x15) and its payload.  Every value goes through the network
- *   library's byte-order slots (`getNetworkLogger()`'s +0x48..+0x54).
- *
- * CLASS MODEL (residual). The queue is the class `NetworkStreamQueue : NetworkStreamSink`
- *   (`Network/network_writer_types.h`): its constructor and destructor (0x803FA5F4/0x803FA63C) are defined here, so
- *   this unit emits its table 0x805FCD98 (`__vt__18NetworkStreamQueue`).  The functions the two writer tables
- *   0x805FCDD4 / 0x805FCE10 point at (the writers' `attach`/`bind`/`fill`/`flush` overrides) are still written as
- *   the free functions their callers in other units already name (`networkPacket_attach`,
- *   `networkStreamReader_attach`, ...); those two tables stay unemitted until the overrides become members (their
- *   destructors live in `lobby/lb_server_sel_trans.cpp`, which would also need its weak copies kept out of ours).
- *
- * NAMES. The sink's +0x30/+0x34/+0x38 slots are typed from the calls here (`encrypt`/`decrypt`/`checksum`, GUESS
- *   names): the forwarding overrides re-narrow the offset and size to u16, so the slots take u16.
- *   `networkStreamReader_decryptFrame`, `networkStreamReader_test` and the two overrides
- *   `networkStreamWriter_encrypt`/`_decrypt` are GUESS names; `NetworkStreamQueue` is the project's name for the
- *   log strings' `NetworkUnitPacketPool`.
- *
- * RESIDUALS (measured). 91 of 98 rows at 100 %.  `networkPacket_getMessageSize` 98.75: retail returns a u16 (its own
- *   callers re-mask it), but `Network/NetworkSessionStable.cpp`'s `send` loses 2.3 points with a u16 declaration, so
- *   the header keeps u32 and the callers here cast; `networkPacket_copyMessage` 98.05 (the same u16 return, and
- *   operand order in two address sums); `beginMessage` 99.36, `getHeaderSize` 99.71, `takeByte` 99.20,
- *   `putTopPacket` 99.74, `acknowledge` 99.00: operand order / one register.  `.data`: the two writer tables stay
- *   unemitted (above; `dataorder` also reads a zigzag seam at 0x805FCE10 because those tables' referrers sit in
- *   `lobby/lb_server_sel_trans.cpp`).  `extab` 608 B, 2 bytes differ: `networkStreamQueue_discard`'s cleanup range
- *   ends at the `hasMessage` call in retail (0x11 words) and at `memmove` in ours (0x1B) - retail's `memmove` is
- *   treated as non-throwing; a `throw()` on the declaration does not move it.  `.sdata` 2 of 8 B (the frame version;
- *   the rest is the alignment tail before the next unit).
- *
- * FLAGS. `cflags_network` with `-O3` like the transport siblings; file-scope `#pragma peephole off` and
- *   `#pragma dont_inline on` (retail calls every helper).
+ * RANGE. .text 0x803F89CC-0x803FAE9C (98 functions); .data 0x805FCC98-0x805FCE50, .sdata 0x80793958-0x80793960, .sdata2
+ *   0x8079C7C0-0x8079C7D0, extab, extabindex.
+ * FLAGS. `-O3` (configure.py) like the transport siblings; file-scope `#pragma peephole off` and `#pragma dont_inline
+ *   on` (retail calls every helper).
+ * NAMES. The log strings name `NetworkUnitPacket` ("::test: CRC error", "Invalid version") and `NetworkUnitPacketPool`
+ *   (`putTopPacket`/`putLowPacket`/`putAllPacket`); the project keeps the names every caller uses
+ *   (`NetworkStreamWriter`/`NetworkStreamWriterDefault`/`NetworkStreamQueue`).  GUESSes: the sink's +0x30/+0x34/+0x38
+ *   slots `encrypt`/`decrypt`/`checksum` (u16 offset and size, from the forwarding overrides),
+ *   `networkStreamReader_decryptFrame`, `networkStreamReader_test`, `networkStreamWriter_encrypt`/`_decrypt`.
+ * RESIDUALS. `networkPacket_getMessageSize`: retail returns a u16, but `Network/NetworkSessionStable.cpp`'s `send` is
+ *   worse with a u16 declaration, so the header keeps u32 and the callers here cast.  `networkPacket_copyMessage`: the
+ *   same u16 return and operand order in two address sums.  The `networkPacket_*` rows `beginMessage`, `getHeaderSize`,
+ *   `takeByte`, `putTopPacket` and `networkStreamQueue_acknowledge`: operand order / one register. `.data`: the two
+ *   writer tables 0x805FCDD4/0x805FCE10 stay unemitted while their `attach`/`bind`/`fill`/`flush` overrides are the
+ *   free functions other units call (`networkPacket_attach`, `networkStreamReader_attach`, ...; their destructors live
+ *   in `lobby/lb_server_sel_trans.cpp`, whence `dataorder`'s zigzag seam at 0x805FCE10).  `extab`:
+ *   `networkStreamQueue_discard`'s cleanup range ends at the `hasMessage` call in retail (0x11 words) and at `memmove`
+ *   in ours (0x1B) - a `throw()` on the declaration does not move it.  `.sdata`: 2 of 8 B (the frame version).
+ * SHAPES. A message is a big-endian u16 payload size, a flag byte (0x80 user data, 0x40 a timestamp follows, 0x3F the
+ *   value count), the optional timestamp, the optional value block and the payload; a frame is a 22-byte header
+ *   (version, payload length, two sequence numbers, two nonces, the flag byte at +0x11, the CRC at +0x12, the key
+ *   bytes at +0x14/+0x15) and its payload; every value goes through the library's byte-order slots
+ *   (`getNetworkLogger()`'s +0x48..+0x54).  `NetworkStreamQueue : NetworkStreamSink` (`Network/network_writer_types.h`)
+ *   has its constructor and destructor (0x803FA5F4/0x803FA63C) here, so this unit emits `__vt__18NetworkStreamQueue`
+ *   (0x805FCD98).
  */
 
 #include "Network/NetworkUnitPacket.h"
@@ -239,9 +224,8 @@ void networkPacket_nextMessage(NetworkStreamWriter* self)
     }
 }
 
-/* Copies the current message into `out` keeping only the parts `mask` selects (0x80 the user-data flag, 0x40 the
-   timestamp, 0x3F the value block); the bytes copied, 0 when no whole message is there, -1 when `capacity` is
-   too small. */
+/* Copies the current message into `out` with only the parts `mask` selects (0x80 user data, 0x40 timestamp, 0x3F
+   values): the bytes copied, 0 when no whole message is there, -1 when `capacity` is too small. */
 s32 networkPacket_copyMessage(NetworkStreamWriter* self, u8* out, u32 capacity, u8 mask)
 {
     u16 size;
@@ -971,9 +955,8 @@ u32 networkStreamWriter_size(const void* sub)
     return ((const NetworkStreamQueue*)sub)->sequence_10;
 }
 
-/* Files the payload of the received frame by its first sequence number when it starts at or before the
-   expected one: 0 when it is old, 2 when it starts beyond, 3 when the new part was appended, or an error
-   source when the queue is full. */
+/* Files the received frame's payload by its first sequence number: 0 when old, 2 when it starts beyond the expected one,
+   3 when the new part was appended, or an error source when the queue is full. */
 u32 putTopPacket(NetworkStreamQueue* self, NetworkStreamWriter* packet)
 {
     NetworkStreamWriter messages;

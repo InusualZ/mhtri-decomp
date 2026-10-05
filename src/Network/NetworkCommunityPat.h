@@ -1,12 +1,6 @@
 /*
- * Network/NetworkCommunityPat.h - the declarations of `src/Network/NetworkCommunityPat.cpp`: the community layer
- * `NetworkCommunityPat` (`.text` 0x803F0294..0x803F6458), its own request record and the records it embeds.
- *
- * `NetworkCommunityPat` is the +0x08 element of the `NetworkPat` holder (Network/NetworkPat.h), built by the pat
- * control (`initNetworkPatControl`, allocation 0x25EC).  It derives from `NetworkCommunity` (Network/
- * NetworkCommunity.h): the base's twelve request slots drive the community session (open, shut, news, the profile
- * writes), and this class adds a second pool of nine slots for the friend requests.  Every name except the class's own
- * (its "NetworkCommunityPat::deleteRequest" string) is derived from what the bodies store, compare and pass (GUESS).
+ * Network/NetworkCommunityPat.h - the declarations of `Network/NetworkCommunityPat.cpp`: `NetworkCommunityPat` (the
+ *   `NetworkPat` holder's +0x08 element, derived from `NetworkCommunity`), its request record and the records it embeds.
  */
 #ifndef MHTRI_NETWORK_NETWORKCOMMUNITYPAT_H
 #define MHTRI_NETWORK_NETWORKCOMMUNITYPAT_H
