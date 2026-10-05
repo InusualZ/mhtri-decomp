@@ -99,7 +99,7 @@
 #include "gx.h"
 #include "sound/mhchar.h"
 #include "nw4r/g3d/scnmdl.h"
-#include "nw4r/g3d/g3d_resmat.h"
+#include "g3d/g3d_resmat.h"
 #include "unsplit/g3d.h"
 #include "enemy/enemy_control.h"
 #include "unsplit/sound.h"

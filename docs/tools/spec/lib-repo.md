@@ -38,6 +38,11 @@ originals hash to. It is also the choke point of the fixture tier's live-tree re
 * `Tree(root)` (frozen): `main`, `is_worktree`, `is_slot`, `build(version)`, `obj_dir`, `src_obj_dir`, `asm_dir`,
   `report_json`, `orig_dol`, `config_yml`, `objdiff_json`, `input(rel, probe)`; `Tree.find(start)`.
 * `guard(path, what)`: the choke point (below).
+* The header layout (owner's ruling 2026-10-05: every header beside its source): `HEADER_ROOT` (`src`),
+  `LEGACY_HEADER_ROOT` (`include`, read only for a ref older than the move), `HEADER_ROOTS` (both, for those history
+  readers), `BUILD_INCLUDE_REL`; `header_root(root=None)` (the tree's include root), `include_roots(root=None)` (the
+  compile's `-i` roots in `configure.py` order) and `include_spelling(rel)` (how a source `#include`s the header at `rel`:
+  the path below its root).
 
 ## Invariants and rules
 

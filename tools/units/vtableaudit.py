@@ -550,12 +550,13 @@ def _pointee_type(decl: str):
 def working_texts(main: str) -> dict:
     """`{relpath: text}` for every source and header in the working tree - the definition index's input.
 
-    `include/` matters as much as `src/`: the class a member belongs to is usually declared in a header
-    (`include/Network/fn_803D3CE8.h` holds `NetworkSessionManager`), and reading only the `.cpp` would miss
-    the member entirely.
+    Headers matter as much as sources: the class a member belongs to is usually declared in a header
+    (`src/Network/NetworkSessionManager.h` holds `NetworkSessionManager`), and reading only the `.cpp` would
+    miss the member entirely. Both header roots are walked (`lib.repo.HEADER_ROOTS`: `include/` before the
+    2026-10-05 move).
     """
     out = {}
-    for top in ("src", "include"):
+    for top in _repo.HEADER_ROOTS:
         root_dir = os.path.join(main, top)
         for dirpath, dirnames, filenames in os.walk(root_dir):
             dirnames[:] = sorted(d for d in dirnames if d != "__pycache__")
@@ -805,9 +806,9 @@ def emission_order(our: dict, classes: list) -> dict:
 
 
 def class_order(main: str, path: str) -> list:
-    """`class_order_from_texts` over the working tree: the unit source (`src/`-relative) and `include/`."""
+    """`class_order_from_texts` over the working tree: the unit source (`src/`-relative) and the include root."""
     src_root = os.path.join(main, "src")
-    inc_root = os.path.join(main, "include")
+    inc_root = os.path.join(main, _repo.header_root(main))
 
     def text_of(name, includer):
         if includer is None:

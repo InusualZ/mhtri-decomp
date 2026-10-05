@@ -103,8 +103,8 @@ declclash's/stylelint's include lists are identical old vs new; `strip` takes 0.
 ## Known gaps
 
 * **One behaviour change**: typeregistry's include reader matched `#include "x"` anywhere, so a header that
-  *mentions* an include in a comment counted as including it (3 headers on this tree: `include/ai/ainpc.h`,
-  `include/ef.h`, `include/mh3_pad/vec3.h`); it now reads directives only. `typeregistry.py --json`, its text report
+  *mentions* an include in a comment counted as including it (3 headers on this tree: `src/ai/ainpc.h`,
+  `src/ef.h`, `src/mh3_pad/vec3.h`); it now reads directives only. `typeregistry.py --json`, its text report
   and `--unit Camellia/camellia.c` are byte-identical before and after on this tree.
 * Not yet here: `statements` (`shapes.split_statements`, which skips literals on raw text), `pragmas`,
   `shapes.match_brace/_paren_match` (raw-text, literal-aware), and `recordmerge.parse` (a line-oriented

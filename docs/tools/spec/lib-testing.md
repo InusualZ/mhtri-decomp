@@ -11,7 +11,7 @@ The tools listed under this concept in `docs/tools/README.md`.
 ## Public API
 
 * `Checker`: `check(name, got, want)`, `expect`, `raises`, `contains`, `summary()` -> `ok - N checks` / `FAIL: ...`
-* `FixtureTree(tmp)`: `configure.py`, `config/RMHE08/{symbols,splits}.txt`, `src/`, `include/`, `build/RMHE08/{obj,src}/` objects from `ElfBuilder`, `report.json`, optional asm dump; `add_unit`, `add_symbol`, `claim`; created outside the repository
+* `FixtureTree(tmp)`: `configure.py`, `config/RMHE08/{symbols,splits}.txt`, `src/`, `build/RMHE08/{obj,src}/` objects from `ElfBuilder`, `report.json`, optional asm dump; `add_unit`, `add_symbol`, `claim`; created outside the repository
 * `GitFixture(tmp)`: `init`, `commit`, `branch`, `worktree`, `conflict`
 * `json_indent(text)`, `rewrite_json(path, data)`: write an allow-list back in its own shape (indent unit, raw
   non-ASCII kept), so `test_prologue.py --prune` / `test_layering.py --prune` are minimal diffs (WP4)

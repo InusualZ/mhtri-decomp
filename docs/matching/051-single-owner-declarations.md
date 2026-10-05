@@ -39,7 +39,7 @@ with 300 old findings is still allowed. The fix is the same refactor in each cas
 
 ```cpp
 // rule 1: one definition, in the owner's header, included where needed
-// include/ef/effect.h
+// src/ef/effect.h
 struct Effect { /* size: 0x10 */ /* +0x00 */ u32 flags; };
 // src/ef/eft004.cpp
 #include "ef/effect.h"
@@ -53,8 +53,8 @@ obj->move(0);                        // not move__6MHcharFUs(obj, 0)
 nw4r::db::Panic(file, line, fmt);    // not Panic__Q24nw4r2dbFPCciPCce(file, line, fmt)
 ```
 
-A rename has a **third place** to sweep beyond the map and the source: `symedit.py refs` roots at `src/` and
-`include/` only; `docs/` and `tools/` are searched only when named in `--roots`. Regenerable caches (the retired
+A rename has a **third place** to sweep beyond the map and the source: `symedit.py refs` roots at `src/`
+only; `docs/` and `tools/` are searched only when named in `--roots`. Regenerable caches (the retired
 `tools/units/attribution-queue.json` was one; `docs/tools/retired.md`) keep their own name strings (keyed by `symbols_sha1`), so the map plus
 `--roots` is the authority, not the rows in the cache (the symbol-map-editing skill, rule 2, states this).
 
@@ -76,13 +76,13 @@ visible to `--diff`.
 
 *Rule 2 widened (2026-09-28).* The scan was extended so rule 2 judges every **declaration** - the `extern`
 keyword *or* a plain prototype (`void foo(void);`) - in **two file classes**, a `src/` file and an ordinary
-`include/<module>/*.h` header. `_owns` accepts an owner's own public header (`include/<module>/<stem>.h`) first,
-without which every owner's header would report itself; and under `include/unsplit/*.h` the reading **inverts** -
+`src/<module>/*.h` header. `_owns` accepts an owner's own public header (`src/<module>/<stem>.h`) first,
+without which every owner's header would report itself; and under `src/unsplit/*.h` the reading **inverts** -
 a declaration there of a symbol a registered unit owns is the finding, because the band is a fallback, not the
 owner. Measured whole-tree on that branch: **7,482** rule-2 findings over **5,949** distinct symbols (4,287
 unsplit-address sites across 7 band names, plus 647 names the map does not contain, which stay gaps). That is
 ~60x the `extern`-only count above and the same semantics: the plain prototype is how the foreign declarations
-were actually written (e.g. `include/Network/fn_8041A87C.h`'s `u16 DWCi_htons(u16 port);`, owned by
+were actually written (e.g. `src/Network/fn_8041A87C.h`'s `u16 DWCi_htons(u16 port);`, owned by
 `src/DWCi/fn_805113B0.c`).
 
 *Shared data with two relocation forms (2026-09-28, DWCi band; local notes `.pi/notes/dwci-band-9050.md`,
@@ -90,8 +90,8 @@ were actually written (e.g. `include/Network/fn_8041A87C.h`'s `u16 DWCi_htons(u1
 from two objects that disagree on the *form*: the negotiator's relocates it `SDA21`, `Network/fn_8041A87C.cpp`'s
 relocates it `ADDR16_HA`/`ADDR16_LO`. A declared size selects the SDA form and an unknown size the absolute one
 (idea 64), so one header declaration cannot serve both. First written as one spelling per band header; as of
-2026-09-29 the tree carries it once: `include/DWCi/DWCi_NatNeg.h` declares the **unsized** form
-(`extern const u8 natNegMessageMagic[];`, the consumer's `lis`/`addi`), `include/unsplit/Network.h` reaches it by
+2026-09-29 the tree carries it once: `src/DWCi/DWCi_NatNeg.h` declares the **unsized** form
+(`extern const u8 natNegMessageMagic[];`, the consumer's `lis`/`addi`), `src/unsplit/Network.h` reaches it by
 including that header, and the owner's own source re-declares it **sized** before its first use for its ten SDA21
 sites (the first use of a symbol fixes its addressing for the whole TU, idea 12). Rule 1 still wants one *definition* where there is
 one; this is the declaration half.

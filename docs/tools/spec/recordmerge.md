@@ -14,7 +14,7 @@ skills (3); CLAUDE.md (1); docs (6)
 
 ```
 python tools/units/recordmerge.py --base <base> --other <other> [--out <path>] [--take other|base]
-python tools/units/recordmerge.py --base include/ai/ainpc.h         --other worker/802d44f4-fn-802d44f4-bd0a:include/ai/ainpc.h --out include/ai/ainpc.h
+python tools/units/recordmerge.py --base src/ai/ainpc.h         --other worker/802d44f4-fn-802d44f4-bd0a:src/ai/ainpc.h --out src/ai/ainpc.h
 ```
 Flags: `--base`, `--dry-run`, `--json`, `--other`, `--out`, `--take`.
 Exit codes: 0 ok, 1 findings or refusal, 2 could not run (the `lib.findings` convention; today's tool documents none, so `migration.md` records the current behaviour before changing it).

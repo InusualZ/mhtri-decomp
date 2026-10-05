@@ -152,7 +152,7 @@ def message_body(b: Batch, before: dict, after: dict, fresh: bool) -> str:
         body.append("scratch: tool scratch outside the batch, not staged, not committed: %s" % ", ".join(b.scratch))
         body.append("")
     if b.band_warnings:
-        body.append("rule 2 boundary: %d newly-owned symbol declaration(s) left in include/unsplit/*.h"
+        body.append("rule 2 boundary: %d newly-owned symbol declaration(s) left in the unsplit band (src/unsplit/*.h)"
                     % len(b.band_warnings))
         for warning in b.band_warnings[:10]:
             body.append("  " + warning)

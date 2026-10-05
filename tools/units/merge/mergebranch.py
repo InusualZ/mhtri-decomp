@@ -9,6 +9,7 @@ import re
 
 from tools.lib import cscan, proc, project as _project, repo, text
 from tools.lib.git import Git
+from tools.lib.project.ownership import HEADER_SUFFIXES, is_band_header
 import tools.units.merge.unionprose as union
 
 # The names `resolve` and the tests use; the implementations live once in `union`.
@@ -110,7 +111,7 @@ def lines_of(data: bytes) -> list[str]:
 
 
 def restore(root: str, path: str, lines: list[str], nl: str) -> None:
-    """Write lines back with the file's own line ending (`include/**` may be CRLF while `src/**` is LF)."""
+    """Write lines back with the file's own line ending (a header may be CRLF while a source is LF)."""
     text.atomic_write(os.path.join(root, path), nl.join(l.rstrip("\r") for l in lines))
 
 
@@ -176,10 +177,12 @@ def sweep_band_header(lines: list[str], ranges: list[tuple[int, int, str]]) -> t
 def classification(path: str) -> str:
     if os.path.basename(path) == "symbols.txt" and path.startswith("config/"):
         return "map"
+    if is_band_header(path):
+        return "band"
+    if path.endswith(HEADER_SUFFIXES):
+        return "threeway"     # a header merges three-way wherever it lives (`src/**` since the 2026-10-05 move)
     if path.startswith("src/"):
         return "source"
-    if path.startswith("include/unsplit/"):
-        return "band"
     return "threeway"
 
 

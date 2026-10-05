@@ -37,16 +37,16 @@ None: modules. The CLI is `stylelint.py`'s (`cli.main`), spec `stylelint.md`.
 ## Invariants and rules
 
 * **One classifier, path-free (2026-10-05).** A header is a `HEADER_SUFFIXES` file **anywhere** (`common.is_header`:
-  `include/**` today, `src/**` after the owner's header move); the unsplit band is `lib.project.ownership.BAND_ROOT`
-  (`include/unsplit` today), the one spelling of its path, so moving the band edits one line. `lint_source` runs the body
+  `src/**`, and `include/**` in a ref older than the owner's 2026-10-05 header move); the unsplit band is `lib.project.ownership.BAND_ROOT`
+  (`src/unsplit`; `LEGACY_BAND_ROOT` `include/unsplit` still classifies a pre-move ref), the one spelling of its path. `lint_source` runs the body
   rule set on **every** `.c`/`.cpp`/`.h` - 3, 4, 5, 6, 7, 8, 9, then 2 and 12, 11, 13, 14 and the STOPGAP check - and
   only rule 2 (source / header / band reading) and the STOPGAP check (not in the band) read the kind. It sorts by
   `(rule, line)` with a stable sort, so the order inside one `(rule, line)` is still each rule's own report order.
   Rules 3, 4, 5, 6, 8 and 9 on a header are the orchestrator's recommendation (the owner was not asked):
   `lint.HEADER_BODY_RULES_ON = False` switches exactly those off. `_owns` and `leaf_header_owner` recognise an owner's
-  header and a leaf header by their stem wherever they live, never by `include/`.
+  header and a leaf header by their stem wherever they live, never by their directory.
 * **A finding names no header path.** Identity is `(rule, file, token, detail)` (`lib.findings`), so a detail that
-  spelled `include/unsplit/<m>.h` would turn the band move into a removal plus an addition per finding; rule 2's
+  spelled `src/unsplit/<m>.h` would turn the band move into a removal plus an addition per finding; rule 2's
   unowned detail names the band by its module (`the `ef` unsplit band header`) instead.
 * **A comparison lints the changed files completely and walks nothing else but rule 12.** Every rule of a changed or
   deleted file comes from `lint_source` on both sides; the one whole-tree walk left is rule 12 over the **untouched**
@@ -57,7 +57,7 @@ None: modules. The CLI is `stylelint.py`'s (`cli.main`), spec `stylelint.md`.
 * **The seams are module attributes.** A name a test stubs or a setter rebinds is read as `_refs.git` / `_refs.git_bytes`
   outside `refs`, never copied into another module's namespace; the selftest stubs `refs.git_bytes`. The open-request
   cache (`context._OPEN_IDS`) and the rule-13 registry (`r13_method._RULE13_CTX`) are rebound only by their setters.
-* **A tree at a ref is read once.** `texts_at_ref` reads every blob under `include/` (or `src/`) at a ref in one
+* **A tree at a ref is read once.** `texts_at_ref` reads every blob under `src/` (and a pre-move ref's `include/`) at a ref in one
   `git cat-file --batch` (`lib.git.Git.show_many`) and keeps it for the process, keyed by the ref's **tree** id (a moving
   branch name cannot serve a stale tree); `headers_at_ref` builds the `Source`s once per (tree, rename) for the four
   header walks. A blob that cannot be read is skipped, exactly as a failed `git show` was; the changed pairs are still
@@ -69,7 +69,7 @@ None: modules. The CLI is `stylelint.py`'s (`cli.main`), spec `stylelint.md`.
   `(rule, token, detail)`; `lib.findings.removed` spells each removal's key the way the after side does
   (`renamed_finding` through `rename_map` and the file map), so a finding whose map row the batch renamed *and* which
   moved file in the same batch (L3, 2026-10-04: `lbl_80794868` -> `frame_counter`, the rule-12 extern from
-  `src/main.cpp` to `include/unsplit/unknown.h`) is one credited move, not +1. The same rule, the same renamed token,
+  `src/main.cpp` to `src/unsplit/unknown.h`) is one credited move, not +1. The same rule, the same renamed token,
   one credit per removal; another rule, or a copy that leaves the original in place, is still added. Every rule whose
   token or detail names the symbol (2, 7, 11, 12, 13 ...) is covered, because the translation is on the finding, not
   per rule.

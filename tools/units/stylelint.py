@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Lint `src/` and `include/` against the type and naming discipline of docs/plan.md section 6.5 (roadmap 7.21).
+"""Lint `src/` (and a pre-move `include/`) against the type and naming discipline of docs/plan.md section 6.5 (roadmap 7.21).
 Spec: docs/tools/spec/stylelint.md. CLI: stylelint.py [--budget [--headers]] [--findings [--path G] [--rule N]]
 [--diff REF | --ref BRANCH] [--list-added] [--json] | --selftest."""
 from __future__ import annotations

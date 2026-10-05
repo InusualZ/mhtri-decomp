@@ -47,7 +47,7 @@ def generated_name_kind(name: str) -> str | None:
 def generated_path_components(path: str) -> list[tuple[str, bool]]:
     """`[(component, is_dir)]` for every component of `path` that `generated_name_kind` flags: each directory and
     the file's stem (the name without its last extension). One reading for stylelint's rule-7 file-name findings
-    and the gate's new-unit row (`include/fn_8004CAD8/psvec.h` -> `[("fn_8004CAD8", True)]`)."""
+    and the gate's new-unit row (`src/fn_8004CAD8/psvec.h` -> `[("fn_8004CAD8", True)]`)."""
     parts = [p for p in (path or "").replace("\\", "/").split("/") if p]
     out = []
     for i, part in enumerate(parts):
@@ -66,7 +66,7 @@ MANGLE_SUFFIX = re.compile(r"__(?:F[A-Za-z0-9]|Q\d|ct|dt)")
 #: The looser test for "carries a C++ argument list or owner": `__F` or `__Q` anywhere.
 MANGLED = re.compile(r"__(F|Q)")
 
-#: The parameter codes the project's scalar typedefs (`include/types.h`) expand to under MWCC's mangling.
+#: The parameter codes the project's scalar typedefs (`src/types.h`) expand to under MWCC's mangling.
 PRIMITIVE_CODES = {
     "u8": "Uc", "s8": "Sc", "u16": "Us", "s16": "s", "u32": "Ul", "s32": "l", "u64": "Ux", "s64": "x",
     "f32": "f", "f64": "d", "BOOL": "i", "int": "i", "char": "c", "short": "s", "long": "l",

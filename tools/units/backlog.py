@@ -189,7 +189,7 @@ def symbols(text: str) -> list[str]:
 def norm_defect(text: str, target: str = "") -> str:
     """The normalised summary of a `shared-file` defect: its class, plus the symbols it names.
 
-    Symbols named by the *target itself* (`include/enemy/fn_801251D0.h`) are dropped: the header's own name is
+    Symbols named by the *target itself* (`src/enemy/fn_801251D0.h`) are dropped: the header's own name is
     not the defect's subject, and counting it stopped the same defect filed against it by two lanes from
     collapsing into one item.
     """
@@ -559,7 +559,7 @@ def collect_lint_items(main: str, register: str | None = None) -> list[Item]:
                    % (target, live or last))
         else:
             ask = ("`%s` carries %d distinct rule-2 name(s) (an `extern` declared where it is not owned) - "
-                   "move each declaration to its owner's header (or `include/unsplit/`) and #include it"
+                   "move each declaration to its owner's header (or `src/unsplit/`) and #include it"
                    % (target, live or last))
         items.append(Item(kind=kind, target=target, defect="rule %d" % rule, status="open",
                           default_status="open", ask=ask, weight=live, names=names, count=count,
@@ -1049,7 +1049,7 @@ def debt_brief(main: str, item: Item) -> str:
     rule = LINT_RULES.get(item.kind, "?")
     fix = ("Rename each name below from what the function/data means, and rename its `symbols.txt` row in "
            "the same change, until rule 7 no longer fires in the file." if item.kind == "naming" else
-           "For each symbol below, move its declaration to its owner's header (or `include/unsplit/`) and "
+           "For each symbol below, move its declaration to its owner's header (or `src/unsplit/`) and "
            "`#include` it, until rule 2 no longer fires in the file.")
     lines = ["# Debt brief: %s" % item.key, "",
              "File: `%s`" % item.target,

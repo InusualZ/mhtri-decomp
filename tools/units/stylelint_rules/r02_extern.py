@@ -45,10 +45,10 @@ def extern_declarations(src: Source) -> list[tuple[str, int, int]]:
 def _owns(rel: str, unit: str) -> bool:
     """Whether `rel` is `unit`'s own source file or its own header.
 
-    Three spellings: the translation unit itself (`src/<unit>`), a private header beside it
-    (`src/<stem>.h`), and the unit's **public** header under `include/` (`include/**/<stem>.h`, any depth,
-    where `<stem>` is the unit's module-qualified stem).  The public-header case is the one the original
-    test missed: `_owns('include/NHTTP/NHTTP_bgnend.h', 'NHTTP/NHTTP_bgnend.c')` was False, so an owner's
+    Two spellings: the translation unit itself (`src/<unit>`) and the unit's header - beside it
+    (`src/<stem>.h`, every header's home since the owner's 2026-10-05 move) or at any depth whose path ends in
+    `<stem>.h`, where `<stem>` is the unit's module-qualified stem (`include/**/<stem>.h` in a pre-move ref).
+    The any-depth case is the one the original test missed: `_owns('include/NHTTP/NHTTP_bgnend.h', 'NHTTP/NHTTP_bgnend.c')` was False, so an owner's
     own header read as a foreign declaration and rule 2 could not be extended to headers without reporting
     ~30 owners' own headers in the Network scope alone (2026-09-28).  The match is by the module-qualified
     stem suffix, not the bare basename, so a same-named header in another module stays foreign.
@@ -58,9 +58,9 @@ def _owns(rel: str, unit: str) -> bool:
         return True
     stem = os.path.splitext(unit)[0]
     # the unit's header, wherever headers live: its path ends in the unit's module-qualified stem
-    # (`src/Network/network_state.h` beside the source, `include/Network/network_state.h` today, for
+    # (`src/Network/network_state.h` beside the source, `include/Network/network_state.h` before the move, for
     # `Network/network_state.cpp`). The suffix match keeps a same-basename header in another module
-    # (`include/other/network_state.h`) out of the owner's set, which a bare-basename match would admit. The band
+    # (`src/other/network_state.h`) out of the owner's set, which a bare-basename match would admit. The band
     # is never an owner's header.
     if is_unsplit_header(rel):
         return False
@@ -160,7 +160,7 @@ def declaration_sites(src: Source) -> list[tuple[str, int, int]]:
 
 
 def rule2_band_findings(src: Source, ownership: "Ownership") -> list[dict]:
-    """Declarations in `include/unsplit/<band>.h` of a symbol a registered unit already owns.
+    """Declarations in `src/unsplit/<band>.h` of a symbol a registered unit already owns.
 
     The band exists for a symbol with no owner, so only an `owned` resolution is a finding; an unsplit
     name stays (that is the band's purpose), and a name the map cannot judge is left alone rather than
@@ -184,8 +184,8 @@ def rule2_findings(src: Source, ownership: "Ownership") -> list[dict]:
     Both declaration shapes are judged (`declaration_sites`): the `extern` keyword and the plain function
     prototype.  Three outcomes: `owned` by this file (no finding), owned by another registered unit (move
     the declaration to that unit's header and `#include` it), or `unsplit` (the symbol has no registered
-    owner: move the declaration to `include/unsplit/<module>.h`, or - when the bracketing bands name
-    different modules so no module is sound - to a header under `include/unsplit/`). A name not in the
+    owner: move the declaration to `src/unsplit/<module>.h`, or - when the bracketing bands name
+    different modules so no module is sound - to a header under `src/unsplit/`). A name not in the
     map and a name with duplicate map rows are left as counted gaps rather than guessed.
     """
     out = []
@@ -232,7 +232,7 @@ def rule2_findings(src: Source, ownership: "Ownership") -> list[dict]:
 def leaf_header_owner(src: Source, names: list[str], ownership: "Ownership") -> "str | None":
     """The unit that owns `src` as a **leaf header**, or None.
 
-    A leaf header is `include/<module>/<symbol>.h`: named for a symbol it declares, and declaring only
+    A leaf header is `src/<module>/<symbol>.h`: named for a symbol it declares, and declaring only
     symbols that one registered unit defines (map row inside the unit's ranges).  It exists because the
     owner's full header can redefine shared types and so cannot be included beside the consumer's.  The
     test is symbol-based and strict: one unresolved, unowned or duplicate name, or symbols of two units,
@@ -242,10 +242,10 @@ def leaf_header_owner(src: Source, names: list[str], ownership: "Ownership") -> 
 
 
 def rule2_header_findings(src: Source, ownership: "Ownership") -> list[dict]:
-    """Declarations in an ordinary `include/` header for a symbol another registered unit owns.
+    """Declarations in an ordinary header for a symbol another registered unit owns.
 
     A header is not a unit - it is the public face of the unit(s) in its module - so a declaration there
-    is clean only when `_owns` recognises the file as the owner's own header (`include/<module>/<stem>.h`,
+    is clean only when `_owns` recognises the file as the owner's own header (`src/<module>/<stem>.h`,
     which the `_owns` fix made it do).  A declaration of a symbol another unit owns is a finding: the
     declaration belongs in that unit's header.
 

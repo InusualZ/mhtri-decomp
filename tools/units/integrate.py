@@ -28,6 +28,7 @@ from tools.lib import text as libtext
 from tools.lib import units as libunits
 from tools.lib.git import Git
 from tools.lib.project import Ownership, Splits
+from tools.lib.project.ownership import HEADER_SUFFIXES, is_band_header
 
 TOOLS_TREE = str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file()))
 SOURCE_SUFFIXES = (".c", ".cpp", ".cp", ".cc", ".h", ".hpp")
@@ -109,7 +110,8 @@ class Files:
         return hit[1]
 
     def resolve(self, inc: str, includer: str) -> str | None:
-        for base in (os.path.dirname(includer), os.path.join(self.root, "include"), os.path.join(self.root, "src")):
+        for base in (os.path.dirname(includer), os.path.join(self.root, librepo.header_root(self.root)),
+                     os.path.join(self.root, "src")):
             cand = os.path.normpath(os.path.join(base, inc))
             r = rel(self.root, cand)
             if self.texts.get(r) is not None or os.path.isfile(cand):
@@ -197,7 +199,7 @@ class DeclOp:
     owned_by_lane: bool = False
     implicit: bool = False          # a rename's declaration: moved only when the lane declared it locally
     move: bool = False              # a decl-move: a band header's declaration of an owned symbol is removed too
-    leaf: bool = False              # declared in its leaf header `include/<module>/<symbol>.h` (the full one clashed)
+    leaf: bool = False              # declared in its leaf header `src/<module>/<symbol>.h` (the full one clashed)
     force: bool = False             # a rename's declaration the build proved a caller needs
     full_header: str | None = None  # the owner's full header, when `leaf` moved the declaration out of it
     result: dict = field(default_factory=dict)
@@ -455,7 +457,7 @@ def type_keyword(files: Files, name: str) -> str | None:
     """`class`/`struct`/`union` for a type the tree defines (the keyword a forward declaration must use)."""
     rx = re.compile(r"\b(class|struct|union)\s+%s\b\s*[:{]" % re.escape(name))
     for r in files.all():
-        if r.startswith("include/"):
+        if r.endswith(HEADER_SUFFIXES):
             t = files.get(r)
             if name in t:
                 m = rx.search(cscan.strip_comments(t))
@@ -477,7 +479,7 @@ def c_header(text: str, owner: str | None) -> bool:
 
 
 def guard_name(header: str) -> str:
-    stem = header[len("include/"):] if header.startswith("include/") else header
+    stem = librepo.include_spelling(header)
     return "MHTRI_" + re.sub(r"[^A-Za-z0-9]", "_", os.path.splitext(stem)[0]).upper() + "_H"
 
 
@@ -694,9 +696,9 @@ def remove_stopgap_blocks(text: str, ids: set[str]) -> tuple[str, list[str], lis
 
 
 def leaf_header(op: "DeclOp") -> str:
-    """The leaf header of `op`'s symbol: `include/<the owner header's directory>/<symbol>.h` (section 6.5 rule 2's
+    """The leaf header of `op`'s symbol: `src/<the owner header's directory>/<symbol>.h` (section 6.5 rule 2's
     one other owner spelling - for an owner whose full header clashes with a consumer)."""
-    base = os.path.dirname(op.header).replace("\\", "/") or "include"
+    base = os.path.dirname(op.header).replace("\\", "/") or librepo.header_root()
     return "%s/%s.h" % (base, op.name)
 
 
@@ -720,7 +722,7 @@ def decl_sites(files: Files, op: "DeclOp", scope_files: set[str]) -> list[tuple]
         if op.name not in t:
             continue
         in_scope = ((r in scope_files and r != owner_src) or (op.owned_by_lane and r != owner_src)
-                    or (op.move and (r.startswith("include/unsplit/") or r == owner_src)))
+                    or (op.move and (is_band_header(r) or r == owner_src)))
         for s, e, stmt in find_prototypes(t, op.name):
             sites.append((r, s, e, stmt, in_scope))
     return sites
@@ -888,7 +890,7 @@ def apply_decls(files: Files, ops: list[DeclOp], scope_files: set[str], applied_
     for op in ops:
         if op.rid in failures or op.result.get("skipped") or "prototype" not in op.result:
             continue
-        inc = op.header[len("include/"):] if op.header.startswith("include/") else op.header
+        inc = librepo.include_spelling(op.header)
         for r in files.all():
             if r == op.header:
                 continue
@@ -1151,7 +1153,7 @@ def make_branch(root: str, base: str | None, branch: str | None) -> str:
 
 def mangle_checker(root: str):
     def check(header: str, op: DeclOp) -> str | None:
-        inc = header[len("include/"):]
+        inc = librepo.include_spelling(header)
         snippet = '#include "%s"\n%s' % (inc, op.result["prototype"])
         p = run_tool("tools/units/mangle.py", "--unit", op.owner or "", "--json", snippet, cwd=root, timeout=180)
         try:
@@ -1333,7 +1335,7 @@ def commit_stage(root: str, subject: str, body: str) -> str | None:
     if p.returncode != 0:
         raise SystemExit("integrate: commitlint refuses %r: %s" % (subject, (p.stdout + p.stderr).strip()))
     g = Git(root)
-    g.run("add", "-A", "src", "include", "config")
+    g.run("add", "-A", *[p for p in ("src", librepo.LEGACY_HEADER_ROOT, "config") if os.path.isdir(os.path.join(root, p))])
     msg = subject + "\n\n" + body.strip() + "\n"
     p = g.run("commit", "-q", "-F", "-", input=msg)
     if p.returncode != 0:
@@ -1344,7 +1346,7 @@ def commit_stage(root: str, subject: str, body: str) -> str | None:
 def module_of(files: list[str]) -> str:
     counts: dict[str, int] = {}
     for f in files:
-        if f.startswith("src/") and "/" in f[4:]:
+        if f.startswith("src/") and "/" in f[4:] and not f.endswith(HEADER_SUFFIXES):   # a source, never a header
             m = f[4:].split("/")[0].lower()
             counts[m] = counts.get(m, 0) + 1
     return max(counts, key=lambda k: (counts[k], k)) if counts else "network"
@@ -1444,7 +1446,7 @@ def narrow(items: list[Item], errors: list[dict], failed: list[str], root: str |
     """Blame every compiler error of a failed build and pick each culprit's remedy, all in one round:
 
     * a redefinition in an owner header this batch declared into or included (a type the full header redefines
-      for the consumer) -> the declarations move to their **leaf** header (`include/<module>/<symbol>.h`);
+      for the consumer) -> the declarations move to their **leaf** header (`src/<module>/<symbol>.h`);
     * `undefined identifier 'X'` for a rename's target whose declaration was skipped -> the declaration is
       **forced** into the owner header (a caller needs it); a second time, the rename is **reverted**;
     * any other error naming a declared symbol in its message -> that declaration is **excluded** everywhere
@@ -1533,7 +1535,7 @@ def declared_for_owner(files: Files, d: DeclOp, ownership: Ownership | None) -> 
     if ownership is None:
         return None
     for r in files.all():
-        if r.startswith("include/") and d.name in files.get(r) and d.name in files.declared(r):
+        if r.endswith(HEADER_SUFFIXES) and d.name in files.get(r) and d.name in files.declared(r):
             leaf_owner = ownership.leaf_header_owner(r, sorted(files.declared(r)))
             if leaf_owner and R.unit_stem(leaf_owner) == R.unit_stem(d.owner):
                 return r
@@ -1673,7 +1675,7 @@ def run(args, root: str | None = None) -> int:
             for ext in (".cpp", ".c", ".cp"):
                 if os.path.exists(os.path.join(root, "src", R.unit_stem(u) + ext)):
                     lane_scope.add("src/%s%s" % (R.unit_stem(u), ext))
-            lane_scope.add("include/%s.h" % R.unit_stem(u))
+            lane_scope.add("%s/%s.h" % (librepo.header_root(root), R.unit_stem(u)))
             lane_names.add(R.unit_stem(u))
     decisions = R.load_decisions(args.names)
     g = Git(root)

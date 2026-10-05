@@ -99,4 +99,4 @@ text) decided every symbol, with at least `max(3, N/50)` symbols read by the uni
   allowance instead of cutting without proof.
 
 The per-unit notes the program carried (homebutton) are in `docs/splits/phase4/homebutton-carried-notes.md`: the headers of
-`src/homebutton/` and `include/homebutton/` point at it.
+`src/homebutton/` (sources and headers) point at it.

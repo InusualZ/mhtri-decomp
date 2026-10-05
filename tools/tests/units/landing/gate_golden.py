@@ -1,6 +1,8 @@
 """The gate's table on the `test_gate_golden` scenarios, recorded from the monolithic `land.py` (main at ec8223e66)
 before the WP4 split: `{scenario: {"exit": code, "rows": [[name, status, kind], ...]}}`. Data, not a test. The two
-`new-unit-*` scenarios were recorded 2026-10-05 with the new-unit name row (every older scenario is unchanged)."""
+`new-unit-*` scenarios were recorded 2026-10-05 with the new-unit name row, and the two `layout-*` scenarios (the
+header move: renames out of the retired `include/` root land, a new path there refuses) the same day; every older
+scenario is unchanged."""
 GOLDEN = {
  "noop-dry-run": {"exit": 0, "rows": [
    ["ground truth (build.sha1 == the DOL's hash)", "PASS", "gate"],
@@ -258,4 +260,43 @@ GOLDEN = {
    ["all tool selftests pass (except the parked list)", "PASS", "gate"],
    ["rule 2 registration boundary (warning)", "PASS", "gate"],
    ["no newly registered unit has a generated name (rule 7)", "PASS", "gate"],
-   ["the gate's own subject follows the convention", "PASS", "gate"]]}}
+   ["the gate's own subject follows the convention", "PASS", "gate"]]},
+ "layout-move": {"exit": 0, "rows": [
+   ["ground truth (build.sha1 == the DOL's hash)", "PASS", "gate"],
+   ["main has not moved since the batch base", "PASS", "bookkeeping"],
+   ["every changed path belongs to a batch", "PASS", "gate"],
+   ["no batch file carries a git conflict marker", "PASS", "gate"],
+   ["orchestrator-only batch (no worker outboxes to check)", "PASS", "gate"],
+   ["style lint (§6.5) adds no violation", "PASS", "gate"],
+   ["all tool selftests pass (except the parked list)", "PASS", "gate"],
+   ["rule 2 registration boundary (warning)", "PASS", "gate"],
+   ["the gate's own subject follows the convention", "PASS", "gate"],
+   ["configure.py (exit 0)", "PASS", "gate"],
+   ["split (config.json) (exit 0)", "PASS", "gate"],
+   ["configure.py (after the split) (exit 0)", "PASS", "gate"],
+   ["every batch unit is registered (configure.py + splits.txt + build graph)", "PASS", "gate"],
+   ["every batch unit compiles (compile gate)", "PASS", "gate"],
+   ["every batch unit's relocations resolve against the link (no new undefined reference)", "PASS", "gate"],
+   ["ninja (exit 0)", "PASS", "gate"],
+   ["report.json (exit 0)", "PASS", "gate"],
+   ["rule 10 (vtable ownership) adds no violation", "PASS", "gate"],
+   ["no unit's split target object moved under the batch (a neighbour re-ranged)", "PASS", "gate"],
+   ["per-symbol re-measure reproduces the report from the objects", "PASS", "gate"],
+   ["ninja changes (DOL-level totals, informational) (exit 0)", "PASS", "gate"],
+   ["no symbol or unit regressed", "PASS", "gate"],
+   ["every --allow-regression was actually needed (warning)", "PASS", "bookkeeping"],
+   ["ok (main.dol verified) (exit 0)", "PASS", "gate"],
+   ["ok was recreated by THIS run", "PASS", "gate"],
+   ["ninja baseline (exit 0)", "PASS", "gate"],
+   ["claim released: configure.py", "PASS", "bookkeeping"]]},
+ "layout-retired-include-refusal": {"exit": 1, "rows": [
+   ["ground truth (build.sha1 == the DOL's hash)", "PASS", "gate"],
+   ["main has not moved since the batch base", "PASS", "bookkeeping"],
+   ["every changed path belongs to a batch", "FAIL", "gate"],
+   ["no batch file carries a git conflict marker", "PASS", "gate"],
+   ["orchestrator-only batch (no worker outboxes to check)", "PASS", "gate"],
+   ["style lint (§6.5) adds no violation", "PASS", "gate"],
+   ["all tool selftests pass (except the parked list)", "PASS", "gate"],
+   ["rule 2 registration boundary (warning)", "PASS", "gate"],
+   ["the gate's own subject follows the convention", "PASS", "gate"]]},
+}

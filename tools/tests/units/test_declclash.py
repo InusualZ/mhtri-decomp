@@ -17,29 +17,29 @@ TIER = "fixture"
 # case - the 30-name clash set of `src/menu/fn_802E4978.cpp`, 25 headers - is in the commit that added the tool.
 FIXTURES = {
     "root.cpp": '#include "root.h"\n\nvoid use(void) {\n    dup(1);\n}\n',
-    "include/root.h": (
+    "src/root.h": (
         '#include "a.h"\n#include "b.h"\n#include "cyc1.h"\n#include "multi.h"\n#include "shadow.h"\n'
         '#include "stmt.h"\n'
     ),
-    "include/a.h": (
+    "src/a.h": (
         "void dup(s32 a);\n"
         "void changed(s32 x);\n"
         "void both(s32 a);\n"
         "void same(void);\n"
         "void strct(struct Big* p);\n"
     ),
-    "include/b.h": (
+    "src/b.h": (
         "void dup(s32 b);\n"
         "void changed(u32 x);\n"
         "void both(u32 b);\n"
         "void same();\n"
         "void strct(Big* q);\n"
     ),
-    "include/cyc1.h": '#include "cyc2.h"\nvoid cyc_one(void);\n',
-    "include/cyc2.h": '#include "cyc1.h"\nvoid cyc_two(void);\n',
-    "include/multi.h": "void multi(\n    s32 a);\n",
-    "include/stmt.h": "void real_call(void);\n\nvoid user(void) {\n    return hidden(a, b);\n}\n",
-    "include/shadow.h": "void shadowed(s32 a);\n",
+    "src/cyc1.h": '#include "cyc2.h"\nvoid cyc_one(void);\n',
+    "src/cyc2.h": '#include "cyc1.h"\nvoid cyc_two(void);\n',
+    "src/multi.h": "void multi(\n    s32 a);\n",
+    "src/stmt.h": "void real_call(void);\n\nvoid user(void) {\n    return hidden(a, b);\n}\n",
+    "src/shadow.h": "void shadowed(s32 a);\n",
     "build/RMHE08/include/shadow.h": "void shadowed(u32 a);\n",
 }
 
@@ -49,7 +49,7 @@ def build_tree(root: Path) -> tuple[str, list[str]]:
         path = root / rel
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8", newline="\n")
-    roots = [str(root / "include"), str(root / "build" / "RMHE08" / "include")]
+    roots = [str(root / "src"), str(root / "build" / "RMHE08" / "include")]
     return str(root / "root.cpp"), roots
 
 
@@ -74,13 +74,13 @@ def test_report(c):
         c.check("`struct X*` and `X*` are SAME", by_name["strct"]["kind"], "SAME")
         c.check("the two-line prototype is ignored", "multi" in by_name, False)
         c.check("the cycle does not duplicate a file", by_name["dup"]["shapes"][0]["files"],
-                [str(root / "include" / "a.h"), str(root / "include" / "b.h")])
+                [str(root / "src" / "a.h"), str(root / "src" / "b.h")])
         c.check("a call in a definition is not a declaration", "use" in by_name, False)
         c.check("a `return fn(...);` line is not a declaration", "hidden" in by_name, False)
         c.check("`real_call` is seen once", "real_call" in by_name, False)
         c.check("the closure stops at the cycle", len(dc.closure(start, roots)), 9)
         c.check("the source tree wins over the generated one", dc.resolve("shadow.h", roots),
-                str(root / "include" / "shadow.h"))
+                str(root / "src" / "shadow.h"))
         c.check("a name only declared once is not a finding", "shadowed" in by_name, False)
         c.check("cycle-only names are not findings", "cyc_one" in by_name, False)
 

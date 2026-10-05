@@ -55,6 +55,9 @@ def mangle(snippet: str, unit_spec: str | None = None, verbose: bool = False,
     root = _repo.repo_root()
     unit = _units.Unit.resolve(unit_spec or DEFAULT_UNIT, root)
     tokens = _units.ninja_command(root, unit.spelling)
+    # the graph may predate configure.py (measure/recompile do the same): a stale `build.ninja` carried `-i include`
+    # after the 2026-10-05 header move, before `python configure.py` ran - the gate's selftest row runs in that state
+    tokens, _notes = _units.reconcile_flags(tokens, root, unit.spelling)
     with tempfile.TemporaryDirectory() as scratch:
         src = os.path.join(scratch, "mangle_probe.cpp")
         with open(src, "w", encoding="utf-8", newline="\n") as fh:
@@ -70,7 +73,7 @@ def mangle(snippet: str, unit_spec: str | None = None, verbose: bool = False,
 # an estimate without the compiler (rule 13's finding detail and `methodize.py` use it)
 # --------------------------------------------------------------------------------------------------
 # MWCC spells a member `name__<len><Class>[C]F<params>`; the parameter codes below are the ones the project's
-# scalar typedefs (`include/types.h`) expand to. It is an ESTIMATE: an unknown identifier is read as a
+# scalar typedefs (`src/types.h`) expand to. It is an ESTIMATE: an unknown identifier is read as a
 # class/struct/enum name (`<len><Name>`), and a shape it cannot spell (a function pointer, an array, a
 # repeated class type that the compiler folds into a `T`/`N` back-reference) returns None instead of a guess.
 # `mangle()` above is the exact answer (it compiles); call it to confirm before a map row is renamed.

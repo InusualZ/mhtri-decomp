@@ -40,17 +40,17 @@ branches, the backlog -> claim + brief + spawn line.
   (`claims.claim`: branch + slot or worktree), then renders the brief at the claim's slug path against the claim's own
   worktree (`promote`) - a brief is never copied from `briefs/pool/`, and the outbox it names always exists.
 * `next --cluster NAME` claims **one lane for every ready unit of a cluster**: a module (`--cluster Network`: every
-  ready unit under `src/Network/`) or a header (`--cluster include/Network/net.h`: every ready unit **of the header's
+  ready unit under `src/Network/`) or a header (`--cluster src/Network/net.h`: every ready unit **of the header's
   own module directory** whose include closure contains it - `--cross-module` adds the units of other modules that
   merely include it, and a top-level header has no module bound). Measured 2026-10-04 on
-  `include/Network/network_transport.h`: 35 units over 8 modules before the bound (enemy, lobby, Pl, stage, hud, ef,
+  `src/Network/network_transport.h`: 35 units over 8 modules before the bound (enemy, lobby, Pl, stage, hud, ef,
   quest pulled in through a hub include), 17 `Network` units after; the reason line names how many it left out. The claim is keyed `cluster/<name>` and records `units`; every member then reads `claimed`.
   The lane gets `briefs/<slug>.md` (the index: the members, the cluster's ack key and its one outbox) plus one brief
   per member under `briefs/<slug>/`.
 * `next --count N` claims up to N lanes at once and **no two share an owner header or a module** (`disjoint_picks`,
-  in address order). Owner headers are the closure's headers under `include/`/`src/` minus the shared base and
-  fallbacks every unit sees (`include/types.h`, `include/dolphin/`, `include/MSL*`, `include/nw4r/`,
-  `include/unsplit/`). A wave that cannot fill reports its shortfall; `--cluster` gives the rest one lane. (The
+  in address order). Owner headers are the closure's headers under `src/` minus the shared base and
+  fallbacks every unit sees (`src/types.h`, `src/nw4r/`,
+  `src/unsplit/`). A wave that cannot fill reports its shortfall; `--cluster` gives the rest one lane. (The
   address stride this replaces put header-sharing neighbours in concurrent lanes.)
 * The guards run before any claim, in this order: MAIN's HEAD is `main`, a slot is free (the concurrency cap), the
   backlog credit covers the claim (`--ignore-backlog` spends nothing), and no branch holds work main lacks

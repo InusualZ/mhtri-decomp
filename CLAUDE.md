@@ -138,11 +138,15 @@ config/RMHE08/config.yml  Analyzer/build settings, DOL path + hash, selfile (RSO
 config/RMHE08/symbols.txt Symbol map: name = section:address; // type/size/scope  (generated, hand-editable)
 config/RMHE08/splits.txt  Which address ranges belong to which translation unit / section
 config/RMHE08/build.sha1  SHA-1 of each built artifact - the pass/fail check for the whole project
-src/                      Our C/C++ source: src/<module>/<name>.<ext>, a unit registered once at its final home
-include/types.h           The project's common scalar types (u8..s64, f32/f64, BOOL/TRUE/FALSE/NULL), one definition.
-                          A declaration moves here the *second* time a unit needs it, never the first; an SDK type
-                          (`GXRenderModeObj`, `Vec`, `Mtx`, ...) gets a `dolphin/` mirror here. `src/Camellia/camellia.c`
-                          is the vendor exception and keeps its own typedefs.
+src/                      Our C/C++ source: src/<module>/<name>.<ext>, a unit registered once at its final home, and
+                          every header beside its source (src/<module>/<name>.h; there is no include/ - owner's ruling
+                          2026-10-05). The include root is src/ (`-i src`), so `#include "Network/x.h"` names src/.
+src/types.h               The project's common scalar types (u8..s64, f32/f64, BOOL/TRUE/FALSE/NULL), one definition.
+                          A declaration moves into a shared header the *second* time a unit needs it, never the first;
+                          an SDK type (`GXRenderModeObj`, `Vec`, `Mtx`, ...) gets one mirror header in its SDK directory
+                          under src/ (src/OS/, src/NAND/, ...). Hub headers mirror their old paths (src/mh3_pad/,
+                          src/nw4r/), the unsplit band is src/unsplit/. `src/Camellia/camellia.c` is the vendor
+                          exception and keeps its own typedefs.
 orig/RMHE08/              Original game files (read-only, gitignored). main.dol, files/mh3.sel, ...
 build/                    Everything generated: build.ninja, compilers/, tools/, RMHE08/ (gitignored)
 tools/                    Tooling: dtk-template's scripts at the top level, plus ours grouped by what they do (agents/,
@@ -239,7 +243,7 @@ The incident behind each is in `docs/pipeline.md` 13.3.
     the member set is derived from the tree); `config/<what>` (`configure.py`/`symbols.txt`/`splits.txt`-only: `config/flags`,
     `config/symbols`, `config/splits`); `docs/<topic>` (documentation that is not this file: `docs/plan`, `docs/pipeline`,
     `docs/matching`, `docs/tools`); `agents/<profile|policy>` (a subagent profile or this file, `agents/policy`);
-    `repo/<area>` (`repo/readme`, `repo/license`, `repo/ci`, `repo/gitignore`). The list is **open and there is no catch-all**: if
+    `repo/<area>` (`repo/readme`, `repo/license`, `repo/ci`, `repo/gitignore`, `repo/layout`). The list is **open and there is no catch-all**: if
     nothing fits, add a category. `python tools/git/commitlint.py --message "<subject>"` checks the shape.
   * **`<message>` is imperative, says what was made, and is at most 120 characters** ("match the vtable slots", "remove the count
     cap") - not the problem, not the investigation.
@@ -283,7 +287,7 @@ The incident behind each is in `docs/pipeline.md` 13.3.
       equal section sizes) - the `objdiff-verify` skill.
 * [ ] `git status --short` shows only intended files; `symbols.txt` / `splits.txt` edits are byte-clean for untouched lines
       (a rename goes through `symedit.py rename`, so its diff is one line per symbol).
-* [ ] For source or `include/` work: `python tools/units/stylelint.py --diff main` adds no section 6.5 violation.
+* [ ] For source or header work: `python tools/units/stylelint.py --diff main` adds no section 6.5 violation.
 * [ ] For a tool change: `python tools/selftest.py --changed main` is green (the gate runs all of it as the row "all tool selftests
       pass (except the parked list)"); a failure is fixed or parked in `tools/selftests-known-failures.json` with a reason and a date.
 * [ ] No new compiler flags / tool version changes smuggled in.

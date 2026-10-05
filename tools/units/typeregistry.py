@@ -19,18 +19,20 @@ from tools.lib import repo as _repo
 from tools.lib import project as _project
 
 
-SHARED_DIR = "include"
+# A header is shared wherever it lives (`src/**` since the owner's 2026-10-05 move, `include/**` before it); a
+# unit is a non-header source under `src/`. Both roots are walked, so a pre-move tree reads the same.
+SHARED_DIR = _repo.LEGACY_HEADER_ROOT
 UNIT_DIR = "src"
 HEADER_SUFFIXES = (".h", ".hpp", ".hh")
 SOURCE_SUFFIXES = (".c", ".cpp", ".cp", ".cc", ".h", ".hpp", ".hh")
 
 # The scalar base every unit includes. Its names are deliberately not offered as "use this header"
 # advice (they would drown the real finding); only a *redefinition* is debt.
-BASE_HEADERS = ("include/types.h",)
+BASE_HEADERS = ("src/types.h", "include/types.h")
 
 # Deliberate duplicates: CLAUDE.md / types.h's own header says these copies must stay.
 EXCEPTIONS = {
-    "src/Camellia/camellia.c": "vendor file mirrors upstream and keeps its own typedefs (include/types.h)",
+    "src/Camellia/camellia.c": "vendor file mirrors upstream and keeps its own typedefs (types.h)",
 }
 
 IDENT = re.compile(r"[A-Za-z_]\w*")
@@ -71,17 +73,17 @@ def _rel(root: str, path: str) -> str:
 
 
 def scan_tree(root: str) -> dict:
-    """Scan `<root>/include` (shared) and `<root>/src` (units): `{relpath: [decl, ...]}` for each."""
+    """Scan every header (shared) and every other `src/` source (units): `{relpath: [decl, ...]}` for each."""
     result = {"shared": {}, "units": {}}
-    for sub, suffixes, key in ((SHARED_DIR, HEADER_SUFFIXES, "shared"),
-                               (UNIT_DIR, SOURCE_SUFFIXES, "units")):
+    for sub in (SHARED_DIR, UNIT_DIR):
         base = os.path.join(root, sub)
         if not os.path.isdir(base):
             continue
         for dirpath, dirs, files in os.walk(base):
             dirs.sort()
             for fname in sorted(files):
-                if not fname.endswith(suffixes):
+                key = "shared" if fname.endswith(HEADER_SUFFIXES) else "units"
+                if not fname.endswith(SOURCE_SUFFIXES) or (key == "units" and sub != UNIT_DIR):
                     continue
                 abspath = os.path.join(dirpath, fname)
                 try:
@@ -141,8 +143,8 @@ def reference_sets(reg: dict, root: str, symbols_by_unit: dict | None = None) ->
 
 
 def _header_included(header: str, includes: set) -> bool:
-    """Whether an include line names `header` (both spellings: `include/ef.h` and `ef.h`)."""
-    variants = {header, header[len(SHARED_DIR) + 1:] if header.startswith(SHARED_DIR + "/") else header,
+    """Whether an include line names `header` (both spellings: `src/ef.h` and `ef.h`)."""
+    variants = {header, _repo.include_spelling(header),
                 posixpath.basename(header)}
     return bool(variants & includes)
 
@@ -583,9 +585,9 @@ extern void Panic(const char* f, int line, ...);
         try:
             clear_cache()
             reg = registry(tmp)
-            check("scan finds the shared headers", sorted(reg["shared"]),
-                  ["include/ef.h", "include/nw4r/math.h", "include/types.h"])
-            check("scan finds the unit files", len(reg["units"]), 7)
+            check("scan finds the shared headers (a header is shared wherever it lives)", sorted(reg["shared"]),
+                  ["include/ef.h", "include/nw4r/math.h", "include/types.h", "src/auto/local.h"])
+            check("scan finds the unit files", len(reg["units"]), 6)
             check("a shared tag and its typedef alias are one row",
                   sorted({d["name"] for d in reg["shared"]["include/ef.h"]}),
                   ["EF_ASSERT_PTR", "EfWork", "IsValidPointer", "Panic", "Vec"])

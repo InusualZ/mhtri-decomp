@@ -92,7 +92,7 @@ def print_rule2_report(ownership: "Ownership | None") -> None:
               % (sum(ownership.foreign_units.values()), len(ownership.foreign_units),
                  ", ".join("%s (%d)" % (u, n) for u, n in ownership.foreign_units.most_common(5))))
     if ownership.unsplit_modules:
-        print("rule 2: include/unsplit/*.h would carry %d declaration site(s) for %d symbol(s): %s"
+        print("rule 2: the unsplit band (src/unsplit/*.h) would carry %d declaration site(s) for %d symbol(s): %s"
               % (sum(ownership.unsplit_modules.values()),
                  sum(len(v) for v in ownership.unsplit_symbols.values()),
                  ", ".join("%s %d site(s)/%d symbol(s)"

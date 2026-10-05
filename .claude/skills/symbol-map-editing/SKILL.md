@@ -40,7 +40,7 @@ flood the context.
    defines or references the symbol. Rename only the map and objdiff stops matching the symbol by name and
    reports it as 0 %.
 2. **Find the other half first**: `refs <name>` lists every in-repo mention, **classified** into `code` /
-   `path` / `mention` - under **`src/` and `include/` by default**; `docs/` and anything under `tools/`
+   `path` / `mention` - under **`src/` by default**; `docs/` and anything under `tools/`
    only when named in `--roots`. So a rename does **not** sweep build-tool data:
    a regenerable cache keeps its own name strings, and the map plus `--roots` is the authority there, not the
    rows in it. `rename` runs the same

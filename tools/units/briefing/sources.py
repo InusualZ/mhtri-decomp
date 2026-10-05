@@ -61,7 +61,7 @@ def flag_probe_verdicts():
 
 
 def clear_caches() -> None:
-    """Forget the type registry's cache (a test that rewrites `include/` between builds)."""
+    """Forget the type registry's cache (a test that rewrites the headers between builds)."""
     _typeregistry().clear_cache()
 
 
@@ -267,7 +267,7 @@ def lib_for(main: str, unit: str) -> str:
 
 
 def shared_headers(main: str, wt: str, unit: str, symbol_names) -> list:
-    """The shared `include/**` headers this unit should reuse (`typeregistry.relevant_headers`)."""
+    """The shared headers this unit should reuse (`typeregistry.relevant_headers`)."""
     tr = _typeregistry()
     try:
         reg = tr.registry(main)

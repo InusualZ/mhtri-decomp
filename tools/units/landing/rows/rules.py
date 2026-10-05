@@ -7,6 +7,7 @@ import os
 import sys
 
 from tools.lib import project as _project
+from tools.lib.project.ownership import BAND_ROOTS, band_root
 from tools.lib.lanes import naming
 import tools.units.stylelint_rules.api as sl
 import tools.units.vtableaudit as vta
@@ -16,7 +17,7 @@ from tools.units.landing.common import Batch, command_detail, run
 
 # --------------------------------------------------------------------------------------------------
 # rule 2 at the range boundary: a batch that REGISTERS a range is what makes the symbols inside it owned
-# (docs/plan.md 6.5 rule 2), so any declaration of one of them still living in `include/unsplit/<band>.h`
+# (docs/plan.md 6.5 rule 2), so any declaration of one of them still living in `src/unsplit/<band>.h`
 # has just become a violation - and, when the new unit's own definition disagrees, the `(10505) illegal
 # overloading` that costs a full build (`-maxerrors 1` only shows it one symbol at a time).
 #
@@ -104,8 +105,8 @@ def added_split_ranges(old_rows: list[tuple[str, str, int, int]],
 
 
 def _band_header_paths(main: str) -> list[str]:
-    """Every `include/unsplit/` header, as an absolute path (the whole band, changed or not)."""
-    base = os.path.join(main, "include", "unsplit")
+    """Every band header (`lib.project.ownership.band_root`), as an absolute path (the whole band, changed or not)."""
+    base = os.path.join(main, *band_root(main).split("/"))
     out: list[str] = []
     for dirpath, _dirnames, filenames in os.walk(base):
         for name in sorted(filenames):
@@ -115,9 +116,9 @@ def _band_header_paths(main: str) -> list[str]:
 
 
 def _changed_band_headers(main: str, base: str) -> list[str]:
-    """The `include/unsplit/` headers this batch added or modified (a delete is not a declaration site)."""
-    p = run(["git", "diff", "--name-status", "-M", "--diff-filter=d", base, "--", "include/unsplit"],
-            main)
+    """The band headers this batch added or modified (a delete is not a declaration site), under either band root
+    (`BAND_ROOTS`: the base may predate the 2026-10-05 move)."""
+    p = run(["git", "diff", "--name-status", "-M", "--diff-filter=d", base, "--", *BAND_ROOTS], main)
     if p.returncode != 0:
         return []
     out: list[str] = []
@@ -250,7 +251,7 @@ def band_ownership_warnings(main: str, base: str | None) -> list[str]:
     Two directions, both keyed on the batch's own diff:
 
     1. the batch REGISTERS a range (splits.txt/configure.py changed): every symbol of `symbols.txt` the
-       range newly covers is now owned, so any `include/unsplit/<band>.h` that still *declares* one is a
+       range newly covers is now owned, so any `src/unsplit/<band>.h` that still *declares* one is a
        rule-2 violation and a candidate `illegal overloading` - whether that header was changed or not;
     2. the batch ADDS a declaration to a band header of a symbol an already-registered unit owns
        (ownership unchanged): the band is a fallback, not the owner.
@@ -399,9 +400,9 @@ def band_row(b: Batch) -> None:
     for warning in b.band_warnings:
         print(warning, file=sys.stderr)
     b.check("rule 2 registration boundary (warning)", True,
-            info=("%d newly-owned symbol declaration(s) still in include/unsplit/*.h - see the WARNING "
+            info=("%d newly-owned symbol declaration(s) still in the unsplit band (src/unsplit/*.h) - see the WARNING "
                   "lines above" % len(b.band_warnings)) if b.band_warnings
-                 else "no newly-owned symbol left declared in include/unsplit/*.h")
+                 else "no newly-owned symbol left declared in the unsplit band (src/unsplit/*.h)")
 
 
 def rule10_before(b: Batch) -> None:

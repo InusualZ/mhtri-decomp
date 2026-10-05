@@ -55,7 +55,7 @@ def test_fixture_tree_layout(c):
         c.expect("the tree is outside the live repository",
                  not str(tree.root).lower().startswith(str(testing.LIVE_ROOT).lower()))
         for rel in ("configure.py", "config/RMHE08/symbols.txt", "config/RMHE08/splits.txt",
-                    "config/RMHE08/config.yml", "src", "include", "build/RMHE08/obj", "build/RMHE08/src"):
+                    "config/RMHE08/config.yml", "src", "build/RMHE08/obj", "build/RMHE08/src"):
             c.expect("the skeleton has %s" % rel, tree.path(rel).exists())
         tree.add_cflags("cflags_runtime", ["-O4,p", "-fp_contract on"])
         tree.add_unit("Dir/file.c", lib="dir", flag="Matching", cflags="cflags_runtime",

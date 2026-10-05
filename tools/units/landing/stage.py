@@ -50,7 +50,7 @@ def land_stageable(units: list[str], rows: list[tuple[str, str]],
     `tools/` change belongs to the batch only when the batch *names* that path as one of its units. Without
     this, `tools/units/langcheck.py` was a tracked change inside the allowed set, `land` staged it, and the
     batch's commit carried another stream's work (`85f3d4b5`, `d50fdd32`). An **untracked** file is staged
-    when it is a named unit's own path or lives under `src/`/`include/` (source is the batch's), but not
+    when it is a named unit's own path or lives under `src/` (or the pre-move `include/`; source is the batch's), but not
     otherwise.
 
     `base_dirty` is the set `record_base` snapshotted when the batch opened: a path that was already dirty

@@ -29,6 +29,37 @@ STATE_NAMES = ("claims.json", "backlog.json", "land-base.json", "land-log.jsonl"
 #: The originals `config.yml` pins, by the key that pins each.
 GROUND_TRUTH_KEYS = (("hash", "orig/%s/sys/main.dol" % VERSION), ("selfile_hash", "orig/%s/files/mh3.sel" % VERSION))
 
+#: Where headers live: beside their sources under `src/` (owner's ruling, 2026-10-05). `LEGACY_HEADER_ROOT` is the
+#: tree before that move: a reader of a *ref* older than the move (the gate's `--diff` back side) still walks it, and
+#: nothing writes there. `HEADER_ROOTS` is every root a header has lived in, for those history readers.
+HEADER_ROOT = "src"
+LEGACY_HEADER_ROOT = "include"
+HEADER_ROOTS = (HEADER_ROOT, LEGACY_HEADER_ROOT)
+#: dtk's generated include directory, the second root of every compile (`configure.py`'s `-i build/<ver>/include`).
+BUILD_INCLUDE_REL = "build/%s/include" % VERSION
+
+
+def header_root(root: str | os.PathLike | None = None) -> str:
+    """The include root of a tree, relative to it: `src`, every tree's since the 2026-10-05 move (the move's
+    dual-layout tolerance is gone; `root` is kept so a caller names the tree it means)."""
+    return HEADER_ROOT
+
+
+def include_spelling(rel: str) -> str:
+    """How a source `#include`s the header at tree path `rel`: the path below its include root (`src/Network/x.h`
+    and the pre-move `include/Network/x.h` both spell `Network/x.h`)."""
+    rel = rel.replace("\\", "/")
+    for top in HEADER_ROOTS:
+        if rel.startswith(top + "/"):
+            return rel[len(top) + 1:]
+    return rel
+
+
+def include_roots(root: str | os.PathLike | None = None) -> tuple[str, str]:
+    """The compile's include search roots relative to the tree, in `configure.py` order."""
+    return (header_root(root), BUILD_INCLUDE_REL)
+
+
 #: This file's own tree - the "packaged copy" `repo_root()` falls back to when the cwd is not a tree.
 PACKAGED_ROOT = Path(__file__).resolve().parents[2]
 

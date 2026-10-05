@@ -43,7 +43,8 @@ Inputs -> outputs: message -> findings, exit 0/1/2.
 * `agents/<name>` - the profiles in `.claude/agents/*.md`, plus `policy` for CLAUDE.md.
 * `config/{flags,symbols,splits}` - the three inputs the convention names (configure.py -> `flags`, symbols.txt -> `symbols`, splits.txt -> `splits`).
 * `docs/<topic>` - the documents under `docs/`.
-* `repo/<area>` - read from the files at the root: `readme`, `license`, `ci` (a `.github*` directory), `gitignore`.
+* `repo/<area>` - read from the files at the root: `readme`, `license`, `ci` (a `.github*` directory), `gitignore`; plus
+  `layout`, always: the tree's own directory structure (the 2026-10-05 header move is its first use).
 * Exit status follows the house convention (`--diff`'s 0/1/2): **0** clean (a warning alone does not fail - an unknown family is legitimate), **1** one or more violations, **2** nothing was checked (no mode given, `--last 0`, or a history with no commits), so the tool can be wired into a gate later.
 * **`--install-hook` is a convenience, not the enforcement path.** It writes an `sh`-compatible `commit-msg` hook to `.git/hooks/commit-msg` (mode 0755) that calls this tool with `"$1"`. That hook is untracked and therefore **per-clone**: it never travels with the repository, and it is not what stops a bad message - the enforcement is a gate that runs this tool directly (the same `0/1/2` it already speaks). Note also that when `core.hooksPath` is configured - `git config core.hooksPath tools/git/hooks` in this repo - git does **not** consult `.git/hooks`, so the installer says so rather than pretend the hook is active.
 

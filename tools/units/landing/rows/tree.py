@@ -273,7 +273,14 @@ def paths_row(b: Batch) -> None:
         # tolerated, but NAMED: the guard's intent is a loud refusal for foreign work, and a path it refuses
         # must never have been staged by this gate - so tolerated scratch is reported, not swallowed.
         print(tolerate_scratch(b.main, b.scratch, act=not b.dry_run), file=sys.stderr)
-    b.check("every changed path belongs to a batch", not bad, "not allowed in a batch: %s" % ", ".join(bad),
+    retired = common.retired_paths(b.main)
+    why = []
+    if bad:
+        why.append("not allowed in a batch: %s" % ", ".join(bad))
+    if retired:
+        why.append("added under a retired root (include/ is gone - a header lives beside its source under src/, "
+                   "owner's ruling 2026-10-05): %s" % ", ".join(retired))
+    b.check("every changed path belongs to a batch", not bad and not retired, "; ".join(why),
             info=("tool scratch tolerated (not staged): %s" % ", ".join(b.scratch)) if b.scratch else "")
 
 

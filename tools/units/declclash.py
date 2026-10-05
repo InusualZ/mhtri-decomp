@@ -12,9 +12,8 @@ import os
 import re
 import sys
 
-from tools.lib import cli, cscan
+from tools.lib import cli, cscan, repo
 
-INCLUDE_ROOTS = ("include", os.path.join("build", "RMHE08", "include"))
 
 # A one-line function declaration: type(s), name, parameter list, `;` and an optional trailing comment.
 # Definitions (a `{` on the line) and multi-line prototypes are deliberately not matched.
@@ -154,7 +153,7 @@ def _main(parser, args):
     if not args.paths:
         parser.error("at least one path is required")
 
-    roots = [os.path.join(args.root, r) for r in INCLUDE_ROOTS]
+    roots = [os.path.join(args.root, *r.split("/")) for r in repo.include_roots(args.root)]
     findings = report(args.paths, roots, args.only_different)
 
     if args.json:

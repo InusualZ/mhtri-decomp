@@ -108,7 +108,9 @@ def derive_members(root: str) -> dict:
             docs.add(name[:-3])
     members["docs"] = docs
 
-    repo: set = set()
+    # `layout` is the tree's own directory structure (where sources and headers live: the 2026-10-05 move of every
+    # header from include/ beside its source) - a repository change no single module, tool or config file owns
+    repo: set = {"layout"}
     try:
         root_names = [n.lower() for n in os.listdir(root)]
     except OSError:

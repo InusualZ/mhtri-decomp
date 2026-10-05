@@ -2,7 +2,7 @@
 Spec: docs/tools/spec/stylelint_rules.md. CLI: none (the stylelint package; `stylelint.py` is the CLI)."""
 from __future__ import annotations
 
-from tools.units.stylelint_rules.common import Source, _finding, type_defs
+from tools.units.stylelint_rules.common import Source, _finding, is_header, type_defs
 
 
 def rule1_findings(sources: list[Source]) -> list[dict]:
@@ -13,8 +13,14 @@ def rule1_findings(sources: list[Source]) -> list[dict]:
     extra definitions to delete, not the number of files involved. Reporting per extra file (rather than
     one finding per type) keeps the budget actionable and lets a batch that only adds a duplicate be
     refused on the file it touched.
+
+    Only sources are compared, never headers (`is_header`, by suffix): a header's definition is the shared one this
+    rule points at, and a header-vs-source copy is `typeregistry`'s `shared` debt. The rule read `src/` while every
+    header sat under `include/`; keying the exclusion on the suffix keeps that reading after the owner's 2026-10-05
+    move put the headers in `src/` (71 header-involving duplicates would otherwise appear, and two owners change).
     """
     where: dict[str, dict[str, int]] = {}
+    sources = [src for src in sources if not is_header(src.rel)]
     by_rel = {src.rel: src for src in sources}
     for src in sources:
         for name, line in type_defs(src):

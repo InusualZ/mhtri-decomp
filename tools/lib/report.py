@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from tools.lib import cscan
+from tools.lib.repo import header_root
 
 #: The per-function score key of report version 2; a function entry **without** it scores 0 %, not 100 %.
 SCORE_KEY = "fuzzy_match_percent"
@@ -687,9 +688,10 @@ def _inside(path: str, root: str) -> bool:
 
 
 def resolve_include(name: str, from_dir: str, root: str) -> str | None:
-    """Where MWCC finds `name` from `from_dir`: beside the includer, then `include/`, then `src/`; in-tree only."""
+    """Where MWCC finds `name` from `from_dir`: beside the includer, then the include root (`lib.repo.header_root`),
+    then `src/`; in-tree only."""
     name = name.replace("\\", "/")
-    for base in (from_dir, os.path.join(root, "include"), os.path.join(root, "src")):
+    for base in (from_dir, os.path.join(root, header_root(root)), os.path.join(root, "src")):
         cand = os.path.normpath(os.path.join(base, *name.split("/")))
         if os.path.isfile(cand) and _inside(cand, root):
             return cand

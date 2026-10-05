@@ -31,7 +31,7 @@ Inputs -> outputs: map, splits, report, configure, dossier, typeregistry, `docs/
 * docs/plan.md 7.3, §5.2. A worker inherits nothing from the orchestrator's context, so the brief is self-contained
   and says the same thing every time. It has exactly six parts:
 * the unit - path, lib, mw_version, the real cflags, object and target paths, the `.text` range, the **language**
-  (`langcheck.py`: the extension decides the front-end) and the shared headers (`include/**`) that already declare
+  (`langcheck.py`: the extension decides the front-end) and the shared headers (`src/**`) that already declare
   what the unit needs (`typeregistry.py`)
 * the inventory - every symbol the unit owns, its address, size and current measured %
 * the residuals - the unit's file-header comment, so a re-brief never re-derives settled work

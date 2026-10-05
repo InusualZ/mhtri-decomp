@@ -394,7 +394,7 @@ def print_report(rep):
     states = sorted({r["owner_state"] for r in rows})
     legend = {"reconstructed": "owner has source in src/ (rename its source too)",
               "registered": "a split range, no source yet (the map row is the only half)",
-              "unsplit": "no registered owner (declare in include/unsplit/)",
+              "unsplit": "no registered owner (declare in src/unsplit/)",
               "unmapped": "not in the symbol map",
               "duplicate": "more than one map row"}
     print()

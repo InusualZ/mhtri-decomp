@@ -171,7 +171,7 @@ config.check_sha_path = Path("config") / config.version / "build.sha1"
 config.asflags = [
     "-mgekko",
     "--strip-local-absolute",
-    "-I include",
+    "-I src",
     f"-I build/{config.version}/include",
     f"--defsym BUILD_VERSION={version_num}",
 ]
@@ -211,7 +211,7 @@ cflags_base = [
     "-fp_contract on",
     "-str reuse",
     "-multibyte",  # For Wii compilers, replace with `-enc SJIS`
-    "-i include",
+    "-i src",
     f"-i build/{config.version}/include",
     f"-DBUILD_VERSION={version_num}",
     f"-DVERSION_{config.version}",
@@ -1187,7 +1187,7 @@ config.libs = [
             # two TUs (`--max-bytes` had cut them in one).  FIRST TU 0x8032C920..0x8033041C, 74
             # functions / 15100 B: the enemy work record's action band - it hands its r3 record to
             # `em_frame_check`/`em_act_ck`/`em_die_ck`/`em_after_frame_check`/`em_get_mot_no`
-            # (67 sites) and every field it reads on that pointer is one `include/enemy/ENEMY_WORK.h`
+            # (67 sites) and every field it reads on that pointer is one `src/enemy/ENEMY_WORK.h`
             # names.  It owns the class vtable `lbl_805E04E0`, the table run `.data`
             # 0x805DFC9C..0x805E0510, extab 0x80016464..0x8001662C, extabindex
             # 0x800354FC..0x800357A8, the `.ctors` word 0x8056F3A0 -> `fn_80330128` and its
@@ -1211,7 +1211,7 @@ config.libs = [
                         Object(NonMatching, "sound/fn_800D7F54.cpp"),
             # Registered from proposal/800DD1F0_fn_800DD1F0.cpp (125 symbols / 0x6ACC bytes) and recut in phase 4: the head is folded into
             # sound/fn_800D7F54.cpp, this row is the SE request cluster's middle, then the `MHchar` model class and the job request.
-            # `sound` module (include/unsplit/sound.h is the band) and C++ (the `* __FP...` / `move__6MHcharFUs` manglings).
+            # `sound` module (src/unsplit/sound.h is the band) and C++ (the `* __FP...` / `move__6MHcharFUs` manglings).
             Object(NonMatching, "sound/se_req.cpp"),
             Object(NonMatching, "sound/mhchar.cpp"),
             Object(NonMatching, "sound/sound_job.cpp"),
@@ -1436,7 +1436,7 @@ config.libs = [
             # proposal/803432B4_fn_803432B4.cpp: the `_EFT` family at `.text` 0x803432B4..0x80349DD8
             # (92 functions / 0x6B24 bytes).  Module `ef` from the code: the range's `self` is the
             # 0x48-byte `_EFT` field for field (`flag_0x01`, `state_0x05`, `field_0x06`,
-            # `timer_0x0C`, `pos_0x18`, `work_0x38`, `area_0x44` - the `include/ef.h` layout), it
+            # `timer_0x0C`, `pos_0x18`, `work_0x38`, `area_0x44` - the `src/ef.h` layout), it
             # spawns models through `ef/eft_res.cpp`'s `res_eft_model_create` and gates on
             # `eft_control`; the sibling units are `ef/eft035.cpp`/`ef/fn_803066F0.c`.  The file is
             # `ef/eft_slot.cpp`: the range is the family's 10-entry slot pool and the enemy-record
@@ -1860,7 +1860,7 @@ config.libs = [
             # more than one original TU (`g3d_anmobj.cpp`/`g3d_anmclr.cpp` in its head, `g3d_anmscn.cpp`
             # from 0x800649CC), so it keeps the map's `fn_80063888` stem (brief evidence class 4); the
             # module is `g3d` and the lib's flags are cflags_g3d.  See the file header for the seam and
-            # the rule-2 owner header `include/g3d/fn_80063888.h`.
+            # the rule-2 owner header `src/g3d/fn_80063888.h`.
             Object(NonMatching, "g3d/fn_80063888.cpp"),       # 0x80063888-0x800680A8
             # Registered once, at its final home (docs/plan.md 12): proposal `8005AA28` - the nw4r g3d
             # `ResMat` accessor cluster (0x8005AA28..0x8005ABD8, 8 functions).  Its own `__FILE__`
@@ -1876,7 +1876,7 @@ config.libs = [
             # g3d_light.cpp - `tools/units/attribution-queue.json`), so it keeps the map's `fn_80075DCC`
             # stem (brief evidence class 4); the module is `g3d` and the lib's flags are cflags_g3d.  The
             # left edge 0x80075DCC is a tudiscover strong cut, the right edge 0x8007C540 is the proposal
-            # cap, not a seam.  See the file header and `include/g3d/fn_80075DCC.h` (rule 2).
+            # cap, not a seam.  See the file header and `src/g3d/fn_80075DCC.h` (rule 2).
             Object(NonMatching, "g3d/fn_80075DCC.cpp"),      # 0x80075DCC-0x8007C540
             # Registered once, at each real TU's own home (docs/plan.md 12), from the pooled proposal
             # `8007C540` (185 functions / 0x7FEC B, 0x8007C540-0x8008452C).  The proposal is NOT one TU:

@@ -293,7 +293,7 @@ becomes it (`duplication.md` has the line numbers).
 * `Checker`: `check(name, got, want)`, `expect`, `raises`, `contains`; prints one shape (`ok - N checks` / `FAIL: name: got != want`)
   so the runner needs one regex, not five.
 * `FixtureTree(tmp)`: a fake repository the lib accepts as a tree - `configure.py` (real Python), `config/RMHE08/{symbols,splits}.txt`,
-  `src/`, `include/`, `build/RMHE08/{obj,src}/` objects from `ElfBuilder`, a `report.json`, an optional asm dump; helpers
+  `src/`, `build/RMHE08/{obj,src}/` objects from `ElfBuilder`, a `report.json`, an optional asm dump; helpers
   `add_unit(...)`, `add_symbol(...)`, `claim(...)`. It is the only way a fixture test builds a tree, and it is created outside the
   repository (the `unitscore_selftest` incident).
 * `GitFixture(tmp)`: `init`, `commit(files, message)`, `branch`, `worktree`, `conflict(a, b)` for the landing/merge/lane tests.

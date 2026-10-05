@@ -12,6 +12,8 @@ from typing import Any, Iterable
 
 from tools.lib import names as libnames
 from tools.lib import text as libtext
+from tools.lib.project.ownership import band_root
+from tools.lib.repo import header_root
 
 # --- the schema (one definition: brief.py renders it, handoff.py validates with it, integrate.py reads it) ----
 
@@ -327,13 +329,18 @@ def prototype_in(text: str) -> str | None:
     return None
 
 
-def header_in(text: str) -> str | None:
-    """The header a request names (`include/X/y.h`, `X/y.h`, `y.h`)."""
-    m = re.search(r"\b((?:include/)?[\w./]+\.h)\b", text or "")
+def header_in(text: str, root: str | None = None) -> str | None:
+    """The header a request names (`src/X/y.h`, `include/X/y.h` - the pre-move spelling -, `X/y.h`, `y.h`), as a
+    path under the tree's include root (`lib.repo.header_root`)."""
+    m = re.search(r"\b([\w./]+\.h)\b", text or "")
     if not m:
         return None
     h = m.group(1)
-    return h if h.startswith("include/") else "include/" + h
+    for pre in ("include/", "src/"):
+        if h.startswith(pre):
+            h = h[len(pre):]
+            break
+    return "%s/%s" % (header_root(root), h)
 
 
 def _confidence(*texts: str) -> str:
@@ -643,12 +650,13 @@ def is_member(map_name: str | None) -> bool:
     return bool(map_name) and re.search(r"__(?:\d+[A-Za-z_]|Q\d|ct__|dt__)", map_name) is not None
 
 
-def owner_header(unit: str | None, band: str | None = None) -> str | None:
-    """`include/<unit stem>.h` for a unit, `include/unsplit/<Band>.h` for an unowned symbol in a band."""
+def owner_header(unit: str | None, band: str | None = None, root: str | None = None) -> str | None:
+    """`src/<unit stem>.h` (beside the unit's source) for a unit, `src/unsplit/<Band>.h` for an unowned symbol in a
+    band - the roots `lib.repo.header_root`/`lib.project.ownership.band_root` give for the tree."""
     if unit:
-        return "include/%s.h" % unit_stem(unit)
+        return "%s/%s.h" % (header_root(root), unit_stem(unit))
     if band:
-        return "include/unsplit/%s.h" % band.split("/")[-1]
+        return "%s/%s.h" % (band_root(root), band.split("/")[-1])
     return None
 
 
@@ -708,10 +716,10 @@ def resolve_target(t: Target, ownership, decisions: dict[str, str] | None = None
     r.owner_state = owner.state
     if owner.state in ("registered", "reconstructed"):
         r.owner = owner.unit
-        r.header = owner_header(owner.unit)
+        r.header = owner_header(owner.unit, root=getattr(ownership, "root", None))
     elif owner.state == "unsplit":
         r.owner = None
-        r.header = owner_header(None, owner.band)
+        r.header = owner_header(None, owner.band, root=getattr(ownership, "root", None))
         if owner.band is None:
             r.notes.append("unowned and between two modules: no band header can be named")
     else:
