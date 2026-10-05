@@ -65,6 +65,15 @@ Inputs -> outputs: splits, map, DOL, objects, src -> rows.
   in a worktree): 9 phantom runs, each the twin of a second-block run at +0x6E0 (`805FBD68` = `805FC448`), and
   2 real first-block runs missing (`805FBC78` 346 words, `805FC1E8` 79 words); the current tree has no such unit,
   so `--json` over MAIN is unchanged (396 keys before and after).
+* **`referenced` is a relocation inside the run (2026-10-05).** `audit_unit` passed the range START to
+  `_verdict_run`, so the window was the range's first `4 * words` bytes: a store of the range's first object's address
+  marked a later, abandoned run `referenced`. It passes the run's own address now, as the docstring always said. Over
+  MAIN's build (`2e6610017`): run verdicts referenced 185 -> 17, violation 374 -> 542; rule-10 keys 396 -> 564 (+168,
+  none removed) over 81 units (top: `Pl/pl_act_step.cpp` 9, `enemy/em016_prog.cpp`, `ai/ai_npc.cpp`,
+  `ef/eft_slot.cpp` 6 each, `enemy/em003_prog.cpp`, `lobby/lb_npc.cpp` 5 each). They are the honest rule-10 baseline:
+  the gate computes both sides with the same code, so the change cannot refuse a batch by itself. The one landed
+  `--allow-rule10` key in the history (`run:.data:805FB0F8`, the Pat claim) is in neither key set, and an allowance is
+  checked only against its own batch's growth, so only a future batch's keys are affected.
 * `--at <addr>` is the census mode: it reads the vtable at `<addr>` straight out of the DOL and prints every slot with the registered unit that **owns** its target (by address, never by name) and the symbol the map names there, plus the reference object's relocation symbol for that slot (`dossier.parse_elf`). One lane hand-built that list twice and got 62 of 114 slots wrong, each time by parsing the DOL header's grouped offset/address/size fields by hand - this mode parses them once, in `dol_segments`/`dol_read`.
 
 ## Lib dependencies
@@ -78,16 +87,12 @@ scan (34 hits) and the class order of all 354 units are identical.
 ## Test contract
 
 Tier: fixture (the tree is hashed before and after).
-Today's selftest (`tools/units/vtableaudit_selftest.py`): Four things here can silently make the sweep lie, so each gets its own block of checks: * the **run rule** - `find_runs` must find maximal blocks of consecutive code pointers and must not call a single pointer a table (a run needs two entries), because one stray code address in a data section is an ordinary pointer; * **address resolution** - a word's value comes from the relocation that sits on it (`section base + symbol + addend`), and a symbol that is *undefined* in the object has no address there at all: it is resolved through `symbols.txt` or the `_XXXXXXXX` spelling every `lbl_`/`fn_` name carries. Get this wrong and the sweep reports the wrong addresses, or nothing at all; * the **verdict** - a run our object emits or references is fine, an owned run it neither emits nor references is the rule-10 violation, and a `.ctors`/`extab` run is **not** a vtable (`n/a`), because a run the linker/compiler puts in `.ctors` cannot be one; * the **section comparison** - a non-`.text` section our object does not carry at all is the `missing` case the report exists for, and metadata (`.symtab`, `.rela*`, `.comment`, `.note.split`) is never compared. The real `src/`, `configure.py`, `splits.txt`, `symbols.txt`, `build/` and DOL are never read or written: every fixture lives in a temp directory, so the selftest is green on a tree with no build. The fixture tree is hashed before and after the sweep, which is how "the tool only reads" is checked rather than promised. A second fixture (`ElfBuilder`) gives one unit two `.data` ranges and a target object with two `.data` sections: each block's run must come back at its own address, with no range mismatch and no section-size difference (the pre-fix reader fails five of those checks).
+Today's selftest (`tools/units/vtableaudit_selftest.py`): Four things here can silently make the sweep lie, so each gets its own block of checks: * the **run rule** - `find_runs` must find maximal blocks of consecutive code pointers and must not call a single pointer a table (a run needs two entries), because one stray code address in a data section is an ordinary pointer; * **address resolution** - a word's value comes from the relocation that sits on it (`section base + symbol + addend`), and a symbol that is *undefined* in the object has no address there at all: it is resolved through `symbols.txt` or the `_XXXXXXXX` spelling every `lbl_`/`fn_` name carries. Get this wrong and the sweep reports the wrong addresses, or nothing at all; * the **verdict** - a run our object emits or references is fine, an owned run it neither emits nor references is the rule-10 violation, and a `.ctors`/`extab` run is **not** a vtable (`n/a`), because a run the linker/compiler puts in `.ctors` cannot be one; * the **section comparison** - a non-`.text` section our object does not carry at all is the `missing` case the report exists for, and metadata (`.symtab`, `.rela*`, `.comment`, `.note.split`) is never compared. The real `src/`, `configure.py`, `splits.txt`, `symbols.txt`, `build/` and DOL are never read or written: every fixture lives in a temp directory, so the selftest is green on a tree with no build. The fixture tree is hashed before and after the sweep, which is how "the tool only reads" is checked rather than promised. A `referenced`-window fixture puts a 2-word run at `.data+0x10` and a relocation of ours at `.data+0` (a violation) or at `.data+0x10` (referenced); the range-start window fails both. A second fixture (`ElfBuilder`) gives one unit two `.data` ranges and a target object with two `.data` sections: each block's run must come back at its own address, with no range mismatch and no section-size difference (the pre-fix reader fails five of those checks).
 Target: `tools/tests/units/test_vtableaudit.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
 
 ## Known gaps
 
-* `referenced` tests a window that starts at the run's RANGE start, not at the run (`audit_unit` passes `start` to
-  `_verdict_run`, whose docstring says "inside the run"): any relocation of ours into the first `4 * words` bytes of
-  the range marks a later run referenced. Passing the run's address instead was measured over MAIN on 2026-10-05:
-  396 -> 564 keys (168 of the 185 `referenced` runs become violations, none removed). Not changed: it moves the
-  rule-10 baseline and is the owner's call.
+* None recorded beyond the Target above.
 
 ## History (the incidents behind the rules - keep the rule, drop the narrative when the rule is stable)
 

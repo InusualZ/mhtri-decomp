@@ -826,6 +826,43 @@ def selftest() -> int:
         check("two .data ranges: no violation, and nothing written", (two["violations"], tree_digest(tmp)),
               ([], before))
 
+    # -- 'referenced' means a relocation INSIDE the run, not inside the range's first bytes (2026-10-05) ----------
+    # `audit_unit` passed the range start to `_verdict_run`, so a store of the range's first object's address marked
+    # a later, abandoned run `referenced` (168 of MAIN's 185 `referenced` runs were that, measured 2026-10-05).
+    def window_case(ref_offset: int) -> str:
+        with tempfile.TemporaryDirectory() as tmp:
+            files = {
+                os.path.join("config", "RMHE08", "splits.txt"):
+                    "t/win.cpp:\n\t.text       start:0x80004000 end:0x80004100\n"
+                    "\t.data       start:0x80050000 end:0x80050020\n",
+                os.path.join("config", "RMHE08", "symbols.txt"):
+                    "fn_80004000 = .text:0x80004000; // type:function size:0x10\n",
+                "configure.py": 'config.libs = [\n    Object(NonMatching, "t/win.cpp"),\n]\n',
+            }
+            for rel, text in files.items():
+                os.makedirs(os.path.dirname(os.path.join(tmp, rel)) or tmp, exist_ok=True)
+                with open(os.path.join(tmp, rel), "w", encoding="utf-8") as fh:
+                    fh.write(text)
+            write_elf(os.path.join(tmp, "orig", "RMHE08", "sys", "main.dol"), dol_header())
+            # the target: a 2-word run at .data+0x10, after 0x10 bytes of plain data
+            target = (ElfBuilder().section(TEXT, b"\x00" * 0x100).section(DATA, b"\x00" * 0x20)
+                      .symbol("fn_80004000", TEXT, 0, 16, type="func"))
+            target.reloc(2, 0x10, "fn_80004000", R_PPC_ADDR32).reloc(2, 0x14, "fn_80004000", R_PPC_ADDR32)
+            # ours: the same .data with no table, and `.text` storing the address of `.data+ref_offset`
+            ours = (ElfBuilder().section(TEXT, b"\x00" * 0x100).section(DATA, b"\x00" * 0x20)
+                    .symbol("fn_80004000", TEXT, 0, 16, type="func")
+                    .symbol("obj", DATA, ref_offset, 4, type="object"))
+            ours.reloc(TEXT, 0x20, "obj", R_PPC_ADDR32)
+            write_elf(os.path.join(tmp, "build", "RMHE08", "obj", "t", "win.o"), target.build())
+            write_elf(os.path.join(tmp, "build", "RMHE08", "src", "t", "win.o"), ours.build())
+            runs = va.sweep(tmp)["runs"]
+            return [(r["address"], r["verdict"]) for r in runs]
+
+    check("referenced window: a relocation to the range's first word does not reach a later run (violation)",
+          window_case(0), [(0x80050010, "violation")])
+    check("referenced window: a relocation into the run itself still marks it referenced",
+          window_case(0x10), [(0x80050010, "referenced")])
+
     # -- (d) the .data emission order ----------------------------------------------------------
     def order_obj(names):
         """An object whose `.data` symbols are `names` at 0x20-byte strides, in the given order."""

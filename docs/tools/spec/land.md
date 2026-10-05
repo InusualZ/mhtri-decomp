@@ -51,6 +51,13 @@ Inputs -> outputs: main tree, branch, .pi/land-base.json -> rows, commit.
 8. *(deleted 2026-10-05)* the `rule 7 deferred` escape-growth row: rule 7 is row 5's (the lint fires on every added
    generated name; the escape is inert since 2026-09-27). Replay: over the 313 gated commits since it was added
    (`373c93732`) the escape grew in 19 and the row refused none.
+   7b. *(added 2026-10-05)* no newly registered unit has a generated name (rule 7) - a **REFUSAL** (GATE) for a unit
+   the batch registers (a `splits.txt` block or an `Object(...)` row the base did not carry) whose path spells a
+   generated component (`lib.names.generated_path_components`: a `fn_`/`lbl_`/`loc_`/`dtor_`/`zz_` stem or a DOL
+   address, in the stem or a directory). A GUESS name passes; a `--unit-rename OLD=NEW` is credited when NEW adds no
+   generated component OLD lacked (a rename to a named stem, a move that keeps one). It protects new registrations
+   only and is reported only when a new registration or a declared rename spells a generated component, so a batch
+   registering named units shows the same table as before (`objects.new_unit_name_row`, pre-build).
 9. the gate's own subject follows the convention (`commitlint`) (GATE).
 10. `configure.py`, then `ninja -k 0` scoped to the batch's objects (the compile gate; a foreign dirty object that fails is named and tolerated), then `ninja build/RMHE08/ok` - each command's exit code is a row (GATE).
 11. every batch unit is registered on three axes: `Object(...)` line, `splits.txt` block, build-graph target (`verifyunit`) (GATE).

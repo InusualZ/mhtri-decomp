@@ -8,24 +8,28 @@ from dataclasses import dataclass
 
 from tools.lib import cscan
 from tools.lib import findings as _findings
+from tools.lib.project.ownership import BAND_ROOT as _BAND_ROOT, HEADER_SUFFIXES as _HEADER_SUFFIXES
+from tools.lib.project.ownership import is_band_header as _is_band_header
 
 
 SRC = "src"
-# The unsplit band (`include/unsplit/<module>.h`) is the legitimate home for a symbol with no registered
-# owner. It is declaration-only glue, so only rule 2 applies to it - but rule 2 *does*: an owned symbol
-# declared here collides with the owner's typed definition (MWCC `(10197) illegal function overloading`)
-# in every translation unit that includes the band.
-UNSPLIT = "include/unsplit"
+# The unsplit band (`include/unsplit/<module>.h` today) is the legitimate home for a symbol with no registered
+# owner. Rule 2 reads it inverted: an owned symbol declared here collides with the owner's typed definition (MWCC
+# `(10197) illegal function overloading`) in every translation unit that includes the band. Every body rule applies
+# to it as to any header (2026-10-05). The path is `lib.project.ownership.BAND_ROOT`, the one spelling - the owner's
+# ruling moves the band beside the sources, and the classifier follows that constant.
+UNSPLIT = _BAND_ROOT
 # The pseudo-module rule 2 reports when the registered bands bracketing an unsplit address name different
 # modules (a `sound` unit inside the `ef` band): no `<module>.h` is sound, so the finding names the band
 # directory instead. It is not a path component, so it cannot collide with a real module name.
 UNSPLIT_UNRESOLVED = "<band unresolved>"
-# Every shared header lives under `include/` (the unsplit band is `include/unsplit/`).  Rule 14 scans this
-# whole tree: a codegen pragma is lexically scoped to the rest of every TU that includes the header, so
-# one in the tree silently changes code that does not belong to the header's author.
+# The shared-header tree as it is today. It is a *walk root*, never a classifier: a header is a file with a
+# `HEADER_SUFFIXES` suffix wherever it lives (`is_header`), because the owner's 2026-10-05 ruling moves every header
+# beside its source under `src/`. `LINT_ROOTS` are the trees the lint reads; after the move `include/` is simply empty.
 HEADERS = "include"
-HEADER_SUFFIXES = (".h", ".hpp", ".hh")
-SUFFIXES = (".c", ".cpp", ".cp", ".cc", ".h", ".hpp", ".hh")
+LINT_ROOTS = (SRC, HEADERS)
+HEADER_SUFFIXES = _HEADER_SUFFIXES
+SUFFIXES = (".c", ".cpp", ".cp", ".cc") + HEADER_SUFFIXES
 
 # Rule 7's path-keyed exemption table is **empty and stays empty** (owner's ruling, 2026-09-27): the
 # `src/auto/` bucket is retired and no path exempts a rule. The table is kept so `exemptions()` and the
@@ -45,7 +49,8 @@ RULE_NAMES = {
     4: "field carries its offset (/* +0xNN */)",
     5: "no field left named unkNN (pad_0xNN / unused_0xNN are the exception)",
     6: "no pointer arithmetic to reach a field",
-    7: "no auto-generated name survives (`fn_XXXXXXXX` / `lbl_XXXXXXXX` / `loc_XXXXXXXX` / bare `unkNN`)",
+    7: "no generated name survives (a `fn_`/`lbl_`/`loc_`/`dtor_`/`zz_` + 8-hex stem or a DOL address anywhere in an "
+       "identifier or a file/directory name, bare `unkNN`)",
     8: "goto is forbidden",
     9: "no mangled spelling used as a callable identifier (call/declare the owner)",
     10: "a vtable we own is compiler output (vtableaudit's violations; `--budget` reads them, the lint has none)",
@@ -72,11 +77,16 @@ def strip(text: str) -> tuple[str, str]:
 
 
 class Source(cscan.Text):
-    """One file's text plus its two stripped views and a line index (`lib.cscan.Text`), and its paths."""
+    """One file's text plus its two stripped views and a line index (`lib.cscan.Text`), and its paths.
 
-    def __init__(self, path: str, rel: str, text: str):
+    `rel` is the key a finding is filed under - the path the *working tree* spells, so both sides of a comparison
+    line up across a rename. `origin` is the path the text really had (a base copy read at its old path), which is
+    what rule 7's file-name findings judge; it defaults to `rel`."""
+
+    def __init__(self, path: str, rel: str, text: str, origin: "str | None" = None):
         self.path = path
         self.rel = rel
+        self.origin = (origin or rel).replace("\\", "/")
         super().__init__(text)
 
 
@@ -178,15 +188,19 @@ def type_defs(src: Source) -> list[tuple[str, int]]:
 
 
 def is_unsplit_header(rel: str) -> bool:
-    """Whether `rel` is a declaration-only header in the unsplit band."""
-    rel = rel.replace("\\", "/")
-    return rel.startswith(UNSPLIT + "/") and rel.endswith(SUFFIXES)
+    """Whether `rel` is a declaration-only header in the unsplit band (`lib.project.ownership.is_band_header`)."""
+    return _is_band_header(rel)
+
+
+def is_header(rel: str) -> bool:
+    """Whether `rel` is a header: a `HEADER_SUFFIXES` file anywhere - `include/**` and `src/**` alike."""
+    return rel.replace("\\", "/").endswith(HEADER_SUFFIXES)
 
 
 def is_shared_header(rel: str) -> bool:
-    """Whether `rel` is a shared header under `include/` (the unsplit band included)."""
-    rel = rel.replace("\\", "/")
-    return rel.startswith(HEADERS + "/") and rel.endswith(HEADER_SUFFIXES)
+    """Whether `rel` is a header (the unsplit band included). The old reading was "under `include/`"; a header is
+    classified by its suffix now (`is_header`), so a header moved beside its source keeps every rule it had."""
+    return is_header(rel)
 
 
 def _finding(src: Source, rule: int, line: int, detail: str, token: str | None = None) -> dict:
@@ -276,20 +290,43 @@ def read_text(path: str) -> str:
         return fh.read()
 
 
+def all_header_files(root: str) -> list[str]:
+    """Every header the lint judges, wherever it lives (`lint_files` filtered by `is_header`), in path order - the
+    walk of the whole-tree header readings, so a header moved into `src/` stays in them."""
+    return [path for path in lint_files(root) if is_header(path)]
+
+
 def all_sources(root: str) -> list["Source"]:
     """Every `src/` file as a `Source`, in path order."""
     return [Source(path, rel_of(root, path), read_text(path)) for path in source_files(root)]
 
 
+def all_lint_sources(root: str) -> list["Source"]:
+    """Every file the lint judges (`lint_files`) as a `Source`, in path order."""
+    return [Source(path, rel_of(root, path), read_text(path)) for path in lint_files(root)]
+
+
 def header_files(root: str) -> list[str]:
-    """Every shared header under `include/`, in path order (the unsplit band included - it is a header)."""
+    """Every header outside `src/` (today the `include/` tree, the unsplit band included), in path order.
+
+    The complement of `source_files`, which already walks every file under `src/` - a header there included - so a
+    caller that adds the two never reads one file twice. After the 2026-10-05 move this is empty."""
     out = []
-    for dirpath, dirnames, filenames in os.walk(os.path.join(root, HEADERS)):
-        dirnames[:] = sorted(d for d in dirnames if d != "__pycache__")
-        for name in sorted(filenames):
-            if name.endswith(HEADER_SUFFIXES):
-                out.append(os.path.join(dirpath, name))
+    for top in LINT_ROOTS:
+        if top == SRC:
+            continue
+        for dirpath, dirnames, filenames in os.walk(os.path.join(root, top)):
+            dirnames[:] = sorted(d for d in dirnames if d != "__pycache__")
+            for name in sorted(filenames):
+                if name.endswith(HEADER_SUFFIXES):
+                    out.append(os.path.join(dirpath, name))
     return out
+
+
+def lint_files(root: str) -> list[str]:
+    """Every file the lint judges - each `.c`/`.cpp`/`.h` under `LINT_ROOTS` - in path order: `source_files` (all of
+    `src/`) then `header_files` (the headers outside it)."""
+    return source_files(root) + header_files(root)
 
 
 def unsplit_header_files(root: str) -> list[str]:

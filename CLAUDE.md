@@ -253,14 +253,17 @@ The incident behind each is in `docs/pipeline.md` 13.3.
   * **The unit's file header comment is the one place for the unit's own notes**: what it is, the `.text` range and function
     order, where its flags/evidence live, the residuals, load-bearing source shapes. One line per fact; no per-function inventory.
   * **Use the real name when known** (retail map, the memory dump, the SDK), or a descriptive name in the **naming scheme of the
-    surrounding symbols**. dtk's `FUN_`/`fn_`/`lbl_`/`unkNN` names are placeholders to replace (section 6.5 rule 7): derive one from
+    surrounding symbols**. dtk's `FUN_`/`fn_`/`lbl_`/`unkNN` names - and an identifier or file named after an address - are
+    placeholders to replace (section 6.5 rule 7, a ratchet: the gate refuses a new one, existing ones only fall): derive one from
     what the function does and who calls it, what the data holds and who reads it; when the context supports only a guess,
     **guess** and mark it in the unit header. Vendor files keep vendor naming (`Camellia/` keeps its MPL-1.1 header).
   * **A rename is always two edits**, `symbols.txt` (it names the *target* object) and the source that defines/references the
     symbol, in the same change, through the proxy: `python tools/symbols/symedit.py rename <old> <new> --dry-run` first. Verify with
     `mt.py diff -u <unit> <symbol>` and an unchanged DOL hash. Never open or regenerate the map for this.
-  * **Work under the campaign plan (`docs/plan.md` 6.5) is held to a stricter standard**: no `fn_XXXXXXXX`/`unkNN` survives in
-    `src/`, every reconstructed type states its size, every field carries its offset and a context name (padding excepted),
+  * **Work under the campaign plan (`docs/plan.md` 6.5) is held to a stricter standard**: no generated name survives in any
+    `.c`/`.cpp`/`.h` - a `fn_`/`lbl_`/`loc_`/`dtor_`/`zz_` + address stem anywhere in an identifier, an address-named identifier
+    (`Panel805482CC`), a bare `unkNN`, or a generated file/directory name (`fn_805113B0.cpp`) - a ratchet with no exemptions:
+    the gate refuses a new one and a unit newly registered under a generated name; every reconstructed type states its size, every field carries its offset and a context name (padding excepted),
     shared types live in one header, an `extern` lives with the owner unit, no pointer arithmetic to reach a field.
     `tools/units/stylelint.py` enforces the fourteen rules at the land gate - rule 10 through `tools/units/vtableaudit.py`
     (regenerate profiles with

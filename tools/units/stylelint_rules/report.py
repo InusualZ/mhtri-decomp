@@ -72,7 +72,7 @@ def unique_names(findings: list[dict]) -> dict:
         return {m.group(1) for f in findings if f["rule"] == rule and f["detail"].startswith(prefix)
                 for m in [re.search(r"`([^`]+)`", f["detail"])] if m}
     return {"fn_names": len(names(7, "auto")), "unk_identifiers": len(names(7, "bare")),
-            "label_names": len(names(7, "data")),
+            "label_names": len(names(7, "data")), "address_names": len(names(7, "address")),
             "unk_fields": len(names(5, "")), "types": len(names(3, "")),
             "shared_types": len(names(1, "")), "extern_symbols": len(names(2, "")),
             "mangled_names": len(names(9, "")), "unowned_data_symbols": len(names(12, "")),
@@ -119,10 +119,10 @@ def print_budget(findings: list[dict], ownership: "Ownership | None" = None,
     print("")
     u = unique_names(findings)
     print("distinct names: rule 1 %d shared type(s), rule 2 %d extern symbol(s), rule 3 %d type(s), "
-          "rule 5 %d field(s), rule 7 %d fn_* + %d unk identifier(s) + %d data label(s), "
+          "rule 5 %d field(s), rule 7 %d fn_* + %d unk identifier(s) + %d data label(s) + %d address-named, "
           "rule 9 %d mangled name(s)"
           % (u["shared_types"], u["extern_symbols"], u["types"], u["unk_fields"], u["fn_names"],
-             u["unk_identifiers"], u["label_names"], u["mangled_names"]))
+             u["unk_identifiers"], u["label_names"], u["address_names"], u["mangled_names"]))
     print("%d finding(s) over %d unit(s), %d file(s) with findings"
           % (b["findings"], len(b["units"]), len(source_files_of(findings))))
     if rule10_note:

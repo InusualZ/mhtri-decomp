@@ -5,8 +5,12 @@ from __future__ import annotations
 import os
 import sys
 
+from tools.lib import names as _names
+from tools.lib import project as _project
+from tools.lib.lanes import naming
 import tools.units.undefrefs as uref
 import tools.units.verifyunit as vu
+from tools.units.landing import state
 from tools.units.landing.common import Batch, KIND_BOOKKEEPING, run
 from tools.units.landing.rows.build import flipped_units
 from tools.units.landing.state import rename_snapshot_keys
@@ -54,6 +58,77 @@ def registration_row(b: Batch) -> None:
             remedy="commit the unit's `Object(...)` line in configure.py and its splits.txt block, "
                    "then re-run configure.py so build.ninja carries build/RMHE08/src/<unit>.o - a "
                    "source file alone is registered in name only and never enters the build")
+
+
+NEW_UNIT_ROW = "no newly registered unit has a generated name (rule 7)"
+
+
+def registered_units(splits_text: str, configure_text: str) -> set[str]:
+    """Every unit a `splits.txt` + `configure.py` pair registers, by claim key (`naming.norm_unit`): a block in the
+    splits or an `Object(...)` row in configure.py - either is a registration."""
+    units = {naming.norm_unit(u) for u in _project.Splits.parse(splits_text).units}
+    units |= {naming.norm_unit(c.path) for c in _project.object_calls(configure_text)}
+    return units
+
+
+def new_unit_name_problems(base_units: set[str], now_units: set[str],
+                           renames: "dict[str, list[str]] | None" = None) -> tuple[list[str], list[str]]:
+    """`(refused, credited)` for the units `now_units` registers that `base_units` did not. Pure.
+
+    A new unit whose path spells a generated component (`lib.names.generated_path_components`: a `fn_`/`lbl_`/...
+    stem or a DOL address, in its stem or a directory) is refused - a GUESS name is allowed, the check is the
+    pattern only. A declared rename (`--unit-rename OLD=NEW`, `renames` = `{OLD: [NEW, ...]}`) is credited when every
+    generated component NEW spells is one OLD already spelled (a move that keeps a generated stem adds no name; a
+    rename from a generated stem to a named one adds none either); it is never a licence for a new generated name.
+    """
+    refused, credited = [], []
+    olds_of: dict[str, list[str]] = {}
+    for old, news in (renames or {}).items():
+        for new in news:
+            olds_of.setdefault(naming.norm_unit(new), []).append(naming.norm_unit(old))
+    for unit in sorted(now_units - base_units):
+        gen = {c for c, _d in _names.generated_path_components(unit)}
+        olds = olds_of.get(unit, [])
+        if not gen:
+            if any(_names.generated_path_components(o) for o in olds):
+                credited.append("%s (renamed from %s)" % (unit, ", ".join(olds)))
+            continue
+        if any(gen <= {c for c, _d in _names.generated_path_components(o)} for o in olds):
+            credited.append("%s (keeps %s from %s)" % (unit, ", ".join(sorted(gen)), ", ".join(olds)))
+            continue
+        refused.append("%s: generated name %s" % (unit, ", ".join("`%s`" % c for c in sorted(gen))))
+    return refused, credited
+
+
+def new_unit_name_row(b: Batch) -> None:
+    """The registration family's name check (owner, 2026-10-05): a REFUSAL for a unit the batch newly registers under
+    a generated stem or directory. Reported only when a new registration or a declared rename spells a generated
+    component - a batch registering named units is the lint's to show (rule 7's file names), and the gate's table
+    for it is unchanged. Cheap: two `git show`s and the working copies, before the build."""
+    if not b.base:
+        return
+    shown = [run(["git", "show", "%s:%s" % (b.base, rel)], b.main) for rel in ("config/RMHE08/splits.txt",
+                                                                            "configure.py")]
+    if any(p.returncode != 0 for p in shown):
+        return
+    spl_base, conf_base = (p.stdout or "" for p in shown)
+    try:
+        with open(os.path.join(b.main, "config", "RMHE08", "splits.txt"), encoding="utf-8", errors="replace") as fh:
+            spl_now = fh.read()
+        with open(os.path.join(b.main, "configure.py"), encoding="utf-8", errors="replace") as fh:
+            conf_now = fh.read()
+    except OSError:
+        return
+    refused, credited = new_unit_name_problems(registered_units(spl_base, conf_base),
+                                               registered_units(spl_now, conf_now), state.UNIT_RENAME_LISTS)
+    if not refused and not credited:
+        return
+    b.check(NEW_UNIT_ROW, not refused, "; ".join(refused[:4]),
+            info=("credited: %s" % "; ".join(credited[:4])) if credited else "",
+            remedy="register the unit under a name for what it holds - a guess is allowed (say so in the unit's "
+                   "header); a `fn_`/`lbl_`/`loc_`/`dtor_`/`zz_` + address stem or an address-named path is the "
+                   "map's placeholder, never a unit name (docs/plan.md 6.5 rule 7). A unit renamed by "
+                   "`--unit-rename OLD=NEW` may keep a generated component OLD already had")
 
 
 def undefrefs_rows(b: Batch) -> None:

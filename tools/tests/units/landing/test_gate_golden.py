@@ -54,10 +54,20 @@ def report(units: dict) -> dict:
     return {"units": out}
 
 
+#: The new-unit name row's two scenarios (2026-10-05): a unit registered under a generated stem, and a unit renamed
+#: from one (`--unit-rename Net/fn_80001100=Net/net_new`).
+GEN_UNIT = "Net/fn_80001100"
+CONF_GEN = CONF_NEW.replace("Net/net_new.cpp", "Net/fn_80001100.cpp")
+SPLITS_GEN = SPLITS_NEW.replace("Net/net_new.cpp", "Net/fn_80001100.cpp")
+
+
 class Scenario:
     def __init__(self, name, kind, units, dry_run=False, check_outbox=True, record_base=True, lint=(0, ""),
-                 after=None, drift=False, allow_regression=(), no_selftests=False, post_fail=False):
+                 after=None, drift=False, allow_regression=(), no_selftests=False, post_fail=False, variant=None,
+                 unit_renames=()):
         self.name, self.kind, self.units, self.dry_run = name, kind, list(units), dry_run
+        # `gen`: the batch registers GEN_UNIT; `rename`: the base registers GEN_UNIT and the batch renames it to UNIT
+        self.variant, self.unit_renames = variant, list(unit_renames)
         self.check_outbox, self.record_base, self.lint, self.drift = check_outbox, record_base, lint, drift
         self.after = after or {"main/Net/net_old": {"fn_net_old": 90.0}, "main/Net/net_new": {"net_new_step": 50.0}}
         self.allow_regression, self.no_selftests = list(allow_regression), no_selftests
@@ -82,6 +92,9 @@ SCENARIOS = [
     Scenario("lint-refusal", "unit", [UNIT], lint=LINT_REFUSAL),
     Scenario("no-base-dry-run", "unit", [UNIT], dry_run=True, record_base=False),
     Scenario("unit-object-rows-refuse", "unit", [UNIT], post_fail=True),
+    Scenario("new-unit-generated-name-refusal", "unit", [GEN_UNIT], check_outbox=False, variant="gen"),
+    Scenario("new-unit-renamed-from-generated-name", "unit", [UNIT], check_outbox=False, dry_run=True,
+             variant="rename", unit_renames=["%s=%s" % (GEN_UNIT, UNIT)]),
 ]
 
 
@@ -97,14 +110,21 @@ def build_fixture(root: str, sc: Scenario) -> None:
              "tools/units/stylelint.py": "", "tools/selftest.py": "", "tools/git/commitlint.py": "",
              "tools/units/fixture_tool.py": "X = 1\n", "CLAUDE.md": "agents\n",
              ".gitignore": ".pi/\nbuild/\nbuild.ninja\n"}
+    if sc.variant == "rename":
+        files.update({"configure.py": CONF_GEN, "config/RMHE08/splits.txt": SPLITS_GEN,
+                      "src/Net/fn_80001100.cpp": "int net_new_step(void) { return 1; }\n"})
     base = fx.commit(files, "base")
     if sc.kind == "unit":
-        fx.branch(BRANCH, checkout=True)
-        fx.commit({"src/Net/net_new.cpp": "int net_new_step(void) { return 1; }\n"}, "the worker's own work")
+        unit = sc.units[0]
+        fx.branch(claims.branch_for(unit), checkout=True)
+        fx.commit({"src/%s.cpp" % unit: "int net_new_step(void) { return 1; }\n"}, "the worker's own work")
         fx.checkout("main")
-        edits = {"configure.py": CONF_NEW, "config/RMHE08/splits.txt": SPLITS_NEW,
+        if sc.variant == "rename":
+            git(root, "rm", "-q", "src/Net/fn_80001100.cpp")
+        conf, spl = (CONF_GEN, SPLITS_GEN) if sc.variant == "gen" else (CONF_NEW, SPLITS_NEW)
+        edits = {"configure.py": conf, "config/RMHE08/splits.txt": spl,
                  "config/RMHE08/symbols.txt": SYMBOLS_NEW,
-                 "src/Net/net_new.cpp": "int net_new_step(void) { return 1; }\n",
+                 "src/%s.cpp" % unit: "int net_new_step(void) { return 1; }\n",
                  "include/Net/net.h": "#ifndef NET_H\n#define NET_H\nint net_old(void);\nint net_new_step(void);\n"
                                       "#endif\n"}
         for rel, text in edits.items():
@@ -199,14 +219,19 @@ def capture(verify, sc: Scenario, mods: dict | None = None) -> dict:
         mock.patch.object(m["claims"], "release", lambda unit, main, force=False, dry_run=False, **k:
                           {"complete": True, "steps": [], "branch": claims.branch_for(unit)}),
     ]
+    from tools.units.landing import state as _state
     with contextlib.ExitStack() as stack:
         for p in patches:
             stack.enter_context(p)
         stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
         stack.enter_context(contextlib.redirect_stderr(io.StringIO()))
-        code = verify(root, sc.units, None, dry_run=sc.dry_run, no_build=False,
-                      allow_regression=sc.allow_regression, check_outbox=sc.check_outbox, release_claims=True,
-                      no_selftests=sc.no_selftests)
+        _state.set_unit_renames(sc.unit_renames)
+        try:
+            code = verify(root, sc.units, None, dry_run=sc.dry_run, no_build=False,
+                          allow_regression=sc.allow_regression, check_outbox=sc.check_outbox, release_claims=True,
+                          no_selftests=sc.no_selftests)
+        finally:
+            _state.set_unit_renames([])
     return {"exit": code, "rows": seen["rows"]}
 
 
@@ -261,6 +286,50 @@ def test_bookkeeping_rows_warn(c):
     c.check("the stale --allow-regression is a warning; the regression and drift rows still refuse",
             got["two-units-neighbour-moved-regressed"], (1, ["every --allow-regression was actually needed"]))
     c.check("a clean unit batch warns nothing", got["unit"], (0, []))
+
+
+def test_new_unit_name_row(c):
+    """The new-unit name row (2026-10-05) refuses a unit registered under a generated stem before the build, credits a
+    declared rename from one, and is absent from a batch that registers named units (every older scenario)."""
+    from tools.units.landing import api
+    from tools.units.landing.rows.objects import NEW_UNIT_ROW
+    gen = capture(api.verify, next(s for s in SCENARIOS if s.name == "new-unit-generated-name-refusal"))
+    c.check("a generated new unit refuses (exit 1)", gen["exit"], 1)
+    c.check("... on the new-unit row, before the build", ([r[1] for r in gen["rows"] if r[0] == NEW_UNIT_ROW],
+                                                          any(r[0] == "ninja (exit 0)" for r in gen["rows"])),
+            (["FAIL"], False))
+    ren = capture(api.verify, next(s for s in SCENARIOS if s.name == "new-unit-renamed-from-generated-name"))
+    c.check("a rename from a generated stem to a named one is credited (PASS)",
+            [r[1] for r in ren["rows"] if r[0] == NEW_UNIT_ROW], ["PASS"])
+    named = capture(api.verify, next(s for s in SCENARIOS if s.name == "unit-dry-run"))
+    c.check("a batch registering a named unit carries no new-unit row", any(r[0] == NEW_UNIT_ROW
+                                                                            for r in named["rows"]), False)
+
+
+def test_new_unit_name_problems(c):
+    """The row's pure decision: refused / credited, by the generated components a new registration spells."""
+    from tools.units.landing.rows.objects import new_unit_name_problems
+    base = {"Net/net_old", "Net/fn_80001100", "auto/fn_80002000"}
+    c.check("a new named unit is neither refused nor credited",
+            new_unit_name_problems(base, base | {"Net/net_new"}), ([], []))
+    c.check("a new generated stem is refused", new_unit_name_problems(base, base | {"Net/fn_80009999"})[0],
+            ["Net/fn_80009999: generated name `fn_80009999`"])
+    c.check("an address-named stem is refused", new_unit_name_problems(base, base | {"menu/Panel805482CC"})[0],
+            ["menu/Panel805482CC: generated name `Panel805482CC`"])
+    c.check("a generated directory is refused", new_unit_name_problems(base, base | {"fn_8004CAD8/vec"})[0],
+            ["fn_8004CAD8/vec: generated name `fn_8004CAD8`"])
+    c.check("a GUESS name is allowed (the check is the pattern only)",
+            new_unit_name_problems(base, base | {"enemy/em_guess_spawner"}), ([], []))
+    c.check("a rename to a named stem is credited",
+            new_unit_name_problems(base - {"Net/fn_80001100"}, base - {"Net/fn_80001100"} | {"Net/net_new"},
+                                   {"Net/fn_80001100": ["Net/net_new"]}),
+            ([], ["Net/net_new (renamed from Net/fn_80001100)"]))
+    c.check("a move that keeps the generated stem is credited",
+            new_unit_name_problems(base, base | {"Net/fn_80002000"}, {"auto/fn_80002000": ["Net/fn_80002000"]}),
+            ([], ["Net/fn_80002000 (keeps fn_80002000 from auto/fn_80002000)"]))
+    c.check("a rename to ANOTHER generated stem is refused",
+            new_unit_name_problems(base, base | {"Net/fn_80003000"}, {"Net/fn_80001100": ["Net/fn_80003000"]})[0],
+            ["Net/fn_80003000: generated name `fn_80003000`"])
 
 
 def test_golden_is_not_vacuous(c):

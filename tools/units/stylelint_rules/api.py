@@ -142,3 +142,24 @@ from tools.units.stylelint_rules.cli import report_comparison  # noqa: E402,F401
 
 __all__ += ["Field", "field_walk", "Judgement", "base_rule2_symbols", "judge", "headers_at_ref", "texts_at_ref",
             "report_comparison"]
+
+# the 2026-10-05 classifier: a header is a `.h` anywhere, the walk roots, the band's rule-2 budget filter
+from tools.units.stylelint_rules.common import (  # noqa: E402,F401
+    LINT_ROOTS, all_header_files, all_lint_sources, is_header, lint_files,
+)
+from tools.units.stylelint_rules.lint import is_band_rule2  # noqa: E402,F401
+from tools.units.stylelint_rules.cli import untouched  # noqa: E402,F401
+
+__all__ += ["LINT_ROOTS", "all_header_files", "all_lint_sources", "is_header", "lint_files", "is_band_rule2",
+            "untouched"]
+
+# rule 7 exact (2026-10-05): the detail of a generated identifier and the one verdict it reads
+from tools.units.stylelint_rules.r07_generated_name import TOKEN_RE, INCLUDE_LINE_RE, name_detail  # noqa: E402,F401
+from tools.lib.names import generated_name_kind  # noqa: E402,F401
+
+__all__ += ["TOKEN_RE", "INCLUDE_LINE_RE", "name_detail", "generated_name_kind"]
+
+# rule 7 file names (2026-10-05)
+from tools.units.stylelint_rules.r07_generated_name import path_detail, path_findings  # noqa: E402,F401
+
+__all__ += ["path_detail", "path_findings"]

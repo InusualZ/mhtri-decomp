@@ -699,7 +699,9 @@ def audit_unit(tree: dict, path: str, flag: str) -> dict:
                    "targets": [resolved[first + i][1] for i in range(words)],
                    "verdict": None, "emitted": None, "referenced": None, "values_match": None,
                    "our_section": None}
-            _verdict_run(run, object_section, our_offset // 4 + first, words, start, our, our_bases,
+            # the run's own address, not the range start: `referenced` is "a relocation of ours lands INSIDE the
+            # run", and the range start made it "inside the first 4*words bytes of the range" (2026-10-05)
+            _verdict_run(run, object_section, our_offset // 4 + first, words, address, our, our_bases,
                          object_symbols, tree["text_ranges"])
             rec["runs"].append(run)
 
