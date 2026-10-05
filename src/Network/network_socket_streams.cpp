@@ -1,44 +1,23 @@
 /*
- * Network/network_socket_streams.cpp - the transport's socket users (`NetworkSingleTcp`, `NetworkMultipleUdp`),
- *   the byte-stream helpers and `NetworkResolverBase`.  The log strings name `NetworkSingleTcp::*` and
- *   `NetworkMultipleUdp::*`.
- *
- * One translation unit of the retail Network transport band, split out of `Network/network_transport.cpp`
- * (docs/network-transport-split.md holds the evidence and the confidence of each cut).  `.text`
- * 0x803CE060..0x803CF14C, `.data` 0x805F9610..0x805F9958, extab 0x800199B0..0x80019A68, extabindex
- * 0x8003A1DC..0x8003A2F0.
- *
- * CLASSES.  Every function is a member (rule 13).  `NetworkSingleTcp::move` and `NetworkMultipleUdp::move` are the
- * pumps the log strings name (`NetworkSingleTcp::move`, `NetworkMultipleUdp::move`); the Pat manager holds the two
- * objects at +0x658/+0x65C.  Tcp and Udp each own a copy of `release`/`disconnect`/`getAvailableToRead`/`getError`
- * (identical bodies, address order Tcp 0x803CE060.. then Udp 0x803CE5EC..), so `NetworkSocketUser` stays a data base.
- * `close`/`clearReceive`/`open`/`clearReceiveBuffer` exist once, in the Tcp run, and only `NetworkPeerMcs` calls them.
- * GUESS: the class name `NetworkByteStream` and its method names `getData`/`getSize` (the map had
- * `networkPeer_getSocket`/`networkPeer_getPeerId`, which return `data_04`/`cursor_0C`), `readLength`, and the Tcp
- * member names `open`/`close`/`clearReceive`/`release`/`disconnect`.  `NetworkStreamSink` is kept as the offset-derived
- * interface of the two record helpers: no `NetworkPeer*` class has `fill`/`put` at +0x20/+0x24 (evidence: none).
- *
- * NAMES.  The file name is a GUESS (the range mixes the socket users, the byte stream and the resolver base, and
- * no `__FILE__` string names it); a further cut at `NetworkResolverBase`'s constructor (0x803CF0A8) is possible
- * but has no `.data` evidence.  Every name here is the map's or a derived one; the derived ones are marked GUESS
- * in `Network/network_transport_types.h`.
- *
- * EDGE UNPROVEN: the left edge is the 4-byte `NetworkSingleTcp::disconnect` stub; its single caller is in the unsplit
- * Network band, so nothing contradicts placing it here, and no evidence pins it to the previous unit either.
- *
- * TABLE.  `NetworkResolverBase`'s table (0x805F9938, 0x20 B) is emitted from its destructor, the key function
- * (rule 10).
- *
- * FLAGS.  C++ under `cflags_network` (`-Cpp_exceptions on` gives the `extab`), per-unit `-O3`/`-pool off` (`configure.py`);
- * file-scope `#pragma peephole off` (playbook 39); each `dont_inline` region keeps a retail `bl` that `-inline auto` folds.
- *
- * SHAPES.  `takeRecord` copies the address-taken length into a register local before testing it (else `lhz`
- * reloads it) and keeps the zero-store in an `else` (retail's shared tail); `receive` computes the running total
- * as `taken + 2` before testing it (retail's `addi` order).
- *
- * RESIDUALS.  `NetworkMultipleUdp::receive`: register colouring only - retail gives the peer index/`taken` r31, the
- * used-count pointer r30 and the length/total r29, ours r29/r31/r30 (all 720 declaration orders measured: no
- * change).
+ * Network/network_socket_streams.cpp - the transport's socket users (`NetworkSingleTcp`, `NetworkMultipleUdp`, named by
+ *   their log strings), the byte-stream helpers and `NetworkResolverBase`.
+ * RANGE. .text 0x803CE060-0x803CF14C (35 functions); .data 0x805F9610-0x805F9958, extab, extabindex.  One TU of the
+ *   transport band: docs/network.md (a further cut at `NetworkResolverBase`'s constructor, 0x803CF0A8,
+ *   has no `.data` evidence; the left edge, the 4-byte `NetworkSingleTcp::disconnect` stub, is unproven).
+ * FLAGS. `-O3 -pool off` (configure.py; measured in docs/network.md); file-scope `#pragma peephole off`
+ *   (playbook 39).
+ * NAMES. The file name is a GUESS (no `__FILE__` string).  GUESSes: `NetworkByteStream` and its `getData`/`getSize`
+ *   (they return `data_04`/`cursor_0C`), `readLength`, and the Tcp members `open`/`close`/`clearReceive`/`release`/
+ *   `disconnect`; `NetworkStreamSink` is the offset-derived interface of the two record helpers (no `NetworkPeer*` class
+ *   has `fill`/`put` at +0x20/+0x24).  The rest are marked in `Network/network_transport_types.h`.
+ * RESIDUALS. `NetworkMultipleUdp::receive`: register colouring only - retail gives the peer index/`taken` r31, the
+ *   used-count pointer r30 and the length/total r29, ours r29/r31/r30 (all 720 declaration orders measured).
+ * SHAPES. Every function is a member (rule 13).  Tcp and Udp each own a copy of `release`/`disconnect`/
+ *   `getAvailableToRead`/`getError` (identical bodies, Tcp run from 0x803CE060, Udp from 0x803CE5EC), so
+ *   `NetworkSocketUser` stays a data base; `close`/`clearReceive`/`open`/`clearReceiveBuffer` exist once, in the Tcp
+ *   run. `NetworkResolverBase`'s table (0x805F9938) is emitted from its destructor, the key function (rule 10).
+ *   `takeRecord` copies the address-taken length into a register local before testing it and keeps the zero-store in an
+ *   `else` (retail's shared tail); `receive` computes the running total as `taken + 2` before testing it.
  */
 #include "types.h"
 #include "Network/network_transport.h"
@@ -114,9 +93,8 @@ void NetworkSingleTcp::move()
 
 #pragma dont_inline on
 
-/* Opens the connection's socket and registers the address it was opened on: the socket comes from the
-   band's pool, `open`/`setPeer` are the socket's own two slots, and the six address bytes are kept on
-   the connection.  Returns 0, or the negative step that failed. */
+/* Opens the connection's socket from the band's pool through its `open`/`setPeer` slots and keeps the six address
+   bytes; 0, or the negative step that failed. */
 s32 NetworkSingleTcp::open(const NetworkPeerAddress* address)
 {
     if (this->handle_04 != NULL) {

@@ -1,56 +1,31 @@
 /*
- * Network/sNetworkLibraryWii.cpp - `sNetworkLibraryWii`, the Wii implementation of the network library
- * singleton.
- *
- * `.text` 0x8041891C..0x80419AD4.  Sections: extab 0x8001CE1C..0x8001CF40; extabindex 0x8003D7DC..0x8003D8E4;
- * .data 0x80602AF8..0x80603118 (the log strings, then the class table 0x80603080); .sbss 0x80794CD0..0x80794CD8
- * (`sNetworkPatInstance`); .sdata2 0x8079C878..0x8079C888 (0.0f, 1e-6f, the u32->float bias).
- *
- * FILE NAME.  Registered as `constructNetworkLibrary.cpp` (the map stem of 0x804189C8, now
- * `__ct__18sNetworkLibraryWiiFv`); renamed for the class the unit is.
- *
- * WHAT IT IS.  The log strings name the class (`sNetworkLibraryWii::init/final/start/stop`, and
- * `sNetworkLibrary::start/stop` for the shared messages); the table at 0x80603080 inherits the base's
- * non-pure slots (`setLogLevel`, the byte-order helpers, the calendar helpers) from `Network/network_opening.cpp`,
- * whose table 0x80602A60 is the base `sNetworkLibrary`'s.  Every method and field name is a GUESS from the
- * body and the strings; the SDK calls are named from the strings next to them (`SOInit`, `SOFinish`,
- * `SOStartup`, `SOCleanup`, `DWC_Init`).  Order: the three worker-thread entry points,
- * `constructNetworkWiiMediator`, ctor, dtor, the table's own slots, the three worker-thread bodies, `start`, `stop`, the clock and address slots, the three factories.
- *
- * MPMEDIATOR (first item of the pilot brief).  `mpMediator__15sNetworkLibrary` (.sbss 0x80794CC4) is a
- * static member of the *base* class (its mangling says so), like its neighbours 0x80794CC0 (`mpInstance`,
- * cleared by the base destructor 0x80417C44) and 0x80794CC8 (`mpRandom`, created/deleted by the base
- * `init`/`final`), so it is defined by the base's unit, `Network/network_opening.cpp`, which already claims
- * 0x80794CC0..0x80794CD0: no splits move is needed for it.  The only writers are this unit's `init` and
- * `final`; `getInstance` in `sound/snd_stream_reloc.cpp` (0x800E89D8) is the header-inline accessor
- * instantiated in the first TU that used it, not a misplaced definition.
- *
- * BOUNDARY.  The `.data` order seam (base table 0x80602A60 followed by this unit's strings, `tudiscover`) puts
- * this TU's start in 0x80417C44..0x80418A60; the three worker-thread entry points 0x8041891C/0x80418940/0x80418964
- * and `constructNetworkWiiMediator` 0x80418988 call only into this class, so the left seam is 0x8041891C (moved
- * here from `network_opening` and from the retired one-function unit `constructNetworkWiiMediator.cpp`, which
- * was byte-identical in `.text`/`extab`/`extabindex`: its extab record is the one a real `new` emits, with
- * `__dl__FPv` as the cleanup).  The right seam is 0x80419AD4: the class's last table slot (`resume`, 0x80419AD0)
- * closes it, and the Pat holder family above it (constructor, destructor, drive) moved to `Network/NetworkPat.cpp`.
- * The `.sbss` word 0x80794CD0 (`sNetworkPatInstance`) is written only by that family and read by `getPatsObject`,
- * so it is probably the Pat TU's too; it stays claimed and defined here because `NetworkPat` is `Matching` and
- * its object would emit 4 B of the 8-byte claim (`flipcheck`: `.sbss` 0x4 against 0x8, the next TU's alignment).
- *
- * FLAGS.  `-O3` and `-inline noauto` in place of the lib's `-O4,p`/`-inline auto` (configure.py, with the numbers).  File scope:
- * `#pragma peephole off` (retail keeps `extsh`+`cmpwi` on the `s16` delete flags and reloads the table word
- * through r3 before each virtual call: dtor 92.55 -> 100, updateNetworkPat 94.40 -> 100) and
- * `#pragma pool_data off` (every string is its own `lis`/`addi`: init 93.58 -> 100, start 91.31 -> 97.32, then 100 with the shared retry tail);
- * `#pragma fp_contract off` around `accumulateElapsed` (retail keeps `fmuls`+`fadds`: 94.08 -> 97.55).
- * Shapes that matter: `getTime` accumulates into a local seeded with the epoch (the constant is then built
- * before the call), and `accumulateElapsed` tests `!*elapsed` (operand order of the `fcmpu`).
- *
- * CALLEES.  The SO/DWC/NET/MSL/socket callees are declared by their owners' headers (`SO/soi.h`,
- * `DWCi/dwc_error.h`, `SSL/ssl.h`, `MSL_C/alloc.h`, `NAND/nand.h`, `Network/NetworkCommunityPat.h`).
- * GUESS names there: `DWC_Shutdown`, `NETGetStartupErrorCode` (evidence beside each declaration).
- *
- * RESIDUALS.  Every `.text` row matches.  Data: `.data` 0x61C of the claimed 0x620 and `.sbss` 4 of 8 (trailing
- * alignment words); `extab` 312 of 292 B: the six `__dl__FPv` cleanup records match retail now that `createSocket` /
- * `createFetcher` are real `new`s, and one `__dt__15sNetworkLibraryFv` record more than retail is left.
+ * Network/sNetworkLibraryWii.cpp - `sNetworkLibraryWii`, the Wii implementation of the network library singleton: the
+ *   three worker-thread entry points, `constructNetworkWiiMediator`, ctor, dtor, the table's own slots, the worker
+ *   bodies, `start`, `stop`, the clock and address slots, the three factories.
+ * RANGE. .text 0x8041891C-0x80419AD4 (34 functions); .data 0x80602AF8-0x80603118 (the log strings, then the class table
+ *   0x80603080), .sbss 0x80794CD0-0x80794CD8 (`sNetworkPatInstance`), .sdata2 0x8079C878-0x8079C888 (0.0f, 1e-6f, the
+ *   u32->float bias), extab, extabindex.  Left seam: the base table 0x80602A60 followed by this unit's strings puts the
+ *   start in 0x80417C44..0x80418A60, and the entry points 0x8041891C/0x80418940/0x80418964 and 0x80418988 call only
+ *   into this class.  Right seam: the class's last slot (`resume`, 0x80419AD0); the Pat holder above is
+ *   `Network/NetworkPat.cpp`'s.  `sNetworkPatInstance` is written only by that family and read by `getPatsObject`, but
+ *   stays claimed here: the `Matching` NetworkPat object would emit 4 B of the 8-byte claim.
+ * FLAGS. `-O3 -inline noauto` (configure.py; measured in docs/network.md).  File scope: `#pragma peephole
+ *   off` (retail keeps `extsh`+`cmpwi` on the `s16` delete flags and reloads the table word through r3 before each
+ *   virtual call: the dtor, `updateNetworkPat`) and `#pragma pool_data off` (every string is its own `lis`/`addi`:
+ *   `init`, `start`); `#pragma fp_contract off` around `accumulateElapsed` (retail keeps `fmuls`+`fadds`).
+ * NAMES. The log strings name the class (`sNetworkLibraryWii::init/final/start/stop`, `sNetworkLibrary::start/stop` for
+ *   the shared messages); every method and field name is a GUESS from the body and strings; the SDK calls are named
+ *   from the strings beside them (`SOInit`, `SOFinish`, `SOStartup`, `SOCleanup`, `DWC_Init`).  GUESSes in the owners'
+ *   headers: `DWC_Shutdown`, `NETGetStartupErrorCode`.
+ * RESIDUALS. none in `.text`.  `.data` 0x61C of the claimed 0x620 and `.sbss` 4 of 8 (trailing alignment words); `extab`
+ *   carries one `__dt__15sNetworkLibraryFv` cleanup record more than retail.
+ * SHAPES. The table 0x80603080 inherits the base's non-pure slots (`setLogLevel`, the byte-order and calendar helpers)
+ *   from the base table 0x80602A60 (`Network/sNetworkLibrary.cpp`).  `mpMediator__15sNetworkLibrary` (.sbss 0x80794CC4)
+ *   is a static member of the base, defined by `Network/sNetworkLibrary.cpp` like `mpInstance` 0x80794CC0 and `mpRandom`
+ *   0x80794CC8; this unit's `init`/`final` are its only writers, and `getInstance` in `sound/snd_stream_reloc.cpp`
+ *   (0x800E89D8) is the header-inline accessor.  `createSocket`/`createFetcher` are real `new`s (the six `__dl__FPv`
+ *   cleanup records); `constructNetworkWiiMediator`'s `new` gives its extab record.  `getTime` accumulates into a local
+ *   seeded with the epoch, and `accumulateElapsed` tests `!*elapsed` (operand order of the `fcmpu`).
  */
 #include "types.h"
 #include "Network/sNetworkLibraryWii.h"

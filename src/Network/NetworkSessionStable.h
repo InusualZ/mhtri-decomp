@@ -1,13 +1,7 @@
 /*
- * Network/NetworkSessionStable.h - the session classes `Network/NetworkSessionStable.cpp` owns: the `NetworkSessionStable` session
- * (derived from `NetworkSessionBase`), the four-slot table it keeps, the connection object each slot owns
- * and the unit packet class.
- *
- * The layouts are reconstructed from the unit's own instructions: every field carries the offset the
- * target addresses, and a field the unit never touches is `pad_`/`unused_` with its offset kept.  The class
- * names follow the log strings (`NetworkSessionStable::`, `NetworkConnectionStable[%d]`) and the map's
- * manglings; every other name is a GUESS read off the field's use.  The types `Network/network_writer_types.h`
- * declares (the small object, the stream writer) are the writer band's.
+ * Network/NetworkSessionStable.h - the classes of `Network/NetworkSessionStable.cpp`: the `NetworkSessionStable`
+ *   session, its four-slot table, the connection object each slot owns and the unit packet class.  The names follow the
+ *   log strings (`NetworkSessionStable::`, `NetworkConnectionStable[%d]`) and the map; every other name is a GUESS.
  */
 
 #ifndef NETWORK_NETWORK_SESSION_STABLE_H

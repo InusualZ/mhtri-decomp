@@ -1,252 +1,94 @@
 /*
- * Network/PatInterface.cpp - the `PatInterface` singleton: its reference count, error records, session handler slots,
- * call stack, clock and accessors; the request state machine the session units drive; and the packet layer (the
- * `sendReq*` request builders and the `recv*` packet handlers behind them).
- *
- * `.text` 0x803FCC34..0x804123F8.  Sections: extab 0x8001BCAC..0x8001C8F4; extabindex 0x8003BF40..0x8003D170;
- * .rodata 0x80570E20..0x80570E70; .data 0x80600978..0x80602428; .sdata 0x80793968..0x80793988;
- * .sbss 0x80794CB0..0x80794CB8; .sdata2 0x8079C7D0..0x8079C868 (config/RMHE08/splits.txt).  Body order follows the
- * address order in three parts: the singleton (0x803FCC34..), the state machine (0x803FE8E4..) and the packet layer
- * (0x804006A8..).
- *
- * TU (round 4 fold, owner ruling 2026-10-05: "One TU make sense").  The former `Network/network_state.cpp` and the head
- * of the former `Network/network_layer_io.cpp` are this unit: the constructor `__ct__12PatInterfaceFv` (0x803FCC34)
- * stores the 161-slot table 0x80602198 whose slots are the destructor 0x803FCF8C, `resetDefaults` and the packet
- * handlers up to `recvCommand` 0x804120B8, and the table is followed by the V->S seam at 0x80602428 ("NHTTPStartup",
- * the next TU's first string).  Edges: left 0x803FCC34 is the `.data` vtable-then-string seam that ends
- * `Network/PatConnection.cpp`; right 0x804123F8 - `onNHTTPDestroyed` is the `NHTTPDestroy` callback whose address only the
- * tail's `stepCleanup__11NetworkPoolFv` takes and which calls only the tail (`getNetworkPool`, `advanceCleanup__11NetworkPoolFv`), so it opens
- * `Network/NetworkPool.cpp`.  The data edges follow the readers: `.sdata` 0x80793988 (read by the tail's
- * `fn_80412C98`), `.sbss` 0x80794CB8 (`getNetworkPool`'s word) and `.sdata2` 0x8079C868 (the tail's `clearState__11NetworkPoolFv`) are
- * the tail's; everything before them is read only by this range.  `splitcheck --unit`: data-order PASS (the old
- * `network_layer_io` FAIL is gone).
- *
- * FLAGS.  `-O3 -inline noauto` (configure.py, with the evidence) and a file-scope `#pragma peephole off`, switched on for
- *   `setSomething` (its s32 store keeps no `clrlwi` only with the pass on) and for the state machine part except
- *   `handleNetworkState2Binary` - the three former units' settings, each measured on its own part and re-measured on
- *   the merged object (0 rows up, 0 down against main).  The singleton's part: memset/memcpy argument order and the unfused
- *   `extsb`+`cmpwi` of isOpeningAnnounce want the pass off (60 rows at 100 against 56 with it on).  The packet layer:
- *   retail keeps the unfused `clrlwi r0,r0,16` before the ticket size's `sth` (recvAnsTicket/recvReqTicket 98.25/98.33
- *   with the pass on, 100 off) and the `bge`+`b` pairs the pass folds.  The state machine: `-O3` (the lib default
- *   `-O4,p` hoists every emitter's constant setup into the prologue's `mflr`->`stw` latency slot and lays the switch
- *   tails out unsorted: 69.42 % at `-O4,p`, 84.16 % at `-O3`); its `#pragma dont_inline` region around
- *   `handleNetworkState1` was load-bearing under the old row's `-inline auto` (retail keeps `bl resetNetworkState3`) and
- *   is moot under `-inline noauto`; `#pragma peephole off`/`on` around `handleNetworkState2Binary` keeps retail's unfused
- *   `extsb r0,r0` + `cmpwi r0,0` (playbook 39).
- *
- * ---- the singleton (0x803FCC34..0x803FE8E4) ----
- *
- * WRITTEN.  The constructor 0x803FCC34, the destructor 0x803FCF8C and `resetDefaults` (slots +0x08/+0x0C; the class
- *   derives from `PatConnection`, `Network/PatConnection.h`: base constructor 0x803FAE9C, table 0x806006E8, base
- *   destructor 0x803FAF34, base `resetDefaults` 0x803FAF78, `disconnect` 0x803FB490 - the map rows carry the
- *   manglings), the accessors (C linkage: the map names them unmangled) and the five buffer setters (members).  The
- *   destructor is the class's key function, so this object emits the 161-slot table `__vt__12PatInterface`
- *   (0x80602198) and the constructor stores it.  Not written: `stepPatInterface`,
- *   `postError` (+0x288), `buildErrorInfo613c`, `getErrorInfoOrCode654c`, `pushStack`, `setConnectServerType`,
- *   `chooseServerAddress`, `getFmpSelection`, the FMP/server helpers 0x803FDE48..0x803FE154, `updatePatInterface`
- *   (a tail call into `PatConnection`'s `setSecureServer`), `getPatServerTime`, `getPatAccountName`,
- *   `getSomething4` (its declared `s8` return would add an `extsb` retail does not have), `getBinaryToken` and the
- *   stack/notice helpers 0x803FE4D8..0x803FE5A0.
- *
- * NAMES (GUESS, integrator 2026-10-04, from the bodies, in the scheme of `errorRecordCode613c`/`getErrorInfo654c`):
- *   `clearErrorRecord613c` 0x803FD674 clears the 0x208-byte record at +0x613C while no error is pending (+0x654C);
- *   `buildErrorInfo613c` 0x803FD6D8 fills a caller's three-word error from a code and the record's code (its code
- *   constants 0x80050038 / 0x80050044 read as relocations to `fn_8004CAD8.cpp`'s functions in the split object: false
- *   references, the `block_relocations` case `Network/NetworkFileFetcher.cpp` records);
- *   `getErrorInfoOrCode654c` 0x803FD7BC copies the pending error and substitutes a negative code for 0x80000000.
- *
- * RESIDUALS.  reportPatError 76.71 (retail materialises `&pendingError_654C` after the code load, ours before).
- *
- * ---- the request state machine (0x803FE8E4..0x804006A8) ----
- *
- * WHAT IT IS.  The `NetworkSessionManager` request-state machine: the block-1..4 resets and the
- * `handleNetworkStateN` dispatchers (1 is the main machine), plus the request emitters
- * 0x803FFD74..0x804002C0 (`sendReqServerTime`/`sendReqShut`/`sendReqTicket`/`sendReqCommonKey`/
- * `sendReqLoginInfo`/`sendReqChargeInfo`/`sendReqUserListData`/`sendReqUserObject`).  C++ but every
- * function is `extern "C"` (the map's names are unmangled).
- *
- * SOURCE SHAPES (each measured on this part; they are levers, not preferences):
- *  - A local that only *aliases* something is its own web and takes a register retail gives to the
- *    parameter or field: `NetworkStateMachine* st = (NetworkStateMachine*)self`, `u8 state =
- *    <field>`, `NetworkFmpSlot* slots = st->fmpSlots_6C40`, `NetworkUserRow* rows = ...`.  Writing
- *    the cast/field expression at the use site instead is worth 0.3-3 points per function here.
- *  - An `if (bad) return x;` written first compiles to `beq <body>` with the return in line; retail
- *    branches *over* the body and leaves the return last, which is the positive test with the return
- *    as the case's last statement (`handleNetworkState2` case 5, `handleNetworkState2Fmp` 5/20).
- *    Same for `if`/`else`: retail's layout wants the branch-taken block written as the `else`.
- *  - `a && b && c` guarding a body whose else is a short tail: retail falls through into the tail,
- *    i.e. the source is the negated `a == 0 || b == 0 || c == 0` (`handleNetworkState1` 40/90/120).
- *  - Where retail has `cmpwi`/`ble`/`cmpw`, the source compared *signed*: `(s32)field` casts
- *    (`handleNetworkState4` 0/20/35, `handleNetworkState2` 50, `handleNetworkState2Fmp` 10/70).
- *  - A state byte taken into a local is an `s32` local, not `u8` (retail's `cmpwi`, not `cmplwi`).
- *  - A `u32` count/limit compared against a small constant is `cmpwi` in retail, i.e. the source
- *    cast: `(s32)count < 30` not `count < 30`, `(s32)i < (s32)field` not `i < field`,
- *    `(s32)field == -1` not `field == (u32)-1`.
- *  - A *u8-typed* comparison survives only on a memory-loaded operand: `(u8)(field + 255) <= 1`
- *    reproduces retail's `addi r0,rX,255; clrlwi r0,r0,24; cmplwi r0,1` where `field - 1 <= 1` gives
- *    `subi`/`cmpwi` and `(u8)(field - 1)` gives `addi r0,rX,-1` + the mask.  On a local whose range
- *    the optimizer proves (the tag index) the same cast measures byte-identical - the mask is folded
- *    away, which is why `sendReqUserObject`'s masked index cannot be reached from the source side.
- *  - A local byte buffer's *declared* size is the frame: `u8 block[4]` gives a 0x20 frame where the
- *    target's 0x30 needs `u8 block[16]` (the bytes actually used are the same three), and every
- *    prologue and save offset follows from it.
- *  - An extern whose target reference is `R_PPC_EMB_SDA21` needs the symbol's real *size* in the
- *    declaration (`extern const char maskedUserName[7]`, the map's own size); with `[]` MWCC emits
- *    `lis`/`addi` plus two `R_PPC_ADDR16_*` relocations instead of one sda21 reference.
- *  - An index store written `count = count + 1; tags[count - 1] = v` instead of
- *    `tags[count] = v; count++` scores 3 points better on both rows that have it and emits
- *    `addi r3,r1,base-1` + the unmasked index - an address-base fold (alignment), not retail's
- *    `addi r3,r1,base` + masked copy.
- *
- * NAMES.  The runtime dump's map ("D:/WiiExperiment/DumpSymbols.zip") names 14 of the 21 already in
- * `symbols.txt`.  The six helpers it leaves as `zz_` were named in the registration batch's naming
- * pass from their own code (`advanceNetworkState5` gates on the `+0x6133 == 5` state byte; the three
- * block-2 dispatchers are named after the request family each drives; `sendReqOpcode1B`/`sendReqOpcode1F`
- * after their `flushBuffer` request opcode).  The unsplit callees the bodies call were renamed in the
- * same batch (rule 7, map + references): `writeUInt32`/`writeUInt32Shared` (0x803FC2D0/0x803FC414 -
- * the dump names both `writeUInt32`, so the 4-byte tail-branch twin's suffix is a GUESS),
- * `putItemTaggedLongs`/`putItemTaggedBytes` (0x8040EBBC/0x8040EC88), `chooseServerAddress`
- * (0x803FDD48, dump name), `getSomething6`/`getSomething9` (0x803FE4B8/0x803FE4C0, numbered into the
- * map's existing `getSomethingN` scheme), `dispatchSessionHandlers` (0x8041233C, walks the session's
- * eight handler slots), `setConnectionPaths` (0x80416320), `getInstance` (0x800E89D8, dump name - the
- * mediator singleton getter, **owned by `src/sound/fn_800E46E8.cpp`**, whose declaration and
- * `Network/GameSpyInterfaceThread.h`'s were updated in the same change) and the six sub-state predicates
- * `isSubState_8254_3`/`isSubState_894F_2..6` (named for the field and value each tests).  The five
- * `lbl_` rows were named from their content and use: `sessionTimeoutParam`/`sessionTimeoutParam2`
- * (0x8079C7D8/DDA = the bytes {1,2,3}), `requestHeaderWord0`/`requestHeaderWord1` (0x8079C7E0/E4 =
- * the 8-byte block {1,2,3,5,4,6,7,8}) and `maskedUserName` (0x80793968 = "******").
- *
- * NAMING GUESSES.  The map gives all three block-2 dispatchers the same `handleNetworkState2`
- * spelling (three distinct local addresses), so the `Fmp`/`Binary` suffixes are inferred from the
- * request family each calls, not from a recovered API name.  `sendReqOpcode1B`/`1F` record the wire
- * opcode because the request name is unknown (the 0x1B/0x1F ids sit in the gaps of the `sendReq*`
- * opcode table).  `NetworkStateMachine`'s field names are derived from how each field is used in this
- * part, not from a recovered header - the object is 0x16D08 bytes and the dump's struct views do not
- * cover it.
- *
- * RESIDUALS (measured 2026-09-27 on the former unit, second pass: 93.85 %, 12 of 21 functions at 100 %, `.text`
- * 7620 B target / 7472 B ours - the whole size gap is `handleNetworkState2Binary`'s tokenizer below; every
- * other function is within 4-8 B of the target):
- *  - `handleNetworkState2Binary` 71.25 % (992 B / 916 B): its case-60 tokenizer is the one place the
- *    original leaves a loop from *inside* two nested loops (retail branches straight from the inner
- *    skip loop's `== 0` test to the outer loop's exit), and the conformant shape (`&& != 0` in the
- *    skip loop plus a `break`) is 76 B short.  Ours keeps a *rolling* pointer `self + i` where retail
- *    recomputes the offset from `i` and uses `lbzx` off `self`; MWCC emits the
- *    `for (k = index; k < 8; k++) tokens[k] = i` fill loop as a plain `subfic`/`mtctr` counted loop
- *    where retail has the unroll-by-8 block plus an `andi.` remainder; and our prologue saves 5
- *    callee-saved registers (`bl _savegpr_27`) where retail saves 2 in line.
- *    Rejected for this row: a local `u8*`/`char* text` (60.8 %), a `u32* tokens` alias (60.1 %),
- *    `-O2` (71.66 % on the row, 89.58 % unit), `-opt nostrength` (62.23 %, unit 90.47 %), and every
- *    statement/declaration/loop-form permutation tried (byte-identical or worse).  The one landed
- *    change is the `u32* tokens = self->binaryTokens_D60C;` alias (+1.03 % on the row, object 24 B
- *    *smaller*) - an alignment effect of the fuzzy metric, not retail's shape.
- *  - `sendReqUserObject` 89.87 % (520 B): the out-of-range error path is retail's now - two 12-byte
- *    `{0x80000000, 0, 0}` records written high-then-low with the *low* one's address passed - which
- *    is what a by-value `postError_288(self, info)` call produces (`NetworkPostedError` is 0x0C; a
- *    by-value parameter makes MWCC build the argument copy and re-materialise the constants), and it
- *    restores retail's 0x50 frame and every `r1+0x20` tag offset.  Left: (a) the masked tag index -
- *    retail `mr r0,rX; addi rX,rX,1; clrlwi r0,r0,24; stbx` on all five variable indices, ours
- *    index-only and unmasked; every shape tried measures byte-identical (`u8 count`, `s32 count`,
- *    block- and function-scope `u8`/`u32` temps, `(u8)count` in all positions, `count++` as the index,
- *    `tags[count++]`, `*(block + count)` and an inlined `appendTag` helper).  The reason is visible
- *    now: `count` is a *local* whose range MWCC proves clean, so it folds the u8 conversion - the
- *    mask survives only where the operand comes from memory (see `sendReqLoginInfo`) or is a
- *    `u8`-typed conversion the optimizer cannot see through; (b) the vcall's vptr load - retail's
- *    `lwz r12,0(r3)` + `lwz r12,0x288(r12)` is the genuine-virtual shape while our table view stages
- *    it through a scratch register (`lwz r5,0(r27)`), and the sibling `Network/GameSpyInterfaceThread.cpp` gets
- *    the r12 form from the same table view, so it is allocator choice, not the declaration.  Two
- *    measured shapes are landed: `count` declared *before* `found`, and the index/increment pair
- *    written `count = count + 1; tags[count - 1] = N;` rather than `tags[count] = N; count++;`.
- *  - `sendReqUnknownCheck` 92.92 % (196 B / 184 B): the same masked index (`block[count] = 2`) and one
- *    extra `li` retail has because its two `1` constants do not CSE.  The same index/increment
- *    spelling as above (89.29 -> 92.92 %).
- *  - `handleNetworkState2Fmp` 95.12 % (1192 B / 1184 B): one extra callee-saved register in the
- *    prologue (`stw r29`) - ours caches `serverCount_6604[1]` in `r30` and keeps the case-40 loop
- *    counter in `r29`, where retail reloads the count from the object every iteration and keeps `i`
- *    in the volatile `r10`; a `while` rewrite of that loop (to force the reload) measures 92.74 %, so
- *    the caching is the optimizer's, not the shape's.  Elsewhere residual colouring (a loop counter
- *    in `r6`/`r10` where retail has `r30`/`r7`) and the `memcpy` argument order in case 50.  Landed
- *    here: case 35's `if (result > 0) { if (count > 0) {...; break;} return ...; }` layout (+1.16 %),
- *    case 40's `if (bestValue <= remaining) {...} else if (secondValue <= remaining) {...}` with the
- *    `<=` arm first (+3.59 %), the signed `(s32)fmpQueryValue_8044 == -1` test and the signed loop
- *    bounds (+0.20 %).
- *  - `handleNetworkState2` 98.19 % (1164 B / 1160 B): the loop's char test is retail's unfused
- *    `lbz; extsb; cmpwi r0,0` where ours folds to `extsb.` - and this one is **not** a peephole row
- *    (measured: a scoped peephole off/on pair around this function changes neither its bytes nor its
- *    score, unlike `handleNetworkState2Binary`'s).  Nothing tried unfuses it: an `s8`/`char` local,
- *    `(s32)`/`(s8)` casts on the element, `-O2`, and `-opt nocse` / `nopropagation` / `nodeadcode` /
- *    `nolifetimes` (each byte-identical).  Also one `mr r5,r30` and the two `setConnectionPaths`
- *    argument setups one slot out of place.  Landed here: case 70 as `if (count > 0) { loop } else
- *    { return ...; } st->requestState_6135 += 10;` (95.53 -> 98.19 %) and the signed
- *    `(s32)st->userRowCount_8BB4 > 0`.
- *  - `handleNetworkState4` 98.01 % (464 B / 460 B): the same unfused `subf` + `cmpwi r0,0` (vs our
- *    `subf.`) as `handleNetworkState2` in case 35, plus the `memset` argument order in case 10
- *    (retail computes `addi r3,r3,0x6c40` before the two `li`s).  Hoisting the subtraction into a
- *    `s32 remaining` local matches the target's *size* but drops the row to 95.47 %, so it is not
- *    landed.  Landed: case 25's `(s32)count < 30` signed min-clamp (+0.52 %).
- *  - `handleNetworkState1` 99.45 % (1736 B, byte-identical size): the switch value is in `r4` where
- *    retail has `r6`, a cascade of 6 operand rows in the two `len < 8192 ? len : 8192` argument
- *    setups (the transient `dataSent` lands in `r4`/`r6` where retail uses `r6`/`r7`) and one
- *    `li r4,2` one slot earlier in case 245.  Pure allocator colouring; no shape found moves it.
- *  - `sendReqLoginInfo` 95.30 % (228 B, byte-identical size): the u8-narrowed test is
- *    `(u8)(loginInfoSent_82B4 + 255) <= 1` - retail's `addi r0,r3,255; clrlwi r0,r0,24;
- *    cmplwi r0,1`, i.e. mod-256 arithmetic on a *memory-loaded* u8 field, which MWCC can neither fold
- *    into `subi`/`cmpwi` nor drop.  `(u8)(field - 1)` measures 95.19 % (`addi r0,r3,-1`) and the
- *    un-cast `field - 1 <= 1` 92.39 %.  `u8 block[4]` was the other half of this row: the target's
- *    frame is 0x30 and ours 0x20 until the array is declared `u8 block[16]`, which makes the whole
- *    prologue match (92.21 -> 92.39 % before the comparison fix).
- *  - `sendReqOpcode1B` 94.74 % (156 B, byte-identical size): retail loads *both* request-header words
- *    before storing either (`lwz r4,0(0); lwz r0,0(0); stw r4,8(r1); stw r0,12(r1)`); ours interleaves
- *    load/store/load/store.  A brace initialiser, hoisted `u32` temporaries, a struct-typed local,
- *    the reversed statement order and a `word0`/`word1` re-association all measure byte-identical.
- *  - FLAG AXIS (each measured on the former unit with `measure.py --main .`): `-O3` is best.  `-O2` 89.58 % unit
- *    (2Binary 71.66 %); `-opt nostrength` 90.47 % unit (2Binary 62.23 %); `-opt nocse`, `-opt nopropagation`,
- *    `-opt nodeadcode` and `-opt nolifetimes` all byte-identical.
- *
- * DATA.  The state machine's constants (`sessionTimeoutParam`/`Param2`, `requestHeaderWord0`/`1`, `maskedUserName`)
- *   are this unit's `.sdata2`/`.sdata` rows, declared `extern` in the unit header and never defined (playbook 29:
- *   defining them rebuilds the pool).
- *
- * ---- the packet layer (0x804006A8..0x804123F8) ----
- *
- * WHAT IT IS.  The `recv*` handlers are `PatInterface` virtuals (slots +0x10..+0x280 of the table 0x80602198, which
- * sits in this unit's `.data`) that `recvCommand` (slot +0x284) reaches through the packet table's member pointers
- * (`PacketTable_BaseOffset_ID1`, `__ptmf_scall`), so they are written as members and their map rows carry the
- * manglings (`recvAnsShut__12PatInterfaceFlPC15PatPacketHeader`; the parameter types are GUESSES from the bodies:
- * r4 is the packet table index `recvAnsNg` stores, r5 the 8-byte header).  The `sendReq*` builders stay C linkage:
- * the map names them unmangled and the session units call them directly.  Every handler starts with the same log
- * line, `"%s:<name> ok\n"` with the connected server's tag (`getServerName`) and a trailing `""`.
- *
- * SOURCE SHAPES.  Locals of one size are laid out in reverse declaration order (the later one at the lower
- * offset), so each handler declares them in the order retail's frame needs; a failed `readBodySlice` returns its
- * own result (retail branches to the epilogue with r3 intact); the stack-clamped list answers divide into a
- * `maxCount` local (retail's register choice for the magic-number division); `tags[count++] = v` with a known count
- * is retail's `li`/`li`/`stb` order; a selector written `x == 0 ? a : b` or `x != 0 ? b : a` decides which constant
- * is loaded first.  The request builders take the session units' `NetworkInstance*` and cast at each use (since request
- * net3-d-03c2#1 the band's `NetworkInstance` is a typedef of `PatInterface`, so the casts are no-ops).
- *
- * WRITTEN.  The request builders 0x804006A8..0x804040xx except sendReqLayerChildInfo, sendReqLayerUserInfoSet
- * (0x80401AF4), sendReqLayerUserListHead, sendReqLayerUserSearchHead, the layer binary/position/chat/tell notices
- * 0x80401EC8..0x804021A8, the mediation requests, sendReqLayerDetailSearchHead, sendReqCircleCreate/Info/Join/
- * MatchOptionSet/InfoSet/ListLayer/ListHead/UserList, the circle binary/chat/tell/value notices 0x8040294C..0x80403460,
- * sendReqCircleInfoNoticeSet, 0x8040354C/0x804035D8, sendReqUserSearchHead/Info/InfoMine, 0x80403A88/0x80403BF4,
- * sendReqFriendList, 0x80403DE4/0x80403EDC and sendReqChannelInfo; and every `recv*` handler.  Not written: the item
- * readers/writers 0x8040E0D0..0x80412188, `recvCommand` and `dispatchSessionHandlers`.
- *
- * NAMES (GUESS, from the bodies): the received item lists the binary and position notices read -
- *   `initItemList` 0x8040E7F4 (binds the rows, marks the list), `readItemList` 0x8041043C (the marker, the count and
- *   up to ten item types), `createItemListStack` 0x803FE4D8 (at most 64 16-byte rows off the call stack) and
- *   `releaseItemListStack` 0x803FE590 (gives them back); the records `PatItem`/`PatItemList`/`PatItemNotice`/
- *   `PatUserPositionNotice`/`PatDetailSearchResult` are named from the handlers that fill them.  The position
- *   notice's loop is written with an index (`list.items_04[i]`): a walking `PatItem*` swaps r3/r4 (99.44).
- *
- * RESIDUALS.  recvAnsAgreementPageInfo 99.94 (retail addresses the page count as `infoPtr+12`, ours folds it to
- * `r1+28`).  Every body not written yet is 0 %; the packet table is not emitted (the table 0x80602198 is, since the
- * destructor was written).  The connection base's readers are declared in
- * `Network/PatConnection.h` (requests net3-d-03c2#2..#12).
- *
- * The unit's data claims are the candidate's (config/RMHE08/splits.txt); the symbols they hold are in the map
- * (`ledger.py unit Network/PatInterface.cpp`), and the pass that writes the bodies defines them.
+ * Network/PatInterface.cpp - the `PatInterface` singleton (reference count, error records, session handler slots, call
+ *   stack, clock, accessors), the request state machine the session units drive (0x803FE8E4..: the block-1..4 resets
+ *   and the `handleNetworkStateN` dispatchers), and the packet layer (0x804006A8..: the `sendReq*` request builders and
+ *   the `recv*` handlers).  Bodies follow the address order.
+ * RANGE. .text 0x803FCC34-0x804123F8 (459 functions); .rodata 0x80570E20-0x80570E70, .data 0x80600978-0x80602428,
+ *   .sdata 0x80793968-0x80793988, .sbss 0x80794CB0-0x80794CB8, .sdata2 0x8079C7D0-0x8079C868, extab, extabindex.  One
+ *   TU: the constructor (0x803FCC34) stores the 161-slot table 0x80602198 whose slots run to `recvCommand` 0x804120B8,
+ *   followed by the V->S seam at 0x80602428 ("NHTTPStartup").  Left: the vtable-then-string seam ending
+ *   `Network/PatConnection.cpp`; right: `onNHTTPDestroyed` opens `Network/NetworkPool.cpp` (only its
+ *   `stepCleanup__11NetworkPoolFv` takes the address); the data edges follow the readers (`splitcheck --unit`:
+ *   data-order PASS).
+ * FLAGS. `-O3 -inline noauto` (configure.py; measured in docs/network.md).  File-scope `#pragma peephole off`
+ *   (memset/memcpy argument order, the unfused `extsb`+`cmpwi` of `isOpeningAnnounce`, the `clrlwi r0,r0,16` before the
+ *   ticket size's `sth`, the `bge`+`b` pairs), on for `setSomething` (its s32 store keeps no `clrlwi` only with the
+ *   pass on) and for the state machine except `handleNetworkState2Binary` (retail's unfused `extsb r0,r0` + `cmpwi
+ *   r0,0`, playbook 39).
+ * NAMES. The runtime dump names 14 of the state machine's 21 functions.  GUESSes from the bodies:
+ *   `advanceNetworkState5` (gates on the +0x6133 == 5 byte); the `Fmp`/`Binary` suffixes of the three block-2
+ *   dispatchers the map spells alike (the request family each calls); `sendReqOpcode1B`/`1F` (the wire opcode);
+ *   `NetworkStateMachine`'s fields (the object is 0x16D08 B, beyond the dump's views); `writeUInt32Shared` (the 4-byte
+ *   tail-branch twin of `writeUInt32`); `getSomething6`/`getSomething9` (the map's `getSomethingN` scheme);
+ *   `dispatchSessionHandlers` (0x8041233C, walks the eight handler slots); `clearErrorRecord613c`,
+ *   `buildErrorInfo613c`, `getErrorInfoOrCode654c` (the `errorRecordCode613c` scheme); `initItemList`, `readItemList`,
+ *   `createItemListStack` (at most 64 16-byte rows off the call stack), `releaseItemListStack` and the records
+ *   `PatItem`/`PatItemList`/`PatItemNotice`/`PatUserPositionNotice`/ `PatDetailSearchResult`; the `recv*` parameter
+ *   types (r4 the packet table index `recvAnsNg` stores, r5 the 8-byte header).  Data rows from their content:
+ *   `sessionTimeoutParam`/`Param2` (0x8079C7D8/DDA, the bytes {1,2,3}), `requestHeaderWord0`/`1` (0x8079C7E0/E4),
+ *   `maskedUserName` (0x80793968, "******").  GUESSes named by the mediator band for the field or slot each touches:
+ *   `setPatReflectPageRange`, `PatInterface_clear`, `PatInterface_isReady`, `getPatServerTime`, `setPatBuffer`,
+ *   `setPatRange`, `getPatAccountName`, `setPatReflectField30/34/38`, `setPatReflectName3C/5C`, `setPatField854/860`.
+ * RESIDUALS. 151 rows unwritten (objdiff scores them zero), in address order:
+ *   - the singleton: `setPatReflectPageRange` (0x803FD04C), `stepPatInterface`, `buildErrorInfo613c`,
+ *     `getErrorInfoOrCode654c`, `postError`, `pushStack`, `setConnectServerType`/`chooseServerAddress`/
+ *     `getFmpSelection`/`copyServerBlock` (0x803FDCB0..0x803FDE84), `saveFmpSelection`..`updatePatInterface`
+ *     (0x803FE03C..0x803FE184), `getPatServerTime`, `getBinaryToken`, `getPatAccountName`, `getSomething4` (its
+ *     header-declared `s8` return would add an `extsb` retail lacks), `createItemListStack`/`releaseItemListStack`/
+ *     `appendItemList` (0x803FE4D8..0x803FE73C);
+ *   - the request builders: `sendReqLayerChildInfo`, `sendReqLayerUserInfoSet`, `sendReqLayerUserListHead`,
+ *     `sendReqLayerUserSearchHead`, the layer notices, mediation and detail-search requests and circle create/info/join
+ *     (0x80401EC8..0x8040275C), `sendReqCircleMatchOptionSet`, `sendReqCircleInfoSet`/`ListLayer`/`ListHead`
+ *     (0x80402930..0x80402B04), `sendReqCircleUserList` through `sendReqBinaryUser` (0x80402CC8..0x80403670),
+ *     `sendReqUserSearchHead`, `sendReqUserSearchInfo`..`sendReqFriendAdd` (0x80403978..0x80403C80),
+ *     `sendReqFriendList`/`sendReqBlackAdd`, `sendReqBlackList`/`sendReqChannelInfo`;
+ *   - `recvReqMemoryCheck` (0x80404EE8), a `recv*` virtual with no body;
+ *   - the item readers/writers, `recvCommand` and `dispatchSessionHandlers` (0x8040E48C..0x804123F8, 84 rows).
+ *   The packet table is not emitted.  Partial rows:
+ *  - `handleNetworkState2Binary`: the case-60 tokenizer leaves a loop from inside two nested loops (the conformant
+ *    `&& != 0` plus `break` is 76 B short); retail recomputes the offset from `i` with `lbzx` off `self`, unrolls the
+ *    token fill by 8 with an `andi.` remainder and saves 2 registers in line (ours 5, `_savegpr_27`); `-O2`, `-opt
+ *    nostrength`, `u8*`/`u32*` aliases and every loop form tried are worse;
+ *  - `sendReqUserObject`, `sendReqUnknownCheck`: the masked tag index (retail `clrlwi r0,r0,24` before `stbx`; `count`
+ *    is a local whose range MWCC proves, so it folds the u8 conversion; an inlined `appendTag` helper and every index
+ *    spelling tried are byte-identical); the error path is retail's through a by-value `postError_288(self, info)`; the
+ *    vcall stages its vptr through a scratch register; `sendReqUnknownCheck` keeps one extra `li` (its two `1`
+ *    constants do not CSE);
+ *  - `handleNetworkState2Fmp`: one more callee-saved register (ours caches `serverCount_6604[1]` in r30) and the
+ *    `memcpy` argument order in case 50;
+ *  - `handleNetworkState2`, `handleNetworkState4`: retail's unfused `lbz; extsb; cmpwi r0,0` / `subf` + `cmpwi r0,0`
+ *    where ours folds (not a peephole row; `-opt nocse`/`nopropagation`/`nodeadcode`/`nolifetimes` byte-identical), and
+ *    argument setups one slot out of place;
+ *  - `handleNetworkState1`: allocator colouring (the switch value in r4, retail r6; the transient `dataSent` in r4/r6);
+ *  - `sendReqLoginInfo`: the remaining operand rows after `(u8)(loginInfoSent_82B4 + 255) <= 1` (retail's
+ *    `addi`/`clrlwi`/`cmplwi` on the memory-loaded u8);
+ *  - `sendReqOpcode1B`: retail loads both request-header words before storing either (a brace initialiser, temporaries
+ *    and a struct local tried);
+ *  - `reportPatError`: retail materialises `&pendingError_654C` after the code load;
+ *  - `recvAnsAgreementPageInfo`: retail addresses the page count as `infoPtr+12`, ours folds it to `r1+28`.
+ * SHAPES. The destructor 0x803FCF8C is the key function, so this object emits `__vt__12PatInterface` (rule 10); the
+ *   class derives from `PatConnection` (`Network/PatConnection.h`).  The `recv*` handlers are virtuals (slots
+ *   +0x10..+0x280) that `recvCommand` reaches through the packet table's member pointers (`__ptmf_scall`), so their map
+ *   rows carry the manglings; the `sendReq*` builders and the accessors keep C linkage (the map names them unmangled)
+ *   and take `NetworkInstance*` (a typedef of `PatInterface`).  Each handler logs `"%s:<name> ok\n"` with
+ *   `getServerName`.
+ *  - an aliasing local (`NetworkStateMachine* st = ...`, `u8 state = <field>`) is its own web: write the expression at
+ *    the use site; a state byte taken into a local is `s32`;
+ *  - retail branches over a body and leaves the return last: write the positive test with the return as the case's last
+ *    statement, the branch-taken block as the `else`, `a && b && c` negated (playbook 34, 71);
+ *  - `cmpwi` in retail means the source compared signed: `(s32)field`, `(s32)count < 30`, `(s32)field == -1`;
+ *  - a u8 comparison survives only on a memory-loaded operand: `(u8)(field + 255) <= 1`;
+ *  - a local byte buffer's declared size is the frame (`u8 block[16]` for retail's 0x30); an SDA extern needs its size
+ *    (`extern const char maskedUserName[7]`, playbook 64; with `[]` MWCC emits `lis`/`addi` and two `R_PPC_ADDR16_*`
+ *    relocations);
+ *  - `count = count + 1; tags[count - 1] = v` (an alignment effect, kept for its score); `tags[count++] = v` with a
+ *    known count is retail's `li`/`li`/`stb`; `u32* tokens = self->binaryTokens_D60C;` in `handleNetworkState2Binary`;
+ *  - locals of one size are laid out in reverse declaration order (playbook 63); a failed `readBodySlice` returns its
+ *    own result; the stack-clamped list answers divide into a `maxCount` local; `x == 0 ? a : b` decides which constant
+ *    loads first; the position notice's loop indexes `list.items_04[i]` (a walking pointer swaps r3/r4);
+ *  - the state machine's constants are this unit's `.sdata2`/`.sdata` rows, declared `extern` in the unit header and
+ *    never defined (playbook 29: defining them rebuilds the pool); `buildErrorInfo613c`'s codes 0x80050038/0x80050044
+ *    read as relocations in the split object (the `block_relocations` case).
  */
 
 #include "types.h"
@@ -438,7 +280,7 @@ void decrement60d4(NetworkInstance* self)
 }
 
 /* Unbinds the first and third session handlers unless the singleton is still referenced. */
-/* free: retail C linkage - the map names it unmangled (`PatInterface_clear`) */
+/* free: retail C linkage - the map names it unmangled */
 void PatInterface_clear(PatInterface* self)
 {
     if (PatInterface_isReady(self) == 0) {
@@ -448,7 +290,7 @@ void PatInterface_clear(PatInterface* self)
 }
 
 /* Whether the singleton is referenced. */
-/* free: retail C linkage - the map names it unmangled (`PatInterface_isReady`) */
+/* free: retail C linkage - the map names it unmangled */
 s32 PatInterface_isReady(PatInterface* self)
 {
     return self->refCount_60D4 > 0;

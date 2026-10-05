@@ -1,18 +1,8 @@
 /*
- * Network/network_pat_control.h - shared views for the network pat-control band
- * (`Network/network_pat_control.cpp`, `.text` 0x80429B94..0x8043065C).
- *
- * The `net_ctrl_wk` singleton (map: `.sbss:0x80794CF8`, a 4-byte pointer) is the record every
- * function in the band dereferences; it points at `net_ctrl_work` (`.bss` 0x806D3790), and the unit
- * defines both.  Only the offsets the band's functions read are named; every other byte stays `pad_0xNNN`.
- *
- * `NetCtrlWk` size: 0xC4A8 - the map's size of `net_ctrl_work`.  It is a class: the band's functions
- * that work on the singleton are its (static) members, and it is packed because the record carries a
- * `u32` run at the odd offset +0x7996 that natural alignment would slide.
- *
- * The four-slot "*Pat" holder and the accessor family that walks it live in their owner's header,
- * `Network/NetworkPat.h`, which this file includes (rule 1/2) - the family is declared once, by the
- * unit that defines it.
+ * Network/network_pat_control.h - the views of `Network/network_pat_control.cpp`: the `net_ctrl_wk` singleton (`.sbss`
+ *   0x80794CF8, pointing at `net_ctrl_work`, `.bss` 0x806D3790) and its class `NetCtrlWk` (0xC4A8 B, the map's size).
+ * SHAPES. `NetCtrlWk` is packed for the `u32` run at the odd offset +0x7996; the band's functions on the singleton are
+ *   its (static) members.  The "*Pat" holder is `Network/NetworkPat.h`'s.
  */
 #ifndef MHTRI_NETWORK_NETWORK_PAT_CONTROL_H
 #define MHTRI_NETWORK_NETWORK_PAT_CONTROL_H
@@ -993,8 +983,8 @@ s8 countOccupiedServerSlots(void);
 s32 isCityMode(void);
 s32 checkOtherInvite(u8 id, s8* result);
 void setErrorCode(s8 code);
-/* `getPatsObject` (0x803DA020) and `isNetworkSessionManagerPatReady` (0x803DF1A8) are declared in
- * `Network/NetworkSessionManagerPat.h` (their owner since the phase 4 fold). */
+/* `getPatsObject` (0x803DA020) and `isNetworkSessionManagerPatReady` (0x803DF1A8) are declared in their owner's
+ * header, `Network/NetworkSessionManagerPat.h`. */
 
 #ifdef __cplusplus
 }
@@ -1018,15 +1008,14 @@ char* get_network_sub_error_msg(void);
 s16 MH3DispErrorString(s16 x, s16 y, s8* text);
 char* MH3GetErrorString2(s32 code);
 
-/* The 0x80423E74..0x80429B94 band's declarations (absorbed from `fn_80423E74.h` at phase 4): the PatCamellia wrapper over the
- * retail Camellia cipher and the work record's arena vectors, slot table and message pool. */
+/* The 0x80423E74..0x80429B94 band's declarations: the PatCamellia wrapper over the retail Camellia cipher and the
+ * work record's arena vectors, slot table and message pool. */
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* Camellia's key schedule (owner: src/Camellia/camellia.c).  Declared here because the vendor header
- * sits beside its source and is not on the include path; a second consumer should promote it into
- * `include/` (rule 2).  `PatCamelliaKey` is the vendor's `KEY_TABLE_TYPE`. */
+/* Camellia's key schedule (owner: src/Camellia/camellia.c, whose vendor header `Camellia/camellia.h` declares it
+ * too; including that header instead is an open rule-2 item).  `PatCamelliaKey` is the vendor's `KEY_TABLE_TYPE`. */
 typedef unsigned int PatCamelliaKey[68];
 
 void Camellia_Ekeygen(int keyBitLength, const unsigned char* rawKey, PatCamelliaKey keyTable);

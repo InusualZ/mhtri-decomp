@@ -1,57 +1,39 @@
 /*
- * GameSpyInterfaceThread.cpp - the GameSpy interface / peer band, `.text` 0x8041B194..0x8041DF10.
- *
- * FILE NAME.  Registered under the map stem `fn_8041A87C.cpp`; renamed for the worker-thread class whose methods
- * fill the range (`__ct__22GameSpyInterfaceThreadFv`, `tGameSpyInterface`, `step`, `publishRequest`).  The class's
- * type-only header, read by the mediator band, is `Network/gamespy_interface_types.h`.
- *
- * WHAT IT IS.  The GT2 socket callbacks and three object types share the range: the worker thread
- * `GameSpyInterfaceThread`, `NetworkPeerGameSpy` and `NetworkTimedHandler`.  Each owns its bodies as members;
- * every call through a foreign object's vtable goes through a declared `virtual` on that class (the only
- * shape MWCC emits as `lwz r12, 0x0(r3)` / `lwz r12, <slot>(r12)`).
- *
- * SEAMS.  (1) The left edge 0x8041B194 is the recut of request net2-l4-cff5#1: `updateCallbackStep`..`applyEvent`
- * (0x8041A87C..0x8041B194) are `NetworkReflectService` members and moved to `Network/NetworkReflectService.cpp`
- * with their string 0x80603154 and the class table 0x80603190.  (2) The thread's vtable 0x806036A0 is followed by the peer's strings 0x806036B0: a
- * vtable-to-string seam at 0x8041D750 (`NetworkPeerGameSpy`, vtable 0x80603714).  (3) The timed handler's vtable
- * 0x80603740 rises above the peer's: a third TU at 0x8041DE20.
- *
- * FLAGS.  Per object in `configure.py`: `-O3` + `-inline noauto`, the lib's `-Cpp_exceptions on`, and `-pool off`
- * (playbook 43; measured there).  The file is `#pragma peephole off` throughout: retail keeps the unfused
- * `clrlwi`/`extsb` + `cmpwi` forms, so narrow stores are compound assignments and shift-and-mask bytes are
- * `(v >> 16) & 0xFF` (playbook 95).
- *
- * LOAD-BEARING SHAPES.  The vtable pointer sits where the first virtual is declared, so `~GameSpyInterfaceThread`
- * comes first in the class (playbook 98); being the key function it makes this unit emit `__vt__` and `__dt__`.
- * The error record is passed by value through `PatInterface`'s inline `postError` overload (playbook 97).
- * `unregisterReceiver` keeps an element pointer across its call (playbook 96); `executeError` copies the two
- * values it logs so the switch re-reads the stack; `isQueued` is the plain three-way return.  `profile_4485` is
- * five `u32` at the odd offset 0x4485 (the class's `#pragma pack(1)`); the connect call's out parameter is one
- * `GT2Connection`.  A `switch` whose cases all leave 0 is `break` + one trailing `return 0;` (playbook 34).
- *
- * DATA (INTERIM).  Claimed and emitted: `.data` 0x806031A0..0x80603714 (the callback set first, then the log
- * strings as literals in retail's order, then the thread vtable), `.bss` 0x806D3650..0x806D3670 and `.sbss`
- * 0x80794CE0..0x80794CE8.  The `.data` claim is interim: its left edge is the Reflect TU's end, but the right
- * edge 0x80603714 is probably false - the thread TU should end at 0x806036B0 (peer strings and vtable belong to
- * the peer TU).  Deferred by the data tools: `lbl_80603740` (span-blocked, it belongs to the timed-handler TU)
- * and the `.sdata` entries `sRejectMessageNG`, `sEmptyString`, `sPortFormat` (isolated run).  The `lbl_` name
- * stays: renaming an extern of unclaimed data adds a rule-12 finding.  The callback set is defined ahead of the first
- * literal because MWCC emits `.data` in definition order.
- *
- * NAMES.  The six `gt2*Callback` bodies and `DWC_GetLastErrorEx` come from the pool strings; every other name
- * for an unsplit callee (the `gt2*` API, `DWC_*`, `DWCi_natProbe*`, `sendReq*`, `hasMultipleRefs60d4`,
- * `errorRecordCode613c`, `getErrorInfo654c`, `getGameInfo2d1c`) and `natNegProgressCallback`,
- * `natNegCompletedCallback`, `copyGameSpyAddress`, `NetworkReflectService::notify` and the peer's
- * `armDrop`/`init` (the base's +0x20/+0x24 slots) is a GUESS from call shape or opcode.
- *
- * RESIDUALS.  `send`/`receive`: retail materialises the error-source constant as a relocation
- * (`@eti_80030018+9/+10`), ours is the immediate; `receive` also keeps a `clrlwi` ours drops.
- * `tGameSpyInterface`: the hoisted high word of `ticks * 17` is a fresh `li r0, 0` where retail reuses r24.
- * `NetworkTimedHandler::create`: retail leaves the `lis` half of the vtable address in r4 as `init`'s unused
- * first argument.  `init`, `publishRequest`: register colouring.  Sections: `.data` 1392 of 1396 B until the
- * cut, `extab` 360 of 380 B (a 20-byte cleanup record against `dtor_803CA338`, the peer's member-mutex
- * destructor, which the hand-modelled `NetworkPeerGameSpy::destroy` does not produce; retry a real
- * `NetworkPeerBase` derivation with a member mutex in the peer TU after the cut).
+ * Network/GameSpyInterfaceThread.cpp - the GameSpy interface / peer band: the GT2 socket callbacks and three classes,
+ *   the worker thread `GameSpyInterfaceThread`, `NetworkPeerGameSpy` and `NetworkTimedHandler`, each owning its bodies
+ *   as members.  The class's type-only header, read by the mediator band, is `Network/gamespy_interface_types.h`.
+ * RANGE. .text 0x8041B194-0x8041DF10 (66 functions); .data 0x806031A0-0x80603714 (the callback set, the log strings in
+ *   retail's order, the thread vtable), .bss 0x806D3650-0x806D3670, .sdata 0x80793990-0x807939A0, .sbss
+ *   0x80794CE0-0x80794CE8, extab, extabindex.  The left edge is `NetworkReflectService`'s end (string 0x80603154, table
+ *   0x80603190).  Two more TUs probably start inside: the thread's vtable 0x806036A0 is followed by the peer's strings
+ *   0x806036B0 (a vtable-to-string seam at 0x8041D750, `NetworkPeerGameSpy`, vtable 0x80603714), and the timed handler's
+ *   vtable 0x80603740 rises above the peer's (0x8041DE20), so the `.data` right edge 0x80603714 is interim; the data
+ *   tools defer `lbl_80603740` (span-blocked) and the `.sdata` `sRejectMessageNG`, `sEmptyString`, `sPortFormat`.
+ * FLAGS. `-O3 -inline noauto -pool off` (configure.py; measured in docs/network.md, playbook 43); file-scope
+ *   `#pragma peephole off` (retail keeps the unfused `clrlwi`/`extsb` + `cmpwi` forms, so narrow stores are compound
+ *   assignments and shift-and-mask bytes are `(v >> 16) & 0xFF`, playbook 95).
+ * NAMES. The class from its methods (`__ct__22GameSpyInterfaceThreadFv`, `tGameSpyInterface`, `step`,
+ *   `publishRequest`); the six `gt2*Callback` bodies and `DWC_GetLastErrorEx` from the pool strings.  GUESSes from call
+ *   shape or opcode: the unsplit callees (the `gt2*` API, `DWC_*`, `DWCi_natProbe*`, `sendReq*`, `hasMultipleRefs60d4`,
+ *   `errorRecordCode613c`, `getErrorInfo654c`, `getGameInfo2d1c`), `natNegProgressCallback`, `natNegCompletedCallback`,
+ *   `copyGameSpyAddress`, `NetworkReflectService::notify` and the peer's `armDrop`/`init` (the base's +0x20/+0x24
+ *   slots).
+ * RESIDUALS. `NetworkPeerGameSpy::receive`: retail materialises the error-source constant as a relocation
+ *   (`@eti_80030018+9/+10`) where ours is the immediate, and keeps a `clrlwi` ours drops.  `tGameSpyInterface`: the
+ *   hoisted high word of `ticks * 17` is a fresh `li r0, 0` where retail reuses r24.  `NetworkTimedHandler::create`:
+ *   retail leaves the `lis` half of the vtable address in r4 as `init`'s unused first argument.
+ *   `NetworkTimedHandler::init`, `publishRequest`, `step`: register colouring.  `.data` 1392 of 1396 B until the cut;
+ *   `extab` lacks a 20-byte cleanup record against `dtor_803CA338` (the peer's member-mutex destructor), which needs a
+ *   real `NetworkPeerBase` derivation with a member mutex in the peer TU.
+ * SHAPES. Every call through a foreign object's vtable goes through a declared `virtual` (the only shape MWCC emits as
+ *   `lwz r12,0x0(r3)` / `lwz r12,<slot>(r12)`).  `~GameSpyInterfaceThread` comes first in the class (the vtable pointer
+ *   sits where the first virtual is declared, playbook 98); as the key function it makes this unit emit `__vt__` and
+ *   `__dt__`.  The error record is passed by value through `PatInterface`'s inline `postError` overload (playbook 97).
+ *   `unregisterReceiver` keeps an element pointer across its call (playbook 96); `executeError` copies the two values it
+ *   logs so the switch re-reads the stack; `isQueued` is the plain three-way return; a `switch` whose cases all leave 0
+ *   is `break` + one trailing `return 0;` (playbook 34).  `profile_4485` is five `u32` at the odd offset 0x4485 (the
+ *   class's `#pragma pack(1)`); the connect call's out parameter is one `GT2Connection`.  The callback set is defined
+ *   ahead of the first literal (MWCC emits `.data` in definition order).
  */
 
 #include "types.h"
@@ -738,9 +720,8 @@ void GameSpyInterfaceThread::resetSlots()
     }
 }
 
-/* Stores the thread's vtable, publishes the singleton, resets the tables and starts its worker
- * thread.  The map row at 0x8041C66C is the mangled constructor name, and callers only reach it as
- * `new GameSpyInterfaceThread()`. */
+/* Stores the thread's vtable, publishes the singleton, resets the tables and starts its worker thread; callers
+ * reach it only through a `new` expression. */
 GameSpyInterfaceThread::GameSpyInterfaceThread()
 {
     sGameSpyInterfaceThread = this;

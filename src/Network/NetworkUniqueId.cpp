@@ -1,31 +1,21 @@
 /*
- * Network/NetworkUniqueId.cpp - the network unique id: the 14-byte address record helpers and the
- *   `NetworkUniqueId` stream sink built around one.
- *
- * SECTIONS. extab 0x8001B918..0x8001B96C; extabindex 0x8003BAC0..0x8003BB20; .text 0x803F84B8..0x803F89CC;
- *   .data 0x805FC9D0..0x805FCC98 (the log strings, then the table 0x805FCC58).
- *
- * WHAT IT IS. Names from the unit's own log strings: the record helpers `NetworkUniqueIdIsValid`,
- *   `NetworkUniqueIdImportFrom`, `NetworkUniqueIdExportTo` and `NetworkUniqueIdEquals` (C-style, with `this`/`arg`
- *   in their messages), then the class's constructor, `isValid`, `importFrom`, `exportTo` and `equals`
- *   (`NetworkUniqueId::exportTo`/`::equals` strings), and the two out-of-line overrides that forward to the sink
- *   (`bind` and `slot_2C`, the table's +0x1C/+0x2C - their names are the sink's own GUESSes).  `isValid` and
- *   `importFrom` log nothing, so their names are GUESSes from what they do.  The destructor (the table's +0x08) is
- *   compiled in `Network/NetworkPeerBase.cpp`, whose range starts with its only copy.
- *
- * WHY IT SITS HERE. the network pilot round 3 recut of the phase 4 stub `Network/NetworkCommunityPat.cpp`
- *   (0x803E4888..0x803FCC34): each cut is a function start where the `.data` run, the `.sdata2` pool and the
+ * Network/NetworkUniqueId.cpp - the network unique id: the 14-byte address record helpers and the `NetworkUniqueId`
+ *   stream sink built around one.
+ * RANGE. .text 0x803F84B8-0x803F89CC (11 functions); .data 0x805FC9D0-0x805FCC98 (the log strings, then the table
+ *   0x805FCC58), extab, extabindex.  Each cut is a function start where the `.data` run, the `.sdata2` pool and the
  *   extab/extabindex tables all change owner together.
- *
- * FLAGS. `cflags_network` with `-O3` and `-pool off` like the transport siblings (each log string is addressed
- *   with its own `lis`/`addi`); file-scope `#pragma peephole off`, and `#pragma dont_inline on` (retail calls the
- *   record helpers from the members; `-inline auto` folds them).
- *
- * RESIDUALS. Every `.text` row is 100 %; `.text`, `extab` and `extabindex` are byte-identical in size.  `flipcheck`
- *   is NOT READY on `.data` alone: the object emits 0x2C4 B against the claim's 0x2C8 - the table is 0x3C B and the
- *   claim ends on the 8-aligned start of the next unit's `.data`, so the last 4 B are alignment the object does
- *   not carry (a trial `Matching` flip linked `main.dol` with the right SHA-1; the unit stays
- *   `NonMatching` while the gate's flipcheck refuses the short claim).  The log strings pair by address but not by name (`@NNN` against the map's `lbl_805FC9D0..`).
+ * FLAGS. `-O3 -pool off` (configure.py) like the transport siblings (each log string is addressed with its own
+ *   `lis`/`addi`); file-scope `#pragma peephole off` and `#pragma dont_inline on` (retail calls the record helpers from
+ *   the members; `-inline auto` folds them).
+ * NAMES. From the unit's own log strings: `NetworkUniqueIdIsValid`, `NetworkUniqueIdImportFrom`,
+ *   `NetworkUniqueIdExportTo`, `NetworkUniqueIdEquals` (C-style, `this`/`arg` in their messages) and
+ *   `NetworkUniqueId::exportTo`/`::equals`; `isValid` and `importFrom` log nothing and are GUESSes; `bind`/`slot_2C`
+ *   (the table's +0x1C/+0x2C) are the sink's.
+ * RESIDUALS. none in `.text`; `.data` is 0x2C4 B against the claim's 0x2C8 (the claim ends on the 8-aligned start of the
+ *   next unit's `.data`), so `flipcheck` refuses the flip although a trial `Matching` link keeps the DOL SHA-1; the
+ *   log strings pair by address, not by name (`@NNN` against the map's `lbl_805FC9D0..`).
+ * SHAPES. The destructor (the table's +0x08) is compiled in `Network/NetworkPeerBase.cpp`, whose range holds its only
+ *   copy.
  */
 
 #include "Network/NetworkUniqueId.h"

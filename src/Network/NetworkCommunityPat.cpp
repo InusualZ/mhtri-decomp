@@ -1,54 +1,36 @@
 /*
- * Network/NetworkCommunityPat.cpp - the community layer `NetworkCommunityPat` (`.text` 0x803F0294..0x803F6458).
- *
- * SECTIONS. extab 0x8001B178..0x8001B780; extabindex 0x8003B544..0x8003B8F8; .text 0x803F0294..0x803F6458; .data
- *   0x805FC4D0..0x805FC820 (the deleteRequest string, the eight friend-request descriptors, the event switch's jump table,
- *   the table 0x805FC728 and the two inline `getArgument` strings - those follow the table because the inline copies are
- *   generated last, not a seam); .sdata 0x80793948..0x80793950; .sdata2 0x8079C7A8..0x8079C7B8.
- *
- * WHAT IT IS. the `NetworkCommunityPat` class (constructor 0x803F02C4, table 0x805FC728 = `__vt__19NetworkCommunityPat`,
- *   allocation 0x25EC), derived from `NetworkCommunity`: the community session handlers of the base's twelve request
- *   slots, a second pool of nine friend-request slots with their own record (`NetworkCommunityPatRequest`), the profile
- *   writers and the Pat event callback.  The request records' members are inline: retail emits each out-of-line copy
- *   right after the first function that calls it (the base record's `getRecord`/`setRecord`/`getArgument` included).
- *   The class name is its own "NetworkCommunityPat::deleteRequest" string's; every other name is derived from what the
- *   bodies store, compare and pass (GUESS), the `setCollectionLog*` helpers by analogy with `NetworkLayerPat`'s siblings.
- *
- * WHY IT SITS HERE. the network pilot round 3 recut shrank the phase 4 stub (0x803E4888..0x803FCC34) to the class's own
- *   run: `NetworkLayerPat` and the base `NetworkCommunity` come before it, `NetworkFileFetcher` and the others after.
- *
- * FLAGS. `-O3 -inline noauto` (configure.py carries the measurement).  File-scope `#pragma dont_inline on`: retail calls
- *   every inline member out of line, the generated member-record constructors and destructors included.  File-scope
- *   `#pragma peephole off` (the `__ptmf_null` copy keeps its unfused lis/addi/lwz).  Shapes the bodies depend on: the
- *   records a handler delivers are declared in the case block that fills them (retail constructs them there), the event
- *   switch's cases follow retail's body order, and `move`'s 1.0 is the named constant `communityProfileSendInterval`
- *   defined after its user (a literal is pooled and loaded in the other order: 97.97 against 100.00).
- *
- * POOL (splitcheck's `pool` FAIL is not a seam). .sdata2 holds `communityProfileSendInterval` (0x8079C7A8, read by
- *   `move`), the inline record `reset`'s 0.0 and `clear`'s -3600.0; retail emits the named constant first, this source
- *   emits it after the two literals because its definition has to follow `move` (defined before, MWCC folds it into a
- *   literal).  Every word is read only from this range.
- *
- * RESIDUALS. `__dt__17NetworkFriendInfoFv` (93.82): retail re-extends the flag (`extsh r0,r4`), the empty inline
- *   destructor here compares r4 directly - 4 bytes short, so the unit's `.text` is 0x61C0 against 0x61C4; a virtual and
- *   a non-virtual destructor score the same.  `writeProfileRange_50` (99.81): one `add` keeps its operands swapped.
- *   `onPatEvent` (99.93): the strtok loop's token/index registers swap (r26/r27) and the two by-value error copies sit in
- *   named locals above retail's compiler temporaries (retail inlines `NetworkInstanceDispatch::postError(NetworkPostedError)`,
- *   which the file-scope dont_inline keeps out of line here).  .sdata2 order (above).  extab: two records differ by the
- *   same mutex-member action `NetworkCommunity` records.
- *
- * FOREIGN NAMES (the lane's requests `net3-b-ad17#1..#17`, integrated).  The community senders are
- *   `Network/PatInterface.cpp`'s, named from their Pat op-codes and the protocol's own `recvAns*` trace strings
- *   (request N, answer N+1): `sendReqTell` 245, `sendReqBinaryUser` 248, `sendReqUserSearchInfo` 265,
- *   `sendReqUserStatusSet` 269, `sendReqFriendAdd` 273, `sendReqFriendAccept` 276, `sendReqFriendDelete` 279,
- *   `sendReqFriendList` 281, `sendReqBlackAdd` 283, `sendReqBlackDelete` 285, `sendReqBlackList` 287.  So `blockPlayer`/
- *   `unblockPlayer` (BlackAdd/BlackDelete) replace the consumer's `sendFriendRequest`/`acceptFriendRequest`; the
- *   starters `inviteFriend` (it sends FriendAccept) and `sendFriendMessage` (FriendAdd with a text) keep the consumer's
- *   names for now.  `NetworkFriendInfo` is `menu/movie.cpp`'s (menu/movie.h), `strtok` MSL's.
- *   `setFriendTransferModeById` (NetworkLayerPat, `u8 mode`): retail passes `isFriend`/`isAcceptedPeer`'s result
- *   unnarrowed while the u8 parameter makes this caller emit a `clrlwi` - `handleUnblockPlayer` 100.00 -> 99.75 and
- *   `onPatEvent` 99.93 -> 99.81 against the old extern "C" `s32` spelling; a `u32` parameter restores both but lowers the
- *   callee (93.85 -> 91.15, 91.98 with a u8 local, 88.40 under peephole on), so the owner's u8 stays.
+ * Network/NetworkCommunityPat.cpp - the community layer `NetworkCommunityPat` (constructor 0x803F02C4, allocation
+ *   0x25EC), derived from `NetworkCommunity`: the session handlers of the base's twelve request slots, a second pool of
+ *   nine friend-request slots (`NetworkCommunityPatRequest`), the profile writers and the Pat event callback.
+ * RANGE. .text 0x803F0294-0x803F6458 (87 functions); .data 0x805FC4D0-0x805FC820 (the deleteRequest string, the eight
+ *   friend-request descriptors, the event switch's jump table, the table 0x805FC728, then the two inline `getArgument`
+ *   strings, generated last), .sdata 0x80793948-0x80793950, .sdata2 0x8079C7A8-0x8079C7B8, extab, extabindex.
+ * FLAGS. `-O3 -inline noauto` (configure.py; measured in docs/network.md).  File-scope
+ *   `#pragma dont_inline on` (retail calls every inline member out of line, the generated record ctors/dtors included)
+ *   and `#pragma peephole off` (the `__ptmf_null` copy keeps its unfused lis/addi/lwz).
+ * NAMES. The class name is its own "NetworkCommunityPat::deleteRequest" string's; every other name is a GUESS from what
+ *   the bodies store, compare and pass (the `setCollectionLog*` helpers by analogy with `NetworkLayerPat`'s).  The
+ *   senders are `Network/PatInterface.cpp`'s, named from their Pat op-codes and the `recvAns*` trace strings (request N,
+ *   answer N+1): `sendReqTell` 245, `sendReqBinaryUser` 248, `sendReqUserSearchInfo` 265, `sendReqUserStatusSet` 269,
+ *   `sendReqFriendAdd` 273, `sendReqFriendAccept` 276, `sendReqFriendDelete` 279, `sendReqFriendList` 281,
+ *   `sendReqBlackAdd` 283, `sendReqBlackDelete` 285, `sendReqBlackList` 287; hence `blockPlayer`/`unblockPlayer`
+ *   (BlackAdd/BlackDelete); `inviteFriend` (sends FriendAccept) and `sendFriendMessage` (FriendAdd with a text) keep the
+ *   consumer's names.  `NetworkFriendInfo` is `menu/movie.cpp`'s (`menu/movie.h`), `strtok` MSL's.
+ * RESIDUALS. `__dt__17NetworkFriendInfoFv`: retail re-extends the flag (`extsh r0,r4`), the empty inline destructor
+ *   here compares r4 directly - 4 bytes short (`.text` 0x61C0 against 0x61C4); a virtual and a non-virtual destructor
+ *   score the same.  `writeProfileRange_50`: one `add` keeps its operands swapped.  `onPatEvent`: the strtok loop's
+ *   token/index registers swap (r26/r27) and the two by-value error copies sit in named locals (retail inlines
+ *   `NetworkInstanceDispatch::postError(NetworkPostedError)`, kept out of line by the file-scope `dont_inline`).
+ *   `handleUnblockPlayer`/`onPatEvent`: `setFriendTransferModeById` (NetworkLayerPat) takes `u8 mode`, so this caller
+ *   emits a `clrlwi` retail lacks; a `u32` parameter restores both and lowers the callee, so the owner's u8 stays.
+ *   `.sdata2`: retail emits `communityProfileSendInterval` (0x8079C7A8) before the inline record `reset`'s 0.0 and
+ *   `clear`'s -3600.0, ours after (its definition has to follow `move`).  `extab`: two records differ by the
+ *   mutex-member action `NetworkCommunity` records.
+ * SHAPES. The records a handler delivers are declared in the case block that fills them (retail constructs them there);
+ *   the event switch's cases follow retail's body order; `move`'s 1.0 is the named constant
+ *   `communityProfileSendInterval` defined after its user (defined before, MWCC folds it into a pooled literal loaded
+ *   in the other order).  The request records' members are inline: retail emits each out-of-line copy right after the
+ *   first function that calls it.
  */
 #include "Network/NetworkCommunityPat.h"         /* the unit's own header */
 #include "Network/NetworkSessionManager.h"       /* networkInstance_initMutex, NetworkRequest_idCounter, NetworkVaState */

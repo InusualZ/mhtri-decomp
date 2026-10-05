@@ -1,18 +1,14 @@
 /*
- * Network/NetworkFetcherBase.cpp - the abstract file fetcher `NetworkFetcherBase` and its error record.
- *
- * SECTIONS. extab 0x8001B780..0x8001B790; extabindex 0x8003B8F8..0x8003B910; .text 0x803F6458..0x803F6524;
- *   .data 0x805FC820..0x805FC848 (the class table: a destructor and six empty slots).
- *
- * WHAT IT IS. The interface `NetworkFileFetcher` and `NetworkNullFetcher` derive from (declared in
- *   `Network/NetworkFileFetcher.h`): the error triple at +0x04 that `copyError` hands out and `setError` fills
- *   once.  The class name is a GUESS from the bodies; `copyError` is the map's.
- *
- * WHY IT SITS HERE. Cut out of `Network/NetworkFileFetcher.cpp` (request net3-c-47f5#1): the `.data` V->D seam at
- *   0x805FC848 (this table, then `onReply`'s jump table) - MWCC emits a TU's jump tables before its class tables,
- *   so one object cannot produce retail's base table, jump table, fetcher table order.
- *
- * FLAGS. `cflags_network` with `-O3` like the fetcher; `#pragma peephole off` and `#pragma dont_inline on` as there.
+ * Network/NetworkFetcherBase.cpp - the abstract file fetcher `NetworkFetcherBase` that `NetworkFileFetcher` and
+ *   `NetworkNullFetcher` derive from: the error triple at +0x04 that `copyError` hands out and `setError` fills once.
+ * RANGE. .text 0x803F6458-0x803F6524 (4 functions); .data 0x805FC820-0x805FC848 (the class table: a destructor and six
+ *   empty slots), extab, extabindex.  The right edge is the `.data` V->D seam at 0x805FC848 (this table, then
+ *   `onReply`'s jump table): MWCC emits a TU's jump tables before its class tables, so one object cannot produce
+ *   retail's base table, jump table, fetcher table order.
+ * FLAGS. `-O3` (configure.py) like the fetcher; file-scope `#pragma peephole off` and `#pragma dont_inline on` as there.
+ * NAMES. `NetworkFetcherBase` is a GUESS from the bodies (declared in `Network/NetworkFileFetcher.h`); `copyError` is
+ *   the map's.
+ * RESIDUALS. none.
  */
 
 #include "Network/NetworkFileFetcher.h"

@@ -1,4 +1,4 @@
-/* Declarations owned by `src/Network/net_session_close.*` (docs/plan.md 6.5 rule 2): a consumer includes this header instead of declaring the symbols itself. */
+/* Network/net_session_close.h - the declarations of `Network/net_session_close.cpp`. */
 #ifndef MHTRI_NETWORK_NET_SESSION_CLOSE_H
 #define MHTRI_NETWORK_NET_SESSION_CLOSE_H
 

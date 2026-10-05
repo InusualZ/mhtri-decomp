@@ -1,225 +1,72 @@
 /*
- * Network/NetworkWiiMediator.cpp - the `NetworkWiiMediator` unit (`.text` 0x80413450..0x80417BC0).
- *
- * ROUND 3 FOLD.  One TU: the mediator head 0x80413450..0x80413C64 (`mediatorEventCallback`, the
- * constructors and destructors, `getReflectService`, `update`, `isMessageRestricted`, `getCountryCode`,
- * `getLanguage` - formerly the tail of `Network/network_layer_io.cpp`), the class band
- * 0x80413C64..0x804155D4 (the original text below) and the opening part 0x804155D4..0x80417BC0 (the former unit
- * `Network/network_opening.cpp`, folded in byte-identical - its header follows the class band's, below).  Evidence:
- * the band's `.data` (the three jump tables, the opening strings and the two mediator tables 0x80602968/0x80602978)
- * reads as one TU's D/S/V run with no seam until V->D at 0x80602988, and the tables are stored by the constructor
- * 0x80413480 (0x80602968) and by 0x80413714 (0x80602978), inside the head.  The left cut is 0x80413450, not
- * 0x80413384: `NetworkRandom`'s table 0x806024A0 precedes the first jump table 0x806024B8, so `NetworkRandom`
- * (0x80413384..0x80413450) is `Network/NetworkPool.cpp`'s.  Sections: extab 0x8001C9B4..0x8001CD94,
- * extabindex 0x8003D278..0x8003D764, .rodata 0x80570E70..0x80570E98, .data 0x806024B8..0x80602988, .sdata2
- * 0x8079C874..0x8079C878.
- * The opening part keeps its file-scope pragmas (`auto_inline off`, `pool_data off`, peephole) from where it
- * starts, so the class band above it compiles as before.
- *
- * THE HEAD'S CLASSES.  `NetworkMediator` (table 0x80602978: its destructor 0x804136D0 and a pure `update`)
- * and `NetworkWiiMediator : NetworkMediator` (table 0x80602968: its destructor 0x80413724 and `update` 0x804138EC),
- * with the terms object `PatTerms` (`menu/PatTerms.h`, constructor/destructor in `menu/menu_plsearch.cpp`) as the
- * member at +0x6DD8; this unit emits both tables (the `.data` claim is byte-complete).  `NetworkMediator` is a GUESS
- * from the `sNetworkLibrary`/`sNetworkLibraryWii` pairing; `update`, `deleteNetworkPool` and the `flag_21` setters
- * `enableMediatorLinkError`/`disableMediatorLinkError` are GUESSes from the bodies.
- * The constructors and destructors sit under `#pragma peephole off` (retail stages the table address in r0 and keeps
- * `extsh`+`cmpwi` on the destructor flag).
- * The `.sdata2` claim starts at 0x8079C870 (the constructor's `0.0f`, then `initMediatorTerms`'s `1.0f`; NetworkPool's
- * only pool read is 0x8079C868).  Head residuals: `isMessageRestricted`, `getCountryCode`, `getLanguage`, 0x80413980/0x80413A34 (the five 4-byte words copied in
- * and out), `checkMediatorLink` (the SO link check) are unwritten; their callees are declared since 2026-10-05
- * (`SCCheckPCMessageRestriction`/`SCGetCountryCode`/`SCGetLanguage` in `SC/sc.h`, `SOGetInterfaceOpt` in `SO/soi.h`;
- * the voice path's in `ARC/arc.h`, `MSL_C/alloc.h` (`labs`) and `menu/menu_plsearch.h`).
- *
- * THE CLASS BAND (0x80413C64..0x804155D4) - its notes as written before the fold:
- *
- * Network/NetworkWiiMediator.cpp - the `NetworkWiiMediator` class band
- * (`.text` 0x80413C64..0x804155D4, 79 functions / 6490 B).
- *
- * BOUNDARY.  Left seam 0x80413C64 is **strong** (two signals): `tudiscover at
- * reflectInit__18NetworkWiiMediatorFPFllllPvPv_vPv` flags the `.data` jumptable run jump
- * `jumptable_806024B8 -> jumptable_8060277C` at 0x80413C64 *and* 0x80413E18 (share 0.090/0.086),
- * so the function above it (`getLanguage`, 0x80413C40..0x80413C64) is a different TU.  Right seam
- * 0x804155D4 is **weak** (`tudiscover at agreeReflect__18NetworkWiiMediatorFv`, share 0.247): the
- * class band may continue past it, but 0x804155D4 is the largest single jump the evidence offers and
- * the next function (`0x804155D4`, 0x9D8) opens a new shape.  Sections: `.text`
- * 0x80413C64..0x804155D4, `extab` 0x8001CA4C..0x8001CBF4, `extabindex` 0x8003D2F0..0x8003D524.
- *
- * RECONCILIATION.  This unit folds in the retired `Network/NetworkWiiMediator.c`, which owned the
- * 20-byte `getReflectPageBuffer` at **0x80413F3C inside this span** as a `Matching` unit.  That address
- * is this original TU's, so the class band owns it now; `getReflectPageBuffer`'s body is carried across
- * verbatim (5 instructions, 100 %).
- *
- * WHAT IT IS.  The mediator's account/opening/reflect query surface (the reflected class methods at
- * 0x8041416C..0x80414B88) plus the helpers around them; the jumptable-referenced 0x80414BF0..0x804155D4
- * block is the reflect sub-machine.  C++ (the mangled member names), so the class is declared in
- * `Network/NetworkWiiMediator.h` and every unmangled helper is `extern "C"`.
- *
- * FLAGS.  `cflags_network` + `-O3 -inline noauto` (the `Object(...)` line in `configure.py`), measured
- * over the whole unit: `-O4,p` leaves getAccountBan/Warning/WaitQueue at 42.86 and getReflectName3C at
- * 51.28 where `-O3` puts both at 100.00, and `-inline auto` scores validateReflectName 0.00 where
- * `-inline noauto` scores it 88.28; every other function is byte-identical under either `-inline`
- * setting (a 79-row report diff).  The `-O4,p` epilogue-swap / hoisted-`li` signature this band showed
- * (updatePatInterface180, updateTermVersion, resetMediatorFlags) is playbook 27's -O3 evidence, and the
- * two sibling units in the same library are already `-O3`.  `-Cpp_exceptions on` now comes from
- * `cflags_network` (flags-audit 2026-09-28), not a per-file pragma: the target object carries `extab`
- * 0x1a8 + `extabindex` 0x234 (one unwind record per frame-bearing function, 47 of them).
- *
- * NAMES.  The `NetworkWiiMediator::*` spellings are the runtime dump's and already in `symbols.txt`.
- * The 65 helpers answer only `zz_XXXXXXXX_` in the dump, so the registration batch named them from their
- * own code: the accessor/updater pairs after the field they touch (`getReflectField30` /
- * `setReflectField30`, `getReflectName3C` / `setReflectName3C`, `getReflectPageRange` /
- * `setReflectPageRange`), the singleton forwarders after the 0x803FE helper they call
- * (`updatePatField854` -> 0x803FE854, `queryOpeningFlag208` -> 0x803FE208), and the packet/reflect
- * helpers after what they do (`parseReflectPacket`, `buildReflectPacket`, `validateReflectName`,
- * `getReflectModeFromLanguage`, `isShiftJisLeadByte`).
- *
- * NAMING GUESSES (rule 6.5: a guess is stated, not hidden).  The 26 callees the bodies call that no
- * registered unit owns answered only `fn_XXXXXXXX` in the map, so they were renamed through `symedit.py`
- * in this pass and every one of those names is a GUESS: `fn_803FE388` -> `setPatRange`, `fn_803FE744` ->
- * `setPatReflectField30`, `fn_8041241C` -> `getNetworkPool`, `fn_8041A1C4` ->
- * the reflect service's constructor, `fn_80413BF8` -> `getCountryCode` and so on - each named for the
- * singleton (`PatInterface`) or the service (`NetworkReflectService`) it belongs to and the field or slot
- * it works on.  Within this file, `getReflectField30/34/38` and `getAccountQuery1..5` are positional (the
- * dump has no name and no caller reveals the field's meaning); `queryOpeningFlagNNN` and
- * The six 0x803FE helpers carry the names `Network/network_state.cpp` gave them
- * (`isSubState_8254_3` / `isSubState_894F_2..6`), which main's committed source already
- * called - those are semantic (the field and value each tests), not address-keyed.
- * `pat_*` / `line_table_*` / `buffer_*` field names come from the functions that use them.
- *
- * BODIES.  70 of 79 functions are at 100 %, and the unit's `.data` (the three jump tables) is
- * byte-complete.  The 9 residuals, largest first:
- *   - `isShiftJisLeadByte` 71.69 - retail evaluates the two byte ranges as four separate unsigned
- *     compares; MWCC folds each range into one `addi`/`clrlwi`/`cmplwi` and the `>= 224` test into
- *     branchless code, the same on -O4,p and for every spelling tried (`||`, nested `if`, a result
- *     variable, an `s32` parameter), so the fold is not reachable from the source side.
- *   - `setMediatorBufferA`/`setMediatorBufferB` 80.00 - retail schedules the `addi r3,r3,0x7C` before
- *     the `li r5,0x106` of the same `memcpy` call; MWCC emits them the other way round for the store
- *     direction only (the load direction, `getMediatorBuffer*`, is byte-identical).  Tried as a typed
- *     array, `&self->buffer[0]` and an explicit `(u8*)self + 0x7C`.
- *   - `parseReflectPacket` 91.27 - the lead-byte guard lands in `cr1` where retail uses `cr0` (retail's
- *     `&&` chain reuses one condition register, ours needs a second because the `>= 0xA0` test is
- *     consumed by a later `bne`), and retail re-reads `in[1]` with a `lbz`+`extsb` before the
- *     `out[1] = in[1] - 32` store where ours keeps the byte live.  The switch and the if-chain spelling
- *     of the nine symbol-map cases emit the same object.
- *   - `parseReflectLines` 96.31 - one instruction (retail keeps `mr r0,r28` before the `*table = text`
- *     store; MWCC stores the pointer directly).  A named temporary and a `#pragma peephole off`
- *     around the function both leave it at 96.31.
- *   - `buildReflectPacket` 99.94 - byte-identical instructions, same 344 B; the last 0.06 is a
- *     relocation/address artefact of the split (no `.rela.text` record in this function).
- *   - `updateServerTime` 98.46 - the 64-bit tail `return 0` emits `li r3,0` where retail emits
- *     `li r4,0` + `mr r3,r4`.
- *   - `getReflectPage` 96.25 - `mr r4,r31` where retail masks the `u8` page (`clrlwi r4,r31,24`) before
- *     the call; an explicit `(u32)` widening cast does not reproduce it.
- *   - `isNameSymbolChar` 96.43 - the `u8` local's mask lands in `r3` where retail masks into `r0` and
- *     keeps the raw parameter in `r4`; declaring the parameter `u8` fixes the mask but costs
- *     `validateReflectName` 3.45 (the caller's `char` -> `u8` conversion), so the local spelling stays.
- *
- * SOLVED THIS PASS (measured before -> after).  `initializeNetworkMediator` 1.89 -> 100, `reflectInit`
- * 88.34 -> 100, `setMediatorState68A` 91.25 -> 100, `isNameSymbolChar` 91.67 -> 96.43, `buildReflectPacket`
- * 95.93 -> 99.94; unit 95.09 -> 98.89, 67 -> 70 functions at 100 %.
- *
- * THE SHAPE THAT CLOSED `initializeNetworkMediator` AND `reflectInit` (playbook-worthy).  Both tail
- * residuals are the same one instruction - a `mr r31,r3` between `bl __nw__FUl` and the null check -
- * and it is **not** reachable from `T* p = (T*)operator new(n); if (p != NULL) ctor(p);`: MWCC coalesces
- * that copy away.  It appears when the allocation is a real **`new` expression whose constructor is
- * called** - with `-Cpp_exceptions on` (the lib's setting) the new-expression's value must survive
- * the constructor for the unwind path, so MWCC keeps it in a callee-saved register and emits the copy.
- * The three classes therefore each carry a declared (out-of-line) ctor plus a padding member that makes
- * `sizeof` the size the allocation passes to `operator new` (0xD640 / 0x816C / 0x44A0), and the three
- * allocation sites are `new PatInterface();` / `new NetworkReflectService();` /
- * `new GameSpyInterfaceThread();`.
- *
- * LINK INPUTS (cleared this pass - the unit could not link before it).  `objdiff` scores a `bl` by its
- * instruction whatever name it carries, which is why the report said 100 % for these sites while the
- * linker had nothing to resolve them against: the three `new` sites and the thread accessor referenced
- * four names **no map row and no link input carried** - `__ct__12PatInterfaceFv`,
- * `__ct__21NetworkReflectServiceFv`, `__ct__22GameSpyInterfaceThreadFv` and
- * `getGameSpyInterfaceThread`, all four `*UND*` with an empty provider set - so a flip would have
- * failed with `undefined:`.  The map now carries the compiler's own spellings, each defined by a link
- * input: `fn_803FCC34` -> `__ct__12PatInterfaceFv` (0x803FCC34) and `constructReflectService` ->
- * `__ct__21NetworkReflectServiceFv` (0x8041A1C4), both unowned bands whose symbols the `new` sites
- * already spelled that way; `create__22GameSpyInterfaceThreadFv` -> `__ct__22GameSpyInterfaceThreadFv`
- * (0x8041C66C), whose owner `Network/GameSpyInterfaceThread.cpp` turned its `create()` into the class's
- * constructor in the same change; and `fn_803D6A98` -> `GameSpyInterfaceThread_getInstance`
- * (0x803D6A98, `Network/NetworkSessionManager.cpp`), with the referrers in `Network/GameSpyInterfaceThread.h` and
- * `src/Network/GameSpyInterfaceThread.cpp`.  Re-measured: every `.text` row and the whole-project progress are
- * unchanged, and `flipcheck.py` reports exactly the four complaints it did before, no new one.
- *
- * Those four rows were **renamed again** by `worker/fn-803d3ce8-2477`, to the owners' own definition
- * spellings (the map rows at 36030, 36676, 36678 and 57701), and the referrers this file and
- * `src/Network/GameSpyInterfaceThread.cpp` carried were left on the old ones - `flipcheck.py` then reported "3
- * referenced symbol(s) are defined by nothing a flip can use - clearPatInterface,
- * getGameSpyInterfaceThread, isPatInterfaceReady" for this unit.  They are spelled
- * `GameSpyInterfaceThread_getInstance`, `PatInterface_clear` and `PatInterface_isReady` here now, and
- * each referrer's **signature** is unchanged: the target passes the pointer in r3 (`bl getInstance_`
- * followed by `bl PatInterface_clear` and `bl PatInterface_isReady`), so the argument stays and only
- * the name moved.
- *
- * .data.  The three jump tables are `jumptable_806024B8` (0x2C4, 177 entries), `jumptable_8060277C`
- * (0x28, 10) and `jumptable_806027A4` (0x80, 32); they tile exactly 0x806024B8..0x80602824 in the same
- * order as the three functions' `.text` addresses, so the range is this TU's `.data` section and is
- * claimed in `splits.txt` (playbook 53).  MWCC emits each table under an anonymous local name while
- * the map calls it `jumptable_<addr>`, so objdiff still reports the tables' relocations as unpaired
- * even though the section sizes and bytes line up - the same shape `tools/elf/objextab.py` fixes for
- * `@etb_`/`@eti_`, wanted here for `.data`.
+ * Network/NetworkWiiMediator.cpp - `NetworkWiiMediator`: the head (`mediatorEventCallback`, the constructors and
+ *   destructors, `getReflectService`, `update`, the SC/SO queries), the class band (the account/opening/reflect query
+ *   surface and the reflect sub-machine) and the opening part (the game-info copy pair, the terms entry points, the
+ *   transfer-slot family and the opening/EC steps).  C++; every unmangled helper is `extern "C"`.
+ * RANGE. .text 0x80413450-0x80417BC0 (165 functions); .rodata 0x80570E70-0x80570E98 (read by 0x80416A30), .data
+ *   0x806024B8-0x80602988, .sdata2 0x8079C870-0x8079C878 (the constructor's 0.0f, `initMediatorTerms`'s 1.0f), extab,
+ *   extabindex.  The `.data` (three jump tables, the opening strings, the two mediator tables) is one D/S/V run with no
+ *   seam until V->D at 0x80602988.  The left cut is 0x80413450, not 0x80413384: `NetworkRandom`'s table 0x806024A0
+ *   precedes the first jump table 0x806024B8, so `NetworkRandom` is `Network/NetworkPool.cpp`'s.
+ * FLAGS. `-O3 -inline noauto` (configure.py; measured in docs/network.md: the `-O4,p` epilogue-swap /
+ *   hoisted-`li` signature of playbook 27).  The constructors and destructors sit under `#pragma peephole off` (retail
+ *   stages the table address in r0, keeps `extsh`+`cmpwi` on the destructor flag); the opening part keeps its file-scope
+ *   `#pragma peephole off` (retail's `extsb`+`cmpwi` on the slot argument), back on around `setMediatorTransferMode` and
+ *   `setPatTermsFlag` (the raw `stb` of a u32), `#pragma auto_inline off` (retail calls `clearTransferQueue`) and
+ *   `#pragma pool_data off` (each log string its own `lis`/`addi`), from where it starts.
+ * NAMES. The `NetworkWiiMediator::*` spellings are the runtime dump's, `ECStart`/`openingStart`/`openingStop` the
+ *   strings'. GUESSes: `NetworkMediator` (the `sNetworkLibrary`/`sNetworkLibraryWii` pairing), `update`,
+ *   `deleteNetworkPool`, `enableMediatorLinkError`/`disableMediatorLinkError` (the `flag_21` setters); the helpers
+ *   after the field they touch (`getReflectField30`, `getReflectName3C`, `getReflectPageRange`;
+ *   `getReflectField30/34/38` and `getAccountQuery1..5` are positional; the `pat_*`/`line_table_*`/`buffer_*` fields
+ *   from the functions that use them), the singleton forwarders after the PatInterface helper they call
+ *   (`updatePatField854`, `queryOpeningFlag208`), the packet helpers after what they do (`parseReflectPacket`,
+ *   `buildReflectPacket`, `validateReflectName`, `getReflectModeFromLanguage`, `isShiftJisLeadByte`); the opening
+ *   members (the ones other units call keep a C name: `setGameInfo2d1c`, `initMediatorTerms`, `setMediatorTransfer*`)
+ *   and the callees named in their owners' headers (`reportPatError`, `notifyPatEvent`, `openPatInterface`,
+ *   `NetworkPool::start`), `NetworkPool::isECStarted`; the terms wrappers 0x80416800..0x80416C18 (`cancelTermsUpdate`,
+ *   `getTermsProgressLevel`, `getMediatorTermsProgress*`, `set/getMediatorTermsFlag`, `isPatTermsReady`,
+ *   `set/getPatTermsFlag`) and the `menu/menu_plsearch.cpp` callees (`initPatTerms`, `requestPatTermsCheck`,
+ *   `requestPatTermsUpdate`, `cancelPatTermsUpdate`, `getPatTermsProgress`).  The six PatInterface sub-state tests keep
+ *   their semantic names (`isSubState_8254_3`, `isSubState_894F_2..6`).
+ * RESIDUALS. 34 rows unwritten (objdiff scores them zero): the head's word copies, `isMessageRestricted` and
+ *   `checkMediatorLink` (0x80413980..0x80413BE0), `getCountryCode`/`getLanguage` (0x80413BF8..0x80413C64); the word
+ *   filter 0x804155D4 (2520 B), `postMediatorRecord` and the `NetworkPool` forwarding wrappers (0x804155D4..0x80416120,
+ *   0x804161D0..0x804165A8); `readVoice` (0x80416DB0); the sound and voice helpers 0x80417080..0x804172CC.
+ *   `flipcheck`: 22 functions retail's `.comment` marks force-active are not marked in ours (row 36: unreferenced, the
+ *   linker would deadstrip them) - `disableMediatorLinkError`, `getMediatorField24`, `updateServerTime`,
+ *   `queryOpeningFlag250`, `queryOpeningFlag290`, `getAccountQuery1..5`, `isShiftJisLeadByte`, `ECStart` and others;
+ *   `.rodata` 0x22 against 0x28.  Partial rows:
+ *  - `isShiftJisLeadByte`: retail evaluates the two byte ranges as four unsigned compares; MWCC folds each range into
+ *    one `addi`/`clrlwi`/`cmplwi` and the `>= 224` test into branchless code for every spelling tried;
+ *  - `setMediatorBufferA`/`B`: retail schedules `addi r3,r3,0x7C` before the `memcpy`'s `li r5,0x106` (the store
+ *    direction only: the load direction, `getMediatorBuffer*`, is byte-identical; a typed array, `&self->buffer[0]` and
+ *    a byte offset tried);
+ *  - `parseReflectPacket`: the lead-byte guard lands in `cr1` where retail reuses `cr0`, and retail re-reads `in[1]`
+ *    (`lbz`+`extsb`) before the `out[1] = in[1] - 32` store; the switch and if-chain spellings emit the same object;
+ *  - `parseReflectLines`: retail keeps `mr r0,r28` before the `*table = text` store (a temporary and a scoped
+ *    `#pragma peephole off` tried);
+ *  - `buildReflectPacket`: the same instructions and size (344 B); a relocation artefact of the split;
+ *  - `updateServerTime`: the 64-bit tail `return 0` emits `li r3,0` where retail emits `li r4,0` + `mr r3,r4`;
+ *  - `getReflectPage`: `mr r4,r31` where retail masks the `u8` page (`clrlwi r4,r31,24`); a `(u32)` cast does not help;
+ *  - `isNameSymbolChar`: the `u8` local's mask lands in r3, retail r0 (a `u8` parameter costs `validateReflectName`);
+ *  - `popTransferRecord`: retail computes `&length` before the queue address for the first `memcpy`;
+ *    `pushTransferRecord`: r29-r31 permuted; `setGameInfo2d1c`: the title length in r29 where retail reuses r28;
+ *  - `.data`: MWCC names the jump tables anonymously while the map calls them `jumptable_806024B8` (177 entries),
+ *    `jumptable_8060277C` (10), `jumptable_806027A4` (32), so objdiff reports their relocations unpaired.
+ * SHAPES. `NetworkMediator` (table 0x80602978: destructor 0x804136D0, a pure `update`) and `NetworkWiiMediator :
+ *   NetworkMediator` (table 0x80602968: destructor 0x80413724, `update` 0x804138EC) are emitted here (rule 10), with
+ *   `PatTerms` (`menu/PatTerms.h`) as the member at +0x6DD8.
+ *  - `initializeNetworkMediator` and `reflectInit` allocate with real `new PatInterface();` / `new
+ *    NetworkReflectService();` / `new GameSpyInterfaceThread();` (playbook 62): each class has a declared constructor
+ *    and a padding member making `sizeof` the allocation size (0xD640 / 0x816C / 0x44A0);
+ *  - the slot range test is `slot < 0 || 4 <= slot` with an early return; the transfer queue is one flat array indexed
+ *    by `slot << 12`; `applyEvent` takes the code as `s32` (the `addis` before the unsigned case compares);
+ *  - each terms leaf accessor sits right after its first caller, the layout MWCC gives an uninlined inline function;
+ *  - `getNASToken` returns the token inside `DWCSvlResult` (`DWCi/dwc_nasfunc.h`);
+ *  - `NetworkPool::isECStarted` (0x8041793C) is defined here: retail emits the pool's accessor in this range.
  */
 
-/*
- * THE OPENING PART (0x804155D4..0x80417BC0) - the notes of the former `Network/network_opening.cpp`:
- *
- * transfer slots (the `NetworkWiiMediator::ECStart()` / `openingStart()` / `openingStop()` strings).
- *
- * `.text` 0x804155D4..0x80417BC0.  Sections: extab 0x8001CBF4..0x8001CD94; extabindex 0x8003D524..0x8003D764;
- * .rodata 0x80570E70..0x80570E98 (read by 0x80416A30); .data 0x80602824..0x80602968; .sdata2 0x8079C874..0x8079C878 (read by `initMediatorTerms`).
- *
- * WHAT IT IS.  Methods of `NetworkWiiMediator` (the strings name the class): the game-info copy pair, the
- * terms entry points, the transfer-slot family (a 0x1000-byte record queue, an activity byte, a timer and a
- * mode record per slot, all in the mediator's fields from +0x2D96) and the opening/EC steps.  The functions
- * other units already call by a C name (`setGameInfo2d1c`, `initMediatorTerms`, `setMediatorTransfer*`, ...)
- * keep it; the ones no source names yet are members (`NetworkWiiMediator::openTransferSlot`, ...).
- *
- * NAMES.  `ECStart`, `openingStart` and `openingStop` are the strings' own; every other member name is a
- * GUESS from the body (the field it reads or writes), and so are the callees this pass named in their
- * owners' headers (`reportPatError`, `notifyPatEvent`, `openPatInterface`, `mediatorEventCallback`,
- * `NetworkPool::start`/`isECStarted`).  The slot family's fields are named in Network/NetworkWiiMediator.h.
- * `NetworkPool::isECStarted` (0x8041793C) is the pool's accessor, emitted in this range.
- *
- * BOUNDARY.  The base library class `sNetworkLibrary` that followed (0x80417BC0..0x8041891C) is its own unit,
- * `Network/sNetworkLibrary.cpp`, with the whole `.data` and `.sbss` this unit used to claim (its header has the
- * seam evidence); the worker-thread entry points after it are `Network/sNetworkLibraryWii.cpp`'s.  `.data`
- * 0x80602824..0x80602968 is the five strings only the opening steps read (emitted here: 321 of the claimed 324 B,
- * the rest is the trailing alignment).  The two tables after them (0x80602968, 0x80602978)
- * close this TU's `.data` by MWCC's order but are read by `Network/network_layer_io.cpp` and are code-pointer
- * tables (rule 10), so they stay unclaimed until a class here emits them.
- *
- * FLAGS.  `-O3` in place of the lib's `-O4,p` (configure.py).  `#pragma peephole off` (retail keeps `extsb` +
- * `cmpwi` on the slot argument: getTransferSlotFlag 31.25 -> 93.44 -> 100 with the range spelling below),
- * back on around `setMediatorTransferMode` (its raw `stb` of the u32 mode: 95.96 -> 100); `#pragma
- * auto_inline off` (retail calls `clearTransferQueue` where the lib's `-inline auto` inlines it); `#pragma
- * pool_data off` (each log string its own `lis`/`addi`).  Shapes: the slot range test is written
- * `slot < 0 || 4 <= slot` with an early return (MWCC folds `slot >= 4` into one unsigned compare), the queue
- * is one flat array indexed by `slot << 12`, and `applyEvent` takes the code as `s32` (the `addis` before the
- * unsigned case compares).
- *
- * RESIDUALS.  `popTransferRecord` 97.19 (retail computes `&length` before the queue address for the first
- * `memcpy`, and keeps the activity byte's address in r5); `pushTransferRecord` 98.71 (callee-saved registers
- * r29-r31 permuted; declaration order and a pointer-free spelling measured, neither moves it);
- * `setGameInfo2d1c` 99.85 (the title length lands in r29 where retail reuses r28).  `getNASToken` returns
- * the token inside `DWCSvlResult` (owner `DWCi/dwc_nasfunc.h`).
- *
- * UNWRITTEN.  The word filter 0x804155D4 (2520 B) and `postMediatorRecord`; the forwarding wrappers over the
- * `NetworkPool` singleton 0x80416028..0x80416578 (its methods are `Network/network_layer_io.cpp`'s, unnamed);
- * the sound helpers 0x804170D8..0x804171A4.
- *
- * TERMS WRAPPERS (0x80416800..0x80416C18, written from request net2-l4-cff5#3).  Every name this pass gave -
- * `cancelTermsUpdate`, `getTermsProgressLevel` (a forwarding thunk), `getMediatorTermsProgressLevel`,
- * `getMediatorTermsProgress`, `set/getMediatorTermsFlag`, the leaf accessors `isPatTermsReady` and
- * `set/getPatTermsFlag`, and the `menu/menu_plsearch.cpp` callees `initPatTerms`, `requestPatTermsCheck`,
- * `requestPatTermsUpdate`, `cancelPatTermsUpdate`, `getPatTermsProgress` - is a GUESS from the bodies.  Each leaf
- * accessor sits right after its first caller, the layout MWCC gives an uninlined inline function.
- * `setPatTermsFlag` takes a `u32` under `#pragma peephole on` (the raw `stb`, like `setMediatorTransferMode`);
- * a `u8` parameter puts a `clrlwi` in it (47.50) or in `setMediatorTermsFlag` (96.25).
- */
 #include "types.h"
 #include "Network/NetworkWiiMediator.h"
 #include "Network/PatInterface.h"            /* the singleton's Pat accessors */
@@ -294,9 +141,8 @@ s32  buildReflectPacket(NetworkWiiMediator* self, const char* text, s32* skipCou
 
 } /* extern "C" */
 
-/* The network singleton the band forwards to: its owner's header (`enemy/em020_ai.h`) spells it `NetworkInstance`, and
- * this band holds it as the `PatInterface` it is (`Network/PatInterface.h`: the same object).  The opening part calls
- * the owner's spelling directly, so the two views meet here instead of in two declarations. */
+/* The network singleton as the `PatInterface` it is: its owner's header (`enemy/em020_ai.h`) spells it
+ * `NetworkInstance`, so the two views meet here instead of in two declarations. */
 static inline PatInterface* getPatInstance(void)
 {
     return (PatInterface*)getInstance_();
@@ -1174,9 +1020,8 @@ void parseReflectLines(NetworkWiiMediator* self, s32 source)
         table++;
     }
 }
-/* Decodes one reflect reply packet at `in` into `out`: the 0xC3 lead-byte escapes, the
- * lower-case -> upper-case fold, and the symbol map the reflect service keys on.  Returns the number
- * of bytes written (0 or 1 has no meaning here: 1 for a decoded byte, 2 for a two-byte escape). */
+/* Decodes one reflect reply packet at `in` into `out` (the 0xC3 lead-byte escapes, the upper-case fold, the symbol
+ * map); 1 for a decoded byte, 2 for a two-byte escape. */
 s32 parseReflectPacket(NetworkWiiMediator* self, char* out, const char* in, u32 unused4,
                        u32 length, s32 allowSymbolMap)
 {
@@ -1250,9 +1095,8 @@ s32 validateReflectName(NetworkWiiMediator* self, const char* name)
     }
     return count;
 }
-/* Scans one reflected name and reports the shape the reflect service has to be told about: the
- * characters a `*`-escape covers go into `skipCount` and the matched escape into `flags`, so the
- * caller knows which of the four name forms the text is.  Returns the character count left over. */
+/* Scans one reflected name: the characters a `*`-escape covers go to `skipCount` and the matched escape to `flags`
+ * (which of the four name forms it is); returns the characters left over. */
 s32 buildReflectPacket(NetworkWiiMediator* self, const char* text, s32* skipCount, s32* flags)
 {
     (void)self;
@@ -1782,9 +1626,8 @@ BOOL NetworkWiiMediator::isTransferSlotReady(s8 slot)
     return (transfer_activity[slot] & 0xF) != 0;
 }
 
-/* One step of the opening: start the library, wait for the NAS service-locator token, open the Pat
- * interface and run its login, then parse the reflect texts; every failure is reported to the Pat
- * interface's session handlers and stops the sequence. */
+/* One step of the opening: start the library, wait for the NAS token, open the Pat interface and log in, then parse
+ * the reflect texts; a failure is reported to the session handlers and stops the sequence. */
 void NetworkWiiMediator::openingStart()
 {
     sNetworkLibraryError error;

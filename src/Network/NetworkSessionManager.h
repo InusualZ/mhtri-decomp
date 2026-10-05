@@ -1,15 +1,8 @@
 /*
- * Network/NetworkSessionManager.h - the externs and layouts the Network session band needs.
- *
- * The types are unit-local (nothing else includes it yet): `NetworkSessionManager` and `NetworkRequest`
- * (`NetworkSessionStable` lives in `Network/NetworkSessionStable.h`) are reconstructed here from the range's own
- * disassembly (every field offset is the one the target instructions address).  `NetworkSessionManager`
- * is a CLASS with inheritance (rule 10): the base declares the 112-slot vtable the DOL carries at
- * 0x805FA908, so MWCC emits the table and the vptr store instead of the unit writing them by hand; the
- * 61 slots the original leaves 0 are pure virtual, and `NetworkSessionManagerPat` declares the override
- * that fills each one (see that class's own comment).  The
- * bit-stream writer and the neighbouring `fn_` helpers are declared `extern "C"` because their owners
- * are still unsplit; per brief section 6.5 rule 2 those sites are the named unsplit gap.
+ * Network/NetworkSessionManager.h - `NetworkSessionManager`, `NetworkRequest` and `NetworkSessionManagerPat` (owners
+ *   `Network/NetworkSessionManager.cpp` and `Network/NetworkSessionManagerPat.cpp`).
+ * SHAPES. The base declares the 112-slot table the DOL carries at 0x805FA908, so MWCC emits it (rule 10); the 61 slots
+ *   the original leaves 0 are pure, and `NetworkSessionManagerPat` declares the override that fills each one.
  */
 
 #ifndef NETWORK_NetworkSessionManager_H

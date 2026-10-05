@@ -1,32 +1,22 @@
 /*
- * Network/NetworkCommunity.cpp - the community layer base class `NetworkCommunity` (`.text` 0x803EF668..0x803F0294).
- *
- * SECTIONS. extab 0x8001B0A0..0x8001B178; extabindex 0x8003B448..0x8003B544; .text 0x803EF668..0x803F0294;
- *   .data 0x805FC390..0x805FC4D0 (the ten request descriptors, the deleteRequest string, the table); .sdata2
- *   0x8079C7A0..0x8079C7A8 (the record's 0.0f).
- *
- * WHAT IT IS. the base `NetworkCommunityPat` builds on - the counterpart of `NetworkLayer` (src/Network/NetworkLayer.cpp)
- *   for the community: twelve request slots, a pool of two `NetworkCommunityRequest` records, the lazy request starters
- *   and the table 0x805FC440 = `__vt__16NetworkCommunity`, emitted here from the class (key function the destructor).
- *   The class name is its own "NetworkCommunity::deleteRequest" string's; the descriptors are the named
- *   `NetworkCommunityHandler` globals `networkCommunityRequestDescNN`.  Every other name is derived from the slot
- *   offset, the field it touches or what the pat control passes (GUESS).
- *
- * WHY IT SITS HERE. the network pilot round 3 recut of the phase 4 stub `Network/NetworkCommunityPat.cpp`: the cut is a
- *   function start where the `.data` run, the `.sdata2` pool and the extab/extabindex tables all change owner together.
- *   Left edge 0x803EF668, not 0x803EF300: 0x803EF300..0x803EF668 are the `setCollectionLog*` siblings, which take a
- *   `NetworkLayerPat*` and close `NetworkLayerPat`'s band.
- *
- * FLAGS. `-O3 -inline noauto` like the sibling session/layer units (configure.py carries the evidence) and a file-scope
- *   `#pragma peephole off` (with it on, `reset` fuses the `__ptmf_null` copy into `lwzu`: 96.07 against 100.00).
- *
- * RESIDUALS. the constructor keeps its counter and pointer registers swapped in the pool loop (r31/r30 against retail
- *   r30/r31; the comma-form loop is the closest spelling, 99.55 - the two-statement pointer loop scores 96.94 and the
- *   indexed one 95.51).  extab: retail records the record's mutex as a member object (`~NetworkCommunityRequest` carries
- *   a member-destructor action naming 0x803CA338, the constructor none), while here the mutex is a byte block with
- *   explicit `networkInstance_initMutex`/`dtor_803CA338` calls - the mutex class is unowned and shared with
- *   `NetworkLayer`, `NetworkSessionManager` and five other units, so its reconstruction is an integrator item.
- *   .sdata2: the object carries the 4-byte 0.0f where the claim is 8 (the same shape as `NetworkLayer`).
+ * Network/NetworkCommunity.cpp - the community layer base class `NetworkCommunity` that `NetworkCommunityPat` builds on,
+ *   the counterpart of `NetworkLayer`: twelve request slots, a pool of two `NetworkCommunityRequest` records and the
+ *   lazy request starters.
+ * RANGE. .text 0x803EF668-0x803F0294 (27 functions); .data 0x805FC390-0x805FC4D0 (the ten request descriptors, the
+ *   deleteRequest string, the table 0x805FC440), .sdata2 0x8079C7A0-0x8079C7A8 (the record's 0.0f), extab, extabindex.
+ *   The left edge is 0x803EF668, not 0x803EF300: the `setCollectionLog*` siblings before it take a `NetworkLayerPat*`
+ *   and close `NetworkLayerPat`'s band.
+ * FLAGS. `-O3 -inline noauto` (configure.py; measured in docs/network.md); file-scope
+ *   `#pragma peephole off` (with it on, `reset` fuses the `__ptmf_null` copy into `lwzu`).
+ * NAMES. The class name is its own "NetworkCommunity::deleteRequest" string's; the descriptors are the named
+ *   `NetworkCommunityHandler` globals `networkCommunityRequestDescNN`; every other name is a GUESS from the slot offset,
+ *   the field it touches or what the pat control passes.
+ * RESIDUALS. `__ct__16NetworkCommunityFv`: the pool loop keeps its counter and pointer registers swapped (r31/r30
+ *   against retail r30/r31; the comma-form loop is the closest spelling of those measured).  `extab`: retail records
+ *   the record's mutex as a member object (`~NetworkCommunityRequest` names 0x803CA338), while here it is a byte block
+ *   with explicit `networkInstance_initMutex`/`dtor_803CA338` calls - the mutex class is unowned and shared with
+ *   `NetworkLayer`, `NetworkSessionManager` and five other units.  `.sdata2`: the object carries 4 B of the claimed 8.
+ * SHAPES. `__vt__16NetworkCommunity` is emitted here from the class (key function the destructor, rule 10).
  */
 #include "Network/NetworkCommunity.h"            /* the unit's own header */
 #include "Network/NetworkSessionManager.h"       /* networkInstance_initMutex, NetworkRequest_idCounter, NetworkVaState */

@@ -1,6 +1,6 @@
 /*
- * Network/NetworkCommunity.h - the declarations of `src/Network/NetworkCommunity.cpp`: the community layer base
- * class `NetworkCommunity` and its request record `NetworkCommunityRequest` (`.text` 0x803EF668..0x803F0294).
+ * Network/NetworkCommunity.h - the declarations of `Network/NetworkCommunity.cpp`: `NetworkCommunity` and its request
+ *   record `NetworkCommunityRequest`.
  */
 #ifndef MHTRI_NETWORK_NETWORKCOMMUNITY_H
 #define MHTRI_NETWORK_NETWORKCOMMUNITY_H

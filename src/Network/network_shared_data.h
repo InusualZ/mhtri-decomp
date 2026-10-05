@@ -1,26 +1,8 @@
 /*
- * Network/network_shared_data.h - the Network band's shared small-data pool, owned by the
- * data-only unit `Network/network_shared_data.cpp` (rule 12's named owner, playbook 54's model).
- *
- * The two runs this header's words live in -
- *   `.sdata2` 0x8079C690-0x8079C758 and `.sdata` 0x80793900-0x80793930 -
- * are the MWLD merge of several Network objects' own pools: one address is read by more than one TU
- * (`callers.py 0x8079C6EC` answers the Network transport units (`Network/NetworkPeerMcs.cpp` ...) and `Network/NetworkSessionManager.cpp`;
- * `0x8079C750` answers an unsplit (Network) object as well), so no single consumer can emit the run
- * and no consumer may claim it without taking rows another registered unit reads.  Giving the run one
- * owner is what lets every consumer *include this header* instead of declaring the words into its own
- * file - which is the rule-12 finding the declarations below used to be, in `Network/NetworkSessionManager.h`.
- *
- * The declarations moved here verbatim from that header (`networkMillisecondsPerSecond` ..
- * `networkSessionPatTimeOrigin`) in the same change that registered the owner; their names and their
- * value comments are that lane's, read off the DOL.  Nothing renames them.
- *
- * The run also holds the rows no consumer has needed to name yet (0x8079C690, 0x8079C6C8, 0x8079C6D0,
- * 0x8079C6D8, ..., still `lbl_8079C6xx` in the map).  They stay unnamed here on purpose: rule 7 names
- * a row from *what it holds and where it is used*, and the bodies that use them are unwritten, so the
- * lane that writes those bodies names them then and declares them in this header.  Playbook 29's
- * shape: a claimed pool is **declared, never defined** - the source here defines nothing and the
- * original bytes stay in the binary.
+ * Network/network_shared_data.h - the words of the Network band's shared small-data pool (owner: the data-only unit
+ *   `Network/network_shared_data.cpp`; every consumer includes this header instead of declaring them, rule 12).
+ * SHAPES. The pool is declared, never defined (playbook 29: the original bytes stay); rows no body reads yet stay
+ *   `lbl_8079C6xx` in the map until a body that uses them names them here.
  */
 
 #ifndef NETWORK_SHARED_DATA_H

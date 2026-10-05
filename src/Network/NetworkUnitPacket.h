@@ -1,7 +1,6 @@
 /*
- * Network/NetworkUnitPacket.h - the free functions of `src/Network/NetworkUnitPacket.cpp` (`.text` 0x803F89CC..0x803FAE9C): the packet, bit-stream writer, stream reader and stream queue entry points.
- * Moved here from `Network/NetworkCommunityPat.h` when the network pilot round 3 recut gave the range its own unit
- * (docs/plan.md 6.5 rule 2: the owner declares).
+ * Network/NetworkUnitPacket.h - the free functions of `Network/NetworkUnitPacket.cpp`: the packet, bit-stream writer,
+ *   stream reader and stream queue entry points.
  */
 #ifndef MHTRI_NETWORK_NETWORKUNITPACKET_H
 #define MHTRI_NETWORK_NETWORKUNITPACKET_H

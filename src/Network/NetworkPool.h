@@ -1,7 +1,6 @@
 /*
- * Network/NetworkPool.h - the declarations `src/Network/NetworkPool.cpp` owns (`.text` 0x804123F8..0x80413450:
- * the `NetworkPool` singleton, the NHTTP wrappers and `NetworkRandom`).  Moved here from
- * `Network/network_layer_io.h` when the round 4 fold gave the tail its own unit (docs/plan.md 6.5 rule 2).
+ * Network/NetworkPool.h - the declarations of `Network/NetworkPool.cpp`: the `NetworkPool` singleton, the NHTTP wrappers
+ *   and `NetworkRandom`.
  */
 #ifndef MHTRI_NETWORK_NETWORKPOOL_H
 #define MHTRI_NETWORK_NETWORKPOOL_H

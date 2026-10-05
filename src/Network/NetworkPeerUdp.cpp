@@ -1,28 +1,17 @@
 /*
- * Network/NetworkPeerUdp.cpp - the Udp peer: its table slots and deleting destructor (its constructor is outside
- *   the range - an unowned function stores the table) and the shared Udp scratch packet in `.bss`.
- *
- * One translation unit of the retail Network transport band, split out of `Network/network_transport.cpp`
- * (docs/network-transport-split.md holds the evidence and the confidence of each cut).  `.text`
- * 0x803CD248..0x803CD764, `.data` 0x805F9540..0x805F9570, extab 0x80019940..0x80019968, extabindex
- * 0x8003A134..0x8003A170, `.bss` 0x806D2C60..0x806D3240.
- *
- * NAMES.  `NetworkPeerUdp` slot names are GUESSes (the dump names
- * `setPeerAndSocket`/`sendPackets`/`receivePackets`).  Every name here is the map's or a derived one; the derived
- * ones are marked GUESS in `Network/network_transport_types.h`.
- *
- * TABLE.  Its table (0x805F9540, 0x30 B) is emitted from `NetworkPeerUdp::destroy`, the key function (rule 10);
- * the constructor lives outside the range (an unowned function at 0x803CA3BC stores the table).
- *
- * FLAGS.  C++ under `cflags_network` (`-Cpp_exceptions on` gives the `extab`), per-unit `-O3`/`-pool off` (`configure.py`);
- * file-scope `#pragma peephole off` (playbook 39); each `dont_inline` region keeps a retail `bl` that `-inline auto` folds.
- *
- * SHAPES.  `send`/`receive` declare the error code at function scope (a block-scope `error` takes r28, retail
- * r31) and `receive` declares `cursor, length, length2` in that order (the two length slots at 0xA/0x8).
- *
- * RESIDUALS.  Code only in relocations: the `NETWORK_ERROR_*` immediates (0x8003xxxx) are plain `lis`/`addi`
- * pairs in ours where dtk's split relocates them against `@eti_` extabindex rows; `.text` differs from the
- * target by 18 B, all such relocation fields.  As `Matching` the DOL hash holds (measured 2026-10-03).
+ * Network/NetworkPeerUdp.cpp - the Udp peer: its table slots, deleting destructor and the shared Udp scratch packet.
+ * RANGE. .text 0x803CD248-0x803CD764 (9 functions); .data 0x805F9540-0x805F9570 (the class table), .bss
+ *   0x806D2C60-0x806D3240, extab, extabindex.  One TU of the transport band: docs/network.md.
+ * FLAGS. `-O3 -pool off` (configure.py; measured in docs/network.md); file-scope `#pragma peephole off`
+ *   (playbook 39).
+ * NAMES. The `NetworkPeerUdp` slot names are GUESSes (the dump names `setPeerAndSocket`/`sendPackets`/`receivePackets`;
+ *   marked in `Network/network_transport_types.h`).
+ * RESIDUALS. none in the rows; the `NETWORK_ERROR_*` immediates (0x8003xxxx) are plain `lis`/`addi` pairs in ours where
+ *   the target relocates them against `@eti_` extabindex rows: 18 B of `.text`.  The DOL hash holds with it linked.
+ * SHAPES. The table is emitted from `NetworkPeerUdp::destroy`, the key function (rule 10); the constructor is outside
+ *   the range (an unowned function at 0x803CA3BC stores the table).  `send`/`receive` declare the error code at
+ *   function scope (a block-scope `error` takes r28, retail r31); `receive` declares `cursor, length, length2` in
+ *   that order (the two length slots at 0xA/0x8).  Each `dont_inline` region keeps a retail `bl`.
  */
 #include "types.h"
 #include "Network/network_transport.h"

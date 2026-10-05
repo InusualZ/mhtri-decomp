@@ -1,26 +1,17 @@
 /*
  * Network/NetworkPeerBuffer.cpp - the payload-buffer peer: constructor, the eight table slots and the deleting
  *   destructor.
- *
- * One translation unit of the retail Network transport band, split out of `Network/network_transport.cpp`
- * (docs/network-transport-split.md holds the evidence and the confidence of each cut).  `.text`
- * 0x803CCF30..0x803CD248, `.data` 0x805F9510..0x805F9540, extab 0x800198E0..0x80019940, extabindex
- * 0x8003A0E0..0x8003A134.
- *
- * NAMES.  `NetworkPeerBuffer` and the slot names that are only an offset are GUESSes.  Every name here is the
- * map's or a derived one; the derived ones are marked GUESS in `Network/network_transport_types.h`.
- *
- * TABLE.  Its table (0x805F9510, 0x30 B) is emitted from `NetworkPeerBuffer::destroy`, the key function (rule 10).
- *
- * FLAGS.  C++ under `cflags_network` (`-Cpp_exceptions on` gives the `extab`), per-unit `-O3`/`-pool off` (`configure.py`);
- * file-scope `#pragma peephole off` (playbook 39); each `dont_inline` region keeps a retail `bl` that `-inline auto` folds.
- *
- * SHAPES.  `receive`'s stream is a real `NetworkStreamWriterDefault` local: its implicit destructor at every
- * return is what gives the `extab` its cleanup record (the claimed 0x60 B, byte-identical).
- *
- * RESIDUALS.  `send` 99.73 % (the `NETWORK_ERROR_*` constant is an immediate the target relocates against an
- * `@eti_` extabindex row, playbook 58's class); `.text` differs from the target by 3 B (relocations).  As
- * `Matching` the DOL hash holds (measured 2026-10-04).
+ * RANGE. .text 0x803CCF30-0x803CD248 (10 functions); .data 0x805F9510-0x805F9540 (the class table), extab, extabindex.
+ *   One TU of the transport band; the cuts and their confidence: docs/network.md.
+ * FLAGS. `-O3 -pool off` (configure.py; measured in docs/network.md); file-scope `#pragma peephole off`
+ *   (playbook 39).
+ * NAMES. `NetworkPeerBuffer` and the slot names that are only an offset are GUESSes (marked in
+ *   `Network/network_transport_types.h`).
+ * RESIDUALS. none in the rows; `send`'s `NETWORK_ERROR_*` constant is an immediate the target relocates against an
+ *   `@eti_` extabindex row (playbook 58), 3 B of `.text` relocation fields.  The DOL hash holds with it linked.
+ * SHAPES. The table is emitted from `NetworkPeerBuffer::destroy`, the key function (rule 10).  `receive`'s stream is a
+ *   real `NetworkStreamWriterDefault` local: its implicit destructor at every return gives the `extab` cleanup record.
+ *   Each `dont_inline` region keeps a retail `bl` that `-inline auto` folds.
  */
 #include "types.h"
 #include "Network/network_transport.h"

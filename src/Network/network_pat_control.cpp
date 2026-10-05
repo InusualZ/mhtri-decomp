@@ -1,122 +1,66 @@
 /*
- * Network/network_pat_control.cpp - the 0x80423E74..0x80432104 network pat-control unit: the work-record /
- * PatCamellia band (0x80423E74..0x80429B94, 77 functions, absorbed from `fn_80423E74.cpp` at phase 4, second header
- * below, same `cflags_main`) followed by the 0x80429B94-0x8043065C pat-control band
- * (114 functions, 27336 B): the server/city/room select, friend and community lists and the terms and
- * file-fetch steps the per-frame `updateNetworkPatControl` state machine drives through the `net_ctrl_wk`
- * work record.
- *
- * Name: no `__FILE__` string is in the range; the stem follows the Pat vocabulary the band calls
- * (`getPatsObject`, `getNetworkSessionManagerPat`, `getNetworkLayerPat`, ...) and its `Network/` siblings.
- * Lib/flags: game-root `main` lib (`cflags_main`, Wii/1.3 -O3, exceptions on: the object has extab).
- *
- * Sections (the unit's own are its splits.txt block, `.text` 0x80423E74..0x80432104; these are the pat-control
- * band's): .text 0x80429B94..0x8043065C, extab 0x8001D368..0x8001D558, extabindex 0x8003DE54..0x8003E0DC,
- * .rodata 0x80571EA0..0x80572240 (`pat_ca_cert`, the only referrer is `updateNetworkPatControl`), .sbss
- * 0x80794CF8, and the `.data` run 0x80603750..0x80603D70 (the message layout's tag, colour and size tables
- * `text_tag_names`/`text_color_index_table`/`text_font_size_table` are defined beside `applyTextTag`).
- *
- * Class model: `NetCtrlWk` (0xC4A8 B, the `.bss` instance `net_ctrl_work`; only it is under `#pragma pack(1)`, for the `u32` run at the odd
- * offset +0x7996) is the `net_ctrl_wk` singleton with its static and instance members; the Pat layers are
- * the virtual classes in `Network/NetworkLayerPat.h` and `Network/NetworkCommunityPat.h` (slots declared,
- * never defined, so no vtable is emitted).  C-linkage free functions stay only for names other units call.
- *
- * Load-bearing shapes (measured): `#pragma peephole off` is per-function evidenced - with it removed 55
- * functions score lower (collectEvents 95.6 -> 63.3, copyPeerList 100 -> 92.7, setTextSize 100 -> 66.7, the
- * unit 93.61 -> 90.25 %) and none scores higher, so it stays for the whole file - including the first band
- * (2026-10-03: moving the pragma above `PatCryptSetKey` raised 8 band-1 functions, e.g. resetNetSlots 90.7 -> 100,
- * PatCryptDecrypt 87.1 -> 96.7, and lowered none); server-index scans are
- * loops (MWCC unrolls them to the target shape); `(dst++)->assign(src++)` gives the target's
- * pointer-increment order in copyPeerList; `ai_npc_reaction_forward()` is called with no argument (r3 is
- * the caller's leftover in retail).
- *
- * Names: `updateNetworkPatControl`, `isCityMode` (mode byte 3: set when the control enters state 0x19
- * after the roster refresh; GUESS) and the field/member names of NetCtrlWk and the record types are
- * derived from use and offsets.  About 150 callee and record names are GUESSES from the caller's use
- * (never from a retail symbol): the blocks marked GUESS in `unsplit/Network.h`,
- * `Network/NetworkWiiMediator.h`, `Network/NetworkLayerPat.h`, `Network/NetworkSessionManager.h` and this
- * unit's own header.  Left as they are: `isReadyCountOne` (the body is `ready_count_0x044 == 1`, what
- * the count is stays unknown) and `resetFailureState` (a `blr` stub).
- *
- * Residuals (re-measure: `python tools/units/recompile.py Network/network_pat_control --measure <symbol>`):
- *  - 2026-10-05: 144 of 225 rows at 100 %.  `drawTextRuns` 99.92 %: retail multiplies the centred pen as
- *    `fmuls f0,f0,f31` where ours emits `f31,f0` (`x * 0.5f` and `0.5f * x` give the same object); its switch is on
- *    `bit + 1` (bit n carries tag n + 1) with the case bodies in retail's order, and the widemode/font calls go through
- *    their owners' headers (`main.h`, `g3d/g3d_anmchr.h`).  `updateFriendTransferModes` (renamed from `updateTransferQueue`, GUESS) 99.69 %: the
- *    second loop's slot/peer registers swap (r27/r28).  `saveLayerId`/`readLayerIdChange`/`classifyLayerIdChange` (
- *    GUESS names) 100 %: `NetworkLayerIdExportTo` is a free function called after an unused `getNetworkLayerPat`
- *    (retail evaluates the layer object first, as a static member call through it would).  Not written yet (no body): the state machine
- *    `updateMessagePool` (5504 B), the message-pool helpers 0x80427868..0x80428628 (they call
- *    NetworkLayerPat/NetworkCommunityPat slots - the owners' headers now declare +0x4C/+0x50/+0x60 and +0xA0,
- *    requests net2-l3-2c54#23/#24 - not yet the bodies), the transfer queue/mode updates, the NetworkInstance error accessors
- *    (0x804312B8..0x80431368: their +0x613C/+0x6344 records sit in the band header's NetworkInstance) and the
- *    static-init/ctor/dtor group 0x80431CD8..0x80432104 (it needs `NetCtrlWk`'s member classes and the small
- *    network object as C++ classes, which `Network/network_writer_types.h` rules out for now).
- *  - `layerReflectCallback` 94.8 %: retail saves r24..r31 and keeps the joining peer's id/name/profile addresses
- *    in their own saved registers (ours CSEs them), the chat-record text address is CSE'd across
- *    `getInstance()` as in net_session_close (request #22), and the invite pointer is formed with a `subi`
- *    where ours re-derives the `addis` base.
- *  - `queueNetCommand` 98.8 % (one store scheduled before the loop's pointer bump), `resetMessagePool` 96.8 % (the
- *    address objects' +0x28 copy is the sink's real virtual `copyFrom` since request net2-l3-2c54#21; the rest is
- *    scheduling).
- *  - GUESS names added 2026-10-04: `allocPoolEntry`/`freePoolEntry`, `allocArenaBlock`/`setArenaBlockValue`/`resetSlotTable`/`findSlotByOwner`/
- *    `resetPeerTable`/`findFreePeerEvent`/`refreshFriendList`/`updatePeerCardBlock` (from their bodies),
- *    `net_peer_join_stamp` (the frame stamp layer command 5 takes), `net_arena_base` (the arena pointer), the
- *    idle-check fields `idle_hold_0xC360`/`idle_press_0xC362`/`idle_frames_0xC364` (refreshServerScreen raises
- *    error 23 after 36000 unchanged frames) and the layer stack `layer_stack_0x6220`/`layer_depth_0x6240`.
- *  - Partial: `updateNetworkPatControl` 88.6 % (retail saves r24..r31 in a 0x50 frame, ours r26.. in 0x30: a
- *    whole-function allocation shift), `layoutTextRuns` 95.5 % (retail keeps the `tag != 4/8/9` loop test on a
- *    constant 0; the glyph copy needs a `(s32)` cast to keep retail's `extsb`), `parseTextTags` 91.2 % (our
- *    compiler folds the redundant `== '\\'` test), `initWorkRecord` 99.5 / `initNetworkPatControl` 99.6 % (one
- *    folded store each; the placement `new` of the friend list is load-bearing - its EH frame moved
- *    initWorkRecord 60 -> 99 %), `get_server_type_name` 44.2 % and the earlier register/unroll residuals.
- *  - `exportNetworkSave` copies the save byte with a `(s32)` cast (retail sign-extends in both directions).
- *  - `initNetworkLibrary` is handed `PatLibraryParams` cast to the owner's `sNetworkLibraryInitParam`: the same
- *    0x2C block read two ways (this unit names the allocator/game words, the owner keeps `gameInfo[8]`);
- *    folding them into one type is open (rule 1).
- *  - Data: the `.rodata` certificate is byte-identical after linking; the split object holds a relocation
- *    at +0x244 (dtk read the DER bytes 8014CB40 as a pointer), so the object compare shows 4 B. The
- *    `.sdata` 0x807939A0.. run (interleaved with the absorbed band's 0x807939A8) and the `.sdata2` words
- *    0x8079C890/0x8079C898 (also read by the first band of this unit and the unsplit 0x80431690) are shared, so they
- *    stay unclaimed and their externs remain; our object also emits 0x10 of each of `.sdata`/`.sdata2` from its own pools (`@NNNN` where the target names lbl_8079C898/lbl_8079C890/lbl_807939C4/SPACE_STR).
- *  - Two rule-2 findings the lint still counts: `lb_entry_flags_clear` and `lb_quest_board_reset` have
- *    registered owners, but their owner headers cannot be included beside `unsplit/lobby.h`
- *    (`lobby_w`/`_mh_ivec2_` redefinitions), so the prototypes sit in the leaf headers
- *    `lobby/lb_entry_flags_clear.h` and `lobby/lb_quest_board_reset.h`, which the lint's `_owns` does not
- *    recognise as the owners'.
- */
-
-/* Absorbed unit `fn_80423E74.cpp` (phase 4 fold):
- * fn_80423E74.cpp - the 0x80423E74-0x80429B94 band (23840 B, 77 functions): the PatCamellia wrapper
- * over the retail Camellia cipher plus the network work record's arena vectors, slot table and message
- * pool that the `net_ctrl_wk` singleton carries.
- *
- * Home and lib (brief section 2).  No `__FILE__` string covers the range: its own `.data` pool is the
- * two dispatch jump tables at 0x80603750 / 0x806037F4 and the twenty-odd bytes `so alloc fail` /
- * `so free fail` / `dwc alloc fail` / `dwc free fail` / `mh3uswii` at 0x80603888 (checked with
- * `python tools/symbols/dumpmap.py lookup <addr>`: the symbols there answer `_80425abcs_so_alloc_fail_80603888`
- * and `lbl_806C...` string rows, never a bare source-file name).  The runtime dump answers only
- * `zz_0423e74_`-style placeholders for every address in the range except `PatCryptDecrypt` and
- * `setErrorHappened`.  So the module is the same un-moduled game-root band as its link neighbour
- * `Network/network_pat_control.cpp` (the network pat-control band that starts where this one ends and also
- * dereferences `net_ctrl_wk` and calls `getPatsObject`/`getNetworkLayerPat`), and the file takes the
- * game-root `main` lib and `cflags_main` (Wii/1.3, -O3, -inline noauto, -Cpp_exceptions on - the target
- * object carries extab/extabindex).  The stem was the map's placeholder for 0x80423E74, now `PatCryptSetKey` (classes 3/4 in the brief).
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * tools/symbols/dumpmap.py: every address in the range answers `zz_<addr>_` or a global name, never a
- * `__FILE__` emitter; `PatCryptDecrypt` and `setErrorHappened` are the only real names in the map).
- *
- * Sections this unit owns: .text 0x80423E74-0x80429B94, extab 0x8001D1B4-0x8001D368,
- * extabindex 0x8003DC44-0x8003DE54, and the two `.data` runs its functions reference
- * (0x80603750-0x80603858, the two jump tables; 0x80603888-0x806038D8, the alloc-failure strings).
- * The array at 0x80603858 and the string at 0x806038D8 belong to the neighbour
- * `Network/network_pat_control.cpp`.
- *
- * Residuals: the two state machines `layerReflectCallback` (0xE78, three jump tables) and `updateMessagePool`
- * (0x1580, one jump table) and the message-pool families that follow them are not reconstructed yet;
- * every function that is reconstructed below is listed in the outbox.  Re-measure with
- * `python tools/units/recompile.py Network/network_pat_control --measure <symbol>`.
+ * Network/network_pat_control.cpp - the network pat-control unit: the work-record / PatCamellia band (the PatCamellia
+ *   wrapper over the retail Camellia cipher, the work record's arena vectors, slot table and message pool) and the
+ *   pat-control band (server/city/room select, friend and community lists, the terms and file-fetch steps) that the
+ *   per-frame `updateNetworkPatControl` state machine drives through the `net_ctrl_wk` work record.
+ * RANGE. .text 0x80423E74-0x80432104 (225 functions; the pat-control band starts at 0x80429B94); .ctors 0x8056F3C0-
+ *   0x8056F3C4, .rodata 0x80571EA0-0x80572240 (`pat_ca_cert`, read only by `updateNetworkPatControl`), .data
+ *   0x80603750-0x80603D70 (the two dispatch jump tables 0x80603750/0x806037F4, the alloc-failure strings 0x80603888, the
+ *   message layout's `text_tag_names`/`text_color_index_table`/`text_font_size_table`), .bss 0x806D3670-0x806E1770,
+ *   .sdata 0x807939A0-0x80793A10, .sbss 0x80794CE8-0x80794D08, .sdata2 0x8079C888-0x8079C8A8, extab, extabindex.
+ * FLAGS. The game-root `cflags_main` (Wii/1.3, -O3, -inline noauto, -Cpp_exceptions on); file-scope `#pragma peephole
+ *   off`, evidenced per function (removing it lowers 55 functions, e.g. `collectEvents`, `copyPeerList`, `setTextSize`,
+ *   and raises none; above `PatCryptSetKey` it also raises band-1 rows such as `resetNetSlots` and `PatCryptDecrypt`).
+ * NAMES. The file name follows the Pat vocabulary the band calls (`getPatsObject`, `getNetworkSessionManagerPat`,
+ *   `getNetworkLayerPat`): no `__FILE__` string and only `zz_` dump names cover the range (`PatCryptDecrypt` and
+ *   `setErrorHappened` are the dump's).  `updateNetworkPatControl`, `isCityMode` (mode byte 3, set when the control
+ *   enters state 0x19), NetCtrlWk's fields and the record types are GUESSes from use and offsets; about 150 callee and
+ *   record names are GUESSes from the caller's use, marked in `unsplit/Network.h`, `Network/NetworkWiiMediator.h`,
+ *   `Network/NetworkLayerPat.h`, `Network/NetworkSessionManager.h` and `Network/network_pat_control.h`.  GUESSes from
+ *   the bodies: `allocPoolEntry`/`freePoolEntry`, `allocArenaBlock`, `setArenaBlockValue`, `resetSlotTable`,
+ *   `findSlotByOwner`, `resetPeerTable`, `findFreePeerEvent`, `refreshFriendList`, `updatePeerCardBlock`,
+ *   `updateFriendTransferModes`, `saveLayerId`/`readLayerIdChange`/`classifyLayerIdChange`, `net_peer_join_stamp`,
+ *   `net_arena_base`, the idle-check fields (`refreshServerScreen` raises error 23 after 36000 unchanged frames) and
+ *   the layer stack `layer_stack_0x6220`/`layer_depth_0x6240`.  `isReadyCountOne` and `resetFailureState` (a `blr`
+ *   stub) keep names that say only what the body does.
+ * RESIDUALS. 30 rows unwritten (objdiff scores them zero):
+ *   - `updateMessagePool` (0x80425790, 5504 B) and the message-pool helpers 0x804273EC..0x80427630 and
+ *     0x80427868..0x804286F0, including `updatePeerCardBlock`, `fn_8042835C` and `refreshFriendList` (they call
+ *     NetworkLayerPat/NetworkCommunityPat slots +0x4C/+0x50/+0x60/+0xA0);
+ *   - the NetworkInstance error accessors and messages 0x804312B8..0x8043137C (their +0x613C/+0x6344 records), the
+ *     helpers 0x80431548..0x8043159C and 0x80431638, and `updateTransferMode` (0x804317E8);
+ *   - the static-init/ctor/dtor group 0x80431CD8..0x80432104 (10 rows; it needs `NetCtrlWk`'s member classes as C++
+ *     classes).
+ *   48 partial rows (re-measure with `python tools/units/recompile.py Network/network_pat_control --measure <symbol>`),
+ *   the characterised ones:
+ *  - `updateNetworkPatControl`, `layerReflectCallback`: retail saves r24..r31 (a 0x50 frame) and keeps the joining
+ *    peer's id/name/profile addresses in their own saved registers, ours CSEs them; the chat-record text address is
+ *    CSE'd across `getInstance()`; the invite pointer is formed with a `subi` where ours re-derives the `addis` base;
+ *  - `drawTextRuns`: retail multiplies the centred pen as `fmuls f0,f0,f31`, ours `f31,f0`;
+ *  - `updateFriendTransferModes`: the second loop's slot/peer registers swap (r27/r28);
+ *  - `layoutTextRuns`: retail keeps the `tag != 4/8/9` loop test on a constant 0; `parseTextTags`: MWCC folds the
+ *    redundant `== '\\'` test;
+ *  - `queueNetCommand`: one store scheduled before the loop's pointer bump; `resetMessagePool`, `initWorkRecord`,
+ *    `initNetworkPatControl`: scheduling, one folded store each;
+ *  - `get_server_type_name` and the rest: register and unroll differences (the objdiff rows).
+ *  - data: the `.rodata` certificate is byte-identical after linking (the split object holds a relocation at +0x244, the
+ *    DER bytes 8014CB40 read as a pointer); our object also emits 0x10 of each of `.sdata`/`.sdata2` from its own pools
+ *    (`@NNNN` where the target names `lbl_8079C898`/`lbl_8079C890`/`lbl_807939C4`/`SPACE_STR`).
+ * SHAPES. `NetCtrlWk` (0xC4A8 B, the `.bss` instance `net_ctrl_work`) is the `net_ctrl_wk` singleton; only it is under
+ *   `#pragma pack(1)` (the `u32` run at the odd offset +0x7996).  The Pat layers are the virtual classes of
+ *   `Network/NetworkLayerPat.h`/`Network/NetworkCommunityPat.h` (slots declared, never defined: no table emitted).
+ *  - `lb_entry_flags_clear` and `lb_quest_board_reset` come from the leaf headers `lobby/lb_entry_flags_clear.h`/
+ *    `lobby/lb_quest_board_reset.h` (their owner headers clash with `unsplit/lobby.h`);
+ *  - server-index scans are loops (MWCC unrolls them to the target shape); `(dst++)->assign(src++)` gives
+ *    `copyPeerList`'s pointer-increment order; `ai_npc_reaction_forward()` takes no argument (r3 is the caller's
+ *    leftover);
+ *  - `drawTextRuns` switches on `bit + 1` (bit n carries tag n + 1) with the cases in retail's order; the glyph copy in
+ *    `layoutTextRuns` keeps retail's `extsb` through a `(s32)` cast; `exportNetworkSave` copies the save byte with one;
+ *  - `NetworkLayerIdExportTo` is called after an unused `getNetworkLayerPat` (retail evaluates the layer object first);
+ *  - the placement `new` of the friend list in `initWorkRecord` (its EH frame);
+ *  - `initNetworkLibrary` is handed `PatLibraryParams` cast to the owner's `sNetworkLibraryInitParam` (one 0x2C block
+ *    read two ways: this unit names the allocator/game words, the owner keeps `gameInfo[8]`; folding them is a rule-1
+ *    item).
  */
 
 #include "Network/network_pat_control.h"
@@ -264,11 +208,8 @@ void PatCryptSetKey(const u8* rawKey)
     Camellia_Ekeygen(0x100, rawKey, lbl_806D3670);
 }
 
-/*
- * PatCryptEncrypt: encrypt `*len` bytes of `buf` in place, writing the big-endian length header and
- * returning it in `*len` (already framed to whole blocks).  The block is a 4-byte rotation of the
- * 16-byte working buffer, followed by one Camellia block per full buffer.
- */
+/* Encrypts `*len` bytes of `buf` in place behind a big-endian length header (a 4-byte rotation of the 16-byte
+ * working buffer, then one Camellia block per full buffer) and returns the framed length in `*len`. */
 s32 PatCryptEncrypt(u8* buf, u16* len)
 {
     u8 hdr[4];
@@ -316,11 +257,8 @@ s32 PatCryptEncrypt(u8* buf, u16* len)
     return 0;
 }
 
-/*
- * PatCryptDecrypt: the inverse of PatCryptEncrypt.  Rejects a length that is not a whole number of 16-byte
- * blocks with 0x8000, otherwise decrypts the framed buffer in place and rewrites `*len` with the
- * payload length the header carries.
- */
+/* The inverse of `PatCryptEncrypt`: 0x8000 for a length that is not whole 16-byte blocks, else decrypts the framed
+ * buffer in place and rewrites `*len` with the payload length the header carries. */
 s32 PatCryptDecrypt(u8* buf, u16* len)
 {
     u8 hdr[4];
@@ -496,11 +434,8 @@ NetSlot* findSlotByOwner(void* owner)
     return 0;
 }
 
-/*
- * The layer's reflect callback: records command `command`'s result word (and a failure's error triple), then
- * follows the layer's state - the layer stack, the peers joining and leaving, positions, chat, the server list,
- * the invites - and reports the outcome through the caller's result byte where a request waits on it.
- */
+/* The layer's reflect callback: records the result word (and a failure's error triple), follows the layer's state (the
+ * stack, peers, positions, chat, servers, invites) and reports through the caller's result byte. */
 /* untyped: caller-owned payload - each layer command delivers its own record */
 s32 layerReflectCallback(u32 command, s32 result, s32 count, void* data)
 {
@@ -1613,11 +1548,8 @@ void resetSystemState(struct SystemWork* system)
 {
 }
 
-/*
- * Points `net_ctrl_wk` at the work record and resets every part of it: the control state, the session
- * results, the layer and pool records, the peer and message tables, the fetch state, the file buffers in
- * MEM2 and the friend list built in place.
- */
+/* Points `net_ctrl_wk` at the work record and resets all of it: control state, session results, layer/pool records,
+ * peer and message tables, fetch state, the MEM2 file buffers and the friend list built in place. */
 void initWorkRecord(void)
 {
     NetCtrlWk* work = &net_ctrl_work;
@@ -1805,11 +1737,8 @@ void allocateDialogRecord(void)
     memset(net_ctrl_work.text_layout_0xC144, 0, 0x314);
 }
 
-/*
- * Brings the network control up: resets the work record, creates the network heap, hands the Pat library
- * its allocators and game identity, checks the terms when the option asks for it, builds the three Pat
- * layers and installs them, then creates the dialog and text-layout records and the transfer mode.
- */
+/* Brings the network control up: work record, network heap, the Pat library's allocators and identity, the optional
+ * terms check, the three Pat layers, then the dialog and text-layout records and the transfer mode. */
 void initNetworkPatControl(void)
 {
     NetCtrlWk* work = &net_ctrl_work;
@@ -6523,11 +6452,8 @@ void layoutTextRuns(NetTextTagState* state)
     }
 }
 
-/*
- * Prints the laid-out runs: each run's flag bits apply its tags (alignment, size, colour, line breaks) to the pen,
- * then its text is printed at the pen in the run's size (`size`, or the size table's entry when 0); `line_gap`
- * replaces the font height on a plain line break.
- */
+/* Prints the laid-out runs: each run's flag bits apply its tags to the pen, then its text prints in the run's size
+ * (`size`, or the size table's entry when 0); `line_gap` replaces the font height on a plain line break. */
 void drawTextRuns(NetTextTagState* state, s16 size, s16 line_gap)
 {
     f32 screen[2];
@@ -6782,11 +6708,8 @@ void applyTransferLevel(void)
     setMediatorTransferLevel(getInstance(), system_w.transfer_level_0xa52);
 }
 
-/*
- * Switches the transfer mode while a terms update runs: on (1) only once the layer is past its first state
- * (else it switches off instead), off otherwise; the mediator, the work record and the sound/system bands are
- * told the mode.
- */
+/* Switches the transfer mode during a terms update: on (1) only once the layer is past its first state, else off; the
+ * mediator, the work record and the sound/system bands are told the mode. */
 void setTransferMode(u32 mode)
 {
     NetCtrlWk* work = net_ctrl_wk;
@@ -6810,11 +6733,8 @@ void setTransferMode(u32 mode)
     }
 }
 
-/*
- * Hands the layer the transfer mode of every connected peer that is a friend: 1 (transfer) when the system
- * transfer mode is on and - in a quest session - the peer is not a session member without friend details and
- * transfers are allowed by the options, else 0.
- */
+/* Hands the layer each connected friend's transfer mode: 1 when the system mode is on, the options allow it and (in a
+ * quest session) the peer is not a member without friend details, else 0. */
 void updateFriendTransferModes(void)
 {
     NetCtrlWk* work = net_ctrl_wk;

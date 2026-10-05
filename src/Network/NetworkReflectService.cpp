@@ -1,27 +1,23 @@
 /*
- * Network/NetworkReflectService.cpp - the head of the `NetworkReflectService` class (the GameSpy reflect
- * service the mediator starts, stops and agrees): its constructor and deleting destructor, the
- * init/finalize/start/stop/page/agree entry points, the per-frame step, the start sequence and the GameSpy
- * sub-machines (`updateCallbackStep`, `dispatchTask`, `runSearch`, `runConnect`, `applyEvent`).
- *
- * `.text` 0x8041A194..0x8041B194.  Sections: extab 0x8001CF88..0x8001D010; extabindex 0x8003D950..0x8003D9EC;
- * .data 0x80603118..0x806031A0 (the start and stop log strings, then the class table the destructor emits);
- * .sbss 0x80794CD8..0x80794CE0 (`sNetworkReflectService`).
- *
- * WHAT IT IS.  Names from the map (`__ct__21NetworkReflectServiceFv`, `notify`, the `reflectService*` family);
- * the helpers this pass named (`resetReflectService`, `resetReflectServiceTask`, `updateReflectService`,
- * `stepReflectServiceStart`, `reflectServiceEventCallback`, `sNetworkReflectService`) are GUESSES from the
- * bodies.  The log string says `ReflectInterface::start()`, so the retail class name may differ.
- *
- * BOUNDARY.  The right edge 0x8041B194 / 0x806031A0 is request net2-l4-cff5#1: the five sub-machines moved here
- * from `Network/GameSpyInterfaceThread.cpp`, and the class table 0x80603190 follows this unit's strings - the
- * layout one object gives when the destructor is the key function (rule 10: the table is compiler output).
- * `.data` residual: 132 of 136 B - the target's last 4 bytes are the link's 8-byte alignment pad before the
- * neighbour's `.data`, which dtk sizes into the table symbol.
- *
- * FLAGS.  `-O3`/`-inline noauto` in place of the lib's `-O4,p`/`-inline auto` (configure.py, with the
- * numbers), and `#pragma peephole off` like the rest of the library.  `setReflectServicePage` takes the page
- * as `u8` (retail stores it with no `clrlwi`).
+ * Network/NetworkReflectService.cpp - the head of `NetworkReflectService`, the GameSpy reflect service the mediator
+ *   starts, stops and agrees: constructor, deleting destructor, the entry points, the per-frame step, the start
+ *   sequence and the GameSpy sub-machines (`updateCallbackStep`, `dispatchTask`, `runSearch`, `runConnect`,
+ *   `applyEvent`).
+ * RANGE. .text 0x8041A194-0x8041B194 (19 functions); .data 0x80603118-0x806031A0 (the start and stop log strings, then
+ *   the class table 0x80603190), .sbss 0x80794CD8-0x80794CE0 (`sNetworkReflectService`), extab, extabindex.  The right
+ *   edge is where the table follows this unit's strings, the layout one object gives when the destructor is the key
+ *   function.
+ * FLAGS. `-O3 -inline noauto` (configure.py; measured in docs/network.md); file-scope
+ *   `#pragma peephole off` like the rest of the library.
+ * NAMES. From the map: `__ct__21NetworkReflectServiceFv`, `notify`, the `reflectService*` family.  GUESSes from the
+ *   bodies: `resetReflectService`, `resetReflectServiceTask`, `updateReflectService`, `stepReflectServiceStart`,
+ *   `reflectServiceEventCallback`, `sNetworkReflectService`.  The log string says `ReflectInterface::start()`, so the
+ *   retail class name may differ.  `initReflectService`, `finalizeReflectService` and `setReflectServicePage` are
+ *   GUESSes named by the mediator band from the slot each drives.
+ * RESIDUALS. none in `.text`; `.data` is 132 of 136 B: the target's last 4 bytes are the link's 8-byte alignment pad
+ *   before the neighbour's `.data`, which dtk sizes into the table symbol.
+ * SHAPES. The table is compiler output from the key-function destructor (rule 10).  `setReflectServicePage` takes the
+ *   page as `u8` (retail stores it with no `clrlwi`).
  */
 #include "types.h"
 #include "Network/NetworkReflectService.h"

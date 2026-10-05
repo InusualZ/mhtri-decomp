@@ -1,10 +1,7 @@
 /*
- * Network/NetworkLayerPat.h - the declarations of `src/Network/NetworkLayerPat.cpp`: the class `NetworkLayerPat`
- * (derived from `NetworkLayer`), the records its slots take, and the free functions of the unit's range.
- *
- * `NetworkLayerPat` is the +0x0C element of the `NetworkPat` holder (Network/NetworkPat.h).  Its table
- * 0x805FC1E0 (0x144 B) is emitted by the unit from the class (rule 10); the method names are the pool strings'
- * ("NetworkLayerPat::move ...") where they exist, otherwise derived from the bodies (GUESS, see the unit header).
+ * Network/NetworkLayerPat.h - the declarations of `Network/NetworkLayerPat.cpp`: `NetworkLayerPat` (the `NetworkPat`
+ *   holder's +0x0C element, derived from `NetworkLayer`; its table 0x805FC1E0 is emitted by the unit), the records its
+ *   slots take and the unit's free functions.
  */
 #ifndef MHTRI_NETWORK_NETWORKLAYERPAT_H
 #define MHTRI_NETWORK_NETWORKLAYERPAT_H
@@ -597,8 +594,8 @@ public:
     /* +0x6EB94 */ NetVoiceBuffer voiceMixed_6EB94;   /* "mVoiceMixed" (the move warning names it) */
 };
 
-/* The free functions of `src/Network/NetworkLayerPat.cpp`'s range (0x803E0BE8..0x803EF668), moved here from
- * `Network/NetworkCommunityPat.h` and `Network/NetworkSessionManagerPat.h` by the round 3 recut (rule 2: the owner declares). */
+/* The free functions of `src/Network/NetworkLayerPat.cpp`'s range (0x803E0BE8..0x803EF668; rule 2: the owner
+ * declares). */
 struct PatTerms;
 
 #ifdef __cplusplus

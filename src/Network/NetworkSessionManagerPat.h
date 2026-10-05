@@ -1,7 +1,6 @@
 /*
- * Declarations of `src/Network/NetworkSessionManagerPat.cpp` that are not class members: the two free functions inside the
- * unit's `.text` range (0x803D70B8..0x803DF2EC).  The class itself is declared in `Network/NetworkSessionManager.h`.  Moved here
- * from `Network/network_pat_control.h` when the phase 4 fold gave the unit the whole band.
+ * Network/NetworkSessionManagerPat.h - the free functions of `Network/NetworkSessionManagerPat.cpp`; the class is
+ *   declared in `Network/NetworkSessionManager.h`.
  */
 #ifndef MHTRI_NETWORK_NETWORKSESSIONMANAGERPAT_H
 #define MHTRI_NETWORK_NETWORKSESSIONMANAGERPAT_H

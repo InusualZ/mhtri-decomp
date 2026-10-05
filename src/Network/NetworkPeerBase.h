@@ -1,11 +1,6 @@
 /*
- * Network/NetworkPeerBase.h - the symbols `Network/NetworkPeerBase.cpp` owns that the rest of the Network band calls
- * (the error-record accessors).  `NetworkUniqueId`'s destructor is compiled here as well; the class is declared in
- * its owner's header, `Network/NetworkUniqueId.h`.
- *
- * The declarations moved out of `Network/network_transport.h` when `Network/network_transport.cpp` was split
- * into one unit per translation unit (docs/network-transport-split.md): a declaration belongs with the TU that
- * defines the symbol (rule 2).  The types they use are `Network/network_transport_types.h`'s.
+ * Network/NetworkPeerBase.h - the error-record accessors of `Network/NetworkPeerBase.cpp`; the types are
+ *   `Network/network_transport_types.h`'s.
  */
 
 #ifndef NETWORK_NetworkPeerBase_H

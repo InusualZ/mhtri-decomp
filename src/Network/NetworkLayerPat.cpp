@@ -1,89 +1,62 @@
 /*
- * Network/NetworkLayerPat.cpp - the `NetworkLayerPat` layer (`.text` 0x803E0BE8..0x803EF668).
- *
- * RECUT.  The unit is the class's whole band: from 0x803E0BE8 (after `NetworkLayer`'s last
- *   function, `setFlag76`) through the constructor 0x803E0C18, the request handlers, the member helpers and the three
- *   `setCollectionLog*` siblings, to 0x803EF668 where `NetworkCommunity`'s constructor opens the next unit.  The left part
- *   (0x803E0BE8..0x803E44C8) was the tail of `Network/NetworkSessionManagerPat.cpp`, the middle the former one-function unit
- *   `Network/NetworkLayerPatStep.cpp` (folded in, renamed to this file), the rest the head of the phase 4 stub
- *   `Network/NetworkCommunityPat.cpp`.  The right edge copies `Network/NetworkSessionManagerPat.cpp`'s shape: the manager
- *   ends with its `setSessionLog*` trio and the layer base class follows; this band ends with `setCollectionLog*` and the
- *   community base class follows (its constructor stores the table 0x805FC440).  `.data` 0x805FB718..0x805FC390 (the class's
- *   strings, its table `__vt__15NetworkLayerPat`, and the two inline `NetworkRequest::getArgument` strings 0x805FC324/0x805FC358 the
- *   handlers at 0x803E3C70/0x803E9C00 read - not a seam), `.sdata` 0x80793940, `.sbss` 0x80794CA8, `.sdata2`
- *   0x8079C780..0x8079C7A0 (every word read only from this range), extab 0x8001A810..0x8001B0A0, extabindex
- *   0x8003AE0C..0x8003B448.  What is still unwritten: `ledger.py unit Network/NetworkLayerPat.cpp` / `unitscore.py`.
- *
- * CLASS.  `NetworkLayerPat` derives from `NetworkLayer` (`Network/NetworkLayerPat.h`): the constructor
- *   calls `NetworkLayer::NetworkLayer` and stores 0x805FC1E0, whose 79 slots are the base's own functions or this
- *   unit's overrides.  The table is emitted here from the class (key function `stepRequest`, declared first); every
- *   overriding map row carries the compiler's mangling, so both objects' `.rela.data` name the same symbols.  The
- *   override names are derived from their bodies (GUESS): the 20 request handlers +0xF4..+0x140 from the
- *   `sendReq*` calls they issue (`handleChat` sends `sendNtcLayerChat`, ...), the accessors from the field they
- *   read (`getCommunityValueE0_B4` reads +0xE0 of a community record; the `_XX` suffix is the slot offset, the
- *   consumers' own scheme).  The base's request starters carry the consumers' spellings (`closeSession_1C`, ...).
- *
- * NAMING (GUESS) of the state machine (0x803E44C8, 960 B).  The range carries no `__FILE__` string and the dump answers
- * `zz_03e44c8_`.  It is the vtable slot +0x104 of `__vt__15NetworkLayerPat` (0x805FC1E0), the table `__ct__15NetworkLayerPatFv`
- * stores into the `NetworkLayerPat` it builds (the class name is the pool strings' own: "NetworkLayerPat::move ...").
- * The body advances the `NetworkRequest` state at +0x00 (0 -> 5 -> 10 -> 15 -> 20 -> 25 -> 30, or 100 / 110 on failure)
- * and issues the layer requests `sendReqLayerUp`, `sendReqLayerChildInfo` and `sendReqLayerUserList`; `stepRequest` is a
- * guess from that; the callees' names are marked GUESS where they are declared.
- *
- * Levers: file-scope `#pragma peephole off` (playbook 39: retail keeps `clrlwi`+`cmpwi` unfused; `getRecord` was written
- * under the old file's peephole-off region too) and the `sendReqLayer*` results declared `u32` (the callee returns a
- * 16-bit value, but the caller stores the whole register - playbook 66).  The field at +0xF19C is reached with
- * `addis`+`lwz`, which is what a real offset that size compiles to.
- *
- * Flags: the lib's `-O4,p` is replaced by `-O3` like the sibling session units (configure.py carries the per-row
- * measurement, `getRecord` included).
- *
- * HANDLERS.  Every request handler is the session manager's state machine over `NetworkLayerRequest::state_00`
- *   (0 start, its own wait steps, 100 cancelled, 110 failed = also event 3); `requestFlags_310[slot]` / `requestIds_368[slot]`
- *   are the reply bits and request ids of request slot `slot` (`requests_0C`'s index; 21 = the layer's own slot at
- *   +0x1C0), set by `reflect`.  Event numbers, reply bits and error codes are the enums above.  Levers found here:
- *   locals are laid out in reverse declaration order (`handleLayerInfo` 99.91 -> 100 by declaring the field list first);
- *   a list read reuses its count variable as the batch's first row (`handleChildList` 99.96 -> 100: retail colours both
- *   in one register); the filter packers walk a pointer beside the counter with the pointer incremented first
- *   (`packLayerSettings` 98.32 -> 100); `setFlag75` and the base's slot take `u32` (no `clrlwi` before either call, the
- *   base's store is byte-identical under a local `#pragma peephole on`).  `config.yml` blocks dtk's relocation on the
- *   0x80060034 immediate in `handleConnect` (0x803E30F4), as for `updateSession`.
- *   Records the handlers send or report are views in `Network/NetworkLayerPat.h` (sizes from the frames and the
- *   memsets); the chat message is the session manager's `NetworkSessionSlotInfo`; the layer requests' field list and
- *   layer record are `PatInterface.cpp`'s `PatTagList`/`PatLayerData`, and the layer address goes to it as its
- *   16-byte `path`.  Callee names decided at integration: `sendReqLayerUserInfoSet` (0x80401AF4, recvAnsLayerUserInfoSet's
- *   slot), `sendReqLayerTell` (0x8040211C, the `sendReqCircleTell` shape), `sendNtcLayerUserTransfer` (0x80403230, GUESS).
- *
- * RESIDUALS (measured).  `moveRequests` 97.86 - the unrolled scan's trip count in r25, the base's own `move` residual;
- *   `clear` 98.89 - two instructions scheduled apart at the end; `setFriendTransferModeById` 93.85 - retail indexes the mode
- *   array as `lbzx` off `this` (best of four spellings: u8/u32 mode, peephole on/off, an entry pointer);
- *   `sendUserPosition_60` 98.28 and `applyLoginRecord` 97.73 - a float compare's operand order and an early return's
- *   branch shape, and a bool store's `clrlwi` under peephole off (peephole on is worse, 95.66);
- *   `setFriendTransferMode_E0` 99.09 - retail passes the u32 mode to the mediator's `setTransferSlotMode` unnarrowed; a u32
- *   parameter there takes this row to 100 but the mediator's own from 100 to 93.82 (a `clrlwi` before its `stb` under
- *   peephole off; peephole on fuses its `extsb`+`cmpwi`: 84.41), so the u8 stays (`getTransferSlotMode` returns `BOOL`:
- *   `isFriendTransferActive_E4` 96.91 -> 100, the mediator unchanged).  The inline copies of
- *   `NetworkLayerRequest`'s ctor/dtor/reset/isOwned/run/begin and of `NetworkRequest::getRecord`/`getArgument`/`setRecord`
- *   (0x803E12B0.., 0x803E24F8, 0x803E283C, 0x803E2928, 0x803E9B88, 0x803E9C00, 0x803EF460) and the member-array
- *   constructors/destructors stay unwritten: their manglings are the ones `Network/NetworkLayer.cpp` /
- *   `Network/NetworkSessionManager.cpp` already define, so the map cannot carry them twice; our calls reach those copies
- *   by name (a relocation-name difference only).  `.data` cannot match yet: the jump tables and strings of the unwritten
- *   handlers are not emitted, and `vtableaudit` keeps the 0x805FC1E8 run until the whole section does.
- *
- * ROUND 4.  The friend table holds real `NetworkUniqueId`s (`NetFriendRec`), and the records with a unique id inside have
- *   their constructors/destructors declared and defined out of line (`NetFriendRec`, `NetFriendTable`, `NetFriendList`,
- *   `NetLayerRequest`, `NetCommunityList`, `NetLayerMediationList`, the two notices): MWCC inlines an implicit one (with
- *   a null check on a member), retail calls them.  `NetFriendRoster` is only the stack payload of `handleUserList`; the
- *   layer and each community record keep table and sessions as separate members (the destructors call the table's
- *   destructor without a null check).  Names of the voice/NAT fields and helpers are GUESSES from the bodies, except
- *   `mVoiceMixed.mSize` (the move warning).  More residuals: `readSelectedServer_88` 96.81 and `readUserRows` 99.14 /
- *   `handleUserSearch` 99.54 / `pollFriendSlot` 97.56 - the same classes as above (an early return's `bge`+`b` pair; the
- *   `addis`/`mulli` order of an unrolled remainder; two registers swapped); `downsampleVoice` 98.98 - retail tests the
- *   count with `cmplwi`+`blelr` (`i != 0` and `i > 0` both give `cmpwi`+`beqlr`); `sendUserFields_5C` 99.55 - two
- *   registers swapped; `move` 97.22 - the mediator's `popTransferRecord` returns `s32` (retail uses it unextended;
- *   97.11 -> 97.22, its own row unchanged) and `GameSpyInterfaceThread::isNegotiating` `BOOL` (96.76 -> 97.11), the
- *   voice-ready byte is compared unextended and stored without `clrlwi` (u8 and u32 spellings each cost one
- *   instruction; peephole on for `move` is 91.19), and two `pairState_C7F0` reads use `lbzx` off a precomputed row.
+ * Network/NetworkLayerPat.cpp - the `NetworkLayerPat` layer (derived from `NetworkLayer`): the constructor, the request
+ *   handlers and their state machine `stepRequest`, the member helpers and the three `setCollectionLog*` siblings.
+ * RANGE. .text 0x803E0BE8-0x803EF668 (158 functions); .data 0x805FB718-0x805FC390 (the class's strings, its table
+ *   `__vt__15NetworkLayerPat` 0x805FC1E0, then the two inline `NetworkRequest::getArgument` strings
+ *   0x805FC324/0x805FC358 the handlers at 0x803E3C70/0x803E9C00 read - not a seam), .sdata 0x80793940-0x80793948, .sbss
+ *   0x80794CA8-0x80794CB0, .sdata2 0x8079C780-0x8079C7A0 (read only from this range), extab, extabindex.  The edges
+ *   mirror the session manager's shape: `NetworkLayer`'s last function `setFlag76` before (as the manager's
+ *   `setSessionLog*` trio before `NetworkLayer`), `NetworkCommunity`'s constructor (it stores 0x805FC440) after.
+ * FLAGS. `-O3 -inline noauto` (configure.py; measured in docs/network.md); file-scope `#pragma peephole off`
+ *   (playbook 39: retail keeps `clrlwi`+`cmpwi` unfused).
+ * NAMES. The class name is the pool strings' ("NetworkLayerPat::move ...").  GUESSes from the bodies: `stepRequest`
+ *   (0x803E44C8, 960 B, slot +0x104: it advances the request state 0 -> 5 -> ... -> 30, or 100/110, issuing
+ *   `sendReqLayerUp`, `sendReqLayerChildInfo`, `sendReqLayerUserList`), the 20 request handlers +0xF4..+0x140 (from the
+ *   `sendReq*` they issue: `handleChat` sends `sendNtcLayerChat`), the accessors (`getCommunityValueE0_B4` reads +0xE0;
+ *   the `_XX` suffix is the slot offset, the consumers' scheme), the voice/NAT fields and helpers (except
+ *   `mVoiceMixed.mSize`, the move warning).  Callees named at integration: `sendReqLayerUserInfoSet` (0x80401AF4,
+ *   recvAnsLayerUserInfoSet's slot), `sendReqLayerTell` (0x8040211C, the `sendReqCircleTell` shape),
+ *   `sendNtcLayerUserTransfer` (0x80403230, GUESS).
+ * RESIDUALS. 40 rows unwritten (the rows objdiff scores zero: `reflect`, `handleLayerCreate`, `handleLayerJump`,
+ *   `requestLayerCreate`, `getPatTerms` and the helpers).  The inline copies of `NetworkLayerRequest`'s
+ *   ctor/dtor/reset/isOwned/run/begin and `NetworkRequest::getRecord`/`getArgument`/`setRecord` (0x803E12B0..,
+ *   0x803E24F8, 0x803E283C, 0x803E2928, 0x803E9B88, 0x803E9C00, 0x803EF460) and the member-array ctors/dtors carry
+ *   manglings `Network/NetworkLayer.cpp`/`Network/NetworkSessionManager.cpp` already define, so the map cannot carry
+ *   them twice; our calls reach those copies by name.  `.data` cannot match until the unwritten handlers' tables and
+ *   strings are emitted (`vtableaudit` keeps the 0x805FC1E8 run); `flipcheck`: the claimed `.sdata` 8 B is not emitted.
+ *   Partial rows:
+ *  - `moveRequests`: the unrolled scan's trip count in r25 (the base's own `move` residual);
+ *  - `clear`: two instructions scheduled apart at the end;
+ *  - `setFriendTransferModeById`: retail indexes the mode array as `lbzx` off `this` (u8/u32 mode, peephole on/off and
+ *    an entry pointer tried);
+ *  - `sendUserPosition_60`, `applyLoginRecord`, `readSelectedServer_88`, `readUserRows`, `handleUserSearch`,
+ *    `pollFriendSlot`: a float compare's operand order, an early return's `bge`+`b` pair, a bool store's `clrlwi`, the
+ *    `addis`/`mulli` order of an unrolled remainder, two registers swapped;
+ *  - `setFriendTransferMode_E0`: retail passes the u32 mode to the mediator's `setTransferSlotMode` unnarrowed; a u32
+ *    parameter there lowers the mediator's own row, so the u8 stays;
+ *  - `downsampleVoice`: retail tests the count with `cmplwi`+`blelr` (`i != 0` and `i > 0` both give `cmpwi`+`beqlr`);
+ *  - `sendUserFields_5C`: two registers swapped;
+ *  - `move`: the voice-ready byte is compared unextended and stored without `clrlwi` (u8 and u32 each cost one
+ *    instruction), and two `pairState_C7F0` reads use `lbzx` off a precomputed row.
+ * SHAPES. The constructor calls `NetworkLayer::NetworkLayer` and stores 0x805FC1E0 (79 slots); the table is emitted here
+ *   (key function `stepRequest`, declared first; rule 10) and every override's map row carries the compiler's mangling.
+ *  - every handler is the state machine over `NetworkLayerRequest::state_00` (0 start, waits, 100 cancelled, 110
+ *    failed); `requestFlags_310[slot]`/`requestIds_368[slot]` are the reply bits and ids `reflect` sets (slot 21 is the
+ *    layer's own, +0x1C0);
+ *  - the `sendReqLayer*` results are declared `u32` (the caller stores the whole register, playbook 66); +0xF19C is
+ *    reached with `addis`+`lwz`, what a real offset that size compiles to;
+ *  - locals are laid out in reverse declaration order (`handleLayerInfo` declares the field list first); a list read
+ *    reuses its count variable as the batch's first row (`handleChildList`); the filter packers walk a pointer beside
+ *    the counter, incremented first (`packLayerSettings`);
+ *  - `setFlag75` and the base's slot take `u32` (no `clrlwi`; the base's store under a local `#pragma peephole on`);
+ *    `popTransferRecord` returns `s32` and `GameSpyInterfaceThread::isNegotiating` `BOOL`, as `move` uses them;
+ *  - the friend table holds real `NetworkUniqueId`s (`NetFriendRec`); the records with a unique id inside
+ *    (`NetFriendRec`, `NetFriendTable`, `NetFriendList`, `NetLayerRequest`, `NetCommunityList`, `NetLayerMediationList`,
+ *    the two notices) declare and define their ctors/dtors out of line (retail calls them); the layer and each community
+ *    record keep table and sessions as separate members; `NetFriendRoster` is only `handleUserList`'s stack payload;
+ *  - records the handlers send are views in `Network/NetworkLayerPat.h`; the layer requests' field list and record are
+ *    `PatInterface.cpp`'s `PatTagList`/`PatLayerData`, the address its 16-byte `path`;
+ *  - `handleConnect`'s 0x80060034 immediate (0x803E30F4) is a `config.yml` relocation block, as for `updateSession`.
  */
 #include "Network/NetworkLayerPat.h"
 #include "Network/NetworkPat.h"
@@ -3583,9 +3556,8 @@ void NetworkLayerPat::applyLoginRecord(const NetLayerLoginRecord* record)
     this->status_F038 = record->status_6C;
 }
 
-/* Logs the layer in (event 1): checks the account, installs the reflect callback, runs the server's login and FMP
- * stages (each ended with a shut request) and the binary stage, enters the layer and takes this console's id and
- * hunter name. */
+/* Logs the layer in (event 1): the account check, the reflect callback, the server's login, FMP and binary stages
+ * (each ended with a shut request), then enters the layer and takes this console's id and hunter name. */
 s32 NetworkLayerPat::handleConnect(NetworkLayerRequest* request)
 {
     char hunterName[0x20];

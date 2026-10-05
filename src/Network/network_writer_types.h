@@ -1,10 +1,6 @@
 /*
- * Network/network_writer_types.h - the bit-stream writer band's classes the session units share.
- *
- * The stream frame objects, the `NetworkBuffer` class and the logger view were
- * declared in `Network/NetworkSessionManager.h`; `Network/NetworkSessionStable.h` needs them below the
- * session class, so they live here once (rule 1) and both headers include this one.  Every type keeps
- * the size and layout evidence it carried there.
+ * Network/network_writer_types.h - the bit-stream writer band's classes the session units share: the stream frame
+ *   objects, `NetworkBuffer` and the logger view (rule 1).
  */
 
 #ifndef NETWORK_NETWORK_WRITER_TYPES_H
