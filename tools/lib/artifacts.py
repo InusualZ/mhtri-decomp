@@ -11,7 +11,6 @@ import time
 from dataclasses import dataclass, field
 from typing import Callable, Iterable, Sequence
 
-from tools.lib import cache as libcache
 from tools.lib import proc, testing
 
 GAME = "RMHE08"
@@ -228,8 +227,8 @@ def check_callers_index(ctx: Context) -> tuple[str, str]:
         return "stale", "unreadable index (%s)" % exc
     if index.get("schema") != refs.SCHEMA:
         return "stale", "index schema %s, the tool writes %s" % (index.get("schema"), refs.SCHEMA)
-    if index.get("signature") != libcache.stat_digest(files, asm_dir) or index.get("files") != len(files):
-        return "stale", "the dump changed since the index was built (%d file(s) now)" % len(files)
+    if index.get("signature") != refs.dump_signature(asm_dir, files, ctx.root) or index.get("files") != len(files):
+        return "stale", "%s since the index was built (%d file(s) now)" % (refs.DUMP_CHANGED, len(files))
     return "fresh", "matches the dump's %d file(s)" % len(files)
 
 
@@ -377,16 +376,16 @@ REGISTRY: dict[str, Artifact] = {a.name: a for a in (
              "1.8-1.9 s in .ninja_log at 415 objects (docs/build-performance.md's ~18 s was 13.5 k objects)",
              check_split, _ninja("build/RMHE08/config.json"), touches_tracked=True),
     Artifact("asm-dump", "the on-demand disassembly build/RMHE08/asm (write_asm: false), stamped",
-             "build/RMHE08/asm/.stamp.json", SPLIT_INPUTS[1:4], (), (3.0, 5.0),
-             "3.4-3.6 s wall at 410 files (2026-10-04; the old 200-400 s was 13.5 k files)",
+             "build/RMHE08/asm/.stamp.json", SPLIT_INPUTS[1:4], (), (4.0, 6.0),
+             "4.2-6.0 s wall at 415 files, replacing the old dump (2026-10-05; 200-400 s was 13.5 k files)",
              check_asm_dump, _py("tools/splits/dump_asm.py")),
     Artifact("tudiscover-graph", "tudiscover's per-function graph cache over the dump",
              "build/tmp/tudiscover/graph.json",
-             ("the dump's file count and bytes", "symbols.txt (sha1)", "tudiscover's SCHEMA and parse code"),
+             ("every dump file's name and content (sha1)", "symbols.txt (sha1)", "tudiscover's SCHEMA and parse code"),
              ("asm-dump",), (15.0, 20.0), "17 s cold, 1.9 s cached (2026-10-04)", check_tudiscover_graph,
              _py("tools/splits/tudiscover.py", "cache")),
     Artifact("callers-index", "callers' address-keyed reference index over the dump",
-             "build/tmp/callers/graph.json", ("every dump file's name, size and mtime", "lib.refs SCHEMA"),
+             "build/tmp/callers/graph.json", ("every dump file's name and content (sha1)", "lib.refs SCHEMA"),
              ("asm-dump",), (10.0, 15.0), "11.8 s cold, 1.6 s cached (2026-10-04)", check_callers_index,
              _py("tools/units/callers.py", "--stats")),
     Artifact("objects", "compiled objects build/RMHE08/src/**.o (one unit's, when a unit is named)",

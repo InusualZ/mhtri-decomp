@@ -161,8 +161,13 @@ class Item:
         return [d for d in self.decls if d.name not in self.excluded]
 
     def exclude(self, op_name: str, why: str) -> None:
-        """Stop applying one declaration; a request left with nothing to apply becomes judgement."""
+        """Stop applying one declaration; a request left with nothing to apply becomes judgement. A `prototypes`
+        request applies as one unit: excluding one of its declarations excludes them all (its STOPGAP block stays)."""
         self.excluded.setdefault(op_name, why)
+        if self.req.atomic:
+            for d in self.decls:
+                self.excluded.setdefault(d.name, "applied as one unit with %s, which is excluded" % op_name)
+            self.rewrites = [(o, n) for o, n in self.rewrites if n not in self.excluded]
         # a stale spelling's rewrite goes with its declaration: renamed, the lane's local declaration would clash
         # with the owner header's (different) one
         self.rewrites = [(o, n) for o, n in self.rewrites if n != op_name]
@@ -1196,7 +1201,8 @@ def apply_plan(root: str, items: list[Item], lane_scope: set[str], comments: boo
             if "STOPGAP" in t:
                 scope.add(r)
         ops = dedupe_ops([op for it in todo for op in it.live_decls()])
-        applied_ids = {it.req.id for it in todo}
+        # a STOPGAP block goes only with every declaration of its request: one left out still needs the block
+        applied_ids = {it.req.id for it in todo if not it.excluded}
         result["failures"] = apply_decls(files, ops, scope, applied_ids, mangle_checker(root) if mangle else None)
         for it in todo:
             if it.config:
@@ -1512,10 +1518,33 @@ def progressed(verdict: dict) -> bool:
 
 # --- already applied: the tree (and the sidecar) say a request needs nothing ------------------------------------
 
-def mark_applied(root: str, items: list[Item], scope: set[str]) -> int:
+def declared_for_owner(files: Files, d: DeclOp, ownership: Ownership | None) -> str | None:
+    """A header other than `d.header` that already declares `d.name` for its owner, or None: one in the include
+    closure of the owner's source (L3 round 2: `em_net_recv` in `hud/net_char_sync.h`, which `hud/pl_frame_sync.cpp`
+    includes), else a leaf header of the owner named for another of its symbols (`lb_act_dispatch_ex` in
+    `lobby/lb_act_dispatch.h`; the rule is `Ownership.leaf_header_owner`, stylelint's rule 2 reads the same one)."""
+    if not d.owner:
+        return None
+    owner_src = "src/%s" % d.owner
+    if files.exists(owner_src):
+        for h in files.closure(owner_src):
+            if h != owner_src and not h.startswith("..") and d.name in files.declared(h):
+                return h
+    if ownership is None:
+        return None
+    for r in files.all():
+        if r.startswith("include/") and d.name in files.get(r) and d.name in files.declared(r):
+            leaf_owner = ownership.leaf_header_owner(r, sorted(files.declared(r)))
+            if leaf_owner and R.unit_stem(leaf_owner) == R.unit_stem(d.owner):
+                return r
+    return None
+
+
+def mark_applied(root: str, items: list[Item], scope: set[str], ownership: Ownership | None = None) -> int:
     """Turn every `apply` item the tree already satisfies into `done` ("already applied"), so a rerun never
     re-proposes it: no rename left to do, no stale spelling left in the code, no STOPGAP block of its id, and each
-    declaration present in its owner header or its leaf header with no foreign declaration left in scope (a rename's
+    declaration present in its owner header, its leaf header, a header the owner's source includes or another leaf
+    header of the owner (`declared_for_owner`), with no foreign declaration left in scope (a rename's
     declaration may instead be unneeded: every caller sees one); a config request whose items config.yml already
     carries. -> the number marked."""
     files = Files(root)
@@ -1553,6 +1582,8 @@ def mark_applied(root: str, items: list[Item], scope: set[str]) -> int:
                 break
             if files.exists(d.header) and d.name in files.declared(d.header):
                 why.append("%s in %s" % (d.name, d.header))
+            elif (elsewhere := declared_for_owner(files, d, ownership)):
+                why.append("%s in %s" % (d.name, elsewhere))
             elif d.implicit and not needs_declaration(files, d):
                 why.append("%s: every caller sees a declaration" % d.name)
             else:
@@ -1656,7 +1687,7 @@ def run(args, root: str | None = None) -> int:
     items = plan(requests, ownership, decisions, live, lane_names, status)
     summary = {"tree": root, "requests": len(requests), "files": [os.path.basename(p) for p in paths],
                "classes": {c: sum(1 for i in items if i.cls == c) for c in R.CLASSES}}
-    summary["already_applied"] = mark_applied(root, items, scope_files(root, lane_scope))
+    summary["already_applied"] = mark_applied(root, items, scope_files(root, lane_scope), ownership)
     if args.dry_run:
         return emit(args, items, summary, log, t_start)
     prev_branch = g.current_branch()

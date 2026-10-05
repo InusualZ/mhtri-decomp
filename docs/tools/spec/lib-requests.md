@@ -18,6 +18,14 @@ sidecar and the STOPGAP marker.
 * `validate(entry) -> [problem]` - a new-schema object: id, kind, evidence, `symbol|address`, `proposed_name` for a
   rename and for a `decl` of a generated name, a one-line `prototype` that declares the name (a `field` request's
   prototype is a member-slot fragment of the type in `symbol`, so only its one-line shape is checked), `stopgap {file, id}`.
+* **Several declarations in one request** (2026-10-05; the SO callees took 11 requests, one STOPGAP block each): a `decl`
+  may carry `prototypes: [...]` instead of `prototype` - each item a C line (its symbol is the name it declares,
+  `declared_name`) or an object `{symbol|address, section, proposed_name, prototype}`. `validate` refuses both forms at
+  once, a top-level `symbol`/`address`/`proposed_name` beside it (each declaration carries its own), another kind, an
+  empty list, an item that is not one line or does not declare its name, a generated item name without `proposed_name`,
+  and a name declared twice. `prototype_items(entry)` normalises both forms; `from_entry` makes one `Target` per item, and
+  `Request.atomic` is True for this form. Old request files load byte-identically (replayed: the nine files under
+  `.pi/outbox/`, four pilot ones included, classify and serialise the same before and after).
 * `Request` / `Target`; `load_file(path)` (JSON lines or a list; a new-schema line keeps its id, a free-text line
   becomes `<slug>#<line>` through `normalise_legacy`, an unparsable line an `info` request - nothing is dropped);
   `request_files(dir)`, `slug_of(path)`.

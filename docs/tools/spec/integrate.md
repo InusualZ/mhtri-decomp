@@ -69,6 +69,11 @@ commit), the branch, and with `--write-status` the sidecars.
   declaration stays; when a caller needs it, the rename is reverted (judgement).
 * **A STOPGAP block's removal takes its markers and its declarations** (prototypes, `extern` variables); any other code
   in it - a typedef a call site casts through (L2's `CircleInfoSetSender`, `NetworkErrorInfoGetter`) - stays, unwrapped.
+* **A block goes only with every declaration of its request**: a request with an excluded declaration keeps its block
+  (`apply_plan`'s `applied_ids`), so a declaration the build refused is never left with neither its stopgap nor its owner
+  header. A `prototypes` request (`lib.requests`, `Request.atomic`) applies as one unit: one STOPGAP id covers all its
+  declarations, and excluding one (a refusal, a build error naming it) excludes them all, with the failing name in each
+  reason. A legacy multi-target request still excludes one declaration at a time.
 * **A prototype names the decided symbol:** the request's prototype is rewritten from the filed spelling, the lane's
   proposed name and the map's current name to the final one (L2: `isCircleListBusy` filed, `testAndSet611b` decided).
 * **Leaf headers:** when a consumer cannot include the owner's full header (a redefinition error in it after this batch
@@ -76,9 +81,13 @@ commit), the branch, and with `--write-status` the sidecars.
   header, created from the template) in the next round; a rerun finds an existing leaf header and declares nothing in
   the full one.
 * **Already applied:** a request the tree already satisfies - no rename left, no stale spelling in the code, no STOPGAP
-  block of its id, every declaration in its owner or leaf header with no foreign declaration left in scope (or, for a
-  rename, unneeded), a config whose items `config.yml` carries - is `done` and listed under `## already applied`, in the
-  dry run too; the sidecar's `applied`/`rejected` does the same.
+  block of its id, every declaration in its owner or leaf header - or in a header the owner's source includes, or in
+  another leaf header of the owner (`declared_for_owner`; the leaf rule is `lib.project.Ownership.leaf_header_owner`,
+  the one stylelint's rule 2 reads) - with no foreign declaration left in scope (or, for a rename, unneeded), a config
+  whose items `config.yml` carries - is `done` and listed under `## already applied`, in the dry run too; the sidecar's
+  `applied`/`rejected` does the same. Replayed on the L3 round-2 file (2026-10-05): 20 already applied before, 22 after -
+  `lb_act_dispatch_ex` (`lobby/lb_act_dispatch.h`, a leaf header named for its sibling) and `em_net_recv`
+  (`hud/net_char_sync.h`, which `hud/pl_frame_sync.cpp` includes) are no longer re-proposed; classes unchanged.
 * **Cleanup:** an emptied `extern "C"` block goes, a comment opening with `STOPGAP` left without code goes, a comment that
   described a removed declaration goes, a blank run the edit made collapses; a unit header's prose is never rewritten
   (its STOPGAP mentions are listed as `stopgap_mentions`).

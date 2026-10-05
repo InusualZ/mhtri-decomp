@@ -822,6 +822,24 @@ def objects_dir(root: str, honour_env: bool = False, game: str = "RMHE08") -> st
     return repo.resolve_input(os.path.join("build", game, "obj"), root, _has_objects, honour_env)
 
 
+#: the one reason both dump caches (callers' index, tudiscover's graph) give when the dump's bytes moved
+DUMP_CHANGED = "the dump's content changed"
+#: the signature prefix: the rule a cached `signature` was computed by (a stat-signed cache from before reads stale)
+SIGNATURE_RULE = "content-sha1:"
+
+
+def dump_memo(root: str) -> str:
+    """The per-file hash memo `dump_signature` keeps for a tree (`build/tmp/dump-digest.json`, shared by every reader)."""
+    return os.path.join(root, "build", "tmp", "dump-digest.json")
+
+
+def dump_signature(asm_dir: str, files: list[str], root: str | None = None) -> str:
+    """What a cache over the dump is keyed on: every file's name and the hash of its bytes (`lib.cache.content_digest`),
+    so a split that rewrites the dump without changing it keeps the cache; `root` names the tree whose memo spares the
+    re-read of a file whose stat did not move."""
+    return SIGNATURE_RULE + libcache.content_digest(files, asm_dir, dump_memo(root) if root else None)
+
+
 def dump_cache(root: str) -> str:
     """Where the dump index is cached (`build/tmp/callers/graph.json`, the format `callers.py` always wrote)."""
     return os.path.join(root, "build", "tmp", "callers", "graph.json")
@@ -841,9 +859,9 @@ def load_dump_index(root: str, rebuild: bool = False, asm_dir: str | None = None
     if not files:
         return None, {"asm_dir": asm_dir, "cache": cache, "files": 0, "cached": False, "rebuilt": False,
                       "reason": "no dump", "stats": {}}
-    index, info = load_index(cache, libcache.stat_digest(files, asm_dir), len(files),
+    index, info = load_index(cache, dump_signature(asm_dir, files, root), len(files),
                              lambda: build_dump_index(asm_dir, files, game), rebuild,
-                             "the dump changed since the index was built")
+                             DUMP_CHANGED + " since the index was built")
     info["asm_dir"] = asm_dir
     return index, info
 

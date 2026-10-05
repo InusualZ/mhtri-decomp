@@ -83,7 +83,10 @@ def integrator_lines() -> list[str]:
              "`python tools/units/handoff.py --check-requests <file>` validates it. Fields: `id` (`<slug>#<n>`), "
              "`kind`, `symbol` or `address`, `section`, `proposed_name`, `confidence` (certain|evidence|guess), "
              "`prototype` (the exact C line), `evidence`; optional `owner_unit` (cross-checked against the map) and "
-             "`stopgap` (`{file, id}`). A `decl` of an `fn_`/`lbl_` symbol must carry `proposed_name`.",
+             "`stopgap` (`{file, id}`). A `decl` of an `fn_`/`lbl_` symbol must carry `proposed_name`. A `decl` that "
+             "needs several declarations of one owner files them once as `prototypes` (a list of C lines, or of "
+             "`{symbol|address, proposed_name, prototype}` objects; no top-level `symbol`): they apply together, "
+             "under one STOPGAP block, or not at all.",
              "",
              "| kind | needs | what it is |",
              "| --- | --- | --- |"]

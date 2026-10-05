@@ -217,5 +217,44 @@ def test_config_items(c):
             R.classify(R.from_entry(dict(l2, proposed="fill_gaps: false")))[0], "judgement")
 
 
+def test_prototypes(c):
+    """One request, several declarations: the SO callees took 11 requests when each needed its own STOPGAP block."""
+    many = {"id": "net3-c#4", "kind": "decl", "evidence": "the SO callees",
+            "prototypes": ["s32 SOInit(void);", "u32 SOGetHostID(void);",
+                           {"address": "0x8051E864", "proposed_name": "SOStartup", "prototype": "s32 SOStartup(void);"}],
+            "stopgap": {"file": "src/Lane/lane.cpp", "id": "net3-c#4"}}
+    c.check("a prototypes request is valid", R.validate(many), [])
+    r = R.from_entry(many)
+    c.check("... and loads one target per declaration, the name read from a string item",
+            [(t.symbol, t.address, t.proposed_name, t.prototype) for t in r.targets],
+            [("SOInit", None, None, "s32 SOInit(void);"), ("SOGetHostID", None, None, "u32 SOGetHostID(void);"),
+             ("0x8051E864", 0x8051E864, "SOStartup", "s32 SOStartup(void);")])
+    c.check("... applies as one unit, and classifies as one decl", (r.atomic, R.classify(r)[0]), (True, "mechanical"))
+    one = {"id": "a#1", "kind": "decl", "symbol": "SOInit", "prototype": "s32 SOInit(void);", "evidence": "x"}
+    c.check("`prototype` stays the one-item form", ([t.prototype for t in R.from_entry(one).targets],
+            R.from_entry(one).atomic, R.prototype_items(one)[0]["prototype"]),
+            (["s32 SOInit(void);"], False, "s32 SOInit(void);"))
+    bad = lambda **kw: R.validate(dict(many, **kw))  # noqa: E731
+    c.check("both forms at once are refused", "prototype and prototypes are exclusive (`prototype` is the one-item "
+            "form)" in bad(prototype="s32 SOInit(void);"), True)
+    c.check("a top-level symbol beside prototypes is refused",
+            "prototypes: symbol belong in the items (each declaration carries its own)" in bad(symbol="SOInit"), True)
+    c.check("only a decl carries several", bad(kind="field", symbol="X"),
+            ["prototypes: only a `decl` request carries several declarations"])
+    c.check("an empty list is refused", "prototypes must be a non-empty list" in bad(prototypes=[]), True)
+    c.check("a two-line item is refused", "prototypes[1]: one C line ending in `;` (a string, or an object with "
+            "`prototype`)" in bad(prototypes=["s32 a(void);\ns32 b(void);"]), True)
+    c.check("an item that declares another name is refused", "prototypes[1]: does not declare SOStop" in
+            bad(prototypes=[{"symbol": "SOStop", "prototype": "s32 SOInit(void);"}]), True)
+    c.check("a name declared twice is refused", "prototypes[2]: SOInit is declared twice" in
+            bad(prototypes=["s32 SOInit(void);", "s32 SOInit(void);"]), True)
+    c.check("a generated item name needs proposed_name", "prototypes[1]: the generated name fn_8051E864 needs "
+            "`proposed_name` (rule 7)" in bad(prototypes=[{"symbol": "fn_8051E864",
+                                                          "prototype": "s32 fn_8051E864(void);"}]), True)
+    c.check("declared_name reads functions, data and arrays",
+            [R.declared_name(p) for p in ("s32 SOInit(void);", "extern u8 table[4];", 'extern "C" void* f(u32 x);',
+                                          "u32 x;", "nonsense")],
+            ["SOInit", "table", "f", "x", None])
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))

@@ -102,6 +102,11 @@ class Request:
     legacy: bool = False
     raw: dict = field(default_factory=dict)
 
+    @property
+    def atomic(self) -> bool:
+        """A request filed with `prototypes`: its declarations apply together or not at all (one STOPGAP block)."""
+        return isinstance(self.raw.get("prototypes"), list)
+
     def symbol_text(self) -> str:
         """The targets' spellings and the raw `symbol` field, one string (what a keyword test reads)."""
         return " ".join(t.symbol for t in self.targets) + " " + str(self.raw.get("symbol") or "")
@@ -131,7 +136,7 @@ def validate(entry: dict) -> list[str]:
         out.append("confidence %r is not one of %s" % (conf, "/".join(CONFIDENCES)))
     sym, addr = entry.get("symbol"), entry.get("address")
     needs = next(r["needs"] for r in SCHEMA if r["kind"] == kind)
-    if "symbol|address" in needs and not (sym or addr):
+    if "symbol|address" in needs and not (sym or addr) and not entry.get("prototypes"):
         out.append("%s: needs `symbol` or `address`" % kind)
     if "symbol" in needs and not sym:
         out.append("%s: needs `symbol`" % kind)
@@ -146,6 +151,8 @@ def validate(entry: dict) -> list[str]:
         out.append("proposed_name %r is not a C identifier" % (pname,))
     if kind == "decl" and sym and libnames.is_generated(str(sym)) and not pname:
         out.append("decl of the generated name %s needs `proposed_name` (rule 7: the integrator names it)" % sym)
+    if entry.get("prototypes") is not None:
+        out.extend(_validate_prototypes(entry))
     proto = entry.get("prototype")
     if proto is not None:
         if "\n" in str(proto) or not str(proto).strip().endswith(";"):
@@ -159,6 +166,79 @@ def validate(entry: dict) -> list[str]:
     gap = entry.get("stopgap")
     if gap is not None and (not isinstance(gap, dict) or not gap.get("file") or not gap.get("id")):
         out.append("stopgap must be {file, id}")
+    return out
+
+
+def _one_line(proto: Any) -> bool:
+    return isinstance(proto, str) and "\n" not in proto and proto.strip().endswith(";")
+
+
+def declared_name(proto: str) -> str | None:
+    """The identifier one C declaration line declares: the name before the parameter list of a function, else the
+    last identifier of a variable (`extern u8 table[4];` -> `table`); None when the line is no declaration."""
+    c = re.sub(r"\s+", " ", str(proto or "").strip().rstrip(";").strip())
+    c = re.sub(r'^extern\s+"C"\s+', "", c)
+    m = re.match(r"^[^()]*?([A-Za-z_]\w*)\s*\(", c)
+    if m:
+        return m.group(1)
+    names = re.findall(r"[A-Za-z_]\w*", re.sub(r"\[[^\]]*\]", " ", c))
+    return names[-1] if len(names) >= 2 else None
+
+
+def prototype_items(entry: dict) -> list[dict]:
+    """The declarations a request carries, one dict each (`prototype`, and the `symbol`/`address`/`section`/
+    `proposed_name` that belong to it): `prototypes` (a string - the symbol is the name it declares - or an object),
+    else the one-item form `prototype` with the request's own fields; `[]` when it carries none."""
+    many = entry.get("prototypes")
+    if isinstance(many, list):
+        out = []
+        for item in many:
+            d = {"prototype": item} if isinstance(item, str) else dict(item) if isinstance(item, dict) else {}
+            if not d.get("symbol") and d.get("address") is None and isinstance(d.get("prototype"), str):
+                d["symbol"] = d.get("proposed_name") or declared_name(d["prototype"])
+            out.append(d)
+        return out
+    if entry.get("prototype") is not None:
+        return [{k: entry.get(k) for k in ("prototype", "symbol", "address", "section", "proposed_name")}]
+    return []
+
+
+def _validate_prototypes(entry: dict) -> list[str]:
+    """The `prototypes` form: a `decl` only, never beside `prototype` or a top-level `symbol`/`address`/
+    `proposed_name` (each declaration carries its own), each item one C line that declares its symbol, no name
+    twice."""
+    out = []
+    many = entry.get("prototypes")
+    if entry.get("kind") != "decl":
+        return ["prototypes: only a `decl` request carries several declarations"]
+    if entry.get("prototype") is not None:
+        out.append("prototype and prototypes are exclusive (`prototype` is the one-item form)")
+    stray = [k for k in ("symbol", "address", "proposed_name") if entry.get(k) is not None]
+    if stray:
+        out.append("prototypes: %s belong in the items (each declaration carries its own)" % "/".join(stray))
+    if not isinstance(many, list) or not many:
+        return out + ["prototypes must be a non-empty list"]
+    seen: set[str] = set()
+    for i, item in enumerate(prototype_items(entry), 1):
+        proto = item.get("prototype")
+        if not _one_line(proto):
+            out.append("prototypes[%d]: one C line ending in `;` (a string, or an object with `prototype`)" % i)
+            continue
+        if item.get("address") is not None and parse_address(item["address"]) is None:
+            out.append("prototypes[%d]: address %r is not a hex address" % (i, item["address"]))
+        pname, sym = item.get("proposed_name"), item.get("symbol")
+        if pname is not None and not _C_IDENT_RE.match(str(pname)):
+            out.append("prototypes[%d]: proposed_name %r is not a C identifier" % (i, pname))
+        if sym and libnames.is_generated(str(sym)) and not pname:
+            out.append("prototypes[%d]: the generated name %s needs `proposed_name` (rule 7)" % (i, sym))
+        want = pname or sym
+        if not want:
+            out.append("prototypes[%d]: declares no name" % i)
+        elif not re.search(r"\b%s\b" % re.escape(str(want)), proto):
+            out.append("prototypes[%d]: does not declare %s" % (i, want))
+        elif want in seen:
+            out.append("prototypes[%d]: %s is declared twice" % (i, want))
+        seen.add(str(want))
     return out
 
 
@@ -312,16 +392,26 @@ def normalise_legacy(raw: dict, slug: str, n: int) -> Request:
                    lane=str(raw.get("lane") or ""), legacy=True, raw=raw)
 
 
-def from_entry(entry: dict) -> Request:
-    """A new-schema object as a Request (one target)."""
-    addr = parse_address(entry.get("address")) if entry.get("address") is not None else None
-    sym = str(entry.get("symbol") or "")
+def _target(d: dict, section: str | None = None) -> Target | None:
+    addr = parse_address(d.get("address")) if d.get("address") is not None else None
+    sym = str(d.get("symbol") or "")
     if not sym and addr is not None:
         sym = "0x%08X" % addr
     if addr is None and sym:
         addr = libnames.address_of(sym)
-    t = Target(sym, addr, entry.get("section"), entry.get("proposed_name"), entry.get("prototype"))
-    return Request(id=entry["id"], kind=entry["kind"], targets=[t] if (sym or addr is not None) else [],
+    if not sym and addr is None:
+        return None
+    return Target(sym, addr, d.get("section") or section, d.get("proposed_name"), d.get("prototype"))
+
+
+def from_entry(entry: dict) -> Request:
+    """A new-schema object as a Request: one target, or one per item of `prototypes`."""
+    if isinstance(entry.get("prototypes"), list):
+        targets = [t for t in (_target(d, entry.get("section")) for d in prototype_items(entry)) if t]
+    else:
+        t = _target(entry)
+        targets = [t] if t else []
+    return Request(id=entry["id"], kind=entry["kind"], targets=targets,
                    evidence=str(entry.get("evidence") or ""), proposed=str(entry.get("proposed") or ""),
                    confidence=entry.get("confidence", "evidence"), owner_unit=entry.get("owner_unit"),
                    header=entry.get("header"), stopgap=entry.get("stopgap"), lane=str(entry.get("lane") or ""),

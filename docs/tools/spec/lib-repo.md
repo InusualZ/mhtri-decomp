@@ -16,7 +16,8 @@ originals hash to. It is also the choke point of the fixture tier's live-tree re
   (`PACKAGED_ROOT`, the tree this file sits in). `SystemExit` when no tree is found.
 * `caller_worktree(start=None)`, `cwd_tree()`: the two halves of that rule.
 * `worktree_root(start=None) -> str`: the git worktree the caller (or `start`) is in; `SystemExit` naming the directory
-  when git cannot say - the one resolver `landing.common.worktree_root` and `recompile.worktree_root` call.
+  when git cannot say - the one resolver `landing.common.worktree_root`, `recompile.worktree_root` and
+  `measure.worktree_root` call.
 * `main_checkout(root) -> str`: MAIN for a tool that must have one - `main_tree(root)` when it holds `configure.py`,
   else the first `git worktree list` entry, else `root` (`recompile.main_root`, `measure.py`).
 * `main_tree(root, honour_env=False) -> str | None`: the parent of `git rev-parse --git-common-dir`; `honour_env` lets a
@@ -71,11 +72,11 @@ root, and a process given a live path all raise.
 
 ## Known gaps
 
-* 18 private resolvers outside `unitutil` remain (`recompile.main_root` - which also falls back to the first
-  worktree row -, `measure.worktree_root` (the same semantics as `lib.repo.worktree_root`, not yet migrated), `infer`, `methodize`, `guard`, `commitlint`, `sync_*`, `backlog`, `rescue`, `slots`, `worktreehook`,
+* 17 private resolvers outside `unitutil` remain (`recompile.main_root` - which also falls back to the first
+  worktree row -, `infer`, `methodize`, `guard`, `commitlint`, `sync_*`, `backlog`, `rescue`, `slots`, `worktreehook`,
   `wtsafe.main_worktree`, `langcheck`, `unwindcut`) and the module-level `ROOT = dirname(...)` constants of `symbolpreflight`,
   `ledger`, `flipcheck`, `datagap`, `selftest`: each goes with its family's WP3 package, because removing a module-level
   `ROOT` is a fixture rewrite of that tool's tests. WP3c: `tudiscover` and `dataorder` resolve their tree paths on first use
-  (assignable, so `dump_asm_selftest` still pins them); `callers`, `callees`, `accessextent`, `dossier` keep only the file's
+  (assignable, so `tests/splits/test_dump_asm.py` still pins them); `callers`, `callees`, `accessextent`, `dossier` keep only the file's
   own tree as `ROOT` (a path computation, nothing resolved at import).
 * `state()` is not called yet: the 40 `.pi/` spellings move with WP3e (lanes).

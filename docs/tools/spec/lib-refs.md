@@ -37,6 +37,9 @@ the dump regexes, `DumpStamp`, `has_dump`).
   unit)]}`, sorted, no extension), `census_symbols(symbols_path)` (name -> row, a duplicated name dropped),
   `census_units(ranges, units)`, `tree_census(root, units, ranges, game) -> ((records, stats), registered, read)`;
   `CENSUS_SECTIONS`, `BOOKKEEPING`, `CALL_TYPES`.
+* The dump caches' key: `dump_signature(asm_dir, files, root=None)` (`SIGNATURE_RULE` + `lib.cache.content_digest` over
+  every file's name and bytes, the memo at `dump_memo(root)` = `build/tmp/dump-digest.json`), what `load_dump_index`,
+  `lib.artifacts.check_callers_index` and `tudiscover.graph_stamp` all call; `DUMP_CHANGED`, the one stale reason.
 * The query (WP3c, from `callers`): `dump_dir(root, honour_env)`, `objects_dir(...)`, `dump_cache(root)`, `objects_cache(root)`,
   `load_dump_index(root, rebuild, asm_dir, cache, honour_env, game)`, `load_object_index(root, rebuild, cmap, cache,
   honour_env, game, obj_dir)`; `RefMap` (the map as an address index, `RefMap.load(root)`; `name_at`, `function_at`,
@@ -92,7 +95,7 @@ for the census (both read `lib.binary.elf`).
 
 ## Lib dependencies
 
-`lib.ppc`, `lib.cache` (`stat_digest`, `content_hash`), `lib.text` (`atomic_write`), `lib.binary.elf`; lazily, for the
+`lib.ppc`, `lib.cache` (`content_digest`, `stat_digest` for the object index, `content_hash`), `lib.text` (`atomic_write`), `lib.binary.elf`; lazily, for the
 tree-level helpers only, `lib.project` (`Splits`, `SymbolMap`, `Ownership`, `owner_label`) and `lib.repo`
 (`resolve_input`, `is_served`).
 

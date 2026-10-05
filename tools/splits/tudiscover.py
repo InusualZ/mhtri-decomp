@@ -299,15 +299,21 @@ def graph_check():
         return "stale", "unreadable graph cache (%s)" % exc
     if cached != stamp:
         changed = sorted(k for k in stamp if not isinstance(cached, dict) or cached.get(k) != stamp[k])
-        return "stale", "%s changed since the graph was built" % "/".join(changed)
+        return "stale", "%s since the graph was built" % "; ".join(STAMP_WORDS.get(k, k + " changed") for k in changed)
     return "fresh", "%d file(s), matches the dump, symbols.txt and this parser" % stamp["files"]
 
 
 def graph_stamp(files):
-    """What the graph cache is a function of: the schema, the map, the dump's size and the parse code."""
+    """What the graph cache is a function of: the schema, the map, the dump's files and content (the one rule
+    `callers`' index uses, `lib.refs.dump_signature`) and the parse code."""
     return {"schema": SCHEMA, "symbols": hashlib.sha1(open(_g("SYMBOLS"), "rb").read()).hexdigest(),
-            "files": len(files), "bytes": sum(os.path.getsize(f) for f in files),
+            "files": len(files), "content": _refs.dump_signature(_g("ASM_DIR"), files, _g("ROOT")),
             "parse": parse_fingerprint()}
+
+
+#: how `graph_check` names a stamp key that moved (the dump's content reads as `callers`' does)
+STAMP_WORDS = {"content": _refs.DUMP_CHANGED, "files": "the dump's file count changed", "symbols": "symbols.txt changed",
+               "schema": "the graph schema changed", "parse": "the parse code changed"}
 
 
 def asm_files(fns=None):

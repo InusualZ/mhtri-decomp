@@ -247,6 +247,24 @@ class Ownership:
         name = self.name_at(section, address)
         return self.resolve(name) if name else None
 
+    def leaf_header_owner(self, rel: str, names: list[str]) -> str | None:
+        """The unit that owns the header `rel` as a **leaf header**, or None (section 6.5 rule 2's one other owner
+        spelling): `include/<module>/<symbol>.h`, named for a symbol it declares (`names`), and declaring only
+        symbols one registered unit defines. Strict: one unresolved, unowned or duplicate name, or symbols of two
+        units, and it is not a leaf. One implementation: stylelint's rule 2 and integrate's already-applied test."""
+        rel = rel.replace("\\", "/")
+        if not rel.startswith("include/") or rel.startswith("include/unsplit/") or not names:
+            return None
+        if os.path.splitext(os.path.basename(rel))[0] not in names:
+            return None
+        units = set()
+        for name in names:
+            r = self.resolve(name)
+            if r is None or r["kind"] != "owned":
+                return None
+            units.add(r["unit"])
+        return units.pop() if len(units) == 1 else None
+
     def unit_of_symbol(self, name: str) -> str | None:
         """The registered unit owning `name`, or None (absent, duplicated or unsplit)."""
         r = self.resolve(name)

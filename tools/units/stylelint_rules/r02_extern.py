@@ -7,6 +7,7 @@ import re
 
 from tools.lib import cscan
 from tools.lib import requests as _requests
+from tools.lib.project.ownership import Ownership as _Ownership
 from tools.units.stylelint_rules.common import (
     HEADERS, HEADER_SUFFIXES, SRC, Source, UNSPLIT, UNSPLIT_UNRESOLVED, _finding, _rule2_finding,
 )
@@ -234,19 +235,7 @@ def leaf_header_owner(src: Source, names: list[str], ownership: "Ownership") -> 
     test is symbol-based and strict: one unresolved, unowned or duplicate name, or symbols of two units,
     and the header is not a leaf (no per-file exemption); the path-stem rule in `_owns` is unchanged.
     """
-    rel = src.rel.replace("\\", "/")
-    if not rel.startswith(HEADERS + "/") or rel.startswith(UNSPLIT + "/") or not names:
-        return None
-    stem = os.path.splitext(os.path.basename(rel))[0]
-    if stem not in names:
-        return None
-    units = set()
-    for name in names:
-        r = ownership.resolve(name)
-        if r is None or r["kind"] != "owned":
-            return None
-        units.add(r["unit"])
-    return units.pop() if len(units) == 1 else None
+    return _Ownership.leaf_header_owner(ownership, src.rel, names)   # the one implementation (lib.project)
 
 
 def rule2_header_findings(src: Source, ownership: "Ownership") -> list[dict]:

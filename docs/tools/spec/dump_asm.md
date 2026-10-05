@@ -1,10 +1,11 @@
-# `dump_asm` - Regenerate dtk's per-unit asm dump on demand (write_asm is off) and stamp it with the input hashes
+# `dump_asm` - Regenerate dtk's per-unit asm dump on demand (write_asm is off), replacing the old one, and stamp it
 
 <!-- generated from the module docstring of `tools/splits/dump_asm.py` at ec2609b46 by the tools-design lane; tightened by hand where marked -->
 
 ## Purpose
 
-Regenerate the split disassembly dump that `tudiscover` reads.
+Regenerate the split disassembly dump that `tudiscover` and `callers` read. The new dump **replaces** the old directory,
+so a `.s` the split no longer writes never survives a refresh.
 
 ## Users
 
@@ -13,45 +14,61 @@ skills (2); CLAUDE.md (1); docs (11)
 ## CLI
 
 ```
-python tools/splits/dump_asm.py              # dump, then stamp it
+python tools/splits/dump_asm.py              # dump the invocation's tree, replace its dump, then stamp it
+python tools/splits/dump_asm.py --root DIR   # the same for DIR (its config, its dtk, its build/)
 python tools/splits/dump_asm.py --check      # report the dump's age only, no split (exit 1 if not fresh)
 python tools/splits/dump_asm.py --dry-run    # print the command it would run
 ```
-Flags: `--check`, `--dry-run`.
-Exit codes: 0 ok, 1 findings or refusal, 2 could not run (the `lib.findings` convention; today's tool documents none, so `migration.md` records the current behaviour before changing it).
-`--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
+Flags: `--root`, `--check`, `--dry-run`.
+Exit codes: 0 ok; 1 `--check` not fresh, or the split wrote no `.s`; dtk's own exit code when the split fails; 2 no
+toolchain, unreadable inputs, or a swap that could not finish. No `--json`.
 
 ## Inputs and outputs
 
-Inputs -> outputs: DOL, map -> build/RMHE08/asm/.
+Inputs -> outputs: `<root>/config/RMHE08/config.yml` (+ the map, splits and DOL it names) -> `<root>/build/RMHE08/asm/`
+and its `.stamp.json`. Scratch, all under `<root>/build/RMHE08/`: `dump_asm.yml` (the temp config, deleted after the run),
+`.dump_asm-stage/` (the split's `out_dir`, kept between runs; its `asm/` is moved out on success) and
+`.dump_asm-retired.<pid>/` (the old dump during the swap).
 
 ## Invariants and rules
 
 * `--no-update` keeps the hand-edited `symbols.txt`/`splits.txt` out of the run (dtk's own "for build systems" mode), and the dump is stamped with the hashes of the three files it is a function of, so `tudiscover stats` can say when it has outlived a symbol edit. That matters because stale asm is silent: `asm_files()`'s docstring records a stale copy printing `bl fn_80456DD4` where the canonical one prints `bl _savegpr_14`, which zeroes a codegen fingerprint.
-* Nothing here is written outside `build/<game>/` (`dump_asm.yml`, the dump itself, the stamp).
+* Nothing here is written outside `<root>/build/<game>/` (`dump_asm.yml`, the stage, the dump itself, the stamp).
+* **One tree.** The config, the toolchain and the output all come from `--root` (default: the invocation's tree, never the
+  tree this file lives in), so `MAIN/tools/splits/dump_asm.py` run in a worktree dumps the worktree. `lib.artifacts` runs
+  each tree's own copy with the tree as cwd, which resolves to the same tree.
+* **The dump is replaced, never merged.** dtk's split writes into the stage; only after a zero exit that wrote at least
+  one `.s` is the old `asm/` renamed to the retired name (its stamp goes with it), the staged `asm/` renamed in, and the
+  retired directory deleted. A failed or empty split, or a swap that cannot finish (a file held open on Windows), leaves
+  the old dump **and its stamp** in place - they still describe each other - and the failed second rename puts the old
+  directory back.
+* **The stamp is written last** and carries the input hashes read **before** dtk ran: a map edit made during the run
+  reads `stale`, never `fresh`.
+* **It deletes only what it owns**: `build/<game>/asm`, the stage, the stage's `asm/` and a retired dump, each a real
+  directory (not a link or junction) under the tree's real `build/<game>/` (`removal_refusal`); any other path is a
+  `SystemExit` that deletes nothing. A leftover from an interrupted run is removed at the start of the next.
 
 ## Lib dependencies
 
-repo, proc, cache.
+repo, refs (`DumpStamp`, `dump_files`). No tool import: the `tudiscover` edge is gone.
 
 ## Test contract
 
-Tier: fixture (temp config).
-Today's selftest (`tools/splits/dump_asm_selftest.py`): The risk `write_asm: false` introduces is a dump that silently outlives the map it was generated from (stale asm zeroes codegen fingerprints - see `asm_files()`'s docstring), so the two things worth pinning down are the temp-config rewrite that keeps the repo's own `config.yml` untouched, and the state machine in `tudiscover.asm_stamp_status` (`lib.refs.DumpStamp` since WP3c): missing / unstamped / fresh / stale / truncated. Both read their inputs from module globals, so this points those at a temp tree: no dtk, no real dump, no writes outside the temp directory.
-Target: `tools/tests/splits/test_dump_asm.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
+Tier: fixture. `tools/tests/splits/test_dump_asm.py` (replaces `dump_asm_selftest.py`) on a temp tree with a fake dtk
+runner: the temp-config rewrite (CRLF kept), the tree is `--root`'s, a refresh removes a stale unit and stamps the new
+count, a failed or empty split changes neither the dump nor the stamp, a failed swap restores the old dump, a mid-run map
+edit stamps `stale`, leftovers are cleared, the removal guard refuses every path it does not own (and deletes nothing),
+the CLI exits; plus `tudiscover`'s view of the stamp state machine. Each of five mutations (merge instead of swap, no
+guard, post-run input hashes, swap after a failed split, no restore) fails at least one check.
 
 ## Known gaps
 
 * It is the registry's `asm-dump` refresh (`lib.artifacts`): `tudiscover` runs it itself when the dump is stale, `callers`
-  with `--refresh`, `fresh.py refresh asm-dump` by name. Measured 2026-10-04 at 410 files: 3.4-3.6 s wall (dtk 3.0 s), not the
-  200-400 s of the 13.5 k-file era. A fresh worktree (no `build/RMHE08/`) used to crash writing the temp config; it now
-  creates the directory first.
-* `ROOT` is the tool file's tree (`Path(__file__)`), while the dump's out dir follows the invocation's tree (`tudiscover`'s
-  `LOCAL_ASM_DIR`): `MAIN/tools/splits/dump_asm.py` run inside a worktree would split MAIN's config into the worktree's
-  `build/`. The registry always runs the tree's own copy with the tree as cwd, so it never mixes them; the tool itself is
-  unchanged here.
-* dtk rewrites every `.s` on each run (no skip-unchanged), so every refresh invalidates `callers`' stat-signed index, and a
-  `write_asm: false` split never cleans the directory: MAIN's dump holds 2 284 files where a fresh dump writes 410.
+  with `--refresh`, `fresh.py refresh asm-dump` by name. Measured 2026-10-05 at 415 files: 4.2-6.0 s wall (dtk 3.4 s, the
+  retired dump's delete 1.3 s); the merge-in-place version took 3.9 s and left every stale file behind (MAIN's dump: 2 489
+  files, of which a fresh split writes 415 - 2 074 stale).
+* dtk rewrites every `.s` on each run (no skip-unchanged); `callers`' index and `tudiscover`'s graph are keyed on the
+  dump's content (`lib.refs.dump_signature`), so a refresh that changes no byte keeps both caches.
 
 ## History (the incidents behind the rules - keep the rule, drop the narrative when the rule is stable)
 
