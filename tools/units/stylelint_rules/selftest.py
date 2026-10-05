@@ -973,6 +973,36 @@ def selftest() -> int:
     check("rule15: ... every one advisory, none refusing", [c for c, _t, _l, a in adv if not a], [])
     check("rule15: a game probability is not a percentage finding; a short generic name is not a self-name",
           [t for c, t, _l, _a in adv if c in ("percent", "self-name")], ["92.5 % fuzzy", "net_foo_reset"])
+
+    def self_names(comment: str, head: str, rel: str = "src/Net/net_a.cpp") -> list[str]:
+        return [t for c, t, _l, _a in r15_of("%s\n%s {\n}\n" % (comment, head), rel) if c == "self-name"]
+
+    check("rule15: a plain-word member name used as the verb is prose (`connect` machine, the receive, the base's release)",
+          (self_names("/* Starts the slot's connection once, and arms its connect machine. */",
+                      "void NetTcp::connect(int a)"),
+           self_names("/* Receives at most `size` bytes; -1 when the receive fails. */", "int NetTcp::receive(int size)"),
+           self_names("/* Runs the base's release. */", "void NetTcp::release(void)")), ([], [], []))
+    check("rule15: a plain-word name spelled as an identifier (backticks, a call, Type::name) is the symbol",
+          (self_names("/* `connect` the slot. */", "void NetTcp::connect(int a)"),
+           self_names("/* Wraps receive(size). */", "int NetTcp::receive(int size)"),
+           self_names("/* NetTcp::release, the slow path. */", "void NetTcp::release(void)")),
+          (["connect"], ["receive"], ["release"]))
+    check("rule15: whole word, case-sensitive: `connection` is not `connect`, `Receives` is not `receive`",
+          (self_names("/* `connection` setup. */", "void NetTcp::connect(int a)"),
+           self_names("/* Receives a frame; Receive(size) is the OS call. */", "int NetTcp::receive(int size)")), ([], []))
+    check("rule15: an identifier-shaped name is the symbol as a bare word, never inside another word",
+          (self_names("/* PatCryptEncrypt: encrypt in place. */", "int PatCryptEncrypt(int a)"),
+           self_names("/* the PatCryptEncryptEx path */", "int PatCryptEncrypt(int a)")), (["PatCryptEncrypt"], []))
+    check("rule15: the qualified and mangled spellings are the symbol (another class's is not)",
+          (self_names("/* `Effect::SetRootMtx`: push the root matrix. */", "void Effect::SetRootMtx(int m)"),
+           self_names("/* map name `pad_reset__Fb` */", "void pad_reset(bool f)"),
+           self_names("/* map name `pad_send__6NetPadFv` */", "void NetPad::pad_send(void)"),
+           self_names("/* calls Base::SetRootMtx and SetRootMtx__4BaseFv */", "void Effect::SetRootMtx(int m)")),
+          (["SetRootMtx"], ["pad_reset"], ["pad_send"], []))
+    check("rule15: a constructor's bare name is its class; an exemption marker is never read",
+          (self_names("/* Builds a NetworkSession. */", "NetworkSession::NetworkSession(void)"),
+           self_names("/* free: retail C linkage - the map names it unmangled (`PatInterface_clear`) */",
+                      "void PatInterface_clear(void)")), ([], []))
     check("rule15: the budget splits the column by class",
           budget([f for f in lint_source(Source("x", "src/Net/net_a.c",
                                                 "/* .pi/x.md 2026-10-05 */\nint a;\n"))])["rule15"],

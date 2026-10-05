@@ -55,6 +55,14 @@ git submodule update --init tools/m2c
   only when exactly one registered unit has it - the rest are printed as NOT recorded) and written to the lock as
   `units`; `claims.py list --json` reads it back, so `integrate.py` defers a request whose owner a live lane holds. The
   slot's `release` clears it with the lock.
+* **`collect`** copies a finished lane's `.pi/outbox/*.json` and `.pi/notes/*.md` into `MAIN/.pi/` (MAIN's copy kept
+  when at least as new), merges its data requests and reports its branch, the commits main lacks and the dirt
+  (`lib.lanes.pool.unlanded_reason_at`). `--slot N` or `--path` naming a slot as before; `--path` may also name a
+  **plain worktree** of the repository (`git worktree list`, MAIN excluded - an Agent-tool lane under
+  `.claude/worktrees/`), which was refused ("no slot resolves") until 2026-10-05; `--release` is refused for it, its
+  teardown being `git worktree remove`. Selftest: the plain worktree's evidence, branch, commit and unlanded verdict,
+  the report line, the `--release` refusal and MAIN refused (373 checks; dropping the plain path, the release refusal
+  or the MAIN exclusion each fails).
 * **reset** = `checkout -f --detach <main-tip>`, a selective `git clean` that keeps `build/`, `orig/`, the toolchain and `tools/m2c` but discards scratch, stale source edits and stray files, then `checkout -B worker/<slug> <main-tip>`.
 * **validate** the kept build tree against MAIN's current map/DOL with the same staleness guard `seed_worktree_build` already uses (`claims._build_is_current` - `config.json` vs `symbols.txt`/`splits.txt`/`main.dol`), a byte comparison of `build/RMHE08/report.json`, AND the **compile-output set** the official scorer opens (`objdiff.json`'s `target_path`/`base_path`, existence - `compile_outputs`). A slot can pass the first two while its `obj/`/`src/` objects are gone; that tree cannot run `objdiff report generate`, so it is refused too. **If it cannot be proven current, re-seed; never proceed on a doubt.**
 * **claim-time currency**: a freshly seeded slot is *always* a few `ninja` steps behind by construction (the seed copies MAIN's `build/` with MAIN's mtimes while `git worktree add` stamps the slot's own sources at checkout time), so "no work to do" is the wrong test for a handover. `acquire` runs `ninja -n`, **finishes the pending steps in the slot** (`claim_currency`, bounded - measured 3: one MWCC unit, REPORT, PROGRESS), re-counts, and prints the proof the lane can see: `report.json` byte-identical, the compile-output set, the pending count. A ninja that cannot run is reported as *unknown*, never silently as 0.

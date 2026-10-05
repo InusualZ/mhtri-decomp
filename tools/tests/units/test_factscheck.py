@@ -102,6 +102,50 @@ def test_removed_facts(c):
         g.cleanup()
 
 
+def test_allow_drop(c):
+    g = _repo()
+    try:
+        (g.root / "src/mod/a.c").write_text(_without_removed(HEADER), encoding="utf-8", newline="\n")
+        allow = factscheck.parse_allowances(["unique_lost_fact,0xdeadbeef", "known_symbol_name", "never_seen_word"],
+                                            "superseded by the rewrite")
+        res = factscheck.run(str(g.root), "main", allow=allow)
+        bad = [t for f in res["failures"] for t in f["tokens"]]
+        c.check("an allowed token is not a failure (a hex matched by value); the rest still fail", bad, ["31337"])
+        c.check("each allowed token is listed dropped on purpose with its reason and origin",
+                sorted((d["token"], d["reason"], d["origin"]) for d in res["dropped"]),
+                [("0xDEADBEEF", "superseded by the rewrite", "--allow-drop"),
+                 ("unique_lost_fact", "superseded by the rewrite", "--allow-drop")])
+        c.check("an allowance that matches nothing, or a token that survives anyway, is stale",
+                sorted(a["token"] for a in res["stale_allowances"]), ["known_symbol_name", "never_seen_word"])
+        sup = g.root.parent / ("%s-superseded.txt" % g.root.name)
+        sup.write_text("# history dropped on purpose\n\nunique_lost_fact, 0xDEADBEEF: old measurement\n"
+                       "31337: map line number of the retired row\n", encoding="utf-8")
+        try:
+            rc, out = _cli(g, "--superseded-file", str(sup))
+            c.check("every lost token allowed: exit 0, each printed `dropped on purpose (reason)`",
+                    (rc, "31337 dropped on purpose (map line number of the retired row)" in out,
+                     "0xDEADBEEF dropped on purpose (old measurement)" in out), (0, True, True))
+            rc, out = _cli(g, "--superseded-file", str(sup), "--json")
+            data = json.loads(out)
+            c.check("the JSON carries dropped and stale_allowances", (data["ok"], len(data["dropped"]),
+                                                                      data["stale_allowances"]), (True, 3, []))
+            sup.write_text("31337 no colon here\n", encoding="utf-8")
+            rc, _out = _cli(g, "--superseded-file", str(sup))
+            c.check("a superseded line without `: reason` cannot run (exit 2)", rc, 2)
+        finally:
+            sup.unlink()
+        rc, _out = _cli(g, "--allow-drop", "31337")
+        c.check("--allow-drop without --reason cannot run (exit 2)", rc, 2)
+        rc, _out = _cli(g, "--allow-drop", "31337,unique_lost_fact,0xDEADBEEF", "--reason", "  ")
+        c.check("a blank --reason is no reason (exit 2)", rc, 2)
+        rc, out = _cli(g, "--allow-drop", "31337,unique_lost_fact,0xDEADBEEF", "--reason", "rewrite", "--allow-drop",
+                       "stale_one")
+        c.check("the CLI exits 0 with every loss allowed and names the stale allowance",
+                (rc, "stale allowance: stale_one (rewrite)" in out), (0, True))
+    finally:
+        g.cleanup()
+
+
 def test_merge_base(c):
     g = _repo()
     try:

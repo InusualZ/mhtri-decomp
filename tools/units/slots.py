@@ -17,6 +17,7 @@ import time
 
 from tools.lib import proc as _proc
 from tools.lib import testing
+from tools.lib.git import Git
 from tools.lib.lanes import launch, naming, pool, seed, sessions
 from tools.lib.lanes.registry import main_of as lane_registry_main_of
 from tools.lib.lanes.launch import KIND_PROFILE, PROFILES, profile_for_kind, tree_block as _tree_block  # noqa: F401
@@ -217,13 +218,22 @@ def collect(main: str, slot: int | None = None, path: str | None = None, release
             force: bool = False, registry: str | None = None) -> dict:
     """Copy a finished lane's `.pi/outbox/*.json` and `.pi/notes/*.md` into MAIN (keeping MAIN's copy when at
     least as new), merge its data requests, report its branch, commits and dirt; release only when nothing is
-    unlanded (or `force`)."""
+    unlanded (or `force`). `path` may also name a plain worktree of the repository (a lane launched in its own
+    `git worktree`, not a slot): its evidence is collected the same way, and it is never released here (its
+    teardown is the harness's `git worktree remove`), so `release_after` is refused for it."""
     n = slot if slot is not None else slot_of_path(main, path)
     if n is None:
-        raise SystemExit("REFUSED collect: no slot resolves from %r - pass --slot N or a slot's path" % (path,))
-    d = slot_dir(main, n)
-    if not os.path.isdir(d):
-        raise SystemExit("REFUSED collect: slot %d does not exist (%s)" % (n, d))
+        d = plain_worktree(main, path)
+        if d is None:
+            raise SystemExit("REFUSED collect: no slot or worktree of this repository resolves from %r - pass "
+                             "--slot N, a slot's path or a `git worktree list` path" % (path,))
+        if release_after:
+            raise SystemExit("REFUSED collect --release: %s is a plain worktree, not a slot - collect without "
+                             "--release; its teardown is `git worktree remove`" % d)
+    else:
+        d = slot_dir(main, n)
+        if not os.path.isdir(d):
+            raise SystemExit("REFUSED collect: slot %d does not exist (%s)" % (n, d))
     branch = slot_attached_branch(d)
     copied, kept = [], []
     for sub, ext in EVIDENCE:
@@ -246,7 +256,7 @@ def collect(main: str, slot: int | None = None, path: str | None = None, release
     if branch:
         head = git(["rev-parse", "HEAD"], main)
         commits = [ln for ln in git(["log", "--format=%h %s", "%s..%s" % (head, branch)], main).splitlines() if ln]
-    reason = unlanded_reason(main, n)
+    reason = pool.unlanded_reason_at(main, d)
     out = {"slot": n, "dir": d, "branch": branch, "slug": naming.slug_of_branch(branch) if branch else None,
            "copied": copied, "kept": kept, "requests_merged": requests_merged, "commits": commits,
            "dirty": slot_dirty(d), "unlanded": reason, "released": False}
@@ -259,8 +269,22 @@ def collect(main: str, slot: int | None = None, path: str | None = None, release
     return out
 
 
+def plain_worktree(main: str, path: str | None) -> str | None:
+    """`path` as one of the repository's own worktrees other than MAIN (`git worktree list`), or None."""
+    if not path:
+        return None
+    want = os.path.normcase(os.path.realpath(path))
+    if want == os.path.normcase(os.path.realpath(main)):
+        return None
+    for wt in Git(main).worktree_list():
+        if os.path.normcase(os.path.realpath(wt.path)) == want:
+            return os.path.realpath(path)
+    return None
+
+
 def collect_lines(out: dict) -> list[str]:
-    lines = ["slot %d  %s" % (out["slot"], out["branch"] or "(detached)")]
+    where = "slot %d" % out["slot"] if out["slot"] is not None else "worktree %s" % out["dir"]
+    lines = ["%s  %s" % (where, out["branch"] or "(detached)")]
     lines.append("  evidence copied to MAIN/.pi: %s" % (", ".join(out["copied"]) or "none"))
     if out.get("requests_merged"):
         lines.append("  data-claim requests merged into MAIN/.pi/data-requests.json: %d" % out["requests_merged"])
@@ -1507,6 +1531,28 @@ def selftest() -> int:
         check("... and a second collect adds nothing", collect(repo, slot=1)["requests_merged"], 0)
         release(repo, slot=1, unit="lane/collect-b", rescue=False)
         check("an unknown path is refused", _raises(lambda: collect(repo, path=os.path.join(tmp, "nowhere"))), True)
+        # (g2) a plain worktree (a lane launched in its own `git worktree`, not a slot) is collected too
+        plain = os.path.join(tmp, "plain-lane")
+        git(["worktree", "add", "-q", "-b", "lane/plain", plain], repo)
+        os.makedirs(os.path.join(plain, ".pi", "notes"), exist_ok=True)
+        os.makedirs(os.path.join(plain, ".pi", "outbox"), exist_ok=True)
+        with open(os.path.join(plain, ".pi", "notes", "plain-lane.md"), "w") as fh:
+            fh.write("note")
+        with open(os.path.join(plain, ".pi", "outbox", "plain-lane.json"), "w") as fh:
+            fh.write("{}")
+        commit(plain, "plain: unlanded content")
+        pc = collect(repo, path=plain)
+        check("a plain worktree's evidence is collected into MAIN's .pi (no slot)",
+              (pc["slot"], sorted(pc["copied"]), os.path.exists(os.path.join(repo, ".pi", "notes", "plain-lane.md"))),
+              (None, ["notes/plain-lane.md", "outbox/plain-lane.json"], True))
+        check("... with its branch, its commit main does not have and the unlanded verdict",
+              (pc["branch"], len(pc["commits"]), "holds commits main does not have" in (pc["unlanded"] or "")),
+              ("lane/plain", 1, True))
+        check("... and the report names the worktree", collect_lines(pc)[0].startswith("worktree "), True)
+        check("--release is refused for a plain worktree (its teardown is not a slot release)",
+              (_raises(lambda: collect(repo, path=plain, release_after=True)), os.path.isdir(plain)), (True, True))
+        check("MAIN itself is not a lane to collect", _raises(lambda: collect(repo, path=repo)), True)
+        git(["worktree", "remove", "--force", plain], repo)
 
     pool.NINJA_RUNNER = saved_ninja
     if fails:

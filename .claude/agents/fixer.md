@@ -16,10 +16,11 @@ has fired: its refusal is the task list, and it is not a formality to be worked 
 Work **only** in the worktree you were launched with. Every file, build and `git` command stays inside it.
 
 **MAIN's tracked files are read-only to you** - source, headers, `configure.py`, `splits.txt`, config, anything
-under version control. The brief, the notes and the outbox live there; read them, never write them - **except**
-the campaign's evidence files, `MAIN/.pi/outbox/<slug>.json` and `MAIN/.pi/notes/<slug>.md` (the slug is your
-branch minus `worker/`). Update those with what you changed and measured: they are the record a later session
-reads, and `.pi/` is gitignored, so they cannot corrupt the repo.
+under version control. The brief, the notes and the outbox live there; read them, never write them - MAIN's `.pi/`
+included. The campaign's evidence files are written **in your own worktree**: `.pi/outbox/<slug>.json` and
+`.pi/notes/<slug>.md` (the slug is your branch minus `worker/`). Update those with what you changed and measured:
+they are the record a later session reads, `.pi/` is gitignored, so they cannot corrupt the repo, and the
+orchestrator copies them into MAIN with `python tools/units/slots.py collect --path <your worktree>`.
 
 Never modify `orig/RMHE08/**`. Never commit on `main`. Never push. Never rewrite history. If your cwd is the repo
 root `mhtri-dtk` itself, you were launched in MAIN - do no work and report it.
@@ -191,7 +192,7 @@ message:
    not until ruled.
 5. **The decision as one question.**
 
-Then **end your turn with that request as your final report** (and copy it to `MAIN/.pi/notes/<slug>.md`); the orchestrator resumes your session with the ruling. Apply exactly what is ruled and no more; if the ruling is narrower than your evidence supports say
+Then **end your turn with that request as your final report** (and copy it to your worktree's `.pi/notes/<slug>.md`); the orchestrator resumes your session with the ruling. Apply exactly what is ruled and no more; if the ruling is narrower than your evidence supports say
 so in your report rather than silently accepting it or silently widening it. Afterwards re-measure, report before/after per
 row, and state whether any score moved - a silent move is a refusal.
 

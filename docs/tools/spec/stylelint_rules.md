@@ -135,6 +135,20 @@ sizes in `NWC24/nwc24_msg.c`, 8 addresses no function starts at in `Pl/pl_act.cp
 read, 340 of them with a size); advisory 783: `phase 4` 177, `next pass` 19, date 109, `round N` 29, `pilot` 13, `wave`
 12, `lane` 49, `header inherited` 40, `percent` 115, `self-name` 220. All are grandfathered by identity.
 
+## Measured (rule 15 self-name, 2026-10-05)
+
+The self-name class reads the own name as a whole word in its symbol spellings (`Type::name`, `name__<len><Type>`,
+a bare identifier-shaped name; a plain word only in backticks or as `name(`; no ctor class name, no `free:`/`untyped:`
+marker). On main `6a1c9583a`, `--budget --json` old vs new: every column and every other rule-15 class identical
+(refusing 168; `phase 4` 164, `next pass` 19, date 93, `round N` 5, `pilot` 0, `wave` 12, `lane` 42, `header
+inherited` 40, `percent` 95); `self-name` 211 -> 220: none removed (the Network sweep had already rewritten the
+plain-word hits) and 9 added, each a comment spelling its function's mangling (`setSoftresetFlag__Fb`, 7) or
+qualified name (`Effect::SetRootMtx`, 2), which the old `(?!\w)`/`(?<!:)` boundaries skipped. On the `src/Network`
+text before that sweep (`a2296165b`) the class reads 9 -> 2: the verbs `connect` x2, `receive`, `release`, the two
+`free:` markers and the `GameSpyInterfaceThread` constructor drop, `PatCryptEncrypt`/`PatCryptDecrypt` stay. Selftest
+539 checks (6 new); each of 8 mutations fails at least one (old regex, no plain-word gate, marker read, ctor read,
+no mangled form, any mangling's class, no qualified form, case-insensitive).
+
 ## Measured (rule 7 file names, 2026-10-05)
 
 Rule 7 44 433 -> 44 710 (+277), total 54 932 -> 55 209: 270 generated stems (70 sources, 200 headers) and 7 directory

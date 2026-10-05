@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Comment-only rewriter for the comment sweep: stale paths, narrative history, header range fixes, `#if 0` blocks.
 Spec: docs/tools/spec/sweepcomments.md. CLI: sweepcomments.py (--paths | --history | --fixes | --if0 | --list-stale
-| --markers) [--apply] [--json] [--root TREE] [FILE...] [--selftest]."""
+| --markers | --unit UNIT) [--apply] [--json] [--root TREE] [FILE...] [--selftest]."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
@@ -17,10 +17,14 @@ from tools.lib import cli
 from tools.lib import comments as _comments
 from tools.lib import cscan
 from tools.lib import facts as _facts
+from tools.lib import proc as _proc
+from tools.lib import report as _report
 from tools.lib import repo as _repo
 from tools.lib import text as _text
+from tools.lib import units as _units
 from tools.lib.git import Git
 from tools.lib.project import splits as _splits
+from tools.lib.project import symbols as _symbols
 
 TOOL = cli.Tool("sweepcomments", "docs/tools/spec/sweepcomments.md", tests="tools/tests/units/test_sweepcomments.py",
                 description=(__doc__ or "").splitlines()[0], common=("json", "root"))
@@ -851,6 +855,124 @@ def census(root: str, scope: str, markers, whitelist_paths: bool) -> dict:
             "files": {k: dict(v.most_common()) for k, v in per_file.items()}}
 
 
+# --- one unit's facts: RANGE, the report's residual runs, flipcheck's blockers -------------------------------------
+
+REPORT_REL = ("build", "RMHE08", "report.json")
+FLIPCHECK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "flipcheck.py")
+
+
+class UnitError(ValueError):
+    """A unit spec `splits.txt` does not register."""
+
+
+def residual_runs(rows: list[dict]) -> dict[str, list[dict]]:
+    """`{"zero": [run], "partial": [run]}`: the unit's functions in address order cut into maximal runs of one class
+    (0 % / partial / 100 %; a function of another class ends a run). A run is `{first, last, count, start, end,
+    low, high}` - `end` is the last function's address plus its size; `low`/`high` its scores."""
+    out: dict[str, list[dict]] = {"zero": [], "partial": []}
+    cur, cls = None, None
+    for r in sorted(rows, key=lambda r: (r["address"] is None, r["address"] or 0, r["name"])):
+        k = "zero" if r["score"] <= 0 else "partial" if r["score"] < 100 else "full"
+        if cur is not None and k == cls and r["address"] is not None:
+            cur.update(last=r["name"], count=cur["count"] + 1, end=r["address"] + r["size"],
+                       low=min(cur["low"], r["score"]), high=max(cur["high"], r["score"]))
+            continue
+        cur, cls = None, k
+        if k != "full":
+            cur = {"first": r["name"], "last": r["name"], "count": 1, "start": r["address"],
+                   "end": None if r["address"] is None else r["address"] + r["size"], "low": r["score"],
+                   "high": r["score"]}
+            out[k].append(cur)
+    return out
+
+
+def flip_blockers(root: str, unit: str) -> dict:
+    """flipcheck's verdict for one unit, read from its `--json` (the tool's own judgement, not a copy of it):
+    `{ready, problems, notes}`, or `{error}` when it could not run."""
+    p = _proc.run([sys.executable, FLIPCHECK, "--json", "--root", root, unit], cwd=root)
+    try:
+        data = json.loads(p.stdout or "")
+    except ValueError:
+        return {"error": ((p.stderr or p.stdout or "").strip().splitlines() or ["no output"])[-1]}
+    if unit in data.get("missing", []):
+        return {"error": "no splits.txt entry"}
+    return data.get("units", {}).get(unit) or {"error": "flipcheck named no verdict for %s" % unit}
+
+
+def unit_facts(root: str, spec: str, flip: bool = True) -> dict:
+    """What a header rewrite states, in one read: the unit's splits.txt RANGE per section, its `.text` function count
+    (`symbols.txt` rows of type function inside the `.text` ranges), the report's 0 % and partial functions as
+    address runs (`residual_runs`; a report row without an address takes the map's), and flipcheck's blockers."""
+    stem = _units.stem(spec)
+    sp = _splits.read(os.path.join(root, "config", "RMHE08", "splits.txt"))
+    block = sp.block(stem)
+    if block is None:
+        raise UnitError("%s: no splits.txt entry" % spec)
+    ranges = [{"section": r.section, "start": r.start, "end": r.end, "size": r.size} for r in sp.claims(block.unit)]
+    smap = _symbols.read(os.path.join(root, "config", "RMHE08", "symbols.txt"))
+    funcs = [s for r in ranges if r["section"] == ".text"
+             for s in smap.in_range(r["start"], r["end"], ".text") if s.type == "function"]
+    by_name = {s.name: s.address for s in funcs}
+    report_path = os.path.join(root, *REPORT_REL)
+    report = _report.read(report_path)
+    name = _units.report_name(stem)
+    rows = _report.address_rows(report, name)
+    for r in rows:
+        if r["address"] is None:
+            r["address"] = by_name.get(r["name"])
+    unit_row = report.unit(name)
+    obj = os.path.join(root, *_units.obj_rel(block.unit).split(os.sep))
+    rep_t, obj_t = _report.mtime(report_path), _report.mtime(obj)
+    out = {"unit": block.unit, "report_name": name, "ranges": ranges, "functions": len(funcs),
+           "report": None if unit_row is None else {
+               "fuzzy_match_percent": _report.num((unit_row.get("measures") or {}).get(_report.SCORE_KEY)),
+               "functions": len(rows), "full": sum(1 for r in rows if r["score"] >= 100),
+               "partial": sum(1 for r in rows if 0 < r["score"] < 100),
+               "zero": sum(1 for r in rows if r["score"] <= 0),
+               "stale": bool(rep_t and obj_t and obj_t > rep_t)},
+           "runs": residual_runs(rows)}
+    if flip:
+        out["flipcheck"] = flip_blockers(root, _units.stem(block.unit))
+    return out
+
+
+def _addr(a) -> str:
+    return "?" if a is None else "0x%08X" % a
+
+
+def render_unit_facts(f: dict) -> list[str]:
+    out = [f["unit"],
+           "RANGE      " + ", ".join("%s %s..%s (0x%X)" % (r["section"], _addr(r["start"]), _addr(r["end"]), r["size"])
+                                     for r in f["ranges"]),
+           "FUNCTIONS  %d in .text (symbols.txt)" % f["functions"]]
+    rep = f["report"]
+    if rep is None:
+        out.append("REPORT     %s has no row in build/RMHE08/report.json" % f["report_name"])
+    else:
+        out.append("REPORT     %s: %s %% fuzzy; %d function(s): %d at 100 %%, %d partial, %d at 0 %%%s"
+                   % (f["report_name"], "?" if rep["fuzzy_match_percent"] is None
+                      else "%.2f" % rep["fuzzy_match_percent"], rep["functions"], rep["full"], rep["partial"],
+                      rep["zero"], " (STALE: the object is newer than report.json)" if rep["stale"] else ""))
+    for k, label in (("zero", "ZERO"), ("partial", "PARTIAL")):
+        runs = f["runs"][k]
+        out.append("%-10s %d function(s) in %d run(s)" % (label, sum(r["count"] for r in runs), len(runs)))
+        for r in runs:
+            names = r["first"] if r["count"] == 1 else "%s .. %s" % (r["first"], r["last"])
+            score = "" if k == "zero" else (", %.1f %%" % r["low"] if r["low"] == r["high"]
+                                            else ", %.1f-%.1f %%" % (r["low"], r["high"]))
+            out.append("    %s..%s  %s (%d%s)" % (_addr(r["start"]), _addr(r["end"]), names, r["count"], score))
+    fc = f.get("flipcheck")
+    if fc is not None:
+        if "error" in fc:
+            out.append("FLIPCHECK  could not run: %s" % fc["error"])
+        elif fc["ready"]:
+            out.append("FLIPCHECK  READY")
+        else:
+            out.append("FLIPCHECK  NOT READY, %d blocker(s)" % len(fc["problems"]))
+            out += ["    - %s" % p for p in fc["problems"]]
+    return out
+
+
 # --- the driver ---------------------------------------------------------------------------------------------------
 
 def _read(path: str) -> str | None:
@@ -920,6 +1042,17 @@ def run(root: str, op: str, apply: bool = False, only=()) -> dict:
 def main(args) -> int:
     root = _repo.worktree_root(args.root)
     ops = [o for o in ("paths", "history", "fixes", "if0") if getattr(args, o)]
+    if args.unit:
+        try:
+            facts = [unit_facts(root, u, flip=not args.no_flipcheck) for u in args.unit]
+        except UnitError as exc:
+            print("sweepcomments: %s" % exc, file=sys.stderr)
+            return 2
+        if args.json:
+            print(json.dumps(facts if len(facts) > 1 else facts[0], indent=1))
+        else:
+            print("\n\n".join("\n".join(render_unit_facts(f)) for f in facts))
+        return 0
     if args.list_stale or args.markers:
         markers = STALE_MARKERS if args.list_stale else HISTORY_MARKERS
         res = census(root, args.scope, markers, whitelist_paths=bool(args.list_stale))
@@ -962,6 +1095,10 @@ def build_parser():
                      ("fixes", "correct the header ranges that contradict splits.txt"),
                      ("if0", "delete `#if 0` blocks")):
         ap.add_argument("--" + op, action="store_true", help=what)
+    ap.add_argument("--unit", action="append", default=[], metavar="UNIT",
+                    help="print a unit's header facts: RANGE, function count, the report's 0 %% and partial runs, "
+                         "flipcheck's blockers (any unit spelling; repeatable)")
+    ap.add_argument("--no-flipcheck", action="store_true", help="with --unit: skip the flipcheck call")
     ap.add_argument("--list-stale", action="store_true", help="count the stale-path markers that remain")
     ap.add_argument("--markers", action="store_true", help="count the narrative markers that remain (advisory)")
     ap.add_argument("--scope", choices=("src", "all"), default="src", help="census scope (default: src + configure.py)")
