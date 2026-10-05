@@ -851,9 +851,11 @@ def test_rule_rows(c):
     def run_row(addr, words, unit="sound/sound_obj", section=".data"):
         return {"unit": unit, "kind": "run", "section": section, "address": addr, "words": words,
                 "where": "%s %s 0x%08X" % (unit, section, addr)}
+    def ref_row(line, symbol="lbl_80597DF8"):
+        return {"unit": "sound/sound_obj", "kind": "ref", "file": "src/sound/sound_obj.cpp", "symbol": symbol,
+                "where": "src/sound/sound_obj.cpp:%d assigns %s" % (line, symbol)}
     base_runs = {"run:.data:80598038": run_row(0x80598038, 6),
-                 "ref:src/sound/sound_obj.cpp:767:lbl_80597DF8": {"unit": "sound/sound_obj", "kind": "ref",
-                                                                 "where": "x"}}
+                 "ref:src/sound/sound_obj.cpp:767:lbl_80597DF8": ref_row(767)}
     moved = {"run:.data:8059803C": run_row(0x8059803C, 5),
              "ref:src/sound/sound_obj.cpp:767:lbl_80597DF8": base_runs["ref:src/sound/sound_obj.cpp:767:lbl_80597DF8"]}
     check("rule10 pairing: a run whose start moved by a word inside the old run is SHIFTED, not added",
@@ -872,9 +874,13 @@ def test_rule_rows(c):
           L.rule10_growth({"run:.data:80598038": run_row(0x80598038, 6)}, other_sec, [])[0],
           ["run:.rodata:8059803C"])
     renum = {"run:.data:80598038": run_row(0x80598038, 6),
-             "ref:src/sound/sound_obj.cpp:770:lbl_80597DF8": {"unit": "sound/sound_obj", "kind": "ref", "where": "y"}}
-    check("rule10 pairing: `ref:` keys stay a set difference (a moved line is an addition, as before)",
-          L.rule10_growth(base_runs, renum, [])[0], ["ref:src/sound/sound_obj.cpp:770:lbl_80597DF8"])
+             "ref:src/sound/sound_obj.cpp:770:lbl_80597DF8": ref_row(770)}
+    check("rule10 pairing: a `ref:` key whose line moved (same file and symbol) is SHIFTED, not added",
+          L.rule10_growth(base_runs, renum, [])[0], [])
+    newsym = {"run:.data:80598038": run_row(0x80598038, 6),
+              "ref:src/sound/sound_obj.cpp:770:lbl_80597DFC": ref_row(770, "lbl_80597DFC")}
+    check("rule10 pairing: a `ref:` key for a different symbol is still an addition",
+          L.rule10_growth(base_runs, newsym, [])[0], ["ref:src/sound/sound_obj.cpp:770:lbl_80597DFC"])
     import tools.units.vtableaudit as _vta
     with mock.patch.object(_vta, "sweep", lambda main, text_ref=None: {}), \
             mock.patch.object(_vta, "violation_rows", lambda s, rename=None: {"run:.data:80598038": run_row(0x80598038, 6,
