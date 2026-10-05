@@ -130,7 +130,7 @@ public:
     u8   getTransferFlag6DD2();
     f32  getTransferLevel();
     void setTransferSlotMode(s8 slot, u8 mode);
-    u8   getTransferSlotMode(s8 slot);
+    BOOL getTransferSlotMode(s8 slot);
     void setTransferSlotFlag(s8 slot, u8 flag);
     u8   getTransferSlotFlag(s8 slot);
     BOOL isTransferSlotReady(s8 slot);

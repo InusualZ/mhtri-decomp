@@ -20,6 +20,12 @@
  *   the id helpers address each warning string with their own lis/addi).  File-scope `#pragma peephole off`: the bodies
  *   were written under the source file's peephole-off region and keep it.
  *
+ * TABLE (round 3).  79 slots (+0x08..+0x140): the derived table 0x805FC1E0 is 0x144 B, so the base has no slot +0x144 -
+ *   the map's `__vt__12NetworkLayer` is 0x144 B and the claim's last 4 bytes (0x805FB714) are the alignment before the next
+ *   object's `.data` (our object's `.data` is 0x45C of the claimed 0x460).  The pure slots carry the names and parameters of
+ *   `NetworkLayerPat`'s overrides; the request starters the game calls carry the consumers' spellings (`closeSession_1C`,
+ *   `requestServers_24`, ... - `Network/network_pat_control.cpp`), with the argument types those call sites pass.
+ *
  * RESIDUALS.  `NetworkLayer::move` keeps the unrolled inner scan's trip count 3 in r0 where retail holds it in a
  *   callee-saved register (r29) - one extra saved register shifts every allocation; the constructor's second pool loop is
  *   spelled with an explicit pointer (98.17; the indexed spelling scores 97.32) and still swaps the counter/pointer
@@ -116,10 +122,10 @@ NetworkLayer::~NetworkLayer()
     NetworkLayer::release();
 }
 
-void NetworkLayer::init(u32 context0, u32 context1)
+void NetworkLayer::setReflectCallback(u32 callback, u32 user)
 {
-    this->context_04 = context0;
-    this->context_08 = context1;
+    this->context_04 = callback;
+    this->context_08 = user;
     NetworkLayer::clear();
 }
 
@@ -287,30 +293,30 @@ void NetworkLayerRequest::run()
 
 /* The request descriptors the starters pass by value: `{0, handler slot, 0}`, a member-function pointer to the
  * pure handler slot of the same request, in the order the target lays them out. */
-NetworkLayerHandler networkLayerRequestDesc1C = &NetworkLayer::handle_F4;
-NetworkLayerHandler networkLayerRequestDesc20 = &NetworkLayer::handle_F8;
-NetworkLayerHandler networkLayerRequestDesc24 = &NetworkLayer::handle_FC;
-NetworkLayerHandler networkLayerRequestDesc28 = &NetworkLayer::handle_100;
-NetworkLayerHandler networkLayerRequestDesc38 = &NetworkLayer::handle_104;
-NetworkLayerHandler networkLayerRequestDesc3C = &NetworkLayer::handle_108;
-NetworkLayerHandler networkLayerRequestDesc40 = &NetworkLayer::handle_108;
-NetworkLayerHandler networkLayerRequestDesc44 = &NetworkLayer::handle_10C;
-NetworkLayerHandler networkLayerRequestDesc48 = &NetworkLayer::handle_110;
-NetworkLayerHandler networkLayerRequestDesc4C = &NetworkLayer::handle_114;
-NetworkLayerHandler networkLayerRequestDesc50 = &NetworkLayer::handle_118;
-NetworkLayerHandler networkLayerRequestDesc54 = &NetworkLayer::handle_118;
-NetworkLayerHandler networkLayerRequestDesc58 = &NetworkLayer::handle_11C;
-NetworkLayerHandler networkLayerRequestDesc64 = &NetworkLayer::handle_120;
-NetworkLayerHandler networkLayerRequestDesc68 = &NetworkLayer::handle_124;
-NetworkLayerHandler networkLayerRequestDesc6C = &NetworkLayer::handle_128;
-NetworkLayerHandler networkLayerRequestDesc70 = &NetworkLayer::handle_12C;
-NetworkLayerHandler networkLayerRequestDesc74 = &NetworkLayer::handle_130;
-NetworkLayerHandler networkLayerRequestDesc78 = &NetworkLayer::handle_134;
-NetworkLayerHandler networkLayerRequestDesc7C = &NetworkLayer::handle_138;
-NetworkLayerHandler networkLayerRequestDesc80 = &NetworkLayer::handle_13C;
-NetworkLayerHandler networkLayerRequestDesc84 = &NetworkLayer::handle_140;
+NetworkLayerHandler networkLayerRequestDesc1C = &NetworkLayer::handleConnect;
+NetworkLayerHandler networkLayerRequestDesc20 = &NetworkLayer::handleDisconnect;
+NetworkLayerHandler networkLayerRequestDesc24 = &NetworkLayer::handleServerList;
+NetworkLayerHandler networkLayerRequestDesc28 = &NetworkLayer::handleServerSelect;
+NetworkLayerHandler networkLayerRequestDesc38 = &NetworkLayer::stepRequest;
+NetworkLayerHandler networkLayerRequestDesc3C = &NetworkLayer::handleLayerCreate;
+NetworkLayerHandler networkLayerRequestDesc40 = &NetworkLayer::handleLayerCreate;
+NetworkLayerHandler networkLayerRequestDesc44 = &NetworkLayer::handleLayerInfo;
+NetworkLayerHandler networkLayerRequestDesc48 = &NetworkLayer::handleChildList;
+NetworkLayerHandler networkLayerRequestDesc4C = &NetworkLayer::handleSiblingList;
+NetworkLayerHandler networkLayerRequestDesc50 = &NetworkLayer::handleUserList;
+NetworkLayerHandler networkLayerRequestDesc54 = &NetworkLayer::handleUserList;
+NetworkLayerHandler networkLayerRequestDesc58 = &NetworkLayer::handleUserInfo;
+NetworkLayerHandler networkLayerRequestDesc64 = &NetworkLayer::handleChat;
+NetworkLayerHandler networkLayerRequestDesc68 = &NetworkLayer::handleDetailSearch;
+NetworkLayerHandler networkLayerRequestDesc6C = &NetworkLayer::handleUserSearch;
+NetworkLayerHandler networkLayerRequestDesc70 = &NetworkLayer::handleLayerJump;
+NetworkLayerHandler networkLayerRequestDesc74 = &NetworkLayer::handleLayerInfoById;
+NetworkLayerHandler networkLayerRequestDesc78 = &NetworkLayer::handleLayerInfoSet;
+NetworkLayerHandler networkLayerRequestDesc7C = &NetworkLayer::handleMediationLock;
+NetworkLayerHandler networkLayerRequestDesc80 = &NetworkLayer::handleMediationUnlock;
+NetworkLayerHandler networkLayerRequestDesc84 = &NetworkLayer::handleMediationList;
 
-void NetworkLayer::request_1C()
+void NetworkLayer::closeSession_1C()
 {
     NetworkLayerRequest* req;
 
@@ -343,7 +349,7 @@ void NetworkLayerRequest::begin(NetworkLayer* owner, NetworkLayerHandler handler
     }
 }
 
-void NetworkLayer::request_20()
+void NetworkLayer::shutdown_20()
 {
     NetworkLayerRequest* req;
 
@@ -356,7 +362,7 @@ void NetworkLayer::request_20()
     }
 }
 
-void NetworkLayer::request_24(u32 a)
+void NetworkLayer::requestServers_24(s32 a)
 {
     NetworkLayerRequest* req;
 
@@ -369,7 +375,7 @@ void NetworkLayer::request_24(u32 a)
     }
 }
 
-void NetworkLayer::request_28(u32 a)
+void NetworkLayer::selectServer_28(s32 a)
 {
     NetworkLayerRequest* req;
 
@@ -395,7 +401,7 @@ void NetworkLayer::request_38()
     }
 }
 
-void NetworkLayer::request_3C(u32 a)
+void NetworkLayer::selectCity_3C(s32 a)
 {
     NetworkLayerRequest* req;
 
@@ -434,7 +440,7 @@ void NetworkLayer::request_44(u32 a)
     }
 }
 
-void NetworkLayer::request_48(u32 a)
+void NetworkLayer::requestCities_48(s32 a)
 {
     NetworkLayerRequest* req;
 
@@ -499,7 +505,7 @@ void NetworkLayer::request_58(u32 a)
     }
 }
 
-void NetworkLayer::request_64(u32 a, u32 b, u32 c, u32 d)
+void NetworkLayer::sendMessage_64(const char* a, s32 b, s32 c, u32 d)
 {
     NetworkLayerRequest* req;
 
@@ -512,7 +518,7 @@ void NetworkLayer::request_64(u32 a, u32 b, u32 c, u32 d)
     }
 }
 
-void NetworkLayer::request_68(u32 a)
+void NetworkLayer::setPageSize_68(s32 a)
 {
     NetworkLayerRequest* req;
 
@@ -525,7 +531,7 @@ void NetworkLayer::request_68(u32 a)
     }
 }
 
-void NetworkLayer::request_6C(u32 a, u32 b)
+void NetworkLayer::requestRefresh_6C(s32 a, s32 b)
 {
     NetworkLayerRequest* req;
 
@@ -603,7 +609,7 @@ void NetworkLayer::request_80(u32 a)
     }
 }
 
-void NetworkLayer::request_84(u32 a)
+void NetworkLayer::requestAccount_84(s32 a)
 {
     NetworkLayerRequest* req;
 
@@ -641,10 +647,12 @@ void NetworkLayer::deleteRequest(NetworkLayerRequest** slot)
     *slot = 0;
 }
 
-void NetworkLayer::setFlag75(u8 value)
+#pragma peephole on
+void NetworkLayer::setFlag75(u32 value)
 {
     this->flag_75 = value;
 }
+#pragma peephole off
 
 u8 NetworkLayer::getFlag75()
 {

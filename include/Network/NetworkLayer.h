@@ -19,6 +19,13 @@ typedef struct NetworkLayerId {
 
 class NetworkLayer;
 struct NetworkLayerRequest;
+/* The records the pure slots take, defined beside the class that implements them (include/Network/NetworkLayerPat.h). */
+struct NetId;
+struct NetUserFields;
+struct NetUserPosition;
+struct NetCityRec;
+struct NetLayerSettings;
+struct NetLayerRequest;
 struct NetworkErrorInfo;   /* the 12-byte error record - Network/gamespy_interface_types.h */
 typedef struct NetworkRequestError NetworkRequestError;   /* include/unsplit/Network.h */
 
@@ -68,105 +75,108 @@ typedef struct NetworkLayerRequest {
     void run();
     void begin(NetworkLayer* owner, NetworkLayerHandler handler, u32 count, ...);
     s32 getRecord(NetworkRequestError* out);   /* 0x803E3598 - the error record, under the mutex; false while none is set */
+    void setRecord(u32 code, u32 arg_a, u32 arg_b);   /* 0x803E3610 - stores the error record under the mutex */
+    s32 getArgument(u32 index);                /* 0x803E3C70 - argument `index`, 0 (with a warning) past `count_28` */
 } NetworkLayerRequest;   /* size: 0xA4 (the pool's element size) */
 
 /* The layer base class: the request pool and the lazy request starters `NetworkLayerPat` builds on.  Its
- * table is 0x805FB5D0 (0x148 B: two RTTI words and 80 slots), emitted by `Network/NetworkLayer.cpp`,
- * which defines the key function (the destructor).  The layout parallels `NetworkSessionManager` one word
- * earlier (no session word at +0x0C): 21 request slots, their 21 running flags, two flag bytes and a pool of
- * two requests.  The slots the original leaves 0 are pure virtual; the 21 handler slots +0xF4..+0x140 are the
- * targets of the request descriptors (`{0, slot, 0}` member-function pointers).  Every name except the
- * class's own (the "NetworkLayer::move"/"NetworkLayer::deleteRequest" strings) is derived from the slot
- * offset or the field it touches (GUESS). */
+ * table is 0x805FB5D0 (two RTTI words and 79 slots, +0x08..+0x140 - the derived table 0x805FC1E0 is 0x144 B, so
+ * the map's 0x148 extent carries 4 bytes of alignment), emitted by `Network/NetworkLayer.cpp`, which defines the
+ * key function (the destructor).  The layout parallels `NetworkSessionManager` one word earlier (no session word
+ * at +0x0C): 21 request slots, their 21 running flags, two flag bytes and a pool of two requests.  The slots the
+ * original leaves 0 are pure virtual and carry the name and parameters of `NetworkLayerPat`'s override (its body
+ * is the evidence); the 21 handler slots +0xF4..+0x140 are the targets of the request descriptors (`{0, slot, 0}`
+ * member-function pointers).  Every name except the class's own (the "NetworkLayer::move"/
+ * "NetworkLayer::deleteRequest" strings) is derived from the slot offset, the override's body or the field it
+ * touches (GUESS). */
 class NetworkLayer {
 public:
     NetworkLayer();
     virtual ~NetworkLayer();                       /* +0x008 */
-    virtual void init(u32 context0, u32 context1); /* +0x00C */
+    virtual void setReflectCallback(u32 callback, u32 user); /* +0x00C */
     virtual void clear();                          /* +0x010 */
     virtual void release();                        /* +0x014 */
     virtual void move();                           /* +0x018 */
-    virtual void request_1C();                     /* +0x01C */
-    virtual void request_20();                     /* +0x020 */
-    virtual void request_24(u32 a);                /* +0x024 */
-    virtual void request_28(u32 a);                /* +0x028 */
-    virtual void slot_2C() = 0;                    /* +0x02C */
-    virtual void slot_30() = 0;                    /* +0x030 */
-    virtual void slot_34() = 0;                    /* +0x034 */
+    virtual void closeSession_1C();   /* +0x01C */
+    virtual void shutdown_20();   /* +0x020 */
+    virtual void requestServers_24(s32 count);   /* +0x024 */
+    virtual void selectServer_28(s32 id);   /* +0x028 */
+    virtual void readServerId_2C(NetId* id) = 0;                 /* +0x02C */
+    virtual void readServerName_30(char* out, s32 size) = 0;     /* +0x030 */
+    virtual void readServerText_34(char* out, s32 size) = 0;     /* +0x034 */
     virtual void request_38();                     /* +0x038 */
-    virtual void request_3C(u32 a);                /* +0x03C */
+    virtual void selectCity_3C(s32 id);   /* +0x03C */
     virtual void request_40(u32 a, u32 b, u32 c);  /* +0x040 */
     virtual void request_44(u32 a);                /* +0x044 */
-    virtual void request_48(u32 a);                /* +0x048 */
+    virtual void requestCities_48(s32 count);   /* +0x048 */
     virtual void request_4C(u32 a);                /* +0x04C */
     virtual void request_50(u32 a);                /* +0x050 */
     virtual void request_54(u32 a, u32 b);         /* +0x054 */
     virtual void request_58(u32 a);                /* +0x058 */
-    virtual void slot_5C() = 0;                    /* +0x05C */
-    virtual void slot_60() = 0;                    /* +0x060 */
-    virtual void request_64(u32 a, u32 b, u32 c, u32 d); /* +0x064 */
-    virtual void request_68(u32 a);                /* +0x068 */
-    virtual void request_6C(u32 a, u32 b);         /* +0x06C */
+    virtual void sendUserFields_5C(NetUserFields* fields) = 0;              /* +0x05C */
+    virtual void sendUserPosition_60(const NetUserPosition* position) = 0;  /* +0x060 */
+    virtual void sendMessage_64(const char* text, s32 value, s32 flag, u32 flags);   /* +0x064 */
+    virtual void setPageSize_68(s32 size);   /* +0x068 */
+    virtual void requestRefresh_6C(s32 code, s32 mask);   /* +0x06C */
     virtual void request_70(u32 a, u32 b);         /* +0x070 */
     virtual void request_74(u32 a);                /* +0x074 */
     virtual void request_78(u32 a, u32 b);         /* +0x078 */
     virtual void request_7C(u32 a, u32 b);         /* +0x07C */
     virtual void request_80(u32 a);                /* +0x080 */
-    virtual void request_84(u32 a);                /* +0x084 */
-    virtual void slot_88() = 0;                    /* +0x088 */
-    virtual void slot_8C() = 0;                    /* +0x08C */
-    virtual void slot_90() = 0;                    /* +0x090 */
-    virtual void slot_94() = 0;                    /* +0x094 */
-    virtual void slot_98() = 0;                    /* +0x098 */
-    virtual void slot_9C() = 0;                    /* +0x09C */
-    virtual void slot_A0() = 0;                    /* +0x0A0 */
-    virtual void slot_A4() = 0;                    /* +0x0A4 */
-    virtual void slot_A8() = 0;                    /* +0x0A8 */
-    virtual void slot_AC() = 0;                    /* +0x0AC */
-    virtual void slot_B0() = 0;                    /* +0x0B0 */
-    virtual void slot_B4() = 0;                    /* +0x0B4 */
-    virtual void slot_B8() = 0;                    /* +0x0B8 */
-    virtual void slot_BC() = 0;                    /* +0x0BC */
-    virtual void slot_C0() = 0;                    /* +0x0C0 */
-    virtual void slot_C4() = 0;                    /* +0x0C4 */
-    virtual void slot_C8() = 0;                    /* +0x0C8 */
-    virtual void setFlag75(u8 value);              /* +0x0CC */
+    virtual void requestAccount_84(s32 kind);   /* +0x084 */
+    virtual void readSelectedServer_88(NetCityRec* out) = 0;                 /* +0x088 */
+    virtual void exportLayerId_8C(NetworkLayerId* out) = 0;                  /* +0x08C */
+    virtual void readUserName_90(char* out, s32 size) = 0;                   /* +0x090 */
+    virtual void setComment_94(const char* text) = 0;                        /* +0x094 */
+    virtual void submitSettings_98(NetLayerSettings* settings) = 0;          /* +0x098 */
+    virtual void submitRequest_9C(NetLayerRequest* request) = 0;             /* +0x09C */
+    virtual void setPresence_A0(const NetLayerSettings* presence) = 0;       /* +0x0A0 */
+    virtual void submitSelect_A4(NetLayerRequest* request) = 0;              /* +0x0A4 */
+    virtual s32 getCommunityCount_A8() = 0;                                  /* +0x0A8 */
+    virtual u8 getCommunityState_AC(s32 index) = 0;                          /* +0x0AC */
+    virtual void readCommunityComment_B0(s32 index, char* out, s32 size) = 0; /* +0x0B0 */
+    virtual u32 getCommunityValueE0_B4(s32 index) = 0;                       /* +0x0B4 */
+    virtual u32 getCommunityValueE4_B8(s32 index) = 0;                       /* +0x0B8 */
+    virtual u32 getCommunityValueE8_BC(s32 index) = 0;                       /* +0x0BC */
+    virtual void readCommunitySettings_C0(s32 index, NetLayerSettings* out) = 0; /* +0x0C0 */
+    virtual void readCommunityHeader_C4(s32 index, u8* out) = 0;             /* +0x0C4 */
+    virtual void readRoomHeader_C8(s32 index, u8* out) = 0;                  /* +0x0C8 */
+    virtual void setFlag75(u32 value);             /* +0x0CC */
     virtual u8 getFlag75();                        /* +0x0D0 */
     virtual void setFlag76(u8 value);              /* +0x0D4 */
-    virtual void slot_D8() = 0;                    /* +0x0D8 */
-    virtual void slot_DC() = 0;                    /* +0x0DC */
-    virtual void slot_E0() = 0;                    /* +0x0E0 */
-    virtual void slot_E4() = 0;                    /* +0x0E4 */
-    virtual void slot_E8() = 0;                    /* +0x0E8 */
-    virtual void slot_EC() = 0;                    /* +0x0EC */
-    virtual void slot_F0() = 0;                    /* +0x0F0 */
-    virtual s32 handle_F4(NetworkLayerRequest* request) = 0;   /* +0x0F4 - `request_1C` */
-    virtual s32 handle_F8(NetworkLayerRequest* request) = 0;   /* +0x0F8 - `request_20` */
-    virtual s32 handle_FC(NetworkLayerRequest* request) = 0;   /* +0x0FC - `request_24` */
-    virtual s32 handle_100(NetworkLayerRequest* request) = 0;  /* +0x100 - `request_28` */
-    virtual s32 handle_104(NetworkLayerRequest* request) = 0;  /* +0x104 - `request_38` */
-    virtual s32 handle_108(NetworkLayerRequest* request) = 0;  /* +0x108 - `request_3C`, `request_40` */
-    virtual s32 handle_10C(NetworkLayerRequest* request) = 0;  /* +0x10C - `request_44` */
-    virtual s32 handle_110(NetworkLayerRequest* request) = 0;  /* +0x110 - `request_48` */
-    virtual s32 handle_114(NetworkLayerRequest* request) = 0;  /* +0x114 - `request_4C` */
-    virtual s32 handle_118(NetworkLayerRequest* request) = 0;  /* +0x118 - `request_50`, `request_54` */
-    virtual s32 handle_11C(NetworkLayerRequest* request) = 0;  /* +0x11C - `request_58` */
-    virtual s32 handle_120(NetworkLayerRequest* request) = 0;  /* +0x120 - `request_64` */
-    virtual s32 handle_124(NetworkLayerRequest* request) = 0;  /* +0x124 - `request_68` */
-    virtual s32 handle_128(NetworkLayerRequest* request) = 0;  /* +0x128 - `request_6C` */
-    virtual s32 handle_12C(NetworkLayerRequest* request) = 0;  /* +0x12C - `request_70` */
-    virtual s32 handle_130(NetworkLayerRequest* request) = 0;  /* +0x130 - `request_74` */
-    virtual s32 handle_134(NetworkLayerRequest* request) = 0;  /* +0x134 - `request_78` */
-    virtual s32 handle_138(NetworkLayerRequest* request) = 0;  /* +0x138 - `request_7C` */
-    virtual s32 handle_13C(NetworkLayerRequest* request) = 0;  /* +0x13C - `request_80` */
-    virtual s32 handle_140(NetworkLayerRequest* request) = 0;  /* +0x140 - `request_84` */
-    virtual void slot_144() = 0;                   /* +0x144 */
+    virtual void setMediatorValue_D8(u32 value) = 0;                         /* +0x0D8 */
+    virtual u8 getMediatorValue_DC() = 0;                                    /* +0x0DC */
+    virtual void setFriendTransferMode_E0(s8 slot, u32 mode) = 0;            /* +0x0E0 */
+    virtual BOOL isFriendTransferActive_E4(s8 slot) = 0;                     /* +0x0E4 */
+    virtual BOOL isFriendTransferReady_E8(s8 slot) = 0;                      /* +0x0E8 */
+    virtual u8 getFriendFlagC084_EC(s8 slot) = 0;                            /* +0x0EC */
+    virtual u8 getFriendTransferFlag_F0(s8 slot) = 0;                        /* +0x0F0 */
+    virtual s32 handleConnect(NetworkLayerRequest* request) = 0;          /* +0x0F4 - `request_1C` */
+    virtual s32 handleDisconnect(NetworkLayerRequest* request) = 0;       /* +0x0F8 - `request_20` */
+    virtual s32 handleServerList(NetworkLayerRequest* request) = 0;       /* +0x0FC - `request_24` */
+    virtual s32 handleServerSelect(NetworkLayerRequest* request) = 0;     /* +0x100 - `request_28` */
+    virtual s32 stepRequest(NetworkLayerRequest* request) = 0;            /* +0x104 - `request_38` */
+    virtual s32 handleLayerCreate(NetworkLayerRequest* request) = 0;      /* +0x108 - `request_3C`, `request_40` */
+    virtual s32 handleLayerInfo(NetworkLayerRequest* request) = 0;        /* +0x10C - `request_44` */
+    virtual s32 handleChildList(NetworkLayerRequest* request) = 0;        /* +0x110 - `request_48` */
+    virtual s32 handleSiblingList(NetworkLayerRequest* request) = 0;      /* +0x114 - `request_4C` */
+    virtual s32 handleUserList(NetworkLayerRequest* request) = 0;         /* +0x118 - `request_50`, `request_54` */
+    virtual s32 handleUserInfo(NetworkLayerRequest* request) = 0;         /* +0x11C - `request_58` */
+    virtual s32 handleChat(NetworkLayerRequest* request) = 0;             /* +0x120 - `request_64` */
+    virtual s32 handleDetailSearch(NetworkLayerRequest* request) = 0;     /* +0x124 - `request_68` */
+    virtual s32 handleUserSearch(NetworkLayerRequest* request) = 0;       /* +0x128 - `request_6C` */
+    virtual s32 handleLayerJump(NetworkLayerRequest* request) = 0;        /* +0x12C - `request_70` */
+    virtual s32 handleLayerInfoById(NetworkLayerRequest* request) = 0;    /* +0x130 - `request_74` */
+    virtual s32 handleLayerInfoSet(NetworkLayerRequest* request) = 0;     /* +0x134 - `request_78` */
+    virtual s32 handleMediationLock(NetworkLayerRequest* request) = 0;    /* +0x138 - `request_7C` */
+    virtual s32 handleMediationUnlock(NetworkLayerRequest* request) = 0;  /* +0x13C - `request_80` */
+    virtual s32 handleMediationList(NetworkLayerRequest* request) = 0;    /* +0x140 - `request_84` */
 
     NetworkLayerRequest* allocRequest();
     void deleteRequest(NetworkLayerRequest** slot);
 
-    /* +0x004 */ u32 context_04;                   /* `init`'s first word */
-    /* +0x008 */ u32 context_08;                   /* `init`'s second word */
+    /* +0x004 */ u32 context_04;                   /* `setReflectCallback`'s first word (the callback) */
+    /* +0x008 */ u32 context_08;                   /* `setReflectCallback`'s second word (its user word) */
     /* +0x00C */ NetworkLayerRequest* requests_0C[21];  /* the running request of each starter, 0 when idle */
     /* +0x060 */ u8 requestState_60[21];           /* set while the request of the same index is moving */
     /* +0x075 */ u8 flag_75;                       /* `setFlag75`/`getFlag75`; the constructor sets it */
@@ -189,6 +199,9 @@ BOOL NetworkUniqueIdEquals(const NetworkLayerId* a, const NetworkLayerId* b);
 
 /* 0x803DFC34 - initialises a layer request record. */
 void initNetLayerRequest(NetLayerRequest* request);
+/* 0x803DFCA8 (GUESS) - copies a layer request record (`NetworkLayerPat::submitRequest_9C`/`submitSelect_A4` store
+ * theirs with it): the count, the items, the embedded unique id (through its +0x28 `copyFrom`) and the tail. */
+void copyNetLayerRequest(NetLayerRequest* dst, const NetLayerRequest* src);
 
 #ifdef __cplusplus
 }

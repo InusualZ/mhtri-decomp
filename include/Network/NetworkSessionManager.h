@@ -394,7 +394,7 @@ typedef struct PatCircleInfo {
 /* The 0x30-byte match option block `sendReqCircleMatchOptionSet` sends (the manager keeps its own at +0x3EC;
  * `handleCircleMatchOptionSet` sends a zeroed one carrying only the mode byte). */
 typedef struct PatMatchOptions {
-    /* +0x00 */ u8 pad_00[0x04];
+    /* +0x00 */ u32 tag_00;            /* the chat senders' tag word (`NetworkLayerPat::handleChat` stores its argument here) */
     /* +0x04 */ u16 sessionKey_04;     /* 10000..19999, drawn at login (`updateSession`) */
     /* +0x06 */ s8 mode_06;            /* 2 = the match is reported to the server when it ends */
     /* +0x07 */ u8 pad_07;

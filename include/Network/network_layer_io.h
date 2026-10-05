@@ -10,6 +10,9 @@
 
 #include "types.h"
 
+typedef struct NetLayerFilter NetLayerFilter;           /* include/Network/NetworkLayerPat.h */
+typedef struct NetUserPosition NetUserPosition;         /* include/Network/NetworkLayerPat.h */
+typedef struct NetLayerUserRecord NetLayerUserRecord;   /* include/Network/NetworkLayerPat.h */
 struct PatCircleOptionList;
 struct PatMatchOptions;
 typedef struct PatCircleFilter PatCircleFilter;   /* include/Network/NetworkSessionManager.h */
@@ -87,8 +90,9 @@ typedef struct PatLayerData {
     /* +0x054 */ s16 layerId_054;      /* the id `recvAnsLayerChildInfo` read first */
     /* +0x056 */ u8  pad_056[0x27];
     /* +0x07D */ s8  isCurrent_07D;    /* selects `recvAnsLayerInfo`'s event (GUESS) */
-    /* +0x07E */ u8  pad_07E[0x1C0];
-    /* +0x23E */ u16 value_23E;        /* the layer setting request sends item 23 while it is nonzero */
+    /* +0x07E */ u8  pad_07E[0xC0];
+    /* +0x13E */ u8  binary_13E[0x100]; /* the binary info `NetworkLayerPat::handleLayerInfoSet` copies in */
+    /* +0x23E */ u16 value_23E;        /* the layer setting request sends item 23 while it is nonzero (the binary size) */
 } PatLayerData;   /* size: 0x240 (the handlers clear 576 bytes) */
 
 /* One layer record of the layer info and list answers: the layer and its tag list. */
@@ -424,6 +428,29 @@ u32 sendReqBlackDelete(NetworkInstance* self, const char* userId);
 
 /* 0x80400F28 (GUESS) - request op 0x47: the checksum of file `fileId`; returns the request id. */
 s32 sendReqBinaryChecksum(NetworkInstance* self, u8 fileId);
+
+/* 0x80401AF4 - request op 136, between sendReqLayerHost and sendReqLayerUserList (recvAnsLayerUserInfoSet's slot) */
+u32 sendReqLayerUserInfoSet(NetworkInstance* self, const NetLayerUserRecord* record);
+/* 0x80401F50 */
+void sendNtcLayerUserPosition(NetworkInstance* self, const NetUserPosition* position);
+/* 0x80402090 */
+u32 sendNtcLayerChat(NetworkInstance* self, u8 channel, const PatMatchOptions* options, const char* text);
+/* 0x8040211C - request op 159 after sendNtcLayerChat, as sendReqCircleTell follows sendNtcCircleChat (recvAnsLayerTell) */
+u32 sendReqLayerTell(NetworkInstance* self, const u8* userId, const PatMatchOptions* options, const char* text);
+/* 0x80402248 */
+u32 sendReqLayerMediationLock(NetworkInstance* self, u8 lock, u8 key);
+/* 0x804022E4 */
+u32 sendReqLayerMediationUnlock(NetworkInstance* self, u8 lock, u8 key);
+/* 0x80402380 */
+u32 sendReqLayerMediationList(NetworkInstance* self, u8 mode, u8 count);
+/* 0x80402404 */
+u32 sendReqLayerDetailSearchHead(NetworkInstance* self, u32 kind, u32 mode, s32 count, const NetLayerFilter* filters, s32 filterCount);
+/* 0x804024EC */
+u32 sendReqLayerDetailSearchData(NetworkInstance* self, s32 first, s32 count);
+/* 0x80402568 */
+u32 sendReqLayerDetailSearchFoot(NetworkInstance* self);
+/* 0x80403230 */
+void sendNtcLayerUserTransfer(NetworkInstance* self, u32 state, const u8* userId, u32 active);
 
 #ifdef __cplusplus
 }
