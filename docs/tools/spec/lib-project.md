@@ -43,8 +43,10 @@ Ownership, Owner, AutoObjects, Refused, ShapeError`.
   `from_files`, `from_texts`; `covering`, `owner_of(section, address) -> Owner(state, unit, section, range, band)`, `band_of`
   (alias `module`), `resolve(name)`, `name_at`, `resolution_at`, `unit_of_symbol`, `symbols_of_unit(unit, section)`,
   `leaf_header_owner(rel, names)` (section 6.5 rule 2's leaf header, a header anywhere outside the band: stylelint and
-  integrate both call it); `BAND_ROOT` (the unsplit band's directory, `include/unsplit` - the one spelling, which the
-  2026-10-05 header move edits), `HEADER_SUFFIXES` and `is_band_header(rel)`;
+  integrate both call it); `BAND_ROOT` (the unsplit band's directory, `src/unsplit` - the one spelling), `LEGACY_BAND_ROOT`
+  (`include/unsplit`, still *classified* as the band so a ref older than the 2026-10-05 header move reads the same; never
+  written), `BAND_ROOTS`, `band_root(root=None)` (where a tool writes a band header), `HEADER_SUFFIXES` and
+  `is_band_header(rel)`;
   `AutoObjects.load(config_json, obj_dir)` / `from_config`; `module_name(unit)`; `symbol_index(rows)`;
   `owner_label(resolution, source_exists) -> (label, state, unit)` (WP3c, from `callees.classify_owner`: the vocabulary
   `callers`/`callees` print) and `source_exists(root)` (from `callees.make_source_exists`).

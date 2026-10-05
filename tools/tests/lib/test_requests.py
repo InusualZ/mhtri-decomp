@@ -86,7 +86,7 @@ def test_legacy_loader(c):
     two = legacy(3)
     c.check("`a, b` is two targets with their addresses", [(x.symbol, x.address) for x in two.targets],
             [("fn_804C2200", 0x804C2200), ("fn_804C2380", 0x804C2380)])
-    c.check("the header the request names", two.header, "include/OS/FindContainHeap_.h")
+    c.check("the header the request names", two.header, "src/OS/FindContainHeap_.h")
     c.check("a whole-line prototype is read", legacy(4).targets[0].prototype, "u32 SOGetHostID(void);")
     c.check("a backtick prototype is read", legacy(12).targets[0].prototype, "void* work_mem_alloc(unsigned long size);")
     c.check("... and the mangled alias is kept", legacy(12).targets[0].alias, "work_mem_alloc__FUl")
@@ -145,12 +145,12 @@ def test_resolve(c):
     own = ownership()
     r = R.resolve_target(R.parse_target("fn_8051E864"), own)
     c.check("a lane's fn_ the map has renamed resolves by address (stale)", (r.current, r.owner, r.header, r.stale),
-            ("SOInit", "SO/soi.cpp", "include/SO/soi.h", True))
+            ("SOInit", "SO/soi.cpp", "src/SO/soi.h", True))
     r = R.resolve_target(R.parse_target("lbl_806BF530"), own)
     c.check("a data label resolves to the unit claiming its .bss", (r.current, r.owner, r.section),
             ("lobby_state_block", "enemy/em020_prog.cpp", ".bss"))
     r = R.resolve_target(R.parse_target("OSGetTick"), own)
-    c.check("a name resolves to the unit whose range covers it", (r.owner, r.header), ("NAND/nand.c", "include/NAND/nand.h"))
+    c.check("a name resolves to the unit whose range covers it", (r.owner, r.header), ("NAND/nand.c", "src/NAND/nand.h"))
     r = R.resolve_target(R.parse_target("ck_option_cfg"), own)
     c.check("a C++ function filed by its plain name finds its one mangled row",
             (r.current, r.cpp_linkage, r.stale), ("ck_option_cfg__FUc", True, False))
@@ -158,7 +158,7 @@ def test_resolve(c):
     r = R.resolve_target(R.parse_target("fn_803DF144"), own)
     c.check("a member is recognised", R.is_member(r.current), True)
     r = R.resolve_target(R.parse_target("loose"), own)
-    c.check("an unowned symbol gets its band header", (r.owner, r.header), (None, "include/unsplit/Network.h"))
+    c.check("an unowned symbol gets its band header", (r.owner, r.header), (None, "src/unsplit/Network.h"))
     r = R.resolve_target(R.parse_target("nowhere"), own)
     c.check("an absent symbol says so", r.notes, ["not in the map (by name)"])
     req = R.normalise_legacy({"kind": "decl", "symbol": "lbl_806BF530", "owner": "unclaimed (.bss)", "proposed": "x",

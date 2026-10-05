@@ -96,8 +96,14 @@ check("a trailing comment on a value line is content",
 
 # --- classify(): real work is still staged -------------------------------------------------------------------
 for path in ("src/Pl/pl_act.cpp", "tools/units/ledger.py", "docs/plan.md", "configure.py", "CLAUDE.md",
-             "config/RMHE08/splits.txt", "config/RMHE08/symbols.txt", "include/types.h"):
+             "config/RMHE08/splits.txt", "config/RMHE08/symbols.txt", "src/types.h"):
     check(f"stage {path}", pc.classify(path)[0], "stage")
+
+# --- classify(): include/ is retired (2026-10-05) - a new or changed path refused, a deletion staged ----------
+for code in ("??", "A", "M", "R"):
+    check(f"refuse a {code} path under include/", pc.classify("include/Net/x.h", code=code)[0], "refuse")
+check("the refusal says where headers live", "src/" in pc.classify("include/Net/x.h", code="??")[1], True)
+check("a deletion under include/ is staged", pc.classify("include/Net/x.h", code="D")[0], "stage")
 
 # --- ground_truth_error(): passes here, catches a rewritten hash, tolerates a missing DOL ---------------------
 check("ground truth on this tree", pc.ground_truth_error(), [])

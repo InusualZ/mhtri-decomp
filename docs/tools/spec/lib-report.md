@@ -65,7 +65,7 @@ older than the sources it describes.
 * **The snapshot is taken at `record-base` and kept in `.pi/`**: `ninja baseline` rewrites the baseline a later comparison
   would need, so two verifies of one tree both read "no regression" while the ledger said 231 -> 228.
 * **Freshness is strict `<`**: `report.json` is written in the same whole second as the last object, so an equal stamp is
-  current. A unit's inputs are its source **and every in-tree header it reaches** (beside the includer, then `include/`, then
+  current. A unit's inputs are its source **and every in-tree header it reaches** (beside the includer, then `src/`, then
   `src/`; commented includes and system headers never date it). `report.json` is an order-only target of `all_source`:
   after an edit `ninja build/RMHE08/report.json` prints "no work to do" and still holds the previous scores (a lane reported
   two "improvements" that were never built).

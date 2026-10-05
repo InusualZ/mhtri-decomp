@@ -293,7 +293,7 @@ confirms it. The six call sites above are the whole `create_move_work` `[xref]` 
 
 ### 4.1 `QuestWork` - `.bss` 0x806C5858, size **0x6AB8** `[bytes: quest_init's memset length]`
 
-`quest_work_ptr` (`.sbss` 0x80794C40) holds its address. `include/unsplit/menu.h` already documents most of it;
+`quest_work_ptr` (`.sbss` 0x80794C40) holds its address. `src/unsplit/menu.h` already documents most of it;
 these are the additions from this pass (every one read out of `quest_init` / `fn_803ADA70` / `fn_803AF4B4`):
 
 | offset | type | name (proposed) | evidence |

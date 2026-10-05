@@ -95,6 +95,9 @@ SCENARIOS = [
     Scenario("new-unit-generated-name-refusal", "unit", [GEN_UNIT], check_outbox=False, variant="gen"),
     Scenario("new-unit-renamed-from-generated-name", "unit", [UNIT], check_outbox=False, dry_run=True,
              variant="rename", unit_renames=["%s=%s" % (GEN_UNIT, UNIT)]),
+    # the 2026-10-05 header move: a batch of renames out of the retired include/ root lands; a new path there refuses
+    Scenario("layout-move", "layout", ["configure.py"], check_outbox=False),
+    Scenario("layout-retired-include-refusal", "layout", ["configure.py"], check_outbox=False, variant="add"),
 ]
 
 
@@ -106,13 +109,15 @@ def build_fixture(root: str, sc: Scenario) -> None:
     fx = testing.GitFixture(root).init()
     files = {"configure.py": CONF, "config/RMHE08/splits.txt": SPLITS, "config/RMHE08/symbols.txt": SYMBOLS,
              "src/Net/net_old.cpp": "int net_old(void) { return 0; }\n",
-             "include/Net/net.h": "#ifndef NET_H\n#define NET_H\nint net_old(void);\n#endif\n",
+             "src/Net/net.h": "#ifndef NET_H\n#define NET_H\nint net_old(void);\n#endif\n",
              "tools/units/stylelint.py": "", "tools/selftest.py": "", "tools/git/commitlint.py": "",
              "tools/units/fixture_tool.py": "X = 1\n", "CLAUDE.md": "agents\n",
              ".gitignore": ".pi/\nbuild/\nbuild.ninja\n"}
     if sc.variant == "rename":
         files.update({"configure.py": CONF_GEN, "config/RMHE08/splits.txt": SPLITS_GEN,
                       "src/Net/fn_80001100.cpp": "int net_new_step(void) { return 1; }\n"})
+    if sc.kind == "layout":
+        files["include/Net/old.h"] = "#ifndef OLD_H\n#define OLD_H\nint net_old(void);\n#endif\n"
     base = fx.commit(files, "base")
     if sc.kind == "unit":
         unit = sc.units[0]
@@ -125,7 +130,7 @@ def build_fixture(root: str, sc: Scenario) -> None:
         edits = {"configure.py": conf, "config/RMHE08/splits.txt": spl,
                  "config/RMHE08/symbols.txt": SYMBOLS_NEW,
                  "src/%s.cpp" % unit: "int net_new_step(void) { return 1; }\n",
-                 "include/Net/net.h": "#ifndef NET_H\n#define NET_H\nint net_old(void);\nint net_new_step(void);\n"
+                 "src/Net/net.h": "#ifndef NET_H\n#define NET_H\nint net_old(void);\nint net_new_step(void);\n"
                                       "#endif\n"}
         for rel, text in edits.items():
             p = os.path.join(root, *rel.split("/"))
@@ -135,6 +140,12 @@ def build_fixture(root: str, sc: Scenario) -> None:
         os.makedirs(os.path.join(root, ".pi", "outbox"), exist_ok=True)
         with open(claims.outbox_path(root, UNIT), "w", encoding="utf-8") as fh:
             json.dump(OUTBOX, fh)
+    elif sc.kind == "layout":
+        if sc.variant == "add":
+            with open(os.path.join(root, "include", "Net", "new.h"), "w", encoding="utf-8") as fh:
+                fh.write("int net_new(void);\n")
+        else:
+            git(root, "mv", "include/Net/old.h", "src/Net/old.h")
     elif sc.kind == "tools":
         with open(os.path.join(root, "tools", "units", "fixture_tool.py"), "w", encoding="utf-8") as fh:
             fh.write("X = 2\n")

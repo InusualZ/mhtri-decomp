@@ -14,7 +14,7 @@ related: [23, 29, 53, 58, 64]
 
 **Problem.** A unit reads or writes bytes the target object carries, the address is covered by **no**
 registered `splits.txt` range, and the only thing the source has for it is an `extern` declaration. The shape
-that prompted this row is in the Network band, `include/Network/network_state.h`:
+that prompted this row is in the Network band, `src/Network/network_state.h`:
 
 ```c
 /* The band's request-header constants (no registered owner; declared, never defined - playbook 29).

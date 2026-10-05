@@ -23,15 +23,25 @@ AUTO_OBJECT_RE = re.compile(r"^auto_\d+_([0-9a-fA-F]{8})_(\w+)$")
 STATES = ("reconstructed", "registered", "auto", "unsplit")
 #: The unsplit band's directory - the home of a declaration no registered unit owns. The one spelling of the path:
 #: the owner's 2026-10-05 ruling moves it beside the sources (`src/unsplit/`), and that move edits only this line.
-BAND_ROOT = "include/unsplit"
-#: What a header is: a file with one of these suffixes, wherever it lives (`include/**` today, `src/**` after the move).
+BAND_ROOT = "src/unsplit"
+#: The band before the move (`include/unsplit`): still *classified* as the band, because a reader of a ref older than
+#: the move (the gate's `--diff` back side) must read the band there the way it reads it here - never written.
+LEGACY_BAND_ROOT = "include/unsplit"
+BAND_ROOTS = (BAND_ROOT, LEGACY_BAND_ROOT)
+#: What a header is: a file with one of these suffixes, wherever it lives (`src/**`; `include/**` before the move).
 HEADER_SUFFIXES = (".h", ".hpp", ".hh")
 
 
 def is_band_header(rel: str) -> bool:
-    """Whether `rel` is a header in the unsplit band (`BAND_ROOT`)."""
+    """Whether `rel` is a header in the unsplit band (`BAND_ROOT`, or `LEGACY_BAND_ROOT` in a pre-move tree)."""
     rel = rel.replace("\\", "/")
-    return rel.startswith(BAND_ROOT + "/") and rel.endswith(HEADER_SUFFIXES)
+    return rel.startswith(tuple(r + "/" for r in BAND_ROOTS)) and rel.endswith(HEADER_SUFFIXES)
+
+
+def band_root(root: str | os.PathLike | None = None) -> str:
+    """The band directory of a tree, relative to it: `BAND_ROOT`, where a tool *writes* a band header (the move's
+    dual-layout tolerance is gone; `root` is kept so a caller names the tree it means)."""
+    return BAND_ROOT
 
 
 def module_name(unit: str) -> str:

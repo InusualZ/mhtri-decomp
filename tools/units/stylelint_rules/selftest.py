@@ -443,6 +443,10 @@ def selftest() -> int:
               Source("x", "src/a.c", "typedef struct {\n    u32 x;\n} Foo;\n"),
               Source("y", "src/b.c", "typedef struct {\n    u32 x;\n} Foo;\n")])],
           [1])
+    check("rule1: a header is never compared, wherever it lives (src/ since the 2026-10-05 move)",
+          [f["rule"] for f in rule1_findings([
+              Source("x", "src/a.c", dup), Source("h", "src/a.h", dup), Source("i", "include/b.h", dup)])],
+          [])
     check("rule1: two different types are not duplicates",
           [f["rule"] for f in rule1_findings([
               Source("x", "src/a.c", dup), Source("y", "src/b.c", dup.replace("Foo", "Bar"))])],
@@ -1438,29 +1442,20 @@ def selftest() -> int:
     check("classifier: a header under include/ is a header", is_header("include/mod/a.h"), True)
     check("classifier: a header under src/ is a header", is_header("src/mod/a.h"), True)
     check("classifier: a .cpp is not a header", is_header("src/mod/a.cpp"), False)
-    check("classifier: the band is include/unsplit/ today", is_unsplit_header("include/unsplit/mod.h"), True)
-    check("classifier: src/unsplit/ is not the band while BAND_ROOT says include/unsplit",
-          is_unsplit_header("src/unsplit/mod.h"), False)
-    import tools.lib.project.ownership as _own_mod
-    _saved_band = _own_mod.BAND_ROOT
-    try:
-        _own_mod.BAND_ROOT = "src/unsplit"
-        check("classifier: moving BAND_ROOT moves the band (one constant)", is_unsplit_header("src/unsplit/mod.h"),
-              True)
-        check("classifier: ... and the old directory is an ordinary header then",
-              is_unsplit_header("include/unsplit/mod.h"), False)
-        check("classifier: the band reading follows the constant (an owned name declared there is rule 2)",
-              lines_of("void foo(void);\n", 2, "src/unsplit/mod.h", idx), [1])
-        check("classifier: the band at its new root carries no STOPGAP reading (band semantics kept)",
-              [f["rule"] for f in lint_source(Source("b", "src/unsplit/mod.h",
-                                                     "/* STOPGAP-BEGIN(none) */\n/* STOPGAP-END(none) */\n"))],
-              [])
-        check("classifier: a rule-2 detail is the same whatever the band root is",
-              [f["detail"] for f in lint_source(Source("x", "src/other/c.c", "extern void mid(void);\n"), mid)
-               if f["rule"] == 2],
-              ["`mid` has no registered owner - declare it in the `mod` unsplit band header"])
-    finally:
-        _own_mod.BAND_ROOT = _saved_band
+    check("classifier: the band is src/unsplit/ (BAND_ROOT)", is_unsplit_header("src/unsplit/mod.h"), True)
+    check("classifier: ... and include/unsplit/ still reads as the band (a pre-move ref, the --diff back side)",
+          is_unsplit_header("include/unsplit/mod.h"), True)
+    check("classifier: any other src/ header is not the band", is_unsplit_header("src/mod/unsplit.h"), False)
+    check("classifier: the band reading at the new root (an owned name declared there is rule 2)",
+          lines_of("void foo(void);\n", 2, "src/unsplit/mod.h", idx), [1])
+    check("classifier: the band at its new root carries no STOPGAP reading (band semantics kept)",
+          [f["rule"] for f in lint_source(Source("b", "src/unsplit/mod.h",
+                                                 "/* STOPGAP-BEGIN(none) */\n/* STOPGAP-END(none) */\n"))],
+          [])
+    check("classifier: a rule-2 detail names no band path",
+          [f["detail"] for f in lint_source(Source("x", "src/other/c.c", "extern void mid(void);\n"), mid)
+           if f["rule"] == 2],
+          ["`mid` has no registered owner - declare it in the `mod` unsplit band header"])
     hbody = ("struct Hdr {\n    u32 unk00;\n};\nvoid fn_80040598(void);\nvoid f(void) {\n    goto x;\n}\n"
              "#pragma peephole off\n")
     for hrel in ("include/mod/h.h", "src/mod/h.h"):

@@ -13,14 +13,16 @@ import re
 import subprocess
 
 from tools.lib import cscan
+from tools.lib import repo as librepo
 from tools.lib.lanes import launch, naming, pool as slot_pool, registry
 from tools.units import backlog
 from tools.units import brief
 from tools.units import claims
 
 POOL_DEPTH = 5  # how many ready candidates `list` prints
-#: Headers every unit shares: a shared base or fallback, never a reason to keep two lanes apart.
-SHARED_HEADER_PREFIXES = ("include/dolphin/", "include/MSL", "include/unsplit/", "include/nw4r/", "include/types.h")
+#: Headers every unit shares: a shared base or fallback, never a reason to keep two lanes apart. Spelled under both
+#: header roots (`lib.repo.HEADER_ROOTS`: `src/` since the 2026-10-05 move, `include/` before it).
+SHARED_HEADER_PREFIXES = tuple("%s/%s" % (top, p) for top in librepo.HEADER_ROOTS for p in ("unsplit/", "nw4r/", "types.h"))
 
 
 def pool_dir(main: str) -> str:
@@ -84,7 +86,7 @@ def next_entry(main: str) -> dict | None:
 # --- header closures: what puts two units in one lane ----------------------------------------------------------
 
 def _resolver(main: str):
-    roots = [os.path.join(main, "include"), os.path.join(main, "src")]
+    roots = [os.path.join(main, librepo.header_root(main)), os.path.join(main, "src")]
 
     def resolve(name: str, includer: str) -> str | None:
         return cscan.resolve_include(name, [os.path.dirname(includer)] + roots)
@@ -113,10 +115,8 @@ def module_of(unit: str) -> str:
 
 
 def header_module(header: str) -> str | None:
-    """The module directory a header sits in (`include/<Module>/x.h` -> `<Module>`); None for a top-level header."""
-    parts = header.replace("\\", "/").strip("/").split("/")
-    if parts and parts[0] == "include":
-        parts = parts[1:]
+    """The module directory a header sits in (`src/<Module>/x.h` -> `<Module>`); None for a top-level header."""
+    parts = librepo.include_spelling(header.replace("\\", "/").strip("/")).split("/")
     return parts[0] if len(parts) > 1 else None
 
 
@@ -649,10 +649,10 @@ def selftest() -> int:
 
     # clusters: owner headers decide which units share a lane; a wave never splits them across lanes
     with testing.temp_dir() as tmp:
-        write(tmp, "include/types.h", "typedef int s32;\n")
-        write(tmp, "include/net/net.h", '#include "types.h"\nstruct Net { s32 x; };\n')
-        write(tmp, "include/net/inner.h", "struct Inner;\n")
-        write(tmp, "include/g/g.h", '#include "types.h"\n')
+        write(tmp, "src/types.h", "typedef int s32;\n")
+        write(tmp, "src/net/net.h", '#include "types.h"\nstruct Net { s32 x; };\n')
+        write(tmp, "src/net/inner.h", "struct Inner;\n")
+        write(tmp, "src/g/g.h", '#include "types.h"\n')
         write(tmp, "src/net/a.cpp", '#include "net/net.h"\n#include "net/inner.h"\nvoid a() {}\n')
         write(tmp, "src/net/b.cpp", '#include "net/net.h"\nvoid b() {}\n')
         write(tmp, "src/g/c.cpp", '#include "g/g.h"\nvoid c() {}\n')
@@ -667,22 +667,22 @@ def selftest() -> int:
               "h/d.cpp:\n\t.text       start:0x80300000 end:0x80300100\n")
         write(tmp, "config/RMHE08/symbols.txt", "fn_80100000 = .text:0x80100000; // type:function size:0x40\n")
         check("owner_headers is the closure's module headers, minus the shared base",
-              sorted(owner_headers(tmp, "net/a.cpp")), ["include/net/inner.h", "include/net/net.h"])
+              sorted(owner_headers(tmp, "net/a.cpp")), ["src/net/inner.h", "src/net/net.h"])
         check("a header cluster is every ready unit OF THE HEADER'S MODULE whose closure includes it",
-              ([e["unit"] for e in cluster_members(tmp, "include/net/net.h")[0]],
-               [e["unit"] for e in cluster_members(tmp, "include/net/inner.h")[0]]),
+              ([e["unit"] for e in cluster_members(tmp, "src/net/net.h")[0]],
+               [e["unit"] for e in cluster_members(tmp, "src/net/inner.h")[0]]),
               (["net/a", "net/b"], ["net/a"]))
         check("... the reason names the units of other modules it left out",
-              "1 unit(s) of other modules" in cluster_members(tmp, "include/net/inner.h")[1], True)
+              "1 unit(s) of other modules" in cluster_members(tmp, "src/net/inner.h")[1], True)
         check("--cross-module takes back a unit of another module that merely includes the header",
-              [e["unit"] for e in cluster_members(tmp, "include/net/inner.h", cross_module=True)[0]],
+              [e["unit"] for e in cluster_members(tmp, "src/net/inner.h", cross_module=True)[0]],
               ["net/a", "h/d"])
-        check("header_module: include/<Module>/x.h -> Module, a top-level header has none",
-              (header_module("include/Network/network_transport.h"), header_module("include/types.h")),
+        check("header_module: src/<Module>/x.h -> Module, a top-level header has none",
+              (header_module("src/Network/network_transport.h"), header_module("src/types.h")),
               ("Network", None))
         check("a module cluster is every ready unit under src/<module>/",
               [e["unit"] for e in cluster_members(tmp, "net")[0]], ["net/a", "net/b"])
-        check("a missing header is refused", _raises(lambda: cluster_members(tmp, "include/nope.h")), True)
+        check("a missing header is refused", _raises(lambda: cluster_members(tmp, "src/nope.h")), True)
         check("a wave never puts header- or module-sharing units in two lanes",
               [e["unit"] for e in disjoint_picks(tmp, ready_entries(tmp), 4)], ["net/a", "g/c"])
         check("... and a unit sharing nothing joins it", [e["unit"] for e in disjoint_picks(
@@ -693,16 +693,16 @@ def selftest() -> int:
               ((3, 2, 1), ["net/a", "g/c"]))
         check("--count below 1 is refused", _raises(lambda: next_briefs(tmp, None, dry_run=True, count=0)), True)
         registry.save(tmp, {})
-        out = next_cluster(tmp, "include/net/net.h", "w", dry_run=False, claim_fn=fake_claim, ignore_backlog=True)
+        out = next_cluster(tmp, "src/net/net.h", "w", dry_run=False, claim_fn=fake_claim, ignore_backlog=True)
         check("a cluster is ONE claim holding every member", (out["unit"], out["units"]),
-              ("cluster/include/net/net", ["net/a", "net/b"]))
+              ("cluster/src/net/net", ["net/a", "net/b"]))
         check("... recorded in the registry, so every member reads claimed",
-              (registry.load(tmp)["cluster/include/net/net"]["units"], [e["unit"] for e in ready_entries(tmp)]),
+              (registry.load(tmp)["cluster/src/net/net"]["units"], [e["unit"] for e in ready_entries(tmp)]),
               (["net/a", "net/b"], ["g/c", "h/d"]))
         index = open(out["brief"], encoding="utf-8").read()
         check("the cluster brief indexes the per-unit briefs and acks with the cluster key",
-              ("# Cluster brief: cluster/include/net/net" in index, "`net/a`" in index and "`net/b`" in index,
-               "claims.py ack cluster/include/net/net" in index, "## 0 · Your tree" in index),
+              ("# Cluster brief: cluster/src/net/net" in index, "`net/a`" in index and "`net/b`" in index,
+               "claims.py ack cluster/src/net/net" in index, "## 0 · Your tree" in index),
               (True, True, True, True))
         member = os.path.join(briefs_dir(tmp), out["claim_slug"], naming.slug("net/a") + ".md")
         check("... each member's brief names the cluster's outbox",
@@ -758,7 +758,7 @@ def selftest() -> int:
         check("an empty backlog hands out a normal claim", next_brief(tmp, None, dry_run=True)["unit"], "u/one")
         write(tmp, ".pi/outbox/lane.json", json.dumps(
             {"unit": "auto/x", "worker": "w1", "finished_at": "2026-09-01T00:00:00",
-             "config_requests": [{"kind": "shared-file", "file": "include/unsplit/lobby.h",
+             "config_requests": [{"kind": "shared-file", "file": "src/unsplit/lobby.h",
                                   "why": "the header's `s32 fn_80215C98(...)` has the wrong arity - every call "
                                          "site passes five arguments."}]}))
         items_before, _ = backlog.build(tmp)
@@ -773,7 +773,7 @@ def selftest() -> int:
         except SystemExit as exc:
             msg = str(exc)
             check("balance 0 refuses, naming the balance, the top item and a paste-ready lane",
-                  ("REFUSED queue next" in msg, "balance is 0" in msg, "include/unsplit/lobby.h" in msg,
+                  ("REFUSED queue next" in msg, "balance is 0" in msg, "src/unsplit/lobby.h" in msg,
                    "claude --agent" in msg), (True, True, True, True))
         over2 = next_brief(tmp, "w-ignore", dry_run=False, claim_fn=fake_claim, ignore_backlog=True)
         check("--ignore-backlog hands out the claim and spends nothing",
@@ -831,7 +831,7 @@ def main() -> int:
                    help="claim up to N lanes at once, no two sharing an owner header or a module (default 1)")
     n.add_argument("--cluster", default=None, metavar="MODULE|HEADER",
                    help="claim ONE lane for every ready unit of a module (`Network`) or of a header's include "
-                        "closure within the header's own module (`include/Network/net.h`)")
+                        "closure within the header's own module (`src/Network/net.h`)")
     n.add_argument("--cross-module", action="store_true",
                    help="with a header --cluster: also take units of other modules whose closure includes it")
     n.add_argument("--worker", default=None)

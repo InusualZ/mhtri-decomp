@@ -35,7 +35,7 @@
 #include "types.h"
 #include "nw4r/math.h"
 #include "nw4r/g3d/res_common.h"           /* ResHandle (rule 1) */
-#include "nw4r/g3d/g3d_resmat.h"           /* nw4r::g3d::ResTexSrt, our owner type (rule 9) */
+#include "g3d/g3d_resmat.h"           /* nw4r::g3d::ResTexSrt, our owner type (rule 9) */
 #include "g3d/fn_80075DCC.h"               /* fn_800768DC, owner g3d/fn_80075DCC.cpp (rule 2) */
 #include "g3d/fn_800680CC.h"               /* fn_8006E2AC, owner g3d/fn_800680CC.cpp (rule 2) */
 #include "g3d/g3d_state.h"                 /* fn_80087870, owner g3d/g3d_state.cpp (rule 2) */

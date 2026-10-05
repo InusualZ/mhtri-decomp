@@ -223,7 +223,7 @@ def _legacy_rewrite(tokens, unit, main, wt):
             out.append(tok)
         i += 1
     inc = []
-    for p in (os.path.join(wt, "build", "RMHE08", "include"), os.path.join(wt, "include")):
+    for p in (os.path.join(wt, "build", "RMHE08", "include"), os.path.join(wt, "src")):
         if os.path.isdir(p):
             inc += ["-i", p]
     first_compile = next(k for k, t in enumerate(out) if t == "-c")
@@ -242,23 +242,23 @@ def include_order_rows() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         main = os.path.join(tmp, "main")
         wt = os.path.join(tmp, "wt")
-        for path in (os.path.join(main, "include", "nw4r"), os.path.join(main, "build", "RMHE08", "include"),
-                     os.path.join(wt, "include", "nw4r"), os.path.join(wt, "src", "probe")):
+        for path in (os.path.join(main, "src", "nw4r"), os.path.join(main, "build", "RMHE08", "include"),
+                     os.path.join(wt, "src", "nw4r"), os.path.join(wt, "src", "probe")):
             os.makedirs(path, exist_ok=True)
-        for path, text in ((os.path.join(main, "include", "shared.h"), "MAIN\n"),
-                           (os.path.join(main, "include", "nw4r", "math.h"), "MAIN\n"),
+        for path, text in ((os.path.join(main, "src", "shared.h"), "MAIN\n"),
+                           (os.path.join(main, "src", "nw4r", "math.h"), "MAIN\n"),
                            (os.path.join(main, "build", "RMHE08", "include", "generated.h"), "gen\n"),
-                           (os.path.join(wt, "include", "shared.h"), "WORKTREE\n"),
-                           (os.path.join(wt, "include", "nw4r", "math.h"), "WORKTREE\n"),
+                           (os.path.join(wt, "src", "shared.h"), "WORKTREE\n"),
+                           (os.path.join(wt, "src", "nw4r", "math.h"), "WORKTREE\n"),
                            (os.path.join(wt, "src", "probe", "probe.cpp"), "int f() { return 1; }\n")):
             open(path, "w", encoding="utf-8").write(text)
 
-        tokens = ["sjiswrap.exe", "mwcceppc.exe", "-nodefaults", "-i", "include", "-i",
+        tokens = ["sjiswrap.exe", "mwcceppc.exe", "-nodefaults", "-i", "src", "-i",
                   "build/RMHE08/include", "-O3", "-MMD", "-c", "src/probe/probe.cpp",
                   "-o", "build/RMHE08/src/probe"]
         cmd, obj = rc.rewrite(tokens, "probe/probe", main, wt)
 
-        wt_inc = os.path.abspath(os.path.join(wt, "include"))
+        wt_inc = os.path.abspath(os.path.join(wt, "src"))
         failures = _ok("worktree include is searched first", _search_path(cmd)[0], wt_inc, failures)
         failures = _ok("a shadowed header resolves to the worktree's copy",
                        _which(cmd, main, "shared.h"), os.path.join(wt_inc, "shared.h"), failures)
@@ -290,7 +290,7 @@ def include_order_rows() -> int:
         legacy, _obj_dir = _legacy_rewrite(tokens, "probe/probe", main, wt)
         failures = _ok("the old ordering read MAIN's header (the bug this pins)",
                        _which(legacy, main, "shared.h"),
-                       os.path.join(main, "include", "shared.h"), failures)
+                       os.path.join(main, "src", "shared.h"), failures)
         failures = _ok("the old ordering put the worktree's include last",
                        os.path.normcase(os.path.abspath(_search_path(legacy)[-1])), os.path.normcase(wt_inc),
                        failures)
@@ -304,23 +304,23 @@ def include_order_rows() -> int:
                        _which(cmd2, main, "generated.h"),
                        os.path.join(wt, "build", "RMHE08", "include", "generated.h"), failures)
 
-        # A worktree with no `include/` of its own: MAIN's directories are kept, in MAIN's own order.
+        # A worktree with no header root of its own (no `src/`): MAIN's directories are kept, in MAIN's own order.
         plain = os.path.join(tmp, "plain")
-        os.makedirs(os.path.join(plain, "src", "probe"), exist_ok=True)
+        os.makedirs(plain, exist_ok=True)
         cmd3, _obj3 = rc.rewrite(tokens, "probe/probe", main, plain)
         failures = _ok("a bare worktree keeps MAIN's search path",
                        _which(cmd3, main, "shared.h"),
-                       os.path.join(main, "include", "shared.h"), failures)
+                       os.path.join(main, "src", "shared.h"), failures)
         failures = _ok("a bare worktree keeps MAIN's order",
                        _search_path(cmd3),
-                       [os.path.join(main, "include"),
+                       [os.path.join(main, "src"),
                         os.path.join(main, "build", "RMHE08", "include")], failures)
 
         # MAIN's line can carry *absolute* `-i` paths too (a borrowed sibling command); the worktree's own
         # header must still be searched first, or the same silent shadowing comes back through the other
         # spelling. An absolute MAIN entry cannot be re-pointed under the worktree by `os.path.join`, so the
         # ordering (step 1) is what protects it.
-        abs_tokens = ["sjiswrap.exe", "mwcceppc.exe", "-i", os.path.join(main, "include"), "-i",
+        abs_tokens = ["sjiswrap.exe", "mwcceppc.exe", "-i", os.path.join(main, "src"), "-i",
                       os.path.join(main, "build", "RMHE08", "include"), "-c", "src/probe/probe.cpp",
                       "-o", "build/RMHE08/src/probe"]
         cmd5, _obj5 = rc.rewrite(abs_tokens, "probe/probe", main, wt)
@@ -354,12 +354,12 @@ def chained_objalign_rows() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         main = os.path.join(tmp, "main")
         wt = os.path.join(tmp, "wt")
-        for d in (os.path.join(main, "include"), os.path.join(main, "build", "RMHE08", "include"),
-                  os.path.join(wt, "include"), os.path.join(wt, "src", "probe")):
+        for d in (os.path.join(main, "src"), os.path.join(main, "build", "RMHE08", "include"),
+                  os.path.join(wt, "src"), os.path.join(wt, "src", "probe")):
             os.makedirs(d, exist_ok=True)
         open(os.path.join(wt, "src", "probe", "probe.cpp"), "w", encoding="utf-8").write(
             "int f() { return 1; }\n")
-        tokens = ["cmd", "/c", "sjiswrap.exe", "mwcceppc.exe", "-i", "include", "-O3", "-MMD",
+        tokens = ["cmd", "/c", "sjiswrap.exe", "mwcceppc.exe", "-i", "src", "-O3", "-MMD",
                   "-c", "src/probe/probe.cpp", "-o", "build/RMHE08/src/probe", "&&",
                   "C:\\Python\\python.exe", "tools\\elf\\objalign.py",
                   "build\\RMHE08\\src\\probe\\probe.o", "&&",
@@ -1028,7 +1028,7 @@ def switch_rows() -> int:
         main = os.path.join(tmp, "main")
         os.makedirs(os.path.join(main, "build", "tools"))
         open(os.path.join(main, "build", "tools", "sjiswrap.exe"), "wb").write(b"")
-        tokens = ["cmd", "/c", "build\\tools\\sjiswrap.exe", "mwcceppc.exe", "-i", "include",
+        tokens = ["cmd", "/c", "build\\tools\\sjiswrap.exe", "mwcceppc.exe", "-i", "src",
                   "-O3", "-c", "src/x.c", "-o", "build\\RMHE08\\src", "&&", "C:\\Py\\python.exe"]
         out = rc.absolutize(tokens, main)
         failures = _ok("a switch is returned byte-for-byte", out[1], "/c", failures)

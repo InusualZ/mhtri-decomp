@@ -16,6 +16,9 @@ from tools.lib import report, repo
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 STAGE_PREFIXES = ("src/", "include/", "tools/", "docs/", ".claude/skills/", "config/")
+#: A root the tree no longer has (owner's ruling 2026-10-05: headers moved beside their sources): a new or changed
+#: path there is refused, a deletion is still staged (it stays in STAGE_PREFIXES for that).
+RETIRED_PREFIXES = ("include/",)
 STAGE_FILES = ("configure.py", "CLAUDE.md", ".gitignore")
 REFUSE_PREFIXES = ("build/", "orig/", ".lavish/", ".pi/", ".vscode/", ".idea/", "__pycache__/")
 REFUSE_FILES = ("objdiff.json", "compile_commands.json", "build.ninja")
@@ -50,8 +53,12 @@ def config_texts(root: str = ROOT) -> tuple[str | None, str | None]:
     return (head.stdout if head.returncode == 0 else None), work
 
 
-def classify(path: str, texts: tuple[str | None, str | None] | None = None) -> tuple[str, str]:
-    """-> ('stage' | 'refuse', reason). `texts` is config.yml's (HEAD, new) pair, read from ROOT when omitted."""
+def classify(path: str, texts: tuple[str | None, str | None] | None = None, code: str = "") -> tuple[str, str]:
+    """-> ('stage' | 'refuse', reason). `texts` is config.yml's (HEAD, new) pair, read from ROOT when omitted; `code` is
+    the porcelain status (`D` for a deletion: the one change a retired root still takes)."""
+    if path.startswith(RETIRED_PREFIXES) and "D" not in code:
+        return "refuse", ("include/ is retired - every header lives beside its source under src/ (owner's ruling "
+                          "2026-10-05); only a deletion there is staged")
     if path in GROUND_TRUTH_FILES:
         return "refuse", "ground truth - rewriting it would void every later `ok` (plan 7.18)"
     if path == repo.CONFIG_PATH:
@@ -257,7 +264,7 @@ def main() -> int:
     rows = status_paths()
     stage, refuse = [], []
     for code, path in rows:
-        verdict, reason = classify(path)
+        verdict, reason = classify(path, code=code)
         (stage if verdict == "stage" else refuse).append((code, path, reason))
 
     # The ground-truth cross-check runs before anything is staged: if the DOL's recorded hash and the DOL itself

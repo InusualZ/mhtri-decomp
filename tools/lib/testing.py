@@ -356,7 +356,7 @@ class FixtureTree:
     """A fake repository the tools accept as a tree, always created outside the live repository.
 
     Layout: `configure.py` (real, runnable Python with `config.libs` and `Object(...)` rows),
-    `config/RMHE08/{symbols.txt,splits.txt,config.yml}`, `src/`, `include/`, `build/RMHE08/{obj,src}/`,
+    `config/RMHE08/{symbols.txt,splits.txt,config.yml}`, `src/` (sources and headers), `build/RMHE08/{obj,src}/`,
     and on demand `build/RMHE08/report.json` and `build/RMHE08/asm/`. Every helper re-renders the file it
     owns, so the files always reflect the calls made.
     """
@@ -372,7 +372,7 @@ class FixtureTree:
         self.cflags: dict[str, list[str]] = {"cflags_base": ["-O4,p", "-inline auto"]}
         self.symbols: list[FixtureSymbol] = []
         self.splits: dict[str, list[tuple[str, int, int]]] = {}
-        for d in ("src", "include", "build/%s/obj" % self.VERSION, "build/%s/src" % self.VERSION):
+        for d in ("src", "build/%s/obj" % self.VERSION, "build/%s/src" % self.VERSION):
             (self.root / d).mkdir(parents=True, exist_ok=True)
         self.write(self.config_dir / "config.yml",
                    "object: orig/%s/sys/main.dol\nsymbols: config/%s/symbols.txt\nsplits: config/%s/splits.txt\n"

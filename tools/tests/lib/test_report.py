@@ -267,26 +267,26 @@ def test_freshness(c):
     with tempfile.TemporaryDirectory() as tmp:
         root, base = Path(tmp), 1_700_000_000.0
         src = root / "src" / "Dir" / "u.cpp"
-        _touch(root / "include" / "deep.h", base + 10)
-        _touch(root / "include" / "Dir" / "u.h", base + 10, '#include "deep.h"\n')
+        _touch(root / "src" / "deep.h", base + 10)
+        _touch(root / "src" / "Dir" / "u.h", base + 10, '#include "deep.h"\n')
         _touch(src, base + 10, '#include "Dir/u.h"\n#include <string.h>\n// #include "gone.h"\n')
         closure = {os.path.relpath(p, root).replace("\\", "/") for p in report.source_closure(str(src), str(root))}
-        c.check("the closure follows include/ transitively, never a system or commented header",
-                closure, {"src/Dir/u.cpp", "include/Dir/u.h", "include/deep.h"})
+        c.check("the closure follows the headers transitively, never a system or commented header",
+                closure, {"src/Dir/u.cpp", "src/Dir/u.h", "src/deep.h"})
         order_root = root / "order"
-        _touch(order_root / "include" / "a.h", base, '#include "deep.h"\n')
-        _touch(order_root / "include" / "deep.h", base)
-        _touch(order_root / "include" / "z.h", base, '/*\n#include "gone.h"\n*/\n')
-        _touch(order_root / "include" / "gone.h", base)   # it exists: only the comment keeps it out
+        _touch(order_root / "src" / "a.h", base, '#include "deep.h"\n')
+        _touch(order_root / "src" / "deep.h", base)
+        _touch(order_root / "src" / "z.h", base, '/*\n#include "gone.h"\n*/\n')
+        _touch(order_root / "src" / "gone.h", base)   # it exists: only the comment keeps it out
         _touch(order_root / "src" / "o.cpp", base, '#include "a.h"\n#include "z.h"\n#include "a.h"\n')
         c.check("the closure is in the preprocessor's order: depth first, each file once, a block-commented include none",
                 [os.path.relpath(p, order_root).replace("\\", "/")
                  for p in report.source_closure(str(order_root / "src" / "o.cpp"), str(order_root))],
-                ["src/o.cpp", "include/a.h", "include/deep.h", "include/z.h"])
+                ["src/o.cpp", "src/a.h", "src/deep.h", "src/z.h"])
         obj, rep = root / "build" / "u.o", root / "build" / "report.json"
         _touch(obj, base + 10)
         c.check("an equal stamp is current (strict <)", report.unit_reasons(str(src), str(obj), str(root))[0], [])
-        _touch(root / "include" / "deep.h", base + 20)
+        _touch(root / "src" / "deep.h", base + 20)
         reasons, newest = report.unit_reasons(str(src), str(obj), str(root))
         c.check("a header edit dates the object, naming the header",
                 (len(reasons), os.path.basename(newest[0])), (1, "deep.h"))

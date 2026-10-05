@@ -280,7 +280,7 @@ extern "C" {
 #include "enemy/fn_80138074.h" /* fn_8013A9F4, the owner's own declaration */
 #include "sound/mhchar.h"
 #include "nw4r/g3d/scnmdl.h"     /* ScnMdl::CopiedMatAccess */
-#include "nw4r/g3d/g3d_resmat.h" /* ResTexSrt */
+#include "g3d/g3d_resmat.h" /* ResTexSrt */
 #include "fn_8004CAD8.h"         /* MTX34_ctor, fn_8005024C (their owner's header) */
 #include "unsplit/g3d.h"         /* fn_8006F304 */
 #include "unsplit/sound.h"       /* fn_800E2994 */

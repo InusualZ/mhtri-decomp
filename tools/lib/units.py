@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import Callable
 
-from tools.lib.repo import VERSION
+from tools.lib.repo import VERSION, include_roots
 
 #: Every source extension a unit can carry.
 SOURCE_EXT = (".c", ".cc", ".cp", ".cpp", ".cxx", ".c++")
@@ -535,8 +535,11 @@ def order_includes(tokens: list[str], main: str, wt: str) -> list[str]:
             seen.add(key)
             dirs.append(path)
 
-    for rel in ("include", os.path.join("build", VERSION, "include")):
-        cand = os.path.join(wt, rel)
+    # the worktree's own copies of the command line's relative roots (`-i src` since the 2026-10-05 header move,
+    # `-i include` before it), else of the layout's roots (`lib.repo.include_roots`, read from MAIN)
+    rels = [v for _idx, v in pairs if not os.path.isabs(v)] or list(include_roots(main))
+    for rel in rels:
+        cand = os.path.join(wt, *rel.replace("\\", "/").split("/"))
         if os.path.isdir(cand):
             add(cand)
     for _idx, value in pairs:

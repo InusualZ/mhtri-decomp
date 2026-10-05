@@ -29,6 +29,8 @@ Inputs -> outputs: git status, report.json -> staged index, .git/prepcommit_msg.
 * `git add -A` would sweep up another agent's in-flight file (this repo has three agents in it),
 * build output, `orig/`, `.lavish/`, `.pi/` and scratch must never be staged, and a stray file in the tree (a `.stackdump`, a `__pycache__`) is an accident worth refusing rather than committing,
 * the commit message is supposed to carry the *results*, and those numbers already exist in `build/RMHE08/report.json`.
+* **`include/` is retired (owner ruling 2026-10-05).** A new or changed path under `include/` is refused (every header
+  lives beside its source under `src/`); a deletion there is still staged (`RETIRED_PREFIXES`, `classify(path, code=)`).
 * **Ground truth.** `config/RMHE08/build.sha1` is always refused, and the DOL hash it states is cross-checked against
   `orig/RMHE08/sys/main.dol` before anything is staged. `config/RMHE08/config.yml` is staged only when its worktree copy
   differs from HEAD's in the relocation-analysis keys (`block_relocations`, `add_relocations`) and comment lines alone

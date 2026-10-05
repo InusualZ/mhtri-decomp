@@ -103,13 +103,14 @@ relative to `MAIN`; the contract of each tool is its spec.
 | `tools/units/dataclaim.py --unit U` | **rule 12 bit you (an `extern` of unowned data)**: every data symbol U references but does not own, its census sharers, and the exact `splits.txt` claim / named data-only unit to paste. Read-only; it never writes `splits.txt`. |
 | `tools/units/unwindcut.py <unit> <cut>` | **you are re-cutting a seam** (moving a unit's right edge to a function boundary): the `extabindex`/`extab` partition at the cut with the sum check, the paste-ready lines for both halves, and the `.ctors`/`.dtors` words the cut obliges you to drop. Read-only; it refuses a cut that is not a function boundary. |
 | `tools/units/langcheck.py` | **a unit's language is in question**: decide C vs C++ from evidence (a mangled definition, a `.cpp` `__FILE__` string), never from convenience. |
+| `tools/units/movehdr.py` | **the header layout moves**: `include/P` -> `src/P` (plus an exception table), every quoted `#include` simulated in both layouts and both search orders first, refused on any target change; `--dry-run` plans, a moved tree reports nothing to do (`spec/movehdr.md`). |
 | `tools/units/recordmerge.py` | **two lanes each hold a view of the same record header**: fold them into one definition with the checks the hand passes lacked. |
 
 ### The rules and the audits
 
 | tool | use it when … |
 | --- | --- |
-| `tools/units/stylelint.py` | **you changed `src/` or `include/`**: rules 1–12 with `file:line`; `--diff <ref>` is the gate's add-only comparison (a recut's *moved* findings are credited one per removal from another file of the batch and printed as `moved`, a copy is not), `--budget` a debt read. |
+| `tools/units/stylelint.py` | **you changed `src/`**: rules 1–12 with `file:line`; `--diff <ref>` is the gate's add-only comparison (a recut's *moved* findings are credited one per removal from another file of the batch and printed as `moved`, a copy is not), `--budget` a debt read. |
 | `tools/units/vtableaudit.py` | **a unit owns a code-pointer run**: find a vtable it owns but does not emit and a hand-written `+0x00` table store — rule 10 made mechanical, with `--diff` at the gate. |
 | `tools/units/datagap.py --census --unit <unit>` | **before you report a unit**: the data its target object references that no claim covers (orphans, with neighbours, section and readers) plus the strict view - the unit's sole-owned pairs as `REFUSE` or `deferred <class>`; `dataclaim.py --unit <unit>` prints the `splits.txt` edit that claims the refusable ones. |
 | `tools/units/declclash.py` | **a cross-unit lane hits `(10197) illegal function overloading`**: list the function names declared more than once with *different text* in one include closure, before any source is edited. |

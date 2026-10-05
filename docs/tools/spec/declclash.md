@@ -15,7 +15,7 @@ profiles (`.claude/agents`) (1); CLAUDE.md (1); docs (1)
 ```
 python tools/units/declclash.py src/menu/fn_802E4978.cpp
 python tools/units/declclash.py --only-different --json src/hud/layout.cpp
-python tools/units/declclash.py include/unsplit/menu.h
+python tools/units/declclash.py src/unsplit/menu.h
 ```
 Flags: `--fail-on-different`, `--json`, `--only-different`, `--root`.
 Exit codes: Exit status is 0 for a report and 1 only with `--fail-on-different` when a `DIFFERENT` name was found.
@@ -27,7 +27,7 @@ Inputs -> outputs: src + include -> SAME/DIFFERENT list.
 
 ## Invariants and rules
 
-* Problem it solves: a unit that legitimately needs a callee owned by another unit must `#include` that unit's header. When the band headers (`include/unsplit/*.h`, `include/ef.h`, ...) still carry their own copy of the same declaration, MWCC stops with `(10197) illegal function overloading` at the *first* clashing line and `-maxerrors 1` hides the rest - so the cost of a cross-unit lane reads as one error after another instead of a finite list. This tool turns that into the list, before any source is edited.
+* Problem it solves: a unit that legitimately needs a callee owned by another unit must `#include` that unit's header. When the band headers (`src/unsplit/*.h`, `src/ef.h`, ...) still carry their own copy of the same declaration, MWCC stops with `(10197) illegal function overloading` at the *first* clashing line and `-maxerrors 1` hides the rest - so the cost of a cross-unit lane reads as one error after another instead of a finite list. This tool turns that into the list, before any source is edited.
 * It is descriptive, not authoritative: it compares declaration *text* (with parameter names and `struct `/`extern ` spelling normalised away), so it is conservative in both directions.
 * `DIFFERENT` names are worth inspecting but may still be the same type (`VEC3*` vs `nw4r::math::VEC3*` is one type when `VEC3` is that typedef).
 * `SAME` names differ only in whitespace, parameter names or the `struct `/`extern ` keyword.

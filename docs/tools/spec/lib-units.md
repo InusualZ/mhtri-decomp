@@ -60,7 +60,7 @@ fresh-object proof, and finds the original object to score against.
   unregistered unit leaves the command as it is. Measured 2026-10-04: 354 of 354 registered units agree with MAIN's current
   graph (no false re-read); the network pilot measured `-O4,p` after its row had gone `-O3`.
 * **The worktree's headers win.** MWCC searches `-i` in order and MAIN's list is relative to MAIN: the worktree's own
-  `include/` and `build/RMHE08/include` go first, and each of MAIN's directories is pointed at the worktree's copy when it has
+  `src/` and `build/RMHE08/include` go first, and each of MAIN's directories is pointed at the worktree's copy when it has
   one (appending them once measured MAIN's copy of an edited header - the `eft004` round).
 * **MWCC's `-o` is a directory**; the object's name comes from the source. The chained `objalign.py`/`objextab.py` arguments
   are absolutised to the object MWCC just wrote (left relative they rewrote MAIN's object, or raised for an unregistered unit).

@@ -35,7 +35,7 @@ Inputs -> outputs: git merge state -> resolved commit.
 | `config/**/symbols.txt` | main's file, then the branch's own rename pairs re-applied as **exact row replacements** - a symbol map is address-ordered, so a textual union reorders it and renames nothing |
 | `src/**` | whichever side already carries the other side's work (the branch's edit there is usually a rename sweep, and main's file may already hold it). If neither does, a **comment-only** delta (identical code after `stylelint.strip`) keeps main's block and records the branch's dropped paragraph; otherwise **refuse** and name what is missing |
 | an **add/add** path (no blob in the merge base) | each side diffed against the base of the path *it was renamed from*; with no such base, the **superset** of the two copies - and the side taken is always named, never guessed |
-| an unsplit band header (`include/unsplit/*`) | a **union by hunk class** (below), then the **rule-2 address sweep**: a declaration whose address is inside a registered `.text` range belongs to that unit's header, and where it should move is reported |
+| an unsplit band header (`src/unsplit/*`) | a **union by hunk class** (below), then the **rule-2 address sweep**: a declaration whose address is inside a registered `.text` range belongs to that unit's header, and where it should move is reported |
 | anything else | a **union by hunk class**: an additive declaration block unions as before; a comment paragraph both sides rewrote takes the **superset** side (named in the output, with the evidence); a mixed comment-and-code hunk prefers the superset and otherwise keeps the union and warns; a prose hunk with no superset is refused |
 
 ## Lib dependencies

@@ -29,7 +29,7 @@ Flags: `--code-only`, `--count`, `--dry-run`, `--file`, `--force`, `--json`, `--
 Exit codes: 0 ok, 1 findings or refusal, 2 could not run (the `lib.findings` convention; today's tool documents none, so `migration.md` records the current behaviour before changing it).
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
 * `rename` / `rename-batch --rewrite [--comments]`: after the map write, rewrite every code reference to the old name
-  under `src/` and `include/` (`lib.cscan.rewrite_identifiers`); `--comments` also rewrites comment mentions. Never
+  under `src/` (`lib.cscan.rewrite_identifiers`); `--comments` also rewrites comment mentions. Never
   rewritten: a string or char literal, an `#include` line, a token beside `/` or `\` or followed by a source suffix (a
   path), a token after `@`, `$`, `.` or before `@`, `$` (a string-table, section or member spelling); a mangled
   `name__Fv` never matches `name`. Byte-exact, line endings kept; a re-run is a no-op.

@@ -214,6 +214,27 @@ def changed_paths(main: str) -> list[str]:
     return [path for _code, path in changed_status(main)]
 
 
+#: A root the tree no longer has (owner's ruling 2026-10-05: every header lives beside its source under `src/`). A
+#: batch may delete there - the move itself, a stale branch's cleanup - but never add or change a path.
+RETIRED_PREFIXES = ("include/",)
+
+
+def retired_paths(main: str) -> list[str]:
+    """The paths a batch adds or changes under a retired root (`RETIRED_PREFIXES`): a deletion, and the old side of a
+    rename, are not additions."""
+    bad = []
+    for line in git(["status", "--porcelain", "-uall"], main).splitlines():
+        if len(line) < 4:
+            continue
+        code, path = line[:2], line[3:].strip()
+        if " -> " in path:
+            path = path.split(" -> ")[1]
+        path = path.strip('"')
+        if path.startswith(RETIRED_PREFIXES) and "D" not in code:
+            bad.append(path)
+    return bad
+
+
 # --------------------------------------------------------------------------------------------------
 # the compile gate: `ninja build/RMHE08/ok` is structurally blind to a unit that does not compile. A
 # `NonMatching` unit's object is never linked, so the DOL hash stays green with any number of uncompilable

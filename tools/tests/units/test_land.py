@@ -143,15 +143,15 @@ band_fixture = {
         "Sections:\n\t.text       type:code align:32\n\n"
         "existing/unit.cpp:\n\t.text       start:0x80010000 end:0x80010010\n"),
     "configure.py": "config.libs = [\n]\n",
-    "include/unsplit/enemy.h": (
+    "src/unsplit/enemy.h": (
         "#ifndef B1\n#define B1\n"
         "void fn_8019E9AC(void);\n"
         "void fn_OTHER(void);\n"
         "void fn_ALREADY(void);\n"
         "#endif\n"),
-    "include/unsplit/widen.h": "#ifndef B2\n#define B2\nvoid fn_WIDENED(void);\n#endif\n",
+    "src/unsplit/widen.h": "#ifndef B2\n#define B2\nvoid fn_WIDENED(void);\n#endif\n",
     # a C++ callee declared by its clean spelling while symbols.txt holds the mangling
-    "include/unsplit/cxx.h": "#ifndef B4\n#define B4\nu32 em_act_ck(struct _ENEMY_WORK*, u8);\n#endif\n",
+    "src/unsplit/cxx.h": "#ifndef B4\n#define B4\nu32 em_act_ck(struct _ENEMY_WORK*, u8);\n#endif\n",
 }
 
 
@@ -1545,7 +1545,7 @@ def test_band_boundary(c):
     """Rule 2 at the registration boundary."""
     check = c.check
     # --- rule 2 at the registration boundary (Backlog #1): a range this batch registers makes the
-    # symbols inside it owned, so a declaration of one of them still in include/unsplit/<band>.h is now a
+    # symbols inside it owned, so a declaration of one of them still in src/unsplit/<band>.h is now a
     # rule-2 violation - and a candidate `(10505) illegal overloading`. The old stylelint `--diff` could
     # not see it: the band header is not a changed file, so it is not in the diff's file set at all. The
     # checks below are the guard's own bar - delete `band_ownership_warnings` (or the range diff) and they
@@ -1581,7 +1581,7 @@ def test_band_boundary(c):
                 "existing/unit.cpp:\n\t.text       start:0x80010000 end:0x80010020\n\n"
                 "new/fn_801993E0.cpp:\n\t.text       start:0x801993E0 end:0x801993F0\n"),
             "configure.py": ("config.libs = [\n    Object(NonMatching, \"new/fn_801993E0.cpp\"),\n]\n"),
-            "include/unsplit/band_added.h": "#ifndef B3\n#define B3\nvoid fn_ALREADY(void);\n#endif\n",
+            "src/unsplit/band_added.h": "#ifndef B3\n#define B3\nvoid fn_ALREADY(void);\n#endif\n",
         })
         warns = L.band_ownership_warnings(tmp, base_sha)
         blob = "\n".join(warns)
@@ -2034,6 +2034,26 @@ def test_f34_and_integrate(c):
     check("integrate: `land.py integrate ARGS` runs integrate.py with ARGS unchanged",
           L.integrate_command(["--dry-run", "--lane", "x"])[1:], [L.INTEGRATE, "--dry-run", "--lane", "x"])
     check("integrate: the forward target exists", os.path.isfile(L.INTEGRATE), True)
+
+
+def test_retired_include_root(c):
+    """include/ is retired (2026-10-05): a batch may delete or rename out of it, never add or change a path there."""
+    from tools.units.landing import common as landing_common
+    g = testing.GitFixture().init()
+    try:
+        g.commit({"include/a.h": "a\n", "include/b.h": "b\n", "include/c.h": "c\n", "src/u.cpp": "u\n"}, "base")
+        g.git("mv", "include/a.h", "src/a.h")             # the move: a staged rename
+        os.remove(os.path.join(str(g.root), "include", "b.h"))   # a deletion
+        c.check("a rename out of include/ and a deletion there are not additions",
+                landing_common.retired_paths(str(g.root)), [])
+        with open(os.path.join(str(g.root), "include", "c.h"), "w") as fh:
+            fh.write("changed\n")
+        with open(os.path.join(str(g.root), "include", "new.h"), "w") as fh:
+            fh.write("new\n")
+        c.check("a changed and a new path under include/ are refused",
+                sorted(landing_common.retired_paths(str(g.root))), ["include/c.h", "include/new.h"])
+    finally:
+        g.cleanup()
 
 
 if __name__ == "__main__":

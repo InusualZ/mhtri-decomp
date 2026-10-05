@@ -46,7 +46,7 @@ python tools/units/land.py integrate ARGS...        # the same, forwarded unchan
 Reads the request files, their sidecars, the lane outbox `<slug>.json` (its units are the removal scope), the tree's
 map/splits/sources, `claims.py list --json` (live lanes: every unmerged row's `unit` and its `units` - a cluster claim's
 or a spawned lane's unit set, `units_of_rows`). Writes only in the invocation tree: `config/RMHE08/symbols.txt`
-(through `symedit.py rename-batch --rewrite --comments`), `src/`, `include/`, `config/RMHE08/config.yml` (relocation keys
+(through `symedit.py rename-batch --rewrite --comments`), `src/`, `config/RMHE08/config.yml` (relocation keys
 only, during the build rounds - the change leaves as a patch file under `build/tmp/integrate/`, never in a unit
 commit), the branch, and with `--write-status` the sidecars.
 
@@ -77,7 +77,7 @@ commit), the branch, and with `--write-status` the sidecars.
 * **A prototype names the decided symbol:** the request's prototype is rewritten from the filed spelling, the lane's
   proposed name and the map's current name to the final one (L2: `isCircleListBusy` filed, `testAndSet611b` decided).
 * **Leaf headers:** when a consumer cannot include the owner's full header (a redefinition error in it after this batch
-  declared into or included it), the declaration moves to `include/<module>/<symbol>.h` (section 6.5 rule 2's leaf
+  declared into or included it), the declaration moves to `src/<module>/<symbol>.h` (section 6.5 rule 2's leaf
   header, created from the template) in the next round; a rerun finds an existing leaf header and declares nothing in
   the full one.
 * **Already applied:** a request the tree already satisfies - no rename left, no stale spelling in the code, no STOPGAP

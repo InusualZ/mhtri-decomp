@@ -2,7 +2,7 @@
 id: 56
 title: Two lanes' views of one work record are merged by tiling, not by choosing a side
 status: works
-problem: Two lanes register neighbouring bands that both take the same work record, so both write `include/<area>/<rec>.h` and the second landing is an add/add conflict on a file already in main; neither side is a superset, so choosing one breaks the other unit and keeping both defines the record twice.
+problem: Two lanes register neighbouring bands that both take the same work record, so both write `src/<area>/<rec>.h` and the second landing is an add/add conflict on a file already in main; neither side is a superset, so choosing one breaks the other unit and keeping both defines the record twice.
 tags: [process]
 applies: []
 demo:
@@ -13,7 +13,7 @@ related: [57, 72, 60]
 # 56. Two lanes' views of one work record are merged by tiling, not by choosing a side
 
 **Problem.** Two lanes register neighbouring bands that both take the same work record, so both write
-`include/<area>/<rec>.h` - and the second landing hits an **add/add conflict on a file that already exists in
+`src/<area>/<rec>.h` - and the second landing hits an **add/add conflict on a file that already exists in
 `main`**. Neither side is a superset (measured on `_AINPC_W`: 90 named members in the landed header vs 85 in the
 newcomer, **75 identical in both name and offset**, 14 only in the landed one, 9 only in the newcomer) and one
 offset carries two different names (`+0x005` was `sub_step` in the landed header, `field_0x005` in the other).
@@ -37,7 +37,7 @@ unit's source is renamed to that spelling (one rename, three sites, codegen-neut
 `tools/units/recordmerge.py` implements exactly these rules:
 
 ```sh
-python tools/units/recordmerge.py --base include/ai/ainpc.h --other worker/<slug>:include/ai/ainpc.h --out include/ai/ainpc.h
+python tools/units/recordmerge.py --base src/ai/ainpc.h --other worker/<slug>:src/ai/ainpc.h --out src/ai/ainpc.h
 ```
 
 (`--dry-run` shows the per-group delta; `--take {other,base}` picks which side's declaration wins a same-offset conflict, default `other`.) It
@@ -53,7 +53,7 @@ build, stylelint and the gate's structural checks all pass. So verify a record m
 consumers' rows** - `ninja changes` must print *no* line for a unit that already owned the record. Offsets in
 comments are not evidence; percentages are.
 
-**Result / Example.** (2026-09-26) `include/ai/ainpc.h`, the `_AINPC_W` record (0x49C bytes): after the merge 99
+**Result / Example.** (2026-09-26) `src/ai/ainpc.h`, the `_AINPC_W` record (0x49C bytes): after the merge 99
 named members (90 base + 9 spliced), 48 fillers, last field `+0x498`, total unchanged. The newcomer's 12 rows then
 reproduced its own report exactly (`fn_802C5D10` 99.0541, `fn_802C6690` 100.0000, unit 20.159) and the landed
 band's rows did not move at all - which is what made the landing acceptable with one `_AINPC_W` definition

@@ -80,7 +80,7 @@ def test_commitlint(c):
         c.check("config has the convention's three members", members["config"], {"flags", "symbols", "splits"})
         c.check("docs members are the documents", members["docs"], {"plan", "pipeline"})
         c.check("repo members are read from the root files",
-              members["repo"], {"readme", "license", "ci", "gitignore"})
+              members["repo"], {"readme", "license", "ci", "gitignore", "layout"})
 
         # a derived set follows the tree: a new module becomes valid the moment the directory exists
         os.makedirs(os.path.join(root, "src", "enemy"))
@@ -105,7 +105,7 @@ def test_commitlint(c):
                      "tools/git: x", "tools/land: x", "tools/stylelint: x", "tools/commitlint: x",
                      "tools/selftest: x", "agents/decompiler: x", "agents/policy: x", "config/flags: x",
                      "config/symbols: x", "config/splits: x", "docs/plan: x", "repo/readme: x",
-                     "repo/gitignore: x"):
+                     "repo/gitignore: x", "repo/layout: x"):
             c.check("known member passes: %s" % good, _errors(good, members), [])
 
         # a script stem at any depth is a member, so the convention's own examples (`tools/land`,

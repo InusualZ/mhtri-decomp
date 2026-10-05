@@ -591,9 +591,9 @@ is what the tool replaced):
   order (`lb_quest_board` anywhere but between its neighbours died with *Cyclic dependency encountered*).
 * Other files: `git merge-file -p --diff3 <ours=git show main:f> <base=git show $MB:f> <theirs=git show $TIP:f>`.
   `git apply --3way` writes markers and **exits 0**, and refuses once the tree differs from the index.
-* `include/unsplit/*.h`: the rule-2 sweep - drop every declaration whose address is inside a registered `.text`
+* `src/unsplit/*.h`: the rule-2 sweep - drop every declaration whose address is inside a registered `.text`
   range and **move the ones a unit still uses into the owner's header** (rule 2 has no deferral); a `void*` in the
-  new home needs `/* untyped: <reason> */`. `include/unsplit/menu.h` is the hot spot: two `menu` lanes in one wave
+  new home needs `/* untyped: <reason> */`. `src/unsplit/menu.h` is the hot spot: two `menu` lanes in one wave
   collide, so prefer disjoint subsystems.
 * **After merging, re-check every name the branch references**: a rename is two edits and a merge resolves only
   the map half (`fn_803754F4` -> `em020_aim_target_ck` left a source call to a dead name; the gate caught it only

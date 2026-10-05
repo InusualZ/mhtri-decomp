@@ -211,7 +211,7 @@ def main(argv: list[str] | None = None) -> int:
                          "held branch can be checked without checking it out (same comparison as --diff)")
     ap.add_argument("--budget", action="store_true", help="report the backlog per unit over src/")
     ap.add_argument("--headers", action="store_true",
-                    help="with --budget: add the include/unsplit band's rule-2 reading to the table (the "
+                    help="with --budget: add the unsplit band's (src/unsplit/) rule-2 reading to the table (the "
                          "declarations of a symbol a registered unit already owns). Additive: without it "
                          "the table is byte-identical to before")
     ap.add_argument("--list-added", action="store_true",

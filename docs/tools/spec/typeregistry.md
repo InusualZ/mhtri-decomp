@@ -1,4 +1,4 @@
-# `typeregistry` - Registry of shared types/helpers under include/ and src/: where defined, who uses, duplicated debt; `relevant_headers` feeds the brief
+# `typeregistry` - Registry of shared types/helpers under src/: where defined, who uses, duplicated debt; `relevant_headers` feeds the brief
 
 <!-- generated from the module docstring of `tools/units/typeregistry.py` at ec2609b46 by the tools-design lane; tightened by hand where marked -->
 
@@ -29,7 +29,7 @@ Inputs -> outputs: include, src, map -> report.
 
 ## Invariants and rules
 
-* The project's rule (CLAUDE.md -> Conventions; docs/plan.md section 6.5 rule 1) is that a type more than one unit needs is declared **once**, under `include/`, and included where needed - a declaration moves there the *second* time a unit needs it. Nothing told a worker what already existed, so two units created `include/ef.h` and `include/nw4r/math.h` independently while three others each defined the same `VEC3`/`EfWork` locally and deferred the consolidation to nobody. This tool is the missing lookup: it scans `include/**` and every `src/**` file, and answers, per declaration:
+* The project's rule (CLAUDE.md -> Conventions; docs/plan.md section 6.5 rule 1) is that a type more than one unit needs is declared **once**, under `src/`, and included where needed - a declaration moves there the *second* time a unit needs it. Nothing told a worker what already existed, so two units created `src/ef.h` and `src/nw4r/math.h` independently while three others each defined the same `VEC3`/`EfWork` locally and deferred the consolidation to nobody. This tool is the missing lookup: it scans `src/**` and every `src/**` file, and answers, per declaration:
 * **where it is defined** - every file (a header, a unit, or both);
 * **which units use it** - a unit uses a declaration when it includes the defining header, names the declaration in its source, or owns a map symbol whose (mangled) name encodes it;
 * **whether it is duplicated debt** - a shared header's name that a unit re-defines (rule 1), a name two units both define with no header owning it, or a name one unit defines that another names without including it (rule 1, before there is a header);
@@ -44,7 +44,7 @@ Inputs -> outputs: include, src, map -> report.
 | `inline` | an `inline`/`__inline` function definition (a helper meant to be shared) |
 | `macro` | a `#define` (object- or function-like) |
 | `extern` | a file-scope `extern` declaration (a helper prototype - rule 2's duplicate when two files both carry it) |
-* `include/types.h` is the project's scalar base: every unit including it is normal, so it is only reported when a unit *redefines* one of its names, and `src/Camellia/camellia.c` is the documented vendor exception (EXCEPTIONS below).
+* `src/types.h` is the project's scalar base: every unit including it is normal, so it is only reported when a unit *redefines* one of its names, and `src/Camellia/camellia.c` is the documented vendor exception (EXCEPTIONS below).
 
 ## Lib dependencies
 

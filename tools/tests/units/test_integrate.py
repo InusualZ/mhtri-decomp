@@ -45,7 +45,7 @@ def test_plan(c):
     c.check("... and says how to call it", "obj->setCircleMode" in items[2].why, True)
     c.check("a decl of a named symbol applies with its prototype",
             (st["lane-a#4"], items[3].decls[0].header, items[3].decls[0].hint),
-            ("apply", "include/SO/soi.h", "u32 SOGetHostID(void);"))
+            ("apply", "src/SO/soi.h", "u32 SOGetHostID(void);"))
     c.check("a stale spelling is rewritten to the map's name, no rename", (items[4].renames, items[4].rewrites),
             ([], [("fn_80419CF0", "updateNetworkPat")]))
     c.check("a field change is judgement", st["lane-a#6"], "judgement")
@@ -93,20 +93,20 @@ LANE = ("/* the unit */\n#include \"types.h\"\n#include \"Lane/lane.h\"\n\nexter
 
 def test_apply_decls(c):
     with tempfile.TemporaryDirectory() as tmp:
-        write(tmp, "include/types.h", "typedef int s32;\ntypedef unsigned int u32;\n")
-        write(tmp, "include/SO/soi.h", SOI_H)
-        write(tmp, "include/Lane/lane.h", "class Profile;\n")
+        write(tmp, "src/types.h", "typedef int s32;\ntypedef unsigned int u32;\n")
+        write(tmp, "src/SO/soi.h", SOI_H)
+        write(tmp, "src/Lane/lane.h", "class Profile;\n")
         write(tmp, "src/SO/soi.cpp", '#include "SO/soi.h"\nextern "C" u32 SOGetHostID(void) { return 0; }\n')
         write(tmp, "src/Lane/lane.cpp", LANE)
         write(tmp, "src/Other/other.cpp", "u32 SOGetHostID(void);\nvoid g() { SOGetHostID(); }\n")
         files = ig.Files(tmp)
-        ops = [ig.DeclOp("lane-a#1", "SOInit", "SOInit", 0x8051E864, ".text", "SO/soi.cpp", "include/SO/soi.h",
+        ops = [ig.DeclOp("lane-a#1", "SOInit", "SOInit", 0x8051E864, ".text", "SO/soi.cpp", "src/SO/soi.h",
                          cpp=False, implicit=True),
                ig.DeclOp("lane-a#4", "SOGetHostID", "SOGetHostID", 0x8051F000, ".text", "SO/soi.cpp",
-                         "include/SO/soi.h", cpp=False, hint="u32 SOGetHostID(void);")]
+                         "src/SO/soi.h", cpp=False, hint="u32 SOGetHostID(void);")]
         fails = ig.apply_decls(files, ops, {"src/Lane/lane.cpp"}, {"lane-a#9"})
         files.flush()
-        soi, lane = read(tmp, "include/SO/soi.h"), read(tmp, "src/Lane/lane.cpp")
+        soi, lane = read(tmp, "src/SO/soi.h"), read(tmp, "src/Lane/lane.cpp")
         c.check("nothing refused", fails, {})
         c.check("the declarations land inside the header's extern \"C\" region, address order",
                 soi.index("u32 SOGetHostID(void);") > soi.index("s32 SOInit(void);") > soi.index("SOSend")
@@ -130,27 +130,27 @@ def test_apply_decls(c):
 
 def test_new_header_and_refusals(c):
     with tempfile.TemporaryDirectory() as tmp:
-        write(tmp, "include/types.h", "typedef int s32;\n")
-        write(tmp, "include/Net/param.h", "typedef struct Param { s32 a; } Param;\n")
-        write(tmp, "include/C/clib.h", "#ifdef __cplusplus\nextern \"C\" {\n#endif\nvoid z(void);\n#ifdef __cplusplus\n}\n"
+        write(tmp, "src/types.h", "typedef int s32;\n")
+        write(tmp, "src/Net/param.h", "typedef struct Param { s32 a; } Param;\n")
+        write(tmp, "src/C/clib.h", "#ifdef __cplusplus\nextern \"C\" {\n#endif\nvoid z(void);\n#ifdef __cplusplus\n}\n"
                                        "#endif\n")
         write(tmp, "src/ef/core.cpp", "void* work_alloc(unsigned long size) { return 0; }\n")
         write(tmp, "src/Lane/lane.cpp", '#include "types.h"\nvoid* work_alloc(unsigned long size);\n'
                                         's32 cinit(Param* p);\nvoid f() { work_alloc(4); cinit(0); }\n')
         files = ig.Files(tmp)
         ops = [ig.DeclOp("a#1", "work_alloc", "work_alloc__FUl", 0x800CF7A8, ".text", "ef/core.cpp",
-                         "include/ef/core.h", cpp=True),
-               ig.DeclOp("a#2", "cinit", "cinit", 0x80001000, ".text", "C/clib.c", "include/C/clib.h", cpp=False)]
+                         "src/ef/core.h", cpp=True),
+               ig.DeclOp("a#2", "cinit", "cinit", 0x80001000, ".text", "C/clib.c", "src/C/clib.h", cpp=False)]
         fails = ig.apply_decls(files, ops, {"src/Lane/lane.cpp"}, set())
         files.flush()
-        core = read(tmp, "include/ef/core.h")
+        core = read(tmp, "src/ef/core.h")
         c.check("a missing owner header is created from the template", core.startswith("/*\n * Declarations for the "
                                                                                       "symbols `src/ef/core.cpp`"), True)
         c.check("... with its guard and the C++-linkage declaration outside any extern \"C\"",
                 ("#ifndef MHTRI_EF_CORE_H" in core, "void* work_alloc(unsigned long size);" in core,
                  "extern \"C\"" in core), (True, True, False))
         c.check("a C header cannot be handed a type it does not see", fails.get("a#2", [""])[0].startswith(
-            "cinit: the prototype names Param, which include/C/clib.h cannot see"), True)
+            "cinit: the prototype names Param, which src/C/clib.h cannot see"), True)
         c.check("... and the refused declaration stays in the lane", "s32 cinit(Param* p);" in read(tmp, "src/Lane/lane.cpp"),
                 True)
 
@@ -201,11 +201,11 @@ def test_build_log_and_blame(c):
             "text": "    block = MEMAlloc(heap, 4);", "message": "function call 'MEMAlloc(void *, long)' does not match"}])
     c.check("the failed objects", ig.failed_objects(LOG), ["build/RMHE08/src/A/a.o"])
     it = ig.Item(req("decl", "MEMAlloc"), "mechanical", "x", state="apply")
-    op = ig.DeclOp(it.req.id, "MEMAlloc", "MEMAlloc", 1, ".text", "OS/h.c", "include/OS/h.h", cpp=False)
+    op = ig.DeclOp(it.req.id, "MEMAlloc", "MEMAlloc", 1, ".text", "OS/h.c", "src/OS/h.h", cpp=False)
     op.result = {"prototype": "void* MEMAlloc(Heap* h, u32 n);"}
     it.decls = [op]
     other = ig.Item(req("decl", "Other", n=2), "mechanical", "x", state="apply")
-    oop = ig.DeclOp(other.req.id, "Other", "Other", 2, ".text", "B/b.c", "include/B/b.h", cpp=False)
+    oop = ig.DeclOp(other.req.id, "Other", "Other", 2, ".text", "B/b.c", "src/B/b.h", cpp=False)
     oop.result = {"prototype": "void Other(void);", "includes_added": ["src/Z/z.cpp"]}
     other.decls = [oop]
     ops, hit = ig.culprits([it, other], errs, ["build/RMHE08/src/A/a.o"])
@@ -234,27 +234,27 @@ def test_rename_declaration_from_its_stopgap(c):
     """The L2 batch's 9 renames: the lane declared each renamed callee in a STOPGAP block; step 0 removed the block, so
     the rename's declaration found no lane site, was skipped, and every caller failed to compile."""
     with tempfile.TemporaryDirectory() as tmp:
-        write(tmp, "include/types.h", "typedef unsigned int u32;\n")
-        write(tmp, "include/Net/io.h", "#ifndef IO_H\n#define IO_H\n#include \"types.h\"\n#endif\n")
+        write(tmp, "src/types.h", "typedef unsigned int u32;\n")
+        write(tmp, "src/Net/io.h", "#ifndef IO_H\n#define IO_H\n#include \"types.h\"\n#endif\n")
         write(tmp, "src/Net/io.cpp", '#include "Net/io.h"\n')                    # the owner: no body to read
         write(tmp, "src/Lane/pat.cpp", '#include "types.h"\n\n/* STOPGAP-BEGIN(a#3) */\n'
                                       'u32 sendReqCircleKick(u32 self, const char* user);\n/* STOPGAP-END(a#3) */\n\n'
                                       "u32 f(void) { return sendReqCircleKick(0, 0); }\n")
         files = ig.Files(tmp)
         op = ig.DeclOp("a#3", "sendReqCircleKick", "sendReqCircleKick", 0x80402BCC, ".text", "Net/io.cpp",
-                       "include/Net/io.h", cpp=True, implicit=True)
+                       "src/Net/io.h", cpp=True, implicit=True)
         c.check("before: a caller would see no declaration once the block goes", ig.needs_declaration(
             ig.Files(tmp), op), False)
         fails = ig.apply_decls(files, [op], {"src/Lane/pat.cpp"}, {"a#3"})
         files.flush()
-        io_h, pat = read(tmp, "include/Net/io.h"), read(tmp, "src/Lane/pat.cpp")
+        io_h, pat = read(tmp, "src/Net/io.h"), read(tmp, "src/Lane/pat.cpp")
         c.check("the rename's declaration is written to the owner header", (fails, op.result.get("skipped"),
                 "u32 sendReqCircleKick(u32 self, const char* user);" in io_h), ({}, None, True))
         c.check("... from the lane's STOPGAP spelling, named as such", op.result.get("source"),
                 "the lane's declaration (src/Lane/pat.cpp, its STOPGAP block)")
         c.check("... and the caller includes the owner header", '#include "Net/io.h"' in pat, True)
         again = ig.DeclOp("a#3", "sendReqCircleKick", "sendReqCircleKick", 0x80402BCC, ".text", "Net/io.cpp",
-                          "include/Net/io.h", cpp=True, implicit=True)
+                          "src/Net/io.h", cpp=True, implicit=True)
         f2 = ig.Files(tmp)
         ig.apply_decls(f2, [again], {"src/Lane/pat.cpp"}, set())
         c.check("a rename whose callers all see a declaration is still skipped", again.result.get("skipped", "")
@@ -277,8 +277,8 @@ def test_already_applied(c):
     with tempfile.TemporaryDirectory() as tmp:
         write(tmp, "config/RMHE08/symbols.txt", SYMBOLS)
         write(tmp, "config/RMHE08/splits.txt", SPLITS)
-        write(tmp, "include/types.h", "typedef unsigned int u32;\n")
-        write(tmp, "include/SO/soi.h", SOI_H.replace("s32 SOSend(s32 fd);", "s32 SOSend(s32 fd);\nu32 SOGetHostID(void);"))
+        write(tmp, "src/types.h", "typedef unsigned int u32;\n")
+        write(tmp, "src/SO/soi.h", SOI_H.replace("s32 SOSend(s32 fd);", "s32 SOSend(s32 fd);\nu32 SOGetHostID(void);"))
         write(tmp, "src/SO/soi.cpp", '#include "SO/soi.h"\nextern "C" u32 SOGetHostID(void) { return 0; }\n')
         write(tmp, "src/Lane/lane.cpp", '#include "SO/soi.h"\nvoid f(void) { SOGetHostID(); }\n')
         own = Ownership.from_texts(SYMBOLS, SPLITS)
@@ -288,7 +288,7 @@ def test_already_applied(c):
         c.check("before: both plan to apply", [i.state for i in items], ["apply", "apply"])
         c.check("a declaration already in the owner header is marked already applied (the tree)",
                 (ig.mark_applied(tmp, items, {"src/Lane/lane.cpp"}), items[0].state, items[0].why),
-                (1, "done", "already applied (the tree): SOGetHostID in include/SO/soi.h"))
+                (1, "done", "already applied (the tree): SOGetHostID in src/SO/soi.h"))
         c.check("... a rename still to do is not", items[1].state, "apply")
         write(tmp, "src/Lane/lane.cpp", '#include "SO/soi.h"\n/* STOPGAP-BEGIN(lane-a#4) */\nu32 SOGetHostID(void);\n'
                                         '/* STOPGAP-END(lane-a#4) */\nvoid f(void) { SOGetHostID(); }\n')
@@ -296,12 +296,12 @@ def test_already_applied(c):
         c.check("... while its STOPGAP block is still in the tree, it is not applied", (ig.mark_applied(
             tmp, items, {"src/Lane/lane.cpp"}), items[0].state), (0, "apply"))
         write(tmp, "src/Lane/lane.cpp", '#include "SO/SOGetHostID.h"\nvoid f(void) { SOGetHostID(); }\n')
-        write(tmp, "include/SO/soi.h", SOI_H)
-        write(tmp, "include/SO/SOGetHostID.h", "#include \"types.h\"\nu32 SOGetHostID(void);\n")
+        write(tmp, "src/SO/soi.h", SOI_H)
+        write(tmp, "src/SO/SOGetHostID.h", "#include \"types.h\"\nu32 SOGetHostID(void);\n")
         items = ig.plan(reqs[:1], own, {}, set(), {"Lane/lane"}, {})
         c.check("... and one its leaf header already declares is applied too",
                 (ig.mark_applied(tmp, items, set()), items[0].why),
-                (1, "already applied (the tree): SOGetHostID in include/SO/SOGetHostID.h"))
+                (1, "already applied (the tree): SOGetHostID in src/SO/SOGetHostID.h"))
 
 
 def test_narrow(c):
@@ -312,10 +312,10 @@ def test_narrow(c):
             it.decls = [op]
             out.append(it)
         return out
-    skipped = ig.DeclOp("lane-a#1", "copyFmpSlot", "copyFmpSlot", 1, ".text", "N/p.cpp", "include/N/p.h", cpp=False,
+    skipped = ig.DeclOp("lane-a#1", "copyFmpSlot", "copyFmpSlot", 1, ".text", "N/p.cpp", "src/N/p.h", cpp=False,
                         implicit=True)
     skipped.result = {"skipped": "no declaration in the lane's scope to move"}
-    wrong = ig.DeclOp("lane-a#2", "getErr", "getErr", 2, ".text", "N/p.cpp", "include/N/p.h", cpp=False)
+    wrong = ig.DeclOp("lane-a#2", "getErr", "getErr", 2, ".text", "N/p.cpp", "src/N/p.h", cpp=False)
     wrong.result = {"prototype": "s32 getErr(u32* x);"}
     items = items_with(skipped, wrong)
     errs = [{"file": "src/L/l.cpp", "line": 5, "text": "copyFmpSlot(a);", "message": "undefined identifier 'copyFmpSlot'"},
@@ -327,16 +327,16 @@ def test_narrow(c):
     v = ig.narrow(items, errs[:1], ["build/RMHE08/src/L/l.o"])
     c.check("... a forced declaration still undefined reverts its request", (v["reverted"], items[0].state),
             (["lane-a#1"], "reverted"))
-    clash = ig.DeclOp("lane-a#3", "em_net_recv", "em_net_recv", 3, ".text", "enemy/em.cpp", "include/enemy/em.h",
+    clash = ig.DeclOp("lane-a#3", "em_net_recv", "em_net_recv", 3, ".text", "enemy/em.cpp", "src/enemy/em.h",
                       cpp=False)
     clash.result = {"prototype": "void em_net_recv(void);", "already_declared": False,
                     "includes_added": ["src/L/l.cpp"]}
     items = items_with(clash)
-    v = ig.narrow(items, [{"file": "include\\enemy\\em.h", "line": 12, "text": "struct EnemyWork {",
+    v = ig.narrow(items, [{"file": "src\\enemy\\em.h", "line": 12, "text": "struct EnemyWork {",
                            "message": "struct/union/enum/class tag 'EnemyWork' redefined", "object": "x"}], ["x"])
     c.check("a redefinition in the owner header moves the declaration to its leaf header",
             (v["leaf"], clash.header, clash.full_header, clash.leaf, items[0].state),
-            (["em_net_recv"], "include/enemy/em_net_recv.h", "include/enemy/em.h", True, "apply"))
+            (["em_net_recv"], "src/enemy/em_net_recv.h", "src/enemy/em.h", True, "apply"))
 
 
 def test_error_command(c):
@@ -370,8 +370,8 @@ RUN_FILES = {
     "config/RMHE08/symbols.txt": "SOGetHostID = .text:0x8051F000; // type:function size:0x8\n",
     "config/RMHE08/splits.txt": ("SO/soi.cpp:\n\t.text       start:0x8051E000 end:0x80520000\n"
                                  "Lane/lane.cpp:\n\t.text       start:0x80070000 end:0x80071000\n"),
-    "include/types.h": "typedef unsigned int u32;\ntypedef int s32;\n",
-    "include/SO/soi.h": SOI_H,
+    "src/types.h": "typedef unsigned int u32;\ntypedef int s32;\n",
+    "src/SO/soi.h": SOI_H,
     "src/SO/soi.cpp": '#include "SO/soi.h"\nextern "C" u32 SOGetHostID(void) { return 0; }\n',
     "src/Lane/lane.cpp": ('#include "types.h"\n\n/* STOPGAP-BEGIN(lane-a#1) */\nextern "C" u32 SOGetHostID(void);\n'
                           '/* STOPGAP-END(lane-a#1) */\n\nvoid f(void) { SOGetHostID(); }\n'),
@@ -424,7 +424,7 @@ def test_run_refusals_and_commit(c):
                 (code, "NOTHING was committed" in out), (1, True))
         c.check("... no commit was made on the integrate branch", fx.git("rev-parse", "HEAD").strip(), base)
         c.check("... and the last attempt is left in the working tree for the operator",
-                sorted(line[3:] for line in status), ["include/SO/soi.h", "src/Lane/lane.cpp"])
+                sorted(line[3:] for line in status), ["src/Lane/lane.cpp", "src/SO/soi.h"])
     with testing.GitFixture() as fx, tempfile.TemporaryDirectory() as tmp:
         base, code, out = _run(fx, tmp, [False], unattributable)
         c.check("(b) a base that does not compile is refused before anything is applied",
@@ -458,8 +458,8 @@ def _multi():
 def _multi_tree(tmp):
     write(tmp, "config/RMHE08/symbols.txt", SYMBOLS)
     write(tmp, "config/RMHE08/splits.txt", SPLITS)
-    write(tmp, "include/types.h", "typedef int s32;\ntypedef unsigned int u32;\n")
-    write(tmp, "include/SO/soi.h", SOI_H)
+    write(tmp, "src/types.h", "typedef int s32;\ntypedef unsigned int u32;\n")
+    write(tmp, "src/SO/soi.h", SOI_H)
     write(tmp, "src/SO/soi.cpp", '#include "SO/soi.h"\n')
     write(tmp, "src/Lane/lane.cpp", MULTI_LANE)
 
@@ -475,7 +475,7 @@ def test_prototypes_apply_as_one_unit(c):
         files = ig.Files(tmp)
         fails = ig.apply_decls(files, it.live_decls(), {"src/Lane/lane.cpp"}, {it.req.id})
         files.flush()
-        soi, lane = read(tmp, "include/SO/soi.h"), read(tmp, "src/Lane/lane.cpp")
+        soi, lane = read(tmp, "src/SO/soi.h"), read(tmp, "src/Lane/lane.cpp")
         c.check("both declarations land in the owner header", (fails, "s32 SOInit(void);" in soi,
                 "u32 SOGetHostID(void);" in soi), ({}, True, True))
         c.check("... and the one STOPGAP block covering both is gone", ("STOPGAP" in lane, "SOInit(void);" in lane),
@@ -508,13 +508,13 @@ def test_already_applied_through_the_owner(c):
     with tempfile.TemporaryDirectory() as tmp:
         write(tmp, "config/RMHE08/symbols.txt", syms)
         write(tmp, "config/RMHE08/splits.txt", SPLITS)
-        write(tmp, "include/types.h", "typedef unsigned int u32;\n")
-        write(tmp, "include/Lane/lane.h", "#include \"types.h\"\n")
-        write(tmp, "include/Lane/shared_sync.h", "#include \"types.h\"\nvoid laneHelper(u32 x);\n")
+        write(tmp, "src/types.h", "typedef unsigned int u32;\n")
+        write(tmp, "src/Lane/lane.h", "#include \"types.h\"\n")
+        write(tmp, "src/Lane/shared_sync.h", "#include \"types.h\"\nvoid laneHelper(u32 x);\n")
         write(tmp, "src/Lane/lane.cpp", '#include "Lane/lane.h"\n#include "Lane/shared_sync.h"\n'
                                         "void laneHelper(u32 x) {}\nvoid lb_act_dispatch(void) {}\n"
                                         "void lb_act_dispatch_ex(u32 i) {}\n")
-        write(tmp, "include/Lane/lb_act_dispatch.h", "void lb_act_dispatch(void);\nvoid lb_act_dispatch_ex(u32 i);\n")
+        write(tmp, "src/Lane/lb_act_dispatch.h", "void lb_act_dispatch(void);\nvoid lb_act_dispatch_ex(u32 i);\n")
         write(tmp, "src/Net/user.cpp", '#include "Lane/shared_sync.h"\n#include "Lane/lb_act_dispatch.h"\n'
                                        "void g(void) { laneHelper(1); lb_act_dispatch_ex(2); }\n")
         reqs = [R.from_entry({"id": "l3#11", "kind": "decl", "address": "0x80070000", "proposed_name": "laneHelper",
@@ -529,17 +529,17 @@ def test_already_applied_through_the_owner(c):
         n = ig.mark_applied(tmp, items, set(), own_named)
         c.check("a declaration in a header the owner's source includes, and one in the owner's leaf header, are "
                 "already applied", (n, [i.state for i in items], [i.why for i in items]),
-                (2, ["done", "done"], ["already applied (the tree): laneHelper in include/Lane/shared_sync.h",
-                                       "already applied (the tree): lb_act_dispatch_ex in include/Lane/lb_act_dispatch.h"]))
-        write(tmp, "include/Lane/lb_act_dispatch.h", "void lb_act_dispatch(void);\nvoid lb_act_dispatch_ex(u32 i);\n"
+                (2, ["done", "done"], ["already applied (the tree): laneHelper in src/Lane/shared_sync.h",
+                                       "already applied (the tree): lb_act_dispatch_ex in src/Lane/lb_act_dispatch.h"]))
+        write(tmp, "src/Lane/lb_act_dispatch.h", "void lb_act_dispatch(void);\nvoid lb_act_dispatch_ex(u32 i);\n"
                                                      "void other_owner_fn(void);\n")
         items = ig.plan(reqs[1:], own_named, {}, set(), set(), {})
         c.check("a header that also declares another unit's symbol is no leaf of the owner",
                 (ig.mark_applied(tmp, items, set(), own_named), items[0].state), (0, "apply"))
     c.check("Ownership.leaf_header_owner: named for a declared symbol, every name one unit's",
-            (own.leaf_header_owner("include/Lane/lb_act_dispatch.h", ["lb_act_dispatch", "lb_act_dispatch_ex"]),
-             own.leaf_header_owner("include/Lane/other.h", ["lb_act_dispatch"]),
-             own.leaf_header_owner("include/unsplit/lb_act_dispatch.h", ["lb_act_dispatch"])),
+            (own.leaf_header_owner("src/Lane/lb_act_dispatch.h", ["lb_act_dispatch", "lb_act_dispatch_ex"]),
+             own.leaf_header_owner("src/Lane/other.h", ["lb_act_dispatch"]),
+             own.leaf_header_owner("src/unsplit/lb_act_dispatch.h", ["lb_act_dispatch"])),
             ("Lane/lane.cpp", None, None))
 
 if __name__ == "__main__":

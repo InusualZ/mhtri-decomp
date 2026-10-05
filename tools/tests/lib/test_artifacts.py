@@ -251,7 +251,7 @@ def test_unit_scoped_objects_and_report(c):
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         src = root / "src" / "demo" / "unit.c"
-        hdr = root / "include" / "demo.h"
+        hdr = root / "src" / "demo.h"
         obj = root / "build" / "RMHE08" / "src" / "demo" / "unit.o"
         rep = root / "build" / "RMHE08" / "report.json"
         for p in (src, hdr, obj, rep):

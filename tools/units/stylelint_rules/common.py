@@ -10,23 +10,25 @@ from tools.lib import cscan
 from tools.lib import findings as _findings
 from tools.lib.project.ownership import BAND_ROOT as _BAND_ROOT, HEADER_SUFFIXES as _HEADER_SUFFIXES
 from tools.lib.project.ownership import is_band_header as _is_band_header
+from tools.lib.repo import LEGACY_HEADER_ROOT as _LEGACY_HEADER_ROOT
 
 
 SRC = "src"
-# The unsplit band (`include/unsplit/<module>.h` today) is the legitimate home for a symbol with no registered
+# The unsplit band (`src/unsplit/<module>.h`; `include/unsplit/` before the 2026-10-05 move) is the legitimate home for a symbol with no registered
 # owner. Rule 2 reads it inverted: an owned symbol declared here collides with the owner's typed definition (MWCC
 # `(10197) illegal function overloading`) in every translation unit that includes the band. Every body rule applies
 # to it as to any header (2026-10-05). The path is `lib.project.ownership.BAND_ROOT`, the one spelling - the owner's
-# ruling moves the band beside the sources, and the classifier follows that constant.
+# ruling moved the band beside the sources, and the classifier follows that constant.
 UNSPLIT = _BAND_ROOT
 # The pseudo-module rule 2 reports when the registered bands bracketing an unsplit address name different
 # modules (a `sound` unit inside the `ef` band): no `<module>.h` is sound, so the finding names the band
 # directory instead. It is not a path component, so it cannot collide with a real module name.
 UNSPLIT_UNRESOLVED = "<band unresolved>"
-# The shared-header tree as it is today. It is a *walk root*, never a classifier: a header is a file with a
-# `HEADER_SUFFIXES` suffix wherever it lives (`is_header`), because the owner's 2026-10-05 ruling moves every header
-# beside its source under `src/`. `LINT_ROOTS` are the trees the lint reads; after the move `include/` is simply empty.
-HEADERS = "include"
+# The header tree before the owner's 2026-10-05 move (`lib.repo.LEGACY_HEADER_ROOT`). It is a *walk root*, never a
+# classifier: a header is a file with a `HEADER_SUFFIXES` suffix wherever it lives (`is_header`), and since the move
+# every header sits beside its source under `src/`. It stays in `LINT_ROOTS` because a ref older than the move (the
+# gate's `--diff` back side) keeps its headers there; in a moved tree it is simply absent.
+HEADERS = _LEGACY_HEADER_ROOT
 LINT_ROOTS = (SRC, HEADERS)
 HEADER_SUFFIXES = _HEADER_SUFFIXES
 SUFFIXES = (".c", ".cpp", ".cp", ".cc") + HEADER_SUFFIXES
@@ -44,7 +46,7 @@ RULE7_NOTES: list = []
 
 RULE_NAMES = {
     1: "a shared type is defined once (in the owner's header)",
-    2: "an extern lives with the TU that owns it (or a header under include/unsplit/)",
+    2: "an extern lives with the TU that owns it (or a header under src/unsplit/)",
     3: "struct/class states its size (/* size: 0xNN */)",
     4: "field carries its offset (/* +0xNN */)",
     5: "no field left named unkNN (pad_0xNN / unused_0xNN are the exception)",
@@ -330,9 +332,9 @@ def lint_files(root: str) -> list[str]:
 
 
 def unsplit_header_files(root: str) -> list[str]:
-    """Every header in the `include/unsplit/` band, in path order."""
+    """Every header in the unsplit band (`src/unsplit/`, or `include/unsplit/` before the move), in path order."""
     out = []
-    for path in header_files(root):
+    for path in lint_files(root):
         if is_unsplit_header(rel_of(root, path)):
             out.append(path)
     return out

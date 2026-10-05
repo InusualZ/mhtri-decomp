@@ -144,8 +144,8 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         os.makedirs(os.path.join(tmp, "src", "demo"))
         src = os.path.join(tmp, "src", "demo", "unit.cpp")
-        hdr = os.path.join(tmp, "include", "demo")
-        os.makedirs(hdr)
+        hdr = os.path.join(tmp, "src", "demo")
+        os.makedirs(hdr, exist_ok=True)
         header = os.path.join(hdr, "unit.h")
         obj = os.path.join(tmp, "build", "RMHE08", "src", "demo", "unit.o")
         os.makedirs(os.path.dirname(obj))

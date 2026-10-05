@@ -393,9 +393,9 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
     sh = b.get("shared_headers") or []
     lines.append("")
     lines.append("**Shared headers this unit should reuse** (`docs/plan.md` \u00a76.5 rule 1, CLAUDE.md -> "
-                 "Repository layout): a type or helper another unit already declares belongs under `include/` - "
-                 "include it, never copy it. `include/**` is read-only for you: a change there goes in the outbox's "
-                 "`config_requests`, not in your branch.")
+                 "Repository layout): a type or helper another unit already declares lives in that unit's header "
+                 "(beside its source under `src/`) - include it, never copy it. Another unit's header is read-only "
+                 "for you: a change there goes in the outbox's `config_requests`, not in your branch.")
     if sh:
         lines.append("")
         lines.append("| header | why | declaration(s) |")
@@ -419,7 +419,7 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
         lines.append("")
         lines.append("No shared header declares anything this unit names yet. If you need a type or helper another "
                      "unit already uses, do not define it here - put it in the outbox's `config_requests` so it can "
-                     "move to `include/` first.")
+                     "move into its owner's header first.")
     lines.append("")
     lines.append("## 2 · The inventory (every symbol the unit owns, and where it stands)")
     lines.append("")
@@ -451,7 +451,7 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
     lines.append("is the base the gate lints against - linting against your own HEAD misses a violation")
     lines.append("that an already-merged header introduces. The rules that catch a new unit are **rule 2**,")
     lines.append("**rule 9** and **rule 11**: **rule 2** (a declaration belongs in the symbol's owner's header,")
-    lines.append("never in your source; `include/unsplit/<band>.h` is the home when no unit owns it), **rule 9**")
+    lines.append("never in your source; `src/unsplit/<band>.h` is the home when no unit owns it), **rule 9**")
     lines.append("(never spell a mangled name - call the owner's member or function through its real signature;")
     lines.append("`tools/units/mangle.py` proves the signature), and **rule 11** (never type a parameter or")
     lines.append("return `void *` - name the real type, or mark the declaration")
