@@ -1,7 +1,7 @@
 /*
  * The `g3d/fn_800680CC.cpp` cluster's cross-unit declarations (docs/plan.md 6.5 rule 2).  The right-hand
  * `g3d/g3d_calcvtx.cpp` unit (0x8007270C-0x800736F8) consumes this `g3d_resvtx_ac.h` accessor group and
- * used to get it from `include/unsplit/g3d.h`, because the range was unclaimed; registering
+ * used to get it from `unsplit/g3d.h`, because the range was unclaimed; registering
  * `g3d/fn_800680CC.cpp` (0x800680CC-0x8006EAC0) makes them owned, so the declarations move here.
  *
  * All keep C linkage (plain `fn_XXXXXXXX` map names).  The consumer's measured spellings are kept - the
@@ -58,7 +58,7 @@ u32 fn_8006CDBC(void* p);
 /* 0x80069664 - the indexed resource reader (the `ResFile` accessor family's tail): with a valid
  * handle returns the body word at +0x4 of the resolved record, else 0.  Declared here for
  * `g3d/g3d_resanmtexsrt.cpp` (rule 2).  It is `s32` here to AGREE with main's landed band
- * declaration `include/unsplit/g3d.h` (`s32 fn_80069664(void*)`): `g3d/g3d_calcvtx.cpp`,
+ * declaration `unsplit/g3d.h` (`s32 fn_80069664(void*)`): `g3d/g3d_calcvtx.cpp`,
  * `g3d/g3d_resanmfog.cpp` and `g3d/g3d_resfile.cpp` all include BOTH headers, so a `u32` here
  * would put two disagreeing declarations of one C-linkage symbol in those translation units.
  * The owner `g3d/fn_800680CC.cpp` defines it `extern "C" u32` (it does not include this header);

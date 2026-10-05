@@ -2,13 +2,13 @@
  * Pl/pl_act.cpp - the player actor: the per-frame actor update, the master/skill/item layers and the action state machines.
  *
  * `.text` 0x802693C4..0x802840DC (about 460 functions), `.bss` 0x20 B, `.data` 0x2178 B, `.rodata` 0x40 B, `.sbss` 8 B, `.sdata` 0x48 B,
- * `.sdata2` 0x1D8 B, extab 0x928 B and extabindex 0xD50 B.  Phase 4 fold (docs/splits/phase4): the seven registered units
+ * `.sdata2` 0x1D8 B, extab 0x928 B and extabindex 0xD50 B.  Phase 4 fold: the seven registered units
  * `Pl/fn_802693C4`, `Pl/pl_master`, `Pl/fn_8026FFBC`, `Pl/pl_skill`, `Pl/fn_80273B14`, `Pl/pl_act` and `Pl/fn_8027D684` are one TU
  * of the candidate; their bodies are kept below in text order, each under its own former header.
  *
  * Scopes: the seven former units declared some shared callees with different signatures, so each section keeps its own
  * declarations in a namespace (`extern "C"` names stay unmangled; the C++-linkage callees and the types the manglings name stay
- * at global scope, where they are made).  The `_PLW` views of `Pl/pl_master` and `Pl/pl_skill` are merged into `include/pl.h`'s.
+ * at global scope, where they are made).  The `_PLW` views of `Pl/pl_master` and `Pl/pl_skill` are merged into `pl.h`'s.
  * Uniting the remaining declarations is the open work of this unit.
  *
  * Flags: `cflags_pl` (the survivor's).  `Pl/pl_skill` was `cflags_pl_skill` (`-opt nopeephole,level=4`), which its section
@@ -571,7 +571,7 @@ void* memset(void* dst, int value, u32 size);
 }
 
 /* Pool literals owned by a neighbouring Pl unit: 60.0f and the two charge bands `fn_8026CC7C` compares
- * `st->unk54` against. Declared, not defined - defining them would rebuild the section (docs/matching.md 29). */
+ * `st->unk54` against. Declared, not defined - defining them would rebuild the section (playbook 29). */
 extern "C" { extern f32 lbl_8079A020; }
 extern "C" { extern f32 lbl_8079A024; }
 extern "C" { extern f32 lbl_8079A028; }
@@ -4090,7 +4090,7 @@ extern "C" u16 fn_80273044(_PLW* plw, u16 slot) {
  * reproduce - MWCC puts a zero-initialised variable in `.bss`/`.sdata` and 8-aligns the 88-byte table
  * after it (measured: `.data` 280 B with the word forced in, 272 B without, target 276 B) - so the pick
  * table sits 4 bytes early.  The gate's strict data row demanded the claim: this unit's object changed
- * with the shared `include/pl.h` edit of the `hud/net_char_sync` batch.
+ * with the shared `pl.h` edit of the `hud/net_char_sync` batch.
  *
  * Residuals (measured per function; see the branch's outbox for the numbers):
  *   * `fn_802751B4` is the one row that does not reach 100 %.  Retail saves/restores `f31` through
@@ -6140,7 +6140,7 @@ extern "C" u32 isServerSelectState(s32);
 /* 0x80338E04 `lobby/lb_companion_ui.cpp` (the companion/status UI band).  The owner's header cannot be
  * included from this unit - it declares `Pl_cat_skill_ck` returning `void` against this file's `u32`
  * (measured: `(10505) illegal overloading 'Pl_cat_skill_ck(_PLW *, unsigned short)'`), and
- * `include/unsplit/*.h` may not carry a symbol a registered unit owns (rule 2) - so the declaration is
+ * `unsplit/*.h` may not carry a symbol a registered unit owns (rule 2) - so the declaration is
  * this unit's own view in a linkage block, the shape `enemy/fn_80137604.cpp` uses for the same case.
  * The three-argument signature is this unit's call site; the callee reads r3/r4/r5. */
 extern "C" {
@@ -9762,7 +9762,7 @@ extern "C" s32 fn_8027C208(_PLW* self, u16 arg1)
  *
  * Home is `Pl`: every function's first argument is the player work `_PLW`, the gates are the Pl
  * siblings (`Pl_master_ck`, `Pl_frame_check`, `Pl_Skill_ck`), the equipment helpers take the `_EQUIP`
- * record `include/pl.h` owns, and both bracketing registered units are Pl.  The target object carries
+ * record `pl.h` owns, and both bracketing registered units are Pl.  The target object carries
  * extab/extabindex, so the flags are the lib's `cflags_pl` (`-Cpp_exceptions on`).
  *
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
@@ -9780,7 +9780,7 @@ extern "C" s32 fn_8027C208(_PLW* self, u16 arg1)
  *     `fn_8027DFE4` 65.2 (the `case 12` equality if-converts to the branchless bool form) and
  *     `fn_8027DCE0` 65.9 (the comparison tree is identical, retail merges every `return 0` into one
  *     tail block where ours repeats the `li r3,0`).
- *   * the band header `include/unsplit/Pl.h` still declares six symbols this unit now owns
+ *   * the band header `unsplit/Pl.h` still declares six symbols this unit now owns
  *     (`fn_8027D7EC`, `fn_8027D8A0`, `fn_8027E1E4`, `fn_8027E220`, `fn_8027EBA8`, `fn_8027EE24`); the
  *     definitions below match those spellings so no consumer breaks, and moving them into an owner
  *     header needs the seven consumer files (which also spell three of them differently:
@@ -9887,7 +9887,7 @@ extern "C" void fn_8027D6DC(_PLW* self, s16 value) {
 
 /* Reports the byte at +0x268 as a boolean.  `u32`, not `s32`: the item menu's caller compares the
  * result unsigned (`bl fn_8027D738; cmplwi r3,0x1` at 0x802A008C), which is what its declaration in
- * this unit's header `include/Pl/fn_8027D684.h` carries too. */
+ * this unit's header `Pl/fn_8027D684.h` carries too. */
 extern "C" u32 fn_8027D738(_PLW* self) {
     return self->field_0x268 != 0;
 }

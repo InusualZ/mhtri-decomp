@@ -1,5 +1,5 @@
 /*
- * DWCi/dwc_nasfunc.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * DWCi/dwc_nasfunc.cpp - STUB (no bodies yet).
  *
  * `.text` 0x80509DB0..0x805113B0.  Sections of the candidate unit: .text 0x80509DB0..0x805113B0; .data 0x806307F0..0x806308A8; .bss 0x807613B8..0x807614D8; .sdata 0x807942FC..0x80794358; .sbss 0x807957F8..0x80795820.
  *

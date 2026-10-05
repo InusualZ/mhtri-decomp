@@ -1,5 +1,5 @@
 /*
- * include/Network/gamespy_interface_types.h - the GameSpy worker thread class and its error record.
+ * Network/gamespy_interface_types.h - the GameSpy worker thread class and its error record.
  *
  * Owner: `src/Network/GameSpyInterfaceThread.cpp`, which defines the constructor (`__ct__22GameSpyInterfaceThreadFv`,
  * 0x8041C66C), the destructor (the class's key function, so that unit emits `__vt__22GameSpyInterfaceThread`)

@@ -1,7 +1,7 @@
 /*
- * enemy/em020_prog.cpp - phase 4 unit, `.text` 0x8036CF64..0x80378F9C (138 functions, 49208 bytes).
+ * enemy/em020_prog.cpp - unit, `.text` 0x8036CF64..0x80378F9C (138 functions, 49208 bytes).
  *
- * PHASE 4 (docs/splits/phase4, window d).  Fold of 3 registered units: em020_prog.cpp, em020_handlers.cpp,
+ * Fold of 3 registered units: em020_prog.cpp, em020_handlers.cpp,
  * em020_ai.cpp.  The functions below are the ones those sources define, in address order; every other function of the
  * range keeps its original bytes.  30 of 138 functions have a body here.
  *
@@ -39,7 +39,7 @@
  * SEAM: UNPROVEN, and it is the one thing this registration cannot settle.  Neither edge has any
  * decisive class-1 evidence (no `__FILE__` string exists anywhere in the band), and the
  * `.sdata2` ordered partition only supports the cut without proving it:
- *   * 0x8079B81C (the neighbour below, proposal/80366618) | 0x8079B820..0x8079BC60 (this range,
+ *   * 0x8079B81C (the neighbour below, ef/eft053.cpp) | 0x8079B820..0x8079BC60 (this range,
  *     86 single-referrer labels, no inversion) | 0x8079BC64 (the neighbour above, Q118).  The
  *     entries either side are disjoint and ordered, which is the reliable class - but a single
  *     object's pool is *also* ordered by first use, so an ordered partition is consistent with
@@ -120,7 +120,7 @@
 /* enemy/em020_handlers.cpp - three handler entries of the em020 enemy program, `.text`
  * 0x80375084..0x80375424 (928 B): `em020_model_refresh` 0x20C (0x80375084), `em020_condition_ck`
  * 0x110 (0x80375290) and `em020_area_model_set` 0x84 (0x803753A0).  Registered once, at its final
- * home (docs/plan.md 12), from proposal/80375084_fn_80375084.cpp.
+ * home (docs/plan.md 12).
  *
  * WHAT IT IS.  All three take the shared `_ENEMY_WORK` record in r3 and each is one entry of the
  * `.data` program table `em020_prog_tbl` (0x805EE098, 0x70 B, the map's own global name): the table
@@ -131,7 +131,7 @@
  * pushes the record's K-colours into the `MHchar` material; `em020_condition_ck` answers the program's
  * per-mode condition query; `em020_area_model_set` switches the stage/model state when the area
  * changes.  Module `enemy` (brief section 2, class 3): the record is `_ENEMY_WORK` (every callee is
- * the band's `em_*` API and `include/enemy/ENEMY_WORK.h` is the record's home), the bracketing
+ * the band's `em_*` API and `enemy/ENEMY_WORK.h` is the record's home), the bracketing
  * registered units are `enemy/*`, and the program table is an enemy-program table like
  * `em035_prog_tbl`, whose handlers the registered `enemy/em035_prog.cpp` reconstructs.
  *
@@ -169,23 +169,23 @@
  * No `.data`/`.sdata` run is claimed: the target objects for this range own `.text`, `extab` and
  * `extabindex` only, and `em020_prog_tbl` is a separate data unit's.
  *
- * RESULT (2026-09-27).  All three functions and both data sections are byte-identical to the target:
+ * RESULT.  All three functions and both data sections are byte-identical to the target:
  * `.text` 0x3A0, extab 0x18 and extabindex 0x24 at 100 %, unit 100.0 fuzzy / 100 % matched code and
  * data, and `datagap.py --unit` reports no gap row.  Two shared-file fixes rode this unit:
- *   * `include/enemy/fn_8012BDF4.h` - the `s32 em_act_ck(...)` declaration sat inside the
+ *   * `enemy/fn_8012BDF4.h` - the `s32 em_act_ck(...)` declaration sat inside the
  *     `extern "C"` block, so a caller including that header emitted the unmangled `em_act_ck` where
  *     the map (and the retail objects) reference `em_act_ck__FP11_ENEMY_WORKUcUc`; the first
  *     declaration of a name fixes its language linkage.  Removed, so the C++-scope declaration at the
  *     bottom of that header is the first (three other units' objects had the same wrong reloc name -
  *     no score moved, but their objects are now linkable);
- *   * `include/Pl/fn_8027D684.h` - `fn_8027DC64` declared `u32` here, not the owner's `s32`: the
+ *   * `Pl/fn_8027D684.h` - `fn_8027DC64` declared `u32` here, not the owner's `s32`: the
  *     target's caller compares it unsigned (`cmplwi r3,0x1`), which is what mode 2 needs.
  *
  * Naming note: references only to other units' unrenamed `fn_XXXXXXXX` symbols (`MTX34_ctor`,
  * `fn_8005024C`, `fn_800E2994`, `fn_8006F304`, `fn_8013A9F4`, `stage_map_kind_get`, `fn_802B0A98`,
  * `fn_802D94C4`, `fn_8027DC64`), each declared by its
- * owner's header below; checked with `grep -n "fn_" include/fn_8004CAD8.h include/unsplit/{g3d,sound,unknown}.h
- * include/enemy/fn_80138074.h include/stage/stg_w.h include/ai/fn_802D44F4.h include/Pl/fn_8027D684.h`.
+ * owner's header below; checked with `grep -n "fn_" fn_8004CAD8.h unsplit/{g3d,sound,unknown}.h
+ * enemy/fn_80138074.h stage/stg_w.h ai/fn_802D44F4.h Pl/fn_8027D684.h`.
  */
 /* ---- header inherited from src/enemy/em020_ai.cpp (written against its pre-phase-4 range) ---- */
 /*
@@ -194,7 +194,7 @@
  * 0x80037614..0x800378CC (58 x 12 B).
  *
  * WHAT IT IS.  Monster-AI code of the em020 program.  Every body takes the shared `_ENEMY_WORK`
- * record (`include/enemy/ENEMY_WORK.h`) and drives it through the enemy core API -
+ * record (`enemy/ENEMY_WORK.h`) and drives it through the enemy core API -
  * `em_frame_check` (124 calls), `em_parts_damage_level_get`, `em_magma_check`, `get_em_chg_scale`,
  * `get_joint_wpos_em`, `em_mot_set`/`em_mot_set_ck`/`em_mot_end_ck` - and through the game's work
  * blocks `system_w` (38 calls), `lobby_w` (45), `get_move_work_adrs`, `my_player_no`,

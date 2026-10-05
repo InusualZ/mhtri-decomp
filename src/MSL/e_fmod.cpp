@@ -1,5 +1,5 @@
 /*
- * MSL/e_fmod.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * MSL/e_fmod.cpp - STUB (no bodies yet).
  *
  * `.text` 0x804647B8..0x80464B38.  Sections of the candidate unit: .text 0x804647B8..0x80464B38; .rodata 0x80573190..0x805731A0.
  *

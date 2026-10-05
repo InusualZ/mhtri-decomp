@@ -1,5 +1,5 @@
 /*
- * ARC/arc.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * ARC/arc.cpp - STUB (no bodies yet).
  *
  * `.text` 0x8046D9F0..0x80474CB0.  Sections of the candidate unit: .text 0x8046D9F0..0x80474CB0; .data 0x8060F868..0x80612980; .bss 0x806F74E0..0x8070C414; .sdata 0x80793D08..0x80793D20; .sbss 0x80794EC8..0x80795008; .sdata2 0x8079CF48..0x8079CFF0.
  *

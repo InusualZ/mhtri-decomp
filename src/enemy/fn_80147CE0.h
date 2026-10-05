@@ -1,7 +1,7 @@
 /* The declarations owned by `enemy/fn_80147CE0.cpp` (docs/plan.md 6.5 rule 2): the enemy action band's
  * entry points that other units call.
  *
- * Moved here on that unit's landing from `include/unsplit/enemy.h`, which carried the consumers'
+ * Moved here on that unit's landing from `unsplit/enemy.h`, which carried the consumers'
  * old-style spellings (`void fn_801493A8();`) while the symbols had no registered owner.  The
  * consumers (`enemy/fn_8014A1BC.c`, `enemy/fn_80149D6C.c`, `enemy/fn_80176C58.cpp`) now include this
  * header; their C call sites keep the old-style declarations below, because two of them pass argument

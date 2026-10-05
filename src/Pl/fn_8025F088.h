@@ -44,8 +44,8 @@ void fn_80261770(struct _PLW* self);
 void fn_802621B0(struct _PLW* self);
 s32 fn_80262688(struct _PLW* self);
 
-/* ---- Pl-band callees with no registered owner (`include/unsplit/Pl.h`'s home) ---- */
-/* `pl_act_enter_raw` is declared by that band header itself (`include/unsplit/Pl.h`, `void`, `u8`/`u16`/`u32`,
+/* ---- Pl-band callees with no registered owner (`unsplit/Pl.h`'s home) ---- */
+/* `pl_act_enter_raw` is declared by that band header itself (`unsplit/Pl.h`, `void`, `u8`/`u16`/`u32`,
  * the callee's own prologue's widths) - the `u32`/`s32`/`u16` copy that stood here clashed with it
  * ((10197) illegal function overloading) as soon as MAIN's landing put the declaration there (rule 2). */
 u32 fn_8024676C(void);
@@ -56,7 +56,7 @@ u32 fn_8025E448(struct _PLW* self);
 u32 fn_8025EC58(struct _PLW* self);
 u32 fn_8025ED00(struct _PLW* self);
 u32 fn_80276800(struct _PLW* self, s32 v);
-/* `fn_80278BE4` is declared by its owner's header, `include/Pl/pl_act.h` (`void`; `Pl/pl_act.cpp`
+/* `fn_80278BE4` is declared by its owner's header, `Pl/pl_act.h` (`void`; `Pl/pl_act.cpp`
  * defines it `extern "C" void`), which this unit includes - the `u32` copy that stood here clashed
  * with it ((10505) illegal overloading) once MAIN's landing registered the declaration (rule 2). */
 u32 fn_80278C7C(struct _PLW* self);
@@ -71,7 +71,7 @@ u32 hit_attack_list_push(void* p);
 u32 fn_8012A624(void* out);
 u32 fn_80131934(u8 index);
 u32 fn_80224AC4(void* physics);
-/* `Pl_item_timer_get` and `fn_80273044` are declared by their owner, `include/Pl/pl_skill.h` (`extern "C"
+/* `Pl_item_timer_get` and `fn_80273044` are declared by their owner, `Pl/pl_skill.h` (`extern "C"
  * int`/`u16`, `struct _PLW*`, `u16`), which this unit includes - the `s32`/`u32` copies that stood here
  * clashed with it ((10197) illegal function overloading) once MAIN's landing registered the owner's
  * declarations (rule 2). */
@@ -79,7 +79,7 @@ u32 fn_80262940(struct _PLW* self);
 u32 fn_802642D0(struct _PLW* self);
 u32 fn_802657F8(struct _PLW* self);
 /* `pl_model_state_set` (0x80267270) stood here as `u32 (struct _PLW*, u32, s32, u16)`; its owner
- * `Pl/fn_80262940.cpp` defines it `void`, so `include/Pl/fn_80262940.h`, included above, declares it
+ * `Pl/fn_80262940.cpp` defines it `void`, so `Pl/fn_80262940.h`, included above, declares it
  * and this header no longer does (rule 2).  `fn_80262940`/`fn_802642D0`/`fn_802657F8` stay: that
  * owner's header does not declare them yet. */
 u32 fn_8026F7B4(void);
@@ -92,11 +92,11 @@ u32 fn_80278578(struct _PLW* self, s32 v);
 u32 fn_80278D1C(struct _PLW* self);
 u32 fn_80279C20(struct _PLW* self);
 u32 fn_8027AF34(struct _PLW* self);
-/* `pl_item_add` is declared by its owner, `include/Pl/pl_skill.h` (`extern "C" s16`,
+/* `pl_item_add` is declared by its owner, `Pl/pl_skill.h` (`extern "C" s16`,
  * `Pl/pl_skill.cpp:1233`), which this unit includes - the `u32` copy that stood here clashed with it
  * ((10505) illegal function overloading) the moment the owner registered its declaration (rule 2). */
 s32 fn_80273228(struct _PLW* self, u16 item_id, s16 value);
-/* `fn_8027D4F0` is declared by its owner, `include/Pl/pl_act.h` (`extern "C" void`), which this
+/* `fn_8027D4F0` is declared by its owner, `Pl/pl_act.h` (`extern "C" void`), which this
  * unit includes - the `u32` copy that stood here clashed with it the moment the owner registered
  * its declaration ((10505) illegal overloading); the call site discards the result (rule 2). */
 u32 pl_act_kind_get(struct _PLW* self);

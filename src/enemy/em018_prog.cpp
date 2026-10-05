@@ -1,7 +1,7 @@
 /* enemy/em018_prog.cpp - enemy 018 program
  *
  * `.text` 0x80192348..0x8019E670, 82 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): fold of 2 registered units, built from `enemy/fn_80191598.cpp`, `enemy/fn_801926EC.cpp`.
+ * Phase 4: fold of 2 registered units, built from `enemy/fn_80191598.cpp`, `enemy/fn_801926EC.cpp`.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  */
 
@@ -10,7 +10,7 @@
  *
  * `.text` 0x801926EC..0x8019E670 (0xBF84 B); extab 0x8000EDF4..0x8000F124; extabindex
  * 0x8002A3D8..0x8002A8A0; `.ctors` 0x8056F340..0x8056F344; `.data` 0x805AD3DC..0x805AE750; `.bss`
- * 0x806A7A70..0x806A7A88.  Registered from `proposal/801926EC_fn_801926EC.cpp`; the unit absorbed the
+ * 0x806A7A70..0x806A7A88.  Registered; the unit absorbed the
  * former `enemy/fn_801993E0.cpp` (0x801993E0..0x8019E670) in the 2026-09-30 recut.
  *
  * Seam.  The right edge 0x8019E670 is where the TU's own static-initializer ends: the `.ctors` word

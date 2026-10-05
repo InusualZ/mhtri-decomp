@@ -1,10 +1,10 @@
 /*
- * include/NWC24/nwc24_msg.h - the NWC24 message-library half (`src/NWC24/nwc24_msg.c`, `.text`
+ * NWC24/nwc24_msg.h - the NWC24 message-library half (`src/NWC24/nwc24_msg.c`, `.text`
  * 0x8051D710..0x8051E068).
  *
  * Rule 2: this unit owns the message-library state API and the request engine, so
  * `NWC24/nwc24_io.c` includes this header instead of declaring them.  The library's shared work
- * block and device-path literals have no owner and live in `include/unsplit/NWC24.h`, which this
+ * block and device-path literals have no owner and live in `unsplit/NWC24.h`, which this
  * file includes.
  */
 #ifndef MHTRI_NWC24_NWC24_MSG_H
@@ -44,7 +44,7 @@ int NWC24iUnlockSocket(void);
 }
 #endif
 
-/* Declarations moved here from `include/unsplit/NWC24.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+/* Declarations moved here from `unsplit/NWC24.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -1,5 +1,5 @@
 /*
- * MSL/e_log10.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * MSL/e_log10.cpp - STUB (no bodies yet).
  *
  * `.text` 0x80464DEC..0x80464F00.  Sections of the candidate unit: .text 0x80464DEC..0x80464F00; .sbss 0x80794E30..0x80794E38; .sdata2 0x8079CC18..0x8079CC48.
  *

@@ -1,7 +1,7 @@
 /* ef/fn_800FD864_fx.cpp - the effects at 0x800FD864 and 0x800FE978 and the head of effect 004
  *
  * `.text` 0x800FD864..0x80100448, 14 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): fold of 3 registered units, built from `ef/fn_800FD864.cpp`, `ef/fn_800FE978.cpp`, `ef/eft004.cpp`.
+ * Phase 4: fold of 3 registered units, built from `ef/fn_800FD864.cpp`, `ef/fn_800FE978.cpp`, `ef/eft004.cpp`.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  */
 
@@ -158,7 +158,7 @@
  *
  * Types: `Eft004`, `_PLW`, the three pool views, `EftEmitter`, `Eft004Owner` and `EftControl` are
  * reconstructed minimally (only the offsets this unit reads); `nw4r::math::MTX34` moved to
- * `include/nw4r/math.h`. `EftControl` is sized 0xC44 (from symbols.txt) so MWCC emits the far
+ * `nw4r/math.h`. `EftControl` is sized 0xC44 (from symbols.txt) so MWCC emits the far
  * `lis`/`addi` address retail has instead of an `@sda21` load.
  *
  * The unit owns no data section: its literals and jump tables live in the shared `.data`/`.sdata2` run

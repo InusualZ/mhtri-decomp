@@ -7,7 +7,7 @@
  * with their real signatures - never as the mangled spelling (rule 9).
  *
  * The band's still-unnamed accessors (`fn_802B9740`, `fn_802B9574`, ...) move here from
- * `include/unsplit/camera.h` as their consumers migrate; that header keeps only what no unit owns.
+ * `unsplit/camera.h` as their consumers migrate; that header keeps only what no unit owns.
  */
 #ifndef MHTRI_CAMERA_CAMERA_H
 #define MHTRI_CAMERA_CAMERA_H
@@ -47,7 +47,7 @@ void fn_802BE7E8(void* self, void* channel, u8 index);
 
 /* The small camera-band setters and predicates 0x802B8DF8/0x802BBA64/0x802BBAC0/0x802BBAC4/
  * 0x802BE638 - the rest of the `.text` range this unit owns (0x802B5C58-0x802BEAAC).  Their
- * consumers read them out of `include/unsplit/lobby.h` and `include/unsplit/unknown.h` while the
+ * consumers read them out of `unsplit/lobby.h` and `unsplit/unknown.h` while the
  * addresses were unclaimed; both of those headers include this one now (docs/plan.md 6.5 rule 2).
  * `fn_802BE638`/`fn_802B8DF8` keep the call sites' spellings - neither body is written yet. */
 

@@ -1,7 +1,6 @@
 /* enemy/enemy_control.cpp - the enemy control unit head
  *
  * `.text` 0x801411B8..0x80147C94, 28 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): recut registered unit; the functions of the neighbouring units were cut out of this file.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  */
 
@@ -122,7 +121,7 @@ extern "C" {
 extern EmcWork emc_work;
 
 /* external callees (the ones whose owner is unregistered; rule 2 moves them to
- * `include/unsplit/enemy.h` when this batch lands) */
+ * `unsplit/enemy.h` when this batch lands) */
 s32  fn_80093B0C(void);
 void fn_80093990(void* self);
 u32  fn_800E264C(void* self);

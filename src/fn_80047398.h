@@ -77,7 +77,7 @@ void fn_8004BCBC(void* userdata, u16 id, s16 count, s32 flag);
 void fn_8004BEA4(u16 id, s16 count, void* out);
 
 /* 0x8004A430 - decodes the packed 0x100-byte character record `blob` into the player card `card`
- * (`NetPlayerCard`, include/Network/network_pat_control.h). */
+ * (`NetPlayerCard`, Network/network_pat_control.h). */
 struct NetPlayerCard;
 void decodePlayerCard(const u8* blob, struct NetPlayerCard* card);
 

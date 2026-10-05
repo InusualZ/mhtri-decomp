@@ -1,5 +1,5 @@
 /*
- * auto/800CCCF8_fn_800CCCF8.c - the effect-emitter shape registry: seven shape constructors, one static
+ * ef/ef_emform.cpp - the effect-emitter shape registry: seven shape constructors, one static
  * initializer and one lookup.  `.text` 0x800CCCF8-0x800CCFB0 (10 functions, 0x2B8 B) and the unit's
  * `.ctors` word at 0x8056F2E8.  All four sections (`.text`, `.ctors`, `extab`, `extabindex`) are
  * byte-identical to the target object.
@@ -26,7 +26,7 @@
  * `cmpwi` chain MWCC emits; and the `.ctors` word is placed with `__declspec(section ".ctors")` alone,
  * because the `#pragma section const_type` pair answers 33041 for the plain `.ctors` name.
  *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/800CCCF8_fn_800CCCF8.c`.
+ * Inventory, addresses and sizes: `python tools/units/ledger.py unit ef/ef_emform.cpp`.
  * The name is provisional - `auto/` plus the first symbol's address - because nothing in the object names
  * the original source file.
  */

@@ -1,4 +1,4 @@
-/* auto/800FD718_fn_800FD718.c - the state-1/2/3 handlers of the `eft002` effect machine,
+/* ef/fn_800FD718.c - the state-1/2/3 handlers of the `eft002` effect machine,
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  * `.text` 0x800FD718..0x800FD864 (3 functions: fn_800FD718, fn_800FD850, fn_800FD860).
  *
@@ -16,7 +16,7 @@
  *
  * Language.  `langcheck` reads the object as *suggested* C++ - the only evidence is six mangled callees -
  * and a mangled callee does not decide the caller's language, so the unit stays `.c` and the callees are
- * declared with the map's spelling, exactly as `auto/800FD520_fn_800FD520.c` does for the same six
+ * declared with the map's spelling, exactly as `ef/fn_800FD520.c` does for the same six
  * (docs/plan.md, "The language comes from the symbol").
  *
  * Result: fn_800FD718 (0x138), fn_800FD850 (0x10) and fn_800FD860 (0x4) 100 %; `.text` (0x14C),
@@ -48,10 +48,10 @@
  * Types.  `_EFT_S8`, `_EFT_WORK` and `_SHELL_W` are reconstructed minimally (only the offsets this unit
  * reads) and are copies of `auto/800FCED4_fn_800FCED4.cpp`'s definitions, which the same `_SHELL_W`
  * extension belongs to; all three belong in one shared header, which does not exist yet (the request is
- * in that unit's outbox).  `VEC3` is `include/nw4r/math.h`'s type, which is C++ and so cannot be
- * included here - the same private copy `auto/80104BD0_fn_80104BD0.c` keeps.
+ * in that unit's outbox).  `VEC3` is `nw4r/math.h`'s type, which is C++ and so cannot be
+ * included here - the same private copy `ef/fn_80104BD0.c` keeps.
  *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/800FD718_fn_800FD718.c`.
+ * Inventory, addresses and sizes: `python tools/units/ledger.py unit ef/fn_800FD718.c`.
  * The name is provisional - `auto/` plus the first symbol's address - because nothing in the object
  * names the original source file.
  */

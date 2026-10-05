@@ -1,6 +1,6 @@
 /* The enemy work record's per-part block at +0x328, as the two bands that own it read it.
  *
- * `include/enemy/ENEMY_WORK.h` carries a union over +0x328 with a dozen other bands' views but not
+ * `enemy/ENEMY_WORK.h` carries a union over +0x328 with a dozen other bands' views but not
  * this one, and the header is shared, so the layout lives here (docs/plan.md 6.5 rule 1: two units
  * use it - `enemy/em019_prog.cpp` clears it and `enemy/em_act_mot.cpp`'s steppers write it).  The
  * offsets are the target's own, read out of the four functions that touch it:

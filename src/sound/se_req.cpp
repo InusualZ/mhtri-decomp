@@ -3,7 +3,7 @@
  *
  * Naming note: the symbol map has only fn_XXXXXXXX for the unsplit functions of the range (checked with symedit); the map's real names
  * (the `*_se_req` helpers) are used verbatim below.  The module is `sound`: the neighbours (`sound/fn_800D7F54.cpp`, `sound/mhchar.cpp`)
- * are `sound` and include/unsplit/sound.h is the band that declares this range's symbols for its consumers.  The language is C++: the map
+ * are `sound` and unsplit/sound.h is the band that declares this range's symbols for its consumers.  The language is C++: the map
  * carries C++ manglings (`shell_se_req__FP5_se_wPQ34nw4r4math4VEC3UcUl`, `map_se_req__FUcPQ34nw4r4math4VEC3`) and the range manipulates
  * `nw4r::math` types by value.
  *

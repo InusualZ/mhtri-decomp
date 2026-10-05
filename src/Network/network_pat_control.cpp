@@ -10,7 +10,8 @@
  * (`getPatsObject`, `getNetworkSessionManagerPat`, `getNetworkLayerPat`, ...) and its `Network/` siblings.
  * Lib/flags: game-root `main` lib (`cflags_main`, Wii/1.3 -O3, exceptions on: the object has extab).
  *
- * Sections: .text 0x80429B94..0x8043065C, extab 0x8001D368..0x8001D558, extabindex 0x8003DE54..0x8003E0DC,
+ * Sections (the unit's own are its splits.txt block, `.text` 0x80423E74..0x80432104; these are the pat-control
+ * band's): .text 0x80429B94..0x8043065C, extab 0x8001D368..0x8001D558, extabindex 0x8003DE54..0x8003E0DC,
  * .rodata 0x80571EA0..0x80572240 (`pat_ca_cert`, the only referrer is `updateNetworkPatControl`), .sbss
  * 0x80794CF8, and the `.data` run 0x80603750..0x80603D70 (the message layout's tag, colour and size tables
  * `text_tag_names`/`text_color_index_table`/`text_font_size_table` are defined beside `applyTextTag`).
@@ -32,17 +33,17 @@
  * Names: `updateNetworkPatControl`, `isCityMode` (mode byte 3: set when the control enters state 0x19
  * after the roster refresh; GUESS) and the field/member names of NetCtrlWk and the record types are
  * derived from use and offsets.  About 150 callee and record names are GUESSES from the caller's use
- * (never from a retail symbol): the blocks marked GUESS in `include/unsplit/Network.h`,
+ * (never from a retail symbol): the blocks marked GUESS in `unsplit/Network.h`,
  * `Network/NetworkWiiMediator.h`, `Network/NetworkLayerPat.h`, `Network/NetworkSessionManager.h` and this
  * unit's own header.  Left as they are: `isReadyCountOne` (the body is `ready_count_0x044 == 1`, what
  * the count is stays unknown) and `resetFailureState` (a `blr` stub).
  *
  * Residuals (re-measure: `python tools/units/recompile.py Network/network_pat_control --measure <symbol>`):
- *  - 2026-10-05: 144 of 225 rows at 100 %.  `drawTextRuns` (round 4) 99.92 %: retail multiplies the centred pen as
+ *  - 2026-10-05: 144 of 225 rows at 100 %.  `drawTextRuns` 99.92 %: retail multiplies the centred pen as
  *    `fmuls f0,f0,f31` where ours emits `f31,f0` (`x * 0.5f` and `0.5f * x` give the same object); its switch is on
  *    `bit + 1` (bit n carries tag n + 1) with the case bodies in retail's order, and the widemode/font calls go through
  *    their owners' headers (`main.h`, `g3d/g3d_anmchr.h`).  `updateFriendTransferModes` (renamed from `updateTransferQueue`, GUESS) 99.69 %: the
- *    second loop's slot/peer registers swap (r27/r28).  `saveLayerId`/`readLayerIdChange`/`classifyLayerIdChange` (round 4,
+ *    second loop's slot/peer registers swap (r27/r28).  `saveLayerId`/`readLayerIdChange`/`classifyLayerIdChange` (
  *    GUESS names) 100 %: `NetworkLayerIdExportTo` is a free function called after an unused `getNetworkLayerPat`
  *    (retail evaluates the layer object first, as a static member call through it would).  Not written yet (no body): the state machine
  *    `updateMessagePool` (5504 B), the message-pool helpers 0x80427868..0x80428628 (they call
@@ -2296,7 +2297,7 @@ const u8 pat_ca_cert[0x3A0] = {
 s32 pat_ca_cert_size = 0x39C;
 
 /* This unit's own functions are members of `NetCtrlWk` (and of the small records below) or
- * free helpers; each is declared in `include/Network/network_pat_control.h`. */
+ * free helpers; each is declared in `Network/network_pat_control.h`. */
 
 /*
  * The per-frame update of the online control: it services the queued action, then runs the state machine

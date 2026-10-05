@@ -1,5 +1,5 @@
 /*
- * include/Network/NetworkWiiMediator.h - the class the 0x80413450..0x80417BC0 Network band owns (the round 3 fold of
+ * Network/NetworkWiiMediator.h - the class the 0x80413450..0x80417BC0 Network band owns (the round 3 fold of
  * the mediator head, the class band and the former `Network/network_opening.cpp`, whose header folded in here).
  *
  * Reconstructed from the range's own disassembly and the runtime dump's map.  The dump spells the
@@ -225,8 +225,8 @@ void getReflectName5C(NetworkWiiMediator* self, char* out, u32 size);
 /* The opening part's and the head's free functions (moved here from `Network/network_opening.h` and
  * `Network/network_layer_io.h` by the round 3 fold; docs/plan.md 6.5 rule 2: the owner declares). */
 struct PatTerms;
-class PatInterface;                               /* include/Network/PatInterface.h */
-typedef PatInterface NetworkInstance;             /* include/unsplit/Network.h: the band's alias */
+class PatInterface;                               /* Network/PatInterface.h */
+typedef PatInterface NetworkInstance;             /* unsplit/Network.h: the band's alias */
 
 #ifdef __cplusplus
 extern "C" {

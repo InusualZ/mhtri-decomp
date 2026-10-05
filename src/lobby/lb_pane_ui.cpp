@@ -3,7 +3,7 @@
  * character-edit (hair/inner colour) screen.
  *
  * `.text` 0x801EC9F8..0x801FBF78 (129 functions), `.data` 0x76C B, `.sdata` 0xF8 B, `.sdata2` 0x10 B, extab 0x340 B and
- * extabindex 0x4E0 B.  Phase 4 fold (docs/splits/phase4): the three registered units `lobby/fn_801EC9F8`,
+ * extabindex 0x4E0 B.  Phase 4 fold: the three registered units `lobby/fn_801EC9F8`,
  * `lobby/fn_801F3294` and `lobby/fn_801F9CD4` are one TU of the candidate (their `.sdata2`/`.data` pools run on without a
  * break across the old edges); their bodies are kept below in text order, each under its own former header.
  *
@@ -21,8 +21,7 @@
 /* lobby/fn_801EC9F8.cpp - the lobby band's digit-entry / item-selection pane group.
  *
  * `.text` 0x801EC9F8..0x801F3294 (67 functions, 26780 B), extab 0x8001079C..0x8001094C (54 unwind-only
- * 8-byte records), extabindex 0x8002CA54..0x8002CCDC (54 x 12 B).  Registered from
- * `proposal/801EC9F8_fn_801EC9F8.cpp`; that proposal's edge is a `--max-bytes` size cap, not a
+ * 8-byte records), extabindex 0x8002CA54..0x8002CCDC (54 x 12 B).  Registered; that proposal's edge is a `--max-bytes` size cap, not a
  * translation-unit boundary, and `tudiscover` finds no anchor in either direction, so the extent
  * settles as the functions match.
  *
@@ -65,9 +64,9 @@
  *
  * Types.  The two panes and the item database are this range's own views (`LbDigitPane`, `LbListPane`,
  * `LbEquipPane`, `LbItemDb`, `LbConfigWork`); `lobby_w.menu_0xAC` is also read by
- * `lobby/fn_801E7530.cpp`, whose `LbMenuWork` in `include/unsplit/lobby.h` marks +0x02/+0x06/+0x0A as
+ * `lobby/fn_801E7530.cpp`, whose `LbMenuWork` in `unsplit/lobby.h` marks +0x02/+0x06/+0x0A as
  * padding where this range reads them - filed as a shared-file request to merge the two views.
- * `include/unsplit/lobby.h` itself cannot be included: its `fn_8021213C(s32, s16)` takes two arguments
+ * `unsplit/lobby.h` itself cannot be included: its `fn_8021213C(s32, s16)` takes two arguments
  * where this range passes one, and its `menu_cursor_step_fixed_tail` takes `s16`s where the call sites pass `u8`s, so
  * the callee declarations live in this file (plain prototypes, one shared-file request each).
  */
@@ -177,7 +176,7 @@ typedef struct LbEquipPane {
 
 /* The lobby menu work object `lobby_w.menu_0xAC` points at.  `fn_801ECB40` is the only reader in this
  * range, so only the six fields it drives are named; the full record belongs to
- * `lobby/fn_801E7530.cpp`, which owns `LbMenuWork` in `include/unsplit/lobby.h` (recorded as a
+ * `lobby/fn_801E7530.cpp`, which owns `LbMenuWork` in `unsplit/lobby.h` (recorded as a
  * shared-file request: these two views of +0x02/+0x06/+0x0A should collapse into one). */
 typedef struct LbMenuPanel {
     /* +0x00 */ u8 state_0x00;
@@ -222,7 +221,7 @@ namespace s_801EC9F8 {
  * The symbols this range reads.  Everything below is a plain prototype at file scope (the project's
  * convention for callees whose owner has no publishable header); each one is filed as a shared-file
  * request.  `lobby_w` and `lobby_world_block` are re-declared here with this range's own view because the
- * callee signatures `include/unsplit/lobby.h` publishes for `menu_cursor_step_fixed_tail`/`fn_8021213C` do not match
+ * callee signatures `unsplit/lobby.h` publishes for `menu_cursor_step_fixed_tail`/`fn_8021213C` do not match
  * the ones this range calls (the header declares `fn_8021213C(s32, s16)` where this range passes one
  * argument), so including it cannot compile.
  */
@@ -1432,7 +1431,7 @@ void set_blendmode(u8 a, u8 b, u8 c);
  *
  * `.text` 0x801F3294..0x801F9CD4 (48 functions, 27200 B), extab 0x8001094C..0x80010A7C (38 unwind-only
  * 8-byte records), extabindex 0x8002CCDC..0x8002CEA4 (38 x 12 B).  Registered once, at its final home
- * (docs/plan.md 12), from proposal/801F3294_fn_801F3294.cpp.
+ * (docs/plan.md 12).
  *
  * Module `lobby`.  The range's callees are the lobby UI/equipment API (`LbStr`, `get_lsp_data`,
  * `chk_pointer`, `PutPageArrow`, `LbPutAnaPageArrow`, `draw_sprite*`, `sysSE_req`) and its neighbours in
@@ -1473,7 +1472,7 @@ void set_blendmode(u8 a, u8 b, u8 c);
  *   - two signatures the target's register use pins down: `fn_801F4444` takes three parameters, the
  *     middle one unused, and `fn_801F60D4` keeps a 12-byte `_SPR_DATA_` local (`+0x1C` is the colour
  *     word it overwrites), so `_SPR_DATA_` is completed here (a config_request asks for it to become the
- *     one shared definition - `include/unsplit/lobby.h` only forward-declares it).
+ *     one shared definition - `unsplit/lobby.h` only forward-declares it).
  *
  * Residuals (measured with `ninja build/RMHE08/report.json`, per symbol):
  *   - fn_801F3294 97.03 %: the target's case-0 "done" step *shares* the case-2 body (a `b` into it) where
@@ -1927,8 +1926,7 @@ void fn_801F8ABC(u32 id, u8 a, u8 b, u32 c, s32 room)
 /* lobby/fn_801F9CD4.cpp - the lobby character-edit (hair/inner colour) screen group.
  *
  * `.text` 0x801F9CD4..0x801FBF78 (14 functions, 8868 B), extab 0x80010A7C..0x80010ADC (12 unwind-only
- * 8-byte records), extabindex 0x8002CEA4..0x8002CF34 (12 x 12 B).  Registered from
- * `proposal/801F9CD4_fn_801F9CD4.cpp`; the extent is a maximal unclaimed run whose seam is unproven.
+ * 8-byte records), extabindex 0x8002CEA4..0x8002CF34 (12 x 12 B).  Registered; the extent is a maximal unclaimed run whose seam is unproven.
  *
  * Module `lobby`: the range reads the lobby state blocks (`lobby_w`, `lb_param_w`, `Screen_w`,
  * `system_w`), its callees are the lobby UI API (`get_lsp_data`, `draw_sprite_ary`,

@@ -4,7 +4,7 @@
  * map's own type names - `_mh_ivec2_` must be a type with exactly that name for MWCC to re-emit
  * `get_lsp_data__FUsP10_mh_ivec2_` - and a name that more than one file needs belongs in one header
  * (docs/plan.md 6.5 rule 1).  NOTE for the next pass: `_mh_ivec2_` is also defined locally by
- * `src/hud/fn_80324F7C.c` (that file's own rule-1 backlog) and by `include/unsplit/lobby.h`; the three
+ * `src/hud/fn_80324F7C.c` (that file's own rule-1 backlog) and by `unsplit/lobby.h`; the three
  * copies are identical (`s16 x; s16 y;`) and should collapse to the unsplit lobby header - this unit
  * cannot include that header, because its `lobby_w`/`lobby_world_block` views are not the ones this range
  * reads (see the source's file header).  Recorded as a config_request.
@@ -213,7 +213,7 @@ typedef struct _mh_ivec2_ {
 
 /* The lobby UI ABI this range calls.  C++ linkage (the map's `__F...` manglings with C++ parameter
  * types), so they sit outside `extern "C"`; the front-end reproduces the map's names from these exact
- * signatures (rule 9).  They are declared here rather than included from `include/unsplit/lobby.h`
+ * signatures (rule 9).  They are declared here rather than included from `unsplit/lobby.h`
  * because that header's `lobby_w`/`lobby_world_block` views conflict with this unit's (see the file
  * header). */
 void* get_lsp_data(u16 id, _mh_ivec2_* out);
@@ -225,7 +225,7 @@ s32 ck_WideMode(void);
 
 /* The map's `calcDistanceSqXZ__FPQ34nw4r4math4VEC3PQ34nw4r4math4VEC3` is a FREE function (`__F`) whose
  * parameters carry the namespace type, so it is declared at global scope (the same shape
- * `include/nw4r/math.h` uses for `setVector3`). */
+ * `nw4r/math.h` uses for `setVector3`). */
 f32 calcDistanceSqXZ(VEC3* a, VEC3* b);
 
 

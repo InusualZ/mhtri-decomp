@@ -51,7 +51,7 @@ s32 fn_8035B700(s32 a, s32 b, u16 c); /* 0x8035B700 - bracket: hud below, Networ
  * owner's header declares it and this one includes it (rule 2). */
 void eft_em_spawn_param(struct _ENEMY_WORK* self, u32 a, u32 b, void* v, f32 s, s32 d);
 /* `enemy_data_find`/`enemy_data_grp` (0x803438E4 / 0x803439D4) are declared in their owner's
- * header, `include/ef/eft_slot.h`, since `ef/eft_slot.cpp` registered the band that defines them -
+ * header, `ef/eft_slot.h`, since `ef/eft_slot.cpp` registered the band that defines them -
  * a declaration here of a symbol a registered unit owns is rule 2's finding.  Their consumers
  * include that header. */
 
@@ -65,7 +65,7 @@ void fn_802D884C(u16* a, s16* b);
 void fn_802DE578(struct _PLW* self, void* work);
 s32 fn_80331104(void);
 /* Added with `Pl/fn_80273B14.cpp`: 0x80335CE8 (hud below, enemy above) names different modules, so its
- * home is this file.  0x8029F73C moved to `include/menu/menu_item.h` (rule 2): `menu/menu_item.cpp`
+ * home is this file.  0x8029F73C moved to `menu/menu_item.h` (rule 2): `menu/menu_item.cpp`
  * registered the range 0x8029F3C8..0x802A6624, which owns that address. */
 
 /* 0x8033A920 and 0x80463EE0 - called by `enemy/fn_802F5138.cpp`'s action band (an idle-mode
@@ -76,7 +76,7 @@ s32 fn_80331104(void);
  * the module is undecided and the declaration belongs in this band, not in a guessed one.  The
  * 0x802FA9A0 / 0x802FAB98 / 0x802FAFB4 / 0x802FAFC4 group left this block when main landed
  * `lobby/fn_802FA9A0.cpp` (0x802FA9A0..0x8030121C, which owns all four) - they are declared in
- * `include/lobby/fn_802FA9A0.h` now (rule 2). */
+ * `lobby/fn_802FA9A0.h` now (rule 2). */
 void fn_8033A920(u32 arg);
 /* 0x80463EE0 - a float-returning two-argument function: `ef/fn_80114E34.cpp` carries the
  * signature its own call sites set (`f32 fn_80463EE0(s16, f32)`), which is the one declared

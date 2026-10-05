@@ -2,8 +2,8 @@
  * The owner header for `src/menu/get_pop_dat_ptr.cpp` (`.text` 0x803BE30C-0x803C4BA0).
  *
  * RULE 2 HOME.  The four symbols the band headers used to carry - `get_option_cfg`
- * (`include/unsplit/lobby.h`), `get_arena_cfg` and `get_cfg` (`include/unsplit/menu.h`) and
- * `event_demo_ck` (`include/unsplit/Pl.h`) - are defined by this unit, so their declarations live
+ * (`unsplit/lobby.h`), `get_arena_cfg` and `get_cfg` (`unsplit/menu.h`) and
+ * `event_demo_ck` (`unsplit/Pl.h`) - are defined by this unit, so their declarations live
  * here and those three headers include this file instead of copying them.
  *
  * Linkage follows the map name, not the band header's old spelling: `get_option_cfg__FUc`,

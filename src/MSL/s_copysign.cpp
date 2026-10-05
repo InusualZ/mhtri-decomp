@@ -1,5 +1,5 @@
 /*
- * MSL/s_copysign.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * MSL/s_copysign.cpp - STUB (no bodies yet).
  *
  * `.text` 0x804678EC..0x80467918.  Sections of the candidate unit: .text 0x804678EC..0x80467918.
  *

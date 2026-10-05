@@ -1,5 +1,5 @@
 /*
- * include/Network/NetworkReflectService.h - the declarations `src/Network/NetworkReflectService.cpp` owns
+ * Network/NetworkReflectService.h - the declarations `src/Network/NetworkReflectService.cpp` owns
  * (`.text` 0x8041A194..0x8041B194, the `NetworkReflectService` class: its members and C-linkage entry points).
  *
  * The unit has no bodies yet, so every parameter list is the one its caller (the mediator band,

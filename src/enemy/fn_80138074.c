@@ -1,4 +1,4 @@
-/* auto/80138074_fn_80138074.c - the enemy "user data" driver and its accessors,
+/* enemy/fn_80138074.c - the enemy "user data" driver and its accessors,
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  * `.text` 0x80138074..0x8013ACC4.
  *
@@ -34,17 +34,17 @@
  *     first and the bodies after it.
  *
  * Language.  The unit's own symbols are plain (`fn_XXXXXXXX`), so the file stays C and the mangled
- * callees are declared with the map's spelling, as `auto/800FD520_fn_800FD520.c` does.
+ * callees are declared with the map's spelling, as `ef/fn_800FD520.c` does.
  *
  * Types.  `EnemyWork` and its sub-records are reconstructed from the field offsets in `.text` (an MWCC
  * object carries no DWARF); fields are named for what the call sites store or compare against, and
  * padding keeps every offset at its measured place.  `Vec3`/`Mtx34` are the nw4r math types the mangled
- * callees take; they live here because `include/nw4r/math.h` is C++-only and this unit is C.
+ * callees take; they live here because `nw4r/math.h` is C++-only and this unit is C.
  *
  * Data.  The unit owns no pool section: the strings, the key tags and the float constants live in a
  * shared pool, so they are `extern`-declared by their map names and never defined (playbook 29).
  *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/80138074_fn_80138074.c`.
+ * Inventory, addresses and sizes: `python tools/units/ledger.py unit enemy/fn_80138074.c`.
  */
 
 struct _ENEMY_WORK; /* file scope, so the leaf headers' `struct _ENEMY_WORK*` parameters name this type (C scopes a struct first named in a prototype) */

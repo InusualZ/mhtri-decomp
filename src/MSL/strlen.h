@@ -1,5 +1,5 @@
 /*
- * Declaration of `src/MSL/strlen.cpp` (`strlen`, 0x804565C0).  Moved here from `include/unsplit/Runtime.PPCEABI.H.h`
+ * Declaration of `src/MSL/strlen.cpp` (`strlen`, 0x804565C0).  Moved here from `unsplit/Runtime.PPCEABI.H.h`
  * when the phase 4 split registered the unit.
  */
 #ifndef MHTRI_MSL_STRLEN_H

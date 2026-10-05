@@ -4,7 +4,7 @@
  * The unit is the em009/em019 program band's shared support block 0x80382310-0x80387844.  The two
  * entries below are the ones the cockpit band above it (`menu/fn_802E4978.cpp`,
  * 0x802E4978-0x802E7408) calls out of its own frame update; they had been declared in
- * `include/unsplit/menu.h` while the address had no registered owner, and their signatures are that
+ * `unsplit/menu.h` while the address had no registered owner, and their signatures are that
  * consumer's call sites (neither body is written yet).
  */
 #ifndef MHTRI_ENEMY_FN_80382310_H

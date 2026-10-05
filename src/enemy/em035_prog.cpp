@@ -120,7 +120,7 @@ extern "C" f32 lbl_8079B734;
 extern "C" f32 lbl_8079B738;
 
 /* The `.data` tables the action start hands to `em_se_tbl_play_alt` (declared, never defined - the
- * unowned 0x805ED8C0 band; see `include/unsplit/enemy.h`). */
+ * unowned 0x805ED8C0 band; see `unsplit/enemy.h`). */
 extern "C" u8 lbl_805ED8C0[];
 extern "C" u8 lbl_805ED8F8[];
 extern "C" u8 lbl_805ED930[];

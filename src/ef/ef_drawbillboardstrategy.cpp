@@ -13,7 +13,7 @@
  * The `.cpp` spelling makes the original language C++ (docs/plan.md, "The language comes from the
  * symbol"); the `Panic__Q24nw4r2dbFPCciPCce` callee and the `__dl__FPv` deleting destructors say the
  * same.  This file is registered as `.cpp` and every definition sits inside an `extern "C"` guard so
- * the front-end keeps the map's `fn_XXXXXXXX` spelling (docs/matching.md row 42) instead of mangling
+ * the front-end keeps the map's `fn_XXXXXXXX` spelling (playbook 42) instead of mangling
  * it.
  *
  * Layout in address order (36 symbols):
@@ -70,7 +70,7 @@
 
 /* `nw4r::db::Panic` - the real declaration; the front-end reproduces the map's
  * `Panic__Q24nw4r2dbFPCciPCce` spelling (tools/units/mangle.py confirms it).  Declaring the mangled
- * spelling instead would re-mangle it and break the link (docs/matching.md 50); rule 9. */
+ * spelling instead would re-mangle it and break the link (playbook 50); rule 9. */
 #ifdef __cplusplus
 namespace nw4r {
 namespace db {

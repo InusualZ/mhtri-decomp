@@ -23,6 +23,7 @@ the plan to get there is `migration.md`; what is dropped is `retired.md`; what t
 | scores, the metric, freshness, regression | `lib/report.py` | `spec/lib-report.md` | ledger, verifyunit, unitscore, symdiff, measure, recompile, pairgap, datagap, brief, land, flags/* |
 | the unit and its compile command | `lib/units.py` | `spec/lib-units.md` | recompile, measure, unitscore, symdiff, flipcheck, datagap, verifyunit, brief, flags/* |
 | target vs ours comparisons | `lib/objcompare.py` | `spec/lib-objcompare.md` | datagap, dataclosure, sectiongap, pairgap, relocdiff, flipcheck, undefrefs, verifyunit |
+| fact tokens and where they survive | `lib/facts.py` | `spec/lib-facts.md` | factscheck, sweepcomments |
 | C/C++ text scanning | `lib/cscan.py` | `spec/lib-cscan.md` | stylelint, typeregistry, declclash, recordmerge, methodize, vtableaudit, shapes |
 | findings, rows, verdicts, add-only diff | `lib/findings.py` | `spec/lib-findings.md` | land, stylelint, vtableaudit, undefrefs, datagap, splitcheck, flipcheck, verifyunit, dataclaim, symbolpreflight, handoff |
 | the CLI entry point | `lib/cli.py` | `spec/lib-cli.md` | every tool |
@@ -104,6 +105,8 @@ relative to `MAIN`; the contract of each tool is its spec.
 | `tools/units/unwindcut.py <unit> <cut>` | **you are re-cutting a seam** (moving a unit's right edge to a function boundary): the `extabindex`/`extab` partition at the cut with the sum check, the paste-ready lines for both halves, and the `.ctors`/`.dtors` words the cut obliges you to drop. Read-only; it refuses a cut that is not a function boundary. |
 | `tools/units/langcheck.py` | **a unit's language is in question**: decide C vs C++ from evidence (a mangled definition, a `.cpp` `__FILE__` string), never from convenience. |
 | `tools/units/movehdr.py` | **the header layout moves**: `include/P` -> `src/P` (plus an exception table), every quoted `#include` simulated in both layouts and both search orders first, refused on any target change; `--dry-run` plans, a moved tree reports nothing to do (`spec/movehdr.md`). |
+| `tools/units/sweepcomments.py` | **comments carry stale paths or narrative history**: one comment-only pass per run (`--paths`, `--history`, `--fixes`, `--if0`), never code, strings or `#include` lines; `--list-stale` / `--markers` count what is left (`spec/sweepcomments.md`). |
+| `tools/units/factscheck.py` | **a change deletes prose**: every fact token (address, name, size) a diff removes must survive in the file, `configure.py`, `splits.txt`, `symbols.txt` or `docs/`; `--explain` says where (`spec/factscheck.md`). |
 | `tools/units/recordmerge.py` | **two lanes each hold a view of the same record header**: fold them into one definition with the checks the hand passes lacked. |
 
 ### The rules and the audits

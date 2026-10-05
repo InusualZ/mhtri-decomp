@@ -12,7 +12,7 @@
  *
  * FLAGS.  `cflags_nhttp` plus the unit's own `#pragma inline_max_size(8)` (below).
  *
- * BODY (2026-09-29, sixth pass).  All 108 functions are written: 48 are byte-identical, 102 are >= 80 %,
+ * BODY (sixth pass).  All 108 functions are written: 48 are byte-identical, 102 are >= 80 %,
  * the unit is 93.56 % fuzzy (13.84 % before this pass).  This pass wrote the request/response object
  * builder and teardown, the socket layer, the comm thread and its nine steps (connect, SSL tunnel,
  * request writer, three post-body senders, head/body receivers, header parser), the public calls and

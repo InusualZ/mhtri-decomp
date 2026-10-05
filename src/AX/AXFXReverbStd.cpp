@@ -1,5 +1,5 @@
 /*
- * AX/AXFXReverbStd.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * AX/AXFXReverbStd.cpp - STUB (no bodies yet).
  *
  * `.text` 0x80475E30..0x804770E0.  Sections of the candidate unit: .text 0x80475E30..0x804770E0; .data 0x80612B20..0x80612CE0; .sdata 0x80793D20..0x80793D28; .sdata2 0x8079D040..0x8079D080.
  *

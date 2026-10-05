@@ -1,11 +1,11 @@
 /*
- * include/Network/GameSpyInterfaceThread.h - the classes and data of the 0x8041A87C Network band
+ * Network/GameSpyInterfaceThread.h - the classes and data of the 0x8041A87C Network band
  * (`src/Network/GameSpyInterfaceThread.cpp`; its header carries the seam evidence, the flags and the residuals).
  *
  * Every offset is one the target instructions address.  `NetworkReflectService` (five methods here), the
  * worker thread `GameSpyInterfaceThread`, `NetworkPeerGameSpy` and `NetworkTimedHandler` own member
  * functions; the foreign objects the target dispatches through (`GameSpyReceiver`, `NetworkPeerCallback`,
- * `NetworkLogger` in `include/unsplit/Network.h` and `PatInterface` in `include/Network/PatInterface.h`) are classes with real
+ * `NetworkLogger` in `unsplit/Network.h` and `PatInterface` in `Network/PatInterface.h`) are classes with real
  * virtuals - the only shape MWCC emits as `lwz r12, 0x0(r3)` / `lwz r12, <slot>(r12)`; none is
  * constructed here, so no vtable is emitted for them.  `GameSpyInterfaceThread` is the exception: its
  * destructor is the class's one virtual, so this unit emits its vtable.  The peer's and the timed
@@ -163,7 +163,7 @@ typedef struct GameSpyNegotiation {
 /* --------------------------------------------------------------------------------------------- */
 /* The data this unit owns, defined at the foot of `GameSpyInterfaceThread.cpp`.  `splits.txt` claims `.data`
  * 0x806031A0.. (the callback set and the string run), `.sbss` 0x80794CE0..0x80794CE8 and `.bss`
- * 0x806D3650..0x806D3670; the labels were declared in `include/unsplit/Network.h` while the ranges
+ * 0x806D3650..0x806D3670; the labels were declared in `unsplit/Network.h` while the ranges
  * were unowned and sit in the owner's own header now (rule 2).  They stay under `extern "C"` so the
  * symbol names the object reports are the map's. */
 extern "C" {
@@ -173,7 +173,7 @@ extern GameSpyNegotiation sNatNegState;   /* 0x806D3660 (.bss) - the NAT-negotia
 extern u32   sGameSpySocket;              /* 0x80794CE0 (.sbss) - the GT2 socket */
 }
 
-/* Declarations moved here from `include/unsplit/Network.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+/* Declarations moved here from `unsplit/Network.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 #ifdef __cplusplus
 extern "C" {
 #endif

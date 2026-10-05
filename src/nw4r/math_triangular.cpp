@@ -1,5 +1,5 @@
 /*
- * nw4r/math_triangular.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * nw4r/math_triangular.cpp - STUB (no bodies yet).
  *
  * `.text` 0x80500E34..0x805012C4.  Sections of the candidate unit: .text 0x80500E34..0x805012C4; .rodata 0x80573CD8..0x80574CE8; .data 0x8062F9C0..0x8062FAC8; .sdata2 0x8079D4A0..0x8079D4C8.
  *

@@ -9,8 +9,8 @@
  * `VFipdm_init_diskmanager`, `VFipf2_init_prfile2`, `dHash_InitHashTable` and
  * `VFSysSetTimeStampCallback` under one mutex - so `VFipf2*` is the scheme they are named in.  The
  * three names are a GUESS in that scheme, not names recovered from the SDK: a later pass that writes
- * the bodies, or that reaches the runtime dump, may confirm or correct them.  No `include/VF/` owner
- * exists, so this file is their home, the way `include/unsplit/SO.h` is the SO band's.
+ * the bodies, or that reaches the runtime dump, may confirm or correct them.  No `VF/` owner
+ * exists, so this file is their home, the way `unsplit/SO.h` is the SO band's.
  *
  * Added with the `DWCi/DWCi_Np_CPUCopyFast.c` friend-code getter, whose body calls all three.
  */

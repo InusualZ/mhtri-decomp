@@ -1,5 +1,5 @@
 /*
- * MSL/s_modf.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * MSL/s_modf.cpp - STUB (no bodies yet).
  *
  * `.text` 0x80467D24..0x80467E20.  Sections of the candidate unit: .text 0x80467D24..0x80467E20.
  *

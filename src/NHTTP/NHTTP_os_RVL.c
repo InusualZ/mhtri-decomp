@@ -2,7 +2,7 @@
  * NHTTP_os_RVL.c - the Revolution SDK NHTTP library's RVL platform TU, `.text`
  * 0x80515010..0x80515774 (10 functions, 1892 B).
  *
- * REGISTRATION (recon lane, 2026-09-27).  Left edge 0x80515010 is `NHTTPi_CheckCurrentThread`, the
+ * REGISTRATION.  Left edge 0x80515010 is `NHTTPi_CheckCurrentThread`, the
  * first referrer of the TU's private string, and the `.sdata` run-jump interval
  * (`0x80794394 -> 0x807943A0`, cuts [18653,18686]) admits it.  Right edge 0x80515774 is
  * `0x80515774`, the first referrer of the next TU's `.data` fragment (0x80630B28, `"https://"`,
@@ -100,7 +100,7 @@
  *     too, and decidable: ours materialises the OSPanic message with `lis`/`addi` where retail has
  *     the target object's **one** `SDA21` reloc, `li r5,NHTTPi_haltMessage@sda21`.  Giving the
  *     declaration its size (`extern const char NHTTPi_haltMessage[6];` in
- *     `include/unsplit/NHTTP.h`) reproduces that reloc, drops the function from 176 B to 172 B, and
+ *     `unsplit/NHTTP.h`) reproduces that reloc, drops the function from 176 B to 172 B, and
  *     pairs its tail exactly (rows 36-47) - but the row *measures down* to 58.39474, because the
  *     removed `lis`/`addi` pair leaves one more row for objdiff's row-count normalisation.  The
  *     absolute form is kept while the comm-thread guard above is open; the sized declaration is the

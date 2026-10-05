@@ -1,4 +1,4 @@
-/* auto/80103D28_fn_80103D28.cpp - the `eft009` enemy-effect cluster, 0x80103D28..0x80104BD0 (10 functions).
+/* ef/eft009.cpp - the `eft009` enemy-effect cluster, 0x80103D28..0x80104BD0 (10 functions).
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * The unit is the enemy-side effect family: `fn_80104A68` is the allocator every setter funnels through
@@ -55,7 +55,7 @@
  * the `.sdata2` run 0x80796750..0x80796778 (the scale constants) are the shared pool, `extern`-declared
  * here and never defined (playbook 23/29).
  *
- * `MTX34` comes from `include/nw4r/math.h` (landed with the `auto/800FF8D4` batch).
+ * `MTX34` comes from `nw4r/math.h` (landed with the `auto/800FF8D4` batch).
  */
 
 #include "ef/eft_state_flags_set.h" /* eft_state_flags_set (rule 2: the owner's header) */

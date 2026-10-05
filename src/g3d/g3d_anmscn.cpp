@@ -30,7 +30,7 @@
  * when the library's validity check rejects it); the map stem is kept, as no better name is evidenced.
  *
  * Registered Matching in configure.py, lib g3d (Wii/1.3, cflags_g3d); the flag evidence sits beside that
- * override in configure.py, the idea is docs/matching.md 27.
+ * override in configure.py, the idea is playbook 27.
  * Measured: fuzzy_match_percent 100.0 - 36 B / 9 instructions, byte-identical (`.text`, `extab` and
  * `extabindex` byte for byte against the retail split object; the rename changes no allocatable byte).
  * Residual: none now. Under cflags_base's -O4,p the unit was 97.56 % with the same nine instructions in the

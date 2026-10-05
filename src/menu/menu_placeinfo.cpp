@@ -1,5 +1,5 @@
 /*
- * menu/menu_placeinfo.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * menu/menu_placeinfo.cpp - STUB (no bodies yet).
  *
  * `.text` 0x80437270..0x8043D524.  Sections of the candidate unit: extab 0x8001DA94..0x8001DBEC; extabindex 0x8003E514..0x8003E718; .text 0x80437270..0x8043D524; .ctors 0x8056F3C8..0x8056F3CC; .data 0x80603E90..0x806047D0; .bss 0x806E1B38..0x806E26E0; .sdata 0x80793A10..0x80793A80; .sdata2 0x8079C8A8..0x8079C8D0.
  *

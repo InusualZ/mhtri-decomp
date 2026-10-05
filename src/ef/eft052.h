@@ -1,11 +1,11 @@
 /* ef/eft052.cpp's header: the item-page / hold-block entry points other units call (rule 2 - an
  * `extern` lives with the unit that owns the symbol, never in a consumer's source and never in
- * `include/unsplit/<module>.h` once the address is registered).
+ * `unsplit/<module>.h` once the address is registered).
  *
- * RULE 2 HOMES.  The three declarations below stood in `include/unsplit/lobby.h` while
+ * RULE 2 HOMES.  The three declarations below stood in `unsplit/lobby.h` while
  * 0x80358624..0x8035E034 was unclaimed; `ef/eft052.cpp` owns that range now, so they moved here and
  * the band header re-exports this one for the units that already include it (the same move
- * `include/menu/menu_message.h` and `include/camera/camera.h` made for their bands).
+ * `menu/menu_message.h` and `camera/camera.h` made for their bands).
  * `lobby/fn_801E7530.cpp` calls `eft052_hold_entry_set`; `eft052_item_value_get` and
  * `eft052_page_counts_get` are called by `lobby/fn_801EC9F8.cpp` and `menu/menu_message.cpp`, which
  * still declare them at their own call sites (their rule-2 pass moves those to their headers).
@@ -13,7 +13,7 @@
  * `eft052_hold_entry_set`'s entry argument is `void*`, not the unit's private `CockpitHoldEntry`
  * view: `lobby/fn_801E7530.cpp` hands its own 0x1C-byte item-hold parameter block (the same field
  * layout from +0x04 up) by address, and publishing the record as a shared type is a separate
- * change - the shape `include/ef/eft_slot.h` uses for `EftSlot`/`_ENEMY_DATA`.  The definition is
+ * change - the shape `ef/eft_slot.h` uses for `EftSlot`/`_ENEMY_DATA`.  The definition is
  * the fuller spelling: `void eft052_hold_entry_set(CockpitHoldEntry* entry, u8 flag)` in
  * `src/ef/eft052.cpp`.
  *

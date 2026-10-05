@@ -23,7 +23,7 @@
  * (only its `zz_0324f7c_` placeholder), so it is named for what it draws - one record's move indicator.
  *
  * The one codegen deviation is `-opt nopeephole`, which the `hud` lib now carries as `cflags_hud`
- * (2026-09-27; this file said `the pragma` before that): with `-opt nopeephole` on the real command line
+ * (this file said `the pragma` before that): with `-opt nopeephole` on the real command line
  * this object is byte-identical to the target, so the original TU was built peephole-off.  The visible
  * effect is the target's `get_option_cfg` test - `clrlwi r0,r3,24` + `cmpwi r0,0`, the non-record form -
  * which MWCC fuses into `clrlwi.` + `bne` with the peephole on, leaving the function 4 bytes short

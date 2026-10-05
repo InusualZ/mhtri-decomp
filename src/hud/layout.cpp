@@ -50,7 +50,7 @@
  * flipcheck: **NOT READY**. Three of its reasons are references that use the plain spelling where the
  * map carries the mangling - `get_lsp_data` (`get_lsp_data__FUsP10_mh_ivec2_`), `get_rare_color`
  * (`get_rare_color__FUc`) and `get_wide_offset` (`get_wide_offset__FUc`), the cockpit-side getters the
- * block of `include/hud/layout.h` declares - so a flip's link answers `undefined: 'get_lsp_data'`.
+ * block of `hud/layout.h` declares - so a flip's link answers `undefined: 'get_lsp_data'`.
  * Pre-existing and unchanged by this run: the base tree returns the same three names, and the note-box
  * bodies add two more *sites*, not a new name.  Not a source defect to fix here (the names are the ones
  * the map and the target object use); the fix is the owner pass that gives the cockpit band
@@ -98,9 +98,9 @@
  * `fn_802E26EC` -> `anim_frame_wrap`, `fn_802E270C` -> `color_lerp` (9 referrer lines across
  * `hud/cockpit_quest.cpp`, `menu/fn_802E4978.cpp`, `menu/menu_item_page.cpp` and their three
  * headers), `fn_802E28B0` -> `color_scale`, `fn_802E2C08`/`fn_802E2F54`/`fn_802E326C` -> the
- * `anim_step_*` family, and the six note-box rows.  `include/g3d/g3d_anmchr.h` gained the two
+ * `anim_step_*` family, and the six note-box rows.  `g3d/g3d_anmchr.h` gained the two
  * string helpers this range owns (`flfntStrLen`, `utf82unicode2`) - the owner's header is their
- * home - and `strcpy` comes from `include/unsplit/Runtime.PPCEABI.H.h` (0x8045F554 is owned by no
+ * home - and `strcpy` comes from `unsplit/Runtime.PPCEABI.H.h` (0x8045F554 is owned by no
  * registered range, so the band header is its home).
  *
  * Still blocked on a **cross-unit rename** (filed, not half-done - each is another registered

@@ -1,7 +1,6 @@
 /* enemy/em025_prog.cpp - enemy 025 program
  *
  * `.text` 0x8019E670..0x801AA154, 57 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): recut registered unit, built from `enemy/fn_8019ED34.cpp`.
  * Renamed from `fn_8019ED34`: the unit's `.data` holds `em025_prog_tbl` (0x805AE750) and its `.text` starts at 0x8019E670.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  */

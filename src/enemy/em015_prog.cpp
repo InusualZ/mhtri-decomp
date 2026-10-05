@@ -1,7 +1,7 @@
 /* enemy/em015_prog.cpp - enemy 015 program
  *
  * `.text` 0x80176C30..0x80182C40, 81 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): fold of 7 registered units, built from `enemy/fn_80176C58.cpp`, `enemy/fn_80177608.cpp`, `enemy/fn_80177890.cpp`, `enemy/fn_80178128.cpp`, `enemy/fn_80178378.cpp`, `enemy/fn_80181C88.cpp`.
+ * Phase 4: fold of 7 registered units, built from `enemy/fn_80176C58.cpp`, `enemy/fn_80177608.cpp`, `enemy/fn_80177890.cpp`, `enemy/fn_80178128.cpp`, `enemy/fn_80178378.cpp`, `enemy/fn_80181C88.cpp`.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  *
  * Kept views: the retired sources declared 11 callee(s) with different signatures (`em_approach_start`, `em_die_ck`, `em_hit_window_set`, `em_mot_set_blend`, `em_parts_damage_level_get`, `em_state_set`, `em_target_pos_set`, `em_turn_seq_start`, `em_turn_to_target`, `fn_80128A8C`, `fn_801823A0`); each function keeps its own source's view through a function-pointer cast macro (`<name>_viewN`, `<name>_cN`), which compiles to the same direct call, so the fold does not move any body.
@@ -40,7 +40,7 @@
  * names with `extern "C"`.  No `__FILE__` string names a source file, so the map's `fn_XXXXXXXX`
  * placeholder is kept (Naming note above).
  *
- * Types.  `_ENEMY_WORK` is the shared record in `include/enemy.h`; this unit's additions to it
+ * Types.  `_ENEMY_WORK` is the shared record in `enemy.h`; this unit's additions to it
  * (the death meter `field_0x1E4`, the death timers `field_0x32F`/`field_0x330`/`timer_0x332`,
  * `field_0x38A` and the effect scale `field_0x7B0`) are declared there.  The 12-byte helper
  * `fn_80176C58` allocates is defined here (only this unit touches it).
@@ -87,7 +87,7 @@
  * Object: `_ENEMY_WORK` (name evidence: the mangled callee
  * `em_frame_check__FP11_ENEMY_WORKUsff` carries the 11-character type name).  Field offsets and widths
  * are read from the target's load/store instructions; only the two fields this unit touches are named
- * (`state_0x05`, `field_0x20`), the rest come from the shared record in `include/enemy.h`.
+ * (`state_0x05`, `field_0x20`), the rest come from the shared record in `enemy.h`.
  *
  * Language: C++ (the region defines no symbol but its undefined set is mangled:
  * `em_frame_check__FP11_ENEMY_WORKUsff`, `setVector3__FPQ34nw4r4math4VEC3fff`).
@@ -102,11 +102,11 @@
  * with the code unit and ARE claimed in `splits.txt`.
  *
  * Declarations: `em_move_mode_set`, `em_mot_set`, `em_mot_end_ck` and `VEC3_ctor` come from the shared
- * headers (`include/unsplit/enemy.h`, `include/ef.h`); their signatures are the shared ones.  The
+ * headers (`unsplit/enemy.h`, `ef.h`); their signatures are the shared ones.  The
  * symbols whose owning unit is not registered and whose band has no sound header
  * (`eft_em_spawn`, `draw_shape_arm`, `em_hit_window_set`, `em_action_finish`) are declared here, as the landed
  * `enemy/fn_8014A1BC.c` does.  `fn_8013221C`, `fn_80132224`, `fn_80132264` belong to the `enemy` band
- * too, but `include/unsplit/enemy.h` does not carry them yet - see the outbox `shared-file` request.
+ * too, but `unsplit/enemy.h` does not carry them yet - see the outbox `shared-file` request.
  */
 
 /* Retired header of `enemy/fn_80177890.cpp` (kept for its notes and residuals): */
@@ -136,7 +136,7 @@
  * `fn_XXXXXXXX` C symbol.  The unit is therefore C++ (the mangled callee is declared with its real
  * signature and mangled by this front-end, docs/plan.md 6.5 rule 9) and the file is `.cpp`.
  *
- * Types.  `_ENEMY_WORK` is the shared 0xB18 record; it lives in `include/enemy/ENEMY_WORK.h` so it is
+ * Types.  `_ENEMY_WORK` is the shared 0xB18 record; it lives in `enemy/ENEMY_WORK.h` so it is
  * defined once (rule 1).  Fields the twelve functions touch are named from their call sites; the rest is
  * `unused_0xNN` padding that keeps every measured offset in place.
  *
@@ -278,15 +278,15 @@
  *    this build, float-first by retail - the five residuals above are all instances.
  *  - `field_0x482` (+0x482) is read only here: it selects between the two `fn_80136D4C` fade floats.
  *
- * TYPES.  `_ENEMY_WORK` lives in `include/enemy.h` (the 0xB1C union copy this unit was measured
- * against; the canonical `include/enemy/ENEMY_WORK.h` record is 0xB18 - the 4-byte difference is the
+ * TYPES.  `_ENEMY_WORK` lives in `enemy.h` (the 0xB1C union copy this unit was measured
+ * against; the canonical `enemy/ENEMY_WORK.h` record is 0xB18 - the 4-byte difference is the
  * union copy's own `pad_0xB18[0x4]` tail and predates this unit).  This unit added ONE named field
  * inside what was `pad_0x474`: `+0x482 field_0x482`, offsets unchanged (0x474 pad_0x474[0xE], 0x482
  * the field, 0x483 pad_0x483[0x141], 0x5C4 flags_0x5C4, 0xB14 se_handle_0xB14 - compile-proved, see
- * MERGE below).  `VEC3`/`Vec3` and the nw4r globals come from `include/nw4r/math.h`, `VEC3_ctor`
+ * MERGE below).  `VEC3`/`Vec3` and the nw4r globals come from `nw4r/math.h`, `VEC3_ctor`
  * from `ef.h`.  The declarations this unit consumes live in the owner's header (rule 2):
  * `enemy/fn_801251D0.h`, `enemy/fn_8012BDF4.h`, `enemy/fn_80176C58.h`, `enemy/fn_80177890.h`,
- * `enemy/fn_80178128.h`; the ones whose owner is still unsplit are in `include/unsplit/enemy.h` -
+ * `enemy/fn_80178128.h`; the ones whose owner is still unsplit are in `unsplit/enemy.h` -
  * except `fn_803B9BA0`, which is declared at the top of THIS file: its address is unsplit with no
  * sound band (bracketing units `hud/fn_80324F7C.c` and `Network/NetworkWiiMediator.c`, rule 2's named
  * gap) and the two landed consumers spell it differently (`enemy/fn_80147CE0.cpp` as
@@ -294,7 +294,7 @@
  * shared-header declaration makes one of them fail to compile (MWCC: illegal function overloading).
  * This unit matches `fn_801550FC.cpp`'s spelling, the one its body was measured against.
  *
- * MERGE (this branch merged main after the sibling `enemy/fn_8015E854.cpp` landing).  `include/enemy.h`
+ * MERGE (this branch merged main after the sibling `enemy/fn_8015E854.cpp` landing).  `enemy.h`
  * conflicted on exactly one line: both sides had split `pad_0x474` at the same offset and added the
  * same `+0x482 field_0x482`, differing only in the comment, so the resolution is ONE field whose comment
  * names both consumers (`enemy/fn_80178378.cpp`'s `fn_80178378`, `enemy/fn_8015E854.cpp`'s `fn_8015EA24`)
@@ -373,22 +373,22 @@
  *    placement) and register colouring; each is the MWCC scheduler, not a source shape.
  *
  * SHARED FILES this landing edits in its own worktree (each filed as a `shared-file` config request):
- *  - `include/enemy/ENEMY_WORK.h`: the EmColorBlock view of +0x328 (the colour scalar + K-colour
+ *  - `enemy/ENEMY_WORK.h`: the EmColorBlock view of +0x328 (the colour scalar + K-colour
  *    bytes), `field_0x48F`, the EmPartState block at +0x740 and `field_0x81A`; every other offset is
  *    unchanged.
- *  - `include/enemy/fn_8012E968.h` (new): the owner declarations of `fn_8012EC3C`/`em_alt_mode_ck`
+ *  - `enemy/fn_8012E968.h` (new): the owner declarations of `fn_8012EC3C`/`em_alt_mode_ck`
  *    (rule 2).  `em_alt_mode_ck` keeps the `(void)` spelling the landed bands need - a variadic
  *    or `(self)` spelling here costs `enemy/fn_801CA004.cpp` 1.1 points and `fn_8019DB9C` 6.25
  *    (measured), because those call sites leave the record in r3.
- *  - `include/unsplit/enemy.h`: re-exports that owner header instead of carrying its own copy
+ *  - `unsplit/enemy.h`: re-exports that owner header instead of carrying its own copy
  *    of the two declarations (rule 2; the band is a fallback, not the owner).
- *  - `include/enemy/fn_801251D0.h`: `fn_80128AEC`/`fn_80128B80`/`fn_80129A70`/`fn_80129DB8`/
+ *  - `enemy/fn_801251D0.h`: `fn_80128AEC`/`fn_80128B80`/`fn_80129A70`/`fn_80129DB8`/
  *    `fn_8012A014`/`fn_8012A204` (owner header, rule 2).
- *  - `include/enemy/fn_80138074.h`: the `EmUserData` record `fn_8013A654` runs on.
- *  - `include/enemy/fn_8011D448.h` (new): `em_parts_damage_level_get`, declared at C++ scope
+ *  - `enemy/fn_80138074.h`: the `EmUserData` record `fn_8013A654` runs on.
+ *  - `enemy/fn_8011D448.h` (new): `em_parts_damage_level_get`, declared at C++ scope
  *    (rule 9, the map name is the mangling).
- *  - `include/fn_8004CAD8.h`: `fn_8005024C`.
- *  - `include/sound/mhchar.h`: the pointer-taking `setTevKColor` overload the enemy action band's
+ *  - `fn_8004CAD8.h`: `fn_8005024C`.
+ *  - `sound/mhchar.h`: the pointer-taking `setTevKColor` overload the enemy action band's
  *    target relocations encode (`...P8_GXColor`); the by-value spelling is kept for the existing
  *    `enemy/fn_801CCBC4.cpp`/`enemy/fn_801D80EC.cpp` call sites.
  *
@@ -511,11 +511,11 @@ u32 em_frame_check(_ENEMY_WORK* self, u16 a, f32 b, f32 c);
 
 extern "C" {
 /* Not registered yet, and the two bracketing registered units of their address bands name different
- * modules, so there is no sound `include/unsplit/<module>.h` to move them to (rule 2's named gap). */
+ * modules, so there is no sound `unsplit/<module>.h` to move them to (rule 2's named gap). */
 void eft_em_spawn(_ENEMY_WORK* self, u32 a, u32 b, VEC3* v, f32 s);
 void draw_shape_arm(_ENEMY_WORK* self, u32 a, u32 b);
 
-/* `enemy`-band, not yet in include/unsplit/enemy.h (see the outbox `shared-file` request). */
+/* `enemy`-band, not yet in unsplit/enemy.h (see the outbox `shared-file` request). */
 }
 
 /* `.sdata2` constants this unit reads (shared pool; unsplit band, no sound module header). */
@@ -652,7 +652,7 @@ struct EmWorkItem {
 };
 
 extern "C" {
-/* `stage_map_kind_get` (the byte-table map lookup) comes from `include/unsplit/unknown.h`, which already
+/* `stage_map_kind_get` (the byte-table map lookup) comes from `unsplit/unknown.h`, which already
  * carries the band-interleaves-modules declaration. */
 
 /* ------------------------------------------------------------------------------------------------

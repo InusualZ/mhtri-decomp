@@ -24,7 +24,7 @@
  * "install" setter, an "uninstall" (`self->slot != value ? -1 : clear`), a "delete" helper and - for
  * three of the slots - a named getter (`getNetworkSessionManagerPat` +0x00, `getNetworkCommunityPat`
  * +0x08, `getNetworkLayerPat` +0x0C).  C++ but every symbol is unmangled (`extern "C"`).  The holder
- * type and the family's declarations live in `include/Network/NetworkPat.h` (this file's own header,
+ * type and the family's declarations live in `Network/NetworkPat.h` (this file's own header,
  * rule 2); the type moved there when the `network_pat_control` unit needed it (rule 1).
  *
  * TYPES.  The slots are typed from the install site `initNetworkPatControl` (0x804294A0..0x8042951C), which

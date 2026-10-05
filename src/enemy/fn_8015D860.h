@@ -1,7 +1,7 @@
 /* The action/state band `enemy/fn_8015D860.cpp` (0x8015D860..0x8015E854).
  *
  * Declarations published for the consumers (docs/plan.md 6.5 rule 2: an extern lives with the TU
- * that owns the symbol).  Moved out of `include/unsplit/enemy.h` when the band registered: that
+ * that owns the symbol).  Moved out of `unsplit/enemy.h` when the band registered: that
  * header is a fallback for unowned addresses, and once the unit owns them its typed declarations
  * belong here.
  *

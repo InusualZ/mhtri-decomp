@@ -4,7 +4,7 @@
  * and equipment helpers `arena_userdata_apply`, `decodePlayerCard`, `userdata_gunner_ck`, `userdata_equip_item_slots_get`, and the
  * `{id, value}` item-table helpers `item_count_find`, `item_pair_index_find`, `item_take`, `color_rgba_copy`).
  *
- * Seam (phase 4): the old `fn_80047398.cpp` held 0x80047398..0x8004C9A0 as one unproven run; the reconciled candidate cuts it at
+ * Seam: the old `fn_80047398.cpp` held 0x80047398..0x8004C9A0 as one unproven run; the reconciled candidate cuts it at
  * 0x80048964 (the extab/extabindex records and the `.bss` 0x806699B8 object the sub-transform code owns start there) and keeps
  * `fn_80047398.cpp` for the face render half.  `.bss` 0x5B0 (`sub_trans_buf`, `sub_trans_state`), `.sbss` 0xC (`bg_tex_disp_func`,
  * `lobby_world_block`), `.sdata2` 0x18.

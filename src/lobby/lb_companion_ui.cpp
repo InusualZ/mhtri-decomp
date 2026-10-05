@@ -1,7 +1,7 @@
 /*
- * lobby/lb_companion_ui.cpp - phase 4 unit, `.text` 0x80338808..0x8033F270 (133 functions, 27240 bytes).
+ * lobby/lb_companion_ui.cpp - unit, `.text` 0x80338808..0x8033F270 (133 functions, 27240 bytes).
  *
- * PHASE 4 (docs/splits/phase4, window d).  Fold of 2 registered units: lb_companion_ui.cpp, cockpit_icon_data.cpp.
+ * Fold of 2 registered units: lb_companion_ui.cpp, cockpit_icon_data.cpp.
  * The functions below are the ones those sources define, in address order; every other function of the range keeps its
  * original bytes.  79 of 133 functions have a body here.
  *
@@ -49,7 +49,7 @@
  * 4. The file name is the band's own (`lb_companion_ui`); every symbol it defines carries a
  *    body-derived name (see NAMES above).
  *
- * SEAM: UNPROVEN (measured 2026-09-26, merger lane; the seam round's `undecidable yet` stands).
+ * SEAM: UNPROVEN (measured 2026-09-26; the seam round's `undecidable yet` stands).
  * The range is an `attribute.py` `--max-bytes` cut of the unclaimed 0x8030121C..0x8035E034
  * stretch, and no evidence class settles either edge:
  *  - no `__FILE__` string exists for the band at all, so the decisive class-1 test cannot fire:
@@ -77,7 +77,7 @@
  *
  * RENAME (done 2026-09-26, the naming pass this branch was parked for; merger.md M5).  The map's 78
  * `fn_` rows in this range were renamed with the file's own definitions and every source/header that
- * spells them (`include/unsplit/menu.h`, `include/unsplit/unknown.h`, `include/stage/fn_802B2AA0.h`,
+ * spells them (`unsplit/menu.h`, `unsplit/unknown.h`, `stage/fn_802B2AA0.h`,
  * `src/Pl/pl_act.cpp`, `src/ef/eft050.cpp`, `src/enemy/fn_80137604.cpp`,
  * `src/enemy/fn_801A9540.cpp`, `src/menu/fn_802E4978.cpp`, `src/stage/fn_802B2AA0.cpp`), so objdiff
  * still pairs every row: 0 rows moved by the rename, and the one row the merge itself had broken

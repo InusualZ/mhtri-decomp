@@ -1246,7 +1246,7 @@ extern "C" SeSlot* fn_800DA72C(s32 kind, s32 id, nw4r::math::VEC3* pos) {
  * =================================================================================================== */
 
 
-/* part b - functions 0x800DB2DC..0x800DCB74 of auto/800D7F54_fn_800D7F54.
+/* part b - functions 0x800DB2DC..0x800DCB74 of sound/fn_800D7F54.cpp.
  *
  * Residuals / notes live in this header. Nothing here is committed; the orchestrator owns the unit.
  *
@@ -1846,7 +1846,7 @@ extern "C" void fn_800DCF0C(_se_w* work, nw4r::math::VEC3* pos) {
 }
 
 
-/* part d - the three per-frame drivers of auto/800D7F54_fn_800D7F54:
+/* part d - the three per-frame drivers of sound/fn_800D7F54.cpp:
  *   0x800D80B8  the camera/enemy-work pass       100.000
  *   0x800D9804  the enemy/SE bank dispatcher      99.977
  *   0x800DC0A8  the per-area SE pass              99.598
@@ -3148,7 +3148,7 @@ extern "C" void fn_800F0EA0(void);
 extern "C" void* memset(void* dst, s32 c, u32 n);
 extern "C" _se_w* lbl_80794978;
 
-/* The `system_w` offsets this unit reads. `system_w` is owned by `auto/80040598_fn_80040598.cpp`; its
+/* The `system_w` offsets this unit reads. `system_w` is owned by `fn_80040598.cpp`; its
  * type belongs there, so this is a local view of the two fields this unit touches.
  * size: 0x958 (partial) */
 struct SystemWorkView {

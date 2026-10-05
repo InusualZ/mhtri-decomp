@@ -1,8 +1,7 @@
 /*
- * ef/eft052.cpp - phase 4 unit, `.text` 0x80358624..0x8035BAB4 (53 functions, 13456 bytes).
+ * ef/eft052.cpp - unit, `.text` 0x80358624..0x8035BAB4 (53 functions, 13456 bytes).
  *
- * PHASE 4 (docs/splits/phase4, window d).  Recut of eft052.cpp: its functions whose address lies in this range, in
- * address order; the rest of the range keeps its original bytes.  20 of 53 functions have a body here.
+ * 20 of 53 functions have a body here.
  *
  * FLAGS.  `cflags_main`.  The tail (0x8035BAB4..) is `enemy/em033_prog.cpp` (no bodies came from this source).
  *

@@ -50,7 +50,7 @@ s32 fn_8027D7EC(struct _PLW* self, u8 flag);
 s32 fn_8027E1E4(struct _PLW* self);
 u32 fn_8027E220(struct _PLW* self, s32 v);
 /* 0x80260198 is NOT declared here: it sits inside the registered unit `Pl/fn_8025F088.cpp`
- * (0x8025F088-0x80262940), so that unit's header `include/Pl/fn_8025F088.h` is its owner's
+ * (0x8025F088-0x80262940), so that unit's header `Pl/fn_8025F088.h` is its owner's
  * declaration (`s32 (_PLW*)`) and a second, differently-typed copy here is the `illegal
  * function overloading` class (rule 2).  Consumers include the owner's header. */
 
@@ -201,7 +201,7 @@ u32 fn_8027D8A0(struct _PLW* self, s32 a);
  * (rule 2 - the owner's header wins, and a second spelling of the same name is the
  * `illegal function overloading` class).  The `fn_8027Exxx` equipment helpers this branch used to
  * declare here moved the same way: `Pl/fn_8027D684.cpp` now owns 0x8027D684-0x80288CEC, so its
- * signatures live in the consumer's own header (`include/Pl/fn_80273B14.h`, which is the only
+ * signatures live in the consumer's own header (`Pl/fn_80273B14.h`, which is the only
  * consumer) - the band must not declare a symbol a registered unit owns. */
 
 /* The `.data` tables the same unit reads. */
@@ -353,14 +353,14 @@ extern const f32 lbl_8079A268; /* 176.0f */
 s32 Pl_atk_act_flag_ck(struct _PLW* self, u8 mask);
 
 /* 0x803C4814 - `event_demo_ck__Fv`: the range that defines it,
- * `src/menu/get_pop_dat_ptr.cpp`, owns it and publishes it in `include/menu/get_pop_dat_ptr.h`,
+ * `src/menu/get_pop_dat_ptr.cpp`, owns it and publishes it in `menu/get_pop_dat_ptr.h`,
  * which this header includes below (rule 2). */
 #include "menu/get_pop_dat_ptr.h"
 
 /* 0x8029F6DC - the item-record lookup, spelled `GetItemData__FUs` in the map: a C++ free function
  * taking the 16-bit item id and returning the record, so it is declared at C++ scope and the
  * front-end reproduces the map spelling (docs/plan.md 6.5 rule 9).  The range is unregistered, but
- * the declaration now lives in `include/Pl/fn_8025F088.h` (the unit that first needed it), so it is
+ * the declaration now lives in `Pl/fn_8025F088.h` (the unit that first needed it), so it is
  * NOT repeated here - a second copy is the rule-2 duplicate this header exists to avoid.  The
  * callers read the record as bytes (`Pl/fn_802430E8.cpp:fn_802466C4` tests bit 3 of +0x2 and byte
  * +0x0). */

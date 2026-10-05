@@ -1,5 +1,5 @@
 /*
- * MSL/s_cos.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * MSL/s_cos.cpp - STUB (no bodies yet).
  *
  * `.text` 0x80467918..0x804679E0.  Sections of the candidate unit: .text 0x80467918..0x804679E0; .sdata2 0x8079CEE0..0x8079CEE8.
  *

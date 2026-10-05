@@ -1,5 +1,5 @@
 /*
- * MTX/mtx44.c - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * MTX/mtx44.c - STUB (no bodies yet).
  *
  * `.text` 0x804C6900..0x804C6B60.  Sections of the candidate unit: .text 0x804C6900..0x804C6B60; .sdata2 0x8079D298..0x8079D2B0.
  *

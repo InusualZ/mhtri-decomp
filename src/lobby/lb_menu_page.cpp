@@ -106,7 +106,7 @@
 #include "types.h"
 
 /* The types this unit's own bodies define (rules 1/3/4/5): the shared views of `lobby_w` and
- * `lobby_world_block` in `include/lobby/*.h` stop short of the offsets below, so each is this unit's
+ * `lobby_world_block` in `lobby/*.h` stop short of the offsets below, so each is this unit's
  * view with its own name.  `LbIconRec`/`LbWorldBlock`/`lobby_world_block`/`equip_record_copy` come from the
  * owner's header (rule 2). */
 #include "lobby/lb_pane_ui.h"

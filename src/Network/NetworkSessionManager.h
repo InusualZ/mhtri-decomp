@@ -1,5 +1,5 @@
 /*
- * include/Network/NetworkSessionManager.h - the externs and layouts the Network session band needs.
+ * Network/NetworkSessionManager.h - the externs and layouts the Network session band needs.
  *
  * The types are unit-local (nothing else includes it yet): `NetworkSessionManager` and `NetworkRequest`
  * (`NetworkSessionStable` lives in `Network/NetworkSessionStable.h`) are reconstructed here from the range's own
@@ -470,7 +470,7 @@ class NetworkSessionManagerPat;
    the destructor itself (rule 10).  `move` is declared **first** - it is the class's key function, so
    the table is emitted in the TU that defines it (this band) and nowhere else.
 
-   62 OF THE TABLE'S 112 SLOTS ARE THIS CLASS'S OVERRIDES (2026-09-28, slot work).  The base leaves
+   62 OF THE TABLE'S 112 SLOTS ARE THIS CLASS'S OVERRIDES (slot work).  The base leaves
    those slots pure, so without a declaration here each one is a **zero word** in our emitted table:
    the target holds a code address, ours held 0x00000000 at 61 slots and the base's `setFlag79` at the
    62nd.  The overrides below therefore are not decoration - they are what makes the table carry a
@@ -682,7 +682,7 @@ void networkStreamWriter_attach(NetworkConnectionStable* connection, NetworkStre
 void networkStreamWriter_reserve(NetworkConnectionStable* connection, const u8* bytes, u32 length, s8 kind);
 
 /* The manager logger accessor `getNetworkLogger` is *not* declared here: no registered unit owns it,
-   so rule 2 puts it in the band header `include/unsplit/Network.h` (which types it as the class
+   so rule 2 puts it in the band header `unsplit/Network.h` (which types it as the class
    `NetworkLogger` that the logging band uses).  A consumer that wants the older
    `NetworkSessionManagerLogger` view of the same object casts. */
 

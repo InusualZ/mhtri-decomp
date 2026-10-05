@@ -10,7 +10,7 @@
  * views into one shared definition is a union-aware merge (the fields this unit names sit inside
  * `pl_act.cpp`'s `unk00[0x31]` run), so it is recorded as a rule-1 residual for the unit header.
  *
- * `extern` declarations for symbols no registered unit owns live in `include/unsplit/`; the ones
+ * `extern` declarations for symbols no registered unit owns live in `unsplit/`; the ones
  * this unit needs are included from there where a band header already carries them.
  */
 #ifndef MHTRI_MENU_MENU_ITEM_H
@@ -273,9 +273,9 @@ extern ItemSpeciesRecord lbl_805DBFB8[]; /* .data:0x805DBFB8 - 132 x 0x0C B */
  *     (`screen_split_mode_ck` - including `mh3_pad.h` here is impossible: it and `ef.h`, which `pl.h` pulls
  *     in for `_HIT_W`'s sibling records, collide in one TU) and `fn_80040598.cpp` (`fn_8004082C`)
  *     have no header that declares these, so the shapes here are this unit's call sites' - the
- *     practice `include/Pl/fn_8028F66C.h` documents for the same situation.
+ *     practice `Pl/fn_8028F66C.h` documents for the same situation.
  *   * `ef/fn_800CDB2C.cpp`'s header declares `GameMode_ck` as `u8`, while the retail caller keeps a
- *     `clrlwi` on the widened form (the same per-consumer-view split `include/Pl/pl_act.h`'s
+ *     `clrlwi` on the widened form (the same per-consumer-view split `Pl/pl_act.h`'s
  *     `fn_8027D050` note records), so the declaration here is the call site's 32-bit view.
  *   * the rest (`game_ready_ck`, `fn_8004082C`'s neighbours, `fn_804273EC`, ...) sit in no registered
  *     range, so they are rule 2's unsplit case.
@@ -285,12 +285,12 @@ extern ItemSpeciesRecord lbl_805DBFB8[]; /* .data:0x805DBFB8 - 132 x 0x0C B */
  * The callees split three ways by whose header can supply a declaration (rule 2):
  *   * `Pl/fn_8027D684.cpp` (`fn_8027EB18`, `fn_8027E120`, `fn_8027D738`), `mh3_pad.cpp`
  *     (`screen_split_mode_ck`) and `fn_80040598.cpp` (`fn_8004082C`) have no header that declares these, so
- *     the shapes here are this unit's call sites' - the practice `include/Pl/fn_8028F66C.h`
+ *     the shapes here are this unit's call sites' - the practice `Pl/fn_8028F66C.h`
  *     documents for the same situation, with one hard constraint: including `mh3_pad.h` here is
  *     impossible because it and `ef.h` (which `pl.h` pulls in for the records above) collide in one
  *     translation unit.
  *   * `ef/fn_800CDB2C.cpp`'s header declares `GameMode_ck` as `u8`, while the retail caller keeps a
- *     `clrlwi` on the widened form (the per-consumer-view split `include/Pl/pl_act.h`'s
+ *     `clrlwi` on the widened form (the per-consumer-view split `Pl/pl_act.h`'s
  *     `fn_8027D050` note records), so the declaration here is the call site's 32-bit view.
  *   * the rest (`quest_select_ready_ck`, `fn_802FBA60`, `fn_8031A638`, `fn_802DA2D4`, `fn_802DB26C`,
  *     `fn_802DE238`, `fn_802DE670`, `fn_80384380`, `game_ready_ck`, `fn_804273EC`) sit in no
@@ -303,7 +303,7 @@ extern ItemSpeciesRecord lbl_805DBFB8[]; /* .data:0x805DBFB8 - 132 x 0x0C B */
 
 /* This unit's own C++-mangled entry points (the map names are these manglings, rule 9).
  * `put_menu_cursor` (0x802A2564) is one of them but has no body yet - it was declared in
- * `include/unsplit/lobby.h` until this range was registered, and its consumer (`lobby/fn_801E7530.cpp`)
+ * `unsplit/lobby.h` until this range was registered, and its consumer (`lobby/fn_801E7530.cpp`)
  * includes this header for it now (rule 2).  Its third parameter is the lobby band's 2D vector, whose
  * tag is declared here rather than including a band header for it. */
 struct _mh_ivec2_;
@@ -375,7 +375,7 @@ void fn_802A4D98(MenuSlot* slot);
 
 /* The callees above this unit. */
 /* `fn_8027D738` is `Pl/fn_8027D684.cpp`'s (its address is inside that unit's range) and it is written
- * there, so its declaration is the owner's header `include/Pl/fn_8027D684.h` (rule 2).  The two
+ * there, so its declaration is the owner's header `Pl/fn_8027D684.h` (rule 2).  The two
  * unwritten siblings above have no owner header entry yet and keep this unit's call-site shape. */
 /* 0x80047058 is `mh3_pad.cpp`'s (no argument, `Screen_w+0x1A != 0`).  It was `u32` here, which
  * MWCC reports as `(10505) illegal overloading` against the owner's `s32` as soon as both headers

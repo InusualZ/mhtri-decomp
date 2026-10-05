@@ -1,7 +1,7 @@
 /* enemy/em012_prog.cpp - enemy 012 program
  *
  * `.text` 0x80170600..0x80176C30, 30 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): fold of 3 registered units, built from `enemy/fn_80170600.cpp`, `enemy/fn_80170FA8.cpp`, `enemy/fn_80171194.cpp`.
+ * Phase 4: fold of 3 registered units, built from `enemy/fn_80170600.cpp`, `enemy/fn_80170FA8.cpp`, `enemy/fn_80171194.cpp`.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  */
 
@@ -46,7 +46,7 @@
  * the next move (`em_action_finish`).  `fn_80171130` is the dispatcher: it reads `state_sub` (+0x1E6) and
  * tail-calls one handler per action code, codes 0 and 9 doing nothing.
  *
- * Object: `_ENEMY_WORK`, included from `include/enemy.h` (name evidence: the mangled callee
+ * Object: `_ENEMY_WORK`, included from `enemy.h` (name evidence: the mangled callee
  * `em_frame_check__FP11_ENEMY_WORKUsff` carries the 11-character type name).  Included, not copied
  * (docs/plan.md 6.5 rule 1).
  *
@@ -71,7 +71,7 @@
  *
  * Enemy-band translation unit at .text 0x80171194-0x80176C58 (46 functions, 23 236 B).
  *
- * Registered from `proposal/80171194_fn_80171194.cpp` (attribute.py queue): one maximal unclaimed run
+ * Registered (attribute.py queue): one maximal unclaimed run
  * whose left/right boundaries `tools/splits/tudiscover.py at 0x80171194` calls strong (2/1 anchors),
  * and whose extabindex run (0x80029790-0x80029928, 34 records) places every entry inside this .text
  * range. The unit owns `extab`/`extabindex`/`.text` (dtk's split added the `.ctors` word at
@@ -93,7 +93,7 @@
  *   brief's section 3 inventory - all 46 symbols are fn_* - and the runtime dump's zz_ placeholders in
  *   .pi/notes/dumpmap-join.json; the .rodata/.data runs carry no source-file string)
  *
- * Object: `_ENEMY_WORK` (include/enemy.h, the union of every consumer's copy, size 0xB1C; the run's
+ * Object: `_ENEMY_WORK` (enemy.h, the union of every consumer's copy, size 0xB1C; the run's
  * mangled-undefined `em_*__FP11_ENEMY_WORK*` arguments name it, and the split's extabindex records
  * place all 34 exception entries inside this range). Every field this file names already carries an
  * offset and a name in that header, so nothing is redefined here (rule 1).
@@ -112,7 +112,7 @@
  *     naming that enum needs 14 state ids the code does not name, so it is recorded rather than guessed.
  *   - **Header gap (the big one).**  The 38 unwritten functions touch `_ENEMY_WORK` bytes the shared
  *     header still calls `pad_*`, so they cannot be written under rule 5 without naming them (and
- *     `include/enemy.h` is read-only here): `+0x1E4` (read as a byte by `fn_80176AA8`, next to
+ *     `enemy.h` is read-only here): `+0x1E4` (read as a byte by `fn_80176AA8`, next to
  *     `action_0x1E5`), `+0x32C..+0x333` (`fn_80176C30` writes `+0x328` as a float, then five bytes and a
  *     u16; the header's `+0x320 VEC3`/`+0x32C u16` do not fit the byte stores), `+0x328` again in
  *     `fn_801762A0` (a `sth`, so the header's `VEC3 v_0x320` is the wrong type there), and the `+0x9AC`
@@ -121,7 +121,7 @@
  *   - **Unsplit callees.**  The range calls 10 functions outside it that no shared header declares
  *     (`fn_80170A00`, `fn_80171130`, `em_frame_flag_set`, `em_busy_set`, `eft_spawn_type10`, `VEC3_ctor`,
  *     `fn_8011E6EC`, `fn_803B9BA0`, `em_parts_damage_level_get`, `fn_8012EC74`); all but the library ones
- *     are enemy-band and belong in `include/unsplit/enemy.h` (its own docstring says so).  That header is
+ *     are enemy-band and belong in `unsplit/enemy.h` (its own docstring says so).  That header is
  *     read-only here, so the declarations sit at the top of this file and the outbox carries them as a
  *     `shared-file` config_request.
  *   - **`.ctors`.**  dtk's own split added `.ctors 0x8056F334-0x8056F338` to the registration, so the TU
@@ -162,7 +162,7 @@ void fn_801706B8(_ENEMY_WORK *self);
 }
 
 /* The one mangled callee, declared by its owner's real name so the C++ front-end reproduces the map's
- * `em_frame_check__FP11_ENEMY_WORKUsff`.  `include/unsplit/enemy.h` carries the C spelling of the same
+ * `em_frame_check__FP11_ENEMY_WORKUsff`.  `unsplit/enemy.h` carries the C spelling of the same
  * symbol for the units that stay C (rule 9: a mangled spelling is never the callable identifier). */
 u32 em_frame_check(_ENEMY_WORK* self, u16 a, f32 b, f32 c);
 
@@ -197,7 +197,7 @@ void fn_80173FF4(_ENEMY_WORK* self);
 void fn_801740A0(_ENEMY_WORK* self);
 
 /* ------------------------------------------------------------------------------------------------ *
- * Callees outside this range.  They belong in `include/unsplit/enemy.h`; that header is read-only for
+ * Callees outside this range.  They belong in `unsplit/enemy.h`; that header is read-only for
  * this round, so the declarations sit here with the parameter widths the call sites show.  The
  * functions at 0x80170A00/0x80171130 are the `action_0x1E5` handlers that live just below this range.
  * ------------------------------------------------------------------------------------------------ */
@@ -210,7 +210,7 @@ void fn_803B9BA0(_ENEMY_WORK* self, VEC3* pos, s32 value);
 
 extern "C" {
 /* `enemy_data_grp`/`enemy_data_find` (0x803439D4 / 0x803438E4) come from their owner's header,
- * `include/ef/eft_slot.h` (rule 2). */
+ * `ef/eft_slot.h` (rule 2). */
 
 /* ---- the range's functions ---- */
 void fn_80170600(_ENEMY_WORK *self) {

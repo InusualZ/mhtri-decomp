@@ -1,5 +1,5 @@
 /*
- * homebutton/fn_8052A040.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * homebutton/fn_8052A040.cpp - STUB (no bodies yet).
  *
  * `.text` 0x8052A040..0x8052B004.  Sections of the candidate unit: .text 0x8052A040..0x8052B004; .ctors 0x8056F3E0..0x8056F3E4; .data 0x806498C8..0x8064A5E8; .sbss 0x80795A18..0x80795A20; .sdata2 0x8079D550..0x8079D570.
  *

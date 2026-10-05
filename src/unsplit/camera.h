@@ -5,7 +5,7 @@
  *
  * `fn_802BECD0` (0x802BECD0) used to be declared here as `struct CamWork*`; `light/light.cpp` owns
  * that address and defines the record's accessor over its own view of the 0x4F8 bytes
- * (`LightWork`), so the declaration lives in `include/light/light.h` - included below - and this
+ * (`LightWork`), so the declaration lives in `light/light.h` - included below - and this
  * header re-exports it (the `(10505) illegal overloading` the two spellings would have been).
  */
 

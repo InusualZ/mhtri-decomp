@@ -1,7 +1,7 @@
 /* sound/snd_bank_loader.cpp - the sound bank/file loader (SE and BGM banks)
  *
  * `.text` 0x800EEAE0..0x800F2A94, 66 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): fold of 2 registered units, built from `sound/fn_800E8E60.cpp`, `sound/fn_800EF7D8.cpp`.
+ * Phase 4: fold of 2 registered units, built from `sound/fn_800E8E60.cpp`, `sound/fn_800EF7D8.cpp`.
  * Name is a GUESS: the range holds `snd_bank_layout`, `scene_se_bank_load`, `system_se_load`, `title_se_load` and the `*_bgm_load` family over the `SndWork` record.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  */
@@ -9,8 +9,7 @@
 /* Retired header of `sound/fn_800EF7D8.cpp` (kept for its notes and residuals): */
 /* sound/fn_800EF7D8.cpp - the sound-system SE/BGM loader cluster.
  *
- * .text 0x800EF7D8-0x800F2A94 (62 functions, 0x52BC bytes), registered once at its final home
- * from `proposal/800EF7D8_fn_800EF7D8` (brief section 2).
+ * .text 0x800EF7D8-0x800F2A94 (62 functions, 0x52BC bytes), registered once at its final home (brief section 2).
  *
  * Registration evidence (brief section 2, in order):
  *   1. no `__FILE__`/assert source-name string exists anywhere in the range (every data symbol the
@@ -89,7 +88,7 @@
  *
  * ## Shared types and shared files
  *
- * The record both per-actor paths walk is `include/pl.h`'s `_PLW`: its `equipB` / `equipB2` /
+ * The record both per-actor paths walk is `pl.h`'s `_PLW`: its `equipB` / `equipB2` /
  * `equipC` / `equipD` are exactly the four `_EQUIP` records `Get_pl_type` and `fn_8027EE24` take at
  * +0x1D0 / +0x1DC / +0x1E8 / +0x1F4, and the enemy list walks it at its 0xB20 stride.  So this unit
  * includes that header rather than carrying a copy of either type.  Four of that record's fields had
@@ -97,7 +96,7 @@
  * offset-preserving: `slot_active` (+0x000, the in-use flag), `chunk_ofs` (+0x008), `se_name_set`
  * (+0x014, the SE bank name-table selector) and `se_name_idx` (+0x01D, its index).
  *
- * `include/sound/fn_800E46E8.h` is new: the eleven sound-manager entry points this unit calls are
+ * `sound/fn_800E46E8.h` is new: the eleven sound-manager entry points this unit calls are
  * owned by `sound/fn_800E46E8.cpp`, so their declarations live in that owner's header (rule 2).
  * `sound/fn_800D7F54.cpp`'s local declarations of this unit's symbols become rule-2 findings once the
  * unit is registered; moving them here is a follow-up shared-file edit, filed in the outbox.

@@ -77,7 +77,7 @@ extern "C" {
 
 /* ---- this unit's free (callback and entry-point) bodies, in address order --------------------- -
  * Every other body in the range is a member of one of the four classes, so those are declared in
- * include/Network/GameSpyInterfaceThread.h and not here.  The DWC callbacks are installed through
+ * Network/GameSpyInterfaceThread.h and not here.  The DWC callbacks are installed through
  * `(NetworkCallback)`, so they keep the C spelling and the flat parameter lists retail shows. */
 void gt2SocketErrorCallback(void);
 void natNegProgressCallback(void);
@@ -1542,7 +1542,7 @@ void NetworkTimedHandler::clear()
     expired_18 = 0;
 }
 
-/* ---- the zero-initialised data this unit owns (declared in include/Network/GameSpyInterfaceThread.h; the
+/* ---- the zero-initialised data this unit owns (declared in Network/GameSpyInterfaceThread.h; the
  * callback set is defined above, ahead of the first log string, because MWCC emits `.data` in
  * definition order and retail's set precedes the whole string run) ------------------------------- */
 

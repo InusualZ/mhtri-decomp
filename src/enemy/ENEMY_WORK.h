@@ -8,7 +8,7 @@
  * with `enemy/fn_80177890.cpp`; the `_ENEMY_WORK` definitions still in `src/enemy/*` are the
  * pre-header copies the residual sweep will fold into this include.
  *
- * `pos` is `nw4r::math::VEC3`, so this header is C++-only (as `include/nw4r/math.h` is).
+ * `pos` is `nw4r::math::VEC3`, so this header is C++-only (as `nw4r/math.h` is).
  */
 #ifndef MHTRI_ENEMY_ENEMY_WORK_H
 #define MHTRI_ENEMY_ENEMY_WORK_H
@@ -16,10 +16,10 @@
 #include "types.h"
 #include "nw4r/math.h"
 
-/* The sound-work record (`include/sound/se.h`) whose handle the `enemy` band's action steps hand
+/* The sound-work record (`sound/se.h`) whose handle the `enemy` band's action steps hand
  * `se_req_pos_ps`/`shell_se_req`; forward-declared so this header stays light (rule 4's 0xB14). */
 struct _se_w;
-/* The player work record `_ENEMY_WORK::plw_0x32C`/`plw_0xA34` point at (`include/pl.h` owns its
+/* The player work record `_ENEMY_WORK::plw_0x32C`/`plw_0xA34` point at (`pl.h` owns its
  * definition; this header only needs the pointer's type, so it forward-declares it). */
 struct _PLW;
 
@@ -84,8 +84,8 @@ struct EmPartRec {
 };
 
 /* The 0x20-byte ground/seat record `fn_80125F54` prepares and `fn_801421E4` fills: both take it as
- * a `void* out` (their declarations are in `include/enemy/fn_801251D0.h` and
- * `include/enemy/enemy_control.h`), so it is the CALLERS' record and the two units that own one
+ * a `void* out` (their declarations are in `enemy/fn_801251D0.h` and
+ * `enemy/enemy_control.h`), so it is the CALLERS' record and the two units that own one
  * share this one definition (docs/plan.md 6.5 rule 1): `enemy/fn_801B4458.cpp` names the seat flags
  * at +0x03 and the two trailing words, `enemy/fn_801B0010.cpp`'s em030 program passes its address
  * and reads `pos_0x08`.  Only the fields those two read are named.
@@ -700,7 +700,7 @@ struct _ENEMY_WORK {
     /* +0x47C */ u8 unused_0x47C[0x482 - 0x47C];
     /* +0x482 */ u8 field_0x482;       /* nonzero picks the second approach float in
                                         * `enemy/fn_80182D5C.cpp`'s `fn_80184CE0` (added by that unit;
-                                        * the pre-header `include/enemy.h` view of this byte) */
+                                        * the pre-header `enemy.h` view of this byte) */
     /* +0x483 */ u8 unused_0x483[0x48E - 0x483];
     /* +0x48E */ u8 field_0x48E;        /* the part-kind byte `enemy/fn_801D80EC.cpp`'s `fn_801DF2F8`
                                         * compares against 4 and 6 */

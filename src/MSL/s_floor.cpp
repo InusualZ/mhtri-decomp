@@ -1,5 +1,5 @@
 /*
- * MSL/s_floor.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * MSL/s_floor.cpp - STUB (no bodies yet).
  *
  * `.text` 0x804679E0..0x80467B30.  Sections of the candidate unit: .text 0x804679E0..0x80467B30; .sdata2 0x8079CEE8..0x8079CEF8.
  *

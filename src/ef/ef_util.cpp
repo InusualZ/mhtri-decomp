@@ -1,5 +1,5 @@
-/* ef_util.cpp - the 16 functions at `.text` 0x8009B374..0x8009CD64 (6640 B) of the discovery
- * proposal `8009B374_fn_8009B374`.
+/* ef_util.cpp - the 17 functions at `.text` 0x8009B374..0x8009CDBC (6728 B): the discovery proposal
+ * `8009B374_fn_8009B374`'s 16 (..0x8009CD64) and the 88-byte tail 0x8009CD64..0x8009CDBC.
  *
  * Naming - which evidence class decided it.  Class 1 decides: the range's own `.data` pool holds the
  * bare source-file name `ef_util.cpp` (lbl_80591948 at 0x80591948, read out of orig/RMHE08/sys/main.dol),
@@ -71,7 +71,7 @@
  *
  * Shared-file note: this unit's declarations for the symbols `src/fn_8004CAD8.cpp` owns
  * (fn_80050EDC/fn_80050F24/sqrt_f32/fn_80051424/fn_80051820/fn_80052214/PSVECSubtract) were added to
- * that owner's header `include/fn_8004CAD8.h` (rule 2), because the owner registered before this unit
+ * that owner's header `fn_8004CAD8.h` (rule 2), because the owner registered before this unit
  * and its header carried only the five declarations its own consumers needed.
  */
 

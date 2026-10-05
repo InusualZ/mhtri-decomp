@@ -9,7 +9,7 @@
  *   named `NetworkLayerHandler` globals `networkLayerRequestDescNN`.  The layer id helpers (`NetworkLayerIdImportFrom`/
  *   `ExportTo`, `NetworkUniqueIdEquals`, named by their own log strings) sit in the same range.
  *
- * WHY IT SITS HERE (recut, network pilot round 3).  The bodies were written by pilot lane L2 inside
+ * WHY IT SITS HERE (recut).  The bodies were written by pilot lane L2 inside
  *   `Network/NetworkSessionManagerPat.cpp`; the `.data` there read as three TUs (V->S seam at 0x805FB2B8), and the unit
  *   holds exactly the run that seam opens: `.text` from the constructor 0x803DF2EC (the manager's last function,
  *   `setSessionLogSessionLost`, ends there) to 0x803E0BE8 (`NetworkLayerPat`'s first), `.data` 0x805FB2B8..0x805FB718 (its
@@ -20,7 +20,7 @@
  *   the id helpers address each warning string with their own lis/addi).  File-scope `#pragma peephole off`: the bodies
  *   were written under the source file's peephole-off region and keep it.
  *
- * TABLE (round 3).  79 slots (+0x08..+0x140): the derived table 0x805FC1E0 is 0x144 B, so the base has no slot +0x144 -
+ * TABLE.  79 slots (+0x08..+0x140): the derived table 0x805FC1E0 is 0x144 B, so the base has no slot +0x144 -
  *   the map's `__vt__12NetworkLayer` is 0x144 B and the claim's last 4 bytes (0x805FB714) are the alignment before the next
  *   object's `.data` (our object's `.data` is 0x45C of the claimed 0x460).  The pure slots carry the names and parameters of
  *   `NetworkLayerPat`'s overrides; the request starters the game calls carry the consumers' spellings (`closeSession_1C`,

@@ -1,8 +1,7 @@
 /*
- * menu/fn_8031A6C0.cpp - phase 4 unit, `.text` 0x8031A6C0..0x8031DAA8 (45 functions, 13288 bytes).
+ * menu/fn_8031A6C0.cpp - unit, `.text` 0x8031A6C0..0x8031DAA8 (45 functions, 13288 bytes).
  *
- * PHASE 4 (docs/splits/phase4, window d).  Recut of fn_8031A6C0.cpp: its functions whose address lies in this range,
- * in address order; the rest of the range keeps its original bytes.  23 of 45 functions have a body here.
+ * 23 of 45 functions have a body here.
  *
  * FLAGS.  `cflags_menu`.  The effect tail of the old range (0x8031DAA8..) is `menu/menu_item_effect.cpp`.
  *
@@ -163,28 +162,6 @@ extern "C" void fn_8031B5D0(MenuSel* self) {
     second->fade_0x23A = 0x29;
     second->field_0x23B = 5;
 }
-
-/* 0x8031B6D0 - reset this record to its item-screen defaults (kept for the follow-up round that
- * writes the in-band `fn_8031B39C`/`fn_8031B4C4` it calls). */
-#if 0
-
-extern "C" void fn_8031B6D0(MenuSel* self) {
-    self->mode_0x014 = 2;
-    self->flag_0x1B0 = 0;
-    self->value_0x19E = 0;
-    self->value_0x017 = 8;
-    self->count_0x1A3 = 8;
-    self->col_0x1A0 = 0;
-    self->row_0x1A1 = menu_page_count(8, 8);
-    self->sel_0x1A2 = 0;
-    self->fade_0x23A = 0;
-    self->state_0x001 = 0;
-    fn_8031B39C(self);
-    fn_8029FFFC((MenuSlot*)self, (s8)self->sel_0x1A2);
-    fn_8031BFEC(&self->cursor_0x1EC, 1, self);
-    fn_8031B4C4(self);
-}
-#endif
 
 /* 0x8031BD50 - copy the five halfwords of one cursor record */
 extern "C" void fn_8031BD50(u16* dst, u16* src) {

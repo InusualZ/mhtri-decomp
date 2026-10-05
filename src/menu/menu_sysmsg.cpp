@@ -1,5 +1,5 @@
 /*
- * menu/menu_sysmsg.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * menu/menu_sysmsg.cpp - STUB (no bodies yet).
  *
  * `.text` 0x804513FC..0x804565C0.  Sections of the candidate unit: extab 0x8001E18C..0x8001E3B0; extabindex 0x8003EF88..0x8003F144; .text 0x804513FC..0x804565C0; .ctors 0x8056F3D4..0x8056F3D8; .rodata 0x80572240..0x80572418; .data 0x80607E50..0x8060E7FC; .bss 0x806F4658..0x806F4B48; .sdata 0x80793C80..0x80793CB8; .sbss 0x80794D64..0x80794DF8; .sdata2 0x8079C998..0x8079C9A8.
  *

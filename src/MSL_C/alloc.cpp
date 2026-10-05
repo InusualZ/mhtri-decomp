@@ -1,5 +1,5 @@
 /*
- * MSL_C/alloc.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * MSL_C/alloc.cpp - STUB (no bodies yet).
  *
  * `.text` 0x804578FC..0x804642C8.  Sections of the candidate unit: extab 0x8001E400..0x8001E464; extabindex 0x8003F18C..0x8003F1C8; .text 0x804578FC..0x804642C8; .rodata 0x80572450..0x80573190; .data 0x8060E8E4..0x8060F538; .bss 0x806F4CC8..0x806F5020; .sdata 0x80793CD0..0x80793D00; .sbss 0x80794E00..0x80794E28; .sdata2 0x8079C9A8..0x8079CAB8.
  *

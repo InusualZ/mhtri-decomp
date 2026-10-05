@@ -2,7 +2,7 @@
  * (0x8019E840..0x8019EC38), which `enemy/fn_801A4504.cpp` calls.  The header was `enemy/fn_801993E0.h`
  * until that unit's tail (0x8019E670..0x8019ED34) joined this one.
  *
- * Declarations moved here from `include/unsplit/enemy.h` (docs/plan.md 6.5 rule 2: an extern lives
+ * Declarations moved here from `unsplit/enemy.h` (docs/plan.md 6.5 rule 2: an extern lives
  * with the TU that owns the symbol) when the unit landed and made them owned.  The signatures are
  * the call sites' registers; `fn_8019E9AC` is `s32` because the landed caller tests its result with
  * a signed compare.

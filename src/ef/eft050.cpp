@@ -70,7 +70,7 @@
  *     which is what a TU that *defined* those small-data objects emits.  Matching it is the data
  *     pass: define the tables and claim `.sdata` 0x8079308C..0x807930F0 (and the `.sdata2` pool
  *     0x8079B2C0..0x8079B320 the two floats in fn_80342B70 read) - one relocation each.
- *   * `include/hud/layout.h` declares `get_lsp_data` inside its `extern "C"` block, so our calls
+ *   * `hud/layout.h` declares `get_lsp_data` inside its `extern "C"` block, so our calls
  *     relocate to the plain name `get_lsp_data` where the target holds the mangling
  *     `get_lsp_data__FUsP10_mh_ivec2_` (rule 9: the map name is a mangling, the declaration belongs
  *     at C++ scope).  That is the owner header's edit, recorded as a `shared-file` request in this

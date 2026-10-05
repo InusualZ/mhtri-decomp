@@ -1,5 +1,5 @@
 /*
- * homebutton/fn_80530680.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * homebutton/fn_80530680.cpp - STUB (no bodies yet).
  *
  * `.text` 0x80530680..0x8053072C.  Sections of the candidate unit: .text 0x80530680..0x8053072C; .ctors 0x8056F3F0..0x8056F3F4; .data 0x8064A800..0x8064A878; .sbss 0x80795A40..0x80795A48.
  *

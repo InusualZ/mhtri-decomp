@@ -22,7 +22,7 @@ void pl_act_guard_timer_reset(struct _PLW* self);
 }
 #endif
 
-/* Declarations moved here from `include/unsplit/Pl.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+/* Declarations moved here from `unsplit/Pl.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 struct _PLW;
 
 #ifdef __cplusplus

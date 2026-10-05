@@ -2,7 +2,7 @@
  * nw4r g3d: g3d_calcworld.cpp - the node/matrix world pass and its node-table accessors, `.text`
  * 0x800736F8-0x800746DC (29 functions).
  *
- * Re-cut from `auto/80073398_fn_80073398.cpp` (docs/plan.md 12 item 5).  The panic string
+ * Re-cut (docs/plan.md 12 item 5).  The panic string
  * `lbl_8058E184` = `g3d_calcworld.cpp` is referenced only from `fn_800737CC` (whose `fn_8007411C`
  * sibling is still unwritten - a residual, not part of this file), and `lbl_8058E340`..`lbl_8058E420`
  * from the `fn_80073E80`..`fn_80074114` helpers; the data fragment is 0x8058E184-0x8058E430.  The six

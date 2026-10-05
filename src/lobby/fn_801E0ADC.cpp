@@ -1,8 +1,7 @@
 /* lobby/fn_801E0ADC.cpp - the effect/flag bookkeeping group that precedes the lobby menu layer.
  *
  * `.text` 0x801E0ADC..0x801E7530 (77 functions, 27220 B), extab 0x800103D4..0x800105B4 (60 unwind-only
- * 8-byte records), extabindex 0x8002C4A8..0x8002C778 (60 x 12 B).  Registered from
- * `proposal/801E0ADC_fn_801E0ADC.cpp`; both section gaps are exactly the space between the registered
+ * 8-byte records), extabindex 0x8002C4A8..0x8002C778 (60 x 12 B).  Registered; both section gaps are exactly the space between the registered
  * `enemy/fn_801D80EC.cpp` and `lobby/fn_801E7530.cpp` claims, which is why the whole capped run is one
  * registration (the seam is unproven, see below).
  *

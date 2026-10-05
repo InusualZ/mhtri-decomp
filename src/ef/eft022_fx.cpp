@@ -1,7 +1,6 @@
 /* ef/eft022_fx.cpp - effect 022 fx band
  *
  * `.text` 0x801153D0..0x8011722C, 37 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): recut registered unit, built from `ef/fn_80114E34.cpp`.
  * Each function keeps the `#pragma` state it had in its retired source.
  */
 

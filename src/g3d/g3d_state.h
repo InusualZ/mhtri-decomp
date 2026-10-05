@@ -41,7 +41,7 @@ u8* fn_80089844(void* pSelf, u32 index);
 }
 #endif
 
-/* Declarations moved here from `include/unsplit/g3d.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+/* Declarations moved here from `unsplit/g3d.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 #ifdef __cplusplus
 extern "C" {
 #endif

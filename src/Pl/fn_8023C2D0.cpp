@@ -60,7 +60,7 @@
  * claims.
  * Resolved: `tools/elf/objalign.py` (landed e242dfecf) lowers a section's `sh_addralign` to what its
  * claim address allows, is chained into every MWCC rule and is a no-op elsewhere; with it this unit
- * links in place and the flip to `Matching` is green (c1ed8e946).  See docs/matching.md section 55.
+ * links in place and the flip to `Matching` is green (c1ed8e946).  See playbook 55.
  */
 
 #include "types.h"

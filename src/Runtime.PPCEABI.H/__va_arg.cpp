@@ -1,5 +1,5 @@
 /*
- * Runtime.PPCEABI.H/__va_arg.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * Runtime.PPCEABI.H/__va_arg.cpp - STUB (no bodies yet).
  *
  * `.text` 0x804565DC..0x804566A4.  Sections of the candidate unit: .text 0x804565DC..0x804566A4.
  *

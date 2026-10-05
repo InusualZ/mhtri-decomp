@@ -87,7 +87,7 @@ u8 get_now_areano(void);
 nw4r::math::VEC3 get_worldworld_pos(nw4r::math::VEC3* pos, u8 area);
 #endif
 
-/* Declarations moved here from `include/unsplit/stage.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+/* Declarations moved here from `unsplit/stage.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 #ifdef __cplusplus
 extern "C" {
 #endif

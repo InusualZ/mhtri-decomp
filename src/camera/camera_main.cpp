@@ -1,7 +1,7 @@
 /*
- * camera/camera_main.cpp - phase 4 unit, `.text` 0x802B5640..0x802BF278 (157 functions, 39992 bytes).
+ * camera/camera_main.cpp - unit, `.text` 0x802B5640..0x802BF278 (157 functions, 39992 bytes).
  *
- * PHASE 4 (docs/splits/phase4, window d).  Fold of 3 registered units: fn_802B2AA0.cpp, fn_802B5C58.cpp, light.cpp.
+ * Fold of 3 registered units: fn_802B2AA0.cpp, fn_802B5C58.cpp, light.cpp.
  * The functions below are the ones those sources define, in address order; every other function of the range keeps its
  * original bytes.  78 of 157 functions have a body here.
  *
@@ -15,7 +15,7 @@
  * view the 0x4F8-byte camera area through `StageAreaObj` (stage/fn_802B2AA0.h) where the camera functions view it as
  * `CamWork`.
  *
- * The light record types the head of the light module needs moved to `include/light/light_work.h` (shared with
+ * The light record types the head of the light module needs moved to `light/light_work.h` (shared with
  * `light/light.cpp`).
  *
  * Sections: the unit's block in config/RMHE08/splits.txt (.bss, .ctors, .data, .sdata, .sdata2, .text, extab,
@@ -27,7 +27,7 @@
  * the two 0x4F8-byte per-area objects and the area colour/effect drivers that read them.
  *
  * `.text` 0x802B2AA0-0x802B5C58 (39 functions, 12728 B), the run right after `stage/fn_802B2978.c`.
- * Registered once, at its final home (docs/plan.md 12), from `proposal/802B2AA0_fn_802B2AA0.cpp`.
+ * Registered once, at its final home (docs/plan.md 12).
  *
  * Name.  Module `stage`: the left neighbour is `stage/fn_802B2978.c`, the lib this file sits in is
  * `stage`, and the range's own entry points are the stage-work block (`stage_w`, .bss 0x806B87C0,
@@ -47,7 +47,7 @@
  * the retail object carries extab/extabindex, which a no-exceptions C unit could not.
  *
  * The band's types, its own entry points and the callee declarations live in
- * `include/stage/fn_802B2AA0.h` (docs/plan.md 6.5 rules 1-5); this file is the bodies.
+ * `stage/fn_802B2AA0.h` (docs/plan.md 6.5 rules 1-5); this file is the bodies.
  *
  * Sections: .text 0x802B2AA0-0x802B5C58; extab 0x80013D34-0x80013E3C (33 8-byte records - the
  * extabindex table has one entry per function that contains a `bl`); extabindex
@@ -61,7 +61,7 @@
  * pooled constant is `extern`-declared and never defined (playbook 29).
  *
  * `.sbss` 0x80794B60-0x80794B68 is claimed for `shell_set_func_ptr` (the shell-set job table pointer, typed
- * in `include/stage/shell_set_func_ptr.h`; 111 functions in 38 units read it, nothing in the DOL stores it, an
+ * in `stage/shell_set_func_ptr.h`; 111 functions in 38 units read it, nothing in the DOL stores it, an
  * RSO does).  Definer: LOW confidence (about one in three) - `.sbss` follows the text order of the defining
  * TUs, which brackets the word between Pl/fn_8028F66C|fn_80295EF4 (0x80794B58, a `u8`) and light/light.cpp
  * (0x80794B68), i.e. any of menu_item, menu_message, stage/shell, Pl/pl_yure, stage/stg_w, this unit or
@@ -130,8 +130,7 @@
 /*
  * camera/fn_802B5C58.cpp - the game camera work block and its controller.
  *
- * `.text` 0x802B5C58-0x802BEAAC (132 functions, 36436 B).  Registered from
- * `proposal/802B5C58_fn_802B5C58.cpp`.
+ * `.text` 0x802B5C58-0x802BEAAC (132 functions, 36436 B).
  *
  * Module `camera` (brief section 2 class 3: what the code does, plus the neighbours' scheme).  The
  * range owns four real map names, all camera entry points - `get_current_view_mtx` (0x802BDC40),
@@ -146,8 +145,8 @@
  * 0x4F8 `CamWork` slots - that is where `CamWork`'s size comes from.  This unit's functions take that
  * pointer as `self`, or call the accessor for it through this unit's own name for the record
  * (`(CamWork*)fn_802BECD0()`: the owner views the same 0x4F8 bytes as `LightWork` and declares only
- * that spelling - `include/light/light.h`; folding the two views into one definition is the rule-1
- * pass `include/unsplit/camera.h` records), and touch fields up to `+0x4F7`.
+ * that spelling - `light/light.h`; folding the two views into one definition is the rule-1
+ * pass `unsplit/camera.h` records), and touch fields up to `+0x4F7`.
  *
  * The seam at 0x802B5C58 is pinned by a `.sdata2` pool jump (`lbl_8079A514` -> `lbl_8079A530`);
  * `tudiscover` reports `MATCH SET 0x802B5C58..0x802BEAAC` (132 functions, 5 must-link anchors).  The
@@ -178,8 +177,8 @@
  *
  * Shared-file cost.  Three declarations this unit needs are not in their owner's headers yet, so they
  * were added there in this branch (each an addition to an existing `extern "C"` block):
- * `include/mh3_pad.h` (`word_copy_return_dst`, owner `src/mh3_pad.cpp`), `include/fn_80047398.h`
- * (`fn_80047398`, owner `src/fn_80047398.cpp`) and `include/g3d/g3d_camera.h` (`fn_800749C8`, owner
+ * `mh3_pad.h` (`word_copy_return_dst`, owner `src/mh3_pad.cpp`), `fn_80047398.h`
+ * (`fn_80047398`, owner `src/fn_80047398.cpp`) and `g3d/g3d_camera.h` (`fn_800749C8`, owner
  * `src/g3d/g3d_camera.cpp`).
  */
 /* ---- header inherited from src/light/light.cpp (written against its pre-phase-4 range) ---- */
@@ -187,8 +186,7 @@
  * light/light.cpp - the map light work: its record, its constructors, its per-frame channels and its
  * accessors.
  *
- * `.text` 0x802BEAAC-0x802C474C (103 functions, 23712 B).  Registered from
- * `proposal/802BEAAC_fn_802BEAAC.cpp`.
+ * `.text` 0x802BEAAC-0x802C474C (103 functions, 23712 B).
  *
  * Module `light` and file name `light.cpp` come from evidence class 2 (brief section 2): the range's
  * own symbols the retail symbol table knows are `light_init__Fv` (0x802BF284), `light_move__Fv`
@@ -294,7 +292,7 @@ typedef struct CamWorkSrc {
  * the accessor's `base + 1272`.  Only the fields this unit touches are named; untouched runs keep
  * their offset as padding.
  *
- * `fn_802BECD0` is declared by its owner (`include/light/light.h`) over the same bytes, under that
+ * `fn_802BECD0` is declared by its owner (`light/light.h`) over the same bytes, under that
  * unit's own view name `LightWork`; this unit's name for the record is `CamWork`, so every read of
  * the accessor goes through a cast to it - a type adaptation, no instruction (rule 1's two-views
  * residual, not a rename of either view).
@@ -470,7 +468,7 @@ void fn_802BBEE0(void);
 }
 
 /* Owner headers (rule 2): every symbol a registered unit defines is declared in that unit's header,
- * never here.  `include/unsplit/unknown.h` carries the module-ambiguous ones. */
+ * never here.  `unsplit/unknown.h` carries the module-ambiguous ones. */
 #include "ef/fn_800CDB2C.h"
 #include "fn_8004CAD8.h"
 #include "g3d/fn_80063888.h"
@@ -497,7 +495,7 @@ void fn_802BBEE0(void);
 
 /* The pooled string and the entry points whose address owns no registered unit, so no header exists
  * for them: the map already names the data (playbook 29), and these are the module-ambiguous band
- * (`include/unsplit/unknown.h` carries `get_now_mapno`, the other declarations here are band gaps the
+ * (`unsplit/unknown.h` carries `get_now_mapno`, the other declarations here are band gaps the
  * lint counts rather than guesses). */
 extern "C" const char lbl_805D1EB8[];
 extern "C" int sprintf(char* buffer, const char* format, ...);

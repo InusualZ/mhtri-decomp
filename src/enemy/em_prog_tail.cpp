@@ -1,8 +1,7 @@
 /*
- * enemy/em_prog_tail.cpp - phase 4 unit, `.text` 0x80385EE0..0x803868DC (14 functions, 2556 bytes).
+ * enemy/em_prog_tail.cpp - unit, `.text` 0x80385EE0..0x803868DC (14 functions, 2556 bytes).
  *
- * PHASE 4 (docs/splits/phase4, window d).  Recut of fn_80382310.cpp: its functions whose address lies in this range,
- * in address order; the rest of the range keeps its original bytes.  11 of 14 functions have a body here.
+ * 11 of 14 functions have a body here.
  *
  * FLAGS.  `cflags_main`.  GUESS (rule 7): the stem names the program tail of the note-pane band; its helpers are
  * declared by `enemy/em_prog_support.h`.

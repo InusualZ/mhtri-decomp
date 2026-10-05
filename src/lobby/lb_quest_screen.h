@@ -15,7 +15,7 @@
 #include "types.h"
 
 /* The record `note_pane_get_motion` takes, forward-declared so that this header stays a leaf: it is
- * included from `include/unsplit/menu.h`, which the whole menu band takes. */
+ * included from `unsplit/menu.h`, which the whole menu band takes. */
 struct NoteWork;
 struct QuestWork;
 struct Q_MoveWork;
@@ -32,7 +32,7 @@ void note_pane_get_motion(struct NoteWork* self);
  * enemy id and a fixed 0 (GUESS: the role; the signature is the call site's). */
 void quest_enemy_spawn_req(u8 a, u16 id, u16 b, s32 c, u8 d);
 
-/* The range's quest-work accessors, moved here from `include/unsplit/menu.h` when this unit
+/* The range's quest-work accessors, moved here from `unsplit/menu.h` when this unit
  * registered over their addresses (docs/plan.md 6.5 rule 2).  Their bodies are still unwritten, so
  * they keep the map's stems; renaming them is the batch that writes them (rule 7's unblock is the
  * name, and nine consumer sites across `enemy/fn_8012BDF4.cpp`, `enemy/fn_80176C58.cpp`,
@@ -86,7 +86,7 @@ u32 quest_element_pick_ck(struct QuestWork* work, u8 index, s32 use_alt);
 }
 #endif
 
-/* Declarations moved here from `include/unsplit/lobby.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+/* Declarations moved here from `unsplit/lobby.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 #ifdef __cplusplus
 extern "C" {
 #endif

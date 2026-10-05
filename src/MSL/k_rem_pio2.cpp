@@ -1,5 +1,5 @@
 /*
- * MSL/k_rem_pio2.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * MSL/k_rem_pio2.cpp - STUB (no bodies yet).
  *
  * `.text` 0x80465BA8..0x80467260.  Sections of the candidate unit: .text 0x80465BA8..0x80467260; .rodata 0x80573358..0x805733A8; .sdata2 0x8079CDF8..0x8079CE38.
  *

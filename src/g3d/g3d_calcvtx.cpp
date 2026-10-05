@@ -21,7 +21,7 @@
  *     and all 12 measure 100 %.  `fn_800731EC` needs a scoped `#pragma peephole off` (playbook 32).
  *   - the 0x80073398-0x800736F8 tail below is the earlier cut's work.
  *
- * Re-cut from `auto/80073398_fn_80073398.cpp` (docs/plan.md 12 item 5, bulk attribution spanning three
+ * Re-cut (docs/plan.md 12 item 5, bulk attribution spanning three
  * original TUs).  The retail `.extabindex` run 0x80020634-0x8002073C (11 EH functions) ends with
  * `fn_800736A4`.  The seam at 0x800736F8 puts the `g3d_resvtx_ac.h` scale setter `fn_800736F8` and the
  * flag helpers `fn_800737AC`..`fn_800737C4` in `g3d/g3d_calcworld.cpp`; the extabindex table pins the
@@ -63,7 +63,7 @@ void Panic(const char* pFile, int line, const char* pFmt, ...);
 
 extern "C" void DCStoreRange(void* pBase, u32 size);
 /* fn_800696E4/fn_80069748/fn_80069754/fn_800695D4/fn_800695DC/fn_80069768/fn_800696C0/fn_8006946C come
- * from include/g3d/fn_800680CC.h (owned by `g3d/fn_800680CC.cpp`, rule 2).
+ * from g3d/fn_800680CC.h (owned by `g3d/fn_800680CC.cpp`, rule 2).
  * fn_800731EC/fn_800732F0/fn_80073354 used to come from unsplit/g3d.h too; this registration now
  * defines them, so their declarations moved to this unit's forward-declaration block (rule 2). */
 

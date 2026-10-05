@@ -1,7 +1,6 @@
 /* enemy/em_motion_update.cpp - an enemy's per-frame motion/action driver
  *
  * `.text` 0x8013791C..0x80138074, 7 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): recut registered unit, built from `enemy/fn_80137604.cpp`.
  * Name is a GUESS: the range is the `fn_8013791C` driver (an outer phase switch around an inner action switch) with its init, action callbacks and angle helpers.
  * Each function keeps the `#pragma` state it had in its retired source.
  */
@@ -44,7 +43,7 @@
  * ------------------------------------------------------------------------------------------------ */
 
 /* `get_enemy_data__FP11_ENEMY_WORK` (owner `enemy/fn_801251D0.cpp`).  Only the record's leading flag
- * word is read here, and `EnemyData`'s definition lives in `include/enemy.h`, which cannot be included
+ * word is read here, and `EnemyData`'s definition lives in `enemy.h`, which cannot be included
  * beside `enemy/ENEMY_WORK.h` - both define `_ENEMY_WORK` - so the word is read at the offset the
  * target loads (`lwz r0,0(r3)`). */
 struct EnemyData;

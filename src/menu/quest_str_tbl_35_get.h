@@ -1,7 +1,7 @@
 /*
  * Leaf header (docs/plan.md 6.5 rule 2): `quest_str_tbl_35_get` (0x803B33B0), defined by
  * `src/quest/quest_entry.cpp`.  `quest/quest_entry.h` includes this one, so there is one declaration; it is
- * separate so `lobby/lb_companion_ui.cpp` can call the string getter without taking `include/unsplit/menu.h`,
+ * separate so `lobby/lb_companion_ui.cpp` can call the string getter without taking `unsplit/menu.h`,
  * whose `Screen_w` view clashes with the lobby band's.
  */
 #ifndef MHTRI_MENU_QUEST_STR_TBL_35_GET_H

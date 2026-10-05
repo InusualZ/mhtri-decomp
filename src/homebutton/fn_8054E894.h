@@ -11,10 +11,10 @@
  * (`.data` 0x8064E780 and its group), so it is a struct of typed slots here and never a definition we
  * emit (rule 10).
  *
- * The callees whose owners are registered are declared in the *owner's* header (`include/homebutton/<unit>.h`) and
+ * The callees whose owners are registered are declared in the *owner's* header (`homebutton/<unit>.h`) and
  * included from the source.  A callee whose band holds no registered unit (the
  * 0x805124F4-0x8054E894 and 0x805425B4-0x8054F550 bands - the address band interleaves the `DWCi` and
- * `homebutton` modules, so there is no sound `include/unsplit/<module>.h`) is declared here with the
+ * `homebutton` modules, so there is no sound `unsplit/<module>.h`) is declared here with the
  * signature its call site shows.
  */
 #ifndef MHTRI_HOMEBUTTON_FN_8054E894_H

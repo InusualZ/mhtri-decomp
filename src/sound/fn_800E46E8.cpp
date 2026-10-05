@@ -1,12 +1,11 @@
 /* sound/fn_800E46E8.cpp - the reverb manager and stream-state band of the sound runtime
  *
  * `.text` 0x800E46E8..0x800E5430, 65 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): recut registered unit; the functions of the neighbouring units were cut out of this file.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  */
 
 /* Retired header of `sound/fn_800E46E8.cpp` (kept for its notes and residuals): */
-/* auto/800E46E8_fn_800E46E8.cpp - the sound/stream runtime: `fn_800E46E8`, `.text` 0x800E46E8-0x800E8E60.
+/* sound/fn_800E46E8.cpp - the sound/stream runtime: `fn_800E46E8`, `.text` 0x800E46E8-0x800E8E60.
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * 196 functions in one C++ TU.  Two globals carry the state:
@@ -52,7 +51,7 @@
  *     range (0x80597D88), so our object emits its own local `@NN` table; the score is unaffected
  *     (reloc-only) and the claim belongs to the measured data pass.
  *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/800E46E8_fn_800E46E8.cpp`.
+ * Inventory, addresses and sizes: `python tools/units/ledger.py unit sound/fn_800E46E8.cpp`.
  * The name is provisional (`auto/` plus the first symbol's address) because nothing in the object names
  * the original source file.
  */

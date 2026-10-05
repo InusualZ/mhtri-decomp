@@ -7,7 +7,7 @@
  *
  * Evidence for the names: the runtime dump (`.pi/tmp/dumpsyms/Dump_Loading85.raw.map`) names AXFXReverbHiInit /
  * AXFXReverbHiShutdown / AXFXReverbHiCallback; the other functions keep the map's `fn_` stems.  The AXFXReverbHi
- * layout is in include/AX/AXFXReverbHi.h, the callees' declarations are in the headers of the units that own them.
+ * layout is in AX/AXFXReverbHi.h, the callees' declarations are in the headers of the units that own them.
  *
  * Residuals: the callees `AXFXReverbHiExpCallback` and `fn_80475B00` (AXFXReverbHiExp.c) are structural reconstructions, not
  * byte-faithful; `-O4,p`'s 16-byte function alignment is restored below.  Last measured 2026-09: see the objdiff report.

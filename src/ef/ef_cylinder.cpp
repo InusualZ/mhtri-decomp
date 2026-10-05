@@ -1,11 +1,11 @@
-/* auto/800CB948_fn_800CB948.c - the retail `ef_cylinder.cpp` unit, 0x800CB948..0x800CC5B0.
+/* ef/ef_cylinder.cpp - the retail `ef_cylinder.cpp` unit, 0x800CB948..0x800CC5B0.
  *
  * Two functions: fn_800CB948 emits one particle per iteration of a count loop, fn_800CBFB0 is the entry
  * point that guards its three pointers, derives the emission parameters and drives the loop.  Both are
  * `em`/`pm`/`params` guarded by the shared `CHECK_PTR` macro, whose `__LINE__` retail stamped into the
  * Panic calls (49-51 and 140-142).
  *
- * Measured with `python tools/units/recompile.py auto/800CB948_fn_800CB948.c --measure <symbol>`:
+ * Measured with `python tools/units/recompile.py ef/ef_cylinder.cpp --measure <symbol>`:
  *   fn_800CB948 97.29 % (target .text 0x668, ours 0x664)   fn_800CBFB0 96.09 % (0x600 / 0x600)
  * The instruction mix, the frames (384 / 224), every stack slot and the `extab`/`extabindex` fragments
  * are the target's.  What is left:
@@ -27,7 +27,7 @@
  *
  * The unit's `.data` (0x80594D20..0x80594DCD) and `.sdata2` (0x80796270..0x807962B0) runs are **not**
  * claimed in `splits.txt` yet, so the four strings are declared `extern` and never defined
- * (docs/matching.md 29).  Our object still emits `.sdata2` (0x40 B) - the float constants have to stay
+ * (playbook 29).  Our object still emits `.sdata2` (0x40 B) - the float constants have to stay
  * literals for the compiler to hoist them into registers - and that pool is the retail run byte for byte
  * except that the 2^52 `(f32)(u16)` conversion constant is pooled last instead of beside the 2^52+2^31
  * one (retail's lbl_80796288/lbl_80796290 are adjacent).  Retail's `.data` is the same 0xAD bytes the
@@ -48,7 +48,7 @@
 #include "fn_8004CAD8.h"       /* sqrt_f32 - that unit owns the address and publishes it (rule 2) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
 
-/* The 3-float vector `include/nw4r/math.h` owns, spelled `VEC3` here: this unit's whole vector
+/* The 3-float vector `nw4r/math.h` owns, spelled `VEC3` here: this unit's whole vector
  * API (`fn_8009C484`, `assignVec3`, the spawn slot) works on it. */
 typedef nw4r::math::VEC3 VEC3; /* size: 0x0C */
 

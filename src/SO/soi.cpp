@@ -1,5 +1,5 @@
 /*
- * SO/soi.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * SO/soi.cpp - STUB (no bodies yet).
  *
  * `.text` 0x8051E864..0x8052A040.  Sections of the candidate unit: .text 0x8051E864..0x8052A040; .rodata 0x80574E10..0x80579450; .data 0x80631230..0x806498C8; .bss 0x80766C40..0x807901C0; .sdata 0x80794448..0x807944B0; .sbss 0x807958D8..0x80795A18; .sdata2 0x8079D528..0x8079D550.
  *

@@ -14,7 +14,7 @@
  * constructor and `init` the strings); the old unit's `.rodata`/`.sdata2` are read by the opening steps and stayed.
  *
  * NAMES.  The class and every method name are GUESSES from the bodies and strings
- * (include/Network/sNetworkLibrary.h).  `networkLog_destroyContext` (really the release half of
+ * (Network/sNetworkLibrary.h).  `networkLog_destroyContext` (really the release half of
  * `acquireResolver`) and `networkSocketPool_acquire`/`_release` (really members over the socket table) keep
  * the C names and parameter types their callers in other lanes use; integrator requests are filed.
  *

@@ -44,7 +44,7 @@
  *   `sendReqFriendList` 281, `sendReqBlackAdd` 283, `sendReqBlackDelete` 285, `sendReqBlackList` 287.  So `blockPlayer`/
  *   `unblockPlayer` (BlackAdd/BlackDelete) replace the consumer's `sendFriendRequest`/`acceptFriendRequest`; the
  *   starters `inviteFriend` (it sends FriendAccept) and `sendFriendMessage` (FriendAdd with a text) keep the consumer's
- *   names for now.  `NetworkFriendInfo` is `menu/movie.cpp`'s (include/menu/movie.h), `strtok` MSL's.
+ *   names for now.  `NetworkFriendInfo` is `menu/movie.cpp`'s (menu/movie.h), `strtok` MSL's.
  *   `setFriendTransferModeById` (NetworkLayerPat, `u8 mode`): retail passes `isFriend`/`isAcceptedPeer`'s result
  *   unnarrowed while the u8 parameter makes this caller emit a `clrlwi` - `handleUnblockPlayer` 100.00 -> 99.75 and
  *   `onPatEvent` 99.93 -> 99.81 against the old extern "C" `s32` spelling; a `u32` parameter restores both but lowers the

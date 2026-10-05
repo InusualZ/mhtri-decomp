@@ -1,5 +1,5 @@
 /*
- * include/Network/NetworkUniqueId.h - the class `src/Network/NetworkUniqueId.cpp` defines (`.text` 0x803F84B8..0x803F89CC):
+ * Network/NetworkUniqueId.h - the class `src/Network/NetworkUniqueId.cpp` defines (`.text` 0x803F84B8..0x803F89CC):
  * the network unique id, a stream sink bound to its own 14-byte address record.
  */
 #ifndef MHTRI_NETWORK_NETWORKUNIQUEID_H

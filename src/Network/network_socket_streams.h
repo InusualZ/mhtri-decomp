@@ -1,5 +1,5 @@
 /*
- * include/Network/network_socket_streams.h - the classes `Network/network_socket_streams.cpp` defines the members of
+ * Network/network_socket_streams.h - the classes `Network/network_socket_streams.cpp` defines the members of
  * (`NetworkSingleTcp`, `NetworkMultipleUdp`, `NetworkByteStream`), declared in `Network/network_transport_types.h`
  * because more than one unit of the band uses them (rule 1); the unit has no free function left.
  */

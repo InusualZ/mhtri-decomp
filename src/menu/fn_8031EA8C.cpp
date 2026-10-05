@@ -3,7 +3,7 @@
  *
  * WHAT IT IS.  The band is the continuation of the item/equipment selection screen
  * (`menu/fn_8031A6C0.cpp`): its head (0x8031EA8C..0x8031FBE8) is the two per-state updater families
- * that drive the selected entry's 3D effect instance (`_EFT`, `include/ef.h`), each four-state
+ * that drive the selected entry's 3D effect instance (`_EFT`, `ef.h`), each four-state
  * machine dispatched from `state_0x05` with its own `+0x38` work record; its tail (0x803203A0..) is
  * the surrounding screen's label/icon draw passes and the keyboard-driven name/message edit screen
  * (two editable names, a 4-character one at +0x43 and a 0x90-character one at +0x48, edited through
@@ -21,7 +21,7 @@
  * LANGUAGE.  C++: the band's own effect callees (`res_eft_model_create`, `setVector3`, `rotVecZXY`,
  * `ran_suu`, ...) are mangled free functions, so the plain `fn_XXXXXXXX` definitions are `extern "C"`
  * and the mangled ones are called through their real signatures (rule 9).  `_EFT`/`MHchar` come from
- * the owner headers `include/ef.h`/`include/pl.h`.
+ * the owner headers `ef.h`/`pl.h`.
  *
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked every `.text` row of
  * config/RMHE08/symbols.txt from 0x8031EA8C to 0x80324F7C - 67 functions, all `fn_` stems but the one

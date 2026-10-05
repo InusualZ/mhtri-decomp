@@ -2,7 +2,7 @@
  * nw4r g3d: g3d_resanmcamera.cpp - the camera-animation channel evaluator, `.text`
  * 0x8008A220-0x8008A664 (4 functions).
  *
- * Re-cut from `auto/800898B0_fn_800898B0.c` (docs/plan.md 12 item 5).  `fn_8008A28C` panics with
+ * Re-cut (docs/plan.md 12 item 5).  `fn_8008A28C` panics with
  * `__FILE__` = `g3d_resanmcamera.cpp` (lines 46/99/121) and the retail data fragment is
  * 0x8058FF20-0x80590010, so the range is `g3d_resanmcamera.cpp`.  The earlier partial cut
  * (`g3d_resanmcamera.c`, 0x8008A220-0x8008A28C) is the SAME TU: `fn_8008A220`'s own strings

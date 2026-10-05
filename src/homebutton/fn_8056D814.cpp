@@ -1,5 +1,5 @@
 /*
- * homebutton/fn_8056D814.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * homebutton/fn_8056D814.cpp - STUB (no bodies yet).
  *
  * `.text` 0x8056D814..0x8056F2B4.  Sections of the candidate unit: .text 0x8056D814..0x8056F2B4; .rodata 0x8057C760..0x8057C808; .data 0x80658458..0x806584E4; .bss 0x80790DF8..0x80790E04; .sdata 0x80794750..0x80794754; .sdata2 0x8079D7B0..0x8079D7C8.
  *

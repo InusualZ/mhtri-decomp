@@ -1,7 +1,6 @@
 /* sound/snd_stream_reloc.cpp - the per-stream relocation-table state installers and stream flag words
  *
  * `.text` 0x800E7D34..0x800E8E48, 55 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): recut registered unit, built from `sound/fn_800E46E8.cpp`.
  * Name is a GUESS: the range holds `fn_800E7E94`..`fn_800E7FBC` (the per-offset installers of the stream records' relocation-table states) and the `.sbss` stream flag words.
  * Each function keeps the `#pragma` state it had in its retired source.
  */

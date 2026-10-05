@@ -2,7 +2,7 @@
  * Pl/pl_hit_sphere.cpp - the player actor's box and sphere hit helpers (`hit_point_sphr` and the box tests before it).
  *
  * `.text` 0x8028F44C..0x8028F66C (4 functions), `.sdata2` 4 B, extab 0x18 B and extabindex 0x24 B.  Phase 4 recut of
- * `Pl/fn_80288CEC` (docs/splits/phase4): see `Pl/pl_motion.cpp` for the two-way split.
+ * `Pl/fn_80288CEC`: see `Pl/pl_motion.cpp` for the two-way split.
  *
  * Name: GUESS, from `hit_point_sphr`, the one named function of the range.
  * Flags: `cflags_pl` as the former unit.
@@ -80,7 +80,7 @@
  * fn_8028D778, fn_8028DDCC, fn_8028DF58, fn_8028E0B8, fn_8028E24C, fn_8028E3EC, fn_8028E528,
  * fn_8028E694, fn_8028E718, fn_8028EA84, fn_8028EC28, fn_8028EF7C's tail-call partner
  * `pl_motion_set` (needs the local string-object shape) and the remaining box builders
- * fn_8028F4B4/`558`'s exact float forms.  They are the next pass's work rather than guesses.
+ * fn_8028F4B4/`558`'s exact float forms.
  * fn_8028F44C is byte-identical (100.0 %, 104 B): its target allocation is the typed-parameter
  * spelling (`PlBox* a`/`b`, `&b->vec_0x0C`), which spells the three field reaches through the
  * `PlBox` members and lets MWCC emit them as immediate offsets; the earlier `void*`-plus-cast
@@ -89,7 +89,7 @@
  * Two rule-1 follow-ups are named, not fixed: `_PL_ROOT` here and `_PLAYER_ROOT` in
  * `src/enemy/fn_8012BDF4.cpp` are the same record (the second user should move one definition into a
  * header), and `Pl_frame_check` has no registered owner, so its declaration belongs in
- * `include/unsplit/Pl.h` (not edited here to keep this batch to its own files).
+ * `unsplit/Pl.h` (not edited here to keep this batch to its own files).
  */
 
 #include "types.h"
@@ -125,7 +125,7 @@
 /* ef/fn_800CDB2C.cpp owns the pool accessors (`PlayMode_ck` is declared in that unit's header). */
 
 
-/* Pl/pl_act.cpp owns `Pl_zanzo_set`; Pl/pl_master.cpp owns `Pl_act_ck` (`include/Pl/Pl_master_ck.h`). */
+/* Pl/pl_act.cpp owns `Pl_zanzo_set`; Pl/pl_master.cpp owns `Pl_act_ck` (`Pl/Pl_master_ck.h`). */
 
 
 /* No registered unit covers these addresses; declared with the view this unit's call sites take. */
@@ -152,7 +152,7 @@ f32 subVec3(void* dst, void* a, void* b);
 }
 
 /* The two small-data seeds `fn_8028F400` fills, and the 256-byte-stride table `fn_8028F1E8` indexes.
- * `setVec3` itself is declared by `include/ef.h` (pulled in by `pl.h`) as `(Vec*, f32, f32,
+ * `setVec3` itself is declared by `ef.h` (pulled in by `pl.h`) as `(Vec*, f32, f32,
  * f32)`; re-declaring it here with `void*` is an illegal overload, so the call site casts. */
 /* Two 0xC-byte records, still referenced by their own `lbl_` names (a `VEC3[]` view would fold
  * `lbl_806AB83C` into `lbl_806AB830 + 0xC` and lose the second relocation, measured 100 -> 77.84

@@ -3,7 +3,7 @@
  * (`.text` 0x803AB3BC..0x803B0F98).  The band's head is `quest/quest_item_slot.h`'s, the records are
  * `quest/quest_types.h`'s.  The foreign functions the unit calls are declared here too because the band
  * they live in has no registered owner yet (the map resolves them to unsplit addresses, and the units
- * bracketing them name different modules, so no `include/unsplit/<module>.h` is sound).  A later pass that
+ * bracketing them name different modules, so no `unsplit/<module>.h` is sound).  A later pass that
  * registers those bands moves each declaration to its owner's header.
  *
  * The arena result accessors (`menu/arena_result.cpp`, folded in at phase 4) are declared here too.
@@ -163,7 +163,7 @@ s32 quest_lot_pick_last(u8* chance, const Q_LotEntry* table, Q_ItemPair* out, s3
 /* The quest/arena result record accessors and the result screen's text getters (0x803B0F98..0x803B465C,
  * absorbed from `menu/arena_result.cpp`): `quest_record_get` hands back the record the quest work block's
  * `record_0x03C` points at and `quest_record_find` looks a record up by quest id.  The record type stays in the
- * band header `include/unsplit/menu.h`. */
+ * band header `unsplit/menu.h`. */
 
 /* The current result row, or NULL when the screen has none. */
 QuestRecord* quest_record_get(void);

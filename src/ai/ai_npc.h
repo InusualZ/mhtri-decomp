@@ -11,10 +11,10 @@
  * The record embeds the actor's `MHchar` model at +0x008: `move__6MHcharFUs`,
  * `get_joint_wpos__6MHcharFUlPQ34nw4r4math4VEC3` and `setVisibility__6MHcharFUlb` are all reached
  * with `self + 8`, and the motion number `ai_get_motion_no` returns is `MHchar::+0x50`.  `MHchar`
- * and `_PLW` come from `include/pl.h`, their owner.
+ * and `_PLW` come from `pl.h`, their owner.
  *
- * `_HIT_W` is this band's view of the attack record - `include/menu/menu_item.h` and
- * `include/menu/hit_attack_list_push.h` carry their own views of the same type (both record it as rule-1
+ * `_HIT_W` is this band's view of the attack record - `menu/menu_item.h` and
+ * `menu/hit_attack_list_push.h` carry their own views of the same type (both record it as rule-1
  * debt), and none of the three names the offsets this band reads (+0x08, +0x18..+0x1E, +0x31,
  * +0x32, +0x40..+0x4E).  Folding the views into one union-aware definition is the rule-1
  * follow-up this header records for the unit.
@@ -23,7 +23,7 @@
  * offsets no reconstructed function touches stay padding so the numbers stay exact.  `_AINPC_W`'s
  * size is a lower bound: the highest offset the band touches is +0x498.
  *
- * RULE-1 DEBT, filed for the next `ai` worker: `include/ai/ainpc.h` is the *other* home of this same
+ * RULE-1 DEBT, filed for the next `ai` worker: `ai/ainpc.h` is the *other* home of this same
  * record - the view `src/ai/fn_802CC794.cpp` and src/ai/fn_802C474C.cpp share (same size, 0x49C, and
  * the same offsets for every field both name).  This header is the 0x802D0F34 band's view: it embeds
  * the actor model as `MHchar` (which is what makes `self + 8` and `MHchar::get_joint_wpos` type out)

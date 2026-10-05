@@ -1,5 +1,5 @@
 /*
- * MSL/s_sin.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * MSL/s_sin.cpp - STUB (no bodies yet).
  *
  * `.text` 0x80467E20..0x80467EEC.  Sections of the candidate unit: .text 0x80467E20..0x80467EEC; .sdata2 0x8079CF28..0x8079CF30.
  *

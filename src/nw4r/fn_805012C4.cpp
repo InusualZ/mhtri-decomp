@@ -1,5 +1,5 @@
 /*
- * nw4r/fn_805012C4.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * nw4r/fn_805012C4.cpp - STUB (no bodies yet).
  *
  * `.text` 0x805012C4..0x80502828.  Sections of the candidate unit: .text 0x805012C4..0x80502828; .ctors 0x8056F3D8..0x8056F3DC; .data 0x8062FAC8..0x8062FAF0; .bss 0x80760C78..0x80760C98; .sdata2 0x8079D4C8..0x8079D4F0.
  *

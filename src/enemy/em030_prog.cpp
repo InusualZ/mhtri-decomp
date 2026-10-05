@@ -1,7 +1,6 @@
 /* enemy/em030_prog.cpp - enemy 030 program
  *
  * `.text` 0x801B0010..0x801B4348, 48 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): recut registered unit, built from `enemy/fn_801B0010.cpp`.
  * Renamed from `fn_801B0010`: the unit's `.data` holds `em030_prog_tbl` (0x805B0FD0).
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  */
@@ -10,8 +9,7 @@
 /* enemy/fn_801B0010.cpp - the em030 (enemy #30) program translation unit.
  *
  * `.text` 0x801B0010..0x801B4458 (60 functions, 17480 B), extab 0x8000F54C..0x8000F6B4 (45 records),
- * extabindex 0x8002AEDC..0x8002B0F8 (45 x 12 B).  Registered once, at its final home, from
- * `proposal/801B0010_fn_801B0010.cpp`.
+ * extabindex 0x8002AEDC..0x8002B0F8 (45 x 12 B).  Registered once, at its final home.
  *
  * MODULE AND NAME (brief section 2, evidence order).
  *   * Option 1 (a `__FILE__` string) fails: no `.string` in the image names this TU.  The only
@@ -59,13 +57,13 @@
  * 95.64 and `fn_801B03E8` 91.35 -> 93.65: the branch had declared `Pl/pl_skill.h`'s `Pl_item_timer_get`/
  * `pl_item_add` at C++ scope, while their owner defines them `extern "C"`, so their call sites were
  * emitting a mangled reloc the target does not have).  Everything else that changed here:
- *   * `pl_model_state_set` moved from `include/unsplit/Pl.h` (a fallback band, and a `rule 2` finding once
- *     its owner existed) to the owner's header `include/Pl/fn_80262940.h`; `fn_801E01BC` likewise to
- *     `include/enemy/em007_act.h`, and this unit's own three band symbols to
- *     `include/enemy/fn_801B0010.h` (`fn_801B0010` was parked in `unsplit/enemy.h` with the note
- *     "owned by the still-unregistered proposal/801B0010 range"; `fn_801B4348`/`fn_801B4398` were
+ *   * `pl_model_state_set` moved from `unsplit/Pl.h` (a fallback band, and a `rule 2` finding once
+ *     its owner existed) to the owner's header `Pl/fn_80262940.h`; `fn_801E01BC` likewise to
+ *     `enemy/em007_act.h`, and this unit's own three band symbols to
+ *     `enemy/fn_801B0010.h` (`fn_801B0010` was parked in `unsplit/enemy.h` with the note
+ *     "owned by the still-unregistered enemy/em030_prog.cpp range"; `fn_801B4348`/`fn_801B4398` were
  *     declared in `enemy/fn_801B4458.cpp`).
- *   * `EmGroundRec` is now one definition, in `include/enemy/ENEMY_WORK.h`: this unit's own copy was
+ *   * `EmGroundRec` is now one definition, in `enemy/ENEMY_WORK.h`: this unit's own copy was
  *     0x18 bytes where the landed view (`enemy/fn_801B4458.cpp`, whose fields +0x18/+0x1C it reads)
  *     is 0x20, i.e. the scratch buffer `fn_801B4348` hands `fn_80125F54`/`fn_801421E4` was 8 bytes
  *     short of what the same record needs elsewhere.
@@ -160,13 +158,13 @@ struct ShellSetBlock {
 };
 
 /* The 0x20-byte ground record `fn_80125F54` prepares and `fn_801421E4` fills is `EmGroundRec`, and
- * it now lives with its producer (`include/enemy/fn_801251D0.h`, docs/plan.md 6.5 rule 1: one
+ * it now lives with its producer (`enemy/fn_801251D0.h`, docs/plan.md 6.5 rule 1: one
  * definition; `enemy/fn_801B4458.cpp` includes the same home).  This unit only passes its address
  * and reads its `pos_0x08`. */
 
 /* 0x800CFA90 / 0x800CFAD0 - the move-work record base and its count.  Their owner's header
- * (`include/ef/fn_800CDB2C.h`) cannot carry either one yet: MAIN spells the pair four incompatible
- * ways - the owner's own bodies return `void*` and `u16`, `include/unsplit/ef.h` carries
+ * (`ef/fn_800CDB2C.h`) cannot carry either one yet: MAIN spells the pair four incompatible
+ * ways - the owner's own bodies return `void*` and `u16`, `unsplit/ef.h` carries
  * `extern "C" void*`/`u32`, `Pl/fn_8025F088.h` and `enemy/fn_80165FC8.h` carry the C++ `void*`/`u32`
  * pair, and `src/ef/eft_res.cpp`/`src/sound/fn_800EF7D8.cpp` re-declare both locally as `u16` -
  * and MWCC rejects any fifth spelling in every TU that includes two of them (`(10505) illegal
@@ -181,7 +179,7 @@ void* get_move_work_adrs(u8 index);
 u16 get_move_work_max(u8 index);
 
 /* The two `fn_8004CAD8.cpp` vector helpers this range calls now come from that unit's owner header
- * (`include/fn_8004CAD8.h`, rule 2): `calcVecDistXZ` measures the distance between two positions and
+ * (`fn_8004CAD8.h`, rule 2): `calcVecDistXZ` measures the distance between two positions and
  * `subVec3` subtracts them.  Their signatures there were settled from the callees' own bodies. */
 
 /* The shared `.sdata2` pool constants this range loads (never defined here - redefining them would
@@ -219,7 +217,7 @@ extern "C" f32 lbl_80798B40; /* 2000.0f */
 /* the range's own view of the player work it is handed                                              */
 /* ------------------------------------------------------------------------------------------------ */
 
-/* `_PLW` comes from `include/pl.h` (rule 1); the record is the one `em030_prog_tbl`'s caller passes
+/* `_PLW` comes from `pl.h` (rule 1); the record is the one `em030_prog_tbl`'s caller passes
  * in, and this range only ever reads the slot table at +0x278 (`_SLOTENT`, 4 bytes each, its
  * `item_id` half read as a 16-bit id) and the liveness byte at +0x000. */
 

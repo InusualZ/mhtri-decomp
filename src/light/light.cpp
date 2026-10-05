@@ -1,10 +1,9 @@
 /*
- * light/light.cpp - phase 4 unit, `.text` 0x802BF278..0x802C2700 (63 functions, 13448 bytes).
+ * light/light.cpp - unit, `.text` 0x802BF278..0x802C2700 (63 functions, 13448 bytes).
  *
- * PHASE 4 (docs/splits/phase4, window d).  Recut of light.cpp: its functions whose address lies in this range, in
- * address order; the rest of the range keeps its original bytes.  15 of 63 functions have a body here.
+ * 15 of 63 functions have a body here.
  *
- * FLAGS.  `cflags_main`.  The record types moved to `include/light/light_work.h` (shared with
+ * FLAGS.  `cflags_main`.  The record types moved to `light/light_work.h` (shared with
  * `camera/camera_main.cpp`, which holds the head of the module).
  *
  * Sections: the unit's block in config/RMHE08/splits.txt (.bss, .ctors, .data, .sbss, .sdata, .sdata2, .text, extab,
@@ -15,8 +14,7 @@
  * light/light.cpp - the map light work: its record, its constructors, its per-frame channels and its
  * accessors.
  *
- * `.text` 0x802BEAAC-0x802C474C (103 functions, 23712 B).  Registered from
- * `proposal/802BEAAC_fn_802BEAAC.cpp`.
+ * `.text` 0x802BEAAC-0x802C474C (103 functions, 23712 B).
  *
  * Module `light` and file name `light.cpp` come from evidence class 2 (brief section 2): the range's
  * own symbols the retail symbol table knows are `light_init__Fv` (0x802BF284), `light_move__Fv`
@@ -77,7 +75,7 @@
 #include "nw4r/math.h"
 
 /* Owner headers (rule 2): every symbol a registered unit defines is declared in that unit's header,
- * never here.  `include/unsplit/unknown.h` carries the module-ambiguous ones. */
+ * never here.  `unsplit/unknown.h` carries the module-ambiguous ones. */
 #include "ef/fn_800CDB2C.h"
 #include "fn_80047398.h"
 #include "fn_8004CAD8.h"

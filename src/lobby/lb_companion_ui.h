@@ -5,7 +5,7 @@
  * map's own type names (`_mh_ivec2_` must be a type with exactly that name for MWCC to re-emit
  * `get_lsp_data__FUsP10_mh_ivec2_`, `LbStr__FUcUs`, ...), and a name that more than one file needs
  * belongs in one header (docs/plan.md 6.5 rule 1).  `_mh_ivec2_` is also defined by
- * `include/unsplit/lobby.h`; this unit cannot include that header, because it spells `lobby_world_block`
+ * `unsplit/lobby.h`; this unit cannot include that header, because it spells `lobby_world_block`
  * as a byte array where this range loads the 4-byte pointer the map records (`size:0x4 data:4byte`)
  * and it gives `lb_param_w` a view without the +0x26..+0x30 fields this range writes.
  *
@@ -21,7 +21,7 @@
 #include "quest/arenatask.h" /* arena_other_player_eq_set: this band's act 25 calls it (rule 2) */
 #include "stage/shell.h" /* ShellSerialEntry, serial_find, serial_state_set_word (rule 2) */
 
-/* `include/lobby/lb_quest_screen.h` (where `quest_element_pick_ck` belongs) cannot be included from
+/* `lobby/lb_quest_screen.h` (where `quest_element_pick_ck` belongs) cannot be included from
  * here: it declares `fmt_803AA41C(s32, f32)` (the owner's two-argument form) where this header's own
  * list carries the one-argument `quest_sub_state_end_ck(s32)`, so the pair trips `illegal function overloading`.
  * The declaration below is the owner's own signature, so a TU that sees both still agrees. */

@@ -1,5 +1,5 @@
 /*
- * auto/800CC5B0_fn_800CC5B0.c - the retail `ef_disc.cpp` unit, 0x800CC5B0..0x800CCCF8.
+ * ef/ef_disc.cpp - the retail `ef_disc.cpp` unit, 0x800CC5B0..0x800CCCF8.
  *
  * One function: the `Disc` effect shape's emitter entry (the shape's single virtual method, dispatched
  * through the `ef_disc.cpp` vtable `lbl_80594DD0`).  It guards its `em`/`pm`/`params` pointers, derives

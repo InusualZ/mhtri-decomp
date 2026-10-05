@@ -5,7 +5,7 @@
  * (`.text` 0x800408A8-0x80047398).
  *
  * The three 3-float-record helpers at 0x80041E40/0x80041E8C/0x80043EA8 are this unit's, and this is
- * their single declaration: `include/ef.h` and `include/unsplit/ef.h` used to carry copies spelled
+ * their single declaration: `ef.h` and `unsplit/ef.h` used to carry copies spelled
  * `VEC3*`/`Vec*`, so a TU including both headers failed with MWCC `(10197) illegal function
  * overloading` (measured on `src/Pl/fn_8028F66C.cpp`).  Every referrer includes this header now.
  *

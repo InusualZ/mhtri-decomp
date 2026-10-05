@@ -1,5 +1,5 @@
 /*
- * DWCi/dwc_error.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * DWCi/dwc_error.cpp - STUB (no bodies yet).
  *
  * `.text` 0x805073C0..0x80507C40.  Sections of the candidate unit: .text 0x805073C0..0x80507C40; .data 0x8062FD00..0x8062FF90; .sdata 0x807941F8..0x80794200; .sbss 0x807957B0..0x807957D0.
  *

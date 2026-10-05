@@ -9,7 +9,7 @@
  * `ItemName`/`ItemExp`, `font_print_ex`, `draw_sprite_anim_ary`).  No `__FILE__` string covers the
  * range (the only referencer of the string at this data offset is the 0x8034C0C4 TU) and
  * `dumpmap.py lookup` answers `zz_` for every address here, so the file name and the symbol names
- * are the naming pass's own (2026-09-27), each derived from its body and the band's `menu_*` file
+ * are the naming pass's own, each derived from its body and the band's `menu_*` file
  * family (`menu_item.cpp`, `menu_infomation.cpp`, `menu_note.cpp`): the page's scroll/fill/update
  * trio, its per-frame draw, and the per-page column/detail pair the `switch (page_index)` arms of
  * `item_page_draw` select (`item_page_draw_column0`/`item_page_draw_detail0` .. `3`).  MARKED GUESS:
@@ -17,7 +17,7 @@
  * 2 = the item card, 3 = the option/season card) is read off the bodies' call surface, not off a
  * name; a later pass with the screen's own symbols can sharpen it.
  *
- * THE RECORD IT DRAWS.  `MenuSlot` (`include/menu/menu_item.h`, the landed half's view): callers hand
+ * THE RECORD IT DRAWS.  `MenuSlot` (`menu/menu_item.h`, the landed half's view): callers hand
  * it `&slot->entries_b[0]` (0x6C) or the embedded `MenuScroll` at +0x1A4.  This unit is why
  * `MenuEntry`'s +0x06/+0x0C, `MenuSlot`'s +0x01C..+0x01F, the `MenuScroll` record and the +0x2ED kind
  * table are named there (one definition, rule 1 - the extension was proven inert:
@@ -84,8 +84,8 @@
 #include "menu/menu_item_page.h"
 
 /* This unit's own view of the 0x24-byte sprite-data record `sprite_frame_apply` fills in and the `draw_*`
- * family takes by reference (`_SPR_DATA_` in the map's manglings): `include/hud/layout.h` owns the full
- * definition and `include/unsplit/lobby.h` keeps the tag incomplete, and including the owner's header
+ * family takes by reference (`_SPR_DATA_` in the map's manglings): `hud/layout.h` owns the full
+ * definition and `unsplit/lobby.h` keeps the tag incomplete, and including the owner's header
  * here collides with the lobby band's `_mh_ivec2_`/`get_lsp_data` views.  The record starts with the
  * anchor the draws read (`&spr.pos` IS the `_SPR_DATA_`'s address) and the row colour is at +0x1C. */
 typedef struct SprWork {

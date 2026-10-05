@@ -246,7 +246,7 @@ void em_busy_timer_reset(struct _ENEMY_WORK* self);
 void fn_80133C3C(struct _ENEMY_WORK* self);
 f32 fn_802B0430(u8 area);
  /* owner `src/mh3_pad.cpp`; its header is
-    * unreachable from an `include/ef.h` consumer (`VEC3_ctor`/`setVec3` conflict), so the
+    * unreachable from an `ef.h` consumer (`VEC3_ctor`/`setVec3` conflict), so the
     * shape here is the owner body's (`mr r3,r31` -> returns `dst`) */
 u32 em_turn_to_target(struct _ENEMY_WORK* self, u32 a);
 void fn_80133CC8(struct _ENEMY_WORK* self, u32 a, u32 b);
@@ -279,7 +279,7 @@ void em_spawn_rec_init(struct _ENEMY_WORK* self, u32 a);
 
 /* the unclaimed enemy action band below this range (0x801CA004..0x801CCBC4), which this range's
  * dispatchers tail-call.  Its owner is not registered yet, so the declarations sit here; the band
- * header `include/unsplit/enemy.h` is where they move once those ranges land (rule 2). */
+ * header `unsplit/enemy.h` is where they move once those ranges land (rule 2). */
 void fn_801CAF70(struct _ENEMY_WORK* self);
 void fn_801CAFBC(struct _ENEMY_WORK* self);
 void fn_801CB008(struct _ENEMY_WORK* self);
@@ -2595,7 +2595,7 @@ void fn_8004FFC8(void* a, void* b, void* c, f32 d);
 void draw_shape_arm(struct _ENEMY_WORK* self, u32 a, u32 b);
 
 /* the unclaimed enemy action band below this range (0x801CB308..0x801D3CF8) - the dispatchers'
- * tail-call targets.  Their band header is `include/unsplit/enemy.h` and the move is recorded as a
+ * tail-call targets.  Their band header is `unsplit/enemy.h` and the move is recorded as a
  * `shared-file` request in the outbox; until it lands this file carries its own copy. */
 void fn_801CCCE8(struct _ENEMY_WORK* self);
 void fn_801CE898(struct _ENEMY_WORK* self);

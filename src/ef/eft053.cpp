@@ -1,4 +1,4 @@
-/* ef/eft053.cpp - the `eft053` effect family at `.text` 0x80366618..0x8036A690 (15 functions).
+/* ef/eft053.cpp - the `eft053` effect family at `.text` 0x80366618..0x8036A828 (18 functions).
  *
  * WHAT IT IS.  The `eft053` family of the game-side effect bank: the range drives one `_EFT` effect
  * instance through its `work_0x38` model block - `eft053_get_shell_data` pulls the shell actor's
@@ -52,7 +52,7 @@
  *     `model->pos_0x04.z`, the family's `Vec` table re-seeds the counter when a stage completes and the
  *     function returns 1 on the last stage.
  *
- * SEAM.  Registered from `proposal/80366618_fn_80366618.cpp`, whose 0x80366618..0x8036CF64 range is a
+ * SEAM.  Registered, whose 0x80366618..0x8036CF64 range is a
  * discovery `--max-bytes` cut.  `tudiscover.py at 0x80366618` returns a 15-function MATCH SET,
  * 0x80366618..0x8036A690, from two must-link `lbl_8079B744` anchors; the range's private `.sdata2`
  * pool run (0x8079B740..0x8079B820, 54 labels, dense 1.00, no leak) ends at its last referrer
@@ -75,7 +75,7 @@
  *     short).  Needs `#pragma peephole off` around it: retail keeps `extsb` + `cmpwi`, `-O3` fuses
  *     them into `extsb.`.
  *   * `eft053_model_list_get` 99.04 - the `li r3,0` argument setups at the `quest_flag_200000_ck` calls are
- *     there since `include/enemy/em_pop.h` declares the helper with its real work-record parameter
+ *     there since `enemy/em_pop.h` declares the helper with its real work-record parameter
  *     (2026-09-30 recut); four bytes of residual remain.
  *   * `eft053_get_shell_data` 93.50 (1260 B) - 40 bytes; every one of its seven map-number cases
  *     shares one tail, which the original reached with a jump - the C here computes the case

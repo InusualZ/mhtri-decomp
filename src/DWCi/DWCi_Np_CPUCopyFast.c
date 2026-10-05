@@ -1,7 +1,7 @@
 /*
  * DWCi_Np_CPUCopyFast.c - the Nintendo Wi-Fi Connection (DWCi) SDK band, `.text` 0x80507C40..0x80509DB0.
  *
- * REGISTRATION (recon lane, 2026-09-27).  One `DWCi` unit for the named function `DWCi_Np_CPUCopyFast`
+ * REGISTRATION.  One `DWCi` unit for the named function `DWCi_Np_CPUCopyFast`
  * (0x80507C40, 0x9E4 B) and its 14 following neighbours (15 functions, 8560 B).  Right edge is a
  * STRONG cut: `tudiscover.py at 0x80507C40` reports `cut 18505 0x80509DB0 strong x2`
  * (.sdata run jump 0x807942D8 -> 0x807942FC and 0x80794328 -> 0x80794330; the second admits
@@ -12,7 +12,7 @@
  *
  * SECTIONS.  `.text` plus two of the band's data objects, claimed 2026-09-28 so that the range the
  * unit's own code stores into is the unit's (rule 12; the declarations lived in
- * `include/unsplit/DWCi.h`, which is rule 12's finding):
+ * `unsplit/DWCi.h`, which is rule 12's finding):
  *   .sbss 0x807957D0..0x807957F8 - the state machine's words: the free-list head, the runtime/result
  *     block and the state-ladder word.  Every symbol in the run is stored by *this* object
  *     (`DWCi_FreeList`, `DWCi_SetResult`, `DWCi_AdvanceStatus`) and by no other registered unit, so
@@ -35,7 +35,7 @@
  * Still unowned and declared in the band header: `DWCi_protocolMagic`, `DWCi_addressFormat*`, the
  * digit class table, `DWCi_addressRingIndex`, `DWCi_stateBlock` and `DWCi_workBuffer` - all read
  * here but stored elsewhere or nowhere.  `DWCi_addressRing` (0x807625C0) is *not* in that list: the word falls
- * inside the NATNEG unit's `.bss` run, so rule 2 declares it in `include/DWCi/DWCi_NatNeg.h`,
+ * inside the NATNEG unit's `.bss` run, so rule 2 declares it in `DWCi/DWCi_NatNeg.h`,
  * which this file reaches through the band header.
  *
  * FLAGS (open question, reported).  The whole 0x80507C40..0x80512490 band has every function start
@@ -67,30 +67,30 @@
  * Criterion, stated once for both DWCi units: no auto-generated name is spelled in source, and a row
  * that no written body reaches keeps its stem - here `fn_80509270`;
  * the unit's own row `DWCi_Np_CPUCopyFast` carries the map's name and has no body yet either.
- * Rows renamed by the data pass (2026-09-28), because the source now spells them:
+ * Rows renamed by the data pass, because the source now spells them:
  * `jumptable_8062FF90` -> `DWCi_npCopyFastTailTable`, `jumptable_8063025C` ->
  * `DWCi_authDataStateTable` (the two switch tables), the run's eleven data labels -> the names of the
  * objects they start (`DWCi_authDataPath`, `DWCi_acUrlDev`, `DWCi_prUrlDev`, ...), and
  * `fn_80508A70` -> `DWCi_authDataTask`, the state machine the second table dispatches into (a GUESS
  * from its shape: a no-argument task the middle band's `DWC_NASLoginProcess`/`DWC_SVLProcess` step functions
  * call, driving the NAND auth-data I/O and the HTTP layer through a 27-way state test).
- * Rows renamed by the body pass (2026-09-28): `fn_80508630` -> `DWCi_GetConsoleFriendCode` (its body
+ * Rows renamed by the body pass: `fn_80508630` -> `DWCi_GetConsoleFriendCode` (its body
  * below), the two `.sbss` words it stores (`lbl_807957D0` -> `DWCi_friendCodeReady`, `lbl_807957D8` ->
  * `DWCi_consoleFriendCode`), and the helpers outside this unit its two new bodies call: `fn_80507690`
  * -> `DWCi_allocNode` and `fn_805078F0` -> `DWCi_report` (both this band, declared in
- * `include/unsplit/DWCi.h`), `fn_80521CA0/D70/DE0` -> `VFipf2Init`/`VFipf2Shutdown`/
- * `VFipf2IsInitialized` (the file-system band; its new `include/unsplit/VF.h` is their home - rule 2
+ * `unsplit/DWCi.h`), `fn_80521CA0/D70/DE0` -> `VFipf2Init`/`VFipf2Shutdown`/
+ * `VFipf2IsInitialized` (the file-system band; its new `unsplit/VF.h` is their home - rule 2
  * cannot place that address, the nearest registered units below and above are `NWC24` and the
  * game-UI band - and the three names are a GUESS from the scheme their own callees use, not names
  * recovered from the SDK, so a later pass may confirm them), `fn_8051C554` -> `NCDGetCurrentIfConfig`
  * (the NCD band, unregistered: declared in
- * the existing `include/unsplit/NCD.h`; the name is read off this file's own
+ * the existing `unsplit/NCD.h`; the name is read off this file's own
  * "...IfConfig failed.[%d]" line, so a later pass can confirm it), and `fn_8051A4E8` ->
  * `NHTTPi_RegisterCallbacks` - a GUESS from this unit's call site, which hands the two command
  * callbacks and command 17 to the HTTP layer's bring-up.  That row lives inside `NHTTP/d_nhttp.c`'s
- * registered range, so its declaration went into that unit's header (`include/NHTTP/d_nhttp.h`) and
+ * registered range, so its declaration went into that unit's header (`NHTTP/d_nhttp.h`) and
  * the NHTTP lane, which owns the body, may refine the name.
- * Rows renamed by the review pass (2026-09-28): the run's two remaining `.sdata` stems, both read
+ * Rows renamed by the review pass: the run's two remaining `.sdata` stems, both read
  * off the code that touches them - `lbl_80794200` -> `DWCi_authDataPathPtr` (the word is an
  * `R_PPC_ADDR32` to `DWCi_authDataPath`) and `lbl_8079420C` -> `DWCi_urlSchemeSeparator` (the
  * `strstr` needle) - and the two coarse `.data` rows, re-sized to the objects the source has.
@@ -98,7 +98,7 @@
  * The one helper it calls that no registered unit owns, `DWCi_freeNode` (0x805076F0, the middle band
  * 0x80509DB0..0x805113B0), is a GUESS derived from this file's own call site - `DWCi_FreeList`
  * drains its list by calling it once per node with the 0xC kind tag - and is declared in the band
- * header `include/unsplit/DWCi.h`; it is a marker for a later reconstruction to confirm.
+ * header `unsplit/DWCi.h`; it is a marker for a later reconstruction to confirm.
  *
  * BODIES (body pass).  Twelve of the 15 functions are written; the unit is 14.70 % over its 8464 B
  * of `.text` (was 9.51 % after the first body).  Byte-identical (100 %): `DWCi_FreeList`,
@@ -135,7 +135,7 @@
  * `fn_80509270` (0xB40) - the DWCi save/HTTP state machine and the two `DWCi_*_Fast` copy loops,
  * multi-wave bodies by their own size.
  *
- * DATA (data pass, 2026-09-28).  `.data` 0x8062FF90..0x806302C8 (824 B) is claimed and emitted by
+ * DATA (data pass).  `.data` 0x8062FF90..0x806302C8 (824 B) is claimed and emitted by
  * this file; the claim's evidence is the target object's only `.rela.sdata` entry, the
  * `R_PPC_ADDR32` from the unit's own `.sdata` word 0x80794200 to the "/shared2/DWC_AUTHDATA" string
  * at 0x80630020 - pointer and string are one TU's data (the full argument, including why the
@@ -174,7 +174,7 @@ typedef struct DWCiRuntime* (*DWCiAllocCallback)(u32 command, u32 size);
 typedef void (*DWCiCommandCallback)(u32 command, u32 arg1, u32 arg2);
 
 /* The DWCi runtime block `DWCi_runtime` (this unit's own object, declared in
- * `include/DWCi/DWCi_Np_CPUCopyFast.h`) points at.  Only the fields this unit's bodies read or
+ * `DWCi/DWCi_Np_CPUCopyFast.h`) points at.  Only the fields this unit's bodies read or
  * write are named; every other offset is an unmodelled run of the original's own layout.
  * size: 0x5B30 - the size DWCi_initRuntime asks the host allocator for, which is also where its
  * last named field ends. */
@@ -205,7 +205,7 @@ typedef struct DWCiListNode {
     /* +0x18 */ struct DWCiListNode* next;
 } DWCiListNode;
 
-/* The DWCi state block `DWCi_stateBlock` (declared `u32[]` in `include/unsplit/DWCi.h` because its
+/* The DWCi state block `DWCi_stateBlock` (declared `u32[]` in `unsplit/DWCi.h` because its
  * unsized form is what makes MWCC address it absolutely), as `DWCi_npStart` clears it: three
  * regions zeroed in place and one count word cleared.  The regions' own contents belong to the
  * band's helpers, so they stay unnamed runs. size: >= 0x380 */

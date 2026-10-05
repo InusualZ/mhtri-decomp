@@ -80,7 +80,7 @@ this machine and ~14 GB of split objects rewritten, because the split is one ste
 registrations - every new unit's source and ranges first, then one split, one link and one report. The same
 cost is why a range is never adjusted "just to see": propose it, then measure the unit before and after it
 (`ninja changes`), because a claimed range has already been measured to make a match *worse* (see
-`docs/matching.md` 23).
+playbook 23).
 
 Registering a range also re-attributes bytes: that region moves out of the per-function `auto_*` scaffolding
 objects into the new unit, so the DOL-wide `total_code` and `fuzzy_match` totals move for bookkeeping reasons,

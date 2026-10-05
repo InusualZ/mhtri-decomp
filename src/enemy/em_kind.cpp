@@ -1,7 +1,7 @@
 /* enemy/em_kind.cpp - the enemy kind set (`em_kind_release` and its lookups)
  *
  * `.text` 0x8013BE60..0x801411B8, 119 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): fold of 2 registered units, built from `enemy/fn_8013BE60.c`, `enemy/fn_8013F764.cpp`.
+ * Phase 4: fold of 2 registered units, built from `enemy/fn_8013BE60.c`, `enemy/fn_8013F764.cpp`.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  *
  * Kept views: the retired sources declared 16 callee(s) with different signatures (`calcVecDistXZ`, `fn_8012B380`, `fn_8013023C`, `fn_80130858`, `fn_80130CDC`, `fn_801321B0`, `fn_8013BDE4`, `fn_8013C36C`, `fn_801406E0`, `fn_80140778`, `fn_801408B4`, `fn_801409C8`, ...); each function keeps its own source's view through a function-pointer cast macro (`<name>_viewN`, `<name>_cN`), which compiles to the same direct call, so the fold does not move any body.
@@ -9,7 +9,7 @@
  */
 
 /* Retired header of `enemy/fn_8013BE60.c` (kept for its notes and residuals): */
-/* auto/8013BE60_fn_8013BE60.c - the enemy parameter interpreter and its handler table,
+/* enemy/em_kind.cpp - the enemy parameter interpreter and its handler table,
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  * .text 0x8013BE60..0x8013F764 (78 functions).
  *
@@ -55,7 +55,7 @@
  * The bodies are grouped by shape rather than written in address order; objdiff pairs by symbol name,
  * so the per-symbol score is unaffected.
  *
- * Range and inventory: `python tools/units/ledger.py unit auto/8013BE60_fn_8013BE60.c`.
+ * Range and inventory: `python tools/units/ledger.py unit enemy/em_kind.cpp`.
  * Attribute pass evidence: `.pi/attribution-batch-4.patch.md`, `.pi/notes/attribution-batch-4.md`.
  * Data runs this unit's split records but does not yet claim (playbook 23, docs/plan.md 8.4):
  *   extabindex 0x80027D20..0x80027F60 (48)   .data 0x805A19D0..0x805A1A7C (3)
@@ -123,7 +123,7 @@
  * scope with the signature its mangling encodes (`tools/units/mangle.py` proves each) and the file is
  * C++.  Every definition keeps the map's plain `fn_XXXXXXXX` name, i.e. the `extern "C"` block below.
  *
- * Types.  `_ENEMY_WORK` is the shared record `include/enemy/ENEMY_WORK.h` owns (rule 1); this unit
+ * Types.  `_ENEMY_WORK` is the shared record `enemy/ENEMY_WORK.h` owns (rule 1); this unit
  * added the fields it measured (+0x010, +0x360, +0x36C, +0x383/+0x384, the 0x961 stack block and the
  * +0x9E8..+0xA00 interpreter bytes) to that header, and the record types that go with them
  * (`EmProgTbl`/`EmCmdRec`/`EmCmdRecWide`/`EmAreaWork`/`EmActRec`/`EmFileEntry`/`EmFileRow`) live
@@ -315,7 +315,7 @@ typedef struct _ENEMY_TABLE {
 
 extern "C" {
 /* Callees owned by other translation units.  Addresses and the mangled spellings are the map's. */
-/* `enemy_data_grp` (0x803439D4) is declared in its owner's header, `include/ef/eft_slot.h` (rule 2). */
+/* `enemy_data_grp` (0x803439D4) is declared in its owner's header, `ef/eft_slot.h` (rule 2). */
 
 /* --------------------------------------------------------------------------------------------- */
 /* The generic parameter interpreter and its two-argument tail. */
@@ -357,7 +357,7 @@ typedef struct _ENEMY_DATA {
 
 
 extern "C" {
-/* `enemy_data_find` (0x803438E4): its owner's header, `include/ef/eft_slot.h` (rule 2). */
+/* `enemy_data_find` (0x803438E4): its owner's header, `ef/eft_slot.h` (rule 2). */
 extern u32 fn_80345A6C(void *a, u8 b, Vec3 *c, f32 d);
 }
 
@@ -370,7 +370,7 @@ extern f32 lbl_80796DA8; /* 65536.0f */
 extern f32 lbl_80796DAC; /* 6.2831855f */
 extern f32 sqrt_f32(f32 x);
 extern f32 atan2f(f32 y, f32 x);
-/* `eft_slot_effect_key` (0x8034539C): its owner's header, `include/ef/eft_slot.h` (rule 2). */
+/* `eft_slot_effect_key` (0x8034539C): its owner's header, `ef/eft_slot.h` (rule 2). */
 extern void fn_8013C57C(_ENEMY_WORK *self, u8 *in, u32 flag);
 extern void fn_802B01AC(Vec3 *out, Vec3 *in, u32 idx);
 extern f32 fn_802B0430(u32 idx);
@@ -413,7 +413,7 @@ extern u8 system_w[];
  * ------------------------------------------------------------------------------------------------ */
 
 /* `get_enemy_data__FP11_ENEMY_WORK` (owner `enemy/fn_801251D0.cpp`).  `EnemyData`'s full definition
- * lives in `include/enemy.h`, which cannot be included beside `enemy/ENEMY_WORK.h` (both define
+ * lives in `enemy.h`, which cannot be included beside `enemy/ENEMY_WORK.h` (both define
  * `_ENEMY_WORK`), so the record is read through the two words the target loads. */
 struct EnemyData;
 struct EnemyData* get_enemy_data(_ENEMY_WORK* work);
@@ -457,7 +457,7 @@ struct EmActList {
 };
 
 /* `get_enemy_data`'s record, as far as this unit reads it: the two words `fn_801409C8` loads for its
- * timer comparison are the enemy data's own limit (`include/enemy.h`'s `EnemyData`, which cannot be
+ * timer comparison are the enemy data's own limit (`enemy.h`'s `EnemyData`, which cannot be
  * included beside `enemy/ENEMY_WORK.h`).
  * size: 0x0C */
 struct EmEnemyDataSub {
@@ -491,7 +491,7 @@ extern "C" {
 /* ------------------------------------------------------------------------------------------------
  * The plain `fn_XXXXXXXX` callees.  The map spells them as C symbols, so the whole set - the map's
  * own definitions included - is `extern "C"`: without it this C++ front-end would mangle them and
- * objdiff would pair nothing (docs/matching.md row 42).  Their owning units' headers do not carry
+ * objdiff would pair nothing (playbook 42).  Their owning units' headers do not carry
  * them yet, so they are declared here (rule 2's interim home for the enemy band, the same one
  * `enemy/fn_80137604.cpp` uses).
  * ------------------------------------------------------------------------------------------------ */

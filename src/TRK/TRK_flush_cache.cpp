@@ -1,5 +1,5 @@
 /*
- * TRK/TRK_flush_cache.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * TRK/TRK_flush_cache.cpp - STUB (no bodies yet).
  *
  * `.text` 0x80467EEC..0x8046D9F0.  Sections of the candidate unit: .text 0x80467EEC..0x8046D9F0; .rodata 0x805734A8..0x80573530; .data 0x8060F538..0x8060F868; .bss 0x806F5020..0x806F74E0; .sdata 0x80793D00..0x80793D08; .sbss 0x80794E38..0x80794EC8; .sdata2 0x8079CF30..0x8079CF40.
  *

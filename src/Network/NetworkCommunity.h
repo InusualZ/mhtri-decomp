@@ -1,5 +1,5 @@
 /*
- * include/Network/NetworkCommunity.h - the declarations of `src/Network/NetworkCommunity.cpp`: the community layer base
+ * Network/NetworkCommunity.h - the declarations of `src/Network/NetworkCommunity.cpp`: the community layer base
  * class `NetworkCommunity` and its request record `NetworkCommunityRequest` (`.text` 0x803EF668..0x803F0294).
  */
 #ifndef MHTRI_NETWORK_NETWORKCOMMUNITY_H
@@ -9,7 +9,7 @@
 
 class NetworkCommunity;
 struct NetworkCommunityRequest;
-class NetworkUniqueId;                                      /* include/Network/NetworkUniqueId.h */
+class NetworkUniqueId;                                      /* Network/NetworkUniqueId.h */
 struct NetworkErrorInfo;                                   /* the 12-byte error record - Network/gamespy_interface_types.h */
 
 /* The handler a community request runs: a member function of the layer that reports completion (non-zero). */
@@ -20,7 +20,7 @@ typedef s32 (NetworkCommunity::*NetworkCommunityHandler)(NetworkCommunityRequest
 /* untyped: caller-owned payload - the record each command delivers */
 typedef s32 (*NetworkCommunityReflectCallback)(u32 command, s32 result, s32 count, void* data, u32 user);
 
-/* The community layer's request record: the layout of `NetworkLayerRequest` (include/Network/NetworkLayer.h) with the
+/* The community layer's request record: the layout of `NetworkLayerRequest` (Network/NetworkLayer.h) with the
  * owner and the handler typed for this class.  `run` is MWCC's member-function-pointer call (`__ptmf_scall`), `reset`
  * assigns the null member pointer (`__ptmf_null`); the constructor/destructor pair is the one the pool array is built
  * and destroyed with (`__construct_array`/`__destroy_arr`, element size 0xA4).  Fields keep `NetworkLayerRequest`'s

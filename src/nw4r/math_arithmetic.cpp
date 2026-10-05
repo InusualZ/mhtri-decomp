@@ -1,5 +1,5 @@
 /*
- * nw4r/math_arithmetic.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * nw4r/math_arithmetic.cpp - STUB (no bodies yet).
  *
  * `.text` 0x80500E10..0x80500E34.  Sections of the candidate unit: .text 0x80500E10..0x80500E34; .sdata2 0x8079D494..0x8079D4A0.
  *

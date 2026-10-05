@@ -23,7 +23,7 @@
  *   0x800BFF3C  the deleting destructor
  *   0x800BFF98  the constructor (installs the `lbl_80594778` vtable)
  *
- * Codegen lever: the out-of-line FIFO writers keep the unfused narrowing stores (docs/matching.md row 39),
+ * Codegen lever: the out-of-line FIFO writers keep the unfused narrowing stores (playbook 39),
  * exactly as the sibling `ef/ef_drawsmoothstripestrategy.cpp` needed, so the peephole pass is off here.
  *
  * The `Panic` line numbers are the literals the target's `li r4,NN` carry (92/96/98 in Draw, 150 in
@@ -49,7 +49,7 @@
 
 /* `nw4r::db::Panic` - the real declaration; the front-end reproduces the map's
  * `Panic__Q24nw4r2dbFPCciPCce` spelling (tools/units/mangle.py confirms it).  Declaring the mangled
- * spelling instead would re-mangle it and break the link (docs/matching.md 50); rule 9. */
+ * spelling instead would re-mangle it and break the link (playbook 50); rule 9. */
 #ifdef __cplusplus
 namespace nw4r {
 namespace db {

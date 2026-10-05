@@ -1,7 +1,7 @@
 /* enemy/em008_prog.cpp - enemy 008 program
  *
  * `.text` 0x8015D860..0x801663E4, 62 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): fold of 3 registered units, built from `enemy/fn_8015D860.cpp`, `enemy/fn_8015E854.cpp`, `enemy/fn_80165FC8.cpp`.
+ * Phase 4: fold of 3 registered units, built from `enemy/fn_8015D860.cpp`, `enemy/fn_8015E854.cpp`, `enemy/fn_80165FC8.cpp`.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  *
  * Kept views: the retired sources declared 13 callee(s) with different signatures (`assignVec3`, `em_act_ck`, `em_fall_height_get`, `em_frame_flag_set`, `em_mot_set`, `em_parts_damage_level_get`, `em_mot_finished_ck`, `em_motion_param_set`, `fn_8013918C`, `fn_8013A654`, `fn_8015D934`, `rotMatrixX`, ...); each function keeps its own source's view through a function-pointer cast macro (`<name>_viewN`, `<name>_cN`), which compiles to the same direct call, so the fold does not move any body.
@@ -60,7 +60,7 @@
  * range is claimed rather than left to the auto band (the two bracketing units have no jump-table
  * claim of their own; this one is measured byte-identical).
  *
- * Types.  `_ENEMY_WORK` is the shared record in `include/enemy/ENEMY_WORK.h` (the one home,
+ * Types.  `_ENEMY_WORK` is the shared record in `enemy/ENEMY_WORK.h` (the one home,
  * rule 1).  This unit's additions there: the byte at +0x491 (`fn_8015DB68` sets it) and the s16
  * view of +0x32A (`fn_8015D9B8`/`fn_8015DB68`/`fn_8015DD6C` count it down as a halfword, where
  * `enemy/fn_80170600.cpp` stores a `stb` over the same byte - a union member, not a re-typing).
@@ -134,7 +134,7 @@
  * calls them through their real signatures, rule 9).  The flat `fn_*` symbols are `extern "C"`
  * so objdiff pairs them by name.
  *
- * Object: `_ENEMY_WORK`, included from `include/enemy.h`.
+ * Object: `_ENEMY_WORK`, included from `enemy.h`.
  *
  * Flags: this unit needs no deviation - the `enemy` lib's `cflags_main` (see the block's comment
  * in `configure.py`) measured every body below.  No `#pragma` is used.
@@ -167,7 +167,7 @@
  *     fn_8015F8E4, fn_8015F9FC, fn_8015FAC0, fn_8015FB78, fn_8015FD1C, fn_80161660, fn_80162154,
  *     fn_8016243C, fn_801631C4, fn_80163298, fn_80163344, fn_801634F8, fn_801635A4, fn_801639C0,
  *     fn_80165964, fn_80165C14, fn_80165CD0.
- *   * fn_80161660 and fn_8015ED94 also need a VEC3 at +0x31C that `include/enemy.h` currently
+ *   * fn_80161660 and fn_8015ED94 also need a VEC3 at +0x31C that `enemy.h` currently
  *     spells `pad_0x31C[4]` before its `v_0x320` VEC3 - a genuine two-view clash (this unit's
  *     actors read a vector at +0x31C; `enemy/fn_8014A1BC.c` reads `v_0x320` at +0x320), so the
  *     type needs a union before those bodies can be written (rule 1/3).  Left for the follow-up.
@@ -210,9 +210,9 @@
  * signature (`em_frame_check`, `em_die_ck`, `em_act_ck`, `get_move_work_adrs`, `get_move_work_max`,
  * `ran_suu`, `rotMatrixX`, `rotMatrixZ`, `copyMat33`) - rule 9 never spells the mangling.  The
  * range's own flat symbols stay C-linkage through the `extern "C"` block in
- * `include/enemy/fn_80165FC8.h`.
+ * `enemy/fn_80165FC8.h`.
  *
- * Object: `_ENEMY_WORK`, included from `include/enemy/ENEMY_WORK.h` (the one shared home; the fields
+ * Object: `_ENEMY_WORK`, included from `enemy/ENEMY_WORK.h` (the one shared home; the fields
  * this range names were added there - +0x00C, +0x320, +0x608/+0x610, +0x834/+0x835).  The
  * `enemy_data_find` entry and the `ResUserDataAc` accessor are in this unit's own header.
  *

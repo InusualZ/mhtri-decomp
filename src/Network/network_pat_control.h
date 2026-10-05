@@ -1,5 +1,5 @@
 /*
- * include/Network/network_pat_control.h - shared views for the network pat-control band
+ * Network/network_pat_control.h - shared views for the network pat-control band
  * (`Network/network_pat_control.cpp`, `.text` 0x80429B94..0x8043065C).
  *
  * The `net_ctrl_wk` singleton (map: `.sbss:0x80794CF8`, a 4-byte pointer) is the record every
@@ -1209,7 +1209,7 @@ extern char pat_server_host[];
 }
 #endif
 
-/* Declarations moved here from `include/unsplit/Network.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+/* Declarations moved here from `unsplit/Network.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 #ifdef __cplusplus
 extern "C" {
 #endif

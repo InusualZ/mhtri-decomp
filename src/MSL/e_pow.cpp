@@ -1,5 +1,5 @@
 /*
- * MSL/e_pow.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * MSL/e_pow.cpp - STUB (no bodies yet).
  *
  * `.text` 0x80464F00..0x80465714.  Sections of the candidate unit: .text 0x80464F00..0x80465714; .rodata 0x805731A0..0x805731D0; .sdata2 0x8079CC48..0x8079CD58.
  *

@@ -4,7 +4,7 @@
  *
  * `fn_801D6694` moved here from `enemy/fn_801B0010.cpp` when this unit landed (docs/plan.md 6.5
  * rule 2: an extern lives with the TU that owns the symbol).  Its previous home was the band header
- * `include/unsplit/enemy.h`, whose comment said the bracketing registered units named different
+ * `unsplit/enemy.h`, whose comment said the bracketing registered units named different
  * modules - true until this unit was registered.
  */
 #ifndef MHTRI_ENEMY_FN_801CCBC4_H

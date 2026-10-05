@@ -7,7 +7,7 @@
 #include "gx.h"
 #include "camera/camera.h"
 
-/* Declarations moved here from `include/unsplit/unknown.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+/* Declarations moved here from `unsplit/unknown.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 struct _ENEMY_WORK;
 
 #ifdef __cplusplus

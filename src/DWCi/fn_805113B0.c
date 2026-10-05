@@ -3,13 +3,13 @@
  * Nintendo Wi-Fi Connection (DWCi) SDK block the game links between its own code and the NHTTP
  * library.
  *
- * SEAM MOVED (recon lane, 2026-09-27).  This unit was registered as 0x805113B0..0x805124F4; the
+ * SEAM MOVED.  This unit was registered as 0x805113B0..0x805124F4; the
  * right edge is now 0x80512490.  `tools/splits/tudiscover.py at 0x80512490` reports a STRONG x2
  * cut there (.sdata run jumps DWCi_addressFormatPort -> DWCi_emptyString and DWCi_emptyString -> 0x80794370
  * intersect at the single cut 18642), so a TU begins at 0x80512490 and the 0x64 overlap with the
  * NHTTP-side probe is exactly `DWCi_GetStringLength`.  That function's definition moved to the new
  * `DWCi/DWCi_NatNeg.c` (0x80512490..0x805145B8), which owns it; the bodies here reach it through
- * that unit's header (`include/DWCi/DWCi_NatNeg.h`, rule 2 - the local `extern` this file used to
+ * that unit's header (`DWCi/DWCi_NatNeg.h`, rule 2 - the local `extern` this file used to
  * carry was removed in the 2026-09-27 networking pass and the row re-measured unchanged).
  * Re-measured before/after: 91.1543 % / 21 functions / 472 B matched
  * (before) -> 90.9439 % / 20 functions / 372 B matched (after) - the 100 B loss is exactly the
@@ -29,8 +29,8 @@
  * helpers it *calls* that no registered unit owns (`DWCi_list*`, `DWCi_table*`, `DWCi_socket*`,
  * `DWCi_malloc`/`free`, `DWCi_buffer*`, `DWCi_request*`, `DWCi_platform*`, `DWCi_getTick`, and the
  * two SO address helpers) and the 7 band data objects are named from this file's own call sites and
- * are declared in `include/unsplit/DWCi.h` / `include/unsplit/SO.h` - except the address ring, which
- * the NATNEG unit's header owns (`include/DWCi/DWCi_NatNeg.h`, rule 2).  Every one of those is a GUESS
+ * are declared in `unsplit/DWCi.h` / `unsplit/SO.h` - except the address ring, which
+ * the NATNEG unit's header owns (`DWCi/DWCi_NatNeg.h`, rule 2).  Every one of those is a GUESS
  * and a marker for a later reconstruction to confirm - only the argument/return shapes at the call
  * sites, not a recovered SDK spelling, back them.
  *
@@ -190,9 +190,9 @@ struct DWCiXfer {
 
 /* --------------------------------------------------------------------------------------------- */
 /* The band data this unit loads.  It is owned by nobody and the registered ranges bracketing it   */
-/* name different modules, so it is declared in `include/unsplit/DWCi.h` (rule 2) and never        */
+/* name different modules, so it is declared in `unsplit/DWCi.h` (rule 2) and never        */
 /* defined here (playbook 29) - apart from `DWCi_addressRing`, which the NATNEG unit's `.bss` run   */
-/* covers and whose declaration therefore lives in `include/DWCi/DWCi_NatNeg.h`.  The private       */
+/* covers and whose declaration therefore lives in `DWCi/DWCi_NatNeg.h`.  The private       */
 /* records those declarations reach stay below, next to the code that uses them.                   */
 /* --------------------------------------------------------------------------------------------- */
 

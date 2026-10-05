@@ -1,15 +1,15 @@
 /*
- * include/menu/fn_8031A6C0.h - the menu selection-screen band (`.text` 0x8031A6C0..0x8031EA8C).
+ * menu/fn_8031A6C0.h - the menu selection-screen band (`.text` 0x8031A6C0..0x8031EA8C).
  *
  * Everything here is traced from the range's own disassembly: every offset is one the target
  * instructions address, every width is the load/store the target uses there.  The band is the
  * item/equipment selection screen.  `MenuSel` is this band's view of the 0x330-byte menu working
- * record `include/menu/menu_item.h` names `MenuSlot` (the same bytes; this band additionally uses
+ * record `menu/menu_item.h` names `MenuSlot` (the same bytes; this band additionally uses
  * the +0x1EC selection cursor and the +0x210 slot pairs the item layer leaves unnamed, so the view
  * is written out here rather than folding into the `menu_item.cpp` record).  `MenuSelEntry` is this
  * band's view of the 0x18-byte entry arrays at +0x24 (3) and +0x6C (8).  The selection state
  * `MenuSelCursor` is embedded at +0x1EC; `self[1]` is the work area's second record (+0x330).
- * The off-range helpers the band calls are declared in `include/unsplit/` and the owner headers
+ * The off-range helpers the band calls are declared in `unsplit/` and the owner headers
  * this file includes.
  */
 #ifndef MHTRI_MENU_FN_8031A6C0_H

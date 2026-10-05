@@ -1,7 +1,7 @@
 /*
  * Declarations of `src/Network/NetworkSessionManagerPat.cpp` that are not class members: the two free functions inside the
  * unit's `.text` range (0x803D70B8..0x803DF2EC).  The class itself is declared in `Network/NetworkSessionManager.h`.  Moved here
- * from `include/Network/network_pat_control.h` when the phase 4 fold gave the unit the whole band.
+ * from `Network/network_pat_control.h` when the phase 4 fold gave the unit the whole band.
  */
 #ifndef MHTRI_NETWORK_NETWORKSESSIONMANAGERPAT_H
 #define MHTRI_NETWORK_NETWORKSESSIONMANAGERPAT_H
@@ -15,7 +15,7 @@ class NetworkSessionManagerPat;
 extern "C" {
 #endif
 
-/* The holder `getPatsObject` returns is `NetworkPat` (include/Network/NetworkPat.h).  The accessor is at 0x803DA020. */
+/* The holder `getPatsObject` returns is `NetworkPat` (Network/NetworkPat.h).  The accessor is at 0x803DA020. */
 NetworkPat* getPatsObject(void);
 /* `isNetworkSessionManagerPatReady` (0x803DF1A8) is the session manager's readiness probe: it is handed the object slot
  * +0x00 holds, so its parameter is that object's class. */
@@ -25,14 +25,14 @@ BOOL isNetworkSessionManagerPatReady(NetworkSessionManagerPat* session_manager);
 }
 #endif
 
-/* Declarations moved here from `include/unsplit/Network.h` (docs/plan.md 6.5 rule 2: the owner declares). */
-class NetworkSessionManagerPat;    /* include/Network/NetworkSessionManager.h */
-typedef struct NetLayerRequest NetLayerRequest; /* include/Network/NetworkLayerPat.h */
-typedef struct NetworkRequest NetworkRequest;   /* include/Network/NetworkSessionManager.h */
-typedef struct NetworkRequestError NetworkRequestError;   /* include/unsplit/Network.h */
-typedef struct NetworkNameList NetworkNameList;           /* include/Network/NetworkSessionManager.h */
-class NetworkBuffer;                                      /* include/Network/network_writer_types.h */
-typedef struct NetworkLayerId NetworkLayerId;             /* include/Network/NetworkLayerPat.h */
+/* Declarations moved here from `unsplit/Network.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+class NetworkSessionManagerPat;    /* Network/NetworkSessionManager.h */
+typedef struct NetLayerRequest NetLayerRequest; /* Network/NetworkLayerPat.h */
+typedef struct NetworkRequest NetworkRequest;   /* Network/NetworkSessionManager.h */
+typedef struct NetworkRequestError NetworkRequestError;   /* unsplit/Network.h */
+typedef struct NetworkNameList NetworkNameList;           /* Network/NetworkSessionManager.h */
+class NetworkBuffer;                                      /* Network/network_writer_types.h */
+typedef struct NetworkLayerId NetworkLayerId;             /* Network/NetworkLayerPat.h */
 struct PatTerms;
 
 #ifdef __cplusplus

@@ -8,7 +8,7 @@
 #include "ef/eft052.h"
 #include "menu/menu_message.h"
 
-/* Declarations moved here from `include/unsplit/lobby.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+/* Declarations moved here from `unsplit/lobby.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 #ifdef __cplusplus
 extern "C" {
 #endif

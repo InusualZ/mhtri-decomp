@@ -21,7 +21,7 @@
  *    0x803F116C, neither declared yet); the static initialiser 0x80437204 (`net_community_state` is built with the
  *    NetworkCommunityPat band's constructor 0x803F0730 / destructor 0x803F0578, and the 0x20-byte address object at
  *    0x806E1B18 with the small object's; both classes belong to that band, so `net_community_state` is a plain object).
- *  - The profile writes (round 4): `sendProfileHead` 92.8 % (retail computes the first presence value before the
+ *  - The profile writes: `sendProfileHead` 92.8 % (retail computes the first presence value before the
  *    count store and keeps it in r4; ours stores the value after the count), `startRosterFetch` 95.5 % (the four
  *    callee-saved registers permuted: retail r31 result / r28 work / r30 profile, ours r29 / r30 / r28; declaration
  *    order does not move it), `onCircleListReceived` 98.2 % (work and the circle cursor swap r30/r31; the best of 120

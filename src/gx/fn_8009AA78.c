@@ -1,4 +1,4 @@
-/* auto/8009AA78_fn_8009AA78.c - the 8 functions at .text 0x8009AA78..0x8009ACE4.
+/* gx/fn_8009AA78.c - the 8 functions at .text 0x8009AA78..0x8009ACE4.
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * A write-gather-pipe command writer and the six entry points built on it. `fn_8009AB1C`/`28`/`38` are
@@ -25,20 +25,20 @@
  * 0x800868D8 *and* 0x8009AB1C, whose bodies are the same single-store pipe write - a dumper alias, not
  * evidence - and no other address in the range resolves, so the provisional names stand.
  *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/8009AA78_fn_8009AA78.c`.
+ * Inventory, addresses and sizes: `python tools/units/ledger.py unit gx/fn_8009AA78.c`.
  */
 
 #include "gx.h"
 #include "unsplit/g3d.h" /* fn_800868A0 (unsplit g3d neighbour, rule 2) */
 #include "g3d/fn_80075DCC.h" /* fn_80077420, owned by g3d/fn_80075DCC.cpp (rule 2) */
 
-/* The write-gather-pipe window at 0xCC008000 and its `GXWGFifo` macro live in `include/gx.h` now that
+/* The write-gather-pipe window at 0xCC008000 and its `GXWGFifo` macro live in `gx.h` now that
  * a second `auto` unit (the GX-writer family at 0x800C6F90) needs them too (CLAUDE.md -> Conventions,
  * rule 1: a type more than one unit uses lives in one header). */
 
 /* Pipe writers and the byte table, all defined by other translation units of the same library; the
  * addresses are the map's and the local extab names above are the only object-level difference.
- * `fn_800868A0`/`fn_80077420` come from include/unsplit/g3d.h (rule 2). */
+ * `fn_800868A0`/`fn_80077420` come from unsplit/g3d.h (rule 2). */
 extern const u8 lbl_80795F58[4];
 
 #pragma peephole off

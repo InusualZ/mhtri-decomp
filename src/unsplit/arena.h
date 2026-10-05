@@ -1,15 +1,15 @@
 /*
- * The arena-task band's record types (`include/unsplit/<band>.h`, the band's fallback home).
+ * The arena-task band's record types (`unsplit/<band>.h`, the band's fallback home).
  *
  * This header held the band's *unowned* declarations while no registered unit owned them.  The data
  * symbols are owned now: `src/quest/arenatask.cpp` claimed its own `.data`/`.bss`/`.sdata`/`.sbss`/
  * `.sdata2` runs in `config/RMHE08/splits.txt` (rule 12), so their declarations moved to that unit's
- * own header, `include/quest/arenatask.h`, and a consumer includes *that* (rule 2).  What is left here
+ * own header, `quest/arenatask.h`, and a consumer includes *that* (rule 2).  What is left here
  * is what a symbol-free header can hold - the band's record types, which the band's other units will
  * include once they register.  A declaration of a symbol *another* unit owns is still wrong here: it
- * belongs in that owner's header (`my_player_no` -> `include/ef/fn_800CDB2C.h`, `get_arena_cfg` ->
- * `include/menu/get_pop_dat_ptr.h`, `setVec3` -> `include/mh3_pad.h`, `multi_arena_clr_time` ->
- * this file's sibling `include/unsplit/menu.h`; `quest_record_get` (owner `quest/quest_entry.cpp`)
+ * belongs in that owner's header (`my_player_no` -> `ef/fn_800CDB2C.h`, `get_arena_cfg` ->
+ * `menu/get_pop_dat_ptr.h`, `setVec3` -> `mh3_pad.h`, `multi_arena_clr_time` ->
+ * this file's sibling `unsplit/menu.h`; `quest_record_get` (owner `quest/quest_entry.cpp`)
  * has no published header yet - that absence is what blocks `dl_acdata_to_ar_eqdata`).
  *
  * Evidence classes: the runtime dump's own local names (`arena_work`, `arena_draw_func`, `que_info`,

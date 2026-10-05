@@ -1,8 +1,8 @@
 /*
- * The stage-work block (`stage_w`, `.bss` 0x806B87C0, 0x2FE0 B) as a light header (`include/unsplit/<band>.h`,
+ * The stage-work block (`stage_w`, `.bss` 0x806B87C0, 0x2FE0 B) as a light header (`unsplit/<band>.h`,
  * the fallback home of a symbol no registered unit owns).
  *
- * `include/stage/fn_802B2AA0.h` carries the full `StageRuntime` view but pulls `sound/mhchar.h`, whose
+ * `stage/fn_802B2AA0.h` carries the full `StageRuntime` view but pulls `sound/mhchar.h`, whose
  * `_GXChannelID` enum and `MHchar` record clash with the ones `pl.h` defines, so a translation unit that
  * includes `pl.h` (the arena task) cannot include it.  The symbol's declaration lives here and that header
  * includes this one; the view below names only the two bytes `StageRuntime` calls `mapno` / `areano` (+0xBC5 /

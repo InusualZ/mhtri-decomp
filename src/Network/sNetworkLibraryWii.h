@@ -6,9 +6,9 @@
 #include "Network/network_transport.h"
 #include "Network/sNetworkLibrary.h"   /* sNetworkLibrary, the base class */
 
-/* Declarations moved here from `include/unsplit/Network.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+/* Declarations moved here from `unsplit/Network.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 struct NetworkPat;
-class NetworkSessionManagerPat;   /* include/Network/NetworkSessionManager.h */
+class NetworkSessionManagerPat;   /* Network/NetworkSessionManager.h */
 
 /* The OS thread record the library runs its SO/DWC calls on (the SDK's `OSThread`). size: 0x318 */
 typedef struct sNetworkLibraryThread {

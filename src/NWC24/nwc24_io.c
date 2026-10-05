@@ -72,7 +72,7 @@
  * (`sShutdownFd`), `.sbss` 0x807958B8-0x807958D8 (the RTC work flag, the async slot and the three
  * shutdown words), `.bss` 0x80766B00-0x80766C40 (the RTC work block, the OS shutdown record and the
  * async request/reply blocks) and `.data` 0x806311E8-0x8063122C (this half's three literals).  Still
- * unowned and therefore declared `extern` in `include/unsplit/NWC24.h`: the sibling half's device-path
+ * unowned and therefore declared `extern` in `unsplit/NWC24.h`: the sibling half's device-path
  * literals (`.data` 0x80631178-0x806311E8) and the library's message work block
  * (`.bss` 0x80766980-0x80766B00) - both are read by `nwc24_msg.c`'s rows as well, so claiming them
  * The `.rodata` 0x80574E00-0x80574E10 nibble table (`sNwc24UserIdSbox`, renamed from lbl_80574E00) is claimed too: its only
@@ -207,7 +207,7 @@ static NWC24ShutdownFdSlot sShutdownFd = { -1, 0 };
 /* The device layer's own work block (`.bss` 0x80766B00, 0xE0 B): the mutex its requests take and
    the two 32-byte buffers an ioctl travels in.  It is referenced only by `NWC24iSetRtcCounter`
    (checked with `tools/units/callers.py`), so it is this unit's to own (rule 12) - the type used to
-   live in `include/unsplit/NWC24.h` as a foreign declaration. size: 0xE0 */
+   live in `unsplit/NWC24.h` as a foreign declaration. size: 0xE0 */
 typedef struct NWC24RtcWork {
     /* +0x000 */ u8 pad_0x000[0x80];
     /* +0x080 */ OSMutex mutex;

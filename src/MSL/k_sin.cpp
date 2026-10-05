@@ -1,5 +1,5 @@
 /*
- * MSL/k_sin.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * MSL/k_sin.cpp - STUB (no bodies yet).
  *
  * `.text` 0x80467260..0x80467320.  Sections of the candidate unit: .text 0x80467260..0x80467320; .sdata2 0x8079CE38..0x8079CE70.
  *

@@ -2,7 +2,7 @@
  * nw4r g3d: g3d_resanmamblight.cpp - the ambient-light channel evaluator, `.text`
  * 0x80089F94-0x8008A220 (6 functions).
  *
- * Re-cut from `auto/800898B0_fn_800898B0.c` (docs/plan.md 12 item 5).  `fn_8008A000` panics with
+ * Re-cut (docs/plan.md 12 item 5).  `fn_8008A000` panics with
  * `__FILE__` = `g3d_resanmamblight.cpp` (line 44) and the retail data fragment is
  * 0x8058FE90-0x8058FF20, so the range is the real `g3d_resanmamblight.cpp`.  `fn_80089F94` cites the
  * `g3d_resanmscn_ac.h` header string (lbl_8058FF08); `fn_8008A204` carries no data reference (the

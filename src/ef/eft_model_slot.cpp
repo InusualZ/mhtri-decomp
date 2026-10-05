@@ -1,7 +1,6 @@
 /* ef/eft_model_slot.cpp - the effect model-slot handlers
  *
  * `.text` 0x800FACAC..0x800FAE08, 5 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): recut registered unit, built from `ef/effect.cpp`.
  * Name is a GUESS: the five functions release or update an effect's model slot (`EftModelOwner`, handler at slot +0x34).
  * Each function keeps the `#pragma` state it had in its retired source.
  */

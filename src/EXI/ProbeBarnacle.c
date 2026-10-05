@@ -1,8 +1,7 @@
 /*
  * EXI/ProbeBarnacle.c - the Revolution SDK library band at 0x804B17D0..0x804B8020.
  *
- * `.text` 0x804B17D0..0x804B8020 (118 functions / 26704 B, 25928 B of code).  Registered from
- * `proposal/804B17D0_ProbeBarnacle.c` (docs/plan.md 12).
+ * `.text` 0x804B17D0..0x804B8020 (118 functions / 26704 B, 25928 B of code).  Registered (docs/plan.md 12).
  *
  * Module `EXI` is class-3 evidence: the runtime dump names the range's head `ProbeBarnacle` /
  * `__OSEnableBarnacle` / `EXIWriteReg`, the EXI library's own entry points, and the module keeps the SDK
@@ -40,9 +39,9 @@
  *     be written at all (rule 6 forbids reaching the fields by pointer arithmetic); the record layouts are
  *     the SDK's own (a distro of the same SDK generation is `doldecomp/ogws`, whose `GXAttr.c`,
  *     `GXGeometry.c`, `GXLight.c` and `GXPixel.c` are `Matching`).  That header import is the blocker, and
- *     it is a shared-file item: `include/gx_hw.h` (the BP/CP/XF/PE register bitfield structs) plus the
+ *     it is a shared-file item: `gx_hw.h` (the BP/CP/XF/PE register bitfield structs) plus the
  *     `GXData` record.  Two rows of the half need no record at all and are cheap follow-ups:
- *     `GXInvalidateVtxCache` (`GXWGFifo.u8 = 0x48`, `include/gx.h` already has the union) and
+ *     `GXInvalidateVtxCache` (`GXWGFifo.u8 = 0x48`, `gx.h` already has the union) and
  *     `__GXIsGPFifoReady` (a byte load of `lbl_807951F1`).
  *   - the two `lo`/`hi` IPC-arena statics of `ISFS_OpenLib` are function-local statics in the SDK; the map
  *     spells their symbols `lo$688_807951BC` / `hi$689_807951C0`, which C cannot declare, so this unit

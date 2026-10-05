@@ -1,5 +1,5 @@
 /*
- * enemy/em_act_step_tail.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * enemy/em_act_step_tail.cpp - STUB (no bodies yet).
  *
  * `.text` 0x80330194..0x8033041C (4 functions, 648 bytes).  Sections of the candidate unit: .text 0x80330194..0x8033041C; extab 0x80016614..0x8001662C; extabindex 0x80035784..0x800357A8.
  *

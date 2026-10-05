@@ -1,5 +1,5 @@
 /*
- * include/Network/NetworkSessionBase.h - the symbols `Network/NetworkSessionBase.cpp` owns that the rest of the Network band calls
+ * Network/NetworkSessionBase.h - the symbols `Network/NetworkSessionBase.cpp` owns that the rest of the Network band calls
  * (the mutex wrappers, the session accessor and the notify setter).
  *
  * The declarations moved out of `Network/network_transport.h` when `Network/network_transport.cpp` was split

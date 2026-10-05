@@ -1,7 +1,6 @@
 /* lobby/fn_80219260.cpp - the lobby equipment page layer.
  *
- * `.text` 0x80219260..0x8021E1EC (76 functions, 20364 B).  Registered from
- * `proposal/80219260_fn_80219260.cpp`.
+ * `.text` 0x80219260..0x8021E1EC (76 functions, 20364 B).
  *
  * Module `lobby`.  Both bracketing registered units are `lobby` (`fn_80212810.cpp` below,
  * `fn_8021E1EC.cpp` above); the range's callees are the lobby/HUD API (`LbStr`, `get_lsp_data`,
@@ -46,8 +45,8 @@
  *  - fn_8021B5AC (87.13 %) has the same merged-symbol difference at 0x805C968C plus one `extsh` of
  *    the `s16` result placement.
  *  - fn_80218138 is declared in this file because its owner unit (`lobby/fn_80212810.cpp`) has no
- *    header yet; a new `include/lobby/fn_80212810.h` is requested in the outbox's `config_requests`.
- *    `fn_8021CBB0`/`fn_8021D5BC` are also declared in `include/unsplit/lobby.h` (the band header)
+ *    header yet; a new `lobby/fn_80212810.h` is requested in the outbox's `config_requests`.
+ *    `fn_8021CBB0`/`fn_8021D5BC` are also declared in `unsplit/lobby.h` (the band header)
  *    although this unit now owns them - the two lines are a leftover for the next data/rename pass.
  */
 #include "types.h"
@@ -69,7 +68,7 @@ extern "C" {
  * object pointer both units pass. */
 void fn_80218138(void* self);
 
-/* Pl-band helpers with no registered owner (the bracketing Pl units make `include/unsplit/Pl.h`
+/* Pl-band helpers with no registered owner (the bracketing Pl units make `unsplit/Pl.h`
  * their rule-2 home). */
 u8 fn_8027E290(u8 kind);
 u8 fn_8027E29C(u8 kind);

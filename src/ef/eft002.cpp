@@ -1,7 +1,7 @@
 /* ef/eft002.cpp - the tail of effect 001 and effect 002 (`eft001_set_pos`, `eft002_set`, `eft002_set_shell`)
  *
  * `.text` 0x800FBE64..0x800FD520, 24 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): fold of 2 registered units, built from `ef/eft001.cpp`, `ef/eft002.cpp`.
+ * Phase 4: fold of 2 registered units, built from `ef/eft001.cpp`, `ef/eft002.cpp`.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  *
  * Kept views: the retired sources declared 6 callee(s) with different signatures (`eft_res_slot_get`, `eft_res_models_spawn`, `eft_state_flags_set`, `fn_800FCED4`, `fn_800FD29C`, `fn_800FD2AC`); each function keeps its own source's view through a function-pointer cast macro (`<name>_viewN`, `<name>_cN`), which compiles to the same direct call, so the fold does not move any body.

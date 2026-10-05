@@ -1,6 +1,6 @@
 /*
  * The three 3-float-record helpers `src/mh3_pad.cpp` owns - 0x80041E40 (`copyVec3`),
- * 0x80041E8C (`setVec3`) and 0x80043EA8 (`VEC3_ctor`).  `include/mh3_pad.h` includes this file, so
+ * 0x80041E8C (`setVec3`) and 0x80043EA8 (`VEC3_ctor`).  `mh3_pad.h` includes this file, so
  * a consumer that can take the whole owner header needs nothing else; it is separate only so that a
  * unit which carries its OWN scalar typedefs can reach the helpers without `types.h`.
  *
@@ -23,7 +23,7 @@
 #ifndef MHTRI_MH3_PAD_VEC3_H
 #define MHTRI_MH3_PAD_VEC3_H
 
-/* The record.  `struct Vec` is tagged in `include/ef.h`, which owns the definition; naming it here
+/* The record.  `struct Vec` is tagged in `ef.h`, which owns the definition; naming it here
  * costs no typedef and no layout. */
 #ifdef __cplusplus
 namespace nw4r { namespace math { struct VEC3; } }

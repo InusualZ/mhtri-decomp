@@ -1,5 +1,5 @@
 /*
- * include/Network/network_shared_data.h - the Network band's shared small-data pool, owned by the
+ * Network/network_shared_data.h - the Network band's shared small-data pool, owned by the
  * data-only unit `Network/network_shared_data.cpp` (rule 12's named owner, playbook 54's model).
  *
  * The two runs this header's words live in -

@@ -65,7 +65,7 @@
 
 #pragma peephole off
 
-/* The allocator pair is owned by `main.cpp` (rule 2); its declarations live in include/main.h. */
+/* The allocator pair is owned by `main.cpp` (rule 2); its declarations live in main.h. */
 #include "main.h"
 
 void* operator new(unsigned long size) throw()

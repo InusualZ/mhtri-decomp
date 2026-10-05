@@ -48,7 +48,7 @@ typedef nw4r::math::MTX34 Mtx34;
 /* The nw4r math free functions the effect units call.  Their map names are GLOBAL-scope manglings
  * (`setVector3__FPQ34nw4r4math4VEC3fff`), so the real declarations sit at global scope: declaring them
  * inside `nw4r::math` would add the `Q34nw4r4math` qualifier and miss the map.  tools/units/mangle.py
- * confirms each spelling; docs/matching.md 50 and docs/plan.md 6.5 rule 9 (call the owner, never the
+ * confirms each spelling; playbook 50 and docs/plan.md 6.5 rule 9 (call the owner, never the
  * mangled identifier).  Additive: a second lane extending this list stays additive. */
 void setVector3(VEC3* v, f32 x, f32 y, f32 z);
 void rotVecX(VEC3* v, u32 angle);

@@ -1,5 +1,5 @@
 /*
- * include/Network/network_transport_types.h - the types the Network transport band's units share.
+ * Network/network_transport_types.h - the types the Network transport band's units share.
  *
  * The band `.text` 0x803CCDF8..0x803D3CE8 was one unit (`Network/network_transport.cpp`) and is now eight
  * (docs/network-transport-split.md).  The classes are used by more than one of them - the peers by the socket

@@ -1,7 +1,7 @@
 /*
- * hud/cockpit_quest.cpp - phase 4 unit, `.text` 0x802E4978..0x802F2238 (158 functions, 55488 bytes).
+ * hud/cockpit_quest.cpp - unit, `.text` 0x802E4978..0x802F2238 (158 functions, 55488 bytes).
  *
- * PHASE 4 (docs/splits/phase4, window d).  Fold of 4 registered units: fn_802E4978.cpp, cockpit_quest.cpp,
+ * Fold of 4 registered units: fn_802E4978.cpp, cockpit_quest.cpp,
  * fn_802EBED8.cpp, eft035.cpp.  The functions below are the ones those sources define, in address order; every other
  * function of the range keeps its original bytes.  107 of 158 functions have a body here.
  *
@@ -62,11 +62,11 @@
  *     are compiled with the sibling `menu` lib's own `cflags_menu` command line.
  *
  * Rule 2 (an extern lives with the TU that owns it).  `stylelint --diff main` reports 0 sites: the 54
- * declarations this band used to carry in `include/unsplit/menu.h` are re-homed - 16 to their owners'
+ * declarations this band used to carry in `unsplit/menu.h` are re-homed - 16 to their owners'
  * headers, which this file now includes (`fn_8004CAD8.h`, `ef/fn_800CDB2C.h`,
  * `Runtime.PPCEABI.H/memset.h`, `Pl/pl_act.h`, `menu/menu_item.h`, the new `ai/fn_802D44F4.h` and
  * `enemy/fn_80382310.h`), 14 dropped (nothing in this file referenced them) and 24 left as this
- * unit's own view in `include/menu/fn_802E4978.h` because the owner's header cannot be included from
+ * unit's own view in `menu/fn_802E4978.h` because the owner's header cannot be included from
  * here (the clash that blocks each is named there; every one is a `shared-file` config_request).  The
  * band header now declares only symbols no registered unit owns.
  *
@@ -959,7 +959,7 @@ void fn_802E646C(void) {
 void fn_802E6AAC(void) {
 }
 
-/* `Screen_w` and its `ScreenGeomView` view come from `include/unsplit/menu.h` (rule 1: this unit
+/* `Screen_w` and its `ScreenGeomView` view come from `unsplit/menu.h` (rule 1: this unit
  * was the first user, `quest/quest_entry.cpp` the second). */
 
 struct SprDataView {

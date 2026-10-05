@@ -1,5 +1,5 @@
 /*
- * MSL/s_ldexp.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * MSL/s_ldexp.cpp - STUB (no bodies yet).
  *
  * `.text` 0x80467BB8..0x80467D24.  Sections of the candidate unit: .text 0x80467BB8..0x80467D24; .sdata2 0x8079CF00..0x8079CF28.
  *

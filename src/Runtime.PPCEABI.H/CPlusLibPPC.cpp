@@ -1,5 +1,5 @@
 /*
- * Runtime.PPCEABI.H/CPlusLibPPC.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * Runtime.PPCEABI.H/CPlusLibPPC.cpp - STUB (no bodies yet).
  *
  * `.text` 0x80456704..0x80456C88.  Sections of the candidate unit: extab 0x8001E3B0..0x8001E3F0; extabindex 0x8003F144..0x8003F174; .text 0x80456704..0x80456C88; .sdata 0x80793CC0..0x80793CC8.
  *

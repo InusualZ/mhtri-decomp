@@ -1,7 +1,7 @@
 /* enemy/em010_prog.cpp - enemy 010 program
  *
  * `.text` 0x801663E4..0x8016D1C4, 30 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): fold of 2 registered units, built from `enemy/fn_80165FC8.cpp`, `enemy/fn_801679B0.cpp`.
+ * Phase 4: fold of 2 registered units, built from `enemy/fn_80165FC8.cpp`, `enemy/fn_801679B0.cpp`.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  *
  * Kept views: the retired sources declared 7 callee(s) with different signatures (`assignVec3`, `em_act_ck`, `em_fall_height_get`, `em_frame_flag_set`, `em_mot_set`, `em_mot_finished_ck`, `em_motion_param_set`); each function keeps its own source's view through a function-pointer cast macro (`<name>_viewN`, `<name>_cN`), which compiles to the same direct call, so the fold does not move any body.
@@ -25,7 +25,7 @@
  * the callee, and a real signature only produces that symbol from the C++ front-end, so the unit is `.cpp`.
  * The unit's own `fn_*` functions stay flat symbols through `extern "C"`.  The one foreign callee it
  * needs a declaration for (`em_busy_set`, owned by `enemy/fn_8012BDF4.cpp`) and the unsplit enemy-band
- * helpers it calls live in their owner headers (`include/enemy/fn_8012BDF4.h`, `include/unsplit/enemy.h`),
+ * helpers it calls live in their owner headers (`enemy/fn_8012BDF4.h`, `unsplit/enemy.h`),
  * not in this file (rule 2).
  *
  * Inventory and per-symbol measurement: `python tools/units/recompile.py enemy/fn_801679B0 --measure <symbol>`.
@@ -40,7 +40,7 @@
  *   * a tiny predicate.
  * `m2c` (tools/m2c, fed by `tools/units/m2cinput.py`) recovered all three, so the residual work is the
  * remaining 75 symbols, not a shape still to find.  The largest unwritten ones (each needs a struct this
- * unit reads that `include/enemy.h` does not yet name - 0x1BC/0x1C4, 0x314-0x324, 0x46C, 0x834/0x835, and a
+ * unit reads that `enemy.h` does not yet name - 0x1BC/0x1C4, 0x314-0x324, 0x46C, 0x834/0x835, and a
  * u8 at 0x1E4 - plus a `cror eq,lt,eq` float compare m2c reports as `M2C_ERROR`) are listed in the outbox;
  * the four written functions still below 100 % are each one extra `clrlwi` byte-mask or one shared
  * `return` branch (see `fn_8016EE00` below).

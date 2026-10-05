@@ -4,11 +4,11 @@
  * RULE 2 HOMES.  `enemy_data_find`/`enemy_data_grp`/`eft_slot_effect_key` are defined by
  * `ef/eft_slot.cpp` (map 0x803438E4 / 0x803439D4 / 0x8034539C) and called from the enemy band -
  * `enemy/fn_8013BE60.c`, `enemy/fn_80165FC8.cpp`, `enemy/fn_80170600.cpp`, `enemy/em_action.cpp`
- * (20+ call sites read the returned record as `_ENEMY_DATA`, `include/enemy/ENEMY_DATA.h`).  This
+ * (20+ call sites read the returned record as `_ENEMY_DATA`, `enemy/ENEMY_DATA.h`).  This
  * unit owns the addresses, so this is their home: the consumers include this header and keep no
  * declaration of their own.  `struct EftSlot` is this unit's own view of the 0x3C-byte record it
  * hands back, forward-declared so a caller with its own view (`_ENEMY_DATA`) can pass its pointer
- * meaning what this unit means; the type itself is defined in `include/ef/EftSlot.h`.
+ * meaning what this unit means; the type itself is defined in `ef/EftSlot.h`.
  *
  * `eft_net_send` (0x803386C4, size 0x144) is the ef band's slot-state sender: r3 the slot record, r4 the
  * mode, r5 the value the mode carries.  `ef/eft_slot.cpp` calls it nine times.  `hud/net_char_sync.cpp` owns
@@ -17,7 +17,7 @@
  * family (an earlier probe measured that the wider declaration surface moved `eft_slot_work_update`).
  *
  * `copyVec3` itself (0x80041E40, `src/mh3_pad.cpp`) is no longer one of these: it comes from
- * `include/mh3_pad.h`, which this unit includes (the `(10197)` clash that used to make that header
+ * `mh3_pad.h`, which this unit includes (the `(10197)` clash that used to make that header
  * unreachable is closed).
  */
 #ifndef MHTRI_EF_EFT_SLOT_H
@@ -35,7 +35,7 @@ struct EftSlot;
 
 /* The 10-entry table lookup: r3 the group index `enemy_data_grp` produced, r4 the enemy-data id;
  * returns the entry, or NULL when the table has none.  Its callers read the record's `+0x08` flag
- * byte and its `+0x17` key byte (both named in `include/enemy/ENEMY_DATA.h`). */
+ * byte and its `+0x17` key byte (both named in `enemy/ENEMY_DATA.h`). */
 void* enemy_data_find(u8 grp, u8 id);
 
 /* The group index that lookup is keyed on, from an enemy's kind byte and its variant. */

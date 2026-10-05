@@ -1,20 +1,20 @@
 /* ef/em_effect_ctrl.cpp - the enemy-effect (`em`) controller
  *
  * `.text` 0x80101FA4..0x80102994, 6 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): the head of the retired `ef/eft007.cpp`, cut away from the player-weapon `eft007` controller (which keeps the name `ef/eft007`).
+ * Phase 4: the head of the retired `ef/eft007.cpp`, cut away from the player-weapon `eft007` controller (which keeps the name `ef/eft007`).
  * Name is a GUESS: the range holds the `em` controller (`EmEffectWork`/`EmEffectUnit`, `fn_80101FA4`'s per-frame screen-box test).
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  */
 
 /* Retired header of `ef/eft007.cpp` (kept for its notes and residuals): */
-/* auto/80101FA4_fn_80101FA4.cpp - the `ef` effect-setup batch: three controller families whose
+/* ef/em_effect_ctrl.cpp - the `ef` effect-setup batch: three controller families whose
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  * per-frame hooks share one object, 22 function(s), 0x80101FA4..0x80103D28.
  *
  * The seam is pinned by the `.data` pool run jumptable_8059E160 -> jumptable_8059E268
  * (`tu-boundary-discovery`).  The unit is C++ (`tools/units/langcheck.py`): two definitions and 21
  * callees arrive mangled, so every definition the map spells plainly is `extern "C"` - a C++ free
- * function would mangle and objdiff pairs by name (docs/matching.md row 42).  A mangled *callee* is a
+ * function would mangle and objdiff pairs by name (playbook 42).  A mangled *callee* is a
  * C++ declaration whose signature reproduces the map's argument list; the ones the map spells plainly
  * are `extern "C"`.
  *

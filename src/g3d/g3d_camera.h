@@ -26,7 +26,7 @@ extern "C" {
 void fn_80075258(nw4r::g3d::Camera* pSelf, u8* pOut, const nw4r::math::VEC3* pVec);
 
 /* 0x80075390..0x80075620 - the matrix helpers `g3d/g3d_state.cpp` calls (rule 2, moved out of that
- * unit's local extern block on landing, 2026-09-25). */
+ * unit's local extern block on landing). */
 void fn_80075390(void* pMtx);
 void fn_80075394(void* pOut, const void* pIn);
 void fn_80075440(void* pOut, const void* pIn);

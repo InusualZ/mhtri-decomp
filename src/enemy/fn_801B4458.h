@@ -33,7 +33,7 @@ struct EmSeatRec {
 struct _ENEMY_WORK;
 
 /* The engine 3-float vector `vec_to_mh_vec3` converts (only forward-declared here: the definition
- * lives in `include/ef.h`, and a `Vec*` is not a `nw4r::math::VEC3*`). */
+ * lives in `ef.h`, and a `Vec*` is not a `nw4r::math::VEC3*`). */
 struct Vec;
 
 #ifdef __cplusplus

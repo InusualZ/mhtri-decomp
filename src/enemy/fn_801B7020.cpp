@@ -2,8 +2,7 @@
  *
  * `.text` 0x801B7020..0x801B98C8 (em036), extab 0x8000F7EC..0x8000F904, extabindex 0x8002B2CC..0x8002B470, one
  * `.ctors` word at 0x8056F34C..0x8056F350 (`fn_801B985C`, the `__sinit`), `.data` 0x805B2188..0x805B2804 (after
- * `em036_prog_tbl`, 0x805B2118) and `.bss` 0x806A7AB8..0x806A7AD0.  Registered from
- * `proposal/801B7020_fn_801B7020.cpp`; the range was 0x801B7020..0x801BD6C0 until the 2026-09-30 recut.
+ * `em036_prog_tbl`, 0x805B2118) and `.bss` 0x806A7AB8..0x806A7AD0.  Registered; the range was 0x801B7020..0x801BD6C0 until the 2026-09-30 recut.
  *
  * The 0x801B7020..0x801E0ADC band was registered as seven ranges that cut through its
  * translation units.  The real TUs (each one's `.data` chunk opens with its `emNNN_prog_tbl`, each ends with its
@@ -71,7 +70,7 @@
  * blocks, and the runtime dump has only `zz_XXXXXXXX_` placeholders for them)
  *
  * Types.  This unit reads `_ENEMY_WORK` bytes that the shared views name differently: it keeps a f32
- * counter at +0x328 (the shared `include/enemy/ENEMY_WORK.h` carries a s16 `field_0x328` there for
+ * counter at +0x328 (the shared `enemy/ENEMY_WORK.h` carries a s16 `field_0x328` there for
  * `fn_80170804`) and it drives a +0x328..+0x358 cluster, +0x310/+0x320 vectors and the +0x210/+0x228
  * words that no shared header names yet.  The unit therefore carries its own view (`EmProgWork`),
  * exactly as `enemy/fn_80191598.cpp` (`EmActWork`), `enemy/fn_8013ACC4.cpp` (`EmWork`) and
@@ -207,8 +206,8 @@ extern "C" void fn_801B78F8(EmProgWork* self);
 /* The two foreign callees this unit cannot reach through a header, each for a documented reason:
  *   * `fn_800B0B90` is `Vec* fn_800B0B90(Vec* self, Vec* b)` in the owner's own source
  *     (`src/ef/fn_800AEE48.cpp:330` - it subtracts `b` from `self` in place), but that owner's header
- *     includes `include/ef.h`, whose `VEC3_ctor`/`setVec3` spellings clash with
- *     `include/mh3_pad.h`'s on the very same C-linkage symbols (MWCC `(10197) illegal function
+ *     includes `ef.h`, whose `VEC3_ctor`/`setVec3` spellings clash with
+ *     `mh3_pad.h`'s on the very same C-linkage symbols (MWCC `(10197) illegal function
  *     overloading`), so the header is not includable here.  The map symbol is the plain
  *     `fn_800B0B90`, hence C linkage.
  *   * `lbl_805B2188` is the 0x60-byte `.data` table `em_key_curve_eval` is handed; no registered unit
@@ -216,7 +215,7 @@ extern "C" void fn_801B78F8(EmProgWork* self);
  *     `src/Pl/pl_act.cpp` uses for its data labels.  Both are `shared-file` requests in the outbox. */
 extern "C" {
 void fn_800B0B90(nw4r::math::VEC3* dst, const nw4r::math::VEC3* src);
-/* 0x80050850 has moved to its owner's header, `include/fn_8004CAD8.h` (included above): the two
+/* 0x80050850 has moved to its owner's header, `fn_8004CAD8.h` (included above): the two
  * in-file copies that made that fold unsafe (`src/ef/fn_801173AC.cpp`'s and this one) were settled
  * in the same batch, 2026-09-27.  0x80051EE0 (r3 `out`, r4 `in`, f1 the scale it saves in f31
  * before zeroing `out` through `VEC3_ctor`) is still declared here: its owner is the same unit,

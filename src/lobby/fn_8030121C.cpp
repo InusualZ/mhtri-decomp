@@ -30,7 +30,7 @@
 #include "ai/fn_802D0F34.h"
 #include "Runtime.PPCEABI.H/memset.h"
 
-/* The effect-pool release the unsplit band declares (`include/unsplit/unknown.h`); its owner is an
+/* The effect-pool release the unsplit band declares (`unsplit/unknown.h`); its owner is an
  * unclaimed address, so the rule-2 named gap applies. */
 namespace nw4r {
 namespace ef {
@@ -38,7 +38,7 @@ struct Effect;
 }
 }  // namespace nw4r
 void push_eft_effect_heap_num(nw4r::ef::Effect** effects, long count);
-/* `include/main.h` cannot be included here: its `_GXChannelID` enum clashes with the one `ef.h` pulls
+/* `main.h` cannot be included here: its `_GXChannelID` enum clashes with the one `ef.h` pulls
  * in.  `ck_WideMode` is a C++ free function (`ck_WideMode__Fv`), so the declaration is at C++ scope. */
 int ck_WideMode(void);
 
@@ -89,7 +89,7 @@ void fn_80306614(_EFT* self);
 void fn_803066B4(_EFT* self);
 
 /* Unclaimed band addresses (rule 2's named unsplit gap - no registered unit owns them yet). */
-/* `include/stage/fn_802B2AA0.h` cannot be included here: it pulls `sound/mhchar.h`, whose
+/* `stage/fn_802B2AA0.h` cannot be included here: it pulls `sound/mhchar.h`, whose
  * `_GXChannelID` enum clashes with the one `pl.h` (via `hud/layout.h`) defines. */
 u8* fn_802B04A0(u8 kind);
 s32 fn_80222BC4(u8*, s32, u8);

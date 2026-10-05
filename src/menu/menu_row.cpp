@@ -1,7 +1,7 @@
 /* menu/menu_row.cpp - the menu row / note slot / placement list code, `.text` 0x8034C1D0..0x8034D2B0
  * (27 functions / 4320 B), with its extab 0x80017094..0x800170F4 (12 records), extabindex
  * 0x80036744..0x800367D4 (12 x 12 B) and `.sdata2` 0x8079B368..0x8079B3A8 (the pool `fn_8034CDDC`
- * loads; the written bodies emit no pool).  Re-cut out of `enemy/em024_ai.cpp` (2026-09-29): that
+ * loads; the written bodies emit no pool).  Re-cut out of `enemy/em024_ai.cpp`: that
  * unit's range 0x8034C1D0..0x80358624 was three translation units, and this is the first of them.
  *
  * WHAT IT IS.  Menu-band item-page code: it calls `get_note_item_slot`, `item_page_option_*` and
@@ -43,7 +43,7 @@
  *   note_slot_cursor_bounds builds a note slot's cursor bounds from the option table `fn_8029F818`
  *                           returns for its kind
  *   item_page_option_item_id maps an item page option id to the item it unlocks, -1 when not yet
- *                           available (declared in `include/menu/menu_item_page.h`)
+ *                           available (declared in `menu/menu_item_page.h`)
  *   place_list_deactivate_all clears `active` on every `MenuSlot::place_entries` record
  *   place_list_overlap_find first active record whose rectangle overlaps the box, else -1
  *   place_rec_key_ptr       the key word's address, 0 when the list is absent
@@ -81,7 +81,7 @@
  * NOT written: `fn_8034C350` (8 B), `fn_8034CCBC` (0xB0) and `fn_8034CD6C` (0x70) - the last two
  * read `_SPR_DATA_`'s rectangle and cannot be typed here: `hud/layout.h` (owner of `_SPR_DATA_`)
  * and `menu/menu_item.h` both define `_mh_ivec2_`, so the two headers collide in one TU (the
- * per-consumer-view split `include/menu/menu_item_page.h` documents); `fn_8034CDDC` (0x348); the
+ * per-consumer-view split `menu/menu_item_page.h` documents); `fn_8034CDDC` (0x348); the
  * nine row fillers `fn_8034D124`..`fn_8034D284`.
  * DATA.  `.sdata2` 0x8079B368..0x8079B3A8 is claimed; no `.data` (the unit owns none).  The
  * `.bss` word `lbl_806AC8C8` the placement functions read is the shared menu work block, unowned.

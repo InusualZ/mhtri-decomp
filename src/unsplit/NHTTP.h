@@ -4,7 +4,7 @@
  * The NHTTP library's info block `NHTTPi_systemInfo` (`.bss` 0x80762C60, 0x51A B) is owned by no
  * registered unit: the address is inside no `splits.txt` range, and the registered NHTTP units
  * (`NHTTP_bgnend.c`, `NHTTP_os_RVL.c`, `d_nhttp.c`) do not claim it.  It was declared in
- * `include/NHTTP/d_nhttp.h` (a unit's own header) until the networking conformance pass; rule 2
+ * `NHTTP/d_nhttp.h` (a unit's own header) until the networking conformance pass; rule 2
  * puts an unowned symbol in the band header, so it lives here and `d_nhttp.h` includes this file.
  *
  * The singleton slot `NHTTPi_systemInfoP` (`.sbss` 0x80795884) that `NHTTPi_GetSystemInfoP` lazily
@@ -13,7 +13,7 @@
  * longer names it.
  *
  * `struct NHTTPInfo`'s definition stays with the unit that reconstructs it
- * (`include/NHTTP/d_nhttp.h`), so only the forward declaration is here.
+ * (`NHTTP/d_nhttp.h`), so only the forward declaration is here.
  */
 #ifndef MHTRI_UNSPLIT_NHTTP_H
 #define MHTRI_UNSPLIT_NHTTP_H

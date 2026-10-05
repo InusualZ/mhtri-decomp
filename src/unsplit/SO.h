@@ -6,10 +6,10 @@
  * (host -> network u16) - sit in the SO/SSL band that no registered unit covers.  stylelint's rule 2
  * cannot place them (`resolve` returns `unsplit` with no module: the nearest registered ranges are
  * `NWC24/nwc24_io.c` below and the game-UI band above, different modules); `SOHtoNs`'s own `SO`
- * prefix and its neighbours' socket vocabulary name the library, and no `include/SO/` owner exists,
+ * prefix and its neighbours' socket vocabulary name the library, and no `SO/` owner exists,
  * so this file is their home.
  *
- * `SOHtoNs` was declared in `include/unsplit/Network.h` (the Network band's header, which is
+ * `SOHtoNs` was declared in `unsplit/Network.h` (the Network band's header, which is
  * C++-only because it carries a class); it moved here and that header now includes this one, so the
  * symbol has one home and the DWCi units (plain `.c`) can reach it.
  *

@@ -1,8 +1,7 @@
 /*
  * OS/FindContainHeap_.c - the Nintendo SDK low-level runtime band at 0x804C1760..0x804C68A0.
  *
- * `.text` 0x804C1760..0x804C68A0 (57 functions).  Registered from
- * `proposal/804C1760_FindContainHeap_.c` (docs/plan.md 12); phase 4 cut the tail from 0x804C68A0 into
+ * `.text` 0x804C1760..0x804C68A0 (57 functions).  Registered (docs/plan.md 12); phase 4 cut the tail from 0x804C68A0 into
  * MTX/mtxvec.c, MTX/mtx44.c and MTX/vec.c (the vec cluster and the C_MTXOrtho / PSMTXMultVec stubs).
  *
  * Module `OS` is class-3 evidence: the nearest registered unit in splits.txt is `OS/OSAlarm.c`

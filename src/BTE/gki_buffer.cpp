@@ -1,5 +1,5 @@
 /*
- * BTE/gki_buffer.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * BTE/gki_buffer.cpp - STUB (no bodies yet).
  *
  * `.text` 0x804772F0..0x804AFED0.  Sections of the candidate unit: .text 0x804772F0..0x804AFED0; .rodata 0x80573530..0x80573A00; .data 0x80612D18..0x8061A4F0; .bss 0x8070CDE0..0x80746B60; .sdata 0x80793D28..0x80793E30; .sbss 0x80795008..0x80795198; .sdata2 0x8079D090..0x8079D0F0; .sbss2 0x8079D7E0..0x8079D7F0.
  *

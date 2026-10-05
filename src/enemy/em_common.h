@@ -7,7 +7,7 @@
 #include "enemy/fn_8012E968.h"
 #include "enemy/fn_801502C8.h"
 
-/* Declarations moved here from `include/unsplit/enemy.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+/* Declarations moved here from `unsplit/enemy.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 struct _ENEMY_WORK;
 
 #ifdef __cplusplus

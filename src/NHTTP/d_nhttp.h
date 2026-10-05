@@ -1,11 +1,11 @@
 /*
- * include/NHTTP/d_nhttp.h - the NHTTP core unit (`src/NHTTP/d_nhttp.c`, `.text`
+ * NHTTP/d_nhttp.h - the NHTTP core unit (`src/NHTTP/d_nhttp.c`, `.text`
  * 0x80515774..0x8051B7FC) and the NHTTP system-info block it owns.
  *
  * Rule 2: this unit owns `NHTTPi_GetSystemInfoP` and the info-block layout, so the consumers
  * (`NHTTP_bgnend.c`, `NHTTP_os_RVL.c`) include this header instead of declaring them.  The two data
  * objects have no registered owner, so they are declared in the band header
- * `include/unsplit/NHTTP.h`, which this file includes.
+ * `unsplit/NHTTP.h`, which this file includes.
  *
  * The block is `NHTTPi_systemInfo` (`.bss`); `NHTTPi_GetSystemInfoP` lazily points `NHTTPi_systemInfoP` at it.
  * Only the fields the reconstructed accessors touch are modelled, with `pad_0xNN` filling the gaps;
@@ -429,7 +429,7 @@ s32 NHTTPi_RegisterCallbacks(void (*commandCallback)(u32), void (*commandCallbac
 }
 #endif
 
-/* Declarations moved here from `include/unsplit/NHTTP.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+/* Declarations moved here from `unsplit/NHTTP.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 #ifdef __cplusplus
 extern "C" {
 #endif

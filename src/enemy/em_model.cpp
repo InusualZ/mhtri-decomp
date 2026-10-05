@@ -7,7 +7,7 @@
  * `.data` 0x805F8220..0x805F84E0, `.bss` 0x806D2A68..0x806D2AF8, `.sdata` 0x80793690..0x807936A8, `.sbss`
  * 0x80794C50..0x80794C60, `.sdata2` 0x8079C5B8..0x8079C630.
  *
- * Phase 4 recut of `enemy/em_pop` (docs/splits/phase4): the tail of the registered unit's range, text from
+ * Phase 4 recut of `enemy/em_pop`: the tail of the registered unit's range, text from
  * `em_roster_record_result_get` on (the first function of the source that lies at or above 0x803B936C), with the
  * unit's own `.sbss`/`.bss` definitions (`em_pop_w` at 0x80794C58, `em_handle_tbl` at 0x806D2A78).  `enemy/em_pop`
  * keeps the head (0x803B465C..0x803B936C); the file name `em_model` is a GUESS from the band's model-handle

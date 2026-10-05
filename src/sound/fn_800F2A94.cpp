@@ -2,7 +2,7 @@
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with `symedit`: every
  * fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
- * 45 functions, 14988 bytes.  Registered from `proposal/800F2A94_fn_800F2A94.cpp` (whose range was
+ * 45 functions, 14988 bytes.  Registered (whose range was
  * 0x800F2A94..0x800F95A4 / 88 functions / 27408 bytes - see "Seam" for why the registration stops at
  * 0x800F6520).
  *

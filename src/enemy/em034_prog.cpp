@@ -1,7 +1,7 @@
 /* enemy/em034_prog.cpp - enemy 034 program
  *
  * `.text` 0x801B4348..0x801B7020, 50 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): fold of 2 registered units, built from `enemy/fn_801B0010.cpp`, `enemy/fn_801B4458.cpp`.
+ * Phase 4: fold of 2 registered units, built from `enemy/fn_801B0010.cpp`, `enemy/fn_801B4458.cpp`.
  * Named after `em034_prog_tbl` (0x805B17A8), the first `.data` symbol of the range (GUESS for the unit as a whole: the range is the seat/effect-action band that follows em030).
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  *
@@ -39,9 +39,9 @@
  * (`em_act_ck`, `em_die_ck`, `em_get_mot_no`, `em_frame_check`, `em_after_frame_check`,
  * `get_move_work_adrs`, `get_move_work_max`, `ran_suu`, `get_em_chg_scale`, `get_joint_wpos_em`,
  * `setVector3`, `vec_to_mh_vec3`) - rule 9 never spells the mangling.  The range's own flat symbols
- * stay C-linkage through the `extern "C"` block in `include/enemy/fn_801B4458.h`.
+ * stay C-linkage through the `extern "C"` block in `enemy/fn_801B4458.h`.
  *
- * Object: `_ENEMY_WORK`, included from `include/enemy/ENEMY_WORK.h` (the one shared home; the fields
+ * Object: `_ENEMY_WORK`, included from `enemy/ENEMY_WORK.h` (the one shared home; the fields
  * this range names were added there - +0x00F, +0x1CC, the +0x328 seat view, +0x440, +0x833 and
  * +0x888, and `EmAreaWork`'s +0x008/+0x3C for the area records `get_move_work_adrs(2)` hands back).
  *
@@ -338,7 +338,7 @@ extern "C" u32 fn_801B4398(_ENEMY_WORK* work, u32 kind, u32* out) {
 }
 
 /* The 0x20-byte ground record `fn_80125F54` prepares and `fn_801421E4` fills lives in
- * `include/enemy/ENEMY_WORK.h` now (rule 1: one definition for both units that own one). */
+ * `enemy/ENEMY_WORK.h` now (rule 1: one definition for both units that own one). */
 
 /* -------------------------------------------------------------------------------------------------
  * the range's functions, in address order

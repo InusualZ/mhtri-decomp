@@ -1,7 +1,6 @@
 /* ef/eft026_fx.cpp - effect 026 fx band
  *
  * `.text` 0x80117DA8..0x80119C44, 20 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): recut registered unit, built from `ef/fn_801173AC.cpp`.
  * Each function keeps the `#pragma` state it had in its retired source.
  */
 
@@ -181,10 +180,10 @@ void fn_80119BB0(u8 kind, nw4r::math::VEC3* pos, _CP_VECTOR* rot, f32 scale, u8 
 _EFT* fn_80119C44(u8 kind, u8 variant, u32 arg);
 void fn_80119D10(_EFT* self);
 void fn_80119D9C(_EFT* self);
-/* 0x80041E40 is owned by `src/mh3_pad.cpp`; its header cannot be included here (`include/ef.h`
- * spells `VEC3_ctor`/`setVec3` differently from `include/mh3_pad.h`, MWCC (10197)), so this
+/* 0x80041E40 is owned by `src/mh3_pad.cpp`; its header cannot be included here (`ef.h`
+ * spells `VEC3_ctor`/`setVec3` differently from `mh3_pad.h`, MWCC (10197)), so this
  * copy stays - normalised to the owner's body (`void*` return).  `fn_80050850`/`addVec3` now
- * come from their owner's header, `include/fn_8004CAD8.h` (included above, rule 2). */
+ * come from their owner's header, `fn_8004CAD8.h` (included above, rule 2). */
 void fn_800513F0(nw4r::math::VEC3* v, f32 angle);
 void fn_800532DC(nw4r::math::MTX34* out, nw4r::math::MTX34* in);
 /* eft_res_model_get comes from the owner's header `ef/eft_res.h` (rule 2): this unit's local

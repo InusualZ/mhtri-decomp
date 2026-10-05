@@ -1,5 +1,5 @@
 /*
- * include/DWCi/fn_805113B0.h - the declarations `src/DWCi/fn_805113B0.c` owns that other units call
+ * DWCi/fn_805113B0.h - the declarations `src/DWCi/fn_805113B0.c` owns that other units call
  * (docs/plan.md 6.5 rule 2): the address helpers the GameSpy interface unit formats its connect
  * address with.  A consumer includes this header instead of declaring the symbols itself.  Keep it
  * minimal - the signatures are the ones `fn_805113B0.c` defines.
@@ -22,7 +22,7 @@ char* DWCi_formatAddress(u32 addr, u16 port, char* buf);
 }
 #endif
 
-/* Declarations moved here from `include/unsplit/DWCi.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+/* Declarations moved here from `unsplit/DWCi.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 #ifdef __cplusplus
 extern "C" {
 #endif

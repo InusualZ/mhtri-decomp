@@ -3,7 +3,7 @@
  *
  * The unit is the cockpit-side AI band 0x802D44F4-0x802DDC04.  The `fn_802DAxxx` entries below are the
  * ones the cockpit band above it (`menu/fn_802E4978.cpp`, 0x802E4978-0x802E7408) calls; they had been
- * declared in `include/unsplit/menu.h` while the address had no registered owner, and their signatures
+ * declared in `unsplit/menu.h` while the address had no registered owner, and their signatures
  * are that consumer's call sites (no body of them is written yet).
  *
  * `fn_802DA3CC` is a body of this range (0x88 B) whose *address* the consumer registers with

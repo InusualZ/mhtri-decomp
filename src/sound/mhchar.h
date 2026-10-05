@@ -1,11 +1,11 @@
 /* The `sound` band's `MHchar` view: the actor's joint/model block as the SE and model methods of
  * `src/sound/fn_800DD1F0.cpp` read it.
  *
- * docs/plan.md 6.5 rules 1/4/5: `MHchar` is a shared record (it also lives in `include/pl.h` as the
+ * docs/plan.md 6.5 rules 1/4/5: `MHchar` is a shared record (it also lives in `pl.h` as the
  * union of the other bands' views and in several `src/` copies), so this unit includes one definition
  * here rather than adding a ninth `struct MHchar { ... }` to `src/`.  The offsets and names below are
  * the ones this unit's methods touch; the fields the other bands name keep that spelling where the two
- * agree (`pos_0x04`, `scale_0x1C`, `field_0x114`).  The record is at least 0x140 bytes (include/pl.h)
+ * agree (`pos_0x04`, `scale_0x1C`, `field_0x114`).  The record is at least 0x140 bytes (pl.h)
  * and the methods here reach +0x160 (`fn_800E1C2C`), so the size below is the union.
  * size: 0x164 */
 #ifndef MHTRI_SOUND_MHCHAR_H

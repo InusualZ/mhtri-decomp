@@ -14,7 +14,7 @@
  * object - so no neighbour shares this TU and the 0x8034C1D0 edge is a real one (the seam the pool
  * brief pinned).
  *
- * SYMBOL NAMES (naming pass, 2026-09-26).  The map and the runtime dump had nothing for this
+ * SYMBOL NAMES (naming pass).  The map and the runtime dump had nothing for this
  * range (`dumpmap.py lookup 0x8034C0C4` answers `zz_034c0c4_`; `symedit.py range 0x8034C000
  * 0x8034D000` shows bare stems up to the registered `hud/` and `ef/` units), so the names are
  * derived from the body and the band's scheme.  It reads one note entry and writes the menu
@@ -34,7 +34,7 @@
  * list row's select/update and draw handlers, called from `fn_8033A160` (0x8033A4D4) and
  * `fn_8033A7DC` (0x8033A808); a scan of every `bl` in the DOL finds no other caller.
  *
- * SECTIONS (phase 4).  The unit claims `.data` 0x805E91F8..0x805E9248 (0x50 B): the two string labels above (0x805E91F8..0x805E9220), which
+ * SECTIONS.  The unit claims `.data` 0x805E91F8..0x805E9248 (0x50 B): the two string labels above (0x805E91F8..0x805E9220), which
  * this file defines ahead of the table, and the 10-entry jump table at 0x805E9220..0x805E9248 that MWCC emits from the switch below.
  *
  * Flags: the lib's `cflags_menu` (`-O3 -inline noauto -opt nopeephole -Cpp_exceptions on`, mw

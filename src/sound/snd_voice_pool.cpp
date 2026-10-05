@@ -1,7 +1,6 @@
 /* sound/snd_voice_pool.cpp - the sound table object and its pool destructors
  *
  * `.text` 0x800ED780..0x800EE014, 22 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): recut registered unit, built from `sound/fn_800E8E60.cpp`.
  * Name is a GUESS: the unit owns `lbl_8069A8E8` (0x6828 B `.bss`, the table `snd_bank1_install`/`fn_800EDD00` install into) and `dtor_800ED780`/`dtor_800ED7EC`.
  * Each function keeps the `#pragma` state it had in its retired source.
  */

@@ -55,7 +55,7 @@ void fn_801281F8(struct _ENEMY_WORK* work);
  * `clrlwi r4,r4,24` / `clrlwi r5,r5,24` before the tail call to `em_act_step_arm`.  This unit is built
  * with `#pragma peephole off`, and under it a u8 parameter keeps that target `clrlwi` (with the pass
  * on the pair is folded away, so the spelling is load-bearing - the same reason the unit's note gives
- * for `fn_80128590`/`fn_801285A0`).  The narrower spelling is the one `include/enemy/fn_80165FC8.h`
+ * for `fn_80128590`/`fn_801285A0`).  The narrower spelling is the one `enemy/fn_80165FC8.h`
  * already carried; this header's old `u32` copy was the second, clashing declaration.  `em_hit_window_set`
  * narrows its second argument to u8 itself (`clrlwi r4,r4,24` on the way into `em_se_tbl_play_alt`) and the
  * owner's own body calls it `(self, (u8)a, b, 0)`.  One declaration, hand-merged for the three
@@ -70,7 +70,7 @@ void fn_80126324(struct _ENEMY_WORK* self, u32 a, u32 b, f32 c);
 void em_hit_window_set(struct _ENEMY_WORK* self, u8 a, u32 b, u32 c);
 /* 0x8012B380 - r3 (`self`) and three scalars; the motion/state setter the action band calls after
  * `em_mot_end_ck` reports done (this unit owns the address).  Added with `enemy/em009_act.cpp`
- * (rule 2; the same signature `include/enemy/fn_80165FC8.h` carried). */
+ * (rule 2; the same signature `enemy/fn_80165FC8.h` carried). */
 void fn_8012B380(struct _ENEMY_WORK* self, u32 a, u32 b, u32 c);
 /* 0x80127FE4 / 0x801280AC - one `self` argument, no return.  Moved here from
  * `enemy/fn_801550FC.cpp` on landing (rule 2): this unit owns the addresses. */
@@ -152,7 +152,7 @@ void em_hit_window_set_default(struct _ENEMY_WORK* self, u32 a, u32 b);
 void fn_80128AEC(struct _ENEMY_WORK* self, u32 a, u32 b);
 /* 0x80128A14 - r3 the work record and the two scalars its own body narrows; the neighbour state
  * machines call it after `em_mot_end_ck` reports the motion done (declaration moved here from
- * include/unsplit/enemy.h by `enemy/fn_801A9540.cpp`'s registration: this range owns the
+ * unsplit/enemy.h by `enemy/fn_801A9540.cpp`'s registration: this range owns the
  * address). */
 void em_state_set(struct _ENEMY_WORK* self, u32 a, u32 b);
 /* 0x80126454 - `get_enemy_data(self)->extra->table_0x1C` indexed by `self->field_0x38a` in

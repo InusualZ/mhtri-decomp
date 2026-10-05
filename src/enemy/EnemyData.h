@@ -1,6 +1,6 @@
-/* The per-enemy data record `get_enemy_data` returns, shared by `include/enemy.h` and the net sync
+/* The per-enemy data record `get_enemy_data` returns, shared by `enemy.h` and the net sync
  * (`hud/net_char_sync.cpp`) that reads its kind byte (docs/plan.md 6.5 rule 1: one definition, included).
- * Moved here from `include/enemy.h`; the definition is unchanged except that its +0x00F byte is named.
+ * Moved here from `enemy.h`; the definition is unchanged except that its +0x00F byte is named.
  */
 #ifndef MHTRI_ENEMY_ENEMYDATA_H
 #define MHTRI_ENEMY_ENEMYDATA_H

@@ -1,5 +1,5 @@
 /*
- * menu/menu_item_sub.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * menu/menu_item_sub.cpp - STUB (no bodies yet).
  *
  * `.text` 0x8036A828..0x8036CF64 (23 functions, 10044 bytes).  Sections of the candidate unit: .bss 0x806BF440..0x806BF530; .data 0x805EE078..0x805EE098; .text 0x8036A828..0x8036CF64; extab 0x80017844..0x800178E4; extabindex 0x800372CC..0x800373BC.
  *

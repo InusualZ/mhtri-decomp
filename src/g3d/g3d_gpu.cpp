@@ -65,7 +65,7 @@
  * it (`Array8`), which is why the fields carry their packing slot rather than a guessed meaning; the
  * assert macro is the project's proven materialised-BOOL expansion (`g3d/g3d_basic.cpp`,
  * `ef/ef_point.cpp`), and `IsValidPointer`'s seven ranges are spelled out there rather than taken from
- * `include/ef.h`, whose copy is the effect lane's (a second copy of an inline is what the check is
+ * `ef.h`, whose copy is the effect lane's (a second copy of an inline is what the check is
  * for).  `Mat33` is local: only this unit reaches the stored 3x3.
  */
 

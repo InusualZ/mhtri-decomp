@@ -1,7 +1,6 @@
 /* Pl/player_control.cpp - the player control set
  *
  * `.text` 0x802673A4..0x802693C4, 12 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): recut registered unit, built from `Pl/fn_80262940.cpp`.
  * Each function keeps the `#pragma` state it had in its retired source.
  */
 

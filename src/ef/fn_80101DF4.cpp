@@ -1,4 +1,4 @@
-/* auto/80101DF4_fn_80101DF4.cpp - the effect-state machine's state-0 handler: `fn_80101DF4`,
+/* ef/fn_80101DF4.cpp - the effect-state machine's state-0 handler: `fn_80101DF4`,
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  * `.text` 0x80101DF4-0x80101FA4.
  *
@@ -37,7 +37,7 @@
  *
  * Residual: none - all 108 rows match, `.text` 0x1B0/0x1B0 and `extab`/`extabindex` byte-equal.
  *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/80101DF4_fn_80101DF4.cpp`.
+ * Inventory, addresses and sizes: `python tools/units/ledger.py unit ef/fn_80101DF4.cpp`.
  * The name is provisional (`auto/` plus the first symbol's address) because nothing in the object names
  * the original source file.
  */

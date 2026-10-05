@@ -7,7 +7,7 @@
  * The object emits no `.sdata`: the target's `.sdata` reads (`"%d"` 0x807922A0, `"%s"` 0x807922A4/0x807922A8)
  * belong to bodies that are not written yet.
  *
- * Provenance: registered from `proposal/802A6624_fn_802A6624.cpp` and re-homed here on 2026-09-29; the name is
+ * Provenance: registered and re-homed here on 2026-09-29; the name is
  * a GUESS from what the range does (the selection list and its cursor, the message/frame dialog) - no
  * `__FILE__` string covers it.  The right edge was cut at 0x802AA764 and then again at 0x802AA6A8: the tail is
  * the gunner-shell pool (`stage/shell.cpp`), whose first function `shell_work_init` (0x802AA6A8) clears the shell pool's `.bss` and calls its table initialisers.
@@ -55,7 +55,7 @@
  *   * rule-2 debt: `menu/menu_item.cpp`, `menu/fn_8031A6C0.cpp` and `lobby/fn_801EC9F8.cpp` still declare the
  *     record-typed entry points (`menu_slot_*`, `menu_item_slot_accepts`, `menu_list_*`, `menu_cursor_column_step`)
  *     locally because they view the record as `MENU_ITEM_W` / `MenuSel`, not `MenuListWork`; folding the views is a
- *     separate change.  `include/unsplit/lobby.h` and `include/lobby/lb_pane_ui.h` declare `menu_cursor_step` as
+ *     separate change.  `unsplit/lobby.h` and `lobby/lb_pane_ui.h` declare `menu_cursor_step` as
  *     a C++ five-argument function while this range owns 0x802A8EFC and the target spells it bare.
  *
  * Declaration linkage: every callee the written bodies call is declared the way the map spells it -
@@ -103,7 +103,7 @@ extern "C" void menu_frame_page_draw(u32* dst, MenuListEntry* entries, s8 a, s8 
 extern MenuSourceRecord lbl_806BE340[10];   /* 2 x 5 records: validity byte + two names */
 
 /* The draw helper that sits in no registered range, so the declaration is this unit's call
- * sites' (rule 2's unsplit case - the address bands interleave, so `include/unsplit/<module>.h` has
+ * sites' (rule 2's unsplit case - the address bands interleave, so `unsplit/<module>.h` has
  * no sound module to move them to). */
 void PutPageArrow(u16* table, s16 a, s16 b, u16 flags, const struct _mh_ivec2_* pos, u8 mode);
 

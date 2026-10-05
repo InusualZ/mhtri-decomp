@@ -1,7 +1,6 @@
 /* enemy/em011_prog.cpp - enemy 011 program
  *
  * `.text` 0x8016D1C4..0x80170600, 28 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): recut registered unit, built from `enemy/fn_801679B0.cpp`.
  * Each function keeps the `#pragma` state it had in its retired source.
  */
 

@@ -1,5 +1,5 @@
 /*
- * The `menu` band's unowned declarations (`include/unsplit/<module>.h`, rule 2's home when no
+ * The `menu` band's unowned declarations (`unsplit/<module>.h`, rule 2's home when no
  * registered unit owns the symbol).
  *
  * Each name here is a `.text` row in `config/RMHE08/symbols.txt` with no owning registered unit: the
@@ -8,12 +8,12 @@
  * includes that header: `menu/fn_802E4978.cpp` includes `fn_8004CAD8.h`, `ef/fn_800CDB2C.h`,
  * `Runtime.PPCEABI.H/memset.h`, `Pl/pl_act.h`, `menu/menu_item.h`, `ai/fn_802D44F4.h` and
  * `enemy/fn_80382310.h` for its callees, and the six owner headers that cannot be included from that
- * unit (with the clash that blocks each) are named in `include/menu/fn_802E4978.h`, which declares
+ * unit (with the clash that blocks each) are named in `menu/fn_802E4978.h`, which declares
  * those callees as the unit's own view.
  *
  * The C++-linkage callees (a mangled map name) are declared with their real signatures so the
  * front-end reproduces the map's mangling (rule 9); `get_lsp_data`, the `draw_*` family and
- * `font_set_size` come from `include/unsplit/lobby.h`, `set_blendmode` from `include/lobby/...`.
+ * `font_set_size` come from `unsplit/lobby.h`, `set_blendmode` from `lobby/...`.
  */
 #ifndef MHTRI_UNSPLIT_MENU_H
 #define MHTRI_UNSPLIT_MENU_H
@@ -38,9 +38,9 @@ s32 put_lsp_anchor_offset(u16, void*, void*);     /* 0x802E06B0 */
 #include "lobby/lb_quest_screen.h"
 /* `fn_803BECA0` (0x803BECA0) and `get_arena_cfg` (0x803BEBF0) are no longer declared here: the
  * range that defines them, `src/menu/get_pop_dat_ptr.cpp`, owns them and publishes both in
- * `include/menu/get_pop_dat_ptr.h`, which this header includes below (rule 2). */
+ * `menu/get_pop_dat_ptr.h`, which this header includes below (rule 2). */
 
-/* The quest-work accessors this band used to declare moved to `include/lobby/lb_quest_screen.h`
+/* The quest-work accessors this band used to declare moved to `lobby/lb_quest_screen.h`
  * for the same reason - that unit's registered range covers their addresses, and this header
  * includes it above. */
 

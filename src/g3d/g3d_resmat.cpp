@@ -3,7 +3,7 @@
  * 0x800947A4-0x80098D5C (140 functions, 0x45B8 B).
  *
  * Registered once, at its final home (docs/plan.md 12), from the pooled proposal
- * `proposal/800947A4_fn_800947A4`.  Naming - evidence class 1, a `__FILE__` string:
+ * `g3d/g3d_resmat.cpp`.  Naming - evidence class 1, a `__FILE__` string:
  * the first body's `nw4r::db::Panic` assert passes `.data` 0x80590D78 = "g3d_resmat.cpp"
  * (`python tools/symbols/dumpmap.py lookup 0x80590D78`), and the next function outside this
  * range - 0x80098D5C - starts `g3d_resnode.cpp` (tudiscover seam, class `source`).  So the
@@ -13,7 +13,7 @@
  *
  * The map owns two mangled symbols in this range - `ResTexSrt::SetEffectMtx` and its const
  * `GetEffectMtx` twin (`Q34nw4r3g3d9ResTexSrt`) - and 138 bare `fn_XXXXXXXX` stems.  The
- * mangled pair is written through its owner class (`include/nw4r/g3d/g3d_resmat.h`, rule 9);
+ * mangled pair is written through its owner class (`g3d/g3d_resmat.h`, rule 9);
  * the rest keep the map's stems (Naming note below).
  *
  * Sections: `.text` 0x800947A4-0x80098D5C, `extab` 0x800094E0-0x80009850 (110 8-byte

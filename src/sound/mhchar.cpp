@@ -9,7 +9,7 @@
  * (`sound/sound_job.cpp`).  The functions here are the old unit's bodies, moved unchanged (measured there, flags unchanged).  The range's
  * codegen carries the non-record forms the peephole pass would fold, so the original TU was peephole-off.
  *
- * Name: `mhchar` is the class the range is about (`MHchar::` methods, the model block `include/sound/mhchar.h` views); no `__FILE__`
+ * Name: `mhchar` is the class the range is about (`MHchar::` methods, the model block `sound/mhchar.h` views); no `__FILE__`
  * string names the TU, so the file name is a GUESS from the class.
  */
 

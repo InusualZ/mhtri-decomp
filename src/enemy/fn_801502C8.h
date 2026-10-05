@@ -2,13 +2,13 @@
  * (docs/plan.md 6.5 rule 2: a consumer includes the owner's header, it never declares the symbol
  * itself).
  *
- * The three entry points below left `include/unsplit/enemy.h` when this unit registered the range -
+ * The three entry points below left `unsplit/enemy.h` when this unit registered the range -
  * they had been declared there from `enemy/fn_801B0010.cpp`'s and `enemy/fn_80147CE0.cpp`'s call
  * sites - and that band header includes this one now.  The spellings are this unit's definitions'.
  *
  * `fn_801545B8` keeps the C consumers' `void*` spelling under `#ifndef __cplusplus`: this unit defines
  * it over `EmSpawnRec` while `enemy/fn_8014A1BC.c` passes its own `ShellParams` view of the same 0x18
- * bytes.  The split is the one `include/enemy/fn_80147CE0.h` carries for the same reason.
+ * bytes.  The split is the one `enemy/fn_80147CE0.h` carries for the same reason.
  */
 #ifndef MHTRI_ENEMY_FN_801502C8_H
 #define MHTRI_ENEMY_FN_801502C8_H

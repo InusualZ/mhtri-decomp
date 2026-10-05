@@ -1,4 +1,4 @@
-/* auto/8010D1A8_fn_8010D1A8.c - the player action-effect state machine, `.text` 0x8010D1A8..0x801121DC.
+/* ef/fn_8010D1A8.c - the player action-effect state machine, `.text` 0x8010D1A8..0x801121DC.
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
  *
  * What it is.  The unit drives the nw4r effects a player action spawns: an `Eft` record carries a
@@ -42,9 +42,9 @@
  * are unions because the variants reuse the same bytes for different payloads.
  *
  * Language.  The unit's own symbols are plain, so the file stays C and the mangled callees are declared
- * by their map spelling, as `auto/800FD520_fn_800FD520.c` does.
+ * by their map spelling, as `ef/fn_800FD520.c` does.
  *
- * Inventory, addresses and sizes: `python tools/units/ledger.py unit auto/8010D1A8_fn_8010D1A8.c`.
+ * Inventory, addresses and sizes: `python tools/units/ledger.py unit ef/fn_8010D1A8.c`.
  */
 
 #include "ef/eft_state_flags_set.h" /* eft_state_flags_set (rule 2: the owner's header) */

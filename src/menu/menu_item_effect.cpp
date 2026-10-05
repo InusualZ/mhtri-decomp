@@ -1,8 +1,7 @@
 /*
- * menu/menu_item_effect.cpp - phase 4 unit, `.text` 0x8031DAA8..0x8031EA8C (14 functions, 4068 bytes).
+ * menu/menu_item_effect.cpp - unit, `.text` 0x8031DAA8..0x8031EA8C (14 functions, 4068 bytes).
  *
- * PHASE 4 (docs/splits/phase4, window d).  Recut of fn_8031A6C0.cpp: its functions whose address lies in this range,
- * in address order; the rest of the range keeps its original bytes.  4 of 14 functions have a body here.
+ * 4 of 14 functions have a body here.
  *
  * FLAGS.  `cflags_menu`.  GUESS (rule 7): the stem names what the old header says the tail drives (the selected item's
  * 3D effect model).
@@ -58,11 +57,6 @@
 
 extern "C" {
 }
-
-/* 0x8031B6D0 - reset this record to its item-screen defaults (kept for the follow-up round that
- * writes the in-band `fn_8031B39C`/`fn_8031B4C4` it calls). */
-#if 0
-#endif
 
 /* ============================================================================================== */
 /* 0x8031E568 / 0x8031EA78 - step counters; 0x8031E578 / 0x8031EA88 / 0x8031DA50 - tail calls    */

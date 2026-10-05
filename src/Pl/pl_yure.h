@@ -43,7 +43,7 @@ struct YureRec {
 };
 
 /* The part of the enemy work record (`get_move_work_adrs(3)`, stride 0xB18) the sway unit reads: the
- * record's type byte and the three sway records.  `include/enemy/ENEMY_WORK.h`'s `_ENEMY_WORK` carries
+ * record's type byte and the three sway records.  `enemy/ENEMY_WORK.h`'s `_ENEMY_WORK` carries
  * the same bytes (`field_0x608`/`field_0x610` are sway record 0's angle words).
  * size: 0xB18 */
 struct YureEnemyWork {
@@ -56,7 +56,7 @@ struct YureEnemyWork {
 };
 
 /* The part of the player work record (`get_move_work_adrs(2)`, stride 0xB20) the sway unit reads: the
- * eight sway records (four hair, four cloth).  `include/pl.h`'s `_PLW` stops at +0x668.
+ * eight sway records (four hair, four cloth).  `pl.h`'s `_PLW` stops at +0x668.
  * size: 0xB20 */
 struct YurePlayerWork {
     /* +0x000 */ u8 active_0x000;

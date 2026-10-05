@@ -1,5 +1,5 @@
 /*
- * include/Network/network_transport.h - the Network transport band's public header: the shared types plus each
+ * Network/network_transport.h - the Network transport band's public header: the shared types plus each
  * unit's own declarations.
  *
  * `Network/network_transport.cpp` (`.text` 0x803CCDF8..0x803D3CE8) is now eight units - `NetworkPeerBase`,

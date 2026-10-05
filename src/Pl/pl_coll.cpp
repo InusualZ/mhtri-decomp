@@ -2,7 +2,7 @@
  * Pl/pl_coll.cpp - the player actor's ground/hit collision band: the ground and hit queries, the land table and the hit-id list.
  *
  * `.text` 0x8028F66C..0x80297E34 (about 80 functions), `.bss` 0x1060 B (the `Pl/pl_coll.h` arrays), `.ctors` 4 B, `.data` 0x40 B,
- * `.sbss` 8 B, `.sdata` 8 B, `.sdata2` 0x6C B, extab 0x218 B and extabindex 0x324 B.  Phase 4 fold/recut (docs/splits/phase4):
+ * `.sbss` 8 B, `.sdata` 8 B, `.sdata2` 0x6C B, extab 0x218 B and extabindex 0x324 B.  Phase 4 fold/recut:
  * `Pl/fn_8028F66C` (whole), the head of `Pl/fn_80295EF4` (0x80295EF4..0x80297E34) and the data-only unit `Pl/bss_pool` (the
  * `.bss` arrays the band's static initialiser constructs) are one TU of the candidate; the tail of `Pl/fn_80295EF4` goes to
  * `menu/menu_item`.
@@ -64,7 +64,7 @@
  *     lands two slots early.  Three source variants (the ratio inline, a named `ratio`, a named
  *     scale local) all keep 90.48 %; 84 B / 22 instructions either way.
  *   * `fn_80291A70` and `fn_80291B48` read `_PLW` bytes that have no field: +0x1E1 (inside
- *     `equipB2.deco_level`) and +0x004 (inside `include/pl.h`'s `unk003[2]` run).  `fn_80291A70`
+ *     `equipB2.deco_level`) and +0x004 (inside `pl.h`'s `unk003[2]` run).  `fn_80291A70`
  *     also zeroes a `_HIT_TENJO_DATA`'s +0x00/+0x01 bytes and its +0x04 float, which needs that
  *     record's layout.  They wait for those fields rather than re-cut `pl.h` from here.
  *   * The three big hits - `GetGroundHit2` (0x80291664, 920 B), `hit_ground_comon` (0x80291CD0,
@@ -83,7 +83,7 @@
  *     `fn_802924C0`/`fn_802929DC`/`fn_80293504`/`fn_80293A88`/`pl_coll_sweep_ck`/`fn_80294538`/
  *     `fn_80294B64`/`fn_80294EFC`/`fn_802950D8` need their record types settled the same way.
  *   * `fn_8028F938`'s two callees whose owners' headers cannot declare them live in
- *     `include/Pl/fn_8028F66C.h` (see that file for the measured `(10197)` reason).
+ *     `Pl/fn_8028F66C.h` (see that file for the measured `(10197)` reason).
  */
 
 #include "types.h"
@@ -218,7 +218,7 @@ f32 fn_8028F86C(PlBox* box, const VEC3* point, f32* param) {
         t = fn_8028F84C(fn_80052214(&sep.x, &box->vec_0x18.x) / axis_len2, 0.0f, 1.0f);
         fn_80051EE0(&scaled, &box->vec_0x18, t);
         /* `fn_800B0B90` is declared with the `ef` module's `Vec`, a distinct 0xC record with the same
-         * layout (`include/ef.h`); the conversion is a view, not arithmetic. */
+         * layout (`ef.h`); the conversion is a view, not arithmetic. */
         fn_800B0B90((Vec*)&sep, (Vec*)&scaled);
     }
     *param = t;

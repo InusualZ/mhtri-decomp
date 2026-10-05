@@ -3,7 +3,7 @@
  * `ResCommon<CameraData>` accessors, `.text` 0x800746DC-0x80075DCC (27 functions, including the
  * already-demangled `Camera::SetPosition`/`SetPosture`/`SetPerspective`).
  *
- * Re-cut from `auto/80073398_fn_80073398.cpp` (docs/plan.md 12 item 5).  The `g3d_camera.cpp` string
+ * Re-cut (docs/plan.md 12 item 5).  The `g3d_camera.cpp` string
  * `lbl_8058E430` is referenced from `fn_800746DC` onward and `g3d_rescommon_ac.h` from
  * `fn_800748E4`/`fn_80074A54`; the data fragment is 0x8058E430-0x8058E570.  The six accessors
  * `fn_80074620`..`fn_800746D4` (0x80074620-0x800746DC, zero data references) are assigned to

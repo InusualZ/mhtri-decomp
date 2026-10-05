@@ -1,7 +1,7 @@
 /* enemy/em001_prog.cpp - enemy 001 program
  *
  * `.text` 0x80147C94..0x80154E40, 121 functions written (the rest of the range is not decompiled yet).
- * Phase 4 (docs/splits/phase4): fold of 5 registered units, built from `enemy/fn_80147CE0.cpp`, `enemy/fn_80149D6C.c`, `enemy/fn_8014A1BC.c`, `enemy/fn_801502C8.cpp`.
+ * Phase 4: fold of 5 registered units, built from `enemy/fn_80147CE0.cpp`, `enemy/fn_80149D6C.c`, `enemy/fn_8014A1BC.c`, `enemy/fn_801502C8.cpp`.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
  *
  * Kept views: the retired sources declared 42 callee(s) with different signatures (`addVec3`, `assignVec3`, `calcVecAngXY`, `draw_shape_arm`, `eft009_set_pos`, `eft009_spawn_at_joint`, `eft_em_spawn`, `eft_spawn_type10`, `eft_spawn_type11`, `em_approach_start`, `em_busy_set`, `em_fall_height_get`, ...); each function keeps its own source's view through a function-pointer cast macro (`<name>_viewN`, `<name>_cN`), which compiles to the same direct call, so the fold does not move any body.
@@ -55,9 +55,9 @@
  * at 0x8002871C, where that unit's begins.  The LEFT edge at 0x80147CE0 is NOT evidence - it is the
  * `--max-bytes` cut of the discovery queue (`MAX_BYTES_DEFAULT` = 27436): the maximal unclaimed run is
  * 0x801411B8..0x80149D6C (35764 B), so `tools/units/attribute.py` cut it at the last function boundary
- * under the cap, and the piece below is `proposal/801411B8` (27432 B, its `tu` verdict `merged`).  The
+ * under the cap, and the piece below is `enemy/enemy_control.cpp` (27432 B, its `tu` verdict `merged`).  The
  * two pieces very probably belong to one TU:
- *   * `proposal/801411B8` carries the only `__FILE__` evidence in the run - `enemy_control.cpp`,
+ *   * `enemy/enemy_control.cpp` carries the only `__FILE__` evidence in the run - `enemy_control.cpp`,
  *     referenced from 0x801411DC/0x80141258 - and this piece's code references no source name at all,
  *     which is what a continuation of that file looks like;
  *   * the two `.data` tables this range's constructors install (`lbl_805A1368` for `em_res_user_data_ctor`,
@@ -78,7 +78,7 @@
  * `langcheck`'s region verdict (C++, medium) rests on.  Every definition keeps the map's plain
  * `fn_XXXXXXXX` name, i.e. the `extern "C"` block below.
  *
- * Types.  `_ENEMY_WORK` is the shared record `include/enemy/ENEMY_WORK.h` owns (rule 1); this unit
+ * Types.  `_ENEMY_WORK` is the shared record `enemy/ENEMY_WORK.h` owns (rule 1); this unit
  * added the fields it measured to that header (+0x1FB, +0x314/+0x318/+0x324, +0x354..+0x358, +0x38B,
  * +0x464).  Two records this unit uses are private copies of records another unit also carries and are
  * a rule-1 follow-up (outbox `config_requests[1]`): the 12-byte vtable helper
@@ -114,7 +114,7 @@
  *     Measured directly: with the band header's `(self, s32, f32)` the same call site emits
  *     `li r4,imm` then `lfs f1,pool` (both orders reproduce the same ABI - one FPR and one GPR slot -
  *     so this is a declaration-order artefact of the original TU, not a wrong call).  Fixing it means
- *     flipping the parameter order in `include/unsplit/enemy.h`'s C++ view of `em_motion_param_set`/
+ *     flipping the parameter order in `unsplit/enemy.h`'s C++ view of `em_motion_param_set`/
  *     `em_approach_start` AND the call sites in `src/enemy/fn_801550FC.cpp` (another unit's file), so it is
  *     recorded rather than done here.
  *   * MASKED-VALUE CSE (fn_80147CE0 92.43).  `(arg & 0xFF)` used twice CSEs into one register
@@ -159,13 +159,13 @@
  *     `enemy/fn_8012BA00.c`, `enemy/fn_8012BDF4.cpp` and `enemy/fn_80176C58.cpp`).
  *
  * Declarations.  Rule 2 sent every callee to the header that owns it: this unit's own entry points are
- * published in `include/enemy/fn_80147CE0.h` (moved out of `include/unsplit/enemy.h`, whose old-style
+ * published in `enemy/fn_80147CE0.h` (moved out of `unsplit/enemy.h`, whose old-style
  * spellings the C consumers keep), and `fn_80154CA4`/`fn_801545B8` (enemy band, unowned) went the
- * other way into `include/unsplit/enemy.h`.  The band header's `fn_80128A8C`, `em_hit_window_set`,
+ * other way into `unsplit/enemy.h`.  The band header's `fn_80128A8C`, `em_hit_window_set`,
  * `em_action_finish_fall`, `em_action_finish_walk` and `em_target_pos_set` moved to their owner's header
- * (`include/enemy/fn_801251D0.h`), and `draw_shape_arm`'s owner (`src/draw_shape.cpp`) got its first
- * header (`include/draw_shape.h`).  `include/fn_8004CAD8.h` gained `calcVecAng2` (C++ linkage, the
- * mangling the map names) and `include/ef/eft007.h`/`eft009.h` gained the C++ views of
+ * (`enemy/fn_801251D0.h`), and `draw_shape_arm`'s owner (`src/draw_shape.cpp`) got its first
+ * header (`draw_shape.h`).  `fn_8004CAD8.h` gained `calcVecAng2` (C++ linkage, the
+ * mangling the map names) and `ef/eft007.h`/`eft009.h` gained the C++ views of
  * `eft007_part_spawn`/`fn_801049D0` (one view per TU - declaring both spellings is `(10197) illegal
  * function overloading`, measured).
  *
@@ -1001,7 +1001,7 @@ extern "C" Helper_80147CE0* fn_80147DF0(Helper_80147CE0* self) {
 }
 
 /* The helper's base constructor (the engine's own joint-table install, then the base table).  The
- * signature is the one `include/unsplit/enemy.h` publishes for the consumer
+ * signature is the one `unsplit/enemy.h` publishes for the consumer
  * `enemy/fn_80176C58.cpp`; the body's trailing `mr r3,r31` is the target's `return self`. */
 extern "C" void* em_res_user_data_ctor(void* self) {
     Helper_80147CE0* helper = (Helper_80147CE0*)self;

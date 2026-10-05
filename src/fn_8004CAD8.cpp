@@ -7,7 +7,7 @@
  *
  * The game-root draw/gallery band.  `.text` 0x8004CAD8..0x8005270C (phase 4 cut: the old range ran to 0x80054C64, 277 functions).
  * The `draw_shape` 2D pipeline's `drawshape_*` half from 0x8005270C on is `draw_shape.cpp`'s now.
- * One maximal unclaimed run (attribute.py `proposal/8004CAD8_fn_8004CAD8.cpp`): its seam is unproven
+ * One maximal unclaimed run (attribute.py `fn_8004CAD8.cpp`): its seam is unproven
  * (`capped at --max-bytes, seam is a guess`) and the body work is plainly several families - the
  * work-block accessors and quest/VS result buffers (0x8004CAD8..0x8004D4xx), the gallery / Wii-message /
  * Wii-remote-memory helpers (0x8004E7xx..0x8004FE88), the nw4r-math wrappers (0x8004FFxx..0x800518xx) and
@@ -153,7 +153,7 @@ extern "C" void fn_8004D1A4(void)
     memset(lbl_8066A620 + 0x100, 0, 0x100);
 }
 
-/* --- the nw4r math free functions this unit defines (declared in include/nw4r/math.h, rule 9) ------- */
+/* --- the nw4r math free functions this unit defines (declared in nw4r/math.h, rule 9) ------- */
 
 void setVector3(VEC3* v, f32 x, f32 y, f32 z)
 {

@@ -3,7 +3,7 @@
  *
  * Registration (brief section 2).  The range is proposal `803253BC_fn_803253BC` from discovery's
  * attribution queue (the map stem the range was claimed under; *Naming* below replaces it).
- * Seam (campaign rule, 2026-09-26), settled from the data - referrer sets taken
+ * Seam (campaign rule), settled from the data - referrer sets taken
  * from every current target object's relocations, not from `tudiscover`'s hints (it reports only
  * weak signals at every candidate cut here): the range references no string at all, so the
  * `__FILE__` test is inapplicable (the DOL's only `enemy`-band file name is `enemy_control.cpp`, one
@@ -53,13 +53,13 @@
  * extabindex 0x800351A8-0x800354FC (both derived from the range's `@etb_` labels) and the one
  * `.ctors` word 0x8056F39C -> fn_8032C65C.
  *
- * The record is the shared `_ENEMY_WORK` (`include/enemy/ENEMY_WORK.h`, rule 1).
+ * The record is the shared `_ENEMY_WORK` (`enemy/ENEMY_WORK.h`, rule 1).
  *
  * Data state (brief section 2).  `python tools/units/datagap.py --unit em_action` reports **no
  * `ours-extra` row** and no data-section row in either direction: this object emits no
  * `.data`/`.sdata2`/`.sdata`/`.rodata` and neither does the target object, because the entries the
  * range loads live in data bands no `splits.txt` block claims.  They are declared, never defined
- * (`include/unsplit/enemy.h`, playbook 29) - a definition would emit a second copy.  The ranges
+ * (`unsplit/enemy.h`, playbook 29) - a definition would emit a second copy.  The ranges
  * *are* claimable, but only once the bodies that use them are written: claiming them now, at 13 of
  * 85 functions, gives the target object bytes this one does not emit (`target-extra`), which playbook
  * 29 calls strictly worse than leaving the claim out.  The one claimed section this object does not
@@ -89,7 +89,7 @@
  *     one register colour away.
  *   * em_act_slots_clr, em_act_noop, em_act_arm_m06s07 and em_act_dispatch are byte-identical.
  *
- * Merged with `main` (2026-09-26).  The `_ENEMY_WORK` +0x194 field split had landed without its
+ * Merged with `main`.  The `_ENEMY_WORK` +0x194 field split had landed without its
  * trailing pad, which shrank the struct to 0xB0C and moved every member above +0x194 down by 0x0C -
  * invisible to this unit's own rows but worth 446 lower rows across the tree.  The two views are one
  * `union` now; an MWCC probe (array extents read back from the object's symtab) re-asserts

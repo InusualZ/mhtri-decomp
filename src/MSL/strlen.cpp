@@ -1,5 +1,5 @@
 /*
- * MSL/strlen.cpp - STUB (phase 4, docs/splits/phase4; no bodies yet).
+ * MSL/strlen.cpp - STUB (no bodies yet).
  *
  * `.text` 0x804565C0..0x804565DC.  Sections of the candidate unit: .text 0x804565C0..0x804565DC.
  *

@@ -425,7 +425,7 @@ extern "C" u32 fn_8006EA24(void *self, u32 *key)
 
 /* The unsplit g3d/main-band teardown helper with no registered owner (rule 2's named gap); the
  * fn_8005D384/fn_8005D3E0/fn_800628A4/fn_800628B4/fn_80062914 helpers now come from
- * `include/g3d/g3d_anmchr.h` (their range registered as `g3d/g3d_anmchr.cpp`). */
+ * `g3d/g3d_anmchr.h` (their range registered as `g3d/g3d_anmchr.cpp`). */
 extern "C" void dtor_8006AAA8(void *self, s32 flag);
 
 typedef struct {

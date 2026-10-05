@@ -17,7 +17,7 @@
  * `EmSeRecord::length_0x08` are thin), the `em024_0x328` view's `tev_color_*` roles and the sub-state numbers'
  * meaning.
  *
- * SHAPES.  `include/enemy/ENEMY_WORK.h` carries an `em024_0x328` union view of the shared record for this
+ * SHAPES.  `enemy/ENEMY_WORK.h` carries an `em024_0x328` union view of the shared record for this
  * monster's fields.  `em_turn_seq_*` take `void*`, so the const turn tables are passed through a `(void*)` cast.
  * `#pragma peephole off`, `pool_data off` and `fp_contract off` are file-scope because each one changes rows all
  * over the unit: measured on the whole unit, dropping peephole lowers 30 rows (58 -> 38 matched functions),

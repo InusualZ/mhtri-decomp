@@ -1,5 +1,5 @@
 /*
- * include/menu/menu_infomation.h - the records and entry points the `menu_infomation.cpp` unit owns
+ * menu/menu_infomation.h - the records and entry points the `menu_infomation.cpp` unit owns
  * (`src/menu/menu_infomation.cpp`, `.text` 0x80308FB4..0x8031A6C0, docs/plan.md 6.5 rule 2).
  *
  * `StatusScreenWork` is the screen's own work record.  Two units read it: the owner
