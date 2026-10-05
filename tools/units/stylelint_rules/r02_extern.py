@@ -9,7 +9,7 @@ from tools.lib import cscan
 from tools.lib import requests as _requests
 from tools.lib.project.ownership import Ownership as _Ownership
 from tools.units.stylelint_rules.common import (
-    HEADERS, HEADER_SUFFIXES, SRC, Source, UNSPLIT, UNSPLIT_UNRESOLVED, _finding, _rule2_finding,
+    HEADER_SUFFIXES, SRC, Source, UNSPLIT_UNRESOLVED, _finding, _rule2_finding, is_unsplit_header,
 )
 from tools.units.stylelint_rules.context import open_request_ids
 
@@ -57,14 +57,14 @@ def _owns(rel: str, unit: str) -> bool:
     if rel == SRC + "/" + unit:
         return True
     stem = os.path.splitext(unit)[0]
-    if any(rel == SRC + "/" + stem + ext for ext in (".h", ".hpp", ".hh")):
-        return True
-    # the unit's public header under `include/`: its path carries the unit's module-qualified stem
-    # (`include/Network/network_state.h` for `Network/network_state.cpp`, `include/NHTTP/NHTTP_bgnend.h`
-    # for `NHTTP/NHTTP_bgnend.c`). The suffix match keeps a same-basename header in another module
-    # (`include/other/network_state.h`) out of the owner's set, which a bare-basename match would admit.
-    return (rel.startswith(HEADERS + "/")
-            and any(rel.endswith("/" + stem + ext) for ext in HEADER_SUFFIXES))
+    # the unit's header, wherever headers live: its path ends in the unit's module-qualified stem
+    # (`src/Network/network_state.h` beside the source, `include/Network/network_state.h` today, for
+    # `Network/network_state.cpp`). The suffix match keeps a same-basename header in another module
+    # (`include/other/network_state.h`) out of the owner's set, which a bare-basename match would admit. The band
+    # is never an owner's header.
+    if is_unsplit_header(rel):
+        return False
+    return any(rel == SRC + "/" + stem + ext or rel.endswith("/" + stem + ext) for ext in HEADER_SUFFIXES)
 
 
 _LINKAGE_OPEN_RE = cscan.LINKAGE_OPEN_RE
@@ -215,13 +215,16 @@ def rule2_findings(src: Source, ownership: "Ownership") -> list[dict]:
             module = UNSPLIT_UNRESOLVED
         ownership.unsplit_modules[module] += 1
         ownership.unsplit_symbols.setdefault(module, set()).add(name)
+        # the detail names the band by its MODULE, never by its path: a finding's identity carries the detail
+        # (`lib.findings.identity`), and the band's directory moves (2026-10-05) - a path here would turn the move
+        # into one removal plus one addition per finding.
         if module == UNSPLIT_UNRESOLVED:
             out.append(_rule2_finding(src, line, name,
-                                      "`%s` has no registered owner - declare it in a header under "
-                                      "`include/unsplit/`" % name))
+                                      "`%s` has no registered owner - declare it in an unsplit band header "
+                                      "(the bracketing bands name different modules)" % name))
         else:
             out.append(_rule2_finding(src, line, name,
-                                      "`%s` has no registered owner - declare it in `include/unsplit/%s.h`"
+                                      "`%s` has no registered owner - declare it in the `%s` unsplit band header"
                                       % (name, module)))
     return out
 

@@ -15,6 +15,49 @@ GENERATED = {
     "map": re.compile(r"^(?:fn_|lbl_|dtor_|FUN_|sub_|loc_|@etb_|@eti_)[0-9A-Fa-f]{6,8}$|^(?:unk|unk_)[0-9A-Fa-f]+$"),
     "ledger": re.compile(r"^(?:fn|lbl|unk|sub|loc|jump|jtbl|jumptable|gap)_?[0-9a-fA-F]*$"),
 }
+#: Section 6.5 rule 7 as the owner ruled it (2026-10-05): a generator's stem plus eight hex digits **anywhere** in an
+#: identifier or a path component - `view_fn_80041234`, `fn_80041234__FPv`, `fn_800FD864_fx` and `dtor_8005E5E8` all
+#: count. dtk's `fn_`/`lbl_`/`loc_`/`zz_` and the `dtor_` the map carries.
+RULE7_STEM_RE = re.compile(r"(?:fn|lbl|loc|dtor|zz)_[0-9A-Fa-f]{8}")
+#: The DOL's address span: the live map's lowest and highest symbol are 0x80004000 and 0x8079D7F0 (2026-10-05), so
+#: [0x80004000, 0x80800000) holds every address a name can be derived from and nothing below the image - a flag value
+#: such as `0x80000000` (`quest_flag_80000000_ck`) is not an address.
+DOL_SPAN = (0x80004000, 0x80800000)
+#: An eight-hex-digit run that reads like a DOL address inside an identifier: it starts with `8`, is not preceded by a
+#: digit (so it is not the tail of a longer number) and not followed by a hex digit (so `Eft8030EffectSlot` - eight
+#: characters `8030Effe` and then a `c` - is not one).
+ADDRESS_RUN_RE = re.compile(r"(?<![0-9])8[0-7][0-9A-Fa-f]{6}(?![0-9A-Fa-f])")
+
+
+def generated_name_kind(name: str) -> str | None:
+    """Rule 7's verdict on one identifier or path component: `generated` (a `RULE7_STEM_RE` stem anywhere in it),
+    `address` (an `ADDRESS_RUN_RE` run inside `DOL_SPAN` - `Panel805482CC`, `s_80276B58`, `Helper_80147CE0`, the
+    `MHTRI_ENEMY_FN_80128204_H` guard of a generated header), or None. A numeric literal is never passed here: the
+    caller tokenises identifiers only (`0x80276B58` is a number, not a name)."""
+    if not name:
+        return None
+    if RULE7_STEM_RE.search(name):
+        return "generated"
+    for m in ADDRESS_RUN_RE.finditer(name):
+        if DOL_SPAN[0] <= int(m.group(0), 16) < DOL_SPAN[1]:
+            return "address"
+    return None
+
+
+def generated_path_components(path: str) -> list[tuple[str, bool]]:
+    """`[(component, is_dir)]` for every component of `path` that `generated_name_kind` flags: each directory and
+    the file's stem (the name without its last extension). One reading for stylelint's rule-7 file-name findings
+    and the gate's new-unit row (`include/fn_8004CAD8/psvec.h` -> `[("fn_8004CAD8", True)]`)."""
+    parts = [p for p in (path or "").replace("\\", "/").split("/") if p]
+    out = []
+    for i, part in enumerate(parts):
+        is_dir = i < len(parts) - 1
+        comp = part if is_dir else part.rsplit(".", 1)[0]
+        if generated_name_kind(comp):
+            out.append((comp, is_dir))
+    return out
+
+
 #: The `_XXXXXXXX` address tail a generated name carries.
 ADDRESS_TAIL = re.compile(r"_([0-9A-Fa-f]{8})$")
 #: MWCC's argument-list suffix: `__F<args>`, `__Q<n>` (a qualified owner), `__ct`/`__dt`. `__start`,

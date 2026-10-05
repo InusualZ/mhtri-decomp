@@ -26,19 +26,34 @@ None: modules. The CLI is `stylelint.py`'s (`cli.main`), spec `stylelint.md`.
 | `common` | paths (`SRC`, `HEADERS`, `UNSPLIT`...), `RULE_NAMES` (1-14), `AUDIT_RULES` (rule 10 is vtableaudit's: no lint finding carries it), `EXEMPT`/`RULE7_NOTES`/`UNCHECKED`, `Source` (a `lib.cscan.Text` with paths), the `lib.cscan` views, `type_defs`, `field_name` + `Field`/`field_walk` (the one field walk rules 4, 5 and 7 read), `_finding`/`_rule2_finding`, `_untyped_marker` (rule 11's and 13's marker window), the tree walks |
 | `context` | the rule-2 `Ownership` (lib.project's index plus the run's counters), `load_ownership`, the open STOPGAP request ids |
 | `r01_shared_type` ... `r14_pragma` | one rule each: its regexes and its finding function (`rule1_findings`, `rule2_*`/`stopgap_findings`, `r03..r09.findings`, `rule11_findings`, `rule12_findings`, `rule13_findings`, `codegen_pragma_findings`); r13 also holds `Rule13Context` and `set_rule13_context`. There is no `r10`: rule 10 is vtableaudit's, and the pragma check was `r10_pragma` until 2026-10-05 |
-| `lint` | `lint_source` (every rule over one `Source`), `lint_tree`, `lint_all`, the header-tree walks |
+| `lint` | `lint_source` (every rule over one `Source`, the one file classifier), `lint_tree`, `lint_all` (every file the lint judges), `HEADER_BODY_RULES[_ON]` (the recommended header rules' one switch), `is_band_rule2`, the whole-tree header walks (API only, plus rule 12's untouched-file view) |
 | `diff` | identities, rename credits, move/split credits, the added-finding detail, and `judge` - the one judgement `--diff` and `--ref` share |
 | `refs` | `git`/`git_bytes`, the ref's map, the changed pairs, the base/ref copies linted, `texts_at_ref`/`headers_at_ref` |
 | `report` | the budget (with `rule10_counts`: the audit's violations per file, by subprocess), the distinct-name counts, the rule-2 shape, the `--findings` listing |
 | `cli` | `main`, `ref_comparison`, `report_comparison`, `_resolve_diff_ref` |
-| `selftest` | the lint's selftest (445 checks), on fixtures and temporary git trees |
+| `selftest` | the lint's selftest (510 checks), on fixtures and temporary git trees |
 | `api` | the facade: every name `stylelint.py` had, plus the split's new ones, with `__all__` |
 
 ## Invariants and rules
 
-* **The split moved code, not behaviour.** `lint_source` runs the rules in the order the monolith did (3, 4, 5, 6, 7, 8,
-  9, then 2, 12, 11, 13 and the STOPGAP check) and sorts by `(rule, line)` with a stable sort, so the order inside one
-  `(rule, line)` is still each rule's own report order.
+* **One classifier, path-free (2026-10-05).** A header is a `HEADER_SUFFIXES` file **anywhere** (`common.is_header`:
+  `include/**` today, `src/**` after the owner's header move); the unsplit band is `lib.project.ownership.BAND_ROOT`
+  (`include/unsplit` today), the one spelling of its path, so moving the band edits one line. `lint_source` runs the body
+  rule set on **every** `.c`/`.cpp`/`.h` - 3, 4, 5, 6, 7, 8, 9, then 2 and 12, 11, 13, 14 and the STOPGAP check - and
+  only rule 2 (source / header / band reading) and the STOPGAP check (not in the band) read the kind. It sorts by
+  `(rule, line)` with a stable sort, so the order inside one `(rule, line)` is still each rule's own report order.
+  Rules 3, 4, 5, 6, 8 and 9 on a header are the orchestrator's recommendation (the owner was not asked):
+  `lint.HEADER_BODY_RULES_ON = False` switches exactly those off. `_owns` and `leaf_header_owner` recognise an owner's
+  header and a leaf header by their stem wherever they live, never by `include/`.
+* **A finding names no header path.** Identity is `(rule, file, token, detail)` (`lib.findings`), so a detail that
+  spelled `include/unsplit/<m>.h` would turn the band move into a removal plus an addition per finding; rule 2's
+  unowned detail names the band by its module (`the `ef` unsplit band header`) instead.
+* **A comparison lints the changed files completely and walks nothing else but rule 12.** Every rule of a changed or
+  deleted file comes from `lint_source` on both sides; the one whole-tree walk left is rule 12 over the **untouched**
+  headers (`cli.untouched`), because each side is judged by its own map and a `splits.txt` edit can uncover an untouched
+  header's `extern`. The rule 11/13/14 whole-tree walks read identical text on both sides for an untouched file, so they
+  contributed no identity and were dropped. `lint_all` (`--budget`) is `lint_source` over `lint_files` (all of `src/`,
+  then the headers outside it) plus rule 1; it leaves the band's rule-2 reading to `--headers`, as before.
 * **The seams are module attributes.** A name a test stubs or a setter rebinds is read as `_refs.git` / `_refs.git_bytes`
   outside `refs`, never copied into another module's namespace; the selftest stubs `refs.git_bytes`. The open-request
   cache (`context._OPEN_IDS`) and the rule-13 registry (`r13_method._RULE13_CTX`) are rebound only by their setters.
@@ -82,7 +97,7 @@ One tool edge: `diff -> tools/units/dataclosure.py` (the fold map `derive_file_a
 ## Test contract
 
 `python tools/units/stylelint.py --selftest` (the runner's entry `tools/units/stylelint`): 445 checks, unchanged by the
-split; 451 with the move+rename rows (two of them fail on the old `removed` keying); 454 with the leaf forward-declaration rows (two fail without the preprocessor mask). Re-homing it to `tools/tests/units/test_stylelint.py` (fixture tier; the one live read is
+split; 451 with the move+rename rows (two of them fail on the old `removed` keying); 454 with the leaf forward-declaration rows (two fail without the preprocessor mask); 510 with the 2026-10-05 classifier, rule 7 exact and file-name rows (35 of the new checks fail on the code before them: 15 classifier, 9 rule 7 exact, 11 file names). Re-homing it to `tools/tests/units/test_stylelint.py` (fixture tier; the one live read is
 `load_ownership(".")`, which the runner's temp cwd turns into "no map") is WP6's.
 
 ## Measured (WP3d)
@@ -97,6 +112,35 @@ On the tree at `1c0e5252b` (+ main through `af8b41844`), old monolith vs the pac
   files, 671 moves) and on the refusing self-comparisons.
 * Wall time of `--diff`: 66 / 70 / 78 / 87 s -> 10 / 17 / 26 / 45 s (the four header walks and rule 1 at the ref read
   ~2 650 blobs one `git show` each; now one `cat-file --batch` per tree). `--budget --json` 25 s before and after.
+
+## Measured (rule 7 file names, 2026-10-05)
+
+Rule 7 44 433 -> 44 710 (+277), total 54 932 -> 55 209: 270 generated stems (70 sources, 200 headers) and 7 directory
+findings - three generated directories (`include/fn_80047398`, `include/fn_8004CAD8`, `include/fn_80056F24`) holding 7
+files. The design estimate was 273 with one finding per directory; one per file in it is what keeps the identity through
+a move. No stem is address-named today.
+
+## Measured (rule 7 exact, 2026-10-05)
+
+On main `2e6610017` plus the classifier, rule 7 42 945 -> 44 433 (+1 488), every other rule identical, total 53 444 ->
+54 932; no existing rule-7 finding disappeared (the `#include` mask removed none: quoted paths were already literals). The
+additions by class: address-named +836 (508 in headers, 328 in sources; 303 distinct tokens, 418 of the occurrences are
+generated headers' include guards), suffix/prefix stems +591 (590 sources, 1 header), `dtor_` +61 (56 sources, 5 headers).
+Against the pre-classifier baseline 40 119 the rule-7 jump is +4 314: headers +2 826 (the old spellings), suffix forms
++591, `dtor_` +61, address-named +836. Distinct names: 7 867 `fn_`-class, 4 153 data labels, 303 address-named, 205 bare
+`unk`.
+
+## Measured (classifier, 2026-10-05)
+
+On main `2e6610017`, `--budget --json` before vs after the classifier: rules 1, 2, 6, 8, 10, 11, 12, 13 and 14 identical
+(1: 8, 2: 3 860, 6: 381, 10: 396, 11: 4 813, 12: 129, 13: 32); the additions are all under `include/`: rule 7 +2 826,
+rule 3 +182, rule 5 +146, rule 4 +35, rule 9 +20 - total 50 235 -> 53 444. The recommended header rules (3, 4, 5, 6, 8,
+9) are 383 of those; rule 7's 2 826 is the owner's. 99 rule-2 findings changed only their detail (the band path became
+its module). Replays (`--diff <c>~1 --json` at `<c>`, old vs new code): `150b7e2dd`, `5a4602a88`, `35d86a517` and
+`ee7d53b06` identical; `3f7532ded` +7 (rule 7 in `include/enemy/em_prog_tail.h`, `include/hud/cockpit.h`,
+`include/lobby/lbl_806BE340.h`, `include/menu/menu_effect_slot.h`, `include/stage/stg_w.h` x2; rule 9 in
+`include/hud/get_lsp_data__FUsP10_mh_ivec2_.h`) and `0375f98c4` +1 (rule 3, `include/Network/session_mediator_views.h`)
+- only headers those batches touched.
 
 ## Measured (rule 14 renumber, 2026-10-05)
 

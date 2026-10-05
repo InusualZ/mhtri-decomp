@@ -21,6 +21,17 @@ CONFIG_JSON_REL = "build/%s/config.json" % VERSION
 AUTO_OBJECT_RE = re.compile(r"^auto_\d+_([0-9a-fA-F]{8})_(\w+)$")
 #: The four answers `owner_of` gives.
 STATES = ("reconstructed", "registered", "auto", "unsplit")
+#: The unsplit band's directory - the home of a declaration no registered unit owns. The one spelling of the path:
+#: the owner's 2026-10-05 ruling moves it beside the sources (`src/unsplit/`), and that move edits only this line.
+BAND_ROOT = "include/unsplit"
+#: What a header is: a file with one of these suffixes, wherever it lives (`include/**` today, `src/**` after the move).
+HEADER_SUFFIXES = (".h", ".hpp", ".hh")
+
+
+def is_band_header(rel: str) -> bool:
+    """Whether `rel` is a header in the unsplit band (`BAND_ROOT`)."""
+    rel = rel.replace("\\", "/")
+    return rel.startswith(BAND_ROOT + "/") and rel.endswith(HEADER_SUFFIXES)
 
 
 def module_name(unit: str) -> str:
@@ -249,11 +260,12 @@ class Ownership:
 
     def leaf_header_owner(self, rel: str, names: list[str]) -> str | None:
         """The unit that owns the header `rel` as a **leaf header**, or None (section 6.5 rule 2's one other owner
-        spelling): `include/<module>/<symbol>.h`, named for a symbol it declares (`names`), and declaring only
+        spelling): `<module>/<symbol>.h` - a header anywhere outside the band (`include/` today, `src/` after the
+        2026-10-05 move) - named for a symbol it declares (`names`), and declaring only
         symbols one registered unit defines. Strict: one unresolved, unowned or duplicate name, or symbols of two
         units, and it is not a leaf. One implementation: stylelint's rule 2 and integrate's already-applied test."""
         rel = rel.replace("\\", "/")
-        if not rel.startswith("include/") or rel.startswith("include/unsplit/") or not names:
+        if not rel.endswith(HEADER_SUFFIXES) or is_band_header(rel) or not names:
             return None
         if os.path.splitext(os.path.basename(rel))[0] not in names:
             return None

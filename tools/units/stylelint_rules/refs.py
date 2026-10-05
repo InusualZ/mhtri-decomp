@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 
 from tools.lib.git import Git
-from tools.units.stylelint_rules.common import HEADERS, HEADER_SUFFIXES, SRC, SUFFIXES, Source
+from tools.units.stylelint_rules.common import HEADERS, HEADER_SUFFIXES, LINT_ROOTS, SRC, SUFFIXES, Source
 from tools.units.stylelint_rules.context import Ownership
 from tools.units.stylelint_rules.r01_shared_type import rule1_findings
 from tools.units.stylelint_rules.r14_pragma import codegen_pragma_findings
@@ -66,13 +66,16 @@ def texts_at_ref(root: str, ref: str, top: str, suffixes: tuple) -> list[tuple[s
 
 
 def headers_at_ref(root: str, ref: str, rename: dict | None = None) -> list[Source]:
-    """`include/` as it was at `ref`, one `Source` per header keyed by the path the working tree spells (`rename` is
-    `{path_at_ref: path_now}`, `renames_of`); built once per (tree, rename) and shared by the four header walks."""
+    """Every header as it was at `ref` (each of `LINT_ROOTS`, so `src/` headers too), one `Source` per header keyed by
+    the path the working tree spells (`rename` is `{path_at_ref: path_now}`, `renames_of`); built once per (tree,
+    rename) and shared by the header walks."""
     rename = rename or {}
-    texts = texts_at_ref(root, ref, HEADERS, HEADER_SUFFIXES)
-    key = (id(texts), tuple(sorted(rename.items())))
+    tree = git(root, "rev-parse", "--verify", "%s^{tree}" % ref).strip()
+    key = (os.path.normcase(os.path.abspath(root)), tree, tuple(sorted(rename.items())))
     if key not in _TREE_SOURCES:
-        _TREE_SOURCES[key] = (texts, [Source(path, rename.get(path, path), text) for path, text in texts])
+        texts = [t for top in LINT_ROOTS for t in texts_at_ref(root, ref, top, HEADER_SUFFIXES)]
+        _TREE_SOURCES[key] = (texts, [Source(path, rename.get(path, path), text, origin=path)
+                                      for path, text in texts])
     return _TREE_SOURCES[key][1]
 
 
@@ -208,7 +211,7 @@ def findings_at_ref(root: str, ref: str, pairs: list[tuple[str | None, str]],
             text = git_bytes(root, "show", "%s:%s" % (ref, before)).decode("utf-8", "replace")
         except RuntimeError:
             continue
-        findings.extend(lint_source(Source(before, after, text), ownership))
+        findings.extend(lint_source(Source(before, after, text, origin=before), ownership))
     return findings
 
 

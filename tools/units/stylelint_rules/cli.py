@@ -16,14 +16,13 @@ from tools.units.stylelint_rules.context import load_ownership
 from tools.units.stylelint_rules.r01_shared_type import rule1_findings
 from tools.units.stylelint_rules.r13_method import set_rule13_context
 from tools.units.stylelint_rules.lint import (
-    header_pragma_findings, header_rule11_findings, header_rule12_findings, header_rule13_findings,
-    header_rule2_band_findings, lint_all, lint_tree, rule11_local_total, rule13_static_like_total,
+    header_rule12_findings, header_rule2_band_findings, lint_all, lint_tree, rule11_local_total,
+    rule13_static_like_total,
 )
 from tools.units.stylelint_rules.diff import Judgement, added_detail_lines, derive_file_absorbers, judge, renames_of
 from tools.units.stylelint_rules.refs import (
     changed_src_files, changed_src_files_between, deleted_src_files, findings_at_ref, findings_of_deleted,
-    findings_of_ref, header_pragma_findings_at_ref, header_rule11_findings_at_ref, header_rule12_findings_at_ref,
-    header_rule13_findings_at_ref, load_ownership_at_ref, rule1_findings_at_ref, sources_of_ref,
+    findings_of_ref, header_rule12_findings_at_ref, load_ownership_at_ref, rule1_findings_at_ref, sources_of_ref,
     unresolved_declarations_at_ref,
 )
 from tools.units.stylelint_rules.report import (
@@ -80,6 +79,19 @@ def _resolve_diff_ref(root: str, ref: str) -> str:
     return base
 
 
+def untouched(findings: list[dict], skip: set) -> list[dict]:
+    """`findings` minus the files in `skip` - the changed and the deleted paths, whose every rule `lint_source` already
+    reports on both sides.
+
+    Every rule of a changed file comes from `lint_source` (headers included since 2026-10-05), so the only whole-tree
+    walk a comparison still needs is rule 12 over the **untouched** headers: it is the one reading of an unchanged file
+    that a batch can still move, because each side is judged by its own map and a `splits.txt` edit can leave an
+    untouched header's `extern` uncovered. The rule 11, 13 and 14 walks were the same text on both sides for an
+    untouched file, so they never contributed an identity and are gone.
+    """
+    return [f for f in findings if f["file"] not in skip]
+
+
 def ref_comparison(root: str, branch: str, ownership: "Ownership | None", as_json: bool,
                    list_added: bool = False) -> int:
     """Judge a **held branch** read-only: its committed tree against the merge base `--diff` would use.
@@ -134,23 +146,19 @@ def ref_comparison(root: str, branch: str, ownership: "Ownership | None", as_jso
     # read the *base* side, so a renamed header must be keyed by the path the branch spells (a rename alone
     # is not an addition), exactly as `--diff` does it.
     rename = renames_of(pairs)
+    deleted = deleted_src_files(root, base, branch)
+    skip = set(rels) | set(deleted)
     before_findings = (
         base_findings
         + rule1_findings_at_ref(root, base, pairs)
-        + header_pragma_findings_at_ref(root, base, rename)
-        + header_rule11_findings_at_ref(root, base, rename)
-        + header_rule13_findings_at_ref(root, base, rename)
-        + header_rule12_findings_at_ref(root, base, base_ownership, rename)
-        + findings_of_deleted(root, base, deleted_src_files(root, base, branch), base_ownership))
+        + untouched(header_rule12_findings_at_ref(root, base, base_ownership, rename), skip)
+        + findings_of_deleted(root, base, deleted, base_ownership))
     touched = findings_of_ref(root, branch, pairs, after_ownership)
     after_sources = sources_of_ref(root, branch, pairs)
     after_findings = (
         touched
         + rule1_findings_at_ref(root, branch, [])
-        + header_pragma_findings_at_ref(root, branch)
-        + header_rule11_findings_at_ref(root, branch)
-        + header_rule13_findings_at_ref(root, branch)
-        + header_rule12_findings_at_ref(root, branch, after_ownership))
+        + untouched(header_rule12_findings_at_ref(root, branch, after_ownership), skip))
     j = judge(before_findings, after_findings, touched, base_findings, base_ownership, after_ownership, base_gaps,
               after_sources, rename,
               derive_file_absorbers(root, base, branch, pairs, deleted_src_files(root, base, branch)))
@@ -257,14 +265,13 @@ def main(argv: list[str] | None = None) -> int:
             rename = renames_of(pairs)
             # every source of the `before` count is kept as findings, not only counts: `--list-added`
             # subtracts the base side's occurrences, and the count is `rule_counts` of the same list.
+            deleted = deleted_src_files(root, args.diff)
+            skip = set(rels) | set(deleted)
             before_findings = (
                 base_findings
                 + rule1_findings_at_ref(root, args.diff, pairs)
-                + header_pragma_findings_at_ref(root, args.diff, rename)
-                + header_rule11_findings_at_ref(root, args.diff, rename)
-                + header_rule13_findings_at_ref(root, args.diff, rename)
-                + header_rule12_findings_at_ref(root, args.diff, base_ownership, rename)
-                + findings_of_deleted(root, args.diff, deleted_src_files(root, args.diff), base_ownership))
+                + untouched(header_rule12_findings_at_ref(root, args.diff, base_ownership, rename), skip)
+                + findings_of_deleted(root, args.diff, deleted, base_ownership))
             base_gaps = unresolved_declarations_at_ref(root, args.diff, pairs, base_ownership)
         except RuntimeError as exc:
             print("stylelint: %s" % exc, file=sys.stderr)
@@ -281,10 +288,7 @@ def main(argv: list[str] | None = None) -> int:
         after_findings = (
             touched
             + rule1_findings(all_sources(root))
-            + header_pragma_findings(root)
-            + header_rule11_findings(root)
-            + header_rule13_findings(root)
-            + header_rule12_findings(root, ownership))
+            + untouched(header_rule12_findings(root, ownership), skip))
         j = judge(before_findings, after_findings, touched, base_findings, base_ownership, ownership, base_gaps,
                   after_sources, rename,
                   derive_file_absorbers(root, args.diff, None, pairs, deleted_src_files(root, args.diff)))

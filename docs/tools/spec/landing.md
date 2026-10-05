@@ -36,7 +36,7 @@ prints the `land.band_ownership_warnings` command beside `stylelint.py --diff ma
   base, the batch-path guard and scratch, conflict markers, the branch guards, the pre-flight), `batch.py` (outbox,
   branch commits), `rules.py` (style lint with rule 12's allowance, rule 2's band boundary, rule 10), `selftests.py` (the suite row), `subject.py` (commitlint), `build.py` (command rows, the compile gate, the
   `ok` stamp), `objects.py` (`verifyunit`, `undefrefs`, `flipcheck`: registration, references, drift, re-measure),
-  `data.py` (`dataclosure`), `regression.py` (`lib.report.regression`); `knowledge.py` (7.10) was deleted
+  `data.py` (`dataclosure`), `regression.py` (`lib.report.regression`); `objects.new_unit_name_row` (pre-build, rule 7: a unit newly registered under a generated name refuses); `knowledge.py` (7.10) was deleted
   2026-10-05 with its row.
 * `gate.py` - `verify`: `PRE_BUILD` rows in order, then the build and the rows that read it, the message body.
 * `flow.py` - `land` and `land_branch` (gate -> stage -> commit -> release, one answer line).
@@ -67,7 +67,7 @@ Tier: fixture. `tools/tests/units/test_land.py` (the re-homed `land.py --selftes
 decisions, `land`/`land --branch` on fixture repos - among them `test_land_branch_config_relocations`: a
 `block_relocations`-only `config.yml` lands with the unit batch in one commit, a frozen key or `build.sha1` refuses at
 pre-flight with main unchanged -, the resolver, the CLI) and
-`tools/tests/units/landing/`: `test_gate_golden.py` (eleven scenarios, the whole table), `test_landlog_hook.py` (the
+`tools/tests/units/landing/`: `test_gate_golden.py` (thirteen scenarios, the whole table - the two `new-unit-*` ones pin the new-unit name row's refusal and its rename credit), `test_landlog_hook.py` (the
 landing log), `test_base_report.py` (the base report rebuild and its row), `test_neighbours.py` (names-only
 neighbours).
 

@@ -1,5 +1,6 @@
 """The gate's table on the `test_gate_golden` scenarios, recorded from the monolithic `land.py` (main at ec8223e66)
-before the WP4 split: `{scenario: {"exit": code, "rows": [[name, status, kind], ...]}}`. Data, not a test."""
+before the WP4 split: `{scenario: {"exit": code, "rows": [[name, status, kind], ...]}}`. Data, not a test. The two
+`new-unit-*` scenarios were recorded 2026-10-05 with the new-unit name row (every older scenario is unchanged)."""
 GOLDEN = {
  "noop-dry-run": {"exit": 0, "rows": [
    ["ground truth (build.sha1 == the DOL's hash)", "PASS", "gate"],
@@ -235,4 +236,26 @@ GOLDEN = {
    ["ok (main.dol verified) (exit 0)", "PASS", "gate"],
    ["ok was recreated by THIS run", "PASS", "gate"],
    ["ninja baseline (exit 0)", "PASS", "gate"],
-   ["claim release deferred", "PASS", "gate"]]}}
+   ["claim release deferred", "PASS", "gate"]]},
+ "new-unit-generated-name-refusal": {"exit": 1, "rows": [
+   ["ground truth (build.sha1 == the DOL's hash)", "PASS", "gate"],
+   ["main has not moved since the batch base", "PASS", "bookkeeping"],
+   ["every changed path belongs to a batch", "PASS", "gate"],
+   ["no batch file carries a git conflict marker", "PASS", "gate"],
+   ["orchestrator-only batch (no worker outboxes to check)", "PASS", "gate"],
+   ["style lint (§6.5) adds no violation", "PASS", "gate"],
+   ["all tool selftests pass (except the parked list)", "PASS", "gate"],
+   ["rule 2 registration boundary (warning)", "PASS", "gate"],
+   ["no newly registered unit has a generated name (rule 7)", "FAIL", "gate"],
+   ["the gate's own subject follows the convention", "PASS", "gate"]]},
+ "new-unit-renamed-from-generated-name": {"exit": 0, "rows": [
+   ["ground truth (build.sha1 == the DOL's hash)", "PASS", "gate"],
+   ["main has not moved since the batch base", "PASS", "bookkeeping"],
+   ["every changed path belongs to a batch", "PASS", "gate"],
+   ["no batch file carries a git conflict marker", "PASS", "gate"],
+   ["orchestrator-only batch (no worker outboxes to check)", "PASS", "gate"],
+   ["style lint (§6.5) adds no violation", "PASS", "gate"],
+   ["all tool selftests pass (except the parked list)", "PASS", "gate"],
+   ["rule 2 registration boundary (warning)", "PASS", "gate"],
+   ["no newly registered unit has a generated name (rule 7)", "PASS", "gate"],
+   ["the gate's own subject follows the convention", "PASS", "gate"]]}}

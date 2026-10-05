@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from tools.units.stylelint_rules.common import HEADERS, _finding
+from tools.units.stylelint_rules.common import _finding, is_header
 
 
 # The codegen-affecting pragma names for rule 14.  A `#pragma` is lexically scoped to the rest of the
@@ -24,10 +24,10 @@ CODEGEN_PRAGMA_RE = re.compile(
 
 
 def codegen_pragma_findings(src: "Source") -> list[dict]:
-    """Rule 14 for one file: a codegen pragma in a **shared header**.  The path gate is here, not in the
-    caller, so a `.c`/`.cpp` can never be reported however this is invoked.  `src.code` blanks
-    comments/literals, so a pragma *named* in a comment is not a finding - only a real directive is."""
-    if not src.rel.replace("\\", "/").startswith(HEADERS + "/"):
+    """Rule 14 for one file: a codegen pragma in a **header** (a `.h` anywhere - `include/` or beside its source in
+    `src/`: `common.is_header`).  The gate is here, not in the caller, so a `.c`/`.cpp` can never be reported however
+    this is invoked.  `src.code` blanks comments/literals, so a pragma *named* in a comment is not a finding."""
+    if not is_header(src.rel):
         return []
     out = []
     for m in CODEGEN_PRAGMA_RE.finditer(src.code):

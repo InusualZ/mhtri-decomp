@@ -27,7 +27,7 @@ from tools.units.landing.rows.tree import unit_rows
 #: The rows that need no build, in their run order (`docs/tools/spec/land.md`, "The rows of verify" 1-9).
 PRE_BUILD = (
     tree.ground_truth_row, tree.base_row, tree.report_base_row, tree.paths_row, tree.conflict_marker_row,
-    batch.outbox_rows, rules.style_lint_row, selftests.selftests_row, rules.band_row,
+    batch.outbox_rows, rules.style_lint_row, selftests.selftests_row, rules.band_row, objects.new_unit_name_row,
     subject.subject_row,
 )
 

@@ -150,12 +150,13 @@ def selftest() -> int:
 
     # --- rule 7 has no exemption: every generated name in src/ fires, everywhere -------------------
     auto = "src/auto/802B2978_fn_802B2978.c"
+    # (the generated file name itself is one more rule-7 finding on line 1 since 2026-10-05)
     check("rule7: a src/auto/ file's own fn_ name fires (the bucket exemption is gone)",
-          lines_of("void fn_802B2978(void) {}\n", 7, auto), [1])
+          lines_of("void fn_802B2978(void) {}\n", 7, auto), [1, 1])
     check("rule7: a src/auto/ body calling fn_ fires",
-          lines_of("void fn_802B2978(void) {\n    fn_80040598();\n}\n", 7, auto), [1, 2])
+          lines_of("void fn_802B2978(void) {\n    fn_80040598();\n}\n", 7, auto), [1, 1, 2])
     check("rule7: a src/auto/ bare unk local fires too",
-          lines_of("void fn_802B2978(void) {\n    u32 unk4 = 0;\n}\n", 7, auto), [1, 2])
+          lines_of("void fn_802B2978(void) {\n    u32 unk4 = 0;\n}\n", 7, auto), [1, 1, 2])
     check("rule7: a subdirectory of src/auto/ fires (no path exempts anything)",
           lines_of("void fn_802B2978(void) {}\n", 7, "src/auto/deep/x.c"), [1])
     check("rule7: the same shape under src/Pl/ fires",
@@ -217,7 +218,122 @@ def selftest() -> int:
         check("rule7 deferred: the real ef/eft053.cpp (comment + generated names) still reports rule 7",
               bool(real), True)
         check("... and every finding is a generated name, not an unk field",
-              all(f["detail"].startswith(("auto-generated name", "data label", "bare ")) for f in real), True)
+              all(f["detail"].startswith(("auto-generated name", "data label", "bare ", "address-named identifier"))
+                  for f in real), True)
+
+    # --- rule 7 exact (owner, 2026-10-05): a stem anywhere in a token, address-named identifiers, headers -------
+    def r7_tokens(text: str, rel: str = "src/x.c") -> list:
+        return [f["token"] for f in lint_source(Source("x", rel, text)) if f["rule"] == 7]
+
+    check("rule7 exact: a suffix form counts as one token (`fn_X__FPv`)",
+          r7_tokens("void fn_80041234__FPv(void);\n"), ["fn_80041234__FPv"])
+    check("rule7 exact: a prefixed form counts (`view_fn_X`)", r7_tokens("int view_fn_80041234;\n"),
+          ["view_fn_80041234"])
+    check("rule7 exact: a tail after the address counts (`fn_X_fx`)", r7_tokens("int fn_800FD864_fx;\n"),
+          ["fn_800FD864_fx"])
+    check("rule7 exact: dtor_ and zz_ stems count", r7_tokens("void dtor_8005E5E8(void);\nint zz_80123456_;\n"),
+          ["dtor_8005E5E8", "zz_80123456_"])
+    check("rule7 exact: lower-case hex still counts", r7_tokens("void fn_8004cad8(void);\n"), ["fn_8004cad8"])
+    check("rule7 exact: address-named identifiers count (Panel805482CC, s_80276B58, Helper_80147CE0)",
+          r7_tokens("struct Panel805482CC;\nchar s_80276B58[4];\nvoid Helper_80147CE0(void);\n"),
+          ["Panel805482CC", "s_80276B58", "Helper_80147CE0"])
+    check("rule7 exact: a generated header's guard is address-named",
+          r7_tokens("#ifndef MHTRI_ENEMY_FN_80128204_H\n#define MHTRI_ENEMY_FN_80128204_H\n#endif\n", "include/e.h"),
+          ["MHTRI_ENEMY_FN_80128204_H", "MHTRI_ENEMY_FN_80128204_H"])
+    check("rule7 exact: a hex literal is a number, not a name",
+          r7_tokens("u32 a = 0x80276B58;\nu32 b = 0x80276B58u;\n"), [])
+    check("rule7 exact: an address-shaped value outside the DOL span is not an address (quest_flag_80000000_ck)",
+          r7_tokens("int quest_flag_80000000_ck(void);\n"), [])
+    check("rule7 exact: eight characters followed by another hex digit are not an address (Eft8030EffectSlot)",
+          r7_tokens("struct Eft8030EffectSlot;\n"), [])
+    check("rule7 exact: a nine-digit number inside a name is not an address", r7_tokens("int abc180123456;\n"), [])
+    check("rule7 exact: an #include path does not count (the file-name finding retires it)",
+          r7_tokens('#include "enemy/fn_80128204.h"\n#include <fn_80128204.h>\n'), [])
+    check("rule7 exact: a header carries rule 7 like a source",
+          r7_tokens("void fn_80041234(void);\n", "include/m/a.h"), ["fn_80041234"])
+    check("rule7 exact: the detail is a function of the token alone (identity = rule, file, token)",
+          len({(f["token"], f["detail"]) for f in lint_source(Source("x", "src/x.c",
+              "void Helper_80147CE0(void);\nvoid g(void) {\n    Helper_80147CE0();\n}\n")) if f["rule"] == 7}), 1)
+    _r7_base = lint_source(Source("x", "src/x.c", "void g(void) {\n    Helper_80147CE0();\n}\n"))
+    _r7_after = lint_source(Source("x", "src/x.c", "void g(void) {\n    panel_helper();\n}\n"))
+    check("rule7 exact: renaming an address-named token removes it and adds nothing",
+          (added_identities(_r7_base, _r7_after), sorted(removed_identities(_r7_base, _r7_after))),
+          ({}, [(7, "Helper_80147CE0", name_detail("Helper_80147CE0", "address"))]))
+    check("rule7 exact: lib.names is the one verdict (generated / address / None)",
+          [generated_name_kind(t) for t in ("fn_80041234__FPv", "Panel805482CC", "quest_flag_80000000_ck", "main")],
+          ["generated", "address", None, None])
+
+    # --- rule 7 file names (2026-10-05): one finding per generated path component ----------------------------
+    def r7_paths(rel: str, origin=None) -> list:
+        return [(f["token"], f["line"], f["detail"].split(" ")[1]) for f in
+                lint_source(Source("x", rel, "int ok;\n", origin=origin)) if f["rule"] == 7]
+
+    check("rule7 files: a generated unit stem is one finding on line 1", r7_paths("src/DWCi/fn_805113B0.cpp"),
+          [("fn_805113B0", 1, "file")])
+    check("rule7 files: a generated directory is one finding per file in it",
+          r7_paths("include/fn_8004CAD8/psvec.h"), [("fn_8004CAD8", 1, "directory")])
+    check("rule7 files: a generated directory and stem are two findings",
+          r7_paths("include/fn_8004CAD8/fn_8004CAD8.h"), [("fn_8004CAD8", 1, "directory"), ("fn_8004CAD8", 1, "file")])
+    check("rule7 files: an address-named stem counts", r7_paths("src/menu/Panel805482CC.cpp"),
+          [("Panel805482CC", 1, "file")])
+    check("rule7 files: a lbl_ header stem counts", r7_paths("include/lobby/lbl_806BE340.h"),
+          [("lbl_806BE340", 1, "file")])
+    check("rule7 files: a named path is clean", r7_paths("src/Network/network_state.cpp"), [])
+    check("rule7 files: the path judged is the one the text really had (origin), filed under rel",
+          [(f["file"], f["token"]) for f in lint_source(Source("x", "src/m/named.cpp", "int ok;\n",
+                                                               origin="src/m/fn_80041234.cpp")) if f["rule"] == 7],
+          [("src/m/named.cpp", "fn_80041234")])
+    with tempfile.TemporaryDirectory() as tmp:
+        def fgit(*args: str) -> None:
+            subprocess.run(["git", "-c", "user.email=selftest@example.invalid",
+                            "-c", "user.name=selftest", "-c", "commit.gpgsign=false", *args],
+                           cwd=tmp, capture_output=True, check=True)
+
+        def fput(rel: str, text: str) -> None:
+            p = os.path.join(tmp, rel)
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            with open(p, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(text)
+
+        def fref(branch: str) -> tuple:
+            import contextlib as _ctx, io as _io  # noqa: PLC0415 - the selftest imports these further down
+            out = _io.StringIO()
+            with _ctx.redirect_stdout(out), _ctx.redirect_stderr(_io.StringIO()):
+                rc = ref_comparison(tmp, branch, load_ownership(tmp), as_json=True)
+            got = json.loads(out.getvalue())
+            return rc, sorted((d["rule"], d["file"], d["token"]) for d in got["detail"])
+
+        fgit("init", "-q")
+        fgit("checkout", "-q", "-b", "main")
+        body = "/* a body large enough for git to pair the rename */\n" + "".join(
+            "int named_value_%d = %d;\n" % (i, i) for i in range(30))
+        fput("config/RMHE08/symbols.txt", "owned_fn = .text:0x80002000; // type:function size:0x10\n")
+        fput("config/RMHE08/splits.txt", "m/other.c:\n\t.text       start:0x80002000 end:0x80002010\n")
+        fput("src/m/fn_80041234.cpp", body)
+        fput("include/fn_8004CAD8/psvec.h", body)
+        fgit("add", "-A")
+        fgit("commit", "-q", "-m", "base")
+        fgit("checkout", "-q", "-b", "named")
+        fgit("mv", "src/m/fn_80041234.cpp", "src/m/menu_cursor.cpp")
+        fgit("commit", "-q", "-m", "rename to a named stem")
+        check("rule7 files: a git mv to a named stem is credited (no addition)", fref("named"), (0, []))
+        fgit("checkout", "-q", "-b", "regen", "main")
+        fgit("mv", "src/m/fn_80041234.cpp", "src/m/fn_80049999.cpp")
+        fgit("commit", "-q", "-m", "rename to another generated stem")
+        check("rule7 files: a git mv to another generated stem adds that name",
+              fref("regen"), (1, [(7, "src/m/fn_80049999.cpp", "fn_80049999")]))
+        fgit("checkout", "-q", "-b", "moved", "main")
+        os.makedirs(os.path.join(tmp, "src", "fn_8004CAD8"), exist_ok=True)
+        fgit("mv", "include/fn_8004CAD8/psvec.h", "src/fn_8004CAD8/psvec.h")
+        fgit("commit", "-q", "-m", "move a header, keep its generated directory")
+        check("rule7 files: a move that keeps the generated directory keeps the identity (no addition)",
+              fref("moved"), (0, []))
+        fgit("checkout", "-q", "-b", "newunit", "main")
+        fput("src/m/fn_8004AAAA.cpp", "int named_value;\n")
+        fgit("add", "-A")
+        fgit("commit", "-q", "-m", "a new file with a generated stem")
+        check("rule7 files: a new file with a generated stem is an addition",
+              fref("newunit"), (1, [(7, "src/m/fn_8004AAAA.cpp", "fn_8004AAAA")]))
 
     # --- rule 7: the data-label half fires on every lbl_/loc_ reference ----------------------------
     lbl = Ownership({"lbl_80010000": [(".data", 0x80010000, "object")],
@@ -355,18 +471,23 @@ def selftest() -> int:
                     {".text": [(0x1000, 0x2000, "mod/a.c"), (0x3000, 0x4000, "mod/b.c")]})
     check("rule2: an unsplit symbol with one bracketing module is a finding",
           lines_of("extern void mid(void);\n", 2, "src/other/c.c", mid), [1])
-    check("rule2: the unsplit detail names the module header",
+    check("rule2: the unsplit detail names the band by its module, never by a path (a band move keeps identities)",
           [f["detail"] for f in lint_source(Source("x", "src/other/c.c", "extern void mid(void);\n"), mid)
            if f["rule"] == 2],
-          ["`mid` has no registered owner - declare it in `include/unsplit/mod.h`"])
+          ["`mid` has no registered owner - declare it in the `mod` unsplit band header"])
     gap = Ownership({"gap": [(".text", 0x2500, "function")]},
                     {".text": [(0x1000, 0x2000, "mod/a.c"), (0x3000, 0x4000, "other/b.c")]})
     check("rule2: an unowned symbol whose brackets disagree is a finding (no module guessed)",
           lines_of("extern void gap(void);\n", 2, "src/other/c.c", gap), [1])
-    check("rule2: the unresolved-band detail names the band directory, not a header",
+    check("rule2: the unresolved-band detail names no module and no path",
           [f["detail"] for f in lint_source(Source("x", "src/other/c.c", "extern void gap(void);\n"), gap)
            if f["rule"] == 2],
-          ["`gap` has no registered owner - declare it in a header under `include/unsplit/`"])
+          ["`gap` has no registered owner - declare it in an unsplit band header (the bracketing bands name "
+           "different modules)"])
+    check("rule2: no rule-2 detail spells a header path (identity survives the 2026-10-05 move)",
+          [f["detail"] for f in lint_source(Source("x", "src/other/c.c", "extern void mid(void);\n"), mid)
+           + lint_source(Source("x", "src/other/c.c", "extern void gap(void);\n"), gap)
+           if f["rule"] == 2 and ("include/" in f["detail"] or "unsplit/" in f["detail"])], [])
     check("rule2: the unresolved band is not counted as a gap", sum(gap.gaps.values()), 0)
     check("rule2: the unresolved band is reported under the sentinel module",
           sorted(gap.unsplit_modules), [UNSPLIT_UNRESOLVED])
@@ -436,8 +557,10 @@ def selftest() -> int:
           lines_of("void foo(void);\nvoid mid(void);\n", 2, leaf, mixed), [1])
     check("leaf header: not named for a declared symbol is not a leaf",
           lines_of("void foo(void);\n", 2, "include/mod/other.h", idx), [1])
-    check("leaf header: the convention applies under include/ only",
-          lines_of("void foo(void);\n", 2, "src/mod/foo.h", idx), [1])
+    check("leaf header: the convention applies to a header anywhere (src/ too: headers move beside sources)",
+          lines_of("void foo(void);\n", 2, "src/mod/foo.h", idx), [])
+    check("leaf header: a band header is never a leaf",
+          lines_of("void foo(void);\n", 2, UNSPLIT + "/foo.h", idx), [1])
     check("leaf header: a forward declaration after the guard and an #include keeps it a leaf",
           lines_of("#ifndef FOO_H\n#define FOO_H\n#include \"types.h\"\nstruct Bar;\nvoid foo(struct Bar* b);\n"
                    "#endif\n", 2, leaf, idx), [])
@@ -459,8 +582,8 @@ def selftest() -> int:
           lines_of("void foo(void) {\n}\n", 2, mhdr, idx), [])
     check("rule2 header: a type forward declaration is not a symbol declaration",
           lines_of("struct Vec;\n", 2, mhdr, idx), [])
-    check("rule2 header: only rule 2 applies, so a fn_ prototype is not rule 7",
-          rules_of("void fn_80040598(void);\n", mhdr, idx), [])
+    check("rule2 header: the body rules apply to a header too, so a fn_ prototype is rule 7",
+          rules_of("void fn_80040598(void);\n", mhdr, idx), [(7, 1)])
 
     # --- rule 2 in the unsplit band: an owned symbol must not be declared there --------------------
     band = "include/unsplit/mod.h"
@@ -486,8 +609,8 @@ def selftest() -> int:
           lines_of("void foo(void) {\n}\n", 2, band, idx), [])
     check("rule2 band: a type forward declaration is not a symbol declaration",
           lines_of("struct Vec;\n", 2, band, idx), [])
-    check("rule2 band: only rule 2 applies, so a fn_ prototype is not rule 7",
-          rules_of("void fn_80040598(void);\n", band, idx), [])
+    check("rule2 band: the body rules apply to the band too, so a fn_ prototype is rule 7",
+          rules_of("void fn_80040598(void);\n", band, idx), [(7, 1)])
     check("rule2 band: a plain prototype in a src/ file is now rule 2's too",
           lines_of("void foo(void);\n", 2, "src/other/c.c", idx), [1])
 
@@ -898,8 +1021,8 @@ def selftest() -> int:
     check("rule13: an already-mangled name is not a finding",
           r13(CLS + "int Tcp_get__FP3Tcp(Tcp* self);\n"), [])
     check("rule13: a C file has no members", r13(CLS + "int Tcp_get(Tcp* self);\n", "x.c"), [])
-    check("rule13: a header is judged (with the type in scope)",
-          r13(CLS + "int Tcp_get(Tcp* self);\n", "include/mod/a.h"), [])  # headers are walked, not linted here
+    check("rule13: a header is judged by lint_source too (with the type in scope)",
+          r13(CLS + "int Tcp_get(Tcp* self);\n", "include/mod/a.h"), [5])
     check("rule13: the header walk reports it",
           [f["line"] for f in rule13_findings(Source("a.h", "include/mod/a.h",
                                                     CLS + "int Tcp_get(Tcp* self);\n"))], [5])
@@ -1307,6 +1430,128 @@ def selftest() -> int:
         ref_rename = json.loads(out.getvalue())
         check("--ref on the same rename also measures delta 0", rc_ref_rename, 0)
         check("... with no added row", ref_rename["added"], [])
+
+    # --- the classifier (2026-10-05): a header is a `.h` anywhere, the band root is one constant ------------
+    # The owner's ruling moves every header beside its source (`include/<m>/x.h` -> `src/<m>/x.h`) and the band to
+    # `src/unsplit/`. A classifier keyed on `include/` would drop every header rule on the move and read the band as
+    # an ordinary header; these pin that it does not.
+    check("classifier: a header under include/ is a header", is_header("include/mod/a.h"), True)
+    check("classifier: a header under src/ is a header", is_header("src/mod/a.h"), True)
+    check("classifier: a .cpp is not a header", is_header("src/mod/a.cpp"), False)
+    check("classifier: the band is include/unsplit/ today", is_unsplit_header("include/unsplit/mod.h"), True)
+    check("classifier: src/unsplit/ is not the band while BAND_ROOT says include/unsplit",
+          is_unsplit_header("src/unsplit/mod.h"), False)
+    import tools.lib.project.ownership as _own_mod
+    _saved_band = _own_mod.BAND_ROOT
+    try:
+        _own_mod.BAND_ROOT = "src/unsplit"
+        check("classifier: moving BAND_ROOT moves the band (one constant)", is_unsplit_header("src/unsplit/mod.h"),
+              True)
+        check("classifier: ... and the old directory is an ordinary header then",
+              is_unsplit_header("include/unsplit/mod.h"), False)
+        check("classifier: the band reading follows the constant (an owned name declared there is rule 2)",
+              lines_of("void foo(void);\n", 2, "src/unsplit/mod.h", idx), [1])
+        check("classifier: the band at its new root carries no STOPGAP reading (band semantics kept)",
+              [f["rule"] for f in lint_source(Source("b", "src/unsplit/mod.h",
+                                                     "/* STOPGAP-BEGIN(none) */\n/* STOPGAP-END(none) */\n"))],
+              [])
+        check("classifier: a rule-2 detail is the same whatever the band root is",
+              [f["detail"] for f in lint_source(Source("x", "src/other/c.c", "extern void mid(void);\n"), mid)
+               if f["rule"] == 2],
+              ["`mid` has no registered owner - declare it in the `mod` unsplit band header"])
+    finally:
+        _own_mod.BAND_ROOT = _saved_band
+    hbody = ("struct Hdr {\n    u32 unk00;\n};\nvoid fn_80040598(void);\nvoid f(void) {\n    goto x;\n}\n"
+             "#pragma peephole off\n")
+    for hrel in ("include/mod/h.h", "src/mod/h.h"):
+        check("classifier: the body rule set runs on %s (3, 4, 5, 7, 8, 14)" % hrel,
+              sorted({r for r, _l in rules_of(hbody, hrel)}), [3, 4, 5, 7, 8, 14])
+    check("classifier: a .c is never judged by rule 14",
+          sorted({r for r, _l in rules_of(hbody, "src/mod/h.c")}), [3, 4, 5, 7, 8])
+    import tools.units.stylelint_rules.lint as _lint_mod
+    _saved_switch = _lint_mod.HEADER_BODY_RULES_ON
+    try:
+        _lint_mod.HEADER_BODY_RULES_ON = False
+        check("classifier: the recommended header body rules switch off in one place (rule 7 and 14 stay)",
+              sorted({r for r, _l in rules_of(hbody, "include/mod/h.h")}), [7, 14])
+        check("classifier: ... and the switch never touches a source file",
+              sorted({r for r, _l in rules_of(hbody, "src/mod/h.c")}), [3, 4, 5, 7, 8])
+    finally:
+        _lint_mod.HEADER_BODY_RULES_ON = _saved_switch
+    check("classifier: the owner's header beside its source is the owner's (rule 2 clean)",
+          lines_of("void foo(void);\n", 2, "src/mod/a.h", idx), [])
+
+    # --- the header move itself: `include/mod/a.h` -> `src/mod/a.h` and the band's rule-2 reading -------------
+    # A `git mv` of a header carrying findings of every header-visible rule must measure delta 0 on both
+    # comparisons: identities are path-free (rule 2's band detail names a module) and the per-file walk keys the base
+    # copy by the path the working tree spells.
+    with tempfile.TemporaryDirectory() as tmp:
+        def mgit(*args: str) -> None:
+            subprocess.run(["git", "-c", "user.email=selftest@example.invalid",
+                            "-c", "user.name=selftest", "-c", "commit.gpgsign=false", *args],
+                           cwd=tmp, capture_output=True, check=True)
+
+        def mput(rel: str, text: str) -> None:
+            p = os.path.join(tmp, rel)
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            with open(p, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(text)
+
+        mgit("init", "-q")
+        mgit("checkout", "-q", "-b", "main")
+        mput("config/RMHE08/symbols.txt",
+             "owned_fn = .text:0x80002000; // type:function size:0x10\n"
+             "unowned_data = .data:0x80003000; // type:object size:0x10\n"
+             "mid_fn = .text:0x80002500; // type:function size:0x10\n")
+        mput("config/RMHE08/splits.txt",
+             "other/other_unit.c:\n\t.text       start:0x80002000 end:0x80002010\n"
+             "other/later_unit.c:\n\t.text       start:0x80003000 end:0x80003010\n")
+        mput("src/other/other_unit.c", "void owned_fn(void) {}\n")
+        mput("src/other/later_unit.c", "void later(void) {}\n")
+        mput("src/mod/user.c", "extern void mid_fn(void);\nvoid u(void) { mid_fn(); }\n")
+        mput("include/mod/a.h",
+             "#pragma pool\nvoid takes_void_star(void *p);\nextern u8 unowned_data[];\nvoid fn_80040598(void);\n"
+             "void owned_fn(void);\nstruct S {\n    u32 x;\n};\n")
+        mgit("add", "-A")
+        mgit("commit", "-q", "-m", "base")
+        base_sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=tmp, capture_output=True, text=True,
+                                  encoding="utf-8", errors="replace").stdout.strip()
+        base_rules = sorted({f["rule"] for f in lint_source(
+            Source("a", "include/mod/a.h", open(os.path.join(tmp, "include/mod/a.h"), encoding="utf-8").read()),
+            load_ownership_at_ref(tmp, base_sha))})
+        check("header move: the base header carries rules 2, 3, 4, 7, 11, 12 and 14 (a positive control)",
+              base_rules, [2, 3, 4, 7, 11, 12, 14])
+        mgit("checkout", "-q", "-b", "lane")
+        mgit("mv", "include/mod/a.h", "src/mod/a.h")
+        mgit("commit", "-q", "-m", "move a header beside its source")
+        old_cwd = os.getcwd()
+        os.chdir(tmp)
+        try:
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                rc_move = main(["--diff", base_sha, "--json"])
+            move = json.loads(out.getvalue())
+        finally:
+            os.chdir(old_cwd)
+        check("header move: --diff measures delta 0 (exit 0)", rc_move, 0)
+        check("header move: ... no added row", move["added"], [])
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            rc_move_ref = ref_comparison(tmp, "lane", load_ownership(tmp), as_json=True)
+        check("header move: --ref measures delta 0 too", (rc_move_ref, json.loads(out.getvalue())["added"]), (0, []))
+        # the negative control: the same move that also adds one generated name is refused, naming it
+        mgit("checkout", "-q", "-b", "lane2", base_sha)
+        mgit("mv", "include/mod/a.h", "src/mod/a.h")
+        mput("src/mod/a.h", open(os.path.join(tmp, "src/mod/a.h"), encoding="utf-8").read()
+             + "void fn_80041234(void);\n")
+        mgit("commit", "-q", "-am", "move and add one generated name")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            rc_move_bad = ref_comparison(tmp, "lane2", load_ownership(tmp), as_json=True)
+        bad = json.loads(out.getvalue())
+        check("header move: a move that adds a generated name refuses (negative control)",
+              (rc_move_bad, [(d["rule"], d["file"], d["token"]) for d in bad["detail"]]),
+              (1, [(7, "src/mod/a.h", "fn_80041234")]))
 
     # --- `--list-added`: name the findings a `--diff` counts, grouped the way a lane needs them -------
     # 2026-09-28: a UI lane read "+76 rule 7" with no way to learn *which* tokens were added; it dropped

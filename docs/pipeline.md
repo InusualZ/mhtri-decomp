@@ -424,12 +424,14 @@ refuses a batch, names the row that refused, and the landing either passes every
 * **Lane-side pre-check for the lint row (row 5):** `python tools/units/stylelint.py --diff main` adds no
   violation and `land.band_ownership_warnings(...)` returns `[]` (the rule-2 band row 7 is a warning); two lanes
   were refused after a full unit for not running it. Rule 2/7 sweeps also need `handoff.py --check` at 0 errors.
-  Rule 7 has no row of its own: the lint row is the whole check.
-* **Open for the owner: rule 7 does not read `include/` or file names.** The lint checks rule 7 in `src/` only:
-  measured 2026-10-05, 286 headers carry 2,975 generated-name lines (`fn_` 1,751, `lbl_`/`loc_` 1,017, `unk` 207),
-  195 headers and 69 `src/` units are named by a generated stem, and nothing reports any of it (the deleted row 8's
-  file-stem check fired only behind a grown escape). Extending rule 7 to headers and stems would be a grandfathered extension
-  of about 3,000 findings (`--diff` keeps existing ones from blocking); not built - the owner rules.
+  Rule 7's identifiers and file names are the lint row's; its one row of its own is the new-unit refusal (row 7b),
+  which judges registrations, not text.
+* **Rule 7 reads every `.c`/`.cpp`/`.h` and every file name (owner, 2026-10-05; built).** A header carries the body rule
+  set like a source; rule 7 counts a generated stem anywhere in a token, address-named identifiers and generated file and
+  directory names (`docs/tools/spec/stylelint.md`). Measured on main `2e6610017`: rule 7 40,119 -> 44,710 (headers
+  +2,826, suffix/prefix stems +591, `dtor_` +61, address-named +836, file names +277). It is a ratchet: `--diff` keeps
+  existing findings from blocking and refuses a new identity. The pre-build row "no newly registered unit has a generated
+  name (rule 7)" refuses a new unit whose path spells one (§4 row 7b).
 * **The data-closure row** ("no batch unit's target object references data no claim covers"): every data address a
   batch unit's *target* object relocates against must sit in some `splits.txt` range, and a recut must not leave a
   claimed byte unclaimed. Add-only over `(unit, address)` pairs - `record-base` snapshots the ~13.5k pre-existing
@@ -1044,6 +1046,10 @@ These are decisions, not lessons. Do not relax one without the owner.
 | 2026-10-03 | **Pilot naming exception:** a pilot lane may leave a foreign-owned `fn_`/`lbl_` name and file an outbox request; the orchestrator is the integrator (a batch after every 3-5 landings). |
 | 2026-10-03 | **`mpMediator__15sNetworkLibrary` (`.sbss` 0x80794CC4) keeps its split**; the L4 lane decides from the bodies (it did: a static of the base class, no move), files the sound-side `getInstance` as an ownership request and records the residual in the unit header. |
 | 2026-10-04 | **Build the integrator** (`tools/units/integrate.py`, `tools/lib/requests.py`). Trial rule: a lane may apply a `rename` or `decl-move` itself when the owner unit has no live claim, the confidence is certain/evidence and `integrate` proves names-only drift for the other units; GUESS names, record unification and seams stay with the integrator. |
+| 2026-10-05 | **Headers live beside their sources.** Hub/type headers and band headers mirror their paths under `src/` after the move (`src/types.h`, `src/mh3_pad/*.h`, `src/nw4r/...`, `src/unsplit/<module>.h`); the lint never hard-codes `include/`: a header is a `.h` anywhere and the band root is one constant (`lib.project.ownership.BAND_ROOT`). |
+| 2026-10-05 | **Leaf headers are folded into their owner's header** (strictly header = source stem), as later lane work, measured per fold (a declaration set is a codegen input, playbook 060). |
+| 2026-10-05 | **Rule 7 is a ratchet with no exemptions**: every generated identifier and every generated file or directory name counts, in every `.c`/`.cpp`/`.h` - address-named identifiers (`Panel805482CC`, `s_80276B58`, `Helper_80147CE0`) included; the gate refuses any new finding (add-only by identity, `lib.findings`), counts only fall, and no comment, path or category is exempt. **A new unit registered with a generated stem is refused** (a GUESS name is allowed). |
+| 2026-10-05 | **Order of the header program**: the lint (this rule set) -> the vtableaudit `referenced` window fix -> the quiesced header move (a separate batch) -> the renames, as lane work. The full body rule set on headers (rules 3, 4, 5, 6, 8, 9) is the orchestrator's recommendation, switchable in one place (`lint.HEADER_BODY_RULES_ON`). |
 | standing | A rule enforced by remembering is not a rule: a rule change ships with its tool row (`stylelint`, `vtableaudit`, `sync_profiles`) in the same batch. |
 
 ---

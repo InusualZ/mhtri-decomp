@@ -6,8 +6,8 @@ from tools.units.stylelint_rules import (
     r03_size, r04_offset, r05_field_name, r06_pointer_arith, r07_generated_name, r08_goto, r09_mangled,
 )
 from tools.units.stylelint_rules.common import (
-    Source, all_sources, field_walk, header_files, is_shared_header, is_unsplit_header, read_text, rel_of,
-    struct_defs, unsplit_header_files,
+    Source, all_header_files, all_lint_sources, all_sources, field_walk, header_files, is_header, is_unsplit_header, read_text,
+    rel_of, struct_defs, unsplit_header_files,
 )
 from tools.units.stylelint_rules.context import load_ownership
 from tools.units.stylelint_rules.r01_shared_type import rule1_findings
@@ -20,34 +20,31 @@ from tools.units.stylelint_rules.r12_unclaimed_data import rule12_findings
 from tools.units.stylelint_rules.r13_method import rule13_findings, rule13_static_like, set_rule13_context
 
 
+# The body rules a header carries ONLY on the orchestrator's recommendation (2026-10-05, "the full body rule set for
+# headers"; the owner was not asked). Rule 7 in headers is the owner's ruling and rules 11/13/14 were already header
+# rules, so they are not in this set. Measured on main 2e6610017: rule 3 +182, 4 +35, 5 +146, 9 +20, 6 and 8 +0 (383
+# findings, all under `include/`). Set `HEADER_BODY_RULES_ON = False` to switch them off - the one place.
+HEADER_BODY_RULES = (3, 4, 5, 6, 8, 9)
+HEADER_BODY_RULES_ON = True
+
+
 def lint_source(src: Source, ownership: "Ownership | None" = None) -> list[dict]:
     """All section 6.5 findings for one file, in rule then line order.
 
-    `ownership` carries the symbols.txt + splits.txt index for rule 2; when it is None (the map is
-    absent, or a caller that only wants the source-local rules), rule 2 is not reported for `src`.
+    `ownership` carries the symbols.txt + splits.txt index for rules 2 and 12; when it is None (the map is
+    absent, or a caller that only wants the source-local rules), neither is reported for `src`.
 
-    The unsplit band is declaration-only glue, so for a file under `include/unsplit/` only rule 2 runs -
-    and there it means the opposite of its `src/` reading: a symbol a registered unit owns must not be
-    declared here.
+    One classifier, three file kinds (2026-10-05). **Every** `.c`/`.cpp`/`.h` - a source, a header anywhere
+    (`common.is_header`: `include/**` today, `src/**` after the move) and the unsplit band - carries the body rule
+    set: 3, 4, 5, 6, 7, 8, 9, 11, 13 and 14 (14 reports only in a header; 13 only where a `.cpp` reaches the file).
+    Only rule 2 and the STOPGAP check read the kind: a source is judged by `rule2_findings`, an ordinary header by
+    `rule2_header_findings` (an unowned name is the band's to detect), and the band by `rule2_band_findings` (an
+    owned name declared there is the finding); the band carries no STOPGAP check, as before. Rule 12 reads every
+    kind the same way.
     """
+    band = is_unsplit_header(src.rel)
+    header = is_header(src.rel)
     out: list[dict] = []
-    if is_unsplit_header(src.rel):
-        if ownership is not None:
-            out.extend(rule2_band_findings(src, ownership))
-            out.extend(rule12_findings(src, ownership))
-        out.sort(key=lambda f: (f["rule"], f["line"]))
-        return out
-    if is_shared_header(src.rel):
-        out.extend(stopgap_findings(src))
-        # an ordinary `include/` header: rules 2 and 12 are the section-6.5 rules it carries. Rules 3-9 are
-        # body/`src/` rules, and rules 14/11 for headers are reported by `header_pragma_findings` and
-        # `header_rule11_findings` rather than here (2026-09-28). Rule 12 is here because a header is where
-        # the unowned data a `src/` unit reads is declared (2026-09-28).
-        if ownership is not None:
-            out.extend(rule2_header_findings(src, ownership))
-            out.extend(rule12_findings(src, ownership))
-        out.sort(key=lambda f: (f["rule"], f["line"]))
-        return out
     # the body rules, each its own module; the final sort is stable, so the order within one (rule, line) is the
     # order each rule's module reports it in
     defs = struct_defs(src)
@@ -57,26 +54,41 @@ def lint_source(src: Source, ownership: "Ownership | None" = None) -> list[dict]
     out.extend(r05_field_name.findings(src, fields))
     out.extend(r06_pointer_arith.findings(src))
     out.extend(r07_generated_name.findings(src, fields))
+    out.extend(r07_generated_name.path_findings(src))
     out.extend(r08_goto.findings(src))
     out.extend(r09_mangled.findings(src))
 
     if ownership is not None:
-        out.extend(rule2_findings(src, ownership))
+        if band:
+            out.extend(rule2_band_findings(src, ownership))
+        elif header:
+            out.extend(rule2_header_findings(src, ownership))
+        else:
+            out.extend(rule2_findings(src, ownership))
         out.extend(rule12_findings(src, ownership))
 
     out.extend(rule11_findings(src))
     out.extend(rule13_findings(src))
-    out.extend(stopgap_findings(src))
+    out.extend(codegen_pragma_findings(src))
+    if not band:
+        out.extend(stopgap_findings(src))
 
+    if header and not HEADER_BODY_RULES_ON:
+        out = [f for f in out if f["rule"] not in HEADER_BODY_RULES]
     out.sort(key=lambda f: (f["rule"], f["line"]))
     return out
 
 
+def is_band_rule2(f: dict) -> bool:
+    """A rule-2 finding filed against the unsplit band - the column `--budget` leaves to `--headers` (it was never
+    in the default table, and the classifier change must not move it there)."""
+    return f["rule"] == 2 and is_unsplit_header(f["file"])
+
+
 def header_pragma_findings(root: str) -> list[dict]:
-    """Rule 14 over the whole shared-header tree (`include/`).  Not part of `lint_source`, which runs
-    rules 3-9 on `src/` files and rule 2 on the band; a header is judged by this rule only."""
+    """Rule 14 over every header (`all_header_files`). `lint_source` reports it too; this is the whole-tree view."""
     out = []
-    for path in header_files(root):
+    for path in all_header_files(root):
         out.extend(codegen_pragma_findings(Source(path, rel_of(root, path), read_text(path))))
     return out
 
@@ -88,7 +100,7 @@ def header_rule11_findings(root: str) -> list[dict]:
     defect as one in a `src/` file. The band is covered here - `lint_source` returns early for it.
     """
     out = []
-    for path in header_files(root):
+    for path in all_header_files(root):
         out.extend(rule11_findings(Source(path, rel_of(root, path), read_text(path))))
     return out
 
@@ -101,7 +113,7 @@ def header_rule13_findings(root: str) -> list[dict]:
     """
     set_rule13_context(root)
     out = []
-    for path in header_files(root):
+    for path in all_header_files(root):
         out.extend(rule13_findings(Source(path, rel_of(root, path), read_text(path))))
     return out
 
@@ -129,7 +141,7 @@ def header_rule12_findings(root: str, ownership: "Ownership | None" = None) -> l
     if ownership is None:
         return []
     out = []
-    for path in header_files(root):
+    for path in all_header_files(root):
         rel = rel_of(root, path)
         out.extend(rule12_findings(Source(path, rel, read_text(path)), ownership))
     return out
@@ -148,7 +160,7 @@ def header_rule2_findings(root: str, ownership: "Ownership | None" = None) -> li
     if ownership is None:
         return []
     out = []
-    for path in header_files(root):
+    for path in all_header_files(root):
         rel = rel_of(root, path)
         if is_unsplit_header(rel):
             continue
@@ -200,7 +212,8 @@ def rule11_local_total(root: str) -> int:
 
 def lint_tree(root: str, paths: list[str] | None = None,
               ownership: "Ownership | None" = None) -> list[dict]:
-    """Per-file findings (rules 2-9) for `paths`, or for the whole tree when `paths` is None.
+    """Per-file findings (every rule but the cross-file rule 1) for `paths`, or for every file the lint judges
+    (`lint_files`: `src/` and the headers outside it) when `paths` is None.
 
     Rule 1 is cross-file and is *not* included here: with `paths` limited to a batch's changed files it
     would miss a duplicate whose partner is untouched. Use `lint_all` for the whole rule set. `ownership`
@@ -211,27 +224,22 @@ def lint_tree(root: str, paths: list[str] | None = None,
         ownership = load_ownership(root)
     set_rule13_context(root)
     out = []
-    sources = all_sources(root) if paths is None else [
+    sources = all_lint_sources(root) if paths is None else [
         Source(path, rel_of(root, path), read_text(path)) for path in paths]
     for src in sources:
         out.extend(lint_source(src, ownership))
     return out
 
 
-def lint_all(root: str, ownership: "Ownership | None" = None) -> list[dict]:
-    """Every checked finding: the per-file rules plus cross-file rule 1, in rule/file/line order."""
+def lint_all(root: str, ownership: "Ownership | None" = None, band_rule2: bool = False) -> list[dict]:
+    """Every checked finding: `lint_source` over every file the lint judges plus cross-file rule 1, in
+    rule/file/line order. The band's rule-2 reading is left out unless `band_rule2` (`--budget --headers`)."""
     if ownership is None:
         ownership = load_ownership(root)
     set_rule13_context(root)
-    sources = all_sources(root)
     out = []
-    for src in sources:
-        out.extend(lint_source(src, ownership))
-    out.extend(rule1_findings(sources))
-    out.extend(header_pragma_findings(root))
-    out.extend(header_rule2_findings(root, ownership))
-    out.extend(header_rule11_findings(root))
-    out.extend(header_rule13_findings(root))
-    out.extend(header_rule12_findings(root, ownership))
+    for src in all_lint_sources(root):
+        out.extend(f for f in lint_source(src, ownership) if band_rule2 or not is_band_rule2(f))
+    out.extend(rule1_findings(all_sources(root)))
     out.sort(key=lambda f: (f["rule"], f["file"], f["line"]))
     return out

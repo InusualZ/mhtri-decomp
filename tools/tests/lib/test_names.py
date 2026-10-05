@@ -33,6 +33,27 @@ def test_generated_schemes(c):
             (0x8018B3B8, None))
 
 
+def test_generated_name_kind(c):
+    """Rule 7 exact (owner, 2026-10-05): a stem anywhere, or a DOL address in the name; the boundaries are the
+    false-positive cases measured on the tree."""
+    table = {
+        "fn_80041234": "generated", "fn_80041234__FPv": "generated", "view_fn_80041234": "generated",
+        "fn_800FD864_fx": "generated", "dtor_8005E5E8": "generated", "zz_80123456_": "generated",
+        "lbl_8059DCF8": "generated", "loc_805113B0": "generated", "fn_8004cad8": "generated",
+        "Panel805482CC": "address", "s_80276B58": "address", "Helper_80147CE0": "address",
+        "MHTRI_ENEMY_FN_80128204_H": "address", "tbl_0x80276B58": "address",
+        "quest_flag_80000000_ck": None,      # 0x80000000 is below the DOL image: a flag value
+        "Eft8030EffectSlot": None,           # `8030Effe` is followed by another hex digit
+        "abc180123456": None,                # nine digits: a number, not an address
+        "addr_80900000": None,               # past the DOL span
+        "fn_1234": None, "main": None, "": None,
+    }
+    for name, want in table.items():
+        c.check("generated_name_kind(%r)" % name, names.generated_name_kind(name), want)
+    c.check("the DOL span covers the live map's lowest and highest symbol", names.DOL_SPAN[0] <= 0x80004000 and
+            0x8079D7F0 < names.DOL_SPAN[1], True)
+
+
 def test_mangling(c):
     c.check("is_mangled", [names.is_mangled(n) for n in ("fn__Fv", "Panic__Q24nw4r2dbFPCciPCce", "__start",
                                                          "_savegpr_14", "lbl_8058B290")],
