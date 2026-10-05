@@ -517,6 +517,12 @@ s32 getServerDateTime(NetworkInstance* self);
 /* 0x803FDF24 - copies FMP slot `index` (0x40 bytes at +0x6C40) to `out`: -1 for a null `out`, -2 out of
  * range, else `index` (GUESS name). */
 s32 copyFmpSlot(NetworkInstance* self, NetworkFmpSlot* out, s32 index);
+/* 0x803FDE48 (GUESS name) - copies server block `type` (0x106 bytes of `serverReserve_6614`, the index taken modulo
+ * 4) to `out`; nothing for a null `out`. */
+void copyServerBlock(NetworkInstance* self, s32 type, u8* out);
+/* 0x803FE410 (GUESS name) - token `index` (0..7) of the split binary reply: `binaryText_D409` plus
+ * `binaryTokens_D60C[index]`, NULL past 7.  The network control's default error texts read tokens 0/1 with it. */
+char* getBinaryToken(NetworkInstance* self, u32 index);
 /* 0x803FE470 */
 void getSelectedID(NetworkInstance* self, u8* out);
 /* 0x803FE488 */
@@ -1073,6 +1079,11 @@ u32 sendNtcLayerBinary(NetworkInstance* self, PatItemList list);
 /* 0x80403460 - packs (from, to, state) as four items and sends them with `sendNtcLayerBinary` (GUESS name: the
  * caller is NetworkLayerPat's NAT pair-state update). */
 void sendNtcLayerBinaryNatState(NetworkInstance* self, u32 from, u32 to, s8 state);
+/* 0x80403304 - packs a kind byte and the 14-byte record (three words, a halfword) as five items and sends them: to
+ * the whole layer with `sendNtcLayerBinary` (kind 6) when `broadcast` is set, else to the member whose exported
+ * id is `userId` through 0x804021A8 (kind 7).  NAME (a GUESS): its caller is NetworkLayerPat's 0x803EEBA4 with the
+ * layer's per-slot record at +0xC1B0. */
+void sendLayerBinaryRecord(NetworkInstance* self, u32 a, u32 b, u32 c, u16 d, const u8* userId, s32 broadcast);
 /* 0x804037EC */
 u32 sendReqUserSearchHead(NetworkInstance* self, u32 kind, u32 count, const char* userId, const char* name, const NetLayerFilter* filters, s32 filterCount, u8 flag);
 

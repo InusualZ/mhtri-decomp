@@ -219,7 +219,7 @@
  * `.sdata2` seam at 0x80375290 (outside the brief's range, and explained by the mergeable-constant
  * pool: 0x8079BC68..0x8079BC88 is referenced from both sides, so it is a shared constant run, not an
  * object boundary), and a weak right boundary.  The evidence that does pin this file's right edge is
- * the `.data` block boundary plus the call closure: `fn_80378464`'s two jump tables
+ * the `.data` block boundary plus the call closure: `handleLobbyNetMessage`'s two jump tables
  * (0x805EE4B8..0x805EE514) are the last `.data` of the em020 block, `em019_prog_tbl` starts the next
  * block at 0x805EE518, and `fn_80378F7C` (the last function here) is called only from 0x8036C284 /
  * 0x8036C6E8 - both em020-side - while `fn_80378F9C` (the first function of `enemy/em019_ai.cpp`) is

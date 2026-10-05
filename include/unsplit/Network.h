@@ -192,7 +192,7 @@ typedef struct NetworkRequest NetworkRequest;   /* include/Network/NetworkSessio
 
 /* The request/layer state machine's owned callees live in their owners' headers (rule 2):
  * `NetworkRequest_getError` in `Network/NetworkSessionManagerPat.h`, `notifyLayerEvent` in
- * `Network/NetworkCommunityPat.h`, the layer requests and `isMaintenanceMode` in
+ * `Network/NetworkCommunityPat.h`, the layer requests and `isMessageRestricted` in
  * `Network/PatInterface.h`, the Pat setters and `getGameTime` in `Network/PatInterface.h`, and the
  * terms entry points in `Network/NetworkWiiMediator.h`. */
 struct PatTerms;

@@ -8,10 +8,10 @@
  *
  * WHY IT SITS HERE.  The tail of the former `Network/network_layer_io.cpp`, its own TU since the round 4 fold gave
  *   the head to `Network/PatInterface.cpp`: the `.data` V->S seam at 0x80602428 (PatInterface's table 0x80602198,
- *   then this range's first string "NHTTPStartup") ends that TU.  The left edge 0x804123F8 is `fn_804123F8`, the
- *   `NHTTPDestroy` callback whose address only this range's `fn_804130EC` takes and which calls only this range;
+ *   then this range's first string "NHTTPStartup") ends that TU.  The left edge 0x804123F8 is `onNHTTPDestroyed`, the
+ *   `NHTTPDestroy` callback whose address only this range's `stepCleanup__11NetworkPoolFv` takes and which calls only this range;
  *   `getNetworkPool` (0x8041241C) reads this unit's `.sbss` word 0x80794CB8, `fn_80412C98` its `.sdata` 0x80793988
- *   and `fn_8041275C` its `.sdata2` 0x8079C868.  Right edge: `mediatorEventCallback` 0x80413450
+ *   and `clearState__11NetworkPoolFv` its `.sdata2` 0x8079C868.  Right edge: `mediatorEventCallback` 0x80413450
  *   (`Network/NetworkWiiMediator.cpp`'s band).
  *
  * UNKNOWN.  `splitcheck --unit` reads a zigzag `.data` seam at 0x806024A0 inside this range: `NetworkPool`'s table

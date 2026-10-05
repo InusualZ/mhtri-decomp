@@ -25,6 +25,11 @@ void draw_lsp_parts(void);                 /* 0x802DFEBC */
 /* 0x802DFB70 - shows the new-mail notice: the cockpit icon and sound 0x27 (GUESS name). */
 void cockpitShowNewMail(void);
 
+/* 0x802E0468 - stores player slot `slot`'s transfer-mode icon (0 none, 1..3) in the cockpit state's per-slot byte
+ * +0x7C.  NAME (a GUESS): its one caller is the network control's `updateTransferMode`, which sets it for the four
+ * slots from the friend list and the layer's transfer state. */
+void setCockpitTransferMode(u8 slot, s32 mode);
+
 #ifdef __cplusplus
 }
 #endif

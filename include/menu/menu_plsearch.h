@@ -44,6 +44,13 @@ s32 updatePatTerms(struct PatTerms* terms);
  * ready (GUESS name: the failure log reads "fail to suppress echo P-Mic"); returns the suppressor's result. */
 s32 suppressPatTermsEcho(struct PatTerms* terms, const u8* in, u8* out, s32 size);
 
+/* 0x8045108C / 0x804510FC - read `size` bytes of voice samples into `out` / write `size` bytes from `in` (the
+ * second reads `in` as 16-bit samples and consults the terms object's +0xE2 flag) through the voice band 0x80526180 / 0x80526270, once
+ * the terms update finished; the byte count, 0 before.  NAMES (GUESSES): the mediator's `readVoice` forwards to the
+ * first, its unnamed 0x80417080 to the second. */
+s32 readPatTermsVoice(struct PatTerms* terms, u8* out, s32 size);
+s32 writePatTermsVoice(struct PatTerms* terms, const s16* in, s32 size);
+
 #ifdef __cplusplus
 }
 #endif

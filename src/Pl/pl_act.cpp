@@ -2569,7 +2569,7 @@ extern f32 lbl_8079A07C;
 /* `_EQUIP`, `_SLOTENT` and `_PLW` are the shared `pl.h` definitions (phase 4 fold: this section carried its own views). */
 
 extern "C" {
-void fn_8004A20C(_EQUIP*, _EQUIP*);
+void equip_record_copy(_EQUIP*, _EQUIP*);
 u32 fn_8026FFBC(_PLW*);
 u32 fn_80273ED8(_PLW*, int, s8);
 
@@ -2913,24 +2913,24 @@ extern "C" void fn_80270F50(_PLW* plw, _EQUIP* equip, u8* out) {
     int i;
 
     if (equip != 0) {
-        fn_8004A20C(&saved[0], &plw->equipA[0]);
-        fn_8004A20C(&saved[1], &plw->equipA[1]);
-        fn_8004A20C(&saved[2], &plw->equipA[2]);
-        fn_8004A20C(&saved[3], &plw->equipA[3]);
-        fn_8004A20C(&saved[4], &plw->equipA[4]);
-        fn_8004A20C(&saved[5], &plw->equipA[5]);
-        fn_8004A20C(&saved[6], &plw->equipB);
-        fn_8004A20C(&saved[7], &plw->equipC);
-        fn_8004A20C(&saved[8], &plw->equipD);
-        fn_8004A20C(&plw->equipA[0], &equip[0]);
-        fn_8004A20C(&plw->equipA[1], &equip[1]);
-        fn_8004A20C(&plw->equipA[2], &equip[2]);
-        fn_8004A20C(&plw->equipA[3], &equip[3]);
-        fn_8004A20C(&plw->equipA[4], &equip[4]);
-        fn_8004A20C(&plw->equipA[5], &equip[5]);
-        fn_8004A20C(&plw->equipB, &equip[6]);
-        fn_8004A20C(&plw->equipC, &equip[7]);
-        fn_8004A20C(&plw->equipD, &equip[8]);
+        equip_record_copy(&saved[0], &plw->equipA[0]);
+        equip_record_copy(&saved[1], &plw->equipA[1]);
+        equip_record_copy(&saved[2], &plw->equipA[2]);
+        equip_record_copy(&saved[3], &plw->equipA[3]);
+        equip_record_copy(&saved[4], &plw->equipA[4]);
+        equip_record_copy(&saved[5], &plw->equipA[5]);
+        equip_record_copy(&saved[6], &plw->equipB);
+        equip_record_copy(&saved[7], &plw->equipC);
+        equip_record_copy(&saved[8], &plw->equipD);
+        equip_record_copy(&plw->equipA[0], &equip[0]);
+        equip_record_copy(&plw->equipA[1], &equip[1]);
+        equip_record_copy(&plw->equipA[2], &equip[2]);
+        equip_record_copy(&plw->equipA[3], &equip[3]);
+        equip_record_copy(&plw->equipA[4], &equip[4]);
+        equip_record_copy(&plw->equipA[5], &equip[5]);
+        equip_record_copy(&plw->equipB, &equip[6]);
+        equip_record_copy(&plw->equipC, &equip[7]);
+        equip_record_copy(&plw->equipD, &equip[8]);
         fn_80272A08(plw);
         for (int i = 0; i < 8; i++) {
             plw->unk61A[i] = plw->unk5F2[i];
@@ -2977,15 +2977,15 @@ extern "C" void fn_80270F50(_PLW* plw, _EQUIP* equip, u8* out) {
         out[26 + i] = 0;
     }
     if (equip != 0) {
-        fn_8004A20C(&plw->equipA[0], &saved[0]);
-        fn_8004A20C(&plw->equipA[1], &saved[1]);
-        fn_8004A20C(&plw->equipA[2], &saved[2]);
-        fn_8004A20C(&plw->equipA[3], &saved[3]);
-        fn_8004A20C(&plw->equipA[4], &saved[4]);
-        fn_8004A20C(&plw->equipA[5], &saved[5]);
-        fn_8004A20C(&plw->equipB, &saved[6]);
-        fn_8004A20C(&plw->equipC, &saved[7]);
-        fn_8004A20C(&plw->equipD, &saved[8]);
+        equip_record_copy(&plw->equipA[0], &saved[0]);
+        equip_record_copy(&plw->equipA[1], &saved[1]);
+        equip_record_copy(&plw->equipA[2], &saved[2]);
+        equip_record_copy(&plw->equipA[3], &saved[3]);
+        equip_record_copy(&plw->equipA[4], &saved[4]);
+        equip_record_copy(&plw->equipA[5], &saved[5]);
+        equip_record_copy(&plw->equipB, &saved[6]);
+        equip_record_copy(&plw->equipC, &saved[7]);
+        equip_record_copy(&plw->equipD, &saved[8]);
         fn_80272A08(plw);
         for (int i = 0; i < 8; i++) {
             plw->unk61A[i] = 0;
@@ -3451,7 +3451,7 @@ extern "C" void fn_8027373C(_PLW* plw, u8 idx) {
     if ((plw->equip_valid & mask) == 0) {
         return;
     }
-    fn_8004A20C((_EQUIP*)((u8*)plw + idx * 12 + 0x140), (_EQUIP*)((u8*)plw + idx * 12 + 0x188));
+    equip_record_copy((_EQUIP*)((u8*)plw + idx * 12 + 0x140), (_EQUIP*)((u8*)plw + idx * 12 + 0x188));
     plw->equip_valid &= (u16)~mask;
 }
 
@@ -3482,15 +3482,15 @@ extern "C" void fn_80273998(_PLW* plw, u8 idx, s32 val) {
 extern "C" void fn_80272A08(_PLW* plw) {
     _EQUIP saved[9];
 
-    fn_8004A20C(&saved[0], &plw->equipA[0]);
-    fn_8004A20C(&saved[1], &plw->equipA[1]);
-    fn_8004A20C(&saved[2], &plw->equipA[2]);
-    fn_8004A20C(&saved[3], &plw->equipA[3]);
-    fn_8004A20C(&saved[4], &plw->equipA[4]);
-    fn_8004A20C(&saved[5], &plw->equipA[5]);
-    fn_8004A20C(&saved[6], &plw->equipB);
-    fn_8004A20C(&saved[7], &plw->equipC);
-    fn_8004A20C(&saved[8], &plw->equipD);
+    equip_record_copy(&saved[0], &plw->equipA[0]);
+    equip_record_copy(&saved[1], &plw->equipA[1]);
+    equip_record_copy(&saved[2], &plw->equipA[2]);
+    equip_record_copy(&saved[3], &plw->equipA[3]);
+    equip_record_copy(&saved[4], &plw->equipA[4]);
+    equip_record_copy(&saved[5], &plw->equipA[5]);
+    equip_record_copy(&saved[6], &plw->equipB);
+    equip_record_copy(&saved[7], &plw->equipC);
+    equip_record_copy(&saved[8], &plw->equipD);
     fn_8027252C(&saved[0], plw->unk5F2, (s8*)plw->unk60A, plw->unk602);
 }
 
@@ -3700,9 +3700,9 @@ extern "C" void fn_802736A0(_PLW* plw) {
     if (plw->deco_dirty == 0) {
         return;
     }
-    fn_8004A20C(&plw->equipB, &plw->equipB2);
+    equip_record_copy(&plw->equipB, &plw->equipB2);
     for (i = 0; i < 2; i++) {
-        fn_8004A20C((&plw->equipC) + i, &plw->equipE[i]);
+        equip_record_copy((&plw->equipC) + i, &plw->equipE[i]);
     }
     plw->deco_dirty = 0;
     plw->field_0x002 = Get_pl_type__FP6_EQUIPP6_EQUIP(&plw->equipB, &plw->equipC);
@@ -3953,15 +3953,15 @@ extern "C" s8 fn_8027234C(u8* rec, u8 skill) {
 extern "C" void fn_8027243C(_PLW* plw, u8 skill) {
     _EQUIP saved[9];
 
-    fn_8004A20C(&saved[0], &plw->equipA[0]);
-    fn_8004A20C(&saved[1], &plw->equipA[1]);
-    fn_8004A20C(&saved[2], &plw->equipA[2]);
-    fn_8004A20C(&saved[3], &plw->equipA[3]);
-    fn_8004A20C(&saved[4], &plw->equipA[4]);
-    fn_8004A20C(&saved[5], &plw->equipA[5]);
-    fn_8004A20C(&saved[6], &plw->equipB);
-    fn_8004A20C(&saved[7], &plw->equipC);
-    fn_8004A20C(&saved[8], &plw->equipD);
+    equip_record_copy(&saved[0], &plw->equipA[0]);
+    equip_record_copy(&saved[1], &plw->equipA[1]);
+    equip_record_copy(&saved[2], &plw->equipA[2]);
+    equip_record_copy(&saved[3], &plw->equipA[3]);
+    equip_record_copy(&saved[4], &plw->equipA[4]);
+    equip_record_copy(&saved[5], &plw->equipA[5]);
+    equip_record_copy(&saved[6], &plw->equipB);
+    equip_record_copy(&saved[7], &plw->equipC);
+    equip_record_copy(&saved[8], &plw->equipD);
     fn_8027234C((u8*)&saved[0], skill);
 }
 
@@ -3983,7 +3983,7 @@ extern "C" void fn_802738E8(_PLW* plw, u8* rec) {
     u8 idx = (u8)fn_8027E290(rec[0]);
 
     fn_8027E98C(rec);
-    fn_8004A20C((_EQUIP*)((u8*)plw + idx * 12 + 0x188), (_EQUIP*)rec);
+    equip_record_copy((_EQUIP*)((u8*)plw + idx * 12 + 0x188), (_EQUIP*)rec);
     plw->equip_valid |= (u16)(1 << idx);
     idx = fn_802738D8(idx);
     if (idx != 0xFF) {
@@ -4018,11 +4018,11 @@ extern "C" s32 fn_802739F0(_PLW* plw, s16 value, s32 mode, s8* out) {
 /* Stores two decoration equipment records into the spare slots, clearing whichever is absent. */
 extern "C" void fn_802737B0(_PLW* plw, u8* a2, u8* a3, u8* a4) {
     fn_8027E98C(a2);
-    fn_8004A20C((_EQUIP*)((u8*)plw + 0x1DC), (_EQUIP*)a2);
+    equip_record_copy((_EQUIP*)((u8*)plw + 0x1DC), (_EQUIP*)a2);
     if (a3 != 0) {
         if (a3[0] != 0) {
             fn_8027E98C(a3);
-            fn_8004A20C((_EQUIP*)((u8*)plw + 0x200), (_EQUIP*)a3);
+            equip_record_copy((_EQUIP*)((u8*)plw + 0x200), (_EQUIP*)a3);
         } else {
             memset((u8*)plw + 0x200, 0, 12);
         }
@@ -4032,7 +4032,7 @@ extern "C" void fn_802737B0(_PLW* plw, u8* a2, u8* a3, u8* a4) {
     if (a4 != 0) {
         if (a4[0] != 0) {
             fn_8027E98C(a4);
-            fn_8004A20C((_EQUIP*)((u8*)plw + 0x20C), (_EQUIP*)a4);
+            equip_record_copy((_EQUIP*)((u8*)plw + 0x20C), (_EQUIP*)a4);
         } else {
             memset((u8*)plw + 0x20C, 0, 12);
         }

@@ -31,7 +31,7 @@
  * family `fn_80214EF0`/`fn_80214FB8`/`fn_802150DC`/`fn_80215170`, `fn_801E66A8`/`fn_801E677C`/
  * `fn_801E68B4`, `fn_801EF73C`/`fn_801F0834`, `fn_802142D8`/`fn_802179D4`/`fn_80217F4C`,
  * `fn_8033C1AC`) plus the Pl/HUD icon queries `equip_kind_table_class`/`fn_8027F1B8`/`fn_8027F21C` and the
- * 12-byte icon copy `fn_8004A20C`.
+ * 12-byte icon copy `equip_record_copy`.
  *
  * NAMES: GUESS, derived from the two bodies (marked per the brief, for a later naming pass).  The pair
  * is the lobby menu page's frame step and its info-text selector, so the unit is `lb_menu_page.cpp`
@@ -107,7 +107,7 @@
 
 /* The types this unit's own bodies define (rules 1/3/4/5): the shared views of `lobby_w` and
  * `lobby_world_block` in `include/lobby/*.h` stop short of the offsets below, so each is this unit's
- * view with its own name.  `LbIconRec`/`LbWorldBlock`/`lobby_world_block`/`fn_8004A20C` come from the
+ * view with its own name.  `LbIconRec`/`LbWorldBlock`/`lobby_world_block`/`equip_record_copy` come from the
  * owner's header (rule 2). */
 #include "lobby/lb_pane_ui.h"
 
@@ -178,7 +178,7 @@ typedef struct LbMenuPage {
     /* +0x12A */ u8 unused_0x12A[0xD6];
     /* +0x200 */ s32 data_0x200;        /* `fn_80215170`'s second argument for the 6265 panel */
     /* +0x204 */ u8 unused_0x204[0x8];
-    /* +0x20C */ LbIconRec icons_0x20C[4]; /* 12-byte icon records `fn_8004A20C` copies */
+    /* +0x20C */ LbIconRec icons_0x20C[4]; /* 12-byte icon records `equip_record_copy` copies */
     /* +0x23C */ u32 values_0x23C[4];      /* the words `fn_80214FB8` is handed */
     /* +0x24C */ u16 flags_0x24C[12];      /* the per-index flag run both text selectors read */
     /* +0x264 */ LbPageRecord records_0x264[8];
@@ -314,7 +314,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
                 msg_a = 97;
                 icon_flag = 1;
             }
-            fn_8004A20C(&icon, &lobby_world_block->entries_0x0E00[fn_801EF73C(&self->work_0x3A4)]);
+            equip_record_copy(&icon, &lobby_world_block->entries_0x0E00[fn_801EF73C(&self->work_0x3A4)]);
             if (icon.kind_0x00 == 0) {
                 break;
             }
@@ -363,7 +363,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
             break;
         case 3:
             msg_a = 77;
-            fn_8004A20C(&icon, &self->icons_0x20C[self->index_0x128]);
+            equip_record_copy(&icon, &self->icons_0x20C[self->index_0x128]);
             if ((u8)equip_kind_table_class(icon.kind_0x00) == 1 && fn_802179D4(&icon) == 0) {
                 msg_b = 78;
             }
@@ -421,7 +421,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
             }
             page = 6264;
             msg_a = 104;
-            fn_8004A20C(&icon, &lobby_world_block->entries_0x0E00[fn_801EF73C(&self->work_0x3A4)]);
+            equip_record_copy(&icon, &lobby_world_block->entries_0x0E00[fn_801EF73C(&self->work_0x3A4)]);
             if (icon.kind_0x00 == 0) {
                 break;
             }
@@ -465,7 +465,7 @@ extern "C" void lb_menu_info_update(LbMenuPage* self) {
             }
             page = 6264;
             msg_a = 111;
-            fn_8004A20C(&icon, &lobby_world_block->entries_0x0E00[fn_801EF73C(&self->work_0x3A4)]);
+            equip_record_copy(&icon, &lobby_world_block->entries_0x0E00[fn_801EF73C(&self->work_0x3A4)]);
             if (icon.kind_0x00 == 0) {
                 break;
             }

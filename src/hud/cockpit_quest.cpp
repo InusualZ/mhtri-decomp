@@ -508,7 +508,7 @@ void fn_802E4978(CockpitWork* self, CockpitMove* move) {
     self->field_0x184 = 0;
     self->field_0x188 = 0;
     for (i = 0; i < 10; i++) {
-        fn_802E0468((u8)i, 0);
+        setCockpitTransferMode((u8)i, 0);
     }
 }
 

@@ -475,6 +475,10 @@ public:
     NetworkLayerRequest* allocRequest();
     void deleteRequest(NetworkLayerRequest** slot);
     void moveRequests();
+    /* 0x803E2890 (GUESS) - while no request is parked at +0x1C0, takes one from the pool and starts it on the
+     * handler 0x803E97F0 (the one that sends `sendReqLayerCreateHead`/`Foot`) with kind 2 and the two arguments;
+     * the message pool passes its queued argument (or 0) and a 0/1 flag. */
+    void requestLayerCreate(u32 arg, s32 mode);
     /* 0x803E9C78 / 0x803EA11C / 0x803EA340 (GUESS) - clear the list-pending flags. */
     void clearListPending0();
     void clearListPending1();

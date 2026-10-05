@@ -238,10 +238,21 @@ void mediatorEventCallback(u32 code, s32 a, s32 b, s32 c, const union GameSpyEve
                            NetworkWiiMediator* mediator);
 /* The reflect service singleton the mediator band forwards to and the language/event queries it reads. */
 NetworkReflectService* getReflectService(void);
-/* 0x80413AEC - whether the server is in maintenance (the status word reads 1). */
-s32 isMaintenanceMode(NetworkWiiMediator* self);
-s32 getReflectEventId(void);
+/* 0x80413AEC - whether the console's parental controls restrict messaging (`SCCheckPCMessageRestriction` reads 1);
+ * the network control aborts its start when it does.  Renamed from `isMaintenanceMode` (GUESS, from that callee). */
+s32 isMessageRestricted(NetworkWiiMediator* self);
+/* 0x80413B18 - the link check: fills `error` with 0x80000008/93 while `flag_21` forces a link error
+ * (`enableMediatorLinkError`), else reads the interface's link state (`SOGetInterfaceOpt`, level 0xFFFE, option
+ * 0x1005) and fills `error` when that read fails; 1 when the link is up.  NAME (a GUESS from the body; the Pat
+ * interface's step calls it before each send). */
+s32 checkMediatorLink(NetworkWiiMediator* self, struct NetworkErrorInfo* error);
+/* 0x80413BF8 - the console's country code (`SCGetCountryCode`, IPL.SADR's first byte), 0 without one; renamed from
+ * `getReflectEventId` (GUESS) - `dispatchReflectEvent` maps the codes it returns (18 Canada, 65.. Europe) to a
+ * region index. */
+s32 getCountryCode(void);
 s32 getLanguage(void);
+/* 0x80414C54 - copies the Pat interface's media version string (up to `size` bytes) into `out`. */
+void getMediaVersionString(NetworkWiiMediator* self, char* out, u32 size);
 
 u32 isTermsUpdateFinished(struct PatTerms* terms);
 

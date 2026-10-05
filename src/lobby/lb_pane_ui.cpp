@@ -193,7 +193,7 @@ typedef struct LbMenuPanel {
     /* +0x0E */ s16 stage_0x0E;        /* the stage id the row selects */
 } LbMenuPanel; /* size: 0x10 (the extent this range reads) */
 
-/* One 0xC-byte equipment record (the `fn_8004A20C`/`fn_8004BD58` copy unit and `Gunner_opt_ok_ck`'s
+/* One 0xC-byte equipment record (the `equip_record_copy`/`fn_8004BD58` copy unit and `Gunner_opt_ok_ck`'s
  * argument).  Only the kind byte is read here. */
 typedef struct LbEquipRec {
     /* +0x00 */ u8 kind_0x00;
@@ -276,7 +276,7 @@ extern "C" {
 /* The lobby UI API.  Signatures are the caller-side ones the call sites imply (the callee is
  * `NonMatching` in every case, so the width a call site uses is what its codegen needs). */
 s32 item_pair_copy(IdValue* dst, const IdValue* src);
-s32 fn_8004A20C(LbEquipRec* dst, const LbEquipRec* src);
+s32 equip_record_copy(LbEquipRec* dst, const LbEquipRec* src);
 u16 fn_8004AE70(LbItemDb* db);
 s16 fn_8004AE98(LbItemDb* db);
 s16 fn_8004AF0C(u8 side);
@@ -1892,7 +1892,7 @@ void fn_801F86FC(LbIconRec* recs, u32 id, u32 sel, u32 kind, u32 mode, u16* flag
 
     if ((u16)id != 0xFFFF) {
         rec = &recs[(u8)kind];
-        fn_8004A20C(rec, &src[(u16)id]);
+        equip_record_copy(rec, &src[(u16)id]);
     } else {
         rec = &recs[(u8)kind];
         memset(rec, 0, sizeof(LbIconRec));

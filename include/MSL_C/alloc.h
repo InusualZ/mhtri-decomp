@@ -60,6 +60,10 @@ int sscanf(const char* src, const char* fmt, ...);
 /* 0x8045F858 */
 char* strtok(char* string, const char* delimiters);
 
+/* 0x8045AB48 - the absolute value (`srawi`/`xor`/`subf`).  Its twin 0x8045AB38 has the same body; MSL's
+ * arith.c defines `abs` before `labs`, so this second one is taken as `labs` (a GUESS by that order). */
+long labs(long n);
+
 #ifdef __cplusplus
 }
 #endif

@@ -23,7 +23,7 @@
  * Load-bearing shapes (measured): `#pragma peephole off` is per-function evidenced - with it removed 55
  * functions score lower (collectEvents 95.6 -> 63.3, copyPeerList 100 -> 92.7, setTextSize 100 -> 66.7, the
  * unit 93.61 -> 90.25 %) and none scores higher, so it stays for the whole file - including the first band
- * (2026-10-03: moving the pragma above `fn_80423E74` raised 8 band-1 functions, e.g. resetNetSlots 90.7 -> 100,
+ * (2026-10-03: moving the pragma above `PatCryptSetKey` raised 8 band-1 functions, e.g. resetNetSlots 90.7 -> 100,
  * PatCryptDecrypt 87.1 -> 96.7, and lowered none); server-index scans are
  * loops (MWCC unrolls them to the target shape); `(dst++)->assign(src++)` gives the target's
  * pointer-increment order in copyPeerList; `ai_npc_reaction_forward()` is called with no argument (r3 is
@@ -75,7 +75,7 @@
  *    folding them into one type is open (rule 1).
  *  - Data: the `.rodata` certificate is byte-identical after linking; the split object holds a relocation
  *    at +0x244 (dtk read the DER bytes 8014CB40 as a pointer), so the object compare shows 4 B. The
- *    `.sdata` 0x807939A0.. run (interleaved with fn_80423E74's 0x807939A8) and the `.sdata2` words
+ *    `.sdata` 0x807939A0.. run (interleaved with the absorbed band's 0x807939A8) and the `.sdata2` words
  *    0x8079C890/0x8079C898 (also read by the first band of this unit and the unsplit 0x80431690) are shared, so they
  *    stay unclaimed and their externs remain; our object also emits 0x10 of each of `.sdata`/`.sdata2` from its own pools (`@NNNN` where the target names lbl_8079C898/lbl_8079C890/lbl_807939C4/SPACE_STR).
  *  - Two rule-2 findings the lint still counts: `lb_entry_flags_clear` and `lb_quest_board_reset` have
@@ -100,7 +100,7 @@
  * `Network/network_pat_control.cpp` (the network pat-control band that starts where this one ends and also
  * dereferences `net_ctrl_wk` and calls `getPatsObject`/`getNetworkLayerPat`), and the file takes the
  * game-root `main` lib and `cflags_main` (Wii/1.3, -O3, -inline noauto, -Cpp_exceptions on - the target
- * object carries extab/extabindex).  The stem is the map's `fn_80423E74` (classes 3/4 in the brief).
+ * object carries extab/extabindex).  The stem was the map's placeholder for 0x80423E74, now `PatCryptSetKey` (classes 3/4 in the brief).
  *
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
  * tools/symbols/dumpmap.py: every address in the range answers `zz_<addr>_` or a global name, never a
@@ -115,7 +115,7 @@
  * Residuals: the two state machines `layerReflectCallback` (0xE78, three jump tables) and `updateMessagePool`
  * (0x1580, one jump table) and the message-pool families that follow them are not reconstructed yet;
  * every function that is reconstructed below is listed in the outbox.  Re-measure with
- * `python tools/units/recompile.py fn_80423E74 --measure <symbol>`.
+ * `python tools/units/recompile.py Network/network_pat_control --measure <symbol>`.
  */
 
 #include "Network/network_pat_control.h"
@@ -258,7 +258,7 @@ typedef struct NetPeerEvent {
 } NetPeerEvent; /* size: 0x4 */
 
 #pragma peephole off
-void fn_80423E74(const u8* rawKey)
+void PatCryptSetKey(const u8* rawKey)
 {
     Camellia_Ekeygen(0x100, rawKey, lbl_806D3670);
 }
@@ -268,7 +268,7 @@ void fn_80423E74(const u8* rawKey)
  * returning it in `*len` (already framed to whole blocks).  The block is a 4-byte rotation of the
  * 16-byte working buffer, followed by one Camellia block per full buffer.
  */
-s32 fn_80423E88(u8* buf, u16* len)
+s32 PatCryptEncrypt(u8* buf, u16* len)
 {
     u8 hdr[4];
     u8 in[16];
@@ -316,7 +316,7 @@ s32 fn_80423E88(u8* buf, u16* len)
 }
 
 /*
- * PatCryptDecrypt: the inverse of fn_80423E88.  Rejects a length that is not a whole number of 16-byte
+ * PatCryptDecrypt: the inverse of PatCryptEncrypt.  Rejects a length that is not a whole number of 16-byte
  * blocks with 0x8000, otherwise decrypts the framed buffer in place and rewrites `*len` with the
  * payload length the header carries.
  */
@@ -365,7 +365,7 @@ void setupArenaVectors(NetCtrlWk* work)
     u32 k;
 
     if (net_arena_base == 0) {
-        net_arena_base = fn_800404BC(0x10000);
+        net_arena_base = new u8[0x10000];
     }
     base = net_arena_base;
     for (k = 0; k < 64; k++) {
@@ -2395,7 +2395,7 @@ void updateNetworkPatControl(void)
     case 0x2:
         getNetworkLogger()->setLevel_18(3);
         if (getInstance_() != NULL) {
-            if (isMaintenanceMode(getInstance()) != 0) {
+            if (isMessageRestricted(getInstance()) != 0) {
                 abortNetworkControl(work, 1);
                 return;
             }
