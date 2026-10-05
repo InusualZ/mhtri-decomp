@@ -43,7 +43,7 @@ class _Sym:
 
 @dataclass
 class _Rel:
-    section: str
+    section: str | int
     offset: int
     symbol: str | int
     type: int
@@ -90,7 +90,9 @@ class ElfBuilder:
     def file_symbol(self, name: str) -> "ElfBuilder":
         return self.symbol(name, None, bind="local", type="file", shndx=SHN_ABS)
 
-    def reloc(self, section: str, offset: int, symbol: str | int, type: int | str, addend: int = 0) -> "ElfBuilder":
+    def reloc(self, section: str | int, offset: int, symbol: str | int, type: int | str,
+              addend: int = 0) -> "ElfBuilder":
+        """`section` is a name (its first section) or a 1-based section index in call order (a repeated name)."""
         t = RELOC_NUMBERS[type] if isinstance(type, str) else type
         self._relocs.append(_Rel(section, offset, symbol, t, addend))
         return self
@@ -143,7 +145,8 @@ class ElfBuilder:
         # relocation sections, one per target section, in section order
         rela: list[tuple[str, bytes, int]] = []
         for sec_index, sec in enumerate(secs, 1):
-            rows = [r for r in self._relocs if r.section == sec.name and index_of.get(sec.name) == sec_index]
+            rows = [r for r in self._relocs
+                    if r.section == sec_index or (r.section == sec.name and index_of.get(sec.name) == sec_index)]
             if not rows:
                 continue
             blob = bytearray()

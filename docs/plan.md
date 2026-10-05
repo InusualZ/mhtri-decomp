@@ -702,7 +702,7 @@ construction: a tool can waste time, it cannot break the link.
 | 7.2 | `tools/units/claims.py` | two independent processes must never take one unit; the branch is the lock, and a silent worker must be reclaimable (see the ack/heartbeat/timeout layer, §5.6) | `claim` takes a reusable **slot** and cuts the worktree+branch or refuses (7.26; `--no-slots` keeps the old construction path); `ack`/`status`/`timeout` cover liveness and reclaim (a timed-out branch is rescued to `refs/rescue/<slug>` first); `list` shows owner/age; `release` returns the slot and classifies the rescue ref it parks (`redundant` pruned and printed, drift reported, `unlanded`/`unknown` surfaced and kept) | ~140 |
 | 7.3 | `tools/units/brief.py` | every fan-out cost a hand-written 40-line brief and each drifted | one file per unit with §5.2's six parts; idempotent | ~120 |
 | 7.4 | `tools/units/handoff.py` | worker replies were inconsistently shaped; detail was lost to truncation | prints the digest skeleton; validates an outbox entry against the schema | ~60 |
-| 7.5 | `tools/units/land.py` | the batch checklist was six manual commands and the regression scan was rewritten four times; a green `ok` can come from a stale link | `verify` **deletes `build/RMHE08/ok` (and `main.elf` when the batch flips an object) before the run and requires both to be recreated**, then runs configure → split → report → regressions → `ok` → ledger delta → knowledge-delta check; refuses on a shared-file edit or an outbox violation; owns the baseline (7.16). The `.ninja_log` ordering idea does not work: a `NonMatching` batch never relinks, so `main.elf` never runs | ~240 |
+| 7.5 | `tools/units/land.py` | the batch checklist was six manual commands and the regression scan was rewritten four times; a green `ok` can come from a stale link | `verify` **deletes `build/RMHE08/ok` (and `main.elf` when the batch flips an object) before the run and requires both to be recreated**, then runs configure → split → report → regressions → `ok` → ledger delta (the knowledge-delta row was deleted 2026-10-05); refuses on a shared-file edit or an outbox violation; owns the baseline (7.16). The `.ninja_log` ordering idea does not work: a `NonMatching` batch never relinks, so `main.elf` never runs | ~240 |
 | 7.6 | **first `Matching` flip** | `0 / 5 files linked` today; every linking question is untested and gets more expensive with every unit | one byte-identical **object** (§1) flipped alone in its commit, `ok` green, then the next | — |
 | 7.7 | **done 2026-09-23** - `tools/symbols/dumpmap.py` (66 checks) | 48 367 real names/signatures sit in `DumpSymbols.zip` and using them means remembering the member, format and flags | `lookup <addr\|name>` and `join` (rename candidates, `zz_` confirmations, conflicts) against `symbols.txt` | ~80 |
 | 7.8 | **done 2026-09-23** - `tools/units/dataclaim.py` (75 checks) | the riskiest edit class was reasoned out by hand three times | for each proposed run: target section size/bytes vs ours, verdict, expected effect | ~80 |
@@ -914,7 +914,8 @@ staged diff — that is when the numbers are in hand); **the generated skill ref
 indistinguishable from not having looked).
 
 From 7.10 this is a machine check, not a good intention: `prepcommit.py` warns when a unit improved and no
-document changed, and `land.py verify` runs the same check before the commit message is written.
+document changed. `land.py verify` no longer runs it: its knowledge-delta row (row 20) was deleted on 2026-10-05,
+because a replay of 572 gated commits found it never fired; the gate still reports the ledger delta.
 
 ## 10. Escalation, grants and the decided queue
 
@@ -955,7 +956,7 @@ queue over as a list with numbers.
 
 **`land.py verify` is the land-batch gate** (once built; until then, its commands by hand): `python configure.py`
 → `ninja` → `ninja build/RMHE08/report.json` → the regression scan (`ninja changes`, no measure down) →
-`ninja build/RMHE08/ok` → `ledger.py` → the knowledge-delta check.  On top of that it runs the **cheap rows**
+`ninja build/RMHE08/ok` → `ledger.py` (the ledger delta, reported).  On top of that it runs the **cheap rows**
 before the build: the ground-truth hash, the batch base, the scope/outbox/branch guards, the style lint, and
 **`all tool selftests pass`** (`tools/selftest.py`, parked pre-existing failures aside; `--no-selftests` is the
 documented fast path).
@@ -1211,8 +1212,9 @@ stub -> later promotion to a real name and location) touched every unit twice an
   `fn_XXXXXXXX` stem is not an outcome** (owner, 2026-09-26): when the evidence is thin, derive a name from the
   context and **mark the guess** in the unit header so a later pass can refine it - a generated `fn_`/`lbl_`/
   `unk` name left in `src/` is a defect, and a `rule 7 deferred` comment exempts nothing - the lint honours
-  no key (the escape's files are pure comment text now); the land gate still refuses a batch that *grows* one
-  for a symbol its own unit defines, or registers a unit at a generated file name). **Inventing a module is
+  no key (the escape's files are pure comment text now), and the land gate's lint row refuses a batch that *adds*
+  a generated name in `src/`; the old row that refused a grown escape or a unit at a generated file name was
+  deleted 2026-10-05). **Inventing a module is
   forbidden** - a module comes from the `__FILE__` string, the dump or the subsystem, never from a guess.
 * **Registration before measurement is the constraint.** A worker cannot score a unit that is not in the build
   graph, so it makes the registration - `splits.txt` range, `configure.py` entry, source file - **inside its own

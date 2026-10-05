@@ -352,7 +352,7 @@ currency check catches it); when a row blames a neighbour, `rm -rf build/RMHE08 
 ninja`, then `ninja build/RMHE08/report.json` + `land.py record-base`.
 
 **R13 — A gate hands out a work order; it must be complete.**
-The failure: `rule7_defer_growth` listed `defs[:3]` and a batch that renamed exactly the 3 shown was refused
+The failure: `rule7_defer_growth` (gate row 8, deleted 2026-10-05) listed `defs[:3]` and a batch that renamed exactly the 3 shown was refused
 again (it defined 8; one unit had 33). Two lanes lost a unit of work each. A refusal message lists every
 offender and leads with the count. Same class: a batch **must name the symbols its own units define** and
 register at a **named path** - only references to other units' symbols were ever deferrable, and now nothing is
@@ -387,6 +387,22 @@ refuses a batch, names the row that refused, and the landing either passes every
   it is committed **directly, path-limited** (the gate's own files and nothing else). This is the only landing
   that skips the gate, and its path-limit is what keeps the exception from becoming a habit.
 
+**The rows as they run now (2026-10-05).** The numbered table is `docs/tools/spec/land.md` ("The rows of
+`verify`"); `landing/gate.py` runs them, one function per row in `landing/rows/`.
+
+* **Pre-build (1-9), cheap, refuse before the build:** 1 ground truth, 2 batch base, 3 paths + conflict markers,
+  4 branch commits (refuses) and the outbox (a **warning**), 5 style lint `--diff`, 6 tool selftests, 7 rule-2 band
+  boundary (a warning), 9 commit subject (`commitlint`).
+* **Build and post-build (10-21):** 10 configure / compile gate / `ok` exit codes, 11 registration on three axes,
+  12 undefined references, 13 flips `flipcheck` READY, 14 rule 10 (`vtableaudit.diff_rows`: a run shifted by at
+  most one word at each end pairs with its removed run, anything else is added), 15 data closure, 16 target-object
+  drift, 17 per-symbol re-measure, 18 regressions (a stale `--allow-regression` is a **warning**), 19 `ok` fresh,
+  21 claim release.
+* **Rows 8 and 20 are gone** (the `rule 7 deferred` escape growth, the knowledge delta): numbers are kept, not
+  reused. **A post-build refusal is named**: `land` receives the failing post-build rows too, so its REFUSED line
+  and the land log carry the row, not `nothing to stage`. A WARNING row always passes and its findings go to
+  the commit body (`warning:`) and the land log (`warnings`).
+
 **Gate rows that cost a round, and the cure for each**
 
 * **`--units` must name what the row names.** The *"a neighbour's split target object moved"* row fires on a
@@ -405,14 +421,14 @@ refuses a batch, names the row that refused, and the landing either passes every
   strictly, wants `flags_probed[].verdict` in `reject`/`adopt`/`inconclusive`, and rejects an unknown
   `config_requests` kind (`seam`). A header named in `--units` once demanded residual/flags for a non-unit path
   (`unit_units` fix pending; check: `land.py` outbox row).
-* **Lane-side pre-check for rule 7:** `python tools/units/stylelint.py --diff main` adds no violation and
-  `land.band_ownership_warnings(...)` returns `[]`; two lanes were refused after a full unit for not running the
-  pre-check. Rule 2/7 sweeps also need `handoff.py --check` at 0 errors. (Gate row 8, the `rule 7 deferred`
-  escape-growth row, was deleted 2026-10-05: the replay over 313 gated commits found it refusing none.)
+* **Lane-side pre-check for the lint row (row 5):** `python tools/units/stylelint.py --diff main` adds no
+  violation and `land.band_ownership_warnings(...)` returns `[]` (the rule-2 band row 7 is a warning); two lanes
+  were refused after a full unit for not running it. Rule 2/7 sweeps also need `handoff.py --check` at 0 errors.
+  Rule 7 has no row of its own: the lint row is the whole check.
 * **Open for the owner: rule 7 does not read `include/` or file names.** The lint checks rule 7 in `src/` only:
   measured 2026-10-05, 286 headers carry 2,975 generated-name lines (`fn_` 1,751, `lbl_`/`loc_` 1,017, `unk` 207),
-  195 headers and 69 `src/` units are named by a generated stem, and nothing reports any of it (row 8's file-stem
-  check fired only behind a grown escape). Extending rule 7 to headers and stems would be a grandfathered extension
+  195 headers and 69 `src/` units are named by a generated stem, and nothing reports any of it (the deleted row 8's
+  file-stem check fired only behind a grown escape). Extending rule 7 to headers and stems would be a grandfathered extension
   of about 3,000 findings (`--diff` keeps existing ones from blocking); not built - the owner rules.
 * **The data-closure row** ("no batch unit's target object references data no claim covers"): every data address a
   batch unit's *target* object relocates against must sit in some `splits.txt` range, and a recut must not leave a
@@ -1016,10 +1032,10 @@ These are decisions, not lessons. Do not relax one without the owner.
 | 2026-09-27 | **Every tool section in a profile carries a feedback loop**: a gaps note as a register source, check it before filing (a repeat is a vote), the report's tooling line, and a tool that *misled* is the most valuable report. A novel row ranks only with two distinct filers (§6). |
 | 2026-09-27 | The `@etb_`/`@eti_` post-compile build step (`objextab.py`) was owner-approved; changing compiler flags, `mw_version` or tool tags still needs concrete evidence and an explicit call-out (rule 3). |
 | 2026-09-28 | The `.init` TRK-image request was landed; the residual 164 B is closed as unclaimable (§8). Parked decisions still standing: `memcpy.c`/`memset.c` stay separate; `-func_align 4` waits for `Runtime.PPCEABI.H`'s next pass; one `Matching` flip per commit. |
-| 2026-09-29 | **No `--allow-rule12` (and no `--no-outbox` for a code row) unless the owner rules.** `land.py --allow-rule12 <token>` is a recorded allowance and using it is the owner's call, not a lane's. The owner ruled once, for `DWCi_natProbeStatus` (`.sbss` 0x80795818, landed with `DWCi/DWCi_NatNeg`); its claim is scheduled in `.pi/data-requests.json` until the unregistered `fn_8050C770` band, which writes the word, becomes a unit. For `network_transport` the owner chose the real fix (peer classes + a `.data` claim) over an exemption. |
+| 2026-09-29 | **No `--allow-rule12` (and no `--no-outbox` for a code row) unless the owner rules.** `land.py --allow-rule12 <token>` is a recorded allowance (the land log's `allow` field and an `allow:` commit-body line since 2026-10-05, §4) and using it is the owner's call, not a lane's. The owner ruled once, for `DWCi_natProbeStatus` (`.sbss` 0x80795818, landed with `DWCi/DWCi_NatNeg`); its claim is scheduled in `.pi/data-requests.json` until the unregistered `fn_8050C770` band, which writes the word, becomes a unit. For `network_transport` the owner chose the real fix (peer classes + a `.data` claim) over an exemption. |
 | 2026-09-29 | **"Touched" is a real change, not an edited file** (owner: "Only real changes"): the strict data-closure row demands a unit's sole-owned orphans only when the batch registers it, recuts it, or changes its compiled object (name-insensitive, relocations by address); a rename sweep does not touch. The add-only half defers NEW pairs by the same classes the strict half uses; `isolated-run` stays as landed. See the gate list. |
 | 2026-09-30 | **Claim-exposed pairs are deferred, not refused** (owner: "defer them as a claim-exposed class"): claiming data exposes new orphan pairs through its own relocations, and refusing them forced claim after claim without end. A NEW pair only the batch's own newly claimed data references is reported `deferred (claim-exposed)` (gate log and `datagap.py --row`), earns no `--allow-orphan`, and becomes a `data-claim` backlog item per (unit, pair-run); every other new pair keeps refusing. Definition and tools: section 4 data-closure row (`datagap.claim_exposed_pairs`, `backlog.collect_dataclaim_items`). |
-| 2026-10-01 | **Splits program, apply phase: orphan and rule-10 allowances are recorded, not waived.** A window landing that needs one carries a recorded `--allow-orphan <hex addr>` / `--allow-rule10` allowance (§4); an allowance that matches nothing earns nothing. The 82 units that still FAIL `splitcheck --baseline` (`pool` 76, `data-order` 13) are recorded allowances, not open edges (`docs/splits-program.md`). |
+| 2026-10-01 | **Splits program, apply phase: orphan and rule-10 allowances are recorded, not waived.** A window landing that needs one carries a recorded `--allow-orphan <hex addr>` / `--allow-rule10` allowance (land log schema 2 and the commit body since 2026-10-05; §4); an allowance that matches nothing earns nothing. The 82 units that still FAIL `splitcheck --baseline` (`pool` 76, `data-order` 13) are recorded allowances, not open edges (`docs/splits-program.md`). |
 | 2026-10-02 | **The program works in phases, not bands:** one engine per phase (text edges, data attachment, review, apply, re-audit), the apply phase one lane and one landing per address window; a band is only an address slice inside a phase. |
 | 2026-10-03 | **Retire the tiler:** `attribute.py`, `attribution-queue.json`, `promote*.py`, `applysplits`, `dataattach`, `matchinggain` and the proposal half of `splitcheck` are removed (`docs/tools/retired.md`); `splits.txt` is the queue and the pool is the registered body-less units. |
 | 2026-10-03 | **One landing path:** `python tools/units/land.py land --branch worker/<slug>`; the `.pi/bin/*` scripts (`applybranch`, `landbranch`, `mergelane`, `union`) are deleted. |
