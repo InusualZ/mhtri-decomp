@@ -967,6 +967,7 @@ def violation_rows(s: dict, rename: dict | None = None) -> dict:
             continue
         key = "ref:%s:%d:%s" % (rename.get(ref["file"], ref["file"]), ref["line"], ref["symbol"])
         rows[key] = {"unit": ref["unit"], "kind": "ref",
+                     "file": rename.get(ref["file"], ref["file"]), "symbol": ref["symbol"],
                      "where": "%s:%d assigns %s" % (ref["file"], ref["line"], ref["symbol"])}
     return rows
 
@@ -1000,6 +1001,19 @@ def diff_rows(before: dict, after: dict) -> dict:
             osec, olo, ohi = span(other)
             if osec == sec and olo < hi and lo < ohi and abs(lo - olo) <= 4 * SHIFT_WORDS \
                     and abs(hi - ohi) <= 4 * SHIFT_WORDS:
+                shifted.append([key, old])
+                added.remove(key)
+                removed.remove(old)
+                break
+    # a `ref:` key carries its source line, so a comment edit above the assignment moves it: the same
+    # (file, symbol) removed and added is one reference that shifted, not a new violation
+    for key in list(added):
+        row = after[key]
+        if row.get("kind") != "ref":
+            continue
+        for old in removed:
+            other = before[old]
+            if other.get("kind") == "ref" and (other.get("file"), other.get("symbol")) ==                     (row.get("file"), row.get("symbol")):
                 shifted.append([key, old])
                 added.remove(key)
                 removed.remove(old)
