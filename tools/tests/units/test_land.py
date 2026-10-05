@@ -14,7 +14,7 @@ import tools.units.claims as claims
 import tools.units.dataclosure as dg
 import tools.units.merge.unionguard as ug
 import tools.units.verifyunit as vu
-from tools.lib import testing
+from tools.lib import proc, testing
 from tools.units.landing import api as L
 
 TIER = "fixture"
@@ -1006,14 +1006,14 @@ def test_land_flow_refusals(c):
         with open(os.path.join(tmp, "d910.json"), "w", encoding="utf-8") as fh:
             fh.write("scratch\n")
         repo_git(tmp, "add", "-A")
-        real_run = L.run
+        real_run = proc.run
 
-        def failing_reset(args, cwd):
-            if args[:2] == ["git", "reset"]:
+        def failing_reset(args, cwd=None, **kw):
+            if list(args[:2]) == ["git", "reset"]:
                 return subprocess.CompletedProcess(args, 1, "", "index.lock exists")
-            return real_run(args, cwd)
+            return real_run(args, cwd=cwd, **kw)
 
-        with mock.patch.object(L.tree, "run", failing_reset):
+        with mock.patch.object(proc, "run", failing_reset):
             note = L.tolerate_scratch(tmp, ["d910.json"])
         check("a failed unstage warns", "WARNING" in note, True)
         check("... and names the path", "d910.json" in note, True)

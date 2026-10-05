@@ -9,6 +9,10 @@ from typing import Iterable
 
 from tools.lib import proc
 
+#: The commands that read their pathspec from stdin (`--pathspec-from-file=- --pathspec-file-nul`, git >= 2.26),
+#: measured on git 2.43: `diff`, `status` and `ls-files` refuse the option, so a long list for them is chunked.
+PATHSPEC_FILE_COMMANDS = frozenset({"add", "checkout", "commit", "reset", "restore", "rm"})
+
 
 class GitError(RuntimeError):
     """A git call that had to succeed failed; carries the argv, the exit code and git's stderr."""
@@ -59,10 +63,36 @@ class Git:
             raise GitError(tuple(args), p.returncode, (p.stderr or b"").decode("utf-8", "replace"), self.cwd)
         return p
 
+    def run_paths(self, args: Iterable[str], paths: Iterable[str | os.PathLike], check: bool = False,
+                  timeout: float | None = None) -> subprocess.CompletedProcess:
+        """`git <args> -- <paths>`, safe for a path list of any length.
+
+        Within `proc.ARGV_BUDGET` the argv is exactly `git <args> -- <paths>` (a small batch keeps today's behaviour).
+        Over it, a `PATHSPEC_FILE_COMMANDS` command reads the list from stdin (`--pathspec-from-file=-
+        --pathspec-file-nul`: the same pathspec semantics, so `commit` still commits ONLY the named paths), and any
+        other command runs once per `proc.argv_chunks` run with stdout and stderr concatenated and the first non-zero
+        exit kept (`proc.run_chunked`) - so a summary command (`diff --stat`) prints one summary per chunk, and a
+        command whose effect is one event (`commit`) must be in `PATHSPEC_FILE_COMMANDS`. An empty list runs
+        `git <args> --`, as the old spelling did."""
+        args, paths = [*args], [slash(p) for p in paths]
+        if proc.argv_size(paths) <= proc.ARGV_BUDGET:
+            return self.run(*args, "--", *paths, timeout=timeout, check=check)
+        if args[0] in PATHSPEC_FILE_COMMANDS:
+            return self.run(*args, "--pathspec-from-file=-", "--pathspec-file-nul",
+                            input="".join(p + "\0" for p in paths), timeout=timeout, check=check)
+        p = proc.run_chunked(["git", *args, "--"], paths, cwd=self.cwd, timeout=timeout)
+        if check and p.returncode != 0:
+            raise GitError(tuple(args) + ("--", "<%d paths>" % len(paths)), p.returncode, p.stderr or "", self.cwd)
+        return p
+
     def out(self, *args: str, check: bool = True) -> str:
         """`git <args>`'s stdout; raises `GitError` on failure when `check`, else returns "" on failure."""
         p = self.run(*args, check=check)
         return p.stdout if p.returncode == 0 else ""
+
+    def _paths_out(self, args: list[str], paths: Iterable[str]) -> str:
+        """`out` for `run_paths`: the stdout, `GitError` on failure."""
+        return self.run_paths(args, paths, check=True).stdout
 
     def ok(self, *args: str) -> bool:
         """Whether `git <args>` exits 0."""
@@ -167,9 +197,9 @@ class Git:
     def ls_files(self, *paths: str, eol: bool = False) -> list:
         """Tracked paths; with `eol`, `[(index class, worktree class, attr, path)]` from `--eol`."""
         if not eol:
-            return [slash(x) for x in self.out("ls-files", "--", *paths).splitlines() if x]
+            return [slash(x) for x in self._paths_out(["ls-files"], paths).splitlines() if x]
         rows = []
-        for line in self.out("ls-files", "--eol", "--", *paths).splitlines():
+        for line in self._paths_out(["ls-files", "--eol"], paths).splitlines():
             head, sep, path = line.partition("\t")
             parts = head.split()
             if not sep or len(parts) < 2:
@@ -193,8 +223,8 @@ class Git:
 
     def diff_names(self, a: str, b: str | None = None, *paths: str) -> list[str]:
         """Paths that differ between `a` and `b` (or the working tree when `b` is None)."""
-        args = ["diff", "--name-only", a] + ([b] if b else []) + ["--", *paths]
-        return [slash(x) for x in self.out(*args).splitlines() if x]
+        args = ["diff", "--name-only", a] + ([b] if b else [])
+        return [slash(x) for x in self._paths_out(args, paths).splitlines() if x]
 
     def renames(self, a: str, b: str) -> list[tuple[str, str]]:
         """`[(old, new)]` for every rename git detects between `a` and `b`."""
@@ -250,20 +280,20 @@ class Git:
         paths = [slash(p) for p in paths]
         if not paths:
             raise ValueError("stage: an empty pathspec stages everything - name the paths")
-        self.run("add", "--", *paths, check=True)
+        self.run_paths(["add"], paths, check=True)
 
     def unstage(self, paths: Iterable[str]) -> None:
         paths = [slash(p) for p in paths]
         if not paths:
             raise ValueError("unstage: an empty pathspec - name the paths")
-        self.run("reset", "-q", "--", *paths, check=True)
+        self.run_paths(["reset", "-q"], paths, check=True)
 
     def commit(self, message_file: str | os.PathLike, pathspec: Iterable[str]) -> str:
         """Commit exactly `pathspec` with the message in `message_file`; return the new commit id."""
         paths = [slash(p) for p in pathspec]
         if not paths:
             raise ValueError("commit: an empty pathspec - name the paths")
-        self.run("commit", "-q", "-F", os.fspath(message_file), "--", *paths, check=True)
+        self.run_paths(["commit", "-q", "-F", os.fspath(message_file)], paths, check=True)
         return self.head() or ""
 
     # --- worktrees ------------------------------------------------------------------------------------------

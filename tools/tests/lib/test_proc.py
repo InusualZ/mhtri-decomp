@@ -114,5 +114,26 @@ def test_trap_scan(c):
                 [s for s in proc.trap_sites(tree.root, skip_selftests=True) if "bad_selftest" in s], [])
 
 
+def test_argv_budget(c):
+    """`argv_size`/`argv_chunks`/`run_chunked`: a list within the budget is one exact argv, a longer one runs in
+    chunks whose outputs concatenate; `testing.argv_limit` refuses the long single argv on any OS."""
+    c.check("argv_size counts bytes, a space and two quotes per argument", proc.argv_size(["ab", "é"]), 5 + 5)
+    c.check("no arguments, no runs", proc.argv_chunks([]), [])
+    c.check("runs stay within the budget, in order", proc.argv_chunks(["aaaa", "bbbb", "cccc"], budget=14),
+            [["aaaa", "bbbb"], ["cccc"]])
+    c.check("an argument over the budget is a run of its own", proc.argv_chunks(["x" * 50, "y"], budget=10),
+            [["x" * 50], ["y"]])
+    echo = [sys.executable, "-c", "import sys; print(' '.join(sys.argv[1:]))"]
+    words = ["word%04d" % i for i in range(5000)]                  # 65 KB: twice the CreateProcess limit
+    with testing.argv_limit() as limit:
+        c.raises("one launch with every word is refused by the simulated limit", OSError, proc.run, echo + words)
+        p = proc.run_chunked(echo, words)
+        small = proc.run_chunked(echo, words[:3])
+    c.check("run_chunked passes every word, in order", p.stdout.split(), words)
+    c.check("... in several runs, none refused", (p.args[-1].endswith("runs>"), len(limit.refused)), (True, 1))
+    c.check("a list within the budget is the exact argv, one run", (small.args, small.stdout.split()),
+            (echo + words[:3], words[:3]))
+
+
 if __name__ == "__main__":
     raise SystemExit(testing.run(globals()))

@@ -18,7 +18,53 @@ SPAWN_BACKOFF_S = 0.1
 #: Trees `trap_sites` never scans: not this repository's code to fix.
 VENDORED = ("tools/m2c/", "tools/mwcc-debugger/")
 
+#: The byte budget of a variable-length argument list (paths, ninja targets) on one command line. Windows'
+#: `CreateProcess` refuses a command line over 32,767 characters (`[WinError 206] The filename or extension is too
+#: long` - the 687-path landing commit of 2026-10-05); a list within the budget keeps its one exact argv, a longer
+#: one goes to stdin (`lib.git.Git.run_paths`) or runs in `argv_chunks`.
+ARGV_BUDGET = 8192
+
 Completed = subprocess.CompletedProcess
+
+
+def argv_size(args: Sequence[str]) -> int:
+    """The bytes `args` cost on a command line: each argument, its separating space and two quotes."""
+    return sum(len(os.fsencode(a)) + 3 for a in args)
+
+
+def argv_chunks(args: Sequence[str], budget: int | None = None) -> list[list[str]]:
+    """`args` split, in order, into runs whose `argv_size` stays within `budget` (default `ARGV_BUDGET`; an
+    argument longer than the budget is a run of its own); `[]` for no arguments."""
+    budget = ARGV_BUDGET if budget is None else budget
+    runs: list[list[str]] = []
+    size = 0
+    for a in args:
+        cost = argv_size([a])
+        if not runs or (runs[-1] and size + cost > budget):
+            runs.append([])
+            size = 0
+        runs[-1].append(a)
+        size += cost
+    return runs
+
+
+def run_chunked(head: Sequence[str], args: Sequence[str], cwd: str | os.PathLike | None = None,
+                timeout: float | None = None) -> subprocess.CompletedProcess:
+    """`run(head + args)` once when `args` fit `ARGV_BUDGET` (the exact argv), else once per `argv_chunks` run:
+    stdout and stderr concatenated in order, the first non-zero exit kept. For a command whose runs compose (a
+    name list, a patch, `ninja` targets): a summary command prints one summary per run, and a command whose effect
+    must be one event (a commit) must never be chunked."""
+    head, args = list(head), list(args)
+    if argv_size(args) <= ARGV_BUDGET:
+        return run(head + args, cwd=cwd, timeout=timeout)
+    outs, errs, code = [], [], 0
+    for chunk in argv_chunks(args):
+        p = run(head + chunk, cwd=cwd, timeout=timeout)
+        outs.append(p.stdout or "")
+        errs.append(p.stderr or "")
+        code = code or p.returncode
+    return subprocess.CompletedProcess(head + ["<%d arguments in %d runs>" % (len(args), len(outs))], code,
+                                       "".join(outs), "".join(errs))
 
 
 def run(args: Sequence[Any], cwd: str | os.PathLike | None = None, check: bool = False, input: str | None = None,

@@ -1114,6 +1114,15 @@ Grouped by cause; each cost a lane ~30 min the first time.
   real `.pi/` registry and slot sentinels, or a fixed temp name - fixtures live under `lib.testing.temp_dir()`.
 * **Gate output.** `land.py land` prints `LEDGER: covered A -> B, closed ..., matched ..., bytes ...` on its own line
   directly above the (unchanged, long) `LANDED ...` answer line; read the answer with `land.answer_line` (last line).
+* **A batch of hundreds of paths crashed the commit step on 2026-10-05.** The 687-path header move (`8cd5ee491`)
+  passed every gate row, then `git commit -- <paths>` raised `[WinError 206] The filename or extension is too long`
+  (Windows refuses a command line over 32,767 characters); the log line said `error` with no row, and the commit was
+  finished by hand. A path list over `lib.proc.ARGV_BUDGET` (8 KB) now goes to git on stdin
+  (`Git.run_paths`: `--pathspec-from-file=- --pathspec-file-nul` for add/checkout/commit/reset/restore/rm, chunks
+  for diff/status/ls-files and for `ninja`/`flipcheck` targets); a commit step that still fails after a green gate is
+  outcome `error` on row `git commit (after the gate passed)`, leaves the batch staged, and prints MAIN's state and
+  the exact recovery command (`.git/land_paths.txt` holds the pathspec). A new call site that passes a variable-length
+  list must use `run_paths`/`proc.run_chunked`; `testing.argv_limit()` makes the limit fail a test on any OS.
 * **The worktree command guard is Claude Code's, not this repository's.** An Agent-tool lane launched with
   `isolation: "worktree"` has its Bash commands screened by the harness ("This agent is isolated in the worktree
   ..."); no file here implements it (`.claude/settings.json` has only the `WorktreeCreate`/`WorktreeRemove` hooks,

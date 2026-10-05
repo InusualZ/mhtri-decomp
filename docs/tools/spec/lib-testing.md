@@ -18,6 +18,9 @@ The tools listed under this concept in `docs/tools/README.md`.
 * `temp_dir(prefix)` (a `with` block), `rmtree_retry(path)` and `isolate_live_state()`: a temp directory whose cleanup
   survives Windows holding a file (read-only bit cleared, growing backoff, never raises), and `CLAUDE_CONFIG_DIR`
   pointed at an empty directory so a slot guard never sees the live `~/.claude/sessions` (WP6: from `unitutil`)
+* `argv_limit(limit=32767)` (a `with` block): every process launch whose `list2cmdline` spelling is longer than `limit`
+  raises the Windows `[WinError 206]` refusal on any OS (`refused` = the refused sizes, `largest` = the longest line let
+  through), so a test of a long path list fails on Linux too when the code puts the list on the command line (2026-10-05)
 * `TIER = 'fixture' | 'smoke'`; under `fixture`, `lib.repo.repo_root()` without `start=` raises
 * `assert_live_allowed(what)`, `assert_path_allowed(path, what)` (raises only for a path inside the live tree): the seams
   `lib.repo` calls; `refusals_expected()` - a `with` block whose refusals are the point of a test OF the guard, so they do

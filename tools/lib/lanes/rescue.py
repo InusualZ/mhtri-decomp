@@ -136,7 +136,7 @@ def main_registration(repo: str, main_ref: str) -> tuple[set[str], set[str]]:
 def drift_paths(repo: str, main_ref: str, ref: str, paths: list[str]) -> list[str]:
     if not paths:
         return []
-    out = git(repo, ["diff", "--name-only", main_ref, ref, "--", *paths], check=False)
+    out = Git(repo).run_paths(["diff", "--name-only", main_ref, ref], paths).stdout
     return [p for p in out.splitlines() if p.strip()]
 
 
@@ -164,9 +164,10 @@ def classify(repo: str, main_ref: str, row: dict, main_conf: set[str], main_spli
     out["touched_paths"] = touched
     out["drift_paths"] = drift_paths(repo, main_ref, ref, touched)
     if touched:
-        out["diff_stat"] = git(repo, ["diff", "--stat", main_ref, ref, "--", *touched], check=False).strip()
+        # a touched list over the argv budget runs in chunks: one stat summary per chunk, the patch concatenated
+        out["diff_stat"] = Git(repo).run_paths(["diff", "--stat", main_ref, ref], touched).stdout.strip()
         if full_diff and out["drift_paths"]:
-            out["diff"] = git(repo, ["diff", main_ref, ref, "--", *touched], check=False)
+            out["diff"] = Git(repo).run_paths(["diff", main_ref, ref], touched).stdout
     missing = [u for u, ok in out["units_on_main"].items() if not ok]
     if missing:
         out["verdict"] = VERDICT_UNLANDED

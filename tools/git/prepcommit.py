@@ -309,7 +309,9 @@ def main() -> int:
     with open(msg_file, "w", encoding="utf-8") as fh:
         fh.write(message)
 
-    git("add", "--", *paths)  # explicit paths only, never `git add -A`
+    p = Git(ROOT).run_paths(["add"], paths)  # explicit paths only, never `git add -A`; any length (stdin)
+    if p.returncode != 0:
+        sys.exit("git add failed for %d path(s): %s" % (len(paths), p.stderr.strip()))
 
     print(f"\nstaged {len(paths)} path(s); message written to {os.path.relpath(msg_file, ROOT)}\n")
     print(git("status", "--short"))

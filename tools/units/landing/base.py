@@ -8,6 +8,7 @@ import sys
 import time
 
 from tools.lib import artifacts as _artifacts
+from tools.lib import proc
 from tools.lib import report as _report
 from tools.lib.lanes import naming
 from tools.units.landing import state
@@ -65,7 +66,7 @@ def record_base(main: str, units: list[str] | None = None) -> dict:
     if norm and os.path.exists(os.path.join(main, "build.ninja")):
         targets = compile_targets(norm)
         if targets:
-            run(["ninja"] + targets, main)       # best effort: a failed compile leaves the object missing
+            proc.run_chunked(["ninja"], targets, cwd=main)  # best effort: a failed compile leaves the object missing
     data["undefrefs"] = undefrefs_snapshot(main, norm or None)
     # The data-closure row's base: every (unit, orphan data address) pair the base's target objects carry and
     # the claimed bytes, so the gate refuses only a pair a batch ADDS or a claim it SHRINKS. Target objects
