@@ -70,10 +70,13 @@ typedef struct NetworkUserRow {
 /* One 0x40-byte row of the FMP slot table at +0x6C40 (80 rows, cleared by `handleNetworkState4`). */
 typedef struct NetworkFmpSlot {
     /* +0x00 */ u32 payload_00;
-    /* +0x04 */ u8  pad_04[0x0C];
+    /* +0x04 */ u8  pad_04[0x04];
+    /* +0x08 */ u64 time_08;        /* copied out as two words by NetworkLayerPat's slot exporter 0x803EA61C (GUESS name) */
     /* +0x10 */ u32 done_10;
     /* +0x14 */ u32 total_14;
-    /* +0x18 */ u8  pad_18[0x28];
+    /* +0x18 */ char name_18[0x20]; /* the exporter copies 31 bytes of it */
+    /* +0x38 */ char text_38[0x04];
+    /* +0x3C */ u32 value_3C;
 } NetworkFmpSlot;   /* size: 0x40 */
 
 /* The network singleton (`getInstance_` returns it, `mpInstance__12PatInterface` holds it).  The mediator band

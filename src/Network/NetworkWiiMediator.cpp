@@ -1568,7 +1568,7 @@ void NetworkWiiMediator::setTransferSlotMode(s8 slot, u8 mode)
     }
 }
 
-u8 NetworkWiiMediator::getTransferSlotMode(s8 slot)
+BOOL NetworkWiiMediator::getTransferSlotMode(s8 slot)
 {
     NetworkWiiMediatorTransferSlot* entry;
 
