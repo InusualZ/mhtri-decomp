@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Who calls this function / who reads this data: the whole-DOL reference index, keyed on addresses.
 Spec: docs/tools/spec/callers.md. CLI: callers.py <address|name> [--json] [--code|--data] [--kind K]
-[--pointers] [--limit N] [--rebuild] | --range LO HI [--step N] [--each] | --stats | --selftest."""
+[--pointers] [--limit N] [--rebuild] [--refresh | --no-refresh] | --range LO HI [--step N] [--each] | --stats | --selftest."""
 
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
@@ -80,7 +80,7 @@ def dump_state(asm_dir, files, root=ROOT):
     """
     if not files:
         return ("missing", "%s holds no `.s` file" % rel(asm_dir, root), DUMP_TOOL)
-    stamp = _refs.DumpStamp.for_tree(_repo.repo_root(), True, GAME)
+    stamp = _refs.DumpStamp.for_tree(root, _repo.is_served(root), GAME)
     if os.path.abspath(asm_dir) != os.path.abspath(stamp.asm_dir):
         return ("present", "%d file(s) (not the repository's dump: %s)"
                 % (len(files), rel(asm_dir, root)), None)
@@ -92,6 +92,43 @@ def dump_state(asm_dir, files, root=ROOT):
                 % (len(files), exc), None)
     remedy = DUMP_TOOL if state in ("stale", "missing", "truncated", "unstamped") else None
     return (state, msg, remedy)
+
+
+#: The dump states that make its answers describe an older map.
+STALE_DUMP = ("stale", "truncated", "unstamped")
+
+
+def choose_dump(root=ROOT, policy=None, out=None, runner=None):
+    """-> `(asm_dir, files, stale_note)`: which dump answers (`lib.artifacts`, default policy `warn`).
+
+    A fresh dump answers. A stale one is rebuilt under `auto` (`--refresh`, `FRESH=auto`), refused under `refuse`,
+    and otherwise left alone: `stale_note` then carries its stamp's message and the caller answers from the split
+    objects - unless the tree has none, when the stale dump answers and says so (the old behaviour)."""
+    from tools.lib import artifacts  # noqa: PLC0415
+    out = out if out is not None else sys.stderr
+    asm_dir = asm_dir_of(root)
+    files = all_asm_files(asm_dir)
+    if not files:
+        return asm_dir, files, None
+    state, msg, _remedy = dump_state(asm_dir, files, root)
+    if state not in STALE_DUMP:
+        return asm_dir, files, None
+    chosen = artifacts.resolve_policy(policy, default="warn")
+    if chosen == "refuse":
+        raise artifacts.StaleArtifact(artifacts.Status("asm-dump", "stale", msg, DUMP_TOOL))
+    if chosen == "auto":
+        try:
+            artifacts.ensure(["asm-dump"], artifacts.Context(root, runner=runner), "auto", out=out)
+        except artifacts.RefreshFailed as exc:
+            print("WARNING: %s" % exc.code, file=out)
+        asm_dir = asm_dir_of(root)
+        files = all_asm_files(asm_dir)
+        state, msg, _remedy = dump_state(asm_dir, files, root)
+        if state not in STALE_DUMP:
+            return asm_dir, files, None
+    if not all_object_files(root):
+        return asm_dir, files, None
+    return asm_dir, files, msg
 
 
 def load_index(root=ROOT, rebuild=False, asm_dir=None, cache=None):
@@ -261,7 +298,7 @@ def _no_dump(asm_dir, root, as_json, query=None):
     print("== no asm dump")
     print("   %s holds no `.s` file, so there is no caller data to read." % rel_asm)
     print("   This is not '0 callers' - the dump is the input. Build it first:")
-    print("     %s   (a full `dol split`, ~3 min)" % DUMP_TOOL)
+    print("     %s   (a full `dol split` with the asm, ~3.5 s; or pass --refresh)" % DUMP_TOOL)
     return 2
 
 
@@ -324,6 +361,11 @@ def main(argv=None, root=ROOT):
     ap.add_argument("--pointers", action="store_true", help="list .4byte pointer-table entries too")
     ap.add_argument("--limit", type=int, default=40, help="max sites listed per kind (0 = all)")
     ap.add_argument("--rebuild", action="store_true", help="rebuild the index even if the cache is valid")
+    fresh = ap.add_mutually_exclusive_group()
+    fresh.add_argument("--refresh", dest="fresh", action="store_const", const="auto",
+                       help="rebuild a stale asm dump first (~3.5 s, lib.artifacts; FRESH=auto)")
+    fresh.add_argument("--no-refresh", dest="fresh", action="store_const", const="warn",
+                       help="never rebuild the dump: a stale one is answered from the split objects (the default)")
     ap.add_argument("--stats", action="store_true", help="report the index's state and exit")
     ap.add_argument("--selftest", action="store_true", help="run the selftest and exit")
     args = ap.parse_args(argv)
@@ -355,26 +397,31 @@ def main(argv=None, root=ROOT):
         bad = [k for k in kinds if k not in KINDS]
         if bad:
             ap.error("unknown kind(s): %s (known: %s)" % (", ".join(bad), ", ".join(KINDS)))
-    asm_dir = asm_dir_of(root)
-    files = all_asm_files(asm_dir)
+    asm_dir, files, stale_note = choose_dump(root, args.fresh)
     cmap = load_map(root)
-    if files:
+    if files and stale_note is None:
         index, info = load_index(root=root, rebuild=args.rebuild, asm_dir=asm_dir)
         if index is None:
             return _no_dump(asm_dir, root, args.json, args.query)
         state, msg, remedy = dump_state(asm_dir, files, root)
     else:
-        # No dump (it is written only on demand): answer from the split objects' relocations instead
-        # of refusing. `--stats` and `--json` carry the same `info` shape, so the reader can see which
-        # graph answered (`source: elf`).
+        # No dump (it is written only on demand), or a stale one the caller did not want refreshed: answer from
+        # the split objects' relocations instead of refusing. `--stats` and `--json` carry the same `info` shape,
+        # so the reader can see which graph answered (`source: elf`).
         index, info = load_elf_index(root=root, rebuild=args.rebuild, cmap=cmap)
         if index is None:
             return _no_dump(asm_dir, root, args.json, args.query)
         obj_dir = obj_dir_of(root)
-        state, msg = "elf fallback", (
-            "no asm dump under %s - the graph is the %d split object(s)' relocations (coarser kinds, "
-            "exact sites); run %s for the instruction-level dump" % (rel(asm_dir, root), info["files"],
-                                                                    DUMP_TOOL))
+        if stale_note is None:
+            state, msg = "elf fallback", (
+                "no asm dump under %s - the graph is the %d split object(s)' relocations (coarser kinds, "
+                "exact sites); run %s for the instruction-level dump" % (rel(asm_dir, root), info["files"],
+                                                                        DUMP_TOOL))
+        else:
+            state, msg = "elf fallback", (
+                "the asm dump under %s is stale (%s) - the graph is the %d split object(s)' relocations "
+                "instead (coarser kinds, exact sites); --refresh (or FRESH=auto) rebuilds the dump first "
+                "(~3.5 s)" % (rel(asm_dir, root), stale_note, info["files"]))
         remedy, asm_dir = None, obj_dir
     if args.stats:
         return stats_report(index, info, cmap, state, msg, remedy, asm_dir, root, args.json)

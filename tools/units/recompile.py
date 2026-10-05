@@ -12,6 +12,7 @@ import subprocess
 import sys
 import time
 
+from tools.lib import artifacts as _artifacts
 from tools.lib import repo as _repo
 from tools.lib import report as _report  # the metric and the diagnostic rows
 from tools.lib import units as _units  # spellings, the compile command, the compile, the target
@@ -220,15 +221,9 @@ target_rel = _units.target_rel
 # The invocation tree's split must postdate the tree's own map/splits/DOL, or every object it holds
 # (and MAIN's for the same range) is the previous build's.
 # ---------------------------------------------------------------------------------------------------
-# The inputs dtk's split reads.  Kept in step with `lib.lanes.seed.build_is_current` (the seeder's own guard,
-# which `slots.verify` uses) - the selftest asserts claims reacts to each of them, so a change there that is
-# not mirrored here is caught rather than silently leaving the refusal message short one file.  Relative
-# paths, so the same tuple reads both roots.
-SPLIT_INPUTS = (os.path.join("config", "RMHE08", "config.yml"),
-                os.path.join("config", "RMHE08", "symbols.txt"),
-                os.path.join("config", "RMHE08", "splits.txt"),
-                os.path.join("orig", "RMHE08", "sys", "main.dol"),
-                os.path.join("orig", "RMHE08", "files", "mh3.sel"))
+# The inputs dtk's split reads: the registry's one list (`lib.artifacts.SPLIT_INPUTS`, which
+# `lib.lanes.seed.build_is_current` and `slots.verify` read too). Relative paths, so the same tuple reads both roots.
+SPLIT_INPUTS = _artifacts.SPLIT_INPUTS
 
 # The deliberate override for `--measure` when the caller knows the stale split cannot touch its unit.
 STALE_SPLIT_FLAG = "--allow-stale-split"
@@ -297,7 +292,7 @@ def split_staleness(wt: str, main: str, dirty=None):
     return (True, lines) if lines else (False, [])
 
 
-def refuse_if_split_stale(wt: str, main: str, allow_stale: bool = False, dirty=None):
+def refuse_if_split_stale(wt: str, main: str, allow_stale: bool = False, dirty=None, runner=None):
     """Raise with the evidence unless this tree's split provably reflects its own map/splits/DOL.
 
     Returns (False, []) when the split is usable (or `allow_stale` skips the gate).  A refusal names every
@@ -306,14 +301,22 @@ def refuse_if_split_stale(wt: str, main: str, allow_stale: bool = False, dirty=N
     """
     if allow_stale:
         return False, []
+    # the freshness policy (`lib.artifacts`): refuse by default, FRESH=warn skips the gate like the flag, and
+    # FRESH=auto re-splits this tree (the registry's `split` refresh, ~2 s) and re-checks
+    policy = _artifacts.effective_policy(None, "refuse", runner)
+    if policy == "warn":
+        return False, []
     stale, lines = split_staleness(wt, main, dirty=dirty)
+    if stale and policy == "auto":
+        _artifacts.refresh("split", _artifacts.Context(wt, runner=runner))
+        stale, lines = split_staleness(wt, main, dirty=dirty)
     if stale:
         raise SystemExit(
             "REFUSED: %s/build/RMHE08/config.json is older than map/split input(s) this tree has edited, "
             "so the split object here is the *previous* range - measuring against it (or falling back to "
             "MAIN, which holds the same previous split) would print a number that looks like a "
             "measurement and is not:\n  %s\n"
-            "  re-split this tree first: ninja build/RMHE08/config.json\n"
+            "  re-split this tree first: ninja build/RMHE08/config.json (or FRESH=auto lets this tool do it)\n"
             "  or measure deliberately against the stale object: %s"
             % (wt, "\n  ".join(lines), STALE_SPLIT_FLAG))
     return stale, lines

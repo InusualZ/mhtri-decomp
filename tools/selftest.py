@@ -366,6 +366,7 @@ def run_one(entry: Entry, timeout: float, root: str = ROOT) -> dict:
     env = dict(os.environ)
     env["PYTHONPATH"] = os.pathsep.join(p for p in (SITE_DIR, env.get("PYTHONPATH")) if p)
     env.pop(TIER_ENV, None)
+    env.pop("FRESH", None)        # an operator's `FRESH=auto` (lib.artifacts) must never make a selftest rebuild
     scratch = None
     if entry.kind == "test":
         # the tier rides into the module and every process it starts; a fixture-tier module gets a cwd

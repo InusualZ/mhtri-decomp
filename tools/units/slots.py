@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The slot pool's CLI over `lib.lanes.pool`: reusable lane directories at stable paths, a slot holds no branch.
 Spec: docs/tools/spec/slots.md. CLI: slots.py init | acquire <unit> | spawn --kind K [--slot N] | release | reclaim |
-collect [--slot N|--path P] [--release] | status [--json] | verify | shadow <slot> <dir> | --selftest."""
+collect [--slot N|--path P] [--release] | status [--json] | refresh N [--force] | verify | shadow <slot> <dir> | --selftest."""
 
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
@@ -26,7 +26,7 @@ from tools.lib.lanes.pool import (DEFAULT_COUNT, LOCK_SUBDIR, SLOT_KEEP, SLOT_MA
                                   free_slots, git, lock_path, lock_stale, locks_dir, mark_used, marker_claim_conflict,
                                   marker_info, marker_owner, marker_path, marker_present, marker_text, merge_tree_of,
                                   ninja_pending, orphaned_commits, owner_label, pool_manifest, pool_size, preview,
-                                  read_lock, reclaim_line, reclaim_slot, reclaim_verdict, refs_containing,
+                                  read_lock, reclaim_line, reclaim_slot, reclaim_verdict, refresh_slot, refs_containing,
                                   registry_claims_by_slot, release, release_blockers, release_refusal,
                                   report_matches, reset_slot, slot_attached_branch, slot_count, slot_dir, slot_dirty,
                                   slot_head, slot_of_path, slot_state, unlanded_reason, verify, write_lock)
@@ -543,6 +543,21 @@ def selftest() -> int:
               any("objdiff.json" in r for r in v0["reasons"]), True)
         seed.seed_worktree_build(repo, slot_dir(repo, 1), copy_orig=True, overwrite=False)
         check("... and re-seeding restores it", verify(repo, 1)["ok"], True)
+        # `refresh N` (the registry's slot-build refresh): a current slot is left alone, a stale one is repaired by
+        # copying only what differs, and the verdict after is what it reports
+        check("refresh leaves a current slot alone", refresh_slot(repo, 1, runs=[])["refreshed"], None)
+        open(os.path.join(slot_dir(repo, 1), "build", "RMHE08", "report.json"), "w").write('{"units": {}}\n')
+        rf = refresh_slot(repo, 1, runs=[])
+        check("refresh repairs a slot whose report differs from MAIN's",
+              (rf["before"]["ok"], bool(rf["refreshed"]), rf["after"]["ok"]), (False, True, True))
+        live = [{"cwd": slot_dir(repo, 1), "run_id": "r-live", "session": "a lane"}]
+        check("a run record in the slot reads LIVE", slot_state(repo, 1, runs=live)["state"], "LIVE")
+        try:
+            refresh_slot(repo, 1, runs=live)
+            refused_live = "not refused"
+        except SystemExit as exc:
+            refused_live = "RUNNING Claude session r-live" in str(exc)
+        check("refresh refuses a slot a running session works in", refused_live, True)
         # claim-time currency: the pending steps a fresh slot ALWAYS has by construction are run here, then
         # re-counted - so the number the lane is shown is what is left, not what was
         nrun = fake_ninja([3])
@@ -1568,6 +1583,11 @@ def main() -> int:
     co.add_argument("--json", action="store_true")
     s = sub.add_parser("status", help="every slot, its lock and whether its build tree is current")
     s.add_argument("--json", action="store_true")
+    rf = sub.add_parser("refresh", help="bring one slot's build tree current from MAIN, copying only what differs")
+    rf.add_argument("slot", type=int)
+    rf.add_argument("--force", action="store_true",
+                    help="re-seed even when the slot verifies, or when a running session works in it")
+    rf.add_argument("--json", action="store_true")
     v = sub.add_parser("verify", help="validate each slot's build tree against MAIN's current map/DOL")
     v.add_argument("--slot", type=int, default=None)
     v.add_argument("--json", action="store_true")
@@ -1715,6 +1735,16 @@ def main() -> int:
             if not row["free"] or row.get("state") == "no worktree" or row.get("record_note"):
                 print("  slot %d: %s" % (row["slot"], row["why"]))
         return 0
+    if args.cmd == "refresh":
+        out = refresh_slot(main_wt, args.slot, force=args.force)
+        if args.json:
+            print(json.dumps(out, indent=2))
+        elif out["refreshed"] is None:
+            print("slot %d: current - nothing to refresh (--force re-seeds anyway)" % args.slot)
+        else:
+            print("slot %d: %s in %.1f s" % (args.slot, out["refreshed"], out["seconds"]))
+            print("slot %d: %s" % (args.slot, "current" if out["after"]["ok"] else "; ".join(out["after"]["reasons"])))
+        return 0 if out["after"]["ok"] else 1
     if args.cmd == "verify":
         rows = all_slots(main_wt)
         nums = [args.slot] if args.slot else [r["slot"] for r in rows]

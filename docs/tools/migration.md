@@ -185,7 +185,8 @@ tools/splits/dump_asm.py [--check]
 tools/flags/mwcc_matrix.py [-u <X>] [--list-versions]
 tools/agents/sync_profiles.py [--check]
 tools/agents/edit.py replace|normalise|check
-tools/units/slots.py spawn --kind <X> | init | collect --path <X> --release
+tools/units/slots.py spawn --kind <X> | init | collect --path <X> --release | refresh <N> [--force]
+tools/units/fresh.py status | refresh [--unit <X>] [--json] [--root <X>]
 tools/units/mangle.py <X>
 tools/units/escape.py --write|--escape
 tools/units/claims.py ack|claim|release
@@ -197,7 +198,7 @@ tools/units/recompile.py <X> [--measure <sym>]
 tools/units/ledger.py [--json] | unit <X>
 tools/units/datagap.py --unit <X> | --census --unit <X> | --flip-blockers
 tools/symbols/dumpmap.py lookup <X>
-tools/splits/tudiscover.py at <X> | dataorder | stats | prune [--include-obj --apply] | cache --force | bench [--seeds|--compare] | --selftest
+tools/splits/tudiscover.py at <X> | dataorder | stats | prune [--include-obj --apply] | cache --force | cache --check | bench [--seeds|--compare] [--refresh|--no-refresh] | --selftest
 tools/objdiff/relocdiff.py <X> --by-owner
 tools/mwlink_debugger.py trace|verify|order|align --unit <X>
 tools/elf/elfsect.py <X>
@@ -209,7 +210,7 @@ tools/units/m2cinput.py build/RMHE08/obj/<X>.o -f <X>
 tools/units/langcheck.py --disagree | --unit <X>
 tools/units/land.py verify | land --branch <X>
 tools/units/flipcheck.py <X>
-tools/units/callers.py <X>
+tools/units/callers.py <X> [--refresh|--no-refresh]
 tools/units/attribute.py plan <X> <X>        (until question 1 is decided)
 tools/objdiff/symdiff.py -u <X>
 tools/objdiff/pairgap.py

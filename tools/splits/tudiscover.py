@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Propose a TU boundary around an address from referrer runs, the pool model, data order and __FILE__ anchors.
-Spec: docs/tools/spec/tudiscover.md. CLI: tudiscover.py at <addr|symbol> [--json] | stats | cache [--force] | dataorder |
-prune [--include-obj --apply] | bench [--seeds N] [--compare F] | --selftest."""
+Spec: docs/tools/spec/tudiscover.md. CLI: tudiscover.py at <addr|symbol> [--json] | stats | cache [--force | --check] |
+dataorder | prune [--include-obj --apply] | bench [--seeds N] [--compare F] [--refresh | --no-refresh] | --selftest."""
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 import argparse
 import collections
@@ -258,6 +258,58 @@ def asm_stamp_status():
     return _stamp().status()
 
 
+def _dump_check(_ctx=None):
+    """The registry's `asm-dump` check over this module's (pinnable) paths: `lib.artifacts` states."""
+    state, msg = asm_stamp_status()
+    return ("fresh" if state == "fresh" else "missing" if state == "missing" else "stale"), msg
+
+
+def ensure_dump(args=None, out=None, runner=None):
+    """Make the asm dump current before a command reads it (`lib.artifacts.ensure`, default policy `auto`: one
+    `dump_asm.py` run, ~3.5 s). `--no-refresh` (or `FRESH=warn`) uses a stale dump and says so; a refresh that
+    cannot run (no toolchain in this tree) warns and goes on with the dump it has. -> the dump's `Status`."""
+    from tools.lib import artifacts  # noqa: PLC0415
+    out = out if out is not None else sys.stderr
+    ctx = artifacts.Context(_g("ROOT"), runner=runner)
+    try:
+        st = artifacts.ensure(["asm-dump"], ctx, getattr(args, "fresh", None), default="auto", out=out,
+                              checks={"asm-dump": _dump_check})[-1]
+    except artifacts.RefreshFailed as exc:
+        print("WARNING: %s - using the dump as it is" % exc.code, file=out)
+        return exc.status
+    if st.refreshed:
+        use_local_dump()                              # the refresh wrote this tree's own dump
+    return st
+
+
+def graph_check():
+    """`(state, message)` for the graph cache against the dump and this parser, building nothing:
+    fresh / stale / missing / no-dump."""
+    fns, _labels = load_map()
+    files = asm_files(fns)
+    if not files:
+        return "no-dump", "no disassembly under %s" % repo_rel(_g("ASM_DIR"))
+    stamp = graph_stamp(files)
+    if not os.path.exists(_g("CACHE")):
+        return "missing", "no graph cache at %s" % repo_rel(_g("CACHE"))
+    try:
+        with open(_g("CACHE"), encoding="utf-8") as fh:
+            cached = json.load(fh).get("stamp")
+    except (ValueError, OSError, AttributeError) as exc:
+        return "stale", "unreadable graph cache (%s)" % exc
+    if cached != stamp:
+        changed = sorted(k for k in stamp if not isinstance(cached, dict) or cached.get(k) != stamp[k])
+        return "stale", "%s changed since the graph was built" % "/".join(changed)
+    return "fresh", "%d file(s), matches the dump, symbols.txt and this parser" % stamp["files"]
+
+
+def graph_stamp(files):
+    """What the graph cache is a function of: the schema, the map, the dump's size and the parse code."""
+    return {"schema": SCHEMA, "symbols": hashlib.sha1(open(_g("SYMBOLS"), "rb").read()).hexdigest(),
+            "files": len(files), "bytes": sum(os.path.getsize(f) for f in files),
+            "parse": parse_fingerprint()}
+
+
 def asm_files(fns=None):
     """Every unit's disassembly - one file per unit, never a stale duplicate.
 
@@ -430,6 +482,12 @@ def parse_report(out):
     return lines
 
 
+def graph_for(args, fns, labels, force=False):
+    """The graph a command reads, after `ensure_dump` made the dump under it current."""
+    ensure_dump(args)
+    return build_graph(fns, labels, force=force)
+
+
 def build_graph(fns, labels, force=False):
     """Per-function data references, calls and codegen fingerprint, from the disassembly."""
     files = asm_files(fns)
@@ -444,9 +502,7 @@ def build_graph(fns, labels, force=False):
             "      python tools/splits/dump_asm.py\n"
             "  Reporting 0 functions is the missing dump, not an empty map."
             % (repo_rel(_g("ASM_DIR")), GAME))
-    stamp = {"schema": SCHEMA, "symbols": hashlib.sha1(open(_g("SYMBOLS"), "rb").read()).hexdigest(),
-             "files": len(files), "bytes": sum(os.path.getsize(f) for f in files),
-             "parse": parse_fingerprint()}
+    stamp = graph_stamp(files)
     if not force and os.path.exists(_g("CACHE")):
         try:
             cached = json.load(open(_g("CACHE"), encoding="utf-8"))
@@ -962,7 +1018,7 @@ def extab_runs(an, labels, graph, lo, hi):
 
 def report(args):
     fns, labels = load_map()
-    graph = build_graph(fns, labels, force=False)
+    graph = graph_for(args, fns, labels)
     dol = Dol(_g("DOL"))
     an = analyse(fns, labels, graph, dol, args.span_max, args.source_span_max, args.data_order)
     ordered, idx = an["ordered"], an["idx"]
@@ -1371,7 +1427,7 @@ def tier_pins(an, claimed=None):
 
 def cmd_bench(args):
     fns, labels = load_map()
-    graph = build_graph(fns, labels, force=args.force)
+    graph = graph_for(args, fns, labels, force=args.force)
     an = analyse(fns, labels, graph, Dol(_g("DOL")), args.span_max, args.source_span_max, args.data_order)
     rows, classes = tier_labels(an, fns, labels, args.seeds_per_unit, args.max_funcs)
     score = {"labels": rows, "label_classes": classes,
@@ -1487,12 +1543,19 @@ def source_anchors(an, top=10):
     return rows[:top], rows
 
 
+def cmd_cache(args):
+    """`cache`: (re)build the graph cache (`cmd_stats`), or with `--check` only say whether it is current."""
+    if args.check:
+        state, msg = graph_check()
+        print("graph cache        %s: %s" % (state, msg))
+        return 0 if state == "fresh" else 2 if state == "no-dump" else 1
+    return cmd_stats(args) or 0
+
+
 def cmd_stats(args):
-    state, msg = asm_stamp_status()
+    ensure_dump(args)
+    _state, msg = asm_stamp_status()
     print("asm dump           %s" % msg)
-    if state != "fresh":
-        print("WARNING: the asm dump is %s - every number below describes that dump, not the current"
-              " map; run `python tools/splits/dump_asm.py` first" % state, file=sys.stderr)
     fns, labels = load_map()
     graph = build_graph(fns, labels, force=args.force)
     dol = Dol(_g("DOL"))
@@ -1587,7 +1650,7 @@ def data_order_stats(an, fns, claimed=None):
 def cmd_dataorder(args):
     """List every `.data` emission-order seam with its `.text` interval and how it sits against the other evidence."""
     fns, labels = load_map()
-    graph = build_graph(fns, labels, force=False)
+    graph = graph_for(args, fns, labels)
     an = analyse(fns, labels, graph, Dol(_g("DOL")), args.span_max, args.source_span_max,
                  "weak" if args.weak else args.data_order if args.data_order != "off" else "on")
     st = data_order_stats(an, fns)
@@ -1786,7 +1849,7 @@ def cmd_prune(args):
     linked build. `--apply` is required; the default is a dry run.
     """
     fns, labels = load_map()
-    graph = build_graph(fns, labels, force=args.force)
+    graph = graph_for(args, fns, labels, force=args.force)
     asm = stale_files(graph)
     print("stale asm files    %d (%.1f MB) - copies `dedupe_ranges()` already drops"
           % (len(asm), sum(os.path.getsize(p) for p, _ in asm) / 1e6))
@@ -1839,6 +1902,13 @@ def main():
                              "is one TU + a value held at two pool addresses is a soft boundary; strong = that boundary "
                              "may move a cut; off = the older rule")
 
+    def fresh_arg(sp):
+        g = sp.add_mutually_exclusive_group()
+        g.add_argument("--refresh", dest="fresh", action="store_const", const="auto",
+                       help="rebuild a stale asm dump first (the default; ~3.5 s, lib.artifacts)")
+        g.add_argument("--no-refresh", dest="fresh", action="store_const", const="warn",
+                       help="read the asm dump as it is and say when it is stale (FRESH=warn)")
+
     a = sub.add_parser("at", help="propose the TU boundary around an address or symbol")
     a.add_argument("at")
     a.add_argument("--window", type=int, default=40, help="candidate cuts to search each side")
@@ -1855,6 +1925,7 @@ def main():
                    help="print the splits block even when stale split-tree files remain (read-only)")
     data_order_arg(a)
     pool_model_arg(a)
+    fresh_arg(a)
     a.set_defaults(func=report)
 
     b = sub.add_parser("stats", help="cache, coverage and observation counts")
@@ -1863,6 +1934,7 @@ def main():
     b.add_argument("--force", action="store_true", help="rebuild the graph cache")
     data_order_arg(b)
     pool_model_arg(b)
+    fresh_arg(b)
     b.set_defaults(func=cmd_stats)
 
     c = sub.add_parser("cache", help="(re)build the graph cache only")
@@ -1871,7 +1943,10 @@ def main():
     c.add_argument("--source-span-max", type=int, default=0x8000)
     data_order_arg(c)
     pool_model_arg(c)
-    c.set_defaults(func=lambda a: cmd_stats(a) or 0)
+    c.add_argument("--check", action="store_true",
+                   help="report whether the graph cache is current and build nothing (exit 0 fresh, 1 stale, 2 no dump)")
+    fresh_arg(c)
+    c.set_defaults(func=cmd_cache)
 
     d = sub.add_parser("bench", help="scorecard used to iterate on this tool")
     d.add_argument("--seeds", type=int, default=400)
@@ -1887,6 +1962,7 @@ def main():
     d.add_argument("--compare", default=None, help="diff the sweep against a saved scorecard")
     data_order_arg(d)
     pool_model_arg(d)
+    fresh_arg(d)
     d.set_defaults(func=cmd_bench)
 
     g = sub.add_parser("dataorder", help="the `.data` emission-order seams as `.text` intervals")
@@ -1897,6 +1973,7 @@ def main():
     g.add_argument("--all", action="store_true", help="list every seam, not just the notable ones")
     g.add_argument("--addr", type=lambda x: int(x, 16), default=None, help="one seam, by its .data address")
     g.add_argument("--json", action="store_true")
+    fresh_arg(g)
     g.set_defaults(func=cmd_dataorder)
 
     e = sub.add_parser("prune", help="remove the stale split-tree duplicates (dry run unless --apply)")
@@ -1905,6 +1982,7 @@ def main():
                    help="also remove the matching stale objects under build/<version>/obj")
     e.add_argument("--limit", type=int, default=20, help="paths to list")
     e.add_argument("--force", action="store_true", help="rebuild the graph cache")
+    fresh_arg(e)
     e.set_defaults(func=cmd_prune)
 
     args = ap.parse_args()

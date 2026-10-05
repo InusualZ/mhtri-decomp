@@ -73,7 +73,8 @@ and never land.
    begin. `recompile.py` already refuses a stale split and deletes an object before compiling it, so a stale
    *number* is hard to get by accident - but a number taken from the wrong **tree** (MAIN's `build/` read while
    you stand in a slot) looks exactly like a measurement and is not one, so check which tree your tool
-   resolved before you believe a score.
+   resolved before you believe a score. A tool refreshes its own derived artifacts; run
+   `python tools/units/fresh.py status` to see (asm dump, caches, split, report, objects, slot tree).
 
 1. **Ack** your claim: `python tools/units/claims.py ack <claim> --agent <your-slug>`, and call it again with
    `--progress` after each meaningful step. It is the heartbeat the orchestrator reads.

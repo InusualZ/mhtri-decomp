@@ -12,6 +12,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 
+from tools.lib import artifacts as _artifacts
 from tools.lib import proc as _proc
 from tools.lib import project as _project
 from tools.lib import repo as _repo
@@ -301,8 +302,8 @@ def summary_line(spec: Spec, measures: dict, rows: list[Row], shown: int,
 def refresh_target(spec: Spec, measure: bool = False) -> str:
     """The ninja target `--refresh` builds: the unit's object for `--measure` (it reads nothing else), else the
     tree's project report - which depends on `all_source`, so every stale object of the tree is compiled first."""
-    path = os.path.relpath(spec.obj, spec.tree) if measure else REPORT_REL
-    return path.replace("\\", "/")
+    art = _artifacts.get("objects" if measure else "report")       # the registry's refresh command
+    return art.command(_artifacts.Context(spec.tree, obj=spec.obj if measure else None))[-1]
 
 
 def refresh(spec: Spec, measure: bool = False, runner=None) -> dict:
@@ -497,8 +498,16 @@ def cli(argv: list[str] | None = None) -> int:
     except SystemExit as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    record = run(spec, report=args.report, threshold=args.threshold, force=args.force_stale,
+    # the freshness policy (`lib.artifacts`): refuse by default, `--force-stale` = FRESH=warn, FRESH=auto rebuilds
+    # what the score reads (`--refresh`'s build) only when the guard would refuse
+    policy = _artifacts.effective_policy("warn" if args.force_stale else None, "refuse")
+    record = run(spec, report=args.report, threshold=args.threshold, force=policy == "warn",
                  measure=args.measure, refresh_build=args.refresh, baseline=args.baseline)
+    if record["refused"] and policy == "auto" and not (args.report and not args.measure):
+        print("refreshing %s: %s" % ("objects" if args.measure else "report", record["freshness"]["reasons"][0]),
+              file=sys.stderr)
+        record = run(spec, report=args.report, threshold=args.threshold, force=False,
+                     measure=args.measure, refresh_build=True, baseline=args.baseline)
     if args.json:
         print(json.dumps(record, indent=2))
     else:

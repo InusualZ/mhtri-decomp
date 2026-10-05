@@ -149,9 +149,9 @@ def selftest() -> int:
         check("the brief carries the order-only report.json trap and the one-report scorer",
               "order-only target of `all_source`" in brief_text and "rm -f build/RMHE08/report.json" in brief_text
               and "tools/objdiff/unitscore.py" in brief_text and "--force-stale" in brief_text, True)
-        check("the brief names the asm dump and the build's objdump",
-              "python tools/splits/dump_asm.py" in brief_text and "build/binutils/powerpc-eabi-objdump.exe" in brief_text,
-              True)
+        check("the brief names the asm dump, the artifact status command and the build's objdump",
+              "python tools/splits/dump_asm.py" in brief_text and "python tools/units/fresh.py status" in brief_text
+              and "build/binutils/powerpc-eabi-objdump.exe" in brief_text, True)
         check("the brief carries the git add hygiene and the selftest runner",
               "`git add -A` with no path arguments" in brief_text and "tools/selftest.py --changed" in brief_text, True)
         check("the brief carries the your-tree block, naming the worktree and the self-check",

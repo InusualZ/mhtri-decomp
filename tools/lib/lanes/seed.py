@@ -8,7 +8,7 @@ import shutil
 import struct
 import subprocess
 
-from tools.lib import proc
+from tools.lib import artifacts, proc
 from tools.lib.lanes import teardown
 
 #: `build/` inputs: ninja `download_tool` outputs, so always COPIED (a junction writes through to MAIN).
@@ -223,34 +223,9 @@ def seed_ninja_state(main: str, wt: str, overwrite: bool = False) -> list[str]:
 
 def build_is_current(build_root: str, input_root: str | None = None) -> bool:
     """Whether `build_root`'s split (`config.json`) and manifest (`build.ninja`) are newer than the map/DOL and
-    configure inputs under `input_root` (default: the same tree). One rule for the seeder and the slot guard."""
-    input_root = input_root or build_root
-    cfg = os.path.join(build_root, RMHE08_REL, "config.json")
-    ninja = os.path.join(build_root, "build.ninja")
-    if not os.path.isfile(cfg) or not os.path.isfile(ninja):
-        return False
-    try:
-        t, tn = os.path.getmtime(cfg), os.path.getmtime(ninja)
-    except OSError:
-        return False
-    split_inputs = (os.path.join(input_root, "config", "RMHE08", "config.yml"),
-                    os.path.join(input_root, "config", "RMHE08", "symbols.txt"),
-                    os.path.join(input_root, "config", "RMHE08", "splits.txt"),
-                    os.path.join(input_root, ORIG_REL, "sys", "main.dol"),
-                    os.path.join(input_root, ORIG_REL, "files", "mh3.sel"))
-    for p in split_inputs:
-        try:
-            if os.path.getmtime(p) > t:
-                return False
-        except OSError:
-            continue
-    for rel in ("configure.py", os.path.join("tools", "project.py"), os.path.join("tools", "ninja_syntax.py")):
-        try:
-            if os.path.getmtime(os.path.join(input_root, rel)) > tn:
-                return False
-        except OSError:
-            continue
-    return True
+    configure inputs under `input_root` (default: the same tree). One rule for the seeder, the slot guard and the
+    artifact registry: `lib.artifacts.split_reasons` and `manifest_reasons` are it."""
+    return not artifacts.split_reasons(build_root, input_root) and not artifacts.manifest_reasons(build_root, input_root)
 
 
 def main_build_is_current(main: str) -> bool:

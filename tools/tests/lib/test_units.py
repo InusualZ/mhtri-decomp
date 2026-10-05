@@ -142,6 +142,29 @@ def test_compile(c):
         c.check("an object older than its source is stale", units.object_is_fresh(obj, str(src))[0], False)
 
 
+def test_run_tokens_scratch_redirects_the_helpers(c):
+    """A scratch compile (`mangle`, `tryvar`, `frame`) must not let the chained helpers rewrite the tree's real object:
+    that write, outside ninja, is what leaves the object dirty for every later `ninja` run."""
+    with tempfile.TemporaryDirectory() as tmp:
+        scratch = os.path.join(tmp, "scratch")
+        tokens = ["cmd", "/c", "mwcceppc.exe", "-c", "src/Pl/u.cpp", "-o", "build/RMHE08/src/Pl", "&&", "python",
+                  "tools\\elf\\objalign.py", "build\\RMHE08\\src\\Pl\\u.o", "&&", "python", "tools\\elf\\objextab.py",
+                  "build\\RMHE08\\src\\Pl\\u.o"]
+        seen = []
+
+        def runner(argv, **kw):
+            seen.append(list(argv))
+            Path(scratch, "u.o").write_bytes(b"\x7fELF")
+            return subprocess.CompletedProcess(argv, 0, "", "")
+
+        rc, _out, obj = units.run_tokens(tokens, tmp, scratch_dir=scratch, runner=runner)
+        want = os.path.abspath(os.path.join(scratch, "u.o"))
+        c.check("the scratch compile writes its object to the scratch dir", (rc, os.path.abspath(obj)), (0, want))
+        c.check("... and both chained helpers follow it, never the real build/RMHE08 object",
+                [seen[0][i + 1] for i, t in enumerate(seen[0]) if t.endswith(("objalign.py", "objextab.py"))],
+                [want, want])
+
+
 def test_target_resolution(c):
     with testing.FixtureTree() as main, testing.FixtureTree() as wt:
         main.add_symbol("fn_80001000", ".text", 0x80001000, 0x20)

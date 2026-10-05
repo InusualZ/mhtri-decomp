@@ -510,6 +510,32 @@ def verify(main: str, n: int) -> dict:
             "compile_outputs_missing": len(missing), "reasons": reasons}
 
 
+def refresh_slot(main: str, n: int, force: bool = False, runs: list | None = None) -> dict:
+    """Bring slot `n`'s build tree current from MAIN by copying only what differs (`seed_worktree_build(...,
+    overwrite=True)`: a file is recopied only when its size or mtime differs), then re-verify. A slot that already
+    verifies is left alone unless `force`. Refuses a slot a RUNNING session works in (`force` overrides) and a MAIN
+    whose own build is stale (the seed would copy a stale tree). -> `{slot, dir, before, refreshed, seconds, after}`."""
+    d = slot_dir(main, n)
+    if not os.path.isdir(d):
+        raise SystemExit("REFUSED: no slot %d at %s" % (n, d))
+    row = slot_state(main, n, runs=runs)
+    if row.get("state") == "LIVE" and not force:
+        raise SystemExit("REFUSED slot %d: %s - refreshing a build tree under a running lane changes what it "
+                         "measures mid-run; --force overrides" % (n, row["why"]))
+    before = verify(main, n)
+    out = {"slot": n, "dir": d, "before": before, "refreshed": None, "seconds": 0.0, "after": before}
+    if before["ok"] and not force:
+        return out
+    if not seed.main_build_is_current(main):
+        raise SystemExit("REFUSED slot %d: MAIN's own build tree is not current (its config.json or build.ninja "
+                         "predates its inputs) - run `ninja` in MAIN first, then refresh" % n)
+    t0 = time.time()
+    out["refreshed"] = seed.seed_worktree_build(main, d, copy_orig=True, overwrite=True)
+    out["seconds"] = round(time.time() - t0, 1)
+    out["after"] = verify(main, n)
+    return out
+
+
 _NINJA_STEP = re.compile(r"^\[\d+/\d+\]", re.M)
 
 

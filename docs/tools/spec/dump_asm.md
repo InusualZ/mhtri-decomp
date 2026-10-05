@@ -42,7 +42,16 @@ Target: `tools/tests/splits/test_dump_asm.py` on `lib.testing` (`FixtureTree`/`G
 
 ## Known gaps
 
-None recorded.
+* It is the registry's `asm-dump` refresh (`lib.artifacts`): `tudiscover` runs it itself when the dump is stale, `callers`
+  with `--refresh`, `fresh.py refresh asm-dump` by name. Measured 2026-10-04 at 410 files: 3.4-3.6 s wall (dtk 3.0 s), not the
+  200-400 s of the 13.5 k-file era. A fresh worktree (no `build/RMHE08/`) used to crash writing the temp config; it now
+  creates the directory first.
+* `ROOT` is the tool file's tree (`Path(__file__)`), while the dump's out dir follows the invocation's tree (`tudiscover`'s
+  `LOCAL_ASM_DIR`): `MAIN/tools/splits/dump_asm.py` run inside a worktree would split MAIN's config into the worktree's
+  `build/`. The registry always runs the tree's own copy with the tree as cwd, so it never mixes them; the tool itself is
+  unchanged here.
+* dtk rewrites every `.s` on each run (no skip-unchanged), so every refresh invalidates `callers`' stat-signed index, and a
+  `write_asm: false` split never cleans the directory: MAIN's dump holds 2 284 files where a fresh dump writes 410.
 
 ## History (the incidents behind the rules - keep the rule, drop the narrative when the rule is stable)
 

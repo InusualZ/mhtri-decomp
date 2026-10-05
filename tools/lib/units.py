@@ -762,6 +762,8 @@ def run_tokens(tokens: list[str], cwd: str, expect: str | None = None, scratch_d
         if src is None:
             j = tokens.index("-c")
             obj = os.path.join(scratch_dir, os.path.splitext(os.path.basename(tokens[j + 1]))[0] + ".o")
+        # the chained `objalign.py`/`objextab.py` follow the object too, or they rewrite the tree's real one
+        tokens = retarget_object_helpers(tokens, obj)
     if obj and os.path.exists(obj):
         os.remove(obj)
     time.sleep(1.05)

@@ -19,11 +19,12 @@ python tools/units/slots.py spawn --kind KIND [--slot N] [--unit U] [--task-file
 python tools/units/slots.py release [--slot N | --unit U | --branch B] [--keep-branch] [--force] [--dry-run]
 python tools/units/slots.py reclaim [--slot N | --unit U | --branch B] [--json]
 python tools/units/slots.py status [--json]
+python tools/units/slots.py refresh N [--force] [--json]   # copy only what differs from MAIN, then re-verify
 python tools/units/slots.py verify [--slot N] [--json]
 python tools/units/slots.py shadow <slot> <dir> [--seed-build] [--force]
 python tools/units/slots.py --selftest
 ```
-Subcommands: `init`, `acquire`, `release`, `reclaim`, `spawn`, `collect`, `status`, `verify`, `shadow`.
+Subcommands: `init`, `acquire`, `release`, `reclaim`, `spawn`, `collect`, `status`, `refresh`, `verify`, `shadow`.
 Flags: `--branch`, `--count`, `--dry-run`, `--force`, `--json`, `--keep-branch`, `--kind`, `--main`, `--path`, `--release`, `--seed-build`, `--selftest`, `--slot`, `--task-file`, `--unit`, `--units`, `--worker`.
 Exit codes: 0 ok, 1 findings or refusal, 2 could not run (the `lib.findings` convention; today's tool documents none, so `migration.md` records the current behaviour before changing it).
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
@@ -60,6 +61,8 @@ git submodule update --init tools/m2c
 * **release** returns the slot to main's tip, keeps the warm trees, deletes the branch (rescue-ref first, as `claims.release` does) and refreshes the build tree so the next acquire is instant.
 * **reclaim** turns "the slot still holds a **landed** branch" from a hand dance into one step. A branch whose content is already in main is not work in progress, so `spawn`/`acquire` test it with the campaign's own free test (`git merge-tree --write-tree main <branch>` vs `git rev-parse main^{tree}` - equal means fully applied, the same test the held-branch audit uses) and, when it is applied, park the rescue ref (`refs/rescue/<slug>`) **first**, then detach the worktree, delete the branch, release the slot and take it - printing one line saying what it did and why. The test compares **trees, not commits**, so the one rule covers both routes: a gate-landed branch stays ahead of main by its own commits but its tree equals main's, and the direct path-limited landing does the same. An **unlanded** branch keeps today's refusal verbatim, and a test that cannot run or is ambiguous **refuses** (fail closed) rather than reclaim: the refusal is load-bearing. The marker is not the signal: a slot whose `.used` is **MISSING** but whose branch is proven applied is reclaimable (a crash remnant), while the same missing marker next to an unlanded branch still refuses. `python tools/units/slots.py reclaim [--slot N | --unit U | --branch B]` runs the same step by name so the orchestrator (or the next lane) can do it deliberately instead of by hand.
 * **the cap is `pool.json`'s `count`** (`pool_size`), **not** a count of slot directories: a slot whose worktree is missing or broken is still a slot. `status`/`capacity_error` enumerate every one and say per slot *why* it is not usable - `no worktree` / `branch` / `claimed` / `debris`, plus a `missing record` or `stale record: its base predates main` note with the remedy - so a full pool can never read as a phantom shortage. A bulk `init --force` **refuses while any slot holds live work** (the pool is the campaign's concurrency cap, not a scratch file), and `tools/selftest.py` guards `.pi/slots/pool.json` **by bytes** (`.pi/` is gitignored) so no test run can shrink it.
+
+* **refresh** (`lib.lanes.pool.refresh_slot`, 2026-10-04) is the registry's `slot-build` refresh (`lib.artifacts`): a slot that verifies is left alone (`--force` re-seeds anyway); otherwise `seed_worktree_build(..., overwrite=True)` recopies only the files whose size or mtime differ from MAIN's, then `verify` runs again and the exit is its verdict. It refuses a slot a RUNNING session works in (a build tree changed under a lane changes what it measures; `--force` overrides) and a MAIN whose own build is stale. Measured on MAIN's tree (892 files, 42 MB, the asm dump excluded): a full seed 0.71 s, a refresh with nothing changed 0.16 s, with five objects changed 0.16 s (5 copied).
 
 ## Lib dependencies
 

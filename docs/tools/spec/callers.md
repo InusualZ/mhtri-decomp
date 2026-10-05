@@ -15,13 +15,13 @@ the landing gate (1); profiles (`.claude/agents`) (6); skills (13); CLAUDE.md (2
 
 ```
 python tools/units/callers.py <address|name> [--json] [--code|--data] [--kind K[,...]]
-[--pointers] [--limit N] [--rebuild]
+[--pointers] [--limit N] [--rebuild] [--refresh | --no-refresh]
 python tools/units/callers.py --range 0x80799F98 0x80799FDC [--step 4] [--each] [--json]
 # the per-address referrer runs over a range (the .sdata2 seam)
 python tools/units/callers.py --stats          # what the index is, and how old the answer is
 python tools/units/callers.py --selftest       # this file + callers_selftest.py (fixtures only)
 ```
-Flags: `--code`, `--data`, `--each`, `--json`, `--kind`, `--limit`, `--pointers`, `--range`, `--rebuild`, `--selftest`, `--stats`, `--step`.
+Flags: `--code`, `--data`, `--each`, `--json`, `--kind`, `--limit`, `--no-refresh`, `--pointers`, `--range`, `--rebuild`, `--refresh`, `--selftest`, `--stats`, `--step`.
 Exit codes: 0 ok, 1 findings or refusal, 2 could not run (the `lib.findings` convention; today's tool documents none, so `migration.md` records the current behaviour before changing it).
 `--json`: the `lib.findings` schema `{tool, rows, ok, summary}` where the tool has `--json`; otherwise none.
 
@@ -53,7 +53,13 @@ Inputs -> outputs: build/RMHE08/asm or obj/ -> build/tmp/callers/graph.json -> r
   byte-identical (replayed on `0x8079A008` and `0x805FAB08`, the playbook's two examples: 0 changed lines); on
   `0x803CB958` 40 of 53 lines change, each only in the callee's spelling.
 * **No dump is not "0 callers"** (the defect `tudiscover` was fixed for): a missing dump is its own message with the remedy, `exit 2`, and `"error": "no asm dump"` under `--json`.
-* **It is a reader.** No `src/` edits, no renames, no writes outside `build/tmp/callers/`.
+* **A stale dump is not read by default (2026-10-04, `lib.artifacts`).** `choose_dump`: a fresh dump answers; a stale,
+  truncated or unstamped one is answered from the split objects' relocations (`source: elf`, state `elf fallback`, the message
+  carries the stamp's reason); `--refresh` / `FRESH=auto` rebuilds it first (`dump_asm.py`, ~3.5 s, then the ~10 s index
+  rebuild every dump rewrite costs) and the dump answers; `FRESH=refuse` refuses. A tree with no split objects keeps the old
+  behaviour (the stale dump answers and says so). Fresh: stdout and `--json` byte-identical (measured on `camellia_setup128`).
+* **It is a reader.** No `src/` edits, no renames, no writes outside `build/tmp/callers/` (and, with `--refresh`, this tree's
+  `build/RMHE08/` dump).
 
 ## Lib dependencies
 
