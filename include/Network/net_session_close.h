@@ -69,11 +69,11 @@ void requestCommunityBlockList(s8* result);
 void requestFriendSync(s8* result);
 
 /* 0x804362E0..0x8043656C - the friend roster and the recent-player list: membership, append and remove. */
-s32 isRosterMember(const struct NetworkSmallObject* address);
+s32 isRosterMember(const NetworkUniqueId* address);
 void appendRosterEntry(const struct NetRosterRec* src);
-void removeRosterEntry(const struct NetworkSmallObject* address);
-void appendRecentEntry(const struct NetworkSmallObject* address);
-void removeRecentEntry(const struct NetworkSmallObject* address);
+void removeRosterEntry(const NetworkUniqueId* address);
+void appendRecentEntry(const NetworkUniqueId* address);
+void removeRecentEntry(const NetworkUniqueId* address);
 
 /* 0x80436658 - the community layer's reflect callback. */
 /* untyped: caller-owned payload - the community layer's reflect payload */
@@ -179,9 +179,9 @@ s8 lookupFriendSlot(const u8* id);
 
 /* 0x80434D34 / 0x80434E48 / 0x80434EA0 - whether an address object (or six raw id bytes) belongs to a session
  * member, and the member's slot (-1 when none). */
-s32 isSessionMember(const struct NetworkSmallObject* address);
+s32 isSessionMember(const NetworkUniqueId* address);
 s32 isSessionMemberId(const NetId* id);
-s8 findSessionMemberSlot(const struct NetworkSmallObject* address);
+s8 findSessionMemberSlot(const NetworkUniqueId* address);
 
 /* 0x804338AC - hands the mediator a quest-board record (the quest board's only network call). */
 void postQuestBoardRecord(u8* record);

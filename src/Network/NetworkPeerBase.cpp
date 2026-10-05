@@ -1,6 +1,6 @@
 /*
  * Network/NetworkPeerBase.cpp - the abstract peer (the class holding the error record every peer constructor
- *   chains), its deleting destructor, the `networkPeerError_*` record accessors and the small object's deleting
+ *   chains), its deleting destructor, the `networkPeerError_*` record accessors and `NetworkUniqueId`'s deleting
  *   destructor.
  *
  * One translation unit of the retail Network transport band, split out of `Network/network_transport.cpp`
@@ -8,9 +8,10 @@
  * 0x803CCDF8..0x803CCF30, `.data` 0x805F94E0..0x805F9510, extab 0x800198C8..0x800198E0, extabindex
  * 0x8003A0BC..0x8003A0E0.
  *
- * NAMES.  `NetworkPeerBase`, the `networkPeerError_*` accessors and `NetworkSmallObjectSink` are GUESSed names
- * (derived from behaviour); the sink's deleting destructor sits at the range's left edge, a discovery cap, so its TU is
- * unproven.  Every name here is the map's or a derived one; the derived ones are marked GUESS in
+ * NAMES.  `NetworkPeerBase` and the `networkPeerError_*` accessors are GUESSed names (derived from behaviour).
+ * `NetworkUniqueId`'s deleting destructor (the class is `Network/NetworkUniqueId.cpp`'s, its table's +0x08 slot) sits
+ * at the range's left edge, a discovery cap, so its TU is unproven: it is defined here because this range holds its
+ * only copy.  Every name here is the map's or a derived one; the derived ones are marked GUESS in
  * `Network/network_transport_types.h`.
  *
  * TABLE.  Its table (0x805F94E0, 0x30 B) is emitted from `NetworkPeerBase::destroy`, the key function (rule 10).
@@ -24,6 +25,7 @@
 #include "types.h"
 #include "Network/network_transport.h"
 #include "Network/NetworkSessionManager.h"
+#include "Network/NetworkUniqueId.h"
 /* `unsplit/Network.h` is the Network band's code half (`getNetworkLogger` and the socket-pool helpers).  It
    cannot be included beside `unsplit/OS.h`: the two band headers declare `OSCreateThread`/`OSResumeThread` with
    different signatures and a TU that sees both fails with `(10197) illegal function overloading`. */
@@ -38,9 +40,9 @@
 
 extern "C" {
 
-/* Deleting destructor of the small transport object: runs the sink's destructor, then frees the object when the
-   caller asks for it. */
-NetworkSmallObjectSink::~NetworkSmallObjectSink()
+/* Deleting destructor of the unique id: runs the sink's destructor, then frees the object when the caller asks
+   for it. */
+NetworkUniqueId::~NetworkUniqueId()
 {
 }
 

@@ -64,11 +64,9 @@
  * stays a pool entry (playbook 58).
  * (5) Bodies written by the network pilot (lane L2): the circle/player getters 0x803DBA2C..0x803DC0E4 and the
  * setters/stubs 0x803DEF38..0x803DF1CC.  Open residuals in them, each blocked on a header another lane owns:
- *   - `NetworkSmallObject` is a struct with a vtable member (`Network/network_writer_types.h`), so a +0x28
- *     dispatch loads the table through the object's own register (`lwz r5,0(r5)`) where retail moves the
- *     object into r3 first (`mr r3,r5; lwz r12,0(r3)`) - the class form of a virtual call
- *     (`exportCircleItem`, `getPlayerRecord`); its +0x28 slot is also typed `const u8*` where both
- *     callers pass a `NetworkSmallObject*` (the cast at each site).
+ *   - the address objects are `NetworkUniqueId`s (`Network/NetworkUniqueId.h`), a class, so every +0x28 `copyFrom`
+ *     is a real virtual call; the slot is still typed `const u8*` by the sink's declaration
+ *     (`Network/network_transport_types.h`) where every caller passes another unique id (the cast at each site).
  *   - `NetworkSessionBase::getUserFlagB` (+0x84, `Network/network_transport_types.h`) returns `u8`, so our
  *     callers re-extend it (`clrlwi.`) where retail uses the full word (`cmpwi r3,0` in
  *     `getTimeSincePublish`, a plain `bctr` tail call in `isNetworkSessionManagerPatReady`).
@@ -86,8 +84,9 @@
  * received `PatCircleInfo` block, the players from the reflection handlers; names are GUESSES from the bodies
  * (`setCircleInfo`/`addCircleInfo`/`removeCircleInfo`, `resetPlayerRecord`/`addPlayerRecord`/
  * `removePlayerRecord`/`updatePlayerRecord`, `packCircleOptions`; `postEvent`'s fifth argument is a per-event
- * payload - an error record, an index or a state byte).  Residuals: the stack copies need the full 0x20-byte
- * `NetworkSmallObject`, which gives `slot_1C4` retail's 0x40 frame (100 %); `setCircleInfo` compares the option's
+ * payload - an error record, an index or a state byte).  The stack copies are real `NetworkUniqueId` /
+ * `NetworkSessionSlotInfo` locals (MWCC's scope-exit destructors and cleanup records), each declared in the block
+ * retail constructs it in.  Residuals: `setCircleInfo` compares the option's
  * enable byte with `cmplwi` where retail has `cmpwi` (u8, s8 and bool spellings tried); `packCircleOptions` addresses the name entries from the list
  * base where retail strength-reduces a pointer at +0x08 (the explicit pointer spelling swaps two registers,
  * 96.16 vs 98.32).
@@ -105,8 +104,7 @@
  *   0x80060034; `networkSessionReflect1` 99.66 and `moveStartSession` 99.94 - one
  *   callee-saved register colouring each; `networkSessionReflect0` 98.68 - the event-code select's scheduling;
  *   `slot_19C` 98.33 and `isNetworkSessionManagerPatReady` 3.33 - `NetworkSessionBase::getUserFlagB` is declared
- *   `u8` in L1's header (`clrlwi` re-extension); `receiveSessionChat` 99.93 - the struct-of-function-pointers
- *   `NetworkSmallObject` dispatch (L1 field request); `handleCircleJoin` 99.97 - the jump table's label name.
+ *   `u8` in L1's header (`clrlwi` re-extension); `handleCircleJoin` 99.97 - the jump table's label name.
  *   Callees in other lanes' units are declared in their owners' headers (integrated from
  *   `.pi/outbox/net2-l2-101a-requests.json`); `getNetworkBinaryState` (owner header `u32`) is narrowed with a `(u8)`
  *   cast at each call.  The mediator records are the owners' (`Network/gamespy_interface_types.h`,
@@ -167,8 +165,7 @@
 #include "Network/NetworkSessionManagerPat.h"   /* the unit's own header: its free functions and constants (rule 2) */
 #include "Network/network_layer_io.h"            /* sendReqCircleInfoSet - owner Network/network_layer_io.cpp */
 #include "Network/NetworkLayerPat.h"             /* NetworkLayerPat - the layer the manager drives */
-#include "Network/NetworkUniqueId.h"            /* networkSmallObject_construct/_setAddress - owner Network/NetworkUniqueId.cpp */
-#include "Network/NetworkPeerBase.h"             /* NetworkSmallObjectSink::destroy - owner Network/NetworkPeerBase.cpp */
+#include "Network/NetworkUniqueId.h"            /* NetworkUniqueId - owner Network/NetworkUniqueId.cpp */
 #include "Network/NetworkSessionBase.h"          /* LockMutex/UnlockMutex - owner Network/NetworkSessionBase.cpp */
 #include "Network/gamespy_interface_types.h"    /* GameSpyInterfaceThread / NetworkErrorInfo - owner Network/GameSpyInterfaceThread.cpp */
 #include "Network/PatInterface.h"              /* PatInterface - owner Network/PatInterface.cpp */
@@ -602,7 +599,7 @@ s32 NetworkSessionManagerPat::updateSession(NetworkRequest* request)
             this->field_6E75 = 1;
         }
         getSelectedID(getInstance_(), userId);
-        networkSmallObject_setAddress(&this->field_3CC, 3, userId, sizeof(userId));
+        this->field_3CC.importFrom(3, userId, sizeof(userId));
         getNetworkLogger()->readMatchOptions_78(0, &this->matchOptions_3EC);
         this->matchOptions_3EC.sessionKey_04 = rand() % 10000 + 10000;
         getSelectedID(getInstance_(), this->matchOptions_3EC.userId_08);
@@ -1875,7 +1872,6 @@ s32 NetworkSessionManagerPat::slot_19C(NetworkRequest* request)
     const char* text = (const char*)request->getArgument(0);
     u32 tag = request->getArgument(1);
     s32 target = request->getArgument(2);
-    NetworkSessionSlotInfo message;
     PatMatchOptions options;
     NetworkErrorInfo error;
     char userId[8];
@@ -1921,7 +1917,7 @@ s32 NetworkSessionManagerPat::slot_19C(NetworkRequest* request)
             sendNtcCircleChat(getInstance_(), &options, text);
             request->state_00 = 10;
         } else {
-            exportTo(&this->players_538[target].smallObject_08, (u8*)userId, sizeof(userId));
+            this->players_538[target].smallObject_08.exportTo((u8*)userId, sizeof(userId));
             this->requestFlags_30C[15] = 0;
             this->requestIds_360[15] = sendReqCircleTell(getInstance_(), userId, &options, text);
             request->state_00 = 5;
@@ -1938,9 +1934,10 @@ s32 NetworkSessionManagerPat::slot_19C(NetworkRequest* request)
             request->state_00 = 10;
         }
         break;
-    case 10:
-        NetworkSessionSlotInfo_construct(&message);
-        ((NetworkSmallObjectSink*)&message.smallObject_00)->copyFrom((const u8*)&this->field_3CC);
+    case 10: {
+        NetworkSessionSlotInfo message;
+
+        message.smallObject_00.copyFrom((const u8*)&this->field_3CC);
         memcpy(message.name_20, this->matchOptions_3EC.name_10, sizeof(message.name_20));
         message.nameEnd_33 = 0;
         memset(&message.flag_34, 0, sizeof(message.flag_34));
@@ -1951,8 +1948,8 @@ s32 NetworkSessionManagerPat::slot_19C(NetworkRequest* request)
         message.tag_238 = tag;
         message.time_23C = getServerDateTime(getInstance_());
         postEvent(18, this->selfIndex_536, 0, 1, &message, this->unused_08);
-        NetworkSessionSlotInfo_dtor(&message, -1);
         return 1;
+    }
     case REQUEST_CANCELLED:
         request->getRecord(&error);
         postEvent(18, 0, error.code_00, 1, &error, this->unused_08);
@@ -1989,7 +1986,7 @@ s32 NetworkSessionManagerPat::slot_1A4(NetworkRequest* request)
             setSessionLog(request, 0x80050011, 0, index);
             request->state_00 = REQUEST_CANCELLED;
         } else {
-            exportTo(&this->players_538[index].smallObject_08, (u8*)userId, sizeof(userId));
+            this->players_538[index].smallObject_08.exportTo((u8*)userId, sizeof(userId));
             this->requestFlags_30C[17] = 0;
             this->requestIds_360[17] = sendReqCircleKick(getInstance_(), userId);
             request->state_00 = 5;
@@ -2163,13 +2160,13 @@ void NetworkSessionManagerPat::getCircleItemName(char* dst, s32 size, s32 idx)
 }
 
 /* Copies circle `idx`'s address object into `dst`. */
-void NetworkSessionManagerPat::exportCircleItem(NetworkSmallObject* dst, s32 idx)
+void NetworkSessionManagerPat::exportCircleItem(NetworkUniqueId* dst, s32 idx)
 {
     if (idx < 0 || idx >= getCircleInfoCount()) {
         return;
     }
     if (dst != NULL) {
-        ((NetworkSmallObjectSink*)dst)->copyFrom((const u8*)&this->circleList_AF0.items_04[idx].smallObject_108);
+        dst->copyFrom((const u8*)&this->circleList_AF0.items_04[idx].smallObject_108);
     }
 }
 
@@ -2317,7 +2314,7 @@ void NetworkSessionManagerPat::clearStringWithId(u32 id, char* dst, s32 size)
 }
 
 /* Copies player `idx`'s address object into `dst`; false for an absent player or no destination. */
-s32 NetworkSessionManagerPat::getPlayerRecord(s8 idx, NetworkSmallObject* dst)
+s32 NetworkSessionManagerPat::getPlayerRecord(s8 idx, NetworkUniqueId* dst)
 {
     if ((u8)idx > 3) {
         return 0;
@@ -2328,7 +2325,7 @@ s32 NetworkSessionManagerPat::getPlayerRecord(s8 idx, NetworkSmallObject* dst)
     if (dst == NULL) {
         return 0;
     }
-    ((NetworkSmallObjectSink*)dst)->copyFrom((const u8*)&this->players_538[idx].smallObject_08);
+    dst->copyFrom((const u8*)&this->players_538[idx].smallObject_08);
     return 1;
 }
 
@@ -2366,7 +2363,6 @@ void networkSessionReflect0(void* a0, void* a1, s8 a2, void* a3, void* a4, void*
 {
     NetworkSessionManagerPat* self = (NetworkSessionManagerPat*)a0;
     const u8* data = (const u8*)a5;
-    NetworkSmallObject address;
     PatChatHeader header;
     s32 player = self->slot_1C4(a2);
     u8 kind;
@@ -2385,16 +2381,16 @@ void networkSessionReflect0(void* a0, void* a1, s8 a2, void* a3, void* a4, void*
         break;
     case 3:
         if (getNetworkLayerPat(getPatsObject(), 0) != NULL) {
-            networkSmallObject_construct(&address);
+            NetworkUniqueId address;
+
             getNetworkLayerPat(getPatsObject(), 0)->getMemberAddress(a2, &address);
-            if (networkSmallObject_isEqual(&address, &self->field_3CC) != 0) {
+            if (address.equals(&self->field_3CC) != 0) {
                 self->reportSessionError((const NetworkErrorInfo*)data);
                 self->errorCode_794 = ((const NetworkErrorInfo*)data)->code_00;
                 self->errorParam1_798 = ((const NetworkErrorInfo*)data)->param1_04;
                 self->errorParam2_79C = ((const NetworkErrorInfo*)data)->param2_08;
             }
             getNetworkLayerPat(getPatsObject(), 0)->onSessionFailed(a2, (const NetworkErrorInfo*)data);
-            NetworkSmallObjectSink::destroy(&address);
         }
         if ((s8)player >= 0 && self->matchRunning_3C1 != 0) {
             if ((s8)player == self->selfIndex_536) {
@@ -2792,11 +2788,10 @@ void networkSessionReflect1(NetworkSessionManagerPat* self, s32 code, s32 reques
 
             if (field->type_10 == 2) {
                 u32 value = field->value_18;
-                NetworkSmallObject address;
+                NetworkUniqueId address;
                 s8 player;
 
-                networkSmallObject_construct(&address);
-                networkSmallObject_setAddress(&address, 3, data, 8);
+                address.importFrom(3, data, 8);
                 switch (kind) {
                 case 2:
                     sendNtcCircleUserValueReply(getInstance_(), self->circleInfoRequestId_41C,
@@ -2821,7 +2816,6 @@ void networkSessionReflect1(NetworkSessionManagerPat* self, s32 code, s32 reques
                     }
                     break;
                 }
-                NetworkSmallObjectSink::destroy(&address);
             }
         }
         break;
@@ -2857,8 +2851,7 @@ void networkSessionReflect1(NetworkSessionManagerPat* self, s32 code, s32 reques
             NetworkSessionSlotInfo message;
             s8 player;
 
-            NetworkSessionSlotInfo_construct(&message);
-            networkSmallObject_setAddress(&message.smallObject_00, 3, ((const PatServerChat*)data)->address_108, 8);
+            message.smallObject_00.importFrom(3, ((const PatServerChat*)data)->address_108, 8);
             memcpy(message.name_20, ((const PatServerChat*)data)->name_110, sizeof(message.name_20));
             message.nameEnd_33 = 0;
             memset(&message.flag_34, 0, sizeof(message.flag_34));
@@ -2871,7 +2864,6 @@ void networkSessionReflect1(NetworkSessionManagerPat* self, s32 code, s32 reques
             if (player >= 0) {
                 self->postEvent(19, player, 0, 1, &message, self->unused_08);
             }
-            NetworkSessionSlotInfo_dtor(&message, -1);
         }
         break;
     case 0x8067:
@@ -2900,7 +2892,7 @@ void networkPatResetCircleInfo(NetworkSessionManagerPat* self, s32 index)
     item->id_000 = 0;
     item->ownerId_004 = 0;
     item->name_008[0] = 0;
-    item->smallObject_108.vtable->slot_18(&item->smallObject_108);
+    item->smallObject_108.clear();
     item->limitA_170 = 0;
     item->limitB_174 = 0;
     item->usedA_178 = 0;
@@ -2958,7 +2950,7 @@ void NetworkSessionManagerPat::setCircleInfo(s32 index, const PatCircleInfo* inf
     item->ownerId_004 = info->ownerId_368;
     memcpy(item->name_008, info->name_004, 63);
     item->name_008[63] = 0;
-    networkSmallObject_setAddress(&item->smallObject_108, 3, info->address_370, sizeof(info->address_370));
+    item->smallObject_108.importFrom(3, info->address_370, sizeof(info->address_370));
     item->limitA_170 = info->limitA_358;
     item->limitB_174 = info->limitB_360;
     item->usedA_178 = info->usedA_35C;
@@ -3070,7 +3062,7 @@ void NetworkSessionManagerPat::resetPlayerRecord(s8 index)
     player->flag_02 = 0;
     player->state_03 = 0;
     player->linked_04 = 0;
-    player->smallObject_08.vtable->slot_18(&player->smallObject_08);
+    player->smallObject_08.clear();
     memset(player->name_28, 0, sizeof(player->name_28));
     player->value_3C = 0;
     memset(&player->address_40, 0, sizeof(player->address_40));
@@ -3134,21 +3126,18 @@ void NetworkSessionManagerPat::removePlayerRecord(s8 index, s32 counted)
 void NetworkSessionManagerPat::updatePlayerRecord(s8 index, const u8* address, const char* name, u32 state)
 {
     NetworkSessionPlayerRecord* player;
-    NetworkSmallObject object;
+    NetworkUniqueId object;
 
-    networkSmallObject_construct(&object);
     if ((u8)index > 3) {
-        NetworkSmallObjectSink::destroy(&object);
         return;
     }
     player = &this->players_538[index];
     if (player->active_00 == 0) {
-        NetworkSmallObjectSink::destroy(&object);
         return;
     }
     if (address != NULL) {
-        networkSmallObject_setAddress(&object, 3, address, 8);
-        ((NetworkSmallObjectSink*)&player->smallObject_08)->copyFrom((const u8*)&object);
+        object.importFrom(3, address, 8);
+        player->smallObject_08.copyFrom((const u8*)&object);
     }
     if (name != NULL) {
         memcpy(player->name_28, name, sizeof(player->name_28) - 1);
@@ -3160,7 +3149,6 @@ void NetworkSessionManagerPat::updatePlayerRecord(s8 index, const u8* address, c
             postEvent(27, index, 0, 1, &player->state_03, this->unused_08);
         }
     }
-    NetworkSmallObjectSink::destroy(&object);
 }
 
 /* Packs the enabled entries of a name list (at most eight, the list's count clamped in place) into `dst`,
@@ -3265,35 +3253,33 @@ s8 NetworkSessionManagerPat::mapId_1C0(s32 value)
 /* The player record holding the address of the layer's member slot `value`, -1 when none does. */
 s32 NetworkSessionManagerPat::slot_1C4(s8 value)
 {
-    NetworkSmallObject id;
     s32 i;
 
     if (getNetworkLayerPat(getPatsObject(), 0) != NULL) {
-        networkSmallObject_construct(&id);
+        NetworkUniqueId id;
+
         getNetworkLayerPat(getPatsObject(), 0)->getMemberAddress(value, &id);
-        if (networkSmallObject_isValid(&id) != 0) {
+        if (id.isValid() != 0) {
             for (i = 0; i < 4; i++) {
                 if (this->players_538[i].active_00 != 0 &&
-                    networkSmallObject_isEqual(&id, &this->players_538[i].smallObject_08) != 0) {
-                    NetworkSmallObjectSink::destroy(&id);
+                    id.equals(&this->players_538[i].smallObject_08) != 0) {
                     return i;
                 }
             }
         }
-        NetworkSmallObjectSink::destroy(&id);
     }
     return -1;
 }
 
 /* The player slot whose address object equals `id`; -1 (and a warning) when none does. */
-s32 NetworkSessionManagerPat::uniqueIdToMember(const NetworkSmallObject* id)
+s32 NetworkSessionManagerPat::uniqueIdToMember(const NetworkUniqueId* id)
 {
     s32 i;
 
     if (id != NULL) {
         for (i = 0; i < 4; i++) {
             if (this->players_538[i].active_00 != 0 &&
-                networkSmallObject_isEqual(id, &this->players_538[i].smallObject_08) != 0) {
+                id->equals(&this->players_538[i].smallObject_08) != 0) {
                 return i;
             }
         }
@@ -3429,7 +3415,7 @@ void closeNetworkSessionManagerPat(NetworkSessionManagerPat* self)
 
 /* Opens a session slot (kind 6) for the layer member at `address` and connects it with the GameSpy thread;
  * the slot, 0 for this console's own address, -1 while the session is not ready, -2 when no slot is free. */
-s8 NetworkSessionManagerPat::connectPeer(const NetworkSmallObject* address, u32 value)
+s8 NetworkSessionManagerPat::connectPeer(const NetworkUniqueId* address, u32 value)
 {
     PatPeerConnect peer;
     s32 slot;
@@ -3438,7 +3424,7 @@ s8 NetworkSessionManagerPat::connectPeer(const NetworkSmallObject* address, u32 
         this->field_3C8 == 0) {
         return -1;
     }
-    if (networkSmallObject_isEqual(&this->field_3CC, address) != 0) {
+    if (this->field_3CC.equals(address) != 0) {
         return 0;
     }
     slot = ((NetworkSessionBase*)this->buffer)->set(6, (const u8*)address);
@@ -3682,10 +3668,9 @@ void NetworkSessionManagerPat::sendSessionChat(const char* text, u32 tag, s8 tar
  * address matches the one the packet carries. */
 void NetworkSessionManagerPat::receiveSessionChat(const u8* data, u32 size)
 {
-    NetworkSessionSlotInfo message;
     u8 text[0x200];
-    NetworkSmallObject sender;
     NetworkUnitPacket packet;
+    NetworkUniqueId sender;
     NetworkPeerRecord record;
     u32 senderWord;
     u32 tag;
@@ -3694,7 +3679,6 @@ void NetworkSessionManagerPat::receiveSessionChat(const u8* data, u32 size)
     s8 index;
     u32 length;
 
-    networkSmallObject_construct(&sender);
     record.data_00 = text;
     record.size_04 = sizeof(text);
     packet.bind((u8*)data, size);
@@ -3706,21 +3690,18 @@ void NetworkSessionManagerPat::receiveSessionChat(const u8* data, u32 size)
     ((NetworkByteStream*)&packet)->takeRecord(&record);
     index = senderWord;
     if (index < 0 || index >= getWord_524()) {
-        NetworkSmallObjectSink::destroy(&sender);
         return;
     }
     if (index == this->selfIndex_536) {
-        NetworkSmallObjectSink::destroy(&sender);
         return;
     }
     if (this->players_538[index].announced_01 != 0) {
-        NetworkSessionSlotInfo_construct(&message);
-        if (networkSmallObject_isEqual(&sender, &this->players_538[index].smallObject_08) == 0) {
-            NetworkSessionSlotInfo_dtor(&message, -1);
-            NetworkSmallObjectSink::destroy(&sender);
+        NetworkSessionSlotInfo message;
+
+        if (sender.equals(&this->players_538[index].smallObject_08) == 0) {
             return;
         }
-        ((NetworkSmallObjectSink*)&message.smallObject_00)->copyFrom((const u8*)&sender);
+        message.smallObject_00.copyFrom((const u8*)&sender);
         memcpy(message.name_20, this->players_538[index].name_28, sizeof(message.name_20));
         message.nameEnd_33 = 0;
         memset(&message.flag_34, 0, sizeof(message.flag_34));
@@ -3731,9 +3712,7 @@ void NetworkSessionManagerPat::receiveSessionChat(const u8* data, u32 size)
         message.tag_238 = tag;
         message.time_23C = getServerDateTime(getInstance_());
         postEvent(19, index, 0, 1, &message, this->unused_08);
-        NetworkSessionSlotInfo_dtor(&message, -1);
     }
-    NetworkSmallObjectSink::destroy(&sender);
 }
 
 /* Reports `code`/`arg_a`/`arg_b` to the server and records them as the request's error. */

@@ -54,6 +54,9 @@ void srand(u32 seed);
  * vectors may alias.  Added with that unit. */
 f32 atan2f(f32 y, f32 x);
 
+/* 0x8045F37C */
+int sscanf(const char* src, const char* fmt, ...);
+
 #ifdef __cplusplus
 }
 #endif

@@ -589,7 +589,7 @@ s32 layerReflectCallback(u32 command, s32 result, s32 count, void* data)
             s32 slot;
 
             work->peer_count_0x62E8++;
-            slot = findFreePeerSlot((const NetworkSmallObject*)data);
+            slot = findFreePeerSlot((const NetworkUniqueId*)data);
             if (slot > 0) {
                 NetPeerEvent* event;
                 char line[0x80];
@@ -627,7 +627,7 @@ s32 layerReflectCallback(u32 command, s32 result, s32 count, void* data)
             s32 slot;
 
             work->peer_count_0x62E8--;
-            slot = findPeerSlot((const NetworkSmallObject*)data);
+            slot = findPeerSlot((const NetworkUniqueId*)data);
             if (slot > 0) {
                 NetPeerEvent* event;
 
@@ -1096,14 +1096,14 @@ void resetMessagePool(void)
             for (; n > 0; n--) {
                 NetRecentRec* listed = &work->layer_peers_0x1AE0[n - 1];
 
-                exportTo(&listed->address_0x00, (u8*)id_text, 8);
+                listed->address_0x00.exportTo((u8*)id_text, 8);
                 if (strcmp(id_text, work->name_0x7368) == 0) {
-                    ((NetworkSmallObjectSink*)&work->peer_addresses_0x7908[0].object_0x00)->copyFrom((const u8*)&listed->address_0x00);
+                    work->peer_addresses_0x7908[0].object_0x00.copyFrom((const u8*)&listed->address_0x00);
                 } else {
                     strcpy(work->peers_0x7488[slot].id_0x00.text_0x00, id_text);
                     strcpy(work->peers_0x7488[slot].name_0x0A.text_0x00, listed->name_0x20);
                     work->used_0x7988[slot] = 1;
-                    ((NetworkSmallObjectSink*)&work->peer_addresses_0x7908[slot].object_0x00)->copyFrom((const u8*)&listed->address_0x00);
+                    work->peer_addresses_0x7908[slot].object_0x00.copyFrom((const u8*)&listed->address_0x00);
                     slot++;
                 }
             }
@@ -1142,7 +1142,7 @@ void resetPeerTable(void)
  * The first free peer slot (1..3) for the peer at `address`: -1 when it is already connected or every slot
  * is taken.
  */
-s32 findFreePeerSlot(const NetworkSmallObject* address)
+s32 findFreePeerSlot(const NetworkUniqueId* address)
 {
     NetCtrlWk* work = net_ctrl_wk;
     char text[16];
@@ -1151,7 +1151,7 @@ s32 findFreePeerSlot(const NetworkSmallObject* address)
     formatNetId(text, (const NetId*)address);
     for (i = 1; i < 4; i++) {
         if (work->used_0x7988[i] != 0 &&
-            networkSmallObject_isEqual((const NetworkSmallObject*)&work->peer_addresses_0x7908[i], address) != 0) {
+            work->peer_addresses_0x7908[i].object_0x00.equals(address) != 0) {
             return -1;
         }
     }
@@ -1166,7 +1166,7 @@ s32 findFreePeerSlot(const NetworkSmallObject* address)
 /*
  * The connected peer slot (1..3) holding the peer at `address`, or -1.
  */
-s32 findPeerSlot(const NetworkSmallObject* address)
+s32 findPeerSlot(const NetworkUniqueId* address)
 {
     NetCtrlWk* work = net_ctrl_wk;
     char text[16];
@@ -1175,7 +1175,7 @@ s32 findPeerSlot(const NetworkSmallObject* address)
     formatNetId(text, (const NetId*)address);
     for (i = 1; i < 4; i++) {
         if (work->used_0x7988[i] != 0 &&
-            networkSmallObject_isEqual((const NetworkSmallObject*)&work->peer_addresses_0x7908[i], address) != 0) {
+            work->peer_addresses_0x7908[i].object_0x00.equals(address) != 0) {
             return i;
         }
     }
@@ -3139,17 +3139,17 @@ void updateNetworkPatControl(void)
         dialog->timer_0x128 = counter + 1;
         ai_npc_reaction_forward();
         if (work->layer_results_0x6244[19] != 0) {
-            NetworkSmallObject id;
-
             if (work->layer_results_0x6244[19] < 0) {
                 failNetworkControl(work);
                 return;
             }
-            networkSmallObject_construct(&id);
-            getNetworkLayerPat(getPatsObject(), 0)->readServerId_2C((NetId*)&id);
-            work->name_0x7368[0] = 0;
-            formatNetId(work->name_0x7368, (NetId*)&id);
-            NetworkSmallObjectSink::destroy(&id);
+            {
+                NetworkUniqueId id;
+
+                getNetworkLayerPat(getPatsObject(), 0)->readServerId_2C((NetId*)&id);
+                work->name_0x7368[0] = 0;
+                formatNetId(work->name_0x7368, (NetId*)&id);
+            }
             flushRosterSync();
             refreshRosterCache();
             work->sub_state_0x017 = 0x10;
@@ -4429,7 +4429,7 @@ s32 NetCtrlWk::stepFetch(s32 kind)
             return -1;
         }
         snprintf(path, 16, "%d", file_number);
-        if (fetcher->NetworkFileFetcher::open(0, path) < 0) {
+        if (fetcher->queryChecksum(0, path) < 0) {
             fetch_step_0x82D0 = 10;
         } else {
             fetch_step_0x82D0++;
@@ -5551,12 +5551,12 @@ void NetCtrlWk::copyRosterLists(NetRosterListView* roster, NetRecentListView* re
     roster->count_0x000 = work->roster_0xA1B8.count_0x000;
     for (i = 0; i < roster->count_0x000; i++) {
         memcpy(roster->rows_0x004[i].name_0x00, work->roster_0xA1B8.entries_0x004[i].name_0x20, 0x14);
-        formatNetId(roster->rows_0x004[i].id_text_0x14, &work->roster_0xA1B8.entries_0x004[i].id_0x00);
+        formatNetId(roster->rows_0x004[i].id_text_0x14, (const NetId*)&work->roster_0xA1B8.entries_0x004[i].address_0x00);
     }
     recent->count_0x000 = work->recent_0xBB84.count_0x000;
     for (i = 0; i < recent->count_0x000; i++) {
         memcpy(recent->rows_0x004[i].name_0x00, work->recent_0xBB84.entries_0x004[i].name_0x20, 0x14);
-        formatNetId(recent->rows_0x004[i].id_text_0x14, &work->recent_0xBB84.entries_0x004[i].id_0x00);
+        formatNetId(recent->rows_0x004[i].id_text_0x14, (const NetId*)&work->recent_0xBB84.entries_0x004[i].address_0x00);
     }
 }
 
@@ -5899,7 +5899,7 @@ s32 NetCtrlWk::stepFileDownloads(void)
             return -1;
         }
         snprintf(path, 16, "%d", fetch_index_0x82D4 + group_0xC494 * 15 + 6);
-        if (fetcher->NetworkFileFetcher::open(0, path) < 0) {
+        if (fetcher->queryChecksum(0, path) < 0) {
             fetch_step_0x82D0 = 10;
         } else {
             fetch_step_0x82D0++;
@@ -6081,7 +6081,7 @@ s32 NetCtrlWk::stepStagingDownload(s32 file, u16 version)
     }
     case 6:
         snprintf(path, 16, "%d", file + group_0xC494 * 15 + 6);
-        if (fetcher->NetworkFileFetcher::open(0, path) < 0) {
+        if (fetcher->queryChecksum(0, path) < 0) {
             fetch_step_0x82D0 = 10;
         } else {
             fetch_step_0x82D0++;

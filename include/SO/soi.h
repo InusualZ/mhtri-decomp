@@ -98,6 +98,50 @@ void VFipf2Init(u8* work, u32 size);
 /* 0x80521D70 - the matching take-down: finalize the file system and clear the flag. */
 void VFipf2Shutdown(void);
 
+/* The IPv4 socket address `SOConnect` takes: the length byte (8), the family (2, AF_INET), the port in
+ * network order and the address word. size: 0x8 */
+typedef struct SOSockAddrIn {
+    /* +0x0 */ u8 len;
+    /* +0x1 */ u8 family;
+    /* +0x2 */ u16 port;
+    /* +0x4 */ u32 addr;
+} SOSockAddrIn;
+
+/* The poll record `SOPoll` takes (`NetworkSocketWii::pollConnect` stores fd/events/revents with `stw` at
+ * +0/+4/+8 and reads revents back). size: 0xC */
+typedef struct SOPollFD {
+    /* +0x0 */ s32 fd;
+    /* +0x4 */ s32 events;
+    /* +0x8 */ s32 revents;
+} SOPollFD;
+
+/* 0x8051FE40 - connect the socket to the address. */
+s32 SOConnect(s32 fd, SOSockAddrIn* addr);
+
+/* 0x8051F110 (GUESS) - the current thread's error word (OSThread +0x30C), or the library's own word when no
+ * thread is running. */
+s32 SOiGetLastError(void);
+/* 0x8051F9D0 */
+s32 SOSocket(s32 domain, s32 type, s32 protocol);
+/* 0x8051FB64 */
+s32 SOListen(s32 fd, s32 backlog);
+/* 0x8051FC18 */
+s32 SOAccept(s32 fd, SOSockAddrIn* address);
+/* 0x8051FD58 */
+s32 SOBind(s32 fd, const SOSockAddrIn* address);
+/* 0x8051FF28 */
+s32 SOGetSockName(s32 fd, SOSockAddrIn* address);
+/* 0x80520024 */
+s32 SOGetPeerName(s32 fd, SOSockAddrIn* address);
+/* 0x80520120 */
+s32 SORecvFrom(s32 fd, u8* buffer, s32 length, s32 flags, SOSockAddrIn* from);
+/* 0x8052016C */
+s32 SOSendTo(s32 fd, const u8* buffer, s32 length, s32 flags, const SOSockAddrIn* to);
+/* 0x805201B8 */
+s32 SOFcntl(s32 fd, s32 command, ...);
+/* 0x8052039C */
+s32 SOPoll(SOPollFD* fds, u32 count, s64 timeout);
+
 #ifdef __cplusplus
 }
 #endif

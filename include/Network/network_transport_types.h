@@ -358,9 +358,12 @@ public:
     /* +0x28 (GUESS: copies another sink's record in - the roster, peer and session address copies dispatch it
        with the source record) */ virtual void copyFrom(const u8* src);
     /* +0x2C (GUESS: offset-derived) */ virtual void slot_2C();
-    /* +0x30 (GUESS: offset-derived) */ virtual void slot_30();
-    /* +0x34 (GUESS: offset-derived) */ virtual void slot_34();
-    /* +0x38 (GUESS: offset-derived) */ virtual void slot_38();
+    /* +0x30 (GUESS: the framed writer scrambles a frame's payload with a random key byte - `size` bytes from `offset`,
+       22 past the frame header) */ virtual void encrypt(u8 key, u16 offset, u16 size);
+    /* +0x34 (GUESS: the reader's inverse, with the key the frame header carries) */
+    virtual void decrypt(u8 key, u16 offset, u16 size);
+    /* +0x38 (GUESS: the frame CRC over the first `size` bytes, stored at +0x12 and compared by the reader's test) */
+    virtual u16 checksum(u16 size);
 
     /* +0x04 */ u8* data_04;         /* the block the stream reads or writes */
     /* +0x08 */ u32 capacity_08;     /* its size */

@@ -2012,12 +2012,30 @@ Network/NetworkCommunityPat.cpp:
 	.sdata      start:0x80793948 end:0x80793950
 	.sdata2     start:0x8079C7A8 end:0x8079C7B8
 
+Network/NetworkFetcherBase.cpp:
+	extab       start:0x8001B780 end:0x8001B790
+	extabindex  start:0x8003B8F8 end:0x8003B910
+	.text       start:0x803F6458 end:0x803F6524
+	.data       start:0x805FC820 end:0x805FC848
+
 Network/NetworkFileFetcher.cpp:
-	extab       start:0x8001B780 end:0x8001B884
-	extabindex  start:0x8003B8F8 end:0x8003BA00
-	.text       start:0x803F6458 end:0x803F7538
-	.data       start:0x805FC820 end:0x805FC920
+	extab       start:0x8001B790 end:0x8001B850
+	extabindex  start:0x8003B910 end:0x8003B9D0
+	.text       start:0x803F6524 end:0x803F73C0
+	.data       start:0x805FC848 end:0x805FC8A8
 	.sdata      start:0x80793950 end:0x80793958
+
+Network/NetworkNullFetcher.cpp:
+	extab       start:0x8001B850 end:0x8001B87C
+	extabindex  start:0x8003B9D0 end:0x8003B9F4
+	.text       start:0x803F73C0 end:0x803F74D8
+	.data       start:0x805FC8A8 end:0x805FC8D0
+
+Network/NetworkSocketBase.cpp:
+	extab       start:0x8001B87C end:0x8001B884
+	extabindex  start:0x8003B9F4 end:0x8003BA00
+	.text       start:0x803F74D8 end:0x803F7538
+	.data       start:0x805FC8D0 end:0x805FC920
 
 Network/NetworkSocketWii.cpp:
 	extab       start:0x8001B884 end:0x8001B918

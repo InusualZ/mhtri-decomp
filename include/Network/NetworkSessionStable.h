@@ -138,14 +138,14 @@ public:
 
 /* ---------------- the slot ------------------------------------------------------------------------ */
 
-/* The small object a slot keeps its peer address in: the writer band's `NetworkSmallObject` with a
-   constructor and a destructor of its own in this unit (the wrapper owns the object at +0x00). */
+/* The record a slot keeps its peer address in: a `NetworkUniqueId` with a constructor and a destructor of its own
+   in this unit (the wrapper owns the object at +0x00). */
 class NetworkSlotSmallObject {
 public:
     NetworkSlotSmallObject();
     ~NetworkSlotSmallObject();
 
-    /* +0x00 */ NetworkSmallObject object_00;
+    /* +0x00 */ NetworkUniqueId object_00;
 };   /* size: 0x20 */
 
 /* One of the session's four slots: a peer's link state, error record, connection, address, queues and the
@@ -256,7 +256,7 @@ public:
     void writeOp2();
     void writeOp6(s8 value);
     void writeOp10(s8 index);
-    void writeOp11(s8 index, const NetworkSmallObject* address, u32 nonce, s8 kind, f32 delay);
+    void writeOp11(s8 index, const NetworkUniqueId* address, u32 nonce, s8 kind, f32 delay);
     void writeOp8or9(u32 hasExtra, s8 index);
     void writeOp3(const NetworkSessionSlot* slot);
     void writeOp5(s8 index);
