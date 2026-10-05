@@ -163,3 +163,13 @@ __all__ += ["TOKEN_RE", "INCLUDE_LINE_RE", "name_detail", "generated_name_kind"]
 from tools.units.stylelint_rules.r07_generated_name import path_detail, path_findings  # noqa: E402,F401
 
 __all__ += ["path_detail", "path_findings"]
+
+# rule 15 (2026-10-05): comment hygiene - the refusing and advisory classes, the address prefix, the tree context
+from tools.units.stylelint_rules.r15_comments import (  # noqa: E402,F401
+    ADDRESS_PREFIX_RE, ADVISORY, REFUSING, address_findings, advisory_findings, function_comments, is_advisory,
+    set_rule15_context, stale_path_findings,
+)
+from tools.units.stylelint_rules.r15_comments import findings as rule15_findings  # noqa: E402,F401
+
+__all__ += ["ADDRESS_PREFIX_RE", "ADVISORY", "REFUSING", "address_findings", "advisory_findings", "function_comments",
+            "is_advisory", "set_rule15_context", "stale_path_findings", "rule15_findings"]

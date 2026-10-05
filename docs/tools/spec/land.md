@@ -46,7 +46,7 @@ Inputs -> outputs: main tree, branch, .pi/land-base.json -> rows, commit.
 3. every changed path belongs to the batch (tool scratch `d<digits>.json`/`t<digits>.json` is tolerated and named), and none
    is added or changed under the retired `include/` root (a deletion or a rename out of it is fine: `common.retired_paths`); no batch file carries a conflict marker (GATE).
 4. every unit's branch carries its work as commits (BOOKKEEPING refusal - the gate's only "the work exists" test); batch units named (or `--no-outbox` for an orchestrator-only batch) (BOOKKEEPING); every unit's outbox validates (`handoff.validate`) - a **WARNING** since 2026-10-05 (`every unit's outbox validates (warning)`, always PASS: each problem is printed as `WARNING: ...`, written as a `warning:` line in the commit body and into the landing log's `warnings`); it is skipped with a printed note for `--branch` naming a branch that is not `worker/<slug>` (only a claim's lane writes an outbox).
-5. style lint (section 6.5) adds no violation (`stylelint --diff <base>`, add-only, with rename/move credits) (GATE).
+5. style lint (section 6.5) adds no violation (`stylelint --diff <base>`, add-only, with rename/move credits; rule 15's advisory classes never count) (GATE).
 6. all tool selftests pass except the parked list (`tools/selftest.py`, ~30 s); `--no-selftests` skips (GATE).
 7. rule 2 registration boundary (a batch registers a range a band header still declares) - a warning row.
 8. *(deleted 2026-10-05)* the `rule 7 deferred` escape-growth row: rule 7 is row 5's (the lint fires on every added

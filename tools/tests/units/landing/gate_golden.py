@@ -1,7 +1,8 @@
 """The gate's table on the `test_gate_golden` scenarios, recorded from the monolithic `land.py` (main at ec8223e66)
 before the WP4 split: `{scenario: {"exit": code, "rows": [[name, status, kind], ...]}}`. Data, not a test. The two
 `new-unit-*` scenarios were recorded 2026-10-05 with the new-unit name row, and the two `layout-*` scenarios (the
-header move: renames out of the retired `include/` root land, a new path there refuses) the same day; every older
+header move: renames out of the retired `include/` root land, a new path there refuses) the same day, and the two `lint-rule15-*`
+scenarios (the style-lint row run by the real lint on a stale path and on advisory markers) the same day; every older
 scenario is unchanged."""
 GOLDEN = {
  "noop-dry-run": {"exit": 0, "rows": [
@@ -295,6 +296,28 @@ GOLDEN = {
    ["every changed path belongs to a batch", "FAIL", "gate"],
    ["no batch file carries a git conflict marker", "PASS", "gate"],
    ["orchestrator-only batch (no worker outboxes to check)", "PASS", "gate"],
+   ["style lint (§6.5) adds no violation", "PASS", "gate"],
+   ["all tool selftests pass (except the parked list)", "PASS", "gate"],
+   ["rule 2 registration boundary (warning)", "PASS", "gate"],
+   ["the gate's own subject follows the convention", "PASS", "gate"]]},
+ "lint-rule15-stale-path-refusal": {"exit": 1, "rows": [
+   ["ground truth (build.sha1 == the DOL's hash)", "PASS", "gate"],
+   ["main has not moved since the batch base", "PASS", "bookkeeping"],
+   ["every changed path belongs to a batch", "PASS", "gate"],
+   ["no batch file carries a git conflict marker", "PASS", "gate"],
+   ["every unit's outbox validates (warning)", "PASS", "bookkeeping"],
+   ["every unit's branch carries its work as commits", "PASS", "bookkeeping"],
+   ["style lint (§6.5) adds no violation", "FAIL", "gate"],
+   ["all tool selftests pass (except the parked list)", "PASS", "gate"],
+   ["rule 2 registration boundary (warning)", "PASS", "gate"],
+   ["the gate's own subject follows the convention", "PASS", "gate"]]},
+ "lint-rule15-advisory-pass": {"exit": 0, "rows": [
+   ["ground truth (build.sha1 == the DOL's hash)", "PASS", "gate"],
+   ["main has not moved since the batch base", "PASS", "bookkeeping"],
+   ["every changed path belongs to a batch", "PASS", "gate"],
+   ["no batch file carries a git conflict marker", "PASS", "gate"],
+   ["every unit's outbox validates (warning)", "PASS", "bookkeeping"],
+   ["every unit's branch carries its work as commits", "PASS", "bookkeeping"],
    ["style lint (§6.5) adds no violation", "PASS", "gate"],
    ["all tool selftests pass (except the parked list)", "PASS", "gate"],
    ["rule 2 registration boundary (warning)", "PASS", "gate"],
