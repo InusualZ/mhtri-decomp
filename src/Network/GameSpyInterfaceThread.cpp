@@ -1247,7 +1247,7 @@ void GameSpyInterfaceThread::startNegotiation(const GameSpyPeerId* a, const Game
 }
 
 /* Reports whether a negotiation is running. */
-u8 GameSpyInterfaceThread::isNegotiating()
+BOOL GameSpyInterfaceThread::isNegotiating()
 {
     return negotiation_446C;
 }

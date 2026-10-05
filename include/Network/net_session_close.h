@@ -94,11 +94,11 @@ s32 net_session_close_start(void);
 
 s32 net_session_close_state_get(void);
 
-/* 0x80437040 - renders a network id as text into `out` (a `%` in the id prints as `*`). */
-void formatNetId(char* out, const NetId* id);
+/* 0x80437040 - renders the unique id `id` as its exported text into `out` (a `%` in the id prints as `*`). */
+void formatNetId(char* out, const NetworkUniqueId* id);
 
-/* 0x804370BC - imports a network id from `src` into `dst`. */
-void importNetId(NetId* dst, const NetId* src);
+/* 0x804370BC - imports the six exported id bytes `src` into the unique id `dst`. */
+void importNetId(NetworkUniqueId* dst, const NetId* src);
 
 /* 0x804344DC.. - the handlers of the actions queued in the work record's action byte (1, 4, 5, 6, 7, 8); each
  * issues one session command and returns 1, or 0 when it could not (no session manager, a busy request). */
@@ -161,7 +161,17 @@ void flushRosterSync(void);
 
 void refreshRosterCache(void);
 
-void startRosterFetch(s32 mode);
+/* 0x80435D1C - publishes the party byte (profile and first presence pair); the result byte takes the outcome. */
+void startRosterFetch(s8* result);
+
+/* 0x80435740 / 0x8043586C / 0x80435934 / 0x804359FC / 0x80435AD4 - refresh one range of this player's profile from
+ * the save and write it to the community layer (command 12); the result byte takes the outcome.  GUESS names from the
+ * range each writes (the head 0..0x7C with the presence pairs, 0x7C.., the rank bytes, the mediator record). */
+void sendProfileHead(s8* result);
+void sendProfileRange7C(s8* result);
+void sendProfileRank(s8* result);
+void sendProfileRecord(s8* result);
+void resendProfileRecord(s8* result);
 
 /* 0x804334B4 / 0x80433518 / 0x8043361C - the session join (command 4): its result (-1 failed, 1 done, 0
  * pending), its completion handler and the request itself; 0x80433814 - whether this player holds a server
@@ -235,8 +245,8 @@ void installCommunityCallback(void);
 void sendBoxPageCheckRequest(u8 code, s32 page);
 void sendCheckRequest(u8 code);
 
-/* 0x804370CC - whether two network ids are equal (1). */
-u32 isSameNetId(const NetId* left, const NetId* right);
+/* 0x804370CC - whether the unique id `left` carries the six exported id bytes `right` (1). */
+u32 isSameNetId(const NetworkUniqueId* left, const NetId* right);
 
 #ifdef __cplusplus
 }

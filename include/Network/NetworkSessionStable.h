@@ -18,26 +18,6 @@
 
 class NetworkSessionStable;
 
-/* ---------------- the writer band's queue of framed messages ----------------------------------- */
-
-/* One 0x18-byte queue of framed messages: the bytes it holds, their capacity and count, the sequence
-   number and the read cursor.  The class is another band's: only its +0x14 slot is called here, so it is
-   declared and never defined, which emits no table.  (GUESS on every name.) */
-class NetworkStreamQueue {
-public:
-    /* +0x08 */ virtual void slot_08();
-    /* +0x0C */ virtual void slot_0C();
-    /* +0x10 */ virtual void slot_10();
-    /* +0x14 (GUESS: binds the queue to the block it stores its messages in) */ virtual void attach(u8* block, u32 capacity);
-
-    /* +0x04 */ u8* data_04;      /* the stored messages */
-    /* +0x08 */ u32 capacity_08;  /* bytes the block holds */
-    /* +0x0C */ u32 used_0C;      /* bytes stored */
-    /* +0x10 */ u16 sequence_10;  /* the sequence number the next message carries */
-    /* +0x12 */ u8 pad_12[0x02];
-    /* +0x14 */ u8* cursor_14;    /* where the reader stands */
-};   /* size: 0x18 */
-
 /* The four queues a slot owns (two send, two receive), built and destroyed by the writer band, and the
    sequence/flush state and send rate that travel with them.  `resetSlot` addresses the trailing words off
    the queues' own base (`stb r30,0x60(r29)` .. `stw r0,0x7C(r29)`), so they are members of this object; the

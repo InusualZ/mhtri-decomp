@@ -69,6 +69,21 @@
  *   `Network/NetworkSessionManager.cpp` already define, so the map cannot carry them twice; our calls reach those copies
  *   by name (a relocation-name difference only).  `.data` cannot match yet: the jump tables and strings of the unwritten
  *   handlers are not emitted, and `vtableaudit` keeps the 0x805FC1E8 run until the whole section does.
+ *
+ * ROUND 4.  The friend table holds real `NetworkUniqueId`s (`NetFriendRec`), and the records with a unique id inside have
+ *   their constructors/destructors declared and defined out of line (`NetFriendRec`, `NetFriendTable`, `NetFriendList`,
+ *   `NetLayerRequest`, `NetCommunityList`, `NetLayerMediationList`, the two notices): MWCC inlines an implicit one (with
+ *   a null check on a member), retail calls them.  `NetFriendRoster` is only the stack payload of `handleUserList`; the
+ *   layer and each community record keep table and sessions as separate members (the destructors call the table's
+ *   destructor without a null check).  Names of the voice/NAT fields and helpers are GUESSES from the bodies, except
+ *   `mVoiceMixed.mSize` (the move warning).  More residuals: `readSelectedServer_88` 96.81 and `readUserRows` 99.14 /
+ *   `handleUserSearch` 99.54 / `pollFriendSlot` 97.56 - the same classes as above (an early return's `bge`+`b` pair; the
+ *   `addis`/`mulli` order of an unrolled remainder; two registers swapped); `downsampleVoice` 98.98 - retail tests the
+ *   count with `cmplwi`+`blelr` (`i != 0` and `i > 0` both give `cmpwi`+`beqlr`); `sendUserFields_5C` 99.55 - two
+ *   registers swapped; `move` 97.22 - the mediator's `popTransferRecord` returns `s32` (retail uses it unextended;
+ *   97.11 -> 97.22, its own row unchanged) and `GameSpyInterfaceThread::isNegotiating` `BOOL` (96.76 -> 97.11), the
+ *   voice-ready byte is compared unextended and stored without `clrlwi` (u8 and u32 spellings each cost one
+ *   instruction; peephole on for `move` is 91.19), and two `pairState_C7F0` reads use `lbzx` off a precomputed row.
  */
 #include "Network/NetworkLayerPat.h"
 #include "Network/NetworkPat.h"
@@ -85,26 +100,32 @@
 #include "MSL/strlen.h"
 #include "Network/PatInterface.h"          /* getErrorInfo654c / buildErrorInfo613c / clearErrorRecord613c - owner Network/PatInterface.cpp */
 
+
 /* The log codes the request reports (0x8006xxxx = the layer's own error range). */
 enum {
     LAYER_ERR_NOT_CONNECTED = 0x80060001,
     LAYER_ERR_BAD_ARGUMENT = 0x80060002,
     LAYER_ERR_CANNOT_START = 0x80060011,
     LAYER_ERR_SERVER = 0x80060012,
-    LAYER_ERR_NO_LAYER = 0x80060032
+    LAYER_ERR_NO_LAYER = 0x80060032,
+    LAYER_ERR_SERVER_REJECTED = 0x80060036   /* GUESS: the selected FMP server's info state reads 5 */
 };
 
 /* The request slots (`NetworkLayer::requests_0C`'s index, also the index of `requestFlags_310`/`requestIds_368`). */
 enum {
     SLOT_CONNECT = 1,        /* `closeSession_1C` -> `handleConnect` */
     SLOT_DISCONNECT = 2,     /* `shutdown_20` -> `handleDisconnect` */
+    SLOT_SERVER_LIST = 3,    /* `requestServers_24` -> `handleServerList` */
+    SLOT_SERVER_SELECT = 4,  /* `selectServer_28` -> `handleServerSelect` */
     SLOT_LAYER_UP = 5,       /* `request_38` -> `stepRequest` */
     SLOT_LAYER_INFO = 7,     /* `request_44` -> `handleLayerInfo` */
     SLOT_CHILD_LIST = 8,     /* `requestCities_48` -> `handleChildList` */
     SLOT_SIBLING_LIST = 9,   /* `request_4C` -> `handleSiblingList` */
+    SLOT_USER_LIST = 10,     /* the user-list reader `readUserRows` */
     SLOT_USER_INFO = 11,         /* `request_58` -> `handleUserInfo` */
     SLOT_CHAT = 12,              /* `sendMessage_64` -> `handleChat` */
     SLOT_DETAIL_SEARCH = 13,     /* `setPageSize_68` -> `handleDetailSearch` */
+    SLOT_USER_SEARCH = 14,       /* `handleUserSearch`'s own search */
     SLOT_LAYER_INFO_BY_ID = 16,  /* `request_74` -> `handleLayerInfoById` */
     SLOT_LAYER_INFO_SET = 17,    /* `request_78` -> `handleLayerInfoSet` */
     SLOT_MEDIATION_LOCK = 18,    /* `request_7C` -> `handleMediationLock` */
@@ -118,17 +139,24 @@ enum {
     EVENT_DISCONNECT = 2,
     EVENT_ERROR = 3,
     EVENT_LAYER_UP = 4,
+    EVENT_FRIEND = 6,
     EVENT_LAYER_INFO = 8,
     EVENT_CHILD_LIST = 9,
     EVENT_SIBLING_LIST = 10,
+    EVENT_USER_LIST = 11,
     EVENT_USER_INFO = 12,
+    EVENT_FRIEND_STATUS = 13,
     EVENT_CHAT = 15,
+    EVENT_SERVER_LIST = 18,
+    EVENT_SERVER_SELECT = 19,
     EVENT_DETAIL_SEARCH = 25,
+    EVENT_USER_SEARCH = 26,
     EVENT_LAYER_INFO_BY_ID = 28,
     EVENT_LAYER_INFO_SET = 29,
     EVENT_MEDIATION_LOCK = 31,
     EVENT_MEDIATION_UNLOCK = 33,
     EVENT_MEDIATION_LIST = 35,
+    EVENT_VOICE = 39,
     EVENT_SESSION_FAILED = 40
 };
 
@@ -152,6 +180,9 @@ enum {
     FLAG_UP_REPLY = 0x200,
     FLAG_CHILD_INFO_REPLY = 0x100000,
     FLAG_USER_LIST_REPLY = 0x400,
+    FLAG_USER_HEAD_REPLY = 0x800,
+    FLAG_USER_DATA_REPLY = 0x1000,
+    FLAG_USER_FOOT_REPLY = 0x2000,
     FLAG_LAYER_START_REPLY = 0x40,
     FLAG_MEDIATION_LOCK_REPLY = 0x40,
     FLAG_MEDIATION_UNLOCK_REPLY = 0x80,
@@ -166,6 +197,11 @@ enum {
     FLAG_SEARCH_DATA_REPLY = 0x2000000,
     FLAG_SEARCH_FOOT_REPLY = 0x4000000,
     FLAG_TELL_REPLY = 0x10000000,
+    FLAG_STATE3_REPLY = 0x8,            /* GUESS on the names of the five server-select bits */
+    FLAG_SHUT_REPLY = 0x10,
+    FLAG_FMP_INFO_REPLY = 0x20,
+    FLAG_LAYER_END_REPLY = 0x80,
+    FLAG_LAYER_JUMP_REPLY = 0x8000000,
     FLAG_LAYER_INFO_SET_REPLY = 0x20000000
 };
 
@@ -311,10 +347,10 @@ s32 NetworkLayerPat::stepRequest(NetworkLayerRequest* request)
 }
 
 /* Copies the server's unique id into `id`. */
-void NetworkLayerPat::readServerId_2C(NetId* id)
+void NetworkLayerPat::readServerId_2C(NetworkUniqueId* id)
 {
     if (id != NULL) {
-        ((NetworkStreamSink*)id)->copyFrom((const u8*)&this->serverId_3DC);
+        id->copyFrom((const u8*)&this->serverId_3DC);
     }
 }
 
@@ -406,7 +442,7 @@ void NetworkLayerPat::submitSelect_A4(NetLayerRequest* request)
 /* The number of communities in the list. */
 s32 NetworkLayerPat::getCommunityCount_A8()
 {
-    return this->communityCount_F1AC;
+    return this->communities_F1AC.count_0x00000;
 }
 
 /* Community `index`'s state byte, 0 out of range. */
@@ -415,7 +451,7 @@ u8 NetworkLayerPat::getCommunityState_AC(s32 index)
     if (index < 0 || index >= getCommunityCount_A8()) {
         return 0;
     }
-    return this->communities_F1B0[index].state_0x0118;
+    return this->communities_F1AC.entries_0x00004[index].state_0x0118;
 }
 
 /* Copies community `index`'s comment (at most `size` - 1 characters, 63 at most) into `out`. */
@@ -429,7 +465,7 @@ void NetworkLayerPat::readCommunityComment_B0(s32 index, char* out, s32 size)
                 size = 64;
             }
             if (size - 1 > 0) {
-                memcpy(out, this->communities_F1B0[index].comment_0x00A0, size - 1);
+                memcpy(out, this->communities_F1AC.entries_0x00004[index].comment_0x00A0, size - 1);
             }
             out[size - 1] = 0;
         }
@@ -442,7 +478,7 @@ u32 NetworkLayerPat::getCommunityValueE0_B4(s32 index)
     if (index < 0 || index >= getCommunityCount_A8()) {
         return 0;
     }
-    return this->communities_F1B0[index].value_0x00E0;
+    return this->communities_F1AC.entries_0x00004[index].value_0x00E0;
 }
 
 /* Community `index`'s +0xE4 word, 0 out of range. */
@@ -451,7 +487,7 @@ u32 NetworkLayerPat::getCommunityValueE4_B8(s32 index)
     if (index < 0 || index >= getCommunityCount_A8()) {
         return 0;
     }
-    return this->communities_F1B0[index].value_0x00E4;
+    return this->communities_F1AC.entries_0x00004[index].value_0x00E4;
 }
 
 /* Community `index`'s +0xE8 word, 0 out of range. */
@@ -460,7 +496,7 @@ u32 NetworkLayerPat::getCommunityValueE8_BC(s32 index)
     if (index < 0 || index >= getCommunityCount_A8()) {
         return 0;
     }
-    return this->communities_F1B0[index].value_0x00E8;
+    return this->communities_F1AC.entries_0x00004[index].value_0x00E8;
 }
 
 /* Copies community `index`'s settings record into `out` (count 0 out of range). */
@@ -470,7 +506,7 @@ void NetworkLayerPat::readCommunitySettings_C0(s32 index, NetLayerSettings* out)
         if (index < 0 || index >= getCommunityCount_A8()) {
             out->count_0x00 = 0;
         } else {
-            memcpy(out, &this->communities_F1B0[index].settingsCount_0x00F4, sizeof(NetLayerSettings));
+            memcpy(out, &this->communities_F1AC.entries_0x00004[index].settingsCount_0x00F4, sizeof(NetLayerSettings));
         }
     }
 }
@@ -482,7 +518,7 @@ void NetworkLayerPat::readCommunityHeader_C4(s32 index, u8* out)
         if (index < 0 || index >= getCommunityCount_A8()) {
             memset(out, 0, 64);
         } else {
-            memcpy(out, this->communities_F1B0[index].header_0x0000, 64);
+            memcpy(out, this->communities_F1AC.entries_0x00004[index].header_0x0000, 64);
         }
     }
 }
@@ -530,7 +566,7 @@ u8 NetworkLayerPat::getFriendFlagC084_EC(s8 slot)
 }
 
 /* Whether friend slot `slot`'s transfer is active, 0 for an empty or invalid slot. */
-u8 NetworkLayerPat::getFriendTransferFlag_F0(s8 slot)
+BOOL NetworkLayerPat::getFriendTransferFlag_F0(s8 slot)
 {
     if ((u8)slot > 99) {
         return 0;
@@ -602,7 +638,7 @@ void NetworkLayerPat::pollLayerSlots()
 
     if (this->memberCount_4C8 >= 0 && this->hostMode_4C4 != 0) {
         for (i = 0; i < 100; i++) {
-            if (this->serverId_3DC.equals(this->friends_3568.entries_0x004[i].address()) == 0) {
+            if (this->serverId_3DC.equals(&this->friends_3568.entries_0x004[i].id_0x00) == 0) {
                 pollFriendSlot(i);
             }
         }
@@ -676,6 +712,743 @@ void NetworkLayerPat::setCollectionLog(NetworkLayerRequest* request, u32 code, u
 }
 
 /* Asks for the layer `depth` levels above this one (the parent itself when `depth` is 1), with fields 1..4. */
+/* Halves `inSize` bytes of samples into `out`: each output sample is the mean of an input pair. */
+s32 NetworkLayerPat::downsampleVoice(s16* out, s32 outSize, const s16* in, s32 inSize)
+{
+    s32 size = inSize / 2;
+    u32 i;
+
+    if (outSize < size) {
+        return 0;
+    }
+    for (i = (u32)size / 2; i > 0; i--) {
+        *out = (in[0] + in[1]) / 2;
+        in += 2;
+        out++;
+    }
+    return size;
+}
+
+/* Mixes `inSize` bytes of a peer's samples into `out` at twice the rate (each input sample adds an interpolated and a
+ * plain output sample), scaled by the mediator's transfer level and clamped to 16 bits. */
+s32 NetworkLayerPat::mixVoice(s16* out, s32 outSize, const s16* in, s32 inSize)
+{
+    s32 level = 2.0f * getInstance()->getTransferLevel();
+    s32 size = inSize * 2;
+    s32 prev;
+    s32 cur;
+    s32 value;
+    u32 i;
+    u32 j;
+
+    if (outSize < size) {
+        return 0;
+    }
+    prev = in[0];
+    for (i = 0, j = 0; i + 1 < (u32)size / 2; i += 2) {
+        cur = in[(s32)j];
+        value = out[0] + level * ((prev + cur) / 2);
+        if (value > 32767) {
+            value = 32767;
+        }
+        if (value < -32768) {
+            value = -32768;
+        }
+        out[0] = value;
+        value = out[1] + cur * level;
+        if (value > 32767) {
+            value = 32767;
+        }
+        if (value < -32768) {
+            value = -32768;
+        }
+        out[1] = value;
+        prev = cur;
+        j++;
+        out += 2;
+    }
+    return size;
+}
+
+/* Runs the layer: the requests, the pending presence, and inside a room the voice transfer and the peers' NAT
+ * negotiation (this console negotiates its own pairs; the host also pairs the other members). */
+void NetworkLayerPat::move()
+{
+    PatTagList tags;
+    s32 mixed;
+    s32 voice;
+    s32 sent;
+    s32 size;
+    s32 i;
+
+    moveRequests();
+    if (this->memberCount_4C8 < 0) {
+        return;
+    }
+    if (this->flag_3D2 != 0 && 1.0f + this->timers_3C4[1] < getNetworkLogger()->getTime_60()) {
+        this->timers_3C4[1] = getNetworkLogger()->getTime_60();
+        buildLayerInfoFields(&tags, &this->presence_450);
+        sendReqUserSearchSet(getInstance_(), &tags);
+        this->flag_3D2 = 0;
+    }
+    if (this->memberCount_4C8 != 2) {
+        return;
+    }
+    if (this->busy_3D1 == 0) {
+        u8 ready = getInstance()->isVoiceReady();
+
+        if (ready != this->friendFlagC084_C084[this->transferSlot_C07C]) {
+            this->friendFlagC084_C084[this->transferSlot_C07C] = ready;
+            for (i = 0; i < 100; i++) {
+                refreshFriendTransfer(i, 0);
+            }
+        }
+        if (getMediatorTermsStatus(getInstance()) != 0 && isMediatorTermsUpdateFinished(getInstance()) != 0) {
+            memset(this->voiceMixed_6EB94.mData, 0, sizeof(this->voiceMixed_6EB94.mData));
+            this->voiceMixed_6EB94.mSize = 0;
+            for (i = 0; i < 100; i++) {
+                if ((s8)i != this->transferSlot_C07C && this->friends_3568.entries_0x004[i].valid_0x35 != 0 &&
+                    isFriendTransferActive_E4(i) != 0 && getFriendTransferFlag_F0(i) != 0) {
+                    size = getInstance()->popTransferRecord(i, (u8*)this->voiceInput_6E5AC, sizeof(this->voiceInput_6E5AC));
+                    if (size > 0) {
+                        mixed = mixVoice(this->voiceMixed_6EB94.mData, sizeof(this->voiceMixed_6EB94.mData),
+                                         this->voiceInput_6E5AC, size);
+                        if (this->voiceMixed_6EB94.mSize < mixed) {
+                            this->voiceMixed_6EB94.mSize = mixed;
+                        }
+                    }
+                }
+            }
+            voice = getInstance()->readVoice((u8*)this->voiceInput_6E5AC, 528);
+            if (getInstance()->isVoiceSilent(this->voiceInput_6E5AC, voice) != 0) {
+                voice = 0;
+            }
+            size = this->voiceMixed_6EB94.mSize;
+            if (size == 528) {
+                if (voice > 0 && getPatTerms() != NULL) {
+                    suppressPatTermsEcho(getPatTerms(), (const u8*)this->voiceInput_6E5AC, (u8*)this->voiceMixed_6EB94.mData,
+                                        528);
+                }
+                notifyLayerEvent(EVENT_VOICE, 0, 1, (NetworkRequestError*)&this->voiceMixed_6EB94, this->context_08);
+            } else if (size != 0) {
+                getNetworkLogger()->warn_10("NetworkLayerPat::move mVoiceMixed.mSize is invalid. %d\n", size);
+            }
+            sent = 0;
+            if (voice > 0) {
+                sent = downsampleVoice(this->voiceSend_6E8A0, sizeof(this->voiceSend_6E8A0), this->voiceInput_6E5AC, voice);
+            }
+            if (sent > 0 && getNetworkSessionManagerPat(getPatsObject(), 0) != NULL) {
+                for (i = 0; i < 100; i++) {
+                    if ((s8)i != this->transferSlot_C07C && this->friends_3568.entries_0x004[i].valid_0x35 != 0 &&
+                        isFriendTransferActive_E4(i) != 0 && getFriendTransferFlag_F0(i) != 0) {
+                        getNetworkSessionManagerPat(getPatsObject(), 0)->post((const u8*)this->voiceSend_6E8A0, sent, 0,
+                                                                              this->friendSession_EF00[(s8)i]);
+                    }
+                }
+            }
+        }
+        this->timers_3C4[2] = getNetworkLogger()->getTime_60();
+    }
+    if (this->transferSlot_C07C >= 0) {
+        for (i = 0; i < 100; i++) {
+            if (i != this->transferSlot_C07C && this->friends_3568.entries_0x004[i].valid_0x35 != 0 &&
+                this->friendPeers_C1B0[i].peerId_00 != 0 && this->pairState_C7F0[this->transferSlot_C07C][i] == 1 &&
+                GameSpyInterfaceThread::getInstance() != NULL &&
+                (s8)GameSpyInterfaceThread::getInstance()->getSlotState(this->friendPeers_C1B0[i].peerId_00) <= 0) {
+                this->pairState_C7F0[this->transferSlot_C07C][i] = 4;
+                this->pairState_C7F0[i][this->transferSlot_C07C] = 4;
+                sendPairState(this->friendPeers_C1B0[this->transferSlot_C07C].peerId_00, this->friendPeers_C1B0[i].peerId_00, 4);
+            }
+        }
+        if (this->negotiateTo_43C != 0) {
+            if (this->negotiated_440 == 0 &&
+                this->negotiateTo_43C == this->friendPeers_C1B0[this->transferSlot_C07C].peerId_00 &&
+                GameSpyInterfaceThread::getInstance() != NULL &&
+                GameSpyInterfaceThread::getInstance()->isNegotiating() == 0) {
+                s8 slot = findFriendByPeerId(this->negotiateFrom_438);
+
+                if (slot >= 0 && this->transferSlot_C07C >= 0) {
+                    this->pairState_C7F0[slot][this->transferSlot_C07C] =
+                        GameSpyInterfaceThread::getInstance()->getNegotiationResult();
+                    this->pairState_C7F0[this->transferSlot_C07C][slot] =
+                        GameSpyInterfaceThread::getInstance()->getNegotiationResult();
+                    sendPairState(this->negotiateFrom_438, this->negotiateTo_43C,
+                                  GameSpyInterfaceThread::getInstance()->getNegotiationResult());
+                    this->negotiated_440 = 1;
+                } else {
+                    sendPairState(this->negotiateFrom_438, this->negotiateTo_43C, 3);
+                    this->negotiateFrom_438 = 0;
+                    this->negotiateTo_43C = 0;
+                }
+            }
+        } else if (this->negotiateFrom_438 != 0 &&
+                   this->negotiateFrom_438 == this->friendPeers_C1B0[this->transferSlot_C07C].peerId_00 &&
+                   GameSpyInterfaceThread::getInstance() != NULL &&
+                   GameSpyInterfaceThread::getInstance()->isNegotiating() == 0) {
+            sendPairState(this->negotiateFrom_438, this->negotiateTo_43C, 3);
+            this->negotiateFrom_438 = 0;
+            this->negotiateTo_43C = 0;
+        }
+    }
+    if (this->transferSlot_C07C == this->sessionState_C080 && this->memberUsed_F02C >= 2 &&
+        (this->negotiated_440 != 0 || (this->negotiateTo_43C == 0 && this->negotiateFrom_438 == 0)) &&
+        GameSpyInterfaceThread::getInstance() != NULL && GameSpyInterfaceThread::getInstance()->getPhase() == 1) {
+        s8 a;
+        s8 b;
+
+        for (a = 0; a < 100; a++) {
+            if (a != this->transferSlot_C07C && this->friends_3568.entries_0x004[a].valid_0x35 != 0 &&
+                this->friendPeers_C1B0[a].peerId_00 != 0 &&
+                (this->pairState_C7F0[this->transferSlot_C07C][a] == 0 ||
+                 this->pairState_C7F0[this->transferSlot_C07C][a] == 4)) {
+                GameSpyPeerId* peer = &this->friendPeers_C1B0[a];
+
+                sendPairState(this->friendPeers_C1B0[this->transferSlot_C07C].peerId_00, peer->peerId_00, 2);
+                this->negotiateFrom_438 = this->friendPeers_C1B0[this->transferSlot_C07C].peerId_00;
+                this->negotiateTo_43C = peer->peerId_00;
+                this->negotiated_440 = 0;
+                GameSpyInterfaceThread::getInstance()->startNegotiation(&this->friendPeers_C1B0[this->transferSlot_C07C],
+                                                                       peer);
+                break;
+            }
+        }
+        if (this->negotiateTo_43C == 0 && this->negotiateFrom_438 == 0) {
+            for (a = 0; a < 99; a++) {
+                if (a != this->transferSlot_C07C && this->friends_3568.entries_0x004[a].valid_0x35 != 0 &&
+                    this->friendPeers_C1B0[a].peerId_00 != 0) {
+                    for (b = a + 1; b < 100; b++) {
+                        if (b != this->transferSlot_C07C && this->friends_3568.entries_0x004[b].valid_0x35 != 0 &&
+                            this->friendPeers_C1B0[b].peerId_00 != 0 &&
+                            (this->pairState_C7F0[a][b] == 0 || this->pairState_C7F0[a][b] == 4)) {
+                            sendPairState(this->friendPeers_C1B0[a].peerId_00, this->friendPeers_C1B0[b].peerId_00, 2);
+                            this->negotiateFrom_438 = this->friendPeers_C1B0[a].peerId_00;
+                            this->negotiateTo_43C = this->friendPeers_C1B0[b].peerId_00;
+                            this->negotiated_440 = 0;
+                            break;
+                        }
+                    }
+                    if (this->negotiateTo_43C != 0 || this->negotiateFrom_438 != 0) {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/* Sends this console's user fields to the layer as an item list (item 64 first; at most 64 fields, each by kind). */
+void NetworkLayerPat::sendUserFields_5C(NetUserFields* fields)
+{
+    PatItemList list;
+    u32 reserved;
+    u8 flag = 1;
+    u8 i;
+
+    if (this->memberCount_4C8 >= 0 && this->memberUsed_F02C > 1 && fields != NULL) {
+        createItemListStack(getInstance_(), &list, &reserved);
+        appendItemList(getInstance_(), &list, 64, 1, &flag, 0);
+        if (fields->count_000 > 64) {
+            fields->count_000 = 64;
+        }
+        for (i = 0; i < fields->count_000; i++) {
+            switch (fields->fields_008[i].kind_00) {
+            case 1:
+                appendItemList(getInstance_(), &list, i, 1, (const u8*)&fields->fields_008[i].data_08, 0);
+                break;
+            case 2:
+                appendItemList(getInstance_(), &list, i, 2, (const u8*)&fields->fields_008[i].data_08, 0);
+                break;
+            case 3:
+                appendItemList(getInstance_(), &list, i, 3, (const u8*)&fields->fields_008[i].data_08, 0);
+                break;
+            case 4:
+                appendItemList(getInstance_(), &list, i, 4, (const u8*)&fields->fields_008[i].data_08, 0);
+                break;
+            case 5:
+                appendItemList(getInstance_(), &list, i, 5, (const u8*)&fields->fields_008[i].data_08, 0);
+                break;
+            case 6:
+                appendItemList(getInstance_(), &list, i, 6, (const u8*)&fields->fields_008[i].data_08, 0);
+                break;
+            case 7:
+                appendItemList(getInstance_(), &list, i, 7, (const u8*)&fields->fields_008[i].data_08, 0);
+                break;
+            case 8:
+                appendItemList(getInstance_(), &list, i, 8, fields->fields_008[i].data_08, 0);
+                break;
+            case 9:
+                appendItemList(getInstance_(), &list, i, 9, fields->fields_008[i].data_08, fields->fields_008[i].size_0C);
+                break;
+            default:
+                appendItemList(getInstance_(), &list, i, 0, NULL, 0);
+                break;
+            }
+        }
+        sendNtcLayerBinary(getInstance_(), list);
+        releaseItemListStack(getInstance_(), &list, reserved);
+    }
+}
+
+/* Reports friend slot `index` to the layer's callback (as the host only): its record and detail, then its status
+ * when it has one. */
+void NetworkLayerPat::pollFriendSlot(u32 index)
+{
+    NetFriendNotice notice;
+    NetFriendStatusNotice status;
+
+    if (this->memberCount_4C8 < 0) {
+        return;
+    }
+    if (this->hostMode_4C4 != 0) {
+        if (this->friends_3568.entries_0x004[index].valid_0x35 == 0) {
+            return;
+        }
+        copyNetFriendRec(&notice.rec_000, &this->friends_3568.entries_0x004[index]);
+        memcpy(&notice.detail_038, &this->details_595C[index], sizeof(NetFriendDetail));
+        notifyLayerEvent(EVENT_FRIEND, 0, 1, (NetworkRequestError*)&notice, this->context_08);
+        if (this->friendStatus_BEEC[index] != 0) {
+            status.id_00.copyFrom((const u8*)&this->friends_3568.entries_0x004[index].id_0x00);
+            status.status_20 = this->friendStatus_BEEC[index];
+            notifyLayerEvent(EVENT_FRIEND_STATUS, 0, 1, (NetworkRequestError*)&status, this->context_08);
+        }
+    }
+}
+
+/* Builds the notice's friend record. */
+NetFriendNotice::NetFriendNotice()
+{
+}
+
+/* Destroys the notice's friend record. */
+NetFriendNotice::~NetFriendNotice()
+{
+}
+
+/* Builds the notice's unique id. */
+NetFriendStatusNotice::NetFriendStatusNotice()
+{
+}
+
+/* Destroys the notice's unique id. */
+NetFriendStatusNotice::~NetFriendStatusNotice()
+{
+}
+
+/* Takes the presence pairs `move` sends: a copy when none is pending, else the enabled pairs merged into the pending
+ * record (its count grown to the new one, at most 4). */
+void NetworkLayerPat::setPresence_A0(const NetLayerSettings* presence)
+{
+    u32 i;
+
+    if (presence != NULL) {
+        if (this->flag_3D2 != 0) {
+            if ((u32)this->presence_450.count_0x00 < (u32)presence->count_0x00) {
+                this->presence_450.count_0x00 = presence->count_0x00;
+            }
+            if ((u32)this->presence_450.count_0x00 > 4) {
+                this->presence_450.count_0x00 = 4;
+            }
+            for (i = 0; i < (u32)this->presence_450.count_0x00; i++) {
+                if (presence->pairs_0x04[i].enabled_0x0 != 0) {
+                    memcpy(&this->presence_450.pairs_0x04[i], &presence->pairs_0x04[i], sizeof(NetLayerSettingPair));
+                }
+            }
+        } else {
+            memcpy(&this->presence_450, presence, sizeof(NetLayerSettings));
+            this->flag_3D2 = 1;
+        }
+    }
+}
+
+/* The valid friend slot whose GameSpy peer id is `peerId`, -1 when none is. */
+s8 NetworkLayerPat::findFriendByPeerId(u32 peerId)
+{
+    s8 i;
+
+    if (peerId != 0) {
+        for (i = 0; i < 100; i++) {
+            if (this->friends_3568.entries_0x004[i].valid_0x35 != 0 && peerId == this->friendPeers_C1B0[i].peerId_00) {
+                return i;
+            }
+        }
+    }
+    return -1;
+}
+
+/* Reports the negotiation state of a peer pair to the layer. */
+void NetworkLayerPat::sendPairState(u32 from, u32 to, s8 state)
+{
+    if (from != to) {
+        sendNtcLayerBinaryNatState(getInstance_(), from, to, state);
+    }
+}
+
+/* Selects server `server`: leaves the current layer and server when it is another one, connects to the new one and
+ * enters its top layer (as the host it also reads the user list), or only re-enters the layer when it is the same. */
+s32 NetworkLayerPat::handleServerSelect(NetworkLayerRequest* request)
+{
+    NetworkRequestError error;
+    NetLayerAddress address;
+    u32 server = request->getArgument(0);
+    s32 slot;
+    s32 result;
+
+    switch (request->state_00) {
+    case STEP_START:
+        if (this->connected_3D0 == 0) {
+            setCollectionLog(request, LAYER_ERR_NOT_CONNECTED, 0, 0);
+            request->state_00 = STEP_CANCELLED;
+            break;
+        }
+        if (this->pendingRequestId_F19C >= 0) {
+            setCollectionLog(request, LAYER_ERR_CANNOT_START, 0, 0);
+            request->state_00 = STEP_CANCELLED;
+            break;
+        }
+        slot = getFmpSlotIndex(getInstance_(), server);
+        if (slot < 0) {
+            setCollectionLog(request, LAYER_ERR_BAD_ARGUMENT, 0, server);
+            request->state_00 = STEP_CANCELLED;
+            break;
+        }
+        if (server == getFmpSelected(getInstance_())) {
+            if (this->memberCount_4C8 < 0) {
+                request->state_00 = 50;
+            } else if (this->memberCount_4C8 > 0) {
+                request->state_00 = 60;
+            } else {
+                request->state_00 = 70;
+            }
+            break;
+        }
+        saveFmpSelection(getInstance_());
+        chooseServerAddress(getInstance_(), 1, slot);
+        this->requestFlags_310[SLOT_SERVER_SELECT] = 0;
+        sendReqFmpInfo(getInstance_(), server, 1);
+        request->state_00 = 5;
+        break;
+    case 5:
+        if (this->requestFlags_310[SLOT_SERVER_SELECT] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_SERVER_SELECT] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            request->state_00 = STEP_CANCELLED;
+        } else if (this->requestFlags_310[SLOT_SERVER_SELECT] & FLAG_FMP_INFO_REPLY) {
+            request->state_00 = 10;
+        }
+        break;
+    case 10:
+        if ((u8)getNetworkBinaryState(getInstance_()) == 0) {
+            request->state_00 = 30;
+        } else if (this->memberCount_4C8 < 0) {
+            request->state_00 = 20;
+        } else {
+            resetLayerState();
+            this->requestFlags_310[SLOT_SERVER_SELECT] = 0;
+            sendReqLayerEnd(getInstance_());
+            request->state_00 = 15;
+        }
+        break;
+    case 15:
+        if (this->requestFlags_310[SLOT_SERVER_SELECT] & FLAG_SESSION_LOST) {
+            request->state_00 = 30;
+        } else if ((this->requestFlags_310[SLOT_SERVER_SELECT] & FLAG_CANCELLED) ||
+                   (this->requestFlags_310[SLOT_SERVER_SELECT] & FLAG_LAYER_END_REPLY)) {
+            request->state_00 = 20;
+        }
+        break;
+    case 20:
+        this->requestFlags_310[SLOT_SERVER_SELECT] = 0;
+        sendReqShut(getInstance_(), 2);
+        request->state_00 = 25;
+        break;
+    case 25:
+        if ((this->requestFlags_310[SLOT_SERVER_SELECT] & FLAG_SESSION_LOST) ||
+            (this->requestFlags_310[SLOT_SERVER_SELECT] & FLAG_CANCELLED) ||
+            (this->requestFlags_310[SLOT_SERVER_SELECT] & FLAG_SHUT_REPLY)) {
+            request->state_00 = 30;
+        }
+        break;
+    case 30:
+        this->requestFlags_310[SLOT_SERVER_SELECT] = 0;
+        resetNetworkState3(getInstance_());
+        request->state_00 = 35;
+        break;
+    case 35:
+        if (this->requestFlags_310[SLOT_SERVER_SELECT] & FLAG_STATE3_REPLY) {
+            request->state_00 = 40;
+        }
+        break;
+    case 40:
+        setConnectServerType(getInstance_(), 1);
+        this->requestFlags_310[SLOT_SERVER_SELECT] = 0;
+        resetNetworkState(getInstance_());
+        request->state_00 = 45;
+        break;
+    case 45:
+        if (this->requestFlags_310[SLOT_SERVER_SELECT] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_SERVER_SELECT] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            request->state_00 = STEP_FAILED;
+        } else {
+            result = handleNetworkState2Binary(getInstance_());
+            if (result < 0) {
+                setCollectionLog(request, LAYER_ERR_SERVER, 110, result);
+                request->state_00 = STEP_FAILED;
+            } else if (result > 0) {
+                if (server != getFmpSelected(getInstance_())) {
+                    if (isFmpServerRejected(getInstance_()) != 0) {
+                        setCollectionLog(request, LAYER_ERR_SERVER_REJECTED, 0, 0);
+                    } else {
+                        setCollectionLog(request, LAYER_ERR_SERVER, 110, 0);
+                    }
+                }
+                request->state_00 = 50;
+            }
+        }
+        break;
+    case 50:
+        this->requestFlags_310[SLOT_SERVER_SELECT] = 0;
+        sendReqLayerStart(getInstance_());
+        request->state_00 = 55;
+        break;
+    case 55:
+        if (this->requestFlags_310[SLOT_SERVER_SELECT] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_SERVER_SELECT] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_SERVER_SELECT] & FLAG_LAYER_START_REPLY) {
+            if (this->hostMode_4C4 != 0) {
+                request->state_00 = 80;
+            } else {
+                request->state_00 = 90;
+            }
+        }
+        break;
+    case 60:
+        address.id_00 = this->address_474.id_00;
+        address.id_04 = this->address_474.id_04;
+        memset(address.path_08, 0, 6);
+        address.path_08[0] = 1;
+        this->requestFlags_310[SLOT_SERVER_SELECT] = 0;
+        sendReqLayerJump(getInstance_(), (const u8*)&address, 0);
+        request->state_00 = 65;
+        break;
+    case 65:
+        if (this->requestFlags_310[SLOT_SERVER_SELECT] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_SERVER_SELECT] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            request->state_00 = 70;
+        } else if (this->requestFlags_310[SLOT_SERVER_SELECT] & FLAG_LAYER_JUMP_REPLY) {
+            memset(this->address_474.path_08, 0, 6);
+            this->address_474.path_08[0] = 1;
+            this->memberCount_4C8 = 0;
+            request->state_00 = 70;
+        }
+        break;
+    case 70:
+        this->requestFlags_310[SLOT_SERVER_SELECT] = 0;
+        sendReqLayerChildInfo(getInstance_(), -1, 0);
+        request->state_00 = 75;
+        break;
+    case 75:
+        if (this->requestFlags_310[SLOT_SERVER_SELECT] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_SERVER_SELECT] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_SERVER_SELECT] & FLAG_CHILD_INFO_REPLY) {
+            if (this->hostMode_4C4 != 0) {
+                request->state_00 = 80;
+            } else {
+                request->state_00 = 90;
+            }
+        }
+        break;
+    case 80:
+        this->requestFlags_310[SLOT_SERVER_SELECT] = 0;
+        sendReqLayerUserList(getInstance_());
+        request->state_00 = 85;
+        break;
+    case 85:
+        if (this->requestFlags_310[SLOT_SERVER_SELECT] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_SERVER_SELECT] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_SERVER_SELECT] & FLAG_USER_LIST_REPLY) {
+            request->state_00 = 90;
+        }
+        break;
+    case 90:
+        memset(&error, 0, sizeof(error));
+        request->getRecord(&error);
+        if (error.code_00 != 0) {
+            request->state_00 = STEP_CANCELLED;
+            break;
+        }
+        this->busy_3D1 = 0;
+        notifyLayerEvent(EVENT_SERVER_SELECT, 0, 0, NULL, this->context_08);
+        pollLayerSlots();
+        notifyLayerSlotSummary();
+        return 1;
+    case STEP_CANCELLED:
+        this->busy_3D1 = 0;
+        request->getRecord(&error);
+        notifyLayerEvent(EVENT_SERVER_SELECT, error.code_00, 1, &error, this->context_08);
+        pollLayerSlots();
+        notifyLayerSlotSummary();
+        return 1;
+    case STEP_FAILED:
+        this->busy_3D1 = 0;
+        request->getRecord(&error);
+        notifyLayerEvent(EVENT_SERVER_SELECT, error.code_00, 1, &error, this->context_08);
+        notifyLayerEvent(EVENT_ERROR, error.code_00, 1, &error, this->context_08);
+        return 1;
+    }
+    return 0;
+}
+
+/* Reads the server list (the FMP slots) and reports up to `count` servers; with a server already selected it skips the
+ * query. */
+s32 NetworkLayerPat::handleServerList(NetworkLayerRequest* request)
+{
+    NetServerList list;
+    NetworkFmpSlot slot;
+    NetworkRequestError error;
+    s32 kind;
+    s32 index;
+    s32 count = request->getArgument(0);
+    s32 result;
+    s32 i;
+
+    if (count > 80) {
+        count = 80;
+    }
+    if (this->memberCount_4C8 < 0) {
+        setCollectionLog(request, LAYER_ERR_NO_LAYER, 0, 0);
+        request->state_00 = STEP_CANCELLED;
+    }
+    switch (request->state_00) {
+    case STEP_START:
+        if (this->connected_3D0 == 0) {
+            setCollectionLog(request, LAYER_ERR_NOT_CONNECTED, 0, 0);
+            request->state_00 = STEP_CANCELLED;
+            break;
+        }
+        if (count <= 0) {
+            setCollectionLog(request, LAYER_ERR_BAD_ARGUMENT, 0, 0);
+            request->state_00 = STEP_CANCELLED;
+            break;
+        }
+        request->state_00++;
+    case 1:
+        if (testAndSet611b(getInstance_()) == 0) {
+            getFmpSelection(getInstance_(), &kind, &index);
+            switch (kind) {
+            case 0:
+                request->state_00 = 20;
+                break;
+            case 1:
+                request->state_00 = 10;
+                break;
+            default:
+                setCollectionLog(request, LAYER_ERR_CANNOT_START, 0, 0);
+                request->state_00 = STEP_CANCELLED;
+                break;
+            }
+        }
+        break;
+    case 10:
+        this->requestFlags_310[SLOT_SERVER_LIST] = 0;
+        resetNetworkState4(getInstance_());
+        request->state_00 = 15;
+        break;
+    case 15:
+        if (this->requestFlags_310[SLOT_SERVER_LIST] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_SERVER_LIST] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            request->state_00 = STEP_CANCELLED;
+        } else {
+            result = handleNetworkState4(getInstance_(), count);
+            if (result < 0) {
+                setCollectionLog(request, LAYER_ERR_SERVER, 113, result);
+                request->state_00 = STEP_CANCELLED;
+            } else if (result > 0) {
+                request->state_00 = 20;
+            }
+        }
+        break;
+    case 20:
+        set611b(getInstance_());
+        list.count_000 = ((u32)count < getFmpSize(getInstance_())) ? count : getFmpSize(getInstance_());
+        for (i = 0; i < list.count_000; i++) {
+            copyFmpSlot(getInstance_(), &slot, i);
+            exportServerRec(&list.entries_008[i], &slot);
+        }
+        notifyLayerEvent(EVENT_SERVER_LIST, 0, 1, (NetworkRequestError*)&list, this->context_08);
+        return 1;
+    case STEP_CANCELLED:
+        request->getRecord(&error);
+        if (error.code_00 != LAYER_ERR_NOT_CONNECTED && error.code_00 != LAYER_ERR_BAD_ARGUMENT) {
+            set611b(getInstance_());
+        }
+        notifyLayerEvent(EVENT_SERVER_LIST, error.code_00, 1, &error, this->context_08);
+        return 1;
+    case STEP_FAILED:
+        request->getRecord(&error);
+        set611b(getInstance_());
+        notifyLayerEvent(EVENT_SERVER_LIST, error.code_00, 1, &error, this->context_08);
+        notifyLayerEvent(EVENT_ERROR, error.code_00, 1, &error, this->context_08);
+        return 1;
+    }
+    return 0;
+}
+
+/* Copies the selected server (an FMP slot) into `out` when one is selected. */
+void NetworkLayerPat::readSelectedServer_88(NetServerRec* out)
+{
+    NetworkFmpSlot slot;
+    s32 kind;
+    s32 index;
+
+    if (out != NULL) {
+        getFmpSelection(getInstance_(), &kind, &index);
+        if (kind == 1) {
+            if (index < 0) {
+                return;
+            }
+            copyFmpSlot(getInstance_(), &slot, index);
+            exportServerRec(out, &slot);
+        }
+    }
+}
+
+/* Copies an FMP slot into a server record: id, name, text, the three words and the time. */
+void NetworkLayerPat::exportServerRec(NetServerRec* out, const NetworkFmpSlot* slot)
+{
+    out->id_00 = slot->payload_00;
+    memcpy(out->name_04, slot->name_18, sizeof(out->name_04) - 1);
+    out->name_04[sizeof(out->name_04) - 1] = 0;
+    memcpy(out->text_24, slot->text_38, sizeof(out->text_24) - 1);
+    out->text_24[sizeof(out->text_24) - 1] = 0;
+    out->done_28 = slot->done_10;
+    out->total_2C = slot->total_14;
+    out->value_30 = slot->value_3C;
+    out->time_38 = slot->time_08;
+}
+
 s32 NetworkLayerPat::handleLayerInfo(NetworkLayerRequest* request)
 {
     PatTagList fields;
@@ -1324,6 +2097,483 @@ s32 NetworkLayerPat::handleSiblingList(NetworkLayerRequest* request)
 }
 
 /* Packs the enabled settings pairs (at most four, `max` fields) as numbered info fields; the field count. */
+/* Builds the record's unique id. */
+NetFriendRec::NetFriendRec()
+{
+}
+
+/* Destroys the record's unique id. */
+NetFriendRec::~NetFriendRec()
+{
+}
+
+/* Builds the 100 friend records. */
+NetFriendTable::NetFriendTable()
+{
+}
+
+/* Destroys the 100 friend records. */
+NetFriendTable::~NetFriendTable()
+{
+}
+
+/* Builds the 100 friend-list entries. */
+NetFriendList::NetFriendList()
+{
+}
+
+/* Destroys the 100 friend-list entries. */
+NetFriendList::~NetFriendList()
+{
+}
+
+/* Builds the request record's unique id. */
+NetLayerRequest::NetLayerRequest()
+{
+}
+
+/* Destroys the request record's unique id. */
+NetLayerRequest::~NetLayerRequest()
+{
+}
+
+/* Builds the 40 community records. */
+NetCommunityList::NetCommunityList()
+{
+}
+
+/* Destroys the 40 community records. */
+NetCommunityList::~NetCommunityList()
+{
+}
+
+/* Builds the 32 mediation entries. */
+NetLayerMediationList::NetLayerMediationList()
+{
+}
+
+/* Destroys the 32 mediation entries. */
+NetLayerMediationList::~NetLayerMediationList()
+{
+}
+
+/* Builds the layer: the base, the members, the Pat interface when there is none yet, then a cleared state. */
+NetworkLayerPat::NetworkLayerPat()
+{
+    if (getInstance_() == NULL) {
+        new PatInterface();
+    }
+    clear();
+}
+
+/* Releases the layer before its members and the base are destroyed. */
+NetworkLayerPat::~NetworkLayerPat()
+{
+    release();
+}
+
+/* Reads the user list of this layer (`mode` 0) or of the child `depth` below it (`mode` 1) and reports it split into
+ * the friend records and their session records. */
+s32 NetworkLayerPat::handleUserList(NetworkLayerRequest* request)
+{
+    NetworkRequestError error;
+    NetLayerAddress address;
+    s32 mode = request->getArgument(0);
+    s32 count = request->getArgument(1);
+    s32 depth = -1;
+    s32 result;
+
+    if (mode == 1) {
+        depth = request->getArgument(2);
+    }
+    switch (request->state_00) {
+    case STEP_START:
+        if (this->connected_3D0 == 0) {
+            setCollectionLog(request, LAYER_ERR_NOT_CONNECTED, 0, 0);
+            request->state_00 = STEP_CANCELLED;
+            break;
+        }
+        if (count <= 0) {
+            setCollectionLog(request, LAYER_ERR_BAD_ARGUMENT, 0, 0);
+            request->state_00 = STEP_CANCELLED;
+            break;
+        }
+        if (mode == 1) {
+            if (depth < 0) {
+                setCollectionLog(request, LAYER_ERR_BAD_ARGUMENT, 0, 0);
+                request->state_00 = STEP_CANCELLED;
+                break;
+            }
+            if (this->memberCount_4C8 < 0 || this->memberCount_4C8 + 1 >= 3) {
+                setCollectionLog(request, LAYER_ERR_CANNOT_START, 0, 0);
+                request->state_00 = STEP_CANCELLED;
+                break;
+            }
+        }
+        request->state_00++;
+    case 1:
+        if (testAndSet611b(getInstance_()) == 0) {
+            if (mode == 1) {
+                address.id_00 = this->address_474.id_00;
+                address.id_04 = this->address_474.id_04;
+                memcpy(address.path_08, this->address_474.path_08, 6);
+                address.path_08[this->memberCount_4C8 + 1] = depth + 1;
+                clearListPending0();
+                readUserList(&address, 0, 1, count, request);
+                request->state_00++;
+            } else {
+                clearListPending0();
+                readUserList(&this->address_474, 0, 1, count, request);
+                request->state_00++;
+            }
+        }
+        break;
+    case 2:
+        result = readUserList(NULL, 0, 1, count, request);
+        if (result == -1) {
+            request->state_00 = STEP_FAILED;
+        } else if (result < 0) {
+            request->state_00 = STEP_CANCELLED;
+        } else if (result > 0) {
+            request->state_00++;
+        }
+        break;
+    case 3: {
+        NetFriendRoster roster;
+        NetFriendRoster* list;
+        s32 i;
+        s32 j;
+
+        set611b(getInstance_());
+        list = &roster;
+        for (i = 0; i < 100; i++) {
+            clearFriendRec(&roster.table_0000.entries_0x004[i]);
+        }
+        list->table_0000.count_0x000 =
+            (this->friendList_6BC30.count_0x00 < 100) ? this->friendList_6BC30.count_0x00 : 100;
+        for (j = 0; j < list->table_0000.count_0x000; j++) {
+            copyNetFriendRec(&list->table_0000.entries_0x004[j], &this->friendList_6BC30.entries_0x04[j].rec_00);
+            memcpy(&list->sessions_15E4[j], &this->friendList_6BC30.entries_0x04[j].session_38,
+                   sizeof(NetFriendSession));
+        }
+        notifyLayerEvent(EVENT_USER_LIST, 0, 1, (NetworkRequestError*)list, this->context_08);
+        return 1;
+    }
+    case STEP_CANCELLED:
+        request->getRecord(&error);
+        if (error.code_00 != LAYER_ERR_NOT_CONNECTED && error.code_00 != LAYER_ERR_BAD_ARGUMENT &&
+            error.code_00 != LAYER_ERR_CANNOT_START) {
+            set611b(getInstance_());
+        }
+        notifyLayerEvent(EVENT_USER_LIST, error.code_00, 1, &error, this->context_08);
+        return 1;
+    case STEP_FAILED:
+        request->getRecord(&error);
+        set611b(getInstance_());
+        notifyLayerEvent(EVENT_USER_LIST, error.code_00, 1, &error, this->context_08);
+        notifyLayerEvent(EVENT_ERROR, error.code_00, 1, &error, this->context_08);
+        return 1;
+    }
+    return 0;
+}
+
+/* Searches users by the select record's id, text and filters: over this layer's tree (`scope` 4/8: this layer or its
+ * parent; 2/20: the whole server) through the user-list reader, or with the plain user search (`scope` 1). */
+s32 NetworkLayerPat::handleUserSearch(NetworkLayerRequest* request)
+{
+    NetLayerFilter filters[4];
+    char name[0x20];
+    NetworkRequestError error;
+    NetLayerAddress address;
+    char userId[8];
+    s32 count = request->getArgument(0);
+    s32 scope = request->getArgument(1);
+    s32 kind;
+    s32 filterCount;
+    s32 first;
+    s32 batch;
+    s32 result;
+
+    switch (request->state_00) {
+    case STEP_START:
+        if (this->connected_3D0 == 0) {
+            setCollectionLog(request, LAYER_ERR_NOT_CONNECTED, 0, 0);
+            request->state_00 = STEP_CANCELLED;
+            break;
+        }
+        request->state_00++;
+    case 1:
+        if (testAndSet611b(getInstance_()) != 0) {
+            break;
+        }
+        if (count <= 0) {
+            setCollectionLog(request, LAYER_ERR_BAD_ARGUMENT, 0, 0);
+            request->state_00 = STEP_CANCELLED;
+            break;
+        }
+        memcpy(&address, &this->address_474, sizeof(address));
+        switch (scope) {
+        case 1:
+            kind = 0;
+            break;
+        case 4:
+            kind = 1;
+            break;
+        case 8:
+            if (this->memberCount_4C8 <= 0) {
+                kind = -1;
+            } else {
+                address.path_08[this->memberCount_4C8] = 0;
+                kind = 1;
+            }
+            break;
+        case 2:
+            memset(address.path_08, 0, 6);
+            address.path_08[0] = 1;
+            kind = 2;
+            break;
+        case 20:
+            kind = 2;
+            break;
+        default:
+            kind = -2;
+            break;
+        }
+        if (kind < 0) {
+            if (kind == -1) {
+                setCollectionLog(request, LAYER_ERR_CANNOT_START, 0, 0);
+            } else {
+                setCollectionLog(request, LAYER_ERR_BAD_ARGUMENT, 0, 0);
+            }
+            request->state_00 = STEP_CANCELLED;
+            break;
+        }
+        this->select_F130.id_34.exportTo((u8*)userId, 8);
+        memcpy(name, this->select_F130.text_54, 19);
+        name[19] = 0;
+        filterCount = packLayerFilters(filters, 4, &this->select_F130);
+        if (kind != 0) {
+            clearListPending0();
+            readUserRows(&address, kind == 2, 1, count, userId, name, filters, filterCount, request);
+            request->state_00++;
+        } else {
+            this->requestFlags_310[SLOT_USER_SEARCH] = 0;
+            this->requestIds_368[SLOT_USER_SEARCH] =
+                sendReqUserSearchHead(getInstance_(), 1, count, userId, name, filters, filterCount, 0);
+            request->state_00 = 5;
+        }
+        break;
+    case 2:
+        result = readUserRows(NULL, 0, 1, count, NULL, NULL, NULL, 0, request);
+        if (result == -1) {
+            request->state_00 = STEP_FAILED;
+        } else if (result < 0) {
+            request->state_00 = STEP_CANCELLED;
+        } else if (result > 0) {
+            request->state_00 = 30;
+        }
+        break;
+    case 5:
+        if (this->requestFlags_310[SLOT_USER_SEARCH] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_USER_SEARCH] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            request->state_00 = STEP_CANCELLED;
+        } else if (this->requestFlags_310[SLOT_USER_SEARCH] & FLAG_USER_HEAD_REPLY) {
+            s32 i;
+
+            this->friendList_6BC30.count_0x00 = 0;
+            for (i = 0; i < 100; i++) {
+                this->friendList_6BC30.entries_0x04[i].rec_00.valid_0x35 = 0;
+            }
+            if (this->listTotal_F1A4 > 0) {
+                this->listCursor_F1A0 = 0;
+                request->state_00 = 10;
+            } else {
+                request->state_00 = 20;
+            }
+        }
+        break;
+    case 10:
+        this->requestFlags_310[SLOT_USER_SEARCH] = 0;
+        first = this->listCursor_F1A0;
+        batch = (this->listTotal_F1A4 - first < 10) ? this->listTotal_F1A4 - first : 10;
+        this->requestIds_368[SLOT_USER_SEARCH] = sendReqUserSearchData(getInstance_(), first + 1, batch);
+        request->state_00 = 15;
+        break;
+    case 15:
+        if (this->requestFlags_310[SLOT_USER_SEARCH] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_USER_SEARCH] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            request->state_00 = 20;
+        } else if (this->requestFlags_310[SLOT_USER_SEARCH] & FLAG_USER_DATA_REPLY) {
+            if (this->friendList_6BC30.count_0x00 < 100 && this->listTotal_F1A4 - this->listCursor_F1A0 > 0) {
+                request->state_00 = 10;
+            } else {
+                request->state_00 = 20;
+            }
+        }
+        break;
+    case 20:
+        this->requestFlags_310[SLOT_USER_SEARCH] = 0;
+        this->requestIds_368[SLOT_USER_SEARCH] = sendReqUserSearchFoot(getInstance_());
+        request->state_00 = 25;
+        break;
+    case 25:
+        if (this->requestFlags_310[SLOT_USER_SEARCH] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            request->state_00 = STEP_FAILED;
+        } else if (this->requestFlags_310[SLOT_USER_SEARCH] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            request->state_00 = STEP_CANCELLED;
+        } else if (this->requestFlags_310[SLOT_USER_SEARCH] & FLAG_USER_FOOT_REPLY) {
+            memset(&error, 0, sizeof(error));
+            request->getRecord(&error);
+            if (error.code_00 != 0) {
+                request->state_00 = STEP_CANCELLED;
+            } else {
+                request->state_00 = 30;
+            }
+        }
+        break;
+    case 30:
+        initNetLayerRequest(&this->select_F130);
+        set611b(getInstance_());
+        notifyLayerEvent(EVENT_USER_SEARCH, 0, 1, (NetworkRequestError*)&this->friendList_6BC30, this->context_08);
+        return 1;
+    case STEP_CANCELLED:
+        initNetLayerRequest(&this->select_F130);
+        request->getRecord(&error);
+        if (error.code_00 != LAYER_ERR_NOT_CONNECTED) {
+            set611b(getInstance_());
+        }
+        notifyLayerEvent(EVENT_USER_SEARCH, error.code_00, 1, &error, this->context_08);
+        return 1;
+    case STEP_FAILED:
+        initNetLayerRequest(&this->select_F130);
+        request->getRecord(&error);
+        set611b(getInstance_());
+        notifyLayerEvent(EVENT_USER_SEARCH, error.code_00, 1, &error, this->context_08);
+        notifyLayerEvent(EVENT_ERROR, error.code_00, 1, &error, this->context_08);
+        return 1;
+    }
+    return 0;
+}
+
+/* Starts a user-list read with no id, text or filters. */
+s32 NetworkLayerPat::readUserList(NetLayerAddress* address, BOOL wide, u32 first, s32 count,
+                                  NetworkLayerRequest* request)
+{
+    return readUserRows(address, wide, first, count, NULL, NULL, NULL, -1, request);
+}
+
+/* One step of the user-list reader: the head (list or search), the data batches into the friend list, the foot. */
+s32 NetworkLayerPat::readUserRows(NetLayerAddress* address, BOOL wide, u32 first, s32 count, const char* userId,
+                                  const char* name, NetLayerFilter* filters, s32 filterCount,
+                                  NetworkLayerRequest* request)
+{
+    NetworkRequestError error;
+    s32 cursor;
+    s32 batch;
+    s32 i;
+
+    switch (this->listPending_3C0[0]) {
+    case 0: {
+        s32 kind = wide ? 1 : 2;
+
+        this->requestFlags_310[SLOT_USER_LIST] = 0;
+        if (filterCount < 0) {
+            this->requestIds_368[SLOT_USER_LIST] =
+                sendReqLayerUserListHead(getInstance_(), kind, (const u8*)address, first, count);
+        } else {
+            this->requestIds_368[SLOT_USER_LIST] = sendReqLayerUserSearchHead(
+                getInstance_(), kind, (const u8*)address, first, count, userId, name, filters, filterCount);
+        }
+        this->listPending_3C0[0] = 5;
+        break;
+    }
+    case 5:
+        if (this->requestFlags_310[SLOT_USER_LIST] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            return -1;
+        }
+        if (this->requestFlags_310[SLOT_USER_LIST] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            return -2;
+        }
+        if (this->requestFlags_310[SLOT_USER_LIST] & FLAG_USER_HEAD_REPLY) {
+            this->friendList_6BC30.count_0x00 = 0;
+            for (i = 0; i < 100; i++) {
+                this->friendList_6BC30.entries_0x04[i].rec_00.valid_0x35 = 0;
+            }
+            if (this->listTotal_F1A4 != 0) {
+                this->listCursor_F1A0 = 0;
+                this->listPending_3C0[0] = 10;
+            } else {
+                this->listPending_3C0[0] = 20;
+            }
+        }
+        break;
+    case 10:
+        cursor = this->listCursor_F1A0;
+        batch = (this->listTotal_F1A4 - cursor < 10) ? this->listTotal_F1A4 - cursor : 10;
+        this->requestFlags_310[SLOT_USER_LIST] = 0;
+        if (filterCount < 0) {
+            this->requestIds_368[SLOT_USER_LIST] =
+                sendReqLayerUserListData(getInstance_(), this->listCursor_F1A0 + 1, batch);
+        } else {
+            this->requestIds_368[SLOT_USER_LIST] =
+                sendReqLayerUserSearchData(getInstance_(), this->listCursor_F1A0 + 1, batch);
+        }
+        this->listPending_3C0[0] = 15;
+        break;
+    case 15:
+        if (this->requestFlags_310[SLOT_USER_LIST] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            return -1;
+        }
+        if (this->requestFlags_310[SLOT_USER_LIST] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            this->listPending_3C0[0] = 20;
+        } else if (this->requestFlags_310[SLOT_USER_LIST] & FLAG_USER_DATA_REPLY) {
+            if (this->friendList_6BC30.count_0x00 < 100 && this->listTotal_F1A4 - this->listCursor_F1A0 > 0) {
+                this->listPending_3C0[0] = 10;
+            } else {
+                this->listPending_3C0[0] = 20;
+            }
+        }
+        break;
+    case 20:
+        this->requestFlags_310[SLOT_USER_LIST] = 0;
+        if (filterCount < 0) {
+            this->requestIds_368[SLOT_USER_LIST] = sendReqLayerUserListFoot(getInstance_());
+        } else {
+            this->requestIds_368[SLOT_USER_LIST] = sendReqLayerUserSearchFoot(getInstance_());
+        }
+        this->listPending_3C0[0] = 25;
+        break;
+    case 25:
+        if (this->requestFlags_310[SLOT_USER_LIST] & FLAG_SESSION_LOST) {
+            setCollectionLogSessionLost(request);
+            return -1;
+        }
+        if (this->requestFlags_310[SLOT_USER_LIST] & FLAG_CANCELLED) {
+            setCollectionLogAborted(request);
+            return -2;
+        }
+        if (this->requestFlags_310[SLOT_USER_LIST] & FLAG_USER_FOOT_REPLY) {
+            memset(&error, 0, sizeof(error));
+            request->getRecord(&error);
+            return (error.code_00 != 0) ? -2 : 1;
+        }
+        break;
+    }
+    return 0;
+}
+
 s32 NetworkLayerPat::packLayerSettings(PatTagValue* out, s32 max, NetLayerSettings* settings)
 {
     s32 n;
@@ -1453,7 +2703,7 @@ s32 NetworkLayerPat::handleDetailSearch(NetworkLayerRequest* request)
             setCollectionLogAborted(request);
             request->state_00 = STEP_CANCELLED;
         } else if (this->requestFlags_310[SLOT_DETAIL_SEARCH] & FLAG_SEARCH_HEAD_REPLY) {
-            this->communityCount_F1AC = 0;
+            this->communities_F1AC.count_0x00000 = 0;
             if (this->listTotal_F1A4 > 0) {
                 this->listCursor_F1A0 = 0;
                 request->state_00 = 10;
@@ -1476,7 +2726,7 @@ s32 NetworkLayerPat::handleDetailSearch(NetworkLayerRequest* request)
             setCollectionLogAborted(request);
             request->state_00 = 20;
         } else if (this->requestFlags_310[SLOT_DETAIL_SEARCH] & FLAG_SEARCH_DATA_REPLY) {
-            if (this->communityCount_F1AC < 40 && this->listTotal_F1A4 - this->listCursor_F1A0 > 0) {
+            if (this->communities_F1AC.count_0x00000 < 40 && this->listTotal_F1A4 - this->listCursor_F1A0 > 0) {
                 request->state_00 = 10;
             } else {
                 request->state_00 = 20;
@@ -1507,7 +2757,7 @@ s32 NetworkLayerPat::handleDetailSearch(NetworkLayerRequest* request)
         break;
     case 30:
         set611b(getInstance_());
-        notifyLayerEvent(EVENT_DETAIL_SEARCH, 0, 1, (NetworkRequestError*)&this->communityCount_F1AC,
+        notifyLayerEvent(EVENT_DETAIL_SEARCH, 0, 1, (NetworkRequestError*)&this->communities_F1AC,
                          this->context_08);
         return 1;
     case STEP_CANCELLED:
@@ -1598,8 +2848,8 @@ s32 NetworkLayerPat::clearFriendRec(NetFriendRec* rec)
     if (rec == NULL) {
         return -1;
     }
-    rec->address()->clear();
-    memset(rec->data_0x20, 0, sizeof(rec->data_0x20));
+    rec->id_0x00.clear();
+    memset(rec->name_0x20, 0, sizeof(rec->name_0x20));
     memset(&rec->flag_0x34, 0, 1);
     rec->valid_0x35 = 0;
     return 1;
@@ -1611,13 +2861,13 @@ s32 NetworkLayerPat::clearFriendSlot(u32 index)
     if (index > 99) {
         return -1;
     }
-    this->details_5958[index].state_0x004 = 0;
+    this->details_595C[index].state_0x000 = 0;
     this->friendStatus_BEEC[index] = 0;
     this->friendFlagC084_C084[index] = 0;
     this->friendTransfer_C0E8[index] = 0;
     this->friendTransferMode_C14C[index] = 0;
-    memset(this->friendKey_C1B0[index], 0, sizeof(this->friendKey_C1B0[index]));
-    memset(this->friendMessage_C7F0[index], 0, sizeof(this->friendMessage_C7F0[index]));
+    memset(&this->friendPeers_C1B0[index], 0, sizeof(this->friendPeers_C1B0[index]));
+    memset(this->pairState_C7F0[index], 0, sizeof(this->pairState_C7F0[index]));
     this->friendSession_EF00[index] = -1;
     this->memberStatus_EF64[index] = 0;
     this->friendFlagEFC8_EFC8[index] = 0;
@@ -1797,7 +3047,7 @@ s32 NetworkLayerPat::handleChat(NetworkLayerRequest* request)
             request->state_00 = STEP_CANCELLED;
             break;
         }
-        this->friends_3568.entries_0x004[target].address()->exportTo(userId, 8);
+        this->friends_3568.entries_0x004[target].id_0x00.exportTo(userId, 8);
         this->requestFlags_310[SLOT_CHAT] = 0;
         this->requestIds_368[SLOT_CHAT] = sendReqLayerTell(getInstance_(), userId, &options, text);
         request->state_00 = 5;
@@ -2005,7 +3255,7 @@ void NetworkLayerPat::clear()
     this->serverValue_42C = 0;
     this->serverValue_430 = 0;
     this->serverPort_434 = 0;
-    this->serverValue_450 = 0;
+    this->presence_450.count_0x00 = 0;
     resetLayerState();
     memset(this->layerInfo_4CC, 0, sizeof(this->layerInfo_4CC));
     this->cities_540.count_0x000 = 0;
@@ -2015,10 +3265,10 @@ void NetworkLayerPat::clear()
     initNetLayerRequest(&this->request_F0C4);
     initNetLayerRequest(&this->select_F130);
     this->pendingRequestId_F19C = -1;
-    this->communityCount_F1AC = 0;
-    this->friendCount_6BC30 = 0;
+    this->communities_F1AC.count_0x00000 = 0;
+    this->friendList_6BC30.count_0x00 = 0;
     for (i = 0; i < 100; i++) {
-        this->friends_6BC34[i].name_0x20[0x15] = 0;
+        this->friendList_6BC30.entries_0x04[i].rec_00.valid_0x35 = 0;
     }
     this->layerRecord_6E024.id_40 = 0;
     this->mediationList_6E128.count_000 = 0;
@@ -2088,7 +3338,7 @@ s32 NetworkLayerPat::findFriendById(const NetworkUniqueId* id)
     }
     for (i = 0; i < 100; i++) {
         if (this->friends_3568.entries_0x004[i].valid_0x35 != 0 &&
-            id->equals(this->friends_3568.entries_0x004[i].address()) != 0) {
+            id->equals(&this->friends_3568.entries_0x004[i].id_0x00) != 0) {
             return i;
         }
     }
@@ -2116,7 +3366,7 @@ void NetworkLayerPat::getMemberAddress(s8 slot, NetworkUniqueId* out)
         out->clear();
         index = findSessionFriend(slot);
         if (index >= 0) {
-            out->copyFrom((const u8*)this->friends_3568.entries_0x004[index].address());
+            out->copyFrom((const u8*)&this->friends_3568.entries_0x004[index].id_0x00);
         }
     }
 }
@@ -2196,7 +3446,7 @@ void NetworkLayerPat::setFriendTransferModeById(const NetworkUniqueId* id, u8 mo
     if (id != NULL && this->memberCount_4C8 == 2) {
         for (i = 0; i < 100; i++) {
             if (this->friends_3568.entries_0x004[i].valid_0x35 != 0 &&
-                id->equals(this->friends_3568.entries_0x004[i].address()) != 0 &&
+                id->equals(&this->friends_3568.entries_0x004[i].id_0x00) != 0 &&
                 mode != this->friendTransferMode_C14C[(s8)i]) {
                 this->friendTransferMode_C14C[(s8)i] = mode;
                 refreshFriendTransfer(i, 0);
@@ -2242,7 +3492,7 @@ void NetworkLayerPat::refreshFriendTransfer(s8 slot, u32 flag)
     if (slot == this->transferSlot_C07C) {
         return;
     }
-    this->friends_3568.entries_0x004[slot].address()->exportTo(userId, 8);
+    this->friends_3568.entries_0x004[slot].id_0x00.exportTo(userId, 8);
     state = getFriendTransferState(slot);
     sendNtcLayerUserTransfer(getInstance_(), state, userId, flag);
 }

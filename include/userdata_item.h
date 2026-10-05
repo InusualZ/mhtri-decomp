@@ -21,6 +21,15 @@ s32 buildNetUserProfile(struct NetUserProfile* profile);
  * (GUESS name). */
 void applyNetUserProfile(const u8* profile);
 
+/* 0x8004A7C4 / 0x8004A8DC / 0x8004A960 / 0x8004A9B8 - refresh parts of the community profile from the save, 0 when
+ * there is no user data, else 1 (GUESS names from the bytes each copies and from their callers, the
+ * `Network/net_session_close.cpp` profile writes): the head fields (+0x02..+0x7B), the bytes +0x7C..+0x94, the rank
+ * and level bytes (+0xF2/+0xF3, then `applyNetUserProfile`) and the 0x56-byte mediator record (+0x9C). */
+s32 fillNetUserProfileHead(struct NetUserProfile* profile);
+s32 fillNetUserProfileRange7C(struct NetUserProfile* profile);
+s32 fillNetUserProfileRank(struct NetUserProfile* profile);
+s32 fillNetUserProfileRecord(struct NetUserProfile* profile);
+
 #ifdef __cplusplus
 }
 #endif

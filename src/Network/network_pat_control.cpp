@@ -38,8 +38,14 @@
  * the count is stays unknown) and `resetFailureState` (a `blr` stub).
  *
  * Residuals (re-measure: `python tools/units/recompile.py Network/network_pat_control --measure <symbol>`):
- *  - 2026-10-04: 144 of 225 rows at 100 % (report metric 73.2 %).  Not written yet (no body): the state machine
- *    `updateMessagePool` (5504 B), `drawTextRuns`, the message-pool helpers 0x80427868..0x80428628 (they call
+ *  - 2026-10-05: 144 of 225 rows at 100 %.  `drawTextRuns` (round 4) 99.92 %: retail multiplies the centred pen as
+ *    `fmuls f0,f0,f31` where ours emits `f31,f0` (`x * 0.5f` and `0.5f * x` give the same object); its switch is on
+ *    `bit + 1` (bit n carries tag n + 1) with the case bodies in retail's order, and the widemode/font calls go through
+ *    their owners' headers (`main.h`, `g3d/g3d_anmchr.h`).  `updateFriendTransferModes` (renamed from `updateTransferQueue`, GUESS) 99.69 %: the
+ *    second loop's slot/peer registers swap (r27/r28).  `saveLayerId`/`readLayerIdChange`/`classifyLayerIdChange` (round 4,
+ *    GUESS names) 100 %: `NetworkLayerIdExportTo` is a free function called after an unused `getNetworkLayerPat`
+ *    (retail evaluates the layer object first, as a static member call through it would).  Not written yet (no body): the state machine
+ *    `updateMessagePool` (5504 B), the message-pool helpers 0x80427868..0x80428628 (they call
  *    NetworkLayerPat/NetworkCommunityPat slots - the owners' headers now declare +0x4C/+0x50/+0x60 and +0xA0,
  *    requests net2-l3-2c54#23/#24 - not yet the bodies), the transfer queue/mode updates, the NetworkInstance error accessors
  *    (0x804312B8..0x80431368: their +0x613C/+0x6344 records sit in the band header's NetworkInstance) and the
@@ -160,6 +166,9 @@
 #include "userdata_item.h"   /* applyNetUserProfile */
 #include "enemy/em020_prog.h"   /* net_layer_error_message */
 #include "sound/snd_stream_reloc.h"   /* pushReverbSamples, advanceReverbClock */
+#include "main.h"                      /* get_ScreenSize, check_change_widemode_flag */
+#include "g3d/g3d_anmchr.h"            /* flfntGetPosX - owner g3d/g3d_anmchr.cpp */
+
 
 
 #ifdef __cplusplus
@@ -181,8 +190,7 @@ typedef struct PatCryptBuf {
 /* The peer record layer command 6 delivers when a player joins: the address object, the name and the
  * peer's 0x100-byte profile.  size: 0x13C */
 typedef struct NetLayerPeerJoin {
-    /* +0x00 */ NetId id_0x00;
-    /* +0x0A */ u8 pad_0x0A[0x16];
+    /* +0x00 */ NetworkUniqueId id_0x00;
     /* +0x20 */ char name_0x20[0x1C];
     /* +0x3C */ u8 profile_0x3C[0x100];
 } NetLayerPeerJoin; /* size: 0x13C */
@@ -190,8 +198,7 @@ typedef struct NetLayerPeerJoin {
 /* The peer position layer command 14 delivers: the peer's id, its position, the message kind, a halfword and
  * four packed bytes.  size: 0x38 */
 typedef struct NetLayerPeerPosition {
-    /* +0x00 */ NetId id_0x00;
-    /* +0x0A */ u8 pad_0x0A[0x16];
+    /* +0x00 */ NetworkUniqueId id_0x00;
     /* +0x20 */ f32 pos_0x20[3];
     /* +0x2C */ s32 kind_0x2C;
     /* +0x30 */ u32 value_0x30;
@@ -213,8 +220,7 @@ typedef struct NetPositionMessage {
 /* The raw block layer command 17 delivers: a type word (1), a kind byte (9), the source and its size.
  * size: 0x36 (approximate) */
 typedef struct NetLayerBlockUpdate {
-    /* +0x00 */ NetId id_0x00;
-    /* +0x0A */ u8 pad_0x0A[0x16];
+    /* +0x00 */ NetworkUniqueId id_0x00;
     /* +0x20 */ u32 type_0x20;
     /* +0x24 */ u8 pad_0x24[0x4];
     /* +0x28 */ u8 kind_0x28;
@@ -593,9 +599,9 @@ s32 layerReflectCallback(u32 command, s32 result, s32 count, void* data)
                 NetPeerEvent* event;
                 char line[0x80];
 
-                formatNetId(work->peers_0x7488[slot].id_0x00.text_0x00, (const NetId*)data);
+                formatNetId(work->peers_0x7488[slot].id_0x00.text_0x00, (const NetworkUniqueId*)data);
                 strcpy(work->peers_0x7488[slot].name_0x0A.text_0x00, ((NetLayerPeerJoin*)data)->name_0x20);
-                importNetId((NetId*)&work->peer_addresses_0x7908[slot], &work->peers_0x7488[slot].id_0x00);
+                importNetId(&work->peer_addresses_0x7908[slot].object_0x00, &work->peers_0x7488[slot].id_0x00);
                 memcpy(&work->peers_0x7488[slot].blob_0x20, ((NetLayerPeerJoin*)data)->profile_0x3C, 0x100);
                 applyNetUserProfile((const u8*)&work->peers_0x7488[slot].blob_0x20);
                 postMediatorRecord(getInstance(), work->peers_0x7488[slot].blob_0x20.record_0x9C);
@@ -699,7 +705,7 @@ s32 layerReflectCallback(u32 command, s32 result, s32 count, void* data)
         }
         break;
     case 14:
-        if (result >= 0 && findPeerIndex((const NetId*)data) > 0) {
+        if (result >= 0 && findPeerIndex((const NetworkUniqueId*)data) > 0) {
             NetPositionMessage* message = (NetPositionMessage*)allocArenaBlock();
 
             if (message != NULL) {
@@ -722,7 +728,7 @@ s32 layerReflectCallback(u32 command, s32 result, s32 count, void* data)
         break;
     case 15:
         if (result >= 0) {
-            s32 member = findPeerIndex((const NetId*)data);
+            s32 member = findPeerIndex((const NetworkUniqueId*)data);
 
             if (member == 0) {
                 char id_text[0x14];
@@ -757,7 +763,7 @@ s32 layerReflectCallback(u32 command, s32 result, s32 count, void* data)
         if (work->flag_0xC48A != 1 && result >= 0 &&
             (get_option_cfg(26) != 1 || work->sub_state_0x017 != 0x21 ||
              ((NetSessionChatRecord*)data)->color_0x238 == 0xFFFF50FF)) {
-            s32 member = findPeerIndex((const NetId*)data);
+            s32 member = findPeerIndex((const NetworkUniqueId*)data);
 
             if (member > 0 || (((NetSessionChatRecord*)data)->color_0x238 & 0xF) == 0) {
                 char id_text[0x14];
@@ -783,7 +789,7 @@ s32 layerReflectCallback(u32 command, s32 result, s32 count, void* data)
         }
         break;
     case 17:
-        if (result >= 0 && findPeerIndex((const NetId*)data) > 0 && ((NetLayerBlockUpdate*)data)->type_0x20 == 1 &&
+        if (result >= 0 && findPeerIndex((const NetworkUniqueId*)data) > 0 && ((NetLayerBlockUpdate*)data)->type_0x20 == 1 &&
             ((NetLayerBlockUpdate*)data)->kind_0x28 == 9) {
             u32* block = allocArenaBlock();
 
@@ -1027,7 +1033,7 @@ void fn_80426D10(void)
  * The connected-peer slot (0..3) whose id is `id`, or -1 (also while the layer is down or not ready, or
  * when the id renders empty).
  */
-s32 findPeerIndex(const NetId* id)
+s32 findPeerIndex(const NetworkUniqueId* id)
 {
     NetCtrlWk* work = net_ctrl_wk;
     char text[16];
@@ -1147,7 +1153,7 @@ s32 findFreePeerSlot(const NetworkUniqueId* address)
     char text[16];
     s32 i;
 
-    formatNetId(text, (const NetId*)address);
+    formatNetId(text, address);
     for (i = 1; i < 4; i++) {
         if (work->used_0x7988[i] != 0 &&
             work->peer_addresses_0x7908[i].object_0x00.equals(address) != 0) {
@@ -1171,7 +1177,7 @@ s32 findPeerSlot(const NetworkUniqueId* address)
     char text[16];
     s32 i;
 
-    formatNetId(text, (const NetId*)address);
+    formatNetId(text, address);
     for (i = 1; i < 4; i++) {
         if (work->used_0x7988[i] != 0 &&
             work->peer_addresses_0x7908[i].object_0x00.equals(address) != 0) {
@@ -1326,6 +1332,71 @@ s32 fn_80428208(void)
 void fn_80428218(void)
 {
     net_ctrl_wk->msg_state_0xC300 = 0;
+}
+
+/*
+ * Keeps the layer's current id for the later change checks.
+ */
+void saveLayerId(void)
+{
+    getNetworkLayerPat(getPatsObject(), 0)->exportLayerId_8C(&net_ctrl_wk->layer_id_0x618C);
+}
+
+/*
+ * Compares the kept layer id with the current one: whether the server changed, the current server, city and
+ * room, and the kept ones are copied to the seen keys.
+ */
+void readLayerIdChange(s32* changed, u32* server, s32* city, s32* room)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+    NetLayerIdText kept;
+    NetLayerIdText now;
+    NetworkLayerId id;
+
+    getNetworkLayerPat(getPatsObject(), 0);
+    NetworkLayerIdExportTo(&work->layer_id_0x618C, (u8*)&kept, 16);
+    getNetworkLayerPat(getPatsObject(), 0)->exportLayerId_8C(&id);
+    getNetworkLayerPat(getPatsObject(), 0);
+    NetworkLayerIdExportTo(&id, (u8*)&now, 16);
+    if (kept.server_0x04 != now.server_0x04) {
+        *changed = 1;
+    } else {
+        *changed = 0;
+    }
+    *server = now.server_0x04;
+    *city = now.city_0x0A;
+    *room = now.room_0x0C;
+    work->seen_key_0xC310 = kept.server_0x04;
+    work->seen_key_0xC314 = kept.city_0x0A;
+    work->seen_key_0xC318 = kept.room_0x0C;
+}
+
+/*
+ * How the current layer id differs from the kept one: 1 unchanged, 2/3 at server level (3 when the server
+ * changed), 4 at city level, -1 otherwise.
+ */
+s32 classifyLayerIdChange(void)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+    NetLayerIdText kept;
+    NetLayerIdText now;
+    NetworkLayerId id;
+
+    getNetworkLayerPat(getPatsObject(), 0);
+    NetworkLayerIdExportTo(&work->layer_id_0x618C, (u8*)&kept, 16);
+    getNetworkLayerPat(getPatsObject(), 0)->exportLayerId_8C(&id);
+    getNetworkLayerPat(getPatsObject(), 0);
+    NetworkLayerIdExportTo(&id, (u8*)&now, 16);
+    if (now.server_0x04 == kept.server_0x04 && now.city_0x0A == kept.city_0x0A && now.room_0x0C == kept.room_0x0C) {
+        return 1;
+    }
+    if (now.city_0x0A == 0) {
+        return (kept.server_0x04 != now.server_0x04) + 2;
+    }
+    if (now.room_0x0C == 0) {
+        return 4;
+    }
+    return -1;
 }
 
 /*
@@ -3145,9 +3216,9 @@ void updateNetworkPatControl(void)
             {
                 NetworkUniqueId id;
 
-                getNetworkLayerPat(getPatsObject(), 0)->readServerId_2C((NetId*)&id);
+                getNetworkLayerPat(getPatsObject(), 0)->readServerId_2C(&id);
                 work->name_0x7368[0] = 0;
-                formatNetId(work->name_0x7368, (NetId*)&id);
+                formatNetId(work->name_0x7368, &id);
             }
             flushRosterSync();
             refreshRosterCache();
@@ -3436,7 +3507,7 @@ void updateNetworkPatControl(void)
                     setErrorHappened(work);
                 } else {
                     work->community_results_0xA144[12] = 0;
-                    startRosterFetch(0);
+                    startRosterFetch(NULL);
                     work->step_0x018 = 1;
                 }
             }
@@ -3524,7 +3595,7 @@ void updateNetworkPatControl(void)
                 break;
             }
         }
-        updateTransferQueue();
+        updateFriendTransferModes();
         updateTransferMode();
         return;
     case 0x3:
@@ -3596,7 +3667,7 @@ void updateNetworkPatControl(void)
                 }
             }
         }
-        updateTransferQueue();
+        updateFriendTransferModes();
         updateTransferMode();
         return;
     }
@@ -4228,7 +4299,7 @@ BOOL NetCtrlWk::loadPeerCard(NetPlayerCard* card, u8 slot)
 {
     NetCtrlWk* work = net_ctrl_wk;
     NetProfileRec* profile = &work->profiles_0x168[work->profile_index_0x170];
-    NetId* slot_id;
+    const NetworkUniqueId* slot_id;
     NetPeerRec* peer;
     s32 i;
 
@@ -4251,7 +4322,7 @@ BOOL NetCtrlWk::loadPeerCard(NetPlayerCard* card, u8 slot)
 /*
  * The name field of the peer whose id matches, or NULL.
  */
-char* NetCtrlWk::findPeerName(NetId* id)
+char* NetCtrlWk::findPeerName(const NetworkUniqueId* id)
 {
     NetCtrlWk* work = net_ctrl_wk;
     NetPeerRec* peer = work->peers_0x7488;
@@ -5550,12 +5621,12 @@ void NetCtrlWk::copyRosterLists(NetRosterListView* roster, NetRecentListView* re
     roster->count_0x000 = work->roster_0xA1B8.count_0x000;
     for (i = 0; i < roster->count_0x000; i++) {
         memcpy(roster->rows_0x004[i].name_0x00, work->roster_0xA1B8.entries_0x004[i].name_0x20, 0x14);
-        formatNetId(roster->rows_0x004[i].id_text_0x14, (const NetId*)&work->roster_0xA1B8.entries_0x004[i].address_0x00);
+        formatNetId(roster->rows_0x004[i].id_text_0x14, &work->roster_0xA1B8.entries_0x004[i].address_0x00);
     }
     recent->count_0x000 = work->recent_0xBB84.count_0x000;
     for (i = 0; i < recent->count_0x000; i++) {
         memcpy(recent->rows_0x004[i].name_0x00, work->recent_0xBB84.entries_0x004[i].name_0x20, 0x14);
-        formatNetId(recent->rows_0x004[i].id_text_0x14, (const NetId*)&work->recent_0xBB84.entries_0x004[i].address_0x00);
+        formatNetId(recent->rows_0x004[i].id_text_0x14, &work->recent_0xBB84.entries_0x004[i].address_0x00);
     }
 }
 
@@ -5643,7 +5714,7 @@ BOOL NetCtrlWk::submitTextSelect(const char* text, s8* result)
     initNetLayerRequest(&work->layer_request_0xC294);
     work->result_0xC290 = result;
     *result = 0;
-    strcpy(work->text_0xC2E8, text);
+    strcpy(work->layer_request_0xC294.text_54, text);
     getNetworkLayerPat(getPatsObject(), 0)->submitSelect_A4(&work->layer_request_0xC294);
     getNetworkLayerPat(getPatsObject(), 0)->requestRefresh_6C(100, 1);
     return TRUE;
@@ -5662,7 +5733,7 @@ BOOL NetCtrlWk::submitIdSelect(const NetId* id, s8* result)
     initNetLayerRequest(&work->layer_request_0xC294);
     work->result_0xC290 = result;
     *result = 0;
-    importNetId(&work->target_id_0xC2C8, id);
+    importNetId(&work->layer_request_0xC294.id_34, id);
     getNetworkLayerPat(getPatsObject(), 0)->submitSelect_A4(&work->layer_request_0xC294);
     getNetworkLayerPat(getPatsObject(), 0)->requestRefresh_6C(100, 1);
     return TRUE;
@@ -5767,19 +5838,19 @@ void NetCtrlWk::copyFriendList(NetFriendListView* out, u8 use_own)
     s32 i;
 
     if (use_own == 0) {
-        out->count_0x00 = getNetworkLayerPat(getPatsObject(), 0)->friendCount_6BC30;
-        entry = getNetworkLayerPat(getPatsObject(), 0)->friends_6BC34;
+        out->count_0x00 = getNetworkLayerPat(getPatsObject(), 0)->friendList_6BC30.count_0x00;
+        entry = getNetworkLayerPat(getPatsObject(), 0)->friendList_6BC30.entries_0x04;
     } else {
         out->count_0x00 = net_ctrl_wk->friend_list_0xC47C->count_0x00;
         entry = net_ctrl_wk->friend_list_0xC47C->entries_0x04;
     }
     row = out->rows_0x04;
     for (i = 0; i < out->count_0x00; i++, entry++, row++) {
-        formatNetId(row->id_text_0x14, &entry->id_0x00);
-        strcpy(row->name_0x00, entry->name_0x20);
-        if (entry->online_0x38 != 0) {
-            row->status_0x20 = entry->status_0x40 >> 24;
-            row->area_0x1E = entry->area_0x48 >> 16;
+        formatNetId(row->id_text_0x14, &entry->rec_00.id_0x00);
+        strcpy(row->name_0x00, entry->rec_00.name_0x20);
+        if (entry->session_38.state_00 != 0) {
+            row->status_0x20 = entry->session_38.status_08 >> 24;
+            row->area_0x1E = entry->session_38.area_10 >> 16;
             row->pad_0x21 = 0;
         }
     }
@@ -5791,7 +5862,7 @@ void NetCtrlWk::copyFriendList(NetFriendListView* out, u8 use_own)
 s32 NetCtrlWk::copyCommunityViews(NetCommunityView* views, s16 first, s32 max, s16* total)
 {
     NetworkLayerPat* layer = getNetworkLayerPat(getPatsObject(), 0);
-    s32 count = layer->communityCount_F1AC;
+    s32 count = layer->communities_F1AC.count_0x00000;
     NetCommunityRec* community;
     s32 copied;
     s16 index;
@@ -5800,7 +5871,7 @@ s32 NetCtrlWk::copyCommunityViews(NetCommunityView* views, s16 first, s32 max, s
     if (count - 1 < first) {
         return 0;
     }
-    community = &getNetworkLayerPat(getPatsObject(), 0)->communities_F1B0[first];
+    community = &getNetworkLayerPat(getPatsObject(), 0)->communities_F1AC.entries_0x00004[first];
     copied = 0;
     for (index = first; index < first + max; index++, community++, views++) {
         if (index >= count || index - first >= max) {
@@ -5837,7 +5908,7 @@ BOOL NetCtrlWk::hasFriendDetail(const NetId* id)
     friend_rec = getNetworkLayerPat(getPatsObject(), 0)->friends_3568.entries_0x004;
     for (i = 0; i < 100; i++, friend_rec++) {
         if (isSameNetId(&friend_rec->id_0x00, id) != 0 && friend_rec->valid_0x35 != 0) {
-            return getNetworkLayerPat(getPatsObject(), 0)->details_5958[i].flag_0x101 != 0;
+            return getNetworkLayerPat(getPatsObject(), 0)->details_595C[i].flag_0x0FD != 0;
         }
     }
     return FALSE;
@@ -6451,6 +6522,114 @@ void layoutTextRuns(NetTextTagState* state)
     }
 }
 
+/*
+ * Prints the laid-out runs: each run's flag bits apply its tags (alignment, size, colour, line breaks) to the pen,
+ * then its text is printed at the pen in the run's size (`size`, or the size table's entry when 0); `line_gap`
+ * replaces the font height on a plain line break.
+ */
+void drawTextRuns(NetTextTagState* state, s16 size, s16 line_gap)
+{
+    f32 screen[2];
+    s32 n;
+    s32 bit;
+    u32 flags;
+    s32 right;
+
+    get_ScreenSize((struct _MH_VEC2*)screen);
+    if (state->status_0x30D == 2) {
+        return;
+    }
+    state->run_0x2F8 = state->runs_0x000;
+    for (n = 0; n < 30; n++) {
+        if (state->run_0x2F8->length_0x0B == 0 && state->run_0x2F8->flags_0x04 == 0) {
+            return;
+        }
+        flags = state->run_0x2F8->flags_0x04;
+        for (bit = 0; bit < 16; bit++) {
+            if (state->run_0x2F8->flags_0x04 & 2) {
+                state->size_0x311 = state->run_0x2F8->size_0x09;
+            }
+            if (flags & 1) {
+                flags >>= 1;
+                /* bit n carries tag n + 1 (`text_tag_names`: BODY, SIZE, COLOR, BR, CENTER, LEFT, RIGHT, END, LF, C) */
+                switch (bit + 1) {
+                case 1:
+                    switch (state->align_0x30F) {
+                    case 5:
+                        state->pen_x_0x304 = (screen[0] - (f32)((state->width_0x312 *
+                                                               text_font_size_table[state->size_0x311]) / 2)) * 0.5f;
+                        break;
+                    case 6:
+                        state->pen_x_0x304 = state->origin_x_0x300;
+                        break;
+                    case 7:
+                        right = check_change_widemode_flag() != 0 ? 722 : 540;
+                        state->pen_x_0x304 = (state->origin_x_0x300 + right) -
+                                             (state->width_0x312 * text_font_size_table[state->size_0x311]) / 2;
+                        break;
+                    }
+                    break;
+                case 4:
+                    state->pen_x_0x304 = state->origin_x_0x300;
+                    if (line_gap == 0) {
+                        state->pen_y_0x306 += text_font_size_table[state->size_0x311];
+                    } else {
+                        state->pen_y_0x306 += line_gap;
+                    }
+                    break;
+                case 5:
+                    state->align_0x30F = 5;
+                    state->pen_x_0x304 = (screen[0] - (f32)((state->width_0x312 *
+                                                           text_font_size_table[state->size_0x311]) / 2)) * 0.5f;
+                    break;
+                case 6:
+                    state->align_0x30F = 6;
+                    state->pen_x_0x304 = state->origin_x_0x300;
+                    break;
+                case 7:
+                    state->align_0x30F = 7;
+                    right = check_change_widemode_flag() != 0 ? 722 : 540;
+                    state->pen_x_0x304 = (state->origin_x_0x300 + right) -
+                                         (state->width_0x312 * text_font_size_table[state->size_0x311]) / 2;
+                    break;
+                case 8:
+                    return;
+                case 2:
+                    state->size_0x311 = state->run_0x2F8->size_0x09;
+                    break;
+                case 3:
+                case 10:
+                    setTextColor(text_color_index_table[state->run_0x2F8->color_0x08]);
+                    break;
+                case 9:
+                    state->pen_x_0x304 = state->origin_x_0x300;
+                    state->pen_y_0x306 +=
+                        (s16)(state->run_0x2F8->lines_0x0A * text_font_size_table[state->size_0x311]);
+                    break;
+                }
+            } else {
+                flags >>= 1;
+                if (flags == 0) {
+                    break;
+                }
+            }
+        }
+        if (state->run_0x2F8->length_0x0B != 0 && state->run_0x2F8->text_0x00 != NULL) {
+            memset(state->line_0x258, 0, sizeof(state->line_0x258));
+            memcpy(state->line_0x258, state->run_0x2F8->text_0x00, state->run_0x2F8->length_0x0B);
+            state->line_0x258[state->run_0x2F8->length_0x0B] = 0;
+            if (size == 0) {
+                font_set_size(text_font_size_table[state->size_0x311], text_font_size_table[state->size_0x311]);
+            } else {
+                setTextSize(size);
+            }
+            printTextRuns(state->pen_x_0x304, state->pen_y_0x306, 0, state->line_0x258);
+            state->pen_x_0x304 = flfntGetPosX();
+        }
+        state->run_0x2F8++;
+    }
+}
+
 #ifdef __cplusplus
 }
 #endif
@@ -6626,6 +6805,59 @@ void setTransferMode(u32 mode)
             work->flag_0xC49D = 0;
             setStreamTransferMode(0);
             setTransferDisplayState(0);
+        }
+    }
+}
+
+/*
+ * Hands the layer the transfer mode of every connected peer that is a friend: 1 (transfer) when the system
+ * transfer mode is on and - in a quest session - the peer is not a session member without friend details and
+ * transfers are allowed by the options, else 0.
+ */
+void updateFriendTransferModes(void)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+    s32 slot;
+    NetPeerRec* peer;
+    s32 index;
+
+    if (work->flag_0xC499 == 0) {
+        return;
+    }
+    if (GameMode_ck() == 1) {
+        for (slot = 0, peer = work->peers_0x7488; slot < 4; peer++, slot++) {
+            if (work->used_0x7988[slot] == 0) {
+                continue;
+            }
+            index = findFriendIndex(&peer->id_0x00);
+            if (index < 0) {
+                continue;
+            }
+            if (isSessionMemberId(&peer->id_0x00) == 0) {
+                if (get_option_cfg(26) == 1 || system_w.transfer_mode_0xa50 == 0) {
+                    getNetworkLayerPat(getPatsObject(), 0)->setFriendTransferMode_E0(index, 0);
+                } else if (NetCtrlWk::hasFriendDetail(&peer->id_0x00) == 0) {
+                    getNetworkLayerPat(getPatsObject(), 0)->setFriendTransferMode_E0(index, 1);
+                } else {
+                    getNetworkLayerPat(getPatsObject(), 0)->setFriendTransferMode_E0(index, 0);
+                }
+            } else if (system_w.transfer_mode_0xa50 == 0) {
+                getNetworkLayerPat(getPatsObject(), 0)->setFriendTransferMode_E0(index, 0);
+            } else {
+                getNetworkLayerPat(getPatsObject(), 0)->setFriendTransferMode_E0(index, 1);
+            }
+        }
+        return;
+    }
+    for (slot = 0, peer = work->peers_0x7488; slot < 4; peer++, slot++) {
+        if (work->used_0x7988[slot] == 0) {
+            continue;
+        }
+        index = findFriendIndex(&peer->id_0x00);
+        if (system_w.transfer_mode_0xa50 == 0) {
+            getNetworkLayerPat(getPatsObject(), 0)->setFriendTransferMode_E0(index, 0);
+        } else {
+            getNetworkLayerPat(getPatsObject(), 0)->setFriendTransferMode_E0(index, 1);
         }
     }
 }

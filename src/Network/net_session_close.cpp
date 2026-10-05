@@ -14,15 +14,24 @@
  * Lib/flags: `cflags_main` (the link neighbour's group); `#pragma peephole off` for the whole file, as in
  * the neighbour (measured on the first bodies: the kept `extsb`/`cmpwi` pairs need it).
  *
- * Residuals (2026-10-04: 58 of 88 rows at 100 %, report metric 80.6 %):
- *  - Not written: the circle-list copies (`onCircleListReceived`, `copyCircleToProfile`: the profile record's +0x1C small object
- *    and +0x44 record block need the small network object as a C++ class); the roster requests
- *    0x80435740..0x80435E34 and `flushRosterSync` (the NetworkCommunityPat slots +0x4C/+0x50/+0x60 and NetworkLayerPat
- *    +0xA0 they dispatch are now declared: `writeProfile_4C`/`writeProfileRange_50`/`request_60`/`setPresence_A0`); `fn_80435E34`/`fn_80435F48` also need
- *    the 0x20-byte address object at 0x806E1B18 and NetworkCommunityPat's 0x803F0F20); `fn_80436220` (192 B: it calls NetworkCommunityPat's slot +0x48 and its 0x803F116C, neither declared yet);
- *    the static initialiser 0x80437204 (`net_community_state` is built with the NetworkCommunityPat band's
- *    constructor 0x803F0730 / destructor 0x803F0578, and the 0x20-byte address object at 0x806E1B18 with the
- *    small object's; both classes belong to that band, so `net_community_state` is a plain object here).
+ * Residuals (2026-10-05: 71 of 88 rows at 100 %, report metric 92.5 %):
+ *  - Not written: `refreshRosterCache` (it reads NetworkLayerPat's u16 at +0xF02C, a field the layer class - lane A's -
+ *    does not declare yet); `fn_80435E34`/`fn_80435F48` (they need the 0x20-byte address object at 0x806E1B18 and
+ *    NetworkCommunityPat's 0x803F0F20); `fn_80436220` (192 B: it calls NetworkCommunityPat's slot +0x48 and its
+ *    0x803F116C, neither declared yet); the static initialiser 0x80437204 (`net_community_state` is built with the
+ *    NetworkCommunityPat band's constructor 0x803F0730 / destructor 0x803F0578, and the 0x20-byte address object at
+ *    0x806E1B18 with the small object's; both classes belong to that band, so `net_community_state` is a plain object).
+ *  - The profile writes (round 4): `sendProfileHead` 92.8 % (retail computes the first presence value before the
+ *    count store and keeps it in r4; ours stores the value after the count), `startRosterFetch` 95.5 % (the four
+ *    callee-saved registers permuted: retail r31 result / r28 work / r30 profile, ours r29 / r30 / r28; declaration
+ *    order does not move it), `onCircleListReceived` 98.2 % (work and the circle cursor swap r30/r31; the best of 120
+ *    declaration orders).  The community writes pass the work record's request word and the profile through
+ *    `request_60`'s `(const u8*, s32, ...)` parameters with casts, and the presence record goes to `setPresence_A0`
+ *    cast to `NetLayerSettings` (the same 0x24 bytes read two ways; unifying them is open, rule 1).  The `userdata_item`
+ *    profile fillers (`fillNetUserProfile*`, GUESS names from the bytes each copies) are declared in `userdata_item.h`.  GUESS names: `sendProfileHead`,
+ *    `sendProfileRange7C`, `sendProfileRank`, `sendProfileRecord`, `resendProfileRecord`, the `NetProfileRec` fields
+ *    and `NetProfileLabels`.  `copyCircleToProfile`'s range test is two early returns (an `||` folds into one unsigned
+ *    compare: 97.91 -> 100).
  *  - `communityReflectCallback` 97.7 %: the roster/recent copies keep three induction pointers where retail keeps
  *    four; the mail text address is CSE'd as in the session callback (request #22).  The address object's +0x28
  *    copy is the sink's real virtual `copyFrom` (request #21: `appendRosterEntry`/`appendRecentEntry` 99.57 -> 100,
@@ -76,6 +85,7 @@
 #include "hud/cockpit.h"   /* cockpitShowNewMail */
 #include "menu/menu_plsearch.h"   /* getLobbyMailBox */
 
+
 #pragma peephole off
 
 /* The kind-0 move work, seen only as the four per-member link-state bytes `setMoveWorkMemberState` writes.
@@ -88,8 +98,7 @@ typedef struct NetMoveWorkView {
 /* The peer-card update community commands 11 and 13 deliver: the peer's id, the offset and size of the changed
  * run (command 13) and the card bytes.  size: 0x128 (approximate: command 11 copies 0x100 bytes from +0x28) */
 typedef struct NetPeerCardUpdate {
-    /* +0x00 */ NetId id_0x00;
-    /* +0x0A */ u8 pad_0x0A[0x16];
+    /* +0x00 */ NetworkUniqueId id_0x00;
     /* +0x20 */ s32 offset_0x20;
     /* +0x24 */ u32 size_0x24;
     /* +0x28 */ u8 blob_0x28[0x100];
@@ -270,7 +279,7 @@ s32 sessionReflectCallback(s32 command, s8 member, s32 result, s32 count, void* 
                 slot_member->joined_0x00 = 1;
                 slot_member->flag_0x04 = 0;
                 getNetworkSessionManagerPat(getPatsObject(), 0)->getPlayerRecord(
-                    member, (NetworkUniqueId*)&slot_member->id_0x20);
+                    member, &slot_member->id_0x20);
                 getNetworkSessionManagerPat(getPatsObject(), 0)->getPlayerRecordName(member, slot_member->name_0x0C,
                                                                                      16);
                 work->server_slot_state_0x040[member] = 1;
@@ -893,6 +902,72 @@ NetworkSessionCircleList* getCircleList(NetworkSessionManagerPat* manager)
 }
 
 /*
+ * The circle list arrived (session command 39): copies every circle into its profile record (id, name, address,
+ * size, options, comment and labels), then marks the list read.
+ */
+void onCircleListReceived(s32 status, s32* values)
+{
+    NetworkSessionCircleList* list;
+    NetworkSessionCircleInfo* circle;
+    u32 length;
+    s32 i;
+    NetCtrlWk* work = net_ctrl_wk;
+    NetProfileRec* profile = work->profiles_0x168;
+    s32 j;
+
+    if (values[0] < 0) {
+        return;
+    }
+    list = getCircleList(getNetworkSessionManagerPat(getPatsObject(), 0));
+    if (list == NULL) {
+        return;
+    }
+    circle = list->items_04;
+    for (i = 0; i < work->profile_count_0x164; i++, circle++, profile++) {
+        profile->index_0x000 = i;
+        profile->active_0x040 = 0;
+        memset(&profile->quest_id_0x190, 0, 292);
+        if (circle == NULL) {
+            continue;
+        }
+        profile->circle_id_0x004 = circle->id_000;
+        profile->name_0x008[0] = 0;
+        profile->active_0x040 = circle->limitA_170;
+        if (profile->active_0x040 == 0) {
+            continue;
+        }
+        profile->capacity_0x03C = circle->limitB_174;
+        strcpy(profile->name_0x008, circle->name_008);
+        profile->address_0x01C.copyFrom((const u8*)&circle->smallObject_108);
+        NetworkRequest_copyRecord((NetworkSessionRecordBlock*)&profile->options_0x044,
+                                  (const NetworkSessionRecordBlock*)&circle->options_128);
+        profile->rank_0x08C = circle->flag_180;
+        profile->quest_id_0x190 = profile->options_0x044.slots_08[1].value_04;
+        profile->option_0x192 = profile->options_0x044.slots_08[0].value_04;
+        if (strlen(circle->comment_288) < 145) {
+            length = strlen(circle->comment_288);
+        } else {
+            length = 144;
+        }
+        memcpy(profile->comment_0x198, circle->comment_288, length);
+        profile->comment_0x198[length] = 0;
+        if (circle->recordCount_184 == 136) {
+            memcpy(&profile->labels_0x22C, circle->records_188, 136);
+            for (j = 0; j < 4; j++) {
+                profile->labels_0x22C.label_0x00[j][15] = 0;
+                profile->labels_0x22C.sublabel_0x40[j][15] = 0;
+                if (profile->labels_0x22C.count_0x80[j] > 8) {
+                    profile->labels_0x22C.count_0x80[j] = 1;
+                }
+            }
+        } else {
+            memset(&profile->labels_0x22C, 0, 136);
+        }
+    }
+    work->flag_0x82C4 = 2;
+}
+
+/*
  * Requests the circle list (session command 39); 0 when there is no session manager or a request is busy.
  */
 s32 requestCircleList(void)
@@ -916,6 +991,71 @@ s32 requestCircleList(void)
     clearPhaseSlot(39);
     getNetworkSessionManagerPat(getPatsObject(), 0)->request380(work->profile_count_0x164);
     return 1;
+}
+
+/*
+ * Copies circle `index` (0..9) of the session manager's list into profile record `index`, as the list handler
+ * does for every circle, plus the circle's active byte.
+ */
+void copyCircleToProfile(s32 index, s32 unused)
+{
+    NetProfileRec* profile = net_ctrl_wk->profiles_0x168;
+    NetworkSessionCircleList* list;
+    NetworkSessionCircleInfo* circle;
+    u32 length;
+    s32 j;
+
+    if (index < 0) {
+        return;
+    }
+    if (index >= 10) {
+        return;
+    }
+    list = getCircleList(getNetworkSessionManagerPat(getPatsObject(), 0));
+    if (list == NULL) {
+        return;
+    }
+    profile += index;
+    profile->active_0x040 = 0;
+    memset(&profile->quest_id_0x190, 0, 292);
+    circle = &list->items_04[index];
+    if (circle == NULL) {
+        return;
+    }
+    profile->circle_id_0x004 = circle->id_000;
+    profile->name_0x008[0] = 0;
+    profile->active_0x040 = circle->limitA_170;
+    if (profile->active_0x040 == 0) {
+        return;
+    }
+    profile->capacity_0x03C = circle->limitB_174;
+    strcpy(profile->name_0x008, circle->name_008);
+    profile->address_0x01C.copyFrom((const u8*)&circle->smallObject_108);
+    NetworkRequest_copyRecord((NetworkSessionRecordBlock*)&profile->options_0x044,
+                              (const NetworkSessionRecordBlock*)&circle->options_128);
+    profile->rank_0x08C = circle->flag_180;
+    profile->flag_0x08D = circle->active_319;
+    profile->quest_id_0x190 = profile->options_0x044.slots_08[1].value_04;
+    profile->option_0x192 = profile->options_0x044.slots_08[0].value_04;
+    if (strlen(circle->comment_288) < 145) {
+        length = strlen(circle->comment_288);
+    } else {
+        length = 144;
+    }
+    memcpy(profile->comment_0x198, circle->comment_288, length);
+    profile->comment_0x198[length] = 0;
+    if (circle->recordCount_184 == 136) {
+        memcpy(&profile->labels_0x22C, circle->records_188, 136);
+        for (j = 0; j < 4; j++) {
+            profile->labels_0x22C.label_0x00[j][15] = 0;
+            profile->labels_0x22C.sublabel_0x40[j][15] = 0;
+            if (profile->labels_0x22C.count_0x80[j] > 8) {
+                profile->labels_0x22C.count_0x80[j] = 1;
+            }
+        }
+    } else {
+        memset(&profile->labels_0x22C, 0, 136);
+    }
 }
 
 /*
@@ -1166,7 +1306,7 @@ void onSessionCloseDone(s32 status, s32* values)
         member = profile->members_0x090;
         for (i = 0; i < 4; member++, i++) {
             if (member->joined_0x00 == 1) {
-                getNetworkSessionManagerPat(getPatsObject(), 0)->getPlayerRecord(i, (NetworkUniqueId*)&member->id_0x20);
+                getNetworkSessionManagerPat(getPatsObject(), 0)->getPlayerRecord(i, &member->id_0x20);
             }
         }
         work->start_done_0xC153 = 1;
@@ -1558,7 +1698,7 @@ u16 getSelectedQuestId(void)
     if (work->profile_index_0x170 < 0) {
         return 0;
     }
-    return work->profiles_0x168[work->profile_index_0x170].quest_0x058;
+    return work->profiles_0x168[work->profile_index_0x170].options_0x044.slots_08[1].value_04;
 }
 
 /*
@@ -1597,7 +1737,7 @@ s32 isSessionMemberId(const NetId* id)
     NetworkUniqueId address;
     s32 found;
 
-    importNetId((NetId*)&address, id);
+    importNetId(&address, id);
     found = isSessionMember(&address);
     return found;
 }
@@ -1636,7 +1776,7 @@ s8 lookupFriendSlot(const u8* id)
     NetworkUniqueId address;
     s8 slot;
 
-    importNetId((NetId*)&address, (const NetId*)id);
+    importNetId(&address, (const NetId*)id);
     slot = findSessionMemberSlot(&address);
     return slot;
 }
@@ -1827,6 +1967,171 @@ void installCommunityCallback(void)
         net_presence_record.pairs_0x04[3].kind_0x00 = 1;
         net_presence_record.pairs_0x04[3].value_0x04 = 0;
         postMediatorRecord(getInstance(), net_user_profile.record_0x9C);
+    }
+}
+
+/*
+ * Sends the whole profile block to the community layer, then raises the layer's presence record.
+ */
+void flushRosterSync(void)
+{
+    getNetworkCommunityPat(getPatsObject(), 0)->writeProfile_4C((const u8*)&net_user_profile, 0x100);
+    sendCheckRequest(1);
+    getNetworkLayerPat(getPatsObject(), 0)->setPresence_A0((const NetLayerSettings*)&net_presence_record);
+}
+
+/*
+ * Refreshes the profile's head (bytes 0..0x7C) from the save, rebuilds the first two presence pairs from it and
+ * writes both out (community command 12); `result` takes the outcome.
+ */
+void sendProfileHead(s8* result)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+
+    if (getNetworkCommunityPat(getPatsObject(), 0) == NULL) {
+        return;
+    }
+    if (fillNetUserProfileHead(&net_user_profile) == 0) {
+        return;
+    }
+    net_presence_record.pairs_0x04[0].value_0x04 = net_user_profile.region_0x05 << 24;
+    net_presence_record.count_0x00 = 4;
+    net_presence_record.pairs_0x04[0].kind_0x00 = 1;
+    net_presence_record.pairs_0x04[1].kind_0x00 = 1;
+    net_presence_record.pairs_0x04[1].value_0x04 =
+        net_user_profile.rank_0xF2 | ((net_user_profile.id_0x00 << 16) | (net_user_profile.level_0xF3 << 8));
+    work->profile_write_0xC148 = 2;
+    work->community_results_0xA144[12] = 0;
+    getNetworkCommunityPat(getPatsObject(), 0)
+        ->request_60((const u8*)&work->profile_write_0xC148, (s32)&net_user_profile, 0x7C, 0);
+    getNetworkLayerPat(getPatsObject(), 0)->setPresence_A0((const NetLayerSettings*)&net_presence_record);
+    sendCheckRequest(2);
+    work->result_0xC290 = result;
+    if (work->result_0xC290 != NULL) {
+        *work->result_0xC290 = 0;
+    }
+}
+
+/*
+ * Refreshes the profile bytes 0x7C..0x95 from the save and writes them out (community command 12).
+ */
+void sendProfileRange7C(s8* result)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+
+    if (getNetworkCommunityPat(getPatsObject(), 0) == NULL) {
+        return;
+    }
+    if (fillNetUserProfileRange7C(&net_user_profile) == 0) {
+        return;
+    }
+    work->community_results_0xA144[12] = 0;
+    work->profile_write_0xC148 = 2;
+    getNetworkCommunityPat(getPatsObject(), 0)
+        ->request_60((const u8*)&work->profile_write_0xC148, (s32)&net_user_profile, 25, 0x7C);
+    work->result_0xC290 = result;
+    if (work->result_0xC290 != NULL) {
+        *work->result_0xC290 = 0;
+    }
+}
+
+/*
+ * Refreshes the rank and level bytes from the save and writes them out (community command 12).
+ */
+void sendProfileRank(s8* result)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+
+    if (getNetworkCommunityPat(getPatsObject(), 0) == NULL) {
+        return;
+    }
+    if (fillNetUserProfileRank(&net_user_profile) == 0) {
+        return;
+    }
+    work->community_results_0xA144[12] = 0;
+    work->profile_write_0xC148 = 2;
+    getNetworkCommunityPat(getPatsObject(), 0)
+        ->request_60((const u8*)&work->profile_write_0xC148, (s32)&net_user_profile, 2, 239);
+    work->result_0xC290 = result;
+    if (work->result_0xC290 != NULL) {
+        *work->result_0xC290 = 0;
+    }
+}
+
+/*
+ * Refreshes the mediator record and the rank bytes from the save and writes bytes 0x9C..0xF4 out (community
+ * command 12).
+ */
+void sendProfileRecord(s8* result)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+
+    if (getNetworkCommunityPat(getPatsObject(), 0) == NULL) {
+        return;
+    }
+    if (fillNetUserProfileRecord(&net_user_profile) == 0) {
+        return;
+    }
+    if (fillNetUserProfileRank(&net_user_profile) == 0) {
+        return;
+    }
+    work->community_results_0xA144[12] = 0;
+    work->profile_write_0xC148 = 2;
+    getNetworkCommunityPat(getPatsObject(), 0)
+        ->request_60((const u8*)&work->profile_write_0xC148, (s32)&net_user_profile, 88, 0x9C);
+    work->result_0xC290 = result;
+    if (work->result_0xC290 != NULL) {
+        *work->result_0xC290 = 0;
+    }
+}
+
+/*
+ * The same write as `sendProfileRecord`, with `result` set to -1 first so a refused refresh reads as failed.
+ */
+void resendProfileRecord(s8* result)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+
+    if (getNetworkCommunityPat(getPatsObject(), 0) == NULL) {
+        return;
+    }
+    *result = -1;
+    if (fillNetUserProfileRecord(&net_user_profile) == 0) {
+        return;
+    }
+    if (fillNetUserProfileRank(&net_user_profile) == 0) {
+        return;
+    }
+    work->community_results_0xA144[12] = 0;
+    work->profile_write_0xC148 = 2;
+    getNetworkCommunityPat(getPatsObject(), 0)
+        ->request_60((const u8*)&work->profile_write_0xC148, (s32)&net_user_profile, 88, 0x9C);
+    work->result_0xC290 = result;
+    *work->result_0xC290 = 0;
+}
+
+/*
+ * Publishes whether this player is in a party: the profile's party byte (community command 12) and the first
+ * presence pair; `result` takes the outcome.
+ */
+void startRosterFetch(s8* result)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+
+    if (getNetworkCommunityPat(getPatsObject(), 0) == NULL) {
+        return;
+    }
+    work->community_results_0xA144[12] = 0;
+    net_user_profile.in_party_0xF9 = (work->flag_0xC379 == 1);
+    work->profile_write_0xC148 = 2;
+    getNetworkCommunityPat(getPatsObject(), 0)
+        ->request_60((const u8*)&work->profile_write_0xC148, (s32)&net_user_profile, 249, 1);
+    net_presence_record.pairs_0x04[0].value_0x04 = net_user_profile.in_party_0xF9 | (net_user_profile.region_0x05 << 24);
+    net_presence_record.pairs_0x04[0].kind_0x00 = 1;
+    getNetworkLayerPat(getPatsObject(), 0)->setPresence_A0((const NetLayerSettings*)&net_presence_record);
+    work->result_0xC290 = result;
+    if (work->result_0xC290 != NULL) {
+        *work->result_0xC290 = 0;
     }
 }
 
@@ -2124,7 +2429,7 @@ s32 communityReflectCallback(u32 command, s32 result, s32 count, void* data)
             s32 peer;
 
             work->community_results_0xA144[command] = 1;
-            peer = findPeerIndex((const NetId*)data);
+            peer = findPeerIndex((const NetworkUniqueId*)data);
             if (peer > 0) {
                 memcpy(&work->peers_0x7488[peer].blob_0x20, ((NetPeerCardUpdate*)data)->blob_0x28, 0x100);
             }
@@ -2175,7 +2480,7 @@ s32 communityReflectCallback(u32 command, s32 result, s32 count, void* data)
             work->community_results_0xA144[command] = result;
         } else {
             work->community_results_0xA144[command] = 1;
-            updatePeerCardBlock((const NetId*)data, ((NetPeerCardUpdate*)data)->blob_0x28,
+            updatePeerCardBlock((const NetworkUniqueId*)data, ((NetPeerCardUpdate*)data)->blob_0x28,
                                 ((NetPeerCardUpdate*)data)->size_0x24, ((NetPeerCardUpdate*)data)->offset_0x20);
         }
         break;
@@ -2278,7 +2583,7 @@ s32 communityReflectCallback(u32 command, s32 result, s32 count, void* data)
                 char id_text[0x14];
                 NetRosterRec* presence = (NetRosterRec*)data;
 
-                formatNetId(id_text, (const NetId*)&presence->address_0x00);
+                formatNetId(id_text, &presence->address_0x00);
                 if (presence->state_0x35 == 1) {
                     appendRosterEntry(presence);
                     addFriendNotice(id_text, presence->name_0x20);
@@ -2329,12 +2634,12 @@ s32 communityReflectCallback(u32 command, s32 result, s32 count, void* data)
 }
 
 /*
- * Renders a network id as text into `out` (ten bytes), printing every `%` as `*`.
+ * Renders the unique id `id` as its exported text into `out` (ten bytes), printing every `%` as `*`.
  */
-void formatNetId(char* out, const NetId* id)
+void formatNetId(char* out, const NetworkUniqueId* id)
 {
     memset(out, 0, 10);
-    ((const NetworkUniqueId*)id)->exportTo((u8*)out, 10);
+    id->exportTo((u8*)out, 10);
     for (; *out != 0; out++) {
         if (*out == '%') {
             *out = '*';
@@ -2343,23 +2648,23 @@ void formatNetId(char* out, const NetId* id)
 }
 
 /*
- * Imports the six raw bytes of a network id into the address object `dst`.
+ * Imports the six exported bytes `src` of a network id into the unique id `dst`.
  */
-void importNetId(NetId* dst, const NetId* src)
+void importNetId(NetworkUniqueId* dst, const NetId* src)
 {
-    ((NetworkUniqueId*)dst)->importFrom(3, (const u8*)src, 6);
+    dst->importFrom(3, (const u8*)src, 6);
 }
 
 /*
  * Whether the address object `left` holds the six raw id bytes `right` (1).
  */
-u32 isSameNetId(const NetId* left, const NetId* right)
+u32 isSameNetId(const NetworkUniqueId* left, const NetId* right)
 {
     NetworkUniqueId object;
     u32 same;
 
     object.importFrom(3, (const u8*)right, 6);
-    same = ((const NetworkUniqueId*)left)->equals(&object);
+    same = left->equals(&object);
     return same;
 }
 

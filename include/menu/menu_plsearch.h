@@ -36,6 +36,13 @@ void requestPatTermsCheck(struct PatTerms* terms);
 void requestPatTermsUpdate(struct PatTerms* terms);
 void cancelPatTermsUpdate(struct PatTerms* terms);
 u16 getPatTermsProgress(struct PatTerms* terms);
+/* 0x80450580 - the terms object's state step (a 21-case switch on its +0x0C state byte); nonzero once it rests
+ * (GUESS name: the mediator steps it every frame and spins on it in its destructor). */
+s32 updatePatTerms(struct PatTerms* terms);
+
+/* 0x804512E8 - runs the echo suppressor over `size` bytes of microphone input into `out` while the terms object is
+ * ready (GUESS name: the failure log reads "fail to suppress echo P-Mic"); returns the suppressor's result. */
+s32 suppressPatTermsEcho(struct PatTerms* terms, const u8* in, u8* out, s32 size);
 
 #ifdef __cplusplus
 }

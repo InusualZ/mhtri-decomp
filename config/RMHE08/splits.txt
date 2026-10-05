@@ -2083,7 +2083,7 @@ Network/NetworkPool.cpp:
 	.data       start:0x80602428 end:0x806024B8
 	.sdata      start:0x80793988 end:0x80793990
 	.sbss       start:0x80794CB8 end:0x80794CC0
-	.sdata2     start:0x8079C868 end:0x8079C874
+	.sdata2     start:0x8079C868 end:0x8079C870
 
 Network/NetworkWiiMediator.cpp:
 	extab       start:0x8001C9B4 end:0x8001CD94
@@ -2091,7 +2091,7 @@ Network/NetworkWiiMediator.cpp:
 	.text       start:0x80413450 end:0x80417BC0
 	.rodata     start:0x80570E70 end:0x80570E98
 	.data       start:0x806024B8 end:0x80602988
-	.sdata2     start:0x8079C874 end:0x8079C878
+	.sdata2     start:0x8079C870 end:0x8079C878
 
 Network/sNetworkLibrary.cpp:
 	extab       start:0x8001CD94 end:0x8001CE1C

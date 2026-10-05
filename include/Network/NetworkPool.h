@@ -36,6 +36,12 @@ public:
     void start();
     /* 0x8041793C (`Network/NetworkWiiMediator.cpp`) - whether the EC sequence is running (+0x44). */
     BOOL isECStarted();
+    /* 0x804127E8 - deletes the session object at +0x50 through its deleting destructor and clears the pointer
+     * (GUESS name; the mediator's `deleteNetworkPool` calls it before deleting the pool). */
+    void destroySession();
+    /* 0x8041283C - the per-frame step: dispatches on the +0x69/+0x68 bytes and the +0x60 mode to the step helpers
+     * (GUESS name; the mediator's `update` calls it once per frame). */
+    void update();
 
     /* +0x0004 */ u8  pad_0004[0x40];
     /* +0x0044 */ u8  ec_started;

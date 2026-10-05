@@ -20,8 +20,17 @@
 
 #include "types.h"
 
-/* the records the members take pointers to (defined in `Network/GameSpyInterfaceThread.h`) */
-struct GameSpyPeerId;
+/* the id pair `startNegotiation` starts a NAT negotiation from (here rather than in `Network/GameSpyInterfaceThread.h`:
+   `NetworkLayerPat` embeds one per friend slot) */
+typedef struct GameSpyPeerId {
+    /* +0x00 */ u32 peerId_00;
+    /* +0x04 */ u32 mode_04;
+    /* +0x08 */ u32 session_08;
+    /* +0x0C */ u16 port_0C;
+    /* +0x0E */ u16 pad_0E;
+} GameSpyPeerId;   /* size: 0x10 */
+
+/* the record the members take pointers to (defined in `Network/GameSpyInterfaceThread.h`) */
 class NetworkPeerGameSpy;
 
 /* --------------------------------------------------------------------------------------------- */
@@ -165,7 +174,7 @@ public:
     /* reports whether the interface can be closed right now */
     s32   canClose();
     /* reports whether a negotiation is running */
-    u8    isNegotiating();
+    BOOL  isNegotiating();
     /* reports the negotiation's outcome */
     u8    getNegotiationResult();
     /* returns this interface's own peer id */

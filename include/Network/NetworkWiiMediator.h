@@ -7,11 +7,10 @@
  * already mangled (`reflectInit__18NetworkWiiMediatorPFllllPvPv_vPv`, `getAccountBan__18NetworkWiiMediatorFPcUl`),
  * so the declarations below are chosen so MWCC mangles them back to those exact spellings.
  *
- * Only the methods the range defines are declared.  They are declared **non-virtual** on purpose:
- * the range's object stores no `.data` vtable (the class's vtable lives in another translation unit),
- * and a class whose virtuals are all defined in its own TU gains a 20-byte `.data` vtable (the same
- * finding the GameSpy interface unit's header records).  `reflectInit`'s first parameter is the callback
- * the retail body stores at +0x78C - the `PFllllPvPv_v` half of the mangled name.
+ * The two polymorphic classes are `NetworkMediator` (table 0x80602978) and `NetworkWiiMediator` (table
+ * 0x80602968): the unit defines both constructors and destructors and `NetworkWiiMediator::update`, so it emits
+ * both tables (rule 10).  The plain member functions are non-virtual.  `reflectInit`'s first parameter is the
+ * callback the retail body stores at +0x78C - the `PFllllPvPv_v` half of the mangled name.
  */
 #ifndef NETWORK_WII_MEDIATOR_H
 #define NETWORK_WII_MEDIATOR_H
@@ -20,6 +19,7 @@
 #include "Network/NetworkReflectService.h"   /* NetworkWiiMediatorReflectFn - the reflect service's callback type */
 #include "Network/gamespy_interface_types.h"
 #include "DWCi/dwc_nasfunc.h"               /* DWCSvlResult - owner DWCi/dwc_nasfunc.cpp */
+#include "menu/PatTerms.h"                  /* PatTerms - the member at +0x6DD8 (owner menu/menu_plsearch.cpp) */
 
 /* The mediator's field layout, traced from the disassembly: every offset below is one an instruction
  * in this unit addresses.  `buffer_A`/`buffer_B` are the two 0x106-byte blocks the accessors copy,
@@ -39,8 +39,75 @@ typedef struct NetworkWiiMediatorTransferSlot {
     /* +0x04 */ f32 level;
 } NetworkWiiMediatorTransferSlot;
 
-typedef struct NetworkWiiMediatorFields {
-    /* +0x000 */ u8  pad_000[0x18];
+/* The mediator interface `sNetworkLibrary` keeps (`mpMediator`) and the per-frame Pat update drives (its +0x0C
+ * slot): the table 0x80602978 holds the destructor 0x804136D0 and an empty (pure) +0x0C slot, the constructor
+ * 0x80413714 only stores it.  Class name GUESSED from the library pair `sNetworkLibrary` / `sNetworkLibraryWii`:
+ * the platform mediator derives from it the same way.  size: 0x04 */
+class NetworkMediator {
+public:
+    NetworkMediator();
+    /* +0x08 */ virtual ~NetworkMediator();
+    /* +0x0C (GUESS: the per-frame step `updateNetworkPat` dispatches) */ virtual void update() = 0;
+};
+
+
+/* The mediator singleton (table 0x80602968: the destructor 0x80413724 and `update` 0x804138EC).  Its fields are
+ * traced from the disassembly: every offset below is one an instruction in this unit addresses, and the
+ * constructor 0x80413480 clears every one of them. */
+class NetworkWiiMediator : public NetworkMediator {
+public:
+    NetworkWiiMediator();
+    virtual ~NetworkWiiMediator();
+    virtual void update();
+
+    void reflectInit(NetworkWiiMediatorReflectFn callback, void* arg);
+    void reflectStart();
+    void reflectStop();
+    void reflectFinal();
+    s32  getOpeningProgress();
+    s32  getOpeningTermsVersion();
+    s32  isOpeningMaintenanceTerms();
+    s32  isOpeningMaintenanceServer();
+    s32  isOpeningAnnounce();
+    char* getAccountBan(char* out, u32 size);
+    char* getAccountWarning(char* out, u32 size);
+    char* getAccountWaitQueue(char* out, u32 size);
+    void getReflectPage(u8 page);
+    void agreeReflect();
+
+    /* the opening part, 0x804155D4..0x80417BC0 (names GUESSED from the bodies) */
+    void deleteNetworkPool();
+    void ECStart();
+    char* getReflectName(char* out, u32 size);
+    void openTransferSlot(s8 slot, u8 mode, f32 level);
+    void closeTransferSlot(s8 slot);
+    void closeTransferSlots();
+    void clearTransferQueue(s8 slot);
+    s32  pushTransferRecord(s8 slot, const u8* data, s32 size);
+    s32  popTransferRecord(s8 slot, u8* out, s32 max);
+    /* 0x80416DB0 / 0x804171A4 / 0x80417294 - the microphone side the layer's `move` drives (GUESS names): read up
+     * to `size` bytes of samples from the terms (P-Mic) object while the transfer mode is on, whether `size` bytes
+     * of samples average below the silence floor, and whether the terms object's update has finished. */
+    s32  readVoice(u8* out, s32 size);
+    s32  isVoiceSilent(const s16* samples, s32 size);
+    u8   isVoiceReady();
+    u8   getTransferFlag6DD1();
+    u8   getTransferFlag6DD2();
+    f32  getTransferLevel();
+    void setTransferSlotMode(s8 slot, u8 mode);
+    BOOL getTransferSlotMode(s8 slot);
+    void setTransferSlotFlag(s8 slot, u8 flag);
+    u8   getTransferSlotFlag(s8 slot);
+    BOOL isTransferSlotReady(s8 slot);
+    void openingStart();
+    void openingStop();
+    void applyEvent(s32 code, s32 a, s32 b, s32 c, const GameSpyEventMsg* msg);
+
+    /* +0x004 */ u8  cleared_004[4];          /* +0x04..+0x17: five words only the constructor touches (GUESS names) */
+    /* +0x008 */ u8  cleared_008[4];
+    /* +0x00C */ u8  cleared_00C[4];
+    /* +0x010 */ u8  cleared_010[4];
+    /* +0x014 */ u8  cleared_014[4];
     /* +0x018 */ u32 event_flags;             /* `applyEvent` ORs the Pat events in: 1 error, 2 refused, 8 shut, 0x10 done */
     /* +0x01C */ u8  flag_1C;
     /* +0x01D */ u8  flag_1D;
@@ -59,20 +126,19 @@ typedef struct NetworkWiiMediatorFields {
     /* +0x05C */ u8  reflect_name_5C[0x20];
     /* +0x07C */ u8  buffer_A[0x106];
     /* +0x182 */ u8  buffer_B[0x106];
-    /* +0x288 */ u32 field_288;
-    /* +0x28C */ u8  pad_28C[0x3FE];
+    /* +0x288 */ u8  field_288[0x402];        /* the block `getMediatorField288` hands out (the constructor clears 0x402) */
     /* +0x68A */ u8  flag_68A;
-    /* +0x68B */ u8  name_buffer_68B;
-    /* +0x68C */ u8  pad_68C[0xFF];
+    /* +0x68B */ u8  name_buffer_68B[0x100];
     /* +0x78B */ u8  flag_78B;
     /* +0x78C */ u8  flag_78C;
     /* +0x78D */ u8  reflect_page[0x400];
     /* +0xB8D */ u8  pad_B8D[0x03];
-    /* +0xB90 */ u32 pat_terms_ptr;
-    /* +0xB94 */ u32 pat_maintenance_ptr;
+    /* +0xB90 */ u32 pat_terms_ptr;           /* the constructor points it at `terms_default` */
+    /* +0xB94 */ u32 pat_maintenance_ptr;     /* the constructor points it at `maintenance_default` */
     /* +0xB98 */ u32 pat_terms_size;
     /* +0xB9C */ u32 pat_maintenance_size;
-    /* +0xBA0 */ u8  pad_BA0[0x02];
+    /* +0xBA0 */ u8  terms_default;           /* the one-byte (empty) terms text the pointers start at */
+    /* +0xBA1 */ u8  maintenance_default;     /* the one-byte (empty) maintenance text */
     /* +0xBA2 */ u8  single_line_buffer[0x02];
     /* +0xBA4 */ char* line_table_a[0x400];
     /* +0x1BA4 */ char* line_table_b[0x400];
@@ -93,64 +159,9 @@ typedef struct NetworkWiiMediatorFields {
     /* +0x6DD2 */ u8  transfer_flag_6DD2;
     /* +0x6DD3 */ u8  pad_6DD3;
     /* +0x6DD4 */ f32 transfer_level;
-} NetworkWiiMediatorFields;  /* size: 0x6DD8 */
-
-/* The mediator singleton: its record is the field layout above (the entry points below take it as that
- * record); the class only adds the member functions this band defines. */
-class NetworkWiiMediator : public NetworkWiiMediatorFields {
-public:
-    /* 0x80413480 (`Network/network_layer_io.cpp`) - stores the table 0x80602968 at +0x00 after its base. */
-    NetworkWiiMediator();
-
-    void reflectInit(NetworkWiiMediatorReflectFn callback, void* arg);
-    void reflectStart();
-    void reflectStop();
-    void reflectFinal();
-    s32  getOpeningProgress();
-    s32  getOpeningTermsVersion();
-    s32  isOpeningMaintenanceTerms();
-    s32  isOpeningMaintenanceServer();
-    s32  isOpeningAnnounce();
-    char* getAccountBan(char* out, u32 size);
-    char* getAccountWarning(char* out, u32 size);
-    char* getAccountWaitQueue(char* out, u32 size);
-    void getReflectPage(u8 page);
-    void agreeReflect();
-
-    /* the opening part, 0x804155D4..0x80417BC0 (names GUESSED from the bodies) */
-    void ECStart();
-    char* getReflectName(char* out, u32 size);
-    void openTransferSlot(s8 slot, u8 mode, f32 level);
-    void closeTransferSlot(s8 slot);
-    void closeTransferSlots();
-    void clearTransferQueue(s8 slot);
-    s32  pushTransferRecord(s8 slot, const u8* data, s32 size);
-    u16  popTransferRecord(s8 slot, u8* out, s32 max);
-    u8   getTransferFlag6DD1();
-    u8   getTransferFlag6DD2();
-    f32  getTransferLevel();
-    void setTransferSlotMode(s8 slot, u8 mode);
-    BOOL getTransferSlotMode(s8 slot);
-    void setTransferSlotFlag(s8 slot, u8 flag);
-    u8   getTransferSlotFlag(s8 slot);
-    BOOL isTransferSlotReady(s8 slot);
-    void openingStart();
-    void openingStop();
-    void applyEvent(s32 code, s32 a, s32 b, s32 c, const GameSpyEventMsg* msg);
-
-    /* +0x6DD8 */ u8 terms_6DD8[0x8400];   /* a member object the constructor builds (0x804504F4) and the
-                                              destructor destroys (0x80450534); not modelled */
+    /* +0x6DD8 */ PatTerms terms;                /* the terms object (`getPatTerms` publishes it) */
 };   /* size: 0xF1D8 (the allocation `sNetworkLibraryWii::init` makes) */
 
-/* The mediator's own virtual slots, read through its table (0x80602968, emitted by
- * this unit once its constructor/destructor are written): the record view above keeps the table word inside `pad_000`, so a
- * dispatch through it is spelled through this view.  Nothing here is defined, so no table is emitted
- * (rule 10). */
-class NetworkWiiMediatorDispatch {
-public:
-    /* +0x08 */ virtual ~NetworkWiiMediatorDispatch();
-    /* +0x0C */ virtual void update();
-};   /* size: 0x04 (the object's leading table word) */
 
 
 #ifdef __cplusplus
@@ -159,30 +170,30 @@ extern "C" {
 
 /* The mediator's plain-named entry points (each takes the singleton `getInstance` returns, as its field
  * record); the parameter lists are this unit's own definitions'. */
-void resetMediatorState(NetworkWiiMediatorFields* self);
-void resetMediatorFlags(NetworkWiiMediatorFields* self);
-void resetMediatorFlag1D(NetworkWiiMediatorFields* self);
-void updateOpeningState(NetworkWiiMediatorFields* self, u32 slot, u32 address, u32 size);
-void updateTermVersion(NetworkWiiMediatorFields* self, u32 value);
-void updatePatInterface180(NetworkWiiMediatorFields* self, u32 a, u32 b, u32 c);
+void resetMediatorState(NetworkWiiMediator* self);
+void resetMediatorFlags(NetworkWiiMediator* self);
+void resetMediatorFlag1D(NetworkWiiMediator* self);
+void updateOpeningState(NetworkWiiMediator* self, u32 slot, u32 address, u32 size);
+void updateTermVersion(NetworkWiiMediator* self, u32 value);
+void updatePatInterface180(NetworkWiiMediator* self, u32 a, u32 b, u32 c);
 void loadPatInterfaceBuffers();
-s32 queryOpeningFlag278(NetworkWiiMediatorFields* self);
-s32 queryOpeningFlag2A8(NetworkWiiMediatorFields* self);
-s32 queryOpeningFlag2C0(NetworkWiiMediatorFields* self);
-void setReflectPageRange(NetworkWiiMediatorFields* self, u32 address, u32 size);
-void setReflectField30(NetworkWiiMediatorFields* self, u32 value);
-void setReflectField34(NetworkWiiMediatorFields* self, u32 value);
-void setReflectField38(NetworkWiiMediatorFields* self, u32 value);
-void setReflectName3C(NetworkWiiMediatorFields* self, char* name);
-void setReflectName5C(NetworkWiiMediatorFields* self, char* name);
+s32 queryOpeningFlag278(NetworkWiiMediator* self);
+s32 queryOpeningFlag2A8(NetworkWiiMediator* self);
+s32 queryOpeningFlag2C0(NetworkWiiMediator* self);
+void setReflectPageRange(NetworkWiiMediator* self, u32 address, u32 size);
+void setReflectField30(NetworkWiiMediator* self, u32 value);
+void setReflectField34(NetworkWiiMediator* self, u32 value);
+void setReflectField38(NetworkWiiMediator* self, u32 value);
+void setReflectName3C(NetworkWiiMediator* self, char* name);
+void setReflectName5C(NetworkWiiMediator* self, char* name);
 s32 dispatchReflectEvent();
-s32 getWarningUInt(NetworkWiiMediatorFields* self);
-char* getAccountName(NetworkWiiMediatorFields* self, char* out, u32 size);
+s32 getWarningUInt(NetworkWiiMediator* self);
+char* getAccountName(NetworkWiiMediator* self, char* out, u32 size);
 /* the mediator state byte at +0x68A (the session state machine sets and reads it) */
-void setMediatorState68A(NetworkWiiMediatorFields* self, u8 value);
+void setMediatorState68A(NetworkWiiMediator* self, u8 value);
 /* 0x8041517C - splits reflect text source `source` (0..2) into the line tables */
-void parseReflectLines(NetworkWiiMediatorFields* self, s32 source);
-void getMediatorState68A(NetworkWiiMediatorFields* self, u8* out);
+void parseReflectLines(NetworkWiiMediator* self, s32 source);
+void getMediatorState68A(NetworkWiiMediator* self, u8* out);
 
 /* The mediator's mirrors of the `PatInterface` state: the singleton's constructor reads them (the reflect page range,
  * fields and names, the reply buffer, the two server blocks, the flags and the ticket) and its destructor writes the
@@ -190,21 +201,21 @@ void getMediatorState68A(NetworkWiiMediatorFields* self, u8* out);
  * written (docs/plan.md 6.5 rule 2: the owner declares).  `getReflectPageBuffer` is the retired
  * `NetworkWiiMediator.c` symbol, carried across verbatim. */
 void getReflectPageBuffer(char* self, char** subobject, unsigned int* limit);
-void setMediatorBufferA(NetworkWiiMediatorFields* self, const u8* src);
-void getMediatorBufferA(NetworkWiiMediatorFields* self, u8* dst);
-void setMediatorBufferB(NetworkWiiMediatorFields* self, const u8* src);
-void getMediatorBufferB(NetworkWiiMediatorFields* self, u8* dst);
-void getMediatorNameBuffer(NetworkWiiMediatorFields* self, u32* out1, u8* out2);
-void setMediatorFlag78B(NetworkWiiMediatorFields* self, u8 value);
-void getMediatorField288(NetworkWiiMediatorFields* self, u32* out);
-void setMediatorFlag78C(NetworkWiiMediatorFields* self, u8 value);
-void getMediatorFlag78C(NetworkWiiMediatorFields* self, u8* out);
-void getReflectPageRange(NetworkWiiMediatorFields* self, u32* out1, u32* out2);
-void getReflectField30(NetworkWiiMediatorFields* self, u32* out);
-void getReflectField34(NetworkWiiMediatorFields* self, u32* out);
-void getReflectField38(NetworkWiiMediatorFields* self, u32* out);
-void getReflectName3C(NetworkWiiMediatorFields* self, char* out, u32 size);
-void getReflectName5C(NetworkWiiMediatorFields* self, char* out, u32 size);
+void setMediatorBufferA(NetworkWiiMediator* self, const u8* src);
+void getMediatorBufferA(NetworkWiiMediator* self, u8* dst);
+void setMediatorBufferB(NetworkWiiMediator* self, const u8* src);
+void getMediatorBufferB(NetworkWiiMediator* self, u8* dst);
+void getMediatorNameBuffer(NetworkWiiMediator* self, u32* out1, u8* out2);
+void setMediatorFlag78B(NetworkWiiMediator* self, u8 value);
+void getMediatorField288(NetworkWiiMediator* self, u32* out);
+void setMediatorFlag78C(NetworkWiiMediator* self, u8 value);
+void getMediatorFlag78C(NetworkWiiMediator* self, u8* out);
+void getReflectPageRange(NetworkWiiMediator* self, u32* out1, u32* out2);
+void getReflectField30(NetworkWiiMediator* self, u32* out);
+void getReflectField34(NetworkWiiMediator* self, u32* out);
+void getReflectField38(NetworkWiiMediator* self, u32* out);
+void getReflectName3C(NetworkWiiMediator* self, char* out, u32 size);
+void getReflectName5C(NetworkWiiMediator* self, char* out, u32 size);
 
 #ifdef __cplusplus
 }

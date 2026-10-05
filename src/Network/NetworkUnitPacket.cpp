@@ -15,32 +15,38 @@
  *   CRC at +0x12 and the two key bytes at +0x14/+0x15) and its payload.  Every value goes through the network
  *   library's byte-order slots (`getNetworkLogger()`'s +0x48..+0x54).
  *
- * CLASS MODEL (residual). The functions the three tables 0x805FCD98 / 0x805FCDD4 / 0x805FCE10 point at (the
- *   writers' `attach`/`bind`/`fill`/`flush` overrides, the queue's destructor) are written as the free functions
- *   their callers in other units already name (`networkPacket_attach`, `networkStreamReader_attach`, ...); the
- *   tables stay unemitted until those callers move to member calls (request net3-c-47f5#9).
+ * CLASS MODEL (residual). The queue is the class `NetworkStreamQueue : NetworkStreamSink`
+ *   (`Network/network_writer_types.h`): its constructor and destructor (0x803FA5F4/0x803FA63C) are defined here, so
+ *   this unit emits its table 0x805FCD98 (`__vt__18NetworkStreamQueue`).  The functions the two writer tables
+ *   0x805FCDD4 / 0x805FCE10 point at (the writers' `attach`/`bind`/`fill`/`flush` overrides) are still written as
+ *   the free functions their callers in other units already name (`networkPacket_attach`,
+ *   `networkStreamReader_attach`, ...); those two tables stay unemitted until the overrides become members (their
+ *   destructors live in `lobby/lb_server_sel_trans.cpp`, which would also need its weak copies kept out of ours).
  *
- * UNWRITTEN. The queue's constructor and destructor (0x803FA5F4/0x803FA63C) store the queue's table 0x805FCD98, so
- *   they wait for the queue class (request net3-c-47f5#9).  The sink's +0x30/+0x34/+0x38 slots are typed from the
- *   calls here (`encrypt`/`decrypt`/`checksum`, GUESS names): the forwarding overrides re-narrow the offset and size
- *   to u16, so the slots take u16.  `networkStreamReader_decryptFrame`, `networkStreamReader_test` and the two
- *   overrides `networkStreamWriter_encrypt`/`_decrypt` are GUESS names.
+ * NAMES. The sink's +0x30/+0x34/+0x38 slots are typed from the calls here (`encrypt`/`decrypt`/`checksum`, GUESS
+ *   names): the forwarding overrides re-narrow the offset and size to u16, so the slots take u16.
+ *   `networkStreamReader_decryptFrame`, `networkStreamReader_test` and the two overrides
+ *   `networkStreamWriter_encrypt`/`_decrypt` are GUESS names; `NetworkStreamQueue` is the project's name for the
+ *   log strings' `NetworkUnitPacketPool`.
  *
- * RESIDUALS (measured). 89 of 98 rows at 100 %.  `networkPacket_getMessageSize` 98.75: retail returns a u16 (its own
+ * RESIDUALS (measured). 91 of 98 rows at 100 %.  `networkPacket_getMessageSize` 98.75: retail returns a u16 (its own
  *   callers re-mask it), but `Network/NetworkSessionStable.cpp`'s `send` loses 2.3 points with a u16 declaration, so
  *   the header keeps u32 and the callers here cast; `networkPacket_copyMessage` 98.05 (the same u16 return, and
  *   operand order in two address sums); `beginMessage` 99.36, `getHeaderSize` 99.71, `takeByte` 99.20,
- *   `putTopPacket` 99.74, `acknowledge` 99.00: operand order / one register.  `.data`: the tables stay unemitted
- *   (above); `extab` 592 of 608 B (the queue's constructor and destructor records).
+ *   `putTopPacket` 99.74, `acknowledge` 99.00: operand order / one register.  `.data`: the two writer tables stay
+ *   unemitted (above; `dataorder` also reads a zigzag seam at 0x805FCE10 because those tables' referrers sit in
+ *   `lobby/lb_server_sel_trans.cpp`).  `extab` 608 B, 2 bytes differ: `networkStreamQueue_discard`'s cleanup range
+ *   ends at the `hasMessage` call in retail (0x11 words) and at `memmove` in ours (0x1B) - retail's `memmove` is
+ *   treated as non-throwing; a `throw()` on the declaration does not move it.  `.sdata` 2 of 8 B (the frame version;
+ *   the rest is the alignment tail before the next unit).
  *
  * FLAGS. `cflags_network` with `-O3` like the transport siblings; file-scope `#pragma peephole off` and
  *   `#pragma dont_inline on` (retail calls every helper).
  */
 
 #include "Network/NetworkUnitPacket.h"
-#include "Network/network_writer_types.h"        /* NetworkStreamWriter, NetworkStreamWriterDefault */
+#include "Network/network_writer_types.h"        /* NetworkStreamWriter, NetworkStreamWriterDefault, NetworkStreamQueue */
 #include "Network/NetworkUniqueId.h"
-#include "Network/NetworkSessionStable.h"         /* NetworkStreamQueue - declared there until request net3-c-47f5#9 */
 #include "unsplit/Network.h"                     /* getNetworkLogger - no registered owner */
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
@@ -868,6 +874,22 @@ s32 networkStreamReader_test(NetworkStreamWriterDefault* self)
     }
     return 1;
 }
+
+}
+
+/* Builds an empty queue: the sink's block, sequence 0 and no read cursor. */
+NetworkStreamQueue::NetworkStreamQueue()
+{
+    sequence_10 = 0;
+    cursor_14 = NULL;
+}
+
+/* Releases the queue; the block belongs to the caller. */
+NetworkStreamQueue::~NetworkStreamQueue()
+{
+}
+
+extern "C" {
 
 /* Appends the packet's current message under `mask`; the bytes, or a negative result. */
 s32 networkStreamQueue_append(NetworkStreamQueue* self, NetworkStreamWriter* packet, u32 mask)

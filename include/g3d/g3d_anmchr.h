@@ -76,6 +76,8 @@ u16 getGlyphWidth(const char* glyph);
  * also declared by `include/unsplit/lobby.h`, with the same signature, so a consumer may include
  * both. */
 void font_set_size(s16 x, s16 y);
+/* 0x8005B740 `flfntGetPosX__Fv` (`g3d_anmchr.cpp`, C++ scope) - the font pen's x position. */
+s16 flfntGetPosX(void);
 void font_flush(void);
 void font_print_ex(s16 x, s16 y, s16 flag, s8* fmt, ...);
 

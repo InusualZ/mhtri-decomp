@@ -80,7 +80,7 @@
  */
 #include "Network/NetworkPat.h"
 #include "Network/sNetworkLibraryWii.h"   /* sNetworkLibrary, constructNetworkWiiMediator, registerNetworkObject */
-#include "Network/NetworkWiiMediator.h"   /* NetworkWiiMediatorDispatch */
+#include "Network/NetworkWiiMediator.h"   /* NetworkMediator - the interface the per-frame update dispatches through */
 #include "Network/PatInterface.h"         /* getInstance_, stepPatInterface */
 #include "unsplit/Network.h"              /* getNetworkLogger */
 #include "sound/fn_800E46E8.h"            /* getInstance - the mediator accessor */
@@ -174,7 +174,7 @@ void updateNetworkPat(NetworkPat* holder)
         ((sNetworkLibrary*)getNetworkLogger())->updateTime();
     }
     if (getInstance() != NULL) {
-        ((NetworkWiiMediatorDispatch*)getInstance())->update();
+        ((NetworkMediator*)getInstance())->update();
     }
     if (getInstance_() != NULL) {
         stepPatInterface(getInstance_());
