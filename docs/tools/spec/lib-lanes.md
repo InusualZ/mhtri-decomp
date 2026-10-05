@@ -56,8 +56,13 @@ lane->wtsafe and slots->lanecmd are gone). Import the module you need; `lanes/__
   has it - `slots.py spawn`'s unit set), `your_tree_lines`/`teardown_lines`/`tree_block` (the block every lane gets, one copy for the brief and
   `slots.py spawn`).
 * `landlog`: `Attempt` (branch, outcome in `landed`/`refused`/`conflict`/`error`, seconds, refused row, conflicted
-  paths, units, commit), `append(main, attempt)` (one line to `.pi/land-log.jsonl`), `read` (records plus the numbers
-  of unreadable lines), `summary`.
+  paths, units, commit, `allow`, `warnings`), `append(main, attempt)` (one line to `.pi/land-log.jsonl`), `read` (records plus the
+  numbers of unreadable lines), `allowance_counts`, `summary` (adds `allowances`, `warning_rows` and `schemas`). **Schema 2**
+  (2026-10-05) adds `allow`: a dict of the allowance classes `ALLOW_CLASSES` the command line granted -
+  `regression` (units), `rule10` (keys), `rule12` (tokens), `orphan` (addresses), `unit_renames` (`OLD=NEW`) as
+  lists, `no_outbox`/`no_selftests` as `true`; an unused class is absent and an unknown one is refused. Readers accept
+  `SCHEMAS` = 1 and 2 (a schema-1 line carries no allowance). Schema 2 also carries `warnings` (the gate's WARNING
+  rows' findings, `<row>: <finding>`).
 
 ## Invariants and rules
 
@@ -69,8 +74,9 @@ lane->wtsafe and slots->lanecmd are gone). Import the module you need; `lanes/__
   probing this replaces is deleted (`retired.md`).
 * The landing log hook (WP4, `tools/units/landing/flow.py`): `t0 = time.time()` before the landing, then in a
   `finally` `landlog.append(main, landlog.Attempt(branch, outcome, time.time() - t0, refused_row=row,
-  conflicts=tuple(paths), units=tuple(units), commit=sha))`; a failure to write the log is a warning, never a
-  different answer.
+  conflicts=tuple(paths), units=tuple(units), commit=sha, allow=allowances))` - `allowances` is
+  `landing.state.allowances(...)`, taken when the attempt opens, so a refusal records its allowances too; a failure
+  to write the log is a warning, never a different answer.
 
 ## Test contract
 

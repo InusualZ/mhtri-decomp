@@ -30,11 +30,20 @@ def test_cli(c):
         c.check("the summary names the outcomes and the refusing row",
                 ("landed 1, refused 2" in text, "  2  flipcheck READY" in text, "landed ratio 33%" in text),
                 (True, True, True))
+        c.check("... and says no allowance was recorded", "allowances: none recorded" in text, True)
+        lib.append(main, lib.Attempt("worker/d-4", "landed", 30.0, commit="def5678",
+                                     allow={"rule10": ["run:.data:1", "run:.data:2"], "no_outbox": True}))
+        rc, text = _run(["summary", "--main", main])
+        c.check("the summary prints the allowance counts per class",
+                "allowances: rule10 1 attempt(s), 2 entries; no_outbox 1 attempt(s), 1 entry" in text, True)
+        rc, text = _run(["list", "--main", main, "--last", "1"])
+        c.check("list names the allowance classes of an attempt", "[allow: no_outbox, rule10]" in text, True)
+        lib.append(main, lib.Attempt("worker/c-3", "refused", 20.0, refused_row="flipcheck READY"))
         rc, text = _run(["list", "--main", main, "--last", "1"])
         c.check("list --last 1 prints the newest attempt only", (text.count("\n"), "worker/c-3" in text), (1, True))
         rc, text = _run(["--main", main, "--json"])
         c.check("--json is the lib's summary plus the unreadable lines",
-                (json.loads(text)["outcomes"]["refused"], json.loads(text)["unreadable_lines"]), (2, []))
+                (json.loads(text)["outcomes"]["refused"], json.loads(text)["unreadable_lines"]), (3, []))
 
 
 if __name__ == "__main__":

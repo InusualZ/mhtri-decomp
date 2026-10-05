@@ -355,8 +355,9 @@ ninja`, then `ninja build/RMHE08/report.json` + `land.py record-base`.
 The failure: `rule7_defer_growth` listed `defs[:3]` and a batch that renamed exactly the 3 shown was refused
 again (it defined 8; one unit had 33). Two lanes lost a unit of work each. A refusal message lists every
 offender and leads with the count. Same class: a batch **must name the symbols its own units define** and
-register at a **named path** (a `fn_XXXXXXXX.c` path is refused) - only references to other units' symbols
-were ever deferrable, and now nothing is (§11).
+register at a **named path** - only references to other units' symbols were ever deferrable, and now nothing is
+(§11). The row that refused a `fn_XXXXXXXX.c` path (behind a grown `rule 7 deferred` escape only) was deleted
+2026-10-05; no check reads a unit's file stem now (69 `src/**/fn_XXXXXXXX.c*` units, section 4).
 
 **R14 — An edit anchored on a heading eats the heading.**
 The failure: an `Edit` whose anchor was a `**HEADING.**` line replaced it, so the next paragraph lost its title.
@@ -392,20 +393,27 @@ refuses a batch, names the row that refused, and the landing either passes every
   unit the batch may not have touched; name exactly the unit it names in `--units` (a rename does **not**
   re-range a neighbour - `verifyunit.target_object_fingerprint` drops names by design; the row's test is not the
   fingerprint alone, so do not guess at renames). A deliberate neighbour re-range needs `--units <neighbour>`
-  **and** `--allow-regression <neighbour>` when a function legitimately leaves it (`--allow-regression` is
-  refused as stale when not needed).
+  **and** `--allow-regression <neighbour>` when a function legitimately leaves it (a stale `--allow-regression` is
+  a printed and logged warning since 2026-10-05, no longer a refusal).
 * **A path is not a unit.** `is_batch_path` says "path" on a file extension *or* something in the tree at that
   exact path; a unit's bare name is never a file. A tools-only/docs-only/comment-only batch names its paths (or,
   for a sweep with no registration diff, every unit) in `--units`; a tooling file left staged after a fixer batch
   needs its own commit (the gate warns *"the index holds N path outside this batch"*).
-* **Expect a BOOKKEEPING bounce from a lane outbox** and reach for `--no-outbox` when the real rows are green:
+* **The outbox row is a warning since 2026-10-05** (printed, in the commit body and the land log; `--no-outbox` is no
+  longer needed to get past it; the branch-commits row still refuses). The record it checks remains strict:
   the outbox row validates one unit per branch (a 2+ unit branch can never satisfy it), attributes renames
   strictly, wants `flags_probed[].verdict` in `reject`/`adopt`/`inconclusive`, and rejects an unknown
   `config_requests` kind (`seam`). A header named in `--units` once demanded residual/flags for a non-unit path
   (`unit_units` fix pending; check: `land.py` outbox row).
-* **Lane-side pre-check for rule 7:** `land.rule7_defer_growth(<worktree>, <base>)` and
-  `land.band_ownership_warnings(...)` must both return `[]`; two lanes were refused after a full unit for not
-  running them. Rule 2/7 sweeps also need `handoff.py --check` at 0 errors.
+* **Lane-side pre-check for rule 7:** `python tools/units/stylelint.py --diff main` adds no violation and
+  `land.band_ownership_warnings(...)` returns `[]`; two lanes were refused after a full unit for not running the
+  pre-check. Rule 2/7 sweeps also need `handoff.py --check` at 0 errors. (Gate row 8, the `rule 7 deferred`
+  escape-growth row, was deleted 2026-10-05: the replay over 313 gated commits found it refusing none.)
+* **Open for the owner: rule 7 does not read `include/` or file names.** The lint checks rule 7 in `src/` only:
+  measured 2026-10-05, 286 headers carry 2,975 generated-name lines (`fn_` 1,751, `lbl_`/`loc_` 1,017, `unk` 207),
+  195 headers and 69 `src/` units are named by a generated stem, and nothing reports any of it (row 8's file-stem
+  check fired only behind a grown escape). Extending rule 7 to headers and stems would be a grandfathered extension
+  of about 3,000 findings (`--diff` keeps existing ones from blocking); not built - the owner rules.
 * **The data-closure row** ("no batch unit's target object references data no claim covers"): every data address a
   batch unit's *target* object relocates against must sit in some `splits.txt` range, and a recut must not leave a
   claimed byte unclaimed. Add-only over `(unit, address)` pairs - `record-base` snapshots the ~13.5k pre-existing
@@ -494,6 +502,21 @@ refuses a batch, names the row that refused, and the landing either passes every
   commit unless the batch names it (`CLAUDE.md`/`docs/plan.md` did): land the orchestrator-side tools/docs batch
   first. `land` refuses off `main`. A commit to main mid-flight does not endanger a running lane (`record-base`
   re-reads main).
+* **Rule 10 pairs a shifted run, never a grown one** (2026-10-05): the row decides with `vtableaudit.diff_rows`; a
+  `run:` key whose start and end each moved by at most one word against a removed run of its section is SHIFTED (its
+  first or last word stopped resolving), anything else - a run that grew over its neighbours included - is added.
+  Replayed on three landings by building each landing and its parent (current `vtableaudit`): `7210b07c9` (window b,
+  21 recorded allowances) reproduces all 21 as additions and still needs all 21 - the 12 `run:` keys are new tables the
+  window claimed, not shifts; `850127ccb` (recut, 3 allowances) still needs 3 (the overlap-only pairing would have
+  passed 2 of them silently, a 630-word run over a 7-word one); `35fe065d8` (L1 round 2) adds none under either rule.
+  The expected drop of `run:` allowances to about 0 did not happen: they were real. Over every landing of the land
+  log (24, 2026-10-04/05, each built with its parent) the two rules give the same added set; only `850127ccb` (3) and
+  `35d86a517` (2) add any key.
+* **Every allowance is recorded, in two places** (2026-10-05): the landing log line (`.pi/land-log.jsonl`, schema 2,
+  field `allow`: `regression`, `rule10`, `rule12`, `orphan`, `no_outbox`, `no_selftests`, `unit_renames`) and the
+  commit body (one `allow: <class> <entries>` line per class). Before that only `--allow-regression` reached the
+  commit body and the log held none, although section 11 (2026-10-01) said allowances were recorded;
+  `python tools/units/landlog.py` prints the counts.
 * **Landing a whole branch:** `land.py land --branch worker/<x>` (a `-named` branch too) derives `--units`; the
   orchestrator's whole landing is that one command - never read the lane report (R9).
 * **` M <file>` with an empty `git diff` is EOL churn.** It refuses with *"main's tree is not clean"*;
@@ -921,7 +944,9 @@ open request is a stylelint finding).
   terms wrappers). Ledger across round 2: closed 8359 -> 8472, matched 6145 -> 6255, bytes 758,416 -> 787,208. No two
   lanes conflicted on a header. Integrator cost per lane 22-37 min (`integrate.py` itself 1-2 min). The land log
   (`.pi/land-log.jsonl`, `python tools/units/landlog.py`) counted 14 attempts: 10 landed; the 4 refusals were
-  bookkeeping (a `config.yml` change in a unit batch, a missing outbox, nothing to stage), none a gate failure.
+  bookkeeping (a `config.yml` change in a unit batch, a missing outbox, nothing to stage), none a gate failure
+  (correction 2026-10-05: a `nothing to stage` row of that log was most likely a post-build gate refusal the log
+  mislabelled - section 12).
 * **Gate refusals worth remembering.** `flipcheck` refuses a Matching flip when a section is 4 B short of its claim
   (the alignment tail) even when the DOL hash holds: keep such units NonMatching. A unit average that drops only
   because functions moved to a neighbour takes `--allow-regression <unit>`. A batch that carries
@@ -937,7 +962,8 @@ open request is a stylelint finding).
   module (`--cross-module` opts out); `vtableaudit --diff` keys are rename-stable and the removed set is printed;
   `unitscore --baseline`, `fnasm.py`, `tryvar` variants and `doclinks.py` exist. Still open: a stopgap form for a missing
   field or slot on another lane's class (design in `docs/tools/spec/stopgap-views.md`, build only if a round hits it
-  again); the gate still decides rule 10 by set difference (adopt `vtableaudit.diff_rows`'s SHIFTED pairing); a
+  again); the gate deciding rule 10 by set difference (done 2026-10-05: the row uses `vtableaudit.diff_rows`, whose
+  pairing now needs both ends within one word - see the rule-10 bullet in section 4); a
   cascading compiler error can exclude a declaration that was fine; the lane brief should require a build check after
   `git merge main` (L3's merged base did not compile until the integrator fixed `exportTo`).
 * **Round 3 (2026-10-05).** Recut first (integrator batch `850127ccb`: 363 units, mediator folded with network_opening,
@@ -1030,6 +1056,13 @@ Grouped by cause; each cost a lane ~30 min the first time.
   (measured 2026-09-30, see "Selftest flakes").
 * **Shell.** A heredoc **truncates silently** when a second one follows (R8); prefer the file tool for long text.
   `m2c` needs `-t ppc-mwcc-c` (the default MIPS rejects `stwu`) and its `.s` needs a space after each comma.
+* **A `nothing to stage` land-log row before 2026-10-05 is usually a post-build GATE refusal.** `verify` handed `land`
+  only its pre-build failures, so a red build refused with "the gate failed" naming no row and the log recorded
+  `nothing to stage`. The 2026-10-05 06:57 line (`worker/net4-a-3e78`) is the proof: its captured gate output
+  (`.pi/tmp/l4a.out`) refused on the undefined-reference row with the branch already at its integrate commit; the four
+  lines of 2026-10-04 (14:08, 17:06, 19:53, 21:55, about 200 s each) ran the same code, their outputs are gone, and two
+  of their retries carry the fix for a post-build row (`de74ae758` landed with `--allow-regression`, `850127ccb` with
+  the recut's `--allow-rule10` keys). Fixed: the post-build failures now reach `land`, which names the row.
 * **Staleness.** `report.json` and `build/` are only current if you proved it (§7, R10, R12); `ok` prints OK off a
   stale `main.dol` and never sees an uncompiled `NonMatching` object (R6). `build/binutils`
   may be empty (`ninja tools`); `symdiff.py -u <unit>` lists every symbol (a bulk scorer over `report.json` was

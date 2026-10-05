@@ -1,15 +1,13 @@
-"""The rule rows: the style lint (rule 12's allowance), rule 2's band boundary, rule 7's escape, rule 10.
+"""The rule rows: the style lint (rule 12's allowance), rule 2's band boundary, rule 10.
 Spec: docs/tools/spec/landing.md. CLI: none (a module of the `land.py` gate)."""
 from __future__ import annotations
 
 import json
 import os
-import re
 import sys
 
 from tools.lib import project as _project
 from tools.lib.lanes import naming
-import tools.units.briefing.sources as brief_sources
 import tools.units.stylelint_rules.api as sl
 import tools.units.vtableaudit as vta
 from tools.units.landing import state
@@ -148,113 +146,6 @@ def _declared_names_at(main: str, base: str, rel: str) -> set[str]:
     return {name for name, _line in sl.header_declarations(sl.Source(rel, rel, p.stdout))}
 
 
-def _defer_count(text: str) -> int:
-    """How many `rule 7 deferred: <reason>` declarations a file carries.
-
-    The spelling is still matched by `stylelint.RULE7_DEFER_RE`, but the lint no longer honours it (the
-    no-exemption ruling deleted the key); this row is a second, narrower guard on the escape's growth.
-    """
-    return len(sl.RULE7_DEFER_RE.findall(text))
-
-
-# a file name (or a symbol) that is a generated stem rather than a name: rule 7's defect class.
-_GENERATED_STEM_RE = re.compile(r"^(?:fn|lbl|unk)_[0-9A-Fa-f]{8}$")
-
-
-_GENERATED_FN_RE = re.compile(r"\bfn_[0-9A-Fa-f]{8}\s*\(")
-
-
-def generated_fn_definitions(text: str) -> list[str]:
-    """The generated `fn_XXXXXXXX` names `text` *defines* (a body, not a prototype) - the file's own.
-
-    Rule 7's escape defers the `fn_` half of a file, and the ruling is that it may only defer names the
-    file does not own: `void fn_802B2978(void);` is a *reference* to another unit's symbol and is
-    tolerated, while `void fn_802B2978(void) { ... }` is this file's own name left generated. The test
-    is syntactic, on stylelint's comment-and-literal-blanked `code` view: the `(` after a generated
-    name must close on a `{` rather than on a `;`.
-    """
-    code = sl.strip(text)[0]
-    out: list[str] = []
-    for m in _GENERATED_FN_RE.finditer(code):
-        depth, i = 0, m.end() - 1
-        while i < len(code):
-            if code[i] == "(":
-                depth += 1
-            elif code[i] == ")":
-                depth -= 1
-                if depth == 0:
-                    break
-            i += 1
-        j = i + 1
-        while j < len(code) and code[j] in " \t\r\n":
-            j += 1
-        if j < len(code) and code[j] == "{":
-            out.append(m.group(0).rstrip(" \t("))
-    return sorted(set(out))
-
-
-def rule7_defer_growth(main: str, base: str | None) -> list[str]:
-    """The batch's OWN symbols left generated behind a `rule 7 deferred` escape - the naming refusal.
-
-    The owner's ruling (2026-09-26) is a hybrid, and this row enforces the batch's own half only: a
-    generated name is never a resting place for a unit being written, so a file that *grows* an escape
-    may not (1) be registered at a generated file name (`src/enemy/fn_8033041C.cpp`) or (2) leave a
-    generated `fn_` name **defined** by it.
-
-    References to *other* units' unrenamed symbols are tolerated - they are not this batch's to fix,
-    and in a wholly unnamed region they are most of rule 7's findings (the 803253bc lane: 42 of 68
-    findings were callee names owned by ~10 other units, with 0 rename candidates anywhere in the
-    band). The escape also stays available for the files registered before the rule, so this is a
-    check on GROWTH, not on presence: rewriting a header that already carries the comment is safe
-    (1 -> 1 passes); adding one to a file that did not have it is examined. `grep -rn "rule 7
-    deferred" src/` remains the complete list of files that use it.
-
-    A *bodyless* file is not examined even when its escape is new: this row only judges a written unit,
-    and the file's name is provisional - `enemy/fn_8033041C.cpp` is the seam re-draw's second half, whose
-    band has no name evidence at all. The *lint* is not so lenient - its key 2 is gone, so a bodyless file's
-    generated names are `--diff` additions that refuse a batch on their own. When the unit is written it
-    grows bodies and this row then demands the name too (`ef/fn_803432B4.cpp`, 33 generated definitions, is
-    refused for exactly that).
-
-    Returns one line per offender, sorted. `[]` when `base` is unknown, no source file changed, or the
-    growth is in files that name their own symbols.
-    """
-    if not base:
-        return []
-    touched = run(["git", "diff", "--name-only", base, "--", "src", "include"], main)
-    if touched.returncode != 0 or not (touched.stdout or "").strip():
-        return []
-    offenders: list[str] = []
-    for rel in touched.stdout.split():
-        if not rel.endswith((".c", ".cpp", ".h", ".hpp", ".cc")):
-            continue
-        new_text = ""
-        path = os.path.join(main, rel)
-        if os.path.exists(path):
-            new_text = open(path, encoding="utf-8", errors="replace", newline="").read()
-        old = run(["git", "show", "%s:%s" % (base, rel)], main)
-        if _defer_count(new_text) <= _defer_count(old.stdout if old.returncode == 0 else ""):
-            continue
-        # a bodyless unit is not "being written" yet: it is rule-7-exempt anyway (key 2, stylelint's own
-        # `text_has_bodies`) and its file name is provisional - `enemy/fn_8033041C.cpp` is the seam
-        # re-draw's second half, whose band has no name evidence at all. Once it carries bodies the row
-        # demands the name (the 803432b4 unit is the case: 33 generated definitions, refused).
-        if not brief_sources.text_has_bodies(new_text):
-            continue
-        if _GENERATED_STEM_RE.match(os.path.splitext(os.path.basename(rel))[0]):
-            offenders.append("%s: registered at a generated file name" % rel)
-            continue
-        defs = generated_fn_definitions(new_text)
-        if defs:
-            # The list must be COMPLETE: a worker who renames only the names it was shown is refused again
-            # on the next run, and that loop cost two lanes a full unit of work each (the 803432b4 unit
-            # defines 33 generated names, the eft053 batch 8 - both messages showed only three). The count
-            # goes first so the scale of the job is visible in one line.
-            offenders.append("%s: defines %d generated name(s): %s"
-                             % (rel, len(defs), ", ".join(defs)))
-    return sorted(offenders)
-
-
 def rule10_violations(main: str, text_ref: str | None = None) -> dict | None:
     """`{key: {"unit", "where", "kind"}}` for every rule-10 violation in the tree as it stands.
 
@@ -275,8 +166,8 @@ def rule10_violations(main: str, text_ref: str | None = None) -> dict | None:
     rename = vta.rename_map(main, text_ref) if text_ref else {}
     rows = {}
     for key, row in vta.violation_rows(sweep, rename).items():
-        rows[key] = {"unit": naming.norm_unit(row["unit"]), "kind": row["kind"],
-                     "where": row["where"]}
+        # every field kept: a `run:` row's section/address/words are what `vtableaudit.diff_rows` pairs on
+        rows[key] = dict(row, unit=naming.norm_unit(row["unit"]))
     return rows
 
 
@@ -284,11 +175,14 @@ def rule10_growth(before: dict, after: dict, units: list[str]) -> tuple[list[str
     """`(added_keys, rows_for_the_batch_units)` - the rule-10 row's decision, as a pure function.
 
     ADD-only, like the lint's `--diff`: a key present before the batch is grandfathered, a key the batch
-    introduced is a refusal. The second element is the report the row prints even when it passes - the
+    introduced is a refusal. "Introduced" is `vtableaudit.diff_rows`'s verdict - the one implementation `--diff`
+    uses - so a `run:` key that moved because the run's first word stopped (or started) resolving as a code
+    pointer is SHIFTED (paired with the removed run it overlaps in the same section), not added; a `ref:` key is
+    a set difference as before. The second element is the report the row prints even when it passes - the
     violation set for the units the batch touches, so a silent pass (rule 10's old "landing review"
     classification) cannot happen again.
     """
-    grew = sorted(set(after) - set(before))
+    grew = vta.diff_rows(before, after)["added"]
     mine = {naming.norm_unit(u) for u in units}
     touched = [after[k]["where"] for k in sorted(after) if after[k]["unit"] in mine]
     return grew, touched
@@ -510,20 +404,6 @@ def band_row(b: Batch) -> None:
                  else "no newly-owned symbol left declared in include/unsplit/*.h")
 
 
-def rule7_row(b: Batch) -> None:
-    """8. no batch leaves its own symbols generated behind a `rule 7 deferred` escape (`rule7_defer_growth`)."""
-    defer_growth = rule7_defer_growth(b.main, b.base)
-    b.check("no batch leaves its own symbols generated behind a `rule 7 deferred` escape",
-            not defer_growth,
-            detail="%d file(s) grew a `rule 7 deferred` escape for a name the batch owns: %s"
-                   % (len(defer_growth), "; ".join(defer_growth[:4])),
-            remedy="name the symbols the batch's own unit defines - derive a name from context and mark "
-                   "the guess in the unit header - and register the unit at a named path; an added reference "
-                   "to another unit's unrenamed symbol is now a stylelint `--diff` finding too, so name it as "
-                   "well",
-            info="no file in the batch grew a `rule 7 deferred` escape")
-
-
 def rule10_before(b: Batch) -> None:
     """Rule 10's BEFORE snapshot, taken before `configure.py` re-splits: text at the batch base, objects as built."""
     b.extra["rule10_before"] = rule10_violations(b.main, text_ref=b.base)
@@ -537,6 +417,13 @@ def rule10_row(b: Batch) -> None:
                 info="vtableaudit could not read this tree - the row is skipped (see the note above)")
         return
     grew, touched_rows = rule10_growth(before, after, b.unit_units)
+    delta = vta.diff_rows(before, after)
+    if delta["shifted"] or delta["removed"]:
+        # the pairing is printed, never silent: a reader can check each SHIFTED pair is one table
+        print("rule 10: %d shifted (added run overlapping a removed run of its section - the same table, not an "
+              "addition): %s; %d removed: %s"
+              % (len(delta["shifted"]), "; ".join("%s <- %s" % (a, r) for a, r in delta["shifted"]) or "-",
+                 len(delta["removed"]), "; ".join(delta["removed"]) or "-"))
     # A sanctioned claim is accepted by an explicit, recorded allowance (`--allow-rule10 <key>`) - never by a key
     # in a file - and the acceptance is printed so the landing's own log carries the exception **and** the key it
     # excused. An allowance that matches nothing stays out of `accepted` and the row still refuses.
@@ -546,11 +433,13 @@ def rule10_row(b: Batch) -> None:
     if accepted:
         print("rule 10: %d authorised by --allow-rule10 (recorded, not a file-level exemption): %s"
               % (len(accepted), "; ".join(accepted)))
+    pairing = ("%d shifted, %d removed; " % (len(delta["shifted"]), len(delta["removed"]))
+               if delta["shifted"] or delta["removed"] else "")
     b.check("rule 10 (vtable ownership) adds no violation", not grew,
             detail="%d added: %s" % (len(grew), "; ".join(grew[:4])),
-            info=("rule 10 report for this batch: %s" % "; ".join(touched_rows)) if touched_rows
-                 else "no owned-but-unemitted code-pointer run or own-range vtable write in the batch's "
-                      "units",
+            info=pairing + (("rule 10 report for this batch: %s" % "; ".join(touched_rows)) if touched_rows
+                            else "no owned-but-unemitted code-pointer run or own-range vtable write in the "
+                                 "batch's units"),
             remedy="declare the class with its `virtual` methods and let MWCC emit the table and the "
                    "store (rule 10 / playbook 52), or claim the `.data` range and emit it; run "
                    "`python tools/units/vtableaudit.py --unit <unit>` for the detail")

@@ -27,7 +27,7 @@ from tools.units.stylelint_rules.refs import (
     unresolved_declarations_at_ref,
 )
 from tools.units.stylelint_rules.report import (
-    budget, print_budget, print_findings, print_findings_listing, select_findings,
+    budget, print_budget, print_findings, print_findings_listing, rule10_counts, select_findings,
 )
 import tools.units.stylelint_rules.refs as _refs
 
@@ -313,8 +313,9 @@ def main(argv: list[str] | None = None) -> int:
                                "budget" + (" + band headers" if args.headers else ""), args.json, args.path,
                                args.rule)
         return 0
+    rule10, rule10_note = rule10_counts(root) if (args.json or args.budget) else (None, "")
     if args.json:
-        print(json.dumps({"budget": budget(findings),
+        print(json.dumps({"budget": budget(findings, rule10),
                           "rule11_locals": rule11_local_total(root),
                           "rule13_static_like": rule13_static_like_total(root),
                           "rule2_gaps": dict(ownership.gaps) if ownership else {},
@@ -324,7 +325,7 @@ def main(argv: list[str] | None = None) -> int:
                           "unchecked": [{"rule": n, "why": w} for n, w in UNCHECKED],
                           "exempt": exemptions()}, indent=2))
     elif args.budget:
-        print_budget(findings, ownership, root)
+        print_budget(findings, ownership, root, rule10, rule10_note)
     else:
         print_findings(findings)
     return 0

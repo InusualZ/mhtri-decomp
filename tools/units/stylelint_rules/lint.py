@@ -14,7 +14,7 @@ from tools.units.stylelint_rules.r01_shared_type import rule1_findings
 from tools.units.stylelint_rules.r02_extern import (
     rule2_band_findings, rule2_findings, rule2_header_findings, stopgap_findings,
 )
-from tools.units.stylelint_rules.r10_pragma import codegen_pragma_findings
+from tools.units.stylelint_rules.r14_pragma import codegen_pragma_findings
 from tools.units.stylelint_rules.r11_untyped import rule11_findings, rule11_local_count
 from tools.units.stylelint_rules.r12_unclaimed_data import rule12_findings
 from tools.units.stylelint_rules.r13_method import rule13_findings, rule13_static_like, set_rule13_context
@@ -40,7 +40,7 @@ def lint_source(src: Source, ownership: "Ownership | None" = None) -> list[dict]
     if is_shared_header(src.rel):
         out.extend(stopgap_findings(src))
         # an ordinary `include/` header: rules 2 and 12 are the section-6.5 rules it carries. Rules 3-9 are
-        # body/`src/` rules, and rules 10/11 for headers are reported by `header_pragma_findings` and
+        # body/`src/` rules, and rules 14/11 for headers are reported by `header_pragma_findings` and
         # `header_rule11_findings` rather than here (2026-09-28). Rule 12 is here because a header is where
         # the unowned data a `src/` unit reads is declared (2026-09-28).
         if ownership is not None:
@@ -73,7 +73,7 @@ def lint_source(src: Source, ownership: "Ownership | None" = None) -> list[dict]
 
 
 def header_pragma_findings(root: str) -> list[dict]:
-    """Rule 10 over the whole shared-header tree (`include/`).  Not part of `lint_source`, which runs
+    """Rule 14 over the whole shared-header tree (`include/`).  Not part of `lint_source`, which runs
     rules 3-9 on `src/` files and rule 2 on the band; a header is judged by this rule only."""
     out = []
     for path in header_files(root):

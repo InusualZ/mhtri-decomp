@@ -12,11 +12,8 @@ RULE7_UNK_RE = re.compile(r"\bunk\w*\b")
 # sibling. Ownership is deliberately **not** consulted any more: a label left generated is a finding in
 # every file that spells it, own, foreign or unowned alike.
 RULE7_LBL_RE = re.compile(r"\b(?:lbl|loc)_[0-9A-Fa-f]{8}\b")
-# The `rule 7 deferred: <reason>` spelling is no longer a key - a comment exempts nothing. The regex is
-# kept because `land.py`'s `rule7_defer_growth` still refuses a batch that *adds* the escape (a second,
-# stricter row on top of rule 7 firing on the generated names themselves). `[ \t]*` rather than `\s*`
-# keeps the declaration and its non-empty reason on one line.
-RULE7_DEFER_RE = re.compile(r"rule[ \t]*7[ \t]+deferred[ \t]*:[ \t]*\S")
+# The `rule 7 deferred: <reason>` spelling is not a key - a comment exempts nothing - and nothing matches it
+# any more (the gate row that judged its growth was deleted 2026-10-05; rule 7 fires on the names themselves).
 
 
 def findings(src: Source, fields: list[Field]) -> list[dict]:

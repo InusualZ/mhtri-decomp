@@ -742,35 +742,35 @@ def selftest() -> int:
                                                "void GameSpyInterfaceThread_getInstance(void);\n"),
                                         new_map)), 1)
 
-    # --- rule 10: a codegen pragma belongs to a TU, not to a shared header ------------------------
+    # --- rule 14 (was 10 until 2026-10-05): a codegen pragma belongs to a TU, not to a shared header -
     hdr = "include/stage/fn_802B2AA0.h"
 
     def pragmas_of(text: str, rel: str = hdr) -> list[int]:
         return [f["line"] for f in codegen_pragma_findings(Source("x", rel, text))]
 
-    check("rule10: peephole in a shared header is a finding", pragmas_of("#pragma peephole off\n"), [1])
-    check("rule10: optimization_level in a shared header is a finding",
+    check("rule14: peephole in a shared header is a finding", pragmas_of("#pragma peephole off\n"), [1])
+    check("rule14: optimization_level in a shared header is a finding",
           pragmas_of("#pragma optimization_level 2\n"), [1])
-    check("rule10: fp_contract in a shared header is a finding",
+    check("rule14: fp_contract in a shared header is a finding",
           pragmas_of("#pragma fp_contract on\n"), [1])
-    check("rule10: an indented pragma is still found", pragmas_of("    #pragma peephole off\n"), [1])
-    check("rule10: a pragma in a .cpp is not reported",
+    check("rule14: an indented pragma is still found", pragmas_of("    #pragma peephole off\n"), [1])
+    check("rule14: a pragma in a .cpp is not reported",
           codegen_pragma_findings(Source("x", "src/enemy/em019_prog.cpp", "#pragma peephole off\n")), [])
-    check("rule10: a pragma in a .c is not reported",
+    check("rule14: a pragma in a .c is not reported",
           codegen_pragma_findings(Source("x", "src/foo.c", "#pragma peephole off\n")), [])
-    check("rule10: a commented pragma is clean", pragmas_of("/* #pragma peephole off */\n"), [])
-    check("rule10: a pragma named in a line comment is clean",
+    check("rule14: a commented pragma is clean", pragmas_of("/* #pragma peephole off */\n"), [])
+    check("rule14: a pragma named in a line comment is clean",
           pragmas_of("// #pragma peephole off\n"), [])
-    check("rule10: `#pragma once` is not a codegen pragma", pragmas_of("#pragma once\n"), [])
-    check("rule10: `#pragma pack` is not a codegen pragma", pragmas_of("#pragma pack(4)\n"), [])
-    check("rule10: the finding names the pragma and the fix",
+    check("rule14: `#pragma once` is not a codegen pragma", pragmas_of("#pragma once\n"), [])
+    check("rule14: `#pragma pack` is not a codegen pragma", pragmas_of("#pragma pack(4)\n"), [])
+    check("rule14: the finding names the pragma and the fix",
           [f["detail"] for f in codegen_pragma_findings(Source("x", hdr, "#pragma peephole off\n"))],
           ["codegen pragma `#pragma peephole` in a shared header - state it in the `.c`/`.cpp` that "
            "needs it, never in the header"])
-    check("rule10: the report is a rule-10 finding",
-          [f["rule"] for f in codegen_pragma_findings(Source("x", hdr, "#pragma peephole off\n"))], [10])
+    check("rule14: the report is a rule-14 finding (plan 6.5 rule 10 is vtableaudit's)",
+          [f["rule"] for f in codegen_pragma_findings(Source("x", hdr, "#pragma peephole off\n"))], [14])
     if os.path.exists(hdr):
-        check("rule10: the motivating header is clean after the fix",
+        check("rule14: the motivating header is clean after the fix",
               codegen_pragma_findings(Source(hdr, hdr, read_text(hdr))), [])
 
     # --- rule 11: no `void *` parameter or return type -------------------------------------------
@@ -1033,8 +1033,39 @@ def selftest() -> int:
     set_rule13_context(None)
 
     # --- end-to-end over the fixtures -------------------------------------------------------------
-    check("e2e: rule list is complete", sorted(RULE_NAMES), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13])
+    check("e2e: rule list is complete", sorted(RULE_NAMES), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
     check("e2e: no rule is declared unchecked", UNCHECKED, [])
+
+    # --- the budget's rule-10 column is vtableaudit's (2026-10-05); the pragma check is rule 14 ------------
+    check("rule 10 is an audit rule, never a lint finding", (AUDIT_RULES, 14 in RULE_NAMES), (
+        {10: "tools/units/vtableaudit.py"}, True))
+    fake = [{"rule": 7, "file": "src/a/x.cpp"}, {"rule": 14, "file": "include/a/x.h"}]
+    for f in fake:
+        f.setdefault("detail", "")
+    b10 = budget(fake, {"src/a/x.cpp": 2, "src/a/y.cpp": 1})
+    check("budget: the audit's counts fill the r10 column per file and the total; `findings` stays the lint's",
+          (b10["totals"]["10"], b10["totals"]["14"], b10["totals"]["7"], b10["total"], b10["findings"],
+           [(u["file"], u["rules"]["10"], u["total"]) for u in b10["units"]], b10["rule10"]),
+          (3, 1, 1, 5, 2, [("include/a/x.h", 0, 1), ("src/a/x.cpp", 2, 3), ("src/a/y.cpp", 1, 1)],
+           {"source": "tools/units/vtableaudit.py", "violations": 3}))
+    check("budget: no audit (None) leaves the column 0 and says so", (budget(fake)["totals"]["10"],
+                                                                     budget(fake)["rule10"]), (0, None))
+    with tempfile.TemporaryDirectory() as aroot:
+        os.makedirs(os.path.join(aroot, "tools", "units"))
+        audit = os.path.join(aroot, "tools", "units", "vtableaudit.py")
+        with open(audit, "w", encoding="utf-8") as fh:
+            fh.write("import json\nprint(json.dumps({'violations': [{'unit': 'a/x.cpp'}, {'unit': 'a/x.cpp'}], "
+                     "'references': [{'kind': 'own', 'file': 'src/a/y.cpp'}, {'kind': 'external', 'file': "
+                     "'src/a/z.cpp'}], 'unbuilt': []}))\n")
+        counts, note = rule10_counts(aroot)
+        check("rule10_counts: a run counts against src/<unit>, an own-range write against its file, nothing else",
+              counts, {"src/a/x.cpp": 2, "src/a/y.cpp": 1})
+        check("... and the note names the audit, the total and the file count",
+              ("vtableaudit" in note, "3 violation(s) over 2 file(s)" in note), (True, True))
+        with open(audit, "w", encoding="utf-8") as fh:
+            fh.write("import sys\nsys.exit(2)\n")
+        check("rule10_counts: an audit that cannot read the tree is (None, why), never a crash or a 0 pass",
+              rule10_counts(aroot)[0], None)
     check("e2e: findings sort by rule then line",
           rules_of(text), sorted(rules_of(text)))
 
@@ -1238,7 +1269,7 @@ def selftest() -> int:
         dput("config/RMHE08/splits.txt",
              "other/other_unit.c:\n\t.text       start:0x80002000 end:0x80002010\n")
         dput("src/other/other_unit.c", "void owned_fn(void) {}\n")
-        # one finding of each header rule: rule 10 (a codegen pragma), rule 11 (`void *` parameter), rule
+        # one finding of each header rule: rule 14 (a codegen pragma), rule 11 (`void *` parameter), rule
         # 12 (`extern` of data no registered range claims).
         dput("include/mod/a.h",
              "#pragma pool\nvoid takes_void_star(void *p);\nextern u8 unowned_data[];\n")
@@ -1253,7 +1284,7 @@ def selftest() -> int:
         check("... the base header really carried one finding of each header rule",
               sorted(f["rule"] for f in (codegen_pragma_findings(base_src) + rule11_findings(base_src)
                                           + rule12_findings(base_src, base_own))),
-              [10, 11, 12])
+              [11, 12, 14])
         # the rename, committed on `lane`, so both comparisons (working tree `--diff`, read-only `--ref`)
         # measure it the same way
         dgit("checkout", "-q", "-b", "lane")

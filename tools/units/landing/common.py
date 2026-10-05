@@ -287,6 +287,7 @@ class Batch:
     paths: list[str] = field(default_factory=list)
     scratch: list[str] = field(default_factory=list)
     band_warnings: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)   # `warn` rows' findings: the gate log, the message, the land log
     subject: str = ""
     extra: dict = field(default_factory=dict)
 
@@ -295,6 +296,18 @@ class Batch:
         """Append one row (`lib.findings.Row`): PASS/FAIL from `good`, `detail` shown on a failure, `info` on a
         pass, `kind` GATE or BOOKKEEPING, `remedy` what to do."""
         self.checks.append(_findings.Row.check(name, good, detail, info, kind, remedy))
+
+    def warn(self, name: str, found: list[str], info: str = "", kind: str = KIND_BOOKKEEPING,
+             remedy: str = "") -> None:
+        """A WARNING row (`<name> (warning)`): always PASS, never a refusal. Each finding is printed as `WARNING:
+        <name>: <finding>` and kept on `warnings`, which the commit body and the landing log carry."""
+        for item in found:
+            print("WARNING: %s: %s" % (name, item))
+        self.warnings.extend("%s: %s" % (name, item) for item in found)
+        self.check(name + " (warning)", True,
+                   info=("WARNING (%d): %s%s" % (len(found), "; ".join(found[:4]),
+                                                  (" - " + remedy) if remedy else "")) if found else info,
+                   kind=kind, remedy=remedy)
 
     @property
     def ok(self) -> bool:

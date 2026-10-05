@@ -1,4 +1,4 @@
-"""The invocation's recorded allowances (`--allow-rule10/12`, `--allow-orphan`) and `--unit-rename` pairs.
+"""The invocation's recorded allowances (`--allow-rule10/12`, `--allow-orphan`), `--unit-rename` pairs, and their record.
 Spec: docs/tools/spec/landing.md. CLI: none (a module of the `land.py` gate)."""
 from __future__ import annotations
 
@@ -110,3 +110,37 @@ def set_allow_rule12(tokens: list[str] | None) -> None:
     """
     global ALLOW_RULE12                                                   # noqa: PLW0603 - one invocation
     ALLOW_RULE12 = [t.strip() for t in (tokens or []) if t and t.strip()]
+
+
+def allowances(allow_regression: list[str] | None = None, check_outbox: bool = True,
+               no_selftests: bool = False) -> dict:
+    """Every allowance this invocation grants, as the landing log's `allow` (`lib.lanes.landlog.ALLOW_CLASSES`).
+
+    The flag arguments are the ones that travel as parameters (`--allow-regression`, `--no-outbox`,
+    `--no-selftests`); the rest is this module's state. A list class keeps the command line's order with
+    duplicates dropped; a flag class is `True`; an unused class is absent, so a landing with none is `{}`.
+    """
+    def uniq(items) -> list[str]:
+        return list(dict.fromkeys(i.strip() for i in (items or []) if i and i.strip()))
+
+    out: dict = {}
+    for cls, items in (("regression", allow_regression), ("rule10", ALLOW_RULE10), ("rule12", ALLOW_RULE12),
+                       ("orphan", ALLOW_ORPHAN)):
+        if uniq(items):
+            out[cls] = uniq(items)
+    if not check_outbox:
+        out["no_outbox"] = True
+    if no_selftests:
+        out["no_selftests"] = True
+    pairs = ["%s=%s" % (old, new) for old, news in UNIT_RENAME_LISTS.items() for new in news]
+    if pairs:
+        out["unit_renames"] = pairs
+    return out
+
+
+def allow_lines(allow: dict) -> list[str]:
+    """One `allow: <class> <entries>` line per allowance class - the commit body's record (`allowances`)."""
+    lines = []
+    for cls, value in allow.items():
+        lines.append("allow: %s%s" % (cls, "" if value is True else " " + ", ".join(value)))
+    return lines

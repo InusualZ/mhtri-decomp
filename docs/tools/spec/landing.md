@@ -8,8 +8,8 @@ gate. The behaviour, the rows and the incidents behind them are `land.md`; this 
 ## Users
 
 `land.py` (the shim); the tools that import `land` keep their names through `landing.api` (`prepcommit`:
-`read_base`, `ledger_numbers`; `merge/mergebranch`: `rule7_defer_growth`, `band_ownership_warnings`,
-`units_from_branch`; the briefing prints `land.rule7_defer_growth` / `land.band_ownership_warnings` commands).
+`read_base`, `ledger_numbers`; `merge/mergebranch`: `band_ownership_warnings`, `units_from_branch`; the briefing
+prints the `land.band_ownership_warnings` command beside `stylelint.py --diff main`).
 
 ## Layout (WP4)
 
@@ -17,10 +17,13 @@ gate. The behaviour, the rows and the incidents behind them are `land.md`; this 
   `config.yml` change, `config_verdict` -, `is_scratch`, `unit_owned_paths`), the row KIND and the
   refusal wording (`failing_checks`, `failure_summary`), `run`/`git`, `read_base`, `worktree_root`
   (`lib.repo.worktree_root`)/`main_root`, the
-  compile targets, and `Batch`: one `verify` run (inputs, the `lib.findings.Row`s so far, the values a later row
+  compile targets, and `Batch`: one `verify` run (inputs, the `lib.findings.Row`s so far, `warn` - a WARNING row that
+  never refuses, its findings kept on `warnings` for the message and the landing log -, the values a later row
   reads). Imports nothing of the package.
 * `state.py` - the invocation's recorded allowances (`--allow-rule10/12`, `--allow-orphan`) and `--unit-rename`
-  pairs, read as `state.<NAME>` (a re-exported copy would not see a setter's rebinding).
+  pairs, read as `state.<NAME>` (a re-exported copy would not see a setter's rebinding); `allowances` folds them with
+  `--allow-regression`/`--no-outbox`/`--no-selftests` into the landing log's `allow` and `allow_lines` into the commit
+  body's `allow:` lines. The CLI is the one path that sets them (`flow.land` takes no `allow_rule10`).
 * `base.py` - `record-base` and the readers it stores (ledger, report snapshot, dirty set); the object and data
   halves of the snapshot come from `rows/objects.py` and `rows/data.py`. Its report rebuild runs the registry's `report`
   command (`lib.artifacts`) unconditionally - ninja judges freshness, a no-op is 0.06 s.
@@ -31,10 +34,10 @@ gate. The behaviour, the rows and the incidents behind them are `land.md`; this 
 * `release.py` - `release_plan`, `release_unit` (the one `claims.release` call), the release rows.
 * `rows/` - one function per row, appending to a `Batch`; grouped by what they read: `tree.py` (ground truth, the
   base, the batch-path guard and scratch, conflict markers, the branch guards, the pre-flight), `batch.py` (outbox,
-  branch commits), `rules.py` (style lint with rule 12's allowance, rule 2's band boundary, rule 7's escape, rule
-  10), `selftests.py` (the suite row), `subject.py` (commitlint), `build.py` (command rows, the compile gate, the
+  branch commits), `rules.py` (style lint with rule 12's allowance, rule 2's band boundary, rule 10), `selftests.py` (the suite row), `subject.py` (commitlint), `build.py` (command rows, the compile gate, the
   `ok` stamp), `objects.py` (`verifyunit`, `undefrefs`, `flipcheck`: registration, references, drift, re-measure),
-  `data.py` (`dataclosure`), `regression.py` (`lib.report.regression`), `knowledge.py` (7.10).
+  `data.py` (`dataclosure`), `regression.py` (`lib.report.regression`); `knowledge.py` (7.10) was deleted
+  2026-10-05 with its row.
 * `gate.py` - `verify`: `PRE_BUILD` rows in order, then the build and the rows that read it, the message body.
 * `flow.py` - `land` and `land_branch` (gate -> stage -> commit -> release, one answer line).
 * `cli.py` - the parser and `main`; `--selftest` forwards to the test modules.

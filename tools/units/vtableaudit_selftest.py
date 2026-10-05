@@ -554,6 +554,19 @@ def selftest() -> int:
                        {"run:.data:80050100": {"kind": "run", "section": ".data", "address": 0x80050100,
                                                "words": 3, "unit": "u", "where": ""}}),
           {"added": ["run:.data:80050100"], "removed": ["run:.data:80050200"], "shifted": []})
+    # the 2026-10-04 recut (850127ccb): a 630-word run over a removed 7-word run overlaps it but is not that table
+    check("... and a run that GREW over a removed one (overlap, but both ends moved) is added, not shifted",
+          va.diff_rows({"run:.data:805FBD68": {"kind": "run", "section": ".data", "address": 0x805FBD68,
+                                               "words": 7, "unit": "u", "where": ""}},
+                       {"run:.data:805FB808": {"kind": "run", "section": ".data", "address": 0x805FB808,
+                                               "words": 630, "unit": "u", "where": ""}}),
+          {"added": ["run:.data:805FB808"], "removed": ["run:.data:805FBD68"], "shifted": []})
+    check("... and a one-word move at the END (the last word stopped resolving) still pairs",
+          va.diff_rows({"run:.data:80050100": {"kind": "run", "section": ".data", "address": 0x80050100,
+                                               "words": 4, "unit": "u", "where": ""}},
+                       {"run:.data:80050104": {"kind": "run", "section": ".data", "address": 0x80050104,
+                                               "words": 4, "unit": "u", "where": ""}}),
+          {"added": [], "removed": [], "shifted": [["run:.data:80050104", "run:.data:80050100"]]})
     with tempfile.TemporaryDirectory() as tmp:
         def rg(*args: str) -> str:
             return subprocess.run(["git", "-c", "user.email=selftest@example.invalid",

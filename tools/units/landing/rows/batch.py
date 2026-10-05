@@ -1,4 +1,4 @@
-"""The batch rows: every unit's outbox validates and its branch carries its work as commits (BOOKKEEPING).
+"""The batch rows: every unit's branch carries its work as commits (BOOKKEEPING); its outbox validates (a warning).
 Spec: docs/tools/spec/landing.md. CLI: none (a module of the `land.py` gate)."""
 from __future__ import annotations
 
@@ -153,8 +153,9 @@ def branch_problems(main: str, units: list[str], branch: str | None = None) -> l
 # --- the rows -------------------------------------------------------------------------------------------------
 
 def outbox_rows(b: Batch) -> None:
-    """4. every unit's outbox validates and its branch carries its work as commits (BOOKKEEPING); an
-    orchestrator-only batch says so; a batch that names no unit is refused."""
+    """4. every unit's branch carries its work as commits (BOOKKEEPING refusal - the only "the work exists" test);
+    its outbox validates (a WARNING since 2026-10-05: a bookkeeping record, printed and logged, never a refusal);
+    an orchestrator-only batch says so; a batch that names no unit is refused."""
     if b.unit_units and b.check_outbox:
         # NOTE: a fresh name for the outbox problems. Reusing the `problems` out-parameter here rebound it
         # locally and the failed-check list never reached the caller's `land` refusal (2026-09-26).
@@ -164,10 +165,8 @@ def outbox_rows(b: Batch) -> None:
             b.check("every unit's outbox validates", True, info=skip_note)
         else:
             _ok_units, outbox_problems = outbox_units(b.main, b.unit_units, branch=b.branch)
-            b.check("every unit's outbox validates", not outbox_problems, "; ".join(outbox_problems[:4]),
-                    kind=KIND_BOOKKEEPING,
-                    remedy="the source is fine - have the worker re-run brief.py to rewrite its outbox, or re-run "
-                           "with --no-outbox for an orchestrator-only batch")
+            b.warn("every unit's outbox validates", outbox_problems,
+                   remedy="have the worker re-run brief.py to rewrite its outbox (the landing does not wait for it)")
         # a `--force` release leaves the work at refs/rescue/<slug>. `branch_problems` already accepts that
         # ref as the branch's work, and the landing path (never `--dry-run`, which touches nothing) restores
         # the real branch from it so the teardown still has a branch to release (2026-09-26 case (a)).

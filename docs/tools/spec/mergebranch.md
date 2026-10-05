@@ -50,7 +50,8 @@ Tier: fixture (GitFixture).
 ## Known gaps
 
 * `newline_of` is `lib.text.line_ending` over the whole blob (it read the first 64 KiB): a file whose first CRLF lies past 64 KiB now restores as CRLF (WP3f; 0 such files in the tree when measured).
-* The pre-flight still imports `land.py` (lazily, never fatal) for `rule7_defer_growth`, `band_ownership_warnings` and `units_from_branch`: those move with the gate's rows in WP4.
+* The pre-flight still imports `land.py` (lazily, never fatal) for `band_ownership_warnings` and `units_from_branch`
+  (`rule7_defer_growth` went with gate row 8, 2026-10-05; the lint's `--diff` is the rule-7 check).
 
 ## History (the incidents behind the rules - keep the rule, drop the narrative when the rule is stable)
 

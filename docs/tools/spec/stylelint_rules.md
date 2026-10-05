@@ -23,13 +23,13 @@ None: modules. The CLI is `stylelint.py`'s (`cli.main`), spec `stylelint.md`.
 
 | module | holds |
 | --- | --- |
-| `common` | paths (`SRC`, `HEADERS`, `UNSPLIT`...), `RULE_NAMES`, `EXEMPT`/`RULE7_NOTES`/`UNCHECKED`, `Source` (a `lib.cscan.Text` with paths), the `lib.cscan` views, `type_defs`, `field_name` + `Field`/`field_walk` (the one field walk rules 4, 5 and 7 read), `_finding`/`_rule2_finding`, `_untyped_marker` (rule 11's and 13's marker window), the tree walks |
+| `common` | paths (`SRC`, `HEADERS`, `UNSPLIT`...), `RULE_NAMES` (1-14), `AUDIT_RULES` (rule 10 is vtableaudit's: no lint finding carries it), `EXEMPT`/`RULE7_NOTES`/`UNCHECKED`, `Source` (a `lib.cscan.Text` with paths), the `lib.cscan` views, `type_defs`, `field_name` + `Field`/`field_walk` (the one field walk rules 4, 5 and 7 read), `_finding`/`_rule2_finding`, `_untyped_marker` (rule 11's and 13's marker window), the tree walks |
 | `context` | the rule-2 `Ownership` (lib.project's index plus the run's counters), `load_ownership`, the open STOPGAP request ids |
-| `r01_shared_type` ... `r13_method` | one rule each: its regexes and its finding function (`rule1_findings`, `rule2_*`/`stopgap_findings`, `r03..r09.findings`, `codegen_pragma_findings`, `rule11_findings`, `rule12_findings`, `rule13_findings`); r13 also holds `Rule13Context` and `set_rule13_context` |
+| `r01_shared_type` ... `r14_pragma` | one rule each: its regexes and its finding function (`rule1_findings`, `rule2_*`/`stopgap_findings`, `r03..r09.findings`, `rule11_findings`, `rule12_findings`, `rule13_findings`, `codegen_pragma_findings`); r13 also holds `Rule13Context` and `set_rule13_context`. There is no `r10`: rule 10 is vtableaudit's, and the pragma check was `r10_pragma` until 2026-10-05 |
 | `lint` | `lint_source` (every rule over one `Source`), `lint_tree`, `lint_all`, the header-tree walks |
 | `diff` | identities, rename credits, move/split credits, the added-finding detail, and `judge` - the one judgement `--diff` and `--ref` share |
 | `refs` | `git`/`git_bytes`, the ref's map, the changed pairs, the base/ref copies linted, `texts_at_ref`/`headers_at_ref` |
-| `report` | the budget, the distinct-name counts, the rule-2 shape, the `--findings` listing |
+| `report` | the budget (with `rule10_counts`: the audit's violations per file, by subprocess), the distinct-name counts, the rule-2 shape, the `--findings` listing |
 | `cli` | `main`, `ref_comparison`, `report_comparison`, `_resolve_diff_ref` |
 | `selftest` | the lint's selftest (445 checks), on fixtures and temporary git trees |
 | `api` | the facade: every name `stylelint.py` had, plus the split's new ones, with `__all__` |
@@ -97,6 +97,13 @@ On the tree at `1c0e5252b` (+ main through `af8b41844`), old monolith vs the pac
   files, 671 moves) and on the refusing self-comparisons.
 * Wall time of `--diff`: 66 / 70 / 78 / 87 s -> 10 / 17 / 26 / 45 s (the four header walks and rule 1 at the ref read
   ~2 650 blobs one `git show` each; now one `cat-file --batch` per tree). `--budget --json` 25 s before and after.
+
+## Measured (rule 14 renumber, 2026-10-05)
+
+Worktree at `378ec7aaf` (main `35d86a517` plus this batch), `--budget --json` before vs after: every lint column
+identical (1: 8, 2: 3 861, 3: 11, 4: 62, 5: 67, 6: 381, 7: 40 185, 8: 0, 9: 357, 11: 4 814, 12: 129, 13: 32),
+`findings` 49 907 both; the old `10` (pragma) 0 is the new `14` 0; the new `10` is vtableaudit's 396 violations over
+101 files (37 of them files with no lint finding), so `total` 49 907 -> 50 303. Wall time: the audit adds 15 s.
 
 ## Measured (move + rename, 2026-10-04)
 

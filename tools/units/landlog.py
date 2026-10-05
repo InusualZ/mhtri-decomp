@@ -26,6 +26,15 @@ def render_summary(s: dict, bad: list[int], path: str) -> str:
     if s["refused_rows"]:
         lines.append("  refused by:")
         lines += ["    %3d  %s" % (n, row) for row, n in s["refused_rows"][:10]]
+    allowances = s.get("allowances") or {}
+    lines.append("  allowances: %s" % ("; ".join("%s %d attempt(s), %d entr%s" % (cls, v["attempts"], v["entries"],
+                                                                              "y" if v["entries"] == 1 else "ies")
+                                                for cls, v in allowances.items()) or "none recorded"))
+    if s.get("warning_rows"):
+        lines.append("  warnings (never a refusal): %s" % "; ".join("%d %s" % (n, row) for row, n in s["warning_rows"]))
+    schemas = s.get("schemas") or {}
+    if schemas.get(1):
+        lines.append("  (%d schema-1 line(s) predate the allowance record and carry none)" % schemas[1])
     if s["conflicted_paths"]:
         lines.append("  conflicted paths:")
         lines += ["    %3d  %s" % (n, p) for p, n in s["conflicted_paths"][:10]]
@@ -36,6 +45,9 @@ def render_list(rows: list[dict]) -> str:
     out = []
     for r in rows:
         why = r.get("refused_row") or ", ".join(r.get("conflicts") or []) or (r.get("commit") or "")
+        allow = r.get("allow") if isinstance(r.get("allow"), dict) else {}
+        if allow:
+            why += "  [allow: %s]" % ", ".join(sorted(allow))
         out.append("%s  %-8s %6.1fs  %-40s %s" % (r.get("at", "?"), r.get("outcome"), float(r.get("seconds") or 0),
                                                  (r.get("branch") or "")[:40], why))
     return "\n".join(out) or "no landing attempts recorded"

@@ -158,7 +158,6 @@ def main() -> int:
         set_unit_renames(args.unit_rename, units)
         set_allow_orphan(args.allow_orphan)
         return land(main, units, args.base, args.no_build, args.allow_regression,
-                    allow_rule10=args.allow_rule10,
                     check_outbox=not args.no_outbox, release_claims=not args.no_release,
                     subject=args.message, already_applied=args.already_applied,
                     no_selftests=args.no_selftests)

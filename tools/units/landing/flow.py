@@ -11,6 +11,7 @@ from tools.lib.lanes import naming
 from tools.lib.lanes import registry
 from tools.units.landing import gate
 from tools.units.landing import release
+from tools.units.landing import state
 from tools.units.landing.base import base_dirty_paths, ledger_line, ledger_numbers, record_base, summary
 from tools.units.landing.branch import (_sweep_resolve_helpers, apply_branch, claim_unit_for_branch,
     resolve_helper_state, undo_apply, units_from_branch)
@@ -25,9 +26,11 @@ from tools.units.landing.stage import (commit_pathspec, foreign_warning, land_de
 
 # --- the landing log: every `land` attempt is one line of `.pi/land-log.jsonl` (`lib.lanes.landlog`) ----------
 
-def _attempt() -> dict:
-    """What one attempt records while it runs; an exception leaves the outcome `error`."""
-    return {"outcome": "error", "row": None, "conflicts": [], "units": [], "commit": None}
+def _attempt(allow: dict | None = None) -> dict:
+    """What one attempt records while it runs; an exception leaves the outcome `error`. `allow` is the invocation's
+    allowances (`state.allowances`), recorded whatever the outcome."""
+    return {"outcome": "error", "row": None, "conflicts": [], "units": [], "commit": None, "allow": dict(allow or {}),
+            "warnings": []}
 
 
 def _refused(rec: dict, line: str, row: str, outcome: str = "refused") -> int:
@@ -46,7 +49,9 @@ def _log(main: str, branch: str, rec: dict, t0: float) -> None:
     try:
         landlog.append(main, landlog.Attempt(branch, rec["outcome"], round(time.time() - t0, 1),
                                              refused_row=rec["row"], conflicts=tuple(rec["conflicts"]),
-                                             units=tuple(rec["units"]), commit=rec["commit"]))
+                                             units=tuple(rec["units"]), commit=rec["commit"],
+                                             allow=rec.get("allow") or {},
+                                             warnings=tuple(rec.get("warnings") or ())))
     except OSError as exc:                         # the log is evidence; it never changes a landing's answer
         print("WARNING: the landing log was not written (%s)" % exc, file=sys.stderr)
 
@@ -63,7 +68,7 @@ def land_branch(main: str, branch: str, units: list[str] | None = None, base: st
     diff when `--units` is not given, so a unit renamed at registration is landed under its real name.
     Every attempt appends one line to the landing log.
     """
-    t0, rec = time.time(), _attempt()
+    t0, rec = time.time(), _attempt(state.allowances(allow_regression, check_outbox, no_selftests))
     try:
         return _land_branch(main, branch, rec, units, base, no_build, allow_regression, check_outbox,
                             release_claims, subject, no_selftests)
@@ -125,7 +130,7 @@ def land(main: str, units: list[str], base: str | None, no_build: bool,
          allow_regression: list[str] | None = None, check_outbox: bool = True,
          release_claims: bool = True, subject: str | None = None,
          already_applied: bool = False, branch: str | None = None,
-         no_selftests: bool = False, allow_rule10: list[str] | None = None) -> int:
+         no_selftests: bool = False) -> int:
     """The one command: gate -> stage the batch's files -> commit -> release, one answer line on stdout.
 
     The failure mode this closes: `verify`'s output was piped (`| tail -3`), the exit status was lost, and a
@@ -153,12 +158,14 @@ def land(main: str, units: list[str], base: str | None, no_build: bool,
     * the gate log goes to **stderr** and stdout carries exactly one answer line, so `tail -1` is the answer
       whether or not the exit status survived the pipe;
     * the exit status *is* the answer: 0 landed, 1 refused (or landed with an incomplete teardown);
-    * every attempt appends one line to the landing log (`.pi/land-log.jsonl`).
+    * every attempt appends one line to the landing log (`.pi/land-log.jsonl`), with every allowance the
+      invocation granted (`state.allowances`: the `--allow-*` values travel on `state`, set by the CLI - the one
+      path - and `--allow-regression`/`--no-outbox`/`--no-selftests` as parameters).
 
     Releasing runs after the commit, never before: until `main` has the commits, the worker's branch is their
     only copy.
     """
-    t0, rec = time.time(), _attempt()
+    t0, rec = time.time(), _attempt(state.allowances(allow_regression, check_outbox, no_selftests))
     try:
         return _land(main, units, rec, base, no_build, allow_regression, check_outbox, release_claims, subject,
                      already_applied, branch, no_selftests)
@@ -197,7 +204,7 @@ def _land(main: str, units: list[str], rec: dict, base: str | None, no_build: bo
         gate_ok = gate.verify(main, norm_units, base, dry_run=False, no_build=no_build,
                               allow_regression=allow_regression, check_outbox=check_outbox,
                               release_claims=False, problems=gate_failures, branch=branch,
-                              no_selftests=no_selftests) == 0
+                              no_selftests=no_selftests, warnings=rec.setdefault("warnings", [])) == 0
     rows = changed_status(main)
     outside = outside_batch([path for _code, path in rows], main=main)
     scratch = scratch_paths(outside)
