@@ -79,7 +79,7 @@ Tier: fixture. `tools/tests/units/test_land.py` (the re-homed `land.py --selftes
 decisions, `land`/`land --branch` on fixture repos - among them `test_land_branch_config_relocations`: a
 `block_relocations`-only `config.yml` lands with the unit batch in one commit, a frozen key or `build.sha1` refuses at
 pre-flight with main unchanged -, the resolver, the CLI) and
-`tools/tests/units/landing/`: `test_gate_golden.py` (thirteen scenarios, the whole table - the two `new-unit-*` ones pin the new-unit name row's refusal and its rename credit), `test_landlog_hook.py` (the
+`tools/tests/units/landing/`: `test_gate_golden.py` (seventeen scenarios, the whole table - the two `new-unit-*` ones pin the new-unit name row's refusal and its rename credit, the two `lint-rule15-*` ones run the real lint: a stale path new to a changed file refuses the style-lint row, advisory markers pass it), `test_landlog_hook.py` (the
 landing log), `test_base_report.py` (the base report rebuild and its row), `test_neighbours.py` (names-only
 neighbours), `test_long_paths.py` (the golden fixture's `bulk` kind - 1,500 renames, 3,000 pathspec entries - landed
 through `flow.land` under `testing.argv_limit()`, the simulated 32,767-character limit: it lands; the old command-line

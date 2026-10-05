@@ -23,15 +23,15 @@ None: modules. The CLI is `stylelint.py`'s (`cli.main`), spec `stylelint.md`.
 
 | module | holds |
 | --- | --- |
-| `common` | paths (`SRC`, `HEADERS`, `UNSPLIT`...), `RULE_NAMES` (1-14), `AUDIT_RULES` (rule 10 is vtableaudit's: no lint finding carries it), `EXEMPT`/`RULE7_NOTES`/`UNCHECKED`, `Source` (a `lib.cscan.Text` with paths), the `lib.cscan` views, `type_defs`, `field_name` + `Field`/`field_walk` (the one field walk rules 4, 5 and 7 read), `_finding`/`_rule2_finding`, `_untyped_marker` (rule 11's and 13's marker window), the tree walks |
+| `common` | paths (`SRC`, `HEADERS`, `UNSPLIT`...), `RULE_NAMES` (1-15), `AUDIT_RULES` (rule 10 is vtableaudit's: no lint finding carries it), `EXEMPT`/`RULE7_NOTES`/`UNCHECKED`, `Source` (a `lib.cscan.Text` with paths), the `lib.cscan` views, `type_defs`, `field_name` + `Field`/`field_walk` (the one field walk rules 4, 5 and 7 read), `_finding`/`_rule2_finding`, `_untyped_marker` (rule 11's and 13's marker window), the tree walks |
 | `context` | the rule-2 `Ownership` (lib.project's index plus the run's counters), `load_ownership`, the open STOPGAP request ids |
-| `r01_shared_type` ... `r14_pragma` | one rule each: its regexes and its finding function (`rule1_findings`, `rule2_*`/`stopgap_findings`, `r03..r09.findings`, `rule11_findings`, `rule12_findings`, `rule13_findings`, `codegen_pragma_findings`); r13 also holds `Rule13Context` and `set_rule13_context`. There is no `r10`: rule 10 is vtableaudit's, and the pragma check was `r10_pragma` until 2026-10-05 |
+| `r01_shared_type` ... `r15_comments` | one rule each: its regexes and its finding function (`rule1_findings`, `rule2_*`/`stopgap_findings`, `r03..r09.findings`, `rule11_findings`, `rule12_findings`, `rule13_findings`, `codegen_pragma_findings`, `r15_comments.findings`); r13 also holds `Rule13Context` and `set_rule13_context`, r15 `REFUSING`/`ADVISORY`, `is_advisory`, `ADDRESS_PREFIX_RE` and `set_rule15_context`. There is no `r10`: rule 10 is vtableaudit's, and the pragma check was `r10_pragma` until 2026-10-05 |
 | `lint` | `lint_source` (every rule over one `Source`, the one file classifier), `lint_tree`, `lint_all` (every file the lint judges), `HEADER_BODY_RULES[_ON]` (the recommended header rules' one switch), `is_band_rule2`, the whole-tree header walks (API only, plus rule 12's untouched-file view) |
 | `diff` | identities, rename credits, move/split credits, the added-finding detail, and `judge` - the one judgement `--diff` and `--ref` share |
 | `refs` | `git`/`git_bytes`, the ref's map, the changed pairs, the base/ref copies linted, `texts_at_ref`/`headers_at_ref` |
 | `report` | the budget (with `rule10_counts`: the audit's violations per file, by subprocess), the distinct-name counts, the rule-2 shape, the `--findings` listing |
 | `cli` | `main`, `ref_comparison`, `report_comparison`, `_resolve_diff_ref` |
-| `selftest` | the lint's selftest (510 checks), on fixtures and temporary git trees |
+| `selftest` | the lint's selftest (533 checks), on fixtures and temporary git trees |
 | `api` | the facade: every name `stylelint.py` had, plus the split's new ones, with `__all__` |
 
 ## Invariants and rules
@@ -39,7 +39,7 @@ None: modules. The CLI is `stylelint.py`'s (`cli.main`), spec `stylelint.md`.
 * **One classifier, path-free (2026-10-05).** A header is a `HEADER_SUFFIXES` file **anywhere** (`common.is_header`:
   `src/**`, and `include/**` in a ref older than the owner's 2026-10-05 header move); the unsplit band is `lib.project.ownership.BAND_ROOT`
   (`src/unsplit`; `LEGACY_BAND_ROOT` `include/unsplit` still classifies a pre-move ref), the one spelling of its path. `lint_source` runs the body
-  rule set on **every** `.c`/`.cpp`/`.h` - 3, 4, 5, 6, 7, 8, 9, then 2 and 12, 11, 13, 14 and the STOPGAP check - and
+  rule set on **every** `.c`/`.cpp`/`.h` - 3, 4, 5, 6, 7, 8, 9, then 2 and 12, 11, 13, 14, 15 and the STOPGAP check - and
   only rule 2 (source / header / band reading) and the STOPGAP check (not in the band) read the kind. It sorts by
   `(rule, line)` with a stable sort, so the order inside one `(rule, line)` is still each rule's own report order.
   Rules 3, 4, 5, 6, 8 and 9 on a header are the orchestrator's recommendation (the owner was not asked):
@@ -84,20 +84,30 @@ None: modules. The CLI is `stylelint.py`'s (`cli.main`), spec `stylelint.md`.
   declaration of `Foo`, an unowned name, which made `leaf_header_owner` reject the header and reported every symbol
   in it as foreign. The leaf rule itself is unchanged: a symbol of a second unit, or an unowned one, still makes the
   header foreign.
+* **Rule 15 is two refusing checks and an advisory count (owner, 2026-10-05).** `stale-path` (a `lib.comments`
+  marker hit in comment text - `lib.comments.comment_only`, never code or a literal - whose path the tree does not have)
+  and `address` (a function comment directly above a definition - only whitespace and no blank line between - whose
+  `0xADDR [(SIZE)]` prefix, `ADDRESS_PREFIX_RE`, names no function row, the definition's own name at another address,
+  or a size that is not the row's, read from `Ownership.functions`) are findings like any rule's: identity `(15, file,
+  token, detail)`, refused when new to a file. Every other class carries `advisory: True` and `diff.judge` drops it from
+  both sides before anything is compared, so it never refuses, moves or credits; `--budget` counts all of them in the
+  `r15` column and splits it by class (`report.rule15_classes`, the `budget.rule15` JSON key). Path existence is asked
+  of one tree for both sides (`set_rule15_context`, the invocation root), so only a comment change can add a finding;
+  `.pi/` is never live. `src/Camellia/` is not read (the vendor's MPL-1.1 comments).
 * **The selftest flag is the entry point's.** `stylelint.py` registers the selftest with `lib.cli.Tool(tests=...)`, the
   shape `tools/selftest.py` discovers; `cli.py` spells `--selftest` through a constant so the runner does not mistake a
   package module for a second entry point (`tools/units/merge/*.py` show that failure mode: each is listed as a tool).
 
 ## Lib dependencies
 
-cscan, findings, git, names, project (`Ownership`, `SymbolMap`, `Splits`), requests, repo (lazily, for the outbox dirs).
+comments (rule 15's markers and stale judgement, shared with `sweepcomments`), cscan, findings, git, names, project (`Ownership`, `SymbolMap`, `Splits`), requests, repo (lazily, for the outbox dirs).
 One tool edge: `diff -> tools/units/dataclosure.py` (the fold map `derive_file_absorbers` reads; it was
 `stylelint -> datagap`, which only re-exported it).
 
 ## Test contract
 
 `python tools/units/stylelint.py --selftest` (the runner's entry `tools/units/stylelint`): 445 checks, unchanged by the
-split; 451 with the move+rename rows (two of them fail on the old `removed` keying); 454 with the leaf forward-declaration rows (two fail without the preprocessor mask); 510 with the 2026-10-05 classifier, rule 7 exact and file-name rows (35 of the new checks fail on the code before them: 15 classifier, 9 rule 7 exact, 11 file names). Re-homing it to `tools/tests/units/test_stylelint.py` (fixture tier; the one live read is
+split; 451 with the move+rename rows (two of them fail on the old `removed` keying); 454 with the leaf forward-declaration rows (two fail without the preprocessor mask); 510 with the 2026-10-05 classifier, rule 7 exact and file-name rows (35 of the new checks fail on the code before them: 15 classifier, 9 rule 7 exact, 11 file names); 533 with rule 15 (23 checks; each mutation fails at least one: advisory findings kept in `--diff` 1, `.pi/` live where it exists 1, no size check 2, no other-address check 1, code read as comment text 1, a blank line allowed above a function 1, live paths not whitelisted 1, a percentage clause crossing punctuation 2). Re-homing it to `tools/tests/units/test_stylelint.py` (fixture tier; the one live read is
 `load_ownership(".")`, which the runner's temp cwd turns into "no map") is WP6's.
 
 ## Measured (WP3d)
@@ -112,6 +122,18 @@ On the tree at `1c0e5252b` (+ main through `af8b41844`), old monolith vs the pac
   files, 671 moves) and on the refusing self-comparisons.
 * Wall time of `--diff`: 66 / 70 / 78 / 87 s -> 10 / 17 / 26 / 45 s (the four header walks and rule 1 at the ref read
   ~2 650 blobs one `git show` each; now one `cat-file --batch` per tree). `--budget --json` 25 s before and after.
+
+## Measured (rule 15, 2026-10-05)
+
+Worktree at `aea522b5e` plus this batch, `--budget --json` old code vs new on the same tree: every column 1-14 identical
+per file (1: 8, 2: 3 860, 3: 193, 4: 97, 5: 213, 6: 381, 7: 44 705, 9: 377, 11: 4 813, 12: 129, 13: 32; `r10` 22 here,
+the worktree has no built objects), `unique` identical; the new `r15` column is 955, 72 of its files carrying no other
+finding, so `findings` 54 808 -> 55 763. By class - refusing 172: `stale-path` 161 over 95 files (`.pi/` 69, retired
+tool 31, `proposal/` 23, `auto/<hex>_` 22, `include/` 16; `sweepcomments --list-stale` says 162 for the same markers
+without `configure.py`, the one more being a hit outside a comment, which rule 15 does not read) and `address` 11 (3
+sizes in `NWC24/nwc24_msg.c`, 8 addresses no function starts at in `Pl/pl_act.cpp`, of 2 022 prefixed function comments
+read, 340 of them with a size); advisory 783: `phase 4` 177, `next pass` 19, date 109, `round N` 29, `pilot` 13, `wave`
+12, `lane` 49, `header inherited` 40, `percent` 115, `self-name` 220. All are grandfathered by identity.
 
 ## Measured (rule 7 file names, 2026-10-05)
 

@@ -61,6 +61,8 @@ RULE_NAMES = {
     13: "a method is a member (`<Type>_<name>(<Type>* self, ...)` is `<Type>::<name>`; mark a genuine C function "
         "`/* free: <reason> */`)",
     14: "a codegen pragma lives in the TU that needs it, not in a shared header",
+    15: "comment hygiene: no stale path, a function comment's `0xADDR (0xSIZE)` prefix is the function's (both "
+        "refuse); narrative markers, dates, percentages and self-names are advisory (counted, never refused)",
 }
 #: Rules the lint itself never reports: plan 6.5 rule 10 (vtable ownership) is `tools/units/vtableaudit.py`'s, so
 #: `--budget` fills its column from the audit (`report.rule10_counts`) and the lint's own sets carry no rule-10 row.

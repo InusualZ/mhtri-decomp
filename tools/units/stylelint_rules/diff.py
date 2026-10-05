@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from tools.lib import findings as _findings
 from tools.units.stylelint_rules.common import Source
 from tools.units.stylelint_rules.r02_extern import header_declarations
+from tools.units.stylelint_rules.r15_comments import is_advisory
 
 
 # --------------------------------------------------------------------------------------------------
@@ -493,7 +494,12 @@ def judge(before_findings: list[dict], after_findings: list[dict], touched: list
     `after_sources` the changed files now. A declaration the base spelled under a name the batch renamed is the
     *same* declaration: `rename_map` (symbols) and `rename` (files) let `added_identities` admit a base identity
     under both spellings, so a rename reads as a rename, never as removal plus addition.
+
+    A rule-15 **advisory** finding (`advisory: True`: a narrative marker, a date, a percentage, a self-name) is
+    dropped from every side first: it is a `--budget` count, never an addition, a move or a credit.
     """
+    before_findings, after_findings, touched, base_findings = (
+        [f for f in fs if not is_advisory(f)] for fs in (before_findings, after_findings, touched, base_findings))
     before, after = rule_counts(before_findings), rule_counts(after_findings)
     # the gaps each file gave up: the old spelling of a renamed row is an *unmapped* name, so a file that completed a
     # rename has strictly fewer of them; one credit costs one freed gap (`rename_credits`)

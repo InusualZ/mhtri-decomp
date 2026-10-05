@@ -371,7 +371,10 @@ STYLE_LINT_REMEDY = (
     "declare `name` in the class, define `Type::name`, rename the map row to the "
     "mangling and sweep the call sites (`python tools/units/methodize.py <Type>` prints "
     "the plan), or mark a genuine C function `/* free: <retail C linkage evidenced|SDK "
-    "C struct> */` on the declaration.")
+    "C struct> */` on the declaration. Rule 15 refuses a stale path in a comment (a retired "
+    "`include/`, `proposal/`, `auto/<hex>_`, `.pi/` or phase-4 path, or a retired tool's "
+    "name: name the live path or drop it) and a function comment whose `0xADDR (0xSIZE)` "
+    "prefix is not the function's (`symedit.py show <name>`); its advisory classes never refuse.")
 
 
 def style_lint_row(b: Batch) -> None:

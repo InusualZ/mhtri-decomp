@@ -15,6 +15,7 @@ from tools.units.stylelint_rules.common import (
 from tools.units.stylelint_rules.context import load_ownership
 from tools.units.stylelint_rules.r01_shared_type import rule1_findings
 from tools.units.stylelint_rules.r13_method import set_rule13_context
+from tools.units.stylelint_rules.r15_comments import set_rule15_context
 from tools.units.stylelint_rules.lint import (
     header_rule12_findings, header_rule2_band_findings, lint_all, lint_tree, rule11_local_total,
     rule13_static_like_total,
@@ -245,6 +246,7 @@ def main(argv: list[str] | None = None) -> int:
     root = root.stdout.strip() if root.returncode == 0 else os.getcwd()
     ownership = load_ownership(root)
     set_rule13_context(root)
+    set_rule15_context(root)
 
     if args.ref is not None:
         return ref_comparison(root, args.ref, ownership, args.json, args.list_added)

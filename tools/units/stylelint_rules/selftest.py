@@ -900,6 +900,127 @@ def selftest() -> int:
         check("rule14: the motivating header is clean after the fix",
               codegen_pragma_findings(Source(hdr, hdr, read_text(hdr))), [])
 
+    # --- rule 15 (2026-10-05): comment hygiene - stale paths and function-comment addresses refuse ---------
+    def r15_of(text: str, rel: str = "src/Net/net_a.c", ownership=None) -> list[tuple]:
+        return [(f["check"], f["token"], f["line"], f["advisory"])
+                for f in lint_source(Source("x", rel, text), ownership) if f["rule"] == 15]
+
+    set_rule15_context(None)
+    check("rule15: a retired include/ path in a comment is a refusing finding, the path its token",
+          r15_of("/* see include/Net/net.h */\nint a;\n"), [("stale-path", "include/Net/net.h", 1, False)])
+    check("rule15: each stale class has its token: .pi/, proposal/, auto/<hex>_, a retired tool named bare",
+          sorted(t for c, t, _l, _a in r15_of("/* .pi/notes/x.md, proposal/80001000.cpp,\n"
+                                                " * auto/80001000_net.cpp and mergelane */\nint a;\n")),
+          [".pi/notes/x.md", "auto/80001000_net.cpp", "mergelane", "proposal/80001000.cpp"])
+    check("rule15: code, an `#include` and a string literal are not comment text",
+          r15_of('#include "include/x.h"\nconst char* s = "proposal/x.cpp";\nint include_x;\n'), [])
+    check("rule15: src/Camellia/ is the vendor's and never read",
+          r15_of("/* include/x.h 2026-10-05 */\nint a;\n", rel="src/Camellia/camellia.c"), [])
+    with tempfile.TemporaryDirectory() as tmp15:
+        for rel in ("tools/units/herdr/README", ".pi/notes/x.md", "src/Net/net.h"):
+            os.makedirs(os.path.dirname(os.path.join(tmp15, rel)), exist_ok=True)
+            open(os.path.join(tmp15, rel), "w").close()
+        retired_live = "/* tools/units/herdr/README */\nint a;\n"
+        check("rule15: without a tree a retired tool's path is stale", len(r15_of(retired_live)), 1)
+        set_rule15_context(tmp15)
+        check("rule15: ... and a path the tree has is live (whitelisted)", r15_of(retired_live), [])
+        check("rule15: `.pi/` is never live, even where the scratch exists (it differs by checkout)",
+              [c for c, *_ in r15_of("/* .pi/notes/x.md */\nint a;\n")], ["stale-path"])
+        check("rule15: a moved include/ path carries the live spelling as its remedy, not in its identity",
+              [(f["token"], f.get("remedy")) for f in lint_source(Source("x", "src/a.c", "/* include/Net/net.h */\n"))
+               if f["rule"] == 15], [("include/Net/net.h", "the live path is `Net/net.h`")])
+        set_rule15_context(None)
+
+    fmap = Ownership({"net_foo": [(".text", 0x80001000, "function")], "net_bar": [(".text", 0x80002000, "function")]},
+                     {".text": [(0x80001000, 0x80003000, "Net/net_a.c")]},
+                     functions={0x80001000: [("net_foo", 0x40)], 0x80002000: [("net_bar", 0x20)]})
+
+    def addr_of(comment: str, name: str = "net_foo", ownership=fmap) -> list[str]:
+        text = "%s\nvoid %s(void) {\n}\n" % (comment, name)
+        return [f["detail"] for f in lint_source(Source("x", "src/Net/net_a.c", text), ownership)
+                if f["rule"] == 15 and f["check"] == "address"]
+
+    check("rule15: the canonical prefix naming the function's address and size is clean",
+          addr_of("/* 0x80001000 (0x40): reset the pool */"), [])
+    check("rule15: a wrong size is a finding naming the symbol's size",
+          addr_of("/* 0x80001000 (0x44): reset the pool */"),
+          ["function comment states 0x80001000 (0x44) above `net_foo`: the symbol's size is 0x40"])
+    check("rule15: another symbol's address is a finding naming where the map has the function",
+          addr_of("/* 0x80002000 (0x20): reset the pool */"),
+          ["function comment states 0x80002000 (0x20) above `net_foo`, which the map has at 0x80001000"])
+    check("rule15: an address no function starts at is a finding",
+          addr_of("/* 0x80001010: reset the pool */"),
+          ["function comment states 0x80001010 above `net_foo`: no function symbol starts there"])
+    check("rule15: the legacy ` - ` separator is read too (no size: only the address is judged)",
+          (addr_of("/* 0x80001000 - reset */"), len(addr_of("/* 0x80001010 - reset */"))), ([], 1))
+    check("rule15: a decimal size is read", addr_of("/* 0x80001000 (64): reset */"), [])
+    check("rule15: a comment separated by a blank line is not the function's",
+          addr_of("/* 0x80001010 (0x44): data */\n"), [])
+    check("rule15: a range or an address list is not the prefix",
+          (addr_of("/* 0x80001010..0x80001020: data */"), addr_of("/* 0x80001010/0x80001020 - data */")), ([], []))
+    check("rule15: a name the map lacks (a ctor, a source-side name) is judged by the row at the address",
+          (addr_of("/* 0x80001000 (0x40): build */", "NetPool"), len(addr_of("/* 0x80001000 (0x4): x */", "NetPool"))),
+          ([], 1))
+    check("rule15: without the map (or a map built without its rows) the address is not judged",
+          (addr_of("/* 0x80001010: x */", ownership=None),
+           addr_of("/* 0x80001010: x */", ownership=Ownership(fmap.symbols, fmap.ranges))), ([], []))
+
+    adv = r15_of("/* 2026-10-05: the network lane, round 3; 92.5 % fuzzy match; a 30 % chance */\n"
+                 "/* 0x80001000 (0x40): net_foo_reset clears the pool */\nvoid net_foo_reset(void) {\n}\n"
+                 "/* 0x80002000: init */\nvoid init(void) {\n}\n")
+    check("rule15: the advisory classes - date, lane, round N, a percentage beside a scoring word, a self-name",
+          sorted(c for c, _t, _l, a in adv if a), ["date", "lane", "percent", "round N", "self-name"])
+    check("rule15: ... every one advisory, none refusing", [c for c, _t, _l, a in adv if not a], [])
+    check("rule15: a game probability is not a percentage finding; a short generic name is not a self-name",
+          [t for c, t, _l, _a in adv if c in ("percent", "self-name")], ["92.5 % fuzzy", "net_foo_reset"])
+    check("rule15: the budget splits the column by class",
+          budget([f for f in lint_source(Source("x", "src/Net/net_a.c",
+                                                "/* .pi/x.md 2026-10-05 */\nint a;\n"))])["rule15"],
+          {"refusing": {"stale-path": 1, "address": 0},
+           "advisory": dict({c: 0 for c in ADVISORY}, date=1)})
+
+    # the add-only comparison: a stale path new to a file refuses; an advisory addition and a reflowed old path pass
+    with tempfile.TemporaryDirectory() as tmp15:
+        def g15(*args: str) -> None:
+            subprocess.run(["git", "-c", "user.email=selftest@example.invalid", "-c", "user.name=selftest",
+                            "-c", "commit.gpgsign=false", *args], cwd=tmp15, capture_output=True, check=True)
+
+        def put15(rel: str, text: str) -> None:
+            p = os.path.join(tmp15, rel)
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            with open(p, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(text)
+
+        def diff15() -> tuple:
+            old = os.getcwd()
+            os.chdir(tmp15)
+            try:
+                out = io.StringIO()
+                with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                    rc = main(["--diff", "HEAD", "--json"])
+            finally:
+                os.chdir(old)
+            data = json.loads(out.getvalue())
+            return rc, [(a["rule"], a["file"], a["added"]) for a in data["added"]], \
+                [(d["rule"], d["token"]) for d in data["detail"]]
+
+        import contextlib
+        import io
+        g15("init", "-q")
+        put15("config/RMHE08/symbols.txt", "net_a = .text:0x80001000; // type:function size:0x10\n")
+        put15("config/RMHE08/splits.txt", "net/net_a.c:\n\t.text       start:0x80001000 end:0x80001010\n")
+        put15("src/net/net_a.c", "/* the pool, see .pi/notes/old.md */\nint a;\n")
+        g15("add", "-A")
+        g15("commit", "-q", "-m", "base")
+        put15("src/net/net_a.c", "/* the pool, see .pi/notes/old.md and proposal/80001000.cpp */\nint a;\n")
+        check("rule15 --diff: a stale path new to a file refuses, the old one stays grandfathered",
+              diff15(), (1, [(15, "src/net/net_a.c", 1)], [(15, "proposal/80001000.cpp")]))
+        put15("src/net/net_a.c", "/* 2026-10-05: the lane's wave 2 (92 % match).\n"
+                                 " * the pool, see .pi/notes/old.md */\nint a;\n")
+        check("rule15 --diff: advisory additions and a reflowed old path pass (no diff effect)",
+              diff15(), (0, [], []))
+        set_rule15_context(None)
+
     # --- rule 11: no `void *` parameter or return type -------------------------------------------
     check("rule11: an unmarked void* parameter is a finding",
           lines_of("void f(void *p) {\n}\n", 11), [1])
@@ -1160,7 +1281,7 @@ def selftest() -> int:
     set_rule13_context(None)
 
     # --- end-to-end over the fixtures -------------------------------------------------------------
-    check("e2e: rule list is complete", sorted(RULE_NAMES), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
+    check("e2e: rule list is complete", sorted(RULE_NAMES), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
     check("e2e: no rule is declared unchecked", UNCHECKED, [])
 
     # --- the budget's rule-10 column is vtableaudit's (2026-10-05); the pragma check is rule 14 ------------

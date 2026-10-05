@@ -4,11 +4,11 @@
 
 Rewrites the comment text of `src/**/*.{c,cp,cpp,h,hpp,inc}` (never code, string literals or `#include` lines),
 `configure.py`'s `#` comments and, for paths, the hand-written docs, one operation per run so each lands as its own
-commit. It also counts what is left: the stale-path markers rule 15 will refuse and the narrative markers stage 3 reads.
+commit. It also counts what is left: the stale-path markers rule 15 refuses and the narrative markers rule 15 counts as advisory.
 
 ## Users
 
-The comment sweep's mechanical stage (stage 1); `--list-stale` is the data stage 2's rule 15 starts from; `--markers`
+The comment sweep's mechanical stage (stage 1); `--list-stale` counts what rule 15 refuses (the same `lib.comments` data); `--markers`
 sizes stage 3's judgement batches.
 
 ## CLI
@@ -70,12 +70,15 @@ Writes only the selected files, byte-exactly (`lib.text.atomic_write`, line endi
   `docs/splits/phase4` (not the live `homebutton-carried-notes.md`) and the hand-curated retired tool names
   (`attribute.py`, `applysplits`, `dataattach`, `matchinggain`, `promote.py`, `promote_batch`, `herdr`, `applybranch`,
   `union.py`, `mergelane`); a path that exists and the files `docs/splits-program.md`, `docs/tools/retired.md`,
-  `docs/splits/phase4/homebutton-carried-notes.md` are whitelisted.
+  `docs/splits/phase4/homebutton-carried-notes.md` are whitelisted. The markers, the whitelist and the stale judgement
+  are `lib.comments`' (`STALE_MARKERS`, `HISTORY_MARKERS`, `stale_hits`), the data section 6.5 rule 15 refuses from:
+  one copy, re-exported here under the old names.
 * Idempotent: a second run of any pass changes nothing.
 
 ## Lib dependencies
 
-`lib.cli`, `lib.cscan`, `lib.facts` (the inherited-header decision), `lib.git`, `lib.project.splits`, `lib.repo`
+`lib.cli`, `lib.comments` (the census vocabulary and the stale judgement), `lib.cscan`, `lib.facts` (the
+inherited-header decision), `lib.git`, `lib.project.splits`, `lib.repo`
 (`include_spelling`, `moved_header`), `lib.text`.
 
 ## Test contract

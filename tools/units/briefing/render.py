@@ -136,7 +136,8 @@ def _cpp_step(lines: list[str]) -> None:
     lines.append("* A member function's `this` arrives in r3 and its name mangles the way the map spells it - a "
                  "free function with an explicit `self` gets neither.")
     lines.append("* If a function measures worse in the class form, keep the better-scoring shape and record "
-                 "both numbers in the unit header - but never leave `self` style in place because it was "
+                 "both numbers on the unit header's `RESIDUALS.` line - but never leave `self` style in place "
+                 "because it was "
                  "written first.")
     lines.append("")
 
@@ -169,7 +170,7 @@ def _data_step(lines: list[str]) -> None:
     lines.append("* A pool entry is claimable **only while your unit is its sole referencer** (playbook 58). A "
                  "private entry is exactly what the claim is for - claim it, flip the unit to "
                  "`Object(Matching)` and say so; a shared entry can be neither claimed nor named in source, so "
-                 "write the measured blocker in the unit header and report it.")
+                 "write the measured blocker on the unit header's `RESIDUALS.` line and report it.")
     lines.append("* Finish with the numbers: the unit's sections and bytes before/after, and whether "
                  "`python tools/units/datagap.py --flip-blockers` lists this unit.")
     lines.append("")
@@ -548,8 +549,9 @@ def render(main: str, b: dict, task: str | None, pool: bool = False) -> str:
                  "`fn_XXXXXXXX`, `lbl_XXXXXXXX`, `loc_XXXXXXXX` and bare `unk*` identifier in `src/` is a "
                  "finding, whoever owns it. Every symbol the unit **defines** needs a name: use the map's "
                  "real name when the evidence has one, otherwise derive one from the symbol's own body and "
-                 "the neighbours' scheme, and when the context supports only a guess, guess and mark it as a "
-                 "GUESS in the unit header with the evidence behind it. `fn_XXXXXXXX` is never the resting "
+                 "the neighbours' scheme, and when the context supports only a guess, guess and mark it on "
+                 "the unit header's `NAMES.` line (`<name> is a GUESS (<the context it is read from>)`, the "
+                 "header template in section 6.5 above). `fn_XXXXXXXX` is never the resting "
                  "place, and a rename is the map **and** the source in one edit - request the map half of "
                  "your own unit's renames in the outbox (`config_requests`, `kind: rename`, "
                  "old/new/evidence), since you may not edit `symbols.txt` here.\n\nThe **only** grandfather "

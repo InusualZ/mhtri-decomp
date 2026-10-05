@@ -24,6 +24,7 @@ the plan to get there is `migration.md`; what is dropped is `retired.md`; what t
 | the unit and its compile command | `lib/units.py` | `spec/lib-units.md` | recompile, measure, unitscore, symdiff, flipcheck, datagap, verifyunit, brief, flags/* |
 | target vs ours comparisons | `lib/objcompare.py` | `spec/lib-objcompare.md` | datagap, dataclosure, sectiongap, pairgap, relocdiff, flipcheck, undefrefs, verifyunit |
 | fact tokens and where they survive | `lib/facts.py` | `spec/lib-facts.md` | factscheck, sweepcomments |
+| comment vocabulary: stale-path and narrative markers, the stale judgement | `lib/comments.py` | `spec/lib-comments.md` | stylelint (rule 15), sweepcomments |
 | C/C++ text scanning | `lib/cscan.py` | `spec/lib-cscan.md` | stylelint, typeregistry, declclash, recordmerge, methodize, vtableaudit, shapes |
 | findings, rows, verdicts, add-only diff | `lib/findings.py` | `spec/lib-findings.md` | land, stylelint, vtableaudit, undefrefs, datagap, splitcheck, flipcheck, verifyunit, dataclaim, symbolpreflight, handoff |
 | the CLI entry point | `lib/cli.py` | `spec/lib-cli.md` | every tool |
@@ -113,7 +114,7 @@ relative to `MAIN`; the contract of each tool is its spec.
 
 | tool | use it when … |
 | --- | --- |
-| `tools/units/stylelint.py` | **you changed `src/`**: rules 1–12 with `file:line`; `--diff <ref>` is the gate's add-only comparison (a recut's *moved* findings are credited one per removal from another file of the batch and printed as `moved`, a copy is not), `--budget` a debt read. |
+| `tools/units/stylelint.py` | **you changed `src/`**: rules 1-9 and 11-15 with `file:line` (10 is vtableaudit's); `--diff <ref>` is the gate's add-only comparison (a recut's *moved* findings are credited one per removal from another file of the batch and printed as `moved`, a copy is not), `--budget` a debt read. |
 | `tools/units/vtableaudit.py` | **a unit owns a code-pointer run**: find a vtable it owns but does not emit and a hand-written `+0x00` table store — rule 10 made mechanical, with `--diff` at the gate. |
 | `tools/units/datagap.py --census --unit <unit>` | **before you report a unit**: the data its target object references that no claim covers (orphans, with neighbours, section and readers) plus the strict view - the unit's sole-owned pairs as `REFUSE` or `deferred <class>`; `dataclaim.py --unit <unit>` prints the `splits.txt` edit that claims the refusable ones. |
 | `tools/units/declclash.py` | **a cross-unit lane hits `(10197) illegal function overloading`**: list the function names declared more than once with *different text* in one include closure, before any source is edited. |

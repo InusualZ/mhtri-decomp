@@ -75,6 +75,17 @@ class Scenario:
         self.post_fail = post_fail
 
 
+#: The style-lint row run for real (rule 15, 2026-10-05): the stylelint subprocess is not stubbed but run from this
+#: repository against the fixture, so the row's verdict is the lint's own on the batch's comment text.
+REAL_LINT = "real"
+REAL_LINT_PATH = os.path.join(str(next(p for p in pathlib.Path(__file__).resolve().parents
+                                       if (p / "tools" / "__init__.py").is_file())), "tools", "units", "stylelint.py")
+#: The worker's unit text per rule-15 variant: a stale path new to the file (refused), and only advisory markers (passes).
+R15_UNIT_TEXT = {
+    "r15-stale": "/* the step table, see proposal/80001100_net.cpp */\nint net_new_step(void) { return 1; }\n",
+    "r15-advisory": "/* 2026-10-05: the network lane's wave 2 (50 % fuzzy match) */\n"
+                    "int net_new_step(void) { return 1; }\n",
+}
 LINT_REFUSAL = (1, json.dumps({"added": [{"rule": 2, "file": "src/Net/net_new.cpp", "added": 1, "before": 0,
                                           "after": 1}],
                                "detail": [{"rule": 2, "file": "src/Net/net_new.cpp", "line": 3, "token": "x"}]}))
@@ -98,6 +109,9 @@ SCENARIOS = [
     # the 2026-10-05 header move: a batch of renames out of the retired include/ root lands; a new path there refuses
     Scenario("layout-move", "layout", ["configure.py"], check_outbox=False),
     Scenario("layout-retired-include-refusal", "layout", ["configure.py"], check_outbox=False, variant="add"),
+    # rule 15 through the real lint: a stale path new to a changed file refuses the row; advisory markers pass it
+    Scenario("lint-rule15-stale-path-refusal", "unit", [UNIT], dry_run=True, lint=REAL_LINT, variant="r15-stale"),
+    Scenario("lint-rule15-advisory-pass", "unit", [UNIT], dry_run=True, lint=REAL_LINT, variant="r15-advisory"),
 ]
 
 
@@ -147,6 +161,10 @@ def build_fixture(root: str, sc: Scenario) -> None:
                  "src/%s.cpp" % unit: "int net_new_step(void) { return 1; }\n",
                  "src/Net/net.h": "#ifndef NET_H\n#define NET_H\nint net_old(void);\nint net_new_step(void);\n"
                                       "#endif\n"}
+        if sc.variant in R15_UNIT_TEXT:
+            # the real lint judges these: only the unit's comment differs, and no foreign declaration rides along
+            edits["src/%s.cpp" % unit] = R15_UNIT_TEXT[sc.variant]
+            del edits["src/Net/net.h"]
         for rel, text in edits.items():
             p = os.path.join(root, *rel.split("/"))
             os.makedirs(os.path.dirname(p), exist_ok=True)
@@ -203,6 +221,8 @@ def capture(verify, sc: Scenario, mods: dict | None = None, root: str | None = N
         if a[0] == "git":
             return real_run(args, cwd=cwd, **kw)
         if tool == "stylelint.py":
+            if sc.lint == REAL_LINT:
+                return real_run([sys.executable, REAL_LINT_PATH] + a[2:], cwd=cwd, **kw)
             return subprocess.CompletedProcess(a, sc.lint[0], sc.lint[1], "")
         if tool == "selftest.py":
             return subprocess.CompletedProcess(a, 0, json.dumps({"failures": [], "stale_parks": [],
@@ -361,6 +381,23 @@ def test_new_unit_name_problems(c):
     c.check("a rename to ANOTHER generated stem is refused",
             new_unit_name_problems(base, base | {"Net/fn_80003000"}, {"Net/fn_80001100": ["Net/fn_80003000"]})[0],
             ["Net/fn_80003000: generated name `fn_80003000`"])
+
+
+def test_rule15_style_lint_row(c):
+    """Rule 15 through the real lint (2026-10-05): a stale path new to a changed file refuses the style-lint row, and
+    the refusal names rule 15 and the file; advisory markers alone (a date, a lane, a percentage) leave it passing."""
+    from tools.units.landing import api
+    style = "style lint (§6.5) adds no violation"
+    got = {}
+    for name in ("lint-rule15-stale-path-refusal", "lint-rule15-advisory-pass"):
+        problems: list = []
+        res = capture(lambda *a, **k: api.verify(*a, problems=problems, **k), next(s for s in SCENARIOS if s.name == name))
+        got[name] = (res["exit"], [r[1] for r in res["rows"] if r[0] == style], [str(p) for p in problems])
+    exit_code, status, problems = got["lint-rule15-stale-path-refusal"]
+    c.check("a new stale path refuses the style-lint row (exit 1)", (exit_code, status), (1, ["FAIL"]))
+    c.check("... and the refusal is rule 15's, on the unit's file",
+            any("rule 15" in p and "src/Net/net_new.cpp" in p for p in problems), True)
+    c.check("advisory markers alone pass the row", got["lint-rule15-advisory-pass"][:2], (0, ["PASS"]))
 
 
 def test_golden_is_not_vacuous(c):

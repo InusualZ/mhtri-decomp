@@ -14,6 +14,7 @@ from tools.lib import findings as _findings
 from tools.units.stylelint_rules.common import (AUDIT_RULES, EXEMPT, RULE7_NOTES, RULE_NAMES, UNCHECKED,
     UNSPLIT_UNRESOLVED)
 from tools.units.stylelint_rules.lint import rule11_local_total
+from tools.units.stylelint_rules.r15_comments import ADVISORY, REFUSING
 
 
 def budget(findings: list[dict], rule10: dict | None = None) -> dict:
@@ -37,7 +38,15 @@ def budget(findings: list[dict], rule10: dict | None = None) -> dict:
     totals = {str(r): sum(row["rules"][str(r)] for row in per.values()) for r in RULE_NAMES}
     return {"units": [per[k] for k in sorted(per)], "totals": totals,
             "total": sum(totals.values()), "findings": len(findings), "unique": unique_names(findings),
-            "rule10": None if rule10 is None else {"source": AUDIT_RULES[10], "violations": sum(rule10.values())}}
+            "rule10": None if rule10 is None else {"source": AUDIT_RULES[10], "violations": sum(rule10.values())},
+            "rule15": rule15_classes(findings)}
+
+
+def rule15_classes(findings: list[dict]) -> dict:
+    """Rule 15's column split by class: `{"refusing": {check: n}, "advisory": {check: n}}`, each in the order
+    `REFUSING` / `ADVISORY` name them (a class with no finding reads 0). The `r15` column is their sum."""
+    counts = collections.Counter(f.get("check") for f in findings if f["rule"] == 15)
+    return {"refusing": {c: counts.get(c, 0) for c in REFUSING}, "advisory": {c: counts.get(c, 0) for c in ADVISORY}}
 
 
 def rule10_counts(root: str) -> tuple[dict | None, str]:
@@ -140,6 +149,10 @@ def print_budget(findings: list[dict], ownership: "Ownership | None" = None,
           "file(s), %d distinct name(s)" % (len([f for f in r13 if f.get("static")]),
                                             len(source_files_of([f for f in r13 if f.get("static")])),
                                             len({f["token"] for f in r13 if f.get("static")})))
+    r15 = rule15_classes(findings)
+    print("rule 15 (comments): %d refusing (%s) + %d advisory (%s) - an advisory finding is counted here and never "
+          "refused" % (sum(r15["refusing"].values()), ", ".join("%s %d" % kv for kv in r15["refusing"].items()),
+                       sum(r15["advisory"].values()), ", ".join("%s %d" % kv for kv in r15["advisory"].items())))
     print_rule2_report(ownership)
     for num, what in UNCHECKED:
         print("not checked (cross-file): rule %d - %s" % (num, what))

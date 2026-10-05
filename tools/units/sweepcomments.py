@@ -14,6 +14,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 
 from tools.lib import cli
+from tools.lib import comments as _comments
 from tools.lib import cscan
 from tools.lib import facts as _facts
 from tools.lib import repo as _repo
@@ -802,32 +803,11 @@ def if0_text(rel: str, text: str, macros: set[str]) -> FileResult:
 
 # --- stale paths and narrative markers: the census -----------------------------------------------------------------
 
-#: The stale-path vocabulary (rule 15's refusal set, stage 2). Hand-curated: the retired tool names are the ones the
-#: comments still cite, not derived from docs/tools/retired.md (which names live tools as replacements).
-STALE_MARKERS = (
-    ("include/", re.compile(r"(?<![\w/.\-#])include/(?![*{])")),
-    ("src/auto", re.compile(r"(?<![\w/])src/auto\b")),
-    ("auto/<hex>_", re.compile(r"(?<![\w/])auto/[0-9A-Fa-f]{8}_")),
-    ("proposal/", re.compile(r"(?<![\w/])proposal/")),
-    (".pi/", re.compile(r"(?<![\w/])\.pi/")),
-    ("docs/splits/phase4", re.compile(r"docs/splits/phase4(?!/homebutton-carried-notes\.md)")),
-    ("retired tool", re.compile(r"\b(?:attribute\.py|applysplits|dataattach|matchinggain|promote\.py|promote_batch|"
-                                r"herdr|applybranch|union\.py|mergelane)\b")),
-)
-STALE_WHITELIST = ("docs/splits-program.md", "docs/tools/retired.md", "docs/splits/phase4/homebutton-carried-notes.md")
-_PATH_TOKEN_RE = re.compile(r"[\w.+\-]*(?:/[\w.+\-]*)+")
-
-#: The narrative markers stage 3 reads (advisory: game text can say "round" or "lane").
-HISTORY_MARKERS = (
-    ("phase 4", re.compile(r"phase[ -]?4", re.I)),
-    ("next pass", re.compile(r"next pass", re.I)),
-    ("date", re.compile(r"\b20\d\d-\d\d-\d\d\b")),
-    ("round N", re.compile(r"\bround \d+\b", re.I)),
-    ("pilot", re.compile(r"\bpilot\b", re.I)),
-    ("wave", re.compile(r"\bwave\b", re.I)),
-    ("lane", re.compile(r"\blane\b", re.I)),
-    ("header inherited", re.compile(r"header inherited from")),
-)
+#: The stale-path vocabulary, the narrative markers and the stale judgement are `lib.comments`' (section 6.5 rule 15
+#: reads the same data): one copy, re-exported under the names this tool always had.
+STALE_MARKERS = _comments.STALE_MARKERS
+STALE_WHITELIST = _comments.STALE_WHITELIST
+HISTORY_MARKERS = _comments.HISTORY_MARKERS
 
 
 def comment_text(rel: str, text: str) -> str:
@@ -851,6 +831,10 @@ def census(root: str, scope: str, markers, whitelist_paths: bool) -> dict:
         sel += [f for f in files if f.endswith(".md") and f.startswith(MD_ROOTS + ("CLAUDE.md",))
                 and not f.startswith(MD_GENERATED)] + [f for f in files if f in ("CLAUDE.md", "README.md")]
     totals, per_file = Counter(), {}
+
+    def exists(path: str) -> bool:
+        return os.path.exists(os.path.join(root, *path.split("/")))
+
     for rel in sel:
         if rel in STALE_WHITELIST:
             continue
@@ -858,28 +842,13 @@ def census(root: str, scope: str, markers, whitelist_paths: bool) -> dict:
         if text is None:
             continue
         com = comment_text(rel, text)
-        for name, rx in markers:
-            n = 0
-            for m in rx.finditer(com):
-                if whitelist_paths:
-                    tok = _PATH_TOKEN_RE.match(com, _line_token_start(com, m.start()))
-                    p = tok.group().strip("`'\".,;:()") if tok else ""
-                    if p and "/" in p and (os.path.exists(os.path.join(root, *p.rstrip("/").split("/")))
-                                           and not p.startswith(("include/", "proposal/", "auto/", "src/auto",
-                                                                 "docs/splits/phase4"))):
-                        continue
-                n += 1
-            if n:
-                totals[name] += n
-                per_file.setdefault(name, Counter())[rel] = n
+        hits = (_comments.stale_hits(com, exists, markers) if whitelist_paths
+                else _comments.marker_hits(com, markers))
+        for name, n in Counter(h.marker for h in hits).items():
+            totals[name] += n
+            per_file.setdefault(name, Counter())[rel] = n
     return {"scope": scope, "totals": dict(totals),
             "files": {k: dict(v.most_common()) for k, v in per_file.items()}}
-
-
-def _line_token_start(text: str, pos: int) -> int:
-    while pos > 0 and (text[pos - 1].isalnum() or text[pos - 1] in "_.+-/"):
-        pos -= 1
-    return pos
 
 
 # --- the driver ---------------------------------------------------------------------------------------------------

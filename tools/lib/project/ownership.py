@@ -114,6 +114,16 @@ def symbol_index(rows: Iterable[Any]) -> dict[str, list[tuple[str, int, str]]]:
     return out
 
 
+def function_sizes(rows: Iterable[Any]) -> dict[int, list[tuple[str, int]]]:
+    """`address -> [(name, size)]` for the map's `type:function` rows - the size view the index keeps beside
+    `symbol_index` (section 6.5 rule 15 checks a function comment's `0xADDR (0xSIZE)` prefix against it)."""
+    out: dict[int, list[tuple[str, int]]] = {}
+    for e in rows:
+        if e.type == "function":
+            out.setdefault(e.address, []).append((e.name, e.size))
+    return out
+
+
 class Ownership:
     """`symbol -> owning unit` and `address -> owner`, from the map rows and the splits ranges.
 
@@ -124,8 +134,11 @@ class Ownership:
     """
 
     def __init__(self, symbols: dict, ranges: dict, auto: AutoObjects | None = None,
-                 root: str | os.PathLike | None = None) -> None:
+                 root: str | os.PathLike | None = None, functions: dict | None = None) -> None:
         self.symbols = symbols
+        #: `address -> [(name, size)]` of the function rows (`function_sizes`); empty when the caller built the index
+        #: without the rows (a fixture), which leaves every size question unanswered rather than wrong.
+        self.functions = functions or {}
         self.ranges = {s: sorted(v) for s, v in ranges.items()}
         self.auto = auto
         self.root = None if root is None else str(root)
@@ -137,12 +150,13 @@ class Ownership:
     def from_texts(cls, symbols_text: str, splits_text: str, **kw: Any) -> "Ownership":
         """From the two files' texts (what `git show` returns for a ref)."""
         from tools.lib.project.symbols import parse_line
-        rows = (e for e in (parse_line(ln) for ln in symbols_text.splitlines()) if e is not None)
-        return cls(symbol_index(rows), Splits.parse(splits_text).by_section(), **kw)
+        rows = [e for e in (parse_line(ln) for ln in symbols_text.splitlines()) if e is not None]
+        return cls(symbol_index(rows), Splits.parse(splits_text).by_section(), functions=function_sizes(rows), **kw)
 
     @classmethod
     def from_files(cls, symbols_path: str | os.PathLike, splits_path: str | os.PathLike, **kw: Any) -> "Ownership":
-        return cls(symbol_index(SymbolMap(symbols_path).rows()), Splits.read(splits_path).by_section(), **kw)
+        rows = list(SymbolMap(symbols_path).rows())
+        return cls(symbol_index(rows), Splits.read(splits_path).by_section(), functions=function_sizes(rows), **kw)
 
     @classmethod
     def load(cls, root: str | os.PathLike, auto: bool = False) -> "Ownership | None":

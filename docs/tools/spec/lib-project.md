@@ -37,8 +37,10 @@ Ownership, Owner, AutoObjects, Refused, ShapeError`.
   mw_version, cflags_name, cflags, progress_category, objects, line)`), `lib(name)`, `groups()`, `cflags(group or lib)`,
   `matching_units()`, `object_line(path)`, `object_line_text(path)`, `skipped` (lines the evaluator did not model);
   `object_calls(text) -> [ObjectCall(flag, path, line, closed)]` for a whole file or a fragment.
-* `ownership.py`: `Ownership(symbols, ranges, auto=None, root=None)` (`symbols` = `{name: [(section, address, type)]}`,
-  `ranges` = `{section: [(start, end, unit)]}`), `Ownership.load(root, auto=False)` (cached per mtime and class),
+* `ownership.py`: `Ownership(symbols, ranges, auto=None, root=None, functions=None)` (`symbols` = `{name: [(section,
+  address, type)]}`, `ranges` = `{section: [(start, end, unit)]}`, `functions` = `{address: [(name, size)]}` of the
+  `type:function` rows, `function_sizes(rows)`: `from_files`/`from_texts` fill it, a hand-built index leaves it empty -
+  section 6.5 rule 15 checks a function comment's `0xADDR (0xSIZE)` prefix against it), `Ownership.load(root, auto=False)` (cached per mtime and class),
   `Ownership.at_ref(root, ref, show=None)` (`show(ref, rel) -> bytes | None`, default `lib.git.Git(root).show`),
   `from_files`, `from_texts`; `covering`, `owner_of(section, address) -> Owner(state, unit, section, range, band)`, `band_of`
   (alias `module`), `resolve(name)`, `name_at`, `resolution_at`, `unit_of_symbol`, `symbols_of_unit(unit, section)`,
@@ -47,7 +49,7 @@ Ownership, Owner, AutoObjects, Refused, ShapeError`.
   (`include/unsplit`, still *classified* as the band so a ref older than the 2026-10-05 header move reads the same; never
   written), `BAND_ROOTS`, `band_root(root=None)` (where a tool writes a band header), `HEADER_SUFFIXES` and
   `is_band_header(rel)`;
-  `AutoObjects.load(config_json, obj_dir)` / `from_config`; `module_name(unit)`; `symbol_index(rows)`;
+  `AutoObjects.load(config_json, obj_dir)` / `from_config`; `module_name(unit)`; `symbol_index(rows)`; `function_sizes(rows)`;
   `owner_label(resolution, source_exists) -> (label, state, unit)` (WP3c, from `callees.classify_owner`: the vocabulary
   `callers`/`callees` print) and `source_exists(root)` (from `callees.make_source_exists`).
 

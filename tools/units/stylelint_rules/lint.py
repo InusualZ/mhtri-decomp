@@ -3,7 +3,7 @@ Spec: docs/tools/spec/stylelint_rules.md. CLI: none (the stylelint package; `sty
 from __future__ import annotations
 
 from tools.units.stylelint_rules import (
-    r03_size, r04_offset, r05_field_name, r06_pointer_arith, r07_generated_name, r08_goto, r09_mangled,
+    r03_size, r04_offset, r05_field_name, r06_pointer_arith, r07_generated_name, r08_goto, r09_mangled, r15_comments,
 )
 from tools.units.stylelint_rules.common import (
     Source, all_header_files, all_lint_sources, all_sources, field_walk, header_files, is_header, is_unsplit_header, read_text,
@@ -36,7 +36,8 @@ def lint_source(src: Source, ownership: "Ownership | None" = None) -> list[dict]
 
     One classifier, three file kinds (2026-10-05). **Every** `.c`/`.cpp`/`.h` - a source, a header anywhere
     (`common.is_header`: `include/**` today, `src/**` after the move) and the unsplit band - carries the body rule
-    set: 3, 4, 5, 6, 7, 8, 9, 11, 13 and 14 (14 reports only in a header; 13 only where a `.cpp` reaches the file).
+    set: 3, 4, 5, 6, 7, 8, 9, 11, 13, 14 and 15 (14 reports only in a header; 13 only where a `.cpp` reaches the
+    file; 15 never in `src/Camellia/`, and its address check reads `ownership` like rules 2 and 12).
     Only rule 2 and the STOPGAP check read the kind: a source is judged by `rule2_findings`, an ordinary header by
     `rule2_header_findings` (an unowned name is the band's to detect), and the band by `rule2_band_findings` (an
     owned name declared there is the finding); the band carries no STOPGAP check, as before. Rule 12 reads every
@@ -70,6 +71,7 @@ def lint_source(src: Source, ownership: "Ownership | None" = None) -> list[dict]
     out.extend(rule11_findings(src))
     out.extend(rule13_findings(src))
     out.extend(codegen_pragma_findings(src))
+    out.extend(r15_comments.findings(src, ownership))
     if not band:
         out.extend(stopgap_findings(src))
 
@@ -223,6 +225,7 @@ def lint_tree(root: str, paths: list[str] | None = None,
     if ownership is None:
         ownership = load_ownership(root)
     set_rule13_context(root)
+    r15_comments.set_rule15_context(root)
     out = []
     sources = all_lint_sources(root) if paths is None else [
         Source(path, rel_of(root, path), read_text(path)) for path in paths]
@@ -237,6 +240,7 @@ def lint_all(root: str, ownership: "Ownership | None" = None, band_rule2: bool =
     if ownership is None:
         ownership = load_ownership(root)
     set_rule13_context(root)
+    r15_comments.set_rule15_context(root)
     out = []
     for src in all_lint_sources(root):
         out.extend(f for f in lint_source(src, ownership) if band_rule2 or not is_band_rule2(f))

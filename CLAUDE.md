@@ -62,13 +62,13 @@ Two working rules that apply to **every** unit, agreed with the project owner:
 
 1. **Apply the best-scoring variant even if it is not a full match.** A source rewrite or flag change is worth landing as soon
    as it *measurably improves* the objdiff score (`ninja build/RMHE08/report.json`, per-symbol `match_percent`) and regresses
-   nothing else. Record the residual diff in the unit's **file header comment** (never as a per-function comment). Never land a
+   nothing else. Record the residual on the unit's file header `RESIDUALS.` line (never in a function comment). Never land a
    change that makes any function worse. Landing means the unit's own source or `configure.py` carries the change and the repo
    rebuilds better (`python .claude/skills/mwcc-unit-matching/scripts/mt.py variants --apply <name>` then a forced rebuild);
    a probe-only winner is not progress.
 2. **Evidence-backed flags live in `configure.py` as soon as they are proven**, even while the unit is short of 100 %. They are
-   **per library** (never edit `cflags_base`/`cflags_runtime` for everyone), called out explicitly (rule 3 above), with the
-   instruction/size evidence in a comment next to them, below `cflags_runtime`.
+   **per library** (never edit `cflags_base`/`cflags_runtime` for everyone), called out explicitly (rule 3 above), below
+   `cflags_runtime`, with a one-line comment pointing at the unit header that holds the instruction/size evidence.
 
 The *how* is the playbook index in `docs/matching/index.md` (see "Matching playbook").
 
@@ -252,10 +252,12 @@ The incident behind each is in `docs/pipeline.md` 13.3.
     the outbox or `.pi/notes/`.
 * **Keep generated/large churn separate.** A `symbols.txt` regeneration or an analyzer settings change gets its own commit.
 * **Commenting and naming** (every unit we write):
-  * **A comment on top of a function is a short description of what it does** - one or two lines, present tense. It must not
-    carry the symbol's name nor a matching percentage. Residuals, flag evidence and name provenance go in the unit's file header.
-  * **The unit's file header comment is the one place for the unit's own notes**: what it is, the `.text` range and function
-    order, where its flags/evidence live, the residuals, load-bearing source shapes. One line per fact; no per-function inventory.
+  * **A comment on top of a function is a short description of what it does** - one or two lines, present tense, optionally
+    opening with its address `/* 0x80512490 (0x64): ... */` (rule 15 checks it against `symbols.txt`). It must not carry the
+    symbol's name nor a matching percentage. Residuals, flag evidence and name provenance go in the unit's file header.
+  * **The unit's file header comment is the one place for the unit's evidence**: one short block in the
+    `RANGE`/`FLAGS`/`NAMES`/`RESIDUALS`/`SHAPES` template (`docs/plan.md` 6.5, rule 15), one line per fact; no history, dates,
+    percentages or per-function inventory. `configure.py` points at it in one line and never repeats it.
   * **Use the real name when known** (retail map, the memory dump, the SDK), or a descriptive name in the **naming scheme of the
     surrounding symbols**. dtk's `FUN_`/`fn_`/`lbl_`/`unkNN` names - and an identifier or file named after an address - are
     placeholders to replace (section 6.5 rule 7, a ratchet: the gate refuses a new one, existing ones only fall): derive one from
@@ -268,8 +270,8 @@ The incident behind each is in `docs/pipeline.md` 13.3.
     `.c`/`.cpp`/`.h` - a `fn_`/`lbl_`/`loc_`/`dtor_`/`zz_` + address stem anywhere in an identifier, an address-named identifier
     (`Panel805482CC`), a bare `unkNN`, or a generated file/directory name (`fn_805113B0.cpp`) - a ratchet with no exemptions:
     the gate refuses a new one and a unit newly registered under a generated name; every reconstructed type states its size, every field carries its offset and a context name (padding excepted),
-    shared types live in one header, an `extern` lives with the owner unit, no pointer arithmetic to reach a field.
-    `tools/units/stylelint.py` enforces the fourteen rules at the land gate - rule 10 through `tools/units/vtableaudit.py`
+    shared types live in one header, an `extern` lives with the owner unit, no pointer arithmetic to reach a field, no stale path
+    in a comment. `tools/units/stylelint.py` enforces the fifteen rules at the land gate - rule 10 through `tools/units/vtableaudit.py`
     (regenerate profiles with
     `tools/agents/sync_profiles.py` after a rule change).
 * **Style:** match the file you are editing; new project code is 4-space-indent C. Files are UTF-8 and **LF in the repository and
