@@ -160,7 +160,7 @@
 #include "types.h"
 #include "NWC24/nwc24_io.h"   /* this unit's own API (rule 2) */
 #include "NWC24/nwc24_msg.h"  /* NWC24iSetScriptMode / NWC24iRegisterVersion (rule 2) */
-#include "unsplit/IOS.h"      /* IOS_Open / IOS_Close / IOS_Ioctl / IOS_IoctlAsync (rule 2 band) */
+#include "RVLGX/GXTexture_tail.h" /* IOS_Open / IOS_Close / IOS_Ioctl / IOS_IoctlAsync (owner's header, rule 2) */
 #include "unsplit/SC.h"       /* SCCheckStatus / SCGetIdleMode / SCGetCounterBias / SCSetIdleMode */
 #include "unsplit/NWC24.h"    /* the band's unowned work block and literals (rule 2) */
 #include "unsplit/OS.h"       /* OSDisable(Interrupts) / OSRestoreInterrupts / OSInitMutex /

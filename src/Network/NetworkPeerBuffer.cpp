@@ -6,7 +6,7 @@
  * FLAGS. `-O3 -pool off` (configure.py; measured in docs/network.md); file-scope `#pragma peephole off`
  *   (playbook 39).
  * NAMES. `NetworkPeerBuffer` and the slot names that are only an offset are GUESSes (marked in
- *   `Network/network_transport_types.h`).
+ *   `Network/NetworkPeerBuffer.h`).
  * RESIDUALS. none in the rows; `send`'s `NETWORK_ERROR_*` constant is an immediate the target relocates against an
  *   `@eti_` extabindex row (playbook 58), 3 B of `.text` relocation fields.  The DOL hash holds with it linked.
  * SHAPES. The table is emitted from `NetworkPeerBuffer::destroy`, the key function (rule 10).  `receive`'s stream is a
@@ -14,12 +14,16 @@
  *   Each `dont_inline` region keeps a retail `bl` that `-inline auto` folds.
  */
 #include "types.h"
-#include "Network/network_transport.h"
+#include "Network/NetworkPeerBase.h"
+#include "Network/NetworkPeerBuffer.h"
+#include "Network/NetworkSessionBase.h"
+#include "Network/NetworkResolverWii.h"
+#include "Network/network_socket_streams.h"
+#include "Network/NetworkSessionStable.h"
 #include "Network/NetworkSessionManager.h"
 #include "Network/NetworkUnitPacket.h"
-/* `unsplit/Network.h` is the Network band's code half (`getNetworkLogger` and the socket-pool helpers).  It
-   cannot be included beside `unsplit/OS.h`: the two band headers declare `OSCreateThread`/`OSResumeThread` with
-   different signatures and a TU that sees both fails with `(10197) illegal function overloading`. */
+/* `unsplit/Network.h` is the Network band's code half (`getNetworkLogger` and the socket-pool helpers); the OS
+   thread calls it reaches are `NAND/nand.h`'s, the one spelling `unsplit/OS.h` includes too. */
 #include "unsplit/Network.h"
 #include "unsplit/Runtime.PPCEABI.H.h"
 #include "Runtime.PPCEABI.H/memcpy.h"

@@ -1,18 +1,52 @@
 /*
- * Network/network_writer_types.h - the bit-stream writer band's classes the session units share: the stream frame
- *   objects, `NetworkBuffer` and the logger view (rule 1).
+ * Network/NetworkStreamSink.h - the classes and entry points `Network/NetworkStreamSink.cpp` owns that other units
+ *   use: the stream sink and its writers, the stream buffer, the logger view, the mutex pair and the frame writer's
+ *   entry points.
  */
-
-#ifndef NETWORK_NETWORK_WRITER_TYPES_H
-#define NETWORK_NETWORK_WRITER_TYPES_H
+#ifndef MHTRI_NETWORK_NETWORKSTREAMSINK_H
+#define MHTRI_NETWORK_NETWORKSTREAMSINK_H
 
 #include "types.h"
-#include "Network/network_transport_types.h"   /* NetworkStreamSink */
-#include "Network/NetworkUniqueId.h"           /* NetworkUniqueId - the address object the session records embed */
+
+class NetworkLogger;                /* unsplit/Network.h: the log manager the accessor returns */
+class NetworkConnectionStable;      /* Network/NetworkSessionStable.h */
+
+/* ---------------- the peer that owns a byte stream -------------------------------------------- */
+
+/* The sink the stream helpers hand a record to: only its +0x20 and +0x24 slots are called here, the first
+   fills the buffer it is given and the second takes a record, each reporting how many bytes it moved
+   (GUESS: offset-derived - the range never names the class, no `NetworkPeer*` class carries these two
+   slots at +0x20/+0x24, and the helper stays valid through a pointer). */
+class NetworkStreamSink {
+public:
+    NetworkStreamSink();
+    /* +0x08 */ virtual ~NetworkStreamSink();
+    /* +0x0C (GUESS: the flush hook, empty in this class) */ virtual void onFlush(u8* data, u32 size);
+    /* +0x10 (GUESS: hands the stored bytes to `onFlush`) */ virtual void flush();
+    /* +0x14 (GUESS: binds the stream to an empty block) */ virtual void attach(u8* block, u32 capacity);
+    /* +0x18 (GUESS: zeroes the block) */ virtual void clear();
+    /* +0x1C (GUESS: binds the stream to a block that is full) */ virtual void bind(u8* block, u32 size);
+    /* +0x20 (GUESS) */ virtual s32 fill(u8* out, u32 size);
+    /* +0x24 (GUESS) */ virtual s32 put(const u8* data, u32 size);
+    /* +0x28 (GUESS: copies another sink's record in - the roster, peer and session address copies dispatch it
+       with the source record) */ virtual void copyFrom(const u8* src);
+    /* +0x2C (GUESS: offset-derived) */ virtual void slot_2C();
+    /* +0x30 (GUESS: the framed writer scrambles a frame's payload with a random key byte - `size` bytes from `offset`,
+       22 past the frame header) */ virtual void encrypt(u8 key, u16 offset, u16 size);
+    /* +0x34 (GUESS: the reader's inverse, with the key the frame header carries) */
+    virtual void decrypt(u8 key, u16 offset, u16 size);
+    /* +0x38 (GUESS: the frame CRC over the first `size` bytes, stored at +0x12 and compared by the reader's test) */
+    virtual u16 checksum(u16 size);
+
+    /* +0x04 */ u8* data_04;         /* the block the stream reads or writes */
+    /* +0x08 */ u32 capacity_08;     /* its size */
+    /* +0x0C */ u32 used_0C;         /* the bytes it holds */
+};   /* size: 0x10 (evidence: the constructor stores the table and three words) */
+
 
 /* ---------------- the bit-stream writer's frame objects (the writer band's classes) ------------- */
 
-/* Two stream-sink classes of the writer band (`lobby/lb_server_sel_trans.cpp` defines their constructors and
+/* Two stream-sink classes of the writer band (this header's unit defines their constructors and
    destructors).  Each constructor chains `NetworkStreamSink`'s and stores its own table - 0x805FCE10 for
    `NetworkStreamWriter` (0x803CB9B4), 0x805FCDD4 for `NetworkStreamWriterDefault` (0x803CB9F0) - and each
    table's +0x08 slot is the matching destructor (0x803CB958, 0x803CB8FC); both destructors chain
@@ -41,26 +75,11 @@ public:
     u8 unused_18[0x04];   /* +0x18..+0x1B */
 };   /* size: 0x1C */
 
-/* The 0x18-byte queue of framed messages (the log strings' `NetworkUnitPacketPool`; GUESS on the project
-   name): a stream sink whose block holds the queued frames, plus the sequence number the next frame carries
-   and the read cursor.  `Network/NetworkUnitPacket.cpp` defines its constructor (0x803FA5F4) and destructor
-   (0x803FA63C), the only virtual it overrides, so that unit emits its table (0x805FCD98: the destructor, then
-   `NetworkStreamSink`'s slots unchanged); the writer band's `NetworkSlotQueues` builds four of them. */
-class NetworkStreamQueue : public NetworkStreamSink {
-public:
-    NetworkStreamQueue();
-    virtual ~NetworkStreamQueue();
-
-    /* +0x10 */ u16 sequence_10;  /* the sequence number the next message carries */
-    /* +0x12 */ u8 pad_12[0x02];
-    /* +0x14 */ u8* cursor_14;    /* where the reader stands */
-};   /* size: 0x18 */
-
-/* ---------------- bit-stream writer (owned by the network-serialization band) -------------- */
+/* ---------------- the stream buffer (its table 0x805F9150 is this unit's .data) ------------- */
 
 /* The stream buffer every op-code writer puts its packet on.  A polymorphic class (rule 10): its
-   table lives at 0x805F9150 in the serialization band, which this unit does not own, so the class
-   only *declares* its virtuals - none is defined here, so MWCC emits no table of ours - and the
+   table lives at 0x805F9150 in `Network/NetworkStreamSink.cpp`'s .data, whose bodies are unwritten, so the class
+   only *declares* its virtuals - none is defined anywhere, so MWCC emits no table - and the
    slots are the offsets the target's calls address (a declared virtual at index i is at +8+4*i).
    The three never-called groups are the dispatch holes between the called slots: the entry points
    this unit reaches are named from what the call passes, the eight `slot_NN` slots from their offset
@@ -104,7 +123,7 @@ public:
     /* +0x90 */ virtual s32 getInt(s32 idx);
 };   /* size: 0x04 - only ever reached through a pointer in this unit */
 
-/* ---------------- the manager's logger (its accessor is another band's) ------------------- */
+/* ---------------- the manager's logger view (`getNetworkLogger` below returns the object) -- */
 
 typedef struct NetworkManagerLoggerVtable {
     u8 pad00[0x0C];
@@ -120,4 +139,25 @@ typedef struct NetworkSessionManagerLogger {
     NetworkManagerLoggerVtable* vtable;   /* +0x00 */
 } NetworkSessionManagerLogger;   /* size: 0x04 */
 
-#endif /* NETWORK_NETWORK_WRITER_TYPES_H */
+
+extern "C" {
+
+/* 0x803C9974 - the game's debug/log manager (the network library singleton, read through `mpInstance`). */
+NetworkLogger* getNetworkLogger(void);
+
+/* 0x803CA338 / 0x803CA37C - destroy (flags -1 at every call site) and construct the member mutex the network
+ * records embed (the constructor references the 0x10-byte .data 0x805F91E0).  The callers hand a byte block
+ * whose layout only this unit's class owns. */
+/* untyped: opaque handle passed through - only the writer band owns the layout */
+void networkInstance_destroyMutex(void* self, s32 flags);
+/* untyped: opaque handle passed through - only the writer band owns the layout */
+void networkInstance_initMutex(void* self);
+
+/* 0x803CBA9C / 0x803CBB98 - the frame writer's entry points on a connection that `NetworkSessionStable` drives
+ * (attach a default writer; hand it `length` bytes of channel `kind`, or none). */
+void networkStreamWriter_attach(NetworkConnectionStable* connection, NetworkStreamWriterDefault* stream);
+void networkStreamWriter_reserve(NetworkConnectionStable* connection, const u8* bytes, u32 length, s8 kind);
+
+}
+
+#endif /* MHTRI_NETWORK_NETWORKSTREAMSINK_H */

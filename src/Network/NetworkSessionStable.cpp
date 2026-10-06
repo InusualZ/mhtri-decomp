@@ -44,15 +44,19 @@
  *    declared at that point, and `setNetworkConnectionEvent`'s reader lives in a block so it dies before the address.
  */
 #include "types.h"
-#include "Network/network_transport.h"
+#include "Network/NetworkPeerBase.h"
+#include "Network/network_socket_streams.h"
+#include "Network/NetworkSessionBase.h"
+#include "Network/NetworkStreamSink.h"
+#include "Network/NetworkResolverWii.h"
+#include "Network/NetworkSessionStable.h"
 #include "Network/NetworkSessionManager.h"
 #include "lobby/lb_server_sel_trans.h"
 #include "Network/NetworkUnitPacket.h"
 #include "Network/NetworkUniqueId.h"
 #include "MSL_C/alloc.h"
-/* `unsplit/Network.h` is the Network band's code half (`getNetworkLogger` and the socket-pool helpers).  It
-   cannot be included beside `unsplit/OS.h`: the two band headers declare `OSCreateThread`/`OSResumeThread` with
-   different signatures and a TU that sees both fails with `(10197) illegal function overloading`. */
+/* `unsplit/Network.h` is the Network band's code half (`getNetworkLogger` and the socket-pool helpers); the OS
+   thread calls it reaches are `NAND/nand.h`'s, the one spelling `unsplit/OS.h` includes too. */
 #include "unsplit/Network.h"
 #include "unsplit/Runtime.PPCEABI.H.h"
 #include "Runtime.PPCEABI.H/memcpy.h"

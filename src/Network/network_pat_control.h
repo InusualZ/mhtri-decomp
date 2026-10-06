@@ -13,7 +13,7 @@
 #include "Network/NetworkPat.h"
 #include "Network/NetworkSessionManagerPat.h"   /* getPatsObject, isNetworkSessionManagerPatReady (owner's header, rule 2) */
 #include "Network/NetworkLayerPat.h"   /* NetId and the layer records the work record embeds */
-#include "Network/network_writer_types.h"   /* NetworkUniqueId - the roster entries' address objects */
+#include "Network/NetworkUniqueId.h"       /* NetworkUniqueId - the roster entries' address objects */
 #include "Network/NetworkFileFetcher.h"     /* NetworkFileFetcher - the fetch state machines' client */
 #include "menu/PatTerms.h"                  /* PatTerms - the terms object (owner menu/menu_plsearch.cpp) */
 

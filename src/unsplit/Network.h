@@ -17,7 +17,12 @@
    so the declarations that range now owns moved into those units' own headers and are reached
    through this include - a band header that still declared them would collide with the owner's
    definitions (docs/plan.md 6.5 rule 2). */
-#include "Network/network_transport.h"
+#include "Network/NetworkPeerBase.h"
+#include "Network/NetworkSessionBase.h"
+#include "Network/NetworkStreamSink.h"
+#include "Network/NetworkResolverWii.h"
+#include "Network/network_socket_streams.h"
+#include "Network/NetworkSessionStable.h"
 #include "Network/sNetworkLibraryWii.h"
 #include "DWCi/dwc_nasfunc.h"
 #include "DWCi/dwc_error.h"
@@ -31,9 +36,6 @@ typedef struct NetId NetId;                 /* Network/NetworkLayerPat.h */
 typedef struct NetLayerRequest NetLayerRequest; /* Network/NetworkLayerPat.h */
 /* the record's layout lives in `Network/NetworkSessionManager.h`, beside the GameSpy handshake that
  * fills it: `NetworkInstance::postError` below only takes a pointer to it. */
-
-/* the DWC callbacks are installed as unprototyped pointers and the callee casts them back */
-typedef void (*NetworkCallback)();
 
 /* ---- the game's debug/log manager (`getNetworkLogger` returns the singleton) ---------------------- */
 
@@ -97,8 +99,8 @@ typedef PatInterface NetworkInstanceDispatch;
 
 extern "C" {
 
-/* debug manager */
-NetworkLogger* getNetworkLogger(void);
+/* debug manager: `getNetworkLogger` is `Network/NetworkStreamSink.cpp`'s, declared in its header (included at the
+ * top of this band). */
 
 /* The socket pool (`networkSocketPool_acquire`/`_release`, owner `Network/sNetworkLibrary.cpp`) is
  * declared in `Network/sNetworkLibrary.h`, included at the top of this band. */
@@ -109,35 +111,8 @@ owner's header and is included here.  The singleton's callback/reference/error a
 `Network/PatInterface.cpp` and declared in `Network/PatInterface.h`. */
 #include "enemy/em020_ai.h"
 
-/* GameSpy GT2 transport (the SDK's `gt2*` API): a socket and a connection are opaque handles, and
- * `gt2Accept` / `gt2Connect` take the four-callback set `GameSpyInterfaceThread` installs on a
- * connection.  The callbacks keep the flat parameter lists the retail bodies read (GUESS on every
- * parameter name: the GT2 header spells `connection, result, message, size`). */
-typedef u32 GT2Socket;
-typedef u32 GT2Connection;
-typedef struct GT2ConnectionCallbacks {
-    /* +0x00 */ void (*connected_00)(s32 connection, s32 result, s32 message, s32 timeout);
-    /* +0x04 */ void (*received_04)(u32 connection, s32 message, s32 size);
-    /* +0x08 */ void (*closed_08)(u32 connection, s32 reason);
-    /* +0x0C */ void (*ping_0C)(void);
-} GT2ConnectionCallbacks;   /* size: 0x10 */
-
-s32 gt2CreateSocket(GT2Socket* socket, const char* localAddress, u32 outgoingBufferSize, u32 incomingBufferSize,
-                    NetworkCallback socketErrorCallback);
-void gt2CloseSocket(GT2Socket socket);
-void gt2Think(GT2Socket socket);
-void gt2Listen(GT2Socket socket, NetworkCallback connectAttemptCallback);
-s32 gt2Accept(GT2Connection connection, const GT2ConnectionCallbacks* callbacks);
-/* untyped: byte range - the reject message */
-void gt2Reject(GT2Connection connection, const char* message, s32 length);
-/* untyped: byte range - the connect message */
-s32 gt2Connect(GT2Socket socket, u32* connection, const char* remoteAddress, const void* message, u32 length,
-               u32 timeout, const GT2ConnectionCallbacks* callbacks, s32 blocking);
-/* untyped: byte range - the datagram */
-s32 gt2Send(GT2Connection connection, const void* message, u32 length, s32 reliable);
-void gt2CloseConnection(GT2Connection connection);
-s32 gt2GetSocketSOCKET(GT2Socket socket);
-void gt2SetUnrecognizedMessageCallback(GT2Socket socket, NetworkCallback callback);
+/* The GameSpy GT2 transport API and its types are `DWCi/dwc_nasfunc.cpp`'s, declared in
+ * `DWCi/dwc_nasfunc.h` (included at the top of this band). */
 
 /* The DWCi NATNEG / transport-tail unit (`.text` 0x80512490..0x805145B8) is registered as
  * `src/DWCi/DWCi_NatNeg.c`, so its five entry points now live in its owner header; including
@@ -145,17 +120,10 @@ void gt2SetUnrecognizedMessageCallback(GT2Socket socket, NetworkCallback callbac
 #include "DWCi/DWCi_NatNeg.h"
 
 /* OS / runtime helpers.  `SOHtoNs` is an SO-library symbol whose one home is the SO band header,
- * which is C-linkage-safe and so reachable from the DWCi `.c` units as well. */
+ * which is C-linkage-safe and so reachable from the DWCi `.c` units as well; the OS mutex and thread
+ * calls are `NAND/nand.c`'s (the NAND/OS SDK block) and are declared in `NAND/nand.h`. */
 #include "unsplit/SO.h"
-void dtor_803CA338(void* self, s32 flags);
-void OSLockMutex(void* mutex);
-void OSUnlockMutex(void* mutex);
-void OSInitMutex(void* mutex);
-s32 OSCreateThread(void* thread, void* entry, void* param, void* stack, u32 stackSize, s32 priority, u32 flags);
-s32 OSResumeThread(void* thread);
-/* untyped: opaque handle passed through - the OS thread record */
-s32 OSIsThreadTerminated(void* thread);
-void OSSleepTicks(u64 ticks);
+#include "NAND/nand.h"
 
 /* another TU's vtables (rule 10: reference, never rebuild) */
 extern u32 lbl_80603740[];

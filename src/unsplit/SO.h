@@ -1,56 +1,13 @@
 /*
- * SO declarations with no registered owner (docs/plan.md 6.5 rule 2).
+ * unsplit/SO.h - the SO band's include hub: it declares nothing of its own (docs/plan.md 6.5 rule 2).
  *
- * The three SDK socket helpers at 0x80520604/0x8052065C/0x80520668 - `SOAddressToString` (a `u32*` address
- * word rendered as text), `SOAddressToHostPort` (a port through the SDK's own conversion) and `SOHtoNs`
- * (host -> network u16) - sit in the SO/SSL band that no registered unit covers.  stylelint's rule 2
- * cannot place them (`resolve` returns `unsplit` with no module: the nearest registered ranges are
- * `NWC24/nwc24_io.c` below and the game-UI band above, different modules); `SOHtoNs`'s own `SO`
- * prefix and its neighbours' socket vocabulary name the library, and no `SO/` owner exists,
- * so this file is their home.
- *
- * `SOHtoNs` was declared in `unsplit/Network.h` (the Network band's header, which is
- * C++-only because it carries a class); it moved here and that header now includes this one, so the
- * symbol has one home and the DWCi units (plain `.c`) can reach it.
- *
- * Added with the networking conformance pass.
+ * `SOHtoNs`, `SOAddrInfo`, `SOGetAddrInfo`, `SOFreeAddrInfo` and `SOInetAtoN` are `SO/soi.cpp`'s and are declared
+ * in `SO/soi.h`; the header is kept so its C and C++ includers reach them unchanged.
  */
 #ifndef MHTRI_UNSPLIT_SO_H
 #define MHTRI_UNSPLIT_SO_H
 
 #include "types.h"
 #include "SO/soi.h"                             /* SOSockAddrIn, SOConnect */
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/* 0x80520668 - host-to-network 16-bit byte swap. */
-u16 SOHtoNs(u16 port);
-
-/* The resolver result `SOGetAddrInfo` fills and `SOFreeAddrInfo` releases (a getaddrinfo record).
- * size: 0x20 */
-typedef struct SOAddrInfo {
-    /* +0x00 */ s32 flags;
-    /* +0x04 */ s32 family;
-    /* +0x08 */ s32 socketType;
-    /* +0x0C */ s32 protocol;
-    /* +0x10 */ u32 addrLength;
-    /* +0x14 */ char* canonName;
-    /* +0x18 */ SOSockAddrIn* addr;
-    /* +0x1C */ struct SOAddrInfo* next;
-} SOAddrInfo;
-
-/* 0x80520D0C / 0x80520FF0 - resolve a host name (getaddrinfo) and release the result. */
-s32 SOGetAddrInfo(const char* node, const char* service, const SOAddrInfo* hints, SOAddrInfo** result);
-void SOFreeAddrInfo(SOAddrInfo* info);
-
-/* 0x805204F8 - parse the dotted-quad text `name` into the four address bytes at `out`; 1 on success
- * (the SDK's INETATON ioctl), negative on failure. */
-s32 SOInetAtoN(const char* name, u8* out);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* MHTRI_UNSPLIT_SO_H */

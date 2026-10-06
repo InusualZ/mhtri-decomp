@@ -55,7 +55,7 @@
 #include "Network/NetworkSessionManagerPat.h"   /* the Pat buffer helpers and the reflection adapters */
 #include "Network/NetworkUniqueId.h"            /* NetworkUniqueId - the records' address objects */
 #include "Network/gamespy_interface_types.h"    /* GameSpyInterfaceThread / NetworkErrorInfo - owner Network/GameSpyInterfaceThread.cpp */
-#include "Network/sGameSpyInterfaceThread.h"    /* sGameSpyInterfaceThread - owner Network/GameSpyInterfaceThread.cpp */
+#include "Network/GameSpyInterfaceThread.h"     /* sGameSpyInterfaceThread - owner Network/GameSpyInterfaceThread.cpp */
 #include "Network/PatInterface.h"              /* PatInterface - owner Network/PatInterface.cpp */
 
 /* `NetworkVaState` and the two variadic intrinsics live in this unit's header (rule 2 keeps the
@@ -93,11 +93,7 @@ void NetworkSessionManager_deleteRequest(NetworkSessionManager*, NetworkRequest*
 }
 
 /* ---- extra neighbouring globals ---- */
-/* The four addresses themselves are declared in the band's data header (rule 2).  They cannot come
-   from `unsplit/Network.h`: that header declares `dtor_803CA338(void*, s32)` where this
-   file's own header declares `dtor_803CA338(void*)`, and including both fails to compile - the
-   reason `unsplit/NetworkData.h` exists.  `getNetworkLogger` and the logger type live in this
-   unit's own header. */
+/* The four addresses themselves are declared in the band's data header (rule 2). */
 
 /* ----------------------------------------------------------------------------------------- */
 /* NetworkSessionManager - construction / pool                                                */
@@ -164,7 +160,7 @@ extern "C" void* NetworkRequest_deleteElement(NetworkRequest* self, s16 flags)
 {
     if (self != 0) {
         NetworkRequest_reset(self);
-        dtor_803CA338(self->mutex_78, -1);
+        networkInstance_destroyMutex(self->mutex_78, -1);
         if (flags > 0) {
             operator delete(self);
         }
@@ -1091,7 +1087,7 @@ NetworkSessionPlayerRecord::NetworkSessionPlayerRecord()
 NetworkRequestPat::~NetworkRequestPat()
 {
     NetworkRequestPat_clear(&request_00);
-    dtor_803CA338(request_00.mutex_78, -1);
+    networkInstance_destroyMutex(request_00.mutex_78, -1);
 }
 
 extern "C" void NetworkRequestPat_clear(NetworkRequest* self)

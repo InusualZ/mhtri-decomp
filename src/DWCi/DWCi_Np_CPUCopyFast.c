@@ -79,12 +79,10 @@
  * `DWCi_consoleFriendCode`), and the helpers outside this unit its two new bodies call: `fn_80507690`
  * -> `DWCi_allocNode` and `fn_805078F0` -> `DWCi_report` (both this band, declared in
  * `unsplit/DWCi.h`), `fn_80521CA0/D70/DE0` -> `VFipf2Init`/`VFipf2Shutdown`/
- * `VFipf2IsInitialized` (the file-system band; its new `unsplit/VF.h` is their home - rule 2
- * cannot place that address, the nearest registered units below and above are `NWC24` and the
- * game-UI band - and the three names are a GUESS from the scheme their own callees use, not names
- * recovered from the SDK, so a later pass may confirm them), `fn_8051C554` -> `NCDGetCurrentIfConfig`
- * (the NCD band, unregistered: declared in
- * the existing `unsplit/NCD.h`; the name is read off this file's own
+ * `VFipf2IsInitialized` (owner `VF/vf.cpp`, declared in `VF/vf.h`; the three names are a GUESS from
+ * the scheme their own callees use, not names recovered from the SDK, so a later pass may confirm
+ * them), `fn_8051C554` -> `NCDGetCurrentIfConfig` (owner `NCD/ncdsystem.c`, declared in
+ * `NCD/ncdsystem.h`; the name is read off this file's own
  * "...IfConfig failed.[%d]" line, so a later pass can confirm it), and `fn_8051A4E8` ->
  * `NHTTPi_RegisterCallbacks` - a GUESS from this unit's call site, which hands the two command
  * callbacks and command 17 to the HTTP layer's bring-up.  That row lives inside `NHTTP/d_nhttp.c`'s
@@ -163,10 +161,9 @@
 #include "NWC24/nwc24_msg.h"             /* NWC24iGetUserId: the NWC24 band's own header (rule 2) */
 #include "unsplit/DWCi.h"                /* the band's unowned data and helpers, and - through it - */
                                          /* the two owners' headers for the data they now own       */
-#include "unsplit/NCD.h"                 /* NCDGetCurrentIfConfig: the NCD band's header (rule 2) */
+#include "NCD/ncdsystem.h"               /* NCDGetCurrentIfConfig: its owner's header (rule 2) */
 #include "unsplit/Runtime.PPCEABI.H.h"   /* strncpy / wcsncpy */
-#include "unsplit/VF.h"                  /* VFipf2*: the file-system band's own header (rule 2) */
-#include "SO/soi.h"
+#include "VF/vf.h"                       /* VFipf2*: its owner's header (rule 2) */
 
 /* The two host callbacks `DWCi_initRuntime` stores in the runtime block: the allocator it is handed
  * the block by, and the command/free callback it publishes results through. */

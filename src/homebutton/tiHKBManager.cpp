@@ -60,7 +60,7 @@
  *     (`&((HkbRecord*)self)[self->rec0.index]`) rather than by the literal 0; that is what makes MWCC keep
  *     the retail `mulli r4,r6,0x6C; add r4,r3,r4` record-base pair instead of folding it away - 26.73 ->
  *     58.63 % at the target's 120 B.
- *   - fn_8056BD38 hands fn_80529430 the built message word (`*(u32*)&msg`), matching the retail
+ *   - fn_8056BD38 hands KBDSetLedsAsync the built message word (`*(u32*)&msg`), matching the retail
  *     `lwz r6,8(r1)`; the earlier spelling passed the message's address (`(u32)&msg` -> `addi r6,r1,8`).
  *     The report metric is unchanged for this one row, but the instruction itself is now the target's.
  *
@@ -93,7 +93,7 @@
 #include "homebutton/gui_manager.h"
 #include "NAND/nand.h"
 #include "OS/FindContainHeap_.h"
-#include "SO/soi.h"
+#include "VF/vf.h"
 #include "homebutton/hbm_hermite.h"
 #include "nw4r/fn_805012C4.h"
 
@@ -185,7 +185,7 @@ struct HkbArg {
 
 /*
  * The 8-byte slot message the two slot-dispatch bodies (fn_8056BC88, fn_8056BD38) build and hand to
- * fn_80529430: the slot index, three bytes of padding and a value word.  One shared definition for the
+ * KBDSetLedsAsync: the slot index, three bytes of padding and a value word.  One shared definition for the
  * two bodies (they built the same anonymous local twice).
  */
 /* size: 0x08 */
@@ -573,7 +573,7 @@ void fn_8056BC88(HkbRecord* rec)
         saved = OSDisableInterrupts();
         bit = 1u << index;
         ((HkbManager*)&lbl_80790D64)->rec0.w08 &= ~bit; /* the global's +0x08 word (record head) */
-        result = fn_80529430(index, 0, (void*)fn_8056BC88, *(u32*)&msg);
+        result = KBDSetLedsAsync(index, 0, (void*)fn_8056BC88, *(u32*)&msg);
         if ((s32)result == 7) {
             ((HkbManager*)&lbl_80790D64)->rec0.w08 |= bit;
         }
@@ -595,7 +595,7 @@ void fn_8056BD38(HkbManager* self, HkbArg* arg)
         u32 value;
         HkbSlotMsg msg;
 
-        fn_80529B50((u8)index, 0);
+        KBDSetChannelValue((u8)index, 0);
         msg.value = 0;
         msg.index = (u8)index;
         records = self->rec0.records;
@@ -603,7 +603,7 @@ void fn_8056BD38(HkbManager* self, HkbArg* arg)
         bit = 1u << index;
         value = records->w08 & ~bit;
         records->w08 = value;
-        result = fn_80529430((u8)index, 0, (void*)fn_8056BC88, *(u32*)&msg);
+        result = KBDSetLedsAsync((u8)index, 0, (void*)fn_8056BC88, *(u32*)&msg);
         if (result == 7) {
             records->w08 |= bit;
         }
@@ -611,7 +611,7 @@ void fn_8056BD38(HkbManager* self, HkbArg* arg)
     } else {
         HkbRecord* records = self->rec0.records;
         records[index].flag = 1;
-        fn_80529B50((u8)index, 0);
+        KBDSetChannelValue((u8)index, 0);
         records[index].channel.b30 = 1;
     }
 }

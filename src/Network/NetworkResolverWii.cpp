@@ -5,7 +5,7 @@
  *   transport band: docs/network.md (the right edge is unproven: `tudiscover` gives only weak signals).
  * FLAGS. `-O3 -pool off` (configure.py; measured in docs/network.md); file-scope `#pragma peephole off`
  *   (playbook 39).
- * NAMES. The thread entry and lookup names are GUESSes (marked in `Network/network_transport_types.h`).
+ * NAMES. The thread entry and lookup names are GUESSes (marked in `Network/NetworkResolverWii.h`).
  * RESIDUALS. none in `.text`; `check`'s error code 0x80020002 is a plain immediate in ours where the target relocates it
  *   against `@eti_8001FFF8+0xA` (an `extabindex` address equal to the constant).  The DOL hash holds with it linked.
  * SHAPES. The table (0x805F9980) is emitted from `~NetworkResolverWii`, the key function (rule 10).
@@ -14,11 +14,14 @@
  *   of the claimed 0x48.  `check`'s states 0 and 10 `break` to one shared `return 0` after the switch.
  */
 #include "types.h"
-#include "Network/network_transport.h"
+#include "Network/NetworkPeerBase.h"
+#include "Network/NetworkSessionBase.h"
+#include "Network/network_socket_streams.h"
+#include "Network/NetworkResolverWii.h"
+#include "Network/NetworkSessionStable.h"
 #include "Network/NetworkSessionManager.h"
-/* `unsplit/Network.h` is the Network band's code half (`getNetworkLogger` and the socket-pool helpers).  It
-   cannot be included beside `unsplit/OS.h`: the two band headers declare `OSCreateThread`/`OSResumeThread` with
-   different signatures and a TU that sees both fails with `(10197) illegal function overloading`. */
+/* `unsplit/Network.h` is the Network band's code half (`getNetworkLogger` and the socket-pool helpers); the OS
+   thread calls it reaches are `NAND/nand.h`'s, the one spelling `unsplit/OS.h` includes too. */
 #include "unsplit/Network.h"
 #include "unsplit/Runtime.PPCEABI.H.h"
 #include "Runtime.PPCEABI.H/memcpy.h"

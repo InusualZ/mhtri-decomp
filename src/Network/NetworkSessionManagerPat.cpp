@@ -16,7 +16,7 @@
  *   the base).
  * RESIDUALS. `networkPatReleaseBuffer`: unwritten (232 B; deletes the Tcp/Udp objects through the virtual destructor).
  *  - `isNetworkSessionManagerPatReady`, `slot_19C`, `getTimeSincePublish`: `NetworkSessionBase::getUserFlagB` (+0x84,
- *    `Network/network_transport_types.h`) returns `u8`, so our callers re-extend it (`clrlwi.`) where retail uses the
+ *    `Network/NetworkSessionBase.h`) returns `u8`, so our callers re-extend it (`clrlwi.`) where retail uses the
  *    full word (`cmpwi r3,0`, a plain `bctr` tail call);
  *  - `networkSessionReflect1`, `moveStartSession`: one callee-saved register colouring each;
  *  - `networkSessionReflect0`: the event-code select's scheduling;

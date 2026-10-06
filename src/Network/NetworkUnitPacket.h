@@ -6,11 +6,25 @@
 #define MHTRI_NETWORK_NETWORKUNITPACKET_H
 
 #include "types.h"
+#include "Network/NetworkStreamSink.h"     /* NetworkStreamSink, NetworkStreamWriter, NetworkStreamWriterDefault */
 
-class NetworkStreamWriterDefault;   /* Network/network_writer_types.h */
-class NetworkStreamWriter;          /* Network/network_writer_types.h */
 class NetworkUniqueId;             /* Network/NetworkUniqueId.h */
-class NetworkStreamQueue;
+
+/* The 0x18-byte queue of framed messages (the log strings' `NetworkUnitPacketPool`; GUESS on the project
+   name): a stream sink whose block holds the queued frames, plus the sequence number the next frame carries
+   and the read cursor.  This unit defines its constructor (0x803FA5F4) and destructor
+   (0x803FA63C), the only virtual it overrides, so that unit emits its table (0x805FCD98: the destructor, then
+   `NetworkStreamSink`'s slots unchanged); the writer band's `NetworkSlotQueues` builds four of them. */
+class NetworkStreamQueue : public NetworkStreamSink {
+public:
+    NetworkStreamQueue();
+    virtual ~NetworkStreamQueue();
+
+    /* +0x10 */ u16 sequence_10;  /* the sequence number the next message carries */
+    /* +0x12 */ u8 pad_12[0x02];
+    /* +0x14 */ u8* cursor_14;    /* where the reader stands */
+};   /* size: 0x18 */
+
 
 #ifdef __cplusplus
 extern "C" {

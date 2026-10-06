@@ -4,17 +4,10 @@
 
 #include "types.h"
 
-/* Declarations moved here from `unsplit/NCD.h, SSL.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+/* Declarations moved here from `unsplit/SSL.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/* 0x8051C554 - fill the caller's interface-configuration block; non-zero on failure (the DWCi
- * runtime initialiser prints its own " NCDGetCurrentIfConfig failed.[%d]\n" with the answer and
- * hands it the `+0x4000` region of its runtime block).  The name is read off that call site's own
- * message: this band is unregistered, so this header is the symbol's home until `ncdsystem.c`
- * registers, and that unit's own header will be the real one then. */
-s32 NCDGetCurrentIfConfig(u8* config);
 
 /* 0x8051B7FC - make a context for a connection: the verification option and the host name. */
 s32 SSLNew(u32 verifyOption, char* host);
@@ -29,11 +22,6 @@ s32 SSLDoHandshake(s32 ssl);
 s32 SSLRead(s32 ssl, void* buf, s32 length); /* untyped: byte range */
 
 s32 SSLWrite(s32 ssl, void* buf, s32 length); /* untyped: byte range */
-
-/* 0x8051D048 - the user-facing network error code for a failed `SOStartup` result (the SDK's NET
- * helper of that name; GUESS from its NCD-band neighbours and its one caller, which logs the negated
- * result as "Network Error Code is %d"). */
-s32 NETGetStartupErrorCode(s32 result);
 
 /* 0x8051C058 - close the context. */
 s32 SSLShutdown(s32 ssl);

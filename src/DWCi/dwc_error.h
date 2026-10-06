@@ -39,6 +39,11 @@ s32 DWC_GetLastErrorEx(s32* code, s32* type);
 
 void DWC_ClearError(void);
 
+/* 0x805076F0 - the middle band's node pump `DWCi_FreeList` drains (its unit is unregistered, so the
+ * map row is a rename of `fn_805076F0` and `src/DWCi/DWCi_Np_CPUCopyFast.c` names it from that call
+ * site). */
+void DWCi_freeNode(u32 kind, void* node, u32 arg);
+
 #ifdef __cplusplus
 }
 #endif

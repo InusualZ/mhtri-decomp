@@ -6,7 +6,7 @@
 #define MHTRI_NETWORK_NETWORKUNIQUEID_H
 
 #include "types.h"
-#include "Network/network_transport_types.h"   /* NetworkStreamSink */
+#include "Network/NetworkStreamSink.h"         /* NetworkStreamSink */
 
 /* The raw address a unique id carries: its kind (1..5 are known kinds) and up to ten address bytes.  The
    helpers clear, compare and bind exactly 14 bytes, the record's size. */

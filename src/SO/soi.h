@@ -6,24 +6,7 @@
 
 #include "types.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/* untyped: opaque band object, typed by the callers' views */
-u32 fn_80526F00(void* list, u32 arg1, u32 arg2);
-
-/* helper entry points in the neighbouring (unsplit) subsystem TUs. */
-/* untyped: opaque band object, typed by the callers' views */
-u32 fn_80529430(u32 index, u32 value, void* callback, u32 arg);
-
-void fn_80529B50(u8 index, u32 value);
-
-#ifdef __cplusplus
-}
-#endif
-
-/* Declarations moved here from `unsplit/DWCi.h, SO.h, VF.h` (docs/plan.md 6.5 rule 2: the owner declares). */
+/* Declarations moved here from `unsplit/DWCi.h, SO.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -86,18 +69,6 @@ s32 SOCleanup(void);
 /* 0x80520B54 - the console's own host address, stored by `sNetworkLibraryWii::start` as its host id. */
 u32 SOGetHostID(void);
 
-/* 0x80521DE0 - 1 while the layers `VFipf2Init` brings up are up.  (The word it reads is the flag
- * `VFipf2Init` sets and `VFipf2Shutdown` clears.) */
-u32 VFipf2IsInitialized(void);
-
-/* 0x80521CA0 - under this band's own mutex, `VFSysInit(work, size)` followed by the disk manager,
- * prfile2 and dHash bring-up; the second argument is the work buffer's size (`DWCi_GetConsoleFriendCode`
- * hands it a freshly allocated 0x8000-byte block). */
-void VFipf2Init(u8* work, u32 size);
-
-/* 0x80521D70 - the matching take-down: finalize the file system and clear the flag. */
-void VFipf2Shutdown(void);
-
 /* The IPv4 socket address `SOConnect` takes: the length byte (8), the family (2, AF_INET), the port in
  * network order and the address word. size: 0x8 */
 typedef struct SOSockAddrIn {
@@ -146,6 +117,30 @@ s32 SOSendTo(s32 fd, const u8* buffer, s32 length, s32 flags, const SOSockAddrIn
 s32 SOFcntl(s32 fd, s32 command, ...);
 /* 0x8052039C */
 s32 SOPoll(SOPollFD* fds, u32 count, s64 timeout);
+
+/* 0x80520668 - host-to-network 16-bit byte swap. */
+u16 SOHtoNs(u16 port);
+
+/* The resolver result `SOGetAddrInfo` fills and `SOFreeAddrInfo` releases (a getaddrinfo record).
+ * size: 0x20 */
+typedef struct SOAddrInfo {
+    /* +0x00 */ s32 flags;
+    /* +0x04 */ s32 family;
+    /* +0x08 */ s32 socketType;
+    /* +0x0C */ s32 protocol;
+    /* +0x10 */ u32 addrLength;
+    /* +0x14 */ char* canonName;
+    /* +0x18 */ SOSockAddrIn* addr;
+    /* +0x1C */ struct SOAddrInfo* next;
+} SOAddrInfo;
+
+/* 0x80520D0C / 0x80520FF0 - resolve a host name (getaddrinfo) and release the result. */
+s32 SOGetAddrInfo(const char* node, const char* service, const SOAddrInfo* hints, SOAddrInfo** result);
+void SOFreeAddrInfo(SOAddrInfo* info);
+
+/* 0x805204F8 - parse the dotted-quad text `name` into the four address bytes at `out`; 1 on success
+ * (the SDK's INETATON ioctl), negative on failure. */
+s32 SOInetAtoN(const char* name, u8* out);
 
 #ifdef __cplusplus
 }

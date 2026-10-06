@@ -6,7 +6,7 @@
 #define MHTRI_NETWORK_NETWORKFILEFETCHER_H
 
 #include "types.h"
-#include "Network/network_transport_types.h"   /* NetworkPeerAddress */
+#include "Network/network_socket_streams.h"
 
 struct NetFetchError;              /* Network/network_pat_control.h */
 
@@ -98,7 +98,7 @@ public:
 
 /* The abstract socket (table 0x805FC8D0: a destructor and sixteen empty - pure - slots; GUESS on the name) that
    `NetworkSocketWii` implements: the source and the code of its last error at +0x04/+0x08.  The slot names come
-   from `NetworkSocketWii`'s bodies (GUESSes); `NetworkSocketHandle` (`Network/network_transport_types.h`) is the
+   from `NetworkSocketWii`'s bodies (GUESSes); `NetworkSocketHandle` (`Network/network_socket_streams.h`) is the
    transport users' view of the same object. */
 class NetworkSocketBase {
 public:

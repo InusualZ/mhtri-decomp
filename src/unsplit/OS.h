@@ -14,6 +14,9 @@
 #define MHTRI_UNSPLIT_OS_H
 
 #include "types.h"
+/* `OSGetTime`, the interrupt pair, the mutex set, `OSCreateThread`/`OSResumeThread`, `OSReport` and `OSPanic`
+ * are `NAND/nand.c`'s (the NAND/OS SDK block 0x804C6D70..0x804D9B4C), declared once in its header. */
+#include "NAND/nand.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -21,9 +24,6 @@ extern "C" {
 
 /* 0x804CB380 - records a library's version string with the OS. */
 void OSRegisterVersion(const char* version);
-
-/* 0x804D4D50 - the console's 64-bit tick counter, one tick per bus clock cycle. */
-u64 OSGetTime(void);
 
 /* 0x804CB420 - which kind of title is running (the SDK's `OS_APP_TYPE_*` values). */
 u8 OSGetAppType(void);
@@ -44,21 +44,6 @@ void OSRegisterShutdownFunction(OSShutdownFunctionInfo* info);
  * object carries no relocation for it, i.e. the source spelled the address out (same shape as
  * `NWC24_RTC_USER_ID` in `unsplit/NWC24.h`). */
 #define OS_BUS_CLOCK (*(u32*)0x800000F8)
-
-/* 0x804D0C70 / 0x804D0CB0 - disable interrupts, returning the previous state; restore it. */
-BOOL OSDisableInterrupts(void);
-void OSRestoreInterrupts(BOOL level);
-
-/* 0x804D1EE0 / 0x804D1F20 - the OS mutex pair `NHTTP/NHTTP_bgnend.c` initialises and locks its
- * request-list mutex with (0x804D2000, `OSUnlockMutex`, is the third of the set; it is declared
- * locally by `OS/FindContainHeap_.c` and in `unsplit/Network.h` and is not needed here, so
- * it is not restated).  Neither address is inside a registered unit, and the nearest registered
- * ranges below and above name different modules (`OS/OSAlarm.c` / `RSO/runtime.c`), so stylelint's
- * rule 2 reports them as an unplaceable gap - the module the band names is `OS`, which is this file. */
-void OSInitMutex(void* mutex);
-void OSLockMutex(void* mutex);
-/* untyped: opaque handle passed through - the caller owns the mutex's storage */
-void OSUnlockMutex(void* mutex);   /* the pair other half: the Network peer band unlocks with it */
 
 /* ----------------------------------------------------------------------------------------------
  * The OS thread and message-queue set the NHTTP library creates its comm thread with
@@ -111,19 +96,8 @@ BOOL OSReceiveMessage(OSMessageQueue* queue, OSMessage* buffer, BOOL block);
 /* 0x804D3C00 - the thread the OS is currently running, null before the scheduler starts. */
 OSThread* OSGetCurrentThread(void);
 
-/* 0x804D3F70 / 0x804D4600 / 0x804D44B0 - create a thread (its stack is `stack`, growing down from
- * there, `stackSize` bytes), start it and wait for it to exit.  The thread argument is handed
- * straight to `entry` and is the caller's payload, so it stays untyped here. */
-/* untyped: caller-owned payload */
-OSThread* OSCreateThread(OSThread* thread, OSThreadEntry entry, void* arg, u8* stack, u32 stackSize,
-                         s32 priority, u16 attribute);
-s32 OSResumeThread(OSThread* thread);
+/* 0x804D44B0 - wait for the thread to exit (`OSCreateThread`/`OSResumeThread` are in `NAND/nand.h`). */
 BOOL OSJoinThread(OSThread* thread, s32* exitValue);
-
-/* 0x804CD620 / 0x804CD6B0 - the OS diagnostics `NHTTPi_Startup`/`NHTTPi_CleanupAsync` report a
- * failed IP configuration through (`OSPanic` takes the source file, the line and the message). */
-void OSReport(const char* format, ...);
-void OSPanic(const char* file, s32 line, const char* format, ...);
 
 #ifdef __cplusplus
 }

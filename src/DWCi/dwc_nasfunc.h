@@ -9,6 +9,36 @@
 /* Declarations moved here from `unsplit/DWCi.h, Network.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 struct DWCiConn;
 struct DWCiReq;
+struct DWCiAddrKey;
+
+/* The resolver records `DWCi_parseAddress` and the NATNEG unit read: an entry whose +0x0C reaches the
+ * host's address words through one more indirection (the SDK's `hostent`: name, aliases, type, length,
+ * then the address list). */
+typedef struct DWCiHostAddr {
+    /* +0x00 */ u32 addr;
+} DWCiHostAddr; /* size: 0x04 */
+
+typedef struct DWCiHostEntry {
+    /* +0x00 */ u8 pad_0x00[0xC];
+    /* +0x0C */ DWCiHostAddr** hosts;
+} DWCiHostEntry; /* size: 0x10 */
+
+/* the DWC callbacks are installed as unprototyped pointers and the callee casts them back */
+typedef void (*NetworkCallback)();
+
+/* GameSpy GT2 transport (the SDK's `gt2*` API): a socket and a connection are opaque handles, and
+ * `gt2Accept` / `gt2Connect` take the four-callback set `GameSpyInterfaceThread` installs on a
+ * connection.  The callbacks keep the flat parameter lists the retail bodies read (GUESS on every
+ * parameter name: the GT2 header spells `connection, result, message, size`). */
+typedef u32 GT2Socket;
+typedef u32 GT2Connection;
+typedef struct GT2ConnectionCallbacks {
+    /* +0x00 */ void (*connected_00)(s32 connection, s32 result, s32 message, s32 timeout);
+    /* +0x04 */ void (*received_04)(u32 connection, s32 message, s32 size);
+    /* +0x08 */ void (*closed_08)(u32 connection, s32 reason);
+    /* +0x0C */ void (*ping_0C)(void);
+} GT2ConnectionCallbacks;   /* size: 0x10 */
+
 
 /* The service-locator result `DWC_SVLGetTokenAsync` fills (the SDK's `DWCSvlResult`: a status, the host and the
  * token).  size: 0x174 - the mediator memsets 0x174 bytes at its +0x2BA8 before handing it over, and
@@ -90,6 +120,57 @@ s32 DWC_SVLProcess(void);
 void DWCi_natProbeStart(const char* gameName);
 
 s32 DWCi_natProbePoll(void);
+
+/* ---- the transport / socket helpers --------------------------------------------------------- */
+
+void* DWCi_listCreate(u32 a, u32 b, void* cb);
+void DWCi_listDestroy(void* list);
+u32 DWCi_listCount(void* list);
+void* DWCi_listItem(void* list, u32 index);
+void DWCi_listRemove(void* list, u32 index);
+void* DWCi_tableCreate(u32 a, u32 b, u32 c, u32 d);
+void DWCi_tableDestroy(void* table);
+void DWCi_tableInsert(void* table, struct DWCiReq** entry);
+void* DWCi_tableLookup(void* table, struct DWCiAddrKey** key);
+void DWCi_tableRemove(void* table, void* key);
+u32 DWCi_tableWalk(void* table, void* callback, void* arg);
+int DWCi_socketBind(int sock, void* buf, int len);
+int DWCi_socketSendTo(int sock, void* buf, int len, u32 flags, void* sa, int salen);
+int DWCi_socketGetLocalName(int sock, void* sa, int* salen);
+/* 0x8050AC70 - append a copy of the fixed-size record at `item` to the list. */
+/* untyped: opaque handle (the list) and byte range (the record copied in) */
+void DWCi_listAppend(void* list, void* item);
+/* 0x8050AF20 - delete the list's `index`th record. */
+/* untyped: opaque handle (the list) */
+void DWCi_listDeleteAt(void* list, u32 index);
+struct DWCiHostEntry* DWCi_socketLookupHost(char* host);
+/* 0x8050C270 - the resolver record of this machine's own host (NULL when it cannot be read). */
+DWCiHostEntry* DWCi_socketGetLocalHostEntry(void);
+/* 0x8050C450 - non-zero when the address the pointer names is a usable (public) one. */
+int DWCi_hostAddressIsUsable(DWCiHostAddr* host);
+void* DWCi_malloc(u32 size);
+void DWCi_free(void* p);
+int DWCi_requestSend(struct DWCiConn* conn, struct DWCiReq* req, u32 addr, u16 port, u32 a, void* buf,
+                int len, u32 flag);
+int DWCi_requestFrame(struct DWCiReq* req, void* p, u32 len);
+void DWCi_requestFree(void* p);
+
+s32 gt2CreateSocket(GT2Socket* socket, const char* localAddress, u32 outgoingBufferSize, u32 incomingBufferSize,
+                    NetworkCallback socketErrorCallback);
+void gt2CloseSocket(GT2Socket socket);
+void gt2Think(GT2Socket socket);
+void gt2Listen(GT2Socket socket, NetworkCallback connectAttemptCallback);
+s32 gt2Accept(GT2Connection connection, const GT2ConnectionCallbacks* callbacks);
+/* untyped: byte range - the reject message */
+void gt2Reject(GT2Connection connection, const char* message, s32 length);
+/* untyped: byte range - the connect message */
+s32 gt2Connect(GT2Socket socket, u32* connection, const char* remoteAddress, const void* message, u32 length,
+               u32 timeout, const GT2ConnectionCallbacks* callbacks, s32 blocking);
+/* untyped: byte range - the datagram */
+s32 gt2Send(GT2Connection connection, const void* message, u32 length, s32 reliable);
+void gt2CloseConnection(GT2Connection connection);
+s32 gt2GetSocketSOCKET(GT2Socket socket);
+void gt2SetUnrecognizedMessageCallback(GT2Socket socket, NetworkCallback callback);
 
 #ifdef __cplusplus
 }

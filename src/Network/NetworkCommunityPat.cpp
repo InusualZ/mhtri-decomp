@@ -41,7 +41,7 @@
 #include "Network/NetworkSessionManagerPat.h"    /* getPatsObject */
 #include "Network/NetworkLayer.h"                /* NetworkLayerIdImportFrom */
 #include "enemy/em020_ai.h"                      /* getInstance_ */
-#include "unsplit/Network.h"                     /* getNetworkLogger, dtor_803CA338 - no registered owner */
+#include "unsplit/Network.h"                     /* getNetworkLogger, networkInstance_destroyMutex (owner Network/NetworkStreamSink.cpp) */
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
 #include "MSL/strlen.h"
@@ -107,7 +107,7 @@ NetworkCommunityPat::NetworkCommunityPat()
 inline NetworkCommunityPatRequest::~NetworkCommunityPatRequest()
 {
     clear();
-    dtor_803CA338(this->mutex_78, -1);
+    networkInstance_destroyMutex(this->mutex_78, -1);
 }
 
 inline void NetworkCommunityPatRequest::clear()

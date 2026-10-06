@@ -23,7 +23,7 @@
  *   hoisted high word of `ticks * 17` is a fresh `li r0, 0` where retail reuses r24.  `NetworkTimedHandler::create`:
  *   retail leaves the `lis` half of the vtable address in r4 as `init`'s unused first argument.
  *   `NetworkTimedHandler::init`, `publishRequest`, `step`: register colouring.  `.data` 1392 of 1396 B until the cut;
- *   `extab` lacks a 20-byte cleanup record against `dtor_803CA338` (the peer's member-mutex destructor), which needs a
+ *   `extab` lacks a 20-byte cleanup record against `networkInstance_destroyMutex` (the peer's member-mutex destructor), which needs a
  *   real `NetworkPeerBase` derivation with a member mutex in the peer TU.
  * SHAPES. Every call through a foreign object's vtable goes through a declared `virtual` (the only shape MWCC emits as
  *   `lwz r12,0x0(r3)` / `lwz r12,<slot>(r12)`).  `~GameSpyInterfaceThread` comes first in the class (the vtable pointer
@@ -1479,7 +1479,7 @@ void NetworkPeerGameSpy::release()
 NetworkPeerGameSpy* NetworkPeerGameSpy::destroy(s16 flags)
 {
     if (this != NULL) {
-        dtor_803CA338(mutex_6614, -1);
+        networkInstance_destroyMutex(mutex_6614, -1);
         /* C cast: this class still hand-models `void* vtable_00`, unrelated to NetworkPeerBase; the measured alternatives failed. */
         ((NetworkPeerBase*)this)->NetworkPeerBase::destroy(0);
         if (flags > 0) {

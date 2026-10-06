@@ -13,9 +13,12 @@
 #include "Network/PatInterface.h"             /* isCallback / resetCallback / the error accessors - owner Network/PatInterface.cpp */
 #include "Network/NetworkReflectService.h"    /* NetworkReflectService / GameSpyChannel - owner Network/NetworkReflectService.cpp */
 #include "Network/gamespy_interface_types.h"   /* the worker thread class and its error record */
-#include "Network/sGameSpyInterfaceThread.h"  /* the live thread pointer this unit defines */
 #include "DWCi/fn_805113B0.h"                  /* DWCi_htons / DWCi_formatAddress - owner DWCi/fn_805113B0.c */
 #include "sound/fn_800E46E8.h"                 /* getInstance - owner sound/fn_800E46E8.cpp */
+
+/* 0x80794CE4 (.sbss) - the live GameSpyInterfaceThread this unit defines (named through the elaborated specifier,
+   the spelling every includer sees). */
+extern "C" class GameSpyInterfaceThread* sGameSpyInterfaceThread;
 
 /* the records the two interface classes take pointers to, defined further down */
 struct GameSpyPeerId;

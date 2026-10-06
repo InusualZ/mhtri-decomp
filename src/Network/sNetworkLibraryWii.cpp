@@ -31,7 +31,8 @@
 #include "Network/sNetworkLibraryWii.h"
 #include "Network/NetworkWiiMediator.h"
 #include "Network/network_pat_control.h"   /* NetworkFileFetcher */
-#include "Network/network_transport_types.h"   /* NetworkResolverWii */
+#include "Network/network_socket_streams.h"
+#include "Network/NetworkResolverWii.h"
 #include "Network/NetworkPat.h"
 #include "unsplit/Network.h"
 #include "sound/fn_800E46E8.h"           /* getInstance - the mediator accessor */
@@ -43,7 +44,7 @@
 #include "Network/NetworkFileFetcher.h"   /* NetworkNullFetcher */
 #include "SO/soi.h"                        /* SOInit, SOFinish, SOStartup, SOCleanup, SOGetHostID */
 #include "DWCi/dwc_error.h"                /* DWC_Init, DWC_Shutdown */
-#include "SSL/ssl.h"                       /* NETGetStartupErrorCode */
+#include "NCD/ncdsystem.h"                 /* NETGetStartupErrorCode */
 #include "MSL_C/alloc.h"                   /* srand */
 #include "NAND/nand.h"                     /* OSGetTick, OSGetTime */
 

@@ -3,7 +3,6 @@
 #define MHTRI_MENU_MENU_PLSEARCH_H
 
 #include "types.h"
-#include "Network/network_transport.h"
 
 /* Declarations moved here from `unsplit/Network.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 struct PatTerms;
