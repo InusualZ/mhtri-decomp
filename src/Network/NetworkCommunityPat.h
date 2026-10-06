@@ -239,6 +239,9 @@ public:
     void deletePatRequest(NetworkCommunityPatRequest** slot);
     void movePatRequests();
     void onPatEvent(s32 code, s32 requestId, s32 flag, s32 count, const u8* data);
+    /* 0x803E8B9C (GUESS) - widens the profile's window back to the last sent one (none at 0x100) and returns the
+     * profile; inline, emitted by Network/NetworkLayerPat.cpp after its first caller. */
+    NetworkCommunityProfile* restoreSentProfile();
 
 
     /* +0x184 */ NetworkCommunityPatRequest* patRequests_184[9];   /* the running friend request of each starter */

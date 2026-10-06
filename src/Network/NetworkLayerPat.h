@@ -170,11 +170,22 @@ struct NetFriendRoster {
 /* One 0x104-byte detail record paired with the friend of the same index (GUESS on the names: only the state word
  * `clearFriendSlot` clears and the flag byte `NetCtrlWk::hasFriendDetail` reads are named). */
 typedef struct NetFriendDetail {
-    /* +0x000 */ u32 state_0x000;   /* cleared with the friend slot (`clearFriendSlot`) */
-    /* +0x004 */ u8 pad_0x004[0xF9];
-    /* +0x0FD */ u8 flag_0x0FD;
-    /* +0x0FE */ u8 pad_0x0FE[0x6];
+    /* +0x000 */ u32 size_0x000;       /* the binary's length, at most 0x100 (`storeFriendDetail`; `clearFriendSlot` clears it) */
+    /* +0x004 */ u8 data_0x004[0xF9];  /* the user's binary (`PatLayerUser::binary_03C`), up to +0x104 */
+    /* +0x0FD */ u8 flag_0x0FD;        /* a byte of that binary `NetCtrlWk::hasFriendDetail` tests */
+    /* +0x0FE */ u8 data_0x0FE[0x6];
 } NetFriendDetail; /* size: 0x104 */
+
+/* The current layer's info record (`layerInfo_4CC`, reported with the layer-info event): the layer's name, four of
+ * its words and its settings (GUESS on the word names: `PatLayerData`'s). */
+typedef struct NetLayerInfoRec {
+    /* +0x00 */ char name_00[0x40];
+    /* +0x40 */ s32 count_40;          /* `PatLayerData::counts_058[1]` */
+    /* +0x44 */ s32 count_44;          /* `PatLayerData::counts_058[0]` */
+    /* +0x48 */ s32 memberLimit_48;    /* `PatLayerData::memberLimitA_064` */
+    /* +0x4C */ s32 value_4C;          /* `PatLayerData::value_06C` */
+    /* +0x50 */ NetLayerSettings settings_50;
+} NetLayerInfoRec; /* size: 0x74 */
 
 /* The friend event `pollFriendSlot` reports (event 6): the friend record and its detail record (GUESS on the name). */
 struct NetFriendNotice {
@@ -206,7 +217,7 @@ typedef struct NetCommunityRec {
     /* +0x00E4 */ s32 value_0x00E4;
     /* +0x00E8 */ s32 value_0x00E8;
     /* +0x00EC */ s32 value_0x00EC;
-    /* +0x00F0 */ u8 pad_0x00F0[0x4];
+    /* +0x00F0 */ u32 matchKey_0x00F0;   /* the community's match key (`handleLayerJump` keeps it in `matchKey_3D4`) */
     /* +0x00F4 */ s32 settingsCount_0x00F4;   /* a `NetLayerSettings` record from here to +0x118 (`readCommunitySettings_C0`) */
     /* +0x00F8 */ s32 enabled_0x00F8;
     /* +0x00FC */ s32 slot_0x00FC;
@@ -329,6 +340,7 @@ struct NetLayerMediationEntry {
     /* +0x22 */ u8 pad_22[0x2];
 
     NetLayerMediationEntry();   /* 0x803E10D4 - builds the id */
+    ~NetLayerMediationEntry();  /* 0x803E0D70 - out of line: the mediation handlers call it (an implicit one is inlined) */
 };   /* size: 0x24 (the element size the list's `__construct_array` passes) */
 
 /* The mediation list the mediation-list request fills: a count and 32 entries. */
@@ -356,6 +368,8 @@ typedef struct NetLayerFilter {
 typedef struct PatTagValue PatTagValue;
 typedef struct NetworkFmpSlot NetworkFmpSlot;   /* Network/PatInterface.h - the FMP slot `exportServerRec` reads */
 typedef struct PatTagList PatTagList;
+typedef struct PatLayerData PatLayerData;   /* the layer record a layer answer carries */
+typedef struct PatLayerUser PatLayerUser;   /* the user record a user answer carries */
 
 /* The mixed voice of the transfer peers (the move warning's "mVoiceMixed.mSize"): the samples and their size in
  * bytes (528 is one whole frame). */
@@ -371,6 +385,56 @@ struct NetVoiceBuffer {
  * the table fills with an address of this unit is declared here as an override; the base's pure slots carry the
  * same names.
  * Only the fields the units read are named; the rest is padding at its real offset. */
+class NetworkLayerPat;
+struct NetworkLayerPatRequest;
+
+/* The handler one of the layer's own requests runs: a non-virtual member function of the layer (the descriptor is
+ * `{0, -1, fn}`). */
+typedef s32 (NetworkLayerPat::*NetworkLayerPatHandler)(NetworkLayerPatRequest* request);
+
+/* The layer's own request record (`pool_1C8`): the `NetworkLayerRequest` layout with the owner and the handler typed
+ * for this class.  Its members are inline - retail emits each one after the first function that calls it. */
+struct NetworkLayerPatRequest {
+    /* +0x00 */ s32 state_00;
+    /* +0x04 */ u32 unused_04;
+    /* +0x08 */ u32 unused_08;
+    /* +0x0C */ u32 unused_0C;
+    /* +0x10 */ u32 unused_10;
+    /* +0x14 */ u32 unused_14;
+    /* +0x18 */ u32 unused_18;
+    /* +0x1C */ u32 unused_1C;
+    /* +0x20 */ u32 unused_20;
+    /* +0x24 */ u32 unused_24;
+    /* +0x28 */ u32 count_28;              /* how many of `args_2C` the starter filled */
+    /* +0x2C */ u32 args_2C[8];
+    /* +0x4C */ f32 interval_4C;
+    /* +0x50 */ f32 timeout_50;            /* the start time `begin` stamps */
+    /* +0x54 */ u32 record_54;
+    /* +0x58 */ u32 record_58;
+    /* +0x5C */ u32 record_5C;
+    /* +0x60 */ u32 unused_60;
+    /* +0x64 */ u32 unused_64;
+    /* +0x68 */ u32 unused_68;
+    /* +0x6C */ u32 unused_6C;
+    /* +0x70 */ u32 requestId_70;
+    /* +0x74 */ u8 cancelled_74;
+    /* +0x75 */ u8 pad_75[0x03];
+    /* +0x78 */ u8 mutex_78[0x1C];
+    /* +0x94 */ NetworkLayerPat* owner_94;     /* set while the request runs */
+    /* +0x98 */ NetworkLayerPatHandler handler_98;
+
+    NetworkLayerPatRequest();
+    ~NetworkLayerPatRequest();
+    void clear();
+    void reset();
+    s32 isOwned();
+    void run();
+    void begin(NetworkLayerPat* owner, NetworkLayerPatHandler handler, u32 count, ...);
+    s32 getRecord(NetworkRequestError* out);
+    s32 getArgument(u32 index);
+    void setRecord(u32 code, u32 arg_a, u32 arg_b);
+};   /* size: 0xA4 (the pool's element size) */
+
 class NetworkLayerPat : public NetworkLayer {   /* size: 0x6EE8C (the allocation `initNetworkPatControl` makes for it) */
 public:
     /* 0x803E0C18 - builds the layer. */
@@ -453,6 +517,10 @@ public:
      * handlers' flag tests report (0x80060012 cancelled, 0x80060033 the session dropped). */
     void setCollectionLogAborted(NetworkLayerRequest* request);
     void setCollectionLogSessionLost(NetworkLayerRequest* request);
+    /* 0x803EF410 / 0x803EF518 / 0x803EF5E8 - the same three for the layer's own requests. */
+    void setCollectionLogSessionLost(NetworkLayerPatRequest* request);
+    void setCollectionLogAborted(NetworkLayerPatRequest* request);
+    void setCollectionLog(NetworkLayerPatRequest* request, u32 code, u32 arg_a, u32 arg_b);
     /* 0x803EBAF0 (GUESS) - hands one layer event (kind 3 = error, kind 4 = done, ...) to the callback the layer was
      * initialised with, replacing a negative code by the singleton's own error record when it has one. */
     void notifyLayerEvent(u32 kind, s32 code, u32 has_info, NetworkRequestError* info, u32 context);
@@ -469,16 +537,35 @@ public:
      * `index` (and close its mediator transfer slot), forget the whole layer (address, name, members, friends). */
     s32 clearFriendRec(NetFriendRec* rec);
     s32 clearFriendSlot(u32 index);
+    /* 0x803EA82C / 0x803EA8C0 (GUESS) - fill the current layer's info record and a community record from a layer
+     * answer and its tag list. */
+    void importLayerInfo(NetLayerInfoRec* out, const PatLayerData* layer, PatTagList* tags);
+    void importCommunityRec(NetCommunityRec* rec, const PatLayerData* layer, PatTagList* tags);
+    /* 0x803EACE4 / 0x803EAD90 / 0x803EAE40 (GUESS) - fill a friend record from a binary user id and a name, keep
+     * friend slot `index`'s binary and key from a user answer, and find the friend slot of a binary user id (-1: no
+     * id, -2: none). */
+    s32 importFriendRec(NetFriendRec* rec, const u8* userId, const char* name);
+    s32 storeFriendDetail(u32 index, const PatLayerUser* user);
+    s32 findFriendByUserId(const u8* userId);
+    /* 0x803EAF14 / 0x803EB1D4 (GUESS) - add a user to the first free friend slot (this console's own slot becomes the
+     * transfer slot) and remove one; each returns the slot or a negative error. */
+    s32 addFriendSlot(const u8* userId, const PatLayerUser* user);
+    s32 removeFriendSlot(const u8* userId, NetFriendRec* out);
+    /* 0x803EB678 (GUESS) - the inverse of `packLayerSettings`: the numbered fields 1..4 of `tags` as settings pairs. */
+    void unpackLayerSettings(NetLayerSettings* out, PatTagList* tags);
     void resetLayerState();
     /* 0x803E2484 / 0x803E250C - the layer's own pool: the first idle request, and the release of one (its own
      * "NetworkLayerPat::deleteRequest" warning); 0x803E257C (GUESS) - runs the 22 request slots ("NetworkLayerPat::move"). */
-    NetworkLayerRequest* allocRequest();
-    void deleteRequest(NetworkLayerRequest** slot);
+    NetworkLayerPatRequest* allocRequest();
+    void deleteRequest(NetworkLayerPatRequest** slot);
     void moveRequests();
     /* 0x803E2890 (GUESS) - while no request is parked at +0x1C0, takes one from the pool and starts it on the
      * handler 0x803E97F0 (the one that sends `sendReqLayerCreateHead`/`Foot`) with kind 2 and the two arguments;
      * the message pool passes its queued argument (or 0) and a 0/1 flag. */
     void requestLayerCreate(u32 arg, s32 mode);
+    /* 0x803E97F0 (GUESS) - the handler `requestLayerCreate` starts: with `reserve` set, the create head for layer
+     * `layerId` (kept as the pending id), else its create foot; reports event 36 with the reserve flag. */
+    s32 handleLayerReserve(NetworkLayerPatRequest* request);
     /* 0x803E9C78 / 0x803EA11C / 0x803EA340 (GUESS) - clear the list-pending flags. */
     void clearListPending0();
     void clearListPending1();
@@ -516,11 +603,23 @@ public:
     void exportServerRec(NetServerRec* out, const NetworkFmpSlot* slot);
     /* 0x803EB75C (GUESS) - polls friend slot `index` (written later; declared for `pollLayerSlots`). */
     void pollFriendSlot(u32 index);
+    /* 0x803EEBA4 (GUESS) - sends this console's binary record to friend slot `slot` (to every member when
+     * `broadcast` is set); nothing while this console has no transfer slot. */
+    void sendPeerRecord(s8 slot, s32 broadcast);
+    /* 0x803EECFC (GUESS) - the members' session state: 1 every flagged friend connected, 0 one still pending or
+     * connecting, -1 one failed. */
+    s32 checkMemberSessions();
+    /* 0x803EA128 / 0x803EA34C (GUESS) - the two list runs a layer change finishes with, each its own step byte
+     * (`listPending_3C0[1]`/`[2]`): leave to the parent layer and re-read its child info (and user list when hosting),
+     * and re-read the child list (city list) in batches of 10; each returns 0 while it waits, 1 when done, -1 when
+     * the session dropped and -2 when it was cancelled. */
+    s32 stepLayerLeave(NetworkLayerRequest* request);
+    s32 stepChildListRead(NetworkLayerRequest* request);
 
-    /* +0x1C0 */ NetworkLayerRequest* ownRequests_1C0[1];   /* the layer's own request slot (index 21 of `moveRequests`) */
+    /* +0x1C0 */ NetworkLayerPatRequest* ownRequests_1C0[1];   /* the layer's own request slot (index 21 of `moveRequests`) */
     /* +0x1C4 */ u8 ownRequestState_1C4[1];               /* set while it is moving */
     /* +0x1C5 */ u8 pad_1C5[0x3];
-    /* +0x1C8 */ NetworkLayerRequest pool_1C8[2];   /* the layer's own two requests (`__construct_array`, 0xA4 each) */
+    /* +0x1C8 */ NetworkLayerPatRequest pool_1C8[2];   /* the layer's own two requests (`__construct_array`, 0xA4 each) */
     /* +0x0310 */ u32 requestFlags_310[22];   /* per request slot (`requests_0C`'s index): bit0 = session lost, bit1 =
                                                 cancelled, higher bits = the replies the reflect callback saw */
     /* +0x0368 */ u32 requestIds_368[22];     /* per request slot (21 = the layer's own): the id the last `sendReq*` returned */
@@ -531,7 +630,8 @@ public:
     /* +0x03D1 */ u8 busy_3D1;   /* set while a request is in flight; the finishing states clear it */
     /* +0x03D2 */ u8 flag_3D2;
     /* +0x03D3 */ u8 flag_3D3;
-    /* +0x03D4 */ u8 pad_03D4[0x8];
+    /* +0x03D4 */ u32 matchKey_3D4;   /* the layer's match key (a created layer's `PatLayerData::matchKey_070`) */
+    /* +0x03D8 */ u32 jumpTicket_3D8;   /* GUESS: the word the jump-ready reply carries; jump-go sends it back */
     /* +0x03DC */ NetworkUniqueId serverId_3DC;   /* the server's unique id (`readServerId_2C` copies it out) */
     /* +0x03FC */ char serverName_3FC[0x14];   /* `readServerName_30` copies at most 19 characters */
     /* +0x0410 */ u8 serverFlag_410;
@@ -552,7 +652,7 @@ public:
     /* +0x04C4 */ u8 hostMode_4C4;   /* selects the user-list step after the child-info reply */
     /* +0x04C5 */ u8 pad_04C5[0x3];
     /* +0x04C8 */ s32 memberCount_4C8;   /* must be positive for a request to start */
-    /* +0x04CC */ u8 layerInfo_4CC[0x74];   /* the record the layer-info handlers report with their done event */
+    /* +0x04CC */ NetLayerInfoRec layerInfo_4CC;   /* the record the layer-info handlers report with their done event */
     /* +0x0540 */ NetCityList cities_540;
     /* +0x18A4 */ NetRoomList rooms_18A4;
     /* +0x3568 */ NetFriendTable friends_3568;                  /* the friend slots (with the sessions below, the shape of a
