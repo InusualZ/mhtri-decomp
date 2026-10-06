@@ -21,12 +21,15 @@ python tools/units/factscheck.py --json                  # lib.findings schema +
                                                          # dropped, stale_allowances
 python tools/units/factscheck.py --allow-drop fn_old_name,0x8009CD64 --reason "superseded by the RANGE line"
 python tools/units/factscheck.py --superseded-file build/tmp/net-superseded.txt   # TOKEN[,TOKEN...]: reason per line
+python tools/units/factscheck.py --superseded-file a.txt --superseded-file b.txt  # repeatable: every file adds
+python tools/units/factscheck.py --no-moved              # the old rule: a token moved to another changed file fails
 python tools/units/factscheck.py --selftest
 ```
 Flags: `--base REF` (default `main`; the diff starts at the merge base of REF and the head, as `stylelint --diff`
 does), `--head REF` (default: the working tree, tracked and untracked-not-ignored files), `--explain`, `--json`,
 `--root`, `PATH...` (limit the diff), `--allow-drop TOKEN[,TOKEN...]` (repeatable) with its mandatory `--reason TEXT`,
-`--superseded-file FILE` (one `TOKEN[,TOKEN...]: reason` per line, blank lines and `#` comments skipped). Exit codes: 0
+`--superseded-file FILE` (repeatable, every file adds; one `TOKEN[,TOKEN...]: reason` per line, blank lines and `#`
+comments skipped), `--no-moved` (do not credit a token found in another changed file). Exit codes: 0
 every removed fact survives or is dropped on purpose, 1 at least one does not, 2 could not run (an allowance without a
 reason, a blank reason, a superseded line that is not `TOKEN: reason`, an unreadable file).
 
@@ -44,6 +47,10 @@ never printed. Writes nothing.
 * **A span** is one run of consecutive removed lines of one hunk; its line is the old file's.
 * **Survives** when the token is in the new text of the unit (the file and its same-stem source/header, `x.cpp` +
   `x.h`), `configure.py`, `splits.txt`, `symbols.txt` or `docs/**` (hex compared by value; a generated stem's eight-digit address is indexed as a value too).
+* **Moved** (`moved to <file>`): the token is in the new text of any other file the same diff changed - a declaration
+  moved to its owner's header, a fact moved from a `configure.py` comment into the unit's header. The changed-file
+  set is the whole diff's (`git diff --name-only`, plus untracked files for a working-tree head), never narrowed by
+  the `PATH...` filter. `--no-moved` restores the stricter rule.
 * **Derivable**: a generated stem (`fn_802D44F4`, `zz_0123abcd_`, `800CC5B0_fn_...`) whose address any corpus holds.
 * **Accepted whole**: a path-qualified name that exists in the tree - as written, below `src/`, or through the retired
   `include/` root (movehdr's mapping).
@@ -74,15 +81,23 @@ matched by value, the stale ones named, the superseded file and its malformed li
 Mutation checks: making every token survive fails 6 checks, dropping the inert classes fails 1, ignoring the sibling
 header fails 4; for the allowances (28 checks) ignoring them fails 6, never reporting stale 2, an optional reason 2,
 matching a hex by spelling 3, letting a surviving token use an allowance 1, accepting a line without `: reason` 1.
+The moved credit and repeatable files (37 checks): indexing no changed file fails 5 (the moved declaration, the
+configure.py fact moved into the unit header, the committed head, the PATH filter); keeping only the last
+`--superseded-file` fails 1.
 
 ## Measured
 
 * The Network sweep commit `6a1c9583a` against its parent: 140 removed spans, 3 290 tokens, 7 spans with 27
   unmatched tokens (exit 1); with a four-line superseded file naming those 27 plus one unused token: 0 failing spans,
   27 dropped on purpose, 1 stale allowance, exit 0; 3.8 s either way.
+* The moved credit, each landing against its parent (unmatched tokens, `--no-moved` -> default): `9db8fbe62`
+  280 -> 9, `65b341058` 132 -> 4, `7e9ddd8c3` 97 -> 1, `b59bb5041` 15 -> 7; the comment sweeps `faa04ea9c` 117 -> 44,
+  `d29784bd7` 158 -> 99, `3f04cda47` 201 -> 147 (their remainder is history dropped on purpose). The landings'
+  remainder is mostly the include guard of a deleted header. Run time unchanged (2.5-14 s).
 
 ## Known gaps
 
-* A removed token that survives only in an unrelated file of `src/` counts as lost: `src/` is not a corpus, because a
-  comment that repeats another unit's fact is not where that fact lives.
+* A removed token that survives only in an unchanged file of `src/` counts as lost: `src/` is not a corpus, because a
+  comment that repeats another unit's fact is not where that fact lives (a file the same diff changed is).
+* The include guard of a deleted header (`MHTRI_UNSPLIT_IOS_H`) still needs an allowance.
 * Judgement is token-level: a sentence whose words all survive elsewhere passes even when its claim does not.

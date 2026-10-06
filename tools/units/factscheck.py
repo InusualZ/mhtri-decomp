@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """The facts-preserved gate: every fact token a diff removes must survive somewhere. Spec: docs/tools/spec/factscheck.md.
-CLI: factscheck.py [--base REF] [--head REF] [--allow-drop T --reason R] [--superseded-file F] [--explain] [PATH...]."""
+CLI: factscheck.py [--base REF] [--head REF] [--allow-drop T --reason R] [--superseded-file F]... [--no-moved] [--explain] [PATH...]."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
@@ -24,9 +24,10 @@ def allowance_key(tok: str) -> tuple[str, object]:
     return _facts.classify(tok)
 
 
-def parse_allowances(tokens=(), reason: str | None = None, superseded: str | None = None) -> dict:
-    """`{key: (token as written, reason, origin)}` from `--allow-drop` (with its one `--reason`) and a superseded file
-    (`TOKEN[,TOKEN...]: reason` per line; blank lines and `#` comments skipped). A missing reason refuses."""
+def parse_allowances(tokens=(), reason: str | None = None, superseded=None) -> dict:
+    """`{key: (token as written, reason, origin)}` from `--allow-drop` (with its one `--reason`) and the superseded
+    files (one path or a list; `TOKEN[,TOKEN...]: reason` per line; blank lines and `#` comments skipped; every file
+    adds, a later one never replaces an earlier one's other tokens). A missing reason refuses."""
     out: dict = {}
 
     def add(spelled: str, why: str, origin: str) -> None:
@@ -41,22 +42,35 @@ def parse_allowances(tokens=(), reason: str | None = None, superseded: str | Non
             add(spelled, reason.strip(), "--allow-drop")
     elif reason:
         raise AllowanceError("--reason without --allow-drop")
-    if superseded:
-        with open(superseded, encoding="utf-8") as fh:
+    for path in ([superseded] if isinstance(superseded, str) else list(superseded or ())):
+        with open(path, encoding="utf-8") as fh:
             for n, line in enumerate(fh, 1):
                 line = line.strip()
                 if not line or line.startswith("#"):
                     continue
                 toks, sep, why = line.partition(":")
                 if not sep or not why.strip() or not toks.strip():
-                    raise AllowanceError("%s:%d: expected `TOKEN[,TOKEN...]: reason`, got %r" % (superseded, n, line))
-                add(toks, why.strip(), "%s:%d" % (superseded.replace("\\", "/"), n))
+                    raise AllowanceError("%s:%d: expected `TOKEN[,TOKEN...]: reason`, got %r" % (path, n, line))
+                add(toks, why.strip(), "%s:%d" % (path.replace("\\", "/"), n))
     return out
 
 
-def run(root: str, base: str = "main", head: str | None = None, paths=(), allow: dict | None = None) -> dict:
+def changed_files(git: Git, base: str, head: str | None) -> list[str]:
+    """Every file the whole diff `base..head` changed (never limited by the PATH filter: a fact may move out of the
+    checked paths), plus the untracked-not-ignored files when the head is the working tree."""
+    out = git.out("diff", "--no-renames", "--name-only", "-z", base, *([head] if head else []), check=False)
+    files = {f for f in out.split("\0") if f}
+    if head is None:
+        files |= {f for f in git.out("ls-files", "-z", "--others", "--exclude-standard", check=False).split("\0") if f}
+    return sorted(files)
+
+
+def run(root: str, base: str = "main", head: str | None = None, paths=(), allow: dict | None = None,
+        moved: bool = True) -> dict:
     """Check the diff `base..head` (`head=None`: the working tree): `{spans, removed_spans, failures: [{file, line,
-    tokens, text}], tokens_checked, dropped, stale_allowances}`. `allow` (`parse_allowances`) names tokens dropped on
+    tokens, text}], tokens_checked, dropped, stale_allowances}`. A token survives in the fixed corpora, the unit's own
+    new text, or - with `moved` - the new text of any other file the same diff changed (a declaration or a fact moved
+    verbatim, e.g. from configure.py into the unit's header). `allow` (`parse_allowances`) names tokens dropped on
     purpose: such a token that survives nowhere is listed in `dropped` with its reason instead of failing; an
     allowance that no otherwise-failing token used (it matches nothing, or the token survives anyway) is listed in
     `stale_allowances`. A token that survives is never an allowance's - it needs none."""
@@ -74,10 +88,12 @@ def run(root: str, base: str = "main", head: str | None = None, paths=(), allow:
     spans = _facts.parse_diff(p.stdout or "")
     tree = _facts.Tree(root, head)
     corpora = _facts.Corpora(tree)
+    if moved:
+        corpora.index_changed(changed_files(git, base, head))
     texts = {f: tree.unit_text(f) for f in sorted({s.file for s in spans})}
     failures, checked, explained = [], 0, []
     for s in spans:
-        verdicts = _facts.judge(s.text, texts.get(s.file) or "", corpora)
+        verdicts = _facts.judge(s.text, texts.get(s.file) or "", corpora, own=s.file)
         checked += len(verdicts)
         bad = []
         for tok, where in verdicts:
@@ -107,7 +123,7 @@ def main(args) -> object:
     except (AllowanceError, OSError) as exc:
         print("factscheck: %s" % exc, file=sys.stderr)
         return 2
-    res = run(root, args.base, args.head, args.paths, allow)
+    res = run(root, args.base, args.head, args.paths, allow, moved=not args.no_moved)
     rows = [_findings.Finding("facts", f["file"], f["line"], tok, "removed and found nowhere")
             for f in res["failures"] for tok in f["tokens"]]
     verdict = _findings.Verdict.of(rows)
@@ -142,8 +158,10 @@ def build_parser():
     ap.add_argument("--allow-drop", action="append", default=[], metavar="TOKEN[,TOKEN...]",
                     help="a fact token removed on purpose (an old name, a past measurement); needs --reason; repeatable")
     ap.add_argument("--reason", default=None, help="why the --allow-drop tokens are dropped (mandatory with it)")
-    ap.add_argument("--superseded-file", default=None, metavar="FILE",
-                    help="allowances, one `TOKEN[,TOKEN...]: reason` per line (# comments)")
+    ap.add_argument("--superseded-file", action="append", default=[], metavar="FILE",
+                    help="allowances, one `TOKEN[,TOKEN...]: reason` per line (# comments); repeatable, every file adds")
+    ap.add_argument("--no-moved", action="store_true",
+                    help="do not credit a token found in another file the same diff changed (the old, stricter rule)")
     ap.add_argument("paths", nargs="*", help="limit the diff to these paths")
     return ap
 

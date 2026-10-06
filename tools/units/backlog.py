@@ -432,10 +432,30 @@ def _add_request(grouped: dict, r: dict, source: str, lane: str, when: str) -> N
         target = norm_file(r.get("file") or r.get("target") or r.get("what") or kind)
         detail = free_text(r, ("why", "evidence", "request", "change", "note"))
         st = "done" if kind == "done-in-this-fold" else "open"
-        key = (kind, target, "other")
-        _merge(grouped, key, Item(kind=kind, target=target, defect="other", status=st, default_status=st,
+        defect = request_defect(r)
+        key = (kind, target, defect)
+        _merge(grouped, key, Item(kind=kind, target=target, defect=defect, status=st, default_status=st,
                                   ask=one_line(detail) or kind,
                                   filings=[Filing(source, lane, when, one_line(detail, 400))]))
+
+
+#: The fields that tell two requests of one kind against one file apart: the symbol (or symbols) they name, else
+#: the request's own id. A request with none of them keys on `other`, as every such item always has.
+REQUEST_IDENTITY_FIELDS = ("symbol", "symbols", "name", "old", "id")
+
+
+def request_defect(r: dict) -> str:
+    """The defect half of a generic request's key: the first identity field it carries (a list joined, sorted),
+    else `other`. Two `fix` requests for two symbols of one file are two items; the same symbol filed twice (by two
+    lanes) is one item with two filings."""
+    for name in REQUEST_IDENTITY_FIELDS:
+        value = r.get(name)
+        if isinstance(value, list):
+            value = ",".join(sorted(asstr(v).strip() for v in value if asstr(v).strip()))
+        value = asstr(value).strip()
+        if value:
+            return value
+    return "other"
 
 
 def stylelint_findings(main: str) -> list[dict]:

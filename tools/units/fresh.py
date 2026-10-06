@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Every derived artifact of a tree (`lib.artifacts`): fresh or stale, why, its cost and its refresh command.
-Spec: docs/tools/spec/fresh.md. CLI: fresh.py [status | refresh [NAME ...]] [--unit SRC] [--json] [--root TREE]."""
+Spec: docs/tools/spec/fresh.md. CLI: fresh.py [status | refresh [NAME ...] | prune-orphans] [--unit SRC] [--json] [--root TREE]."""
 from __future__ import annotations
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
 
@@ -38,6 +38,15 @@ def render(rows: list[artifacts.Status], root: str) -> None:
 
 def main(args) -> int:
     root = os.path.abspath(args.root if args.root != "." else (repo.cwd_tree() or "."))
+    if args.cmd == "prune-orphans":
+        gone = artifacts.prune_orphan_objects(root)
+        if args.json:
+            print(json.dumps({"root": root, "deleted": gone}, indent=1))
+        else:
+            for rel in gone:
+                print("deleted %s" % rel)
+            print("fresh: deleted %d orphan object(s)" % len(gone))
+        return 0 if not artifacts.orphan_objects(root) else 1
     ctx = unit_context(root, args.unit)
     names = args.names or None
     if args.cmd == "refresh":
@@ -54,8 +63,10 @@ def main(args) -> int:
 
 def build_parser():
     ap = TOOL.parser()
-    ap.add_argument("cmd", nargs="?", choices=("status", "refresh"), default="status",
-                    help="status (default): one row per artifact; refresh: rebuild the stale ones in dependency order")
+    ap.add_argument("cmd", nargs="?", choices=("status", "refresh", "prune-orphans"), default="status",
+                    help="status (default): one row per artifact; refresh: rebuild the stale ones in dependency order; "
+                         "prune-orphans: delete the objects no registered unit produces (what `refresh "
+                         "orphan-objects` runs)")
     ap.add_argument("names", nargs="*", metavar="NAME",
                     help="artifacts to report or refresh (default: all): %s" % ", ".join(artifacts.REGISTRY))
     ap.add_argument("--unit", default=None,

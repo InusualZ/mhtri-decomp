@@ -45,7 +45,8 @@ zz_0040598_ 80040598 f           # `zz_<address>_` = the dumper had no name for 
 
 ## Lib dependencies
 
-project.symbols, names.
+project.symbols, names, dumpsyms (the dump reader: `parse_map_text`, `load_dump`, `base_name`, `is_placeholder`,
+moved out of this tool 2026-10-06 so `lanecheck` reads the dump through the same code).
 
 ## Test contract
 

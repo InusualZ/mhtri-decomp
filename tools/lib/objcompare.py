@@ -633,6 +633,90 @@ def by_owner(target, ours) -> tuple[int, int, list[str]]:
     return matched, total, lines + notes
 
 
+# --- callees: symbol-name relocation differences per written function -------------------------------------------
+
+#: A compiler-local name in OUR object: a pool/jump-table/string label (`@123`, `@stringBase0`, `@4@x`), a local
+#: static's counter (`x$123`) or a section symbol. It names nothing the source chose, so it never is a callee.
+LOCAL_LABEL_RE = re.compile(r"^(?:@|\.|<)|\$\d+")
+#: The target's spelling of the same labels: the map's pool/jump-table names (`lbl_<ADDR>`, `jumptable_<ADDR>`) or a
+#: compiler label the map kept. Dropped only one-for-one against a local label of ours with the same relocation type.
+TARGET_LABEL_RE = re.compile(r"^(?:@|\.|<|jumptable_[0-9A-Fa-f]{8}$|lbl_[0-9A-Fa-f]{8}$)")
+#: A function body this small in our object is a stub (`blr`, `li r3,0; blr`): not written, never judged.
+STUB_MAX_BYTES = 8
+
+
+def callee_kind(ours: str | None, target: str | None) -> str:
+    """How one paired difference reads: `mangling` (the same stem, two manglings), `linkage` (the same stem, one side
+    C), `callee` (a different symbol), or `extra`/`missing` (no counterpart)."""
+    if target is None:
+        return "extra"
+    if ours is None:
+        return "missing"
+    so, st = _names.owner_stem(ours), _names.owner_stem(target)
+    if so == st:
+        return "mangling" if so != ours and st != target else "linkage"
+    return "callee"
+
+
+def _functions(elf: Elf) -> dict[str, tuple[int, int]]:
+    """`{name: (value, size)}` of the defined functions in `.text`."""
+    nsec = len(elf.sections)
+    return {s.name: (s.value, s.size) for s in elf.symbols
+            if s.name and 0 < s.shndx < nsec and elf.sections[s.shndx].name == ".text" and s.type == 2}
+
+
+def callee_diffs(target, ours) -> list[dict]:
+    """Per function both objects define in `.text` that ours has written (larger than `STUB_MAX_BYTES`): the
+    relocation symbol names that differ, `[{function, diffs: [{kind, ours, target, offset}]}]` (only functions with
+    a difference). The two name sequences are aligned per function (`difflib`, as `by_owner` does); the unaligned
+    rows then cancel by name, so a relocation that only moved (a slid instruction) is not a difference; then each local label of ours (`LOCAL_LABEL_RE`) cancels one target pool or jump-table
+    label (`TARGET_LABEL_RE`) of the same relocation type, and the leftover local labels are dropped (noise). The
+    remaining names pair in offset order (`offset` is the target's, else ours', in the function); `callee_kind`
+    classifies each pair."""
+    o_elf, t_elf = load(ours), load(target)
+    o_funcs, t_funcs = _functions(o_elf), _functions(t_elf)
+    a, b = owner_groups(o_elf), owner_groups(t_elf)
+    out = []
+    for name in sorted(set(o_funcs) & set(t_funcs), key=lambda n: t_funcs[n][0]):
+        if o_funcs[name][1] <= STUB_MAX_BYTES:
+            continue
+        mine = [(off, typ, sym) for off, typ, sym, _add in a.get((".text", name), [])]
+        theirs = [(off, typ, sym) for off, typ, sym, _add in b.get((".text", name), [])]
+        sm = difflib.SequenceMatcher(None, [r[2] for r in mine], [r[2] for r in theirs], autojunk=False)
+        left_o, left_t = [], []
+        for op, i1, i2, j1, j2 in sm.get_opcodes():
+            if op != "equal":
+                left_o += mine[i1:i2]
+                left_t += theirs[j1:j2]
+        common = Counter(r[2] for r in left_o) & Counter(r[2] for r in left_t)   # a row that only moved
+        for left in (left_o, left_t):
+            budget = Counter(common)
+            keep = []
+            for row in left:
+                if budget[row[2]]:
+                    budget[row[2]] -= 1
+                else:
+                    keep.append(row)
+            left[:] = keep
+        locals_by_type = Counter(typ for _o, typ, sym in left_o if LOCAL_LABEL_RE.search(sym))
+        left_o = [r for r in left_o if not LOCAL_LABEL_RE.search(r[2])]
+        kept_t = []
+        for row in left_t:
+            if TARGET_LABEL_RE.search(row[2]) and locals_by_type[row[1]]:
+                locals_by_type[row[1]] -= 1
+                continue
+            kept_t.append(row)
+        diffs = []
+        for i in range(max(len(left_o), len(kept_t))):
+            o = left_o[i] if i < len(left_o) else None
+            t = kept_t[i] if i < len(kept_t) else None
+            diffs.append({"kind": callee_kind(o and o[2], t and t[2]), "ours": o and o[2], "target": t and t[2],
+                          "offset": (t or o)[0]})
+        if diffs:
+            out.append({"function": name, "diffs": diffs})
+    return out
+
+
 # --- undefined names: what a flip would leave unresolved --------------------------------------------------------
 
 def reloc_facts(obj) -> dict | None:

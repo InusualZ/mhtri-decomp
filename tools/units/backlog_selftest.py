@@ -687,7 +687,9 @@ def selftest() -> int:
         for sub in ("build/RMHE08/src/mod", "config/RMHE08", ".pi/outbox", ".pi/notes"):
             os.makedirs(os.path.join(d, sub))
         with open(os.path.join(d, "configure.py"), "w", encoding="utf-8") as fh:
-            fh.write("config.libs = [\n]\n")
+            # the fixture's objects are registered units: undefrefs skips an object no Object(...) names
+            fh.write("config.libs = [\n" + "".join('    Object(NonMatching, "mod/%s.c"),\n' % u for u in "xab")
+                     + "]\n")
         return d
 
     check("the undefrefs kind is declared once", bl.UNDEFREF_KIND, "undefrefs")
@@ -793,7 +795,9 @@ def selftest() -> int:
         with open(os.path.join(d, "config", "RMHE08", "symbols.txt"), "w", encoding="utf-8", newline="\n") as fh:
             fh.write("w_orphan = .data:0x805EB000; // type:object size:0x4\n")
         with open(os.path.join(d, "configure.py"), "w", encoding="utf-8") as fh:
-            fh.write("config.libs = [\n]\n")
+            # the fixture's objects are registered units: undefrefs skips an object no Object(...) names
+            fh.write("config.libs = [\n" + "".join('    Object(NonMatching, "mod/%s.c"),\n' % u for u in "xab")
+                     + "]\n")
         if with_object:
             dgap.build_fixture_object(os.path.join(d, "build", "RMHE08", "obj", "A", "a.o"), ["w_orphan"])
         return d
@@ -959,6 +963,21 @@ def selftest() -> int:
                "src/mod/a.c" in dbrief and dbrief.count("- `") == 2
                and "--set-status %s done" % debt_item.key in dbrief)
     check("the debt claim unit is the item's file", bl.debt_unit(debt_item), "src/mod/a.c")
+
+    # --- a generic request keys on its symbol (or id): two `fix` requests for two symbols of one file ----------
+    grouped: dict = {}
+    for r in ({"kind": "fix", "file": "src/ef/ef_util.cpp", "symbol": "fn_8009B840", "why": "wrong callee"},
+              {"kind": "fix", "file": "src/ef/ef_util.cpp", "symbol": "fn_8009CD64", "why": "wrong callee"},
+              {"kind": "fix", "file": "src/ef/ef_util.cpp", "symbol": "fn_8009B840", "why": "same, another lane"},
+              {"kind": "decl", "file": "src/ef/ef_util.cpp", "symbols": ["b_sym", "a_sym"], "why": "move"},
+              {"kind": "band-header", "file": "src/unsplit/ef.h", "id": "req-7", "why": "x"},
+              {"kind": "band-header", "file": "src/unsplit/ef.h", "why": "no identity"}):
+        bl._add_request(grouped, r, "lane-%d.json" % len(grouped), "lane", "")
+    got = sorted((k, i.defect, len(i.filings)) for k, i in ((k[0], v) for k, v in grouped.items()))
+    check("two fix requests for two symbols of one file are two items; the same symbol twice is one item with two "
+          "filings; a symbol list keys sorted; an id keys when no symbol; none keys `other`",
+          got, [("band-header", "other", 1), ("band-header", "req-7", 1), ("decl", "a_sym,b_sym", 1),
+                ("fix", "fn_8009B840", 2), ("fix", "fn_8009CD64", 1)])
 
     if fails:
         print("FAIL (%d)" % len(fails))

@@ -33,7 +33,8 @@ def repo_git(path, *args):
     p = subprocess.run(["git", "-c", "user.email=selftest@example.invalid", "-c", "user.name=selftest",
                         "-c", "commit.gpgsign=false", *args], cwd=path, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if p.returncode != 0:
-        raise RuntimeError("git %s: %s" % (" ".join(args), p.stderr.strip()))
+        raise RuntimeError("git %s: exit %d (0x%08X): %s" % (" ".join(args), p.returncode, p.returncode & 0xFFFFFFFF,
+                                                               p.stderr.strip()))
     return p.stdout.strip()
 
 def repo_commit(path, msg):

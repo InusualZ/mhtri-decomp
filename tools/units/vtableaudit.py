@@ -905,7 +905,15 @@ def sweep(main: str, only: str | None = None, text_ref: str | None = None) -> di
     runs = [r for rec in records for r in rec["runs"]]
     sections = [dict(d, unit=rec["unit"]) for rec in records for d in rec["sections"]]
     violations = [r for r in runs if r["verdict"] == "violation"]
+    owners = []
+    if text_ref:
+        # the back side's data-range owners, for `diff_rows`' re-own credit: the objects are the working tree's, so a
+        # run a recut gave to a NEW unit is invisible here and would read as added (9db8fbe62: 6 runs)
+        owners = sorted((r["start"], r["end"], u) for u, rs in tree["splits"].items() for r in rs
+                        if r["section"] in DATA_SECTIONS)
     return {
+        "owners": owners,
+        "matching_at_ref": matching_units_at(main, text_ref) if text_ref else [],
         "root": main,
         "text_source": tree["text_source"],
         "text_ref": text_ref,
@@ -934,6 +942,17 @@ def sweep(main: str, only: str | None = None, text_ref: str | None = None) -> di
     }
 
 
+def matching_units_at(main: str, ref: str) -> list:
+    """The units `configure.py` flags `Matching` at `ref` (their objects emit every table they own)."""
+    text = _git(main, "show", "%s:configure.py" % ref)
+    if not text:
+        return []
+    try:
+        return sorted(o.path for o in _project.Configure.parse(text).objects() if o.flag == "Matching")
+    except Exception:                                          # noqa: BLE001 - evidence only: no credit
+        return []
+
+
 def _same_unit(path: str, spec: str) -> bool:
     a, b = path.replace("\\", "/"), spec.replace("\\", "/").strip("/")
     return a == b or os.path.splitext(a)[0] == os.path.splitext(b)[0]
@@ -956,6 +975,12 @@ def violation_rows(s: dict, rename: dict | None = None) -> dict:
     """
     rename = rename or {}
     rows: dict = {}
+    if s.get("text_ref") and s.get("owners"):
+        # one bookkeeping row (kind `owners`): the back side's data-range owners, which `diff_rows` reads for the
+        # re-own credit and never reports as a violation of its own
+        rows["owners:%s" % s["text_ref"]] = {"unit": "", "kind": "owners", "where": "data-range owners at %s"
+                                             % s["text_ref"], "owners": s["owners"],
+                                             "matching": s.get("matching_at_ref", [])}
     for run in s["violations"]:
         key = "run:%s:%08X" % (run["section"], run["address"])
         rows[key] = {"unit": run["unit"], "kind": "run", "section": run["section"],
@@ -981,7 +1006,17 @@ def diff_rows(before: dict, after: dict) -> dict:
     (`[added_key, removed_key]`) and leaves both lists. A mere overlap does not pair - a run that grew over a
     neighbour (a recut that claims new tables next to an old one) is an addition. Only `added` refuses; the land
     gate's rule-10 row decides with this function too.
+
+    **A re-owned run is not an addition.** The back side reads the working tree's objects with the base's map, so a
+    run a recut gave from unit A to a new unit B is not seen there at all. When the before rows carry the base's
+    data-range owners (the `owners` row `violation_rows` adds for a `text_ref` sweep) and an added run's address lay,
+    at the base, inside another registered unit's range, the run is `reowned` (`[key, base owner]`) and leaves
+    `added` - unless that base owner was `Matching` (its object emitted the table, so B not emitting it is a
+    regression). The `owners` row itself is never added, removed or counted.
     """
+    meta = [r for r in before.values() if r.get("kind") == "owners"]
+    before = {k: v for k, v in before.items() if v.get("kind") != "owners"}
+    after = {k: v for k, v in after.items() if v.get("kind") != "owners"}
     added = sorted(set(after) - set(before))
     removed = sorted(set(before) - set(after))
 
@@ -1018,7 +1053,21 @@ def diff_rows(before: dict, after: dict) -> dict:
                 added.remove(key)
                 removed.remove(old)
                 break
-    return {"added": added, "removed": removed, "shifted": shifted}
+    reowned = []
+    if meta:
+        owners = [tuple(o) for m in meta for o in m.get("owners", [])]
+        matching = {os.path.splitext(u)[0] for m in meta for u in m.get("matching", [])}
+        for key in list(added):
+            row = after[key]
+            if row.get("kind") != "run" or "address" not in row:
+                continue
+            was = next((u for lo, hi, u in owners if lo <= row["address"] < hi), None)
+            if was is None or os.path.splitext(was)[0] == os.path.splitext(row["unit"])[0] \
+                    or os.path.splitext(was)[0] in matching:
+                continue
+            reowned.append([key, was])
+            added.remove(key)
+    return {"added": added, "removed": removed, "shifted": shifted, "reowned": reowned}
 
 
 def violation_keys(s: dict, rename: dict | None = None) -> list:
@@ -1279,15 +1328,20 @@ def main(argv=None) -> int:
         # already keyed on the range, which a rename keeps.
         rename = rename_map(main_tree, args.diff)
         before_rows, after_rows = violation_rows(back, rename), violation_rows(s)
-        before, after = sorted(before_rows), sorted(after_rows)
+        before = sorted(k for k, v in before_rows.items() if v.get("kind") != "owners")
+        after = sorted(k for k, v in after_rows.items() if v.get("kind") != "owners")
         d = diff_rows(before_rows, after_rows)
         added = d["added"]
         if args.json:
             print(json.dumps({"ref": args.diff, "added": added, "removed": d["removed"],
-                              "shifted": d["shifted"], "before": before, "after": after}, indent=2))
+                              "shifted": d["shifted"], "reowned": d["reowned"], "before": before, "after": after},
+                             indent=2))
             return 1 if added else 0
-        print("vtableaudit --diff %s: %d rule-10 violation(s) before, %d after, %d added, %d removed, %d shifted"
-              % (args.diff, len(before), len(after), len(added), len(d["removed"]), len(d["shifted"])))
+        print("vtableaudit --diff %s: %d rule-10 violation(s) before, %d after, %d added, %d removed, %d shifted, "
+              "%d re-owned" % (args.diff, len(before), len(after), len(added), len(d["removed"]), len(d["shifted"]),
+                               len(d["reowned"])))
+        for key, was in d["reowned"]:
+            print("  REOWNED %s  %s (owned by %s at %s; credited)" % (key, after_rows[key]["where"], was, args.diff))
         for key in added:
             print("  ADDED   %s  %s" % (key, after_rows[key]["where"]))
         for key in d["removed"]:

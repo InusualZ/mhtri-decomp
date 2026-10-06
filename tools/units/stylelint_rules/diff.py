@@ -228,7 +228,29 @@ def rename_map(base: "Ownership | None", after: "Ownership | None",
     return out
 
 
-def renamed_finding(f: dict, symbols: dict, files: "dict | None" = None) -> dict:
+def owner_map(base: "Ownership | None", after: "Ownership | None", findings: list[dict],
+              symbols: "dict | None" = None) -> dict:
+    """`{token: (detail at base, detail now)}` for the rule-2 tokens a recut **re-owned**: the base map resolves the
+    symbol to one registered unit and the after map - under its renamed spelling, `symbols` - to another, so a base
+    finding's text names the old owner although the declaration is the same one.  Only unit -> unit: a range the batch
+    dropped (owned -> unsplit) or claimed (unsplit -> owned) changes what the finding asks for, and stays an
+    addition (the selftest's owned-foreign -> unsplit case).  Both texts come from `r02_extern.rule2_detail` (the one
+    spelling); a token that becomes this file's own (no finding now) never appears on the after side."""
+    from tools.units.stylelint_rules.r02_extern import rule2_detail  # noqa: PLC0415 - r02 imports this package
+    out: dict = {}
+    if base is None or after is None:
+        return out
+    for tok in {f.get("token") for f in findings if f.get("rule") == 2 and f.get("token")}:
+        r_was, r_now = base.resolve(tok), after.resolve((symbols or {}).get(tok, tok))
+        if not r_was or not r_now or r_was.get("kind") != "owned" or r_now.get("kind") != "owned":
+            continue
+        was, now = rule2_detail(tok, r_was), rule2_detail(tok, r_now)
+        if was != now:
+            out[tok] = (was, now)
+    return out
+
+
+def renamed_finding(f: dict, symbols: dict, files: "dict | None" = None, owners: "dict | None" = None) -> dict:
     """`f` with its token - and the owner path its detail spells - translated: the same token, renamed.
 
     Two translations, because a rename changes two things a base-side finding names.  `symbols`
@@ -238,10 +260,16 @@ def renamed_finding(f: dict, symbols: dict, files: "dict | None" = None) -> dict
     `src/menu/fn_802A6624.cpp`"), and when the batch re-homes that unit too the same finding would look
     like a new one for no reason but the unit's new name.
 
+    A third, `owners` (`owner_map`), re-owns a rule-2 finding: when the batch's `splits.txt` moved the symbol to
+    another unit (a recut), the base text naming the old owner reads as the text naming the new one - the same
+    declaration, not a new one.
+
     The map holds only map-row names, so a finding whose token is not a renamed row comes back unchanged.
     """
     tok = f.get("token")
     detail = f["detail"]
+    if owners and f.get("rule") == 2 and tok in owners and detail == owners[tok][0]:
+        detail = owners[tok][1]
     token2 = tok
     if tok and tok in (symbols or {}):
         token2 = symbols[tok]
@@ -255,20 +283,32 @@ def renamed_finding(f: dict, symbols: dict, files: "dict | None" = None) -> dict
 
 
 def added_identities(before_findings: list[dict], after_findings: list[dict],
-                     symbols: "dict | None" = None, files: "dict | None" = None) -> dict:
+                     symbols: "dict | None" = None, files: "dict | None" = None, owners: "dict | None" = None) -> dict:
     """`{(rule, file): [finding, ...]}` - one entry per after-side identity **new to that file**
-    (`lib.findings.added`), each base identity admitted under every spelling a rename gives it
-    (`renamed_finding`, driven by the symbol map and the file map)."""
+    (`lib.findings.added`), each base identity admitted under every spelling a rename or a re-own gives it
+    (`renamed_finding`, driven by the symbol map, the file map and the owner map)."""
     return _findings.added(before_findings, after_findings,
-                           lambda f: (renamed_finding(f, symbols or {}, files),))
+                           lambda f: (renamed_finding(f, symbols or {}, files, owners),))
 
 
 def removed_identities(before_findings: list[dict], after_findings: list[dict],
-                       symbols: "dict | None" = None, files: "dict | None" = None) -> dict:
+                       symbols: "dict | None" = None, files: "dict | None" = None,
+                       owners: "dict | None" = None) -> dict:
     """`{(rule, token, detail): [file, ...]}` - one entry per base identity a file **stopped** carrying under any
-    spelling a rename gives it (`lib.findings.removed`); the mirror of `added_identities`."""
+    spelling a rename or a re-own gives it (`lib.findings.removed`); the mirror of `added_identities`."""
     return _findings.removed(before_findings, after_findings,
-                             lambda f: (renamed_finding(f, symbols or {}, files),))
+                             lambda f: (renamed_finding(f, symbols or {}, files, owners),))
+
+
+def owner_credit_lines(credited: list[dict], owners: dict) -> list[str]:
+    """`--diff`'s report of the rule-2 identities it credited as re-owned by the batch's `splits.txt`: never silent."""
+    out = []
+    if credited:
+        out.append("  re-owned (credited: the batch's splits.txt moved the owner, the declaration is the same): "
+                   "%d finding(s)" % len(credited))
+        for f in credited:
+            out.append("    re-owned rule 2 %s %s: %s" % (f["file"], f.get("token"), owners[f.get("token")][1]))
+    return out
 
 
 def _unit_stem(path: str) -> "str | None":
@@ -320,7 +360,7 @@ def derive_file_absorbers(root: str, base: str, ref: "str | None", pairs: list, 
 
 def apply_move_credits(fresh: dict, before_findings: list[dict], after_findings: list[dict],
                        symbols: "dict | None" = None, files: "dict | None" = None,
-                       absorbers: "dict | None" = None) -> tuple[dict, list[dict]]:
+                       absorbers: "dict | None" = None, owners: "dict | None" = None) -> tuple[dict, list[dict]]:
     """Credit an added identity that another file of the same batch **gave up**: a move, not growth.
 
     `--diff` grandfathers per file, so functions moved from an old file into a new one read as additions
@@ -334,7 +374,7 @@ def apply_move_credits(fresh: dict, before_findings: list[dict], after_findings:
     gained it, one lost it) still leaves the surplus refused.  Returns `(fresh_left, moves)`, each move
     `{rule, token, detail, from, to}`; a batch without a move returns `fresh` unchanged and `[]`.
     """
-    removed = removed_identities(before_findings, after_findings, symbols, files)
+    removed = removed_identities(before_findings, after_findings, symbols, files, owners)
     pool = {k: list(v) for k, v in removed.items()}
     left: dict = {}
     moves: list[dict] = []
@@ -418,7 +458,7 @@ def added_rows(fresh: dict, before_counts: dict, after_counts: dict) -> list[dic
 
 def added_finding_detail(added: list[dict], after_findings: list[dict], before_findings: list[dict],
                          symbols: "dict | None" = None, files: "dict | None" = None,
-                         fresh: "dict | None" = None) -> list[dict]:
+                         fresh: "dict | None" = None, owners: "dict | None" = None) -> list[dict]:
     """The findings behind `added`'s `+N rule R <file>` rows, named: rule, file, line and token.
 
     `added` is `added_rows`' new-identity rows, so by itself it says how many new tokens a file gained but
@@ -430,7 +470,7 @@ def added_finding_detail(added: list[dict], after_findings: list[dict], before_f
     token that names it - so the `--diff --json` `detail` key is stable whatever the internal finding adds.
     """
     if fresh is None:
-        fresh = added_identities(before_findings, after_findings, symbols, files)
+        fresh = added_identities(before_findings, after_findings, symbols, files, owners)
     out = []
     for row in sorted(added, key=lambda a: (a["rule"], -a["added"], a["file"])):
         key = (row["rule"], row["file"])
@@ -472,6 +512,7 @@ class Judgement:
     detail: list
     credit_lines: list
     freed_gaps: dict
+    re_owned: list = ()
 
 
 def base_rule2_symbols(base_findings: list[dict]) -> dict[str, set]:
@@ -507,15 +548,23 @@ def judge(before_findings: list[dict], after_findings: list[dict], touched: list
              for src in after_sources}
     symbol_rename = rename_map(base_ownership, after_ownership,
                                {f.get("token") for f in before_findings if f.get("token")})
+    owners = owner_map(base_ownership, after_ownership, before_findings, symbol_rename)
+    with_owners = added_identities(before_findings, after_findings, symbol_rename, rename, owners)
+    re_owned = []
+    if owners:
+        kept = {id(f) for fs in with_owners.values() for f in fs}
+        re_owned = [f for fs in added_identities(before_findings, after_findings, symbol_rename, rename).values()
+                    for f in fs if id(f) not in kept and f.get("rule") == 2 and f.get("token") in owners]
     fresh, moves = apply_move_credits(
-        added_identities(before_findings, after_findings, symbol_rename, rename),
-        before_findings, after_findings, symbol_rename, rename, absorbers=absorbers)
+        with_owners, before_findings, after_findings, symbol_rename, rename, absorbers=absorbers, owners=owners)
     added, credits = apply_rename_credits(
         added_rows(fresh, before, after), touched, base_ownership, after_ownership,
         base_rule2_symbols(base_findings), {p: len(names) for p, names in freed.items()})
     return Judgement(added, credits, moves,
-                     added_finding_detail(added, after_findings, before_findings, symbol_rename, rename, fresh),
-                     rename_credit_lines(credits, freed) + move_credit_lines(moves), freed)
+                     added_finding_detail(added, after_findings, before_findings, symbol_rename, rename, fresh,
+                                          owners),
+                     rename_credit_lines(credits, freed) + move_credit_lines(moves)
+                     + owner_credit_lines(re_owned, owners), freed, re_owned)
 
 
 def merge_counts(*counts: dict) -> dict:

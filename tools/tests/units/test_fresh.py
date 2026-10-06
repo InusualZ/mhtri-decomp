@@ -13,7 +13,7 @@ from pathlib import Path
 
 from tools.lib import artifacts, refs, testing
 from tools.splits import tudiscover as td
-from tools.units import callers, fresh
+from tools.units import callers, fresh, undefrefs
 
 TIER = "fixture"
 os.environ.pop(artifacts.ENV, None)       # the defaults are what is tested, never the caller's FRESH
@@ -165,6 +165,43 @@ def test_fresh_cli(c):
         c.contains("the table names it", buf.getvalue(), "asm-dump")
         c.raises("an unknown artifact is refused", SystemExit, fresh.TOOL.run, fresh.main,
                  ["status", "nope", "--root", tmp], parser=fresh.build_parser())
+
+
+ORPHAN_CONFIGURE = ('cflags_base = ["-O4"]\nconfig.libs = [\n    {"lib": "A", "mw_version": "Wii/1.3", "cflags": '
+                    'cflags_base, "objects": [\n        Object(NonMatching, "A/live.c"),\n    ]},\n]\n')
+
+
+def test_orphan_objects(c):
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        files = {"configure.py": ORPHAN_CONFIGURE, "build/RMHE08/src/A/live.o": "o", "build/RMHE08/src/A/gone.o": "o",
+                 "build/RMHE08/src/A/gone.d": "d", "build/RMHE08/obj/A/live.o": "o", "build/RMHE08/obj/auto_x.o": "o",
+                 "build/RMHE08/obj/A/retired.o": "o",
+                 "build/RMHE08/config.json": json.dumps({"units": [{"object": "build/RMHE08/obj/A/live.o"},
+                                                                   {"object": "build/RMHE08/obj/auto_x.o"}],
+                                                         "modules": []})}
+        for rel, text in files.items():
+            (root / rel).parent.mkdir(parents=True, exist_ok=True)
+            (root / rel).write_text(text, encoding="utf-8")
+        c.check("an object no Object(...) names (src) or the split does not list (obj) is an orphan",
+                artifacts.orphan_objects(tmp), ["build/RMHE08/obj/A/retired.o", "build/RMHE08/src/A/gone.o"])
+        st = artifacts.status("orphan-objects", artifacts.Context(tmp))
+        c.check("the artifact is stale and names the count", (st.state, st.reason.startswith("2 object(s)")),
+                ("stale", True))
+        c.check("its refresh command is fresh.py prune-orphans", st.command, "python tools/units/fresh.py prune-orphans")
+        c.check("undefrefs' census and record-base walk skips the orphan", undefrefs.discover_units(tmp), ["A/live"])
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = fresh.TOOL.run(fresh.main, ["prune-orphans", "--root", tmp], parser=fresh.build_parser())
+        c.check("prune-orphans deletes them (and the depfile) and nothing else, exit 0",
+                (rc, (root / "build/RMHE08/src/A/gone.o").exists(), (root / "build/RMHE08/src/A/gone.d").exists(),
+                 (root / "build/RMHE08/src/A/live.o").exists(), (root / "build/RMHE08/obj/auto_x.o").exists()),
+                (0, False, False, True, True))
+        c.check("afterwards the artifact is fresh", artifacts.status("orphan-objects", artifacts.Context(tmp)).state,
+                "fresh")
+        os.unlink(root / "build/RMHE08/config.json")
+        (root / "build/RMHE08/obj/A/other.o").write_text("o", encoding="utf-8")
+        c.check("without a split's config.json the obj side is not judged", artifacts.orphan_objects(tmp), [])
 
 
 if __name__ == "__main__":

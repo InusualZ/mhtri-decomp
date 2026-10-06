@@ -29,8 +29,11 @@ nothing.
   (`auto/<hex>_`, `proposal/`, `src/auto/`, `docs/splits/phase4`) it is inert with that reason; `INERT_WORDS` likewise.
 * `Tree.unit_text(rel)`: the new text of `rel` and its same-stem siblings (`UNIT_SUFFIXES`: a source and its own
   header), the "new text" a unit's removed fact may move to.
-* `judge(text, new_text, corpora)` -> `[(token, where)]`, `where` the first holder in the order: the new text of the
-  unit, `configure.py`, `splits.txt`, `symbols.txt`, `docs/**`; a generated stem whose eight-digit address any holder has
+* `Corpora.index_changed(rels)`: one extra corpus per file the diff changed (its new text; the fixed corpora and
+  `docs/` skipped, a deleted file has none) - where a token moved verbatim to another file of the same diff survives.
+* `judge(text, new_text, corpora, own=None)` -> `[(token, where)]`, `where` the first holder in the order: the new text of the
+  unit, `configure.py`, `splits.txt`, `symbols.txt`, `docs/**`, then `moved to <file>` for every changed file whose
+  stem is not `own`'s; a generated stem whose eight-digit address any holder has
   (or the runtime dump's `zz_<7 hex>_`, the address less 0x80000000) is `derivable`; `""` means lost.
   `unmatched(...)` is the lost tokens, each once.
 * Hex tokens compare by value; every eight-hex-digit run of a corpus (the address inside `fn_802D44F4`) is indexed as
@@ -38,6 +41,7 @@ nothing.
 * `Tree.exists(path)` accepts a path as written, below `src/`, or through `lib.repo.moved_header` for `include/...`.
 * `parse_diff(text)` -> `[Span(file, line, text)]`: one span per run of removed lines of a `git diff -U0` hunk, the old
   file's line; an added file has none.
+* `parse_added(text)` -> `{file: [(new line, text)]}`: every added line of a `git diff -U0` text (`lanecheck` reads it).
 
 ## Lib dependencies
 
@@ -51,4 +55,5 @@ decision).
 
 ## Known gaps
 
-* `src/` is not a corpus: a fact repeated in another unit's comment does not count as surviving.
+* `src/` as a whole is not a corpus: a fact repeated in an unchanged unit's comment does not count as surviving;
+  only the files the same diff changed are (`index_changed`).

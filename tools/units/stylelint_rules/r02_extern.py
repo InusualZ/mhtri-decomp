@@ -17,6 +17,25 @@ from tools.units.stylelint_rules.context import open_request_ids
 EXTERN_RE = re.compile(r"\bextern\b")
 
 
+def rule2_detail(name: str, r: dict) -> "str | None":
+    """The finding text for a foreign declaration of `name` resolved to `r` (`Ownership.resolve`): owned by another
+    unit, or unsplit in a module's band (`module` None: the bracketing bands disagree); None for any other kind.
+    The one spelling every rule-2 reading uses, so `diff.owner_map` can translate a re-owned symbol's identity."""
+    if r is None:
+        return None
+    if r["kind"] == "owned":
+        return "`%s` is owned by `src/%s` - declare it in that unit's header and #include it" % (name, r["unit"])
+    if r["kind"] != "unsplit":
+        return None
+    # the detail names the band by its MODULE, never by its path: a finding's identity carries the detail
+    # (`lib.findings.identity`), and the band's directory moves (2026-10-05) - a path here would turn the move
+    # into one removal plus one addition per finding.
+    if r.get("module") in (None, UNSPLIT_UNRESOLVED):
+        return ("`%s` has no registered owner - declare it in an unsplit band header "
+                "(the bracketing bands name different modules)" % name)
+    return "`%s` has no registered owner - declare it in the `%s` unsplit band header" % (name, r["module"])
+
+
 def _declared_name(segment: str) -> "str | None":
     """The identifier an `extern` declaration introduces (`lib.cscan.declared_name`)."""
     return cscan.declared_name(segment)
@@ -172,9 +191,7 @@ def rule2_band_findings(src: Source, ownership: "Ownership") -> list[dict]:
         r = ownership.resolve(name)
         if r is None or r["kind"] != "owned":
             continue
-        out.append(_rule2_finding(src, line, name,
-                                  "`%s` is owned by `src/%s` - declare it in that unit's header and "
-                                  "#include it" % (name, r["unit"])))
+        out.append(_rule2_finding(src, line, name, rule2_detail(name, r)))
     return out
 
 
@@ -201,9 +218,7 @@ def rule2_findings(src: Source, ownership: "Ownership") -> list[dict]:
             if _owns(src.rel, r["unit"]):
                 continue
             ownership.foreign_units[r["unit"]] += 1
-            out.append(_rule2_finding(src, line, name,
-                                      "`%s` is owned by `src/%s` - declare it in that unit's header and "
-                                      "#include it" % (name, r["unit"])))
+            out.append(_rule2_finding(src, line, name, rule2_detail(name, r)))
             continue
         module = r["module"]
         if module is None:
@@ -215,17 +230,7 @@ def rule2_findings(src: Source, ownership: "Ownership") -> list[dict]:
             module = UNSPLIT_UNRESOLVED
         ownership.unsplit_modules[module] += 1
         ownership.unsplit_symbols.setdefault(module, set()).add(name)
-        # the detail names the band by its MODULE, never by its path: a finding's identity carries the detail
-        # (`lib.findings.identity`), and the band's directory moves (2026-10-05) - a path here would turn the move
-        # into one removal plus one addition per finding.
-        if module == UNSPLIT_UNRESOLVED:
-            out.append(_rule2_finding(src, line, name,
-                                      "`%s` has no registered owner - declare it in an unsplit band header "
-                                      "(the bracketing bands name different modules)" % name))
-        else:
-            out.append(_rule2_finding(src, line, name,
-                                      "`%s` has no registered owner - declare it in the `%s` unsplit band header"
-                                      % (name, module)))
+        out.append(_rule2_finding(src, line, name, rule2_detail(name, r)))
     return out
 
 
@@ -263,9 +268,7 @@ def rule2_header_findings(src: Source, ownership: "Ownership") -> list[dict]:
         if _owns(src.rel, r["unit"]) or r["unit"] == leaf:
             continue
         ownership.foreign_units[r["unit"]] += 1
-        out.append(_rule2_finding(src, line, name,
-                                  "`%s` is owned by `src/%s` - declare it in that unit's header and "
-                                  "#include it" % (name, r["unit"])))
+        out.append(_rule2_finding(src, line, name, rule2_detail(name, r)))
     return out
 
 

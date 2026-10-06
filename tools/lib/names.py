@@ -104,6 +104,36 @@ def linkage_stem(name: str) -> str:
     return name[:m.start()] if m else name
 
 
+def owner_stem(name: str) -> str:
+    """The identifier and its owner qualifier without the argument list: `setTevKColor__6MHchar` for
+    `setTevKColor__6MHcharFUl...`, `fn` for `fn__Fv`, `get__Q24nw4r2db` for `get__Q24nw4r2dbCFv`; a name with no
+    argument list is itself. Two spellings with one owner stem are one function mangled two ways (or once in C)."""
+    i = name.find("__", 1)
+    while i > 0:
+        j = i + 2
+        rest = name[j:]
+        if rest[:1] == "F":
+            return name[:i]
+        m = re.match(r"Q(\d)", rest)
+        k = None
+        if m:
+            k, count = j + 2, int(m.group(1))
+            for _ in range(count):
+                d = re.match(r"\d+", name[k:])
+                if not d:
+                    k = None
+                    break
+                k += len(d.group()) + int(d.group())
+        else:
+            d = re.match(r"\d+", rest)
+            if d:
+                k = j + len(d.group()) + int(d.group())
+        if k is not None and k <= len(name) and name[k:k + 1] in ("F", "C"):
+            return name[:k]
+        i = name.find("__", i + 1)
+    return name
+
+
 def peel_tokens(name: str) -> set[str]:
     """Every `<digits><exactly that many chars>` component of a mangling that starts like an identifier
     (`Q34nw4r4math4VEC3` -> `nw4r`, `math`, `VEC3`)."""

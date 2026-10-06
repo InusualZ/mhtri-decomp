@@ -19,7 +19,7 @@ from tools.units.stylelint_rules.r01_shared_type import (  # noqa: F401
 from tools.units.stylelint_rules.r02_extern import (  # noqa: F401
     EXTERN_RE, _declared_name, extern_declarations, _owns, _LINKAGE_OPEN_RE, _TYPE_ONLY_RE, _file_scope_declarations,
     _seg_line, header_declarations, prototype_declarations, declaration_sites, rule2_band_findings, rule2_findings,
-    leaf_header_owner, rule2_header_findings, stopgap_findings,
+    leaf_header_owner, rule2_header_findings, stopgap_findings, rule2_detail,
 )
 from tools.units.stylelint_rules.r03_size import (  # noqa: F401
     SIZE_RE, struct_has_size,
@@ -66,7 +66,8 @@ from tools.units.stylelint_rules.diff import (  # noqa: F401
     unresolved_declarations, owed_rename_completion, rename_credits, apply_rename_credits, rename_credit_lines,
     rule_counts, diff_deltas, finding_identity, _covering_range, rename_map, renamed_finding, added_identities,
     removed_identities, _unit_stem, file_absorbers, derive_file_absorbers, apply_move_credits, move_credit_lines,
-    added_rows, added_finding_detail, added_detail_lines, merge_counts, renames_of,
+    added_rows, added_finding_detail, added_detail_lines, merge_counts, renames_of, owner_map, owner_credit_lines,
+    judge,
 )
 from tools.units.stylelint_rules.refs import (  # noqa: F401
     load_ownership_at_ref, unresolved_declarations_at_ref, header_pragma_findings_at_ref,
@@ -98,6 +99,7 @@ __all__ = [
     "EXTERN_RE", "_declared_name", "extern_declarations", "_owns", "_LINKAGE_OPEN_RE", "_TYPE_ONLY_RE",
     "_file_scope_declarations", "_seg_line", "header_declarations", "prototype_declarations", "declaration_sites",
     "rule2_band_findings", "rule2_findings", "leaf_header_owner", "rule2_header_findings", "stopgap_findings",
+    "rule2_detail",
     "SIZE_RE", "struct_has_size",
     "OFFSET_RE",
     "UNK_FIELD_RE",
@@ -121,7 +123,7 @@ __all__ = [
     "rename_credit_lines", "rule_counts", "diff_deltas", "finding_identity", "_covering_range", "rename_map",
     "renamed_finding", "added_identities", "removed_identities", "_unit_stem", "file_absorbers",
     "derive_file_absorbers", "apply_move_credits", "move_credit_lines", "added_rows", "added_finding_detail",
-    "added_detail_lines", "merge_counts", "renames_of",
+    "added_detail_lines", "merge_counts", "renames_of", "owner_map", "owner_credit_lines", "judge",
     "load_ownership_at_ref", "unresolved_declarations_at_ref", "header_pragma_findings_at_ref",
     "header_pragma_counts_at_ref", "header_rule13_findings_at_ref", "header_rule11_findings_at_ref",
     "header_rule11_counts_at_ref", "header_rule12_findings_at_ref", "header_rule12_counts_at_ref", "git",
