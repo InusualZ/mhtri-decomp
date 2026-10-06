@@ -1,4 +1,5 @@
 /*
+ * NAMES. GUESS (from each body and its callers): nw_res_entry_clear
  * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with `nm build/RMHE08/main.elf`
  * and `python tools/symbols/dumpmap.py lookup`, which give a `zz_` placeholder for every fn_ address).
  *
@@ -150,7 +151,7 @@ s32 fn_800D516C(void* data);
 void fn_800D5250(void);
 s32 fn_800D5360(char* path);
 ResEntry* fn_800D5418(s32 index);
-void fn_800D58B0(s32 index);
+void nw_res_entry_clear(s32 index);
 void fn_800D58DC(void);
 s32 fn_800D5A04(char* name, void* data);
 void* fn_800D5A08(char* path, u32 size);
@@ -504,7 +505,7 @@ s32 nwDelResource(s32 index) {
 }
 
 /* 0x800D58B0 - clear one resource-table entry outright. */
-void fn_800D58B0(s32 index) {
+void nw_res_entry_clear(s32 index) {
     ResEntry* e = &nw_res_manager->resTable[index];
     e->name[0] = 0;
     e->index = -1;

@@ -9,7 +9,7 @@
  *   2 `fn_80286DF8`, 3 `fn_8034EE18`, 4-6 `fn_80288848`, 7 `fn_8028B330`, 8 `Pl_act_frame_dispatch`.
  *   Left seam 0x8034D2B0: the `extabindex` run (`fn_8034CDDC` is the menu unit's last record), the `.sdata2` run
  *   (0x8079B3A0 is the menu unit's last word) and the callee set all break there.  Right seam 0x8034F138:
- *   `em024_action11_state5_ck` reads `_ENEMY_WORK` and its only caller (`camera/camera_main.cpp`'s `fn_802BC564`)
+ *   `em024_action11_state5_ck` reads `_ENEMY_WORK` and its only caller (`camera/camera_main.cpp`'s `camera_kill_cut_start`)
  *   gates it on enemy id 0x18, so it opens `enemy/em024_ai.cpp`.
  *   The `.data` run is contiguous from `menu/menu_note.cpp`'s jump table to `em024_prog_tbl`, but seven 0x9C tables
  *   (0x805EA594-0x805EA93C), 0x805EB46C-0x805EB7D4, 0x805EB870/0x805EBA54 and four 0xB0 tables are read only from

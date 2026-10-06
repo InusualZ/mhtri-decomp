@@ -10,7 +10,7 @@
  *   0x80385E7C-0x80386028 and the right edge 0x80385EE0 is a GUESS.
  * NAMES. `em_prog_support` and the `note_pane_*`/`qn_chr_flag_set` names are GUESSES from the band's role and the
  *   bodies; `qn_get_motion_no` is the map's mangled name.
- *   GUESS (from each body and its callers): em_prog_slots_init, em_prog_work_init
+ *   GUESS (from each body and its callers): em_prog_slots_init, em_prog_work_init, qnpc_load_ck, qnpc_res_load_done
  * RESIDUALS. 28 rows unwritten: 0x80383148-0x803831B0, 0x803831B4-0x803836EC, 0x80383720-0x8038392C,
  *   0x80383944-0x803839C0, 0x803839EC-0x80384004, 0x80384048-0x80384304, 0x80384434-0x80384B34, 0x80384BA0-0x80384ECC,
  *   0x803850A4-0x803851D4, 0x8038530C-0x803853C8, 0x803855D4-0x8038575C, 0x80385828-0x80385A54, 0x80385CAC-0x80385E7C.
@@ -21,7 +21,7 @@
  *    +0x2C/+0x30/+0x34;
  *  - `note_pane_motion_end_ck`, `fn_80385C70`, `fn_80385C80`: retail adds 4 to r3 before the argument setup of the
  *    tail call, ours after;
- *  - `fn_80384F48`, `fn_80384F80`, `fn_80384FF8`, `fn_803853C8`, `fn_8038541C`, `fn_80385538`, `fn_80385B28`,
+ *  - `fn_80384F48`, `qnpc_load_ck`, `fn_80384FF8`, `fn_803853C8`, `fn_8038541C`, `fn_80385538`, `fn_80385B28`,
  *    `fn_80385B5C`, `note_pane_anim_pair_ck`, `note_pane_motion_set`: retail narrows the argument with `clrlwi`, ours
  *    drops it;
  *  - `fn_80384004`, `fn_80384B34`: retail keeps `extsh`/`extsb` + `cmpwi`, ours the record form; `fn_803843D8`:
@@ -104,7 +104,7 @@ void note_pane_set_anim_pair(NoteWork* self, u32 a, u32 b);
 void fn_803854E4(void);
 void fn_80385598(void);
 void em_prog_work_init(void);
-void fn_800D58B0(s32 handle);
+void nw_res_entry_clear(s32 handle);
 s32 fn_800D9804(u32 a, void* b, void* c);
 void mhchar_reset(MHchar* self);
 void mhchar_construct(void* self);
@@ -281,7 +281,7 @@ extern "C" void fn_80385538(u8 idx) {
     if (slot->field_0x01 != 0) {
         slot->field_0x00 = idx;
         slot->field_0x01 = 0;
-        fn_800D58B0(slot->handle_0x04);
+        nw_res_entry_clear(slot->handle_0x04);
         slot->handle_0x04 = -1;
     }
 }
@@ -448,7 +448,7 @@ extern "C" u32 fn_80384ECC(u8 a, u8 b) {
 }
 
 /* 0x80384F80 */
-extern "C" u32 fn_80384F80(u8 a, u8 b) {
+extern "C" u32 qnpc_load_ck(u8 a, u8 b) {
     if (a >= 21) {
         return 0;
     }

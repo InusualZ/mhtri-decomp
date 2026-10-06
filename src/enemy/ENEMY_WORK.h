@@ -214,7 +214,7 @@ struct _ENEMY_WORK {
     /* +0x010 */ u8 field_0x010;       /* the value `fn_80140244`'s command reports */
     /* +0x011 */ u8 field_0x011;        /* the attack timer  arms */
     /* +0x012 */ u8 field_0x012;        /* the second counter `fn_8013791C`'s states run */
-    /* +0x013 */ u8 unused_0x013[1];
+    /* +0x013 */ u8 area_slot_0x013;     /* the area list its spawn record was filed under */
     /* +0x014 */ u8 field_0x014;        /* the mode  maps to a two-state mask */
     /* +0x015 */ u8 unused_0x015[1];
     /* +0x016 */ u8 field_0x016;        /* the first counter `fn_8013791C`'s states run */

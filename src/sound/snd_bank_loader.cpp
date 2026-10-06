@@ -4,7 +4,7 @@
  * Phase 4: fold of 2 registered units, built from `sound/fn_800E8E60.cpp`, `sound/fn_800EF7D8.cpp`.
  * Name is a GUESS: the range holds `snd_bank_layout`, `scene_se_bank_load`, `system_se_load`, `title_se_load` and the `*_bgm_load` family over the `SndWork` record.
  * Each function keeps the `#pragma` state it had in its retired source. The retired header's notes follow below.
- * NAMES. GUESS (from each body and its callers): snd_player_banks_load
+ * NAMES. GUESS (from each body and its callers): snd_player_banks_load, snd_em_se_slot_release, snd_npc_voice_bank_load
  */
 
 /* Retired header of `sound/fn_800EF7D8.cpp` (kept for its notes and residuals): */
@@ -146,7 +146,7 @@ typedef struct SndWork {
     /* +0x9682 */ u8   whd_ready[0x31]; /* set by the `fn_800F0230` callback for the `whd` half */
     /* +0x96B3 */ u8   tsb_ready[0x31]; /* set by the `fn_800F0230` callback for the `tsb` half */
     /* +0x96E4 */ SndSeSlot se_slot[0x10];
-    /* +0x9704 */ u8   se_slot_id[6];   /* fn_800F1250 / fn_800F0F38 / fn_800F0F9C */
+    /* +0x9704 */ u8   se_slot_id[6];   /* fn_800F1250 / snd_em_se_slot_release / fn_800F0F9C */
     /* +0x970A */ u8   se_slot_num[6];  /* its refcount */
     /* +0x9710 */ u8   se_slot_bank[6]; /* get_em_se_bank returns it */
     /* +0x9716 */ u8   se_slot_idx[6];  /* the request id fn_800F0F9C loads for it */
@@ -366,11 +366,11 @@ extern "C" s8 fn_800F0C14(s32 chunk);
 extern "C" u8 fn_800F0C74(u8 id);
 extern "C" void fn_800F0D88(u8 kind);
 extern "C" void fn_800F0EA0(void);
-extern "C" void fn_800F0F38(u8 id);
+extern "C" void snd_em_se_slot_release(u8 id);
 extern "C" void fn_800F0F9C(u8 id);
 extern "C" s32 fn_800F1250(u8 id);
 extern "C" u8 fn_800F1398(SndFlag3* work, u8 kind);
-extern "C" void fn_800F13D8(u8 arg0, u8 arg1);
+extern "C" void snd_npc_voice_bank_load(u8 arg0, u8 arg1);
 extern "C" void fn_800F15B0(void);
 extern "C" void fn_800F1620(s32 arg0);
 extern "C" void se_slot_req(u8 arg0);
@@ -1041,7 +1041,7 @@ extern "C" void fn_800F0EA0(void)
 }
 
 /* Releases one reference of an already loaded SE id. */
-extern "C" void fn_800F0F38(u8 id)
+extern "C" void snd_em_se_slot_release(u8 id)
 {
     s32 slot = fn_800F1250(id);
 
@@ -1172,7 +1172,7 @@ extern "C" u8 fn_800F1398(SndFlag3* work, u8 kind)
 }
 
 /* The NPC voice banks: `c_npc_nekotaku` when the call is demoted, `c_npc_sansai` otherwise. */
-extern "C" void fn_800F13D8(u8 arg0, u8 arg1)
+extern "C" void snd_npc_voice_bank_load(u8 arg0, u8 arg1)
 {
     char name[0x88];
     u32 args[3];

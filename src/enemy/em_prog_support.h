@@ -9,6 +9,12 @@
 
 extern "C" {
 
+/* 0x80384F80 - whether the quest NPC of (`map`, `area`) needs its models loaded (GUESS name). */
+u32 qnpc_load_ck(u8 map, u8 area);
+/* 0x80385118 - the `load_file_req` completion of one quest NPC model file: registers the read file in the resource
+ * slot `*ctx` names (GUESS name). */
+void qnpc_res_load_done(u32 data, s32 size, s32 flag, u32* ctx);
+
 /* 0x80385AD4 - arms the pane's animation pair and runs the motion reset. */
 void note_pane_set_anim_pair(NoteWork* self, u32 a, u32 b);
 

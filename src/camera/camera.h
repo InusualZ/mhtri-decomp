@@ -32,11 +32,11 @@ nw4r::math::MTX34 get_current_view_mtx(void);
 /* 0x802BE4B0 - starts a camera quake at `origin`, or at the follow target when `origin` is null. */
 void set_quake_sub(u8 kind, nw4r::math::VEC3* origin);
 
-/* 0x802BC564 - the per-id light-record handler the bank queries fall through to (its consumer is
- * `light/light.cpp`, which needed these three declared where their owner is).  `extern "C"` because
- * the owner defines all three inside its file-wide `extern "C"` block. */
+/* 0x802BC564 - starts the kill cut-in on the monster `enemy` (its kind picks the shot).  `extern "C"` because
+ * the owner defines it inside its file-wide `extern "C"` block. */
+struct _ENEMY_WORK;
 extern "C" {
-void fn_802BC564(u8 id, void* arg);
+void camera_kill_cut_start(u8 id, struct _ENEMY_WORK* enemy);
 
 /* 0x802BE3EC - whether the camera work's +0x284 byte holds 1. */
 bool camera_work_ck(void);

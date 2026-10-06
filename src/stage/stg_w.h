@@ -35,7 +35,7 @@ const struct QuestScreen* screen_projection_get(void);
 void stage_area_point_get(u8 area, u8 idx, nw4r::math::VEC3* pos, u32* extra);
 #endif
 
-/* 0x802B0688 - the stage resource query the light unit's `fn_802BEE3C` hands a block to; added with
+/* 0x802B0688 - the stage resource query the light unit's `camera_kill_cut_start_split` hands a block to; added with
  * the `light/light.cpp` registration (rule 2: this range owns the address).  The owner defines it
  * `extern "C" u32 fn_802B0688(void* self)` at `stage/stg_w.cpp:275`. */
 u32 fn_802B0688(void* self);

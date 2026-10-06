@@ -72,7 +72,7 @@ struct Q_ResultRow {
     /* +0x374 */ u16 kind_0x374;     /* the row's quest kind (stored into the item work's +0x8B) */
     /* +0x376 */ u8 pad_0x376[0x37C - 0x376];
     /* +0x37C */ u32 area_ofs_0x37C; /* byte offset of the row's area block from the row, 0 when it has none */
-    /* +0x380 */ u8 pad_0x380[0x384 - 0x380];
+    /* +0x380 */ u32 em_stat_0x380;  /* the parameter `quest_em_stat_tbl_get` returns for a monster id of 32 or more */
     /* +0x384 */ Q_ArenaItem items_0x384[2];
 };  /* size: 0x390 (a prefix of the 0x714-byte row) */
 
@@ -84,6 +84,13 @@ struct Q_Element {
     /* +0x06 */ u16 value;
     /* +0x08 */ u8 pad_0x08[0x58];
 };  /* size: 0x60 */
+
+/* The (smallest, largest) size pair the kill bookkeeping keeps per monster kind, in percent of the base size
+ * (0 while none was recorded). */
+struct Q_SizePair {
+    /* +0x0 */ u16 min;
+    /* +0x2 */ u16 max;
+};  /* size: 0x4 */
 
 /* The (flag byte, value byte) pair `quest_grade_set` keeps per element. */
 struct Q_GradePair {
@@ -110,7 +117,9 @@ struct Q_GradePair {
 struct Q_ItemWork {
     /* +0x0000 */ u8 field_0x00;
     /* +0x0001 */ u8 field_0x01;
-    /* +0x0002 */ u8 pad_0x0002[0x12];
+    /* +0x0002 */ u8 pad_0x0002[0xE];
+    /* +0x0010 */ u16 quest_id_0x10;  /* the accepted quest's id (`quest_id_get` outside the entry state) */
+    /* +0x0012 */ u8 pad_0x0012[0x2];
     /* +0x0014 */ u8 field_0x14;
     /* +0x0015 */ u8 pad_0x0015[0x1];
     /* +0x0016 */ u8 field_0x16;
@@ -121,7 +130,10 @@ struct Q_ItemWork {
     /* +0x0028 */ s32 frame_count_0x28;  /* frames the quest step has run (the element sync goes every 32) */
     /* +0x002C */ u8 step_0x2C;  /* the entry/result states set it to 2; the lobby acts bump it when they take over */
     /* +0x002D */ u8 field_0x2D;
-    /* +0x002E */ u8 pad_0x002E[0xE];
+    /* +0x002E */ u8 pad_0x002E[0x2];
+    /* +0x0030 */ s32 rec_value_0x30;  /* copied from the accepted row's +0x34C word */
+    /* +0x0034 */ s32 rec_value_0x34;  /* copied from the accepted row's +0x358 word */
+    /* +0x0038 */ u32 rec_flags_0x38;  /* copied from the accepted row's +0x310 flag word */
     /* +0x003C */ Q_ResultRow* record_0x3C;  /* the current result row, 0 when there is none */
     /* +0x0040 */ Q_ItemCount slots_0x40[5];  /* the five delivered-item slots `quest_item_slot_add` merges into */
     /* +0x0054 */ u8 rot_0x54;  /* the round-robin slot the next new id takes */
@@ -181,7 +193,9 @@ struct Q_ItemWork {
     /* +0x0490 */ Q_CountSet set_c;
     /* +0x04E0 */ u8 pad_0x04E0[0x2];
     /* +0x04E2 */ Q_CountSet set_d;
-    /* +0x0532 */ u8 pad_0x0532[0xA6];
+    /* +0x0532 */ u8 pad_0x0532[0x2];
+    /* +0x0534 */ Q_SizePair size_0x534[0x24];  /* the smallest/largest size of each monster kind slain or captured */
+    /* +0x05C4 */ u8 pad_0x05C4[0x14];
     /* +0x05D8 */ u16 score_0x5D8;  /* the run's point score */
     /* +0x05DA */ u8 pad_0x05DA[0x6];
     /* +0x05E0 */ u8 field_0x5E0;  /* `quest_entry_setup` stores 40 */
@@ -222,7 +236,9 @@ struct Q_ItemWork {
     /* +0x6A58 */ f64 timer_rate_0x6A58;  /* the clock's rate divisor (`quest_clock_real_step`) */
     /* +0x6A60 */ f64 time_left_0x6A60;   /* the real-time limit the clock counts down */
     /* +0x6A68 */ u8 lobby_result_0x6A68;  /* the result the lobby hand-off (step 4) repeats */
-    /* +0x6A69 */ u8 pad_0x6A69[0x4F];
+    /* +0x6A69 */ u8 pad_0x6A69[0x37];
+    /* +0x6AA0 */ s32 state_0x6AA0;  /* the state word `quest_work_state_get` returns */
+    /* +0x6AA4 */ u8 pad_0x6AA4[0x14];
 };  /* size: 0x6AB8 */
 
 /* The game's save/user block, seen only as the four count blocks this unit reads.  It is the arena
@@ -330,7 +346,15 @@ struct Q_MoveWork {
     /* +0x0144 */ u32 area_0x144;            /* the area the hunt spawn table is indexed by */
     /* +0x0148 */ u8 pad_0x0148[0x150 - 0x148];
     /* +0x0150 */ u8* result_buffer_0x150;   /* the 0x4800-byte buffer the quest entry allocates */
-    /* +0x0154 */ u8 pad_0x0154[0x225C - 0x154];
+    /* +0x0154 */ QuestSpawnRec area_recs_0x154[4][0x80];  /* the spawn records of the four area lists */
+    /* +0x2154 */ u32 area_counts_0x2154[4];  /* the records each list holds (each list continues the previous key run) */
+    /* +0x2164 */ u16 kinds_0x2164[6];        /* the monster kinds whose resources are resident */
+    /* +0x2170 */ u16 kinds_prev_0x2170[6];   /* the same before `quest_area_spawn_apply` reworks them */
+    /* +0x217C */ u8 pad_0x217C[0x2194 - 0x217C];
+    /* +0x2194 */ s32 res_a_0x2194[4][6];     /* per area list and kind slot: a resource handle, -1 when free */
+    /* +0x21F4 */ s32 res_b_0x21F4[4][6];
+    /* +0x2254 */ u8 pad_0x2254[0x2258 - 0x2254];
+    /* +0x2258 */ QuestSpawnRec* main_0x2258;  /* the record of the area's main monster (kind byte 0) */
     /* +0x225C */ s32 spawn_order_0x225C[6]; /* the spawn order each monster slot took */
     /* +0x2274 */ QuestSpawnRec spawn_0x2274[6];  /* what each monster slot spawned */
     /* +0x22D4 */ u8 state_0x22D4;          /* the state byte `quest_move_state_valid_ck`/`_get` read */
@@ -470,7 +494,8 @@ typedef struct QuestRecord {
     /* +0x34C */ s32 field_0x34C;
     /* +0x350 */ s32 field_0x350;
     /* +0x354 */ s32 field_0x354;
-    /* +0x358 */ u8 unused_0x358[0x014];
+    /* +0x358 */ s32 field_0x358;     /* `quest_id_set` copies it to the item work's +0x34 */
+    /* +0x35C */ u8 unused_0x35C[0x010];
     /* +0x36C */ u16 field_0x36C;     /* `quest_slot_progress_get` returns its low byte */
     /* +0x36E */ u8 lobby_kind_0x36E;  /* the lobby quest kind (`lb_quest_work_init`) */
     /* +0x36F */ u8 stage_0x36F;       /* the stage whose dcm archive the quest entry loads */
@@ -588,7 +613,8 @@ typedef struct QuestWork {
     /* +0x6978 */ u8 field_0x6978;             /* the screen phase the dispatchers switch on */
     /* +0x6979 */ u8 unused_0x6979[0x003];
     /* +0x697C */ s32 field_0x697C;
-    /* +0x6980 */ u8 unused_0x6980[0x024];
+    /* +0x6980 */ u8 slot_kills_0x6980[3];    /* kills of the move work's three tracked monster slots outside the elements */
+    /* +0x6983 */ u8 unused_0x6983[0x021];
     /* +0x69A4 */ u8 sync_count_0x69A4;         /* the players the lobby-synchronised intruder heard from */
     /* +0x69A5 */ u8 unused_0x69A5[0x085];
     /* +0x6A2A */ s8 count_0x6A2A;             /* entries in the arena item table below */

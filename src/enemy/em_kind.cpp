@@ -344,7 +344,7 @@ char* fn_80146F10(u8 id);
 void fn_80146B98(s32 id);
 u32 fn_80146DF4(u8 id);
 u8 fn_80141470(u8 id);
-u8 fn_801414D4(u8 id);
+u8 em_kind_slot_find(u8 id);
 void fn_801414C8(void* work);
 void fn_80147160(u8 id);
 u8 fn_80147550(u8 id);
@@ -2494,7 +2494,7 @@ s32 fn_80140FB0(char* name, u32 size, u8 flag) {
 s32 em_kind_release(u8 id) {
     s32 loaded = 0;
 
-    if (fn_801414D4(id) != 0xFF) {
+    if (em_kind_slot_find(id) != 0xFF) {
         s8 v = lbl_805A1B08[id];
         if (v > 0) {
             fn_80146B98(v);
