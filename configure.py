@@ -781,55 +781,14 @@ config.libs = [
             # `.sdata2` pool 0x8079B640..0x8079B704 and the extab/extabindex records stay
             # unclaimed (the pooled constants and tables are declared, never defined).
             Object(NonMatching, "ef/eft052.cpp"),
-            # Registered once, at its final home (docs/plan.md 12).  The `ef/ef_util.cpp`
-            # range (`.text` 0x8009B374..0x8009CD64, 16 functions / 6640 B): the NW4R effect library's
-            # shared math/utility file.  The range's own `__FILE__` string (`ef_util.cpp` at 0x80591948,
-            # read out of orig/RMHE08/sys/main.dol) names the TU - see the unit's file header.  Sections:
-            # extab 0x80009A38..0x80009A98, extabindex 0x80022B30..0x80022BC0, .text 0x8009B374..0x8009CD64.
-            # The lib is `ef` (the file's own module); its cflags_main is token-identical to the
-            # neighbouring g3d/g3d_gpu.cpp's cflags_g3d, and dtk links by address, so the lib choice
-            # cannot move the object or change its codegen.
             Object(NonMatching, "ef/ef_util.cpp"),
-            # Registered once, at its final home (docs/plan.md 12).  The
-            # `ef/ef_animcurve.cpp` range (0x8009CDBC..0x800A3044, 26 functions): the
-            # effect library's key-frame animation curve.  The range's own `__FILE__` string
-            # (`ef_animcurve.cpp` at 0x80591E68) names the TU - see the unit's file header.  Sections:
-            # extab 0x80009A98..0x80009B40, extabindex 0x80022BC0..0x80022CBC,
-            # .text 0x8009CDBC..0x800A3044.
             Object(NonMatching, "ef/ef_animcurve.cpp"),
-            # Registered once, at its final home (docs/plan.md 12).  The
-            # `ef/ef_creationqueue.cpp` range (0x800A3044..0x800A388C, 7 functions): the NW4R
-            # effect library's creation queue.  The range's own `__FILE__` string (`ef_creationqueue.cpp`
-            # at 0x805922C0) names the TU - see the unit's file header.
             Object(NonMatching, "ef/ef_creationqueue.cpp"),
-            # Registered once, at its final home (docs/plan.md 12).  The
-            # `ef/ef_draworder.cpp` range (0x800A388C..0x800A40F4, 9 functions): the NW4R
-            # effect library's draw-order helpers.  The range's own `__FILE__` string
-            # (`ef_draworder.cpp` at 0x805923A0) names the TU - see the unit's file header.  Sections:
-            # extab 0x80009B60..0x80009BA0, extabindex 0x80022CEC..0x80022D4C,
-            # .text 0x800A388C..0x800A40F4.
             Object(NonMatching, "ef/ef_draworder.cpp"),
-            # Registered once, at its final home (docs/plan.md 12).  The
-            # `ef/ef_effect.cpp` range (0x800A40F4..0x800A56B0, 39 functions): the NW4R
-            # effect library's `nw4r::ef::Effect` object (its table lbl_80592588, the create/retire
-            # paths, the emitter sweeps and the EffectSystem constructor/destructor).  The range's own
-            # `__FILE__` string (`ef_effect.cpp` at 0x80592430) names the TU - see the unit's file
-            # header.  Sections: extab 0x80009BA0..0x80009C38, extabindex 0x80022D4C..0x80022E30,
-            # .text 0x800A40F4..0x800A56B0.
             Object(NonMatching, "ef/ef_effect.cpp"),
-            # Registered once, at its final home (docs/plan.md 12).  The
-            # `ef/ef_effectsystem.cpp` range (0x800A56B0..0x800A6350, 23 functions): the game side
-            # of the NW4R effect library's system object.  The range's own `__FILE__` string
-            # (`ef_effectsystem.cpp` at 0x80592698) names the TU - see the unit's file header.  Sections:
-            # extab 0x80009C38..0x80009CD4, extabindex 0x80022E30..0x80022EE4,
-            # .text 0x800A56B0..0x800A6350, .ctors 0x8056F2D8..0x8056F2DC.
             Object(NonMatching, "ef/ef_effectsystem.cpp"),
                         Object(NonMatching, "ef/ef_drawstripestrategy.cpp"),
             Object(NonMatching, "ef/ef_particlemanager.cpp"),
-            # Registered once, at its final home (docs/plan.md 12).  The `ef/fn_800AEE48.cpp`
-            # range, recut in phase 4: this row keeps the first two TUs (ef_postfield.cpp, ef_resource.cpp) of `nw4r::ef`; the
-            # ef_drawstripestrategy.cpp head is `ef/ef_drawstripestrategy.cpp` (its row is above, by file order of the old registration).
-            # C++ from the `.cpp` __FILE__ strings and Panic__Q24nw4r2dbFPCciPCce.
             Object(NonMatching, "ef/fn_800AEE48.cpp"),
             Object(NonMatching, "ef/ef_drawbillboardstrategy.cpp"),
                         Object(NonMatching, "ef/ef_drawpointstrategy.cpp"),
@@ -837,25 +796,16 @@ config.libs = [
                         Object(NonMatching, "ef/ef_drawsmoothstripestrategy.cpp"),
             Object(NonMatching, "ef/ef_drawstrategyimpl.cpp"),
             Object(NonMatching, "ef/ef_drawfreestrategy.cpp"),
-            # Registered (a 0x800C9540 run discovery proposed).
             Object(NonMatching, "ef/ef_torus.cpp"),
             Object(NonMatching, "ef/ef_cube.cpp"),
             Object(NonMatching, "ef/ef_cylinder.cpp"),
             Object(NonMatching, "ef/ef_disc.cpp"),
             Object(NonMatching, "ef/ef_emitterform.cpp"),
-            # Registered once, at its final home (docs/plan.md 12).  `proposal/800A6350_fn_800A6350`:
-            # the range's own `__FILE__` string is "ef_emitter.cpp" (0x80592850, read from the DOL),
-            # it is C++ (the .cpp suffix, the Panic__Q24nw4r2dbFPCciPCce callees and the range's own
-            # vtable at 0x80592BB0), and both seams are proven - the run starts where
-            # ef/ef_effectsystem.cpp ends and stops at ef/ef_emitterform.cpp's first instruction
-            # (0x800A99B4).  Sections: extab 0x80009CD4..0x80009DF4, extabindex
-            # 0x80022EE4..0x80023094, .text 0x800A6350..0x800A99B4.
             Object(NonMatching, "ef/ef_emitter.cpp"),
             Object(NonMatching, "ef/ef_particle.cpp"),
             Object(NonMatching, "ef/ef_emform.cpp"),
             Object(NonMatching, "ef/ef_line.cpp"),
             Object(NonMatching, "ef/ef_point.cpp"),
-            # Carved out of the 0x800CDB2C proposal range on 2026-09-30: the `ef_sphere.cpp` TU (one function; see the unit header).
             Object(NonMatching, "ef/ef_sphere.cpp"),
             # Registered (a 0x800CDB2C run discovery proposed at a --max-bytes cap, recut
             # 2026-09-30 and renamed in phase 4) - the game-system core; see the unit's file header.

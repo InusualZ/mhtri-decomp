@@ -1,41 +1,30 @@
 /*
- * ef/ef_particle.cpp - the nw4r effect particle record.
- *
- * The range this unit owns is `.text` 0x800AA18C..0x800AB658 (19 functions, 0x14CC B), reconstructed
- * from the split object `build/RMHE08/obj/auto/800AA18C_fn_800AA18C.o`.  The name is evidence class 1:
- * every `nw4r::db::Panic` call in the object passes the bare `__FILE__` string "ef_particle.cpp"
- * (`lbl_80592D50`, read from the DOL), so the module is `ef` and the extension `.cpp`.  The inline
- * asserts that come from `particle.h` pass that header's own name (`lbl_80592E78`/`lbl_80592EB4`/...),
- * which is what an nw4r assert macro defined in a header does.
- *
- * The class is the engine's particle record (`ef.h`): a dispatch-table pointer at +0x1C, the
- * emitter-parameter sub-record at +0x20, the position at +0xCC and the phase index at +0xDC.
- *
- * State (measured with `recompile.py`'s report path, target object
- * `build/RMHE08/obj/auto/800AA18C_fn_800AA18C.o`), 19 functions:
- *   100.00 %  fn_800AA18C, fn_800AA27C, fn_800AA2C0, fn_800AA2CC, fn_800AA700, fn_800AA75C,
- *             fn_800AA78C, fn_800AB2DC, fn_800AB37C, fn_800AB388, fn_800AB3D0, fn_800AB3D8
- *    94.54 %  fn_800AA1D8   - loop rotation: retail's two 3-element loops are `body; test; branch
- *             back`, this build emits a pre-test and a `b`.
- *    93.62 %  fn_800AB058   - address-computation schedule and one register in the assert chain.
- *    89.53 %  fn_800AB220   - same, plus the layer/index register swap.
- *    82.45 %  fn_800AB3FC   - the ramp is complete; the remaining diff is which register the
- *             parameter record and `mode` live in (`r31`/`r6` in retail).
- *    77.78 %  fn_800AB3AC   - RESIDUAL, below the bar: retail is 9 instructions, this is 7.  The
- *             retail object contains `mr r4,r3` (an argument setup whose call was inlined) and an
- *             unrelocated `b +4` (the vestigial call branch) that C source cannot reproduce; the
- *             arithmetic itself (`scale_0x10.x * scale_0x18.x * manager->scale_a`) is byte-for-byte.
- *     0.37 %  fn_800AA2D0   - STUB, not reconstructed (0x430 B).
- *     0.18 %  fn_800AA7A0   - STUB, not reconstructed (0x8B8 B).
- *
- * Pragma state: `#pragma peephole off` from the top through fn_800AA27C (fn_800AA18C's vtable store
- * and fn_800AA27C's `extsh` + `cmpwi` pair need it), `#pragma peephole on` from the colour getters
- * down (their assert materialisation needs it), `#pragma peephole off` again for fn_800AB3FC (retail
- * has no fused `clrlslwi` there), and file-scoped `#pragma fp_contract off`.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/dumpmap.py lookup <addr>` for all 21 symbols of the proposal - every one
- * resolves to `map=fn_XXXXXXXX`, and the shared dump has no name for the helpers either).
+ * ef/ef_particle.cpp - the nw4r effect particle record (`EfParticle`, `ef.h`: a table pointer at +0x1C, the
+ *   emitter-parameter sub-record at +0x20, the position at +0xCC, the phase index at +0xDC): its constructors and
+ *   deleting destructor, the phase scale getters, the colour getters and the colour ramp.
+ * RANGE. .text 0x800AA18C-0x800AB658 (19 functions); extab 0x80009E04-0x80009E6C, extabindex 0x800230AC-0x80023148,
+ *   .data 0x80592D50-0x80592F78 (the `__FILE__` string "ef_particle.cpp" first; the inline asserts of
+ *   `particle.h` pass that header's name), .sdata2 0x80796060-0x807960A0.
+ * FLAGS. `cflags_main`; file-wide `#pragma fp_contract off` (retail keeps `0.01f * v * x` as `fmuls`/`fsubs` in
+ *   `fn_800AA700`); `#pragma peephole off` through `fn_800AA27C` (the table store and the `extsh` + `cmpwi` pair),
+ *   on for the colour getters (their assert materialisation), off again for `fn_800AB3FC` (no fused `clrlslwi`).
+ * NAMES. The map has only `fn_` stems for the range.
+ * RESIDUALS. 2 rows unwritten (empty bodies): 0x800AA2D0-0x800AA700, 0x800AA7A0-0x800AB058.  They are defined
+ *   last, so our `.text` (and the extab and extabindex records) run in a different order from retail's.
+ *   5 partial rows:
+ *  - `fn_800AA1D8`: retail's two 3-element loops are `body; test; branch back`, ours add a pre-test `b`, and the
+ *    two element pointers swap r30/r31;
+ *  - `fn_800AB058`, `fn_800AB220`: the two phase tests compile branchless (`xori`/`cntlzw`/`slw`) where retail
+ *    compares `cmplwi ...,1; bgt`, and the address computation is scheduled differently; `fn_800AB220` also passes
+ *    `fn_800AB058`'s copies of the `particle.h` assert strings (`lbl_80592E84`/`EB4`/`EC0`/`EF0`) where retail
+ *    passes its own (`lbl_80592EFC`/`F2C`/`F38`/`F68`);
+ *  - `fn_800AB3AC` (ours 0x1C of 0x24): retail keeps an inlined call's `mr r4,r3` and its vestigial `b` to the
+ *    next instruction; the arithmetic is retail's;
+ *  - `fn_800AB3FC` (ours 0x240 of 0x25C): the parameter record and `mode` live in r5/r31 where retail uses
+ *    r31/r6, and the `+0x108` product is computed later.
+ *   flipcheck: `.data` claimed, not emitted; `.sdata2` 0x10 of 0x40 (a partial pool: flipcheck names a fold with
+ *   `ef/ef_particlemanager.cpp`, one shared literal); `.text` 0x7D0 of 0x14CC; extab 0x58 of 0x68; extabindex
+ *   0x84 of 0x9C.
  */
 
 #include "types.h"
@@ -44,13 +33,10 @@
 #include "unsplit/ef.h"
 #include "unsplit/g3d.h"
 
-/* The retail object keeps `0.01f * v * x` as a separate fmuls/fsubs (fn_800AA700); the command line's
- * -fp_contract on fuses them into fmsubs.  Nothing else in the unit emits an fma, so the pragma is
- * file-scoped and costs nothing (same lever as the neighbouring ef units). */
 #pragma fp_contract off
 #pragma peephole off
 
-/* This unit's own pooled data (still another unit's range in splits.txt - declared, never defined). */
+/* This unit's own strings (its claimed `.data`), declared, never defined. */
 extern char lbl_80592D50[]; /* "ef_particle.cpp"                                      .data */
 extern char lbl_80592D60[]; /* "NW4R:Pointer Error\nppd(=%p) is not valid pointer."    .data */
 extern char lbl_80592E44[]; /* "NW4R:Pointer Error\ncolor(=%p) is not valid pointer."  .data */
@@ -69,8 +55,7 @@ extern f32 lbl_8079607C; /* pi      .sdata2 */
 extern f32 lbl_80796078; /* 128.0f  .sdata2 */
 extern f32 lbl_80796080; /* 0.5f    .sdata2 */
 
-/* nw4r helpers, all still `fn_*` in the symbol map and unsplit (no owner file to move the declaration
- * to - the rule-2 gap the campaign records for an unsplit address). */
+/* nw4r helpers, declared locally with C linkage. */
 extern "C" void fn_800A4080(void* self); /* the particle's base constructor */
 extern "C" f32 fn_800A8A04(f32 v);       /* the angle -> byte rounding helper */
 extern "C" void* fn_800A4864(void* p);   /* walks to an object's chain head */
@@ -124,12 +109,7 @@ extern "C" EfParticleParams* fn_800AA1D8(EfParticleParams* self)
 }
 
 /* Frees the record when the caller asks for it (positive flag); always returns the pointer so a
- * deleting expression can keep using it.
- *
- * This function and the two constructors above are built with `#pragma peephole off` (enabled just
- * below): with the peephole on, MWCC fuses the `extsh` + `cmpwi` pair into the record form `extsh.`,
- * which retail does not have, and rewrites fn_800AA18C's vtable store.  The two colour getters further
- * down need the peephole back ON - their assert materialisation depends on it. */
+ * deleting expression can keep using it. */
 extern "C" void* fn_800AA27C(void* p, s32 flag)
 {
     if (p != 0) {
@@ -273,7 +253,7 @@ extern "C" f32* fn_800AA75C(f32* dst, f32* src)
 }
 
 /* -------------------------------------------------------------------------------------------------
- * Still open - the three large bodies.  Stubbed so the unit compiles and the rest can be measured.
+ * The two unwritten bodies (empty).
  * ----------------------------------------------------------------------------------------------- */
 
 extern "C" void fn_800AA2D0(EfParticle* self, void* ppd, void* p)
@@ -285,9 +265,8 @@ extern "C" void fn_800AA7A0(EfParticle* self, u32 a, u32 b, void* c)
 }
 
 #pragma peephole off
-/* The particle's colour ramp: maps the record's phase into one of five byte ramps.  `mode` 0 means the
- * particle has no ramp (white); the ramp's period is the record's +0xDC, the amplitude and step come
- * from the parameter chain, and the ramp is clamped to a byte at the end. */
+/* Maps the record's phase into one of five byte colour ramps (mode 0: white), period +0xDC, amplitude and
+ * step from the parameter chain, clamped to a byte. */
 extern "C" u8 fn_800AB3FC(EfParticle* self)
 {
     EfParticleChain* p;

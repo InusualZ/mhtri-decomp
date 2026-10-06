@@ -1,50 +1,28 @@
 /*
- * ef_point.cpp - the point-emitter spawn routine of the "ef" (effect) library.
- *
- * The file is named by the `__FILE__` string its own asserts reference: `.data:lbl_80594F98` reads
- * "ef_point.cpp", and the three sibling strings `lbl_80594FA8`/`lbl_80594FDC`/`lbl_80595010` are the
- * "NW4R:Pointer Error\n{em,pm,params}(=%p) is not valid pointer." messages. The unit holds exactly one
- * function, `.text 0x800CD584..0x800CDB2C` (`fn_800CD584`); the surrounding seams are ef_line.cpp ->
- * ef_point.cpp below it and ef_point.cpp -> ef_sphere.cpp above it.
- *
- * What the function does: validates its emitter (`em`), parameter-manager (`pm`) and parameter-block
- * (`params`) pointers, then spawns `count` points. Each point takes a normalised rate from `em`'s
- * `+0xEC` sub-object (`fn_800A8A08`), maps it through `0.66 +/- 0.34 * t` onto a circle, builds a
- * position/rotation pair (`fn_800A99B4`), and hands it to `pm`'s virtual method at vtable `+0x14`
- * together with the id `fn_800A9FB0` resolves.
- *
- * Load-bearing source shapes (each one is what the target's bytes require):
- *   - `#pragma fp_contract off` (scoped to this file): the target has **no** fused float op anywhere
- *     (`fmuls`/`fadds`/`fsubs` only), while `-fp_contract on` fuses `2.0f * rate - 1.0f`,
- *     `0.66f + 0.34f * t` and `1.0f - s * s` into `fmsubs`/`fmadds`/`fnmsubs`. Per-library flag
- *     evidence lives in `configure.py`; this is a one-unit deviation (docs/plan.md 8.2).
- *   - the pool constants are **declared, never defined** (`lbl_80796300..lbl_80796320`, playbook 29):
- *     writing `0.0f`/`2.0f`/... literals makes MWCC pool them under its own names and the `lfs`
- *     relocations stop pairing with the target's.
- *   - the pointer asserts are the `if (!okN && !test) okN-1 = FALSE;` chain (six materialised BOOLs,
- *     the first `if` carrying two tests) - that exact shape is what the target emits; a plain
- *     `||`-chain short-circuits and a single accumulator produces one `li` instead of six.
- *   - the masked top bits are precomputed *after* the six BOOL declarations (`u32 top_ = (u32)ptr &
- *     0xFF000000`). Declaring it before them, or inlining the mask in each test, colours the mask web
- *     r5 and shifts all six BOOLs up one register; the target's r11 + r5..r10 only appears with the
- *     declaration after the BOOLs.
- *   - the three assert call sites are at lines 42/43/44 of the original file; `#line` reproduces the
- *     `li r4,{42,43,44}` immediates.
- *
- * Residual - `fn_800CD584` measures 93.69 % (`build/RMHE08/report.json`; ours 0x580 = 1408 B vs the
- * target's 0x5A8 = 1448 B, so ten instructions are still missing):
- *   - the whole size gap is the FPR-restore idiom: the target does `li r0,<off>; psq_lx fN,r1,r0,0,0;
- *     lfd` per saved register, while every Wii compiler here emits `psq_l fN,<off>(r1); lfd`
- *     (`-use_lmw_stmw on|off`, `-schedule off`, `-O4,p` and Wii 1.0/1.1/1.5/1.6/1.7 all emit the
- *     latter). Not source-reachable.
- *   - FPR colouring: the target keeps pi/2^52/0.01 in f22/f23/f24 and the sqrt result in f25; this
- *     build gives f22 to the sqrt result and f23..f25 to the constants (8 instructions).
- *   - `(...) * t` is emitted `fmuls f0,f1,f0` where the target has `fmuls f0,f0,f1` (2 instructions);
- *     the literal-constant variant gets the order right but drops the `lbl_8079630*` pool
- *     relocations, which measures 93.74 % - objdiff's partial credit for nine wrong relocations, so
- *     the extern form stays.
- *   - the emitter's fields keep `field_0xNN` names: their roles are not evidenced beyond their use in
- *     this function (opaque arguments to the spawn call), so no context name was invented.
+ * ef/ef_point.cpp - the point emitter form's spawn routine: validates `em`/`pm`/`params`, then spawns `count`
+ *   points, each mapping the emitter's random rate through `0.66 +/- 0.34 * t` onto a circle, building the
+ *   position/velocity pair (`fn_800A99B4`) and handing it to the particle manager's slot +0x14.
+ * RANGE. .text 0x800CD584-0x800CDB2C (1 function); extab 0x8000A5D4-0x8000A5DC, extabindex 0x80023C64-0x80023C70,
+ *   .data 0x80594F98-0x80595058 (the `__FILE__` string "ef_point.cpp" and the three pointer-error messages),
+ *   .sdata2 0x80796300-0x80796328.
+ * FLAGS. `cflags_main`; file-wide `#pragma fp_contract off` (retail has no fused float op: `2.0f * rate - 1.0f`,
+ *   `0.66f + 0.34f * t` and `1.0f - s * s` stay `fmuls` + `fadds`/`fsubs`).
+ * NAMES. The emitter fields keep `field_0xNN` names: they are opaque arguments to the spawn call here.
+ * RESIDUALS. 1 partial row, `fn_800CD584__FPvP9EfEmitterP4EfPmlPvPvllf` (ours 0x580 of 0x5A8):
+ *  - the FPR restores: retail emits `li r0,<off>; psq_lx` per saved register, ours `psq_l <off>(r1)` (the size
+ *    gap; `ef/ef_line.cpp` gets retail's form with `#pragma peephole off`);
+ *  - the argument registers r29-r31 rotate and the float constants sit one FPR lower than retail's (pi/2^52/0.01
+ *    in f22-f24 and the sqrt result in f25 there);
+ *  - `(...) * t` is `fmuls f0,f1,f0` where retail has `fmuls f0,f0,f1`; literal constants fix the order but lose
+ *    the `lbl_8079630*` pool relocations;
+ *  - the `v_a`/`v_b` copies move floats (`lfs`/`stfs`) where retail moves words (`lwz`/`stw`);
+ *  - the slot +0x14 dispatch loads through the saved `pm` (`lwz r11, 0x1C(r27)`) where retail goes through r3.
+ *   flipcheck: `.data` claimed, not emitted; `.sdata2` 0x8 of the claimed 0x28; `.text` 0x580 of 0x5A8.
+ * SHAPES. The pool constants are declared, never defined (playbook 29): literals pool under MWCC's own names.
+ * SHAPES. The pointer assert is the `if (!okN && !test) okN-1 = FALSE;` chain (six materialised BOOLs, the first
+ *   `if` carrying two tests), with `top_` computed after the six BOOLs (before them the mask takes r5 and every
+ *   BOOL moves up one register).
+ * SHAPES. `#line 42` puts the three assert sites on lines 42-44 (`li r4,{42,43,44}`).
  */
 
 #include "types.h"
@@ -55,9 +33,7 @@
 /* Types                                                                                          */
 /* --------------------------------------------------------------------------------------------- */
 
-/* The three-float vector the ef emitter calls pass around: the shared record the three vector
- * helpers take, reached here as the local spelling `EfVec3` (the name the ef band's own code
- * uses). */
+/* The three-float vector the ef emitter calls pass around, under the ef band's local spelling. */
 typedef nw4r::math::VEC3 EfVec3; /* size: 0x0C */
 
 /* The emitter sub-object at `em + 0xEC` whose normalised progress `fn_800A8A08` returns. Only its
@@ -95,15 +71,12 @@ typedef struct EfPm {
 } EfPm; /* size: 0x20 (lower bound) */
 
 /* --------------------------------------------------------------------------------------------- */
-/* Referenced symbols. The pool labels and the assert strings belong to ranges this unit does not
- * own (docs/plan.md 8.4), so they stay undefined externs here. */
+/* Referenced symbols: the strings and pool constants of this unit's claimed `.data`/`.sdata2`,
+ * declared, never defined. */
 /* --------------------------------------------------------------------------------------------- */
 
-/* nw4r::db::Panic. The map already carries its real C++ mangling
- * (Panic__Q24nw4r2dbFPCciPCce), and declaring that spelling as a C++ identifier re-mangles it
- * (Panic__Q24nw4r2dbFPCciPCce__FPCciPCce) - which only shows up at LINK time, so a NonMatching
- * unit hides it until it is flipped. Declare the real thing and the front-end reproduces the
- * map's spelling exactly: tools/units/mangle.py confirms it. */
+/* `nw4r::db::Panic`, declared in its namespace so the front-end emits the map's mangling
+ * (`Panic__Q24nw4r2dbFPCciPCce`). */
 namespace nw4r { namespace db { void Panic(const char* file, int line, const char* fmt, ...); } }
 extern const char lbl_80594F98[]; /* "ef_point.cpp" */
 extern const char lbl_80594FA8[]; /* "NW4R:Pointer Error\nem(=%p) is not valid pointer." */
@@ -118,9 +91,7 @@ extern const f32 lbl_80796310; /* 0.34f */
 extern const f32 lbl_80796314; /* 3.14159274f */
 extern const f32 lbl_80796318; /* 0.01f */
 
-/* ef/nw4r math helpers.  The target object references each by its plain `fn_XXXXXXXX` map name,
- * so they carry C linkage; a C++ spelling mangles the reloc (fn_80041E8C__FP6EfVec3fff) and it no
- * longer pairs (relocaudit). */
+/* ef/nw4r math helpers; retail's relocations carry their plain map names, so they have C linkage. */
 extern "C" {
 extern f32 fn_800A8A08(struct EfRate *rate);
 extern u16 fn_800A9FB0(void *self, u16 id, struct EfEmitter *em, f32 f);

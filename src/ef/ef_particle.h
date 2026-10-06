@@ -1,12 +1,11 @@
+/* ef/ef_particle.h - the symbols `ef/ef_particle.cpp` owns, spelled as its definitions (C linkage);
+ * `EfParticle` is `ef.h`'s. */
 #ifndef MHTRI_EF_EF_PARTICLE_H
 #define MHTRI_EF_EF_PARTICLE_H
 
 #include "types.h"
 #include "ef.h"
 
-/* Declarations for the symbols `src/ef/ef_particle.cpp` owns (docs/plan.md 6.5, rule 2).  The signatures
- * are the owner's, spelled exactly as its definitions; C-visible, kept minimal.  `EfParticle` is the
- * engine's particle record defined in `ef.h`, so consumers include this header, not a local copy. */
 #ifdef __cplusplus
 extern "C" {
 #endif

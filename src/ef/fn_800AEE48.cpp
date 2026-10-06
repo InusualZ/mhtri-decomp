@@ -1,24 +1,23 @@
-/* ef/fn_800AEE48.cpp - nw4r::ef post-field / resource layer, `.text` 0x800AEE48..0x800B4AC8.
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
- *
- * What it is.  The first two TUs of the NintendoWare-for-Revolution effect library (`nw4r::ef`) that the discovery's
- * `ef/fn_800AEE48.cpp` range (0x800AEE48..0x800B99E8, capped at `--max-bytes`) held.  The split object's own `__FILE__`
- * strings name them, in `.data` order (which is `.text` order): `ef_postfield.cpp` (0x80593580) and `ef_resource.cpp` (0x80593690), plus the
- * header strings `res_drawparam_ac.h` and `res_emitterparam_ac.h`.  Provisional internal seam, from the panic-site file strings:
- *   0x800AEE48..0x800B2810   ef_postfield.cpp          (fn_800AF440 / fn_800B18F0 cite it)
- *   0x800B2810..0x800B4AC8   ef_resource.cpp           (fn_800B28FC .. fn_800B4898 cite it)
- * Phase 4 cut the third TU, the head of `ef_drawstripestrategy.cpp` (0x800B4AC8..0x800B99E8, `.data` 0x805939E8..), into
- * `ef/ef_drawstripestrategy.cpp` together with the 36 functions already written for it.
- *
- * Two names mean no single one names the unit, so the registration keeps the map's `fn_` stem (evidence class 4: the `__FILE__` evidence
- * decides the module `ef` and the language C++).  `langcheck.py` confirms C++ (the `Panic__Q24nw4r2dbFPCciPCce` callee and the `.cpp` names).
- *
- * Data.  The unit owns no pool section here: its `.data`/`.sdata`/`.sdata2` labels are `extern` by their map names and never defined
- * (playbook 29); the data pass claims the ranges once the source emits them (docs/plan.md 8.4).
- *
- * Status.  25 of the unit's 60 symbols are reconstructed.  The missing ones are the `ef_postfield.cpp` body (`fn_800AEE48`..
- * `fn_800B23A4`, 0x800AEE48..0x800B2810) and the `ef_resource.cpp` loader (`fn_800B28FC`.. `fn_800B4898`).  Residuals are in
- * `.pi/notes/800aee48-fn-800aee48-517d.md`.
+/*
+ * ef/fn_800AEE48.cpp - the nw4r::ef post-field and resource layer: the post-field list pair and its indexed
+ *   accessors, the resource-parameter accessor family, the list teardown and small draw helpers, the indexed list
+ *   search and the ahead-context vector builders.
+ * RANGE. .text 0x800AEE48-0x800B4AC8 (60 functions); extab 0x80009F74-0x8000A10C, extabindex 0x800232D4-0x80023538,
+ *   .ctors 0x8056F2E0-0x8056F2E4, .data 0x80593580-0x805939E8, .bss 0x80694598-0x806945B8, .sdata
+ *   0x807912E8-0x80791300, .sdata2 0x807960E8-0x80796120.  Two TUs by their `__FILE__` strings (in `.data` order,
+ *   which is `.text` order): "ef_postfield.cpp" (0x80593580; 0x800AEE48-0x800B2810, cited by `fn_800AF440` and
+ *   `fn_800B18F0`) and "ef_resource.cpp" (0x80593690; 0x800B2810-0x800B4AC8, cited from `fn_800B28FC` to
+ *   `fn_800B4898`), with the header strings `res_drawparam_ac.h` and `res_emitterparam_ac.h`; the internal seam is
+ *   provisional.
+ * FLAGS. `cflags_main`; file-wide `#pragma peephole off`.
+ * NAMES. Two `__FILE__` strings name no single TU, so the file keeps the map's `fn_` stem.
+ * RESIDUALS. 35 rows unwritten (declared, never defined): 0x800AEE48-0x800B0B90, 0x800B0BC8-0x800B24BC,
+ *   0x800B2598-0x800B26B0, 0x800B26F8-0x800B2810, 0x800B28FC-0x800B2BB8, 0x800B2DF8-0x800B38B8,
+ *   0x800B38C0-0x800B3D4C, 0x800B3E80-0x800B483C, 0x800B4898-0x800B4A14.  The 25 written rows are byte-identical;
+ *   the source order differs from retail's, so our `.text` and the extab and extabindex records run in another
+ *   order.
+ *   flipcheck: `.bss`, `.ctors`, `.data`, `.sdata` and `.sdata2` claimed, not emitted (declared by their map names,
+ *   playbook 29); `.text` 0x6D4 of 0x5C80; extab 0x88 of 0x198; extabindex 0xCC of 0x264.
  */
 
 #include "types.h"
@@ -45,11 +44,8 @@ extern "C" {
 
 #pragma peephole off
 
-/* `nw4r::db::Panic` is declared by `ef.h` outside its `extern "C"` block, so it keeps the real C++
- * mangled spelling (`Panic__Q24nw4r2dbFPCciPCce`) without a hand-written mangling (rule 9). */
-
-/* This unit's pooled `__FILE__`/assert strings and constants (the `.data` range
- * 0x80593580..0x80593E7C and the `.sdata2` range 0x807960E8..0x80796148).  Declared, never defined. */
+/* The `__FILE__`/assert strings and constants of this unit's claimed data (and of the strip unit's that
+ * follows it, 0x80593580-0x80593E7C and 0x807960E8-0x80796148), declared, never defined. */
 extern char lbl_80593580[];  /* "ef_postfield.cpp"                                        .data 0x80593580 */
 extern char lbl_80593598[];  /* "NW4R:Failed assertion 0"                                  .data 0x80593598 */
 extern char lbl_805935E4[];  /* "res_drawparam_ac.h"                                       .data 0x805935E4 */

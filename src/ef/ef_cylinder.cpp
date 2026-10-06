@@ -1,44 +1,29 @@
-/* ef/ef_cylinder.cpp - the retail `ef_cylinder.cpp` unit, 0x800CB948..0x800CC5B0.
- *
- * Two functions: fn_800CB948 emits one particle per iteration of a count loop, fn_800CBFB0 is the entry
- * point that guards its three pointers, derives the emission parameters and drives the loop.  Both are
- * `em`/`pm`/`params` guarded by the shared `CHECK_PTR` macro, whose `__LINE__` retail stamped into the
- * Panic calls (49-51 and 140-142).
- *
- * Measured with `python tools/units/recompile.py ef/ef_cylinder.cpp --measure <symbol>`:
- *   fn_800CB948 97.29 % (target .text 0x668, ours 0x664)   fn_800CBFB0 96.09 % (0x600 / 0x600)
- * The instruction mix, the frames (384 / 224), every stack slot and the `extab`/`extabindex` fragments
- * are the target's.  What is left:
- *   - fn_800CB948's float registers are retail's set rotated by one: retail holds 0.01f in f18 and the
- *     `(f32)(s8)` conversion's 2^52+2^31 constant in f31, ours holds the double in f18 and 0.01f in f19,
- *     so every other float register sits one higher.  Only that constant's web priority differs.  Tried
- *     and did not move it: splitting the scale statement, a `hundredth` temporary, swapping the
- *     multiply's operands, and making the angle a modified parameter (which is what put farg4 in f23).
- *   - three fn_800CB948 instructions pick a different scratch register: the u16 narrowing of
- *     fn_800A9FB0's result goes into r4 where retail copies it to r0 first, and the spawn slot's two
- *     vtable loads use r11/r12 where retail reuses r12.  fn_800CBFB0's scheduler moves `mr r10,r31`
- *     (the 8th argument) one slot earlier than retail.
- *
- * The three pragmas below are per-unit flag deviations, each with its instruction evidence: the retail
- * object has no fused `a*b+c`, keeps the `li r0,<slot>; psq_lx` paired-single epilogue, and its
- * `__LINE__` values are the retail file's.  The declarations this file needs cannot live in a sibling
- * header (`cflags_main` has no `-gccinc`, so MWCC does not search the source's own directory), so the
- * line counter is realigned with `#line` instead of padding.
- *
- * The unit's `.data` (0x80594D20..0x80594DCD) and `.sdata2` (0x80796270..0x807962B0) runs are **not**
- * claimed in `splits.txt` yet, so the four strings are declared `extern` and never defined
- * (playbook 29).  Our object still emits `.sdata2` (0x40 B) - the float constants have to stay
- * literals for the compiler to hoist them into registers - and that pool is the retail run byte for byte
- * except that the 2^52 `(f32)(u16)` conversion constant is pooled last instead of beside the 2^52+2^31
- * one (retail's lbl_80796288/lbl_80796290 are adjacent).  Retail's `.data` is the same 0xAD bytes the
- * string literals would produce, but reaching them needs `-pool off` (without it MWCC reaches the pool
- * through a `@stringBase0` base register instead of retail's per-string `lis`/`addi`) and `-pool off`
- * has no source pragma; a `range` and `flag` request for all of this rides the outbox.
+/*
+ * ef/ef_cylinder.cpp - the cylinder emitter form: `fn_800CB948` emits one particle per step of a count loop,
+ *   `fn_800CBFB0` is the entry that guards its three pointers, derives the emission parameters and drives it.
+ * RANGE. .text 0x800CB948-0x800CC5B0 (2 functions); extab 0x8000A56C-0x8000A57C, extabindex 0x80023BC8-0x80023BE0,
+ *   .data 0x80594D20-0x80594DE0 (the `__FILE__` string "ef_cylinder.cpp" first), .sdata2 0x80796270-0x807962B0.
+ * FLAGS. `cflags_main`; file-wide `#pragma peephole off` (retail keeps the `li r0,<slot>; psq_lx` epilogue) and
+ *   `#pragma fp_contract off` (retail has no fused `a*b+c`).
+ * NAMES. The map has only `fn_` stems for the range.
+ * RESIDUALS. 2 partial rows:
+ *  - `fn_800CB948__FlP6EfWorkP10EfParticlelUlP8EfParamsUslffffffff` (ours 0x664 of 0x668): the prologue saves
+ *    `spawn_arg` (`mr r31,r10`) early and the saved arguments take r24-r31 where retail takes r22-r28 and r30;
+ *    retail holds the `(f32)(s8)` conversion constant in f31 and 0.01f in f18, ours the constant in f18, so the
+ *    other float registers sit one higher; the spawn argument copies move floats (`lfs`/`stfs`) where retail
+ *    moves words; the u16 narrowing of `fn_800A9FB0`'s result and the slot +0x14 loads pick other scratch
+ *    registers;
+ *  - `fn_800CBFB0__FlP6EfWorkP10EfParticlelUlP8EfParamsUslf`: the three `|scale|` clamps load their 1.19e-7
+ *    floor before the `fn_800C9DCC` call where retail loads it after, and `mr r10,r31` (the 8th argument) is
+ *    one slot early at both spawn calls.
+ *   `.sdata2` is retail's run except that the 2^52 `(f32)(u16)` constant pools last (retail's
+ *   `lbl_80796288`/`lbl_80796290` are adjacent), so the pool references read our `@N` labels.
+ *   flipcheck: `.data` claimed, not emitted (`-pool off`, which has no pragma, is what reaches retail's per-string
+ *   `lis`/`addi`); `.text` 0xC64 of 0xC68.
+ * SHAPES. The float constants are literals, so MWCC hoists them into registers.
+ * SHAPES. `#line 49` and `#line 140` put the two functions' `CHECK_PTR` sites on retail's lines 49-51 and 140-142.
  */
 
-/* The retail object was built with the peephole pass off and FP contraction off: its paired-single
- * epilogue keeps the `li r0,<slot>; psq_lx` form (ours folds it into `psq_l <slot>(r1)`) and every
- * `a*b+c` stays two instructions (ours fuses them into `fmadds`/`fmsubs`). */
 #pragma peephole off
 #pragma fp_contract off
 
@@ -90,18 +75,12 @@ struct EfParticle {
     EfParticleSlots* slots; /* +0x1C */
 };                        /* size: 0x20 */
 
-/* nw4r::db::Panic. The map already carries its real C++ mangling
- * (Panic__Q24nw4r2dbFPCciPCce), and declaring that spelling as a C++ identifier re-mangles it
- * (Panic__Q24nw4r2dbFPCciPCce__FPCciPCce) - which only shows up at LINK time, so a NonMatching
- * unit hides it until it is flipped. Declare the real thing and the front-end reproduces the
- * map's spelling exactly: tools/units/mangle.py confirms it. */
+/* `nw4r::db::Panic`, declared in its namespace so the front-end emits the map's mangling
+ * (`Panic__Q24nw4r2dbFPCciPCce`). */
 namespace nw4r { namespace db { void Panic(const char* file, int line, const char* fmt, ...); } }
 
-/* nw4r::math and effect-library helpers.  The target object references each by its plain
- * `fn_XXXXXXXX` map name, so they carry C linkage; a C++ spelling mangles the reloc
- * (fn_80043EA8__FPv) and it no longer pairs (relocaudit).  The one name `unsplit/ef.h` already
- * declares (VEC3_ctor) is left to that header; this file's own spelling of the record is the
- * same type under the name `VEC3`). */
+/* nw4r::math and effect-library helpers; retail's relocations carry their plain map names, so they
+ * have C linkage (`VEC3_ctor` comes from `mh3_pad.h`). */
 extern "C" {
 extern void fn_8009C484(VEC3* out, VEC3* in);
 extern void assignVec3(VEC3* out, VEC3* in);
@@ -135,9 +114,8 @@ inline int IsValidPointer(u32 ptr) {
     if (!IsValidPointer((u32)(ptr))) \
         nw4r::db::Panic(lbl_80594D20, __LINE__, msg, (ptr))
 
-/* Emits the effect's particles: for each of `count` steps it rebuilds the emission transform from the
- * parameter block and the effect's progress, hands the result to the particle manager's spawn slot and
- * advances the emission angle when the effect is a swept one. */
+/* Emits `count` particles, rebuilding the emission transform each step and advancing the angle when the
+ * effect is swept. */
 void fn_800CB948(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfParams* params,
                  u16 id, s32 spawn_arg, f32 scale, f32 size_x, f32 size_y, f32 size_z, f32 angle,
                  f32 angle_step, f32 phase, f32 offset_y) {
@@ -153,7 +131,7 @@ void fn_800CB948(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
         f32 cs, sn;
         f32 factor, rate, t;
 
-        VEC3_ctor(&v88); /* C-linkage decl in unsplit/ef.h takes nw4r::math::VEC3* */
+        VEC3_ctor(&v88); /* `mh3_pad.h`'s C-linkage declaration takes nw4r::math::VEC3* */
         VEC3_ctor(&v76);
         t = fn_800A8A08(&em->progress);
         rate = params->rate_pct / 100.0f;
@@ -192,9 +170,8 @@ void fn_800CB948(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfPa
     }
 }
 
-/* The entry point: guards its pointers, then - when at least one particle was asked for - derives the
- * scale triplet, the parameter range and the per-step scale from the parameter block and the effect's
- * progress and either sweeps the whole count or emits a single particle. */
+/* Guards its pointers, derives the scale triplet, the parameter range and the per-step scale, then
+ * sweeps the whole count or emits a single particle. */
 void fn_800CBFB0(s32 ctx, EfWork* em, EfParticle* pm, s32 count, u32 flags, EfParams* params,
                  u16 id, s32 spawn_arg, f32 scale) {
     f32 scaleA, scaleB, scaleC, angle, range_phase, phase, angle_step, offset;

@@ -1,55 +1,37 @@
-/* ef/ef_drawpointstrategy.cpp - nw4r::ef DrawPointStrategy family, 0x800BF818..0x800BFFD4.
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every
- * fn_ name this file uses is a bare .text entry in config/RMHE08/symbols.txt)
- *
- * 9 functions / 0x7BC bytes of the NintendoWare-for-Revolution effect library (`nw4r::ef`).  The split
- * object's own traces name the original source file: the `__FILE__` string in its `.data` is
- * `ef_drawpointstrategy.cpp` (0x80594408), next to the three `NW4R:Pointer Error` messages the Panic
- * calls pass (0x80594424/0x80594458/0x80594494).  The `.cpp` name makes the original language C++
- * (docs/plan.md, "The language comes from the symbol"); the `Panic__Q24nw4r2dbFPCciPCce` callee and the
- * `__dl__FPv` deleting destructors say the same.  This is the point sibling of
- * `ef/ef_drawstripestrategy.cpp` (0x800B99E8..0x800BE154) and `ef/ef_drawsmoothstripestrategy.cpp`
- * (0x800BFFD4..0x800C5DB8); the seam is unproven (docs/plan.md 8.3) - the two gap units between them own
- * 0x800BE154.. and 0x800BEF98.., this unit is registered at its final home `ef/ef_drawpointstrategy.cpp`.
- *
- * Layout in address order:
- *   0x800BF818  DrawPointStrategy::Draw - the point particle walker
- *   0x800BFCCC  the single point emitter (GXBegin POINTS + position + optional texcoord)
- *   0x800BFD38  the no-op GXEnd
- *   0x800BFD3C  the f32-pair FIFO writer (texcoord)
- *   0x800BFD4C  the low-bit test
- *   0x800BFD60  the Vec3 FIFO writer
- *   0x800BFD84  DrawPointStrategy::SetupState - the point GX state
- *   0x800BFF3C  the deleting destructor
- *   0x800BFF98  the constructor (installs the `lbl_80594778` vtable)
- *
- * Codegen lever: the out-of-line FIFO writers keep the unfused narrowing stores (playbook 39),
- * exactly as the sibling `ef/ef_drawsmoothstripestrategy.cpp` needed, so the peephole pass is off here.
- *
- * The `Panic` line numbers are the literals the target's `li r4,NN` carry (92/96/98 in Draw, 150 in
- * SetupState); writing them as literals keeps the source line count from moving them.
- *
- * Status (measured with `tools/units/recompile.py`, the official report metric): six of the nine
- * functions are byte-identical (fn_800BFCCC, fn_800BFD38, fn_800BFD3C, fn_800BFD4C, fn_800BFD84,
- * fn_800BFF3C, fn_800BFF98 - the emitter, the FIFO writers, the low-bit test, the state setup, the
- * destructor and the constructor), fn_800BF818 is 98.57 % and fn_800BFD60 is 85.56 %; every one is far
- * above the 80 % bar.  Residual: fn_800BFD60 is 32 B against the target's 36 B - retail materialises a
- * 4-byte `b $+4` between the three `lfs` and the `lis` on the FIFO base, the same irreducible shape the
- * sibling `ef/ef_drawstripestrategy.cpp` recorded for fn_800BA710/fn_800BC070; the two direct-store and
- * locals variants both score 40 %/85.6 %, so the locals shape is kept.  fn_800BF818's remaining 1.4 %
- * is the argument evaluator's `mr r3,self` schedule around the two vtable getter calls (ours loads the
- * vtable through r5 where retail uses r3) and the scheduler's placement of one `lwz`/one `lfs`; the
- * sizes and every other instruction match.
+/*
+ * ef/ef_drawpointstrategy.cpp - nw4r::ef DrawPointStrategy: `Draw` (the point particle walker), the single point
+ *   emitter (`GXBegin` POINTS, position, optional texcoord), the out-of-line GX FIFO writers, the point GX state,
+ *   a deleting destructor and the constructor that installs the DrawSmoothStripeStrategy table `lbl_80594778`.
+ * RANGE. .text 0x800BF818-0x800BFFD4 (9 functions); extab 0x8000A36C-0x8000A394, extabindex 0x800238C8-0x80023904,
+ *   .data 0x80594408-0x805944E0 (the `__FILE__` string "ef_drawpointstrategy.cpp" and the three pointer-error
+ *   messages first), .sdata 0x80791350-0x80791358, .sdata2 0x807961B8-0x807961C0.
+ *   Unproven seam (playbook 80: a TU's tables sit late in its `.data`): this unit's table `lbl_805944C8` is installed
+ *   by `fn_800BF7DC` at the tail of `ef/ef_drawlinestrategy.cpp`'s range, and this range ends with
+ *   `fn_800BFF3C`/`fn_800BFF98`, the constructor installing `ef/ef_drawsmoothstripestrategy.cpp`'s table, so each
+ *   `.text` seam may be off by that constructor.
+ * FLAGS. `cflags_main`; `#pragma peephole off` (the FIFO writers keep the unfused narrowing stores, playbook 39).
+ * NAMES. The map has only `fn_` stems for the range and the dump only `zz_` names; `fn_800BF818`/`fn_800BFD84` are
+ *   a GUESS for NintendoWare's `DrawPointStrategy::Draw`/`SetupState` (their asserts on lines 92/96/98 and 150
+ *   name `pm`, `pm->mResource` and `&ed`).
+ * RESIDUALS. The source defines the FIFO writers and the emitter before `Draw`, so our `.text` (and the extab and
+ *   extabindex records) run in a different order from retail's address order.
+ *   2 partial rows:
+ *  - `fn_800BF818`: the two table getter calls load the table through r5 where retail uses r3 (the `mr r3,self`
+ *    schedule), and one `lwz` and one `lfs` are placed differently;
+ *  - `fn_800BFD60` (ours 0x20 of 0x24): retail has a `b` to the next instruction between the three `lfs` and the
+ *    `lis` of the FIFO base (the `ef/ef_drawlinestrategy.cpp` row `fn_800BF58C` is the same).
+ *   flipcheck: `.data`, `.sdata` and `.sdata2` claimed, not emitted; `.text` 0x7B8 of 0x7BC.
+ * SHAPES. The `Panic` line numbers are literals (92/96/98 in `Draw`, 150 in the state setup), so the source's
+ *   line count does not move them.
  */
 
 #include "ef.h"
 #include "gx.h"
 #include "ef/ef_drawstrategy.h"
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 
-/* `nw4r::db::Panic` - the real declaration; the front-end reproduces the map's
- * `Panic__Q24nw4r2dbFPCciPCce` spelling (tools/units/mangle.py confirms it).  Declaring the mangled
- * spelling instead would re-mangle it and break the link (playbook 50); rule 9. */
+/* `nw4r::db::Panic`, declared in its namespace so the front-end emits the map's mangling
+ * (`Panic__Q24nw4r2dbFPCciPCce`). */
 #ifdef __cplusplus
 namespace nw4r {
 namespace db {
@@ -65,7 +47,7 @@ extern "C" {
 #pragma peephole off
 
 /* --------------------------------------------------------------------------------------------------
- * externs owned by neighbouring translation units / the SDK (rule 2 keeps the definition where it is).
+ * externs owned by neighbouring translation units and the SDK.
  * -------------------------------------------------------------------------------------------------- */
 
 EfEmitterShape* fn_800AB388(void* emitter);
@@ -82,7 +64,7 @@ void fn_800C68E8(EfDrawStrategyObj* self, void* particle, EfEmitterShape* shape,
 void fn_800B4B04(void* self, int mode);
 void fn_800C5F74(void* self);
 
-/* SDK GX entry points (unsplit: rule 2's named gap). */
+/* SDK GX entry points, declared locally. */
 extern void GXBegin(u8 prim, u8 vtxfmt, u16 nverts);
 extern void GXSetPointSize(u8 pointSize, u32 texOffset);
 extern void GXEnableTexOffsets(u32 coord, u32 line_enable, u32 point_enable);
@@ -92,13 +74,13 @@ extern void GXSetVtxAttrFmt(u32 fmt, u32 attr, u32 cnt, u32 type, u32 frac);
 extern void GXLoadPosMtxImm(void* mtx, u32 id);
 extern void GXSetCurrentMtx(u32 id);
 
-/* This unit's pooled `__FILE__`/assert strings, the draw-order vtable and the constants (declared, never
- * defined here: the data pass claims the ranges once the source emits them, docs/plan.md 8.4). */
+/* This unit's `__FILE__`/assert strings, the draw-order table and the constants, declared, never
+ * defined. */
 extern char lbl_80594408[]; /* "ef_drawpointstrategy.cpp"                                .data 0x80594408 */
 extern char lbl_80594424[]; /* "NW4R:Pointer Error\npm(=%p) is not valid pointer."      .data 0x80594424 */
 extern char lbl_80594458[]; /* "NW4R:Pointer Error\npm->mResource(=%p) is not valid..." .data 0x80594458 */
 extern char lbl_80594494[]; /* "NW4R:Pointer Error\n&ed(=%p) is not valid pointer."     .data 0x80594494 */
-extern char lbl_80594778[]; /* the DrawPointStrategy vtable                             .data 0x80594778 */
+extern char lbl_80594778[]; /* the DrawSmoothStripeStrategy table                       .data 0x80594778 */
 extern f32 lbl_80791350;    /* 42.5f - the point-size clamp                            .sdata  0x80791350 */
 extern f32 lbl_807961B8;    /* 6.0f  - the point-size scale                           .sdata2 0x807961B8 */
 extern f32 lbl_807961BC;    /* 0.0f  - the point texcoord                             .sdata2 0x807961BC */
@@ -233,7 +215,7 @@ void fn_800BF818(EfDrawStrategyObj* self, void* em, EfDrawArgs* args) {
  * The deleting destructor and the constructor.
  * -------------------------------------------------------------------------------------------------- */
 
-/* Deletes the DrawPointStrategy and, when the flag is positive, frees the storage. */
+/* A deleting destructor: tears down the base and, when the flag is positive, frees the storage. */
 void* fn_800BFF3C(void* self, s16 flag) {
     if (self != 0) {
         fn_800B4B04(self, 0);
@@ -244,7 +226,7 @@ void* fn_800BFF3C(void* self, s16 flag) {
     return self;
 }
 
-/* Constructs the DrawPointStrategy: runs the base constructor and installs the vtable. */
+/* Constructs the DrawSmoothStripeStrategy: runs the base constructor and installs lbl_80594778. */
 void** fn_800BFF98(void** self) {
     fn_800C5F74(self);
     self[0] = (void*)lbl_80594778;

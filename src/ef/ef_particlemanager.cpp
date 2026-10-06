@@ -1,50 +1,44 @@
 /*
- * ef_particlemanager.cpp - the nw4r::ef ParticleManager implementation.
- *
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with symedit: every name
- * this file uses is a bare .text entry in config/RMHE08/symbols.txt, and the only __FILE__ string the
- * range references is "ef_particlemanager.cpp").
- *
- * The unit is named by the `__FILE__` string its asserts reference: `.data:lbl_80592F78` reads
- * "ef_particlemanager.cpp", and the sibling strings lbl_80592F90..lbl_80593500 are the
- * "NW4R:Pointer Error\n<name>(=%p) is not valid pointer." / "NW4R:Failed assertion ..." messages. The
- * unit owns `.text 0x800AB658..0x800AEE48`, `extab 0x80009E6C..0x80009F74`,
- * `extabindex 0x80023148..0x800232D4` and one `.ctors` word at 0x8056F2DC. Both extab seams abut the
- * neighbouring units (fn_800AB3FC ends at 0x80009E64/0x8002313C, fn_800AEE48 begins at
- * 0x80009F74/0x800232D4), so the seam is proven on both sides.
- *
- * What the unit is: the `nw4r::ef::ParticleManager` bookkeeping object. Its constructor `fn_800AB664`
- * installs the vtable `lbl_805934E0` (slots 2..7 = fn_800AB730, fn_800AB73C, fn_800ABA6C, fn_800AC1BC,
- * fn_800AC2F8, fn_800ADED8); the rest of the file is the object's lifecycle. The .ctors word points at
- * fn_800AEE14, which constructs the file's two static matrices.
- *
- * Load-bearing source shapes:
- *   - the pointer asserts are the `NW4R_POINTER_ASSERT` shape the ef shape units use (six materialised
- *     BOOLs, the first `if` carrying two tests); the target's `li r5..r10,1` + one
- *     `clrrwi`/`addis`/`cmplwi` per range is exactly that chain. The file name argument differs by call
- *     site ("ef_particlemanager.cpp", "particle.h", "res_emitter.h"), so the macro takes it.
- *   - the assert `__LINE__` immediates are reproduced with `#line` (61, 72, 73, 0x29E, 0x2D5, ...).
- *   - a particle's link sits at `manager->list.linkOffset`; `next` is read at `node + linkOffset + 4`,
- *     which is the target's `lhz r0,0x42(self)` + `lwz rX,4(r3)` pair. The offset is a runtime value,
- *     so the traversal keeps the byte offset rather than a named field (rule 6's byte-range case).
- *
- * RESIDUAL - this round is a partial reconstruction. These symbols are still stubs and measure near 0:
- *   fn_800ABA6C (0x678), fn_800AC1BC (0x13C), fn_800AC2F8 (0xDCC), fn_800AD254 (0x130),
- *   fn_800AD384 (0x9C), fn_800AD420 (0x5C), fn_800AD47C (0x98), fn_800AD520 (0x4A0),
- *   fn_800AD9CC (0x58), fn_800ADA5C (0x370), fn_800ADED8 (0x3C0), fn_800AE2A4 (0xBC),
- *   fn_800AE360 (0x1A0), fn_800AE628 (0x70), fn_800AE6A8 (0x764).
+ * ef/ef_particlemanager.cpp - the nw4r::ef::ParticleManager bookkeeping object: its constructor `fn_800AB664`
+ *   (installs the table `lbl_805934E0`, slots 2-7 = fn_800AB730, fn_800AB73C, fn_800ABA6C, fn_800AC1BC,
+ *   fn_800AC2F8, fn_800ADED8), the object's lifecycle, and the static initializer `fn_800AEE14`, which constructs
+ *   the file's two static matrices.
+ * RANGE. .text 0x800AB658-0x800AEE48 (44 functions); extab 0x80009E6C-0x80009F74, extabindex 0x80023148-0x800232D4,
+ *   .ctors 0x8056F2DC-0x8056F2E0, .data 0x80592F78-0x80593580 (the `__FILE__` string "ef_particlemanager.cpp"
+ *   first), .bss 0x80694538-0x80694598, .sdata2 0x807960A0-0x807960E8.
+ * FLAGS. `cflags_main`; `#pragma fp_contract off` around one body.
+ * NAMES. The map has only `fn_` stems for the range.
+ * RESIDUALS. 15 rows unwritten (empty bodies): 0x800ABA6C-0x800AC0E4, 0x800AC1BC-0x800AD0C4,
+ *   0x800AD254-0x800AD514, 0x800AD520-0x800AD9C0, 0x800AD9CC-0x800ADA24, 0x800ADA5C-0x800ADDCC,
+ *   0x800ADED8-0x800AE298, 0x800AE2A4-0x800AE500, 0x800AE628-0x800AE698, 0x800AE6A8-0x800AEE0C.  The source order
+ *   differs from retail's, so `.text`, extab and extabindex run in another order.
+ *   5 partial rows:
+ *  - `fn_800AB664`: the table store computes into r3 (`addi r3, r3, ...@l`) where retail uses r0, and
+ *    `fn_800AC178`: `extsh.` where retail keeps `extsh` + `cmpwi` (both the peephole pass's folds);
+ *  - `fn_800AC0E4`, `fn_800AC100`: the argument copies take other registers and are scheduled differently;
+ *  - `fn_800ADDCC`: the index scaling folds to `clrlslwi` where retail keeps `clrlwi` + `slwi`.
+ *   relocdiff: `fn_800AD9C0` scores 100 but calls `fn_80501EE0`, a name the map does not carry, where retail calls
+ *   `fn_80051EE0`; our `.ctors` word carries the symbol `lbl_8056F2DC`, retail's none.
+ *   flipcheck: `.bss`, `.data` and `.sdata2` claimed, not emitted (`.sdata2` is a partial pool: flipcheck names a
+ *   fold with `ef/ef_particle.cpp`, one shared literal); `.text` 0x990 of 0x37F0; extab 0x90 of 0x108; extabindex
+ *   0xD8 of 0x18C; `fn_80501EE0` is undefined at link.
+ * SHAPES. The pointer asserts are the `NW4R_POINTER_ASSERT` six-BOOL chain taking the file string
+ *   ("ef_particlemanager.cpp", "particle.h" or "res_emitter.h"); `#line` reproduces each assert's line (61, 72, 73,
+ *   0x29E, 0x2D5, ...).
+ * SHAPES. A particle's link sits at `manager->list.linkOffset` (`next` at `node + linkOffset + 4`, retail's `lhz
+ *   r0,0x42(self)` + `lwz rX,4(r3)`); the offset is a runtime value, so the walk keeps the byte offset.
  */
 
 #include "types.h"
 #include "nw4r/math.h"
 #include "ef/ef_particlemanager.h"
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 
 namespace nw4r { namespace db { void Panic(const char* file, int line, const char* fmt, ...); } }
 namespace nw4r { namespace math { f32 SinFIdx(f32); } }
 
-/* The assert strings, the vtable and the pool constants this unit references but does not own. */
+/* The assert strings, the class table and the pool constants of this unit's claimed data, declared, never defined. */
 extern "C" {
 extern const f32 lbl_807960A4;
 extern const f32 lbl_807960A8;

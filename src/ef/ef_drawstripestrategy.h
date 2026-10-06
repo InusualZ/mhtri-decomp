@@ -1,8 +1,6 @@
-/*
- * Declarations for the symbols `src/ef/ef_drawstripestrategy.cpp` owns (docs/plan.md 6.5 rule 2): the draw-time particle copies and ahead-vector
- * builders (0x800B8788..0x800B882C) that the next unit's walker dispatch (`ef/ef_drawbillboardstrategy.cpp`) hands out as function pointers.
- * The strip unit's other declarations are still in `ef/fn_800AEE48.h` (the header of the registration it was cut from).
- */
+/* ef/ef_drawstripestrategy.h - symbols `ef/ef_drawstripestrategy.cpp` owns: the draw-time particle copies and
+ * ahead-vector builders (0x800B8788-0x800B882C) that `ef/ef_drawbillboardstrategy.cpp`'s dispatch hands out.  The
+ * unit's other declarations are in `ef/fn_800AEE48.h`. */
 #ifndef MHTRI_EF_EF_DRAWSTRIPESTRATEGY_H
 #define MHTRI_EF_EF_DRAWSTRIPESTRATEGY_H
 

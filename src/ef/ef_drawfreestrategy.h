@@ -1,7 +1,6 @@
-/*
- * Declarations for the symbols `src/ef/ef_drawfreestrategy.cpp` owns (docs/plan.md 6.5 rule 2).  The class table is stored by the draw-strategy
- * constructor that sits before it (`ef/ef_drawbillboardstrategy.cpp`'s directional-strategy constructor).
- */
+/* ef/ef_drawfreestrategy.h - the symbols `ef/ef_drawfreestrategy.cpp` owns: the DrawFreeStrategy table at the end
+ * of its `.data`, which the constructor at 0x800BE118, at the tail of `ef/ef_drawbillboardstrategy.cpp`'s range,
+ * stores. */
 #ifndef MHTRI_EF_EF_DRAWFREESTRATEGY_H
 #define MHTRI_EF_EF_DRAWFREESTRATEGY_H
 

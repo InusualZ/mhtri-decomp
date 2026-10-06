@@ -1,62 +1,27 @@
-/* ef_drawlinestrategy.cpp - nw4r::ef DrawLineStrategy, .text 0x800BEF98..0x800BF818.
- * Naming note: the symbol map has only fn_XXXXXXXX for this range (checked with
- * `python tools/symbols/dumpmap.py lookup 0x800BEF98` - the map carries `fn_800BEF98` and the shared
- * runtime dump carries only `zz_00bef98_`, so no better name exists for the ten functions).
- *
- * The unit's own `.data` pool starts with the `__FILE__` string "ef_drawlinestrategy.cpp"
- * (`lbl_80594330`, confirmed by the shared dump's symbol map as `s_ef_drawlinestrategy.cpp_80594330`,
- * 24 bytes = the string + NUL) which is the file argument of every `nw4r::db::Panic` call below.  The
- * three panic messages beside it are "pm(=%p) is not valid pointer." (0x80594348), "pm->mResource(=%p)
- * is not valid pointer." (0x8059437C) and "&ed(=%p) is not valid pointer." (0x805943B8) - the exact
- * `NW4R_POINTER_ASSERT` names of the NintendoWare 2009-04-03 `ef_drawlinestrategy.cpp`.  The runtime
- * dump string is not a `zz_` placeholder, so it is evidence class 1: module `ef`, file
- * `ef_drawlinestrategy.cpp`, language C++ (the `.cpp` suffix; langcheck.py agrees - the file's
- * `nw4r::db::Panic` callee is the `Panic__Q24nw4r2dbFPCciPCce` spelling the C++ front end emits).
- *
- * The class: `self` carries a vptr at +0x00 (the vtable is the map's `lbl_805944C8`, 24 bytes =
- * offset-to-top, typeinfo and four slots) and the one byte `self+0xD0` the draw path reads.  The
- * constructor fn_800BF7DC chains to the base constructor fn_800C5F74 and installs the vtable; the
- * destructor fn_800BF780 chains to fn_800B4B04 (the base vtable's slot +0x08) and, for a positive
- * flag, `operator delete`s.  fn_800BEF98 is the class's Draw(): it chains / projects the particle
- * space, then walks the draw-order particle list (the vtable's +0x10/+0x14 "first/next particle"
- * selectors) and emits one GX line per eligible particle, with the line width quantised to
- * `(u8)(6.0f * min(t, 42.5f))`.
- *
- * Sections: the code unit owns `.text` plus the `extab`/`extabindex` fragments that travel with it
- * (five exception entries, one per non-leaf function) - the target object emits no `.data`/`.sdata2`
- * of its own, so the pool strings and floats below are declared, never defined.
- *
- * Shared types and externs (docs/plan.md 6.5): the ef-band callees the owning unit does not exist for
- * yet live in `unsplit/ef.h` (fn_800C5F74, fn_800C6064, fn_800C68E8) and
- * `unsplit/g3d.h` (fn_800710BC); the types below are this unit's private views (the layouts
- * differ from the same-named copies other ef units carry - `_ParticleManager` here reads +0x24 while
- * ef_line.cpp's reads a vtable at +0x1C), so they carry unit-qualified names rather than duplicating a
- * `src/` type (rule 1).
- *
- * Status (official `report generate` metric from `recompile.py ef/ef_drawlinestrategy.cpp
- * --measure <symbol>`; unit mean 99.71 % over 2176 bytes):
- *   fn_800BEF98  99.90964 %  (1328 B; 4 of 332 instruction rows differ - see the residual below)
- *   fn_800BF58C  85.55556 %  (target 36 B / ours 32 B - see the residual below)
- *   fn_800BF4C8 100.00 %   fn_800BF564 100.00 %   fn_800BF568 100.00 %   fn_800BF578 100.00 %
- *   fn_800BF5B0 100.00 %   fn_800BF5C8 100.00 %   fn_800BF780 100.00 %   fn_800BF7DC 100.00 %
- *
- * Residual fn_800BEF98 (99.91 %): the two virtual-call sequences that fetch the draw-order
- * first/next-particle walkers load the vtable base from the `this` register into `r12`
- * (`lwz r12, 0x0(r3); lwz r12, 0x10(r12)`), which is MWCC's native virtual-dispatch shape; the
- * struct-member call this C-compatible source uses emits a general temp instead
- * (`lwz r5, 0x0(r28); lwz r12, 0x10(r5)`).  Everything else - both pointer asserts' register webs,
- * the matrix chain, the loop, the width quantisation `(u8)(s32)(6.0f * min(t, 42.5f))` and the
- * `min` call - is byte-identical.  Tried and rejected: naming the vtable pointer in a local, and
- * fetching the slot through the expression directly; both keep the `r5`/`r28` shape.
- *
- * Residual fn_800BF58C (85.56 %): retail is 9 instructions - `lfs f1/f2/f3` of the three position
- * components, then a `b` to the very next instruction, then the three FIFO stores; ours is 8 with
- * `f0/f1/f2` and no `b`.  The loads, the store order and the `lis r3, 0xcc01` base all match.  The
- * `b +4` is a branch to the instruction after it, so no source-shape branch is observable; tried
- * and rejected (all below the 85.56 % recorded): the three stores straight from `v->x/y/z` (40 %),
- * a `switch` (40 %), the three stores inside `{}`, `if (1)`, `do { } while (0)`, `while (1)`,
- * `for (;;)`, an empty `if` (all 85.56 %), a local `f32 xyz[3]` (45.6 %), a `GXPosition3f32`
- * `do-while(0)` macro (40 %), and a `static inline` forwarder (85.33 %, wrong load order).
+/*
+ * ef/ef_drawlinestrategy.cpp - nw4r::ef DrawLineStrategy: the class's `Draw` (projects the particle space, walks
+ *   the draw-order particle list through the table's +0x10/+0x14 first/next selectors and emits one GX line per
+ *   eligible particle, width `(u8)(6.0f * min(t, 42.5f))`), its per-draw setup, the GX helpers, a deleting
+ *   destructor (base `fn_800B4B04`) and the constructor that installs the DrawPointStrategy table `lbl_805944C8`.
+ * RANGE. .text 0x800BEF98-0x800BF818 (10 functions); extab 0x8000A344-0x8000A36C, extabindex 0x8002388C-0x800238C8,
+ *   .data 0x80594330-0x80594408 (the `__FILE__` string "ef_drawlinestrategy.cpp" first), .sdata
+ *   0x80791348-0x80791350, .sdata2 0x807961A8-0x807961B8.
+ *   Unproven seam (playbook 80: a TU's tables sit late in its `.data`): this unit's table `lbl_805943F0` is installed
+ *   by `fn_800BEF5C` at the tail of `ef/ef_drawfreestrategy.cpp`'s range, and this range ends with
+ *   `fn_800BF780`/`fn_800BF7DC`, the constructor installing `ef/ef_drawpointstrategy.cpp`'s table, so each `.text`
+ *   seam may be off by that constructor.
+ * FLAGS. `cflags_main`.
+ * NAMES. The map has only `fn_` stems for the range; the assert names (`pm`, `pm->mResource`, `&ed`) are
+ *   NintendoWare's `ef_drawlinestrategy.cpp`'s.  The types are this unit's private views, so they carry
+ *   unit-qualified names (`_ParticleManager` here reads +0x24, `ef/ef_line.cpp`'s a table at +0x1C).
+ * RESIDUALS. 2 partial rows:
+ *  - `fn_800BEF98`: the two first/next-particle virtual calls load the table through a general temp (`lwz r5,
+ *    0x0(r28); lwz r12, 0x10(r5)`) where retail's native dispatch reuses r12 off r3 (`lwz r12, 0x0(r3)`); a named
+ *    table local or a direct slot fetch keeps ours;
+ *  - `fn_800BF58C` (ours 0x20 of 0x24): retail has a `b` to the next instruction between the three `lfs` and the
+ *    three FIFO stores and loads into f1-f3 (ours f0-f2); no source shape tried (a block, `if (1)`, `do {} while
+ *    (0)`, `for (;;)`, a `switch`, a local array, a forwarder) emits the branch.
+ *   flipcheck: `.data`, `.sdata` and `.sdata2` claimed, not emitted; `.text` 0x87C of 0x880.
  */
 
 #include "types.h"
@@ -68,11 +33,10 @@
 #include "ef/ef_particlemanager.h"
 #include "unsplit/ef.h"
 #include "unsplit/g3d.h"
-#include "fn_8004CAD8/mtx.h" /* the symbols deleted above (rule 2) */
+#include "fn_8004CAD8/mtx.h" /* the matrix helpers (rule 2) */
 
-/* The real `nw4r::db::Panic`; the map already carries its C++ mangling
- * (`Panic__Q24nw4r2dbFPCciPCce`) and the C++ front end reproduces it (tools/units/mangle.py agrees).
- * Rule 9: declare the owner, never the mangled spelling. */
+/* `nw4r::db::Panic`, declared in its namespace so the front-end emits the map's mangling
+ * (`Panic__Q24nw4r2dbFPCciPCce`). */
 namespace nw4r {
 namespace db {
 void Panic(const char* file, int line, const char* fmt, ...);
@@ -88,14 +52,13 @@ extern "C" {
 
 #pragma peephole off
 
-/* This unit's pooled `__FILE__`/assert strings and constants (`.data` 0x80594330..0x805944E0 and
- * `.sdata2` 0x807961A8..0x807961B4).  Declared, never defined: the split does not own them, and the
- * target object emits no `.data`/`.sdata2` of its own. */
+/* This unit's `__FILE__`/assert strings and constants (its claimed `.data` and `.sdata2`), declared,
+ * never defined. */
 extern char lbl_80594330[];  /* "ef_drawlinestrategy.cpp"                                 .data */
 extern char lbl_80594348[];  /* "NW4R:Pointer Error\npm(=%p) is not valid pointer."        .data */
 extern char lbl_8059437C[];  /* "NW4R:Pointer Error\npm->mResource(=%p) is not valid..."  .data */
 extern char lbl_805943B8[];  /* "NW4R:Pointer Error\n&ed(=%p) is not valid pointer."      .data */
-extern char lbl_805944C8[];  /* the DrawLineStrategy vtable                               .data */
+extern char lbl_805944C8[];  /* the DrawPointStrategy table (end of ef_drawpointstrategy's .data) */
 extern f32 lbl_80791348;     /* 42.5f                                                     .sdata */
 extern f32 lbl_807961A8;     /* 6.0f                                                      .sdata2 */
 extern f32 lbl_807961AC;     /* 0.0f                                                      .sdata2 */
@@ -111,13 +74,8 @@ extern void GXSetCurrentMtx(u32 id);
 extern void GXSetLineWidth(u8 width, u32 texOffsets);
 extern void GXLoadPosMtxImm(void* mtx, u32 id);
 
-/* The nw4r math/effect helpers the target object references as plain `fn_` names.  The ef-band
- * callees whose owner units are registered live in those units' headers (rule 2):
- * fn_800B5A48/fn_800B59E4/fn_800B4B04/fn_800B7DB0 -> `ef/fn_800AEE48.h`,
- * fn_800AB388/fn_800AB3AC/fn_800AB2DC -> `ef/ef_particle.h`, fn_800AE360 ->
- * `ef/ef_particlemanager.h`.  The still-unsplit ones live in `unsplit/ef.h` (fn_800C5F74,
- * fn_800C6064, fn_800C68E8) and `unsplit/g3d.h` (fn_800710BC). */
-                        /* MTX34::MTX34() (identity) */
+/* The nw4r math/effect helpers retail references by their plain `fn_` names; the ef callees come from
+ * the headers included above. */
 extern MTX34* fn_80050508(MTX34* mtx);                      /* MTX34::Get() */
 extern void fn_800513F0(VEC3* v, f32 scale);                /* VEC3::Scale / rotate helper */
 extern void fn_800A7F00(void* particle, VEC3* out);         /* particle velocity/axis accessor */
@@ -272,7 +230,7 @@ void fn_800BEF98(DrawLineStrategy* self, DrawLineEmitter* em, DrawLineParticleMa
     }
 }
 
-/* Draw one GX line between two positions, with the texture coords the target uses. */
+/* Draws one GX line between two positions, with the texture coords the target uses. */
 void fn_800BF4C8(const VEC3* a, const VEC3* b, u32 flag) {
     GXBegin(0xA8, 0, 2);
     fn_800BF58C(a);
@@ -300,9 +258,7 @@ u32 fn_800BF578(u32 value) {
     return (value & 1) != 0;
 }
 
-/* Writes a position to the GX FIFO.  Residual (85.56 %): see the file header - retail carries one
- * extra `b +4` between the three loads and the three stores, and numbers the loads f1/f2/f3 where
- * ours uses f0/f1/f2; the loads, the store order and the FIFO base all match. */
+/* Writes a position to the GX FIFO. */
 void fn_800BF58C(const VEC3* v) {
     f32 x = v->x;
     f32 y = v->y;
@@ -317,7 +273,7 @@ f32* fn_800BF5B0(f32* a, f32* b) {
     return (*b < *a) ? b : a;
 }
 
-/* DrawLineStrategy per-draw setup: bind the resource and the line vertex format. */
+/* DrawLineStrategy per-draw setup: binds the resource and the line vertex format. */
 void fn_800BF5C8(DrawLineStrategy* self, DrawLineEmitter* em, DrawLineParticleManager* pm) {
     NW4R_POINTER_ASSERT(pm, 174, lbl_80594348);
     fn_800C6064((EfDrawStrategyImpl*)self, (u32)pm, (u16*)fn_800AB388(pm->mResource), (void*)em);
@@ -333,7 +289,7 @@ void fn_800BF5C8(DrawLineStrategy* self, DrawLineEmitter* em, DrawLineParticleMa
     GXSetCurrentMtx(0);
 }
 
-/* DrawLineStrategy destructor: tear down the base and, for a positive flag, free. */
+/* A deleting destructor: tears down the base and, for a positive flag, frees. */
 void* fn_800BF780(void* self, s16 flag) {
     if (self != NULL) {
         fn_800B4B04(self, 0);
@@ -344,7 +300,7 @@ void* fn_800BF780(void* self, s16 flag) {
     return self;
 }
 
-/* DrawLineStrategy constructor: chain to the base and install the vtable. */
+/* Constructs the DrawPointStrategy: chains to the base and installs lbl_805944C8. */
 void* fn_800BF7DC(DrawLineStrategy* self) {
     fn_800C5F74((EfParticleLayers*)self);
     self->vtbl = (DrawLineStrategyVtbl*)lbl_805944C8;
