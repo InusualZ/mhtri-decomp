@@ -100,6 +100,10 @@ draw_shape.cpp:
 	.sbss       start:0x807948A0 end:0x807948C0
 	.sdata2     start:0x80795BF8 end:0x80795C18
 
+quest/quest_file_table.cpp:
+	.data       start:0x8058AF98 end:0x8058B178
+	.sdata      start:0x807910F8 end:0x80791100
+
 draw_shape_arm.cpp:
 	extab       start:0x800071E0 end:0x80007218
 	extabindex  start:0x8001F440 end:0x8001F494

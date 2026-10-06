@@ -1831,6 +1831,7 @@ void fn_801F8ABC(u32 id, u8 a, u8 b, u32 c, s32 room)
 #include "Network/network_pat_control.h" /* the owner's header (rule 2) */
 #include "fn_8004CAD8/get_qResult_work.h" /* get_qResult_work (rule 2) */
 #include "quest/quest_result_work.h"        /* Q_ResultWork (rule 1) */
+#include "quest/quest_file_table.h"         /* stage_dcm_file_table (rule 2) */
 
 #pragma peephole off
 
@@ -2128,7 +2129,7 @@ void fn_801FB478(void)
     s32 i;
 
     i = 3;
-    req = (LbChgFileReq*)lbl_8058AFE8 + i;
+    req = (LbChgFileReq*)stage_dcm_file_table + i;
     dst = (void**)lbl_806BC1D0 + i;
     for (; i <= 0xD; i++) {
         if (req != NULL && req->size_0x00 != 0 && *dst == NULL) {
