@@ -74,6 +74,7 @@
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
 #include "MSL/strlen.h"
+#include "menu/menu_plsearch.h"           /* sPatTerms - owner menu/menu_plsearch.cpp */
 #include "Network/PatInterface.h"          /* getErrorInfo654c / buildErrorInfo613c / clearErrorRecord613c - owner Network/PatInterface.cpp */
 
 
@@ -594,6 +595,36 @@ s32 NetworkLayerRequest::getArgument(u32 index)
     return (s32)this->args_2C[index];
 }
 
+/* 0x803E55AC (0x84): whether the request has waited longer than its interval (never while the interval is 0). */
+s32 NetworkLayerRequest::isTimedOut()
+{
+    NetworkLogger* log;
+    s32 result;
+
+    result = 0;
+    LockMutex(this->mutex_78);
+    if (0.0f != this->interval_4C) {
+        log = getNetworkLogger();
+        if (log->getTime_60() - this->timeout_50 > this->interval_4C) {
+            result = 1;
+        }
+    }
+    UnlockMutex(this->mutex_78);
+    return result;
+}
+
+/* 0x803E5630 (0x60): restarts the wait: the clock becomes the baseline and the interval is replaced. */
+void NetworkLayerRequest::restartTimer(f32 interval)
+{
+    NetworkLogger* log;
+
+    LockMutex(this->mutex_78);
+    log = getNetworkLogger();
+    this->timeout_50 = log->getTime_60();
+    this->interval_4C = interval;
+    UnlockMutex(this->mutex_78);
+}
+
 /* The layer event callback `setReflectCallback` installs (its first word). */
 typedef void (*NetworkLayerEventCallback)(u32 kind, s32 code, u32 has_info, NetworkRequestError* info, u32 context);
 
@@ -910,6 +941,12 @@ void NetworkLayerPat::move()
             }
         }
     }
+}
+
+/* 0x803E247C (0x8): the live terms object. */
+extern "C" struct PatTerms* getPatTerms(void)
+{
+    return sPatTerms;
 }
 
 /* Sends this console's user fields to the layer as an item list (item 64 first; at most 64 fields, each by kind). */

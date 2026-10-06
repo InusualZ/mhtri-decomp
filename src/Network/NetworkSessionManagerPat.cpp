@@ -15,9 +15,6 @@
  *   Where a body identifies nothing, an override is named for the vtable offset it fills (`slot_068`, as `slot_13C` in
  *   the base).
  * RESIDUALS. Every row has a body.
- *  - `isNetworkSessionManagerPatReady`, `slot_19C`, `getTimeSincePublish`: `NetworkSessionBase::getUserFlagB` (+0x84,
- *    `Network/NetworkSessionBase.h`) returns `u8`, so our callers re-extend it (`clrlwi.`) where retail uses the
- *    full word (`cmpwi r3,0`, a plain `bctr` tail call);
  *  - `networkSessionReflect1`, `moveStartSession`: one callee-saved register colouring each;
  *  - `networkSessionReflect0`: the event-code select's scheduling;
  *  - `setCircleInfo`: the option's enable byte compares with `cmplwi` where retail has `cmpwi` (u8, s8, bool tried);
@@ -25,7 +22,6 @@
  *    +0x08 (the explicit pointer spelling swaps two registers);
  *  - `updatePlayerRecord`: under its `#pragma peephole on` island (retail stores the u32 state into the byte field
  *    unmasked) MWCC folds the second dispatch's `lwz r12,0(r3)` into `lwz r12,0x540(r31)`;
- *  - `isNetworkSessionManagerPatReady` also costs one extabindex row (ours has a frame, retail's tail call none);
  *  - `.sdata2`: the pool entries pair by address, not by name (anonymous `@NNN` against the map's `lbl_8079C758`;
  *    naming one would claim a symbol the original did not have, playbook 58);
  *  - `.sdata` 0xC against 0x10; `flipcheck` reads both small-data pools as a partial pool of a TU spanning several

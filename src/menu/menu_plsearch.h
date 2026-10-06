@@ -29,6 +29,9 @@ struct NetMailBox* getLobbyMailBox(void);
  * the mediator's terms wrappers forward to (GUESS names from the bodies: the open stores the buffer pair and sets
  * the ready byte, the check request clears it and raises +0x0E, the update request raises +0x0F while ready, the
  * cancel drops +0x0F and raises +0x10, the read returns the +0xE0 count). */
+/* .sbss 0x80794D58 - the live terms object (its constructor publishes it, the destructor clears it; GUESS name). */
+extern struct PatTerms* sPatTerms;
+
 /* untyped: byte range - the MEM2 buffer handed to the terms object */
 void initPatTerms(struct PatTerms* terms, void* buffer, u32 size);
 void requestPatTermsCheck(struct PatTerms* terms);

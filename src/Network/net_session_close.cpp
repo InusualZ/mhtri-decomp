@@ -17,13 +17,14 @@
  *   `postQuestBoardRecord` (its one caller is the quest board); the `userdata_item` profile fillers
  *   `fillNetUserProfile*` (declared in `userdata_item.h`); `refreshRosterCache`, `copyPeerProfileCard`, `sendPeerMessage`,
  *   `net_peer_address` and the `NetPeerCard` fields from what the bodies copy.
- * RESIDUALS. Unwritten: `requestPeerProfileById` (it reads the lobby state block's per-row state byte two bytes before
- *   each timer word, which `enemy/lobby_state_block.h`'s row view does not name); the static initialiser 0x80437204
+ * RESIDUALS. Unwritten: the static initialiser 0x80437204
  *   (`net_community_state` is a `NetworkCommunityPeer` built with that record's constructor 0x803F0730 / destructor
- *   0x803F0578, which `Network/NetworkCommunityPat.h` does not declare): our `__sinit` constructs `net_peer_address`
+ *   0x803F0578, which `Network/NetworkCommunityPat.h` leaves implicit: declaring them moves that unit's implicit member
+ *   run and costs its extab order): our `__sinit` constructs `net_peer_address`
  *   only, so its row and the first destructor-chain record stay unpaired (the `.ctors` word matches).
  *   `flipcheck`: `sendBoxPageCheckRequest` is force-active in retail's `.comment` and not in ours (row 36).
  *   Partial rows:
+ *  - `requestPeerProfileById`: the work record, result and mode sit one callee-saved register off retail's;
  *  - `sessionReflectCallback`: the case-29 message switch lowers to a binary compare tree where retail tests
  *    `(u32)(kind - 1) <= 3` linearly; the chat-record text address (+0x35) is CSE'd into r27; the peer offset (index *
  *    0x120) is recomputed for the chat-log call in cases 7 and 27; cases 24/25 keep an `extsb` before the `stb`;
@@ -74,6 +75,7 @@
 #include "fn_8004CAD8.h"   /* exportItemBoxPage, exportEquipRecord */
 #include "hud/cockpit.h"   /* cockpitShowNewMail */
 #include "menu/menu_plsearch.h"   /* getLobbyMailBox */
+#include "enemy/lobby_state_block.h"   /* lobby_state_block - owner enemy/em020_prog.cpp (its leaf header) */
 
 
 #pragma peephole off
@@ -2153,6 +2155,38 @@ void startRosterFetch(s8* result)
     if (work->result_0xC290 != NULL) {
         *work->result_0xC290 = 0;
     }
+}
+
+/* 0x80435E34 (0x104): asks the community layer for the profile of the peer whose id text is `id` and parks `result`;
+ * for mode 1 with a quest-page row `index` that already holds a timeout it answers from the row's state instead (the
+ * first ask arms the row's timeout). */
+void requestPeerProfileById(const char* id, s8* result, s8 mode, u8 index)
+{
+    NetCtrlWk* work = net_ctrl_wk;
+    struct LobbyTimerRow* row;
+
+    if (work == NULL) {
+        return;
+    }
+    if (mode == 1 && lobby_state_block.timer_count_0x16D0 != 0 &&
+        (u8)(lobby_state_block.timer_count_0x16D0 - 1) >= index) {
+        row = &lobby_state_block.timers_0x16D4[index];
+        if (row->timer_0x20 == 0) {
+            row->timer_0x20 = get_server_big_data_timeout_element(3);
+        } else {
+            if (row->state_0x1E == 1) {
+                *result = 1;
+            } else {
+                *result = -1;
+            }
+            return;
+        }
+    }
+    importNetId(&net_peer_address, (const NetId*)id);
+    getNetworkCommunityPat(getPatsObject(), 0)->requestPeerProfile(&net_peer_address);
+    net_ctrl_wk->result_0xC290 = result;
+    *result = 0;
+    work->flag_0xC368 = mode;
 }
 
 /*

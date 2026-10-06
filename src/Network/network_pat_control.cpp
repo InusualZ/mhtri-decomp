@@ -2283,8 +2283,8 @@ void tickPatControl(void)
     NetCtrlWk* work = net_ctrl_wk;
 
     for (i = 0; i < lobby_state_block.timer_count_0x16D0; i++) {
-        if (lobby_state_block.timers_0x16F4[i].timer_0x00 != 0) {
-            lobby_state_block.timers_0x16F4[i].timer_0x00--;
+        if (lobby_state_block.timers_0x16D4[i].timer_0x20 != 0) {
+            lobby_state_block.timers_0x16D4[i].timer_0x20--;
         }
     }
     if (work->timeout_0xC484 > 0) {

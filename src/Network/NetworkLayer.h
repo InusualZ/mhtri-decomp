@@ -75,6 +75,8 @@ typedef struct NetworkLayerRequest {
     s32 getRecord(NetworkRequestError* out);   /* 0x803E3598 - the error record, under the mutex; false while none is set */
     void setRecord(u32 code, u32 arg_a, u32 arg_b);   /* 0x803E3610 - stores the error record under the mutex */
     s32 getArgument(u32 index);                /* 0x803E3C70 - argument `index`, 0 (with a warning) past `count_28` */
+    s32 isTimedOut();                          /* 0x803E55AC - waiting longer than `interval_4C` (never while it is 0) */
+    void restartTimer(f32 interval);           /* 0x803E5630 - the clock becomes the baseline, the interval is replaced */
 } NetworkLayerRequest;   /* size: 0xA4 (the pool's element size) */
 
 /* The layer base class: the request pool and the lazy request starters `NetworkLayerPat` builds on.  Its

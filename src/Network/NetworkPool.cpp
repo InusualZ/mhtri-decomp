@@ -14,15 +14,12 @@
  * NAMES. `getNetworkPool` is a GUESS named by the mediator band (it returns the singleton); every `NetworkPool`
  *   method and field name is a GUESS from its body; `setAccount` from the mediator's `setConnectionPaths` (user id,
  *   password), `getPointBalance` from `purchase` comparing the row price with it.
- * RESIDUALS. `init`: retail calls `NetworkTimedHandler::init` with the period in r5/r6 and leaves r4 untouched (its
- *   real parameter is one `s64`; the map's `Flll` spelling needs a first argument, so ours sets r4), and allocates the
- *   handler with a new-expression whose constructor (the map's `create`) carries an extab cleanup record (0x18 B; ours
- *   16 B short, so the extabindex pointers after it shift).  `destroySession` reaches the handler's deleting
- *   destructor through its table slot +0x08 (`Network/GameSpyInterfaceThread.h` declares no virtual destructor), so
- *   the slot is loaded through r5 where retail's virtual call uses r12.  `.sbss`/`.sdata`/`.sdata2` are the
- *   target's 8-byte padded fragments of our 4/5/4 bytes.
+ * RESIDUALS. None in `.text`, `extab` or `extabindex`; `.sbss`/`.sdata`/`.sdata2` are the target's 8-byte padded
+ *   fragments of our 4/5/4 bytes (the link places them identically: the DOL hash holds with the unit linked).
  * SHAPES. The two tables come out in retail's order (`NetworkPool`'s 0x80602490, then `NetworkRandom`'s 0x806024A0)
  *   from one TU, so the zigzag `splitcheck --unit` reads at 0x806024A0 is not a seam.
+ *  - the timed handler is a real `new NetworkTimedHandler()` (its extab cleanup record) and `delete session` (the
+ *    virtual deleting destructor, slot +0x08).
  */
 
 #include "Network/NetworkPool.h"
@@ -38,15 +35,6 @@
 
 #pragma peephole off
 
-/* `operator new` is what the timed handler's allocation lowers to (`__nw__FUl`). */
-void* operator new(unsigned long size);   /* untyped: allocation returns a raw byte range */
-
-/* The timed handler's table as `destroySession` reads it: slot +0x08 is the deleting destructor. */
-typedef struct NetworkTimedHandlerSlots {
-    /* +0x00 */ u32 rtti;
-    /* +0x04 */ u32 offset;
-    /* +0x08 */ NetworkTimedHandler* (*destroy)(NetworkTimedHandler* handler, s16 flags);
-} NetworkTimedHandlerSlots;   /* size: 0x0C */
 
 /* 0x80794CB8 (.sbss) - the live pool (the constructor publishes it, the destructor clears it). */
 NetworkPool* sNetworkPool;
@@ -137,12 +125,8 @@ void NetworkPool::init(NetworkPoolCallback callback, void* arg, const NetworkPoo
         option_40 = config->option_34;
         this->timed = timed;
         if (timed != 0 && session == NULL) {
-            NetworkTimedHandler* handler = (NetworkTimedHandler*)operator new(0x20);
-            if (handler != NULL) {
-                handler->create();
-            }
-            session = handler;
-            handler->init(0, (s32)(config->period >> 32), (s32)config->period);
+            session = new NetworkTimedHandler();
+            session->init(config->period);
         }
     }
 }
@@ -189,9 +173,7 @@ void NetworkPool::clearState()
 void NetworkPool::destroySession()
 {
     if (session != NULL) {
-        if (session != NULL) {
-            (*(NetworkTimedHandlerSlots**)session)->destroy(session, 1);
-        }
+        delete session;
         session = NULL;
     }
 }

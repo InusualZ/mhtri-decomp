@@ -20,9 +20,9 @@
  *   slots).
  * RESIDUALS. `NetworkPeerGameSpy::receive`: retail materialises the error-source constant as a relocation
  *   (`@eti_80030018+9/+10`) where ours is the immediate, and keeps a `clrlwi` ours drops.  `tGameSpyInterface`: the
- *   hoisted high word of `ticks * 17` is a fresh `li r0, 0` where retail reuses r24.  `NetworkTimedHandler::create`:
- *   retail leaves the `lis` half of the vtable address in r4 as `init`'s unused first argument.
- *   `NetworkTimedHandler::init`, `publishRequest`, `step`: register colouring.  `.data` 1392 of 1396 B until the cut;
+ *   hoisted high word of `ticks * 17` is a fresh `li r0, 0` where retail reuses r24.  `publishRequest`, `step`: register
+ *   colouring.  `.data`: 1392 of 1396 B until the cut, plus `NetworkTimedHandler`'s table, which this unit emits (its
+ *   destructor is defined here) while retail's 0x80603740 lies past the claimed range;
  *   `extab` lacks a 20-byte cleanup record against `networkInstance_destroyMutex` (the peer's member-mutex destructor), which needs a
  *   real `NetworkPeerBase` derivation with a member mutex in the peer TU.
  * SHAPES. Every call through a foreign object's vtable goes through a declared `virtual` (the only shape MWCC emits as
@@ -1490,29 +1490,22 @@ NetworkPeerGameSpy* NetworkPeerGameSpy::destroy(s16 flags)
 }
 
 /* Constructs the timed handler. */
-NetworkTimedHandler* NetworkTimedHandler::create()
+NetworkTimedHandler::NetworkTimedHandler()
 {
-    vtable_00 = lbl_80603740;
-    init((s32)lbl_80603740, 0, 0);
-    return this;
+    init(0);
 }
 
-/* Deleting destructor for the timed handler. */
-NetworkTimedHandler* NetworkTimedHandler::destroy(s16 flags)
+/* The timed handler owns nothing. */
+NetworkTimedHandler::~NetworkTimedHandler()
 {
-    if (this != NULL && flags > 0) {
-        operator delete(this);
-    }
-    return this;
 }
 
-/* Initialises the timed handler's interval, limit and timeout. */
-void NetworkTimedHandler::init(s32 a, s32 b, s32 c)
+/* Sets the period and the timeout, clearing the state. */
+void NetworkTimedHandler::init(s64 period)
 {
     clear();
     timeout_14 = 1000;
-    interval_08 = b;
-    limit_0C = c;
+    period_08 = period;
 }
 
 /* Clears the timed handler's state, ready flag and expiry flag. */

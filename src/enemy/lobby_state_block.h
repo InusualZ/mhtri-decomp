@@ -13,19 +13,22 @@
 extern "C" {
 #endif
 
-/* One 0x24-byte timer row: the count-down word, then the row's other words. */
+/* One 0x24-byte timer row: the row's state byte (`requestPeerProfileById` answers 1 / -1 from it) and the count-down
+ * word the network pat control decrements every frame. */
 struct LobbyTimerRow {
-    /* +0x00 */ s32 timer_0x00;
-    /* +0x04 */ u8 pad_0x04[0x20];
+    /* +0x00 */ u8 pad_0x00[0x1E];
+    /* +0x1E */ u8 state_0x1E;
+    /* +0x1F */ u8 pad_0x1F;
+    /* +0x20 */ s32 timer_0x20;
 }; /* size: 0x24 */
 
-/* The block, viewed as its timer table: the count at +0x16D0 and the rows from +0x16F4.  size: 0x2EB8 (the
+/* The block, viewed as its timer table: the count at +0x16D0 and the rows from +0x16D4.  size: 0x2EB8 (the
  * map's object size, and the length the work-record init clears) */
 struct LobbyTimerBlock {
     /* +0x0000 */ u8 pad_0x0000[0x16D0];
     /* +0x16D0 */ s32 timer_count_0x16D0;
-    /* +0x16D4 */ u8 pad_0x16D4[0x20];
-    /* +0x16F4 */ struct LobbyTimerRow timers_0x16F4[169];
+    /* +0x16D4 */ struct LobbyTimerRow timers_0x16D4[169];
+    /* +0x2E98 */ u8 pad_0x2E98[0x20];
 }; /* size: 0x2EB8 */
 
 extern struct LobbyTimerBlock lobby_state_block;
