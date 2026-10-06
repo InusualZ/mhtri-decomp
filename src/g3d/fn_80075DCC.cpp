@@ -7,7 +7,8 @@
  *   `g3d/g3d_camera.cpp`; the right edge is the discovery's byte cap, not a TU seam (`g3d/g3d_scnmdl.cpp` follows).
  * NAMES. The file keeps the map's stem (no one `__FILE__` names the run).  The bodies are m2c's output, typed
  *   mechanically: each `RawView_N` struct's `field_0xNN` states an offset and a size, not a meaning.
- *   GUESS (from the body and its callers): `sin_cos_deg`, `mtx34_set`; GDWriteXFCmd is a GUESS (the SDK's GD inline that
+ *   GUESS (from the body and its callers): `sin_cos_deg`, `mtx34_set`; g3d_gd_set_chan_mat_color is a GUESS (XF 0x100C
+ *   plus the channel); GDWriteXFCmd is a GUESS (the SDK's GD inline that
  *   writes one XF register: opcode 0x10, a zero count, the address, the value); `CopiedMatResources` is a GUESS (the 0x38-byte
  *   set of material handles fn_80077E70 refills and 0x80078DC0 constructs).  The material resource classes'
  *   constructors, assignments, ResMatTexCoordGen::IsValid, ResMatTevColor::IsValid and `ResMat` getters are nw4r's `g3d_resmat_ac.h` members.
@@ -225,14 +226,9 @@ s32 fn_80074074(void*);
 u32 fn_80074620(void*);
 void* fn_80074A54(void);
 s32 fn_80075844(s32);
-u32 fn_80086B2C(void*, s32, s32, s32, s32, void*, s32);
 u32 fn_8008715C(void*);
 u32 fn_80087978(void*);
 u32 fn_80087AD0(void*, s32, s32);
-u32 fn_8008818C(void);
-s32 fn_80088260(s8);
-s8 fn_80088270(s8);
-u32 fn_800882A0(void*, void*, void*, void*, void*);
 u32 fn_80088574(void*);
 s32 fn_80094094(s32);
 s32 fn_80099974(void*);
@@ -265,7 +261,6 @@ u32 math_sincos_idx(f32);
 /* internal */ void* fn_80077398(s32 arg0);
 /* internal */ s32 fn_800773FC(s32 *arg0);
 /* internal */ void* fn_80077404(void* a0);
-/* internal */ u32 fn_8007740C(s32 arg0, s32 *arg1);
 /* internal */ u32 GDWriteXFCmd(u16 arg0, s32 arg1);
 /* internal */ u32 fn_80077474(s32 arg0);
 /* internal */ u32 fn_80077480(u16 arg0);
@@ -560,20 +555,14 @@ typedef struct {
     /* +0x28 */ u32 field_0x28;
 } RawView_2; /* size: 0x2C */
 u32 fn_800761BC(s32 arg0, s32 arg1, void *arg2, void **arg3, s32 arg4) {
-    u32 sp75;
-    u32 sp76;
-    u32 sp77;
 
     u32 sp90;
-    s32 sp88;
-    s32 sp84;
-    s32 sp80;
-    s32 sp7C;
-    u8 sp7B;
-    u8 sp7A;
-    u8 sp79;
-    u8 sp78;
-    u8 sp74;
+    u32 sp88;
+    u32 sp84;
+    u32 sp80;
+    u32 sp7C;
+    GXColor sp78;
+    GXColor sp74;
     s32 sp70;
     s32 sp6C;
     s32 sp68;
@@ -592,10 +581,6 @@ u32 fn_800761BC(s32 arg0, s32 arg1, void *arg2, void **arg3, s32 arg4) {
     s32 sp34;
     s32 sp30;
     s32 sp2C;
-    s32 sp28;
-    s32 sp24;
-    s32 sp20;
-    s32 sp1C;
     s32 sp18;
     s32 sp14;
     s32 sp10;
@@ -610,8 +595,7 @@ u32 fn_800761BC(s32 arg0, s32 arg1, void *arg2, void **arg3, s32 arg4) {
         } else {
             misc = *reinterpret_cast<const nw4r::g3d::ResMatMisc*>(&((RawView_2*)arg2)->field_0x24);
         }
-        misc.GetFogIdx();
-        fn_8008818C();
+        g3d_state_load_fog(misc.GetFogIdx());
         sp6C = (s32)misc.mpData;
         g3d_state_set_mat_misc(*reinterpret_cast<nw4r::g3d::ResMatMisc*>((void*)(&sp6C)));
         if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResTlutObj*>((s32 *)(&((RawView_2*)arg2)->field_0x04))->IsValid() == 0)) {
@@ -671,20 +655,14 @@ u32 fn_800761BC(s32 arg0, s32 arg1, void *arg2, void **arg3, s32 arg4) {
             sp2C = ((RawView_2*)arg2)->field_0x18;
             g3d_state_load_mat_ind_mtx_dl(*reinterpret_cast<nw4r::g3d::ResMatIndMtxAndScale*>((void*)(&sp2C)));
         }
-        misc.GetLightSetIdx();
-        fn_800882A0((void*)(&sp88), (void*)(&sp84), (void*)(&sp80), (void*)(&sp7C), (void*)(&sp74));
+        g3d_state_load_light_set(misc.GetLightSetIdx(), &sp88, &sp84, &sp80, &sp7C, &sp74);
         sp78 = sp74;
-        sp79 = sp75;
-        sp7A = sp76;
-        sp7B = sp77;
         if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResMatChan*>((void*)(&((RawView_2*)arg2)->field_0x1C))->IsValid() == 0)) {
-            sp24 = (s32) sp78;
-            sp28 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((s32)(arg0))->GetResMatChan().mpData;
-            fn_80086B2C((void*)(&sp28), (s32)(sp88), (s32)(sp84), (s32)(sp80), (s32)(sp7C), (void*)(&sp24), (s32)((arg1 & 8) != 0));
+            g3d_state_load_mat_chan(reinterpret_cast<nw4r::g3d::ResMat*>((s32)(arg0))->GetResMatChan(), sp88, sp84, sp80,
+                                    sp7C, sp78, (arg1 & 8) != 0);
         } else {
-            sp1C = (s32) sp78;
-            sp20 = ((RawView_2*)arg2)->field_0x1C;
-            fn_80086B2C((void*)(&sp20), (s32)(sp88), (s32)(sp84), (s32)(sp80), (s32)(sp7C), (void*)(&sp1C), (s32)((arg1 & 8) != 0));
+            g3d_state_load_mat_chan(*reinterpret_cast<nw4r::g3d::ResMatChan*>((void*)(&((RawView_2*)arg2)->field_0x1C)),
+                                    sp88, sp84, sp80, sp7C, sp78, (arg1 & 8) != 0);
         }
         if ((arg2 == NULL) || (reinterpret_cast<const nw4r::g3d::ResMatTexCoordGen*>((void*)(&((RawView_2*)arg2)->field_0x20))->IsValid() == 0)) {
             sp18 = (s32)reinterpret_cast<nw4r::g3d::ResMat*>((void*)(arg0))->GetResMatTexCoordGen().mpData;
@@ -1011,8 +989,9 @@ void* fn_80077404(void* a0) {
     return &lbl_807911F0;
 }
 
-u32 fn_8007740C(s32 arg0, s32 *arg1) {
-    GDWriteXFCmd((u16)((u16) ((arg0 & 1) + 0x100C)), (s32)(*arg1));
+/* 0x8007740C (0x14): writes a colour channel's material colour (XF 0x100C + chan). */
+void g3d_gd_set_chan_mat_color(u32 chan, GXColor color) {
+    GDWriteXFCmd((chan & 1) + 0x100C, *(const u32*)&color);
 }
 
 u32 GDWriteXFCmd(u16 arg0, s32 arg1) {
@@ -1373,7 +1352,7 @@ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
                     fn_8007100C((void*)(&spC8), (s32)(g3d_state_get_camera_mtx()));
                 }
             }
-            temp_r3_5 = fn_80088260((s8)(fn_80088270((s8)((s8) *var_r30))));
+            temp_r3_5 = (s32)g3d_state_get_light_obj(g3d_state_get_light_set_entry((s8)*var_r30));
             if ((temp_r3_5 != 0) && (fn_8006518C() != 0)) {
                 VEC3_ctor((nw4r::math::VEC3*)&sp5C);
                 if (fn_80077DD8((s32 *)(temp_r3_5)) != 0) {
