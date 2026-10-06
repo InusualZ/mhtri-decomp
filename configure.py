@@ -1046,7 +1046,7 @@ config.libs = [
             Object(NonMatching, "Network/NetworkUnitPacket.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3"]),
             # Flags: unit header of src/Network/PatConnection.cpp; measurements in docs/network.md.
-            Object(NonMatching, "Network/PatConnection.cpp",
+            Object(Matching, "Network/PatConnection.cpp",
                    cflags=[f for f in cflags_network if f not in ("-O4,p", "-inline auto")] + ["-O3", "-inline noauto"]),
             # Flags: unit header of src/Network/PatInterface.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/PatInterface.cpp",
