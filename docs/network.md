@@ -136,6 +136,17 @@ bullet per row (function `match_percent` over the same source, flag against flag
   `-O4,p -inline auto` scores 67.22 % (5/27 at 100) against 99.97 % (26/27).
 * **`NetworkCommunityPat`**: the same flags.  Over 87 rows `-O4,p -inline auto` scores 84.24 % (4/87 at 100) against
   99.97 % (84/87).
+* **`PatConnection`**: `-O3 -inline noauto`, the `PatInterface` row's flags.  Over the unit's 37 written rows the
+  lib's `-O4,p -inline auto` scores 76.78 % (6/37 at 100) against 96.48 % (20/37) before any source tuning:
+  `-inline auto` folds the 4- and 8-byte tail branches `writeBool`/`writeInt16`/`writeUInt32Shared` and the reader
+  wrappers into copies of their callees, and `-O4,p` hoists the constant setup above the callee-save stores.  The
+  file-scope pragmas (`peephole off`, `pool_data off`) are in the unit header; with them every row is 100 % and a
+  trial `Matching` link keeps main.dol's SHA-1.
+* **`NetworkStreamSink`**: `-O3 -inline noauto -pool off`, the transport band's flags plus `noauto`.  Over the buffer
+  class's 15 rows the lib's `-O4,p -inline auto` schedules the stores out of source order (the constructor 66.88,
+  `attach` 45.43) and inlines the 8-byte `getNetworkLogger` into its callers (`fill`/`put`/`copyFrom` 96.3, a `lwz` of
+  the singleton where retail calls); `-O3 -pool off` alone left those three at 96.3, and with `-inline noauto` and the
+  file's `peephole off` every written row is 100 %.
 * **`PatInterface`** (with the former `network_state` and the head of the former `network_layer_io`):
   `-O3 -inline noauto`.  At the lib default `setTermVersion`/`setAnnounceBuffer`/`increment60d4` schedule their
   stores out of source order (60.00/77.78/80.00, 100 at `-O3`), and every framed function hoists its

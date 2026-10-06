@@ -1,14 +1,17 @@
 /*
  * Network/PatConnection.h - the declarations of `Network/PatConnection.cpp`: the `PatConnection` class (the
- *   `PatInterface` base) and the session band's request writers.
+ *   `PatInterface` base), the packet table and the connection's free entry points (the body readers and the request
+ *   writers).
  */
 #ifndef MHTRI_NETWORK_PATCONNECTION_H
 #define MHTRI_NETWORK_PATCONNECTION_H
 
 #include "types.h"
 #include "Network/gamespy_interface_types.h"   /* NetworkErrorInfo - the error `postError` takes */
+#include "Network/network_socket_streams.h"   /* NetworkPeerAddress, NetworkResolverBase */
 
 class PatInterface;                       /* Network/PatInterface.h */
+class NetworkSocketBase;                  /* Network/NetworkFileFetcher.h */
 
 /* The 8-byte header of one received packet (the connection keeps it at +0x60AA): `recvCommand` matches the three
  * op-code bytes against the packet table, a status of -1/1 selects `recvAnsNg`/`recvAnsAlert`, and the handlers hand
@@ -20,11 +23,17 @@ typedef struct PatPacketHeader {
     /* +0x07 */ s8 status_07;         /* -1 negative reply, 1 alert, else the handler's own */
 } PatPacketHeader;   /* size: 0x08 */
 
-/* The Pat server connection, `PatInterface`'s base: the constructor 0x803FAE9C stores the table 0x806006E8, whose
- * slots are the destructor 0x803FAF34, `resetDefaults` 0x803FAF78 and 159 pure virtuals (null words +0x10..+0x288:
- * the packet handlers, `recvCommand` and `postError`, which `PatInterface` overrides).  The fields the bodies read
- * are named; the rest of the buffers is padding that keeps the offsets exact.  The virtuals are declared and the
- * key function (the destructor) is not defined here, so no table is emitted by a consumer (rule 10). */
+/* The server a connection dials: the host name and the address it resolves to (`setServerAddress` fills both; a
+ * non-zero address skips the name lookup). */
+typedef struct PatServerInfo {
+    /* +0x00 */ char host_00[0x80];
+    /* +0x80 */ NetworkPeerAddress address_80;
+} PatServerInfo;   /* size: 0x86 */
+
+/* The Pat server connection, `PatInterface`'s base: the constructor 0x803FAE9C stores `__vt__13PatConnection`
+ * (0x806006E8), whose slots are the destructor 0x803FAF34, `resetDefaults` 0x803FAF78 and 159 pure virtuals (null
+ * words +0x10..+0x288: the packet handlers, `recvCommand` and `postError`, which `PatInterface` overrides).  The
+ * destructor is the key function, so `Network/PatConnection.cpp` emits the table (rule 10). */
 class PatConnection {
 public:
     /* 0x803FAE9C */
@@ -191,27 +200,50 @@ public:
     /* +0x27C */ virtual s32 recvAnsAgreementPage(s32 index, const PatPacketHeader* header) = 0;
     /* +0x280 */ virtual s32 recvAnsAgreement(s32 index, const PatPacketHeader* header) = 0;
     /* +0x284 */ virtual s32 recvCommand(const PatPacketHeader* header) = 0;
-    /* +0x288 */ virtual void postError(NetworkErrorInfo* info) = 0;
+    /* +0x288 */ virtual s32 postError(NetworkErrorInfo* info) = 0;
 
-    /* 0x803FB490 - one step of the connection's close: arms it (state 0 -> 10), then releases the log context and
-     * the socket and returns 1 once closed, else 0 (GUESS name from the body). */
-    s32 disconnect();
+    /* the by-value spelling: the caller's argument copy is what the virtual slot is handed */
+    inline void postError(NetworkErrorInfo info) { postError(&info); }
+
     /* 0x803FB018 - one step of the connect state machine (+0x60D1: resolve, socket, the secure open when
      * `setSecureServer` armed it, connect); the failures fill `error` and log "PatConnection::connectServer ...
      * fail" (.data 0x80600500..), which names it. */
     s32 connectServer(NetworkErrorInfo* error);
+    /* 0x803FB490 - one step of the connection's close: arms it (state 0 -> 10), then releases the resolver and
+     * the socket and returns 1 once closed, else 0 (GUESS name from the body). */
+    s32 disconnect();
     /* 0x803FB634 - receives what the socket holds into the receive buffer; "PatConnection::receiveCommand fail"
      * (.data 0x806005B8) names it. */
     s32 receiveCommand(NetworkErrorInfo* error);
     /* 0x803FB77C (GUESS name) - takes the next whole packet out of the receive buffer, decrypts it while
      * `cryptEnabled_60D0` is set ("PatCryptDecrypt fail") and hands its header to `recvCommand` (+0x284). */
     s32 dispatchCommand(NetworkErrorInfo* error);
+    /* 0x803FC548 - fails when the handler read past the packet's declared size ("PatConnection::checkBufError"
+     * names it). */
+    s32 checkBufError();
 
-    /* +0x0004 */ u8 pad_0004[0x60A6];   /* the connection's buffers and socket state */
-    /* +0x60AA */ PatPacketHeader header_60AA;   /* the packet being dispatched */
+    /* +0x0004 */ PatServerInfo server_0004;            /* the server `setServerAddress` names */
+    /* +0x008A */ u8 pad_008A[0x02];
+    /* +0x008C */ PatServerInfo* serverInfo_008C;       /* the server the connect dials (NULL: none set) */
+    /* +0x0090 */ NetworkResolverBase* resolver_0090;   /* the name lookup while the connect resolves */
+    /* +0x0094 */ NetworkSocketBase* socket_0094;       /* the connection's socket */
+    /* +0x0098 */ u8 connected_0098;                    /* set once the connect completed */
+    /* +0x0099 */ u8 pad_0099[0x03];
+    /* +0x009C */ s32 sendSize_009C;                    /* bytes of `sendBuffer_00A0` waiting to be sent */
+    /* +0x00A0 */ u8 sendBuffer_00A0[0x2000];
+    /* +0x20A0 */ s32 recvSize_20A0;                    /* bytes of `recvBuffer_20A8` received */
+    /* +0x20A4 */ s32 blockSize_20A4;                   /* the size `beginReadBlock` read */
+    /* +0x20A8 */ u8 recvBuffer_20A8[0x4000];
+    /* +0x60A8 */ u16 sequence_60A8;                    /* the last request id sent (seeded with `rand`) */
+    /* +0x60AA */ PatPacketHeader header_60AA;          /* the packet being dispatched */
     /* +0x60B2 */ u8 pad_60B2[0x02];
-    /* +0x60B4 */ u8* readCursor_60B4;   /* the readers' position in the packet body */
-    /* +0x60B8 */ u8 pad_60B8[0x18];
+    /* +0x60B4 */ u8* readCursor_60B4;                  /* the readers' position in the packet body */
+    /* +0x60B8 */ u8* blockStart_60B8;                  /* the read position `beginReadBlock` saved */
+    /* +0x60BC */ u8* packetStart_60BC;                 /* the request being written (its 8-byte header) */
+    /* +0x60C0 */ u8* writeCursor_60C0;                 /* the writers' position in the request body */
+    /* +0x60C4 */ const char* secureHost_60C4;          /* the secure server's host (empty: plain socket) */
+    /* +0x60C8 */ const u8* rootCA_60C8;                /* its root certificate */
+    /* +0x60CC */ s32 rootCASize_60CC;
     /* +0x60D0 */ u8 cryptEnabled_60D0;   /* the receive loop decrypts the body while set */
     /* +0x60D1 */ u8 opening_state;     /* the opening sub-step the mediator's progress reads (0 and 90 ignored) */
     /* +0x60D2 */ u8 connectionState_60D2;   /* `disconnect`'s state: 0 idle, 10 closing */
@@ -219,53 +251,82 @@ public:
 };   /* size: 0x60D4 (the derived `PatInterface`'s first own field, the reference count, is at +0x60D4) */
 typedef PatInterface NetworkStateMachine;  /* the state machine's spelling of the singleton */
 
+/* A packet handler: a `PatConnection` virtual the table names (`recvCommand` calls it through `__ptmf_scall`). */
+typedef s32 (PatConnection::*PatPacketHandler)(s32 index, const PatPacketHeader* header);
+
+/* One row of the packet table: the three op-code bytes (the third is 1 for a request, 2 for its answer and 0x10
+ * for a notice), the handler of a received packet (null for a packet this side only sends), and two descriptions,
+ * the Japanese one and an empty one. */
+typedef struct PatPacketEntry {
+    /* +0x00 */ u8 opcode_00[3];
+    /* +0x04 */ PatPacketHandler handler_04;
+    /* +0x10 */ const char* description_10;
+    /* +0x14 */ const char* label_14;
+} PatPacketEntry;   /* size: 0x18 */
+
+/* 0x805FE910 - the 297 packets of the Pat protocol and a zero terminator (GUESS name; `flushBuffer` and
+ * `recvCommand` index it with the packet number). */
+extern PatPacketEntry patPacketTable[298];
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* ---- the session band's request writers (moved here from `Network/network_state.h`; the state machine
-   passes its own view of the session object) */
-u32  flushBuffer(NetworkStateMachine* self, u32 opcode, u32 flags);
-void encryptBuffer(NetworkStateMachine* self);
-u32  writeUInt8(NetworkStateMachine* self, u8 value);
-void writeUInt16(NetworkStateMachine* self, u16 value);
-void writeUInt32(NetworkStateMachine* self, u32 value);
-void writeUInt32Shared(NetworkStateMachine* self, u32 value);
-void writeUInt8Array(NetworkStateMachine* self, const u8* data, u16 count);
-void writeBool(NetworkStateMachine* self, s8 value);
+/* The connection's free entry points: the map names them without a mangling.  `self` is the connection (the
+ * request builders pass the `PatInterface` singleton). */
 
-/* 0x803FB5CC / 0x803FB5E0 / 0x803FB5F0 (GUESS names from the bodies) - copy the 4-byte server address
- * `setServerAddress` stored at +0x84 to `out`; store the host, root certificate and its size (+0x60C4..+0x60CC)
- * that `connectServer` hands the socket's `openSecure`; set the PatCamellia key and raise `cryptEnabled_60D0`. */
-void getServerAddress(NetworkStateMachine* self, u8* out);
-void setSecureServer(NetworkStateMachine* self, const char* host, const u8* rootCA, s32 rootCASize);
-void enableCrypt(NetworkStateMachine* self, const u8* key);
+/* 0x803FB550 - names the server (`host` printed into the connection's own server record, the 4-byte address and
+ * the port copied) and makes it the one `connectServer` dials. */
+void setServerAddress(PatConnection* self, const char* host, const u8* address, const u16* port);
+/* 0x803FB5CC / 0x803FB5E0 / 0x803FB5F0 (GUESS names from the bodies) - copy the server's 4-byte address to `out`;
+ * store the host, root certificate and its size that `connectServer` hands the socket's `openSecure`; set the
+ * PatCamellia key and raise `cryptEnabled_60D0`. */
+void getServerAddress(PatConnection* self, u8* out);
+void setSecureServer(PatConnection* self, const char* host, const u8* rootCA, s32 rootCASize);
+void enableCrypt(PatConnection* self, const u8* key);
+/* 0x803FB628 (GUESS name: `enableCrypt`'s inverse) - clears `cryptEnabled_60D0`. */
+void disableCrypt(PatConnection* self);
+/* 0x803FB9B0 - sends the queued requests ("PatConnection::sendCommand fail" names it): 0 when sent or nothing
+ * was queued, negative with `error` filled on failure. */
+s32 sendCommand(PatConnection* self, NetworkErrorInfo* error);
 
-/* 0x803FBB04 */
-void readUInt8(NetworkStateMachine* self, u8* out);
-/* 0x803FBB20 */
-void readUInt16(NetworkStateMachine* self, u16* out);
-/* 0x803FBB8C */
-void readUInt32_(NetworkStateMachine* self, u32* out);
-/* 0x803FBC6C */
-void readUInt8_(NetworkStateMachine* self, s8* out);
-/* 0x803FBCA8 - the signed halfword reader (`readUInt16` into a temporary, stored as `s16`), named in its
- * siblings' scheme (`readUInt8_`/`readInt32`, `writeInt16`). */
-void readInt16(NetworkStateMachine* self, s16* out);
-/* 0x803FBCE0 */
-void readInt32(NetworkStateMachine* self, s32* out);
-/* 0x803FBD18 */
-void readString(NetworkStateMachine* self, u32* length, char* buffer, u16 size);
-/* 0x803FBDDC */
-void readUInt8Array(NetworkStateMachine* self, u32* length, u8* buffer, u16 size);
-/* 0x803FBE88 */
-void beginReadBlock(NetworkStateMachine* self, u16* size);
-/* 0x803FBED0 */
-void endReadBlock(NetworkStateMachine* self);
-/* 0x803FC40C */
-void writeInt16(NetworkStateMachine* self, s16 value);
-/* 0x803FC418 */
-u32 writeString(NetworkStateMachine* self, const char* text);
+/* 0x803FBB04..0x803FBED0 - the packet body readers: each takes its value at the read cursor (multi-byte values
+ * converted from network order) and advances the cursor. */
+void readUInt8(PatConnection* self, u8* out);
+void readUInt16(PatConnection* self, u16* out);
+void readUInt32_(PatConnection* self, u32* out);
+void readUInt64(PatConnection* self, u64* out);
+void readUInt8_(PatConnection* self, s8* out);
+/* the signed halfword reader (`readUInt16` into a temporary, stored as `s16`), named in its siblings' scheme
+ * (`readUInt8_`/`readInt32`, `writeInt16`) */
+void readInt16(PatConnection* self, s16* out);
+void readInt32(PatConnection* self, s32* out);
+/* a 16-bit length and that many bytes: at most `size - 1` (the string) or `size` (the array) are copied into the
+ * cleared buffer and `*length` says how many; the cursor skips the whole field */
+void readString(PatConnection* self, u32* length, char* buffer, u16 size);
+void readUInt8Array(PatConnection* self, u32* length, u8* buffer, u16 size);
+/* a block: its 16-bit size, then `endReadBlock` skips whatever of it the reader left */
+void beginReadBlock(PatConnection* self, u16* size);
+void endReadBlock(PatConnection* self);
+
+/* 0x803FBEF0 - starts a request of packet `index` (its 8-byte header: a fresh request id, or the answered
+ * request's for an answer, `flags` and the op-code); sends the queue first when less than 0x800 bytes are free.
+ * Returns the request id, 0 when not connected or the send failed. */
+u32  flushBuffer(PatConnection* self, s32 index, u8 flags);
+/* 0x803FC084 - closes the request: encrypts its body while crypt is on, stores its size and queues it. */
+void encryptBuffer(PatConnection* self);
+/* 0x803FC210..0x803FC4B4 - the request body writers: each stores its value at the write cursor (multi-byte values
+ * in network order) and returns where it went, NULL when not connected. */
+u8*  writeUInt8(PatConnection* self, u8 value);
+u8*  writeUInt16(PatConnection* self, u16 value);
+u8*  writeUInt32(PatConnection* self, u32 value);
+u8*  writeUInt64(PatConnection* self, u64 value);
+u8*  writeBool(PatConnection* self, s8 value);
+u8*  writeInt16(PatConnection* self, s16 value);
+/* the 4-byte tail-branch twin of `writeUInt32` */
+u8*  writeUInt32Shared(PatConnection* self, u32 value);
+u8*  writeString(PatConnection* self, const char* text);
+u8*  writeUInt8Array(PatConnection* self, const u8* data, u16 count);
 
 #ifdef __cplusplus
 }

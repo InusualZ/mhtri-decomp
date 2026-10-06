@@ -28,9 +28,11 @@ public:
     /* +0x1C (GUESS: binds the stream to a block that is full) */ virtual void bind(u8* block, u32 size);
     /* +0x20 (GUESS) */ virtual s32 fill(u8* out, u32 size);
     /* +0x24 (GUESS) */ virtual s32 put(const u8* data, u32 size);
-    /* +0x28 (GUESS: copies another sink's record in - the roster, peer and session address copies dispatch it
-       with the source record) */ virtual void copyFrom(const u8* src);
-    /* +0x2C (GUESS: offset-derived) */ virtual void slot_2C();
+    /* +0x28 ("duplicate" in its log strings: copies another buffer's stored bytes in - the roster, peer and session
+       address copies dispatch it with the source record; their count, or -1) */ virtual s32 copyFrom(const u8* src);
+    /* +0x2C ("NetworkBuffer::equals" in its log strings: whether another buffer stores the same bytes; retail takes the
+       other buffer and returns the verdict, which this declaration cannot carry while `NetworkUniqueId` overrides it
+       as declared) */ virtual void slot_2C();
     /* +0x30 (GUESS: the framed writer scrambles a frame's payload with a random key byte - `size` bytes from `offset`,
        22 past the frame header) */ virtual void encrypt(u8 key, u16 offset, u16 size);
     /* +0x34 (GUESS: the reader's inverse, with the key the frame header carries) */
