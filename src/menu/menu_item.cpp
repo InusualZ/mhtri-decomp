@@ -243,7 +243,7 @@ extern "C" const char lbl_805CDFD8[];
 /* The cursor-arrow sprite rows `fn_802A6414` hands `fn_802DB140` (`.data` 0x805CDFF0). */
 extern "C" u16 lbl_805CDFF0[];
 
-/* One 0x130-byte record of the option table `lbl_806BE340` (`.bss`): +0x00 says the row is filled,
+/* One 0x130-byte record of the option table `lobby_hunter_cards` (`.bss`): +0x00 says the row is filled,
  * +0x03 is its label and +0x0D its value text.  Only those three fields are named.
  * size: 0x130 */
 typedef struct MENU_OPTION_REC {
@@ -263,7 +263,7 @@ typedef struct MENU_MOVE_WORK {
 
 /* The option-list records `menu_list_fill`/`menu_list_names_set` and the draw walk: 0x130-byte records whose
  * +0x00 byte says the row is filled, +0x03 the label and +0x0D its value text.  `.bss` 0x806BE340. */
-extern u8 lbl_806BE340[];
+extern u8 lobby_hunter_cards[];
 
 /* The block `fn_802AA0DC` draws for the panel (`self` +0x24).  Only ever passed by pointer, so the
  * run is opaque here. size: 0x48 */
@@ -922,7 +922,7 @@ extern "C" void fn_802A5E64(MENU_ITEM_W* self) {
             }
             item = self->items_0x1BE[i];
             if (self->menu_kind == 2) {
-                MENU_OPTION_REC* option = &((MENU_OPTION_REC*)lbl_806BE340)[(s8)item];
+                MENU_OPTION_REC* option = &((MENU_OPTION_REC*)lobby_hunter_cards)[(s8)item];
                 if (get_option_cfg(12) == 0) {
                     fn_802E2358(&spr, option->value_0x0D, length, &pos);
                 } else {

@@ -55,6 +55,26 @@ typedef struct NetPoolEntry {
     /* +0x0C */ u8 pad_0x0C[0x14];
 } NetPoolEntry; /* size: 0x20 */
 
+/* A pool record seen as a queued network command (`queueNetCommand`, `updateMessagePool`): its state (1 queued,
+ * 2 sent, 3..6 a layer entry's later steps), the command, the caller's result byte, a data pointer, the argument
+ * count and up to four argument words.  size: 0x20 */
+typedef struct NetCommandEntry {
+    /* +0x00 */ u8 state_0x00;
+    /* +0x01 */ u8 command_0x01;
+    /* +0x02 */ u8 pad_0x02[0x2];
+    /* +0x04 */ s8* result_0x04;
+    /* +0x08 */ s32 data_0x08;   /* commands 1 and 2: the caller's buffer / word */
+    /* +0x0C */ s32 arg_count_0x0C;
+    /* +0x10 */ s32 args_0x10[4];
+} NetCommandEntry; /* size: 0x20 */
+
+/* The command pool from its head: the live count, then the 128 records.  size: 0x1008 */
+typedef struct NetCommandPool {
+    /* +0x000 */ u32 unused_0x000;
+    /* +0x004 */ u32 count_0x004;
+    /* +0x008 */ NetCommandEntry entries_0x008[128];
+} NetCommandPool; /* size: 0x1008 */
+
 /*@TYPES begin@*/
 /* One 0x40-byte member slot of a profile: the joined word and flag the session join writes, the value
  * session commands 20/21 report, the member's display name (`getPlayerRecordName`, 16 bytes) and the
@@ -185,7 +205,8 @@ typedef struct NetSrvRec {
     /* +0x04 */ char name_0x04[0x24];
     /* +0x28 */ s32 population_0x28;
     /* +0x2C */ s32 capacity_0x2C;
-    /* +0x30 */ u8 pad_0x30[0x8];
+    /* +0x30 */ s32 value_0x30;
+    /* +0x34 */ u8 pad_0x34[0x4];
     /* +0x38 */ u32 flags_0x38;
     /* +0x3C */ u32 type_0x3C;          /* 1-based server type, matched against `NetServerType` */
 } NetSrvRec; /* size: 0x40 */
@@ -703,19 +724,22 @@ typedef struct NetCtrlWk {
     /* +0x3ED0 */ NetSlot* slot_list_0x3ED0;
     /* +0x3ED4 */ NetSlot slots_0x3ED4[100];
     /* +0x6134 */ NetUserPosition position_0x6134;   /* the position `sendUserPosition` publishes */
-    /* +0x614C */ u8 pad_0x614C[0x40];
+    /* +0x614C */ NetworkLayerId room_id_0x614C;   /* the room `readRoomHeader_C8` copies out before a jump into it */
     /* +0x618C */ NetworkLayerId layer_id_0x618C;   /* the layer id `saveLayerId` keeps for the change checks */
     /* +0x61CC */ NetRosterSync roster_sync_0x61CC;
     /* +0x6210 */ u32 settings_0x6210[4];
     /* +0x6220 */ u16 layer_stack_0x6220[16];   /* the layer ids entered (command 5 pushes, command 4 pops) */
     /* +0x6240 */ s32 layer_depth_0x6240;
-    /* +0x6244 */ s32 layer_results_0x6244[36];   /* one result word per layer command (installLayerCallback clears them) */
-    /* +0x62D4 */ u8 pad_0x62D4[0x14];
+    /* +0x6244 */ s32 layer_results_0x6244[41];   /* one result word per layer command (installLayerCallback clears them) */
     /* +0x62E8 */ s32 peer_count_0x62E8;
-    /* +0x62EC */ u8 pad_0x62EC[0x24];
+    /* +0x62EC */ s32 member_total_0x62EC;   /* the layer's friend count after a user-list read */
+    /* +0x62F0 */ u8 pad_0x62F0[0x20];
     /* +0x6310 */ u32 sizes_0x6310[4];   /* 0x2E0 / 0x200 / 0x2260 / 0 after init */
-    /* +0x6320 */ NetPoolEntry pool_0x6320[128];
-    /* +0x7320 */ u8 pad_0x7320[0x48];
+    /* +0x6320 */ union {
+        NetPoolEntry pool_0x6320[128];
+        NetCommandPool command_pool_0x6320;   /* the same records seen from the pool head: the queued commands */
+    };
+    /* +0x7328 */ u8 pad_0x7328[0x40];
     /* +0x7368 */ char name_0x7368[0xA];
     /* +0x7372 */ char name2_0x7372[0xA];
     /* +0x737C */ u8 pad_0x737C[0x10C];
@@ -833,7 +857,7 @@ typedef struct NetCtrlWk {
     /* +0xC300 */ s32 msg_state_0xC300;
     /* +0xC304 */ s32 view_key_0xC304;     /* compared with seen_key_0xC310 (GUESS on the pair's role) */
     /* +0xC308 */ s32 view_key_0xC308;     /* compared with seen_key_0xC314 */
-    /* +0xC30C */ u8 pad_0xC30C[0x4];
+    /* +0xC30C */ s32 view_key_0xC30C;
     /* +0xC310 */ s32 seen_key_0xC310;
     /* +0xC314 */ s32 seen_key_0xC314;
     /* +0xC318 */ s32 seen_key_0xC318;
@@ -856,7 +880,7 @@ typedef struct NetCtrlWk {
     /* +0xC3C4 */ u32 file_sums_0xC3C4[10];
     /* +0xC3EC */ u8* staging_0xC3EC;
     /* +0xC3F0 */ u8 flag_0xC3F0;
-    /* +0xC3F1 */ u8 pad_0xC3F1[0x1];
+    /* +0xC3F1 */ s8 profile_result_0xC3F1;   /* `requestPeerProfileById`'s answer for a pending layer entry */
     /* +0xC3F2 */ u8 flag_0xC3F2;
     /* +0xC3F3 */ u8 pad_0xC3F3[0x1];
     /* +0xC3F4 */ NetCircleRecords circle_records_0xC3F4;   /* handed to the session manager (setCircleRecords) */
@@ -1147,6 +1171,8 @@ s32 sendUserPosition(u8 action, const f32* position, const u32* values, u8 mode,
 /* 0x8042822C / 0x8042826C / 0x80428538 - keep the layer's id, read how it changed since, and classify the change
  * (GUESS names from the bodies). */
 void saveLayerId(void);
+/* 0x804281C4 (GUESS) - the layer's community record `index` (a layer entry's target). */
+NetCommunityRec* getCommunityRecord(s32 index);
 void readLayerIdChange(s32* changed, u32* server, s32* city, s32* room);
 s32 classifyLayerIdChange(void);
 /* 0x8042835C - whether this player may enter the layer `target`: 2 not (no known server, or no city), 4 already

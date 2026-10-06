@@ -9,7 +9,7 @@
 #include "types.h"
 #include "id_value.h"
 
-/* One record of the item-record table `lbl_806BE340` (two blocks of five, 0x130 B each): a validity
+/* One record of the item-record table `lobby_hunter_cards` (two blocks of five, 0x130 B each): a validity
  * byte, the short (10-byte) name the list keeps, and the long name at +0x0D.  Field sizes are the
  * gaps the table's own `strcpy` call sites walk; the rest of the record is not touched by this range.
  * size: 0x130 */

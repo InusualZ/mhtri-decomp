@@ -10,6 +10,7 @@
 #include "hud/NetMsgHeader.h" /* `NetMsgHeader::fill` writes each command packet's 4-byte header */
 #include "quest/arenatask.h" /* arena_other_player_eq_set: this band's act 25 calls it (rule 2) */
 #include "stage/shell.h" /* ShellSerialEntry, serial_find, serial_state_set_word (rule 2) */
+#include "lobby/lobby_hunter_cards.h" /* LbQuestPage, lobby_hunter_cards - this unit's leaf header */
 
 /* `quest_element_pick_ck` (owner `lobby/lb_quest_screen.h`) is declared below with the owner's signature. */
 struct QuestWork;
@@ -372,12 +373,6 @@ typedef struct LbPageWork {
     /* +0x78 */ u8 unused_0x78[0x24];
 } LbPageWork; /* size: 0x9C (>= 0x9C read) */
 
-/* The 0x130-byte quest/page record `hud_key_lookup` scans for a six-byte key.  size: 0x130 */
-typedef struct LbQuestPage {
-    /* +0x000 */ u8 unused_0x000[0x3];
-    /* +0x003 */ u8 key_0x03[6];
-    /* +0x009 */ u8 unused_0x009[0x127];
-} LbQuestPage; /* size: 0x130 */
 
 /* The tutorial/quest announcement block (`lbl_806BEF20`, 0x10 B): the state bytes the state machine
  * walks and the data pointer it hands out.  size: 0x10 */
@@ -439,7 +434,6 @@ extern u8 lbl_80794B98[8];         /* .sbss 0x80794B98 - the per-entry "handled"
 extern const f32 lbl_8079B2B8;     /* .sdata2 - the delay `lb_act_award_handover` scales by Screen_w */
 extern const f32 lbl_8079B2BC;     /* .sdata2 */
 extern LbQuestWork lbl_806BEF20;   /* .bss 0x806BEF20 - the tutorial/quest announcement block */
-extern LbQuestPage lbl_806BE340[10]; /* .bss 0x806BE340 - the ten 0x130-byte quest/page records */
 extern u16 lbl_805E6A20[];         /* .data 0x805E6A20 - the three-level table (see the cast below) */
 extern LbTriplet* lbl_805E69E8[];  /* .data 0x805E69E8 - the per-kind 3-byte row tables */
 extern u16 lbl_806042B8[];         /* .data 0x806042B8 - the id table `lb_page_id_find` scans */

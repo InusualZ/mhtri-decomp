@@ -94,7 +94,7 @@ extern "C" const f32 lbl_8079BC68; /* -400.0f */
  * byte), declared: the source does not emit it yet. */
 extern u8 lobby_state_block[];
 /* `lobby/lb_companion_ui.cpp`'s quest-page block (ten 0x130-byte records), from its leaf header. */
-#include "lobby/lbl_806BE340.h"
+#include "lobby/lobby_hunter_cards.h"
 /* The `.sbss` one-byte flag `em020_unknown_flag_set` writes. */
 extern u8 lbl_80794BF4;
 /* The pooled `.sdata2` constants this unit loads through `r2`.  Declared, never defined (playbook
@@ -583,7 +583,7 @@ void em020_noop(void)
  * 0x80376968 */
 u8* em020_quest_page_ptr(void)
 {
-    return lbl_806BE340 + 3;
+    return lobby_hunter_cards[0].key_0x03;
 }
 
 /* The em020 "false" program-table stub.
@@ -621,7 +621,7 @@ void em020_quest_pages_clear(void)
     s32 i;
 
     for (i = 1; i < 10; i++) {
-        memset(lbl_806BE340 + i * 304, 0, 304);
+        memset(&lobby_hunter_cards[i], 0, sizeof(LbQuestPage));
     }
 }
 

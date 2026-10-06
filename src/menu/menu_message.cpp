@@ -76,7 +76,7 @@ extern "C" void menu_frame_draw_blocks(void* dst, void* src, s8 a, s8 b, u16 c, 
 extern "C" void menu_frame_page_draw(u32* dst, MenuListEntry* entries, s8 a, s8 b, u16 c, u32 d, u8 e);
 
 /* The source table the list is built from: `lobby/lb_companion_ui.cpp`'s `.bss`, declared here. */
-extern MenuSourceRecord lbl_806BE340[10];   /* 2 x 5 records: validity byte + two names */
+extern MenuSourceRecord lobby_hunter_cards[10];   /* 2 x 5 records: validity byte + two names */
 
 /* `hud/cockpit.cpp`'s page-arrow helper (0x802DAF48), declared in this unit's call sites' shape; its owner's
  * declaration in `ai/fn_802D44F4.h` is not included here. */
@@ -180,7 +180,7 @@ extern "C" u8 menu_list_fill(MenuListWork* self, s32 index)
 
     self->list_count_0x1BB = 0;
     if (self->kind_0x00F == 2) {
-        u8* rec = (u8*)&lbl_806BE340[0];
+        u8* rec = (u8*)&lobby_hunter_cards[0];
         s8 pick;
         s8 id;
         s32 block;
@@ -254,7 +254,7 @@ extern "C" s32 menu_list_names_set(MenuListWork* self, u8 index)
         return 1;
     }
     if (self->kind_0x00F == 2) {
-        MenuSourceRecord* rec = &lbl_806BE340[index];
+        MenuSourceRecord* rec = &lobby_hunter_cards[index];
 
         if (rec->valid_0x000 != 0) {
             strcpy(self->long_name_0x1D2, rec->long_name_0x00D);
