@@ -43,6 +43,26 @@ void OSReport(const char* format, ...);
  * signed `OSTime`; one tick is a quarter of the bus clock). */
 u32 OSGetTick(void);
 
+/* The broken-down time `OSTicksToCalendarTime` fills. */
+typedef struct OSCalendarTime {
+    /* +0x00 */ s32 sec;
+    /* +0x04 */ s32 min;
+    /* +0x08 */ s32 hour;
+    /* +0x0C */ s32 mday;
+    /* +0x10 */ s32 mon;
+    /* +0x14 */ s32 year;
+    /* +0x18 */ s32 wday;
+    /* +0x1C */ s32 yday;
+    /* +0x20 */ s32 msec;
+    /* +0x24 */ s32 usec;
+} OSCalendarTime; /* size: 0x28 */
+/* 0x804D4E50 - converts a time-base value to calendar time. */
+void OSTicksToCalendarTime(s64 ticks, OSCalendarTime* td);
+/* 0x804D5180 - converts calendar time back to a time-base value. */
+s64 OSCalendarTimeToTicks(const OSCalendarTime* td);
+/* 0x804CB390 - the 4-character game code of the running title, copied into a static buffer. */
+char* OSGetAppGamename(void);
+
 s64 OSGetTime(void);
 
 /* The NAND file API the EC (shop) client `Network/NetworkPool.cpp` drives.  The command block and the file
@@ -59,6 +79,22 @@ s32 NANDOpenAsync(const char* path, NANDFileInfo* info, u8 mode, NANDAsyncCallba
 s32 NANDReadAsync(NANDFileInfo* info, void* buffer, u32 length, NANDAsyncCallback callback, NANDCommandBlock* block); /* untyped: byte range */
 /* 0x804C8680 - close the open file. */
 s32 NANDCloseAsync(NANDFileInfo* info, NANDAsyncCallback callback, NANDCommandBlock* block);
+/* 0x804C7840 - write `length` bytes of `buffer` to the open file. */
+s32 NANDWriteAsync(NANDFileInfo* info, const void* buffer, u32 length, NANDAsyncCallback callback, NANDCommandBlock* block); /* untyped: byte range */
+/* 0x804C72F0 / 0x804C8510 / 0x804C7620 - create, open and delete `path` by its absolute name (the private
+ * twins of the home-directory calls). */
+s32 NANDPrivateCreateAsync(const char* path, u8 permission, u8 attribute, NANDAsyncCallback callback, NANDCommandBlock* block);
+s32 NANDPrivateOpenAsync(const char* path, NANDFileInfo* info, u8 mode, NANDAsyncCallback callback, NANDCommandBlock* block);
+s32 NANDPrivateDeleteAsync(const char* path, NANDAsyncCallback callback, NANDCommandBlock* block);
+/* The record `NANDGetStatus` fills: owner, group (the maker code), attribute and permission. */
+typedef struct NANDStatus {
+    /* +0x00 */ u32 ownerId;
+    /* +0x04 */ u16 groupId;
+    /* +0x06 */ u8 attribute;
+    /* +0x07 */ u8 permission;
+} NANDStatus; /* size: 0x08 */
+/* 0x804C8090 - the owner/group/attribute/permission record of `path`. */
+s32 NANDGetStatus(const char* path, NANDStatus* status);
 /* 0x804C7540 - delete `path` (`ISFS_DeleteAsync` on the absolute path); the public twin of
  * `NANDPrivateDeleteAsync` 0x804C7620. */
 s32 NANDDeleteAsync(const char* path, NANDAsyncCallback callback, NANDCommandBlock* block);

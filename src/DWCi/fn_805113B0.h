@@ -8,10 +8,29 @@
 #define MHTRI_DWCI_FN_805113B0_H
 
 #include "types.h"
+#include "DWCi/dwc_nasfunc.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* The GT2 socket / connection core the `DWCi/dwc_nasfunc.cpp` GT2 entry points call (types in
+ * `DWCi/dwc_nasfunc.h`). */
+u32 DWCi_sendControlFrame(DWCiReq* req);
+u32 DWCi_appendTransfer(DWCiReq* req, DWCiXfer* xfer);
+u32 DWCi_flushRequest(DWCiReq* req, u32 a, u32 b, u32 flag);
+void DWCi_createConnection(DWCiConn** out, char* host, u32 bufSize1, u32 bufSize2, u32 arg5, u32 mode);
+void DWCi_destroyConnection(DWCiConn* conn);
+void DWCi_setConnectionUserValue(DWCiConn* conn, u32 value);
+u32 DWCi_createRequest(DWCiConn* conn, DWCiReq** out, u32 addr, u16 port);
+void DWCi_removeRequest(DWCiReq* req);
+/* untyped: byte range - the datagram */
+u32 DWCi_sendTo(DWCiConn* conn, u32 addr, u16 port, void* buf, int len);
+u32 DWCi_connectionTick(DWCiConn* conn);
+void DWCi_connectionFlushRequests(DWCiConn* conn);
+u32 DWCi_parseAddress(char* str, u32* outAddr, u16* outPort);
+u32 DWCi_findRequest(DWCiConn* conn, u32 addr, u16 port);
+void DWCi_connectionShutdown(DWCiConn* conn);
 
 /* host-to-network byte order for a port */
 u16 DWCi_htons(u16 port);
@@ -26,6 +45,10 @@ char* DWCi_formatAddress(u32 addr, u16 port, char* buf);
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* 0x806308A8 - the GameSpy stats server host name, a 64-byte buffer `DWC_Init` rewrites for the server type
+ * (the unit's `.data` run 0x806308A8..0x806308E8). GUESS on the name. */
+extern char DWCi_statsServerHostname[64];
 
 extern char DWCi_addressFormat[6];
 

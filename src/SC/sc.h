@@ -26,6 +26,15 @@ u32 SCGetCounterBias(void);
 /* 0x804DCAD0 - the console language (the U8 item IPL.LNG). */
 u8 SCGetLanguage(void);
 
+/* 0x804DD180 - the console's product area (the dump's name). */
+s8 SCGetProductArea(void);
+
+/* 0x804DD210 / 0x804DD250 - the console's product code string (NULL when unset) and its serial number (non-zero on
+ * success); the DWC login sends them as "%s%09d".  NAMES: SCGetProductCode and SCGetProductSN are GUESSes from that
+ * use, not names recovered from the SDK. */
+const char* SCGetProductCode(void);
+BOOL SCGetProductSN(u32* serial);
+
 /* 0x804DCE90 - the country byte of the IPL.SADR simple-address record (item 16, 0x1008 bytes): TRUE and
  * `*country` set when the record is valid (its first word is not 0xFFFF and neither of its two top bytes is
  * 0 or 0xFF), else FALSE.  NAME (a GUESS): no log string covers it; it reads IPL.SADR's first byte, the

@@ -23,6 +23,7 @@
 #define MHTRI_DWCI_DWCI_NATNEG_H
 
 #include "types.h"
+#include "SO/soi.h"
 
 struct DWCiNatNegSession;
 
@@ -33,16 +34,12 @@ extern "C" {
 /* the unprototyped callback shape the GameSpy interface installs and casts back */
 typedef void (*DWCiCallback)();
 
-/* The address record the DWCi socket wrappers send and receive through: one length byte, one family
- * byte, the network-order port and the network-order address - the same 8 bytes `bind`/`connect`
- * take.  Moved here from `src/DWCi/fn_805113B0.c` when `DWCi_natNegSetSocket` became its second
- * user (brief section 6.5 rule 1). size: 0x08 */
-typedef struct DWCiSockAddrIn {
-    /* +0x00 */ u8 len;
-    /* +0x01 */ u8 family;
-    /* +0x02 */ u16 port;
-    /* +0x04 */ u32 addr;
-} DWCiSockAddrIn;
+/* The address record the DWCi socket wrappers send and receive through: SO's own `SOSockAddrIn` (length,
+ * family, network-order port and address). */
+typedef SOSockAddrIn DWCiSockAddrIn;
+
+/* 0x807625F0 - the game name `DWC_Init` copies in (the word sits in this unit's `.bss` run). GUESS on the name. */
+extern char DWCi_gameName[];
 
 void DWCi_NatNegCleanup(void);
 /* Begins one negotiation: the game socket to bind the probes to (-1 for none), the cookie the peers share,
@@ -90,9 +87,29 @@ extern s32 DWCi_natNegIdleSocketA;
 extern s32 DWCi_natNegIdleSocketB;
 extern u32 DWCi_natNegNatType;
 
-/* 0x807614D8 (.bss, 0x80 B) - the host-name text the announce copies the local name from (read at 15
- * sites, written nowhere in the link set). */
-extern char DWCi_natNegGameName[];
+/* 0x807614D8 (.bss, 0x80 B) - the game name `DWCi_natProbeStart` stores (the NATNEG announce and host names read
+ * it) and the availability-probe host override behind it (empty: "<game>.available.gs.nintendowifi.net"). */
+typedef struct DWCiAvailableNames {
+    /* +0x00 */ char gameName[0x40];
+    /* +0x40 */ char hostName[0x40];
+} DWCiAvailableNames; /* size: 0x80 */
+extern DWCiAvailableNames DWCi_availableNames;
+
+/* 0x80761558 (.bss) - the availability probe `DWCi_natProbeStart` sends and `DWCi_natProbePoll` waits on: its
+ * socket, the server address, the query packet and its length, the send time and the resend count. */
+typedef struct DWCiAvailableCheck {
+    /* +0x00 */ s32 sock;
+    /* +0x04 */ SOSockAddrIn address;
+    /* +0x0C */ u8 packet[0x40];
+    /* +0x4C */ s32 packetLength;
+    /* +0x50 */ u32 sendTime;
+    /* +0x54 */ s32 resendCount;
+    /* +0x58 */ u8 pad_0x58[0x10];
+} DWCiAvailableCheck; /* size: 0x68 (the map row's extent; the bodies use 0x58) */
+extern DWCiAvailableCheck DWCi_availableCheck;
+
+/* 0x807615C0 (.bss, 0x1000 B) - the datagram buffer `gti2ReceiveMessages` reads into. */
+extern u8 DWCi_gt2ReceiveBuffer[0x1000];
 
 /* 0x807625C0 (.bss) - the two-buffer address-string ring `DWCi_formatAddress` /
  * `DWCi_natNegFormatAddress` write into, `DWCi_addressRingIndex` (declared unowned in

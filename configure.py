@@ -1125,8 +1125,9 @@ config.libs = [
             # neighbours (.text 0x80507C40..0x80509DB0, 15 functions / 8560 B).  Right edge is the
             # strong `.sdata` run-jump cut at 0x80509DB0 (`tudiscover.py at 0x80507C40`); the left
             # edge is the named symbol's own start.  Claims .text only.  See the file header.
-            Object(NonMatching, "DWCi/dwc_error.cpp"),
-            Object(NonMatching, "DWCi/DWCi_Np_CPUCopyFast.c"),
+            # dwc_error / DWCi_Np_CPUCopyFast: cflags_base (-func_align 16, the retail 16-byte packing); docs/network.md.
+            Object(NonMatching, "DWCi/dwc_error.cpp", cflags=cflags_base),
+            Object(NonMatching, "DWCi/DWCi_Np_CPUCopyFast.c", cflags=cflags_base),
             Object(NonMatching, "DWCi/dwc_nasfunc.cpp"),
             Object(NonMatching, "DWCi/fn_805113B0.c"),
             # The DWCi band tail (.text 0x80512490..0x805145B8, 17 functions / 8488 B).  The left
@@ -1154,7 +1155,8 @@ config.libs = [
         # `Wii/1.3` + cflags_nhttp (4-byte packing is instruction-level evidence here; the flags
         # are otherwise the sibling SDK group's).  Each unit claims .text only.
         "lib": "NHTTP",
-        "mw_version": "Wii/1.3",
+        # Compiler: GC/3.0a5.2 (the library build string 0x4199_60831); measurements in docs/network.md.
+        "mw_version": "GC/3.0a5.2",
         "cflags": cflags_nhttp,
         "host": False,
         "objects": [
@@ -1178,7 +1180,8 @@ config.libs = [
         # fn_8051D878 at 0x8051D878) and from the named NWC24* API; no `__FILE__` string covers the
         # range, so the files keep the map's stems under a rule-7 deferral.
         "lib": "NWC24",
-        "mw_version": "Wii/1.3",
+        # Compiler: GC/3.0a5.2 (the library build string 0x4199_60831); measurements in docs/network.md.
+        "mw_version": "GC/3.0a5.2",
         "cflags": cflags_nwc24,
         "host": False,
         "objects": [
