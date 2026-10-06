@@ -24,6 +24,10 @@ EXPENSIVE_S = 60.0
 LOCK_REL = os.path.join("build", "tmp", "fresh")
 #: How often a waiting process re-reads a lock.
 POLL_S = 0.25
+#: How long a release waits for a reader of the lock file to close it (a Windows delete fails while it is open),
+#: and how often it tries.
+RELEASE_WAIT_S = 10.0
+RELEASE_POLL_S = 0.01
 #: The states; `n/a` is an artifact that does not apply to this tree (a slot check outside a slot).
 STATES = ("fresh", "stale", "missing", "unknown", "n/a")
 
@@ -296,6 +300,89 @@ def _newest_object(top: str) -> tuple[str, float] | None:
     return best
 
 
+def registered_stems(root: str) -> set[str] | None:
+    """The extensionless source paths (`Network/net_session`) of every `Object(...)` in the tree's `configure.py`,
+    the units whose compiled object `build/RMHE08/src/<stem>.o` is current; None when there is no configure.py."""
+    path = os.path.join(root, "configure.py")
+    if not os.path.isfile(path):
+        return None
+    from tools.lib.project import configure  # noqa: PLC0415 - the evaluator is only needed here
+    return {os.path.splitext(o.path.replace("\\", "/"))[0] for o in configure.load(path).objects()}
+
+
+def split_objects(root: str) -> set[str] | None:
+    """The tree-relative target objects (`build/RMHE08/obj/x.o`) the tree's split wrote, by its `config.json`'s
+    units (registered and `auto_*`); None when there is no split."""
+    path = os.path.join(root, BUILD_REL, "config.json")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            cfg = json.load(fh)
+    except (OSError, ValueError):
+        return None
+    out = set()
+    for module in [cfg] + list(cfg.get("modules") or []):
+        for unit in module.get("units") or []:
+            if unit.get("object"):
+                out.add(os.path.normpath(unit["object"]).replace("\\", "/"))
+    return out
+
+
+def object_stem(root: str, path: str, side: str = "src") -> str:
+    """`Network/net_session` for `<root>/build/RMHE08/<side>/Network/net_session.o`."""
+    rel = os.path.relpath(path, os.path.join(root, BUILD_REL, side)).replace("\\", "/")
+    return rel[:-2] if rel.endswith(".o") else rel
+
+
+def orphan_objects(root: str) -> list[str]:
+    """Tree-relative paths of the objects no registered unit produces: under `build/RMHE08/src` an object whose stem
+    no `configure.py` `Object` names, under `build/RMHE08/obj` one the split's `config.json` does not list. A side
+    whose registry cannot be read is not judged (nothing there is called an orphan)."""
+    out = []
+    stems = registered_stems(root)
+    targets = split_objects(root)
+    for side, known in (("src", stems), ("obj", targets)):
+        top = os.path.join(root, BUILD_REL, side)
+        if known is None or not os.path.isdir(top):
+            continue
+        for dirpath, _dirs, names in os.walk(top):
+            for n in sorted(names):
+                if not n.endswith(".o"):
+                    continue
+                p = os.path.join(dirpath, n)
+                rel = os.path.relpath(p, root).replace("\\", "/")
+                key = object_stem(root, p, side) if side == "src" else rel
+                if key not in known:
+                    out.append(rel)
+    return sorted(out)
+
+
+def prune_orphan_objects(root: str) -> list[str]:
+    """Delete `orphan_objects(root)` (and each one's `.d` depfile beside it) -> the deleted object paths."""
+    gone = []
+    for rel in orphan_objects(root):
+        p = os.path.join(root, rel)
+        for victim in (p, p[:-2] + ".d"):
+            try:
+                os.unlink(victim)
+            except FileNotFoundError:
+                continue
+            except OSError:
+                break
+        if not os.path.exists(p):
+            gone.append(rel)
+    return gone
+
+
+def check_orphan_objects(ctx: Context) -> tuple[str, str]:
+    if not os.path.isdir(ctx.path(BUILD_REL)):
+        return "n/a", "no %s" % BUILD_REL.replace("\\", "/")
+    found = orphan_objects(ctx.root)
+    if not found:
+        return "fresh", "every object under build/RMHE08/src and obj belongs to a registered unit"
+    shown = ", ".join(found[:3]) + ("" if len(found) <= 3 else " (+%d more)" % (len(found) - 3))
+    return "stale", "%d object(s) of no registered unit: %s" % (len(found), shown)
+
+
 def check_slot_build(ctx: Context) -> tuple[str, str]:
     from tools.lib import repo  # noqa: PLC0415
     from tools.lib.lanes import pool  # noqa: PLC0415 - lanes imports seed, which imports this module
@@ -395,6 +482,10 @@ REGISTRY: dict[str, Artifact] = {a.name: a for a in (
              "build/RMHE08/report.json", ("compiled objects (all_source)", "split target objects", "objdiff.json"),
              ("split", "objects"), (1.0, 4.0), "1.1-1.2 s in .ninja_log, plus any stale compile", _report,
              _ninja("build/RMHE08/report.json")),
+    Artifact("orphan-objects", "objects under build/RMHE08/src and obj that no registered unit produces (a retired "
+             "or renamed unit's leftovers: ninja -t cleandead cannot see them)",
+             "build/RMHE08/src", ("configure.py's Object rows", "build/RMHE08/config.json's units"), (), (0.1, 1.0),
+             "a walk and a delete (2026-10-06)", check_orphan_objects, _py("tools/units/fresh.py", "prune-orphans")),
     Artifact("slot-build", "a slot's whole build tree, seeded from MAIN and verified against it",
              "build/", ("MAIN's split, report.json and compile outputs",), (), (1.0, 10.0),
              "an incremental re-seed (see slots.py refresh)", check_slot_build, _slot_cmd, tree_local=False),
@@ -515,10 +606,23 @@ class Lock:
             return None
 
     def __exit__(self, *exc) -> None:
-        try:
-            os.unlink(self.path)
-        except OSError:
-            pass
+        """Release: delete the lock file. On Windows a waiter reading the holder's pid (`_holder`) has the file open
+        without delete sharing for that instant, so the delete fails with PermissionError; swallowing it left the
+        lock in place, held by a live pid, and every waiter slept until its 600 s timeout (the selftest's thread
+        then outlived its temp directory). The delete is retried until that read closes (`RELEASE_WAIT_S`)."""
+        deadline = time.time() + RELEASE_WAIT_S
+        while True:
+            try:
+                os.unlink(self.path)
+                return
+            except FileNotFoundError:
+                return
+            except PermissionError:
+                if time.time() > deadline:
+                    return
+                self.sleep(RELEASE_POLL_S)
+            except OSError:
+                return
 
 
 def _tracked_dirty(root: str) -> set[str]:

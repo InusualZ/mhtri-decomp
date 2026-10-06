@@ -73,6 +73,16 @@ None: modules. The CLI is `stylelint.py`'s (`cli.main`), spec `stylelint.md`.
   one credit per removal; another rule, or a copy that leaves the original in place, is still added. Every rule whose
   token or detail names the symbol (2, 7, 11, 12, 13 ...) is covered, because the translation is on the finding, not
   per rule.
+* **A recut's re-owned declaration is the same declaration.** A rule-2 finding's identity carries its owner unit
+  (`r02_extern.rule2_detail`, the one spelling), so a batch whose `splits.txt` gives a range to another unit made every
+  existing local declaration of its symbols in a *touched* file read as added. `diff.owner_map` reads the base and the
+  after maps and, for every rule-2 token whose owner moved **unit -> unit**, translates the base text to the new owner
+  (`renamed_finding(..., owners)`); `judge` reports each credit as `re-owned rule 2 <file> <token>: ...`
+  (`Judgement.re_owned`). A range the batch dropped (owned -> unsplit) or claimed (unsplit -> owned) changes what the
+  finding asks for and stays an addition; a declaration the file did not carry before is still added. Replay
+  (2026-10-06): the font recut 7e9ddd8c3 with its three consumers that declare re-owned symbols touched
+  (`g3d/fn_80063888.cpp`, `g3d/g3d_resanm.c`, `menu/menu_item_page.h`), `--diff 7e9ddd8c3~1`: +5 rule 2 before, 0 after
+  with 5 credited re-owns; the landed diff itself (those files untouched) reads 0 either way, 36 moves credited.
 * **Rule 13's mangling estimate is `lib.names`.** It was `import mangle`, which resolved only while `tools/units/` was on
   `sys.path` (a script in that directory); a caller from anywhere else (a `tools/tests/` module, `python -m`) silently got
   no estimate and a different detail text. Every script's output is unchanged.
@@ -107,7 +117,7 @@ One tool edge: `diff -> tools/units/dataclosure.py` (the fold map `derive_file_a
 ## Test contract
 
 `python tools/units/stylelint.py --selftest` (the runner's entry `tools/units/stylelint`): 445 checks, unchanged by the
-split; 451 with the move+rename rows (two of them fail on the old `removed` keying); 454 with the leaf forward-declaration rows (two fail without the preprocessor mask); 510 with the 2026-10-05 classifier, rule 7 exact and file-name rows (35 of the new checks fail on the code before them: 15 classifier, 9 rule 7 exact, 11 file names); 533 with rule 15 (23 checks; each mutation fails at least one: advisory findings kept in `--diff` 1, `.pi/` live where it exists 1, no size check 2, no other-address check 1, code read as comment text 1, a blank line allowed above a function 1, live paths not whitelisted 1, a percentage clause crossing punctuation 2). Re-homing it to `tools/tests/units/test_stylelint.py` (fixture tier; the one live read is
+split; 451 with the move+rename rows (two of them fail on the old `removed` keying); 454 with the leaf forward-declaration rows (two fail without the preprocessor mask); 510 with the 2026-10-05 classifier, rule 7 exact and file-name rows (35 of the new checks fail on the code before them: 15 classifier, 9 rule 7 exact, 11 file names); 533 with rule 15 (23 checks; each mutation fails at least one: advisory findings kept in `--diff` 1, `.pi/` live where it exists 1, no size check 2, no other-address check 1, code read as comment text 1, a blank line allowed above a function 1, live paths not whitelisted 1, a percentage clause crossing punctuation 2); 545 with the re-own rows (12 checks; `owner_map` returning nothing fails 4). Re-homing it to `tools/tests/units/test_stylelint.py` (fixture tier; the one live read is
 `load_ownership(".")`, which the runner's temp cwd turns into "no map") is WP6's.
 
 ## Measured (WP3d)

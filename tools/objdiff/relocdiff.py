@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Relocation-level diff of one unit: the target object's relocations against ours, on both sides.
 Spec: docs/tools/spec/relocdiff.md. CLI: relocdiff.py <unit>... [--unit U] [--section S] [--rows N | --all] [--json F]
-[--check] [--by-owner] | --selftest."""
+[--check] [--by-owner] | --callees [unit...] [--json F|-] | --selftest."""
 from __future__ import annotations
 
 import sys, pathlib; sys.path.insert(0, str(next(p for p in pathlib.Path(__file__).resolve().parents if (p / "tools" / "__init__.py").is_file())))
@@ -94,6 +94,73 @@ def run_by_owner(units: list[str]) -> int:
         print("%s: %d/%d relocations match" % (spec, matched, total))
         if any(not ln.startswith("note") for ln in lines):
             status = max(status, 1)
+    return status
+
+
+def callee_record(spec: str, root: str | None = None) -> dict:
+    """`{unit, functions: lib.objcompare.callee_diffs(...), error}` for one unit (`--callees`)."""
+    unit = _units.Unit.resolve(spec, root or _repo.repo_root())
+    rec = {"unit": unit.report_name, "stem": spec, "functions": [], "error": None}
+    missing = [p for p in (unit.obj_ours, unit.obj_target) if not os.path.exists(p)]
+    if missing:
+        rec["error"] = "object missing (%s) - build/split it first" % missing[0]
+        return rec
+    try:
+        rec["functions"] = objcompare.callee_diffs(unit.obj_target, unit.obj_ours)
+    except (ValueError, OSError) as exc:
+        rec["error"] = "unreadable object (%s)" % exc
+    return rec
+
+
+def callee_line(fn: dict) -> str:
+    """One function's differences on one line: `kind: ours X vs target Y @+0xNN; ...`."""
+    parts = []
+    for d in fn["diffs"]:
+        if d["kind"] == "extra":
+            parts.append("extra: ours %s @+0x%x" % (d["ours"], d["offset"]))
+        elif d["kind"] == "missing":
+            parts.append("missing: target %s @+0x%x" % (d["target"], d["offset"]))
+        else:
+            parts.append("%s: ours %s vs target %s @+0x%x" % (d["kind"], d["ours"], d["target"], d["offset"]))
+    return "%s  %s" % (fn["function"], "; ".join(parts))
+
+
+def registered_with_objects(root: str) -> list[str]:
+    """Every registered unit (`configure.py`) whose compiled and split objects both exist, extensionless."""
+    from tools.lib import artifacts  # noqa: PLC0415 - only the whole-tree sweep needs the registry
+    out = []
+    for stem in sorted(artifacts.registered_stems(root) or ()):
+        if all(os.path.exists(os.path.join(root, "build", _repo.VERSION, side, *(stem + ".o").split("/")))
+               for side in ("src", "obj")):
+            out.append(stem)
+    return out
+
+
+def run_callees(units: list[str], json_path: str | None = None) -> int:
+    """`--callees`: per written function, the relocation symbol names that differ (wrong callee, mangling,
+    linkage), one line per function. 0 none, 1 some, 2 an object missing or unreadable."""
+    root = _repo.repo_root()
+    specs = units or registered_with_objects(root)
+    recs = [callee_record(spec, root) for spec in specs]
+    status = 0
+    for rec in recs:
+        if rec["error"]:
+            print("%s: %s" % (rec["stem"], rec["error"]))
+            status = 2
+            continue
+        for fn in rec["functions"]:
+            print("%s  %s" % (rec["stem"], callee_line(fn)))
+            status = max(status, 1)
+    n = sum(len(r["functions"]) for r in recs)
+    print("relocdiff --callees: %d function(s) with a symbol-name difference in %d of %d unit(s)"
+          % (n, sum(1 for r in recs if r["functions"]), len(recs)))
+    if json_path:
+        payload = json.dumps(recs, indent=1)
+        if json_path == "-":
+            print(payload)
+        else:
+            with open(json_path, "w", encoding="utf-8") as fh:
+                fh.write(payload)
     return status
 
 
@@ -245,12 +312,18 @@ def main(argv: list[str] | None = None) -> int:
                     help="compact mode: align relocations in order within each owning symbol, print only "
                          "differences and `N/N relocations match` per unit (exit 1 on a difference); a "
                          "moved function or slid instruction is not a difference")
+    ap.add_argument("--callees", action="store_true",
+                    help="per written function, the relocation symbol names that differ (wrong callee, mangling, "
+                         "linkage), one line per function; no unit = every registered unit with both objects; "
+                         "--json F (or -) writes the record")
     ap.add_argument("--selftest", action="store_true", help="run the selftest and exit")
     args = ap.parse_args(argv)
 
     if args.selftest:
         return selftest()
     units = list(args.units) + list(args.specs)
+    if args.callees:
+        return run_callees(units, args.json)
     if not units:
         ap.error("a unit is required (or --selftest)")
     if args.all and args.rows != 60:

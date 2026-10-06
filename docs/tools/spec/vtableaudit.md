@@ -54,6 +54,17 @@ Inputs -> outputs: splits, map, DOL, objects, src -> rows.
   removed 7-word one (and a 79-word run with an 8-word one) - two of the three rule-10 keys that landing really added
   (and took as recorded allowances) would have passed silently. The gate row (`landing/rows/rules.py`) shares the
   sweep **and** `diff_rows` (since 2026-10-05), so the lane-side `--diff` and the gate give one verdict.
+* **A recut's re-owned run is credited (2026-10-06).** The back side reads the working tree's objects with the
+  base's map, so a run a recut gave from unit A to a new unit B is invisible there and read as ADDED. A `text_ref`
+  sweep now carries the base's data-range owners (`owners`, plus `matching_at_ref` from the base `configure.py`), and
+  `violation_rows` hands them to `diff_rows` as one bookkeeping row (`owners:<ref>`, kind `owners`: never added,
+  removed or counted). An added run whose address lay, at the base, inside another registered unit's range is
+  `REOWNED` (`reowned: [[key, base owner]]` in `--json`) and leaves `added` - unless the base owner was `Matching`
+  (its object emitted the table, so the new owner not emitting it is a regression) or the base owner is the head
+  owner. Replay of `9db8fbe62` (the lobby-tail recut, which needed six `--allow-rule10` keys) against its parent with
+  that commit's own objects: 6 added -> 0 added, 6 re-owned (3 from `lobby/lb_server_sel_trans.cpp` to
+  `Network/NetworkStreamSink.cpp`, 3 from `SO/soi.cpp` to `VF/vf.cpp`). The gate row gets the credit through
+  `diff_rows` unchanged; it does not print the re-owned list yet.
 * **A unit with two ranges of one section (2026-10-05).** dtk writes one object section per split range, so a
   unit with two `.data` ranges has two sections named `.data` in its target object, each with its own `.rela.data`.
   The reader keys sections and relocations by `object_key` (`.data`, `.data#2`, in address order), reads the k-th
@@ -87,12 +98,18 @@ scan (34 hits) and the class order of all 354 units are identical.
 ## Test contract
 
 Tier: fixture (the tree is hashed before and after).
-Today's selftest (`tools/units/vtableaudit_selftest.py`): Four things here can silently make the sweep lie, so each gets its own block of checks: * the **run rule** - `find_runs` must find maximal blocks of consecutive code pointers and must not call a single pointer a table (a run needs two entries), because one stray code address in a data section is an ordinary pointer; * **address resolution** - a word's value comes from the relocation that sits on it (`section base + symbol + addend`), and a symbol that is *undefined* in the object has no address there at all: it is resolved through `symbols.txt` or the `_XXXXXXXX` spelling every `lbl_`/`fn_` name carries. Get this wrong and the sweep reports the wrong addresses, or nothing at all; * the **verdict** - a run our object emits or references is fine, an owned run it neither emits nor references is the rule-10 violation, and a `.ctors`/`extab` run is **not** a vtable (`n/a`), because a run the linker/compiler puts in `.ctors` cannot be one; * the **section comparison** - a non-`.text` section our object does not carry at all is the `missing` case the report exists for, and metadata (`.symtab`, `.rela*`, `.comment`, `.note.split`) is never compared. The real `src/`, `configure.py`, `splits.txt`, `symbols.txt`, `build/` and DOL are never read or written: every fixture lives in a temp directory, so the selftest is green on a tree with no build. The fixture tree is hashed before and after the sweep, which is how "the tool only reads" is checked rather than promised. A `referenced`-window fixture puts a 2-word run at `.data+0x10` and a relocation of ours at `.data+0` (a violation) or at `.data+0x10` (referenced); the range-start window fails both. A second fixture (`ElfBuilder`) gives one unit two `.data` ranges and a target object with two `.data` sections: each block's run must come back at its own address, with no range mismatch and no section-size difference (the pre-fix reader fails five of those checks).
+Today's selftest (`tools/units/vtableaudit_selftest.py`): Four things here can silently make the sweep lie, so each gets its own block of checks: * the **run rule** - `find_runs` must find maximal blocks of consecutive code pointers and must not call a single pointer a table (a run needs two entries), because one stray code address in a data section is an ordinary pointer; * **address resolution** - a word's value comes from the relocation that sits on it (`section base + symbol + addend`), and a symbol that is *undefined* in the object has no address there at all: it is resolved through `symbols.txt` or the `_XXXXXXXX` spelling every `lbl_`/`fn_` name carries. Get this wrong and the sweep reports the wrong addresses, or nothing at all; * the **verdict** - a run our object emits or references is fine, an owned run it neither emits nor references is the rule-10 violation, and a `.ctors`/`extab` run is **not** a vtable (`n/a`), because a run the linker/compiler puts in `.ctors` cannot be one; * the **section comparison** - a non-`.text` section our object does not carry at all is the `missing` case the report exists for, and metadata (`.symtab`, `.rela*`, `.comment`, `.note.split`) is never compared. The real `src/`, `configure.py`, `splits.txt`, `symbols.txt`, `build/` and DOL are never read or written: every fixture lives in a temp directory, so the selftest is green on a tree with no build. The fixture tree is hashed before and after the sweep, which is how "the tool only reads" is checked rather than promised. A `referenced`-window fixture puts a 2-word run at `.data+0x10` and a relocation of ours at `.data+0` (a violation) or at `.data+0x10` (referenced); the range-start window fails both. A second fixture (`ElfBuilder`) gives one unit two `.data` ranges and a target object with two `.data` sections: each block's run must come back at its own address, with no range mismatch and no section-size difference (the pre-fix reader fails five of those checks). The re-own block (3
+checks, 136 in all): a run another unit owned at the base is re-owned, a `Matching` base owner's run and an unowned
+run stay added, no owners row means every run is added, and a run its base owner still owns is added.
 Target: `tools/tests/units/test_vtableaudit.py` on `lib.testing` (`FixtureTree`/`GitFixture`/`ElfBuilder`); live-tree checks, if any, under `TIER='smoke'` and tolerant.
 
 ## Known gaps
 
-* None recorded beyond the Target above.
+* A re-owned run's verdict at the base is not computed (that needs the base's objects): the credit assumes a
+  non-`Matching` owner did not emit it. A non-`Matching` unit whose source did emit the table, recut to one that
+  does not, would be credited.
+* The land gate's rule-10 row (`landing/rows/rules.py`) takes the credit but prints only shifted/removed, not
+  `reowned`.
 
 ## History (the incidents behind the rules - keep the rule, drop the narrative when the rule is stable)
 

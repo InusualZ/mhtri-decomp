@@ -548,26 +548,49 @@ def selftest() -> int:
                                                "words": 2, "unit": "u", "where": ""}},
                        {"run:.data:80050100": {"kind": "run", "section": ".data", "address": 0x80050100,
                                                "words": 3, "unit": "u", "where": ""}}),
-          {"added": [], "removed": [], "shifted": [["run:.data:80050100", "run:.data:80050104"]]})
+          {"added": [], "removed": [], "shifted": [["run:.data:80050100", "run:.data:80050104"]], "reowned": []})
     check("... and a disjoint run is added, the other removed",
           va.diff_rows({"run:.data:80050200": {"kind": "run", "section": ".data", "address": 0x80050200,
                                                "words": 2, "unit": "u", "where": ""}},
                        {"run:.data:80050100": {"kind": "run", "section": ".data", "address": 0x80050100,
                                                "words": 3, "unit": "u", "where": ""}}),
-          {"added": ["run:.data:80050100"], "removed": ["run:.data:80050200"], "shifted": []})
+          {"added": ["run:.data:80050100"], "removed": ["run:.data:80050200"], "shifted": [], "reowned": []})
     # the 2026-10-04 recut (850127ccb): a 630-word run over a removed 7-word run overlaps it but is not that table
     check("... and a run that GREW over a removed one (overlap, but both ends moved) is added, not shifted",
           va.diff_rows({"run:.data:805FBD68": {"kind": "run", "section": ".data", "address": 0x805FBD68,
                                                "words": 7, "unit": "u", "where": ""}},
                        {"run:.data:805FB808": {"kind": "run", "section": ".data", "address": 0x805FB808,
                                                "words": 630, "unit": "u", "where": ""}}),
-          {"added": ["run:.data:805FB808"], "removed": ["run:.data:805FBD68"], "shifted": []})
+          {"added": ["run:.data:805FB808"], "removed": ["run:.data:805FBD68"], "shifted": [], "reowned": []})
     check("... and a one-word move at the END (the last word stopped resolving) still pairs",
           va.diff_rows({"run:.data:80050100": {"kind": "run", "section": ".data", "address": 0x80050100,
                                                "words": 4, "unit": "u", "where": ""}},
                        {"run:.data:80050104": {"kind": "run", "section": ".data", "address": 0x80050104,
                                                "words": 4, "unit": "u", "where": ""}}),
-          {"added": [], "removed": [], "shifted": [["run:.data:80050104", "run:.data:80050100"]]})
+          {"added": [], "removed": [], "shifted": [["run:.data:80050104", "run:.data:80050100"]], "reowned": []})
+    # -- a recut's re-owned run (9db8fbe62: 6 runs from lobby/lb_server_sel_trans and SO/soi to two new units) --------
+    # the back side reads the working tree's objects with the base map, so a run the recut gave to a NEW unit is not
+    # seen there; the base's data-range owners (the `owners` row of a text_ref sweep) credit it as re-owned
+    owners_row = {"owners:base": {"kind": "owners", "unit": "", "where": "",
+                                  "owners": [(0x80050000, 0x80051000, "lobby/lb_server_sel_trans.cpp"),
+                                             (0x80060000, 0x80061000, "SO/soi.cpp")],
+                                  "matching": ["SO/soi.cpp"]}}
+    new_runs = {"run:.data:80050100": {"kind": "run", "section": ".data", "address": 0x80050100, "words": 3,
+                                       "unit": "Network/NetworkStreamSink", "where": ""},
+                "run:.data:80060100": {"kind": "run", "section": ".data", "address": 0x80060100, "words": 3,
+                                       "unit": "VF/vf", "where": ""},
+                "run:.data:80070100": {"kind": "run", "section": ".data", "address": 0x80070100, "words": 3,
+                                       "unit": "VF/vf", "where": ""}}
+    check("a run another registered unit owned at the base is re-owned, not added; a Matching base owner's run "
+          "(its object emitted the table) and a run no unit owned stay added; the owners row is never reported",
+          va.diff_rows(owners_row, new_runs),
+          {"added": ["run:.data:80060100", "run:.data:80070100"], "removed": [], "shifted": [],
+           "reowned": [["run:.data:80050100", "lobby/lb_server_sel_trans.cpp"]]})
+    check("... and without the owners row (an old before snapshot) every one is added, as before",
+          va.diff_rows({}, new_runs)["added"], sorted(new_runs))
+    same_owner = {"run:.data:80050100": dict(new_runs["run:.data:80050100"], unit="lobby/lb_server_sel_trans")}
+    check("... and a run its base owner still owns is no re-own (an addition is an addition)",
+          va.diff_rows(owners_row, same_owner)["added"], ["run:.data:80050100"])
     with tempfile.TemporaryDirectory() as tmp:
         def rg(*args: str) -> str:
             return subprocess.run(["git", "-c", "user.email=selftest@example.invalid",
@@ -612,9 +635,9 @@ def selftest() -> int:
         after_rows = va.violation_rows(va.sweep(tmp))
         before_rows = va.violation_rows(va.sweep(tmp, text_ref=base_ref), va.rename_map(tmp, base_ref))
         check("a map rename keeps the run's key: the back side resolves the object's new spelling",
-              (sorted(before_rows), sorted(after_rows)), (["run:.data:80050100"], ["run:.data:80050100"]))
+              (sorted(k for k in before_rows if not k.startswith("owners:")), sorted(after_rows)), (["run:.data:80050100"], ["run:.data:80050100"]))
         check("... so --diff reads it as nothing added, removed or shifted",
-              va.diff_rows(before_rows, after_rows), {"added": [], "removed": [], "shifted": []})
+              va.diff_rows(before_rows, after_rows), {"added": [], "removed": [], "shifted": [], "reowned": []})
         tool = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vtableaudit.py")
         p = subprocess.run([sys.executable, tool, "--main", tmp, "--diff", base_ref],
                            capture_output=True, text=True, encoding="utf-8", errors="replace")

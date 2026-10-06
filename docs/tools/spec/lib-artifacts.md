@@ -26,6 +26,11 @@ makes it current when a tool needs it (`ensure`), under one policy rule (`auto` 
 * `StaleArtifact` (refuse; a `SystemExit`), `RefreshFailed` (the command failed, or left it stale; a `SystemExit`).
 * The shared rules: `split_reasons(build_root, input_root)`, `manifest_reasons(...)`, `newer_inputs(output, inputs)`,
   `ninja_plan(ctx, target)` (`ninja -n`, dry run), `SPLIT_INPUTS`, `MANIFEST_INPUTS`, `Lock`.
+* Orphan objects: `registered_stems(root)` (the extensionless `Object(...)` paths of `configure.py`, through
+  `lib.project.configure`; None without one), `split_objects(root)` (the target objects `config.json` lists; None
+  without a split), `orphan_objects(root)` (tree-relative objects under `build/RMHE08/src` no `Object` names and under
+  `build/RMHE08/obj` the split does not list; an unreadable registry judges nothing), `prune_orphan_objects(root)`
+  (deletes them and each `.d` beside). `objsame` and `undefrefs --census` skip what `registered_stems` does not name.
 
 ## The registry (measured 2026-10-04, this machine)
 
@@ -39,6 +44,11 @@ makes it current when a tool needs it (`ensure`), under one policy rule (`auto` 
 | `objects` | a unit's include closure (`lib.report.unit_reasons`); tree: `ninja -n all_source` | `ninja <obj>` / `ninja all_source` | 0.2-24 s per unit | manifest |
 | `report` | the objects, the split target objects, `objdiff.json`; unit: `lib.report.report_reasons`; tree: `ninja -n report.json` + newest `obj/*.o` | `ninja build/RMHE08/report.json` | 1.1-1.2 s + stale compiles | split, objects |
 | `slot-build` | MAIN's split, report bytes and compile outputs (`lib.lanes.pool.verify`) | `python tools/units/slots.py refresh N` (from MAIN) | 0.16 s incremental, 0.71 s full (892 files, 42 MB) | - |
+| `orphan-objects` | `configure.py`'s `Object` rows, `config.json`'s units (`orphan_objects`) | `python tools/units/fresh.py prune-orphans` | a walk and a delete, under 1 s | - |
+
+`orphan-objects` measured 2026-10-06 on a copy of MAIN's build at 65b341058: 128 orphans (118 under `src/`, 10 under `obj/`),
+the leftovers of retired or renamed units that `ninja -t cleandead` never sees (they are in no `.ninja_log`); skipping them
+took `undefrefs --census` from 213 references in 70 units to 45 in 19.
 
 `docs/build-performance.md`'s ~18 s split and 200-400 s dump were measured at 13.5 k objects; at 415 objects both are seconds.
 
@@ -51,6 +61,12 @@ makes it current when a tool needs it (`ensure`), under one policy rule (`auto` 
   create; a second process waits, re-checks and skips the rebuild another process just did; a lock whose holder pid is dead is
   taken over); `warn` prints one line per stale artifact and goes on; `refuse` raises `StaleArtifact` naming the artifact, its
   reason and its refresh command. Precedence: a tool's flag, then `$FRESH`, then the tool's default.
+* **A release waits for a reader (2026-10-06).** A waiter reads the holder's pid out of the lock file; on Windows the
+  holder's delete fails with PermissionError while that read has the file open (no delete sharing), and the old release
+  swallowed it - the lock stayed, held by a live pid, and every waiter slept toward its 600 s timeout. Under the selftest
+  runner's load that left the concurrent-callers test's third thread alive past its temp directory (`got 2 != 3`, then
+  a FileNotFoundError on `asm-dump.lock`: reproduced once in three full-suite runs). `Lock.__exit__` now retries the
+  delete on PermissionError every `RELEASE_POLL_S` for up to `RELEASE_WAIT_S`.
 * **A fresh artifact prints nothing**, so a tool's output is byte-identical when everything is current.
 * **A rebuild must leave the artifact fresh**: it is re-checked after the command, and a command that exits 0 but leaves it
   stale is `RefreshFailed`, never a silent pass. A rebuild over `EXPENSIVE_S` (60 s) announces its cost on one line first.
@@ -72,10 +88,14 @@ makes it current when a tool needs it (`ensure`), under one policy rule (`auto` 
 Tier: fixture (`tools/tests/lib/test_artifacts.py`, stub rebuild commands, temp trees). Pinned: `order` (deps first, once, a
 cycle refused); `split_reasons`/`manifest_reasons` and `seed.build_is_current` agree on missing / fresh / stale; refuse names
 the reason and command; warn prints one line and runs nothing; fresh prints nothing; auto rebuilds once and releases the lock;
-a failing rebuild and a rebuild that leaves it stale both raise; three concurrent callers rebuild once; a dead holder's lock is
+a failing rebuild and a rebuild that leaves it stale both raise; three concurrent callers rebuild once and all finish; a
+release with the lock file held open by a reader completes and deletes it once the reader closes (a release that gives up on
+the first PermissionError fails it, on Windows; POSIX deletes an open file, so there it cannot fail); a dead holder's lock is
 taken over and a live one past the timeout is refused; `FRESH` precedence; the fixture-tier degrade; the expensive-rebuild
 line; the unit-scoped `objects`/`report` checks. Mutations measured to fail it: no lock (3 failures), no post-rebuild check
 (6), `split_reasons` always empty (3), no fixture guard (a real rebuild escapes), a silent warn (4).
+`orphan-objects` is pinned in `tools/tests/units/test_fresh.py` (the two sides, the status and command, `prune-orphans`,
+no split -> no obj verdict, undefrefs' walk); `registered_stems` always None fails 4 of its checks.
 
 ## Known gaps
 

@@ -170,6 +170,17 @@ class Corpora:
         for rel in docs:
             idx.add_text(texts.get(rel) or "")
         self.named.append((DOCS_REL + "/**", idx))
+        self.changed: list[tuple[str, Index]] = []
+
+    def index_changed(self, rels) -> int:
+        """Index the new text of every file the diff changed, one corpus per file, so a token moved verbatim to
+        another file of the same diff survives there (`judge` names it `moved to <file>`). The fixed corpora are
+        skipped (already indexed); a deleted file has no new text. Returns how many files were indexed."""
+        fixed = set(CORPUS_FILES) | {SYMBOLS_REL}
+        rels = sorted({r for r in rels if r not in fixed and not r.startswith(DOCS_REL + "/")})
+        texts = self.tree.read_many(rels)
+        self.changed = [(rel, Index().add_text(texts[rel])) for rel in rels if texts.get(rel)]
+        return len(self.changed)
 
     def _symbols_index(self) -> Index:
         """The map's names, addresses and sizes, read row by row through `lib.project.symbols` (never printed)."""
@@ -224,11 +235,15 @@ def fact_tokens(text: str, tree: Tree | None = None) -> list[tuple[str, str]]:
     return out
 
 
-def judge(text: str, new_text: str, corpora: Corpora) -> list[tuple[str, str]]:
+def judge(text: str, new_text: str, corpora: Corpora, own: str | None = None) -> list[tuple[str, str]]:
     """`[(token, where)]` for every fact token of a removed span: the corpus that holds it, the inert reason, or
-    `""` when it survives nowhere (the failure)."""
+    `""` when it survives nowhere (the failure). After the unit's own new text and the fixed corpora, the new text of
+    every other file the diff changed (`Corpora.index_changed`; the span's own file `own` and its same-stem
+    siblings are skipped - they are the unit's text) is a corpus too: a token moved there reads `moved to <file>`."""
     new_idx = Index().add_text(new_text or "")
-    named = [("new text of the unit", new_idx)] + corpora.named
+    stem = os.path.splitext(own)[0] if own else None
+    moved = [("moved to " + rel, idx) for rel, idx in corpora.changed if os.path.splitext(rel)[0] != stem]
+    named = [("new text of the unit", new_idx)] + corpora.named + moved
     out = []
     for tok, reason in fact_tokens(text, corpora.tree):
         if reason:
@@ -268,6 +283,34 @@ class Span:
 
 
 _HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
+
+
+def parse_added(diff: str) -> dict[str, list[tuple[int, str]]]:
+    """`{file: [(new line number, text)]}` for every added line of a `git diff -U0` text (a deleted file has none)."""
+    out: dict[str, list[tuple[int, str]]] = {}
+    cur, new_line = None, 0
+    for line in diff.split("\n"):
+        if line.startswith("diff --git "):
+            cur = None
+            continue
+        if line.startswith("--- "):
+            continue
+        if line.startswith("+++ "):
+            path = line[4:].strip()
+            cur = path[2:] if path.startswith("b/") else None
+            continue
+        m = _HUNK_RE.match(line)
+        if m:
+            new_line = int(m.group(3))
+            continue
+        if cur is None:
+            continue
+        if line.startswith("+"):
+            out.setdefault(cur, []).append((new_line, line[1:].rstrip("\r")))
+            new_line += 1
+        elif not line.startswith("-") and not line.startswith("\\"):
+            new_line += 1
+    return out
 
 
 def parse_diff(diff: str) -> list[Span]:

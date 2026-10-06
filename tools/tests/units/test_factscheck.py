@@ -146,6 +146,66 @@ def test_allow_drop(c):
         g.cleanup()
 
 
+def test_moved_tokens(c):
+    """A declaration moved verbatim to another file of the same diff survives there; a fact moved from a configure.py
+    comment into the unit's header survives there; `moved=False` (the old rule) fails both - the mutation."""
+    g = _repo()
+    try:
+        g.commit({"src/mod/b.c": "/* b */\nextern int moved_decl_name;\nint keep;\n",
+                  "configure.py": "# cflags_main lives here\n# mod/c.c: peephole_off_evidence at 0x80012345\n"},
+                 "more")
+        (g.root / "src/mod/b.c").write_text("/* b */\nint keep;\n", encoding="utf-8", newline="\n")
+        (g.root / "src/other/owner.h").parent.mkdir(parents=True)
+        (g.root / "src/other/owner.h").write_text("extern int moved_decl_name;\n", encoding="utf-8", newline="\n")
+        (g.root / "configure.py").write_text("# cflags_main lives here\n", encoding="utf-8", newline="\n")
+        (g.root / "src/mod/c.c").write_text("/*\n * FLAGS. peephole_off_evidence at 0x80012345.\n */\n",
+                                            encoding="utf-8", newline="\n")
+        res = factscheck.run(str(g.root), "main")
+        verdicts = {t: w for e in res["explained"] for t, w in e["tokens"]}
+        c.check("a declaration moved to another file of the diff survives (an untracked new file counts)",
+                verdicts.get("moved_decl_name"), "moved to src/other/owner.h")
+        c.check("a configure.py comment fact moved into the unit header survives",
+                (verdicts.get("peephole_off_evidence"), verdicts.get("0x80012345")),
+                ("moved to src/mod/c.c", "moved to src/mod/c.c"))
+        c.check("with every fact moved the diff passes", res["failures"], [])
+        old = factscheck.run(str(g.root), "main", moved=False)
+        c.check("the mutation: without the moved credit all three fail",
+                sorted(t for f in old["failures"] for t in f["tokens"]),
+                sorted(["moved_decl_name", "peephole_off_evidence", "0x80012345"]))
+        rc, _out = _cli(g, "--no-moved")
+        c.check("--no-moved exits 1", rc, 1)
+        g.git("add", "-A")
+        g.git("commit", "-q", "-m", "move")
+        res = factscheck.run(str(g.root), "main~1", "HEAD")
+        c.check("a committed head credits the move too", res["failures"], [])
+        res = factscheck.run(str(g.root), "main~1", "HEAD", paths=["src/mod/b.c"])
+        c.check("a PATH filter limits the spans, never the files a token may move to", res["failures"], [])
+    finally:
+        g.cleanup()
+
+
+def test_many_superseded_files(c):
+    g = _repo()
+    try:
+        (g.root / "src/mod/a.c").write_text(_without_removed(HEADER), encoding="utf-8", newline="\n")
+        one = g.root.parent / ("%s-one.txt" % g.root.name)
+        two = g.root.parent / ("%s-two.txt" % g.root.name)
+        one.write_text("unique_lost_fact, 0xDEADBEEF: old measurement\n", encoding="utf-8")
+        two.write_text("31337: map line number\n", encoding="utf-8")
+        try:
+            rc, out = _cli(g, "--superseded-file", str(one), "--superseded-file", str(two))
+            c.check("two --superseded-file both apply (the second never replaces the first)",
+                    (rc, "unique_lost_fact dropped on purpose" in out, "31337 dropped on purpose" in out),
+                    (0, True, True))
+            rc, _out = _cli(g, "--superseded-file", str(two))
+            c.check("one file alone leaves the other's tokens failing", rc, 1)
+        finally:
+            one.unlink()
+            two.unlink()
+    finally:
+        g.cleanup()
+
+
 def test_merge_base(c):
     g = _repo()
     try:

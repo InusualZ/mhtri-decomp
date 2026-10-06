@@ -101,6 +101,34 @@ def parse_line(line: str, lineno: int = 0) -> Symbol | None:
                   kind.group(1) if kind else "", int(size.group(1), 16) if size else 0, text, lineno)
 
 
+def rename_pairs(removed: Iterable[str], added: Iterable[str]) -> dict[str, str]:
+    """`{old: new}` from the removed and added lines of a map diff: a row whose `section:address` is the only one
+    removed and the only one added at that place, under another name, is a rename (the address is the identity).
+    A place with several rows on either side, or the same name on both, is not one."""
+    def by_place(lines: Iterable[str]) -> dict[tuple[str, int], list[str]]:
+        out: dict[tuple[str, int], list[str]] = {}
+        for line in lines:
+            row = parse_line(line)
+            if row is not None:
+                out.setdefault((row.section, row.address), []).append(row.name)
+        return out
+
+    old, new = by_place(removed), by_place(added)
+    return {o[0]: n[0] for place, o in old.items() for n in [new.get(place)]
+            if n and len(o) == 1 and len(n) == 1 and o[0] != n[0]}
+
+
+def stem_renames(rows: Iterable[Symbol]) -> dict[str, str]:
+    """`{generated stem: map name}` for every row whose name is not dtk's generated stem for its address (`fn_<ADDR>`
+    for a function, `lbl_<ADDR>` otherwise): a source still spelling the stem means that row, renamed."""
+    out: dict[str, str] = {}
+    for r in rows:
+        stem = "%s_%08X" % ("fn" if r.type == "function" else "lbl", r.address)
+        if r.name != stem:
+            out.setdefault(stem, r.name)
+    return out
+
+
 def write_text(path: str | os.PathLike, text: str, rename: Callable | None = None) -> None:
     """Write `text` through a `lib.text.Transaction` and read it back: a failure, or bytes on disk that are
     not the planned ones, restores the previous bytes exactly and re-raises. `rename` is the fault seam."""

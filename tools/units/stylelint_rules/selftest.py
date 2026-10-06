@@ -1946,6 +1946,43 @@ def selftest() -> int:
             check("... while a range that moved is not read as a rename",
                   rename_map(unit_a, moved_unit, {"old_row"}), {})
 
+            # a RECUT re-owns a symbol: the batch's splits.txt gives `re_row`'s range to another unit, so the
+            # local declaration a consumer file already carried names the new owner - the same declaration,
+            # never a new one (the font recut 7e9ddd8c3: 5 such findings in touched consumers read as added).
+            own_old = Ownership({"re_row": [(".text", 0x80200030, "function")],
+                                 "band_row": [(".text", 0x80300010, "function")]},
+                                {".text": [(0x80200000, 0x80201000, "g3d/g3d_anmchr.cpp")]})
+            own_new = Ownership({"re_row": [(".text", 0x80200030, "function")],
+                                 "band_row": [(".text", 0x80300010, "function")]},
+                                {".text": [(0x80200000, 0x80200020, "g3d/g3d_anmchr.cpp"),
+                                           (0x80200020, 0x80201000, "font/flfnt.cpp"),
+                                           (0x80300000, 0x80300100, "font/flfnt_tail.cpp")]})
+
+            def _r2(tok, own):
+                return {"rule": 2, "file": "src/menu/user.cpp", "line": 3, "token": tok,
+                        "detail": rule2_detail(tok, own.resolve(tok))}
+            before_r2, after_r2 = [_r2("re_row", own_old), _r2("band_row", own_old)], \
+                [_r2("re_row", own_new), _r2("band_row", own_new)]
+            omap = owner_map(own_old, own_new, before_r2)
+            check("(r) owner_map reads the owner a recut moved (unit -> unit only; a claimed band row is not one)",
+                  sorted((t, omap[t][1].split("`")[3]) for t in omap), [("re_row", "src/font/flfnt.cpp")])
+            j_r = judge(before_r2, after_r2, after_r2, before_r2, own_old, own_new, {}, [], {}, {})
+            check("... so the re-owned declaration is credited, the claimed band row still added",
+                  ([(a["file"], a["added"]) for a in j_r.added], [f["token"] for f in j_r.re_owned]),
+                  ([("src/menu/user.cpp", 1)], ["re_row"]))
+            check("... and the credit is reported, never silent",
+                  any("re-owned (credited" in ln for ln in j_r.credit_lines), True)
+            j_off = judge(before_r2, after_r2, after_r2, before_r2, own_old, own_old, {}, [], {}, {})
+            check("... without the ownership change they would read as added (the mutation)",
+                  sum(a["added"] for a in judge(before_r2, after_r2, after_r2, before_r2, own_old, own_old, {}, [],
+                                                {}, {}).added), 2)
+            check("... and the unchanged pair is no credit", j_off.re_owned, [])
+            new_decl = after_r2 + [_r2("re_row", own_new) | {"file": "src/menu/other.cpp"}]
+            j_new = judge(before_r2, new_decl, new_decl, before_r2, own_old, own_new, {}, [], {}, {})
+            check("... while a declaration a file did not carry before is still added",
+                  [(a["file"], a["added"]) for a in j_new.added],
+                  [("src/menu/other.cpp", 1), ("src/menu/user.cpp", 1)])
+
             # the same rename is NOT credited when the address moved: the map (`rename_map`) keys on the
             # address, so `new_name` at a new address leaves the old declaration's finding in place.
             cput("config/RMHE08/symbols.txt",

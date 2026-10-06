@@ -179,11 +179,37 @@ def test_concurrent_callers_rebuild_once(c):
         for t in threads:
             t.start()
         for t in threads:
-            t.join(10)
+            t.join(30)
+        c.check("every caller finished (none is left waiting on a lock nobody holds)",
+                [t.is_alive() for t in threads], [False] * 3)
         c.check("three concurrent callers: one rebuild", len(stub.calls), 1)
         c.check("... and all three see it fresh", sorted(r.state for r in results), ["fresh"] * 3)
         c.check("... the waiters say another process rebuilt it",
                 sum(1 for r in results if "rebuilt by another process" in r.note), 2)
+
+
+def test_release_waits_for_a_reader(c):
+    """The race behind the flaky concurrent test: a waiter reads the holder's pid at the instant the holder releases.
+    On Windows the delete fails while the file is open (no delete sharing); the old release swallowed that and left a
+    live-pid lock no waiter would take over. The release now waits for the read to close."""
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "x.lock")
+        lock = artifacts.Lock(path, timeout=5)
+        lock.__enter__()
+        reader = open(path, encoding="utf-8")                 # a waiter's `_holder()` read, held open
+        done = threading.Event()
+
+        def release():
+            lock.__exit__(None, None, None)
+            done.set()
+
+        t = threading.Thread(target=release)
+        t.start()
+        time.sleep(0.3)
+        reader.close()
+        t.join(10)
+        c.check("the release finished once the reader closed", done.is_set(), True)
+        c.check("... and the lock file is gone (a second caller can take the lock)", os.path.exists(path), False)
 
 
 def test_dead_lock_holder_is_taken_over(c):

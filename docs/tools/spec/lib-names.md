@@ -15,7 +15,9 @@ and estimates the mangling of a member function without the compiler.
 
 * `is_generated(name, scheme="default")`, `GENERATED = {scheme: regex}`; `address_of(name)` (the `_XXXXXXXX` tail).
 * `generated_name_kind(name) -> 'generated' | 'address' | None` - section 6.5 rule 7 exact (owner, 2026-10-05): a `RULE7_STEM_RE` stem (`fn`/`lbl`/`loc`/`dtor`/`zz` + `_` + 8 hex) **anywhere** in the name, else an `ADDRESS_RUN_RE` run inside `DOL_SPAN` (`[0x80004000, 0x80800000)`). One verdict for stylelint's identifier and file-name findings and the gate's new-unit row.
-* `is_mangled(name)`; `linkage_stem(name)`; `peel_tokens(name)` (the `<digits><chars>` components).
+* `is_mangled(name)`; `linkage_stem(name)`; `peel_tokens(name)` (the `<digits><chars>` components); `owner_stem(name)`
+  (the identifier plus its `<len><Class>` / `Q<n>...` owner, without the argument list: `setTevKColor__6MHchar` for
+  `setTevKColor__6MHcharFUl...`; `relocdiff --callees` tells a mangling from a wrong callee by it).
 * `param_code(decl)`, `estimate_member_mangling(type, method, rest_params, const_self=False)`,
   `estimate_static_mangling(type, method, params)`; `PRIMITIVE_CODES`, `QUALIFIERS`.
 

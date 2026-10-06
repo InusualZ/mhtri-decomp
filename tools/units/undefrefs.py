@@ -16,6 +16,7 @@ import sys
 import tempfile
 import time
 
+from tools.lib import artifacts as _artifacts
 from tools.lib import names as libnames
 from tools.lib import objcompare
 from tools.lib import project as _project  # the map reader, the registered units
@@ -145,13 +146,17 @@ def check_object(unit: str, our: dict, target: dict | None, *, map_set: set[str]
 # ---------------------------------------------------------------------------------------------------------
 
 def discover_units(main: str) -> list[str]:
-    """Every unit with a compiled object in this tree (`build/RMHE08/src/**/*.o`), extensionless."""
+    """Every registered unit with a compiled object in this tree (`build/RMHE08/src/**/*.o`), extensionless. An
+    object no `configure.py` `Object` names (a retired unit's leftover, `lib.artifacts.orphan_objects`) is skipped."""
     root = os.path.join(main, SRC_REL)
+    registered = _artifacts.registered_stems(main)
     out = []
     for dirpath, _dirs, files in os.walk(root):
         for name in sorted(files):
             if name.endswith(".o"):
-                out.append(os.path.relpath(os.path.join(dirpath, name), root).replace("\\", "/")[:-2])
+                stem = os.path.relpath(os.path.join(dirpath, name), root).replace("\\", "/")[:-2]
+                if registered is None or stem in registered:
+                    out.append(stem)
     return sorted(out)
 
 
