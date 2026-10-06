@@ -297,10 +297,11 @@ extern "C" u32 fn_800697A4(void)
     return (u32)*fn_8005DC60(&local, lbl_8056F598);
 }
 
-extern "C" u32 fn_80069C50(void)
+/* 0x80069C50 (0x30): returns the AnmObjTexPat type. */
+const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjTexPat::GetTypeObjStatic()
 {
     void *local;
-    return (u32)*fn_8005DCD0(&local, lbl_8056F5A8);
+    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_anmchr(&local, lbl_8056F5A8));
 }
 
 
@@ -635,7 +636,7 @@ const char* nw4r::g3d::AnmObjTexSrt::GetTypeName() const
 const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjTexSrt::GetTypeObj() const
 {
     void* pName;
-    return *reinterpret_cast<const TypeObj*>(fn_8005DCD0(&pName, lbl_8056F5C0));
+    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_anmchr(&pName, lbl_8056F5C0));
 }
 
 /* 0x8006A3F4 (0x38): returns the type's name. */
@@ -940,7 +941,7 @@ bool nw4r::g3d::AnmObjTexSrt::IsDerivedFrom(TypeObj type) const
 const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjTexSrt::GetTypeObjStatic()
 {
     void* pName;
-    return *reinterpret_cast<const TypeObj*>(fn_8005DCD0(&pName, lbl_8056F5C0));
+    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_anmchr(&pName, lbl_8056F5C0));
 }
 
 /* 0x8006E764 (0x30): returns the type. */

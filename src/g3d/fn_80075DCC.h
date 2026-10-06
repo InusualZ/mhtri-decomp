@@ -43,16 +43,11 @@ const u8** type_obj_set_name_scnleaf(const u8** out, const u8* v);
 const u8** type_obj_set_name_scngroup(const u8** out, const u8* v);
 
 /* The ScnMdl/ScnMdlSimple material and draw-buffer helpers `g3d/g3d_scnmdl.cpp` calls. */
-s32 fn_8007B734(void* pSelf);  /* 0x8007B734 - a name-record reader */
 s32 fn_8007B764(void* pSelf);  /* 0x8007B764 - a name-record reader */
-void fn_8007B8E4(void* pSelf, u32 mask, void* pArg2, void* pArg3);
-void fn_8007B940(void* pSelf, u32 mask, void* pArg2, void* pArg3);
 u32 fn_8007C464(void* pSelf);
 s32 fn_80077E34(s32 pOut, void* pIn);  /* 0x80077E34 - builds the model view the node walks read */
 
 s32 fn_80078904(s32 pNode);            /* 0x80078904 - the node's visibility test */
-void fn_800793A4(s32* pArg0, s32 arg1, s32 arg2, s32 arg3, s32 arg4, s32 arg5, s32 arg6, s32 arg7,
-                 u32 argSp0);          /* 0x800793A4 - the draw-buffer builder */
 
 /* The `g3d_resmat_ac.h` validity predicates `g3d/g3d_resfile.cpp`'s accessors call. */
 /* 0x8007B878 - the alignment-asserting offset helper, declared as the owner defines it; `g3d/g3d_resanmtexsrt.cpp`
@@ -64,6 +59,16 @@ void fn_8007A510(void);
 
 #ifdef __cplusplus
 }
+
+namespace nw4r { namespace g3d { class ResMdl; } } /* only pointed to here: the full class is g3d/g3d_resmat.h's */
+
+/* 0x800793A4 - draws the model directly: the opaque or translucent byte code over the view matrices, with an
+ * optional replacement block, in a draw mode. */
+/* untyped: caller-owned payload - the replacement block */
+extern "C" void g3d_draw_res_mdl_directly(const nw4r::g3d::ResMdl* pMdl, const nw4r::math::MTX34* pViewPosMtxArray,
+                                          const nw4r::math::MTX33* pViewNrmMtxArray,
+                                          const nw4r::math::MTX34* pViewTexMtxArray, const u8* pByteCodeOpa,
+                                          const u8* pByteCodeXlu, const void* pReplacement, u32 drawMode);
 
 /* 0x8007B870 - the placement `operator new` (`mr r3,r4; blr`: hands the caller's address back); the network
  * work record builds its friend list in place with it. */

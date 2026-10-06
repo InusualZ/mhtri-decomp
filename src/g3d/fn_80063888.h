@@ -31,9 +31,6 @@ nw4r::g3d::Camera::PostureInfo *camera_posture_info_ctor(nw4r::g3d::Camera::Post
 /* The 3-float clamp `g3d/g3d_resanmchr.cpp`'s frame walkers call. */
 f32 fn_8006497C(f32 a, f32 b, f32 c);       /* 0x8006497C - the 3-float clamp helper */
 
-/* 0x800649B4 - the animation-object flag setter `g3d/g3d_scnmdl.cpp`'s fn_8007EA08 calls; the object is opaque
- * here, and the owner reads it through its `G3dFlagWord` view of the +0xC flag word. */
-s32 fn_800649B4(void* pSelf, u32 bits);
 
 #ifdef __cplusplus
 }

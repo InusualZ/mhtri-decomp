@@ -15,11 +15,14 @@
  *   The ScnObj, ScnLeaf and ScnGroup members (0x8007B424-0x8007BB8C: IsDerivedFrom, GetTypeObjStatic, the flag and
  *   callback helpers, ScnLeaf's constructor and destructor) are nw4r's `g3d_scnobj.h` members (`g3d/g3d_scnobj.h`);
  *   type_obj_set_name_scnleaf and type_obj_set_name_scngroup are GUESSES (the type-name store copies they call).
+ *   g3d_draw_res_mdl_directly is a GUESS (0x800793A4: draws a model's opaque or translucent byte code over its view
+ *   matrices; ScnMdlSimple's draw passes call it).
  * RESIDUALS. Unwritten (objdiff scores them zero): fn_80075DD8, fn_80077DBC, mtx34_set, fn_80079EE4, fn_8007A468.
+ *   Unwritten (empty stub): g3d_draw_res_mdl_directly.
  *   Unwritten (empty stubs, 33 rows, 0x31F0 bytes; objdiff scores them near zero): fn_800769F4, fn_8007868C,
- *   fn_80078A9C, fn_80078E7C, fn_80079018, fn_800791D8, fn_800793A4, fn_80079604, fn_80079938, fn_800799BC,
+ *   fn_80078A9C, fn_80078E7C, fn_80079018, fn_800791D8, g3d_draw_res_mdl_directly, fn_80079604, fn_80079938, fn_800799BC,
  *   fn_80079A48, fn_80079B38, fn_8007A814, fn_8007A8E0, dtor_8007AF28, fn_8007AF6C, fn_8007B074, fn_8007B0A0,
- *   fn_8007B160, fn_8007B224, dtor_8007B2D4, fn_8007B3BC, fn_8007B734,
+ *   fn_8007B160, fn_8007B224, dtor_8007B2D4, fn_8007B3BC,
  *   fn_8007B764, fn_8007B794, dtor_8007B7F0, the `ScnMdl::CopiedMatAccess` constructor (0x8007BEAC),
  *   fn_8007C3CC, fn_8007C474.
  *   Partial (101 written bodies): every remaining function except the 77 at 100 %.
@@ -43,21 +46,6 @@
 #include "types.h"
 
 
-/* The indirect-dispatch object and vtable the five `bctr` trampolines share. */
-typedef struct {
-    /* +0x00 */ u32 pad_0x00[5];
-    /* +0x14 */ u32 (*method_0x14)(...);
-    /* +0x18 */ u8 pad_0x18[4];
-    /* +0x1C */ u32 (*method_0x1C)(...);
-} DispatchVtbl; /* size: 0x20 */
-typedef struct {
-    /* +0x00 */ u8 pad_0x00[0xD4];
-    /* +0xD4 */ void* field_0xD4;
-    /* +0xD8 */ u8 field_0xD8;
-    /* +0xD9 */ u8 pad_0xD9[1];
-    /* +0xDA */ u16 field_0xDA;
-} DispatchObj; /* size: 0xDC */
-
 #include "sys_mem.h" /* operator delete (rule 9: call through the owner) */
 #include "nw4r/g3d/scnmdl.h" /* nw4r::g3d::ScnMdl::CopiedMatAccess - the owner of the two mangled members (rule 1/9) */
 #include "mh3_pad.h" /* VEC3_ctor / copyVec3 / setVec3 (rule 2) */
@@ -74,6 +62,7 @@ typedef struct {
 #include "g3d/g3d_state.h"     /* the material loaders (rule 2) */
 #include "nw4r/fn_805012C4.h"
 #include "g3d/g3d_scnobj.h"   /* nw4r::g3d::ScnObj / ScnLeaf / ScnGroup (rule 1) */
+#include "g3d/g3d_scnmdlsmpl.h" /* nw4r::g3d::ScnMdlSimple (rule 1) */
 #include "MSL/algorithm.h"     /* std::find / std::distance */
 #include "unsplit/g3d.h"      /* the scene objects' type-name records no unit owns (rule 2) */
 
@@ -84,7 +73,6 @@ typedef struct {
 /* Data objects the range references (unsplit, address-only). */
 extern u32 lbl_8056F658;
 extern u32 lbl_8056F678;
-extern u32 lbl_8056F688;
 extern const char lbl_8058E570[];
 extern const char lbl_8058E57C[];
 extern const char lbl_8058E5B0[];
@@ -191,7 +179,6 @@ u32 vec3_normalize_into(void*, void*, f32, f32);
 u32 mtx34_mult_vec3(void*, s32, void*);
 u32 fn_8005A8E0(void*, void*);
 s32 fn_8005AAEC(s32);
-s32 fn_8005AB00(void*);
 void* fn_8005CEEC(void);
 s32 fn_8005D050(void*);
 u32 fn_8005D0CC(void*, void*);
@@ -214,9 +201,9 @@ s32 fn_8006FEC8(void*, s32);
 s32 fn_80070020(s32);
 u32 mtx34_copy_ps(void*, s32);
 u32 mtx34_concat(void*, void*, void*);
-u32 fn_80071C38(u32);
-s32 fn_80074074(void*);
-u32 fn_80074620(void*);
+u32 g3d_lc_queue_wait(u32);
+s32 res_mdl_get_info(void*);
+u32 res_mdl_info_num_view_mtx(void*);
 void* fn_80074A54(void);
 s32 fn_80075844(s32);
 u32 fn_8008715C(void*);
@@ -286,7 +273,7 @@ u32 math_sincos_idx(f32);
 /* internal */ u32 fn_80078E7C(s32 arg0, void *arg1, u32 arg2, s32 arg3, u32 arg_sp0);
 /* internal */ u32 fn_80079018(s32 arg0, void *arg1, u32 arg2, s32 arg3, s32 arg4, u32 arg_sp0);
 /* internal */ void* fn_800791D8(u32 *arg0, s32 arg1, s32 arg2, void *arg3, void *arg4);
-/* internal */ void fn_800793A4(s32 *arg0, s32 arg1, s32 arg2, s32 arg3, s32 arg4, s32 arg5, s32 arg6, s32 arg7, u32 arg_sp0);
+/* internal */ void g3d_draw_res_mdl_directly(s32 *arg0, s32 arg1, s32 arg2, s32 arg3, s32 arg4, s32 arg5, s32 arg6, s32 arg7, u32 arg_sp0);
 /* internal */ u32 fn_80079604(u32 arg0, u32 arg1, s32 (*arg2)(u32, u32), u32 arg_sp0);
 /* internal */ u32 fn_80079938(u32 arg0, u32 arg1, s32 arg2);
 /* internal */ u32 fn_800799BC(u32 arg0, u32 arg1, s32 (**arg2)(u32, u32));
@@ -341,7 +328,6 @@ u32 math_sincos_idx(f32);
 /* internal */ void fn_8007B540(void* a0);
 /* internal */ void fn_8007B5BC(void* a0);
 /* internal */ const u8** type_obj_set_name_scngroup(const u8** out, const u8* v);
-/* internal */ s32 fn_8007B734(void* a0);
 /* internal */ s32 fn_8007B764(void* a0);
 /* internal */ s32 fn_8007B794(s32 arg0, s16 arg1);
 /* internal */ s32 dtor_8007B7F0(s32 arg0, s16 arg1);
@@ -1295,7 +1281,7 @@ void* fn_800777B0(s32 arg0, u32 *arg1, s32 arg2) {
                     } else {
                         sp20 = fn_80094094((s32)(arg0));
                         fn_80077E34((s32)(&sp2C), (void*)(&sp20));
-                        sp1C = fn_80074074((void*)(&sp2C));
+                        sp1C = res_mdl_get_info((void*)(&sp2C));
                         temp_r3_3 = fn_8006FEC8((void*)(&sp1C), (s32)(reinterpret_cast<nw4r::g3d::ResShp*>(arg2)->ptr()->curMtxIdx));
                         if (temp_r3_3 < 0) {
                             nw4r::db::Panic((const char*)&lbl_8058E880, 0x64, (const char*)&lbl_8058E890);
@@ -2012,7 +1998,7 @@ void* fn_800791D8(u32 *arg0, s32 arg1, s32 arg2, void *arg3, void *arg4) {
 }
 
 
-void fn_800793A4(s32 *arg0, s32 arg1, s32 arg2, s32 arg3, s32 arg4, s32 arg5, s32 arg6, s32 arg7, u32 arg_sp0) {
+void g3d_draw_res_mdl_directly(s32 *arg0, s32 arg1, s32 arg2, s32 arg3, s32 arg4, s32 arg5, s32 arg6, s32 arg7, u32 arg_sp0) {
 }
 
 
@@ -2828,8 +2814,16 @@ const u8** type_obj_set_name_scngroup(const u8** out, const u8* v)
     return out;
 }
 
-s32 fn_8007B734(void* a0) {
+}   /* extern "C": the ScnMdlSimple member below has C++ linkage */
+
+/* 0x8007B734 (0x30): returns the ScnMdlSimple type. */
+const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::ScnMdlSimple::GetTypeObjStatic()
+{
+    void* pName;
+    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_anmchr(&pName, scn_typename_ScnMdlSimple));
 }
+
+extern "C" {
 
 
 s32 fn_8007B764(void* a0) {
@@ -3217,25 +3211,29 @@ void nw4r::g3d::ScnObj::CheckCallback_CALC_WORLD(Timing timing, u32 param, void*
 
 extern "C" {
 
-/* 0x8007B8E4 / 0x8007B940: vtable slot +0x1C, guarded by the +0xDA bit 5 / bit 4 and the +0xD8 mask. */
-void fn_8007B8E4(void* self, u32 mask, void* a5, void* a6)
+}   /* extern "C": the scene object members below have C++ linkage */
+
+/* 0x8007B8E4 (0x58): runs the callback's DRAW_XLU hook at `timing` when it is enabled for the pass and the timing. */
+#pragma peephole off
+/* untyped: caller-owned payload - the pass's info block */
+void nw4r::g3d::ScnObj::CheckCallback_DRAW_XLU(Timing timing, u32 param, void* pInfo)
 {
-    DispatchObj* o = (DispatchObj*)self;
-    void* p = o->field_0xD4;
-    if (p == 0 || (o->field_0xDA & 0x20) == 0)
-        return;
-    if ((o->field_0xD8 & mask) == 0)
-        return;
-    ((DispatchVtbl*)*(void**)p)->method_0x1C(p, mask, self, a5, a6);
+    if (mpFnCallback != NULL && (mCallbackExecOpMask & EXECOP_DRAW_XLU) && (mCallbackTiming & timing)) {
+        mpFnCallback->ExecCallback_DRAW_XLU(timing, this, param, pInfo);
+    }
 }
-void fn_8007B940(void* self, u32 mask, void* a5, void* a6)
+#pragma peephole on
+
+/* 0x8007B940 (0x58): runs the callback's DRAW_OPA hook at `timing` when it is enabled for the pass and the timing. */
+#pragma peephole off
+/* untyped: caller-owned payload - the pass's info block */
+void nw4r::g3d::ScnObj::CheckCallback_DRAW_OPA(Timing timing, u32 param, void* pInfo)
 {
-    DispatchObj* o = (DispatchObj*)self;
-    void* p = o->field_0xD4;
-    if (p == 0 || (o->field_0xDA & 0x10) == 0)
-        return;
-    if ((o->field_0xD8 & mask) == 0)
-        return;
-    ((DispatchVtbl*)*(void**)p)->method_0x1C(p, mask, self, a5, a6);
+    if (mpFnCallback != NULL && (mCallbackExecOpMask & EXECOP_DRAW_OPA) && (mCallbackTiming & timing)) {
+        mpFnCallback->ExecCallback_DRAW_OPA(timing, this, param, pInfo);
+    }
 }
+#pragma peephole on
+
+extern "C" {
 }

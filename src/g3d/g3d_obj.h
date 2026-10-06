@@ -106,6 +106,8 @@ public:
     virtual void Release() = 0;
 
     void SetAnmFlag(AnmFlag flag, bool on);
+    bool TestAnmFlag(AnmFlag flag) const;
+    bool IsBound() const;
     static const TypeObj GetTypeObjStatic();
 
     /* +0x0C */ u32 mFlags;
@@ -123,6 +125,40 @@ public:
     virtual const TypeObj GetTypeObj() const;
     virtual const char* GetTypeName() const;
 };
+
+/* The visibility, material-colour and texture-pattern animation interfaces; only their run-time type is reconstructed
+ * (ScnMdlSimple::SetAnmObj casts to them).  size: 0x10 each (approximation: AnmObj's size, the derived classes add
+ * their members) */
+class AnmObjVis : public AnmObj {
+public:
+    static const TypeObj GetTypeObjStatic();
+};
+
+class AnmObjMatClr : public AnmObj {
+public:
+    static const TypeObj GetTypeObjStatic();
+};
+
+class AnmObjTexPat : public AnmObj {
+public:
+    static const TypeObj GetTypeObjStatic();
+};
+
+/* The checked cast of the run-time type: `pObj` as a `TTo`, or NULL when it is not one. */
+template <typename TTo, typename TFrom>
+TTo* DynamicCast(TFrom* pObj)
+{
+    bool derived = false;
+    if (pObj != NULL) {
+        if (pObj->IsDerivedFrom(TTo::GetTypeObjStatic())) {
+            derived = true;
+        }
+    }
+    if (derived) {
+        return static_cast<TTo*>(pObj);
+    }
+    return NULL;
+}
 
 /* How a frame past the end is folded back (PlayPolicy_Onetime, PlayPolicy_Loop): (start, end, frame) -> frame. */
 typedef f32 (*PlayPolicyFunc)(f32 startFrame, f32 endFrame, f32 frame);

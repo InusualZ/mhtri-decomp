@@ -1,13 +1,18 @@
 /*
- * g3d/g3d_calcworld.cpp - nw4r g3d node/matrix world pass (fn_800737CC, fn_8007411C) and its node-table accessors.
- * RANGE. .text 0x800736F8-0x800746DC (30 functions); extab, extabindex, .data 0x8058E178-0x8058E430 (fn_800737CC
- *   passes "g3d_calcworld.cpp", lbl_8058E184; the fn_80073E80..fn_80074114 helpers read lbl_8058E340..lbl_8058E420),
- *   .sdata 0x807911D0-0x807911E0, .sdata2 0x80795DC0-0x80795DC8.  The six accessors fn_80074620..fn_800746D4 carry no
+ * g3d/g3d_calcworld.cpp - nw4r g3d node/matrix world pass (g3d_calc_world, g3d_calc_skinning) and its node-table accessors.
+ * RANGE. .text 0x800736F8-0x800746DC (30 functions); extab, extabindex, .data 0x8058E178-0x8058E430 (g3d_calc_world
+ *   passes "g3d_calcworld.cpp", lbl_8058E184; the fn_80073E80..world_mtx_attr_root_mtx helpers read lbl_8058E340..lbl_8058E420),
+ *   .sdata 0x807911D0-0x807911E0, .sdata2 0x80795DC0-0x80795DC8.  The six accessors res_mdl_info_num_view_mtx..fn_800746D4 carry no
  *   data reference: the candidate cut 0x800746DC puts them here, 0x80074620 is the alternative.
  * NAMES. Map stems.
- * RESIDUALS. Unwritten (objdiff scores it zero): fn_8007411C.  Partial: fn_800736F8, fn_800737CC, fn_80073CE0,
+ *   world_mtx_attr_not_scale_uniform is a GUESS, world_mtx_attr_not_scale_one is a GUESS,
+ *   world_mtx_attr_scale_uniform is a GUESS, world_mtx_attr_scale_one is a GUESS and world_mtx_attr_root_mtx is a
+ *   GUESS (the world-matrix attribute bit helpers), g3d_calc_world is a GUESS and g3d_calc_skinning is a GUESS (the
+ *   node-tree and node-mix byte-code runners), res_mdl_get_info is a GUESS and res_mdl_info_num_view_mtx is a GUESS
+ *   (the ResMdlInfo handle and its view-matrix count).
+ * RESIDUALS. Unwritten (objdiff scores it zero): g3d_calc_skinning.  Partial: fn_800736F8, g3d_calc_world, fn_80073CE0,
  *   fn_80073D34, fn_80073F00, addVec3To.
- *   Relocation names that differ from retail: `fn_800737CC` calls `fn_8050133C` where retail calls
+ *   Relocation names that differ from retail: `g3d_calc_world` calls `fn_8050133C` where retail calls
  *   `MTX34Scale__Q24nw4r4mathFPQ34nw4r4math5MTX34PCQ34nw4r4math5MTX34PCQ34nw4r4math4VEC3` (undefined in a flip).
  *   flipcheck: `.text` 0xAD0 of 0xFE4; `.data` is claimed and not emitted; `.sdata` is 0x4 of 0x10, `.sdata2` 0x4
  *   of 0x8.
@@ -149,11 +154,11 @@ extern "C" {
 /* ------------------------------------------------------------------------------------------------ */
 
 void fn_800736F8(VtxAttrRef* pSelf, f32 x, f32 y, f32 z);
-u32 fn_800737AC(u32 value);
-u32 fn_800737B4(u32 value);
-u32 fn_800737BC(u32 value);
-u32 fn_800737C4(u32 value);
-void fn_800737CC(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx, ResHandle* pMdl,
+u32 world_mtx_attr_not_scale_uniform(u32 value);
+u32 world_mtx_attr_not_scale_one(u32 value);
+u32 world_mtx_attr_scale_uniform(u32 value);
+u32 world_mtx_attr_scale_one(u32 value);
+void g3d_calc_world(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx, ResHandle* pMdl,
                  NodeCallback* pNodeCallback, NodeCallback* pNodeCallback2, u32 flags);
 void fn_80073CE0(NodeCallback* pSelf, void* pMtx, s32* pMtxID);
 void fn_80073D30(void);
@@ -168,11 +173,11 @@ nw4r::math::VEC3* addVec3To(nw4r::math::VEC3* pOut, const nw4r::math::VEC3* pIn)
 void fn_80073FA0(NodeMtxRec* pDst, const NodeMtxRec* pSrc);
 s32 fn_8007403C(u32 flags);
 s32 fn_80074050(const void* p);
-s32 fn_80074074(ResHandle* pMdl);
+s32 res_mdl_get_info(ResHandle* pMdl);
 ResMdlData* fn_800740A8(ResHandle* pMdl);
 void* fn_8007410C(ResHandle* pSelf);
-u32 fn_80074114(void);
-u32 fn_80074620(const ResHandle* pSelf);
+u32 world_mtx_attr_root_mtx(void);
+u32 res_mdl_info_num_view_mtx(const ResHandle* pSelf);
 s32 fn_80074644(const ResHandle* pSelf);
 void fn_80074698(ResHandle* pSelf, const ResHandle* pRhs);
 ResHandle* fn_80074668(ResHandle* pSelf, const ResHandle* pRhs);
@@ -187,30 +192,30 @@ void fn_800736F8(VtxAttrRef* pSelf, f32 x, f32 y, f32 z) {
     pSelf->mpValue[2] = z;
     if (x == y && x == z) {
         if (1.0f == x) {
-            *pSelf->mpFlags = fn_800737C4(*pSelf->mpFlags);
+            *pSelf->mpFlags = world_mtx_attr_scale_one(*pSelf->mpFlags);
             return;
         }
         u32* pFlags = pSelf->mpFlags;
-        *pFlags = fn_800737BC(*pFlags);
-        *pSelf->mpFlags = fn_800737B4(*pSelf->mpFlags);
+        *pFlags = world_mtx_attr_scale_uniform(*pFlags);
+        *pSelf->mpFlags = world_mtx_attr_not_scale_one(*pSelf->mpFlags);
         return;
     }
-    *pSelf->mpFlags = fn_800737AC(*pSelf->mpFlags);
+    *pSelf->mpFlags = world_mtx_attr_not_scale_uniform(*pSelf->mpFlags);
 }
 
-u32 fn_800737AC(u32 value) {
+u32 world_mtx_attr_not_scale_uniform(u32 value) {
     return value & 0x0FFFFFFF;
 }
 
-u32 fn_800737B4(u32 value) {
+u32 world_mtx_attr_not_scale_one(u32 value) {
     return value & 0x3FFFFFFF;
 }
 
-u32 fn_800737BC(u32 value) {
+u32 world_mtx_attr_scale_uniform(u32 value) {
     return value | 0x10000000;
 }
 
-u32 fn_800737C4(u32 value) {
+u32 world_mtx_attr_scale_one(u32 value) {
     return value | 0x40000000;
 }
 
@@ -220,7 +225,7 @@ u32 fn_800737C4(u32 value) {
 
 /* Walk a `ResByteCodeData` node tree: build each node's matrix record, compute its world matrix
  * (`fn_800D77B0` / `fn_800D7D24`), then scale the matrices the byte code marked. */
-void fn_800737CC(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx, ResHandle* pMdl,
+void g3d_calc_world(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx, ResHandle* pMdl,
                  NodeCallback* pNodeCallback, NodeCallback* pNodeCallback2, u32 flags) {
     s32 mayaDisable;
     u8 singleMtx;
@@ -240,7 +245,7 @@ void fn_800737CC(u8* pMtxArray, s32* pMtxIDs, u8* pByteCode, const void* pMtx, R
     }
     if (pCode != NULL) {
         NodeMtxRec* pRec = NULL;
-        s18 = fn_80074074(pMdl);
+        s18 = res_mdl_get_info(pMdl);
         singleMtx = (fn_80074050(&s18) == 1);
         mayaDisable = fn_8007403C(flags);
         f32* pScale = fn_8005CED0();
@@ -452,7 +457,7 @@ s32 fn_80074050(const void* p) {
 
 /* Look one entry up in the model's node table (`fn_800740A8` hands back the model data, +0x4C is the
  * table's owning object). */
-s32 fn_80074074(ResHandle* pMdl) {
+s32 res_mdl_get_info(ResHandle* pMdl) {
     ResMdlData* pData = fn_800740A8(pMdl);
     s32 idx;
     return *fn_80070054(&idx, &pData->mNodeTableKey);
@@ -470,7 +475,7 @@ void* fn_8007410C(ResHandle* pSelf) {
     return pSelf->mpData;
 }
 
-u32 fn_80074114(void) {
+u32 world_mtx_attr_root_mtx(void) {
     return 0xF0000000;
 }
 
@@ -478,7 +483,7 @@ u32 fn_80074114(void) {
 /* g3d_calcworld.cpp: the node-table accessors                                                       */
 /* ------------------------------------------------------------------------------------------------ */
 
-u32 fn_80074620(const ResHandle* pSelf) {
+u32 res_mdl_info_num_view_mtx(const ResHandle* pSelf) {
     return fn_8006FF50()->mNumMtx;
 }
 

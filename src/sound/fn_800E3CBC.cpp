@@ -57,6 +57,7 @@
 #include "g3d/g3d_state.h" /* g3d_state_invalidate (rule 2) */
 #include "g3d/g3d_camera_types.h" /* nw4r::g3d::Camera (rule 2) */
 #include "g3d/g3d_scnobj.h"       /* nw4r::g3d::ScnObj::GetMtx / GetMtxPtr (rule 2) */
+#include "g3d/g3d_scnmdlsmpl.h"   /* nw4r::g3d::ScnMdlSimple::CalcSkinning (rule 2) */
 
 #pragma peephole off
 
@@ -156,7 +157,6 @@ s32 fn_800D0724(void);
 s32 fn_802BE39C(void);
 s32 camera_work_ck(void);
 s32 my_player_no(void);
-void fn_8007F77C(void* p);
 void* fn_800A60C0(void* p);
 f32 vec3_dot(const VEC3* a, const VEC3* b);
 void fn_80049728(void* p, s32 n);
@@ -277,7 +277,7 @@ extern "C" void fn_800E3E1C(void* a, u8 mode)
                     if ((p->flags & 0x40) && p->callback != 0) {
                         p->callback(p);
                     }
-                    fn_8007F77C(h);
+                    reinterpret_cast<nw4r::g3d::ScnMdlSimple*>(h)->CalcSkinning();
                     p->started = 1;
                 }
                 h->vtbl->slot3(h, 4, 0, &b40);

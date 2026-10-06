@@ -1,12 +1,14 @@
 /*
  * g3d/g3d_calcmaterial.cpp - nw4r g3d material-controller helpers: pointer wrappers over the global material table
  *   fn_8005A9BC returns (their inlined `g3d_resmat_ac.h` constructors assert 32-byte alignment in fn_8006F158/
- *   fn_8006F298 and 4-byte in fn_8006F374/fn_8006F41C/fn_8006F4BC), and fn_8006EE78, which walks the material
+ *   fn_8006F298 and 4-byte in fn_8006F374/fn_8006F41C/fn_8006F4BC), and g3d_calc_material_directly, which walks the material
  *   list and drives the per-material matrix updates.
  * RANGE. .text 0x8006EE78-0x8006F738 (33 functions); extab, extabindex, .data 0x8058D7E0-0x8058D938 (opens on
- *   "g3d_calcmaterial.cpp", fn_8006EE78's assert).  The right seam is proven: fn_8006F738 cites "g3d_calcview.cpp".
+ *   "g3d_calcmaterial.cpp", g3d_calc_material_directly's assert).  The right seam is proven: fn_8006F738 cites "g3d_calcview.cpp".
  * NAMES. Map stems.
- * RESIDUALS. The large vector/matrix bodies fn_8006EE78, fn_8006F5A0 and fn_8006F660 are stubs; fn_8006F200 and
+ *   g3d_calc_material_directly is a GUESS (0x8006EE78: applies the texture and colour animations to the model's
+ *   materials, called by ScnMdlSimple's material pass).
+ * RESIDUALS. The large vector/matrix bodies g3d_calc_material_directly, fn_8006F5A0 and fn_8006F660 are stubs; fn_8006F200 and
  *   fn_8006F528 are partial.
  *   flipcheck: `.text` 0x4D4 of 0x8C0; `.data` is claimed and not emitted.
  */
@@ -37,7 +39,7 @@ void res_pltt_ctor(void* p, u32 flag);
 /* The global material-table accessor the accessor chain reads at +0x3C. */
 
 /* This unit's own bodies, in address order. */
-void* fn_8006EE78(void* pMdl, void* pMatArray, void* pTexArray, void* pClrArray);
+void* g3d_calc_material_directly(void* pMdl, void* pMatArray, void* pTexArray, void* pClrArray);
 u32 fn_8006F0DC(void* p);
 void fn_8006F0E4(void* p);
 void* fn_8006F0E8(void* pDst, const void* pSrc);
@@ -295,7 +297,7 @@ u32* fn_8006F528(u32* self) {
 }
 
 /* Walks the model's material list and drives the per-material matrix update (a stub). */
-void* fn_8006EE78(void* pMdl, void* pMatArray, void* pTexArray, void* pClrArray) {
+void* g3d_calc_material_directly(void* pMdl, void* pMatArray, void* pTexArray, void* pClrArray) {
     (void)pMdl;
     (void)pMatArray;
     (void)pTexArray;

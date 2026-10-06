@@ -12,6 +12,8 @@ extern "C" {
 #endif
 
 void g3d_root_model_bind(s32 root, u32 id);
+/* 0x8007D404 - the `ResMdlInfo` handle's block (asserting the handle is valid). */
+u32 res_mdl_info_ref(const void* pInfo); /* untyped: opaque handle - the info handle */
 
 #ifdef __cplusplus
 }

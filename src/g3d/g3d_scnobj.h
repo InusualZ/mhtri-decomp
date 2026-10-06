@@ -44,6 +44,10 @@ public:
     virtual void ExecCallback_CALC_MAT(u32 timing, ScnObj* pObj, u32 param, void* pInfo);
     /* untyped: caller-owned payload - the pass's info block */
     virtual void ExecCallback_CALC_VIEW(u32 timing, ScnObj* pObj, u32 param, void* pInfo);
+    /* untyped: caller-owned payload - the pass's info block */
+    virtual void ExecCallback_DRAW_OPA(u32 timing, ScnObj* pObj, u32 param, void* pInfo);
+    /* untyped: caller-owned payload - the pass's info block */
+    virtual void ExecCallback_DRAW_XLU(u32 timing, ScnObj* pObj, u32 param, void* pInfo);
 };
 
 /* The collector the gather pass hands every scene object to (`ScnRoot`'s draw lists).  size: 0x4 */
@@ -127,7 +131,9 @@ public:
     enum ExecOp {
         EXECOP_CALC_WORLD = 1,
         EXECOP_CALC_MAT = 2,
-        EXECOP_CALC_VIEW = 4
+        EXECOP_CALC_VIEW = 4,
+        EXECOP_DRAW_OPA = 0x10,
+        EXECOP_DRAW_XLU = 0x20
     };
 
     explicit ScnObj(MEMAllocator* pHeap);
@@ -160,6 +166,11 @@ public:
     void CheckCallback_CALC_MAT(Timing timing, u32 param, void* pInfo);
     /* untyped: caller-owned payload - the pass's info block */
     void CheckCallback_CALC_VIEW(Timing timing, u32 param, void* pInfo);
+    /* untyped: caller-owned payload - the pass's info block */
+    void CheckCallback_DRAW_OPA(Timing timing, u32 param, void* pInfo);
+    /* untyped: caller-owned payload - the pass's info block */
+    void CheckCallback_DRAW_XLU(Timing timing, u32 param, void* pInfo);
+    bool SetBoundingVolume(const math::AABB* pAABB);
     static const TypeObj GetTypeObjStatic();
 
     /* +0x0C */ math::MTX34 mMtxArray[MTX_TYPE_MAX];

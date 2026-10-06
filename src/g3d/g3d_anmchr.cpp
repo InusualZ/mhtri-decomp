@@ -25,6 +25,8 @@
  *   (0x800604CC) is the member the Construct functions build their objects with.  g3d_obj_alloc_tail is a GUESS
  *   (the allocation forwarder above); math_reciprocal is a GUESS (0x800610AC: one Newton-Raphson step on `fres`,
  *   nw4r's `math::FInv`).
+ *   type_obj_set_name_anmchr is a GUESS (0x8005DCD0: the type-name store copy the AnmObjChr, AnmObjMatClr,
+ *   AnmObjTexPat and ScnMdlSimple type members call).
  * RESIDUALS. 36 functions unwritten (objdiff scores them zero; `python tools/objdiff/unitscore.py g3d/g3d_anmchr`
  *   lists them), the largest fn_80060658 (AnmObjChrBlend::GetResult, 0x8D0), fn_80061424 (AnmObjChrRes::Construct,
  *   0x474: its ResAnmChr accessors and the AnmObjChrRes constructor are unwritten), fn_80062980 (0x384) and
@@ -175,7 +177,7 @@ extern "C" void **fn_8005DC60(void **out, void *v)
     return out;
 }
 
-extern "C" void **fn_8005DCD0(void **out, void *v)
+extern "C" void **type_obj_set_name_anmchr(void **out, void *v)
 {
     *out = v;
     return out;
@@ -1197,7 +1199,7 @@ const char* nw4r::g3d::AnmObjChrRes::GetTypeName() const
 const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjChrRes::GetTypeObj() const
 {
     void* pName;
-    return *reinterpret_cast<const TypeObj*>(fn_8005DCD0(&pName, lbl_8056F538));
+    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_anmchr(&pName, lbl_8056F538));
 }
 
 /* 0x80063D68 (0x5C): destroys the resource animation. */
@@ -1220,5 +1222,5 @@ bool nw4r::g3d::AnmObjChrRes::IsDerivedFrom(TypeObj type) const
 const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjChrRes::GetTypeObjStatic()
 {
     void* pName;
-    return *reinterpret_cast<const TypeObj*>(fn_8005DCD0(&pName, lbl_8056F538));
+    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_anmchr(&pName, lbl_8056F538));
 }

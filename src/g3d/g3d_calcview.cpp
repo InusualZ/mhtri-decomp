@@ -8,12 +8,17 @@
  * NAMES. Map stems.
  *   GUESS (from the body and its callers): `mtx34_concat`, `mtx34_copy_ps` (0x8007100C: a paired-single 3x4 matrix
  *   copy, 32 call sites in ef/, enemy/ and g3d/).
+ *   res_mdl_info_num_pos_nrm_mtx is a GUESS (0x8006FFDC: the info block's matrix count), g3d_calc_view is a GUESS,
+ *   g3d_calc_view_lc is a GUESS and g3d_calc_view_lc_dma is a GUESS (the three view-matrix calculators
+ *   ScnMdlSimple's view pass picks between), g3d_lc_queue_wait is a GUESS, g3d_dc_invalidate_range is a GUESS and
+ *   g3d_lc_base is a GUESS (the tail calls of LCQueueWait / DCInvalidateRange and the locked cache's address).
  * RESIDUALS. Unwritten (empty stubs, 27 rows, 0x2C74 bytes; objdiff scores them near zero): fn_8006F738,
+ *   Unwritten (empty stubs): g3d_calc_view, g3d_calc_view_lc, g3d_calc_view_lc_dma.
  *   fn_8006F898, fn_8006F8D4, fn_8006F934, fn_8006FB60, fn_8006FBBC, fn_8006FE40, fn_80070134, fn_80070410,
- *   fn_80070600, fn_80070820, fn_80071008, mtx34_copy_ps, fn_80071064, fn_800710A0, fn_800710B4, mtx34_concat,
- *   fn_80071130, fn_8007118C, fn_80071198, fn_80071B70, fn_80071BD4, fn_80071C38, fn_80071C3C, fn_80071C40,
- *   fn_80071C48, fn_800726D0.
- *   Partial (7 written bodies): fn_8006F908, fn_8006FDCC, fn_8006FE7C, fn_8006FEC8, fn_8006FF50, fn_8006FFDC,
+ *   fn_80070600, g3d_calc_view, fn_80071008, mtx34_copy_ps, fn_80071064, fn_800710A0, fn_800710B4, mtx34_concat,
+ *   fn_80071130, fn_8007118C, g3d_calc_view_lc, fn_80071B70, fn_80071BD4, g3d_lc_queue_wait, g3d_dc_invalidate_range, g3d_lc_base,
+ *   g3d_calc_view_lc_dma, fn_800726D0.
+ *   Partial (7 written bodies): fn_8006F908, fn_8006FDCC, fn_8006FE7C, fn_8006FEC8, fn_8006FF50, res_mdl_info_num_pos_nrm_mtx,
  *   fn_800700C0.
  *   flipcheck: `.text` 0x258 of 0x2FD4; `.rodata`, `.data`, `.sdata` and `.sdata2` are claimed and not emitted.
  *   `mtx34_concat` and `mtx34_copy_ps` are unwritten (empty bodies).
@@ -82,14 +87,14 @@ u32 fn_8006FF50(void* self);
 u32 fn_8006FFB4(void* self);
 const char* fn_8006FFBC(void);
 u32 fn_8006FFC8(void* self);
-u32 fn_8006FFDC(void* self);
+u32 res_mdl_info_num_pos_nrm_mtx(void* self);
 u32 fn_80070020(void* self);
 u32* fn_80070054(u32* pDst, u32 ptr);
 void fn_800700B8(u32* pDst, u32 value);
 void fn_80070134(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
 void fn_80070410(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
 void fn_80070600(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
-void fn_80070820(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
+void g3d_calc_view(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
 void fn_80071008(void* p);
 void mtx34_copy_ps(Mtx34* pDst, const Mtx34* pSrc);
 void fn_80071064(void* p);
@@ -98,15 +103,15 @@ void fn_800710B4(void* p);
 void mtx34_concat(void* pDst, void* pA, void* pB);
 void fn_80071130(void* p);
 void fn_8007118C(void* p);
-void fn_80071198(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
+void g3d_calc_view_lc(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
 void fn_80071B70(void* p);
 void fn_80071BD0(void* p);
 void fn_80071BD4(void* p);
 void fn_80071C34(void* p);
-void fn_80071C38(void* p);
-void fn_80071C3C(void* p);
-void fn_80071C40(void* p);
-void fn_80071C48(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
+void g3d_lc_queue_wait(void* p);
+void g3d_dc_invalidate_range(void* p);
+void g3d_lc_base(void* p);
+void g3d_calc_view_lc_dma(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7);
 void fn_800726D0(void* p);
 
 /* -------- reconstructed bodies -------- */
@@ -215,14 +220,14 @@ u32 fn_8006FF50(void* self) {
     (void)self;
     return 0;
 }
-u32 fn_8006FFDC(void* self) {
+u32 res_mdl_info_num_pos_nrm_mtx(void* self) {
     (void)self;
     return 0;
 }
 void fn_80070134(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
 void fn_80070410(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
 void fn_80070600(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
-void fn_80070820(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
+void g3d_calc_view(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
 void fn_80071008(void* p) {}
 void mtx34_copy_ps(Mtx34* pDst, const Mtx34* pSrc) {}
 void fn_80071064(void* p) {}
@@ -231,15 +236,15 @@ void fn_800710B4(void* p) {}
 void mtx34_concat(void* pDst, void* pA, void* pB) {}
 void fn_80071130(void* p) {}
 void fn_8007118C(void* p) {}
-void fn_80071198(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
+void g3d_calc_view_lc(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
 void fn_80071B70(void* p) {}
 void fn_80071BD0(void* p) {}
 void fn_80071BD4(void* p) {}
 void fn_80071C34(void* p) {}
-void fn_80071C38(void* p) {}
-void fn_80071C3C(void* p) {}
-void fn_80071C40(void* p) {}
-void fn_80071C48(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
+void g3d_lc_queue_wait(void* p) {}
+void g3d_dc_invalidate_range(void* p) {}
+void g3d_lc_base(void* p) {}
+void g3d_calc_view_lc_dma(void* p0, void* p1, void* p2, void* p3, void* p4, void* p5, void* p6, u32 p7) {}
 void fn_800726D0(void* p) {}
 
 }  // extern "C"

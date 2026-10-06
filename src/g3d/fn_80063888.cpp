@@ -181,10 +181,11 @@ extern "C" u32 fn_8006480C(u32 *p)
     return *p;
 }
 
-extern "C" u32 fn_80064868(void)
+/* 0x80064868 (0x30): returns the AnmObjMatClr type. */
+const nw4r::g3d::G3dObj::TypeObj nw4r::g3d::AnmObjMatClr::GetTypeObjStatic()
 {
     void *local;
-    return (u32)*fn_8005DCD0(&local, lbl_8056F550);
+    return *reinterpret_cast<const TypeObj*>(type_obj_set_name_anmchr(&local, lbl_8056F550));
 }
 
 extern "C" const u8 **type_obj_set_name_texsrt_node(const u8 **out, const u8 *v)
@@ -628,13 +629,10 @@ void nw4r::g3d::AnmObj::SetAnmFlag(AnmFlag flag, bool on)
         mFlags &= ~flag;
 }
 
-/* Tests `bits` in the object's +0xC flag word; the object is opaque, as `g3d/fn_80063888.h` declares it (the
- * ScnMdl pointer fn_8007EA08 passes through). */
-extern "C" s32 fn_800649B4(void *pSelf, u32 bits)
+/* 0x800649B4 (0x18): whether any of `flag`'s bits is set. */
+bool nw4r::g3d::AnmObj::TestAnmFlag(AnmFlag flag) const
 {
-    G3dFlagWord *self = (G3dFlagWord *)pSelf;
-
-    return (self->field_0x0C & bits) != 0;
+    return (mFlags & flag) != 0;
 }
 
 /* The three-word records (0x800651B4-0x80065204). */
