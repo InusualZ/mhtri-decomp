@@ -99,6 +99,9 @@ extern u8 pl_coll_slot_used[0x10];               /* 0x806AC078: 16 per-slot live
 extern PlLandCell pl_land_data[0x7F8 / 0x88];      /* 0x806AC088: 15 x 0x88, element ctor `fn_80297D9C` */
 extern u32 pl_hit_id_list[0x28 / 4];             /* 0x806AC880: 10 ids, scanned by `fn_80296228` */
 
+/* 0x80293A7C - scales `v` by the coll unit's constant over `len`.  GUESS name. */
+void vec3_scale_inv(VEC3* v, f32 len);
+
 #ifdef __cplusplus
 }
 #endif

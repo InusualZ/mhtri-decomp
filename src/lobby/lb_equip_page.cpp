@@ -72,7 +72,7 @@ extern "C" {
 
 s32 game_ready_ck(void);
 
-s32 fn_80217934(void);
+s32 lb_panel_close(void);
 u8* fn_80223A18(u8 table, s32 index);
 u8* fn_80223A44(u8 table, s32 index);
 void fn_802FAFC8(s32 id);
@@ -135,7 +135,7 @@ void* fn_802235E0(u32* base, s32 offset)
 /* The no-argument page entry the item page's dispatcher tails into. */
 void fn_80220818(void)
 {
-    fn_80217934();
+    lb_panel_close();
 }
 
 /* One shared sprite row: the layout entry plus its row table. */

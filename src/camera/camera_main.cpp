@@ -22,6 +22,7 @@
  * extabindex).
  * NAMES. GUESS (from each body and its callers): camera_work_init, camera_area_reset, stage_dcm_path_get,
  *   GUESS: camera_kill_cut_start, camera_kill_cut_start_split
+ *   GUESS: `camera_talk_lock_set`, `camera_talk_reset`, `camera_frame_get`
  */
 /* ---- header inherited from src/stage/fn_802B2AA0.cpp (written against its pre-phase-4 range) ---- */
 /*
@@ -343,7 +344,7 @@ typedef struct CamWork {
     /* +0x1EE */ u8 field_0x1EE;             /* fn_802B9740 gates on it */
     /* +0x1EF */ u8 pad_0x1EF[0x95];
     /* +0x284 */ u8 field_0x284;             /* camera_work_ck tests it against 1 */
-    /* +0x285 */ u8 field_0x285;             /* cleared by fn_802BC468 */
+    /* +0x285 */ u8 field_0x285;             /* cleared by camera_talk_reset */
     /* +0x286 */ u8 field_0x286;
     /* +0x287 */ u8 field_0x287;
     /* +0x288 */ s16 field_0x288;            /* fn_802BC82C returns it, or one less */
@@ -365,7 +366,7 @@ typedef struct CamWork {
     /* +0x461 */ u8 pad_0x461[0x19];
     /* +0x47A */ u8 field_0x47A;             /* fn_802BBA3C clears it */
     /* +0x47B */ u8 pad_0x47B[0x3];
-    /* +0x47E */ u8 field_0x47E;             /* fn_802BBA64 stores its argument here */
+    /* +0x47E */ u8 field_0x47E;             /* camera_talk_lock_set stores its argument here */
     /* +0x47F */ u8 field_0x47F;             /* fn_802BBAC4 stores its argument here */
     /* +0x480 */ u8 pad_0x480[0x19];
     /* +0x499 */ u8 field_0x499;             /* the camera slot fn_802BB0EC selects */
@@ -937,7 +938,7 @@ void fn_802BBA3C(void)
 /*
  * Stores the +0x47E byte of the current camera work.
  */
-void fn_802BBA64(u8 value)
+void camera_talk_lock_set(u8 value)
 {
     ((CamWork*)fn_802BECD0())->field_0x47E = value;
 }
@@ -1014,7 +1015,7 @@ bool fn_802BC1CC(CamWork* self)
 /*
  * Clears the camera mode bytes the quake and fade paths latch.
  */
-void fn_802BC468(void)
+void camera_talk_reset(void)
 {
     CamWork* self = (CamWork*)fn_802BECD0();
 
@@ -1031,7 +1032,7 @@ void fn_802BC468(void)
 /*
  * Returns the +0x288 counter, one lower when `full` is set.
  */
-s16 fn_802BC82C(u8 full)
+s16 camera_frame_get(u8 full)
 {
     CamWork* self = (CamWork*)fn_802BECD0();
 
@@ -1346,7 +1347,7 @@ void fn_802BC7C8(u8 mode, u32 arg)
 void camera_event_set(u8 mode, u32 arg)
 {
     if (camera_work_ck()) {
-        fn_802BC468();
+        camera_talk_reset();
         fn_802BC4AC(mode, arg);
     }
 }

@@ -18,6 +18,7 @@
  * NAMES. `lb_npc` is the NPC work array the range owns, with `npc_data_town`, `npc_data_village`, `npc_lp_tbl`,
  *   `npc_model_*`, `npc_sub_data`, `npc_event_set_data`, `lb_npc_Get_motion_no`, `lb_npc_area_ck` and
  *   `get_talk_npc_data_ptr`; the map and the dump give only placeholders for the rest.
+ *   GUESS: `lb_cmd_pressed_ck`, `lb_cmd_held_ck`, `lb_cmd_repeat_ck`, `lb_cmd_repeat_get`, `lb_yes_no_step`
  * RESIDUALS. 238 rows unwritten: 0x801FC318-0x801FC6A0, 0x801FCBC8-0x801FD0F8, 0x801FD338-0x801FDD9C,
  *   0x801FE200-0x802029B4, 0x80204DA8-0x8020505C, 0x8020623C-0x80206824, 0x80206AD0-0x80206CB4, 0x80207284-0x80207698,
  *   0x80207B3C-0x80207E9C, 0x80207EEC-0x802080C0, 0x80208100-0x80208928, 0x80208AFC-0x8020A5D4, 0x8020A714-0x8020AD14,
@@ -95,8 +96,8 @@ extern "C" LbResId lbl_80582A68[];
  * Declarations: mangled map names are C++ linkage (rule 9), plain fn_/lbl_ names are C.
  */
 extern "C" {
-s32 fn_8004D27C(s32);
-u32 fn_8004D70C(s32);
+s32 userdata_progress_flag_ck(s32);
+u32 userdata_flag_ck(s32);
 void fn_802FAFC8(u16);
 u16 fn_802FB54C(s32);
 u8 fn_802FB948(void);
@@ -108,7 +109,7 @@ void fn_800E2198(void* self, s32 a);
 void fn_800E1640(void* self);
 s32 fn_8026A00C(u16 id);
 s32 fn_802D282C(u16 id);
-s32 fn_8045AB38(s32 a);
+s32 abs(s32 a);
 }
 } /* namespace s_801FBF78 */
 
@@ -133,57 +134,57 @@ void fn_801FBF78(void)
 {
     switch (fn_802FB54C(1)) {
     case 0x1D:
-        if (fn_8004D27C(0x3C) == 0 && fn_8004D70C(0x2711) == 1 && fn_8004D70C(0x2714) == 1 &&
-            fn_8004D70C(0x2715) == 1 && fn_8004D70C(0x2718) == 1 && fn_8004D70C(0x271D) == 1) {
+        if (userdata_progress_flag_ck(0x3C) == 0 && userdata_flag_ck(0x2711) == 1 && userdata_flag_ck(0x2714) == 1 &&
+            userdata_flag_ck(0x2715) == 1 && userdata_flag_ck(0x2718) == 1 && userdata_flag_ck(0x271D) == 1) {
             fn_802FAFC8(0x3C);
         }
         break;
     case 0x1E:
-        if (fn_8004D70C(0x36B0) == 1) {
+        if (userdata_flag_ck(0x36B0) == 1) {
             fn_802FAFC8(0x3D);
         }
         break;
     case 0x1F:
-        if (fn_8004D27C(0x3E) == 0 && fn_8004D70C(0x2743) == 1 && fn_8004D70C(0x274A) == 1 &&
-            fn_8004D70C(0x274B) == 1 && fn_8004D70C(0x274D) == 1 && fn_8004D70C(0x2750) == 1) {
+        if (userdata_progress_flag_ck(0x3E) == 0 && userdata_flag_ck(0x2743) == 1 && userdata_flag_ck(0x274A) == 1 &&
+            userdata_flag_ck(0x274B) == 1 && userdata_flag_ck(0x274D) == 1 && userdata_flag_ck(0x2750) == 1) {
             fn_802FAFC8(0x3E);
         }
         break;
     case 0x20:
-        if (fn_8004D70C(0x36B1) == 1) {
+        if (userdata_flag_ck(0x36B1) == 1) {
             fn_802FAFC8(0x3F);
         }
         break;
     case 0x21:
-        if (fn_8004D27C(0x40) == 0 && fn_8004D70C(0x2774) == 1 && fn_8004D70C(0x2775) == 1 &&
-            fn_8004D70C(0x277A) == 1 && fn_8004D70C(0x277C) == 1 && fn_8004D70C(0x2780) == 1) {
+        if (userdata_progress_flag_ck(0x40) == 0 && userdata_flag_ck(0x2774) == 1 && userdata_flag_ck(0x2775) == 1 &&
+            userdata_flag_ck(0x277A) == 1 && userdata_flag_ck(0x277C) == 1 && userdata_flag_ck(0x2780) == 1) {
             fn_802FAFC8(0x40);
         }
         break;
     case 0x22:
-        if (fn_8004D70C(0x36B2) == 1) {
+        if (userdata_flag_ck(0x36B2) == 1) {
             fn_802FAFC8(0x41);
         }
         break;
     case 0x23:
-        if (fn_8004D27C(0x42) == 0 && fn_8004D70C(0x3A9B) == 1 && fn_8004D70C(0x3A9E) == 1 &&
-            fn_8004D70C(0x3A9F) == 1 && fn_8004D70C(0x3AA1) == 1 && fn_8004D70C(0x3AA6) == 1) {
+        if (userdata_progress_flag_ck(0x42) == 0 && userdata_flag_ck(0x3A9B) == 1 && userdata_flag_ck(0x3A9E) == 1 &&
+            userdata_flag_ck(0x3A9F) == 1 && userdata_flag_ck(0x3AA1) == 1 && userdata_flag_ck(0x3AA6) == 1) {
             fn_802FAFC8(0x42);
         }
         break;
     case 0x24:
-        if (fn_8004D70C(0x4A38) == 1) {
+        if (userdata_flag_ck(0x4A38) == 1) {
             fn_802FAFC8(0x43);
         }
         break;
     case 0x25:
-        if (fn_8004D27C(0x44) == 0 && fn_8004D70C(0x3ACB) == 1 && fn_8004D70C(0x3ACD) == 1 &&
-            fn_8004D70C(0x3AD0) == 1 && fn_8004D70C(0x3AD4) == 1 && fn_8004D70C(0x3AD6) == 1) {
+        if (userdata_progress_flag_ck(0x44) == 0 && userdata_flag_ck(0x3ACB) == 1 && userdata_flag_ck(0x3ACD) == 1 &&
+            userdata_flag_ck(0x3AD0) == 1 && userdata_flag_ck(0x3AD4) == 1 && userdata_flag_ck(0x3AD6) == 1) {
             fn_802FAFC8(0x44);
         }
         break;
     case 0x26:
-        if (fn_8004D70C(0x4A39) == 1) {
+        if (userdata_flag_ck(0x4A39) == 1) {
             fn_802FAFC8(0x45);
         }
         break;
@@ -350,7 +351,7 @@ void fn_801FDEE4(_LB_NPC* self, s32 ticks)
     s32 angle;
 
     self->field_0x1D4 = fn_801FDE3C(self, &self->field_0x214->vec_0x3C);
-    angle = fn_8045AB38((s16)self->field_0x1D4);
+    angle = abs((s16)self->field_0x1D4);
     if (angle > 10 && self->field_0x229 == 0) {
         self->field_0x228 = 1;
         self->field_0x218 = self->field_0x02C;
@@ -2771,7 +2772,7 @@ extern "C" {
 __declspec(noinline) u32 fn_80208AB8(void);
 __declspec(noinline) u32 fn_80208AC0(_PLW* self);
 __declspec(noinline) u32 fn_80208AE8(_PLW* self);
-void fn_8020A3E4(_PLW* self, u32 a, s32 b, s32 c);
+void lb_npc_act_set(_PLW* self, u32 a, s32 b, s32 c);
 __declspec(noinline) void fn_8020A5D4(_PLW* self, u32 a, s32 b, s32 c);
 __declspec(noinline) void fn_8020A5EC(_PLW* self, u8 id);
 void fn_8020A5F4(_PLW* self, u32 a, s32 b, s32 c, u16 d);
@@ -3098,7 +3099,7 @@ __declspec(noinline) u32 fn_80208AE8(_PLW* self)
 __declspec(noinline) void fn_8020A5D4(_PLW* self, u32 a, s32 b, s32 c)
 {
     self->act_state_0x00E[0] = 1;
-    fn_8020A3E4(self, (u8)a, (u16)b, (u16)c);
+    lb_npc_act_set(self, (u8)a, (u16)b, (u16)c);
 }
 
 /* 0x8020A5EC - store the act id byte. */
@@ -3198,7 +3199,7 @@ void fn_8020AF90(_PLW* self)
     case 1:
         if (Pl_motion_end_ck(self) == 1) {
             Pl_chr_setX(self, 609, 6, 0);
-            fn_8020A3E4(self, 0, 4, 32);
+            lb_npc_act_set(self, 0, 4, 32);
         }
         break;
     }
@@ -3239,7 +3240,7 @@ s32 get_fade_stat(s32 slot);
 #pragma dont_inline on
 #pragma peephole off
 namespace s_8020C588 {
-#include "lobby/fn_8021213C.h"
+#include "lobby/lb_cmd_pressed_ck.h"
 #include "lobby/lb_npc_callees.h"
 #include "lobby/lb_menu_pos_tbl.h"
 #include "lobby/lb_equip_page.h"
@@ -3297,21 +3298,21 @@ extern "C" u32 fn_80212060(void) {
 }
 
 /* The four player-0 command-mask testers; all report "clear" while the screen is not owned. */
-extern "C" s32 fn_8021213C(u16 mask) {
+extern "C" s32 lb_cmd_pressed_ck(u16 mask) {
     if (fn_80212060() == 1) {
         return 0;
     }
     return (lobby_w.cmd_mask_0x084[0][0] & mask) != 0;
 }
 
-extern "C" s32 fn_80212198(u16 mask) {
+extern "C" s32 lb_cmd_held_ck(u16 mask) {
     if (fn_80212060() == 1) {
         return 0;
     }
     return (lobby_w.cmd_mask_0x084[0][1] & mask) != 0;
 }
 
-extern "C" s32 fn_802121F4(u16 mask) {
+extern "C" s32 lb_cmd_repeat_ck(u16 mask) {
     if (fn_80212060() == 1) {
         return 0;
     }
@@ -3326,7 +3327,7 @@ extern "C" s32 fn_80212250(u16 mask) {
 }
 
 /* The four player-0 command-mask getters. */
-extern "C" u16 fn_802122AC(void) {
+extern "C" u16 lb_cmd_repeat_get(void) {
     if (fn_80212060() == 1) {
         return 0;
     }
@@ -3352,8 +3353,8 @@ extern "C" u16 fn_80212334(void) {
 }
 
 /* Steps the caller's 4/8 sprite stepper over player 0's first mask. */
-extern "C" void fn_80212540(void* self) {
-    toggle_word_step_dpad(self, fn_802122E8(), 4, 8);
+extern "C" s32 lb_yes_no_step(void* self) {
+    return toggle_word_step_dpad(self, fn_802122E8(), 4, 8);
 }
 
 /* Steps the caller's 4/8 sprite stepper over the same mask, ignoring the screen guard. */

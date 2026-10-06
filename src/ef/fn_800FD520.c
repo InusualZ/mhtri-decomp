@@ -108,7 +108,7 @@ void fn_800FD520(struct _EFT* self)
             self->state_0x05 = 3;
             return;
         }
-        fn_800E0A14(((struct _EfPlBody*)source->physics_0x13C)->chr_0x04, work->param_id, &mtx);
+        mhchar_joint_mtx_get(((struct _EfPlBody*)source->physics_0x13C)->chr_0x04, work->param_id, &mtx);
         switch (source->field_0x002) {
         default:
             break;

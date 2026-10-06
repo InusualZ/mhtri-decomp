@@ -9,6 +9,7 @@
  * NAMES. `GetGroundHit`, `GetGroundHit2`, `hit_ground_comon`, `findInterSection`, `findInterSection2` and
  *   `findInterSection3` are the map's (mangled) names; every other function keeps its unmangled map stem in an
  *   `extern "C"` block.
+ *   GUESS: `vec3_scale_inv`
  * RESIDUALS. 53 functions unwritten (objdiff scores them 0) in 16 runs: 0x8028FA20-0x802910C0, 0x80291114-0x8029163C,
  *   0x80291664-0x802919FC, 0x80291A70-0x80291B08, 0x80291B48-0x80291BBC, 0x80291CD0-0x80292468, 0x802924C0-0x80293A7C,
  *   0x80293A88-0x8029573C, 0x8029576C-0x80295924, 0x80295998-0x802961F8, 0x80296260-0x80296368, 0x80296448-0x802969A8,
@@ -75,7 +76,7 @@ s32 fn_80291B08(_PLW* self, VEC3* pos, LandData* land, f32* out, u32 kind);
 s32 fn_80291BBC(VEC3* pos, u8 flag, u16* hit_layer, f32* out, u32 kind);
 void fn_80291C50(VEC3* pos, u8 flag, LandData* land, u32 kind);
 VEC3* fn_80292468(VEC3* pair);
-void fn_80293A7C(VEC3* v, f32 divisor);
+void vec3_scale_inv(VEC3* v, f32 divisor);
 VEC3* fn_8029573C(VEC3* v);
 }
 
@@ -260,7 +261,7 @@ VEC3* fn_80292468(VEC3* pair) {
 
 /* 0x80293A7C - scale `v` by the reciprocal of `divisor` through the in-place scale `fn_800513F0`;
  * the tail call is the whole body. */
-void fn_80293A7C(VEC3* v, f32 divisor) {
+void vec3_scale_inv(VEC3* v, f32 divisor) {
     return fn_800513F0(v, 1.0f / divisor);
 }
 

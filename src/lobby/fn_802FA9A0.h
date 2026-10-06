@@ -26,7 +26,7 @@ typedef struct LbLobbyView {
  * field) */
 typedef struct LbKujiraWork {
     /* +0x00 */ u8 flag_0x00;   /* mirrored from +0x01 by `fn_802FF248` */
-    /* +0x01 */ u8 bits_0x01;   /* one bit per unlocked kind (`fn_802FF29C` sets, `fn_802FF234`
+    /* +0x01 */ u8 bits_0x01;   /* one bit per unlocked kind (`fn_802FF29C` sets, `kujira_event_over_ck`
                                 * reports the top one) */
     /* +0x02 */ s8 count_0x02;  /* `fn_802FF248` seeds it to -4 */
     /* +0x03 */ u8 unused_0x03[0x1];
@@ -36,7 +36,7 @@ typedef struct LbKujiraWork {
 
 /* The block the `.sbss` pointer `lobby_world_block` (0x80794880) points at, as this range sees it: the
  * mode byte at +0x3E01 (`fn_802FB5E4`), the per-kind state bytes at +0x4654 (`fn_802FB8EC`) and the
- * flag bytes at +0x4832..+0x4834 (`fn_802FF248`/`fn_802FF234`/`fn_802FF29C`).  Everything between them
+ * flag bytes at +0x4832..+0x4834 (`fn_802FF248`/`kujira_event_over_ck`/`fn_802FF29C`).  Everything between them
  * is filler.  size: 0x6010 (the neighbour view's extent - `lobby/fn_8021E1EC.h`; this range
  * reads nothing above +0x4834) */
 typedef struct LbBlockView {

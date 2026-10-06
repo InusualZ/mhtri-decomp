@@ -84,4 +84,29 @@ struct MenuLobbyView {
     /* +0x48 */ u16 field_0x48;
 };
 
+struct QuestRecord;
+struct LbQuestBoardData;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* The quest board's entry points into this range (rule 2: their owner's header).  GUESS names, from the lobby quest
+ * board's calls: 0x80321830 takes quest `quest_id` for the player work `plw` (lobby parameter block, `lobby_w`'s
+ * quest bytes, the payload's flag byte); 0x8032194C confirms and resets the party state; 0x80322CEC / 0x80322650 /
+ * 0x80322B98 / 0x80322C68 / 0x80322DE4 draw the quest detail page's header, its target, reward and label tabs and
+ * its footer; 0x80323428 wraps a comment into `out`, 24 characters a line. */
+void quest_board_accept(struct LbQuestBoardData* plw, u16 quest_id, u8 mode);
+void quest_party_state_reset(_PLW* plw);
+void quest_detail_header_draw(struct QuestRecord* rec);
+void quest_detail_target_draw(struct QuestRecord* rec);
+void quest_detail_reward_draw(struct QuestRecord* rec);
+void quest_detail_label_draw(struct MenuQuestWork* self);
+void quest_detail_footer_draw(struct QuestRecord* rec);
+void quest_comment_wrap(char* text, char* out);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_MENU_FN_8031EA8C_H */

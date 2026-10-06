@@ -132,7 +132,6 @@ void fn_80055DC8(void* uv0, void* uv1, u8 tex_idx);            /* 0x80055DC8 */
 void spr_data_copy(_SPR_DATA_* dst, const _SPR_DATA_* src);      /* 0x801E6850, the record copy */
 
 const _SPR_ANIM_* fn_802E0714(u16 id);                          /* 0x802E0714 */
-u32 get_rare_color(u8 index);                                  /* 0x802DB254 */
 
 /* This unit's own bodies, in address order. */
 void fn_802E08E8(u16 id, u32 color, const _mh_ivec2_* pos);
@@ -149,12 +148,18 @@ void fn_802E1134(u16 id, u8 tex_idx, u32 color, const _mh_ivec2_* pos);
 void fn_802E1190(u16 id, u16 item_id, const _mh_ivec2_* pos);
 void fn_802E1288(s16 x, s16 y, s16 size, u32 color, u8 tex_idx);
 u32 fn_802E12A0(u16 id, u16 part, u8 tex_idx, u32 color, const _mh_ivec2_* pos);
-void fn_802E1320(u16 id, u16 part, u16 item_id, const _mh_ivec2_* pos);
+void draw_itemicon_anim_idx(u16 id, u16 part, u16 item_id, const _mh_ivec2_* pos);
 void fn_802E1400(_SPR_DATA_* spr, _EQUIP* equip, const _mh_ivec2_* pos, u8 rare);
-void fn_802E14CC(u16 id, _EQUIP* equip, const _mh_ivec2_* pos);
+void draw_equipicon_idx(u16 id, _EQUIP* equip, const _mh_ivec2_* pos);
 void fn_802E1518(_SPR_DATA_* spr, u8 kind, u32 color, const _mh_ivec2_* pos);
-void fn_802E1588(u16 id, u8 tex_idx, u32 color, const _mh_ivec2_* pos);
-void fn_802E163C(u16 id, u8 tex_idx, const _mh_ivec2_* pos);
+void draw_sprite_uv_color_idx(u16 id, u8 tex_idx, u32 color, const _mh_ivec2_* pos);
+void draw_sprite_uv_idx(u16 id, u8 tex_idx, const _mh_ivec2_* pos);
+/* 0x802E23D0 - `draw_font` over layout `id` posed at animation frame `part`.  GUESS name. */
+void draw_font_anim_idx(u16 id, u16 part, s8* str, u32 flags, const _mh_ivec2_* pos);
+/* 0x802E4134 / 0x802E4798 - a window frame of `width` x `height` at (`x`, `y`): a flat colour, or style `style` of
+ * the frame-style table (blend mode 4/5/1).  GUESS names; added with `menu/menu_result.cpp` (rule 2). */
+void draw_window_frame(s16 x, s16 y, u16 width, u16 height, u32 color);
+void draw_window_frame_style(s16 x, s16 y, u16 width, u16 height, u8 style);
 void fn_802E16E0(u16 id, u8 tex_idx, u32 color, const _mh_ivec2_* pos);
 void fn_802E1794(s16 x, s16 y, s16 size, u32 color, u8 tex_idx);
 void fn_802E1834(s16 x, s16 y, s16 size, u32 color, u8 tex_idx);
@@ -208,6 +213,7 @@ void note_box_pos_lower(_mh_ivec2_* pos, s16 lines);
  * block above relocates to the bare stem, which no link input defines. */
 _SPR_DATA_* get_lsp_data(u16 id, _mh_ivec2_* out);             /* 0x802E0550 */
 s32 get_wide_offset(u8 index);                                 /* 0x802E0490 */
+u32 get_rare_color(u8 index);                                  /* 0x802DB254 -> get_rare_color__FUc */
 
 void draw_sprite(const _SPR_DATA_& spr, const _mh_ivec2_* pos);
 void draw_font(const _SPR_DATA_& spr, s8* str, u32 flags, const _mh_ivec2_* pos);

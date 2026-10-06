@@ -29,7 +29,7 @@ void setScaleAll__6MHcharFf(struct MHchar* ch, f32 scale);
 /* Merged 2026-09-24: a second lane formalized into this shared header.  Declarations it
  * needed that the first did not; a symbol both named keeps the first (verified) signature. */
 void fn_800DD7E0(struct MHchar* model, Vec3* pos, s32 flag);
-void fn_800E0A14(void* mhchar, u32 joint, Mtx34* out);
+void mhchar_joint_mtx_get(void* mhchar, u32 joint, Mtx34* out);
 int fn_800E2994(void* handle);
 void fn_800E3B2C(void);
 /* Merged 2026-09-24: the 0x800EF7D8 proposal's consumer needed this one. */

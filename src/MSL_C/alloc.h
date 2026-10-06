@@ -60,8 +60,9 @@ int sscanf(const char* src, const char* fmt, ...);
 /* 0x8045F858 */
 char* strtok(char* string, const char* delimiters);
 
-/* 0x8045AB48 - the absolute value (`srawi`/`xor`/`subf`).  Its twin 0x8045AB38 has the same body; MSL's
- * arith.c defines `abs` before `labs`, so this second one is taken as `labs` (a GUESS by that order). */
+/* 0x8045AB38 / 0x8045AB48 - the absolute value (`srawi`/`xor`/`subf`).  The two bodies are the same; MSL's
+ * arith.c defines `abs` before `labs`, so the first is `abs` and the second `labs` (a GUESS by that order). */
+int abs(int n);
 long labs(long n);
 
 /* 0x80463E74 - the global frame thunk `g3d/g3d_resanmlight.cpp`'s `fn_8008FFFC` tail-calls. */

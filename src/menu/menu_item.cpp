@@ -15,6 +15,7 @@
  *   `GetItemData`, `get_menu_tbl_ptr`, `get_menu_lsp_tbl`, `put_menu_cursor`; the map's own `get_hit_id__Fv`.  The other
  *   named rows are GUESSes from their bodies (the dump answers `zz_` for them).
  *   GUESS (from each body and its callers): hit_mask_ck
+ *   GUESS: `menu_row_table_get`
  * RESIDUALS. 96 rows unwritten (objdiff scores them zero): 0x80297E34-0x80299ED8, 0x80299EF8-0x8029A140,
  *   0x8029A19C-0x8029B8F4, 0x8029B918-0x8029D6FC, 0x8029D744-0x8029EFDC, 0x8029F204-0x8029F3C8 (`hit_data_apply`),
  *   0x8029F834-0x8029FA74, 0x8029FCFC-0x8029FFB8, 0x802A0568-0x802A16F8, 0x802A1714-0x802A2550,
@@ -1246,7 +1247,7 @@ extern "C" u32 fn_8029F7E0(u16 idx, u16 sub)
 }
 
 /* 0x8029F808: the menu table's +0x754 word. */
-extern "C" u32 fn_8029F808(void)
+extern "C" u32 menu_row_table_get(void)
 {
     return lbl_806ACF28.field_0x754;
 }
@@ -1290,7 +1291,7 @@ extern "C" void fn_8029FFFC(MenuSlot* slot, s32 index)
 /* 0x802A0040: the same selection over the first slot's third entry array. */
 extern "C" void fn_802A0040(s32 index)
 {
-    MenuSlot* slot = &lbl_806AC8C8.slot[0];
+    MenuSlot* slot = &menu_work.slot[0];
     s32 i;
 
     for (i = 0; i < (s8)slot->entry_count_c; i++) {
@@ -1346,7 +1347,7 @@ extern "C" u32 menu_busy_ck(void)
 /* 0x802A02D4: whether a slot is in use, else what `fn_802DE670` reports for its index. */
 extern "C" u32 fn_802A02D4(u8 idx)
 {
-    if (lbl_806AC8C8.slot[idx].active != 0) {
+    if (menu_work.slot[idx].active != 0) {
         return 1;
     }
     return fn_802DE670(idx);
@@ -1356,7 +1357,7 @@ extern "C" u32 fn_802A02D4(u8 idx)
  * mode's own slot. */
 extern "C" u32 menu_item_frame_update(MenuFrameWork* self)
 {
-    MenuSlot* slot = &lbl_806AC8C8.slot[0];
+    MenuSlot* slot = &menu_work.slot[0];
     u32 idx = 0;
 
     if (self != 0) {
@@ -1366,7 +1367,7 @@ extern "C" u32 menu_item_frame_update(MenuFrameWork* self)
         case 1:
             if (screen_split_mode_ck() != 0) {
                 idx = self->slot_index;
-                slot = &lbl_806AC8C8.slot[idx];
+                slot = &menu_work.slot[idx];
             }
             break;
         case 2:
@@ -1382,7 +1383,7 @@ extern "C" u32 menu_item_frame_update(MenuFrameWork* self)
 /* 0x802A03A4: whether the first slot is in use in its single-player mode. */
 extern "C" u32 fn_802A03A4(void)
 {
-    if (lbl_806AC8C8.slot[0].active != 0 && lbl_806AC8C8.slot[0].field_0x000 < 2) {
+    if (menu_work.slot[0].active != 0 && menu_work.slot[0].field_0x000 < 2) {
         return 1;
     }
     if (fn_802DE670(0) != 0) {
@@ -1407,8 +1408,8 @@ extern "C" u32 fn_802A0404(MenuFrameWork* self)
  * cleared - the state the menu's item list accepts input in. */
 extern "C" u32 fn_802A0464(void)
 {
-    if (lbl_806AC8C8.slot[0].active != 0 && lbl_806AC8C8.slot[0].field_0x000 == 1 &&
-        lbl_806AC8C8.slot[0].field_0x014 == 3 && lbl_806AC8C8.slot[0].field_0x001 == 0) {
+    if (menu_work.slot[0].active != 0 && menu_work.slot[0].field_0x000 == 1 &&
+        menu_work.slot[0].field_0x014 == 3 && menu_work.slot[0].field_0x001 == 0) {
         return 1;
     }
     return 0;
@@ -1417,8 +1418,8 @@ extern "C" u32 fn_802A0464(void)
 /* 0x802A04B0: whether the first slot is in use in mode 2 with its flag set to 2. */
 extern "C" u32 fn_802A04B0(void)
 {
-    if (lbl_806AC8C8.slot[0].active != 0 && lbl_806AC8C8.slot[0].field_0x000 == 2 &&
-        lbl_806AC8C8.slot[0].field_0x001 == 2) {
+    if (menu_work.slot[0].active != 0 && menu_work.slot[0].field_0x000 == 2 &&
+        menu_work.slot[0].field_0x001 == 2) {
         return 1;
     }
     return 0;
@@ -1427,8 +1428,8 @@ extern "C" u32 fn_802A04B0(void)
 /* 0x802A04EC: whether a slot is in use in mode 1 and carries `value` as its stored byte. */
 extern "C" u32 fn_802A04EC(s8 value, u8 idx)
 {
-    if (lbl_806AC8C8.slot[idx].active != 0 && lbl_806AC8C8.slot[idx].field_0x000 == 1 &&
-        lbl_806AC8C8.slot[idx].field_0x014 == value) {
+    if (menu_work.slot[idx].active != 0 && menu_work.slot[idx].field_0x000 == 1 &&
+        menu_work.slot[idx].field_0x014 == value) {
         return 1;
     }
     return 0;
@@ -1437,13 +1438,13 @@ extern "C" u32 fn_802A04EC(s8 value, u8 idx)
 /* 0x802A053C: stores the first slot's +0x021 byte. */
 extern "C" void fn_802A053C(u8 value)
 {
-    lbl_806AC8C8.slot[0].field_0x021 = value;
+    menu_work.slot[0].field_0x021 = value;
 }
 
 /* 0x802A054C: the same store for the slot the caller names. */
 extern "C" void fn_802A054C(u8 idx, u8 value)
 {
-    lbl_806AC8C8.slot[idx].field_0x021 = value;
+    menu_work.slot[idx].field_0x021 = value;
 }
 
 
@@ -1550,22 +1551,22 @@ extern "C" void fn_802A0188(void)
     s32 i;
 
     fn_802DA2D4(1);
-    for (i = 0, slot = &lbl_806AC8C8.slot[0]; i < 2; slot++, i++) {
+    for (i = 0, slot = &menu_work.slot[0]; i < 2; slot++, i++) {
         if (slot->active != 0) {
             fn_8031A638(slot);
         }
     }
-    lbl_806AC8C8.slot[1].active = 0;
-    lbl_806AC8C8.slot[0].active = 0;
-    if (lbl_806AC8C8.slot[0].field_0x32D != 0) {
+    menu_work.slot[1].active = 0;
+    menu_work.slot[0].active = 0;
+    if (menu_work.slot[0].field_0x32D != 0) {
         fn_8004082C();
-        lbl_806AC8C8.slot[0].field_0x32D = 0;
-        lbl_806AC8C8.slot[1].field_0x32D = 0;
+        menu_work.slot[0].field_0x32D = 0;
+        menu_work.slot[1].field_0x32D = 0;
     }
     fn_802DB26C();
     fn_80384380();
     if (game_ready_ck() == 1) {
-        if (lbl_806AC8C8.slot[0].field_0x31E == 1 || lbl_806AC8C8.slot[1].field_0x31E == 1) {
+        if (menu_work.slot[0].field_0x31E == 1 || menu_work.slot[1].field_0x31E == 1) {
             fn_804273EC(4, 0, 0);
         }
     }
@@ -1580,7 +1581,7 @@ extern "C" u32 fn_802A025C(void)
     fn_802DA2D4(1);
     fn_80384380();
     fn_802DE238();
-    if (game_ready_ck() == 1 && lbl_806AC8C8.slot[0].field_0x31E == 1) {
+    if (game_ready_ck() == 1 && menu_work.slot[0].field_0x31E == 1) {
         fn_804273EC(4, 0, 0);
         released = 1;
     }
@@ -1607,7 +1608,7 @@ extern "C" void fn_802A2550(MenuEntryState* dst, const MenuEntryState* src)
 /* 0x802A2C98: clears a slot's in-use flag. */
 extern "C" void fn_802A2C98(u8 idx)
 {
-    lbl_806AC8C8.slot[idx].active = 0;
+    menu_work.slot[idx].active = 0;
 }
 
 /* 0x802A3190: the second entry array's selector, over the slot the caller passes. */

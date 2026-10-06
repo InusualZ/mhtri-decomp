@@ -70,13 +70,32 @@ void rotVecY(nw4r::math::VEC3* v, u32 angle);
  * artefact. */
 #ifdef __cplusplus
 extern "C" {
-u32 fn_8004D27C(s32 id);
-/* 0x8004D70C - the event-flag test that shares the same table `fn_8004D27C` reads; added with
+u32 userdata_progress_flag_ck(s32 id);
+/* 0x8004D210 - sets progress flag `id` (the halfword bit run at +0x47DA `userdata_progress_flag_ck` reads).  GUESS. */
+void userdata_progress_flag_set(u32 id);
+/* 0x8004D70C - the event-flag test that shares the same table `userdata_progress_flag_ck` reads; added with
  * `src/lobby/fn_802FA9A0.cpp` as the second consumer (it was declared locally by four
  * `src/lobby/*.cpp` files, which is the rule-2 backlog this declaration closes). */
-s32 fn_8004D70C(s32 id);
+s32 userdata_flag_ck(s32 id);
 /* 0x8004DE7C - the hunter-rank cap for the lobby data block `block` (its rank byte and the user record). */
 u16 get_hunter_rank_max(const u8* block);
+/* 0x8004D774 / 0x8004D79C - sets / tests the save's event bit `event - 9000` (the halfword at +0x52E2).  GUESS
+ * names, from the bodies; added with `menu/menu_result.cpp`, their first consumer (rule 2). */
+void userdata_event_bit_set(u16 event);
+u32 userdata_event_bit_ck(u16 event);
+/* 0x8004E424 - credits `points` hunter points to the save (tail call into 0x8004E1C4 with the save block) and
+ * returns its rank state.  GUESS name. */
+s32 userdata_hunter_points_add(s32 points);
+/* 0x8004E4D4 - folds 41 measured sizes (`sizes`, a stride-4 run) into the save's records: `which` 0 keeps the
+ * smallest, 1 the largest.  GUESS name. */
+void userdata_size_records_update(const u16* sizes, u8 which);
+/* 0x8004E634 - the crown class of a monster size: 0xFF when the monster has no size table, else 0..3.  GUESS
+ * name. */
+u8 monster_size_crown_get(u8 monster, u16 size);
+/* 0x8004E8BC / 0x8004E8E8 - ORs the two unlock words into `system_w`'s announced set / raises the unlock bit
+ * an event id maps to in the root move work's +0x148 words.  GUESS names. */
+void unlock_seen_mark(const u32* bits);
+void unlock_bit_raise(u8 event);
 #endif
 /* 0x8004D0E8 - clamp `*value += delta` into [0, 9999999], the score/point accumulator the VS result
  * and skill bands credit.  The owner defines it at C linkage, so the declaration sits inside the

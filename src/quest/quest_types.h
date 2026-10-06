@@ -10,6 +10,7 @@
 #include "types.h"
 #include "nw4r/math.h"                /* nw4r::math::VEC3 (Q_MoveWork) */
 #include "quest/quest_result_work.h"   /* Q_QuestStat, Q_ResultWork (shared with menu/ and lobby/) */
+#include "id_value.h"                 /* IdValue (Q_UserData's item box) */
 
 /* The player work record `quest_item_work_merge`'s first argument points at (defined in `pl.h`);
  * nothing here reads it, so the forward declaration is all this header needs. */
@@ -67,7 +68,9 @@ struct Q_ResultRow {
     /* +0x08B */ u8 state_0x8B;     /* the row's state byte: 7 marks a finished quest */
     /* +0x08C */ u8 pad_0x08C[0x310 - 0x8C];
     /* +0x310 */ u32 flags_0x310;   /* bit 0x00800000: the row is live */
-    /* +0x314 */ u8 pad_0x314[0x372 - 0x314];
+    /* +0x314 */ u8 pad_0x314[0x34C - 0x314];
+    /* +0x34C */ s32 objective_0x34C[3];  /* the main and the two sub-quest objectives; > 0 when the quest has one */
+    /* +0x358 */ u8 pad_0x358[0x372 - 0x358];
     /* +0x372 */ u16 item_id_0x372;  /* the quest's item id, 0 when it has none */
     /* +0x374 */ u16 kind_0x374;     /* the row's quest kind (stored into the item work's +0x8B) */
     /* +0x376 */ u8 pad_0x376[0x37C - 0x376];
@@ -160,11 +163,14 @@ struct Q_ItemWork {
             /* +0x0094 */ Q_Element elements_0x94[3];  /* the three quest elements */
             /* +0x01B4 */ u8 pad_0x01B4[0x120];
             /* +0x02D4 */ u8 armed_0x2D4[3];  /* per-element "armed" bytes `quest_monsters_release` walks */
-            /* +0x02D7 */ u8 pad_0x02D7[0x11];
+            /* +0x02D7 */ u8 pad_0x02D7[0xD];
+            /* +0x02E4 */ s32 fee_0x2E4;  /* GUESS name: the quest fee; the result pays the host twice it back */
             /* +0x02E8 */ s32 reward_0x2E8;  /* the quest reward left to lose */
-            /* +0x02EC */ u8 pad_0x02EC[0x8];
+            /* +0x02EC */ s32 sub_reward_0x2EC[2];  /* the two sub-quests' rewards */
             /* +0x02F4 */ s32 penalty_0x2F4;  /* the reward one faint costs */
-            /* +0x02F8 */ u8 pad_0x02F8[0x10];
+            /* +0x02F8 */ s32 points_0x2F8;  /* the main quest's hunter points */
+            /* +0x02FC */ u8 pad_0x02FC[0x4];
+            /* +0x0300 */ s32 sub_points_0x300[2];  /* the two sub-quests' hunter points */
             /* +0x0308 */ u8 result_kind_0x308;
             /* +0x0309 */ u8 pad_0x0309[0x3];
             /* +0x030C */ u8 field_0x30C;
@@ -218,7 +224,11 @@ struct Q_ItemWork {
     /* +0x6980 */ u8 tier_count_0x6980[2];  /* how many monster rolls each of the two tiers makes */
     /* +0x6982 */ u8 pad_0x6982[0x2];
     /* +0x6984 */ u16 tier_monster_0x6984[2];  /* the monster id whose lot table each tier rolls */
-    /* +0x6988 */ u8 pad_0x6988[0x1D];
+    /* +0x6988 */ u8 pad_0x6988[0x4];
+    /* +0x698C */ s32 tier_zenny_0x698C[2];  /* the reward per monster of each tier */
+    /* +0x6994 */ u8 pad_0x6994[0x4];
+    /* +0x6998 */ s32 tier_points_0x6998[2];  /* the hunter points per monster of each tier */
+    /* +0x69A0 */ u8 pad_0x69A0[0x5];
     /* +0x69A5 */ u8 area_count_0x69A5;  /* how many area records `area_0x69A8` holds */
     /* +0x69A6 */ u8 pad_0x69A6[0x2];
     /* +0x69A8 */ u32 area_0x69A8[32];  /* the area entry handles `em_area_entry_make` returns */
@@ -269,8 +279,19 @@ struct EmSetSave {
     /* +0xD4 */ u16 flag_0xD4;          /* `em_set_userdata_flag_ck` */
 };
 
+/* One arena quest's record holders in the save block: the two hunter names the best time was set with.
+ * size: 0x34 */
+struct Q_ArenaRecord {
+    /* +0x00 */ char name_a[0x14];
+    /* +0x14 */ char name_b[0x20];
+};
+
 struct Q_UserData {
-    /* +0x0000 */ u8 pad_0x0000[0x490];
+    /* +0x0000 */ u8 pad_0x0000[0x18];
+    /* +0x0018 */ s32 zenny_0x18;  /* the player's money (`score_add_clamped` credits it) */
+    /* +0x001C */ u8 pad_0x001C[0x180 - 0x1C];
+    /* +0x0180 */ IdValue box_0x180[0x18];  /* the item box's first page */
+    /* +0x01E0 */ u8 pad_0x01E0[0x490 - 0x1E0];
     /* +0x0490 */ Q_CountSet set_c;
     /* +0x04E0 */ u8 pad_0x04E0[0x2];
     /* +0x04E2 */ Q_CountSet set_d;
@@ -278,11 +299,28 @@ struct Q_UserData {
     /* +0x39C0 */ Q_CountSet set_a;
     /* +0x3A10 */ u8 pad_0x3A10[0xB0];
     /* +0x3AC0 */ Q_CountSet set_b;
-    /* +0x3B10 */ u8 pad_0x3B10[0x3F28 - 0x3B10];
+    /* +0x3B10 */ u8 pad_0x3B10[0x3BC0 - 0x3B10];
+    /* +0x3BC0 */ Q_SizeRecord sizes_0x3BC0[0x29];  /* the best monster sizes, by monster index */
+    /* +0x3C64 */ u8 pad_0x3C64[0x3DE0 - 0x3C64];
+    /* +0x3DE0 */ s32 hunter_points_0x3DE0;  /* the hunter points total */
+    /* +0x3DE4 */ u16 hunter_rank_0x3DE4;    /* the hunter rank */
+    /* +0x3DE6 */ u8 pad_0x3DE6[0x3F04 - 0x3DE6];
+    /* +0x3F04 */ s32 points_0x3F04;          /* the resource points (`userdata_zenny_add` credits them) */
+    /* +0x3F08 */ u8 pad_0x3F08[0x3F28 - 0x3F08];
     /* +0x3F28 */ Q_QuestStat quest_stat;  /* the stat `quest_init` copies into the work block's own */
     /* +0x3F38 */ u8 pad_0x3F38[0x3F98 - 0x3F38];
     /* +0x3F98 */ EmSetSave em_set_0x3F98;   /* the free hunt's monster records (`em_set_work_init`) */
-    /* +0x406E */ u8 pad_0x406E[0x6000 - 0x406E];
+    /* +0x406E */ u8 pad_0x406E[0x42D0 - 0x406E];
+    /* +0x42D0 */ Q_ArenaRecord arena_0x42D0[12];  /* the arena quests' record holders, by arena quest */
+    /* +0x4540 */ u8 pad_0x4540[0x484E - 0x4540];
+    /* +0x484E */ u16 kitchen_seed_0x484E;    /* the kitchen's roll seed, re-drawn after every meal */
+    /* +0x4850 */ u8 pad_0x4850[0x516C - 0x4850];
+    /* +0x516C */ u8 kitchen_pairs_0x516C[0xF0];  /* the ingredient pairs tried offline, one bit per pair */
+    /* +0x525C */ u8 kitchen_pairs_0x525C[0x86];  /* the pairs tried online (approximate: to the next field) */
+    /* +0x52E2 */ u16 event_bits_0x52E2;  /* the event flags the result screen reports as new */
+    /* +0x52E4 */ u8 pad_0x52E4[0x5334 - 0x52E4];
+    /* +0x5334 */ u32 arena_best_0x5334[12];  /* the arena quests' best times in frames, 0 when unset */
+    /* +0x5364 */ u8 pad_0x5364[0x6000 - 0x5364];
 };  /* size: 0x6000 */
 
 struct QuestEntrySlot;
@@ -344,7 +382,7 @@ struct Q_MoveWork {
     /* +0x0134 */ u16 entry_angle_0x134;
     /* +0x0136 */ u8 pad_0x0136[0x144 - 0x136];
     /* +0x0144 */ u32 area_0x144;            /* the area the hunt spawn table is indexed by */
-    /* +0x0148 */ u8 pad_0x0148[0x150 - 0x148];
+    /* +0x0148 */ u32 unlock_bits_0x148[2];  /* the unlock flags the quest raised */
     /* +0x0150 */ u8* result_buffer_0x150;   /* the 0x4800-byte buffer the quest entry allocates */
     /* +0x0154 */ QuestSpawnRec area_recs_0x154[4][0x80];  /* the spawn records of the four area lists */
     /* +0x2154 */ u32 area_counts_0x2154[4];  /* the records each list holds (each list continues the previous key run) */
@@ -366,7 +404,9 @@ struct Q_MoveWork {
     /* +0x22DA */ u8 pad_0x22DA;
     /* +0x22DB */ u8 em_level_0x22DB;       /* the enemy level the quest start set */
     /* +0x22DC */ u8 flag_0x22DC;          /* `LbParamWork::hunt_option_0x0A` at the free-hunt start */
-    /* +0x22DD */ u8 pad_0x22DD[0x22E8 - 0x22DD];  /* cleared, never read: the lobby's own view names
+    /* +0x22DD */ u8 pad_0x22DD[0x22E2 - 0x22DD];
+    /* +0x22E2 */ u8 player_count_0x22E2;  /* the players the quest ran with */
+    /* +0x22E3 */ u8 pad_0x22E3[0x22E8 - 0x22E3];  /* cleared, never read: the lobby's own view names
                                                    * +0x22E3, this one reads up to +0x22DC */
 };  /* size: 0x22E8 */
 

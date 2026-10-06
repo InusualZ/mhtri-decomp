@@ -24,6 +24,9 @@ void note_pane_mode_set(NoteWork* self, u8 mode);
 /* 0x80385BF4 - starts motion `motion` on the pane's model unless the quest NPC is already in it (GUESS name). */
 void note_pane_motion_set(NoteWork* self, u16 motion, u32 b, u32 c);
 
+/* 0x80385B5C - starts motion `motion` (up to 16) on the pane's model for `frames` frames.  GUESS name. */
+void note_pane_motion_start(NoteWork* self, u16 motion, u32 b, s32 frames);
+
 /* 0x80385C64 - whether the pane model's motion has ended (GUESS name: a tail call into the model's end test). */
 u32 note_pane_motion_end_ck(NoteWork* self);
 

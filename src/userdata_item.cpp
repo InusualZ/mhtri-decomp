@@ -14,6 +14,7 @@
  * exists for the range (it replaces the placeholder stem `fn_80048964`).  Module: the game-root band (`main` lib, `cflags_main`).
  *
  * Status: the small table helpers and the FIFO writers have bodies; the rest of the range (87 functions) is not decompiled.
+ * NAMES. GUESS: `userdata_pouch_size`, `userdata_pouch_get`, `item_slots_free_count`
  */
 
 #include "types.h"
@@ -58,13 +59,13 @@ extern "C" void fn_80048CD8(u32 a, u32 b, u32 c, u32 d)
 /* --- the small table helpers ----------------------------------------------------------------------- */
 
 /* The record size for one menu kind. */
-extern "C" u32 fn_8004AF0C(u32 kind)
+extern "C" u32 userdata_pouch_size(u32 kind)
 {
     return kind == 1 ? 0x20 : 0x18;
 }
 
 /* The record block for one layout kind. */
-extern "C" u8* fn_8004AF60(u8* base, u32 kind)
+extern "C" u8* userdata_pouch_get(u8* base, u32 kind)
 {
     if (kind == 1) {
         return base + 0x100;
@@ -133,7 +134,7 @@ extern "C" u32 fn_8004BD30(IdValue* entry)
 }
 
 /* Counts the free entries of a 4-byte `{id, value}` table. */
-extern "C" u32 fn_8004C004(const IdValue* table, s32 count)
+extern "C" u32 item_slots_free_count(const IdValue* table, s32 count)
 {
     u32 free = 0;
 

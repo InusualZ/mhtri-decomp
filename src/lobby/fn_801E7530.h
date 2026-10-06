@@ -14,6 +14,9 @@ extern "C" {
 
 extern u8 jumptable_805B7CD8[36];
 
+/* 0x801E9B74 - whether lobby part slot `slot` is open (its progress flags set and the slot not locked).  GUESS. */
+u32 lb_part_slot_open_ck(u8 slot);
+
 #ifdef __cplusplus
 }
 #endif

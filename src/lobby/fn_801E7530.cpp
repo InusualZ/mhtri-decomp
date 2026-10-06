@@ -9,7 +9,7 @@
  *   0x801EB7A4-0x801EC194, 0x801EC19C-0x801EC7AC, 0x801EC85C-0x801EC9E0.
  *  - `fn_801E7530`: retail loads the `lbl_805BA6D4`/`lbl_805BA718` table bases into saved registers up front and is 132
  *    B shorter than ours (the body's structure differs);
- *  - `fn_801E8994`: it calls `fn_80214948` with the five arguments `unsplit/lobby.h` declares, so every argument sits
+ *  - `fn_801E8994`: it calls `lb_choice_draw` with the five arguments `unsplit/lobby.h` declares, so every argument sits
  *    one register early against retail's six;
  *  - `fn_801E7EA8`, `fn_801E88E8`, `fn_801E8CDC`, `fn_801EB744`, `fn_801E936C`: retail narrows `u8`/`u16` values with
  *    `clrlwi` at the use where ours passes them through (`fn_801E936C` narrows the sum and returns with `blelr`);
@@ -46,10 +46,10 @@ int sprintf(char* dst, const char* fmt, ...);
 /* Foreign functions whose owners' headers do not declare them, as plain prototypes (rule 2 debt). */
 extern "C" {
 void item_pair_copy(void* p);
-s32 fn_8004B0A4(u16 id, void* out);
+s32 userdata_item_count_total(u16 id, void* out);
 s32 item_take(s16 a, void* b, s32 c, s32 d, s32 e);
 void* get_FqResult_work(void);
-s32 fn_8004D27C(s32 a);
+s32 userdata_progress_flag_ck(s32 a);
 s32 userdata_zenny_add(s32 a);
 void uv_pair_copy(_mh_ivec2_* dst, const _mh_ivec2_* src);
 u16 fn_800CEF18(u16 id);
@@ -85,7 +85,7 @@ void sysSE_req(s32 id);
 
 /* ------------------------------------------------------------------------------------------------ */
 
-/* The two 6-byte selection-table walks below share this: a row's flag gates it (`fn_802FB4BC`). */
+/* The two 6-byte selection-table walks below share this: a row's flag gates it (`lb_unlock_cond_ck`). */
 
 /* Every map name in this range is a plain `fn_XXXXXXXX`, so the whole batch of definitions takes C
  * linkage (the map does not mangle them). */
@@ -104,13 +104,13 @@ void fn_801E7530(LbMenuWork* self, s16 list_mode)
         if (row[0] == 0) {
             break;
         }
-        if (fn_802FB4BC(row[2]) == 0) {
+        if (lb_unlock_cond_ck(row[2]) == 0) {
             break;
         }
         count++;
         row += 3;
     }
-    if (fn_802FB4BC(0xA) != 0) {
+    if (lb_unlock_cond_ck(0xA) != 0) {
         self->stage_0x0E = (count > 6) ? 6 : 5;
     } else {
         self->stage_0x0E = (count > 6) ? 5 : 4;
@@ -124,7 +124,7 @@ void fn_801E7530(LbMenuWork* self, s16 list_mode)
                 if (row[0] == 0) {
                     break;
                 }
-                if (fn_802FB4BC(row[2]) == 0) {
+                if (lb_unlock_cond_ck(row[2]) == 0) {
                     break;
                 }
                 self->entries_0xD0[self->count_0x10].kind_0x00 = (u8)row[0];
@@ -140,13 +140,13 @@ void fn_801E7530(LbMenuWork* self, s16 list_mode)
             }
             break;
         case 4:
-            if (self->stage_0x0E != 3 || fn_802FB4BC(0xA) != 1U) {
+            if (self->stage_0x0E != 3 || lb_unlock_cond_ck(0xA) != 1U) {
                 row = lbl_805BA6D4 + 18;
                 for (;;) {
                     if (row[0] == 0) {
                         break;
                     }
-                    if (fn_802FB4BC(row[2]) == 0) {
+                    if (lb_unlock_cond_ck(row[2]) == 0) {
                         break;
                     }
                     self->entries_0xD0[self->count_0x10].kind_0x00 = (u8)row[0];
@@ -166,7 +166,7 @@ void fn_801E7530(LbMenuWork* self, s16 list_mode)
                     if (row[0] == 0) {
                         break;
                     }
-                    if (fn_802FB4BC(row[3]) == 0) {
+                    if (lb_unlock_cond_ck(row[3]) == 0) {
                         break;
                     }
                     self->entries_0xD0[self->count_0x10].kind_0x00 = (u8)row[0];
@@ -188,7 +188,7 @@ void fn_801E7530(LbMenuWork* self, s16 list_mode)
                 if (row[0] == 0) {
                     break;
                 }
-                if (fn_802FB4BC(row[3]) == 0) {
+                if (lb_unlock_cond_ck(row[3]) == 0) {
                     break;
                 }
                 self->entries_0xD0[self->count_0x10].kind_0x00 = (u8)row[0];
@@ -226,7 +226,7 @@ void fn_801E7530(LbMenuWork* self, s16 list_mode)
 
 void fn_801E78B4(LbMenuWork* self)
 {
-    if (fn_802FB4BC(0xA) != 0) {
+    if (lb_unlock_cond_ck(0xA) != 0) {
         self->stage_0x0E = 3;
     } else {
         self->stage_0x0E = 2;
@@ -239,16 +239,16 @@ s32 fn_801E790C(LbMenuWork* self)
     s16 value;
     s32 result = 0;
 
-    if (fn_8021213C(0x20, 0) != 0) {
+    if (lb_cmd_pressed_ck(0x20, 0) != 0) {
         result = 2;
         sysSE_req(1);
-    } else if (fn_802121F4(0xC) != 0) {
+    } else if (lb_cmd_repeat_ck(0xC) != 0) {
         /* The string block's first halfword receives the moved mask; the cast emits nothing. */
-        value = menu_cursor_step_fixed_tail(self->list_mode_0x0C, self->stage_0x0E, fn_802122AC(0), 4, 8, (u16*)self->str_0x24);
+        value = menu_cursor_step_fixed_tail(self->list_mode_0x0C, self->stage_0x0E, lb_cmd_repeat_get(0), 4, 8, (u16*)self->str_0x24);
         self->list_mode_0x0C = value;
         fn_801E7530(self, value);
-    } else if (fn_802121F4(3) != 0) {
-        self->selected_0x08 = menu_cursor_step(self->selected_0x08, self->count_0x10, fn_802122AC(0), 1, 2);
+    } else if (lb_cmd_repeat_ck(3) != 0) {
+        self->selected_0x08 = menu_cursor_step(self->selected_0x08, self->count_0x10, lb_cmd_repeat_get(0), 1, 2);
     }
     return result;
 }
@@ -274,24 +274,24 @@ void fn_801E79E4(void)
     state = self->state_0x00;
     switch (state) {
     case 0:
-        if ((u32)(fn_8021D5BC() - 1) <= 1U) {
+        if ((u32)(lb_talk_page_mode_reset() - 1) <= 1U) {
             self->state_0x00 = 1U;
             fn_801E6F80(self);
             flags = 0;
-            if (fn_802FB4BC(5U) == 0 && fn_802089F4(self->data_0x1C) == 0xFFFFFFFFU) {
+            if (lb_unlock_cond_ck(5U) == 0 && fn_802089F4(self->data_0x1C) == 0xFFFFFFFFU) {
                 flags = 4;
             }
-            if (fn_802FB4BC(6U) == 0) {
+            if (lb_unlock_cond_ck(6U) == 0) {
                 flags |= 1;
             }
             if (fn_8033B6C0(self->data_0x1C, self->data_0x20) > 0 && fn_802FB4F4(4) == 0) {
-                fn_802146F0(self->str_0x24, lbl_805B7CB0 + 20, flags, 0x10);
+                lb_choice_init(self->str_0x24, lbl_805B7CB0 + 20, flags, 0x10);
             } else {
-                fn_802146F0(self->str_0x24, lbl_805B7CB0, flags, 0);
+                lb_choice_init(self->str_0x24, lbl_805B7CB0, flags, 0);
             }
             self->value_0x38 = -1;
             self->value_0x3C = 3;
-            fn_802BBA64(1);
+            camera_talk_lock_set(1);
             sysSE_stop(0x29);
         }
         /* fall through */
@@ -306,8 +306,8 @@ void fn_801E79E4(void)
         }
         break;
     case 1:
-        fn_802DE224();
-        switch (fn_80214798(self->str_0x24)) {
+        ainpc_page_hold_set();
+        switch (lb_choice_step(self->str_0x24)) {
         case 1:
             self->mode_0x01 = 0;
             self->unused_0x02[1] = 0;
@@ -359,20 +359,20 @@ void fn_801E79E4(void)
             break;
         case 2:
             self->state_0x00 = 8U;
-            fn_8021CBB0(1);
+            lb_talk_page_open(1);
             sysSE_req(1);
-            fn_802BBA64(0);
+            camera_talk_lock_set(0);
             break;
         }
         return;
     case 7:
-        fn_802DE224();
+        ainpc_page_hold_set();
         if ((u32)(fn_801E790C(self) - 1) <= 1U) {
             self->state_0x00 = 1U;
         }
         return;
     case 6:
-        fn_802DE224();
+        ainpc_page_hold_set();
         switch (fn_8033B990()) {
         case 1:
             break;
@@ -382,23 +382,23 @@ void fn_801E79E4(void)
         }
         return;
     case 2:
-        fn_802DE224();
-        if (fn_8021213C(0x20, 0) != 0) {
+        ainpc_page_hold_set();
+        if (lb_cmd_pressed_ck(0x20, 0) != 0) {
             self->state_0x00 = 1U;
             sysSE_req(1);
-        } else if (fn_8021213C(0x80, 0) != 0) {
+        } else if (lb_cmd_pressed_ck(0x80, 0) != 0) {
             self->open_0x05 = self->open_0x05 ^ 1;
             if (self->open_0x05 != 0) {
                 sysSE_req(0x1B);
             } else {
                 sysSE_req(1);
             }
-        } else if (fn_802121F4(0xC) != 0) {
-            self->list_mode_0x0C = menu_cursor_step_open_last(self->list_mode_0x0C, self->stage_0x0E, fn_802122AC(0), 4, 8, 6);
+        } else if (lb_cmd_repeat_ck(0xC) != 0) {
+            self->list_mode_0x0C = menu_cursor_step_open_last(self->list_mode_0x0C, self->stage_0x0E, lb_cmd_repeat_get(0), 4, 8, 6);
         }
         return;
     case 3:
-        fn_802DE224();
+        ainpc_page_hold_set();
         switch (fn_801E7178(self)) {
         case 1:
             self->state_0x00 = 5U;
@@ -410,19 +410,19 @@ void fn_801E79E4(void)
         }
         return;
     case 4:
-        fn_802DE224();
+        ainpc_page_hold_set();
         if ((u32)(fn_801E73A4(self) - 1) <= 1U) {
             self->state_0x00 = 1U;
         }
         return;
     case 5:
-        fn_802DE224();
+        ainpc_page_hold_set();
         if (fn_8035A034() == 1) {
             self->state_0x00 = 1U;
         }
         return;
     case 8:
-        if ((u32)(fn_8021D5BC() - 1) <= 1U) {
+        if ((u32)(lb_talk_page_mode_reset() - 1) <= 1U) {
             fn_801E6DCC();
         }
         return;
@@ -526,7 +526,7 @@ void fn_801E80FC(LbMenuWork* self)
         idp++;
         idp2++;
     }
-    fn_802159F0(0x1D93, self->list_mode_0x0C, self->stage_0x0E, self->item_id_0x12,
+    lb_page_arrow_draw(0x1D93, self->list_mode_0x0C, self->stage_0x0E, self->item_id_0x12,
                 (u32)((self->mode_0x01 - 1) << __cntlzw((self->mode_0x01 - 1) ^ 1)) >> 0x1FU);
 }
 void fn_801E8348(LbMenuWork* self)
@@ -549,14 +549,14 @@ void fn_801E8348(LbMenuWork* self)
         break;
     case 1:
         a = 9;
-        fn_80215170(0x1879, self->data_0x1C);
+        lb_panel_yes_no_draw(0x1879, self->data_0x1C);
         break;
     case 2:
         a = 0xA;
         break;
     }
     if (a != 0xFFFFU) {
-        fn_80214EF0(0x1877, (s16)a);
+        lb_panel_msg_draw(0x1877, (s16)a);
         if (b != 0xFFFFU) {
             fn_8021505C(0x1877, (s16)b, 2);
         }
@@ -671,9 +671,9 @@ void fn_801E88E8(u8 mode)
         draw_sprite_ary((const u16*)lbl_805B7E50, &pos);
     }
     if (mode == 0) {
-        fn_80215C04(0x1D11);
+        lb_points_draw(0x1D11);
     } else {
-        fn_802DF6E4(0x14FC);
+        menu_money_draw(0x14FC);
     }
     get_lsp_data(0x1D12U, &pos);
     draw_sprite_ary((const u16*)lbl_805B7E30, &pos);
@@ -681,7 +681,7 @@ void fn_801E88E8(u8 mode)
 
 void fn_801E8994(void)
 {
-    fn_80214948((u8*)0x1D2D, lbl_805B7E68, lbl_805B7E80, (void*)0x1877, 0);
+    lb_choice_draw((u8*)0x1D2D, lbl_805B7E68, lbl_805B7E80, (void*)0x1877, 0);
 }
 
 void fn_801E89B4(LbMenuWork* self)
@@ -783,7 +783,7 @@ void fn_801E8D5C(LbMenuWork* self)
     get_lsp_data(0x1E4BU, &anchor);
     draw_sprite_ary((const u16*)lbl_805B7EE0, &anchor);
     draw_sprite_ary((const u16*)lbl_80791BB8, &anchor);
-    fn_802159F0(0x1E6D, self->list_mode_0x0C, self->stage_0x0E, self->item_id_0x12, 1U);
+    lb_page_arrow_draw(0x1E6D, self->list_mode_0x0C, self->stage_0x0E, self->item_id_0x12, 1U);
     if ((u32)self->list_mode_0x0C <= 2U) {
         base = lbl_805BA660 + self->list_mode_0x0C * 18;
         draw_font_idx(0x1E59U, (s8*)LbStr(0, 0x139U), 1, &anchor);
@@ -828,7 +828,7 @@ void fn_801E8D5C(LbMenuWork* self)
             s32 color = GetMenuFontColor(1, selected != 0, 1, 0);
 
             str_tbl_33_get(entry->kind_0x00);
-            fn_80215C98(selected, (s16*)&pos, color, 0xC);
+            lb_list_row_draw(selected, (s16*)&pos, color, 0xC);
             sprintf((char*)buf, (char*)lbl_80791BC0, entry->id_0x02, LbStr(1, 0x2CU));
             spr_data_copy((s16*)&data, (s16*)get_lsp_data(0x1E62U, NULL));
             draw_font((const _SPR_DATA_&)data, (s8*)buf, 2, &pos);
@@ -901,7 +901,7 @@ void fn_801EC194(void)
 void fn_801E9FC8(void)
 {
     fn_801E9AA8(1U);
-    fn_80217934();
+    lb_panel_close();
 }
 
 void fn_801EB524(void)

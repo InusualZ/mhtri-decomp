@@ -13,7 +13,7 @@
  *   `hud/cockpit.cpp` units and no enemy unit, and the fillers' callers are `menu/menu_infomation`, `lobby/lb_companion_ui`
  *   and `lobby/lb_quest_ui`.  The file name (the dominant type `MenuRowData`) and every symbol name are GUESSes from the
  *   bodies, in the band's scheme (`get_note_item_slot`, `item_page_option_row_index`).
- * RESIDUALS. 13 rows unwritten (objdiff scores them zero): `fn_8034C350` (8 B), 0x8034CCBC-0x8034D2B0
+ * RESIDUALS. 13 rows unwritten (objdiff scores them zero): `menu_row_monster_index_get` (8 B), 0x8034CCBC-0x8034D2B0
  *   (`fn_8034CCBC`, `fn_8034CD6C`, `fn_8034CDDC` and the nine fillers).  `fn_8034CCBC`/`fn_8034CD6C` read
  *   `_SPR_DATA_`'s rectangle, and `hud/layout.h` (its owner) and `menu/menu_item_page.h` both define `_mh_ivec2_`, so the two
  *   headers collide in one TU.  The 10 partial rows include:
@@ -235,42 +235,42 @@ extern "C" s32 item_page_option_item_id(u8 kind, u8 index) {
         case 10:
         case 32:
             if (game_ready_ck() == 0) {
-                value = fn_8004D27C(14);
+                value = userdata_progress_flag_ck(14);
             }
             break;
         case 11:
         case 33:
             if (game_ready_ck() == 0) {
-                value = fn_8004D27C(15);
+                value = userdata_progress_flag_ck(15);
             }
             break;
         case 42:
             if (game_ready_ck() == 0) {
-                value = fn_8004D70C(2004);
+                value = userdata_flag_ck(2004);
             } else {
-                value = fn_8004D70C(14001);
+                value = userdata_flag_ck(14001);
             }
             break;
         case 50:
-            value = fn_8004D27C(17);
+            value = userdata_progress_flag_ck(17);
             break;
         case 74:
             if (game_ready_ck() == 0) {
                 value = -1;
             } else {
-                value = fn_8004D27C(16);
+                value = userdata_progress_flag_ck(16);
             }
             break;
         case 104:
             if (game_ready_ck() == 0) {
-                value = fn_8004D27C(25);
+                value = userdata_progress_flag_ck(25);
             } else {
                 value = -1;
             }
             break;
         case 105:
             if (game_ready_ck() == 0) {
-                value = fn_8004D27C(26);
+                value = userdata_progress_flag_ck(26);
             } else {
                 value = -1;
             }
@@ -278,7 +278,7 @@ extern "C" s32 item_page_option_item_id(u8 kind, u8 index) {
         case 106:
         case 107:
             if (game_ready_ck() == 0) {
-                value = fn_8004D27C(28);
+                value = userdata_progress_flag_ck(28);
             } else {
                 value = -1;
             }
@@ -288,7 +288,7 @@ extern "C" s32 item_page_option_item_id(u8 kind, u8 index) {
         case 110:
         case 111:
             if (game_ready_ck() == 0) {
-                value = fn_8004D27C(31);
+                value = userdata_progress_flag_ck(31);
             } else {
                 value = -1;
             }
@@ -306,8 +306,8 @@ extern "C" s32 item_page_option_item_id(u8 kind, u8 index) {
 
 /* Deactivates every record of the `.bss` placement list. */
 extern "C" void place_list_deactivate_all(void) {
-    MenuPlaceRec* rec = lbl_806AC8C8.slot[0].place_entries;
-    s32 count = lbl_806AC8C8.slot[0].place_count;
+    MenuPlaceRec* rec = menu_work.slot[0].place_entries;
+    s32 count = menu_work.slot[0].place_count;
 
     if (rec == 0) {
         return;
@@ -320,7 +320,7 @@ extern "C" void place_list_deactivate_all(void) {
 /* Returns the index of the first active record whose rectangle overlaps the given box. */
 #pragma peephole on
 extern "C" s32 place_list_overlap_find(s16 x, s16 y, s16 width, s16 height) {
-    MenuPlaceRec* rec = lbl_806AC8C8.slot[0].place_entries;
+    MenuPlaceRec* rec = menu_work.slot[0].place_entries;
     s16 half_w = (s16)(width / 2);
     s16 half_h = (s16)(height / 2);
     s16 left = (s16)(x - half_w);
@@ -331,7 +331,7 @@ extern "C" s32 place_list_overlap_find(s16 x, s16 y, s16 width, s16 height) {
     if (rec == 0) {
         return -1;
     }
-    for (s32 i = 0; i < lbl_806AC8C8.slot[0].place_count; i++) {
+    for (s32 i = 0; i < menu_work.slot[0].place_count; i++) {
         if (rec[i].active != 0) {
             s16 rec_x = rec[i].pos_x;
             s16 rec_x2 = (s16)(rec_x + rec[i].width);
@@ -349,21 +349,21 @@ extern "C" s32 place_list_overlap_find(s16 x, s16 y, s16 width, s16 height) {
 
 /* Returns the key word of the placement record with the given index. */
 extern "C" u32* place_rec_key_ptr(s8 index) {
-    if (lbl_806AC8C8.slot[0].place_entries == 0) {
+    if (menu_work.slot[0].place_entries == 0) {
         return 0;
     }
-    return &lbl_806AC8C8.slot[0].place_entries[index].key;
+    return &menu_work.slot[0].place_entries[index].key;
 }
 
 /* Counts the active placement records carrying the given key. */
 extern "C" u8 place_list_key_count(u32 key) {
     u8 count = 0;
-    MenuPlaceRec* rec = lbl_806AC8C8.slot[0].place_entries;
+    MenuPlaceRec* rec = menu_work.slot[0].place_entries;
 
     if (rec == 0) {
         return 0;
     }
-    for (s32 i = 0; i < lbl_806AC8C8.slot[0].place_count; i++) {
+    for (s32 i = 0; i < menu_work.slot[0].place_count; i++) {
         if (rec[i].active != 0 && rec[i].key == key) {
             count++;
         }
@@ -373,8 +373,8 @@ extern "C" u8 place_list_key_count(u32 key) {
 
 /* Returns the first free placement record. */
 extern "C" MenuPlaceRec* place_rec_free_get(void) {
-    MenuPlaceRec* rec = lbl_806AC8C8.slot[0].place_entries;
-    s32 count = lbl_806AC8C8.slot[0].place_count;
+    MenuPlaceRec* rec = menu_work.slot[0].place_entries;
+    s32 count = menu_work.slot[0].place_count;
 
     if (rec == 0) {
         return 0;

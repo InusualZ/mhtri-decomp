@@ -149,6 +149,7 @@
  */
 
 #include "types.h"
+#include "main.h"                /* `_MH_VEC2` (rule 1: the owner's header) */
 #include "gx.h"                  /* the SDK colour record `GXColor` (rule 1) */
 #include "RVLGX/GXSetZCompLoc.h"  /* owned by RVLGX/GXTexture_tail.cpp (rule 2) */
 #include "OS/mem.h"               /* `MEMAllocator` (rule 1) */
@@ -198,12 +199,6 @@ typedef struct {
     u8 sample_pattern[12][2];
     u8 vfilter[7];
 } GXRenderModeObj;
-
-/* A pair of floats; `get_ScreenSize` is the only user, and its map name pins the tag to `_MH_VEC2`. */
-struct _MH_VEC2 {
-    f32 x;
-    f32 y;
-};
 
 extern GXRenderModeObj* Rmode;
 extern u32 restart;

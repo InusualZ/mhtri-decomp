@@ -13,6 +13,8 @@
  *   bodies.  GUESSes, from the argument list `put_equip_category_panel` calls them with: `equip_variant_resolve`/
  *   `equip_variant_resolve_ex`, `put_equip_panel_row_ex`/`put_equip_panel_row_base`, `put_equip_panel_kind4`/
  *   `put_equip_panel_kind5`.
+ *   GUESS: `equip_detail_melee_draw`, `equip_detail_bowgun_draw`, `equip_detail_kind6_draw`,
+ *   GUESS: `equip_detail_slots_draw`
  * RESIDUALS. 59 rows unwritten (objdiff scores them zero): 0x80309098-0x8030A1D0, 0x8030A1DC-0x8030A30C,
  *   0x8030A328-0x8030B790, 0x8030B868-0x8030BACC, 0x8030BAF4-0x8030CA50, 0x8030CA68-0x8030D338,
  *   0x8030D798-0x8030D808, 0x8030D980-0x8030E784, 0x8030E79C-0x8030F374, 0x8030F38C-0x8030F7B0,
@@ -124,13 +126,13 @@ s32  equip_page_count_step(void*, void*, u32, s32);
 s32  fn_8030A328(void*, void*, s32, s32, u16, s8);
 void equip_detail_page_refresh(EquipWork*, _EQUIP*, s8 page, s8 last, u16 flags);
 void fn_8030BACC(StatusScreenWork*);
-s32  fn_8030CA50(void*, void*, u32, u32);
+s32  equip_detail_melee_draw(void*, void*, u32, u32);
 s32  fn_8030CA68(void*, void*, s32, u16, u8);
 void fn_8030D6C0(void*, void*, void*, u16, u8);
-void fn_8030D6A8(void*, void*, u16, u8);
+void equip_detail_bowgun_draw(void*, void*, u16, u8);
 void fn_8030D808(void*, void*, u16, u8);
 void put_equip_row_variant(void*, void*, void*, void*, u16, u8);
-void fn_8030F814(void*, void*, u16, u8);
+void equip_detail_slots_draw(void*, void*, u16, u8);
 void fn_8030F7B0(void*, void*, void*, u16, u8);
 void put_equip_row_variant_ex(void*, void*, void*, void*, u16, u8);
 void fn_8030FD30(void*, void*, void*, void*, void*, void*, void*, u16);
@@ -157,7 +159,7 @@ void fn_8031077C(void*, void*, u8, void*);
 void fn_8030E79C(void*, void*, void*, u16, u8);
 void fn_8030E784(void*, void*, u16, u8);
 void fn_8030F38C(void*, void*, void*, u16, u8);
-void fn_8030F374(void*, void*, u16, u8);
+void equip_detail_kind6_draw(void*, void*, u16, u8);
 void fn_8030FB78(u16, u8);
 void fn_8030FB60(u16);
 void fn_8030FB6C(u16);
@@ -254,7 +256,7 @@ s32 equip_page_count_step(void* a, void* b, u32 page, s32 delta)
 }
 
 /* The equip detail page with the row and the item list's own selector. */
-s32 fn_8030CA50(void* a, void* b, u32 row, u32 sel)
+s32 equip_detail_melee_draw(void* a, void* b, u32 row, u32 sel)
 {
     return fn_8030CA68(a, b, 0, row, sel);
 }
@@ -372,12 +374,12 @@ void Put_equip_dtl_basis_sword_colorX(_PLW* plw, _EQUIP_INDEX* idx, u16 a, u16 b
 
 /* 0x8030D6A8 - the sword-detail colour entry: force the sub-index to 0 and tail into the shared
  * `fn_8030D6C0`. */
-void fn_8030D6A8(void* s0, void* s1, u16 a, u8 b) {
+void equip_detail_bowgun_draw(void* s0, void* s1, u16 a, u8 b) {
     fn_8030D6C0(s0, s1, 0, a, b);
 }
 
 /* 0x8030F374 - the same zero-sub-index entry for the `fn_8030F38C` band. */
-void fn_8030F374(void* s0, void* s1, u16 a, u8 b) {
+void equip_detail_kind6_draw(void* s0, void* s1, u16 a, u8 b) {
     fn_8030F38C(s0, s1, 0, a, b);
 }
 
@@ -522,7 +524,7 @@ void fn_8030F7B0(void* s0, void* s1, void* s2, u16 a, u8 b) {
 }
 
 /* 0x8030F814 - the `fn_8030F87C` band's variant whose variant word is forced to 0. */
-void fn_8030F814(void* s0, void* s1, u16 a, u8 b) {
+void equip_detail_slots_draw(void* s0, void* s1, u16 a, u8 b) {
     u8 out[24];
     u8 spb;
     spb = b;

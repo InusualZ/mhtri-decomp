@@ -11,4 +11,8 @@
  * result text getters of `quest/quest_entry.cpp`). */
 extern char* quest_grade_none_text_table[];
 
+/* .data 0x8060DAC0 - the per-language unlock notice tables the quest-result screen's unlock page reads
+ * (`[language][notice]`, six languages).  GUESS name. */
+extern char** q_result_unlock_text_tbl[];
+
 #endif /* MHTRI_MENU_MENU_SYSMSG_H */

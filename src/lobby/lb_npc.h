@@ -5,6 +5,7 @@
 
 #include "types.h"
 #include "nw4r/math.h"
+#include "Pl/plw.h"   /* _PLW (`lb_npc_act_set`'s player work) */
 
 /* ---------------------------------------------------------------------------------------------------
  * Types
@@ -199,8 +200,15 @@ extern u8 lb_item_get_data[];
 /* 0x802087D4 - resets the lobby party state when the party is dissolved (GUESS name, from the body). */
 void lb_party_state_reset(void);
 
+/* 0x8020A3E4 - starts act `act`/`sub` on the player work, with the request `flags` (bit 0x20 re-rolls the random
+ * pick).  GUESS name; the spelling is the owner's own (`lobby/lb_npc.cpp`). */
+void lb_npc_act_set(_PLW* self, u32 act, s32 sub, s32 flags);
+
 #ifdef __cplusplus
 }
+
+/* 0x801FE1C4 - the NPC's current motion number (`lb_npc_Get_motion_no__FP7_LB_NPC`, C++ linkage - rule 9). */
+u16 lb_npc_Get_motion_no(_LB_NPC* self);
 #endif
 
 #endif /* MHTRI_LOBBY_LB_NPC_H */

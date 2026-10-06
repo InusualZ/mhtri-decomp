@@ -60,7 +60,7 @@ u32 fn_800E2198(MHchar* chr, s32 flag);
 void fn_800E26B4(MHchar* chr, u32 index, f32 value);
 /* 0x800E0A14 - the joint's world position through the model; the same signature `unsplit/sound.h`
  * carries, so a TU that includes both headers sees one declaration, not an overload. */
-void fn_800E0A14(void* chr, u32 joint, Mtx34* out);
+void mhchar_joint_mtx_get(void* chr, u32 joint, Mtx34* out);
 /* 0x800DD514 - the fixed SE request the effect step makes when its joint window is hit (the body
  * loads 46/13 and tail-calls the SE request path).  Added with `ef/fn_8030681C.cpp`. */
 void fn_800DD514(nw4r::math::VEC3* pos);

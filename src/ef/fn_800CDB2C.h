@@ -83,6 +83,11 @@ void set_move_work_max(u8 index, s32 value);
 void loading_disp_set(u8 kind, u8 arg);
 #endif
 
+#ifdef __cplusplus
+/* 0x800D2E34 - the string table `index` (`get_str_tbl__Fl`, a C++ free function - rule 9). */
+u8** get_str_tbl(long index);
+#endif
+
 /* 0x800D2914 - switches the display power-management off (`pmic_disp_off__Fv`, C++ linkage). */
 void pmic_disp_off(void);
 #endif /* MHTRI_EF_FN_800CDB2C_H */

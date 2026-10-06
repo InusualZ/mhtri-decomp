@@ -97,7 +97,6 @@ extern "C" {
 void menu_hold_row_draw_by_lsp(u16 id, u16* item);
 void draw_dialog_piece(struct _SPR_DATA_* spr, s16 x, s16 y, s16 width, s16 height, u16 index,
                          const struct _mh_ivec2_* pos);
-void put_frame_dialog(s16 x, s16 y, s16 width, s16 height, u32 color, u32 frame_color);
 
 s32 menu_cursor_step_fixed_tail(s32 a, s32 b, u16 c, u16 d, u16 e, u16* moved);
 s32 menu_cursor_step_open_last(s32 a, s32 b, u16 c, u16 d, u16 e, s32 f);
@@ -117,6 +116,17 @@ s8* get_item_name_str(u8 index);
 s8* get_player_name_str(u8 index);
 s8* get_group2_name_str(u8 index);
 s8* get_digit_str(u8 index);
+/* 0x802A6F64 - draws a block-framed item page: the `items` the `entries` index, page `row` of `rows`, with the
+ * page-arrow `flags`, at `pos`. */
+void menu_frame_draw_blocks(IdValue* items, MenuListEntry* entries, s8 row, s8 rows, u16 timer, s32 flags,
+                            struct _mh_ivec2_* pos);
+/* 0x802A79B8 - draws an item row's two count columns (`a`, `b`) beside the item. */
+void menu_item_row_draw_values(u16* item, struct _mh_ivec2_* pos, s32 a, s32 b);
+/* 0x802A9558 - the x a text block of `size`-pixel glyphs is centred on around `center`; `out_lines` gets its line
+ * count. */
+s16 menu_text_block_center_x(char* text, s32 center, s16 size, s16* out_lines);
+/* 0x802A907C - draws the yes/no dialog row at layout `id` with the answer `sel` (0 = yes) highlighted.  GUESS name. */
+void menu_yes_no_draw(u16 id, s32 sel);
 
 #ifdef __cplusplus
 }
@@ -129,6 +139,8 @@ s32 GetMenuIconColor(bool a, bool b, bool c, bool d);
 
 /* 0x802A8D74 - the system dialog's OK-button row. */
 void put_message_sys_ok_button(void);
+/* 0x802A8020 - a framed dialog box (`put_frame_dialog__FssssUlUl`, C++ linkage - rule 9). */
+void put_frame_dialog(s16 x, s16 y, s16 width, s16 height, u32 color, u32 frame_color);
 #endif
 
 #endif /* MHTRI_MENU_MENU_MESSAGE_H */

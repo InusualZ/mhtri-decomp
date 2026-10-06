@@ -412,7 +412,7 @@ u32 fn_8026A364(_PLW* self)
 /* The named joint's world position, through the model. */
 void fn_8026A394(_PLW* self, s32 joint, nw4r::math::MTX34* out)
 {
-    fn_800E0A14(&((PlSeRig*)self->physics_0x13C)->models_0x004[0].model, joint, out);
+    mhchar_joint_mtx_get(&((PlSeRig*)self->physics_0x13C)->models_0x004[0].model, joint, out);
 }
 
 /* The work record's actor-mode byte. */

@@ -461,7 +461,7 @@ void fn_8010D688(Plw* self)
         work = eft->work_0x38;
         work->field_0x68 = self->field_0x60;
         work->field_0x6C = self->field_0x7C;
-        fn_800E0A14(self->physics_0x13C + 4, 7, &work->body_0x34.matrix_0x34);
+        mhchar_joint_mtx_get(self->physics_0x13C + 4, 7, &work->body_0x34.matrix_0x34);
         eft_state_flags_set_c1(eft, 1, 4);
     }
 }

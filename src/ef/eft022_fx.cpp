@@ -877,7 +877,7 @@ extern "C" void fn_801156A0(_EFT* self)
         plw = (_PLW*)self->source_0x30;
         setVisibility__6MHcharFUlb(work->models[0], 1, 1);
         setVisibility__6MHcharFUlb(work->models[0], 2, 0);
-        fn_800E0A14(&plw->physics_0x13C->chr_0x04, 7, &work->mtx[0][0]);
+        mhchar_joint_mtx_get(&plw->physics_0x13C->chr_0x04, 7, &work->mtx[0][0]);
         self->field_0x24 = (s32)plw->param_0x54;
         self->field_0x28 = (s32)plw->field_0x058;
         self->field_0x2C = (s32)plw->rot_z_0x5C;
@@ -888,7 +888,7 @@ extern "C" void fn_801156A0(_EFT* self)
         plw = (_PLW*)self->source_0x30;
         setVisibility__6MHcharFUlb(work->models[0], 1, 0);
         setVisibility__6MHcharFUlb(work->models[0], 2, 1);
-        fn_800E0A14(&plw->physics_0x13C->chr_0x04, 7, &work->mtx[0][0]);
+        mhchar_joint_mtx_get(&plw->physics_0x13C->chr_0x04, 7, &work->mtx[0][0]);
         self->field_0x24 = (s32)plw->param_0x54;
         self->field_0x28 = (s32)plw->field_0x058;
         self->field_0x2C = (s32)plw->rot_z_0x5C;
@@ -1090,7 +1090,7 @@ extern "C" void fn_80115A80(_EFT* self)
         motion = Get_motion_no(plw);
         if (plw->field_0x662 <= 0 || (plw->field_0x664 != motion && plw->field_0x666 != motion)) {
             moved = 0;
-            fn_800E0A14(&plw->physics_0x13C->chr_0x04, 7, &work->mtx[i][0]);
+            mhchar_joint_mtx_get(&plw->physics_0x13C->chr_0x04, 7, &work->mtx[i][0]);
             for (j = 0; j < 5; j++) {
                 mtx34_copy(&work->mtx[i][j + 1], &work->mtx[i][j]);
             }
@@ -1100,7 +1100,7 @@ extern "C" void fn_80115A80(_EFT* self)
         for (j = 5; j > 0; j--) {
             mtx34_copy(&work->mtx[i][j], &work->mtx[i][j - 1]);
         }
-        fn_800E0A14(&plw->physics_0x13C->chr_0x04, 7, &work->mtx[i][0]);
+        mhchar_joint_mtx_get(&plw->physics_0x13C->chr_0x04, 7, &work->mtx[i][0]);
         self->flag_0x01 = plw->field_0x001;
         self->field_0x24 = (s32)plw->param_0x54;
         self->field_0x28 = (s32)plw->field_0x058;

@@ -772,7 +772,7 @@ extern "C" void fn_8010383C(_EFT007* self, nw4r::math::MTX34* mtx)
 
     VEC3_ctor(&pos);
     VEC3_ctor(&origin);
-    fn_800E0A14(&((_MHcharJoints*)model->physics_0x13C)->joint_0x004, work->param_id, mtx);
+    mhchar_joint_mtx_get(&((_MHcharJoints*)model->physics_0x13C)->joint_0x004, work->param_id, mtx);
     switch (self->type_0x02) {
     case 0:
     case 1:

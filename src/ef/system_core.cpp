@@ -17,6 +17,7 @@
  *   `player_count_set`, `game_ready_ck`, `game_reset_to_title`, `move_work_state_ck`, `ef_move_state_dispatch` and
  *   `setTransferDisplayState` are GUESSes from their bodies and callers (the dump's `SaveLoad::DidGameIDChange` /
  *   `BTM_IsDeviceUp` at four of these addresses contradict the one-byte bodies).
+ *   GUESS: `monster_size_value_get` (0x800CEE74, from its body and its quest-result caller).
  * RESIDUALS. 54 rows unwritten in 23 runs (and `TPLtexLoad`, written, at 0 %: ours emits the plain `TPLtexLoad`
  *   where retail defines `TPLtexLoad__FPvP9_tex_info`); the largest by size is 0x800D0764-0x800D2098 (6 rows, the
  *   texture loader up to `fn_800D104C`); `sweepcomments.py --unit ef/system_core` lists them.
@@ -169,7 +170,7 @@ u32 fn_800CEDBC(void) {
 }
 
 /* 0x800CEE74/0x800CEE88 - the two command-table tails. */
-void fn_800CEE74(u32 a, u32 b) {
+void monster_size_value_get(u32 a, u32 b) {
     ((ComDataFunc)com_data_func[0])((u8)a, (u16)b);
 }
 

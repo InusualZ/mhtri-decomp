@@ -134,7 +134,8 @@ typedef struct SystemWork {
     /* +0x884 */ u8 field_0x884;
     /* +0x885 */ u8 pad_0x885[0x1];
     /* +0x886 */ u8 field_0x886;
-    /* +0x887 */ u8 pad_0x887[0x9];
+    /* +0x887 */ u8 pad_0x887[0x1];
+    /* +0x888 */ u32 unlock_seen_0x888[2];   /* the unlock flags the result screen has already announced */
     /* +0x890 */ u32 field_0x890;
     /* +0x894 */ u32 field_0x894;
     /* +0x898 */ u8 pad_0x898[0x4];

@@ -36,6 +36,9 @@ u32 em020_quest_active_ck(void);
 /* .sbss 0x80794BF0 - the message id of the last failed network layer command (GUESS name). */
 extern s32 net_layer_error_message;
 
+/* 0x80377348 - sends the served meal's skills and bonuses to the area `area` (a 0x36-byte packet).  GUESS name. */
+void meal_result_send(u8 area);
+
 #ifdef __cplusplus
 }
 #endif

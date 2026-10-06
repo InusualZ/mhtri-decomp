@@ -8,12 +8,20 @@
 #define MHTRI_QUEST_QUEST_RESULT_WORK_H
 
 #include "types.h"
+#include "id_value.h"
 
 /* The 4-byte `(item id, count)` slot `item_pair_copy` moves - and the record the lot picks write
  * their output with: a u16 id and a u16 count (the pick stores a sign-extended byte payload). */
 struct Q_ItemPair {
     /* +0x0 */ u16 id;
     /* +0x2 */ u16 num;
+};  /* size: 0x4 */
+
+/* One monster's two size records (the smallest and the largest), as the hunt measured them and as the
+ * save keeps the best of them. */
+struct Q_SizeRecord {
+    /* +0x0 */ u16 size_min;
+    /* +0x2 */ u16 size_max;
 };  /* size: 0x4 */
 
 /* The 16-byte quest stat the save block keeps and `quest_init` copies into the work block. */
@@ -34,6 +42,7 @@ struct Q_ResultWork {
     /* +0x052 */ u16 count_b[0x29];
     /* +0x0A4 */ union {
         u8 block_0x0A4[0xA4];           /* cleared as one block by `quest_result_work_flush` */
+        Q_SizeRecord sizes_0x0A4[0x29];  /* each monster's sizes the quest measured, by monster index */
         struct {
             /* +0x0A4 */ u8 pad_0x0A4[0x5C];
             /* +0x100 */ s32 gate_0x100;   /* GUESS name: the menu band's `> 0` gate */
@@ -43,7 +52,10 @@ struct Q_ResultWork {
     /* +0x148 */ u32 elapsed_0x148;    /* the quest's elapsed frames at the result */
     /* +0x14C */ u32 seconds_0x14C;    /* the same in seconds */
     /* +0x150 */ s32 time_base_0x150;  /* the quest work's time base (+0x20) */
-    /* +0x154 */ Q_ItemPair items_0x154[0x23];  /* the carried items at the result (pouch, then spare slots from 0x18) */
+    /* +0x154 */ union {
+        Q_ItemPair items_0x154[0x23];  /* the carried items at the result (pouch, then spare slots from 0x18) */
+        IdValue box_0x154[0x23];       /* the same pairs read with a signed count (the result screen's item box) */
+    };
     /* +0x1E0 */ u16 progress_0x1E0;   /* GUESS name: compared against 10000 by the result screen's phase 6 */
     /* +0x1E2 */ u8 phase_0x1E2;       /* the load phase: 2 while loading, 3 when done */
     /* +0x1E3 */ u8 kind_0x1E3;        /* the result kind (1 and 3 are checked by the lobby colour step) */
@@ -54,6 +66,7 @@ struct Q_ResultWork {
     /* +0x304 */ union {
         u8 block_0x304[0xA0];
         Q_ItemPair delivered_0x304[0x28];       /* the category-0x10 items the result delivers, packed */
+        IdValue delivered_ids_0x304[0x28];      /* the same pairs read with a signed count (a negative count ends the list) */
     };
     /* +0x3A4 */ u8 present_0x3A4;     /* a "records present" flag */
     /* +0x3A5 */ u8 pad_0x3A5;

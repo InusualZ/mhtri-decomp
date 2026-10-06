@@ -17,8 +17,8 @@
 #include "lobby/lb_npc.h"
 
 /* Owner headers (rule 2).  The menu range's list/cursor entry points and the camera range's
- * `fn_802BBA64` group were declared in this band header while their addresses were unclaimed; both
- * ranges are registered now (`menu/menu_message.cpp`, `camera/fn_802B5C58.cpp`), so their declarations
+ * `camera_talk_lock_set` group were declared in this band header before their ranges were registered; both
+ * owners are registered now (`menu/menu_message.cpp`, `camera/camera_main.cpp`), so their declarations
  * live in these headers and this one re-exports them for the units that already include it.  The
  * `ef/eft052.cpp` entry points this header used to declare (`eft052_page_count_add`,
  * `eft052_hold_row_get`, `eft052_hold_entry_set`) made the same move into `ef/eft052.h`. */
@@ -411,31 +411,31 @@ u16 fn_801E72F4(u16);
 s32 fn_801E73A4(void *);
 s16 fn_801E74B0(void *, s16);
 u16 fn_802089F4(s32);
-s32 fn_8021213C(s32, s16);
-s32 fn_802121F4(s32);
-u16 fn_802122AC(s32);
+s32 lb_cmd_pressed_ck(s32, s16);
+s32 lb_cmd_repeat_ck(s32);
+u16 lb_cmd_repeat_get(s32);
 u16 fn_802122E8(void);
-s32 fn_80212540(void *);
+s32 lb_yes_no_step(void *);
 u8 fn_802126E8(s32, s16, s32);
 s32 fn_80214654(void *, s32, s32, s32, s32, s32, s32, s32);
-s32 fn_802146F0(void *, void*, u16, s32);
-s32 fn_80214798(void *);
-s32 fn_80214948(u8 *, const void*, const void*, void*, s32);
-s32 fn_80214EF0(s32, s16);
+s32 lb_choice_init(void *, void*, u16, s32);
+s32 lb_choice_step(void *);
+s32 lb_choice_draw(u8 *, const void*, const void*, void*, s32);
+s32 lb_panel_msg_draw(s32, s16);
 s32 fn_80214FB8(s32, s32, u16);
 s32 fn_8021505C(s32, s16, s32);
-s32 fn_802150DC(s32, s16, s32, s32);
-s32 fn_80215170(s32, s32);
+s32 lb_panel_line_draw(s32, s16, s32, s32);
+s32 lb_panel_yes_no_draw(s32, s32);
 s32 fn_8021565C(u8, s16 *);
 s32 fn_8021591C(s32, s16 *);
-s32 fn_802159F0(s32, s16, s16, u16, u32);
-s32 fn_80215C04(s32);
-s32 fn_80215C98(s32, s16 *, s32, s32);
+s32 lb_page_arrow_draw(s32, s16, s16, u16, u32);
+s32 lb_points_draw(s32);
+s32 lb_list_row_draw(s32, s16 *, s32, s32);
 s32 fn_80216560(u16, u16, s16 *, s32, s32, s32, s32);
 s32 fn_80216678(u16, s32, s16 *, s32, s32, s32, s32);
-s32 fn_80217934(void);
-s32 fn_8021CBB0(s32);
-s32 fn_8021D5BC(void);
+s32 lb_panel_close(void);
+s32 lb_talk_page_open(s32);
+s32 lb_talk_page_mode_reset(void);
 s32 getItemListSelection(void);
 s32 fn_80222848(s32, s16 *);
 s32 fn_80222BC4(void*, s32, u8);
@@ -444,13 +444,13 @@ s32 fn_80222BC4(void*, s32, u8);
  * now, so its header `menu/menu_message.h` declares them and this header includes it (rule 2).
  * They stood here with `s16` returns and `void*`/`s32` tails while the owner defines `s32` - that
  * mismatch is the `(10505) illegal overloading` this move clears. */
-s32 fn_802DE224(void);
-/* `fn_802BBA64`/`fn_802BBAC0`/`fn_802BBAC4` (0x802BBA64-0x802BBAF4) were declared here as `s32 (s32)`;
+s32 ainpc_page_hold_set(void);
+/* `camera_talk_lock_set`/`fn_802BBAC0`/`fn_802BBAC4` (0x802BBA64-0x802BBAF4) were declared here as `s32 (s32)`;
  * `camera/fn_802B5C58.cpp` owns that range and `camera/camera.h` - included by this header -
  * declares them `void (u8)` (rule 2). */
-s32 fn_802DF6E4(s32);
+s32 menu_money_draw(s32);
 s32 fn_802E0DA8(s16 *, u16, s16 *);
-s32 fn_802FB4BC(u16);
+s32 lb_unlock_cond_ck(u16);
 s32 fn_802FB4F4(s32);
 u16 fn_802FB54C(s32);
 s16 fn_8033B6C0(s32, s32);
