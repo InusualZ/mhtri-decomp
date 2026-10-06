@@ -181,7 +181,8 @@ typedef struct DWCiAddrKey {
 struct DWCiXfer {
     /* +0x00 */ u32 offset;
     /* +0x04 */ u32 length;
-    /* +0x08 */ u32 field_0x08;
+    /* +0x08 */ u16 serialNumber;
+    /* +0x0A */ u16 pad_0x0A;
     /* +0x0C */ u32 stamp;
 }; /* size: 0x10 */
 
@@ -213,7 +214,7 @@ struct DWCiConn {
     /* +0x34 */ u32 data;
     /* +0x38 */ u32 outgoingBufferSize;
     /* +0x3C */ u32 incomingBufferSize;
-    /* +0x40 */ u32 protocolType;
+    /* +0x40 */ s32 protocolType;
     /* +0x44 */ u32 protocolOffset;
     /* +0x48 */ u32 broadcastEnabled;
 }; /* size: 0x4C */

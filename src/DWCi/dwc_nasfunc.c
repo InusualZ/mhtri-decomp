@@ -38,7 +38,10 @@
  *   GUESS: `DWCi_socketHasData`, `DWCi_socketIsUsable`, `DWCi_socketGetLocalHostEntry`, `DWCi_hostAddressIsPrivate`
  *   GUESS: `SocketStartUp`, `SocketShutDown`, `current_time`, `msleep`, `gsiMemoryCallbacksSet`, `gsimalloc`
  *   GUESS: `gsirealloc`, `gsifree`
- * SHAPES. The retail object is twelve SDK files (auth callback | nas | svl | darray | hashtable | socket | platform
+ * SHAPES. GT2 message handling runs through 0/1 static inlines (one per message type, the keep-alive / resend /
+ *   ack think steps, the delivery step) tested again by their callers (playbook idea 101); the dispatchers are
+ *   if-chains, not switches; a 0/1 tail is spelled `return f(...) != 0;` where retail shows `neg/or/srwi`.
+ *   The retail object is twelve SDK files (auth callback | nas | svl | darray | hashtable | socket | platform
  *   | memory | available | gt2 auth | gt2 callback/connection/main/message | buffer). MWCC inlines any function
  *   defined earlier in one TU, so the source is ordered callers-first across those file boundaries (the auth
  *   callback, then GT2 main, connection, message, the exported `gti2ConnectionClosed`/`gti2ConnectionSendData`
@@ -436,7 +439,7 @@ s32 gt2Send(GT2Connection connection, const void* message, u32 length, s32 relia
     DWCi_GetStringLength((void**)&data, (int*)&len);
     if (reliable && conn->conn->protocolType == 2) {
         memcpy(&vdpLength, data, 2);
-        if (len != vdpLength + conn->conn->protocolOffset) {
+        if (len != (s32)(vdpLength + conn->conn->protocolOffset)) {
             return 9;
         }
     }
@@ -572,28 +575,58 @@ s32 gti2CheckTimeout(DWCiReq* connection, u32 now) {
 
 /* 0x8050DBC0 (0x14C): runs a connection's timers: the attempt timeout, the keep-alive, the resends and the
  * delayed ack; 0 when the socket went away during a callback. */
-int DWCi_requestIsTimedOut(DWCiReq* req, u32 now) {
+/* Sends a keep-alive when the connection has been quiet for 30 s. */
+static inline s32 gti2KeepAliveThink(DWCiReq* req, u32 now) {
+    if (now - req->lastSend > 30000) {
+        if (!gti2SendKeepAlive(req)) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+/* Resends every reliable message unacknowledged for a second. */
+static inline s32 gti2ResendThink(DWCiReq* req, u32 now) {
     s32 count;
     s32 i;
     DWCiXfer* message;
 
-    if (!gti2CheckTimeout(req, now)) {
-        return 0;
-    }
-    if (now - req->lastSend > 30000 && !gti2SendKeepAlive(req)) {
-        return 0;
-    }
     count = ArrayLength(req->outgoingBufferMessages);
     for (i = 0; i < count; i++) {
         message = (DWCiXfer*)ArrayNth(req->outgoingBufferMessages, i);
-        if (now - message->stamp > 1000 && !DWCi_appendTransfer(req, message)) {
+        if (now - message->stamp > 1000) {
+            if (!DWCi_appendTransfer(req, message)) {
+                return 0;
+            }
+        }
+    }
+    return 1;
+}
+
+/* Sends the pending acknowledgement once it is 100 ms old. */
+static inline s32 gti2AckThink(DWCiReq* req, u32 now) {
+    if (!req->pendingAck) {
+        return 1;
+    }
+    if (now - req->pendingAckTime > 100) {
+        if (!gti2SendAck(req)) {
             return 0;
         }
     }
-    if (req->pendingAck && now - req->pendingAckTime > 100 && !gti2SendAck(req)) {
+    return 1;
+}
+
+int DWCi_requestIsTimedOut(DWCiReq* req, u32 now) {
+    if (!gti2CheckTimeout(req, now)) {
         return 0;
     }
-    return 1;
+    if (!gti2KeepAliveThink(req, now)) {
+        return 0;
+    }
+    if (!gti2ResendThink(req, now)) {
+        return 0;
+    }
+    return gti2AckThink(req, now) != 0;
 }
 
 /* 0x8050DD10 (0xA0): closes a connection: hard (notify, free) or soft (send the close and wait). */
@@ -669,8 +702,9 @@ static inline s32 gti2SocketSendClosedInline(DWCiConn* socket, u32 ip, u16 port)
         pos = 2;
     }
     memcpy(&buffer[pos], &DWCi_protocolMagic, GTI2_MAGIC_LEN);
-    buffer[pos + 2] = GTI2_MSG_CLOSED;
-    return DWCi_sendTo(socket, ip, port, buffer, pos + 3) != 0;
+    pos += GTI2_MAGIC_LEN;
+    buffer[pos++] = GTI2_MSG_CLOSED;
+    return DWCi_sendTo(socket, ip, port, buffer, pos) != 0;
 }
 
 /* Sends the "closed" message to a connection's peer. */
@@ -726,7 +760,7 @@ s32 gti2RemoveAckedMessages(DWCiReq* connection, u16 serialNumber) {
     }
     for (i = 0; i < count; i++) {
         message = (DWCiXfer*)ArrayNth(connection->outgoingBufferMessages, i);
-        if ((s16)(message->field_0x08 - serialNumber) >= 0) {
+        if ((s16)(message->serialNumber - serialNumber) >= 0) {
             break;
         }
     }
@@ -763,7 +797,10 @@ static inline s32 gti2SendClientResponseInline(DWCiReq* connection, const u8* re
     }
     DWCi_bufferFrame(&connection->outgoingBuffer, response, 0x20);
     DWCi_bufferFrame(&connection->outgoingBuffer, message, len);
-    return gti2EndReliableMessageInline(connection);
+    if (!gti2EndReliableMessageInline(connection)) {
+        return 0;
+    }
+    return 1;
 }
 
 /* A reliable message buffered out of order: its place in the incoming buffer, its type and serial number. */
@@ -802,92 +839,114 @@ static inline s32 gti2SendServerChallengeInline(DWCiReq* connection, const u8* r
 }
 
 /* 0x8050EA30 (0x7BC): one reliable message, in order: the application data or a handshake / close step. */
-s32 gti2HandleReliableMessage(DWCiReq* connection, s32 type, u8* message, s32 len) {
+/* Delivers reliable application data (a connection not yet or no longer up fails instead). */
+static inline s32 gti2HandleAppReliableInline(DWCiReq* connection, u8* message, s32 len) {
+    s32 state = connection->state;
+
+    if (state != GTI2_STATE_CONNECTED && state != GTI2_STATE_CLOSING) {
+        if (!gti2ConnectionError(connection, 7, 2)) {
+            return 0;
+        }
+    } else if (ArrayLength(connection->receiveFilters) != 0) {
+        if (!gti2ReceiveFilterCallback(connection, 0, message, len, 1)) {
+            return 0;
+        }
+    } else if (!gti2ReceivedCallback(connection, message, len, 1)) {
+        return 0;
+    }
+    return 1;
+}
+
+/* Answers the client's challenge with ours and its response. */
+static inline s32 gti2HandleClientChallengeInline(DWCiReq* connection, u8* message, s32 len) {
     u8 response[0x20];
     u8 challenge[0x20];
-    s32 state;
 
-    connection->expectedSerialNumber++;
-    if (type == GTI2_MSG_APP_RELIABLE) {
-        state = connection->state;
-        if (state != GTI2_STATE_CONNECTED && state != GTI2_STATE_CLOSING) {
-            if (!gti2ConnectionError(connection, 7, 2)) {
-                return 0;
-            }
-        } else if (ArrayLength(connection->receiveFilters) != 0) {
-            if (!gti2ReceiveFilterCallback(connection, 0, message, len, 1)) {
-                return 0;
-            }
-        } else if (!gti2ReceivedCallback(connection, message, len, 1)) {
+    if (connection->state != GTI2_STATE_AWAITING_CLIENT_CHALLENGE) {
+        if (!gti2ConnectionError(connection, 7, 2)) {
+            return 0;
+        }
+    } else if (len < 0x20) {
+        if (!gti2ConnectionError(connection, 7, 2)) {
+            return 0;
+        }
+    } else {
+        gti2GetResponse(response, message);
+        gti2GetChallenge(challenge);
+        gti2GetResponse(connection->response, challenge);
+        if (!gti2SendServerChallengeInline(connection, response, challenge)) {
+            return 0;
+        }
+        connection->state = 3;
+    }
+    return 1;
+}
+
+/* The server accepted our attempt. */
+static inline s32 gti2HandleAcceptInline(DWCiReq* connection) {
+    if (connection->state != 1) {
+        if (!gti2ConnectionError(connection, 7, 2)) {
             return 0;
         }
         return 1;
     }
-    switch (type) {
-    case GTI2_MSG_CLIENT_CHALLENGE:
-        if (connection->state != GTI2_STATE_AWAITING_CLIENT_CHALLENGE) {
-            if (!gti2ConnectionError(connection, 7, 2)) {
-                return 0;
-            }
-        } else if (len < 0x20) {
-            if (!gti2ConnectionError(connection, 7, 2)) {
-                return 0;
-            }
-        } else {
-            gti2GetResponse(response, message);
-            gti2GetChallenge(challenge);
-            gti2GetResponse(connection->response, challenge);
-            if (!gti2SendServerChallengeInline(connection, response, challenge)) {
-                return 0;
-            }
-            connection->state = 3;
+    connection->state = GTI2_STATE_CONNECTED;
+    return gti2ConnectedCallback(connection, 0, NULL, 0) != 0;
+}
+
+/* The server rejected our attempt. */
+static inline s32 gti2HandleRejectInline(DWCiReq* connection, u8* message, s32 len) {
+    if (connection->state != 1) {
+        if (!gti2ConnectionError(connection, 7, 2)) {
+            return 0;
         }
-        break;
-    case GTI2_MSG_SERVER_CHALLENGE:
+        return 1;
+    }
+    gti2ConnectionClosed(connection);
+    if (!gti2SendClosedInline(connection)) {
+        return 0;
+    }
+    return gti2ConnectedCallback(connection, 2, message, len) != 0;
+}
+
+/* The peer closes the connection. */
+static inline s32 gti2HandleCloseInline(DWCiReq* connection) {
+    if (!gti2SendClosedInline(connection)) {
+        return 0;
+    }
+    return gti2ConnectionError(connection, 2, connection->state != GTI2_STATE_CLOSING) != 0;
+}
+
+s32 gti2HandleReliableMessage(DWCiReq* connection, s32 type, u8* message, s32 len) {
+    connection->expectedSerialNumber++;
+    if (type == GTI2_MSG_APP_RELIABLE) {
+        if (!gti2HandleAppReliableInline(connection, message, len)) {
+            return 0;
+        }
+    } else if (type == GTI2_MSG_CLIENT_CHALLENGE) {
+        if (!gti2HandleClientChallengeInline(connection, message, len)) {
+            return 0;
+        }
+    } else if (type == GTI2_MSG_SERVER_CHALLENGE) {
         if (!gti2HandleServerChallenge(connection, message, len)) {
             return 0;
         }
-        break;
-    case GTI2_MSG_CLIENT_RESPONSE:
+    } else if (type == GTI2_MSG_CLIENT_RESPONSE) {
         if (!gti2HandleClientResponse(connection, message, len)) {
             return 0;
         }
-        break;
-    case GTI2_MSG_ACCEPT:
-        if (connection->state != 1) {
-            if (!gti2ConnectionError(connection, 7, 2)) {
-                return 0;
-            }
-        } else {
-            connection->state = GTI2_STATE_CONNECTED;
-            if (!gti2ConnectedCallback(connection, 0, NULL, 0)) {
-                return 0;
-            }
-        }
-        break;
-    case GTI2_MSG_REJECT:
-        if (connection->state != 1) {
-            if (!gti2ConnectionError(connection, 7, 2)) {
-                return 0;
-            }
-        } else {
-            gti2ConnectionClosed(connection);
-            if (!gti2SendClosedInline(connection)) {
-                return 0;
-            }
-            if (!gti2ConnectedCallback(connection, 2, message, len)) {
-                return 0;
-            }
-        }
-        break;
-    case GTI2_MSG_CLOSE:
-        if (!gti2SendClosedInline(connection)) {
+    } else if (type == GTI2_MSG_ACCEPT) {
+        if (!gti2HandleAcceptInline(connection)) {
             return 0;
         }
-        if (!gti2ConnectionError(connection, 2, connection->state != GTI2_STATE_CLOSING)) {
+    } else if (type == GTI2_MSG_REJECT) {
+        if (!gti2HandleRejectInline(connection, message, len)) {
             return 0;
         }
-        break;
+    } else if (type == GTI2_MSG_CLOSE) {
+        if (!gti2HandleCloseInline(connection)) {
+            return 0;
+        }
     }
     return 1;
 }
@@ -898,13 +957,13 @@ s32 gti2HandleServerChallenge(DWCiReq* connection, u8* message, s32 len) {
     u8 response[0x20];
 
     if (connection->state != GTI2_STATE_AWAITING_SERVER_CHALLENGE) {
-        return gti2ConnectionError(connection, 7, 2);
+        return gti2ConnectionError(connection, 7, 2) != 0;
     }
     if (len < 0x40) {
-        return gti2ConnectionError(connection, 7, 2);
+        return gti2ConnectionError(connection, 7, 2) != 0;
     }
     if (!gti2CheckResponse(message, connection->response)) {
-        return gti2ConnectionError(connection, 7, 2);
+        return gti2ConnectionError(connection, 7, 2) != 0;
     }
     gti2GetResponse(response, message + 0x20);
     if (!gti2SendClientResponseInline(connection, response, connection->initialMessage,
@@ -924,13 +983,13 @@ s32 gti2HandleClientResponse(DWCiReq* connection, u8* message, s32 len) {
     DWCiConn* socket;
 
     if (connection->state != 3) {
-        return gti2ConnectionError(connection, 7, 2);
+        return gti2ConnectionError(connection, 7, 2) != 0;
     }
     if (len < 0x20) {
-        return gti2ConnectionError(connection, 7, 2);
+        return gti2ConnectionError(connection, 7, 2) != 0;
     }
     if (!gti2CheckResponse(message, connection->response)) {
-        return gti2ConnectionError(connection, 7, 2);
+        return gti2ConnectionError(connection, 7, 2) != 0;
     }
     socket = connection->conn;
     if (socket->connectAttemptCallback == 0) {
@@ -1056,7 +1115,7 @@ s32 gti2HandleReliablePacket(DWCiReq* connection, s32 type, u8* message, s32 len
     s32 overflow;
 
     if (len < headerLength) {
-        return gti2ConnectionError(connection, 7, 2);
+        return gti2ConnectionError(connection, 7, 2) != 0;
     }
     serialNumber = (header[3] << 8) | header[4];
     if (socket->protocolType == GTI2_VDP_PROTOCOL && type == GTI2_MSG_APP_RELIABLE) {
@@ -1079,7 +1138,10 @@ s32 gti2HandleReliablePacket(DWCiReq* connection, s32 type, u8* message, s32 len
         if (!gti2HandleReliableMessage(connection, type, data, dataLength)) {
             return 0;
         }
-        return gti2DeliverBufferedMessagesInline(connection);
+        if (!gti2DeliverBufferedMessagesInline(connection)) {
+            return 0;
+        }
+        return 1;
     }
     if ((s16)(serialNumber - connection->expectedSerialNumber) < 0) {
         if (!connection->pendingAck) {
@@ -1092,9 +1154,10 @@ s32 gti2HandleReliablePacket(DWCiReq* connection, s32 type, u8* message, s32 len
         return 0;
     }
     if (overflow) {
-        if (!gti2SendClosedInline(connection) || !gti2ConnectionError(connection, 1, 4)) {
+        if (!gti2SendClosedInline(connection)) {
             return 0;
         }
+        return gti2ConnectionError(connection, 1, 4) != 0;
     }
     return 1;
 }
@@ -1114,14 +1177,14 @@ s32 gti2HandleNack(DWCiReq* connection, u8* message, s32 len) {
     } else if (len == 4) {
         end = (message[2] << 8) | message[3];
     } else {
-        return gti2ConnectionError(connection, 7, 2);
+        return gti2ConnectionError(connection, 7, 2) != 0;
     }
     count = ArrayLength(connection->outgoingBufferMessages);
     for (i = 0; i < count; i++) {
         outgoing = (DWCiXfer*)ArrayNth(connection->outgoingBufferMessages, i);
-        if ((s16)(outgoing->field_0x08 - start) >= 0 && (s16)(outgoing->field_0x08 - end) <= 0) {
+        if ((s16)(outgoing->serialNumber - start) >= 0 && (s16)(outgoing->serialNumber - end) <= 0) {
             pos = outgoing->offset + connection->conn->protocolOffset + 5;
-            connection->outgoingBuffer.buffer[pos] = (u8)(connection->expectedSerialNumber >> 8);
+            connection->outgoingBuffer.buffer[pos] = (u8)((connection->expectedSerialNumber >> 8) & 0xFF);
             connection->outgoingBuffer.buffer[pos + 1] = (u8)connection->expectedSerialNumber;
             if (!DWCi_requestFrame(connection, connection->outgoingBuffer.buffer + outgoing->offset,
                                    outgoing->length)) {
@@ -1138,53 +1201,91 @@ s32 gti2HandleNack(DWCiReq* connection, u8* message, s32 len) {
 }
 
 /* 0x8050FA00 (0x2C8): an unreliable protocol message: ack, nack, ping, pong or closed. */
+/* Handles an acknowledgement: drops the messages it covers (a malformed one fails the connection). */
+static inline s32 gti2HandleAckInline(DWCiReq* connection, u8* data, s32 dataLength) {
+    if (dataLength != 2) {
+        if (!gti2ConnectionError(connection, 7, 2)) {
+            return 0;
+        }
+        return 1;
+    }
+    return gti2RemoveAckedMessages(connection, (data[0] << 8) | data[1]) != 0;
+}
+
+/* Handles a pong: reports the round trip of the "time" stamp it echoes. */
+static inline s32 gti2HandlePongInline(DWCiReq* connection, u8* data, s32 dataLength) {
+    u32 time;
+
+    if (connection->callbacks.ping_0C == NULL) {
+        return 1;
+    }
+    if ((u32)dataLength != 8) {
+        return 1;
+    }
+    if (memcmp(data, "time", 4) != 0) {
+        return 1;
+    }
+    memcpy(&time, data + 4, 4);
+    return gti2PingCallback(connection, current_time() - time) != 0;
+}
+
+/* Handles the peer's closed notice. */
+static inline s32 gti2HandleClosedInline(DWCiReq* connection) {
+    s32 localClose;
+
+    if (connection->state == GTI2_STATE_CLOSED) {
+        return 1;
+    }
+    localClose = connection->state == GTI2_STATE_CLOSING;
+    return gti2ConnectionError(connection, 2, !localClose) != 0;
+}
+
 s32 gti2HandleUnreliableMessage(DWCiReq* connection, s32 type, u8* message, s32 len) {
     s32 headerLength = connection->conn->protocolOffset + 3;
     u8* data = message + headerLength;
     s32 dataLength = len - headerLength;
-    u32 time;
 
-    switch (type) {
-    case GTI2_MSG_ACK:
-        if (dataLength != 2) {
-            if (!gti2ConnectionError(connection, 7, 2)) {
-                return 0;
-            }
-        } else if (!gti2RemoveAckedMessages(connection, (data[0] << 8) | data[1])) {
+    if (type == GTI2_MSG_ACK) {
+        if (!gti2HandleAckInline(connection, data, dataLength)) {
             return 0;
         }
-        break;
-    case GTI2_MSG_NACK:
+    } else if (type == GTI2_MSG_NACK) {
         if (!gti2HandleNack(connection, data, dataLength)) {
             return 0;
         }
-        break;
-    case GTI2_MSG_PING:
+    } else if (type == GTI2_MSG_PING) {
         message[2] = GTI2_MSG_PONG;
         if (!DWCi_requestFrame(connection, message, len)) {
             return 0;
         }
-        break;
-    case GTI2_MSG_PONG:
-        if (connection->callbacks.ping_0C != NULL && (u32)dataLength == 8 && memcmp(data, "time", 4) == 0) {
-            memcpy(&time, data + 4, 4);
-            if (!gti2PingCallback(connection, current_time() - time)) {
-                return 0;
-            }
-        }
-        break;
-    case GTI2_MSG_CLOSED:
-        if (connection->state != GTI2_STATE_CLOSED &&
-            !gti2ConnectionError(connection, 2, connection->state == GTI2_STATE_CLOSING)) {
+    } else if (type == GTI2_MSG_PONG) {
+        if (!gti2HandlePongInline(connection, data, dataLength)) {
             return 0;
         }
-        break;
+    } else if (type == GTI2_MSG_CLOSED) {
+        if (!gti2HandleClosedInline(connection)) {
+            return 0;
+        }
     }
     return 1;
 }
 
 /* 0x8050FCD0 (0x48C): one datagram from `ip:port`: a new connection attempt, a protocol message of a known
  * connection, or application data. */
+/* Hands an application message to the receive filters or the received callback. */
+static inline s32 gti2DeliverInline(DWCiReq* connection, u8* message, s32 len) {
+    if (connection->state == GTI2_STATE_CONNECTED || connection->state == GTI2_STATE_CLOSING) {
+        if (ArrayLength(connection->receiveFilters) != 0) {
+            if (!gti2ReceiveFilterCallback(connection, 0, message, len, 0)) {
+                return 0;
+            }
+            return 1;
+        }
+        return gti2ReceivedCallback(connection, message, len, 0) != 0;
+    }
+    return 1;
+}
+
 s32 gti2HandleMessage(DWCiConn* socket, u8* message, s32 len, u32 ip, u16 port) {
     u8* header = message + socket->protocolOffset;
     s32 headerLength = len - socket->protocolOffset;
@@ -1243,9 +1344,9 @@ s32 gti2HandleMessage(DWCiConn* socket, u8* message, s32 len, u32 ip, u16 port) 
         isProtocol = 0;
         header += 2;
         message[3] = message[1];
+        message[2] = message[0];
         len -= 2;
         message += 2;
-        message[2] = message[0];
     }
     if (!isProtocol) {
         if (connection->state < GTI2_STATE_CONNECTED) {
@@ -1254,14 +1355,8 @@ s32 gti2HandleMessage(DWCiConn* socket, u8* message, s32 len, u32 ip, u16 port) 
             }
             return 1;
         }
-        if (connection->state == GTI2_STATE_CONNECTED || connection->state == GTI2_STATE_CLOSING) {
-            if (ArrayLength(connection->receiveFilters) != 0) {
-                if (!gti2ReceiveFilterCallback(connection, 0, message, len, 0)) {
-                    return 0;
-                }
-            } else if (!gti2ReceivedCallback(connection, message, len, 0)) {
-                return 0;
-            }
+        if (!gti2DeliverInline(connection, message, len)) {
+            return 0;
         }
         return 1;
     }
@@ -1286,9 +1381,9 @@ int DWCi_requestReconnect(DWCiConn* conn, u32 addr, u16 port) {
         if (connection->timeout == 0 || current_time() - connection->startTime < connection->timeout) {
             return 1;
         }
-        return gti2ConnectionError(connection, 6, 1);
+        return gti2ConnectionError(connection, 6, 1) != 0;
     }
-    return gti2ConnectionError(connection, 2, 1);
+    return gti2ConnectionError(connection, 2, 1) != 0;
 }
 
 /* 0x80510380 (0x130): the peer is unreachable. */
@@ -1301,7 +1396,7 @@ int DWCi_requestRetry(DWCiConn* conn, u32 addr, u16 port, u32 flag) {
     if (connection == NULL) {
         return 1;
     }
-    return gti2ConnectionError(connection, 6, 1);
+    return gti2ConnectionError(connection, 6, 1) != 0;
 }
 
 /* 0x805104B0 (0x3FC): reads every waiting datagram and handles it (a reset or unreachable peer is reported to its
@@ -1311,27 +1406,24 @@ s32 gti2ReceiveMessages(DWCiConn* socket) {
     int fromLength;
     int len;
     u16 port;
+    s32 error;
 
     while (DWCi_socketHasData(socket->sock)) {
         fromLength = 8;
         len = DWCi_socketRecvFrom(socket->sock, DWCi_gt2ReceiveBuffer, 0x1000, 0, &from, &fromLength);
         if (len == -1) {
-            switch (DWCi_socketGetLastError(socket->sock)) {
-            case -15:
+            error = DWCi_socketGetLastError(socket->sock);
+            if (error == -15) {
                 port = SOAddressToHostPort(from.port);
                 if (!DWCi_requestReconnect(socket, from.addr, port)) {
                     return 0;
                 }
-                break;
-            case -23:
+            } else if (error == -23) {
                 port = SOAddressToHostPort(from.port);
                 if (!DWCi_requestRetry(socket, from.addr, port, 0)) {
                     return 0;
                 }
-                break;
-            case -35:
-                break;
-            default:
+            } else if (error != -35) {
                 DWCi_connectionShutdown(socket);
                 return 0;
             }
@@ -1369,7 +1461,7 @@ int DWCi_requestBlockState(DWCiReq* req, u32 type, u32 len, u32* overflow) {
     memset(&message, 0, sizeof(message));
     message.offset = req->outgoingBuffer.len;
     message.length = len;
-    message.field_0x08 = serialNumber;
+    message.serialNumber = serialNumber;
     message.stamp = current_time();
     count = ArrayLength(req->outgoingBufferMessages);
     ArrayAppend(req->outgoingBufferMessages, &message);
@@ -1402,7 +1494,10 @@ s32 gti2SendClientChallenge(DWCiReq* connection, const u8* challenge) {
         return 1;
     }
     DWCi_bufferFrame(&connection->outgoingBuffer, challenge, 0x20);
-    return gti2EndReliableMessageInline(connection) != 0;
+    if (!gti2EndReliableMessageInline(connection)) {
+        return 0;
+    }
+    return 1;
 }
 
 /* 0x80510D40 (0xC8): sends the accept. */
@@ -1414,7 +1509,10 @@ s32 gti2SendAccept(DWCiReq* connection) {
     if (overflow) {
         return 1;
     }
-    return gti2EndReliableMessageInline(connection) != 0;
+    if (!gti2EndReliableMessageInline(connection)) {
+        return 0;
+    }
+    return 1;
 }
 
 /* 0x80510E10 (0xF4): sends the reject with its message. */
@@ -1428,7 +1526,10 @@ s32 gti2SendReject(DWCiReq* connection, const u8* message, s32 len) {
         return 1;
     }
     DWCi_bufferFrame(&connection->outgoingBuffer, message, len);
-    return gti2EndReliableMessageInline(connection) != 0;
+    if (!gti2EndReliableMessageInline(connection)) {
+        return 0;
+    }
+    return 1;
 }
 
 /* 0x80510F10 (0xC8): sends the close. */
@@ -1440,7 +1541,10 @@ s32 gti2SendClose(DWCiReq* connection) {
     if (overflow) {
         return 1;
     }
-    return gti2EndReliableMessageInline(connection) != 0;
+    if (!gti2EndReliableMessageInline(connection)) {
+        return 0;
+    }
+    return 1;
 }
 
 /* 0x80510FE0 (0xC8): sends a keep-alive. */
@@ -1453,12 +1557,16 @@ s32 gti2SendKeepAlive(DWCiReq* connection) {
     if (overflow) {
         return 1;
     }
-    return gti2EndReliableMessageInline(connection) != 0;
+    if (!gti2EndReliableMessageInline(connection)) {
+        return 0;
+    }
+    return 1;
 }
 
 /* 0x805110B0 (0x12C): sends application data unreliably, escaping a payload that starts with the magic. */
 int DWCi_requestFlush(DWCiReq* req, u8* message, s32 len) {
     u8* start;
+    s32 total;
 
     if (len < 2 || memcmp(message + req->conn->protocolOffset, &DWCi_protocolMagic, GTI2_MAGIC_LEN) != 0) {
         if (!DWCi_requestFrame(req, message, len)) {
@@ -1466,7 +1574,8 @@ int DWCi_requestFlush(DWCiReq* req, u8* message, s32 len) {
         }
         return 1;
     }
-    if (gti2GetBufferFreeSpace(&req->outgoingBuffer) < len + 2) {
+    total = len + 2;
+    if (gti2GetBufferFreeSpace(&req->outgoingBuffer) < total) {
         return 1;
     }
     start = req->outgoingBuffer.buffer + req->outgoingBuffer.len;
@@ -1475,10 +1584,10 @@ int DWCi_requestFlush(DWCiReq* req, u8* message, s32 len) {
     }
     DWCi_bufferFrame(&req->outgoingBuffer, (const u8*)&DWCi_protocolMagic, GTI2_MAGIC_LEN);
     DWCi_bufferFrame(&req->outgoingBuffer, message + req->conn->protocolOffset, len - req->conn->protocolOffset);
-    if (!DWCi_requestFrame(req, start, len + 2)) {
+    if (!DWCi_requestFrame(req, start, total)) {
         return 0;
     }
-    gti2BufferShorten(&req->outgoingBuffer, -1, len + 2);
+    gti2BufferShorten(&req->outgoingBuffer, -1, total);
     return 1;
 }
 
@@ -1496,8 +1605,9 @@ s32 gti2SendAck(DWCiReq* connection) {
     memcpy(&buffer[pos], &DWCi_protocolMagic, GTI2_MAGIC_LEN);
     pos += GTI2_MAGIC_LEN;
     buffer[pos++] = GTI2_MSG_ACK;
-    buffer[pos++] = (u8)(connection->expectedSerialNumber >> 8);
-    buffer[pos++] = (u8)connection->expectedSerialNumber;
+    buffer[pos] = (u8)((connection->expectedSerialNumber >> 8) & 0xFF);
+    buffer[pos + 1] = (u8)connection->expectedSerialNumber;
+    pos += 2;
     if (!DWCi_requestFrame(connection, buffer, pos)) {
         return 0;
     }
