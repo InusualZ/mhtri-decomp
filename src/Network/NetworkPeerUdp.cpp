@@ -5,7 +5,7 @@
  * FLAGS. `-O3 -pool off` (configure.py; measured in docs/network.md); file-scope `#pragma peephole off`
  *   (playbook 39).
  * NAMES. The `NetworkPeerUdp` slot names are GUESSes (the dump names `setPeerAndSocket`/`sendPackets`/`receivePackets`;
- *   marked in `Network/network_transport_types.h`).
+ *   marked in `Network/NetworkPeerUdp.h`).
  * RESIDUALS. none in the rows; the `NETWORK_ERROR_*` immediates (0x8003xxxx) are plain `lis`/`addi` pairs in ours where
  *   the target relocates them against `@eti_` extabindex rows: 18 B of `.text`.  The DOL hash holds with it linked.
  * SHAPES. The table is emitted from `NetworkPeerUdp::destroy`, the key function (rule 10); the constructor is outside
@@ -14,11 +14,15 @@
  *   that order (the two length slots at 0xA/0x8).  Each `dont_inline` region keeps a retail `bl`.
  */
 #include "types.h"
-#include "Network/network_transport.h"
+#include "Network/NetworkPeerBase.h"
+#include "Network/NetworkPeerUdp.h"
+#include "Network/NetworkSessionBase.h"
+#include "Network/NetworkResolverWii.h"
+#include "Network/network_socket_streams.h"
+#include "Network/NetworkSessionStable.h"
 #include "Network/NetworkSessionManager.h"
-/* `unsplit/Network.h` is the Network band's code half (`getNetworkLogger` and the socket-pool helpers).  It
-   cannot be included beside `unsplit/OS.h`: the two band headers declare `OSCreateThread`/`OSResumeThread` with
-   different signatures and a TU that sees both fails with `(10197) illegal function overloading`. */
+/* `unsplit/Network.h` is the Network band's code half (`getNetworkLogger` and the socket-pool helpers); the OS
+   thread calls it reaches are `NAND/nand.h`'s, the one spelling `unsplit/OS.h` includes too. */
 #include "unsplit/Network.h"
 #include "unsplit/Runtime.PPCEABI.H.h"
 #include "Runtime.PPCEABI.H/memcpy.h"

@@ -1093,6 +1093,8 @@ config.libs = [
             # Flags: unit header of src/Network/NetworkSessionStable.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/NetworkSessionStable.cpp",
                    cflags=[f for f in cflags_network if f != "-O4,p"] + ["-O3", "-pool off"]),
+            # Flags: unit header of src/Network/NetworkStreamSink.cpp.
+            Object(NonMatching, "Network/NetworkStreamSink.cpp"),
             # Flags: unit header of src/Network/network_shared_data.cpp; measurements in docs/network.md.
             Object(NonMatching, "Network/network_shared_data.cpp"),
             # Flags: unit header of src/Network/GameSpyInterfaceThread.cpp; measurements in docs/network.md.
@@ -1268,7 +1270,9 @@ config.libs = [
             Object(NonMatching, "nw4r/fn_80504A3C.cpp"),
             Object(NonMatching, "nw4r/fn_8050661C.cpp"),
             Object(NonMatching, "SSL/ssl.cpp"),
+            Object(NonMatching, "NCD/ncdsystem.c"),
             Object(NonMatching, "SO/soi.cpp"),
+            Object(NonMatching, "VF/vf.cpp"),
         ],
     },
     {

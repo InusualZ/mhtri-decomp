@@ -1910,11 +1910,10 @@ menu/get_pop_dat_ptr.cpp:
 	.sdata2     start:0x8079C630 end:0x8079C680
 
 lobby/lb_server_sel_trans.cpp:
-	extab       start:0x8001936C end:0x800198C8
-	extabindex  start:0x80039B88 end:0x8003A0BC
-	.text       start:0x803C3A5C end:0x803CCDF8
-	.rodata     start:0x80570C20 end:0x80570E20
-	.data       start:0x805F8920 end:0x805F94E0
+	extab       start:0x8001936C end:0x80019554
+	extabindex  start:0x80039B88 end:0x80039E64
+	.text       start:0x803C3A5C end:0x803C987C
+	.data       start:0x805F8920 end:0x805F8DB0
 	.bss        start:0x806D2B20 end:0x806D2C60
 	.sdata      start:0x80793738 end:0x80793900
 	.sbss       start:0x80794C90 end:0x80794C98
@@ -1923,6 +1922,13 @@ lobby/lb_server_sel_trans.cpp:
 Network/network_shared_data.cpp:
 	.sdata      start:0x80793900 end:0x80793930
 	.sdata2     start:0x8079C690 end:0x8079C758
+
+Network/NetworkStreamSink.cpp:
+	extab       start:0x80019554 end:0x800198C8
+	extabindex  start:0x80039E64 end:0x8003A0BC
+	.text       start:0x803C987C end:0x803CCDF8
+	.rodata     start:0x80570C20 end:0x80570E20
+	.data       start:0x805F8DB0 end:0x805F94E0
 
 Network/NetworkPeerBase.cpp:
 	extab       start:0x800198C8 end:0x800198E0
@@ -2566,11 +2572,18 @@ NHTTP/d_nhttp.c:
 	.sbss       start:0x80795878 end:0x80795888
 
 SSL/ssl.cpp:
-	.text       start:0x8051B7FC end:0x8051D710
-	.data       start:0x80630F88 end:0x80631128
-	.bss        start:0x80763900 end:0x80766980
-	.sdata      start:0x80794420 end:0x80794438
-	.sbss       start:0x80795888 end:0x80795898
+	.text       start:0x8051B7FC end:0x8051C554
+	.data       start:0x80630F88 end:0x80630FE0
+	.bss        start:0x80763900 end:0x80766920
+	.sdata      start:0x80794420 end:0x80794428
+	.sbss       start:0x80795888 end:0x80795890
+
+NCD/ncdsystem.c:
+	.text       start:0x8051C554 end:0x8051D710
+	.data       start:0x80630FE0 end:0x80631128
+	.bss        start:0x80766920 end:0x80766980
+	.sdata      start:0x80794428 end:0x80794438
+	.sbss       start:0x80795890 end:0x80795898
 
 NWC24/nwc24_msg.c:
 	.text       start:0x8051D710 end:0x8051E068
@@ -2588,12 +2601,19 @@ NWC24/nwc24_io.c:
 	.sbss       start:0x807958B8 end:0x807958D8
 
 SO/soi.cpp:
-	.text       start:0x8051E864 end:0x8052A040
+	.text       start:0x8051E864 end:0x80521340
+	.data       start:0x80631230 end:0x80631468
+	.bss        start:0x80766C40 end:0x80766C68
+	.sdata      start:0x80794448 end:0x80794458
+	.sbss       start:0x807958D8 end:0x807958F0
+
+VF/vf.cpp:
+	.text       start:0x80521340 end:0x8052A040
 	.rodata     start:0x80574E10 end:0x80579450
-	.data       start:0x80631230 end:0x806498C8
-	.bss        start:0x80766C40 end:0x807901C0
-	.sdata      start:0x80794448 end:0x807944B0
-	.sbss       start:0x807958D8 end:0x80795A18
+	.data       start:0x80631468 end:0x806498C8
+	.bss        start:0x80766C68 end:0x807901C0
+	.sdata      start:0x80794458 end:0x807944B0
+	.sbss       start:0x807958F0 end:0x80795A18
 	.sdata2     start:0x8079D528 end:0x8079D550
 
 homebutton/fn_8052A040.cpp:

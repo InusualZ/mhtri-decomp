@@ -28,7 +28,4 @@ void fn_803C7F88(void);
 }
 #endif
 
-/* The writer classes' constructors and destructors this unit defines (0x803CB8FC..0x803CBA2C) are declared
-   on their classes in `Network/network_writer_types.h`. */
-
 #endif /* MHTRI_LOBBY_LB_SERVER_SEL_TRANS_H */

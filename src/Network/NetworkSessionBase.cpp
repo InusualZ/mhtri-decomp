@@ -10,17 +10,20 @@
  * NAMES. `NetworkSessionBase` is a GUESS (`resetAllSlots__20NetworkSessionStableFv` drives its +0x1C slot; the setters'
  *   slot positions).  `getNetworkBinaryState` is a GUESS from the field it reads,
  *   `NetworkStateMachine::binaryState_6134` (the view `Network/PatInterface.h` owns).  The other derived names are
- *   marked in `Network/network_transport_types.h`.
+ *   marked in `Network/NetworkSessionBase.h`.
  * RESIDUALS. none.
  * SHAPES. The table (0x805F99A0: the deleting destructor, 33 pure slots and the four setters) is emitted from
  *   `~NetworkSessionBase`, the key function (rule 10).  Each `dont_inline` region keeps a retail `bl`.
  */
 #include "types.h"
-#include "Network/network_transport.h"
+#include "Network/NetworkPeerBase.h"
+#include "Network/network_socket_streams.h"
+#include "Network/NetworkResolverWii.h"
+#include "Network/NetworkSessionBase.h"
+#include "Network/NetworkSessionStable.h"
 #include "Network/NetworkSessionManager.h"
-/* `unsplit/Network.h` is the Network band's code half (`getNetworkLogger` and the socket-pool helpers).  It
-   cannot be included beside `unsplit/OS.h`: the two band headers declare `OSCreateThread`/`OSResumeThread` with
-   different signatures and a TU that sees both fails with `(10197) illegal function overloading`. */
+/* `unsplit/Network.h` is the Network band's code half (`getNetworkLogger` and the socket-pool helpers); the OS
+   thread calls it reaches are `NAND/nand.h`'s, the one spelling `unsplit/OS.h` includes too. */
 #include "unsplit/Network.h"
 #include "Network/PatInterface.h"   /* owner Network/PatInterface.cpp (the state machine and the packet layer) */
 #include "unsplit/Runtime.PPCEABI.H.h"

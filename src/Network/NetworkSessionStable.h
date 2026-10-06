@@ -7,8 +7,10 @@
 #ifndef NETWORK_NETWORK_SESSION_STABLE_H
 #define NETWORK_NETWORK_SESSION_STABLE_H
 
-#include "Network/network_transport_types.h"
-#include "Network/network_writer_types.h"
+#include "Network/NetworkPeerBase.h"
+#include "Network/NetworkSessionBase.h"
+#include "Network/NetworkStreamSink.h"
+#include "Network/NetworkUnitPacket.h"     /* NetworkStreamQueue */
 
 class NetworkSessionStable;
 

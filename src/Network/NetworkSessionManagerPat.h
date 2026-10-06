@@ -30,7 +30,7 @@ typedef struct NetLayerRequest NetLayerRequest; /* Network/NetworkLayerPat.h */
 typedef struct NetworkRequest NetworkRequest;   /* Network/NetworkSessionManager.h */
 typedef struct NetworkRequestError NetworkRequestError;   /* unsplit/Network.h */
 typedef struct NetworkNameList NetworkNameList;           /* Network/NetworkSessionManager.h */
-class NetworkBuffer;                                      /* Network/network_writer_types.h */
+class NetworkBuffer;                                      /* Network/NetworkStreamSink.h */
 typedef struct NetworkLayerId NetworkLayerId;             /* Network/NetworkLayerPat.h */
 struct PatTerms;
 

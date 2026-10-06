@@ -232,7 +232,7 @@ typedef struct NHTTPCommContext {
     /* +0x33C */ s32 chunked;           /* 1 for a chunked body */
 } NHTTPCommContext;
 
-/* `NHTTPi_GetSystemInfoP`'s singleton slot and the block it points at. */
+/* The band header of the NHTTP literal groups (`NHTTPi_systemInfo` itself is declared at the end of this file). */
 #include "unsplit/NHTTP.h"
 
 /* The data this unit owns: the `.sbss` run 0x80795878..0x80795888 (the connection list's head plus the
@@ -437,6 +437,9 @@ extern "C" {
 /* 0x80574CE8 (0x15 B, `.rodata`) - the 19-character code `NHTTPAddPostDataRaw` walks its request's
  * 18-byte code field up to, one character at a time, re-submitting after each step. */
 extern const char NHTTPi_postDataRawCode[];
+
+/* 0x80762C60 - the info block the unit's own `NHTTPi_systemInfoP` slot points at. */
+extern struct NHTTPInfo NHTTPi_systemInfo;
 
 #ifdef __cplusplus
 }

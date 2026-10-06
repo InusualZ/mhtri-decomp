@@ -3,7 +3,11 @@
 #define MHTRI_NETWORK_NET_SESSION_CLOSE_H
 
 #include "types.h"
-#include "Network/network_transport.h"
+#include "Network/NetworkPeerBase.h"
+#include "Network/NetworkSessionBase.h"
+#include "Network/NetworkResolverWii.h"
+#include "Network/network_socket_streams.h"
+#include "Network/NetworkSessionStable.h"
 
 /* Declarations moved here from `unsplit/Network.h` (docs/plan.md 6.5 rule 2: the owner declares). */
 typedef struct NetId NetId;                 /* Network/NetworkLayerPat.h */

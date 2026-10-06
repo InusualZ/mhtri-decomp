@@ -9,9 +9,13 @@
 #define NETWORK_NetworkSessionManager_H
 
 #include "types.h"
-#include "Network/network_transport.h"
+#include "Network/NetworkPeerBase.h"
+#include "Network/network_socket_streams.h"
+#include "Network/NetworkSessionBase.h"
+#include "Network/NetworkStreamSink.h"
+#include "Network/NetworkResolverWii.h"
+#include "Network/NetworkSessionStable.h"
 #include "Network/network_shared_data.h"
-#include "Network/network_writer_types.h"
 #include "Runtime.PPCEABI.H/ptmf.h"
 
 /* The 0x60-byte record block `NetworkRequest_copyRecord` moves.  Only its size (24 words) is
@@ -451,7 +455,7 @@ typedef struct PatCircleOptionList {
 } PatCircleOptionList;   /* size: 0x104 */
 
 /* The Pat band's helpers: the members the manager pumps (`NetworkSingleTcp::move`, `NetworkMultipleUdp::move`)
- * are declared with their classes in `Network/network_transport_types.h`.  The free helpers that take
+ * are declared with their classes in `Network/network_socket_streams.h`.  The free helpers that take
  * the records above are owned by registered units and declared in their owners' headers (rule 2):
  * `buildCircleInfoName`, `circleAvailable` and the `networkPat*` buffer helpers in
  * `Network/NetworkSessionManagerPat.h`, `sendReqCircleInfoSet` in `Network/PatInterface.h`. */
@@ -668,11 +672,10 @@ extern NetworkRequestDesc networkRequestDesc396;
 extern NetworkRequestDesc networkRequestDesc400;
 extern NetworkRequestDesc networkRequestDesc428;
 
-/* the writer's remaining entry points the tail of the range drives (the second writer class); the
-   writer methods `Network/NetworkCommunityPat.cpp` owns (`writeByte`..`writeBytes`,
-   `networkStreamWriter_putBytes`..`_size`) are declared in `Network/NetworkCommunityPat.h` */
-void networkStreamWriter_attach(NetworkConnectionStable* connection, NetworkStreamWriterDefault* stream);
-void networkStreamWriter_reserve(NetworkConnectionStable* connection, const u8* bytes, u32 length, s8 kind);
+/* the writer's remaining entry points the tail of the range drives (`networkStreamWriter_attach`/`_reserve`) are
+   `Network/NetworkStreamSink.cpp`'s, declared in its header; the writer methods `Network/NetworkCommunityPat.cpp`
+   owns (`writeByte`..`writeBytes`, `networkStreamWriter_putBytes`..`_size`) are declared in
+   `Network/NetworkCommunityPat.h` */
 
 /* The manager logger accessor `getNetworkLogger` is *not* declared here: no registered unit owns it,
    so rule 2 puts it in the band header `unsplit/Network.h` (which types it as the class
@@ -686,17 +689,12 @@ void networkStreamWriter_reserve(NetworkConnectionStable* connection, const u8* 
 /* 0x80794CA0 (.sbss) - the request-id source: `requestId_70 = counter; counter = requestId_70 + 1`. */
 extern u32 NetworkRequest_idCounter;
 
-/* neighbouring helpers.  Each `untyped:` marker below is the honest case for that declaration: a
+/* neighbouring helpers.  The member mutex's constructor and destructor (`networkInstance_initMutex`,
+   `networkInstance_destroyMutex`) are `Network/NetworkStreamSink.cpp`'s, declared in its header (included at
+   the top of this file).  Each `untyped:` marker below is the honest case for that declaration: a
    record whose layout this range never reads.  The reflection adapters `networkSessionReflect0`/`1`
    are declared in `Network/NetworkSessionManagerPat.h` and `NetworkUniqueId` in
    `Network/NetworkCommunityPat.h` (their owners' headers). */
-
-/* untyped: opaque handle passed through - only the writer band owns the layout */
-void fn_803CA338(void* self);
-/* untyped: opaque handle passed through - only the writer band owns the layout */
-void dtor_803CA338(void* self, s32 flags);
-/* untyped: opaque handle passed through - only the writer band owns the layout */
-void networkInstance_initMutex(void* self);
 
 /* the two reflection adapters (this unit defines them; `initNetworkSessionStable` takes the first
    one's address as the session vtable's +0x0C callback) */

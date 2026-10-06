@@ -1,11 +1,8 @@
 /*
  * NHTTP declarations with no registered owner (docs/plan.md 6.5 rule 2).
  *
- * The NHTTP library's info block `NHTTPi_systemInfo` (`.bss` 0x80762C60, 0x51A B) is owned by no
- * registered unit: the address is inside no `splits.txt` range, and the registered NHTTP units
- * (`NHTTP_bgnend.c`, `NHTTP_os_RVL.c`, `d_nhttp.c`) do not claim it.  It was declared in
- * `NHTTP/d_nhttp.h` (a unit's own header) until the networking conformance pass; rule 2
- * puts an unowned symbol in the band header, so it lives here and `d_nhttp.h` includes this file.
+ * The NHTTP library's info block `NHTTPi_systemInfo` (`.bss` 0x80762C60, 0x51A B) is inside `NHTTP/d_nhttp.c`'s
+ * `.bss` claim (0x80762C20..0x80763900), so it is declared in `NHTTP/d_nhttp.h` (rule 2).
  *
  * The singleton slot `NHTTPi_systemInfoP` (`.sbss` 0x80795884) that `NHTTPi_GetSystemInfoP` lazily
  * points at it was declared here too until `d_nhttp.c` claimed the 16-byte `.sbss` run
@@ -25,9 +22,6 @@ struct NHTTPInfo;
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/* 0x80762C60 - the info block the unit's own `NHTTPi_systemInfoP` slot points at. */
-extern struct NHTTPInfo NHTTPi_systemInfo;
 
 /*
  * The four `.data` literal groups `NHTTP/NHTTP_bgnend.c`'s bodies address.  dtk assigns them to

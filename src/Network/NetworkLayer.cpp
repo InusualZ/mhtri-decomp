@@ -24,7 +24,7 @@
 #include "Network/NetworkLayer.h"                /* the unit's own header: the layer base class and its free functions */
 #include "Network/NetworkLayerPat.h"             /* NetLayerRequest, NetFriendRec - the records the free functions copy */
 #include "Network/NetworkSessionManager.h"       /* networkInstance_initMutex - the record's mutex */
-#include "unsplit/Network.h"                     /* getNetworkLogger, dtor_803CA338 - no registered owner */
+#include "unsplit/Network.h"                     /* getNetworkLogger, networkInstance_destroyMutex (owner Network/NetworkStreamSink.cpp) */
 #include "Runtime.PPCEABI.H/memcpy.h"
 #include "Runtime.PPCEABI.H/memset.h"
 #include "MSL_C/alloc.h"                         /* memcmp - owner MSL_C/alloc.cpp */
@@ -93,7 +93,7 @@ void NetworkLayerRequest::reset()
 NetworkLayerRequest::~NetworkLayerRequest()
 {
     clear();
-    dtor_803CA338(this->mutex_78, -1);
+    networkInstance_destroyMutex(this->mutex_78, -1);
 }
 
 void NetworkLayerRequest::clear()

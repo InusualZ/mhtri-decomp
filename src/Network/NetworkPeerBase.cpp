@@ -6,19 +6,22 @@
  * FLAGS. `-O3 -pool off` (configure.py; measured in docs/network.md); file-scope `#pragma peephole off`
  *   (playbook 39).
  * NAMES. `NetworkPeerBase` and the `networkPeerError_*` accessors are GUESSes from behaviour (marked in
- *   `Network/network_transport_types.h`).
+ *   `Network/NetworkPeerBase.h`).
  * RESIDUALS. none.
  * SHAPES. The table is emitted from `NetworkPeerBase::destroy`, the key function (rule 10).  `NetworkUniqueId`'s
  *   deleting destructor (its table's +0x08 slot) is defined here: the range holds its only copy, at the left edge,
  *   a discovery cap.  Each `dont_inline` region keeps a retail `bl` that `-inline auto` folds.
  */
 #include "types.h"
-#include "Network/network_transport.h"
+#include "Network/NetworkSessionBase.h"
+#include "Network/NetworkResolverWii.h"
+#include "Network/NetworkPeerBase.h"
+#include "Network/network_socket_streams.h"
+#include "Network/NetworkSessionStable.h"
 #include "Network/NetworkSessionManager.h"
 #include "Network/NetworkUniqueId.h"
-/* `unsplit/Network.h` is the Network band's code half (`getNetworkLogger` and the socket-pool helpers).  It
-   cannot be included beside `unsplit/OS.h`: the two band headers declare `OSCreateThread`/`OSResumeThread` with
-   different signatures and a TU that sees both fails with `(10197) illegal function overloading`. */
+/* `unsplit/Network.h` is the Network band's code half (`getNetworkLogger` and the socket-pool helpers); the OS
+   thread calls it reaches are `NAND/nand.h`'s, the one spelling `unsplit/OS.h` includes too. */
 #include "unsplit/Network.h"
 #include "unsplit/Runtime.PPCEABI.H.h"
 #include "Runtime.PPCEABI.H/memcpy.h"

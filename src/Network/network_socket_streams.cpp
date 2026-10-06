@@ -9,7 +9,7 @@
  * NAMES. The file name is a GUESS (no `__FILE__` string).  GUESSes: `NetworkByteStream` and its `getData`/`getSize`
  *   (they return `data_04`/`cursor_0C`), `readLength`, and the Tcp members `open`/`close`/`clearReceive`/`release`/
  *   `disconnect`; `NetworkStreamSink` is the offset-derived interface of the two record helpers (no `NetworkPeer*` class
- *   has `fill`/`put` at +0x20/+0x24).  The rest are marked in `Network/network_transport_types.h`.
+ *   has `fill`/`put` at +0x20/+0x24).  The rest are marked in `Network/network_socket_streams.h`.
  * RESIDUALS. `NetworkMultipleUdp::receive`: register colouring only - retail gives the peer index/`taken` r31, the
  *   used-count pointer r30 and the length/total r29, ours r29/r31/r30 (all 720 declaration orders measured).
  * SHAPES. Every function is a member (rule 13).  Tcp and Udp each own a copy of `release`/`disconnect`/
@@ -20,12 +20,17 @@
  *   `else` (retail's shared tail); `receive` computes the running total as `taken + 2` before testing it.
  */
 #include "types.h"
-#include "Network/network_transport.h"
+#include "Network/NetworkPeerBase.h"
+#include "Network/NetworkPeerMcs.h"
+#include "Network/NetworkSessionBase.h"
+#include "Network/NetworkStreamSink.h"
+#include "Network/NetworkResolverWii.h"
+#include "Network/network_socket_streams.h"
+#include "Network/NetworkSessionStable.h"
 #include "Network/NetworkSessionManager.h"
 #include "Network/NetworkSocketWii.h"
-/* `unsplit/Network.h` is the Network band's code half (`getNetworkLogger` and the socket-pool helpers).  It
-   cannot be included beside `unsplit/OS.h`: the two band headers declare `OSCreateThread`/`OSResumeThread` with
-   different signatures and a TU that sees both fails with `(10197) illegal function overloading`. */
+/* `unsplit/Network.h` is the Network band's code half (`getNetworkLogger` and the socket-pool helpers); the OS
+   thread calls it reaches are `NAND/nand.h`'s, the one spelling `unsplit/OS.h` includes too. */
 #include "unsplit/Network.h"
 #include "unsplit/Runtime.PPCEABI.H.h"
 #include "Runtime.PPCEABI.H/memcpy.h"

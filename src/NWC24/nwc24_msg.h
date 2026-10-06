@@ -3,14 +3,14 @@
  * 0x8051D710..0x8051E068).
  *
  * Rule 2: this unit owns the message-library state API and the request engine, so
- * `NWC24/nwc24_io.c` includes this header instead of declaring them.  The library's shared work
- * block and device-path literals have no owner and live in `unsplit/NWC24.h`, which this
- * file includes.
+ * `NWC24/nwc24_io.c` includes this header instead of declaring them.  The work block and the request
+ * path are this unit's too (its `.bss` and `.data` claims); `unsplit/NWC24.h` keeps the RTC shadow words.
  */
 #ifndef MHTRI_NWC24_NWC24_MSG_H
 #define MHTRI_NWC24_NWC24_MSG_H
 
 #include "types.h"
+#include "unsplit/OS.h"       /* OSMutex, the work block's mutexes */
 #include "unsplit/NWC24.h"
 
 #ifdef __cplusplus
@@ -64,6 +64,21 @@ extern u32* sNwc24UserWork;
 extern const char Nwc24SetScriptModeName[]; /* 0x8063118C "NWC24iSetScriptMode" */
 
 extern const char Nwc24GenerateUserIdName[]; /* 0x806311A0 "NWC24iRequestGenerateUserId" */
+
+/* The library's work block (`.bss` 0x80766980, 0x180 B): the two mutexes every device request takes
+ * and the request/response buffers the ioctls are handed.  Only the modelled prefix is addressed by
+ * this band's bodies. size: 0x80 */
+typedef struct NWC24RequestWork {
+    /* +0x00 */ OSMutex mutex[2];    /* +0x00 the script-mode setter's, +0x18 the scheduler pair's */
+    /* +0x30 */ u8 pad_0x30[0x10];
+    /* +0x40 */ u32 inBuffer[8];     /* 32 B, memset by the initialiser, the command input */
+    /* +0x60 */ u32 outBuffer[8];    /* 32 B, memset by the initialiser, the command result */
+} NWC24RequestWork; /* size: 0x80 */
+
+/* 0x80766980 - the work block. */
+extern NWC24RequestWork sNwc24Work;
+
+extern const char Nwc24RequestPath[];      /* 0x80631178 "/dev/net/kd/request" */
 
 #ifdef __cplusplus
 }

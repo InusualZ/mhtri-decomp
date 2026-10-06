@@ -6,12 +6,16 @@
 #define MHTRI_NETWORK_SNETWORKLIBRARY_H
 
 #include "types.h"
-#include "Network/network_transport.h"
+#include "Network/NetworkPeerBase.h"
+#include "Network/network_socket_streams.h"
+#include "Network/NetworkSessionBase.h"
+#include "Network/NetworkResolverWii.h"
+#include "Network/NetworkSessionStable.h"
 #include "SO/soi.h"                     /* SOLibraryConfig - the init block's first member */
 
 class NetworkLogger;          /* unsplit/Network.h */
 class NetworkWiiMediator;     /* Network/NetworkWiiMediator.h */
-class NetworkResolverWii;     /* Network/network_transport_types.h */
+class NetworkResolverWii;     /* Network/NetworkResolverWii.h */
 class NetworkFileFetcher;     /* Network/network_pat_control.h */
 class NetworkRandom;          /* Network/NetworkPool.h */
 
@@ -47,7 +51,7 @@ typedef struct NetworkDateTime {
 } NetworkDateTime;
 
 /* The platform-independent network library: the singleton the whole Network band reaches through
- * `getNetworkLogger` (lobby/lb_server_sel_trans.cpp reads `mpInstance`).  Its table (0x80602A60) and the
+ * `getNetworkLogger` (Network/NetworkStreamSink.cpp reads `mpInstance`).  Its table (0x80602A60) and the
  * non-pure virtuals are this unit's; the Wii implementation `sNetworkLibraryWii` lives in
  * `Network/sNetworkLibraryWii.cpp`.  Slot names are GUESSES from the bodies and the log strings
  * (`sNetworkLibrary::start`, `sNetworkLibrary::stop`).  size: 0x9C (sizeof; MWCC packs the derived

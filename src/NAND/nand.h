@@ -19,12 +19,23 @@ void OSRestoreInterrupts(BOOL level);
 /* untyped: opaque band object, typed by the callers' views */
 void OSInitMutex(void* mutex);
 
-/* Foreign OS mutex API (unowned in the map; bare prototypes, rule 2 shared-file request in the outbox). */
+/* 0x804D1F20 / 0x804D2000 (with `OSInitMutex` 0x804D1EE0 above) - the OS mutex set. */
 /* untyped: opaque band object, typed by the callers' views */
 void OSLockMutex(void* mutex);
 
 /* untyped: opaque band object, typed by the callers' views */
 void OSUnlockMutex(void* mutex);
+
+/* 0x804D3F70 / 0x804D4600 - create a thread on `stack` (growing down, `stackSize` bytes) that runs `entry(param)`,
+ * and start it; non-zero on success.  The callers pass their own spellings of the thread record (an OS thread
+ * block, a `u8` array) and of the entry, so the parameters are still untyped. */
+s32 OSCreateThread(void* thread, void* entry, void* param, void* stack, u32 stackSize, s32 priority, u32 flags);
+s32 OSResumeThread(void* thread);
+/* untyped: opaque handle passed through - the OS thread record */
+s32 OSIsThreadTerminated(void* thread);
+
+/* 0x804D4CA0 - sleep the calling thread for `ticks` time-base ticks. */
+void OSSleepTicks(u64 ticks);
 
 void OSReport(const char* format, ...);
 

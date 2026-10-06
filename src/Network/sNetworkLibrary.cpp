@@ -13,7 +13,7 @@
  *   (members over the socket table) keep the C names and parameter types their callers use.
  * RESIDUALS. `dateToTime`: the unrolled month loop computes `months - 8` before `months - 1` in retail (two adjacent
  *   instructions swapped; loop/declaration/type variants measured).  `extab` is 96 of 136 B: retail's constructor and
- *   destructor carry cleanup records for the member mutex (`dtor_803CA338`), which needs the mutex as a class member
+ *   destructor carry cleanup records for the member mutex (`networkInstance_destroyMutex`), which needs the mutex as a class member
  *   with a destructor (NetworkSessionManager's type).
  * SHAPES. `convertTime`/`dateToTime` count days from 1 January of year 0; every unit constant is an unsigned 64-bit
  *   macro (retail divides through `__div2u`/`__mod2u`), the products `n * 366ULL` keep retail's dead sign extension,
@@ -23,7 +23,7 @@
 #include "Network/sNetworkLibrary.h"
 #include "Network/sNetworkLibraryWii.h"   /* sNetworkLibraryWii - the worker-thread bodies */
 #include "Network/NetworkPool.h"               /* NetworkRandom */
-#include "Network/NetworkSessionManager.h"     /* networkInstance_initMutex / dtor_803CA338 - the member mutex */
+#include "Network/NetworkSessionManager.h"     /* networkInstance_initMutex / networkInstance_destroyMutex - the member mutex */
 #include "unsplit/Network.h"                   /* getNetworkLogger */
 #include "Runtime.PPCEABI.H/memset.h"
 #include "sys_mem.h"
@@ -89,7 +89,7 @@ sNetworkLibrary::~sNetworkLibrary()
 {
     sNetworkLibrary::final();
     mpInstance = NULL;
-    dtor_803CA338(mutex, -1);
+    networkInstance_destroyMutex(mutex, -1);
 }
 
 void sNetworkLibrary::setLogLevel(s32 level)

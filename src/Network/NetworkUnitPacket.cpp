@@ -17,20 +17,19 @@
  *   `takeByte`, `putTopPacket` and `networkStreamQueue_acknowledge`: operand order / one register. `.data`: the two
  *   writer tables 0x805FCDD4/0x805FCE10 stay unemitted while their `attach`/`bind`/`fill`/`flush` overrides are the
  *   free functions other units call (`networkPacket_attach`, `networkStreamReader_attach`, ...; their destructors live
- *   in `lobby/lb_server_sel_trans.cpp`, whence `dataorder`'s zigzag seam at 0x805FCE10).  `extab`:
+ *   in `Network/NetworkStreamSink.cpp`, whence `dataorder`'s zigzag seam at 0x805FCE10).  `extab`:
  *   `networkStreamQueue_discard`'s cleanup range ends at the `hasMessage` call in retail (0x11 words) and at `memmove`
  *   in ours (0x1B) - a `throw()` on the declaration does not move it.  `.sdata`: 2 of 8 B (the frame version).
  * SHAPES. A message is a big-endian u16 payload size, a flag byte (0x80 user data, 0x40 a timestamp follows, 0x3F the
  *   value count), the optional timestamp, the optional value block and the payload; a frame is a 22-byte header
  *   (version, payload length, two sequence numbers, two nonces, the flag byte at +0x11, the CRC at +0x12, the key
  *   bytes at +0x14/+0x15) and its payload; every value goes through the library's byte-order slots
- *   (`getNetworkLogger()`'s +0x48..+0x54).  `NetworkStreamQueue : NetworkStreamSink` (`Network/network_writer_types.h`)
+ *   (`getNetworkLogger()`'s +0x48..+0x54).  `NetworkStreamQueue : NetworkStreamSink` (`Network/NetworkUnitPacket.h`)
  *   has its constructor and destructor (0x803FA5F4/0x803FA63C) here, so this unit emits `__vt__18NetworkStreamQueue`
  *   (0x805FCD98).
  */
 
 #include "Network/NetworkUnitPacket.h"
-#include "Network/network_writer_types.h"        /* NetworkStreamWriter, NetworkStreamWriterDefault, NetworkStreamQueue */
 #include "Network/NetworkUniqueId.h"
 #include "unsplit/Network.h"                     /* getNetworkLogger - no registered owner */
 #include "Runtime.PPCEABI.H/memcpy.h"

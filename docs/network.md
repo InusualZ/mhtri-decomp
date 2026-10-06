@@ -198,6 +198,29 @@ Earlier unit names cited by the playbook and the notes, and where their ranges l
 | `fn_80423E74.cpp` (the work-record / PatCamellia band) | `.text` 0x80423E74..0x80429B94 (23840 B, 77 functions) | `Network/network_pat_control.cpp` |
 | the pat-control proposal at 0x80429B94 | `.text` 0x80429B94..0x8043065C (114 functions, 27336 B) | `Network/network_pat_control.cpp` (0x80423E74..0x80432104) |
 | the GameSpy proposal at 0x8041A87C | `.text` 0x8041A87C..0x8041DF10 (71 functions, 13972 B) | `Network/GameSpyInterfaceThread.cpp` (0x8041B194..) and `Network/NetworkReflectService.cpp` |
+| the tail of `lobby/lb_server_sel_trans.cpp` | `.text` 0x803C987C..0x803CCDF8 (74 functions, 13692 B), its extab/extabindex, `.rodata` and `.data` 0x805F8DB0..0x805F94E0 | `Network/NetworkStreamSink.cpp` (seam evidence in its header) |
+| the VF/DB/PMIC/KPR/HID/KBD half of `SO/soi.cpp` | `.text` 0x80521340..0x8052A040 (174 functions) | `VF/vf.cpp`; `SO/soi.cpp` keeps 0x8051E864..0x80521340 |
+| the NCD/NET half of `SSL/ssl.cpp` | `.text` 0x8051C554..0x8051D710 (14 functions) | `NCD/ncdsystem.c`; `SSL/ssl.cpp` keeps 0x8051B7FC..0x8051C554 |
+
+## Header layout (2026-10-06)
+
+Each transport class is declared in its owner unit's header; the former shared headers are gone.
+
+| class / declarations | header |
+| --- | --- |
+| `NetworkPeerBase`, the error record and `NetworkPeerErrorSource` | `Network/NetworkPeerBase.h` |
+| `NetworkPeerBuffer` / `NetworkPeerUdp` / `NetworkPeerMcs` (+ `NetworkPeerInfo`) | `Network/NetworkPeerBuffer.h` / `NetworkPeerUdp.h` / `NetworkPeerMcs.h` |
+| the socket handle, `NetworkSingleTcp`, `NetworkMultipleUdp`, `NetworkByteStream`, `NetworkResolverBase` | `Network/network_socket_streams.h` |
+| `NetworkSessionBase` / `NetworkResolverWii` | `Network/NetworkSessionBase.h` / `Network/NetworkResolverWii.h` |
+| `NetworkStreamSink`, `NetworkStreamWriter(Default)`, `NetworkBuffer`, the logger view, `getNetworkLogger`, the mutex pair, `networkStreamWriter_attach`/`_reserve` | `Network/NetworkStreamSink.h` |
+| `NetworkStreamQueue` | `Network/NetworkUnitPacket.h` |
+| the GT2 API and the DWCi socket/list layer | `DWCi/dwc_nasfunc.h` |
+| the OS mutex/thread calls | `NAND/nand.h` (one spelling; `unsplit/OS.h` includes it) |
+
+`Network/network_transport.h`, `network_transport_types.h`, `network_writer_types.h` and `sGameSpyInterfaceThread.h`
+were folded into these; `Network/gamespy_interface_types.h` stays a type-only header, because folding it into
+`Network/GameSpyInterfaceThread.h` makes `PatInterface.h` and `GameSpyInterfaceThread.h` include each other and
+`PatConnection.cpp` stops compiling.
 
 ## Renamed symbols
 
@@ -216,5 +239,7 @@ Spellings the notes and older unit headers used, and the map's current names.
 | `constructReflectService` | `__ct__21NetworkReflectServiceFv` (0x8041A1C4) |
 | `create__22GameSpyInterfaceThreadFv` | `__ct__22GameSpyInterfaceThreadFv` (0x8041C66C) |
 | `reflectInit__18NetworkWiiMediatorPFllllPvPv_vPv` (a misspelling the mediator header carried) | `reflectInit__18NetworkWiiMediatorFPFllllPvPv_vPv` |
+| `dtor_803CA338` (and the stale `fn_803CA338`) | `networkInstance_destroyMutex` (0x803CA338) |
+| `fn_80526F00` / `fn_80529430` / `fn_80529B50` | `KPRLookAhead` / `KBDSetLedsAsync` / `KBDSetChannelValue` (GUESSes, `VF/vf.cpp`) |
 
 The four constructor/accessor rows were renamed twice, the second time to the owners' definition spellings.

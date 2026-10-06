@@ -1,16 +1,17 @@
 /*
  * lobby/lb_server_sel_trans.cpp - the demo/event work accessors and the server-selection transition band.
- * RANGE. .text 0x803C3A5C-0x803CCDF8 (161 functions); .rodata 0x80570C20-0x80570E20, .data 0x805F8920-0x805F94E0, .bss
- *   0x806D2B20-0x806D2C60 (`demo_work` first), .sdata 0x80793738-0x80793900, .sbss 0x80794C90-0x80794C98, .sdata2
- *   0x8079C680-0x8079C690, extab, extabindex.  The head 0x803C3A5C-0x803C4B74 follows `menu/get_pop_dat_ptr.cpp`'s
- *   pop-data/option code.
+ * RANGE. .text 0x803C3A5C-0x803C987C (87 functions); extab 0x8001936C-0x80019554, extabindex 0x80039B88-0x80039E64,
+ *   .data 0x805F8920-0x805F8DB0, .bss 0x806D2B20-0x806D2C60 (`demo_work` first), .sdata 0x80793738-0x80793900,
+ *   .sbss 0x80794C90-0x80794C98, .sdata2 0x8079C680-0x8079C690.  The head 0x803C3A5C-0x803C4B74 follows
+ *   `menu/get_pop_dat_ptr.cpp`'s pop-data/option code; the right edge 0x803C987C is the left edge of
+ *   `Network/NetworkStreamSink.cpp` (its header holds the seam evidence).
  * FLAGS. `cflags_menu` (the row sits in the menu lib); the lobby lib's flags are untested for this band.
  * NAMES. Module `lobby` and `lb_server_sel_trans` are a GUESS from the band's server-selection transition code; no
  *   `__FILE__` string covers it.
- * RESIDUALS. 153 rows unwritten: 0x803C3A70-0x803C3DF8, 0x803C3E1C-0x803C4814, 0x803C482C-0x803C4840,
- *   0x803C48B0-0x803C4AA0, 0x803C4AB4-0x803C4B74 and everything from 0x803C4BA0 up.  Partial: `map_id_ck`,
+ * RESIDUALS. 79 rows unwritten: 0x803C3A70-0x803C3DF8, 0x803C3E1C-0x803C4814, 0x803C482C-0x803C4840,
+ *   0x803C48B0-0x803C4AA0, 0x803C4AB4-0x803C4B74 and 0x803C4BA0-0x803C987C.  Partial: `map_id_ck`,
  *   `demo_flag_ck`, `demo_work_init`.
- *   flipcheck: `.bss` 0x28 against 0x140; `.rodata`/`.data`/`.sdata`/`.sbss`/`.sdata2`/extab/extabindex claimed, not
+ *   flipcheck: `.bss` 0x28 against 0x140; `.data`/`.sdata`/`.sbss`/`.sdata2`/extab/extabindex claimed, not
  *   emitted; `.text` short of the claim (the unwritten rows); the `.sdata`/`.sdata2` pool is shared with the Network
  *   transport units (`NetworkPeerMcs`, `NetworkSessionStable`, `NetworkSessionManager`, `NetworkSessionManagerPat`,
  *   `network_shared_data`: a low-confidence fold candidate).
