@@ -21,6 +21,8 @@
  *   `DWCi_Auth_RequestCallback` (0x80509DB0, registered in `DWCi/dwc_nasfunc.c`) addresses the same string pool,
  *   and `.data` 0x806302C8..0x806307F0 holds the request and callback strings; the registration is not re-cut, so
  *   the object's `.data` runs past the claim. `.sdata` ends 1 byte short of the claim (the tail pad).
+ *   `DWCi_npStart` takes its base register from the first-defined static where retail names `DWCi_stateBlock`
+ *   (same bytes; MWCC addresses the four objects this file defines from one base).
  *   Relocation names that differ: ours forms `DWCi_npCopyFastTailTable`, `DWCi_npEmptyFriendCode`,
  *   `DWCi_npEmptyPlayerName`, `DWCi_authDataStateTable` and `DWCi_urlSchemeSeparator` as pool offsets where retail
  *   names them, and `DWCi_GetConsoleFriendCode` names `DWCi_consoleFriendCode` where retail names `lbl_807957DC`.
@@ -357,15 +359,13 @@ u32 DWCi_FreeList(void) {
  * block, remember the argument and return 1.  The reset every session begins with. */
 
 u32 DWCi_npStart(u32 arg) {
-    DWCiStateBlock* state = (DWCiStateBlock*)DWCi_stateBlock;
-
-    memset(state, 0, 0x1D0);
-    memset(&state->svl, 0, 0x174);
-    memset(&state->saveImage, 0, 0x20);
+    memset(DWCi_stateBlock, 0, 0x1D0);
+    memset(DWCi_workBuffer, 0, 0x174);
+    memset(&DWCi_authSaveData, 0, 0x20);
     DWCi_runtime = 0;
     DWCi_state = 0;
     DWCi_initArgument = arg;
-    state->loginKind = 0;
+    ((DWCiStateBlock*)DWCi_stateBlock)->loginKind = 0;
     DWCi_useStoredConfig = 0;
     return 1;
 }
