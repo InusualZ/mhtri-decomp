@@ -71,7 +71,10 @@ public:
     void SetParent(G3dObj* pParent);
     static const TypeObj GetTypeObjStatic();
     static void operator delete(void* pBlock); /* untyped: byte range */
+    /* untyped: byte range - the placement address the Construct functions build the object in */
+    static void* operator new(unsigned long size, void* pBlock);
     static void Dealloc(MEMAllocator* pHeap, void* pBlock); /* untyped: byte range */
+    static void* Alloc(MEMAllocator* pHeap, u32 size); /* untyped: byte range */
 
     /* +0x00 vtable */
     /* +0x04 */ G3dObj* mpParent;

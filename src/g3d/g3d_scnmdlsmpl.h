@@ -32,6 +32,12 @@ void fn_800810DC(void* arg0, s32 arg1);
 
 #ifdef __cplusplus
 }
+
+#include "nw4r/fn_805012C4.h" /* nw4r::math::AABB, owner nw4r/fn_805012C4.cpp (rule 2) */
+
+/* 0x80080F44 - constructs an AABB's two corner records (two VEC3_ctor no-ops) and returns it: the element
+ * constructor ScnObj's bounding-box array is built with. */
+extern "C" nw4r::math::AABB* AABB_ctor(nw4r::math::AABB* pBox);
 #endif
 
 #endif /* MHTRI_G3D_G3D_SCNMDLSMPL_H */

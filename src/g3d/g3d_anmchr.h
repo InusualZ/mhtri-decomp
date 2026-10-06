@@ -145,6 +145,7 @@ public:
     virtual void SetWeight(int idx, f32 weight);
     virtual f32 GetWeight(int idx) const;
 
+    static AnmObjChrBlend* Construct(MEMAllocator* pHeap, u32* pSize, ResMdl mdl, int numChildren);
     static const TypeObj GetTypeObjStatic();
 
     /* +0x20 */ f32* mpWeightArray;

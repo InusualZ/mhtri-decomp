@@ -12,10 +12,9 @@
  *   members are nw4r's (the `AnmObjTexSrt::Attach(...)` / `AnmObjTexSrtNode::G3dProc(...)` warnings and the four
  *   vtables); type_obj_set_name_texsrt_res/_node/_override are GUESSES (the store copies in
  *   `g3d/fn_80063888.cpp` their GetTypeObj members call).
- * RESIDUALS. 35 functions unwritten (objdiff scores them zero) in 17 runs: 0x800680CC-0x800686FC (the anmscn
+ * RESIDUALS. 33 functions unwritten (objdiff scores them zero) in 15 runs: 0x800680CC-0x800686FC (the anmscn
  *   head), 0x800686FC-0x800689B0, 0x80068A78-0x80069334, 0x8006946C-0x800695D4, 0x800697D4-0x8006993C,
- *   0x800699C8-0x80069BD8, 0x8006B514-0x8006B6D8 and 0x8006B840-0x8006BA04 (AnmObjTexSrtNode::SetFrame and
- *   SetUpdateRate: they assert on `MSL_C/alloc.cpp`'s __fpclassifyf), 0x8006C138-0x8006C650, 0x8006C668-0x8006CDBC,
+ *   0x800699C8-0x80069BD8, 0x8006C138-0x8006C650, 0x8006C668-0x8006CDBC,
  *   0x8006CD98-0x8006CDBC, 0x8006CE48-0x8006D000, 0x8006D084-0x8006D9A0 (the AnmObjTexSrtRes members),
  *   0x8006DA48-0x8006E2A8, 0x8006E338-0x8006E668.
  *   AnmObjTexSrt, AnmObjTexSrtNode, AnmObjTexSrtOverride, AnmObjTexSrtRes: the destructors' empty bodies are complete
@@ -34,6 +33,7 @@
 #include "g3d/g3d_anmchr.h"  /* the fn_8005Dxx / fn_80062xx helpers the g3d_anmchr.cpp range now owns (rule 2) */
 #include "g3d/g3d_anmtexsrt.h" /* the texture-SRT classes this range defines (rule 1) */
 #include "nw4r/db_assert.h"   /* nw4r::db::Warning (rule 2) */
+#include "MSL_C/alloc.h"      /* __fpclassifyf, owner MSL_C/alloc.cpp (rule 2) */
 
 #pragma pool_data off
 
@@ -783,6 +783,45 @@ void nw4r::g3d::AnmObjTexSrtNode::UpdateFrame()
         AnmObjTexSrtRes* pChild = mpChildrenArray[i];
         if (pChild != NULL) {
             pChild->UpdateFrame();
+        }
+    }
+}
+
+/* Whether `value` is a finite number (not infinite, not NaN): the frame and rate setters' assertion. */
+static inline bool texsrt_value_valid(f32 value)
+{
+    bool valid = false;
+    if (__fpclassifyf(value) > 2 && __fpclassifyf(value) != 1) {
+        valid = true;
+    }
+    return valid;
+}
+/* 0x8006B514 (0x1C4): sets every child's frame. */
+void nw4r::g3d::AnmObjTexSrtNode::SetFrame(f32 frame)
+{
+    TEXSRT_POINTER_ASSERT(this, 0x10F, TEXSRT_THIS_MSG);
+    if (!texsrt_value_valid(frame)) {
+        nw4r::db::Panic("g3d_anmtexsrt.cpp", 0x110, "NW4R:Floating Point Value Error(%f)\nframe is infinite or nan.", frame);
+    }
+    for (int i = 0; i < mChildrenArraySize; i++) {
+        AnmObjTexSrtRes* pChild = mpChildrenArray[i];
+        if (pChild != NULL) {
+            pChild->SetFrame(frame);
+        }
+    }
+}
+
+/* 0x8006B840 (0x1C4): sets every child's update rate. */
+void nw4r::g3d::AnmObjTexSrtNode::SetUpdateRate(f32 rate)
+{
+    TEXSRT_POINTER_ASSERT(this, 0x12E, TEXSRT_THIS_MSG);
+    if (!texsrt_value_valid(rate)) {
+        nw4r::db::Panic("g3d_anmtexsrt.cpp", 0x12F, "NW4R:Floating Point Value Error(%f)\nrate is infinite or nan.", rate);
+    }
+    for (int i = 0; i < mChildrenArraySize; i++) {
+        AnmObjTexSrtRes* pChild = mpChildrenArray[i];
+        if (pChild != NULL) {
+            pChild->SetUpdateRate(rate);
         }
     }
 }

@@ -20,14 +20,18 @@
  *   helper) and `anm_typename_AnmObj`/`_AnmObjChrNode`/`_AnmObjChrBlend`/`_G3dObj` (the `.rodata` records by their strings).
  *   GUESS: `Alloc__Q34nw4r3g3d6G3dObjFP12MEMAllocatorUl` (0x800604D4, `b` to the next word: G3dObj's allocation entry the
  *   callers pass (heap, size) to) and `g3d_obj_alloc_tail` (0x800604D8, the 4-byte local that tail-calls
- *   MEMAllocFromAllocator); the map row was one 8-byte `fn_800604D4` before.
- * RESIDUALS. 42 functions unwritten (objdiff scores them zero; `python tools/objdiff/unitscore.py g3d/g3d_anmchr`
- *   lists them), the largest fn_80060658 (AnmObjChrBlend::GetResult, 0x8D0), fn_80061424 (0x474), fn_800600C8
- *   (AnmObjChrBlend::Construct, 0x404), fn_80062980 (0x384) and fn_80062E50 (0x320).  AnmObjChrNode::SetFrame and
- *   SetUpdateRate (0x8005F054, 0x8005F380) assert on `MSL_C/alloc.cpp`'s __fpclassifyf;
- *   AnmObj::~AnmObj (dtor_8005D384) is written but keeps its stem while `g3d/fn_800680CC.cpp` calls it as a free
- *   function.  Partial: fn_8005D27C, fn_800604DC, fn_8006244C, fn_80062824, fn_800628AC, and the members whose only
- *   difference is a relocation name (the strings, the AnmObj destructor's stem).
+ *   MEMAllocFromAllocator); the map row was one 8-byte `fn_800604D4` before.  g3d_round_up (0x800604DC) is a GUESS
+ *   (the Construct functions' align-up of an offset: nw4r's `ut::RoundUp`); G3dObj's placement operator new
+ *   (0x800604CC) is the member the Construct functions build their objects with.  g3d_obj_alloc_tail is a GUESS
+ *   (the allocation forwarder above); math_reciprocal is a GUESS (0x800610AC: one Newton-Raphson step on `fres`,
+ *   nw4r's `math::FInv`).
+ * RESIDUALS. 36 functions unwritten (objdiff scores them zero; `python tools/objdiff/unitscore.py g3d/g3d_anmchr`
+ *   lists them), the largest fn_80060658 (AnmObjChrBlend::GetResult, 0x8D0), fn_80061424 (AnmObjChrRes::Construct,
+ *   0x474: its ResAnmChr accessors and the AnmObjChrRes constructor are unwritten), fn_80062980 (0x384) and
+ *   fn_80062E50 (0x320).
+ *   Partial: fn_8005D27C, g3d_round_up (retail materialises `~(align - 1)` with `nor` + `and` where MWCC folds it
+ *   into `andc`), fn_8006244C, fn_80062824, fn_800628AC, and the members whose only difference is a relocation name
+ *   (the strings).
  *   G3dObj::operator delete, AnmObj, AnmObjChr, AnmObjChrBlend, AnmObjChrRes: the empty bodies are complete (retail's
  *   operator delete is a bare `blr`; the compiler emits the constructors' base calls, vtable stores and member
  *   initialisers and the destructors' base calls).  The G3dObj vtable is emitted here (its first virtual,
@@ -38,11 +42,13 @@
  *   flipcheck: `.text` 0xB38 of 0x6F90; extab 0x110 of 0x3A4; extabindex 0x198 of 0x4E0; `.rodata`, `.data`, `.bss`, `.sdata` and `.sdata2` are claimed and not emitted.
  *   Relocation names that differ from retail (pool constants, save helpers, statics): `lbl_80791148`,
  *     `lbl_807911E8`, `lbl_80791168`, `lbl_80791150`.
- * SHAPES. The ResName constructor is complete: its work is the base initialiser.
+ * SHAPES. The ResName constructor is complete: its work is the base initialiser.  The unit includes the leaf
+ *   `g3d/anm_typename_AnmObj.h` instead of `g3d/fn_80063888.h`: a visible global placement `operator delete` gives
+ *   AnmObjChrBlend::Construct a landing pad (`__dl__FPvPv`) retail does not have.
  */
 
 #include "types.h"
-#include "g3d/fn_80063888.h" /* the anm_typename_* records, owned by g3d/fn_80063888.cpp (rule 2) */
+#include "g3d/anm_typename_AnmObj.h" /* anm_typename_AnmObj, owned by g3d/fn_80063888.cpp (leaf header, rule 2) */
 #include "g3d/fn_80075DCC.h" /* anm_typename_G3dObj, owned by g3d/fn_80075DCC.cpp (rule 2) */
 #include "g3d/g3d_anmchr.h" /* this unit's own declarations, and the G3dObj dispatch record (rule 1) */
 #include "g3d/g3d_resmat.h" /* nw4r::g3d::ResMdl (rule 2) */
@@ -50,6 +56,8 @@
 #include "fn_8004CAD8.h"   /* mtx34_const_ptr's owner header (docs/plan.md 6.5, rule 2) */
 #include "nw4r/math_arithmetic.h"   /* nw4r::math::detail::FExp, owner nw4r/math_arithmetic.cpp (rule 2) */
 #include "nw4r/db_assert.h"  /* nw4r::db::Warning (rule 2) */
+#include "MSL_C/alloc.h"     /* __fpclassifyf, owner MSL_C/alloc.cpp (rule 2) */
+#include "OS/MEMAllocFromAllocator.h" /* MEMAllocFromAllocator, owner OS/FindContainHeap_.c (rule 2) */
 
 #pragma pool_data off
 
@@ -197,10 +205,12 @@ nw4r::g3d::G3dObj* nw4r::g3d::G3dObj::GetParent() const
     return mpParent;
 }
 
-extern "C" u32 fn_800604CC(u32 a, u32 b)
+/* 0x800604CC (0x8): the placement form: builds the object in the caller's block. */
+/* untyped: byte range - the placement address the Construct functions build the object in */
+void* nw4r::g3d::G3dObj::operator new(unsigned long size, void* pBlock)
 {
-    (void)a;
-    return b;
+    (void)size;
+    return pBlock;
 }
 
 extern "C" void fn_80060FEC(void)
@@ -235,6 +245,39 @@ extern "C" void fn_800621DC(f32* p, f32 v)
 extern "C" f32 fn_80062300(f32* p)
 {
     return p[1];
+}
+
+extern "C" {
+/* untyped: byte range - the allocated block */
+static void* g3d_obj_alloc_tail(MEMAllocator* pHeap, u32 size);
+}
+
+/* 0x800604D4 (0x4): allocates `size` bytes from the object heap. */
+/* untyped: byte range - the allocated block */
+void* nw4r::g3d::G3dObj::Alloc(MEMAllocator* pHeap, u32 size)
+{
+    return g3d_obj_alloc_tail(pHeap, size);
+}
+
+extern "C" {
+/* 0x800604D8 (0x4): forwards the allocation to the allocator. */
+/* untyped: byte range - the allocated block */
+static void* g3d_obj_alloc_tail(MEMAllocator* pHeap, u32 size)
+{
+    return MEMAllocFromAllocator(pHeap, size);
+}
+
+/* 0x800610AC (0x18): 1 / value by one Newton-Raphson step from the hardware estimate. */
+asm f32 math_reciprocal(register f32 value)
+{
+    nofralloc
+    fres f0, value
+    ps_add f2, f0, f0
+    ps_mul f0, f0, f0
+    ps_nmsub f0, value, f0, f2
+    fmr f1, f0
+    blr
+}
 }
 
 /* 0x800626BC (0x8): stores the block address. */
@@ -308,12 +351,12 @@ extern "C" u32 fn_80062824(u32* p, u32 offset)
 }
 
 /* The align-up helper: (~(align - 1)) & (offset + align - 1). */
-extern "C" u32 fn_800604DC(u32 offset, u32 align)
+#pragma peephole off
+extern "C" u32 g3d_round_up(u32 offset, u32 align)
 {
-    u32 end = offset + align;
-
-    return ~(align - 1) & (end - 1);
+    return ~(align - 1) & (align + offset - 1);
 }
+#pragma peephole on
 
 /* nw4r's four-float vector setter. */
 extern "C" void dVector4Set(f32* dst, f32 x, f32 y, f32 z, f32 w)
@@ -476,6 +519,47 @@ extern "C" void **fn_80063C8C(void **out, void *v)
         if (!ok1_)                                                                              \
             nw4r::db::Panic(file, line, msg, (ptr));                                             \
     }
+
+extern "C" u32 g3d_round_up(u32 offset, u32 align);
+
+/* 0x800600C8 (0x404): sizes a blend node for `mdl` with `numChildren` weighted children, reports the size through
+ * `pSize`, and builds it in one block from `pHeap` (NULL without a heap or memory). */
+#pragma peephole off
+nw4r::g3d::AnmObjChrBlend* nw4r::g3d::AnmObjChrBlend::Construct(MEMAllocator* pHeap, u32* pSize, ResMdl mdl,
+                                                                int numChildren)
+{
+    if (!mdl.IsValid()) {
+        return NULL;
+    }
+    int numNode = mdl.GetResNodeNumEntries();
+    u32 bindingOffset = g3d_round_up(sizeof(AnmObjChrBlend), 2);
+    u32 childrenOffset = g3d_round_up(bindingOffset + numNode * sizeof(u16), 4);
+    u32 childrenSize = numChildren * sizeof(AnmObjChrRes*);
+    u32 weightOffset = g3d_round_up(childrenOffset + childrenSize, 4);
+    u32 size = g3d_round_up(weightOffset + childrenSize, 4);
+    if (pSize != NULL) {
+        ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", pSize, 0x267, "NW4R:Pointer Error\npSize(=%p) is not valid pointer.");
+        *pSize = size;
+    }
+    if (pHeap == NULL) {
+        return NULL;
+    }
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", pHeap, 0x270, "NW4R:Pointer Error\npHeap(=%p) is not valid pointer.");
+    u8* pBuf = (u8*)Alloc(pHeap, size);
+    if (pBuf == NULL) {
+        return NULL;
+    }
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", pBuf, 0x27A, "NW4R:Pointer Error\nbuf(=%p) is not valid pointer.");
+    if ((u32)pBuf & 3) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x27B, "NW4R:Alignment Error(0x%x)\nbuf must be aligned to 4 bytes boundary.",
+                        pBuf);
+    }
+    return new (pBuf) AnmObjChrBlend(pHeap, (u16*)(pBuf + bindingOffset), numNode,
+                                     (AnmObjChrRes**)(pBuf + childrenOffset), numChildren,
+                                     (f32*)(pBuf + weightOffset));
+}
+#pragma peephole on
+
 
 /* 0x8005D384 (0x5C): destroys the animation object. */
 #pragma peephole off
@@ -789,6 +873,45 @@ void nw4r::g3d::AnmObjChrNode::UpdateFrame()
         AnmObjChrRes* pChild = mpChildrenArray[i];
         if (pChild != NULL) {
             pChild->UpdateFrame();
+        }
+    }
+}
+
+/* Whether `value` is a finite number (not infinite, not NaN): the frame and rate setters' assertion. */
+static inline bool anmchr_value_valid(f32 value)
+{
+    bool valid = false;
+    if (__fpclassifyf(value) > 2 && __fpclassifyf(value) != 1) {
+        valid = true;
+    }
+    return valid;
+}
+/* 0x8005F054 (0x1C4): sets every child's frame. */
+void nw4r::g3d::AnmObjChrNode::SetFrame(f32 frame)
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x150, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    if (!anmchr_value_valid(frame)) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x151, "NW4R:Floating Point Value Error(%f)\nframe is infinite or nan.", frame);
+    }
+    for (int i = 0; i < mChildrenArraySize; i++) {
+        AnmObjChrRes* pChild = mpChildrenArray[i];
+        if (pChild != NULL) {
+            pChild->SetFrame(frame);
+        }
+    }
+}
+
+/* 0x8005F380 (0x1C4): sets every child's update rate. */
+void nw4r::g3d::AnmObjChrNode::SetUpdateRate(f32 rate)
+{
+    ANMCHR_POINTER_ASSERT("g3d_anmchr.cpp", this, 0x16F, "NW4R:Pointer Error\nthis(=%p) is not valid pointer.");
+    if (!anmchr_value_valid(rate)) {
+        nw4r::db::Panic("g3d_anmchr.cpp", 0x170, "NW4R:Floating Point Value Error(%f)\nrate is infinite or nan.", rate);
+    }
+    for (int i = 0; i < mChildrenArraySize; i++) {
+        AnmObjChrRes* pChild = mpChildrenArray[i];
+        if (pChild != NULL) {
+            pChild->SetUpdateRate(rate);
         }
     }
 }

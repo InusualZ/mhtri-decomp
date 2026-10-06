@@ -17,19 +17,22 @@
  *   type_obj_set_name_scngroup are GUESSES (the type-name store copies of `g3d/fn_80075DCC.cpp` the ScnLeaf and
  *   ScnGroup type members call); G3dProcGatherScnObj, G3dProcCalcWorld, G3dProcCalcMat and G3dProcCalcView are
  *   GUESSES (the per-pass ScnGroup members DefG3dProcScnGroup dispatches to).
- * RESIDUALS. Unwritten: 0x80081260-0x800813B8 (the ScnObj constructor), 0x8008147C-0x800814C0 (IScnObjCallback's destructor: defining it would emit the interface's
+ * RESIDUALS. Unwritten: 0x8008147C-0x800814C0 (IScnObjCallback's destructor: defining it would emit the interface's
  *   vtable here, which the target object does not carry) and 0x80081804-0x80081838 (the AABB copy assignment
  *   retail emits out of line; `nw4r::math::AABB` is a plain struct, so MWCC copies inline).
  *   Partial: SetBoundingVolume and GetBoundingVolume (retail calls the out-of-line AABB copy `fn_80081804`; ours
  *   copies inline), Remove(u32) (retail keeps `idx * 4` in
  *   a saved register across the detach call), Insert (one `subf` scheduled later), DefG3dProcScnGroup (retail keeps
- *   a dead `b` after the CALC_VIEW case), and the rows whose only difference is a string relocation name.
- *   The ScnObj constructor (0x80081260) is unwritten (its MTX34/AABB member arrays are built by out-of-line element
- *   constructors the math types do not declare); IsDerivedFrom, GetTypeObjStatic, TestScnObjFlag, SetScnObjFlag and
- *   the CheckCallback members sit in `g3d/fn_80075DCC.cpp`'s range.
- *   flipcheck: `.rodata` (the three name records) is claimed and not emitted; `.sdata2` is 0x4 of 0x8 (the other word,
- *   0x80795E60, is the unwritten constructor's).
- * SHAPES. `(int)mCallbackDeleteOption == 1` and `(u32)type < MTX_TYPE_MAX` reproduce retail's signed and unsigned
+ *   a dead `b` after the CALC_VIEW case).  The ScnObj and ScnGroup constructors stage the vtable address in r3
+ *   where retail uses r0; DefG3dProcScnLeaf, G3dProcGatherScnObj, G3dProcCalcWorld and Remove(ScnObj*) load one
+ *   virtual call's vtable through the saved `this` register where retail reloads it through r3 (one register field
+ *   each).
+ *   IsDerivedFrom, GetTypeObjStatic, TestScnObjFlag, SetScnObjFlag and the CheckCallback members sit in
+ *   `g3d/fn_80075DCC.cpp`'s range.
+ *   flipcheck: `.rodata` (the three name records) is claimed and not emitted.
+ * SHAPES. The ScnObj constructor builds its MTX34/AABB arrays with explicit do-while loops over MTX34_ctor and
+ *   AABB_ctor (retail's member-array construction: the math types declare no constructors to let MWCC emit it).
+ *   `(int)mCallbackDeleteOption == 1` and `(u32)type < MTX_TYPE_MAX` reproduce retail's signed and unsigned
  *   compares; the destructors and CalcWorldMtx keep `#pragma peephole off` (retail's `extsh` and `clrlwi` + `cmpwi`).
  */
 
@@ -42,6 +45,8 @@
 #include "unsplit/g3d.h"      /* the name records and the culling frustum no unit owns (rule 2) */
 #include "nw4r/db_assert.h"   /* nw4r::db::Panic (rule 2) */
 #include "MSL/algorithm.h"    /* std::find / std::distance */
+#include "g3d/g3d_scnmdlsmpl.h" /* AABB_ctor, owner g3d/g3d_scnmdlsmpl.cpp (rule 2) */
+#include "mh3_pad.h"            /* setVec3 / copyVec3 (rule 2) */
 
 #pragma pool_data off
 
@@ -81,6 +86,45 @@ void nw4r::g3d::ScnObj::CalcWorldMtx(const math::MTX34* pParent, u32* pParam)
 void nw4r::g3d::ScnObj::CalcViewMtx(const math::MTX34* pCamera)
 {
     mtx34_concat(&mMtxArray[MTX_VIEW], pCamera, &mMtxArray[MTX_WORLD]);
+}
+
+/* 0x80081260 (0x158): constructs the object: identity matrices, empty boxes, the default draw priorities and no
+ * callback. */
+nw4r::g3d::ScnObj::ScnObj(MEMAllocator* pHeap) : G3dObj(pHeap, NULL)
+{
+    math::MTX34* pMtx = mMtxArray;
+    do {
+        MTX34_ctor(pMtx);
+        pMtx++;
+    } while (pMtx < (math::MTX34*)mAABB);
+    math::AABB* pBox = mAABB;
+    do {
+        AABB_ctor(pBox);
+        pBox++;
+    } while (pBox < (math::AABB*)&mScnObjFlags);
+
+    mScnObjFlags = 0;
+    mPriorityDrawOpa = 128;
+    mPriorityDrawXlu = 128;
+    pad_0xD2 = 0;
+    pad_0xD3 = 0;
+    mpFnCallback = NULL;
+    mCallbackTiming = 0;
+    mCallbackDeleteOption = 0;
+    mCallbackExecOpMask = 0;
+    SetScnObjFlag(SCNOBJFLAG_MTX_LOCAL_IDENTITY, true);
+    mtx34_identity(&mMtxArray[MTX_LOCAL]);
+    mtx34_identity(&mMtxArray[MTX_WORLD]);
+    mtx34_identity(&mMtxArray[MTX_VIEW]);
+
+    math::VEC3 zero0;
+    math::VEC3 zero1;
+    math::VEC3 zero2;
+    math::VEC3 zero3;
+    copyVec3(&mAABB[BOUNDINGVOLUME_AABB_LOCAL].min, setVec3(&zero0, 0.0f, 0.0f, 0.0f));
+    copyVec3(&mAABB[BOUNDINGVOLUME_AABB_LOCAL].max, setVec3(&zero1, 0.0f, 0.0f, 0.0f));
+    copyVec3(&mAABB[BOUNDINGVOLUME_AABB_WORLD].min, setVec3(&zero2, 0.0f, 0.0f, 0.0f));
+    copyVec3(&mAABB[BOUNDINGVOLUME_AABB_WORLD].max, setVec3(&zero3, 0.0f, 0.0f, 0.0f));
 }
 
 /* 0x800813B8 (0xC4): asserts the object is detached and deletes an owned callback. */

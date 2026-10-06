@@ -8,8 +8,20 @@
  *   unit's ScnObj vtable and reads the `.sdata2` word 0x80795E60, which is its claim).
  * NAMES. Map stems.  The pool's asserts name the members: `ScnMdlSimple::SetAnmObj` ("does not 'Bind' AnmObjChr
  *   now"), `mpAnmObjChr`, `mpAnmObjVis`, `mpAnmObjMatClr`, `mpAnmObjTexPat`, `mpAnmObjTexSrt`, `mdl.IsValid()`.
- * RESIDUALS. 46 functions unwritten (objdiff scores them zero): the whole range, 0x8007F0E4-0x80081188.
+ *   AABB_ctor (0x80080F44) is a GUESS in the `MTX34_ctor`/`VEC3_ctor` scheme: it runs the two corner records'
+ *   constructors, the element constructor of ScnObj's bounding-box array.
+ * RESIDUALS. 45 functions unwritten (objdiff scores them zero): 0x8007F0E4-0x80080F44 and 0x80080F7C-0x80081188.
  *   flipcheck: `.data` and `.sdata` are claimed and not emitted.
  */
 
 #include "types.h"
+#include "g3d/g3d_scnmdlsmpl.h" /* this unit's own declarations (rule 1) */
+#include "mh3_pad.h"            /* VEC3_ctor (rule 2) */
+
+/* 0x80080F44 (0x38): constructs the box's two corner records. */
+extern "C" nw4r::math::AABB* AABB_ctor(nw4r::math::AABB* pBox)
+{
+    VEC3_ctor(&pBox->min);
+    VEC3_ctor(&pBox->max);
+    return pBox;
+}
