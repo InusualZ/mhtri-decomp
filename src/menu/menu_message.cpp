@@ -48,7 +48,7 @@
 #include "ef/fn_800CDB2C.h"
 #include "menu/menu_message.h"
 #include "menu/menu_item.h"
-#include "g3d/g3d_anmchr.h"
+#include "font/flfnt.h"
 #include "fn_80047398.h"
 #include "hud/layout.h"
 #include "menu/get_pop_dat_ptr.h"

@@ -67,7 +67,7 @@
 #include "Network/NetworkSessionManager.h"   /* NetworkSessionManagerPat - the class the band dispatches through */
 #include "Runtime.PPCEABI.H/memset.h"            /* memset, owner Runtime.PPCEABI.H/memset.c (rule 2) */
 #include "unsplit/Runtime.PPCEABI.H.h"           /* strcpy - unowned MSL helper (rule 2's unsplit gap) */
-#include "g3d/g3d_anmchr.h"                      /* flfntStrLen, owner g3d/g3d_anmchr.cpp (rule 2) */
+#include "font/flfnt.h"                           /* flfntStrLen, owner font/flfnt.cpp (rule 2) */
 #include "enemy/em020_ai.h"
 #include "enemy/em_pop.h"                          /* matchesFileVersion, owner enemy/em_pop.cpp (rule 2) */
 #include "fn_80047398.h"                          /* decodePlayerCard, owner fn_80047398.cpp (rule 2) */
@@ -112,7 +112,7 @@
 #include "enemy/em020_prog.h"   /* net_layer_error_message */
 #include "sound/snd_stream_reloc.h"   /* pushReverbSamples, advanceReverbClock */
 #include "main.h"                      /* get_ScreenSize, check_change_widemode_flag */
-#include "g3d/g3d_anmchr.h"            /* flfntGetPosX - owner g3d/g3d_anmchr.cpp */
+#include "font/flfnt.h"                 /* flfntGetPosX - owner font/flfnt.cpp */
 
 
 

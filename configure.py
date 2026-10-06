@@ -1120,6 +1120,7 @@ config.libs = [
         "host": False,
         "objects": [
             Object(Matching, "g3d/g3d_anmscn.cpp"),
+            Object(NonMatching, "font/flfnt.cpp"),
             Object(NonMatching, "g3d/g3d_anmchr.cpp"),
             Object(NonMatching, "g3d/fn_800680CC.cpp"),
             Object(NonMatching, "g3d/g3d_calcmaterial.cpp"),
@@ -1409,6 +1410,7 @@ config.libs = [
             Object(NonMatching, "RVLGX/GXTexture_tail.cpp"),
             Object(NonMatching, "SC/sc.cpp"),
             Object(NonMatching, "WPAD/wpad.cpp"),
+            Object(NonMatching, "nw4r/db_assert.cpp"),
             Object(NonMatching, "nw4r/math_arithmetic.cpp"),
             Object(NonMatching, "nw4r/math_triangular.cpp"),
             Object(NonMatching, "nw4r/fn_805012C4.cpp"),

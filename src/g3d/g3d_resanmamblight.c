@@ -15,12 +15,10 @@
 
 #include "types.h"
 #include "nw4r/g3d/res_common.h"
+#include "nw4r/db_assert.h" /* nw4r::db::Panic, owner nw4r/db_assert.cpp (rule 2) */
 
 #pragma peephole off
 #pragma fp_contract off
-
-/* nw4r::db::Panic(const char*, int, const char*, ...) */
-extern void Panic__Q24nw4r2dbFPCciPCce(const char *file, int line, const char *msg, ...);
 
 /* The C++ helper `fn_80066C8C` (owner `g3d/fn_80063888.cpp`), spelled with its mangling because this unit is C. */
 extern u32 *fn_80066C8C__FPv(void *obj);

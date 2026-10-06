@@ -992,9 +992,9 @@ void setErrorCode(s8 code);
 
 /* Mangled callees are declared with their real signatures, never with the map's mangling
  * (docs/plan.md 6.5 rule 9): the C++ front-end emits the map's name itself.  `sysSE_req` (`__Fl`) has
- * no registered owner; `flfntStrLen` (`__FPc`, 0x8005B874) is owned by `g3d/g3d_anmchr.cpp`, so it is
- * declared in that unit's header (`g3d/g3d_anmchr.h`) and included where it is called (rule 2) -
- * `g3d/g3d_anmchr.h` and this header declare no other symbol in common, so a TU may include both. */
+ * no registered owner; `flfntStrLen` (`__FPc`, 0x8005B874) is owned by `font/flfnt.cpp`, so it is
+ * declared in that unit's header (`font/flfnt.h`) and included where it is called (rule 2) -
+ * `font/flfnt.h` and this header declare no other symbol in common, so a TU may include both. */
 
 /* The band's C++-linkage helpers (their map names are the compiler's manglings). */
 s32 getUtf8CharLength(u8* bytes);

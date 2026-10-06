@@ -136,15 +136,24 @@ g3d/fn_8005AA28.cpp:
 	.sdata      start:0x80791124 end:0x80791130
 	.sdata2     start:0x80795CF0 end:0x80795CF8
 
-g3d/g3d_anmchr.cpp:
-	extab       start:0x80007328 end:0x800076C4
-	extabindex  start:0x8001F62C end:0x8001FB00
-	.text       start:0x8005ABD8 end:0x80063888
-	.data       start:0x8058B388 end:0x8058C118
-	.bss        start:0x8066AE60 end:0x80682E80
-	.sdata      start:0x80791130 end:0x80791158
+font/flfnt.cpp:
+	extab       start:0x80007328 end:0x800073C8
+	extabindex  start:0x8001F62C end:0x8001F71C
+	.text       start:0x8005ABD8 end:0x8005CED0
+	.data       start:0x8058B388 end:0x8058B410
+	.bss        start:0x8066AE60 end:0x8066AE80
+	.sdata      start:0x80791130 end:0x80791138
 	.sbss       start:0x807948D8 end:0x807948E8
-	.sdata2     start:0x80795CF8 end:0x80795D68
+	.sdata2     start:0x80795CF8 end:0x80795D48
+
+g3d/g3d_anmchr.cpp:
+	extab       start:0x800073C8 end:0x800076C4
+	extabindex  start:0x8001F71C end:0x8001FB00
+	.text       start:0x8005CED0 end:0x80063888
+	.data       start:0x8058B410 end:0x8058C118
+	.bss        start:0x8066AE80 end:0x80682E80
+	.sdata      start:0x80791138 end:0x80791158
+	.sdata2     start:0x80795D48 end:0x80795D68
 
 g3d/fn_80063888.cpp:
 	extab       start:0x800076C4 end:0x80007B14
@@ -2453,17 +2462,25 @@ SC/sc.cpp:
 	.sdata2     start:0x8079D330 end:0x8079D3C0
 
 WPAD/wpad.cpp:
-	.text       start:0x804E45B0 end:0x80500E10
+	.text       start:0x804E45B0 end:0x80500868
 	.rodata     start:0x80573C40 end:0x80573CD8
-	.data       start:0x8062AB68 end:0x8062F9C0
-	.bss        start:0x8075B110 end:0x80760C78
-	.sdata      start:0x80794148 end:0x807941E8
-	.sbss       start:0x807955C8 end:0x80795768
-	.sdata2     start:0x8079D3C0 end:0x8079D494
+	.data       start:0x8062AB68 end:0x8062F030
+	.bss        start:0x8075B110 end:0x80760C48
+	.sdata      start:0x80794148 end:0x807941E0
+	.sbss       start:0x807955C8 end:0x80795758
+	.sdata2     start:0x8079D3C0 end:0x8079D480
+
+nw4r/db_assert.cpp:
+	.text       start:0x80500868 end:0x80500CF8
+	.data       start:0x8062F030 end:0x8062F0B0
+	.bss        start:0x80760C48 end:0x80760C78
+	.sdata      start:0x807941E0 end:0x807941E8
+	.sbss       start:0x80795758 end:0x80795768
 
 nw4r/math_arithmetic.cpp:
-	.text       start:0x80500E10 end:0x80500E34
-	.sdata2     start:0x8079D494 end:0x8079D4A0
+	.text       start:0x80500CF8 end:0x80500E34
+	.data       start:0x8062F0B0 end:0x8062F9C0
+	.sdata2     start:0x8079D480 end:0x8079D4A0
 
 nw4r/math_triangular.cpp:
 	.text       start:0x80500E34 end:0x805012C4

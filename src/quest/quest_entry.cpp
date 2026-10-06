@@ -276,7 +276,7 @@
 #include "Runtime.PPCEABI.H/memcpy.h"  /* memcpy (owner: the Runtime.PPCEABI.H lib) */
 #include "types.h"
 #include "quest/quest_list_values.h"     /* `quest_list_values` - owned by quest/quest_entry.cpp (rule 2) */
-#include "g3d/g3d_anmchr.h"               /* msg_str_gen / flfntStrLen / flKnjMsgNumPtr (rule 2) */
+#include "font/flfnt.h"                    /* msg_str_gen / flfntStrLen / flKnjMsgNumPtr (rule 2) */
 #include "Pl/fn_80273B14.h"               /* `Pl_item_id_usable_ck`, the id-usable predicate (rule 2) */
 
 /* The band's quest-work pointer in this unit's own view of the record.  `quest_work_ptr` itself is

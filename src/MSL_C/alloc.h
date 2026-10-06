@@ -3,7 +3,7 @@
  * conversion helpers the SDK links instead of a `stdlib` (`-nosyspath` leaves the prototypes to the unit that calls them).
  * Moved here from `unsplit/Runtime.PPCEABI.H.h` when the phase 4 split registered the unit; that band header
  * includes this one.  Other units that still declare them locally (`src/g3d/g3d_resanmtexsrt.cpp`,
- * `src/homebutton/keyboard_ui.cpp`, `src/light/light.cpp`, `src/g3d/g3d_anmchr.cpp`) can adopt it when next touched.
+ * `src/homebutton/keyboard_ui.cpp`, `src/light/light.cpp`, `src/font/flfnt.cpp`) can adopt it when next touched.
  */
 #ifndef MHTRI_MSL_C_ALLOC_H
 #define MHTRI_MSL_C_ALLOC_H
