@@ -14,7 +14,8 @@
  *   GUESS (the frame-header field each reads): networkPacket_getSequenceA, networkPacket_getSequenceB,
  *   GUESS: networkPacket_getSourceNonce, networkPacket_getSessionNonce, networkPacket_getFlag10, networkPacket_getChannel,
  *   GUESS: networkPacket_getFlag04, networkPacket_isHandshake, networkStreamQueue_putNextPacket,
- *   GUESS: networkStreamQueue_acknowledge.
+ *   GUESS: networkStreamQueue_acknowledge, networkStreamWriter_size (the queue's sequence number; the runtime dump's
+ *   `J3DShapeMtxMulti::getUseMtxNum` there is a folded one-load body).
  * RESIDUALS. `networkPacket_getMessageSize`: retail returns a u16, but `Network/NetworkSessionStable.cpp`'s `send` is
  *   worse with a u16 declaration, so the header keeps u32 and the callers here cast.  `networkPacket_copyMessage`: the
  *   same u16 return and operand order in two address sums.  The `networkPacket_*` rows `beginMessage`, `getHeaderSize`,
@@ -954,7 +955,7 @@ void networkStreamQueue_setSequence(NetworkStreamQueue* self, u16 sequence)
 
 /* The sequence number the queue expects next. */
 /* untyped: opaque handle passed through - the session hands the queue it holds */
-u32 networkStreamWriter_size(const void* sub)
+u16 networkStreamWriter_size(const void* sub)
 {
     return ((const NetworkStreamQueue*)sub)->sequence_10;
 }

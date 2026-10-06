@@ -12,7 +12,12 @@
  *   `execControlOne`, `setNetworkConnectionEvent`, `downPerformance`, `upPerformance`, `moveOutOfBand`) or GUESSes read
  *   off the body, each marked in `Network/NetworkSessionStable.h`; the writer-band callees are GUESSes in
  *   `unsplit/NetworkStream.h`.
- * RESIDUALS. `.text` 0x521C against the claim's 0x522C; `extab`/`extabindex` differ in the rows whose sizes differ;
+ * RESIDUALS. `post`: one callee-saved register fewer (`_savegpr_27`/`_restgpr_27` against retail's
+ *   `_savegpr_26`/`_restgpr_26`); `downPerformance`, `upPerformance`, `moveOutOfBand`: the log strings retail names
+ *   (`NetworkSessionStable_downPerformancePackMessage`, `NetworkSessionStable_downPerformanceByteMessage`,
+ *   `NetworkSessionStable_upPerformancePackMessage`, `NetworkSessionStable_upPerformanceByteMessage`,
+ *   `NetworkSessionStable_moveOutOfBandMessage`) are this object's anonymous literals.
+ *   `.text` 0x521C against the claim's 0x522C; `extab`/`extabindex` differ in the rows whose sizes differ;
  *   the object emits 16 B of `.sdata2` int-to-float constants retail loads from `Network/network_shared_data.cpp`
  *   (playbook 58: not their sole referencer, so unclaimable).  Rows:
  *  - `move`, `init`, `send`, `set`, `execControlOne`: register allocation and frame size; `move` also destroys the
@@ -24,8 +29,7 @@
  *    the `0 <= channel < 1` test folds into one `bne` (spelling every access `slots_14828[index].` folds the 0x4D40
  *    displacement but emits `lwzx`/`stwx`, worse);
  *  - `writeOp11` and the other `writeOp*` writers: the arguments are masked one instruction earlier than retail;
- *  - `leave`/`put`/`moveOutOfBand`: `ownIndex_14826` loads into r0 before the `extsb` (an `s8` field fixes them and
- *    costs `getOwnIndex` more); `getUsableSlot` is the mirror image on `relayIndex_10`; `sendStream` swaps r26/r29;
+ *  - `sendStream` swaps r26/r29;
  *    `moveOutOfBand` keeps one more saved register (frame 0x50 against 0x40);
  *  - `upPerformance`: retail reloads `networkRateFloor` (the `.sdata` word) for the clamp, ours reuses the register;
  *  - `downPerformance`, `setNetworkConnectionEvent`: not characterised one by one (the objdiff rows);
@@ -377,10 +381,10 @@ void NetworkSessionStable::move()
                 }
                 slot->closeState_08 = 3;
             case 3:
-                if ((s8)ownIndex_14826 == index) {
+                if (ownIndex_14826 == index) {
                     writeOp7();
                     for (j = 0; j < 4; j++) {
-                        if ((s8)ownIndex_14826 != j && slots_14828[j].connection_2C != 0) {
+                        if (ownIndex_14826 != j && slots_14828[j].connection_2C != 0) {
                             setError(j, NETWORK_ERROR_CONNECT_FAILED, 0, 0x80000000, 3);
                         }
                     }
@@ -419,7 +423,7 @@ void NetworkSessionStable::move()
             break;
         case 4:
             connection->end();
-            if (index == (s8)ownIndex_14826) {
+            if (index == ownIndex_14826) {
                 slot->linkState_00 = 1;
             } else {
                 peers = 0;
@@ -454,7 +458,7 @@ void NetworkSessionStable::move()
         }
         switch (slot->sessionState_04) {
         case 1:
-            if (index == (s8)ownIndex_14826) {
+            if (index == ownIndex_14826) {
                 slot->sessionState_04 = 0;
             } else {
                 getNetworkLogger()->signal_0C(3, "NetworkSessionStable::move: [%d] relay connect init.\n", index);
@@ -481,14 +485,14 @@ void NetworkSessionStable::move()
                         if (joined_16D00 == 0) {
                             getNetworkLogger()->signal_0C(3, "NetworkSessionStable::move: [%d] cannot establish, but drop sync disable. -> 0x%08x\n",
                                                           index, slot->nonce_50);
-                            setError((s8)ownIndex_14826, NETWORK_ERROR_CONNECT_TIMEOUT, slot->retryCount_FC, 0x80000000, 3);
+                            setError(ownIndex_14826, NETWORK_ERROR_CONNECT_TIMEOUT, slot->retryCount_FC, 0x80000000, 3);
                         } else if (networkSessionNonce_isValid(slot->nonce_50) != 0) {
                             getNetworkLogger()->signal_0C(3, "NetworkSessionStable::move: [%d] cannot establish. kick now. -> 0x%08x\n",
                                                           index, slot->nonce_50);
                             setError(index, NETWORK_ERROR_PEER_CLOSED, 0, 0x80000000, 1);
-                        } else if (isHost_0C == 0 && (s8)ownIndex_14826 == hostIndex_14824) {
+                        } else if (isHost_0C == 0 && ownIndex_14826 == hostIndex_14824) {
                             getNetworkLogger()->signal_0C(3, "NetworkSessionStable::move: [%d] cannot establish, first connect failed.\n", index);
-                            setError((s8)ownIndex_14826, NETWORK_ERROR_CONNECT_TIMEOUT, slot->retryCount_FC, 0x80000000, 3);
+                            setError(ownIndex_14826, NETWORK_ERROR_CONNECT_TIMEOUT, slot->retryCount_FC, 0x80000000, 3);
                         }
                     } else {
                         writeOp10(index);
@@ -506,7 +510,7 @@ void NetworkSessionStable::move()
                 slot->sessionState_04 = 1;
             } else if (slot->relayAck_1B != 0) {
                 getNetworkLogger()->signal_0C(3, "NetworkSessionStable::move: relay establish. [%d] -> [%d] -> [%d]\n",
-                                              (s8)ownIndex_14826, slot->relayIndex_10, index);
+                                              ownIndex_14826, slot->relayIndex_10, index);
                 slot->sessionState_04 = 4;
             } else if (networkRateMax + slot->retryTime_F8 <= time_16CDC) {
                 slot->retryTime_F8 = time_16CDC;
@@ -639,7 +643,7 @@ void NetworkSessionStable::move()
     }
     if (connectedCount > 2) {
         if (connectedCount - 1 <= hostsOver) {
-            setError((s8)ownIndex_14826, NETWORK_ERROR_SESSION_TIMEOUT, 0, 0x80000000, 3);
+            setError(ownIndex_14826, NETWORK_ERROR_SESSION_TIMEOUT, 0, 0x80000000, 3);
         } else if (connectedCount - 1 <= hostsWarn) {
             for (j = 0; j < 4; j++) {
                 if (slots_14828[j].connection_2C != NULL) {
@@ -652,20 +656,20 @@ void NetworkSessionStable::move()
         if (subhostsOver >= 1) {
             if (connectedCount / 2 <= subhostsWarn) {
                 for (j = 0; j < 4; j++) {
-                    if (isConnected(j) != 0 && j != (s8)ownIndex_14826) {
+                    if (isConnected(j) != 0 && j != ownIndex_14826) {
                         downPerformance(j);
                     }
                 }
             } else {
                 for (j = 0; j < 4; j++) {
-                    if (isConnected(j) != 0 && j != (s8)ownIndex_14826 && sizes[j] >= maxSubhosts_16CEC) {
+                    if (isConnected(j) != 0 && j != ownIndex_14826 && sizes[j] >= maxSubhosts_16CEC) {
                         downPerformance(j);
                     }
                 }
             }
         } else if (subhostsWarn == 0) {
             for (j = 0; j < 4; j++) {
-                if (isConnected(j) != 0 && j != (s8)ownIndex_14826) {
+                if (isConnected(j) != 0 && j != ownIndex_14826) {
                     upPerformance(j);
                 }
             }
@@ -673,7 +677,7 @@ void NetworkSessionStable::move()
     }
     if (getUsableSlot(hostIndex_14824) >= 0) {
         if (networkSessionZero == hostSeen_16CE0) {
-            getNetworkLogger()->signal_0C(3, "NetworkSessionStable::move: [%d] host[%d] exist.\n", (s8)ownIndex_14826, hostIndex_14824);
+            getNetworkLogger()->signal_0C(3, "NetworkSessionStable::move: [%d] host[%d] exist.\n", ownIndex_14826, hostIndex_14824);
         }
         hostSeen_16CE0 = time_16CDC;
     }
@@ -684,12 +688,12 @@ void NetworkSessionStable::move()
             timeout = (f32)(maxHosts_16CE8 + 6);
         }
         if (timeout <= time_16CDC - hostSeen_16CE0) {
-            setError((s8)ownIndex_14826, NETWORK_ERROR_HOST_TIMEOUT, (s32)timeout, 0x80000000, 3);
+            setError(ownIndex_14826, NETWORK_ERROR_HOST_TIMEOUT, (s32)timeout, 0x80000000, 3);
         }
     }
     if (getUsableSlot(subhostIndex_14825) >= 0) {
         if (networkSessionZero == subhostSeen_16CE4) {
-            getNetworkLogger()->signal_0C(3, "NetworkSessionStable::move: [%d] subhost[%d] exist.\n", (s8)ownIndex_14826, subhostIndex_14825);
+            getNetworkLogger()->signal_0C(3, "NetworkSessionStable::move: [%d] subhost[%d] exist.\n", ownIndex_14826, subhostIndex_14825);
         }
         subhostSeen_16CE4 = time_16CDC;
     }
@@ -700,7 +704,7 @@ void NetworkSessionStable::move()
             timeout = (f32)(maxHosts_16CE8 + 6);
         }
         if (timeout <= time_16CDC - subhostSeen_16CE4) {
-            setError((s8)ownIndex_14826, NETWORK_ERROR_HOST_TIMEOUT, (s32)timeout, 0x80000000, 3);
+            setError(ownIndex_14826, NETWORK_ERROR_HOST_TIMEOUT, (s32)timeout, 0x80000000, 3);
         }
     }
 }
@@ -735,8 +739,8 @@ s32 NetworkSessionStable::set(s32 isSelf, const u8* address)
     packet.attach(block, sizeof(block));
     ((NetworkByteStream*)&packet)->pullRecord((NetworkStreamSink*)&address_16CB8.object_00);
     ((NetworkByteStream*)&packet)->putU32(nonce_16CD8);
-    ((NetworkByteStream*)&packet)->putU16((u16)networkStreamWriter_size(&slots_14828[index].queues_54.send_00[0]));
-    ((NetworkByteStream*)&packet)->putU16((u16)networkStreamWriter_size(&slots_14828[index].queues_54.send_00[1]));
+    ((NetworkByteStream*)&packet)->putU16(networkStreamWriter_size(&slots_14828[index].queues_54.send_00[0]));
+    ((NetworkByteStream*)&packet)->putU16(networkStreamWriter_size(&slots_14828[index].queues_54.send_00[1]));
     memset(&info, 0, sizeof(info));
     info.data_00 = ((NetworkByteStream*)&packet)->getData();
     info.size_04 = ((NetworkByteStream*)&packet)->getSize();
@@ -864,7 +868,7 @@ void NetworkSessionStable::disconnectAll()
 /* Records the own slot as kicked. */
 void NetworkSessionStable::leave()
 {
-    setError((s8)ownIndex_14826, NETWORK_ERROR_SESSION_KICKED, 0, 0x80000000, 3);
+    setError(ownIndex_14826, NETWORK_ERROR_SESSION_KICKED, 0, 0x80000000, 3);
 }
 
 /* Records a slot as kicked. */
@@ -898,14 +902,14 @@ void NetworkSessionStable::put(const u8* data, s32 size, s32 channel, s32 count,
 
     room = 0x200 - (u16)networkPacket_getFrameOverhead();
     if (room - (u16)networkPacket_getMessageOverhead() < size) {
-        setError((s8)ownIndex_14826, NETWORK_ERROR_PUT_TOO_BIG, 0, 0x80000000, 3);
+        setError(ownIndex_14826, NETWORK_ERROR_PUT_TOO_BIG, 0, 0x80000000, 3);
         getNetworkLogger()->warn_10("NetworkSessionStable::put: data too big -> %d\n", size);
         return;
     }
     networkPacket_attach(&packet, sendBuffer_0D, 0x200);
     networkPacket_begin(&packet, 1);
     if (writeBytes(&packet, data, size) < 0) {
-        setError((s8)ownIndex_14826, NETWORK_ERROR_PUT_OVERFLOW, 0, 0x80000000, 3);
+        setError(ownIndex_14826, NETWORK_ERROR_PUT_OVERFLOW, 0, 0x80000000, 3);
         getNetworkLogger()->warn_10("NetworkSessionStable::put: data overflow -> %d\n", size);
         return;
     }
@@ -1027,8 +1031,8 @@ void NetworkSessionStable::setNetworkConnectionEvent(s32 event, s8 index, u32 ar
                     }
                     getNetworkLogger()->signal_0C(3, "NetworkSessionStable::setNetworkConnectionEvent: [%d] nonce:0x%08x sqntop:0x%04x sqnlow:0x%04x\n",
                                                   index, slot->nonce_50,
-                                                  (u16)networkStreamWriter_size(&slot->queues_54.receive_30[0]),
-                                                  (u16)networkStreamWriter_size(&slot->queues_54.receive_30[1]));
+                                                  networkStreamWriter_size(&slot->queues_54.receive_30[0]),
+                                                  networkStreamWriter_size(&slot->queues_54.receive_30[1]));
                     slot->authenticated_19 = 1;
                     if (slot->established_18 == 0) {
                         slot->established_18 = 1;
@@ -1055,8 +1059,8 @@ void NetworkSessionStable::setNetworkConnectionEvent(s32 event, s8 index, u32 ar
                                 markLeft(i);
                             }
                             getNetworkLogger()->signal_0C(3, "NetworkSessionStable::setNetworkConnectionEvent: [%d] oob sqn received. sqntop:0x%04x sqnlow:0x%04x\n",
-                                                          i, (u16)networkStreamWriter_size(&slot->queues_54.receive_30[0]),
-                                                          (u16)networkStreamWriter_size(&slot->queues_54.receive_30[1]));
+                                                          i, networkStreamWriter_size(&slot->queues_54.receive_30[0]),
+                                                          networkStreamWriter_size(&slot->queues_54.receive_30[1]));
                         } else if (slot->queues_54.receiveStarted_60 != 0) {
                             if (channel == 0) {
                                 result = putTopPacket(&slot->queues_54.receive_30[channel], &reader);
@@ -1187,7 +1191,7 @@ void NetworkSessionStable::setConnectionLimit(f32 seconds)
    result with `extsb`, which MWCC only emits for a callee declared wider than its own `s8`. */
 s32 NetworkSessionStable::getOwnIndex()
 {
-    return (s8)ownIndex_14826;
+    return (s8)(u8)ownIndex_14826;
 }
 
 /* Stores the host slot index. */
@@ -1378,7 +1382,7 @@ s32 NetworkSessionStable::send(s8 index, s32 channel, s32 force)
     s32 result;
     s32 sentTotal;
     s32 sent;
-    s32 total;
+    u32 total;
     s32 congestion;
     s8 usable;
     f32 rate;
@@ -1451,7 +1455,7 @@ s32 NetworkSessionStable::send(s8 index, s32 channel, s32 force)
         force = 0;
         networkStreamWriter_setMode(&writer, (u16)sent);
         networkStreamWriter_putU16(&writer, (u16)total);
-        networkStreamWriter_putU16b(&writer, (u16)networkStreamWriter_size(&slots_14828[index].queues_54.receive_30[channel]));
+        networkStreamWriter_putU16b(&writer, networkStreamWriter_size(&slots_14828[index].queues_54.receive_30[channel]));
         networkStreamWriter_putU32(&writer, nonce_16CD8);
         networkStreamWriter_putU32b(&writer, slots_14828[index].nonce_50);
         networkStreamWriter_enable1(&writer, 1);
@@ -1601,7 +1605,7 @@ s32 NetworkSessionStable::execControlOne(s8 index, NetworkStreamWriter* packet)
         break;
     case 5:
         getNetworkLogger()->signal_0C(3, "NetworkSessionStable::execControlOne:[%d] said i'm drop. sync_close me.\n", index);
-        setError((s8)ownIndex_14826, NETWORK_ERROR_SESSION_DROPPED, 0, 0x80000000, 3);
+        setError(ownIndex_14826, NETWORK_ERROR_SESSION_DROPPED, 0, 0x80000000, 3);
         break;
     case 6:
         break;
@@ -1663,7 +1667,7 @@ s32 NetworkSessionStable::execControlOne(s8 index, NetworkStreamWriter* packet)
             writeOp11(index, &address, 0, 0, networkSessionZero);
         } else {
             delay = networkSessionDefaultDelay;
-            if (found == (s8)ownIndex_14826) {
+            if (found == ownIndex_14826) {
                 type = 0;
             } else if (slots_14828[found].authenticated_19 != 0) {
                 type = 2;
@@ -1709,7 +1713,7 @@ s32 NetworkSessionStable::execControlOne(s8 index, NetworkStreamWriter* packet)
                         slots_14828[found].relayIndex_10 = index;
                         slots_14828[found].relayDelay_14 = (f32)delayMs / networkMillisecondsPerSecond;
                         getNetworkLogger()->signal_0C(3, "NetworkSessionStable::execControlOne: relay route (SELF)[%d](0x%08x) -> (RELAY)[%d](0x%08x) -> (FORWARD)[%d](0x%08x)\n",
-                                                      (s8)ownIndex_14826, nonce_16CD8, index, slot->nonce_50, found,
+                                                      ownIndex_14826, nonce_16CD8, index, slot->nonce_50, found,
                                                       slots_14828[found].nonce_50);
                     }
                 }
@@ -1749,7 +1753,7 @@ void NetworkSessionStable::sendStream(NetworkStreamWriter* stream, s32 channel, 
                     break;
                 }
                 if (value == -2) {
-                    if (index != (s8)ownIndex_14826) {
+                    if (index != ownIndex_14826) {
                         selected[index] = 1;
                         break;
                     }
@@ -2035,8 +2039,8 @@ void NetworkSessionStable::moveOutOfBand(s8 index)
     networkStreamWriter_putBytes(&stream, sendBuffer_0D, 0x400);
     networkStreamWriter_flush(&stream);
     networkStreamWriter_setMode(&stream, 0);
-    networkStreamWriter_putU16(&stream, (u16)networkStreamWriter_size(&slots_14828[index].queues_54.send_00[0]));
-    networkStreamWriter_putU16b(&stream, (u16)networkStreamWriter_size(&slots_14828[index].queues_54.send_00[1]));
+    networkStreamWriter_putU16(&stream, networkStreamWriter_size(&slots_14828[index].queues_54.send_00[0]));
+    networkStreamWriter_putU16b(&stream, networkStreamWriter_size(&slots_14828[index].queues_54.send_00[1]));
     networkStreamWriter_putU32(&stream, nonce_16CD8);
     networkStreamWriter_putU32b(&stream, slots_14828[index].nonce_50);
     networkStreamWriter_enable1(&stream, 1);
@@ -2046,10 +2050,10 @@ void NetworkSessionStable::moveOutOfBand(s8 index)
     networkStreamWriter_bytes(&stream);
     networkStreamWriter_attach(connection, &stream);
     networkStreamWriter_reserve(connection, 0, 0, 0);
-    size5C = networkStreamWriter_size(&slots_14828[index].queues_54.send_00[1]) & 0xFFFF;
-    size44 = networkStreamWriter_size(&slots_14828[index].queues_54.send_00[0]) & 0xFFFF;
+    size5C = networkStreamWriter_size(&slots_14828[index].queues_54.send_00[1]);
+    size44 = networkStreamWriter_size(&slots_14828[index].queues_54.send_00[0]);
     getNetworkLogger()->signal_0C(3, "NetworkSessionStable::move: oob sqn send. [%d] -> [%d] -> [%d] sqntop:0x%04x sqnlow:0x%04x\n",
-                                  (s8)ownIndex_14826, (u32)slotIndex, (u32)index, (u32)size44, (u32)size5C);
+                                  ownIndex_14826, (u32)slotIndex, (u32)index, (u32)size44, (u32)size5C);
 }
 
 /* Resolves the slot the session should transmit on: the slot itself, else the slot it is reached through. */
@@ -2067,7 +2071,7 @@ s8 NetworkSessionStable::getUsableSlot(s8 index)
     if (slots_14828[index].authenticated_19 != 0) {
         return index;
     }
-    viaIndex = slots_14828[index].relayIndex_10;
+    viaIndex = (s8)(u8)slots_14828[index].relayIndex_10;
     if (viaIndex < 0) {
         return -1;
     }
