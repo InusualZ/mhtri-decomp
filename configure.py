@@ -1132,10 +1132,10 @@ config.libs = [
             # neighbours (.text 0x80507C40..0x80509DB0, 15 functions / 8560 B).  Right edge is the
             # strong `.sdata` run-jump cut at 0x80509DB0 (`tudiscover.py at 0x80507C40`); the left
             # edge is the named symbol's own start.  Claims .text only.  See the file header.
-            # dwc_error / DWCi_Np_CPUCopyFast: cflags_base (-func_align 16, the retail 16-byte packing); docs/network.md.
+            # dwc_error / DWCi_Np_CPUCopyFast / dwc_nasfunc: cflags_base (-func_align 16, the retail 16-byte packing); docs/network.md.
             Object(NonMatching, "DWCi/dwc_error.cpp", cflags=cflags_base),
             Object(NonMatching, "DWCi/DWCi_Np_CPUCopyFast.c", cflags=cflags_base),
-            Object(NonMatching, "DWCi/dwc_nasfunc.cpp"),
+            Object(NonMatching, "DWCi/dwc_nasfunc.c", cflags=cflags_base),
             Object(NonMatching, "DWCi/fn_805113B0.c"),
             # The DWCi band tail (.text 0x80512490..0x805145B8, 17 functions / 8488 B).  The left
             # edge is the seam the recon resolved: `tudiscover.py at 0x80512490` pins `strong x2`
@@ -1203,6 +1203,11 @@ config.libs = [
             # names are documented in the two headers and in .pi/notes/net-nwc24.md.
             Object(NonMatching, "NWC24/nwc24_msg.c"),  # 0x8051D710-0x8051E068
             Object(NonMatching, "NWC24/nwc24_io.c"),   # 0x8051E068-0x8051E864
+            # SO/soi: same SDK build (0x4199_60831); GC/3.0a5.2 measured 19 better / 0 worse (docs/network.md).
+            Object(NonMatching, "SO/soi.cpp"),
+            # SSL/ssl and NCD/ncdsystem: same SDK build; GC/3.0a5.2 measured 5 / 5 better, 0 worse (docs/network.md).
+            Object(NonMatching, "SSL/ssl.cpp"),
+            Object(NonMatching, "NCD/ncdsystem.c"),
         ],
     },
     {
@@ -1276,9 +1281,6 @@ config.libs = [
             Object(NonMatching, "RVLGX/GXTexture_tail.cpp"),
             Object(NonMatching, "SC/sc.cpp"),
             Object(NonMatching, "WPAD/wpad.cpp"),
-            Object(NonMatching, "SSL/ssl.cpp"),
-            Object(NonMatching, "NCD/ncdsystem.c"),
-            Object(NonMatching, "SO/soi.cpp"),
             Object(NonMatching, "VF/vf.cpp"),
         ],
     },

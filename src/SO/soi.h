@@ -160,6 +160,40 @@ void SOFreeAddrInfo(SOAddrInfo* info);
  * (the SDK's INETATON ioctl), negative on failure. */
 s32 SOInetAtoN(const char* name, u8* out);
 
+/* The library's work record: the allocator pair, the start-up state (-2 down, -1 busy, 0 up), the IOS fd of
+ * `/dev/net/ip/top`, the 0x460-byte resolver buffer and the outstanding allocation count. size: 0x18 */
+typedef struct SOSysWork {
+    /* +0x00 */ SOAllocFunc alloc;
+    /* +0x04 */ SOFreeFunc free;
+    /* +0x08 */ s32 state;
+    /* +0x0C */ s32 fd;
+    /* +0x10 */ u8* hostBuffer;
+    /* +0x14 */ s32 allocCount;
+} SOSysWork;
+
+/* 0x8051EB38 - brings the interface up, giving up after `timeout` milliseconds (0: never). GUESS on the name. */
+s32 SOStartupEx(s32 timeout);
+/* 0x8051F144 */
+SOSysWork* SOiGetSysWork(void);
+/* 0x8051F150 */
+BOOL SOiIsBufferAddrCheck(void);
+/* 0x8051F158 */
+BOOL SOiIsInitialized(void);
+/* 0x8051F1A8 / 0x8051F290 - the registered allocator pair, counted. */
+void* SOiAlloc(u32 name, s32 size); /* untyped: caller-owned payload - an IPC buffer */
+void SOiFree(u32 name, void* p, s32 size); /* untyped: caller-owned payload - an IPC buffer */
+/* 0x8051F2C4 / 0x8051F3AC */
+s32 SOiPrepare(const char* function, s32* fd);
+s32 SOiConclude(const char* function, s32 result);
+/* 0x8051F408 / 0x8051F6E0 */
+s32 SOiPrepareTempRm(const char* function, s32* fd, s32* opened);
+s32 SOiConcludeTempRm(const char* function, s32 result, s32 opened);
+/* 0x8051F7C4 - waits until the interface has an address. GUESS on the name. */
+s32 SOiWaitForDHCPEx(u32 timeout);
+/* 0x80520670 / 0x80520928 */
+s32 RecvFrom(const char* function, s32 fd, u8* buffer, s32 length, s32 flags, SOSockAddrIn* from);
+s32 SendTo(const char* function, s32 fd, const u8* buffer, s32 length, s32 flags, const SOSockAddrIn* to);
+
 #ifdef __cplusplus
 }
 #endif

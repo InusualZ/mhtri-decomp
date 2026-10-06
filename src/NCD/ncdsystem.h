@@ -30,6 +30,16 @@ s32 NCDGetCurrentIpConfig(void* config);
  * result as "Network Error Code is %d"). */
 s32 NETGetStartupErrorCode(s32 result);
 
+/* 0x8051C7A4 - the network link state (-8 / 1 while it is still coming up, 2 when the cable is out, negative on
+ * failure). GUESS on the name: the SDK's NCD reader of that name, from SOStartupEx's wait on it. */
+s32 NCDGetLinkStatus(void);
+
+/* 0x8051D24C / 0x8051D60C - the NET library's memcpy / memset. */
+/* untyped: byte range */
+void* NETMemCpy(void* dst, const void* src, u32 size);
+/* untyped: byte range */
+void* NETMemSet(void* dst, s32 value, u32 size);
+
 #ifdef __cplusplus
 }
 #endif

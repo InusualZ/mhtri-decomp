@@ -18,23 +18,23 @@
  * LIBRARY.  `NHTTP` - the TU's own `__FILE__` string says NHTTP, and its callees are
  * `NHTTPi_lockReqList`/`0x80514EFC` (same library).
  *
- * SECTIONS.  `.text` only.
+ * SECTIONS.  `.text`, plus the `.data` assert strings and the `.sdata` halt message the comm-thread guard
+ *   emits as literals (`__FUNCTION__` first, then the format and the file name).
  *
  * FLAGS.  `cflags_nhttp`, as `NHTTP_bgnend.c`.
  *
- * BODY.  Nine of the ten functions are reconstructed.  Five are byte-identical; the unit is
- * 63.08668 % fuzzy over its 1892 B and the five open rows are:
+ * BODY.  All ten functions are reconstructed; six are byte-identical and the four open rows are:
  *
  *    100.00  NHTTPi_RecvBufCopy         (324/324)  the ring's read half
+ *    100.00  NHTTPi_CheckCurrentThread  (152/152)
  *    100.00  NHTTPi_SocRecvFromOffset   (32/32)
  *    100.00  NHTTPi_commThreadMain      (36/36)
  *    100.00  NHTTPi_isRecvBufFull       (28/28)
  *    100.00  NHTTPi_InitRequestInfo     (12/12)
- *     91.77  NHTTPi_RecvBufFindSpace   (248/244)
+ *     96.60  NHTTPi_RecvBufFindSpace   (248)
+ *     90.35  NHTTPi_RecvBufFindUpper   (496)
+ *     80.59  NHTTPi_RecvBufFindLine    (504)
  *     79.67  NHTTPi_SocRecvOffsetRange (60/56)
- *     77.94  NHTTPi_RecvBufFindLine    (504/428)
- *     61.45  NHTTPi_CheckCurrentThread (152/176)
- *      0.00  NHTTPi_RecvBufFindUpper   (496 B, unwritten)
  *
  * NAMING (rule 7).  The six `fn_` rows this pass renamed in the map, and what each name rests on:
  * `0x805150CC` -> `NHTTPi_RecvBufFindLine` and `0x805152C4` -> `NHTTPi_RecvBufFindSpace`, from the
@@ -42,10 +42,9 @@
  * `NHTTPi_RecvBufCopy`, the ring's read half; `0x8051570C` -> `NHTTPi_SocRecvFromOffset` and
  * `0x8051572C` -> `NHTTPi_SocRecvOffsetRange`, named for what they do to `NHTTPi_SocRecv`'s
  * arguments (the wrappers forward their own unchanged, which is what pins the register mapping
- * their declarations use); and `0x805153BC` -> `NHTTPi_RecvBufFindUpper`, a **GUESS** - the row is
- * still unwritten, so the name is the registration lane's, from the target's `li r28,65` /
- * `li r31,90` seed: the `'A'..'Z'` test that folds a character by 32 before the `cmpw`, i.e. a
- * case-insensitive compare of the ring stream against a caller string.
+ * their declarations use); and `0x805153BC` -> `NHTTPi_RecvBufFindUpper`, a **GUESS** from the
+ * `'A'..'Z'` test that folds both characters by 32 before the `cmpw`: a case-insensitive compare of
+ * the ring stream against a caller string.
  *
  * The ring's layout, read off these bodies: `+0x00` is the ring's total byte count, `+0x34` heads a
  * singly-linked list of blocks and `+0x38` is the first 1024 bytes of stream.  A ring offset below
@@ -66,7 +65,12 @@
  *     unrolls by 8 (`srwi. r0,r3,3; mtctr; 8x; bdnz; andi. r3,r3,7; mtctr; 1x; bdnz`).  A
  *     `for (i = 0; i < n; i++)` over a separate counter emits a signed guard instead and does not
  *     pair.
- *   - `NHTTPi_RecvBufFindSpace` declares `index` before `block` for the same register reason.
+ *   - `NHTTPi_RecvBufFindSpace` declares `index` before `block` for the same register reason;
+ *     `NHTTPi_RecvBufFindUpper` declares `block` first.
+ *   - The byte reader post-increments the offset inside each subscript (`data[(*index)++]`).
+ *   - `NHTTPi_RecvBufFindUpper` folds case with `((c >= 'A') & (c <= 'Z')) ? c + 32 : c` (the bitwise
+ *     `&` is what gives retail's carry-arithmetic booleans), compares `lower(c) == lower(*name)` as a
+ *     `while` condition (the rotated loop with its entry branch) and guards with the positive form.
  *   - Both walkers guard their range with the **positive** form, `if (start < end) { ...body... }
  *     return -1;`, not `if (start >= end) { return -1; } ...`: the negative form lays the `-1` out
  *     inline (`blt` over `li r3,-1` / `blr`) where retail's `bge` reaches a `-1` tail at the
@@ -74,7 +78,10 @@
  *     76.27 -> 77.94.
  *
  * Residuals:
- *   - `NHTTPi_RecvBufFindLine` (77.94) and `NHTTPi_RecvBufFindSpace` (91.77) share the byte reader:
+ *   - `NHTTPi_RecvBufFindUpper` (90.35): retail sign-extends the byte as it reads it and reloads the
+ *     index into the shared block arm (`li r9,0`, then the shared `data[index++]`), ours folds the
+ *     first block read to `li r9,1`; the remaining rows are register numbering.
+ *   - `NHTTPi_RecvBufFindLine` (80.59) and `NHTTPi_RecvBufFindSpace` (96.60) share the byte reader:
  *     retail *specialises* its first arm (its own `addi <index>,<index>,1` plus an `extsb`, then a
  *     branch to the shared `extsb`) where ours shares one tail; four spellings of the reader (`u8`
  *     value, `char` value and return, the `(char)` cast on the ring arm, post-increment in the
@@ -93,21 +100,11 @@
  *   - NHTTPi_SocRecvOffsetRange (79.67): retail re-loads `sock->length` after the range check
  *     (`lwz r0,0x1c(r10)` at the test, `lwz r9,0x1c(r10)` again in the body) where ours reuses the
  *     first load.  The check, the clamp and the `sock->base + offset` computation all pair.
- *   - NHTTPi_CheckCurrentThread (61.45): the comm-thread guard.  Retail's `offThread` is true on the
- *     arm that panics when the caller IS the comm thread; the folded single-condition form measures
- *     61.45 % against the if/else forms' 55.00 %, and no C spelling of the two branches reproduces
- *     retail's `cmpwi r30,0` / `bne` / `cmplw` chain exactly.  The call site's *addressing* is open
- *     too, and decidable: ours materialises the OSPanic message with `lis`/`addi` where retail has
- *     the target object's **one** `SDA21` reloc, `li r5,NHTTPi_haltMessage@sda21`.  Giving the
- *     declaration its size (`extern const char NHTTPi_haltMessage[6];` in
- *     `unsplit/NHTTP.h`) reproduces that reloc, drops the function from 176 B to 172 B, and
- *     pairs its tail exactly (rows 36-47) - but the row *measures down* to 58.39474, because the
- *     removed `lis`/`addi` pair leaves one more row for objdiff's row-count normalisation.  The
- *     absolute form is kept while the comm-thread guard above is open; the sized declaration is the
- *     lever to take with it.
  *   - `NHTTPi_SocRecv`'s body and its six-parameter signature belong to `d_nhttp.c` (still
  *     unwritten); the wrappers here forward their own arguments unchanged, which is what pins the
  *     register mapping the declaration uses.
+ * RESIDUALS. `NHTTPi_CheckCurrentThread`: retail relocates its strings against the map labels `NHTTPi_threadCheckMessages`
+ *   / `NHTTPi_haltMessage`, ours against the anonymous literals the source emits (same bytes, same offsets).
  */
 #include "types.h"
 #include "NHTTP/NHTTP_os_RVL.h"   /* this unit's own types (rule 1) */
@@ -123,20 +120,19 @@ static u8 NHTTPi_RecvBufNextByte(NHTTPRecvBuf* ring, NHTTPRecvBlock** block, s32
 
     if (*block == 0) {
         if (*index < 1024) {
-            value = ring->data[*index];
+            value = ring->data[(*index)++];
         } else {
             *block = ring->blocks;
             *index = 0;
-            value = (*block)->data[*index];
+            value = (*block)->data[(*index)++];
         }
     } else {
         if (*index == 512) {
             *index = 0;
             *block = (*block)->next;
         }
-        value = (*block)->data[*index];
+        value = (*block)->data[(*index)++];
     }
-    (*index)++;
     return value;
 }
 
@@ -294,6 +290,43 @@ s32 NHTTPi_RecvBufFindSpace(NHTTPRecvBuf* ring, s32 start, s32 end) {
     return -1;
 }
 
+/* Lower-cases an ASCII letter. */
+#define NHTTPI_TOLOWER(c) ((((c) >= 'A') & ((c) <= 'Z')) ? (c) + 32 : (c))
+
+/* 0x805153BC (0x1F0): compares the ring bytes from `start` against `name` without case; 0 when they agree up to
+ * the end of `name` (a NUL, a space or `terminator` also ending it) or up to `end`, -1 when they do not. */
+s32 NHTTPi_RecvBufFindUpper(NHTTPRecvBuf* ring, s32 start, s32 end, const char* name, char terminator) {
+    NHTTPRecvBlock* block;
+    s32 index;
+    s32 n;
+    char c;
+
+    if (start < end) {
+        if (start < 1024) {
+            index = start;
+            block = 0;
+        } else {
+            block = ring->blocks;
+            n = (start - 1024) >> 9;
+            while (n != 0) {
+                block = block->next;
+                n--;
+            }
+            index = (start - 1024) & 511;
+        }
+        c = (char)NHTTPi_RecvBufNextByte(ring, &block, &index);
+        while (NHTTPI_TOLOWER(c) == NHTTPI_TOLOWER(*name)) {
+            if (*name == '\0' || *name == ' ' || *name == terminator || start == end - 1) {
+                return 0;
+            }
+            c = (char)NHTTPi_RecvBufNextByte(ring, &block, &index);
+            start++;
+            name++;
+        }
+    }
+    return -1;
+}
+
 /* 0x8051570C (0x20): hand the raw receive the socket buffer that starts `offset` bytes into the
  * connection's receive area, with the length that is left from there. */
 s32 NHTTPi_SocRecvFromOffset(s32 handle, NHTTPConnection* conn, s32 flags, s32 offset, s32 arg) {
@@ -333,13 +366,13 @@ void NHTTPi_InitRequestInfo(NHTTPRequestInfo* info) {
  * it set the caller must NOT be the comm thread (`NHTTPi_CleanupAsync` passes 1), with it clear the
  * caller must be on it.  Either way the failure path is the TU's `%s:illegal thread` assert. */
 void NHTTPi_CheckCurrentThread(NHTTPThreadInfo* info, BOOL offThread) {
-    const char* messages = NHTTPi_threadCheckMessages;
     OSThread* current = OSGetCurrentThread();
+    OSThread* comm = &info->thread;
 
     if (current != 0) {
-        if (offThread ? (current == &info->thread) : (current != &info->thread)) {
-            OSReport(messages + 0x1C, messages);
-            OSPanic(messages + 0x30, 223, NHTTPi_haltMessage);
+        if ((!offThread && current != comm) || (offThread && current == comm)) {
+            OSReport("%s:illegal thread\n", __FUNCTION__);
+            OSPanic("NHTTP_os_RVL.c", 223, "halt\n");
         }
     }
 }

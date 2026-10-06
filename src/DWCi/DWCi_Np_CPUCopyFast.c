@@ -7,7 +7,7 @@
  * FLAGS. `cflags_base` (the retail functions start 16-byte aligned, `gap_*` words between them; the lib's
  *   `cflags_dwc` packs on 4); measurement in docs/network.md.
  * NAMES. `DWCi_Np_CPUCopyFast` is the map's; `DWCi_Auth_*` follow the SDK's own `DWCi_Auth_EndProcess` string
- *   (`dwc_nasfunc.cpp`'s `.data`); the rest are GUESSes from the bodies (`DWCi_authDataTask`, `DWCi_npStart`,
+ *   (`dwc_nasfunc.c`'s `.data`); the rest are GUESSes from the bodies (`DWCi_authDataTask`, `DWCi_npStart`,
  *   `DWCi_initRuntime`, `DWCi_npSetup`, the status accessors, the `.bss`/`.sbss` object names).
  * SHAPES. `DWCi_Np_CPUCopyFast` is a goto-free dispatch on the copy width (rule 8): the retail jumps share the
  *   `memcpy` tail and the three copy loops (93.82 with gotos, 91.11 without). Each POST field of
@@ -18,9 +18,14 @@
  *   `addi r3,r31,0`); `DWCi_authDataTask` 98.63 (retail keeps NULL in r30 for the response test and store);
  *   `DWCi_Auth_StartRequest` 99.65 (one `li r31,0` scheduled earlier); `DWCi_initRuntime` 99.96. Relocations
  *   name the section where retail names `DWCi_authDataPath`. Seam: the retail TU extends to 0x8050A710 -
- *   `DWCi_Auth_RequestCallback` (0x80509DB0, registered in `DWCi/dwc_nasfunc.cpp`) addresses the same string pool,
+ *   `DWCi_Auth_RequestCallback` (0x80509DB0, registered in `DWCi/dwc_nasfunc.c`) addresses the same string pool,
  *   and `.data` 0x806302C8..0x806307F0 holds the request and callback strings; the registration is not re-cut, so
  *   the object's `.data` runs past the claim. `.sdata` ends 1 byte short of the claim (the tail pad).
+ *   Relocation names that differ: ours forms `DWCi_npCopyFastTailTable`, `DWCi_npEmptyFriendCode`,
+ *   `DWCi_npEmptyPlayerName`, `DWCi_authDataStateTable` and `DWCi_urlSchemeSeparator` as pool offsets where retail
+ *   names them, and `DWCi_GetConsoleFriendCode` names `DWCi_consoleFriendCode` where retail names `lbl_807957DC`.
+ *   Flip blocker (row 36): 13 functions are force-active in retail `.comment` (`DWCi_acUrlTable`, `DWCi_prUrlTable`,
+ *   `DWCi_report*`, ...) and not in ours.
  */
 
 #include "types.h"

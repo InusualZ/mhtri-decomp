@@ -2547,7 +2547,7 @@ DWCi/DWCi_Np_CPUCopyFast.c:
 	.sdata      start:0x80794200 end:0x807942FC
 	.sbss       start:0x807957D0 end:0x807957F8
 
-DWCi/dwc_nasfunc.cpp:
+DWCi/dwc_nasfunc.c:
 	.text       start:0x80509DB0 end:0x805113B0
 	.data       start:0x806307F0 end:0x806308A8
 	.bss        start:0x807613B8 end:0x807614D8
