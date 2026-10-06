@@ -76,6 +76,7 @@
  *   flipcheck: `.sbss` claimed, not emitted.
  *   flipcheck: `.sdata` claimed, not emitted.
  *   flipcheck: `.sdata2` claimed, not emitted.
+ * NAMES. GUESS (from each body and its callers): get_FqResult_work
  */
 
 #include "types.h"
@@ -96,7 +97,7 @@ extern u8 lbl_8066A620[0x200];
 /* --- the unit's own functions, declared so each has one signature --------------------------------- */
 
 extern "C" void score_add_clamped(s32 delta, s32* value);
-extern "C" void* fn_8004D134(void);
+extern "C" void* get_FqResult_work(void);
 extern "C" void fn_8004D1A4(void);
 /* These four carry a C++ mangling in the map (`__Fv`/`__Fl`), so they are real C++ functions: the
  * compiler produces the map name from the plain spelling (rule 9 - the mangled form is never written). */
@@ -118,7 +119,7 @@ extern "C" void score_add_clamped(s32 delta, s32* value)
 }
 
 /* The 0x27C B FqResult buffer. */
-extern "C" void* fn_8004D134(void)
+extern "C" void* get_FqResult_work(void)
 {
     return lbl_80669F68;
 }

@@ -60,6 +60,7 @@
  *   flipcheck: `.sdata` claimed, not emitted.
  *   flipcheck: `.sdata2` claimed, not emitted.
  *   GUESS (from the body and its callers): `vec3_assign`.
+ * NAMES. GUESS (from each body and its callers): stage_map_set
  */
 
 #include "types.h"
@@ -345,7 +346,7 @@ extern "C" void fn_80040CA8(void)
 }
 
 /* Reload the language overlay (state byte 1) selected by `which`. */
-extern "C" void fn_80040DE8(u8 which)
+extern "C" void stage_map_set(u8 which)
 {
     u8 sel;
 

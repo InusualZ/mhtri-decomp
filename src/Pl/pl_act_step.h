@@ -29,6 +29,9 @@ extern "C" {
  * setting r3 and the three call sites drop the result. */
 void pl_act_clear_wait(struct _PLW* self, u8 a);
 
+/* 0x80246654 - places the local player at an area entry (GUESS name). */
+void pl_area_entry_set(nw4r::math::VEC3* pos, u16 angle, u8 map, u8 area);
+
 #ifdef __cplusplus
 }
 #endif

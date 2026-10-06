@@ -20,6 +20,7 @@
  *
  * Sections: the unit's block in config/RMHE08/splits.txt (.bss, .ctors, .data, .sdata, .sdata2, .text, extab,
  * extabindex).
+ * NAMES. GUESS (from each body and its callers): camera_work_init, camera_area_reset, stage_dcm_path_get
  */
 /* ---- header inherited from src/stage/fn_802B2AA0.cpp (written against its pre-phase-4 range) ---- */
 /*
@@ -461,7 +462,7 @@ extern "C" {
 
 /* Defined later in this file. */
 void fn_802BB870(u32 mode, u32 a, u32 b, u8 c);
-void fn_802B8B8C(void);
+void camera_area_reset(void);
 void fn_802BC4AC(u32 kind, u32 arg);
 void fn_802BB118(CamWork* self);
 void fn_802BBEE0(void);
@@ -556,7 +557,7 @@ extern "C" void fn_802B5640(StageAreaObj* area, u8 index)
 }
 
 /* Resets both per-area objects. */
-extern "C" void fn_802B56E0(void)
+extern "C" void camera_work_init(void)
 {
     u8 index;
 
@@ -1256,7 +1257,7 @@ void camera_shake_req(u8 kind)
 /*
  * Resets the three camera slot flags and the three state bytes the follow path uses.
  */
-void fn_802B8B8C(void)
+void camera_area_reset(void)
 {
     CamWork* self = (CamWork*)fn_802BECD0();
 
@@ -1278,7 +1279,7 @@ void fn_802BB0EC(void)
     CamWork* self = (CamWork*)fn_802BECD0();
 
     self->field_0x499 = 4;
-    fn_802B8B8C();
+    camera_area_reset();
 }
 
 /*
@@ -1414,7 +1415,7 @@ extern "C" void fn_802BEAAC(LightWork* self, u8 index)
 }
 
 /* Formats the per-map light file name into the caller's buffer. */
-extern "C" int fn_802BECB8(char* buffer, u8 mapno)
+extern "C" int stage_dcm_path_get(char* buffer, u8 mapno)
 {
     return sprintf(buffer, lbl_805D1EB8, mapno);
 }

@@ -2766,7 +2766,7 @@ void fn_8026099C(_PLW* self) {
         break;
     case 1:
         fn_8026F7B4();
-        if ((u8)fn_803C482C() == 0 && event_demo_ck() == 0) {
+        if ((u8)event_demo_running_ck() == 0 && event_demo_ck() == 0) {
             fn_8025F088(self);
         }
         break;

@@ -77,7 +77,6 @@ s32 fn_80331104(void);
  * 0x802FA9A0 / 0x802FAB98 / 0x802FAFB4 / 0x802FAFC4 group left this block when main landed
  * `lobby/fn_802FA9A0.cpp` (0x802FA9A0..0x8030121C, which owns all four) - they are declared in
  * `lobby/fn_802FA9A0.h` now (rule 2). */
-void fn_8033A920(u32 arg);
 /* 0x80463EE0 - a float-returning two-argument function: `ef/fn_80114E34.cpp` carries the
  * signature its own call sites set (`f32 fn_80463EE0(s16, f32)`), which is the one declared
  * here; the action band tail-calls it with its own parameters. */

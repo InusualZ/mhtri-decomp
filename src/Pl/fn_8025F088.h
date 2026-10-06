@@ -78,7 +78,7 @@ u32 pl_act_kind_get(struct _PLW* self);
 u32 fn_80050A40(f32 a, f32 b, f32 c, f32 d);
 u32 fn_800524C0(f32 a, void* b, void* c, void* d, void* e);
 u32 fn_800E0914(void* p);
-u32 fn_803C482C(void);
+u32 event_demo_running_ck(void);
 u32 se_slot_req(s32 value);
 u32 fn_8033112C(void* p);
 u32 fn_803BA9B0(void* p);

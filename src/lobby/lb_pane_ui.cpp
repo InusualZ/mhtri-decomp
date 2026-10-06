@@ -1896,14 +1896,14 @@ typedef struct LbChgFileReq {
  * ------------------------------------------------------------------------------------------------- */
 extern "C" {
 s32 score_add_clamped(s32 delta, s32* value);
-void fn_80040DE8(u8 mode);
+void stage_map_set(u8 mode);
 s32 res_file_assign(void* dst, void* src);
 void* res_file_ctor(void* out, u32 value);
 void fn_800D5CAC(void* rec);
 void fn_800E3358(u32 kind, u8 arg, void* str);
 void fn_800F6520(void);
-void fn_800F65B4(void);
-void fn_800F6710(void);
+void eft_control_init(void);
+void eft_common_load(void);
 void fn_801E92B0(void);
 void fn_801F3588(const void* table);
 s32 fn_801F36CC(const void* table, s16 a, s16 b);
@@ -1925,16 +1925,16 @@ void fn_801FC8F0(void);
 void fn_801FCA80(u32 index);
 void fn_801FCADC(u8* self, u32 index);
 void fn_8021D9F8(void);
-void fn_802A0568(void);
-void fn_802AD9CC(void);
-s32 fn_802AE5C0(u32 a, u8 b, u8 c);
-s32 fn_802AEEF8(u8 a, u8 b);
+void menu_item_work_init(void);
+void stage_work_init(void);
+s32 stage_area_load(u32 a, u8 b, u8 c);
+s32 stage_area_enter(u8 a, u8 b);
 void fn_802AFA40(void);
-s32 fn_802AFB48(u8 a, u8 b);
-void fn_802B2318(u8 mode);
-void fn_802B56E0(void);
+s32 stage_area_slot_get(u8 a, u8 b);
+void stage_map_obj_load(u8 mode);
+void camera_work_init(void);
 void fn_802BB0EC(void);
-void fn_802BECB8(char* buf, u8 index);
+void stage_dcm_path_get(char* buf, u8 index);
 void sprite_frame_apply(void* dst, u16 id, u8 flag, const _mh_ivec2_* src);
 void fn_8032422C(void);
 void fn_8035A9E4(void);
@@ -2065,13 +2065,13 @@ void fn_801FB2A8(u8 a, u8 b, u8 c)
     fn_800D5CAC((void*)lbl_8058AA98);
     fn_801FCA80(a);
     fn_800F6520();
-    fn_800F6710();
+    eft_common_load();
     if (isCityMode() == 0 || system_w.field_0x8b1 == 1) {
         village_tex_load();
     }
-    fn_80040DE8(b);
-    fn_802B2318(b);
-    fn_802AE5C0(0, b, c);
+    stage_map_set(b);
+    stage_map_obj_load(b);
+    stage_area_load(0, b, c);
 }
 
 /* 0x801FB364 - queue the model resources the editor needs: the `index + 1`-th row of the lobby
@@ -2110,11 +2110,11 @@ void fn_801FB364(u8 index)
 void fn_801FB438(void)
 {
     light_init();
-    fn_800F65B4();
-    fn_802AD9CC();
-    fn_802B56E0();
+    eft_control_init();
+    stage_work_init();
+    camera_work_init();
     fn_8021D9F8();
-    fn_802A0568();
+    menu_item_work_init();
     fn_8032422C();
     fn_8035A9E4();
     fn_803C3A70();
@@ -2130,10 +2130,10 @@ void fn_801FB478(void)
 
     i = 3;
     req = (LbChgFileReq*)stage_dcm_file_table + i;
-    dst = (void**)lbl_806BC1D0 + i;
+    dst = (void**)stage_dcm_buffer_tbl + i;
     for (; i <= 0xD; i++) {
         if (req != NULL && req->size_0x00 != 0 && *dst == NULL) {
-            fn_802BECB8(name, (u8)i);
+            stage_dcm_path_get(name, (u8)i);
             *dst = work_mem_alloc(req->size_0x00);
             load_file(name, (u32)*dst, (s32)req->size_0x00);
         }
@@ -2245,12 +2245,12 @@ s32 fn_801FB524(LbChgSeqWork* self)
     case 4:
         if (file_loading_ck(NULL, NULL) != 1) {
             fn_801FB364(0);
-            lobby_w.slots_0x00C[lobby_w.field_0x014] = (u32)(s8)fn_802AFB48(lobby_w.field_0x001, lobby_w.field_0x002);
+            lobby_w.slots_0x00C[lobby_w.field_0x014] = (u32)(s8)stage_area_slot_get(lobby_w.field_0x001, lobby_w.field_0x002);
             self->state_0x0B++;
         }
         break;
     case 6:
-        fn_802AEEF8(lobby_w.field_0x001, lobby_w.field_0x002);
+        stage_area_enter(lobby_w.field_0x001, lobby_w.field_0x002);
         fn_803C3F60();
         fn_801FC8F0();
         fn_802BB0EC();

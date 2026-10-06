@@ -293,7 +293,7 @@ extern const u16 lbl_805B8AAC[12];
 extern const u16 lbl_805B8AC4[6];
 extern const u16 lbl_805B8AD0[20];
 extern const char lbl_805B8CE0[16];
-extern u8 lbl_806BC1D0[200];
+extern u8 stage_dcm_buffer_tbl[200];
 extern const u16 lbl_80791CA4[4];
 extern const u16 lbl_80791D18[4];
 extern const u16 lbl_80791D20[4];

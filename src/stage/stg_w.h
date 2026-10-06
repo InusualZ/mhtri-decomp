@@ -98,4 +98,35 @@ extern u8 stage_w[]; /* the block itself, viewed as `StageMapView` by a cast (th
 }
 #endif
 
+/* Quest entry points and gates (GUESS names from the quest callers).  0x802AFC94 / 0x802AFE08: entry point
+ * `entry` of map `map` - its position (a static VEC3) and its angle; 0x802B20A4 / 0x802B47B0: the stage gates the
+ * special quest elements 2 and 3 wait on; 0x802B085C: the stage's own bonus pick for name index `name`. */
+#ifdef __cplusplus
+extern "C" {
+#endif
+nw4r::math::VEC3* stage_entry_pos_get(u8 map, u8 entry);
+u32 stage_entry_angle_get(u8 map, u8 entry);
+u32 stage_gate_a_ck(void);
+u32 stage_gate_b_ck(void);
+u8 stage_bonus_pick(u8 name);
+/* 0x802AD9CC .. 0x802B2318 - the stage work's reset, the area load and entry, the area slot (0, 1, -1), a cell
+ * word of the area grid, and the map's resource and object loads (GUESS names). */
+void stage_work_init(void);
+s32 stage_area_load(u32 mode, u8 map, u8 area);
+s32 stage_area_enter(u8 map, u8 area);
+s32 stage_area_slot_get(u8 map, u8 area);
+u32 stage_cell_get(u8 i, u8 j);
+/* The cell word `stage_cell_get` returns, read byte by byte by its callers (0xFA/0xFF/0xFF marks the gallery
+ * cell).  size: 0x4 */
+typedef union StageCell {
+    /* +0x0 */ u32 word;
+    /* +0x0 */ u8 bytes[4];
+} StageCell;
+void stage_map_res_load(u8 map);
+void stage_map_obj_load(u8 map);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_STAGE_STG_W_H */

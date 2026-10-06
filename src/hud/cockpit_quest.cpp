@@ -19,6 +19,7 @@
  *
  * Sections: the unit's block in config/RMHE08/splits.txt (.bss, .ctors, .data, .sdata, .sdata2, .text, extab,
  * extabindex).
+ * NAMES. GUESS (from each body and its callers): cockpit_quest_init
  */
 /* ---- header inherited from src/menu/fn_802E4978.cpp (written against its pre-phase-4 range) ---- */
 /*
@@ -366,7 +367,7 @@ extern u8 lbl_805D5BD8[];
 extern u8 lbl_805D5C68[];
 u32 fn_800AB658(u8, f32);
 void fn_802E4978(CockpitWork*, CockpitMove*);
-void fn_802E4AD4(void);
+void cockpit_quest_init(void);
 void fn_802E4B8C(void);
 void fn_802E4C24(void);
 void fn_802E5220(CockpitWork*);
@@ -453,7 +454,7 @@ void fn_802E4978(CockpitWork* self, CockpitMove* move) {
     }
 }
 
-void fn_802E4AD4(void) {
+void cockpit_quest_init(void) {
     CockpitMove* move;
     CockpitState* st;
     s8 idx;
@@ -760,7 +761,7 @@ void fn_802E5284(void) {
 
     m0 = (CockpitMove0*)::get_move_work_adrs(0);
     move = cockpit_work[0].move;
-    if (fn_80046F0C(&cockpit_work[0]) != 1) {
+    if (pad_hold_ck(&cockpit_work[0]) != 1) {
         cockpit_work[0].field_0x0D1 = 0;
         fn_802E4C24();
         fn_803839EC();

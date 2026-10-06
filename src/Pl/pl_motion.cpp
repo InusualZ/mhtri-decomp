@@ -9,6 +9,7 @@
  *   `pl_motion_set` loads the motion resources); `pl_motion_set` and `get_gm_daynight` are the map's names.  The root
  *   work `get_move_work_adrs(0)` hands back is `_PL_ROOT` (`Pl/fn_80288CEC.h`), the record `enemy/em_common.cpp`
  *   defines again as `_PLAYER_ROOT` (rule 1).
+ *   GUESS (from each body and its callers): quest_spawn_rec_find
  * RESIDUALS. 53 functions unwritten (objdiff scores them 0) in 6 runs: 0x80288E68-0x8028BCF4, 0x8028BD98-0x8028C570,
  *   0x8028C5B4-0x8028D574, 0x8028D5F4-0x8028DF24, 0x8028DF58-0x8028E4F0, 0x8028E528-0x8028EF30; most are jump-table
  *   state machines of 100-450 instructions, and `pl_motion_set` needs the local string-object shape.  4 partial,
@@ -67,15 +68,15 @@ extern "C" {
 
 
 
-void fn_800553B4(u8 idx);
+void draw_shape_stage_load(u8 idx);
 void fn_800D8E44(void* handle);
-void fn_800F6710(void);
+void eft_common_load(void);
 
 u32 fn_8027CB1C(void* self);
 u32 stage_map_kind_get(u8 idx);
 void fn_802BE568(void* self, u32 sub);
 u32 quest_arena_item_count_get(void);
-void fn_803BA814(u8 idx);
+void em_pop_res_load(u8 idx);
 
 }
 
@@ -199,10 +200,10 @@ void fn_8028D5B8(s32 value) {
 /* 0x8028C570 - the mode object's per-scene player data init. */
 void fn_8028C570(_PL_ROOT* self) {
     player_init_data_load();
-    fn_800F6710();
+    eft_common_load();
     quest_monsters_release();
-    fn_803BA814(self->area_no_0xED);
-    fn_800553B4(self->area_no_0xED);
+    em_pop_res_load(self->area_no_0xED);
+    draw_shape_stage_load(self->area_no_0xED);
 }
 
 /* 0x8028DF24 - arm the mode object's sequence: state 0 -> 1, then hand over. */
@@ -237,7 +238,7 @@ u8 Pl_area_flag_get(u8 index) {
 
 /* 0x8028EF7C - find the root entry whose key is `key`: the six fixed slots at +0x2274 first, then
  * the area record `quest_arena_item_count_get()` names, then the single extra pointer at +0x2258. */
-PlRootEntry* fn_8028EF7C(u32 key) {
+PlRootEntry* quest_spawn_rec_find(u32 key) {
     _PL_ROOT* root = (_PL_ROOT*)get_move_work_adrs(0);
     PlRootEntry* entry;
     u32 index;

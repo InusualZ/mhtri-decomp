@@ -79,7 +79,7 @@ struct ShellSetBlock {
     /* +0x58 */ ShellSetFn field_0x58;
 };
 
-/* The 0x20-byte ground record `fn_80125F54` prepares and `fn_801421E4` fills is `EmGroundRec`
+/* The 0x20-byte ground record `em_ground_rec_clear` prepares and `fn_801421E4` fills is `EmGroundRec`
  * (`enemy/ENEMY_WORK.h`); this unit passes its address and reads its `pos_0x08`. */
 
 /* 0x800CFA90 / 0x800CFAD0: the move-work record base and its count (`ef/system_core.cpp`), declared with the

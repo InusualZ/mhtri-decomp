@@ -118,7 +118,7 @@ void em_demo_rot_set(struct _ENEMY_WORK* self, f32 a, f32 b, f32 c);
 
 
 /* 0x801421E4 - r3 is narrowed with `clrlwi r3,r3,16` (a u16 id, 0xFFFF = the "no record" arm) and r4
- * is the out record `fn_80125F54` prepared; returns a word the enemy program functions compare with 1. */
+ * is the out record `em_ground_rec_clear` prepared; returns a word the enemy program functions compare with 1. */
 u32 fn_801421E4(u32 id, void* out);
 /* 0x80146008 - reads the record's motion timer and returns 1 once the elapsed frame count has passed the value in
  * r3 (the call sites pass 0x96/0x12C/...). */
@@ -156,5 +156,34 @@ struct _ENEMY_MINI_WORK;
 u32 em_get_unique_work(u16 id, struct _ENEMY_WORK** out, struct _ENEMY_MINI_WORK** mini);
 #endif
 
+
+/* The quest spawn entry points (GUESS names from the quest callers): the ground record from a monster slot's
+ * placement block (0x801423E0), the small and large spawns (0x80142BC0 / 0x80143654), the intruder spawn
+ * (0x80142CE8), the check before a key monster makes way (0x80146B1C) and the area spawn clear (0x80143B84). */
+struct EmGroundRec;
+struct Q_ElementBlock;
+struct QuestBossSpawn;
+#ifdef __cplusplus
+extern "C" {
+#endif
+void em_ground_rec_set(struct EmGroundRec* rec, const struct Q_ElementBlock* element);
+struct _ENEMY_WORK* em_small_spawn(u8 monster, struct EmGroundRec* rec, u16 order);
+struct QuestBossSpawn* em_large_spawn(u8 monster, struct EmGroundRec* rec, u16 order);
+void em_intruder_spawn(u8 monster, struct EmGroundRec* rec, u16 row);
+s32 em_kind_release_ck(u8 monster);
+void em_area_spawn_clear(void);
+/* 0x801465A0 - the enemy level the quest sets (GUESS name). */
+void em_level_set(s8 level);
+/* 0x801422FC - resets every enemy work and the effect slot pool (GUESS name). */
+void enemy_work_reset(void);
+/* 0x80142E1C / 0x80142EEC - spawn a free-hunt placement entry's monster with spawn order `order`: the small
+ * spawn returns the enemy, the large one goes through the large spawn (GUESS names). */
+struct EmSetEntry;
+struct _ENEMY_WORK* em_set_entry_spawn(struct EmSetEntry* entry, u16 order);
+s32 em_set_boss_spawn(struct EmSetEntry* entry, u16 order);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

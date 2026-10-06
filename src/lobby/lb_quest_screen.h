@@ -88,6 +88,11 @@ extern const u16* note_slot_table[4];
 
 extern const u16 note_slot_flat_table[];
 
+/* 0x803A86EC / 0x803A86F0 - start the area's enemies for the move work, and load the area's quest resources
+ * (GUESS names). */
+void quest_screen_enemy_start(struct Q_MoveWork* work);
+void quest_area_res_load(u8 map, u8 area);
+
 #ifdef __cplusplus
 }
 #endif

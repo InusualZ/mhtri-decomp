@@ -997,7 +997,8 @@ struct _PLW {
             /* +0x5A8 */ u8 pad_0x5A8[0x10];
         };
         struct {   /* the later names, padded to the same byte total */
-        /* +0x5A8 */ u8 pad_merge_0x5A8[0x4];
+        /* +0x5A8 */ u8 pad_merge_0x5A8[0x3];
+        /* +0x5AB */ u8 area_cell_0x5AB;   /* the cell row `stage_cell_get` reads for the player's spot */
                                 /* +0x5AC */ u8 field_0x5AC;
         /* +0x5AD */ u8 pad_merge_0x5AD[0xB];
         };

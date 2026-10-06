@@ -50,4 +50,15 @@ void* res_eft_UV_model_create(MHchar* model, u16 id, u32 arg, long mode, struct 
                               long count, u8 flag);
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x800F65B4 / 0x800F6710 - set the effect control's three pools up, and load the mode's common effect models
+ * (GUESS names). */
+void eft_control_init(void);
+void eft_common_load(void);
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_EF_EFT_RES_H */

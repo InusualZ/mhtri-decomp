@@ -378,4 +378,13 @@ void menu_slot_panel_draw(void);
 
 #endif /* MHTRI_MENU_MENU_ITEM_DECLARED */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* 0x802A0568 - clears the item box work (GUESS name). */
+void menu_item_work_init(void);
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* MHTRI_MENU_MENU_ITEM_H */

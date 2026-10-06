@@ -48,9 +48,9 @@ extern "C" {
 void item_pair_copy(void* p);
 s32 fn_8004B0A4(u16 id, void* out);
 s32 item_take(s16 a, void* b, s32 c, s32 d, s32 e);
-void* fn_8004D134(void);
+void* get_FqResult_work(void);
 s32 fn_8004D27C(s32 a);
-s32 fn_8004D334(s32 a);
+s32 userdata_zenny_add(s32 a);
 void uv_pair_copy(_mh_ivec2_* dst, const _mh_ivec2_* src);
 u16 fn_800CEF18(u16 id);
 u32 game_ready_ck(void);

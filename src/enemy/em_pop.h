@@ -144,11 +144,19 @@ s32 quest_arena_need_get(s32 index);
 /* 0x803B6998 - takes `points` off the quest work's score (+0x5D8, clamped at 0) and plays the penalty sound at
  * enemy `unique_id`'s position.  GUESS name. */
 void quest_score_deduct(u16 points, u16 unique_id);
+/* 0x803B5700 / 0x803B58B8 - step the special elements and the grade's team goals of the work block. */
+void quest_special_element_step(struct QuestWork* work);
+void quest_grade_goal_step(struct QuestWork* work);
+/* 0x803B6B14 / 0x803B6DEC - step the quest's supply drops; pick the quest's bonus byte. */
+void quest_supply_drop_step(void);
+u8 quest_bonus_pick(void);
 /* 0x803B7154 - the record's extra condition (`quest_ex_condition_tbl` entry +0x198): kinds 0/4 pass, 1 tests
  * `param` against the entry's range, 2 tests `arg` against its byte, 3 needs the board data's six counters at 0.
  * GUESS name. */
 struct LbQuestBoardData;
 u32 quest_ex_condition_ck(QuestRecord* rec, u16 param, u8 arg, struct LbQuestBoardData* data);
+/* 0x803B700C - the same test with the row's first kind, for the quest list (GUESS name). */
+u32 quest_ex_condition_show_ck(QuestRecord* rec, u16 param, u8 arg, struct LbQuestBoardData* data);
 
 /* Whether any of the item work's three elements is in its entry state: `quest_work_ptr` must be set,
  * the move work's own +0x22D4 state byte must not be 1, and one of the three element flag words at
@@ -168,7 +176,7 @@ u32 quest_arena_value_clear_ck(u16 id, u16 value);
 u32 quest_arena_key_clear(u8 key);
 u32 quest_element_progress_step(u16 kind, u8 mode, s8* first);
 /* 0x803B6AC4 / 0x803B6F2C / 0x803B6F90 - the +0x6AA4 run, and the key-row tests.  GUESS names. */
-u8* quest_field6AA4_get(void);
+struct Q_QuestStat* quest_stat_get(void);
 u32 quest_key_row_ck(u8 key);
 u32 quest_key20_flag_ck(u8 invert);
 
@@ -210,6 +218,31 @@ u8 quest_objective_get(QuestRecord* rec);
 /* 0x803B8650 - warps the local player to the start of stage 1 (the hub): the stage's start position and
  * facing go through `pl_warp_start` with the player's chunk offset.  GUESS name from that use. */
 void quest_warp_hub(void);
+
+/* The free-hunt monster set (0x803B744C..0x803B9384, `enemy/em_set_work.h`): the entry and work setup, the
+ * area set files, the rotation, the field setup and area entry, the kill tally and the stored result.  GUESS
+ * names from the bodies. */
+struct EmSetEntry;
+struct EmSetSaveRec;
+struct Q_MoveWork;
+void em_set_entry_rec_apply(struct EmSetEntry* entry, struct EmSetSaveRec* rec);
+void em_set_work_init(void);
+void em_set_live_count(void);
+void em_set_area_files_load(struct Q_MoveWork* work, s32 map);
+void em_set_entries_spawn(struct Q_MoveWork* work);
+void em_set_rotation_step(struct Q_MoveWork* work);
+void em_set_start(void);
+void em_set_field_setup(struct Q_MoveWork* work);
+void quest_clock_real_step(s32 mode);
+s32 em_set_move_start(struct Q_MoveWork* work);
+s32 em_set_area_enter(struct Q_MoveWork* work);
+void em_set_frame_step(struct Q_MoveWork* work);
+s32 em_set_reward_item_add(u16 item);
+void em_set_kill_record(struct _ENEMY_WORK* enemy, u8 mini);
+s32 em_set_userdata_flag_ck(void);
+void em_set_result_store(s8 end_kind);
+void em_set_result_restore(void);
+void em_set_enemy_detach(struct _ENEMY_WORK* enemy);
 
 #ifdef __cplusplus
 }

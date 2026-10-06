@@ -91,11 +91,14 @@
  *     and 1 both jump into.  Two goto-free shapes are measured: inlined twice (committed, 83.50 %, 1728 B
  *     against the target's 1484 B) and a `vs_enter` flag shape (65.33 %, 1516 B).  A `goto` into the else branch scores
  *     99.70 % and rule 8 forbids landing it.  Also `NetCtrlWk::getSelectedServer()`'s `extsb` lands in r0 here
- *     (in place in r3 in retail).
+ *     (in place in r3 in retail).  The duplicated block is what the relocation diff shows: extra sites of
+ *     arena_sub_mode_set, lb_param_w, arena_user_data_buf, memcpy, PlayMode_set, VsGameModeExec,
+ *     arena_stage_config and get_vsUser_work.
  *   - `arena_result_next` 96.32 %: register allocation only - retail keeps the constants 1 and 2 in
  *     r23/r25 across the item-mask loops (ours hoists only the 1, and `li r0, 2` stays at the `mtctr`), so it
- *     saves r23-r31 where ours saves r24-r31.  `pool_data off` does not change it.
- *   - `arena_light_init` 99.88 %: the first colour load is `lwz r0, 0(r30)` in retail and
+ *     saves r23-r31 where ours saves r24-r31 (_savegpr_24/_restgpr_24 against _savegpr_23/_restgpr_23).
+ *     `pool_data off` does not change it.
+ *   - `arena_light_init` 99.88 % (one extra arena_light_colors site): the first colour load is `lwz r0, 0(r30)` in retail and
  *     `lwz r0, arena_light_colors@l(r3)` here (one instruction); `*colors`, a walking pointer and
  *     `pool_data off` leave it unchanged.
  *   - `get_move_work_max` is declared locally (rule 2 debt): ten headers view the pair with different types
@@ -106,6 +109,7 @@
  *     owner `u8` drops it 100 -> 95.4 %, so the rule 2 split stays.
  *   - `StageMapView` (`unsplit/stage.h`) duplicates `StageRuntime`'s +0xBC5/+0xBC6 bytes: `stage/fn_802B2AA0.h`
  *     cannot be included beside `pl.h` (both redefine `_GXChannelID` and `MHchar`, verified by compiling both).
+ * NAMES. GUESS (from each body and its callers): arena_lsp_data_get
  */
 
 #include "types.h"
@@ -479,6 +483,11 @@ const char* arena_texture_names[32] = {
     "arena_bg_a", "arena_bg_b", "vt_arena", "icon", "menu00", "menu01", "menu02", "waku00", "waku01",
     "waku02", "waku03", "v_moji00", "v_yoko00", "v_comp00", "icon_m", "a_arena", "icon01", NULL,
 };
+
+/* The arena's loaded LSP data block. */
+extern "C" u8* arena_lsp_data_get(void) {
+    return arena_lsp_data_adrs;
+}
 
 /* Loads the arena's `.brres` texture pack into a resource-memory slot and binds its textures (with their
  * palettes) to draw-shape texture slots; on failure it raises the assert and clears slots 7..12. */

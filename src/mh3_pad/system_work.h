@@ -147,7 +147,8 @@ typedef struct SystemWork {
     /* +0x8B0 */ u8 vs_mode_0x8b0;  /* non-zero in VS/arena mode: `get_cfg`/`ck_cfg` then read the VS
                                     * user work's profile instead of `option_w` (0x803BE30C band) */
     /* +0x8B1 */ u8 field_0x8b1;
-    /* +0x8B2 */ u8 pad_0x8b2[0xF];
+    /* +0x8B2 */ u8 field_0x8b2;   /* set by the quest result fill when element 0 is monster 25 and was armed */
+    /* +0x8B3 */ u8 pad_0x8b3[0xE];
     /* +0x8C1 */ u8 net_result_wait_0x8c1;   /* GUESS name: `arena_task` step 4 skips its network-result wait unless this is 1 */
     /* +0x8C2 */ u8 pad_0x8c2[0x12];
     /* +0x8D4 */ void (*field_0x8d4)(void);

@@ -22,7 +22,7 @@
 
 /* Foreign callees whose owners' headers do not declare them, as plain prototypes (rule 2 debt). */
 extern "C" {
-void fn_8004D334(s32 size);
+void userdata_zenny_add(s32 size);
 void fn_8004C038(void* a, void* b);
 s32 game_ready_ck(void);
 u32 fn_800D0734(s32 a);
@@ -165,7 +165,7 @@ typedef struct LbEftWork {
 
 /* Foreign callees whose owners' headers do not declare them, as plain prototypes (rule 2 debt). */
 extern "C" {
-void fn_8004D334(s32 size);
+void userdata_zenny_add(s32 size);
 void fn_8004C038(void* a, void* b);
 s32 game_ready_ck(void);
 u32 fn_800D0734(s32 a);

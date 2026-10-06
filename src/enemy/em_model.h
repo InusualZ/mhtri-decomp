@@ -45,6 +45,11 @@ u8 em_roster_kind_collect(u8 kind, u8* out, u8 max);
 nw4r::math::VEC3* em_roster_kind_aim_pos_get(u8 index, u8 kind);
 s32 em_roster_kind_field5_get(u8 index, u8 kind);
 
+/* 0x803BA5A0 / 0x803BA814 - steps the population work's state, and loads the map's population resources
+ * (GUESS names). */
+void em_pop_work_step(void);
+void em_pop_res_load(u8 map);
+
 #ifdef __cplusplus
 }
 #endif
