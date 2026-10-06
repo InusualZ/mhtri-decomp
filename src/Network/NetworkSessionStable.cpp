@@ -1244,7 +1244,7 @@ void NetworkSessionStable::setUserFlagB(u8 value)
 }
 
 /* Returns the second user flag. */
-u8 NetworkSessionStable::getUserFlagB()
+BOOL NetworkSessionStable::getUserFlagB()
 {
     return userFlagB_14811;
 }

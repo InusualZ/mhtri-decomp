@@ -125,9 +125,6 @@ owner's header and is included here.  The singleton's callback/reference/error a
 #include "unsplit/SO.h"
 #include "NAND/nand.h"
 
-/* another TU's vtables (rule 10: reference, never rebuild) */
-extern u32 lbl_80603740[];
-
 /* 0x80794380 `natNegMessageMagic` - the NATNEG message signature this unit compares the head of a
  * received datagram against - is deliberately *not* declared here: the bytes belong to the NATNEG
  * unit, so rule 2 puts the declaration in `DWCi/DWCi_NatNeg.h` (included above), and that

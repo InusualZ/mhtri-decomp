@@ -53,7 +53,7 @@ public:
     /* +0x78 */ virtual void setUserFlagA(u8 value) = 0;
     /* +0x7C */ virtual u8 getUserFlagA() = 0;
     /* +0x80 */ virtual void setUserFlagB(u8 value) = 0;
-    /* +0x84 */ virtual u8 getUserFlagB() = 0;
+    /* +0x84 */ virtual BOOL getUserFlagB() = 0;
     /* +0x88 */ virtual void markJoined() = 0;
     /* +0x8C */ virtual f32 getRoundTrip(s8 index) = 0;
     /* +0x90 */ virtual s32 getBandwidth(s8 index) = 0;

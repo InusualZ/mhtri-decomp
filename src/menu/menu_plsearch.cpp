@@ -7,7 +7,8 @@
  *   0x80794D50-0x80794D64.  The left edge is `quest/arenatask.cpp`'s end, the right one the `.data` vtable-then-string
  *   seam at 0x80607E50 (`menu/menu_sysmsg.cpp`).
  * FLAGS. `cflags_menu` (configure.py; unmeasured).
- * NAMES. Module and file from the `__FILE__` string "menu_plsearch.cpp".
+ * NAMES. Module and file from the `__FILE__` string "menu_plsearch.cpp".  `sPatTerms` (.sbss 0x80794D58) is a GUESS:
+ *   the terms object's constructor publishes itself there.
  * RESIDUALS. every body (118 rows score zero) and the internal seams: at least three TUs (`menu_plsearch.cpp`,
  *   `menu_message.cpp` at 0x8044E340, the save-data code).  The symbols are in the map
  *   (`python tools/units/ledger.py unit menu/menu_plsearch.cpp`).

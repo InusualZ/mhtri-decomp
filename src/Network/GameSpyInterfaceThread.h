@@ -38,27 +38,27 @@ union GameSpyEventMsg;
 /* the small timed handler whose ctor sits at the end of the range                                */
 /* --------------------------------------------------------------------------------------------- */
 
+/* A polymorphic class: the constructor 0x8041DE20 stores its table 0x80603740 (the deleting destructor 0x8041DE64
+ * alone), `NetworkPool::init` allocates one with a new-expression (0x20 bytes) and `NetworkPool::destroySession`
+ * deletes it through the table. */
 class NetworkTimedHandler {
 public:
-    /* +0x00 */ void* vtable_00;
+    /* constructs the timed handler (period 0) */
+    NetworkTimedHandler();
+    virtual ~NetworkTimedHandler();
+    /* sets the period and the 1000 ms timeout, clearing the state */
+    void  init(s64 period);
+    /* clears the timed handler's state, ready flag and expiry flag */
+    void  clear();
+
     /* +0x04 */ s32 state_04;
-    /* +0x08 */ s32 interval_08;
-    /* +0x0C */ s32 limit_0C;
+    /* +0x08 */ s64 period_08;
     /* +0x10 */ u8  ready_10;
     /* +0x11 */ u8  pad_11[0x03];
     /* +0x14 */ s32 timeout_14;
     /* +0x18 */ u8  expired_18;
-    /* +0x19 */ u8  pad_19[0x03];
-
-    /* constructs the timed handler */
-    NetworkTimedHandler* create();
-    /* deleting destructor for the timed handler */
-    NetworkTimedHandler* destroy(s16 flags);
-    /* initialises the timed handler's interval, limit and timeout */
-    void  init(s32 a, s32 b, s32 c);
-    /* clears the timed handler's state, ready flag and expiry flag */
-    void  clear();
-};   /* size: 0x1C */
+    /* +0x19 */ u8  pad_19[0x07];
+};   /* size: 0x20 (the allocation `NetworkPool::init` makes) */
 
 /* --------------------------------------------------------------------------------------------- */
 /* `NetworkPeerGameSpy` - the 0x600-byte send / 0x6000-byte receive buffer pair                   */
